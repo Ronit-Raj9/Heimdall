@@ -9,6 +9,7 @@ import (
 	"strings"
 
 	"github.com/maximhq/bifrost/bench/schemas"
+	"github.com/maximhq/bifrost/bench/stats"
 )
 
 // Endpoint labels an audit verdict carries: the result was published, and
@@ -62,21 +63,50 @@ func Audit(rows []AuditRow, alpha float64) (*schemas.Verdict, error) {
 	}
 	eff := pairedEffect(AuditCondition, AuditMetric, ArmBaseline, ArmCandidate, a, b, true)
 	decision := decide(invalid, eff, nil, alpha)
+	// A published table carries its own per-task differences, so the MDE uses
+	// their SD when there is one; the assumed SD only stands in when the
+	// differences are all equal or there is a single task.
+	sd, assumed := defaultAssumedSD, true
+	if ds := taskDiffs(eff); len(ds) >= 2 {
+		if v := stats.SD(ds); v > 0 {
+			sd, assumed = v, false
+		}
+	}
+	needed := tasksNeeded(eff.DBar, sd, alpha)
+	over := 0
+	if needed == 0 && eff.DBar != 0 {
+		over = auditMaxTasks
+	}
 	return &schemas.Verdict{
 		Primary:           schemas.Endpoint{Condition: AuditCondition, Metric: AuditMetric},
 		Decision:          decision,
 		Action:            actionFor(decision, nil, ""),
 		Effect:            eff,
 		Alpha:             alpha,
-		MDE:               mdePP(eff.NTasks, defaultAssumedSD, alpha),
-		MDEAssumedSD:      true,
-		SD:                defaultAssumedSD,
-		TasksNeeded:       tasksNeeded(eff.DBar, defaultAssumedSD, alpha),
+		MDE:               mdePP(eff.NTasks, sd, alpha),
+		MDEAssumedSD:      assumed,
+		SD:                sd,
+		TasksNeeded:       needed,
+		TasksNeededOver:   over,
 		RandomizationUnit: randomizationUnit,
 		TieRule:           tieRule,
 		Guards:            []schemas.GuardResult{},
 		InvalidReasons:    invalid,
+		Integrity:         schemas.IntegrityUnknown, // published counts carry no gate data
 	}, nil
+}
+
+// auditMaxTasks is the largest suite TasksNeeded searches; beyond it the
+// verdict reports "more than auditMaxTasks".
+const auditMaxTasks = 200
+
+// taskDiffs returns the per-task differences of an effect.
+func taskDiffs(e *schemas.Effect) []float64 {
+	out := make([]float64, 0, len(e.PerTask))
+	for _, t := range e.PerTask {
+		out = append(out, t.D)
+	}
+	return out
 }
 
 // ParseAuditCSV reads audit rows from a CSV whose header names the columns

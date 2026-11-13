@@ -1,6 +1,7 @@
 package verdict
 
 import (
+	"math"
 	"os"
 	"path/filepath"
 	"strings"
@@ -39,7 +40,9 @@ func TestAuditMaximTB21(t *testing.T) {
 		{"4 discordant for A, 3 for B", e.NNonzero == 7 && e.NNegative == 4 && e.NPositive == 3 && e.NTasks == 77},
 		{"d_bar -1/77", near(e.DBar, -1.0/77, 1e-12)},
 		{"bounds equal the point estimate", e.LowerBound.DBar == e.DBar && e.UpperBound.DBar == e.DBar},
-		{"assumed SD", v.MDEAssumedSD && v.SD == defaultAssumedSD && v.MDE > 0},
+		{"observed SD from the table", !v.MDEAssumedSD && math.Abs(v.SD-0.3032) < 0.001 && v.MDE > 0},
+		{"needs more than 200 tasks", v.TasksNeeded == 0 && v.TasksNeededOver == auditMaxTasks},
+		{"integrity unknown", v.Integrity == schemas.IntegrityUnknown},
 		{"no invalid reasons", len(v.InvalidReasons) == 0},
 	}
 	for _, tt := range tests {

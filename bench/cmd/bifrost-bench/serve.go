@@ -49,7 +49,7 @@ func runServe(args []string) int {
 		return fail("index runs: %v", err)
 	}
 	deps := server.Deps{
-		Index:    indexAdapter{ix: ix},
+		Index:    indexAdapter{ix: ix, root: a.store.Root()},
 		Analyzer: analyzerAdapter{a: a, ix: ix},
 		Catalog:  &catalogSource{a: a},
 		Auditor:  auditor{},
@@ -85,7 +85,34 @@ func builtUI() fs.FS {
 }
 
 // indexAdapter exposes the store index through the handlers' read interface.
-type indexAdapter struct{ ix *store.Index }
+type indexAdapter struct {
+	ix   *store.Index
+	root string // run store root, for the analysis folders
+}
+
+// LatestAnalysis returns the newest analysis id of an experiment from its
+// analysis/ folder, so the verdict page survives a server restart.
+func (x indexAdapter) LatestAnalysis(expID string) (string, bool) {
+	entries, err := os.ReadDir(filepath.Join(x.root, expID, "analysis"))
+	if err != nil {
+		return "", false
+	}
+	var best string
+	var bestAt time.Time
+	for _, e := range entries {
+		if !e.IsDir() {
+			continue
+		}
+		info, err := e.Info()
+		if err != nil {
+			continue
+		}
+		if best == "" || info.ModTime().After(bestAt) {
+			best, bestAt = e.Name(), info.ModTime()
+		}
+	}
+	return best, best != ""
+}
 
 func view(e store.RunEntry) handlers.RunView {
 	return handlers.RunView{Slot: e.Slot, Run: e.Run, Sealed: e.Sealed, SealHash: e.SealHash}
