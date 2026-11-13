@@ -48,7 +48,7 @@ type GatewayPolicy struct {
 
 // ScriptedSpec selects a scripted control agent.
 type ScriptedSpec struct {
-	Kind string `json:"kind" yaml:"kind"` // oracle | noop | exploit | refuse
+	Kind string `json:"kind" yaml:"kind"` // oracle | noop | exploit | refuse | toy
 }
 
 // AgentAdapter turns an agent config into a container run plan. It starts

@@ -63,5 +63,6 @@ type Registry struct {
 	Policies     []VerdictPolicy
 	Reporters    []Reporter
 	Gateway      Gateway
+	Fault        FaultController // nil when no fault proxy is configured
 	Store        Store
 }

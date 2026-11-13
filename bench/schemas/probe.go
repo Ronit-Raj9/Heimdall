@@ -103,7 +103,7 @@ type LedgerEntry struct {
 	Kind       string    `json:"kind"` // message | count_tokens | models | other
 	Path       string    `json:"path"`
 	Stream     bool      `json:"stream"`
-	Action     string    `json:"action"` // pass | inject
+	Action     string    `json:"action"` // pass | inject | reject
 	Status     int       `json:"status"`
 	ReqSHA256  string    `json:"req_sha256"`
 	ResponseID string    `json:"response_id,omitempty"`

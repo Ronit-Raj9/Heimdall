@@ -55,6 +55,9 @@ type VerdictPolicy interface {
 	Decide(ctx context.Context, m *Manifest, runs []SealedRun) (*Analysis, error)
 }
 
+// GradeSourceOriginal names the grade written when the run was sealed.
+const GradeSourceOriginal = "original"
+
 // SealedRun is a sealed run as analysis reads it, with the grade source chosen
 // (original or a regrade).
 type SealedRun struct {
