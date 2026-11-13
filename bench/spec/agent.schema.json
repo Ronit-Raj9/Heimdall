@@ -59,7 +59,7 @@
       "additionalProperties": false,
       "required": ["kind"],
       "properties": {
-        "kind": {"enum": ["oracle", "noop", "exploit", "refuse"]}
+        "kind": {"enum": ["oracle", "noop", "exploit", "refuse", "toy"]}
       }
     }
   },

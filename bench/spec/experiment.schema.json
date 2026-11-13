@@ -7,7 +7,7 @@
   "additionalProperties": false,
   "required": ["name", "suite", "base", "arms", "primary", "conditions"],
   "properties": {
-    "id": {"type": "string", "pattern": "^e_[a-z0-9][a-z0-9_-]*$", "description": "Set by the planner when absent."},
+    "id": {"type": "string", "pattern": "^e_[a-z0-9][a-z0-9_]*$", "description": "Set by the planner when absent."},
     "name": {"type": "string", "minLength": 1},
     "suite": {"type": "string", "minLength": 1, "description": "<suite id>[@<version>] or a folder path."},
     "base": {"type": "string", "minLength": 1, "description": "Agent config path every arm starts from."},

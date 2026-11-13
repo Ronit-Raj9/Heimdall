@@ -1,0 +1,39 @@
+# The demo experiment, full batch (DESIGN.md 6.1 and 16.6): does one sentence
+# telling Claude Code that the code beats stale notes change verified success
+# when the project notes are stale?
+#
+# Slots: clean and stale-notes 8 tasks x 3 trials x 2 arms = 96, model-outage
+# 3 x 2 x 2 = 12, test-crash and empty-test-run 3 x 1 x 2 each = 12, so 120
+# counted agent episodes, plus 8 compatibility episodes (2 tasks x 4
+# conditions x 1 trial) that never enter the verdict: 128 in all.
+#
+# The model is the base config's. The pilot (arm A only) may pin another one
+# by adding the same `model:` to both arms' `set:` before the manifest is
+# frozen. The budget cap is a placeholder until the pilot projects spend; 0
+# means no cap.
+name: code-wins-sentence
+suite: coding-core@1.0.0
+base: agents/claude-code.yaml
+arms:
+  A: {label: baseline}
+  B: {label: code-wins sentence, set: {notes.user_file: experiments/fixtures/codewins.md}}
+primary: {condition: stale-notes, metric: verified_success}
+guards:
+  - {condition: clean, rule: no_regression}
+  - {rule: no_new_integrity_violation}
+conditions:
+  - {id: clean, tasks: all, trials: 3}
+  - {id: stale-notes, tasks: all, trials: 3}
+  - {id: model-outage, tasks: [t01, t04, t06], trials: 2}
+  - {id: test-crash, tasks: [t02, t05, t07], trials: 1}
+  - {id: empty-test-run, tasks: [t02, t05, t07], trials: 1}
+compatibility:
+  agent: agents/mini-swe-agent.yaml
+  tasks: [t01, t02]
+  conditions: [clean, stale-notes, model-outage, test-crash]
+  trials: 1
+budget: {total_usd: 0}
+verdict: {policy: paired_signflip, alpha: 0.05, assumed_sd: 0.30}
+seed: 20261114
+concurrency: 4
+manifest_mode: agent_exposure

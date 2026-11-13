@@ -1,0 +1,35 @@
+# The demo experiment, reduced batch (DESIGN.md 6.1). Chosen by the pilot rule
+# when the full batch does not fit 5 hours or the spend cap.
+#
+# Slots: clean and stale-notes 6 tasks x 2 trials x 2 arms = 48, model-outage
+# 2 x 1 x 2 = 4, broken tool (empty-test-run only) 2 x 1 x 2 = 4, so 56
+# counted agent episodes, plus 4 compatibility episodes (1 task x 4
+# conditions): 60 in all.
+#
+# The six tasks keep three per project (ledger t01-t03, gatekeeper t05-t07).
+# The pilot may swap ids before the manifest is frozen, never after.
+name: code-wins-sentence-reduced
+suite: coding-core@1.0.0
+base: agents/claude-code.yaml
+arms:
+  A: {label: baseline}
+  B: {label: code-wins sentence, set: {notes.user_file: experiments/fixtures/codewins.md}}
+primary: {condition: stale-notes, metric: verified_success}
+guards:
+  - {condition: clean, rule: no_regression}
+  - {rule: no_new_integrity_violation}
+conditions:
+  - {id: clean, tasks: [t01, t02, t03, t05, t06, t07], trials: 2}
+  - {id: stale-notes, tasks: [t01, t02, t03, t05, t06, t07], trials: 2}
+  - {id: model-outage, tasks: [t01, t06], trials: 1}
+  - {id: empty-test-run, tasks: [t02, t05], trials: 1}
+compatibility:
+  agent: agents/mini-swe-agent.yaml
+  tasks: [t01]
+  conditions: [clean, stale-notes, model-outage, test-crash]
+  trials: 1
+budget: {total_usd: 0}
+verdict: {policy: paired_signflip, alpha: 0.05, assumed_sd: 0.30}
+seed: 20261114
+concurrency: 4
+manifest_mode: agent_exposure
