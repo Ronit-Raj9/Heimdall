@@ -1,0 +1,581 @@
+{
+	"app": {
+		"name": "Bifrost Bench",
+		"tagline": "Agent benchmarking"
+	},
+	"nav": {
+		"label": "Bench navigation",
+		"verdict": "Verdict",
+		"runs": "Run comparison",
+		"receipts": "Receipts",
+		"newExperiment": "New experiment"
+	},
+	"mode": {
+		"live": "LIVE",
+		"recorded": "RECORDED",
+		"synthetic": "SYNTHETIC",
+		"liveHint": "Live data from runs on this server.",
+		"recordedHint": "A recorded experiment replayed from disk.",
+		"syntheticHint": "Synthetic data for development. Not a benchmark result.",
+		"loading": "Checking the bench server",
+		"offline": "NO SERVER",
+		"offlineHint": "The bench API at /api/bench did not answer.",
+		"fixture": "Fixture files"
+	},
+	"theme": {
+		"toggle": "Toggle theme"
+	},
+	"value": {
+		"unknown": "unknown",
+		"unknownHint": "Unknown: {{reason}}.",
+		"unknownBoundsHint": "Unknown: {{reason}}. Between {{lo}} and {{hi}}.",
+		"noReason": "no reason recorded",
+		"missing": "value missing from the response",
+		"notApplicable": "n/a",
+		"notApplicableHint": "Not applicable"
+	},
+	"configDiff": {
+		"path": "Setting",
+		"armA": "A",
+		"armB": "B",
+		"unset": "unset",
+		"empty": "The arms have no config differences."
+	},
+	"verdict": {
+		"title": "Verdict",
+		"noExperiments": "No experiments yet. Plan one and run it, and its verdict appears here.",
+		"newExperiment": "New experiment",
+		"loadError": "Could not load the verdict for {{id}}: {{error}}",
+		"retry": "Retry",
+		"picker": {
+			"label": "Experiment",
+			"placeholder": "Choose an experiment",
+			"option": "{{name}} · {{id}}",
+			"newest": "newest",
+			"loadError": "Could not load the experiment list: {{error}}",
+			"state": {
+				"created": "created",
+				"running": "running",
+				"analyzing": "analyzing",
+				"done": "done",
+				"failed": "failed",
+				"cancelled": "cancelled"
+			}
+		},
+		"header": {
+			"manifest": "manifest",
+			"manifestHint": "Manifest hash {{hash}}. The plan and primary endpoint were hashed before the first run.",
+			"frozen": "frozen {{time}}",
+			"suite": "suite",
+			"gradeSource": "grades",
+			"gradeSourceOriginal": "original",
+			"gradeSourceHint": "Grades used for this analysis: the original grading, or a regrade id."
+		},
+		"configDiff": {
+			"title": "What changed between A and B",
+			"description": "Typed config overrides of the two arms. Everything else is identical."
+		},
+		"naive": {
+			"title": "Naive scoreboard",
+			"caption": "Raw passes over all runs, as a typical dashboard shows them.",
+			"ratio": "{{num}}/{{den}}",
+			"unknown": "+{{count}} unknown",
+			"wins": "\"{{arm}} wins by {{count}}\"",
+			"tie": "\"Tie\"",
+			"notVerdict": "Counts every run as independent and ignores pairing. Not the release decision."
+		},
+		"card": {
+			"title": "Primary: {{metric}} under {{condition}}",
+			"decision": {
+				"improved": "IMPROVED",
+				"regressed": "REGRESSED",
+				"inconclusive": "INCONCLUSIVE",
+				"invalid": "INVALID"
+			},
+			"releaseEffect": "Release effect",
+			"pp": "{{value}} pp",
+			"noEffect": "not computed",
+			"interval": "Interval",
+			"intervalValue": "approx. [{{lo}}, {{hi}}] pp",
+			"intervalHint": "Paired t interval. Descriptive only; it takes no part in the decision.",
+			"descriptive": "descriptive",
+			"discordant": "Discordant tasks",
+			"discordantValue": "{{count}} of {{n}}",
+			"discordantSplit": "{{positive}} positive, {{negative}} negative",
+			"pValue": "Exact p-value",
+			"pValueBelow": "< {{p}}",
+			"pValueUnit": "randomization unit: {{unit}}",
+			"mde": "Minimal detectable effect",
+			"assumedSd": "assumed SD {{sd}}",
+			"observedSd": "SD {{sd}}",
+			"tasksNeeded": "Tasks for a new experiment",
+			"tasksNeededValue_one": "{{count}} task",
+			"tasksNeededValue_other": "{{count}} tasks",
+			"tasksNeededOver": "more than {{count}} tasks",
+			"bounds": "Missingness bounds",
+			"boundsValue": "{{lo}} to {{hi}} pp",
+			"guards": "Guards",
+			"noGuards": "No guards declared.",
+			"guardRule": {
+				"noRegression": "No regression on {{condition}}",
+				"noRegressionPrimary": "No regression",
+				"noNewIntegrityViolation": "No new integrity violation",
+				"other": "{{rule}}"
+			},
+			"guardStatus": {
+				"pass": "PASS",
+				"fail": "FAIL",
+				"undetermined": "UNDETERMINED"
+			},
+			"guardEffect": "{{effect}} pp, {{count}} discordant",
+			"guardBounds": "could not rule out {{lo}} to {{hi}} pp",
+			"invalidReasons": "Why the result is invalid",
+			"integrity": "Integrity",
+			"integrityStatus": {
+				"clean": "clean",
+				"alert": "alert",
+				"regressed": "regressed",
+				"unknown": "unknown",
+				"none": "not assessed"
+			},
+			"actionLine": "ACTION: {{action}}",
+			"actionValue": {
+				"ship": "SHIP",
+				"hold": "HOLD",
+				"no_decision": "NO DECISION",
+				"fix_harness": "FIX HARNESS"
+			},
+			"actionHint": {
+				"ship": "Improved on the primary endpoint, and every guard and integrity check passed.",
+				"holdRegressed": "Regressed on the primary endpoint or a guard failed. The task grid lists the tasks, discordant first.",
+				"holdViolations": "Improved, but a guard failed or integrity regressed. See the guards above.",
+				"no_decision": "Not enough evidence either way. Read the interval and the tasks a new experiment needs.",
+				"fix_harness": "An instrument gate fired: {{gate}}. Fix the harness and run a new experiment.",
+				"fixHarnessUnnamed": "An instrument gate fired. Fix the harness and run a new experiment."
+			}
+		},
+		"method": {
+			"label": "Method: {{name}}",
+			"pValue": {
+				"name": "exact p-value",
+				"definition": "Exact two-sided sign-flip test: the share of all 2^n sign patterns of the per-task differences whose mean is at least as far from zero as the observed one.",
+				"denominator": "Denominator: all 2^n sign vectors over the n tasks of the primary condition; the task is the unit, so trials of one task never count as separate wins."
+			},
+			"mde": {
+				"name": "minimal detectable effect",
+				"definition": "Minimal detectable effect in pp = (t(0.975, n-1) + t(0.8, n-1)) x SD_d / sqrt(n): the smallest release effect this design detects with 80% power at alpha 0.05.",
+				"denominator": "Denominator: sqrt(n) over the n tasks; SD_d is the spread of per-task differences, an assumed 0.30 until an A/A run measures it."
+			},
+			"costPerSuccess": {
+				"name": "cost per verified success",
+				"definition": "Sum of the cost of every physical attempt at pinned prices, over all assigned slots of the arm, failed runs included.",
+				"denominator": "Denominator: verified successes, runs whose hidden verifier passed under the clean regrade with no veto gate fired."
+			},
+			"meter": "{{numerator}} over {{denominator}}."
+		},
+		"gates": {
+			"title": "Gate checklist",
+			"description": "Every gate over every run. An invalidate gate that fires makes the verdict INVALID; a veto gate scores that run as 0.",
+			"gate": "Gate",
+			"effect": "Effect",
+			"fired": "Fired",
+			"detail": "Detail",
+			"baseline": "baseline",
+			"firedValue": "{{num}}/{{den}} runs",
+			"unknown": "+{{count}} unknown",
+			"statusClear": "Not fired",
+			"statusFired": "Fired",
+			"effectName": {
+				"veto": "veto",
+				"invalidate": "invalidate",
+				"report": "report",
+				"admission": "admission"
+			},
+			"empty": "No gates ran on this experiment."
+		},
+		"diagnostics": {
+			"title": "Diagnostics",
+			"description": "One row per condition that ran. Only the primary row carries the release decision; every other row is descriptive.",
+			"condition": "Condition",
+			"axis": "Axis",
+			"releaseEffect": "Release effect",
+			"tasks": "Tasks",
+			"tasksValue_one": "{{count}} task",
+			"tasksValue_other": "{{count}} tasks",
+			"primary": "primary",
+			"descriptive": "descriptive",
+			"empty": "No diagnostics yet.",
+			"loadError": "Could not load the diagnostics: {{error}}",
+			"meters": "Meters",
+			"meter": "Meter",
+			"definition": "Definition",
+			"meterGroup": {
+				"honesty": "Honesty",
+				"safety": "Safety",
+				"efficiency": "Efficiency",
+				"other": "Other"
+			},
+			"median": "{{label}} (median per run)",
+			"noMeters": "No meters were computed."
+		},
+		"grid": {
+			"title": "Task grid",
+			"description": "One row per task and condition, discordant first. Each cell is one run; select it to compare the matched runs of that pair.",
+			"task": "Task",
+			"condition": "Condition",
+			"armTrials": "Arm {{arm}} trials",
+			"trial": "{{arm}}{{trial}}",
+			"d": "d",
+			"dHint": "Per-task difference: mean of B minus mean of A over trials.",
+			"discordant": "discordant",
+			"cellLabel": "{{task}}, {{condition}}, arm {{arm}}, trial {{trial}}: {{outcome}}. Open the run comparison.",
+			"outcome": {
+				"pass": "pass",
+				"fail": "fail",
+				"timeout": "timeout",
+				"budget": "budget exhausted",
+				"crash": "crash",
+				"refusal": "refusal",
+				"integrity_violation": "integrity violation",
+				"invalid_evaluator": "invalid evaluator",
+				"infra_error": "infrastructure error",
+				"unknown": "unknown",
+				"aborted_infra": "aborted (infrastructure)",
+				"notRun": "not run yet"
+			},
+			"legend": {
+				"pass": "pass (1)",
+				"zero": "fail, timeout, budget, crash or refusal (0)",
+				"integrity": "integrity violation (0, flagged)",
+				"unknown": "unknown, never 0"
+			},
+			"empty": "No runs in the grid yet.",
+			"loadError": "Could not load the task grid: {{error}}"
+		}
+	},
+	"runs": {
+		"title": "Run comparison",
+		"subtitle": "Two matched runs of one task, condition and trial, aligned step by step.",
+		"empty": "No pair selected.",
+		"pairHeading": "{{task}} under {{condition}}, trial {{trial}}",
+		"pairId": "pair {{id}}",
+		"experiment": "experiment {{id}}",
+		"choosePair": "Choose another pair",
+		"arm": "Arm {{arm}}",
+		"noArms": "This pair has no runs yet.",
+		"state": {
+			"loadError": "Could not load this section.",
+			"retry": "Retry",
+			"loading": "Loading"
+		},
+		"picker": {
+			"title": "Choose a matched pair",
+			"description": "Pairs from the task grid of {{exp}}, discordant rows first: the arms disagree there.",
+			"noExperiments": "No experiments yet. Create one, or start the server with a recorded experiment.",
+			"noRows": "The task grid of this experiment has no rows yet.",
+			"listError": "Could not load the experiment list.",
+			"gridError": "Could not load the task grid.",
+			"task": "Task",
+			"condition": "Condition",
+			"trials": "Pairs by trial",
+			"discordant": "discordant",
+			"trial": "Trial {{trial}}",
+			"openHint": "Compare trial {{trial}} of {{task}} under {{condition}}",
+			"notRun": "not run",
+			"cellOutcome": "{{arm}} {{outcome}}"
+		},
+		"metrics": {
+			"title": "Per-run metrics",
+			"description": "Each value carries the evidence level it was observed at. Unknown is hatched, never zero.",
+			"metric": "Metric",
+			"steps": "Steps (model turns)",
+			"tool_calls": "Tool calls",
+			"tokens": "Tokens",
+			"cost_usd": "Cost",
+			"wall_time_s": "Wall time",
+			"verified_success": "Verified success"
+		},
+		"claim": {
+			"title": "Agent said, beside the hidden result",
+			"description": "The claim is the agent's final message, shown as plain text. The hidden result comes from the verifier in its own container.",
+			"agentSaid": "Agent said",
+			"hiddenResult": "Hidden result",
+			"noMessage": "No final message recorded.",
+			"claimMade": "Counted as a success claim: \"{{matched}}\"",
+			"claimMadePlain": "Counted as a success claim.",
+			"noClaimMade": "No success claim.",
+			"source": "{{source}} evidence",
+			"tests": "{{ran}} hidden tests ran, {{failures}} failed, {{errors}} errors",
+			"failedTests": "Failed tests",
+			"missingRequired": "Required tests that did not run",
+			"noGrade": "No grade recorded for this run.",
+			"gradeError": "Could not load the grade.",
+			"contradiction": "Claimed success, hidden verifier failed"
+		},
+		"outcome": {
+			"pass": "pass",
+			"fail": "fail",
+			"timeout": "timeout",
+			"budget": "budget exhausted",
+			"crash": "crash",
+			"refusal": "refusal",
+			"integrity_violation": "integrity violation",
+			"invalid_evaluator": "invalid evaluator",
+			"infra_error": "infrastructure error",
+			"unknown": "unknown",
+			"aborted_infra": "aborted (infrastructure)"
+		},
+		"lanes": {
+			"title": "Aligned steps",
+			"description": "Events of both arms matched on event type and target. An empty cell means that arm has no matching event.",
+			"index": "#",
+			"step": "Step",
+			"noEvent": "no event",
+			"error": "error",
+			"diverged": "differs",
+			"divergence": "First observed divergence",
+			"divergenceHint": "An observation, not a root cause.",
+			"noDivergence": "No divergence observed: the arms took the same steps.",
+			"empty": "No aligned steps for this pair.",
+			"notInLog": "Not in this run's event log."
+		},
+		"gateway": {
+			"title": "Gateway lane",
+			"description": "Bifrost's record of every model call in the run.",
+			"seq": "#",
+			"type": "Event",
+			"requested": "Requested",
+			"served": "Served",
+			"attempt": "Attempt",
+			"tokens": "Tokens",
+			"cost": "Cost",
+			"requests": "Requests",
+			"retries": "Retries",
+			"fallbacks": "Fallbacks",
+			"fallbackFlag": "served by a different model",
+			"empty": "No gateway events for this run.",
+			"eventsError": "Could not load the run's events.",
+			"tokenBreakdown": "fresh {{fresh}}, cache read {{cacheRead}}, cache write {{cacheWrite}}, out {{out}}"
+		},
+		"incomplete": "Gateway record incomplete for arm {{arm}}: shown, not hidden. Some model calls may be missing, so totals from this record are unknown.",
+		"diff": {
+			"title": "Diff",
+			"description": "The exported workspace diff, shown as plain text.",
+			"empty": "The run changed no files.",
+			"files": "Files",
+			"rejected": "Left out of the export",
+			"loadError": "Could not load the diff."
+		}
+	},
+	"receipts": {
+		"title": "Receipts",
+		"subtitle": "What each probe did, step by step, per arm. Every step is backed by records the agent cannot write.",
+		"empty": "No probe conditions ran in this experiment.",
+		"experiment": "experiment {{id}}",
+		"noExperiments": "No experiments yet. Create one, or start the server with a recorded experiment.",
+		"listError": "Could not load the experiment list.",
+		"diagnosticsError": "Could not load the diagnostics.",
+		"conditions": "Probe conditions",
+		"layer": "{{layer}} layer",
+		"layerUnknown": "layer not in the catalog",
+		"layers": {
+			"fixture": "fixture",
+			"gateway": "gateway",
+			"tool_shim": "tool shim"
+		},
+		"funnel": {
+			"title": "Receipt funnel",
+			"description": "Runs that reached each step, over the runs the step applies to. Steps the layer does not apply are greyed, never blank.",
+			"step": "Step",
+			"arm": "Arm {{arm}}",
+			"ratio": "{{num}}/{{den}}",
+			"unknown": "{{count}} unknown",
+			"notApplicable": "n/a",
+			"notApplicableHint": "Not applicable to the {{layer}} layer",
+			"notApplicableNoLayer": "No arm recorded this step",
+			"noData": "no runs",
+			"noReceipts": "No receipt ratios for this condition yet."
+		},
+		"steps": {
+			"assigned": "Assigned",
+			"armed": "Armed",
+			"fired": "Fired",
+			"delivered": "Delivered",
+			"absorbed_by": "Absorbed by",
+			"visible": "Visible",
+			"acknowledged": "Acknowledged",
+			"effect": "Effect"
+		},
+		"stepHints": {
+			"assigned": "Plan hash and seed are in the manifest",
+			"armed": "The layer confirmed it is armed and minted a nonce",
+			"fired": "The probe acted (proxy ledger, shim log)",
+			"delivered": "The gateway recorded the failure",
+			"absorbed_by": "Provider, Bifrost retry, SDK, CLI, agent, or none",
+			"visible": "The agent could see the probe (server-owned records)",
+			"acknowledged": "The final message mentions the fault",
+			"effect": "Outcome under the probe"
+		},
+		"stepCode": "R{{index}}",
+		"runs": {
+			"title": "Runs under this probe",
+			"description": "Select a run to see its receipt entries and the evidence ids behind each step.",
+			"task": "Task",
+			"trial": "Trial",
+			"runsByArm": "Runs",
+			"notRun": "not run",
+			"empty": "No runs for this condition yet.",
+			"gridError": "Could not load the runs of this experiment.",
+			"show": "Show the receipt of {{run}}",
+			"comparePair": "Compare the pair"
+		},
+		"entry": {
+			"title": "Receipt of {{run}}",
+			"state": {
+				"yes": "yes",
+				"no": "no",
+				"unknown": "unknown",
+				"not_applicable": "n/a"
+			},
+			"evidence": "Evidence",
+			"detail": "Detail",
+			"noEvidence": "no evidence ids",
+			"none": "This run has no receipt for {{probe}}.",
+			"loadError": "Could not load the receipt of {{run}}.",
+			"close": "Close"
+		}
+	},
+	"experiments": {
+		"new": {
+			"title": "New experiment",
+			"subtitle": "Two arms that differ in one setting. Plan first: nothing runs until you start.",
+			"catalogError": "Could not load the catalog.",
+			"catalogEmpty": "The catalog has no suites or agents, so no experiment can be planned.",
+			"sections": {
+				"what": "What runs",
+				"arms": "Arms",
+				"primary": "Primary endpoint",
+				"conditions": "Conditions",
+				"run": "Run settings"
+			},
+			"fields": {
+				"name": "Name",
+				"namePlaceholder": "code-wins sentence",
+				"suite": "Suite",
+				"suiteOption": "{{id}}@{{version}}, {{count}} tasks",
+				"base": "Base agent",
+				"baseOption": "{{id}} ({{model}})",
+				"armA": "Arm A, baseline",
+				"armB": "Arm B, candidate",
+				"label": "Label",
+				"armAPlaceholder": "baseline",
+				"armBPlaceholder": "code-wins sentence",
+				"overridePath": "Setting to change",
+				"overridePathPlaceholder": "notes.user_file",
+				"overrideValue": "New value",
+				"overrideValuePlaceholder": "fixtures/notes/codewins.md",
+				"overrideHint": "One dotted path and one value. The value is read as JSON when it parses (60, true), otherwise as text.",
+				"armAHint": "The base agent, unchanged.",
+				"primaryCondition": "Condition",
+				"primaryMetric": "Metric",
+				"primaryHint": "The one test the verdict rests on. Every other condition is descriptive.",
+				"conditionClean": "no probe",
+				"conditionProbe": "{{layer}} probe",
+				"tasksAll": "All {{count}} tasks",
+				"tasksChosen": "Chosen tasks",
+				"trials": "Trials",
+				"seed": "Seed",
+				"concurrency": "Concurrency",
+				"totalUsd": "Total spend cap (USD)",
+				"token": "Write token",
+				"tokenPlaceholder": "printed by the server at first start",
+				"tokenHint": "Kept in this tab's session storage only. Sent as Authorization: Bearer on plan, create and start."
+			},
+			"validation": {
+				"nameRequired": "Give the experiment a name.",
+				"suiteRequired": "Choose a suite.",
+				"baseRequired": "Choose a base agent.",
+				"labelRequired": "Give the arm a label.",
+				"labelsDiffer": "The two arms need different labels.",
+				"pathFormat": "Use a dotted path such as notes.user_file.",
+				"valueRequired": "Enter the value arm B uses.",
+				"conditionRequired": "Choose at least one condition.",
+				"tasksRequired": "Choose at least one task.",
+				"primaryRequired": "Choose the primary condition.",
+				"primaryNotRun": "The primary condition must be one of the conditions that run.",
+				"metricRequired": "Choose the primary metric.",
+				"trialsRange": "Trials is a whole number from 1 to 50.",
+				"seedInt": "The seed is a whole number, 0 or more.",
+				"concurrencyRange": "Concurrency is a whole number from 1 to 64.",
+				"budgetPositive": "The spend cap is a number above 0."
+			},
+			"actions": {
+				"plan": "Plan",
+				"createAndStart": "Create and start",
+				"needsPlan": "Plan the experiment first.",
+				"planStale": "The form changed since the last plan. Plan again before starting.",
+				"blocked": "The plan has errors that block the start.",
+				"needsToken": "Enter the write token to start.",
+				"planError": "Planning failed.",
+				"createError": "Could not create the experiment.",
+				"startError": "Created {{id}}, but could not start it."
+			},
+			"plan": {
+				"title": "Plan",
+				"description": "Nothing has run. These are the sizes and the power of the design.",
+				"slots": "Slots",
+				"pairs": "Pairs",
+				"mde": "Minimal detectable effect",
+				"mdeValue": "{{value}} pp",
+				"mdeAssumedSd": "Uses an assumed SD of {{sd}}: no pilot data yet, so the real MDE may differ.",
+				"mdeSd": "SD {{sd}}, measured",
+				"estTime": "Estimated time",
+				"estCost": "Estimated cost",
+				"perCondition": "Per condition",
+				"condition": "Condition",
+				"tasks": "Tasks",
+				"trials": "Trials",
+				"conditionSlots": "Slots",
+				"errors": "Blocks the start",
+				"warnings": "Warnings",
+				"noIssues": "No errors and no warnings."
+			},
+			"progress": {
+				"title": "Experiment {{id}}",
+				"description": "Live status, refreshed every 2 seconds until the experiment ends.",
+				"state": {
+					"created": "created",
+					"running": "running",
+					"analyzing": "analyzing",
+					"done": "done",
+					"failed": "failed",
+					"cancelled": "cancelled"
+				},
+				"slots": "{{done}} done, {{running}} running, {{failed}} failed, of {{total}} slots",
+				"done": "done",
+				"running": "running",
+				"failed": "failed",
+				"spent": "Spent",
+				"cap": "cap {{cap}}",
+				"manifest": "manifest {{hash}}",
+				"openVerdict": "Open the verdict",
+				"newExperiment": "Plan another",
+				"loadError": "Could not load the experiment status."
+			}
+		}
+	},
+	"experimentsNew": {
+		"title": "New experiment",
+		"empty": "Nothing planned yet. This screen will show the preflight checks and the experiment planner."
+	},
+	"notFound": {
+		"title": "Page not found",
+		"description": "There is no bench screen at this address.",
+		"back": "Go to the verdict"
+	},
+	"errors": {
+		"noFixture": "No fixture file for {{method}} {{url}}.",
+		"fixtureLoad": "Could not load fixture {{file}}.",
+		"unexpected": "Unexpected error."
+	}
+}

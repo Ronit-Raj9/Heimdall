@@ -1,0 +1,120 @@
+{
+	"_comment": "SYNTHETIC fixture for UI development. Not a benchmark result.",
+	"mode": "synthetic",
+	"primary": {
+		"condition": "published",
+		"metric": "pass"
+	},
+	"decision": "inconclusive",
+	"action": "no_decision",
+	"effect": {
+		"condition": "published",
+		"metric": "pass",
+		"arm_a": "A",
+		"arm_b": "B",
+		"n_tasks": 8,
+		"n_nonzero": 4,
+		"n_positive": 4,
+		"n_negative": 0,
+		"d_bar": 0.1667,
+		"p_value": 0.125,
+		"interval": [
+			0.0177,
+			0.3156
+		],
+		"per_task": [
+			{
+				"task": "t01",
+				"mean_a": 1.0,
+				"mean_b": 1.0,
+				"d": 0.0,
+				"n_a": 3,
+				"n_b": 3,
+				"unknown_a": 0,
+				"unknown_b": 0
+			},
+			{
+				"task": "t02",
+				"mean_a": 1.0,
+				"mean_b": 1.0,
+				"d": 0.0,
+				"n_a": 3,
+				"n_b": 3,
+				"unknown_a": 0,
+				"unknown_b": 0
+			},
+			{
+				"task": "t03",
+				"mean_a": 0.0,
+				"mean_b": 0.3333,
+				"d": 0.3333,
+				"n_a": 3,
+				"n_b": 3,
+				"unknown_a": 0,
+				"unknown_b": 0
+			},
+			{
+				"task": "t04",
+				"mean_a": 0.6667,
+				"mean_b": 1.0,
+				"d": 0.3333,
+				"n_a": 3,
+				"n_b": 3,
+				"unknown_a": 0,
+				"unknown_b": 0
+			},
+			{
+				"task": "t05",
+				"mean_a": 0.0,
+				"mean_b": 0.0,
+				"d": 0.0,
+				"n_a": 3,
+				"n_b": 3,
+				"unknown_a": 0,
+				"unknown_b": 0
+			},
+			{
+				"task": "t06",
+				"mean_a": 0.6667,
+				"mean_b": 1.0,
+				"d": 0.3333,
+				"n_a": 3,
+				"n_b": 3,
+				"unknown_a": 0,
+				"unknown_b": 0
+			},
+			{
+				"task": "t07",
+				"mean_a": 0.3333,
+				"mean_b": 0.6667,
+				"d": 0.3333,
+				"n_a": 3,
+				"n_b": 3,
+				"unknown_a": 0,
+				"unknown_b": 0
+			},
+			{
+				"task": "t08",
+				"mean_a": 1.0,
+				"mean_b": 1.0,
+				"d": 0.0,
+				"n_a": 3,
+				"n_b": 3,
+				"unknown_a": 0,
+				"unknown_b": 0
+			}
+		],
+		"descriptive": false
+	},
+	"alpha": 0.05,
+	"mde": 34.58,
+	"mde_assumed_sd": true,
+	"sd": 0.3,
+	"tasks_needed": 28,
+	"randomization_unit": "task",
+	"tie_rule": "tasks with a zero difference stay in n and cannot move the statistic",
+	"guards": [],
+	"integrity": "",
+	"manifest_hash": "",
+	"frozen_at": "0001-01-01T00:00:00Z"
+}

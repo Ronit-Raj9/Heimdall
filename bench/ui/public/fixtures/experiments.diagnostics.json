@@ -1,0 +1,566 @@
+{
+	"_comment": "SYNTHETIC fixture for UI development. Not a benchmark result.",
+	"mode": "synthetic",
+	"analysis_id": "a_synth00001",
+	"exp_id": "e_synthetic-codewins",
+	"diagnostics": [
+		{
+			"condition": "clean",
+			"axis": "solve",
+			"n_tasks": 4,
+			"per_arm": {
+				"A": {
+					"num": 9,
+					"den": 12,
+					"unknown": 0
+				},
+				"B": {
+					"num": 10,
+					"den": 12,
+					"unknown": 0
+				}
+			},
+			"effect": {
+				"condition": "clean",
+				"metric": "verified_success",
+				"arm_a": "A",
+				"arm_b": "B",
+				"n_tasks": 4,
+				"n_nonzero": 1,
+				"n_positive": 1,
+				"n_negative": 0,
+				"d_bar": 0.0833,
+				"interval": [
+					-0.1819,
+					0.3485
+				],
+				"per_task": [
+					{
+						"task": "t01",
+						"mean_a": 1.0,
+						"mean_b": 1.0,
+						"d": 0.0,
+						"n_a": 3,
+						"n_b": 3,
+						"unknown_a": 0,
+						"unknown_b": 0
+					},
+					{
+						"task": "t02",
+						"mean_a": 0.6667,
+						"mean_b": 1.0,
+						"d": 0.3333,
+						"n_a": 3,
+						"n_b": 3,
+						"unknown_a": 0,
+						"unknown_b": 0
+					},
+					{
+						"task": "t03",
+						"mean_a": 0.3333,
+						"mean_b": 0.3333,
+						"d": 0.0,
+						"n_a": 3,
+						"n_b": 3,
+						"unknown_a": 0,
+						"unknown_b": 0
+					},
+					{
+						"task": "t04",
+						"mean_a": 1.0,
+						"mean_b": 1.0,
+						"d": 0.0,
+						"n_a": 3,
+						"n_b": 3,
+						"unknown_a": 0,
+						"unknown_b": 0
+					}
+				],
+				"descriptive": true
+			},
+			"descriptive": true
+		},
+		{
+			"condition": "stale-notes",
+			"axis": "memory",
+			"n_tasks": 4,
+			"per_arm": {
+				"A": {
+					"num": 4,
+					"den": 12,
+					"unknown": 0
+				},
+				"B": {
+					"num": 9,
+					"den": 12,
+					"unknown": 0
+				}
+			},
+			"effect": {
+				"condition": "stale-notes",
+				"metric": "verified_success",
+				"arm_a": "A",
+				"arm_b": "B",
+				"n_tasks": 4,
+				"n_nonzero": 3,
+				"n_positive": 3,
+				"n_negative": 0,
+				"d_bar": 0.4167,
+				"interval": [
+					-0.0912,
+					0.9245
+				],
+				"per_task": [
+					{
+						"task": "t01",
+						"mean_a": 0.3333,
+						"mean_b": 1.0,
+						"d": 0.6667,
+						"n_a": 3,
+						"n_b": 3,
+						"unknown_a": 0,
+						"unknown_b": 0
+					},
+					{
+						"task": "t02",
+						"mean_a": 0.0,
+						"mean_b": 0.6667,
+						"d": 0.6667,
+						"n_a": 3,
+						"n_b": 3,
+						"unknown_a": 0,
+						"unknown_b": 0
+					},
+					{
+						"task": "t03",
+						"mean_a": 0.3333,
+						"mean_b": 0.3333,
+						"d": 0.0,
+						"n_a": 3,
+						"n_b": 3,
+						"unknown_a": 0,
+						"unknown_b": 0
+					},
+					{
+						"task": "t04",
+						"mean_a": 0.6667,
+						"mean_b": 1.0,
+						"d": 0.3333,
+						"n_a": 3,
+						"n_b": 3,
+						"unknown_a": 0,
+						"unknown_b": 0
+					}
+				],
+				"descriptive": false,
+				"p_value": 0.25,
+				"lower_bound": {
+					"condition": "stale-notes",
+					"metric": "verified_success",
+					"arm_a": "A",
+					"arm_b": "B",
+					"n_tasks": 4,
+					"n_nonzero": 3,
+					"n_positive": 3,
+					"n_negative": 0,
+					"d_bar": 0.4167,
+					"interval": [
+						-0.0912,
+						0.9245
+					],
+					"per_task": [
+						{
+							"task": "t01",
+							"mean_a": 0.3333,
+							"mean_b": 1.0,
+							"d": 0.6667,
+							"n_a": 3,
+							"n_b": 3,
+							"unknown_a": 0,
+							"unknown_b": 0
+						},
+						{
+							"task": "t02",
+							"mean_a": 0.0,
+							"mean_b": 0.6667,
+							"d": 0.6667,
+							"n_a": 3,
+							"n_b": 3,
+							"unknown_a": 0,
+							"unknown_b": 0
+						},
+						{
+							"task": "t03",
+							"mean_a": 0.3333,
+							"mean_b": 0.3333,
+							"d": 0.0,
+							"n_a": 3,
+							"n_b": 3,
+							"unknown_a": 0,
+							"unknown_b": 0
+						},
+						{
+							"task": "t04",
+							"mean_a": 0.6667,
+							"mean_b": 1.0,
+							"d": 0.3333,
+							"n_a": 3,
+							"n_b": 3,
+							"unknown_a": 0,
+							"unknown_b": 0
+						}
+					],
+					"descriptive": false,
+					"p_value": 0.25
+				},
+				"upper_bound": {
+					"condition": "stale-notes",
+					"metric": "verified_success",
+					"arm_a": "A",
+					"arm_b": "B",
+					"n_tasks": 4,
+					"n_nonzero": 3,
+					"n_positive": 3,
+					"n_negative": 0,
+					"d_bar": 0.4167,
+					"interval": [
+						-0.0912,
+						0.9245
+					],
+					"per_task": [
+						{
+							"task": "t01",
+							"mean_a": 0.3333,
+							"mean_b": 1.0,
+							"d": 0.6667,
+							"n_a": 3,
+							"n_b": 3,
+							"unknown_a": 0,
+							"unknown_b": 0
+						},
+						{
+							"task": "t02",
+							"mean_a": 0.0,
+							"mean_b": 0.6667,
+							"d": 0.6667,
+							"n_a": 3,
+							"n_b": 3,
+							"unknown_a": 0,
+							"unknown_b": 0
+						},
+						{
+							"task": "t03",
+							"mean_a": 0.3333,
+							"mean_b": 0.3333,
+							"d": 0.0,
+							"n_a": 3,
+							"n_b": 3,
+							"unknown_a": 0,
+							"unknown_b": 0
+						},
+						{
+							"task": "t04",
+							"mean_a": 0.6667,
+							"mean_b": 1.0,
+							"d": 0.3333,
+							"n_a": 3,
+							"n_b": 3,
+							"unknown_a": 0,
+							"unknown_b": 0
+						}
+					],
+					"descriptive": false,
+					"p_value": 0.25,
+					"lower_bound": {
+						"condition": "stale-notes",
+						"metric": "verified_success",
+						"arm_a": "A",
+						"arm_b": "B",
+						"n_tasks": 4,
+						"n_nonzero": 3,
+						"n_positive": 3,
+						"n_negative": 0,
+						"d_bar": 0.4167,
+						"interval": [
+							-0.0912,
+							0.9245
+						],
+						"per_task": [
+							{
+								"task": "t01",
+								"mean_a": 0.3333,
+								"mean_b": 1.0,
+								"d": 0.6667,
+								"n_a": 3,
+								"n_b": 3,
+								"unknown_a": 0,
+								"unknown_b": 0
+							},
+							{
+								"task": "t02",
+								"mean_a": 0.0,
+								"mean_b": 0.6667,
+								"d": 0.6667,
+								"n_a": 3,
+								"n_b": 3,
+								"unknown_a": 0,
+								"unknown_b": 0
+							},
+							{
+								"task": "t03",
+								"mean_a": 0.3333,
+								"mean_b": 0.3333,
+								"d": 0.0,
+								"n_a": 3,
+								"n_b": 3,
+								"unknown_a": 0,
+								"unknown_b": 0
+							},
+							{
+								"task": "t04",
+								"mean_a": 0.6667,
+								"mean_b": 1.0,
+								"d": 0.3333,
+								"n_a": 3,
+								"n_b": 3,
+								"unknown_a": 0,
+								"unknown_b": 0
+							}
+						],
+						"descriptive": false,
+						"p_value": 0.25
+					}
+				}
+			},
+			"descriptive": false,
+			"receipts": {
+				"A": {
+					"assigned": {
+						"num": 12,
+						"den": 12,
+						"unknown": 0
+					},
+					"armed": {
+						"num": 12,
+						"den": 12,
+						"unknown": 0
+					},
+					"visible": {
+						"num": 12,
+						"den": 12,
+						"unknown": 0
+					},
+					"acknowledged": {
+						"num": 2,
+						"den": 12,
+						"unknown": 1
+					},
+					"effect": {
+						"num": 4,
+						"den": 12,
+						"unknown": 0
+					}
+				},
+				"B": {
+					"assigned": {
+						"num": 12,
+						"den": 12,
+						"unknown": 0
+					},
+					"armed": {
+						"num": 12,
+						"den": 12,
+						"unknown": 0
+					},
+					"visible": {
+						"num": 12,
+						"den": 12,
+						"unknown": 0
+					},
+					"acknowledged": {
+						"num": 9,
+						"den": 12,
+						"unknown": 0
+					},
+					"effect": {
+						"num": 9,
+						"den": 12,
+						"unknown": 0
+					}
+				}
+			}
+		}
+	],
+	"meters": [
+		{
+			"name": "false_completion",
+			"label": "False completion",
+			"kind": "rate",
+			"numerator": "success claims on failed runs",
+			"denominator": "runs with a success claim",
+			"per_arm": {
+				"A": {
+					"state": "observed",
+					"v": 0.2778,
+					"evidence": "native"
+				},
+				"B": {
+					"state": "observed",
+					"v": 0.05,
+					"evidence": "native"
+				}
+			}
+		},
+		{
+			"name": "gates_fired",
+			"label": "Gates fired",
+			"kind": "count",
+			"numerator": "runs with a veto or invalidate gate fired",
+			"denominator": "runs",
+			"per_arm": {
+				"A": {
+					"state": "observed",
+					"v": 0,
+					"evidence": "outcome"
+				},
+				"B": {
+					"state": "observed",
+					"v": 0,
+					"evidence": "outcome"
+				}
+			}
+		},
+		{
+			"name": "egress_attempts",
+			"label": "Egress attempts",
+			"kind": "count",
+			"numerator": "outbound connections to a host other than the gateway",
+			"denominator": "runs",
+			"per_arm": {
+				"A": {
+					"state": "observed",
+					"v": 0,
+					"evidence": "gateway"
+				},
+				"B": {
+					"state": "observed",
+					"v": 0,
+					"evidence": "gateway"
+				}
+			}
+		},
+		{
+			"name": "cost_per_verified_success",
+			"label": "Cost per verified success",
+			"kind": "usd",
+			"numerator": "attempt cost over all assigned slots",
+			"denominator": "verified successes",
+			"per_arm": {
+				"A": {
+					"state": "observed",
+					"v": 0.41,
+					"evidence": "gateway"
+				},
+				"B": {
+					"state": "unknown",
+					"v": null,
+					"evidence": "gateway",
+					"bounds": [
+						0.33,
+						0.37
+					],
+					"reason": "telemetry_incomplete"
+				}
+			}
+		}
+	],
+	"arm_metrics": {
+		"A": {
+			"verified_success": {
+				"state": "observed",
+				"v": 0.5417,
+				"evidence": "outcome"
+			},
+			"steps": {
+				"state": "observed",
+				"v": 21,
+				"evidence": "gateway"
+			},
+			"tool_calls": {
+				"state": "observed",
+				"v": 34,
+				"evidence": "gateway"
+			},
+			"tokens": {
+				"state": "observed",
+				"v": 182400,
+				"evidence": "gateway"
+			},
+			"cost_usd": {
+				"state": "observed",
+				"v": 0.39,
+				"evidence": "gateway"
+			},
+			"wall_time_s": {
+				"state": "observed",
+				"v": 312,
+				"evidence": "outcome"
+			},
+			"false_completion": {
+				"state": "observed",
+				"v": 0,
+				"evidence": "native"
+			},
+			"retry_amplification": {
+				"state": "not_applicable",
+				"v": null
+			}
+		},
+		"B": {
+			"verified_success": {
+				"state": "observed",
+				"v": 0.7917,
+				"evidence": "outcome"
+			},
+			"steps": {
+				"state": "observed",
+				"v": 19,
+				"evidence": "gateway"
+			},
+			"tool_calls": {
+				"state": "observed",
+				"v": 30,
+				"evidence": "gateway"
+			},
+			"tokens": {
+				"state": "observed",
+				"v": 171250,
+				"evidence": "gateway"
+			},
+			"cost_usd": {
+				"state": "unknown",
+				"v": null,
+				"evidence": "gateway",
+				"bounds": [
+					0.31,
+					0.36
+				],
+				"reason": "telemetry_incomplete"
+			},
+			"wall_time_s": {
+				"state": "observed",
+				"v": 287,
+				"evidence": "outcome"
+			},
+			"false_completion": {
+				"state": "observed",
+				"v": 0,
+				"evidence": "native"
+			},
+			"retry_amplification": {
+				"state": "not_applicable",
+				"v": null
+			}
+		}
+	}
+}

@@ -1,0 +1,9 @@
+node_modules/
+*.tsbuildinfo
+# auto-generated TanStack Router route tree, as in ui/
+app/routeTree.gen.ts
+# Build output. The repo root ignores every dist/, so re-include this one and keep only
+# the placeholder that lets `//go:embed all:dist` compile before the first build.
+!/dist/
+/dist/*
+!/dist/.gitkeep

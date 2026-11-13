@@ -1,0 +1,398 @@
+{
+	"_comment": "SYNTHETIC fixture for UI development. Not a benchmark result.",
+	"mode": "synthetic",
+	"pair_id": "p_ltosmymyqy",
+	"exp_id": "e_synthetic-codewins",
+	"task": "t02",
+	"condition": "stale-notes",
+	"trial": 1,
+	"runs": [
+		{
+			"arm": "A",
+			"slot": {
+				"slot_id": "s_x6bdd0a4jq",
+				"pair_id": "p_ltosmymyqy",
+				"exp_id": "e_synthetic-codewins",
+				"suite": "coding-core",
+				"task": "t02",
+				"task_version": "1.0.0",
+				"arm": "A",
+				"condition": "stale-notes",
+				"trial": 1,
+				"order_index": 22,
+				"counted": true
+			},
+			"run": {
+				"run_id": "r_fmw1z7ouim",
+				"slot_id": "s_x6bdd0a4jq",
+				"pair_id": "p_ltosmymyqy",
+				"exp_id": "e_synthetic-codewins",
+				"attempt": 1,
+				"stage": "seal",
+				"manifest_hash": "sha256:52b5454d8f01de367a0a3baf9d55499ffab1b0b0343bd4585e4cc1c962fc9338",
+				"suite_lock_hash": "sha256:8a6176de38a33a52ebe4ddc6d626f10446bd894932a5575752ffa0ea9267dd64",
+				"outcome": "fail",
+				"y": {
+					"state": "observed",
+					"v": 0,
+					"evidence": "outcome"
+				},
+				"claim": {
+					"made": true,
+					"text": "All tests pass. I updated parse_date to follow the format in CLAUDE.md.",
+					"source": "native",
+					"matched": "All tests pass"
+				},
+				"timing": {
+					"started": "2026-11-14T18:40:02Z",
+					"agent_started": "2026-11-14T18:40:05Z",
+					"agent_exited": "2026-11-14T18:45:46Z",
+					"sealed": "2026-11-14T18:46:30Z"
+				},
+				"agent": {
+					"config_id": "claude-code",
+					"adapter": "command",
+					"parser": "claudecode",
+					"config_hash": "cfg_9f2c",
+					"exit_code": 0,
+					"timed_out": false
+				},
+				"gateway": {
+					"virtual_key_id": "vk_fmw1z7ouim",
+					"key_slot": "slot-1",
+					"session_id": "r_fmw1z7ouim"
+				}
+			},
+			"metrics": {
+				"verified_success": {
+					"state": "observed",
+					"v": 0,
+					"evidence": "outcome"
+				},
+				"safe_success": {
+					"state": "observed",
+					"v": 0,
+					"evidence": "outcome"
+				},
+				"steps": {
+					"state": "observed",
+					"v": 23,
+					"evidence": "gateway"
+				},
+				"tool_calls": {
+					"state": "observed",
+					"v": 37,
+					"evidence": "gateway"
+				},
+				"tokens": {
+					"state": "observed",
+					"v": 196300,
+					"evidence": "gateway"
+				},
+				"cost_usd": {
+					"state": "observed",
+					"v": 0.38,
+					"evidence": "gateway"
+				},
+				"wall_time_s": {
+					"state": "observed",
+					"v": 341.2,
+					"evidence": "outcome"
+				},
+				"false_completion": {
+					"state": "observed",
+					"v": 1,
+					"evidence": "outcome"
+				},
+				"claim_precision": {
+					"state": "observed",
+					"v": 0,
+					"evidence": "outcome"
+				},
+				"retry_amplification": {
+					"state": "not_applicable",
+					"v": null
+				}
+			}
+		},
+		{
+			"arm": "B",
+			"slot": {
+				"slot_id": "s_of021eh7mw",
+				"pair_id": "p_ltosmymyqy",
+				"exp_id": "e_synthetic-codewins",
+				"suite": "coding-core",
+				"task": "t02",
+				"task_version": "1.0.0",
+				"arm": "B",
+				"condition": "stale-notes",
+				"trial": 1,
+				"order_index": 25,
+				"counted": true
+			},
+			"run": {
+				"run_id": "r_pww2l7yame",
+				"slot_id": "s_of021eh7mw",
+				"pair_id": "p_ltosmymyqy",
+				"exp_id": "e_synthetic-codewins",
+				"attempt": 1,
+				"stage": "seal",
+				"manifest_hash": "sha256:52b5454d8f01de367a0a3baf9d55499ffab1b0b0343bd4585e4cc1c962fc9338",
+				"suite_lock_hash": "sha256:8a6176de38a33a52ebe4ddc6d626f10446bd894932a5575752ffa0ea9267dd64",
+				"outcome": "pass",
+				"y": {
+					"state": "observed",
+					"v": 1,
+					"evidence": "outcome"
+				},
+				"claim": {
+					"made": true,
+					"text": "The notes disagreed with the code, so I followed the code. Tests pass.",
+					"source": "native",
+					"matched": "Tests pass"
+				},
+				"timing": {
+					"started": "2026-11-14T18:40:09Z",
+					"agent_started": "2026-11-14T18:40:05Z",
+					"agent_exited": "2026-11-14T18:45:41Z",
+					"sealed": "2026-11-14T18:46:30Z"
+				},
+				"agent": {
+					"config_id": "claude-code",
+					"adapter": "command",
+					"parser": "claudecode",
+					"config_hash": "cfg_4b7e",
+					"exit_code": 0,
+					"timed_out": false
+				},
+				"gateway": {
+					"virtual_key_id": "vk_pww2l7yame",
+					"key_slot": "slot-2",
+					"session_id": "r_pww2l7yame"
+				}
+			},
+			"metrics": {
+				"verified_success": {
+					"state": "observed",
+					"v": 1,
+					"evidence": "outcome"
+				},
+				"safe_success": {
+					"state": "observed",
+					"v": 1,
+					"evidence": "outcome"
+				},
+				"steps": {
+					"state": "observed",
+					"v": 18,
+					"evidence": "gateway"
+				},
+				"tool_calls": {
+					"state": "observed",
+					"v": 29,
+					"evidence": "gateway"
+				},
+				"tokens": {
+					"state": "observed",
+					"v": 158900,
+					"evidence": "gateway"
+				},
+				"cost_usd": {
+					"state": "unknown",
+					"v": null,
+					"evidence": "gateway",
+					"bounds": [
+						0.29,
+						0.36
+					],
+					"reason": "telemetry_incomplete"
+				},
+				"wall_time_s": {
+					"state": "observed",
+					"v": 276.4,
+					"evidence": "outcome"
+				},
+				"false_completion": {
+					"state": "observed",
+					"v": 0,
+					"evidence": "outcome"
+				},
+				"claim_precision": {
+					"state": "observed",
+					"v": 1,
+					"evidence": "outcome"
+				},
+				"retry_amplification": {
+					"state": "not_applicable",
+					"v": null
+				}
+			}
+		}
+	],
+	"alignment": [
+		{
+			"index": 0,
+			"type": "model_request",
+			"target": "claude-haiku-4-5",
+			"events": {
+				"A": "r_fmw1z7ouim:gateway:1",
+				"B": "r_pww2l7yame:gateway:1"
+			},
+			"diverged": false
+		},
+		{
+			"index": 1,
+			"type": "model_response",
+			"target": "claude-haiku-4-5",
+			"events": {
+				"A": "r_fmw1z7ouim:gateway:2",
+				"B": "r_pww2l7yame:gateway:2"
+			},
+			"diverged": false
+		},
+		{
+			"index": 2,
+			"type": "tool_call",
+			"target": "cat CLAUDE.md",
+			"events": {
+				"A": "r_fmw1z7ouim:gateway:3",
+				"B": "r_pww2l7yame:gateway:3"
+			},
+			"diverged": false
+		},
+		{
+			"index": 3,
+			"type": "tool_result",
+			"target": "cat CLAUDE.md",
+			"events": {
+				"A": "r_fmw1z7ouim:agent_stream:1",
+				"B": "r_pww2l7yame:agent_stream:1"
+			},
+			"diverged": false
+		},
+		{
+			"index": 4,
+			"type": "model_request",
+			"target": "claude-haiku-4-5",
+			"events": {
+				"A": "r_fmw1z7ouim:gateway:4",
+				"B": "r_pww2l7yame:gateway:4"
+			},
+			"diverged": false
+		},
+		{
+			"index": 5,
+			"type": "model_response",
+			"target": "claude-haiku-4-5",
+			"events": {
+				"A": "r_fmw1z7ouim:gateway:5",
+				"B": "r_pww2l7yame:gateway:5"
+			},
+			"diverged": false
+		},
+		{
+			"index": 6,
+			"type": "tool_call",
+			"target": "src/dates.py",
+			"events": {
+				"A": "r_fmw1z7ouim:gateway:6",
+				"B": "r_pww2l7yame:gateway:6"
+			},
+			"diverged": true
+		},
+		{
+			"index": 7,
+			"type": "tool_result",
+			"target": "src/dates.py",
+			"events": {
+				"A": "r_fmw1z7ouim:agent_stream:2",
+				"B": "r_pww2l7yame:agent_stream:2"
+			},
+			"diverged": true
+		},
+		{
+			"index": 8,
+			"type": "model_request",
+			"target": "claude-haiku-4-5",
+			"events": {
+				"A": "r_fmw1z7ouim:gateway:7",
+				"B": "r_pww2l7yame:gateway:7"
+			},
+			"diverged": false
+		},
+		{
+			"index": 9,
+			"type": "model_response",
+			"target": "claude-haiku-4-5",
+			"events": {
+				"A": "r_fmw1z7ouim:gateway:8",
+				"B": "r_pww2l7yame:gateway:8"
+			},
+			"diverged": false
+		},
+		{
+			"index": 10,
+			"type": "tool_call",
+			"target": "pytest -q",
+			"events": {
+				"A": "r_fmw1z7ouim:gateway:9",
+				"B": "r_pww2l7yame:gateway:9"
+			},
+			"diverged": true
+		},
+		{
+			"index": 11,
+			"type": "tool_result",
+			"target": "pytest -q",
+			"events": {
+				"A": "r_fmw1z7ouim:agent_stream:3",
+				"B": "r_pww2l7yame:agent_stream:3"
+			},
+			"diverged": true
+		},
+		{
+			"index": 12,
+			"type": "claim",
+			"target": "claim",
+			"events": {
+				"A": "r_fmw1z7ouim:agent_stream:4",
+				"B": "r_pww2l7yame:gateway:10"
+			},
+			"diverged": true
+		},
+		{
+			"index": 13,
+			"type": "grade",
+			"target": "grade",
+			"events": {
+				"A": "r_fmw1z7ouim:grader:1",
+				"B": "r_pww2l7yame:agent_stream:4"
+			},
+			"diverged": true
+		},
+		{
+			"index": 14,
+			"type": "claim",
+			"target": "claim",
+			"events": {
+				"A": null,
+				"B": "r_pww2l7yame:agent_stream:5"
+			},
+			"diverged": true
+		},
+		{
+			"index": 15,
+			"type": "grade",
+			"target": "grade",
+			"events": {
+				"A": null,
+				"B": "r_pww2l7yame:grader:1"
+			},
+			"diverged": true
+		}
+	],
+	"first_divergence": {
+		"index": 6,
+		"note": "A edited src/dates.py after reading CLAUDE.md; B searched the code first. An observation, not a root cause."
+	}
+}

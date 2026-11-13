@@ -1,0 +1,16 @@
+{
+	"_comment": "SYNTHETIC fixture for UI development. Not a benchmark result.",
+	"mode": "synthetic",
+	"run_id": "r_fmw1z7ouim",
+	"diff": {
+		"path": "workspace.diff",
+		"sha256": "sha256:7904487f1fe313b16eba82bf5295094ea10c4a8881003122331aea57e9c57733",
+		"files": [
+			{
+				"path": "src/dates.py",
+				"status": "modified"
+			}
+		]
+	},
+	"patch": "diff --git a/src/dates.py b/src/dates.py\n--- a/src/dates.py\n+++ b/src/dates.py\n@@ -14,3 +14,3 @@\n def parse_date(text):\n-    return datetime.strptime(text, \"%Y-%m-%d\")\n+    return datetime.strptime(text, \"%d/%m/%Y\")\n"
+}

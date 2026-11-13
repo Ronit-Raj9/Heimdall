@@ -3,6 +3,7 @@ package utils
 import (
 	"fmt"
 	"io"
+	"strings"
 	"sync"
 	"time"
 )
@@ -37,10 +38,26 @@ func (l *StdLogger) Warn(msg string, args ...any) { l.write("WARN", msg, args) }
 // Error implements schemas.Logger.
 func (l *StdLogger) Error(msg string, args ...any) { l.write("ERROR", msg, args) }
 
+// write formats msg with args printf-style when msg has a verb, and otherwise
+// appends args as key=value pairs, so both call styles used across the bench
+// read well.
 func (l *StdLogger) write(level, msg string, args []any) {
 	line := msg
-	if len(args) > 0 {
+	switch {
+	case len(args) == 0:
+	case strings.Contains(msg, "%"):
 		line = fmt.Sprintf(msg, args...)
+	default:
+		var b strings.Builder
+		b.WriteString(msg)
+		for i := 0; i < len(args); i += 2 {
+			if i+1 < len(args) {
+				fmt.Fprintf(&b, " %v=%v", args[i], args[i+1])
+			} else {
+				fmt.Fprintf(&b, " %v", args[i])
+			}
+		}
+		line = b.String()
 	}
 	l.mu.Lock()
 	defer l.mu.Unlock()

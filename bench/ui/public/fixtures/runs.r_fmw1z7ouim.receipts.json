@@ -1,0 +1,50 @@
+{
+	"_comment": "SYNTHETIC fixture for UI development. Not a benchmark result.",
+	"mode": "synthetic",
+	"run_id": "r_fmw1z7ouim",
+	"receipts": [
+		{
+			"probe_id": "stale-notes",
+			"layer": "fixture",
+			"steps": {
+				"assigned": {
+					"state": "yes",
+					"evidence": [
+						"sha256:52b5454d8f01de367a0a3baf9d55499ffab1b0b0343bd4585e4cc1c962fc9338"
+					]
+				},
+				"armed": {
+					"state": "yes",
+					"detail": "overlay sha256 matched in workspace"
+				},
+				"fired": {
+					"state": "not_applicable"
+				},
+				"delivered": {
+					"state": "not_applicable"
+				},
+				"absorbed_by": {
+					"state": "not_applicable"
+				},
+				"visible": {
+					"state": "yes",
+					"evidence": [
+						"r_fmw1z7ouim:gateway:4"
+					]
+				},
+				"acknowledged": {
+					"state": "no",
+					"evidence": [
+						"r_fmw1z7ouim:agent_stream:4"
+					]
+				},
+				"effect": {
+					"state": "no",
+					"evidence": [
+						"r_fmw1z7ouim:grader:1"
+					]
+				}
+			}
+		}
+	]
+}

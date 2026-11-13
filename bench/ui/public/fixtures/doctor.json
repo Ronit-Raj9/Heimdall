@@ -1,0 +1,32 @@
+{
+	"_comment": "SYNTHETIC fixture for UI development. Not a benchmark result.",
+	"mode": "synthetic",
+	"ok": true,
+	"checks": [
+		{
+			"id": "docker",
+			"status": "pass",
+			"detail": "Docker 28.4.0 reachable."
+		},
+		{
+			"id": "gateway",
+			"status": "pass",
+			"detail": "Bifrost gateway answered /health."
+		},
+		{
+			"id": "fault-proxy",
+			"status": "pass",
+			"detail": "Fault proxy listening."
+		},
+		{
+			"id": "suite-lock",
+			"status": "pass",
+			"detail": "coding-core@1.0.0 lock hash matches."
+		},
+		{
+			"id": "provider-key",
+			"status": "skip",
+			"detail": "Synthetic mode needs no provider key."
+		}
+	]
+}

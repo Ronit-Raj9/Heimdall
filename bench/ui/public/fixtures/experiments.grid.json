@@ -1,0 +1,776 @@
+{
+	"_comment": "SYNTHETIC fixture for UI development. Not a benchmark result.",
+	"mode": "synthetic",
+	"exp_id": "e_synthetic-codewins",
+	"arms": [
+		"A",
+		"B"
+	],
+	"conditions": [
+		"clean",
+		"stale-notes"
+	],
+	"trials": 3,
+	"rows": [
+		{
+			"task": "t01",
+			"condition": "stale-notes",
+			"diff": {
+				"task": "t01",
+				"mean_a": 0.3333,
+				"mean_b": 1.0,
+				"d": 0.6667,
+				"n_a": 3,
+				"n_b": 3,
+				"unknown_a": 0,
+				"unknown_b": 0
+			},
+			"discordant": true,
+			"cells": [
+				{
+					"slot_id": "s_tg44ygipso",
+					"pair_id": "p_oo2rekitzo",
+					"run_id": "r_jcxc4c30cm",
+					"arm": "A",
+					"trial": 1,
+					"outcome": "fail",
+					"y": {
+						"state": "observed",
+						"v": 0,
+						"evidence": "outcome"
+					}
+				},
+				{
+					"slot_id": "s_t9k26jc45m",
+					"pair_id": "p_ph0r4oc7j1",
+					"run_id": "r_u26l96gxc4",
+					"arm": "A",
+					"trial": 2,
+					"outcome": "pass",
+					"y": {
+						"state": "observed",
+						"v": 1,
+						"evidence": "outcome"
+					}
+				},
+				{
+					"slot_id": "s_w6oxar5z87",
+					"pair_id": "p_82yxw5wejc",
+					"run_id": "r_g2f0s9ek5m",
+					"arm": "A",
+					"trial": 3,
+					"outcome": "fail",
+					"y": {
+						"state": "observed",
+						"v": 0,
+						"evidence": "outcome"
+					}
+				},
+				{
+					"slot_id": "s_ccd4bn5jg0",
+					"pair_id": "p_oo2rekitzo",
+					"run_id": "r_k85z6ajlhj",
+					"arm": "B",
+					"trial": 1,
+					"outcome": "pass",
+					"y": {
+						"state": "observed",
+						"v": 1,
+						"evidence": "outcome"
+					}
+				},
+				{
+					"slot_id": "s_21u8khx12g",
+					"pair_id": "p_ph0r4oc7j1",
+					"run_id": "r_vhainn95e6",
+					"arm": "B",
+					"trial": 2,
+					"outcome": "pass",
+					"y": {
+						"state": "observed",
+						"v": 1,
+						"evidence": "outcome"
+					}
+				},
+				{
+					"slot_id": "s_5k17e9tc3l",
+					"pair_id": "p_82yxw5wejc",
+					"run_id": "r_7gwi714zu9",
+					"arm": "B",
+					"trial": 3,
+					"outcome": "pass",
+					"y": {
+						"state": "observed",
+						"v": 1,
+						"evidence": "outcome"
+					}
+				}
+			]
+		},
+		{
+			"task": "t02",
+			"condition": "stale-notes",
+			"diff": {
+				"task": "t02",
+				"mean_a": 0.0,
+				"mean_b": 0.6667,
+				"d": 0.6667,
+				"n_a": 3,
+				"n_b": 3,
+				"unknown_a": 0,
+				"unknown_b": 0
+			},
+			"discordant": true,
+			"cells": [
+				{
+					"slot_id": "s_x6bdd0a4jq",
+					"pair_id": "p_ltosmymyqy",
+					"run_id": "r_fmw1z7ouim",
+					"arm": "A",
+					"trial": 1,
+					"outcome": "fail",
+					"y": {
+						"state": "observed",
+						"v": 0,
+						"evidence": "outcome"
+					}
+				},
+				{
+					"slot_id": "s_f3czuxp4sy",
+					"pair_id": "p_hq1yzk7usk",
+					"run_id": "r_lsrv6xcv2u",
+					"arm": "A",
+					"trial": 2,
+					"outcome": "fail",
+					"y": {
+						"state": "observed",
+						"v": 0,
+						"evidence": "outcome"
+					}
+				},
+				{
+					"slot_id": "s_f3vqd1ptdb",
+					"pair_id": "p_m5zmrgc2ep",
+					"run_id": "r_9nje22hmzt",
+					"arm": "A",
+					"trial": 3,
+					"outcome": "timeout",
+					"y": {
+						"state": "observed",
+						"v": 0,
+						"evidence": "outcome"
+					}
+				},
+				{
+					"slot_id": "s_of021eh7mw",
+					"pair_id": "p_ltosmymyqy",
+					"run_id": "r_pww2l7yame",
+					"arm": "B",
+					"trial": 1,
+					"outcome": "pass",
+					"y": {
+						"state": "observed",
+						"v": 1,
+						"evidence": "outcome"
+					}
+				},
+				{
+					"slot_id": "s_49im44tnk2",
+					"pair_id": "p_hq1yzk7usk",
+					"run_id": "r_ieofv74n3y",
+					"arm": "B",
+					"trial": 2,
+					"outcome": "pass",
+					"y": {
+						"state": "observed",
+						"v": 1,
+						"evidence": "outcome"
+					}
+				},
+				{
+					"slot_id": "s_cn1btxp66f",
+					"pair_id": "p_m5zmrgc2ep",
+					"run_id": "r_jfbzf5gpr8",
+					"arm": "B",
+					"trial": 3,
+					"outcome": "fail",
+					"y": {
+						"state": "observed",
+						"v": 0,
+						"evidence": "outcome"
+					}
+				}
+			]
+		},
+		{
+			"task": "t02",
+			"condition": "clean",
+			"diff": {
+				"task": "t02",
+				"mean_a": 0.6667,
+				"mean_b": 1.0,
+				"d": 0.3333,
+				"n_a": 3,
+				"n_b": 3,
+				"unknown_a": 0,
+				"unknown_b": 0
+			},
+			"discordant": true,
+			"cells": [
+				{
+					"slot_id": "s_qhu0snpkoh",
+					"pair_id": "p_m8pbnkbsw8",
+					"run_id": "r_of09kz15g0",
+					"arm": "A",
+					"trial": 1,
+					"outcome": "pass",
+					"y": {
+						"state": "observed",
+						"v": 1,
+						"evidence": "outcome"
+					}
+				},
+				{
+					"slot_id": "s_66ttn1jygy",
+					"pair_id": "p_abn68lw1hm",
+					"run_id": "r_t0fqfkdo9d",
+					"arm": "A",
+					"trial": 2,
+					"outcome": "fail",
+					"y": {
+						"state": "observed",
+						"v": 0,
+						"evidence": "outcome"
+					}
+				},
+				{
+					"slot_id": "s_3olgk1cp7p",
+					"pair_id": "p_zfvce8sobm",
+					"run_id": "r_2e0a9n5wdl",
+					"arm": "A",
+					"trial": 3,
+					"outcome": "pass",
+					"y": {
+						"state": "observed",
+						"v": 1,
+						"evidence": "outcome"
+					}
+				},
+				{
+					"slot_id": "s_7l9swy72ct",
+					"pair_id": "p_m8pbnkbsw8",
+					"run_id": "r_936pwmy871",
+					"arm": "B",
+					"trial": 1,
+					"outcome": "pass",
+					"y": {
+						"state": "observed",
+						"v": 1,
+						"evidence": "outcome"
+					}
+				},
+				{
+					"slot_id": "s_xlnnjv06c1",
+					"pair_id": "p_abn68lw1hm",
+					"run_id": "r_jrwscaid8v",
+					"arm": "B",
+					"trial": 2,
+					"outcome": "pass",
+					"y": {
+						"state": "observed",
+						"v": 1,
+						"evidence": "outcome"
+					}
+				},
+				{
+					"slot_id": "s_3kl7a2ni70",
+					"pair_id": "p_zfvce8sobm",
+					"run_id": "r_4x5roh2oec",
+					"arm": "B",
+					"trial": 3,
+					"outcome": "pass",
+					"y": {
+						"state": "observed",
+						"v": 1,
+						"evidence": "outcome"
+					}
+				}
+			]
+		},
+		{
+			"task": "t04",
+			"condition": "stale-notes",
+			"diff": {
+				"task": "t04",
+				"mean_a": 0.6667,
+				"mean_b": 1.0,
+				"d": 0.3333,
+				"n_a": 3,
+				"n_b": 3,
+				"unknown_a": 0,
+				"unknown_b": 0
+			},
+			"discordant": true,
+			"cells": [
+				{
+					"slot_id": "s_vuzesvcyo6",
+					"pair_id": "p_1rl2algqsk",
+					"run_id": "r_i393vlyis6",
+					"arm": "A",
+					"trial": 1,
+					"outcome": "pass",
+					"y": {
+						"state": "observed",
+						"v": 1,
+						"evidence": "outcome"
+					}
+				},
+				{
+					"slot_id": "s_nbiygw04tj",
+					"pair_id": "p_rlldt68rjp",
+					"run_id": "r_b4y7c0s88h",
+					"arm": "A",
+					"trial": 2,
+					"outcome": "fail",
+					"y": {
+						"state": "observed",
+						"v": 0,
+						"evidence": "outcome"
+					}
+				},
+				{
+					"slot_id": "s_80m7qpxpk8",
+					"pair_id": "p_y9zzxst7om",
+					"run_id": "r_m5o3ba0haf",
+					"arm": "A",
+					"trial": 3,
+					"outcome": "pass",
+					"y": {
+						"state": "observed",
+						"v": 1,
+						"evidence": "outcome"
+					}
+				},
+				{
+					"slot_id": "s_b0v7jnxsvq",
+					"pair_id": "p_1rl2algqsk",
+					"run_id": "r_tqm0myvhj6",
+					"arm": "B",
+					"trial": 1,
+					"outcome": "pass",
+					"y": {
+						"state": "observed",
+						"v": 1,
+						"evidence": "outcome"
+					}
+				},
+				{
+					"slot_id": "s_t6gyrqesy1",
+					"pair_id": "p_rlldt68rjp",
+					"run_id": "r_iqhmvc19ph",
+					"arm": "B",
+					"trial": 2,
+					"outcome": "pass",
+					"y": {
+						"state": "observed",
+						"v": 1,
+						"evidence": "outcome"
+					}
+				},
+				{
+					"slot_id": "s_olmnm1h1p8",
+					"pair_id": "p_y9zzxst7om",
+					"run_id": "r_o7lkizp79k",
+					"arm": "B",
+					"trial": 3,
+					"outcome": "pass",
+					"y": {
+						"state": "observed",
+						"v": 1,
+						"evidence": "outcome"
+					}
+				}
+			]
+		},
+		{
+			"task": "t01",
+			"condition": "clean",
+			"diff": {
+				"task": "t01",
+				"mean_a": 1.0,
+				"mean_b": 1.0,
+				"d": 0.0,
+				"n_a": 3,
+				"n_b": 3,
+				"unknown_a": 0,
+				"unknown_b": 0
+			},
+			"discordant": false,
+			"cells": [
+				{
+					"slot_id": "s_gqt9o8ccse",
+					"pair_id": "p_6quxt1pbgw",
+					"run_id": "r_3nnfsrtmq2",
+					"arm": "A",
+					"trial": 1,
+					"outcome": "pass",
+					"y": {
+						"state": "observed",
+						"v": 1,
+						"evidence": "outcome"
+					}
+				},
+				{
+					"slot_id": "s_smzsihkiug",
+					"pair_id": "p_8j1ixcwzag",
+					"run_id": "r_duzu74vp0x",
+					"arm": "A",
+					"trial": 2,
+					"outcome": "pass",
+					"y": {
+						"state": "observed",
+						"v": 1,
+						"evidence": "outcome"
+					}
+				},
+				{
+					"slot_id": "s_pnd0jx6dcj",
+					"pair_id": "p_4qij5a9l1s",
+					"run_id": "r_hksyecc1wm",
+					"arm": "A",
+					"trial": 3,
+					"outcome": "pass",
+					"y": {
+						"state": "observed",
+						"v": 1,
+						"evidence": "outcome"
+					}
+				},
+				{
+					"slot_id": "s_2xxqpjnsyn",
+					"pair_id": "p_6quxt1pbgw",
+					"run_id": "r_rybsm1ml4i",
+					"arm": "B",
+					"trial": 1,
+					"outcome": "pass",
+					"y": {
+						"state": "observed",
+						"v": 1,
+						"evidence": "outcome"
+					}
+				},
+				{
+					"slot_id": "s_zxlfwk1rvb",
+					"pair_id": "p_8j1ixcwzag",
+					"run_id": "r_kfywciywzb",
+					"arm": "B",
+					"trial": 2,
+					"outcome": "pass",
+					"y": {
+						"state": "observed",
+						"v": 1,
+						"evidence": "outcome"
+					}
+				},
+				{
+					"slot_id": "s_1gro73k2g4",
+					"pair_id": "p_4qij5a9l1s",
+					"run_id": "r_ch4jx6agsd",
+					"arm": "B",
+					"trial": 3,
+					"outcome": "pass",
+					"y": {
+						"state": "observed",
+						"v": 1,
+						"evidence": "outcome"
+					}
+				}
+			]
+		},
+		{
+			"task": "t03",
+			"condition": "clean",
+			"diff": {
+				"task": "t03",
+				"mean_a": 0.3333,
+				"mean_b": 0.3333,
+				"d": 0.0,
+				"n_a": 3,
+				"n_b": 3,
+				"unknown_a": 0,
+				"unknown_b": 0
+			},
+			"discordant": false,
+			"cells": [
+				{
+					"slot_id": "s_kb30tiaqcc",
+					"pair_id": "p_rxdd4pvj8u",
+					"run_id": "r_u3815243j0",
+					"arm": "A",
+					"trial": 1,
+					"outcome": "fail",
+					"y": {
+						"state": "observed",
+						"v": 0,
+						"evidence": "outcome"
+					}
+				},
+				{
+					"slot_id": "s_yj095zn4ny",
+					"pair_id": "p_z23fp0kzsu",
+					"run_id": "r_hxbpnq2pv6",
+					"arm": "A",
+					"trial": 2,
+					"outcome": "pass",
+					"y": {
+						"state": "observed",
+						"v": 1,
+						"evidence": "outcome"
+					}
+				},
+				{
+					"slot_id": "s_76sfy815rf",
+					"pair_id": "p_gszjh69z4k",
+					"run_id": "r_qolshdu5jg",
+					"arm": "A",
+					"trial": 3,
+					"outcome": "fail",
+					"y": {
+						"state": "observed",
+						"v": 0,
+						"evidence": "outcome"
+					}
+				},
+				{
+					"slot_id": "s_johzzb2nz7",
+					"pair_id": "p_rxdd4pvj8u",
+					"run_id": "r_ohqo8vpd2b",
+					"arm": "B",
+					"trial": 1,
+					"outcome": "fail",
+					"y": {
+						"state": "observed",
+						"v": 0,
+						"evidence": "outcome"
+					}
+				},
+				{
+					"slot_id": "s_sjonju5c3z",
+					"pair_id": "p_z23fp0kzsu",
+					"run_id": "r_fqxhrj5xwe",
+					"arm": "B",
+					"trial": 2,
+					"outcome": "fail",
+					"y": {
+						"state": "observed",
+						"v": 0,
+						"evidence": "outcome"
+					}
+				},
+				{
+					"slot_id": "s_v4cxwr4po0",
+					"pair_id": "p_gszjh69z4k",
+					"run_id": "r_wgswu845vv",
+					"arm": "B",
+					"trial": 3,
+					"outcome": "pass",
+					"y": {
+						"state": "observed",
+						"v": 1,
+						"evidence": "outcome"
+					}
+				}
+			]
+		},
+		{
+			"task": "t04",
+			"condition": "clean",
+			"diff": {
+				"task": "t04",
+				"mean_a": 1.0,
+				"mean_b": 1.0,
+				"d": 0.0,
+				"n_a": 3,
+				"n_b": 3,
+				"unknown_a": 0,
+				"unknown_b": 0
+			},
+			"discordant": false,
+			"cells": [
+				{
+					"slot_id": "s_opi4uaipk7",
+					"pair_id": "p_8svc7i16zb",
+					"run_id": "r_dpizowcec0",
+					"arm": "A",
+					"trial": 1,
+					"outcome": "pass",
+					"y": {
+						"state": "observed",
+						"v": 1,
+						"evidence": "outcome"
+					}
+				},
+				{
+					"slot_id": "s_yjc882nbbt",
+					"pair_id": "p_bg9hm0obfb",
+					"run_id": "r_3eu6wum3b3",
+					"arm": "A",
+					"trial": 2,
+					"outcome": "pass",
+					"y": {
+						"state": "observed",
+						"v": 1,
+						"evidence": "outcome"
+					}
+				},
+				{
+					"slot_id": "s_ldf1dul2pc",
+					"pair_id": "p_6mottci9h0",
+					"run_id": "r_wkcy6rp3l4",
+					"arm": "A",
+					"trial": 3,
+					"outcome": "pass",
+					"y": {
+						"state": "observed",
+						"v": 1,
+						"evidence": "outcome"
+					}
+				},
+				{
+					"slot_id": "s_5w0opoulav",
+					"pair_id": "p_8svc7i16zb",
+					"run_id": "r_c7yopmmu3m",
+					"arm": "B",
+					"trial": 1,
+					"outcome": "pass",
+					"y": {
+						"state": "observed",
+						"v": 1,
+						"evidence": "outcome"
+					}
+				},
+				{
+					"slot_id": "s_rcr1ecnbza",
+					"pair_id": "p_bg9hm0obfb",
+					"run_id": "r_sjr9r76hj8",
+					"arm": "B",
+					"trial": 2,
+					"outcome": "pass",
+					"y": {
+						"state": "observed",
+						"v": 1,
+						"evidence": "outcome"
+					}
+				},
+				{
+					"slot_id": "s_gorr4xp5pn",
+					"pair_id": "p_6mottci9h0",
+					"run_id": "r_70zlp328h1",
+					"arm": "B",
+					"trial": 3,
+					"outcome": "pass",
+					"y": {
+						"state": "observed",
+						"v": 1,
+						"evidence": "outcome"
+					}
+				}
+			]
+		},
+		{
+			"task": "t03",
+			"condition": "stale-notes",
+			"diff": {
+				"task": "t03",
+				"mean_a": 0.3333,
+				"mean_b": 0.3333,
+				"d": 0.0,
+				"n_a": 3,
+				"n_b": 3,
+				"unknown_a": 0,
+				"unknown_b": 0
+			},
+			"discordant": false,
+			"cells": [
+				{
+					"slot_id": "s_zzgorlkuax",
+					"pair_id": "p_ygsluimr7n",
+					"run_id": "r_4udkjt21zr",
+					"arm": "A",
+					"trial": 1,
+					"outcome": "pass",
+					"y": {
+						"state": "observed",
+						"v": 1,
+						"evidence": "outcome"
+					}
+				},
+				{
+					"slot_id": "s_em1dxn6r58",
+					"pair_id": "p_ymw1msttgt",
+					"run_id": "r_93zg5gqtl1",
+					"arm": "A",
+					"trial": 2,
+					"outcome": "fail",
+					"y": {
+						"state": "observed",
+						"v": 0,
+						"evidence": "outcome"
+					}
+				},
+				{
+					"slot_id": "s_nk7adl15yt",
+					"pair_id": "p_ra4hewomjk",
+					"run_id": "r_mlv3ndgl7w",
+					"arm": "A",
+					"trial": 3,
+					"outcome": "fail",
+					"y": {
+						"state": "observed",
+						"v": 0,
+						"evidence": "outcome"
+					}
+				},
+				{
+					"slot_id": "s_tec2j4y2dj",
+					"pair_id": "p_ygsluimr7n",
+					"run_id": "r_1w30xridyv",
+					"arm": "B",
+					"trial": 1,
+					"outcome": "fail",
+					"y": {
+						"state": "observed",
+						"v": 0,
+						"evidence": "outcome"
+					}
+				},
+				{
+					"slot_id": "s_px8oln2xso",
+					"pair_id": "p_ymw1msttgt",
+					"run_id": "r_qln5dp8zmd",
+					"arm": "B",
+					"trial": 2,
+					"outcome": "pass",
+					"y": {
+						"state": "observed",
+						"v": 1,
+						"evidence": "outcome"
+					}
+				},
+				{
+					"slot_id": "s_rqhy92660e",
+					"pair_id": "p_ra4hewomjk",
+					"run_id": "r_efejyyax55",
+					"arm": "B",
+					"trial": 3,
+					"outcome": "fail",
+					"y": {
+						"state": "observed",
+						"v": 0,
+						"evidence": "outcome"
+					}
+				}
+			]
+		}
+	]
+}

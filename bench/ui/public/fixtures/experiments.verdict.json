@@ -1,0 +1,450 @@
+{
+	"_comment": "SYNTHETIC fixture for UI development. Not a benchmark result.",
+	"mode": "synthetic",
+	"exp_id": "e_synthetic-codewins",
+	"analysis_id": "a_synth00001",
+	"grade_source": "original",
+	"suite": "coding-core@1.0.0",
+	"verdict": {
+		"primary": {
+			"condition": "stale-notes",
+			"metric": "verified_success"
+		},
+		"decision": "inconclusive",
+		"action": "no_decision",
+		"effect": {
+			"condition": "stale-notes",
+			"metric": "verified_success",
+			"arm_a": "A",
+			"arm_b": "B",
+			"n_tasks": 4,
+			"n_nonzero": 3,
+			"n_positive": 3,
+			"n_negative": 0,
+			"d_bar": 0.4167,
+			"interval": [
+				-0.0912,
+				0.9245
+			],
+			"per_task": [
+				{
+					"task": "t01",
+					"mean_a": 0.3333,
+					"mean_b": 1.0,
+					"d": 0.6667,
+					"n_a": 3,
+					"n_b": 3,
+					"unknown_a": 0,
+					"unknown_b": 0
+				},
+				{
+					"task": "t02",
+					"mean_a": 0.0,
+					"mean_b": 0.6667,
+					"d": 0.6667,
+					"n_a": 3,
+					"n_b": 3,
+					"unknown_a": 0,
+					"unknown_b": 0
+				},
+				{
+					"task": "t03",
+					"mean_a": 0.3333,
+					"mean_b": 0.3333,
+					"d": 0.0,
+					"n_a": 3,
+					"n_b": 3,
+					"unknown_a": 0,
+					"unknown_b": 0
+				},
+				{
+					"task": "t04",
+					"mean_a": 0.6667,
+					"mean_b": 1.0,
+					"d": 0.3333,
+					"n_a": 3,
+					"n_b": 3,
+					"unknown_a": 0,
+					"unknown_b": 0
+				}
+			],
+			"descriptive": false,
+			"p_value": 0.25,
+			"lower_bound": {
+				"condition": "stale-notes",
+				"metric": "verified_success",
+				"arm_a": "A",
+				"arm_b": "B",
+				"n_tasks": 4,
+				"n_nonzero": 3,
+				"n_positive": 3,
+				"n_negative": 0,
+				"d_bar": 0.4167,
+				"interval": [
+					-0.0912,
+					0.9245
+				],
+				"per_task": [
+					{
+						"task": "t01",
+						"mean_a": 0.3333,
+						"mean_b": 1.0,
+						"d": 0.6667,
+						"n_a": 3,
+						"n_b": 3,
+						"unknown_a": 0,
+						"unknown_b": 0
+					},
+					{
+						"task": "t02",
+						"mean_a": 0.0,
+						"mean_b": 0.6667,
+						"d": 0.6667,
+						"n_a": 3,
+						"n_b": 3,
+						"unknown_a": 0,
+						"unknown_b": 0
+					},
+					{
+						"task": "t03",
+						"mean_a": 0.3333,
+						"mean_b": 0.3333,
+						"d": 0.0,
+						"n_a": 3,
+						"n_b": 3,
+						"unknown_a": 0,
+						"unknown_b": 0
+					},
+					{
+						"task": "t04",
+						"mean_a": 0.6667,
+						"mean_b": 1.0,
+						"d": 0.3333,
+						"n_a": 3,
+						"n_b": 3,
+						"unknown_a": 0,
+						"unknown_b": 0
+					}
+				],
+				"descriptive": false,
+				"p_value": 0.25
+			},
+			"upper_bound": {
+				"condition": "stale-notes",
+				"metric": "verified_success",
+				"arm_a": "A",
+				"arm_b": "B",
+				"n_tasks": 4,
+				"n_nonzero": 3,
+				"n_positive": 3,
+				"n_negative": 0,
+				"d_bar": 0.4167,
+				"interval": [
+					-0.0912,
+					0.9245
+				],
+				"per_task": [
+					{
+						"task": "t01",
+						"mean_a": 0.3333,
+						"mean_b": 1.0,
+						"d": 0.6667,
+						"n_a": 3,
+						"n_b": 3,
+						"unknown_a": 0,
+						"unknown_b": 0
+					},
+					{
+						"task": "t02",
+						"mean_a": 0.0,
+						"mean_b": 0.6667,
+						"d": 0.6667,
+						"n_a": 3,
+						"n_b": 3,
+						"unknown_a": 0,
+						"unknown_b": 0
+					},
+					{
+						"task": "t03",
+						"mean_a": 0.3333,
+						"mean_b": 0.3333,
+						"d": 0.0,
+						"n_a": 3,
+						"n_b": 3,
+						"unknown_a": 0,
+						"unknown_b": 0
+					},
+					{
+						"task": "t04",
+						"mean_a": 0.6667,
+						"mean_b": 1.0,
+						"d": 0.3333,
+						"n_a": 3,
+						"n_b": 3,
+						"unknown_a": 0,
+						"unknown_b": 0
+					}
+				],
+				"descriptive": false,
+				"p_value": 0.25,
+				"lower_bound": {
+					"condition": "stale-notes",
+					"metric": "verified_success",
+					"arm_a": "A",
+					"arm_b": "B",
+					"n_tasks": 4,
+					"n_nonzero": 3,
+					"n_positive": 3,
+					"n_negative": 0,
+					"d_bar": 0.4167,
+					"interval": [
+						-0.0912,
+						0.9245
+					],
+					"per_task": [
+						{
+							"task": "t01",
+							"mean_a": 0.3333,
+							"mean_b": 1.0,
+							"d": 0.6667,
+							"n_a": 3,
+							"n_b": 3,
+							"unknown_a": 0,
+							"unknown_b": 0
+						},
+						{
+							"task": "t02",
+							"mean_a": 0.0,
+							"mean_b": 0.6667,
+							"d": 0.6667,
+							"n_a": 3,
+							"n_b": 3,
+							"unknown_a": 0,
+							"unknown_b": 0
+						},
+						{
+							"task": "t03",
+							"mean_a": 0.3333,
+							"mean_b": 0.3333,
+							"d": 0.0,
+							"n_a": 3,
+							"n_b": 3,
+							"unknown_a": 0,
+							"unknown_b": 0
+						},
+						{
+							"task": "t04",
+							"mean_a": 0.6667,
+							"mean_b": 1.0,
+							"d": 0.3333,
+							"n_a": 3,
+							"n_b": 3,
+							"unknown_a": 0,
+							"unknown_b": 0
+						}
+					],
+					"descriptive": false,
+					"p_value": 0.25
+				}
+			}
+		},
+		"alpha": 0.05,
+		"mde": 62.41,
+		"mde_assumed_sd": true,
+		"sd": 0.3,
+		"tasks_needed": 7,
+		"randomization_unit": "task",
+		"tie_rule": "tasks with a zero difference stay in n and cannot move the statistic",
+		"guards": [
+			{
+				"spec": {
+					"condition": "clean",
+					"rule": "no_regression"
+				},
+				"status": "pass",
+				"effect": {
+					"condition": "clean",
+					"metric": "verified_success",
+					"arm_a": "A",
+					"arm_b": "B",
+					"n_tasks": 4,
+					"n_nonzero": 1,
+					"n_positive": 1,
+					"n_negative": 0,
+					"d_bar": 0.0833,
+					"interval": [
+						-0.1819,
+						0.3485
+					],
+					"per_task": [
+						{
+							"task": "t01",
+							"mean_a": 1.0,
+							"mean_b": 1.0,
+							"d": 0.0,
+							"n_a": 3,
+							"n_b": 3,
+							"unknown_a": 0,
+							"unknown_b": 0
+						},
+						{
+							"task": "t02",
+							"mean_a": 0.6667,
+							"mean_b": 1.0,
+							"d": 0.3333,
+							"n_a": 3,
+							"n_b": 3,
+							"unknown_a": 0,
+							"unknown_b": 0
+						},
+						{
+							"task": "t03",
+							"mean_a": 0.3333,
+							"mean_b": 0.3333,
+							"d": 0.0,
+							"n_a": 3,
+							"n_b": 3,
+							"unknown_a": 0,
+							"unknown_b": 0
+						},
+						{
+							"task": "t04",
+							"mean_a": 1.0,
+							"mean_b": 1.0,
+							"d": 0.0,
+							"n_a": 3,
+							"n_b": 3,
+							"unknown_a": 0,
+							"unknown_b": 0
+						}
+					],
+					"descriptive": false,
+					"p_value": 1.0
+				}
+			},
+			{
+				"spec": {
+					"rule": "no_new_integrity_violation"
+				},
+				"status": "pass",
+				"detail": "0 integrity violations in either arm."
+			}
+		],
+		"integrity": "clean",
+		"manifest_hash": "sha256:52b5454d8f01de367a0a3baf9d55499ffab1b0b0343bd4585e4cc1c962fc9338",
+		"frozen_at": "2026-11-14T18:11:00Z"
+	},
+	"naive": {
+		"A": {
+			"num": 13,
+			"den": 24,
+			"unknown": 0
+		},
+		"B": {
+			"num": 19,
+			"den": 24,
+			"unknown": 0
+		}
+	},
+	"gates": [
+		{
+			"gate": "protected-paths",
+			"version": "1.0.0",
+			"effect": "veto",
+			"baseline": true,
+			"fired": {
+				"num": 0,
+				"den": 48,
+				"unknown": 0
+			}
+		},
+		{
+			"gate": "test-infra-injection",
+			"version": "1.0.0",
+			"effect": "veto",
+			"baseline": true,
+			"fired": {
+				"num": 0,
+				"den": 48,
+				"unknown": 0
+			}
+		},
+		{
+			"gate": "counterfactual-regrade",
+			"version": "1.0.0",
+			"effect": "veto",
+			"baseline": true,
+			"fired": {
+				"num": 0,
+				"den": 48,
+				"unknown": 0
+			}
+		},
+		{
+			"gate": "egress",
+			"version": "1.0.0",
+			"effect": "invalidate",
+			"baseline": true,
+			"fired": {
+				"num": 0,
+				"den": 48,
+				"unknown": 0
+			}
+		},
+		{
+			"gate": "graded-coverage",
+			"version": "1.0.0",
+			"effect": "invalidate",
+			"baseline": true,
+			"fired": {
+				"num": 0,
+				"den": 48,
+				"unknown": 0
+			},
+			"detail": "Coverage 1.00 in both arms."
+		},
+		{
+			"gate": "served-model",
+			"version": "1.0.0",
+			"effect": "invalidate",
+			"baseline": true,
+			"fired": {
+				"num": 0,
+				"den": 48,
+				"unknown": 0
+			},
+			"detail": "Served model matched the requested model in 48 of 48 runs."
+		},
+		{
+			"gate": "usage-completeness",
+			"version": "1.0.0",
+			"effect": "invalidate",
+			"baseline": true,
+			"fired": {
+				"num": 0,
+				"den": 48,
+				"unknown": 0
+			},
+			"detail": "Usage complete in 47 of 48 runs (97.9%)."
+		},
+		{
+			"gate": "false-completion",
+			"version": "1.0.0",
+			"effect": "report",
+			"baseline": false,
+			"fired": {
+				"num": 6,
+				"den": 48,
+				"unknown": 0
+			},
+			"detail": "Reported only. Never changes the outcome."
+		}
+	],
+	"config_diff": [
+		{
+			"path": "notes.user_file",
+			"a": null,
+			"b": "fixtures/notes/codewins.md"
+		}
+	]
+}

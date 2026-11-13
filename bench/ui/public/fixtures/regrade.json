@@ -1,0 +1,7 @@
+{
+	"_comment": "SYNTHETIC fixture for UI development. Not a benchmark result.",
+	"mode": "synthetic",
+	"regrade_id": "rg_synth00001",
+	"exp_id": "e_synthetic-codewins",
+	"runs": 48
+}

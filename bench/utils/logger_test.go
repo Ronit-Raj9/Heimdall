@@ -15,6 +15,7 @@ func TestStdLogger(t *testing.T) {
 		empty bool
 	}{
 		{"info formats args", false, func(l *StdLogger) { l.Info("run %s sealed", "r_1") }, "INFO  run r_1 sealed", false},
+		{"key value pairs", false, func(l *StdLogger) { l.Info("graded", "run", "r_1", "passed", true) }, "INFO  graded run=r_1 passed=true", false},
 		{"debug hidden", false, func(l *StdLogger) { l.Debug("x") }, "", true},
 		{"debug shown", true, func(l *StdLogger) { l.Debug("x") }, "DEBUG x", false},
 	}

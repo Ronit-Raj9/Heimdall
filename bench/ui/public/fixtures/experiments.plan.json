@@ -1,0 +1,37 @@
+{
+	"_comment": "SYNTHETIC fixture for UI development. Not a benchmark result.",
+	"mode": "synthetic",
+	"slots": 48,
+	"pairs": 24,
+	"conditions": [
+		{
+			"condition": "clean",
+			"tasks": 4,
+			"trials": 3,
+			"slots": 24
+		},
+		{
+			"condition": "stale-notes",
+			"tasks": 4,
+			"trials": 3,
+			"slots": 24
+		}
+	],
+	"mde": 62.41,
+	"mde_assumed_sd": true,
+	"sd": 0.3,
+	"est_wall_s": {
+		"state": "observed",
+		"v": 3600,
+		"evidence": "outcome"
+	},
+	"est_usd": {
+		"state": "observed",
+		"v": 17.5,
+		"evidence": "gateway"
+	},
+	"errors": [],
+	"warnings": [
+		"With 4 tasks the sign-flip test cannot reach p < 0.05; it needs at least 6 tasks with a nonzero difference."
+	]
+}
