@@ -2,3 +2,5 @@
 bin/
 # The repo-level .gitignore ignores .env*; the example file holds placeholders only.
 !deploy/.env.example
+# Run folders are local evidence; the recorded demo bundle lives in testdata/.
+runs/

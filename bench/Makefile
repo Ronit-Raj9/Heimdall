@@ -59,7 +59,7 @@ doctor: bin ## Preflight checks
 	@$(WITHENV) ./$(BIN) doctor
 
 smoke: bin ## No-key end-to-end run through real Bifrost
-	@$(WITHENV) ./$(BIN) run experiments/smoke.yaml
+	@$(WITHENV) BENCH_SERVER_MODE=synthetic ./$(BIN) run experiments/smoke.yaml
 
 serve: bin ## Web UI and API
 	@$(WITHENV) ./$(BIN) serve
