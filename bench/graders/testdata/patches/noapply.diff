@@ -1,0 +1,10 @@
+diff --git a/calc/__init__.py b/calc/__init__.py
+index c83cf5c..39a55dd 100644
+--- a/calc/__init__.py
++++ b/calc/__init__.py
+@@ -3,4 +3,4 @@
+ 
+ def add(a, b):
+     """Return the sum of a and b."""
+-    return a * b
++    return a + b  # wrong context

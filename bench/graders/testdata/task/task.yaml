@@ -1,0 +1,14 @@
+id: tcalc
+version: 1.0.0
+title: Fix add
+project: calc
+kind: bugfix
+instruction: instruction.md
+repo_dir: repo
+notes:
+  clean: fixtures/notes.clean.md
+  stale: fixtures/notes.stale.md
+verifier:
+  tests: verifier/tests
+  required: ["test_hidden_calc.py::test_add"]
+protected: ["tests/**"]

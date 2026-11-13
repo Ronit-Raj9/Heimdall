@@ -1,0 +1,17 @@
+diff --git a/calc/__init__.py b/calc/__init__.py
+index c83cf5c..f3b9b5d 100644
+--- a/calc/__init__.py
++++ b/calc/__init__.py
+@@ -3,4 +3,4 @@
+ 
+ def add(a, b):
+     """Return the sum of a and b."""
+-    return a - b
++    return a + b
+diff --git a/out/result.txt b/out/result.txt
+new file mode 100644
+index 0000000..19f86f4
+--- /dev/null
++++ b/out/result.txt
+@@ -0,0 +1 @@
++done
