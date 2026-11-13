@@ -108,6 +108,14 @@ func (s *TaskSelector) UnmarshalYAML(node *yaml.Node) error {
 	}
 }
 
+// MarshalYAML writes `all` or the list, the inverse of UnmarshalYAML.
+func (s TaskSelector) MarshalYAML() (any, error) {
+	if s.All {
+		return "all", nil
+	}
+	return s.IDs, nil
+}
+
 // Resolve returns the selected task ids given every task id of the suite.
 func (s TaskSelector) Resolve(all []string) []string {
 	if s.All {

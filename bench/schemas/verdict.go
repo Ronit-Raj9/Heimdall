@@ -46,6 +46,7 @@ const (
 	IntegrityClean     IntegrityStatus = "clean"
 	IntegrityAlert     IntegrityStatus = "alert"
 	IntegrityRegressed IntegrityStatus = "regressed"
+	IntegrityUnknown   IntegrityStatus = "unknown" // no gate data, e.g. an audit of published counts
 )
 
 // VerdictPolicy turns sealed runs into an analysis.
@@ -117,8 +118,9 @@ type Verdict struct {
 	MDE               float64         `json:"mde"` // percentage points
 	MDEAssumedSD      bool            `json:"mde_assumed_sd"`
 	SD                float64         `json:"sd"`
-	TasksNeeded       int             `json:"tasks_needed,omitempty"` // for a new experiment to detect |d_bar|
-	RandomizationUnit string          `json:"randomization_unit"`     // "task"
+	TasksNeeded       int             `json:"tasks_needed,omitempty"`      // for a new experiment to detect |d_bar|
+	TasksNeededOver   int             `json:"tasks_needed_over,omitempty"` // set when even this many tasks would not be enough
+	RandomizationUnit string          `json:"randomization_unit"`          // "task"
 	TieRule           string          `json:"tie_rule"`
 	Guards            []GuardResult   `json:"guards"`
 	InvalidReasons    []string        `json:"invalid_reasons,omitempty"`
@@ -163,7 +165,7 @@ type Analysis struct {
 	ExpID       string                      `json:"exp_id"`
 	CreatedAt   time.Time                   `json:"created_at"`
 	GradeSource string                      `json:"grade_source"` // "original" or a regrade id
-	Mode        string                      `json:"mode"`         // live | recorded | synthetic
+	Mode        Mode                        `json:"mode"`
 	Verdict     Verdict                     `json:"verdict"`
 	Naive       map[string]Ratio            `json:"naive"` // arm -> raw passes over runs, the naive scoreboard
 	Diagnostics []DiagnosticsRow            `json:"diagnostics"`
