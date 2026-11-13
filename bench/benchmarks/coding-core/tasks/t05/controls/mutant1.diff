@@ -1,0 +1,28 @@
+diff --git a/gatekeeper/limiter.py b/gatekeeper/limiter.py
+index 931f9a1..ab906f1 100644
+--- a/gatekeeper/limiter.py
++++ b/gatekeeper/limiter.py
+@@ -4,11 +4,11 @@ A :class:`SlidingWindowLimiter` admits at most ``limit`` requests per key in
+ any window of ``window`` seconds. Time comes from an injectable clock (see
+ :mod:`gatekeeper.clock`), so tests can control it exactly.
+ 
+-Window rule: a request recorded at time ``t`` keeps counting against its key
+-up to and including time ``t + window``. Refused requests are never recorded.
++Window rule: a request recorded at time ``t`` stops counting against its key
++at time ``t + window``. Refused requests are never recorded.
+ """
+ 
+-from bisect import bisect_left
++from bisect import bisect_left, bisect_right
+ 
+ from .clock import Clock, SystemClock
+ 
+@@ -86,7 +86,7 @@ class SlidingWindowLimiter:
+     def _live_events(self, key: str, now: float) -> list[float]:
+         """Drop requests for ``key`` that left the window; return the rest."""
+         events = self._events.setdefault(key, [])
+-        expired = bisect_left(events, now - self.window)
++        expired = bisect_right(events, now - self.window)
+         if expired:
+             del events[:expired]
+         return events

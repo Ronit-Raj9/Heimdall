@@ -1,0 +1,15 @@
+# Example configuration. Every setting is optional; missing ones keep their defaults.
+name = "edge-eu-1"
+
+[limiter]
+enabled = true
+limit = 100
+window = 60.0
+exempt_keys = ["healthcheck"]
+
+[dedupe]
+keys = ["email", "phone"]
+
+[log]
+level = "INFO"
+timestamps = true

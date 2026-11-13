@@ -1,0 +1,10 @@
+[project]
+name = "gatekeeper"
+version = "0.4.0"
+description = "Request admission helpers: rate limiting, configuration, deduplication."
+requires-python = ">=3.12"
+dependencies = []
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["."]

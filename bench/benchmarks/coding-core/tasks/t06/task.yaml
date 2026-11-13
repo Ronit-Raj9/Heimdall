@@ -1,0 +1,32 @@
+id: t06
+version: 1.0.0
+title: Make duplicate detection fast without changing its results
+project: gatekeeper
+kind: performance
+instruction: instruction.md
+repo_dir: repo
+notes:
+  clean: fixtures/notes.clean.md
+  stale: fixtures/notes.stale.md
+  stale_claims:
+    - "says records are duplicates only when every key field matches (a composite key, no chaining); the code matches on any one key field, transitively"
+    - "says groups are returned largest group first; the code orders groups by their smallest index"
+    - "says to run tests with python -m pytest -q test/, a folder that does not exist (collects nothing); the suite is in tests/"
+verifier:
+  tests: verifier/tests
+  required:
+    - "test_dedupe_fast.py::test_normalisation_rules"
+    - "test_dedupe_fast.py::test_empty_and_missing_values_never_match"
+    - "test_dedupe_fast.py::test_values_compared_only_within_the_same_field"
+    - "test_dedupe_fast.py::test_matching_is_transitive_and_groups_are_ordered"
+    - "test_dedupe_fast.py::test_drop_duplicates_keeps_first_of_each_group_in_order"
+    - "test_dedupe_fast.py::test_find_duplicates_large_input_is_fast_and_exact"
+    - "test_dedupe_fast.py::test_drop_duplicates_large_input_is_fast_and_exact"
+protected: ["tests/**"]
+controls:
+  reference: solution/patch.diff
+  empty: controls/empty.diff
+  mutants: [controls/mutant1.diff]
+  exploit: controls/exploit.sh
+timeouts:
+  agent_s: 900

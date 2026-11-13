@@ -1,0 +1,71 @@
+diff --git a/gatekeeper/dedupe.py b/gatekeeper/dedupe.py
+index 4251e3f..336bc8a 100644
+--- a/gatekeeper/dedupe.py
++++ b/gatekeeper/dedupe.py
+@@ -39,26 +39,26 @@ def find_duplicates(records: Sequence[Mapping[str, Any]], keys: Iterable[str]) -
+     ordered by their smallest index. Records that match nothing are left out.
+     """
+     fields = _check_keys(keys)
+-    normalised = [[normalise_key(record.get(field)) for field in fields] for record in records]
+-    count = len(records)
+-
+-    # Every record starts in its own group, labelled by its index. Whenever two
+-    # records match, the later group label is folded into the earlier one.
+-    label = list(range(count))
+-    for i in range(count):
+-        for j in range(i + 1, count):
+-            if _matches(normalised[i], normalised[j]) and label[i] != label[j]:
+-                keep, fold = min(label[i], label[j]), max(label[i], label[j])
+-                for k in range(count):
+-                    if label[k] == fold:
+-                        label[k] = keep
+-
+-    found: list[list[int]] = []
+-    for group_label in sorted(set(label)):
+-        members = [k for k in range(count) if label[k] == group_label]
+-        if len(members) > 1:
+-            found.append(members)
+-    return found
++    # One pass: each record joins the group of the first earlier record it
++    # matches on any key field, or starts a new group.
++    first_seen: dict[tuple[str, str], int] = {}
++    group_of: list[int] = []
++    groups: list[list[int]] = []
++    for index, record in enumerate(records):
++        joined = None
++        for field in fields:
++            value = normalise_key(record.get(field))
++            if not value:
++                continue
++            earlier = first_seen.setdefault((field, value), index)
++            if earlier != index and joined is None:
++                joined = group_of[earlier]
++        if joined is None:
++            joined = len(groups)
++            groups.append([])
++        group_of.append(joined)
++        groups[joined].append(index)
++    return [members for members in groups if len(members) > 1]
+ 
+ 
+ def drop_duplicates(records: Sequence[Mapping[str, Any]], keys: Iterable[str]) -> list[Mapping[str, Any]]:
+@@ -67,17 +67,12 @@ def drop_duplicates(records: Sequence[Mapping[str, Any]], keys: Iterable[str]) -
+     The first record (lowest index) of each duplicate group is kept. The
+     input is not modified.
+     """
+-    dropped: list[int] = []
++    dropped: set[int] = set()
+     for group in find_duplicates(records, keys):
+-        dropped.extend(group[1:])
++        dropped.update(group[1:])
+     return [record for index, record in enumerate(records) if index not in dropped]
+ 
+ 
+-def _matches(a: list[str], b: list[str]) -> bool:
+-    """True if some key field has the same non-empty value in both records."""
+-    return any(x and x == y for x, y in zip(a, b))
+-
+-
+ def _check_keys(keys: Iterable[str]) -> list[str]:
+     fields = list(keys)
+     if not fields:

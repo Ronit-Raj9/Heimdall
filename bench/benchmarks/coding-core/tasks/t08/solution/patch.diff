@@ -1,0 +1,114 @@
+diff --git a/gatekeeper/__init__.py b/gatekeeper/__init__.py
+index 4ec2dcb..6a578dd 100644
+--- a/gatekeeper/__init__.py
++++ b/gatekeeper/__init__.py
+@@ -5,8 +5,8 @@ The public API is everything listed in ``__all__`` below:
+ * rate limiting: :class:`SlidingWindowLimiter`, :class:`Gate`, :class:`Decision`
+ * clocks: :class:`SystemClock`, :class:`ManualClock`
+ * configuration: :func:`load_config`, :func:`default_config`, :data:`DEFAULTS`
+-* duplicate detection: :func:`normalise_key`, :func:`find_duplicates`,
+-  :func:`drop_duplicates`
++* duplicate detection: :func:`normalise_key`, :func:`duplicate_groups`,
++  :func:`drop_duplicates` (:func:`find_duplicates` is deprecated)
+ * errors: :class:`GatekeeperError`, :class:`ConfigError`
+ 
+ Submodules are implementation details unless a name is re-exported here.
+@@ -14,7 +14,7 @@ Submodules are implementation details unless a name is re-exported here.
+ 
+ from .clock import ManualClock, SystemClock
+ from .config import DEFAULTS, default_config, load_config
+-from .dedupe import drop_duplicates, find_duplicates, normalise_key
++from .dedupe import drop_duplicates, duplicate_groups, find_duplicates, normalise_key
+ from .errors import ConfigError, GatekeeperError
+ from .gate import Decision, Gate
+ from .limiter import SlidingWindowLimiter
+@@ -32,6 +32,7 @@ __all__ = [
+     "SystemClock",
+     "default_config",
+     "drop_duplicates",
++    "duplicate_groups",
+     "find_duplicates",
+     "load_config",
+     "normalise_key",
+diff --git a/gatekeeper/cli.py b/gatekeeper/cli.py
+index cd347a8..2c1b9dc 100644
+--- a/gatekeeper/cli.py
++++ b/gatekeeper/cli.py
+@@ -23,7 +23,7 @@ from typing import Any
+ from . import __version__
+ from .clock import ManualClock
+ from .config import load_config
+-from .dedupe import find_duplicates
++from .dedupe import duplicate_groups
+ from .errors import GatekeeperError
+ from .gate import Gate
+ 
+@@ -95,7 +95,7 @@ def _run_dedupe(args: argparse.Namespace) -> int:
+     config = load_config(args.file)
+     keys = args.keys or config["dedupe"]["keys"]
+     records = _read_jsonl(args.path)
+-    print(json.dumps(find_duplicates(records, keys)))
++    print(json.dumps(duplicate_groups(records, keys=keys)))
+     return 0
+ 
+ 
+diff --git a/gatekeeper/dedupe.py b/gatekeeper/dedupe.py
+index e7276c9..07baf5a 100644
+--- a/gatekeeper/dedupe.py
++++ b/gatekeeper/dedupe.py
+@@ -13,6 +13,7 @@ Rules:
+   one duplicate group, even if the two ends share no value.
+ """
+ 
++import warnings
+ from collections.abc import Iterable, Mapping, Sequence
+ from typing import Any
+ 
+@@ -32,10 +33,10 @@ def normalise_key(value: Any) -> str:
+     return " ".join(str(value).split()).casefold()
+ 
+ 
+-def find_duplicates(records: Sequence[Mapping[str, Any]], keys: Iterable[str]) -> list[list[int]]:
++def duplicate_groups(records: Sequence[Mapping[str, Any]], *, keys: Iterable[str]) -> list[tuple[int, ...]]:
+     """Return the duplicate groups in ``records``.
+ 
+-    Each group is a list of record indices in ascending order, and groups are
++    Each group is a tuple of record indices in ascending order, and groups are
+     ordered by their smallest index. Records that match nothing are left out.
+     """
+     fields = _check_keys(keys)
+@@ -63,11 +64,24 @@ def find_duplicates(records: Sequence[Mapping[str, Any]], keys: Iterable[str]) -
+     groups: dict[int, list[int]] = {}
+     for index in range(len(records)):
+         groups.setdefault(root(index), []).append(index)
+-    found = [members for members in groups.values() if len(members) > 1]
++    found = [tuple(members) for members in groups.values() if len(members) > 1]
+     found.sort(key=lambda members: members[0])
+     return found
+ 
+ 
++def find_duplicates(records: Sequence[Mapping[str, Any]], keys: Iterable[str]) -> list[list[int]]:
++    """Deprecated: use :func:`duplicate_groups`.
++
++    Same groups as :func:`duplicate_groups`, but each group is a list.
++    """
++    warnings.warn(
++        "find_duplicates() is deprecated; use duplicate_groups() instead",
++        DeprecationWarning,
++        stacklevel=2,
++    )
++    return [list(group) for group in duplicate_groups(records, keys=keys)]
++
++
+ def drop_duplicates(records: Sequence[Mapping[str, Any]], keys: Iterable[str]) -> list[Mapping[str, Any]]:
+     """Return ``records`` without duplicates, in their original order.
+ 
+@@ -75,7 +89,7 @@ def drop_duplicates(records: Sequence[Mapping[str, Any]], keys: Iterable[str]) -
+     input is not modified.
+     """
+     dropped: set[int] = set()
+-    for group in find_duplicates(records, keys):
++    for group in duplicate_groups(records, keys=keys):
+         dropped.update(group[1:])
+     return [record for index, record in enumerate(records) if index not in dropped]
+ 
