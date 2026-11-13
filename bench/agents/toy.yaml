@@ -1,0 +1,21 @@
+# Toy agent for SYNTHETIC smoke runs (DESIGN.md 19.1): three Anthropic
+# Messages API calls through the gateway with the run key, printed as Claude
+# Code stream-json, then the reference patch and a success claim. Drives the
+# fault proxy's scripted model; its results are never findings.
+# Scripted adapter: argv, env and files come from the adapter, not this file.
+id: toy
+adapter: scripted
+image: bench/coding-core-base:1
+scripted:
+  kind: toy
+model: claude-sonnet-4-5
+notes:
+  project_file: CLAUDE.md
+parser: claudecode
+budgets:
+  wall_s: 900
+  cpus: 1
+  mem_gb: 1
+gateway:
+  provider: anthropic
+  max_retries: 0
