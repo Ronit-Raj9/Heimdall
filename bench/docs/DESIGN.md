@@ -153,7 +153,7 @@ Nothing from the harness is kept except what graduates into `deploy/`.
 | # | Check | Pass when | If it fails |
 |---|---|---|---|
 | S1 | Stock Bifrost (pinned image) and Postgres start from `bench/spike/compose.yaml` | `/health` is 200 | Use SQLite logs at concurrency 2 |
-| S2 | Authenticate to the management API. Open-source Bifrost locks `/api` behind a setup token until dashboard auth is on (`transports/bifrost-http/server/server.go:3863-3867` [code]) | A provider and a virtual key can be created by script | Read the pinned release's auth path and record it |
+| S2 | Authenticate to the management API. Open-source Bifrost locks `/api` behind a setup token until dashboard auth is on (`transports/bifrost-http/server/server.go:3863-3867` on `dev`, `3745-3750` on the v2.5.1 tag [code]; header `X-Bifrost-Setup-Token`) | A provider and a virtual key can be created by script | Read the pinned release's auth path and record it |
 | S3 | **Fault path A:** set the built-in `anthropic` provider's `network_config.base_url` to the fault proxy (`core/schemas/provider.go:65` [code] says BaseURL is supported for Anthropic). One key slot, one virtual key, one request to `/anthropic/v1/messages` with a plain Claude model id. Retries are set explicitly on the provider (`max_retries: 0`) | The proxy ledger shows the call, the proxy saw the slot key, the Bifrost row shows the model | **Path B:** custom provider `faultproxy-anthropic`. If plain model ids do not route there, use a routing rule scoped to the key |
 | S4 | Evidence | With `max_retries: 1`, a plan that fails call 2 once shows two attempts in the detail row's `attempt_trail` and two lines in the ledger. With `max_retries: 0` it shows one failed request | The "absorbed by Bifrost" receipt comes from the ledger alone |
 | S5 | Log completeness and join | Polling by virtual key, with paging, reaches "no row is `processing`". Every row matches exactly one ledger entry. The join key is found: the provider's response id if the row keeps it, else order plus token usage | Mark usage unknown for that run |
@@ -500,7 +500,7 @@ For the demo experiment (a sentence telling the agent that code beats stale note
 **Stated assumptions.**
 
 - The unit is the task. The verdict is about this suite version, not about all coding work.
-- Arm order is randomized inside each (task, condition, trial) block from a recorded seed, with identical budgets.
+- Arm order is drawn once per task from a recorded seed and used for every block of that task, with identical budgets. The task is the randomization unit, which is exactly what the task-level sign-flip test flips.
 - **Why a task-level flip is exact.** With no real effect, swapping the two arm labels inside any one block leaves the outcome distribution unchanged. So does swapping them in every block of one task at once, which turns d_i into minus d_i. The test uses exactly those task-level swaps, and a test over a subset of the valid swaps is still exact. This subset is the conservative choice: it stays valid when the trials of one task are correlated, and it does not let three trials of one task count as three independent wins.
 - Trials per arm are equal within a condition. Unequal trials fire a gate.
 - "Add N tasks" means a new experiment with a new manifest. A re-analysis that pools old and new runs is labelled exploratory.
@@ -597,7 +597,7 @@ goal_preserving: true
 apply:
   overlay: {from: fixtures/notes.stale.md, to: "{{agent.notes.project_file}}"}
 safe_behavior: follow the code, not the stale file
-scorers: [obsolete_path_ops]
+metrics: []
 ```
 
 ### 10.3 Receipts
@@ -973,15 +973,15 @@ env:
   ANTHROPIC_AUTH_TOKEN: "{{run.key}}"
   ANTHROPIC_CUSTOM_HEADERS: "x-bf-session-id: {{run.id}}\nx-bf-session-affinity: off"
   ANTHROPIC_DEFAULT_HAIKU_MODEL: "{{model}}"
-  CLAUDE_CONFIG_DIR: /tmp/cc
+  CLAUDE_CONFIG_DIR: /home/agent/.claude
   CLAUDE_CODE_DISABLE_AUTO_MEMORY: "1"
 model: "<set per experiment>"
 notes:
   project_file: CLAUDE.md          # the repo file this agent reads. The stale-notes probe overwrites it
   user_file: null                  # optional file installed as the agent's user-level instructions
-  user_path: /tmp/cc/CLAUDE.md     # where user_file is installed, outside the workspace
+  user_path: /home/agent/.claude/CLAUDE.md     # where user_file is installed, outside the workspace
 parser: claudecode            # omit for gateway-level evidence only
-budgets: {wall_s: 900, turns: 60, cpu: 2, mem_gb: 4}
+budgets: {wall_s: 900, turns: 60, cpus: 2, mem_gb: 4}
 ```
 
 The exact flags and variable names are confirmed in spike S7.
@@ -1010,7 +1010,7 @@ compatibility:                # second agent, gateway-level evidence, never part
   tasks: [t01, t02]
   conditions: [clean, stale-notes, model-outage, test-crash]
   trials: 1
-budget: {total_usd: "<cap>"}
+budget: {total_usd: 0}             # 0 = no cap; set before the batch
 verdict: {policy: paired_signflip, alpha: 0.05, assumed_sd: 0.30}
 seed: 20261114
 concurrency: 4
