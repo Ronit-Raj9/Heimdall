@@ -51,7 +51,7 @@ clean_grade() {
 		--junitxml=/grader/out/junit.xml /grader/tests >"$out/stdout.txt" 2>&1
 	rc=$?
 	set -e
-	if [ ! -s "$out/junit.xml" ]; then echo "fail (no junit, rc=$rc)"; return; fi
+	if [ ! -s "$out/junit.xml" ]; then echo "fail (no junit, rc=$rc)"; rm -rf "$out"; return; fi
 	line="$(grep -o '<testsuite [^>]*>' "$out/junit.xml" | head -1)"
 	tests="$(echo "$line" | sed -n 's/.* tests="\([0-9]*\)".*/\1/p')"
 	failures="$(echo "$line" | sed -n 's/.* failures="\([0-9]*\)".*/\1/p')"
@@ -63,6 +63,7 @@ clean_grade() {
 	else
 		echo "fail (rc=$rc tests=${tests:-?} failures=${failures:-?} errors=${errors:-?} skipped=${skipped:-?})"
 	fi
+	rm -rf "$out"
 }
 
 # naive_grade runs the visible tests inside the workspace, as an in-container grader would.
@@ -74,6 +75,21 @@ naive_grade() {
 	else
 		echo "fail"
 	fi
+}
+
+# incontainer_grade runs the hidden tests inside the workspace itself, the way a
+# grader that trusts the agent's container would: workspace conftest.py and
+# pytest config are active. It exists to show the exploit control beats it.
+incontainer_grade() {
+	local w="$1"
+	cp -a "$TASK/verifier/tests" "$w/.incontainer_hidden"
+	if docker run --rm --network none -v "$w:/workspace" "$IMG" \
+		python -m pytest -q -p no:cacheprovider .incontainer_hidden >/dev/null 2>&1; then
+		echo "pass"
+	else
+		echo "fail"
+	fi
+	rm -rf "$w/.incontainer_hidden"
 }
 
 # apply_patch applies patch $2 to workspace $1. An empty patch is a no-op.
@@ -111,6 +127,7 @@ w="$(prepare)"
 apply_patch "$w" "$TASK/controls/empty.diff"
 restore "$w"
 expect "empty patch clean grade" "fail" "$(clean_grade "$w")"
+expect "empty patch in-container" "fail" "$(incontainer_grade "$w")"
 rm -rf "$w"
 
 for m in "$TASK"/controls/mutant*.diff; do
@@ -125,7 +142,7 @@ done
 w="$(prepare)"
 docker run --rm --network none -v "$w:/workspace" -v "$TASK/controls:/controls:ro" "$IMG" \
 	sh /controls/exploit.sh >/dev/null 2>&1 || true
-expect "exploit naive (seeded control)" "pass" "$(naive_grade "$w")"
+expect "exploit in-container (seeded control)" "pass" "$(incontainer_grade "$w")"
 restore "$w"
 expect "exploit clean grade" "fail" "$(clean_grade "$w")"
 rm -rf "$w"

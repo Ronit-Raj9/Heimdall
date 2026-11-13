@@ -1,0 +1,90 @@
+diff --git a/README.md b/README.md
+index 38b4303..a767268 100644
+--- a/README.md
++++ b/README.md
+@@ -15,7 +15,7 @@ One row per line item, comma separated, UTF-8, with a header row:
+ | column | meaning |
+ |---|---|
+ | `invoice` | invoice number; rows with the same number form one invoice |
+-| `date` | issue date, `YYYY-MM-DD` |
++| `date` | issue date, `YYYY-MM-DD` or day-first `D/M/YYYY` |
+ | `customer` | customer name |
+ | `description` | line item text |
+ | `quantity` | decimal, at most three decimal places |
+diff --git a/ledger/csvio.py b/ledger/csvio.py
+index 85d5e55..aa9589d 100644
+--- a/ledger/csvio.py
++++ b/ledger/csvio.py
+@@ -5,7 +5,8 @@ Rows that share an ``invoice`` value belong to the same invoice; invoices
+ keep the order in which they first appear. The invoice-level columns
+ (``date``, ``customer``, ``tax_rate``, ``discount``) are read from the first
+ row of each invoice. Later rows of the same invoice may leave them blank or
+-repeat the same value; a different value is an error.
++repeat the same value (a date may be repeated in either accepted format); a
++different value is an error.
+ 
+ Every error raises CsvFormatError whose message starts with ``line N:``,
+ where N is the line number in the file (the header row is line 1).
+@@ -94,5 +95,12 @@ def _start_invoice(number: str, fields: dict[str, str]) -> Invoice:
+ def _check_same(number: str, first: dict[str, str], fields: dict[str, str]) -> None:
+     for name in INVOICE_COLUMNS:
+         value = fields[name]
+-        if value and value != first[name]:
++        if not value:
++            continue
++        if name == "date":
++            # The same day may be written in either accepted format.
++            same = parse_date(value) == parse_date(first[name])
++        else:
++            same = value == first[name]
++        if not same:
+             raise ValueError(f"invoice {number}: {name} {value!r} conflicts with {first[name]!r}")
+diff --git a/ledger/dates.py b/ledger/dates.py
+index 8838a75..13d80fa 100644
+--- a/ledger/dates.py
++++ b/ledger/dates.py
+@@ -6,21 +6,36 @@ import re
+ from datetime import date
+ 
+ _ISO_RE = re.compile(r"([0-9]{4})-([0-9]{2})-([0-9]{2})")
++_DAY_FIRST_RE = re.compile(r"([0-9]{1,2})/([0-9]{1,2})/([0-9]+)")
+ 
+ 
+ def parse_date(text: str) -> date:
+-    """Parse an invoice date written as ``YYYY-MM-DD``.
++    """Parse an invoice date written as ``YYYY-MM-DD`` or ``D/M/YYYY``.
+ 
+-    Surrounding whitespace is ignored. Anything else, including a day that
+-    does not exist such as ``2026-02-30``, raises ValueError naming the text
+-    as written.
++    Slash dates are always day first (``03/04/2026`` is 3 April 2026); day
++    and month take one or two digits, the year exactly four. Surrounding
++    whitespace is ignored. A slash date with a two-digit year raises
++    ValueError saying it is ambiguous; anything else that does not parse,
++    including a day that does not exist, raises ValueError saying it is an
++    invalid date. Both messages name the text as written.
+     """
+     value = text.strip()
+     match = _ISO_RE.fullmatch(value)
+-    if match is None:
+-        raise ValueError(f"invalid date {text!r}")
+-    year, month, day = (int(group) for group in match.groups())
++    if match is not None:
++        year, month, day = match.groups()
++        return _make_date(text, year, month, day)
++    match = _DAY_FIRST_RE.fullmatch(value)
++    if match is not None:
++        day, month, year = match.groups()
++        if len(year) == 2:
++            raise ValueError(f"ambiguous date {text!r}: write the year with four digits")
++        if len(year) == 4:
++            return _make_date(text, year, month, day)
++    raise ValueError(f"invalid date {text!r}")
++
++
++def _make_date(text: str, year: str, month: str, day: str) -> date:
+     try:
+-        return date(year, month, day)
++        return date(int(year), int(month), int(day))
+     except ValueError:
+         raise ValueError(f"invalid date {text!r}") from None

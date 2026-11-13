@@ -1,0 +1,143 @@
+diff --git a/README.md b/README.md
+index 38b4303..e5f5359 100644
+--- a/README.md
++++ b/README.md
+@@ -1,11 +1,12 @@
+ # ledger
+ 
+-Invoices with integer-cent money, discounts, tax, CSV import and JSON export.
++Invoices with integer-cent money, discounts, tax, CSV import, and JSON or CSV export.
+ Python 3.12, standard library only.
+ 
+ ```
+ python -m ledger summary examples/invoices.csv
+ python -m ledger export examples/invoices.csv -o invoices.json
++python -m ledger export examples/invoices.csv --format csv
+ ```
+ 
+ ## CSV input
+diff --git a/ledger/__init__.py b/ledger/__init__.py
+index 902d7f9..456e4cd 100644
+--- a/ledger/__init__.py
++++ b/ledger/__init__.py
+@@ -17,7 +17,7 @@ from .errors import CsvFormatError, LedgerError
+ from .invoice import Invoice, LineItem, Totals
+ from .money import format_cents, parse_amount, percent_of, round_half_up
+ from .csvio import load_invoices, read_invoices
+-from .export import export_json, invoice_to_dict
++from .export import export_csv, export_json, invoice_to_dict
+ 
+ __all__ = [
+     "CsvFormatError",
+@@ -27,6 +27,7 @@ __all__ = [
+     "LineItem",
+     "Totals",
+     "__version__",
++    "export_csv",
+     "export_json",
+     "format_cents",
+     "invoice_to_dict",
+diff --git a/ledger/cli.py b/ledger/cli.py
+index dcb6f4d..1d4c823 100644
+--- a/ledger/cli.py
++++ b/ledger/cli.py
+@@ -4,8 +4,9 @@ Commands:
+ 
+ ``summary FILE``
+     One line per invoice with its total, then a grand total.
+-``export FILE [-o PATH]``
+-    Every invoice with its lines and totals, as JSON.
++``export FILE [-o PATH] [--format json|csv]``
++    Every invoice with its lines and totals, as JSON (the default), or one
++    CSV row of totals per invoice.
+ 
+ Exit status is 0 on success, 1 when the file cannot be read or imported and
+ 2 for usage errors.
+@@ -21,10 +22,12 @@ from typing import IO
+ from . import __version__
+ from .csvio import load_invoices
+ from .errors import LedgerError
+-from .export import export_json
++from .export import export_csv, export_json
+ from .invoice import Invoice
+ from .money import format_cents
+ 
++EXPORTERS = {"json": export_json, "csv": export_csv}
++
+ 
+ def build_parser() -> argparse.ArgumentParser:
+     """The argument parser for ``python -m ledger``."""
+@@ -35,9 +38,12 @@ def build_parser() -> argparse.ArgumentParser:
+     summary = commands.add_parser("summary", help="print one line per invoice and a grand total")
+     summary.add_argument("file", help="CSV file of line items")
+ 
+-    export = commands.add_parser("export", help="write invoices with lines and totals as JSON")
++    export = commands.add_parser("export", help="write invoices with their totals as JSON or CSV")
+     export.add_argument("file", help="CSV file of line items")
+     export.add_argument("-o", "--output", metavar="PATH", help="write to PATH instead of standard output")
++    export.add_argument(
++        "--format", choices=sorted(EXPORTERS), default="json", help="output format (default: json)"
++    )
+     return parser
+ 
+ 
+@@ -75,8 +81,9 @@ def print_summary(invoices: Sequence[Invoice], out: IO[str]) -> None:
+ 
+ 
+ def _export(invoices: Sequence[Invoice], args: argparse.Namespace) -> None:
++    write = EXPORTERS[args.format]
+     if args.output:
+         with open(args.output, "w", encoding="utf-8", newline="") as fh:
+-            export_json(invoices, fh)
++            write(invoices, fh)
+     else:
+-        export_json(invoices, sys.stdout)
++        write(invoices, sys.stdout)
+diff --git a/ledger/export.py b/ledger/export.py
+index 9145903..e8147a8 100644
+--- a/ledger/export.py
++++ b/ledger/export.py
+@@ -2,11 +2,15 @@
+ 
+ from __future__ import annotations
+ 
++import csv
+ import json
+ from collections.abc import Iterable
+ from typing import IO, Any
+ 
+ from .invoice import Invoice
++from .money import format_cents
++
++CSV_COLUMNS = ("invoice", "date", "customer", "lines", "subtotal", "discount", "tax", "total")
+ 
+ 
+ def invoice_to_dict(invoice: Invoice) -> dict[str, Any]:
+@@ -38,3 +42,27 @@ def export_json(invoices: Iterable[Invoice], fh: IO[str]) -> None:
+     """Write invoices as a JSON array indented by two spaces, then a newline."""
+     json.dump([invoice_to_dict(inv) for inv in invoices], fh, indent=2, ensure_ascii=False)
+     fh.write("\n")
++
++
++def export_csv(invoices: Iterable[Invoice], fh: IO[str]) -> None:
++    """Write a header row, then one CSV row per invoice with its totals.
++
++    Comma separated, fields quoted only when they need it, every row ending
++    in a bare line feed. Amounts are written like ``1234.50``.
++    """
++    writer = csv.writer(fh, quoting=csv.QUOTE_NONNUMERIC, lineterminator="\n")
++    writer.writerow(CSV_COLUMNS)
++    for invoice in invoices:
++        totals = invoice.totals()
++        writer.writerow(
++            [
++                invoice.number,
++                invoice.issued.isoformat(),
++                invoice.customer,
++                len(invoice.lines),
++                format_cents(totals.subtotal),
++                format_cents(totals.discount),
++                format_cents(totals.tax),
++                format_cents(totals.total),
++            ]
++        )

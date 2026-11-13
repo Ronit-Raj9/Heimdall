@@ -1,0 +1,85 @@
+diff --git a/README.md b/README.md
+index 38b4303..006e493 100644
+--- a/README.md
++++ b/README.md
+@@ -21,7 +21,7 @@ One row per line item, comma separated, UTF-8, with a header row:
+ | `quantity` | decimal, at most three decimal places |
+ | `unit_price` | money amount such as `12.50` |
+ | `tax_rate` | optional, percent such as `8.875` |
+-| `discount` | optional, `10%` or a fixed amount such as `5.00` |
++| `discount` | optional, `10%` or a fixed amount such as `5.00`; several joined by `+`, e.g. `10%+5.00` |
+ 
+ `date`, `customer`, `tax_rate` and `discount` are read from the first row of
+ each invoice. Later rows may leave them blank.
+@@ -29,8 +29,10 @@ each invoice. Later rows may leave them blank.
+ ## Totals
+ 
+ Money is held as integer cents. Line amount = quantity x unit price. The
+-subtotal is the sum of the line amounts, the discount comes off the subtotal,
++subtotal is the sum of the line amounts, the discounts come off the subtotal,
+ and tax is charged on what is left. Fractions of a cent are rounded half up.
++Percentage discounts apply first, each to what is left after the previous
++one; fixed discounts follow. Discounts never take more than the subtotal.
+ 
+ ## Tests
+ 
+diff --git a/ledger/discounts.py b/ledger/discounts.py
+index 2004372..b1260c0 100644
+--- a/ledger/discounts.py
++++ b/ledger/discounts.py
+@@ -72,22 +72,25 @@ class Discount:
+ 
+ 
+ def parse_discounts(text: str) -> list[Discount]:
+-    """Parse the CSV ``discount`` column: empty for none, otherwise one discount."""
++    """Parse the CSV ``discount`` column.
++
++    Empty means no discount. Several discounts are separated by ``+``, as in
++    ``"10%+5.00"``; every part must be a valid discount.
++    """
+     value = text.strip()
+     if not value:
+         return []
+-    return [Discount.parse(value)]
++    return [Discount.parse(part) for part in value.split("+")]
+ 
+ 
+ def total_discount(subtotal: int, discounts: Iterable[Discount]) -> int:
+     """Total discount in cents on ``subtotal`` for an invoice's discounts.
+ 
+-    An invoice holds at most one discount, so this is that discount's amount,
+-    or 0 when there is none.
++    Discounts apply in the order they were added, each to what is left after
++    the previous ones. No discount takes more than what is left, so the
++    result never exceeds ``subtotal``.
+     """
+-    items = list(discounts)
+-    if not items:
+-        return 0
+-    if len(items) > 1:
+-        raise LedgerError("only one discount per invoice is supported")
+-    return items[0].amount_on(subtotal)
++    remaining = subtotal
++    for discount in discounts:
++        remaining -= discount.amount_on(remaining)
++    return subtotal - remaining
+diff --git a/ledger/invoice.py b/ledger/invoice.py
+index 7c1d3f9..c1bce5b 100644
+--- a/ledger/invoice.py
++++ b/ledger/invoice.py
+@@ -89,14 +89,9 @@ class Invoice:
+         return item
+ 
+     def add_discount(self, discount: Discount) -> None:
+-        """Attach a discount. An invoice supports one discount."""
++        """Attach a discount. Several discounts stack; see ``total_discount``."""
+         if not isinstance(discount, Discount):
+             raise TypeError(f"expected a Discount, got {type(discount).__name__}")
+-        if self._discounts:
+-            raise LedgerError(
+-                f"invoice {self.number} already has a discount ({self._discounts[0]}); "
+-                "only one discount per invoice is supported"
+-            )
+         self._discounts.append(discount)
+ 
+     @property

@@ -1,0 +1,27 @@
+diff --git a/ledger/money.py b/ledger/money.py
+index 5096f3f..d1de3c9 100644
+--- a/ledger/money.py
++++ b/ledger/money.py
+@@ -8,6 +8,7 @@ rounded to a whole cent with :func:`round_cents`.
+ 
+ from __future__ import annotations
+ 
++import math
+ import re
+ from decimal import Decimal
+ 
+@@ -66,8 +67,12 @@ def to_decimal(value: str | int | Decimal, what: str) -> Decimal:
+ 
+ 
+ def round_cents(value: float) -> int:
+-    """Round a fractional number of cents to the nearest whole cent."""
+-    return int(round(value))
++    """Round a fractional number of cents to a whole cent, halves up.
++
++    Python's round() sends halves to the even neighbour (24.5 -> 24), so
++    add a half and take the floor instead.
++    """
++    return math.floor(value + 0.5)
+ 
+ 
+ def percent_of(cents: int, percent: Decimal) -> int:

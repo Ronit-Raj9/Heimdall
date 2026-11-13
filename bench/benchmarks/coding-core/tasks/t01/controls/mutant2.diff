@@ -1,0 +1,116 @@
+diff --git a/ledger/__init__.py b/ledger/__init__.py
+index 481db64..902d7f9 100644
+--- a/ledger/__init__.py
++++ b/ledger/__init__.py
+@@ -15,7 +15,7 @@ __version__ = "0.4.0"
+ from .discounts import Discount
+ from .errors import CsvFormatError, LedgerError
+ from .invoice import Invoice, LineItem, Totals
+-from .money import format_cents, parse_amount, percent_of, round_cents
++from .money import format_cents, parse_amount, percent_of, round_half_up
+ from .csvio import load_invoices, read_invoices
+ from .export import export_json, invoice_to_dict
+ 
+@@ -34,5 +34,5 @@ __all__ = [
+     "parse_amount",
+     "percent_of",
+     "read_invoices",
+-    "round_cents",
++    "round_half_up",
+ ]
+diff --git a/ledger/discounts.py b/ledger/discounts.py
+index 5efeb42..2004372 100644
+--- a/ledger/discounts.py
++++ b/ledger/discounts.py
+@@ -54,7 +54,7 @@ class Discount:
+     def amount_on(self, base: int) -> int:
+         """Cents this discount takes from ``base`` cents.
+ 
+-        Percentages are rounded to a whole cent. The result is never
++        Percentages are rounded half up to a whole cent. The result is never
+         more than ``base``, so a discount cannot make an amount negative.
+         """
+         if base <= 0:
+diff --git a/ledger/invoice.py b/ledger/invoice.py
+index 1936d83..334b6fa 100644
+--- a/ledger/invoice.py
++++ b/ledger/invoice.py
+@@ -8,7 +8,7 @@ from decimal import Decimal
+ 
+ from .discounts import Discount, total_discount
+ from .errors import LedgerError
+-from .money import percent_of, round_cents, to_decimal
++from .money import percent_of, round_half_up, to_decimal
+ 
+ MAX_TAX_RATE = Decimal(100)
+ 
+@@ -36,8 +36,8 @@ class LineItem:
+ 
+     @property
+     def amount(self) -> int:
+-        """Line amount in cents: quantity times unit price, rounded to a whole cent."""
+-        return round_cents(float(self.quantity) * self.unit_price)
++        """Line amount in cents: quantity times unit price, rounded half up."""
++        return round_half_up(self.quantity * self.unit_price)
+ 
+ 
+ @dataclass(frozen=True)
+@@ -105,12 +105,8 @@ class Invoice:
+         return tuple(self._discounts)
+ 
+     def subtotal(self) -> int:
+-        """Sum of the line amounts, in cents.
+-
+-        Added up from the unrounded line values so that the subtotal is
+-        rounded only once.
+-        """
+-        return round_cents(sum(float(item.quantity) * item.unit_price for item in self.lines))
++        """Sum of the line amounts, in cents, rounded half up once."""
++        return round_half_up(sum((item.quantity * item.unit_price for item in self.lines), Decimal(0)))
+ 
+     def totals(self) -> Totals:
+         """Subtotal, discount, tax and total of this invoice, in cents."""
+diff --git a/ledger/money.py b/ledger/money.py
+index 5096f3f..321fc8c 100644
+--- a/ledger/money.py
++++ b/ledger/money.py
+@@ -2,14 +2,15 @@
+ 
+ Every amount of money in ledger is an ``int`` number of cents. Quantities,
+ percentages and tax rates are :class:`decimal.Decimal` values with at most
+-three decimal places. Arithmetic that can produce a fraction of a cent is
+-rounded to a whole cent with :func:`round_cents`.
++three decimal places. Arithmetic that can produce a fraction of a cent goes
++through :func:`round_half_up`, so results never depend on float
++representation.
+ """
+ 
+ from __future__ import annotations
+ 
+ import re
+-from decimal import Decimal
++from decimal import ROUND_HALF_UP, Decimal
+ 
+ MAX_PLACES = 3
+ 
+@@ -65,11 +66,15 @@ def to_decimal(value: str | int | Decimal, what: str) -> Decimal:
+     return result
+ 
+ 
+-def round_cents(value: float) -> int:
+-    """Round a fractional number of cents to the nearest whole cent."""
+-    return int(round(value))
++def round_half_up(value: Decimal) -> int:
++    """Round a Decimal number of cents to a whole cent.
++
++    A value exactly halfway between two whole cents goes to the one further
++    from zero: 166.5 -> 167.
++    """
++    return int(value.to_integral_value(rounding=ROUND_HALF_UP))
+ 
+ 
+ def percent_of(cents: int, percent: Decimal) -> int:
+-    """Return ``percent`` % of ``cents``, rounded to a whole cent."""
+-    return round_cents(cents * float(percent) / 100)
++    """Return ``percent`` % of ``cents``, rounded half up to a whole cent."""
++    return round_half_up(Decimal(cents) * percent / 100)

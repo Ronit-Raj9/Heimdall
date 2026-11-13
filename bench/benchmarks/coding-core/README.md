@@ -72,7 +72,7 @@ The suite file (`suite.yaml`) sets the grader command, the restore list and the 
    `python -I -B -m pytest -q -p no:cacheprovider --rootdir=/grader --junitxml=/grader/out/junit.xml /grader/tests`
 5. Pass only if the exit code is 0 and the JUnit file shows more than 0 tests with 0 failures, 0 errors and 0 skipped.
 
-`tools/checktask.sh tasks/<id>` runs this procedure for the reference, the empty patch, every mutant, the exploit and both notes files.
+`tools/checktask.sh tasks/<id>` (or `bash tools/checktask.sh ...`) runs this procedure for the reference, the empty patch, every mutant, the exploit and both notes files.
 
 ## Rules for task authors
 

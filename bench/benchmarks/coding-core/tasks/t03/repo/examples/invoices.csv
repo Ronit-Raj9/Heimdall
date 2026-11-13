@@ -1,0 +1,6 @@
+invoice,date,customer,description,quantity,unit_price,tax_rate,discount
+INV-1001,2026-03-02,Northwind Traders,Website audit,1,1200.00,8.875,
+INV-1001,,,Follow-up calls,2.5,80.00,,
+INV-1002,2026-03-05,"Hale, Brook & Sons",Annual support plan,1,2400.00,0,10%
+INV-1003,2026-03-09,Juniper Labs,Data cleanup,12,45.00,7.25,50.00
+INV-1003,,,Report,1,150.00,,
