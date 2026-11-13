@@ -1,0 +1,31 @@
+{
+  "id": "bifrost-datasheet-2026-11-14",
+  "source": "github.com/maximhq/bifrost bench/spike/datasheet/pricing.json at commit 8dae3c7fa2cd84baed6d9ec447813b599390b06e: the Anthropic rows of Bifrost's pricing datasheet https://getbifrost.ai/datasheet fetched 2026-11-14 (bench/spike/report.sh), the same file the bench gateway pins as framework.pricing.pricing_url (bench/spike/config/config.offline-pinned.json). Every Claude model it lists. Base tier only: input_cost_per_token, output_cost_per_token, cache_read_input_token_cost and cache_creation_input_token_cost, times 1e6. Above-100k/200k-token, 1-hour cache-write, batch and fast tiers are not included.",
+  "captured_at": "2026-11-13T23:05:36Z",
+  "models": {
+    "claude-fable-5": {"input_per_mtok": 10, "output_per_mtok": 50, "cache_read_per_mtok": 1, "cache_write_per_mtok": 12.5},
+    "claude-fable-5-1": {"input_per_mtok": 10, "output_per_mtok": 50, "cache_read_per_mtok": 0.25, "cache_write_per_mtok": 12.5},
+    "claude-fable-5-2": {"input_per_mtok": 8, "output_per_mtok": 40, "cache_read_per_mtok": 0.2, "cache_write_per_mtok": 10},
+    "claude-haiku-4-5": {"input_per_mtok": 1, "output_per_mtok": 5, "cache_read_per_mtok": 0.1, "cache_write_per_mtok": 1.25},
+    "claude-haiku-4-5-20251001": {"input_per_mtok": 1, "output_per_mtok": 5, "cache_read_per_mtok": 0.1, "cache_write_per_mtok": 1.25},
+    "claude-haiku-5-5": {"input_per_mtok": 0.1, "output_per_mtok": 0.5, "cache_read_per_mtok": 0.01, "cache_write_per_mtok": 0.125},
+    "claude-mythos-5": {"input_per_mtok": 10, "output_per_mtok": 50, "cache_read_per_mtok": 1, "cache_write_per_mtok": 12.5},
+    "claude-mythos-5-1": {"input_per_mtok": 10, "output_per_mtok": 50, "cache_read_per_mtok": 0.25, "cache_write_per_mtok": 12.5},
+    "claude-mythos-5-2": {"input_per_mtok": 8, "output_per_mtok": 40, "cache_read_per_mtok": 0.2, "cache_write_per_mtok": 10},
+    "claude-mythos-preview": {"input_per_mtok": 10, "output_per_mtok": 50, "cache_read_per_mtok": 1, "cache_write_per_mtok": 12.5},
+    "claude-opus-4-5": {"input_per_mtok": 5, "output_per_mtok": 25, "cache_read_per_mtok": 0.5, "cache_write_per_mtok": 6.25},
+    "claude-opus-4-5-20251101": {"input_per_mtok": 5, "output_per_mtok": 25, "cache_read_per_mtok": 0.5, "cache_write_per_mtok": 6.25},
+    "claude-opus-4-6": {"input_per_mtok": 5, "output_per_mtok": 25, "cache_read_per_mtok": 0.5, "cache_write_per_mtok": 6.25},
+    "claude-opus-4-6-20260205": {"input_per_mtok": 5, "output_per_mtok": 25, "cache_read_per_mtok": 0.5, "cache_write_per_mtok": 6.25},
+    "claude-opus-4-7": {"input_per_mtok": 5, "output_per_mtok": 25, "cache_read_per_mtok": 0.5, "cache_write_per_mtok": 6.25},
+    "claude-opus-4-7-20260416": {"input_per_mtok": 5, "output_per_mtok": 25, "cache_read_per_mtok": 0.5, "cache_write_per_mtok": 6.25},
+    "claude-opus-4-8": {"input_per_mtok": 5, "output_per_mtok": 25, "cache_read_per_mtok": 0.5, "cache_write_per_mtok": 6.25},
+    "claude-opus-5": {"input_per_mtok": 5, "output_per_mtok": 25, "cache_read_per_mtok": 0.5, "cache_write_per_mtok": 6.25},
+    "claude-opus-5-5": {"input_per_mtok": 4, "output_per_mtok": 20, "cache_read_per_mtok": 0.2, "cache_write_per_mtok": 5},
+    "claude-sonnet-4-5": {"input_per_mtok": 3, "output_per_mtok": 15, "cache_read_per_mtok": 0.3, "cache_write_per_mtok": 3.75},
+    "claude-sonnet-4-5-20250929": {"input_per_mtok": 3, "output_per_mtok": 15, "cache_read_per_mtok": 0.3, "cache_write_per_mtok": 3.75},
+    "claude-sonnet-4-6": {"input_per_mtok": 3, "output_per_mtok": 15, "cache_read_per_mtok": 0.3, "cache_write_per_mtok": 3.75},
+    "claude-sonnet-5": {"input_per_mtok": 2, "output_per_mtok": 10, "cache_read_per_mtok": 0.2, "cache_write_per_mtok": 2.5},
+    "claude-sonnet-5-5": {"input_per_mtok": 2, "output_per_mtok": 10, "cache_read_per_mtok": 0.1, "cache_write_per_mtok": 2.5}
+  }
+}
