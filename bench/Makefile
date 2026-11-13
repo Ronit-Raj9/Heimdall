@@ -31,7 +31,7 @@ test: ## go vet and unit tests (no Docker, no network)
 test-integration: ## Tests that use real Docker
 	$(GOENV) $(GO) test -tags integration ./environments/ ./graders/ ./probes/ ./gateways/...
 
-images: bin ## Build the task base image, the bench image and the agent images
+images: build ## Build the UI and binary, then the task base image, the bench image and the agent images
 	docker build -t bench/coding-core-base:1 benchmarks/coding-core/base
 	docker build -t bench/bifrost-bench:dev .
 	docker build -t bench/agent-claude-code:1 agents/images/claude-code
