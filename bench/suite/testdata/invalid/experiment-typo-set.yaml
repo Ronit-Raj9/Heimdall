@@ -1,0 +1,9 @@
+name: code-wins
+suite: mini@1.0.0
+base: agents/claude-code.yaml
+arms:
+  A: {label: baseline}
+  B: {label: typo, set: {modle: x}}
+primary: {condition: clean, metric: verified_success}
+conditions:
+  - {id: clean, tasks: everything, trials: 1}

@@ -1,0 +1,78 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/maximhq/bifrost/bench/spec/probe.schema.json",
+  "title": "Bifrost Bench probe",
+  "description": "benchmarks/<suite>/probes/<id>.yaml: one perturbation on one layer. Mirrors schemas.ProbeSpec. The layer is any name here; `suite lint` reports a layer the bench does not ship.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["id", "version", "axis", "ps2_family", "layer", "goal_preserving", "apply", "safe_behavior"],
+  "properties": {
+    "id": {"type": "string", "pattern": "^[a-z0-9][a-z0-9._-]*$", "description": "Equals the file name without .yaml."},
+    "version": {"type": "string", "pattern": "^(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)$"},
+    "axis": {"type": "string", "minLength": 1, "description": "Diagnostics row label, e.g. memory, tools, resilience."},
+    "ps2_family": {"enum": ["unavailable_model", "broken_tool", "misleading_instruction"]},
+    "layer": {"type": "string", "pattern": "^[a-z][a-z0-9_]*$"},
+    "goal_preserving": {"type": "boolean"},
+    "apply": {
+      "type": "object",
+      "additionalProperties": false,
+      "minProperties": 1,
+      "maxProperties": 1,
+      "properties": {
+        "overlay": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["from", "to"],
+          "properties": {
+            "from": {"type": "string", "minLength": 1, "description": "Relative to the task folder; may be {{task.notes.stale}}."},
+            "to": {"type": "string", "minLength": 1, "description": "Relative to the workspace; may be {{agent.notes.project_file}}."}
+          }
+        },
+        "fault": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["mode"],
+          "properties": {
+            "mode": {"enum": ["none", "persistent", "once"]},
+            "from_call": {"type": "integer", "minimum": 1},
+            "call": {"type": "integer", "minimum": 1},
+            "status": {"type": "integer", "minimum": 100, "maximum": 599},
+            "retry_after_s": {"type": "integer", "minimum": 0}
+          },
+          "allOf": [
+            {"if": {"properties": {"mode": {"const": "persistent"}}}, "then": {"required": ["from_call", "status"]}},
+            {"if": {"properties": {"mode": {"const": "once"}}}, "then": {"required": ["call", "status"]}}
+          ]
+        },
+        "shim": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["tool", "mode", "calls"],
+          "properties": {
+            "tool": {"type": "string", "minLength": 1},
+            "mode": {"enum": ["crash", "empty"]},
+            "calls": {"type": "integer", "minimum": 1},
+            "exit_code": {"type": "integer", "minimum": 0, "maximum": 255},
+            "output": {"type": "string"}
+          }
+        }
+      }
+    },
+    "safe_behavior": {"type": "string", "minLength": 1},
+    "metrics": {"type": "array", "items": {"type": "string", "minLength": 1}}
+  },
+  "allOf": [
+    {
+      "if": {"required": ["layer"], "properties": {"layer": {"const": "fixture"}}},
+      "then": {"properties": {"apply": {"required": ["overlay"]}}}
+    },
+    {
+      "if": {"required": ["layer"], "properties": {"layer": {"const": "gateway"}}},
+      "then": {"properties": {"apply": {"required": ["fault"]}}}
+    },
+    {
+      "if": {"required": ["layer"], "properties": {"layer": {"const": "tool_shim"}}},
+      "then": {"properties": {"apply": {"required": ["shim"]}}}
+    }
+  ]
+}

@@ -1,0 +1,199 @@
+package suite
+
+import (
+	"context"
+	"io/fs"
+	"os"
+	"path/filepath"
+	"strings"
+	"testing"
+
+	"github.com/maximhq/bifrost/bench/utils"
+)
+
+// copyPack copies testdata/valid/mini into a temp benchmarks folder and
+// returns that folder and the pack root.
+func copyPack(t *testing.T) (benchRoot, packRoot string) {
+	t.Helper()
+	benchRoot = t.TempDir()
+	packRoot = filepath.Join(benchRoot, "mini")
+	src := filepath.Join("testdata", "valid", "mini")
+	err := filepath.WalkDir(src, func(path string, d fs.DirEntry, err error) error {
+		if err != nil {
+			return err
+		}
+		r, err := filepath.Rel(src, path)
+		if err != nil {
+			return err
+		}
+		dst := filepath.Join(packRoot, r)
+		if d.IsDir() {
+			return os.MkdirAll(dst, 0o755)
+		}
+		b, err := os.ReadFile(path)
+		if err != nil {
+			return err
+		}
+		return os.WriteFile(dst, b, 0o644)
+	})
+	if err != nil {
+		t.Fatalf("copy pack: %v", err)
+	}
+	return benchRoot, packRoot
+}
+
+// editFile replaces old with new in the file at path, failing if old is absent.
+func editFile(t *testing.T, path, old, new string) {
+	t.Helper()
+	b, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(b), old) {
+		t.Fatalf("%s does not contain %q", path, old)
+	}
+	if err := os.WriteFile(path, []byte(strings.Replace(string(b), old, new, 1)), 0o644); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestLoad(t *testing.T) {
+	benchRoot, packRoot := copyPack(t)
+	l := newLocalLoader(benchRoot)
+	if l.GetName() != "local" || l.GetVersion() != "1.0.0" {
+		t.Fatalf("name/version = %s/%s", l.GetName(), l.GetVersion())
+	}
+	for _, ref := range []string{"mini", "mini@1.0.0", packRoot} {
+		t.Run(ref, func(t *testing.T) {
+			s, err := l.Load(context.Background(), ref)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if s.ID != "mini" || s.Root != packRoot || len(s.Tasks) != 1 || len(s.Probes) != 1 {
+				t.Fatalf("loaded %+v", s)
+			}
+			task := s.TaskByID("m01")
+			if task == nil || task.Dir != filepath.Join(packRoot, "tasks", "m01") || !filepath.IsAbs(task.Dir) {
+				t.Fatalf("task: %+v", task)
+			}
+			p := s.ProbeByID("stale-notes")
+			if p == nil || p.Path != filepath.Join(packRoot, "probes", "stale-notes.yaml") {
+				t.Fatalf("probe: %+v", p)
+			}
+			if s.Lock != nil || s.LockHash != "" {
+				t.Fatalf("no lock expected, got %s", s.LockHash)
+			}
+		})
+	}
+}
+
+func TestLoadErrors(t *testing.T) {
+	tests := []struct {
+		name string
+		ref  string
+		edit func(t *testing.T, pack string)
+		want []string
+	}{
+		{"version mismatch", "mini@2.0.0", nil, []string{"mini/suite.yaml", "version"}},
+		{"missing pack", "nope", nil, []string{"not found"}},
+		{"unknown task field", "mini", func(t *testing.T, pack string) {
+			editFile(t, filepath.Join(pack, "tasks/m01/task.yaml"), "kind: bugfix", "kind: bugfix\nkinds: bugfix")
+		}, []string{"mini/tasks/m01/task.yaml", "kinds: unknown field"}},
+		{"missing mutant file", "mini", func(t *testing.T, pack string) {
+			editFile(t, filepath.Join(pack, "tasks/m01/task.yaml"), "controls/mutant1.diff", "controls/mutant9.diff")
+		}, []string{"mini/tasks/m01/task.yaml", "controls.mutants[0]", "controls/mutant9.diff not found"}},
+		{"path escapes task", "mini", func(t *testing.T, pack string) {
+			editFile(t, filepath.Join(pack, "tasks/m01/task.yaml"), "instruction: instruction.md", "instruction: ../../suite.yaml")
+		}, []string{"instruction", "leaves the folder"}},
+		{"task id mismatch", "mini", func(t *testing.T, pack string) {
+			editFile(t, filepath.Join(pack, "tasks/m01/task.yaml"), "id: m01", "id: m02")
+		}, []string{"mini/tasks/m01/task.yaml", "id: got \"m02\""}},
+		{"bad probe", "mini", func(t *testing.T, pack string) {
+			editFile(t, filepath.Join(pack, "probes/stale-notes.yaml"), "goal_preserving: true", "goal_preserving: yes please")
+		}, []string{"mini/probes/stale-notes.yaml", "goal_preserving"}},
+		{"suite unknown field", "mini", func(t *testing.T, pack string) {
+			editFile(t, filepath.Join(pack, "suite.yaml"), "workdir:", "work_dir: /x\nworkdir:")
+		}, []string{"mini/suite.yaml", "work_dir: unknown field"}},
+		{"lock for another suite", "mini", func(t *testing.T, pack string) {
+			if err := os.WriteFile(filepath.Join(pack, LockFile), []byte(`{"suite":"other"}`), 0o644); err != nil {
+				t.Fatal(err)
+			}
+		}, []string{"mini/suite.lock", "suite: got \"other\""}},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			benchRoot, packRoot := copyPack(t)
+			if tc.edit != nil {
+				tc.edit(t, packRoot)
+			}
+			_, err := newLocalLoader(benchRoot).Load(context.Background(), tc.ref)
+			if err == nil {
+				t.Fatal("want error, got nil")
+			}
+			for _, w := range tc.want {
+				if !strings.Contains(err.Error(), w) {
+					t.Errorf("error %q does not contain %q", err, w)
+				}
+			}
+		})
+	}
+}
+
+func TestLoadReadsLock(t *testing.T) {
+	benchRoot, packRoot := copyPack(t)
+	l := newLocalLoader(benchRoot)
+	s, err := l.Load(context.Background(), "mini")
+	if err != nil {
+		t.Fatal(err)
+	}
+	lock, err := Lock(s, fixedNow)
+	if err != nil {
+		t.Fatal(err)
+	}
+	data, err := WriteLock(filepath.Join(packRoot, LockFile), lock)
+	if err != nil {
+		t.Fatal(err)
+	}
+	s2, err := l.Load(context.Background(), "mini@1.0.0")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if s2.Lock == nil || s2.LockHash != utils.SHA256Bytes(data) {
+		t.Fatalf("lock hash = %q, want %q", s2.LockHash, utils.SHA256Bytes(data))
+	}
+	if s2.Lock.Tasks["m01"].RepoTreeSHA256 != lock.Tasks["m01"].RepoTreeSHA256 {
+		t.Fatal("lock round trip lost task hashes")
+	}
+}
+
+// TestLoadCodingCore loads and lints the real pack once all eight tasks exist.
+// The pack must load; lint findings are logged for the task authors, not
+// failed on, because tasks are authored in parallel with this package.
+func TestLoadCodingCore(t *testing.T) {
+	benchRoot := filepath.Join("..", "benchmarks")
+	entries, err := os.ReadDir(filepath.Join(benchRoot, "coding-core", "tasks"))
+	if err != nil {
+		t.Skipf("coding-core tasks not readable: %v", err)
+	}
+	n := 0
+	for _, e := range entries {
+		if _, err := os.Stat(filepath.Join(benchRoot, "coding-core", "tasks", e.Name(), TaskFile)); e.IsDir() && err == nil {
+			n++
+		}
+	}
+	if n < 8 {
+		t.Skipf("coding-core has %d task folders with task.yaml, want 8", n)
+	}
+	s, err := newLocalLoader(benchRoot).Load(context.Background(), "coding-core@1.0.0")
+	if err != nil {
+		t.Fatalf("load coding-core: %v", err)
+	}
+	problems := Lint(s)
+	for _, p := range problems {
+		t.Logf("lint %s %s: %s", p.Severity, p.Path, p.Message)
+	}
+	t.Logf("coding-core: %d tasks, %d probes, %d lint problems", len(s.Tasks), len(s.Probes), len(problems))
+	if _, err := Lock(s, fixedNow); err != nil {
+		t.Errorf("lock coding-core: %v", err)
+	}
+}

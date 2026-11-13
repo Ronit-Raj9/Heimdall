@@ -1,0 +1,11 @@
+id: m01
+version: "1.0"
+title: t
+project: calc
+kind: bugfixx
+instruction: /etc/passwd
+repo_dir: repo
+notes: {clean: fixtures/notes.clean.md}
+verifier: {tests: verifier/tests, required: ["test_hidden.py::test_add_negative"]}
+controls: {reference: a.diff, empty: b.diff, mutants: [], exploit: c.sh}
+timeouts: {agent_s: 0}

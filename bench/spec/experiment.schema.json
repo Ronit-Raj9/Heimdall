@@ -1,0 +1,113 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/maximhq/bifrost/bench/spec/experiment.schema.json",
+  "title": "Bifrost Bench experiment",
+  "description": "experiments/<name>.yaml: arms, conditions, endpoint and verdict policy. Mirrors schemas.Experiment (DESIGN.md 16.6).",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["name", "suite", "base", "arms", "primary", "conditions"],
+  "properties": {
+    "id": {"type": "string", "pattern": "^e_[a-z0-9][a-z0-9_-]*$", "description": "Set by the planner when absent."},
+    "name": {"type": "string", "minLength": 1},
+    "suite": {"type": "string", "minLength": 1, "description": "<suite id>[@<version>] or a folder path."},
+    "base": {"type": "string", "minLength": 1, "description": "Agent config path every arm starts from."},
+    "arms": {
+      "type": "object",
+      "minProperties": 2,
+      "patternProperties": {"^[A-Za-z0-9][A-Za-z0-9_-]*$": {"$ref": "#/$defs/arm"}},
+      "additionalProperties": false
+    },
+    "primary": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["condition", "metric"],
+      "properties": {
+        "condition": {"$ref": "#/$defs/condition_id"},
+        "metric": {"type": "string", "minLength": 1}
+      }
+    },
+    "guards": {"type": "array", "items": {"$ref": "#/$defs/guard"}},
+    "conditions": {"type": "array", "minItems": 1, "items": {"$ref": "#/$defs/condition"}},
+    "compatibility": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["agent", "tasks", "conditions", "trials"],
+      "properties": {
+        "agent": {"type": "string", "minLength": 1},
+        "tasks": {"$ref": "#/$defs/task_selector"},
+        "conditions": {"type": "array", "minItems": 1, "items": {"$ref": "#/$defs/condition_id"}},
+        "trials": {"type": "integer", "minimum": 1}
+      }
+    },
+    "budget": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["total_usd"],
+      "properties": {
+        "total_usd": {"type": "number", "minimum": 0}
+      }
+    },
+    "verdict": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["policy"],
+      "properties": {
+        "policy": {"type": "string", "minLength": 1},
+        "alpha": {"type": "number", "exclusiveMinimum": 0, "exclusiveMaximum": 1},
+        "assumed_sd": {"type": "number", "exclusiveMinimum": 0}
+      }
+    },
+    "metrics": {"type": "array", "items": {"type": "string", "minLength": 1}},
+    "extra_gates": {"type": "array", "items": {"type": "string", "minLength": 1}},
+    "seed": {"type": "integer"},
+    "concurrency": {"type": "integer", "minimum": 1},
+    "manifest_mode": {"enum": ["agent_exposure", "stack_resilience"]}
+  },
+  "$defs": {
+    "condition_id": {"type": "string", "pattern": "^[a-z0-9][a-z0-9._-]*$", "description": "clean or a probe id."},
+    "task_selector": {
+      "description": "The scalar all, or a list of task ids.",
+      "anyOf": [
+        {"const": "all"},
+        {"type": "array", "minItems": 1, "items": {"type": "string", "pattern": "^[a-z0-9][a-z0-9._-]*$"}}
+      ]
+    },
+    "arm": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["label"],
+      "properties": {
+        "label": {"type": "string", "minLength": 1},
+        "agent": {"type": "string", "minLength": 1, "description": "Overrides the experiment's base config path."},
+        "set": {
+          "type": "object",
+          "description": "Dotted agent config paths to any value, e.g. notes.user_file or model.",
+          "patternProperties": {"^(id|adapter|image|build|argv|env|files|model|notes|parser|budgets|gateway|scripted)(\\..+)?$": true},
+          "additionalProperties": false
+        }
+      }
+    },
+    "guard": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["rule"],
+      "properties": {
+        "condition": {"$ref": "#/$defs/condition_id"},
+        "rule": {"enum": ["no_regression", "no_new_integrity_violation"]},
+        "metric": {"type": "string", "minLength": 1}
+      },
+      "if": {"properties": {"rule": {"const": "no_regression"}}},
+      "then": {"required": ["condition"]}
+    },
+    "condition": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "tasks", "trials"],
+      "properties": {
+        "id": {"$ref": "#/$defs/condition_id"},
+        "tasks": {"$ref": "#/$defs/task_selector"},
+        "trials": {"type": "integer", "minimum": 1}
+      }
+    }
+  }
+}

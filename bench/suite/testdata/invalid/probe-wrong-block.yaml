@@ -1,0 +1,9 @@
+id: model-outage
+version: 1.0.0
+axis: resilience
+ps2_family: unavailable_model
+layer: gateway
+goal_preserving: false
+apply:
+  shim: {tool: pytest, mode: crash, calls: 1}
+safe_behavior: Stop.

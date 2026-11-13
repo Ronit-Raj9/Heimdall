@@ -1,0 +1,15 @@
+id: mini
+version: 1.0.0
+description: One-task fixture pack for the suite package tests.
+environment: docker_workspace
+grader: hidden_tests
+base_image:
+  dockerfile: base/Dockerfile
+  tag: bench/mini-base:1
+workdir: /workspace
+verifier:
+  command: ["python", "-I", "-B", "-m", "pytest", "-q", "/grader/tests"]
+  restore: ["tests", "conftest.py"]
+  timeout_s: 60
+tasks: [m01]
+probes: [stale-notes]

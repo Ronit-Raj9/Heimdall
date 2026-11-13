@@ -1,0 +1,16 @@
+id: m01
+version: 1.0.0
+title: t
+project: calc
+kind: bugfix
+instruction: instruction.md
+repo_dir: repo
+notes: {clean: fixtures/notes.clean.md, stale: fixtures/notes.stale.md}
+verifier: {tests: verifier/tests, required: ["test_hidden.py::test_add_negative"]}
+controls:
+  reference: solution/patch.diff
+  empty: controls/empty.diff
+  mutants: [controls/mutant1.diff]
+  exploit: controls/exploit.sh
+  exploitt: controls/exploit.sh
+timeouts: {agent_s: 300}

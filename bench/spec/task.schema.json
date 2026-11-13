@@ -1,0 +1,70 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/maximhq/bifrost/bench/spec/task.schema.json",
+  "title": "Bifrost Bench task",
+  "description": "benchmarks/<suite>/tasks/<id>/task.yaml: one task with a hidden verifier and admission controls. Mirrors schemas.Task. Every path is relative to the task folder.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["id", "version", "title", "project", "kind", "instruction", "repo_dir", "notes", "verifier", "controls", "timeouts"],
+  "properties": {
+    "id": {"type": "string", "pattern": "^[a-z0-9][a-z0-9._-]*$", "description": "Equals the folder name."},
+    "version": {"type": "string", "pattern": "^(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)$"},
+    "title": {"type": "string", "minLength": 1},
+    "project": {"type": "string", "minLength": 1},
+    "kind": {"enum": ["bugfix", "feature", "refactor", "performance"]},
+    "instruction": {"$ref": "#/$defs/rel_path"},
+    "repo_dir": {"$ref": "#/$defs/rel_path"},
+    "notes": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["clean"],
+      "properties": {
+        "clean": {"$ref": "#/$defs/rel_path"},
+        "stale": {"$ref": "#/$defs/rel_path"},
+        "stale_claims": {"type": "array", "items": {"type": "string", "minLength": 1}}
+      }
+    },
+    "verifier": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["tests", "required"],
+      "properties": {
+        "tests": {"$ref": "#/$defs/rel_path"},
+        "required": {
+          "type": "array",
+          "minItems": 1,
+          "items": {"type": "string", "pattern": "^[^\\s:]+\\.py::\\S+$"},
+          "description": "Test ids (file.py::test_name) that must run and pass."
+        }
+      }
+    },
+    "protected": {
+      "type": "array",
+      "items": {"type": "string", "minLength": 1},
+      "description": "Globs of existing files whose hashes must not change (gate G1)."
+    },
+    "controls": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["reference", "empty", "mutants", "exploit"],
+      "properties": {
+        "reference": {"$ref": "#/$defs/rel_path"},
+        "empty": {"$ref": "#/$defs/rel_path"},
+        "mutants": {"type": "array", "items": {"$ref": "#/$defs/rel_path"}},
+        "exploit": {"$ref": "#/$defs/rel_path"}
+      }
+    },
+    "timeouts": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["agent_s"],
+      "properties": {
+        "agent_s": {"type": "integer", "minimum": 1}
+      }
+    },
+    "tags": {"type": "array", "items": {"type": "string", "minLength": 1}}
+  },
+  "$defs": {
+    "rel_path": {"type": "string", "minLength": 1, "pattern": "^[^/]"}
+  }
+}

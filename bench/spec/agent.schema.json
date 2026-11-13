@@ -1,0 +1,88 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/maximhq/bifrost/bench/spec/agent.schema.json",
+  "title": "Bifrost Bench agent config",
+  "description": "agents/<id>.yaml: the system under test. Mirrors schemas.AgentConfig. String values may hold {{...}} template variables.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["id", "adapter"],
+  "properties": {
+    "id": {"type": "string", "pattern": "^[a-z0-9][a-z0-9._-]*$"},
+    "adapter": {"enum": ["command", "scripted"]},
+    "image": {"type": "string", "minLength": 1},
+    "build": {"$ref": "#/$defs/image"},
+    "argv": {"type": "array", "items": {"type": "string"}},
+    "env": {"type": "object", "additionalProperties": {"type": "string"}},
+    "files": {
+      "type": "object",
+      "patternProperties": {"^/": {"type": "string"}},
+      "additionalProperties": false,
+      "description": "Container path to content template."
+    },
+    "model": {"type": "string"},
+    "notes": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["project_file"],
+      "properties": {
+        "project_file": {"type": "string", "minLength": 1, "pattern": "^[^/]", "description": "Repo file the agent reads; the stale-notes probe overwrites it."},
+        "user_file": {"type": ["string", "null"], "description": "Host file installed as user-level instructions."},
+        "user_path": {"type": ["string", "null"], "description": "Where user_file is installed, outside the workspace."}
+      }
+    },
+    "parser": {"type": "string", "description": "Empty or absent means gateway-level evidence only."},
+    "budgets": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["wall_s", "cpus", "mem_gb"],
+      "properties": {
+        "wall_s": {"type": "integer", "minimum": 1},
+        "turns": {"type": "integer", "minimum": 0},
+        "cpus": {"type": "number", "exclusiveMinimum": 0},
+        "mem_gb": {"type": "number", "exclusiveMinimum": 0},
+        "pids_limit": {"type": "integer", "minimum": 0},
+        "usd": {"type": "number", "minimum": 0}
+      }
+    },
+    "gateway": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["provider"],
+      "properties": {
+        "provider": {"type": "string", "minLength": 1},
+        "max_retries": {"type": "integer", "minimum": 0},
+        "fallbacks": {"type": "array", "items": {"type": "string", "minLength": 1}}
+      }
+    },
+    "scripted": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind"],
+      "properties": {
+        "kind": {"enum": ["oracle", "noop", "exploit", "refuse"]}
+      }
+    }
+  },
+  "allOf": [
+    {
+      "if": {"required": ["adapter"], "properties": {"adapter": {"const": "command"}}},
+      "then": {"required": ["image", "argv"]}
+    },
+    {
+      "if": {"required": ["adapter"], "properties": {"adapter": {"const": "scripted"}}},
+      "then": {"required": ["scripted"]}
+    }
+  ],
+  "$defs": {
+    "image": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["tag"],
+      "properties": {
+        "dockerfile": {"type": "string", "minLength": 1},
+        "tag": {"type": "string", "minLength": 1},
+        "digest": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"}
+      }
+    }
+  }
+}
