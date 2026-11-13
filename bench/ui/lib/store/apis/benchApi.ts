@@ -6,6 +6,7 @@ import type {
 	DiagnosticsResponse,
 	DoctorResponse,
 	ExperimentCreatedResponse,
+	ExperimentListResponse,
 	ExperimentResponse,
 	Experiment,
 	GridResponse,
@@ -32,6 +33,37 @@ export const IS_FIXTURE_MODE = detectFixtureMode(
 	import.meta.env.VITE_BENCH_FIXTURE,
 );
 
+/**
+ * sessionStorage key of the write token the server requires on every POST (lib.RequireWriteToken).
+ * The token lives only in this tab: never in the URL, Redux or localStorage.
+ */
+export const WRITE_TOKEN_KEY = "bifrost-bench.write-token";
+
+// The token for this page view when sessionStorage is blocked (private mode).
+let pageWriteToken = "";
+
+/** The write token for this tab, or "" when none was entered. Storage access is guarded. */
+export function readWriteToken(): string {
+	if (typeof window === "undefined") return "";
+	try {
+		return window.sessionStorage.getItem(WRITE_TOKEN_KEY) ?? pageWriteToken;
+	} catch {
+		return pageWriteToken;
+	}
+}
+
+/** Stores the write token for this tab; an empty token clears it. */
+export function saveWriteToken(token: string): void {
+	if (typeof window === "undefined") return;
+	pageWriteToken = token;
+	try {
+		if (token) window.sessionStorage.setItem(WRITE_TOKEN_KEY, token);
+		else window.sessionStorage.removeItem(WRITE_TOKEN_KEY);
+	} catch {
+		// Storage blocked: pageWriteToken still carries the token for this page view.
+	}
+}
+
 /** Server-sent events URL for live experiment status. Not an RTK Query endpoint: it streams. */
 export function experimentEventsUrl(expId: string): string {
 	return `${BENCH_API_BASE}/experiments/${encodeURIComponent(expId)}/events`;
@@ -49,15 +81,20 @@ export function getBenchErrorMessage(error: unknown): string {
 	return i18n.t("errors.unexpected", { ns: "bench" });
 }
 
+/** JSON by default; every mutation (each a POST behind the write token) carries the token, queries never do. */
+export function prepareBenchHeaders(headers: Headers, type: "query" | "mutation"): Headers {
+	if (!headers.has("Content-Type")) headers.set("Content-Type", "application/json");
+	const token = type === "mutation" ? readWriteToken().trim() : "";
+	if (token && !headers.has("Authorization")) headers.set("Authorization", `Bearer ${token}`);
+	return headers;
+}
+
 type BenchBaseQuery = BaseQueryFn<string | FetchArgs, unknown, FetchBaseQueryError>;
 
 const httpBaseQuery: BenchBaseQuery = fetchBaseQuery({
 	baseUrl: BENCH_API_BASE,
 	credentials: "include",
-	prepareHeaders: (headers) => {
-		if (!headers.has("Content-Type")) headers.set("Content-Type", "application/json");
-		return headers;
-	},
+	prepareHeaders: (headers, { type }) => prepareBenchHeaders(headers, type),
 });
 
 const fixtureBaseQuery: BenchBaseQuery = async (args) => {
@@ -116,15 +153,23 @@ export const benchApi = createApi({
 		}),
 
 		// Experiments
+		listExperiments: builder.query<ExperimentListResponse, void>({
+			query: () => "/experiments",
+			providesTags: [{ type: "BenchExperiment", id: "LIST" }],
+		}),
 		planExperiment: builder.mutation<PlanResponse, Experiment>({
 			query: (experiment) => ({ url: "/experiments/plan", method: "POST", body: experiment }),
 		}),
 		createExperiment: builder.mutation<ExperimentCreatedResponse, Experiment>({
 			query: (experiment) => ({ url: "/experiments", method: "POST", body: experiment }),
+			invalidatesTags: [{ type: "BenchExperiment", id: "LIST" }],
 		}),
 		startExperiment: builder.mutation<ExperimentResponse, string>({
 			query: (expId) => ({ url: `/experiments/${id(expId)}/start`, method: "POST" }),
-			invalidatesTags: (_result, _error, expId) => [{ type: "BenchExperiment", id: expId }],
+			invalidatesTags: (_result, _error, expId) => [
+				{ type: "BenchExperiment", id: expId },
+				{ type: "BenchExperiment", id: "LIST" },
+			],
 		}),
 		getExperiment: builder.query<ExperimentResponse, string>({
 			query: (expId) => `/experiments/${id(expId)}`,
@@ -185,6 +230,7 @@ export const {
 	useGetHealthQuery,
 	useGetDoctorQuery,
 	useGetCatalogQuery,
+	useListExperimentsQuery,
 	usePlanExperimentMutation,
 	useCreateExperimentMutation,
 	useStartExperimentMutation,

@@ -1,0 +1,4 @@
+# Keys of bench.ts `RunReceipts`, one per line; a trailing ? marks an optional (Go omitempty) key.
+# The top-level response adds "mode". Change with bench.ts and schemas/api.go.
+run_id
+receipts

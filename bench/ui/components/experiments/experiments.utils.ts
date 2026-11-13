@@ -18,26 +18,5 @@ export function newestExperiment(experiments: readonly ExperimentStatus[]): Expe
 	return best;
 }
 
-const TOKEN_KEY = "bifrost-bench.write-token";
-
-/**
- * The write token lives only in this tab's sessionStorage: never in the URL, Redux or
- * localStorage. Storage can be unavailable (private mode, tests), so every access is guarded.
- */
-export function readWriteToken(): string {
-	try {
-		return typeof window === "undefined" ? "" : (window.sessionStorage.getItem(TOKEN_KEY) ?? "");
-	} catch {
-		return "";
-	}
-}
-
-export function saveWriteToken(token: string): void {
-	try {
-		if (typeof window === "undefined") return;
-		if (token) window.sessionStorage.setItem(TOKEN_KEY, token);
-		else window.sessionStorage.removeItem(TOKEN_KEY);
-	} catch {
-		// Storage blocked: the token still works for this page view.
-	}
-}
+// The write token is stored where benchApi reads it for every mutation.
+export { readWriteToken, saveWriteToken } from "@/lib/store/apis/benchApi";

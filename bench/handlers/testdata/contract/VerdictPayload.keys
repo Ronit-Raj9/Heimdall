@@ -1,0 +1,10 @@
+# Keys of bench.ts `VerdictPayload`, one per line; a trailing ? marks an optional (Go omitempty) key.
+# The top-level response adds "mode". Change with bench.ts and schemas/api.go.
+exp_id
+analysis_id
+grade_source
+suite
+verdict
+naive
+gates
+config_diff

@@ -1,0 +1,10 @@
+# Keys of bench.ts `Pair`, one per line; a trailing ? marks an optional (Go omitempty) key.
+# The top-level response adds "mode". Change with bench.ts and schemas/api.go.
+pair_id
+exp_id
+task
+condition
+trial
+runs
+alignment
+first_divergence

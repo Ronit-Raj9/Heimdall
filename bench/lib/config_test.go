@@ -18,7 +18,7 @@ func TestLoadShippedConfig(t *testing.T) {
 		"runs_root": cfg.RunsRoot == "runs", "benchmarks_root": cfg.BenchmarksRoot == "benchmarks",
 		"listen": cfg.Server.Listen == "127.0.0.1:8090", "mode": cfg.Server.Mode == schemas.ModeLive,
 		"gateway.url": cfg.Gateway.URL == "http://127.0.0.1:18080", "agent_url": cfg.Gateway.AgentURL == "http://bifrost:8080",
-		"admin_token_env": cfg.Gateway.AdminTokenEnv == "BIFROST_ADMIN_TOKEN", "provider": cfg.Gateway.Provider == "anthropic",
+		"admin_token_env": cfg.Gateway.AdminTokenEnv == "BIFROST_SETUP_TOKEN", "provider": cfg.Gateway.Provider == "anthropic",
 		"key_slots":   reflect.DeepEqual(cfg.Gateway.KeySlots, []string{"fp-slot-1", "fp-slot-2", "fp-slot-3", "fp-slot-4"}),
 		"control_url": cfg.FaultProxy.ControlURL == "http://127.0.0.1:19101", "eval": cfg.Networks.Eval == "bench-evalnet",
 		"helper": cfg.Images.Helper == "bench/coding-core-base:1", "pricing": cfg.Pricing == "deploy/pricing-snapshot.json",

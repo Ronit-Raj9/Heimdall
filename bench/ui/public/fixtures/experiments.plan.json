@@ -21,14 +21,16 @@
 	"mde_assumed_sd": true,
 	"sd": 0.3,
 	"est_wall_s": {
-		"state": "observed",
-		"v": 3600,
-		"evidence": "outcome"
+		"state": "unknown",
+		"v": null,
+		"evidence": "outcome",
+		"reason": "no pilot yet"
 	},
 	"est_usd": {
-		"state": "observed",
-		"v": 17.5,
-		"evidence": "gateway"
+		"state": "unknown",
+		"v": null,
+		"evidence": "gateway",
+		"reason": "no pilot yet"
 	},
 	"errors": [],
 	"warnings": [

@@ -3,13 +3,19 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { DiagnosticsTable } from "@/components/verdict/diagnosticsTable";
-import { useListVerdictExperimentsQuery } from "@/components/verdict/experimentListApi";
 import { GateChecklist } from "@/components/verdict/gateChecklist";
 import { NaiveScoreboard } from "@/components/verdict/naiveScoreboard";
 import { TaskGrid } from "@/components/verdict/taskGrid";
 import { VerdictCard } from "@/components/verdict/verdictCard";
 import { armOrder, sortExperimentsNewestFirst } from "@/components/verdict/verdict.utils";
-import { getBenchErrorMessage, useGetCatalogQuery, useGetDiagnosticsQuery, useGetGridQuery, useGetVerdictQuery } from "@/lib/store";
+import {
+	getBenchErrorMessage,
+	useGetCatalogQuery,
+	useGetDiagnosticsQuery,
+	useGetGridQuery,
+	useGetVerdictQuery,
+	useListExperimentsQuery,
+} from "@/lib/store";
 import type { MetricDescriptor } from "@/lib/types/bench";
 import { Link, useNavigate } from "@tanstack/react-router";
 import { parseAsString, useQueryState } from "nuqs";
@@ -22,7 +28,7 @@ import { VerdictHeaderStrip } from "./verdictHeaderStrip";
 export default function VerdictView() {
 	const { t } = useTranslation("bench");
 	const [exp, setExp] = useQueryState("exp", parseAsString);
-	const list = useListVerdictExperimentsQuery();
+	const list = useListExperimentsQuery();
 	const experiments = useMemo(() => sortExperimentsNewestFirst(list.data?.experiments ?? []), [list.data]);
 	// Default to the newest experiment without writing it to the URL, so "newest" stays a live default.
 	const selectedId = exp ?? experiments[0]?.exp_id;

@@ -1,0 +1,7 @@
+# Keys of bench.ts `GridRow`, one per line; a trailing ? marks an optional (Go omitempty) key.
+# The top-level response adds "mode". Change with bench.ts and schemas/api.go.
+task
+condition
+diff
+discordant
+cells

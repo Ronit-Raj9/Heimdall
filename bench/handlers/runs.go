@@ -59,18 +59,6 @@ func NewRunsHandler(mode schemas.Mode, index ReadIndex) *RunsHandler {
 	return &RunsHandler{mode: mode, index: index}
 }
 
-// RunDetail answers GET /runs/{id}: the run record with its metrics, gates
-// and grade. A file not yet written is empty or null, never zeros.
-type RunDetail struct {
-	Run      schemas.Run              `json:"run"`
-	Slot     schemas.Slot             `json:"slot"`
-	Sealed   bool                     `json:"sealed"`
-	SealHash string                   `json:"seal_hash,omitempty"`
-	Metrics  map[string]schemas.Value `json:"metrics"`
-	Gates    []schemas.GateResult     `json:"gates"`
-	Grade    *schemas.Grade           `json:"grade"`
-}
-
 // RegisterRoutes registers the run routes.
 func (h *RunsHandler) RegisterRoutes(r *router.Router, middlewares ...lib.Middleware) {
 	p := APIPrefix + "/runs/{id}"
@@ -81,31 +69,46 @@ func (h *RunsHandler) RegisterRoutes(r *router.Router, middlewares ...lib.Middle
 	r.GET(p+"/files/{name}", lib.ChainMiddlewares(h.getRunFile, middlewares...))
 }
 
-// getRun handles GET /api/bench/runs/{id}.
+// getRun handles GET /api/bench/runs/{id}: the run record with its grade,
+// metrics, gates and receipts. The grade is the one the run was sealed with;
+// regrades are read through the experiment's analysis.
 func (h *RunsHandler) getRun(ctx *fasthttp.RequestCtx) {
 	rv, ok := h.lookup(ctx)
 	if !ok {
 		return
 	}
-	out := RunDetail{Run: rv.Run, Slot: rv.Slot, Sealed: rv.Sealed, SealHash: rv.SealHash, Gates: []schemas.GateResult{}}
-	metrics, err := readMetrics(h.index, rv.Run.RunID)
+	id := rv.Run.RunID
+	out := schemas.RunDetail{
+		Slot: rv.Slot, Run: rv.Run, Sealed: rv.Sealed, SealHash: rv.SealHash, GradeSource: GradeSourceOriginal,
+		Gates: []schemas.GateResult{}, Receipts: []schemas.Receipt{},
+	}
+	metrics, err := readMetrics(h.index, id)
 	if err != nil {
-		sendDepError(ctx, h.mode, "read metrics", err)
+		sendDepError(ctx, h.mode, "read metrics of run "+id, err)
 		return
 	}
 	out.Metrics = metrics
-	if _, err := readJSONFile(h.index, rv.Run.RunID, FileGates, &out.Gates); err != nil {
-		sendDepError(ctx, h.mode, "read gates", err)
-		return
-	}
 	var grade schemas.Grade
-	found, err := readJSONFile(h.index, rv.Run.RunID, FileGrade, &grade)
+	found, err := readJSONFile(h.index, id, FileGrade, &grade)
 	if err != nil {
-		sendDepError(ctx, h.mode, "read grade", err)
+		sendDepError(ctx, h.mode, "read grade of run "+id, err)
 		return
 	}
 	if found {
 		out.Grade = &grade
+	}
+	for name, dst := range map[string]any{FileGates: &out.Gates, FileReceipts: &out.Receipts} {
+		if _, err := readJSONFile(h.index, id, name, dst); err != nil {
+			sendDepError(ctx, h.mode, "read "+name+" of run "+id, err)
+			return
+		}
+	}
+	// A file holding JSON null decodes to a nil slice; the contract is a list.
+	if out.Gates == nil {
+		out.Gates = []schemas.GateResult{}
+	}
+	if out.Receipts == nil {
+		out.Receipts = []schemas.Receipt{}
 	}
 	lib.SendJSON(ctx, h.mode, fasthttp.StatusOK, out)
 }

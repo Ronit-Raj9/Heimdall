@@ -1,0 +1,12 @@
+# Keys of bench.ts `ExperimentStatus`, one per line; a trailing ? marks an optional (Go omitempty) key.
+# The top-level response adds "mode". Change with bench.ts and schemas/api.go.
+exp_id
+name
+state
+manifest_hash
+frozen_at
+started_at?
+finished_at?
+slots
+spent_usd
+analysis_id?

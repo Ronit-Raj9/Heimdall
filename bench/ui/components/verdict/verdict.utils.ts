@@ -67,14 +67,11 @@ export function integrityTone(integrity: IntegrityView, decision: Decision): Ton
 	}
 }
 
-/**
- * Go's Verdict carries tasks_needed_over (set when even that many tasks would not be enough);
- * lib/types/bench.ts does not mirror it yet, so it is read here without widening the shared type.
- */
+/** Tasks a new experiment needs: an exact count, or "more than" when tasks_needed_over is set. */
 export type TasksNeededView = { kind: "exact"; count: number } | { kind: "over"; count: number } | null;
 
 export function tasksNeededView(verdict: Verdict): TasksNeededView {
-	const over = (verdict as Verdict & { tasks_needed_over?: number }).tasks_needed_over;
+	const over = verdict.tasks_needed_over;
 	if (typeof over === "number" && over > 0) return { kind: "over", count: over };
 	if (typeof verdict.tasks_needed === "number" && verdict.tasks_needed > 0) return { kind: "exact", count: verdict.tasks_needed };
 	return null;

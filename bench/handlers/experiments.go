@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"bytes"
 	"cmp"
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -11,6 +12,7 @@ import (
 	"slices"
 	"strconv"
 	"strings"
+	"sync"
 
 	"github.com/fasthttp/router"
 	"github.com/maximhq/bifrost/bench/lib"
@@ -33,6 +35,7 @@ type ExperimentsHandler struct {
 	catalog  CatalogSource
 	write    lib.Middleware
 	recorder *eventRecorder
+	analyses sync.Map // exp id -> id of the last original-grade analysis this server computed
 }
 
 // NewExperimentsHandler creates the experiments handler. write guards the
@@ -71,18 +74,10 @@ const (
 	defaultAlpha     = 0.05
 	defaultAssumedSD = 0.30
 	mdePower         = 0.8
+	// noPilotReason is why a plan's time and spend are unknown: nothing has
+	// run yet to estimate them from.
+	noPilotReason = "no pilot yet"
 )
-
-// EventsPoll answers GET /experiments/{id}/events without SSE: the events
-// after ?since=<seq>, the cursor for the next poll, and the status. It is not
-// in schemas/api.go; the UI's designed fallback polls GET /experiments/{id}.
-type EventsPoll struct {
-	ExpID     string                   `json:"exp_id"`
-	Events    []schemas.LiveEvent      `json:"events"`
-	Next      int                      `json:"next"`
-	Truncated bool                     `json:"truncated"` // older events fell out of the window
-	Status    schemas.ExperimentStatus `json:"status"`
-}
 
 // listExperiments handles GET /api/bench/experiments.
 func (h *ExperimentsHandler) listExperiments(ctx *fasthttp.RequestCtx) {
@@ -93,26 +88,46 @@ func (h *ExperimentsHandler) listExperiments(ctx *fasthttp.RequestCtx) {
 	out := schemas.ExperimentList{Experiments: []schemas.ExperimentStatus{}}
 	for _, id := range h.index.Experiments() {
 		if m, ok := h.index.Manifest(id); ok {
-			out.Experiments = append(out.Experiments, BuildStatus(m, h.index.Runs(id)))
+			out.Experiments = append(out.Experiments, h.status(m, h.index.Runs(id), false))
 		}
 	}
 	lib.SendJSON(ctx, h.mode, fasthttp.StatusOK, out)
 }
 
-// planExperiment handles POST /api/bench/experiments/plan. Nothing runs.
+// planExperiment handles POST /api/bench/experiments/plan. Nothing runs. A
+// planner error is part of the plan (its errors list, HTTP 200), so the UI
+// shows it beside the form; only an unreadable body is a 4xx.
 func (h *ExperimentsHandler) planExperiment(ctx *fasthttp.RequestCtx) {
-	m, ok := h.plan(ctx)
+	exp, ok := h.decode(ctx)
 	if !ok {
 		return
 	}
-	lib.SendJSON(ctx, h.mode, fasthttp.StatusOK, BuildPlan(m))
+	m, err := h.planManifest(ctx, exp)
+	switch {
+	case errors.Is(err, context.DeadlineExceeded):
+		sendDepError(ctx, h.mode, "plan experiment", err)
+	case err != nil:
+		lib.SendJSON(ctx, h.mode, fasthttp.StatusOK, FailedPlan(exp, err))
+	default:
+		lib.SendJSON(ctx, h.mode, fasthttp.StatusOK, BuildPlan(m))
+	}
 }
 
 // createExperiment handles POST /api/bench/experiments: plan, then freeze the
-// manifest and write the slots. Nothing runs until start.
+// manifest and write the slots. Nothing runs until start. A planner error is
+// a 400 here: there is nothing to create.
 func (h *ExperimentsHandler) createExperiment(ctx *fasthttp.RequestCtx) {
-	m, ok := h.plan(ctx)
+	exp, ok := h.decode(ctx)
 	if !ok {
+		return
+	}
+	m, err := h.planManifest(ctx, exp)
+	if errors.Is(err, context.DeadlineExceeded) {
+		sendDepError(ctx, h.mode, "plan experiment", err)
+		return
+	}
+	if err != nil {
+		lib.SendError(ctx, h.mode, fasthttp.StatusBadRequest, lib.ErrTypeBadRequest, "plan experiment: "+err.Error())
 		return
 	}
 	work, cancel := workContext(ctx, readTimeout)
@@ -127,7 +142,8 @@ func (h *ExperimentsHandler) createExperiment(ctx *fasthttp.RequestCtx) {
 }
 
 // startExperiment handles POST /api/bench/experiments/{id}/start and answers
-// the experiment's status.
+// 202 with the experiment's full status. The launcher has just accepted the
+// experiment, so the status counts it as active.
 func (h *ExperimentsHandler) startExperiment(ctx *fasthttp.RequestCtx) {
 	if h.launcher == nil {
 		sendUnavailable(ctx, h.mode, "launcher")
@@ -144,13 +160,14 @@ func (h *ExperimentsHandler) startExperiment(ctx *fasthttp.RequestCtx) {
 		return
 	}
 	h.recorder.follow(id)
-	st := schemas.ExperimentStatus{ExpID: id, SpentUSD: schemas.Unknown("not_aggregated", schemas.EvidenceGateway)}
+	// Without the experiment in the index only the id and the state are known.
+	st := schemas.ExperimentStatus{ExpID: id, State: schemas.ExperimentRunning,
+		SpentUSD: schemas.Unknown("not_indexed", schemas.EvidenceGateway)}
 	if h.index != nil {
 		if m, ok := h.index.Manifest(id); ok {
-			st = BuildStatus(m, h.index.Runs(id))
+			st = h.status(m, h.index.Runs(id), true)
 		}
 	}
-	st.State = schemas.ExperimentRunning
 	lib.SendJSON(ctx, h.mode, fasthttp.StatusAccepted, st)
 }
 
@@ -160,7 +177,7 @@ func (h *ExperimentsHandler) getExperiment(ctx *fasthttp.RequestCtx) {
 	if !ok {
 		return
 	}
-	lib.SendJSON(ctx, h.mode, fasthttp.StatusOK, BuildStatus(m, runs))
+	lib.SendJSON(ctx, h.mode, fasthttp.StatusOK, h.status(m, runs, false))
 }
 
 // getVerdict handles GET /api/bench/experiments/{id}/verdict?grade_source=.
@@ -242,8 +259,8 @@ func (h *ExperimentsHandler) getEvents(ctx *fasthttp.RequestCtx) {
 	}
 	h.recorder.follow(m.ExpID)
 	events, next, truncated := h.recorder.since(m.ExpID, since)
-	lib.SendJSON(ctx, h.mode, fasthttp.StatusOK, EventsPoll{
-		ExpID: m.ExpID, Events: events, Next: next, Truncated: truncated, Status: BuildStatus(m, runs),
+	lib.SendJSON(ctx, h.mode, fasthttp.StatusOK, schemas.EventsPoll{
+		ExpID: m.ExpID, Events: events, Next: next, Truncated: truncated, Status: h.status(m, runs, false),
 	})
 }
 
@@ -275,14 +292,11 @@ func (h *ExperimentsHandler) streamEvents(ctx *fasthttp.RequestCtx, expID string
 // BuildPlan sizes a planned manifest: slots, pairs, per-condition counts and
 // the minimal detectable effect on the primary endpoint for its task count,
 // with the experiment's alpha and assumed SD (power 0.8, as the verdict).
-// Time and spend are not estimated and stay unknown. It is pure.
+// Time and spend stay unknown until a pilot exists. It never carries the
+// manifest. It is pure.
 func BuildPlan(m *schemas.Manifest) schemas.ExperimentPlan {
-	p := schemas.ExperimentPlan{
-		Slots: len(m.Slots), Conditions: planConditions(m),
-		EstWallS: schemas.Unknown("not_estimated", schemas.EvidenceOutcome),
-		EstUSD:   schemas.Unknown("not_estimated", schemas.EvidenceGateway),
-		Errors:   []string{}, Warnings: []string{},
-	}
+	p := emptyPlan(&m.Experiment)
+	p.Slots, p.Conditions = len(m.Slots), planConditions(m)
 	pairs := map[string]bool{}
 	for _, s := range m.Slots {
 		if s.Counted {
@@ -291,7 +305,6 @@ func BuildPlan(m *schemas.Manifest) schemas.ExperimentPlan {
 	}
 	p.Pairs = len(pairs)
 	alpha := cmp.Or(m.Experiment.Verdict.Alpha, defaultAlpha)
-	p.SD, p.MDEAssumedSD = cmp.Or(m.Experiment.Verdict.AssumedSD, defaultAssumedSD), true
 	tasks := 0
 	for _, c := range p.Conditions {
 		if c.Condition == m.Experiment.Primary.Condition {
@@ -308,8 +321,29 @@ func BuildPlan(m *schemas.Manifest) schemas.ExperimentPlan {
 	return p
 }
 
-// plan decodes the experiment from the body and runs the launcher's planner.
-func (h *ExperimentsHandler) plan(ctx *fasthttp.RequestCtx) (*schemas.Manifest, bool) {
+// FailedPlan is the plan answered when the planner refuses an experiment:
+// nothing sized, the planner's error in errors. It is pure.
+func FailedPlan(exp *schemas.Experiment, err error) schemas.ExperimentPlan {
+	p := emptyPlan(exp)
+	p.Errors = append(p.Errors, "plan experiment: "+err.Error())
+	return p
+}
+
+// emptyPlan is a plan with nothing sized: the assumed SD, estimates unknown
+// for want of a pilot, and empty, non-null lists.
+func emptyPlan(exp *schemas.Experiment) schemas.ExperimentPlan {
+	return schemas.ExperimentPlan{
+		Conditions: []schemas.PlanCondition{},
+		SD:         cmp.Or(exp.Verdict.AssumedSD, defaultAssumedSD), MDEAssumedSD: true,
+		EstWallS: schemas.Unknown(noPilotReason, schemas.EvidenceOutcome),
+		EstUSD:   schemas.Unknown(noPilotReason, schemas.EvidenceGateway),
+		Errors:   []string{}, Warnings: []string{},
+	}
+}
+
+// decode checks for a launcher and reads the experiment from the body, or
+// answers the error.
+func (h *ExperimentsHandler) decode(ctx *fasthttp.RequestCtx) (*schemas.Experiment, bool) {
 	if h.launcher == nil {
 		sendUnavailable(ctx, h.mode, "launcher")
 		return nil, false
@@ -323,18 +357,81 @@ func (h *ExperimentsHandler) plan(ctx *fasthttp.RequestCtx) (*schemas.Manifest, 
 		lib.SendError(ctx, h.mode, status, errType, err.Error())
 		return nil, false
 	}
+	return exp, true
+}
+
+// planManifest runs the launcher's planner under the read deadline.
+func (h *ExperimentsHandler) planManifest(ctx *fasthttp.RequestCtx, exp *schemas.Experiment) (*schemas.Manifest, error) {
 	work, cancel := workContext(ctx, readTimeout)
 	defer cancel()
 	m, err := h.launcher.Plan(work, exp)
 	if err != nil {
-		lib.SendError(ctx, h.mode, fasthttp.StatusBadRequest, lib.ErrTypeBadRequest, "plan experiment: "+err.Error())
-		return nil, false
+		return nil, err
 	}
 	if m == nil {
-		lib.SendError(ctx, h.mode, fasthttp.StatusInternalServerError, lib.ErrTypeInternal, "plan experiment: no manifest")
-		return nil, false
+		return nil, errors.New("the planner returned no manifest")
 	}
-	return m, true
+	return m, nil
+}
+
+// status derives an experiment's status with the facts BuildStatus cannot
+// read itself: run costs, the launcher's activity and the newest analysis.
+// started marks an experiment the launcher has just accepted.
+func (h *ExperimentsHandler) status(m *schemas.Manifest, runs []RunView, started bool) schemas.ExperimentStatus {
+	active := started
+	if ar, ok := h.launcher.(ActivityReporter); ok && !active {
+		active = ar.Active(m.ExpID)
+	}
+	return BuildStatus(m, runs, StatusFacts{Costs: runCosts(h.index, runs), Active: active, AnalysisID: h.latestAnalysis(m.ExpID)})
+}
+
+// latestAnalysis returns the newest analysis id of an experiment: from the
+// index when it lists analyses, else the last one this server computed.
+func (h *ExperimentsHandler) latestAnalysis(expID string) string {
+	if ai, ok := h.index.(AnalysisIndex); ok {
+		if id, found := ai.LatestAnalysis(expID); found {
+			return id
+		}
+	}
+	if id, ok := h.analyses.Load(expID); ok {
+		if s, isString := id.(string); isString {
+			return s
+		}
+	}
+	return ""
+}
+
+// runCosts reads cost_usd from every sealed run's metrics.json. A run with
+// no metrics.json gets no entry. A file that cannot be read or parsed, or
+// carries no cost, gives an unknown: a bad file never zeroes the spend and
+// never fails a status read.
+func runCosts(index ReadIndex, runs []RunView) map[string]schemas.Value {
+	out := map[string]schemas.Value{}
+	for _, rv := range runs {
+		if !rv.Sealed {
+			continue
+		}
+		id := rv.Run.RunID
+		data, found, err := readRunFile(index, id, FileMetrics)
+		if err != nil {
+			out[id] = schemas.Unknown("metrics_unreadable", schemas.EvidenceGateway)
+			continue
+		}
+		if !found {
+			continue
+		}
+		var metrics map[string]schemas.Value
+		if err := json.Unmarshal(data, &metrics); err != nil {
+			out[id] = schemas.Unknown("metrics_unreadable", schemas.EvidenceGateway)
+			continue
+		}
+		c, ok := metrics[costMetric]
+		if !ok {
+			c = schemas.Unknown("cost_not_measured", schemas.EvidenceGateway)
+		}
+		out[id] = c
+	}
+	return out
 }
 
 // DecodeExperiment reads an experiment from a request body: JSON for
@@ -410,6 +507,9 @@ func (h *ExperimentsHandler) analyze(ctx *fasthttp.RequestCtx, expID string) (*s
 	if a == nil {
 		sendNotFound(ctx, h.mode, "analysis", expID)
 		return nil, false
+	}
+	if source == GradeSourceOriginal && a.AnalysisID != "" {
+		h.analyses.Store(expID, a.AnalysisID)
 	}
 	return a, true
 }

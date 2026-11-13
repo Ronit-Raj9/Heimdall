@@ -1,0 +1,6 @@
+# Keys of bench.ts `PairRun`, one per line; a trailing ? marks an optional (Go omitempty) key.
+# The top-level response adds "mode". Change with bench.ts and schemas/api.go.
+arm
+slot
+run
+metrics

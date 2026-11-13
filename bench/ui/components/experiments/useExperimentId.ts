@@ -1,4 +1,4 @@
-import { useListBenchExperimentsQuery } from "./experimentsApi";
+import { useListExperimentsQuery } from "@/lib/store/apis/benchApi";
 import { newestExperiment } from "./experiments.utils";
 
 export interface ExperimentIdState {
@@ -13,7 +13,7 @@ export interface ExperimentIdState {
 
 /** The experiment named in the URL, or the newest one on the server when the URL names none. */
 export function useExperimentId(fromUrl: string | null): ExperimentIdState {
-	const list = useListBenchExperimentsQuery(undefined, { skip: Boolean(fromUrl) });
+	const list = useListExperimentsQuery(undefined, { skip: Boolean(fromUrl) });
 	if (fromUrl) return { expId: fromUrl, isLoading: false, error: undefined, isEmpty: false, refetch: () => undefined };
 	const newest = list.data ? newestExperiment(list.data.experiments) : null;
 	return {

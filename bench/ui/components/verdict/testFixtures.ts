@@ -9,6 +9,6 @@ export const diagnosticsFixture = diagnosticsJson as unknown as DiagnosticsRespo
 export const gridFixture = gridJson as unknown as GridResponse;
 
 /** A copy of the fixture verdict with fields replaced. */
-export function verdictWith(overrides: Partial<Verdict> & { tasks_needed_over?: number }): Verdict {
+export function verdictWith(overrides: Partial<Verdict>): Verdict {
 	return { ...structuredClone(verdictFixture.verdict), ...overrides };
 }

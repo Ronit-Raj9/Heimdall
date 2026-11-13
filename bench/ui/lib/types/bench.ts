@@ -6,9 +6,9 @@
  * JSON keys are snake_case. Go `omitempty` fields are optional here; Go pointers are `| null`
  * only where the JSON can carry an explicit null.
  *
- * Sections marked "UI PROPOSAL" have no Go type yet (HTTP response envelopes, grid, pair, plan,
- * status, health, doctor, audit, regrade, config diff). They are the UI's reading of
- * docs/DESIGN.md 16.7 and must be confirmed or replaced when the API server's types land.
+ * The "HTTP API payloads" section mirrors bench/schemas/api.go, the API contract. The Go test
+ * bench/handlers/contract_test.go pins every route's keys to bench/handlers/testdata/contract/*.keys,
+ * one file per type below; change a type here, its Go struct and its .keys file together.
  */
 
 // ---------------------------------------------------------------------------------------------
@@ -464,8 +464,8 @@ export type Action = "ship" | "hold" | "no_decision" | "fix_harness";
 /** An undetermined guard blocks IMPROVED. */
 export type GuardStatus = "pass" | "fail" | "undetermined";
 
-/** Sits beside the verdict. A regression never shows green. */
-export type IntegrityStatus = "clean" | "alert" | "regressed";
+/** Sits beside the verdict. A regression never shows green. unknown: no gate data (an audit of published counts). */
+export type IntegrityStatus = "clean" | "alert" | "regressed" | "unknown";
 
 /** One task's paired difference. */
 export interface TaskDiff {
@@ -522,12 +522,14 @@ export interface Verdict {
 	sd: number;
 	/** Tasks a new experiment needs to detect |d_bar|. */
 	tasks_needed?: number;
+	/** Set when even this many tasks would not be enough. */
+	tasks_needed_over?: number;
 	/** "task" */
 	randomization_unit: string;
 	tie_rule: string;
 	guards: GuardResult[];
 	invalid_reasons?: string[];
-	/** Empty on an audit verdict: a published table says nothing about veto gates. */
+	/** "unknown" or "" on an audit verdict: a published table says nothing about veto gates. */
 	integrity: IntegrityStatus | "";
 	manifest_hash: string;
 	frozen_at: string;
@@ -634,7 +636,7 @@ export interface Catalog {
 }
 
 // =============================================================================================
-// UI PROPOSAL: no Go type yet. Confirm against the API server when it lands.
+// api.go: HTTP API payloads (DESIGN.md 16.7)
 // =============================================================================================
 
 /** `mode` sits at the top level of every response object, beside the payload. */
@@ -736,6 +738,21 @@ export interface Pair {
 	first_divergence: FirstDivergence | null;
 }
 
+/** GET /runs/{id}: one run with its seal, grade, metrics, gates and receipts. Unwritten files are null or empty. */
+export interface RunDetail {
+	slot: Slot;
+	run: Run;
+	sealed: boolean;
+	/** Empty until the run is sealed. */
+	seal_hash: string;
+	grade: Grade | null;
+	/** "original": the grade the run was sealed with. */
+	grade_source: string;
+	metrics: Record<string, Value>;
+	gates: GateResult[];
+	receipts: Receipt[];
+}
+
 /** GET /runs/{id}/events */
 export interface RunEvents {
 	run_id: string;
@@ -811,6 +828,35 @@ export interface ExperimentStatus {
 	analysis_id?: string;
 }
 
+/** GET /experiments */
+export interface ExperimentList {
+	experiments: ExperimentStatus[];
+}
+
+/** One server-sent event on GET /experiments/{id}/events. */
+export interface LiveEvent {
+	seq: number;
+	/** slot_started | stage | slot_sealed | budget_stop | experiment_done | error | end */
+	kind: string;
+	slot_id?: string;
+	run_id?: string;
+	stage?: Stage;
+	outcome?: Outcome;
+	message?: string;
+	at: string;
+}
+
+/** GET /experiments/{id}/events without text/event-stream: the events after ?since=<seq>. */
+export interface EventsPoll {
+	exp_id: string;
+	events: LiveEvent[];
+	/** The ?since= of the next poll. */
+	next: number;
+	/** Older events fell out of the server's window. */
+	truncated: boolean;
+	status: ExperimentStatus;
+}
+
 /** GET /health */
 export interface Health {
 	status: "ok";
@@ -868,10 +914,12 @@ export type CatalogResponse = Catalog;
 export type PlanResponse = WithMode<ExperimentPlan>;
 export type ExperimentCreatedResponse = WithMode<ExperimentCreated>;
 export type ExperimentResponse = WithMode<ExperimentStatus>;
+export type ExperimentListResponse = WithMode<ExperimentList>;
+export type EventsPollResponse = WithMode<EventsPoll>;
 export type VerdictResponse = WithMode<VerdictPayload>;
 export type DiagnosticsResponse = WithMode<DiagnosticsPayload>;
 export type GridResponse = WithMode<Grid>;
-export type RunResponse = WithMode<SealedRun>;
+export type RunResponse = WithMode<RunDetail>;
 export type RunEventsResponse = WithMode<RunEvents>;
 export type RunDiffResponse = WithMode<RunDiff>;
 export type RunReceiptsResponse = WithMode<RunReceipts>;

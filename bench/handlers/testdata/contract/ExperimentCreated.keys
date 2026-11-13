@@ -1,0 +1,5 @@
+# Keys of bench.ts `ExperimentCreated`, one per line; a trailing ? marks an optional (Go omitempty) key.
+# The top-level response adds "mode". Change with bench.ts and schemas/api.go.
+exp_id
+manifest_hash
+created_at

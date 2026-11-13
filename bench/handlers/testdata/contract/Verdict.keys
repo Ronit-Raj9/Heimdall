@@ -1,0 +1,19 @@
+# Keys of bench.ts `Verdict`, one per line; a trailing ? marks an optional (Go omitempty) key.
+# The top-level response adds "mode". Change with bench.ts and schemas/api.go.
+primary
+decision
+action
+effect?
+alpha
+mde
+mde_assumed_sd
+sd
+tasks_needed?
+tasks_needed_over?
+randomization_unit
+tie_rule
+guards
+invalid_reasons?
+integrity
+manifest_hash
+frozen_at

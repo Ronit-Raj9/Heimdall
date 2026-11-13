@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"errors"
 	"testing"
 
 	"github.com/maximhq/bifrost/bench/schemas"
@@ -51,14 +52,21 @@ func TestBuildPlan(t *testing.T) {
 	if p.Slots != 4 || p.Pairs != 2 || len(p.Conditions) != 1 || !p.MDEAssumedSD || p.SD != 0.30 {
 		t.Fatalf("plan = %+v", p)
 	}
-	// Two tasks: MDE exists and is large.
-	if p.MDE <= 0 || len(p.Warnings) != 0 || p.EstUSD.IsObserved() {
+	// Two tasks: MDE exists and is large. Nothing has run: no estimates.
+	if p.MDE <= 0 || len(p.Warnings) != 0 || len(p.Errors) != 0 || p.EstUSD.IsObserved() || p.EstWallS.Reason != "no pilot yet" {
 		t.Errorf("plan = %+v", p)
 	}
 	m.Slots = m.Slots[:2] // one task left
 	p = BuildPlan(m)
 	if p.MDE != 0 || len(p.Warnings) != 1 {
 		t.Errorf("one-task plan = %+v", p)
+	}
+}
+
+func TestFailedPlan(t *testing.T) {
+	p := FailedPlan(&schemas.Experiment{Verdict: schemas.VerdictSpec{AssumedSD: 0.4}}, errors.New("no arms"))
+	if len(p.Errors) != 1 || p.Slots != 0 || p.SD != 0.4 || p.Conditions == nil || p.Warnings == nil || p.EstUSD.State != schemas.ValueUnknown {
+		t.Fatalf("plan = %+v", p)
 	}
 }
 
@@ -72,13 +80,31 @@ func TestPlanAndCreateRoutes(t *testing.T) {
 	if body["slots"] != float64(4) || body["pairs"] != float64(2) || l.planned == nil || !l.planned.Conditions[0].Tasks.All {
 		t.Fatalf("plan = %v", body)
 	}
-	if resp := c.do(t, "POST", "/api/bench/experiments/plan", []byte("name: bad\n"), authed("application/yaml")); resp.StatusCode() != 400 {
-		t.Errorf("bad plan status = %d", resp.StatusCode())
-	}
-	resp := c.do(t, "POST", "/api/bench/experiments", []byte("name: demo\n"), authed("application/yaml"))
+	resp := c.do(t, "POST", "/api/bench/experiments/plan", []byte("name: bad\n"), authed("application/yaml"))
 	body = decodeBody(t, resp)
-	if resp.StatusCode() != 201 || body["exp_id"] != testExp || body["manifest_hash"] != "sha256:abc" || l.created == nil {
+	if errs, _ := body["errors"].([]any); resp.StatusCode() != 200 || len(errs) != 1 || body["slots"] != float64(0) {
+		t.Errorf("refused plan = %d %v, want 200 with one error", resp.StatusCode(), body)
+	}
+	if _, leaked := body["manifest"]; leaked {
+		t.Errorf("plan leaks the manifest: %v", body)
+	}
+	if resp := c.do(t, "POST", "/api/bench/experiments/plan", []byte("nope: 1\n"), authed("application/yaml")); resp.StatusCode() != 400 {
+		t.Errorf("unreadable plan body status = %d, want 400", resp.StatusCode())
+	}
+	if resp := c.do(t, "POST", "/api/bench/experiments", []byte("name: bad\n"), authed("application/yaml")); resp.StatusCode() != 400 {
+		t.Errorf("refused create status = %d, want 400", resp.StatusCode())
+	}
+	resp = c.do(t, "POST", "/api/bench/experiments", []byte("name: demo\n"), authed("application/yaml"))
+	body = decodeBody(t, resp)
+	if resp.StatusCode() != 201 || body["exp_id"] != testExp || body["manifest_hash"] != "sha256:abc" ||
+		body["created_at"] != "2026-11-14T23:41:00Z" || l.created == nil {
 		t.Fatalf("create = %d %v", resp.StatusCode(), body)
+	}
+	resp = c.do(t, "POST", "/api/bench/experiments/e_test/start", nil, authed(""))
+	body = decodeBody(t, resp)
+	slots, _ := body["slots"].(map[string]any)
+	if resp.StatusCode() != 202 || body["state"] != "analyzing" || slots["total"] != float64(4) || l.started != testExp {
+		t.Fatalf("start = %d %v", resp.StatusCode(), body)
 	}
 }
 

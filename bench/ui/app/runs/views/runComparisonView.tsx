@@ -166,7 +166,8 @@ function toClaimRow(lane: LoadedLane): ClaimRow {
 	return {
 		arm: lane.pairRun.arm,
 		run: lane.pairRun.run,
-		grade: lane.detail.data?.grade,
+		// RunDetail.grade is null until the run is graded.
+		grade: lane.detail.data?.grade ?? undefined,
 		gradeState: lane.detail.isLoading ? "loading" : lane.detail.error ? "error" : "ready",
 	};
 }

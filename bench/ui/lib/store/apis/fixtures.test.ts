@@ -2,6 +2,7 @@ import {
 	RECEIPT_STEPS,
 	type Grid,
 	type PairResponse,
+	type PlanResponse,
 	type RunEventsResponse,
 	type RunReceiptsResponse,
 	type RunResponse,
@@ -13,6 +14,8 @@ import { describe, expect, it } from "vitest";
 import { BENCH_API_BASE, FIXTURE_ROUTES, detectFixtureMode, resolveFixture } from "./fixtures";
 
 const FIXTURE_DIR = path.resolve(__dirname, "../../../public/fixtures");
+// The Go contract test reads the same key lists (bench/handlers/contract_test.go).
+const CONTRACT_DIR = path.resolve(__dirname, "../../../../handlers/testdata/contract");
 const readFixture = <T>(file: string): T => JSON.parse(fs.readFileSync(path.join(FIXTURE_DIR, file), "utf8")) as T;
 const fixtureFiles = fs.readdirSync(FIXTURE_DIR).filter((file) => file.endsWith(".json"));
 
@@ -39,6 +42,7 @@ describe("resolveFixture", () => {
 		{ method: "POST", url: "/experiments", want: "experiments.create.json" },
 		{ method: "post", url: "/experiments/e_x/start", want: "experiments.start.json" },
 		{ method: "GET", url: "/experiments/e_x", want: "experiments.get.json" },
+		{ method: "GET", url: `${BENCH_API_BASE}/experiments`, want: "experiments.list.json" },
 		{ method: "GET", url: "/experiments/e_x/verdict?x=1", want: "experiments.verdict.json" },
 		{ method: "GET", url: "/runs/r_abc", want: "runs.r_abc.json" },
 		{ method: "GET", url: "/runs/r_abc/events", want: "runs.r_abc.events.json" },
@@ -103,6 +107,100 @@ describe("fixture files", () => {
 			for (const receipt of readFixture<RunReceiptsResponse>(file).receipts) {
 				expect(Object.keys(receipt.steps).sort()).toEqual([...RECEIPT_STEPS].sort());
 			}
+		}
+	});
+});
+
+/** A contract key list: required keys, and optional ones (Go omitempty, "?" in the file). */
+function contractKeys(type: string): { required: string[]; optional: string[] } {
+	const lines = fs
+		.readFileSync(path.join(CONTRACT_DIR, `${type}.keys`), "utf8")
+		.split("\n")
+		.map((line) => line.trim())
+		.filter((line) => line.length > 0 && !line.startsWith("#"));
+	return {
+		required: lines.filter((line) => !line.endsWith("?")),
+		optional: lines.filter((line) => line.endsWith("?")).map((line) => line.slice(0, -1)),
+	};
+}
+
+type JsonObject = Record<string, unknown>;
+
+/** The objects at a path of keys, where "[]" after a key means every element of that array. */
+function objectsAt(root: JsonObject, keyPath: string): JsonObject[] {
+	let current: JsonObject[] = [root];
+	for (const segment of keyPath.split(".")) {
+		const each = segment.endsWith("[]");
+		const key = each ? segment.slice(0, -2) : segment;
+		current = current.flatMap((obj) => {
+			const value = obj[key];
+			const items = each ? (Array.isArray(value) ? value : []) : [value];
+			return items.filter((item): item is JsonObject => typeof item === "object" && item !== null && !Array.isArray(item));
+		});
+	}
+	return current;
+}
+
+/** Fixture file -> its bench.ts type, plus nested objects to check: path -> type. */
+function contractFor(file: string): { type: string; nested: Record<string, string> } | null {
+	const byFile: Record<string, { type: string; nested: Record<string, string> }> = {
+		"health.json": { type: "Health", nested: {} },
+		"doctor.json": { type: "Doctor", nested: {} },
+		"catalog.json": { type: "Catalog", nested: {} },
+		"audit.json": { type: "Verdict", nested: {} },
+		"regrade.json": { type: "RegradeResult", nested: {} },
+		"experiments.plan.json": { type: "ExperimentPlan", nested: {} },
+		"experiments.create.json": { type: "ExperimentCreated", nested: {} },
+		"experiments.get.json": { type: "ExperimentStatus", nested: { slots: "SlotProgress" } },
+		"experiments.start.json": { type: "ExperimentStatus", nested: { slots: "SlotProgress" } },
+		"experiments.list.json": { type: "ExperimentList", nested: { "experiments[]": "ExperimentStatus" } },
+		"experiments.verdict.json": { type: "VerdictPayload", nested: { verdict: "Verdict" } },
+		"experiments.diagnostics.json": { type: "DiagnosticsPayload", nested: {} },
+		"experiments.grid.json": { type: "Grid", nested: { "rows[]": "GridRow", "rows[].cells[]": "GridCell" } },
+	};
+	if (byFile[file]) return byFile[file];
+	if (file.startsWith("pairs.")) return { type: "Pair", nested: { "runs[]": "PairRun" } };
+	if (!file.startsWith("runs.")) return null;
+	if (file.endsWith(".events.json")) return { type: "RunEvents", nested: {} };
+	if (file.endsWith(".diff.json")) return { type: "RunDiff", nested: {} };
+	if (file.endsWith(".receipts.json")) return { type: "RunReceipts", nested: {} };
+	return { type: "RunDetail", nested: {} };
+}
+
+/** Problems with one object's keys against a contract key list. "_comment" labels a fixture and is allowed. */
+function keyProblems(where: string, obj: JsonObject, type: string, topLevel: boolean): string[] {
+	const { required, optional } = contractKeys(type);
+	const need = topLevel && !required.includes("mode") ? [...required, "mode"] : required;
+	const allowed = new Set([...need, ...optional, ...(topLevel ? ["_comment"] : [])]);
+	return [
+		...need.filter((key) => !(key in obj)).map((key) => `${where}: missing ${key}`),
+		...Object.keys(obj)
+			.filter((key) => !allowed.has(key))
+			.map((key) => `${where}: ${key} is not in ${type}`),
+	];
+}
+
+describe("fixture shapes", () => {
+	it("match the Go contract key lists", () => {
+		const problems: string[] = [];
+		for (const file of fixtureFiles) {
+			const contract = contractFor(file);
+			expect(contract, `${file} has no contract type`).not.toBeNull();
+			const body = readFixture<JsonObject>(file);
+			problems.push(...keyProblems(file, body, contract!.type, true));
+			for (const [keyPath, type] of Object.entries(contract!.nested)) {
+				const objects = objectsAt(body, keyPath);
+				expect(objects.length, `${file} ${keyPath}`).toBeGreaterThan(0);
+				objects.forEach((obj, i) => problems.push(...keyProblems(`${file} ${keyPath} #${i}`, obj, type, false)));
+			}
+		}
+		expect(problems).toEqual([]);
+	});
+
+	it("leave plan estimates unknown until a pilot exists", () => {
+		const plan = readFixture<PlanResponse>("experiments.plan.json");
+		for (const estimate of [plan.est_wall_s, plan.est_usd]) {
+			expect(estimate).toMatchObject({ state: "unknown", v: null, reason: "no pilot yet" });
 		}
 	});
 });

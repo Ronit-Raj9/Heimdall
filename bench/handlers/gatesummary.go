@@ -7,9 +7,9 @@ import (
 	"github.com/maximhq/bifrost/bench/schemas"
 )
 
-// GateSummaries aggregates every gate over the sealed latest runs of counted
-// slots, from their gates.json. Fired is runs fired over runs checked; a run
-// sealed without that gate's result counts as unknown. Baseline comes from the
+// GateSummaries aggregates every gate over the counted runs of counted slots,
+// from their gates.json. Fired is runs fired over runs checked; a run sealed
+// without that gate's result counts as unknown. Baseline comes from the
 // catalog when one is given. Gates are sorted by name.
 func GateSummaries(index ReadIndex, runs []RunView, catalog *schemas.Catalog) ([]schemas.GateSummary, error) {
 	baseline := map[string]bool{}
@@ -18,9 +18,9 @@ func GateSummaries(index ReadIndex, runs []RunView, catalog *schemas.Catalog) ([
 			baseline[g.Name] = g.Baseline
 		}
 	}
-	latest := latestRuns(runs)
-	views := make([]RunView, 0, len(latest))
-	for _, rv := range latest {
+	counted := countedRuns(runs)
+	views := make([]RunView, 0, len(counted))
+	for _, rv := range counted {
 		views = append(views, rv)
 	}
 	slices.SortFunc(views, func(x, y RunView) int {

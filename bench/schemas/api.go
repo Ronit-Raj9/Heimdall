@@ -117,6 +117,21 @@ type RunEvents struct {
 	Events   []Event `json:"events"`
 }
 
+// RunDetail is GET /runs/{id}: one run with its seal, grade, metrics, gates
+// and receipts. A file the run has not written yet is null or empty, never
+// zeros. SealHash is empty until the run is sealed.
+type RunDetail struct {
+	Slot        Slot             `json:"slot"`
+	Run         Run              `json:"run"`
+	Sealed      bool             `json:"sealed"`
+	SealHash    string           `json:"seal_hash"`
+	Grade       *Grade           `json:"grade"`
+	GradeSource string           `json:"grade_source"` // "original": the grade the run was sealed with
+	Metrics     map[string]Value `json:"metrics"`
+	Gates       []GateResult     `json:"gates"`
+	Receipts    []Receipt        `json:"receipts"`
+}
+
 // RunDiff is GET /runs/{id}/diff. Patch is inert text.
 type RunDiff struct {
 	RunID string `json:"run_id"`
@@ -209,6 +224,17 @@ type LiveEvent struct {
 	Outcome Outcome   `json:"outcome,omitempty"`
 	Message string    `json:"message,omitempty"`
 	At      time.Time `json:"at"`
+}
+
+// EventsPoll is GET /experiments/{id}/events for a client that does not ask
+// for text/event-stream: the live events after ?since=<seq>, the cursor for
+// the next poll, and the experiment's status.
+type EventsPoll struct {
+	ExpID     string           `json:"exp_id"`
+	Events    []LiveEvent      `json:"events"`
+	Next      int              `json:"next"`
+	Truncated bool             `json:"truncated"` // older events fell out of the server's window
+	Status    ExperimentStatus `json:"status"`
 }
 
 // Health is GET /health.

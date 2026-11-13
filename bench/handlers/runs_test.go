@@ -79,8 +79,22 @@ func TestRunEventsAndDetail(t *testing.T) {
 	}
 	body = decodeBody(t, c.do(t, "GET", "/api/bench/runs/r_t01_A", nil, nil))
 	metrics, _ := body["metrics"].(map[string]any)
-	if gates, _ := body["gates"].([]any); len(gates) != 1 || metrics["steps"] == nil || body["grade"] != nil {
+	gates, _ := body["gates"].([]any)
+	receipts, _ := body["receipts"].([]any)
+	if len(gates) != 1 || len(receipts) != 1 || metrics["steps"] == nil || body["grade"] != nil ||
+		body["grade_source"] != "original" || body["sealed"] != true || body["seal_hash"] != "sha256:seal" {
 		t.Errorf("run detail = %v", body)
+	}
+	idx.files["r_t02_A"][FileGrade] = []byte(`{"passed":true}`)
+	delete(idx.files["r_t02_A"], FileGates)
+	delete(idx.files["r_t02_A"], FileReceipts)
+	body = decodeBody(t, c.do(t, "GET", "/api/bench/runs/r_t02_A", nil, nil))
+	grade, _ := body["grade"].(map[string]any)
+	if gates, _ := body["gates"].([]any); gates == nil || len(gates) != 0 || grade["passed"] != true {
+		t.Errorf("run detail without gates = %v", body)
+	}
+	if receipts, _ := body["receipts"].([]any); receipts == nil || len(receipts) != 0 {
+		t.Errorf("run detail without receipts = %v", body)
 	}
 	body = decodeBody(t, c.do(t, "GET", "/api/bench/runs/r_t01_A/receipts", nil, nil))
 	if receipts, _ := body["receipts"].([]any); len(receipts) != 1 {

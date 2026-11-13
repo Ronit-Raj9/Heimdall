@@ -26,6 +26,7 @@ export const FIXTURE_ROUTES: readonly FixtureRoute[] = [
 	{ method: "POST", pattern: "/experiments/plan", file: "experiments.plan.json" },
 	{ method: "POST", pattern: "/experiments", file: "experiments.create.json" },
 	{ method: "POST", pattern: "/experiments/:id/start", file: "experiments.start.json" },
+	{ method: "GET", pattern: "/experiments", file: "experiments.list.json" },
 	{ method: "GET", pattern: "/experiments/:id", file: "experiments.get.json" },
 	{ method: "GET", pattern: "/experiments/:id/verdict", file: "experiments.verdict.json" },
 	{ method: "GET", pattern: "/experiments/:id/diagnostics", file: "experiments.diagnostics.json" },

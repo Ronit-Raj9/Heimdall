@@ -56,6 +56,19 @@ type Launcher interface {
 	Events(expID string) (<-chan schemas.LiveEvent, func())
 }
 
+// ActivityReporter is optionally implemented by a Launcher. Active reports
+// whether the experiment is executing in this process, so an experiment
+// between two slots, or analyzing after its last one, still reads as running.
+type ActivityReporter interface {
+	Active(expID string) bool
+}
+
+// AnalysisIndex is optionally implemented by a ReadIndex. LatestAnalysis
+// returns the id of the newest analysis written for the experiment, if any.
+type AnalysisIndex interface {
+	LatestAnalysis(expID string) (string, bool)
+}
+
 // CatalogSource returns every registered part.
 type CatalogSource interface {
 	Catalog() *schemas.Catalog

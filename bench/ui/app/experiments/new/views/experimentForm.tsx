@@ -1,8 +1,3 @@
-import {
-	useCreateExperimentWithTokenMutation,
-	usePlanExperimentWithTokenMutation,
-	useStartExperimentWithTokenMutation,
-} from "@/components/experiments/experimentsApi";
 import { readWriteToken, saveWriteToken } from "@/components/experiments/experiments.utils";
 import { PlanResult, planBlocksStart } from "@/components/experiments/planResult";
 import { LoadError } from "@/components/runs/screenStates";
@@ -10,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { useCreateExperimentMutation, usePlanExperimentMutation, useStartExperimentMutation } from "@/lib/store/apis/benchApi";
 import type { Catalog, Experiment, ExperimentPlan } from "@/lib/types/bench";
 import { cn } from "@/lib/utils";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -48,9 +44,10 @@ export function ExperimentForm({ catalog, defaults, onStarted }: ExperimentFormP
 	const [token, setToken] = useState(readWriteToken);
 	const [planned, setPlanned] = useState<Planned | null>(null);
 	const [actionError, setActionError] = useState<{ title: string; error: unknown } | null>(null);
-	const [plan, planState] = usePlanExperimentWithTokenMutation();
-	const [create, createState] = useCreateExperimentWithTokenMutation();
-	const [start, startState] = useStartExperimentWithTokenMutation();
+	// benchApi attaches the write token saved below to every mutation.
+	const [plan, planState] = usePlanExperimentMutation();
+	const [create, createState] = useCreateExperimentMutation();
+	const [start, startState] = useStartExperimentMutation();
 
 	const stale = planned !== null && planned.snapshot !== JSON.stringify(values);
 	const busy = createState.isLoading || startState.isLoading;
@@ -69,7 +66,7 @@ export function ExperimentForm({ catalog, defaults, onStarted }: ExperimentFormP
 		setActionError(null);
 		setPlanned(null);
 		try {
-			const result = await plan({ body: experiment, token: token.trim() }).unwrap();
+			const result = await plan(experiment).unwrap();
 			setPlanned({ snapshot: JSON.stringify(formValues), experiment, plan: result });
 		} catch {
 			// planState.error renders the failure.
@@ -81,13 +78,13 @@ export function ExperimentForm({ catalog, defaults, onStarted }: ExperimentFormP
 		setActionError(null);
 		let expId: string;
 		try {
-			expId = (await create({ body: planned.experiment, token: token.trim() }).unwrap()).exp_id;
+			expId = (await create(planned.experiment).unwrap()).exp_id;
 		} catch (error) {
 			setActionError({ title: t("experiments.new.actions.createError"), error });
 			return;
 		}
 		try {
-			await start({ body: expId, token: token.trim() }).unwrap();
+			await start(expId).unwrap();
 		} catch (error) {
 			setActionError({ title: t("experiments.new.actions.startError", { id: expId }), error });
 		}

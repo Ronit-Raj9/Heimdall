@@ -1,5 +1,5 @@
 {
-	"_comment": "SYNTHETIC fixture for UI development. Not a benchmark result.",
+	"_comment": "SYNTHETIC fixture for UI development. Not a benchmark result. GET /runs/{id} (schemas.RunDetail).",
 	"mode": "synthetic",
 	"slot": {
 		"slot_id": "s_x6bdd0a4jq",
@@ -55,7 +55,7 @@
 			"session_id": "r_fmw1z7ouim"
 		}
 	},
-	"dir": "runs/e_synthetic-codewins/slots/s_x6bdd0a4jq/runs/r_fmw1z7ouim",
+	"sealed": true,
 	"seal_hash": "sha256:4fd47830d83cd73533ad18dabeb81ae5e6a39ac8c68c2211ab50ee427338a94c",
 	"grade": {
 		"passed": false,

@@ -7,13 +7,19 @@ import (
 	"github.com/maximhq/bifrost/bench/schemas"
 )
 
-// BuildGrid lays out every counted slot of the manifest with its latest run.
+// BuildGrid lays out every counted slot of the manifest with its counted run.
 // Each row's diff is mean(second arm) minus mean(first arm) over the cells
 // with an observed score; unknown cells are counted apart, never as 0. Rows
 // whose arms differ (discordant) come first, then the primary condition, then
 // condition and task order. It is pure.
 func BuildGrid(m *schemas.Manifest, runs []RunView) schemas.Grid {
-	latest := latestRuns(runs)
+	counted := countedRuns(runs)
+	inFlight := map[string]bool{}
+	for _, rv := range runs {
+		if !rv.Sealed {
+			inFlight[rv.Slot.SlotID] = true
+		}
+	}
 	g := schemas.Grid{ExpID: m.ExpID, Arms: armIDs(m), Conditions: []string{}}
 	type rowKey struct{ task, cond string }
 	rows := map[rowKey]*schemas.GridRow{}
@@ -32,7 +38,8 @@ func BuildGrid(m *schemas.Manifest, runs []RunView) schemas.Grid {
 				g.Conditions = append(g.Conditions, s.Condition)
 			}
 		}
-		row.Cells = append(row.Cells, gridCell(s, latest[s.SlotID]))
+		rv, ok := counted[s.SlotID]
+		row.Cells = append(row.Cells, gridCell(s, rv, ok, inFlight[s.SlotID]))
 		g.Trials = max(g.Trials, s.Trial)
 	}
 	g.Rows = make([]schemas.GridRow, 0, len(order))
@@ -57,17 +64,6 @@ func BuildGrid(m *schemas.Manifest, runs []RunView) schemas.Grid {
 	return g
 }
 
-// latestRuns keeps the highest attempt of each slot.
-func latestRuns(runs []RunView) map[string]RunView {
-	out := make(map[string]RunView, len(runs))
-	for _, rv := range runs {
-		if cur, ok := out[rv.Slot.SlotID]; !ok || rv.Run.Attempt > cur.Run.Attempt {
-			out[rv.Slot.SlotID] = rv
-		}
-	}
-	return out
-}
-
 // armIDs returns the manifest's arms in sorted order. The compatibility
 // agent is not an arm.
 func armIDs(m *schemas.Manifest) []string {
@@ -79,18 +75,22 @@ func armIDs(m *schemas.Manifest) []string {
 	return arms
 }
 
-// gridCell builds one cell from a slot and its latest run, if any. Run id and
-// outcome stay null until the slot has a run.
-func gridCell(s schemas.Slot, rv RunView) schemas.GridCell {
-	c := schemas.GridCell{SlotID: s.SlotID, PairID: s.PairID, Arm: s.Arm, Trial: s.Trial,
-		Y: schemas.Unknown("no_run", schemas.EvidenceOutcome)}
-	if rv.Run.RunID == "" {
+// gridCell builds one cell from a slot and its counted run. Run id and
+// outcome stay null until the slot has a counted run; until then y is
+// unknown, "not_sealed" while a run is in flight and "no_run" before.
+func gridCell(s schemas.Slot, rv RunView, counted, inFlight bool) schemas.GridCell {
+	c := schemas.GridCell{SlotID: s.SlotID, PairID: s.PairID, Arm: s.Arm, Trial: s.Trial}
+	switch {
+	case !counted && inFlight:
+		c.Y = schemas.Unknown("not_sealed", schemas.EvidenceOutcome)
+		return c
+	case !counted:
+		c.Y = schemas.Unknown("no_run", schemas.EvidenceOutcome)
 		return c
 	}
-	runID := rv.Run.RunID
+	runID, outcome := rv.Run.RunID, rv.Run.Outcome
 	c.RunID = &runID
-	if rv.Run.Outcome != "" {
-		outcome := rv.Run.Outcome
+	if outcome != "" {
 		c.Outcome = &outcome
 	}
 	c.Y = runScore(rv)

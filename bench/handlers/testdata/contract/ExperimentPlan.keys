@@ -1,0 +1,12 @@
+# Keys of bench.ts `ExperimentPlan`, one per line; a trailing ? marks an optional (Go omitempty) key.
+# The top-level response adds "mode". Change with bench.ts and schemas/api.go.
+slots
+pairs
+conditions
+mde
+mde_assumed_sd
+sd
+est_wall_s
+est_usd
+errors
+warnings

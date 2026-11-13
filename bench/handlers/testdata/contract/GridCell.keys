@@ -1,0 +1,9 @@
+# Keys of bench.ts `GridCell`, one per line; a trailing ? marks an optional (Go omitempty) key.
+# The top-level response adds "mode". Change with bench.ts and schemas/api.go.
+slot_id
+pair_id
+run_id
+arm
+trial
+outcome
+y

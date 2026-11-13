@@ -1,5 +1,5 @@
 {
-	"_comment": "SYNTHETIC fixture for UI development. Not a benchmark result. GET /experiments (schemas.ExperimentList); needs a FIXTURE_ROUTES entry to be served.",
+	"_comment": "SYNTHETIC fixture for UI development. Not a benchmark result. GET /experiments (schemas.ExperimentList).",
 	"mode": "synthetic",
 	"experiments": [
 		{

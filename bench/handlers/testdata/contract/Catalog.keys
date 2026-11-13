@@ -1,0 +1,9 @@
+# Keys of bench.ts `Catalog`, one per line; a trailing ? marks an optional (Go omitempty) key.
+# The top-level response adds "mode". Change with bench.ts and schemas/api.go.
+mode
+suites
+probes
+agents
+metrics
+gates
+parts

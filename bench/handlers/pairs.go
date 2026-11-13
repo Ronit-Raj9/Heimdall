@@ -29,8 +29,8 @@ func (h *PairsHandler) RegisterRoutes(r *router.Router, middlewares ...lib.Middl
 	r.GET(APIPrefix+"/pairs/{id}", lib.ChainMiddlewares(h.getPair, middlewares...))
 }
 
-// getPair handles GET /api/bench/pairs/{id}. Runs are the latest attempt of
-// each slot, counted arms first in arm order. The alignment is between the
+// getPair handles GET /api/bench/pairs/{id}. Runs are each slot's counted
+// run, counted arms first in arm order. The alignment is between the
 // first two counted runs; with fewer it is empty. Event content stays on
 // GET /runs/{id}/events; steps carry event ids only.
 func (h *PairsHandler) getPair(ctx *fasthttp.RequestCtx) {
@@ -42,13 +42,13 @@ func (h *PairsHandler) getPair(ctx *fasthttp.RequestCtx) {
 	if !ok {
 		return
 	}
-	latest := latestRuns(h.index.Pair(id))
-	if len(latest) == 0 {
+	counted := countedRuns(h.index.Pair(id))
+	if len(counted) == 0 {
 		sendNotFound(ctx, h.mode, "pair", id)
 		return
 	}
-	views := make([]RunView, 0, len(latest))
-	for _, rv := range latest {
+	views := make([]RunView, 0, len(counted))
+	for _, rv := range counted {
 		views = append(views, rv)
 	}
 	slices.SortFunc(views, func(x, y RunView) int {

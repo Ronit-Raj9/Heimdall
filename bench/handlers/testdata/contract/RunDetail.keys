@@ -1,0 +1,11 @@
+# Keys of bench.ts `RunDetail`, one per line; a trailing ? marks an optional (Go omitempty) key.
+# The top-level response adds "mode". Change with bench.ts and schemas/api.go.
+slot
+run
+sealed
+seal_hash
+grade
+grade_source
+metrics
+gates
+receipts

@@ -28,12 +28,12 @@ func TestBuildGrid(t *testing.T) {
 		for _, row := range g.Rows {
 			for _, c := range row.Cells {
 				switch c.SlotID {
-				case "s_t01_A":
-					if c.Y.State != schemas.ValueUnknown || c.RunID == nil {
+				case "s_t01_A": // in flight: no counted run yet
+					if c.Y.State != schemas.ValueUnknown || c.Y.Reason != "not_sealed" || c.RunID != nil || c.Outcome != nil {
 						t.Errorf("unsealed cell = %+v", c)
 					}
 				case "s_t02_B":
-					if c.Y.State != schemas.ValueUnknown || c.RunID != nil || c.Outcome != nil {
+					if c.Y.State != schemas.ValueUnknown || c.Y.Reason != "no_run" || c.RunID != nil || c.Outcome != nil {
 						t.Errorf("planned cell = %+v", c)
 					}
 				}
@@ -43,8 +43,9 @@ func TestBuildGrid(t *testing.T) {
 			}
 		}
 	})
-	t.Run("latest attempt wins", func(t *testing.T) {
+	t.Run("retry after aborted_infra is the counted run", func(t *testing.T) {
 		runs := idx.Runs(testExp)
+		runs[0].Run.Outcome = schemas.OutcomeAbortedInfra
 		retry := runs[0]
 		retry.Run.Attempt, retry.Run.RunID, retry.Run.Outcome = 2, "r_retry", schemas.OutcomePass
 		retry.Run.Y = schemas.Observed(1, schemas.EvidenceOutcome)

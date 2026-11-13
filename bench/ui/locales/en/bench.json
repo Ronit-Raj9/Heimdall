@@ -564,10 +564,6 @@
 			}
 		}
 	},
-	"experimentsNew": {
-		"title": "New experiment",
-		"empty": "Nothing planned yet. This screen will show the preflight checks and the experiment planner."
-	},
 	"notFound": {
 		"title": "Page not found",
 		"description": "There is no bench screen at this address.",

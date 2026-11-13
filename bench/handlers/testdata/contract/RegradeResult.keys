@@ -1,0 +1,5 @@
+# Keys of bench.ts `RegradeResult`, one per line; a trailing ? marks an optional (Go omitempty) key.
+# The top-level response adds "mode". Change with bench.ts and schemas/api.go.
+regrade_id
+exp_id
+runs
