@@ -1,0 +1,174 @@
+package schemas
+
+import (
+	"context"
+	"time"
+)
+
+// ProbeLayerName names where a probe acts.
+type ProbeLayerName string
+
+// Probe layers shipped in P0.
+const (
+	LayerFixture  ProbeLayerName = "fixture"   // files overlaid in the workspace
+	LayerGateway  ProbeLayerName = "gateway"   // fault proxy behind Bifrost
+	LayerToolShim ProbeLayerName = "tool_shim" // a wrapper around a tool binary
+)
+
+// PS2Family maps a probe to the PS2 failure family it covers.
+type PS2Family string
+
+// PS2 failure families.
+const (
+	FamilyUnavailableModel      PS2Family = "unavailable_model"
+	FamilyBrokenTool            PS2Family = "broken_tool"
+	FamilyMisleadingInstruction PS2Family = "misleading_instruction"
+)
+
+// ProbeSpec is one probe, read from benchmarks/<suite>/probes/<id>.yaml.
+type ProbeSpec struct {
+	ID             string         `json:"id" yaml:"id"`
+	Version        string         `json:"version" yaml:"version"`
+	Axis           string         `json:"axis" yaml:"axis"` // diagnostics row label, e.g. memory, tools, resilience
+	PS2Family      PS2Family      `json:"ps2_family" yaml:"ps2_family"`
+	Layer          ProbeLayerName `json:"layer" yaml:"layer"`
+	GoalPreserving bool           `json:"goal_preserving" yaml:"goal_preserving"`
+	Apply          ProbeApply     `json:"apply" yaml:"apply"`
+	SafeBehavior   string         `json:"safe_behavior" yaml:"safe_behavior"`
+	Metrics        []string       `json:"metrics,omitempty" yaml:"metrics"` // extra metric names reported for this probe
+
+	Path string `json:"-" yaml:"-"` // absolute path of the YAML file
+}
+
+// ProbeApply holds the layer-specific parameters. Only the block matching the
+// probe's layer is read.
+type ProbeApply struct {
+	// fixture: copy a task fixture over a workspace path. Template variables:
+	// {{task.notes.stale}} and {{agent.notes.project_file}}.
+	Overlay *OverlaySpec `json:"overlay,omitempty" yaml:"overlay"`
+	// gateway: the fault plan bound to the run's key slot.
+	Fault *FaultPlan `json:"fault,omitempty" yaml:"fault"`
+	// tool_shim: which command to wrap and how to break it.
+	Shim *ShimSpec `json:"shim,omitempty" yaml:"shim"`
+}
+
+// OverlaySpec copies From (relative to the task folder) to To (relative to the
+// workspace root).
+type OverlaySpec struct {
+	From string `json:"from" yaml:"from"`
+	To   string `json:"to" yaml:"to"`
+}
+
+// ShimSpec wraps a tool. Mode crash exits with ExitCode and a crash message for
+// the first Calls invocations; mode empty exits 0 and prints Output (for
+// example "collected 0 items") for the first Calls invocations. Later calls run
+// the real tool.
+type ShimSpec struct {
+	Tool     string `json:"tool" yaml:"tool"`   // e.g. pytest
+	Mode     string `json:"mode" yaml:"mode"`   // crash | empty
+	Calls    int    `json:"calls" yaml:"calls"` // how many invocations are broken
+	ExitCode int    `json:"exit_code" yaml:"exit_code"`
+	Output   string `json:"output,omitempty" yaml:"output"`
+}
+
+// FaultPlan is what the fault proxy does for one key slot. Only conversation
+// requests (POST /v1/messages) are counted; token counting and model listing
+// pass through uncounted.
+type FaultPlan struct {
+	Mode        string `json:"mode" yaml:"mode"`                     // none | persistent | once
+	FromCall    int    `json:"from_call,omitempty" yaml:"from_call"` // persistent: first failing call, 1-based
+	Call        int    `json:"call,omitempty" yaml:"call"`           // once: the failing call, 1-based
+	Status      int    `json:"status,omitempty" yaml:"status"`       // e.g. 503
+	RetryAfterS int    `json:"retry_after_s,omitempty" yaml:"retry_after_s"`
+	Nonce       string `json:"nonce,omitempty" yaml:"-"` // secret per run, set when armed, never from YAML
+	RunID       string `json:"run_id,omitempty" yaml:"-"`
+}
+
+// FaultController is the bench's handle on the fault proxy's control API. The
+// faultproxy package implements it; main.go injects it into the gateway probe
+// layer and the proxy-ledger evidence source.
+type FaultController interface {
+	SetPlan(ctx context.Context, slot string, plan FaultPlan) error
+	ClearPlan(ctx context.Context, slot string) error
+	// Ledger returns every ledger entry the proxy recorded for runID.
+	Ledger(ctx context.Context, runID string) ([]LedgerEntry, error)
+}
+
+// LedgerEntry is one request the fault proxy received. Entries are
+// hash-chained per slot.
+type LedgerEntry struct {
+	Slot       string    `json:"slot"`
+	RunID      string    `json:"run_id"`
+	Call       int       `json:"call"` // 1-based count of conversation requests; 0 for uncounted kinds
+	Kind       string    `json:"kind"` // message | count_tokens | models | other
+	Path       string    `json:"path"`
+	Stream     bool      `json:"stream"`
+	Action     string    `json:"action"` // pass | inject
+	Status     int       `json:"status"`
+	ReqSHA256  string    `json:"req_sha256"`
+	ResponseID string    `json:"response_id,omitempty"`
+	Nonce      string    `json:"nonce,omitempty"` // present when a fault payload carried it
+	Tokens     *Tokens   `json:"tokens,omitempty"`
+	UpstreamMS float64   `json:"upstream_ms"`
+	At         time.Time `json:"at"`
+	PrevHash   string    `json:"prev_hash"`
+	Hash       string    `json:"hash"`
+}
+
+// ProbeLayer applies one kind of perturbation and proves that it happened.
+// Layers arm in order and disarm in reverse, like Bifrost plugin hooks.
+type ProbeLayer interface {
+	Part
+	// Steps lists the receipt steps that apply to this layer. The others are
+	// recorded as not_applicable.
+	Steps() []ReceiptStep
+	Arm(ctx context.Context, rc *RunContext) (*Receipt, error)
+	Disarm(ctx context.Context, rc *RunContext) error
+	// Receipts completes the receipt from the run's evidence.
+	Receipts(ctx context.Context, rc *RunContext, ev *Evidence) (*Receipt, error)
+}
+
+// ReceiptStep is one rung of the receipt ladder (DESIGN.md 10.3).
+type ReceiptStep string
+
+// Receipt steps.
+const (
+	StepAssigned     ReceiptStep = "assigned"
+	StepArmed        ReceiptStep = "armed"
+	StepFired        ReceiptStep = "fired"
+	StepDelivered    ReceiptStep = "delivered"
+	StepAbsorbed     ReceiptStep = "absorbed_by"
+	StepVisible      ReceiptStep = "visible"
+	StepAcknowledged ReceiptStep = "acknowledged"
+	StepEffect       ReceiptStep = "effect"
+)
+
+// AllReceiptSteps is the ladder in order.
+var AllReceiptSteps = []ReceiptStep{
+	StepAssigned, StepArmed, StepFired, StepDelivered, StepAbsorbed, StepVisible, StepAcknowledged, StepEffect,
+}
+
+// StepState is the state of one receipt step.
+type StepState string
+
+// Step states.
+const (
+	StepYes           StepState = "yes"
+	StepNo            StepState = "no"
+	StepUnknown       StepState = "unknown"
+	StepNotApplicable StepState = "not_applicable"
+)
+
+// Receipt records what a probe did in one run.
+type Receipt struct {
+	ProbeID string                       `json:"probe_id"`
+	Layer   ProbeLayerName               `json:"layer"`
+	Steps   map[ReceiptStep]ReceiptEntry `json:"steps"`
+}
+
+// ReceiptEntry is one step's state with its evidence.
+type ReceiptEntry struct {
+	State    StepState `json:"state"`
+	Detail   string    `json:"detail,omitempty"`   // e.g. absorbed_by layer name, fired count
+	Evidence []string  `json:"evidence,omitempty"` // event ids, ledger hashes, row ids
+}

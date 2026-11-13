@@ -1,0 +1,118 @@
+package schemas
+
+import "time"
+
+// Suite is one benchmark pack: a versioned set of tasks, probes, a grader type
+// and an environment type, read from benchmarks/<id>/suite.yaml.
+type Suite struct {
+	ID          string        `json:"id" yaml:"id"`
+	Version     string        `json:"version" yaml:"version"`
+	Description string        `json:"description,omitempty" yaml:"description"`
+	Environment string        `json:"environment" yaml:"environment"` // environment part name, e.g. docker_workspace
+	Grader      string        `json:"grader" yaml:"grader"`           // grader part name, e.g. hidden_tests
+	BaseImage   ImageSpec     `json:"base_image" yaml:"base_image"`
+	Workdir     string        `json:"workdir" yaml:"workdir"`
+	Verifier    SuiteVerifier `json:"verifier" yaml:"verifier"`
+	TaskIDs     []string      `json:"tasks" yaml:"tasks"`
+	ProbeIDs    []string      `json:"probes" yaml:"probes"`
+
+	Root     string       `json:"-" yaml:"-"` // absolute folder of the pack
+	Tasks    []*Task      `json:"-" yaml:"-"` // loaded tasks, in TaskIDs order
+	Probes   []*ProbeSpec `json:"-" yaml:"-"` // loaded probes, in ProbeIDs order
+	Lock     *SuiteLock   `json:"-" yaml:"-"` // nil until locked
+	LockHash string       `json:"lock_hash,omitempty" yaml:"-"`
+}
+
+// ImageSpec names a container image and, optionally, how to build it.
+type ImageSpec struct {
+	Dockerfile string `json:"dockerfile,omitempty" yaml:"dockerfile"` // relative to the suite root
+	Tag        string `json:"tag" yaml:"tag"`
+	Digest     string `json:"digest,omitempty" yaml:"digest"` // filled by `suite lock`
+}
+
+// SuiteVerifier is the grading command and restore policy shared by every task
+// of a suite.
+type SuiteVerifier struct {
+	Command  []string `json:"command" yaml:"command"`
+	Restore  []string `json:"restore" yaml:"restore"` // paths reset to the pristine repo before grading
+	TimeoutS int      `json:"timeout_s" yaml:"timeout_s"`
+}
+
+// TaskByID returns the loaded task with id, or nil.
+func (s *Suite) TaskByID(id string) *Task {
+	for _, t := range s.Tasks {
+		if t.ID == id {
+			return t
+		}
+	}
+	return nil
+}
+
+// ProbeByID returns the loaded probe with id, or nil.
+func (s *Suite) ProbeByID(id string) *ProbeSpec {
+	for _, p := range s.Probes {
+		if p.ID == id {
+			return p
+		}
+	}
+	return nil
+}
+
+// SuiteLock pins every task and probe of a suite version by hash
+// (benchmarks/<id>/suite.lock, JSON).
+type SuiteLock struct {
+	Suite     string               `json:"suite"`
+	Version   string               `json:"version"`
+	BaseImage ImageSpec            `json:"base_image"`
+	Tasks     map[string]TaskLock  `json:"tasks"`
+	Probes    map[string]ProbeLock `json:"probes"`
+	CreatedAt time.Time            `json:"created_at"`
+}
+
+// TaskLock pins one task version. A comparison is valid only between runs of
+// identical task locks.
+type TaskLock struct {
+	Version           string           `json:"version"`
+	InstructionSHA256 string           `json:"instruction_sha256"`
+	RepoTreeSHA256    string           `json:"repo_tree_sha256"`
+	VerifierSHA256    string           `json:"verifier_sha256"`
+	ControlsSHA256    string           `json:"controls_sha256"`
+	FixturesSHA256    string           `json:"fixtures_sha256"`
+	Status            TaskStatus       `json:"status"`
+	Admission         *AdmissionRecord `json:"admission,omitempty"`
+}
+
+// ProbeLock pins one probe version.
+type ProbeLock struct {
+	Version string `json:"version"`
+	SHA256  string `json:"sha256"`
+}
+
+// TaskStatus is a task's lifecycle state.
+type TaskStatus string
+
+// Task lifecycle states.
+const (
+	TaskDraft       TaskStatus = "draft"
+	TaskAdmitted    TaskStatus = "admitted"
+	TaskQuarantined TaskStatus = "quarantined"
+	TaskRetired     TaskStatus = "retired"
+)
+
+// AdmissionRecord is the result of `suite admit` for one task version.
+type AdmissionRecord struct {
+	Admitted bool             `json:"admitted"`
+	Checks   []AdmissionCheck `json:"checks"`
+	At       time.Time        `json:"at"`
+}
+
+// AdmissionCheck is one admission control (reference passes, empty patch
+// fails, mutant fails, exploit scores 0, null agent scores 0, probe keeps the
+// reference passing).
+type AdmissionCheck struct {
+	Name   string `json:"name"`
+	Want   string `json:"want"`
+	Got    string `json:"got"`
+	Passed bool   `json:"passed"`
+	Detail string `json:"detail,omitempty"`
+}
