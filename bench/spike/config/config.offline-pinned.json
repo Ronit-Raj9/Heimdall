@@ -1,0 +1,21 @@
+{
+  "$schema": "https://www.getbifrost.ai/schema",
+  "disable_onboarding": true,
+  "client": {
+    "enable_logging": true,
+    "disable_content_logging": false,
+    "enforce_auth_on_inference": true,
+    "mcp_disable_auto_tool_inject": true
+  },
+  "framework": {
+    "pricing": {
+      "pricing_url": "file:///app/datasheet/pricing.json",
+      "model_parameters_url": "file:///app/datasheet/model-parameters.json",
+      "pricing_sync_interval": 86400,
+      "mcp_library_sync_interval": 0,
+      "live_models_sync_interval": 0
+    }
+  },
+  "config_store": { "enabled": true, "type": "sqlite", "config": { "path": "/app/data/config.db" } },
+  "logs_store": { "enabled": true, "type": "sqlite", "config": { "path": "/app/data/logs.db" } }
+}

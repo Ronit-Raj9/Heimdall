@@ -1,0 +1,6046 @@
+{
+ "claude-3-7-sonnet-20250219": {
+  "deprecation_date": "2026-02-19",
+  "is_deprecated": true
+ },
+ "claude-3-haiku-20240307": {
+  "base_model": "claude-3-haiku",
+  "deprecation_date": "2026-04-20",
+  "is_deprecated": true,
+  "max_input_tokens": 200000,
+  "max_output_tokens": 4096,
+  "max_tokens": 4096,
+  "mode": "chat",
+  "model_parameters": [
+   {
+    "helpText": "A list of tools the model may call.",
+    "id": "promptTools",
+    "label": "Prompt Tools (Functions)",
+    "supported_endpoints": [
+     "/v1/chat/completions",
+     "/v1/responses"
+    ],
+    "type": "select"
+   },
+   {
+    "default": 1,
+    "helpText": "What sampling temperature to use, between 0 and 2. Higher values like 0.8 will make the output more random, while lower values like 0.2 will make it more focused and deterministic.",
+    "id": "temperature",
+    "label": "Temperature",
+    "range": {
+     "max": 2,
+     "min": 0,
+     "step": 0.01
+    },
+    "supported_endpoints": [
+     "/v1/chat/completions",
+     "/v1/completions",
+     "/v1/responses"
+    ],
+    "type": "number"
+   },
+   {
+    "default": 2048,
+    "helpText": "The maximum number of tokens that can be generated in the Result.",
+    "id": "max_tokens",
+    "label": "Max Tokens",
+    "range": {
+     "max": 4096,
+     "min": 1
+    },
+    "supported_endpoints": [
+     "/v1/chat/completions",
+     "/v1/completions"
+    ],
+    "type": "number"
+   },
+   {
+    "array": {
+     "maxElements": 4,
+     "minElements": 1,
+     "type": "text"
+    },
+    "helpText": "Custom text sequences that will cause the model to stop generating.",
+    "id": "stop",
+    "label": "Stop",
+    "supported_endpoints": [
+     "/v1/chat/completions",
+     "/v1/completions"
+    ],
+    "type": "array"
+   },
+   {
+    "default": 1,
+    "helpText": "An alternative to sampling with temperature, called nucleus sampling, where the model considers the results of the tokens with top_p probability mass. So 0.1 means only the tokens comprising the top 10% probability mass are considered.",
+    "id": "top_p",
+    "label": "Top P",
+    "range": {
+     "max": 1,
+     "min": 0,
+     "step": 0.01
+    },
+    "supported_endpoints": [
+     "/v1/chat/completions",
+     "/v1/completions",
+     "/v1/responses"
+    ],
+    "type": "number"
+   },
+   {
+    "default": 0,
+    "helpText": "Number between 0 and 2.0. Positive values penalize new tokens based on their existing frequency in the text so far, decreasing the model's likelihood to repeat the same line verbatim.",
+    "id": "frequency_penalty",
+    "label": "Frequency Penalty",
+    "range": {
+     "max": 2,
+     "min": 0,
+     "step": 0.01
+    },
+    "supported_endpoints": [
+     "/v1/chat/completions",
+     "/v1/completions"
+    ],
+    "type": "number"
+   },
+   {
+    "helpText": "Modify the likelihood of specified tokens appearing in the completion.",
+    "id": "logit_bias",
+    "label": "Logit Bias",
+    "range": {
+     "max": 100,
+     "min": -100
+    },
+    "supported_endpoints": [
+     "/v1/chat/completions",
+     "/v1/completions"
+    ],
+    "type": "number"
+   },
+   {
+    "default": false,
+    "helpText": "Whether to return log probabilities of the output tokens or not. If true, returns the log probabilities of each output token returned in the content of message.",
+    "id": "logprobs",
+    "label": "Logprobs",
+    "supported_endpoints": [
+     "/v1/chat/completions",
+     "/v1/completions"
+    ],
+    "type": "boolean"
+   },
+   {
+    "helpText": "An integer between 0 and 5 specifying the number of most likely tokens to return at each token position, each with an associated log probability.",
+    "id": "top_logprobs",
+    "label": "Top Logprobs",
+    "range": {
+     "max": 5,
+     "min": 0,
+     "step": 1
+    },
+    "supported_endpoints": [
+     "/v1/chat/completions",
+     "/v1/responses"
+    ],
+    "type": "number"
+   },
+   {
+    "default": 1,
+    "helpText": "How many chat completion choices to generate for each input message.",
+    "id": "n",
+    "label": "Number of Responses",
+    "range": {
+     "max": 10,
+     "min": 1,
+     "step": 1
+    },
+    "supported_endpoints": [
+     "/v1/chat/completions",
+     "/v1/completions"
+    ],
+    "type": "number"
+   },
+   {
+    "default": 0,
+    "helpText": "Positive values penalize new tokens based on whether they appear in the text so far, increasing the model's likelihood to talk about new topics.",
+    "id": "presence_penalty",
+    "label": "Presence Penalty",
+    "range": {
+     "max": 2,
+     "min": 0,
+     "step": 0.01
+    },
+    "supported_endpoints": [
+     "/v1/chat/completions",
+     "/v1/completions"
+    ],
+    "type": "number"
+   },
+   {
+    "helpText": "(BETA) - System will make a best effort to sample deterministically, such that repeated requests with the same seed and parameters should return the same result.",
+    "id": "seed",
+    "label": "Seed",
+    "range": {
+     "max": 100,
+     "min": 0
+    },
+    "supported_endpoints": [
+     "/v1/chat/completions",
+     "/v1/completions"
+    ],
+    "type": "number"
+   },
+   {
+    "default": false,
+    "helpText": "The stream parameter in the API controls whether the response is sent in incremental updates, like tokenized data as it's generated, or as a complete result in one go.",
+    "id": "stream",
+    "label": "Stream",
+    "supported_endpoints": [
+     "/v1/chat/completions",
+     "/v1/completions",
+     "/v1/responses"
+    ],
+    "type": "boolean"
+   },
+   {
+    "helpText": "A unique identifier representing your end-user.",
+    "id": "metadata",
+    "label": "Metadata",
+    "supported_endpoints": [
+     "/v1/chat/completions",
+     "/v1/responses"
+    ],
+    "type": "text"
+   }
+  ],
+  "provider": "anthropic",
+  "supports_assistant_prefill": true,
+  "supports_function_calling": true,
+  "supports_prompt_caching": true,
+  "supports_response_schema": true,
+  "supports_tool_choice": true,
+  "supports_vision": true,
+  "tool_use_system_prompt_tokens": 264
+ },
+ "claude-3-opus-20240229": {
+  "deprecation_date": "2026-01-05",
+  "is_deprecated": true
+ },
+ "claude-4-opus-20250514": {
+  "base_model": "claude-opus-4",
+  "max_input_tokens": 200000,
+  "max_output_tokens": 32000,
+  "max_tokens": 32000,
+  "mode": "chat",
+  "model_parameters": [
+   {
+    "helpText": "A list of tools the model may call.",
+    "id": "promptTools",
+    "label": "Prompt Tools (Functions)",
+    "supported_endpoints": [
+     "/v1/chat/completions",
+     "/v1/responses"
+    ],
+    "type": "select"
+   },
+   {
+    "default": 1,
+    "helpText": "What sampling temperature to use, between 0 and 2. Higher values like 0.8 will make the output more random, while lower values like 0.2 will make it more focused and deterministic.",
+    "id": "temperature",
+    "label": "Temperature",
+    "range": {
+     "max": 2,
+     "min": 0,
+     "step": 0.01
+    },
+    "supported_endpoints": [
+     "/v1/chat/completions",
+     "/v1/completions",
+     "/v1/responses"
+    ],
+    "type": "number"
+   },
+   {
+    "default": 2048,
+    "helpText": "The maximum number of tokens that can be generated in the Result.",
+    "id": "max_tokens",
+    "label": "Max Tokens",
+    "range": {
+     "max": 32000,
+     "min": 1
+    },
+    "supported_endpoints": [
+     "/v1/chat/completions",
+     "/v1/completions"
+    ],
+    "type": "number"
+   },
+   {
+    "array": {
+     "maxElements": 4,
+     "minElements": 1,
+     "type": "text"
+    },
+    "helpText": "Custom text sequences that will cause the model to stop generating.",
+    "id": "stop",
+    "label": "Stop",
+    "supported_endpoints": [
+     "/v1/chat/completions",
+     "/v1/completions"
+    ],
+    "type": "array"
+   },
+   {
+    "default": 1,
+    "helpText": "An alternative to sampling with temperature, called nucleus sampling, where the model considers the results of the tokens with top_p probability mass. So 0.1 means only the tokens comprising the top 10% probability mass are considered.",
+    "id": "top_p",
+    "label": "Top P",
+    "range": {
+     "max": 1,
+     "min": 0,
+     "step": 0.01
+    },
+    "supported_endpoints": [
+     "/v1/chat/completions",
+     "/v1/completions",
+     "/v1/responses"
+    ],
+    "type": "number"
+   },
+   {
+    "default": 0,
+    "helpText": "Number between 0 and 2.0. Positive values penalize new tokens based on their existing frequency in the text so far, decreasing the model's likelihood to repeat the same line verbatim.",
+    "id": "frequency_penalty",
+    "label": "Frequency Penalty",
+    "range": {
+     "max": 2,
+     "min": 0,
+     "step": 0.01
+    },
+    "supported_endpoints": [
+     "/v1/chat/completions",
+     "/v1/completions"
+    ],
+    "type": "number"
+   },
+   {
+    "helpText": "Modify the likelihood of specified tokens appearing in the completion.",
+    "id": "logit_bias",
+    "label": "Logit Bias",
+    "range": {
+     "max": 100,
+     "min": -100
+    },
+    "supported_endpoints": [
+     "/v1/chat/completions",
+     "/v1/completions"
+    ],
+    "type": "number"
+   },
+   {
+    "default": false,
+    "helpText": "Whether to return log probabilities of the output tokens or not. If true, returns the log probabilities of each output token returned in the content of message.",
+    "id": "logprobs",
+    "label": "Logprobs",
+    "supported_endpoints": [
+     "/v1/chat/completions",
+     "/v1/completions"
+    ],
+    "type": "boolean"
+   },
+   {
+    "helpText": "An integer between 0 and 5 specifying the number of most likely tokens to return at each token position, each with an associated log probability.",
+    "id": "top_logprobs",
+    "label": "Top Logprobs",
+    "range": {
+     "max": 5,
+     "min": 0,
+     "step": 1
+    },
+    "supported_endpoints": [
+     "/v1/chat/completions",
+     "/v1/responses"
+    ],
+    "type": "number"
+   },
+   {
+    "default": 1,
+    "helpText": "How many chat completion choices to generate for each input message.",
+    "id": "n",
+    "label": "Number of Responses",
+    "range": {
+     "max": 10,
+     "min": 1,
+     "step": 1
+    },
+    "supported_endpoints": [
+     "/v1/chat/completions",
+     "/v1/completions"
+    ],
+    "type": "number"
+   },
+   {
+    "default": 0,
+    "helpText": "Positive values penalize new tokens based on whether they appear in the text so far, increasing the model's likelihood to talk about new topics.",
+    "id": "presence_penalty",
+    "label": "Presence Penalty",
+    "range": {
+     "max": 2,
+     "min": 0,
+     "step": 0.01
+    },
+    "supported_endpoints": [
+     "/v1/chat/completions",
+     "/v1/completions"
+    ],
+    "type": "number"
+   },
+   {
+    "helpText": "(BETA) - System will make a best effort to sample deterministically, such that repeated requests with the same seed and parameters should return the same result.",
+    "id": "seed",
+    "label": "Seed",
+    "range": {
+     "max": 100,
+     "min": 0
+    },
+    "supported_endpoints": [
+     "/v1/chat/completions",
+     "/v1/completions"
+    ],
+    "type": "number"
+   },
+   {
+    "default": false,
+    "helpText": "The stream parameter in the API controls whether the response is sent in incremental updates, like tokenized data as it's generated, or as a complete result in one go.",
+    "id": "stream",
+    "label": "Stream",
+    "supported_endpoints": [
+     "/v1/chat/completions",
+     "/v1/completions",
+     "/v1/responses"
+    ],
+    "type": "boolean"
+   },
+   {
+    "helpText": "A unique identifier representing your end-user.",
+    "id": "metadata",
+    "label": "Metadata",
+    "supported_endpoints": [
+     "/v1/chat/completions",
+     "/v1/responses"
+    ],
+    "type": "text"
+   }
+  ],
+  "provider": "anthropic",
+  "supports_assistant_prefill": true,
+  "supports_computer_use": true,
+  "supports_function_calling": true,
+  "supports_pdf_input": true,
+  "supports_prompt_caching": true,
+  "supports_reasoning": true,
+  "supports_response_schema": true,
+  "supports_tool_choice": true,
+  "supports_vision": true,
+  "tool_use_system_prompt_tokens": 159
+ },
+ "claude-4-sonnet-20250514": {
+  "base_model": "claude-sonnet-4",
+  "max_input_tokens": 1000000,
+  "max_output_tokens": 64000,
+  "max_tokens": 64000,
+  "mode": "chat",
+  "model_parameters": [
+   {
+    "helpText": "A list of tools the model may call.",
+    "id": "promptTools",
+    "label": "Prompt Tools (Functions)",
+    "supported_endpoints": [
+     "/v1/chat/completions",
+     "/v1/responses"
+    ],
+    "type": "select"
+   },
+   {
+    "default": 1,
+    "helpText": "What sampling temperature to use, between 0 and 2. Higher values like 0.8 will make the output more random, while lower values like 0.2 will make it more focused and deterministic.",
+    "id": "temperature",
+    "label": "Temperature",
+    "range": {
+     "max": 2,
+     "min": 0,
+     "step": 0.01
+    },
+    "supported_endpoints": [
+     "/v1/chat/completions",
+     "/v1/completions",
+     "/v1/responses"
+    ],
+    "type": "number"
+   },
+   {
+    "default": 2048,
+    "helpText": "The maximum number of tokens that can be generated in the Result.",
+    "id": "max_tokens",
+    "label": "Max Tokens",
+    "range": {
+     "max": 64000,
+     "min": 1
+    },
+    "supported_endpoints": [
+     "/v1/chat/completions",
+     "/v1/completions"
+    ],
+    "type": "number"
+   },
+   {
+    "array": {
+     "maxElements": 4,
+     "minElements": 1,
+     "type": "text"
+    },
+    "helpText": "Custom text sequences that will cause the model to stop generating.",
+    "id": "stop",
+    "label": "Stop",
+    "supported_endpoints": [
+     "/v1/chat/completions",
+     "/v1/completions"
+    ],
+    "type": "array"
+   },
+   {
+    "default": 1,
+    "helpText": "An alternative to sampling with temperature, called nucleus sampling, where the model considers the results of the tokens with top_p probability mass. So 0.1 means only the tokens comprising the top 10% probability mass are considered.",
+    "id": "top_p",
+    "label": "Top P",
+    "range": {
+     "max": 1,
+     "min": 0,
+     "step": 0.01
+    },
+    "supported_endpoints": [
+     "/v1/chat/completions",
+     "/v1/completions",
+     "/v1/responses"
+    ],
+    "type": "number"
+   },
+   {
+    "default": 0,
+    "helpText": "Number between 0 and 2.0. Positive values penalize new tokens based on their existing frequency in the text so far, decreasing the model's likelihood to repeat the same line verbatim.",
+    "id": "frequency_penalty",
+    "label": "Frequency Penalty",
+    "range": {
+     "max": 2,
+     "min": 0,
+     "step": 0.01
+    },
+    "supported_endpoints": [
+     "/v1/chat/completions",
+     "/v1/completions"
+    ],
+    "type": "number"
+   },
+   {
+    "helpText": "Modify the likelihood of specified tokens appearing in the completion.",
+    "id": "logit_bias",
+    "label": "Logit Bias",
+    "range": {
+     "max": 100,
+     "min": -100
+    },
+    "supported_endpoints": [
+     "/v1/chat/completions",
+     "/v1/completions"
+    ],
+    "type": "number"
+   },
+   {
+    "default": false,
+    "helpText": "Whether to return log probabilities of the output tokens or not. If true, returns the log probabilities of each output token returned in the content of message.",
+    "id": "logprobs",
+    "label": "Logprobs",
+    "supported_endpoints": [
+     "/v1/chat/completions",
+     "/v1/completions"
+    ],
+    "type": "boolean"
+   },
+   {
+    "helpText": "An integer between 0 and 5 specifying the number of most likely tokens to return at each token position, each with an associated log probability.",
+    "id": "top_logprobs",
+    "label": "Top Logprobs",
+    "range": {
+     "max": 5,
+     "min": 0,
+     "step": 1
+    },
+    "supported_endpoints": [
+     "/v1/chat/completions",
+     "/v1/responses"
+    ],
+    "type": "number"
+   },
+   {
+    "default": 1,
+    "helpText": "How many chat completion choices to generate for each input message.",
+    "id": "n",
+    "label": "Number of Responses",
+    "range": {
+     "max": 10,
+     "min": 1,
+     "step": 1
+    },
+    "supported_endpoints": [
+     "/v1/chat/completions",
+     "/v1/completions"
+    ],
+    "type": "number"
+   },
+   {
+    "default": 0,
+    "helpText": "Positive values penalize new tokens based on whether they appear in the text so far, increasing the model's likelihood to talk about new topics.",
+    "id": "presence_penalty",
+    "label": "Presence Penalty",
+    "range": {
+     "max": 2,
+     "min": 0,
+     "step": 0.01
+    },
+    "supported_endpoints": [
+     "/v1/chat/completions",
+     "/v1/completions"
+    ],
+    "type": "number"
+   },
+   {
+    "helpText": "(BETA) - System will make a best effort to sample deterministically, such that repeated requests with the same seed and parameters should return the same result.",
+    "id": "seed",
+    "label": "Seed",
+    "range": {
+     "max": 100,
+     "min": 0
+    },
+    "supported_endpoints": [
+     "/v1/chat/completions",
+     "/v1/completions"
+    ],
+    "type": "number"
+   },
+   {
+    "default": false,
+    "helpText": "The stream parameter in the API controls whether the response is sent in incremental updates, like tokenized data as it's generated, or as a complete result in one go.",
+    "id": "stream",
+    "label": "Stream",
+    "supported_endpoints": [
+     "/v1/chat/completions",
+     "/v1/completions",
+     "/v1/responses"
+    ],
+    "type": "boolean"
+   },
+   {
+    "helpText": "A unique identifier representing your end-user.",
+    "id": "metadata",
+    "label": "Metadata",
+    "supported_endpoints": [
+     "/v1/chat/completions",
+     "/v1/responses"
+    ],
+    "type": "text"
+   }
+  ],
+  "provider": "anthropic",
+  "supports_assistant_prefill": true,
+  "supports_computer_use": true,
+  "supports_function_calling": true,
+  "supports_pdf_input": true,
+  "supports_prompt_caching": true,
+  "supports_reasoning": true,
+  "supports_response_schema": true,
+  "supports_tool_choice": true,
+  "supports_vision": true,
+  "tool_use_system_prompt_tokens": 159
+ },
+ "claude-fable-5": {
+  "base_model": "claude-fable-5",
+  "deprecation_date": "2027-06-09",
+  "max_input_tokens": 1000000,
+  "max_output_tokens": 128000,
+  "max_tokens": 1000000,
+  "mode": "chat",
+  "model_parameters": [
+   {
+    "helpText": "A list of tools the model may call.",
+    "id": "promptTools",
+    "label": "Prompt Tools (Functions)",
+    "supported_endpoints": [
+     "/v1/chat/completions",
+     "/v1/responses"
+    ],
+    "type": "select"
+   },
+   {
+    "default": 256,
+    "helpText": "The maximum number of tokens that can be generated in the Result.",
+    "id": "max_tokens",
+    "label": "Max Tokens",
+    "range": {
+     "max": 128000,
+     "min": 1
+    },
+    "supported_endpoints": [
+     "/v1/chat/completions",
+     "/v1/completions"
+    ],
+    "type": "number"
+   },
+   {
+    "array": {
+     "maxElements": 4,
+     "minElements": 1,
+     "type": "text"
+    },
+    "helpText": "Custom text sequences that will cause the model to stop generating.",
+    "id": "stop_sequences",
+    "label": "Stop Sequence",
+    "type": "array"
+   },
+   {
+    "accesorKey": "type",
+    "default": {
+     "type": "text"
+    },
+    "id": "thinking",
+    "label": "Thinking",
+    "options": [
+     {
+      "label": "adaptive",
+      "value": "adaptive"
+     }
+    ],
+    "type": "select"
+   },
+   {
+    "accesorKey": "effort",
+    "default": {
+     "type": "text"
+    },
+    "id": "output_config",
+    "label": "output_config",
+    "options": [
+     {
+      "label": "max",
+      "value": "max"
+     },
+     {
+      "label": "xhigh",
+      "value": "xhigh"
+     },
+     {
+      "label": "high",
+      "value": "high"
+     },
+     {
+      "label": "medium",
+      "value": "medium"
+     },
+     {
+      "label": "low",
+      "value": "low"
+     }
+    ],
+    "type": "select"
+   },
+   {
+    "default": "medium",
+    "helpText": "Reasoning effort gives the model guidance on how many reasoning tokens to generate before answering. Lower values favour speed and economical token usage; higher values favour more complete reasoning.",
+    "id": "reasoning_effort",
+    "label": "Reasoning Effort",
+    "options": [
+     {
+      "label": "Low",
+      "value": "low"
+     },
+     {
+      "label": "Medium",
+      "value": "medium"
+     },
+     {
+      "label": "High",
+      "value": "high"
+     },
+     {
+      "label": "XHigh",
+      "value": "xhigh"
+     },
+     {
+      "label": "Max",
+      "value": "max"
+     }
+    ],
+    "supported_endpoints": [
+     "/v1/chat/completions",
+     "/v1/responses"
+    ],
+    "type": "select"
+   },
+   {
+    "accesorKey": "type",
+    "default": {
+     "type": "text"
+    },
+    "helpText": "The format of the response. If set to 'Structured output', the response will match the supplied JSON schema.",
+    "id": "response_format",
+    "label": "Response Format",
+    "options": [
+     {
+      "label": "Structured output",
+      "subFields": [
+       {
+        "default": {
+         "name": "",
+         "schema": {},
+         "strict": true
+        },
+        "helpText": "A JSON schema that the model will follow when generating the response.",
+        "id": "json_schema",
+        "label": "JSON Schema",
+        "type": "json"
+       }
+      ],
+      "value": "json_schema"
+     },
+     {
+      "label": "Text",
+      "value": "text"
+     }
+    ],
+    "supported_endpoints": [
+     "/v1/chat/completions",
+     "/v1/responses"
+    ],
+    "type": "select"
+   },
+   {
+    "default": false,
+    "helpText": "Enable web search tool for real-time information retrieval.",
+    "id": "web_search",
+    "label": "Web Search",
+    "supported_endpoints": [
+     "/v1/chat/completions",
+     "/v1/responses"
+    ],
+    "type": "boolean"
+   },
+   {
+    "default": false,
+    "helpText": "The stream parameter in the API controls whether the response is sent in incremental updates, like tokenized data as it's generated, or as a complete result in one go.",
+    "id": "stream",
+    "label": "Stream",
+    "supported_endpoints": [
+     "/v1/chat/completions",
+     "/v1/completions",
+     "/v1/responses"
+    ],
+    "type": "boolean"
+   }
+  ],
+  "prompt_cache_min_tokens": 512,
+  "provider": "anthropic",
+  "provider_specific_entry": {
+   "us": 1.1
+  },
+  "reasoning": {
+   "can_disable": false
+  },
+  "reasoning_effort_levels": [
+   "low",
+   "medium",
+   "high",
+   "xhigh",
+   "max"
+  ],
+  "service_tiers": [
+   "auto",
+   "standard_only"
+  ],
+  "source": "https://docs.anthropic.com/en/docs/about-claude/models/overview",
+  "supports_adaptive_thinking": true,
+  "supports_anthropic_compaction": true,
+  "supports_assistant_prefill": false,
+  "supports_computer_use": true,
+  "supports_dynamic_reasoning_budget": false,
+  "supports_forced_tool_choice": true,
+  "supports_function_calling": true,
+  "supports_max_reasoning_effort": true,
+  "supports_mid_conversation_system": true,
+  "supports_mid_conversation_system_messages": true,
+  "supports_native_effort": true,
+  "supports_native_structured_output": true,
+  "supports_output_config": true,
+  "supports_pdf_input": true,
+  "supports_prompt_caching": true,
+  "supports_reasoning": true,
+  "supports_reasoning_disable": false,
+  "supports_reasoning_effort": true,
+  "supports_reasoning_with_tool_calls": true,
+  "supports_response_schema": true,
+  "supports_response_schema_with_tools": true,
+  "supports_safeguards": true,
+  "supports_sampling_params": false,
+  "supports_service_tier": true,
+  "supports_speed": false,
+  "supports_tool_choice": true,
+  "supports_vision": true,
+  "supports_web_search": true,
+  "supports_xhigh_reasoning_effort": true,
+  "thinking_always_on": true,
+  "tool_use_system_prompt_tokens": 346,
+  "web_search_billing_unit": "per_request"
+ },
+ "claude-fable-5-1": {
+  "base_model": "claude-fable-5-1",
+  "deprecation_date": "2027-09-01",
+  "inference_geo_us_multiplier": 1.1,
+  "max_input_tokens": 1000000,
+  "max_output_tokens": 128000,
+  "max_tokens": 1000000,
+  "mode": "chat",
+  "model_parameters": [
+   {
+    "helpText": "A list of tools the model may call.",
+    "id": "promptTools",
+    "label": "Prompt Tools (Functions)",
+    "supported_endpoints": [
+     "/v1/chat/completions",
+     "/v1/responses"
+    ],
+    "type": "select"
+   },
+   {
+    "default": 256,
+    "helpText": "The maximum number of tokens that can be generated in the Result.",
+    "id": "max_tokens",
+    "label": "Max Tokens",
+    "range": {
+     "max": 128000,
+     "min": 1
+    },
+    "supported_endpoints": [
+     "/v1/chat/completions",
+     "/v1/completions"
+    ],
+    "type": "number"
+   },
+   {
+    "array": {
+     "maxElements": 4,
+     "minElements": 1,
+     "type": "text"
+    },
+    "helpText": "Custom text sequences that will cause the model to stop generating.",
+    "id": "stop_sequences",
+    "label": "Stop Sequence",
+    "type": "array"
+   },
+   {
+    "accesorKey": "type",
+    "default": {
+     "type": "text"
+    },
+    "id": "thinking",
+    "label": "Thinking",
+    "options": [
+     {
+      "label": "adaptive",
+      "value": "adaptive"
+     }
+    ],
+    "type": "select"
+   },
+   {
+    "accesorKey": "effort",
+    "default": {
+     "type": "text"
+    },
+    "id": "output_config",
+    "label": "output_config",
+    "options": [
+     {
+      "label": "max",
+      "value": "max"
+     },
+     {
+      "label": "xhigh",
+      "value": "xhigh"
+     },
+     {
+      "label": "high",
+      "value": "high"
+     },
+     {
+      "label": "medium",
+      "value": "medium"
+     },
+     {
+      "label": "low",
+      "value": "low"
+     }
+    ],
+    "type": "select"
+   },
+   {
+    "default": "medium",
+    "helpText": "Reasoning effort gives the model guidance on how many reasoning tokens to generate before answering. Lower values favour speed and economical token usage; higher values favour more complete reasoning.",
+    "id": "reasoning_effort",
+    "label": "Reasoning Effort",
+    "options": [
+     {
+      "label": "Low",
+      "value": "low"
+     },
+     {
+      "label": "Medium",
+      "value": "medium"
+     },
+     {
+      "label": "High",
+      "value": "high"
+     },
+     {
+      "label": "XHigh",
+      "value": "xhigh"
+     },
+     {
+      "label": "Max",
+      "value": "max"
+     }
+    ],
+    "supported_endpoints": [
+     "/v1/chat/completions",
+     "/v1/responses"
+    ],
+    "type": "select"
+   },
+   {
+    "accesorKey": "type",
+    "default": {
+     "type": "text"
+    },
+    "helpText": "The format of the response. If set to 'Structured output', the response will match the supplied JSON schema.",
+    "id": "response_format",
+    "label": "Response Format",
+    "options": [
+     {
+      "label": "Structured output",
+      "subFields": [
+       {
+        "default": {
+         "name": "",
+         "schema": {},
+         "strict": true
+        },
+        "helpText": "A JSON schema that the model will follow when generating the response.",
+        "id": "json_schema",
+        "label": "JSON Schema",
+        "type": "json"
+       }
+      ],
+      "value": "json_schema"
+     },
+     {
+      "label": "Text",
+      "value": "text"
+     }
+    ],
+    "supported_endpoints": [
+     "/v1/chat/completions",
+     "/v1/responses"
+    ],
+    "type": "select"
+   },
+   {
+    "default": false,
+    "helpText": "Enable web search tool for real-time information retrieval.",
+    "id": "web_search",
+    "label": "Web Search",
+    "supported_endpoints": [
+     "/v1/chat/completions",
+     "/v1/responses"
+    ],
+    "type": "boolean"
+   },
+   {
+    "default": false,
+    "helpText": "The stream parameter in the API controls whether the response is sent in incremental updates, like tokenized data as it's generated, or as a complete result in one go.",
+    "id": "stream",
+    "label": "Stream",
+    "supported_endpoints": [
+     "/v1/chat/completions",
+     "/v1/completions",
+     "/v1/responses"
+    ],
+    "type": "boolean"
+   }
+  ],
+  "prompt_cache_min_tokens": 512,
+  "provider": "anthropic",
+  "provider_specific_entry": {
+   "us": 1.1
+  },
+  "reasoning": {
+   "can_disable": false
+  },
+  "reasoning_effort_levels": [
+   "low",
+   "medium",
+   "high",
+   "xhigh",
+   "max"
+  ],
+  "service_tiers": [
+   "auto",
+   "standard_only"
+  ],
+  "source": "https://platform.claude.com/docs/en/models/fable-5-1/whats-new-fable-5-1",
+  "supports_adaptive_thinking": true,
+  "supports_anthropic_compaction": true,
+  "supports_assistant_prefill": false,
+  "supports_computer_use": true,
+  "supports_dynamic_reasoning_budget": false,
+  "supports_forced_tool_choice": false,
+  "supports_forced_tool_use": false,
+  "supports_function_calling": true,
+  "supports_max_reasoning_effort": true,
+  "supports_mid_conversation_system": true,
+  "supports_mid_conversation_system_messages": true,
+  "supports_native_effort": true,
+  "supports_native_structured_output": true,
+  "supports_output_config": true,
+  "supports_pdf_input": true,
+  "supports_prompt_caching": true,
+  "supports_reasoning": true,
+  "supports_reasoning_disable": false,
+  "supports_reasoning_effort": true,
+  "supports_reasoning_with_tool_calls": true,
+  "supports_response_schema": true,
+  "supports_response_schema_with_tools": true,
+  "supports_safeguards": true,
+  "supports_sampling_params": false,
+  "supports_service_tier": true,
+  "supports_speed": false,
+  "supports_tool_choice": true,
+  "supports_vision": true,
+  "supports_web_search": true,
+  "supports_xhigh_reasoning_effort": true,
+  "thinking_always_on": true,
+  "tool_use_system_prompt_tokens": 346,
+  "web_search_billing_unit": "per_request"
+ },
+ "claude-fable-5-2": {
+  "base_model": "claude-fable-5-2",
+  "default_reasoning_effort": "high",
+  "inference_geo_us_multiplier": 1.1,
+  "max_input_tokens": 1000000,
+  "max_output_tokens": 128000,
+  "max_tokens": 1000000,
+  "mode": "chat",
+  "prompt_cache_min_tokens": 512,
+  "provider": "anthropic",
+  "provider_specific_entry": {
+   "us": 1.1
+  },
+  "reasoning_effort_levels": [
+   "low",
+   "medium",
+   "high",
+   "xhigh",
+   "max"
+  ],
+  "service_tiers": [
+   "auto",
+   "standard_only",
+   "fast"
+  ],
+  "source": "https://platform.claude.com/docs/en/about-claude/pricing",
+  "supports_adaptive_thinking": true,
+  "supports_anthropic_compaction": true,
+  "supports_assistant_prefill": false,
+  "supports_computer_use": true,
+  "supports_dynamic_reasoning_budget": false,
+  "supports_fast_mode": true,
+  "supports_forced_tool_choice": false,
+  "supports_forced_tool_use": false,
+  "supports_function_calling": true,
+  "supports_max_reasoning_effort": true,
+  "supports_mid_conversation_system": true,
+  "supports_mid_conversation_system_messages": true,
+  "supports_native_effort": true,
+  "supports_native_structured_output": true,
+  "supports_output_config": true,
+  "supports_pdf_input": true,
+  "supports_prompt_caching": true,
+  "supports_reasoning": true,
+  "supports_reasoning_disable": false,
+  "supports_reasoning_effort": true,
+  "supports_reasoning_with_tool_calls": true,
+  "supports_response_schema": true,
+  "supports_response_schema_with_tools": true,
+  "supports_safeguards": true,
+  "supports_sampling_params": false,
+  "supports_service_tier": true,
+  "supports_speed": true,
+  "supports_tool_choice": true,
+  "supports_vision": true,
+  "supports_web_search": true,
+  "supports_xhigh_reasoning_effort": true,
+  "thinking_always_on": true,
+  "tool_use_system_prompt_tokens": 346,
+  "web_search_billing_unit": "per_request"
+ },
+ "claude-haiku-4-5": {
+  "base_model": "claude-haiku-4-5",
+  "deprecation_date": "2026-10-15",
+  "is_deprecated": true,
+  "max_input_tokens": 200000,
+  "max_output_tokens": 64000,
+  "max_tokens": 64000,
+  "mode": "chat",
+  "model_parameters": [
+   {
+    "helpText": "A list of tools the model may call.",
+    "id": "promptTools",
+    "label": "Prompt Tools (Functions)",
+    "supported_endpoints": [
+     "/v1/chat/completions",
+     "/v1/responses"
+    ],
+    "type": "select"
+   },
+   {
+    "default": 1,
+    "helpText": "What sampling temperature to use, between 0 and 1. Higher values like 0.8 will make the output more random, while lower values like 0.2 will make it more focused and deterministic.",
+    "id": "temperature",
+    "label": "Temperature",
+    "range": {
+     "max": 1,
+     "min": 0,
+     "step": 0.01
+    },
+    "supported_endpoints": [
+     "/v1/chat/completions",
+     "/v1/completions",
+     "/v1/responses"
+    ],
+    "type": "number"
+   },
+   {
+    "default": 256,
+    "helpText": "The maximum number of tokens that can be generated in the Result.",
+    "id": "max_tokens",
+    "label": "Max Tokens",
+    "range": {
+     "max": 64000,
+     "min": 1
+    },
+    "supported_endpoints": [
+     "/v1/chat/completions",
+     "/v1/completions"
+    ],
+    "type": "number"
+   },
+   {
+    "array": {
+     "maxElements": 4,
+     "minElements": 1,
+     "type": "text"
+    },
+    "helpText": "Custom text sequences that will cause the model to stop generating.",
+    "id": "stop_sequences",
+    "label": "Stop Sequence",
+    "type": "array"
+   },
+   {
+    "default": 1,
+    "helpText": "An alternative to sampling with temperature, called nucleus sampling, where the model considers the results of the tokens with top_p probability mass. So 0.1 means only the tokens comprising the top 10% probability mass are considered.",
+    "id": "top_p",
+    "label": "Top P",
+    "range": {
+     "max": 1,
+     "min": 0,
+     "step": 0.01
+    },
+    "supported_endpoints": [
+     "/v1/chat/completions",
+     "/v1/completions",
+     "/v1/responses"
+    ],
+    "type": "number"
+   },
+   {
+    "default": 50,
+    "helpText": "The top_k parameter is used to limit the number of choices for the next predicted word or token. It specifies the maximum number of tokens to consider at each step, based on their probability of occurrence.",
+    "id": "top_k",
+    "label": "Top K",
+    "range": {
+     "max": 100,
+     "min": 1
+    },
+    "type": "number"
+   },
+   {
+    "accesorKey": "type",
+    "default": {
+     "type": "text"
+    },
+    "id": "thinking",
+    "label": "Thinking",
+    "options": [
+     {
+      "label": "disabled",
+      "value": "disabled"
+     },
+     {
+      "label": "enabled",
+      "value": "enabled"
+     }
+    ],
+    "type": "select"
+   },
+   {
+    "accesorKey": "type",
+    "default": {
+     "type": "text"
+    },
+    "helpText": "The format of the response. If set to 'Structured output', the response will match the supplied JSON schema.",
+    "id": "response_format",
+    "label": "Response Format",
+    "options": [
+     {
+      "label": "Structured output",
+      "subFields": [
+       {
+        "default": {
+         "name": "",
+         "schema": {},
+         "strict": true
+        },
+        "helpText": "A JSON schema that the model will follow when generating the response.",
+        "id": "json_schema",
+        "label": "JSON Schema",
+        "type": "json"
+       }
+      ],
+      "value": "json_schema"
+     },
+     {
+      "label": "Text",
+      "value": "text"
+     }
+    ],
+    "supported_endpoints": [
+     "/v1/chat/completions",
+     "/v1/responses"
+    ],
+    "type": "select"
+   },
+   {
+    "default": false,
+    "helpText": "Enable web search tool for real-time information retrieval.",
+    "id": "web_search",
+    "label": "Web Search",
+    "supported_endpoints": [
+     "/v1/chat/completions",
+     "/v1/responses"
+    ],
+    "type": "boolean"
+   },
+   {
+    "default": false,
+    "helpText": "The stream parameter in the API controls whether the response is sent in incremental updates, like tokenized data as it's generated, or as a complete result in one go.",
+    "id": "stream",
+    "label": "Stream",
+    "supported_endpoints": [
+     "/v1/chat/completions",
+     "/v1/completions",
+     "/v1/responses"
+    ],
+    "type": "boolean"
+   }
+  ],
+  "prompt_cache_min_tokens": 4096,
+  "provider": "anthropic",
+  "service_tiers": [
+   "auto",
+   "standard_only"
+  ],
+  "source": "https://platform.claude.com/docs/en/about-claude/pricing",
+  "supports_adaptive_thinking": false,
+  "supports_assistant_prefill": true,
+  "supports_computer_use": true,
+  "supports_dynamic_reasoning_budget": false,
+  "supports_forced_tool_choice": true,
+  "supports_function_calling": true,
+  "supports_mid_conversation_system_messages": false,
+  "supports_native_effort": false,
+  "supports_native_structured_output": true,
+  "supports_pdf_input": true,
+  "supports_prompt_caching": true,
+  "supports_reasoning": true,
+  "supports_reasoning_disable": true,
+  "supports_reasoning_with_tool_calls": true,
+  "supports_response_schema": true,
+  "supports_response_schema_with_tools": true,
+  "supports_sampling_params": true,
+  "supports_service_tier": true,
+  "supports_speed": false,
+  "supports_tool_choice": true,
+  "supports_vision": true,
+  "supports_web_search": true,
+  "web_search_billing_unit": "per_request"
+ },
+ "claude-haiku-4-5-20251001": {
+  "base_model": "claude-haiku-4-5",
+  "deprecation_date": "2026-10-15",
+  "is_deprecated": true,
+  "max_input_tokens": 200000,
+  "max_output_tokens": 64000,
+  "max_tokens": 64000,
+  "mode": "chat",
+  "model_parameters": [
+   {
+    "helpText": "A list of tools the model may call.",
+    "id": "promptTools",
+    "label": "Prompt Tools (Functions)",
+    "supported_endpoints": [
+     "/v1/chat/completions",
+     "/v1/responses"
+    ],
+    "type": "select"
+   },
+   {
+    "default": 1,
+    "helpText": "What sampling temperature to use, between 0 and 1. Higher values like 0.8 will make the output more random, while lower values like 0.2 will make it more focused and deterministic.",
+    "id": "temperature",
+    "label": "Temperature",
+    "range": {
+     "max": 1,
+     "min": 0,
+     "step": 0.01
+    },
+    "supported_endpoints": [
+     "/v1/chat/completions",
+     "/v1/completions",
+     "/v1/responses"
+    ],
+    "type": "number"
+   },
+   {
+    "default": 256,
+    "helpText": "The maximum number of tokens that can be generated in the Result.",
+    "id": "max_tokens",
+    "label": "Max Tokens",
+    "range": {
+     "max": 64000,
+     "min": 1
+    },
+    "supported_endpoints": [
+     "/v1/chat/completions",
+     "/v1/completions"
+    ],
+    "type": "number"
+   },
+   {
+    "array": {
+     "maxElements": 4,
+     "minElements": 1,
+     "type": "text"
+    },
+    "helpText": "Custom text sequences that will cause the model to stop generating.",
+    "id": "stop_sequences",
+    "label": "Stop Sequence",
+    "type": "array"
+   },
+   {
+    "default": 1,
+    "helpText": "An alternative to sampling with temperature, called nucleus sampling, where the model considers the results of the tokens with top_p probability mass. So 0.1 means only the tokens comprising the top 10% probability mass are considered.",
+    "id": "top_p",
+    "label": "Top P",
+    "range": {
+     "max": 1,
+     "min": 0,
+     "step": 0.01
+    },
+    "supported_endpoints": [
+     "/v1/chat/completions",
+     "/v1/completions",
+     "/v1/responses"
+    ],
+    "type": "number"
+   },
+   {
+    "default": 50,
+    "helpText": "The top_k parameter is used to limit the number of choices for the next predicted word or token. It specifies the maximum number of tokens to consider at each step, based on their probability of occurrence.",
+    "id": "top_k",
+    "label": "Top K",
+    "range": {
+     "max": 100,
+     "min": 1
+    },
+    "type": "number"
+   },
+   {
+    "accesorKey": "type",
+    "default": {
+     "type": "text"
+    },
+    "id": "thinking",
+    "label": "Thinking",
+    "options": [
+     {
+      "label": "disabled",
+      "value": "disabled"
+     },
+     {
+      "label": "enabled",
+      "value": "enabled"
+     }
+    ],
+    "type": "select"
+   },
+   {
+    "accesorKey": "type",
+    "default": {
+     "type": "text"
+    },
+    "helpText": "The format of the response. If set to 'Structured output', the response will match the supplied JSON schema.",
+    "id": "response_format",
+    "label": "Response Format",
+    "options": [
+     {
+      "label": "Structured output",
+      "subFields": [
+       {
+        "default": {
+         "name": "",
+         "schema": {},
+         "strict": true
+        },
+        "helpText": "A JSON schema that the model will follow when generating the response.",
+        "id": "json_schema",
+        "label": "JSON Schema",
+        "type": "json"
+       }
+      ],
+      "value": "json_schema"
+     },
+     {
+      "label": "Text",
+      "value": "text"
+     }
+    ],
+    "supported_endpoints": [
+     "/v1/chat/completions",
+     "/v1/responses"
+    ],
+    "type": "select"
+   },
+   {
+    "default": false,
+    "helpText": "Enable web search tool for real-time information retrieval.",
+    "id": "web_search",
+    "label": "Web Search",
+    "supported_endpoints": [
+     "/v1/chat/completions",
+     "/v1/responses"
+    ],
+    "type": "boolean"
+   },
+   {
+    "default": false,
+    "helpText": "The stream parameter in the API controls whether the response is sent in incremental updates, like tokenized data as it's generated, or as a complete result in one go.",
+    "id": "stream",
+    "label": "Stream",
+    "supported_endpoints": [
+     "/v1/chat/completions",
+     "/v1/completions",
+     "/v1/responses"
+    ],
+    "type": "boolean"
+   }
+  ],
+  "prompt_cache_min_tokens": 4096,
+  "provider": "anthropic",
+  "service_tiers": [
+   "auto",
+   "standard_only"
+  ],
+  "supports_adaptive_thinking": false,
+  "supports_assistant_prefill": true,
+  "supports_computer_use": true,
+  "supports_dynamic_reasoning_budget": false,
+  "supports_forced_tool_choice": true,
+  "supports_function_calling": true,
+  "supports_mid_conversation_system_messages": false,
+  "supports_native_effort": false,
+  "supports_native_structured_output": true,
+  "supports_pdf_input": true,
+  "supports_prompt_caching": true,
+  "supports_reasoning": true,
+  "supports_reasoning_disable": true,
+  "supports_reasoning_with_tool_calls": true,
+  "supports_response_schema": true,
+  "supports_response_schema_with_tools": true,
+  "supports_sampling_params": true,
+  "supports_service_tier": true,
+  "supports_speed": false,
+  "supports_tool_choice": true,
+  "supports_vision": true,
+  "supports_web_search": true,
+  "web_search_billing_unit": "per_request"
+ },
+ "claude-haiku-5-5": {
+  "base_model": "claude-haiku-5-5",
+  "default_reasoning_effort": "medium",
+  "knowledge_cutoff": "2026-06-30",
+  "max_input_tokens": 1000000,
+  "max_output_tokens": 128000,
+  "max_tokens": 128000,
+  "mode": "chat",
+  "model_parameters": [
+   {
+    "helpText": "A list of tools the model may call.",
+    "id": "promptTools",
+    "label": "Prompt Tools (Functions)",
+    "supported_endpoints": [
+     "/v1/chat/completions",
+     "/v1/responses"
+    ],
+    "type": "select"
+   },
+   {
+    "default": 256,
+    "helpText": "The maximum number of tokens that can be generated in the Result.",
+    "id": "max_tokens",
+    "label": "Max Tokens",
+    "range": {
+     "max": 128000,
+     "min": 1
+    },
+    "supported_endpoints": [
+     "/v1/chat/completions",
+     "/v1/completions"
+    ],
+    "type": "number"
+   },
+   {
+    "array": {
+     "maxElements": 4,
+     "minElements": 1,
+     "type": "text"
+    },
+    "helpText": "Custom text sequences that will cause the model to stop generating.",
+    "id": "stop_sequences",
+    "label": "Stop Sequence",
+    "type": "array"
+   },
+   {
+    "accesorKey": "type",
+    "default": {
+     "type": "text"
+    },
+    "id": "thinking",
+    "label": "Thinking",
+    "options": [
+     {
+      "label": "disabled",
+      "value": "disabled"
+     },
+     {
+      "label": "adaptive",
+      "value": "adaptive"
+     }
+    ],
+    "type": "select"
+   },
+   {
+    "accesorKey": "effort",
+    "default": {
+     "type": "text"
+    },
+    "id": "output_config",
+    "label": "output_config",
+    "options": [
+     {
+      "label": "max",
+      "value": "max"
+     },
+     {
+      "label": "xhigh",
+      "value": "xhigh"
+     },
+     {
+      "label": "high",
+      "value": "high"
+     },
+     {
+      "label": "medium",
+      "value": "medium"
+     },
+     {
+      "label": "low",
+      "value": "low"
+     }
+    ],
+    "type": "select"
+   },
+   {
+    "default": "medium",
+    "helpText": "Reasoning effort gives the model guidance on how many reasoning tokens to generate before answering. Lower values favour speed and economical token usage; higher values favour more complete reasoning.",
+    "id": "reasoning_effort",
+    "label": "Reasoning Effort",
+    "options": [
+     {
+      "label": "Low",
+      "value": "low"
+     },
+     {
+      "label": "Medium",
+      "value": "medium"
+     },
+     {
+      "label": "High",
+      "value": "high"
+     },
+     {
+      "label": "XHigh",
+      "value": "xhigh"
+     },
+     {
+      "label": "Max",
+      "value": "max"
+     }
+    ],
+    "supported_endpoints": [
+     "/v1/chat/completions",
+     "/v1/responses"
+    ],
+    "type": "select"
+   },
+   {
+    "accesorKey": "type",
+    "default": {
+     "type": "text"
+    },
+    "helpText": "The format of the response. If set to 'Structured output', the response will match the supplied JSON schema.",
+    "id": "response_format",
+    "label": "Response Format",
+    "options": [
+     {
+      "label": "Structured output",
+      "subFields": [
+       {
+        "default": {
+         "name": "",
+         "schema": {},
+         "strict": true
+        },
+        "helpText": "A JSON schema that the model will follow when generating the response.",
+        "id": "json_schema",
+        "label": "JSON Schema",
+        "type": "json"
+       }
+      ],
+      "value": "json_schema"
+     },
+     {
+      "label": "Text",
+      "value": "text"
+     }
+    ],
+    "supported_endpoints": [
+     "/v1/chat/completions",
+     "/v1/responses"
+    ],
+    "type": "select"
+   },
+   {
+    "default": false,
+    "helpText": "Enable web search tool for real-time information retrieval.",
+    "id": "web_search",
+    "label": "Web Search",
+    "supported_endpoints": [
+     "/v1/chat/completions",
+     "/v1/responses"
+    ],
+    "type": "boolean"
+   },
+   {
+    "default": false,
+    "helpText": "The stream parameter in the API controls whether the response is sent in incremental updates, like tokenized data as it's generated, or as a complete result in one go.",
+    "id": "stream",
+    "label": "Stream",
+    "supported_endpoints": [
+     "/v1/chat/completions",
+     "/v1/completions",
+     "/v1/responses"
+    ],
+    "type": "boolean"
+   }
+  ],
+  "prompt_cache_min_tokens": 512,
+  "provider": "anthropic",
+  "provider_specific_entry": {
+   "us": 1.1
+  },
+  "source": "https://platform.claude.com/docs/en/models/haiku-5-5/overview",
+  "supported_modalities": [
+   "text",
+   "image"
+  ],
+  "supported_output_modalities": [
+   "text"
+  ],
+  "supports_adaptive_thinking": true,
+  "supports_anthropic_compaction": true,
+  "supports_assistant_prefill": false,
+  "supports_computer_use": true,
+  "supports_forced_tool_use": false,
+  "supports_function_calling": true,
+  "supports_image_input": true,
+  "supports_max_reasoning_effort": true,
+  "supports_mid_conversation_system": true,
+  "supports_native_effort": true,
+  "supports_native_streaming": true,
+  "supports_native_structured_output": true,
+  "supports_output_config": true,
+  "supports_pdf_input": true,
+  "supports_prompt_caching": true,
+  "supports_reasoning": true,
+  "supports_response_schema": true,
+  "supports_safeguards": true,
+  "supports_sampling_params": false,
+  "supports_system_messages": true,
+  "supports_tool_choice": true,
+  "supports_vision": true,
+  "supports_web_search": true,
+  "supports_xhigh_reasoning_effort": true,
+  "thinking_always_on": false,
+  "thinking_on_by_default": true,
+  "web_search_billing_unit": "per_request"
+ },
+ "claude-mythos-5": {
+  "base_model": "claude-mythos-5",
+  "max_input_tokens": 1000000,
+  "max_output_tokens": 128000,
+  "max_tokens": 128000,
+  "mode": "chat",
+  "model_parameters": [
+   {
+    "default": 4096,
+    "helpText": "The maximum number of tokens that can be generated in the Result.",
+    "id": "max_tokens",
+    "label": "Max Tokens",
+    "range": {
+     "max": 128000,
+     "min": 1
+    },
+    "supported_endpoints": [
+     "/v1/chat/completions",
+     "/v1/completions"
+    ],
+    "type": "number"
+   }
+  ],
+  "prompt_cache_min_tokens": 512,
+  "provider": "anthropic",
+  "provider_specific_entry": {
+   "us": 1.1
+  },
+  "source": "https://platform.claude.com/docs/en/about-claude/pricing",
+  "supports_adaptive_thinking": true,
+  "supports_anthropic_compaction": true,
+  "supports_assistant_prefill": false,
+  "supports_computer_use": true,
+  "supports_function_calling": true,
+  "supports_max_reasoning_effort": true,
+  "supports_mid_conversation_system": true,
+  "supports_native_structured_output": true,
+  "supports_output_config": true,
+  "supports_pdf_input": true,
+  "supports_prompt_caching": true,
+  "supports_reasoning": true,
+  "supports_response_schema": true,
+  "supports_safeguards": true,
+  "supports_sampling_params": false,
+  "supports_tool_choice": true,
+  "supports_vision": true,
+  "supports_xhigh_reasoning_effort": true,
+  "thinking_always_on": true,
+  "web_search_billing_unit": "per_request"
+ },
+ "claude-mythos-5-1": {
+  "base_model": "claude-mythos-5-1",
+  "max_input_tokens": 1000000,
+  "max_output_tokens": 128000,
+  "max_tokens": 128000,
+  "mode": "chat",
+  "model_parameters": [
+   {
+    "default": 4096,
+    "helpText": "The maximum number of tokens that can be generated in the Result.",
+    "id": "max_tokens",
+    "label": "Max Tokens",
+    "range": {
+     "max": 128000,
+     "min": 1
+    },
+    "supported_endpoints": [
+     "/v1/chat/completions",
+     "/v1/completions"
+    ],
+    "type": "number"
+   }
+  ],
+  "prompt_cache_min_tokens": 512,
+  "provider": "anthropic",
+  "provider_specific_entry": {
+   "us": 1.1
+  },
+  "source": "https://platform.claude.com/docs/en/about-claude/pricing",
+  "supports_adaptive_thinking": true,
+  "supports_anthropic_compaction": true,
+  "supports_assistant_prefill": false,
+  "supports_computer_use": true,
+  "supports_forced_tool_use": false,
+  "supports_function_calling": true,
+  "supports_max_reasoning_effort": true,
+  "supports_mid_conversation_system": true,
+  "supports_native_structured_output": true,
+  "supports_output_config": true,
+  "supports_pdf_input": true,
+  "supports_prompt_caching": true,
+  "supports_reasoning": true,
+  "supports_response_schema": true,
+  "supports_safeguards": true,
+  "supports_sampling_params": false,
+  "supports_tool_choice": true,
+  "supports_vision": true,
+  "supports_xhigh_reasoning_effort": true,
+  "thinking_always_on": true,
+  "web_search_billing_unit": "per_request"
+ },
+ "claude-mythos-5-2": {
+  "base_model": "claude-mythos-5-2",
+  "default_reasoning_effort": "high",
+  "inference_geo_us_multiplier": 1.1,
+  "max_input_tokens": 1000000,
+  "max_output_tokens": 128000,
+  "max_tokens": 1000000,
+  "mode": "chat",
+  "prompt_cache_min_tokens": 512,
+  "provider": "anthropic",
+  "provider_specific_entry": {
+   "us": 1.1
+  },
+  "reasoning_effort_levels": [
+   "low",
+   "medium",
+   "high",
+   "xhigh",
+   "max"
+  ],
+  "service_tiers": [
+   "auto",
+   "standard_only",
+   "fast"
+  ],
+  "source": "https://platform.claude.com/docs/en/about-claude/pricing",
+  "supports_adaptive_thinking": true,
+  "supports_anthropic_compaction": true,
+  "supports_assistant_prefill": false,
+  "supports_computer_use": true,
+  "supports_dynamic_reasoning_budget": false,
+  "supports_fast_mode": true,
+  "supports_forced_tool_choice": false,
+  "supports_forced_tool_use": false,
+  "supports_function_calling": true,
+  "supports_max_reasoning_effort": true,
+  "supports_mid_conversation_system": true,
+  "supports_mid_conversation_system_messages": true,
+  "supports_native_effort": true,
+  "supports_native_structured_output": true,
+  "supports_output_config": true,
+  "supports_pdf_input": true,
+  "supports_prompt_caching": true,
+  "supports_reasoning": true,
+  "supports_reasoning_disable": false,
+  "supports_reasoning_effort": true,
+  "supports_reasoning_with_tool_calls": true,
+  "supports_response_schema": true,
+  "supports_response_schema_with_tools": true,
+  "supports_safeguards": true,
+  "supports_sampling_params": false,
+  "supports_service_tier": true,
+  "supports_speed": true,
+  "supports_tool_choice": true,
+  "supports_vision": true,
+  "supports_web_search": true,
+  "supports_xhigh_reasoning_effort": true,
+  "thinking_always_on": true,
+  "tool_use_system_prompt_tokens": 346,
+  "web_search_billing_unit": "per_request"
+ },
+ "claude-mythos-preview": {
+  "base_model": "claude-mythos",
+  "deprecation_date": "2026-06-09",
+  "deprecation_source": "https://platform.claude.com/docs/en/about-claude/model-deprecations",
+  "is_deprecated": true,
+  "max_input_tokens": 1000000,
+  "max_output_tokens": 128000,
+  "max_tokens": 128000,
+  "mode": "chat",
+  "model_parameters": [
+   {
+    "default": 4096,
+    "helpText": "The maximum number of tokens that can be generated in the Result.",
+    "id": "max_tokens",
+    "label": "Max Tokens",
+    "range": {
+     "max": 128000,
+     "min": 1
+    },
+    "supported_endpoints": [
+     "/v1/chat/completions",
+     "/v1/completions"
+    ],
+    "type": "number"
+   }
+  ],
+  "prompt_cache_min_tokens": 512,
+  "provider": "anthropic",
+  "provider_specific_entry": {
+   "us": 1.1
+  },
+  "source": "https://platform.claude.com/docs/en/about-claude/models/overview",
+  "supports_adaptive_thinking": true,
+  "supports_anthropic_compaction": true,
+  "supports_assistant_prefill": false,
+  "supports_computer_use": true,
+  "supports_function_calling": true,
+  "supports_max_reasoning_effort": true,
+  "supports_native_structured_output": true,
+  "supports_output_config": true,
+  "supports_pdf_input": true,
+  "supports_prompt_caching": true,
+  "supports_reasoning": true,
+  "supports_response_schema": true,
+  "supports_safeguards": true,
+  "supports_sampling_params": false,
+  "supports_tool_choice": true,
+  "supports_vision": true,
+  "supports_xhigh_reasoning_effort": true,
+  "thinking_always_on": true,
+  "web_search_billing_unit": "per_request"
+ },
+ "claude-opus-4": {
+  "base_model": "claude-opus-4",
+  "deprecation_date": "2026-05-14",
+  "is_deprecated": true,
+  "max_input_tokens": 200000,
+  "max_output_tokens": 32000,
+  "max_tokens": 32000,
+  "mode": "chat",
+  "model_parameters": [
+   {
+    "helpText": "A list of tools the model may call.",
+    "id": "promptTools",
+    "label": "Prompt Tools (Functions)",
+    "supported_endpoints": [
+     "/v1/chat/completions",
+     "/v1/responses"
+    ],
+    "type": "select"
+   },
+   {
+    "default": 1,
+    "helpText": "What sampling temperature to use, between 0 and 1. Higher values like 0.8 will make the output more random, while lower values like 0.2 will make it more focused and deterministic.",
+    "id": "temperature",
+    "label": "Temperature",
+    "range": {
+     "max": 1,
+     "min": 0,
+     "step": 0.01
+    },
+    "supported_endpoints": [
+     "/v1/chat/completions",
+     "/v1/completions",
+     "/v1/responses"
+    ],
+    "type": "number"
+   },
+   {
+    "default": 256,
+    "helpText": "The maximum number of tokens that can be generated in the Result.",
+    "id": "max_tokens",
+    "label": "Max Tokens",
+    "range": {
+     "max": 32000,
+     "min": 1
+    },
+    "supported_endpoints": [
+     "/v1/chat/completions",
+     "/v1/completions"
+    ],
+    "type": "number"
+   },
+   {
+    "array": {
+     "maxElements": 4,
+     "minElements": 1,
+     "type": "text"
+    },
+    "helpText": "Custom text sequences that will cause the model to stop generating.",
+    "id": "stop_sequences",
+    "label": "Stop Sequence",
+    "type": "array"
+   },
+   {
+    "default": 1,
+    "helpText": "An alternative to sampling with temperature, called nucleus sampling, where the model considers the results of the tokens with top_p probability mass. So 0.1 means only the tokens comprising the top 10% probability mass are considered.",
+    "id": "top_p",
+    "label": "Top P",
+    "range": {
+     "max": 1,
+     "min": 0,
+     "step": 0.01
+    },
+    "supported_endpoints": [
+     "/v1/chat/completions",
+     "/v1/completions",
+     "/v1/responses"
+    ],
+    "type": "number"
+   },
+   {
+    "default": 50,
+    "helpText": "The top_k parameter is used to limit the number of choices for the next predicted word or token. It specifies the maximum number of tokens to consider at each step, based on their probability of occurrence.",
+    "id": "top_k",
+    "label": "Top K",
+    "range": {
+     "max": 100,
+     "min": 1
+    },
+    "type": "number"
+   },
+   {
+    "accesorKey": "type",
+    "default": {
+     "type": "text"
+    },
+    "id": "thinking",
+    "label": "Thinking",
+    "options": [
+     {
+      "label": "disabled",
+      "value": "disabled"
+     },
+     {
+      "label": "enabled",
+      "value": "enabled"
+     }
+    ],
+    "type": "select"
+   },
+   {
+    "accesorKey": "type",
+    "default": {
+     "type": "text"
+    },
+    "helpText": "The format of the response. If set to 'Structured output', the response will match the supplied JSON schema.",
+    "id": "response_format",
+    "label": "Response Format",
+    "options": [
+     {
+      "label": "Structured output",
+      "subFields": [
+       {
+        "default": {
+         "name": "",
+         "schema": {},
+         "strict": true
+        },
+        "helpText": "A JSON schema that the model will follow when generating the response.",
+        "id": "json_schema",
+        "label": "JSON Schema",
+        "type": "json"
+       }
+      ],
+      "value": "json_schema"
+     },
+     {
+      "label": "Text",
+      "value": "text"
+     }
+    ],
+    "supported_endpoints": [
+     "/v1/chat/completions",
+     "/v1/responses"
+    ],
+    "type": "select"
+   },
+   {
+    "default": false,
+    "helpText": "Enable web search tool for real-time information retrieval.",
+    "id": "web_search",
+    "label": "Web Search",
+    "supported_endpoints": [
+     "/v1/chat/completions",
+     "/v1/responses"
+    ],
+    "type": "boolean"
+   },
+   {
+    "default": false,
+    "helpText": "The stream parameter in the API controls whether the response is sent in incremental updates, like tokenized data as it's generated, or as a complete result in one go.",
+    "id": "stream",
+    "label": "Stream",
+    "supported_endpoints": [
+     "/v1/chat/completions",
+     "/v1/completions",
+     "/v1/responses"
+    ],
+    "type": "boolean"
+   }
+  ],
+  "prompt_cache_min_tokens": 1024,
+  "provider": "vertex_ai",
+  "supports_adaptive_thinking": false,
+  "supports_assistant_prefill": true,
+  "supports_computer_use": true,
+  "supports_dynamic_reasoning_budget": false,
+  "supports_forced_tool_choice": true,
+  "supports_function_calling": true,
+  "supports_mid_conversation_system_messages": false,
+  "supports_native_effort": false,
+  "supports_pdf_input": true,
+  "supports_prompt_caching": true,
+  "supports_reasoning": true,
+  "supports_reasoning_disable": true,
+  "supports_reasoning_with_tool_calls": true,
+  "supports_response_schema": true,
+  "supports_response_schema_with_tools": true,
+  "supports_sampling_params": true,
+  "supports_service_tier": false,
+  "supports_speed": false,
+  "supports_tool_choice": true,
+  "supports_vision": true,
+  "supports_web_search": true,
+  "tool_use_system_prompt_tokens": 159
+ },
+ "claude-opus-4-1": {
+  "base_model": "claude-opus-4-1",
+  "deprecation_date": "2026-08-05",
+  "is_deprecated": true,
+  "max_input_tokens": 200000,
+  "max_output_tokens": 32000,
+  "max_tokens": 32000,
+  "mode": "chat",
+  "model_parameters": [
+   {
+    "helpText": "A list of tools the model may call.",
+    "id": "promptTools",
+    "label": "Prompt Tools (Functions)",
+    "supported_endpoints": [
+     "/v1/chat/completions",
+     "/v1/responses"
+    ],
+    "type": "select"
+   },
+   {
+    "default": 1,
+    "helpText": "What sampling temperature to use, between 0 and 1. Higher values like 0.8 will make the output more random, while lower values like 0.2 will make it more focused and deterministic.",
+    "id": "temperature",
+    "label": "Temperature",
+    "range": {
+     "max": 1,
+     "min": 0,
+     "step": 0.01
+    },
+    "supported_endpoints": [
+     "/v1/chat/completions",
+     "/v1/completions",
+     "/v1/responses"
+    ],
+    "type": "number"
+   },
+   {
+    "default": 256,
+    "helpText": "The maximum number of tokens that can be generated in the Result.",
+    "id": "max_tokens",
+    "label": "Max Tokens",
+    "range": {
+     "max": 32000,
+     "min": 1
+    },
+    "supported_endpoints": [
+     "/v1/chat/completions",
+     "/v1/completions"
+    ],
+    "type": "number"
+   },
+   {
+    "array": {
+     "maxElements": 4,
+     "minElements": 1,
+     "type": "text"
+    },
+    "helpText": "Custom text sequences that will cause the model to stop generating.",
+    "id": "stop_sequences",
+    "label": "Stop Sequence",
+    "type": "array"
+   },
+   {
+    "default": 1,
+    "helpText": "An alternative to sampling with temperature, called nucleus sampling, where the model considers the results of the tokens with top_p probability mass. So 0.1 means only the tokens comprising the top 10% probability mass are considered.",
+    "id": "top_p",
+    "label": "Top P",
+    "range": {
+     "max": 1,
+     "min": 0,
+     "step": 0.01
+    },
+    "supported_endpoints": [
+     "/v1/chat/completions",
+     "/v1/completions",
+     "/v1/responses"
+    ],
+    "type": "number"
+   },
+   {
+    "default": 50,
+    "helpText": "The top_k parameter is used to limit the number of choices for the next predicted word or token. It specifies the maximum number of tokens to consider at each step, based on their probability of occurrence.",
+    "id": "top_k",
+    "label": "Top K",
+    "range": {
+     "max": 100,
+     "min": 1
+    },
+    "type": "number"
+   },
+   {
+    "accesorKey": "type",
+    "default": {
+     "type": "text"
+    },
+    "id": "thinking",
+    "label": "Thinking",
+    "options": [
+     {
+      "label": "disabled",
+      "value": "disabled"
+     },
+     {
+      "label": "enabled",
+      "value": "enabled"
+     }
+    ],
+    "type": "select"
+   },
+   {
+    "accesorKey": "type",
+    "default": {
+     "type": "text"
+    },
+    "helpText": "The format of the response. If set to 'Structured output', the response will match the supplied JSON schema.",
+    "id": "response_format",
+    "label": "Response Format",
+    "options": [
+     {
+      "label": "Structured output",
+      "subFields": [
+       {
+        "default": {
+         "name": "",
+         "schema": {},
+         "strict": true
+        },
+        "helpText": "A JSON schema that the model will follow when generating the response.",
+        "id": "json_schema",
+        "label": "JSON Schema",
+        "type": "json"
+       }
+      ],
+      "value": "json_schema"
+     },
+     {
+      "label": "Text",
+      "value": "text"
+     }
+    ],
+    "supported_endpoints": [
+     "/v1/chat/completions",
+     "/v1/responses"
+    ],
+    "type": "select"
+   },
+   {
+    "default": false,
+    "helpText": "Enable web search tool for real-time information retrieval.",
+    "id": "web_search",
+    "label": "Web Search",
+    "supported_endpoints": [
+     "/v1/chat/completions",
+     "/v1/responses"
+    ],
+    "type": "boolean"
+   },
+   {
+    "default": false,
+    "helpText": "The stream parameter in the API controls whether the response is sent in incremental updates, like tokenized data as it's generated, or as a complete result in one go.",
+    "id": "stream",
+    "label": "Stream",
+    "supported_endpoints": [
+     "/v1/chat/completions",
+     "/v1/completions",
+     "/v1/responses"
+    ],
+    "type": "boolean"
+   }
+  ],
+  "prompt_cache_min_tokens": 1024,
+  "provider": "anthropic",
+  "supports_adaptive_thinking": false,
+  "supports_assistant_prefill": true,
+  "supports_computer_use": true,
+  "supports_dynamic_reasoning_budget": false,
+  "supports_forced_tool_choice": true,
+  "supports_function_calling": true,
+  "supports_mid_conversation_system_messages": false,
+  "supports_native_effort": false,
+  "supports_native_structured_output": true,
+  "supports_pdf_input": true,
+  "supports_prompt_caching": true,
+  "supports_reasoning": true,
+  "supports_reasoning_disable": true,
+  "supports_reasoning_with_tool_calls": true,
+  "supports_response_schema": true,
+  "supports_response_schema_with_tools": true,
+  "supports_sampling_params": true,
+  "supports_service_tier": false,
+  "supports_speed": false,
+  "supports_tool_choice": true,
+  "supports_vision": true,
+  "supports_web_search": true,
+  "tool_use_system_prompt_tokens": 159
+ },
+ "claude-opus-4-1-20250805": {
+  "base_model": "claude-opus-4-1",
+  "deprecation_date": "2026-08-05",
+  "is_deprecated": true,
+  "max_input_tokens": 200000,
+  "max_output_tokens": 32000,
+  "max_tokens": 32000,
+  "mode": "chat",
+  "model_parameters": [
+   {
+    "helpText": "A list of tools the model may call.",
+    "id": "promptTools",
+    "label": "Prompt Tools (Functions)",
+    "supported_endpoints": [
+     "/v1/chat/completions",
+     "/v1/responses"
+    ],
+    "type": "select"
+   },
+   {
+    "default": 0.7,
+    "helpText": "What sampling temperature to use, between 0 and 2. Higher values like 0.8 will make the output more random, while lower values like 0.2 will make it more focused and deterministic.",
+    "id": "temperature",
+    "label": "Temperature",
+    "range": {
+     "max": 1,
+     "min": 0
+    },
+    "supported_endpoints": [
+     "/v1/chat/completions",
+     "/v1/completions",
+     "/v1/responses"
+    ],
+    "type": "number"
+   },
+   {
+    "default": 16384,
+    "helpText": "The maximum number of tokens that can be generated in the Result.",
+    "id": "max_tokens",
+    "label": "Max Tokens",
+    "range": {
+     "max": 32000,
+     "min": 1
+    },
+    "supported_endpoints": [
+     "/v1/chat/completions",
+     "/v1/completions"
+    ],
+    "type": "number"
+   },
+   {
+    "accesorKey": "type",
+    "helpText": "The format of the response. If set to 'Structured output', the response will match the supplied JSON schema.",
+    "id": "output_format",
+    "label": "Output Format",
+    "options": [
+     {
+      "label": "Output output",
+      "subFields": [
+       {
+        "default": {
+         "type": "object"
+        },
+        "helpText": "A JSON schema that the model will follow when generating the response.",
+        "id": "schema",
+        "label": "Schema",
+        "type": "json"
+       }
+      ],
+      "value": "json_schema"
+     }
+    ],
+    "type": "select"
+   },
+   {
+    "array": {
+     "maxElements": 4,
+     "minElements": 1,
+     "type": "text"
+    },
+    "helpText": "Custom text sequences that will cause the model to stop generating.",
+    "id": "stop_sequences",
+    "label": "Stop Sequence",
+    "type": "array"
+   },
+   {
+    "helpText": "The top_k parameter is used to limit the number of choices for the next predicted word or token. It specifies the maximum number of tokens to consider at each step, based on their probability of occurrence. This technique helps to speed up the generation process and can improve the quality of the generated text by focusing on the most likely options.",
+    "id": "top_k",
+    "label": "Top K",
+    "range": {
+     "max": 100,
+     "min": 0
+    },
+    "type": "number"
+   },
+   {
+    "default": false,
+    "helpText": "The stream parameter in the API controls whether the response is sent in incremental updates, like tokenized data as it's generated, or as a complete result in one go.",
+    "id": "stream",
+    "label": "Stream",
+    "supported_endpoints": [
+     "/v1/chat/completions",
+     "/v1/completions",
+     "/v1/responses"
+    ],
+    "type": "boolean"
+   },
+   {
+    "helpText": "An external identifier for the user who is associated with the request.",
+    "id": "metadata",
+    "label": "Metadata",
+    "supported_endpoints": [
+     "/v1/chat/completions",
+     "/v1/responses"
+    ],
+    "type": "text"
+   }
+  ],
+  "provider": "anthropic",
+  "supports_assistant_prefill": true,
+  "supports_computer_use": true,
+  "supports_function_calling": true,
+  "supports_pdf_input": true,
+  "supports_prompt_caching": true,
+  "supports_reasoning": true,
+  "supports_response_schema": true,
+  "supports_tool_choice": true,
+  "supports_vision": true,
+  "tool_use_system_prompt_tokens": 159
+ },
+ "claude-opus-4-20250514": {
+  "deprecation_date": "2026-06-15",
+  "is_deprecated": true
+ },
+ "claude-opus-4-5": {
+  "base_model": "claude-opus-4-5",
+  "deprecation_date": "2026-11-24",
+  "max_input_tokens": 200000,
+  "max_output_tokens": 64000,
+  "max_tokens": 64000,
+  "mode": "chat",
+  "model_parameters": [
+   {
+    "helpText": "A list of tools the model may call.",
+    "id": "promptTools",
+    "label": "Prompt Tools (Functions)",
+    "supported_endpoints": [
+     "/v1/chat/completions",
+     "/v1/responses"
+    ],
+    "type": "select"
+   },
+   {
+    "default": 1,
+    "helpText": "What sampling temperature to use, between 0 and 1. Higher values like 0.8 will make the output more random, while lower values like 0.2 will make it more focused and deterministic.",
+    "id": "temperature",
+    "label": "Temperature",
+    "range": {
+     "max": 1,
+     "min": 0,
+     "step": 0.01
+    },
+    "supported_endpoints": [
+     "/v1/chat/completions",
+     "/v1/completions",
+     "/v1/responses"
+    ],
+    "type": "number"
+   },
+   {
+    "default": 256,
+    "helpText": "The maximum number of tokens that can be generated in the Result.",
+    "id": "max_tokens",
+    "label": "Max Tokens",
+    "range": {
+     "max": 64000,
+     "min": 1
+    },
+    "supported_endpoints": [
+     "/v1/chat/completions",
+     "/v1/completions"
+    ],
+    "type": "number"
+   },
+   {
+    "array": {
+     "maxElements": 4,
+     "minElements": 1,
+     "type": "text"
+    },
+    "helpText": "Custom text sequences that will cause the model to stop generating.",
+    "id": "stop_sequences",
+    "label": "Stop Sequence",
+    "type": "array"
+   },
+   {
+    "default": 1,
+    "helpText": "An alternative to sampling with temperature, called nucleus sampling, where the model considers the results of the tokens with top_p probability mass. So 0.1 means only the tokens comprising the top 10% probability mass are considered.",
+    "id": "top_p",
+    "label": "Top P",
+    "range": {
+     "max": 1,
+     "min": 0,
+     "step": 0.01
+    },
+    "supported_endpoints": [
+     "/v1/chat/completions",
+     "/v1/completions",
+     "/v1/responses"
+    ],
+    "type": "number"
+   },
+   {
+    "default": 50,
+    "helpText": "The top_k parameter is used to limit the number of choices for the next predicted word or token. It specifies the maximum number of tokens to consider at each step, based on their probability of occurrence.",
+    "id": "top_k",
+    "label": "Top K",
+    "range": {
+     "max": 100,
+     "min": 1
+    },
+    "type": "number"
+   },
+   {
+    "accesorKey": "type",
+    "default": {
+     "type": "text"
+    },
+    "id": "thinking",
+    "label": "Thinking",
+    "options": [
+     {
+      "label": "disabled",
+      "value": "disabled"
+     },
+     {
+      "label": "enabled",
+      "value": "enabled"
+     }
+    ],
+    "type": "select"
+   },
+   {
+    "accesorKey": "effort",
+    "default": {
+     "type": "text"
+    },
+    "id": "output_config",
+    "label": "output_config",
+    "options": [
+     {
+      "label": "high",
+      "value": "high"
+     },
+     {
+      "label": "medium",
+      "value": "medium"
+     },
+     {
+      "label": "low",
+      "value": "low"
+     }
+    ],
+    "type": "select"
+   },
+   {
+    "default": "medium",
+    "helpText": "Reasoning effort gives the model guidance on how many reasoning tokens to generate before answering. Lower values favour speed and economical token usage; higher values favour more complete reasoning.",
+    "id": "reasoning_effort",
+    "label": "Reasoning Effort",
+    "options": [
+     {
+      "label": "Low",
+      "value": "low"
+     },
+     {
+      "label": "Medium",
+      "value": "medium"
+     },
+     {
+      "label": "High",
+      "value": "high"
+     }
+    ],
+    "supported_endpoints": [
+     "/v1/chat/completions",
+     "/v1/responses"
+    ],
+    "type": "select"
+   },
+   {
+    "accesorKey": "type",
+    "default": {
+     "type": "text"
+    },
+    "helpText": "The format of the response. If set to 'Structured output', the response will match the supplied JSON schema.",
+    "id": "response_format",
+    "label": "Response Format",
+    "options": [
+     {
+      "label": "Structured output",
+      "subFields": [
+       {
+        "default": {
+         "name": "",
+         "schema": {},
+         "strict": true
+        },
+        "helpText": "A JSON schema that the model will follow when generating the response.",
+        "id": "json_schema",
+        "label": "JSON Schema",
+        "type": "json"
+       }
+      ],
+      "value": "json_schema"
+     },
+     {
+      "label": "Text",
+      "value": "text"
+     }
+    ],
+    "supported_endpoints": [
+     "/v1/chat/completions",
+     "/v1/responses"
+    ],
+    "type": "select"
+   },
+   {
+    "default": false,
+    "helpText": "Enable web search tool for real-time information retrieval.",
+    "id": "web_search",
+    "label": "Web Search",
+    "supported_endpoints": [
+     "/v1/chat/completions",
+     "/v1/responses"
+    ],
+    "type": "boolean"
+   },
+   {
+    "default": false,
+    "helpText": "The stream parameter in the API controls whether the response is sent in incremental updates, like tokenized data as it's generated, or as a complete result in one go.",
+    "id": "stream",
+    "label": "Stream",
+    "supported_endpoints": [
+     "/v1/chat/completions",
+     "/v1/completions",
+     "/v1/responses"
+    ],
+    "type": "boolean"
+   }
+  ],
+  "prompt_cache_min_tokens": 4096,
+  "provider": "anthropic",
+  "reasoning_effort_levels": [
+   "low",
+   "medium",
+   "high"
+  ],
+  "service_tiers": [
+   "auto",
+   "standard_only"
+  ],
+  "source": "https://platform.claude.com/docs/en/about-claude/pricing",
+  "supports_adaptive_thinking": false,
+  "supports_assistant_prefill": true,
+  "supports_computer_use": true,
+  "supports_dynamic_reasoning_budget": false,
+  "supports_forced_tool_choice": true,
+  "supports_function_calling": true,
+  "supports_mid_conversation_system_messages": false,
+  "supports_native_effort": true,
+  "supports_native_structured_output": true,
+  "supports_output_config": true,
+  "supports_pdf_input": true,
+  "supports_prompt_caching": true,
+  "supports_reasoning": true,
+  "supports_reasoning_disable": true,
+  "supports_reasoning_effort": true,
+  "supports_reasoning_with_tool_calls": true,
+  "supports_response_schema": true,
+  "supports_response_schema_with_tools": true,
+  "supports_sampling_params": true,
+  "supports_service_tier": true,
+  "supports_speed": false,
+  "supports_thinking_cache_preservation": true,
+  "supports_tool_choice": true,
+  "supports_vision": true,
+  "supports_web_search": true,
+  "tool_use_system_prompt_tokens": 159,
+  "web_search_billing_unit": "per_request"
+ },
+ "claude-opus-4-5-20251101": {
+  "base_model": "claude-opus-4-5",
+  "deprecation_date": "2026-11-24",
+  "max_input_tokens": 200000,
+  "max_output_tokens": 64000,
+  "max_tokens": 64000,
+  "mode": "chat",
+  "model_parameters": [
+   {
+    "helpText": "A list of tools the model may call.",
+    "id": "promptTools",
+    "label": "Prompt Tools (Functions)",
+    "supported_endpoints": [
+     "/v1/chat/completions",
+     "/v1/responses"
+    ],
+    "type": "select"
+   },
+   {
+    "default": 1,
+    "helpText": "What sampling temperature to use, between 0 and 1. Higher values like 0.8 will make the output more random, while lower values like 0.2 will make it more focused and deterministic.",
+    "id": "temperature",
+    "label": "Temperature",
+    "range": {
+     "max": 1,
+     "min": 0,
+     "step": 0.01
+    },
+    "supported_endpoints": [
+     "/v1/chat/completions",
+     "/v1/completions",
+     "/v1/responses"
+    ],
+    "type": "number"
+   },
+   {
+    "default": 256,
+    "helpText": "The maximum number of tokens that can be generated in the Result.",
+    "id": "max_tokens",
+    "label": "Max Tokens",
+    "range": {
+     "max": 64000,
+     "min": 1
+    },
+    "supported_endpoints": [
+     "/v1/chat/completions",
+     "/v1/completions"
+    ],
+    "type": "number"
+   },
+   {
+    "array": {
+     "maxElements": 4,
+     "minElements": 1,
+     "type": "text"
+    },
+    "helpText": "Custom text sequences that will cause the model to stop generating.",
+    "id": "stop_sequences",
+    "label": "Stop Sequence",
+    "type": "array"
+   },
+   {
+    "default": 1,
+    "helpText": "An alternative to sampling with temperature, called nucleus sampling, where the model considers the results of the tokens with top_p probability mass. So 0.1 means only the tokens comprising the top 10% probability mass are considered.",
+    "id": "top_p",
+    "label": "Top P",
+    "range": {
+     "max": 1,
+     "min": 0,
+     "step": 0.01
+    },
+    "supported_endpoints": [
+     "/v1/chat/completions",
+     "/v1/completions",
+     "/v1/responses"
+    ],
+    "type": "number"
+   },
+   {
+    "default": 50,
+    "helpText": "The top_k parameter is used to limit the number of choices for the next predicted word or token. It specifies the maximum number of tokens to consider at each step, based on their probability of occurrence.",
+    "id": "top_k",
+    "label": "Top K",
+    "range": {
+     "max": 100,
+     "min": 1
+    },
+    "type": "number"
+   },
+   {
+    "accesorKey": "type",
+    "default": {
+     "type": "text"
+    },
+    "id": "thinking",
+    "label": "Thinking",
+    "options": [
+     {
+      "label": "disabled",
+      "value": "disabled"
+     },
+     {
+      "label": "enabled",
+      "value": "enabled"
+     }
+    ],
+    "type": "select"
+   },
+   {
+    "accesorKey": "effort",
+    "default": {
+     "type": "text"
+    },
+    "id": "output_config",
+    "label": "output_config",
+    "options": [
+     {
+      "label": "high",
+      "value": "high"
+     },
+     {
+      "label": "medium",
+      "value": "medium"
+     },
+     {
+      "label": "low",
+      "value": "low"
+     }
+    ],
+    "type": "select"
+   },
+   {
+    "default": "medium",
+    "helpText": "Reasoning effort gives the model guidance on how many reasoning tokens to generate before answering. Lower values favour speed and economical token usage; higher values favour more complete reasoning.",
+    "id": "reasoning_effort",
+    "label": "Reasoning Effort",
+    "options": [
+     {
+      "label": "Low",
+      "value": "low"
+     },
+     {
+      "label": "Medium",
+      "value": "medium"
+     },
+     {
+      "label": "High",
+      "value": "high"
+     }
+    ],
+    "supported_endpoints": [
+     "/v1/chat/completions",
+     "/v1/responses"
+    ],
+    "type": "select"
+   },
+   {
+    "accesorKey": "type",
+    "default": {
+     "type": "text"
+    },
+    "helpText": "The format of the response. If set to 'Structured output', the response will match the supplied JSON schema.",
+    "id": "response_format",
+    "label": "Response Format",
+    "options": [
+     {
+      "label": "Structured output",
+      "subFields": [
+       {
+        "default": {
+         "name": "",
+         "schema": {},
+         "strict": true
+        },
+        "helpText": "A JSON schema that the model will follow when generating the response.",
+        "id": "json_schema",
+        "label": "JSON Schema",
+        "type": "json"
+       }
+      ],
+      "value": "json_schema"
+     },
+     {
+      "label": "Text",
+      "value": "text"
+     }
+    ],
+    "supported_endpoints": [
+     "/v1/chat/completions",
+     "/v1/responses"
+    ],
+    "type": "select"
+   },
+   {
+    "default": false,
+    "helpText": "Enable web search tool for real-time information retrieval.",
+    "id": "web_search",
+    "label": "Web Search",
+    "supported_endpoints": [
+     "/v1/chat/completions",
+     "/v1/responses"
+    ],
+    "type": "boolean"
+   },
+   {
+    "default": false,
+    "helpText": "The stream parameter in the API controls whether the response is sent in incremental updates, like tokenized data as it's generated, or as a complete result in one go.",
+    "id": "stream",
+    "label": "Stream",
+    "supported_endpoints": [
+     "/v1/chat/completions",
+     "/v1/completions",
+     "/v1/responses"
+    ],
+    "type": "boolean"
+   }
+  ],
+  "prompt_cache_min_tokens": 4096,
+  "provider": "anthropic",
+  "reasoning_effort_levels": [
+   "low",
+   "medium",
+   "high"
+  ],
+  "service_tiers": [
+   "auto",
+   "standard_only"
+  ],
+  "supports_adaptive_thinking": false,
+  "supports_assistant_prefill": true,
+  "supports_computer_use": true,
+  "supports_dynamic_reasoning_budget": false,
+  "supports_forced_tool_choice": true,
+  "supports_function_calling": true,
+  "supports_mid_conversation_system_messages": false,
+  "supports_native_effort": true,
+  "supports_native_structured_output": true,
+  "supports_output_config": true,
+  "supports_pdf_input": true,
+  "supports_prompt_caching": true,
+  "supports_reasoning": true,
+  "supports_reasoning_disable": true,
+  "supports_reasoning_effort": true,
+  "supports_reasoning_with_tool_calls": true,
+  "supports_response_schema": true,
+  "supports_response_schema_with_tools": true,
+  "supports_sampling_params": true,
+  "supports_service_tier": true,
+  "supports_speed": false,
+  "supports_thinking_cache_preservation": true,
+  "supports_tool_choice": true,
+  "supports_vision": true,
+  "supports_web_search": true,
+  "tool_use_system_prompt_tokens": 159,
+  "web_search_billing_unit": "per_request"
+ },
+ "claude-opus-4-6": {
+  "base_model": "claude-opus-4-6",
+  "deprecation_date": "2027-02-05",
+  "inference_geo_us_multiplier": 1.1,
+  "max_input_tokens": 1000000,
+  "max_output_tokens": 128000,
+  "max_tokens": 128000,
+  "mode": "chat",
+  "model_parameters": [
+   {
+    "helpText": "A list of tools the model may call.",
+    "id": "promptTools",
+    "label": "Prompt Tools (Functions)",
+    "supported_endpoints": [
+     "/v1/chat/completions",
+     "/v1/responses"
+    ],
+    "type": "select"
+   },
+   {
+    "default": 1,
+    "helpText": "What sampling temperature to use, between 0 and 1. Higher values like 0.8 will make the output more random, while lower values like 0.2 will make it more focused and deterministic.",
+    "id": "temperature",
+    "label": "Temperature",
+    "range": {
+     "max": 1,
+     "min": 0,
+     "step": 0.01
+    },
+    "supported_endpoints": [
+     "/v1/chat/completions",
+     "/v1/completions",
+     "/v1/responses"
+    ],
+    "type": "number"
+   },
+   {
+    "default": 256,
+    "helpText": "The maximum number of tokens that can be generated in the Result.",
+    "id": "max_tokens",
+    "label": "Max Tokens",
+    "range": {
+     "max": 128000,
+     "min": 1
+    },
+    "supported_endpoints": [
+     "/v1/chat/completions",
+     "/v1/completions"
+    ],
+    "type": "number"
+   },
+   {
+    "array": {
+     "maxElements": 4,
+     "minElements": 1,
+     "type": "text"
+    },
+    "helpText": "Custom text sequences that will cause the model to stop generating.",
+    "id": "stop_sequences",
+    "label": "Stop Sequence",
+    "type": "array"
+   },
+   {
+    "default": 1,
+    "helpText": "An alternative to sampling with temperature, called nucleus sampling, where the model considers the results of the tokens with top_p probability mass. So 0.1 means only the tokens comprising the top 10% probability mass are considered.",
+    "id": "top_p",
+    "label": "Top P",
+    "range": {
+     "max": 1,
+     "min": 0,
+     "step": 0.01
+    },
+    "supported_endpoints": [
+     "/v1/chat/completions",
+     "/v1/completions",
+     "/v1/responses"
+    ],
+    "type": "number"
+   },
+   {
+    "default": 50,
+    "helpText": "The top_k parameter is used to limit the number of choices for the next predicted word or token. It specifies the maximum number of tokens to consider at each step, based on their probability of occurrence.",
+    "id": "top_k",
+    "label": "Top K",
+    "range": {
+     "max": 100,
+     "min": 1
+    },
+    "type": "number"
+   },
+   {
+    "accesorKey": "type",
+    "default": {
+     "type": "text"
+    },
+    "id": "thinking",
+    "label": "Thinking",
+    "options": [
+     {
+      "label": "disabled",
+      "value": "disabled"
+     },
+     {
+      "label": "enabled",
+      "value": "enabled"
+     },
+     {
+      "label": "adaptive",
+      "value": "adaptive"
+     }
+    ],
+    "type": "select"
+   },
+   {
+    "accesorKey": "effort",
+    "default": {
+     "type": "text"
+    },
+    "id": "output_config",
+    "label": "output_config",
+    "options": [
+     {
+      "label": "max",
+      "value": "max"
+     },
+     {
+      "label": "high",
+      "value": "high"
+     },
+     {
+      "label": "medium",
+      "value": "medium"
+     },
+     {
+      "label": "low",
+      "value": "low"
+     }
+    ],
+    "type": "select"
+   },
+   {
+    "default": "medium",
+    "helpText": "Reasoning effort gives the model guidance on how many reasoning tokens to generate before answering. Lower values favour speed and economical token usage; higher values favour more complete reasoning.",
+    "id": "reasoning_effort",
+    "label": "Reasoning Effort",
+    "options": [
+     {
+      "label": "Low",
+      "value": "low"
+     },
+     {
+      "label": "Medium",
+      "value": "medium"
+     },
+     {
+      "label": "High",
+      "value": "high"
+     },
+     {
+      "label": "Max",
+      "value": "max"
+     }
+    ],
+    "supported_endpoints": [
+     "/v1/chat/completions",
+     "/v1/responses"
+    ],
+    "type": "select"
+   },
+   {
+    "accesorKey": "type",
+    "default": {
+     "type": "text"
+    },
+    "helpText": "The format of the response. If set to 'Structured output', the response will match the supplied JSON schema.",
+    "id": "response_format",
+    "label": "Response Format",
+    "options": [
+     {
+      "label": "Structured output",
+      "subFields": [
+       {
+        "default": {
+         "name": "",
+         "schema": {},
+         "strict": true
+        },
+        "helpText": "A JSON schema that the model will follow when generating the response.",
+        "id": "json_schema",
+        "label": "JSON Schema",
+        "type": "json"
+       }
+      ],
+      "value": "json_schema"
+     },
+     {
+      "label": "Text",
+      "value": "text"
+     }
+    ],
+    "supported_endpoints": [
+     "/v1/chat/completions",
+     "/v1/responses"
+    ],
+    "type": "select"
+   },
+   {
+    "default": false,
+    "helpText": "Enable web search tool for real-time information retrieval.",
+    "id": "web_search",
+    "label": "Web Search",
+    "supported_endpoints": [
+     "/v1/chat/completions",
+     "/v1/responses"
+    ],
+    "type": "boolean"
+   },
+   {
+    "default": false,
+    "helpText": "The stream parameter in the API controls whether the response is sent in incremental updates, like tokenized data as it's generated, or as a complete result in one go.",
+    "id": "stream",
+    "label": "Stream",
+    "supported_endpoints": [
+     "/v1/chat/completions",
+     "/v1/completions",
+     "/v1/responses"
+    ],
+    "type": "boolean"
+   }
+  ],
+  "provider": "anthropic",
+  "provider_specific_entry": {
+   "fast": 6,
+   "us": 1.1
+  },
+  "reasoning_effort_levels": [
+   "low",
+   "medium",
+   "high",
+   "max"
+  ],
+  "service_tiers": [
+   "auto",
+   "standard_only"
+  ],
+  "supports_adaptive_thinking": true,
+  "supports_assistant_prefill": false,
+  "supports_computer_use": true,
+  "supports_dynamic_reasoning_budget": false,
+  "supports_forced_tool_choice": true,
+  "supports_function_calling": true,
+  "supports_mid_conversation_system_messages": false,
+  "supports_native_effort": true,
+  "supports_pdf_input": true,
+  "supports_prompt_caching": true,
+  "supports_reasoning": true,
+  "supports_reasoning_disable": true,
+  "supports_reasoning_effort": true,
+  "supports_reasoning_with_tool_calls": true,
+  "supports_response_schema": true,
+  "supports_response_schema_with_tools": true,
+  "supports_sampling_params": true,
+  "supports_service_tier": true,
+  "supports_speed": true,
+  "supports_tool_choice": true,
+  "supports_vision": true,
+  "supports_web_search": true,
+  "tool_use_system_prompt_tokens": 346,
+  "web_search_billing_unit": "per_request"
+ },
+ "claude-opus-4-6-20260205": {
+  "base_model": "claude-opus-4-6",
+  "max_input_tokens": 1000000,
+  "max_output_tokens": 128000,
+  "max_tokens": 128000,
+  "mode": "chat",
+  "model_parameters": [
+   {
+    "default": 4096,
+    "helpText": "The maximum number of tokens that can be generated in the Result.",
+    "id": "max_tokens",
+    "label": "Max Tokens",
+    "range": {
+     "max": 128000,
+     "min": 1
+    },
+    "supported_endpoints": [
+     "/v1/chat/completions",
+     "/v1/completions"
+    ],
+    "type": "number"
+   }
+  ],
+  "prompt_cache_min_tokens": 4096,
+  "provider": "anthropic",
+  "provider_specific_entry": {
+   "fast": 6,
+   "us": 1.1
+  },
+  "supports_adaptive_thinking": true,
+  "supports_anthropic_compaction": true,
+  "supports_assistant_prefill": false,
+  "supports_computer_use": true,
+  "supports_function_calling": true,
+  "supports_legacy_thinking": true,
+  "supports_max_reasoning_effort": true,
+  "supports_native_structured_output": true,
+  "supports_output_config": true,
+  "supports_pdf_input": true,
+  "supports_prompt_caching": true,
+  "supports_reasoning": true,
+  "supports_response_schema": true,
+  "supports_speed": true,
+  "supports_thinking_cache_preservation": true,
+  "supports_tool_choice": true,
+  "supports_vision": true,
+  "supports_web_search": true,
+  "web_search_billing_unit": "per_request"
+ },
+ "claude-opus-4-7": {
+  "base_model": "claude-opus-4-7",
+  "deprecation_date": "2027-04-16",
+  "inference_geo_us_multiplier": 1.1,
+  "max_input_tokens": 1000000,
+  "max_output_tokens": 128000,
+  "max_tokens": 128000,
+  "mode": "chat",
+  "model_parameters": [
+   {
+    "helpText": "A list of tools the model may call.",
+    "id": "promptTools",
+    "label": "Prompt Tools (Functions)",
+    "supported_endpoints": [
+     "/v1/chat/completions",
+     "/v1/responses"
+    ],
+    "type": "select"
+   },
+   {
+    "default": 256,
+    "helpText": "The maximum number of tokens that can be generated in the Result.",
+    "id": "max_tokens",
+    "label": "Max Tokens",
+    "range": {
+     "max": 128000,
+     "min": 1
+    },
+    "supported_endpoints": [
+     "/v1/chat/completions",
+     "/v1/completions"
+    ],
+    "type": "number"
+   },
+   {
+    "array": {
+     "maxElements": 4,
+     "minElements": 1,
+     "type": "text"
+    },
+    "helpText": "Custom text sequences that will cause the model to stop generating.",
+    "id": "stop_sequences",
+    "label": "Stop Sequence",
+    "type": "array"
+   },
+   {
+    "accesorKey": "type",
+    "default": {
+     "type": "text"
+    },
+    "id": "thinking",
+    "label": "Thinking",
+    "options": [
+     {
+      "label": "disabled",
+      "value": "disabled"
+     },
+     {
+      "label": "adaptive",
+      "value": "adaptive"
+     }
+    ],
+    "type": "select"
+   },
+   {
+    "accesorKey": "effort",
+    "default": {
+     "type": "text"
+    },
+    "id": "output_config",
+    "label": "output_config",
+    "options": [
+     {
+      "label": "max",
+      "value": "max"
+     },
+     {
+      "label": "xhigh",
+      "value": "xhigh"
+     },
+     {
+      "label": "high",
+      "value": "high"
+     },
+     {
+      "label": "medium",
+      "value": "medium"
+     },
+     {
+      "label": "low",
+      "value": "low"
+     }
+    ],
+    "type": "select"
+   },
+   {
+    "default": "medium",
+    "helpText": "Reasoning effort gives the model guidance on how many reasoning tokens to generate before answering. Lower values favour speed and economical token usage; higher values favour more complete reasoning.",
+    "id": "reasoning_effort",
+    "label": "Reasoning Effort",
+    "options": [
+     {
+      "label": "Low",
+      "value": "low"
+     },
+     {
+      "label": "Medium",
+      "value": "medium"
+     },
+     {
+      "label": "High",
+      "value": "high"
+     },
+     {
+      "label": "XHigh",
+      "value": "xhigh"
+     },
+     {
+      "label": "Max",
+      "value": "max"
+     }
+    ],
+    "supported_endpoints": [
+     "/v1/chat/completions",
+     "/v1/responses"
+    ],
+    "type": "select"
+   },
+   {
+    "accesorKey": "type",
+    "default": {
+     "type": "text"
+    },
+    "helpText": "The format of the response. If set to 'Structured output', the response will match the supplied JSON schema.",
+    "id": "response_format",
+    "label": "Response Format",
+    "options": [
+     {
+      "label": "Structured output",
+      "subFields": [
+       {
+        "default": {
+         "name": "",
+         "schema": {},
+         "strict": true
+        },
+        "helpText": "A JSON schema that the model will follow when generating the response.",
+        "id": "json_schema",
+        "label": "JSON Schema",
+        "type": "json"
+       }
+      ],
+      "value": "json_schema"
+     },
+     {
+      "label": "Text",
+      "value": "text"
+     }
+    ],
+    "supported_endpoints": [
+     "/v1/chat/completions",
+     "/v1/responses"
+    ],
+    "type": "select"
+   },
+   {
+    "default": false,
+    "helpText": "Enable web search tool for real-time information retrieval.",
+    "id": "web_search",
+    "label": "Web Search",
+    "supported_endpoints": [
+     "/v1/chat/completions",
+     "/v1/responses"
+    ],
+    "type": "boolean"
+   },
+   {
+    "default": false,
+    "helpText": "The stream parameter in the API controls whether the response is sent in incremental updates, like tokenized data as it's generated, or as a complete result in one go.",
+    "id": "stream",
+    "label": "Stream",
+    "supported_endpoints": [
+     "/v1/chat/completions",
+     "/v1/completions",
+     "/v1/responses"
+    ],
+    "type": "boolean"
+   }
+  ],
+  "prompt_cache_min_tokens": 2048,
+  "provider": "anthropic",
+  "provider_specific_entry": {
+   "fast": 6,
+   "us": 1.1
+  },
+  "reasoning_effort_levels": [
+   "low",
+   "medium",
+   "high",
+   "xhigh",
+   "max"
+  ],
+  "service_tiers": [
+   "auto",
+   "standard_only"
+  ],
+  "source": "https://platform.claude.com/docs/en/about-claude/pricing",
+  "supports_adaptive_thinking": true,
+  "supports_anthropic_compaction": true,
+  "supports_assistant_prefill": false,
+  "supports_computer_use": true,
+  "supports_dynamic_reasoning_budget": false,
+  "supports_forced_tool_choice": true,
+  "supports_function_calling": true,
+  "supports_max_reasoning_effort": true,
+  "supports_mid_conversation_system_messages": false,
+  "supports_native_effort": true,
+  "supports_native_structured_output": true,
+  "supports_output_config": true,
+  "supports_pdf_input": true,
+  "supports_prompt_caching": true,
+  "supports_reasoning": true,
+  "supports_reasoning_disable": true,
+  "supports_reasoning_effort": true,
+  "supports_reasoning_with_tool_calls": true,
+  "supports_response_schema": true,
+  "supports_response_schema_with_tools": true,
+  "supports_safeguards": true,
+  "supports_sampling_params": false,
+  "supports_service_tier": true,
+  "supports_speed": false,
+  "supports_thinking_cache_preservation": true,
+  "supports_tool_choice": true,
+  "supports_vision": true,
+  "supports_web_search": true,
+  "supports_xhigh_reasoning_effort": true,
+  "tool_use_system_prompt_tokens": 346,
+  "web_search_billing_unit": "per_request"
+ },
+ "claude-opus-4-7-20260416": {
+  "base_model": "claude-opus-4-7",
+  "deprecation_date": "2027-04-16",
+  "max_input_tokens": 1000000,
+  "max_output_tokens": 128000,
+  "max_tokens": 128000,
+  "mode": "chat",
+  "model_parameters": [
+   {
+    "default": 4096,
+    "helpText": "The maximum number of tokens that can be generated in the Result.",
+    "id": "max_tokens",
+    "label": "Max Tokens",
+    "range": {
+     "max": 128000,
+     "min": 1
+    },
+    "supported_endpoints": [
+     "/v1/chat/completions",
+     "/v1/completions"
+    ],
+    "type": "number"
+   }
+  ],
+  "prompt_cache_min_tokens": 2048,
+  "provider": "anthropic",
+  "provider_specific_entry": {
+   "fast": 6,
+   "us": 1.1
+  },
+  "supports_adaptive_thinking": true,
+  "supports_anthropic_compaction": true,
+  "supports_assistant_prefill": false,
+  "supports_computer_use": true,
+  "supports_function_calling": true,
+  "supports_max_reasoning_effort": true,
+  "supports_native_structured_output": true,
+  "supports_output_config": true,
+  "supports_pdf_input": true,
+  "supports_prompt_caching": true,
+  "supports_reasoning": true,
+  "supports_response_schema": true,
+  "supports_safeguards": true,
+  "supports_sampling_params": false,
+  "supports_speed": true,
+  "supports_thinking_cache_preservation": true,
+  "supports_tool_choice": true,
+  "supports_vision": true,
+  "supports_web_search": true,
+  "supports_xhigh_reasoning_effort": true,
+  "web_search_billing_unit": "per_request"
+ },
+ "claude-opus-4-8": {
+  "base_model": "claude-opus-4-8",
+  "deprecation_date": "2027-05-28",
+  "inference_geo_us_multiplier": 1.1,
+  "max_input_tokens": 1000000,
+  "max_output_tokens": 128000,
+  "max_tokens": 1000000,
+  "mode": "chat",
+  "model_parameters": [
+   {
+    "helpText": "A list of tools the model may call.",
+    "id": "promptTools",
+    "label": "Prompt Tools (Functions)",
+    "supported_endpoints": [
+     "/v1/chat/completions",
+     "/v1/responses"
+    ],
+    "type": "select"
+   },
+   {
+    "default": 256,
+    "helpText": "The maximum number of tokens that can be generated in the Result.",
+    "id": "max_tokens",
+    "label": "Max Tokens",
+    "range": {
+     "max": 128000,
+     "min": 1
+    },
+    "supported_endpoints": [
+     "/v1/chat/completions",
+     "/v1/completions"
+    ],
+    "type": "number"
+   },
+   {
+    "array": {
+     "maxElements": 4,
+     "minElements": 1,
+     "type": "text"
+    },
+    "helpText": "Custom text sequences that will cause the model to stop generating.",
+    "id": "stop_sequences",
+    "label": "Stop Sequence",
+    "type": "array"
+   },
+   {
+    "accesorKey": "type",
+    "default": {
+     "type": "text"
+    },
+    "id": "thinking",
+    "label": "Thinking",
+    "options": [
+     {
+      "label": "disabled",
+      "value": "disabled"
+     },
+     {
+      "label": "adaptive",
+      "value": "adaptive"
+     }
+    ],
+    "type": "select"
+   },
+   {
+    "accesorKey": "effort",
+    "default": {
+     "type": "text"
+    },
+    "id": "output_config",
+    "label": "output_config",
+    "options": [
+     {
+      "label": "max",
+      "value": "max"
+     },
+     {
+      "label": "xhigh",
+      "value": "xhigh"
+     },
+     {
+      "label": "high",
+      "value": "high"
+     },
+     {
+      "label": "medium",
+      "value": "medium"
+     },
+     {
+      "label": "low",
+      "value": "low"
+     }
+    ],
+    "type": "select"
+   },
+   {
+    "default": "medium",
+    "helpText": "Reasoning effort gives the model guidance on how many reasoning tokens to generate before answering. Lower values favour speed and economical token usage; higher values favour more complete reasoning.",
+    "id": "reasoning_effort",
+    "label": "Reasoning Effort",
+    "options": [
+     {
+      "label": "Low",
+      "value": "low"
+     },
+     {
+      "label": "Medium",
+      "value": "medium"
+     },
+     {
+      "label": "High",
+      "value": "high"
+     },
+     {
+      "label": "XHigh",
+      "value": "xhigh"
+     },
+     {
+      "label": "Max",
+      "value": "max"
+     }
+    ],
+    "supported_endpoints": [
+     "/v1/chat/completions",
+     "/v1/responses"
+    ],
+    "type": "select"
+   },
+   {
+    "accesorKey": "type",
+    "default": {
+     "type": "text"
+    },
+    "helpText": "The format of the response. If set to 'Structured output', the response will match the supplied JSON schema.",
+    "id": "response_format",
+    "label": "Response Format",
+    "options": [
+     {
+      "label": "Structured output",
+      "subFields": [
+       {
+        "default": {
+         "name": "",
+         "schema": {},
+         "strict": true
+        },
+        "helpText": "A JSON schema that the model will follow when generating the response.",
+        "id": "json_schema",
+        "label": "JSON Schema",
+        "type": "json"
+       }
+      ],
+      "value": "json_schema"
+     },
+     {
+      "label": "Text",
+      "value": "text"
+     }
+    ],
+    "supported_endpoints": [
+     "/v1/chat/completions",
+     "/v1/responses"
+    ],
+    "type": "select"
+   },
+   {
+    "default": false,
+    "helpText": "Enable web search tool for real-time information retrieval.",
+    "id": "web_search",
+    "label": "Web Search",
+    "supported_endpoints": [
+     "/v1/chat/completions",
+     "/v1/responses"
+    ],
+    "type": "boolean"
+   },
+   {
+    "default": false,
+    "helpText": "The stream parameter in the API controls whether the response is sent in incremental updates, like tokenized data as it's generated, or as a complete result in one go.",
+    "id": "stream",
+    "label": "Stream",
+    "supported_endpoints": [
+     "/v1/chat/completions",
+     "/v1/completions",
+     "/v1/responses"
+    ],
+    "type": "boolean"
+   }
+  ],
+  "prompt_cache_min_tokens": 1024,
+  "provider": "anthropic",
+  "provider_specific_entry": {
+   "fast": 6,
+   "us": 1.1
+  },
+  "reasoning_effort_levels": [
+   "low",
+   "medium",
+   "high",
+   "xhigh",
+   "max"
+  ],
+  "service_tiers": [
+   "auto",
+   "standard_only"
+  ],
+  "source": "https://platform.claude.com/docs/en/about-claude/pricing",
+  "supports_adaptive_thinking": true,
+  "supports_anthropic_compaction": true,
+  "supports_assistant_prefill": false,
+  "supports_computer_use": true,
+  "supports_dynamic_reasoning_budget": false,
+  "supports_fast_mode": true,
+  "supports_forced_tool_choice": true,
+  "supports_function_calling": true,
+  "supports_max_reasoning_effort": true,
+  "supports_mid_conversation_system": true,
+  "supports_mid_conversation_system_messages": true,
+  "supports_native_effort": true,
+  "supports_native_structured_output": true,
+  "supports_output_config": true,
+  "supports_pdf_input": true,
+  "supports_prompt_caching": true,
+  "supports_reasoning": true,
+  "supports_reasoning_disable": true,
+  "supports_reasoning_effort": true,
+  "supports_reasoning_with_tool_calls": true,
+  "supports_response_schema": true,
+  "supports_response_schema_with_tools": true,
+  "supports_safeguards": true,
+  "supports_sampling_params": false,
+  "supports_service_tier": true,
+  "supports_speed": true,
+  "supports_thinking_cache_preservation": true,
+  "supports_tool_choice": true,
+  "supports_vision": true,
+  "supports_web_search": true,
+  "supports_xhigh_reasoning_effort": true,
+  "tool_use_system_prompt_tokens": 346,
+  "web_search_billing_unit": "per_request"
+ },
+ "claude-opus-5": {
+  "base_model": "claude-opus-5",
+  "deprecation_date": "2027-07-24",
+  "max_input_tokens": 1000000,
+  "max_output_tokens": 128000,
+  "max_tokens": 128000,
+  "mode": "chat",
+  "model_parameters": [
+   {
+    "helpText": "A list of tools the model may call.",
+    "id": "promptTools",
+    "label": "Prompt Tools (Functions)",
+    "supported_endpoints": [
+     "/v1/chat/completions",
+     "/v1/responses"
+    ],
+    "type": "select"
+   },
+   {
+    "default": 256,
+    "helpText": "The maximum number of tokens that can be generated in the Result.",
+    "id": "max_tokens",
+    "label": "Max Tokens",
+    "range": {
+     "max": 128000,
+     "min": 1
+    },
+    "supported_endpoints": [
+     "/v1/chat/completions",
+     "/v1/completions"
+    ],
+    "type": "number"
+   },
+   {
+    "array": {
+     "maxElements": 4,
+     "minElements": 1,
+     "type": "text"
+    },
+    "helpText": "Custom text sequences that will cause the model to stop generating.",
+    "id": "stop_sequences",
+    "label": "Stop Sequence",
+    "type": "array"
+   },
+   {
+    "accesorKey": "type",
+    "default": {
+     "type": "text"
+    },
+    "id": "thinking",
+    "label": "Thinking",
+    "options": [
+     {
+      "label": "disabled",
+      "value": "disabled"
+     },
+     {
+      "label": "adaptive",
+      "value": "adaptive"
+     }
+    ],
+    "type": "select"
+   },
+   {
+    "accesorKey": "effort",
+    "default": {
+     "type": "text"
+    },
+    "id": "output_config",
+    "label": "output_config",
+    "options": [
+     {
+      "label": "max",
+      "value": "max"
+     },
+     {
+      "label": "xhigh",
+      "value": "xhigh"
+     },
+     {
+      "label": "high",
+      "value": "high"
+     },
+     {
+      "label": "medium",
+      "value": "medium"
+     },
+     {
+      "label": "low",
+      "value": "low"
+     }
+    ],
+    "type": "select"
+   },
+   {
+    "default": "medium",
+    "helpText": "Reasoning effort gives the model guidance on how many reasoning tokens to generate before answering. Lower values favour speed and economical token usage; higher values favour more complete reasoning.",
+    "id": "reasoning_effort",
+    "label": "Reasoning Effort",
+    "options": [
+     {
+      "label": "Low",
+      "value": "low"
+     },
+     {
+      "label": "Medium",
+      "value": "medium"
+     },
+     {
+      "label": "High",
+      "value": "high"
+     },
+     {
+      "label": "XHigh",
+      "value": "xhigh"
+     },
+     {
+      "label": "Max",
+      "value": "max"
+     }
+    ],
+    "supported_endpoints": [
+     "/v1/chat/completions",
+     "/v1/responses"
+    ],
+    "type": "select"
+   },
+   {
+    "accesorKey": "type",
+    "default": {
+     "type": "text"
+    },
+    "helpText": "The format of the response. If set to 'Structured output', the response will match the supplied JSON schema.",
+    "id": "response_format",
+    "label": "Response Format",
+    "options": [
+     {
+      "label": "Structured output",
+      "subFields": [
+       {
+        "default": {
+         "name": "",
+         "schema": {},
+         "strict": true
+        },
+        "helpText": "A JSON schema that the model will follow when generating the response.",
+        "id": "json_schema",
+        "label": "JSON Schema",
+        "type": "json"
+       }
+      ],
+      "value": "json_schema"
+     },
+     {
+      "label": "Text",
+      "value": "text"
+     }
+    ],
+    "supported_endpoints": [
+     "/v1/chat/completions",
+     "/v1/responses"
+    ],
+    "type": "select"
+   },
+   {
+    "default": false,
+    "helpText": "Enable web search tool for real-time information retrieval.",
+    "id": "web_search",
+    "label": "Web Search",
+    "supported_endpoints": [
+     "/v1/chat/completions",
+     "/v1/responses"
+    ],
+    "type": "boolean"
+   },
+   {
+    "default": false,
+    "helpText": "The stream parameter in the API controls whether the response is sent in incremental updates, like tokenized data as it's generated, or as a complete result in one go.",
+    "id": "stream",
+    "label": "Stream",
+    "supported_endpoints": [
+     "/v1/chat/completions",
+     "/v1/completions",
+     "/v1/responses"
+    ],
+    "type": "boolean"
+   }
+  ],
+  "prompt_cache_min_tokens": 512,
+  "provider": "anthropic",
+  "provider_specific_entry": {
+   "us": 1.1
+  },
+  "reasoning_effort_levels": [
+   "low",
+   "medium",
+   "high",
+   "xhigh",
+   "max"
+  ],
+  "service_tiers": [
+   "auto",
+   "standard_only"
+  ],
+  "source": "https://docs.anthropic.com/en/docs/about-claude/models/overview",
+  "supports_adaptive_thinking": true,
+  "supports_anthropic_compaction": true,
+  "supports_assistant_prefill": false,
+  "supports_computer_use": true,
+  "supports_dynamic_reasoning_budget": false,
+  "supports_fast_mode": true,
+  "supports_forced_tool_choice": true,
+  "supports_function_calling": true,
+  "supports_max_reasoning_effort": true,
+  "supports_mid_conversation_system": true,
+  "supports_mid_conversation_system_messages": true,
+  "supports_native_effort": true,
+  "supports_native_structured_output": true,
+  "supports_output_config": true,
+  "supports_pdf_input": true,
+  "supports_prompt_caching": true,
+  "supports_reasoning": true,
+  "supports_reasoning_disable": true,
+  "supports_reasoning_effort": true,
+  "supports_reasoning_with_tool_calls": true,
+  "supports_response_schema": true,
+  "supports_response_schema_with_tools": true,
+  "supports_safeguards": true,
+  "supports_sampling_params": false,
+  "supports_service_tier": true,
+  "supports_speed": true,
+  "supports_thinking_cache_preservation": true,
+  "supports_tool_choice": true,
+  "supports_vision": true,
+  "supports_web_search": true,
+  "supports_xhigh_reasoning_effort": true,
+  "thinking_on_by_default": true,
+  "tool_use_system_prompt_tokens": 286,
+  "web_search_billing_unit": "per_request"
+ },
+ "claude-opus-5-5": {
+  "base_model": "claude-opus-5-5",
+  "default_reasoning_effort": "medium",
+  "inference_geo_us_multiplier": 1.1,
+  "max_input_tokens": 1000000,
+  "max_output_tokens": 128000,
+  "max_tokens": 128000,
+  "mode": "chat",
+  "model_parameters": [
+   {
+    "helpText": "A list of tools the model may call.",
+    "id": "promptTools",
+    "label": "Prompt Tools (Functions)",
+    "supported_endpoints": [
+     "/v1/chat/completions",
+     "/v1/responses"
+    ],
+    "type": "select"
+   },
+   {
+    "default": 256,
+    "helpText": "The maximum number of tokens that can be generated in the Result.",
+    "id": "max_tokens",
+    "label": "Max Tokens",
+    "range": {
+     "max": 128000,
+     "min": 1
+    },
+    "supported_endpoints": [
+     "/v1/chat/completions",
+     "/v1/completions"
+    ],
+    "type": "number"
+   },
+   {
+    "array": {
+     "maxElements": 4,
+     "minElements": 1,
+     "type": "text"
+    },
+    "helpText": "Custom text sequences that will cause the model to stop generating.",
+    "id": "stop_sequences",
+    "label": "Stop Sequence",
+    "type": "array"
+   },
+   {
+    "accesorKey": "type",
+    "default": {
+     "type": "text"
+    },
+    "id": "thinking",
+    "label": "Thinking",
+    "options": [
+     {
+      "label": "disabled",
+      "value": "disabled"
+     },
+     {
+      "label": "adaptive",
+      "value": "adaptive"
+     }
+    ],
+    "type": "select"
+   },
+   {
+    "accesorKey": "effort",
+    "default": {
+     "type": "text"
+    },
+    "id": "output_config",
+    "label": "output_config",
+    "options": [
+     {
+      "label": "max",
+      "value": "max"
+     },
+     {
+      "label": "xhigh",
+      "value": "xhigh"
+     },
+     {
+      "label": "high",
+      "value": "high"
+     },
+     {
+      "label": "medium",
+      "value": "medium"
+     },
+     {
+      "label": "low",
+      "value": "low"
+     }
+    ],
+    "type": "select"
+   },
+   {
+    "default": "medium",
+    "helpText": "Reasoning effort gives the model guidance on how many reasoning tokens to generate before answering. Lower values favour speed and economical token usage; higher values favour more complete reasoning.",
+    "id": "reasoning_effort",
+    "label": "Reasoning Effort",
+    "options": [
+     {
+      "label": "Low",
+      "value": "low"
+     },
+     {
+      "label": "Medium",
+      "value": "medium"
+     },
+     {
+      "label": "High",
+      "value": "high"
+     },
+     {
+      "label": "XHigh",
+      "value": "xhigh"
+     },
+     {
+      "label": "Max",
+      "value": "max"
+     }
+    ],
+    "supported_endpoints": [
+     "/v1/chat/completions",
+     "/v1/responses"
+    ],
+    "type": "select"
+   },
+   {
+    "accesorKey": "type",
+    "default": {
+     "type": "text"
+    },
+    "helpText": "The format of the response. If set to 'Structured output', the response will match the supplied JSON schema.",
+    "id": "response_format",
+    "label": "Response Format",
+    "options": [
+     {
+      "label": "Structured output",
+      "subFields": [
+       {
+        "default": {
+         "name": "",
+         "schema": {},
+         "strict": true
+        },
+        "helpText": "A JSON schema that the model will follow when generating the response.",
+        "id": "json_schema",
+        "label": "JSON Schema",
+        "type": "json"
+       }
+      ],
+      "value": "json_schema"
+     },
+     {
+      "label": "Text",
+      "value": "text"
+     }
+    ],
+    "supported_endpoints": [
+     "/v1/chat/completions",
+     "/v1/responses"
+    ],
+    "type": "select"
+   },
+   {
+    "default": false,
+    "helpText": "Enable web search tool for real-time information retrieval.",
+    "id": "web_search",
+    "label": "Web Search",
+    "supported_endpoints": [
+     "/v1/chat/completions",
+     "/v1/responses"
+    ],
+    "type": "boolean"
+   },
+   {
+    "default": false,
+    "helpText": "The stream parameter in the API controls whether the response is sent in incremental updates, like tokenized data as it's generated, or as a complete result in one go.",
+    "id": "stream",
+    "label": "Stream",
+    "supported_endpoints": [
+     "/v1/chat/completions",
+     "/v1/completions",
+     "/v1/responses"
+    ],
+    "type": "boolean"
+   }
+  ],
+  "prompt_cache_min_tokens": 512,
+  "provider": "anthropic",
+  "provider_specific_entry": {
+   "fast": 2
+  },
+  "reasoning_effort_levels": [
+   "low",
+   "medium",
+   "high",
+   "xhigh",
+   "max"
+  ],
+  "source": "https://platform.claude.com/docs/en/models/opus-5-5/overview",
+  "supported_modalities": [
+   "text",
+   "image"
+  ],
+  "supported_output_modalities": [
+   "text"
+  ],
+  "supports_adaptive_thinking": true,
+  "supports_anthropic_compaction": true,
+  "supports_assistant_prefill": false,
+  "supports_computer_use": true,
+  "supports_fast_mode": true,
+  "supports_forced_tool_choice": false,
+  "supports_forced_tool_use": false,
+  "supports_function_calling": true,
+  "supports_image_input": true,
+  "supports_max_reasoning_effort": true,
+  "supports_mid_conversation_system": true,
+  "supports_mid_conversation_system_messages": true,
+  "supports_native_structured_output": true,
+  "supports_output_config": true,
+  "supports_parallel_function_calling": true,
+  "supports_pdf_input": true,
+  "supports_prompt_caching": true,
+  "supports_reasoning": true,
+  "supports_reasoning_disable": false,
+  "supports_response_schema": true,
+  "supports_safeguards": true,
+  "supports_sampling_params": false,
+  "supports_speed": true,
+  "supports_system_messages": true,
+  "supports_tool_choice": true,
+  "supports_vision": true,
+  "supports_web_search": true,
+  "supports_xhigh_reasoning_effort": true,
+  "thinking_always_on": true,
+  "tool_use_system_prompt_tokens": 286,
+  "web_search_billing_unit": "per_request"
+ },
+ "claude-sonnet-4": {
+  "base_model": "claude-sonnet-4",
+  "deprecation_date": "2026-05-14",
+  "is_deprecated": true,
+  "max_input_tokens": 1000000,
+  "max_output_tokens": 64000,
+  "max_tokens": 64000,
+  "mode": "chat",
+  "model_parameters": [
+   {
+    "helpText": "A list of tools the model may call.",
+    "id": "promptTools",
+    "label": "Prompt Tools (Functions)",
+    "supported_endpoints": [
+     "/v1/chat/completions",
+     "/v1/responses"
+    ],
+    "type": "select"
+   },
+   {
+    "default": 1,
+    "helpText": "What sampling temperature to use, between 0 and 1. Higher values like 0.8 will make the output more random, while lower values like 0.2 will make it more focused and deterministic.",
+    "id": "temperature",
+    "label": "Temperature",
+    "range": {
+     "max": 1,
+     "min": 0,
+     "step": 0.01
+    },
+    "supported_endpoints": [
+     "/v1/chat/completions",
+     "/v1/completions",
+     "/v1/responses"
+    ],
+    "type": "number"
+   },
+   {
+    "default": 256,
+    "helpText": "The maximum number of tokens that can be generated in the Result.",
+    "id": "max_tokens",
+    "label": "Max Tokens",
+    "range": {
+     "max": 64000,
+     "min": 1
+    },
+    "supported_endpoints": [
+     "/v1/chat/completions",
+     "/v1/completions"
+    ],
+    "type": "number"
+   },
+   {
+    "array": {
+     "maxElements": 4,
+     "minElements": 1,
+     "type": "text"
+    },
+    "helpText": "Custom text sequences that will cause the model to stop generating.",
+    "id": "stop_sequences",
+    "label": "Stop Sequence",
+    "type": "array"
+   },
+   {
+    "default": 1,
+    "helpText": "An alternative to sampling with temperature, called nucleus sampling, where the model considers the results of the tokens with top_p probability mass. So 0.1 means only the tokens comprising the top 10% probability mass are considered.",
+    "id": "top_p",
+    "label": "Top P",
+    "range": {
+     "max": 1,
+     "min": 0,
+     "step": 0.01
+    },
+    "supported_endpoints": [
+     "/v1/chat/completions",
+     "/v1/completions",
+     "/v1/responses"
+    ],
+    "type": "number"
+   },
+   {
+    "default": 50,
+    "helpText": "The top_k parameter is used to limit the number of choices for the next predicted word or token. It specifies the maximum number of tokens to consider at each step, based on their probability of occurrence.",
+    "id": "top_k",
+    "label": "Top K",
+    "range": {
+     "max": 100,
+     "min": 1
+    },
+    "type": "number"
+   },
+   {
+    "accesorKey": "type",
+    "default": {
+     "type": "text"
+    },
+    "id": "thinking",
+    "label": "Thinking",
+    "options": [
+     {
+      "label": "disabled",
+      "value": "disabled"
+     },
+     {
+      "label": "enabled",
+      "value": "enabled"
+     }
+    ],
+    "type": "select"
+   },
+   {
+    "accesorKey": "type",
+    "default": {
+     "type": "text"
+    },
+    "helpText": "The format of the response. If set to 'Structured output', the response will match the supplied JSON schema.",
+    "id": "response_format",
+    "label": "Response Format",
+    "options": [
+     {
+      "label": "Structured output",
+      "subFields": [
+       {
+        "default": {
+         "name": "",
+         "schema": {},
+         "strict": true
+        },
+        "helpText": "A JSON schema that the model will follow when generating the response.",
+        "id": "json_schema",
+        "label": "JSON Schema",
+        "type": "json"
+       }
+      ],
+      "value": "json_schema"
+     },
+     {
+      "label": "Text",
+      "value": "text"
+     }
+    ],
+    "supported_endpoints": [
+     "/v1/chat/completions",
+     "/v1/responses"
+    ],
+    "type": "select"
+   },
+   {
+    "default": false,
+    "helpText": "Enable web search tool for real-time information retrieval.",
+    "id": "web_search",
+    "label": "Web Search",
+    "supported_endpoints": [
+     "/v1/chat/completions",
+     "/v1/responses"
+    ],
+    "type": "boolean"
+   },
+   {
+    "default": false,
+    "helpText": "The stream parameter in the API controls whether the response is sent in incremental updates, like tokenized data as it's generated, or as a complete result in one go.",
+    "id": "stream",
+    "label": "Stream",
+    "supported_endpoints": [
+     "/v1/chat/completions",
+     "/v1/completions",
+     "/v1/responses"
+    ],
+    "type": "boolean"
+   }
+  ],
+  "prompt_cache_min_tokens": 1024,
+  "provider": "vertex_ai",
+  "supports_adaptive_thinking": false,
+  "supports_assistant_prefill": true,
+  "supports_computer_use": true,
+  "supports_dynamic_reasoning_budget": false,
+  "supports_forced_tool_choice": true,
+  "supports_function_calling": true,
+  "supports_mid_conversation_system_messages": false,
+  "supports_native_effort": false,
+  "supports_pdf_input": true,
+  "supports_prompt_caching": true,
+  "supports_reasoning": true,
+  "supports_reasoning_disable": true,
+  "supports_reasoning_with_tool_calls": true,
+  "supports_response_schema": true,
+  "supports_response_schema_with_tools": true,
+  "supports_sampling_params": true,
+  "supports_service_tier": false,
+  "supports_speed": false,
+  "supports_tool_choice": true,
+  "supports_vision": true,
+  "supports_web_search": true,
+  "tool_use_system_prompt_tokens": 159
+ },
+ "claude-sonnet-4-20250514": {
+  "base_model": "claude-sonnet-4",
+  "deprecation_date": "2026-06-15",
+  "is_deprecated": true,
+  "max_input_tokens": 1000000,
+  "max_output_tokens": 64000,
+  "max_tokens": 64000,
+  "mode": "chat",
+  "model_parameters": [
+   {
+    "helpText": "A list of tools the model may call.",
+    "id": "promptTools",
+    "label": "Prompt Tools (Functions)",
+    "supported_endpoints": [
+     "/v1/chat/completions",
+     "/v1/responses"
+    ],
+    "type": "select"
+   },
+   {
+    "default": 0.7,
+    "helpText": "What sampling temperature to use, between 0 and 2. Higher values like 0.8 will make the output more random, while lower values like 0.2 will make it more focused and deterministic.",
+    "id": "temperature",
+    "label": "Temperature",
+    "range": {
+     "max": 1,
+     "min": 0
+    },
+    "supported_endpoints": [
+     "/v1/chat/completions",
+     "/v1/completions",
+     "/v1/responses"
+    ],
+    "type": "number"
+   },
+   {
+    "default": 32768,
+    "helpText": "The maximum number of tokens that can be generated in the Result.",
+    "id": "max_tokens",
+    "label": "Max Tokens",
+    "range": {
+     "max": 64000,
+     "min": 1
+    },
+    "supported_endpoints": [
+     "/v1/chat/completions",
+     "/v1/completions"
+    ],
+    "type": "number"
+   },
+   {
+    "array": {
+     "maxElements": 4,
+     "minElements": 1,
+     "type": "text"
+    },
+    "helpText": "Custom text sequences that will cause the model to stop generating.",
+    "id": "stop_sequences",
+    "label": "Stop Sequence",
+    "type": "array"
+   },
+   {
+    "helpText": "The top_k parameter is used to limit the number of choices for the next predicted word or token. It specifies the maximum number of tokens to consider at each step, based on their probability of occurrence. This technique helps to speed up the generation process and can improve the quality of the generated text by focusing on the most likely options.",
+    "id": "top_k",
+    "label": "Top K",
+    "range": {
+     "max": 100,
+     "min": 0
+    },
+    "type": "number"
+   },
+   {
+    "default": false,
+    "helpText": "The stream parameter in the API controls whether the response is sent in incremental updates, like tokenized data as it's generated, or as a complete result in one go.",
+    "id": "stream",
+    "label": "Stream",
+    "supported_endpoints": [
+     "/v1/chat/completions",
+     "/v1/completions",
+     "/v1/responses"
+    ],
+    "type": "boolean"
+   },
+   {
+    "helpText": "An external identifier for the user who is associated with the request.",
+    "id": "metadata",
+    "label": "Metadata",
+    "supported_endpoints": [
+     "/v1/chat/completions",
+     "/v1/responses"
+    ],
+    "type": "text"
+   }
+  ],
+  "provider": "anthropic",
+  "supports_assistant_prefill": true,
+  "supports_computer_use": true,
+  "supports_function_calling": true,
+  "supports_pdf_input": true,
+  "supports_prompt_caching": true,
+  "supports_reasoning": true,
+  "supports_response_schema": true,
+  "supports_tool_choice": true,
+  "supports_vision": true,
+  "tool_use_system_prompt_tokens": 159
+ },
+ "claude-sonnet-4-5": {
+  "base_model": "claude-sonnet-4-5",
+  "deprecation_date": "2026-09-29",
+  "deprecation_source": "https://platform.claude.com/docs/en/about-claude/model-deprecations",
+  "is_deprecated": true,
+  "max_input_tokens": 200000,
+  "max_output_tokens": 64000,
+  "max_tokens": 64000,
+  "mode": "chat",
+  "model_parameters": [
+   {
+    "helpText": "A list of tools the model may call.",
+    "id": "promptTools",
+    "label": "Prompt Tools (Functions)",
+    "supported_endpoints": [
+     "/v1/chat/completions",
+     "/v1/responses"
+    ],
+    "type": "select"
+   },
+   {
+    "default": 1,
+    "helpText": "What sampling temperature to use, between 0 and 1. Higher values like 0.8 will make the output more random, while lower values like 0.2 will make it more focused and deterministic.",
+    "id": "temperature",
+    "label": "Temperature",
+    "range": {
+     "max": 1,
+     "min": 0,
+     "step": 0.01
+    },
+    "supported_endpoints": [
+     "/v1/chat/completions",
+     "/v1/completions",
+     "/v1/responses"
+    ],
+    "type": "number"
+   },
+   {
+    "default": 256,
+    "helpText": "The maximum number of tokens that can be generated in the Result.",
+    "id": "max_tokens",
+    "label": "Max Tokens",
+    "range": {
+     "max": 64000,
+     "min": 1
+    },
+    "supported_endpoints": [
+     "/v1/chat/completions",
+     "/v1/completions"
+    ],
+    "type": "number"
+   },
+   {
+    "array": {
+     "maxElements": 4,
+     "minElements": 1,
+     "type": "text"
+    },
+    "helpText": "Custom text sequences that will cause the model to stop generating.",
+    "id": "stop_sequences",
+    "label": "Stop Sequence",
+    "type": "array"
+   },
+   {
+    "default": 1,
+    "helpText": "An alternative to sampling with temperature, called nucleus sampling, where the model considers the results of the tokens with top_p probability mass. So 0.1 means only the tokens comprising the top 10% probability mass are considered.",
+    "id": "top_p",
+    "label": "Top P",
+    "range": {
+     "max": 1,
+     "min": 0,
+     "step": 0.01
+    },
+    "supported_endpoints": [
+     "/v1/chat/completions",
+     "/v1/completions",
+     "/v1/responses"
+    ],
+    "type": "number"
+   },
+   {
+    "default": 50,
+    "helpText": "The top_k parameter is used to limit the number of choices for the next predicted word or token. It specifies the maximum number of tokens to consider at each step, based on their probability of occurrence.",
+    "id": "top_k",
+    "label": "Top K",
+    "range": {
+     "max": 100,
+     "min": 1
+    },
+    "type": "number"
+   },
+   {
+    "accesorKey": "type",
+    "default": {
+     "type": "text"
+    },
+    "id": "thinking",
+    "label": "Thinking",
+    "options": [
+     {
+      "label": "disabled",
+      "value": "disabled"
+     },
+     {
+      "label": "enabled",
+      "value": "enabled"
+     }
+    ],
+    "type": "select"
+   },
+   {
+    "accesorKey": "type",
+    "default": {
+     "type": "text"
+    },
+    "helpText": "The format of the response. If set to 'Structured output', the response will match the supplied JSON schema.",
+    "id": "response_format",
+    "label": "Response Format",
+    "options": [
+     {
+      "label": "Structured output",
+      "subFields": [
+       {
+        "default": {
+         "name": "",
+         "schema": {},
+         "strict": true
+        },
+        "helpText": "A JSON schema that the model will follow when generating the response.",
+        "id": "json_schema",
+        "label": "JSON Schema",
+        "type": "json"
+       }
+      ],
+      "value": "json_schema"
+     },
+     {
+      "label": "Text",
+      "value": "text"
+     }
+    ],
+    "supported_endpoints": [
+     "/v1/chat/completions",
+     "/v1/responses"
+    ],
+    "type": "select"
+   },
+   {
+    "default": false,
+    "helpText": "Enable web search tool for real-time information retrieval.",
+    "id": "web_search",
+    "label": "Web Search",
+    "supported_endpoints": [
+     "/v1/chat/completions",
+     "/v1/responses"
+    ],
+    "type": "boolean"
+   },
+   {
+    "default": false,
+    "helpText": "The stream parameter in the API controls whether the response is sent in incremental updates, like tokenized data as it's generated, or as a complete result in one go.",
+    "id": "stream",
+    "label": "Stream",
+    "supported_endpoints": [
+     "/v1/chat/completions",
+     "/v1/completions",
+     "/v1/responses"
+    ],
+    "type": "boolean"
+   }
+  ],
+  "prompt_cache_min_tokens": 1024,
+  "provider": "anthropic",
+  "service_tiers": [
+   "auto",
+   "standard_only"
+  ],
+  "source": "https://platform.claude.com/docs/en/about-claude/pricing",
+  "successor_model": "claude-sonnet-5-5",
+  "supports_adaptive_thinking": false,
+  "supports_assistant_prefill": true,
+  "supports_computer_use": true,
+  "supports_dynamic_reasoning_budget": false,
+  "supports_forced_tool_choice": true,
+  "supports_function_calling": true,
+  "supports_mid_conversation_system_messages": false,
+  "supports_native_effort": false,
+  "supports_native_structured_output": true,
+  "supports_pdf_input": true,
+  "supports_prompt_caching": true,
+  "supports_reasoning": true,
+  "supports_reasoning_disable": true,
+  "supports_reasoning_with_tool_calls": true,
+  "supports_response_schema": true,
+  "supports_response_schema_with_tools": true,
+  "supports_sampling_params": true,
+  "supports_service_tier": true,
+  "supports_speed": false,
+  "supports_tool_choice": true,
+  "supports_vision": true,
+  "supports_web_search": true,
+  "tool_use_system_prompt_tokens": 346,
+  "web_search_billing_unit": "per_request"
+ },
+ "claude-sonnet-4-5-20250929": {
+  "base_model": "claude-sonnet-4-5",
+  "deprecation_date": "2026-09-29",
+  "deprecation_source": "https://platform.claude.com/docs/en/about-claude/model-deprecations",
+  "is_deprecated": true,
+  "max_input_tokens": 200000,
+  "max_output_tokens": 64000,
+  "max_tokens": 64000,
+  "mode": "chat",
+  "model_parameters": [
+   {
+    "helpText": "A list of tools the model may call.",
+    "id": "promptTools",
+    "label": "Prompt Tools (Functions)",
+    "supported_endpoints": [
+     "/v1/chat/completions",
+     "/v1/responses"
+    ],
+    "type": "select"
+   },
+   {
+    "default": 1,
+    "helpText": "What sampling temperature to use, between 0 and 1. Higher values like 0.8 will make the output more random, while lower values like 0.2 will make it more focused and deterministic.",
+    "id": "temperature",
+    "label": "Temperature",
+    "range": {
+     "max": 1,
+     "min": 0,
+     "step": 0.01
+    },
+    "supported_endpoints": [
+     "/v1/chat/completions",
+     "/v1/completions",
+     "/v1/responses"
+    ],
+    "type": "number"
+   },
+   {
+    "default": 256,
+    "helpText": "The maximum number of tokens that can be generated in the Result.",
+    "id": "max_tokens",
+    "label": "Max Tokens",
+    "range": {
+     "max": 64000,
+     "min": 1
+    },
+    "supported_endpoints": [
+     "/v1/chat/completions",
+     "/v1/completions"
+    ],
+    "type": "number"
+   },
+   {
+    "array": {
+     "maxElements": 4,
+     "minElements": 1,
+     "type": "text"
+    },
+    "helpText": "Custom text sequences that will cause the model to stop generating.",
+    "id": "stop_sequences",
+    "label": "Stop Sequence",
+    "type": "array"
+   },
+   {
+    "default": 1,
+    "helpText": "An alternative to sampling with temperature, called nucleus sampling, where the model considers the results of the tokens with top_p probability mass. So 0.1 means only the tokens comprising the top 10% probability mass are considered.",
+    "id": "top_p",
+    "label": "Top P",
+    "range": {
+     "max": 1,
+     "min": 0,
+     "step": 0.01
+    },
+    "supported_endpoints": [
+     "/v1/chat/completions",
+     "/v1/completions",
+     "/v1/responses"
+    ],
+    "type": "number"
+   },
+   {
+    "default": 50,
+    "helpText": "The top_k parameter is used to limit the number of choices for the next predicted word or token. It specifies the maximum number of tokens to consider at each step, based on their probability of occurrence.",
+    "id": "top_k",
+    "label": "Top K",
+    "range": {
+     "max": 100,
+     "min": 1
+    },
+    "type": "number"
+   },
+   {
+    "accesorKey": "type",
+    "default": {
+     "type": "text"
+    },
+    "id": "thinking",
+    "label": "Thinking",
+    "options": [
+     {
+      "label": "disabled",
+      "value": "disabled"
+     },
+     {
+      "label": "enabled",
+      "value": "enabled"
+     }
+    ],
+    "type": "select"
+   },
+   {
+    "accesorKey": "type",
+    "default": {
+     "type": "text"
+    },
+    "helpText": "The format of the response. If set to 'Structured output', the response will match the supplied JSON schema.",
+    "id": "response_format",
+    "label": "Response Format",
+    "options": [
+     {
+      "label": "Structured output",
+      "subFields": [
+       {
+        "default": {
+         "name": "",
+         "schema": {},
+         "strict": true
+        },
+        "helpText": "A JSON schema that the model will follow when generating the response.",
+        "id": "json_schema",
+        "label": "JSON Schema",
+        "type": "json"
+       }
+      ],
+      "value": "json_schema"
+     },
+     {
+      "label": "Text",
+      "value": "text"
+     }
+    ],
+    "supported_endpoints": [
+     "/v1/chat/completions",
+     "/v1/responses"
+    ],
+    "type": "select"
+   },
+   {
+    "default": false,
+    "helpText": "Enable web search tool for real-time information retrieval.",
+    "id": "web_search",
+    "label": "Web Search",
+    "supported_endpoints": [
+     "/v1/chat/completions",
+     "/v1/responses"
+    ],
+    "type": "boolean"
+   },
+   {
+    "default": false,
+    "helpText": "The stream parameter in the API controls whether the response is sent in incremental updates, like tokenized data as it's generated, or as a complete result in one go.",
+    "id": "stream",
+    "label": "Stream",
+    "supported_endpoints": [
+     "/v1/chat/completions",
+     "/v1/completions",
+     "/v1/responses"
+    ],
+    "type": "boolean"
+   }
+  ],
+  "prompt_cache_min_tokens": 1024,
+  "provider": "anthropic",
+  "service_tiers": [
+   "auto",
+   "standard_only"
+  ],
+  "source": "https://docs.anthropic.com/en/docs/about-claude/pricing",
+  "successor_model": "claude-sonnet-5-5",
+  "supports_adaptive_thinking": false,
+  "supports_assistant_prefill": true,
+  "supports_computer_use": true,
+  "supports_dynamic_reasoning_budget": false,
+  "supports_forced_tool_choice": true,
+  "supports_function_calling": true,
+  "supports_mid_conversation_system_messages": false,
+  "supports_native_effort": false,
+  "supports_native_structured_output": true,
+  "supports_pdf_input": true,
+  "supports_prompt_caching": true,
+  "supports_reasoning": true,
+  "supports_reasoning_disable": true,
+  "supports_reasoning_with_tool_calls": true,
+  "supports_response_schema": true,
+  "supports_response_schema_with_tools": true,
+  "supports_sampling_params": true,
+  "supports_service_tier": true,
+  "supports_speed": false,
+  "supports_tool_choice": true,
+  "supports_vision": true,
+  "supports_web_search": true,
+  "tool_use_system_prompt_tokens": 346,
+  "web_search_billing_unit": "per_request"
+ },
+ "claude-sonnet-4-5-20250929-v1:0": {
+  "base_model": "claude-sonnet-4-5",
+  "deprecation_date": "2027-04-08",
+  "deprecation_source": "https://docs.aws.amazon.com/bedrock/latest/userguide/model-card-anthropic-claude-sonnet-4-5.md",
+  "max_input_tokens": 200000,
+  "max_output_tokens": 64000,
+  "max_tokens": 64000,
+  "mode": "chat",
+  "model_parameters": [
+   {
+    "helpText": "A list of tools the model may call.",
+    "id": "promptTools",
+    "label": "Prompt Tools (Functions)",
+    "supported_endpoints": [
+     "/v1/chat/completions",
+     "/v1/responses"
+    ],
+    "type": "select"
+   },
+   {
+    "default": 1,
+    "helpText": "What sampling temperature to use, between 0 and 1. Higher values like 0.8 will make the output more random, while lower values like 0.2 will make it more focused and deterministic.",
+    "id": "temperature",
+    "label": "Temperature",
+    "range": {
+     "max": 1,
+     "min": 0,
+     "step": 0.01
+    },
+    "supported_endpoints": [
+     "/v1/chat/completions",
+     "/v1/completions",
+     "/v1/responses"
+    ],
+    "type": "number"
+   },
+   {
+    "default": 2048,
+    "helpText": "The maximum number of tokens that can be generated in the Result.",
+    "id": "max_tokens",
+    "label": "Max Tokens",
+    "range": {
+     "max": 64000,
+     "min": 1
+    },
+    "supported_endpoints": [
+     "/v1/chat/completions",
+     "/v1/completions"
+    ],
+    "type": "number"
+   },
+   {
+    "array": {
+     "maxElements": 4,
+     "minElements": 1,
+     "type": "text"
+    },
+    "helpText": "Custom text sequences that will cause the model to stop generating.",
+    "id": "stop_sequences",
+    "label": "Stop Sequence",
+    "type": "array"
+   },
+   {
+    "default": 1,
+    "helpText": "An alternative to sampling with temperature, called nucleus sampling, where the model considers the results of the tokens with top_p probability mass. So 0.1 means only the tokens comprising the top 10% probability mass are considered.",
+    "id": "top_p",
+    "label": "Top P",
+    "range": {
+     "max": 1,
+     "min": 0,
+     "step": 0.01
+    },
+    "supported_endpoints": [
+     "/v1/chat/completions",
+     "/v1/completions",
+     "/v1/responses"
+    ],
+    "type": "number"
+   },
+   {
+    "default": 50,
+    "helpText": "The top_k parameter is used to limit the number of choices for the next predicted word or token. It specifies the maximum number of tokens to consider at each step, based on their probability of occurrence.",
+    "id": "top_k",
+    "label": "Top K",
+    "range": {
+     "max": 100,
+     "min": 1
+    },
+    "type": "number"
+   },
+   {
+    "accesorKey": "type",
+    "default": {
+     "type": "text"
+    },
+    "id": "thinking",
+    "label": "Thinking",
+    "options": [
+     {
+      "label": "disabled",
+      "value": "disabled"
+     },
+     {
+      "label": "enabled",
+      "value": "enabled"
+     }
+    ],
+    "type": "select"
+   },
+   {
+    "accesorKey": "type",
+    "default": {
+     "type": "text"
+    },
+    "helpText": "The format of the response. If set to 'Structured output', the response will match the supplied JSON schema.",
+    "id": "response_format",
+    "label": "Response Format",
+    "options": [
+     {
+      "label": "Structured output",
+      "subFields": [
+       {
+        "default": {
+         "name": "",
+         "schema": {},
+         "strict": true
+        },
+        "helpText": "A JSON schema that the model will follow when generating the response.",
+        "id": "json_schema",
+        "label": "JSON Schema",
+        "type": "json"
+       }
+      ],
+      "value": "json_schema"
+     },
+     {
+      "label": "Text",
+      "value": "text"
+     }
+    ],
+    "supported_endpoints": [
+     "/v1/chat/completions",
+     "/v1/responses"
+    ],
+    "type": "select"
+   },
+   {
+    "helpText": "An external identifier for the user who is associated with the request.",
+    "id": "metadata",
+    "label": "Metadata",
+    "supported_endpoints": [
+     "/v1/chat/completions",
+     "/v1/responses"
+    ],
+    "type": "text"
+   },
+   {
+    "default": false,
+    "helpText": "The stream parameter in the API controls whether the response is sent in incremental updates, like tokenized data as it's generated, or as a complete result in one go.",
+    "id": "stream",
+    "label": "Stream",
+    "supported_endpoints": [
+     "/v1/chat/completions",
+     "/v1/completions",
+     "/v1/responses"
+    ],
+    "type": "boolean"
+   }
+  ],
+  "prompt_cache_min_tokens": 1024,
+  "provider": "bedrock",
+  "source": "https://aws.amazon.com/bedrock/pricing/",
+  "supports_assistant_prefill": false,
+  "supports_computer_use": true,
+  "supports_function_calling": true,
+  "supports_parallel_tool_use_config": true,
+  "supports_pdf_input": true,
+  "supports_prompt_caching": true,
+  "supports_reasoning": true,
+  "supports_response_schema": true,
+  "supports_tool_choice": true,
+  "supports_tool_search": true,
+  "supports_vision": true,
+  "token_count_model": {
+   "litellm_provider": "bedrock",
+   "model": "anthropic.claude-sonnet-4-5-20250929-v1:0"
+  },
+  "tool_use_system_prompt_tokens": 159
+ },
+ "claude-sonnet-4-6": {
+  "base_model": "claude-sonnet-4-6",
+  "deprecation_date": "2027-02-17",
+  "inference_geo_us_multiplier": 1.1,
+  "max_input_tokens": 1000000,
+  "max_output_tokens": 64000,
+  "max_tokens": 64000,
+  "mode": "chat",
+  "model_parameters": [
+   {
+    "helpText": "A list of tools the model may call.",
+    "id": "promptTools",
+    "label": "Prompt Tools (Functions)",
+    "supported_endpoints": [
+     "/v1/chat/completions",
+     "/v1/responses"
+    ],
+    "type": "select"
+   },
+   {
+    "default": 1,
+    "helpText": "What sampling temperature to use, between 0 and 1. Higher values like 0.8 will make the output more random, while lower values like 0.2 will make it more focused and deterministic.",
+    "id": "temperature",
+    "label": "Temperature",
+    "range": {
+     "max": 1,
+     "min": 0,
+     "step": 0.01
+    },
+    "supported_endpoints": [
+     "/v1/chat/completions",
+     "/v1/completions",
+     "/v1/responses"
+    ],
+    "type": "number"
+   },
+   {
+    "default": 256,
+    "helpText": "The maximum number of tokens that can be generated in the Result.",
+    "id": "max_tokens",
+    "label": "Max Tokens",
+    "range": {
+     "max": 64000,
+     "min": 1
+    },
+    "supported_endpoints": [
+     "/v1/chat/completions",
+     "/v1/completions"
+    ],
+    "type": "number"
+   },
+   {
+    "array": {
+     "maxElements": 4,
+     "minElements": 1,
+     "type": "text"
+    },
+    "helpText": "Custom text sequences that will cause the model to stop generating.",
+    "id": "stop_sequences",
+    "label": "Stop Sequence",
+    "type": "array"
+   },
+   {
+    "default": 1,
+    "helpText": "An alternative to sampling with temperature, called nucleus sampling, where the model considers the results of the tokens with top_p probability mass. So 0.1 means only the tokens comprising the top 10% probability mass are considered.",
+    "id": "top_p",
+    "label": "Top P",
+    "range": {
+     "max": 1,
+     "min": 0,
+     "step": 0.01
+    },
+    "supported_endpoints": [
+     "/v1/chat/completions",
+     "/v1/completions",
+     "/v1/responses"
+    ],
+    "type": "number"
+   },
+   {
+    "default": 50,
+    "helpText": "The top_k parameter is used to limit the number of choices for the next predicted word or token. It specifies the maximum number of tokens to consider at each step, based on their probability of occurrence.",
+    "id": "top_k",
+    "label": "Top K",
+    "range": {
+     "max": 100,
+     "min": 1
+    },
+    "type": "number"
+   },
+   {
+    "accesorKey": "type",
+    "default": {
+     "type": "text"
+    },
+    "id": "thinking",
+    "label": "Thinking",
+    "options": [
+     {
+      "label": "disabled",
+      "value": "disabled"
+     },
+     {
+      "label": "enabled",
+      "value": "enabled"
+     },
+     {
+      "label": "adaptive",
+      "value": "adaptive"
+     }
+    ],
+    "type": "select"
+   },
+   {
+    "accesorKey": "effort",
+    "default": {
+     "type": "text"
+    },
+    "id": "output_config",
+    "label": "output_config",
+    "options": [
+     {
+      "label": "max",
+      "value": "max"
+     },
+     {
+      "label": "high",
+      "value": "high"
+     },
+     {
+      "label": "medium",
+      "value": "medium"
+     },
+     {
+      "label": "low",
+      "value": "low"
+     }
+    ],
+    "type": "select"
+   },
+   {
+    "default": "medium",
+    "helpText": "Reasoning effort gives the model guidance on how many reasoning tokens to generate before answering. Lower values favour speed and economical token usage; higher values favour more complete reasoning.",
+    "id": "reasoning_effort",
+    "label": "Reasoning Effort",
+    "options": [
+     {
+      "label": "Low",
+      "value": "low"
+     },
+     {
+      "label": "Medium",
+      "value": "medium"
+     },
+     {
+      "label": "High",
+      "value": "high"
+     },
+     {
+      "label": "Max",
+      "value": "max"
+     }
+    ],
+    "supported_endpoints": [
+     "/v1/chat/completions",
+     "/v1/responses"
+    ],
+    "type": "select"
+   },
+   {
+    "accesorKey": "type",
+    "default": {
+     "type": "text"
+    },
+    "helpText": "The format of the response. If set to 'Structured output', the response will match the supplied JSON schema.",
+    "id": "response_format",
+    "label": "Response Format",
+    "options": [
+     {
+      "label": "Structured output",
+      "subFields": [
+       {
+        "default": {
+         "name": "",
+         "schema": {},
+         "strict": true
+        },
+        "helpText": "A JSON schema that the model will follow when generating the response.",
+        "id": "json_schema",
+        "label": "JSON Schema",
+        "type": "json"
+       }
+      ],
+      "value": "json_schema"
+     },
+     {
+      "label": "Text",
+      "value": "text"
+     }
+    ],
+    "supported_endpoints": [
+     "/v1/chat/completions",
+     "/v1/responses"
+    ],
+    "type": "select"
+   },
+   {
+    "default": false,
+    "helpText": "Enable web search tool for real-time information retrieval.",
+    "id": "web_search",
+    "label": "Web Search",
+    "supported_endpoints": [
+     "/v1/chat/completions",
+     "/v1/responses"
+    ],
+    "type": "boolean"
+   },
+   {
+    "default": false,
+    "helpText": "The stream parameter in the API controls whether the response is sent in incremental updates, like tokenized data as it's generated, or as a complete result in one go.",
+    "id": "stream",
+    "label": "Stream",
+    "supported_endpoints": [
+     "/v1/chat/completions",
+     "/v1/completions",
+     "/v1/responses"
+    ],
+    "type": "boolean"
+   }
+  ],
+  "provider": "anthropic",
+  "reasoning_effort_levels": [
+   "low",
+   "medium",
+   "high",
+   "max"
+  ],
+  "service_tiers": [
+   "auto",
+   "standard_only"
+  ],
+  "supports_adaptive_thinking": true,
+  "supports_assistant_prefill": false,
+  "supports_computer_use": true,
+  "supports_dynamic_reasoning_budget": false,
+  "supports_forced_tool_choice": true,
+  "supports_function_calling": true,
+  "supports_mid_conversation_system_messages": false,
+  "supports_native_effort": true,
+  "supports_parallel_function_calling": true,
+  "supports_pdf_input": true,
+  "supports_prompt_caching": true,
+  "supports_reasoning": true,
+  "supports_reasoning_disable": true,
+  "supports_reasoning_effort": true,
+  "supports_reasoning_with_tool_calls": true,
+  "supports_response_schema": true,
+  "supports_response_schema_with_tools": true,
+  "supports_sampling_params": true,
+  "supports_service_tier": true,
+  "supports_speed": false,
+  "supports_tool_choice": true,
+  "supports_vision": true,
+  "supports_web_search": true,
+  "tool_use_system_prompt_tokens": 346,
+  "web_search_billing_unit": "per_request"
+ },
+ "claude-sonnet-5": {
+  "base_model": "claude-sonnet-5",
+  "deprecation_date": "2027-06-30",
+  "max_input_tokens": 1000000,
+  "max_output_tokens": 128000,
+  "max_tokens": 128000,
+  "mode": "chat",
+  "model_parameters": [
+   {
+    "helpText": "A list of tools the model may call.",
+    "id": "promptTools",
+    "label": "Prompt Tools (Functions)",
+    "supported_endpoints": [
+     "/v1/chat/completions",
+     "/v1/responses"
+    ],
+    "type": "select"
+   },
+   {
+    "default": 256,
+    "helpText": "The maximum number of tokens that can be generated in the Result.",
+    "id": "max_tokens",
+    "label": "Max Tokens",
+    "range": {
+     "max": 128000,
+     "min": 1
+    },
+    "supported_endpoints": [
+     "/v1/chat/completions",
+     "/v1/completions"
+    ],
+    "type": "number"
+   },
+   {
+    "array": {
+     "maxElements": 4,
+     "minElements": 1,
+     "type": "text"
+    },
+    "helpText": "Custom text sequences that will cause the model to stop generating.",
+    "id": "stop_sequences",
+    "label": "Stop Sequence",
+    "type": "array"
+   },
+   {
+    "accesorKey": "type",
+    "default": {
+     "type": "text"
+    },
+    "id": "thinking",
+    "label": "Thinking",
+    "options": [
+     {
+      "label": "disabled",
+      "value": "disabled"
+     },
+     {
+      "label": "adaptive",
+      "value": "adaptive"
+     }
+    ],
+    "type": "select"
+   },
+   {
+    "accesorKey": "effort",
+    "default": {
+     "type": "text"
+    },
+    "id": "output_config",
+    "label": "output_config",
+    "options": [
+     {
+      "label": "max",
+      "value": "max"
+     },
+     {
+      "label": "xhigh",
+      "value": "xhigh"
+     },
+     {
+      "label": "high",
+      "value": "high"
+     },
+     {
+      "label": "medium",
+      "value": "medium"
+     },
+     {
+      "label": "low",
+      "value": "low"
+     }
+    ],
+    "type": "select"
+   },
+   {
+    "default": "medium",
+    "helpText": "Reasoning effort gives the model guidance on how many reasoning tokens to generate before answering. Lower values favour speed and economical token usage; higher values favour more complete reasoning.",
+    "id": "reasoning_effort",
+    "label": "Reasoning Effort",
+    "options": [
+     {
+      "label": "Low",
+      "value": "low"
+     },
+     {
+      "label": "Medium",
+      "value": "medium"
+     },
+     {
+      "label": "High",
+      "value": "high"
+     },
+     {
+      "label": "XHigh",
+      "value": "xhigh"
+     },
+     {
+      "label": "Max",
+      "value": "max"
+     }
+    ],
+    "supported_endpoints": [
+     "/v1/chat/completions",
+     "/v1/responses"
+    ],
+    "type": "select"
+   },
+   {
+    "accesorKey": "type",
+    "default": {
+     "type": "text"
+    },
+    "helpText": "The format of the response. If set to 'Structured output', the response will match the supplied JSON schema.",
+    "id": "response_format",
+    "label": "Response Format",
+    "options": [
+     {
+      "label": "Structured output",
+      "subFields": [
+       {
+        "default": {
+         "name": "",
+         "schema": {},
+         "strict": true
+        },
+        "helpText": "A JSON schema that the model will follow when generating the response.",
+        "id": "json_schema",
+        "label": "JSON Schema",
+        "type": "json"
+       }
+      ],
+      "value": "json_schema"
+     },
+     {
+      "label": "Text",
+      "value": "text"
+     }
+    ],
+    "supported_endpoints": [
+     "/v1/chat/completions",
+     "/v1/responses"
+    ],
+    "type": "select"
+   },
+   {
+    "default": false,
+    "helpText": "Enable web search tool for real-time information retrieval.",
+    "id": "web_search",
+    "label": "Web Search",
+    "supported_endpoints": [
+     "/v1/chat/completions",
+     "/v1/responses"
+    ],
+    "type": "boolean"
+   },
+   {
+    "default": false,
+    "helpText": "The stream parameter in the API controls whether the response is sent in incremental updates, like tokenized data as it's generated, or as a complete result in one go.",
+    "id": "stream",
+    "label": "Stream",
+    "supported_endpoints": [
+     "/v1/chat/completions",
+     "/v1/completions",
+     "/v1/responses"
+    ],
+    "type": "boolean"
+   }
+  ],
+  "prompt_cache_min_tokens": 1024,
+  "provider": "anthropic",
+  "provider_specific_entry": {
+   "us": 1.1
+  },
+  "reasoning_effort_levels": [
+   "low",
+   "medium",
+   "high",
+   "xhigh",
+   "max"
+  ],
+  "service_tiers": [
+   "auto",
+   "standard_only"
+  ],
+  "source": "https://docs.anthropic.com/en/docs/about-claude/models/overview",
+  "supports_adaptive_thinking": true,
+  "supports_anthropic_compaction": true,
+  "supports_assistant_prefill": true,
+  "supports_computer_use": true,
+  "supports_dynamic_reasoning_budget": false,
+  "supports_forced_tool_choice": true,
+  "supports_function_calling": true,
+  "supports_max_reasoning_effort": true,
+  "supports_mid_conversation_system": true,
+  "supports_mid_conversation_system_messages": true,
+  "supports_native_effort": true,
+  "supports_native_structured_output": true,
+  "supports_output_config": true,
+  "supports_pdf_input": true,
+  "supports_prompt_caching": true,
+  "supports_reasoning": true,
+  "supports_reasoning_disable": true,
+  "supports_reasoning_effort": true,
+  "supports_reasoning_with_tool_calls": true,
+  "supports_response_schema": true,
+  "supports_response_schema_with_tools": true,
+  "supports_safeguards": true,
+  "supports_sampling_params": false,
+  "supports_service_tier": true,
+  "supports_speed": false,
+  "supports_thinking_cache_preservation": true,
+  "supports_tool_choice": true,
+  "supports_vision": true,
+  "supports_web_search": true,
+  "supports_xhigh_reasoning_effort": true,
+  "thinking_on_by_default": true,
+  "web_search_billing_unit": "per_request"
+ },
+ "claude-sonnet-5-5": {
+  "base_model": "claude-sonnet-5-5",
+  "max_input_tokens": 1000000,
+  "max_output_tokens": 128000,
+  "max_tokens": 128000,
+  "mode": "chat",
+  "model_parameters": [
+   {
+    "helpText": "A list of tools the model may call.",
+    "id": "promptTools",
+    "label": "Prompt Tools (Functions)",
+    "supported_endpoints": [
+     "/v1/chat/completions",
+     "/v1/responses"
+    ],
+    "type": "select"
+   },
+   {
+    "default": 4096,
+    "helpText": "The maximum number of tokens that can be generated in the Result.",
+    "id": "max_tokens",
+    "label": "Max Tokens",
+    "range": {
+     "max": 128000,
+     "min": 1
+    },
+    "supported_endpoints": [
+     "/v1/chat/completions",
+     "/v1/completions"
+    ],
+    "type": "number"
+   },
+   {
+    "array": {
+     "maxElements": 4,
+     "minElements": 1,
+     "type": "text"
+    },
+    "helpText": "Custom text sequences that will cause the model to stop generating.",
+    "id": "stop_sequences",
+    "label": "Stop Sequence",
+    "type": "array"
+   },
+   {
+    "accesorKey": "type",
+    "default": {
+     "type": "text"
+    },
+    "id": "thinking",
+    "label": "Thinking",
+    "options": [
+     {
+      "label": "adaptive",
+      "value": "adaptive"
+     },
+     {
+      "label": "between_tools",
+      "value": "between_tools"
+     }
+    ],
+    "type": "select"
+   },
+   {
+    "accesorKey": "effort",
+    "default": {
+     "type": "text"
+    },
+    "id": "output_config",
+    "label": "output_config",
+    "options": [
+     {
+      "label": "max",
+      "value": "max"
+     },
+     {
+      "label": "xhigh",
+      "value": "xhigh"
+     },
+     {
+      "label": "high",
+      "value": "high"
+     },
+     {
+      "label": "medium",
+      "value": "medium"
+     },
+     {
+      "label": "low",
+      "value": "low"
+     }
+    ],
+    "type": "select"
+   },
+   {
+    "default": "high",
+    "helpText": "Reasoning effort gives the model guidance on how many reasoning tokens to generate before answering. Lower values favour speed and economical token usage; higher values favour more complete reasoning.",
+    "id": "reasoning_effort",
+    "label": "Reasoning Effort",
+    "options": [
+     {
+      "label": "Low",
+      "value": "low"
+     },
+     {
+      "label": "Medium",
+      "value": "medium"
+     },
+     {
+      "label": "High",
+      "value": "high"
+     },
+     {
+      "label": "XHigh",
+      "value": "xhigh"
+     },
+     {
+      "label": "Max",
+      "value": "max"
+     }
+    ],
+    "supported_endpoints": [
+     "/v1/chat/completions",
+     "/v1/responses"
+    ],
+    "type": "select"
+   },
+   {
+    "accesorKey": "type",
+    "default": {
+     "type": "text"
+    },
+    "helpText": "The format of the response. If set to 'Structured output', the response will match the supplied JSON schema.",
+    "id": "response_format",
+    "label": "Response Format",
+    "options": [
+     {
+      "label": "Structured output",
+      "subFields": [
+       {
+        "default": {
+         "name": "",
+         "schema": {},
+         "strict": true
+        },
+        "helpText": "A JSON schema that the model will follow when generating the response.",
+        "id": "json_schema",
+        "label": "JSON Schema",
+        "type": "json"
+       }
+      ],
+      "value": "json_schema"
+     },
+     {
+      "label": "Text",
+      "value": "text"
+     }
+    ],
+    "supported_endpoints": [
+     "/v1/chat/completions",
+     "/v1/responses"
+    ],
+    "type": "select"
+   },
+   {
+    "default": false,
+    "helpText": "Enable web search tool for real-time information retrieval.",
+    "id": "web_search",
+    "label": "Web Search",
+    "supported_endpoints": [
+     "/v1/chat/completions",
+     "/v1/responses"
+    ],
+    "type": "boolean"
+   },
+   {
+    "default": false,
+    "helpText": "The stream parameter in the API controls whether the response is sent in incremental updates, like tokenized data as it's generated, or as a complete result in one go.",
+    "id": "stream",
+    "label": "Stream",
+    "supported_endpoints": [
+     "/v1/chat/completions",
+     "/v1/completions",
+     "/v1/responses"
+    ],
+    "type": "boolean"
+   }
+  ],
+  "prompt_cache_min_tokens": 1024,
+  "provider": "anthropic",
+  "provider_specific_entry": {
+   "us": 1.1
+  },
+  "reasoning_effort_levels": [
+   "low",
+   "medium",
+   "high",
+   "xhigh",
+   "max"
+  ],
+  "source": "https://platform.claude.com/docs/en/about-claude/pricing",
+  "supports_adaptive_thinking": true,
+  "supports_anthropic_compaction": true,
+  "supports_assistant_prefill": false,
+  "supports_computer_use": true,
+  "supports_forced_tool_choice": false,
+  "supports_forced_tool_use": false,
+  "supports_function_calling": true,
+  "supports_max_reasoning_effort": true,
+  "supports_mid_conversation_system": true,
+  "supports_mid_conversation_system_messages": true,
+  "supports_native_structured_output": true,
+  "supports_output_config": true,
+  "supports_parallel_function_calling": true,
+  "supports_pdf_input": true,
+  "supports_prompt_caching": true,
+  "supports_reasoning": true,
+  "supports_reasoning_disable": false,
+  "supports_response_schema": true,
+  "supports_safeguards": true,
+  "supports_sampling_params": false,
+  "supports_thinking_cache_preservation": true,
+  "supports_tool_choice": true,
+  "supports_vision": true,
+  "supports_web_search": true,
+  "supports_xhigh_reasoning_effort": true,
+  "thinking_always_on": true,
+  "web_search_billing_unit": "per_request"
+ }
+}

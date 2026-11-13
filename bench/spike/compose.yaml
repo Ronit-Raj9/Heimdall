@@ -1,0 +1,108 @@
+# Bifrost Bench spike stack. Throwaway: see bench/docs/spike.md.
+# evalnet is where an agent container lives: internal, no IPv6, only Bifrost reachable.
+# upstream is the normal bridge Bifrost uses to reach Postgres and the fault proxy.
+name: bbspike
+
+x-labels: &labels
+  bifrost-bench: "1"
+
+networks:
+  evalnet:
+    internal: true
+    enable_ipv6: false
+    labels: *labels
+  upstream:
+    enable_ipv6: false
+    labels: *labels
+
+volumes:
+  pgdata:
+    labels: *labels
+  bifrost-data:
+    labels: *labels
+  offline-default-data:
+    labels: *labels
+  offline-pinned-data:
+    labels: *labels
+
+services:
+  postgres:
+    image: postgres:18
+    labels: *labels
+    environment:
+      POSTGRES_USER: bifrost
+      POSTGRES_PASSWORD: bifrost-spike-pw
+      POSTGRES_DB: bifrost
+    volumes:
+      - pgdata:/var/lib/postgresql
+    networks: [upstream]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U bifrost -d bifrost"]
+      interval: 2s
+      timeout: 3s
+      retries: 30
+
+  faultproxy:
+    image: alpine:3.20
+    labels: *labels
+    user: "${SPIKE_UID:-1000}:${SPIKE_GID:-1000}"
+    command: ["/usr/local/bin/faultproxy"]
+    environment:
+      FP_MODE: ${FP_MODE:-scripted}
+      FP_LEDGER: /ledger/ledger.jsonl
+      FP_CONTROL_TOKEN: ${FP_CONTROL_TOKEN:-}
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+    volumes:
+      - ./out/faultproxy:/usr/local/bin/faultproxy:ro
+      - ./out/ledger:/ledger
+    read_only: true
+    cap_drop: [ALL]
+    security_opt: ["no-new-privileges:true"]
+    networks: [upstream]
+    ports:
+      - "127.0.0.1:19101:9101"
+
+  bifrost:
+    image: maximhq/bifrost:v2.5.1
+    labels: *labels
+    environment:
+      BIFROST_SETUP_TOKEN: ${BIFROST_SETUP_TOKEN:?set BIFROST_SETUP_TOKEN}
+      LOG_STYLE: json
+    volumes:
+      - bifrost-data:/app/data
+      - ./config/config.json:/app/data/config.json:ro
+      - ./datasheet:/app/datasheet:ro
+    depends_on:
+      postgres:
+        condition: service_healthy
+      faultproxy:
+        condition: service_started
+    networks: [evalnet, upstream]
+    ports:
+      - "127.0.0.1:18080:8080"
+
+  # S1 offline boot checks: attached to evalnet only, so no route to the internet.
+  bifrost-offline-default:
+    profiles: [offline]
+    image: maximhq/bifrost:v2.5.1
+    labels: *labels
+    environment:
+      BIFROST_SETUP_TOKEN: ${BIFROST_SETUP_TOKEN:?set BIFROST_SETUP_TOKEN}
+    volumes:
+      - offline-default-data:/app/data
+      - ./config/config.offline-default.json:/app/data/config.json:ro
+    networks: [evalnet]
+    restart: "no"
+
+  bifrost-offline-pinned:
+    profiles: [offline]
+    image: maximhq/bifrost:v2.5.1
+    labels: *labels
+    environment:
+      BIFROST_SETUP_TOKEN: ${BIFROST_SETUP_TOKEN:?set BIFROST_SETUP_TOKEN}
+    volumes:
+      - offline-pinned-data:/app/data
+      - ./config/config.offline-pinned.json:/app/data/config.json:ro
+      - ./datasheet:/app/datasheet:ro
+    networks: [evalnet]
+    restart: "no"
