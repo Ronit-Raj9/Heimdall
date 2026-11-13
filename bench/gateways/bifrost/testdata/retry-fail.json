@@ -1,0 +1,217 @@
+{
+  "id": "4b3b1159-1b93-43cc-973b-cbd6169c09f8",
+  "inc_number": 8,
+  "parent_request_id": null,
+  "timestamp": "2026-11-13T23:10:12.944969Z",
+  "object": "responses",
+  "provider": "anthropic",
+  "model": "claude-sonnet-4-6",
+  "number_of_retries": 1,
+  "fallback_index": 0,
+  "selected_key_id": "",
+  "selected_key_name": "",
+  "virtual_key_id": "8b842280-1301-43e1-8b41-f1b0b479a146",
+  "virtual_key_name": "r_testvk0001",
+  "routing_rule_id": null,
+  "routing_rule_name": null,
+  "selected_prompt_name": null,
+  "selected_prompt_version": null,
+  "selected_prompt_id": null,
+  "user_id": null,
+  "user_name": null,
+  "team_id": null,
+  "team_name": null,
+  "customer_id": null,
+  "customer_name": null,
+  "business_unit_id": null,
+  "business_unit_name": null,
+  "project_id": null,
+  "project_name": null,
+  "user_agent": "curl/8.18.0",
+  "app": "Other",
+  "latency": 118.822926,
+  "upstream_latency": 0.516838,
+  "overhead_latency": 118.30608799999999,
+  "status": "error",
+  "stream": false,
+  "content_summary": "fixture retry fail faultproxy injected 503 on call 2 (nonce l87QjSk5s6tiSBGU)",
+  "raw_request": "{\"model\":\"claude-sonnet-4-6\",\"max_tokens\":32,\"messages\":[{\"role\":\"user\",\"content\":[{\"type\":\"text\",\"text\":\"fixture retry fail\"}]}]}",
+  "raw_response": "{\"error\":{\"message\":\"faultproxy injected 503 on call 2 (nonce l87QjSk5s6tiSBGU)\",\"type\":\"api_error\"},\"request_id\":\"req_glC1OpATKh4MPqAL9emBi2Ib\",\"type\":\"error\"}",
+  "routing_engine_logs": "[1794611412944] [governance] [info] - Load balancing provider for model claude-sonnet-4-6\n[1794611412944] [governance] [info] - Load balancing model claude-sonnet-4-6 across 1 available providers: [anthropic]\n[1794611412944] [governance] [info] - Allowed providers after filtering: [anthropic]\n[1794611412944] [governance] [info] - Selected provider anthropic for model claude-sonnet-4-6 (from 1 weighted: [anthropic])\n[1794611412948] [core] [info] - Retry 1/1 for anthropic/claude-sonnet-4-6 (previous attempt failed: api_error HTTP 503; same key=slot-b)\n[1794611413063] [core] [error] - Retries exhausted for anthropic/claude-sonnet-4-6 after 2 attempt(s); last error: api_error HTTP 503\n",
+  "plugin_logs": "{\"compat\":[{\"plugin_name\":\"compat\",\"level\":\"debug\",\"message\":\"model does not support assistant prefill, assistant messages will be trimmed\",\"timestamp\":1794611412945},{\"plugin_name\":\"compat\",\"level\":\"debug\",\"message\":\"no unsupported params to drop for model claude-sonnet-4-6\",\"timestamp\":1794611412945},{\"plugin_name\":\"compat\",\"level\":\"debug\",\"message\":\"no param values converted for model claude-sonnet-4-6 (anthropic)\",\"timestamp\":1794611412945}]}",
+  "is_large_payload_request": false,
+  "is_large_payload_response": false,
+  "content_hidden": false,
+  "created_at": "2026-11-13T23:10:12.944969Z",
+  "routing_engines_used": [
+    "governance"
+  ],
+  "responses_input_history": [
+    {
+      "type": "message",
+      "role": "user",
+      "content": [
+        {
+          "type": "input_text",
+          "text": "fixture retry fail"
+        }
+      ]
+    }
+  ],
+  "params": {
+    "max_output_tokens": 32
+  },
+  "error_details": {
+    "is_bifrost_error": false,
+    "status_code": 503,
+    "error": {
+      "type": "api_error",
+      "message": "faultproxy injected 503 on call 2 (nonce l87QjSk5s6tiSBGU)"
+    },
+    "extra_fields": {
+      "routing_info": {
+        "provider": "anthropic",
+        "model": "claude-sonnet-4-6",
+        "key": "slot-b",
+        "requested_model": "claude-sonnet-4-6"
+      },
+      "provider": "anthropic",
+      "original_model_requested": "claude-sonnet-4-6",
+      "resolved_model_used": "claude-sonnet-4-6",
+      "request_type": "responses"
+    }
+  },
+  "attempt_trail": [
+    {
+      "attempt": 0,
+      "key_id": "03c43c45-e672-47d7-ada1-e2cccc4502bd",
+      "key_name": "slot-b",
+      "fail_reason": "api_error",
+      "failure_class": "transient",
+      "status_code": 503,
+      "triggered_rotation": false
+    },
+    {
+      "attempt": 1,
+      "key_id": "03c43c45-e672-47d7-ada1-e2cccc4502bd",
+      "key_name": "slot-b",
+      "fail_reason": "api_error",
+      "failure_class": "transient",
+      "status_code": 503,
+      "triggered_rotation": false
+    }
+  ],
+  "overhead_breakdown": [
+    {
+      "name": "worker-handoff",
+      "duration_us": 4.993
+    },
+    {
+      "name": "plugin.telemetry",
+      "duration_us": 49.473
+    },
+    {
+      "name": "plugin.prompts",
+      "duration_us": 3.757
+    },
+    {
+      "name": "plugin.logging",
+      "duration_us": 83.347
+    },
+    {
+      "name": "plugin.governance",
+      "duration_us": 34.311
+    },
+    {
+      "name": "plugin.compat",
+      "duration_us": 15.683
+    },
+    {
+      "name": "transport-context",
+      "duration_us": 27.628
+    },
+    {
+      "name": "convertor",
+      "duration_us": 66.775
+    },
+    {
+      "name": "handle-setup",
+      "duration_us": 9.541
+    },
+    {
+      "name": "plugin.routing",
+      "duration_us": 31.197
+    },
+    {
+      "name": "plugin.model-catalog-resolver",
+      "duration_us": 2.237
+    },
+    {
+      "name": "miscellaneous",
+      "duration_us": 3.817
+    },
+    {
+      "name": "pipeline-pre",
+      "duration_us": 6.305
+    },
+    {
+      "name": "queue-wait",
+      "duration_us": 5.913
+    },
+    {
+      "name": "worker-setup",
+      "duration_us": 1.683
+    },
+    {
+      "name": "key-pool",
+      "duration_us": 5.322
+    },
+    {
+      "name": "key.selection",
+      "duration_us": 1.533
+    },
+    {
+      "name": "provider-internal",
+      "duration_us": 2892.325
+    },
+    {
+      "name": "attribute-population",
+      "duration_us": 83.489
+    },
+    {
+      "name": "request-marshal",
+      "duration_us": 25.245
+    },
+    {
+      "name": "response-finalize",
+      "duration_us": 10.547
+    },
+    {
+      "name": "pipeline-post",
+      "duration_us": 11.847
+    },
+    {
+      "name": "transport-response-headers",
+      "duration_us": 8.442
+    },
+    {
+      "name": "scheduling",
+      "duration_us": 114920.67799999999
+    }
+  ],
+  "virtual_key": {
+    "agent_grants": null,
+    "allow_all_providers": false,
+    "calendar_aligned": false,
+    "config_hash": "",
+    "created_at": "0001-01-01T00:00:00Z",
+    "id": "8b842280-1301-43e1-8b41-f1b0b479a146",
+    "is_active": true,
+    "mcp_configs": null,
+    "name": "r_testvk0001",
+    "provider_configs": null,
+    "relay_grants": null,
+    "updated_at": "0001-01-01T00:00:00Z",
+    "value": ""
+  }
+}

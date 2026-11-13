@@ -1,0 +1,147 @@
+{
+  "id": "e72c6248-33d2-4a7c-86a7-87aa8a68ec2a",
+  "inc_number": 10,
+  "parent_request_id": null,
+  "timestamp": "2026-11-13T23:10:24.915176Z",
+  "object": "list_models",
+  "provider": "anthropic",
+  "model": "",
+  "number_of_retries": 0,
+  "fallback_index": 0,
+  "selected_key_id": "",
+  "selected_key_name": "",
+  "virtual_key_id": "8b842280-1301-43e1-8b41-f1b0b479a146",
+  "virtual_key_name": "r_testvk0001",
+  "routing_rule_id": null,
+  "routing_rule_name": null,
+  "selected_prompt_name": null,
+  "selected_prompt_version": null,
+  "selected_prompt_id": null,
+  "user_id": null,
+  "user_name": null,
+  "team_id": null,
+  "team_name": null,
+  "customer_id": null,
+  "customer_name": null,
+  "business_unit_id": null,
+  "business_unit_name": null,
+  "project_id": null,
+  "project_name": null,
+  "user_agent": "curl/8.18.0",
+  "app": "Other",
+  "latency": 4.685106,
+  "upstream_latency": 0.246331,
+  "overhead_latency": 4.438775000000001,
+  "status": "success",
+  "stream": false,
+  "raw_request": "",
+  "raw_response": "[{\"data\":[{\"created_at\":\"2026-02-17T00:00:00Z\",\"display_name\":\"Claude Sonnet 4.6\",\"id\":\"claude-sonnet-4-6\",\"type\":\"model\"},{\"created_at\":\"2026-09-01T00:00:00Z\",\"display_name\":\"Claude Haiku 5.5\",\"id\":\"claude-haiku-5-5\",\"type\":\"model\"}],\"first_id\":\"claude-sonnet-4-6\",\"has_more\":false,\"last_id\":\"claude-haiku-5-5\"}]",
+  "is_large_payload_request": false,
+  "is_large_payload_response": false,
+  "content_hidden": false,
+  "created_at": "2026-11-13T23:10:24.915176Z",
+  "list_models_output": [
+    {
+      "id": "anthropic/claude-sonnet-4-6",
+      "name": "Claude Sonnet 4.6",
+      "created": 1771286400
+    }
+  ],
+  "overhead_breakdown": [
+    {
+      "name": "worker-handoff",
+      "duration_us": 4.317
+    },
+    {
+      "name": "plugin.telemetry",
+      "duration_us": 46.274
+    },
+    {
+      "name": "plugin.prompts",
+      "duration_us": 4.043
+    },
+    {
+      "name": "plugin.logging",
+      "duration_us": 62.059
+    },
+    {
+      "name": "plugin.governance",
+      "duration_us": 1083.23
+    },
+    {
+      "name": "plugin.compat",
+      "duration_us": 8.591
+    },
+    {
+      "name": "transport-context",
+      "duration_us": 22.903
+    },
+    {
+      "name": "convertor",
+      "duration_us": 0.417
+    },
+    {
+      "name": "handle-setup",
+      "duration_us": 9.994
+    },
+    {
+      "name": "plugin.routing",
+      "duration_us": 32.361
+    },
+    {
+      "name": "plugin.model-catalog-resolver",
+      "duration_us": 2.079
+    },
+    {
+      "name": "miscellaneous",
+      "duration_us": 8.776
+    },
+    {
+      "name": "pipeline-pre",
+      "duration_us": 14.942
+    },
+    {
+      "name": "queue-wait",
+      "duration_us": 9.569
+    },
+    {
+      "name": "worker-setup",
+      "duration_us": 3.091
+    },
+    {
+      "name": "provider-internal",
+      "duration_us": 116.299
+    },
+    {
+      "name": "attribute-population",
+      "duration_us": 18.982
+    },
+    {
+      "name": "pipeline-post",
+      "duration_us": 12.223
+    },
+    {
+      "name": "transport-response-headers",
+      "duration_us": 5.444
+    },
+    {
+      "name": "scheduling",
+      "duration_us": 2973.1810000000005
+    }
+  ],
+  "virtual_key": {
+    "agent_grants": null,
+    "allow_all_providers": false,
+    "calendar_aligned": false,
+    "config_hash": "",
+    "created_at": "0001-01-01T00:00:00Z",
+    "id": "8b842280-1301-43e1-8b41-f1b0b479a146",
+    "is_active": true,
+    "mcp_configs": null,
+    "name": "r_testvk0001",
+    "provider_configs": null,
+    "relay_grants": null,
+    "updated_at": "0001-01-01T00:00:00Z",
+    "value": ""
+  }
+}

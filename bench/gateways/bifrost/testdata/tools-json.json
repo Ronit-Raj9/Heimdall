@@ -1,0 +1,311 @@
+{
+  "id": "f8dbab8a-16b3-4e03-8a6a-a9d6eeef6659",
+  "inc_number": 4,
+  "parent_request_id": null,
+  "timestamp": "2026-11-13T23:10:12.861178Z",
+  "object": "responses",
+  "provider": "anthropic",
+  "model": "claude-sonnet-4-6",
+  "number_of_retries": 0,
+  "fallback_index": 0,
+  "selected_key_id": "03c43c45-e672-47d7-ada1-e2cccc4502bd",
+  "selected_key_name": "slot-b",
+  "virtual_key_id": "8b842280-1301-43e1-8b41-f1b0b479a146",
+  "virtual_key_name": "r_testvk0001",
+  "routing_rule_id": null,
+  "routing_rule_name": null,
+  "selected_prompt_name": null,
+  "selected_prompt_version": null,
+  "selected_prompt_id": null,
+  "user_id": null,
+  "user_name": null,
+  "team_id": null,
+  "team_name": null,
+  "customer_id": null,
+  "customer_name": null,
+  "business_unit_id": null,
+  "business_unit_name": null,
+  "project_id": null,
+  "project_name": null,
+  "user_agent": "curl/8.18.0",
+  "app": "Other",
+  "latency": 1.425798,
+  "upstream_latency": 0.435445,
+  "overhead_latency": 0.9903529999999998,
+  "cost": 0.0003384,
+  "cost_breakdown": {
+    "input_cost": 0.0001884,
+    "input_cost_details": {
+      "text_cost": 0.000054,
+      "cached_read_cost": 0.0000144,
+      "cached_write_cost": 0.00012
+    },
+    "output_cost": 0.00015000000000000001,
+    "output_cost_details": {
+      "text_cost": 0.00015000000000000001
+    },
+    "total_cost": 0.0003384
+  },
+  "status": "success",
+  "stop_reason": "tool_calls",
+  "stream": false,
+  "content_summary": "fixture tools json Scripted reply 3 for slot slot-b.",
+  "raw_request": "{\"model\":\"claude-sonnet-4-6\",\"max_tokens\":64,\"messages\":[{\"role\":\"user\",\"content\":[{\"type\":\"text\",\"text\":\"fixture tools json\"}]}],\"tools\":[{\"name\":\"Read\",\"description\":\"Read a file\",\"input_schema\":{\"type\":\"object\",\"properties\":{\"file_path\":{\"type\":\"string\"}}}}]}",
+  "raw_response": "{\"content\":[{\"text\":\"Scripted reply 3 for slot slot-b.\",\"type\":\"text\"},{\"id\":\"toolu_8YAwCypWV2DFrDm8AiflrP8w\",\"input\":{\"note\":\"scripted tool call\"},\"name\":\"Read\",\"type\":\"tool_use\"}],\"id\":\"msg_lyYshndOGNL7OOMHfZSfdihf\",\"model\":\"claude-sonnet-4-6\",\"role\":\"assistant\",\"stop_reason\":\"tool_use\",\"stop_sequence\":null,\"type\":\"message\",\"usage\":{\"cache_creation_input_tokens\":32,\"cache_read_input_tokens\":48,\"input_tokens\":18,\"output_tokens\":10}}",
+  "routing_engine_logs": "[1794611412861] [governance] [info] - Load balancing provider for model claude-sonnet-4-6\n[1794611412861] [governance] [info] - Load balancing model claude-sonnet-4-6 across 1 available providers: [anthropic]\n[1794611412861] [governance] [info] - Allowed providers after filtering: [anthropic]\n[1794611412861] [governance] [info] - Selected provider anthropic for model claude-sonnet-4-6 (from 1 weighted: [anthropic])\n",
+  "plugin_logs": "{\"compat\":[{\"plugin_name\":\"compat\",\"level\":\"debug\",\"message\":\"model does not support assistant prefill, assistant messages will be trimmed\",\"timestamp\":1794611412861},{\"plugin_name\":\"compat\",\"level\":\"debug\",\"message\":\"no unsupported params to drop for model claude-sonnet-4-6\",\"timestamp\":1794611412861},{\"plugin_name\":\"compat\",\"level\":\"debug\",\"message\":\"no param values converted for model claude-sonnet-4-6 (anthropic)\",\"timestamp\":1794611412861}]}",
+  "is_large_payload_request": false,
+  "is_large_payload_response": false,
+  "content_hidden": false,
+  "created_at": "2026-11-13T23:10:12.861178Z",
+  "routing_engines_used": [
+    "governance"
+  ],
+  "tool_call_names": [
+    "Read"
+  ],
+  "responses_input_history": [
+    {
+      "type": "message",
+      "role": "user",
+      "content": [
+        {
+          "type": "input_text",
+          "text": "fixture tools json"
+        }
+      ]
+    }
+  ],
+  "responses_output": [
+    {
+      "id": "msg_f1af05f7b096bb108b0ad5482c9a707016cfb9a64c0bd0f2ad",
+      "type": "message",
+      "status": "completed",
+      "role": "assistant",
+      "content": [
+        {
+          "type": "output_text",
+          "text": "Scripted reply 3 for slot slot-b.",
+          "annotations": [],
+          "logprobs": []
+        }
+      ]
+    },
+    {
+      "arguments": "{\"note\":\"scripted tool call\"}",
+      "id": "fc_26c31cc3b50319d37a589066c3d006db66a9e645259a58c6ed",
+      "type": "function_call",
+      "status": "completed",
+      "call_id": "toolu_8YAwCypWV2DFrDm8AiflrP8w",
+      "name": "Read"
+    }
+  ],
+  "params": {
+    "max_output_tokens": 64,
+    "tools": [
+      {
+        "description": "Read a file",
+        "name": "Read",
+        "parameters": {
+          "properties": {
+            "file_path": {
+              "type": "string"
+            }
+          },
+          "type": "object"
+        },
+        "strict": null,
+        "type": "function"
+      }
+    ]
+  },
+  "tools": [
+    {
+      "type": "function",
+      "function": {
+        "name": "Read",
+        "description": "Read a file",
+        "parameters": {
+          "type": "object",
+          "properties": {
+            "file_path": {
+              "type": "string"
+            }
+          }
+        }
+      }
+    }
+  ],
+  "tool_calls": [
+    {
+      "index": 0,
+      "type": "function",
+      "id": "toolu_8YAwCypWV2DFrDm8AiflrP8w",
+      "function": {
+        "name": "Read",
+        "arguments": "{\"note\":\"scripted tool call\"}"
+      }
+    }
+  ],
+  "token_usage": {
+    "prompt_tokens": 98,
+    "prompt_tokens_details": {
+      "cached_read_tokens": 48,
+      "cached_write_tokens": 32,
+      "cached_tokens": 48,
+      "cache_write_tokens": 32
+    },
+    "completion_tokens": 10,
+    "total_tokens": 108,
+    "cost": {
+      "input_cost": 0.0001884,
+      "input_cost_details": {
+        "text_cost": 0.000054,
+        "cached_read_cost": 0.0000144,
+        "cached_write_cost": 0.00012
+      },
+      "output_cost": 0.00015000000000000001,
+      "output_cost_details": {
+        "text_cost": 0.00015000000000000001
+      },
+      "total_cost": 0.0003384
+    }
+  },
+  "attempt_trail": [
+    {
+      "attempt": 0,
+      "key_id": "03c43c45-e672-47d7-ada1-e2cccc4502bd",
+      "key_name": "slot-b",
+      "triggered_rotation": false
+    }
+  ],
+  "overhead_breakdown": [
+    {
+      "name": "worker-handoff",
+      "duration_us": 5.396
+    },
+    {
+      "name": "plugin.telemetry",
+      "duration_us": 34.131
+    },
+    {
+      "name": "plugin.prompts",
+      "duration_us": 4.024
+    },
+    {
+      "name": "plugin.logging",
+      "duration_us": 106.824
+    },
+    {
+      "name": "plugin.governance",
+      "duration_us": 36.135
+    },
+    {
+      "name": "plugin.compat",
+      "duration_us": 14.674
+    },
+    {
+      "name": "transport-context",
+      "duration_us": 26.007
+    },
+    {
+      "name": "convertor",
+      "duration_us": 57.374
+    },
+    {
+      "name": "handle-setup",
+      "duration_us": 11.259
+    },
+    {
+      "name": "plugin.routing",
+      "duration_us": 33.98
+    },
+    {
+      "name": "plugin.model-catalog-resolver",
+      "duration_us": 1.822
+    },
+    {
+      "name": "miscellaneous",
+      "duration_us": 6.542
+    },
+    {
+      "name": "pipeline-pre",
+      "duration_us": 5.65
+    },
+    {
+      "name": "queue-wait",
+      "duration_us": 5.163
+    },
+    {
+      "name": "worker-setup",
+      "duration_us": 1.663
+    },
+    {
+      "name": "key-pool",
+      "duration_us": 10.928
+    },
+    {
+      "name": "key.selection",
+      "duration_us": 2.378
+    },
+    {
+      "name": "provider-internal",
+      "duration_us": 59.317
+    },
+    {
+      "name": "attribute-population",
+      "duration_us": 83.355
+    },
+    {
+      "name": "request-marshal",
+      "duration_us": 41.591
+    },
+    {
+      "name": "response-finalize",
+      "duration_us": 8.066
+    },
+    {
+      "name": "response-parse",
+      "duration_us": 23.766
+    },
+    {
+      "name": "pipeline-post",
+      "duration_us": 13.111
+    },
+    {
+      "name": "transport-response-headers",
+      "duration_us": 8.741
+    },
+    {
+      "name": "scheduling",
+      "duration_us": 388.4559999999998
+    }
+  ],
+  "virtual_key": {
+    "agent_grants": null,
+    "allow_all_providers": false,
+    "calendar_aligned": false,
+    "config_hash": "",
+    "created_at": "0001-01-01T00:00:00Z",
+    "id": "8b842280-1301-43e1-8b41-f1b0b479a146",
+    "is_active": true,
+    "mcp_configs": null,
+    "name": "r_testvk0001",
+    "provider_configs": null,
+    "relay_grants": null,
+    "updated_at": "0001-01-01T00:00:00Z",
+    "value": ""
+  },
+  "selected_key": {
+    "id": "03c43c45-e672-47d7-ada1-e2cccc4502bd",
+    "name": "slot-b",
+    "value": {
+      "value": ""
+    },
+    "models": [
+      "claude-sonnet-4-6"
+    ],
+    "blacklisted_models": [],
+    "weight": 1
+  }
+}

@@ -1,0 +1,261 @@
+{
+  "id": "33e15d33-cfbd-442a-aba9-77b947f2beac",
+  "inc_number": 9,
+  "parent_request_id": null,
+  "timestamp": "2026-11-13T23:10:24.794795Z",
+  "object": "responses",
+  "provider": "anthropic",
+  "model": "claude-sonnet-4-6",
+  "number_of_retries": 1,
+  "fallback_index": 0,
+  "selected_key_id": "03c43c45-e672-47d7-ada1-e2cccc4502bd",
+  "selected_key_name": "slot-b",
+  "virtual_key_id": "8b842280-1301-43e1-8b41-f1b0b479a146",
+  "virtual_key_name": "r_testvk0001",
+  "routing_rule_id": null,
+  "routing_rule_name": null,
+  "selected_prompt_name": null,
+  "selected_prompt_version": null,
+  "selected_prompt_id": null,
+  "user_id": null,
+  "user_name": null,
+  "team_id": null,
+  "team_name": null,
+  "customer_id": null,
+  "customer_name": null,
+  "business_unit_id": null,
+  "business_unit_name": null,
+  "project_id": null,
+  "project_name": null,
+  "user_agent": "curl/8.18.0",
+  "app": "Other",
+  "latency": 105.997287,
+  "upstream_latency": 0.560437,
+  "overhead_latency": 105.43685,
+  "cost": 0.0003306,
+  "cost_breakdown": {
+    "input_cost": 0.0001806,
+    "input_cost_details": {
+      "text_cost": 0.000051,
+      "cached_read_cost": 0.0000096,
+      "cached_write_cost": 0.00012
+    },
+    "output_cost": 0.00015000000000000001,
+    "output_cost_details": {
+      "text_cost": 0.00015000000000000001
+    },
+    "total_cost": 0.0003306
+  },
+  "status": "success",
+  "stop_reason": "stop",
+  "stream": false,
+  "content_summary": "fixture retry ok Scripted reply 2 for slot slot-b.",
+  "raw_request": "{\"model\":\"claude-sonnet-4-6\",\"max_tokens\":32,\"messages\":[{\"role\":\"user\",\"content\":[{\"type\":\"text\",\"text\":\"fixture retry ok\"}]}]}",
+  "raw_response": "{\"content\":[{\"text\":\"Scripted reply 2 for slot slot-b.\",\"type\":\"text\"}],\"id\":\"msg_fl7F3iP4kqDFAO6BZWqViwDp\",\"model\":\"claude-sonnet-4-6\",\"role\":\"assistant\",\"stop_reason\":\"end_turn\",\"stop_sequence\":null,\"type\":\"message\",\"usage\":{\"cache_creation_input_tokens\":32,\"cache_read_input_tokens\":32,\"input_tokens\":17,\"output_tokens\":10}}",
+  "routing_engine_logs": "[1794611424794] [governance] [info] - Load balancing provider for model claude-sonnet-4-6\n[1794611424794] [governance] [info] - Load balancing model claude-sonnet-4-6 across 1 available providers: [anthropic]\n[1794611424794] [governance] [info] - Allowed providers after filtering: [anthropic]\n[1794611424794] [governance] [info] - Selected provider anthropic for model claude-sonnet-4-6 (from 1 weighted: [anthropic])\n[1794611424795] [core] [info] - Retry 1/1 for anthropic/claude-sonnet-4-6 (previous attempt failed: api_error HTTP 503; same key=slot-b)\n[1794611424900] [core] [info] - Request to anthropic/claude-sonnet-4-6 succeeded after 1 retry attempt(s)\n",
+  "plugin_logs": "{\"compat\":[{\"plugin_name\":\"compat\",\"level\":\"debug\",\"message\":\"model does not support assistant prefill, assistant messages will be trimmed\",\"timestamp\":1794611424794},{\"plugin_name\":\"compat\",\"level\":\"debug\",\"message\":\"no unsupported params to drop for model claude-sonnet-4-6\",\"timestamp\":1794611424794},{\"plugin_name\":\"compat\",\"level\":\"debug\",\"message\":\"no param values converted for model claude-sonnet-4-6 (anthropic)\",\"timestamp\":1794611424794}]}",
+  "is_large_payload_request": false,
+  "is_large_payload_response": false,
+  "content_hidden": false,
+  "created_at": "2026-11-13T23:10:24.794795Z",
+  "routing_engines_used": [
+    "governance"
+  ],
+  "responses_input_history": [
+    {
+      "type": "message",
+      "role": "user",
+      "content": [
+        {
+          "type": "input_text",
+          "text": "fixture retry ok"
+        }
+      ]
+    }
+  ],
+  "responses_output": [
+    {
+      "id": "msg_254ca746f996387da5fac5b571440de6664f3054b766531503",
+      "type": "message",
+      "status": "completed",
+      "role": "assistant",
+      "content": [
+        {
+          "type": "output_text",
+          "text": "Scripted reply 2 for slot slot-b.",
+          "annotations": [],
+          "logprobs": []
+        }
+      ]
+    }
+  ],
+  "params": {
+    "max_output_tokens": 32
+  },
+  "token_usage": {
+    "prompt_tokens": 81,
+    "prompt_tokens_details": {
+      "cached_read_tokens": 32,
+      "cached_write_tokens": 32,
+      "cached_tokens": 32,
+      "cache_write_tokens": 32
+    },
+    "completion_tokens": 10,
+    "total_tokens": 91,
+    "cost": {
+      "input_cost": 0.0001806,
+      "input_cost_details": {
+        "text_cost": 0.000051,
+        "cached_read_cost": 0.0000096,
+        "cached_write_cost": 0.00012
+      },
+      "output_cost": 0.00015000000000000001,
+      "output_cost_details": {
+        "text_cost": 0.00015000000000000001
+      },
+      "total_cost": 0.0003306
+    }
+  },
+  "attempt_trail": [
+    {
+      "attempt": 0,
+      "key_id": "03c43c45-e672-47d7-ada1-e2cccc4502bd",
+      "key_name": "slot-b",
+      "fail_reason": "api_error",
+      "failure_class": "transient",
+      "status_code": 503,
+      "triggered_rotation": false
+    },
+    {
+      "attempt": 1,
+      "key_id": "03c43c45-e672-47d7-ada1-e2cccc4502bd",
+      "key_name": "slot-b",
+      "triggered_rotation": false
+    }
+  ],
+  "overhead_breakdown": [
+    {
+      "name": "worker-handoff",
+      "duration_us": 5.537
+    },
+    {
+      "name": "plugin.telemetry",
+      "duration_us": 80.701
+    },
+    {
+      "name": "plugin.prompts",
+      "duration_us": 6.026
+    },
+    {
+      "name": "plugin.logging",
+      "duration_us": 215.827
+    },
+    {
+      "name": "plugin.governance",
+      "duration_us": 56.484
+    },
+    {
+      "name": "plugin.compat",
+      "duration_us": 21.444
+    },
+    {
+      "name": "transport-context",
+      "duration_us": 26.876
+    },
+    {
+      "name": "convertor",
+      "duration_us": 79.056
+    },
+    {
+      "name": "handle-setup",
+      "duration_us": 13.054
+    },
+    {
+      "name": "plugin.routing",
+      "duration_us": 35.326
+    },
+    {
+      "name": "plugin.model-catalog-resolver",
+      "duration_us": 3.005
+    },
+    {
+      "name": "miscellaneous",
+      "duration_us": 7.32
+    },
+    {
+      "name": "pipeline-pre",
+      "duration_us": 9.238
+    },
+    {
+      "name": "queue-wait",
+      "duration_us": 6.626
+    },
+    {
+      "name": "worker-setup",
+      "duration_us": 1.549
+    },
+    {
+      "name": "key-pool",
+      "duration_us": 6.515
+    },
+    {
+      "name": "key.selection",
+      "duration_us": 1.233
+    },
+    {
+      "name": "attribute-population",
+      "duration_us": 99.528
+    },
+    {
+      "name": "request-marshal",
+      "duration_us": 68.593
+    },
+    {
+      "name": "response-finalize",
+      "duration_us": 10.789
+    },
+    {
+      "name": "response-parse",
+      "duration_us": 28.409
+    },
+    {
+      "name": "pipeline-post",
+      "duration_us": 17.948
+    },
+    {
+      "name": "transport-response-headers",
+      "duration_us": 12.488
+    },
+    {
+      "name": "scheduling",
+      "duration_us": 104623.278
+    }
+  ],
+  "virtual_key": {
+    "agent_grants": null,
+    "allow_all_providers": false,
+    "calendar_aligned": false,
+    "config_hash": "",
+    "created_at": "0001-01-01T00:00:00Z",
+    "id": "8b842280-1301-43e1-8b41-f1b0b479a146",
+    "is_active": true,
+    "mcp_configs": null,
+    "name": "r_testvk0001",
+    "provider_configs": null,
+    "relay_grants": null,
+    "updated_at": "0001-01-01T00:00:00Z",
+    "value": ""
+  },
+  "selected_key": {
+    "id": "03c43c45-e672-47d7-ada1-e2cccc4502bd",
+    "name": "slot-b",
+    "value": {
+      "value": ""
+    },
+    "models": [
+      "claude-sonnet-4-6"
+    ],
+    "blacklisted_models": [],
+    "weight": 1
+  }
+}

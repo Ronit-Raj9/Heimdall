@@ -1,0 +1,116 @@
+# Bifrost Bench gateway stack, graduated from bench/spike/compose.yaml
+# (docs/spike.md). Run from bench/:
+#
+#   cp deploy/.env.example deploy/.env   # then fill it in
+#   CGO_ENABLED=0 GOWORK=off go build -o bin/bifrost-bench ./cmd/bifrost-bench
+#   docker build -t bench/bifrost-bench:dev .
+#   docker compose -f deploy/docker-compose.yml up -d --wait
+#
+# Networks:
+#   bench-evalnet   internal, IPv6 off. Agent containers attach here and can
+#                   reach only Bifrost (http://bifrost:8080).
+#   bench-upstream  normal bridge. Bifrost reaches Postgres and the fault
+#                   proxy here; the fault proxy reaches the real provider.
+# Agent -> Bifrost -> fault proxy (http://faultproxy:9100) -> provider. The
+# real provider key lives only in the fault proxy. Bifrost (18080) and the
+# proxy control API (19101) are published on loopback only.
+#
+# Secrets come from deploy/.env (see .env.example). Unset values interpolate
+# empty so `docker compose config` validates without them, and every service
+# then fails closed: Postgres refuses to initialise without a password,
+# Bifrost answers 403 on every /api call without a setup token, and the proxy
+# generates a control token nobody else knows.
+name: bifrost-bench
+
+x-labels: &labels
+  bifrost-bench: "1"
+
+networks:
+  evalnet:
+    name: bench-evalnet
+    internal: true
+    enable_ipv6: false
+    labels: *labels
+  upstream:
+    name: bench-upstream
+    enable_ipv6: false
+    labels: *labels
+
+volumes:
+  pgdata:
+    labels: *labels
+  bifrost-data:
+    labels: *labels
+  ledger:
+    labels: *labels
+
+services:
+  postgres:
+    image: postgres:18
+    labels: *labels
+    environment:
+      POSTGRES_USER: bifrost
+      POSTGRES_PASSWORD: ${BIFROST_PG_PASSWORD:-}
+      POSTGRES_DB: bifrost
+    volumes:
+      - pgdata:/var/lib/postgresql
+    networks: [upstream]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U bifrost -d bifrost"]
+      interval: 2s
+      timeout: 3s
+      retries: 30
+    restart: unless-stopped
+
+  # The bench binary's proxy subcommand (package bench/faultproxy). The
+  # BENCH_FAULTPROXY_* names follow bench.yaml's BENCH_<SECTION>_<KEY>
+  # override rule. The control API listens on all interfaces inside the
+  # container so the loopback-only port mapping below can reach it.
+  faultproxy:
+    image: bench/bifrost-bench:dev
+    labels: *labels
+    command: ["proxy", "--config", "/etc/bench/bench.yaml"]
+    environment:
+      BENCH_FAULTPROXY_TOKEN: ${BENCH_FAULTPROXY_TOKEN:-}
+      BENCH_FAULTPROXY_LISTEN: ":9100"
+      BENCH_FAULTPROXY_CONTROL_LISTEN: "0.0.0.0:9101"
+      BENCH_FAULTPROXY_LEDGER: /var/lib/bench/ledger/ledger.jsonl
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+    volumes:
+      - ./bench.yaml:/etc/bench/bench.yaml:ro
+      - ledger:/var/lib/bench/ledger
+    read_only: true
+    tmpfs:
+      - /tmp
+    cap_drop: [ALL]
+    security_opt: ["no-new-privileges:true"]
+    networks: [upstream]
+    ports:
+      - "127.0.0.1:19101:9101"
+    restart: unless-stopped
+
+  bifrost:
+    image: maximhq/bifrost:v2.5.1
+    labels: *labels
+    environment:
+      BIFROST_SETUP_TOKEN: ${BIFROST_SETUP_TOKEN:-}
+      BIFROST_PG_PASSWORD: ${BIFROST_PG_PASSWORD:-}
+      LOG_STYLE: json
+    volumes:
+      - bifrost-data:/app/data
+      - ./bifrost/config.json:/app/data/config.json:ro
+      - ./bifrost/datasheet:/app/datasheet:ro
+    depends_on:
+      postgres:
+        condition: service_healthy
+      faultproxy:
+        condition: service_started
+    networks: [evalnet, upstream]
+    ports:
+      - "127.0.0.1:18080:8080"
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q -O /dev/null http://127.0.0.1:8080/health"]
+      interval: 2s
+      timeout: 3s
+      retries: 60
+    restart: unless-stopped

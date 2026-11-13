@@ -1,0 +1,299 @@
+{
+  "id": "ae09522b-9a4c-46b1-a8a9-576f362a806c",
+  "inc_number": 3,
+  "parent_request_id": null,
+  "timestamp": "2026-11-13T23:10:12.762133Z",
+  "object": "responses_stream",
+  "provider": "anthropic",
+  "model": "claude-sonnet-4-6",
+  "number_of_retries": 0,
+  "fallback_index": 0,
+  "selected_key_id": "03c43c45-e672-47d7-ada1-e2cccc4502bd",
+  "selected_key_name": "slot-b",
+  "virtual_key_id": "8b842280-1301-43e1-8b41-f1b0b479a146",
+  "virtual_key_name": "r_testvk0001",
+  "routing_rule_id": null,
+  "routing_rule_name": null,
+  "selected_prompt_name": null,
+  "selected_prompt_version": null,
+  "selected_prompt_id": null,
+  "user_id": null,
+  "user_name": null,
+  "team_id": null,
+  "team_name": null,
+  "customer_id": null,
+  "customer_name": null,
+  "business_unit_id": null,
+  "business_unit_name": null,
+  "project_id": null,
+  "project_name": null,
+  "user_agent": "curl/8.18.0",
+  "app": "Other",
+  "latency": 115.276235,
+  "upstream_latency": 45.860428,
+  "overhead_latency": 69.415807,
+  "cost": 0.00033360000000000003,
+  "cost_breakdown": {
+    "input_cost": 0.00018360000000000002,
+    "input_cost_details": {
+      "text_cost": 0.000054,
+      "cached_read_cost": 0.0000096,
+      "cached_write_cost": 0.00012
+    },
+    "output_cost": 0.00015000000000000001,
+    "output_cost_details": {
+      "text_cost": 0.00015000000000000001
+    },
+    "total_cost": 0.00033360000000000003
+  },
+  "status": "success",
+  "stop_reason": "tool_calls",
+  "stream": true,
+  "content_summary": "fixture tools stream Scripted reply 2 for slot slot-b.",
+  "raw_request": "{\"model\":\"claude-sonnet-4-6\",\"max_tokens\":64,\"messages\":[{\"role\":\"user\",\"content\":[{\"type\":\"text\",\"text\":\"fixture tools stream\"}]}],\"stream\":true,\"tools\":[{\"name\":\"Read\",\"description\":\"Read a file\",\"input_schema\":{\"type\":\"object\",\"properties\":{\"file_path\":{\"type\":\"string\"}}}}]}",
+  "raw_response": "{\"message\":{\"content\":[],\"id\":\"msg_3DKXf4zB0T7kvHbEVdJM0SrR\",\"model\":\"claude-sonnet-4-6\",\"role\":\"assistant\",\"stop_reason\":null,\"stop_sequence\":null,\"type\":\"message\",\"usage\":{\"cache_creation_input_tokens\":32,\"cache_read_input_tokens\":32,\"input_tokens\":18,\"output_tokens\":1}},\"type\":\"message_start\"}\n\n{\"content_block\":{\"text\":\"\",\"type\":\"text\"},\"index\":0,\"type\":\"content_block_start\"}\n\n{\"type\":\"ping\"}\n\n{\"delta\":{\"text\":\"Scripted reply 2\",\"type\":\"text_delta\"},\"index\":0,\"type\":\"content_block_delta\"}\n\n{\"delta\":{\"text\":\" for slot slot-b.\",\"type\":\"text_delta\"},\"index\":0,\"type\":\"content_block_delta\"}\n\n{\"index\":0,\"type\":\"content_block_stop\"}\n\n{\"content_block\":{\"id\":\"toolu_Bl7Wl4zUGvCd0wlJWf2dvATh\",\"input\":{},\"name\":\"Read\",\"type\":\"tool_use\"},\"index\":1,\"type\":\"content_block_start\"}\n\n{\"delta\":{\"partial_json\":\"{\\\"note\\\":\\\"scripted tool call\\\"}\",\"type\":\"input_json_delta\"},\"index\":1,\"type\":\"content_block_delta\"}\n\n{\"index\":1,\"type\":\"content_block_stop\"}\n\n{\"delta\":{\"stop_reason\":\"tool_use\",\"stop_sequence\":null},\"type\":\"message_delta\",\"usage\":{\"cache_creation_input_tokens\":32,\"cache_read_input_tokens\":32,\"input_tokens\":18,\"output_tokens\":10}}\n\n{\"type\":\"message_stop\"}",
+  "routing_engine_logs": "[1794611412762] [governance] [info] - Load balancing provider for model claude-sonnet-4-6\n[1794611412762] [governance] [info] - Load balancing model claude-sonnet-4-6 across 1 available providers: [anthropic]\n[1794611412762] [governance] [info] - Allowed providers after filtering: [anthropic]\n[1794611412762] [governance] [info] - Selected provider anthropic for model claude-sonnet-4-6 (from 1 weighted: [anthropic])\n",
+  "plugin_logs": "{\"compat\":[{\"plugin_name\":\"compat\",\"level\":\"debug\",\"message\":\"model does not support assistant prefill, assistant messages will be trimmed\",\"timestamp\":1794611412762},{\"plugin_name\":\"compat\",\"level\":\"debug\",\"message\":\"no unsupported params to drop for model claude-sonnet-4-6\",\"timestamp\":1794611412762},{\"plugin_name\":\"compat\",\"level\":\"debug\",\"message\":\"no param values converted for model claude-sonnet-4-6 (anthropic)\",\"timestamp\":1794611412762}]}",
+  "is_large_payload_request": false,
+  "is_large_payload_response": false,
+  "content_hidden": false,
+  "created_at": "2026-11-13T23:10:12.762133Z",
+  "routing_engines_used": [
+    "governance"
+  ],
+  "tool_call_names": [
+    "Read"
+  ],
+  "responses_input_history": [
+    {
+      "type": "message",
+      "role": "user",
+      "content": [
+        {
+          "type": "input_text",
+          "text": "fixture tools stream"
+        }
+      ]
+    }
+  ],
+  "responses_output": [
+    {
+      "id": "msg_msg_3DKXf4zB0T7kvHbEVdJM0SrR_item_0",
+      "type": "message",
+      "status": "completed",
+      "role": "assistant",
+      "content": [
+        {
+          "type": "output_text",
+          "text": "Scripted reply 2 for slot slot-b.",
+          "annotations": null,
+          "logprobs": []
+        }
+      ]
+    },
+    {
+      "arguments": "{\"note\":\"scripted tool call\"}",
+      "id": "toolu_Bl7Wl4zUGvCd0wlJWf2dvATh",
+      "type": "function_call",
+      "status": "completed",
+      "call_id": "toolu_Bl7Wl4zUGvCd0wlJWf2dvATh",
+      "name": "Read"
+    }
+  ],
+  "params": {
+    "max_output_tokens": 64,
+    "tools": [
+      {
+        "description": "Read a file",
+        "name": "Read",
+        "parameters": {
+          "properties": {
+            "file_path": {
+              "type": "string"
+            }
+          },
+          "type": "object"
+        },
+        "strict": null,
+        "type": "function"
+      }
+    ]
+  },
+  "tools": [
+    {
+      "type": "function",
+      "function": {
+        "name": "Read",
+        "description": "Read a file",
+        "parameters": {
+          "type": "object",
+          "properties": {
+            "file_path": {
+              "type": "string"
+            }
+          }
+        }
+      }
+    }
+  ],
+  "tool_calls": [
+    {
+      "index": 0,
+      "type": "function",
+      "id": "toolu_Bl7Wl4zUGvCd0wlJWf2dvATh",
+      "function": {
+        "name": "Read",
+        "arguments": "{\"note\":\"scripted tool call\"}"
+      }
+    }
+  ],
+  "token_usage": {
+    "prompt_tokens": 82,
+    "prompt_tokens_details": {
+      "cached_read_tokens": 32,
+      "cached_write_tokens": 32,
+      "cached_tokens": 32,
+      "cache_write_tokens": 32
+    },
+    "completion_tokens": 10,
+    "total_tokens": 92,
+    "cost": {
+      "input_cost": 0.00018360000000000002,
+      "input_cost_details": {
+        "text_cost": 0.000054,
+        "cached_read_cost": 0.0000096,
+        "cached_write_cost": 0.00012
+      },
+      "output_cost": 0.00015000000000000001,
+      "output_cost_details": {
+        "text_cost": 0.00015000000000000001
+      },
+      "total_cost": 0.00033360000000000003
+    }
+  },
+  "attempt_trail": [
+    {
+      "attempt": 0,
+      "key_id": "03c43c45-e672-47d7-ada1-e2cccc4502bd",
+      "key_name": "slot-b",
+      "triggered_rotation": false
+    }
+  ],
+  "overhead_breakdown": [
+    {
+      "name": "convertor.stream-in",
+      "duration_us": 37.58
+    },
+    {
+      "name": "convertor.stream-out",
+      "duration_us": 0.271
+    },
+    {
+      "name": "stream-client-write",
+      "duration_us": 8.16
+    },
+    {
+      "name": "response-parse",
+      "duration_us": 60460.431
+    },
+    {
+      "name": "plugin.telemetry",
+      "duration_us": 188.579
+    },
+    {
+      "name": "plugin.prompts",
+      "duration_us": 5.423
+    },
+    {
+      "name": "plugin.logging",
+      "duration_us": 337.605
+    },
+    {
+      "name": "plugin.governance",
+      "duration_us": 92.333
+    },
+    {
+      "name": "plugin.compat",
+      "duration_us": 28.971
+    },
+    {
+      "name": "transport-context",
+      "duration_us": 28.856
+    },
+    {
+      "name": "convertor",
+      "duration_us": 79.435
+    },
+    {
+      "name": "plugin.routing",
+      "duration_us": 51.484
+    },
+    {
+      "name": "plugin.model-catalog-resolver",
+      "duration_us": 4.445
+    },
+    {
+      "name": "miscellaneous",
+      "duration_us": 40.665
+    },
+    {
+      "name": "pipeline-pre",
+      "duration_us": 11.459
+    },
+    {
+      "name": "queue-wait",
+      "duration_us": 15.326
+    },
+    {
+      "name": "worker-setup",
+      "duration_us": 3.087
+    },
+    {
+      "name": "key-pool",
+      "duration_us": 20.201
+    },
+    {
+      "name": "key.selection",
+      "duration_us": 3.309
+    },
+    {
+      "name": "attribute-population",
+      "duration_us": 1060.053
+    },
+    {
+      "name": "request-marshal",
+      "duration_us": 6926.224
+    },
+    {
+      "name": "transport-response-headers",
+      "duration_us": 11.91
+    }
+  ],
+  "virtual_key": {
+    "agent_grants": null,
+    "allow_all_providers": false,
+    "calendar_aligned": false,
+    "config_hash": "",
+    "created_at": "0001-01-01T00:00:00Z",
+    "id": "8b842280-1301-43e1-8b41-f1b0b479a146",
+    "is_active": true,
+    "mcp_configs": null,
+    "name": "r_testvk0001",
+    "provider_configs": null,
+    "relay_grants": null,
+    "updated_at": "0001-01-01T00:00:00Z",
+    "value": ""
+  },
+  "selected_key": {
+    "id": "03c43c45-e672-47d7-ada1-e2cccc4502bd",
+    "name": "slot-b",
+    "value": {
+      "value": ""
+    },
+    "models": [
+      "claude-sonnet-4-6"
+    ],
+    "blacklisted_models": [],
+    "weight": 1
+  }
+}

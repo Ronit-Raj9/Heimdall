@@ -1,0 +1,3 @@
+# The bench image only needs the prebuilt binary.
+*
+!bin/bifrost-bench

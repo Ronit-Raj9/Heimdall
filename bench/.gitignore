@@ -1,0 +1,4 @@
+# Host-built binary copied into the bench image (see Dockerfile).
+bin/
+# The repo-level .gitignore ignores .env*; the example file holds placeholders only.
+!deploy/.env.example

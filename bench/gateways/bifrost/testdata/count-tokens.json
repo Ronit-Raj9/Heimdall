@@ -1,0 +1,194 @@
+{
+  "id": "cce852a1-830f-4cf1-b6fd-edff7b4bc5aa",
+  "inc_number": 6,
+  "parent_request_id": null,
+  "timestamp": "2026-11-13T23:10:12.910364Z",
+  "object": "count_tokens",
+  "provider": "anthropic",
+  "model": "claude-sonnet-4-6",
+  "number_of_retries": 0,
+  "fallback_index": 0,
+  "selected_key_id": "03c43c45-e672-47d7-ada1-e2cccc4502bd",
+  "selected_key_name": "slot-b",
+  "virtual_key_id": "8b842280-1301-43e1-8b41-f1b0b479a146",
+  "virtual_key_name": "r_testvk0001",
+  "routing_rule_id": null,
+  "routing_rule_name": null,
+  "selected_prompt_name": null,
+  "selected_prompt_version": null,
+  "selected_prompt_id": null,
+  "user_id": null,
+  "user_name": null,
+  "team_id": null,
+  "team_name": null,
+  "customer_id": null,
+  "customer_name": null,
+  "business_unit_id": null,
+  "business_unit_name": null,
+  "project_id": null,
+  "project_name": null,
+  "user_agent": "curl/8.18.0",
+  "app": "Other",
+  "latency": 2.797727,
+  "upstream_latency": 0.248231,
+  "overhead_latency": 2.549496,
+  "status": "success",
+  "stream": false,
+  "content_summary": "fixture count",
+  "raw_request": "{\"model\":\"claude-sonnet-4-6\",\"messages\":[{\"role\":\"user\",\"content\":[{\"type\":\"text\",\"text\":\"fixture count\"}]}]}",
+  "raw_response": "{\"input_tokens\":27}",
+  "routing_engine_logs": "[1794611412910] [governance] [info] - Load balancing provider for model claude-sonnet-4-6\n[1794611412910] [governance] [info] - Load balancing model claude-sonnet-4-6 across 1 available providers: [anthropic]\n[1794611412910] [governance] [info] - Allowed providers after filtering: [anthropic]\n[1794611412910] [governance] [info] - Selected provider anthropic for model claude-sonnet-4-6 (from 1 weighted: [anthropic])\n",
+  "plugin_logs": "{\"compat\":[{\"plugin_name\":\"compat\",\"level\":\"debug\",\"message\":\"model does not support assistant prefill, assistant messages will be trimmed\",\"timestamp\":1794611412910},{\"plugin_name\":\"compat\",\"level\":\"debug\",\"message\":\"no unsupported params to drop for model claude-sonnet-4-6\",\"timestamp\":1794611412910},{\"plugin_name\":\"compat\",\"level\":\"debug\",\"message\":\"no param values converted for model claude-sonnet-4-6 (anthropic)\",\"timestamp\":1794611412910}]}",
+  "is_large_payload_request": false,
+  "is_large_payload_response": false,
+  "content_hidden": false,
+  "created_at": "2026-11-13T23:10:12.910364Z",
+  "routing_engines_used": [
+    "governance"
+  ],
+  "responses_input_history": [
+    {
+      "type": "message",
+      "role": "user",
+      "content": [
+        {
+          "type": "input_text",
+          "text": "fixture count"
+        }
+      ]
+    }
+  ],
+  "attempt_trail": [
+    {
+      "attempt": 0,
+      "key_id": "03c43c45-e672-47d7-ada1-e2cccc4502bd",
+      "key_name": "slot-b",
+      "triggered_rotation": false
+    }
+  ],
+  "overhead_breakdown": [
+    {
+      "name": "worker-handoff",
+      "duration_us": 11.914
+    },
+    {
+      "name": "plugin.telemetry",
+      "duration_us": 55.73
+    },
+    {
+      "name": "plugin.prompts",
+      "duration_us": 5.287
+    },
+    {
+      "name": "plugin.logging",
+      "duration_us": 118.45
+    },
+    {
+      "name": "plugin.governance",
+      "duration_us": 40.879
+    },
+    {
+      "name": "plugin.compat",
+      "duration_us": 19.195
+    },
+    {
+      "name": "transport-context",
+      "duration_us": 22.682
+    },
+    {
+      "name": "convertor",
+      "duration_us": 34.782
+    },
+    {
+      "name": "handle-setup",
+      "duration_us": 10.507
+    },
+    {
+      "name": "plugin.routing",
+      "duration_us": 32.99
+    },
+    {
+      "name": "plugin.model-catalog-resolver",
+      "duration_us": 3.482
+    },
+    {
+      "name": "miscellaneous",
+      "duration_us": 7.303
+    },
+    {
+      "name": "pipeline-pre",
+      "duration_us": 4.783
+    },
+    {
+      "name": "queue-wait",
+      "duration_us": 5.443
+    },
+    {
+      "name": "worker-setup",
+      "duration_us": 1.444
+    },
+    {
+      "name": "key-pool",
+      "duration_us": 13.041
+    },
+    {
+      "name": "key.selection",
+      "duration_us": 1.567
+    },
+    {
+      "name": "provider-internal",
+      "duration_us": 1390.921
+    },
+    {
+      "name": "attribute-population",
+      "duration_us": 23.455
+    },
+    {
+      "name": "request-marshal",
+      "duration_us": 14.333
+    },
+    {
+      "name": "response-finalize",
+      "duration_us": 3.07
+    },
+    {
+      "name": "pipeline-post",
+      "duration_us": 25.237
+    },
+    {
+      "name": "transport-response-headers",
+      "duration_us": 10.022
+    },
+    {
+      "name": "scheduling",
+      "duration_us": 692.979
+    }
+  ],
+  "virtual_key": {
+    "agent_grants": null,
+    "allow_all_providers": false,
+    "calendar_aligned": false,
+    "config_hash": "",
+    "created_at": "0001-01-01T00:00:00Z",
+    "id": "8b842280-1301-43e1-8b41-f1b0b479a146",
+    "is_active": true,
+    "mcp_configs": null,
+    "name": "r_testvk0001",
+    "provider_configs": null,
+    "relay_grants": null,
+    "updated_at": "0001-01-01T00:00:00Z",
+    "value": ""
+  },
+  "selected_key": {
+    "id": "03c43c45-e672-47d7-ada1-e2cccc4502bd",
+    "name": "slot-b",
+    "value": {
+      "value": ""
+    },
+    "models": [
+      "claude-sonnet-4-6"
+    ],
+    "blacklisted_models": [],
+    "weight": 1
+  }
+}
