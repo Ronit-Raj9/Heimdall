@@ -2,11 +2,13 @@
 # runs carry gateway-level evidence only (DESIGN.md 9.5): success, steps,
 # tokens, cost and time from one YAML file and no adapter code.
 #
-# It calls Bifrost's OpenAI-compatible route through litellm: the `openai/`
-# prefix selects litellm's OpenAI client, and the rest (`anthropic/<model>`)
-# is the provider-qualified model id Bifrost routes. -y (yolo) and
-# --exit-immediately make it non-interactive; -l 0 turns off its own cost cap
-# because the run's virtual key and wall budget already bound the run.
+# It calls Bifrost's OpenAI route through litellm with the run key: the
+# `openai/` prefix selects litellm's OpenAI client, which posts the bare model
+# id to {{gateway.url}}/openai/v1/chat/completions, and Bifrost's OpenAI route
+# sends it to the openai provider. Flags checked with `mini --help` in
+# bench/agent-mini-swe-agent:1 (mini-swe-agent 2.4.6, litellm 1.109.1): -y
+# (yolo) and --exit-immediately make it non-interactive; -l 0 turns off its own
+# cost cap because the run's virtual key and wall budget already bound the run.
 id: mini-swe-agent
 adapter: command
 image: bench/agent-mini-swe-agent:1
@@ -20,7 +22,7 @@ argv:
   - -l
   - "0"
   - -m
-  - "openai/anthropic/{{model}}"
+  - "openai/{{model}}"
   - -o
   - /tmp/bench/mini.traj.json
   - -t
@@ -35,7 +37,7 @@ env:
   MSWEA_COST_TRACKING: ignore_errors
   LITELLM_LOCAL_MODEL_COST_MAP: "True"
 # Placeholder: the experiment's compatibility block sets the model.
-model: claude-sonnet-4-5
+model: gpt-5.6-terra
 notes:
   project_file: AGENTS.md
 budgets:
@@ -43,5 +45,5 @@ budgets:
   cpus: 2
   mem_gb: 4
 gateway:
-  provider: anthropic
+  provider: openai
   max_retries: 0

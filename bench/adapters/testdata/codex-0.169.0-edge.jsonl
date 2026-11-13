@@ -1,0 +1,10 @@
+{"type":"thread.started","thread_id":"01a1d74d-58b5-7921-b178-ee3e1abdba91"}
+{"type":"turn.started"}
+{"type":"item.started","item":{"id":"item_0","type":"command_execution","command":"/bin/sh -c 'echo one'","aggregated_output":"","exit_code":null,"status":"in_progress"}}
+{"type":"item.completed","item":{"id":"item_0","type":"command_execution","command":"/bin/sh -c 'echo one'","aggregated_output":"one\n","exit_code":0,"status":"completed"}}
+{"type":"item.started","item":{"id":"item_1","type":"command_execution","command":"/bin/sh -c 'ls /nonexistent'","aggregated_output":"","exit_code":null,"status":"in_progress"}}
+{"type":"item.completed","item":{"id":"item_1","type":"command_execution","command":"/bin/sh -c 'ls /nonexistent'","aggregated_output":"ls: cannot access '/nonexistent': No such file or directory\n","exit_code":2,"status":"failed"}}
+{"type":"error","message":"Reconnecting... 1/5 (stream disconnected before completion: stream closed before response.completed)"}
+{"type":"error","message":"Reconnecting... 1/5 (stream disconnected before completion: fake response failed)"}
+{"type":"item.completed","item":{"id":"item_2","type":"agent_message","text":"I could not fix it; the tests still fail."}}
+{"type":"turn.completed","usage":{"input_tokens":4500,"cached_input_tokens":3072,"cache_write_input_tokens":0,"output_tokens":129,"reasoning_output_tokens":24}}

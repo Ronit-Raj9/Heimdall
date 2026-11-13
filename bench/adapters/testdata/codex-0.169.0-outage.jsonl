@@ -1,0 +1,13 @@
+{"type":"thread.started","thread_id":"01a1d74d-6ea3-7460-a5aa-aeea0b240477"}
+{"type":"turn.started"}
+{"type":"item.completed","item":{"id":"item_0","type":"reasoning","text":"**Running tests**"}}
+{"type":"item.completed","item":{"id":"item_1","type":"agent_message","text":"Let me run the tests first."}}
+{"type":"item.started","item":{"id":"item_2","type":"command_execution","command":"/bin/sh -c 'python -m pytest -q'","aggregated_output":"","exit_code":null,"status":"in_progress"}}
+{"type":"item.completed","item":{"id":"item_2","type":"command_execution","command":"/bin/sh -c 'python -m pytest -q'","aggregated_output":"F                                                                        [100%]\n=================================== FAILURES ===================================\n___________________________________ test_add ___________________________________\n\n    def test_add():\n>       assert add(2, 3) == 5\nE       assert -1 == 5\nE        +  where -1 = add(2, 3)\n\ntest_money.py:4: AssertionError\n=========================== short test summary info ============================\nFAILED test_money.py::test_add - assert -1 == 5\n1 failed in 0.02s\n","exit_code":1,"status":"failed"}}
+{"type":"error","message":"Reconnecting... 1/5 (unexpected status 503 Service Unavailable: fake upstream unavailable, url: http://bifrost:8080/openai/v1/responses)"}
+{"type":"error","message":"Reconnecting... 2/5 (unexpected status 503 Service Unavailable: fake upstream unavailable, url: http://bifrost:8080/openai/v1/responses)"}
+{"type":"error","message":"Reconnecting... 3/5 (unexpected status 503 Service Unavailable: fake upstream unavailable, url: http://bifrost:8080/openai/v1/responses)"}
+{"type":"error","message":"Reconnecting... 4/5 (unexpected status 503 Service Unavailable: fake upstream unavailable, url: http://bifrost:8080/openai/v1/responses)"}
+{"type":"error","message":"Reconnecting... 5/5 (unexpected status 503 Service Unavailable: fake upstream unavailable, url: http://bifrost:8080/openai/v1/responses)"}
+{"type":"error","message":"unexpected status 503 Service Unavailable: fake upstream unavailable, url: http://bifrost:8080/openai/v1/responses"}
+{"type":"turn.failed","error":{"message":"unexpected status 503 Service Unavailable: fake upstream unavailable, url: http://bifrost:8080/openai/v1/responses"}}

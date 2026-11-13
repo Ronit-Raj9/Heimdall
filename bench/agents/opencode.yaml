@@ -1,0 +1,90 @@
+# OpenCode, headless, through the bench's Bifrost gateway.
+#
+# Launch pattern taken from Bifrost's own CLI harness:
+# - argv: tests/e2e/clis/matrix_test.go runs `opencode run --format json
+#   --model bifrost/<provider>/<model> <prompt>`. OpenCode has no
+#   permission-bypass flag; tools are granted by "permission": "allow" in the
+#   config (matrix_test.go opencodeWriteConfig).
+# - provider: cli/internal/harness/harness.go opencodePreLaunch writes an
+#   OPENCODE_CONFIG file with one custom provider "bifrost"
+#   (@ai-sdk/openai-compatible, bundled in the binary, so nothing is installed
+#   at run time) whose baseURL is Bifrost's /openai/v1 route.
+# - model: the provider-qualified Bifrost model id; OpenCode addresses it as
+#   bifrost/<provider>/<model>. It is set by the config's "model", not by
+#   --model, so it is written in exactly one place.
+#
+# The model id lives in one env var, BENCH_MODEL, which the config reads with
+# OpenCode's {env:...} substitution. To run OpenCode on another provider, an
+# arm overrides gateway.provider and env.BENCH_MODEL together, e.g.
+#   set: {gateway.provider: openai, model: gpt-5.1, env.BENCH_MODEL: "openai/{{model}}"}
+# small_model pins title and summary calls to the same model, so the run's
+# virtual key (one model) serves every call. The key stays in env, never in
+# the config file. The env switches keep OpenCode off every network but the
+# gateway and away from Claude Code's files (CLAUDE.md, ~/.claude skills), so
+# the notes it reads are AGENTS.md only.
+id: opencode
+adapter: command
+image: bench/agent-opencode:1
+build:
+  dockerfile: agents/images/opencode/Dockerfile
+  tag: bench/agent-opencode:1
+argv:
+  - opencode
+  - run
+  - --format
+  - json
+  - --pure
+  - --title
+  - "{{task.id}}"
+  - "{{instruction}}"
+env:
+  OPENCODE_CONFIG: /tmp/bench/opencode.json
+  BENCH_MODEL: "anthropic/{{model}}"
+  BIFROST_API_KEY: "{{run.key}}"
+  OPENCODE_DISABLE_AUTOUPDATE: "1"
+  OPENCODE_DISABLE_MODELS_FETCH: "1"
+  OPENCODE_DISABLE_DEFAULT_PLUGINS: "1"
+  OPENCODE_DISABLE_LSP_DOWNLOAD: "1"
+  OPENCODE_DISABLE_CLAUDE_CODE: "1"
+  OPENCODE_DISABLE_EXTERNAL_SKILLS: "1"
+files:
+  /tmp/bench/opencode.json: |
+    {
+      "$schema": "https://opencode.ai/config.json",
+      "model": "bifrost/{env:BENCH_MODEL}",
+      "small_model": "bifrost/{env:BENCH_MODEL}",
+      "enabled_providers": ["bifrost"],
+      "permission": "allow",
+      "autoupdate": false,
+      "share": "disabled",
+      "provider": {
+        "bifrost": {
+          "npm": "@ai-sdk/openai-compatible",
+          "name": "Bifrost",
+          "options": {
+            "baseURL": "{{gateway.url}}/openai/v1",
+            "apiKey": "{env:BIFROST_API_KEY}",
+            "headers": {
+              "x-bf-session-id": "{{run.session}}",
+              "x-bf-session-affinity": "off"
+            }
+          },
+          "models": {
+            "{env:BENCH_MODEL}": {"name": "{env:BENCH_MODEL}"}
+          }
+        }
+      }
+    }
+# Placeholder: every experiment sets the model (an arm may vary it).
+model: claude-sonnet-4-5
+notes:
+  project_file: AGENTS.md
+  user_path: /home/agent/.config/opencode/AGENTS.md
+parser: opencode
+budgets:
+  wall_s: 900
+  cpus: 2
+  mem_gb: 4
+gateway:
+  provider: anthropic
+  max_retries: 0

@@ -35,6 +35,11 @@ images: build ## Build the UI and binary, then the task base image, the bench im
 	docker build -t bench/coding-core-base:1 benchmarks/coding-core/base
 	docker build -t bench/bifrost-bench:dev .
 	docker build -t bench/agent-claude-code:1 agents/images/claude-code
+	docker build -t bench/agent-codex:1 agents/images/codex
+	docker build -t bench/agent-mini-swe-agent:1 agents/images/mini-swe-agent
+	docker build -t bench/agent-opencode:1 agents/images/opencode
+	docker build -t bench/agent-gemini-cli:1 agents/images/gemini-cli
+	docker build -t bench/agent-custom-python:1 agents/images/custom-python
 
 env: ## Create deploy/.env with random tokens if it does not exist
 	@if [ ! -f deploy/.env ]; then \

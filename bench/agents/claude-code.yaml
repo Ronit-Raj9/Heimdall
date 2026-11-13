@@ -26,6 +26,10 @@ argv:
   - --output-format
   - stream-json
   - --verbose
+  # Provider-side web tools would reach the internet past the internal
+  # network and could fetch task answers, so they are switched off.
+  - --disallowedTools
+  - WebSearch,WebFetch
   - --model
   - "{{model}}"
   - "{{instruction}}"

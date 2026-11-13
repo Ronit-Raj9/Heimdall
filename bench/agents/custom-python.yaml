@@ -1,0 +1,42 @@
+# Custom agent template: a minimal real coding agent in one standard-library
+# Python file (agents/images/custom-python/agent.py), benchmarked with this
+# YAML and no Go code. Copy this file and that folder to add your own agent.
+#
+# It has no parser, so its runs carry gateway-level evidence (DESIGN.md 9.5):
+# success, steps, tokens, cost and time come from Bifrost's rows for the run's
+# virtual key, and tool calls from the gateway's content logs. Its stdout (one
+# JSON line per step, then the final message) is kept as raw output only.
+#
+# The agent speaks OpenAI chat completions to Bifrost's /openai/v1 route, and
+# Bifrost translates to whichever provider the run's key allows. The model id
+# Bifrost routes is provider/model: to run it on another provider, override
+# gateway.provider and env.BENCH_MODEL together, e.g.
+#   set: {gateway.provider: openai, model: gpt-5.1, env.BENCH_MODEL: "openai/{{model}}"}
+id: custom-python
+adapter: command
+image: bench/agent-custom-python:1
+build:
+  dockerfile: agents/images/custom-python/Dockerfile
+  tag: bench/agent-custom-python:1
+argv:
+  - bench-agent
+env:
+  BENCH_BASE_URL: "{{gateway.url}}/openai/v1"
+  BENCH_API_KEY: "{{run.key}}"
+  BENCH_MODEL: "anthropic/{{model}}"
+  BENCH_INSTRUCTION_FILE: "{{instruction_file}}"
+  BENCH_SESSION_ID: "{{run.session}}"
+  BENCH_MAX_TURNS: "40"
+  BENCH_SHELL_TIMEOUT_S: "120"
+# Placeholder: every experiment sets the model (an arm may vary it).
+model: claude-sonnet-4-5
+notes:
+  project_file: AGENTS.md
+budgets:
+  wall_s: 900
+  turns: 40
+  cpus: 1
+  mem_gb: 2
+gateway:
+  provider: anthropic
+  max_retries: 0

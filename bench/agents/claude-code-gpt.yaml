@@ -1,0 +1,80 @@
+# Claude Code on an OpenAI model: the claude-code config with the model routed
+# by Bifrost to another provider, so one harness can be compared across model
+# providers (an arm that changes only the model provider).
+#
+# How it routes (verified in Bifrost's code, transports/bifrost-http/
+# integrations/anthropic.go and core/schemas/utils.go ParseModelString):
+# Claude Code still speaks the Anthropic Messages API to {{gateway.url}}/anthropic.
+# Bifrost reads the provider from the model id's prefix: "openai/gpt-5.1"
+# routes to the openai provider, a bare id to anthropic. The prefix must be a
+# provider Bifrost knows, and the run's virtual key must allow that provider
+# (gateway.provider: openai) and the bare model (model: gpt-5.1). Claude Code
+# sends the id unchanged, so --model, ANTHROPIC_MODEL and every tier variable
+# carry the prefixed id; no Claude Code call can fall back to a Claude model.
+# docs/cli-agents/claude-code.mdx ("Using provider-specific model pinning",
+# "Provider compatibility") documents this form.
+#
+# Translation caveats: Bifrost converts the Messages request to the provider's
+# format (raw passthrough is reserved for Claude models). Claude-only server
+# tools (web search, web fetch, code execution) are unavailable; cache_control
+# is dropped, so cache tokens are only those the provider reports; Claude
+# Code's own cost figure on its result line uses Claude prices and is ignored
+# (the bench prices gateway rows). A /v1/messages/count_tokens call is served
+# by the provider's own counter (OpenAI /v1/responses/input_tokens) and is not
+# a conversation turn. Claude Code 2.1.325 logs
+# "[claude-code:unrecognized_model]" to stderr for the prefixed id and runs on
+# (seen in the fake-API smoke, docs/harness-matrix.md). Anthropic does not
+# support Claude Code on non-Claude models: a regression on this arm can be a
+# harness and model mismatch, not a model regression.
+id: claude-code-gpt
+adapter: command
+image: bench/agent-claude-code:1
+build:
+  dockerfile: agents/images/claude-code/Dockerfile
+  tag: bench/agent-claude-code:1
+argv:
+  - claude
+  - -p
+  - --dangerously-skip-permissions
+  - --output-format
+  - stream-json
+  - --verbose
+  # Provider-side web tools would reach the internet past the internal
+  # network and could fetch task answers, so they are switched off.
+  - --disallowedTools
+  - WebSearch,WebFetch
+  - --model
+  - "openai/{{model}}"
+  - "{{instruction}}"
+env:
+  ANTHROPIC_BASE_URL: "{{gateway.url}}/anthropic"
+  ANTHROPIC_AUTH_TOKEN: "{{run.key}}"
+  ANTHROPIC_API_KEY: ""
+  ANTHROPIC_MODEL: "openai/{{model}}"
+  ANTHROPIC_DEFAULT_SONNET_MODEL: "openai/{{model}}"
+  ANTHROPIC_DEFAULT_OPUS_MODEL: "openai/{{model}}"
+  ANTHROPIC_DEFAULT_HAIKU_MODEL: "openai/{{model}}"
+  ANTHROPIC_SMALL_FAST_MODEL: "openai/{{model}}"
+  CLAUDE_CODE_SUBAGENT_MODEL: "openai/{{model}}"
+  ANTHROPIC_CUSTOM_HEADERS: "x-bf-session-id: {{run.session}}\nx-bf-session-affinity: off"
+  CLAUDE_CONFIG_DIR: /home/agent/.claude
+  CLAUDE_CODE_DISABLE_AUTO_MEMORY: "1"
+  DISABLE_AUTOUPDATER: "1"
+  DISABLE_TELEMETRY: "1"
+  CLAUDE_CODE_DISABLE_TELEMETRY: "1"
+  CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC: "1"
+  DISABLE_ERROR_REPORTING: "1"
+# Placeholder: every experiment sets the model (an arm may vary it). Bare id;
+# the openai/ prefix is added above.
+model: gpt-5.1
+notes:
+  project_file: CLAUDE.md
+  user_path: /home/agent/.claude/CLAUDE.md
+parser: claudecode
+budgets:
+  wall_s: 900
+  cpus: 2
+  mem_gb: 4
+gateway:
+  provider: openai
+  max_retries: 0

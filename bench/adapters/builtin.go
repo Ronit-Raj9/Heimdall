@@ -15,5 +15,7 @@ func Builtin(cfg CommandConfig) []schemas.AgentAdapter {
 func BuiltinParsers() []schemas.Parser {
 	return []schemas.Parser{
 		newClaudeCodeParser(),
+		newCodexParser(),
+		newOpenCodeParser(),
 	}
 }
