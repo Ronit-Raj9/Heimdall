@@ -1,0 +1,6 @@
+#!/bin/sh
+# Bifrost Bench tool shim for pytest (tool_shim probe layer). See common.sh.
+# Runs the real pytest unless the probe config says this call is broken.
+. "$(dirname -- "$0")/common.sh"
+bench_find_real pytest || bench_not_found pytest
+bench_intercept pytest "$bench_real" "$@"

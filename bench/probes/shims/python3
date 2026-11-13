@@ -1,0 +1,11 @@
+#!/bin/sh
+# Bifrost Bench tool shim for python3 (tool_shim probe layer). See common.sh.
+# Only `python3 -m pytest` and `python3 -m py.test` are intercepted; every
+# other command line execs the real interpreter unchanged.
+. "$(dirname -- "$0")/common.sh"
+bench_find_real python3 || bench_not_found python3
+bench_py_module "$@"
+case $bench_module in
+pytest | py.test) bench_intercept python3 "$bench_real" "$@" ;;
+esac
+exec "$bench_real" "$@"
