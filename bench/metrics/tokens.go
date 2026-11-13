@@ -1,0 +1,59 @@
+package metrics
+
+import (
+	"context"
+	"fmt"
+
+	"github.com/maximhq/bifrost/bench/schemas"
+)
+
+// Tokens is the name of the token total.
+const Tokens = "tokens"
+
+var _ schemas.Metric = (*tokensMetric)(nil)
+
+// tokensMetric totals the four disjoint token buckets over every message row.
+type tokensMetric struct{}
+
+// GetName implements schemas.Part.
+func (m *tokensMetric) GetName() string { return Tokens }
+
+// GetVersion implements schemas.Part.
+func (m *tokensMetric) GetVersion() string { return version }
+
+// Descriptor implements schemas.Metric.
+func (m *tokensMetric) Descriptor() schemas.MetricDescriptor {
+	return schemas.MetricDescriptor{
+		Name:           Tokens,
+		Version:        version,
+		Label:          "Tokens",
+		Kind:           schemas.KindTokens,
+		HigherIsBetter: false,
+		MinEvidence:    schemas.EvidenceGateway,
+		Description:    "Tokens per run as fresh input plus cache read plus cache write plus output over every message request, averaged over runs whose every message request recorded usage.",
+		PS2:            true,
+	}
+}
+
+// Compute implements schemas.Metric. One row without usage makes the total
+// unknown: the buckets are summed only when every one of them was recorded,
+// so a partial sum is never shown as the run's total.
+func (m *tokensMetric) Compute(_ context.Context, _ *schemas.RunContext, ev *schemas.Evidence) (schemas.Value, error) {
+	ev = orEmpty(ev)
+	if v, bad := requestLogProblem(ev.Requests); bad {
+		return v, nil
+	}
+	var sum int64
+	for _, r := range messageRows(ev.Requests.Requests) {
+		if r.Tokens == nil {
+			return schemas.Unknown(fmt.Sprintf("message request %s has no usage", r.ID), schemas.EvidenceGateway), nil
+		}
+		sum += r.Tokens.Fresh + r.Tokens.CacheRead + r.Tokens.CacheWrite + r.Tokens.Out
+	}
+	return schemas.Observed(float64(sum), schemas.EvidenceGateway), nil
+}
+
+// newTokensMetric returns the tokens metric.
+func newTokensMetric() *tokensMetric {
+	return &tokensMetric{}
+}

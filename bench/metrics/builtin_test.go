@@ -1,0 +1,97 @@
+package metrics
+
+import (
+	"strings"
+	"testing"
+
+	"github.com/maximhq/bifrost/bench/schemas"
+)
+
+func TestBuiltin(t *testing.T) {
+	tests := []struct {
+		name   string
+		kind   schemas.ValueKind
+		higher bool
+		min    schemas.EvidenceLevel
+		ps2    bool
+	}{
+		{name: VerifiedSuccess, kind: schemas.KindRate, higher: true, min: schemas.EvidenceOutcome, ps2: true},
+		{name: SafeSuccess, kind: schemas.KindRate, higher: true, min: schemas.EvidenceOutcome},
+		{name: Steps, kind: schemas.KindCount, min: schemas.EvidenceGateway, ps2: true},
+		{name: ToolCalls, kind: schemas.KindCount, min: schemas.EvidenceGateway, ps2: true},
+		{name: Tokens, kind: schemas.KindTokens, min: schemas.EvidenceGateway, ps2: true},
+		{name: CostUSD, kind: schemas.KindUSD, min: schemas.EvidenceGateway, ps2: true},
+		{name: WallTimeS, kind: schemas.KindDuration, min: schemas.EvidenceOutcome, ps2: true},
+		{name: FalseCompletion, kind: schemas.KindRate, min: schemas.EvidenceOutcome},
+		{name: ClaimPrecision, kind: schemas.KindRate, higher: true, min: schemas.EvidenceOutcome},
+		{name: RetryAmplification, kind: schemas.KindCount, min: schemas.EvidenceGateway},
+	}
+	got := Builtin()
+	if len(got) != len(tests) {
+		t.Fatalf("Builtin() has %d metrics, want %d", len(got), len(tests))
+	}
+	for i, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			m := got[i]
+			d := m.Descriptor()
+			if m.GetName() != tt.name || d.Name != tt.name {
+				t.Errorf("position %d: name %q, descriptor %q, want %q", i, m.GetName(), d.Name, tt.name)
+			}
+			if m.GetVersion() != "1.0.0" || d.Version != "1.0.0" {
+				t.Errorf("version %q, descriptor %q, want 1.0.0", m.GetVersion(), d.Version)
+			}
+			if d.Kind != tt.kind || d.HigherIsBetter != tt.higher || d.MinEvidence != tt.min || d.PS2 != tt.ps2 {
+				t.Errorf("descriptor = %+v, want kind %q higher %v min %q ps2 %v", d, tt.kind, tt.higher, tt.min, tt.ps2)
+			}
+			if d.Label == "" {
+				t.Error("empty label")
+			}
+			if !strings.HasSuffix(d.Description, ".") || strings.Count(d.Description, ". ") > 0 {
+				t.Errorf("description is not one sentence: %q", d.Description)
+			}
+			if !strings.Contains(d.Description, "over ") {
+				t.Errorf("description names no denominator: %q", d.Description)
+			}
+		})
+	}
+}
+
+func TestBuiltinFreshInstances(t *testing.T) {
+	tests := []struct {
+		name string
+	}{
+		{name: "two calls do not share instances"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			a, b := Builtin(), Builtin()
+			for i := range a {
+				if a[i] == b[i] {
+					t.Errorf("metric %s returned the same instance twice", a[i].GetName())
+				}
+			}
+		})
+	}
+}
+
+func TestBuiltinSixPS2(t *testing.T) {
+	tests := []struct {
+		name string
+		want []string
+	}{
+		{name: "PS2 metrics", want: []string{VerifiedSuccess, Steps, ToolCalls, Tokens, CostUSD, WallTimeS}},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			var got []string
+			for _, m := range Builtin() {
+				if m.Descriptor().PS2 {
+					got = append(got, m.GetName())
+				}
+			}
+			if strings.Join(got, ",") != strings.Join(tt.want, ",") {
+				t.Errorf("PS2 metrics = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
