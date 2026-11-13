@@ -3432,3 +3432,7 @@ run-provider-harness-test: $(if $(HELP),,install-newman) ## Run the Bifrost prov
 	fi; \
 	if [ "$$NEWMAN_EXIT" -ne 0 ]; then exit $$NEWMAN_EXIT; fi; \
 	exit $$STREAM_CANCEL_EXIT
+
+# Bifrost Bench (bench/): `make bench-up`, `make bench-smoke`, `make bench-serve`, ...
+bench-%:
+	@$(MAKE) -C bench $*

@@ -22,10 +22,11 @@ func init() {
 // BENCH_FAULTPROXY_TOKEN, so neither appears in a process listing.
 func runProxy(args []string) int {
 	fs := flag.NewFlagSet("proxy", flag.ContinueOnError)
-	listen := fs.String("listen", ":9100", "data-plane address Bifrost's base_url points at")
-	control := fs.String("control", "127.0.0.1:9101", "control API address")
-	upstream := fs.String("upstream", "scripted", `"scripted" or the provider URL, e.g. https://api.anthropic.com`)
-	ledger := fs.String("ledger", "faultproxy.ledger.jsonl", "ledger file path")
+	listen := fs.String("listen", envOr("BENCH_FAULTPROXY_LISTEN", ":9100"), "data-plane address Bifrost's base_url points at")
+	control := fs.String("control", envOr("BENCH_FAULTPROXY_CONTROL_LISTEN", "127.0.0.1:9101"), "control API address")
+	upstream := fs.String("upstream", envOr("BENCH_FAULTPROXY_UPSTREAM", defaultUpstream()), `"scripted" or the provider URL, e.g. https://api.anthropic.com`)
+	ledger := fs.String("ledger", envOr("BENCH_FAULTPROXY_LEDGER", "faultproxy.ledger.jsonl"), "ledger file path")
+	_ = fs.String("config", "", "bench config (accepted for compose; the proxy reads only its flags and environment)")
 	slots := fs.String("slots", "fp-slot-1,fp-slot-2,fp-slot-3,fp-slot-4", "comma-separated key slots; each slot's placeholder key value equals its name")
 	debug := fs.Bool("debug", false, "debug logging")
 	if err := fs.Parse(args); err != nil {
@@ -63,4 +64,13 @@ func runProxy(args []string) int {
 		return fail("fault proxy: %v", err)
 	}
 	return exitOK
+}
+
+// defaultUpstream is the real Anthropic API when a key is present, otherwise
+// the scripted model, so a stack with no key still runs end to end.
+func defaultUpstream() string {
+	if os.Getenv("ANTHROPIC_API_KEY") != "" {
+		return "https://api.anthropic.com"
+	}
+	return "scripted"
 }
