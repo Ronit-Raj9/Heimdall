@@ -91,7 +91,10 @@ func runRun(args []string) int {
 	if m == nil {
 		return code
 	}
-	if code := a.execute(ctx, m, *resume != "", *concurrency); code != exitOK {
+	// manifestFor has already frozen the experiment in the store, so the
+	// scheduler always runs in resume mode: it runs every slot without a
+	// counted sealed run.
+	if code := a.execute(ctx, m, *concurrency); code != exitOK {
 		return code
 	}
 	an, report, err := a.analyze(context.WithoutCancel(ctx), m.ExpID, "")
@@ -128,7 +131,7 @@ func (a *app) manifestFor(ctx context.Context, path, resume string) (*schemas.Ma
 }
 
 // execute runs every slot and prints progress lines.
-func (a *app) execute(ctx context.Context, m *schemas.Manifest, resume bool, concurrency int) int {
+func (a *app) execute(ctx context.Context, m *schemas.Manifest, concurrency int) int {
 	events := make(chan engine.Event, 256)
 	done := make(chan struct{})
 	go func() {
@@ -149,7 +152,7 @@ func (a *app) execute(ctx context.Context, m *schemas.Manifest, resume bool, con
 	}()
 	janitor := engine.NewJanitor(a.reg.Gateway, a.docker, a.logger)
 	sched := engine.NewScheduler(a.reg, a.cfg.Root, a.logger, janitor)
-	sum, err := sched.Run(ctx, m, engine.RunOptions{Resume: resume, Concurrency: concurrency, Events: events})
+	sum, err := sched.Run(ctx, m, engine.RunOptions{Resume: true, Concurrency: concurrency, Events: events})
 	close(events)
 	<-done
 	if sum != nil {
@@ -184,7 +187,7 @@ func runCheck(args []string) int {
 		if m == nil {
 			return code
 		}
-		if code := a.execute(ctx, m, false, 0); code != exitOK {
+		if code := a.execute(ctx, m, 0); code != exitOK {
 			return code
 		}
 		expID = m.ExpID

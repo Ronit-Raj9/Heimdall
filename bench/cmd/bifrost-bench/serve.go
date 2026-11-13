@@ -297,7 +297,8 @@ func (l *launcher) execute(m *schemas.Manifest, run *liveRun) {
 	}()
 	janitor := engine.NewJanitor(l.a.reg.Gateway, l.a.docker, l.a.logger)
 	sched := engine.NewScheduler(l.a.reg, l.a.cfg.Root, l.a.logger, janitor)
-	_, err := sched.Run(ctx, m, engine.RunOptions{Events: events})
+	// Create already froze the experiment, so the scheduler runs in resume mode.
+	_, err := sched.Run(ctx, m, engine.RunOptions{Resume: true, Events: events})
 	close(events)
 	<-forwarded
 	if err != nil {
