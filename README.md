@@ -1,5 +1,7 @@
 # Bifrost AI Gateway
 
+> **Hackathon submission (PS2, agent benchmarking): Bifrost Bench.** A release-check platform for coding agents built on Bifrost lives in [`bench/`](bench/). Every model call of the agents under test goes through Bifrost; the bench turns that record into a verdict (improved, regressed, inconclusive or evaluation invalid). Start with [`bench/README.md`](bench/README.md); run `make bench-up`, `make bench-smoke` and `make bench-serve` from the repo root. Everything else in this repository is upstream Bifrost.
+
 <a href="https://trendshift.io/repositories/14529?utm_source=repository-badge&amp;utm_medium=badge&amp;utm_campaign=badge-repository-14529" target="_blank" rel="noopener noreferrer"><img src="https://trendshift.io/api/badge/repositories/14529" alt="maximhq%2Fbifrost | Trendshift" width="250" height="55"/></a>
 
 [![Discord badge](https://img.shields.io/badge/Discord-Join%20Community-5865F2?logo=discord&logoColor=white)](https://discord.gg/exN5KAydbU)
