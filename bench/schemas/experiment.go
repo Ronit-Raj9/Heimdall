@@ -1,6 +1,8 @@
 package schemas
 
 import (
+	"bytes"
+	"encoding/json"
 	"fmt"
 	"time"
 
@@ -83,8 +85,8 @@ const ConditionClean = "clean"
 // TaskSelector is either all tasks of the suite or an explicit list. In YAML it
 // is the scalar `all` or a sequence of task ids.
 type TaskSelector struct {
-	All bool     `json:"all,omitempty"`
-	IDs []string `json:"ids,omitempty"`
+	All bool
+	IDs []string
 }
 
 // UnmarshalYAML accepts `all` or a list of ids.
@@ -106,6 +108,51 @@ func (s *TaskSelector) UnmarshalYAML(node *yaml.Node) error {
 	default:
 		return fmt.Errorf("tasks: want \"all\" or a list")
 	}
+}
+
+// MarshalJSON writes "all" or the list, the same shape as the YAML form and the
+// UI's `tasks: "all" | string[]`.
+func (s TaskSelector) MarshalJSON() ([]byte, error) {
+	if s.All {
+		return []byte(`"all"`), nil
+	}
+	ids := s.IDs
+	if ids == nil {
+		ids = []string{}
+	}
+	return json.Marshal(ids)
+}
+
+// UnmarshalJSON accepts "all", a list of ids, or the object {"all", "ids"}.
+func (s *TaskSelector) UnmarshalJSON(b []byte) error {
+	b = bytes.TrimSpace(b)
+	switch {
+	case len(b) > 0 && b[0] == '"':
+		var v string
+		if err := json.Unmarshal(b, &v); err != nil {
+			return fmt.Errorf("tasks: %w", err)
+		}
+		if v != "all" {
+			return fmt.Errorf("tasks: want \"all\" or a list, got %q", v)
+		}
+		*s = TaskSelector{All: true}
+	case len(b) > 0 && b[0] == '[':
+		var ids []string
+		if err := json.Unmarshal(b, &ids); err != nil {
+			return fmt.Errorf("tasks: %w", err)
+		}
+		*s = TaskSelector{IDs: ids}
+	default:
+		var obj struct {
+			All bool     `json:"all"`
+			IDs []string `json:"ids"`
+		}
+		if err := json.Unmarshal(b, &obj); err != nil {
+			return fmt.Errorf("tasks: %w", err)
+		}
+		*s = TaskSelector{All: obj.All, IDs: obj.IDs}
+	}
+	return nil
 }
 
 // MarshalYAML writes `all` or the list, the inverse of UnmarshalYAML.

@@ -202,7 +202,7 @@ type ExperimentList struct {
 // LiveEvent is one server-sent event on /experiments/{id}/events.
 type LiveEvent struct {
 	Seq     int       `json:"seq"`
-	Kind    string    `json:"kind"` // slot_started | stage | slot_sealed | budget_stop | experiment_done | error
+	Kind    string    `json:"kind"` // slot_started | stage | slot_sealed | budget_stop | experiment_done | error | end
 	SlotID  string    `json:"slot_id,omitempty"`
 	RunID   string    `json:"run_id,omitempty"`
 	Stage   Stage     `json:"stage,omitempty"`

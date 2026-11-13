@@ -1,0 +1,116 @@
+package handlers
+
+import (
+	"slices"
+	"strings"
+	"testing"
+)
+
+func TestRunFileAllowlist(t *testing.T) {
+	idx := testIndex()
+	idx.files["r_t01_A"][FileRun] = []byte(`{"run_id":"r_t01_A"}`)
+	d := fullDeps()
+	d.index = idx
+	c := newTestClient(t, d)
+	tests := []struct {
+		name   string
+		status int
+	}{
+		{"run.json", 200},
+		{"workspace.diff", 200},
+		{"agent.stream.jsonl", 404},     // content log, never served
+		{"gateway.requests.jsonl", 404}, // content log, never served
+		{"evidence.json", 404},          // read internally only
+		{"..%2Fmanifest.json", 404},
+		{"..", 301},        // the router cleans dot segments with a redirect; the index is never asked
+		{"seal.json", 404}, // allowlisted but absent
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			resp := c.do(t, "GET", "/api/bench/runs/r_t01_A/files/"+tt.name, nil, nil)
+			if resp.StatusCode() != tt.status {
+				t.Fatalf("status = %d, want %d", resp.StatusCode(), tt.status)
+			}
+			if ct := string(resp.Header.ContentType()); strings.Contains(ct, "html") {
+				t.Errorf("served as %q", ct)
+			}
+		})
+	}
+	for _, name := range []string{"agent.stream.jsonl", "gateway.requests.jsonl", ".."} {
+		if slices.Contains(idx.asked, name) {
+			t.Errorf("index was asked for %q", name)
+		}
+	}
+}
+
+func TestRunDiffFormats(t *testing.T) {
+	c := newTestClient(t, fullDeps())
+	t.Run("json default", func(t *testing.T) {
+		body := decodeBody(t, c.do(t, "GET", "/api/bench/runs/r_t01_A/diff", nil, nil))
+		diff, _ := body["diff"].(map[string]any)
+		if body["run_id"] != "r_t01_A" || !strings.Contains(body["patch"].(string), "+b") || diff == nil {
+			t.Fatalf("body = %v", body)
+		}
+	})
+	t.Run("text", func(t *testing.T) {
+		resp := c.do(t, "GET", "/api/bench/runs/r_t01_A/diff?format=text", nil, nil)
+		if ct := string(resp.Header.ContentType()); !strings.HasPrefix(ct, "text/plain") {
+			t.Fatalf("content type = %q", ct)
+		}
+		if !strings.HasPrefix(string(resp.Body()), "diff --git") {
+			t.Errorf("body = %q", resp.Body())
+		}
+	})
+}
+
+func TestRunEventsAndDetail(t *testing.T) {
+	idx := testIndex()
+	delete(idx.files["r_t02_A"], FileEvidence)
+	d := fullDeps()
+	d.index = idx
+	c := newTestClient(t, d)
+	body := decodeBody(t, c.do(t, "GET", "/api/bench/runs/r_t01_A/events", nil, nil))
+	if events, _ := body["events"].([]any); len(events) != 1 || body["complete"] != true {
+		t.Fatalf("events body = %v", body)
+	}
+	body = decodeBody(t, c.do(t, "GET", "/api/bench/runs/r_t02_A/events", nil, nil))
+	if body["complete"] != false {
+		t.Errorf("no evidence must be incomplete: %v", body)
+	}
+	body = decodeBody(t, c.do(t, "GET", "/api/bench/runs/r_t01_A", nil, nil))
+	metrics, _ := body["metrics"].(map[string]any)
+	if gates, _ := body["gates"].([]any); len(gates) != 1 || metrics["steps"] == nil || body["grade"] != nil {
+		t.Errorf("run detail = %v", body)
+	}
+	body = decodeBody(t, c.do(t, "GET", "/api/bench/runs/r_t01_A/receipts", nil, nil))
+	if receipts, _ := body["receipts"].([]any); len(receipts) != 1 {
+		t.Errorf("receipts = %v", body)
+	}
+}
+
+func TestDiffSummary(t *testing.T) {
+	patch := "diff --git a/a.py b/a.py\nnew file mode 100644\n--- /dev/null\n+++ b/a.py\n@@\n+x\n" +
+		"diff --git a/b.py b/b.py\ndeleted file mode 100644\n" +
+		"diff --git a/c.py b/c.py\n--- a/c.py\n+++ b/c.py\n"
+	d := DiffSummary([]byte(patch))
+	want := []string{"a.py:added", "b.py:deleted", "c.py:modified"}
+	if len(d.Files) != len(want) || !strings.HasPrefix(d.SHA256, "sha256:") || d.Path != FileDiff {
+		t.Fatalf("summary = %+v", d)
+	}
+	for i, f := range d.Files {
+		if got := f.Path + ":" + f.Status; got != want[i] {
+			t.Errorf("file %d = %s, want %s", i, got, want[i])
+		}
+	}
+	if empty := DiffSummary(nil); len(empty.Files) != 0 {
+		t.Errorf("empty diff files = %v", empty.Files)
+	}
+}
+
+func TestReadEventsRejectsMalformedLine(t *testing.T) {
+	idx := testIndex()
+	idx.files["r_t01_A"][FileEvents] = []byte("{\"type\":\"claim\"}\nnot json\n")
+	if _, err := readEvents(idx, "r_t01_A"); err == nil || !strings.Contains(err.Error(), "line 2") {
+		t.Fatalf("err = %v, want line 2", err)
+	}
+}
