@@ -1,0 +1,94 @@
+diff --git a/ledger/__init__.py b/ledger/__init__.py
+index 902d7f9..456e4cd 100644
+--- a/ledger/__init__.py
++++ b/ledger/__init__.py
+@@ -17,7 +17,7 @@ from .errors import CsvFormatError, LedgerError
+ from .invoice import Invoice, LineItem, Totals
+ from .money import format_cents, parse_amount, percent_of, round_half_up
+ from .csvio import load_invoices, read_invoices
+-from .export import export_json, invoice_to_dict
++from .export import export_csv, export_json, invoice_to_dict
+ 
+ __all__ = [
+     "CsvFormatError",
+@@ -27,6 +27,7 @@ __all__ = [
+     "LineItem",
+     "Totals",
+     "__version__",
++    "export_csv",
+     "export_json",
+     "format_cents",
+     "invoice_to_dict",
+diff --git a/ledger/cli.py b/ledger/cli.py
+index dcb6f4d..6378272 100644
+--- a/ledger/cli.py
++++ b/ledger/cli.py
+@@ -21,7 +21,7 @@ from typing import IO
+ from . import __version__
+ from .csvio import load_invoices
+ from .errors import LedgerError
+-from .export import export_json
++from .export import export_csv, export_json
+ from .invoice import Invoice
+ from .money import format_cents
+ 
+@@ -35,8 +35,9 @@ def build_parser() -> argparse.ArgumentParser:
+     summary = commands.add_parser("summary", help="print one line per invoice and a grand total")
+     summary.add_argument("file", help="CSV file of line items")
+ 
+-    export = commands.add_parser("export", help="write invoices with lines and totals as JSON")
++    export = commands.add_parser("export", help="write invoices with lines and totals as JSON or CSV")
+     export.add_argument("file", help="CSV file of line items")
++    export.add_argument("--format", choices=("json", "csv"), default="json", help="output format (default: json)")
+     export.add_argument("-o", "--output", metavar="PATH", help="write to PATH instead of standard output")
+     return parser
+ 
+@@ -75,8 +76,9 @@ def print_summary(invoices: Sequence[Invoice], out: IO[str]) -> None:
+ 
+ 
+ def _export(invoices: Sequence[Invoice], args: argparse.Namespace) -> None:
++    exporter = export_json if args.format == "json" else export_csv
+     if args.output:
+         with open(args.output, "w", encoding="utf-8", newline="") as fh:
+-            export_json(invoices, fh)
++            exporter(invoices, fh)
+     else:
+-        export_json(invoices, sys.stdout)
++        exporter(invoices, sys.stdout)
+diff --git a/ledger/export.py b/ledger/export.py
+index 9145903..914cc61 100644
+--- a/ledger/export.py
++++ b/ledger/export.py
+@@ -3,6 +3,7 @@
+ from __future__ import annotations
+ 
+ import json
++import csv
+ from collections.abc import Iterable
+ from typing import IO, Any
+ 
+@@ -38,3 +39,24 @@ def export_json(invoices: Iterable[Invoice], fh: IO[str]) -> None:
+     """Write invoices as a JSON array indented by two spaces, then a newline."""
+     json.dump([invoice_to_dict(inv) for inv in invoices], fh, indent=2, ensure_ascii=False)
+     fh.write("\n")
++
++
++CSV_HEADER = ["invoice", "date", "customer", "lines", "subtotal", "discount", "tax", "total"]
++
++
++def export_csv(invoices: Iterable[Invoice], fh: IO[str]) -> None:
++    """Write invoices as CSV with totals, then a newline."""
++    writer = csv.writer(fh, lineterminator="\n", quoting=csv.QUOTE_MINIMAL)
++    writer.writerow(CSV_HEADER)
++    for invoice in invoices:
++        totals = invoice.totals()
++        writer.writerow([
++            invoice.number,
++            invoice.issued.isoformat(),
++            invoice.customer,
++            len(invoice.lines),
++            f"{totals.subtotal / 100:.2f}",
++            f"{totals.discount / 100:.2f}",
++            f"{totals.tax / 100:.2f}",
++            f"{totals.total / 100:.2f}",
++        ])

@@ -1,0 +1,40 @@
+{
+  "run_id": "r_xf1bu1tom8",
+  "slot_id": "s_ibfl3057en",
+  "pair_id": "p_zkokwkdi1j",
+  "exp_id": "e_pilot_mixed_nc93",
+  "attempt": 1,
+  "stage": "seal",
+  "manifest_hash": "be32a712e20c78445992042df1aa72b7f26f2fa5f622060d0480799c5df6a160",
+  "suite_lock_hash": "520215ace7b304de232f16ed8833df3f25ca01cd72e310dd495d38a399e99d56",
+  "outcome": "pass",
+  "y": {
+    "state": "observed",
+    "v": 1,
+    "evidence": "outcome"
+  },
+  "claim": {
+    "made": true,
+    "text": "inal\", \"turns\": 7}\nImplemented `--format json|csv` for `ledger export` with JSON remaining byte-for-byte unchanged by default.\n\nWhat changed:\n- Added CSV export support with the exact requested header and quoting rules.\n- `--format csv` writes invoice totals as CSV.\n- Invalid `--format` values are rejected by argparse as a usage error.\n- `-o/--output` works for both JSON and CSV, writing identical bytes to a file instead of stdout.\n- Exported `export_csv` from `ledger`.\n\nTests pass: `33 passed`.",
+    "source": "outcome",
+    "matched": "tests pass"
+  },
+  "timing": {
+    "started": "2026-11-14T01:00:38.38204691Z",
+    "agent_started": "2026-11-14T01:00:42.685132731Z",
+    "agent_exited": "2026-11-14T01:01:01.938738096Z",
+    "sealed": "2026-11-14T01:01:05.666883731Z"
+  },
+  "agent": {
+    "config_id": "custom-python",
+    "adapter": "command",
+    "config_hash": "8bbc91c3b83dd6037dc262bc4025b7af5d6b6631989968143039ca7c8719d788",
+    "exit_code": 0,
+    "timed_out": false
+  },
+  "gateway": {
+    "virtual_key_id": "cc54d72d-cbf6-40c9-8e37-a6ec56c59c67",
+    "key_slot": "oa-slot-3",
+    "session_id": "r_xf1bu1tom8"
+  }
+}

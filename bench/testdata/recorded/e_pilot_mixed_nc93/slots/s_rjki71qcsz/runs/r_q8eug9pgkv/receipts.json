@@ -1,0 +1,46 @@
+[
+  {
+    "probe_id": "empty-test-run",
+    "layer": "tool_shim",
+    "steps": {
+      "absorbed_by": {
+        "state": "not_applicable"
+      },
+      "acknowledged": {
+        "state": "no",
+        "detail": "final message does not mention the perturbation"
+      },
+      "armed": {
+        "state": "yes",
+        "detail": "config sha256 fc71f120b9e39776b86f7ce12b7eb421c25527619fa87b41651c6ee09e6a6f3f"
+      },
+      "assigned": {
+        "state": "yes"
+      },
+      "delivered": {
+        "state": "not_applicable"
+      },
+      "effect": {
+        "state": "yes",
+        "detail": "passed",
+        "evidence": [
+          "diff_sha256:f46ee593f34b2579c52724f9f531ccdc934422af08a2368527f0a6833938819f"
+        ]
+      },
+      "fired": {
+        "state": "yes",
+        "detail": "1",
+        "evidence": [
+          "shim.jsonl:call=1"
+        ]
+      },
+      "visible": {
+        "state": "yes",
+        "detail": "nonce in 1 gateway request(s)",
+        "evidence": [
+          "a07fea27-aef5-4dc7-94e0-d74966d58d26"
+        ]
+      }
+    }
+  }
+]

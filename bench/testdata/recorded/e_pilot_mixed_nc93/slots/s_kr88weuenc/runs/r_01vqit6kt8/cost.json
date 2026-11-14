@@ -1,0 +1,135 @@
+[
+  {
+    "request_id": "aa4d0484-9a75-4284-a9e1-8b7f6ab842c6",
+    "attempt": 1,
+    "model": "gpt-5.4-mini-2026-03-17",
+    "tokens": {
+      "fresh": 8240,
+      "cache_read": 0,
+      "cache_write": 0,
+      "out": 104
+    },
+    "price_ref": "bifrost-datasheet-2026-11-14-openai@sha256:064520900aeda8c3b5dec578dbbbe095f8fd366c388837fb21667ba2acf02000",
+    "usd": {
+      "state": "observed",
+      "v": 0.006648,
+      "evidence": "gateway"
+    },
+    "bifrost_usd": 0.006647999999999999,
+    "fault_inject": false
+  },
+  {
+    "request_id": "aab10ffe-120f-4853-bc81-dffb2c69f6f2",
+    "attempt": 1,
+    "model": "gpt-5.4-mini-2026-03-17",
+    "tokens": {
+      "fresh": 3026,
+      "cache_read": 8064,
+      "cache_write": 0,
+      "out": 166
+    },
+    "price_ref": "bifrost-datasheet-2026-11-14-openai@sha256:064520900aeda8c3b5dec578dbbbe095f8fd366c388837fb21667ba2acf02000",
+    "usd": {
+      "state": "observed",
+      "v": 0.0036213,
+      "evidence": "gateway"
+    },
+    "bifrost_usd": 0.0036213,
+    "fault_inject": false
+  },
+  {
+    "request_id": "e4081fbd-6790-4a62-be1e-66334b2a2aa1",
+    "attempt": 1,
+    "model": "gpt-5.4-mini-2026-03-17",
+    "tokens": {
+      "fresh": 2747,
+      "cache_read": 11008,
+      "cache_write": 0,
+      "out": 112
+    },
+    "price_ref": "bifrost-datasheet-2026-11-14-openai@sha256:064520900aeda8c3b5dec578dbbbe095f8fd366c388837fb21667ba2acf02000",
+    "usd": {
+      "state": "observed",
+      "v": 0.00338985,
+      "evidence": "gateway"
+    },
+    "bifrost_usd": 0.0033898500000000002,
+    "fault_inject": false
+  },
+  {
+    "request_id": "35664efb-35e5-4704-87a7-9e2b6abced16",
+    "attempt": 1,
+    "model": "gpt-5.4-mini-2026-03-17",
+    "tokens": {
+      "fresh": 1927,
+      "cache_read": 13696,
+      "cache_write": 0,
+      "out": 528
+    },
+    "price_ref": "bifrost-datasheet-2026-11-14-openai@sha256:064520900aeda8c3b5dec578dbbbe095f8fd366c388837fb21667ba2acf02000",
+    "usd": {
+      "state": "observed",
+      "v": 0.00484845,
+      "evidence": "gateway"
+    },
+    "bifrost_usd": 0.004848450000000001,
+    "fault_inject": false
+  },
+  {
+    "request_id": "91161db5-169f-4fd0-8b4f-9ec28c6feedb",
+    "attempt": 1,
+    "model": "gpt-5.4-mini-2026-03-17",
+    "tokens": {
+      "fresh": 736,
+      "cache_read": 15488,
+      "cache_write": 0,
+      "out": 87
+    },
+    "price_ref": "bifrost-datasheet-2026-11-14-openai@sha256:064520900aeda8c3b5dec578dbbbe095f8fd366c388837fb21667ba2acf02000",
+    "usd": {
+      "state": "observed",
+      "v": 0.0021051,
+      "evidence": "gateway"
+    },
+    "bifrost_usd": 0.0021051,
+    "fault_inject": false
+  },
+  {
+    "request_id": "16c3b95e-7907-4de5-a2e0-aeed798b2ba5",
+    "attempt": 1,
+    "model": "gpt-5.4-mini-2026-03-17",
+    "tokens": {
+      "fresh": 243,
+      "cache_read": 16128,
+      "cache_write": 0,
+      "out": 95
+    },
+    "price_ref": "bifrost-datasheet-2026-11-14-openai@sha256:064520900aeda8c3b5dec578dbbbe095f8fd366c388837fb21667ba2acf02000",
+    "usd": {
+      "state": "observed",
+      "v": 0.00181935,
+      "evidence": "gateway"
+    },
+    "bifrost_usd": 0.00181935,
+    "fault_inject": false
+  },
+  {
+    "request_id": "bc9a8ab4-57a7-4ef6-97ac-1bcc844d3d89",
+    "attempt": 1,
+    "model": "gpt-5.4-mini-2026-03-17",
+    "tokens": {
+      "fresh": 255,
+      "cache_read": 16256,
+      "cache_write": 0,
+      "out": 151
+    },
+    "price_ref": "bifrost-datasheet-2026-11-14-openai@sha256:064520900aeda8c3b5dec578dbbbe095f8fd366c388837fb21667ba2acf02000",
+    "usd": {
+      "state": "observed",
+      "v": 0.0020899499999999997,
+      "evidence": "gateway"
+    },
+    "bifrost_usd": 0.00208995,
+    "fault_inject": false
+  }
+]

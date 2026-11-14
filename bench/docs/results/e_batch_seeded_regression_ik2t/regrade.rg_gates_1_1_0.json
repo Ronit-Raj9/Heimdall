@@ -1,0 +1,16 @@
+{
+  "regrade_id": "rg_gates_1_1_0",
+  "exp_id": "e_batch_seeded_regression_ik2t",
+  "suite_version": "1.0.0",
+  "grader_version": "",
+  "gate_versions": {
+    "egress": "1.0.0",
+    "g1_protected_paths": "1.1.0",
+    "g2_test_infra": "1.0.0",
+    "g4_regrade": "1.1.0",
+    "g6_null_agents": "1.0.0"
+  },
+  "suite_lock_hash": "8d94484578c0c921229d0dcca73e8a0eae2ad90f10932680482ca36f1bbd764b",
+  "note": "G1/G4 1.1.0: harmless edits to protected tests (re-indented or wrapped asserts, superset imports) no longer veto; see commit 687738ead.",
+  "created_at": "2026-11-14T02:05:46.024640737Z"
+}

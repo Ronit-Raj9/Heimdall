@@ -1,0 +1,91 @@
+diff --git a/gatekeeper/dedupe.py b/gatekeeper/dedupe.py
+index 4251e3f..460c9bc 100644
+--- a/gatekeeper/dedupe.py
++++ b/gatekeeper/dedupe.py
+@@ -39,26 +39,31 @@ def find_duplicates(records: Sequence[Mapping[str, Any]], keys: Iterable[str]) -
+     ordered by their smallest index. Records that match nothing are left out.
+     """
+     fields = _check_keys(keys)
+-    normalised = [[normalise_key(record.get(field)) for field in fields] for record in records]
+     count = len(records)
++    if count < 2:
++        return []
++
++    normalised = [[normalise_key(record.get(field)) for field in fields] for record in records]
++    parent = list(range(count))
++    rank = [0] * count
++    seen: list[dict[str, int]] = [dict() for _ in fields]
++
++    for index, values in enumerate(normalised):
++        for field_index, value in enumerate(values):
++            if not value:
++                continue
++            previous = seen[field_index].get(value)
++            if previous is None:
++                seen[field_index][value] = index
++                continue
++            _union(parent, rank, index, previous)
++
++    groups: dict[int, list[int]] = {}
++    for index in range(count):
++        root = _find(parent, index)
++        groups.setdefault(root, []).append(index)
+ 
+-    # Every record starts in its own group, labelled by its index. Whenever two
+-    # records match, the later group label is folded into the earlier one.
+-    label = list(range(count))
+-    for i in range(count):
+-        for j in range(i + 1, count):
+-            if _matches(normalised[i], normalised[j]) and label[i] != label[j]:
+-                keep, fold = min(label[i], label[j]), max(label[i], label[j])
+-                for k in range(count):
+-                    if label[k] == fold:
+-                        label[k] = keep
+-
+-    found: list[list[int]] = []
+-    for group_label in sorted(set(label)):
+-        members = [k for k in range(count) if label[k] == group_label]
+-        if len(members) > 1:
+-            found.append(members)
+-    return found
++    return [members for members in sorted(groups.values(), key=lambda members: members[0]) if len(members) > 1]
+ 
+ 
+ def drop_duplicates(records: Sequence[Mapping[str, Any]], keys: Iterable[str]) -> list[Mapping[str, Any]]:
+@@ -67,15 +72,30 @@ def drop_duplicates(records: Sequence[Mapping[str, Any]], keys: Iterable[str]) -
+     The first record (lowest index) of each duplicate group is kept. The
+     input is not modified.
+     """
+-    dropped: list[int] = []
+-    for group in find_duplicates(records, keys):
+-        dropped.extend(group[1:])
++    groups = find_duplicates(records, keys)
++    dropped = {index for group in groups for index in group[1:]}
+     return [record for index, record in enumerate(records) if index not in dropped]
+ 
+ 
+-def _matches(a: list[str], b: list[str]) -> bool:
+-    """True if some key field has the same non-empty value in both records."""
+-    return any(x and x == y for x, y in zip(a, b))
++def _find(parent: list[int], index: int) -> int:
++    while parent[index] != index:
++        parent[index] = parent[parent[index]]
++        index = parent[index]
++    return index
++
++
++def _union(parent: list[int], rank: list[int], left: int, right: int) -> None:
++    left_root = _find(parent, left)
++    right_root = _find(parent, right)
++    if left_root == right_root:
++        return
++    if rank[left_root] < rank[right_root]:
++        parent[left_root] = right_root
++    elif rank[left_root] > rank[right_root]:
++        parent[right_root] = left_root
++    else:
++        parent[right_root] = left_root
++        rank[left_root] += 1
+ 
+ 
+ def _check_keys(keys: Iterable[str]) -> list[str]:

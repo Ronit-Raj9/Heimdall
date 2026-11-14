@@ -1,0 +1,154 @@
+[
+  {
+    "request_id": "a46e9058-6705-4698-a409-45558ecba6f8",
+    "attempt": 1,
+    "model": "gpt-5.4-mini-2026-03-17",
+    "tokens": {
+      "fresh": 2371,
+      "cache_read": 5888,
+      "cache_write": 0,
+      "out": 98
+    },
+    "price_ref": "bifrost-datasheet-2026-11-14-openai@sha256:064520900aeda8c3b5dec578dbbbe095f8fd366c388837fb21667ba2acf02000",
+    "usd": {
+      "state": "observed",
+      "v": 0.0026608499999999998,
+      "evidence": "gateway"
+    },
+    "bifrost_usd": 0.00266085,
+    "fault_inject": false
+  },
+  {
+    "request_id": "8623a370-f488-42fc-b73f-120dc553ed7a",
+    "attempt": 1,
+    "model": "gpt-5.4-mini-2026-03-17",
+    "tokens": {
+      "fresh": 2333,
+      "cache_read": 8192,
+      "cache_write": 0,
+      "out": 159
+    },
+    "price_ref": "bifrost-datasheet-2026-11-14-openai@sha256:064520900aeda8c3b5dec578dbbbe095f8fd366c388837fb21667ba2acf02000",
+    "usd": {
+      "state": "observed",
+      "v": 0.00307965,
+      "evidence": "gateway"
+    },
+    "bifrost_usd": 0.0030796499999999997,
+    "fault_inject": false
+  },
+  {
+    "request_id": "4f88d060-f568-4e4a-b36c-96e7ae22a47e",
+    "attempt": 1,
+    "model": "gpt-5.4-mini-2026-03-17",
+    "tokens": {
+      "fresh": 2881,
+      "cache_read": 10368,
+      "cache_write": 0,
+      "out": 51
+    },
+    "price_ref": "bifrost-datasheet-2026-11-14-openai@sha256:064520900aeda8c3b5dec578dbbbe095f8fd366c388837fb21667ba2acf02000",
+    "usd": {
+      "state": "observed",
+      "v": 0.00316785,
+      "evidence": "gateway"
+    },
+    "bifrost_usd": 0.00316785,
+    "fault_inject": false
+  },
+  {
+    "request_id": "9eac42c0-0164-4bcf-a350-04792d1599af",
+    "attempt": 1,
+    "model": "gpt-5.4-mini-2026-03-17",
+    "tokens": {
+      "fresh": 1366,
+      "cache_read": 13184,
+      "cache_write": 0,
+      "out": 493
+    },
+    "price_ref": "bifrost-datasheet-2026-11-14-openai@sha256:064520900aeda8c3b5dec578dbbbe095f8fd366c388837fb21667ba2acf02000",
+    "usd": {
+      "state": "observed",
+      "v": 0.0042318,
+      "evidence": "gateway"
+    },
+    "bifrost_usd": 0.0042318,
+    "fault_inject": false
+  },
+  {
+    "request_id": "0728408c-c344-4979-bf4c-b80d42c6eaac",
+    "attempt": 1,
+    "model": "gpt-5.4-mini-2026-03-17",
+    "tokens": {
+      "fresh": 632,
+      "cache_read": 14464,
+      "cache_write": 0,
+      "out": 226
+    },
+    "price_ref": "bifrost-datasheet-2026-11-14-openai@sha256:064520900aeda8c3b5dec578dbbbe095f8fd366c388837fb21667ba2acf02000",
+    "usd": {
+      "state": "observed",
+      "v": 0.0025758,
+      "evidence": "gateway"
+    },
+    "bifrost_usd": 0.0025758,
+    "fault_inject": false
+  },
+  {
+    "request_id": "ce5114f9-eb0e-4c3c-a5f3-16fb5dcfe67b",
+    "attempt": 1,
+    "model": "gpt-5.4-mini-2026-03-17",
+    "tokens": {
+      "fresh": 398,
+      "cache_read": 14976,
+      "cache_write": 0,
+      "out": 52
+    },
+    "price_ref": "bifrost-datasheet-2026-11-14-openai@sha256:064520900aeda8c3b5dec578dbbbe095f8fd366c388837fb21667ba2acf02000",
+    "usd": {
+      "state": "observed",
+      "v": 0.0016557,
+      "evidence": "gateway"
+    },
+    "bifrost_usd": 0.0016557,
+    "fault_inject": false
+  },
+  {
+    "request_id": "e0ff0bdd-eca5-472c-9d35-f54e4554722d",
+    "attempt": 1,
+    "model": "gpt-5.4-mini-2026-03-17",
+    "tokens": {
+      "fresh": 287,
+      "cache_read": 15232,
+      "cache_write": 0,
+      "out": 92
+    },
+    "price_ref": "bifrost-datasheet-2026-11-14-openai@sha256:064520900aeda8c3b5dec578dbbbe095f8fd366c388837fb21667ba2acf02000",
+    "usd": {
+      "state": "observed",
+      "v": 0.0017716499999999998,
+      "evidence": "gateway"
+    },
+    "bifrost_usd": 0.00177165,
+    "fault_inject": false
+  },
+  {
+    "request_id": "119330d8-ef87-42c7-8830-e6c153efebef",
+    "attempt": 1,
+    "model": "gpt-5.4-mini-2026-03-17",
+    "tokens": {
+      "fresh": 377,
+      "cache_read": 15360,
+      "cache_write": 0,
+      "out": 150
+    },
+    "price_ref": "bifrost-datasheet-2026-11-14-openai@sha256:064520900aeda8c3b5dec578dbbbe095f8fd366c388837fb21667ba2acf02000",
+    "usd": {
+      "state": "observed",
+      "v": 0.00210975,
+      "evidence": "gateway"
+    },
+    "bifrost_usd": 0.00210975,
+    "fault_inject": false
+  }
+]

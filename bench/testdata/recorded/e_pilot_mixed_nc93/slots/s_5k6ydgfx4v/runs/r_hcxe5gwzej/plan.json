@@ -1,0 +1,32 @@
+{
+  "image": "bench/agent-codex:1",
+  "argv": [
+    "codex",
+    "exec",
+    "--json",
+    "--skip-git-repo-check",
+    "--dangerously-bypass-approvals-and-sandbox",
+    "--ephemeral",
+    "--strict-config",
+    "--model",
+    "gpt-5.4-mini",
+    "--",
+    "# Fix the window boundary in the rate limiter\n\n`gatekeeper.SlidingWindowLimiter` gets the edge of its window wrong. A request made exactly `window` seconds ago is still counted, so clients are refused, and told to wait longer, at the moment they should be admitted again.\n\nMake the limiter follow this rule everywhere it decides or reports anything:\n\n1. Time is whatever the limiter's clock returns from `now()`, in seconds. At time `now`, a recorded request made at time `t` is inside the window when `now - window \u003c t \u003c= now`. A request made exactly `window` seconds ago is outside the window and no longer counts; a request made less than `window` seconds ago still counts.\n2. `allow(key)` admits the request, records it and returns `True` when fewer than `limit` requests for `key` are inside the window. Otherwise it returns `False` and records nothing: a refused request never counts against later requests.\n3. `remaining(key)` returns `limit` minus the number of requests for `key` inside the window at the current time. Calling it does not change anything.\n4. `retry_after(key)` returns `0.0` when a request for `key` would be admitted now. Otherwise it returns the exact number of seconds until the oldest request that still counts leaves the window, so that moving the clock forward by exactly that amount makes the next request for `key` admissible.\n5. `python -m gatekeeper simulate --limit N --window S EVENT...` follows the same rule. Each event is written `KEY@SECONDS`, events are given in time order, and the command prints one line per event: the event exactly as given, then `allow` or `deny`, then `remaining=R`, where R is `remaining(key)` right after the decision, separated by single spaces.\n\nDifferent keys never affect each other. `gatekeeper.ManualClock` gives you a clock you can move by hand (`set(t)`, `advance(seconds)`). The existing tests must keep passing.\n"
+  ],
+  "env": {
+    "BIFROST_API_KEY": "[redacted]",
+    "CODEX_HOME": "/home/agent/.codex",
+    "OPENAI_API_KEY": "[redacted]"
+  },
+  "files": {
+    "/home/agent/.codex/config.toml": "model = \"gpt-5.4-mini\"\nmodel_provider = \"bifrost\"\nallow_login_shell = false\ncheck_for_update_on_startup = false\nweb_search = \"disabled\"\n\n[analytics]\nenabled = false\n\n[feedback]\nenabled = false\n\n[history]\npersistence = \"none\"\n\n[otel]\nexporter = \"none\"\nlog_user_prompt = false\n\n[features]\nmemories = false\n\n[shell_environment_policy]\nexclude = [\"BIFROST_API_KEY\"]\n\n[model_providers.bifrost]\nname = \"Bifrost\"\nbase_url = \"http://bifrost:8080/openai/v1\"\nwire_api = \"responses\"\nenv_key = \"BIFROST_API_KEY\"\nrequires_openai_auth = false\nsupports_websockets = false\n\n[model_providers.bifrost.http_headers]\nx-bf-session-id = \"r_hcxe5gwzej\"\nx-bf-session-affinity = \"off\"\n",
+    "/tmp/bench/instruction.md": "# Fix the window boundary in the rate limiter\n\n`gatekeeper.SlidingWindowLimiter` gets the edge of its window wrong. A request made exactly `window` seconds ago is still counted, so clients are refused, and told to wait longer, at the moment they should be admitted again.\n\nMake the limiter follow this rule everywhere it decides or reports anything:\n\n1. Time is whatever the limiter's clock returns from `now()`, in seconds. At time `now`, a recorded request made at time `t` is inside the window when `now - window \u003c t \u003c= now`. A request made exactly `window` seconds ago is outside the window and no longer counts; a request made less than `window` seconds ago still counts.\n2. `allow(key)` admits the request, records it and returns `True` when fewer than `limit` requests for `key` are inside the window. Otherwise it returns `False` and records nothing: a refused request never counts against later requests.\n3. `remaining(key)` returns `limit` minus the number of requests for `key` inside the window at the current time. Calling it does not change anything.\n4. `retry_after(key)` returns `0.0` when a request for `key` would be admitted now. Otherwise it returns the exact number of seconds until the oldest request that still counts leaves the window, so that moving the clock forward by exactly that amount makes the next request for `key` admissible.\n5. `python -m gatekeeper simulate --limit N --window S EVENT...` follows the same rule. Each event is written `KEY@SECONDS`, events are given in time order, and the command prints one line per event: the event exactly as given, then `allow` or `deny`, then `remaining=R`, where R is `remaining(key)` right after the decision, separated by single spaces.\n\nDifferent keys never affect each other. `gatekeeper.ManualClock` gives you a clock you can move by hand (`set(t)`, `advance(seconds)`). The existing tests must keep passing.\n"
+  },
+  "workdir": "/workspace",
+  "wall_s": 900,
+  "cpus": 2,
+  "mem_gb": 4,
+  "pids": 512,
+  "network": "bench-evalnet",
+  "user": "1000"
+}

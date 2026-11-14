@@ -1,0 +1,935 @@
+{
+  "exp_id": "e_batch_seeded_regression_ik2t",
+  "created_at": "2026-11-14T01:26:10.214906117Z",
+  "experiment": {
+    "id": "e_batch_seeded_regression_ik2t",
+    "name": "batch-seeded-regression",
+    "suite": "coding-core@1.0.0",
+    "base": "agents/codex.yaml",
+    "arms": {
+      "A": {
+        "label": "codex baseline",
+        "set": {
+          "model": "gpt-5.4-mini"
+        }
+      },
+      "B": {
+        "label": "codex told to skip tests",
+        "set": {
+          "model": "gpt-5.4-mini",
+          "notes.user_file": "experiments/fixtures/skip-tests.md"
+        }
+      }
+    },
+    "primary": {
+      "condition": "clean",
+      "metric": "verified_success"
+    },
+    "guards": [
+      {
+        "rule": "no_new_integrity_violation"
+      }
+    ],
+    "conditions": [
+      {
+        "id": "clean",
+        "tasks": "all",
+        "trials": 3
+      }
+    ],
+    "budget": {
+      "total_usd": 1.5
+    },
+    "verdict": {
+      "policy": "paired_signflip",
+      "alpha": 0.05,
+      "assumed_sd": 0.3
+    },
+    "seed": 20261116,
+    "concurrency": 4,
+    "manifest_mode": "agent_exposure",
+    "policy": "policies/default.yaml"
+  },
+  "suite_id": "coding-core",
+  "suite_version": "1.0.0",
+  "suite_lock_hash": "520215ace7b304de232f16ed8833df3f25ca01cd72e310dd495d38a399e99d56",
+  "arms": {
+    "A": {
+      "label": "codex baseline",
+      "config": {
+        "id": "codex",
+        "adapter": "command",
+        "image": "bench/agent-codex:1",
+        "build": {
+          "dockerfile": "agents/images/codex/Dockerfile",
+          "tag": "bench/agent-codex:1"
+        },
+        "argv": [
+          "codex",
+          "exec",
+          "--json",
+          "--skip-git-repo-check",
+          "--dangerously-bypass-approvals-and-sandbox",
+          "--ephemeral",
+          "--strict-config",
+          "--model",
+          "{{model}}",
+          "--",
+          "{{instruction}}"
+        ],
+        "env": {
+          "BIFROST_API_KEY": "{{run.key}}",
+          "CODEX_HOME": "/home/agent/.codex",
+          "OPENAI_API_KEY": ""
+        },
+        "files": {
+          "/home/agent/.codex/config.toml": "model = \"{{model}}\"\nmodel_provider = \"bifrost\"\nallow_login_shell = false\ncheck_for_update_on_startup = false\nweb_search = \"disabled\"\n\n[analytics]\nenabled = false\n\n[feedback]\nenabled = false\n\n[history]\npersistence = \"none\"\n\n[otel]\nexporter = \"none\"\nlog_user_prompt = false\n\n[features]\nmemories = false\n\n[shell_environment_policy]\nexclude = [\"BIFROST_API_KEY\"]\n\n[model_providers.bifrost]\nname = \"Bifrost\"\nbase_url = \"{{gateway.url}}/openai/v1\"\nwire_api = \"responses\"\nenv_key = \"BIFROST_API_KEY\"\nrequires_openai_auth = false\nsupports_websockets = false\n\n[model_providers.bifrost.http_headers]\nx-bf-session-id = \"{{run.session}}\"\nx-bf-session-affinity = \"off\"\n"
+        },
+        "model": "gpt-5.4-mini",
+        "notes": {
+          "project_file": "AGENTS.md",
+          "user_path": "/home/agent/.codex/AGENTS.md"
+        },
+        "parser": "codex",
+        "budgets": {
+          "wall_s": 900,
+          "cpus": 2,
+          "mem_gb": 4
+        },
+        "gateway": {
+          "provider": "openai",
+          "max_retries": 0
+        }
+      },
+      "config_hash": "dfd6f713e64a15496a8d3756bfc8c6acc77026980a7f8b0a7beb573d94d58b39",
+      "files": {
+        "clean": {
+          "/home/agent/.codex/config.toml": "ca39788de3a13b176789f1f2d2711896fa3b40c9b2e319549f485d6fdfab49c3",
+          "t01:/workspace/AGENTS.md": "97d7a53fd87465daae3423d0158a445676b95a2c222384f06c0052eaab074728",
+          "t02:/workspace/AGENTS.md": "7ab9ad54e251a8fe4879f66ad8f81e0cdaf499fc0a466abaf3c3016d499281dc",
+          "t03:/workspace/AGENTS.md": "7ab9ad54e251a8fe4879f66ad8f81e0cdaf499fc0a466abaf3c3016d499281dc",
+          "t04:/workspace/AGENTS.md": "7ab9ad54e251a8fe4879f66ad8f81e0cdaf499fc0a466abaf3c3016d499281dc",
+          "t05:/workspace/AGENTS.md": "a441aab50e623905286db6129bc5261e27ac7f2a77685a9a3abd2fa57751ebc9",
+          "t06:/workspace/AGENTS.md": "a441aab50e623905286db6129bc5261e27ac7f2a77685a9a3abd2fa57751ebc9",
+          "t07:/workspace/AGENTS.md": "0e50b4881018ca8345e2d4d9b9787b7b27c1d44d872ff7776dd4b4ee839d31b0",
+          "t08:/workspace/AGENTS.md": "a441aab50e623905286db6129bc5261e27ac7f2a77685a9a3abd2fa57751ebc9"
+        }
+      }
+    },
+    "B": {
+      "label": "codex told to skip tests",
+      "config": {
+        "id": "codex",
+        "adapter": "command",
+        "image": "bench/agent-codex:1",
+        "build": {
+          "dockerfile": "agents/images/codex/Dockerfile",
+          "tag": "bench/agent-codex:1"
+        },
+        "argv": [
+          "codex",
+          "exec",
+          "--json",
+          "--skip-git-repo-check",
+          "--dangerously-bypass-approvals-and-sandbox",
+          "--ephemeral",
+          "--strict-config",
+          "--model",
+          "{{model}}",
+          "--",
+          "{{instruction}}"
+        ],
+        "env": {
+          "BIFROST_API_KEY": "{{run.key}}",
+          "CODEX_HOME": "/home/agent/.codex",
+          "OPENAI_API_KEY": ""
+        },
+        "files": {
+          "/home/agent/.codex/config.toml": "model = \"{{model}}\"\nmodel_provider = \"bifrost\"\nallow_login_shell = false\ncheck_for_update_on_startup = false\nweb_search = \"disabled\"\n\n[analytics]\nenabled = false\n\n[feedback]\nenabled = false\n\n[history]\npersistence = \"none\"\n\n[otel]\nexporter = \"none\"\nlog_user_prompt = false\n\n[features]\nmemories = false\n\n[shell_environment_policy]\nexclude = [\"BIFROST_API_KEY\"]\n\n[model_providers.bifrost]\nname = \"Bifrost\"\nbase_url = \"{{gateway.url}}/openai/v1\"\nwire_api = \"responses\"\nenv_key = \"BIFROST_API_KEY\"\nrequires_openai_auth = false\nsupports_websockets = false\n\n[model_providers.bifrost.http_headers]\nx-bf-session-id = \"{{run.session}}\"\nx-bf-session-affinity = \"off\"\n"
+        },
+        "model": "gpt-5.4-mini",
+        "notes": {
+          "project_file": "AGENTS.md",
+          "user_file": "experiments/fixtures/skip-tests.md",
+          "user_path": "/home/agent/.codex/AGENTS.md"
+        },
+        "parser": "codex",
+        "budgets": {
+          "wall_s": 900,
+          "cpus": 2,
+          "mem_gb": 4
+        },
+        "gateway": {
+          "provider": "openai",
+          "max_retries": 0
+        }
+      },
+      "config_hash": "b4410b6803e338f46751f28a7984caff958561bd60220c2157054c930a03e7fe",
+      "files": {
+        "clean": {
+          "/home/agent/.codex/AGENTS.md": "322912ca75ea139a479cc9e45005db4b85a236da54915da9b32d1c64e613c20e",
+          "/home/agent/.codex/config.toml": "ca39788de3a13b176789f1f2d2711896fa3b40c9b2e319549f485d6fdfab49c3",
+          "t01:/workspace/AGENTS.md": "97d7a53fd87465daae3423d0158a445676b95a2c222384f06c0052eaab074728",
+          "t02:/workspace/AGENTS.md": "7ab9ad54e251a8fe4879f66ad8f81e0cdaf499fc0a466abaf3c3016d499281dc",
+          "t03:/workspace/AGENTS.md": "7ab9ad54e251a8fe4879f66ad8f81e0cdaf499fc0a466abaf3c3016d499281dc",
+          "t04:/workspace/AGENTS.md": "7ab9ad54e251a8fe4879f66ad8f81e0cdaf499fc0a466abaf3c3016d499281dc",
+          "t05:/workspace/AGENTS.md": "a441aab50e623905286db6129bc5261e27ac7f2a77685a9a3abd2fa57751ebc9",
+          "t06:/workspace/AGENTS.md": "a441aab50e623905286db6129bc5261e27ac7f2a77685a9a3abd2fa57751ebc9",
+          "t07:/workspace/AGENTS.md": "0e50b4881018ca8345e2d4d9b9787b7b27c1d44d872ff7776dd4b4ee839d31b0",
+          "t08:/workspace/AGENTS.md": "a441aab50e623905286db6129bc5261e27ac7f2a77685a9a3abd2fa57751ebc9"
+        }
+      }
+    }
+  },
+  "parts": {
+    "adapter/command": "1.0.0",
+    "adapter/scripted": "1.0.0",
+    "environment/docker_workspace": "1.0.0",
+    "evidence/agent_stream": "1.0.0",
+    "evidence/cost": "1.0.0",
+    "evidence/gateway": "1.0.0",
+    "evidence/proxy_ledger": "1.0.0",
+    "evidence/shim_log": "1.0.0",
+    "gate/egress": "1.0.0",
+    "gate/g10_destroyed_user_work": "1.0.0",
+    "gate/g11_protected_path": "1.0.0",
+    "gate/g12_injection_followed": "1.0.0",
+    "gate/g1_protected_paths": "1.0.0",
+    "gate/g2_test_infra": "1.0.0",
+    "gate/g4_regrade": "1.0.0",
+    "gate/g6_null_agents": "1.0.0",
+    "gate/g8_false_completion": "1.0.0",
+    "gate/model_fidelity": "1.0.0",
+    "gateway/bifrost": "1.0.0",
+    "grader/hidden_tests": "1.0.0",
+    "loader/local": "1.0.0",
+    "metric/claim_precision": "1.0.0",
+    "metric/cost_usd": "1.0.0",
+    "metric/false_completion": "1.0.0",
+    "metric/pattern_ignored_error": "1.0.0",
+    "metric/pattern_loop": "1.0.0",
+    "metric/pattern_unverified_finish": "1.0.0",
+    "metric/retry_amplification": "1.0.0",
+    "metric/safe_success": "1.0.0",
+    "metric/secret_exposed": "1.0.0",
+    "metric/secret_in_context": "1.0.0",
+    "metric/steps": "1.0.0",
+    "metric/tokens": "1.0.0",
+    "metric/tool_calls": "1.0.0",
+    "metric/verified_success": "1.0.0",
+    "metric/wall_time_s": "1.0.0",
+    "parser/claudecode": "1.0.0",
+    "parser/codex": "1.0.0",
+    "parser/opencode": "1.0.0",
+    "probe_layer/fixture": "1.0.0",
+    "probe_layer/gateway": "1.0.0",
+    "probe_layer/tool_shim": "1.0.0",
+    "reporter/json": "1.0.0",
+    "reporter/markdown": "1.0.0",
+    "store/fs": "1.0.0",
+    "verdict_policy/paired_signflip": "1.0.0"
+  },
+  "gateway": {
+    "name": "bifrost",
+    "version": "v2.5.1",
+    "config_sha256": "fb9e8e0766e7c2daa458289b2ea4d6e18d7d097b6a8942ee7207bef054cfc0a2",
+    "plugins": [
+      "compat",
+      "governance",
+      "logging",
+      "model-catalog-resolver",
+      "prompts",
+      "routing",
+      "telemetry"
+    ],
+    "settings": {
+      "allow_direct_keys": "false",
+      "anthropic.base_url": "http://faultproxy:9100",
+      "anthropic.key_slots": "4",
+      "anthropic.max_retries": "0",
+      "anthropic.mode": "proxied",
+      "anthropic.store_raw_request_response": "true",
+      "base_url": "http://faultproxy:9100",
+      "content_logging": "true",
+      "egress_probe": "blocked",
+      "enable_logging": "true",
+      "enforce_auth_on_inference": "true",
+      "eval_network": "bench-evalnet",
+      "key_slots": "4",
+      "max_retries": "0",
+      "mcp_disable_auto_tool_inject": "true",
+      "mode": "proxied",
+      "openai.base_url": "http://faultproxy:9100",
+      "openai.key_slots": "4",
+      "openai.max_retries": "0",
+      "openai.mode": "proxied",
+      "openai.store_raw_request_response": "true",
+      "store_raw_request_response": "true"
+    },
+    "checked_at": "2026-11-14T01:26:10.216853101Z"
+  },
+  "arm_order": {
+    "t01": [
+      "A",
+      "B"
+    ],
+    "t02": [
+      "B",
+      "A"
+    ],
+    "t03": [
+      "B",
+      "A"
+    ],
+    "t04": [
+      "A",
+      "B"
+    ],
+    "t05": [
+      "A",
+      "B"
+    ],
+    "t06": [
+      "B",
+      "A"
+    ],
+    "t07": [
+      "A",
+      "B"
+    ],
+    "t08": [
+      "A",
+      "B"
+    ]
+  },
+  "slots": [
+    {
+      "slot_id": "s_cx92gbcgmg",
+      "pair_id": "p_f5au6dvp7x",
+      "exp_id": "e_batch_seeded_regression_ik2t",
+      "suite": "coding-core",
+      "task": "t01",
+      "task_version": "1.0.0",
+      "arm": "A",
+      "condition": "clean",
+      "trial": 1,
+      "order_index": 0,
+      "counted": true
+    },
+    {
+      "slot_id": "s_du5cx4f075",
+      "pair_id": "p_f5au6dvp7x",
+      "exp_id": "e_batch_seeded_regression_ik2t",
+      "suite": "coding-core",
+      "task": "t01",
+      "task_version": "1.0.0",
+      "arm": "B",
+      "condition": "clean",
+      "trial": 1,
+      "order_index": 1,
+      "counted": true
+    },
+    {
+      "slot_id": "s_kwk3wdda8r",
+      "pair_id": "p_2qz5wo2rbw",
+      "exp_id": "e_batch_seeded_regression_ik2t",
+      "suite": "coding-core",
+      "task": "t02",
+      "task_version": "1.0.0",
+      "arm": "B",
+      "condition": "clean",
+      "trial": 1,
+      "order_index": 2,
+      "counted": true
+    },
+    {
+      "slot_id": "s_1owz85nllw",
+      "pair_id": "p_2qz5wo2rbw",
+      "exp_id": "e_batch_seeded_regression_ik2t",
+      "suite": "coding-core",
+      "task": "t02",
+      "task_version": "1.0.0",
+      "arm": "A",
+      "condition": "clean",
+      "trial": 1,
+      "order_index": 3,
+      "counted": true
+    },
+    {
+      "slot_id": "s_fvgo3g9p6r",
+      "pair_id": "p_p3bwdujce1",
+      "exp_id": "e_batch_seeded_regression_ik2t",
+      "suite": "coding-core",
+      "task": "t03",
+      "task_version": "1.0.0",
+      "arm": "B",
+      "condition": "clean",
+      "trial": 1,
+      "order_index": 4,
+      "counted": true
+    },
+    {
+      "slot_id": "s_o04kfg5280",
+      "pair_id": "p_p3bwdujce1",
+      "exp_id": "e_batch_seeded_regression_ik2t",
+      "suite": "coding-core",
+      "task": "t03",
+      "task_version": "1.0.0",
+      "arm": "A",
+      "condition": "clean",
+      "trial": 1,
+      "order_index": 5,
+      "counted": true
+    },
+    {
+      "slot_id": "s_ofnce394kt",
+      "pair_id": "p_t8o97fchoy",
+      "exp_id": "e_batch_seeded_regression_ik2t",
+      "suite": "coding-core",
+      "task": "t04",
+      "task_version": "1.0.0",
+      "arm": "A",
+      "condition": "clean",
+      "trial": 1,
+      "order_index": 6,
+      "counted": true
+    },
+    {
+      "slot_id": "s_ov4g809j8g",
+      "pair_id": "p_t8o97fchoy",
+      "exp_id": "e_batch_seeded_regression_ik2t",
+      "suite": "coding-core",
+      "task": "t04",
+      "task_version": "1.0.0",
+      "arm": "B",
+      "condition": "clean",
+      "trial": 1,
+      "order_index": 7,
+      "counted": true
+    },
+    {
+      "slot_id": "s_q75tw6d00x",
+      "pair_id": "p_6sn6s3ymo8",
+      "exp_id": "e_batch_seeded_regression_ik2t",
+      "suite": "coding-core",
+      "task": "t05",
+      "task_version": "1.0.0",
+      "arm": "A",
+      "condition": "clean",
+      "trial": 1,
+      "order_index": 8,
+      "counted": true
+    },
+    {
+      "slot_id": "s_0ne3cholfk",
+      "pair_id": "p_6sn6s3ymo8",
+      "exp_id": "e_batch_seeded_regression_ik2t",
+      "suite": "coding-core",
+      "task": "t05",
+      "task_version": "1.0.0",
+      "arm": "B",
+      "condition": "clean",
+      "trial": 1,
+      "order_index": 9,
+      "counted": true
+    },
+    {
+      "slot_id": "s_1bld0jxivn",
+      "pair_id": "p_7znn4mda5w",
+      "exp_id": "e_batch_seeded_regression_ik2t",
+      "suite": "coding-core",
+      "task": "t06",
+      "task_version": "1.0.0",
+      "arm": "B",
+      "condition": "clean",
+      "trial": 1,
+      "order_index": 10,
+      "counted": true
+    },
+    {
+      "slot_id": "s_shykw8q852",
+      "pair_id": "p_7znn4mda5w",
+      "exp_id": "e_batch_seeded_regression_ik2t",
+      "suite": "coding-core",
+      "task": "t06",
+      "task_version": "1.0.0",
+      "arm": "A",
+      "condition": "clean",
+      "trial": 1,
+      "order_index": 11,
+      "counted": true
+    },
+    {
+      "slot_id": "s_ykzeus5ljp",
+      "pair_id": "p_vdg51f0ix2",
+      "exp_id": "e_batch_seeded_regression_ik2t",
+      "suite": "coding-core",
+      "task": "t07",
+      "task_version": "1.0.0",
+      "arm": "A",
+      "condition": "clean",
+      "trial": 1,
+      "order_index": 12,
+      "counted": true
+    },
+    {
+      "slot_id": "s_ezsy20rs11",
+      "pair_id": "p_vdg51f0ix2",
+      "exp_id": "e_batch_seeded_regression_ik2t",
+      "suite": "coding-core",
+      "task": "t07",
+      "task_version": "1.0.0",
+      "arm": "B",
+      "condition": "clean",
+      "trial": 1,
+      "order_index": 13,
+      "counted": true
+    },
+    {
+      "slot_id": "s_n5apewrnlv",
+      "pair_id": "p_v3ivbvzwim",
+      "exp_id": "e_batch_seeded_regression_ik2t",
+      "suite": "coding-core",
+      "task": "t08",
+      "task_version": "1.0.0",
+      "arm": "A",
+      "condition": "clean",
+      "trial": 1,
+      "order_index": 14,
+      "counted": true
+    },
+    {
+      "slot_id": "s_8ozdjnum0x",
+      "pair_id": "p_v3ivbvzwim",
+      "exp_id": "e_batch_seeded_regression_ik2t",
+      "suite": "coding-core",
+      "task": "t08",
+      "task_version": "1.0.0",
+      "arm": "B",
+      "condition": "clean",
+      "trial": 1,
+      "order_index": 15,
+      "counted": true
+    },
+    {
+      "slot_id": "s_ybupnnvp2u",
+      "pair_id": "p_j853xkibfd",
+      "exp_id": "e_batch_seeded_regression_ik2t",
+      "suite": "coding-core",
+      "task": "t01",
+      "task_version": "1.0.0",
+      "arm": "A",
+      "condition": "clean",
+      "trial": 2,
+      "order_index": 16,
+      "counted": true
+    },
+    {
+      "slot_id": "s_4gy5cyzovd",
+      "pair_id": "p_j853xkibfd",
+      "exp_id": "e_batch_seeded_regression_ik2t",
+      "suite": "coding-core",
+      "task": "t01",
+      "task_version": "1.0.0",
+      "arm": "B",
+      "condition": "clean",
+      "trial": 2,
+      "order_index": 17,
+      "counted": true
+    },
+    {
+      "slot_id": "s_1if2ejrv0o",
+      "pair_id": "p_s32ga35w4c",
+      "exp_id": "e_batch_seeded_regression_ik2t",
+      "suite": "coding-core",
+      "task": "t02",
+      "task_version": "1.0.0",
+      "arm": "B",
+      "condition": "clean",
+      "trial": 2,
+      "order_index": 18,
+      "counted": true
+    },
+    {
+      "slot_id": "s_ynlpdkchex",
+      "pair_id": "p_s32ga35w4c",
+      "exp_id": "e_batch_seeded_regression_ik2t",
+      "suite": "coding-core",
+      "task": "t02",
+      "task_version": "1.0.0",
+      "arm": "A",
+      "condition": "clean",
+      "trial": 2,
+      "order_index": 19,
+      "counted": true
+    },
+    {
+      "slot_id": "s_71nrfrupvc",
+      "pair_id": "p_s46k007gc4",
+      "exp_id": "e_batch_seeded_regression_ik2t",
+      "suite": "coding-core",
+      "task": "t03",
+      "task_version": "1.0.0",
+      "arm": "B",
+      "condition": "clean",
+      "trial": 2,
+      "order_index": 20,
+      "counted": true
+    },
+    {
+      "slot_id": "s_5l3r5bxedr",
+      "pair_id": "p_s46k007gc4",
+      "exp_id": "e_batch_seeded_regression_ik2t",
+      "suite": "coding-core",
+      "task": "t03",
+      "task_version": "1.0.0",
+      "arm": "A",
+      "condition": "clean",
+      "trial": 2,
+      "order_index": 21,
+      "counted": true
+    },
+    {
+      "slot_id": "s_07rou91189",
+      "pair_id": "p_vkige3mtsi",
+      "exp_id": "e_batch_seeded_regression_ik2t",
+      "suite": "coding-core",
+      "task": "t04",
+      "task_version": "1.0.0",
+      "arm": "A",
+      "condition": "clean",
+      "trial": 2,
+      "order_index": 22,
+      "counted": true
+    },
+    {
+      "slot_id": "s_2bjp79zgj3",
+      "pair_id": "p_vkige3mtsi",
+      "exp_id": "e_batch_seeded_regression_ik2t",
+      "suite": "coding-core",
+      "task": "t04",
+      "task_version": "1.0.0",
+      "arm": "B",
+      "condition": "clean",
+      "trial": 2,
+      "order_index": 23,
+      "counted": true
+    },
+    {
+      "slot_id": "s_2dv436ljou",
+      "pair_id": "p_ad2st0yt12",
+      "exp_id": "e_batch_seeded_regression_ik2t",
+      "suite": "coding-core",
+      "task": "t05",
+      "task_version": "1.0.0",
+      "arm": "A",
+      "condition": "clean",
+      "trial": 2,
+      "order_index": 24,
+      "counted": true
+    },
+    {
+      "slot_id": "s_vqzl26j6gw",
+      "pair_id": "p_ad2st0yt12",
+      "exp_id": "e_batch_seeded_regression_ik2t",
+      "suite": "coding-core",
+      "task": "t05",
+      "task_version": "1.0.0",
+      "arm": "B",
+      "condition": "clean",
+      "trial": 2,
+      "order_index": 25,
+      "counted": true
+    },
+    {
+      "slot_id": "s_88uzr1f6fw",
+      "pair_id": "p_dd3a1rsxk1",
+      "exp_id": "e_batch_seeded_regression_ik2t",
+      "suite": "coding-core",
+      "task": "t06",
+      "task_version": "1.0.0",
+      "arm": "B",
+      "condition": "clean",
+      "trial": 2,
+      "order_index": 26,
+      "counted": true
+    },
+    {
+      "slot_id": "s_b9vp0ngf83",
+      "pair_id": "p_dd3a1rsxk1",
+      "exp_id": "e_batch_seeded_regression_ik2t",
+      "suite": "coding-core",
+      "task": "t06",
+      "task_version": "1.0.0",
+      "arm": "A",
+      "condition": "clean",
+      "trial": 2,
+      "order_index": 27,
+      "counted": true
+    },
+    {
+      "slot_id": "s_qd15zu2itt",
+      "pair_id": "p_oyov4vw8gn",
+      "exp_id": "e_batch_seeded_regression_ik2t",
+      "suite": "coding-core",
+      "task": "t07",
+      "task_version": "1.0.0",
+      "arm": "A",
+      "condition": "clean",
+      "trial": 2,
+      "order_index": 28,
+      "counted": true
+    },
+    {
+      "slot_id": "s_56ayth8iea",
+      "pair_id": "p_oyov4vw8gn",
+      "exp_id": "e_batch_seeded_regression_ik2t",
+      "suite": "coding-core",
+      "task": "t07",
+      "task_version": "1.0.0",
+      "arm": "B",
+      "condition": "clean",
+      "trial": 2,
+      "order_index": 29,
+      "counted": true
+    },
+    {
+      "slot_id": "s_8m8o28eg23",
+      "pair_id": "p_9cw4re1u1y",
+      "exp_id": "e_batch_seeded_regression_ik2t",
+      "suite": "coding-core",
+      "task": "t08",
+      "task_version": "1.0.0",
+      "arm": "A",
+      "condition": "clean",
+      "trial": 2,
+      "order_index": 30,
+      "counted": true
+    },
+    {
+      "slot_id": "s_4f834ei7ue",
+      "pair_id": "p_9cw4re1u1y",
+      "exp_id": "e_batch_seeded_regression_ik2t",
+      "suite": "coding-core",
+      "task": "t08",
+      "task_version": "1.0.0",
+      "arm": "B",
+      "condition": "clean",
+      "trial": 2,
+      "order_index": 31,
+      "counted": true
+    },
+    {
+      "slot_id": "s_glc0dnx709",
+      "pair_id": "p_437t0meb2d",
+      "exp_id": "e_batch_seeded_regression_ik2t",
+      "suite": "coding-core",
+      "task": "t01",
+      "task_version": "1.0.0",
+      "arm": "A",
+      "condition": "clean",
+      "trial": 3,
+      "order_index": 32,
+      "counted": true
+    },
+    {
+      "slot_id": "s_bhbakpknuv",
+      "pair_id": "p_437t0meb2d",
+      "exp_id": "e_batch_seeded_regression_ik2t",
+      "suite": "coding-core",
+      "task": "t01",
+      "task_version": "1.0.0",
+      "arm": "B",
+      "condition": "clean",
+      "trial": 3,
+      "order_index": 33,
+      "counted": true
+    },
+    {
+      "slot_id": "s_i2w25squb0",
+      "pair_id": "p_q0atdevcco",
+      "exp_id": "e_batch_seeded_regression_ik2t",
+      "suite": "coding-core",
+      "task": "t02",
+      "task_version": "1.0.0",
+      "arm": "B",
+      "condition": "clean",
+      "trial": 3,
+      "order_index": 34,
+      "counted": true
+    },
+    {
+      "slot_id": "s_c8h6uu6us7",
+      "pair_id": "p_q0atdevcco",
+      "exp_id": "e_batch_seeded_regression_ik2t",
+      "suite": "coding-core",
+      "task": "t02",
+      "task_version": "1.0.0",
+      "arm": "A",
+      "condition": "clean",
+      "trial": 3,
+      "order_index": 35,
+      "counted": true
+    },
+    {
+      "slot_id": "s_9tlpyd2vti",
+      "pair_id": "p_m4nitnbhq0",
+      "exp_id": "e_batch_seeded_regression_ik2t",
+      "suite": "coding-core",
+      "task": "t03",
+      "task_version": "1.0.0",
+      "arm": "B",
+      "condition": "clean",
+      "trial": 3,
+      "order_index": 36,
+      "counted": true
+    },
+    {
+      "slot_id": "s_j3u9ya3nby",
+      "pair_id": "p_m4nitnbhq0",
+      "exp_id": "e_batch_seeded_regression_ik2t",
+      "suite": "coding-core",
+      "task": "t03",
+      "task_version": "1.0.0",
+      "arm": "A",
+      "condition": "clean",
+      "trial": 3,
+      "order_index": 37,
+      "counted": true
+    },
+    {
+      "slot_id": "s_y352451rjx",
+      "pair_id": "p_qumwiqtgkq",
+      "exp_id": "e_batch_seeded_regression_ik2t",
+      "suite": "coding-core",
+      "task": "t04",
+      "task_version": "1.0.0",
+      "arm": "A",
+      "condition": "clean",
+      "trial": 3,
+      "order_index": 38,
+      "counted": true
+    },
+    {
+      "slot_id": "s_64rvqzjcn4",
+      "pair_id": "p_qumwiqtgkq",
+      "exp_id": "e_batch_seeded_regression_ik2t",
+      "suite": "coding-core",
+      "task": "t04",
+      "task_version": "1.0.0",
+      "arm": "B",
+      "condition": "clean",
+      "trial": 3,
+      "order_index": 39,
+      "counted": true
+    },
+    {
+      "slot_id": "s_f3wkd1uf8c",
+      "pair_id": "p_g2rc59q5h7",
+      "exp_id": "e_batch_seeded_regression_ik2t",
+      "suite": "coding-core",
+      "task": "t05",
+      "task_version": "1.0.0",
+      "arm": "A",
+      "condition": "clean",
+      "trial": 3,
+      "order_index": 40,
+      "counted": true
+    },
+    {
+      "slot_id": "s_165jcus406",
+      "pair_id": "p_g2rc59q5h7",
+      "exp_id": "e_batch_seeded_regression_ik2t",
+      "suite": "coding-core",
+      "task": "t05",
+      "task_version": "1.0.0",
+      "arm": "B",
+      "condition": "clean",
+      "trial": 3,
+      "order_index": 41,
+      "counted": true
+    },
+    {
+      "slot_id": "s_npel04s9oy",
+      "pair_id": "p_603dfr92x0",
+      "exp_id": "e_batch_seeded_regression_ik2t",
+      "suite": "coding-core",
+      "task": "t06",
+      "task_version": "1.0.0",
+      "arm": "B",
+      "condition": "clean",
+      "trial": 3,
+      "order_index": 42,
+      "counted": true
+    },
+    {
+      "slot_id": "s_j5yc6dqggu",
+      "pair_id": "p_603dfr92x0",
+      "exp_id": "e_batch_seeded_regression_ik2t",
+      "suite": "coding-core",
+      "task": "t06",
+      "task_version": "1.0.0",
+      "arm": "A",
+      "condition": "clean",
+      "trial": 3,
+      "order_index": 43,
+      "counted": true
+    },
+    {
+      "slot_id": "s_gmfkl3usdd",
+      "pair_id": "p_kyw73u2100",
+      "exp_id": "e_batch_seeded_regression_ik2t",
+      "suite": "coding-core",
+      "task": "t07",
+      "task_version": "1.0.0",
+      "arm": "A",
+      "condition": "clean",
+      "trial": 3,
+      "order_index": 44,
+      "counted": true
+    },
+    {
+      "slot_id": "s_4lngpnele0",
+      "pair_id": "p_kyw73u2100",
+      "exp_id": "e_batch_seeded_regression_ik2t",
+      "suite": "coding-core",
+      "task": "t07",
+      "task_version": "1.0.0",
+      "arm": "B",
+      "condition": "clean",
+      "trial": 3,
+      "order_index": 45,
+      "counted": true
+    },
+    {
+      "slot_id": "s_qumfdgh3ln",
+      "pair_id": "p_bpg1266hpc",
+      "exp_id": "e_batch_seeded_regression_ik2t",
+      "suite": "coding-core",
+      "task": "t08",
+      "task_version": "1.0.0",
+      "arm": "A",
+      "condition": "clean",
+      "trial": 3,
+      "order_index": 46,
+      "counted": true
+    },
+    {
+      "slot_id": "s_jyl2ypgx7t",
+      "pair_id": "p_bpg1266hpc",
+      "exp_id": "e_batch_seeded_regression_ik2t",
+      "suite": "coding-core",
+      "task": "t08",
+      "task_version": "1.0.0",
+      "arm": "B",
+      "condition": "clean",
+      "trial": 3,
+      "order_index": 47,
+      "counted": true
+    }
+  ],
+  "randomization_unit": "task",
+  "bench_version": "0.1.0",
+  "policy_hash": "e47dcf5ea03a71755dce421754ef82d7833c517aa1d2c79fa1be6d9479a27531",
+  "hash": "cf5d211c3c36de0380f80ffbec65abe3dfbf5ebdcd264efb3069531c6d998f54"
+}

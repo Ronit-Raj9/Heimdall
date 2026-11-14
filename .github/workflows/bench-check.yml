@@ -45,22 +45,21 @@ jobs:
         with:
           persist-credentials: false
 
-      # The bundle is the SYNTHETIC smoke run (toy agent, scripted model, real
-      # Bifrost v2.5.1), so the report is labelled synthetic. Switch data-mode
-      # to recorded and set exp-id when a real recorded run joins the bundle.
-      # policy left empty uses bench/policies/default.yaml when
-      # `bifrost-bench check` has -policy; "none" turns it off. On this
-      # 8-run bundle the default policy blocks (false-completion-ceiling sees
-      # 2 observed runs, min_n is 10) and the job exits 5; with "none" it
-      # gates on the verdict only.
+      # The bundle holds a REAL run: e_pilot_mixed_nc93, Codex CLI against the
+      # custom-python agent on gpt-5.4-mini through Bifrost v2.5.1, clean and
+      # under all three PS2 failure families (see
+      # bench/testdata/recorded/README.md). The synthetic smoke run
+      # e_smoke_sdoj stays in the bundle as a no-key example. policy left
+      # empty uses bench/policies/default.yaml: small samples warn, real
+      # failures block (exit 5); "none" gates on the verdict only.
       - name: Bifrost Bench gate
         id: gate
         uses: ./bench/ci
         with:
           mode: recorded
           bundle: testdata/recorded
-          exp-id: e_smoke_sdoj
-          data-mode: synthetic
+          exp-id: e_pilot_mixed_nc93
+          data-mode: recorded
           policy: ""
           fail-on: regressed,invalid
 

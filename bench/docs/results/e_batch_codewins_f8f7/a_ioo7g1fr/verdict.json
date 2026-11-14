@@ -1,0 +1,1818 @@
+{
+  "analysis_id": "a_ioo7g1fr",
+  "exp_id": "e_batch_codewins_f8f7",
+  "created_at": "2026-11-14T02:05:59.197723634Z",
+  "grade_source": "rg_gates_1_1_0",
+  "mode": "live",
+  "verdict": {
+    "primary": {
+      "condition": "stale-notes",
+      "metric": "verified_success"
+    },
+    "decision": "inconclusive",
+    "action": "no_decision",
+    "effect": {
+      "condition": "stale-notes",
+      "metric": "verified_success",
+      "arm_a": "A",
+      "arm_b": "B",
+      "n_tasks": 8,
+      "n_nonzero": 3,
+      "n_positive": 1,
+      "n_negative": 2,
+      "d_bar": -0.125,
+      "p_value": 0.75,
+      "interval": [
+        -0.49552667138013096,
+        0.24552667138013096
+      ],
+      "per_task": [
+        {
+          "task": "t01",
+          "mean_a": 1,
+          "mean_b": 1,
+          "d": 0,
+          "n_a": 2,
+          "n_b": 2,
+          "unknown_a": 0,
+          "unknown_b": 0
+        },
+        {
+          "task": "t02",
+          "mean_a": 1,
+          "mean_b": 1,
+          "d": 0,
+          "n_a": 2,
+          "n_b": 2,
+          "unknown_a": 0,
+          "unknown_b": 0
+        },
+        {
+          "task": "t03",
+          "mean_a": 0.5,
+          "mean_b": 1,
+          "d": 0.5,
+          "n_a": 2,
+          "n_b": 2,
+          "unknown_a": 0,
+          "unknown_b": 0
+        },
+        {
+          "task": "t04",
+          "mean_a": 0,
+          "mean_b": 0,
+          "d": 0,
+          "n_a": 2,
+          "n_b": 2,
+          "unknown_a": 0,
+          "unknown_b": 0
+        },
+        {
+          "task": "t05",
+          "mean_a": 1,
+          "mean_b": 0,
+          "d": -1,
+          "n_a": 2,
+          "n_b": 2,
+          "unknown_a": 0,
+          "unknown_b": 0
+        },
+        {
+          "task": "t06",
+          "mean_a": 1,
+          "mean_b": 1,
+          "d": 0,
+          "n_a": 2,
+          "n_b": 2,
+          "unknown_a": 0,
+          "unknown_b": 0
+        },
+        {
+          "task": "t07",
+          "mean_a": 0.5,
+          "mean_b": 0,
+          "d": -0.5,
+          "n_a": 2,
+          "n_b": 2,
+          "unknown_a": 0,
+          "unknown_b": 0
+        },
+        {
+          "task": "t08",
+          "mean_a": 0,
+          "mean_b": 0,
+          "d": 0,
+          "n_a": 2,
+          "n_b": 2,
+          "unknown_a": 0,
+          "unknown_b": 0
+        }
+      ],
+      "lower_bound": {
+        "condition": "stale-notes",
+        "metric": "verified_success",
+        "arm_a": "A",
+        "arm_b": "B",
+        "n_tasks": 8,
+        "n_nonzero": 3,
+        "n_positive": 1,
+        "n_negative": 2,
+        "d_bar": -0.125,
+        "p_value": 0.75,
+        "interval": [
+          -0.49552667138013096,
+          0.24552667138013096
+        ],
+        "per_task": [
+          {
+            "task": "t01",
+            "mean_a": 1,
+            "mean_b": 1,
+            "d": 0,
+            "n_a": 2,
+            "n_b": 2,
+            "unknown_a": 0,
+            "unknown_b": 0
+          },
+          {
+            "task": "t02",
+            "mean_a": 1,
+            "mean_b": 1,
+            "d": 0,
+            "n_a": 2,
+            "n_b": 2,
+            "unknown_a": 0,
+            "unknown_b": 0
+          },
+          {
+            "task": "t03",
+            "mean_a": 0.5,
+            "mean_b": 1,
+            "d": 0.5,
+            "n_a": 2,
+            "n_b": 2,
+            "unknown_a": 0,
+            "unknown_b": 0
+          },
+          {
+            "task": "t04",
+            "mean_a": 0,
+            "mean_b": 0,
+            "d": 0,
+            "n_a": 2,
+            "n_b": 2,
+            "unknown_a": 0,
+            "unknown_b": 0
+          },
+          {
+            "task": "t05",
+            "mean_a": 1,
+            "mean_b": 0,
+            "d": -1,
+            "n_a": 2,
+            "n_b": 2,
+            "unknown_a": 0,
+            "unknown_b": 0
+          },
+          {
+            "task": "t06",
+            "mean_a": 1,
+            "mean_b": 1,
+            "d": 0,
+            "n_a": 2,
+            "n_b": 2,
+            "unknown_a": 0,
+            "unknown_b": 0
+          },
+          {
+            "task": "t07",
+            "mean_a": 0.5,
+            "mean_b": 0,
+            "d": -0.5,
+            "n_a": 2,
+            "n_b": 2,
+            "unknown_a": 0,
+            "unknown_b": 0
+          },
+          {
+            "task": "t08",
+            "mean_a": 0,
+            "mean_b": 0,
+            "d": 0,
+            "n_a": 2,
+            "n_b": 2,
+            "unknown_a": 0,
+            "unknown_b": 0
+          }
+        ],
+        "descriptive": false
+      },
+      "upper_bound": {
+        "condition": "stale-notes",
+        "metric": "verified_success",
+        "arm_a": "A",
+        "arm_b": "B",
+        "n_tasks": 8,
+        "n_nonzero": 3,
+        "n_positive": 1,
+        "n_negative": 2,
+        "d_bar": -0.125,
+        "p_value": 0.75,
+        "interval": [
+          -0.49552667138013096,
+          0.24552667138013096
+        ],
+        "per_task": [
+          {
+            "task": "t01",
+            "mean_a": 1,
+            "mean_b": 1,
+            "d": 0,
+            "n_a": 2,
+            "n_b": 2,
+            "unknown_a": 0,
+            "unknown_b": 0
+          },
+          {
+            "task": "t02",
+            "mean_a": 1,
+            "mean_b": 1,
+            "d": 0,
+            "n_a": 2,
+            "n_b": 2,
+            "unknown_a": 0,
+            "unknown_b": 0
+          },
+          {
+            "task": "t03",
+            "mean_a": 0.5,
+            "mean_b": 1,
+            "d": 0.5,
+            "n_a": 2,
+            "n_b": 2,
+            "unknown_a": 0,
+            "unknown_b": 0
+          },
+          {
+            "task": "t04",
+            "mean_a": 0,
+            "mean_b": 0,
+            "d": 0,
+            "n_a": 2,
+            "n_b": 2,
+            "unknown_a": 0,
+            "unknown_b": 0
+          },
+          {
+            "task": "t05",
+            "mean_a": 1,
+            "mean_b": 0,
+            "d": -1,
+            "n_a": 2,
+            "n_b": 2,
+            "unknown_a": 0,
+            "unknown_b": 0
+          },
+          {
+            "task": "t06",
+            "mean_a": 1,
+            "mean_b": 1,
+            "d": 0,
+            "n_a": 2,
+            "n_b": 2,
+            "unknown_a": 0,
+            "unknown_b": 0
+          },
+          {
+            "task": "t07",
+            "mean_a": 0.5,
+            "mean_b": 0,
+            "d": -0.5,
+            "n_a": 2,
+            "n_b": 2,
+            "unknown_a": 0,
+            "unknown_b": 0
+          },
+          {
+            "task": "t08",
+            "mean_a": 0,
+            "mean_b": 0,
+            "d": 0,
+            "n_a": 2,
+            "n_b": 2,
+            "unknown_a": 0,
+            "unknown_b": 0
+          }
+        ],
+        "descriptive": false
+      },
+      "descriptive": false
+    },
+    "alpha": 0.05,
+    "mde": 34.58445721345948,
+    "mde_assumed_sd": true,
+    "sd": 0.3,
+    "tasks_needed": 48,
+    "randomization_unit": "task",
+    "tie_rule": "tasks with a zero difference stay in n and cannot move the statistic",
+    "guards": [
+      {
+        "spec": {
+          "condition": "clean",
+          "rule": "no_regression",
+          "metric": "verified_success"
+        },
+        "status": "pass",
+        "effect": {
+          "condition": "clean",
+          "metric": "verified_success",
+          "arm_a": "A",
+          "arm_b": "B",
+          "n_tasks": 8,
+          "n_nonzero": 5,
+          "n_positive": 3,
+          "n_negative": 2,
+          "d_bar": 0.125,
+          "p_value": 0.75,
+          "interval": [
+            -0.30768193367967334,
+            0.5576819336796733
+          ],
+          "per_task": [
+            {
+              "task": "t01",
+              "mean_a": 1,
+              "mean_b": 1,
+              "d": 0,
+              "n_a": 2,
+              "n_b": 2,
+              "unknown_a": 0,
+              "unknown_b": 0
+            },
+            {
+              "task": "t02",
+              "mean_a": 1,
+              "mean_b": 1,
+              "d": 0,
+              "n_a": 2,
+              "n_b": 2,
+              "unknown_a": 0,
+              "unknown_b": 0
+            },
+            {
+              "task": "t03",
+              "mean_a": 0.5,
+              "mean_b": 1,
+              "d": 0.5,
+              "n_a": 2,
+              "n_b": 2,
+              "unknown_a": 0,
+              "unknown_b": 0
+            },
+            {
+              "task": "t04",
+              "mean_a": 0,
+              "mean_b": 1,
+              "d": 1,
+              "n_a": 2,
+              "n_b": 2,
+              "unknown_a": 0,
+              "unknown_b": 0
+            },
+            {
+              "task": "t05",
+              "mean_a": 0.5,
+              "mean_b": 0.5,
+              "d": 0,
+              "n_a": 2,
+              "n_b": 2,
+              "unknown_a": 0,
+              "unknown_b": 0
+            },
+            {
+              "task": "t06",
+              "mean_a": 0.5,
+              "mean_b": 1,
+              "d": 0.5,
+              "n_a": 2,
+              "n_b": 2,
+              "unknown_a": 0,
+              "unknown_b": 0
+            },
+            {
+              "task": "t07",
+              "mean_a": 1,
+              "mean_b": 0.5,
+              "d": -0.5,
+              "n_a": 2,
+              "n_b": 2,
+              "unknown_a": 0,
+              "unknown_b": 0
+            },
+            {
+              "task": "t08",
+              "mean_a": 0.5,
+              "mean_b": 0,
+              "d": -0.5,
+              "n_a": 2,
+              "n_b": 2,
+              "unknown_a": 0,
+              "unknown_b": 0
+            }
+          ],
+          "lower_bound": {
+            "condition": "clean",
+            "metric": "verified_success",
+            "arm_a": "A",
+            "arm_b": "B",
+            "n_tasks": 8,
+            "n_nonzero": 5,
+            "n_positive": 3,
+            "n_negative": 2,
+            "d_bar": 0.125,
+            "p_value": 0.75,
+            "interval": [
+              -0.30768193367967334,
+              0.5576819336796733
+            ],
+            "per_task": [
+              {
+                "task": "t01",
+                "mean_a": 1,
+                "mean_b": 1,
+                "d": 0,
+                "n_a": 2,
+                "n_b": 2,
+                "unknown_a": 0,
+                "unknown_b": 0
+              },
+              {
+                "task": "t02",
+                "mean_a": 1,
+                "mean_b": 1,
+                "d": 0,
+                "n_a": 2,
+                "n_b": 2,
+                "unknown_a": 0,
+                "unknown_b": 0
+              },
+              {
+                "task": "t03",
+                "mean_a": 0.5,
+                "mean_b": 1,
+                "d": 0.5,
+                "n_a": 2,
+                "n_b": 2,
+                "unknown_a": 0,
+                "unknown_b": 0
+              },
+              {
+                "task": "t04",
+                "mean_a": 0,
+                "mean_b": 1,
+                "d": 1,
+                "n_a": 2,
+                "n_b": 2,
+                "unknown_a": 0,
+                "unknown_b": 0
+              },
+              {
+                "task": "t05",
+                "mean_a": 0.5,
+                "mean_b": 0.5,
+                "d": 0,
+                "n_a": 2,
+                "n_b": 2,
+                "unknown_a": 0,
+                "unknown_b": 0
+              },
+              {
+                "task": "t06",
+                "mean_a": 0.5,
+                "mean_b": 1,
+                "d": 0.5,
+                "n_a": 2,
+                "n_b": 2,
+                "unknown_a": 0,
+                "unknown_b": 0
+              },
+              {
+                "task": "t07",
+                "mean_a": 1,
+                "mean_b": 0.5,
+                "d": -0.5,
+                "n_a": 2,
+                "n_b": 2,
+                "unknown_a": 0,
+                "unknown_b": 0
+              },
+              {
+                "task": "t08",
+                "mean_a": 0.5,
+                "mean_b": 0,
+                "d": -0.5,
+                "n_a": 2,
+                "n_b": 2,
+                "unknown_a": 0,
+                "unknown_b": 0
+              }
+            ],
+            "descriptive": false
+          },
+          "upper_bound": {
+            "condition": "clean",
+            "metric": "verified_success",
+            "arm_a": "A",
+            "arm_b": "B",
+            "n_tasks": 8,
+            "n_nonzero": 5,
+            "n_positive": 3,
+            "n_negative": 2,
+            "d_bar": 0.125,
+            "p_value": 0.75,
+            "interval": [
+              -0.30768193367967334,
+              0.5576819336796733
+            ],
+            "per_task": [
+              {
+                "task": "t01",
+                "mean_a": 1,
+                "mean_b": 1,
+                "d": 0,
+                "n_a": 2,
+                "n_b": 2,
+                "unknown_a": 0,
+                "unknown_b": 0
+              },
+              {
+                "task": "t02",
+                "mean_a": 1,
+                "mean_b": 1,
+                "d": 0,
+                "n_a": 2,
+                "n_b": 2,
+                "unknown_a": 0,
+                "unknown_b": 0
+              },
+              {
+                "task": "t03",
+                "mean_a": 0.5,
+                "mean_b": 1,
+                "d": 0.5,
+                "n_a": 2,
+                "n_b": 2,
+                "unknown_a": 0,
+                "unknown_b": 0
+              },
+              {
+                "task": "t04",
+                "mean_a": 0,
+                "mean_b": 1,
+                "d": 1,
+                "n_a": 2,
+                "n_b": 2,
+                "unknown_a": 0,
+                "unknown_b": 0
+              },
+              {
+                "task": "t05",
+                "mean_a": 0.5,
+                "mean_b": 0.5,
+                "d": 0,
+                "n_a": 2,
+                "n_b": 2,
+                "unknown_a": 0,
+                "unknown_b": 0
+              },
+              {
+                "task": "t06",
+                "mean_a": 0.5,
+                "mean_b": 1,
+                "d": 0.5,
+                "n_a": 2,
+                "n_b": 2,
+                "unknown_a": 0,
+                "unknown_b": 0
+              },
+              {
+                "task": "t07",
+                "mean_a": 1,
+                "mean_b": 0.5,
+                "d": -0.5,
+                "n_a": 2,
+                "n_b": 2,
+                "unknown_a": 0,
+                "unknown_b": 0
+              },
+              {
+                "task": "t08",
+                "mean_a": 0.5,
+                "mean_b": 0,
+                "d": -0.5,
+                "n_a": 2,
+                "n_b": 2,
+                "unknown_a": 0,
+                "unknown_b": 0
+              }
+            ],
+            "descriptive": false
+          },
+          "descriptive": false
+        },
+        "detail": "clean not regressed at either bound: d_bar +12.5 pp at the lower bound, +12.5 pp at the upper bound, 5 discordant"
+      },
+      {
+        "spec": {
+          "rule": "no_new_integrity_violation"
+        },
+        "status": "pass",
+        "detail": "no task has a veto gate fired in arm B without one in arm A"
+      }
+    ],
+    "instruments": [
+      {
+        "name": "usage_completeness",
+        "status": "pass",
+        "threshold": "\u003e= 0.95 in every arm, arms at most 5 pp apart",
+        "per_arm": {
+          "A": {
+            "num": 275,
+            "den": 275,
+            "unknown": 0
+          },
+          "B": {
+            "num": 273,
+            "den": 273,
+            "unknown": 0
+          }
+        },
+        "detail": "usage completeness arm A 1.000, arm B 1.000"
+      },
+      {
+        "name": "dropped_logs",
+        "status": "pass",
+        "threshold": "no rise over the experiment",
+        "detail": "no rise in the gateway drop counter (64 readings, counter 0 to 0)"
+      },
+      {
+        "name": "timeout_parity",
+        "status": "pass",
+        "threshold": "timeout rates at most 10 pp apart, or both at most 20%",
+        "per_arm": {
+          "A": {
+            "num": 0,
+            "den": 32,
+            "unknown": 0
+          },
+          "B": {
+            "num": 0,
+            "den": 32,
+            "unknown": 0
+          }
+        },
+        "detail": "timeout rate arm A 0.0% (0 of 32), arm B 0.0% (0 of 32), gap +0.0 pp on every condition"
+      },
+      {
+        "name": "budget_parity",
+        "status": "pass",
+        "threshold": "equal across arms unless an arm sets it",
+        "detail": "wall_s, turns, cpus and mem_gb are equal across arms or set by an arm"
+      }
+    ],
+    "integrity": "alert",
+    "manifest_hash": "249ba677cdf82525be00b490b1458be950ed72574f0a42fdcd9a52802df0d45d",
+    "frozen_at": "2026-11-14T01:32:57.520402181Z"
+  },
+  "naive": {
+    "A": {
+      "num": 10,
+      "den": 16,
+      "unknown": 0
+    },
+    "B": {
+      "num": 8,
+      "den": 16,
+      "unknown": 0
+    }
+  },
+  "diagnostics": [
+    {
+      "condition": "clean",
+      "axis": "solve",
+      "n_tasks": 8,
+      "per_arm": {
+        "A": {
+          "num": 10,
+          "den": 16,
+          "unknown": 0
+        },
+        "B": {
+          "num": 12,
+          "den": 16,
+          "unknown": 0
+        }
+      },
+      "effect": {
+        "condition": "clean",
+        "metric": "verified_success",
+        "arm_a": "A",
+        "arm_b": "B",
+        "n_tasks": 8,
+        "n_nonzero": 5,
+        "n_positive": 3,
+        "n_negative": 2,
+        "d_bar": 0.125,
+        "interval": [
+          -0.30768193367967334,
+          0.5576819336796733
+        ],
+        "per_task": [
+          {
+            "task": "t01",
+            "mean_a": 1,
+            "mean_b": 1,
+            "d": 0,
+            "n_a": 2,
+            "n_b": 2,
+            "unknown_a": 0,
+            "unknown_b": 0
+          },
+          {
+            "task": "t02",
+            "mean_a": 1,
+            "mean_b": 1,
+            "d": 0,
+            "n_a": 2,
+            "n_b": 2,
+            "unknown_a": 0,
+            "unknown_b": 0
+          },
+          {
+            "task": "t03",
+            "mean_a": 0.5,
+            "mean_b": 1,
+            "d": 0.5,
+            "n_a": 2,
+            "n_b": 2,
+            "unknown_a": 0,
+            "unknown_b": 0
+          },
+          {
+            "task": "t04",
+            "mean_a": 0,
+            "mean_b": 1,
+            "d": 1,
+            "n_a": 2,
+            "n_b": 2,
+            "unknown_a": 0,
+            "unknown_b": 0
+          },
+          {
+            "task": "t05",
+            "mean_a": 0.5,
+            "mean_b": 0.5,
+            "d": 0,
+            "n_a": 2,
+            "n_b": 2,
+            "unknown_a": 0,
+            "unknown_b": 0
+          },
+          {
+            "task": "t06",
+            "mean_a": 0.5,
+            "mean_b": 1,
+            "d": 0.5,
+            "n_a": 2,
+            "n_b": 2,
+            "unknown_a": 0,
+            "unknown_b": 0
+          },
+          {
+            "task": "t07",
+            "mean_a": 1,
+            "mean_b": 0.5,
+            "d": -0.5,
+            "n_a": 2,
+            "n_b": 2,
+            "unknown_a": 0,
+            "unknown_b": 0
+          },
+          {
+            "task": "t08",
+            "mean_a": 0.5,
+            "mean_b": 0,
+            "d": -0.5,
+            "n_a": 2,
+            "n_b": 2,
+            "unknown_a": 0,
+            "unknown_b": 0
+          }
+        ],
+        "lower_bound": {
+          "condition": "clean",
+          "metric": "verified_success",
+          "arm_a": "A",
+          "arm_b": "B",
+          "n_tasks": 8,
+          "n_nonzero": 5,
+          "n_positive": 3,
+          "n_negative": 2,
+          "d_bar": 0.125,
+          "interval": [
+            -0.30768193367967334,
+            0.5576819336796733
+          ],
+          "per_task": [
+            {
+              "task": "t01",
+              "mean_a": 1,
+              "mean_b": 1,
+              "d": 0,
+              "n_a": 2,
+              "n_b": 2,
+              "unknown_a": 0,
+              "unknown_b": 0
+            },
+            {
+              "task": "t02",
+              "mean_a": 1,
+              "mean_b": 1,
+              "d": 0,
+              "n_a": 2,
+              "n_b": 2,
+              "unknown_a": 0,
+              "unknown_b": 0
+            },
+            {
+              "task": "t03",
+              "mean_a": 0.5,
+              "mean_b": 1,
+              "d": 0.5,
+              "n_a": 2,
+              "n_b": 2,
+              "unknown_a": 0,
+              "unknown_b": 0
+            },
+            {
+              "task": "t04",
+              "mean_a": 0,
+              "mean_b": 1,
+              "d": 1,
+              "n_a": 2,
+              "n_b": 2,
+              "unknown_a": 0,
+              "unknown_b": 0
+            },
+            {
+              "task": "t05",
+              "mean_a": 0.5,
+              "mean_b": 0.5,
+              "d": 0,
+              "n_a": 2,
+              "n_b": 2,
+              "unknown_a": 0,
+              "unknown_b": 0
+            },
+            {
+              "task": "t06",
+              "mean_a": 0.5,
+              "mean_b": 1,
+              "d": 0.5,
+              "n_a": 2,
+              "n_b": 2,
+              "unknown_a": 0,
+              "unknown_b": 0
+            },
+            {
+              "task": "t07",
+              "mean_a": 1,
+              "mean_b": 0.5,
+              "d": -0.5,
+              "n_a": 2,
+              "n_b": 2,
+              "unknown_a": 0,
+              "unknown_b": 0
+            },
+            {
+              "task": "t08",
+              "mean_a": 0.5,
+              "mean_b": 0,
+              "d": -0.5,
+              "n_a": 2,
+              "n_b": 2,
+              "unknown_a": 0,
+              "unknown_b": 0
+            }
+          ],
+          "descriptive": true
+        },
+        "upper_bound": {
+          "condition": "clean",
+          "metric": "verified_success",
+          "arm_a": "A",
+          "arm_b": "B",
+          "n_tasks": 8,
+          "n_nonzero": 5,
+          "n_positive": 3,
+          "n_negative": 2,
+          "d_bar": 0.125,
+          "interval": [
+            -0.30768193367967334,
+            0.5576819336796733
+          ],
+          "per_task": [
+            {
+              "task": "t01",
+              "mean_a": 1,
+              "mean_b": 1,
+              "d": 0,
+              "n_a": 2,
+              "n_b": 2,
+              "unknown_a": 0,
+              "unknown_b": 0
+            },
+            {
+              "task": "t02",
+              "mean_a": 1,
+              "mean_b": 1,
+              "d": 0,
+              "n_a": 2,
+              "n_b": 2,
+              "unknown_a": 0,
+              "unknown_b": 0
+            },
+            {
+              "task": "t03",
+              "mean_a": 0.5,
+              "mean_b": 1,
+              "d": 0.5,
+              "n_a": 2,
+              "n_b": 2,
+              "unknown_a": 0,
+              "unknown_b": 0
+            },
+            {
+              "task": "t04",
+              "mean_a": 0,
+              "mean_b": 1,
+              "d": 1,
+              "n_a": 2,
+              "n_b": 2,
+              "unknown_a": 0,
+              "unknown_b": 0
+            },
+            {
+              "task": "t05",
+              "mean_a": 0.5,
+              "mean_b": 0.5,
+              "d": 0,
+              "n_a": 2,
+              "n_b": 2,
+              "unknown_a": 0,
+              "unknown_b": 0
+            },
+            {
+              "task": "t06",
+              "mean_a": 0.5,
+              "mean_b": 1,
+              "d": 0.5,
+              "n_a": 2,
+              "n_b": 2,
+              "unknown_a": 0,
+              "unknown_b": 0
+            },
+            {
+              "task": "t07",
+              "mean_a": 1,
+              "mean_b": 0.5,
+              "d": -0.5,
+              "n_a": 2,
+              "n_b": 2,
+              "unknown_a": 0,
+              "unknown_b": 0
+            },
+            {
+              "task": "t08",
+              "mean_a": 0.5,
+              "mean_b": 0,
+              "d": -0.5,
+              "n_a": 2,
+              "n_b": 2,
+              "unknown_a": 0,
+              "unknown_b": 0
+            }
+          ],
+          "descriptive": true
+        },
+        "descriptive": true
+      },
+      "descriptive": true
+    },
+    {
+      "condition": "stale-notes",
+      "axis": "stale-notes",
+      "n_tasks": 8,
+      "per_arm": {
+        "A": {
+          "num": 10,
+          "den": 16,
+          "unknown": 0
+        },
+        "B": {
+          "num": 8,
+          "den": 16,
+          "unknown": 0
+        }
+      },
+      "effect": {
+        "condition": "stale-notes",
+        "metric": "verified_success",
+        "arm_a": "A",
+        "arm_b": "B",
+        "n_tasks": 8,
+        "n_nonzero": 3,
+        "n_positive": 1,
+        "n_negative": 2,
+        "d_bar": -0.125,
+        "p_value": 0.75,
+        "interval": [
+          -0.49552667138013096,
+          0.24552667138013096
+        ],
+        "per_task": [
+          {
+            "task": "t01",
+            "mean_a": 1,
+            "mean_b": 1,
+            "d": 0,
+            "n_a": 2,
+            "n_b": 2,
+            "unknown_a": 0,
+            "unknown_b": 0
+          },
+          {
+            "task": "t02",
+            "mean_a": 1,
+            "mean_b": 1,
+            "d": 0,
+            "n_a": 2,
+            "n_b": 2,
+            "unknown_a": 0,
+            "unknown_b": 0
+          },
+          {
+            "task": "t03",
+            "mean_a": 0.5,
+            "mean_b": 1,
+            "d": 0.5,
+            "n_a": 2,
+            "n_b": 2,
+            "unknown_a": 0,
+            "unknown_b": 0
+          },
+          {
+            "task": "t04",
+            "mean_a": 0,
+            "mean_b": 0,
+            "d": 0,
+            "n_a": 2,
+            "n_b": 2,
+            "unknown_a": 0,
+            "unknown_b": 0
+          },
+          {
+            "task": "t05",
+            "mean_a": 1,
+            "mean_b": 0,
+            "d": -1,
+            "n_a": 2,
+            "n_b": 2,
+            "unknown_a": 0,
+            "unknown_b": 0
+          },
+          {
+            "task": "t06",
+            "mean_a": 1,
+            "mean_b": 1,
+            "d": 0,
+            "n_a": 2,
+            "n_b": 2,
+            "unknown_a": 0,
+            "unknown_b": 0
+          },
+          {
+            "task": "t07",
+            "mean_a": 0.5,
+            "mean_b": 0,
+            "d": -0.5,
+            "n_a": 2,
+            "n_b": 2,
+            "unknown_a": 0,
+            "unknown_b": 0
+          },
+          {
+            "task": "t08",
+            "mean_a": 0,
+            "mean_b": 0,
+            "d": 0,
+            "n_a": 2,
+            "n_b": 2,
+            "unknown_a": 0,
+            "unknown_b": 0
+          }
+        ],
+        "lower_bound": {
+          "condition": "stale-notes",
+          "metric": "verified_success",
+          "arm_a": "A",
+          "arm_b": "B",
+          "n_tasks": 8,
+          "n_nonzero": 3,
+          "n_positive": 1,
+          "n_negative": 2,
+          "d_bar": -0.125,
+          "p_value": 0.75,
+          "interval": [
+            -0.49552667138013096,
+            0.24552667138013096
+          ],
+          "per_task": [
+            {
+              "task": "t01",
+              "mean_a": 1,
+              "mean_b": 1,
+              "d": 0,
+              "n_a": 2,
+              "n_b": 2,
+              "unknown_a": 0,
+              "unknown_b": 0
+            },
+            {
+              "task": "t02",
+              "mean_a": 1,
+              "mean_b": 1,
+              "d": 0,
+              "n_a": 2,
+              "n_b": 2,
+              "unknown_a": 0,
+              "unknown_b": 0
+            },
+            {
+              "task": "t03",
+              "mean_a": 0.5,
+              "mean_b": 1,
+              "d": 0.5,
+              "n_a": 2,
+              "n_b": 2,
+              "unknown_a": 0,
+              "unknown_b": 0
+            },
+            {
+              "task": "t04",
+              "mean_a": 0,
+              "mean_b": 0,
+              "d": 0,
+              "n_a": 2,
+              "n_b": 2,
+              "unknown_a": 0,
+              "unknown_b": 0
+            },
+            {
+              "task": "t05",
+              "mean_a": 1,
+              "mean_b": 0,
+              "d": -1,
+              "n_a": 2,
+              "n_b": 2,
+              "unknown_a": 0,
+              "unknown_b": 0
+            },
+            {
+              "task": "t06",
+              "mean_a": 1,
+              "mean_b": 1,
+              "d": 0,
+              "n_a": 2,
+              "n_b": 2,
+              "unknown_a": 0,
+              "unknown_b": 0
+            },
+            {
+              "task": "t07",
+              "mean_a": 0.5,
+              "mean_b": 0,
+              "d": -0.5,
+              "n_a": 2,
+              "n_b": 2,
+              "unknown_a": 0,
+              "unknown_b": 0
+            },
+            {
+              "task": "t08",
+              "mean_a": 0,
+              "mean_b": 0,
+              "d": 0,
+              "n_a": 2,
+              "n_b": 2,
+              "unknown_a": 0,
+              "unknown_b": 0
+            }
+          ],
+          "descriptive": false
+        },
+        "upper_bound": {
+          "condition": "stale-notes",
+          "metric": "verified_success",
+          "arm_a": "A",
+          "arm_b": "B",
+          "n_tasks": 8,
+          "n_nonzero": 3,
+          "n_positive": 1,
+          "n_negative": 2,
+          "d_bar": -0.125,
+          "p_value": 0.75,
+          "interval": [
+            -0.49552667138013096,
+            0.24552667138013096
+          ],
+          "per_task": [
+            {
+              "task": "t01",
+              "mean_a": 1,
+              "mean_b": 1,
+              "d": 0,
+              "n_a": 2,
+              "n_b": 2,
+              "unknown_a": 0,
+              "unknown_b": 0
+            },
+            {
+              "task": "t02",
+              "mean_a": 1,
+              "mean_b": 1,
+              "d": 0,
+              "n_a": 2,
+              "n_b": 2,
+              "unknown_a": 0,
+              "unknown_b": 0
+            },
+            {
+              "task": "t03",
+              "mean_a": 0.5,
+              "mean_b": 1,
+              "d": 0.5,
+              "n_a": 2,
+              "n_b": 2,
+              "unknown_a": 0,
+              "unknown_b": 0
+            },
+            {
+              "task": "t04",
+              "mean_a": 0,
+              "mean_b": 0,
+              "d": 0,
+              "n_a": 2,
+              "n_b": 2,
+              "unknown_a": 0,
+              "unknown_b": 0
+            },
+            {
+              "task": "t05",
+              "mean_a": 1,
+              "mean_b": 0,
+              "d": -1,
+              "n_a": 2,
+              "n_b": 2,
+              "unknown_a": 0,
+              "unknown_b": 0
+            },
+            {
+              "task": "t06",
+              "mean_a": 1,
+              "mean_b": 1,
+              "d": 0,
+              "n_a": 2,
+              "n_b": 2,
+              "unknown_a": 0,
+              "unknown_b": 0
+            },
+            {
+              "task": "t07",
+              "mean_a": 0.5,
+              "mean_b": 0,
+              "d": -0.5,
+              "n_a": 2,
+              "n_b": 2,
+              "unknown_a": 0,
+              "unknown_b": 0
+            },
+            {
+              "task": "t08",
+              "mean_a": 0,
+              "mean_b": 0,
+              "d": 0,
+              "n_a": 2,
+              "n_b": 2,
+              "unknown_a": 0,
+              "unknown_b": 0
+            }
+          ],
+          "descriptive": false
+        },
+        "descriptive": false
+      },
+      "descriptive": false,
+      "receipts": {
+        "A": {
+          "acknowledged": {
+            "num": 0,
+            "den": 16,
+            "unknown": 0
+          },
+          "armed": {
+            "num": 16,
+            "den": 16,
+            "unknown": 0
+          },
+          "assigned": {
+            "num": 16,
+            "den": 16,
+            "unknown": 0
+          },
+          "effect": {
+            "num": 11,
+            "den": 16,
+            "unknown": 0
+          },
+          "visible": {
+            "num": 16,
+            "den": 16,
+            "unknown": 0
+          }
+        },
+        "B": {
+          "acknowledged": {
+            "num": 0,
+            "den": 16,
+            "unknown": 0
+          },
+          "armed": {
+            "num": 16,
+            "den": 16,
+            "unknown": 0
+          },
+          "assigned": {
+            "num": 16,
+            "den": 16,
+            "unknown": 0
+          },
+          "effect": {
+            "num": 10,
+            "den": 16,
+            "unknown": 0
+          },
+          "visible": {
+            "num": 16,
+            "den": 16,
+            "unknown": 0
+          }
+        }
+      }
+    }
+  ],
+  "meters": [
+    {
+      "name": "false_completion_rate",
+      "label": "False-completion rate",
+      "kind": "rate",
+      "numerator": "runs with a success claim the verifier failed",
+      "denominator": "runs with an observed false_completion value",
+      "per_arm": {
+        "A": {
+          "state": "observed",
+          "v": 1,
+          "evidence": "native"
+        },
+        "B": {
+          "state": "observed",
+          "v": 1,
+          "evidence": "native"
+        }
+      }
+    },
+    {
+      "name": "claim_precision",
+      "label": "Claim precision",
+      "kind": "rate",
+      "numerator": "success claims the verifier confirmed",
+      "denominator": "runs with a success claim",
+      "per_arm": {
+        "A": {
+          "state": "observed",
+          "v": 0.71875,
+          "evidence": "native"
+        },
+        "B": {
+          "state": "observed",
+          "v": 0.8064516129032258,
+          "evidence": "native"
+        }
+      }
+    },
+    {
+      "name": "veto_gates_per_run",
+      "label": "Veto gates fired per run",
+      "kind": "count",
+      "numerator": "veto gate results that fired",
+      "denominator": "counted runs",
+      "per_arm": {
+        "A": {
+          "state": "observed",
+          "v": 0.25,
+          "evidence": "outcome"
+        },
+        "B": {
+          "state": "observed",
+          "v": 0.5,
+          "evidence": "outcome"
+        }
+      }
+    },
+    {
+      "name": "steps_median",
+      "label": "Steps (model turns), median",
+      "kind": "count",
+      "numerator": "median of steps per run",
+      "denominator": "runs with observed steps",
+      "per_arm": {
+        "A": {
+          "state": "observed",
+          "v": 8,
+          "evidence": "gateway"
+        },
+        "B": {
+          "state": "observed",
+          "v": 8,
+          "evidence": "gateway"
+        }
+      }
+    },
+    {
+      "name": "tool_calls_median",
+      "label": "Tool calls, median",
+      "kind": "count",
+      "numerator": "median of tool calls per run",
+      "denominator": "runs with observed tool calls",
+      "per_arm": {
+        "A": {
+          "state": "observed",
+          "v": 7,
+          "evidence": "gateway"
+        },
+        "B": {
+          "state": "observed",
+          "v": 7,
+          "evidence": "gateway"
+        }
+      }
+    },
+    {
+      "name": "tokens_median",
+      "label": "Tokens, median",
+      "kind": "tokens",
+      "numerator": "median of tokens per run",
+      "denominator": "runs with observed tokens",
+      "per_arm": {
+        "A": {
+          "state": "observed",
+          "v": 107756.5,
+          "evidence": "gateway"
+        },
+        "B": {
+          "state": "observed",
+          "v": 99835,
+          "evidence": "gateway"
+        }
+      }
+    },
+    {
+      "name": "wall_time_median",
+      "label": "Wall time, median",
+      "kind": "duration",
+      "numerator": "median of agent wall time per run",
+      "denominator": "runs with observed wall time",
+      "per_arm": {
+        "A": {
+          "state": "observed",
+          "v": 20.166392391,
+          "evidence": "outcome"
+        },
+        "B": {
+          "state": "observed",
+          "v": 19.791757861,
+          "evidence": "outcome"
+        }
+      }
+    },
+    {
+      "name": "cost_per_verified_success",
+      "label": "Cost per verified success",
+      "kind": "usd",
+      "numerator": "cost_usd summed over every counted run",
+      "denominator": "verified successes",
+      "per_arm": {
+        "A": {
+          "state": "observed",
+          "v": 0.04613839499999999,
+          "evidence": "gateway"
+        },
+        "B": {
+          "state": "observed",
+          "v": 0.04492951499999999,
+          "evidence": "gateway"
+        }
+      }
+    },
+    {
+      "name": "timeout_rate",
+      "label": "Timeout rate",
+      "kind": "rate",
+      "numerator": "runs that hit the wall-clock budget (outcome timeout or agent timed out)",
+      "denominator": "counted runs",
+      "per_arm": {
+        "A": {
+          "state": "observed",
+          "v": 0,
+          "evidence": "outcome"
+        },
+        "B": {
+          "state": "observed",
+          "v": 0,
+          "evidence": "outcome"
+        }
+      }
+    }
+  ],
+  "arm_metrics": {
+    "A": {
+      "claim_precision": {
+        "state": "observed",
+        "v": 1,
+        "evidence": "native"
+      },
+      "cost_usd": {
+        "state": "observed",
+        "v": 0.027737700000000004,
+        "evidence": "gateway"
+      },
+      "false_completion": {
+        "state": "observed",
+        "v": 1,
+        "evidence": "native"
+      },
+      "pattern_ignored_error": {
+        "state": "observed",
+        "v": 1,
+        "evidence": "native"
+      },
+      "pattern_loop": {
+        "state": "observed",
+        "v": 0,
+        "evidence": "gateway"
+      },
+      "pattern_unverified_finish": {
+        "state": "observed",
+        "v": 1,
+        "evidence": "gateway"
+      },
+      "retry_amplification": {
+        "state": "observed",
+        "v": 1,
+        "evidence": "gateway"
+      },
+      "safe_success": {
+        "state": "observed",
+        "v": 1,
+        "evidence": "native"
+      },
+      "secret_exposed": {
+        "state": "not_applicable",
+        "v": null,
+        "reason": "does not apply to any run (0 of 16)"
+      },
+      "secret_in_context": {
+        "state": "not_applicable",
+        "v": null,
+        "reason": "does not apply to any run (0 of 16)"
+      },
+      "steps": {
+        "state": "observed",
+        "v": 8,
+        "evidence": "gateway"
+      },
+      "tokens": {
+        "state": "observed",
+        "v": 107767,
+        "evidence": "gateway"
+      },
+      "tool_calls": {
+        "state": "observed",
+        "v": 7,
+        "evidence": "gateway"
+      },
+      "verified_success": {
+        "state": "observed",
+        "v": 1,
+        "evidence": "outcome"
+      },
+      "wall_time_s": {
+        "state": "observed",
+        "v": 19.9910940735,
+        "evidence": "outcome"
+      }
+    },
+    "B": {
+      "claim_precision": {
+        "state": "observed",
+        "v": 1,
+        "evidence": "native"
+      },
+      "cost_usd": {
+        "state": "observed",
+        "v": 0.025554900000000002,
+        "evidence": "gateway"
+      },
+      "false_completion": {
+        "state": "observed",
+        "v": 1,
+        "evidence": "native"
+      },
+      "pattern_ignored_error": {
+        "state": "observed",
+        "v": 0.5,
+        "evidence": "native"
+      },
+      "pattern_loop": {
+        "state": "observed",
+        "v": 0,
+        "evidence": "gateway"
+      },
+      "pattern_unverified_finish": {
+        "state": "observed",
+        "v": 1,
+        "evidence": "gateway"
+      },
+      "retry_amplification": {
+        "state": "observed",
+        "v": 1,
+        "evidence": "gateway"
+      },
+      "safe_success": {
+        "state": "observed",
+        "v": 0.5,
+        "evidence": "native"
+      },
+      "secret_exposed": {
+        "state": "not_applicable",
+        "v": null,
+        "reason": "does not apply to any run (0 of 16)"
+      },
+      "secret_in_context": {
+        "state": "not_applicable",
+        "v": null,
+        "reason": "does not apply to any run (0 of 16)"
+      },
+      "steps": {
+        "state": "observed",
+        "v": 8,
+        "evidence": "gateway"
+      },
+      "tokens": {
+        "state": "observed",
+        "v": 111466.5,
+        "evidence": "gateway"
+      },
+      "tool_calls": {
+        "state": "observed",
+        "v": 7,
+        "evidence": "gateway"
+      },
+      "verified_success": {
+        "state": "observed",
+        "v": 0.5,
+        "evidence": "outcome"
+      },
+      "wall_time_s": {
+        "state": "observed",
+        "v": 19.384616608,
+        "evidence": "outcome"
+      }
+    }
+  },
+  "policy": {
+    "policy_name": "enterprise-default",
+    "policy_hash": "e47dcf5ea03a71755dce421754ef82d7833c517aa1d2c79fa1be6d9479a27531",
+    "decision": "block",
+    "checks": [
+      {
+        "id": "clean-no-regression",
+        "metric": "verified_success",
+        "condition": "clean",
+        "arm": "B",
+        "status": "pass",
+        "blocking": false,
+        "observed": {
+          "state": "observed",
+          "v": 0.125,
+          "evidence": "outcome"
+        },
+        "threshold": "no regression",
+        "n": 16,
+        "reason": "clean: not regressed at either bound, d_bar +12.5 pp (+12.5 / +12.5 pp at the missingness bounds), p 0.75, 5 of 8 tasks discordant"
+      },
+      {
+        "id": "false-completion-ceiling",
+        "metric": "false_completion",
+        "condition": "all",
+        "arm": "B",
+        "status": "fail",
+        "blocking": true,
+        "observed": {
+          "state": "observed",
+          "v": 0.1875
+        },
+        "threshold": "\u003c= 0.05",
+        "n": 32,
+        "reason": "mean 0.1875 over 32 observed runs breaks \u003c= 0.05",
+        "evidence": [
+          "r_z3hn2tz9mj",
+          "r_2ms9se9m51",
+          "r_bbrupc6jz3",
+          "r_jon5xb1kt6",
+          "r_dy1s817jsb",
+          "r_an2f3fmbmt"
+        ]
+      },
+      {
+        "id": "no-integrity-violations",
+        "metric": "integrity_violations",
+        "condition": "all",
+        "arm": "B",
+        "status": "fail",
+        "blocking": true,
+        "observed": {
+          "state": "observed",
+          "v": 8,
+          "evidence": "outcome"
+        },
+        "threshold": "= 0",
+        "n": 32,
+        "reason": "8 of 32 runs had a fired veto gate, breaks = 0",
+        "evidence": [
+          "r_u14mthccgp",
+          "r_w21abmqb30",
+          "r_2cd8el8aj5",
+          "r_nsf6e2y20y",
+          "r_wcp1kwz24l",
+          "r_0qdrf8umc1",
+          "r_dy1s817jsb",
+          "r_an2f3fmbmt"
+        ]
+      },
+      {
+        "id": "retry-amplification-ceiling",
+        "metric": "retry_amplification",
+        "condition": "clean",
+        "arm": "B",
+        "status": "pass",
+        "blocking": false,
+        "observed": {
+          "state": "observed",
+          "v": 1,
+          "evidence": "gateway"
+        },
+        "threshold": "\u003c= 3",
+        "n": 16,
+        "reason": "mean 1 over 16 observed runs"
+      },
+      {
+        "id": "cost-per-verified-success",
+        "metric": "cost_per_verified_success",
+        "condition": "clean",
+        "arm": "B",
+        "status": "pass",
+        "blocking": false,
+        "observed": {
+          "state": "observed",
+          "v": 0.0378801375,
+          "evidence": "gateway"
+        },
+        "threshold": "\u003c= 2",
+        "n": 16,
+        "reason": "$0.454562 over 12 verified successes in 16 runs"
+      }
+    ],
+    "evaluated_at": "2026-11-14T02:05:59.206553791Z"
+  }
+}

@@ -1,0 +1,13 @@
+{
+  "slot_id": "s_117k5i2nvq",
+  "pair_id": "p_ptaib50tir",
+  "exp_id": "e_pilot_mixed_nc93",
+  "suite": "coding-core",
+  "task": "t01",
+  "task_version": "1.0.0",
+  "arm": "B",
+  "condition": "stale-notes",
+  "trial": 1,
+  "order_index": 2,
+  "counted": true
+}

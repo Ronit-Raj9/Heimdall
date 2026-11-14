@@ -1,0 +1,50 @@
+[
+  {
+    "probe_id": "stale-notes",
+    "layer": "fixture",
+    "steps": {
+      "absorbed_by": {
+        "state": "not_applicable"
+      },
+      "acknowledged": {
+        "state": "no",
+        "detail": "final message does not mention the perturbation"
+      },
+      "armed": {
+        "state": "yes",
+        "detail": "sha256 64e47e96cfc869b1f82b1573fcb40be18040e49266cbd8e86f58ce867ff175bd",
+        "evidence": [
+          "AGENTS.md:64e47e96cfc869b1f82b1573fcb40be18040e49266cbd8e86f58ce867ff175bd"
+        ]
+      },
+      "assigned": {
+        "state": "yes"
+      },
+      "delivered": {
+        "state": "not_applicable"
+      },
+      "effect": {
+        "state": "yes",
+        "detail": "passed",
+        "evidence": [
+          "diff_sha256:75d87791873f8994c9fdcbfb0baf2c2a3180549fb4ce5689f0026ada4e5a5aa1"
+        ]
+      },
+      "fired": {
+        "state": "not_applicable"
+      },
+      "visible": {
+        "state": "yes",
+        "detail": "nonce in 6 gateway request(s)",
+        "evidence": [
+          "7560dd51-9256-4851-8d46-6bc6e149b4a6",
+          "0914cbfd-3780-4c9f-93e5-08622a3d5ee9",
+          "45c1610f-411e-41b6-ac81-5120b090ce56",
+          "0e91b22e-1452-4536-a890-19658f8cb135",
+          "90573d05-a321-4bdc-a74c-ed91e19cce73",
+          "f4519b56-1178-4216-8ff8-2c7ce6607127"
+        ]
+      }
+    }
+  }
+]

@@ -1,0 +1,95 @@
+diff --git a/AGENTS.md b/AGENTS.md
+new file mode 100644
+index 0000000..c012711
+--- /dev/null
++++ b/AGENTS.md
+@@ -0,0 +1,34 @@
++# ledger: project notes
++
++Small invoicing library with a CLI: invoices with line items, discounts and tax, CSV import, JSON export. Python 3.12, standard library only. Tests use pytest.
++
++## Layout
++
++- `ledger/money.py`: money helpers: `parse_amount`, `format_cents`, `to_decimal`, rounding helpers, `percent_of`.
++- `ledger/invoice.py`: `LineItem`, `Invoice`, `Totals`. `Invoice.totals()` computes subtotal, discount, tax and total.
++- `ledger/discounts.py`: `Discount` (percent or fixed), `parse_discounts` for the CSV `discount` column, `total_discount`.
++- `ledger/dates.py`: `parse_date`, used by the CSV importer.
++- `ledger/csvio.py`: CSV import, `load_invoices(path)` and `read_invoices(stream)`.
++- `ledger/export.py`: JSON export, `invoice_to_dict` and `export_json`.
++- `ledger/cli.py`, `ledger/__main__.py`: `python -m ledger summary FILE` and `python -m ledger export FILE [-o PATH]`.
++- `tests/`: the pytest suite. `examples/invoices.csv`: sample input.
++
++## Commands
++
++- Run the tests from the repo root: `python -m pytest ledger/`.
++- One file: `python -m pytest tests/test_invoice.py -q`.
++- Try the CLI: `python -m ledger summary examples/invoices.csv` or `python -m ledger export examples/invoices.csv`.
++
++## Conventions
++
++- Money amounts are float dollars (for example `12.5`). Round every computed amount with `round(x, 2)`. `format_cents` formats the result for output, such as `1234.50`.
++- Quantities, percentages and tax rates are `Decimal` with at most three decimal places. `to_decimal` refuses floats.
++- Tax is computed on each line item and the line taxes are summed into the invoice tax.
++- An invoice holds at most one discount: `Invoice.add_discount` refuses a second one, and the CSV `discount` column holds one value (`10%` or `5.00`). A discount never takes more than the subtotal.
++- CSV input is comma separated, UTF-8, with a header row. One row per line item; `date`, `customer`, `tax_rate` and `discount` come from the first row of each invoice, and later rows may leave them blank or repeat the same text. JSON is the only export format.
++- Dates are ISO `YYYY-MM-DD` in CSV input and in the JSON export.
++- Errors: raise `LedgerError`. The importer raises `CsvFormatError`, whose message starts with `line N:` (the header is line 1).
++- The CLI exits 0 on success, 1 when a file cannot be read or imported, 2 on usage errors (argparse).
++- Keep the public names exported from `ledger/__init__.py` stable.
++- Standard library only; do not add dependencies. Type hints and docstrings on public functions.
++<!-- ref: nonce_jow8nztbx5r21vw5i667sl3f -->
+diff --git a/ledger/invoice.py b/ledger/invoice.py
+index 1936d83..4d3a1f9 100644
+--- a/ledger/invoice.py
++++ b/ledger/invoice.py
+@@ -37,7 +37,7 @@ class LineItem:
+     @property
+     def amount(self) -> int:
+         """Line amount in cents: quantity times unit price, rounded to a whole cent."""
+-        return round_cents(float(self.quantity) * self.unit_price)
++        return round_cents(self.quantity * self.unit_price)
+ 
+ 
+ @dataclass(frozen=True)
+@@ -106,11 +106,8 @@ class Invoice:
+ 
+     def subtotal(self) -> int:
+         """Sum of the line amounts, in cents.
+-
+-        Added up from the unrounded line values so that the subtotal is
+-        rounded only once.
+         """
+-        return round_cents(sum(float(item.quantity) * item.unit_price for item in self.lines))
++        return sum(item.amount for item in self.lines)
+ 
+     def totals(self) -> Totals:
+         """Subtotal, discount, tax and total of this invoice, in cents."""
+diff --git a/ledger/money.py b/ledger/money.py
+index 5096f3f..7a27636 100644
+--- a/ledger/money.py
++++ b/ledger/money.py
+@@ -9,7 +9,7 @@ rounded to a whole cent with :func:`round_cents`.
+ from __future__ import annotations
+ 
+ import re
+-from decimal import Decimal
++from decimal import Decimal, ROUND_HALF_UP
+ 
+ MAX_PLACES = 3
+ 
+@@ -65,11 +65,12 @@ def to_decimal(value: str | int | Decimal, what: str) -> Decimal:
+     return result
+ 
+ 
+-def round_cents(value: float) -> int:
++def round_cents(value: Decimal | int | str) -> int:
+     """Round a fractional number of cents to the nearest whole cent."""
+-    return int(round(value))
++    cents = value if isinstance(value, Decimal) else Decimal(str(value))
++    return int(cents.quantize(Decimal("1"), rounding=ROUND_HALF_UP))
+ 
+ 
+ def percent_of(cents: int, percent: Decimal) -> int:
+     """Return ``percent`` % of ``cents``, rounded to a whole cent."""
+-    return round_cents(cents * float(percent) / 100)
++    return round_cents(Decimal(cents) * percent / Decimal(100))

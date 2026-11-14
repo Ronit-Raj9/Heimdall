@@ -1,0 +1,39 @@
+{
+  "run_id": "r_q8eug9pgkv",
+  "slot_id": "s_rjki71qcsz",
+  "pair_id": "p_uwpe1pdp9o",
+  "exp_id": "e_pilot_mixed_nc93",
+  "attempt": 1,
+  "stage": "seal",
+  "manifest_hash": "be32a712e20c78445992042df1aa72b7f26f2fa5f622060d0480799c5df6a160",
+  "suite_lock_hash": "520215ace7b304de232f16ed8833df3f25ca01cd72e310dd495d38a399e99d56",
+  "outcome": "pass",
+  "y": {
+    "state": "observed",
+    "v": 1,
+    "evidence": "outcome"
+  },
+  "claim": {
+    "made": false,
+    "text": "d_tokens\": 7680, \"cached_tokens\": 7680, \"cache_write_tokens\": 0}, \"completion_tokens\": 56, \"completion_tokens_details\": {}, \"total_tokens\": 7950, \"tool_usage\": {\"web_search\": {\"num_requests\": 0}}}, \"tool_calls\": []}\n{\"type\": \"final\", \"turns\": 8}\nFixed the limiter's window boundary so requests exactly `window` seconds old no longer count. Updated `allow`, `remaining`, and `retry_after` to use the correct half-open window rule, and kept the CLI simulate output aligned with the limiter's decisions.",
+    "source": "outcome"
+  },
+  "timing": {
+    "started": "2026-11-14T01:01:15.615104913Z",
+    "agent_started": "2026-11-14T01:01:16.982787967Z",
+    "agent_exited": "2026-11-14T01:01:42.524815791Z",
+    "sealed": "2026-11-14T01:01:47.607814978Z"
+  },
+  "agent": {
+    "config_id": "custom-python",
+    "adapter": "command",
+    "config_hash": "8bbc91c3b83dd6037dc262bc4025b7af5d6b6631989968143039ca7c8719d788",
+    "exit_code": 0,
+    "timed_out": false
+  },
+  "gateway": {
+    "virtual_key_id": "523c6e2c-dcf4-4620-8d75-114827c77cc3",
+    "key_slot": "oa-slot-2",
+    "session_id": "r_q8eug9pgkv"
+  }
+}

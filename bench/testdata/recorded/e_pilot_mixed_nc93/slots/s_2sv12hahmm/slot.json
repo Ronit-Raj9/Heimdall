@@ -1,0 +1,13 @@
+{
+  "slot_id": "s_2sv12hahmm",
+  "pair_id": "p_1dnhfd5sv9",
+  "exp_id": "e_pilot_mixed_nc93",
+  "suite": "coding-core",
+  "task": "t01",
+  "task_version": "1.0.0",
+  "arm": "A",
+  "condition": "model-outage",
+  "trial": 1,
+  "order_index": 5,
+  "counted": true
+}

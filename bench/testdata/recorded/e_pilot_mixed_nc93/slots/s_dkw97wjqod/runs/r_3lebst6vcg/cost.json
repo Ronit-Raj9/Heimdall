@@ -1,0 +1,58 @@
+[
+  {
+    "request_id": "45aba78a-22ac-4a83-8bb6-5ed1a9409e76",
+    "attempt": 1,
+    "model": "gpt-5.4-mini-2026-03-17",
+    "tokens": {
+      "fresh": 1228,
+      "cache_read": 0,
+      "cache_write": 0,
+      "out": 27
+    },
+    "price_ref": "bifrost-datasheet-2026-11-14-openai@sha256:064520900aeda8c3b5dec578dbbbe095f8fd366c388837fb21667ba2acf02000",
+    "usd": {
+      "state": "observed",
+      "v": 0.0010425,
+      "evidence": "gateway"
+    },
+    "bifrost_usd": 0.0010425,
+    "fault_inject": false
+  },
+  {
+    "request_id": "e9655caf-1de8-4033-b169-1da8daecaf89",
+    "attempt": 1,
+    "model": "gpt-5.4-mini-2026-03-17",
+    "tokens": {
+      "fresh": 134,
+      "cache_read": 1152,
+      "cache_write": 0,
+      "out": 79
+    },
+    "price_ref": "bifrost-datasheet-2026-11-14-openai@sha256:064520900aeda8c3b5dec578dbbbe095f8fd366c388837fb21667ba2acf02000",
+    "usd": {
+      "state": "observed",
+      "v": 0.0005424,
+      "evidence": "gateway"
+    },
+    "bifrost_usd": 0.0005424,
+    "fault_inject": false
+  },
+  {
+    "request_id": "9299b831-80f4-455b-b01f-c87f6b2611d7",
+    "attempt": 1,
+    "model": "gpt-5.4-mini",
+    "tokens": {
+      "fresh": 0,
+      "cache_read": 0,
+      "cache_write": 0,
+      "out": 0
+    },
+    "price_ref": "bifrost-datasheet-2026-11-14-openai@sha256:064520900aeda8c3b5dec578dbbbe095f8fd366c388837fb21667ba2acf02000",
+    "usd": {
+      "state": "observed",
+      "v": 0,
+      "evidence": "gateway"
+    },
+    "fault_inject": true
+  }
+]

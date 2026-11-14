@@ -1,0 +1,561 @@
+{
+  "exec": {
+    "exit_code": 1,
+    "timed_out": false,
+    "started": "2026-11-14T01:01:01.027566519Z",
+    "ended": "2026-11-14T01:01:06.010292044Z",
+    "stdout_path": "/home/raj/Storage/CODING/Hackathon/Bifrost/repo/bench/runs/e_pilot_mixed_nc93/slots/s_dkw97wjqod/runs/r_3lebst6vcg/agent.stream.jsonl",
+    "stderr_path": "/home/raj/Storage/CODING/Hackathon/Bifrost/repo/bench/runs/e_pilot_mixed_nc93/slots/s_dkw97wjqod/runs/r_3lebst6vcg/agent.stderr.txt",
+    "truncated": false
+  },
+  "diff": {
+    "path": "/home/raj/Storage/CODING/Hackathon/Bifrost/repo/bench/runs/e_pilot_mixed_nc93/slots/s_dkw97wjqod/runs/r_3lebst6vcg/workspace.diff",
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "files": null,
+    "rejected": [
+      {
+        "path": ".pytest_cache/.gitignore",
+        "reason": "cache"
+      },
+      {
+        "path": ".pytest_cache/CACHEDIR.TAG",
+        "reason": "cache"
+      },
+      {
+        "path": ".pytest_cache/README.md",
+        "reason": "cache"
+      },
+      {
+        "path": ".pytest_cache/v/cache/nodeids",
+        "reason": "cache"
+      },
+      {
+        "path": ".pytest_cache/v/cache/stepwise",
+        "reason": "cache"
+      }
+    ]
+  },
+  "requests": {
+    "requests": [
+      {
+        "id": "45aba78a-22ac-4a83-8bb6-5ed1a9409e76",
+        "timestamp": "2026-11-14T01:01:01.258456Z",
+        "status": "success",
+        "kind": "message",
+        "provider": "openai",
+        "model_requested": "gpt-5.4-mini",
+        "model_served": "gpt-5.4-mini-2026-03-17",
+        "fallback_index": 0,
+        "stream": false,
+        "latency_ms": 1691.738802,
+        "tokens": {
+          "fresh": 1228,
+          "cache_read": 0,
+          "cache_write": 0,
+          "out": 27
+        },
+        "bifrost_usd": 0.0010425,
+        "cache_hit": false,
+        "response_id": "resp_013c9b1245466ac8006af7b2cd662087d2b29f869174ec4486",
+        "attempts": [
+          {
+            "n": 1,
+            "key_name": "oa-slot-1"
+          }
+        ],
+        "tool_calls": [
+          {
+            "id": "call_DWEO6qBGCiaOUrtr99ZVtdVj",
+            "name": "run_shell",
+            "args_hash": "15224e0ae3d65ae5fef8d18dedd85e7c553e52c1e2d66345edb35816d10adb31",
+            "target": "cd /workspace \u0026\u0026 python -m pytest -q"
+          }
+        ]
+      },
+      {
+        "id": "e9655caf-1de8-4033-b169-1da8daecaf89",
+        "timestamp": "2026-11-14T01:01:03.454601Z",
+        "status": "success",
+        "kind": "message",
+        "provider": "openai",
+        "model_requested": "gpt-5.4-mini",
+        "model_served": "gpt-5.4-mini-2026-03-17",
+        "fallback_index": 0,
+        "stream": false,
+        "latency_ms": 2413.307836,
+        "tokens": {
+          "fresh": 134,
+          "cache_read": 1152,
+          "cache_write": 0,
+          "out": 79
+        },
+        "bifrost_usd": 0.0005424,
+        "cache_hit": false,
+        "response_id": "resp_09a5437af6ad80c6006af7b2cf95108190805570a564989d8d",
+        "attempts": [
+          {
+            "n": 1,
+            "key_name": "oa-slot-1"
+          }
+        ],
+        "tool_calls": [
+          {
+            "id": "call_NdDQB5fqLBQeFvrtG0cFRAr4",
+            "name": "run_shell",
+            "args_hash": "1d7072e84c5c4eb7f13e904f41b69cf39250375792d9a6e90c06706cda6e0351",
+            "target": "cd /workspace \u0026\u0026 sed -n '1,220p' ledger/money.py \u0026\u0026 printf '\\n---\\n' \u0026\u0026 sed -n '1,240p' ledger/invoice.py \u0026\u0026 printf '\\n---\\n' \u0026\u0026 sed -n '1,220p' ledger/discounts.py"
+          }
+        ],
+        "tool_result_ids": [
+          "call_DWEO6qBGCiaOUrtr99ZVtdVj"
+        ]
+      },
+      {
+        "id": "9299b831-80f4-455b-b01f-c87f6b2611d7",
+        "timestamp": "2026-11-14T01:01:05.87305Z",
+        "status": "error",
+        "kind": "message",
+        "provider": "openai",
+        "model_requested": "gpt-5.4-mini",
+        "model_served": "gpt-5.4-mini",
+        "fallback_index": 0,
+        "stream": false,
+        "latency_ms": 21.563746,
+        "cache_hit": false,
+        "error_status": 503,
+        "error_message": "The server is overloaded or not ready yet. ref nonce_5l7m7njw691pcbwiqhszkmqf call 3",
+        "attempts": [
+          {
+            "n": 1,
+            "key_name": "oa-slot-1",
+            "status_code": 503,
+            "fail_reason": "server_error",
+            "failure_class": "transient",
+            "retry_after_ms": 2000
+          }
+        ],
+        "tool_result_ids": [
+          "call_DWEO6qBGCiaOUrtr99ZVtdVj",
+          "call_NdDQB5fqLBQeFvrtG0cFRAr4"
+        ]
+      }
+    ],
+    "complete": true,
+    "row_ids": [
+      "45aba78a-22ac-4a83-8bb6-5ed1a9409e76",
+      "e9655caf-1de8-4033-b169-1da8daecaf89",
+      "9299b831-80f4-455b-b01f-c87f6b2611d7"
+    ],
+    "dropped_global": 0
+  },
+  "ledger": [
+    {
+      "slot": "oa-slot-1",
+      "run_id": "r_3lebst6vcg",
+      "call": 1,
+      "kind": "message",
+      "path": "/v1/responses",
+      "stream": false,
+      "action": "pass",
+      "status": 200,
+      "req_sha256": "029a40bd4a7504b25fb6daf9fe37304ad532ebdaaa9be6481ec8157fac7cba1b",
+      "response_id": "resp_013c9b1245466ac8006af7b2cd662087d2b29f869174ec4486",
+      "tokens": {
+        "fresh": 1228,
+        "cache_read": 0,
+        "cache_write": 0,
+        "out": 27
+      },
+      "upstream_ms": 1685.031,
+      "at": "2026-11-14T01:01:01.259142006Z",
+      "prev_hash": "b5b506d4e2b032a0b86a7695eebdd35a81db524d22811fdee92c8d829f1dae26",
+      "hash": "06b153934f6525866865e9836cbc15c79732fccc36d7656725f024d10e75f03c"
+    },
+    {
+      "slot": "oa-slot-1",
+      "run_id": "r_3lebst6vcg",
+      "call": 2,
+      "kind": "message",
+      "path": "/v1/responses",
+      "stream": false,
+      "action": "pass",
+      "status": 200,
+      "req_sha256": "c08755c898de7e6db2c85e0420f1fbdc068ed4ae9b974cdff0c89cb8b7b22d48",
+      "response_id": "resp_09a5437af6ad80c6006af7b2cf95108190805570a564989d8d",
+      "tokens": {
+        "fresh": 134,
+        "cache_read": 1152,
+        "cache_write": 0,
+        "out": 79
+      },
+      "upstream_ms": 2404.94,
+      "at": "2026-11-14T01:01:03.455240345Z",
+      "prev_hash": "06b153934f6525866865e9836cbc15c79732fccc36d7656725f024d10e75f03c",
+      "hash": "762672ac629af15d5d66a78d245b77c8d0ef0321cf5cf786b458f7ab1bc7e78b"
+    },
+    {
+      "slot": "oa-slot-1",
+      "run_id": "r_3lebst6vcg",
+      "call": 3,
+      "kind": "message",
+      "path": "/v1/responses",
+      "stream": false,
+      "action": "inject",
+      "status": 503,
+      "req_sha256": "945389a582cf99667328a10c9459416a321fe6b4830b48ad933a7d4a0dc2ba92",
+      "nonce": "nonce_5l7m7njw691pcbwiqhszkmqf",
+      "upstream_ms": 0,
+      "at": "2026-11-14T01:01:05.873458519Z",
+      "prev_hash": "762672ac629af15d5d66a78d245b77c8d0ef0321cf5cf786b458f7ab1bc7e78b",
+      "hash": "d7322385d3d76a10454f6afd63aa50aa117bf287706f7e84a0f6d17c5b4aedca"
+    }
+  ],
+  "events": [
+    {
+      "event_id": "r_3lebst6vcg:proxy_ledger:1",
+      "run_id": "r_3lebst6vcg",
+      "slot_id": "s_dkw97wjqod",
+      "pair_id": "p_1dnhfd5sv9",
+      "seq": 1,
+      "turn_index": 0,
+      "ts": "2026-11-14T01:01:05.873458519Z",
+      "type": "fault",
+      "source": "proxy_ledger",
+      "evidence": "gateway",
+      "target": "/v1/responses",
+      "is_error": true,
+      "summary": "proxy injected status 503 on message call 3"
+    },
+    {
+      "event_id": "r_3lebst6vcg:gateway:1",
+      "run_id": "r_3lebst6vcg",
+      "slot_id": "s_dkw97wjqod",
+      "pair_id": "p_1dnhfd5sv9",
+      "seq": 1,
+      "turn_index": 1,
+      "ts": "2026-11-14T01:01:01.258456Z",
+      "type": "model_request",
+      "source": "gateway",
+      "evidence": "gateway",
+      "request_id": "45aba78a-22ac-4a83-8bb6-5ed1a9409e76",
+      "provider": "openai",
+      "model_requested": "gpt-5.4-mini",
+      "model_served": "gpt-5.4-mini-2026-03-17"
+    },
+    {
+      "event_id": "r_3lebst6vcg:gateway:2",
+      "run_id": "r_3lebst6vcg",
+      "slot_id": "s_dkw97wjqod",
+      "pair_id": "p_1dnhfd5sv9",
+      "seq": 2,
+      "turn_index": 1,
+      "ts": "2026-11-14T01:01:02.950194802Z",
+      "type": "model_response",
+      "source": "gateway",
+      "evidence": "gateway",
+      "request_id": "45aba78a-22ac-4a83-8bb6-5ed1a9409e76",
+      "attempt_no": 1,
+      "parent_event_id": "r_3lebst6vcg:gateway:1",
+      "provider": "openai",
+      "model_requested": "gpt-5.4-mini",
+      "model_served": "gpt-5.4-mini-2026-03-17",
+      "tokens": {
+        "fresh": 1228,
+        "cache_read": 0,
+        "cache_write": 0,
+        "out": 27
+      },
+      "usd": {
+        "state": "observed",
+        "v": 0.0010425,
+        "evidence": "gateway"
+      },
+      "summary": "1 tool calls"
+    },
+    {
+      "event_id": "r_3lebst6vcg:gateway:3",
+      "run_id": "r_3lebst6vcg",
+      "slot_id": "s_dkw97wjqod",
+      "pair_id": "p_1dnhfd5sv9",
+      "seq": 3,
+      "turn_index": 1,
+      "ts": "2026-11-14T01:01:02.950194802Z",
+      "type": "tool_call",
+      "source": "gateway",
+      "evidence": "gateway",
+      "request_id": "45aba78a-22ac-4a83-8bb6-5ed1a9409e76",
+      "tool_call_id": "call_DWEO6qBGCiaOUrtr99ZVtdVj",
+      "parent_event_id": "r_3lebst6vcg:gateway:2",
+      "tool_name": "run_shell",
+      "target": "cd /workspace \u0026\u0026 python -m pytest -q",
+      "args_hash": "15224e0ae3d65ae5fef8d18dedd85e7c553e52c1e2d66345edb35816d10adb31",
+      "provider": "openai",
+      "model_requested": "gpt-5.4-mini",
+      "model_served": "gpt-5.4-mini-2026-03-17",
+      "summary": "run_shell cd /workspace \u0026\u0026 python -m pytest -q"
+    },
+    {
+      "event_id": "r_3lebst6vcg:gateway:4",
+      "run_id": "r_3lebst6vcg",
+      "slot_id": "s_dkw97wjqod",
+      "pair_id": "p_1dnhfd5sv9",
+      "seq": 4,
+      "turn_index": 2,
+      "ts": "2026-11-14T01:01:03.454601Z",
+      "type": "tool_result",
+      "source": "gateway",
+      "evidence": "gateway",
+      "request_id": "e9655caf-1de8-4033-b169-1da8daecaf89",
+      "tool_call_id": "call_DWEO6qBGCiaOUrtr99ZVtdVj",
+      "parent_event_id": "r_3lebst6vcg:gateway:3",
+      "provider": "openai",
+      "model_requested": "gpt-5.4-mini",
+      "model_served": "gpt-5.4-mini-2026-03-17"
+    },
+    {
+      "event_id": "r_3lebst6vcg:gateway:5",
+      "run_id": "r_3lebst6vcg",
+      "slot_id": "s_dkw97wjqod",
+      "pair_id": "p_1dnhfd5sv9",
+      "seq": 5,
+      "turn_index": 2,
+      "ts": "2026-11-14T01:01:03.454601Z",
+      "type": "model_request",
+      "source": "gateway",
+      "evidence": "gateway",
+      "request_id": "e9655caf-1de8-4033-b169-1da8daecaf89",
+      "provider": "openai",
+      "model_requested": "gpt-5.4-mini",
+      "model_served": "gpt-5.4-mini-2026-03-17"
+    },
+    {
+      "event_id": "r_3lebst6vcg:gateway:6",
+      "run_id": "r_3lebst6vcg",
+      "slot_id": "s_dkw97wjqod",
+      "pair_id": "p_1dnhfd5sv9",
+      "seq": 6,
+      "turn_index": 2,
+      "ts": "2026-11-14T01:01:05.867908836Z",
+      "type": "model_response",
+      "source": "gateway",
+      "evidence": "gateway",
+      "request_id": "e9655caf-1de8-4033-b169-1da8daecaf89",
+      "attempt_no": 1,
+      "parent_event_id": "r_3lebst6vcg:gateway:5",
+      "provider": "openai",
+      "model_requested": "gpt-5.4-mini",
+      "model_served": "gpt-5.4-mini-2026-03-17",
+      "tokens": {
+        "fresh": 134,
+        "cache_read": 1152,
+        "cache_write": 0,
+        "out": 79
+      },
+      "usd": {
+        "state": "observed",
+        "v": 0.0005424,
+        "evidence": "gateway"
+      },
+      "summary": "1 tool calls"
+    },
+    {
+      "event_id": "r_3lebst6vcg:gateway:7",
+      "run_id": "r_3lebst6vcg",
+      "slot_id": "s_dkw97wjqod",
+      "pair_id": "p_1dnhfd5sv9",
+      "seq": 7,
+      "turn_index": 2,
+      "ts": "2026-11-14T01:01:05.867908836Z",
+      "type": "tool_call",
+      "source": "gateway",
+      "evidence": "gateway",
+      "request_id": "e9655caf-1de8-4033-b169-1da8daecaf89",
+      "tool_call_id": "call_NdDQB5fqLBQeFvrtG0cFRAr4",
+      "parent_event_id": "r_3lebst6vcg:gateway:6",
+      "tool_name": "run_shell",
+      "target": "cd /workspace \u0026\u0026 sed -n '1,220p' ledger/money.py \u0026\u0026 printf '\\n---\\n' \u0026\u0026 sed -n '1,240p' ledger/invoice.py \u0026\u0026 printf '\\n---\\n' \u0026\u0026 sed -n '1,220p' ledger/discounts.py",
+      "args_hash": "1d7072e84c5c4eb7f13e904f41b69cf39250375792d9a6e90c06706cda6e0351",
+      "provider": "openai",
+      "model_requested": "gpt-5.4-mini",
+      "model_served": "gpt-5.4-mini-2026-03-17",
+      "summary": "run_shell cd /workspace \u0026\u0026 sed -n '1,220p' ledger/money.py \u0026\u0026 printf '\\n---\\n' \u0026\u0026 sed -n '1,240p' ledger/invoice.py \u0026\u0026 printf '\\n---\\n' \u0026\u0026 sed -n '1,220p' ledger/discounts.py"
+    },
+    {
+      "event_id": "r_3lebst6vcg:gateway:8",
+      "run_id": "r_3lebst6vcg",
+      "slot_id": "s_dkw97wjqod",
+      "pair_id": "p_1dnhfd5sv9",
+      "seq": 8,
+      "turn_index": 3,
+      "ts": "2026-11-14T01:01:05.87305Z",
+      "type": "tool_result",
+      "source": "gateway",
+      "evidence": "gateway",
+      "request_id": "9299b831-80f4-455b-b01f-c87f6b2611d7",
+      "tool_call_id": "call_NdDQB5fqLBQeFvrtG0cFRAr4",
+      "parent_event_id": "r_3lebst6vcg:gateway:7",
+      "provider": "openai",
+      "model_requested": "gpt-5.4-mini",
+      "model_served": "gpt-5.4-mini"
+    },
+    {
+      "event_id": "r_3lebst6vcg:gateway:9",
+      "run_id": "r_3lebst6vcg",
+      "slot_id": "s_dkw97wjqod",
+      "pair_id": "p_1dnhfd5sv9",
+      "seq": 9,
+      "turn_index": 3,
+      "ts": "2026-11-14T01:01:05.87305Z",
+      "type": "model_request",
+      "source": "gateway",
+      "evidence": "gateway",
+      "request_id": "9299b831-80f4-455b-b01f-c87f6b2611d7",
+      "provider": "openai",
+      "model_requested": "gpt-5.4-mini",
+      "model_served": "gpt-5.4-mini"
+    },
+    {
+      "event_id": "r_3lebst6vcg:gateway:10",
+      "run_id": "r_3lebst6vcg",
+      "slot_id": "s_dkw97wjqod",
+      "pair_id": "p_1dnhfd5sv9",
+      "seq": 10,
+      "turn_index": 3,
+      "ts": "2026-11-14T01:01:05.894613746Z",
+      "type": "model_response",
+      "source": "gateway",
+      "evidence": "gateway",
+      "request_id": "9299b831-80f4-455b-b01f-c87f6b2611d7",
+      "attempt_no": 1,
+      "parent_event_id": "r_3lebst6vcg:gateway:9",
+      "is_error": true,
+      "provider": "openai",
+      "model_requested": "gpt-5.4-mini",
+      "model_served": "gpt-5.4-mini",
+      "usd": {
+        "state": "observed",
+        "v": 0,
+        "evidence": "gateway"
+      },
+      "summary": "error 503: The server is overloaded or not ready yet. ref nonce_5l7m7njw691pcbwiqhszkmqf call 3"
+    }
+  ],
+  "claim": {
+    "made": false,
+    "text": "y yet. ref nonce_5l7m7njw691pcbwiqhszkmqf call 3\\\"},\\\"extra_fields\\\":{\\\"routing_info\\\":{\\\"provider\\\":\\\"openai\\\",\\\"model\\\":\\\"gpt-5.4-mini\\\",\\\"key\\\":\\\"oa-slot-1\\\",\\\"requested_provider\\\":\\\"openai\\\",\\\"requested_model\\\":\\\"gpt-5.4-mini\\\"},\\\"provider\\\":\\\"openai\\\",\\\"original_model_requested\\\":\\\"gpt-5.4-mini\\\",\\\"resolved_model_used\\\":\\\"gpt-5.4-mini\\\",\\\"request_type\\\":\\\"chat_completion\\\",\\\"converted_request_type\\\":\\\"responses\\\",\\\"\"}\nStopped: model call failed on turn 3: HTTP Error 503: Service Unavailable",
+    "source": "outcome"
+  },
+  "cost": [
+    {
+      "request_id": "45aba78a-22ac-4a83-8bb6-5ed1a9409e76",
+      "attempt": 1,
+      "model": "gpt-5.4-mini-2026-03-17",
+      "tokens": {
+        "fresh": 1228,
+        "cache_read": 0,
+        "cache_write": 0,
+        "out": 27
+      },
+      "price_ref": "bifrost-datasheet-2026-11-14-openai@sha256:064520900aeda8c3b5dec578dbbbe095f8fd366c388837fb21667ba2acf02000",
+      "usd": {
+        "state": "observed",
+        "v": 0.0010425,
+        "evidence": "gateway"
+      },
+      "bifrost_usd": 0.0010425,
+      "fault_inject": false
+    },
+    {
+      "request_id": "e9655caf-1de8-4033-b169-1da8daecaf89",
+      "attempt": 1,
+      "model": "gpt-5.4-mini-2026-03-17",
+      "tokens": {
+        "fresh": 134,
+        "cache_read": 1152,
+        "cache_write": 0,
+        "out": 79
+      },
+      "price_ref": "bifrost-datasheet-2026-11-14-openai@sha256:064520900aeda8c3b5dec578dbbbe095f8fd366c388837fb21667ba2acf02000",
+      "usd": {
+        "state": "observed",
+        "v": 0.0005424,
+        "evidence": "gateway"
+      },
+      "bifrost_usd": 0.0005424,
+      "fault_inject": false
+    },
+    {
+      "request_id": "9299b831-80f4-455b-b01f-c87f6b2611d7",
+      "attempt": 1,
+      "model": "gpt-5.4-mini",
+      "tokens": {
+        "fresh": 0,
+        "cache_read": 0,
+        "cache_write": 0,
+        "out": 0
+      },
+      "price_ref": "bifrost-datasheet-2026-11-14-openai@sha256:064520900aeda8c3b5dec578dbbbe095f8fd366c388837fb21667ba2acf02000",
+      "usd": {
+        "state": "observed",
+        "v": 0,
+        "evidence": "gateway"
+      },
+      "fault_inject": true
+    }
+  ],
+  "grade": {
+    "passed": false,
+    "invalid_evaluator": false,
+    "exit_code": 1,
+    "tests_ran": 7,
+    "failures": 7,
+    "errors": 0,
+    "skipped": 0,
+    "failed_tests": [
+      "tests.test_hidden_rounding::test_line_amount_half_cent_rounds_up",
+      "tests.test_hidden_rounding::test_line_amount_is_exact_for_decimal_quantities",
+      "tests.test_hidden_rounding::test_subtotal_is_sum_of_rounded_line_amounts",
+      "tests.test_hidden_rounding::test_tax_half_cent_rounds_up",
+      "tests.test_hidden_rounding::test_tax_is_exact_for_decimal_rates",
+      "tests.test_hidden_rounding::test_percentage_discount_half_cent_rounds_up_before_tax",
+      "tests.test_hidden_rounding::test_cli_export_and_summary_follow_rounding_rules"
+    ],
+    "reason": "exit 1; 7 failures; required tests failed: test_hidden_rounding.py::test_line_amount_half_cent_rounds_up, test_hidden_rounding.py::test_line_amount_is_exact_for_decimal_quantities, test_hidden_rounding.py::test_subtotal_is_sum_of_rounded_line_amounts, test_hidden_rounding.py::test_tax_half_cent_rounds_up, test_hidden_rounding.py::test_tax_is_exact_for_decimal_rates, test_hidden_rounding.py::test_percentage_discount_half_cent_rounds_up_before_tax, test_hidden_rounding.py::test_cli_export_and_summary_follow_rounding_rules",
+    "suite_version": "1.0.0",
+    "grader_version": "1.0.0",
+    "diff_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  "gates": [
+    {
+      "gate": "g1_protected_paths",
+      "version": "1.0.0",
+      "effect": "veto",
+      "fired": false
+    },
+    {
+      "gate": "g2_test_infra",
+      "version": "1.0.0",
+      "effect": "veto",
+      "fired": false
+    },
+    {
+      "gate": "g4_regrade",
+      "version": "1.0.0",
+      "effect": "veto",
+      "fired": false
+    },
+    {
+      "gate": "g6_null_agents",
+      "version": "1.0.0",
+      "effect": "admission",
+      "fired": false,
+      "detail": "not a null agent"
+    },
+    {
+      "gate": "egress",
+      "version": "1.0.0",
+      "effect": "invalidate",
+      "fired": false
+    }
+  ]
+}

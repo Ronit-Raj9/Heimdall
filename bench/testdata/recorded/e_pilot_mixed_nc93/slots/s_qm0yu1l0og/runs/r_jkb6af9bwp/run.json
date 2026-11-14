@@ -1,0 +1,39 @@
+{
+  "run_id": "r_jkb6af9bwp",
+  "slot_id": "s_qm0yu1l0og",
+  "pair_id": "p_lofxs2indz",
+  "exp_id": "e_pilot_mixed_nc93",
+  "attempt": 1,
+  "stage": "seal",
+  "manifest_hash": "be32a712e20c78445992042df1aa72b7f26f2fa5f622060d0480799c5df6a160",
+  "suite_lock_hash": "520215ace7b304de232f16ed8833df3f25ca01cd72e310dd495d38a399e99d56",
+  "outcome": "pass",
+  "y": {
+    "state": "observed",
+    "v": 1,
+    "evidence": "outcome"
+  },
+  "claim": {
+    "made": false,
+    "text": ": []}\n{\"type\": \"final\", \"turns\": 4}\nImplemented an O(n α(n)) duplicate detector using per-key indexing plus union-find, so `find_duplicates` and `drop_duplicates` no longer do quadratic pairwise scans.\n\nI also kept the public behavior the same:\n- same normalization rules\n- same transitive grouping\n- same group ordering and record ordering\n- same error handling for keys\n\nI wasn't able to complete the test run because the environment crashed with a Python segmentation fault during pytest startup.",
+    "source": "outcome"
+  },
+  "timing": {
+    "started": "2026-11-14T01:01:09.876050682Z",
+    "agent_started": "2026-11-14T01:01:11.493920481Z",
+    "agent_exited": "2026-11-14T01:01:26.334984076Z",
+    "sealed": "2026-11-14T01:01:33.313739005Z"
+  },
+  "agent": {
+    "config_id": "custom-python",
+    "adapter": "command",
+    "config_hash": "8bbc91c3b83dd6037dc262bc4025b7af5d6b6631989968143039ca7c8719d788",
+    "exit_code": 0,
+    "timed_out": false
+  },
+  "gateway": {
+    "virtual_key_id": "ffcf31ca-be73-4cbf-a79a-d5e534dfcf65",
+    "key_slot": "oa-slot-4",
+    "session_id": "r_jkb6af9bwp"
+  }
+}

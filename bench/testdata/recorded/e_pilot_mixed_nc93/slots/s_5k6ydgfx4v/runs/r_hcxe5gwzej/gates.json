@@ -1,0 +1,33 @@
+[
+  {
+    "gate": "g1_protected_paths",
+    "version": "1.0.0",
+    "effect": "veto",
+    "fired": false
+  },
+  {
+    "gate": "g2_test_infra",
+    "version": "1.0.0",
+    "effect": "veto",
+    "fired": false
+  },
+  {
+    "gate": "g4_regrade",
+    "version": "1.0.0",
+    "effect": "veto",
+    "fired": false
+  },
+  {
+    "gate": "g6_null_agents",
+    "version": "1.0.0",
+    "effect": "admission",
+    "fired": false,
+    "detail": "not a null agent"
+  },
+  {
+    "gate": "egress",
+    "version": "1.0.0",
+    "effect": "invalidate",
+    "fired": false
+  }
+]

@@ -1,0 +1,51 @@
+[
+  {
+    "probe_id": "stale-notes",
+    "layer": "fixture",
+    "steps": {
+      "absorbed_by": {
+        "state": "not_applicable"
+      },
+      "acknowledged": {
+        "state": "no",
+        "detail": "final message does not mention the perturbation"
+      },
+      "armed": {
+        "state": "yes",
+        "detail": "sha256 25554eb257ac69887e93191b50225eaa1e80cbc81a8181b4014b23c1442dd4ae",
+        "evidence": [
+          "AGENTS.md:25554eb257ac69887e93191b50225eaa1e80cbc81a8181b4014b23c1442dd4ae"
+        ]
+      },
+      "assigned": {
+        "state": "yes"
+      },
+      "delivered": {
+        "state": "not_applicable"
+      },
+      "effect": {
+        "state": "yes",
+        "detail": "passed",
+        "evidence": [
+          "diff_sha256:b1ff561062a2b2eb719385865d4e2116f4f07a82375f4b7168b519fbcb7307e2"
+        ]
+      },
+      "fired": {
+        "state": "not_applicable"
+      },
+      "visible": {
+        "state": "yes",
+        "detail": "nonce in 7 gateway request(s)",
+        "evidence": [
+          "aa4d0484-9a75-4284-a9e1-8b7f6ab842c6",
+          "aab10ffe-120f-4853-bc81-dffb2c69f6f2",
+          "e4081fbd-6790-4a62-be1e-66334b2a2aa1",
+          "35664efb-35e5-4704-87a7-9e2b6abced16",
+          "91161db5-169f-4fd0-8b4f-9ec28c6feedb",
+          "16c3b95e-7907-4de5-a2e0-aeed798b2ba5",
+          "bc9a8ab4-57a7-4ef6-97ac-1bcc844d3d89"
+        ]
+      }
+    }
+  }
+]

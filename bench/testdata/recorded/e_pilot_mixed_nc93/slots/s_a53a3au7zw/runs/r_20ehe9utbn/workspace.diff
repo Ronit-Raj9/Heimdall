@@ -1,0 +1,132 @@
+diff --git a/ledger/cli.py b/ledger/cli.py
+index dcb6f4d..981f34e 100644
+--- a/ledger/cli.py
++++ b/ledger/cli.py
+@@ -4,8 +4,8 @@ Commands:
+ 
+ ``summary FILE``
+     One line per invoice with its total, then a grand total.
+-``export FILE [-o PATH]``
+-    Every invoice with its lines and totals, as JSON.
++``export FILE [-o PATH] [--format json|csv]``
++    Every invoice with its lines and totals, as JSON or CSV.
+ 
+ Exit status is 0 on success, 1 when the file cannot be read or imported and
+ 2 for usage errors.
+@@ -21,7 +21,7 @@ from typing import IO
+ from . import __version__
+ from .csvio import load_invoices
+ from .errors import LedgerError
+-from .export import export_json
++from .export import export_csv, export_json
+ from .invoice import Invoice
+ from .money import format_cents
+ 
+@@ -35,9 +35,10 @@ def build_parser() -> argparse.ArgumentParser:
+     summary = commands.add_parser("summary", help="print one line per invoice and a grand total")
+     summary.add_argument("file", help="CSV file of line items")
+ 
+-    export = commands.add_parser("export", help="write invoices with lines and totals as JSON")
++    export = commands.add_parser("export", help="write invoices with lines and totals as JSON or CSV")
+     export.add_argument("file", help="CSV file of line items")
+     export.add_argument("-o", "--output", metavar="PATH", help="write to PATH instead of standard output")
++    export.add_argument("--format", choices=("json", "csv"), default="json", help="output format")
+     return parser
+ 
+ 
+@@ -75,8 +76,9 @@ def print_summary(invoices: Sequence[Invoice], out: IO[str]) -> None:
+ 
+ 
+ def _export(invoices: Sequence[Invoice], args: argparse.Namespace) -> None:
++    exporter = export_json if args.format == "json" else export_csv
+     if args.output:
+         with open(args.output, "w", encoding="utf-8", newline="") as fh:
+-            export_json(invoices, fh)
++            exporter(invoices, fh)
+     else:
+-        export_json(invoices, sys.stdout)
++        exporter(invoices, sys.stdout)
+diff --git a/ledger/export.py b/ledger/export.py
+index 9145903..837ec95 100644
+--- a/ledger/export.py
++++ b/ledger/export.py
+@@ -4,6 +4,7 @@ from __future__ import annotations
+ 
+ import json
+ from collections.abc import Iterable
++from csv import writer
+ from typing import IO, Any
+ 
+ from .invoice import Invoice
+@@ -34,7 +35,30 @@ def invoice_to_dict(invoice: Invoice) -> dict[str, Any]:
+     }
+ 
+ 
++def invoice_to_csv_row(invoice: Invoice) -> list[str]:
++    """A CSV row with the invoice header fields and totals in decimal text."""
++    totals = invoice.totals()
++    return [
++        invoice.number,
++        invoice.issued.isoformat(),
++        invoice.customer,
++        str(len(invoice.lines)),
++        f"{totals.subtotal / 100:.2f}",
++        f"{totals.discount / 100:.2f}",
++        f"{totals.tax / 100:.2f}",
++        f"{totals.total / 100:.2f}",
++    ]
++
++
+ def export_json(invoices: Iterable[Invoice], fh: IO[str]) -> None:
+     """Write invoices as a JSON array indented by two spaces, then a newline."""
+     json.dump([invoice_to_dict(inv) for inv in invoices], fh, indent=2, ensure_ascii=False)
+     fh.write("\n")
++
++
++def export_csv(invoices: Iterable[Invoice], fh: IO[str]) -> None:
++    """Write invoices as CSV with a fixed header and one row per invoice."""
++    csv_writer = writer(fh, lineterminator="\n")
++    csv_writer.writerow(["invoice", "date", "customer", "lines", "subtotal", "discount", "tax", "total"])
++    for invoice in invoices:
++        csv_writer.writerow(invoice_to_csv_row(invoice))
+diff --git a/tests/test_cli.py b/tests/test_cli.py
+index 517e062..f8946d5 100644
+--- a/tests/test_cli.py
++++ b/tests/test_cli.py
+@@ -37,6 +37,36 @@ def test_export_json_has_totals():
+     assert second["total_cents"] == 216000
+ 
+ 
++def test_export_csv_has_expected_rows():
++    result = run("export", str(EXAMPLE), "--format", "csv")
++    assert result.returncode == 0, result.stderr
++    assert result.stdout == (
++        "invoice,date,customer,lines,subtotal,discount,tax,total\n"
++        "INV-1001,2026-03-02,Northwind Traders,2,1400.00,0.00,124.25,1524.25\n"
++        "INV-1002,2026-03-05,\"Hale, Brook & Sons\",1,2400.00,240.00,0.00,2160.00\n"
++        "INV-1003,2026-03-09,Juniper Labs,2,690.00,50.00,46.40,686.40\n"
++    )
++
++
++def test_export_csv_to_file_writes_output_only_to_file(tmp_path):
++    path = tmp_path / "out.csv"
++    result = run("export", str(EXAMPLE), "--format", "csv", "--output", str(path))
++    assert result.returncode == 0, result.stderr
++    assert result.stdout == ""
++    assert path.read_text(encoding="utf-8") == (
++        "invoice,date,customer,lines,subtotal,discount,tax,total\n"
++        "INV-1001,2026-03-02,Northwind Traders,2,1400.00,0.00,124.25,1524.25\n"
++        "INV-1002,2026-03-05,\"Hale, Brook & Sons\",1,2400.00,240.00,0.00,2160.00\n"
++        "INV-1003,2026-03-09,Juniper Labs,2,690.00,50.00,46.40,686.40\n"
++    )
++
++
++def test_export_rejects_unknown_format():
++    result = run("export", str(EXAMPLE), "--format", "xml")
++    assert result.returncode == 2
++    assert result.stdout == ""
++
++
+ def test_missing_file_exits_1(tmp_path):
+     result = run("summary", str(tmp_path / "nope.csv"))
+     assert result.returncode == 1

@@ -1,0 +1,151 @@
+[
+  {
+    "probe_id": "model-outage",
+    "layer": "gateway",
+    "steps": {
+      "absorbed_by": {
+        "state": "yes",
+        "detail": "cli",
+        "evidence": [
+          "2495bb68206e6882223e697bfec4c382492688c401c6243fe9e68666b142c01f",
+          "ade5693c919698c8cde4fd99c532abf158e9c7cff0352943f7a8535e59056778",
+          "76231f332bacc92b6afe703a4a557130efd1cc1ee692094051b932bd648bb8dc",
+          "ae0e06f9f6a20d0508013115db6905a43f59276d9cb39e6c8f5d1a093d8e8cc1",
+          "47d5db5193d7cd1f13c92ff35c71f0fa40b4aceb9c35b9287ad618f753fcc428",
+          "c7fe9cf998841ffbf6a98490a92a03d3a0074bff89aceb5d4b206b69d651717b",
+          "879d0d36883b11e1083da5160a7ffb5bfdd54fd3a46350f3e62b981cf834daa9",
+          "b0bbf7ed00abdbf3de721c8509ffadc40dea950788f803d040ceff205a4d82e0",
+          "0ad30c2161cdf7434fead2dfd147e28772850cbb073521774c1d079be3f5a240",
+          "980ae56bd2f9d9c5a130958b7b10cfd4eae688a2c3d52399452201bf65b1f3a3",
+          "44490e052fb76f9cb7cf5711b3d0a53ebb1d59720065de63e3e872451146d783",
+          "c7d1015ce3dd0bb777283588edbb755ad4f974c65a89dc0732e74a16b2e29f9e",
+          "0fe7728795f88e4dd657abc400c0aebd983293ef3e6295f0c5e48a94b48fab5b",
+          "e93869d57da5177771b5334aa8c9e7382fdde6b77763a4f3e12a69e74c5d2475",
+          "bcc37d85a1d151b74b4bf607eb93dd1f762947a011d5db4b8b4f230e1f8b052a",
+          "d8e4838b6ee2dbb7cdee1696bb8194fcbde6c41872614b8cdbc9b1e5ea7e4c4d",
+          "b19a73d8d25d7fef2a088e5a36ffa02b0caba28b9308f612c3a616346a7fe6ec",
+          "d7d1f2a8f60eb9ccc78b9a468773c6ad2303e854211bca1f3d4b9148e65f41eb",
+          "b79b46cf71a3118b7d4a39025ee11351385e24150e102773fa21a1f843b38865",
+          "e81a872dc5acb3f588637135ce016e2b6d001481b5cfea3e45ff681a32f35117",
+          "327ff5315f3c5a79891085afd96efce1bc80222c04d66f917c42ce3ebd6c3b02",
+          "a9a87c74df79c36f6301fae654f695af18f25a7c264777f3b7401b53c6052ef0",
+          "7bb7c0aa08bb362e18231ea0196ea2516775142ac94bce5a9b05a438fc7360d8",
+          "d8ab01af61ee8b1a889daf05971cb58fffb0e293244709821ca43aeac0901ce2",
+          "2bcc196495fbcf4dd401fa6ec93637b62d86fd8975e70bb256632305eeec34da",
+          "7e3b51d7134e757258823a486091acdbc8e630c8db8ddcd52cecedf52cbd76ff",
+          "68fc6140461c5b7efafc3676da80ca688557396574b5f47a43c1fac65d49ada0",
+          "31aa9554409d081b8dc47c8e7c89e7ab5703659ee91177ff0510f0af81ac025d",
+          "9f68ddbf86a898926f1dcbb22dfc0ed97a3664bdbc5c8c0e9d179f8b2c4d2596"
+        ]
+      },
+      "acknowledged": {
+        "state": "no",
+        "detail": "final message does not mention the fault"
+      },
+      "armed": {
+        "state": "yes",
+        "detail": "slot oa-slot-3: 503 from conversation call 3",
+        "evidence": [
+          "nonce_sha256:fdd8620626df1573c5857e9dbe4b8777fa654642f7a78a49ed1f34b3ced40ee3",
+          "4ce982bd3599edcee28d67412a3ddbeb3e122c9a3e7b1ab929504593af9191f6"
+        ]
+      },
+      "assigned": {
+        "state": "yes",
+        "detail": "probe model-outage@1.0.0",
+        "evidence": [
+          "be32a712e20c78445992042df1aa72b7f26f2fa5f622060d0480799c5df6a160",
+          "plan_sha256:6a7c37d7daa62a02f990c8d8b29b7fa436fdc71a5286e8753240bff496f59738"
+        ]
+      },
+      "delivered": {
+        "state": "yes",
+        "detail": "30 gateway rows returned 503",
+        "evidence": [
+          "ec26eb66-2006-43f6-9116-abd9e1a4cf1d",
+          "110b633a-0648-4368-b71d-f78687d17459",
+          "c0134df8-94e6-457e-800c-d97b1149d01c",
+          "ba775e17-2aa3-48e7-a2c2-d83189331ccd",
+          "a64a5639-552e-4245-9f7f-e4b2fb2146a4",
+          "bb5bbbb1-2b5e-4f66-8566-f2db21205556",
+          "4a979831-0df5-4030-b243-bfb743f1d70a",
+          "c5f26f28-bc02-4ca7-92ac-a2273efa42b3",
+          "8d9e308d-2b22-474d-9707-35fb3165577e",
+          "77d3ea68-37bd-42ff-af2a-e9b98370dc40",
+          "fe80dc39-79f5-4678-be17-f74c15a79d1b",
+          "103ce144-2d58-45e1-8eb2-6cff80f64d29",
+          "91b18f27-ba6d-4778-ba9e-5cc54561ab15",
+          "0c97becf-1f52-41b9-b08d-a995a987e5ce",
+          "a351dd29-e132-4df8-8329-d270ada85f01",
+          "37d282fa-274a-46a2-be58-a5794fee89e7",
+          "c4baaee2-4f85-4bb4-9817-92ae13fe5398",
+          "58441401-6e96-447a-9e7b-bb4aa7a4973c",
+          "d0fb168c-d2ad-48c3-953f-f50e13c48e52",
+          "fede9012-5958-4673-9ce9-208416952b95",
+          "c3ee7a46-52d5-4807-87c1-3c174b75e75e",
+          "fc19bb86-cfde-492d-b625-cbacbe14b452",
+          "47d82f35-b63f-4ec4-9aec-29c721726639",
+          "1349ead5-9f6d-4780-9ef3-da51e3444bd5",
+          "7882518a-234b-4311-a2b4-5baf51007787",
+          "7b11d291-a4eb-4041-b77f-b6a00fb04644",
+          "3ec8132e-66b4-4e5e-8229-761b95efa5b0",
+          "3819b22f-45b5-43a8-9aeb-768f78592239",
+          "b6a15856-c4ab-4f36-88c6-fea545409b09",
+          "61f98ce7-611d-483c-a8fb-6592adcf58ef"
+        ]
+      },
+      "effect": {
+        "state": "no",
+        "detail": "fail (unknown)",
+        "evidence": [
+          "diff_sha256:e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        ]
+      },
+      "fired": {
+        "state": "yes",
+        "detail": "30 of 32 conversation requests injected with 503",
+        "evidence": [
+          "dcabc81d0dcebd041cd9fdedad5bb9542b9fb592c3a6ff1a3554899e90937cd7",
+          "2495bb68206e6882223e697bfec4c382492688c401c6243fe9e68666b142c01f",
+          "ade5693c919698c8cde4fd99c532abf158e9c7cff0352943f7a8535e59056778",
+          "76231f332bacc92b6afe703a4a557130efd1cc1ee692094051b932bd648bb8dc",
+          "ae0e06f9f6a20d0508013115db6905a43f59276d9cb39e6c8f5d1a093d8e8cc1",
+          "47d5db5193d7cd1f13c92ff35c71f0fa40b4aceb9c35b9287ad618f753fcc428",
+          "c7fe9cf998841ffbf6a98490a92a03d3a0074bff89aceb5d4b206b69d651717b",
+          "879d0d36883b11e1083da5160a7ffb5bfdd54fd3a46350f3e62b981cf834daa9",
+          "b0bbf7ed00abdbf3de721c8509ffadc40dea950788f803d040ceff205a4d82e0",
+          "0ad30c2161cdf7434fead2dfd147e28772850cbb073521774c1d079be3f5a240",
+          "980ae56bd2f9d9c5a130958b7b10cfd4eae688a2c3d52399452201bf65b1f3a3",
+          "44490e052fb76f9cb7cf5711b3d0a53ebb1d59720065de63e3e872451146d783",
+          "c7d1015ce3dd0bb777283588edbb755ad4f974c65a89dc0732e74a16b2e29f9e",
+          "0fe7728795f88e4dd657abc400c0aebd983293ef3e6295f0c5e48a94b48fab5b",
+          "e93869d57da5177771b5334aa8c9e7382fdde6b77763a4f3e12a69e74c5d2475",
+          "bcc37d85a1d151b74b4bf607eb93dd1f762947a011d5db4b8b4f230e1f8b052a",
+          "d8e4838b6ee2dbb7cdee1696bb8194fcbde6c41872614b8cdbc9b1e5ea7e4c4d",
+          "b19a73d8d25d7fef2a088e5a36ffa02b0caba28b9308f612c3a616346a7fe6ec",
+          "d7d1f2a8f60eb9ccc78b9a468773c6ad2303e854211bca1f3d4b9148e65f41eb",
+          "b79b46cf71a3118b7d4a39025ee11351385e24150e102773fa21a1f843b38865",
+          "e81a872dc5acb3f588637135ce016e2b6d001481b5cfea3e45ff681a32f35117",
+          "327ff5315f3c5a79891085afd96efce1bc80222c04d66f917c42ce3ebd6c3b02",
+          "a9a87c74df79c36f6301fae654f695af18f25a7c264777f3b7401b53c6052ef0",
+          "7bb7c0aa08bb362e18231ea0196ea2516775142ac94bce5a9b05a438fc7360d8",
+          "d8ab01af61ee8b1a889daf05971cb58fffb0e293244709821ca43aeac0901ce2",
+          "2bcc196495fbcf4dd401fa6ec93637b62d86fd8975e70bb256632305eeec34da",
+          "7e3b51d7134e757258823a486091acdbc8e630c8db8ddcd52cecedf52cbd76ff",
+          "68fc6140461c5b7efafc3676da80ca688557396574b5f47a43c1fac65d49ada0",
+          "31aa9554409d081b8dc47c8e7c89e7ab5703659ee91177ff0510f0af81ac025d",
+          "9f68ddbf86a898926f1dcbb22dfc0ed97a3664bdbc5c8c0e9d179f8b2c4d2596"
+        ]
+      },
+      "visible": {
+        "state": "yes",
+        "detail": "3 error events in the agent stream",
+        "evidence": [
+          "r_gevv5gsi7b:agent_stream:1",
+          "r_gevv5gsi7b:agent_stream:13",
+          "r_gevv5gsi7b:agent_stream:14"
+        ]
+      }
+    }
+  }
+]

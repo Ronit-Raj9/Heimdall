@@ -1,0 +1,154 @@
+[
+  {
+    "request_id": "efb71d4e-4922-4b19-a3e9-d677e8decd52",
+    "attempt": 1,
+    "model": "gpt-5.4-mini-2026-03-17",
+    "tokens": {
+      "fresh": 1260,
+      "cache_read": 0,
+      "cache_write": 0,
+      "out": 55
+    },
+    "price_ref": "bifrost-datasheet-2026-11-14-openai@sha256:064520900aeda8c3b5dec578dbbbe095f8fd366c388837fb21667ba2acf02000",
+    "usd": {
+      "state": "observed",
+      "v": 0.0011925,
+      "evidence": "gateway"
+    },
+    "bifrost_usd": 0.0011925,
+    "fault_inject": false
+  },
+  {
+    "request_id": "acebcbb4-5a6d-48dc-96d8-725474663a7f",
+    "attempt": 1,
+    "model": "gpt-5.4-mini-2026-03-17",
+    "tokens": {
+      "fresh": 897,
+      "cache_read": 1152,
+      "cache_write": 0,
+      "out": 127
+    },
+    "price_ref": "bifrost-datasheet-2026-11-14-openai@sha256:064520900aeda8c3b5dec578dbbbe095f8fd366c388837fb21667ba2acf02000",
+    "usd": {
+      "state": "observed",
+      "v": 0.00133065,
+      "evidence": "gateway"
+    },
+    "bifrost_usd": 0.00133065,
+    "fault_inject": false
+  },
+  {
+    "request_id": "30a2e404-34be-4575-b221-21bee8183a47",
+    "attempt": 1,
+    "model": "gpt-5.4-mini-2026-03-17",
+    "tokens": {
+      "fresh": 2285,
+      "cache_read": 1920,
+      "cache_write": 0,
+      "out": 36
+    },
+    "price_ref": "bifrost-datasheet-2026-11-14-openai@sha256:064520900aeda8c3b5dec578dbbbe095f8fd366c388837fb21667ba2acf02000",
+    "usd": {
+      "state": "observed",
+      "v": 0.00201975,
+      "evidence": "gateway"
+    },
+    "bifrost_usd": 0.00201975,
+    "fault_inject": false
+  },
+  {
+    "request_id": "30095c0c-7bc0-4378-9249-ed01495df0a0",
+    "attempt": 1,
+    "model": "gpt-5.4-mini-2026-03-17",
+    "tokens": {
+      "fresh": 1086,
+      "cache_read": 4096,
+      "cache_write": 0,
+      "out": 885
+    },
+    "price_ref": "bifrost-datasheet-2026-11-14-openai@sha256:064520900aeda8c3b5dec578dbbbe095f8fd366c388837fb21667ba2acf02000",
+    "usd": {
+      "state": "observed",
+      "v": 0.0051042,
+      "evidence": "gateway"
+    },
+    "bifrost_usd": 0.0051042,
+    "fault_inject": false
+  },
+  {
+    "request_id": "0831437c-20be-41fb-b06e-805baf40724a",
+    "attempt": 1,
+    "model": "gpt-5.4-mini-2026-03-17",
+    "tokens": {
+      "fresh": 971,
+      "cache_read": 5120,
+      "cache_write": 0,
+      "out": 479
+    },
+    "price_ref": "bifrost-datasheet-2026-11-14-openai@sha256:064520900aeda8c3b5dec578dbbbe095f8fd366c388837fb21667ba2acf02000",
+    "usd": {
+      "state": "observed",
+      "v": 0.00326775,
+      "evidence": "gateway"
+    },
+    "bifrost_usd": 0.00326775,
+    "fault_inject": false
+  },
+  {
+    "request_id": "53f96b45-a672-4817-8f53-b7ecc2f52f1a",
+    "attempt": 1,
+    "model": "gpt-5.4-mini-2026-03-17",
+    "tokens": {
+      "fresh": 577,
+      "cache_read": 6016,
+      "cache_write": 0,
+      "out": 1189
+    },
+    "price_ref": "bifrost-datasheet-2026-11-14-openai@sha256:064520900aeda8c3b5dec578dbbbe095f8fd366c388837fb21667ba2acf02000",
+    "usd": {
+      "state": "observed",
+      "v": 0.00623445,
+      "evidence": "gateway"
+    },
+    "bifrost_usd": 0.00623445,
+    "fault_inject": false
+  },
+  {
+    "request_id": "7261617e-803b-400a-b723-dd845be3ec9b",
+    "attempt": 1,
+    "model": "gpt-5.4-mini-2026-03-17",
+    "tokens": {
+      "fresh": 1277,
+      "cache_read": 6528,
+      "cache_write": 0,
+      "out": 27
+    },
+    "price_ref": "bifrost-datasheet-2026-11-14-openai@sha256:064520900aeda8c3b5dec578dbbbe095f8fd366c388837fb21667ba2acf02000",
+    "usd": {
+      "state": "observed",
+      "v": 0.0015688499999999999,
+      "evidence": "gateway"
+    },
+    "bifrost_usd": 0.00156885,
+    "fault_inject": false
+  },
+  {
+    "request_id": "a07fea27-aef5-4dc7-94e0-d74966d58d26",
+    "attempt": 1,
+    "model": "gpt-5.4-mini-2026-03-17",
+    "tokens": {
+      "fresh": 214,
+      "cache_read": 7680,
+      "cache_write": 0,
+      "out": 56
+    },
+    "price_ref": "bifrost-datasheet-2026-11-14-openai@sha256:064520900aeda8c3b5dec578dbbbe095f8fd366c388837fb21667ba2acf02000",
+    "usd": {
+      "state": "observed",
+      "v": 0.0009885,
+      "evidence": "gateway"
+    },
+    "bifrost_usd": 0.0009885,
+    "fault_inject": false
+  }
+]

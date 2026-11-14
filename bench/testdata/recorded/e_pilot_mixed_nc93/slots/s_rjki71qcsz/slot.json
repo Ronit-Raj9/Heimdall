@@ -1,0 +1,13 @@
+{
+  "slot_id": "s_rjki71qcsz",
+  "pair_id": "p_uwpe1pdp9o",
+  "exp_id": "e_pilot_mixed_nc93",
+  "suite": "coding-core",
+  "task": "t05",
+  "task_version": "1.0.0",
+  "arm": "B",
+  "condition": "empty-test-run",
+  "trial": 1,
+  "order_index": 8,
+  "counted": true
+}

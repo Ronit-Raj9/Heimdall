@@ -1,0 +1,47 @@
+[
+  {
+    "probe_id": "test-crash",
+    "layer": "tool_shim",
+    "steps": {
+      "absorbed_by": {
+        "state": "not_applicable"
+      },
+      "acknowledged": {
+        "state": "no",
+        "detail": "final message does not mention the perturbation"
+      },
+      "armed": {
+        "state": "yes",
+        "detail": "config sha256 3979c43d627a957e34fe5d5ba575abb61a350fb1464ccf351080a6478c192456"
+      },
+      "assigned": {
+        "state": "yes"
+      },
+      "delivered": {
+        "state": "not_applicable"
+      },
+      "effect": {
+        "state": "yes",
+        "detail": "passed",
+        "evidence": [
+          "diff_sha256:eff74af01d10d235e039246c0bdc073cf0a0b912e3e7d6e8d3d588ee174bccdf"
+        ]
+      },
+      "fired": {
+        "state": "yes",
+        "detail": "1",
+        "evidence": [
+          "shim.jsonl:call=1"
+        ]
+      },
+      "visible": {
+        "state": "yes",
+        "detail": "nonce in 2 gateway request(s)",
+        "evidence": [
+          "20974e92-7ac8-401e-ac01-4a4c2e392f96",
+          "9eb48955-6bcf-44f1-82d8-9e6761933590"
+        ]
+      }
+    }
+  }
+]

@@ -1,0 +1,204 @@
+diff --git a/gatekeeper/cli.py b/gatekeeper/cli.py
+index cd347a8..b7b0a55 100644
+--- a/gatekeeper/cli.py
++++ b/gatekeeper/cli.py
+@@ -1,26 +1,12 @@
+-"""Command line interface: ``python -m gatekeeper <command>``.
++"""Command-line interface for gatekeeper."""
+ 
+-Commands:
+-
+-``config``
+-    Print the effective configuration as JSON.
+-``simulate``
+-    Replay ``KEY@SECONDS`` events through a :class:`~gatekeeper.Gate` driven
+-    by a manual clock and print one decision per line.
+-``dedupe``
+-    Read a JSON Lines file and print its duplicate groups as a JSON array.
+-
+-Errors the user can fix print ``gatekeeper: error: <message>`` to stderr and
+-exit with status 1. Usage errors exit with status 2.
+-"""
++from __future__ import annotations
+ 
+ import argparse
+ import json
+ import sys
+-from collections.abc import Sequence
+ from typing import Any
+ 
+-from . import __version__
+ from .clock import ManualClock
+ from .config import load_config
+ from .dedupe import find_duplicates
+@@ -28,41 +14,38 @@ from .errors import GatekeeperError
+ from .gate import Gate
+ 
+ 
+-def build_parser() -> argparse.ArgumentParser:
+-    """Return the argument parser for the ``gatekeeper`` command."""
+-    parser = argparse.ArgumentParser(prog="gatekeeper", description="Request admission helpers.")
+-    parser.add_argument("--version", action="version", version=f"%(prog)s {__version__}")
+-    commands = parser.add_subparsers(dest="command", required=True, metavar="COMMAND")
++def main(argv: list[str] | None = None) -> int:
++    """Run the command-line interface and return an exit status."""
++    parser = _build_parser()
++    args = parser.parse_args(argv)
++    handlers = {"config": _run_config, "simulate": _run_simulate, "dedupe": _run_dedupe}
++    try:
++        return handlers[args.command](args)
++    except GatekeeperError as exc:
++        print(f"gatekeeper: error: {exc}", file=sys.stderr)
++        return 1
++
++
++def _build_parser() -> argparse.ArgumentParser:
++    parser = argparse.ArgumentParser(prog="gatekeeper")
++    commands = parser.add_subparsers(dest="command", required=True)
+ 
+-    show = commands.add_parser("config", help="print the effective configuration as JSON")
+-    show.add_argument("--file", "-f", help="TOML configuration file")
++    config = commands.add_parser("config", help="print the merged configuration as JSON")
++    config.add_argument("--file", "-f", help="TOML configuration file")
+ 
+     simulate = commands.add_parser("simulate", help="replay KEY@SECONDS events through the limiter")
+     simulate.add_argument("--file", "-f", help="TOML configuration file")
+     simulate.add_argument("--limit", type=int, help="override limiter.limit")
+     simulate.add_argument("--window", type=float, help="override limiter.window (seconds)")
+-    simulate.add_argument("events", nargs="+", metavar="KEY@SECONDS",
+-                          help="events in time order, e.g. alice@0 alice@2.5")
++    simulate.add_argument("events", nargs="+", metavar="KEY@SECONDS")
+ 
+-    dedupe = commands.add_parser("dedupe", help="print duplicate groups in a JSON Lines file")
+-    dedupe.add_argument("path", help="JSON Lines file, one object per line")
++    dedupe = commands.add_parser("dedupe", help="find duplicate records in JSONL")
++    dedupe.add_argument("path", help="JSONL input file")
+     dedupe.add_argument("--file", "-f", help="TOML configuration file")
+-    dedupe.add_argument("--key", action="append", dest="keys", metavar="FIELD",
+-                        help="key field (repeatable); default: dedupe.keys from the configuration")
++    dedupe.add_argument("--key", "-k", dest="keys", action="append", help="record field to compare")
+     return parser
+ 
+ 
+-def main(argv: Sequence[str] | None = None) -> int:
+-    """Run the CLI and return the process exit status."""
+-    args = build_parser().parse_args(argv)
+-    handlers = {"config": _run_config, "simulate": _run_simulate, "dedupe": _run_dedupe}
+-    try:
+-        return handlers[args.command](args)
+-    except GatekeeperError as exc:
+-        print(f"gatekeeper: error: {exc}", file=sys.stderr)
+-        return 1
+-
+-
+ def _run_config(args: argparse.Namespace) -> int:
+     config = load_config(args.file)
+     print(json.dumps(config, indent=2, sort_keys=True))
+diff --git a/gatekeeper/gate.py b/gatekeeper/gate.py
+index 2c2929b..692c571 100644
+--- a/gatekeeper/gate.py
++++ b/gatekeeper/gate.py
+@@ -37,11 +37,7 @@ class Gate:
+         self.limiter = SlidingWindowLimiter(settings["limit"], settings["window"], clock)
+ 
+     def check(self, key: str) -> Decision:
+-        """Decide on one request for ``key`` and record it if admitted.
+-
+-        Exempt keys, and every key while the gate is disabled, are always
+-        admitted and never recorded.
+-        """
++        """Decide on one request for ``key`` and record it if admitted."""
+         if not self.enabled or key in self.exempt_keys:
+             return Decision(allowed=True, remaining=self.limiter.limit, retry_after=0.0)
+         allowed = self.limiter.allow(key)
+diff --git a/gatekeeper/limiter.py b/gatekeeper/limiter.py
+index 931f9a1..2e09e95 100644
+--- a/gatekeeper/limiter.py
++++ b/gatekeeper/limiter.py
+@@ -4,18 +4,15 @@ A :class:`SlidingWindowLimiter` admits at most ``limit`` requests per key in
+ any window of ``window`` seconds. Time comes from an injectable clock (see
+ :mod:`gatekeeper.clock`), so tests can control it exactly.
+ 
+-Window rule: a request recorded at time ``t`` keeps counting against its key
+-up to and including time ``t + window``. Refused requests are never recorded.
++Window rule: a request recorded at time ``t`` counts inside the window at time
++``now`` when ``now - window < t <= now``. Requests exactly ``window`` seconds
++old no longer count, and refused requests are never recorded.
+ """
+ 
+-from bisect import bisect_left
++from bisect import bisect_right
+ 
+ from .clock import Clock, SystemClock
+ 
+-# A request still counts at exactly ``t + window``, so the earliest moment a
+-# blocked key gets room again is a hair after that.
+-_EDGE_STEP = 1e-6
+-
+ 
+ class SlidingWindowLimiter:
+     """Admit at most ``limit`` requests per key in any ``window`` seconds.
+@@ -35,16 +32,10 @@ class SlidingWindowLimiter:
+         self.limit = limit
+         self.window = float(window)
+         self.clock = clock if clock is not None else SystemClock()
+-        # Per key, the times of admitted requests in ascending order. The
+-        # clock never goes backwards, so appending keeps each list sorted.
+         self._events: dict[str, list[float]] = {}
+ 
+     def allow(self, key: str) -> bool:
+-        """Admit and record a request for ``key`` if there is room.
+-
+-        Returns ``True`` when the request is admitted. A refused request is
+-        not recorded, so it does not count against later requests.
+-        """
++        """Admit and record a request for ``key`` if there is room."""
+         now = self.clock.now()
+         events = self._live_events(key, now)
+         if len(events) >= self.limit:
+@@ -53,25 +44,18 @@ class SlidingWindowLimiter:
+         return True
+ 
+     def remaining(self, key: str) -> int:
+-        """Return how many more requests ``key`` may make right now.
+-
+-        This only reads the state; it never records anything.
+-        """
++        """Return how many more requests ``key`` may make right now."""
+         now = self.clock.now()
+         return self.limit - self._count(key, now)
+ 
+     def retry_after(self, key: str) -> float:
+-        """Return the seconds until a request for ``key`` would be admitted.
+-
+-        Returns ``0.0`` when a request would be admitted now.
+-        """
++        """Return the seconds until a request for ``key`` would be admitted."""
+         now = self.clock.now()
+         events = self._live_events(key, now)
+         if len(events) < self.limit:
+             return 0.0
+-        # The request that has to leave the window before another one fits.
+         blocking = events[len(events) - self.limit]
+-        return max(0.0, blocking + self.window - now + _EDGE_STEP)
++        return max(0.0, blocking + self.window - now)
+ 
+     def reset(self, key: str | None = None) -> None:
+         """Forget recorded requests for ``key``, or for every key if ``None``."""
+@@ -84,14 +68,12 @@ class SlidingWindowLimiter:
+         return f"SlidingWindowLimiter(limit={self.limit!r}, window={self.window!r})"
+ 
+     def _live_events(self, key: str, now: float) -> list[float]:
+-        """Drop requests for ``key`` that left the window; return the rest."""
+         events = self._events.setdefault(key, [])
+-        expired = bisect_left(events, now - self.window)
++        expired = bisect_right(events, now - self.window)
+         if expired:
+             del events[:expired]
+         return events
+ 
+     def _count(self, key: str, now: float) -> int:
+-        """Count requests for ``key`` inside the window, without pruning."""
+         events = self._events.get(key, [])
+-        return len(events) - bisect_left(events, now - self.window)
++        return len(events) - bisect_right(events, now - self.window)

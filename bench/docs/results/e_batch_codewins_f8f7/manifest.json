@@ -1,0 +1,1175 @@
+{
+  "exp_id": "e_batch_codewins_f8f7",
+  "created_at": "2026-11-14T01:32:57.520402181Z",
+  "experiment": {
+    "id": "e_batch_codewins_f8f7",
+    "name": "batch-codewins",
+    "suite": "coding-core@1.0.0",
+    "base": "agents/codex.yaml",
+    "arms": {
+      "A": {
+        "label": "codex baseline",
+        "set": {
+          "model": "gpt-5.4-mini"
+        }
+      },
+      "B": {
+        "label": "codex with code-wins sentence",
+        "set": {
+          "model": "gpt-5.4-mini",
+          "notes.user_file": "experiments/fixtures/codewins.md"
+        }
+      }
+    },
+    "primary": {
+      "condition": "stale-notes",
+      "metric": "verified_success"
+    },
+    "guards": [
+      {
+        "condition": "clean",
+        "rule": "no_regression"
+      },
+      {
+        "rule": "no_new_integrity_violation"
+      }
+    ],
+    "conditions": [
+      {
+        "id": "clean",
+        "tasks": "all",
+        "trials": 2
+      },
+      {
+        "id": "stale-notes",
+        "tasks": "all",
+        "trials": 2
+      }
+    ],
+    "budget": {
+      "total_usd": 1.8
+    },
+    "verdict": {
+      "policy": "paired_signflip",
+      "alpha": 0.05,
+      "assumed_sd": 0.3
+    },
+    "seed": 20261117,
+    "concurrency": 4,
+    "manifest_mode": "agent_exposure",
+    "policy": "policies/default.yaml"
+  },
+  "suite_id": "coding-core",
+  "suite_version": "1.0.0",
+  "suite_lock_hash": "520215ace7b304de232f16ed8833df3f25ca01cd72e310dd495d38a399e99d56",
+  "arms": {
+    "A": {
+      "label": "codex baseline",
+      "config": {
+        "id": "codex",
+        "adapter": "command",
+        "image": "bench/agent-codex:1",
+        "build": {
+          "dockerfile": "agents/images/codex/Dockerfile",
+          "tag": "bench/agent-codex:1"
+        },
+        "argv": [
+          "codex",
+          "exec",
+          "--json",
+          "--skip-git-repo-check",
+          "--dangerously-bypass-approvals-and-sandbox",
+          "--ephemeral",
+          "--strict-config",
+          "--model",
+          "{{model}}",
+          "--",
+          "{{instruction}}"
+        ],
+        "env": {
+          "BIFROST_API_KEY": "{{run.key}}",
+          "CODEX_HOME": "/home/agent/.codex",
+          "OPENAI_API_KEY": ""
+        },
+        "files": {
+          "/home/agent/.codex/config.toml": "model = \"{{model}}\"\nmodel_provider = \"bifrost\"\nallow_login_shell = false\ncheck_for_update_on_startup = false\nweb_search = \"disabled\"\n\n[analytics]\nenabled = false\n\n[feedback]\nenabled = false\n\n[history]\npersistence = \"none\"\n\n[otel]\nexporter = \"none\"\nlog_user_prompt = false\n\n[features]\nmemories = false\n\n[shell_environment_policy]\nexclude = [\"BIFROST_API_KEY\"]\n\n[model_providers.bifrost]\nname = \"Bifrost\"\nbase_url = \"{{gateway.url}}/openai/v1\"\nwire_api = \"responses\"\nenv_key = \"BIFROST_API_KEY\"\nrequires_openai_auth = false\nsupports_websockets = false\n\n[model_providers.bifrost.http_headers]\nx-bf-session-id = \"{{run.session}}\"\nx-bf-session-affinity = \"off\"\n"
+        },
+        "model": "gpt-5.4-mini",
+        "notes": {
+          "project_file": "AGENTS.md",
+          "user_path": "/home/agent/.codex/AGENTS.md"
+        },
+        "parser": "codex",
+        "budgets": {
+          "wall_s": 900,
+          "cpus": 2,
+          "mem_gb": 4
+        },
+        "gateway": {
+          "provider": "openai",
+          "max_retries": 0
+        }
+      },
+      "config_hash": "dfd6f713e64a15496a8d3756bfc8c6acc77026980a7f8b0a7beb573d94d58b39",
+      "files": {
+        "clean": {
+          "/home/agent/.codex/config.toml": "ca39788de3a13b176789f1f2d2711896fa3b40c9b2e319549f485d6fdfab49c3",
+          "t01:/workspace/AGENTS.md": "97d7a53fd87465daae3423d0158a445676b95a2c222384f06c0052eaab074728",
+          "t02:/workspace/AGENTS.md": "7ab9ad54e251a8fe4879f66ad8f81e0cdaf499fc0a466abaf3c3016d499281dc",
+          "t03:/workspace/AGENTS.md": "7ab9ad54e251a8fe4879f66ad8f81e0cdaf499fc0a466abaf3c3016d499281dc",
+          "t04:/workspace/AGENTS.md": "7ab9ad54e251a8fe4879f66ad8f81e0cdaf499fc0a466abaf3c3016d499281dc",
+          "t05:/workspace/AGENTS.md": "a441aab50e623905286db6129bc5261e27ac7f2a77685a9a3abd2fa57751ebc9",
+          "t06:/workspace/AGENTS.md": "a441aab50e623905286db6129bc5261e27ac7f2a77685a9a3abd2fa57751ebc9",
+          "t07:/workspace/AGENTS.md": "0e50b4881018ca8345e2d4d9b9787b7b27c1d44d872ff7776dd4b4ee839d31b0",
+          "t08:/workspace/AGENTS.md": "a441aab50e623905286db6129bc5261e27ac7f2a77685a9a3abd2fa57751ebc9"
+        },
+        "stale-notes": {
+          "/home/agent/.codex/config.toml": "ca39788de3a13b176789f1f2d2711896fa3b40c9b2e319549f485d6fdfab49c3",
+          "t01:/workspace/AGENTS.md": "8fc5b08ed369ba10268770025149ccfb58ed5df9b3f908b9c16e66ed3aaa48b6",
+          "t02:/workspace/AGENTS.md": "fd15c9a83cde154ac0d825b9a2245731f808bb2bb95ad7d93e0c916a20f93e51",
+          "t03:/workspace/AGENTS.md": "00a0cf99760f1ef0d741621b1d8a3d45ec443cc8d6c687185a4d26b210125e0f",
+          "t04:/workspace/AGENTS.md": "eac10efaa3c0bdcd0e80d59abb5896b9e0851be59be909ca43bec9696bc85962",
+          "t05:/workspace/AGENTS.md": "0a1134aec37b3b2e9d4b6835c283b002d687f0c2059244975bb0b4e331847438",
+          "t06:/workspace/AGENTS.md": "36dd609da44dcf3bc575c18b06891a6f06adf0bf3d8d999737599c1dc5351b23",
+          "t07:/workspace/AGENTS.md": "368249d19d3981dd9665fb04e9a01bac46fd7e4000ceb3ebf9f2f013984bd780",
+          "t08:/workspace/AGENTS.md": "ae9d7b12ffad01f6db61ba19fda8611297df8c143c9ef144d5cc4ec6df250ccf"
+        }
+      }
+    },
+    "B": {
+      "label": "codex with code-wins sentence",
+      "config": {
+        "id": "codex",
+        "adapter": "command",
+        "image": "bench/agent-codex:1",
+        "build": {
+          "dockerfile": "agents/images/codex/Dockerfile",
+          "tag": "bench/agent-codex:1"
+        },
+        "argv": [
+          "codex",
+          "exec",
+          "--json",
+          "--skip-git-repo-check",
+          "--dangerously-bypass-approvals-and-sandbox",
+          "--ephemeral",
+          "--strict-config",
+          "--model",
+          "{{model}}",
+          "--",
+          "{{instruction}}"
+        ],
+        "env": {
+          "BIFROST_API_KEY": "{{run.key}}",
+          "CODEX_HOME": "/home/agent/.codex",
+          "OPENAI_API_KEY": ""
+        },
+        "files": {
+          "/home/agent/.codex/config.toml": "model = \"{{model}}\"\nmodel_provider = \"bifrost\"\nallow_login_shell = false\ncheck_for_update_on_startup = false\nweb_search = \"disabled\"\n\n[analytics]\nenabled = false\n\n[feedback]\nenabled = false\n\n[history]\npersistence = \"none\"\n\n[otel]\nexporter = \"none\"\nlog_user_prompt = false\n\n[features]\nmemories = false\n\n[shell_environment_policy]\nexclude = [\"BIFROST_API_KEY\"]\n\n[model_providers.bifrost]\nname = \"Bifrost\"\nbase_url = \"{{gateway.url}}/openai/v1\"\nwire_api = \"responses\"\nenv_key = \"BIFROST_API_KEY\"\nrequires_openai_auth = false\nsupports_websockets = false\n\n[model_providers.bifrost.http_headers]\nx-bf-session-id = \"{{run.session}}\"\nx-bf-session-affinity = \"off\"\n"
+        },
+        "model": "gpt-5.4-mini",
+        "notes": {
+          "project_file": "AGENTS.md",
+          "user_file": "experiments/fixtures/codewins.md",
+          "user_path": "/home/agent/.codex/AGENTS.md"
+        },
+        "parser": "codex",
+        "budgets": {
+          "wall_s": 900,
+          "cpus": 2,
+          "mem_gb": 4
+        },
+        "gateway": {
+          "provider": "openai",
+          "max_retries": 0
+        }
+      },
+      "config_hash": "9c181777680c0ba0e1e55eec4a66468645aa29d8f635dc77261069929dcc5db5",
+      "files": {
+        "clean": {
+          "/home/agent/.codex/AGENTS.md": "237707dbe80754b719d5ecbc4155289540c6a5efcba2a26329e8b478f07f33ef",
+          "/home/agent/.codex/config.toml": "ca39788de3a13b176789f1f2d2711896fa3b40c9b2e319549f485d6fdfab49c3",
+          "t01:/workspace/AGENTS.md": "97d7a53fd87465daae3423d0158a445676b95a2c222384f06c0052eaab074728",
+          "t02:/workspace/AGENTS.md": "7ab9ad54e251a8fe4879f66ad8f81e0cdaf499fc0a466abaf3c3016d499281dc",
+          "t03:/workspace/AGENTS.md": "7ab9ad54e251a8fe4879f66ad8f81e0cdaf499fc0a466abaf3c3016d499281dc",
+          "t04:/workspace/AGENTS.md": "7ab9ad54e251a8fe4879f66ad8f81e0cdaf499fc0a466abaf3c3016d499281dc",
+          "t05:/workspace/AGENTS.md": "a441aab50e623905286db6129bc5261e27ac7f2a77685a9a3abd2fa57751ebc9",
+          "t06:/workspace/AGENTS.md": "a441aab50e623905286db6129bc5261e27ac7f2a77685a9a3abd2fa57751ebc9",
+          "t07:/workspace/AGENTS.md": "0e50b4881018ca8345e2d4d9b9787b7b27c1d44d872ff7776dd4b4ee839d31b0",
+          "t08:/workspace/AGENTS.md": "a441aab50e623905286db6129bc5261e27ac7f2a77685a9a3abd2fa57751ebc9"
+        },
+        "stale-notes": {
+          "/home/agent/.codex/AGENTS.md": "237707dbe80754b719d5ecbc4155289540c6a5efcba2a26329e8b478f07f33ef",
+          "/home/agent/.codex/config.toml": "ca39788de3a13b176789f1f2d2711896fa3b40c9b2e319549f485d6fdfab49c3",
+          "t01:/workspace/AGENTS.md": "8fc5b08ed369ba10268770025149ccfb58ed5df9b3f908b9c16e66ed3aaa48b6",
+          "t02:/workspace/AGENTS.md": "fd15c9a83cde154ac0d825b9a2245731f808bb2bb95ad7d93e0c916a20f93e51",
+          "t03:/workspace/AGENTS.md": "00a0cf99760f1ef0d741621b1d8a3d45ec443cc8d6c687185a4d26b210125e0f",
+          "t04:/workspace/AGENTS.md": "eac10efaa3c0bdcd0e80d59abb5896b9e0851be59be909ca43bec9696bc85962",
+          "t05:/workspace/AGENTS.md": "0a1134aec37b3b2e9d4b6835c283b002d687f0c2059244975bb0b4e331847438",
+          "t06:/workspace/AGENTS.md": "36dd609da44dcf3bc575c18b06891a6f06adf0bf3d8d999737599c1dc5351b23",
+          "t07:/workspace/AGENTS.md": "368249d19d3981dd9665fb04e9a01bac46fd7e4000ceb3ebf9f2f013984bd780",
+          "t08:/workspace/AGENTS.md": "ae9d7b12ffad01f6db61ba19fda8611297df8c143c9ef144d5cc4ec6df250ccf"
+        }
+      }
+    }
+  },
+  "parts": {
+    "adapter/command": "1.0.0",
+    "adapter/scripted": "1.0.0",
+    "environment/docker_workspace": "1.0.0",
+    "evidence/agent_stream": "1.0.0",
+    "evidence/cost": "1.0.0",
+    "evidence/gateway": "1.0.0",
+    "evidence/proxy_ledger": "1.0.0",
+    "evidence/shim_log": "1.0.0",
+    "gate/egress": "1.0.0",
+    "gate/g10_destroyed_user_work": "1.0.0",
+    "gate/g11_protected_path": "1.0.0",
+    "gate/g12_injection_followed": "1.0.0",
+    "gate/g1_protected_paths": "1.0.0",
+    "gate/g2_test_infra": "1.0.0",
+    "gate/g4_regrade": "1.0.0",
+    "gate/g6_null_agents": "1.0.0",
+    "gate/g8_false_completion": "1.0.0",
+    "gate/model_fidelity": "1.0.0",
+    "gateway/bifrost": "1.0.0",
+    "grader/hidden_tests": "1.0.0",
+    "loader/local": "1.0.0",
+    "metric/claim_precision": "1.0.0",
+    "metric/cost_usd": "1.0.0",
+    "metric/false_completion": "1.0.0",
+    "metric/pattern_ignored_error": "1.0.0",
+    "metric/pattern_loop": "1.0.0",
+    "metric/pattern_unverified_finish": "1.0.0",
+    "metric/retry_amplification": "1.0.0",
+    "metric/safe_success": "1.0.0",
+    "metric/secret_exposed": "1.0.0",
+    "metric/secret_in_context": "1.0.0",
+    "metric/steps": "1.0.0",
+    "metric/tokens": "1.0.0",
+    "metric/tool_calls": "1.0.0",
+    "metric/verified_success": "1.0.0",
+    "metric/wall_time_s": "1.0.0",
+    "parser/claudecode": "1.0.0",
+    "parser/codex": "1.0.0",
+    "parser/opencode": "1.0.0",
+    "probe_layer/fixture": "1.0.0",
+    "probe_layer/gateway": "1.0.0",
+    "probe_layer/tool_shim": "1.0.0",
+    "reporter/json": "1.0.0",
+    "reporter/markdown": "1.0.0",
+    "store/fs": "1.0.0",
+    "verdict_policy/paired_signflip": "1.0.0"
+  },
+  "gateway": {
+    "name": "bifrost",
+    "version": "v2.5.1",
+    "config_sha256": "fb9e8e0766e7c2daa458289b2ea4d6e18d7d097b6a8942ee7207bef054cfc0a2",
+    "plugins": [
+      "compat",
+      "governance",
+      "logging",
+      "model-catalog-resolver",
+      "prompts",
+      "routing",
+      "telemetry"
+    ],
+    "settings": {
+      "allow_direct_keys": "false",
+      "anthropic.base_url": "http://faultproxy:9100",
+      "anthropic.key_slots": "4",
+      "anthropic.max_retries": "0",
+      "anthropic.mode": "proxied",
+      "anthropic.store_raw_request_response": "true",
+      "base_url": "http://faultproxy:9100",
+      "content_logging": "true",
+      "egress_probe": "blocked",
+      "enable_logging": "true",
+      "enforce_auth_on_inference": "true",
+      "eval_network": "bench-evalnet",
+      "key_slots": "4",
+      "max_retries": "0",
+      "mcp_disable_auto_tool_inject": "true",
+      "mode": "proxied",
+      "openai.base_url": "http://faultproxy:9100",
+      "openai.key_slots": "4",
+      "openai.max_retries": "0",
+      "openai.mode": "proxied",
+      "openai.store_raw_request_response": "true",
+      "store_raw_request_response": "true"
+    },
+    "checked_at": "2026-11-14T01:32:57.523711726Z"
+  },
+  "arm_order": {
+    "t01": [
+      "B",
+      "A"
+    ],
+    "t02": [
+      "A",
+      "B"
+    ],
+    "t03": [
+      "B",
+      "A"
+    ],
+    "t04": [
+      "B",
+      "A"
+    ],
+    "t05": [
+      "B",
+      "A"
+    ],
+    "t06": [
+      "B",
+      "A"
+    ],
+    "t07": [
+      "A",
+      "B"
+    ],
+    "t08": [
+      "B",
+      "A"
+    ]
+  },
+  "slots": [
+    {
+      "slot_id": "s_8wpwiqd6ux",
+      "pair_id": "p_c81rxl3v6r",
+      "exp_id": "e_batch_codewins_f8f7",
+      "suite": "coding-core",
+      "task": "t01",
+      "task_version": "1.0.0",
+      "arm": "B",
+      "condition": "clean",
+      "trial": 1,
+      "order_index": 0,
+      "counted": true
+    },
+    {
+      "slot_id": "s_rjvlutnegp",
+      "pair_id": "p_c81rxl3v6r",
+      "exp_id": "e_batch_codewins_f8f7",
+      "suite": "coding-core",
+      "task": "t01",
+      "task_version": "1.0.0",
+      "arm": "A",
+      "condition": "clean",
+      "trial": 1,
+      "order_index": 1,
+      "counted": true
+    },
+    {
+      "slot_id": "s_w15xu1ygy1",
+      "pair_id": "p_bj59birr8h",
+      "exp_id": "e_batch_codewins_f8f7",
+      "suite": "coding-core",
+      "task": "t02",
+      "task_version": "1.0.0",
+      "arm": "A",
+      "condition": "clean",
+      "trial": 1,
+      "order_index": 2,
+      "counted": true
+    },
+    {
+      "slot_id": "s_7yyxfx9k42",
+      "pair_id": "p_bj59birr8h",
+      "exp_id": "e_batch_codewins_f8f7",
+      "suite": "coding-core",
+      "task": "t02",
+      "task_version": "1.0.0",
+      "arm": "B",
+      "condition": "clean",
+      "trial": 1,
+      "order_index": 3,
+      "counted": true
+    },
+    {
+      "slot_id": "s_0ip0yqf12s",
+      "pair_id": "p_idyo5l8a36",
+      "exp_id": "e_batch_codewins_f8f7",
+      "suite": "coding-core",
+      "task": "t03",
+      "task_version": "1.0.0",
+      "arm": "B",
+      "condition": "clean",
+      "trial": 1,
+      "order_index": 4,
+      "counted": true
+    },
+    {
+      "slot_id": "s_qcfqei7vu4",
+      "pair_id": "p_idyo5l8a36",
+      "exp_id": "e_batch_codewins_f8f7",
+      "suite": "coding-core",
+      "task": "t03",
+      "task_version": "1.0.0",
+      "arm": "A",
+      "condition": "clean",
+      "trial": 1,
+      "order_index": 5,
+      "counted": true
+    },
+    {
+      "slot_id": "s_e71ljbx3yx",
+      "pair_id": "p_qa6gh0gx02",
+      "exp_id": "e_batch_codewins_f8f7",
+      "suite": "coding-core",
+      "task": "t04",
+      "task_version": "1.0.0",
+      "arm": "B",
+      "condition": "clean",
+      "trial": 1,
+      "order_index": 6,
+      "counted": true
+    },
+    {
+      "slot_id": "s_u5bkfm5ccj",
+      "pair_id": "p_qa6gh0gx02",
+      "exp_id": "e_batch_codewins_f8f7",
+      "suite": "coding-core",
+      "task": "t04",
+      "task_version": "1.0.0",
+      "arm": "A",
+      "condition": "clean",
+      "trial": 1,
+      "order_index": 7,
+      "counted": true
+    },
+    {
+      "slot_id": "s_wjkhw0kvoc",
+      "pair_id": "p_yx349af5f1",
+      "exp_id": "e_batch_codewins_f8f7",
+      "suite": "coding-core",
+      "task": "t05",
+      "task_version": "1.0.0",
+      "arm": "B",
+      "condition": "clean",
+      "trial": 1,
+      "order_index": 8,
+      "counted": true
+    },
+    {
+      "slot_id": "s_q94nlxjhch",
+      "pair_id": "p_yx349af5f1",
+      "exp_id": "e_batch_codewins_f8f7",
+      "suite": "coding-core",
+      "task": "t05",
+      "task_version": "1.0.0",
+      "arm": "A",
+      "condition": "clean",
+      "trial": 1,
+      "order_index": 9,
+      "counted": true
+    },
+    {
+      "slot_id": "s_1rhrh7bggk",
+      "pair_id": "p_oq1u0ng443",
+      "exp_id": "e_batch_codewins_f8f7",
+      "suite": "coding-core",
+      "task": "t06",
+      "task_version": "1.0.0",
+      "arm": "B",
+      "condition": "clean",
+      "trial": 1,
+      "order_index": 10,
+      "counted": true
+    },
+    {
+      "slot_id": "s_e8h18wr3i4",
+      "pair_id": "p_oq1u0ng443",
+      "exp_id": "e_batch_codewins_f8f7",
+      "suite": "coding-core",
+      "task": "t06",
+      "task_version": "1.0.0",
+      "arm": "A",
+      "condition": "clean",
+      "trial": 1,
+      "order_index": 11,
+      "counted": true
+    },
+    {
+      "slot_id": "s_ewok0ghqum",
+      "pair_id": "p_udyfdph1oi",
+      "exp_id": "e_batch_codewins_f8f7",
+      "suite": "coding-core",
+      "task": "t07",
+      "task_version": "1.0.0",
+      "arm": "A",
+      "condition": "clean",
+      "trial": 1,
+      "order_index": 12,
+      "counted": true
+    },
+    {
+      "slot_id": "s_l12ojso3qq",
+      "pair_id": "p_udyfdph1oi",
+      "exp_id": "e_batch_codewins_f8f7",
+      "suite": "coding-core",
+      "task": "t07",
+      "task_version": "1.0.0",
+      "arm": "B",
+      "condition": "clean",
+      "trial": 1,
+      "order_index": 13,
+      "counted": true
+    },
+    {
+      "slot_id": "s_pcnz81p7d9",
+      "pair_id": "p_urs169org6",
+      "exp_id": "e_batch_codewins_f8f7",
+      "suite": "coding-core",
+      "task": "t08",
+      "task_version": "1.0.0",
+      "arm": "B",
+      "condition": "clean",
+      "trial": 1,
+      "order_index": 14,
+      "counted": true
+    },
+    {
+      "slot_id": "s_vhnfs0bn04",
+      "pair_id": "p_urs169org6",
+      "exp_id": "e_batch_codewins_f8f7",
+      "suite": "coding-core",
+      "task": "t08",
+      "task_version": "1.0.0",
+      "arm": "A",
+      "condition": "clean",
+      "trial": 1,
+      "order_index": 15,
+      "counted": true
+    },
+    {
+      "slot_id": "s_0lw2ujt9ad",
+      "pair_id": "p_vfphgilorg",
+      "exp_id": "e_batch_codewins_f8f7",
+      "suite": "coding-core",
+      "task": "t01",
+      "task_version": "1.0.0",
+      "arm": "B",
+      "condition": "stale-notes",
+      "trial": 1,
+      "order_index": 16,
+      "counted": true
+    },
+    {
+      "slot_id": "s_2915ekrdym",
+      "pair_id": "p_vfphgilorg",
+      "exp_id": "e_batch_codewins_f8f7",
+      "suite": "coding-core",
+      "task": "t01",
+      "task_version": "1.0.0",
+      "arm": "A",
+      "condition": "stale-notes",
+      "trial": 1,
+      "order_index": 17,
+      "counted": true
+    },
+    {
+      "slot_id": "s_mi2drhng04",
+      "pair_id": "p_wigru01s95",
+      "exp_id": "e_batch_codewins_f8f7",
+      "suite": "coding-core",
+      "task": "t02",
+      "task_version": "1.0.0",
+      "arm": "A",
+      "condition": "stale-notes",
+      "trial": 1,
+      "order_index": 18,
+      "counted": true
+    },
+    {
+      "slot_id": "s_kn9wrvdjw4",
+      "pair_id": "p_wigru01s95",
+      "exp_id": "e_batch_codewins_f8f7",
+      "suite": "coding-core",
+      "task": "t02",
+      "task_version": "1.0.0",
+      "arm": "B",
+      "condition": "stale-notes",
+      "trial": 1,
+      "order_index": 19,
+      "counted": true
+    },
+    {
+      "slot_id": "s_6els2181z3",
+      "pair_id": "p_himgsjw2v6",
+      "exp_id": "e_batch_codewins_f8f7",
+      "suite": "coding-core",
+      "task": "t03",
+      "task_version": "1.0.0",
+      "arm": "B",
+      "condition": "stale-notes",
+      "trial": 1,
+      "order_index": 20,
+      "counted": true
+    },
+    {
+      "slot_id": "s_1kdh8iy3qx",
+      "pair_id": "p_himgsjw2v6",
+      "exp_id": "e_batch_codewins_f8f7",
+      "suite": "coding-core",
+      "task": "t03",
+      "task_version": "1.0.0",
+      "arm": "A",
+      "condition": "stale-notes",
+      "trial": 1,
+      "order_index": 21,
+      "counted": true
+    },
+    {
+      "slot_id": "s_dc8h2xd1bw",
+      "pair_id": "p_693tv3ou86",
+      "exp_id": "e_batch_codewins_f8f7",
+      "suite": "coding-core",
+      "task": "t04",
+      "task_version": "1.0.0",
+      "arm": "B",
+      "condition": "stale-notes",
+      "trial": 1,
+      "order_index": 22,
+      "counted": true
+    },
+    {
+      "slot_id": "s_113uq4ctu7",
+      "pair_id": "p_693tv3ou86",
+      "exp_id": "e_batch_codewins_f8f7",
+      "suite": "coding-core",
+      "task": "t04",
+      "task_version": "1.0.0",
+      "arm": "A",
+      "condition": "stale-notes",
+      "trial": 1,
+      "order_index": 23,
+      "counted": true
+    },
+    {
+      "slot_id": "s_tqhtry5ooj",
+      "pair_id": "p_j6doh1qj6n",
+      "exp_id": "e_batch_codewins_f8f7",
+      "suite": "coding-core",
+      "task": "t05",
+      "task_version": "1.0.0",
+      "arm": "B",
+      "condition": "stale-notes",
+      "trial": 1,
+      "order_index": 24,
+      "counted": true
+    },
+    {
+      "slot_id": "s_4e0pis0d8s",
+      "pair_id": "p_j6doh1qj6n",
+      "exp_id": "e_batch_codewins_f8f7",
+      "suite": "coding-core",
+      "task": "t05",
+      "task_version": "1.0.0",
+      "arm": "A",
+      "condition": "stale-notes",
+      "trial": 1,
+      "order_index": 25,
+      "counted": true
+    },
+    {
+      "slot_id": "s_1656dk22k3",
+      "pair_id": "p_j3ifb2pzcw",
+      "exp_id": "e_batch_codewins_f8f7",
+      "suite": "coding-core",
+      "task": "t06",
+      "task_version": "1.0.0",
+      "arm": "B",
+      "condition": "stale-notes",
+      "trial": 1,
+      "order_index": 26,
+      "counted": true
+    },
+    {
+      "slot_id": "s_fylvq429p7",
+      "pair_id": "p_j3ifb2pzcw",
+      "exp_id": "e_batch_codewins_f8f7",
+      "suite": "coding-core",
+      "task": "t06",
+      "task_version": "1.0.0",
+      "arm": "A",
+      "condition": "stale-notes",
+      "trial": 1,
+      "order_index": 27,
+      "counted": true
+    },
+    {
+      "slot_id": "s_cuslg1n7qu",
+      "pair_id": "p_1s0x9n98on",
+      "exp_id": "e_batch_codewins_f8f7",
+      "suite": "coding-core",
+      "task": "t07",
+      "task_version": "1.0.0",
+      "arm": "A",
+      "condition": "stale-notes",
+      "trial": 1,
+      "order_index": 28,
+      "counted": true
+    },
+    {
+      "slot_id": "s_yoteklf24x",
+      "pair_id": "p_1s0x9n98on",
+      "exp_id": "e_batch_codewins_f8f7",
+      "suite": "coding-core",
+      "task": "t07",
+      "task_version": "1.0.0",
+      "arm": "B",
+      "condition": "stale-notes",
+      "trial": 1,
+      "order_index": 29,
+      "counted": true
+    },
+    {
+      "slot_id": "s_kjq0w1jb1i",
+      "pair_id": "p_w0vt439l0h",
+      "exp_id": "e_batch_codewins_f8f7",
+      "suite": "coding-core",
+      "task": "t08",
+      "task_version": "1.0.0",
+      "arm": "B",
+      "condition": "stale-notes",
+      "trial": 1,
+      "order_index": 30,
+      "counted": true
+    },
+    {
+      "slot_id": "s_ltg12uougp",
+      "pair_id": "p_w0vt439l0h",
+      "exp_id": "e_batch_codewins_f8f7",
+      "suite": "coding-core",
+      "task": "t08",
+      "task_version": "1.0.0",
+      "arm": "A",
+      "condition": "stale-notes",
+      "trial": 1,
+      "order_index": 31,
+      "counted": true
+    },
+    {
+      "slot_id": "s_1s66ovxmd7",
+      "pair_id": "p_ged23k6m6b",
+      "exp_id": "e_batch_codewins_f8f7",
+      "suite": "coding-core",
+      "task": "t01",
+      "task_version": "1.0.0",
+      "arm": "B",
+      "condition": "clean",
+      "trial": 2,
+      "order_index": 32,
+      "counted": true
+    },
+    {
+      "slot_id": "s_0h5uiualui",
+      "pair_id": "p_ged23k6m6b",
+      "exp_id": "e_batch_codewins_f8f7",
+      "suite": "coding-core",
+      "task": "t01",
+      "task_version": "1.0.0",
+      "arm": "A",
+      "condition": "clean",
+      "trial": 2,
+      "order_index": 33,
+      "counted": true
+    },
+    {
+      "slot_id": "s_9xhyn6pkk0",
+      "pair_id": "p_eidcf7hnl3",
+      "exp_id": "e_batch_codewins_f8f7",
+      "suite": "coding-core",
+      "task": "t02",
+      "task_version": "1.0.0",
+      "arm": "A",
+      "condition": "clean",
+      "trial": 2,
+      "order_index": 34,
+      "counted": true
+    },
+    {
+      "slot_id": "s_6v55h0l041",
+      "pair_id": "p_eidcf7hnl3",
+      "exp_id": "e_batch_codewins_f8f7",
+      "suite": "coding-core",
+      "task": "t02",
+      "task_version": "1.0.0",
+      "arm": "B",
+      "condition": "clean",
+      "trial": 2,
+      "order_index": 35,
+      "counted": true
+    },
+    {
+      "slot_id": "s_smuv815p6z",
+      "pair_id": "p_hak2beizhl",
+      "exp_id": "e_batch_codewins_f8f7",
+      "suite": "coding-core",
+      "task": "t03",
+      "task_version": "1.0.0",
+      "arm": "B",
+      "condition": "clean",
+      "trial": 2,
+      "order_index": 36,
+      "counted": true
+    },
+    {
+      "slot_id": "s_n5auexw7x3",
+      "pair_id": "p_hak2beizhl",
+      "exp_id": "e_batch_codewins_f8f7",
+      "suite": "coding-core",
+      "task": "t03",
+      "task_version": "1.0.0",
+      "arm": "A",
+      "condition": "clean",
+      "trial": 2,
+      "order_index": 37,
+      "counted": true
+    },
+    {
+      "slot_id": "s_5h3mblyorr",
+      "pair_id": "p_ji4ehnollo",
+      "exp_id": "e_batch_codewins_f8f7",
+      "suite": "coding-core",
+      "task": "t04",
+      "task_version": "1.0.0",
+      "arm": "B",
+      "condition": "clean",
+      "trial": 2,
+      "order_index": 38,
+      "counted": true
+    },
+    {
+      "slot_id": "s_bedkk9u316",
+      "pair_id": "p_ji4ehnollo",
+      "exp_id": "e_batch_codewins_f8f7",
+      "suite": "coding-core",
+      "task": "t04",
+      "task_version": "1.0.0",
+      "arm": "A",
+      "condition": "clean",
+      "trial": 2,
+      "order_index": 39,
+      "counted": true
+    },
+    {
+      "slot_id": "s_b04408x8ko",
+      "pair_id": "p_xd9efvu638",
+      "exp_id": "e_batch_codewins_f8f7",
+      "suite": "coding-core",
+      "task": "t05",
+      "task_version": "1.0.0",
+      "arm": "B",
+      "condition": "clean",
+      "trial": 2,
+      "order_index": 40,
+      "counted": true
+    },
+    {
+      "slot_id": "s_51c0f20pue",
+      "pair_id": "p_xd9efvu638",
+      "exp_id": "e_batch_codewins_f8f7",
+      "suite": "coding-core",
+      "task": "t05",
+      "task_version": "1.0.0",
+      "arm": "A",
+      "condition": "clean",
+      "trial": 2,
+      "order_index": 41,
+      "counted": true
+    },
+    {
+      "slot_id": "s_qkr41s78n9",
+      "pair_id": "p_nzcpunkdsp",
+      "exp_id": "e_batch_codewins_f8f7",
+      "suite": "coding-core",
+      "task": "t06",
+      "task_version": "1.0.0",
+      "arm": "B",
+      "condition": "clean",
+      "trial": 2,
+      "order_index": 42,
+      "counted": true
+    },
+    {
+      "slot_id": "s_zv413youtm",
+      "pair_id": "p_nzcpunkdsp",
+      "exp_id": "e_batch_codewins_f8f7",
+      "suite": "coding-core",
+      "task": "t06",
+      "task_version": "1.0.0",
+      "arm": "A",
+      "condition": "clean",
+      "trial": 2,
+      "order_index": 43,
+      "counted": true
+    },
+    {
+      "slot_id": "s_s3few9fokx",
+      "pair_id": "p_dt7hlm5akx",
+      "exp_id": "e_batch_codewins_f8f7",
+      "suite": "coding-core",
+      "task": "t07",
+      "task_version": "1.0.0",
+      "arm": "A",
+      "condition": "clean",
+      "trial": 2,
+      "order_index": 44,
+      "counted": true
+    },
+    {
+      "slot_id": "s_joddkwxvs7",
+      "pair_id": "p_dt7hlm5akx",
+      "exp_id": "e_batch_codewins_f8f7",
+      "suite": "coding-core",
+      "task": "t07",
+      "task_version": "1.0.0",
+      "arm": "B",
+      "condition": "clean",
+      "trial": 2,
+      "order_index": 45,
+      "counted": true
+    },
+    {
+      "slot_id": "s_cqaeowce3a",
+      "pair_id": "p_pvxkn4ndi9",
+      "exp_id": "e_batch_codewins_f8f7",
+      "suite": "coding-core",
+      "task": "t08",
+      "task_version": "1.0.0",
+      "arm": "B",
+      "condition": "clean",
+      "trial": 2,
+      "order_index": 46,
+      "counted": true
+    },
+    {
+      "slot_id": "s_e0wuw2vlbr",
+      "pair_id": "p_pvxkn4ndi9",
+      "exp_id": "e_batch_codewins_f8f7",
+      "suite": "coding-core",
+      "task": "t08",
+      "task_version": "1.0.0",
+      "arm": "A",
+      "condition": "clean",
+      "trial": 2,
+      "order_index": 47,
+      "counted": true
+    },
+    {
+      "slot_id": "s_c08gqb0nnk",
+      "pair_id": "p_z0cyxior49",
+      "exp_id": "e_batch_codewins_f8f7",
+      "suite": "coding-core",
+      "task": "t01",
+      "task_version": "1.0.0",
+      "arm": "B",
+      "condition": "stale-notes",
+      "trial": 2,
+      "order_index": 48,
+      "counted": true
+    },
+    {
+      "slot_id": "s_gjt4httyik",
+      "pair_id": "p_z0cyxior49",
+      "exp_id": "e_batch_codewins_f8f7",
+      "suite": "coding-core",
+      "task": "t01",
+      "task_version": "1.0.0",
+      "arm": "A",
+      "condition": "stale-notes",
+      "trial": 2,
+      "order_index": 49,
+      "counted": true
+    },
+    {
+      "slot_id": "s_a2twvo2jbo",
+      "pair_id": "p_7z28w37drm",
+      "exp_id": "e_batch_codewins_f8f7",
+      "suite": "coding-core",
+      "task": "t02",
+      "task_version": "1.0.0",
+      "arm": "A",
+      "condition": "stale-notes",
+      "trial": 2,
+      "order_index": 50,
+      "counted": true
+    },
+    {
+      "slot_id": "s_vidk2j1kp1",
+      "pair_id": "p_7z28w37drm",
+      "exp_id": "e_batch_codewins_f8f7",
+      "suite": "coding-core",
+      "task": "t02",
+      "task_version": "1.0.0",
+      "arm": "B",
+      "condition": "stale-notes",
+      "trial": 2,
+      "order_index": 51,
+      "counted": true
+    },
+    {
+      "slot_id": "s_isfve8sbrs",
+      "pair_id": "p_cikw3104xx",
+      "exp_id": "e_batch_codewins_f8f7",
+      "suite": "coding-core",
+      "task": "t03",
+      "task_version": "1.0.0",
+      "arm": "B",
+      "condition": "stale-notes",
+      "trial": 2,
+      "order_index": 52,
+      "counted": true
+    },
+    {
+      "slot_id": "s_lps70vc21k",
+      "pair_id": "p_cikw3104xx",
+      "exp_id": "e_batch_codewins_f8f7",
+      "suite": "coding-core",
+      "task": "t03",
+      "task_version": "1.0.0",
+      "arm": "A",
+      "condition": "stale-notes",
+      "trial": 2,
+      "order_index": 53,
+      "counted": true
+    },
+    {
+      "slot_id": "s_nqvecgsnk4",
+      "pair_id": "p_7murzq9fbh",
+      "exp_id": "e_batch_codewins_f8f7",
+      "suite": "coding-core",
+      "task": "t04",
+      "task_version": "1.0.0",
+      "arm": "B",
+      "condition": "stale-notes",
+      "trial": 2,
+      "order_index": 54,
+      "counted": true
+    },
+    {
+      "slot_id": "s_12nkp5t74e",
+      "pair_id": "p_7murzq9fbh",
+      "exp_id": "e_batch_codewins_f8f7",
+      "suite": "coding-core",
+      "task": "t04",
+      "task_version": "1.0.0",
+      "arm": "A",
+      "condition": "stale-notes",
+      "trial": 2,
+      "order_index": 55,
+      "counted": true
+    },
+    {
+      "slot_id": "s_xau9771d6o",
+      "pair_id": "p_2uzh2rl4eu",
+      "exp_id": "e_batch_codewins_f8f7",
+      "suite": "coding-core",
+      "task": "t05",
+      "task_version": "1.0.0",
+      "arm": "B",
+      "condition": "stale-notes",
+      "trial": 2,
+      "order_index": 56,
+      "counted": true
+    },
+    {
+      "slot_id": "s_q6f4ihs41e",
+      "pair_id": "p_2uzh2rl4eu",
+      "exp_id": "e_batch_codewins_f8f7",
+      "suite": "coding-core",
+      "task": "t05",
+      "task_version": "1.0.0",
+      "arm": "A",
+      "condition": "stale-notes",
+      "trial": 2,
+      "order_index": 57,
+      "counted": true
+    },
+    {
+      "slot_id": "s_egf4y6wzs5",
+      "pair_id": "p_yjt1nmbrcq",
+      "exp_id": "e_batch_codewins_f8f7",
+      "suite": "coding-core",
+      "task": "t06",
+      "task_version": "1.0.0",
+      "arm": "B",
+      "condition": "stale-notes",
+      "trial": 2,
+      "order_index": 58,
+      "counted": true
+    },
+    {
+      "slot_id": "s_j6jgx98s4v",
+      "pair_id": "p_yjt1nmbrcq",
+      "exp_id": "e_batch_codewins_f8f7",
+      "suite": "coding-core",
+      "task": "t06",
+      "task_version": "1.0.0",
+      "arm": "A",
+      "condition": "stale-notes",
+      "trial": 2,
+      "order_index": 59,
+      "counted": true
+    },
+    {
+      "slot_id": "s_3ybp0lglmq",
+      "pair_id": "p_smew3o4n10",
+      "exp_id": "e_batch_codewins_f8f7",
+      "suite": "coding-core",
+      "task": "t07",
+      "task_version": "1.0.0",
+      "arm": "A",
+      "condition": "stale-notes",
+      "trial": 2,
+      "order_index": 60,
+      "counted": true
+    },
+    {
+      "slot_id": "s_l6kjwj9dml",
+      "pair_id": "p_smew3o4n10",
+      "exp_id": "e_batch_codewins_f8f7",
+      "suite": "coding-core",
+      "task": "t07",
+      "task_version": "1.0.0",
+      "arm": "B",
+      "condition": "stale-notes",
+      "trial": 2,
+      "order_index": 61,
+      "counted": true
+    },
+    {
+      "slot_id": "s_fvac4b70qm",
+      "pair_id": "p_dqali3jzia",
+      "exp_id": "e_batch_codewins_f8f7",
+      "suite": "coding-core",
+      "task": "t08",
+      "task_version": "1.0.0",
+      "arm": "B",
+      "condition": "stale-notes",
+      "trial": 2,
+      "order_index": 62,
+      "counted": true
+    },
+    {
+      "slot_id": "s_zjeo8sj6t8",
+      "pair_id": "p_dqali3jzia",
+      "exp_id": "e_batch_codewins_f8f7",
+      "suite": "coding-core",
+      "task": "t08",
+      "task_version": "1.0.0",
+      "arm": "A",
+      "condition": "stale-notes",
+      "trial": 2,
+      "order_index": 63,
+      "counted": true
+    }
+  ],
+  "randomization_unit": "task",
+  "bench_version": "0.1.0",
+  "policy_hash": "e47dcf5ea03a71755dce421754ef82d7833c517aa1d2c79fa1be6d9479a27531",
+  "hash": "249ba677cdf82525be00b490b1458be950ed72574f0a42fdcd9a52802df0d45d"
+}

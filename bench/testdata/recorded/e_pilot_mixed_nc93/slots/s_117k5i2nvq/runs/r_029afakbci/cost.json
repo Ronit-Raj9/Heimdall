@@ -1,0 +1,116 @@
+[
+  {
+    "request_id": "7560dd51-9256-4851-8d46-6bc6e149b4a6",
+    "attempt": 1,
+    "model": "gpt-5.4-mini-2026-03-17",
+    "tokens": {
+      "fresh": 1238,
+      "cache_read": 0,
+      "cache_write": 0,
+      "out": 167
+    },
+    "price_ref": "bifrost-datasheet-2026-11-14-openai@sha256:064520900aeda8c3b5dec578dbbbe095f8fd366c388837fb21667ba2acf02000",
+    "usd": {
+      "state": "observed",
+      "v": 0.00168,
+      "evidence": "gateway"
+    },
+    "bifrost_usd": 0.00168,
+    "fault_inject": false
+  },
+  {
+    "request_id": "0914cbfd-3780-4c9f-93e5-08622a3d5ee9",
+    "attempt": 1,
+    "model": "gpt-5.4-mini-2026-03-17",
+    "tokens": {
+      "fresh": 2477,
+      "cache_read": 1152,
+      "cache_write": 0,
+      "out": 144
+    },
+    "price_ref": "bifrost-datasheet-2026-11-14-openai@sha256:064520900aeda8c3b5dec578dbbbe095f8fd366c388837fb21667ba2acf02000",
+    "usd": {
+      "state": "observed",
+      "v": 0.00259215,
+      "evidence": "gateway"
+    },
+    "bifrost_usd": 0.00259215,
+    "fault_inject": false
+  },
+  {
+    "request_id": "45c1610f-411e-41b6-ac81-5120b090ce56",
+    "attempt": 1,
+    "model": "gpt-5.4-mini-2026-03-17",
+    "tokens": {
+      "fresh": 2069,
+      "cache_read": 3456,
+      "cache_write": 0,
+      "out": 883
+    },
+    "price_ref": "bifrost-datasheet-2026-11-14-openai@sha256:064520900aeda8c3b5dec578dbbbe095f8fd366c388837fb21667ba2acf02000",
+    "usd": {
+      "state": "observed",
+      "v": 0.00578445,
+      "evidence": "gateway"
+    },
+    "bifrost_usd": 0.00578445,
+    "fault_inject": false
+  },
+  {
+    "request_id": "0e91b22e-1452-4536-a890-19658f8cb135",
+    "attempt": 1,
+    "model": "gpt-5.4-mini-2026-03-17",
+    "tokens": {
+      "fresh": 1054,
+      "cache_read": 5376,
+      "cache_write": 0,
+      "out": 1104
+    },
+    "price_ref": "bifrost-datasheet-2026-11-14-openai@sha256:064520900aeda8c3b5dec578dbbbe095f8fd366c388837fb21667ba2acf02000",
+    "usd": {
+      "state": "observed",
+      "v": 0.0061617,
+      "evidence": "gateway"
+    },
+    "bifrost_usd": 0.0061617,
+    "fault_inject": false
+  },
+  {
+    "request_id": "90573d05-a321-4bdc-a74c-ed91e19cce73",
+    "attempt": 1,
+    "model": "gpt-5.4-mini-2026-03-17",
+    "tokens": {
+      "fresh": 1284,
+      "cache_read": 6272,
+      "cache_write": 0,
+      "out": 27
+    },
+    "price_ref": "bifrost-datasheet-2026-11-14-openai@sha256:064520900aeda8c3b5dec578dbbbe095f8fd366c388837fb21667ba2acf02000",
+    "usd": {
+      "state": "observed",
+      "v": 0.0015549000000000001,
+      "evidence": "gateway"
+    },
+    "bifrost_usd": 0.0015549000000000001,
+    "fault_inject": false
+  },
+  {
+    "request_id": "f4519b56-1178-4216-8ff8-2c7ce6607127",
+    "attempt": 1,
+    "model": "gpt-5.4-mini-2026-03-17",
+    "tokens": {
+      "fresh": 190,
+      "cache_read": 7424,
+      "cache_write": 0,
+      "out": 83
+    },
+    "price_ref": "bifrost-datasheet-2026-11-14-openai@sha256:064520900aeda8c3b5dec578dbbbe095f8fd366c388837fb21667ba2acf02000",
+    "usd": {
+      "state": "observed",
+      "v": 0.0010728,
+      "evidence": "gateway"
+    },
+    "bifrost_usd": 0.0010728,
+    "fault_inject": false
+  }
+]

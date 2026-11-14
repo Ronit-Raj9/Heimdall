@@ -2,6 +2,26 @@
 
 A runs root holding sealed experiments that the CI gate (`../../ci/`, `../../docs/ci.md`) re-analyzes with `bifrost-bench check -exp <id>`. No agent, gateway, Docker or key is needed to replay it.
 
+## `e_pilot_mixed_nc93`: REAL
+
+Real agents, a real model and real Bifrost. This is the bundle the CI workflow replays.
+
+| Field | Value |
+|---|---|
+| Agents | arm A: Codex CLI 0.169.0 (`agents/codex.yaml`); arm B: the custom-python template agent (`agents/custom-python.yaml`, no framework) |
+| Model | `gpt-5.4-mini` on OpenAI, through stock Bifrost `v2.5.1` and the fault proxy (real upstream; the key lived only in the proxy) |
+| Experiment file | `experiments/pilot-mixed.yaml`: one run per arm of clean (t02), stale-notes (t01), model-outage (t01), test-crash (t06) and empty-test-run (t05) |
+| Runs | 10, all sealed. Arm A: pass on clean, stale-notes and test-crash; fail on model-outage and empty-test-run. Arm B: pass on clean, stale-notes, test-crash and empty-test-run; fail on model-outage |
+| Spend | $0.172 for all 10 runs, from the bench's own cost ledger |
+| Fault receipts | every probe armed and fired; the run nonce reached the model in Bifrost's request rows for stale-notes, test-crash and empty-test-run; under model-outage Codex retried until 30 of its 32 requests had been answered with 503 |
+| Manifest hash | `be32a712e20c78445992042df1aa72b7f26f2fa5f622060d0480799c5df6a160`, frozen 2026-11-14T01:00:36Z |
+| Verdict | `inconclusive`, action `no_decision`, policy `warn` (5 tasks, 1 run each: too few to decide anything, by design) |
+| Size | 184 files, about 19 MB, most of it Bifrost's request rows (`gateway.requests.jsonl`) |
+
+It was copied from `bench/runs/e_pilot_mixed_nc93` byte for byte (`cp -a`) and made owner-writable; `GOWORK=off go test ./ci/` verifies its seals. Before the copy every file was scanned for the values in `deploy/.env` (provider key, setup token, Postgres password, fault proxy token) and for `sk-proj-`, `Bearer sk-` and Bifrost virtual keys (`sk-bf-`): none were found.
+
+The larger real batch (240 runs: Codex against custom-python under all three PS2 failure families, a seeded regression, and the code-wins experiment) is too big for git (about 560 MB); its reports are in `../../docs/results/`.
+
 ## `e_smoke_sdoj`: SYNTHETIC
 
 **This experiment is synthetic. Its numbers are not findings about any agent or model.**

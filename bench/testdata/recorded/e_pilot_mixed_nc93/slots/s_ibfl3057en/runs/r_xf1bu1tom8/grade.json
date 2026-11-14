@@ -1,0 +1,13 @@
+{
+  "passed": true,
+  "invalid_evaluator": false,
+  "exit_code": 0,
+  "tests_ran": 7,
+  "failures": 0,
+  "errors": 0,
+  "skipped": 0,
+  "reason": "passed (7 tests)",
+  "suite_version": "1.0.0",
+  "grader_version": "1.0.0",
+  "diff_sha256": "d5681557a627bcd738f0d3cc9ec60c284d8bc244f4cd9bae2e2b0928eda19a4b"
+}

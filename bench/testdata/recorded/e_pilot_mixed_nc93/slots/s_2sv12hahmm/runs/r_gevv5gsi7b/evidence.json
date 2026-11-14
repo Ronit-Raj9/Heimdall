@@ -1,0 +1,4288 @@
+{
+  "exec": {
+    "exit_code": 1,
+    "timed_out": false,
+    "started": "2026-11-14T01:01:06.454029482Z",
+    "ended": "2026-11-14T01:02:09.626945672Z",
+    "stdout_path": "/home/raj/Storage/CODING/Hackathon/Bifrost/repo/bench/runs/e_pilot_mixed_nc93/slots/s_2sv12hahmm/runs/r_gevv5gsi7b/agent.stream.jsonl",
+    "stderr_path": "/home/raj/Storage/CODING/Hackathon/Bifrost/repo/bench/runs/e_pilot_mixed_nc93/slots/s_2sv12hahmm/runs/r_gevv5gsi7b/agent.stderr.txt",
+    "truncated": false
+  },
+  "diff": {
+    "path": "/home/raj/Storage/CODING/Hackathon/Bifrost/repo/bench/runs/e_pilot_mixed_nc93/slots/s_2sv12hahmm/runs/r_gevv5gsi7b/workspace.diff",
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "files": null
+  },
+  "requests": {
+    "requests": [
+      {
+        "id": "72cb8596-f73f-4830-aeee-975f372c3858",
+        "timestamp": "2026-11-14T01:01:06.822116Z",
+        "status": "success",
+        "kind": "message",
+        "provider": "openai",
+        "model_requested": "gpt-5.4-mini",
+        "model_served": "gpt-5.4-mini-2026-03-17",
+        "fallback_index": 0,
+        "stream": true,
+        "latency_ms": 1441.321114,
+        "tokens": {
+          "fresh": 8227,
+          "cache_read": 0,
+          "cache_write": 0,
+          "out": 85
+        },
+        "bifrost_usd": 0.00655275,
+        "cache_hit": false,
+        "response_id": "resp_094acf00c138e0b4016af7b2d2fc0487d293a5599ca43e64c3",
+        "attempts": [
+          {
+            "n": 1,
+            "key_name": "oa-slot-3"
+          }
+        ],
+        "tool_calls": [
+          {
+            "id": "call_ShCCbCIYxf1Th4DGBkonEaHM",
+            "name": "exec_command",
+            "args_hash": "2ca5e6ec50afce41c32ad3a191233c73e2f4b5e1d8f5a1c30824d65db4e1aa3a"
+          }
+        ]
+      },
+      {
+        "id": "17b37bd4-9c58-4270-a9e1-7b281ab6e2a3",
+        "timestamp": "2026-11-14T01:01:08.287913Z",
+        "status": "success",
+        "kind": "message",
+        "provider": "openai",
+        "model_requested": "gpt-5.4-mini",
+        "model_served": "gpt-5.4-mini-2026-03-17",
+        "fallback_index": 0,
+        "stream": true,
+        "latency_ms": 2430.346025,
+        "tokens": {
+          "fresh": 3038,
+          "cache_read": 8064,
+          "cache_write": 0,
+          "out": 160
+        },
+        "bifrost_usd": 0.0036033000000000003,
+        "cache_hit": false,
+        "response_id": "resp_094acf00c138e0b4016af7b2d4753487d2ba7370d2e59e6437",
+        "attempts": [
+          {
+            "n": 1,
+            "key_name": "oa-slot-3"
+          }
+        ],
+        "tool_calls": [
+          {
+            "id": "call_ZplakoxoSaRSd5uYE8K3SVbp",
+            "name": "exec_command",
+            "args_hash": "2d1c3b350997d29a4958146914320788e87151cf3a425226fa5be1c483728d06"
+          }
+        ],
+        "tool_result_ids": [
+          "call_ShCCbCIYxf1Th4DGBkonEaHM"
+        ]
+      },
+      {
+        "id": "ec26eb66-2006-43f6-9116-abd9e1a4cf1d",
+        "timestamp": "2026-11-14T01:01:10.734505Z",
+        "status": "error",
+        "kind": "message",
+        "provider": "openai",
+        "model_requested": "gpt-5.4-mini",
+        "model_served": "gpt-5.4-mini",
+        "fallback_index": 0,
+        "stream": true,
+        "latency_ms": 9,
+        "cache_hit": false,
+        "error_status": 503,
+        "error_message": "The server is overloaded or not ready yet. ref nonce_txc3ha2m07frd41bnuoafy0i call 3",
+        "attempts": [
+          {
+            "n": 1,
+            "key_name": "oa-slot-3",
+            "status_code": 503,
+            "fail_reason": "server_error",
+            "failure_class": "transient",
+            "retry_after_ms": 2000
+          }
+        ],
+        "tool_result_ids": [
+          "call_ShCCbCIYxf1Th4DGBkonEaHM",
+          "call_ZplakoxoSaRSd5uYE8K3SVbp"
+        ]
+      },
+      {
+        "id": "110b633a-0648-4368-b71d-f78687d17459",
+        "timestamp": "2026-11-14T01:01:12.747363Z",
+        "status": "error",
+        "kind": "message",
+        "provider": "openai",
+        "model_requested": "gpt-5.4-mini",
+        "model_served": "gpt-5.4-mini",
+        "fallback_index": 0,
+        "stream": true,
+        "latency_ms": 6,
+        "cache_hit": false,
+        "error_status": 503,
+        "error_message": "The server is overloaded or not ready yet. ref nonce_txc3ha2m07frd41bnuoafy0i call 4",
+        "attempts": [
+          {
+            "n": 1,
+            "key_name": "oa-slot-3",
+            "status_code": 503,
+            "fail_reason": "server_error",
+            "failure_class": "transient",
+            "retry_after_ms": 2000
+          }
+        ],
+        "tool_result_ids": [
+          "call_ShCCbCIYxf1Th4DGBkonEaHM",
+          "call_ZplakoxoSaRSd5uYE8K3SVbp"
+        ]
+      },
+      {
+        "id": "c0134df8-94e6-457e-800c-d97b1149d01c",
+        "timestamp": "2026-11-14T01:01:14.757157Z",
+        "status": "error",
+        "kind": "message",
+        "provider": "openai",
+        "model_requested": "gpt-5.4-mini",
+        "model_served": "gpt-5.4-mini",
+        "fallback_index": 0,
+        "stream": true,
+        "latency_ms": 6,
+        "cache_hit": false,
+        "error_status": 503,
+        "error_message": "The server is overloaded or not ready yet. ref nonce_txc3ha2m07frd41bnuoafy0i call 5",
+        "attempts": [
+          {
+            "n": 1,
+            "key_name": "oa-slot-3",
+            "status_code": 503,
+            "fail_reason": "server_error",
+            "failure_class": "transient",
+            "retry_after_ms": 2000
+          }
+        ],
+        "tool_result_ids": [
+          "call_ShCCbCIYxf1Th4DGBkonEaHM",
+          "call_ZplakoxoSaRSd5uYE8K3SVbp"
+        ]
+      },
+      {
+        "id": "ba775e17-2aa3-48e7-a2c2-d83189331ccd",
+        "timestamp": "2026-11-14T01:01:16.767145Z",
+        "status": "error",
+        "kind": "message",
+        "provider": "openai",
+        "model_requested": "gpt-5.4-mini",
+        "model_served": "gpt-5.4-mini",
+        "fallback_index": 0,
+        "stream": true,
+        "latency_ms": 9,
+        "cache_hit": false,
+        "error_status": 503,
+        "error_message": "The server is overloaded or not ready yet. ref nonce_txc3ha2m07frd41bnuoafy0i call 6",
+        "attempts": [
+          {
+            "n": 1,
+            "key_name": "oa-slot-3",
+            "status_code": 503,
+            "fail_reason": "server_error",
+            "failure_class": "transient",
+            "retry_after_ms": 2000
+          }
+        ],
+        "tool_result_ids": [
+          "call_ShCCbCIYxf1Th4DGBkonEaHM",
+          "call_ZplakoxoSaRSd5uYE8K3SVbp"
+        ]
+      },
+      {
+        "id": "a64a5639-552e-4245-9f7f-e4b2fb2146a4",
+        "timestamp": "2026-11-14T01:01:18.780064Z",
+        "status": "error",
+        "kind": "message",
+        "provider": "openai",
+        "model_requested": "gpt-5.4-mini",
+        "model_served": "gpt-5.4-mini",
+        "fallback_index": 0,
+        "stream": true,
+        "latency_ms": 5,
+        "cache_hit": false,
+        "error_status": 503,
+        "error_message": "The server is overloaded or not ready yet. ref nonce_txc3ha2m07frd41bnuoafy0i call 7",
+        "attempts": [
+          {
+            "n": 1,
+            "key_name": "oa-slot-3",
+            "status_code": 503,
+            "fail_reason": "server_error",
+            "failure_class": "transient",
+            "retry_after_ms": 2000
+          }
+        ],
+        "tool_result_ids": [
+          "call_ShCCbCIYxf1Th4DGBkonEaHM",
+          "call_ZplakoxoSaRSd5uYE8K3SVbp"
+        ]
+      },
+      {
+        "id": "bb5bbbb1-2b5e-4f66-8566-f2db21205556",
+        "timestamp": "2026-11-14T01:01:20.805173Z",
+        "status": "error",
+        "kind": "message",
+        "provider": "openai",
+        "model_requested": "gpt-5.4-mini",
+        "model_served": "gpt-5.4-mini",
+        "fallback_index": 0,
+        "stream": true,
+        "latency_ms": 6,
+        "cache_hit": false,
+        "error_status": 503,
+        "error_message": "The server is overloaded or not ready yet. ref nonce_txc3ha2m07frd41bnuoafy0i call 8",
+        "attempts": [
+          {
+            "n": 1,
+            "key_name": "oa-slot-3",
+            "status_code": 503,
+            "fail_reason": "server_error",
+            "failure_class": "transient",
+            "retry_after_ms": 2000
+          }
+        ],
+        "tool_result_ids": [
+          "call_ShCCbCIYxf1Th4DGBkonEaHM",
+          "call_ZplakoxoSaRSd5uYE8K3SVbp"
+        ]
+      },
+      {
+        "id": "4a979831-0df5-4030-b243-bfb743f1d70a",
+        "timestamp": "2026-11-14T01:01:22.816312Z",
+        "status": "error",
+        "kind": "message",
+        "provider": "openai",
+        "model_requested": "gpt-5.4-mini",
+        "model_served": "gpt-5.4-mini",
+        "fallback_index": 0,
+        "stream": true,
+        "latency_ms": 7,
+        "cache_hit": false,
+        "error_status": 503,
+        "error_message": "The server is overloaded or not ready yet. ref nonce_txc3ha2m07frd41bnuoafy0i call 9",
+        "attempts": [
+          {
+            "n": 1,
+            "key_name": "oa-slot-3",
+            "status_code": 503,
+            "fail_reason": "server_error",
+            "failure_class": "transient",
+            "retry_after_ms": 2000
+          }
+        ],
+        "tool_result_ids": [
+          "call_ShCCbCIYxf1Th4DGBkonEaHM",
+          "call_ZplakoxoSaRSd5uYE8K3SVbp"
+        ]
+      },
+      {
+        "id": "c5f26f28-bc02-4ca7-92ac-a2273efa42b3",
+        "timestamp": "2026-11-14T01:01:24.827303Z",
+        "status": "error",
+        "kind": "message",
+        "provider": "openai",
+        "model_requested": "gpt-5.4-mini",
+        "model_served": "gpt-5.4-mini",
+        "fallback_index": 0,
+        "stream": true,
+        "latency_ms": 9,
+        "cache_hit": false,
+        "error_status": 503,
+        "error_message": "The server is overloaded or not ready yet. ref nonce_txc3ha2m07frd41bnuoafy0i call 10",
+        "attempts": [
+          {
+            "n": 1,
+            "key_name": "oa-slot-3",
+            "status_code": 503,
+            "fail_reason": "server_error",
+            "failure_class": "transient",
+            "retry_after_ms": 2000
+          }
+        ],
+        "tool_result_ids": [
+          "call_ShCCbCIYxf1Th4DGBkonEaHM",
+          "call_ZplakoxoSaRSd5uYE8K3SVbp"
+        ]
+      },
+      {
+        "id": "8d9e308d-2b22-474d-9707-35fb3165577e",
+        "timestamp": "2026-11-14T01:01:26.840108Z",
+        "status": "error",
+        "kind": "message",
+        "provider": "openai",
+        "model_requested": "gpt-5.4-mini",
+        "model_served": "gpt-5.4-mini",
+        "fallback_index": 0,
+        "stream": true,
+        "latency_ms": 6,
+        "cache_hit": false,
+        "error_status": 503,
+        "error_message": "The server is overloaded or not ready yet. ref nonce_txc3ha2m07frd41bnuoafy0i call 11",
+        "attempts": [
+          {
+            "n": 1,
+            "key_name": "oa-slot-3",
+            "status_code": 503,
+            "fail_reason": "server_error",
+            "failure_class": "transient",
+            "retry_after_ms": 2000
+          }
+        ],
+        "tool_result_ids": [
+          "call_ShCCbCIYxf1Th4DGBkonEaHM",
+          "call_ZplakoxoSaRSd5uYE8K3SVbp"
+        ]
+      },
+      {
+        "id": "77d3ea68-37bd-42ff-af2a-e9b98370dc40",
+        "timestamp": "2026-11-14T01:01:28.849278Z",
+        "status": "error",
+        "kind": "message",
+        "provider": "openai",
+        "model_requested": "gpt-5.4-mini",
+        "model_served": "gpt-5.4-mini",
+        "fallback_index": 0,
+        "stream": true,
+        "latency_ms": 10,
+        "cache_hit": false,
+        "error_status": 503,
+        "error_message": "The server is overloaded or not ready yet. ref nonce_txc3ha2m07frd41bnuoafy0i call 12",
+        "attempts": [
+          {
+            "n": 1,
+            "key_name": "oa-slot-3",
+            "status_code": 503,
+            "fail_reason": "server_error",
+            "failure_class": "transient",
+            "retry_after_ms": 2000
+          }
+        ],
+        "tool_result_ids": [
+          "call_ShCCbCIYxf1Th4DGBkonEaHM",
+          "call_ZplakoxoSaRSd5uYE8K3SVbp"
+        ]
+      },
+      {
+        "id": "fe80dc39-79f5-4678-be17-f74c15a79d1b",
+        "timestamp": "2026-11-14T01:01:30.877853Z",
+        "status": "error",
+        "kind": "message",
+        "provider": "openai",
+        "model_requested": "gpt-5.4-mini",
+        "model_served": "gpt-5.4-mini",
+        "fallback_index": 0,
+        "stream": true,
+        "latency_ms": 13,
+        "cache_hit": false,
+        "error_status": 503,
+        "error_message": "The server is overloaded or not ready yet. ref nonce_txc3ha2m07frd41bnuoafy0i call 13",
+        "attempts": [
+          {
+            "n": 1,
+            "key_name": "oa-slot-3",
+            "status_code": 503,
+            "fail_reason": "server_error",
+            "failure_class": "transient",
+            "retry_after_ms": 2000
+          }
+        ],
+        "tool_result_ids": [
+          "call_ShCCbCIYxf1Th4DGBkonEaHM",
+          "call_ZplakoxoSaRSd5uYE8K3SVbp"
+        ]
+      },
+      {
+        "id": "103ce144-2d58-45e1-8eb2-6cff80f64d29",
+        "timestamp": "2026-11-14T01:01:32.900404Z",
+        "status": "error",
+        "kind": "message",
+        "provider": "openai",
+        "model_requested": "gpt-5.4-mini",
+        "model_served": "gpt-5.4-mini",
+        "fallback_index": 0,
+        "stream": true,
+        "latency_ms": 9,
+        "cache_hit": false,
+        "error_status": 503,
+        "error_message": "The server is overloaded or not ready yet. ref nonce_txc3ha2m07frd41bnuoafy0i call 14",
+        "attempts": [
+          {
+            "n": 1,
+            "key_name": "oa-slot-3",
+            "status_code": 503,
+            "fail_reason": "server_error",
+            "failure_class": "transient",
+            "retry_after_ms": 2000
+          }
+        ],
+        "tool_result_ids": [
+          "call_ShCCbCIYxf1Th4DGBkonEaHM",
+          "call_ZplakoxoSaRSd5uYE8K3SVbp"
+        ]
+      },
+      {
+        "id": "91b18f27-ba6d-4778-ba9e-5cc54561ab15",
+        "timestamp": "2026-11-14T01:01:34.913332Z",
+        "status": "error",
+        "kind": "message",
+        "provider": "openai",
+        "model_requested": "gpt-5.4-mini",
+        "model_served": "gpt-5.4-mini",
+        "fallback_index": 0,
+        "stream": true,
+        "latency_ms": 9,
+        "cache_hit": false,
+        "error_status": 503,
+        "error_message": "The server is overloaded or not ready yet. ref nonce_txc3ha2m07frd41bnuoafy0i call 15",
+        "attempts": [
+          {
+            "n": 1,
+            "key_name": "oa-slot-3",
+            "status_code": 503,
+            "fail_reason": "server_error",
+            "failure_class": "transient",
+            "retry_after_ms": 2000
+          }
+        ],
+        "tool_result_ids": [
+          "call_ShCCbCIYxf1Th4DGBkonEaHM",
+          "call_ZplakoxoSaRSd5uYE8K3SVbp"
+        ]
+      },
+      {
+        "id": "0c97becf-1f52-41b9-b08d-a995a987e5ce",
+        "timestamp": "2026-11-14T01:01:36.926277Z",
+        "status": "error",
+        "kind": "message",
+        "provider": "openai",
+        "model_requested": "gpt-5.4-mini",
+        "model_served": "gpt-5.4-mini",
+        "fallback_index": 0,
+        "stream": true,
+        "latency_ms": 6,
+        "cache_hit": false,
+        "error_status": 503,
+        "error_message": "The server is overloaded or not ready yet. ref nonce_txc3ha2m07frd41bnuoafy0i call 16",
+        "attempts": [
+          {
+            "n": 1,
+            "key_name": "oa-slot-3",
+            "status_code": 503,
+            "fail_reason": "server_error",
+            "failure_class": "transient",
+            "retry_after_ms": 2000
+          }
+        ],
+        "tool_result_ids": [
+          "call_ShCCbCIYxf1Th4DGBkonEaHM",
+          "call_ZplakoxoSaRSd5uYE8K3SVbp"
+        ]
+      },
+      {
+        "id": "a351dd29-e132-4df8-8329-d270ada85f01",
+        "timestamp": "2026-11-14T01:01:38.936345Z",
+        "status": "error",
+        "kind": "message",
+        "provider": "openai",
+        "model_requested": "gpt-5.4-mini",
+        "model_served": "gpt-5.4-mini",
+        "fallback_index": 0,
+        "stream": true,
+        "latency_ms": 6,
+        "cache_hit": false,
+        "error_status": 503,
+        "error_message": "The server is overloaded or not ready yet. ref nonce_txc3ha2m07frd41bnuoafy0i call 17",
+        "attempts": [
+          {
+            "n": 1,
+            "key_name": "oa-slot-3",
+            "status_code": 503,
+            "fail_reason": "server_error",
+            "failure_class": "transient",
+            "retry_after_ms": 2000
+          }
+        ],
+        "tool_result_ids": [
+          "call_ShCCbCIYxf1Th4DGBkonEaHM",
+          "call_ZplakoxoSaRSd5uYE8K3SVbp"
+        ]
+      },
+      {
+        "id": "37d282fa-274a-46a2-be58-a5794fee89e7",
+        "timestamp": "2026-11-14T01:01:40.958896Z",
+        "status": "error",
+        "kind": "message",
+        "provider": "openai",
+        "model_requested": "gpt-5.4-mini",
+        "model_served": "gpt-5.4-mini",
+        "fallback_index": 0,
+        "stream": true,
+        "latency_ms": 6,
+        "cache_hit": false,
+        "error_status": 503,
+        "error_message": "The server is overloaded or not ready yet. ref nonce_txc3ha2m07frd41bnuoafy0i call 18",
+        "attempts": [
+          {
+            "n": 1,
+            "key_name": "oa-slot-3",
+            "status_code": 503,
+            "fail_reason": "server_error",
+            "failure_class": "transient",
+            "retry_after_ms": 2000
+          }
+        ],
+        "tool_result_ids": [
+          "call_ShCCbCIYxf1Th4DGBkonEaHM",
+          "call_ZplakoxoSaRSd5uYE8K3SVbp"
+        ]
+      },
+      {
+        "id": "c4baaee2-4f85-4bb4-9817-92ae13fe5398",
+        "timestamp": "2026-11-14T01:01:42.968902Z",
+        "status": "error",
+        "kind": "message",
+        "provider": "openai",
+        "model_requested": "gpt-5.4-mini",
+        "model_served": "gpt-5.4-mini",
+        "fallback_index": 0,
+        "stream": true,
+        "latency_ms": 13,
+        "cache_hit": false,
+        "error_status": 503,
+        "error_message": "The server is overloaded or not ready yet. ref nonce_txc3ha2m07frd41bnuoafy0i call 19",
+        "attempts": [
+          {
+            "n": 1,
+            "key_name": "oa-slot-3",
+            "status_code": 503,
+            "fail_reason": "server_error",
+            "failure_class": "transient",
+            "retry_after_ms": 2000
+          }
+        ],
+        "tool_result_ids": [
+          "call_ShCCbCIYxf1Th4DGBkonEaHM",
+          "call_ZplakoxoSaRSd5uYE8K3SVbp"
+        ]
+      },
+      {
+        "id": "58441401-6e96-447a-9e7b-bb4aa7a4973c",
+        "timestamp": "2026-11-14T01:01:44.986121Z",
+        "status": "error",
+        "kind": "message",
+        "provider": "openai",
+        "model_requested": "gpt-5.4-mini",
+        "model_served": "gpt-5.4-mini",
+        "fallback_index": 0,
+        "stream": true,
+        "latency_ms": 9,
+        "cache_hit": false,
+        "error_status": 503,
+        "error_message": "The server is overloaded or not ready yet. ref nonce_txc3ha2m07frd41bnuoafy0i call 20",
+        "attempts": [
+          {
+            "n": 1,
+            "key_name": "oa-slot-3",
+            "status_code": 503,
+            "fail_reason": "server_error",
+            "failure_class": "transient",
+            "retry_after_ms": 2000
+          }
+        ],
+        "tool_result_ids": [
+          "call_ShCCbCIYxf1Th4DGBkonEaHM",
+          "call_ZplakoxoSaRSd5uYE8K3SVbp"
+        ]
+      },
+      {
+        "id": "d0fb168c-d2ad-48c3-953f-f50e13c48e52",
+        "timestamp": "2026-11-14T01:01:46.998001Z",
+        "status": "error",
+        "kind": "message",
+        "provider": "openai",
+        "model_requested": "gpt-5.4-mini",
+        "model_served": "gpt-5.4-mini",
+        "fallback_index": 0,
+        "stream": true,
+        "latency_ms": 9,
+        "cache_hit": false,
+        "error_status": 503,
+        "error_message": "The server is overloaded or not ready yet. ref nonce_txc3ha2m07frd41bnuoafy0i call 21",
+        "attempts": [
+          {
+            "n": 1,
+            "key_name": "oa-slot-3",
+            "status_code": 503,
+            "fail_reason": "server_error",
+            "failure_class": "transient",
+            "retry_after_ms": 2000
+          }
+        ],
+        "tool_result_ids": [
+          "call_ShCCbCIYxf1Th4DGBkonEaHM",
+          "call_ZplakoxoSaRSd5uYE8K3SVbp"
+        ]
+      },
+      {
+        "id": "fede9012-5958-4673-9ce9-208416952b95",
+        "timestamp": "2026-11-14T01:01:49.010069Z",
+        "status": "error",
+        "kind": "message",
+        "provider": "openai",
+        "model_requested": "gpt-5.4-mini",
+        "model_served": "gpt-5.4-mini",
+        "fallback_index": 0,
+        "stream": true,
+        "latency_ms": 9,
+        "cache_hit": false,
+        "error_status": 503,
+        "error_message": "The server is overloaded or not ready yet. ref nonce_txc3ha2m07frd41bnuoafy0i call 22",
+        "attempts": [
+          {
+            "n": 1,
+            "key_name": "oa-slot-3",
+            "status_code": 503,
+            "fail_reason": "server_error",
+            "failure_class": "transient",
+            "retry_after_ms": 2000
+          }
+        ],
+        "tool_result_ids": [
+          "call_ShCCbCIYxf1Th4DGBkonEaHM",
+          "call_ZplakoxoSaRSd5uYE8K3SVbp"
+        ]
+      },
+      {
+        "id": "c3ee7a46-52d5-4807-87c1-3c174b75e75e",
+        "timestamp": "2026-11-14T01:01:51.037662Z",
+        "status": "error",
+        "kind": "message",
+        "provider": "openai",
+        "model_requested": "gpt-5.4-mini",
+        "model_served": "gpt-5.4-mini",
+        "fallback_index": 0,
+        "stream": true,
+        "latency_ms": 5,
+        "cache_hit": false,
+        "error_status": 503,
+        "error_message": "The server is overloaded or not ready yet. ref nonce_txc3ha2m07frd41bnuoafy0i call 23",
+        "attempts": [
+          {
+            "n": 1,
+            "key_name": "oa-slot-3",
+            "status_code": 503,
+            "fail_reason": "server_error",
+            "failure_class": "transient",
+            "retry_after_ms": 2000
+          }
+        ],
+        "tool_result_ids": [
+          "call_ShCCbCIYxf1Th4DGBkonEaHM",
+          "call_ZplakoxoSaRSd5uYE8K3SVbp"
+        ]
+      },
+      {
+        "id": "fc19bb86-cfde-492d-b625-cbacbe14b452",
+        "timestamp": "2026-11-14T01:01:53.046113Z",
+        "status": "error",
+        "kind": "message",
+        "provider": "openai",
+        "model_requested": "gpt-5.4-mini",
+        "model_served": "gpt-5.4-mini",
+        "fallback_index": 0,
+        "stream": true,
+        "latency_ms": 6,
+        "cache_hit": false,
+        "error_status": 503,
+        "error_message": "The server is overloaded or not ready yet. ref nonce_txc3ha2m07frd41bnuoafy0i call 24",
+        "attempts": [
+          {
+            "n": 1,
+            "key_name": "oa-slot-3",
+            "status_code": 503,
+            "fail_reason": "server_error",
+            "failure_class": "transient",
+            "retry_after_ms": 2000
+          }
+        ],
+        "tool_result_ids": [
+          "call_ShCCbCIYxf1Th4DGBkonEaHM",
+          "call_ZplakoxoSaRSd5uYE8K3SVbp"
+        ]
+      },
+      {
+        "id": "47d82f35-b63f-4ec4-9aec-29c721726639",
+        "timestamp": "2026-11-14T01:01:55.055401Z",
+        "status": "error",
+        "kind": "message",
+        "provider": "openai",
+        "model_requested": "gpt-5.4-mini",
+        "model_served": "gpt-5.4-mini",
+        "fallback_index": 0,
+        "stream": true,
+        "latency_ms": 7,
+        "cache_hit": false,
+        "error_status": 503,
+        "error_message": "The server is overloaded or not ready yet. ref nonce_txc3ha2m07frd41bnuoafy0i call 25",
+        "attempts": [
+          {
+            "n": 1,
+            "key_name": "oa-slot-3",
+            "status_code": 503,
+            "fail_reason": "server_error",
+            "failure_class": "transient",
+            "retry_after_ms": 2000
+          }
+        ],
+        "tool_result_ids": [
+          "call_ShCCbCIYxf1Th4DGBkonEaHM",
+          "call_ZplakoxoSaRSd5uYE8K3SVbp"
+        ]
+      },
+      {
+        "id": "1349ead5-9f6d-4780-9ef3-da51e3444bd5",
+        "timestamp": "2026-11-14T01:01:57.066794Z",
+        "status": "error",
+        "kind": "message",
+        "provider": "openai",
+        "model_requested": "gpt-5.4-mini",
+        "model_served": "gpt-5.4-mini",
+        "fallback_index": 0,
+        "stream": true,
+        "latency_ms": 12,
+        "cache_hit": false,
+        "error_status": 503,
+        "error_message": "The server is overloaded or not ready yet. ref nonce_txc3ha2m07frd41bnuoafy0i call 26",
+        "attempts": [
+          {
+            "n": 1,
+            "key_name": "oa-slot-3",
+            "status_code": 503,
+            "fail_reason": "server_error",
+            "failure_class": "transient",
+            "retry_after_ms": 2000
+          }
+        ],
+        "tool_result_ids": [
+          "call_ShCCbCIYxf1Th4DGBkonEaHM",
+          "call_ZplakoxoSaRSd5uYE8K3SVbp"
+        ]
+      },
+      {
+        "id": "7882518a-234b-4311-a2b4-5baf51007787",
+        "timestamp": "2026-11-14T01:01:59.082494Z",
+        "status": "error",
+        "kind": "message",
+        "provider": "openai",
+        "model_requested": "gpt-5.4-mini",
+        "model_served": "gpt-5.4-mini",
+        "fallback_index": 0,
+        "stream": true,
+        "latency_ms": 7,
+        "cache_hit": false,
+        "error_status": 503,
+        "error_message": "The server is overloaded or not ready yet. ref nonce_txc3ha2m07frd41bnuoafy0i call 27",
+        "attempts": [
+          {
+            "n": 1,
+            "key_name": "oa-slot-3",
+            "status_code": 503,
+            "fail_reason": "server_error",
+            "failure_class": "transient",
+            "retry_after_ms": 2000
+          }
+        ],
+        "tool_result_ids": [
+          "call_ShCCbCIYxf1Th4DGBkonEaHM",
+          "call_ZplakoxoSaRSd5uYE8K3SVbp"
+        ]
+      },
+      {
+        "id": "7b11d291-a4eb-4041-b77f-b6a00fb04644",
+        "timestamp": "2026-11-14T01:02:01.105654Z",
+        "status": "error",
+        "kind": "message",
+        "provider": "openai",
+        "model_requested": "gpt-5.4-mini",
+        "model_served": "gpt-5.4-mini",
+        "fallback_index": 0,
+        "stream": true,
+        "latency_ms": 7,
+        "cache_hit": false,
+        "error_status": 503,
+        "error_message": "The server is overloaded or not ready yet. ref nonce_txc3ha2m07frd41bnuoafy0i call 28",
+        "attempts": [
+          {
+            "n": 1,
+            "key_name": "oa-slot-3",
+            "status_code": 503,
+            "fail_reason": "server_error",
+            "failure_class": "transient",
+            "retry_after_ms": 2000
+          }
+        ],
+        "tool_result_ids": [
+          "call_ShCCbCIYxf1Th4DGBkonEaHM",
+          "call_ZplakoxoSaRSd5uYE8K3SVbp"
+        ]
+      },
+      {
+        "id": "3ec8132e-66b4-4e5e-8229-761b95efa5b0",
+        "timestamp": "2026-11-14T01:02:03.116393Z",
+        "status": "error",
+        "kind": "message",
+        "provider": "openai",
+        "model_requested": "gpt-5.4-mini",
+        "model_served": "gpt-5.4-mini",
+        "fallback_index": 0,
+        "stream": true,
+        "latency_ms": 7,
+        "cache_hit": false,
+        "error_status": 503,
+        "error_message": "The server is overloaded or not ready yet. ref nonce_txc3ha2m07frd41bnuoafy0i call 29",
+        "attempts": [
+          {
+            "n": 1,
+            "key_name": "oa-slot-3",
+            "status_code": 503,
+            "fail_reason": "server_error",
+            "failure_class": "transient",
+            "retry_after_ms": 2000
+          }
+        ],
+        "tool_result_ids": [
+          "call_ShCCbCIYxf1Th4DGBkonEaHM",
+          "call_ZplakoxoSaRSd5uYE8K3SVbp"
+        ]
+      },
+      {
+        "id": "3819b22f-45b5-43a8-9aeb-768f78592239",
+        "timestamp": "2026-11-14T01:02:05.126003Z",
+        "status": "error",
+        "kind": "message",
+        "provider": "openai",
+        "model_requested": "gpt-5.4-mini",
+        "model_served": "gpt-5.4-mini",
+        "fallback_index": 0,
+        "stream": true,
+        "latency_ms": 6,
+        "cache_hit": false,
+        "error_status": 503,
+        "error_message": "The server is overloaded or not ready yet. ref nonce_txc3ha2m07frd41bnuoafy0i call 30",
+        "attempts": [
+          {
+            "n": 1,
+            "key_name": "oa-slot-3",
+            "status_code": 503,
+            "fail_reason": "server_error",
+            "failure_class": "transient",
+            "retry_after_ms": 2000
+          }
+        ],
+        "tool_result_ids": [
+          "call_ShCCbCIYxf1Th4DGBkonEaHM",
+          "call_ZplakoxoSaRSd5uYE8K3SVbp"
+        ]
+      },
+      {
+        "id": "b6a15856-c4ab-4f36-88c6-fea545409b09",
+        "timestamp": "2026-11-14T01:02:07.136396Z",
+        "status": "error",
+        "kind": "message",
+        "provider": "openai",
+        "model_requested": "gpt-5.4-mini",
+        "model_served": "gpt-5.4-mini",
+        "fallback_index": 0,
+        "stream": true,
+        "latency_ms": 18,
+        "cache_hit": false,
+        "error_status": 503,
+        "error_message": "The server is overloaded or not ready yet. ref nonce_txc3ha2m07frd41bnuoafy0i call 31",
+        "attempts": [
+          {
+            "n": 1,
+            "key_name": "oa-slot-3",
+            "status_code": 503,
+            "fail_reason": "server_error",
+            "failure_class": "transient",
+            "retry_after_ms": 2000
+          }
+        ],
+        "tool_result_ids": [
+          "call_ShCCbCIYxf1Th4DGBkonEaHM",
+          "call_ZplakoxoSaRSd5uYE8K3SVbp"
+        ]
+      },
+      {
+        "id": "61f98ce7-611d-483c-a8fb-6592adcf58ef",
+        "timestamp": "2026-11-14T01:02:09.158179Z",
+        "status": "error",
+        "kind": "message",
+        "provider": "openai",
+        "model_requested": "gpt-5.4-mini",
+        "model_served": "gpt-5.4-mini",
+        "fallback_index": 0,
+        "stream": true,
+        "latency_ms": 22,
+        "cache_hit": false,
+        "error_status": 503,
+        "error_message": "The server is overloaded or not ready yet. ref nonce_txc3ha2m07frd41bnuoafy0i call 32",
+        "attempts": [
+          {
+            "n": 1,
+            "key_name": "oa-slot-3",
+            "status_code": 503,
+            "fail_reason": "server_error",
+            "failure_class": "transient",
+            "retry_after_ms": 2000
+          }
+        ],
+        "tool_result_ids": [
+          "call_ShCCbCIYxf1Th4DGBkonEaHM",
+          "call_ZplakoxoSaRSd5uYE8K3SVbp"
+        ]
+      }
+    ],
+    "complete": true,
+    "row_ids": [
+      "72cb8596-f73f-4830-aeee-975f372c3858",
+      "17b37bd4-9c58-4270-a9e1-7b281ab6e2a3",
+      "ec26eb66-2006-43f6-9116-abd9e1a4cf1d",
+      "110b633a-0648-4368-b71d-f78687d17459",
+      "c0134df8-94e6-457e-800c-d97b1149d01c",
+      "ba775e17-2aa3-48e7-a2c2-d83189331ccd",
+      "a64a5639-552e-4245-9f7f-e4b2fb2146a4",
+      "bb5bbbb1-2b5e-4f66-8566-f2db21205556",
+      "4a979831-0df5-4030-b243-bfb743f1d70a",
+      "c5f26f28-bc02-4ca7-92ac-a2273efa42b3",
+      "8d9e308d-2b22-474d-9707-35fb3165577e",
+      "77d3ea68-37bd-42ff-af2a-e9b98370dc40",
+      "fe80dc39-79f5-4678-be17-f74c15a79d1b",
+      "103ce144-2d58-45e1-8eb2-6cff80f64d29",
+      "91b18f27-ba6d-4778-ba9e-5cc54561ab15",
+      "0c97becf-1f52-41b9-b08d-a995a987e5ce",
+      "a351dd29-e132-4df8-8329-d270ada85f01",
+      "37d282fa-274a-46a2-be58-a5794fee89e7",
+      "c4baaee2-4f85-4bb4-9817-92ae13fe5398",
+      "58441401-6e96-447a-9e7b-bb4aa7a4973c",
+      "d0fb168c-d2ad-48c3-953f-f50e13c48e52",
+      "fede9012-5958-4673-9ce9-208416952b95",
+      "c3ee7a46-52d5-4807-87c1-3c174b75e75e",
+      "fc19bb86-cfde-492d-b625-cbacbe14b452",
+      "47d82f35-b63f-4ec4-9aec-29c721726639",
+      "1349ead5-9f6d-4780-9ef3-da51e3444bd5",
+      "7882518a-234b-4311-a2b4-5baf51007787",
+      "7b11d291-a4eb-4041-b77f-b6a00fb04644",
+      "3ec8132e-66b4-4e5e-8229-761b95efa5b0",
+      "3819b22f-45b5-43a8-9aeb-768f78592239",
+      "b6a15856-c4ab-4f36-88c6-fea545409b09",
+      "61f98ce7-611d-483c-a8fb-6592adcf58ef"
+    ],
+    "dropped_global": 0
+  },
+  "ledger": [
+    {
+      "slot": "oa-slot-3",
+      "run_id": "r_gevv5gsi7b",
+      "call": 1,
+      "kind": "message",
+      "path": "/v1/responses",
+      "stream": true,
+      "action": "pass",
+      "status": 200,
+      "req_sha256": "d26abfec5775810939b0b732fe1a361289e170fc60e321922aa869be9c9e8e52",
+      "response_id": "resp_094acf00c138e0b4016af7b2d2fc0487d293a5599ca43e64c3",
+      "tokens": {
+        "fresh": 8227,
+        "cache_read": 0,
+        "cache_write": 0,
+        "out": 85
+      },
+      "upstream_ms": 1432.976,
+      "at": "2026-11-14T01:01:06.822922987Z",
+      "prev_hash": "b9b1d428bbd86bc9ea0501f86ee0f80ee7e164158e9dabede87732304feec30a",
+      "hash": "1f69a4a1f4a7603cccd281ffa7b70729d489618a8069c4171a5b614e12accf48"
+    },
+    {
+      "slot": "oa-slot-3",
+      "run_id": "r_gevv5gsi7b",
+      "call": 2,
+      "kind": "message",
+      "path": "/v1/responses",
+      "stream": true,
+      "action": "pass",
+      "status": 200,
+      "req_sha256": "b9aa4280329f374cef5e5a74e99974bbb0cbd9f7f06cbe3d7a4571c2ac350aeb",
+      "response_id": "resp_094acf00c138e0b4016af7b2d4753487d2ba7370d2e59e6437",
+      "tokens": {
+        "fresh": 3038,
+        "cache_read": 8064,
+        "cache_write": 0,
+        "out": 160
+      },
+      "upstream_ms": 2420.891,
+      "at": "2026-11-14T01:01:08.288765939Z",
+      "prev_hash": "1f69a4a1f4a7603cccd281ffa7b70729d489618a8069c4171a5b614e12accf48",
+      "hash": "97636647b3977ad794347962ea275bd257167d9960d60d84ba5c244af2e3dc20"
+    },
+    {
+      "slot": "oa-slot-3",
+      "run_id": "r_gevv5gsi7b",
+      "call": 3,
+      "kind": "message",
+      "path": "/v1/responses",
+      "stream": true,
+      "action": "inject",
+      "status": 503,
+      "req_sha256": "294ecd35ce63b7016d3ae55e5621a15658298f14550e0e4f74fa4f090f61df55",
+      "nonce": "nonce_txc3ha2m07frd41bnuoafy0i",
+      "upstream_ms": 0,
+      "at": "2026-11-14T01:01:10.736908506Z",
+      "prev_hash": "97636647b3977ad794347962ea275bd257167d9960d60d84ba5c244af2e3dc20",
+      "hash": "dcabc81d0dcebd041cd9fdedad5bb9542b9fb592c3a6ff1a3554899e90937cd7"
+    },
+    {
+      "slot": "oa-slot-3",
+      "run_id": "r_gevv5gsi7b",
+      "call": 4,
+      "kind": "message",
+      "path": "/v1/responses",
+      "stream": true,
+      "action": "inject",
+      "status": 503,
+      "req_sha256": "294ecd35ce63b7016d3ae55e5621a15658298f14550e0e4f74fa4f090f61df55",
+      "nonce": "nonce_txc3ha2m07frd41bnuoafy0i",
+      "upstream_ms": 0,
+      "at": "2026-11-14T01:01:12.748443541Z",
+      "prev_hash": "dcabc81d0dcebd041cd9fdedad5bb9542b9fb592c3a6ff1a3554899e90937cd7",
+      "hash": "2495bb68206e6882223e697bfec4c382492688c401c6243fe9e68666b142c01f"
+    },
+    {
+      "slot": "oa-slot-3",
+      "run_id": "r_gevv5gsi7b",
+      "call": 5,
+      "kind": "message",
+      "path": "/v1/responses",
+      "stream": true,
+      "action": "inject",
+      "status": 503,
+      "req_sha256": "294ecd35ce63b7016d3ae55e5621a15658298f14550e0e4f74fa4f090f61df55",
+      "nonce": "nonce_txc3ha2m07frd41bnuoafy0i",
+      "upstream_ms": 0,
+      "at": "2026-11-14T01:01:14.758184044Z",
+      "prev_hash": "2495bb68206e6882223e697bfec4c382492688c401c6243fe9e68666b142c01f",
+      "hash": "ade5693c919698c8cde4fd99c532abf158e9c7cff0352943f7a8535e59056778"
+    },
+    {
+      "slot": "oa-slot-3",
+      "run_id": "r_gevv5gsi7b",
+      "call": 6,
+      "kind": "message",
+      "path": "/v1/responses",
+      "stream": true,
+      "action": "inject",
+      "status": 503,
+      "req_sha256": "294ecd35ce63b7016d3ae55e5621a15658298f14550e0e4f74fa4f090f61df55",
+      "nonce": "nonce_txc3ha2m07frd41bnuoafy0i",
+      "upstream_ms": 0,
+      "at": "2026-11-14T01:01:16.769744288Z",
+      "prev_hash": "ade5693c919698c8cde4fd99c532abf158e9c7cff0352943f7a8535e59056778",
+      "hash": "76231f332bacc92b6afe703a4a557130efd1cc1ee692094051b932bd648bb8dc"
+    },
+    {
+      "slot": "oa-slot-3",
+      "run_id": "r_gevv5gsi7b",
+      "call": 7,
+      "kind": "message",
+      "path": "/v1/responses",
+      "stream": true,
+      "action": "inject",
+      "status": 503,
+      "req_sha256": "294ecd35ce63b7016d3ae55e5621a15658298f14550e0e4f74fa4f090f61df55",
+      "nonce": "nonce_txc3ha2m07frd41bnuoafy0i",
+      "upstream_ms": 0,
+      "at": "2026-11-14T01:01:18.780952515Z",
+      "prev_hash": "76231f332bacc92b6afe703a4a557130efd1cc1ee692094051b932bd648bb8dc",
+      "hash": "ae0e06f9f6a20d0508013115db6905a43f59276d9cb39e6c8f5d1a093d8e8cc1"
+    },
+    {
+      "slot": "oa-slot-3",
+      "run_id": "r_gevv5gsi7b",
+      "call": 8,
+      "kind": "message",
+      "path": "/v1/responses",
+      "stream": true,
+      "action": "inject",
+      "status": 503,
+      "req_sha256": "294ecd35ce63b7016d3ae55e5621a15658298f14550e0e4f74fa4f090f61df55",
+      "nonce": "nonce_txc3ha2m07frd41bnuoafy0i",
+      "upstream_ms": 0,
+      "at": "2026-11-14T01:01:20.806357989Z",
+      "prev_hash": "ae0e06f9f6a20d0508013115db6905a43f59276d9cb39e6c8f5d1a093d8e8cc1",
+      "hash": "47d5db5193d7cd1f13c92ff35c71f0fa40b4aceb9c35b9287ad618f753fcc428"
+    },
+    {
+      "slot": "oa-slot-3",
+      "run_id": "r_gevv5gsi7b",
+      "call": 9,
+      "kind": "message",
+      "path": "/v1/responses",
+      "stream": true,
+      "action": "inject",
+      "status": 503,
+      "req_sha256": "294ecd35ce63b7016d3ae55e5621a15658298f14550e0e4f74fa4f090f61df55",
+      "nonce": "nonce_txc3ha2m07frd41bnuoafy0i",
+      "upstream_ms": 0,
+      "at": "2026-11-14T01:01:22.817550272Z",
+      "prev_hash": "47d5db5193d7cd1f13c92ff35c71f0fa40b4aceb9c35b9287ad618f753fcc428",
+      "hash": "c7fe9cf998841ffbf6a98490a92a03d3a0074bff89aceb5d4b206b69d651717b"
+    },
+    {
+      "slot": "oa-slot-3",
+      "run_id": "r_gevv5gsi7b",
+      "call": 10,
+      "kind": "message",
+      "path": "/v1/responses",
+      "stream": true,
+      "action": "inject",
+      "status": 503,
+      "req_sha256": "294ecd35ce63b7016d3ae55e5621a15658298f14550e0e4f74fa4f090f61df55",
+      "nonce": "nonce_txc3ha2m07frd41bnuoafy0i",
+      "upstream_ms": 0,
+      "at": "2026-11-14T01:01:24.828720623Z",
+      "prev_hash": "c7fe9cf998841ffbf6a98490a92a03d3a0074bff89aceb5d4b206b69d651717b",
+      "hash": "879d0d36883b11e1083da5160a7ffb5bfdd54fd3a46350f3e62b981cf834daa9"
+    },
+    {
+      "slot": "oa-slot-3",
+      "run_id": "r_gevv5gsi7b",
+      "call": 11,
+      "kind": "message",
+      "path": "/v1/responses",
+      "stream": true,
+      "action": "inject",
+      "status": 503,
+      "req_sha256": "294ecd35ce63b7016d3ae55e5621a15658298f14550e0e4f74fa4f090f61df55",
+      "nonce": "nonce_txc3ha2m07frd41bnuoafy0i",
+      "upstream_ms": 0,
+      "at": "2026-11-14T01:01:26.8409696Z",
+      "prev_hash": "879d0d36883b11e1083da5160a7ffb5bfdd54fd3a46350f3e62b981cf834daa9",
+      "hash": "b0bbf7ed00abdbf3de721c8509ffadc40dea950788f803d040ceff205a4d82e0"
+    },
+    {
+      "slot": "oa-slot-3",
+      "run_id": "r_gevv5gsi7b",
+      "call": 12,
+      "kind": "message",
+      "path": "/v1/responses",
+      "stream": true,
+      "action": "inject",
+      "status": 503,
+      "req_sha256": "294ecd35ce63b7016d3ae55e5621a15658298f14550e0e4f74fa4f090f61df55",
+      "nonce": "nonce_txc3ha2m07frd41bnuoafy0i",
+      "upstream_ms": 0,
+      "at": "2026-11-14T01:01:28.850385216Z",
+      "prev_hash": "b0bbf7ed00abdbf3de721c8509ffadc40dea950788f803d040ceff205a4d82e0",
+      "hash": "0ad30c2161cdf7434fead2dfd147e28772850cbb073521774c1d079be3f5a240"
+    },
+    {
+      "slot": "oa-slot-3",
+      "run_id": "r_gevv5gsi7b",
+      "call": 13,
+      "kind": "message",
+      "path": "/v1/responses",
+      "stream": true,
+      "action": "inject",
+      "status": 503,
+      "req_sha256": "294ecd35ce63b7016d3ae55e5621a15658298f14550e0e4f74fa4f090f61df55",
+      "nonce": "nonce_txc3ha2m07frd41bnuoafy0i",
+      "upstream_ms": 0,
+      "at": "2026-11-14T01:01:30.881894776Z",
+      "prev_hash": "0ad30c2161cdf7434fead2dfd147e28772850cbb073521774c1d079be3f5a240",
+      "hash": "980ae56bd2f9d9c5a130958b7b10cfd4eae688a2c3d52399452201bf65b1f3a3"
+    },
+    {
+      "slot": "oa-slot-3",
+      "run_id": "r_gevv5gsi7b",
+      "call": 14,
+      "kind": "message",
+      "path": "/v1/responses",
+      "stream": true,
+      "action": "inject",
+      "status": 503,
+      "req_sha256": "294ecd35ce63b7016d3ae55e5621a15658298f14550e0e4f74fa4f090f61df55",
+      "nonce": "nonce_txc3ha2m07frd41bnuoafy0i",
+      "upstream_ms": 0,
+      "at": "2026-11-14T01:01:32.904464315Z",
+      "prev_hash": "980ae56bd2f9d9c5a130958b7b10cfd4eae688a2c3d52399452201bf65b1f3a3",
+      "hash": "44490e052fb76f9cb7cf5711b3d0a53ebb1d59720065de63e3e872451146d783"
+    },
+    {
+      "slot": "oa-slot-3",
+      "run_id": "r_gevv5gsi7b",
+      "call": 15,
+      "kind": "message",
+      "path": "/v1/responses",
+      "stream": true,
+      "action": "inject",
+      "status": 503,
+      "req_sha256": "294ecd35ce63b7016d3ae55e5621a15658298f14550e0e4f74fa4f090f61df55",
+      "nonce": "nonce_txc3ha2m07frd41bnuoafy0i",
+      "upstream_ms": 0,
+      "at": "2026-11-14T01:01:34.914654049Z",
+      "prev_hash": "44490e052fb76f9cb7cf5711b3d0a53ebb1d59720065de63e3e872451146d783",
+      "hash": "c7d1015ce3dd0bb777283588edbb755ad4f974c65a89dc0732e74a16b2e29f9e"
+    },
+    {
+      "slot": "oa-slot-3",
+      "run_id": "r_gevv5gsi7b",
+      "call": 16,
+      "kind": "message",
+      "path": "/v1/responses",
+      "stream": true,
+      "action": "inject",
+      "status": 503,
+      "req_sha256": "294ecd35ce63b7016d3ae55e5621a15658298f14550e0e4f74fa4f090f61df55",
+      "nonce": "nonce_txc3ha2m07frd41bnuoafy0i",
+      "upstream_ms": 0,
+      "at": "2026-11-14T01:01:36.927249458Z",
+      "prev_hash": "c7d1015ce3dd0bb777283588edbb755ad4f974c65a89dc0732e74a16b2e29f9e",
+      "hash": "0fe7728795f88e4dd657abc400c0aebd983293ef3e6295f0c5e48a94b48fab5b"
+    },
+    {
+      "slot": "oa-slot-3",
+      "run_id": "r_gevv5gsi7b",
+      "call": 17,
+      "kind": "message",
+      "path": "/v1/responses",
+      "stream": true,
+      "action": "inject",
+      "status": 503,
+      "req_sha256": "294ecd35ce63b7016d3ae55e5621a15658298f14550e0e4f74fa4f090f61df55",
+      "nonce": "nonce_txc3ha2m07frd41bnuoafy0i",
+      "upstream_ms": 0,
+      "at": "2026-11-14T01:01:38.937486159Z",
+      "prev_hash": "0fe7728795f88e4dd657abc400c0aebd983293ef3e6295f0c5e48a94b48fab5b",
+      "hash": "e93869d57da5177771b5334aa8c9e7382fdde6b77763a4f3e12a69e74c5d2475"
+    },
+    {
+      "slot": "oa-slot-3",
+      "run_id": "r_gevv5gsi7b",
+      "call": 18,
+      "kind": "message",
+      "path": "/v1/responses",
+      "stream": true,
+      "action": "inject",
+      "status": 503,
+      "req_sha256": "294ecd35ce63b7016d3ae55e5621a15658298f14550e0e4f74fa4f090f61df55",
+      "nonce": "nonce_txc3ha2m07frd41bnuoafy0i",
+      "upstream_ms": 0,
+      "at": "2026-11-14T01:01:40.95998262Z",
+      "prev_hash": "e93869d57da5177771b5334aa8c9e7382fdde6b77763a4f3e12a69e74c5d2475",
+      "hash": "bcc37d85a1d151b74b4bf607eb93dd1f762947a011d5db4b8b4f230e1f8b052a"
+    },
+    {
+      "slot": "oa-slot-3",
+      "run_id": "r_gevv5gsi7b",
+      "call": 19,
+      "kind": "message",
+      "path": "/v1/responses",
+      "stream": true,
+      "action": "inject",
+      "status": 503,
+      "req_sha256": "294ecd35ce63b7016d3ae55e5621a15658298f14550e0e4f74fa4f090f61df55",
+      "nonce": "nonce_txc3ha2m07frd41bnuoafy0i",
+      "upstream_ms": 0,
+      "at": "2026-11-14T01:01:42.970408012Z",
+      "prev_hash": "bcc37d85a1d151b74b4bf607eb93dd1f762947a011d5db4b8b4f230e1f8b052a",
+      "hash": "d8e4838b6ee2dbb7cdee1696bb8194fcbde6c41872614b8cdbc9b1e5ea7e4c4d"
+    },
+    {
+      "slot": "oa-slot-3",
+      "run_id": "r_gevv5gsi7b",
+      "call": 20,
+      "kind": "message",
+      "path": "/v1/responses",
+      "stream": true,
+      "action": "inject",
+      "status": 503,
+      "req_sha256": "294ecd35ce63b7016d3ae55e5621a15658298f14550e0e4f74fa4f090f61df55",
+      "nonce": "nonce_txc3ha2m07frd41bnuoafy0i",
+      "upstream_ms": 0,
+      "at": "2026-11-14T01:01:44.987240218Z",
+      "prev_hash": "d8e4838b6ee2dbb7cdee1696bb8194fcbde6c41872614b8cdbc9b1e5ea7e4c4d",
+      "hash": "b19a73d8d25d7fef2a088e5a36ffa02b0caba28b9308f612c3a616346a7fe6ec"
+    },
+    {
+      "slot": "oa-slot-3",
+      "run_id": "r_gevv5gsi7b",
+      "call": 21,
+      "kind": "message",
+      "path": "/v1/responses",
+      "stream": true,
+      "action": "inject",
+      "status": 503,
+      "req_sha256": "294ecd35ce63b7016d3ae55e5621a15658298f14550e0e4f74fa4f090f61df55",
+      "nonce": "nonce_txc3ha2m07frd41bnuoafy0i",
+      "upstream_ms": 0,
+      "at": "2026-11-14T01:01:46.999448662Z",
+      "prev_hash": "b19a73d8d25d7fef2a088e5a36ffa02b0caba28b9308f612c3a616346a7fe6ec",
+      "hash": "d7d1f2a8f60eb9ccc78b9a468773c6ad2303e854211bca1f3d4b9148e65f41eb"
+    },
+    {
+      "slot": "oa-slot-3",
+      "run_id": "r_gevv5gsi7b",
+      "call": 22,
+      "kind": "message",
+      "path": "/v1/responses",
+      "stream": true,
+      "action": "inject",
+      "status": 503,
+      "req_sha256": "294ecd35ce63b7016d3ae55e5621a15658298f14550e0e4f74fa4f090f61df55",
+      "nonce": "nonce_txc3ha2m07frd41bnuoafy0i",
+      "upstream_ms": 0,
+      "at": "2026-11-14T01:01:49.013107047Z",
+      "prev_hash": "d7d1f2a8f60eb9ccc78b9a468773c6ad2303e854211bca1f3d4b9148e65f41eb",
+      "hash": "b79b46cf71a3118b7d4a39025ee11351385e24150e102773fa21a1f843b38865"
+    },
+    {
+      "slot": "oa-slot-3",
+      "run_id": "r_gevv5gsi7b",
+      "call": 23,
+      "kind": "message",
+      "path": "/v1/responses",
+      "stream": true,
+      "action": "inject",
+      "status": 503,
+      "req_sha256": "294ecd35ce63b7016d3ae55e5621a15658298f14550e0e4f74fa4f090f61df55",
+      "nonce": "nonce_txc3ha2m07frd41bnuoafy0i",
+      "upstream_ms": 0,
+      "at": "2026-11-14T01:01:51.038623872Z",
+      "prev_hash": "b79b46cf71a3118b7d4a39025ee11351385e24150e102773fa21a1f843b38865",
+      "hash": "e81a872dc5acb3f588637135ce016e2b6d001481b5cfea3e45ff681a32f35117"
+    },
+    {
+      "slot": "oa-slot-3",
+      "run_id": "r_gevv5gsi7b",
+      "call": 24,
+      "kind": "message",
+      "path": "/v1/responses",
+      "stream": true,
+      "action": "inject",
+      "status": 503,
+      "req_sha256": "294ecd35ce63b7016d3ae55e5621a15658298f14550e0e4f74fa4f090f61df55",
+      "nonce": "nonce_txc3ha2m07frd41bnuoafy0i",
+      "upstream_ms": 0,
+      "at": "2026-11-14T01:01:53.047127532Z",
+      "prev_hash": "e81a872dc5acb3f588637135ce016e2b6d001481b5cfea3e45ff681a32f35117",
+      "hash": "327ff5315f3c5a79891085afd96efce1bc80222c04d66f917c42ce3ebd6c3b02"
+    },
+    {
+      "slot": "oa-slot-3",
+      "run_id": "r_gevv5gsi7b",
+      "call": 25,
+      "kind": "message",
+      "path": "/v1/responses",
+      "stream": true,
+      "action": "inject",
+      "status": 503,
+      "req_sha256": "294ecd35ce63b7016d3ae55e5621a15658298f14550e0e4f74fa4f090f61df55",
+      "nonce": "nonce_txc3ha2m07frd41bnuoafy0i",
+      "upstream_ms": 0,
+      "at": "2026-11-14T01:01:55.057354625Z",
+      "prev_hash": "327ff5315f3c5a79891085afd96efce1bc80222c04d66f917c42ce3ebd6c3b02",
+      "hash": "a9a87c74df79c36f6301fae654f695af18f25a7c264777f3b7401b53c6052ef0"
+    },
+    {
+      "slot": "oa-slot-3",
+      "run_id": "r_gevv5gsi7b",
+      "call": 26,
+      "kind": "message",
+      "path": "/v1/responses",
+      "stream": true,
+      "action": "inject",
+      "status": 503,
+      "req_sha256": "294ecd35ce63b7016d3ae55e5621a15658298f14550e0e4f74fa4f090f61df55",
+      "nonce": "nonce_txc3ha2m07frd41bnuoafy0i",
+      "upstream_ms": 0,
+      "at": "2026-11-14T01:01:57.068104596Z",
+      "prev_hash": "a9a87c74df79c36f6301fae654f695af18f25a7c264777f3b7401b53c6052ef0",
+      "hash": "7bb7c0aa08bb362e18231ea0196ea2516775142ac94bce5a9b05a438fc7360d8"
+    },
+    {
+      "slot": "oa-slot-3",
+      "run_id": "r_gevv5gsi7b",
+      "call": 27,
+      "kind": "message",
+      "path": "/v1/responses",
+      "stream": true,
+      "action": "inject",
+      "status": 503,
+      "req_sha256": "294ecd35ce63b7016d3ae55e5621a15658298f14550e0e4f74fa4f090f61df55",
+      "nonce": "nonce_txc3ha2m07frd41bnuoafy0i",
+      "upstream_ms": 0,
+      "at": "2026-11-14T01:01:59.08396627Z",
+      "prev_hash": "7bb7c0aa08bb362e18231ea0196ea2516775142ac94bce5a9b05a438fc7360d8",
+      "hash": "d8ab01af61ee8b1a889daf05971cb58fffb0e293244709821ca43aeac0901ce2"
+    },
+    {
+      "slot": "oa-slot-3",
+      "run_id": "r_gevv5gsi7b",
+      "call": 28,
+      "kind": "message",
+      "path": "/v1/responses",
+      "stream": true,
+      "action": "inject",
+      "status": 503,
+      "req_sha256": "294ecd35ce63b7016d3ae55e5621a15658298f14550e0e4f74fa4f090f61df55",
+      "nonce": "nonce_txc3ha2m07frd41bnuoafy0i",
+      "upstream_ms": 0,
+      "at": "2026-11-14T01:02:01.107471272Z",
+      "prev_hash": "d8ab01af61ee8b1a889daf05971cb58fffb0e293244709821ca43aeac0901ce2",
+      "hash": "2bcc196495fbcf4dd401fa6ec93637b62d86fd8975e70bb256632305eeec34da"
+    },
+    {
+      "slot": "oa-slot-3",
+      "run_id": "r_gevv5gsi7b",
+      "call": 29,
+      "kind": "message",
+      "path": "/v1/responses",
+      "stream": true,
+      "action": "inject",
+      "status": 503,
+      "req_sha256": "294ecd35ce63b7016d3ae55e5621a15658298f14550e0e4f74fa4f090f61df55",
+      "nonce": "nonce_txc3ha2m07frd41bnuoafy0i",
+      "upstream_ms": 0,
+      "at": "2026-11-14T01:02:03.117756066Z",
+      "prev_hash": "2bcc196495fbcf4dd401fa6ec93637b62d86fd8975e70bb256632305eeec34da",
+      "hash": "7e3b51d7134e757258823a486091acdbc8e630c8db8ddcd52cecedf52cbd76ff"
+    },
+    {
+      "slot": "oa-slot-3",
+      "run_id": "r_gevv5gsi7b",
+      "call": 30,
+      "kind": "message",
+      "path": "/v1/responses",
+      "stream": true,
+      "action": "inject",
+      "status": 503,
+      "req_sha256": "294ecd35ce63b7016d3ae55e5621a15658298f14550e0e4f74fa4f090f61df55",
+      "nonce": "nonce_txc3ha2m07frd41bnuoafy0i",
+      "upstream_ms": 0,
+      "at": "2026-11-14T01:02:05.127476164Z",
+      "prev_hash": "7e3b51d7134e757258823a486091acdbc8e630c8db8ddcd52cecedf52cbd76ff",
+      "hash": "68fc6140461c5b7efafc3676da80ca688557396574b5f47a43c1fac65d49ada0"
+    },
+    {
+      "slot": "oa-slot-3",
+      "run_id": "r_gevv5gsi7b",
+      "call": 0,
+      "kind": "models",
+      "path": "/v1/models",
+      "stream": false,
+      "action": "pass",
+      "status": 200,
+      "req_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "upstream_ms": 497.899,
+      "at": "2026-11-14T01:02:06.375452429Z",
+      "prev_hash": "68fc6140461c5b7efafc3676da80ca688557396574b5f47a43c1fac65d49ada0",
+      "hash": "4ce982bd3599edcee28d67412a3ddbeb3e122c9a3e7b1ab929504593af9191f6"
+    },
+    {
+      "slot": "oa-slot-3",
+      "run_id": "r_gevv5gsi7b",
+      "call": 31,
+      "kind": "message",
+      "path": "/v1/responses",
+      "stream": true,
+      "action": "inject",
+      "status": 503,
+      "req_sha256": "294ecd35ce63b7016d3ae55e5621a15658298f14550e0e4f74fa4f090f61df55",
+      "nonce": "nonce_txc3ha2m07frd41bnuoafy0i",
+      "upstream_ms": 0,
+      "at": "2026-11-14T01:02:07.138018886Z",
+      "prev_hash": "4ce982bd3599edcee28d67412a3ddbeb3e122c9a3e7b1ab929504593af9191f6",
+      "hash": "31aa9554409d081b8dc47c8e7c89e7ab5703659ee91177ff0510f0af81ac025d"
+    },
+    {
+      "slot": "oa-slot-3",
+      "run_id": "r_gevv5gsi7b",
+      "call": 0,
+      "kind": "models",
+      "path": "/v1/models",
+      "stream": false,
+      "action": "pass",
+      "status": 200,
+      "req_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "upstream_ms": 1029.665,
+      "at": "2026-11-14T01:02:06.37545246Z",
+      "prev_hash": "31aa9554409d081b8dc47c8e7c89e7ab5703659ee91177ff0510f0af81ac025d",
+      "hash": "dd98b491167ba51d4cdd7b8d4871d20f735ca1cae7240cf25ba6d55af18c4b54"
+    },
+    {
+      "slot": "oa-slot-3",
+      "run_id": "r_gevv5gsi7b",
+      "call": 32,
+      "kind": "message",
+      "path": "/v1/responses",
+      "stream": true,
+      "action": "inject",
+      "status": 503,
+      "req_sha256": "294ecd35ce63b7016d3ae55e5621a15658298f14550e0e4f74fa4f090f61df55",
+      "nonce": "nonce_txc3ha2m07frd41bnuoafy0i",
+      "upstream_ms": 0,
+      "at": "2026-11-14T01:02:09.159357341Z",
+      "prev_hash": "dd98b491167ba51d4cdd7b8d4871d20f735ca1cae7240cf25ba6d55af18c4b54",
+      "hash": "9f68ddbf86a898926f1dcbb22dfc0ed97a3664bdbc5c8c0e9d179f8b2c4d2596"
+    }
+  ],
+  "events": [
+    {
+      "event_id": "r_gevv5gsi7b:proxy_ledger:1",
+      "run_id": "r_gevv5gsi7b",
+      "slot_id": "s_2sv12hahmm",
+      "pair_id": "p_1dnhfd5sv9",
+      "seq": 1,
+      "turn_index": 0,
+      "ts": "2026-11-14T01:01:10.736908506Z",
+      "type": "fault",
+      "source": "proxy_ledger",
+      "evidence": "gateway",
+      "target": "/v1/responses",
+      "is_error": true,
+      "summary": "proxy injected status 503 on message call 3"
+    },
+    {
+      "event_id": "r_gevv5gsi7b:proxy_ledger:2",
+      "run_id": "r_gevv5gsi7b",
+      "slot_id": "s_2sv12hahmm",
+      "pair_id": "p_1dnhfd5sv9",
+      "seq": 2,
+      "turn_index": 0,
+      "ts": "2026-11-14T01:01:12.748443541Z",
+      "type": "fault",
+      "source": "proxy_ledger",
+      "evidence": "gateway",
+      "target": "/v1/responses",
+      "is_error": true,
+      "summary": "proxy injected status 503 on message call 4"
+    },
+    {
+      "event_id": "r_gevv5gsi7b:proxy_ledger:3",
+      "run_id": "r_gevv5gsi7b",
+      "slot_id": "s_2sv12hahmm",
+      "pair_id": "p_1dnhfd5sv9",
+      "seq": 3,
+      "turn_index": 0,
+      "ts": "2026-11-14T01:01:14.758184044Z",
+      "type": "fault",
+      "source": "proxy_ledger",
+      "evidence": "gateway",
+      "target": "/v1/responses",
+      "is_error": true,
+      "summary": "proxy injected status 503 on message call 5"
+    },
+    {
+      "event_id": "r_gevv5gsi7b:proxy_ledger:4",
+      "run_id": "r_gevv5gsi7b",
+      "slot_id": "s_2sv12hahmm",
+      "pair_id": "p_1dnhfd5sv9",
+      "seq": 4,
+      "turn_index": 0,
+      "ts": "2026-11-14T01:01:16.769744288Z",
+      "type": "fault",
+      "source": "proxy_ledger",
+      "evidence": "gateway",
+      "target": "/v1/responses",
+      "is_error": true,
+      "summary": "proxy injected status 503 on message call 6"
+    },
+    {
+      "event_id": "r_gevv5gsi7b:proxy_ledger:5",
+      "run_id": "r_gevv5gsi7b",
+      "slot_id": "s_2sv12hahmm",
+      "pair_id": "p_1dnhfd5sv9",
+      "seq": 5,
+      "turn_index": 0,
+      "ts": "2026-11-14T01:01:18.780952515Z",
+      "type": "fault",
+      "source": "proxy_ledger",
+      "evidence": "gateway",
+      "target": "/v1/responses",
+      "is_error": true,
+      "summary": "proxy injected status 503 on message call 7"
+    },
+    {
+      "event_id": "r_gevv5gsi7b:proxy_ledger:6",
+      "run_id": "r_gevv5gsi7b",
+      "slot_id": "s_2sv12hahmm",
+      "pair_id": "p_1dnhfd5sv9",
+      "seq": 6,
+      "turn_index": 0,
+      "ts": "2026-11-14T01:01:20.806357989Z",
+      "type": "fault",
+      "source": "proxy_ledger",
+      "evidence": "gateway",
+      "target": "/v1/responses",
+      "is_error": true,
+      "summary": "proxy injected status 503 on message call 8"
+    },
+    {
+      "event_id": "r_gevv5gsi7b:proxy_ledger:7",
+      "run_id": "r_gevv5gsi7b",
+      "slot_id": "s_2sv12hahmm",
+      "pair_id": "p_1dnhfd5sv9",
+      "seq": 7,
+      "turn_index": 0,
+      "ts": "2026-11-14T01:01:22.817550272Z",
+      "type": "fault",
+      "source": "proxy_ledger",
+      "evidence": "gateway",
+      "target": "/v1/responses",
+      "is_error": true,
+      "summary": "proxy injected status 503 on message call 9"
+    },
+    {
+      "event_id": "r_gevv5gsi7b:proxy_ledger:8",
+      "run_id": "r_gevv5gsi7b",
+      "slot_id": "s_2sv12hahmm",
+      "pair_id": "p_1dnhfd5sv9",
+      "seq": 8,
+      "turn_index": 0,
+      "ts": "2026-11-14T01:01:24.828720623Z",
+      "type": "fault",
+      "source": "proxy_ledger",
+      "evidence": "gateway",
+      "target": "/v1/responses",
+      "is_error": true,
+      "summary": "proxy injected status 503 on message call 10"
+    },
+    {
+      "event_id": "r_gevv5gsi7b:proxy_ledger:9",
+      "run_id": "r_gevv5gsi7b",
+      "slot_id": "s_2sv12hahmm",
+      "pair_id": "p_1dnhfd5sv9",
+      "seq": 9,
+      "turn_index": 0,
+      "ts": "2026-11-14T01:01:26.8409696Z",
+      "type": "fault",
+      "source": "proxy_ledger",
+      "evidence": "gateway",
+      "target": "/v1/responses",
+      "is_error": true,
+      "summary": "proxy injected status 503 on message call 11"
+    },
+    {
+      "event_id": "r_gevv5gsi7b:proxy_ledger:10",
+      "run_id": "r_gevv5gsi7b",
+      "slot_id": "s_2sv12hahmm",
+      "pair_id": "p_1dnhfd5sv9",
+      "seq": 10,
+      "turn_index": 0,
+      "ts": "2026-11-14T01:01:28.850385216Z",
+      "type": "fault",
+      "source": "proxy_ledger",
+      "evidence": "gateway",
+      "target": "/v1/responses",
+      "is_error": true,
+      "summary": "proxy injected status 503 on message call 12"
+    },
+    {
+      "event_id": "r_gevv5gsi7b:proxy_ledger:11",
+      "run_id": "r_gevv5gsi7b",
+      "slot_id": "s_2sv12hahmm",
+      "pair_id": "p_1dnhfd5sv9",
+      "seq": 11,
+      "turn_index": 0,
+      "ts": "2026-11-14T01:01:30.881894776Z",
+      "type": "fault",
+      "source": "proxy_ledger",
+      "evidence": "gateway",
+      "target": "/v1/responses",
+      "is_error": true,
+      "summary": "proxy injected status 503 on message call 13"
+    },
+    {
+      "event_id": "r_gevv5gsi7b:proxy_ledger:12",
+      "run_id": "r_gevv5gsi7b",
+      "slot_id": "s_2sv12hahmm",
+      "pair_id": "p_1dnhfd5sv9",
+      "seq": 12,
+      "turn_index": 0,
+      "ts": "2026-11-14T01:01:32.904464315Z",
+      "type": "fault",
+      "source": "proxy_ledger",
+      "evidence": "gateway",
+      "target": "/v1/responses",
+      "is_error": true,
+      "summary": "proxy injected status 503 on message call 14"
+    },
+    {
+      "event_id": "r_gevv5gsi7b:proxy_ledger:13",
+      "run_id": "r_gevv5gsi7b",
+      "slot_id": "s_2sv12hahmm",
+      "pair_id": "p_1dnhfd5sv9",
+      "seq": 13,
+      "turn_index": 0,
+      "ts": "2026-11-14T01:01:34.914654049Z",
+      "type": "fault",
+      "source": "proxy_ledger",
+      "evidence": "gateway",
+      "target": "/v1/responses",
+      "is_error": true,
+      "summary": "proxy injected status 503 on message call 15"
+    },
+    {
+      "event_id": "r_gevv5gsi7b:proxy_ledger:14",
+      "run_id": "r_gevv5gsi7b",
+      "slot_id": "s_2sv12hahmm",
+      "pair_id": "p_1dnhfd5sv9",
+      "seq": 14,
+      "turn_index": 0,
+      "ts": "2026-11-14T01:01:36.927249458Z",
+      "type": "fault",
+      "source": "proxy_ledger",
+      "evidence": "gateway",
+      "target": "/v1/responses",
+      "is_error": true,
+      "summary": "proxy injected status 503 on message call 16"
+    },
+    {
+      "event_id": "r_gevv5gsi7b:proxy_ledger:15",
+      "run_id": "r_gevv5gsi7b",
+      "slot_id": "s_2sv12hahmm",
+      "pair_id": "p_1dnhfd5sv9",
+      "seq": 15,
+      "turn_index": 0,
+      "ts": "2026-11-14T01:01:38.937486159Z",
+      "type": "fault",
+      "source": "proxy_ledger",
+      "evidence": "gateway",
+      "target": "/v1/responses",
+      "is_error": true,
+      "summary": "proxy injected status 503 on message call 17"
+    },
+    {
+      "event_id": "r_gevv5gsi7b:proxy_ledger:16",
+      "run_id": "r_gevv5gsi7b",
+      "slot_id": "s_2sv12hahmm",
+      "pair_id": "p_1dnhfd5sv9",
+      "seq": 16,
+      "turn_index": 0,
+      "ts": "2026-11-14T01:01:40.95998262Z",
+      "type": "fault",
+      "source": "proxy_ledger",
+      "evidence": "gateway",
+      "target": "/v1/responses",
+      "is_error": true,
+      "summary": "proxy injected status 503 on message call 18"
+    },
+    {
+      "event_id": "r_gevv5gsi7b:proxy_ledger:17",
+      "run_id": "r_gevv5gsi7b",
+      "slot_id": "s_2sv12hahmm",
+      "pair_id": "p_1dnhfd5sv9",
+      "seq": 17,
+      "turn_index": 0,
+      "ts": "2026-11-14T01:01:42.970408012Z",
+      "type": "fault",
+      "source": "proxy_ledger",
+      "evidence": "gateway",
+      "target": "/v1/responses",
+      "is_error": true,
+      "summary": "proxy injected status 503 on message call 19"
+    },
+    {
+      "event_id": "r_gevv5gsi7b:proxy_ledger:18",
+      "run_id": "r_gevv5gsi7b",
+      "slot_id": "s_2sv12hahmm",
+      "pair_id": "p_1dnhfd5sv9",
+      "seq": 18,
+      "turn_index": 0,
+      "ts": "2026-11-14T01:01:44.987240218Z",
+      "type": "fault",
+      "source": "proxy_ledger",
+      "evidence": "gateway",
+      "target": "/v1/responses",
+      "is_error": true,
+      "summary": "proxy injected status 503 on message call 20"
+    },
+    {
+      "event_id": "r_gevv5gsi7b:proxy_ledger:19",
+      "run_id": "r_gevv5gsi7b",
+      "slot_id": "s_2sv12hahmm",
+      "pair_id": "p_1dnhfd5sv9",
+      "seq": 19,
+      "turn_index": 0,
+      "ts": "2026-11-14T01:01:46.999448662Z",
+      "type": "fault",
+      "source": "proxy_ledger",
+      "evidence": "gateway",
+      "target": "/v1/responses",
+      "is_error": true,
+      "summary": "proxy injected status 503 on message call 21"
+    },
+    {
+      "event_id": "r_gevv5gsi7b:proxy_ledger:20",
+      "run_id": "r_gevv5gsi7b",
+      "slot_id": "s_2sv12hahmm",
+      "pair_id": "p_1dnhfd5sv9",
+      "seq": 20,
+      "turn_index": 0,
+      "ts": "2026-11-14T01:01:49.013107047Z",
+      "type": "fault",
+      "source": "proxy_ledger",
+      "evidence": "gateway",
+      "target": "/v1/responses",
+      "is_error": true,
+      "summary": "proxy injected status 503 on message call 22"
+    },
+    {
+      "event_id": "r_gevv5gsi7b:proxy_ledger:21",
+      "run_id": "r_gevv5gsi7b",
+      "slot_id": "s_2sv12hahmm",
+      "pair_id": "p_1dnhfd5sv9",
+      "seq": 21,
+      "turn_index": 0,
+      "ts": "2026-11-14T01:01:51.038623872Z",
+      "type": "fault",
+      "source": "proxy_ledger",
+      "evidence": "gateway",
+      "target": "/v1/responses",
+      "is_error": true,
+      "summary": "proxy injected status 503 on message call 23"
+    },
+    {
+      "event_id": "r_gevv5gsi7b:proxy_ledger:22",
+      "run_id": "r_gevv5gsi7b",
+      "slot_id": "s_2sv12hahmm",
+      "pair_id": "p_1dnhfd5sv9",
+      "seq": 22,
+      "turn_index": 0,
+      "ts": "2026-11-14T01:01:53.047127532Z",
+      "type": "fault",
+      "source": "proxy_ledger",
+      "evidence": "gateway",
+      "target": "/v1/responses",
+      "is_error": true,
+      "summary": "proxy injected status 503 on message call 24"
+    },
+    {
+      "event_id": "r_gevv5gsi7b:proxy_ledger:23",
+      "run_id": "r_gevv5gsi7b",
+      "slot_id": "s_2sv12hahmm",
+      "pair_id": "p_1dnhfd5sv9",
+      "seq": 23,
+      "turn_index": 0,
+      "ts": "2026-11-14T01:01:55.057354625Z",
+      "type": "fault",
+      "source": "proxy_ledger",
+      "evidence": "gateway",
+      "target": "/v1/responses",
+      "is_error": true,
+      "summary": "proxy injected status 503 on message call 25"
+    },
+    {
+      "event_id": "r_gevv5gsi7b:proxy_ledger:24",
+      "run_id": "r_gevv5gsi7b",
+      "slot_id": "s_2sv12hahmm",
+      "pair_id": "p_1dnhfd5sv9",
+      "seq": 24,
+      "turn_index": 0,
+      "ts": "2026-11-14T01:01:57.068104596Z",
+      "type": "fault",
+      "source": "proxy_ledger",
+      "evidence": "gateway",
+      "target": "/v1/responses",
+      "is_error": true,
+      "summary": "proxy injected status 503 on message call 26"
+    },
+    {
+      "event_id": "r_gevv5gsi7b:proxy_ledger:25",
+      "run_id": "r_gevv5gsi7b",
+      "slot_id": "s_2sv12hahmm",
+      "pair_id": "p_1dnhfd5sv9",
+      "seq": 25,
+      "turn_index": 0,
+      "ts": "2026-11-14T01:01:59.08396627Z",
+      "type": "fault",
+      "source": "proxy_ledger",
+      "evidence": "gateway",
+      "target": "/v1/responses",
+      "is_error": true,
+      "summary": "proxy injected status 503 on message call 27"
+    },
+    {
+      "event_id": "r_gevv5gsi7b:proxy_ledger:26",
+      "run_id": "r_gevv5gsi7b",
+      "slot_id": "s_2sv12hahmm",
+      "pair_id": "p_1dnhfd5sv9",
+      "seq": 26,
+      "turn_index": 0,
+      "ts": "2026-11-14T01:02:01.107471272Z",
+      "type": "fault",
+      "source": "proxy_ledger",
+      "evidence": "gateway",
+      "target": "/v1/responses",
+      "is_error": true,
+      "summary": "proxy injected status 503 on message call 28"
+    },
+    {
+      "event_id": "r_gevv5gsi7b:proxy_ledger:27",
+      "run_id": "r_gevv5gsi7b",
+      "slot_id": "s_2sv12hahmm",
+      "pair_id": "p_1dnhfd5sv9",
+      "seq": 27,
+      "turn_index": 0,
+      "ts": "2026-11-14T01:02:03.117756066Z",
+      "type": "fault",
+      "source": "proxy_ledger",
+      "evidence": "gateway",
+      "target": "/v1/responses",
+      "is_error": true,
+      "summary": "proxy injected status 503 on message call 29"
+    },
+    {
+      "event_id": "r_gevv5gsi7b:proxy_ledger:28",
+      "run_id": "r_gevv5gsi7b",
+      "slot_id": "s_2sv12hahmm",
+      "pair_id": "p_1dnhfd5sv9",
+      "seq": 28,
+      "turn_index": 0,
+      "ts": "2026-11-14T01:02:05.127476164Z",
+      "type": "fault",
+      "source": "proxy_ledger",
+      "evidence": "gateway",
+      "target": "/v1/responses",
+      "is_error": true,
+      "summary": "proxy injected status 503 on message call 30"
+    },
+    {
+      "event_id": "r_gevv5gsi7b:proxy_ledger:29",
+      "run_id": "r_gevv5gsi7b",
+      "slot_id": "s_2sv12hahmm",
+      "pair_id": "p_1dnhfd5sv9",
+      "seq": 29,
+      "turn_index": 0,
+      "ts": "2026-11-14T01:02:07.138018886Z",
+      "type": "fault",
+      "source": "proxy_ledger",
+      "evidence": "gateway",
+      "target": "/v1/responses",
+      "is_error": true,
+      "summary": "proxy injected status 503 on message call 31"
+    },
+    {
+      "event_id": "r_gevv5gsi7b:proxy_ledger:30",
+      "run_id": "r_gevv5gsi7b",
+      "slot_id": "s_2sv12hahmm",
+      "pair_id": "p_1dnhfd5sv9",
+      "seq": 30,
+      "turn_index": 0,
+      "ts": "2026-11-14T01:02:09.159357341Z",
+      "type": "fault",
+      "source": "proxy_ledger",
+      "evidence": "gateway",
+      "target": "/v1/responses",
+      "is_error": true,
+      "summary": "proxy injected status 503 on message call 32"
+    },
+    {
+      "event_id": "r_gevv5gsi7b:gateway:1",
+      "run_id": "r_gevv5gsi7b",
+      "slot_id": "s_2sv12hahmm",
+      "pair_id": "p_1dnhfd5sv9",
+      "seq": 1,
+      "turn_index": 1,
+      "ts": "2026-11-14T01:01:06.822116Z",
+      "type": "model_request",
+      "source": "gateway",
+      "evidence": "gateway",
+      "request_id": "72cb8596-f73f-4830-aeee-975f372c3858",
+      "provider": "openai",
+      "model_requested": "gpt-5.4-mini",
+      "model_served": "gpt-5.4-mini-2026-03-17"
+    },
+    {
+      "event_id": "r_gevv5gsi7b:gateway:2",
+      "run_id": "r_gevv5gsi7b",
+      "slot_id": "s_2sv12hahmm",
+      "pair_id": "p_1dnhfd5sv9",
+      "seq": 2,
+      "turn_index": 1,
+      "ts": "2026-11-14T01:01:08.263437114Z",
+      "type": "model_response",
+      "source": "gateway",
+      "evidence": "gateway",
+      "request_id": "72cb8596-f73f-4830-aeee-975f372c3858",
+      "attempt_no": 1,
+      "parent_event_id": "r_gevv5gsi7b:gateway:1",
+      "provider": "openai",
+      "model_requested": "gpt-5.4-mini",
+      "model_served": "gpt-5.4-mini-2026-03-17",
+      "tokens": {
+        "fresh": 8227,
+        "cache_read": 0,
+        "cache_write": 0,
+        "out": 85
+      },
+      "usd": {
+        "state": "observed",
+        "v": 0.00655275,
+        "evidence": "gateway"
+      },
+      "summary": "1 tool calls"
+    },
+    {
+      "event_id": "r_gevv5gsi7b:gateway:3",
+      "run_id": "r_gevv5gsi7b",
+      "slot_id": "s_2sv12hahmm",
+      "pair_id": "p_1dnhfd5sv9",
+      "seq": 3,
+      "turn_index": 1,
+      "ts": "2026-11-14T01:01:08.263437114Z",
+      "type": "tool_call",
+      "source": "gateway",
+      "evidence": "gateway",
+      "request_id": "72cb8596-f73f-4830-aeee-975f372c3858",
+      "tool_call_id": "call_ShCCbCIYxf1Th4DGBkonEaHM",
+      "parent_event_id": "r_gevv5gsi7b:gateway:2",
+      "tool_name": "exec_command",
+      "args_hash": "2ca5e6ec50afce41c32ad3a191233c73e2f4b5e1d8f5a1c30824d65db4e1aa3a",
+      "provider": "openai",
+      "model_requested": "gpt-5.4-mini",
+      "model_served": "gpt-5.4-mini-2026-03-17",
+      "summary": "exec_command "
+    },
+    {
+      "event_id": "r_gevv5gsi7b:gateway:4",
+      "run_id": "r_gevv5gsi7b",
+      "slot_id": "s_2sv12hahmm",
+      "pair_id": "p_1dnhfd5sv9",
+      "seq": 4,
+      "turn_index": 2,
+      "ts": "2026-11-14T01:01:08.287913Z",
+      "type": "tool_result",
+      "source": "gateway",
+      "evidence": "gateway",
+      "request_id": "17b37bd4-9c58-4270-a9e1-7b281ab6e2a3",
+      "tool_call_id": "call_ShCCbCIYxf1Th4DGBkonEaHM",
+      "parent_event_id": "r_gevv5gsi7b:gateway:3",
+      "provider": "openai",
+      "model_requested": "gpt-5.4-mini",
+      "model_served": "gpt-5.4-mini-2026-03-17"
+    },
+    {
+      "event_id": "r_gevv5gsi7b:gateway:5",
+      "run_id": "r_gevv5gsi7b",
+      "slot_id": "s_2sv12hahmm",
+      "pair_id": "p_1dnhfd5sv9",
+      "seq": 5,
+      "turn_index": 2,
+      "ts": "2026-11-14T01:01:08.287913Z",
+      "type": "model_request",
+      "source": "gateway",
+      "evidence": "gateway",
+      "request_id": "17b37bd4-9c58-4270-a9e1-7b281ab6e2a3",
+      "provider": "openai",
+      "model_requested": "gpt-5.4-mini",
+      "model_served": "gpt-5.4-mini-2026-03-17"
+    },
+    {
+      "event_id": "r_gevv5gsi7b:gateway:6",
+      "run_id": "r_gevv5gsi7b",
+      "slot_id": "s_2sv12hahmm",
+      "pair_id": "p_1dnhfd5sv9",
+      "seq": 6,
+      "turn_index": 2,
+      "ts": "2026-11-14T01:01:10.718259025Z",
+      "type": "model_response",
+      "source": "gateway",
+      "evidence": "gateway",
+      "request_id": "17b37bd4-9c58-4270-a9e1-7b281ab6e2a3",
+      "attempt_no": 1,
+      "parent_event_id": "r_gevv5gsi7b:gateway:5",
+      "provider": "openai",
+      "model_requested": "gpt-5.4-mini",
+      "model_served": "gpt-5.4-mini-2026-03-17",
+      "tokens": {
+        "fresh": 3038,
+        "cache_read": 8064,
+        "cache_write": 0,
+        "out": 160
+      },
+      "usd": {
+        "state": "observed",
+        "v": 0.0036033000000000003,
+        "evidence": "gateway"
+      },
+      "summary": "1 tool calls"
+    },
+    {
+      "event_id": "r_gevv5gsi7b:gateway:7",
+      "run_id": "r_gevv5gsi7b",
+      "slot_id": "s_2sv12hahmm",
+      "pair_id": "p_1dnhfd5sv9",
+      "seq": 7,
+      "turn_index": 2,
+      "ts": "2026-11-14T01:01:10.718259025Z",
+      "type": "tool_call",
+      "source": "gateway",
+      "evidence": "gateway",
+      "request_id": "17b37bd4-9c58-4270-a9e1-7b281ab6e2a3",
+      "tool_call_id": "call_ZplakoxoSaRSd5uYE8K3SVbp",
+      "parent_event_id": "r_gevv5gsi7b:gateway:6",
+      "tool_name": "exec_command",
+      "args_hash": "2d1c3b350997d29a4958146914320788e87151cf3a425226fa5be1c483728d06",
+      "provider": "openai",
+      "model_requested": "gpt-5.4-mini",
+      "model_served": "gpt-5.4-mini-2026-03-17",
+      "summary": "exec_command "
+    },
+    {
+      "event_id": "r_gevv5gsi7b:gateway:8",
+      "run_id": "r_gevv5gsi7b",
+      "slot_id": "s_2sv12hahmm",
+      "pair_id": "p_1dnhfd5sv9",
+      "seq": 8,
+      "turn_index": 3,
+      "ts": "2026-11-14T01:01:10.734505Z",
+      "type": "tool_result",
+      "source": "gateway",
+      "evidence": "gateway",
+      "request_id": "ec26eb66-2006-43f6-9116-abd9e1a4cf1d",
+      "tool_call_id": "call_ZplakoxoSaRSd5uYE8K3SVbp",
+      "parent_event_id": "r_gevv5gsi7b:gateway:7",
+      "provider": "openai",
+      "model_requested": "gpt-5.4-mini",
+      "model_served": "gpt-5.4-mini"
+    },
+    {
+      "event_id": "r_gevv5gsi7b:gateway:9",
+      "run_id": "r_gevv5gsi7b",
+      "slot_id": "s_2sv12hahmm",
+      "pair_id": "p_1dnhfd5sv9",
+      "seq": 9,
+      "turn_index": 3,
+      "ts": "2026-11-14T01:01:10.734505Z",
+      "type": "model_request",
+      "source": "gateway",
+      "evidence": "gateway",
+      "request_id": "ec26eb66-2006-43f6-9116-abd9e1a4cf1d",
+      "provider": "openai",
+      "model_requested": "gpt-5.4-mini",
+      "model_served": "gpt-5.4-mini"
+    },
+    {
+      "event_id": "r_gevv5gsi7b:gateway:10",
+      "run_id": "r_gevv5gsi7b",
+      "slot_id": "s_2sv12hahmm",
+      "pair_id": "p_1dnhfd5sv9",
+      "seq": 10,
+      "turn_index": 3,
+      "ts": "2026-11-14T01:01:10.743505Z",
+      "type": "model_response",
+      "source": "gateway",
+      "evidence": "gateway",
+      "request_id": "ec26eb66-2006-43f6-9116-abd9e1a4cf1d",
+      "attempt_no": 1,
+      "parent_event_id": "r_gevv5gsi7b:gateway:9",
+      "is_error": true,
+      "provider": "openai",
+      "model_requested": "gpt-5.4-mini",
+      "model_served": "gpt-5.4-mini",
+      "usd": {
+        "state": "observed",
+        "v": 0,
+        "evidence": "gateway"
+      },
+      "summary": "error 503: The server is overloaded or not ready yet. ref nonce_txc3ha2m07frd41bnuoafy0i call 3"
+    },
+    {
+      "event_id": "r_gevv5gsi7b:gateway:11",
+      "run_id": "r_gevv5gsi7b",
+      "slot_id": "s_2sv12hahmm",
+      "pair_id": "p_1dnhfd5sv9",
+      "seq": 11,
+      "turn_index": 4,
+      "ts": "2026-11-14T01:01:12.747363Z",
+      "type": "model_request",
+      "source": "gateway",
+      "evidence": "gateway",
+      "request_id": "110b633a-0648-4368-b71d-f78687d17459",
+      "provider": "openai",
+      "model_requested": "gpt-5.4-mini",
+      "model_served": "gpt-5.4-mini"
+    },
+    {
+      "event_id": "r_gevv5gsi7b:gateway:12",
+      "run_id": "r_gevv5gsi7b",
+      "slot_id": "s_2sv12hahmm",
+      "pair_id": "p_1dnhfd5sv9",
+      "seq": 12,
+      "turn_index": 4,
+      "ts": "2026-11-14T01:01:12.753363Z",
+      "type": "model_response",
+      "source": "gateway",
+      "evidence": "gateway",
+      "request_id": "110b633a-0648-4368-b71d-f78687d17459",
+      "attempt_no": 1,
+      "parent_event_id": "r_gevv5gsi7b:gateway:11",
+      "is_error": true,
+      "provider": "openai",
+      "model_requested": "gpt-5.4-mini",
+      "model_served": "gpt-5.4-mini",
+      "usd": {
+        "state": "observed",
+        "v": 0,
+        "evidence": "gateway"
+      },
+      "summary": "error 503: The server is overloaded or not ready yet. ref nonce_txc3ha2m07frd41bnuoafy0i call 4"
+    },
+    {
+      "event_id": "r_gevv5gsi7b:gateway:13",
+      "run_id": "r_gevv5gsi7b",
+      "slot_id": "s_2sv12hahmm",
+      "pair_id": "p_1dnhfd5sv9",
+      "seq": 13,
+      "turn_index": 5,
+      "ts": "2026-11-14T01:01:14.757157Z",
+      "type": "model_request",
+      "source": "gateway",
+      "evidence": "gateway",
+      "request_id": "c0134df8-94e6-457e-800c-d97b1149d01c",
+      "provider": "openai",
+      "model_requested": "gpt-5.4-mini",
+      "model_served": "gpt-5.4-mini"
+    },
+    {
+      "event_id": "r_gevv5gsi7b:gateway:14",
+      "run_id": "r_gevv5gsi7b",
+      "slot_id": "s_2sv12hahmm",
+      "pair_id": "p_1dnhfd5sv9",
+      "seq": 14,
+      "turn_index": 5,
+      "ts": "2026-11-14T01:01:14.763157Z",
+      "type": "model_response",
+      "source": "gateway",
+      "evidence": "gateway",
+      "request_id": "c0134df8-94e6-457e-800c-d97b1149d01c",
+      "attempt_no": 1,
+      "parent_event_id": "r_gevv5gsi7b:gateway:13",
+      "is_error": true,
+      "provider": "openai",
+      "model_requested": "gpt-5.4-mini",
+      "model_served": "gpt-5.4-mini",
+      "usd": {
+        "state": "observed",
+        "v": 0,
+        "evidence": "gateway"
+      },
+      "summary": "error 503: The server is overloaded or not ready yet. ref nonce_txc3ha2m07frd41bnuoafy0i call 5"
+    },
+    {
+      "event_id": "r_gevv5gsi7b:gateway:15",
+      "run_id": "r_gevv5gsi7b",
+      "slot_id": "s_2sv12hahmm",
+      "pair_id": "p_1dnhfd5sv9",
+      "seq": 15,
+      "turn_index": 6,
+      "ts": "2026-11-14T01:01:16.767145Z",
+      "type": "model_request",
+      "source": "gateway",
+      "evidence": "gateway",
+      "request_id": "ba775e17-2aa3-48e7-a2c2-d83189331ccd",
+      "provider": "openai",
+      "model_requested": "gpt-5.4-mini",
+      "model_served": "gpt-5.4-mini"
+    },
+    {
+      "event_id": "r_gevv5gsi7b:gateway:16",
+      "run_id": "r_gevv5gsi7b",
+      "slot_id": "s_2sv12hahmm",
+      "pair_id": "p_1dnhfd5sv9",
+      "seq": 16,
+      "turn_index": 6,
+      "ts": "2026-11-14T01:01:16.776145Z",
+      "type": "model_response",
+      "source": "gateway",
+      "evidence": "gateway",
+      "request_id": "ba775e17-2aa3-48e7-a2c2-d83189331ccd",
+      "attempt_no": 1,
+      "parent_event_id": "r_gevv5gsi7b:gateway:15",
+      "is_error": true,
+      "provider": "openai",
+      "model_requested": "gpt-5.4-mini",
+      "model_served": "gpt-5.4-mini",
+      "usd": {
+        "state": "observed",
+        "v": 0,
+        "evidence": "gateway"
+      },
+      "summary": "error 503: The server is overloaded or not ready yet. ref nonce_txc3ha2m07frd41bnuoafy0i call 6"
+    },
+    {
+      "event_id": "r_gevv5gsi7b:gateway:17",
+      "run_id": "r_gevv5gsi7b",
+      "slot_id": "s_2sv12hahmm",
+      "pair_id": "p_1dnhfd5sv9",
+      "seq": 17,
+      "turn_index": 7,
+      "ts": "2026-11-14T01:01:18.780064Z",
+      "type": "model_request",
+      "source": "gateway",
+      "evidence": "gateway",
+      "request_id": "a64a5639-552e-4245-9f7f-e4b2fb2146a4",
+      "provider": "openai",
+      "model_requested": "gpt-5.4-mini",
+      "model_served": "gpt-5.4-mini"
+    },
+    {
+      "event_id": "r_gevv5gsi7b:gateway:18",
+      "run_id": "r_gevv5gsi7b",
+      "slot_id": "s_2sv12hahmm",
+      "pair_id": "p_1dnhfd5sv9",
+      "seq": 18,
+      "turn_index": 7,
+      "ts": "2026-11-14T01:01:18.785064Z",
+      "type": "model_response",
+      "source": "gateway",
+      "evidence": "gateway",
+      "request_id": "a64a5639-552e-4245-9f7f-e4b2fb2146a4",
+      "attempt_no": 1,
+      "parent_event_id": "r_gevv5gsi7b:gateway:17",
+      "is_error": true,
+      "provider": "openai",
+      "model_requested": "gpt-5.4-mini",
+      "model_served": "gpt-5.4-mini",
+      "usd": {
+        "state": "observed",
+        "v": 0,
+        "evidence": "gateway"
+      },
+      "summary": "error 503: The server is overloaded or not ready yet. ref nonce_txc3ha2m07frd41bnuoafy0i call 7"
+    },
+    {
+      "event_id": "r_gevv5gsi7b:gateway:19",
+      "run_id": "r_gevv5gsi7b",
+      "slot_id": "s_2sv12hahmm",
+      "pair_id": "p_1dnhfd5sv9",
+      "seq": 19,
+      "turn_index": 8,
+      "ts": "2026-11-14T01:01:20.805173Z",
+      "type": "model_request",
+      "source": "gateway",
+      "evidence": "gateway",
+      "request_id": "bb5bbbb1-2b5e-4f66-8566-f2db21205556",
+      "provider": "openai",
+      "model_requested": "gpt-5.4-mini",
+      "model_served": "gpt-5.4-mini"
+    },
+    {
+      "event_id": "r_gevv5gsi7b:gateway:20",
+      "run_id": "r_gevv5gsi7b",
+      "slot_id": "s_2sv12hahmm",
+      "pair_id": "p_1dnhfd5sv9",
+      "seq": 20,
+      "turn_index": 8,
+      "ts": "2026-11-14T01:01:20.811173Z",
+      "type": "model_response",
+      "source": "gateway",
+      "evidence": "gateway",
+      "request_id": "bb5bbbb1-2b5e-4f66-8566-f2db21205556",
+      "attempt_no": 1,
+      "parent_event_id": "r_gevv5gsi7b:gateway:19",
+      "is_error": true,
+      "provider": "openai",
+      "model_requested": "gpt-5.4-mini",
+      "model_served": "gpt-5.4-mini",
+      "usd": {
+        "state": "observed",
+        "v": 0,
+        "evidence": "gateway"
+      },
+      "summary": "error 503: The server is overloaded or not ready yet. ref nonce_txc3ha2m07frd41bnuoafy0i call 8"
+    },
+    {
+      "event_id": "r_gevv5gsi7b:gateway:21",
+      "run_id": "r_gevv5gsi7b",
+      "slot_id": "s_2sv12hahmm",
+      "pair_id": "p_1dnhfd5sv9",
+      "seq": 21,
+      "turn_index": 9,
+      "ts": "2026-11-14T01:01:22.816312Z",
+      "type": "model_request",
+      "source": "gateway",
+      "evidence": "gateway",
+      "request_id": "4a979831-0df5-4030-b243-bfb743f1d70a",
+      "provider": "openai",
+      "model_requested": "gpt-5.4-mini",
+      "model_served": "gpt-5.4-mini"
+    },
+    {
+      "event_id": "r_gevv5gsi7b:gateway:22",
+      "run_id": "r_gevv5gsi7b",
+      "slot_id": "s_2sv12hahmm",
+      "pair_id": "p_1dnhfd5sv9",
+      "seq": 22,
+      "turn_index": 9,
+      "ts": "2026-11-14T01:01:22.823312Z",
+      "type": "model_response",
+      "source": "gateway",
+      "evidence": "gateway",
+      "request_id": "4a979831-0df5-4030-b243-bfb743f1d70a",
+      "attempt_no": 1,
+      "parent_event_id": "r_gevv5gsi7b:gateway:21",
+      "is_error": true,
+      "provider": "openai",
+      "model_requested": "gpt-5.4-mini",
+      "model_served": "gpt-5.4-mini",
+      "usd": {
+        "state": "observed",
+        "v": 0,
+        "evidence": "gateway"
+      },
+      "summary": "error 503: The server is overloaded or not ready yet. ref nonce_txc3ha2m07frd41bnuoafy0i call 9"
+    },
+    {
+      "event_id": "r_gevv5gsi7b:gateway:23",
+      "run_id": "r_gevv5gsi7b",
+      "slot_id": "s_2sv12hahmm",
+      "pair_id": "p_1dnhfd5sv9",
+      "seq": 23,
+      "turn_index": 10,
+      "ts": "2026-11-14T01:01:24.827303Z",
+      "type": "model_request",
+      "source": "gateway",
+      "evidence": "gateway",
+      "request_id": "c5f26f28-bc02-4ca7-92ac-a2273efa42b3",
+      "provider": "openai",
+      "model_requested": "gpt-5.4-mini",
+      "model_served": "gpt-5.4-mini"
+    },
+    {
+      "event_id": "r_gevv5gsi7b:gateway:24",
+      "run_id": "r_gevv5gsi7b",
+      "slot_id": "s_2sv12hahmm",
+      "pair_id": "p_1dnhfd5sv9",
+      "seq": 24,
+      "turn_index": 10,
+      "ts": "2026-11-14T01:01:24.836303Z",
+      "type": "model_response",
+      "source": "gateway",
+      "evidence": "gateway",
+      "request_id": "c5f26f28-bc02-4ca7-92ac-a2273efa42b3",
+      "attempt_no": 1,
+      "parent_event_id": "r_gevv5gsi7b:gateway:23",
+      "is_error": true,
+      "provider": "openai",
+      "model_requested": "gpt-5.4-mini",
+      "model_served": "gpt-5.4-mini",
+      "usd": {
+        "state": "observed",
+        "v": 0,
+        "evidence": "gateway"
+      },
+      "summary": "error 503: The server is overloaded or not ready yet. ref nonce_txc3ha2m07frd41bnuoafy0i call 10"
+    },
+    {
+      "event_id": "r_gevv5gsi7b:gateway:25",
+      "run_id": "r_gevv5gsi7b",
+      "slot_id": "s_2sv12hahmm",
+      "pair_id": "p_1dnhfd5sv9",
+      "seq": 25,
+      "turn_index": 11,
+      "ts": "2026-11-14T01:01:26.840108Z",
+      "type": "model_request",
+      "source": "gateway",
+      "evidence": "gateway",
+      "request_id": "8d9e308d-2b22-474d-9707-35fb3165577e",
+      "provider": "openai",
+      "model_requested": "gpt-5.4-mini",
+      "model_served": "gpt-5.4-mini"
+    },
+    {
+      "event_id": "r_gevv5gsi7b:gateway:26",
+      "run_id": "r_gevv5gsi7b",
+      "slot_id": "s_2sv12hahmm",
+      "pair_id": "p_1dnhfd5sv9",
+      "seq": 26,
+      "turn_index": 11,
+      "ts": "2026-11-14T01:01:26.846108Z",
+      "type": "model_response",
+      "source": "gateway",
+      "evidence": "gateway",
+      "request_id": "8d9e308d-2b22-474d-9707-35fb3165577e",
+      "attempt_no": 1,
+      "parent_event_id": "r_gevv5gsi7b:gateway:25",
+      "is_error": true,
+      "provider": "openai",
+      "model_requested": "gpt-5.4-mini",
+      "model_served": "gpt-5.4-mini",
+      "usd": {
+        "state": "observed",
+        "v": 0,
+        "evidence": "gateway"
+      },
+      "summary": "error 503: The server is overloaded or not ready yet. ref nonce_txc3ha2m07frd41bnuoafy0i call 11"
+    },
+    {
+      "event_id": "r_gevv5gsi7b:gateway:27",
+      "run_id": "r_gevv5gsi7b",
+      "slot_id": "s_2sv12hahmm",
+      "pair_id": "p_1dnhfd5sv9",
+      "seq": 27,
+      "turn_index": 12,
+      "ts": "2026-11-14T01:01:28.849278Z",
+      "type": "model_request",
+      "source": "gateway",
+      "evidence": "gateway",
+      "request_id": "77d3ea68-37bd-42ff-af2a-e9b98370dc40",
+      "provider": "openai",
+      "model_requested": "gpt-5.4-mini",
+      "model_served": "gpt-5.4-mini"
+    },
+    {
+      "event_id": "r_gevv5gsi7b:gateway:28",
+      "run_id": "r_gevv5gsi7b",
+      "slot_id": "s_2sv12hahmm",
+      "pair_id": "p_1dnhfd5sv9",
+      "seq": 28,
+      "turn_index": 12,
+      "ts": "2026-11-14T01:01:28.859278Z",
+      "type": "model_response",
+      "source": "gateway",
+      "evidence": "gateway",
+      "request_id": "77d3ea68-37bd-42ff-af2a-e9b98370dc40",
+      "attempt_no": 1,
+      "parent_event_id": "r_gevv5gsi7b:gateway:27",
+      "is_error": true,
+      "provider": "openai",
+      "model_requested": "gpt-5.4-mini",
+      "model_served": "gpt-5.4-mini",
+      "usd": {
+        "state": "observed",
+        "v": 0,
+        "evidence": "gateway"
+      },
+      "summary": "error 503: The server is overloaded or not ready yet. ref nonce_txc3ha2m07frd41bnuoafy0i call 12"
+    },
+    {
+      "event_id": "r_gevv5gsi7b:gateway:29",
+      "run_id": "r_gevv5gsi7b",
+      "slot_id": "s_2sv12hahmm",
+      "pair_id": "p_1dnhfd5sv9",
+      "seq": 29,
+      "turn_index": 13,
+      "ts": "2026-11-14T01:01:30.877853Z",
+      "type": "model_request",
+      "source": "gateway",
+      "evidence": "gateway",
+      "request_id": "fe80dc39-79f5-4678-be17-f74c15a79d1b",
+      "provider": "openai",
+      "model_requested": "gpt-5.4-mini",
+      "model_served": "gpt-5.4-mini"
+    },
+    {
+      "event_id": "r_gevv5gsi7b:gateway:30",
+      "run_id": "r_gevv5gsi7b",
+      "slot_id": "s_2sv12hahmm",
+      "pair_id": "p_1dnhfd5sv9",
+      "seq": 30,
+      "turn_index": 13,
+      "ts": "2026-11-14T01:01:30.890853Z",
+      "type": "model_response",
+      "source": "gateway",
+      "evidence": "gateway",
+      "request_id": "fe80dc39-79f5-4678-be17-f74c15a79d1b",
+      "attempt_no": 1,
+      "parent_event_id": "r_gevv5gsi7b:gateway:29",
+      "is_error": true,
+      "provider": "openai",
+      "model_requested": "gpt-5.4-mini",
+      "model_served": "gpt-5.4-mini",
+      "usd": {
+        "state": "observed",
+        "v": 0,
+        "evidence": "gateway"
+      },
+      "summary": "error 503: The server is overloaded or not ready yet. ref nonce_txc3ha2m07frd41bnuoafy0i call 13"
+    },
+    {
+      "event_id": "r_gevv5gsi7b:gateway:31",
+      "run_id": "r_gevv5gsi7b",
+      "slot_id": "s_2sv12hahmm",
+      "pair_id": "p_1dnhfd5sv9",
+      "seq": 31,
+      "turn_index": 14,
+      "ts": "2026-11-14T01:01:32.900404Z",
+      "type": "model_request",
+      "source": "gateway",
+      "evidence": "gateway",
+      "request_id": "103ce144-2d58-45e1-8eb2-6cff80f64d29",
+      "provider": "openai",
+      "model_requested": "gpt-5.4-mini",
+      "model_served": "gpt-5.4-mini"
+    },
+    {
+      "event_id": "r_gevv5gsi7b:gateway:32",
+      "run_id": "r_gevv5gsi7b",
+      "slot_id": "s_2sv12hahmm",
+      "pair_id": "p_1dnhfd5sv9",
+      "seq": 32,
+      "turn_index": 14,
+      "ts": "2026-11-14T01:01:32.909404Z",
+      "type": "model_response",
+      "source": "gateway",
+      "evidence": "gateway",
+      "request_id": "103ce144-2d58-45e1-8eb2-6cff80f64d29",
+      "attempt_no": 1,
+      "parent_event_id": "r_gevv5gsi7b:gateway:31",
+      "is_error": true,
+      "provider": "openai",
+      "model_requested": "gpt-5.4-mini",
+      "model_served": "gpt-5.4-mini",
+      "usd": {
+        "state": "observed",
+        "v": 0,
+        "evidence": "gateway"
+      },
+      "summary": "error 503: The server is overloaded or not ready yet. ref nonce_txc3ha2m07frd41bnuoafy0i call 14"
+    },
+    {
+      "event_id": "r_gevv5gsi7b:gateway:33",
+      "run_id": "r_gevv5gsi7b",
+      "slot_id": "s_2sv12hahmm",
+      "pair_id": "p_1dnhfd5sv9",
+      "seq": 33,
+      "turn_index": 15,
+      "ts": "2026-11-14T01:01:34.913332Z",
+      "type": "model_request",
+      "source": "gateway",
+      "evidence": "gateway",
+      "request_id": "91b18f27-ba6d-4778-ba9e-5cc54561ab15",
+      "provider": "openai",
+      "model_requested": "gpt-5.4-mini",
+      "model_served": "gpt-5.4-mini"
+    },
+    {
+      "event_id": "r_gevv5gsi7b:gateway:34",
+      "run_id": "r_gevv5gsi7b",
+      "slot_id": "s_2sv12hahmm",
+      "pair_id": "p_1dnhfd5sv9",
+      "seq": 34,
+      "turn_index": 15,
+      "ts": "2026-11-14T01:01:34.922332Z",
+      "type": "model_response",
+      "source": "gateway",
+      "evidence": "gateway",
+      "request_id": "91b18f27-ba6d-4778-ba9e-5cc54561ab15",
+      "attempt_no": 1,
+      "parent_event_id": "r_gevv5gsi7b:gateway:33",
+      "is_error": true,
+      "provider": "openai",
+      "model_requested": "gpt-5.4-mini",
+      "model_served": "gpt-5.4-mini",
+      "usd": {
+        "state": "observed",
+        "v": 0,
+        "evidence": "gateway"
+      },
+      "summary": "error 503: The server is overloaded or not ready yet. ref nonce_txc3ha2m07frd41bnuoafy0i call 15"
+    },
+    {
+      "event_id": "r_gevv5gsi7b:gateway:35",
+      "run_id": "r_gevv5gsi7b",
+      "slot_id": "s_2sv12hahmm",
+      "pair_id": "p_1dnhfd5sv9",
+      "seq": 35,
+      "turn_index": 16,
+      "ts": "2026-11-14T01:01:36.926277Z",
+      "type": "model_request",
+      "source": "gateway",
+      "evidence": "gateway",
+      "request_id": "0c97becf-1f52-41b9-b08d-a995a987e5ce",
+      "provider": "openai",
+      "model_requested": "gpt-5.4-mini",
+      "model_served": "gpt-5.4-mini"
+    },
+    {
+      "event_id": "r_gevv5gsi7b:gateway:36",
+      "run_id": "r_gevv5gsi7b",
+      "slot_id": "s_2sv12hahmm",
+      "pair_id": "p_1dnhfd5sv9",
+      "seq": 36,
+      "turn_index": 16,
+      "ts": "2026-11-14T01:01:36.932277Z",
+      "type": "model_response",
+      "source": "gateway",
+      "evidence": "gateway",
+      "request_id": "0c97becf-1f52-41b9-b08d-a995a987e5ce",
+      "attempt_no": 1,
+      "parent_event_id": "r_gevv5gsi7b:gateway:35",
+      "is_error": true,
+      "provider": "openai",
+      "model_requested": "gpt-5.4-mini",
+      "model_served": "gpt-5.4-mini",
+      "usd": {
+        "state": "observed",
+        "v": 0,
+        "evidence": "gateway"
+      },
+      "summary": "error 503: The server is overloaded or not ready yet. ref nonce_txc3ha2m07frd41bnuoafy0i call 16"
+    },
+    {
+      "event_id": "r_gevv5gsi7b:gateway:37",
+      "run_id": "r_gevv5gsi7b",
+      "slot_id": "s_2sv12hahmm",
+      "pair_id": "p_1dnhfd5sv9",
+      "seq": 37,
+      "turn_index": 17,
+      "ts": "2026-11-14T01:01:38.936345Z",
+      "type": "model_request",
+      "source": "gateway",
+      "evidence": "gateway",
+      "request_id": "a351dd29-e132-4df8-8329-d270ada85f01",
+      "provider": "openai",
+      "model_requested": "gpt-5.4-mini",
+      "model_served": "gpt-5.4-mini"
+    },
+    {
+      "event_id": "r_gevv5gsi7b:gateway:38",
+      "run_id": "r_gevv5gsi7b",
+      "slot_id": "s_2sv12hahmm",
+      "pair_id": "p_1dnhfd5sv9",
+      "seq": 38,
+      "turn_index": 17,
+      "ts": "2026-11-14T01:01:38.942345Z",
+      "type": "model_response",
+      "source": "gateway",
+      "evidence": "gateway",
+      "request_id": "a351dd29-e132-4df8-8329-d270ada85f01",
+      "attempt_no": 1,
+      "parent_event_id": "r_gevv5gsi7b:gateway:37",
+      "is_error": true,
+      "provider": "openai",
+      "model_requested": "gpt-5.4-mini",
+      "model_served": "gpt-5.4-mini",
+      "usd": {
+        "state": "observed",
+        "v": 0,
+        "evidence": "gateway"
+      },
+      "summary": "error 503: The server is overloaded or not ready yet. ref nonce_txc3ha2m07frd41bnuoafy0i call 17"
+    },
+    {
+      "event_id": "r_gevv5gsi7b:gateway:39",
+      "run_id": "r_gevv5gsi7b",
+      "slot_id": "s_2sv12hahmm",
+      "pair_id": "p_1dnhfd5sv9",
+      "seq": 39,
+      "turn_index": 18,
+      "ts": "2026-11-14T01:01:40.958896Z",
+      "type": "model_request",
+      "source": "gateway",
+      "evidence": "gateway",
+      "request_id": "37d282fa-274a-46a2-be58-a5794fee89e7",
+      "provider": "openai",
+      "model_requested": "gpt-5.4-mini",
+      "model_served": "gpt-5.4-mini"
+    },
+    {
+      "event_id": "r_gevv5gsi7b:gateway:40",
+      "run_id": "r_gevv5gsi7b",
+      "slot_id": "s_2sv12hahmm",
+      "pair_id": "p_1dnhfd5sv9",
+      "seq": 40,
+      "turn_index": 18,
+      "ts": "2026-11-14T01:01:40.964896Z",
+      "type": "model_response",
+      "source": "gateway",
+      "evidence": "gateway",
+      "request_id": "37d282fa-274a-46a2-be58-a5794fee89e7",
+      "attempt_no": 1,
+      "parent_event_id": "r_gevv5gsi7b:gateway:39",
+      "is_error": true,
+      "provider": "openai",
+      "model_requested": "gpt-5.4-mini",
+      "model_served": "gpt-5.4-mini",
+      "usd": {
+        "state": "observed",
+        "v": 0,
+        "evidence": "gateway"
+      },
+      "summary": "error 503: The server is overloaded or not ready yet. ref nonce_txc3ha2m07frd41bnuoafy0i call 18"
+    },
+    {
+      "event_id": "r_gevv5gsi7b:gateway:41",
+      "run_id": "r_gevv5gsi7b",
+      "slot_id": "s_2sv12hahmm",
+      "pair_id": "p_1dnhfd5sv9",
+      "seq": 41,
+      "turn_index": 19,
+      "ts": "2026-11-14T01:01:42.968902Z",
+      "type": "model_request",
+      "source": "gateway",
+      "evidence": "gateway",
+      "request_id": "c4baaee2-4f85-4bb4-9817-92ae13fe5398",
+      "provider": "openai",
+      "model_requested": "gpt-5.4-mini",
+      "model_served": "gpt-5.4-mini"
+    },
+    {
+      "event_id": "r_gevv5gsi7b:gateway:42",
+      "run_id": "r_gevv5gsi7b",
+      "slot_id": "s_2sv12hahmm",
+      "pair_id": "p_1dnhfd5sv9",
+      "seq": 42,
+      "turn_index": 19,
+      "ts": "2026-11-14T01:01:42.981902Z",
+      "type": "model_response",
+      "source": "gateway",
+      "evidence": "gateway",
+      "request_id": "c4baaee2-4f85-4bb4-9817-92ae13fe5398",
+      "attempt_no": 1,
+      "parent_event_id": "r_gevv5gsi7b:gateway:41",
+      "is_error": true,
+      "provider": "openai",
+      "model_requested": "gpt-5.4-mini",
+      "model_served": "gpt-5.4-mini",
+      "usd": {
+        "state": "observed",
+        "v": 0,
+        "evidence": "gateway"
+      },
+      "summary": "error 503: The server is overloaded or not ready yet. ref nonce_txc3ha2m07frd41bnuoafy0i call 19"
+    },
+    {
+      "event_id": "r_gevv5gsi7b:gateway:43",
+      "run_id": "r_gevv5gsi7b",
+      "slot_id": "s_2sv12hahmm",
+      "pair_id": "p_1dnhfd5sv9",
+      "seq": 43,
+      "turn_index": 20,
+      "ts": "2026-11-14T01:01:44.986121Z",
+      "type": "model_request",
+      "source": "gateway",
+      "evidence": "gateway",
+      "request_id": "58441401-6e96-447a-9e7b-bb4aa7a4973c",
+      "provider": "openai",
+      "model_requested": "gpt-5.4-mini",
+      "model_served": "gpt-5.4-mini"
+    },
+    {
+      "event_id": "r_gevv5gsi7b:gateway:44",
+      "run_id": "r_gevv5gsi7b",
+      "slot_id": "s_2sv12hahmm",
+      "pair_id": "p_1dnhfd5sv9",
+      "seq": 44,
+      "turn_index": 20,
+      "ts": "2026-11-14T01:01:44.995121Z",
+      "type": "model_response",
+      "source": "gateway",
+      "evidence": "gateway",
+      "request_id": "58441401-6e96-447a-9e7b-bb4aa7a4973c",
+      "attempt_no": 1,
+      "parent_event_id": "r_gevv5gsi7b:gateway:43",
+      "is_error": true,
+      "provider": "openai",
+      "model_requested": "gpt-5.4-mini",
+      "model_served": "gpt-5.4-mini",
+      "usd": {
+        "state": "observed",
+        "v": 0,
+        "evidence": "gateway"
+      },
+      "summary": "error 503: The server is overloaded or not ready yet. ref nonce_txc3ha2m07frd41bnuoafy0i call 20"
+    },
+    {
+      "event_id": "r_gevv5gsi7b:gateway:45",
+      "run_id": "r_gevv5gsi7b",
+      "slot_id": "s_2sv12hahmm",
+      "pair_id": "p_1dnhfd5sv9",
+      "seq": 45,
+      "turn_index": 21,
+      "ts": "2026-11-14T01:01:46.998001Z",
+      "type": "model_request",
+      "source": "gateway",
+      "evidence": "gateway",
+      "request_id": "d0fb168c-d2ad-48c3-953f-f50e13c48e52",
+      "provider": "openai",
+      "model_requested": "gpt-5.4-mini",
+      "model_served": "gpt-5.4-mini"
+    },
+    {
+      "event_id": "r_gevv5gsi7b:gateway:46",
+      "run_id": "r_gevv5gsi7b",
+      "slot_id": "s_2sv12hahmm",
+      "pair_id": "p_1dnhfd5sv9",
+      "seq": 46,
+      "turn_index": 21,
+      "ts": "2026-11-14T01:01:47.007001Z",
+      "type": "model_response",
+      "source": "gateway",
+      "evidence": "gateway",
+      "request_id": "d0fb168c-d2ad-48c3-953f-f50e13c48e52",
+      "attempt_no": 1,
+      "parent_event_id": "r_gevv5gsi7b:gateway:45",
+      "is_error": true,
+      "provider": "openai",
+      "model_requested": "gpt-5.4-mini",
+      "model_served": "gpt-5.4-mini",
+      "usd": {
+        "state": "observed",
+        "v": 0,
+        "evidence": "gateway"
+      },
+      "summary": "error 503: The server is overloaded or not ready yet. ref nonce_txc3ha2m07frd41bnuoafy0i call 21"
+    },
+    {
+      "event_id": "r_gevv5gsi7b:gateway:47",
+      "run_id": "r_gevv5gsi7b",
+      "slot_id": "s_2sv12hahmm",
+      "pair_id": "p_1dnhfd5sv9",
+      "seq": 47,
+      "turn_index": 22,
+      "ts": "2026-11-14T01:01:49.010069Z",
+      "type": "model_request",
+      "source": "gateway",
+      "evidence": "gateway",
+      "request_id": "fede9012-5958-4673-9ce9-208416952b95",
+      "provider": "openai",
+      "model_requested": "gpt-5.4-mini",
+      "model_served": "gpt-5.4-mini"
+    },
+    {
+      "event_id": "r_gevv5gsi7b:gateway:48",
+      "run_id": "r_gevv5gsi7b",
+      "slot_id": "s_2sv12hahmm",
+      "pair_id": "p_1dnhfd5sv9",
+      "seq": 48,
+      "turn_index": 22,
+      "ts": "2026-11-14T01:01:49.019069Z",
+      "type": "model_response",
+      "source": "gateway",
+      "evidence": "gateway",
+      "request_id": "fede9012-5958-4673-9ce9-208416952b95",
+      "attempt_no": 1,
+      "parent_event_id": "r_gevv5gsi7b:gateway:47",
+      "is_error": true,
+      "provider": "openai",
+      "model_requested": "gpt-5.4-mini",
+      "model_served": "gpt-5.4-mini",
+      "usd": {
+        "state": "observed",
+        "v": 0,
+        "evidence": "gateway"
+      },
+      "summary": "error 503: The server is overloaded or not ready yet. ref nonce_txc3ha2m07frd41bnuoafy0i call 22"
+    },
+    {
+      "event_id": "r_gevv5gsi7b:gateway:49",
+      "run_id": "r_gevv5gsi7b",
+      "slot_id": "s_2sv12hahmm",
+      "pair_id": "p_1dnhfd5sv9",
+      "seq": 49,
+      "turn_index": 23,
+      "ts": "2026-11-14T01:01:51.037662Z",
+      "type": "model_request",
+      "source": "gateway",
+      "evidence": "gateway",
+      "request_id": "c3ee7a46-52d5-4807-87c1-3c174b75e75e",
+      "provider": "openai",
+      "model_requested": "gpt-5.4-mini",
+      "model_served": "gpt-5.4-mini"
+    },
+    {
+      "event_id": "r_gevv5gsi7b:gateway:50",
+      "run_id": "r_gevv5gsi7b",
+      "slot_id": "s_2sv12hahmm",
+      "pair_id": "p_1dnhfd5sv9",
+      "seq": 50,
+      "turn_index": 23,
+      "ts": "2026-11-14T01:01:51.042662Z",
+      "type": "model_response",
+      "source": "gateway",
+      "evidence": "gateway",
+      "request_id": "c3ee7a46-52d5-4807-87c1-3c174b75e75e",
+      "attempt_no": 1,
+      "parent_event_id": "r_gevv5gsi7b:gateway:49",
+      "is_error": true,
+      "provider": "openai",
+      "model_requested": "gpt-5.4-mini",
+      "model_served": "gpt-5.4-mini",
+      "usd": {
+        "state": "observed",
+        "v": 0,
+        "evidence": "gateway"
+      },
+      "summary": "error 503: The server is overloaded or not ready yet. ref nonce_txc3ha2m07frd41bnuoafy0i call 23"
+    },
+    {
+      "event_id": "r_gevv5gsi7b:gateway:51",
+      "run_id": "r_gevv5gsi7b",
+      "slot_id": "s_2sv12hahmm",
+      "pair_id": "p_1dnhfd5sv9",
+      "seq": 51,
+      "turn_index": 24,
+      "ts": "2026-11-14T01:01:53.046113Z",
+      "type": "model_request",
+      "source": "gateway",
+      "evidence": "gateway",
+      "request_id": "fc19bb86-cfde-492d-b625-cbacbe14b452",
+      "provider": "openai",
+      "model_requested": "gpt-5.4-mini",
+      "model_served": "gpt-5.4-mini"
+    },
+    {
+      "event_id": "r_gevv5gsi7b:gateway:52",
+      "run_id": "r_gevv5gsi7b",
+      "slot_id": "s_2sv12hahmm",
+      "pair_id": "p_1dnhfd5sv9",
+      "seq": 52,
+      "turn_index": 24,
+      "ts": "2026-11-14T01:01:53.052113Z",
+      "type": "model_response",
+      "source": "gateway",
+      "evidence": "gateway",
+      "request_id": "fc19bb86-cfde-492d-b625-cbacbe14b452",
+      "attempt_no": 1,
+      "parent_event_id": "r_gevv5gsi7b:gateway:51",
+      "is_error": true,
+      "provider": "openai",
+      "model_requested": "gpt-5.4-mini",
+      "model_served": "gpt-5.4-mini",
+      "usd": {
+        "state": "observed",
+        "v": 0,
+        "evidence": "gateway"
+      },
+      "summary": "error 503: The server is overloaded or not ready yet. ref nonce_txc3ha2m07frd41bnuoafy0i call 24"
+    },
+    {
+      "event_id": "r_gevv5gsi7b:gateway:53",
+      "run_id": "r_gevv5gsi7b",
+      "slot_id": "s_2sv12hahmm",
+      "pair_id": "p_1dnhfd5sv9",
+      "seq": 53,
+      "turn_index": 25,
+      "ts": "2026-11-14T01:01:55.055401Z",
+      "type": "model_request",
+      "source": "gateway",
+      "evidence": "gateway",
+      "request_id": "47d82f35-b63f-4ec4-9aec-29c721726639",
+      "provider": "openai",
+      "model_requested": "gpt-5.4-mini",
+      "model_served": "gpt-5.4-mini"
+    },
+    {
+      "event_id": "r_gevv5gsi7b:gateway:54",
+      "run_id": "r_gevv5gsi7b",
+      "slot_id": "s_2sv12hahmm",
+      "pair_id": "p_1dnhfd5sv9",
+      "seq": 54,
+      "turn_index": 25,
+      "ts": "2026-11-14T01:01:55.062401Z",
+      "type": "model_response",
+      "source": "gateway",
+      "evidence": "gateway",
+      "request_id": "47d82f35-b63f-4ec4-9aec-29c721726639",
+      "attempt_no": 1,
+      "parent_event_id": "r_gevv5gsi7b:gateway:53",
+      "is_error": true,
+      "provider": "openai",
+      "model_requested": "gpt-5.4-mini",
+      "model_served": "gpt-5.4-mini",
+      "usd": {
+        "state": "observed",
+        "v": 0,
+        "evidence": "gateway"
+      },
+      "summary": "error 503: The server is overloaded or not ready yet. ref nonce_txc3ha2m07frd41bnuoafy0i call 25"
+    },
+    {
+      "event_id": "r_gevv5gsi7b:gateway:55",
+      "run_id": "r_gevv5gsi7b",
+      "slot_id": "s_2sv12hahmm",
+      "pair_id": "p_1dnhfd5sv9",
+      "seq": 55,
+      "turn_index": 26,
+      "ts": "2026-11-14T01:01:57.066794Z",
+      "type": "model_request",
+      "source": "gateway",
+      "evidence": "gateway",
+      "request_id": "1349ead5-9f6d-4780-9ef3-da51e3444bd5",
+      "provider": "openai",
+      "model_requested": "gpt-5.4-mini",
+      "model_served": "gpt-5.4-mini"
+    },
+    {
+      "event_id": "r_gevv5gsi7b:gateway:56",
+      "run_id": "r_gevv5gsi7b",
+      "slot_id": "s_2sv12hahmm",
+      "pair_id": "p_1dnhfd5sv9",
+      "seq": 56,
+      "turn_index": 26,
+      "ts": "2026-11-14T01:01:57.078794Z",
+      "type": "model_response",
+      "source": "gateway",
+      "evidence": "gateway",
+      "request_id": "1349ead5-9f6d-4780-9ef3-da51e3444bd5",
+      "attempt_no": 1,
+      "parent_event_id": "r_gevv5gsi7b:gateway:55",
+      "is_error": true,
+      "provider": "openai",
+      "model_requested": "gpt-5.4-mini",
+      "model_served": "gpt-5.4-mini",
+      "usd": {
+        "state": "observed",
+        "v": 0,
+        "evidence": "gateway"
+      },
+      "summary": "error 503: The server is overloaded or not ready yet. ref nonce_txc3ha2m07frd41bnuoafy0i call 26"
+    },
+    {
+      "event_id": "r_gevv5gsi7b:gateway:57",
+      "run_id": "r_gevv5gsi7b",
+      "slot_id": "s_2sv12hahmm",
+      "pair_id": "p_1dnhfd5sv9",
+      "seq": 57,
+      "turn_index": 27,
+      "ts": "2026-11-14T01:01:59.082494Z",
+      "type": "model_request",
+      "source": "gateway",
+      "evidence": "gateway",
+      "request_id": "7882518a-234b-4311-a2b4-5baf51007787",
+      "provider": "openai",
+      "model_requested": "gpt-5.4-mini",
+      "model_served": "gpt-5.4-mini"
+    },
+    {
+      "event_id": "r_gevv5gsi7b:gateway:58",
+      "run_id": "r_gevv5gsi7b",
+      "slot_id": "s_2sv12hahmm",
+      "pair_id": "p_1dnhfd5sv9",
+      "seq": 58,
+      "turn_index": 27,
+      "ts": "2026-11-14T01:01:59.089494Z",
+      "type": "model_response",
+      "source": "gateway",
+      "evidence": "gateway",
+      "request_id": "7882518a-234b-4311-a2b4-5baf51007787",
+      "attempt_no": 1,
+      "parent_event_id": "r_gevv5gsi7b:gateway:57",
+      "is_error": true,
+      "provider": "openai",
+      "model_requested": "gpt-5.4-mini",
+      "model_served": "gpt-5.4-mini",
+      "usd": {
+        "state": "observed",
+        "v": 0,
+        "evidence": "gateway"
+      },
+      "summary": "error 503: The server is overloaded or not ready yet. ref nonce_txc3ha2m07frd41bnuoafy0i call 27"
+    },
+    {
+      "event_id": "r_gevv5gsi7b:gateway:59",
+      "run_id": "r_gevv5gsi7b",
+      "slot_id": "s_2sv12hahmm",
+      "pair_id": "p_1dnhfd5sv9",
+      "seq": 59,
+      "turn_index": 28,
+      "ts": "2026-11-14T01:02:01.105654Z",
+      "type": "model_request",
+      "source": "gateway",
+      "evidence": "gateway",
+      "request_id": "7b11d291-a4eb-4041-b77f-b6a00fb04644",
+      "provider": "openai",
+      "model_requested": "gpt-5.4-mini",
+      "model_served": "gpt-5.4-mini"
+    },
+    {
+      "event_id": "r_gevv5gsi7b:gateway:60",
+      "run_id": "r_gevv5gsi7b",
+      "slot_id": "s_2sv12hahmm",
+      "pair_id": "p_1dnhfd5sv9",
+      "seq": 60,
+      "turn_index": 28,
+      "ts": "2026-11-14T01:02:01.112654Z",
+      "type": "model_response",
+      "source": "gateway",
+      "evidence": "gateway",
+      "request_id": "7b11d291-a4eb-4041-b77f-b6a00fb04644",
+      "attempt_no": 1,
+      "parent_event_id": "r_gevv5gsi7b:gateway:59",
+      "is_error": true,
+      "provider": "openai",
+      "model_requested": "gpt-5.4-mini",
+      "model_served": "gpt-5.4-mini",
+      "usd": {
+        "state": "observed",
+        "v": 0,
+        "evidence": "gateway"
+      },
+      "summary": "error 503: The server is overloaded or not ready yet. ref nonce_txc3ha2m07frd41bnuoafy0i call 28"
+    },
+    {
+      "event_id": "r_gevv5gsi7b:gateway:61",
+      "run_id": "r_gevv5gsi7b",
+      "slot_id": "s_2sv12hahmm",
+      "pair_id": "p_1dnhfd5sv9",
+      "seq": 61,
+      "turn_index": 29,
+      "ts": "2026-11-14T01:02:03.116393Z",
+      "type": "model_request",
+      "source": "gateway",
+      "evidence": "gateway",
+      "request_id": "3ec8132e-66b4-4e5e-8229-761b95efa5b0",
+      "provider": "openai",
+      "model_requested": "gpt-5.4-mini",
+      "model_served": "gpt-5.4-mini"
+    },
+    {
+      "event_id": "r_gevv5gsi7b:gateway:62",
+      "run_id": "r_gevv5gsi7b",
+      "slot_id": "s_2sv12hahmm",
+      "pair_id": "p_1dnhfd5sv9",
+      "seq": 62,
+      "turn_index": 29,
+      "ts": "2026-11-14T01:02:03.123393Z",
+      "type": "model_response",
+      "source": "gateway",
+      "evidence": "gateway",
+      "request_id": "3ec8132e-66b4-4e5e-8229-761b95efa5b0",
+      "attempt_no": 1,
+      "parent_event_id": "r_gevv5gsi7b:gateway:61",
+      "is_error": true,
+      "provider": "openai",
+      "model_requested": "gpt-5.4-mini",
+      "model_served": "gpt-5.4-mini",
+      "usd": {
+        "state": "observed",
+        "v": 0,
+        "evidence": "gateway"
+      },
+      "summary": "error 503: The server is overloaded or not ready yet. ref nonce_txc3ha2m07frd41bnuoafy0i call 29"
+    },
+    {
+      "event_id": "r_gevv5gsi7b:gateway:63",
+      "run_id": "r_gevv5gsi7b",
+      "slot_id": "s_2sv12hahmm",
+      "pair_id": "p_1dnhfd5sv9",
+      "seq": 63,
+      "turn_index": 30,
+      "ts": "2026-11-14T01:02:05.126003Z",
+      "type": "model_request",
+      "source": "gateway",
+      "evidence": "gateway",
+      "request_id": "3819b22f-45b5-43a8-9aeb-768f78592239",
+      "provider": "openai",
+      "model_requested": "gpt-5.4-mini",
+      "model_served": "gpt-5.4-mini"
+    },
+    {
+      "event_id": "r_gevv5gsi7b:gateway:64",
+      "run_id": "r_gevv5gsi7b",
+      "slot_id": "s_2sv12hahmm",
+      "pair_id": "p_1dnhfd5sv9",
+      "seq": 64,
+      "turn_index": 30,
+      "ts": "2026-11-14T01:02:05.132003Z",
+      "type": "model_response",
+      "source": "gateway",
+      "evidence": "gateway",
+      "request_id": "3819b22f-45b5-43a8-9aeb-768f78592239",
+      "attempt_no": 1,
+      "parent_event_id": "r_gevv5gsi7b:gateway:63",
+      "is_error": true,
+      "provider": "openai",
+      "model_requested": "gpt-5.4-mini",
+      "model_served": "gpt-5.4-mini",
+      "usd": {
+        "state": "observed",
+        "v": 0,
+        "evidence": "gateway"
+      },
+      "summary": "error 503: The server is overloaded or not ready yet. ref nonce_txc3ha2m07frd41bnuoafy0i call 30"
+    },
+    {
+      "event_id": "r_gevv5gsi7b:gateway:65",
+      "run_id": "r_gevv5gsi7b",
+      "slot_id": "s_2sv12hahmm",
+      "pair_id": "p_1dnhfd5sv9",
+      "seq": 65,
+      "turn_index": 31,
+      "ts": "2026-11-14T01:02:07.136396Z",
+      "type": "model_request",
+      "source": "gateway",
+      "evidence": "gateway",
+      "request_id": "b6a15856-c4ab-4f36-88c6-fea545409b09",
+      "provider": "openai",
+      "model_requested": "gpt-5.4-mini",
+      "model_served": "gpt-5.4-mini"
+    },
+    {
+      "event_id": "r_gevv5gsi7b:gateway:66",
+      "run_id": "r_gevv5gsi7b",
+      "slot_id": "s_2sv12hahmm",
+      "pair_id": "p_1dnhfd5sv9",
+      "seq": 66,
+      "turn_index": 31,
+      "ts": "2026-11-14T01:02:07.154396Z",
+      "type": "model_response",
+      "source": "gateway",
+      "evidence": "gateway",
+      "request_id": "b6a15856-c4ab-4f36-88c6-fea545409b09",
+      "attempt_no": 1,
+      "parent_event_id": "r_gevv5gsi7b:gateway:65",
+      "is_error": true,
+      "provider": "openai",
+      "model_requested": "gpt-5.4-mini",
+      "model_served": "gpt-5.4-mini",
+      "usd": {
+        "state": "observed",
+        "v": 0,
+        "evidence": "gateway"
+      },
+      "summary": "error 503: The server is overloaded or not ready yet. ref nonce_txc3ha2m07frd41bnuoafy0i call 31"
+    },
+    {
+      "event_id": "r_gevv5gsi7b:gateway:67",
+      "run_id": "r_gevv5gsi7b",
+      "slot_id": "s_2sv12hahmm",
+      "pair_id": "p_1dnhfd5sv9",
+      "seq": 67,
+      "turn_index": 32,
+      "ts": "2026-11-14T01:02:09.158179Z",
+      "type": "model_request",
+      "source": "gateway",
+      "evidence": "gateway",
+      "request_id": "61f98ce7-611d-483c-a8fb-6592adcf58ef",
+      "provider": "openai",
+      "model_requested": "gpt-5.4-mini",
+      "model_served": "gpt-5.4-mini"
+    },
+    {
+      "event_id": "r_gevv5gsi7b:gateway:68",
+      "run_id": "r_gevv5gsi7b",
+      "slot_id": "s_2sv12hahmm",
+      "pair_id": "p_1dnhfd5sv9",
+      "seq": 68,
+      "turn_index": 32,
+      "ts": "2026-11-14T01:02:09.180179Z",
+      "type": "model_response",
+      "source": "gateway",
+      "evidence": "gateway",
+      "request_id": "61f98ce7-611d-483c-a8fb-6592adcf58ef",
+      "attempt_no": 1,
+      "parent_event_id": "r_gevv5gsi7b:gateway:67",
+      "is_error": true,
+      "provider": "openai",
+      "model_requested": "gpt-5.4-mini",
+      "model_served": "gpt-5.4-mini",
+      "usd": {
+        "state": "observed",
+        "v": 0,
+        "evidence": "gateway"
+      },
+      "summary": "error 503: The server is overloaded or not ready yet. ref nonce_txc3ha2m07frd41bnuoafy0i call 32"
+    },
+    {
+      "event_id": "r_gevv5gsi7b:agent_stream:1",
+      "run_id": "r_gevv5gsi7b",
+      "slot_id": "s_2sv12hahmm",
+      "pair_id": "p_1dnhfd5sv9",
+      "seq": 1,
+      "turn_index": 0,
+      "ts": "2026-11-14T01:01:06.454029482Z",
+      "type": "error",
+      "source": "agent_stream",
+      "evidence": "native",
+      "is_error": true,
+      "provider": "openai",
+      "model_requested": "gpt-5.4-mini",
+      "summary": "error: Model metadata for `gpt-5.4-mini` not found. Defaulting to fallback metadata; this can degrade performance and..."
+    },
+    {
+      "event_id": "r_gevv5gsi7b:agent_stream:2",
+      "run_id": "r_gevv5gsi7b",
+      "slot_id": "s_2sv12hahmm",
+      "pair_id": "p_1dnhfd5sv9",
+      "seq": 2,
+      "turn_index": 1,
+      "ts": "2026-11-14T01:01:06.454029482Z",
+      "type": "model_response",
+      "source": "agent_stream",
+      "evidence": "native",
+      "provider": "openai",
+      "model_requested": "gpt-5.4-mini",
+      "summary": "I’m checking the current money and totals code first, then I’ll patch rounding at the source."
+    },
+    {
+      "event_id": "r_gevv5gsi7b:agent_stream:3",
+      "run_id": "r_gevv5gsi7b",
+      "slot_id": "s_2sv12hahmm",
+      "pair_id": "p_1dnhfd5sv9",
+      "seq": 3,
+      "turn_index": 1,
+      "ts": "2026-11-14T01:01:06.454029482Z",
+      "type": "tool_call",
+      "source": "agent_stream",
+      "evidence": "native",
+      "tool_call_id": "item_2",
+      "parent_event_id": "r_gevv5gsi7b:agent_stream:2",
+      "tool_name": "exec_command",
+      "target": "rg -n \"def totals|amount|subtotal|tax|discount|round|quant|percent_of|Decimal\" ledger tests -S",
+      "args_hash": "933d98614976a863ca29c3cc10e7f6965e1cb002a10726e23caac26b54834fdc",
+      "provider": "openai",
+      "model_requested": "gpt-5.4-mini",
+      "summary": "exec_command rg -n \"def totals|amount|subtotal|tax|discount|round|quant|percent_of|Decimal\" ledger tests -S"
+    },
+    {
+      "event_id": "r_gevv5gsi7b:agent_stream:4",
+      "run_id": "r_gevv5gsi7b",
+      "slot_id": "s_2sv12hahmm",
+      "pair_id": "p_1dnhfd5sv9",
+      "seq": 4,
+      "turn_index": 1,
+      "ts": "2026-11-14T01:01:06.454029482Z",
+      "type": "tool_result",
+      "source": "agent_stream",
+      "evidence": "native",
+      "tool_call_id": "item_2",
+      "parent_event_id": "r_gevv5gsi7b:agent_stream:3",
+      "tool_name": "exec_command",
+      "target": "rg -n \"def totals|amount|subtotal|tax|discount|round|quant|percent_of|Decimal\" ledger tests -S",
+      "result_hash": "3c76a0ce54fd2ac6756f4190f19fe69fe233070d7b7ad0c255a8ee8a4d710eca",
+      "provider": "openai",
+      "model_requested": "gpt-5.4-mini",
+      "summary": "exit 0: ledger/invoice.py:121: return Totals(subtotal=subtotal, discount=discount, tax=tax, total=taxable + tax)"
+    },
+    {
+      "event_id": "r_gevv5gsi7b:agent_stream:5",
+      "run_id": "r_gevv5gsi7b",
+      "slot_id": "s_2sv12hahmm",
+      "pair_id": "p_1dnhfd5sv9",
+      "seq": 5,
+      "turn_index": 2,
+      "ts": "2026-11-14T01:01:06.454029482Z",
+      "type": "model_response",
+      "source": "agent_stream",
+      "evidence": "native",
+      "provider": "openai",
+      "model_requested": "gpt-5.4-mini",
+      "summary": "I found float-based rounding in the core path; now I’m switching it to exact `Decimal` arithmetic."
+    },
+    {
+      "event_id": "r_gevv5gsi7b:agent_stream:6",
+      "run_id": "r_gevv5gsi7b",
+      "slot_id": "s_2sv12hahmm",
+      "pair_id": "p_1dnhfd5sv9",
+      "seq": 6,
+      "turn_index": 2,
+      "ts": "2026-11-14T01:01:06.454029482Z",
+      "type": "tool_call",
+      "source": "agent_stream",
+      "evidence": "native",
+      "tool_call_id": "item_4",
+      "parent_event_id": "r_gevv5gsi7b:agent_stream:5",
+      "tool_name": "exec_command",
+      "target": "sed -n '1,220p' ledger/money.py \u0026\u0026 printf '\\n---\\n' \u0026\u0026 sed -n '1,220p' ledger/invoice.py \u0026\u0026 printf '\\n---\\n' \u0026\u0026 sed -n '1,220p' ledger/discounts.py \u0026\u0026 printf '\\n---\\n' \u0026\u0026 sed -n '1,220p' ledger/export.py \u0026\u0026 printf '\\n---\\n' \u0026\u0026 sed -n '1,220p' ledger/cli.py",
+      "args_hash": "f7cbab3524e23012c57c7c98aa575432d18cf7429908e9d92ed89926925d378c",
+      "provider": "openai",
+      "model_requested": "gpt-5.4-mini",
+      "summary": "exec_command sed -n '1,220p' ledger/money.py \u0026\u0026 printf '\\n---\\n' \u0026\u0026 sed -n '1,220p' ledger/invoice.py \u0026\u0026 printf '\\n--..."
+    },
+    {
+      "event_id": "r_gevv5gsi7b:agent_stream:7",
+      "run_id": "r_gevv5gsi7b",
+      "slot_id": "s_2sv12hahmm",
+      "pair_id": "p_1dnhfd5sv9",
+      "seq": 7,
+      "turn_index": 2,
+      "ts": "2026-11-14T01:01:06.454029482Z",
+      "type": "tool_result",
+      "source": "agent_stream",
+      "evidence": "native",
+      "tool_call_id": "item_4",
+      "parent_event_id": "r_gevv5gsi7b:agent_stream:6",
+      "tool_name": "exec_command",
+      "target": "sed -n '1,220p' ledger/money.py \u0026\u0026 printf '\\n---\\n' \u0026\u0026 sed -n '1,220p' ledger/invoice.py \u0026\u0026 printf '\\n---\\n' \u0026\u0026 sed -n '1,220p' ledger/discounts.py \u0026\u0026 printf '\\n---\\n' \u0026\u0026 sed -n '1,220p' ledger/export.py \u0026\u0026 printf '\\n---\\n' \u0026\u0026 sed -n '1,220p' ledger/cli.py",
+      "result_hash": "cffae1b1843c0e888634a59c07ba774d49ee085623a7dd7f5d3eb84d3d5bc866",
+      "provider": "openai",
+      "model_requested": "gpt-5.4-mini",
+      "summary": "exit 0: export_json(invoices, sys.stdout)"
+    },
+    {
+      "event_id": "r_gevv5gsi7b:agent_stream:8",
+      "run_id": "r_gevv5gsi7b",
+      "slot_id": "s_2sv12hahmm",
+      "pair_id": "p_1dnhfd5sv9",
+      "seq": 8,
+      "turn_index": 2,
+      "ts": "2026-11-14T01:01:06.454029482Z",
+      "type": "retry",
+      "source": "agent_stream",
+      "evidence": "native",
+      "attempt_no": 1,
+      "is_error": true,
+      "provider": "openai",
+      "model_requested": "gpt-5.4-mini",
+      "summary": "reconnecting 1/5: unexpected status 503 Service Unavailable: The server is overloaded or not ready yet. ref nonce_txc..."
+    },
+    {
+      "event_id": "r_gevv5gsi7b:agent_stream:9",
+      "run_id": "r_gevv5gsi7b",
+      "slot_id": "s_2sv12hahmm",
+      "pair_id": "p_1dnhfd5sv9",
+      "seq": 9,
+      "turn_index": 2,
+      "ts": "2026-11-14T01:01:06.454029482Z",
+      "type": "retry",
+      "source": "agent_stream",
+      "evidence": "native",
+      "attempt_no": 2,
+      "is_error": true,
+      "provider": "openai",
+      "model_requested": "gpt-5.4-mini",
+      "summary": "reconnecting 2/5: unexpected status 503 Service Unavailable: The server is overloaded or not ready yet. ref nonce_txc..."
+    },
+    {
+      "event_id": "r_gevv5gsi7b:agent_stream:10",
+      "run_id": "r_gevv5gsi7b",
+      "slot_id": "s_2sv12hahmm",
+      "pair_id": "p_1dnhfd5sv9",
+      "seq": 10,
+      "turn_index": 2,
+      "ts": "2026-11-14T01:01:06.454029482Z",
+      "type": "retry",
+      "source": "agent_stream",
+      "evidence": "native",
+      "attempt_no": 3,
+      "is_error": true,
+      "provider": "openai",
+      "model_requested": "gpt-5.4-mini",
+      "summary": "reconnecting 3/5: unexpected status 503 Service Unavailable: The server is overloaded or not ready yet. ref nonce_txc..."
+    },
+    {
+      "event_id": "r_gevv5gsi7b:agent_stream:11",
+      "run_id": "r_gevv5gsi7b",
+      "slot_id": "s_2sv12hahmm",
+      "pair_id": "p_1dnhfd5sv9",
+      "seq": 11,
+      "turn_index": 2,
+      "ts": "2026-11-14T01:01:06.454029482Z",
+      "type": "retry",
+      "source": "agent_stream",
+      "evidence": "native",
+      "attempt_no": 4,
+      "is_error": true,
+      "provider": "openai",
+      "model_requested": "gpt-5.4-mini",
+      "summary": "reconnecting 4/5: unexpected status 503 Service Unavailable: The server is overloaded or not ready yet. ref nonce_txc..."
+    },
+    {
+      "event_id": "r_gevv5gsi7b:agent_stream:12",
+      "run_id": "r_gevv5gsi7b",
+      "slot_id": "s_2sv12hahmm",
+      "pair_id": "p_1dnhfd5sv9",
+      "seq": 12,
+      "turn_index": 2,
+      "ts": "2026-11-14T01:01:06.454029482Z",
+      "type": "retry",
+      "source": "agent_stream",
+      "evidence": "native",
+      "attempt_no": 5,
+      "is_error": true,
+      "provider": "openai",
+      "model_requested": "gpt-5.4-mini",
+      "summary": "reconnecting 5/5: unexpected status 503 Service Unavailable: The server is overloaded or not ready yet. ref nonce_txc..."
+    },
+    {
+      "event_id": "r_gevv5gsi7b:agent_stream:13",
+      "run_id": "r_gevv5gsi7b",
+      "slot_id": "s_2sv12hahmm",
+      "pair_id": "p_1dnhfd5sv9",
+      "seq": 13,
+      "turn_index": 2,
+      "ts": "2026-11-14T01:01:06.454029482Z",
+      "type": "error",
+      "source": "agent_stream",
+      "evidence": "native",
+      "is_error": true,
+      "provider": "openai",
+      "model_requested": "gpt-5.4-mini",
+      "summary": "error: unexpected status 503 Service Unavailable: The server is overloaded or not ready yet. ref nonce_txc3ha2m07frd4..."
+    },
+    {
+      "event_id": "r_gevv5gsi7b:agent_stream:14",
+      "run_id": "r_gevv5gsi7b",
+      "slot_id": "s_2sv12hahmm",
+      "pair_id": "p_1dnhfd5sv9",
+      "seq": 14,
+      "turn_index": 2,
+      "ts": "2026-11-14T01:01:06.454029482Z",
+      "type": "error",
+      "source": "agent_stream",
+      "evidence": "native",
+      "is_error": true,
+      "provider": "openai",
+      "model_requested": "gpt-5.4-mini",
+      "summary": "turn failed: unexpected status 503 Service Unavailable: The server is overloaded or not ready yet. ref nonce_txc3ha2m..."
+    }
+  ],
+  "claim": {
+    "made": false,
+    "text": "I found float-based rounding in the core path; now I’m switching it to exact `Decimal` arithmetic.",
+    "source": "native"
+  },
+  "cost": [
+    {
+      "request_id": "72cb8596-f73f-4830-aeee-975f372c3858",
+      "attempt": 1,
+      "model": "gpt-5.4-mini-2026-03-17",
+      "tokens": {
+        "fresh": 8227,
+        "cache_read": 0,
+        "cache_write": 0,
+        "out": 85
+      },
+      "price_ref": "bifrost-datasheet-2026-11-14-openai@sha256:064520900aeda8c3b5dec578dbbbe095f8fd366c388837fb21667ba2acf02000",
+      "usd": {
+        "state": "observed",
+        "v": 0.00655275,
+        "evidence": "gateway"
+      },
+      "bifrost_usd": 0.00655275,
+      "fault_inject": false
+    },
+    {
+      "request_id": "17b37bd4-9c58-4270-a9e1-7b281ab6e2a3",
+      "attempt": 1,
+      "model": "gpt-5.4-mini-2026-03-17",
+      "tokens": {
+        "fresh": 3038,
+        "cache_read": 8064,
+        "cache_write": 0,
+        "out": 160
+      },
+      "price_ref": "bifrost-datasheet-2026-11-14-openai@sha256:064520900aeda8c3b5dec578dbbbe095f8fd366c388837fb21667ba2acf02000",
+      "usd": {
+        "state": "observed",
+        "v": 0.0036033000000000003,
+        "evidence": "gateway"
+      },
+      "bifrost_usd": 0.0036033000000000003,
+      "fault_inject": false
+    },
+    {
+      "request_id": "ec26eb66-2006-43f6-9116-abd9e1a4cf1d",
+      "attempt": 1,
+      "model": "gpt-5.4-mini",
+      "tokens": {
+        "fresh": 0,
+        "cache_read": 0,
+        "cache_write": 0,
+        "out": 0
+      },
+      "price_ref": "bifrost-datasheet-2026-11-14-openai@sha256:064520900aeda8c3b5dec578dbbbe095f8fd366c388837fb21667ba2acf02000",
+      "usd": {
+        "state": "observed",
+        "v": 0,
+        "evidence": "gateway"
+      },
+      "fault_inject": true
+    },
+    {
+      "request_id": "110b633a-0648-4368-b71d-f78687d17459",
+      "attempt": 1,
+      "model": "gpt-5.4-mini",
+      "tokens": {
+        "fresh": 0,
+        "cache_read": 0,
+        "cache_write": 0,
+        "out": 0
+      },
+      "price_ref": "bifrost-datasheet-2026-11-14-openai@sha256:064520900aeda8c3b5dec578dbbbe095f8fd366c388837fb21667ba2acf02000",
+      "usd": {
+        "state": "observed",
+        "v": 0,
+        "evidence": "gateway"
+      },
+      "fault_inject": true
+    },
+    {
+      "request_id": "c0134df8-94e6-457e-800c-d97b1149d01c",
+      "attempt": 1,
+      "model": "gpt-5.4-mini",
+      "tokens": {
+        "fresh": 0,
+        "cache_read": 0,
+        "cache_write": 0,
+        "out": 0
+      },
+      "price_ref": "bifrost-datasheet-2026-11-14-openai@sha256:064520900aeda8c3b5dec578dbbbe095f8fd366c388837fb21667ba2acf02000",
+      "usd": {
+        "state": "observed",
+        "v": 0,
+        "evidence": "gateway"
+      },
+      "fault_inject": true
+    },
+    {
+      "request_id": "ba775e17-2aa3-48e7-a2c2-d83189331ccd",
+      "attempt": 1,
+      "model": "gpt-5.4-mini",
+      "tokens": {
+        "fresh": 0,
+        "cache_read": 0,
+        "cache_write": 0,
+        "out": 0
+      },
+      "price_ref": "bifrost-datasheet-2026-11-14-openai@sha256:064520900aeda8c3b5dec578dbbbe095f8fd366c388837fb21667ba2acf02000",
+      "usd": {
+        "state": "observed",
+        "v": 0,
+        "evidence": "gateway"
+      },
+      "fault_inject": true
+    },
+    {
+      "request_id": "a64a5639-552e-4245-9f7f-e4b2fb2146a4",
+      "attempt": 1,
+      "model": "gpt-5.4-mini",
+      "tokens": {
+        "fresh": 0,
+        "cache_read": 0,
+        "cache_write": 0,
+        "out": 0
+      },
+      "price_ref": "bifrost-datasheet-2026-11-14-openai@sha256:064520900aeda8c3b5dec578dbbbe095f8fd366c388837fb21667ba2acf02000",
+      "usd": {
+        "state": "observed",
+        "v": 0,
+        "evidence": "gateway"
+      },
+      "fault_inject": true
+    },
+    {
+      "request_id": "bb5bbbb1-2b5e-4f66-8566-f2db21205556",
+      "attempt": 1,
+      "model": "gpt-5.4-mini",
+      "tokens": {
+        "fresh": 0,
+        "cache_read": 0,
+        "cache_write": 0,
+        "out": 0
+      },
+      "price_ref": "bifrost-datasheet-2026-11-14-openai@sha256:064520900aeda8c3b5dec578dbbbe095f8fd366c388837fb21667ba2acf02000",
+      "usd": {
+        "state": "observed",
+        "v": 0,
+        "evidence": "gateway"
+      },
+      "fault_inject": true
+    },
+    {
+      "request_id": "4a979831-0df5-4030-b243-bfb743f1d70a",
+      "attempt": 1,
+      "model": "gpt-5.4-mini",
+      "tokens": {
+        "fresh": 0,
+        "cache_read": 0,
+        "cache_write": 0,
+        "out": 0
+      },
+      "price_ref": "bifrost-datasheet-2026-11-14-openai@sha256:064520900aeda8c3b5dec578dbbbe095f8fd366c388837fb21667ba2acf02000",
+      "usd": {
+        "state": "observed",
+        "v": 0,
+        "evidence": "gateway"
+      },
+      "fault_inject": true
+    },
+    {
+      "request_id": "c5f26f28-bc02-4ca7-92ac-a2273efa42b3",
+      "attempt": 1,
+      "model": "gpt-5.4-mini",
+      "tokens": {
+        "fresh": 0,
+        "cache_read": 0,
+        "cache_write": 0,
+        "out": 0
+      },
+      "price_ref": "bifrost-datasheet-2026-11-14-openai@sha256:064520900aeda8c3b5dec578dbbbe095f8fd366c388837fb21667ba2acf02000",
+      "usd": {
+        "state": "observed",
+        "v": 0,
+        "evidence": "gateway"
+      },
+      "fault_inject": true
+    },
+    {
+      "request_id": "8d9e308d-2b22-474d-9707-35fb3165577e",
+      "attempt": 1,
+      "model": "gpt-5.4-mini",
+      "tokens": {
+        "fresh": 0,
+        "cache_read": 0,
+        "cache_write": 0,
+        "out": 0
+      },
+      "price_ref": "bifrost-datasheet-2026-11-14-openai@sha256:064520900aeda8c3b5dec578dbbbe095f8fd366c388837fb21667ba2acf02000",
+      "usd": {
+        "state": "observed",
+        "v": 0,
+        "evidence": "gateway"
+      },
+      "fault_inject": true
+    },
+    {
+      "request_id": "77d3ea68-37bd-42ff-af2a-e9b98370dc40",
+      "attempt": 1,
+      "model": "gpt-5.4-mini",
+      "tokens": {
+        "fresh": 0,
+        "cache_read": 0,
+        "cache_write": 0,
+        "out": 0
+      },
+      "price_ref": "bifrost-datasheet-2026-11-14-openai@sha256:064520900aeda8c3b5dec578dbbbe095f8fd366c388837fb21667ba2acf02000",
+      "usd": {
+        "state": "observed",
+        "v": 0,
+        "evidence": "gateway"
+      },
+      "fault_inject": true
+    },
+    {
+      "request_id": "fe80dc39-79f5-4678-be17-f74c15a79d1b",
+      "attempt": 1,
+      "model": "gpt-5.4-mini",
+      "tokens": {
+        "fresh": 0,
+        "cache_read": 0,
+        "cache_write": 0,
+        "out": 0
+      },
+      "price_ref": "bifrost-datasheet-2026-11-14-openai@sha256:064520900aeda8c3b5dec578dbbbe095f8fd366c388837fb21667ba2acf02000",
+      "usd": {
+        "state": "observed",
+        "v": 0,
+        "evidence": "gateway"
+      },
+      "fault_inject": true
+    },
+    {
+      "request_id": "103ce144-2d58-45e1-8eb2-6cff80f64d29",
+      "attempt": 1,
+      "model": "gpt-5.4-mini",
+      "tokens": {
+        "fresh": 0,
+        "cache_read": 0,
+        "cache_write": 0,
+        "out": 0
+      },
+      "price_ref": "bifrost-datasheet-2026-11-14-openai@sha256:064520900aeda8c3b5dec578dbbbe095f8fd366c388837fb21667ba2acf02000",
+      "usd": {
+        "state": "observed",
+        "v": 0,
+        "evidence": "gateway"
+      },
+      "fault_inject": true
+    },
+    {
+      "request_id": "91b18f27-ba6d-4778-ba9e-5cc54561ab15",
+      "attempt": 1,
+      "model": "gpt-5.4-mini",
+      "tokens": {
+        "fresh": 0,
+        "cache_read": 0,
+        "cache_write": 0,
+        "out": 0
+      },
+      "price_ref": "bifrost-datasheet-2026-11-14-openai@sha256:064520900aeda8c3b5dec578dbbbe095f8fd366c388837fb21667ba2acf02000",
+      "usd": {
+        "state": "observed",
+        "v": 0,
+        "evidence": "gateway"
+      },
+      "fault_inject": true
+    },
+    {
+      "request_id": "0c97becf-1f52-41b9-b08d-a995a987e5ce",
+      "attempt": 1,
+      "model": "gpt-5.4-mini",
+      "tokens": {
+        "fresh": 0,
+        "cache_read": 0,
+        "cache_write": 0,
+        "out": 0
+      },
+      "price_ref": "bifrost-datasheet-2026-11-14-openai@sha256:064520900aeda8c3b5dec578dbbbe095f8fd366c388837fb21667ba2acf02000",
+      "usd": {
+        "state": "observed",
+        "v": 0,
+        "evidence": "gateway"
+      },
+      "fault_inject": true
+    },
+    {
+      "request_id": "a351dd29-e132-4df8-8329-d270ada85f01",
+      "attempt": 1,
+      "model": "gpt-5.4-mini",
+      "tokens": {
+        "fresh": 0,
+        "cache_read": 0,
+        "cache_write": 0,
+        "out": 0
+      },
+      "price_ref": "bifrost-datasheet-2026-11-14-openai@sha256:064520900aeda8c3b5dec578dbbbe095f8fd366c388837fb21667ba2acf02000",
+      "usd": {
+        "state": "observed",
+        "v": 0,
+        "evidence": "gateway"
+      },
+      "fault_inject": true
+    },
+    {
+      "request_id": "37d282fa-274a-46a2-be58-a5794fee89e7",
+      "attempt": 1,
+      "model": "gpt-5.4-mini",
+      "tokens": {
+        "fresh": 0,
+        "cache_read": 0,
+        "cache_write": 0,
+        "out": 0
+      },
+      "price_ref": "bifrost-datasheet-2026-11-14-openai@sha256:064520900aeda8c3b5dec578dbbbe095f8fd366c388837fb21667ba2acf02000",
+      "usd": {
+        "state": "observed",
+        "v": 0,
+        "evidence": "gateway"
+      },
+      "fault_inject": true
+    },
+    {
+      "request_id": "c4baaee2-4f85-4bb4-9817-92ae13fe5398",
+      "attempt": 1,
+      "model": "gpt-5.4-mini",
+      "tokens": {
+        "fresh": 0,
+        "cache_read": 0,
+        "cache_write": 0,
+        "out": 0
+      },
+      "price_ref": "bifrost-datasheet-2026-11-14-openai@sha256:064520900aeda8c3b5dec578dbbbe095f8fd366c388837fb21667ba2acf02000",
+      "usd": {
+        "state": "observed",
+        "v": 0,
+        "evidence": "gateway"
+      },
+      "fault_inject": true
+    },
+    {
+      "request_id": "58441401-6e96-447a-9e7b-bb4aa7a4973c",
+      "attempt": 1,
+      "model": "gpt-5.4-mini",
+      "tokens": {
+        "fresh": 0,
+        "cache_read": 0,
+        "cache_write": 0,
+        "out": 0
+      },
+      "price_ref": "bifrost-datasheet-2026-11-14-openai@sha256:064520900aeda8c3b5dec578dbbbe095f8fd366c388837fb21667ba2acf02000",
+      "usd": {
+        "state": "observed",
+        "v": 0,
+        "evidence": "gateway"
+      },
+      "fault_inject": true
+    },
+    {
+      "request_id": "d0fb168c-d2ad-48c3-953f-f50e13c48e52",
+      "attempt": 1,
+      "model": "gpt-5.4-mini",
+      "tokens": {
+        "fresh": 0,
+        "cache_read": 0,
+        "cache_write": 0,
+        "out": 0
+      },
+      "price_ref": "bifrost-datasheet-2026-11-14-openai@sha256:064520900aeda8c3b5dec578dbbbe095f8fd366c388837fb21667ba2acf02000",
+      "usd": {
+        "state": "observed",
+        "v": 0,
+        "evidence": "gateway"
+      },
+      "fault_inject": true
+    },
+    {
+      "request_id": "fede9012-5958-4673-9ce9-208416952b95",
+      "attempt": 1,
+      "model": "gpt-5.4-mini",
+      "tokens": {
+        "fresh": 0,
+        "cache_read": 0,
+        "cache_write": 0,
+        "out": 0
+      },
+      "price_ref": "bifrost-datasheet-2026-11-14-openai@sha256:064520900aeda8c3b5dec578dbbbe095f8fd366c388837fb21667ba2acf02000",
+      "usd": {
+        "state": "observed",
+        "v": 0,
+        "evidence": "gateway"
+      },
+      "fault_inject": true
+    },
+    {
+      "request_id": "c3ee7a46-52d5-4807-87c1-3c174b75e75e",
+      "attempt": 1,
+      "model": "gpt-5.4-mini",
+      "tokens": {
+        "fresh": 0,
+        "cache_read": 0,
+        "cache_write": 0,
+        "out": 0
+      },
+      "price_ref": "bifrost-datasheet-2026-11-14-openai@sha256:064520900aeda8c3b5dec578dbbbe095f8fd366c388837fb21667ba2acf02000",
+      "usd": {
+        "state": "observed",
+        "v": 0,
+        "evidence": "gateway"
+      },
+      "fault_inject": true
+    },
+    {
+      "request_id": "fc19bb86-cfde-492d-b625-cbacbe14b452",
+      "attempt": 1,
+      "model": "gpt-5.4-mini",
+      "tokens": {
+        "fresh": 0,
+        "cache_read": 0,
+        "cache_write": 0,
+        "out": 0
+      },
+      "price_ref": "bifrost-datasheet-2026-11-14-openai@sha256:064520900aeda8c3b5dec578dbbbe095f8fd366c388837fb21667ba2acf02000",
+      "usd": {
+        "state": "observed",
+        "v": 0,
+        "evidence": "gateway"
+      },
+      "fault_inject": true
+    },
+    {
+      "request_id": "47d82f35-b63f-4ec4-9aec-29c721726639",
+      "attempt": 1,
+      "model": "gpt-5.4-mini",
+      "tokens": {
+        "fresh": 0,
+        "cache_read": 0,
+        "cache_write": 0,
+        "out": 0
+      },
+      "price_ref": "bifrost-datasheet-2026-11-14-openai@sha256:064520900aeda8c3b5dec578dbbbe095f8fd366c388837fb21667ba2acf02000",
+      "usd": {
+        "state": "observed",
+        "v": 0,
+        "evidence": "gateway"
+      },
+      "fault_inject": true
+    },
+    {
+      "request_id": "1349ead5-9f6d-4780-9ef3-da51e3444bd5",
+      "attempt": 1,
+      "model": "gpt-5.4-mini",
+      "tokens": {
+        "fresh": 0,
+        "cache_read": 0,
+        "cache_write": 0,
+        "out": 0
+      },
+      "price_ref": "bifrost-datasheet-2026-11-14-openai@sha256:064520900aeda8c3b5dec578dbbbe095f8fd366c388837fb21667ba2acf02000",
+      "usd": {
+        "state": "observed",
+        "v": 0,
+        "evidence": "gateway"
+      },
+      "fault_inject": true
+    },
+    {
+      "request_id": "7882518a-234b-4311-a2b4-5baf51007787",
+      "attempt": 1,
+      "model": "gpt-5.4-mini",
+      "tokens": {
+        "fresh": 0,
+        "cache_read": 0,
+        "cache_write": 0,
+        "out": 0
+      },
+      "price_ref": "bifrost-datasheet-2026-11-14-openai@sha256:064520900aeda8c3b5dec578dbbbe095f8fd366c388837fb21667ba2acf02000",
+      "usd": {
+        "state": "observed",
+        "v": 0,
+        "evidence": "gateway"
+      },
+      "fault_inject": true
+    },
+    {
+      "request_id": "7b11d291-a4eb-4041-b77f-b6a00fb04644",
+      "attempt": 1,
+      "model": "gpt-5.4-mini",
+      "tokens": {
+        "fresh": 0,
+        "cache_read": 0,
+        "cache_write": 0,
+        "out": 0
+      },
+      "price_ref": "bifrost-datasheet-2026-11-14-openai@sha256:064520900aeda8c3b5dec578dbbbe095f8fd366c388837fb21667ba2acf02000",
+      "usd": {
+        "state": "observed",
+        "v": 0,
+        "evidence": "gateway"
+      },
+      "fault_inject": true
+    },
+    {
+      "request_id": "3ec8132e-66b4-4e5e-8229-761b95efa5b0",
+      "attempt": 1,
+      "model": "gpt-5.4-mini",
+      "tokens": {
+        "fresh": 0,
+        "cache_read": 0,
+        "cache_write": 0,
+        "out": 0
+      },
+      "price_ref": "bifrost-datasheet-2026-11-14-openai@sha256:064520900aeda8c3b5dec578dbbbe095f8fd366c388837fb21667ba2acf02000",
+      "usd": {
+        "state": "observed",
+        "v": 0,
+        "evidence": "gateway"
+      },
+      "fault_inject": true
+    },
+    {
+      "request_id": "3819b22f-45b5-43a8-9aeb-768f78592239",
+      "attempt": 1,
+      "model": "gpt-5.4-mini",
+      "tokens": {
+        "fresh": 0,
+        "cache_read": 0,
+        "cache_write": 0,
+        "out": 0
+      },
+      "price_ref": "bifrost-datasheet-2026-11-14-openai@sha256:064520900aeda8c3b5dec578dbbbe095f8fd366c388837fb21667ba2acf02000",
+      "usd": {
+        "state": "observed",
+        "v": 0,
+        "evidence": "gateway"
+      },
+      "fault_inject": true
+    },
+    {
+      "request_id": "b6a15856-c4ab-4f36-88c6-fea545409b09",
+      "attempt": 1,
+      "model": "gpt-5.4-mini",
+      "tokens": {
+        "fresh": 0,
+        "cache_read": 0,
+        "cache_write": 0,
+        "out": 0
+      },
+      "price_ref": "bifrost-datasheet-2026-11-14-openai@sha256:064520900aeda8c3b5dec578dbbbe095f8fd366c388837fb21667ba2acf02000",
+      "usd": {
+        "state": "observed",
+        "v": 0,
+        "evidence": "gateway"
+      },
+      "fault_inject": true
+    },
+    {
+      "request_id": "61f98ce7-611d-483c-a8fb-6592adcf58ef",
+      "attempt": 1,
+      "model": "gpt-5.4-mini",
+      "tokens": {
+        "fresh": 0,
+        "cache_read": 0,
+        "cache_write": 0,
+        "out": 0
+      },
+      "price_ref": "bifrost-datasheet-2026-11-14-openai@sha256:064520900aeda8c3b5dec578dbbbe095f8fd366c388837fb21667ba2acf02000",
+      "usd": {
+        "state": "observed",
+        "v": 0,
+        "evidence": "gateway"
+      },
+      "fault_inject": true
+    }
+  ],
+  "grade": {
+    "passed": false,
+    "invalid_evaluator": false,
+    "exit_code": 1,
+    "tests_ran": 7,
+    "failures": 7,
+    "errors": 0,
+    "skipped": 0,
+    "failed_tests": [
+      "tests.test_hidden_rounding::test_line_amount_half_cent_rounds_up",
+      "tests.test_hidden_rounding::test_line_amount_is_exact_for_decimal_quantities",
+      "tests.test_hidden_rounding::test_subtotal_is_sum_of_rounded_line_amounts",
+      "tests.test_hidden_rounding::test_tax_half_cent_rounds_up",
+      "tests.test_hidden_rounding::test_tax_is_exact_for_decimal_rates",
+      "tests.test_hidden_rounding::test_percentage_discount_half_cent_rounds_up_before_tax",
+      "tests.test_hidden_rounding::test_cli_export_and_summary_follow_rounding_rules"
+    ],
+    "reason": "exit 1; 7 failures; required tests failed: test_hidden_rounding.py::test_line_amount_half_cent_rounds_up, test_hidden_rounding.py::test_line_amount_is_exact_for_decimal_quantities, test_hidden_rounding.py::test_subtotal_is_sum_of_rounded_line_amounts, test_hidden_rounding.py::test_tax_half_cent_rounds_up, test_hidden_rounding.py::test_tax_is_exact_for_decimal_rates, test_hidden_rounding.py::test_percentage_discount_half_cent_rounds_up_before_tax, test_hidden_rounding.py::test_cli_export_and_summary_follow_rounding_rules",
+    "suite_version": "1.0.0",
+    "grader_version": "1.0.0",
+    "diff_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  "gates": [
+    {
+      "gate": "g1_protected_paths",
+      "version": "1.0.0",
+      "effect": "veto",
+      "fired": false
+    },
+    {
+      "gate": "g2_test_infra",
+      "version": "1.0.0",
+      "effect": "veto",
+      "fired": false
+    },
+    {
+      "gate": "g4_regrade",
+      "version": "1.0.0",
+      "effect": "veto",
+      "fired": false
+    },
+    {
+      "gate": "g6_null_agents",
+      "version": "1.0.0",
+      "effect": "admission",
+      "fired": false,
+      "detail": "not a null agent"
+    },
+    {
+      "gate": "egress",
+      "version": "1.0.0",
+      "effect": "invalidate",
+      "fired": false
+    }
+  ]
+}

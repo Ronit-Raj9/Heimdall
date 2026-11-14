@@ -1,0 +1,16 @@
+{
+  "passed": false,
+  "invalid_evaluator": false,
+  "exit_code": 1,
+  "tests_ran": 6,
+  "failures": 1,
+  "errors": 0,
+  "skipped": 0,
+  "failed_tests": [
+    "tests.test_window_boundary::test_simulate_cli_follows_the_rule"
+  ],
+  "reason": "exit 1; 1 failures; required tests failed: test_window_boundary.py::test_simulate_cli_follows_the_rule",
+  "suite_version": "1.0.0",
+  "grader_version": "1.0.0",
+  "diff_sha256": "5a63c1b0ed327540aff263f1655f0b2dd663e14bac88e3c9fde6c390fe0f4505"
+}

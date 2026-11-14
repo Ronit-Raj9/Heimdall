@@ -1,0 +1,78 @@
+[
+  {
+    "request_id": "9dbc77e9-1a72-46c0-bdfd-0e6e7b8e7aaf",
+    "attempt": 1,
+    "model": "gpt-5.4-mini-2026-03-17",
+    "tokens": {
+      "fresh": 1285,
+      "cache_read": 0,
+      "cache_write": 0,
+      "out": 121
+    },
+    "price_ref": "bifrost-datasheet-2026-11-14-openai@sha256:064520900aeda8c3b5dec578dbbbe095f8fd366c388837fb21667ba2acf02000",
+    "usd": {
+      "state": "observed",
+      "v": 0.00150825,
+      "evidence": "gateway"
+    },
+    "bifrost_usd": 0.00150825,
+    "fault_inject": false
+  },
+  {
+    "request_id": "bc05fb1c-9d6b-4ee4-86fa-6262ee6d9e15",
+    "attempt": 1,
+    "model": "gpt-5.4-mini-2026-03-17",
+    "tokens": {
+      "fresh": 1562,
+      "cache_read": 1152,
+      "cache_write": 0,
+      "out": 998
+    },
+    "price_ref": "bifrost-datasheet-2026-11-14-openai@sha256:064520900aeda8c3b5dec578dbbbe095f8fd366c388837fb21667ba2acf02000",
+    "usd": {
+      "state": "observed",
+      "v": 0.0057488999999999995,
+      "evidence": "gateway"
+    },
+    "bifrost_usd": 0.0057489,
+    "fault_inject": false
+  },
+  {
+    "request_id": "349d825a-81c0-4cdb-a85d-e2dae0be5aea",
+    "attempt": 1,
+    "model": "gpt-5.4-mini-2026-03-17",
+    "tokens": {
+      "fresh": 1176,
+      "cache_read": 2560,
+      "cache_write": 0,
+      "out": 27
+    },
+    "price_ref": "bifrost-datasheet-2026-11-14-openai@sha256:064520900aeda8c3b5dec578dbbbe095f8fd366c388837fb21667ba2acf02000",
+    "usd": {
+      "state": "observed",
+      "v": 0.0011955,
+      "evidence": "gateway"
+    },
+    "bifrost_usd": 0.0011955,
+    "fault_inject": false
+  },
+  {
+    "request_id": "be70ff61-4e94-4e76-966f-77435fa037a2",
+    "attempt": 1,
+    "model": "gpt-5.4-mini-2026-03-17",
+    "tokens": {
+      "fresh": 436,
+      "cache_read": 3584,
+      "cache_write": 0,
+      "out": 96
+    },
+    "price_ref": "bifrost-datasheet-2026-11-14-openai@sha256:064520900aeda8c3b5dec578dbbbe095f8fd366c388837fb21667ba2acf02000",
+    "usd": {
+      "state": "observed",
+      "v": 0.0010278,
+      "evidence": "gateway"
+    },
+    "bifrost_usd": 0.0010278000000000002,
+    "fault_inject": false
+  }
+]

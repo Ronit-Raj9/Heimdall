@@ -1,0 +1,32 @@
+{
+  "image": "bench/agent-codex:1",
+  "argv": [
+    "codex",
+    "exec",
+    "--json",
+    "--skip-git-repo-check",
+    "--dangerously-bypass-approvals-and-sandbox",
+    "--ephemeral",
+    "--strict-config",
+    "--model",
+    "gpt-5.4-mini",
+    "--",
+    "# Fix rounding in invoice totals\n\nCustomers report invoices that are off by a cent. Some totals come out one cent low when an amount lands exactly on half a cent, and some invoices show a subtotal that is not the sum of the line amounts printed above it.\n\nMake the `ledger` package compute invoice totals by these rules. Money is an integer number of cents throughout. Quantities, discount percentages and tax rates are decimal values with at most three decimal places (for example `\"1.15\"` or `\"9.975\"`).\n\n1. A line amount (`LineItem.amount`) is quantity times unit price, rounded to a whole cent.\n2. The subtotal (`Totals.subtotal`) is the sum of the rounded line amounts.\n3. A percentage discount is the subtotal times the percentage divided by 100, rounded to a whole cent. A fixed discount is taken as it is, but never more than the subtotal.\n4. The tax (`Totals.tax`) is the subtotal minus the discount, times the tax rate divided by 100, rounded to a whole cent. It is computed once per invoice.\n5. The total (`Totals.total`) is subtotal minus discount plus tax.\n\nEvery rounding above is half up: a value exactly halfway between two whole cents goes to the larger one (166.5 cents becomes 167, 24.5 becomes 25), and any other value goes to the nearest whole cent.\n\nThe calculations must be exact for the decimal values as written. For example, quantity `1.15` at a unit price of 0.50 is exactly 57.5 cents, so the line amount is 58 cents; tax at 1.15 % on 30.00 is exactly 34.5 cents, so the tax is 35 cents.\n\nThe same rules apply wherever totals appear, including `python -m ledger export` (`amount_cents`, `subtotal_cents`, `discount_cents`, `tax_cents`, `total_cents`) and `python -m ledger summary`.\n\nKeep the public API as it is: `Invoice`, `LineItem`, `Discount` and `Invoice.totals()` keep their names and arguments.\n"
+  ],
+  "env": {
+    "BIFROST_API_KEY": "[redacted]",
+    "CODEX_HOME": "/home/agent/.codex",
+    "OPENAI_API_KEY": "[redacted]"
+  },
+  "files": {
+    "/home/agent/.codex/config.toml": "model = \"gpt-5.4-mini\"\nmodel_provider = \"bifrost\"\nallow_login_shell = false\ncheck_for_update_on_startup = false\nweb_search = \"disabled\"\n\n[analytics]\nenabled = false\n\n[feedback]\nenabled = false\n\n[history]\npersistence = \"none\"\n\n[otel]\nexporter = \"none\"\nlog_user_prompt = false\n\n[features]\nmemories = false\n\n[shell_environment_policy]\nexclude = [\"BIFROST_API_KEY\"]\n\n[model_providers.bifrost]\nname = \"Bifrost\"\nbase_url = \"http://bifrost:8080/openai/v1\"\nwire_api = \"responses\"\nenv_key = \"BIFROST_API_KEY\"\nrequires_openai_auth = false\nsupports_websockets = false\n\n[model_providers.bifrost.http_headers]\nx-bf-session-id = \"r_01vqit6kt8\"\nx-bf-session-affinity = \"off\"\n",
+    "/tmp/bench/instruction.md": "# Fix rounding in invoice totals\n\nCustomers report invoices that are off by a cent. Some totals come out one cent low when an amount lands exactly on half a cent, and some invoices show a subtotal that is not the sum of the line amounts printed above it.\n\nMake the `ledger` package compute invoice totals by these rules. Money is an integer number of cents throughout. Quantities, discount percentages and tax rates are decimal values with at most three decimal places (for example `\"1.15\"` or `\"9.975\"`).\n\n1. A line amount (`LineItem.amount`) is quantity times unit price, rounded to a whole cent.\n2. The subtotal (`Totals.subtotal`) is the sum of the rounded line amounts.\n3. A percentage discount is the subtotal times the percentage divided by 100, rounded to a whole cent. A fixed discount is taken as it is, but never more than the subtotal.\n4. The tax (`Totals.tax`) is the subtotal minus the discount, times the tax rate divided by 100, rounded to a whole cent. It is computed once per invoice.\n5. The total (`Totals.total`) is subtotal minus discount plus tax.\n\nEvery rounding above is half up: a value exactly halfway between two whole cents goes to the larger one (166.5 cents becomes 167, 24.5 becomes 25), and any other value goes to the nearest whole cent.\n\nThe calculations must be exact for the decimal values as written. For example, quantity `1.15` at a unit price of 0.50 is exactly 57.5 cents, so the line amount is 58 cents; tax at 1.15 % on 30.00 is exactly 34.5 cents, so the tax is 35 cents.\n\nThe same rules apply wherever totals appear, including `python -m ledger export` (`amount_cents`, `subtotal_cents`, `discount_cents`, `tax_cents`, `total_cents`) and `python -m ledger summary`.\n\nKeep the public API as it is: `Invoice`, `LineItem`, `Discount` and `Invoice.totals()` keep their names and arguments.\n"
+  },
+  "workdir": "/workspace",
+  "wall_s": 900,
+  "cpus": 2,
+  "mem_gb": 4,
+  "pids": 512,
+  "network": "bench-evalnet",
+  "user": "1000"
+}

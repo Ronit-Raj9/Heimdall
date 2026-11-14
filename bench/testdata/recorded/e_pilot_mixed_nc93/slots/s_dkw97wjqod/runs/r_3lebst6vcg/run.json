@@ -1,0 +1,39 @@
+{
+  "run_id": "r_3lebst6vcg",
+  "slot_id": "s_dkw97wjqod",
+  "pair_id": "p_1dnhfd5sv9",
+  "exp_id": "e_pilot_mixed_nc93",
+  "attempt": 1,
+  "stage": "seal",
+  "manifest_hash": "be32a712e20c78445992042df1aa72b7f26f2fa5f622060d0480799c5df6a160",
+  "suite_lock_hash": "520215ace7b304de232f16ed8833df3f25ca01cd72e310dd495d38a399e99d56",
+  "outcome": "fail",
+  "y": {
+    "state": "observed",
+    "v": 0,
+    "evidence": "outcome"
+  },
+  "claim": {
+    "made": false,
+    "text": "y yet. ref nonce_5l7m7njw691pcbwiqhszkmqf call 3\\\"},\\\"extra_fields\\\":{\\\"routing_info\\\":{\\\"provider\\\":\\\"openai\\\",\\\"model\\\":\\\"gpt-5.4-mini\\\",\\\"key\\\":\\\"oa-slot-1\\\",\\\"requested_provider\\\":\\\"openai\\\",\\\"requested_model\\\":\\\"gpt-5.4-mini\\\"},\\\"provider\\\":\\\"openai\\\",\\\"original_model_requested\\\":\\\"gpt-5.4-mini\\\",\\\"resolved_model_used\\\":\\\"gpt-5.4-mini\\\",\\\"request_type\\\":\\\"chat_completion\\\",\\\"converted_request_type\\\":\\\"responses\\\",\\\"\"}\nStopped: model call failed on turn 3: HTTP Error 503: Service Unavailable",
+    "source": "outcome"
+  },
+  "timing": {
+    "started": "2026-11-14T01:01:00.387637514Z",
+    "agent_started": "2026-11-14T01:01:01.027566519Z",
+    "agent_exited": "2026-11-14T01:01:06.010292044Z",
+    "sealed": "2026-11-14T01:01:09.448104399Z"
+  },
+  "agent": {
+    "config_id": "custom-python",
+    "adapter": "command",
+    "config_hash": "8bbc91c3b83dd6037dc262bc4025b7af5d6b6631989968143039ca7c8719d788",
+    "exit_code": 1,
+    "timed_out": false
+  },
+  "gateway": {
+    "virtual_key_id": "413077d0-95bb-40e5-86ff-c3dd61b0a090",
+    "key_slot": "oa-slot-1",
+    "session_id": "r_3lebst6vcg"
+  }
+}

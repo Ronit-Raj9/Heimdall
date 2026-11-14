@@ -1,0 +1,1186 @@
+{
+  "exec": {
+    "exit_code": 0,
+    "timed_out": false,
+    "started": "2026-11-14T01:00:43.459230726Z",
+    "ended": "2026-11-14T01:01:12.090436095Z",
+    "stdout_path": "/home/raj/Storage/CODING/Hackathon/Bifrost/repo/bench/runs/e_pilot_mixed_nc93/slots/s_117k5i2nvq/runs/r_029afakbci/agent.stream.jsonl",
+    "stderr_path": "/home/raj/Storage/CODING/Hackathon/Bifrost/repo/bench/runs/e_pilot_mixed_nc93/slots/s_117k5i2nvq/runs/r_029afakbci/agent.stderr.txt",
+    "truncated": false
+  },
+  "diff": {
+    "path": "/home/raj/Storage/CODING/Hackathon/Bifrost/repo/bench/runs/e_pilot_mixed_nc93/slots/s_117k5i2nvq/runs/r_029afakbci/workspace.diff",
+    "sha256": "75d87791873f8994c9fdcbfb0baf2c2a3180549fb4ce5689f0026ada4e5a5aa1",
+    "files": [
+      {
+        "path": "AGENTS.md",
+        "status": "added"
+      },
+      {
+        "path": "ledger/invoice.py",
+        "status": "modified"
+      },
+      {
+        "path": "ledger/money.py",
+        "status": "modified"
+      }
+    ],
+    "rejected": [
+      {
+        "path": ".pytest_cache/.gitignore",
+        "reason": "cache"
+      },
+      {
+        "path": ".pytest_cache/CACHEDIR.TAG",
+        "reason": "cache"
+      },
+      {
+        "path": ".pytest_cache/README.md",
+        "reason": "cache"
+      },
+      {
+        "path": ".pytest_cache/v/cache/nodeids",
+        "reason": "cache"
+      },
+      {
+        "path": ".pytest_cache/v/cache/stepwise",
+        "reason": "cache"
+      }
+    ]
+  },
+  "requests": {
+    "requests": [
+      {
+        "id": "7560dd51-9256-4851-8d46-6bc6e149b4a6",
+        "timestamp": "2026-11-14T01:00:43.746141Z",
+        "status": "success",
+        "kind": "message",
+        "provider": "openai",
+        "model_requested": "gpt-5.4-mini",
+        "model_served": "gpt-5.4-mini-2026-03-17",
+        "fallback_index": 0,
+        "stream": false,
+        "latency_ms": 3347.947728,
+        "tokens": {
+          "fresh": 1238,
+          "cache_read": 0,
+          "cache_write": 0,
+          "out": 167
+        },
+        "bifrost_usd": 0.00168,
+        "cache_hit": false,
+        "response_id": "resp_0113805b06d22f42006af7b2bc56b487d2a4b9973c4e6ccbba",
+        "attempts": [
+          {
+            "n": 1,
+            "key_name": "oa-slot-2"
+          }
+        ],
+        "tool_calls": [
+          {
+            "id": "call_L8L8JF12ZWBGDZeSmQcPPZDB",
+            "name": "run_shell",
+            "args_hash": "7291825431a8aa76bc7ae34445f6edbc148cd7f0398be4681fedc110f656fbfb",
+            "target": "grep -R \"def totals\\|round(\\|percent_of\\|amount_cents\\|subtotal_cents\\|tax_cents\\|discount_cents\\|total_cents\" -n ledger tests | sed -n '1,220p'"
+          },
+          {
+            "id": "call_JT2n1GhZwtowUawmzVsQlnEq",
+            "name": "run_shell",
+            "args_hash": "d96cf61c2e693bc686080462d6234fed326caad5c680f8c247359127c728efca",
+            "target": "python - \u003c\u003c'PY'\nimport os\nfor p in ['ledger/money.py','ledger/invoice.py','ledger/discounts.py','ledger/export.py','ledger/cli.py']:\n    print('\\n###',p)\n    with open(p) as f:\n        print(f.read())\nPY"
+          }
+        ]
+      },
+      {
+        "id": "0914cbfd-3780-4c9f-93e5-08622a3d5ee9",
+        "timestamp": "2026-11-14T01:00:47.113287Z",
+        "status": "success",
+        "kind": "message",
+        "provider": "openai",
+        "model_requested": "gpt-5.4-mini",
+        "model_served": "gpt-5.4-mini-2026-03-17",
+        "fallback_index": 0,
+        "stream": false,
+        "latency_ms": 3013.8337,
+        "tokens": {
+          "fresh": 2477,
+          "cache_read": 1152,
+          "cache_write": 0,
+          "out": 144
+        },
+        "bifrost_usd": 0.00259215,
+        "cache_hit": false,
+        "response_id": "resp_0cb89eb451775fb9006af7b2bf43ac87d2aa13da0c35dcd5b6",
+        "attempts": [
+          {
+            "n": 1,
+            "key_name": "oa-slot-2"
+          }
+        ],
+        "tool_calls": [
+          {
+            "id": "call_VcSY3idf3XTyRenwpRSuKHoh",
+            "name": "run_shell",
+            "args_hash": "cb95ca3e6f1979950aa642945f01fa4a11a5ec8b7d51045431cb3f3896d021d9",
+            "target": "python - \u003c\u003c'PY'\nfrom decimal import Decimal, ROUND_HALF_UP\nfor x in ['1.15','9.975','0.5','0.005','0.015']:\n    d=Decimal(x)\n    print(x, (d*Decimal('50')))\nPY"
+          },
+          {
+            "id": "call_zRcX10ViD3xFliZh3V9mkYXA",
+            "name": "run_shell",
+            "args_hash": "7088d68e3ddfe67893500cd4e2e0349349609ab75e5f69e27d5d9b48b503b26a",
+            "target": "sed -n '1,220p' ledger/money.py \u0026\u0026 printf '\\n---\\n' \u0026\u0026 sed -n '1,220p' ledger/invoice.py"
+          }
+        ],
+        "tool_result_ids": [
+          "call_L8L8JF12ZWBGDZeSmQcPPZDB",
+          "call_JT2n1GhZwtowUawmzVsQlnEq"
+        ]
+      },
+      {
+        "id": "45c1610f-411e-41b6-ac81-5120b090ce56",
+        "timestamp": "2026-11-14T01:00:50.14808Z",
+        "status": "success",
+        "kind": "message",
+        "provider": "openai",
+        "model_requested": "gpt-5.4-mini",
+        "model_served": "gpt-5.4-mini-2026-03-17",
+        "fallback_index": 0,
+        "stream": false,
+        "latency_ms": 5610.694661,
+        "tokens": {
+          "fresh": 2069,
+          "cache_read": 3456,
+          "cache_write": 0,
+          "out": 883
+        },
+        "bifrost_usd": 0.00578445,
+        "cache_hit": false,
+        "response_id": "resp_00ed9f339ea33473006af7b2c24c6c87d2bad066e279b65a1e",
+        "attempts": [
+          {
+            "n": 1,
+            "key_name": "oa-slot-2"
+          }
+        ],
+        "tool_calls": [
+          {
+            "id": "call_QmbjdHQohTyqFt9Br7z9mUAZ",
+            "name": "write_file",
+            "args_hash": "2c4930e026a5d3651bfd37a37085b50ebca6d836b6563dfd3fcb4c27dd343e4e",
+            "target": "ledger/money.py"
+          }
+        ],
+        "tool_result_ids": [
+          "call_L8L8JF12ZWBGDZeSmQcPPZDB",
+          "call_JT2n1GhZwtowUawmzVsQlnEq",
+          "call_VcSY3idf3XTyRenwpRSuKHoh",
+          "call_zRcX10ViD3xFliZh3V9mkYXA"
+        ]
+      },
+      {
+        "id": "0e91b22e-1452-4536-a890-19658f8cb135",
+        "timestamp": "2026-11-14T01:00:55.760623Z",
+        "status": "success",
+        "kind": "message",
+        "provider": "openai",
+        "model_requested": "gpt-5.4-mini",
+        "model_served": "gpt-5.4-mini-2026-03-17",
+        "fallback_index": 0,
+        "stream": false,
+        "latency_ms": 11056.750407,
+        "tokens": {
+          "fresh": 1054,
+          "cache_read": 5376,
+          "cache_write": 0,
+          "out": 1104
+        },
+        "bifrost_usd": 0.0061617,
+        "cache_hit": false,
+        "response_id": "resp_044f8ec9d48a4f80006af7b2cbb41c87d283dab906b5d7b2ce",
+        "attempts": [
+          {
+            "n": 1,
+            "key_name": "oa-slot-2"
+          }
+        ],
+        "tool_calls": [
+          {
+            "id": "call_AdJnFUJF4Nm4A6NeiHTk3X90",
+            "name": "write_file",
+            "args_hash": "5d34599441912b48937db9b7ed99560b6777566478a19b6d4dfe10c919d5e939",
+            "target": "ledger/invoice.py"
+          }
+        ],
+        "tool_result_ids": [
+          "call_L8L8JF12ZWBGDZeSmQcPPZDB",
+          "call_JT2n1GhZwtowUawmzVsQlnEq",
+          "call_VcSY3idf3XTyRenwpRSuKHoh",
+          "call_zRcX10ViD3xFliZh3V9mkYXA",
+          "call_QmbjdHQohTyqFt9Br7z9mUAZ"
+        ]
+      },
+      {
+        "id": "90573d05-a321-4bdc-a74c-ed91e19cce73",
+        "timestamp": "2026-11-14T01:01:06.820161Z",
+        "status": "success",
+        "kind": "message",
+        "provider": "openai",
+        "model_requested": "gpt-5.4-mini",
+        "model_served": "gpt-5.4-mini-2026-03-17",
+        "fallback_index": 0,
+        "stream": false,
+        "latency_ms": 1968.48551,
+        "tokens": {
+          "fresh": 1284,
+          "cache_read": 6272,
+          "cache_write": 0,
+          "out": 27
+        },
+        "bifrost_usd": 0.0015549000000000001,
+        "cache_hit": false,
+        "response_id": "resp_0bc0815efff0d563006af7b2d2f97487d29c0a06a4467d585e",
+        "attempts": [
+          {
+            "n": 1,
+            "key_name": "oa-slot-2"
+          }
+        ],
+        "tool_calls": [
+          {
+            "id": "call_VOpRMQXjm7AHGyBi3Xdr2yUU",
+            "name": "run_shell",
+            "args_hash": "9e262779a03ed2cfd5efabd7f0cb2cab6fb9a830cf787e2da5476eaa7ab9c269",
+            "target": "python -m pytest ledger/ tests/ -q"
+          }
+        ],
+        "tool_result_ids": [
+          "call_L8L8JF12ZWBGDZeSmQcPPZDB",
+          "call_JT2n1GhZwtowUawmzVsQlnEq",
+          "call_VcSY3idf3XTyRenwpRSuKHoh",
+          "call_zRcX10ViD3xFliZh3V9mkYXA",
+          "call_QmbjdHQohTyqFt9Br7z9mUAZ",
+          "call_AdJnFUJF4Nm4A6NeiHTk3X90"
+        ]
+      },
+      {
+        "id": "f4519b56-1178-4216-8ff8-2c7ce6607127",
+        "timestamp": "2026-11-14T01:01:09.436119Z",
+        "status": "success",
+        "kind": "message",
+        "provider": "openai",
+        "model_requested": "gpt-5.4-mini",
+        "model_served": "gpt-5.4-mini-2026-03-17",
+        "fallback_index": 0,
+        "stream": false,
+        "latency_ms": 2506.555267,
+        "tokens": {
+          "fresh": 190,
+          "cache_read": 7424,
+          "cache_write": 0,
+          "out": 83
+        },
+        "bifrost_usd": 0.0010728,
+        "cache_hit": false,
+        "response_id": "resp_0737a82e353d7a45006af7b2d598c087d2b71ce6ae4526947f",
+        "attempts": [
+          {
+            "n": 1,
+            "key_name": "oa-slot-2"
+          }
+        ],
+        "tool_result_ids": [
+          "call_L8L8JF12ZWBGDZeSmQcPPZDB",
+          "call_JT2n1GhZwtowUawmzVsQlnEq",
+          "call_VcSY3idf3XTyRenwpRSuKHoh",
+          "call_zRcX10ViD3xFliZh3V9mkYXA",
+          "call_QmbjdHQohTyqFt9Br7z9mUAZ",
+          "call_AdJnFUJF4Nm4A6NeiHTk3X90",
+          "call_VOpRMQXjm7AHGyBi3Xdr2yUU"
+        ]
+      }
+    ],
+    "complete": true,
+    "row_ids": [
+      "7560dd51-9256-4851-8d46-6bc6e149b4a6",
+      "0914cbfd-3780-4c9f-93e5-08622a3d5ee9",
+      "45c1610f-411e-41b6-ac81-5120b090ce56",
+      "0e91b22e-1452-4536-a890-19658f8cb135",
+      "90573d05-a321-4bdc-a74c-ed91e19cce73",
+      "f4519b56-1178-4216-8ff8-2c7ce6607127"
+    ],
+    "dropped_global": 0
+  },
+  "ledger": [
+    {
+      "slot": "oa-slot-2",
+      "run_id": "r_029afakbci",
+      "call": 1,
+      "kind": "message",
+      "path": "/v1/responses",
+      "stream": false,
+      "action": "pass",
+      "status": 200,
+      "req_sha256": "2deccbd8add4e9adb1264c0eeb112ff81a94c08f47d323fd365fcf4bed83d451",
+      "response_id": "resp_0113805b06d22f42006af7b2bc56b487d2a4b9973c4e6ccbba",
+      "tokens": {
+        "fresh": 1238,
+        "cache_read": 0,
+        "cache_write": 0,
+        "out": 167
+      },
+      "upstream_ms": 3342.33,
+      "at": "2026-11-14T01:00:43.747011974Z",
+      "prev_hash": "733ccf15464df383dad844712a9abf09b610ca0ac88c004bb333512bf773bde5",
+      "hash": "a0d80c9be3aa7222bcd3814375e57501279a4e0418b8142e9d196e2f682e9ac8"
+    },
+    {
+      "slot": "oa-slot-2",
+      "run_id": "r_029afakbci",
+      "call": 2,
+      "kind": "message",
+      "path": "/v1/responses",
+      "stream": false,
+      "action": "pass",
+      "status": 200,
+      "req_sha256": "443aae2ce2505145ede76d720f6f4da834ebad481d4cc8a994518301541db17e",
+      "response_id": "resp_0cb89eb451775fb9006af7b2bf43ac87d2aa13da0c35dcd5b6",
+      "tokens": {
+        "fresh": 2477,
+        "cache_read": 1152,
+        "cache_write": 0,
+        "out": 144
+      },
+      "upstream_ms": 3009.189,
+      "at": "2026-11-14T01:00:47.11365743Z",
+      "prev_hash": "a0d80c9be3aa7222bcd3814375e57501279a4e0418b8142e9d196e2f682e9ac8",
+      "hash": "e58b8676eb5b165b2963b0c1b3ead68011f506f32c158683b5abb009191eb338"
+    },
+    {
+      "slot": "oa-slot-2",
+      "run_id": "r_029afakbci",
+      "call": 3,
+      "kind": "message",
+      "path": "/v1/responses",
+      "stream": false,
+      "action": "pass",
+      "status": 200,
+      "req_sha256": "e35fdb368bb2c5546b84a0031e278a2cdfbcf116c941e0e67e42bcc21393373e",
+      "response_id": "resp_00ed9f339ea33473006af7b2c24c6c87d2bad066e279b65a1e",
+      "tokens": {
+        "fresh": 2069,
+        "cache_read": 3456,
+        "cache_write": 0,
+        "out": 883
+      },
+      "upstream_ms": 5603.635,
+      "at": "2026-11-14T01:00:50.148647634Z",
+      "prev_hash": "e58b8676eb5b165b2963b0c1b3ead68011f506f32c158683b5abb009191eb338",
+      "hash": "d540feda2f0a11932ecc9223c8be369a69ec0ffa73b17797aad62b9ca43398ca"
+    },
+    {
+      "slot": "oa-slot-2",
+      "run_id": "r_029afakbci",
+      "call": 4,
+      "kind": "message",
+      "path": "/v1/responses",
+      "stream": false,
+      "action": "pass",
+      "status": 200,
+      "req_sha256": "1776c3f0dce18841ab85974210c2700d3f24ff69bc366e9c7bc3ef0b9035b2be",
+      "response_id": "resp_044f8ec9d48a4f80006af7b2cbb41c87d283dab906b5d7b2ce",
+      "tokens": {
+        "fresh": 1054,
+        "cache_read": 5376,
+        "cache_write": 0,
+        "out": 1104
+      },
+      "upstream_ms": 11048.62,
+      "at": "2026-11-14T01:00:55.762208576Z",
+      "prev_hash": "d540feda2f0a11932ecc9223c8be369a69ec0ffa73b17797aad62b9ca43398ca",
+      "hash": "e1df3e06d2e81ef86269f696b765ee16c39bfab04841c9b1633b79798b9dc28d"
+    },
+    {
+      "slot": "oa-slot-2",
+      "run_id": "r_029afakbci",
+      "call": 5,
+      "kind": "message",
+      "path": "/v1/responses",
+      "stream": false,
+      "action": "pass",
+      "status": 200,
+      "req_sha256": "5881614100f9bf5ab6a0721def1a6f004da852d9fd4f32fdf105a1dd97e68285",
+      "response_id": "resp_0bc0815efff0d563006af7b2d2f97487d29c0a06a4467d585e",
+      "tokens": {
+        "fresh": 1284,
+        "cache_read": 6272,
+        "cache_write": 0,
+        "out": 27
+      },
+      "upstream_ms": 1958.543,
+      "at": "2026-11-14T01:01:06.820727519Z",
+      "prev_hash": "e1df3e06d2e81ef86269f696b765ee16c39bfab04841c9b1633b79798b9dc28d",
+      "hash": "241b1c1bf4094a42088596ffb5a6a1210862e970f4905e77adbff0eb26b84d7a"
+    },
+    {
+      "slot": "oa-slot-2",
+      "run_id": "r_029afakbci",
+      "call": 6,
+      "kind": "message",
+      "path": "/v1/responses",
+      "stream": false,
+      "action": "pass",
+      "status": 200,
+      "req_sha256": "1fc46194ae4212c8a9f238555952f66457b298a8c1654125e89d951a01779152",
+      "response_id": "resp_0737a82e353d7a45006af7b2d598c087d2b71ce6ae4526947f",
+      "tokens": {
+        "fresh": 190,
+        "cache_read": 7424,
+        "cache_write": 0,
+        "out": 83
+      },
+      "upstream_ms": 2497.733,
+      "at": "2026-11-14T01:01:09.43680926Z",
+      "prev_hash": "241b1c1bf4094a42088596ffb5a6a1210862e970f4905e77adbff0eb26b84d7a",
+      "hash": "561f72c7a7eecb91834e59ed7ab319fc075fda425a85169252a43edf66c586ff"
+    }
+  ],
+  "events": [
+    {
+      "event_id": "r_029afakbci:gateway:1",
+      "run_id": "r_029afakbci",
+      "slot_id": "s_117k5i2nvq",
+      "pair_id": "p_ptaib50tir",
+      "seq": 1,
+      "turn_index": 1,
+      "ts": "2026-11-14T01:00:43.746141Z",
+      "type": "model_request",
+      "source": "gateway",
+      "evidence": "gateway",
+      "request_id": "7560dd51-9256-4851-8d46-6bc6e149b4a6",
+      "provider": "openai",
+      "model_requested": "gpt-5.4-mini",
+      "model_served": "gpt-5.4-mini-2026-03-17"
+    },
+    {
+      "event_id": "r_029afakbci:gateway:2",
+      "run_id": "r_029afakbci",
+      "slot_id": "s_117k5i2nvq",
+      "pair_id": "p_ptaib50tir",
+      "seq": 2,
+      "turn_index": 1,
+      "ts": "2026-11-14T01:00:47.094088728Z",
+      "type": "model_response",
+      "source": "gateway",
+      "evidence": "gateway",
+      "request_id": "7560dd51-9256-4851-8d46-6bc6e149b4a6",
+      "attempt_no": 1,
+      "parent_event_id": "r_029afakbci:gateway:1",
+      "provider": "openai",
+      "model_requested": "gpt-5.4-mini",
+      "model_served": "gpt-5.4-mini-2026-03-17",
+      "tokens": {
+        "fresh": 1238,
+        "cache_read": 0,
+        "cache_write": 0,
+        "out": 167
+      },
+      "usd": {
+        "state": "observed",
+        "v": 0.00168,
+        "evidence": "gateway"
+      },
+      "summary": "2 tool calls"
+    },
+    {
+      "event_id": "r_029afakbci:gateway:3",
+      "run_id": "r_029afakbci",
+      "slot_id": "s_117k5i2nvq",
+      "pair_id": "p_ptaib50tir",
+      "seq": 3,
+      "turn_index": 1,
+      "ts": "2026-11-14T01:00:47.094088728Z",
+      "type": "tool_call",
+      "source": "gateway",
+      "evidence": "gateway",
+      "request_id": "7560dd51-9256-4851-8d46-6bc6e149b4a6",
+      "tool_call_id": "call_L8L8JF12ZWBGDZeSmQcPPZDB",
+      "parent_event_id": "r_029afakbci:gateway:2",
+      "tool_name": "run_shell",
+      "target": "grep -R \"def totals\\|round(\\|percent_of\\|amount_cents\\|subtotal_cents\\|tax_cents\\|discount_cents\\|total_cents\" -n ledger tests | sed -n '1,220p'",
+      "args_hash": "7291825431a8aa76bc7ae34445f6edbc148cd7f0398be4681fedc110f656fbfb",
+      "provider": "openai",
+      "model_requested": "gpt-5.4-mini",
+      "model_served": "gpt-5.4-mini-2026-03-17",
+      "summary": "run_shell grep -R \"def totals\\|round(\\|percent_of\\|amount_cents\\|subtotal_cents\\|tax_cents\\|discount_cents\\|total_cents\" -n ledger tests | sed -n '1,220p'"
+    },
+    {
+      "event_id": "r_029afakbci:gateway:4",
+      "run_id": "r_029afakbci",
+      "slot_id": "s_117k5i2nvq",
+      "pair_id": "p_ptaib50tir",
+      "seq": 4,
+      "turn_index": 1,
+      "ts": "2026-11-14T01:00:47.094088728Z",
+      "type": "tool_call",
+      "source": "gateway",
+      "evidence": "gateway",
+      "request_id": "7560dd51-9256-4851-8d46-6bc6e149b4a6",
+      "tool_call_id": "call_JT2n1GhZwtowUawmzVsQlnEq",
+      "parent_event_id": "r_029afakbci:gateway:2",
+      "tool_name": "run_shell",
+      "target": "python - \u003c\u003c'PY'\nimport os\nfor p in ['ledger/money.py','ledger/invoice.py','ledger/discounts.py','ledger/export.py','ledger/cli.py']:\n    print('\\n###',p)\n    with open(p) as f:\n        print(f.read())\nPY",
+      "args_hash": "d96cf61c2e693bc686080462d6234fed326caad5c680f8c247359127c728efca",
+      "provider": "openai",
+      "model_requested": "gpt-5.4-mini",
+      "model_served": "gpt-5.4-mini-2026-03-17",
+      "summary": "run_shell python - \u003c\u003c'PY'\nimport os\nfor p in ['ledger/money.py','ledger/invoice.py','ledger/discounts.py','ledger/export.py','ledger/cli.py']:\n    print('\\n###',p)\n    with open(p) as f:\n        print"
+    },
+    {
+      "event_id": "r_029afakbci:gateway:5",
+      "run_id": "r_029afakbci",
+      "slot_id": "s_117k5i2nvq",
+      "pair_id": "p_ptaib50tir",
+      "seq": 5,
+      "turn_index": 2,
+      "ts": "2026-11-14T01:00:47.113287Z",
+      "type": "tool_result",
+      "source": "gateway",
+      "evidence": "gateway",
+      "request_id": "0914cbfd-3780-4c9f-93e5-08622a3d5ee9",
+      "tool_call_id": "call_L8L8JF12ZWBGDZeSmQcPPZDB",
+      "parent_event_id": "r_029afakbci:gateway:3",
+      "provider": "openai",
+      "model_requested": "gpt-5.4-mini",
+      "model_served": "gpt-5.4-mini-2026-03-17"
+    },
+    {
+      "event_id": "r_029afakbci:gateway:6",
+      "run_id": "r_029afakbci",
+      "slot_id": "s_117k5i2nvq",
+      "pair_id": "p_ptaib50tir",
+      "seq": 6,
+      "turn_index": 2,
+      "ts": "2026-11-14T01:00:47.113287Z",
+      "type": "tool_result",
+      "source": "gateway",
+      "evidence": "gateway",
+      "request_id": "0914cbfd-3780-4c9f-93e5-08622a3d5ee9",
+      "tool_call_id": "call_JT2n1GhZwtowUawmzVsQlnEq",
+      "parent_event_id": "r_029afakbci:gateway:4",
+      "provider": "openai",
+      "model_requested": "gpt-5.4-mini",
+      "model_served": "gpt-5.4-mini-2026-03-17"
+    },
+    {
+      "event_id": "r_029afakbci:gateway:7",
+      "run_id": "r_029afakbci",
+      "slot_id": "s_117k5i2nvq",
+      "pair_id": "p_ptaib50tir",
+      "seq": 7,
+      "turn_index": 2,
+      "ts": "2026-11-14T01:00:47.113287Z",
+      "type": "model_request",
+      "source": "gateway",
+      "evidence": "gateway",
+      "request_id": "0914cbfd-3780-4c9f-93e5-08622a3d5ee9",
+      "provider": "openai",
+      "model_requested": "gpt-5.4-mini",
+      "model_served": "gpt-5.4-mini-2026-03-17"
+    },
+    {
+      "event_id": "r_029afakbci:gateway:8",
+      "run_id": "r_029afakbci",
+      "slot_id": "s_117k5i2nvq",
+      "pair_id": "p_ptaib50tir",
+      "seq": 8,
+      "turn_index": 2,
+      "ts": "2026-11-14T01:00:50.1271207Z",
+      "type": "model_response",
+      "source": "gateway",
+      "evidence": "gateway",
+      "request_id": "0914cbfd-3780-4c9f-93e5-08622a3d5ee9",
+      "attempt_no": 1,
+      "parent_event_id": "r_029afakbci:gateway:7",
+      "provider": "openai",
+      "model_requested": "gpt-5.4-mini",
+      "model_served": "gpt-5.4-mini-2026-03-17",
+      "tokens": {
+        "fresh": 2477,
+        "cache_read": 1152,
+        "cache_write": 0,
+        "out": 144
+      },
+      "usd": {
+        "state": "observed",
+        "v": 0.00259215,
+        "evidence": "gateway"
+      },
+      "summary": "2 tool calls"
+    },
+    {
+      "event_id": "r_029afakbci:gateway:9",
+      "run_id": "r_029afakbci",
+      "slot_id": "s_117k5i2nvq",
+      "pair_id": "p_ptaib50tir",
+      "seq": 9,
+      "turn_index": 2,
+      "ts": "2026-11-14T01:00:50.1271207Z",
+      "type": "tool_call",
+      "source": "gateway",
+      "evidence": "gateway",
+      "request_id": "0914cbfd-3780-4c9f-93e5-08622a3d5ee9",
+      "tool_call_id": "call_VcSY3idf3XTyRenwpRSuKHoh",
+      "parent_event_id": "r_029afakbci:gateway:8",
+      "tool_name": "run_shell",
+      "target": "python - \u003c\u003c'PY'\nfrom decimal import Decimal, ROUND_HALF_UP\nfor x in ['1.15','9.975','0.5','0.005','0.015']:\n    d=Decimal(x)\n    print(x, (d*Decimal('50')))\nPY",
+      "args_hash": "cb95ca3e6f1979950aa642945f01fa4a11a5ec8b7d51045431cb3f3896d021d9",
+      "provider": "openai",
+      "model_requested": "gpt-5.4-mini",
+      "model_served": "gpt-5.4-mini-2026-03-17",
+      "summary": "run_shell python - \u003c\u003c'PY'\nfrom decimal import Decimal, ROUND_HALF_UP\nfor x in ['1.15','9.975','0.5','0.005','0.015']:\n    d=Decimal(x)\n    print(x, (d*Decimal('50')))\nPY"
+    },
+    {
+      "event_id": "r_029afakbci:gateway:10",
+      "run_id": "r_029afakbci",
+      "slot_id": "s_117k5i2nvq",
+      "pair_id": "p_ptaib50tir",
+      "seq": 10,
+      "turn_index": 2,
+      "ts": "2026-11-14T01:00:50.1271207Z",
+      "type": "tool_call",
+      "source": "gateway",
+      "evidence": "gateway",
+      "request_id": "0914cbfd-3780-4c9f-93e5-08622a3d5ee9",
+      "tool_call_id": "call_zRcX10ViD3xFliZh3V9mkYXA",
+      "parent_event_id": "r_029afakbci:gateway:8",
+      "tool_name": "run_shell",
+      "target": "sed -n '1,220p' ledger/money.py \u0026\u0026 printf '\\n---\\n' \u0026\u0026 sed -n '1,220p' ledger/invoice.py",
+      "args_hash": "7088d68e3ddfe67893500cd4e2e0349349609ab75e5f69e27d5d9b48b503b26a",
+      "provider": "openai",
+      "model_requested": "gpt-5.4-mini",
+      "model_served": "gpt-5.4-mini-2026-03-17",
+      "summary": "run_shell sed -n '1,220p' ledger/money.py \u0026\u0026 printf '\\n---\\n' \u0026\u0026 sed -n '1,220p' ledger/invoice.py"
+    },
+    {
+      "event_id": "r_029afakbci:gateway:11",
+      "run_id": "r_029afakbci",
+      "slot_id": "s_117k5i2nvq",
+      "pair_id": "p_ptaib50tir",
+      "seq": 11,
+      "turn_index": 3,
+      "ts": "2026-11-14T01:00:50.14808Z",
+      "type": "tool_result",
+      "source": "gateway",
+      "evidence": "gateway",
+      "request_id": "45c1610f-411e-41b6-ac81-5120b090ce56",
+      "tool_call_id": "call_VcSY3idf3XTyRenwpRSuKHoh",
+      "parent_event_id": "r_029afakbci:gateway:9",
+      "provider": "openai",
+      "model_requested": "gpt-5.4-mini",
+      "model_served": "gpt-5.4-mini-2026-03-17"
+    },
+    {
+      "event_id": "r_029afakbci:gateway:12",
+      "run_id": "r_029afakbci",
+      "slot_id": "s_117k5i2nvq",
+      "pair_id": "p_ptaib50tir",
+      "seq": 12,
+      "turn_index": 3,
+      "ts": "2026-11-14T01:00:50.14808Z",
+      "type": "tool_result",
+      "source": "gateway",
+      "evidence": "gateway",
+      "request_id": "45c1610f-411e-41b6-ac81-5120b090ce56",
+      "tool_call_id": "call_zRcX10ViD3xFliZh3V9mkYXA",
+      "parent_event_id": "r_029afakbci:gateway:10",
+      "provider": "openai",
+      "model_requested": "gpt-5.4-mini",
+      "model_served": "gpt-5.4-mini-2026-03-17"
+    },
+    {
+      "event_id": "r_029afakbci:gateway:13",
+      "run_id": "r_029afakbci",
+      "slot_id": "s_117k5i2nvq",
+      "pair_id": "p_ptaib50tir",
+      "seq": 13,
+      "turn_index": 3,
+      "ts": "2026-11-14T01:00:50.14808Z",
+      "type": "model_request",
+      "source": "gateway",
+      "evidence": "gateway",
+      "request_id": "45c1610f-411e-41b6-ac81-5120b090ce56",
+      "provider": "openai",
+      "model_requested": "gpt-5.4-mini",
+      "model_served": "gpt-5.4-mini-2026-03-17"
+    },
+    {
+      "event_id": "r_029afakbci:gateway:14",
+      "run_id": "r_029afakbci",
+      "slot_id": "s_117k5i2nvq",
+      "pair_id": "p_ptaib50tir",
+      "seq": 14,
+      "turn_index": 3,
+      "ts": "2026-11-14T01:00:55.758774661Z",
+      "type": "model_response",
+      "source": "gateway",
+      "evidence": "gateway",
+      "request_id": "45c1610f-411e-41b6-ac81-5120b090ce56",
+      "attempt_no": 1,
+      "parent_event_id": "r_029afakbci:gateway:13",
+      "provider": "openai",
+      "model_requested": "gpt-5.4-mini",
+      "model_served": "gpt-5.4-mini-2026-03-17",
+      "tokens": {
+        "fresh": 2069,
+        "cache_read": 3456,
+        "cache_write": 0,
+        "out": 883
+      },
+      "usd": {
+        "state": "observed",
+        "v": 0.00578445,
+        "evidence": "gateway"
+      },
+      "summary": "1 tool calls"
+    },
+    {
+      "event_id": "r_029afakbci:gateway:15",
+      "run_id": "r_029afakbci",
+      "slot_id": "s_117k5i2nvq",
+      "pair_id": "p_ptaib50tir",
+      "seq": 15,
+      "turn_index": 3,
+      "ts": "2026-11-14T01:00:55.758774661Z",
+      "type": "tool_call",
+      "source": "gateway",
+      "evidence": "gateway",
+      "request_id": "45c1610f-411e-41b6-ac81-5120b090ce56",
+      "tool_call_id": "call_QmbjdHQohTyqFt9Br7z9mUAZ",
+      "parent_event_id": "r_029afakbci:gateway:14",
+      "tool_name": "write_file",
+      "target": "ledger/money.py",
+      "args_hash": "2c4930e026a5d3651bfd37a37085b50ebca6d836b6563dfd3fcb4c27dd343e4e",
+      "provider": "openai",
+      "model_requested": "gpt-5.4-mini",
+      "model_served": "gpt-5.4-mini-2026-03-17",
+      "summary": "write_file ledger/money.py"
+    },
+    {
+      "event_id": "r_029afakbci:gateway:16",
+      "run_id": "r_029afakbci",
+      "slot_id": "s_117k5i2nvq",
+      "pair_id": "p_ptaib50tir",
+      "seq": 16,
+      "turn_index": 4,
+      "ts": "2026-11-14T01:00:55.760623Z",
+      "type": "tool_result",
+      "source": "gateway",
+      "evidence": "gateway",
+      "request_id": "0e91b22e-1452-4536-a890-19658f8cb135",
+      "tool_call_id": "call_QmbjdHQohTyqFt9Br7z9mUAZ",
+      "parent_event_id": "r_029afakbci:gateway:15",
+      "provider": "openai",
+      "model_requested": "gpt-5.4-mini",
+      "model_served": "gpt-5.4-mini-2026-03-17"
+    },
+    {
+      "event_id": "r_029afakbci:gateway:17",
+      "run_id": "r_029afakbci",
+      "slot_id": "s_117k5i2nvq",
+      "pair_id": "p_ptaib50tir",
+      "seq": 17,
+      "turn_index": 4,
+      "ts": "2026-11-14T01:00:55.760623Z",
+      "type": "model_request",
+      "source": "gateway",
+      "evidence": "gateway",
+      "request_id": "0e91b22e-1452-4536-a890-19658f8cb135",
+      "provider": "openai",
+      "model_requested": "gpt-5.4-mini",
+      "model_served": "gpt-5.4-mini-2026-03-17"
+    },
+    {
+      "event_id": "r_029afakbci:gateway:18",
+      "run_id": "r_029afakbci",
+      "slot_id": "s_117k5i2nvq",
+      "pair_id": "p_ptaib50tir",
+      "seq": 18,
+      "turn_index": 4,
+      "ts": "2026-11-14T01:01:06.817373407Z",
+      "type": "model_response",
+      "source": "gateway",
+      "evidence": "gateway",
+      "request_id": "0e91b22e-1452-4536-a890-19658f8cb135",
+      "attempt_no": 1,
+      "parent_event_id": "r_029afakbci:gateway:17",
+      "provider": "openai",
+      "model_requested": "gpt-5.4-mini",
+      "model_served": "gpt-5.4-mini-2026-03-17",
+      "tokens": {
+        "fresh": 1054,
+        "cache_read": 5376,
+        "cache_write": 0,
+        "out": 1104
+      },
+      "usd": {
+        "state": "observed",
+        "v": 0.0061617,
+        "evidence": "gateway"
+      },
+      "summary": "1 tool calls"
+    },
+    {
+      "event_id": "r_029afakbci:gateway:19",
+      "run_id": "r_029afakbci",
+      "slot_id": "s_117k5i2nvq",
+      "pair_id": "p_ptaib50tir",
+      "seq": 19,
+      "turn_index": 4,
+      "ts": "2026-11-14T01:01:06.817373407Z",
+      "type": "tool_call",
+      "source": "gateway",
+      "evidence": "gateway",
+      "request_id": "0e91b22e-1452-4536-a890-19658f8cb135",
+      "tool_call_id": "call_AdJnFUJF4Nm4A6NeiHTk3X90",
+      "parent_event_id": "r_029afakbci:gateway:18",
+      "tool_name": "write_file",
+      "target": "ledger/invoice.py",
+      "args_hash": "5d34599441912b48937db9b7ed99560b6777566478a19b6d4dfe10c919d5e939",
+      "provider": "openai",
+      "model_requested": "gpt-5.4-mini",
+      "model_served": "gpt-5.4-mini-2026-03-17",
+      "summary": "write_file ledger/invoice.py"
+    },
+    {
+      "event_id": "r_029afakbci:gateway:20",
+      "run_id": "r_029afakbci",
+      "slot_id": "s_117k5i2nvq",
+      "pair_id": "p_ptaib50tir",
+      "seq": 20,
+      "turn_index": 5,
+      "ts": "2026-11-14T01:01:06.820161Z",
+      "type": "tool_result",
+      "source": "gateway",
+      "evidence": "gateway",
+      "request_id": "90573d05-a321-4bdc-a74c-ed91e19cce73",
+      "tool_call_id": "call_AdJnFUJF4Nm4A6NeiHTk3X90",
+      "parent_event_id": "r_029afakbci:gateway:19",
+      "provider": "openai",
+      "model_requested": "gpt-5.4-mini",
+      "model_served": "gpt-5.4-mini-2026-03-17"
+    },
+    {
+      "event_id": "r_029afakbci:gateway:21",
+      "run_id": "r_029afakbci",
+      "slot_id": "s_117k5i2nvq",
+      "pair_id": "p_ptaib50tir",
+      "seq": 21,
+      "turn_index": 5,
+      "ts": "2026-11-14T01:01:06.820161Z",
+      "type": "model_request",
+      "source": "gateway",
+      "evidence": "gateway",
+      "request_id": "90573d05-a321-4bdc-a74c-ed91e19cce73",
+      "provider": "openai",
+      "model_requested": "gpt-5.4-mini",
+      "model_served": "gpt-5.4-mini-2026-03-17"
+    },
+    {
+      "event_id": "r_029afakbci:gateway:22",
+      "run_id": "r_029afakbci",
+      "slot_id": "s_117k5i2nvq",
+      "pair_id": "p_ptaib50tir",
+      "seq": 22,
+      "turn_index": 5,
+      "ts": "2026-11-14T01:01:08.78864651Z",
+      "type": "model_response",
+      "source": "gateway",
+      "evidence": "gateway",
+      "request_id": "90573d05-a321-4bdc-a74c-ed91e19cce73",
+      "attempt_no": 1,
+      "parent_event_id": "r_029afakbci:gateway:21",
+      "provider": "openai",
+      "model_requested": "gpt-5.4-mini",
+      "model_served": "gpt-5.4-mini-2026-03-17",
+      "tokens": {
+        "fresh": 1284,
+        "cache_read": 6272,
+        "cache_write": 0,
+        "out": 27
+      },
+      "usd": {
+        "state": "observed",
+        "v": 0.0015549000000000001,
+        "evidence": "gateway"
+      },
+      "summary": "1 tool calls"
+    },
+    {
+      "event_id": "r_029afakbci:gateway:23",
+      "run_id": "r_029afakbci",
+      "slot_id": "s_117k5i2nvq",
+      "pair_id": "p_ptaib50tir",
+      "seq": 23,
+      "turn_index": 5,
+      "ts": "2026-11-14T01:01:08.78864651Z",
+      "type": "tool_call",
+      "source": "gateway",
+      "evidence": "gateway",
+      "request_id": "90573d05-a321-4bdc-a74c-ed91e19cce73",
+      "tool_call_id": "call_VOpRMQXjm7AHGyBi3Xdr2yUU",
+      "parent_event_id": "r_029afakbci:gateway:22",
+      "tool_name": "run_shell",
+      "target": "python -m pytest ledger/ tests/ -q",
+      "args_hash": "9e262779a03ed2cfd5efabd7f0cb2cab6fb9a830cf787e2da5476eaa7ab9c269",
+      "provider": "openai",
+      "model_requested": "gpt-5.4-mini",
+      "model_served": "gpt-5.4-mini-2026-03-17",
+      "summary": "run_shell python -m pytest ledger/ tests/ -q"
+    },
+    {
+      "event_id": "r_029afakbci:gateway:24",
+      "run_id": "r_029afakbci",
+      "slot_id": "s_117k5i2nvq",
+      "pair_id": "p_ptaib50tir",
+      "seq": 24,
+      "turn_index": 6,
+      "ts": "2026-11-14T01:01:09.436119Z",
+      "type": "tool_result",
+      "source": "gateway",
+      "evidence": "gateway",
+      "request_id": "f4519b56-1178-4216-8ff8-2c7ce6607127",
+      "tool_call_id": "call_VOpRMQXjm7AHGyBi3Xdr2yUU",
+      "parent_event_id": "r_029afakbci:gateway:23",
+      "provider": "openai",
+      "model_requested": "gpt-5.4-mini",
+      "model_served": "gpt-5.4-mini-2026-03-17"
+    },
+    {
+      "event_id": "r_029afakbci:gateway:25",
+      "run_id": "r_029afakbci",
+      "slot_id": "s_117k5i2nvq",
+      "pair_id": "p_ptaib50tir",
+      "seq": 25,
+      "turn_index": 6,
+      "ts": "2026-11-14T01:01:09.436119Z",
+      "type": "model_request",
+      "source": "gateway",
+      "evidence": "gateway",
+      "request_id": "f4519b56-1178-4216-8ff8-2c7ce6607127",
+      "provider": "openai",
+      "model_requested": "gpt-5.4-mini",
+      "model_served": "gpt-5.4-mini-2026-03-17"
+    },
+    {
+      "event_id": "r_029afakbci:gateway:26",
+      "run_id": "r_029afakbci",
+      "slot_id": "s_117k5i2nvq",
+      "pair_id": "p_ptaib50tir",
+      "seq": 26,
+      "turn_index": 6,
+      "ts": "2026-11-14T01:01:11.942674267Z",
+      "type": "model_response",
+      "source": "gateway",
+      "evidence": "gateway",
+      "request_id": "f4519b56-1178-4216-8ff8-2c7ce6607127",
+      "attempt_no": 1,
+      "parent_event_id": "r_029afakbci:gateway:25",
+      "provider": "openai",
+      "model_requested": "gpt-5.4-mini",
+      "model_served": "gpt-5.4-mini-2026-03-17",
+      "tokens": {
+        "fresh": 190,
+        "cache_read": 7424,
+        "cache_write": 0,
+        "out": 83
+      },
+      "usd": {
+        "state": "observed",
+        "v": 0.0010728,
+        "evidence": "gateway"
+      },
+      "summary": "0 tool calls"
+    },
+    {
+      "event_id": "r_029afakbci:agent_stream:1",
+      "run_id": "r_029afakbci",
+      "slot_id": "s_117k5i2nvq",
+      "pair_id": "p_ptaib50tir",
+      "seq": 1,
+      "turn_index": 0,
+      "ts": "2026-11-14T01:01:12.090436095Z",
+      "type": "claim",
+      "source": "agent_stream",
+      "evidence": "outcome",
+      "summary": "tests pass"
+    }
+  ],
+  "claim": {
+    "made": true,
+    "text": "ch\": {\"num_requests\": 0}}}, \"tool_calls\": []}\n{\"type\": \"final\", \"turns\": 6}\nImplemented exact Decimal-based cent rounding throughout invoice calculations.\n\nWhat changed:\n- Line amounts now use exact decimal arithmetic and half-up rounding.\n- Subtotals now sum rounded line amounts instead of rounding an unrounded aggregate.\n- Discount and tax calculations use exact decimal math with half-up rounding.\n- `Totals` and CLI/export output now reflect the corrected cent values.\n\nTests pass: `33 passed`.",
+    "source": "outcome",
+    "matched": "tests pass"
+  },
+  "cost": [
+    {
+      "request_id": "7560dd51-9256-4851-8d46-6bc6e149b4a6",
+      "attempt": 1,
+      "model": "gpt-5.4-mini-2026-03-17",
+      "tokens": {
+        "fresh": 1238,
+        "cache_read": 0,
+        "cache_write": 0,
+        "out": 167
+      },
+      "price_ref": "bifrost-datasheet-2026-11-14-openai@sha256:064520900aeda8c3b5dec578dbbbe095f8fd366c388837fb21667ba2acf02000",
+      "usd": {
+        "state": "observed",
+        "v": 0.00168,
+        "evidence": "gateway"
+      },
+      "bifrost_usd": 0.00168,
+      "fault_inject": false
+    },
+    {
+      "request_id": "0914cbfd-3780-4c9f-93e5-08622a3d5ee9",
+      "attempt": 1,
+      "model": "gpt-5.4-mini-2026-03-17",
+      "tokens": {
+        "fresh": 2477,
+        "cache_read": 1152,
+        "cache_write": 0,
+        "out": 144
+      },
+      "price_ref": "bifrost-datasheet-2026-11-14-openai@sha256:064520900aeda8c3b5dec578dbbbe095f8fd366c388837fb21667ba2acf02000",
+      "usd": {
+        "state": "observed",
+        "v": 0.00259215,
+        "evidence": "gateway"
+      },
+      "bifrost_usd": 0.00259215,
+      "fault_inject": false
+    },
+    {
+      "request_id": "45c1610f-411e-41b6-ac81-5120b090ce56",
+      "attempt": 1,
+      "model": "gpt-5.4-mini-2026-03-17",
+      "tokens": {
+        "fresh": 2069,
+        "cache_read": 3456,
+        "cache_write": 0,
+        "out": 883
+      },
+      "price_ref": "bifrost-datasheet-2026-11-14-openai@sha256:064520900aeda8c3b5dec578dbbbe095f8fd366c388837fb21667ba2acf02000",
+      "usd": {
+        "state": "observed",
+        "v": 0.00578445,
+        "evidence": "gateway"
+      },
+      "bifrost_usd": 0.00578445,
+      "fault_inject": false
+    },
+    {
+      "request_id": "0e91b22e-1452-4536-a890-19658f8cb135",
+      "attempt": 1,
+      "model": "gpt-5.4-mini-2026-03-17",
+      "tokens": {
+        "fresh": 1054,
+        "cache_read": 5376,
+        "cache_write": 0,
+        "out": 1104
+      },
+      "price_ref": "bifrost-datasheet-2026-11-14-openai@sha256:064520900aeda8c3b5dec578dbbbe095f8fd366c388837fb21667ba2acf02000",
+      "usd": {
+        "state": "observed",
+        "v": 0.0061617,
+        "evidence": "gateway"
+      },
+      "bifrost_usd": 0.0061617,
+      "fault_inject": false
+    },
+    {
+      "request_id": "90573d05-a321-4bdc-a74c-ed91e19cce73",
+      "attempt": 1,
+      "model": "gpt-5.4-mini-2026-03-17",
+      "tokens": {
+        "fresh": 1284,
+        "cache_read": 6272,
+        "cache_write": 0,
+        "out": 27
+      },
+      "price_ref": "bifrost-datasheet-2026-11-14-openai@sha256:064520900aeda8c3b5dec578dbbbe095f8fd366c388837fb21667ba2acf02000",
+      "usd": {
+        "state": "observed",
+        "v": 0.0015549000000000001,
+        "evidence": "gateway"
+      },
+      "bifrost_usd": 0.0015549000000000001,
+      "fault_inject": false
+    },
+    {
+      "request_id": "f4519b56-1178-4216-8ff8-2c7ce6607127",
+      "attempt": 1,
+      "model": "gpt-5.4-mini-2026-03-17",
+      "tokens": {
+        "fresh": 190,
+        "cache_read": 7424,
+        "cache_write": 0,
+        "out": 83
+      },
+      "price_ref": "bifrost-datasheet-2026-11-14-openai@sha256:064520900aeda8c3b5dec578dbbbe095f8fd366c388837fb21667ba2acf02000",
+      "usd": {
+        "state": "observed",
+        "v": 0.0010728,
+        "evidence": "gateway"
+      },
+      "bifrost_usd": 0.0010728,
+      "fault_inject": false
+    }
+  ],
+  "grade": {
+    "passed": true,
+    "invalid_evaluator": false,
+    "exit_code": 0,
+    "tests_ran": 7,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 0,
+    "reason": "passed (7 tests)",
+    "suite_version": "1.0.0",
+    "grader_version": "1.0.0",
+    "diff_sha256": "75d87791873f8994c9fdcbfb0baf2c2a3180549fb4ce5689f0026ada4e5a5aa1"
+  },
+  "gates": [
+    {
+      "gate": "g1_protected_paths",
+      "version": "1.0.0",
+      "effect": "veto",
+      "fired": false
+    },
+    {
+      "gate": "g2_test_infra",
+      "version": "1.0.0",
+      "effect": "veto",
+      "fired": false
+    },
+    {
+      "gate": "g4_regrade",
+      "version": "1.0.0",
+      "effect": "veto",
+      "fired": false
+    },
+    {
+      "gate": "g6_null_agents",
+      "version": "1.0.0",
+      "effect": "admission",
+      "fired": false,
+      "detail": "not a null agent"
+    },
+    {
+      "gate": "egress",
+      "version": "1.0.0",
+      "effect": "invalidate",
+      "fired": false
+    }
+  ]
+}

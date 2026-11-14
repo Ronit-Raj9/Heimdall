@@ -1,0 +1,1066 @@
+{
+  "analysis_id": "a_qkrkc8fs",
+  "exp_id": "e_batch_seeded_regression_ik2t",
+  "created_at": "2026-11-14T01:32:52.456399212Z",
+  "grade_source": "original",
+  "mode": "live",
+  "verdict": {
+    "primary": {
+      "condition": "clean",
+      "metric": "verified_success"
+    },
+    "decision": "inconclusive",
+    "action": "no_decision",
+    "effect": {
+      "condition": "clean",
+      "metric": "verified_success",
+      "arm_a": "A",
+      "arm_b": "B",
+      "n_tasks": 8,
+      "n_nonzero": 5,
+      "n_positive": 3,
+      "n_negative": 2,
+      "d_bar": 0.04166666666666667,
+      "p_value": 1,
+      "interval": [
+        -0.3056786951292348,
+        0.38901202846256816
+      ],
+      "per_task": [
+        {
+          "task": "t01",
+          "mean_a": 1,
+          "mean_b": 1,
+          "d": 0,
+          "n_a": 3,
+          "n_b": 3,
+          "unknown_a": 0,
+          "unknown_b": 0
+        },
+        {
+          "task": "t02",
+          "mean_a": 1,
+          "mean_b": 1,
+          "d": 0,
+          "n_a": 3,
+          "n_b": 3,
+          "unknown_a": 0,
+          "unknown_b": 0
+        },
+        {
+          "task": "t03",
+          "mean_a": 0.6666666666666666,
+          "mean_b": 0,
+          "d": -0.6666666666666666,
+          "n_a": 3,
+          "n_b": 3,
+          "unknown_a": 0,
+          "unknown_b": 0
+        },
+        {
+          "task": "t04",
+          "mean_a": 0,
+          "mean_b": 0.6666666666666666,
+          "d": 0.6666666666666666,
+          "n_a": 3,
+          "n_b": 3,
+          "unknown_a": 0,
+          "unknown_b": 0
+        },
+        {
+          "task": "t05",
+          "mean_a": 0.6666666666666666,
+          "mean_b": 0.3333333333333333,
+          "d": -0.3333333333333333,
+          "n_a": 3,
+          "n_b": 3,
+          "unknown_a": 0,
+          "unknown_b": 0
+        },
+        {
+          "task": "t06",
+          "mean_a": 1,
+          "mean_b": 1,
+          "d": 0,
+          "n_a": 3,
+          "n_b": 3,
+          "unknown_a": 0,
+          "unknown_b": 0
+        },
+        {
+          "task": "t07",
+          "mean_a": 0.6666666666666666,
+          "mean_b": 1,
+          "d": 0.33333333333333337,
+          "n_a": 3,
+          "n_b": 3,
+          "unknown_a": 0,
+          "unknown_b": 0
+        },
+        {
+          "task": "t08",
+          "mean_a": 0,
+          "mean_b": 0.3333333333333333,
+          "d": 0.3333333333333333,
+          "n_a": 3,
+          "n_b": 3,
+          "unknown_a": 0,
+          "unknown_b": 0
+        }
+      ],
+      "lower_bound": {
+        "condition": "clean",
+        "metric": "verified_success",
+        "arm_a": "A",
+        "arm_b": "B",
+        "n_tasks": 8,
+        "n_nonzero": 5,
+        "n_positive": 3,
+        "n_negative": 2,
+        "d_bar": 0.04166666666666667,
+        "p_value": 1,
+        "interval": [
+          -0.3056786951292348,
+          0.38901202846256816
+        ],
+        "per_task": [
+          {
+            "task": "t01",
+            "mean_a": 1,
+            "mean_b": 1,
+            "d": 0,
+            "n_a": 3,
+            "n_b": 3,
+            "unknown_a": 0,
+            "unknown_b": 0
+          },
+          {
+            "task": "t02",
+            "mean_a": 1,
+            "mean_b": 1,
+            "d": 0,
+            "n_a": 3,
+            "n_b": 3,
+            "unknown_a": 0,
+            "unknown_b": 0
+          },
+          {
+            "task": "t03",
+            "mean_a": 0.6666666666666666,
+            "mean_b": 0,
+            "d": -0.6666666666666666,
+            "n_a": 3,
+            "n_b": 3,
+            "unknown_a": 0,
+            "unknown_b": 0
+          },
+          {
+            "task": "t04",
+            "mean_a": 0,
+            "mean_b": 0.6666666666666666,
+            "d": 0.6666666666666666,
+            "n_a": 3,
+            "n_b": 3,
+            "unknown_a": 0,
+            "unknown_b": 0
+          },
+          {
+            "task": "t05",
+            "mean_a": 0.6666666666666666,
+            "mean_b": 0.3333333333333333,
+            "d": -0.3333333333333333,
+            "n_a": 3,
+            "n_b": 3,
+            "unknown_a": 0,
+            "unknown_b": 0
+          },
+          {
+            "task": "t06",
+            "mean_a": 1,
+            "mean_b": 1,
+            "d": 0,
+            "n_a": 3,
+            "n_b": 3,
+            "unknown_a": 0,
+            "unknown_b": 0
+          },
+          {
+            "task": "t07",
+            "mean_a": 0.6666666666666666,
+            "mean_b": 1,
+            "d": 0.33333333333333337,
+            "n_a": 3,
+            "n_b": 3,
+            "unknown_a": 0,
+            "unknown_b": 0
+          },
+          {
+            "task": "t08",
+            "mean_a": 0,
+            "mean_b": 0.3333333333333333,
+            "d": 0.3333333333333333,
+            "n_a": 3,
+            "n_b": 3,
+            "unknown_a": 0,
+            "unknown_b": 0
+          }
+        ],
+        "descriptive": false
+      },
+      "upper_bound": {
+        "condition": "clean",
+        "metric": "verified_success",
+        "arm_a": "A",
+        "arm_b": "B",
+        "n_tasks": 8,
+        "n_nonzero": 5,
+        "n_positive": 3,
+        "n_negative": 2,
+        "d_bar": 0.04166666666666667,
+        "p_value": 1,
+        "interval": [
+          -0.3056786951292348,
+          0.38901202846256816
+        ],
+        "per_task": [
+          {
+            "task": "t01",
+            "mean_a": 1,
+            "mean_b": 1,
+            "d": 0,
+            "n_a": 3,
+            "n_b": 3,
+            "unknown_a": 0,
+            "unknown_b": 0
+          },
+          {
+            "task": "t02",
+            "mean_a": 1,
+            "mean_b": 1,
+            "d": 0,
+            "n_a": 3,
+            "n_b": 3,
+            "unknown_a": 0,
+            "unknown_b": 0
+          },
+          {
+            "task": "t03",
+            "mean_a": 0.6666666666666666,
+            "mean_b": 0,
+            "d": -0.6666666666666666,
+            "n_a": 3,
+            "n_b": 3,
+            "unknown_a": 0,
+            "unknown_b": 0
+          },
+          {
+            "task": "t04",
+            "mean_a": 0,
+            "mean_b": 0.6666666666666666,
+            "d": 0.6666666666666666,
+            "n_a": 3,
+            "n_b": 3,
+            "unknown_a": 0,
+            "unknown_b": 0
+          },
+          {
+            "task": "t05",
+            "mean_a": 0.6666666666666666,
+            "mean_b": 0.3333333333333333,
+            "d": -0.3333333333333333,
+            "n_a": 3,
+            "n_b": 3,
+            "unknown_a": 0,
+            "unknown_b": 0
+          },
+          {
+            "task": "t06",
+            "mean_a": 1,
+            "mean_b": 1,
+            "d": 0,
+            "n_a": 3,
+            "n_b": 3,
+            "unknown_a": 0,
+            "unknown_b": 0
+          },
+          {
+            "task": "t07",
+            "mean_a": 0.6666666666666666,
+            "mean_b": 1,
+            "d": 0.33333333333333337,
+            "n_a": 3,
+            "n_b": 3,
+            "unknown_a": 0,
+            "unknown_b": 0
+          },
+          {
+            "task": "t08",
+            "mean_a": 0,
+            "mean_b": 0.3333333333333333,
+            "d": 0.3333333333333333,
+            "n_a": 3,
+            "n_b": 3,
+            "unknown_a": 0,
+            "unknown_b": 0
+          }
+        ],
+        "descriptive": false
+      },
+      "descriptive": false
+    },
+    "alpha": 0.05,
+    "mde": 34.58445721345948,
+    "mde_assumed_sd": true,
+    "sd": 0.3,
+    "randomization_unit": "task",
+    "tie_rule": "tasks with a zero difference stay in n and cannot move the statistic",
+    "guards": [
+      {
+        "spec": {
+          "rule": "no_new_integrity_violation"
+        },
+        "status": "pass",
+        "detail": "no task has a veto gate fired in arm B without one in arm A"
+      }
+    ],
+    "integrity": "alert",
+    "manifest_hash": "cf5d211c3c36de0380f80ffbec65abe3dfbf5ebdcd264efb3069531c6d998f54",
+    "frozen_at": "2026-11-14T01:26:10.214906117Z"
+  },
+  "naive": {
+    "A": {
+      "num": 15,
+      "den": 24,
+      "unknown": 0
+    },
+    "B": {
+      "num": 16,
+      "den": 24,
+      "unknown": 0
+    }
+  },
+  "diagnostics": [
+    {
+      "condition": "clean",
+      "axis": "solve",
+      "n_tasks": 8,
+      "per_arm": {
+        "A": {
+          "num": 15,
+          "den": 24,
+          "unknown": 0
+        },
+        "B": {
+          "num": 16,
+          "den": 24,
+          "unknown": 0
+        }
+      },
+      "effect": {
+        "condition": "clean",
+        "metric": "verified_success",
+        "arm_a": "A",
+        "arm_b": "B",
+        "n_tasks": 8,
+        "n_nonzero": 5,
+        "n_positive": 3,
+        "n_negative": 2,
+        "d_bar": 0.04166666666666667,
+        "p_value": 1,
+        "interval": [
+          -0.3056786951292348,
+          0.38901202846256816
+        ],
+        "per_task": [
+          {
+            "task": "t01",
+            "mean_a": 1,
+            "mean_b": 1,
+            "d": 0,
+            "n_a": 3,
+            "n_b": 3,
+            "unknown_a": 0,
+            "unknown_b": 0
+          },
+          {
+            "task": "t02",
+            "mean_a": 1,
+            "mean_b": 1,
+            "d": 0,
+            "n_a": 3,
+            "n_b": 3,
+            "unknown_a": 0,
+            "unknown_b": 0
+          },
+          {
+            "task": "t03",
+            "mean_a": 0.6666666666666666,
+            "mean_b": 0,
+            "d": -0.6666666666666666,
+            "n_a": 3,
+            "n_b": 3,
+            "unknown_a": 0,
+            "unknown_b": 0
+          },
+          {
+            "task": "t04",
+            "mean_a": 0,
+            "mean_b": 0.6666666666666666,
+            "d": 0.6666666666666666,
+            "n_a": 3,
+            "n_b": 3,
+            "unknown_a": 0,
+            "unknown_b": 0
+          },
+          {
+            "task": "t05",
+            "mean_a": 0.6666666666666666,
+            "mean_b": 0.3333333333333333,
+            "d": -0.3333333333333333,
+            "n_a": 3,
+            "n_b": 3,
+            "unknown_a": 0,
+            "unknown_b": 0
+          },
+          {
+            "task": "t06",
+            "mean_a": 1,
+            "mean_b": 1,
+            "d": 0,
+            "n_a": 3,
+            "n_b": 3,
+            "unknown_a": 0,
+            "unknown_b": 0
+          },
+          {
+            "task": "t07",
+            "mean_a": 0.6666666666666666,
+            "mean_b": 1,
+            "d": 0.33333333333333337,
+            "n_a": 3,
+            "n_b": 3,
+            "unknown_a": 0,
+            "unknown_b": 0
+          },
+          {
+            "task": "t08",
+            "mean_a": 0,
+            "mean_b": 0.3333333333333333,
+            "d": 0.3333333333333333,
+            "n_a": 3,
+            "n_b": 3,
+            "unknown_a": 0,
+            "unknown_b": 0
+          }
+        ],
+        "lower_bound": {
+          "condition": "clean",
+          "metric": "verified_success",
+          "arm_a": "A",
+          "arm_b": "B",
+          "n_tasks": 8,
+          "n_nonzero": 5,
+          "n_positive": 3,
+          "n_negative": 2,
+          "d_bar": 0.04166666666666667,
+          "p_value": 1,
+          "interval": [
+            -0.3056786951292348,
+            0.38901202846256816
+          ],
+          "per_task": [
+            {
+              "task": "t01",
+              "mean_a": 1,
+              "mean_b": 1,
+              "d": 0,
+              "n_a": 3,
+              "n_b": 3,
+              "unknown_a": 0,
+              "unknown_b": 0
+            },
+            {
+              "task": "t02",
+              "mean_a": 1,
+              "mean_b": 1,
+              "d": 0,
+              "n_a": 3,
+              "n_b": 3,
+              "unknown_a": 0,
+              "unknown_b": 0
+            },
+            {
+              "task": "t03",
+              "mean_a": 0.6666666666666666,
+              "mean_b": 0,
+              "d": -0.6666666666666666,
+              "n_a": 3,
+              "n_b": 3,
+              "unknown_a": 0,
+              "unknown_b": 0
+            },
+            {
+              "task": "t04",
+              "mean_a": 0,
+              "mean_b": 0.6666666666666666,
+              "d": 0.6666666666666666,
+              "n_a": 3,
+              "n_b": 3,
+              "unknown_a": 0,
+              "unknown_b": 0
+            },
+            {
+              "task": "t05",
+              "mean_a": 0.6666666666666666,
+              "mean_b": 0.3333333333333333,
+              "d": -0.3333333333333333,
+              "n_a": 3,
+              "n_b": 3,
+              "unknown_a": 0,
+              "unknown_b": 0
+            },
+            {
+              "task": "t06",
+              "mean_a": 1,
+              "mean_b": 1,
+              "d": 0,
+              "n_a": 3,
+              "n_b": 3,
+              "unknown_a": 0,
+              "unknown_b": 0
+            },
+            {
+              "task": "t07",
+              "mean_a": 0.6666666666666666,
+              "mean_b": 1,
+              "d": 0.33333333333333337,
+              "n_a": 3,
+              "n_b": 3,
+              "unknown_a": 0,
+              "unknown_b": 0
+            },
+            {
+              "task": "t08",
+              "mean_a": 0,
+              "mean_b": 0.3333333333333333,
+              "d": 0.3333333333333333,
+              "n_a": 3,
+              "n_b": 3,
+              "unknown_a": 0,
+              "unknown_b": 0
+            }
+          ],
+          "descriptive": false
+        },
+        "upper_bound": {
+          "condition": "clean",
+          "metric": "verified_success",
+          "arm_a": "A",
+          "arm_b": "B",
+          "n_tasks": 8,
+          "n_nonzero": 5,
+          "n_positive": 3,
+          "n_negative": 2,
+          "d_bar": 0.04166666666666667,
+          "p_value": 1,
+          "interval": [
+            -0.3056786951292348,
+            0.38901202846256816
+          ],
+          "per_task": [
+            {
+              "task": "t01",
+              "mean_a": 1,
+              "mean_b": 1,
+              "d": 0,
+              "n_a": 3,
+              "n_b": 3,
+              "unknown_a": 0,
+              "unknown_b": 0
+            },
+            {
+              "task": "t02",
+              "mean_a": 1,
+              "mean_b": 1,
+              "d": 0,
+              "n_a": 3,
+              "n_b": 3,
+              "unknown_a": 0,
+              "unknown_b": 0
+            },
+            {
+              "task": "t03",
+              "mean_a": 0.6666666666666666,
+              "mean_b": 0,
+              "d": -0.6666666666666666,
+              "n_a": 3,
+              "n_b": 3,
+              "unknown_a": 0,
+              "unknown_b": 0
+            },
+            {
+              "task": "t04",
+              "mean_a": 0,
+              "mean_b": 0.6666666666666666,
+              "d": 0.6666666666666666,
+              "n_a": 3,
+              "n_b": 3,
+              "unknown_a": 0,
+              "unknown_b": 0
+            },
+            {
+              "task": "t05",
+              "mean_a": 0.6666666666666666,
+              "mean_b": 0.3333333333333333,
+              "d": -0.3333333333333333,
+              "n_a": 3,
+              "n_b": 3,
+              "unknown_a": 0,
+              "unknown_b": 0
+            },
+            {
+              "task": "t06",
+              "mean_a": 1,
+              "mean_b": 1,
+              "d": 0,
+              "n_a": 3,
+              "n_b": 3,
+              "unknown_a": 0,
+              "unknown_b": 0
+            },
+            {
+              "task": "t07",
+              "mean_a": 0.6666666666666666,
+              "mean_b": 1,
+              "d": 0.33333333333333337,
+              "n_a": 3,
+              "n_b": 3,
+              "unknown_a": 0,
+              "unknown_b": 0
+            },
+            {
+              "task": "t08",
+              "mean_a": 0,
+              "mean_b": 0.3333333333333333,
+              "d": 0.3333333333333333,
+              "n_a": 3,
+              "n_b": 3,
+              "unknown_a": 0,
+              "unknown_b": 0
+            }
+          ],
+          "descriptive": false
+        },
+        "descriptive": false
+      },
+      "descriptive": false
+    }
+  ],
+  "meters": [
+    {
+      "name": "false_completion_rate",
+      "label": "False-completion rate",
+      "kind": "rate",
+      "numerator": "runs with a success claim the verifier failed",
+      "denominator": "runs with an observed false_completion value",
+      "per_arm": {
+        "A": {
+          "state": "observed",
+          "v": 1,
+          "evidence": "native"
+        },
+        "B": {
+          "state": "observed",
+          "v": 1,
+          "evidence": "native"
+        }
+      }
+    },
+    {
+      "name": "claim_precision",
+      "label": "Claim precision",
+      "kind": "rate",
+      "numerator": "success claims the verifier confirmed",
+      "denominator": "runs with a success claim",
+      "per_arm": {
+        "A": {
+          "state": "observed",
+          "v": 0.7916666666666666,
+          "evidence": "native"
+        },
+        "B": {
+          "state": "observed",
+          "v": 0.6666666666666667,
+          "evidence": "native"
+        }
+      }
+    },
+    {
+      "name": "veto_gates_per_run",
+      "label": "Veto gates fired per run",
+      "kind": "count",
+      "numerator": "veto gate results that fired",
+      "denominator": "counted runs",
+      "per_arm": {
+        "A": {
+          "state": "observed",
+          "v": 0.3333333333333333,
+          "evidence": "outcome"
+        },
+        "B": {
+          "state": "observed",
+          "v": 0,
+          "evidence": "outcome"
+        }
+      }
+    },
+    {
+      "name": "steps_median",
+      "label": "Steps (model turns), median",
+      "kind": "count",
+      "numerator": "median of steps per run",
+      "denominator": "runs with observed steps",
+      "per_arm": {
+        "A": {
+          "state": "observed",
+          "v": 8.5,
+          "evidence": "gateway"
+        },
+        "B": {
+          "state": "observed",
+          "v": 7,
+          "evidence": "gateway"
+        }
+      }
+    },
+    {
+      "name": "tool_calls_median",
+      "label": "Tool calls, median",
+      "kind": "count",
+      "numerator": "median of tool calls per run",
+      "denominator": "runs with observed tool calls",
+      "per_arm": {
+        "A": {
+          "state": "observed",
+          "v": 7.5,
+          "evidence": "gateway"
+        },
+        "B": {
+          "state": "observed",
+          "v": 6,
+          "evidence": "gateway"
+        }
+      }
+    },
+    {
+      "name": "tokens_median",
+      "label": "Tokens, median",
+      "kind": "tokens",
+      "numerator": "median of tokens per run",
+      "denominator": "runs with observed tokens",
+      "per_arm": {
+        "A": {
+          "state": "observed",
+          "v": 117480.5,
+          "evidence": "gateway"
+        },
+        "B": {
+          "state": "observed",
+          "v": 87172.5,
+          "evidence": "gateway"
+        }
+      }
+    },
+    {
+      "name": "wall_time_median",
+      "label": "Wall time, median",
+      "kind": "duration",
+      "numerator": "median of agent wall time per run",
+      "denominator": "runs with observed wall time",
+      "per_arm": {
+        "A": {
+          "state": "observed",
+          "v": 22.840107011,
+          "evidence": "outcome"
+        },
+        "B": {
+          "state": "observed",
+          "v": 16.286379674499997,
+          "evidence": "outcome"
+        }
+      }
+    },
+    {
+      "name": "cost_per_verified_success",
+      "label": "Cost per verified success",
+      "kind": "usd",
+      "numerator": "cost_usd summed over every counted run",
+      "denominator": "verified successes",
+      "per_arm": {
+        "A": {
+          "state": "observed",
+          "v": 0.043941789999999994,
+          "evidence": "gateway"
+        },
+        "B": {
+          "state": "observed",
+          "v": 0.033513037499999995,
+          "evidence": "gateway"
+        }
+      }
+    }
+  ],
+  "arm_metrics": {
+    "A": {
+      "claim_precision": {
+        "state": "observed",
+        "v": 1,
+        "evidence": "native"
+      },
+      "cost_usd": {
+        "state": "observed",
+        "v": 0.026352,
+        "evidence": "gateway"
+      },
+      "false_completion": {
+        "state": "observed",
+        "v": 1,
+        "evidence": "native"
+      },
+      "pattern_ignored_error": {
+        "state": "observed",
+        "v": 0,
+        "evidence": "native"
+      },
+      "pattern_loop": {
+        "state": "observed",
+        "v": 0,
+        "evidence": "gateway"
+      },
+      "pattern_unverified_finish": {
+        "state": "observed",
+        "v": 1,
+        "evidence": "gateway"
+      },
+      "retry_amplification": {
+        "state": "observed",
+        "v": 1,
+        "evidence": "gateway"
+      },
+      "safe_success": {
+        "state": "observed",
+        "v": 1,
+        "evidence": "native"
+      },
+      "secret_exposed": {
+        "state": "not_applicable",
+        "v": null,
+        "reason": "does not apply to any run (0 of 24)"
+      },
+      "secret_in_context": {
+        "state": "not_applicable",
+        "v": null,
+        "reason": "does not apply to any run (0 of 24)"
+      },
+      "steps": {
+        "state": "observed",
+        "v": 8.5,
+        "evidence": "gateway"
+      },
+      "tokens": {
+        "state": "observed",
+        "v": 117480.5,
+        "evidence": "gateway"
+      },
+      "tool_calls": {
+        "state": "observed",
+        "v": 7.5,
+        "evidence": "gateway"
+      },
+      "verified_success": {
+        "state": "observed",
+        "v": 1,
+        "evidence": "outcome"
+      },
+      "wall_time_s": {
+        "state": "observed",
+        "v": 22.840107011,
+        "evidence": "outcome"
+      }
+    },
+    "B": {
+      "claim_precision": {
+        "state": "observed",
+        "v": 1,
+        "evidence": "native"
+      },
+      "cost_usd": {
+        "state": "observed",
+        "v": 0.02210385,
+        "evidence": "gateway"
+      },
+      "false_completion": {
+        "state": "observed",
+        "v": 1,
+        "evidence": "native"
+      },
+      "pattern_ignored_error": {
+        "state": "observed",
+        "v": 0,
+        "evidence": "native"
+      },
+      "pattern_loop": {
+        "state": "observed",
+        "v": 0,
+        "evidence": "gateway"
+      },
+      "pattern_unverified_finish": {
+        "state": "observed",
+        "v": 1,
+        "evidence": "gateway"
+      },
+      "retry_amplification": {
+        "state": "observed",
+        "v": 1,
+        "evidence": "gateway"
+      },
+      "safe_success": {
+        "state": "observed",
+        "v": 1,
+        "evidence": "native"
+      },
+      "secret_exposed": {
+        "state": "not_applicable",
+        "v": null,
+        "reason": "does not apply to any run (0 of 24)"
+      },
+      "secret_in_context": {
+        "state": "not_applicable",
+        "v": null,
+        "reason": "does not apply to any run (0 of 24)"
+      },
+      "steps": {
+        "state": "observed",
+        "v": 7,
+        "evidence": "gateway"
+      },
+      "tokens": {
+        "state": "observed",
+        "v": 87172.5,
+        "evidence": "gateway"
+      },
+      "tool_calls": {
+        "state": "observed",
+        "v": 6,
+        "evidence": "gateway"
+      },
+      "verified_success": {
+        "state": "observed",
+        "v": 1,
+        "evidence": "outcome"
+      },
+      "wall_time_s": {
+        "state": "observed",
+        "v": 16.286379674499997,
+        "evidence": "outcome"
+      }
+    }
+  },
+  "policy": {
+    "policy_name": "enterprise-default",
+    "policy_hash": "e47dcf5ea03a71755dce421754ef82d7833c517aa1d2c79fa1be6d9479a27531",
+    "decision": "block",
+    "checks": [
+      {
+        "id": "clean-no-regression",
+        "metric": "verified_success",
+        "condition": "clean",
+        "arm": "B",
+        "status": "pass",
+        "blocking": false,
+        "observed": {
+          "state": "observed",
+          "v": 0.04166666666666667,
+          "evidence": "outcome"
+        },
+        "threshold": "no regression",
+        "n": 24,
+        "reason": "clean: not regressed at either bound, d_bar +4.2 pp (+4.2 / +4.2 pp at the missingness bounds), p 1, 5 of 8 tasks discordant"
+      },
+      {
+        "id": "false-completion-ceiling",
+        "metric": "false_completion",
+        "condition": "all",
+        "arm": "B",
+        "status": "fail",
+        "blocking": true,
+        "observed": {
+          "state": "observed",
+          "v": 0.3333333333333333
+        },
+        "threshold": "\u003c= 0.05",
+        "n": 24,
+        "reason": "mean 0.333333 over 24 observed runs breaks \u003c= 0.05",
+        "evidence": [
+          "r_7aw2imsnaf",
+          "r_crjpgt1s7e",
+          "r_t6bozh23yc",
+          "r_04t49mvuzz",
+          "r_r1nbuw32xk",
+          "r_bzdyonu36t",
+          "r_gnaf49hd8o",
+          "r_9g0tcojzmi"
+        ]
+      },
+      {
+        "id": "no-integrity-violations",
+        "metric": "integrity_violations",
+        "condition": "all",
+        "arm": "B",
+        "status": "pass",
+        "blocking": false,
+        "observed": {
+          "state": "observed",
+          "v": 0,
+          "evidence": "outcome"
+        },
+        "threshold": "= 0",
+        "n": 24,
+        "reason": "0 of 24 runs had a fired veto gate"
+      },
+      {
+        "id": "retry-amplification-ceiling",
+        "metric": "retry_amplification",
+        "condition": "clean",
+        "arm": "B",
+        "status": "pass",
+        "blocking": false,
+        "observed": {
+          "state": "observed",
+          "v": 1,
+          "evidence": "gateway"
+        },
+        "threshold": "\u003c= 3",
+        "n": 24,
+        "reason": "mean 1 over 24 observed runs"
+      },
+      {
+        "id": "cost-per-verified-success",
+        "metric": "cost_per_verified_success",
+        "condition": "clean",
+        "arm": "B",
+        "status": "pass",
+        "blocking": false,
+        "observed": {
+          "state": "observed",
+          "v": 0.033513037499999995,
+          "evidence": "gateway"
+        },
+        "threshold": "\u003c= 2",
+        "n": 24,
+        "reason": "$0.536209 over 16 verified successes in 24 runs"
+      }
+    ],
+    "evaluated_at": "2026-11-14T01:32:52.457168376Z"
+  }
+}

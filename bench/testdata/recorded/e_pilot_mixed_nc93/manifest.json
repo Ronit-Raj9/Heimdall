@@ -1,0 +1,458 @@
+{
+  "exp_id": "e_pilot_mixed_nc93",
+  "created_at": "2026-11-14T01:00:36.440069109Z",
+  "experiment": {
+    "id": "e_pilot_mixed_nc93",
+    "name": "pilot-mixed",
+    "suite": "coding-core@1.0.0",
+    "base": "agents/codex.yaml",
+    "arms": {
+      "A": {
+        "label": "codex gpt-5.4-mini",
+        "set": {
+          "model": "gpt-5.4-mini"
+        }
+      },
+      "B": {
+        "label": "custom-python gpt-5.4-mini",
+        "agent": "agents/custom-python.yaml",
+        "set": {
+          "env.BENCH_MODEL": "openai/{{model}}",
+          "gateway.provider": "openai",
+          "model": "gpt-5.4-mini"
+        }
+      }
+    },
+    "primary": {
+      "condition": "clean",
+      "metric": "verified_success"
+    },
+    "guards": [
+      {
+        "rule": "no_new_integrity_violation"
+      }
+    ],
+    "conditions": [
+      {
+        "id": "clean",
+        "tasks": [
+          "t02"
+        ],
+        "trials": 1
+      },
+      {
+        "id": "stale-notes",
+        "tasks": [
+          "t01"
+        ],
+        "trials": 1
+      },
+      {
+        "id": "model-outage",
+        "tasks": [
+          "t01"
+        ],
+        "trials": 1
+      },
+      {
+        "id": "test-crash",
+        "tasks": [
+          "t06"
+        ],
+        "trials": 1
+      },
+      {
+        "id": "empty-test-run",
+        "tasks": [
+          "t05"
+        ],
+        "trials": 1
+      }
+    ],
+    "budget": {
+      "total_usd": 1
+    },
+    "verdict": {
+      "policy": "paired_signflip",
+      "alpha": 0.05,
+      "assumed_sd": 0.3
+    },
+    "seed": 20261114,
+    "concurrency": 4,
+    "manifest_mode": "agent_exposure",
+    "policy": "policies/default.yaml"
+  },
+  "suite_id": "coding-core",
+  "suite_version": "1.0.0",
+  "suite_lock_hash": "520215ace7b304de232f16ed8833df3f25ca01cd72e310dd495d38a399e99d56",
+  "arms": {
+    "A": {
+      "label": "codex gpt-5.4-mini",
+      "config": {
+        "id": "codex",
+        "adapter": "command",
+        "image": "bench/agent-codex:1",
+        "build": {
+          "dockerfile": "agents/images/codex/Dockerfile",
+          "tag": "bench/agent-codex:1"
+        },
+        "argv": [
+          "codex",
+          "exec",
+          "--json",
+          "--skip-git-repo-check",
+          "--dangerously-bypass-approvals-and-sandbox",
+          "--ephemeral",
+          "--strict-config",
+          "--model",
+          "{{model}}",
+          "--",
+          "{{instruction}}"
+        ],
+        "env": {
+          "BIFROST_API_KEY": "{{run.key}}",
+          "CODEX_HOME": "/home/agent/.codex",
+          "OPENAI_API_KEY": ""
+        },
+        "files": {
+          "/home/agent/.codex/config.toml": "model = \"{{model}}\"\nmodel_provider = \"bifrost\"\nallow_login_shell = false\ncheck_for_update_on_startup = false\nweb_search = \"disabled\"\n\n[analytics]\nenabled = false\n\n[feedback]\nenabled = false\n\n[history]\npersistence = \"none\"\n\n[otel]\nexporter = \"none\"\nlog_user_prompt = false\n\n[features]\nmemories = false\n\n[shell_environment_policy]\nexclude = [\"BIFROST_API_KEY\"]\n\n[model_providers.bifrost]\nname = \"Bifrost\"\nbase_url = \"{{gateway.url}}/openai/v1\"\nwire_api = \"responses\"\nenv_key = \"BIFROST_API_KEY\"\nrequires_openai_auth = false\nsupports_websockets = false\n\n[model_providers.bifrost.http_headers]\nx-bf-session-id = \"{{run.session}}\"\nx-bf-session-affinity = \"off\"\n"
+        },
+        "model": "gpt-5.4-mini",
+        "notes": {
+          "project_file": "AGENTS.md",
+          "user_path": "/home/agent/.codex/AGENTS.md"
+        },
+        "parser": "codex",
+        "budgets": {
+          "wall_s": 900,
+          "cpus": 2,
+          "mem_gb": 4
+        },
+        "gateway": {
+          "provider": "openai",
+          "max_retries": 0
+        }
+      },
+      "config_hash": "dfd6f713e64a15496a8d3756bfc8c6acc77026980a7f8b0a7beb573d94d58b39",
+      "files": {
+        "clean": {
+          "/home/agent/.codex/config.toml": "ca39788de3a13b176789f1f2d2711896fa3b40c9b2e319549f485d6fdfab49c3",
+          "t02:/workspace/AGENTS.md": "7ab9ad54e251a8fe4879f66ad8f81e0cdaf499fc0a466abaf3c3016d499281dc"
+        },
+        "empty-test-run": {
+          "/home/agent/.codex/config.toml": "ca39788de3a13b176789f1f2d2711896fa3b40c9b2e319549f485d6fdfab49c3",
+          "t05:/workspace/AGENTS.md": "a441aab50e623905286db6129bc5261e27ac7f2a77685a9a3abd2fa57751ebc9"
+        },
+        "model-outage": {
+          "/home/agent/.codex/config.toml": "ca39788de3a13b176789f1f2d2711896fa3b40c9b2e319549f485d6fdfab49c3",
+          "t01:/workspace/AGENTS.md": "97d7a53fd87465daae3423d0158a445676b95a2c222384f06c0052eaab074728"
+        },
+        "stale-notes": {
+          "/home/agent/.codex/config.toml": "ca39788de3a13b176789f1f2d2711896fa3b40c9b2e319549f485d6fdfab49c3",
+          "t01:/workspace/AGENTS.md": "8fc5b08ed369ba10268770025149ccfb58ed5df9b3f908b9c16e66ed3aaa48b6"
+        },
+        "test-crash": {
+          "/home/agent/.codex/config.toml": "ca39788de3a13b176789f1f2d2711896fa3b40c9b2e319549f485d6fdfab49c3",
+          "t06:/workspace/AGENTS.md": "a441aab50e623905286db6129bc5261e27ac7f2a77685a9a3abd2fa57751ebc9"
+        }
+      }
+    },
+    "B": {
+      "label": "custom-python gpt-5.4-mini",
+      "config": {
+        "id": "custom-python",
+        "adapter": "command",
+        "image": "bench/agent-custom-python:1",
+        "build": {
+          "dockerfile": "agents/images/custom-python/Dockerfile",
+          "tag": "bench/agent-custom-python:1"
+        },
+        "argv": [
+          "bench-agent"
+        ],
+        "env": {
+          "BENCH_API_KEY": "{{run.key}}",
+          "BENCH_BASE_URL": "{{gateway.url}}/openai/v1",
+          "BENCH_INSTRUCTION_FILE": "{{instruction_file}}",
+          "BENCH_MAX_TURNS": "40",
+          "BENCH_MODEL": "openai/{{model}}",
+          "BENCH_SESSION_ID": "{{run.session}}",
+          "BENCH_SHELL_TIMEOUT_S": "120"
+        },
+        "model": "gpt-5.4-mini",
+        "notes": {
+          "project_file": "AGENTS.md"
+        },
+        "budgets": {
+          "wall_s": 900,
+          "turns": 40,
+          "cpus": 1,
+          "mem_gb": 2
+        },
+        "gateway": {
+          "provider": "openai",
+          "max_retries": 0
+        }
+      },
+      "config_hash": "8bbc91c3b83dd6037dc262bc4025b7af5d6b6631989968143039ca7c8719d788",
+      "files": {
+        "clean": {
+          "t02:/workspace/AGENTS.md": "7ab9ad54e251a8fe4879f66ad8f81e0cdaf499fc0a466abaf3c3016d499281dc"
+        },
+        "empty-test-run": {
+          "t05:/workspace/AGENTS.md": "a441aab50e623905286db6129bc5261e27ac7f2a77685a9a3abd2fa57751ebc9"
+        },
+        "model-outage": {
+          "t01:/workspace/AGENTS.md": "97d7a53fd87465daae3423d0158a445676b95a2c222384f06c0052eaab074728"
+        },
+        "stale-notes": {
+          "t01:/workspace/AGENTS.md": "8fc5b08ed369ba10268770025149ccfb58ed5df9b3f908b9c16e66ed3aaa48b6"
+        },
+        "test-crash": {
+          "t06:/workspace/AGENTS.md": "a441aab50e623905286db6129bc5261e27ac7f2a77685a9a3abd2fa57751ebc9"
+        }
+      }
+    }
+  },
+  "parts": {
+    "adapter/command": "1.0.0",
+    "adapter/scripted": "1.0.0",
+    "environment/docker_workspace": "1.0.0",
+    "evidence/agent_stream": "1.0.0",
+    "evidence/cost": "1.0.0",
+    "evidence/gateway": "1.0.0",
+    "evidence/proxy_ledger": "1.0.0",
+    "evidence/shim_log": "1.0.0",
+    "gate/egress": "1.0.0",
+    "gate/g10_destroyed_user_work": "1.0.0",
+    "gate/g11_protected_path": "1.0.0",
+    "gate/g12_injection_followed": "1.0.0",
+    "gate/g1_protected_paths": "1.0.0",
+    "gate/g2_test_infra": "1.0.0",
+    "gate/g4_regrade": "1.0.0",
+    "gate/g6_null_agents": "1.0.0",
+    "gate/g8_false_completion": "1.0.0",
+    "gate/model_fidelity": "1.0.0",
+    "gateway/bifrost": "1.0.0",
+    "grader/hidden_tests": "1.0.0",
+    "loader/local": "1.0.0",
+    "metric/claim_precision": "1.0.0",
+    "metric/cost_usd": "1.0.0",
+    "metric/false_completion": "1.0.0",
+    "metric/pattern_ignored_error": "1.0.0",
+    "metric/pattern_loop": "1.0.0",
+    "metric/pattern_unverified_finish": "1.0.0",
+    "metric/retry_amplification": "1.0.0",
+    "metric/safe_success": "1.0.0",
+    "metric/secret_exposed": "1.0.0",
+    "metric/secret_in_context": "1.0.0",
+    "metric/steps": "1.0.0",
+    "metric/tokens": "1.0.0",
+    "metric/tool_calls": "1.0.0",
+    "metric/verified_success": "1.0.0",
+    "metric/wall_time_s": "1.0.0",
+    "parser/claudecode": "1.0.0",
+    "parser/codex": "1.0.0",
+    "parser/opencode": "1.0.0",
+    "probe_layer/fixture": "1.0.0",
+    "probe_layer/gateway": "1.0.0",
+    "probe_layer/tool_shim": "1.0.0",
+    "reporter/json": "1.0.0",
+    "reporter/markdown": "1.0.0",
+    "store/fs": "1.0.0",
+    "verdict_policy/paired_signflip": "1.0.0"
+  },
+  "gateway": {
+    "name": "bifrost",
+    "version": "v2.5.1",
+    "config_sha256": "fb9e8e0766e7c2daa458289b2ea4d6e18d7d097b6a8942ee7207bef054cfc0a2",
+    "plugins": [
+      "compat",
+      "governance",
+      "logging",
+      "model-catalog-resolver",
+      "prompts",
+      "routing",
+      "telemetry"
+    ],
+    "settings": {
+      "allow_direct_keys": "false",
+      "anthropic.base_url": "http://faultproxy:9100",
+      "anthropic.key_slots": "4",
+      "anthropic.max_retries": "0",
+      "anthropic.mode": "proxied",
+      "anthropic.store_raw_request_response": "true",
+      "base_url": "http://faultproxy:9100",
+      "content_logging": "true",
+      "egress_probe": "blocked",
+      "enable_logging": "true",
+      "enforce_auth_on_inference": "true",
+      "eval_network": "bench-evalnet",
+      "key_slots": "4",
+      "max_retries": "0",
+      "mcp_disable_auto_tool_inject": "true",
+      "mode": "proxied",
+      "openai.base_url": "http://faultproxy:9100",
+      "openai.key_slots": "4",
+      "openai.max_retries": "0",
+      "openai.mode": "proxied",
+      "openai.store_raw_request_response": "true",
+      "store_raw_request_response": "true"
+    },
+    "checked_at": "2026-11-14T01:00:36.441500432Z"
+  },
+  "arm_order": {
+    "t01": [
+      "B",
+      "A"
+    ],
+    "t02": [
+      "A",
+      "B"
+    ],
+    "t05": [
+      "B",
+      "A"
+    ],
+    "t06": [
+      "A",
+      "B"
+    ]
+  },
+  "slots": [
+    {
+      "slot_id": "s_a53a3au7zw",
+      "pair_id": "p_zkokwkdi1j",
+      "exp_id": "e_pilot_mixed_nc93",
+      "suite": "coding-core",
+      "task": "t02",
+      "task_version": "1.0.0",
+      "arm": "A",
+      "condition": "clean",
+      "trial": 1,
+      "order_index": 0,
+      "counted": true
+    },
+    {
+      "slot_id": "s_ibfl3057en",
+      "pair_id": "p_zkokwkdi1j",
+      "exp_id": "e_pilot_mixed_nc93",
+      "suite": "coding-core",
+      "task": "t02",
+      "task_version": "1.0.0",
+      "arm": "B",
+      "condition": "clean",
+      "trial": 1,
+      "order_index": 1,
+      "counted": true
+    },
+    {
+      "slot_id": "s_117k5i2nvq",
+      "pair_id": "p_ptaib50tir",
+      "exp_id": "e_pilot_mixed_nc93",
+      "suite": "coding-core",
+      "task": "t01",
+      "task_version": "1.0.0",
+      "arm": "B",
+      "condition": "stale-notes",
+      "trial": 1,
+      "order_index": 2,
+      "counted": true
+    },
+    {
+      "slot_id": "s_kr88weuenc",
+      "pair_id": "p_ptaib50tir",
+      "exp_id": "e_pilot_mixed_nc93",
+      "suite": "coding-core",
+      "task": "t01",
+      "task_version": "1.0.0",
+      "arm": "A",
+      "condition": "stale-notes",
+      "trial": 1,
+      "order_index": 3,
+      "counted": true
+    },
+    {
+      "slot_id": "s_dkw97wjqod",
+      "pair_id": "p_1dnhfd5sv9",
+      "exp_id": "e_pilot_mixed_nc93",
+      "suite": "coding-core",
+      "task": "t01",
+      "task_version": "1.0.0",
+      "arm": "B",
+      "condition": "model-outage",
+      "trial": 1,
+      "order_index": 4,
+      "counted": true
+    },
+    {
+      "slot_id": "s_2sv12hahmm",
+      "pair_id": "p_1dnhfd5sv9",
+      "exp_id": "e_pilot_mixed_nc93",
+      "suite": "coding-core",
+      "task": "t01",
+      "task_version": "1.0.0",
+      "arm": "A",
+      "condition": "model-outage",
+      "trial": 1,
+      "order_index": 5,
+      "counted": true
+    },
+    {
+      "slot_id": "s_u599qoa2mc",
+      "pair_id": "p_lofxs2indz",
+      "exp_id": "e_pilot_mixed_nc93",
+      "suite": "coding-core",
+      "task": "t06",
+      "task_version": "1.0.0",
+      "arm": "A",
+      "condition": "test-crash",
+      "trial": 1,
+      "order_index": 6,
+      "counted": true
+    },
+    {
+      "slot_id": "s_qm0yu1l0og",
+      "pair_id": "p_lofxs2indz",
+      "exp_id": "e_pilot_mixed_nc93",
+      "suite": "coding-core",
+      "task": "t06",
+      "task_version": "1.0.0",
+      "arm": "B",
+      "condition": "test-crash",
+      "trial": 1,
+      "order_index": 7,
+      "counted": true
+    },
+    {
+      "slot_id": "s_rjki71qcsz",
+      "pair_id": "p_uwpe1pdp9o",
+      "exp_id": "e_pilot_mixed_nc93",
+      "suite": "coding-core",
+      "task": "t05",
+      "task_version": "1.0.0",
+      "arm": "B",
+      "condition": "empty-test-run",
+      "trial": 1,
+      "order_index": 8,
+      "counted": true
+    },
+    {
+      "slot_id": "s_5k6ydgfx4v",
+      "pair_id": "p_uwpe1pdp9o",
+      "exp_id": "e_pilot_mixed_nc93",
+      "suite": "coding-core",
+      "task": "t05",
+      "task_version": "1.0.0",
+      "arm": "A",
+      "condition": "empty-test-run",
+      "trial": 1,
+      "order_index": 9,
+      "counted": true
+    }
+  ],
+  "randomization_unit": "task",
+  "bench_version": "0.1.0",
+  "policy_hash": "e47dcf5ea03a71755dce421754ef82d7833c517aa1d2c79fa1be6d9479a27531",
+  "hash": "be32a712e20c78445992042df1aa72b7f26f2fa5f622060d0480799c5df6a160"
+}
