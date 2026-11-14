@@ -2,6 +2,8 @@
 
 > **Hackathon submission (PS2, agent benchmarking).** Heimdall decides whether a change to an AI agent (a new model, prompt, notes file, tool or gateway rule) made it better, worse, or whether we cannot tell yet. It runs agents on the same tasks, repeatedly, clean and under injected failures, with every model call going through Bifrost, and turns that record into a verdict (improved, regressed, inconclusive or evaluation invalid) with the evidence one click away. It lives in [`bench/`](bench/) (code name `bifrost-bench`). Start with [`bench/README.md`](bench/README.md); run `make bench-up`, `make bench-smoke` and `make bench-serve` from the repo root.
 >
+> A team can also benchmark its own agent on tasks cut from its own repositories, in any language and without Go code: [`bench/docs/bring-your-own.md`](bench/docs/bring-your-own.md).
+>
 > In Norse myth Heimdall guards Bifrost, the bridge to Asgard: nothing crosses without passing him. Heimdall is built inside a fork of [Bifrost](https://github.com/maximhq/bifrost) (Apache-2.0); everything below this section is upstream Bifrost's own README.
 
 ---

@@ -2,6 +2,8 @@ package evidence
 
 import (
 	"encoding/json"
+	"errors"
+	"io/fs"
 	"math"
 	"os"
 	"path/filepath"
@@ -75,10 +77,24 @@ func TestLoadPrices(t *testing.T) {
 		})
 	}
 	t.Run("missing file", func(t *testing.T) {
-		if _, err := LoadPrices(filepath.Join(t.TempDir(), "absent.json")); err == nil {
-			t.Errorf("want error")
+		_, err := LoadPrices(filepath.Join(t.TempDir(), "absent.json"))
+		if !errors.Is(err, fs.ErrNotExist) {
+			t.Errorf("err = %v, want one wrapping fs.ErrNotExist", err)
 		}
 	})
+}
+
+func TestParsePrices(t *testing.T) {
+	fromBytes, err := ParsePrices([]byte(priceFixture), "embedded default")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if fromBytes.Ref() != testPrices(t).Ref() {
+		t.Errorf("Ref() = %q, want the file's %q", fromBytes.Ref(), testPrices(t).Ref())
+	}
+	if _, err := ParsePrices([]byte(`{"models": {}}`), "embedded default"); err == nil || !strings.Contains(err.Error(), "price snapshot embedded default: missing id") {
+		t.Errorf("err = %v", err)
+	}
 }
 
 // TestShippedSnapshot keeps deploy/pricing-snapshot.json loadable, honest

@@ -68,7 +68,13 @@ func runServe(args []string) int {
 	if err != nil {
 		return fail("server: %v", err)
 	}
-	a.logger.Info("bench UI and API on http://%s (mode %s)", a.cfg.Server.Listen, a.cfg.Server.Mode)
+	if *offline {
+		// -offline is not a mode: the mode label (live, recorded, synthetic)
+		// still comes from bench.yaml, so say what offline changes.
+		a.logger.Info("bench UI and API on http://%s (mode %s, offline: no gateway, no launching)", a.cfg.Server.Listen, a.cfg.Server.Mode)
+	} else {
+		a.logger.Info("bench UI and API on http://%s (mode %s)", a.cfg.Server.Listen, a.cfg.Server.Mode)
+	}
 	if err := srv.ListenAndServe(ctx); err != nil && ctx.Err() == nil {
 		return fail("serve: %v", err)
 	}

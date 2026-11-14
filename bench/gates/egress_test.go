@@ -24,6 +24,9 @@ func TestEgress(t *testing.T) {
 	}{
 		{"isolated", rcWith(ok, "bench-eval"), false, ""},
 		{"egress open", rcWith(map[string]string{"egress_probe": "open", "eval_network": "bench-eval"}, "bench-eval"), true, `egress probe is "open"`},
+		{"probe not run says why", rcWith(map[string]string{"egress_probe": "not_run", "eval_network": "bench-eval",
+			"egress_probe_error": "egress probe not run: helper image acme/node:1 has no python3; set images.helper to the bench helper image"}, "bench-eval"),
+			true, `egress probe is "not_run", not "blocked": egress probe not run: helper image acme/node:1 has no python3`},
 		{"egress not recorded", rcWith(map[string]string{"eval_network": "bench-eval"}, "bench-eval"), true, "egress probe not recorded"},
 		{"wrong network", rcWith(ok, "bridge"), true, `run network "bridge" is not the eval network "bench-eval"`},
 		{"no run network", rcWith(ok, ""), true, "run has no network"},

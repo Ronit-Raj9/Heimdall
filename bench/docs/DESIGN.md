@@ -1059,6 +1059,9 @@ concurrency: 4
 | `GET /pairs/{pair_id}` | Matched runs, aligned, with first divergence |
 | `POST /audit` | Verdict for a pasted per-task table |
 | `POST /regrade` | Regrade stored diffs under a new suite version (stretch) |
+| `GET /suites` | Every suite of the project: grader, verifier format, base image, lock state and drift, probes, and per task its provenance and admission record (UI page `/suites`) |
+| `GET /suites/{id}/tasks/{task}` | One task: provenance, admission checks cut to their counts, instruction, visible repo files. Never a hidden test, the reference solution or a control (UI page `/suites/{id}/tasks/{task}`) |
+| `GET /agents` | Every `agents/*.yaml`: adapter, image, per-suite build, parser and evidence level, budgets, gateway policy. Never an env value or a delivered file's content (UI page `/agents`) |
 
 Every response carries `mode: live | recorded | synthetic`.
 
@@ -1073,9 +1076,23 @@ bifrost-bench check  experiments/<file>.yaml --fail-on regressed,invalid
 bifrost-bench audit  table.csv
 bifrost-bench demo                      # replays the recorded run, then runs the synthetic smoke test
 bifrost-bench serve | proxy
+bifrost-bench init <dir> [-force]
+bifrost-bench suite init <id> -template python-pytest|node-test|go-test|generic-reward [-image <tag>]
+bifrost-bench task init -suite <suite> -id <task> -repo <git repo> -base <commit> -reference <commit> [-tests <globs>] [-license <id>] [-capabilities a,b]
+bifrost-bench task validate | admit <suite>/<task>
+bifrost-bench agent init <id> -template command|python|http-service [-tag <image:tag>]
+bifrost-bench agent build <agents/id.yaml> [-suite <suite>]
+bifrost-bench agent check <agents/id.yaml> -suite <suite> [-task <task>] [-no-build] [-json] [-runs checks]
+bifrost-bench leaderboard | regate | release
 ```
 
 `check` exits 0 when the verdict is not listed in `--fail-on`; otherwise 1 regressed, 2 inconclusive, 3 invalid. 4 is always an infrastructure error. With `-policy <file>`, 5 means the release policy decided block; it is checked before the verdict codes. It writes `report.md` and `report.json`.
+
+`agent check` exits 0 when no row fails, 1 when a row fails and 4 when the check could not run. `task validate` exits 1 on any error-level problem.
+
+### 16.9 Bring your own agent and tasks
+
+A company keeps a project folder of its own (`init`), describes its agent in one YAML file and cuts tasks from its own commits, in any language, with no Go code. The contract (project folder, `verifier_command` grader and its three result formats, `task init`, admission checks, `build.base_arg`, `agent check`) is `docs/bring-your-own-design.md`; the user guide is `docs/bring-your-own.md`, and `examples/acme-node/` is a complete project.
 
 ---
 

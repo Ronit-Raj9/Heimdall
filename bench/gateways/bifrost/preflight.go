@@ -17,6 +17,7 @@ import (
 // Manifest setting keys. The egress gate reads egress_probe and eval_network.
 const (
 	SettingEgressProbe  = "egress_probe"
+	SettingEgressError  = "egress_probe_error" // why the probe did not run; set only then
 	SettingEvalNetwork  = "eval_network"
 	SettingMaxRetries   = "max_retries"
 	SettingStoreRaw     = "store_raw_request_response"
@@ -31,13 +32,15 @@ const (
 
 	egressBlocked = "blocked"
 	egressOpen    = "open"
+	egressNotRun  = "not_run"
 	probeTimeout  = 60 * time.Second
 )
 
 // egressScript tries DNS, a public TCP address and the cloud metadata
 // address, 3 seconds each, and prints one "<check> open|blocked" line per
 // try. It runs inside HelperImage on the evaluation network.
-const egressScript = `if getent hosts example.com >/dev/null 2>&1; then echo "dns open"; else echo "dns blocked"; fi
+const egressScript = `if ! command -v python3 >/dev/null 2>&1; then echo "missing python3"; exit 0; fi
+if getent hosts example.com >/dev/null 2>&1; then echo "dns open"; else echo "dns blocked"; fi
 python3 -c '
 import socket
 for host, port in (("1.1.1.1", 443), ("169.254.169.254", 80)):
@@ -219,13 +222,21 @@ func (g *Gateway) checkProvider(ctx context.Context, p ProviderSetup, set func(s
 
 // probeEgress runs egressScript in a short-lived HelperImage container on
 // the evaluation network. The result is "blocked" only when every check
-// failed; a probe that could not run, or printed too little, is "open" with
-// a problem, because isolation that was not shown is not assumed.
+// failed and "open" when one connected. A probe that could not run, or
+// printed too little, is "not_run" with a problem and the reason in
+// SettingEgressError, because isolation that was not shown is not assumed
+// and a probe that never ran proves nothing either way. A helper image
+// without python3 is named as such, since that is the usual cause.
 func (g *Gateway) probeEgress(ctx context.Context, m *schemas.GatewayManifest, problem func(string, ...any)) {
 	m.Settings[SettingEvalNetwork] = g.cfg.EvalNetwork
-	m.Settings[SettingEgressProbe] = egressOpen
+	m.Settings[SettingEgressProbe] = egressNotRun
+	notRun := func(format string, args ...any) {
+		msg := fmt.Sprintf(format, args...)
+		m.Settings[SettingEgressError] = msg
+		problem("%s", msg)
+	}
 	if g.cfg.EvalNetwork == "" || g.cfg.HelperImage == "" {
-		problem("egress probe not run: eval network and helper image are required")
+		notRun("egress probe not run: eval network and helper image are required")
 		return
 	}
 	pctx, cancel := context.WithTimeout(ctx, probeTimeout)
@@ -236,7 +247,11 @@ func (g *Gateway) probeEgress(ctx context.Context, m *schemas.GatewayManifest, p
 	args = append(args, g.cfg.HelperImage, "-c", egressScript)
 	res, err := g.cfg.Docker.Run(pctx, args...)
 	if err != nil {
-		problem("egress probe: %v", err)
+		notRun("egress probe not run: %v", err)
+		return
+	}
+	if missing := utils.MissingTools(string(res.Stdout)); len(missing) > 0 {
+		notRun("egress probe not run: %s", utils.HelperLacks(g.cfg.HelperImage, missing...))
 		return
 	}
 	results := parseEgress(string(res.Stdout))
@@ -251,11 +266,12 @@ func (g *Gateway) probeEgress(ctx context.Context, m *schemas.GatewayManifest, p
 		}
 	}
 	switch {
-	case len(missing) > 0:
-		problem("egress probe incomplete (exit %d), no result for %s: %s", res.ExitCode,
-			strings.Join(missing, ", "), snippet(res.Stderr))
 	case len(open) > 0:
+		m.Settings[SettingEgressProbe] = egressOpen
 		problem("egress from %s is open: %s", g.cfg.EvalNetwork, strings.Join(open, ", "))
+	case len(missing) > 0:
+		notRun("egress probe incomplete (exit %d), no result for %s: %s", res.ExitCode,
+			strings.Join(missing, ", "), snippet(res.Stderr))
 	default:
 		m.Settings[SettingEgressProbe] = egressBlocked
 	}

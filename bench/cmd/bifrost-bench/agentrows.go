@@ -177,7 +177,7 @@ func modelCallRow(in *checkInput, net netSummary) checkRow {
 		return row.set(checkWarn, fmt.Sprintf("%d model calls answered, %d failed: %s", ok, failed, firstErr),
 			"every call, including title, summary and sub-agent calls, must use the run's one model")
 	default:
-		return row.set(checkPass, fmt.Sprintf("%d model calls through Bifrost with the run key, answered by the scripted model", ok), "")
+		return row.set(checkPass, plural(ok, "model call")+" through Bifrost with the run key, answered by the scripted model", "")
 	}
 }
 
@@ -188,6 +188,9 @@ func sessionRow(in *checkInput, net netSummary) checkRow {
 	row := newRow(rowSession)
 	fix := "send the header x-bf-session-id: {{run.session}} (and x-bf-session-affinity: off) on every model call; rows still join by the run key without it"
 	if in.netErr != "" {
+		if hf, ok := helperFix(in.netErr); ok {
+			return row.set(checkWarn, "not observed on the wire ("+in.netErr+")", hf)
+		}
 		if configUses(in.agent, sessionVar) {
 			return row.set(checkWarn, "not observed on the wire ("+in.netErr+"); the config passes "+sessionVar, "make sure the agent sends it as x-bf-session-id")
 		}
@@ -254,7 +257,7 @@ func diffRow(in *checkInput) checkRow {
 			rejected = append(rejected, r.Path+" ("+r.Reason+")")
 		}
 	}
-	detail := fmt.Sprintf("exported, %d files changed", len(d.Files))
+	detail := "exported, " + plural(len(d.Files), "file") + " changed"
 	if len(d.Files) == 0 {
 		detail += " (expected: the scripted model asks for no edit)"
 	}
@@ -271,17 +274,35 @@ func egressRow(in *checkInput, net netSummary) checkRow {
 	row := newRow(rowEgress)
 	for _, g := range in.gates {
 		if g.Gate == "egress" && g.Fired {
-			return row.set(checkFail, "isolation not proven: "+g.Detail, "run bifrost-bench doctor; the agent must attach only to the internal evaluation network")
+			fix := "run bifrost-bench doctor; the agent must attach only to the internal evaluation network"
+			if hf, ok := helperFix(g.Detail); ok {
+				fix = hf
+			}
+			return row.set(checkFail, "isolation not proven: "+g.Detail, fix)
 		}
 	}
 	if in.netErr != "" {
-		return row.set(checkWarn, "attempts not observed: "+in.netErr, "the helper image needs python3 and sleep for the observer")
+		fix := "the helper image needs python3 and sleep for the observer"
+		if hf, ok := helperFix(in.netErr); ok {
+			fix = hf
+		}
+		return row.set(checkWarn, "attempts not observed: "+in.netErr, fix)
 	}
 	if len(net.attempts) > 0 {
 		return row.set(checkFail, fmt.Sprintf("tried to reach %s other than the gateway: %s", plural(len(net.attempts), "host"), listed(net.attempts)),
 			"switch off telemetry, update checks and downloads at start, bake dependencies into the image, and send model calls only to {{gateway.url}}")
 	}
 	return row.set(checkPass, fmt.Sprintf("only the gateway %s was contacted", in.gatewayHost), "")
+}
+
+// helperFix is the fix hint for a detail that blames the helper image
+// (utils.HelperLacks): the cause is the project's images.helper, not the
+// agent, so the agent-side hints would send its author the wrong way.
+func helperFix(detail string) (string, bool) {
+	if !strings.Contains(detail, "set images.helper") {
+		return "", false
+	}
+	return "set images.helper in deploy/bench.yaml to the bench helper image (bench/coding-core-base:1, built from deploy/helper/Dockerfile), then run bifrost-bench doctor", true
 }
 
 // evidenceRow: which evidence level the agent's runs carry.
@@ -298,7 +319,7 @@ func evidenceRow(in *checkInput) checkRow {
 			return row.set(checkWarn, fmt.Sprintf("parser %s read no events from stdout; runs fall back to gateway level", in.agent.Parser),
 				"check that the parser matches the harness version and the harness prints its stream to stdout")
 		}
-		return row.set(checkPass, fmt.Sprintf("native: parser %s read %d events, plus gateway rows", in.agent.Parser, native), "")
+		return row.set(checkPass, fmt.Sprintf("native: parser %s read %s, plus gateway rows", in.agent.Parser, plural(native, "event")), "")
 	}
 	if in.ev.Requests != nil && !in.ev.Requests.Complete && in.ev.Requests.Reason != "" {
 		return row.set(checkWarn, "gateway only, and the gateway rows are incomplete: "+in.ev.Requests.Reason,

@@ -12,6 +12,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"regexp"
 	"strings"
 	"sync"
 	"time"
@@ -81,6 +82,21 @@ func ReadNetWatch(path string) ([]NetWatchRecord, error) {
 	return out, nil
 }
 
+// missingExecRe matches the docker error for an entrypoint the image does
+// not have.
+var missingExecRe = regexp.MustCompile(`exec: "([^"]+)": executable file not found`)
+
+// missingExecutable returns the program a docker error says is not in the
+// image ("exec: \"python3\": executable file not found in $PATH"), or "".
+// The observer runs python3 and its holder runs sleep from the helper image,
+// so a toolchain image set as the helper fails here first.
+func missingExecutable(msg string) string {
+	if m := missingExecRe.FindStringSubmatch(msg); m != nil {
+		return m[1]
+	}
+	return ""
+}
+
 // netWatch is one running observer: a holder container that owns the
 // network namespace on the evaluation network, and the observer process that
 // shares it. The agent joins the holder's namespace, so the observer sees
@@ -111,6 +127,9 @@ func (e *dockerWorkspace) startNetWatch(ctx context.Context, rc *schemas.RunCont
 		"--log-driver", "none", "--entrypoint", "sleep", image, "infinity")
 	if _, err := e.cfg.Docker.MustRun(ctx, hold...); err != nil {
 		w.remove(ctx)
+		if tool := missingExecutable(err.Error()); tool != "" {
+			return nil, fmt.Errorf("start network holder: %s", utils.HelperLacks(image, tool))
+		}
 		return nil, fmt.Errorf("start network holder: %w", err)
 	}
 	f, err := os.OpenFile(filepath.Join(rc.Dir, NetWatchFile), os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0o644)
@@ -140,7 +159,11 @@ func (e *dockerWorkspace) startNetWatch(ctx context.Context, rc *schemas.RunCont
 	case <-ready:
 		return w, nil
 	case <-w.done:
-		err = fmt.Errorf("observer exited before it was ready: %s", strings.TrimSpace(w.stderr.String()))
+		msg := strings.TrimSpace(w.stderr.String())
+		if tool := missingExecutable(msg); tool != "" {
+			msg = utils.HelperLacks(image, tool)
+		}
+		err = fmt.Errorf("observer exited before it was ready: %s", msg)
 	case <-time.After(netWatchReady):
 		err = fmt.Errorf("observer not ready after %s", netWatchReady)
 	case <-ctx.Done():

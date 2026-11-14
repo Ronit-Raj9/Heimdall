@@ -6,11 +6,15 @@ import (
 	"flag"
 	"fmt"
 	"os"
+	"path/filepath"
+	"sort"
 	"strings"
 	"time"
 
+	"github.com/maximhq/bifrost/bench/engine"
 	"github.com/maximhq/bifrost/bench/faultproxy"
 	"github.com/maximhq/bifrost/bench/schemas"
+	"github.com/maximhq/bifrost/bench/utils"
 )
 
 func init() {
@@ -56,13 +60,21 @@ func (a *app) doctor(ctx context.Context) []schemas.DoctorCheck {
 	} else {
 		add("docker", schemas.DoctorPass, "server "+strings.TrimSpace(string(res.Stdout)))
 	}
-	for _, img := range []string{a.cfg.Images.Helper, "bench/agent-claude-code:1"} {
-		if res, err := a.docker.Run(ctx, "image", "inspect", "--format", "{{.Id}}", img); err != nil || res.ExitCode != 0 {
-			add("image "+img, schemas.DoctorWarn, "missing; run make -C bench images")
+	suites, suiteRows := a.doctorSuites(ctx)
+	agents, agentRows := loadDoctorAgents(a.cfg.Root)
+	needs, needRows := imageNeeds(a.cfg.Root, a.cfg.Images.Helper, suites, agents)
+	for _, n := range needs {
+		if res, err := a.docker.Run(ctx, "image", "inspect", "--format", "{{.Id}}", n.tag); err != nil || res.ExitCode != 0 {
+			add("image "+n.tag, schemas.DoctorWarn, "missing; "+n.hint)
 		} else {
-			add("image "+img, schemas.DoctorPass, short(strings.TrimSpace(string(res.Stdout))))
+			add("image "+n.tag, schemas.DoctorPass, short(strings.TrimSpace(string(res.Stdout))))
+			if n.tag == a.cfg.Images.Helper {
+				out = append(out, a.helperToolsCheck(ctx))
+			}
 		}
 	}
+	out = append(out, needRows...)
+	out = append(out, agentRows...)
 	if res, err := a.docker.Run(ctx, "network", "inspect", "--format", "{{.Internal}}", a.cfg.Networks.Eval); err != nil || res.ExitCode != 0 {
 		add("eval network", schemas.DoctorWarn, a.cfg.Networks.Eval+" does not exist; start the stack")
 	} else if strings.TrimSpace(string(res.Stdout)) != "true" {
@@ -70,26 +82,7 @@ func (a *app) doctor(ctx context.Context) []schemas.DoctorCheck {
 	} else {
 		add("eval network", schemas.DoctorPass, a.cfg.Networks.Eval+" is internal")
 	}
-
-	s, err := loadSuite(ctx, a.cfg.Path(a.cfg.BenchmarksRoot), "coding-core")
-	switch {
-	case err != nil:
-		add("suite coding-core", schemas.DoctorFail, err.Error())
-	case s.Lock == nil:
-		add("suite coding-core", schemas.DoctorFail, "no suite.lock; run suite admit")
-	default:
-		admitted := 0
-		for _, t := range s.Lock.Tasks {
-			if t.Status == schemas.TaskAdmitted {
-				admitted++
-			}
-		}
-		st := schemas.DoctorPass
-		if admitted < len(s.Tasks) {
-			st = schemas.DoctorWarn
-		}
-		add("suite coding-core", st, fmt.Sprintf("%d of %d tasks admitted", admitted, len(s.Tasks)))
-	}
+	out = append(out, suiteRows...)
 
 	if a.reg.Gateway == nil {
 		add("gateway", schemas.DoctorSkip, "offline")
@@ -103,6 +96,170 @@ func (a *app) doctor(ctx context.Context) []schemas.DoctorCheck {
 		add("gateway", schemas.DoctorPass, fmt.Sprintf("%s %s, egress %s", gm.Name, gm.Version, gm.Settings["egress_probe"]))
 	}
 	return append(out, faultProxyChecks(ctx, a.cfg.FaultProxy.ControlURL, os.Getenv("BENCH_FAULTPROXY_TOKEN"))...)
+}
+
+// doctorSuites loads every suite of the project (benchmarks/*/suite.yaml, by
+// folder name) and returns the loaded ones with one row each: how many tasks
+// are admitted, or why the suite cannot be used. A project with no suite
+// gets one warning row.
+func (a *app) doctorSuites(ctx context.Context) ([]*schemas.Suite, []schemas.DoctorCheck) {
+	root := a.cfg.Path(a.cfg.BenchmarksRoot)
+	files, err := filepath.Glob(filepath.Join(root, "*", "suite.yaml"))
+	if err != nil {
+		return nil, []schemas.DoctorCheck{{ID: "suites", Status: schemas.DoctorFail, Detail: err.Error()}}
+	}
+	if len(files) == 0 {
+		return nil, []schemas.DoctorCheck{{ID: "suites", Status: schemas.DoctorWarn,
+			Detail: "no suite in " + root + "; create one with bifrost-bench suite init <id> -template <name>"}}
+	}
+	sort.Strings(files)
+	var suites []*schemas.Suite
+	var rows []schemas.DoctorCheck
+	for _, f := range files {
+		id := filepath.Base(filepath.Dir(f))
+		s, err := loadSuite(ctx, root, id)
+		if err != nil {
+			rows = append(rows, schemas.DoctorCheck{ID: "suite " + id, Status: schemas.DoctorFail, Detail: err.Error()})
+			continue
+		}
+		suites = append(suites, s)
+		rows = append(rows, suiteRow(s))
+	}
+	return suites, rows
+}
+
+// suiteRow says how many of a suite's tasks the lock admits.
+func suiteRow(s *schemas.Suite) schemas.DoctorCheck {
+	row := schemas.DoctorCheck{ID: "suite " + s.ID}
+	if s.Lock == nil {
+		row.Status, row.Detail = schemas.DoctorFail, "no suite.lock; run suite admit "+s.ID
+		return row
+	}
+	admitted := 0
+	for _, t := range s.Lock.Tasks {
+		if t.Status == schemas.TaskAdmitted {
+			admitted++
+		}
+	}
+	row.Status = schemas.DoctorPass
+	if admitted < len(s.Tasks) {
+		row.Status = schemas.DoctorWarn
+	}
+	row.Detail = fmt.Sprintf("%d of %d tasks admitted", admitted, len(s.Tasks))
+	return row
+}
+
+// doctorAgent is one agents/*.yaml file, strictly decoded.
+type doctorAgent struct {
+	file string // path relative to the project root, agents/<id>.yaml
+	cfg  *schemas.AgentConfig
+}
+
+// loadDoctorAgents reads every agents/*.yaml of the project the way the
+// planner does. A file that does not decode is a warning row: doctor still
+// checks the others.
+func loadDoctorAgents(root string) ([]doctorAgent, []schemas.DoctorCheck) {
+	files, err := filepath.Glob(filepath.Join(root, "agents", "*.yaml"))
+	if err != nil {
+		return nil, []schemas.DoctorCheck{{ID: "agents", Status: schemas.DoctorFail, Detail: err.Error()}}
+	}
+	sort.Strings(files)
+	var agents []doctorAgent
+	var rows []schemas.DoctorCheck
+	for _, f := range files {
+		rel := filepath.ToSlash(filepath.Join("agents", filepath.Base(f)))
+		cfg, err := loadAgentConfig(f)
+		if err != nil {
+			rows = append(rows, schemas.DoctorCheck{ID: "agent " + rel, Status: schemas.DoctorWarn, Detail: err.Error()})
+			continue
+		}
+		agents = append(agents, doctorAgent{file: rel, cfg: cfg})
+	}
+	return agents, rows
+}
+
+// imageNeed is one image the project needs, with the command that makes it.
+type imageNeed struct {
+	tag  string
+	hint string // how to get the image, shown when it is missing
+}
+
+// imageNeeds lists, once each and in this order, the images the project
+// uses: the helper (images.helper), each suite's base image, and each
+// agent's image, resolved per suite with engine.ResolveAgentImage when the
+// agent sets build.base_arg. An agent whose per-suite image cannot be
+// resolved is a warning row. It is pure.
+func imageNeeds(root, helper string, suites []*schemas.Suite, agents []doctorAgent) ([]imageNeed, []schemas.DoctorCheck) {
+	var needs []imageNeed
+	var rows []schemas.DoctorCheck
+	seen := map[string]bool{}
+	need := func(tag, hint string) {
+		if tag != "" && !seen[tag] {
+			seen[tag] = true
+			needs = append(needs, imageNeed{tag: tag, hint: hint})
+		}
+	}
+	helperHint := "run make -C bench images"
+	if _, err := os.Stat(filepath.Join(root, "deploy", "helper", "Dockerfile")); err == nil {
+		helperHint = "docker build -t " + helper + " deploy/helper"
+	}
+	need(helper, helperHint)
+	for _, s := range suites {
+		hint := "build or pull it; suite " + s.ID + " names it as base_image.tag"
+		if s.BaseImage.Dockerfile != "" {
+			hint = "bifrost-bench suite admit " + s.ID + " builds it from its base_image.dockerfile"
+		}
+		need(s.BaseImage.Tag, hint)
+	}
+	for _, ag := range agents {
+		if ag.cfg.Build == nil || ag.cfg.Build.BaseArg == "" {
+			hint := "build or pull it; " + ag.file + " names it"
+			if ag.cfg.Build != nil && ag.cfg.Build.Dockerfile != "" {
+				hint = "bifrost-bench agent build " + ag.file
+			}
+			need(ag.cfg.Image, hint)
+			continue
+		}
+		for _, s := range suites {
+			img, err := engine.ResolveAgentImage(ag.cfg, s, root)
+			if err != nil {
+				rows = append(rows, schemas.DoctorCheck{ID: "agent " + ag.file, Status: schemas.DoctorWarn, Detail: err.Error()})
+				continue
+			}
+			need(img.Tag, "bifrost-bench agent build "+ag.file+" -suite "+s.ID)
+		}
+	}
+	return needs, rows
+}
+
+// helperToolsCheck runs utils.HelperToolsScript in the helper image, with no
+// network, and fails when a tool the bench runs there is missing. A
+// toolchain image set as the helper (a node or golang image) lacks python3,
+// which otherwise shows up as an egress probe or a network observer that
+// "did not run" with no word about the helper.
+func (a *app) helperToolsCheck(ctx context.Context) schemas.DoctorCheck {
+	img := a.cfg.Images.Helper
+	row := schemas.DoctorCheck{ID: "helper tools"}
+	args := append([]string{"run", "--rm", "--pull", "never", "--network", "none", "--cap-drop", "ALL",
+		"--security-opt", "no-new-privileges", "--entrypoint", "sh"}, utils.LabelArgs("", "")...)
+	res, err := a.docker.Run(ctx, append(args, img, "-c", utils.HelperToolsScript)...)
+	switch {
+	case err != nil:
+		row.Status, row.Detail = schemas.DoctorFail, fmt.Sprintf("could not run %s: %v", img, err)
+	case res.ExitCode != 0:
+		row.Status, row.Detail = schemas.DoctorFail, fmt.Sprintf("could not run sh in %s (exit %d): %s", img, res.ExitCode, strings.TrimSpace(string(res.Stderr)))
+	default:
+		row.Status, row.Detail = helperToolsResult(img, utils.MissingTools(string(res.Stdout)))
+	}
+	return row
+}
+
+// helperToolsResult turns the missing tools into a status and detail.
+func helperToolsResult(img string, missing []string) (schemas.DoctorStatus, string) {
+	if len(missing) > 0 {
+		return schemas.DoctorFail, utils.HelperLacks(img, missing...)
+	}
+	return schemas.DoctorPass, strings.Join(utils.HelperTools, ", ") + " present"
 }
 
 // faultProxyChecks checks the fault proxy's control API and then, with the

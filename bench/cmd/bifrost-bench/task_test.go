@@ -115,3 +115,21 @@ func TestRunTaskInitAndValidate(t *testing.T) {
 		}
 	}
 }
+
+func TestValidateSummary(t *testing.T) {
+	tests := []struct {
+		problems, errs int
+		want           string
+	}{
+		{0, 0, "no problems"},
+		{4, 1, "1 error, 3 warnings"},
+		{3, 0, "0 errors, 3 warnings"},
+		{2, 2, "2 errors, 0 warnings"},
+		{2, 1, "1 error, 1 warning"},
+	}
+	for _, tt := range tests {
+		if got := validateSummary(tt.problems, tt.errs); got != tt.want {
+			t.Errorf("validateSummary(%d, %d) = %q, want %q", tt.problems, tt.errs, got, tt.want)
+		}
+	}
+}

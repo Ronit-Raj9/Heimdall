@@ -9,6 +9,7 @@ import (
 	"io/fs"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"github.com/maximhq/bifrost/bench/handlers"
 	"github.com/maximhq/bifrost/bench/leaderboard"
@@ -72,6 +73,17 @@ func runLeaderboard(args []string) int {
 	if err != nil {
 		return fail("leaderboard: %v", err)
 	}
+	var synth *schemas.Leaderboard
+	if len(lb.Entries) == 0 && q.Synthetic != leaderboard.SyntheticOnly {
+		sq := q
+		sq.Synthetic = leaderboard.SyntheticOnly
+		if synth, err = leaderboard.Build(ctx, src, sq); err != nil {
+			return fail("leaderboard: %v", err)
+		}
+	}
+	for _, h := range leaderboardHints(*suiteFlag, lb, synth) {
+		fmt.Fprintln(os.Stderr, h)
+	}
 	var body []byte
 	if *format == "json" {
 		if body, err = json.MarshalIndent(lb, "", "  "); err != nil {
@@ -91,6 +103,24 @@ func runLeaderboard(args []string) int {
 		return fail("write leaderboard: %v", err)
 	}
 	return exitOK
+}
+
+// leaderboardHints are the notes printed on stderr beside a board: which
+// suites have runs when the board picked one by itself, and, when a live
+// board is empty but scripted runs exist (a new project has only oracle,
+// noop or smoke runs), that -synthetic only shows them. synth is the
+// synthetic board for the same query, or nil. It is pure.
+func leaderboardHints(suiteFlag string, lb, synth *schemas.Leaderboard) []string {
+	var hints []string
+	if suiteFlag == "" && len(lb.Suites) > 1 {
+		hints = append(hints, fmt.Sprintf("suites with runs: %s; this board is %s, pick another with -suite <id@version>",
+			strings.Join(lb.Suites, ", "), lb.Suite))
+	}
+	if synth != nil && len(lb.Entries) == 0 && len(synth.Suites) > 0 {
+		hints = append(hints, fmt.Sprintf("no live runs to rank; scripted runs (control agents or the scripted model) exist for %s: add -synthetic only to see them",
+			strings.Join(synth.Suites, ", ")))
+	}
+	return hints
 }
 
 // LatestDecision returns the verdict decision of the experiment's newest

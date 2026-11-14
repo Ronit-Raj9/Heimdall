@@ -262,3 +262,29 @@ func makeWritable(t *testing.T, root string) {
 		t.Logf("make writable %s: %v", root, err)
 	}
 }
+
+func TestLeaderboardHints(t *testing.T) {
+	empty := &schemas.Leaderboard{}
+	two := &schemas.Leaderboard{Suite: "pyapp@0.1.0", Suites: []string{"pyapp@0.1.0", "webapp@0.1.0"},
+		Entries: []schemas.LeaderboardEntry{{Rank: 1}}}
+	synth := &schemas.Leaderboard{Suites: []string{"pyapp@0.1.0", "webapp@0.1.0"}}
+	tests := []struct {
+		name      string
+		suiteFlag string
+		lb, synth *schemas.Leaderboard
+		want      []string
+	}{
+		{"nothing to say", "", &schemas.Leaderboard{Suite: "a@1", Suites: []string{"a@1"}, Entries: []schemas.LeaderboardEntry{{Rank: 1}}}, nil, nil},
+		{"several suites", "", two, nil, []string{"suites with runs: pyapp@0.1.0, webapp@0.1.0; this board is pyapp@0.1.0, pick another with -suite <id@version>"}},
+		{"suite named", "webapp@0.1.0", two, nil, nil},
+		{"only scripted runs", "", empty, synth, []string{"no live runs to rank; scripted runs (control agents or the scripted model) exist for pyapp@0.1.0, webapp@0.1.0: add -synthetic only to see them"}},
+		{"no runs at all", "", empty, &schemas.Leaderboard{}, nil},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := leaderboardHints(tt.suiteFlag, tt.lb, tt.synth); !reflect.DeepEqual(got, tt.want) {
+				t.Fatalf("got  %q\nwant %q", got, tt.want)
+			}
+		})
+	}
+}

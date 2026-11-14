@@ -9,8 +9,13 @@
 # python3 in the image.
 ARG BASE_IMAGE=bench/coding-core-base:1
 FROM ${BASE_IMAGE}
+ARG BASE_IMAGE
 
 USER root
+# The launcher and server.py run on python3. Fail with a plain message
+# instead of exit code 127 when the suite's base image has none (a node or
+# golang toolchain).
+RUN command -v python3 >/dev/null 2>&1 || { echo "this agent needs python3 and the suite base image ${BASE_IMAGE} has none: build it for a suite whose base image has python3, or install python3 in this Dockerfile" >&2; exit 1; }
 COPY server.py /opt/agent/server.py
 RUN python3 -m py_compile /opt/agent/server.py
 

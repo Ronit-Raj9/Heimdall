@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"io/fs"
 	"os"
 	"path/filepath"
 	"strings"
@@ -20,6 +21,7 @@ import (
 	"github.com/maximhq/bifrost/bench/policy"
 	"github.com/maximhq/bifrost/bench/probes"
 	"github.com/maximhq/bifrost/bench/reporters"
+	"github.com/maximhq/bifrost/bench/scaffold"
 	"github.com/maximhq/bifrost/bench/schemas"
 	"github.com/maximhq/bifrost/bench/store"
 	"github.com/maximhq/bifrost/bench/suite"
@@ -74,7 +76,7 @@ func newApp(ctx context.Context, configPath string, opts appOptions) (*app, erro
 		}
 	}
 
-	prices, err := evidence.LoadPrices(cfg.Path(cfg.Pricing))
+	prices, err := loadPrices(cfg.Path(cfg.Pricing), logger)
 	if err != nil {
 		return nil, fmt.Errorf("load prices: %w", err)
 	}
@@ -106,6 +108,34 @@ func newApp(ctx context.Context, configPath string, opts appOptions) (*app, erro
 		a.reg.Fault = nil // a typed nil would look non-nil to the engine
 	}
 	return a, nil
+}
+
+// pricingDefault is the project path of the embedded price snapshot.
+const pricingDefault = "deploy/pricing-snapshot.json"
+
+// loadPrices reads the price snapshot bench.yaml names. When the file does
+// not exist (a project folder copied without it, or a config that names a
+// path that was never written) it falls back to the snapshot built into the
+// binary, the one `init` writes, with a warning, instead of refusing every
+// command. A file that exists but does not parse is still an error: a
+// broken snapshot must never be replaced silently. Cost rows record the
+// snapshot's id and sha256 either way.
+func loadPrices(path string, logger schemas.Logger) (*evidence.PriceTable, error) {
+	prices, err := evidence.LoadPrices(path)
+	if err == nil || !errors.Is(err, fs.ErrNotExist) {
+		return prices, err
+	}
+	raw, derr := scaffold.ProjectDefault(pricingDefault)
+	if derr != nil {
+		return nil, fmt.Errorf("%w (and no embedded default: %v)", err, derr)
+	}
+	prices, derr = evidence.ParsePrices(raw, "embedded default "+pricingDefault)
+	if derr != nil {
+		return nil, fmt.Errorf("%w (and the embedded default does not load: %v)", err, derr)
+	}
+	logger.Warn("price snapshot not found; using the embedded default (restore the file, or point pricing in deploy/bench.yaml at a snapshot)",
+		"path", path, "snapshot", prices.Ref())
+	return prices, nil
 }
 
 // newPlanner returns the planner every command uses, with the fault proxy's

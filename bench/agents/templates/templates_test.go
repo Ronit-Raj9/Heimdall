@@ -61,6 +61,11 @@ func TestRender(t *testing.T) {
 				!strings.Contains(string(df.Content), "USER 1000") {
 				t.Errorf("Dockerfile does not build on the suite base as uid 1000:\n%s", df.Content)
 			}
+			// Every template runs python3; a base image without it must fail
+			// the build with a message, not with a bare exit code 127.
+			if !strings.Contains(string(df.Content), "command -v python3") || !strings.Contains(string(df.Content), "has none") {
+				t.Errorf("Dockerfile does not check for python3:\n%s", df.Content)
+			}
 			for k, v := range cfg.Env {
 				if strings.Contains(v, "{{run.key}}") && strings.Contains(k, "SESSION") {
 					t.Errorf("env %s carries the run key", k)

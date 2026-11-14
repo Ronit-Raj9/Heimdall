@@ -7,6 +7,8 @@ import (
 	"fmt"
 	"os"
 	"os/signal"
+	"sort"
+	"strings"
 	"syscall"
 
 	"github.com/maximhq/bifrost/bench/engine"
@@ -71,9 +73,43 @@ func printPlan(m *schemas.Manifest) {
 			n += v
 		}
 		total += n
-		fmt.Printf("  %-16s %3d slots  %v\n", c.ID, n, counts[c.ID])
+		fmt.Printf("  %-16s %3d slots  %s\n", c.ID, n, armCounts(counts[c.ID]))
 	}
 	fmt.Printf("  counted %d, compatibility %d, total %d agent episodes\n", total, compat, total+compat)
+}
+
+// armCounts formats slots per arm in arm order, "arm A 2, arm B 2".
+func armCounts(counts map[string]int) string {
+	arms := make([]string, 0, len(counts))
+	for arm := range counts {
+		arms = append(arms, arm)
+	}
+	sort.Strings(arms)
+	parts := make([]string, 0, len(arms))
+	for _, arm := range arms {
+		parts = append(parts, fmt.Sprintf("arm %s %d", arm, counts[arm]))
+	}
+	return strings.Join(parts, ", ")
+}
+
+// progressLine is one line of run progress: time, event kind, slot, then the
+// stage, run and outcome when the event has them, so a "stage" line says
+// which stage started or finished.
+func progressLine(ev engine.Event) string {
+	line := fmt.Sprintf("%s %-14s %s", ev.At.Format("15:04:05"), ev.Kind, ev.SlotID)
+	if ev.Stage != "" {
+		line += " " + string(ev.Stage)
+	}
+	if ev.RunID != "" {
+		line += " " + ev.RunID
+	}
+	if ev.Outcome != "" {
+		line += " " + string(ev.Outcome)
+	}
+	if ev.Message != "" {
+		line += " " + ev.Message
+	}
+	return line
 }
 
 func runRun(args []string) int {
@@ -149,14 +185,7 @@ func (a *app) execute(ctx context.Context, m *schemas.Manifest, concurrency int)
 			if ev.Kind == "" {
 				continue
 			}
-			line := fmt.Sprintf("%s %-14s %s", ev.At.Format("15:04:05"), ev.Kind, ev.SlotID)
-			if ev.Outcome != "" {
-				line += " " + string(ev.Outcome)
-			}
-			if ev.Message != "" {
-				line += " " + ev.Message
-			}
-			fmt.Fprintln(os.Stderr, line)
+			fmt.Fprintln(os.Stderr, progressLine(ev))
 		}
 	}()
 	janitor := engine.NewJanitor(a.reg.Gateway, a.docker, a.logger)

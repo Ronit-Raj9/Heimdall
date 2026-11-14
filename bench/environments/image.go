@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"os"
 	"os/exec"
 	"sort"
 	"strings"
@@ -69,12 +70,35 @@ func BuildImage(ctx context.Context, d utils.Docker, b ImageBuild, out io.Writer
 		return ImageInfo{}, err
 	}
 	cmd := exec.CommandContext(ctx, dockerBinary(d), args...)
+	cmd.Env = buildEnv(os.Environ())
 	cmd.Stdout, cmd.Stderr = out, out
 	if err := cmd.Run(); err != nil {
 		return ImageInfo{}, fmt.Errorf("docker build %s: %w", b.Tag, err)
 	}
 	return InspectImage(ctx, d, b.Tag)
 }
+
+// buildEnv is the environment of `docker build`: the caller's, with buildx's
+// default provenance attestation switched off. On Docker's containerd image
+// store the image id is the digest of an index that holds the attestation,
+// and the attestation records the build time, so every rebuild of an
+// unchanged agent got a new id. A frozen experiment compares that id before
+// each run, so `agent check` (which rebuilds) after `plan` refused every
+// remaining run of the experiment. Without the attestation an unchanged
+// build keeps its id. The legacy builder ignores the variable. A value the
+// caller set is kept.
+func buildEnv(environ []string) []string {
+	for _, kv := range environ {
+		if strings.HasPrefix(kv, noDefaultAttestations+"=") {
+			return environ
+		}
+	}
+	return append(append([]string(nil), environ...), noDefaultAttestations+"=1")
+}
+
+// noDefaultAttestations is the buildx variable that turns off the
+// attestations it adds by default.
+const noDefaultAttestations = "BUILDX_NO_DEFAULT_ATTESTATIONS"
 
 // ImageID implements engine.ImageInspector: the local image id of ref.
 func (e *dockerWorkspace) ImageID(ctx context.Context, ref string) (string, error) {

@@ -9,8 +9,13 @@
 # nothing but the gateway.
 ARG BASE_IMAGE=bench/coding-core-base:1
 FROM ${BASE_IMAGE}
+ARG BASE_IMAGE
 
 USER root
+# example-cli runs on python3: fail with a plain message instead of exit
+# code 127 when the suite's base image has none (a node or golang
+# toolchain). Drop this check with example-cli when your CLI needs no python3.
+RUN command -v python3 >/dev/null 2>&1 || { echo "this agent needs python3 and the suite base image ${BASE_IMAGE} has none: build it for a suite whose base image has python3, or install python3 in this Dockerfile" >&2; exit 1; }
 COPY example-cli.py /usr/local/bin/example-cli
 RUN chmod 0755 /usr/local/bin/example-cli \
  && example-cli --help > /dev/null

@@ -140,11 +140,20 @@ func runTaskValidate(args []string) int {
 			errs++
 		}
 	}
-	fmt.Printf("%s/%s: %d problems, %d errors\n", s.ID, t.ID, len(problems), errs)
+	fmt.Printf("%s/%s: %s\n", s.ID, t.ID, validateSummary(len(problems), errs))
 	if errs > 0 {
 		return 1
 	}
 	return exitOK
+}
+
+// validateSummary is the last line of `task validate`: "2 errors, 1
+// warning", or "no problems".
+func validateSummary(problems, errs int) string {
+	if problems == 0 {
+		return "no problems"
+	}
+	return plural(errs, "error") + ", " + plural(problems-errs, "warning")
 }
 
 // runTaskAdmit admits one task and records it in suite.lock, as

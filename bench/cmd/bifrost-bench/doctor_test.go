@@ -5,6 +5,8 @@ import (
 	"net"
 	"net/http"
 	"net/http/httptest"
+	"os"
+	"path/filepath"
 	"reflect"
 	"sync/atomic"
 	"testing"
@@ -132,4 +134,84 @@ func closedLoopback(t *testing.T) string {
 		t.Fatal(err)
 	}
 	return addr
+}
+
+func TestImageNeeds(t *testing.T) {
+	root := t.TempDir()
+	py := &schemas.Suite{ID: "pyapp", BaseImage: schemas.ImageSpec{Dockerfile: "base/Dockerfile", Tag: "acme/pyapp-base:1"}}
+	web := &schemas.Suite{ID: "webapp", BaseImage: schemas.ImageSpec{Tag: "acme/node:22"}}
+	perSuite := &schemas.AgentConfig{ID: "pybot", Image: "acme/pybot:1",
+		Build: &schemas.ImageSpec{Dockerfile: "agents/images/pybot/Dockerfile", Tag: "acme/pybot:1", BaseArg: "BASE_IMAGE"}}
+	broken := &schemas.AgentConfig{ID: "broken", Image: "acme/broken",
+		Build: &schemas.ImageSpec{Dockerfile: "agents/images/broken/Dockerfile", Tag: "acme/broken", BaseArg: "BASE_IMAGE"}}
+	agents := []doctorAgent{
+		{file: "agents/oracle.yaml", cfg: &schemas.AgentConfig{ID: "oracle", Image: "acme/helper:1"}},
+		{file: "agents/codex.yaml", cfg: &schemas.AgentConfig{ID: "codex", Image: "bench/agent-codex:1",
+			Build: &schemas.ImageSpec{Dockerfile: "agents/images/codex/Dockerfile", Tag: "bench/agent-codex:1"}}},
+		{file: "agents/pybot.yaml", cfg: perSuite},
+		{file: "agents/broken.yaml", cfg: broken},
+	}
+	needs, rows := imageNeeds(root, "acme/helper:1", []*schemas.Suite{py, web}, agents)
+	want := []imageNeed{
+		{tag: "acme/helper:1", hint: "run make -C bench images"},
+		{tag: "acme/pyapp-base:1", hint: "bifrost-bench suite admit pyapp builds it from its base_image.dockerfile"},
+		{tag: "acme/node:22", hint: "build or pull it; suite webapp names it as base_image.tag"},
+		{tag: "bench/agent-codex:1", hint: "bifrost-bench agent build agents/codex.yaml"},
+		{tag: "acme/pybot:1-pyapp", hint: "bifrost-bench agent build agents/pybot.yaml -suite pyapp"},
+		{tag: "acme/pybot:1-webapp", hint: "bifrost-bench agent build agents/pybot.yaml -suite webapp"},
+	}
+	if !reflect.DeepEqual(needs, want) {
+		t.Fatalf("needs:\n got  %+v\n want %+v", needs, want)
+	}
+	// The tag without a tag part cannot carry a suite suffix: one warning per suite.
+	if len(rows) != 2 || rows[0].ID != "agent agents/broken.yaml" || rows[0].Status != schemas.DoctorWarn {
+		t.Fatalf("rows = %+v", rows)
+	}
+
+	// A project folder from `init` has the helper's Dockerfile, so the hint builds it.
+	if err := os.MkdirAll(filepath.Join(root, "deploy", "helper"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(root, "deploy", "helper", "Dockerfile"), []byte("FROM scratch\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	needs, _ = imageNeeds(root, "acme/helper:1", nil, nil)
+	if len(needs) != 1 || needs[0].hint != "docker build -t acme/helper:1 deploy/helper" {
+		t.Fatalf("needs = %+v", needs)
+	}
+}
+
+func TestSuiteRow(t *testing.T) {
+	tasks := []*schemas.Task{{ID: "t01"}, {ID: "t02"}}
+	admitted := map[string]schemas.TaskLock{"t01": {Status: schemas.TaskAdmitted}, "t02": {Status: schemas.TaskAdmitted}}
+	half := map[string]schemas.TaskLock{"t01": {Status: schemas.TaskAdmitted}}
+	tests := []struct {
+		name string
+		s    *schemas.Suite
+		want schemas.DoctorCheck
+	}{
+		{"no lock", &schemas.Suite{ID: "web", Tasks: tasks}, schemas.DoctorCheck{ID: "suite web", Status: schemas.DoctorFail, Detail: "no suite.lock; run suite admit web"}},
+		{"all admitted", &schemas.Suite{ID: "web", Tasks: tasks, Lock: &schemas.SuiteLock{Tasks: admitted}},
+			schemas.DoctorCheck{ID: "suite web", Status: schemas.DoctorPass, Detail: "2 of 2 tasks admitted"}},
+		{"some admitted", &schemas.Suite{ID: "web", Tasks: tasks, Lock: &schemas.SuiteLock{Tasks: half}},
+			schemas.DoctorCheck{ID: "suite web", Status: schemas.DoctorWarn, Detail: "1 of 2 tasks admitted"}},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := suiteRow(tt.s); got != tt.want {
+				t.Fatalf("got %+v, want %+v", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestHelperToolsResult(t *testing.T) {
+	st, detail := helperToolsResult("acme/node:22", []string{"python3"})
+	if st != schemas.DoctorFail || detail != "helper image acme/node:22 has no python3; set images.helper to the bench helper image" {
+		t.Fatalf("got %s %q", st, detail)
+	}
+	st, detail = helperToolsResult("bench/coding-core-base:1", nil)
+	if st != schemas.DoctorPass || detail != "sh, cp, git, python3, sleep present" {
+		t.Fatalf("got %s %q", st, detail)
+	}
 }

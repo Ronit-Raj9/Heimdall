@@ -1,8 +1,9 @@
 # Bring your own agent and tasks: design contract
 
-Status: build contract for the parallel build of 14 Nov 2026. The user guide
-is `docs/bring-your-own.md` (written after the build); this file fixes the
-names and shapes every part must agree on.
+Status: implemented (build of 14 Nov 2026, checked by a fresh-project
+walkthrough on 15 Nov 2026). The user guide is `docs/bring-your-own.md`.
+This file fixes the names and shapes every part agrees on; where the code
+differs, "Deviations in the implementation" at the end says how.
 
 ## Goal
 
@@ -152,3 +153,51 @@ bifrost-bench agent check <agents/id.yaml> -suite <suite> [-task <task>]
   a coding task needs the agent next to the workspace.
 - Importers for public benchmark formats (Harbor) reuse the `reward`
   verifier contract and are a separate piece of work.
+
+## Deviations in the implementation
+
+Found while walking a fresh project through every command on 15 Nov 2026.
+The code is the reference; the guides describe it.
+
+- **Python suites keep the `hidden_tests` grader.** `suite init -template
+  python-pytest` writes `grader: hidden_tests`, which runs pytest in the
+  trusted helper image (`images.helper`), not in the suite's base image. The
+  helper therefore needs the Python packages the tasks import; the other
+  three templates use `verifier_command` on the suite's base image as above.
+- **The Node verifier is not a bare `node --test` on a glob.** The
+  `node-test` template runs `sh -c`: it copies the read-only workspace to
+  `/tmp`, lays the hidden files over the copy at their repository paths (so
+  tests cut from a repository import the code by relative paths), finds the
+  hidden test files with `find` and passes them to `node --test
+  --test-reporter=junit`. The Go template uses the same overlay. A
+  hand-written suite may still pass a glob (`/grader/tests/**/*.test.mjs`,
+  as `examples/acme-node` does); in Node 22 a bare folder is not walked.
+- **`task init` writes more than the list above:** `controls/exploit.sh` (a
+  generic exploit per template that rewrites the visible tests), for Python
+  a bootstrap `verifier/tests/conftest.py` that puts the workspace on
+  `sys.path`, and `required` test ids for Python and Go only (Node starts
+  with `required: []`).
+- **The exploit control is a script,** `controls.exploit`, run as uid 1000
+  for up to 120 s in a workspace with a git baseline; the diff it leaves is
+  exported and graded like an agent's.
+- **Admission check names** in `suite.lock`: `reference_1` to
+  `reference_3`, `empty_patch`, `mutant_<n>`, `exploit`,
+  `reference_stale_notes` (when the task has stale notes), `null_noop`,
+  `null_refuse`, `instruction_edited`, `secret_scan` and
+  `verifier_no_network`. `instruction_edited` and `reference_stale_notes`
+  are additions to the six items above. `task admit` also builds the helper
+  and the suite's base image when they are missing.
+- **A broken test run's reason** is the text `test run broken by the patch:
+  ...` (`graders.ReasonTestRunBroken`), not the token `test_run_broken`.
+- **`agent check`'s egress row** comes from a passive network observer
+  (python3 and sleep in the helper image) plus the egress gate. A helper
+  without python3 makes the gateway's egress probe `not_run` (never
+  `blocked`) with the reason recorded, and `doctor` fails a `helper tools`
+  row. `-runs` moves check runs out of `checks/`.
+- **Additions not in the contract:** `suite init -image <tag>` (use an
+  existing toolchain image), `task init -kind`, `-difficulty` and `-force`,
+  `doctor` checking every suite, base image and agent image of a project,
+  the http-service launcher polling a 202 answer at `AGENT_STATUS_URL`, a
+  missing price snapshot falling back to the embedded one with a warning,
+  and agent image builds without buildx's default provenance attestation, so
+  an unchanged rebuild keeps its image id.

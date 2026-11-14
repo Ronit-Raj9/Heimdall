@@ -48,6 +48,40 @@ In the final smoke of `opencode`, `gemini-cli`, `claude-code-gpt`, `custom-pytho
 - **gemini-cli.** Gemini CLI can make side calls on its own flash models (next-speaker check, loop detection, compression). None appeared in the smoke; in a longer session the run's key refuses them and the gateway shows an error row.
 - **mini-swe-agent** sends no session header; rows still join by virtual key.
 
+## Findings from `agent check`
+
+`agent check` (the free conformance run on the scripted model, with a
+passive network observer next to the agent) was run on 2026-11-15 for the
+shipped Codex config and for the acme example's copy of it.
+
+- **Codex CLI 0.169.0 looks up github.com at start.** With the config in
+  `agents/codex.yaml`, which already sets `check_for_update_on_startup =
+  false`, analytics and feedback off and no OpenTelemetry exporter,
+  `bifrost-bench agent check -no-build -suite coding-core -task t01
+  agents/codex.yaml` passes eight rows and fails the egress row: `tried to
+  reach 1 host other than the gateway: github.com`. The observer saw DNS
+  queries for `github.com` (A and AAAA, plus the resolver's search-suffix
+  retry) and no connection attempt, because the internal network answers no
+  name but `bifrost`. An earlier check run also listed `api.github.com`.
+  The lookup comes from Codex's `plugins` feature, which `codex features
+  list` shows as stable and on by default in 0.169.0; `codex --help`
+  documents `--disable <FEATURE>` as `-c features.<name>=false`, so the
+  config key is `plugins = false` under `[features]`. In
+  `examples/acme-node/agents/codex.yaml` that one line removes the lookup:
+  `agent check agents/codex.yaml -suite acme-orders -task ord01 -no-build`
+  failed on the egress row before it and passed all nine rows twice after
+  it.
+- **Effect on the recorded results: none measured.** The lookup failed
+  inside the evaluation network, Codex went on, and the egress gate reads
+  the preflight probe, not the observer, so the 249 sealed Codex runs were
+  graded as before. `agents/codex.yaml` is left unchanged on purpose: its
+  resolved config hash identifies those runs on the leaderboard and in
+  every manifest. A new experiment that wants a clean egress row should use
+  a new config (a copy with `plugins = false` and its own id).
+- **Gemini CLI** cannot be checked this way: the fault proxy has no
+  scripted Gemini model, so `agent check` refuses an agent whose provider is
+  `gemini`.
+
 ## Reproducing the smoke
 
 The smoke tools are not in the tree: a fake server for OpenAI chat, Anthropic messages and Gemini generateContent (Python standard library), a planner that renders a config through `adapters.Builtin` into a `RunPlan`, and a runner that starts the container with the flags above. The method is in `docs/adding-an-agent.md`, "Check it before a real run".

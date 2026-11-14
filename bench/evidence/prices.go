@@ -33,11 +33,21 @@ type ModelPrice struct {
 // LoadPrices reads a price snapshot and records the sha256 of its bytes, so a
 // cost row names exactly the file it was priced from. Every model must state
 // all four prices: a missing price would otherwise read as free.
+// A missing file's error wraps fs.ErrNotExist, so a caller can fall back to
+// another snapshot (the embedded project default) and say so.
 func LoadPrices(path string) (*PriceTable, error) {
 	raw, err := os.ReadFile(path)
 	if err != nil {
 		return nil, fmt.Errorf("read price snapshot %s: %w", path, err)
 	}
+	return ParsePrices(raw, path)
+}
+
+// ParsePrices reads a price snapshot from its bytes; name labels errors (a
+// path, or "embedded default"). The rules are LoadPrices's, and the sha256
+// is of raw, so the same bytes give the same Ref wherever they came from.
+func ParsePrices(raw []byte, name string) (*PriceTable, error) {
+	path := name
 	var file struct {
 		ID         string                         `json:"id"`
 		Source     string                         `json:"source"`

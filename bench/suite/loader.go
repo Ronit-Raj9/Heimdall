@@ -16,6 +16,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"sort"
 	"strings"
 
 	"github.com/maximhq/bifrost/bench/schemas"
@@ -67,7 +68,7 @@ func (l *localLoader) Load(ctx context.Context, ref string) (*schemas.Suite, err
 		return nil, fmt.Errorf("resolve suite folder %s: %w", dir, err)
 	}
 	if fi, err := os.Stat(root); err != nil || !fi.IsDir() {
-		return nil, fmt.Errorf("suite %q: folder %s not found", ref, root)
+		return nil, fmt.Errorf("suite %q: folder %s not found (%s)", ref, root, suitesBeside(filepath.Dir(root)))
 	}
 	d := displayer{base: filepath.Dir(root)}
 
@@ -301,4 +302,20 @@ func (d displayer) name(path string) string {
 		return path
 	}
 	return filepath.ToSlash(rel)
+}
+
+// suitesBeside names the suites in dir (folders holding a suite.yaml), so a
+// wrong or placeholder suite id ("my-suite" in a fresh smoke experiment)
+// shows what the project has. It is for messages only.
+func suitesBeside(dir string) string {
+	files, err := filepath.Glob(filepath.Join(dir, "*", SuiteFile))
+	if err != nil || len(files) == 0 {
+		return "no suite in " + dir + "; create one with bifrost-bench suite init <id> -template <name>"
+	}
+	ids := make([]string, 0, len(files))
+	for _, f := range files {
+		ids = append(ids, filepath.Base(filepath.Dir(f)))
+	}
+	sort.Strings(ids)
+	return "suites here: " + strings.Join(ids, ", ")
 }

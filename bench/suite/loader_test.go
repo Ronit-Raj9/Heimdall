@@ -96,7 +96,7 @@ func TestLoadErrors(t *testing.T) {
 		want []string
 	}{
 		{"version mismatch", "mini@2.0.0", nil, []string{"mini/suite.yaml", "version"}},
-		{"missing pack", "nope", nil, []string{"not found"}},
+		{"missing pack", "nope", nil, []string{"not found", "suites here: mini"}},
 		{"unknown task field", "mini", func(t *testing.T, pack string) {
 			editFile(t, filepath.Join(pack, "tasks/m01/task.yaml"), "kind: bugfix", "kind: bugfix\nkinds: bugfix")
 		}, []string{"mini/tasks/m01/task.yaml", "kinds: unknown field"}},

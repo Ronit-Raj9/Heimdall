@@ -10,6 +10,21 @@ It runs two versions of an agent on the same tasks, several times, clean and und
 
 Built for PS2 (agent benchmarking platform) of the Geek Room Global AI Hackathon, title partner Bifrost by Maxim AI.
 
+## Bring your own agent and tasks
+
+A team can benchmark its own agent on tasks cut from its own repositories, in any language, without Go code or changes to this repository. Six commands take a project from nothing to an admitted task and a free conformance check of the agent:
+
+```bash
+bifrost-bench init acme-bench                                  # project folder: deploy/, agents/, benchmarks/, experiments/, policies/
+bifrost-bench suite init pyapp -template python-pytest         # or node-test, go-test, generic-reward
+bifrost-bench task init -suite pyapp -id t01 -repo <git repo> -base <commit before the fix> -reference <fix commit>
+bifrost-bench task validate pyapp/t01 && bifrost-bench task admit pyapp/t01     # after rewriting instruction.md
+bifrost-bench agent init pybot -template python                # or command, http-service
+bifrost-bench agent check agents/pybot.yaml -suite pyapp       # builds the image, runs one task on the scripted model, $0
+```
+
+The guide, with real output from a fresh-project walkthrough, the CI gate and the limits: [`docs/bring-your-own.md`](docs/bring-your-own.md). A complete example project (four Node tasks, a custom agent, Codex): [`examples/acme-node`](examples/acme-node/README.md).
+
 ## Why it is different
 
 Most evaluation tools show traces, token charts and a pass rate. Teams already have those. What they cannot get is a trustworthy answer:
@@ -97,6 +112,8 @@ The three batches with a regate give the same verdict on the sealed gates and on
 | CI gate | `.github/workflows/bench-check.yml` runs `bifrost-bench check` through the composite action in `ci/` on pull requests that touch an agent, an experiment, a policy, a benchmark or the bench; a bad verdict or a policy block fails the build | `docs/ci.md` |
 | Failure triage | Counts per arm how many runs show each observed pattern (`pattern_loop`, `pattern_unverified_finish`, `pattern_ignored_error`), each count linked to its runs and event ids; `/triage`. Patterns, not root causes | `docs/triage.md` |
 | Safety probes | `destructive-bait`, `protected-path` and `prompt-injection` (veto gates G10 to G12) and `secret-canary` (report-only metrics) plant a trap per run; `experiments/safety.yaml` | `docs/safety-probes.md` |
+| Bring your own agent and tasks | `init` scaffolds a project folder; `suite init` writes a suite for Python, Node, Go or a reward script; `task init` cuts a task from a fix commit of your repository (hidden tests from the commit's tests), `task validate` and `task admit` prove it fit; `agent init` writes an agent from a template (`command`, `python`, `http-service`), `agent build` builds it per suite, `agent check` runs a free conformance check on the scripted model. `doctor` checks every suite, base image and agent image of the project | `docs/bring-your-own.md` |
+| Suites and Agents pages | `/suites` lists every suite with its grader, lock state and admitted tasks; `/suites/{id}/tasks/{task}` shows a task's provenance, admission checks, instruction and visible files (never a hidden test, solution or control); `/agents` lists every agent config with its image, per-suite build and evidence level. API: `GET /api/bench/suites`, `/suites/{id}/tasks/{task}`, `/agents` | `docs/bring-your-own.md` |
 | Leaderboard | Ranks agent configs (one per resolved config hash) over every sealed run of one suite version and condition, across experiments, by verified success with cost, tokens and steps beside it and no blended score. Each entry is compared with the leader by the exact sign-flip test on shared tasks, Holm-adjusted (tier 1: cannot be told apart, tier 2: significantly behind). Invalid experiments, infra errors and unsealed runs are left out and counted; scripted agents and scripted-model runs appear only with `-synthetic only`, under a SYNTHETIC banner. `bifrost-bench leaderboard`, `GET /api/bench/leaderboard`, `/leaderboard` | `docs/leaderboard.md` |
 
 ## How it works
@@ -176,6 +193,8 @@ If the provider becomes unreachable during a run anyway, the run is sealed as in
 | `policy/`, `policies/` | Release policy engine and the shipped policy files |
 | `release/`, `leaderboard/`, `ci/` | Release log and evidence packs, leaderboard, CI gate |
 | `suite/` | Suite loading, lint, lock and admission controls |
+| `scaffold/`, `agents/templates/` | Project, suite and task generators (`init`, `suite init`, `task init`); agent templates (`agent init`) |
+| `examples/acme-node/` | A complete bring-your-own project: a Node suite of four tasks, a custom agent, Codex |
 | `store/` | Sealed run folders, transitions, leases, seal chain, read index |
 | `server/`, `handlers/`, `lib/`, `reporters/` | HTTP API (Bifrost's fasthttp handler style) and reports |
 | `ui/` | Web UI (React, TanStack Router, RTK Query, Bifrost's UI primitives), embedded in the binary |
@@ -190,7 +209,7 @@ Everything that varies is a file, validated by a JSON Schema; everything that co
 
 | To add | Do this | Go code? |
 |---|---|---|
-| A task | A folder under `benchmarks/<suite>/tasks/`, then `bifrost-bench suite admit` | No |
+| A task | A folder under `benchmarks/<suite>/tasks/`, or `bifrost-bench task init` from a fix commit of your repository, then `bifrost-bench task admit` | No |
 | A benchmark | A folder with `suite.yaml` | No, if its environment and grader types exist |
 | A probe | One YAML in `benchmarks/<suite>/probes/` | No, for an existing layer |
 | An agent | One YAML in `agents/` (any CLI or custom agent that accepts a base URL); see `docs/adding-an-agent.md` | No |

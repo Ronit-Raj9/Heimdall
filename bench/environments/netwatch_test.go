@@ -126,3 +126,22 @@ func TestNetWatchScript(t *testing.T) {
 		}
 	}
 }
+
+func TestMissingExecutable(t *testing.T) {
+	tests := []struct {
+		name string
+		msg  string
+		want string
+	}{
+		{"python3 not in a node image", `docker: Error response from daemon: failed to create task for container: failed to create shim task: OCI runtime create failed: runc create failed: unable to start container process: error during container init: exec: "python3": executable file not found in $PATH`, "python3"},
+		{"sleep missing", `docker run: exit 127: ... exec: "sleep": executable file not found in $PATH: unknown`, "sleep"},
+		{"other failure", "docker: Error response from daemon: network bench-evalnet not found", ""},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := missingExecutable(tt.msg); got != tt.want {
+				t.Fatalf("got %q, want %q", got, tt.want)
+			}
+		})
+	}
+}

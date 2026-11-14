@@ -26,6 +26,29 @@ func TestBuildArgs(t *testing.T) {
 	}
 }
 
+func TestBuildEnv(t *testing.T) {
+	tests := []struct {
+		name    string
+		environ []string
+		want    []string
+	}{
+		{"adds the switch", []string{"PATH=/usr/bin", "HOME=/home/a"}, []string{"PATH=/usr/bin", "HOME=/home/a", "BUILDX_NO_DEFAULT_ATTESTATIONS=1"}},
+		{"keeps the caller's value", []string{"BUILDX_NO_DEFAULT_ATTESTATIONS=0"}, []string{"BUILDX_NO_DEFAULT_ATTESTATIONS=0"}},
+		{"empty environment", nil, []string{"BUILDX_NO_DEFAULT_ATTESTATIONS=1"}},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			in := append([]string(nil), tt.environ...)
+			if got := buildEnv(in); !reflect.DeepEqual(got, tt.want) {
+				t.Fatalf("got %v, want %v", got, tt.want)
+			}
+			if !reflect.DeepEqual(in, tt.environ) {
+				t.Fatalf("input changed to %v", in)
+			}
+		})
+	}
+}
+
 func TestParseImageInspect(t *testing.T) {
 	info, err := parseImageInspect([]byte(`{"Id":"sha256:abc","RepoDigests":["acme/x@sha256:def"],"Config":{"User":"agent"}}`))
 	if err != nil || info.ID != "sha256:abc" || info.User != "agent" || len(info.RepoDigests) != 1 || !info.NonRoot() {

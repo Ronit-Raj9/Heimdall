@@ -1,15 +1,20 @@
 package main
 
 import (
+	"bytes"
 	"context"
 	"errors"
 	"net/http"
 	"net/http/httptest"
+	"os"
+	"path/filepath"
 	"reflect"
+	"strings"
 	"testing"
 
 	"github.com/maximhq/bifrost/bench/engine"
 	"github.com/maximhq/bifrost/bench/faultproxy"
+	"github.com/maximhq/bifrost/bench/utils"
 )
 
 func TestProxyUpstreams(t *testing.T) {
@@ -53,4 +58,34 @@ func TestProxyUpstreams(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestLoadPrices(t *testing.T) {
+	dir := t.TempDir()
+	t.Run("missing file falls back with a warning", func(t *testing.T) {
+		var log bytes.Buffer
+		pt, err := loadPrices(filepath.Join(dir, "absent.json"), utils.NewStdLogger(&log, false))
+		if err != nil {
+			t.Fatal(err)
+		}
+		if pt.ID == "" || len(pt.Models) == 0 {
+			t.Fatalf("table = %+v", pt)
+		}
+		if !strings.Contains(log.String(), "WARN") || !strings.Contains(log.String(), "using the embedded default") {
+			t.Errorf("log = %q", log.String())
+		}
+	})
+	t.Run("broken file is an error", func(t *testing.T) {
+		p := filepath.Join(dir, "broken.json")
+		if err := os.WriteFile(p, []byte("{"), 0o644); err != nil {
+			t.Fatal(err)
+		}
+		var log bytes.Buffer
+		if _, err := loadPrices(p, utils.NewStdLogger(&log, false)); err == nil {
+			t.Fatal("a broken snapshot loaded")
+		}
+		if log.Len() != 0 {
+			t.Errorf("log = %q", log.String())
+		}
+	})
 }

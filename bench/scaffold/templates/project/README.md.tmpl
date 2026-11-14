@@ -45,6 +45,15 @@ Run these from this folder.
 
        docker compose -f deploy/docker-compose.yml --env-file deploy/.env up -d --wait
 
+   One stack serves every project on a machine: the compose project is
+   named `bifrost-bench` and binds fixed ports, so a second `up` from
+   another project replaces the running stack instead of starting a new
+   one. When a stack already runs here, skip steps 2 and 3: the defaults in
+   `deploy/bench.yaml` already point at it (gateway `127.0.0.1:18080`, fault
+   proxy `127.0.0.1:19101`, network `bench-evalnet`), so load that stack's
+   `.env` instead of writing a new one. Run one project's experiments at a
+   time: key slots are leased per process.
+
 4. Create a suite for your language (`python-pytest`, `node-test`,
    `go-test` or `generic-reward`):
 
@@ -56,8 +65,8 @@ Run these from this folder.
 
        bifrost-bench task init -suite my-suite -id t01 -repo ~/src/app -base <commit before the fix> -reference <fix commit>
 
-6. Check the task, prove it is fit to measure with, and run the free smoke
-   experiment:
+6. Check the task, prove it is fit to measure with, then set `suite:` in
+   `experiments/smoke.yaml` to `my-suite` and run the free smoke experiment:
 
        bifrost-bench task validate my-suite/t01 && bifrost-bench task admit my-suite/t01
        set -a; . deploy/.env; set +a; BENCH_SERVER_MODE=synthetic bifrost-bench run experiments/smoke.yaml

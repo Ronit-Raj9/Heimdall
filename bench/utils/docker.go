@@ -77,6 +77,39 @@ func LabelArgs(expID, runID string) []string {
 	return args
 }
 
+// HelperTools are the commands the bench runs inside the trusted helper image
+// (images.helper): sh, cp and git prepare, commit and export workspaces,
+// python3 runs the egress probe, the network observer and the hidden_tests
+// grader, and sleep holds the observer's network namespace. A toolchain image
+// picked as the helper (a node or golang image, say) usually lacks python3,
+// and every one of those steps then fails in a way that names something else.
+var HelperTools = []string{"sh", "cp", "git", "python3", "sleep"}
+
+// HelperToolsScript is a POSIX sh script that prints "missing <tool>" for
+// every entry of HelperTools the image lacks, and nothing else.
+const HelperToolsScript = `for t in sh cp git python3 sleep; do command -v "$t" >/dev/null 2>&1 || echo "missing $t"; done`
+
+// MissingTools reads the output of HelperToolsScript (or any output with
+// "missing <tool>" lines) and returns the tools named, in order.
+func MissingTools(out string) []string {
+	var missing []string
+	for _, line := range strings.Split(out, "\n") {
+		f := strings.Fields(line)
+		if len(f) == 2 && f[0] == "missing" {
+			missing = append(missing, f[1])
+		}
+	}
+	return missing
+}
+
+// HelperLacks is the one message every part uses for a helper image without
+// a tool it needs, so doctor, the egress probe and the observer say the same
+// thing: "helper image <tag> has no python3; set images.helper to the bench
+// helper image".
+func HelperLacks(image string, tools ...string) string {
+	return fmt.Sprintf("helper image %s has no %s; set images.helper to the bench helper image", image, strings.Join(tools, " or "))
+}
+
 func firstArg(args []string) string {
 	if len(args) == 0 {
 		return ""

@@ -17,7 +17,7 @@ not Python, with an agent the company wrote itself, without any Go code:
 - **A custom agent.** `acme-agent`: one dependency-free Node file speaking
   OpenAI chat completions with tool calling, built per suite on the suite's
   toolchain image (`build.base_arg`), unit-tested offline against a scripted
-  fake server.
+  fake server, and passing all nine rows of the free `agent check`.
 - **Experiments.** A free smoke check with the control agents, and a real
   comparison (`acme-agent` against Codex CLI, same model, clean plus two
   failure families).
@@ -39,14 +39,14 @@ acme-node/
   README.md                         this file
   .gitignore                        runs/ stays local
   deploy/
-    bench.yaml                      paths, gateway, networks, helper image (lib/config.go)
+    bench.yaml                      paths, gateway, networks, helper image bench/coding-core-base:1 (lib/config.go)
     pricing-snapshot.json           model prices for cost metrics (copy of the bench's)
   policies/default.yaml             release policy (copy of the bench's)
   agents/
     acme-agent.yaml                 Acme's agent (command adapter, build.base_arg)
     images/acme-agent/Dockerfile    ARG BASE_IMAGE / FROM ${BASE_IMAGE}
     images/acme-agent/agent.mjs     the whole agent, one file, no dependencies
-    codex.yaml                      Codex CLI (the bench's config, image built per suite)
+    codex.yaml                      Codex CLI (the bench's config, image built per suite, plugins off)
     images/codex/Dockerfile         Codex CLI on a suite's base image
     oracle.yaml, noop.yaml          scripted controls for the free smoke run
   benchmarks/acme-orders/
@@ -134,7 +134,14 @@ All from this folder, with `bifrost-bench` built from `bench/`
 (`CGO_ENABLED=0 GOWORK=off go build -o bin/bifrost-bench ./cmd/bifrost-bench`)
 and on `PATH`. Every command takes `-config deploy/bench.yaml`; the project
 root is that file's grandparent. The gateway stack is the bench's own
-(`deploy/docker-compose.yml` in `bench/`); `bench.yaml` here points at it.
+(`deploy/docker-compose.yml` in `bench/`); `bench.yaml` here points at it,
+and the commands that reach it need that stack's `.env` loaded
+(`set -a; . ../../deploy/.env >/dev/null 2>&1; set +a`). The trusted helper
+image is the bench's, `bench/coding-core-base:1`: it prepares and exports
+workspaces with git and runs the egress probe and the `agent check` network
+observer with python3, which the Node suite image does not have. The suite's
+own image, `heimdall-example/acme-orders-base:1`, is the verifier's and the
+agents' toolchain (`base_image.tag` in `suite.yaml`).
 
 ```sh
 cd bench/examples/acme-node
@@ -145,7 +152,7 @@ bifrost-bench suite init acme-orders -template node-test -config deploy/bench.ya
 bifrost-bench task init -suite acme-orders -id ord01 -repo ~/src/acme-orders -base <commit> -reference <commit> \
     -license MIT -kind bugfix -config deploy/bench.yaml        # then edit instruction.md and the controls
 
-# 1. The suite's toolchain image (also the trusted helper image in bench.yaml)
+# 1. The suite's toolchain image (verifier and agents; the helper stays bench/coding-core-base:1)
 docker build -t heimdall-example/acme-orders-base:1 benchmarks/acme-orders/base
 
 # 2. Check the tasks: by hand with plain docker, then with the bench
@@ -172,7 +179,29 @@ bifrost-bench serve -config deploy/bench.yaml                                   
 
 `acme-smoke` uses the `oracle` and `noop` controls rather than the bench's
 `toy` agent, because `toy` is a Python script and this project's images have
-no Python. Expected: arm A verifies 4 of 4, arm B 0 of 4.
+no Python. The run of 15 Nov 2026 (`runs/e_smoke_acme_63q5`, not committed):
+8 runs sealed, oracle 4 of 4 pass, noop 0 of 4, $0 spent (no model call).
+The verdict is **inconclusive, no decision**, as it must be: all 4 tasks
+are discordant, but with 4 tasks the smallest possible two-sided p of the
+exact sign-flip test is 0.125, so 4 tasks cannot reach significance at 0.05
+(the report says 6 tasks are needed for this effect).
+
+## Agent check
+
+`agent check` (free: every model call is answered by the fault proxy's
+scripted model) on 15 Nov 2026, with `-runs` pointing outside the repository
+(the default is `checks/`, git-ignored):
+
+| Agent | Command | Result |
+|---|---|---|
+| `acme-agent` | `bifrost-bench agent check agents/acme-agent.yaml -suite acme-orders -task ord01 -no-build -runs <dir>` | PASS on all 9 rows: image, uid 1000, 2 model calls through Bifrost with the run key, session id on every request, exit 0, diff exported, only the gateway contacted, gateway-level evidence, final message captured |
+| `codex` | `bifrost-bench agent check agents/codex.yaml -suite acme-orders -task ord01 -no-build -runs <dir>` | PASS on all 9 rows with `plugins = false` in its config; without that line the egress row fails, because Codex 0.169.0 looks up github.com at start (`docs/harness-matrix.md`) |
+
+The agent is checked with the bench's helper image. With the helper set to
+the Node suite image, the check could not show isolation: the egress probe
+and the network observer need python3. `doctor` and `agent check` now say so
+directly (`helper image heimdall-example/acme-orders-base:1 has no python3;
+set images.helper to the bench helper image`).
 
 ## Verification by hand
 

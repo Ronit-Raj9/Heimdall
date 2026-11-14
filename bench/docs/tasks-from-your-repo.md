@@ -159,8 +159,9 @@ commit.
 
 `task admit` runs the admission controls in Docker and records the result in
 `suite.lock` (`suite admit <suite>` admits every task). A task that is not
-admitted cannot be planned. Then run the free smoke experiment (it needs the
-gateway stack and the variables of `deploy/.env`):
+admitted cannot be planned. Then set `suite:` in `experiments/smoke.yaml` to
+your suite and run the free smoke experiment (it needs the gateway stack and
+the variables of `deploy/.env`):
 
 ```sh
 set -a; . deploy/.env; set +a

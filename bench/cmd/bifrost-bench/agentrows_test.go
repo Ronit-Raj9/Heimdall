@@ -75,6 +75,11 @@ func TestCheckRows(t *testing.T) {
 			want: map[string]string{rowSession: checkWarn}, detail: `"mine-1"`},
 		{name: "observer did not run", mutate: func(in *checkInput) { in.net, in.netErr = nil, "the network observer did not start: no python3" },
 			want: map[string]string{rowSession: checkWarn, rowEgress: checkWarn}, detail: "no python3"},
+		{name: "helper without python3", mutate: func(in *checkInput) {
+			lacks := "helper image acme/node:22 has no python3; set images.helper to the bench helper image"
+			in.net, in.netErr = nil, "observer exited before it was ready: "+lacks
+			in.gates[0].Fired, in.gates[0].Detail = true, `egress probe is "not_run", not "blocked": egress probe not run: `+lacks
+		}, want: map[string]string{rowSession: checkWarn, rowEgress: checkFail}, detail: "acme/node:22 has no python3"},
 		{name: "timed out", mutate: func(in *checkInput) { in.run.Agent.TimedOut = true }, want: map[string]string{rowExit: checkFail}, detail: "wall budget (900s)"},
 		{name: "non-zero exit", mutate: func(in *checkInput) {
 			c := 2
@@ -144,12 +149,13 @@ func TestCheckRowsPassDetails(t *testing.T) {
 		got[r.ID] = r.Detail
 	}
 	for id, want := range map[string]string{
-		rowSession:  "x-bf-session-id: r_1 on every gateway request seen",
-		rowExit:     "exited 0 after 3s (budget 900s)",
-		rowDiff:     "exported, 1 files changed",
-		rowEgress:   "only the gateway bifrost",
-		rowEvidence: "native: parser codex read 1 events",
-		rowClaim:    `"All tests pass.", success claimed (all tests pass)`,
+		rowSession:   "x-bf-session-id: r_1 on every gateway request seen",
+		rowExit:      "exited 0 after 3s (budget 900s)",
+		rowModelCall: "1 model call through Bifrost with the run key",
+		rowDiff:      "exported, 1 file changed",
+		rowEgress:    "only the gateway bifrost",
+		rowEvidence:  "native: parser codex read 1 event,",
+		rowClaim:     `"All tests pass.", success claimed (all tests pass)`,
 	} {
 		if !strings.Contains(got[id], want) {
 			t.Errorf("%s detail %q, want %q", id, got[id], want)
@@ -199,5 +205,20 @@ func TestRowHelpers(t *testing.T) {
 	cfg := &schemas.AgentConfig{Files: map[string]string{"/x": "id={{run.session}}"}}
 	if !configUses(cfg, sessionVar) || configUses(&schemas.AgentConfig{}, sessionVar) {
 		t.Error("configUses")
+	}
+}
+
+func TestHelperFix(t *testing.T) {
+	in := goodCheckInput()
+	lacks := "helper image acme/node:22 has no python3; set images.helper to the bench helper image"
+	in.net, in.netErr = nil, "observer exited before it was ready: "+lacks
+	in.gates[0].Fired, in.gates[0].Detail = true, `egress probe is "not_run", not "blocked": egress probe not run: `+lacks
+	for _, r := range checkRows(in) {
+		if (r.ID == rowSession || r.ID == rowEgress) && !strings.HasPrefix(r.Fix, "set images.helper in deploy/bench.yaml") {
+			t.Errorf("row %s fix = %q, want the images.helper hint", r.ID, r.Fix)
+		}
+	}
+	if _, ok := helperFix("egress probe is \"open\""); ok {
+		t.Error("an open probe is not the helper's fault")
 	}
 }

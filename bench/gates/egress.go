@@ -13,8 +13,9 @@ const Egress = "egress"
 
 // Gateway manifest settings the egress gate reads. Preflight records them.
 const (
-	settingEgressProbe = "egress_probe" // "blocked" when a test connection off the eval network failed
-	settingEvalNetwork = "eval_network" // the internal network agents must be attached to
+	settingEgressProbe = "egress_probe"       // "blocked" when a test connection off the eval network failed
+	settingEvalNetwork = "eval_network"       // the internal network agents must be attached to
+	settingEgressError = "egress_probe_error" // why the probe did not run (a helper without python3, say)
 	egressBlocked      = "blocked"
 )
 
@@ -50,7 +51,11 @@ func (g *egressGate) Check(_ context.Context, rc *schemas.RunContext, _ *schemas
 	case !ok:
 		problems = append(problems, "egress probe not recorded in the gateway manifest")
 	case probe != egressBlocked:
-		problems = append(problems, fmt.Sprintf("egress probe is %q, not %q", probe, egressBlocked))
+		p := fmt.Sprintf("egress probe is %q, not %q", probe, egressBlocked)
+		if reason := settings[settingEgressError]; reason != "" {
+			p += ": " + reason
+		}
+		problems = append(problems, p)
 	}
 	want := settings[settingEvalNetwork]
 	got := ""

@@ -38,9 +38,13 @@ func TestPreflight(t *testing.T) {
 		{name: "healthy and isolated", dockerOut: allBlocked, wantEgress: "blocked"},
 		{name: "dns resolves", dockerOut: strings.Replace(allBlocked, "dns blocked", "dns open", 1), wantEgress: "open",
 			wantProblems: []string{"egress from bench-evalnet is open: dns"}},
-		{name: "no python in helper", dockerOut: "dns blocked", dockerExit: 1, wantEgress: "open",
+		{name: "no python in helper", dockerOut: "missing python3", wantEgress: "not_run",
+			wantProblems: []string{"egress probe not run: helper image bench/coding-core-base:1 has no python3; set images.helper to the bench helper image"}},
+		{name: "probe cut short", dockerOut: "dns blocked", dockerExit: 1, wantEgress: "not_run",
 			wantProblems: []string{"egress probe incomplete (exit 1), no result for tcp:1.1.1.1:443, tcp:169.254.169.254:80"}},
-		{name: "no eval network", noNetwork: true, dockerOut: allBlocked, wantEgress: "open",
+		{name: "open wins over incomplete", dockerOut: "dns open", dockerExit: 1, wantEgress: "open",
+			wantProblems: []string{"egress from bench-evalnet is open: dns"}},
+		{name: "no eval network", noNetwork: true, dockerOut: allBlocked, wantEgress: "not_run",
 			wantProblems: []string{"egress probe not run"}},
 		{
 			name: "drifted settings", dockerOut: allBlocked, wantEgress: "blocked",
@@ -92,6 +96,12 @@ func TestPreflight(t *testing.T) {
 			}
 			if m.Settings["egress_probe"] != tt.wantEgress || m.Settings["eval_network"] != cfg.EvalNetwork {
 				t.Errorf("egress settings = %v", m.Settings)
+			}
+			// The reason is recorded exactly when the probe did not run, so the
+			// egress gate can say why instead of only "not blocked".
+			if reason := m.Settings["egress_probe_error"]; (tt.wantEgress == "not_run") != (reason != "") ||
+				(reason != "" && !strings.Contains(reason, tt.wantProblems[0])) {
+				t.Errorf("egress_probe_error = %q", reason)
 			}
 			if len(m.Problems) != len(tt.wantProblems) {
 				t.Fatalf("problems = %q, want %q", m.Problems, tt.wantProblems)
