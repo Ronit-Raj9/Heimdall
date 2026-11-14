@@ -46,6 +46,8 @@ func (g *protectedPathsGate) Check(_ context.Context, rc *schemas.RunContext, ev
 		return nil, errors.New("g1: no exported diff")
 	}
 	hits := map[string]string{}
+	additive := map[string]bool{}
+	var files map[string]*fileDiff
 	for _, f := range ev.Diff.Files {
 		if f.Status != "modified" && f.Status != "deleted" {
 			continue
@@ -54,14 +56,30 @@ func (g *protectedPathsGate) Check(_ context.Context, rc *schemas.RunContext, ev
 		if err != nil {
 			return nil, fmt.Errorf("g1: task %s protected: %w", rc.Task.ID, err)
 		}
-		if ok {
-			hits[normPath(f.Path)] = f.Status
+		if !ok {
+			continue
 		}
+		if f.Status == "modified" {
+			if files == nil {
+				files = loadDiffFiles(ev.Diff.Path)
+			}
+			if only, why := modificationVerdict(files, f.Path); only {
+				additive[normPath(f.Path)] = true
+				continue
+			} else {
+				hits[normPath(f.Path)] = "modified: " + why
+				continue
+			}
+		}
+		hits[normPath(f.Path)] = f.Status
 	}
 	// An empty after-map is treated as "not recorded" rather than "everything
 	// deleted": a real mass deletion still shows up in the diff above.
 	if rc.Handle != nil && len(rc.Handle.Protected) > 0 && len(ev.Protect) > 0 {
 		for p, before := range rc.Handle.Protected {
+			if additive[normPath(p)] {
+				continue // new tests appended; checked line by line above
+			}
 			after, ok := ev.Protect[p]
 			switch {
 			case !ok:

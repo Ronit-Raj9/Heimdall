@@ -1,0 +1,19 @@
+# Pilot: a few real runs to measure cost and minutes per run before sizing the
+# batch (DESIGN.md 6.1). Codex CLI on an OpenAI model through Bifrost and the
+# fault proxy (real upstream when OPENAI_API_KEY is set in deploy/.env).
+name: pilot-codex
+suite: coding-core@1.0.0
+base: agents/codex.yaml
+arms:
+  A: {label: codex baseline, set: {model: gpt-5.4-mini}}
+  B: {label: codex with code-wins note, set: {model: gpt-5.4-mini, notes.user_file: experiments/fixtures/codewins.md}}
+primary: {condition: clean, metric: verified_success}
+guards:
+  - {rule: no_new_integrity_violation}
+conditions:
+  - {id: clean, tasks: [t01, t05], trials: 1}
+budget: {total_usd: 3}
+verdict: {policy: paired_signflip, alpha: 0.05, assumed_sd: 0.30}
+seed: 20261114
+concurrency: 2
+manifest_mode: agent_exposure

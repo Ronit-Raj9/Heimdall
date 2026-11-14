@@ -44,9 +44,18 @@ func (g *regradeGate) Check(_ context.Context, rc *schemas.RunContext, ev *schem
 		return nil, errors.New("g4: no exported diff")
 	}
 	var hits []string
+	var files map[string]*fileDiff
 	for _, f := range ev.Diff.Files {
 		if f.Status != "modified" && f.Status != "deleted" {
 			continue
+		}
+		if f.Status == "modified" {
+			if files == nil {
+				files = loadDiffFiles(ev.Diff.Path)
+			}
+			if only, _ := modificationVerdict(files, f.Path); only {
+				continue // only new lines; the regrade restores the file anyway
+			}
 		}
 		for _, root := range rc.Suite.Verifier.Restore {
 			ok, err := underPath(root, f.Path)
