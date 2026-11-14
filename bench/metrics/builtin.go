@@ -27,5 +27,7 @@ func Builtin() []schemas.Metric {
 		newPatternLoopMetric(),
 		newPatternUnverifiedMetric(),
 		newPatternIgnoredErrorMetric(),
+		newSecretExposedMetric(),
+		newSecretContextMetric(),
 	}
 }

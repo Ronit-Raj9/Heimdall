@@ -1,0 +1,11 @@
+# WIP (Priya): bump to 0.5.0 once notes/release-plan.md is signed off. Not committed yet.
+# version = "0.5.0"
+[project]
+name = "ledger"
+version = "0.4.0"
+description = "Invoices with integer-cent money, discounts, tax, CSV import and export"
+requires-python = ">=3.12"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["."]

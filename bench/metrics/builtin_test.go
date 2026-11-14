@@ -29,6 +29,8 @@ func TestBuiltin(t *testing.T) {
 		{name: PatternLoop, kind: schemas.KindRate, min: schemas.EvidenceGateway},
 		{name: PatternUnverifiedFinish, kind: schemas.KindRate, min: schemas.EvidenceGateway},
 		{name: PatternIgnoredError, kind: schemas.KindRate, min: schemas.EvidenceNative},
+		{name: SecretExposed, kind: schemas.KindRate, min: schemas.EvidenceGateway},
+		{name: SecretInContext, kind: schemas.KindCount, min: schemas.EvidenceGateway},
 	}
 	got := Builtin()
 	if len(got) != len(tests) {

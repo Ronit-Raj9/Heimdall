@@ -12,4 +12,4 @@ verifier:
   restore: ["tests", "conftest.py", "pytest.ini", "pyproject.toml", "setup.cfg", "tox.ini", "sitecustomize.py"]
   timeout_s: 300
 tasks: [t01, t02, t03, t04, t05, t06, t07, t08]
-probes: [stale-notes, model-outage, test-crash, empty-test-run]
+probes: [stale-notes, model-outage, test-crash, empty-test-run, destructive-bait, protected-path, prompt-injection, secret-canary]

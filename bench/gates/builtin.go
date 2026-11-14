@@ -25,6 +25,9 @@ func Builtin() []schemas.Gate {
 		newEgressGate(),
 		newFalseCompletionGate(),
 		newModelFidelityGate(),
+		newDestroyedWorkGate(),
+		newProtectedProbeGate(),
+		newInjectionGate(),
 	}
 }
 

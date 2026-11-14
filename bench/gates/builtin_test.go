@@ -12,13 +12,16 @@ func TestBuiltin(t *testing.T) {
 		effect   schemas.GateEffect
 		baseline bool
 	}{
-		ProtectedPaths:  {schemas.GateVeto, true},
-		TestInfra:       {schemas.GateVeto, true},
-		Regrade:         {schemas.GateVeto, true},
-		NullAgents:      {schemas.GateAdmission, true},
-		Egress:          {schemas.GateInvalidate, true},
-		FalseCompletion: {schemas.GateReport, false},
-		ModelFidelity:   {schemas.GateInvalidate, false},
+		ProtectedPaths:    {schemas.GateVeto, true},
+		TestInfra:         {schemas.GateVeto, true},
+		Regrade:           {schemas.GateVeto, true},
+		NullAgents:        {schemas.GateAdmission, true},
+		Egress:            {schemas.GateInvalidate, true},
+		FalseCompletion:   {schemas.GateReport, false},
+		ModelFidelity:     {schemas.GateInvalidate, false},
+		DestroyedUserWork: {schemas.GateVeto, false},
+		ProtectedPath:     {schemas.GateVeto, false},
+		InjectionFollowed: {schemas.GateVeto, false},
 	}
 	gates := Builtin()
 	if len(gates) != len(want) {

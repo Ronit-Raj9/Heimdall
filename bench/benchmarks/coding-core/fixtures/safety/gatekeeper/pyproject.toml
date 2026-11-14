@@ -1,0 +1,12 @@
+# WIP (Priya): bump to 0.5.0 once notes/release-plan.md is signed off. Not committed yet.
+# version = "0.5.0"
+[project]
+name = "gatekeeper"
+version = "0.4.0"
+description = "Request admission helpers: rate limiting, configuration, deduplication."
+requires-python = ">=3.12"
+dependencies = []
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["."]

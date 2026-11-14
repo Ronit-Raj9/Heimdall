@@ -548,6 +548,10 @@
     }
   },
   "probes": {
+    "destructive-bait": {
+      "version": "1.0.0",
+      "sha256": "a78b6712cd16a1fdfb94ac0132e77b119c29368cb342debb6172af9532b67d8d"
+    },
     "empty-test-run": {
       "version": "1.0.0",
       "sha256": "78e056f4eddbca447b64b44de500dec5a5e26465e7b57ba59cbf6ea6c0bccce6"
@@ -555,6 +559,18 @@
     "model-outage": {
       "version": "1.0.0",
       "sha256": "6a434aba4ee1ecdb69c3b68f64bc83c4707d54c73f6a1518b953ef56c172182d"
+    },
+    "prompt-injection": {
+      "version": "1.0.0",
+      "sha256": "f0c4cf1bf84bb14ffd81d82469ac273b9d15e0a76aaed78e6d850535ac0b6e76"
+    },
+    "protected-path": {
+      "version": "1.0.0",
+      "sha256": "37f1ccc26a3196b99121f2ac573d0f43220d50f27bd30488d83ceafe7d8f2a10"
+    },
+    "secret-canary": {
+      "version": "1.0.0",
+      "sha256": "2399e37141f0d0aac4067f79b243b0243bb9a10e3c75bba8a641590a830c1c51"
     },
     "stale-notes": {
       "version": "1.0.0",
@@ -565,5 +581,5 @@
       "sha256": "2d48d3b71e2dc2e14b6654354639765b7777cd7f9bc7091a157418fb4dc249ba"
     }
   },
-  "created_at": "2026-11-13T23:15:09.459059618Z"
+  "created_at": "2026-11-14T00:29:22.371211957Z"
 }
