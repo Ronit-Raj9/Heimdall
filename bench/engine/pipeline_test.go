@@ -329,3 +329,101 @@ func TestOpenStage(t *testing.T) {
 		})
 	}
 }
+
+// upstreamDNSErr is the transport error the fault proxy logged when Docker
+// DNS broke on a live experiment.
+const upstreamDNSErr = "Post: dial tcp: lookup api.openai.com on 127.0.0.11:53: i/o timeout"
+
+// ledgerLine is one model call in a fault proxy ledger: answered with 200,
+// or unreachable with the proxy's 502 and upstream_error set.
+func ledgerLine(call int, reached bool) schemas.LedgerEntry {
+	e := schemas.LedgerEntry{RunID: "r", Call: call, Kind: "message", Action: "pass", Upstream: "real", Status: 200, ResponseID: "resp"}
+	if !reached {
+		e.Status, e.ResponseID, e.UpstreamError = 502, "", upstreamDNSErr
+	}
+	return e
+}
+
+// loadDNSIncident reads testdata/upstreamdns: the ledger and gateway rows of a
+// real run whose fault proxy could not resolve api.openai.com. The proxy
+// predates upstream_error, so the rows carry only its 502 and message.
+func loadDNSIncident(t *testing.T) ([]schemas.LedgerEntry, *schemas.RequestLog) {
+	t.Helper()
+	var ledger []schemas.LedgerEntry
+	var rl schemas.RequestLog
+	for name, add := range map[string]func([]byte) error{
+		"proxy.ledger.jsonl": func(b []byte) error {
+			var e schemas.LedgerEntry
+			err := json.Unmarshal(b, &e)
+			ledger = append(ledger, e)
+			return err
+		},
+		"gateway.requests.jsonl": func(b []byte) error {
+			var r schemas.GatewayRequest
+			err := json.Unmarshal(b, &r)
+			rl.Requests = append(rl.Requests, r)
+			return err
+		},
+	} {
+		raw, err := os.ReadFile(filepath.Join("testdata", "upstreamdns", name))
+		if err != nil {
+			t.Fatal(err)
+		}
+		for _, line := range strings.Split(strings.TrimSpace(string(raw)), "\n") {
+			if err := add([]byte(line)); err != nil {
+				t.Fatalf("%s: %v", name, err)
+			}
+		}
+	}
+	return ledger, &rl
+}
+
+// TestRunSlotUpstreamUnreachable checks the upstream rule end to end: model
+// calls the fault proxy could not deliver, with no fault planned, never count
+// against the agent.
+func TestRunSlotUpstreamUnreachable(t *testing.T) {
+	unreachable := []schemas.LedgerEntry{ledgerLine(1, false), ledgerLine(2, false), ledgerLine(3, false)}
+	lost := []schemas.LedgerEntry{ledgerLine(1, true), ledgerLine(2, true), ledgerLine(3, false)}
+	recovered := []schemas.LedgerEntry{ledgerLine(1, false), ledgerLine(2, true)}
+	tests := []struct {
+		name     string
+		ledger   []schemas.LedgerEntry
+		setup    func(w *world)
+		want     schemas.Outcome
+		recorded bool // an upstream part failure is on the run
+	}{
+		{"never answered", unreachable, func(w *world) { w.gradePass = false }, schemas.OutcomeAbortedInfra, true},
+		{"never answered even if graded pass", unreachable, func(*world) {}, schemas.OutcomeAbortedInfra, true},
+		{"lost after answers", lost, func(w *world) { w.gradePass = false }, schemas.OutcomeInfraError, true},
+		{"lost after answers and timed out", lost, func(w *world) { w.gradePass, w.timedOut = false, true }, schemas.OutcomeInfraError, true},
+		{"lost after answers but passed", lost, func(*world) {}, schemas.OutcomePass, false},
+		{"recovered and failed", recovered, func(w *world) { w.gradePass = false }, schemas.OutcomeFail, false},
+		{"veto wins", unreachable, func(w *world) { w.veto = true }, schemas.OutcomeIntegrityViolation, false},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			b, m, slot := pipelineFixture(t, "stale-notes")
+			tt.setup(b.w)
+			b.w.ledgers = [][]schemas.LedgerEntry{tt.ledger}
+			res, err := runOne(context.Background(), t, b, m, slot)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if res.Run.Outcome != tt.want {
+				t.Fatalf("outcome %s, want %s (failures %+v)", res.Run.Outcome, tt.want, res.Run.Failures)
+			}
+			var pf *schemas.PartFailure
+			for i, f := range res.Run.Failures {
+				if f.Part == upstreamPart {
+					pf = &res.Run.Failures[i]
+				}
+			}
+			if (pf != nil) != tt.recorded {
+				t.Fatalf("upstream failure recorded %v, want %v: %+v", pf != nil, tt.recorded, res.Run.Failures)
+			}
+			if pf != nil && (pf.Stage != schemas.StageRun || !strings.Contains(pf.Error, upstreamDNSErr)) {
+				t.Fatalf("upstream failure %+v", pf)
+			}
+		})
+	}
+}

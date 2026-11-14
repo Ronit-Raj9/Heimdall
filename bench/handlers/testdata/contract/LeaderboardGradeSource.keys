@@ -1,0 +1,6 @@
+# Keys of bench.ts `LeaderboardGradeSource`, one per line; a trailing ? marks an optional (Go omitempty) key.
+# Change with bench.ts and schemas/leaderboard.go.
+experiment
+source
+runs
+regraded_runs

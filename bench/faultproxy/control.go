@@ -5,6 +5,7 @@ import (
 	"context"
 	"crypto/subtle"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -23,18 +24,22 @@ const (
 
 // ControlHandler returns the control API. Writes need the control token as a
 // bearer token; reads do not, because the control listener is bound to
-// loopback and the agent can never reach the proxy.
+// loopback and the agent can never reach the proxy. GET /upstreams needs the
+// token too: it makes the proxy open connections to the providers, so it is
+// an action rather than a read.
 //
 //	PUT    /plans/{slot}     body schemas.FaultPlan; resets the slot's counters
 //	DELETE /plans/{slot}     clears the plan; resets the slot's counters
 //	GET    /ledger?run_id=   {"run_id":..., "entries":[...]}
 //	GET    /health           {"status":"ok", ...}
+//	GET    /upstreams        UpstreamReport: TCP and TLS reachability of each real upstream
 func (s *Server) ControlHandler() http.Handler {
 	mux := http.NewServeMux()
 	mux.HandleFunc("PUT /plans/{slot}", s.handleSetPlan)
 	mux.HandleFunc("DELETE /plans/{slot}", s.handleClearPlan)
 	mux.HandleFunc("GET /ledger", s.handleLedger)
 	mux.HandleFunc("GET /health", s.handleHealth)
+	mux.HandleFunc("GET /upstreams", s.handleUpstreams)
 	return mux
 }
 
@@ -90,11 +95,35 @@ func (s *Server) handleHealth(w http.ResponseWriter, _ *http.Request) {
 	})
 }
 
-// controlSlot authorizes a write and resolves its slot name.
-func (s *Server) controlSlot(w http.ResponseWriter, r *http.Request) (string, bool) {
+// handleUpstreams checks every real upstream and reports each one. A
+// failed provider is still a 200: the report is the answer, and the caller
+// decides what a failure blocks.
+func (s *Server) handleUpstreams(w http.ResponseWriter, r *http.Request) {
+	if !s.authorized(w, r) {
+		return
+	}
+	rep := s.checkUpstreams(r.Context(), s.newUpstreamDialer())
+	for _, c := range rep.Upstreams {
+		if !c.OK && c.Skipped == "" {
+			s.logger.Warn("upstream check failed", "provider", c.Provider, "host", c.Host, "error", c.Error)
+		}
+	}
+	s.writeJSON(w, http.StatusOK, rep)
+}
+
+// authorized checks the control token and answers 401 when it is wrong.
+func (s *Server) authorized(w http.ResponseWriter, r *http.Request) bool {
 	got := strings.TrimSpace(strings.TrimPrefix(r.Header.Get("Authorization"), "Bearer "))
 	if subtle.ConstantTimeCompare([]byte(got), []byte(s.token)) != 1 {
 		s.controlError(w, http.StatusUnauthorized, "control token required")
+		return false
+	}
+	return true
+}
+
+// controlSlot authorizes a write and resolves its slot name.
+func (s *Server) controlSlot(w http.ResponseWriter, r *http.Request) (string, bool) {
+	if !s.authorized(w, r) {
 		return "", false
 	}
 	slot := r.PathValue("slot")
@@ -187,6 +216,26 @@ func (c *Client) Health(ctx context.Context) error {
 	return nil
 }
 
+// CheckUpstreams asks the proxy to dial every provider it answers from the
+// real API with a real key and returns its report. It needs the control
+// token. A proxy older than the check answers 404 or 405, which comes back
+// as ErrUpstreamCheckUnsupported so a caller can tell "unknown" from
+// "unreachable".
+func (c *Client) CheckUpstreams(ctx context.Context) (*UpstreamReport, error) {
+	var out UpstreamReport
+	if err := c.do(ctx, http.MethodGet, "/upstreams", nil, &out); err != nil {
+		var se *statusError
+		if errors.As(err, &se) && (se.code == http.StatusNotFound || se.code == http.StatusMethodNotAllowed) {
+			return nil, fmt.Errorf("fault proxy upstream check: %w (%w)", ErrUpstreamCheckUnsupported, err)
+		}
+		return nil, fmt.Errorf("fault proxy upstream check: %w", err)
+	}
+	if out.Upstreams == nil {
+		out.Upstreams = []UpstreamCheck{}
+	}
+	return &out, nil
+}
+
 func (c *Client) do(ctx context.Context, method, path string, body []byte, out any) error {
 	var rd io.Reader
 	if body != nil {
@@ -215,10 +264,11 @@ func (c *Client) do(ctx context.Context, method, path string, body []byte, out a
 		var e struct {
 			Error string `json:"error"`
 		}
-		if json.Unmarshal(data, &e) == nil && e.Error != "" {
-			return fmt.Errorf("status %d: %s", resp.StatusCode, e.Error)
+		se := &statusError{code: resp.StatusCode}
+		if json.Unmarshal(data, &e) == nil {
+			se.msg = e.Error
 		}
-		return fmt.Errorf("status %d", resp.StatusCode)
+		return se
 	}
 	if out == nil {
 		return nil
@@ -227,4 +277,18 @@ func (c *Client) do(ctx context.Context, method, path string, body []byte, out a
 		return fmt.Errorf("decode response: %w", err)
 	}
 	return nil
+}
+
+// statusError is a non-2xx answer from the control API. Its text keeps the
+// status code first, as "status 404" or "status 401: control token required".
+type statusError struct {
+	code int
+	msg  string
+}
+
+func (e *statusError) Error() string {
+	if e.msg != "" {
+		return fmt.Sprintf("status %d: %s", e.code, e.msg)
+	}
+	return fmt.Sprintf("status %d", e.code)
 }

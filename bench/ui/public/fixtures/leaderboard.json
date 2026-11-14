@@ -512,5 +512,38 @@
 			]
 		}
 	],
-	"generated_at": "2026-11-14T06:00:00Z"
+	"generated_at": "2026-11-14T06:00:00Z",
+	"grade_source": "latest",
+	"grade_sources": [
+		{
+			"experiment": "e_synthetic-codewins",
+			"source": "rg_synthetic_gates",
+			"runs": 36,
+			"regraded_runs": 34
+		},
+		{
+			"experiment": "e_synthetic-providers",
+			"source": "original",
+			"runs": 52,
+			"regraded_runs": 0
+		},
+		{
+			"experiment": "e_synthetic-custom",
+			"source": "original",
+			"runs": 8,
+			"regraded_runs": 0
+		},
+		{
+			"experiment": "e_synthetic-flaky",
+			"source": "original",
+			"runs": 24,
+			"regraded_runs": 0
+		},
+		{
+			"experiment": "e_synthetic-running",
+			"source": "original",
+			"runs": 6,
+			"regraded_runs": 0
+		}
+	]
 }

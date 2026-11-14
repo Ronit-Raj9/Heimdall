@@ -26,6 +26,15 @@ type Leaderboard struct {
 	Entries     []LeaderboardEntry     `json:"entries"`      // ordered by Rank
 	Excluded    []LeaderboardExclusion `json:"excluded"`     // runs left out, grouped by reason
 	GeneratedAt time.Time              `json:"generated_at"`
+
+	// GradeSource is what the board read each run's outcome and metrics
+	// from: original (as sealed) or latest (each experiment's newest
+	// regrade, see LeaderboardGradeSource).
+	GradeSource string `json:"grade_source"`
+	// GradeSources says, for every experiment with runs on the board
+	// (graded or excluded), which source its runs were read from, newest
+	// experiment first.
+	GradeSources []LeaderboardGradeSource `json:"grade_sources"`
 }
 
 // LeaderboardEntry is one agent configuration on the board.
@@ -42,7 +51,7 @@ type LeaderboardEntry struct {
 	Experiments []string `json:"experiments"` // experiment ids that contributed runs, newest first
 	Tasks       int      `json:"tasks"`       // distinct tasks with at least one graded run
 	Runs        int      `json:"runs"`        // graded runs counted
-	Trials      int      `json:"trials"`      // fewest graded runs on any of its tasks: the k of Reliability
+	Trials      int      `json:"trials"`      // the k of Reliability: min(3, trials per task its experiments ran) unless the query sets k
 
 	// Success is the mean over tasks of the per-task verified success rate.
 	// Bounds is a descriptive 95% t interval over tasks (stats.PairedT on the
@@ -51,11 +60,13 @@ type LeaderboardEntry struct {
 	// Passes is verified successes over graded runs, pooled.
 	Passes Ratio `json:"passes"`
 	// Reliability is the mean over tasks of pass^k with k = Trials
-	// (stats.PassHatK): the chance all k tries succeed. Unknown when Trials < 2.
+	// (stats.PassHatK): the chance all k tries succeed. Unknown when Trials < 2
+	// or a task has fewer than Trials graded runs.
 	Reliability Value `json:"reliability"`
 	// Metrics are per-run aggregates keyed by metric id: the median over runs
-	// for steps, tool_calls, tokens, cost_usd and wall_time_s; the rate over
-	// runs for false_completion and safe_success; and cost_per_success (total
+	// for steps, tool_calls, tokens, cost_usd and wall_time_s; the share of
+	// runs for false_completion (over runs whose outcome and claim are known,
+	// a passing run counting as 0) and safe_success; and cost_per_success (total
 	// observed cost over verified successes, not_applicable with none).
 	// A value is unknown when no run observed it; Reason says how many runs
 	// were unknown.
@@ -73,4 +84,17 @@ type LeaderboardExclusion struct {
 	Reason      string   `json:"reason"`
 	Runs        int      `json:"runs"`
 	Experiments []string `json:"experiments"`
+}
+
+// LeaderboardGradeSource is the grade source one experiment's runs on the
+// board were read from. Under grade source latest it is the experiment's
+// newest regrade (regrade.json created_at, ties by the larger regrade id),
+// read as analysis reads it; a run that regrade has no result for (a
+// compatibility run, or one sealed after the regrade) keeps its original
+// grade, so RegradedRuns can be below Runs.
+type LeaderboardGradeSource struct {
+	Experiment   string `json:"experiment"`
+	Source       string `json:"source"`        // "original" or the regrade id read
+	Runs         int    `json:"runs"`          // the experiment's runs on the board, graded or excluded
+	RegradedRuns int    `json:"regraded_runs"` // of Runs, those read from the regrade
 }

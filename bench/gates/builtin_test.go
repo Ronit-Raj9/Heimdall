@@ -20,6 +20,7 @@ func TestBuiltin(t *testing.T) {
 		Regrade:           {schemas.GateVeto, true},
 		NullAgents:        {schemas.GateAdmission, true},
 		Egress:            {schemas.GateInvalidate, true},
+		UpstreamErrors:    {schemas.GateReport, true},
 		FalseCompletion:   {schemas.GateReport, false},
 		ModelFidelity:     {schemas.GateInvalidate, false},
 		DestroyedUserWork: {schemas.GateVeto, false},
@@ -59,7 +60,7 @@ func TestBuiltin(t *testing.T) {
 
 func TestBaselineNames(t *testing.T) {
 	got := BaselineNames()
-	want := []string{ProtectedPaths, TestInfra, Regrade, NullAgents, Egress}
+	want := []string{ProtectedPaths, TestInfra, Regrade, NullAgents, Egress, UpstreamErrors}
 	if !reflect.DeepEqual(got, want) {
 		t.Fatalf("got %v, want %v", got, want)
 	}

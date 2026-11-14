@@ -15,6 +15,7 @@ import (
 	"time"
 
 	"github.com/maximhq/bifrost/bench/schemas"
+	"github.com/maximhq/bifrost/bench/utils"
 )
 
 // testEnv is one proxy with its data and control planes on httptest servers.
@@ -440,6 +441,65 @@ func TestUpstreamUnreachable(t *testing.T) {
 	}
 	if strings.Contains(string(body), "sk-real-key") || decodeError(t, body).Error.Type != "api_error" {
 		t.Errorf("body %s", body)
+	}
+	if !strings.Contains(string(body), utils.ProxyUnreachable) {
+		t.Errorf("body %s lacks %q", body, utils.ProxyUnreachable)
+	}
+	entries := env.entries(t)
+	last := entries[len(entries)-1]
+	if last.Action != ActionPass || last.Status != http.StatusBadGateway || !strings.Contains(last.UpstreamError, "connection refused") ||
+		strings.Contains(last.UpstreamError, "sk-real-key") || strings.Contains(last.UpstreamError, "/v1/messages") {
+		t.Errorf("ledger entry = %+v", last)
+	}
+}
+
+// TestUpstreamErrorOnlyWhenUnreachable checks that upstream_error marks only
+// calls the provider never answered: a provider's own 502 and a caller that
+// went away before the provider answered leave it empty.
+func TestUpstreamErrorOnlyWhenUnreachable(t *testing.T) {
+	release := make(chan struct{})
+	up := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if b, _ := io.ReadAll(r.Body); strings.Contains(string(b), "hang") {
+			select {
+			case <-r.Context().Done():
+			case <-release:
+			}
+			return
+		}
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusBadGateway)
+		_, _ = io.WriteString(w, `{"type":"error","error":{"type":"api_error","message":"provider overloaded"}}`)
+	}))
+	defer up.Close()
+	defer close(release)
+	env := newTestEnv(t, up.URL, "sk-real-key")
+	if resp, _ := env.call(t, http.MethodPost, "/v1/messages", "auth-a", msgBody); resp.StatusCode != http.StatusBadGateway {
+		t.Fatalf("status %d", resp.StatusCode)
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 200*time.Millisecond)
+	defer cancel()
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, env.data.URL+"/v1/messages", strings.NewReader(strings.Replace(msgBody, "hi", "hang", 1)))
+	if err != nil {
+		t.Fatal(err)
+	}
+	req.Header.Set("x-api-key", "auth-a")
+	if resp, err := http.DefaultClient.Do(req); err == nil {
+		resp.Body.Close()
+		t.Fatal("hanging upstream answered")
+	}
+	var entries []schemas.LedgerEntry
+	for deadline := time.Now().Add(5 * time.Second); time.Now().Before(deadline); time.Sleep(20 * time.Millisecond) {
+		if entries = env.entries(t); len(entries) == 2 {
+			break
+		}
+	}
+	if len(entries) != 2 {
+		t.Fatalf("ledger has %d entries, want 2", len(entries))
+	}
+	for i, e := range entries {
+		if e.UpstreamError != "" || e.Action != ActionPass {
+			t.Errorf("entry %d = %+v, want a pass line with no upstream_error", i+1, e)
+		}
 	}
 }
 

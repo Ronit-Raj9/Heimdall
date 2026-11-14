@@ -1,11 +1,21 @@
 package main
 
 import (
+	"context"
+	"encoding/json"
+	"fmt"
+	"io/fs"
 	"os"
 	"path/filepath"
+	"reflect"
+	"slices"
 	"testing"
+	"time"
 
+	"github.com/maximhq/bifrost/bench/handlers"
+	"github.com/maximhq/bifrost/bench/leaderboard"
 	"github.com/maximhq/bifrost/bench/schemas"
+	"github.com/maximhq/bifrost/bench/store"
 )
 
 func TestLatestDecision(t *testing.T) {
@@ -52,6 +62,9 @@ func TestLeaderboardUsage(t *testing.T) {
 		{name: "positional argument", args: []string{"extra"}},
 		{name: "unknown format", args: []string{"-format", "xml"}},
 		{name: "unknown flag", args: []string{"-alpha", "0.1"}},
+		{name: "grade source is not original or latest", args: []string{"-grade-source", "rg_gates_1_1_0"}},
+		{name: "k of 1", args: []string{"-k", "1"}},
+		{name: "k not an integer", args: []string{"-k", "two"}},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -59,5 +72,193 @@ func TestLeaderboardUsage(t *testing.T) {
 				t.Errorf("exit = %d, want %d", got, exitUsage)
 			}
 		})
+	}
+}
+
+// regradeStore builds a run store in a temp dir: experiment e_rg, where arm
+// A (sha256:aaa) ran t1 and t2 once each, sealed, and a gate vetoed t1. Its
+// regrades: rg_b (older) fails t1 again, rg_a and rg_c share the newest
+// created_at and only rg_c passes t1, so the tie must go to the larger id.
+// rg_partial has no regrade.json and a stray file sits beside the folders.
+func regradeStore(t *testing.T) (*store.FSStore, map[string]time.Time) {
+	t.Helper()
+	ctx := context.Background()
+	root := t.TempDir()
+	t.Cleanup(func() { makeWritable(t, root) })
+	st, err := store.NewFSStore(root, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	m := &schemas.Manifest{ExpID: "e_rg", SuiteID: "s", SuiteVersion: "1", CreatedAt: time.Date(2026, 11, 14, 1, 0, 0, 0, time.UTC),
+		Arms: map[string]schemas.ArmManifest{"A": {Label: "a", ConfigHash: "sha256:aaa", Config: schemas.AgentConfig{ID: "codex", Adapter: "command"}}},
+		Slots: []schemas.Slot{
+			{SlotID: "s_t1", PairID: "p_t1", Task: "t1", Arm: "A", Condition: "clean", Trial: 1, Counted: true},
+			{SlotID: "s_t2", PairID: "p_t2", Task: "t2", Arm: "A", Condition: "clean", Trial: 1, OrderIndex: 1, Counted: true},
+		}}
+	if err := st.CreateExperiment(ctx, m); err != nil {
+		t.Fatal(err)
+	}
+	seal := func(slot, runID string, o schemas.Outcome, y float64) {
+		sl := m.Slots[slices.IndexFunc(m.Slots, func(s schemas.Slot) bool { return s.SlotID == slot })]
+		sl.ExpID = m.ExpID
+		r := &schemas.Run{RunID: runID, Attempt: 1, Stage: schemas.StageCleanup, Outcome: o}
+		if _, err := st.NewRun(ctx, &sl, r); err != nil {
+			t.Fatal(err)
+		}
+		r.ExpID, r.SlotID, r.PairID = m.ExpID, sl.SlotID, sl.PairID
+		metrics := fmt.Sprintf(`{"verified_success":{"state":"observed","v":%v,"evidence":"outcome"}}`, y)
+		if err := st.WriteRunFile(ctx, r, "metrics.json", []byte(metrics)); err != nil {
+			t.Fatal(err)
+		}
+		if _, err := st.Seal(ctx, r); err != nil {
+			t.Fatal(err)
+		}
+	}
+	seal("s_t1", "r_t1", schemas.OutcomeIntegrityViolation, 0)
+	seal("s_t2", "r_t2", schemas.OutcomePass, 1)
+
+	newest := time.Date(2026, 11, 14, 3, 0, 0, 0, time.UTC)
+	created := map[string]time.Time{"rg_a": newest, "rg_b": newest.Add(-time.Hour), "rg_c": newest}
+	outcomes := map[string]schemas.Outcome{"rg_a": schemas.OutcomeTimeout, "rg_b": schemas.OutcomeFail, "rg_c": schemas.OutcomePass}
+	versions := map[string]string{"g1_protected_paths": "1.1.0"}
+	for id, at := range created {
+		dir := filepath.Join(root, "e_rg", "regrades", id)
+		if err := os.MkdirAll(dir, 0o755); err != nil {
+			t.Fatal(err)
+		}
+		info, err := json.Marshal(store.RegradeInfo{RegradeID: id, ExpID: "e_rg", SuiteVersion: "1", GateVersions: versions, CreatedAt: at})
+		if err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(filepath.Join(dir, "regrade.json"), info, 0o644); err != nil {
+			t.Fatal(err)
+		}
+		y := 0.0
+		if outcomes[id] == schemas.OutcomePass {
+			y = 1
+		}
+		r := &store.GateRegrade{SealedOutcome: schemas.OutcomeIntegrityViolation, Outcome: outcomes[id], Y: schemas.Observed(y, schemas.EvidenceOutcome),
+			Metrics: map[string]schemas.Value{"verified_success": schemas.Observed(y, schemas.EvidenceOutcome)}}
+		if err := st.WriteGateRegrade(ctx, "e_rg", id, "r_t1", store.RegradeInfo{SuiteVersion: "1", GateVersions: versions}, r); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if err := os.MkdirAll(filepath.Join(root, "e_rg", "regrades", "rg_partial"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(root, "e_rg", "regrades", "notes.txt"), []byte("x"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	return st, created
+}
+
+func TestIndexAdapterRegrades(t *testing.T) {
+	ctx := context.Background()
+	st, created := regradeStore(t)
+	x := indexAdapter{root: st.Root()}
+	list, err := x.Regrades(ctx, "e_rg")
+	if err != nil {
+		t.Fatalf("Regrades: %v", err)
+	}
+	got := map[string]time.Time{}
+	for _, r := range list {
+		got[r.ID] = r.CreatedAt.UTC()
+	}
+	if !reflect.DeepEqual(got, created) {
+		t.Errorf("regrades = %v, want %v (rg_partial has no regrade.json)", got, created)
+	}
+	if list, err := x.Regrades(ctx, "e_none"); err != nil || len(list) != 0 {
+		t.Errorf("experiment without regrades = %v, %v", list, err)
+	}
+	runs, err := x.RegradedRuns(ctx, "e_rg", "rg_c")
+	if err != nil || len(runs) != 2 || runs[0].GradeSource != "rg_c" || runs[0].Run.Outcome != schemas.OutcomePass || runs[1].GradeSource != "original" {
+		t.Errorf("regraded runs = %+v, %v", runs, err)
+	}
+	if _, err := (indexAdapter{root: filepath.Join(st.Root(), "missing")}).RegradedRuns(ctx, "e_rg", "rg_c"); err == nil {
+		t.Error("a missing store root opened")
+	}
+	if _, err := os.Stat(filepath.Join(st.Root(), "missing")); err == nil {
+		t.Error("reading created the missing store root")
+	}
+}
+
+func TestLeaderboardGradeSourceOnDisk(t *testing.T) {
+	ctx := context.Background()
+	st, _ := regradeStore(t)
+	ix := store.NewIndex(st)
+	if err := ix.Rebuild(ctx); err != nil {
+		t.Fatal(err)
+	}
+	src := handlers.LeaderboardSource(indexAdapter{ix: ix, root: st.Root()})
+	before := treeState(t, st.Root())
+	tests := []struct {
+		source      string
+		wantSuccess float64
+		wantSources []schemas.LeaderboardGradeSource
+	}{
+		{source: leaderboard.GradeSourceOriginal, wantSuccess: 0.5,
+			wantSources: []schemas.LeaderboardGradeSource{{Experiment: "e_rg", Source: "original", Runs: 2}}},
+		{source: leaderboard.GradeSourceLatest, wantSuccess: 1,
+			wantSources: []schemas.LeaderboardGradeSource{{Experiment: "e_rg", Source: "rg_c", Runs: 2, RegradedRuns: 1}}},
+	}
+	for _, tt := range tests {
+		t.Run(tt.source, func(t *testing.T) {
+			lb, err := leaderboard.Build(ctx, src, leaderboard.Query{GradeSource: tt.source})
+			if err != nil {
+				t.Fatalf("Build: %v", err)
+			}
+			if !reflect.DeepEqual(lb.GradeSources, tt.wantSources) {
+				t.Errorf("grade sources = %+v, want %+v", lb.GradeSources, tt.wantSources)
+			}
+			if len(lb.Entries) != 1 {
+				t.Fatalf("entries = %+v", lb.Entries)
+			}
+			if v, _ := lb.Entries[0].Success.Float(); v != tt.wantSuccess {
+				t.Errorf("success = %v, want %v", v, tt.wantSuccess)
+			}
+		})
+	}
+	if after := treeState(t, st.Root()); !reflect.DeepEqual(before, after) {
+		t.Errorf("the leaderboard wrote to the run store:\nbefore %v\nafter  %v", before, after)
+	}
+}
+
+// treeState maps every path under root to its size, mode and modification
+// time, so a test can tell that nothing was written.
+func treeState(t *testing.T, root string) map[string]string {
+	t.Helper()
+	out := map[string]string{}
+	err := filepath.WalkDir(root, func(p string, d fs.DirEntry, err error) error {
+		if err != nil {
+			return err
+		}
+		info, err := d.Info()
+		if err != nil {
+			return err
+		}
+		out[p] = fmt.Sprintf("%d %v %d", info.Size(), info.Mode(), info.ModTime().UnixNano())
+		return nil
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	return out
+}
+
+// makeWritable undoes the read-only modes of sealed folders so the temp dir
+// can be removed.
+func makeWritable(t *testing.T, root string) {
+	t.Helper()
+	err := filepath.WalkDir(root, func(p string, d fs.DirEntry, err error) error {
+		if err != nil {
+			return err
+		}
+		if d.IsDir() {
+			return os.Chmod(p, 0o755)
+		}
+		return os.Chmod(p, 0o644)
+	})
+	if err != nil {
+		t.Logf("make writable %s: %v", root, err)
 	}
 }

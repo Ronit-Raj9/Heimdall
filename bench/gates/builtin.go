@@ -23,6 +23,7 @@ func Builtin() []schemas.Gate {
 		newRegradeGate(),
 		newNullAgentsGate(),
 		newEgressGate(),
+		newUpstreamGate(),
 		newFalseCompletionGate(),
 		newModelFidelityGate(),
 		newDestroyedWorkGate(),

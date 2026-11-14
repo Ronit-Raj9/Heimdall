@@ -3,6 +3,7 @@ package engine
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -401,6 +402,106 @@ func TestNewExpID(t *testing.T) {
 			got := newExpID(tt.name)
 			if !strings.HasPrefix(got, tt.prefix) || len(got) != len(tt.prefix)+4 || !storeID.MatchString(got) {
 				t.Fatalf("newExpID(%q) = %q", tt.name, got)
+			}
+		})
+	}
+}
+
+// fakeChecker is an UpstreamChecker with a canned answer.
+type fakeChecker struct {
+	statuses []UpstreamStatus
+	err      error
+	calls    int
+}
+
+func (f *fakeChecker) CheckUpstreams(context.Context) ([]UpstreamStatus, error) {
+	f.calls++
+	return f.statuses, f.err
+}
+
+func TestPlanUpstreamCheck(t *testing.T) {
+	const dnsErr = "dial tcp: lookup api.anthropic.com on 127.0.0.11:53: server misbehaving"
+	anthDown := []UpstreamStatus{{Provider: "anthropic", Host: "api.anthropic.com:443", Error: dnsErr}}
+	openaiDown := []UpstreamStatus{
+		{Provider: "anthropic", Host: "api.anthropic.com:443", OK: true},
+		{Provider: "openai", Host: "api.openai.com:443", Error: "dial tcp: lookup api.openai.com: no such host"},
+	}
+	toyYAML := fmt.Sprintf(testAgentYAML, "toy-model", "scripted", "CLAUDE.md", "/tmp/toy/CLAUDE.md") + "scripted: {kind: toy}\n"
+	oracleYAML := fmt.Sprintf(testAgentYAML, "oracle", "scripted", "CLAUDE.md", "/tmp/toy/CLAUDE.md") + "scripted: {kind: oracle}\n"
+	tests := []struct {
+		name      string
+		checker   *fakeChecker // nil: no checker wired
+		mutate    func(e *schemas.Experiment)
+		want      string // error substring; empty means the plan succeeds
+		wantCalls int
+	}{
+		{name: "no checker wired", mutate: func(*schemas.Experiment) {}},
+		{name: "reachable", checker: &fakeChecker{statuses: openaiDown[:1]}, wantCalls: 1},
+		{name: "used provider unreachable refuses", checker: &fakeChecker{statuses: anthDown}, wantCalls: 1,
+			want: "upstream check failed, every model call would fail; fix the network or the provider key before planning: " +
+				"provider anthropic (api.anthropic.com:443, arms A, B): " + dnsErr},
+		{name: "old proxy proceeds", checker: &fakeChecker{err: fmt.Errorf("fault proxy upstream check: %w", ErrUpstreamCheckUnsupported)},
+			wantCalls: 1},
+		{name: "checker error refuses", checker: &fakeChecker{err: errors.New("fault proxy upstream check: status 401: control token required")},
+			wantCalls: 1, want: "upstream check: fault proxy upstream check: status 401"},
+		{name: "provider not used by arms proceeds", checker: &fakeChecker{statuses: openaiDown}, wantCalls: 1},
+		{name: "skipped provider proceeds", checker: &fakeChecker{statuses: []UpstreamStatus{
+			{Provider: "anthropic", Host: "api.anthropic.com:443", Skipped: "through an HTTP proxy"}}}, wantCalls: 1},
+		{name: "one arm on the unreachable provider refuses", checker: &fakeChecker{statuses: openaiDown}, wantCalls: 1,
+			mutate: func(e *schemas.Experiment) {
+				e.Arms["B"] = schemas.ArmSpec{Label: "gpt", Set: map[string]any{"gateway.provider": "openai"}}
+			}, want: "provider openai (api.openai.com:443, arms B): dial tcp: lookup api.openai.com"},
+		{name: "compatibility agent counts", checker: &fakeChecker{statuses: openaiDown}, wantCalls: 1,
+			mutate: func(e *schemas.Experiment) {
+				e.Arms["B"] = schemas.ArmSpec{Label: "other model", Set: map[string]any{"model": "claude-other"}}
+				e.Compatibility = &schemas.CompatibilitySpec{Agent: "agents/compat-openai.yaml",
+					Conditions: []string{"clean"}, Tasks: schemas.TaskSelector{IDs: []string{"t01"}}, Trials: 1}
+			}, want: "provider openai (api.openai.com:443, arms " + CompatArm + ")"},
+		{name: "offline scripted controls skip the check", checker: &fakeChecker{statuses: anthDown},
+			mutate: func(e *schemas.Experiment) {
+				e.Base = "agents/oracle.yaml"
+				e.Arms["B"] = schemas.ArmSpec{Label: "other model", Set: map[string]any{"model": "claude-other"}}
+			}},
+		{name: "toy control calls its provider", checker: &fakeChecker{statuses: anthDown}, wantCalls: 1,
+			mutate: func(e *schemas.Experiment) {
+				e.Arms["B"] = schemas.ArmSpec{Label: "toy", Agent: "agents/toy-model.yaml"}
+			}, want: "provider anthropic (api.anthropic.com:443, arms A, B)"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			b := newBench(t)
+			for name, body := range map[string]string{
+				"agents/toy-model.yaml":     toyYAML,
+				"agents/oracle.yaml":        oracleYAML,
+				"agents/compat-openai.yaml": strings.Replace(fmt.Sprintf(testAgentYAML, "compat", "command", "CLAUDE.md", "/tmp/c/CLAUDE.md"), "provider: anthropic", "provider: openai", 1),
+			} {
+				if err := os.WriteFile(filepath.Join(b.root, name), []byte(body), 0o644); err != nil {
+					t.Fatal(err)
+				}
+			}
+			e := testExperiment()
+			if tt.mutate != nil {
+				tt.mutate(e)
+			}
+			var opts []PlannerOption
+			if tt.checker != nil {
+				opts = append(opts, WithUpstreamChecker(tt.checker))
+			}
+			m, err := NewPlanner(b.reg, b.root, nil, opts...).Plan(context.Background(), e)
+			if tt.checker != nil && tt.checker.calls != tt.wantCalls {
+				t.Fatalf("checker called %d times, want %d", tt.checker.calls, tt.wantCalls)
+			}
+			if tt.want != "" {
+				if err == nil || !strings.Contains(err.Error(), tt.want) {
+					t.Fatalf("err = %v, want it to contain %q", err, tt.want)
+				}
+				return
+			}
+			if err != nil {
+				t.Fatalf("plan: %v", err)
+			}
+			if m.Hash == "" {
+				t.Fatal("plan returned an unhashed manifest")
 			}
 		})
 	}

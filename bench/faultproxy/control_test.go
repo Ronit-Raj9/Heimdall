@@ -2,7 +2,9 @@ package faultproxy
 
 import (
 	"context"
+	"errors"
 	"net/http"
+	"net/http/httptest"
 	"strings"
 	"testing"
 	"time"
@@ -98,5 +100,102 @@ func TestControlRejectsUnknownPlanFields(t *testing.T) {
 	resp.Body.Close()
 	if resp.StatusCode != http.StatusBadRequest {
 		t.Fatalf("status %d, want 400", resp.StatusCode)
+	}
+}
+
+func TestControlUpstreamsAuth(t *testing.T) {
+	env := newTestEnv(t, UpstreamScripted, "")
+	ctx := context.Background()
+	tests := []struct {
+		name    string
+		client  *Client
+		wantErr string // empty: success
+	}{
+		{"control token", env.client, ""},
+		{"no token", NewClient(env.ctrl.URL), "status 401: control token required"},
+		{"wrong token", NewClient(env.ctrl.URL, WithToken("nope")), "status 401: control token required"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			rep, err := tt.client.CheckUpstreams(ctx)
+			if tt.wantErr == "" {
+				if err != nil {
+					t.Fatal(err)
+				}
+				if rep.Upstreams == nil || len(rep.Upstreams) != 0 {
+					t.Fatalf("scripted-only proxy reported %+v, want an empty list", rep.Upstreams)
+				}
+				return
+			}
+			if err == nil || !strings.Contains(err.Error(), tt.wantErr) || errors.Is(err, ErrUpstreamCheckUnsupported) {
+				t.Fatalf("err = %v, want %q and not the unsupported sentinel", err, tt.wantErr)
+			}
+		})
+	}
+}
+
+func TestClientCheckUpstreams(t *testing.T) {
+	// oldProxy has the control routes of a proxy that predates /upstreams.
+	oldProxy := http.NewServeMux()
+	oldProxy.HandleFunc("GET /health", func(w http.ResponseWriter, _ *http.Request) { w.WriteHeader(http.StatusOK) })
+	oldProxy.HandleFunc("PUT /upstreams", func(w http.ResponseWriter, _ *http.Request) { w.WriteHeader(http.StatusNoContent) })
+	tests := []struct {
+		name        string
+		handler     http.Handler
+		path        string // appended to the fake's URL as the control base
+		unsupported bool
+		wantErr     string // empty: success
+		want        []UpstreamCheck
+	}{
+		{name: "old proxy answers 404", handler: oldProxy, path: "/old", unsupported: true, wantErr: "status 404"},
+		{name: "old proxy answers 405", handler: oldProxy, unsupported: true, wantErr: "status 405"},
+		{name: "proxy error is not unsupported", handler: http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+			http.Error(w, `{"error":"boom"}`, http.StatusInternalServerError)
+		}), wantErr: "status 500: boom"},
+		{name: "report decoded", handler: http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			if r.URL.Path != "/upstreams" || r.Header.Get("Authorization") != "Bearer tok" {
+				http.Error(w, `{"error":"bad request"}`, http.StatusBadRequest)
+				return
+			}
+			_, err := w.Write([]byte(`{"checked_at":"2026-11-14T10:00:00Z","upstreams":[` +
+				`{"provider":"openai","host":"api.openai.com:443","ok":false,"latency_ms":12.5,"error":"dial tcp: lookup api.openai.com: no such host"}]}`))
+			if err != nil {
+				t.Errorf("write: %v", err)
+			}
+		}), want: []UpstreamCheck{{Provider: "openai", Host: "api.openai.com:443", LatencyMS: 12.5,
+			Error: "dial tcp: lookup api.openai.com: no such host"}}},
+		{name: "empty report is an empty list", handler: http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+			_, err := w.Write([]byte(`{"checked_at":"2026-11-14T10:00:00Z"}`))
+			if err != nil {
+				t.Errorf("write: %v", err)
+			}
+		}), want: []UpstreamCheck{}},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			srv := httptest.NewServer(tt.handler)
+			defer srv.Close()
+			rep, err := NewClient(srv.URL+tt.path, WithToken("tok")).CheckUpstreams(context.Background())
+			if errors.Is(err, ErrUpstreamCheckUnsupported) != tt.unsupported {
+				t.Fatalf("err = %v, unsupported sentinel want %v", err, tt.unsupported)
+			}
+			if tt.wantErr != "" {
+				if err == nil || !strings.Contains(err.Error(), tt.wantErr) {
+					t.Fatalf("err = %v, want it to contain %q", err, tt.wantErr)
+				}
+				return
+			}
+			if err != nil {
+				t.Fatal(err)
+			}
+			if len(rep.Upstreams) != len(tt.want) || rep.Upstreams == nil || rep.CheckedAt.IsZero() {
+				t.Fatalf("report = %+v, want %+v", rep, tt.want)
+			}
+			for i := range tt.want {
+				if rep.Upstreams[i] != tt.want[i] {
+					t.Fatalf("upstream %d = %+v, want %+v", i, rep.Upstreams[i], tt.want[i])
+				}
+			}
+		})
 	}
 }

@@ -161,6 +161,38 @@ func TestSchedulerRetries(t *testing.T) {
 	}
 }
 
+// TestSchedulerRetriesUnreachableProvider runs a slot whose first attempt
+// never reached the provider: it is sealed as aborted_infra although its agent
+// started, and the slot gets a new run that is the counted one.
+func TestSchedulerRetriesUnreachableProvider(t *testing.T) {
+	b := newBench(t)
+	b.w.ledgers = [][]schemas.LedgerEntry{{ledgerLine(1, false), ledgerLine(2, false)}}
+	m := b.plan(t, testExperiment())
+	sum, err := NewScheduler(b.reg, b.root, nil, nil).Run(context.Background(), m, RunOptions{Concurrency: 1})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if sum.Sealed != len(m.Slots)+1 || sum.Retried != 1 {
+		t.Fatalf("summary %+v", sum)
+	}
+	retried := 0
+	for _, s := range m.Slots {
+		runs := b.store.slotRuns(s.SlotID)
+		if len(runs) == 1 {
+			continue
+		}
+		retried++
+		first, second := runs[0].run, runs[1].run
+		if first.Outcome != schemas.OutcomeAbortedInfra || first.Timing.AgentStarted == nil ||
+			second.Outcome != schemas.OutcomePass || second.Attempt != 2 {
+			t.Fatalf("slot %s runs %+v then %+v", s.SlotID, first, second)
+		}
+	}
+	if retried != 1 {
+		t.Fatalf("%d slots retried, want 1", retried)
+	}
+}
+
 func TestSchedulerRefuses(t *testing.T) {
 	tests := []struct {
 		name   string

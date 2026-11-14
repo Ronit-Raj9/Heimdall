@@ -23,7 +23,8 @@ const (
 )
 
 // medianMetrics are aggregated as the median over runs, rateMetrics as the
-// mean of the 0/1 values over runs.
+// mean of the 0/1 values over runs (notApplicableValue says which
+// not-applicable runs still count).
 var (
 	medianMetrics = []string{MetricSteps, MetricToolCalls, MetricTokens, MetricCostUSD, MetricWallTime}
 	rateMetrics   = []string{MetricFalseCompletion, MetricSafeSuccess}
@@ -80,7 +81,7 @@ func buildEntries(p pool, q Query) ([]*entryCalc, []string) {
 		if q.Scope == ScopeCommon {
 			scoped = slices.DeleteFunc(slices.Clone(all), func(r gradedRun) bool { return !slices.Contains(common, r.rec.slot.Task) })
 		}
-		c := newEntry(h, all, scoped)
+		c := newEntry(h, all, scoped, q.K)
 		if q.Condition == schemas.ConditionClean {
 			c.e.Resilience = resilience(p[h], c.rates)
 		}
@@ -92,7 +93,9 @@ func buildEntries(p pool, q Query) ([]*entryCalc, []string) {
 // newEntry computes an entry's numbers from its runs in scope. Identity
 // (agent, model, label) comes from the newest experiment among all its runs
 // under the condition, so an entry restricted to no tasks still says who it is.
-func newEntry(hash string, all, scoped []gradedRun) *entryCalc {
+// k is the query's k of pass^k, 0 for the entry's default (defaultK); Trials
+// reports the k used.
+func newEntry(hash string, all, scoped []gradedRun, k int) *entryCalc {
 	c := &entryCalc{rates: map[string]float64{}}
 	e := &c.e
 	e.ConfigHash = hash
@@ -123,12 +126,13 @@ func newEntry(hash string, all, scoped []gradedRun) *entryCalc {
 	e.Tasks, e.Runs, e.Passes.Den = len(tally), len(scoped), len(scoped)
 	for task, t := range tally {
 		c.rates[task] = float64(t.succ) / float64(t.n)
-		if e.Trials == 0 || t.n < e.Trials {
-			e.Trials = t.n
-		}
 	}
+	if k == 0 {
+		k = defaultK(scoped)
+	}
+	e.Trials = k
 	e.Success = successValue(c.rates)
-	e.Reliability = reliability(tally, e.Trials)
+	e.Reliability = reliability(tally, k)
 	e.Metrics = runMetrics(scoped)
 	e.Resilience = map[string]schemas.Value{}
 	return c
@@ -151,11 +155,43 @@ func successValue(rates map[string]float64) schemas.Value {
 	return v
 }
 
-// reliability is the mean over tasks of pass^k with k the fewest graded runs
-// on any task: the chance that k tries in a row all succeed.
+// defaultK is an entry's default k of pass^k: min(trials, MaxDefaultK),
+// with trials the fewest trials per task among the experiment arms its runs
+// in scope came from that repeat tasks (2 or more trials per task). Pooled
+// runs still all enter the estimate; k only says how many tries in a row it
+// is about, and an experiment that repeated tasks k times measured exactly
+// that. The fewest, not the most, keeps k within what every repeating
+// experiment ran, so pooled tasks normally have k graded runs. An arm with one
+// trial per task measured no repeats and does not set k; when no arm repeats,
+// k is 1 and reliability is unknown.
+func defaultK(runs []gradedRun) int {
+	fewest := 0
+	for _, r := range runs {
+		n := r.rec.exp.trials[trialKey(r.rec.slot.Arm, r.rec.slot.Condition)]
+		if n >= 2 && (fewest == 0 || n < fewest) {
+			fewest = n
+		}
+	}
+	switch {
+	case fewest >= 2:
+		return min(fewest, MaxDefaultK)
+	case len(runs) > 0:
+		return 1
+	default:
+		return 0
+	}
+}
+
+// reliability is the mean over tasks of the unbiased pass^k: the chance that
+// k tries in a row all succeed. It needs k of 2 or more and k graded runs on
+// every task; one task short makes it unknown rather than a mean over the
+// tasks that happen to have more runs.
 func reliability(tally map[string]taskTally, k int) schemas.Value {
-	if k < 2 {
-		return schemas.Unknown(fmt.Sprintf("needs 2 or more graded runs on every task; the fewest is %d", k), schemas.EvidenceOutcome)
+	switch {
+	case len(tally) == 0:
+		return schemas.Unknown("no graded run in scope", schemas.EvidenceOutcome)
+	case k < 2:
+		return schemas.Unknown(fmt.Sprintf("pass^k needs 2 or more trials per task; its experiments ran %d", k), schemas.EvidenceOutcome)
 	}
 	tasks := make([]string, 0, len(tally))
 	for t := range tally {
@@ -166,7 +202,7 @@ func reliability(tally map[string]taskTally, k int) schemas.Value {
 	for _, t := range tasks {
 		p, ok := stats.PassHatK(tally[t].succ, tally[t].n, k)
 		if !ok {
-			return schemas.Unknown(fmt.Sprintf("pass^%d undefined on task %s", k, t), schemas.EvidenceOutcome)
+			return schemas.Unknown(fmt.Sprintf("pass^%d needs %d graded runs on every task; %s has %d", k, k, t, tally[t].n), schemas.EvidenceOutcome)
 		}
 		xs = append(xs, p)
 	}
@@ -189,10 +225,11 @@ func runMetrics(runs []gradedRun) map[string]schemas.Value {
 }
 
 // aggregate reduces one metric over runs with f, over the runs that observed
-// it. Not applicable values (false completion on a passing run) are left
-// out; with nothing else the aggregate is not applicable too. Unknown and
-// missing values never count as zero: Reason says how many there were, and
-// with no observed value the aggregate is unknown.
+// it. A not-applicable value counts as notApplicableValue says (false
+// completion on a passing run is 0) or is left out; with nothing else the
+// aggregate is not applicable too. Unknown and missing values never count as
+// zero: Reason says how many there were, and with no observed value the
+// aggregate is unknown.
 func aggregate(id string, runs []gradedRun, f func([]float64) float64) schemas.Value {
 	var xs []float64
 	unknown, na := 0, 0
@@ -207,7 +244,11 @@ func aggregate(id string, runs []gradedRun, f func([]float64) float64) schemas.V
 				ev = v.Evidence
 			}
 		case found && v.State == schemas.ValueNotApplicable:
-			na++
+			if x, ok := notApplicableValue(id); ok {
+				xs = append(xs, x)
+			} else {
+				na++
+			}
 		default:
 			unknown++
 		}
@@ -223,6 +264,19 @@ func aggregate(id string, runs []gradedRun, f func([]float64) float64) schemas.V
 		v.Reason = fmt.Sprintf("%d of %d runs unknown", unknown, len(xs)+unknown)
 	}
 	return v
+}
+
+// notApplicableValue is the value a not-applicable run has for metric when
+// it is still known, as the release policy reads it (policy/evaluate.go).
+// false_completion is not applicable on a run whose hidden verifier passed,
+// and such a run is never a false completion, so it counts as 0: the rate is
+// over every run whose outcome and claim are known, not only failed runs.
+// Every other metric's not-applicable runs are left out.
+func notApplicableValue(metric string) (float64, bool) {
+	if metric == MetricFalseCompletion {
+		return 0, true
+	}
+	return 0, false
 }
 
 // costPerSuccess is the observed cost of every graded run, failures

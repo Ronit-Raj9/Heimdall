@@ -42,7 +42,8 @@ type pool map[string]map[string][]gradedRun
 // a crash counts as a failure and never improves a rank. Success is the
 // run's verified_success metric, the default primary endpoint, and the
 // outcome's score when the metric is missing (a run measured before it
-// existed).
+// existed). A record read from a regrade (readGradeSource) carries its
+// outcome and metrics already; any other reads metrics.json.
 func grade(ctx context.Context, src Source, recs []*record) (pool, []excludedRun, error) {
 	p := pool{}
 	var excluded []excludedRun
@@ -54,9 +55,12 @@ func grade(ctx context.Context, src Source, recs []*record) (pool, []excludedRun
 			excluded = append(excluded, excludedRun{rec: r, reason: reason})
 			continue
 		}
-		metrics, err := readMetrics(src, r.run.RunID)
-		if err != nil {
-			return nil, nil, err
+		metrics := r.metrics
+		if metrics == nil {
+			var err error
+			if metrics, err = readMetrics(src, r.run.RunID); err != nil {
+				return nil, nil, err
+			}
 		}
 		y, _ := r.run.Outcome.Score()
 		if v, ok := metrics[metricVerifiedSuccess].Float(); ok {

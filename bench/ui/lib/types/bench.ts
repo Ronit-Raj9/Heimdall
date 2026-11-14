@@ -540,7 +540,7 @@ export interface Verdict {
 /** fail makes the experiment INVALID; unknown is never a pass and holds an IMPROVED verdict; warn changes nothing unless declared as a guard. */
 export type InstrumentStatus = "pass" | "fail" | "unknown" | "warn" | "not_applicable";
 
-/** One check that the measurement itself worked (usage_completeness, dropped_logs, timeout_parity, budget_parity). */
+/** One check that the measurement itself worked (usage_completeness, dropped_logs, timeout_parity, budget_parity, upstream_errors). */
 export interface InstrumentCheck {
 	name: string;
 	status: InstrumentStatus;
@@ -1087,6 +1087,9 @@ export type LeaderboardScope = "all" | "common";
 /** exclude: live runs only. only: scripted agent or scripted model runs only. */
 export type LeaderboardSynthetic = "exclude" | "only";
 
+/** original: every run as sealed. latest: each experiment's newest regrade, where it has a result for the run. */
+export type LeaderboardGradeSourceMode = "original" | "latest";
+
 /**
  * One agent configuration on the board (schemas.LeaderboardEntry), one per resolved config hash.
  * Rank alone is never a claim that one agent beats another: the tier says whether the entry can
@@ -1116,17 +1119,18 @@ export interface LeaderboardEntry {
 	tasks: number;
 	/** Graded runs counted. */
 	runs: number;
-	/** Fewest graded runs on any of its tasks: the k of reliability. */
+	/** The k of reliability: min(3, the fewest trials per task among its experiments that repeat tasks), unless the query sets k. */
 	trials: number;
 	/** Mean over tasks of the per-task verified success rate. Bounds: descriptive 95% t interval, absent with fewer than 2 tasks. */
 	success: Value;
 	/** Verified successes over graded runs, pooled. */
 	passes: Ratio;
-	/** Mean over tasks of pass^k with k = trials. Unknown when trials < 2. */
+	/** Mean over tasks of pass^k with k = trials. Unknown when trials < 2 or a task has fewer than trials graded runs. */
 	reliability: Value;
 	/**
 	 * Per-run aggregates by metric id: medians for steps, tool_calls, tokens, cost_usd, wall_time_s;
-	 * rates for false_completion and safe_success; cost_per_success (not_applicable with no success).
+	 * shares of runs for false_completion (over runs whose outcome and claim are known, a passing run counting as 0)
+	 * and safe_success; cost_per_success (not_applicable with no success).
 	 */
 	metrics: Record<string, Value>;
 	/** Fault condition -> mean over shared tasks of (success under it minus success clean), a fraction. Only on a clean board. */
@@ -1138,6 +1142,17 @@ export interface LeaderboardExclusion {
 	reason: string;
 	runs: number;
 	experiments: string[];
+}
+
+/** The grade source one experiment's runs on the board were read from (schemas.LeaderboardGradeSource). */
+export interface LeaderboardGradeSource {
+	experiment: string;
+	/** "original", or the regrade id read: the experiment's newest regrade by created_at, ties by the larger id. */
+	source: string;
+	/** The experiment's runs on the board, graded or excluded. */
+	runs: number;
+	/** Of runs, those read from the regrade; the rest keep their original grade. */
+	regraded_runs: number;
 }
 
 /** GET /leaderboard: every sealed run of one suite version under one condition, across experiments. */
@@ -1162,14 +1177,21 @@ export interface Leaderboard {
 	/** Runs left out, grouped by reason. */
 	excluded: LeaderboardExclusion[];
 	generated_at: string;
+	/** What each run's outcome and metrics were read from. */
+	grade_source: LeaderboardGradeSourceMode;
+	/** Per experiment with runs on the board, the source its runs were read from, newest experiment first. */
+	grade_sources: LeaderboardGradeSource[];
 }
 
-/** Query of GET /leaderboard. An absent field takes the server default: newest suite, clean, all, exclude. */
+/** Query of GET /leaderboard. An absent field takes the server default: newest suite, clean, all, exclude, original, each entry's k. */
 export interface LeaderboardParams {
 	suite?: string;
 	condition?: string;
 	scope?: LeaderboardScope;
 	synthetic?: LeaderboardSynthetic;
+	grade_source?: LeaderboardGradeSourceMode;
+	/** k of the pass^k reliability for every entry, 2 or more. */
+	k?: number;
 }
 
 // ---------------------------------------------------------------------------------------------

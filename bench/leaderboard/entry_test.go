@@ -1,8 +1,11 @@
 package leaderboard
 
 import (
+	"cmp"
+	"context"
 	"math"
 	"reflect"
+	"slices"
 	"testing"
 
 	"github.com/maximhq/bifrost/bench/schemas"
@@ -56,22 +59,29 @@ func TestSuccessValue(t *testing.T) {
 
 func TestReliability(t *testing.T) {
 	tests := []struct {
-		name      string
-		tally     map[string]taskTally
-		k         int
-		wantState schemas.ValueState
-		wantV     float64
+		name       string
+		tally      map[string]taskTally
+		k          int
+		wantState  schemas.ValueState
+		wantV      float64
+		wantReason string
 	}{
-		{name: "one trial", tally: map[string]taskTally{"t1": {1, 1}}, k: 1, wantState: schemas.ValueUnknown},
-		{name: "all pass", tally: map[string]taskTally{"t1": {2, 2}, "t2": {3, 3}}, k: 2, wantState: schemas.ValueObserved, wantV: 1},
+		{name: "no task", tally: map[string]taskTally{}, k: 0, wantState: schemas.ValueUnknown, wantReason: "no graded run in scope"},
+		{name: "one trial", tally: map[string]taskTally{"t1": {1, 1}}, k: 1, wantState: schemas.ValueUnknown,
+			wantReason: "pass^k needs 2 or more trials per task; its experiments ran 1"},
+		{name: "a task short of k", tally: map[string]taskTally{"t1": {2, 3}, "t2": {1, 1}}, k: 2, wantState: schemas.ValueUnknown,
+			wantReason: "pass^2 needs 2 graded runs on every task; t2 has 1"},
+		{name: "all pass", tally: map[string]taskTally{"t1": {2, 2}, "t2": {3, 3}}, k: 2, wantState: schemas.ValueObserved, wantV: 1, wantReason: "pass^2"},
 		// t1: C(2,2)/C(3,2) = 1/3; t2: 0.
-		{name: "unbiased pass^k", tally: map[string]taskTally{"t1": {2, 3}, "t2": {1, 2}}, k: 2, wantState: schemas.ValueObserved, wantV: 1.0 / 6},
+		{name: "unbiased pass^k", tally: map[string]taskTally{"t1": {2, 3}, "t2": {1, 2}}, k: 2, wantState: schemas.ValueObserved, wantV: 1.0 / 6, wantReason: "pass^2"},
+		// Pooled runs beyond k still enter: C(3,3)/C(4,3) = 1/4.
+		{name: "more runs than k", tally: map[string]taskTally{"t1": {3, 4}}, k: 3, wantState: schemas.ValueObserved, wantV: 0.25, wantReason: "pass^3"},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			v := reliability(tt.tally, tt.k)
-			if v.State != tt.wantState {
-				t.Fatalf("state = %s (%s), want %s", v.State, v.Reason, tt.wantState)
+			if v.State != tt.wantState || v.Reason != tt.wantReason {
+				t.Fatalf("got %s %q, want %s %q", v.State, v.Reason, tt.wantState, tt.wantReason)
 			}
 			if x, ok := v.Float(); ok && math.Abs(x-tt.wantV) > 1e-12 {
 				t.Errorf("v = %v, want %v", x, tt.wantV)
@@ -80,10 +90,104 @@ func TestReliability(t *testing.T) {
 	}
 }
 
+func TestDefaultK(t *testing.T) {
+	run := func(exp string, trials int) gradedRun {
+		e := &expInfo{id: exp, trials: map[string]int{trialKey("A", "clean"): trials}}
+		return gradedRun{rec: &record{exp: e, slot: schemas.Slot{Arm: "A", Condition: "clean"}}}
+	}
+	tests := []struct {
+		name string
+		runs []gradedRun
+		want int
+	}{
+		{name: "no runs", runs: nil, want: 0},
+		{name: "one trial everywhere", runs: []gradedRun{run("e1", 1), run("e2", 1)}, want: 1},
+		{name: "trials unknown", runs: []gradedRun{run("e1", 0)}, want: 1},
+		{name: "fewest among repeating experiments", runs: []gradedRun{run("e1", 3), run("e2", 2), run("e1", 3)}, want: 2},
+		{name: "a single-trial pilot does not set k", runs: []gradedRun{run("e1", 1), run("e2", 3)}, want: 3},
+		{name: "capped at 3", runs: []gradedRun{run("e1", 5), run("e2", 8)}, want: 3},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := defaultK(tt.runs); got != tt.want {
+				t.Errorf("defaultK = %d, want %d", got, tt.want)
+			}
+		})
+	}
+}
+
+// kSource has config h with 3 trials per task in e_rep (t1: 2 of 3, t2: 3
+// of 3) and a single-trial pilot e_pilot that passed t1 once more.
+func kSource() *fakeSource {
+	f := newFake()
+	f.exp("e_rep", "s@1", 1, map[string]schemas.ArmManifest{"A": arm("rep", "h", "command")})
+	f.exp("e_pilot", "s@1", 0, map[string]schemas.ArmManifest{"A": arm("pilot", "h", "command")})
+	for trial := 1; trial <= 3; trial++ {
+		f.pass("e_rep", "t2", "A", "clean", trial, 0.1)
+		if trial < 3 {
+			f.pass("e_rep", "t1", "A", "clean", trial, 0.1)
+		} else {
+			f.fail("e_rep", "t1", "A", "clean", trial, 0.1)
+		}
+	}
+	f.pass("e_pilot", "t1", "A", "clean", 1, 0.1)
+	return f
+}
+
+func TestBuildReliabilityK(t *testing.T) {
+	tests := []struct {
+		name       string
+		k          int
+		wantTrials int
+		wantState  schemas.ValueState
+		wantV      float64
+		wantReason string
+	}{
+		// t1 pooled 3 of 4: C(3,3)/C(4,3) = 1/4; t2: 1.
+		{name: "default is the repeating experiment's trials", wantTrials: 3, wantState: schemas.ValueObserved, wantV: 0.625, wantReason: "pass^3"},
+		// t1: C(3,2)/C(4,2) = 1/2; t2: 1.
+		{name: "query k", k: 2, wantTrials: 2, wantState: schemas.ValueObserved, wantV: 0.75, wantReason: "pass^2"},
+		{name: "query k above the runs", k: 4, wantTrials: 4, wantState: schemas.ValueUnknown, wantReason: "pass^4 needs 4 graded runs on every task; t2 has 3"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			lb := buildOrFail(t, kSource(), Query{K: tt.k, Now: t0})
+			e := lb.Entries[0]
+			if e.Trials != tt.wantTrials || e.Reliability.State != tt.wantState || e.Reliability.Reason != tt.wantReason {
+				t.Fatalf("trials %d reliability %+v, want %d %s %q", e.Trials, e.Reliability, tt.wantTrials, tt.wantState, tt.wantReason)
+			}
+			if x, ok := e.Reliability.Float(); ok && math.Abs(x-tt.wantV) > 1e-12 {
+				t.Errorf("reliability = %v, want %v", x, tt.wantV)
+			}
+		})
+	}
+}
+
+func TestCollectTrials(t *testing.T) {
+	f := newFake()
+	m := f.exp("e", "s@1", 0, map[string]schemas.ArmManifest{"A": arm("a", "h_a", "command"), "B": arm("b", "h_b", "command")})
+	// The manifest plans A for 2 trials; only trial 1 ran. It lists no B slots.
+	m.Slots = []schemas.Slot{
+		{SlotID: "p1", Arm: "A", Task: "t1", Condition: "clean", Trial: 1},
+		{SlotID: "p2", Arm: "A", Task: "t1", Condition: "clean", Trial: 2},
+	}
+	f.pass("e", "t1", "A", "clean", 1, 0.1)
+	f.pass("e", "t1", "B", "clean", 3, 0.1)
+	recs, err := collect(context.Background(), f)
+	if err != nil {
+		t.Fatalf("collect: %v", err)
+	}
+	want := map[string]int{trialKey("A", "clean"): 2, trialKey("B", "clean"): 3}
+	if got := recs[0].exp.trials; !reflect.DeepEqual(got, want) {
+		t.Errorf("trials = %v, want %v", got, want)
+	}
+}
+
 func TestAggregate(t *testing.T) {
 	na := schemas.NotApplicable()
 	tests := []struct {
 		name       string
+		metric     string // default steps
 		vals       []schemas.Value
 		wantState  schemas.ValueState
 		wantV      float64
@@ -95,10 +199,21 @@ func TestAggregate(t *testing.T) {
 		{name: "all unknown", vals: []schemas.Value{unk(), unk()}, wantState: schemas.ValueUnknown, wantReason: "unknown in all 2 runs"},
 		{name: "not applicable left out", vals: []schemas.Value{na, obs(3)}, wantState: schemas.ValueObserved, wantV: 3},
 		{name: "all not applicable", vals: []schemas.Value{na, na}, wantState: schemas.ValueNotApplicable},
+		{name: "false completion: a passing run counts as 0", metric: MetricFalseCompletion, vals: []schemas.Value{na, na, obs(1), obs(0)},
+			wantState: schemas.ValueObserved, wantV: 0.25},
+		{name: "false completion: every run passed", metric: MetricFalseCompletion, vals: []schemas.Value{na, na}, wantState: schemas.ValueObserved, wantV: 0},
+		{name: "false completion: unknown claims left out", metric: MetricFalseCompletion, vals: []schemas.Value{na, unk(), obs(1)},
+			wantState: schemas.ValueObserved, wantV: 0.5, wantReason: "1 of 3 runs unknown"},
+		{name: "safe success: not applicable left out", metric: MetricSafeSuccess, vals: []schemas.Value{na, obs(1)}, wantState: schemas.ValueObserved, wantV: 1},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			v := aggregate(MetricSteps, runsWith(MetricSteps, make([]float64, len(tt.vals)), tt.vals), stats.Median)
+			id := cmp.Or(tt.metric, MetricSteps)
+			f := stats.Median
+			if slices.Contains(rateMetrics, id) {
+				f = stats.Mean
+			}
+			v := aggregate(id, runsWith(id, make([]float64, len(tt.vals)), tt.vals), f)
 			if v.State != tt.wantState || v.Reason != tt.wantReason {
 				t.Fatalf("got %s %q, want %s %q", v.State, v.Reason, tt.wantState, tt.wantReason)
 			}

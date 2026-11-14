@@ -18,18 +18,22 @@ import (
 
 var t0 = time.Date(2026, 11, 14, 10, 0, 0, 0, time.UTC)
 
-// fakeSource is an in-memory Source.
+// fakeSource is an in-memory Source and RegradeSource.
 type fakeSource struct {
-	manifests map[string]*schemas.Manifest
-	runs      map[string][]Run
-	files     map[string]map[string][]byte // run id -> name -> bytes
-	decisions map[string]schemas.Decision
-	fileErr   error // returned by every RunFile call when set
+	manifests  map[string]*schemas.Manifest
+	runs       map[string][]Run
+	files      map[string]map[string][]byte // run id -> name -> bytes
+	decisions  map[string]schemas.Decision
+	regrades   map[string][]Regrade           // exp id -> regrades
+	regraded   map[string][]schemas.SealedRun // exp id + "/" + regrade id -> runs
+	fileErr    error                          // returned by every RunFile call when set
+	regradeErr error                          // returned by every RegradedRuns call when set
 }
 
 func newFake() *fakeSource {
 	return &fakeSource{manifests: map[string]*schemas.Manifest{}, runs: map[string][]Run{},
-		files: map[string]map[string][]byte{}, decisions: map[string]schemas.Decision{}}
+		files: map[string]map[string][]byte{}, decisions: map[string]schemas.Decision{},
+		regrades: map[string][]Regrade{}, regraded: map[string][]schemas.SealedRun{}}
 }
 
 func (f *fakeSource) Experiments() []string {
@@ -60,6 +64,21 @@ func (f *fakeSource) RunFile(runID, name string) ([]byte, error) {
 func (f *fakeSource) LatestDecision(expID string) (schemas.Decision, bool) {
 	d, ok := f.decisions[expID]
 	return d, ok
+}
+
+func (f *fakeSource) Regrades(_ context.Context, expID string) ([]Regrade, error) {
+	return slices.Clone(f.regrades[expID]), nil
+}
+
+func (f *fakeSource) RegradedRuns(_ context.Context, expID, regradeID string) ([]schemas.SealedRun, error) {
+	if f.regradeErr != nil {
+		return nil, f.regradeErr
+	}
+	runs, ok := f.regraded[expID+"/"+regradeID]
+	if !ok {
+		return nil, fmt.Errorf("regrade %s: %w", regradeID, schemas.ErrNotFound)
+	}
+	return slices.Clone(runs), nil
 }
 
 // arm is a manifest arm with a live command agent unless adapter says otherwise.
@@ -141,15 +160,19 @@ func TestQueryNormalize(t *testing.T) {
 		wantErr bool
 	}{
 		{name: "defaults", in: Query{Now: t0},
-			want: Query{Condition: "clean", Scope: "all", Synthetic: "exclude", Alpha: 0.05, Now: t0}},
-		{name: "explicit", in: Query{Suite: "coding-core@1.0.0", Condition: "model-outage", Scope: "common", Synthetic: "only", Alpha: 0.1, Now: t0},
-			want: Query{Suite: "coding-core@1.0.0", Condition: "model-outage", Scope: "common", Synthetic: "only", Alpha: 0.1, Now: t0}},
+			want: Query{Condition: "clean", Scope: "all", Synthetic: "exclude", GradeSource: "original", Alpha: 0.05, Now: t0}},
+		{name: "explicit", in: Query{Suite: "coding-core@1.0.0", Condition: "model-outage", Scope: "common", Synthetic: "only", GradeSource: " latest ", K: 2, Alpha: 0.1, Now: t0},
+			want: Query{Suite: "coding-core@1.0.0", Condition: "model-outage", Scope: "common", Synthetic: "only", GradeSource: "latest", K: 2, Alpha: 0.1, Now: t0}},
 		{name: "suite without version", in: Query{Suite: "coding-core"}, wantErr: true},
 		{name: "suite with slash", in: Query{Suite: "../x@1"}, wantErr: true},
 		{name: "condition with space", in: Query{Condition: "a b"}, wantErr: true},
 		{name: "bad scope", in: Query{Scope: "some"}, wantErr: true},
 		{name: "bad synthetic", in: Query{Synthetic: "include"}, wantErr: true},
 		{name: "alpha out of range", in: Query{Alpha: 1.5}, wantErr: true},
+		{name: "grade source is not a regrade id", in: Query{GradeSource: "rg_gates_1_1_0"}, wantErr: true},
+		{name: "grade source newest", in: Query{GradeSource: "newest"}, wantErr: true},
+		{name: "k of 1 is the success rate", in: Query{K: 1}, wantErr: true},
+		{name: "negative k", in: Query{K: -2}, wantErr: true},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

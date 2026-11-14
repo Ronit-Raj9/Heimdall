@@ -2,12 +2,14 @@ package main
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
 
 	"github.com/maximhq/bifrost/bench/adapters"
+	"github.com/maximhq/bifrost/bench/engine"
 	"github.com/maximhq/bifrost/bench/environments"
 	"github.com/maximhq/bifrost/bench/evidence"
 	"github.com/maximhq/bifrost/bench/faultproxy"
@@ -31,11 +33,12 @@ const defaultConfig = "deploy/bench.yaml"
 // app is everything a command needs: config, logger, the assembled registry
 // and the store. This is the only place registries are assembled.
 type app struct {
-	cfg    *lib.Config
-	logger schemas.Logger
-	docker utils.Docker
-	reg    *schemas.Registry
-	store  *store.FSStore
+	cfg       *lib.Config
+	logger    schemas.Logger
+	docker    utils.Docker
+	reg       *schemas.Registry
+	store     *store.FSStore
+	upstreams engine.UpstreamChecker // the fault proxy's upstream check; nil without the gateway
 }
 
 // appOptions says which live services a command needs.
@@ -62,7 +65,9 @@ func newApp(ctx context.Context, configPath string, opts appOptions) (*app, erro
 	var fault schemas.FaultController
 	var gw schemas.Gateway
 	if opts.gateway {
-		fault = faultproxy.NewClient(cfg.FaultProxy.ControlURL, faultproxy.WithToken(os.Getenv("BENCH_FAULTPROXY_TOKEN")))
+		fp := faultproxy.NewClient(cfg.FaultProxy.ControlURL, faultproxy.WithToken(os.Getenv("BENCH_FAULTPROXY_TOKEN")))
+		fault = fp
+		a.upstreams = proxyUpstreams{fp}
 		gw, err = newGateway(ctx, cfg, a.docker, logger)
 		if err != nil {
 			return nil, err
@@ -101,6 +106,40 @@ func newApp(ctx context.Context, configPath string, opts appOptions) (*app, erro
 		a.reg.Fault = nil // a typed nil would look non-nil to the engine
 	}
 	return a, nil
+}
+
+// newPlanner returns the planner every command uses, with the fault proxy's
+// upstream check wired when the gateway is, so a live experiment is never
+// frozen while its provider cannot be reached.
+func (a *app) newPlanner() *engine.Planner {
+	var opts []engine.PlannerOption
+	if a.upstreams != nil {
+		opts = append(opts, engine.WithUpstreamChecker(a.upstreams))
+	}
+	return engine.NewPlanner(a.reg, a.cfg.Root, a.logger, opts...)
+}
+
+// proxyUpstreams adapts the fault proxy client to engine.UpstreamChecker, so
+// the engine never imports faultproxy. An older proxy's answer becomes
+// engine.ErrUpstreamCheckUnsupported.
+type proxyUpstreams struct {
+	c *faultproxy.Client
+}
+
+// CheckUpstreams implements engine.UpstreamChecker.
+func (u proxyUpstreams) CheckUpstreams(ctx context.Context) ([]engine.UpstreamStatus, error) {
+	rep, err := u.c.CheckUpstreams(ctx)
+	if errors.Is(err, faultproxy.ErrUpstreamCheckUnsupported) {
+		return nil, fmt.Errorf("%w: %w", engine.ErrUpstreamCheckUnsupported, err)
+	}
+	if err != nil {
+		return nil, err
+	}
+	out := make([]engine.UpstreamStatus, 0, len(rep.Upstreams))
+	for _, c := range rep.Upstreams {
+		out = append(out, engine.UpstreamStatus{Provider: c.Provider, Host: c.Host, OK: c.OK, Skipped: c.Skipped, Error: c.Error})
+	}
+	return out, nil
 }
 
 // loadExperiment reads and strictly decodes an experiment file.

@@ -27,11 +27,53 @@ const (
 	GuardTimeoutParity           = "timeout_parity"
 )
 
+// Default provider and scripted control names the planner reads from an
+// agent config. They mirror gateways/bifrost (DefaultProvider) and
+// adapters/scripted.go, which the engine does not import.
+const (
+	defaultGatewayProvider = "anthropic"
+	adapterScripted        = "scripted"
+	scriptedToy            = "toy"
+)
+
+// ErrUpstreamCheckUnsupported is what an UpstreamChecker returns, wrapped,
+// when it cannot run the check at all (a fault proxy older than the check).
+// The planner then warns and plans without it.
+var ErrUpstreamCheckUnsupported = errors.New("upstream check is not supported")
+
+// UpstreamChecker checks, from where a run's model calls leave the bench for
+// the provider APIs, that each provider's real API can be reached.
+// cmd/bifrost-bench wires the fault proxy's GET /upstreams.
+type UpstreamChecker interface {
+	CheckUpstreams(ctx context.Context) ([]UpstreamStatus, error)
+}
+
+// UpstreamStatus is one provider's check. A checker lists only providers
+// whose calls go to the real API with a real key; a provider it does not
+// list (scripted model, no key) has nothing to check.
+type UpstreamStatus struct {
+	Provider string
+	Host     string // host:port dialled
+	OK       bool
+	Skipped  string // not checked, and why; never a failure
+	Error    string
+}
+
+// PlannerOption configures a Planner.
+type PlannerOption func(*Planner)
+
+// WithUpstreamChecker makes Plan refuse a live experiment whose arms use a
+// provider the checker reports unreachable. Without it no check runs.
+func WithUpstreamChecker(c UpstreamChecker) PlannerOption {
+	return func(p *Planner) { p.upstreams = c }
+}
+
 // Planner turns an experiment into a frozen, hashed manifest. Nothing runs.
 type Planner struct {
 	reg       *schemas.Registry
 	benchRoot string
 	logger    schemas.Logger
+	upstreams UpstreamChecker // nil: no upstream check
 }
 
 // condPlan is one condition resolved against the suite.
@@ -44,11 +86,15 @@ type condPlan struct {
 
 // NewPlanner returns a planner. benchRoot anchors relative agent config and
 // arm file paths (agents/claude-code.yaml, experiments/fixtures/...).
-func NewPlanner(reg *schemas.Registry, benchRoot string, logger schemas.Logger) *Planner {
+func NewPlanner(reg *schemas.Registry, benchRoot string, logger schemas.Logger, opts ...PlannerOption) *Planner {
 	if logger == nil {
 		logger = schemas.NoopLogger{}
 	}
-	return &Planner{reg: reg, benchRoot: benchRoot, logger: logger}
+	p := &Planner{reg: reg, benchRoot: benchRoot, logger: logger}
+	for _, o := range opts {
+		o(p)
+	}
+	return p
 }
 
 // Plan validates the experiment against the suite and the registry, resolves
@@ -57,6 +103,8 @@ func NewPlanner(reg *schemas.Registry, benchRoot string, logger schemas.Logger) 
 // It refuses a gateway whose preflight found a hygiene violation (MCP tools
 // auto-injected, semantic cache, multi-target routing), and records, with a
 // warning, every budget that differs between arms without a `set:` override.
+// With an UpstreamChecker it also refuses when a provider an arm calls is
+// reported unreachable (checkUpstreams).
 //
 // It refuses a suite without a lock, or any selected task that the lock does
 // not mark admitted, unless the experiment name starts with "smoke" (then it
@@ -130,6 +178,9 @@ func (p *Planner) Plan(ctx context.Context, exp *schemas.Experiment) (*schemas.M
 		m.Compatibility = &c
 	}
 	if m.Gateway, err = p.preflight(ctx, e.Name); err != nil {
+		return nil, fmt.Errorf("plan %s: %w", e.ID, err)
+	}
+	if err := p.checkUpstreams(ctx, m); err != nil {
 		return nil, fmt.Errorf("plan %s: %w", e.ID, err)
 	}
 	m.ArmOrder = drawArmOrder(e.Seed, suite.TaskIDs, conds, sortedKeys(m.Arms))
@@ -338,6 +389,79 @@ func (p *Planner) preflight(ctx context.Context, name string) (*schemas.GatewayM
 		return nil, fmt.Errorf("gateway hygiene check failed, fix the gateway config before planning: %s", strings.Join(h.Violations, "; "))
 	}
 	return gm, nil
+}
+
+// checkUpstreams refuses to freeze a live experiment whose model calls
+// would fail before any agent sees them: a provider an arm calls is answered
+// by its real API with a real key (the checker lists it) and the check
+// cannot reach it. Live is decided per provider and per arm. A provider the
+// checker does not list, or lists as skipped, is answered by the scripted
+// model or not checkable, so it is not live. An arm that cannot make a model
+// call (a scripted control other than toy, which runs with no network) uses
+// no provider. With no checker, or no arm that calls a provider, nothing is
+// checked; a checker that cannot run the check (an older fault proxy) only
+// warns. Any other checker error refuses the plan: every run binds a plan
+// through the same control API, so it would fail too.
+func (p *Planner) checkUpstreams(ctx context.Context, m *schemas.Manifest) error {
+	if p.upstreams == nil {
+		return nil
+	}
+	used := armProviders(m)
+	if len(used) == 0 {
+		return nil
+	}
+	statuses, err := p.upstreams.CheckUpstreams(ctx)
+	if errors.Is(err, ErrUpstreamCheckUnsupported) {
+		p.logger.Warn("upstream check not supported; planning without it", "experiment", m.ExpID, "error", err.Error())
+		return nil
+	}
+	if err != nil {
+		return fmt.Errorf("upstream check: %w", err)
+	}
+	var problems []string
+	for _, st := range statuses {
+		if st.OK || st.Skipped != "" {
+			continue
+		}
+		arms, ok := used[st.Provider]
+		if !ok {
+			p.logger.Warn("upstream unreachable for a provider no arm uses", "experiment", m.ExpID,
+				"provider", st.Provider, "host", st.Host, "error", st.Error)
+			continue
+		}
+		problems = append(problems, fmt.Sprintf("provider %s (%s, arms %s): %s", st.Provider, st.Host, strings.Join(arms, ", "), st.Error))
+	}
+	if len(problems) > 0 {
+		return fmt.Errorf("upstream check failed, every model call would fail; fix the network or the provider key before planning: %s",
+			strings.Join(problems, "; "))
+	}
+	return nil
+}
+
+// armProviders maps each provider a run of m can call to the arms that call
+// it, the compatibility agent included. An arm calls its gateway provider
+// (anthropic when the config names none, as the gateway defaults) unless it
+// is a scripted control other than toy.
+func armProviders(m *schemas.Manifest) map[string][]string {
+	out := map[string][]string{}
+	add := func(arm string, cfg *schemas.AgentConfig) {
+		if cfg.Adapter == adapterScripted && (cfg.Scripted == nil || cfg.Scripted.Kind != scriptedToy) {
+			return
+		}
+		prov := cfg.Gateway.Provider
+		if prov == "" {
+			prov = defaultGatewayProvider
+		}
+		out[prov] = append(out[prov], arm)
+	}
+	for _, id := range sortedKeys(m.Arms) {
+		am := m.Arms[id]
+		add(id, &am.Config)
+	}
+	if m.Compatibility != nil {
+		add(CompatArm, &m.Compatibility.Config)
+	}
+	return out
 }
 
 // budgetText is "A=2, B=1" for a log line.

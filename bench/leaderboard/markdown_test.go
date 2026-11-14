@@ -16,6 +16,9 @@ func TestMarkdown(t *testing.T) {
 	unknown := buildOrFail(t, boardSource(), Query{Now: t0})
 	unknown.Entries[0].Metrics[MetricTokens] = schemas.Unknown("no rows", schemas.EvidenceGateway)
 	unknown.Entries[0].Metrics[MetricCostPerSuccess] = schemas.NotApplicable()
+	repeated := buildOrFail(t, kSource(), Query{Now: t0})
+	short := buildOrFail(t, kSource(), Query{K: 4, Now: t0})
+	latest := buildOrFail(t, regradeSource(t), Query{GradeSource: GradeSourceLatest, Now: t0})
 	tests := []struct {
 		name    string
 		lb      *schemas.Leaderboard
@@ -35,9 +38,32 @@ func TestMarkdown(t *testing.T) {
 				"- experiment verdict invalid: 1 run (e_bad)",
 				"- infra_error: 1 run (e_one)",
 				"Common tasks (2): t1, t2.",
+				"| False completion (share of runs) | Safe success |",
+				"over runs whose outcome and claim are known; a run whose verifier passed counts as 0.",
+				"k shown per entry: min(3, the fewest trials per task among its experiments that repeat tasks) unless the query sets k.",
+				"Grade source original: every run's outcome and metrics as sealed (e_bad, e_two, e_one).",
 				"Generated 2026-11-14T10:00:00Z.",
 			},
-			notWant: []string{"SYNTHETIC"},
+			notWant: []string{"SYNTHETIC", "(pass^1)", "Grade source latest"},
+		},
+		{
+			name: "reliability states its k",
+			lb:   repeated,
+			want: []string{"| 6/7 | 62.5% (pass^3) | 2 | 7 |"},
+		},
+		{
+			name: "unknown reliability still states its k",
+			lb:   short,
+			want: []string{"| 6/7 | unknown (pass^4) |"},
+		},
+		{
+			name: "grade source latest lists each experiment",
+			lb:   latest,
+			want: []string{
+				"Grade source latest: each experiment's newest regrade (by regrade.json created_at, ties by the larger id)",
+				"- e_two: original (no regrade), 1 run\n",
+				"- e_one: rg_new, 1 of 4 runs regraded\n",
+			},
 		},
 		{
 			name: "synthetic banner",

@@ -44,10 +44,15 @@ func RegateVersions(reg *schemas.Registry, m *schemas.Manifest) map[string]strin
 // run keeps its sealed result, so a regate never drops a veto it could not
 // recompute.
 //
-// The outcome changes only when the veto changes: a run with a new fired veto
+// The outcome changes when the veto changes: a run with a new fired veto
 // becomes integrity_violation, and an integrity_violation run with none left
 // is decided again from its grade, as the pipeline does (a run that recorded
-// any part failure stays infra_error). aborted_infra runs never change. A
+// any part failure stays infra_error). It also changes when the sealed fault
+// proxy ledger shows the provider was unreachable (the upstream rule of
+// outcomeFrom) and the run was sealed as fail or timeout before that rule
+// existed: such a run becomes infra_error. A regate cannot give the slot a new
+// run, so a run that never got a model response is infra_error here, not
+// aborted_infra. aborted_infra runs never change. A
 // metric is replaced only when computing it with the new gates gives another
 // value than with the sealed ones, and then only if the sealed gates
 // reproduce its sealed value; otherwise Regate fails rather than mix inputs.
@@ -72,7 +77,7 @@ func Regate(ctx context.Context, reg *schemas.Registry, m *schemas.Manifest, sui
 	}
 	out := &Regated{}
 	out.Gates, out.Recomputed, out.Notes = regateGates(ctx, reg, rc, ev, sr.Gates)
-	out.Outcome = regateOutcome(&sr.Run, out.Gates, ev.Grade, ev.Exec)
+	out.Outcome = regateOutcome(&sr.Run, out.Gates, ev.Grade, ev.Exec, utils.TallyUpstream(ev.Ledger, ev.Requests))
 	out.Y = scoreOf(out.Outcome)
 	if out.Metrics, err = regateMetrics(ctx, reg, rc, ev, sr, out.Gates); err != nil {
 		return nil, fmt.Errorf("regate run %s: %w", sr.Run.RunID, err)
@@ -134,7 +139,16 @@ func regateContext(m *schemas.Manifest, suite *schemas.Suite, sr *schemas.Sealed
 // regateGates checks again every selected gate whose version changed and
 // carries the others, in registry order. Sealed results of gates no longer
 // selected are carried too.
+//
+// A run sealed with no gate results at all never reached its gate stage (it
+// was interrupted or broke first), so its evidence lacks what gates read, such
+// as the diff or the run's network: checking gates on it now would fire them
+// on missing evidence (egress fires on "no network recorded" and would make
+// the whole experiment INVALID). Such a run keeps no gate results.
 func regateGates(ctx context.Context, reg *schemas.Registry, rc *schemas.RunContext, ev *schemas.Evidence, sealed []schemas.GateResult) ([]schemas.GateResult, []string, []string) {
+	if len(sealed) == 0 {
+		return nil, nil, []string{"no gate checked: the run was sealed with no gate results, so its gate stage never ran"}
+	}
 	byName := make(map[string]schemas.GateResult, len(sealed))
 	for _, r := range sealed {
 		byName[r.Gate] = r
@@ -185,17 +199,26 @@ func regateGates(ctx context.Context, reg *schemas.Registry, rc *schemas.RunCont
 	return gates, recomputed, notes
 }
 
-// regateOutcome is the run's outcome under the new gates (see Regate).
-func regateOutcome(run *schemas.Run, gates []schemas.GateResult, grade *schemas.Grade, exec *schemas.ExecResult) schemas.Outcome {
+// regateOutcome is the run's outcome under the new gates and the upstream
+// rule (see Regate).
+func regateOutcome(run *schemas.Run, gates []schemas.GateResult, grade *schemas.Grade, exec *schemas.ExecResult, up utils.UpstreamTally) schemas.Outcome {
 	switch {
 	case run.Outcome == schemas.OutcomeAbortedInfra:
 		return run.Outcome
 	case vetoFired(gates):
 		return schemas.OutcomeIntegrityViolation
-	case run.Outcome != schemas.OutcomeIntegrityViolation:
+	case run.Outcome == schemas.OutcomeIntegrityViolation:
+		o := outcomeFrom(false, len(run.Failures) > 0, gates, grade, exec, up)
+		if o == schemas.OutcomeAbortedInfra {
+			return schemas.OutcomeInfraError
+		}
+		return o
+	case run.Outcome != schemas.OutcomeFail && run.Outcome != schemas.OutcomeTimeout:
 		return run.Outcome
+	case up.NeverAnswered(), up.EndedOnError():
+		return schemas.OutcomeInfraError
 	default:
-		return outcomeFrom(false, len(run.Failures) > 0, gates, grade, exec)
+		return run.Outcome
 	}
 }
 

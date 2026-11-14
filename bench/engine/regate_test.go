@@ -149,11 +149,6 @@ func TestRegate(t *testing.T) {
 				return regateRun(t, schemas.OutcomePass, true, quietV1, 1, "", nil)
 			},
 			outcome: schemas.OutcomeIntegrityViolation, recomputed: []string{"g1"}, metrics: map[string]float64{"verified_success": 0}},
-		{name: "aborted run never changes", g1: regateGate{name: "g1", version: "1.1.0", fire: true},
-			run: func(t *testing.T) *schemas.SealedRun {
-				return regateRun(t, schemas.OutcomeAbortedInfra, false, nil, 0, "", nil)
-			},
-			outcome: schemas.OutcomeAbortedInfra, recomputed: []string{"g1", "g2"}},
 		{name: "diff changed since export", g1: regateGate{name: "g1", version: "1.1.0"},
 			run: func(t *testing.T) *schemas.SealedRun {
 				return regateRun(t, schemas.OutcomeIntegrityViolation, true, vetoV1, 0, strings.Repeat("0", 64), nil)
@@ -222,27 +217,133 @@ func TestRegateVersions(t *testing.T) {
 func TestOutcomeFrom(t *testing.T) {
 	veto := []schemas.GateResult{{Effect: schemas.GateVeto, Fired: true}}
 	pass, fail := &schemas.Grade{Passed: true}, &schemas.Grade{}
+	timedOut := &schemas.ExecResult{TimedOut: true}
+	none := utils.UpstreamTally{}
+	never := utils.UpstreamTally{Errors: 3, LastFailed: true}
+	lost := utils.UpstreamTally{Errors: 2, Answered: 4, LastFailed: true}
+	recovered := utils.UpstreamTally{Errors: 1, Answered: 4}
+	incident := utils.TallyUpstream(loadDNSIncident(t))
 	cases := []struct {
 		name            string
 		aborted, broken bool
 		gates           []schemas.GateResult
 		grade           *schemas.Grade
 		exec            *schemas.ExecResult
+		up              utils.UpstreamTally
 		want            schemas.Outcome
 	}{
-		{"aborted wins", true, true, veto, pass, nil, schemas.OutcomeAbortedInfra},
-		{"veto beats broken", false, true, veto, pass, nil, schemas.OutcomeIntegrityViolation},
-		{"broken", false, true, nil, pass, nil, schemas.OutcomeInfraError},
-		{"no grade", false, false, nil, nil, nil, schemas.OutcomeInfraError},
-		{"invalid evaluator", false, false, nil, &schemas.Grade{InvalidEvaluator: true}, nil, schemas.OutcomeInvalidEvaluator},
-		{"pass", false, false, nil, pass, nil, schemas.OutcomePass},
-		{"timeout", false, false, nil, fail, &schemas.ExecResult{TimedOut: true}, schemas.OutcomeTimeout},
-		{"fail", false, false, nil, fail, nil, schemas.OutcomeFail},
+		{"aborted wins", true, true, veto, pass, nil, none, schemas.OutcomeAbortedInfra},
+		{"veto beats broken", false, true, veto, pass, nil, none, schemas.OutcomeIntegrityViolation},
+		{"broken", false, true, nil, pass, nil, none, schemas.OutcomeInfraError},
+		{"no grade", false, false, nil, nil, nil, none, schemas.OutcomeInfraError},
+		{"invalid evaluator", false, false, nil, &schemas.Grade{InvalidEvaluator: true}, nil, none, schemas.OutcomeInvalidEvaluator},
+		{"pass", false, false, nil, pass, nil, none, schemas.OutcomePass},
+		{"timeout", false, false, nil, fail, timedOut, none, schemas.OutcomeTimeout},
+		{"fail", false, false, nil, fail, nil, none, schemas.OutcomeFail},
+		{"never answered is aborted", false, false, nil, fail, nil, never, schemas.OutcomeAbortedInfra},
+		{"never answered beats broken", false, true, nil, nil, nil, never, schemas.OutcomeAbortedInfra},
+		{"veto beats never answered", false, false, veto, fail, nil, never, schemas.OutcomeIntegrityViolation},
+		{"lost after answers is infra", false, false, nil, fail, nil, lost, schemas.OutcomeInfraError},
+		{"lost after answers beats timeout", false, false, nil, fail, timedOut, lost, schemas.OutcomeInfraError},
+		{"lost after answers but passed", false, false, nil, pass, nil, lost, schemas.OutcomePass},
+		{"recovered errors change nothing", false, false, nil, fail, nil, recovered, schemas.OutcomeFail},
+		{"DNS incident sealed as fail is aborted", false, false, nil, fail, nil, incident, schemas.OutcomeAbortedInfra},
 	}
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
-			if got := outcomeFrom(c.aborted, c.broken, c.gates, c.grade, c.exec); got != c.want {
+			if got := outcomeFrom(c.aborted, c.broken, c.gates, c.grade, c.exec, c.up); got != c.want {
 				t.Fatalf("got %s, want %s", got, c.want)
+			}
+		})
+	}
+	if incident.Errors != 30 || incident.Answered != 0 || !incident.Inferred {
+		t.Fatalf("incident tally %+v", incident)
+	}
+}
+
+func TestRegateOutcomeUpstream(t *testing.T) {
+	veto := []schemas.GateResult{{Effect: schemas.GateVeto, Fired: true}}
+	fail := &schemas.Grade{}
+	never := utils.UpstreamTally{Errors: 3, LastFailed: true}
+	lost := utils.UpstreamTally{Errors: 2, Answered: 4, LastFailed: true}
+	recovered := utils.UpstreamTally{Errors: 1, Answered: 4}
+	cases := []struct {
+		name   string
+		sealed schemas.Outcome
+		gates  []schemas.GateResult
+		up     utils.UpstreamTally
+		want   schemas.Outcome
+	}{
+		{"fail that never reached the provider", schemas.OutcomeFail, nil, never, schemas.OutcomeInfraError},
+		{"timeout that ended on the provider", schemas.OutcomeTimeout, nil, lost, schemas.OutcomeInfraError},
+		{"recovered fail stays", schemas.OutcomeFail, nil, recovered, schemas.OutcomeFail},
+		{"pass stays", schemas.OutcomePass, nil, lost, schemas.OutcomePass},
+		{"crash stays", schemas.OutcomeCrash, nil, never, schemas.OutcomeCrash},
+		{"aborted stays", schemas.OutcomeAbortedInfra, veto, never, schemas.OutcomeAbortedInfra},
+		{"new veto wins", schemas.OutcomeFail, veto, never, schemas.OutcomeIntegrityViolation},
+		{"cleared veto, never answered", schemas.OutcomeIntegrityViolation, nil, never, schemas.OutcomeInfraError},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			run := &schemas.Run{Outcome: c.sealed}
+			if got := regateOutcome(run, c.gates, fail, nil, c.up); got != c.want {
+				t.Fatalf("got %s, want %s", got, c.want)
+			}
+		})
+	}
+}
+
+// TestRegateDNSIncident regates a run sealed as fail by an engine older than
+// the upstream rule: its fault proxy could not resolve the provider, and no
+// model call was ever answered. The regate makes it infra_error.
+func TestRegateDNSIncident(t *testing.T) {
+	m := &schemas.Manifest{ExpID: "e_1", Arms: map[string]schemas.ArmManifest{"A": {Config: schemas.AgentConfig{ID: "codex"}}}}
+	suite := &schemas.Suite{ID: "coding-core", Tasks: []*schemas.Task{{ID: "t08"}}}
+	sealed := []schemas.GateResult{{Gate: "g1", Version: "1.0.0", Effect: schemas.GateVeto}}
+	sr := regateRun(t, schemas.OutcomeFail, false, sealed, 0, "", nil)
+	var ev schemas.Evidence
+	raw, err := os.ReadFile(filepath.Join(sr.Dir, "evidence.json"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := json.Unmarshal(raw, &ev); err != nil {
+		t.Fatal(err)
+	}
+	ev.Ledger, ev.Requests = loadDNSIncident(t)
+	if raw, err = json.Marshal(ev); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(sr.Dir, "evidence.json"), raw, 0o644); err != nil {
+		t.Fatal(err)
+	}
+	reg := &schemas.Registry{Gates: []schemas.Gate{regateGate{name: "g1", version: "1.0.0"}}}
+	got, err := Regate(context.Background(), reg, m, suite, sr)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got.Outcome != schemas.OutcomeInfraError || got.Y.State != schemas.ValueUnknown {
+		t.Fatalf("outcome %s y %+v", got.Outcome, got.Y)
+	}
+}
+
+// TestRegateRunWithoutGateStage regates runs that were sealed before their
+// gate stage ran: no gate is checked on their partial evidence, nothing fires
+// and the outcome stays.
+func TestRegateRunWithoutGateStage(t *testing.T) {
+	m := &schemas.Manifest{ExpID: "e_1", Arms: map[string]schemas.ArmManifest{"A": {Config: schemas.AgentConfig{ID: "codex"}}}}
+	suite := &schemas.Suite{ID: "coding-core", Tasks: []*schemas.Task{{ID: "t08"}}}
+	reg := &schemas.Registry{Gates: []schemas.Gate{regateGate{name: "egress", version: "1.0.0", fire: true}}}
+	for _, o := range []schemas.Outcome{schemas.OutcomeInfraError, schemas.OutcomeAbortedInfra} {
+		t.Run(string(o), func(t *testing.T) {
+			sr := regateRun(t, o, false, nil, 0, "", nil)
+			sr.Run.Failures = []schemas.PartFailure{{Stage: schemas.StageRun, Part: "engine", Error: "agent run interrupted: context canceled"}}
+			got, err := Regate(context.Background(), reg, m, suite, sr)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if len(got.Gates) != 0 || len(got.Recomputed) != 0 || got.Outcome != o ||
+				len(got.Notes) != 1 || !strings.Contains(got.Notes[0], "gate stage never ran") {
+				t.Fatalf("regated %+v", got)
 			}
 		})
 	}

@@ -17,6 +17,10 @@ import (
 // after the run's own context was cancelled.
 const cleanupTimeout = 2 * time.Minute
 
+// upstreamPart names the provider's API in the part failure the upstream rule
+// records.
+const upstreamPart = "upstream"
+
 // Pipeline runs one slot through the fixed stage order of schemas.Stages.
 // It is safe for concurrent use: all per-run state lives in runState.
 type Pipeline struct {
@@ -100,8 +104,14 @@ func (p *Pipeline) RunSlot(ctx context.Context, in SlotInput) (*SlotResult, erro
 	cctx, cancel := afterContext(ctx)
 	defer cancel()
 	p.runStage(cctx, st, schemas.StageCleanup)
-	st.rc.Run.Outcome = decideOutcome(st)
+	up := utils.TallyUpstream(st.ev.Ledger, st.ev.Requests)
+	st.rc.Run.Outcome = decideOutcome(st, up)
 	st.rc.Run.Y = scoreOf(st.rc.Run.Outcome)
+	if pf, ok := upstreamFailure(up, st.rc.Run.Outcome); ok {
+		st.rc.Run.Failures = append(st.rc.Run.Failures, pf)
+		p.logger.Warn("provider unreachable during run", "run", st.rc.Run.RunID, "slot", st.rc.Slot.SlotID,
+			"outcome", string(st.rc.Run.Outcome), "upstream_errors", up.Errors, "answered", up.Answered)
+	}
 	return p.seal(cctx, st)
 }
 
@@ -336,30 +346,67 @@ func (p *Pipeline) emit(st *runState, ev Event) {
 }
 
 // decideOutcome maps what the run observed to its outcome.
-func decideOutcome(st *runState) schemas.Outcome {
-	return outcomeFrom(st.aborted, st.broken, st.ev.Gates, st.ev.Grade, st.rc.Exec)
+func decideOutcome(st *runState, up utils.UpstreamTally) schemas.Outcome {
+	return outcomeFrom(st.aborted, st.broken, st.ev.Gates, st.ev.Grade, st.rc.Exec, up)
 }
 
 // outcomeFrom maps what a run observed to its outcome. A fired veto gate is an
 // observed fact and wins over a later infrastructure failure. Regate uses it
 // too, so a recomputed gate list decides an outcome the same way.
-func outcomeFrom(aborted, broken bool, gates []schemas.GateResult, grade *schemas.Grade, exec *schemas.ExecResult) schemas.Outcome {
+//
+// up is the run's upstream tally from the fault proxy ledger. Model calls the
+// proxy passed on with no fault planned but could not deliver to the provider
+// are an infrastructure failure, never the agent's:
+//   - no model call was answered at all: aborted_infra. The agent never got a
+//     model response, so nothing it did depends on the model, and the
+//     scheduler gives the slot a new run as it does for any aborted run.
+//   - some calls were answered and the last model call failed upstream: the
+//     agent stopped because the provider went away. infra_error (unknown,
+//     never rerun, since the agent did real work), unless the grade passed.
+//
+// Upstream errors the agent recovered from (a later call was answered and the
+// run ended on it) change nothing; the upstream_errors gate reports them.
+func outcomeFrom(aborted, broken bool, gates []schemas.GateResult, grade *schemas.Grade, exec *schemas.ExecResult, up utils.UpstreamTally) schemas.Outcome {
 	switch {
 	case aborted:
 		return schemas.OutcomeAbortedInfra
 	case vetoFired(gates):
 		return schemas.OutcomeIntegrityViolation
+	case up.NeverAnswered():
+		return schemas.OutcomeAbortedInfra
 	case broken, grade == nil:
 		return schemas.OutcomeInfraError
 	case grade.InvalidEvaluator:
 		return schemas.OutcomeInvalidEvaluator
 	case grade.Passed:
 		return schemas.OutcomePass
+	case up.EndedOnError():
+		return schemas.OutcomeInfraError
 	case exec != nil && exec.TimedOut:
 		return schemas.OutcomeTimeout
 	default:
 		return schemas.OutcomeFail
 	}
+}
+
+// upstreamFailure is the part failure that records why the upstream rule of
+// outcomeFrom made a run infrastructure: ok is false when it did not.
+func upstreamFailure(up utils.UpstreamTally, o schemas.Outcome) (schemas.PartFailure, bool) {
+	if !up.NeverAnswered() && !up.EndedOnError() {
+		return schemas.PartFailure{}, false
+	}
+	if o != schemas.OutcomeAbortedInfra && o != schemas.OutcomeInfraError {
+		return schemas.PartFailure{}, false
+	}
+	msg := fmt.Sprintf("provider unreachable: %d model calls with no planned fault got no response from the provider, %d answered, last call failed: %t",
+		up.Errors, up.Answered, up.LastFailed)
+	switch {
+	case up.FirstError != "":
+		msg += "; first error: " + up.FirstError
+	case up.Inferred:
+		msg += "; inferred from the gateway's \"" + utils.ProxyUnreachable + "\" errors (proxy predates upstream_error)"
+	}
+	return schemas.PartFailure{Stage: schemas.StageRun, Part: upstreamPart, Error: msg}, true
 }
 
 func vetoFired(gates []schemas.GateResult) bool {

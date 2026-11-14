@@ -852,7 +852,7 @@ planned -> leased -> prepare -> arm -> run -> disarm -> export -> collect -> gra
         -> measure -> receipt -> cleanup -> seal
 ```
 
-- A run that fails **before its agent starts** is recorded as `aborted_infra` and cleaned up, and the slot gets a new run (at most 2 retries, all kept).
+- A run that fails **before its agent starts** is recorded as `aborted_infra` and cleaned up, and the slot gets a new run (at most 2 retries, all kept), and so is a run whose agent got no model response at all because the provider was unreachable (docs/upstream-failures.md). A run that ends on an unreachable provider after some answered calls is `infra_error`, never an agent failure.
 - A run **whose agent started** is never rerun. The later stages still run, `cleanup` always runs, and the run is sealed with whatever outcome it has, or `unknown`. This is what keeps the intention-to-treat ledger honest.
 - `--resume` re-leases only slots with no counted run. A lease carries an owner and a heartbeat, and a stale lease is reclaimed.
 

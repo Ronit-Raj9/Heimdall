@@ -1,7 +1,11 @@
 package handlers
 
 import (
+	"context"
 	"errors"
+	"fmt"
+	"strconv"
+	"strings"
 	"time"
 
 	"github.com/fasthttp/router"
@@ -17,6 +21,14 @@ import (
 // it no experiment is left out for its verdict.
 type VerdictIndex interface {
 	LatestDecision(expID string) (schemas.Decision, bool)
+}
+
+// RegradeIndex is optionally implemented by a ReadIndex. It lists an
+// experiment's regrades and reads its sealed runs with one as grade source,
+// so the leaderboard can serve grade_source=latest. Without it every
+// experiment reads its original grades.
+type RegradeIndex interface {
+	leaderboard.RegradeSource
 }
 
 // LeaderboardHandler serves the agent leaderboard: agent configurations
@@ -38,23 +50,32 @@ func (h *LeaderboardHandler) RegisterRoutes(r *router.Router, middlewares ...lib
 	r.GET(APIPrefix+"/leaderboard", lib.ChainMiddlewares(h.getLeaderboard, middlewares...))
 }
 
-// getLeaderboard handles GET /api/bench/leaderboard?suite=&condition=&scope=&synthetic=.
+// getLeaderboard handles GET
+// /api/bench/leaderboard?suite=&condition=&scope=&synthetic=&grade_source=&k=.
 // Absent parameters take the defaults: the newest suite with runs, clean,
-// all, exclude. A malformed one is a 400. A well-formed suite or condition
-// with no runs is an empty board, not an error, so the picker can still
-// list what exists.
+// all, exclude, original, each entry's default k. A malformed one is a 400,
+// as is a grade_source other than original or latest and a k that is not 2
+// or more. A well-formed suite or condition with no runs is an empty board,
+// not an error, so the picker can still list what exists.
 func (h *LeaderboardHandler) getLeaderboard(ctx *fasthttp.RequestCtx) {
 	if h.index == nil {
 		sendUnavailable(ctx, h.mode, "run index")
 		return
 	}
 	args := ctx.QueryArgs()
+	k, err := queryK(string(args.Peek("k")))
+	if err != nil {
+		lib.SendError(ctx, h.mode, fasthttp.StatusBadRequest, lib.ErrTypeBadRequest, err.Error())
+		return
+	}
 	q := leaderboard.Query{
-		Suite:     string(args.Peek("suite")),
-		Condition: string(args.Peek("condition")),
-		Scope:     string(args.Peek("scope")),
-		Synthetic: string(args.Peek("synthetic")),
-		Now:       h.now(),
+		Suite:       string(args.Peek("suite")),
+		Condition:   string(args.Peek("condition")),
+		Scope:       string(args.Peek("scope")),
+		Synthetic:   string(args.Peek("synthetic")),
+		GradeSource: string(args.Peek("grade_source")),
+		K:           k,
+		Now:         h.now(),
 	}
 	work, cancel := workContext(ctx, readTimeout)
 	defer cancel()
@@ -70,9 +91,24 @@ func (h *LeaderboardHandler) getLeaderboard(ctx *fasthttp.RequestCtx) {
 	lib.SendJSON(ctx, h.mode, fasthttp.StatusOK, lb)
 }
 
+// queryK parses the k parameter: absent is 0, each entry's default.
+// leaderboard.Query.Normalize checks the range.
+func queryK(raw string) (int, error) {
+	raw = strings.TrimSpace(raw)
+	if raw == "" {
+		return 0, nil
+	}
+	k, err := strconv.Atoi(raw)
+	if err != nil {
+		return 0, fmt.Errorf("k %q is not an integer", raw)
+	}
+	return k, nil
+}
+
 // LeaderboardSource adapts a ReadIndex to the leaderboard's Source. The
-// verdict decisions come from the index when it implements VerdictIndex.
-// The CLI uses it too, so both read the run folder the same way.
+// verdict decisions come from the index when it implements VerdictIndex,
+// and the regrades when it implements RegradeIndex. The CLI uses it too, so
+// both read the run folder the same way.
 func LeaderboardSource(index ReadIndex) leaderboard.Source {
 	return leaderboardSource{index: index}
 }
@@ -113,4 +149,22 @@ func (s leaderboardSource) LatestDecision(expID string) (schemas.Decision, bool)
 		return vi.LatestDecision(expID)
 	}
 	return "", false
+}
+
+// Regrades implements leaderboard.RegradeSource. An index without
+// RegradeIndex has no regrades.
+func (s leaderboardSource) Regrades(ctx context.Context, expID string) ([]leaderboard.Regrade, error) {
+	if ri, ok := s.index.(RegradeIndex); ok {
+		return ri.Regrades(ctx, expID)
+	}
+	return nil, nil
+}
+
+// RegradedRuns implements leaderboard.RegradeSource. It is only asked for a
+// regrade Regrades listed, so an index without RegradeIndex is never asked.
+func (s leaderboardSource) RegradedRuns(ctx context.Context, expID, regradeID string) ([]schemas.SealedRun, error) {
+	if ri, ok := s.index.(RegradeIndex); ok {
+		return ri.RegradedRuns(ctx, expID, regradeID)
+	}
+	return nil, fmt.Errorf("regrade %s of experiment %s: %w", regradeID, expID, schemas.ErrNotFound)
 }

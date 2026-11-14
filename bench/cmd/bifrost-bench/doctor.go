@@ -2,18 +2,19 @@ package main
 
 import (
 	"context"
+	"errors"
 	"flag"
 	"fmt"
-	"net/http"
 	"os"
 	"strings"
 	"time"
 
+	"github.com/maximhq/bifrost/bench/faultproxy"
 	"github.com/maximhq/bifrost/bench/schemas"
 )
 
 func init() {
-	register("doctor", "check docker, images, the gateway, the fault proxy and the suite lock", runDoctor)
+	register("doctor", "check docker, images, the gateway, the fault proxy and its upstreams, and the suite lock", runDoctor)
 }
 
 func runDoctor(args []string) int {
@@ -101,19 +102,64 @@ func (a *app) doctor(ctx context.Context) []schemas.DoctorCheck {
 	} else {
 		add("gateway", schemas.DoctorPass, fmt.Sprintf("%s %s, egress %s", gm.Name, gm.Version, gm.Settings["egress_probe"]))
 	}
-	req, _ := http.NewRequestWithContext(ctx, http.MethodGet, strings.TrimRight(a.cfg.FaultProxy.ControlURL, "/")+"/health", nil)
-	if resp, err := http.DefaultClient.Do(req); err != nil {
+	return append(out, faultProxyChecks(ctx, a.cfg.FaultProxy.ControlURL, os.Getenv("BENCH_FAULTPROXY_TOKEN"))...)
+}
+
+// faultProxyChecks checks the fault proxy's control API and then, with the
+// control token, that the proxy can reach each provider it answers from the
+// real API: one row per provider. A healthy proxy is not enough. When the
+// proxy cannot resolve or connect to the provider, every model call gets a
+// 502 while /health still answers, so only the upstream rows show it.
+func faultProxyChecks(ctx context.Context, controlURL, token string) []schemas.DoctorCheck {
+	var out []schemas.DoctorCheck
+	add := func(id string, st schemas.DoctorStatus, detail string) {
+		out = append(out, schemas.DoctorCheck{ID: id, Status: st, Detail: detail})
+	}
+	c := faultproxy.NewClient(controlURL, faultproxy.WithToken(token))
+	healthy := true
+	if err := c.Health(ctx); err != nil {
+		healthy = false
 		add("fault proxy", schemas.DoctorFail, err.Error())
 	} else {
-		resp.Body.Close()
-		if resp.StatusCode != http.StatusOK {
-			add("fault proxy", schemas.DoctorFail, resp.Status)
-		} else {
-			add("fault proxy", schemas.DoctorPass, a.cfg.FaultProxy.ControlURL)
-		}
+		add("fault proxy", schemas.DoctorPass, controlURL)
 	}
-	if os.Getenv("BENCH_FAULTPROXY_TOKEN") == "" {
+	switch {
+	case token == "":
 		add("fault proxy token", schemas.DoctorWarn, "BENCH_FAULTPROXY_TOKEN is not set; plans cannot be armed")
+		add("upstreams", schemas.DoctorWarn, "BENCH_FAULTPROXY_TOKEN is not set; upstream check skipped")
+	case !healthy:
+		add("upstreams", schemas.DoctorSkip, "fault proxy is not reachable")
+	default:
+		out = append(out, upstreamChecks(ctx, c)...)
+	}
+	return out
+}
+
+// upstreamChecks turns the proxy's upstream report into doctor rows. A proxy
+// older than the check gives one warning row, not a failure.
+func upstreamChecks(ctx context.Context, c *faultproxy.Client) []schemas.DoctorCheck {
+	rep, err := c.CheckUpstreams(ctx)
+	switch {
+	case errors.Is(err, faultproxy.ErrUpstreamCheckUnsupported):
+		return []schemas.DoctorCheck{{ID: "upstreams", Status: schemas.DoctorWarn, Detail: "proxy too old for upstream check"}}
+	case err != nil:
+		return []schemas.DoctorCheck{{ID: "upstreams", Status: schemas.DoctorFail, Detail: err.Error()}}
+	case len(rep.Upstreams) == 0:
+		return []schemas.DoctorCheck{{ID: "upstreams", Status: schemas.DoctorSkip,
+			Detail: "no provider has a real key in the fault proxy; the scripted model answers"}}
+	}
+	out := make([]schemas.DoctorCheck, 0, len(rep.Upstreams))
+	for _, u := range rep.Upstreams {
+		row := schemas.DoctorCheck{ID: "upstream " + u.Provider}
+		switch {
+		case u.Skipped != "":
+			row.Status, row.Detail = schemas.DoctorSkip, u.Host+": "+u.Skipped
+		case u.OK:
+			row.Status, row.Detail = schemas.DoctorPass, fmt.Sprintf("%s, %.0f ms", u.Host, u.LatencyMS)
+		default:
+			row.Status, row.Detail = schemas.DoctorFail, u.Error
+		}
+		out = append(out, row)
 	}
 	return out
 }

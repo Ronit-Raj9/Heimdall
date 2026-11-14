@@ -272,7 +272,7 @@ func newLauncher(a *app, ix *store.Index) *launcher {
 }
 
 func (l *launcher) Plan(ctx context.Context, exp *schemas.Experiment) (*schemas.Manifest, error) {
-	return engine.NewPlanner(l.a.reg, l.a.cfg.Root, l.a.logger).Plan(ctx, exp)
+	return l.a.newPlanner().Plan(ctx, exp)
 }
 
 func (l *launcher) Create(ctx context.Context, m *schemas.Manifest) error {

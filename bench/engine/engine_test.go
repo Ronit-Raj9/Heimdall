@@ -31,6 +31,7 @@ type world struct {
 	agents    []schemas.AgentConfig
 	seq       []string // every op in call order
 	plans     []schemas.FaultPlan
+	ledgers   [][]schemas.LedgerEntry // proxy ledgers handed to collects in order; none after
 }
 
 func newWorld() *world {
@@ -152,6 +153,11 @@ func (s fakeSource) Collect(_ context.Context, _ *schemas.RunContext, ev *schema
 	}
 	ev.Claim = &schemas.Claim{Made: true, Text: "done", Source: schemas.EvidenceNative}
 	ev.Requests = &schemas.RequestLog{Complete: true, Requests: []schemas.GatewayRequest{{ID: "row1", Raw: json.RawMessage(`{"big":true}`)}}}
+	s.w.mu.Lock()
+	defer s.w.mu.Unlock()
+	if len(s.w.ledgers) > 0 {
+		ev.Ledger, s.w.ledgers = s.w.ledgers[0], s.w.ledgers[1:]
+	}
 	return nil
 }
 

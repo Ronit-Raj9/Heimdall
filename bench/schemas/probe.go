@@ -116,24 +116,33 @@ type FaultController interface {
 // is empty for a provider with neither a key nor a scripted model, and on
 // every line a proxy older than the field wrote; omitempty keeps the hashes of
 // those older lines unchanged.
+//
+// UpstreamError is set on a pass line when the proxy could not get any
+// response from the provider's API (DNS, connect, TLS or response-header
+// timeout): the status on that line is the proxy's own 502, not the
+// provider's. It holds the transport error with the URL dropped. It is empty
+// when the provider answered, on injected and rejected lines, when the
+// caller went away before the provider answered, and on every line a proxy
+// older than the field wrote (omitempty keeps their hashes).
 type LedgerEntry struct {
-	Slot       string    `json:"slot"`
-	RunID      string    `json:"run_id"`
-	Call       int       `json:"call"` // 1-based count of conversation requests; 0 for uncounted kinds
-	Kind       string    `json:"kind"` // message | count_tokens | models | other
-	Path       string    `json:"path"`
-	Stream     bool      `json:"stream"`
-	Action     string    `json:"action"`             // pass | inject | reject
-	Upstream   string    `json:"upstream,omitempty"` // real | scripted
-	Status     int       `json:"status"`
-	ReqSHA256  string    `json:"req_sha256"`
-	ResponseID string    `json:"response_id,omitempty"`
-	Nonce      string    `json:"nonce,omitempty"` // present when a fault payload carried it
-	Tokens     *Tokens   `json:"tokens,omitempty"`
-	UpstreamMS float64   `json:"upstream_ms"`
-	At         time.Time `json:"at"`
-	PrevHash   string    `json:"prev_hash"`
-	Hash       string    `json:"hash"`
+	Slot          string    `json:"slot"`
+	RunID         string    `json:"run_id"`
+	Call          int       `json:"call"` // 1-based count of conversation requests; 0 for uncounted kinds
+	Kind          string    `json:"kind"` // message | count_tokens | models | other
+	Path          string    `json:"path"`
+	Stream        bool      `json:"stream"`
+	Action        string    `json:"action"`             // pass | inject | reject
+	Upstream      string    `json:"upstream,omitempty"` // real | scripted
+	Status        int       `json:"status"`
+	ReqSHA256     string    `json:"req_sha256"`
+	ResponseID    string    `json:"response_id,omitempty"`
+	Nonce         string    `json:"nonce,omitempty"` // present when a fault payload carried it
+	Tokens        *Tokens   `json:"tokens,omitempty"`
+	UpstreamMS    float64   `json:"upstream_ms"`
+	UpstreamError string    `json:"upstream_error,omitempty"` // transport error reaching the provider; see above
+	At            time.Time `json:"at"`
+	PrevHash      string    `json:"prev_hash"`
+	Hash          string    `json:"hash"`
 }
 
 // Ledger upstream values (LedgerEntry.Upstream).

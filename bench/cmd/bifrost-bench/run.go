@@ -41,7 +41,7 @@ func runPlan(args []string) int {
 	if err := a.validatePolicy(exp); err != nil {
 		return fail("%v", err)
 	}
-	m, err := engine.NewPlanner(a.reg, a.cfg.Root, a.logger).Plan(ctx, exp)
+	m, err := a.newPlanner().Plan(ctx, exp)
 	if err != nil {
 		return fail("plan: %v", err)
 	}
@@ -128,7 +128,7 @@ func (a *app) manifestFor(ctx context.Context, path, resume string) (*schemas.Ma
 	if err := a.validatePolicy(exp); err != nil {
 		return nil, fail("%v", err)
 	}
-	m, err := engine.NewPlanner(a.reg, a.cfg.Root, a.logger).Plan(ctx, exp)
+	m, err := a.newPlanner().Plan(ctx, exp)
 	if err != nil {
 		return nil, fail("plan: %v", err)
 	}

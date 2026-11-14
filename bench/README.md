@@ -110,7 +110,7 @@ Needs Docker, Go 1.26+ and Node 22. From `bench/` (or `make bench-<target>` from
 
 ```bash
 make up        # builds the binary, UI and images, creates deploy/.env with random tokens, starts Bifrost + Postgres + fault proxy
-make doctor    # preflight: docker, images, internal network, egress blocked, suite lock, gateway, fault proxy
+make doctor    # preflight: docker, images, internal network, egress blocked, suite lock, gateway, fault proxy, provider reachability
 make smoke     # no API key needed: toy agent + scripted model through real Bifrost, clean and model-outage
 make serve     # web UI and API on http://127.0.0.1:8090
 make down      # stop the stack
@@ -125,6 +125,15 @@ With a provider key in `deploy/.env` (only the fault proxy ever sees it):
 ./bin/bifrost-bench audit testdata/audit/maxim-tb21.csv     # verdict for a published per-task table
 ./bin/bifrost-bench leaderboard -scope common               # rank every agent config across experiments; no gateway needed
 ```
+
+A healthy fault proxy is not proof that model calls will work: if the proxy cannot resolve or connect to the provider (a host that changed networks and broke Docker DNS, for example), `/health` still answers while every model call gets a 502 `fault proxy could not reach the upstream`. So `doctor` also asks the proxy to check its upstreams and prints one `upstream <provider>` row per provider it answers from the real API with a real key: `pass` with the host and connect time, or `fail` with the error. `plan`, `run` and the UI's launch run the same check and refuse to freeze an experiment when a provider its arms call is unreachable. The rules:
+
+- The check is `GET /upstreams` on the fault proxy's control API. It needs the control token (`BENCH_FAULTPROXY_TOKEN`), because it makes the proxy open connections. For each provider with a real key it resolves the host, connects and, for https, completes a TLS handshake that verifies the certificate, with a 5 second bound and all providers at once. No HTTP request is sent, so no key leaves the proxy and no tokens are spent. The answer is `{"checked_at": ..., "upstreams": [{"provider", "host", "ok", "latency_ms", "error", "skipped"}]}`, where `host` is the `host:port` dialled and `error` is the transport error without a URL.
+- Providers answered by the scripted model and providers with no key are not listed: none of their calls leaves the proxy. Keyless providers (ollama) are not listed either, because their default address only exists in deployments that run them. `GET /health` lists every provider's mode. A provider whose traffic goes through an HTTP proxy from the environment is listed as `skipped`, not dialled.
+- The planner checks only the providers an experiment's arms (and its compatibility agent) call: the agent config's `gateway.provider`, anthropic when it names none. A scripted control other than `toy` runs with no network and calls none, so an oracle or noop experiment is never refused. A provider no arm calls only logs a warning.
+- A fault proxy older than the check answers 404: `doctor` prints one `warn` row, `proxy too old for upstream check`, and the planner logs a warning and plans as before. Any other failure of the check itself (proxy unreachable, missing or wrong token) refuses the plan, since every run binds a fault plan through the same control API and would fail the same way. Without `BENCH_FAULTPROXY_TOKEN`, `doctor` warns and skips the check.
+
+If the provider becomes unreachable during a run anyway, the run is sealed as infrastructure (`aborted_infra` and retried when no model call was answered, `infra_error` when it ended on one), never as the agent's `fail`, and the `upstream_errors` gate and instrument count it: `docs/upstream-failures.md`.
 
 `audit` on Maxim's own Terminal-Bench 2.1 routing result (fixed model 74 of 77, router 73 of 77) gives **inconclusive, exact p = 1.0**: 7 discordant tasks out of 77, and detecting a 1.3-point gap needs more than 200 tasks.
 

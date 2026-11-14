@@ -11,8 +11,8 @@
 // beats another.
 //
 // The package is pure compute over the run folder's read side: it reads
-// manifests, runs, metrics.json and proxy.ledger.jsonl through Source and
-// writes nothing.
+// manifests, runs, metrics.json and proxy.ledger.jsonl through Source, and
+// regrades through RegradeSource, and writes nothing.
 package leaderboard
 
 import (
@@ -34,6 +34,13 @@ const (
 	SyntheticExclude = "exclude"
 	SyntheticOnly    = "only"
 	DefaultAlpha     = 0.05
+	// GradeSourceOriginal reads every run as sealed; GradeSourceLatest reads
+	// each experiment's newest regrade where it has a result for the run.
+	GradeSourceOriginal = "original"
+	GradeSourceLatest   = "latest"
+	// MaxDefaultK caps the default k of pass^k: beyond a few tries in a row
+	// the estimate says more about the sample than about the agent.
+	MaxDefaultK = 3
 	// SortMetric is the one metric entries are ordered by.
 	SortMetric = "verified_success"
 )
@@ -56,7 +63,8 @@ type Run struct {
 }
 
 // Source is the read side of the run folder. handlers.LeaderboardSource
-// adapts the API's read index to it.
+// adapts the API's read index to it. A Source that also implements
+// RegradeSource can serve grade source latest.
 type Source interface {
 	Experiments() []string
 	Manifest(expID string) (*schemas.Manifest, bool)
@@ -71,15 +79,17 @@ type Source interface {
 }
 
 // Query selects one board. Zero fields take the defaults: the newest suite
-// with runs, the clean condition, scope all, live runs only, alpha 0.05 and
-// the current time.
+// with runs, the clean condition, scope all, live runs only, original
+// grades, each entry's default k, alpha 0.05 and the current time.
 type Query struct {
-	Suite     string    // id@version
-	Condition string    // clean or a probe id
-	Scope     string    // all | common
-	Synthetic string    // exclude | only
-	Alpha     float64   // significance level for tiers
-	Now       time.Time // GeneratedAt
+	Suite       string    // id@version
+	Condition   string    // clean or a probe id
+	Scope       string    // all | common
+	Synthetic   string    // exclude | only
+	GradeSource string    // original | latest
+	K           int       // k of pass^k for every entry; 0: each entry's default (defaultK)
+	Alpha       float64   // significance level for tiers
+	Now         time.Time // GeneratedAt
 }
 
 // Normalize fills the defaults and checks every field. Its error wraps
@@ -88,6 +98,7 @@ func (q Query) Normalize() (Query, error) {
 	q.Condition = cmp.Or(strings.TrimSpace(q.Condition), schemas.ConditionClean)
 	q.Scope = cmp.Or(strings.TrimSpace(q.Scope), ScopeAll)
 	q.Synthetic = cmp.Or(strings.TrimSpace(q.Synthetic), SyntheticExclude)
+	q.GradeSource = cmp.Or(strings.TrimSpace(q.GradeSource), GradeSourceOriginal)
 	q.Suite = strings.TrimSpace(q.Suite)
 	if q.Alpha == 0 {
 		q.Alpha = DefaultAlpha
@@ -104,6 +115,10 @@ func (q Query) Normalize() (Query, error) {
 		return q, fmt.Errorf("%w: scope %q is not all or common", ErrBadQuery, q.Scope)
 	case q.Synthetic != SyntheticExclude && q.Synthetic != SyntheticOnly:
 		return q, fmt.Errorf("%w: synthetic %q is not exclude or only", ErrBadQuery, q.Synthetic)
+	case q.GradeSource != GradeSourceOriginal && q.GradeSource != GradeSourceLatest:
+		return q, fmt.Errorf("%w: grade source %q is not original or latest", ErrBadQuery, q.GradeSource)
+	case q.K < 0 || q.K == 1:
+		return q, fmt.Errorf("%w: k %d is not 0 (each entry's default) or 2 or more", ErrBadQuery, q.K)
 	case !(q.Alpha > 0 && q.Alpha < 1):
 		return q, fmt.Errorf("%w: alpha %v is not in (0, 1)", ErrBadQuery, q.Alpha)
 	}
@@ -117,7 +132,9 @@ func (q Query) Normalize() (Query, error) {
 // invalid_evaluator, unknown, aborted_infra), "not sealed", or "experiment
 // verdict invalid" when the experiment's newest analysis decided invalid.
 // The synthetic filter applies before anything is counted, so a live board
-// never mentions scripted runs and the other way round.
+// never mentions scripted runs and the other way round. With grade source
+// latest each experiment's runs are read from its newest regrade
+// (readGradeSource) before they are graded or excluded.
 func Build(ctx context.Context, src Source, q Query) (*schemas.Leaderboard, error) {
 	q, err := q.Normalize()
 	if err != nil {
@@ -139,7 +156,7 @@ func Build(ctx context.Context, src Source, q Query) (*schemas.Leaderboard, erro
 	}
 	lb := &schemas.Leaderboard{
 		Suites: suiteList(kept), Condition: q.Condition, Scope: q.Scope, Synthetic: q.Synthetic,
-		Alpha: q.Alpha, SortMetric: SortMetric, GeneratedAt: q.Now.UTC(),
+		Alpha: q.Alpha, SortMetric: SortMetric, GeneratedAt: q.Now.UTC(), GradeSource: q.GradeSource,
 		Conditions: []string{}, CommonTasks: []string{}, Entries: []schemas.LeaderboardEntry{}, Excluded: []schemas.LeaderboardExclusion{},
 	}
 	lb.Suite = q.Suite
@@ -153,6 +170,10 @@ func Build(ctx context.Context, src Source, q Query) (*schemas.Leaderboard, erro
 		}
 	}
 	lb.Conditions = conditionList(inSuite)
+	if err := readGradeSource(ctx, src, inSuite, q.GradeSource); err != nil {
+		return nil, err
+	}
+	lb.GradeSources = gradeSourceList(inSuite, q.Condition)
 	graded, excluded, err := grade(ctx, src, inSuite)
 	if err != nil {
 		return nil, err
@@ -173,18 +194,22 @@ func Build(ctx context.Context, src Source, q Query) (*schemas.Leaderboard, erro
 type expInfo struct {
 	id      string
 	m       *schemas.Manifest
-	suite   string // id@version
-	invalid bool   // the newest analysis decided invalid
+	suite   string         // id@version
+	invalid bool           // the newest analysis decided invalid
+	trials  map[string]int // trialKey(arm, condition) -> trials per task
+	regrade string         // regrade id read under grade source latest; "" for none
 }
 
 // record is one slot of an experiment with its counted run, if sealed.
 type record struct {
-	exp    *expInfo
-	slot   schemas.Slot
-	run    schemas.Run // the counted run; the latest attempt when none is sealed
-	sealed bool
-	arm    *schemas.ArmManifest // nil when the manifest does not list the slot's arm
-	hash   string               // resolved agent config hash
+	exp     *expInfo
+	slot    schemas.Slot
+	run     schemas.Run // the counted run; the latest attempt when none is sealed
+	sealed  bool
+	arm     *schemas.ArmManifest     // nil when the manifest does not list the slot's arm
+	hash    string                   // resolved agent config hash
+	metrics map[string]schemas.Value // set when read from a regrade; nil: read metrics.json
+	source  string                   // regrade id the run was read from; "" for its original grade
 }
 
 // key is the (experiment, config) pair synthetic classification works on.
@@ -194,7 +219,9 @@ func (r *record) key() string { return r.exp.id + "\x00" + r.hash }
 // the store does: the first sealed run whose outcome is not aborted_infra,
 // else the last attempt when it is a sealed aborted_infra. A slot with only
 // unsealed runs keeps its latest attempt, unsealed. Slots with no run are
-// planned work, not runs, and are skipped.
+// planned work, not runs, and are skipped. Each experiment's trials per task
+// come from its manifest's slots, or from its runs' slots when the manifest
+// lists none for an arm and condition.
 func collect(ctx context.Context, src Source) ([]*record, error) {
 	var out []*record
 	ids := slices.Clone(src.Experiments())
@@ -211,9 +238,18 @@ func collect(ctx context.Context, src Source) ([]*record, error) {
 		if d, ok := src.LatestDecision(id); ok && d == schemas.DecisionInvalid {
 			exp.invalid = true
 		}
+		runs := src.Runs(id)
+		exp.trials = slotTrials(m.Slots)
 		bySlot := map[string][]Run{}
-		for _, r := range src.Runs(id) {
+		ran := make([]schemas.Slot, 0, len(runs))
+		for _, r := range runs {
 			bySlot[r.Slot.SlotID] = append(bySlot[r.Slot.SlotID], r)
+			ran = append(ran, r.Slot)
+		}
+		for key, n := range slotTrials(ran) {
+			if exp.trials[key] == 0 {
+				exp.trials[key] = n
+			}
 		}
 		slotIDs := make([]string, 0, len(bySlot))
 		for s := range bySlot {
@@ -255,6 +291,20 @@ func newRecord(exp *expInfo, runs []Run) *record {
 	}
 	return rec
 }
+
+// slotTrials maps trialKey(arm, condition) to the trials per task the slots
+// plan: the highest 1-based trial number.
+func slotTrials(slots []schemas.Slot) map[string]int {
+	out := map[string]int{}
+	for _, s := range slots {
+		key := trialKey(s.Arm, s.Condition)
+		out[key] = max(out[key], s.Trial)
+	}
+	return out
+}
+
+// trialKey keys an experiment's trials per task by arm and condition.
+func trialKey(arm, condition string) string { return arm + "\x00" + condition }
 
 // suiteList returns every suite with a sealed run, newest first by the
 // newest manifest that contributed one.

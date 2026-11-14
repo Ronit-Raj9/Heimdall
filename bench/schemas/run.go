@@ -58,9 +58,9 @@ const (
 	OutcomeRefusal            Outcome = "refusal"             // 0
 	OutcomeIntegrityViolation Outcome = "integrity_violation" // 0 plus a flag: a veto gate fired
 	OutcomeInvalidEvaluator   Outcome = "invalid_evaluator"   // unknown: the grader could not decide
-	OutcomeInfraError         Outcome = "infra_error"         // unknown: the bench or gateway failed after the agent started
+	OutcomeInfraError         Outcome = "infra_error"         // unknown: the bench or gateway failed after the agent started, or the run ended on an unreachable provider
 	OutcomeUnknown            Outcome = "unknown"             // unknown
-	OutcomeAbortedInfra       Outcome = "aborted_infra"       // not counted: failed before the agent started; the slot gets a new run
+	OutcomeAbortedInfra       Outcome = "aborted_infra"       // not counted: failed before the agent started, or no model call was answered because the provider was unreachable; the slot gets a new run
 )
 
 // Score maps an outcome to the verdict's 0/1 scale. ok is false for outcomes

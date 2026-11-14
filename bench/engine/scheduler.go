@@ -331,7 +331,7 @@ func (r *schedRun) skipDone(slot *schemas.Slot, recs []schemas.RunRecord) bool {
 	if sealedAborts >= maxAttempts {
 		r.count(func(s *Summary) { s.Skipped++ })
 		r.emit(Event{Kind: EventSlotSkipped, SlotID: slot.SlotID, Outcome: schemas.OutcomeAbortedInfra,
-			Message: "every allowed attempt aborted before its agent started"})
+			Message: "every allowed attempt aborted on infrastructure: before its agent started, or with no model call answered because the provider was unreachable"})
 		return true
 	}
 	return false

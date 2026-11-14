@@ -9,13 +9,19 @@ import (
 )
 
 // Instrument check names (DESIGN.md 9.4). Usage completeness and dropped logs
-// can make the experiment INVALID; the two parity checks only warn.
+// can make the experiment INVALID; the two parity checks and upstream errors
+// only warn.
 const (
 	InstrumentUsageCompleteness = "usage_completeness"
 	InstrumentDroppedLogs       = "dropped_logs"
 	InstrumentTimeoutParity     = "timeout_parity"
 	InstrumentBudgetParity      = "budget_parity"
+	InstrumentUpstreamErrors    = "upstream_errors"
 )
+
+// GateUpstreamErrors is the name of the report gate that counts a run's model
+// calls the fault proxy could not deliver to the provider.
+const GateUpstreamErrors = "upstream_errors"
 
 const (
 	minUsageCompleteness = 0.95
@@ -28,7 +34,7 @@ const (
 // an unknown one holds an IMPROVED verdict; a warning changes nothing unless
 // the experiment declares the timeout_parity guard.
 func instrumentChecks(m *schemas.Manifest, idx runIndex) []schemas.InstrumentCheck {
-	return []schemas.InstrumentCheck{usageCompleteness(idx), droppedLogs(m, idx), timeoutParityCheck(idx), budgetParity(m)}
+	return []schemas.InstrumentCheck{usageCompleteness(idx), droppedLogs(m, idx), timeoutParityCheck(idx), budgetParity(m), upstreamErrors(idx)}
 }
 
 // instrumentReasons returns the detail of every failed check, as invalid
@@ -237,6 +243,58 @@ func budgetParity(m *schemas.Manifest) schemas.InstrumentCheck {
 	}
 	c.Status = schemas.InstrumentWarn
 	c.Detail = strings.Join(parts, "; ") + ": differ between arms with no set: override, so the comparison includes them"
+	return c
+}
+
+// upstreamErrors counts, per arm, the counted runs on which the
+// upstream_errors gate fired: model calls the fault proxy passed on with no
+// fault planned but could not deliver to the provider. It only warns. Such
+// runs never score against the agent (the engine seals a run that never got a
+// model response as aborted_infra and one that ended on such an error as
+// infra_error), but the reader should know the provider was unreachable
+// during the experiment, and in which arm. A run sealed before the gate
+// existed carries no result and is left out; with no run carrying it the
+// check is not applicable.
+func upstreamErrors(idx runIndex) schemas.InstrumentCheck {
+	c := schemas.InstrumentCheck{Name: InstrumentUpstreamErrors, Threshold: "no run with upstream errors", PerArm: map[string]schemas.Ratio{}}
+	var fired, carried int
+	var parts []string
+	for _, arm := range armsIn(idx, "") {
+		var r schemas.Ratio
+		for _, run := range idx.armRuns("", arm) {
+			for _, g := range run.Gates {
+				if g.Gate != GateUpstreamErrors {
+					continue
+				}
+				r.Den++
+				if g.Fired {
+					r.Num++
+				}
+				break
+			}
+		}
+		if r.Den == 0 {
+			continue
+		}
+		c.PerArm[arm] = r
+		fired += r.Num
+		carried += r.Den
+		if r.Num > 0 {
+			parts = append(parts, fmt.Sprintf("%s %d of %d", arm, r.Num, r.Den))
+		}
+	}
+	switch {
+	case carried == 0:
+		c.Status = schemas.InstrumentNotApplicable
+		c.Detail = "no counted run carries the upstream_errors gate"
+	case fired == 0:
+		c.Status = schemas.InstrumentPass
+		c.Detail = fmt.Sprintf("the provider answered every passed model call in %d runs", carried)
+	default:
+		c.Status = schemas.InstrumentWarn
+		c.Detail = "runs with model calls the provider never answered: " + strings.Join(parts, ", ") +
+			"; they never score against the agent (aborted_infra or infra_error when it could not go on)"
+	}
 	return c
 }
 

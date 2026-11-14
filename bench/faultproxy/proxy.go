@@ -345,6 +345,11 @@ func (s *Server) serveScripted(w http.ResponseWriter, r *http.Request, kind, slo
 // copies the response back chunk by chunk, flushing each one, while a bounded
 // sniffer reads the response id and usage. Only safe headers are forwarded;
 // every credential location the table knows is stripped first.
+//
+// When the provider gives no response at all, e.UpstreamError records why, so
+// the engine can tell an unreachable provider from a provider error and never
+// count it against the agent. A request whose caller went away first is not
+// an upstream failure and is left unmarked.
 func (s *Server) forward(w http.ResponseWriter, r *http.Request, p ProviderSpec, up upstream, body []byte, e *schemas.LedgerEntry) {
 	q := r.URL.Query()
 	for _, a := range s.providers.auths {
@@ -355,6 +360,7 @@ func (s *Server) forward(w http.ResponseWriter, r *http.Request, p ProviderSpec,
 	target := up.base + r.URL.EscapedPath()
 	out, err := http.NewRequestWithContext(r.Context(), r.Method, target, bytes.NewReader(body))
 	if err != nil {
+		e.UpstreamError = "build request: " + redactURLError(err)
 		s.writeError(w, p.Format, http.StatusBadGateway, errUpstream, "fault proxy could not build the upstream request")
 		return
 	}
@@ -370,8 +376,12 @@ func (s *Server) forward(w http.ResponseWriter, r *http.Request, p ProviderSpec,
 	out.Header.Set("Accept-Encoding", "identity")
 	resp, err := s.client.Do(out)
 	if err != nil {
-		s.logger.Warn("upstream request failed", "slot", e.Slot, "provider", p.Name, "path", r.URL.Path, "error", redactURLError(err))
-		s.writeError(w, p.Format, http.StatusBadGateway, errUpstream, "fault proxy could not reach the upstream")
+		msg := redactURLError(err)
+		s.logger.Warn("upstream request failed", "slot", e.Slot, "provider", p.Name, "path", r.URL.Path, "error", msg)
+		if r.Context().Err() == nil {
+			e.UpstreamError = msg
+		}
+		s.writeError(w, p.Format, http.StatusBadGateway, errUpstream, utils.ProxyUnreachable)
 		return
 	}
 	defer resp.Body.Close()
