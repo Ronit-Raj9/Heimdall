@@ -8,3 +8,5 @@
 /bifrost-bench
 # Release log and evidence packs written by `bifrost-bench release`.
 /releases/
+# The repo-level .gitignore drops *.test (Go test binaries); this is the py.test shim.
+!/probes/shims/py.test

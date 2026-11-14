@@ -1,0 +1,6 @@
+#!/bin/sh
+# Bifrost Bench tool shim for py.test (tool_shim probe layer). See common.sh.
+# Shares the pytest call counter, so either entry point counts.
+. "$(dirname -- "$0")/common.sh"
+bench_find_real py.test || bench_not_found py.test
+bench_intercept py.test "$bench_real" "$@"
