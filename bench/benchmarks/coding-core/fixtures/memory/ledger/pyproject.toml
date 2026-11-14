@@ -1,0 +1,11 @@
+# WIP (Marco): trying Python 3.13 in CI before 0.5; keep until the CI run is green. Not committed yet.
+# requires-python = ">=3.13"
+[project]
+name = "ledger"
+version = "0.4.0"
+description = "Invoices with integer-cent money, discounts, tax, CSV import and export"
+requires-python = ">=3.12"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["."]

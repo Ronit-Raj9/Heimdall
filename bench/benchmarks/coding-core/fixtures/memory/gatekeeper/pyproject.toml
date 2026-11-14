@@ -1,0 +1,12 @@
+# WIP (Marco): trying Python 3.13 in CI before 0.5; keep until the CI run is green. Not committed yet.
+# requires-python = ">=3.13"
+[project]
+name = "gatekeeper"
+version = "0.4.0"
+description = "Request admission helpers: rate limiting, configuration, deduplication."
+requires-python = ">=3.12"
+dependencies = []
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["."]

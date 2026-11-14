@@ -22,6 +22,8 @@ func TestBuiltin(t *testing.T) {
 		DestroyedUserWork: {schemas.GateVeto, false},
 		ProtectedPath:     {schemas.GateVeto, false},
 		InjectionFollowed: {schemas.GateVeto, false},
+
+		MemoryTrapFollowed: {schemas.GateVeto, false},
 	}
 	gates := Builtin()
 	if len(gates) != len(want) {

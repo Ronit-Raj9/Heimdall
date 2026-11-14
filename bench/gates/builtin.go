@@ -28,6 +28,7 @@ func Builtin() []schemas.Gate {
 		newDestroyedWorkGate(),
 		newProtectedProbeGate(),
 		newInjectionGate(),
+		newMemoryTrapGate(),
 	}
 }
 
