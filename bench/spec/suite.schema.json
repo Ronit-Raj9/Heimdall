@@ -6,12 +6,25 @@
   "type": "object",
   "additionalProperties": false,
   "required": ["id", "version", "environment", "grader", "base_image", "workdir", "verifier", "tasks", "probes"],
+  "allOf": [
+    {
+      "if": {"required": ["grader"], "properties": {"grader": {"const": "hidden_tests"}}},
+      "then": {
+        "properties": {
+          "verifier": {"properties": {"result": {"const": "junit"}, "result_path": false, "pass_threshold": false}}
+        }
+      }
+    }
+  ],
   "properties": {
     "id": {"$ref": "#/$defs/id", "description": "Pack id; equals the folder name under benchmarks/."},
     "version": {"$ref": "#/$defs/semver"},
     "description": {"type": "string"},
     "environment": {"$ref": "#/$defs/part_name", "description": "Environment part name, e.g. docker_workspace."},
-    "grader": {"$ref": "#/$defs/part_name", "description": "Grader part name, e.g. hidden_tests."},
+    "grader": {
+      "enum": ["hidden_tests", "verifier_command"],
+      "description": "Grader part name. hidden_tests: pytest JUnit at /grader/out/junit.xml, the original Python grader. verifier_command: any language, reporting as junit, reward or exit_code (docs/verifiers.md)."
+    },
     "base_image": {"$ref": "#/$defs/image"},
     "workdir": {"type": "string", "pattern": "^/", "description": "Absolute workspace path inside containers."},
     "verifier": {
@@ -25,8 +38,35 @@
           "items": {"type": "string", "minLength": 1},
           "description": "Paths reset to the pristine repo before grading."
         },
-        "timeout_s": {"type": "integer", "minimum": 1}
-      }
+        "timeout_s": {"type": "integer", "minimum": 1},
+        "result": {
+          "enum": ["junit", "reward", "exit_code"],
+          "default": "junit",
+          "description": "How the command reports (verifier_command only). junit: JUnit XML at result_path. reward: a number, or {\"reward\": n, \"dimensions\": {...}}, at result_path. exit_code: exit 0 passes."
+        },
+        "result_path": {
+          "type": "string",
+          "pattern": "^/grader/out/[A-Za-z0-9_][A-Za-z0-9._-]{0,127}$",
+          "description": "Result file inside the verifier container, directly in /grader/out, which the grader creates empty for each grade. Default /grader/out/junit.xml or /grader/out/reward.json."
+        },
+        "pass_threshold": {
+          "type": "number",
+          "exclusiveMinimum": 0,
+          "maximum": 1000000000,
+          "default": 1,
+          "description": "Lowest reward that passes (result reward only)."
+        }
+      },
+      "allOf": [
+        {
+          "if": {"required": ["result"], "properties": {"result": {"const": "exit_code"}}},
+          "then": {"properties": {"result_path": false}}
+        },
+        {
+          "if": {"not": {"required": ["result"], "properties": {"result": {"const": "reward"}}}},
+          "then": {"properties": {"pass_threshold": false}}
+        }
+      ]
     },
     "tasks": {"type": "array", "minItems": 1, "items": {"$ref": "#/$defs/id"}},
     "probes": {"type": "array", "items": {"$ref": "#/$defs/id"}}

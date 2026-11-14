@@ -143,3 +143,13 @@ type Metric interface {
 	Descriptor() MetricDescriptor
 	Compute(ctx context.Context, rc *RunContext, ev *Evidence) (Value, error)
 }
+
+// DerivedMetric is a metric that also yields values under names known only at
+// run time, such as one value per reward dimension a verifier reported
+// (reward_<name>). The measure stage stores them beside the registered
+// metrics; a derived name never replaces a registered one and never feeds
+// the primary endpoint.
+type DerivedMetric interface {
+	Metric
+	ComputeDerived(ctx context.Context, rc *RunContext, ev *Evidence) (map[string]Value, error)
+}

@@ -33,6 +33,7 @@ func TestBuiltin(t *testing.T) {
 		{name: SecretInContext, kind: schemas.KindCount, min: schemas.EvidenceGateway},
 		{name: MemoryNoteSeen, kind: schemas.KindRate, min: schemas.EvidenceGateway},
 		{name: MemoryTrapDisclosed, kind: schemas.KindRate, higher: true, min: schemas.EvidenceOutcome},
+		{name: Reward, kind: schemas.KindCount, higher: true, min: schemas.EvidenceOutcome},
 	}
 	got := Builtin()
 	if len(got) != len(tests) {

@@ -55,7 +55,10 @@ type xmlCase struct {
 // parseJUnit reads a JUnit XML report whose root is <testsuites> or
 // <testsuite>, summing counts over every <testsuite>. A count is never taken
 // below what the suite's testcase elements show, so a missing or understated
-// failures attribute cannot hide a failed case. It is pure.
+// failures attribute cannot hide a failed case. Testcase elements directly
+// under <testsuites>, which Node's junit reporter writes for top-level tests,
+// count from the elements alone; otherwise a failing top-level test beside a
+// passing describe block would vanish. It is pure.
 func parseJUnit(data []byte) (*junitReport, error) {
 	var root xmlSuite
 	if err := xml.Unmarshal(data, &root); err != nil {
@@ -64,9 +67,9 @@ func parseJUnit(data []byte) (*junitReport, error) {
 	r := &junitReport{}
 	switch root.XMLName.Local {
 	case "testsuites":
-		if len(root.Suites) == 0 {
-			return r, nil
-		}
+		top := tallyCases(root.Cases)
+		r.Tests, r.Failures, r.Errors, r.Skipped = top.Tests, top.Failures, top.Errors, top.Skipped
+		r.Cases = top.Cases
 		for _, s := range root.Suites {
 			if err := r.addSuite(s); err != nil {
 				return nil, err
@@ -84,21 +87,8 @@ func parseJUnit(data []byte) (*junitReport, error) {
 
 // addSuite adds one suite, and any nested suites, to r.
 func (r *junitReport) addSuite(s xmlSuite) error {
-	var cases junitReport
-	for _, c := range s.Cases {
-		jc := junitCase{
-			Classname: c.Classname,
-			Name:      c.Name,
-			Failed:    len(c.Failures) > 0,
-			Errored:   len(c.Errors) > 0,
-			Skipped:   len(c.Skipped) > 0,
-		}
-		cases.Tests++
-		cases.Failures += boolInt(jc.Failed)
-		cases.Errors += boolInt(jc.Errored)
-		cases.Skipped += boolInt(jc.Skipped)
-		r.Cases = append(r.Cases, jc)
-	}
+	cases := tallyCases(s.Cases)
+	r.Cases = append(r.Cases, cases.Cases...)
 	counts := []struct {
 		attr     *string
 		fallback int
@@ -129,6 +119,26 @@ func (r *junitReport) addSuite(s xmlSuite) error {
 	return nil
 }
 
+// tallyCases turns testcase elements into cases and counts them.
+func tallyCases(xs []xmlCase) junitReport {
+	var t junitReport
+	for _, c := range xs {
+		jc := junitCase{
+			Classname: c.Classname,
+			Name:      c.Name,
+			Failed:    len(c.Failures) > 0,
+			Errored:   len(c.Errors) > 0,
+			Skipped:   len(c.Skipped) > 0,
+		}
+		t.Tests++
+		t.Failures += boolInt(jc.Failed)
+		t.Errors += boolInt(jc.Errored)
+		t.Skipped += boolInt(jc.Skipped)
+		t.Cases = append(t.Cases, jc)
+	}
+	return t
+}
+
 // requiredResult says, for each required id, whether it ran and passed.
 type requiredResult struct {
 	Missing []string // required ids with no matching testcase, or only skipped ones
@@ -139,9 +149,12 @@ type requiredResult struct {
 // "file.py::Class::test" against testcases. pytest writes the module as a
 // dotted classname relative to its rootdir (for example
 // "tests.test_file"), so the module part matches as a dotted suffix, and a
-// parametrized "test[param]" counts as an instance of "test". A required id
-// passes only when at least one instance ran and none failed, errored or was
-// skipped. It is pure.
+// parametrized "test[param]" counts as an instance of "test". Classnames
+// with slashes, as Go reporters write package paths ("example.com/calc"),
+// match as if dotted, so "example.com/calc::TestAdd" and "calc::TestAdd"
+// both work; pytest never writes a slash, so its matching is unchanged. A
+// required id passes only when at least one instance ran and none failed,
+// errored or was skipped. It is pure.
 func checkRequired(r *junitReport, required []string) (requiredResult, error) {
 	var out requiredResult
 	for _, id := range required {
@@ -190,6 +203,7 @@ func splitTestID(id string) (string, string, error) {
 }
 
 func classMatches(classname, want string) bool {
+	classname = strings.ReplaceAll(classname, "/", ".")
 	return classname == want || strings.HasSuffix(classname, "."+want)
 }
 

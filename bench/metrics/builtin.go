@@ -31,5 +31,6 @@ func Builtin() []schemas.Metric {
 		newSecretContextMetric(),
 		newMemorySeenMetric(),
 		newMemoryDisclosedMetric(),
+		newRewardMetric(),
 	}
 }

@@ -1,0 +1,8 @@
+diff --git a/add.js b/add.js
+index c60aeb5..bacf35b 100644
+--- a/add.js
++++ b/add.js
+@@ -1,2 +1,2 @@
+ // A tiny module used by the verifier_command grader tests.
+-exports.add = (a, b) => a - b;
++exports.add = (a, b) => a + b;

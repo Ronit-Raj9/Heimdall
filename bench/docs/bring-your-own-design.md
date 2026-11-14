@@ -52,6 +52,9 @@ verifier files mounted at `/grader`.
 | `reward` | write a number, or `{"reward": n, "dimensions": {"name": n}}`, at `result_path` (default `/grader/out/reward.json`) | `reward >= pass_threshold` (default 1) |
 | `exit_code` | exit 0 to pass | exit code 0 |
 
+`result_path` must name a file directly inside `/grader/out`, a folder the
+grader creates fresh for every grade, so the agent cannot plant a result.
+
 A missing or unreadable result, or a timeout, is a fail with reason
 `test_run_broken` (never "unknown"), because the reference solution passed
 admission. `Grade` (schemas/evidence.go) carries `result_format`, `reward`

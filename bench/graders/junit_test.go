@@ -17,6 +17,12 @@ E       assert 1 == -5</failure></testcase></testsuite></testsuites>`
 	// junitUnderstated claims no failures while a testcase failed.
 	junitUnderstated = `<testsuite tests="1" failures="0" errors="0" skipped="0"><testcase classname="tests.test_hidden_calc" name="test_add"><failure/></testcase></testsuite>`
 	junitNoAttrs     = `<testsuite><testcase classname="t.test_x" name="test_a"/><testcase classname="t.test_x" name="test_b"><error/></testcase></testsuite>`
+	// junitGo is the shape gotestsum and go-junit-report write: the package
+	// path is the classname.
+	junitGo = `<testsuites><testsuite name="example.com/calc" tests="2" failures="1" errors="0"><testcase classname="example.com/calc" name="TestAdd"/><testcase classname="example.com/calc" name="TestSub"><failure/></testcase></testsuite></testsuites>`
+	// junitNode is the shape of node --test --test-reporter=junit: top-level
+	// tests sit directly under testsuites, describe blocks become testsuites.
+	junitNode = `<?xml version="1.0" encoding="utf-8"?><testsuites><testcase name="adds" classname="test"/><testcase name="fails" classname="test" failure="no"><failure type="testCodeFailure" message="no">x</failure></testcase><testsuite name="group" errors="0" tests="1" failures="0" skipped="0"><testcase name="inner" classname="test"/></testsuite><!-- tests 3 --></testsuites>`
 )
 
 func TestParseJUnit(t *testing.T) {
@@ -35,6 +41,8 @@ func TestParseJUnit(t *testing.T) {
 		{name: "understated failures", xml: junitUnderstated, tests: 1, failures: 1, cases: 1},
 		{name: "testsuite root without attributes", xml: junitNoAttrs, tests: 2, errors: 1, cases: 2},
 		{name: "empty testsuites", xml: `<testsuites/>`},
+		{name: "node top-level testcases count", xml: junitNode, tests: 3, failures: 1, cases: 3},
+		{name: "node top-level only", xml: `<testsuites><testcase name="a" classname="test"><skipped/></testcase></testsuites>`, tests: 1, skipped: 1, cases: 1},
 		{name: "not xml", xml: `garbage`, wantErr: true},
 		{name: "wrong root", xml: `<html/>`, wantErr: true},
 		{name: "bad count", xml: `<testsuite tests="many"/>`, wantErr: true},
@@ -75,6 +83,10 @@ func TestCheckRequired(t *testing.T) {
 		{name: "failed", xml: junitFail, required: []string{"test_hidden_calc.py::test_add_negative"}, failed: []string{"test_hidden_calc.py::test_add_negative"}},
 		{name: "skipped counts as missing", xml: junitSkipped, required: []string{"test_hidden_calc.py::test_add"}, missing: []string{"test_hidden_calc.py::test_add"}},
 		{name: "malformed id", xml: junitPass, required: []string{"test_add"}, wantErr: true},
+		{name: "go package path", xml: junitGo, required: []string{"example.com/calc::TestAdd", "calc::TestAdd"}},
+		{name: "go failed", xml: junitGo, required: []string{"example.com/calc::TestSub"}, failed: []string{"example.com/calc::TestSub"}},
+		{name: "go other package", xml: junitGo, required: []string{"example.com/other::TestAdd"}, missing: []string{"example.com/other::TestAdd"}},
+		{name: "node top-level test", xml: junitNode, required: []string{"test::adds"}},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
