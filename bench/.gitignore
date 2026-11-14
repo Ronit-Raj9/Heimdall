@@ -4,3 +4,5 @@ bin/
 !deploy/.env.example
 # Run folders are local evidence; the recorded demo bundle lives in testdata/.
 runs/
+# A binary built with plain `go build ./cmd/bifrost-bench` from bench/.
+/bifrost-bench

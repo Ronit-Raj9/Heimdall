@@ -14,7 +14,8 @@ import (
 // Defaults for the gateway wiring that bench.yaml does not carry yet.
 const (
 	defaultFaultProxyURL = "http://faultproxy:9100" // the fault proxy as Bifrost sees it
-	defaultModel         = "claude-sonnet-4-5"      // every key slot serves it at setup; MintKey adds the run's model
+	defaultModel         = "claude-sonnet-4-5"      // every anthropic key slot serves it at setup; MintKey adds the run's model
+	defaultOpenAIModel   = "gpt-5.4-mini"           // every openai key slot serves it at setup
 )
 
 // newGateway builds the Bifrost client and makes sure the provider and its key
@@ -26,18 +27,11 @@ func newGateway(ctx context.Context, cfg *lib.Config, docker utils.Docker, logge
 	if token == "" {
 		return nil, fmt.Errorf("gateway: %s is not set (see deploy/.env.example)", cfg.Gateway.AdminTokenEnv)
 	}
-	slots := make([]bifrost.Slot, 0, len(cfg.Gateway.KeySlots))
-	for _, s := range cfg.Gateway.KeySlots {
-		slots = append(slots, bifrost.Slot{Name: s, Value: s})
-	}
-	model := envOr("BENCH_MODEL", defaultModel)
 	gw, err := bifrost.New(bifrost.Config{
 		URL:           cfg.Gateway.URL,
 		SetupToken:    token,
-		Provider:      cfg.Gateway.Provider,
 		FaultProxyURL: envOr("BENCH_GATEWAY_FAULT_PROXY_URL", defaultFaultProxyURL),
-		Model:         model,
-		Slots:         slots,
+		Providers:     providerSetups(cfg),
 		MaxRetries:    0,
 		EvalNetwork:   cfg.Networks.Eval,
 		HelperImage:   cfg.Images.Helper,
@@ -51,6 +45,27 @@ func newGateway(ctx context.Context, cfg *lib.Config, docker utils.Docker, logge
 		return nil, fmt.Errorf("gateway setup at %s: %w", cfg.Gateway.URL, err)
 	}
 	return gw, nil
+}
+
+// providerSetups lists the providers the bench configures in Bifrost. Both
+// Anthropic and OpenAI go through the fault proxy, so every probe works for
+// them; the proxy forwards to the real provider when its key is in the proxy's
+// environment and answers with its scripted model otherwise. More providers
+// can be added here, proxied or direct.
+func providerSetups(cfg *lib.Config) []bifrost.ProviderSetup {
+	anth := make([]bifrost.Slot, 0, len(cfg.Gateway.KeySlots))
+	for _, s := range cfg.Gateway.KeySlots {
+		anth = append(anth, bifrost.Slot{Name: s, Value: s})
+	}
+	oa := make([]bifrost.Slot, 0, 4)
+	for i := 1; i <= 4; i++ {
+		n := fmt.Sprintf("oa-slot-%d", i)
+		oa = append(oa, bifrost.Slot{Name: n, Value: n})
+	}
+	return []bifrost.ProviderSetup{
+		{Name: "anthropic", Mode: bifrost.ModeProxied, Model: envOr("BENCH_MODEL", defaultModel), Slots: anth},
+		{Name: "openai", Mode: bifrost.ModeProxied, Model: envOr("BENCH_OPENAI_MODEL", defaultOpenAIModel), Slots: oa},
+	}
 }
 
 // envOr returns the environment value of key, or def when it is empty.
