@@ -1,4 +1,6 @@
-# Bifrost Bench
+# Heimdall (`bifrost-bench`)
+
+Heimdall is the project name; the folder, the Go module and the `bifrost-bench` command keep the code name. Older docs call it Bifrost Bench.
 
 **Crash tests for coding agents, ending in a release verdict that knows when it cannot tell.**
 

@@ -1,6 +1,13 @@
+# Heimdall: the release gate for AI agents, built on Bifrost
+
+> **Hackathon submission (PS2, agent benchmarking).** Heimdall decides whether a change to an AI agent (a new model, prompt, notes file, tool or gateway rule) made it better, worse, or whether we cannot tell yet. It runs agents on the same tasks, repeatedly, clean and under injected failures, with every model call going through Bifrost, and turns that record into a verdict (improved, regressed, inconclusive or evaluation invalid) with the evidence one click away. It lives in [`bench/`](bench/) (code name `bifrost-bench`). Start with [`bench/README.md`](bench/README.md); run `make bench-up`, `make bench-smoke` and `make bench-serve` from the repo root.
+>
+> In Norse myth Heimdall guards Bifrost, the bridge to Asgard: nothing crosses without passing him. Heimdall is built inside a fork of [Bifrost](https://github.com/maximhq/bifrost) (Apache-2.0); everything below this section is upstream Bifrost's own README.
+
+---
+
 # Bifrost AI Gateway
 
-> **Hackathon submission (PS2, agent benchmarking): Bifrost Bench.** A release-check platform for coding agents built on Bifrost lives in [`bench/`](bench/). Every model call of the agents under test goes through Bifrost; the bench turns that record into a verdict (improved, regressed, inconclusive or evaluation invalid). Start with [`bench/README.md`](bench/README.md); run `make bench-up`, `make bench-smoke` and `make bench-serve` from the repo root. Everything else in this repository is upstream Bifrost.
 
 <a href="https://trendshift.io/repositories/14529?utm_source=repository-badge&amp;utm_medium=badge&amp;utm_campaign=badge-repository-14529" target="_blank" rel="noopener noreferrer"><img src="https://trendshift.io/api/badge/repositories/14529" alt="maximhq%2Fbifrost | Trendshift" width="250" height="55"/></a>
 
