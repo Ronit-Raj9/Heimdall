@@ -31,7 +31,7 @@ type meterDef struct {
 // every condition, because the meters describe every run (DESIGN.md 9.6).
 func meters(idx runIndex) []schemas.Meter {
 	defs := []meterDef{
-		{MeterFalseCompletion, "False-completion rate", "runs with a success claim the verifier failed", "runs with an observed false_completion value",
+		{MeterFalseCompletion, "False completion among failed runs", "failed runs that still claimed success", "failed runs whose claim is known",
 			schemas.KindRate, meanOf(MetricFalseCompletion)},
 		{MeterClaimPrecision, "Claim precision", "success claims the verifier confirmed", "runs with a success claim",
 			schemas.KindRate, meanOf(MetricClaimPrecision)},
