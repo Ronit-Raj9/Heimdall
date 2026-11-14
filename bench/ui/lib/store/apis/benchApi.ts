@@ -11,6 +11,8 @@ import type {
 	Experiment,
 	GridResponse,
 	HealthResponse,
+	LeaderboardParams,
+	LeaderboardResponse,
 	PairResponse,
 	PlanResponse,
 	RegradeRequest,
@@ -148,6 +150,7 @@ export const benchApi = createApi({
 		"BenchPair",
 		"BenchRelease",
 		"BenchTriage",
+		"BenchLeaderboard",
 	],
 	endpoints: (builder) => ({
 		getHealth: builder.query<HealthResponse, void>({
@@ -240,6 +243,16 @@ export const benchApi = createApi({
 			invalidatesTags: [{ type: "BenchRelease", id: "LIST" }],
 		}),
 
+		// Leaderboard: agent configurations ranked by verified success across experiments. An absent
+		// or empty param is left out so the server default applies (newest suite, clean, all, exclude).
+		getLeaderboard: builder.query<LeaderboardResponse, LeaderboardParams | void>({
+			query: (params) => {
+				const search = Object.fromEntries(Object.entries(params ?? {}).filter(([, value]) => Boolean(value)));
+				return Object.keys(search).length > 0 ? { url: "/leaderboard", params: search } : "/leaderboard";
+			},
+			providesTags: ["BenchLeaderboard"],
+		}),
+
 		// Analysis
 		auditTable: builder.mutation<AuditResponse, AuditRequest>({
 			query: (body) => ({ url: "/audit", method: "POST", body }),
@@ -252,6 +265,7 @@ export const benchApi = createApi({
 				{ type: "BenchDiagnostics", id: exp_id },
 				{ type: "BenchGrid", id: exp_id },
 				{ type: "BenchTriage", id: exp_id },
+				"BenchLeaderboard",
 			],
 		}),
 	}),
@@ -275,6 +289,7 @@ export const {
 	useGetRunReceiptsQuery,
 	useGetPairQuery,
 	useGetTriageQuery,
+	useGetLeaderboardQuery,
 	useListReleasesQuery,
 	useGetReleaseQuery,
 	useCreateReleaseMutation,

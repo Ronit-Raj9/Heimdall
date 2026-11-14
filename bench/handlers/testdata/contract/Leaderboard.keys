@@ -1,0 +1,14 @@
+# Keys of bench.ts `Leaderboard`, one per line; a trailing ? marks an optional (Go omitempty) key.
+# The top-level response adds "mode". Change with bench.ts and schemas/leaderboard.go.
+suite
+suites
+condition
+conditions
+scope
+synthetic
+common_tasks
+alpha
+sort_metric
+entries
+excluded
+generated_at

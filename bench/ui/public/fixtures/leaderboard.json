@@ -1,0 +1,516 @@
+{
+	"_comment": "SYNTHETIC fixture for UI development. Not a benchmark result: every number is made up.",
+	"mode": "synthetic",
+	"suite": "coding-core@1.0.0",
+	"suites": [
+		"coding-core@1.0.0",
+		"coding-core@0.9.0"
+	],
+	"condition": "clean",
+	"conditions": [
+		"clean",
+		"model-outage",
+		"stale-notes",
+		"test-crash"
+	],
+	"scope": "all",
+	"synthetic": "only",
+	"common_tasks": [
+		"t01",
+		"t02",
+		"t03"
+	],
+	"alpha": 0.05,
+	"sort_metric": "verified_success",
+	"entries": [
+		{
+			"rank": 1,
+			"tier": 1,
+			"p_vs_leader": null,
+			"tier_reason": "leader",
+			"config_hash": "sha256:67cd7a069ba6e6141a645638240d97c5062022fa81126e36300d8bc0006730cd",
+			"agent": "codex",
+			"model": "gpt-5.4-mini",
+			"label": "B: code-wins note",
+			"synthetic": true,
+			"experiments": [
+				"e_synthetic-codewins"
+			],
+			"tasks": 8,
+			"runs": 24,
+			"trials": 3,
+			"success": {
+				"state": "observed",
+				"v": 0.75,
+				"evidence": "outcome",
+				"bounds": [
+					0.52,
+					0.98
+				]
+			},
+			"passes": {
+				"num": 18,
+				"den": 24,
+				"unknown": 0
+			},
+			"reliability": {
+				"state": "observed",
+				"v": 0.5,
+				"evidence": "outcome"
+			},
+			"metrics": {
+				"cost_per_success": {
+					"state": "observed",
+					"v": 0.042,
+					"evidence": "gateway"
+				},
+				"steps": {
+					"state": "observed",
+					"v": 21,
+					"evidence": "native"
+				},
+				"tool_calls": {
+					"state": "observed",
+					"v": 16,
+					"evidence": "native"
+				},
+				"tokens": {
+					"state": "observed",
+					"v": 41000,
+					"evidence": "gateway"
+				},
+				"cost_usd": {
+					"state": "observed",
+					"v": 0.032,
+					"evidence": "gateway"
+				},
+				"wall_time_s": {
+					"state": "observed",
+					"v": 184,
+					"evidence": "outcome"
+				},
+				"false_completion": {
+					"state": "observed",
+					"v": 0.042,
+					"evidence": "native"
+				},
+				"safe_success": {
+					"state": "observed",
+					"v": 0.75,
+					"evidence": "outcome"
+				}
+			},
+			"resilience": {
+				"model-outage": {
+					"state": "observed",
+					"v": -0.125,
+					"evidence": "outcome"
+				},
+				"stale-notes": {
+					"state": "observed",
+					"v": -0.25,
+					"evidence": "outcome"
+				},
+				"test-crash": {
+					"state": "observed",
+					"v": -0.042,
+					"evidence": "outcome"
+				}
+			}
+		},
+		{
+			"rank": 2,
+			"tier": 1,
+			"p_vs_leader": 0.38,
+			"tier_reason": "p 0.38 on 8 common tasks",
+			"config_hash": "sha256:895fa8468a3bcbdb1351f9dcdc550dc492c5df1daf7bbd092e4543f5c1c83758",
+			"agent": "codex",
+			"model": "gpt-5.4-mini",
+			"label": "A: baseline",
+			"synthetic": true,
+			"experiments": [
+				"e_synthetic-providers",
+				"e_synthetic-codewins"
+			],
+			"tasks": 8,
+			"runs": 48,
+			"trials": 6,
+			"success": {
+				"state": "observed",
+				"v": 0.625,
+				"evidence": "outcome",
+				"bounds": [
+					0.38,
+					0.87
+				]
+			},
+			"passes": {
+				"num": 30,
+				"den": 48,
+				"unknown": 0
+			},
+			"reliability": {
+				"state": "observed",
+				"v": 0.25,
+				"evidence": "outcome"
+			},
+			"metrics": {
+				"cost_per_success": {
+					"state": "observed",
+					"v": 0.047,
+					"evidence": "gateway"
+				},
+				"steps": {
+					"state": "observed",
+					"v": 24,
+					"evidence": "native"
+				},
+				"tool_calls": {
+					"state": "observed",
+					"v": 18,
+					"evidence": "native"
+				},
+				"tokens": {
+					"state": "observed",
+					"v": 44500,
+					"evidence": "gateway"
+				},
+				"cost_usd": {
+					"state": "observed",
+					"v": 0.029,
+					"evidence": "gateway"
+				},
+				"wall_time_s": {
+					"state": "observed",
+					"v": 201,
+					"evidence": "outcome"
+				},
+				"false_completion": {
+					"state": "observed",
+					"v": 0.083,
+					"evidence": "native"
+				},
+				"safe_success": {
+					"state": "observed",
+					"v": 0.625,
+					"evidence": "outcome"
+				}
+			},
+			"resilience": {
+				"model-outage": {
+					"state": "observed",
+					"v": -0.208,
+					"evidence": "outcome"
+				},
+				"stale-notes": {
+					"state": "observed",
+					"v": -0.042,
+					"evidence": "outcome"
+				},
+				"test-crash": {
+					"state": "unknown",
+					"v": null,
+					"evidence": "outcome",
+					"reason": "2 of 6 test-crash runs had no graded outcome"
+				}
+			}
+		},
+		{
+			"rank": 3,
+			"tier": 1,
+			"p_vs_leader": 0.21,
+			"tier_reason": "p 0.21 on 8 common tasks",
+			"config_hash": "sha256:e885efa97a924a21c4c94a63979a83b2267e1daedc256eca02c5986999d1ac10",
+			"agent": "claude-code-gpt",
+			"model": "openai/gpt-5.1",
+			"label": "B: gpt-5.1 via openai",
+			"synthetic": true,
+			"experiments": [
+				"e_synthetic-providers"
+			],
+			"tasks": 8,
+			"runs": 24,
+			"trials": 3,
+			"success": {
+				"state": "observed",
+				"v": 0.542,
+				"evidence": "outcome",
+				"bounds": [
+					0.29,
+					0.79
+				]
+			},
+			"passes": {
+				"num": 13,
+				"den": 24,
+				"unknown": 0
+			},
+			"reliability": {
+				"state": "observed",
+				"v": 0.25,
+				"evidence": "outcome"
+			},
+			"metrics": {
+				"cost_per_success": {
+					"state": "observed",
+					"v": 0.11,
+					"evidence": "gateway"
+				},
+				"steps": {
+					"state": "observed",
+					"v": 31,
+					"evidence": "native"
+				},
+				"tool_calls": {
+					"state": "observed",
+					"v": 27,
+					"evidence": "native"
+				},
+				"tokens": {
+					"state": "observed",
+					"v": 88000,
+					"evidence": "gateway"
+				},
+				"cost_usd": {
+					"state": "observed",
+					"v": 0.06,
+					"evidence": "gateway"
+				},
+				"wall_time_s": {
+					"state": "observed",
+					"v": 265,
+					"evidence": "outcome"
+				},
+				"false_completion": {
+					"state": "observed",
+					"v": 0.125,
+					"evidence": "native"
+				},
+				"safe_success": {
+					"state": "observed",
+					"v": 0.5,
+					"evidence": "outcome"
+				}
+			},
+			"resilience": {
+				"model-outage": {
+					"state": "observed",
+					"v": -0.333,
+					"evidence": "outcome"
+				},
+				"stale-notes": {
+					"state": "observed",
+					"v": -0.083,
+					"evidence": "outcome"
+				}
+			}
+		},
+		{
+			"rank": 4,
+			"tier": 2,
+			"p_vs_leader": 0.012,
+			"tier_reason": "p 0.012 on 8 common tasks",
+			"config_hash": "sha256:62bb7b463f077bde2075ceb0404476411f8597c92ec7ba596d10030eb0dce0c4",
+			"agent": "custom-python",
+			"model": "gpt-5.4-mini",
+			"label": "A: custom template",
+			"synthetic": true,
+			"experiments": [
+				"e_synthetic-custom"
+			],
+			"tasks": 8,
+			"runs": 8,
+			"trials": 1,
+			"success": {
+				"state": "observed",
+				"v": 0.25,
+				"evidence": "outcome",
+				"bounds": [
+					0.0,
+					0.57
+				]
+			},
+			"passes": {
+				"num": 2,
+				"den": 8,
+				"unknown": 0
+			},
+			"reliability": {
+				"state": "unknown",
+				"v": null,
+				"evidence": "outcome",
+				"reason": "1 trial per task: pass^k needs at least 2"
+			},
+			"metrics": {
+				"cost_per_success": {
+					"state": "observed",
+					"v": 0.085,
+					"evidence": "gateway"
+				},
+				"steps": {
+					"state": "observed",
+					"v": 12,
+					"evidence": "gateway"
+				},
+				"tool_calls": {
+					"state": "observed",
+					"v": 9,
+					"evidence": "gateway"
+				},
+				"tokens": {
+					"state": "observed",
+					"v": 23000,
+					"evidence": "gateway"
+				},
+				"cost_usd": {
+					"state": "observed",
+					"v": 0.021,
+					"evidence": "gateway"
+				},
+				"wall_time_s": {
+					"state": "observed",
+					"v": 96,
+					"evidence": "outcome"
+				},
+				"false_completion": {
+					"state": "observed",
+					"v": 0.375,
+					"evidence": "outcome"
+				},
+				"safe_success": {
+					"state": "observed",
+					"v": 0.25,
+					"evidence": "outcome"
+				}
+			},
+			"resilience": {
+				"model-outage": {
+					"state": "observed",
+					"v": -0.125,
+					"evidence": "outcome"
+				},
+				"stale-notes": {
+					"state": "observed",
+					"v": 0,
+					"evidence": "outcome"
+				},
+				"test-crash": {
+					"state": "observed",
+					"v": 0.125,
+					"evidence": "outcome"
+				}
+			}
+		},
+		{
+			"rank": 5,
+			"tier": 1,
+			"p_vs_leader": 0.25,
+			"tier_reason": "too few common tasks (3) to separate",
+			"config_hash": "sha256:23bda390fc797d26c757102097d8a3e2a5f170846b98c3ebd9426fcbad6e707f",
+			"agent": "mini-swe-agent",
+			"model": "gpt-5.4-mini",
+			"label": "compat",
+			"synthetic": true,
+			"experiments": [
+				"e_synthetic-codewins"
+			],
+			"tasks": 3,
+			"runs": 9,
+			"trials": 3,
+			"success": {
+				"state": "observed",
+				"v": 0,
+				"evidence": "outcome",
+				"bounds": [
+					0,
+					0
+				]
+			},
+			"passes": {
+				"num": 0,
+				"den": 9,
+				"unknown": 0
+			},
+			"reliability": {
+				"state": "observed",
+				"v": 0,
+				"evidence": "outcome"
+			},
+			"metrics": {
+				"cost_per_success": {
+					"state": "not_applicable",
+					"v": null
+				},
+				"steps": {
+					"state": "observed",
+					"v": 40,
+					"evidence": "gateway"
+				},
+				"tool_calls": {
+					"state": "unknown",
+					"v": null,
+					"evidence": "gateway",
+					"reason": "9 of 9 runs unknown: no parser and no gateway content logs"
+				},
+				"tokens": {
+					"state": "observed",
+					"v": 61000,
+					"evidence": "gateway"
+				},
+				"cost_usd": {
+					"state": "observed",
+					"v": 0.038,
+					"evidence": "gateway"
+				},
+				"wall_time_s": {
+					"state": "observed",
+					"v": 300,
+					"evidence": "outcome"
+				},
+				"false_completion": {
+					"state": "observed",
+					"v": 0.556,
+					"evidence": "outcome"
+				},
+				"safe_success": {
+					"state": "observed",
+					"v": 0,
+					"evidence": "outcome"
+				}
+			},
+			"resilience": {}
+		}
+	],
+	"excluded": [
+		{
+			"reason": "experiment verdict invalid",
+			"runs": 24,
+			"experiments": [
+				"e_synthetic-flaky"
+			]
+		},
+		{
+			"reason": "not sealed",
+			"runs": 6,
+			"experiments": [
+				"e_synthetic-running"
+			]
+		},
+		{
+			"reason": "infra_error",
+			"runs": 3,
+			"experiments": [
+				"e_synthetic-codewins",
+				"e_synthetic-providers"
+			]
+		},
+		{
+			"reason": "invalid_evaluator",
+			"runs": 1,
+			"experiments": [
+				"e_synthetic-providers"
+			]
+		}
+	],
+	"generated_at": "2026-11-14T06:00:00Z"
+}

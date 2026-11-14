@@ -48,6 +48,7 @@ describe("resolveFixture", () => {
 		{ method: "GET", url: "/runs/r_abc/events", want: "runs.r_abc.events.json" },
 		{ method: "GET", url: "/pairs/p_abc", want: "pairs.p_abc.json" },
 		{ method: "POST", url: "/audit", want: "audit.json" },
+		{ method: "GET", url: "/leaderboard?suite=coding-core%401.0.0&scope=common", want: "leaderboard.json" },
 		{ method: "GET", url: "/experiments/plan/extra", want: null },
 		{ method: "DELETE", url: "/health", want: null },
 		{ method: "GET", url: "/runs/..%2F..%2Fsecret", want: null },
@@ -159,6 +160,7 @@ function contractFor(file: string): { type: string; nested: Record<string, strin
 		"experiments.grid.json": { type: "Grid", nested: { "rows[]": "GridRow", "rows[].cells[]": "GridCell" } },
 		"releases.list.json": { type: "ReleaseList", nested: { "releases[]": "ReleaseRecord" } },
 		"experiments.triage.json": { type: "Triage", nested: { "groups[]": "TriageGroup" } },
+		"leaderboard.json": { type: "Leaderboard", nested: { "entries[]": "LeaderboardEntry", "excluded[]": "LeaderboardExclusion" } },
 	};
 	if (byFile[file]) return byFile[file];
 	if (file.startsWith("pairs.")) return { type: "Pair", nested: { "runs[]": "PairRun" } };

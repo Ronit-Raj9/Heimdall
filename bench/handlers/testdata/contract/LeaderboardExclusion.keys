@@ -1,0 +1,5 @@
+# Keys of bench.ts `LeaderboardExclusion`, one per line; a trailing ? marks an optional (Go omitempty) key.
+# Change with bench.ts and schemas/leaderboard.go.
+reason
+runs
+experiments

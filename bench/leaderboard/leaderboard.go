@@ -1,0 +1,328 @@
+// Package leaderboard ranks agent configurations across experiments
+// (docs/leaderboard.md). One entry is one resolved agent config hash; its
+// runs are pooled from every experiment of one suite version under one
+// condition. Entries are ordered by verified success with every other
+// column beside it: there is no blended score.
+//
+// Ranking uncertainty is explicit. Each entry is compared with the leader by
+// the exact sign-flip test on the tasks both ran, Holm-adjusted across
+// entries, and lands in tier 1 (cannot be told apart from the leader) or
+// tier 2 (significantly behind). Rank alone is never a claim that one agent
+// beats another.
+//
+// The package is pure compute over the run folder's read side: it reads
+// manifests, runs, metrics.json and proxy.ledger.jsonl through Source and
+// writes nothing.
+package leaderboard
+
+import (
+	"cmp"
+	"context"
+	"errors"
+	"fmt"
+	"slices"
+	"strings"
+	"time"
+
+	"github.com/maximhq/bifrost/bench/schemas"
+)
+
+// Query values and defaults.
+const (
+	ScopeAll         = "all"    // each entry over its own tasks
+	ScopeCommon      = "common" // every entry over the common tasks only
+	SyntheticExclude = "exclude"
+	SyntheticOnly    = "only"
+	DefaultAlpha     = 0.05
+	// SortMetric is the one metric entries are ordered by.
+	SortMetric = "verified_success"
+)
+
+// Run files the board reads.
+const (
+	fileMetrics = "metrics.json"
+	fileLedger  = "proxy.ledger.jsonl"
+)
+
+// ErrBadQuery marks a query the board cannot answer as asked. The HTTP
+// handler maps it to 400 and the CLI to a usage error.
+var ErrBadQuery = errors.New("bad leaderboard query")
+
+// Run is one run as the board reads it from the run index.
+type Run struct {
+	Slot   schemas.Slot
+	Run    schemas.Run
+	Sealed bool
+}
+
+// Source is the read side of the run folder. handlers.LeaderboardSource
+// adapts the API's read index to it.
+type Source interface {
+	Experiments() []string
+	Manifest(expID string) (*schemas.Manifest, bool)
+	// Runs returns every run of an experiment, retries and unsealed runs included.
+	Runs(expID string) []Run
+	// RunFile returns one file of a run folder. A missing file is an error
+	// wrapping fs.ErrNotExist or schemas.ErrNotFound.
+	RunFile(runID, name string) ([]byte, error)
+	// LatestDecision returns the verdict decision of the experiment's newest
+	// analysis, and false when it has none.
+	LatestDecision(expID string) (schemas.Decision, bool)
+}
+
+// Query selects one board. Zero fields take the defaults: the newest suite
+// with runs, the clean condition, scope all, live runs only, alpha 0.05 and
+// the current time.
+type Query struct {
+	Suite     string    // id@version
+	Condition string    // clean or a probe id
+	Scope     string    // all | common
+	Synthetic string    // exclude | only
+	Alpha     float64   // significance level for tiers
+	Now       time.Time // GeneratedAt
+}
+
+// Normalize fills the defaults and checks every field. Its error wraps
+// ErrBadQuery.
+func (q Query) Normalize() (Query, error) {
+	q.Condition = cmp.Or(strings.TrimSpace(q.Condition), schemas.ConditionClean)
+	q.Scope = cmp.Or(strings.TrimSpace(q.Scope), ScopeAll)
+	q.Synthetic = cmp.Or(strings.TrimSpace(q.Synthetic), SyntheticExclude)
+	q.Suite = strings.TrimSpace(q.Suite)
+	if q.Alpha == 0 {
+		q.Alpha = DefaultAlpha
+	}
+	if q.Now.IsZero() {
+		q.Now = time.Now()
+	}
+	switch {
+	case q.Suite != "" && !validSuite(q.Suite):
+		return q, fmt.Errorf("%w: suite %q is not id@version", ErrBadQuery, q.Suite)
+	case !validToken(q.Condition):
+		return q, fmt.Errorf("%w: condition %q is not a condition id", ErrBadQuery, q.Condition)
+	case q.Scope != ScopeAll && q.Scope != ScopeCommon:
+		return q, fmt.Errorf("%w: scope %q is not all or common", ErrBadQuery, q.Scope)
+	case q.Synthetic != SyntheticExclude && q.Synthetic != SyntheticOnly:
+		return q, fmt.Errorf("%w: synthetic %q is not exclude or only", ErrBadQuery, q.Synthetic)
+	case !(q.Alpha > 0 && q.Alpha < 1):
+		return q, fmt.Errorf("%w: alpha %v is not in (0, 1)", ErrBadQuery, q.Alpha)
+	}
+	return q, nil
+}
+
+// Build computes one board. Runs enter it when their slot's counted run is
+// sealed and graded (the outcome scores: pass, fail, timeout, budget, crash,
+// refusal, integrity_violation). Every other run of the board's suite and
+// condition is counted in Excluded by reason: its outcome (infra_error,
+// invalid_evaluator, unknown, aborted_infra), "not sealed", or "experiment
+// verdict invalid" when the experiment's newest analysis decided invalid.
+// The synthetic filter applies before anything is counted, so a live board
+// never mentions scripted runs and the other way round.
+func Build(ctx context.Context, src Source, q Query) (*schemas.Leaderboard, error) {
+	q, err := q.Normalize()
+	if err != nil {
+		return nil, err
+	}
+	recs, err := collect(ctx, src)
+	if err != nil {
+		return nil, err
+	}
+	synthetic, err := classify(ctx, src, recs)
+	if err != nil {
+		return nil, err
+	}
+	kept := make([]*record, 0, len(recs))
+	for _, r := range recs {
+		if synthetic[r.key()] == (q.Synthetic == SyntheticOnly) {
+			kept = append(kept, r)
+		}
+	}
+	lb := &schemas.Leaderboard{
+		Suites: suiteList(kept), Condition: q.Condition, Scope: q.Scope, Synthetic: q.Synthetic,
+		Alpha: q.Alpha, SortMetric: SortMetric, GeneratedAt: q.Now.UTC(),
+		Conditions: []string{}, CommonTasks: []string{}, Entries: []schemas.LeaderboardEntry{}, Excluded: []schemas.LeaderboardExclusion{},
+	}
+	lb.Suite = q.Suite
+	if lb.Suite == "" && len(lb.Suites) > 0 {
+		lb.Suite = lb.Suites[0]
+	}
+	var inSuite []*record
+	for _, r := range kept {
+		if r.exp.suite == lb.Suite {
+			inSuite = append(inSuite, r)
+		}
+	}
+	lb.Conditions = conditionList(inSuite)
+	graded, excluded, err := grade(ctx, src, inSuite)
+	if err != nil {
+		return nil, err
+	}
+	lb.Excluded = exclusions(excluded, q.Condition)
+	calcs, common := buildEntries(graded, q)
+	rank(calcs, q.Alpha)
+	lb.Entries, lb.CommonTasks = toEntries(calcs), common
+	if q.Synthetic == SyntheticOnly {
+		for i := range lb.Entries {
+			lb.Entries[i].Synthetic = true
+		}
+	}
+	return lb, nil
+}
+
+// expInfo is what the board needs of one experiment.
+type expInfo struct {
+	id      string
+	m       *schemas.Manifest
+	suite   string // id@version
+	invalid bool   // the newest analysis decided invalid
+}
+
+// record is one slot of an experiment with its counted run, if sealed.
+type record struct {
+	exp    *expInfo
+	slot   schemas.Slot
+	run    schemas.Run // the counted run; the latest attempt when none is sealed
+	sealed bool
+	arm    *schemas.ArmManifest // nil when the manifest does not list the slot's arm
+	hash   string               // resolved agent config hash
+}
+
+// key is the (experiment, config) pair synthetic classification works on.
+func (r *record) key() string { return r.exp.id + "\x00" + r.hash }
+
+// collect reads every experiment and picks each slot's counted run the way
+// the store does: the first sealed run whose outcome is not aborted_infra,
+// else the last attempt when it is a sealed aborted_infra. A slot with only
+// unsealed runs keeps its latest attempt, unsealed. Slots with no run are
+// planned work, not runs, and are skipped.
+func collect(ctx context.Context, src Source) ([]*record, error) {
+	var out []*record
+	ids := slices.Clone(src.Experiments())
+	slices.Sort(ids)
+	for _, id := range ids {
+		if err := ctx.Err(); err != nil {
+			return nil, fmt.Errorf("leaderboard: %w", err)
+		}
+		m, ok := src.Manifest(id)
+		if !ok || m == nil {
+			continue
+		}
+		exp := &expInfo{id: id, m: m, suite: m.SuiteID + "@" + m.SuiteVersion}
+		if d, ok := src.LatestDecision(id); ok && d == schemas.DecisionInvalid {
+			exp.invalid = true
+		}
+		bySlot := map[string][]Run{}
+		for _, r := range src.Runs(id) {
+			bySlot[r.Slot.SlotID] = append(bySlot[r.Slot.SlotID], r)
+		}
+		slotIDs := make([]string, 0, len(bySlot))
+		for s := range bySlot {
+			slotIDs = append(slotIDs, s)
+		}
+		slices.Sort(slotIDs)
+		for _, s := range slotIDs {
+			if rec := newRecord(exp, bySlot[s]); rec != nil {
+				out = append(out, rec)
+			}
+		}
+	}
+	return out, nil
+}
+
+// newRecord builds a slot's record from its runs, or nil when the slot's arm
+// resolves to no config hash.
+func newRecord(exp *expInfo, runs []Run) *record {
+	slices.SortStableFunc(runs, func(x, y Run) int { return cmp.Compare(x.Run.Attempt, y.Run.Attempt) })
+	pick, sealed := runs[len(runs)-1], false
+	if i := slices.IndexFunc(runs, func(r Run) bool { return r.Sealed && r.Run.Outcome != schemas.OutcomeAbortedInfra }); i >= 0 {
+		pick, sealed = runs[i], true
+	} else if pick.Sealed {
+		sealed = true
+	}
+	rec := &record{exp: exp, slot: pick.Slot, run: pick.Run, sealed: sealed}
+	if pick.Slot.Arm == "compat" && exp.m.Compatibility != nil {
+		rec.arm = exp.m.Compatibility
+	} else if a, ok := exp.m.Arms[pick.Slot.Arm]; ok {
+		rec.arm = &a
+	}
+	switch {
+	case rec.arm != nil && rec.arm.ConfigHash != "":
+		rec.hash = rec.arm.ConfigHash
+	case pick.Run.Agent.ConfigHash != "":
+		rec.hash = pick.Run.Agent.ConfigHash
+	default:
+		return nil
+	}
+	return rec
+}
+
+// suiteList returns every suite with a sealed run, newest first by the
+// newest manifest that contributed one.
+func suiteList(recs []*record) []string {
+	newest := map[string]time.Time{}
+	for _, r := range recs {
+		if !r.sealed {
+			continue
+		}
+		if t, ok := newest[r.exp.suite]; !ok || r.exp.m.CreatedAt.After(t) {
+			newest[r.exp.suite] = r.exp.m.CreatedAt
+		}
+	}
+	out := make([]string, 0, len(newest))
+	for s := range newest {
+		out = append(out, s)
+	}
+	slices.SortFunc(out, func(x, y string) int {
+		return cmp.Or(newest[y].Compare(newest[x]), cmp.Compare(x, y))
+	})
+	return out
+}
+
+// conditionList returns the conditions with a sealed run, clean first, then
+// by name.
+func conditionList(recs []*record) []string {
+	seen := map[string]bool{}
+	out := []string{}
+	for _, r := range recs {
+		if r.sealed && !seen[r.slot.Condition] {
+			seen[r.slot.Condition] = true
+			out = append(out, r.slot.Condition)
+		}
+	}
+	slices.SortFunc(out, func(x, y string) int {
+		return cmp.Or(compareTrueFirst(x == schemas.ConditionClean, y == schemas.ConditionClean), cmp.Compare(x, y))
+	})
+	return out
+}
+
+// validSuite reports whether s is id@version with both parts plain tokens.
+func validSuite(s string) bool {
+	id, version, ok := strings.Cut(s, "@")
+	return ok && validToken(id) && validToken(version)
+}
+
+// validToken reports whether s is 1 to 128 letters, digits, '-', '_' or '.'.
+func validToken(s string) bool {
+	if s == "" || len(s) > 128 {
+		return false
+	}
+	for _, c := range s {
+		ok := c == '-' || c == '_' || c == '.' || (c >= '0' && c <= '9') || (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z')
+		if !ok {
+			return false
+		}
+	}
+	return true
+}
+
+// compareTrueFirst orders true before false.
+func compareTrueFirst(x, y bool) int {
+	switch {
+	case x == y:
+		return 0
+	case x:
+		return -1
+	default:
+		return 1
+	}
+}

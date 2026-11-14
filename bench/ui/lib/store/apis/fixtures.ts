@@ -40,6 +40,8 @@ export const FIXTURE_ROUTES: readonly FixtureRoute[] = [
 	{ method: "POST", pattern: "/audit", file: "audit.json" },
 	{ method: "POST", pattern: "/regrade", file: "regrade.json" },
 	{ method: "GET", pattern: "/releases", file: "releases.list.json" },
+	// One board for every suite, condition, scope and synthetic filter: the query string is ignored.
+	{ method: "GET", pattern: "/leaderboard", file: "leaderboard.json" },
 ];
 
 /** True when the URL has fixture=1 or the build sets VITE_BENCH_FIXTURE=1. */

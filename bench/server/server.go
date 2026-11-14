@@ -94,6 +94,7 @@ func New(cfg *lib.Config, deps Deps) (*Server, error) {
 	handlers.NewRunsHandler(mode, deps.Index).RegisterRoutes(r, common...)
 	handlers.NewPairsHandler(mode, deps.Index).RegisterRoutes(r, common...)
 	handlers.NewTriageHandler(mode, deps.Index, deps.Catalog).RegisterRoutes(r, common...)
+	handlers.NewLeaderboardHandler(mode, deps.Index).RegisterRoutes(r, common...)
 	handlers.NewAuditHandler(mode, deps.Auditor, write).RegisterRoutes(r, common...)
 	handlers.NewReleasesHandler(mode, deps.Releases, write).RegisterRoutes(r, common...)
 	if deps.UI != nil {

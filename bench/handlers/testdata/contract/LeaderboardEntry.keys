@@ -1,0 +1,20 @@
+# Keys of bench.ts `LeaderboardEntry`, one per line; a trailing ? marks an optional (Go omitempty) key.
+# Change with bench.ts and schemas/leaderboard.go.
+rank
+tier
+p_vs_leader
+tier_reason
+config_hash
+agent
+model
+label
+synthetic
+experiments
+tasks
+runs
+trials
+success
+passes
+reliability
+metrics
+resilience

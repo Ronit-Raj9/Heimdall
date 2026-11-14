@@ -1051,6 +1051,101 @@ export interface ReleaseList {
 }
 
 // ---------------------------------------------------------------------------------------------
+// leaderboard.go: agent configurations ranked by verified success. No blended score.
+// ---------------------------------------------------------------------------------------------
+
+/** all: each entry over its own tasks. common: every entry over common_tasks only. */
+export type LeaderboardScope = "all" | "common";
+
+/** exclude: live runs only. only: scripted agent or scripted model runs only. */
+export type LeaderboardSynthetic = "exclude" | "only";
+
+/**
+ * One agent configuration on the board (schemas.LeaderboardEntry), one per resolved config hash.
+ * Rank alone is never a claim that one agent beats another: the tier says whether the entry can
+ * be told apart from the leader.
+ */
+export interface LeaderboardEntry {
+	/** 1-based position by success, ties broken by lower cost per success, then more runs. */
+	rank: number;
+	/** 1: cannot be told apart from the leader. 2: significantly behind the leader. */
+	tier: number;
+	/** Holm-adjusted two-sided exact sign-flip p against the leader on common tasks; null for the leader. */
+	p_vs_leader: number | null;
+	/** Plain words, for example "leader", "p 0.62 on 8 common tasks". */
+	tier_reason: string;
+	/** sha256 of the resolved agent config. */
+	config_hash: string;
+	/** Agent config id, for example "codex". */
+	agent: string;
+	model: string;
+	/** Arm label from the newest contributing experiment. */
+	label: string;
+	/** Scripted agent or scripted model: the numbers are not findings. */
+	synthetic: boolean;
+	/** Experiment ids that contributed runs, newest first. */
+	experiments: string[];
+	/** Distinct tasks with at least one graded run. */
+	tasks: number;
+	/** Graded runs counted. */
+	runs: number;
+	/** Fewest graded runs on any of its tasks: the k of reliability. */
+	trials: number;
+	/** Mean over tasks of the per-task verified success rate. Bounds: descriptive 95% t interval, absent with fewer than 2 tasks. */
+	success: Value;
+	/** Verified successes over graded runs, pooled. */
+	passes: Ratio;
+	/** Mean over tasks of pass^k with k = trials. Unknown when trials < 2. */
+	reliability: Value;
+	/**
+	 * Per-run aggregates by metric id: medians for steps, tool_calls, tokens, cost_usd, wall_time_s;
+	 * rates for false_completion and safe_success; cost_per_success (not_applicable with no success).
+	 */
+	metrics: Record<string, Value>;
+	/** Fault condition -> mean over shared tasks of (success under it minus success clean), a fraction. Only on a clean board. */
+	resilience: Record<string, Value>;
+}
+
+/** Runs the board left out for one reason, for example "infra_error" or "not sealed". */
+export interface LeaderboardExclusion {
+	reason: string;
+	runs: number;
+	experiments: string[];
+}
+
+/** GET /leaderboard: every sealed run of one suite version under one condition, across experiments. */
+export interface Leaderboard {
+	/** id@version this board covers. */
+	suite: string;
+	/** Every id@version with sealed runs, newest first. */
+	suites: string[];
+	condition: string;
+	/** Conditions with sealed runs in this suite. */
+	conditions: string[];
+	scope: LeaderboardScope;
+	synthetic: LeaderboardSynthetic;
+	/** Tasks every listed entry ran under the condition. */
+	common_tasks: string[];
+	/** Significance level for tiers (0.05). */
+	alpha: number;
+	/** Always verified_success. */
+	sort_metric: string;
+	/** Ordered by rank. */
+	entries: LeaderboardEntry[];
+	/** Runs left out, grouped by reason. */
+	excluded: LeaderboardExclusion[];
+	generated_at: string;
+}
+
+/** Query of GET /leaderboard. An absent field takes the server default: newest suite, clean, all, exclude. */
+export interface LeaderboardParams {
+	suite?: string;
+	condition?: string;
+	scope?: LeaderboardScope;
+	synthetic?: LeaderboardSynthetic;
+}
+
+// ---------------------------------------------------------------------------------------------
 // HTTP responses (DESIGN.md 16.7). Every one carries `mode`.
 // ---------------------------------------------------------------------------------------------
 
@@ -1075,3 +1170,4 @@ export type RegradeResponse = WithMode<RegradeResult>;
 export type TriageResponse = WithMode<Triage>;
 export type ReleaseListResponse = WithMode<ReleaseList>;
 export type ReleaseResponse = WithMode<ReleaseRecord>;
+export type LeaderboardResponse = WithMode<Leaderboard>;

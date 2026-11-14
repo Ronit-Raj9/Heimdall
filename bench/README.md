@@ -96,9 +96,14 @@ With a provider key in `deploy/.env` (only the fault proxy ever sees it):
 ./bin/bifrost-bench run  experiments/codewins.reduced.yaml   # freeze, run, analyze, print report.md
 ./bin/bifrost-bench check -fail-on regressed,invalid -policy policies/default.yaml experiments/codewins.yaml   # CI: exit 1 regressed, 2 inconclusive, 3 invalid, 5 policy block
 ./bin/bifrost-bench audit testdata/audit/maxim-tb21.csv     # verdict for a published per-task table
+./bin/bifrost-bench leaderboard -scope common               # rank every agent config across experiments; no gateway needed
 ```
 
 `audit` on Maxim's own Terminal-Bench 2.1 routing result (fixed model 74 of 77, router 73 of 77) gives **inconclusive, exact p = 1.0**: 7 discordant tasks out of 77, and detecting a 1.3-point gap needs more than 200 tasks.
+
+### Leaderboard
+
+`bifrost-bench leaderboard` (and `GET /api/bench/leaderboard`) ranks agent configurations, one per resolved config hash, over every sealed run of one suite version under one condition, across experiments. Entries are ordered by verified success with cost, tokens, steps and the rest beside it; there is no blended score. Each entry is compared with the leader by the exact sign-flip test on shared tasks, Holm-adjusted: tier 1 cannot be told apart from the leader, tier 2 is significantly behind. Runs from experiments with an invalid verdict, infra errors and unsealed runs are left out and counted. Scripted agents and scripted-model runs only appear with `-synthetic only`, under a SYNTHETIC banner. Rules and limits: `docs/leaderboard.md`.
 
 ## Repository layout
 
