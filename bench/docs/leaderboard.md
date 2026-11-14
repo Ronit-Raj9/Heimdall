@@ -81,9 +81,9 @@ Tier 1 is not a tie claim. It means the evidence cannot separate the two; more t
 The unit of classification is the (experiment, config) pair. It is synthetic when:
 
 - the config uses the scripted adapter (oracle, noop, exploit, refuse, toy), or
-- any sealed run of that config in that experiment has a proxy ledger line answered by the fault proxy's scripted model.
+- any sealed run of that config in that experiment ran against the fault proxy's scripted model, as its proxy ledger shows.
 
-The proxy ledger does not record which upstream answered, so the scripted model is recognized by its fingerprint: a passed `message` request answered 200 with exactly 32 output tokens and a response id of the form `msg_`, `resp_` or `chatcmpl-` followed by 24 lowercase base-36 characters (`faultproxy/scripted.go`, `utils.NewID`). Real Anthropic message ids mix upper and lower case; real OpenAI response ids carry 50 hex characters. A pair rather than a config is the unit so that a dry run of a real agent against the scripted model (no provider key) makes that experiment's runs synthetic without hiding the same config's live runs in other experiments. Runs of one pair share the proxy's upstream, so a run that made no model call follows the others.
+Every ledger line the fault proxy writes carries `upstream`: `real` when the provider's requests go to its API (with a key, or a keyless provider such as ollama), `scripted` when the scripted model answers them. It names the provider's route rather than who wrote that one response, so injected and rejected lines carry it too. A run whose ledger has any labelled line is scripted exactly when a line says `scripted`; no fingerprint is consulted. Ledgers written before the field existed have no labelled line and fall back to the scripted model's fingerprint: a passed `message` request answered 200 with exactly 32 output tokens and a response id of the form `msg_`, `resp_` or `chatcmpl-` followed by 24 lowercase base-36 characters (`faultproxy/scripted.go`, `utils.NewID`). Real Anthropic message ids mix upper and lower case; real OpenAI response ids carry 50 hex characters. A pair rather than a config is the unit so that a dry run of a real agent against the scripted model (no provider key) makes that experiment's runs synthetic without hiding the same config's live runs in other experiments. Runs of one pair share the proxy's upstream, so a run that made no model call follows the others.
 
 Every list on a board (suites, conditions, entries, exclusions) is computed after this filter: a live board never mentions scripted runs, and the other way round.
 
@@ -94,5 +94,5 @@ Every list on a board (suites, conditions, entries, exclusions) is computed afte
 - **The leader is the point estimate's leader.** Who leads can change with one more run; the tiers, not the ranks, carry the uncertainty.
 - **Few tasks, few tiers.** With fewer than 6 differing tasks no entry can reach tier 2, whatever its rate. A board with small experiments is mostly tier 1, by design.
 - **The success interval is descriptive.** The paired-t interval over tasks is approximate, as in the verdict, and takes no part in the tiers.
-- **Synthetic detection is a fingerprint.** It relies on the scripted model's fixed usage and id format. A future ledger field naming the upstream would make it exact.
+- **Synthetic detection on older runs is a fingerprint.** Runs recorded by a fault proxy that predates the ledger `upstream` field are classified by the scripted model's fixed usage and id format; newer runs use the field.
 - **Computed on request.** Every request reads each run's `metrics.json` and, for live configs, `proxy.ledger.jsonl`. That is fine for hundreds of runs; a very large run folder would want a cache.

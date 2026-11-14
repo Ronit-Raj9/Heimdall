@@ -235,7 +235,7 @@ func (s *Server) serveData(w http.ResponseWriter, r *http.Request) {
 		s.writeError(sw, p.Format, http.StatusRequestEntityTooLarge, errTooLarge, "request body too large")
 		return
 	}
-	e := &schemas.LedgerEntry{Kind: kind, Path: r.URL.Path, ReqSHA256: utils.SHA256Bytes(body), At: start.UTC()}
+	e := &schemas.LedgerEntry{Kind: kind, Path: r.URL.Path, Upstream: s.ledgerUpstream(p), ReqSHA256: utils.SHA256Bytes(body), At: start.UTC()}
 	if !ok {
 		s.writeError(sw, p.Format, http.StatusUnauthorized, errAuth, "invalid api key")
 		e.Action, e.Status = ActionReject, sw.status()
@@ -280,6 +280,23 @@ func (s *Server) answer(w http.ResponseWriter, r *http.Request, p ProviderSpec, 
 	default:
 		s.writeError(w, p.Format, http.StatusServiceUnavailable, errUpstream,
 			fmt.Sprintf("fault proxy: no key configured for provider %s (set %s)", p.Name, p.KeyEnv))
+	}
+}
+
+// ledgerUpstream is the ledger's upstream label for provider p: real when its
+// requests go to the provider's API (with its key, or keyless like ollama),
+// scripted when the scripted model answers them, empty when nothing does. It
+// is the provider's route, not who wrote this one response, so injected and
+// rejected lines carry it too and a run is labelled even if every call was
+// faulted.
+func (s *Server) ledgerUpstream(p ProviderSpec) string {
+	switch s.upstreams[p.Name].mode {
+	case modeReal:
+		return schemas.LedgerUpstreamReal
+	case modeScripted:
+		return schemas.LedgerUpstreamScripted
+	default:
+		return ""
 	}
 }
 

@@ -26,7 +26,7 @@ func writeLedger(t *testing.T, n int) string {
 		slot := []string{"slot-a", "slot-b"}[i%2]
 		e := &schemas.LedgerEntry{
 			Slot: slot, RunID: "r-" + slot, Call: i/2 + 1, Kind: KindMessage, Path: "/v1/messages",
-			Action: ActionPass, Status: 200, ReqSHA256: "abc", UpstreamMS: 1.25,
+			Action: ActionPass, Upstream: schemas.LedgerUpstreamReal, Status: 200, ReqSHA256: "abc", UpstreamMS: 1.25,
 			Tokens: &schemas.Tokens{Fresh: int64(i), Out: 32}, At: time.Unix(1_700_000_000, int64(i)*1001).UTC(),
 		}
 		if err := l.append(e); err != nil {
@@ -72,6 +72,10 @@ func TestLedgerDetectsTampering(t *testing.T) {
 		}},
 		{"edited tokens", func(l []string) []string {
 			l[3] = strings.Replace(l[3], `"out":32`, `"out":1`, 1)
+			return l
+		}},
+		{"edited upstream", func(l []string) []string {
+			l[4] = strings.Replace(l[4], `"upstream":"real"`, `"upstream":"scripted"`, 1)
 			return l
 		}},
 		{"deleted line", func(l []string) []string { return append(l[:2], l[3:]...) }},
@@ -146,6 +150,64 @@ func TestLedgerReopenContinuesChain(t *testing.T) {
 	}
 	if info.Mode().Perm() != 0o600 {
 		t.Errorf("ledger mode %v, want 0600", info.Mode().Perm())
+	}
+}
+
+// olderLedgerLine is a line a proxy without the upstream field wrote, copied
+// from testdata/recorded.
+const olderLedgerLine = `{"slot":"fp-slot-1","run_id":"r_nnfsjc6is2","call":1,"kind":"message","path":"/v1/messages","stream":false,"action":"pass","status":200,"req_sha256":"d6f2d34bab6649bf5d681c021defde0129b7a5252bdf51ef971fbf81e129fb53","response_id":"msg_56qkt85cuadskjjrp8koshjo","tokens":{"fresh":619,"cache_read":0,"cache_write":0,"out":32},"upstream_ms":0.042,"at":"2026-11-13T23:29:10.498606021Z","prev_hash":"18ecc694499424fa51969bd4eb95afc9b75dd094bd7841bb83791910dbfd1ed9","hash":"23d45beadabb0b169a5d436a67d75f7aa9c8b2be5208274a7853fe5264040ad8"}`
+
+// TestLedgerOlderLinesStillVerify checks that adding the upstream field kept
+// older ledgers valid: an older line hashes to its recorded hash and
+// re-encodes byte for byte, and a ledger of unlabelled lines reopens and
+// chains labelled ones after them.
+func TestLedgerOlderLinesStillVerify(t *testing.T) {
+	entries, err := ReadLedger(strings.NewReader(olderLedgerLine))
+	if err != nil {
+		t.Fatal(err)
+	}
+	e := entries[0]
+	if e.Upstream != "" {
+		t.Fatalf("older line upstream = %q, want empty", e.Upstream)
+	}
+	h, err := HashEntry(e)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if h != e.Hash {
+		t.Errorf("older line hash %s, recorded %s", h, e.Hash)
+	}
+	line, err := canonicalLine(e)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if line != olderLedgerLine {
+		t.Errorf("older line re-encodes differently:\n%s", line)
+	}
+
+	path := filepath.Join(t.TempDir(), "ledger.jsonl")
+	l, err := openLedger(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := l.append(&schemas.LedgerEntry{Slot: "slot-a", RunID: "r1", Kind: KindMessage, Action: ActionPass}); err != nil {
+		t.Fatal(err)
+	}
+	if err := l.close(); err != nil {
+		t.Fatal(err)
+	}
+	if l, err = openLedger(path); err != nil {
+		t.Fatalf("reopen unlabelled ledger: %v", err)
+	}
+	if err := l.append(&schemas.LedgerEntry{Slot: "slot-a", RunID: "r1", Kind: KindMessage, Action: ActionPass,
+		Upstream: schemas.LedgerUpstreamScripted}); err != nil {
+		t.Fatal(err)
+	}
+	if err := l.close(); err != nil {
+		t.Fatal(err)
+	}
+	if err := VerifyFile(path); err != nil {
+		t.Fatalf("mixed ledger: %v", err)
 	}
 }
 

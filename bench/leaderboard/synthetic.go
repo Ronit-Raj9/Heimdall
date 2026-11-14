@@ -27,14 +27,12 @@ var scriptedResponseID = regexp.MustCompile(`^(?:(?:msg|resp)_|chatcmpl-)[0-9a-z
 
 // classify decides, per (experiment, config), whether the runs are
 // synthetic: the config uses the scripted adapter, or any sealed run of that
-// config in that experiment has a proxy ledger line answered by the scripted
-// model. The proxy ledger does not record which upstream answered, so the
-// scripted model is recognized by its fingerprint: a passed message request
-// answered 200 with exactly 32 output tokens and a scripted response id. The
-// pair, not the config, is the unit: a dry run of a real agent against the
-// scripted model makes that experiment's runs synthetic without hiding the
-// same config's live runs elsewhere. Runs of one pair share the proxy's
-// upstream, so a run that made no model call follows the others.
+// config in that experiment ran against the scripted model, as its proxy
+// ledger shows (scriptedLedger). The pair, not the config, is the unit: a dry
+// run of a real agent against the scripted model makes that experiment's runs
+// synthetic without hiding the same config's live runs elsewhere. Runs of one
+// pair share the proxy's upstream, so a run that made no model call follows
+// the others.
 func classify(ctx context.Context, src Source, recs []*record) (map[string]bool, error) {
 	byKey := map[string][]*record{}
 	for _, r := range recs {
@@ -88,9 +86,14 @@ func scriptedAgent(r *record) bool {
 	return r.run.Agent.Adapter == adapterScripted
 }
 
-// scriptedLedger reports whether any line of a proxy.ledger.jsonl was
-// answered by the scripted model. It is pure.
+// scriptedLedger reports whether a run's proxy.ledger.jsonl shows the
+// scripted model. A proxy that labels its lines (LedgerEntry.Upstream) is
+// taken at its word: once any line carries the label, the run is scripted
+// exactly when a line says scripted, and no fingerprint is consulted. Only a
+// ledger with no labelled line, written by a proxy older than the field,
+// falls back to the scripted model's fingerprint (scriptedEntry). It is pure.
 func scriptedLedger(data []byte) (bool, error) {
+	labelled, scripted, fingerprint := false, false, false
 	for i, line := range bytes.Split(data, []byte("\n")) {
 		if len(bytes.TrimSpace(line)) == 0 {
 			continue
@@ -99,15 +102,21 @@ func scriptedLedger(data []byte) (bool, error) {
 		if err := json.Unmarshal(line, &e); err != nil {
 			return false, fmt.Errorf("parse %s line %d: %w", fileLedger, i+1, err)
 		}
-		if scriptedEntry(e) {
-			return true, nil
+		if e.Upstream != "" {
+			labelled = true
+			scripted = scripted || e.Upstream == schemas.LedgerUpstreamScripted
 		}
+		fingerprint = fingerprint || scriptedEntry(e)
 	}
-	return false, nil
+	if labelled {
+		return scripted, nil
+	}
+	return fingerprint, nil
 }
 
-// scriptedEntry reports whether one ledger entry carries the scripted
-// model's fingerprint.
+// scriptedEntry reports whether one unlabelled ledger entry carries the
+// scripted model's fingerprint: a passed message request answered 200 with
+// exactly 32 output tokens and a scripted response id.
 func scriptedEntry(e schemas.LedgerEntry) bool {
 	return e.Kind == "message" && e.Action == "pass" && e.Status == 200 &&
 		e.Tokens != nil && e.Tokens.Out == scriptedOutputTokens && scriptedResponseID.MatchString(e.ResponseID)

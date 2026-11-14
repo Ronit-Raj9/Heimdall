@@ -101,8 +101,8 @@ func (s leaderboardSource) Runs(expID string) []leaderboard.Run {
 }
 
 // RunFile implements leaderboard.Source. It reads the proxy ledger, which
-// the API never serves: the board only looks for the scripted model's
-// fingerprint in it.
+// the API never serves: the board only looks in it for the scripted model,
+// by the ledger's upstream label or, on older runs, its fingerprint.
 func (s leaderboardSource) RunFile(runID, name string) ([]byte, error) {
 	return s.index.RunFile(runID, name)
 }

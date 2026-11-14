@@ -104,6 +104,15 @@ type FaultController interface {
 
 // LedgerEntry is one request the fault proxy received. Entries are
 // hash-chained per slot.
+//
+// Upstream names the upstream the request's provider is wired to when the
+// proxy recorded it: LedgerUpstreamReal (the provider's API) or
+// LedgerUpstreamScripted (the proxy's scripted model). It is set on injected
+// and rejected lines too, where the proxy answered itself (Action says so),
+// so a run whose every call was faulted still shows what it ran against. It
+// is empty for a provider with neither a key nor a scripted model, and on
+// every line a proxy older than the field wrote; omitempty keeps the hashes of
+// those older lines unchanged.
 type LedgerEntry struct {
 	Slot       string    `json:"slot"`
 	RunID      string    `json:"run_id"`
@@ -111,7 +120,8 @@ type LedgerEntry struct {
 	Kind       string    `json:"kind"` // message | count_tokens | models | other
 	Path       string    `json:"path"`
 	Stream     bool      `json:"stream"`
-	Action     string    `json:"action"` // pass | inject | reject
+	Action     string    `json:"action"`             // pass | inject | reject
+	Upstream   string    `json:"upstream,omitempty"` // real | scripted
 	Status     int       `json:"status"`
 	ReqSHA256  string    `json:"req_sha256"`
 	ResponseID string    `json:"response_id,omitempty"`
@@ -122,6 +132,12 @@ type LedgerEntry struct {
 	PrevHash   string    `json:"prev_hash"`
 	Hash       string    `json:"hash"`
 }
+
+// Ledger upstream values (LedgerEntry.Upstream).
+const (
+	LedgerUpstreamReal     = "real"
+	LedgerUpstreamScripted = "scripted"
+)
 
 // ProbeLayer applies one kind of perturbation and proves that it happened.
 // Layers arm in order and disarm in reverse, like Bifrost plugin hooks.

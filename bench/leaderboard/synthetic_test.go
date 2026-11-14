@@ -17,6 +17,17 @@ const (
 	injectedLine          = `{"slot":"fp-slot-2","run_id":"r_0ppcga450x","call":3,"kind":"message","path":"/v1/messages","action":"inject","status":503,"nonce":"nonce_d3youkc9og8izfcx3hg3bfi6"}`
 )
 
+// Ledger lines as a proxy that labels its upstream writes them. The labelled
+// real line deliberately carries the scripted fingerprint and the labelled
+// scripted line deliberately does not, so only the label can decide.
+const (
+	labelledRealFingerprintLine = `{"slot":"fp-slot-1","run_id":"r_z","call":1,"kind":"message","path":"/v1/messages","action":"pass","upstream":"real","status":200,"response_id":"msg_dvimkra0resgf3rxw26q65hu","tokens":{"fresh":10,"out":32}}`
+	labelledScriptedLine        = `{"slot":"fp-slot-1","run_id":"r_z","call":1,"kind":"message","path":"/v1/messages","action":"pass","upstream":"scripted","status":200,"response_id":"msg_01XFDUDYJgAACzvnptvVoYEL","tokens":{"fresh":10,"out":7}}`
+	labelledScriptedInjectLine  = `{"slot":"fp-slot-1","run_id":"r_z","call":1,"kind":"message","path":"/v1/messages","action":"inject","upstream":"scripted","status":503}`
+	labelledRealInjectLine      = `{"slot":"fp-slot-1","run_id":"r_z","call":2,"kind":"message","path":"/v1/messages","action":"inject","upstream":"real","status":503}`
+	unlabelledUnconfiguredLine  = `{"slot":"groq-slot-1","run_id":"r_z","call":1,"kind":"message","path":"/v1/chat/completions","action":"pass","status":503}`
+)
+
 func TestScriptedLedger(t *testing.T) {
 	tests := []struct {
 		name    string
@@ -32,6 +43,14 @@ func TestScriptedLedger(t *testing.T) {
 		{name: "empty", data: "", want: false},
 		{name: "blank lines", data: "\n\n" + scriptedAnthropicLine + "\n\n", want: true},
 		{name: "corrupt line", data: "{oops", wantErr: true},
+		{name: "label real beats fingerprint", data: labelledRealFingerprintLine, want: false},
+		{name: "label scripted without fingerprint", data: labelledScriptedLine, want: true},
+		{name: "label scripted on injected line only", data: labelledScriptedInjectLine, want: true},
+		{name: "label real on injected line only", data: labelledRealInjectLine, want: false},
+		{name: "labelled ledger ignores fingerprint of unlabelled lines", data: labelledRealInjectLine + "\n" + scriptedAnthropicLine, want: false},
+		{name: "unlabelled unconfigured line beside a real label", data: unlabelledUnconfiguredLine + "\n" + labelledRealFingerprintLine, want: false},
+		{name: "unlabelled unconfigured line beside a scripted label", data: unlabelledUnconfiguredLine + "\n" + labelledScriptedLine, want: true},
+		{name: "corrupt line after a label", data: labelledScriptedLine + "\n{oops", wantErr: true},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -76,6 +95,30 @@ func TestClassify(t *testing.T) {
 	}
 	if len(lb.Entries) != 1 || lb.Entries[0].Runs != 1 || lb.Entries[0].Experiments[0] != "e_live" {
 		t.Errorf("live board = %+v, want h_live over e_live only", lb.Entries)
+	}
+}
+
+// TestClassifyLabelled checks classify on ledgers whose lines carry the
+// upstream label: the label decides even against the fingerprint.
+func TestClassifyLabelled(t *testing.T) {
+	f := newFake()
+	f.exp("e_real", "s@1", 0, map[string]schemas.ArmManifest{"A": arm("a", "h_a", "command")})
+	f.exp("e_scripted", "s@1", 1, map[string]schemas.ArmManifest{"A": arm("a", "h_a", "command")})
+	f.files[f.pass("e_real", "t1", "A", "clean", 1, 0.1)][fileLedger] = []byte(labelledRealFingerprintLine)
+	f.files[f.pass("e_scripted", "t1", "A", "clean", 1, 0.1)][fileLedger] = []byte(labelledScriptedInjectLine + "\n" + labelledScriptedLine)
+	recs, err := collect(context.Background(), f)
+	if err != nil {
+		t.Fatalf("collect: %v", err)
+	}
+	got, err := classify(context.Background(), f, recs)
+	if err != nil {
+		t.Fatalf("classify: %v", err)
+	}
+	want := map[string]bool{"e_real\x00h_a": false, "e_scripted\x00h_a": true}
+	for k, w := range want {
+		if got[k] != w {
+			t.Errorf("synthetic[%q] = %v, want %v", k, got[k], w)
+		}
 	}
 }
 

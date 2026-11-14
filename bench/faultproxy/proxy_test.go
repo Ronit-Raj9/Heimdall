@@ -771,3 +771,68 @@ func TestQueryAuthForward(t *testing.T) {
 		t.Errorf("ledger entry %+v", last)
 	}
 }
+
+// TestLedgerUpstream checks the upstream label on every kind of ledger line:
+// it names the provider's route (real API or scripted model), so injected
+// and rejected lines carry it too, and a provider with neither has none.
+func TestLedgerUpstream(t *testing.T) {
+	inject := schemas.FaultPlan{Mode: ModeOnce, Call: 1, Status: 503, RunID: "r1", Nonce: "nonce_up"}
+	cases := []struct {
+		name                string
+		real                bool // point every provider at a fake upstream and give anthropic and openai keys
+		plan                *schemas.FaultPlan
+		slot, header, value string
+		path, body          string
+		wantStatus          int
+		wantAction          string
+		want                string
+	}{
+		{"scripted anthropic pass", false, nil, "slot-a", "x-api-key", "auth-a", "/v1/messages", msgBody,
+			200, ActionPass, schemas.LedgerUpstreamScripted},
+		{"scripted openai pass", false, nil, "oa-1", "Authorization", "Bearer oa-auth-1", "/v1/chat/completions", chatBody,
+			200, ActionPass, schemas.LedgerUpstreamScripted},
+		{"scripted injected", false, &inject, "slot-a", "x-api-key", "auth-a", "/v1/messages", msgBody,
+			503, ActionInject, schemas.LedgerUpstreamScripted},
+		{"scripted rejected", false, nil, "", "x-api-key", "sk-unknown", "/v1/messages", msgBody,
+			401, ActionReject, schemas.LedgerUpstreamScripted},
+		{"real anthropic pass", true, nil, "slot-a", "x-api-key", "auth-a", "/v1/messages", msgBody,
+			200, ActionPass, schemas.LedgerUpstreamReal},
+		{"real openai pass", true, nil, "oa-1", "Authorization", "Bearer oa-auth-1", "/v1/chat/completions", chatBody,
+			200, ActionPass, schemas.LedgerUpstreamReal},
+		{"real injected", true, &inject, "slot-a", "x-api-key", "auth-a", "/v1/messages", msgBody,
+			503, ActionInject, schemas.LedgerUpstreamReal},
+		{"keyless ollama is real", true, nil, "ollama-slot-1", "Authorization", "Bearer ollama-slot-1", "/v1/chat/completions", chatBody,
+			200, ActionPass, schemas.LedgerUpstreamReal},
+		{"unconfigured groq has none", false, nil, "groq-slot-1", "Authorization", "Bearer groq-slot-1", "/v1/chat/completions", chatBody,
+			503, ActionPass, ""},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			cfg := Config{}
+			if tc.real {
+				seen := make(chan *http.Request, 4)
+				up := fakeUpstream(t, "application/json", upstreamJSON, seen)
+				t.Cleanup(up.Close)
+				specs := DefaultProviders()
+				for i := range specs {
+					specs[i].BaseURL = up.URL
+				}
+				keys := map[string]string{"ANTHROPIC_API_KEY": "sk-ant", "OPENAI_API_KEY": "sk-openai"}
+				cfg = Config{Providers: specs, Getenv: func(k string) string { return keys[k] }}
+			}
+			env := newTestEnvConfig(t, cfg)
+			if tc.plan != nil {
+				env.setPlan(t, tc.slot, *tc.plan)
+			}
+			resp, body := env.callAs(t, http.MethodPost, tc.path, tc.header, tc.value, tc.body)
+			if resp.StatusCode != tc.wantStatus {
+				t.Fatalf("status %d, want %d: %s", resp.StatusCode, tc.wantStatus, body)
+			}
+			last := env.last(t)
+			if last.Slot != tc.slot || last.Action != tc.wantAction || last.Upstream != tc.want {
+				t.Errorf("ledger slot %q action %q upstream %q, want %q %q %q", last.Slot, last.Action, last.Upstream,
+					tc.slot, tc.wantAction, tc.want)
+			}
+		})
+	}
+}

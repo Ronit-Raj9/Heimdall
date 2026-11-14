@@ -79,7 +79,7 @@ Policies are YAML files in `bench/policies/` (`default.yaml`, `strict.yaml`), ev
 - An experiment can also reference its policy (`policy: policies/default.yaml`) so the policy hash is frozen in its manifest.
 - `policies/**` is a trigger path: a pull request that loosens a policy runs the gate.
 
-**The synthetic bundle blocks under the default policy.** With `on_unknown: block`, a check with too few observations is unknown and blocks. On the 8-run smoke bundle, `false-completion-ceiling` sees 2 observed runs against `min_n: 10`, so the decision is `block` and the recorded job exits 5 (sample below). That is the policy working as written. Until a larger recorded run joins the bundle, either set `policy: none` on the recorded job (it then gates on the verdict only and passes, exit 0) or keep the red check as the honest answer.
+**Small samples warn, they do not block.** The default policy leaves `on_unknown` unset, so a check with too few observations is unknown and only warns ("needs review"); a real fail, or an unknown for any other reason, still blocks. On the 8-run smoke bundle, `false-completion-ceiling` sees 4 observed runs against `min_n: 10`, so the decision is `warn` and the recorded job exits 0. `policies/strict.yaml` sets `on_unknown: block` for teams that want small samples to block.
 
 ## Wiring provider keys for live runs
 
