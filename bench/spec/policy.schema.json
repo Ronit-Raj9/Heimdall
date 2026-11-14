@@ -1,0 +1,51 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/maximhq/bifrost/bench/spec/policy.schema.json",
+  "title": "Bifrost Bench release policy",
+  "description": "policies/<name>.yaml: explicit rules a candidate arm must meet before it ships. Mirrors schemas.Policy. A policy only adds requirements: the baseline integrity gates always run and no field here can switch them off.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["policy_version", "name", "checks"],
+  "properties": {
+    "policy_version": {"const": 1},
+    "name": {"type": "string", "pattern": "^[a-z0-9][a-z0-9._-]*$"},
+    "description": {"type": "string"},
+    "on_unknown": {"enum": ["block", "warn"], "description": "What an unknown result on a block-severity check does. Unset: a small-sample unknown (fewer runs than min_n even counting unknown runs) warns and any other unknown blocks."},
+    "checks": {"type": "array", "minItems": 1, "items": {"$ref": "#/$defs/check"}}
+  },
+  "$defs": {
+    "check": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "metric"],
+      "description": "One rule. Exactly one of rule, max, min or equals.",
+      "properties": {
+        "id": {"type": "string", "pattern": "^[a-z0-9][a-z0-9_-]*$"},
+        "description": {"type": "string"},
+        "metric": {
+          "type": "string",
+          "pattern": "^[a-z0-9][a-z0-9_]*$",
+          "description": "A per-run metric name, or an aggregate: integrity_violations, cost_per_verified_success."
+        },
+        "condition": {
+          "type": "string",
+          "pattern": "^[a-z0-9][a-z0-9._-]*$",
+          "description": "clean, a probe id, or all for every condition. Default: the experiment's primary condition."
+        },
+        "arm": {"type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9_-]*$", "description": "Default B, the candidate."},
+        "rule": {"enum": ["no_regression", "improved"]},
+        "max": {"type": "number"},
+        "min": {"type": "number"},
+        "equals": {"type": "number"},
+        "min_n": {"type": "integer", "minimum": 1, "description": "Fewer observed runs than this gives unknown. Default 1."},
+        "severity": {"enum": ["block", "warn"], "description": "Default block."}
+      },
+      "oneOf": [
+        {"required": ["rule"]},
+        {"required": ["max"]},
+        {"required": ["min"]},
+        {"required": ["equals"]}
+      ]
+    }
+  }
+}

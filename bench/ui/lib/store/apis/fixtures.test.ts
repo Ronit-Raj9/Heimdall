@@ -157,6 +157,8 @@ function contractFor(file: string): { type: string; nested: Record<string, strin
 		"experiments.verdict.json": { type: "VerdictPayload", nested: { verdict: "Verdict" } },
 		"experiments.diagnostics.json": { type: "DiagnosticsPayload", nested: {} },
 		"experiments.grid.json": { type: "Grid", nested: { "rows[]": "GridRow", "rows[].cells[]": "GridCell" } },
+		"releases.list.json": { type: "ReleaseList", nested: { "releases[]": "ReleaseRecord" } },
+		"experiments.triage.json": { type: "Triage", nested: { "groups[]": "TriageGroup" } },
 	};
 	if (byFile[file]) return byFile[file];
 	if (file.startsWith("pairs.")) return { type: "Pair", nested: { "runs[]": "PairRun" } };

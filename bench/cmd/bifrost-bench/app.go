@@ -15,6 +15,7 @@ import (
 	"github.com/maximhq/bifrost/bench/graders"
 	"github.com/maximhq/bifrost/bench/lib"
 	"github.com/maximhq/bifrost/bench/metrics"
+	"github.com/maximhq/bifrost/bench/policy"
 	"github.com/maximhq/bifrost/bench/probes"
 	"github.com/maximhq/bifrost/bench/reporters"
 	"github.com/maximhq/bifrost/bench/schemas"
@@ -114,6 +115,13 @@ func loadExperiment(path string) (*schemas.Experiment, error) {
 // analyze runs the experiment's verdict policy over its sealed runs, writes
 // the analysis and its markdown report, and returns both.
 func (a *app) analyze(ctx context.Context, expID, gradeSource string) (*schemas.Analysis, []byte, error) {
+	return a.analyzeWith(ctx, expID, gradeSource, "")
+}
+
+// analyzeWith is analyze with a release policy file that overrides the one
+// the experiment froze, for `check -policy`. The policy result is part of the
+// analysis, so the report, the JSON and the verdict route all carry it.
+func (a *app) analyzeWith(ctx context.Context, expID, gradeSource, policyOverride string) (*schemas.Analysis, []byte, error) {
 	m, err := a.store.LoadManifest(ctx, expID)
 	if err != nil {
 		return nil, nil, err
@@ -145,6 +153,9 @@ func (a *app) analyze(ctx context.Context, expID, gradeSource string) (*schemas.
 	an.AnalysisID = utils.NewID("a", 8)
 	an.Mode = a.cfg.Server.Mode
 	an.GradeSource = gradeSource
+	if an.Policy, err = a.releasePolicy(m, an, runs, policyOverride); err != nil {
+		return nil, nil, err
+	}
 	var md strings.Builder
 	for _, r := range a.reg.Reporters {
 		if r.GetName() == "markdown" {
@@ -157,6 +168,43 @@ func (a *app) analyze(ctx context.Context, expID, gradeSource string) (*schemas.
 		return nil, nil, fmt.Errorf("save analysis: %w", err)
 	}
 	return an, []byte(md.String()), nil
+}
+
+// releasePolicy evaluates the release policy over the analysis: the override
+// file when one is given (a path from the command line), otherwise the policy
+// the experiment froze (relative to the bench root), otherwise none. An
+// override that cannot be loaded is an error. A frozen policy that cannot be
+// loaded gives a blocking result instead, so a deleted or broken policy file
+// can never let a release through, and the verdict page still renders.
+func (a *app) releasePolicy(m *schemas.Manifest, an *schemas.Analysis, runs []schemas.SealedRun, override string) (*schemas.PolicyResult, error) {
+	if override != "" {
+		p, raw, err := policy.Load(override)
+		if err != nil {
+			return nil, err
+		}
+		return policy.Evaluate(p, policy.Hash(raw), m, an, runs), nil
+	}
+	if m.Experiment.Policy == "" {
+		return nil, nil
+	}
+	p, raw, err := policy.Load(a.cfg.Path(m.Experiment.Policy))
+	if err != nil {
+		a.logger.Warn("release policy could not be loaded; the release is blocked", "experiment", m.ExpID, "policy", m.Experiment.Policy, "error", err.Error())
+		return policy.LoadFailure(m.Experiment.Policy, m.PolicyHash, err), nil
+	}
+	return policy.Evaluate(p, policy.Hash(raw), m, an, runs), nil
+}
+
+// validatePolicy loads the policy an experiment names before anything is
+// planned, so a schema error is reported before a run starts, not after.
+func (a *app) validatePolicy(exp *schemas.Experiment) error {
+	if exp.Policy == "" {
+		return nil
+	}
+	if _, _, err := policy.Load(a.cfg.Path(exp.Policy)); err != nil {
+		return err
+	}
+	return nil
 }
 
 // benchRelative turns a path given on the command line into one the planner

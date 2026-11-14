@@ -182,7 +182,9 @@ func (h *ExperimentsHandler) getExperiment(ctx *fasthttp.RequestCtx) {
 
 // getVerdict handles GET /api/bench/experiments/{id}/verdict?grade_source=.
 // The gate checklist and config diff come from the run folder, not the
-// analysis, so they show even when the analysis has nothing to say.
+// analysis, so they show even when the analysis has nothing to say. The
+// release policy result comes from the analysis and is absent when the
+// experiment has no policy.
 func (h *ExperimentsHandler) getVerdict(ctx *fasthttp.RequestCtx) {
 	m, runs, ok := h.lookup(ctx)
 	if !ok {
@@ -208,7 +210,7 @@ func (h *ExperimentsHandler) getVerdict(ctx *fasthttp.RequestCtx) {
 	}
 	lib.SendJSON(ctx, h.mode, fasthttp.StatusOK, schemas.VerdictPayload{
 		ExpID: m.ExpID, AnalysisID: a.AnalysisID, GradeSource: a.GradeSource, Suite: m.Experiment.Suite,
-		Verdict: a.Verdict, Naive: a.Naive, Gates: gates, ConfigDiff: diff,
+		Verdict: a.Verdict, Naive: a.Naive, Gates: gates, ConfigDiff: diff, Policy: a.Policy,
 	})
 }
 

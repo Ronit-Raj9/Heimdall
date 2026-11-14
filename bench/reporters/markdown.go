@@ -8,6 +8,7 @@ import (
 	"io"
 	"math"
 	"slices"
+	"strconv"
 	"strings"
 	"time"
 
@@ -51,6 +52,7 @@ func (r *markdownReporter) Write(ctx context.Context, a *schemas.Analysis, m *sc
 	writePrimary(bw, &a.Verdict)
 	writeGuards(bw, a.Verdict.Guards)
 	writeInvalid(bw, a.Verdict.InvalidReasons)
+	writePolicy(bw, a.Policy)
 	writeNaive(bw, a.Naive, arms)
 	writeDiagnostics(bw, a.Diagnostics, arms)
 	writeMeters(bw, a.Meters, arms)
@@ -61,11 +63,16 @@ func (r *markdownReporter) Write(ctx context.Context, a *schemas.Analysis, m *sc
 	return nil
 }
 
-// writeHeader writes the decision line and the mode label.
+// writeHeader writes the decision line and the mode label. A release policy
+// decision joins the first line so a PR comment preview shows a block.
 func writeHeader(w *bufio.Writer, a *schemas.Analysis) {
 	v := &a.Verdict
-	fmt.Fprintf(w, "# Bifrost Bench: %s, action %s [%s]\n\n",
-		strings.ToUpper(orUnknown(string(v.Decision))), strings.ToUpper(orUnknown(string(v.Action))), modeLabel(a.Mode))
+	policy := ""
+	if a.Policy != nil {
+		policy = ", policy " + strings.ToUpper(orUnknown(string(a.Policy.Decision)))
+	}
+	fmt.Fprintf(w, "# Bifrost Bench: %s, action %s%s [%s]\n\n",
+		strings.ToUpper(orUnknown(string(v.Decision))), strings.ToUpper(orUnknown(string(v.Action))), policy, modeLabel(a.Mode))
 	if a.Mode == schemas.ModeSynthetic {
 		w.WriteString("> SYNTHETIC smoke test: scripted agent and scripted model. These numbers are not findings.\n\n")
 	}
@@ -125,6 +132,77 @@ func writeInvalid(w *bufio.Writer, reasons []string) {
 		fmt.Fprintf(w, "- %s\n", cell(r))
 	}
 	w.WriteString("\n")
+}
+
+// writePolicy writes the release policy result: the decision, then one row
+// per check with its status, observed value, threshold, n and reason. An
+// unknown check reads UNKNOWN, never PASS. At most policyEvidenceShown run ids
+// are listed per check.
+func writePolicy(w *bufio.Writer, p *schemas.PolicyResult) {
+	w.WriteString("## Release policy\n\n")
+	if p == nil {
+		w.WriteString("None.\n\n")
+		return
+	}
+	fmt.Fprintf(w, "Policy `%s`, hash `%s`: **%s**. A policy only adds requirements; the baseline gates always run.\n\n",
+		cell(orUnknown(p.PolicyName)), cell(shortHash(p.PolicyHash)), strings.ToUpper(orUnknown(string(p.Decision))))
+	if len(p.Checks) == 0 {
+		w.WriteString("No checks.\n\n")
+		return
+	}
+	w.WriteString("| Check | Metric | Condition | Arm | Status | Observed | Threshold | n | Reason | Evidence |\n|---|---|---|---|---|---|---|---|---|---|\n")
+	for _, c := range p.Checks {
+		status := strings.ToUpper(orUnknown(string(c.Status)))
+		if c.Blocking {
+			status += " (blocks)"
+		}
+		fmt.Fprintf(w, "| %s | %s | %s | %s | %s | %s | %s | %d | %s | %s |\n",
+			cell(c.ID), cell(orDash(c.Metric)), cell(orDash(c.Condition)), cell(orDash(c.Arm)), status,
+			policyValue(c.Observed), cell(orDash(c.Threshold)), c.N, cell(orDash(c.Reason)), evidenceText(c.Evidence))
+	}
+	w.WriteString("\n")
+}
+
+// policyEvidenceShown caps the run ids one policy row lists.
+const policyEvidenceShown = 5
+
+// policyValue formats a check's observed value. Checks mix units, so the
+// number is written plainly with up to four significant digits.
+func policyValue(v schemas.Value) string {
+	if v.State == schemas.ValueNotApplicable {
+		return "n/a"
+	}
+	f, ok := v.Float()
+	if !ok || math.IsNaN(f) || math.IsInf(f, 0) {
+		return unknownText
+	}
+	return strconv.FormatFloat(f, 'g', 4, 64)
+}
+
+// evidenceText lists run ids in code spans, with the rest counted.
+func evidenceText(ids []string) string {
+	if len(ids) == 0 {
+		return "-"
+	}
+	shown := ids[:min(len(ids), policyEvidenceShown)]
+	parts := make([]string, len(shown))
+	for i, id := range shown {
+		parts[i] = "`" + cell(id) + "`"
+	}
+	text := strings.Join(parts, ", ")
+	if rest := len(ids) - len(shown); rest > 0 {
+		text += fmt.Sprintf(" and %d more", rest)
+	}
+	return text
+}
+
+// shortHash is the first 12 characters of a hash, unknown when empty.
+func shortHash(h string) string {
+	h = strings.TrimPrefix(h, "sha256:")
+	if len(h) > 12 {
+		return h[:12]
+	}
+	return orUnknown(h)
 }
 
 // writeNaive writes the naive scoreboard, shown beside the verdict on purpose.

@@ -1,0 +1,91 @@
+{
+	"_comment": "SYNTHETIC fixture for UI development. Not a benchmark result.",
+	"mode": "synthetic",
+	"exp_id": "e_synthetic-codewins",
+	"groups": [
+		{
+			"pattern": "pattern_loop",
+			"label": "Loop",
+			"description": "Share of runs where the same tool call (same tool and arguments hash, or the same command text for shell tools) repeats 3 or more times in a row, or 4 or more times with no edit tool call between, over runs with gateway or agent_stream events; an observed pattern, not a root cause.",
+			"per_arm": {
+				"A": {
+					"num": 3,
+					"den": 24,
+					"unknown": 0
+				},
+				"B": {
+					"num": 5,
+					"den": 23,
+					"unknown": 1
+				}
+			},
+			"runs": {
+				"A": ["r_9nje22hmzt", "r_lsrv6xcv2u", "r_qolshdu5jg"],
+				"B": ["r_1w30xridyv", "r_efejyyax55", "r_fqxhrj5xwe", "r_jfbzf5gpr8", "r_ohqo8vpd2b"]
+			}
+		},
+		{
+			"pattern": "pattern_unverified_finish",
+			"label": "Unverified finish",
+			"description": "Share of runs that end with a success claim and no shell command containing pytest, py.test, python -m pytest, unittest, npm test, go test or make test (or a tool named for tests) after the last edit tool call, over runs with gateway or agent_stream events and a known claim; an observed pattern, not a root cause.",
+			"per_arm": {
+				"A": {
+					"num": 4,
+					"den": 23,
+					"unknown": 1
+				},
+				"B": {
+					"num": 1,
+					"den": 24,
+					"unknown": 0
+				}
+			},
+			"runs": {
+				"A": ["r_93zg5gqtl1", "r_b4y7c0s88h", "r_g2f0s9ek5m", "r_jcxc4c30cm"],
+				"B": ["r_jfbzf5gpr8"]
+			}
+		},
+		{
+			"pattern": "pattern_ignored_error",
+			"label": "Ignored error",
+			"description": "Share of runs that claim success after a failed tool result (an error flag or a non-zero exit) that none of the next 2 tool calls answers with a retry of the same call or target, an edit, or a read of a file the failed call named, over runs with agent_stream events and a known claim; an observed pattern, not a root cause.",
+			"per_arm": {
+				"A": {
+					"num": 2,
+					"den": 20,
+					"unknown": 4
+				},
+				"B": {
+					"num": 1,
+					"den": 21,
+					"unknown": 3
+				}
+			},
+			"runs": {
+				"A": ["r_mlv3ndgl7w", "r_u3815243j0"],
+				"B": ["r_1w30xridyv"]
+			}
+		},
+		{
+			"pattern": "false_completion",
+			"label": "False completion",
+			"description": "Share of runs that claimed success while the hidden verifier failed, over runs whose verifier failed and whose claim is known.",
+			"per_arm": {
+				"A": {
+					"num": 4,
+					"den": 10,
+					"unknown": 1
+				},
+				"B": {
+					"num": 1,
+					"den": 5,
+					"unknown": 0
+				}
+			},
+			"runs": {
+				"A": ["r_b4y7c0s88h", "r_fmw1z7ouim", "r_g2f0s9ek5m", "r_jcxc4c30cm"],
+				"B": ["r_jfbzf5gpr8"]
+			}
+		}
+	]
+}

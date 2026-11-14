@@ -26,12 +26,13 @@ const (
 	SchemaProbe      = "probe"
 	SchemaAgent      = "agent"
 	SchemaExperiment = "experiment"
+	SchemaPolicy     = "policy"
 )
 
 // schemaBaseURL is the $id prefix every file in bench/spec declares.
 const schemaBaseURL = "https://github.com/maximhq/bifrost/bench/spec/"
 
-var allSchemas = []string{SchemaSuite, SchemaTask, SchemaProbe, SchemaAgent, SchemaExperiment}
+var allSchemas = []string{SchemaSuite, SchemaTask, SchemaProbe, SchemaAgent, SchemaExperiment, SchemaPolicy}
 
 var (
 	compileOnce sync.Once

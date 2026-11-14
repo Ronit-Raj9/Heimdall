@@ -1,0 +1,6 @@
+# Keys of bench.ts `PolicyResult` (schemas.PolicyResult), the `policy` object of VerdictPayload.
+policy_name
+policy_hash
+decision
+checks
+evaluated_at

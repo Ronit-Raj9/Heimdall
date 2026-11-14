@@ -1,6 +1,6 @@
 // Package spec holds the JSON Schemas (draft 2020-12) for every YAML file a
 // person writes for Bifrost Bench: suite.yaml, task.yaml, probes/<id>.yaml,
-// agents/<id>.yaml and experiments/<name>.yaml.
+// agents/<id>.yaml, experiments/<name>.yaml and policies/<name>.yaml.
 //
 // The schemas are the source of truth for those files, as
 // transports/config.schema.json is for Bifrost. Each one mirrors the YAML form

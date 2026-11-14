@@ -1,0 +1,12 @@
+# Keys of bench.ts `PolicyCheckResult` (schemas.PolicyCheckResult), one element of PolicyResult.checks.
+id
+metric
+condition
+arm
+status
+blocking
+observed
+threshold
+n
+reason?
+evidence?

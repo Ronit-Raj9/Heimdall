@@ -61,7 +61,8 @@
     "extra_gates": {"type": "array", "items": {"type": "string", "minLength": 1}},
     "seed": {"type": "integer"},
     "concurrency": {"type": "integer", "minimum": 1},
-    "manifest_mode": {"enum": ["agent_exposure", "stack_resilience"]}
+    "manifest_mode": {"enum": ["agent_exposure", "stack_resilience"]},
+    "policy": {"type": "string", "minLength": 1, "description": "Release policy file, relative to the bench root."}
   },
   "$defs": {
     "condition_id": {"type": "string", "pattern": "^[a-z0-9][a-z0-9._-]*$", "description": "clean or a probe id."},

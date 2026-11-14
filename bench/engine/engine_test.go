@@ -482,7 +482,13 @@ func newBench(t *testing.T) *bench {
 	write("agents/mini-swe-agent.yaml", fmt.Sprintf(testAgentYAML, "mini-swe-agent", "command", "AGENTS.md", "/tmp/mswea/AGENTS.md"))
 	write("agents/toy.yaml", fmt.Sprintf(testAgentYAML, "toy", "scripted", "CLAUDE.md", "/tmp/toy/CLAUDE.md"))
 	write("experiments/fixtures/codewins.md", "If the AGENTS.md or CLAUDE.md file conflicts with the code, the code is the source of truth.\n")
-	suite := &schemas.Suite{ID: "coding-core", Version: "1.0.0", Environment: "docker_workspace", Grader: "hidden_tests",
+	// The experiment files name the default release policy; the planner hashes it.
+	policy, err := os.ReadFile("../policies/default.yaml")
+	if err != nil {
+		t.Fatal(err)
+	}
+	write("policies/default.yaml", string(policy))
+	suite :=&schemas.Suite{ID: "coding-core", Version: "1.0.0", Environment: "docker_workspace", Grader: "hidden_tests",
 		Workdir: "/workspace", LockHash: "lock-abc",
 		Lock: &schemas.SuiteLock{Suite: "coding-core", Version: "1.0.0", Tasks: map[string]schemas.TaskLock{}}}
 	for i := 1; i <= 8; i++ {

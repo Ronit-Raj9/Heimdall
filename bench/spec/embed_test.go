@@ -6,7 +6,7 @@ import (
 )
 
 func TestSchemasEmbedded(t *testing.T) {
-	for _, name := range []string{"suite", "task", "probe", "agent", "experiment"} {
+	for _, name := range []string{"suite", "task", "probe", "agent", "experiment", "policy"} {
 		t.Run(name, func(t *testing.T) {
 			file := name + ".schema.json"
 			b, err := FS.ReadFile(file)

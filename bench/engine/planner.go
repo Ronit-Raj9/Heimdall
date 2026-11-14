@@ -106,6 +106,9 @@ func (p *Planner) Plan(ctx context.Context, exp *schemas.Experiment) (*schemas.M
 		RandomizationU: RandomizationUnit,
 		BenchVersion:   BenchVersion,
 	}
+	if m.PolicyHash, err = p.policyHash(e.Policy); err != nil {
+		return nil, fmt.Errorf("plan %s: %w", e.ID, err)
+	}
 	if m.Arms, err = p.resolveArms(&e, suite, conds); err != nil {
 		return nil, fmt.Errorf("plan %s: %w", e.ID, err)
 	}
@@ -318,6 +321,22 @@ func (p *Planner) preflight(ctx context.Context, name string) (*schemas.GatewayM
 		p.logger.Warn("gateway preflight problem", "experiment", name, "problem", pr)
 	}
 	return gm, nil
+}
+
+// policyHash freezes the release policy the experiment names: the sha256 of
+// the file's raw bytes, so a policy edited after planning is detected at
+// analysis. No policy gives no hash; a named policy that cannot be read fails
+// the plan, because the experiment would otherwise run without the rules it
+// declared.
+func (p *Planner) policyHash(rel string) (string, error) {
+	if rel == "" {
+		return "", nil
+	}
+	sum, err := utils.SHA256File(p.abs(rel))
+	if err != nil {
+		return "", fmt.Errorf("release policy %s: %w", rel, err)
+	}
+	return sum, nil
 }
 
 func (p *Planner) abs(rel string) string {

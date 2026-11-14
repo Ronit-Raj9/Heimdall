@@ -1,8 +1,8 @@
-import { FlaskConical, GitCompareArrows, Gavel, ReceiptText, type LucideIcon } from "lucide-react";
+import { FlaskConical, GitCompareArrows, Gavel, PackageCheck, ReceiptText, ScanSearch, type LucideIcon } from "lucide-react";
 
 export interface BenchNavItem {
-	to: "/verdict" | "/runs" | "/receipts" | "/experiments/new";
-	labelKey: "nav.verdict" | "nav.runs" | "nav.receipts" | "nav.newExperiment";
+	to: "/verdict" | "/runs" | "/receipts" | "/experiments/new" | "/triage" | "/releases";
+	labelKey: "nav.verdict" | "nav.runs" | "nav.receipts" | "nav.newExperiment" | "nav.triage" | "nav.releases";
 	icon: LucideIcon;
 	testId: string;
 }
@@ -12,5 +12,7 @@ export const BENCH_NAV: readonly BenchNavItem[] = [
 	{ to: "/verdict", labelKey: "nav.verdict", icon: Gavel, testId: "nav-link-verdict" },
 	{ to: "/runs", labelKey: "nav.runs", icon: GitCompareArrows, testId: "nav-link-runs" },
 	{ to: "/receipts", labelKey: "nav.receipts", icon: ReceiptText, testId: "nav-link-receipts" },
+	{ to: "/triage", labelKey: "nav.triage", icon: ScanSearch, testId: "nav-link-triage" },
+	{ to: "/releases", labelKey: "nav.releases", icon: PackageCheck, testId: "nav-link-releases" },
 	{ to: "/experiments/new", labelKey: "nav.newExperiment", icon: FlaskConical, testId: "nav-link-new-experiment" },
 ];

@@ -30,3 +30,4 @@ verdict: {policy: paired_signflip, alpha: 0.05, assumed_sd: 0.30}
 seed: 20261114
 concurrency: 4
 manifest_mode: agent_exposure
+policy: policies/default.yaml

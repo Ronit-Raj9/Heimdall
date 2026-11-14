@@ -1,4 +1,4 @@
-# Bifrost Bench: IMPROVED, action SHIP [RECORDED]
+# Bifrost Bench: IMPROVED, action SHIP, policy BLOCK [RECORDED]
 
 Experiment `e_codewins`, analysis `a_1`, grade source `original`.
 
@@ -26,6 +26,17 @@ Experiment `e_codewins`, analysis `a_1`, grade source `original`.
 ## Invalid reasons
 
 None.
+
+## Release policy
+
+Policy `enterprise-default`, hash `4f1c2a9b7d3e`: **BLOCK**. A policy only adds requirements; the baseline gates always run.
+
+| Check | Metric | Condition | Arm | Status | Observed | Threshold | n | Reason | Evidence |
+|---|---|---|---|---|---|---|---|---|---|
+| clean-no-regression | verified_success | clean | B | PASS | 0.0417 | no regression | 24 | clean: not regressed at either bound | - |
+| false-completion-ceiling | false_completion | all | B | FAIL (blocks) | 0.125 | &lt;= 0.05 | 16 | mean 0.125 over 16 observed runs breaks &lt;= 0.05 | `r_1`, `r_2`, `r_3`, `r_4`, `r_5` and 2 more |
+| retry-amplification-ceiling | retry_amplification | clean | B | UNKNOWN (blocks) | unknown | &lt;= 3 | 0 | metric retry_amplification is not recorded in any of the 24 runs \| of arm B | - |
+| cost-per-verified-success | cost_per_verified_success | clean | B | FAIL | n/a | &lt;= 2 | 24 | no verified success in 24 runs | - |
 
 ## Naive scoreboard
 

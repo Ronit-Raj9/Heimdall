@@ -1,0 +1,4 @@
+# Keys of bench.ts `ReleaseList`, one per line; a trailing ? marks an optional (Go omitempty) key.
+# The top-level response adds "mode". Change with bench.ts and schemas/policy.go.
+releases
+chain_ok

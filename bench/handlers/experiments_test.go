@@ -1,7 +1,9 @@
 package handlers
 
 import (
+	"context"
 	"errors"
+	"fmt"
 	"testing"
 
 	"github.com/maximhq/bifrost/bench/schemas"
@@ -105,6 +107,53 @@ func TestPlanAndCreateRoutes(t *testing.T) {
 	slots, _ := body["slots"].(map[string]any)
 	if resp.StatusCode() != 202 || body["state"] != "analyzing" || slots["total"] != float64(4) || l.started != testExp {
 		t.Fatalf("start = %d %v", resp.StatusCode(), body)
+	}
+}
+
+// policyAnalyzer is fakeAnalyzer with a blocking release policy result.
+type policyAnalyzer struct{ fakeAnalyzer }
+
+func (p *policyAnalyzer) Analyze(ctx context.Context, expID, gradeSource string) (*schemas.Analysis, error) {
+	a, err := p.fakeAnalyzer.Analyze(ctx, expID, gradeSource)
+	if err != nil {
+		return nil, err
+	}
+	a.Policy = &schemas.PolicyResult{
+		PolicyName: "enterprise-default", PolicyHash: "abc", Decision: schemas.PolicyBlock,
+		Checks: []schemas.PolicyCheckResult{
+			{ID: "fc", Metric: "false_completion", Condition: "all", Arm: "B", Status: schemas.PolicyFail, Blocking: true,
+				Observed: schemas.Observed(0.2, schemas.EvidenceNative), Threshold: "<= 0.05", N: 10, Reason: "mean 0.2", Evidence: []string{"r_t01_B"}},
+			{ID: "ra", Metric: "retry_amplification", Condition: "clean", Arm: "B", Status: schemas.PolicyUnknown, Blocking: true,
+				Observed: schemas.Unknown("not recorded", ""), Threshold: "<= 3"},
+		},
+	}
+	return a, nil
+}
+
+func TestVerdictPayloadPolicy(t *testing.T) {
+	d := fullDeps()
+	d.analyzer = &policyAnalyzer{}
+	body := decodeBody(t, newTestClient(t, d).do(t, "GET", "/api/bench/experiments/e_test/verdict", nil, nil))
+	checkKeys(t, "VerdictPayload", body, loadKeys(t, "VerdictPayload"), true)
+	pol, ok := body["policy"].(map[string]any)
+	if !ok || pol["decision"] != "block" || pol["policy_name"] != "enterprise-default" {
+		t.Fatalf("policy = %v", body["policy"])
+	}
+	checkKeys(t, "PolicyResult", pol, loadKeys(t, "PolicyResult"), false)
+	for i, c := range objectsAt(t, body, "policy.checks[]") {
+		checkKeys(t, fmt.Sprintf("PolicyCheckResult #%d", i), c, loadKeys(t, "PolicyCheckResult"), false)
+	}
+	checks, _ := pol["checks"].([]any)
+	second, _ := checks[1].(map[string]any)
+	observed, _ := second["observed"].(map[string]any)
+	if second["status"] != "unknown" || observed["state"] != "unknown" || observed["v"] != nil {
+		t.Fatalf("unknown check = %v", second)
+	}
+
+	// No policy: the key is absent, not null.
+	plain := decodeBody(t, newTestClient(t, fullDeps()).do(t, "GET", "/api/bench/experiments/e_test/verdict", nil, nil))
+	if _, ok := plain["policy"]; ok {
+		t.Fatalf("policy present without a policy: %v", plain["policy"])
 	}
 }
 

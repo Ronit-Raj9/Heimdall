@@ -15,6 +15,9 @@ const (
 	// ExitInfra is an infrastructure error. The caller returns it; a verdict
 	// never maps to it.
 	ExitInfra = 4
+	// ExitPolicyBlock is a release policy decision of block (policy.ExitBlock).
+	// It is checked before the verdict codes.
+	ExitPolicyBlock = 5
 )
 
 // ExitCode maps a decision to the check exit code: 0 when the decision is not

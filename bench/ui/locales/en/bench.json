@@ -8,7 +8,9 @@
 		"verdict": "Verdict",
 		"runs": "Run comparison",
 		"receipts": "Receipts",
-		"newExperiment": "New experiment"
+		"newExperiment": "New experiment",
+		"triage": "Triage",
+		"releases": "Releases"
 	},
 	"mode": {
 		"live": "LIVE",
@@ -445,6 +447,50 @@
 			"close": "Close"
 		}
 	},
+	"triage": {
+		"title": "Failure triage",
+		"subtitle": "Deterministic failure patterns per arm, each linked to the runs and events that show it.",
+		"banner": "Observed patterns, not root causes.",
+		"bannerHint": "Each pattern is a fixed rule over a run's events. A pattern that is more common in one arm is a lead to read in the trace, not the reason the arm is worse.",
+		"experiment": "Experiment {{id}}",
+		"noExperiments": "No experiments yet. Plan one to see its failure patterns.",
+		"listError": "Could not load the experiment list.",
+		"loadError": "Could not load the triage.",
+		"empty": "This experiment has no counted runs yet.",
+		"table": {
+			"title": "Patterns by arm",
+			"description": "Runs showing each pattern over runs where it was observed. Unknown runs are counted apart, never as 0.",
+			"label": "Failure patterns by arm",
+			"pattern": "Pattern",
+			"arm": "Arm {{arm}}",
+			"diff": "{{b}} - {{a}}",
+			"diffHint": "Difference in share, in percentage points. Descriptive only: no test, no p-value.",
+			"unknown": "+{{count}} unknown",
+			"noObserved": "not observed",
+			"noDiff": "n/a",
+			"points": "{{value}} pts",
+			"show": "Runs",
+			"showAria": "Show the runs with {{pattern}}",
+			"hideAria": "Hide the runs with {{pattern}}"
+		},
+		"drill": {
+			"title": "Runs showing {{pattern}}",
+			"description": "Each run links to its matched pair. Event ids come from the reason the metric recorded for that run.",
+			"close": "Close",
+			"empty": "No run shows this pattern.",
+			"run": "Run",
+			"arm": "Arm",
+			"task": "Task",
+			"trial": "trial {{trial}}",
+			"events": "Triggering events",
+			"compare": "Compare pair",
+			"noPair": "Pair not in the grid",
+			"loading": "Loading the run's metrics",
+			"loadError": "Could not load this run's metrics.",
+			"noReason": "No event ids recorded for this run.",
+			"moreEvents": "+{{count}} more"
+		}
+	},
 	"experiments": {
 		"new": {
 			"title": "New experiment",
@@ -563,6 +609,106 @@
 				"loadError": "Could not load the experiment status."
 			}
 		}
+	},
+	"releases": {
+		"title": "Releases",
+		"subtitle": "Which agent version was released, by whom, and on what evidence.",
+		"disclaimer": "A hash-chained record of release decisions: it shows the log has not changed since it was written. It is not a cryptographic signature and not a compliance certification.",
+		"timeline": {
+			"title": "Release timeline",
+			"empty": "No releases recorded yet.",
+			"loadError": "Could not load the release log",
+			"chainOk": "Chain verifies",
+			"chainBroken": "Chain does not verify",
+			"chainBrokenHint": "A record was edited, removed or reordered after it was written. Run bifrost-bench release verify to find the first bad line.",
+			"experiment": "Experiment",
+			"config": "Agent config",
+			"configValue": "arm {{arm}}: {{id}} ({{hash}})",
+			"verdict": "Verdict",
+			"policy": "Policy",
+			"policyValue": "{{name}}: {{decision}}",
+			"noPolicy": "none evaluated",
+			"approver": "Approved by",
+			"note": "Note",
+			"override": "Override",
+			"linked": "linked to the previous record",
+			"linkBroken": "link broken",
+			"hashTitle": "hash {{hash}}, prev_hash {{prev}}",
+			"evidence": "Evidence pack"
+		},
+		"panel": {
+			"title": "Release",
+			"description": "Record a release of the candidate arm, citing the analysis shown here.",
+			"experiment": "Experiment",
+			"experimentPlaceholder": "Pick an experiment",
+			"experimentOption": "{{name}} ({{id}})",
+			"experimentsError": "Could not load experiments: {{error}}",
+			"noExperiments": "No experiments yet.",
+			"analysis": "Analysis",
+			"action": "Verdict",
+			"policy": "Policy decision",
+			"noPolicy": "none evaluated",
+			"verdictLoading": "Loading the verdict",
+			"verdictError": "Could not load the verdict: {{error}}",
+			"blocked": {
+				"notShip": "The verdict action is {{action}}, not ship.",
+				"policyBlock": "The policy decision is block."
+			},
+			"override": "Override with a reason",
+			"overrideReason": "Override reason",
+			"overridePlaceholder": "Why this ships anyway",
+			"overrideHint": "The reason is recorded with the release and shown in red on the timeline.",
+			"approver": "Approver",
+			"approverPlaceholder": "Who approves this release",
+			"note": "Note",
+			"notePlaceholder": "Optional",
+			"token": "Write token",
+			"tokenHint": "The server's BENCH_WRITE_TOKEN. Kept in this tab only.",
+			"tokenPlaceholder": "Paste the write token",
+			"submit": "Release",
+			"error": "Not released: {{error}}",
+			"created": "Released as {{id}}."
+		}
+	},
+	"policy": {
+		"title": "Release policy",
+		"description": "Explicit rules the candidate must meet before it ships. A policy only adds requirements; the baseline gates always run.",
+		"none": "No release policy applies to this experiment. Name one in the experiment or pass -policy to check.",
+		"decisionLabel": "Policy decision",
+		"decision": {
+			"allow": "ALLOW",
+			"warn": "WARN",
+			"block": "BLOCK"
+		},
+		"decisionHint": {
+			"allow": "No rule objects. The verdict still decides whether to ship.",
+			"warn": "A warn-level rule failed or needs review. Shipping is allowed; review first.",
+			"block": "A blocking rule failed or could not be judged. This release must not ship."
+		},
+		"meta": "{{name}}, sha256 {{hash}}",
+		"counts": "{{pass}} pass, {{fail}} fail, {{unknown}} unknown",
+		"status": {
+			"pass": "pass",
+			"fail": "fail",
+			"unknown": "unknown"
+		},
+		"blocking": "blocks",
+		"columns": {
+			"status": "Status",
+			"check": "Check",
+			"target": "Condition / arm",
+			"observed": "Observed",
+			"threshold": "Threshold",
+			"n": "n",
+			"reason": "Reason",
+			"evidence": "Evidence"
+		},
+		"allConditions": "all conditions",
+		"target": "{{condition}} / {{arm}}",
+		"dbar": "{{value}} pp",
+		"dbarHint": "Release effect d_bar, arm {{arm}} minus arm A",
+		"evidenceMore": "+{{count}} more",
+		"openRun": "Open the matched pair of run {{run}}"
 	},
 	"notFound": {
 		"title": "Page not found",

@@ -54,6 +54,7 @@ func runServe(args []string) int {
 		Catalog:  &catalogSource{a: a},
 		Auditor:  auditor{},
 		Doctor:   a.doctor,
+		Releases: serveReleaseLog(a),
 		UI:       builtUI(),
 		Logger:   a.logger,
 		Version:  benchVersion,

@@ -1,0 +1,23 @@
+# Keys of bench.ts `ReleaseRecord`, one per line; a trailing ? marks an optional (Go omitempty) key.
+# The top-level response adds "mode". Change with bench.ts and schemas/policy.go.
+release_id
+exp_id
+analysis_id
+arm
+agent_config_id
+config_hash
+decision
+action
+policy_name?
+policy_hash?
+policy_decision?
+manifest_hash
+seals_digest
+approver
+note?
+override?
+evidence_path?
+evidence_sha256?
+created_at
+prev_hash
+hash

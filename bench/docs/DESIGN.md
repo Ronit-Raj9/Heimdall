@@ -1048,7 +1048,7 @@ bifrost-bench demo                      # replays the recorded run, then runs th
 bifrost-bench serve | proxy
 ```
 
-`check` exits 0 when the verdict is not listed in `--fail-on`; otherwise 1 regressed, 2 inconclusive, 3 invalid. 4 is always an infrastructure error. It writes `report.md` and `report.json`.
+`check` exits 0 when the verdict is not listed in `--fail-on`; otherwise 1 regressed, 2 inconclusive, 3 invalid. 4 is always an infrastructure error. With `-policy <file>`, 5 means the release policy decided block; it is checked before the verdict codes. It writes `report.md` and `report.json`.
 
 ---
 

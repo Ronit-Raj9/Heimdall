@@ -581,6 +581,8 @@ export interface Analysis {
 	meters: Meter[];
 	/** arm -> metric -> median per run */
 	arm_metrics: Record<string, Record<string, Value>>;
+	/** The release policy result; absent when the experiment has no policy. */
+	policy?: PolicyResult;
 }
 
 /** A sealed run as analysis reads it, with the grade source chosen. */
@@ -671,6 +673,78 @@ export interface VerdictPayload {
 	naive: Record<string, Ratio>;
 	gates: GateSummary[];
 	config_diff: ConfigChange[];
+	/** The release policy result; absent when the experiment has no policy. */
+	policy?: PolicyResult;
+}
+
+// ---------------------------------------------------------------------------------------------
+// policy.go: release policy as code. A policy only adds requirements; the baseline gates always run.
+// ---------------------------------------------------------------------------------------------
+
+/** One rule of a policies/<name>.yaml file. Exactly one of rule, max, min or equals. */
+export interface PolicyCheck {
+	id: string;
+	description?: string;
+	/** A per-run metric name, or an aggregate: integrity_violations, cost_per_verified_success. */
+	metric: string;
+	/** Default: the primary condition; "all" for every condition. */
+	condition?: string;
+	/** Default B, the candidate. */
+	arm?: string;
+	rule?: "no_regression" | "improved";
+	max?: number;
+	min?: number;
+	equals?: number;
+	min_n?: number;
+	severity?: "block" | "warn";
+}
+
+/** A release policy file (schemas.Policy). */
+export interface Policy {
+	policy_version: number;
+	name: string;
+	description?: string;
+	on_unknown: "block" | "warn";
+	checks: PolicyCheck[];
+}
+
+/** One check's result. Unknown is never a pass. */
+export type PolicyStatus = "pass" | "fail" | "unknown";
+
+/** The policy's overall result. block means the release must not ship. */
+export type PolicyDecision = "allow" | "warn" | "block";
+
+/** Threshold texts of the two rules (policy.ThresholdNoRegression, policy.ThresholdImproved); their observed value is d_bar. */
+export const POLICY_RULE_THRESHOLDS: readonly string[] = ["no regression", "improved"];
+
+/** One check's result with its evidence (schemas.PolicyCheckResult). */
+export interface PolicyCheckResult {
+	id: string;
+	metric: string;
+	condition: string;
+	arm: string;
+	status: PolicyStatus;
+	/** This result alone blocks the release. */
+	blocking: boolean;
+	/** The arm's mean, the aggregate, or for a rule the release effect d_bar (a fraction). */
+	observed: Value;
+	/** For example "<= 0.05" or "no regression". */
+	threshold: string;
+	/** Observed runs behind `observed`. */
+	n: number;
+	reason?: string;
+	/** Run ids that break the rule, or whose value is unknown; at most 20. */
+	evidence?: string[];
+}
+
+/** The evaluation of a policy over one analysis (schemas.PolicyResult). */
+export interface PolicyResult {
+	policy_name: string;
+	/** sha256 of the policy file as evaluated. */
+	policy_hash: string;
+	decision: PolicyDecision;
+	checks: PolicyCheckResult[];
+	evaluated_at: string;
 }
 
 /** GET /experiments/{id}/diagnostics */
@@ -904,6 +978,78 @@ export interface RegradeResult {
 	runs: number;
 }
 
+/** One observed failure pattern across an experiment (schemas.TriageGroup). An observed pattern, never a root cause. */
+export interface TriageGroup {
+	/** Metric name, for example "pattern_loop". */
+	pattern: string;
+	label: string;
+	description: string;
+	/** arm -> runs showing the pattern over runs with an observed value; unknowns kept apart. */
+	per_arm: Record<string, Ratio>;
+	/** arm -> run ids showing the pattern. */
+	runs: Record<string, string[]>;
+}
+
+/** GET /experiments/{id}/triage */
+export interface Triage {
+	exp_id: string;
+	groups: TriageGroup[];
+}
+
+// ---------------------------------------------------------------------------------------------
+// policy.go: release log. A hash-chained record of a decision, not a signature or a certification.
+// ---------------------------------------------------------------------------------------------
+
+/** schemas.PolicyDecision as a release records it. block means the release must not ship without an override. */
+export type ReleasePolicyDecision = "allow" | "warn" | "block";
+
+/** One entry of the hash-chained release log (schemas.ReleaseRecord). */
+export interface ReleaseRecord {
+	release_id: string;
+	exp_id: string;
+	analysis_id: string;
+	/** The arm released, normally B. */
+	arm: string;
+	agent_config_id: string;
+	config_hash: string;
+	decision: Decision;
+	action: Action;
+	policy_name?: string;
+	policy_hash?: string;
+	/** Absent when no policy was evaluated. */
+	policy_decision?: ReleasePolicyDecision;
+	manifest_hash: string;
+	/** sha256 over every counted run's seal hash, sorted. */
+	seals_digest: string;
+	approver: string;
+	note?: string;
+	/** Set only when released against a non-ship action or a policy block, with the reason. */
+	override?: string;
+	/** Relative to the releases root. */
+	evidence_path?: string;
+	evidence_sha256?: string;
+	created_at: string;
+	prev_hash: string;
+	hash: string;
+}
+
+/** POST /releases */
+export interface ReleaseRequest {
+	exp_id: string;
+	/** Default: the latest analysis. */
+	analysis_id?: string;
+	approver: string;
+	note?: string;
+	/** Required to release against a non-ship action or a policy block. */
+	override?: string;
+}
+
+/** GET /releases, in log order (oldest first). */
+export interface ReleaseList {
+	releases: ReleaseRecord[];
+	chain_ok: boolean;
+}
+
 // ---------------------------------------------------------------------------------------------
 // HTTP responses (DESIGN.md 16.7). Every one carries `mode`.
 // ---------------------------------------------------------------------------------------------
@@ -926,3 +1072,6 @@ export type RunReceiptsResponse = WithMode<RunReceipts>;
 export type PairResponse = WithMode<Pair>;
 export type AuditResponse = WithMode<Verdict>;
 export type RegradeResponse = WithMode<RegradeResult>;
+export type TriageResponse = WithMode<Triage>;
+export type ReleaseListResponse = WithMode<ReleaseList>;
+export type ReleaseResponse = WithMode<ReleaseRecord>;

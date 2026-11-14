@@ -5,6 +5,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { DiagnosticsTable } from "@/components/verdict/diagnosticsTable";
 import { GateChecklist } from "@/components/verdict/gateChecklist";
 import { NaiveScoreboard } from "@/components/verdict/naiveScoreboard";
+import { PolicyScorecard } from "@/components/verdict/policyScorecard";
 import { TaskGrid } from "@/components/verdict/taskGrid";
 import { VerdictCard } from "@/components/verdict/verdictCard";
 import { armOrder, sortExperimentsNewestFirst } from "@/components/verdict/verdict.utils";
@@ -74,6 +75,15 @@ function ExperimentVerdict({ expId }: { expId: string }) {
 		return byName;
 	}, [catalog.data]);
 
+	// run id -> pair id, so policy evidence opens the matched pair in the run inspector.
+	const runPairs = useMemo(() => {
+		const byRun: Record<string, string> = {};
+		for (const row of grid.data?.rows ?? []) {
+			for (const cell of row.cells) if (cell.run_id) byRun[cell.run_id] = cell.pair_id;
+		}
+		return byRun;
+	}, [grid.data]);
+
 	const openPair = useCallback(
 		(pairId: string) => {
 			void navigate({ href: `/runs?pair=${encodeURIComponent(pairId)}&exp=${encodeURIComponent(expId)}` });
@@ -107,6 +117,10 @@ function ExperimentVerdict({ expId }: { expId: string }) {
 				<NaiveScoreboard naive={payload.naive} arms={arms} />
 				<VerdictCard verdict={payload.verdict} metricLabel={metrics[payload.verdict.primary.metric]?.label} />
 			</div>
+
+			<Section title={t("policy.title")} description={t("policy.description")} testId="verdict-policy">
+				<PolicyScorecard policy={payload.policy} expId={payload.exp_id} metrics={metrics} runPairs={runPairs} onOpenPair={openPair} />
+			</Section>
 
 			<Section title={t("verdict.gates.title")} description={t("verdict.gates.description")} testId="verdict-gates">
 				<GateChecklist gates={payload.gates} />

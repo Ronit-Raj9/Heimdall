@@ -15,10 +15,14 @@ import type {
 	PlanResponse,
 	RegradeRequest,
 	RegradeResponse,
+	ReleaseListResponse,
+	ReleaseRequest,
+	ReleaseResponse,
 	RunDiffResponse,
 	RunEventsResponse,
 	RunReceiptsResponse,
 	RunResponse,
+	TriageResponse,
 	VerdictResponse,
 } from "@/lib/types/bench";
 import { createApi, fetchBaseQuery, type BaseQueryFn, type FetchArgs, type FetchBaseQueryError } from "@reduxjs/toolkit/query/react";
@@ -67,6 +71,11 @@ export function saveWriteToken(token: string): void {
 /** Server-sent events URL for live experiment status. Not an RTK Query endpoint: it streams. */
 export function experimentEventsUrl(expId: string): string {
 	return `${BENCH_API_BASE}/experiments/${encodeURIComponent(expId)}/events`;
+}
+
+/** Download URL of a release's evidence pack (a zip). Not an RTK Query endpoint: the browser saves it. */
+export function releaseEvidenceUrl(releaseId: string): string {
+	return `${BENCH_API_BASE}/releases/${encodeURIComponent(releaseId)}/evidence`;
 }
 
 /** The message to show for a failed bench request. */
@@ -137,6 +146,8 @@ export const benchApi = createApi({
 		"BenchRunDiff",
 		"BenchRunReceipts",
 		"BenchPair",
+		"BenchRelease",
+		"BenchTriage",
 	],
 	endpoints: (builder) => ({
 		getHealth: builder.query<HealthResponse, void>({
@@ -209,6 +220,25 @@ export const benchApi = createApi({
 			query: (pairId) => `/pairs/${id(pairId)}`,
 			providesTags: (_result, _error, pairId) => [{ type: "BenchPair", id: pairId }],
 		}),
+		// Observed failure patterns per arm, read from each run's metrics.json.
+		getTriage: builder.query<TriageResponse, string>({
+			query: (expId) => `/experiments/${id(expId)}/triage`,
+			providesTags: (_result, _error, expId) => [{ type: "BenchTriage", id: expId }],
+		}),
+
+		// Releases: the hash-chained release log.
+		listReleases: builder.query<ReleaseListResponse, void>({
+			query: () => "/releases",
+			providesTags: [{ type: "BenchRelease", id: "LIST" }],
+		}),
+		getRelease: builder.query<ReleaseResponse, string>({
+			query: (releaseId) => `/releases/${id(releaseId)}`,
+			providesTags: (_result, _error, releaseId) => [{ type: "BenchRelease", id: releaseId }],
+		}),
+		createRelease: builder.mutation<ReleaseResponse, ReleaseRequest>({
+			query: (body) => ({ url: "/releases", method: "POST", body }),
+			invalidatesTags: [{ type: "BenchRelease", id: "LIST" }],
+		}),
 
 		// Analysis
 		auditTable: builder.mutation<AuditResponse, AuditRequest>({
@@ -221,6 +251,7 @@ export const benchApi = createApi({
 				{ type: "BenchVerdict", id: exp_id },
 				{ type: "BenchDiagnostics", id: exp_id },
 				{ type: "BenchGrid", id: exp_id },
+				{ type: "BenchTriage", id: exp_id },
 			],
 		}),
 	}),
@@ -243,6 +274,10 @@ export const {
 	useGetRunDiffQuery,
 	useGetRunReceiptsQuery,
 	useGetPairQuery,
+	useGetTriageQuery,
+	useListReleasesQuery,
+	useGetReleaseQuery,
+	useCreateReleaseMutation,
 	useAuditTableMutation,
 	useRegradeMutation,
 } = benchApi;

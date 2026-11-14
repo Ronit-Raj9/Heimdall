@@ -3,6 +3,7 @@ package engine
 import (
 	"context"
 	"encoding/json"
+	"os"
 	"path/filepath"
 	"regexp"
 	"strings"
@@ -183,6 +184,55 @@ func TestPlanRejects(t *testing.T) {
 			_, err := NewPlanner(b.reg, b.root, nil).Plan(context.Background(), e)
 			if err == nil || !strings.Contains(err.Error(), tt.want) {
 				t.Fatalf("err = %v, want it to contain %q", err, tt.want)
+			}
+		})
+	}
+}
+
+func TestPlanPolicyHash(t *testing.T) {
+	const policyYAML = "policy_version: 1\nname: p\nchecks:\n  - {id: a, metric: steps, max: 1}\n"
+	tests := []struct {
+		name, policy string
+		write        bool
+		want         string // error substring; empty means success
+	}{
+		{"no policy", "", false, ""},
+		{"policy hashed", "policies/p.yaml", true, ""},
+		{"missing policy fails", "policies/missing.yaml", false, "release policy policies/missing.yaml"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			b := newBench(t)
+			if tt.write {
+				p := filepath.Join(b.root, tt.policy)
+				if err := os.MkdirAll(filepath.Dir(p), 0o755); err != nil {
+					t.Fatal(err)
+				}
+				if err := os.WriteFile(p, []byte(policyYAML), 0o644); err != nil {
+					t.Fatal(err)
+				}
+			}
+			e := testExperiment()
+			e.Policy = tt.policy
+			m, err := NewPlanner(b.reg, b.root, nil).Plan(context.Background(), e)
+			if tt.want != "" {
+				if err == nil || !strings.Contains(err.Error(), tt.want) {
+					t.Fatalf("err = %v, want it to contain %q", err, tt.want)
+				}
+				return
+			}
+			if err != nil {
+				t.Fatal(err)
+			}
+			want := ""
+			if tt.write {
+				want = utils.SHA256Bytes([]byte(policyYAML))
+			}
+			if m.PolicyHash != want {
+				t.Fatalf("policy hash = %q, want %q", m.PolicyHash, want)
+			}
+			if h, _ := ManifestHash(m); h != m.Hash {
+				t.Fatal("manifest hash does not cover the policy hash")
 			}
 		})
 	}

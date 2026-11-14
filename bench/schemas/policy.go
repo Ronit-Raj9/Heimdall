@@ -9,7 +9,7 @@ type Policy struct {
 	PolicyVersion int           `json:"policy_version" yaml:"policy_version"`
 	Name          string        `json:"name" yaml:"name"`
 	Description   string        `json:"description,omitempty" yaml:"description"`
-	OnUnknown     string        `json:"on_unknown" yaml:"on_unknown"` // block (default) | warn
+	OnUnknown     string        `json:"on_unknown" yaml:"on_unknown"` // block | warn; unset: a small-sample unknown warns, any other unknown blocks
 	Checks        []PolicyCheck `json:"checks" yaml:"checks"`
 }
 

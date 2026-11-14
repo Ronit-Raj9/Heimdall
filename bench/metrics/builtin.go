@@ -24,5 +24,8 @@ func Builtin() []schemas.Metric {
 		newFalseCompletionMetric(),
 		newClaimPrecisionMetric(),
 		newRetryAmplificationMetric(),
+		newPatternLoopMetric(),
+		newPatternUnverifiedMetric(),
+		newPatternIgnoredErrorMetric(),
 	}
 }

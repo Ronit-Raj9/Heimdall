@@ -1,6 +1,7 @@
 package metrics
 
 import (
+	"reflect"
 	"strings"
 	"testing"
 
@@ -25,6 +26,9 @@ func TestBuiltin(t *testing.T) {
 		{name: FalseCompletion, kind: schemas.KindRate, min: schemas.EvidenceOutcome},
 		{name: ClaimPrecision, kind: schemas.KindRate, higher: true, min: schemas.EvidenceOutcome},
 		{name: RetryAmplification, kind: schemas.KindCount, min: schemas.EvidenceGateway},
+		{name: PatternLoop, kind: schemas.KindRate, min: schemas.EvidenceGateway},
+		{name: PatternUnverifiedFinish, kind: schemas.KindRate, min: schemas.EvidenceGateway},
+		{name: PatternIgnoredError, kind: schemas.KindRate, min: schemas.EvidenceNative},
 	}
 	got := Builtin()
 	if len(got) != len(tests) {
@@ -66,6 +70,12 @@ func TestBuiltinFreshInstances(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			a, b := Builtin(), Builtin()
 			for i := range a {
+				// Pointers to distinct zero-size values may compare equal once
+				// Builtin is too big to inline (they all point at the runtime's
+				// zero base); a stateless metric has nothing to share.
+				if reflect.TypeOf(a[i]).Elem().Size() == 0 {
+					continue
+				}
 				if a[i] == b[i] {
 					t.Errorf("metric %s returned the same instance twice", a[i].GetName())
 				}

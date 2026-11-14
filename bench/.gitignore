@@ -6,3 +6,5 @@
 /runs/
 # A binary built with plain `go build ./cmd/bifrost-bench` from bench/.
 /bifrost-bench
+# Release log and evidence packs written by `bifrost-bench release`.
+/releases/

@@ -31,6 +31,7 @@ export const FIXTURE_ROUTES: readonly FixtureRoute[] = [
 	{ method: "GET", pattern: "/experiments/:id/verdict", file: "experiments.verdict.json" },
 	{ method: "GET", pattern: "/experiments/:id/diagnostics", file: "experiments.diagnostics.json" },
 	{ method: "GET", pattern: "/experiments/:id/grid", file: "experiments.grid.json" },
+	{ method: "GET", pattern: "/experiments/:id/triage", file: "experiments.triage.json" },
 	{ method: "GET", pattern: "/runs/:id", file: "runs.{id}.json" },
 	{ method: "GET", pattern: "/runs/:id/events", file: "runs.{id}.events.json" },
 	{ method: "GET", pattern: "/runs/:id/diff", file: "runs.{id}.diff.json" },
@@ -38,6 +39,7 @@ export const FIXTURE_ROUTES: readonly FixtureRoute[] = [
 	{ method: "GET", pattern: "/pairs/:id", file: "pairs.{id}.json" },
 	{ method: "POST", pattern: "/audit", file: "audit.json" },
 	{ method: "POST", pattern: "/regrade", file: "regrade.json" },
+	{ method: "GET", pattern: "/releases", file: "releases.list.json" },
 ];
 
 /** True when the URL has fixture=1 or the build sets VITE_BENCH_FIXTURE=1. */

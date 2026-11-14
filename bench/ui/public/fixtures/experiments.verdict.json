@@ -446,5 +446,100 @@
 			"a": null,
 			"b": "fixtures/notes/codewins.md"
 		}
-	]
+	],
+	"policy": {
+		"policy_name": "enterprise-default",
+		"policy_hash": "5c1e0f9a2b7d4e6f8a9b0c1d2e3f405162738495a6b7c8d9e0f1a2b3c4d5e6f7",
+		"decision": "block",
+		"evaluated_at": "2026-11-14T10:12:00Z",
+		"checks": [
+			{
+				"id": "clean-no-regression",
+				"metric": "verified_success",
+				"condition": "clean",
+				"arm": "B",
+				"status": "pass",
+				"blocking": false,
+				"observed": {
+					"state": "observed",
+					"v": 0.0833,
+					"evidence": "outcome"
+				},
+				"threshold": "no regression",
+				"n": 12,
+				"reason": "clean: not regressed at either bound, d_bar +8.3 pp (+8.3 / +8.3 pp at the missingness bounds), p 1, 1 of 4 tasks discordant"
+			},
+			{
+				"id": "false-completion-ceiling",
+				"metric": "false_completion",
+				"condition": "all",
+				"arm": "B",
+				"status": "fail",
+				"blocking": true,
+				"observed": {
+					"state": "observed",
+					"v": 0.0833,
+					"evidence": "native"
+				},
+				"threshold": "<= 0.05",
+				"n": 24,
+				"reason": "mean 0.0833333 over 24 observed runs breaks <= 0.05",
+				"evidence": [
+					"r_1w30xridyv",
+					"r_efejyyax55"
+				]
+			},
+			{
+				"id": "no-integrity-violations",
+				"metric": "integrity_violations",
+				"condition": "all",
+				"arm": "B",
+				"status": "pass",
+				"blocking": false,
+				"observed": {
+					"state": "observed",
+					"v": 0,
+					"evidence": "outcome"
+				},
+				"threshold": "= 0",
+				"n": 24,
+				"reason": "0 of 24 runs had a fired veto gate"
+			},
+			{
+				"id": "retry-amplification-ceiling",
+				"metric": "retry_amplification",
+				"condition": "clean",
+				"arm": "B",
+				"status": "pass",
+				"blocking": false,
+				"observed": {
+					"state": "observed",
+					"v": 1.08,
+					"evidence": "gateway"
+				},
+				"threshold": "<= 3",
+				"n": 12,
+				"reason": "mean 1.08 over 12 observed runs"
+			},
+			{
+				"id": "cost-per-verified-success",
+				"metric": "cost_per_verified_success",
+				"condition": "clean",
+				"arm": "B",
+				"status": "unknown",
+				"blocking": false,
+				"observed": {
+					"state": "unknown",
+					"v": null,
+					"reason": "cost_usd unknown in 1 of 12 runs"
+				},
+				"threshold": "<= 2",
+				"n": 11,
+				"reason": "cost_usd unknown in 1 of 12 runs",
+				"evidence": [
+					"r_4x5roh2oec"
+				]
+			}
+		]
+	}
 }

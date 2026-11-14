@@ -1,0 +1,7 @@
+# Keys of bench.ts `TriageGroup`, one per line; a trailing ? marks an optional (Go omitempty) key.
+# Change with bench.ts and schemas/policy.go.
+pattern
+label
+description
+per_arm
+runs
