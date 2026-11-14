@@ -1,0 +1,285 @@
+{
+  "id": "a7da58a1-e951-48cc-829c-399739a1c7f3",
+  "inc_number": 2,
+  "parent_request_id": null,
+  "timestamp": "2026-11-13T23:51:59.902652Z",
+  "object": "chat_completion_stream",
+  "provider": "openai",
+  "model": "gpt-5.4-mini",
+  "number_of_retries": 0,
+  "fallback_index": 0,
+  "selected_key_id": "85a3ce7e-0d0c-4f5b-85cf-b2419ccbc970",
+  "selected_key_name": "oa-slot-1",
+  "virtual_key_id": "22f0423c-87b8-4b9c-87d9-39701df5ac53",
+  "virtual_key_name": "r_yegqmia4f0",
+  "routing_rule_id": null,
+  "routing_rule_name": null,
+  "selected_prompt_name": null,
+  "selected_prompt_version": null,
+  "selected_prompt_id": null,
+  "user_id": null,
+  "user_name": null,
+  "team_id": null,
+  "team_name": null,
+  "customer_id": null,
+  "customer_name": null,
+  "business_unit_id": null,
+  "business_unit_name": null,
+  "project_id": null,
+  "project_name": null,
+  "user_agent": "Go-http-client/1.1",
+  "app": "Other",
+  "latency": 135.161121,
+  "upstream_latency": 25.95045900000001,
+  "overhead_latency": 109.210662,
+  "cost": 0.00017445,
+  "cost_breakdown": {
+    "input_cost": 0.00003045,
+    "input_cost_details": {
+      "text_cost": 0.00002775,
+      "cached_read_cost": 0.0000027
+    },
+    "output_cost": 0.000144,
+    "output_cost_details": {
+      "text_cost": 0.000144
+    },
+    "total_cost": 0.00017445
+  },
+  "status": "success",
+  "stop_reason": "tool_calls",
+  "stream": true,
+  "content_summary": "openai chat",
+  "raw_request": "{\"model\":\"gpt-5.4-mini\",\"stream\":true,\"input\":[{\"type\":\"message\",\"role\":\"user\",\"content\":\"openai chat\"}],\"tools\":[{\"type\":\"function\",\"name\":\"Read\",\"description\":\"Read a file\",\"parameters\":{\"type\":\"object\",\"properties\":{\"file_path\":{\"type\":\"string\"}},\"required\":[\"file_path\"]},\"strict\":false}]}",
+  "raw_response": "{\"response\":{\"created_at\":1794613919,\"error\":null,\"id\":\"resp_oo8mp78vryh9k8rldf0od4qq\",\"incomplete_details\":null,\"model\":\"gpt-5.4-mini\",\"object\":\"response\",\"output\":[],\"parallel_tool_calls\":true,\"status\":\"in_progress\",\"store\":false,\"tool_choice\":\"auto\",\"tools\":[],\"usage\":null},\"sequence_number\":0,\"type\":\"response.created\"}\n\n{\"response\":{\"created_at\":1794613919,\"error\":null,\"id\":\"resp_oo8mp78vryh9k8rldf0od4qq\",\"incomplete_details\":null,\"model\":\"gpt-5.4-mini\",\"object\":\"response\",\"output\":[],\"parallel_tool_calls\":true,\"status\":\"in_progress\",\"store\":false,\"tool_choice\":\"auto\",\"tools\":[],\"usage\":null},\"sequence_number\":1,\"type\":\"response.in_progress\"}\n\n{\"item\":{\"arguments\":\"\",\"call_id\":\"call_peerdr8hhgoh8dnu818houhj\",\"id\":\"fc_z4owei3ottadkr52955gm69e\",\"name\":\"Read\",\"status\":\"in_progress\",\"type\":\"function_call\"},\"output_index\":0,\"sequence_number\":2,\"type\":\"response.output_item.added\"}\n\n{\"delta\":\"{\\\"file_path\\\":\\\"\\\"}\",\"item_id\":\"fc_z4owei3ottadkr52955gm69e\",\"output_index\":0,\"sequence_number\":3,\"type\":\"response.function_call_arguments.delta\"}\n\n{\"arguments\":\"{\\\"file_path\\\":\\\"\\\"}\",\"item_id\":\"fc_z4owei3ottadkr52955gm69e\",\"output_index\":0,\"sequence_number\":4,\"type\":\"response.function_call_arguments.done\"}\n\n{\"item\":{\"arguments\":\"{\\\"file_path\\\":\\\"\\\"}\",\"call_id\":\"call_peerdr8hhgoh8dnu818houhj\",\"id\":\"fc_z4owei3ottadkr52955gm69e\",\"name\":\"Read\",\"status\":\"completed\",\"type\":\"function_call\"},\"output_index\":0,\"sequence_number\":5,\"type\":\"response.output_item.done\"}\n\n{\"response\":{\"created_at\":1794613919,\"error\":null,\"id\":\"resp_oo8mp78vryh9k8rldf0od4qq\",\"incomplete_details\":null,\"model\":\"gpt-5.4-mini\",\"object\":\"response\",\"output\":[{\"arguments\":\"{\\\"file_path\\\":\\\"\\\"}\",\"call_id\":\"call_peerdr8hhgoh8dnu818houhj\",\"id\":\"fc_z4owei3ottadkr52955gm69e\",\"name\":\"Read\",\"status\":\"completed\",\"type\":\"function_call\"}],\"parallel_tool_calls\":true,\"status\":\"completed\",\"store\":false,\"tool_choice\":\"auto\",\"tools\":[],\"usage\":{\"input_tokens\":73,\"input_tokens_details\":{\"cached_tokens\":36},\"output_tokens\":32,\"output_tokens_details\":{\"reasoning_tokens\":0},\"total_tokens\":105}},\"sequence_number\":6,\"type\":\"response.completed\"}",
+  "routing_engine_logs": "[1794613919902] [governance] [info] - Load balancing provider for model gpt-5.4-mini\n[1794613919902] [governance] [info] - Load balancing model gpt-5.4-mini across 1 available providers: [openai]\n[1794613919902] [governance] [info] - Allowed providers after filtering: [openai]\n[1794613919902] [governance] [info] - Selected provider openai for model gpt-5.4-mini (from 1 weighted: [openai])\n",
+  "plugin_logs": "{\"compat\":[{\"plugin_name\":\"compat\",\"level\":\"info\",\"message\":\"model gpt-5.4-mini (openai) does not support reasoning with tool calls on chat_completion, converting request to responses\",\"timestamp\":1794613919902},{\"plugin_name\":\"compat\",\"level\":\"debug\",\"message\":\"no unsupported params to drop for model gpt-5.4-mini\",\"timestamp\":1794613919902},{\"plugin_name\":\"compat\",\"level\":\"debug\",\"message\":\"no param values converted for model gpt-5.4-mini (openai)\",\"timestamp\":1794613919902}]}",
+  "is_large_payload_request": false,
+  "is_large_payload_response": false,
+  "content_hidden": false,
+  "created_at": "2026-11-13T23:51:59.902652Z",
+  "routing_engines_used": [
+    "governance"
+  ],
+  "tool_call_names": [
+    "Read"
+  ],
+  "input_history": [
+    {
+      "role": "user",
+      "content": "openai chat"
+    }
+  ],
+  "output_message": {
+    "role": "assistant",
+    "content": null,
+    "refusal": null,
+    "tool_calls": [
+      {
+        "index": 0,
+        "type": "function",
+        "id": "call_peerdr8hhgoh8dnu818houhj",
+        "function": {
+          "name": "Read",
+          "arguments": "{\"file_path\":\"\"}"
+        }
+      }
+    ]
+  },
+  "params": {
+    "tools": [
+      {
+        "function": {
+          "description": "Read a file",
+          "name": "Read",
+          "parameters": {
+            "properties": {
+              "file_path": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "file_path"
+            ],
+            "type": "object"
+          }
+        },
+        "type": "function"
+      }
+    ]
+  },
+  "tools": [
+    {
+      "type": "function",
+      "function": {
+        "name": "Read",
+        "description": "Read a file",
+        "parameters": {
+          "properties": {
+            "file_path": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "file_path"
+          ],
+          "type": "object"
+        }
+      }
+    }
+  ],
+  "tool_calls": [
+    {
+      "index": 0,
+      "type": "function",
+      "id": "call_peerdr8hhgoh8dnu818houhj",
+      "function": {
+        "name": "Read",
+        "arguments": "{\"file_path\":\"\"}"
+      }
+    }
+  ],
+  "token_usage": {
+    "prompt_tokens": 73,
+    "prompt_tokens_details": {
+      "cached_read_tokens": 36,
+      "cached_tokens": 36,
+      "cache_write_tokens": 0
+    },
+    "completion_tokens": 32,
+    "completion_tokens_details": {},
+    "total_tokens": 105,
+    "cost": {
+      "input_cost": 0.00003045,
+      "input_cost_details": {
+        "text_cost": 0.00002775,
+        "cached_read_cost": 0.0000027
+      },
+      "output_cost": 0.000144,
+      "output_cost_details": {
+        "text_cost": 0.000144
+      },
+      "total_cost": 0.00017445
+    }
+  },
+  "attempt_trail": [
+    {
+      "attempt": 0,
+      "key_id": "85a3ce7e-0d0c-4f5b-85cf-b2419ccbc970",
+      "key_name": "oa-slot-1",
+      "triggered_rotation": false
+    }
+  ],
+  "overhead_breakdown": [
+    {
+      "name": "stream-client-write",
+      "duration_us": 10.196
+    },
+    {
+      "name": "convertor.stream-out",
+      "duration_us": 0.04
+    },
+    {
+      "name": "response-parse",
+      "duration_us": 69032.466
+    },
+    {
+      "name": "plugin.telemetry",
+      "duration_us": 155.767
+    },
+    {
+      "name": "plugin.prompts",
+      "duration_us": 4.325
+    },
+    {
+      "name": "plugin.logging",
+      "duration_us": 227.059
+    },
+    {
+      "name": "plugin.governance",
+      "duration_us": 57.89
+    },
+    {
+      "name": "plugin.compat",
+      "duration_us": 16.277
+    },
+    {
+      "name": "transport-context",
+      "duration_us": 25.475
+    },
+    {
+      "name": "convertor",
+      "duration_us": 16.149
+    },
+    {
+      "name": "plugin.routing",
+      "duration_us": 30.146
+    },
+    {
+      "name": "plugin.model-catalog-resolver",
+      "duration_us": 3.917
+    },
+    {
+      "name": "miscellaneous",
+      "duration_us": 25.539
+    },
+    {
+      "name": "pipeline-pre",
+      "duration_us": 5.437
+    },
+    {
+      "name": "queue-wait",
+      "duration_us": 7.133
+    },
+    {
+      "name": "worker-setup",
+      "duration_us": 1.905
+    },
+    {
+      "name": "key-pool",
+      "duration_us": 11.922
+    },
+    {
+      "name": "key.selection",
+      "duration_us": 1.234
+    },
+    {
+      "name": "attribute-population",
+      "duration_us": 620.402
+    },
+    {
+      "name": "request-marshal",
+      "duration_us": 38951.894
+    },
+    {
+      "name": "transport-response-headers",
+      "duration_us": 5.489
+    }
+  ],
+  "virtual_key": {
+    "agent_grants": null,
+    "allow_all_providers": false,
+    "calendar_aligned": false,
+    "config_hash": "",
+    "created_at": "0001-01-01T00:00:00Z",
+    "id": "22f0423c-87b8-4b9c-87d9-39701df5ac53",
+    "is_active": true,
+    "mcp_configs": null,
+    "name": "r_yegqmia4f0",
+    "provider_configs": null,
+    "relay_grants": null,
+    "updated_at": "0001-01-01T00:00:00Z",
+    "value": ""
+  },
+  "selected_key": {
+    "id": "85a3ce7e-0d0c-4f5b-85cf-b2419ccbc970",
+    "name": "oa-slot-1",
+    "value": {
+      "value": ""
+    },
+    "models": [
+      "gpt-5.4-mini"
+    ],
+    "blacklisted_models": [],
+    "weight": 1
+  }
+}

@@ -34,6 +34,7 @@ type VerdictPayload struct {
 	Naive       map[string]Ratio `json:"naive"`
 	Gates       []GateSummary    `json:"gates"`
 	ConfigDiff  []ConfigChange   `json:"config_diff"`
+	Policy      *PolicyResult    `json:"policy,omitempty"`
 }
 
 // DiagnosticsPayload is GET /experiments/{id}/diagnostics.

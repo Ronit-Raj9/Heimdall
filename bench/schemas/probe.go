@@ -46,6 +46,14 @@ type ProbeApply struct {
 	// fixture: copy a task fixture over a workspace path. Template variables:
 	// {{task.notes.stale}} and {{agent.notes.project_file}}.
 	Overlay *OverlaySpec `json:"overlay,omitempty" yaml:"overlay"`
+	// fixture: several overlays, applied in order after Overlay. Template
+	// variables also include {{suite.root}} for suite-level fixture files.
+	Overlays []OverlaySpec `json:"overlays,omitempty" yaml:"overlays"`
+	// Safety probes: what the matching gate looks for. Markers are literal
+	// strings (a canary secret, an injected command) and Paths are workspace
+	// paths the probe protects or plants as user work.
+	Markers []string `json:"markers,omitempty" yaml:"markers"`
+	Paths   []string `json:"paths,omitempty" yaml:"paths"`
 	// gateway: the fault plan bound to the run's key slot.
 	Fault *FaultPlan `json:"fault,omitempty" yaml:"fault"`
 	// tool_shim: which command to wrap and how to break it.

@@ -27,6 +27,7 @@ type Experiment struct {
 	Seed          int64              `json:"seed" yaml:"seed"`
 	Concurrency   int                `json:"concurrency" yaml:"concurrency"`
 	ManifestMode  string             `json:"manifest_mode" yaml:"manifest_mode"` // agent_exposure | stack_resilience
+	Policy        string             `json:"policy,omitempty" yaml:"policy"`     // release policy file, relative to the bench root
 }
 
 // ArmSpec is a base agent config plus dotted-path overrides, for example
@@ -188,7 +189,8 @@ type Manifest struct {
 	Slots          []Slot                 `json:"slots"`
 	RandomizationU string                 `json:"randomization_unit"` // "task"
 	BenchVersion   string                 `json:"bench_version"`
-	Hash           string                 `json:"hash"` // sha256 of the canonical JSON with Hash empty
+	PolicyHash     string                 `json:"policy_hash,omitempty"` // sha256 of the policy file named by the experiment
+	Hash           string                 `json:"hash"`                  // sha256 of the canonical JSON with Hash empty
 }
 
 // ArmManifest is one arm's resolved config and the hashes of every file laid

@@ -32,7 +32,9 @@ const (
 // PollEvery until every ledger entry of kind message and count_tokens is
 // covered by exactly one row (joinLedger), every row that reached the proxy
 // is covered, no row is processing, and two polls in a row return the same
-// rows; or until Timeout. Each detail row is fetched once (rows still
+// rows; or until Timeout. A direct provider has no proxy and no ledger: its
+// set is complete when no row is processing and two polls match, after the
+// settle time that covers Bifrost's batched log writer. Each detail row is fetched once (rows still
 // processing are fetched again). An incomplete set is returned with
 // Complete=false and a Reason, never dropped. Only a cancelled context or a
 // key without an id is an error.
@@ -52,9 +54,13 @@ func (g *Gateway) FetchRequests(ctx context.Context, key *schemas.RunKey, expect
 	cache := map[string]*parsedRow{}
 	prev, lastErr := "\x00none", "" // no poll yet: the first signature never counts as repeated
 	var last *schemas.RequestLog
-	expected := len(joinLedger(nil, expect.LedgerEntries, key.KeySlot).Entries)
+	direct := g.keyMode(key) == ModeDirect
+	expected := 0
+	if !direct {
+		expected = len(joinLedger(nil, expect.LedgerEntries, key.KeySlot).Entries)
+	}
 	for {
-		snap, err := g.snapshot(ctx, key, since, cache, expect.LedgerEntries)
+		snap, err := g.snapshot(ctx, key, since, cache, expect.LedgerEntries, direct)
 		switch {
 		case err != nil && ctx.Err() != nil:
 			return last, fmt.Errorf("fetch requests for key %s: %w", key.ID, ctx.Err())
@@ -104,7 +110,7 @@ func (s snapshot) final() bool {
 // snapshot lists every row of the key, fetches detail rows not yet cached
 // (and again while processing or when the status changed), and joins them to
 // the ledger.
-func (g *Gateway) snapshot(ctx context.Context, key *schemas.RunKey, since time.Time, cache map[string]*parsedRow, ledger []schemas.LedgerEntry) (*snapshot, error) {
+func (g *Gateway) snapshot(ctx context.Context, key *schemas.RunKey, since time.Time, cache map[string]*parsedRow, ledger []schemas.LedgerEntry, direct bool) (*snapshot, error) {
 	rows, err := g.listRows(ctx, key.ID, since)
 	if err != nil {
 		return nil, err
@@ -129,7 +135,10 @@ func (g *Gateway) snapshot(ctx context.Context, key *schemas.RunKey, since time.
 		sig = append(sig, p.Req.ID+"="+p.Req.Status)
 	}
 	sort.Strings(sig)
-	join := joinLedger(parsed, ledger, key.KeySlot)
+	var join joinResult
+	if !direct {
+		join = joinLedger(parsed, ledger, key.KeySlot)
+	}
 	log := &schemas.RequestLog{Requests: make([]schemas.GatewayRequest, 0, len(parsed)), RowIDs: ids}
 	for _, p := range parsed {
 		log.Requests = append(log.Requests, p.Req)
@@ -192,6 +201,18 @@ func (g *Gateway) finish(ctx context.Context, log *schemas.RequestLog) *schemas.
 		g.logger.Warn("bifrost reports dropped log rows", "dropped_requests", *log.Dropped)
 	}
 	return log
+}
+
+// keyMode is the mode of the key's provider: by its slot, else by its
+// provider name. Unknown keys are treated as proxied, the stricter check.
+func (g *Gateway) keyMode(key *schemas.RunKey) string {
+	if p, ok := g.slotProvider(key.KeySlot); ok {
+		return p.Mode
+	}
+	if p, ok := g.provider(key.Provider); ok {
+		return p.Mode
+	}
+	return ModeProxied
 }
 
 // windowStart is the list query's start_time: shortly before the key was

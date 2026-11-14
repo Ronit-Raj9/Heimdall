@@ -132,6 +132,9 @@ func TestShippedSnapshot(t *testing.T) {
 			}
 			for _, pr := range pairs {
 				want, ok := row[pr.field].(float64)
+				if _, stated := row[pr.field]; !stated && pr.field == "cache_creation_input_token_cost" {
+					want, ok = 0, true // no cache-write price (OpenAI rows): the snapshot must say 0
+				}
 				if !ok || math.Abs(pr.got-want*1e6) > 1e-9 {
 					t.Errorf("%s: snapshot %v per Mtok, datasheet %v per token", pr.field, pr.got, row[pr.field])
 				}

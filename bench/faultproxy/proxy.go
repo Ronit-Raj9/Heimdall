@@ -1,10 +1,12 @@
-// Package faultproxy is the bench's fault-injecting Anthropic upstream. It sits
-// behind Bifrost as the base URL of the built-in anthropic provider (DESIGN.md
-// 13.3): agent, Bifrost, fault proxy, then the Anthropic API or the scripted
-// model. It identifies the run's key slot from the placeholder credential
-// Bifrost sends, applies that slot's fault plan to conversation requests,
-// swaps in the real provider key, and writes every request to a hash-chained
-// ledger outside the agent's reach.
+// Package faultproxy is the bench's fault-injecting provider upstream. It sits
+// behind Bifrost as the base URL of each proxied provider (DESIGN.md 13.3):
+// agent, Bifrost, fault proxy, then the provider's API or the scripted model.
+// A provider table (DefaultProviders, overridable by file) says, per provider,
+// where the real API is, where its key goes, which paths are conversation
+// calls and which error envelope it speaks. The proxy identifies the run's key
+// slot from the placeholder credential Bifrost sends, applies that slot's
+// fault plan to conversation requests, swaps in the real provider key, and
+// writes every request to a hash-chained ledger outside the agent's reach.
 //
 // It uses net/http rather than fasthttp because it streams; that is the one
 // stated exception in bench/AGENTS.md.
@@ -22,7 +24,7 @@ import (
 	"net"
 	"net/http"
 	"net/url"
-	"strconv"
+	"os"
 	"strings"
 	"time"
 
@@ -42,36 +44,70 @@ const (
 	shutdownTimeout = 10 * time.Second
 )
 
+// Upstream modes, as /health reports them.
+const (
+	modeReal         = "real"
+	modeScripted     = UpstreamScripted
+	modeUnconfigured = "unconfigured"
+)
+
 // Config configures a Server.
+//
+// Each provider's real key is read once, at NewServer, from the environment
+// variable its ProviderSpec names (through Getenv). A provider with no key
+// answers from the scripted model when its format has one (anthropic,
+// openai) and with a 503 "no key configured" otherwise. Upstream and
+// UpstreamKey are the older single-provider form and apply to anthropic
+// only: "scripted" forces its scripted model, a URL replaces its base URL and
+// then needs UpstreamKey.
 type Config struct {
 	Listen        string // data plane, the address Bifrost's base_url points at
 	ControlListen string // control API; loopback by default
 	ControlToken  string // bearer token for control writes; generated when empty
-	Upstream      string // "scripted" or a URL like https://api.anthropic.com
-	UpstreamKey   string // real provider key, from env, never logged
+	Upstream      string // anthropic only: "scripted" or a URL like https://api.anthropic.com
+	UpstreamKey   string // anthropic only: real key for Upstream, never logged
+	Providers     []ProviderSpec
+	Getenv        func(string) string // os.Getenv when nil
 	LedgerPath    string
 	Slots         []SlotConfig
 	Logger        schemas.Logger
 }
 
-// SlotConfig is one key slot of the anthropic provider in Bifrost.
+// SlotConfig is one key slot of a provider in Bifrost. Bifrost key names are
+// unique across providers, so Name alone identifies the slot.
 type SlotConfig struct {
-	Name string // provider key name in Bifrost, e.g. fp-slot-3; the plan table key
-	Auth string // the placeholder key value Bifrost sends for this slot
+	Name     string // provider key name in Bifrost, e.g. fp-slot-3; the plan table key
+	Auth     string // the placeholder key value Bifrost sends for this slot
+	Provider string // provider name in the table; anthropic when empty
 }
 
 // Server is the fault proxy: a data plane for Bifrost and a control plane for
 // the bench.
 type Server struct {
-	cfg      Config
-	upstream string // "" in scripted mode, else the base URL without a trailing slash
-	slots    map[string]string
-	names    map[string]bool
-	plans    *planTable
-	ledger   *ledger
-	client   *http.Client
-	logger   schemas.Logger
-	token    string
+	cfg       Config
+	providers *providerTable
+	upstreams map[string]upstream // provider name -> how it is answered
+	slots     map[string]slotRef  // placeholder credential -> slot
+	names     map[string]bool
+	plans     *planTable
+	ledger    *ledger
+	client    *http.Client
+	logger    schemas.Logger
+	token     string
+}
+
+// upstream is how one provider is answered: the real API with a key, the
+// scripted model, or not at all.
+type upstream struct {
+	mode string
+	base string
+	key  string
+}
+
+// slotRef is a slot and the provider it belongs to.
+type slotRef struct {
+	name     string
+	provider string
 }
 
 // NewServer validates cfg, opens the ledger and returns a Server. The caller
@@ -87,14 +123,19 @@ func NewServer(cfg Config) (*Server, error) {
 	if logger == nil {
 		logger = schemas.NoopLogger{}
 	}
-	upstream, err := parseUpstream(cfg.Upstream)
+	specs := cfg.Providers
+	if len(specs) == 0 {
+		specs = DefaultProviders()
+	}
+	table, err := indexProviders(specs)
 	if err != nil {
 		return nil, err
 	}
-	if upstream != "" && cfg.UpstreamKey == "" {
-		return nil, errors.New("real upstream needs an upstream key")
+	ups, err := resolveUpstreams(cfg, table)
+	if err != nil {
+		return nil, err
 	}
-	slots, names, err := indexSlots(cfg.Slots)
+	slots, names, err := indexSlots(withDefaultSlots(cfg.Slots, table), table)
 	if err != nil {
 		return nil, err
 	}
@@ -109,7 +150,7 @@ func NewServer(cfg Config) (*Server, error) {
 		return nil, err
 	}
 	return &Server{
-		cfg: cfg, upstream: upstream, slots: slots, names: names,
+		cfg: cfg, providers: table, upstreams: ups, slots: slots, names: names,
 		plans: newPlanTable(), ledger: lg, client: newUpstreamClient(),
 		logger: logger, token: token,
 	}, nil
@@ -174,52 +215,72 @@ func (s *Server) Close() error {
 	return s.ledger.close()
 }
 
-// serveData handles one request from Bifrost: identify the slot, classify,
-// decide, answer, record.
+// serveData handles one request from Bifrost: identify the slot and its
+// provider, classify, decide, answer, record.
 func (s *Server) serveData(w http.ResponseWriter, r *http.Request) {
 	start := time.Now()
 	sw := &statusWriter{ResponseWriter: w}
-	kind := classify(r)
+	slot, ok := s.slotOf(r)
+	p := s.providers.guess(r)
+	if ok {
+		p = s.providers.byName[slot.provider]
+	}
+	kind := p.classify(r)
 	body, err := io.ReadAll(io.LimitReader(r.Body, maxRequestBody+1))
 	if err != nil {
-		s.writeError(sw, http.StatusBadRequest, "invalid_request_error", "could not read request body", 0)
+		s.writeError(sw, p.Format, http.StatusBadRequest, errInvalid, "could not read request body")
 		return
 	}
 	if len(body) > maxRequestBody {
-		s.writeError(sw, http.StatusRequestEntityTooLarge, "request_too_large", "request body too large", 0)
+		s.writeError(sw, p.Format, http.StatusRequestEntityTooLarge, errTooLarge, "request body too large")
 		return
 	}
 	e := &schemas.LedgerEntry{Kind: kind, Path: r.URL.Path, ReqSHA256: utils.SHA256Bytes(body), At: start.UTC()}
-	slot, ok := s.slotOf(r)
 	if !ok {
-		s.writeError(sw, http.StatusUnauthorized, "authentication_error", "invalid x-api-key", 0)
+		s.writeError(sw, p.Format, http.StatusUnauthorized, errAuth, "invalid api key")
 		e.Action, e.Status = ActionReject, sw.status()
 		s.record(e)
 		return
 	}
-	var req messagesRequest
-	if kind == KindMessage {
-		if err := json.Unmarshal(body, &req); err != nil {
-			req = messagesRequest{}
-		}
+	var req struct {
+		Stream bool `json:"stream"`
 	}
-	d := s.plans.begin(slot, kind)
-	e.Slot, e.RunID, e.Call, e.Stream = slot, d.RunID, d.Call, req.Stream
+	if kind == KindMessage && json.Unmarshal(body, &req) != nil {
+		req.Stream = false
+	}
+	if p.Format == FormatGemini && strings.Contains(r.URL.Path, ":streamGenerateContent") {
+		req.Stream = true
+	}
+	d := s.plans.begin(slot.name, kind)
+	e.Slot, e.RunID, e.Call, e.Stream = slot.name, d.RunID, d.Call, req.Stream
 	if d.Inject {
-		s.writeFault(sw, d)
+		s.writeFault(sw, p, d)
 		e.Action, e.Nonce = ActionInject, d.Nonce
 	} else {
 		e.Action = ActionPass
 		upstreamStart := time.Now()
-		if s.upstream != "" {
-			s.forward(sw, r, body, e)
-		} else {
-			s.serveScripted(sw, r, kind, slot, body, req, e)
-		}
+		s.answer(sw, r, p, kind, slot.name, body, e)
 		e.UpstreamMS = float64(time.Since(upstreamStart).Microseconds()) / 1000
 	}
 	e.Status = sw.status()
 	s.record(e)
+}
+
+// answer passes one request on: to the real upstream, the scripted model, or
+// a 503 when the provider has neither.
+func (s *Server) answer(w http.ResponseWriter, r *http.Request, p ProviderSpec, kind, slot string, body []byte, e *schemas.LedgerEntry) {
+	up := s.upstreams[p.Name]
+	switch {
+	case up.mode == modeReal:
+		s.forward(w, r, p, up, body, e)
+	case up.mode == modeScripted && p.Format == FormatOpenAI:
+		s.serveScriptedOpenAI(w, r, kind, slot, body, e)
+	case up.mode == modeScripted:
+		s.serveScripted(w, r, kind, slot, body, e)
+	default:
+		s.writeError(w, p.Format, http.StatusServiceUnavailable, errUpstream,
+			fmt.Sprintf("fault proxy: no key configured for provider %s (set %s)", p.Name, p.KeyEnv))
+	}
 }
 
 // record appends e to the ledger and logs the decision without any secret.
@@ -231,11 +292,15 @@ func (s *Server) record(e *schemas.LedgerEntry) {
 		"action", e.Action, "status", e.Status, "response_id", e.ResponseID)
 }
 
-// serveScripted answers from the scripted model.
-func (s *Server) serveScripted(w http.ResponseWriter, r *http.Request, kind, slot string, body []byte, req messagesRequest, e *schemas.LedgerEntry) {
+// serveScripted answers an Anthropic-format request from the scripted model.
+func (s *Server) serveScripted(w http.ResponseWriter, r *http.Request, kind, slot string, body []byte, e *schemas.LedgerEntry) {
 	w.Header().Set("request-id", utils.NewID("req", 24))
 	switch kind {
 	case KindMessage:
+		var req messagesRequest
+		if err := json.Unmarshal(body, &req); err != nil {
+			req = messagesRequest{}
+		}
 		rp := newScriptedReply(body, req, len(req.Tools) > 0 && s.plans.takeToolTurn(slot))
 		e.ResponseID, e.Tokens = rp.ID, rp.tokens()
 		if req.Stream {
@@ -254,34 +319,42 @@ func (s *Server) serveScripted(w http.ResponseWriter, r *http.Request, kind, slo
 		}
 		s.writeJSON(w, http.StatusOK, scriptedModelList())
 	default:
-		s.writeError(w, http.StatusNotFound, "not_found_error", "no scripted route for "+r.Method+" "+r.URL.Path, 0)
+		s.writeError(w, FormatAnthropic, http.StatusNotFound, errNotFound, "no scripted route for "+r.Method+" "+r.URL.Path)
 	}
 }
 
-// forward relays the request to the real upstream with the real key, then
-// copies the response back chunk by chunk, flushing each one, while a
-// bounded sniffer reads the message id and usage.
-func (s *Server) forward(w http.ResponseWriter, r *http.Request, body []byte, e *schemas.LedgerEntry) {
-	target := s.upstream + r.URL.EscapedPath()
-	if r.URL.RawQuery != "" {
-		target += "?" + r.URL.RawQuery
+// forward relays any request to the provider's real upstream (same method,
+// path and query) with the real key in the provider's auth style, then
+// copies the response back chunk by chunk, flushing each one, while a bounded
+// sniffer reads the response id and usage. Only safe headers are forwarded;
+// every credential location the table knows is stripped first.
+func (s *Server) forward(w http.ResponseWriter, r *http.Request, p ProviderSpec, up upstream, body []byte, e *schemas.LedgerEntry) {
+	q := r.URL.Query()
+	for _, a := range s.providers.auths {
+		if a.Query != "" {
+			q.Del(a.Query)
+		}
 	}
+	target := up.base + r.URL.EscapedPath()
 	out, err := http.NewRequestWithContext(r.Context(), r.Method, target, bytes.NewReader(body))
 	if err != nil {
-		s.writeError(w, http.StatusBadGateway, "api_error", "fault proxy could not build the upstream request", 0)
+		s.writeError(w, p.Format, http.StatusBadGateway, errUpstream, "fault proxy could not build the upstream request")
 		return
 	}
+	out.URL.RawQuery = q.Encode()
 	for _, name := range forwardedRequestHeaders {
 		if v := r.Header.Values(name); len(v) > 0 {
 			out.Header[http.CanonicalHeaderKey(name)] = v
 		}
 	}
-	out.Header.Set("x-api-key", s.cfg.UpstreamKey)
+	if up.key != "" {
+		p.Auth.apply(out, up.key)
+	}
 	out.Header.Set("Accept-Encoding", "identity")
 	resp, err := s.client.Do(out)
 	if err != nil {
-		s.logger.Warn("upstream request failed", "slot", e.Slot, "path", r.URL.Path, "error", redactURLError(err))
-		s.writeError(w, http.StatusBadGateway, "api_error", "fault proxy could not reach the upstream", 0)
+		s.logger.Warn("upstream request failed", "slot", e.Slot, "provider", p.Name, "path", r.URL.Path, "error", redactURLError(err))
+		s.writeError(w, p.Format, http.StatusBadGateway, errUpstream, "fault proxy could not reach the upstream")
 		return
 	}
 	defer resp.Body.Close()
@@ -291,81 +364,39 @@ func (s *Server) forward(w http.ResponseWriter, r *http.Request, body []byte, e 
 		}
 	}
 	w.WriteHeader(resp.StatusCode)
-	sn := newSniffer(strings.HasPrefix(strings.ToLower(resp.Header.Get("Content-Type")), "text/event-stream"))
+	sn := newSniffer(p.Format, strings.HasPrefix(strings.ToLower(resp.Header.Get("Content-Type")), "text/event-stream"))
 	if err := copyFlushing(w, io.TeeReader(resp.Body, sn)); err != nil {
-		s.logger.Warn("upstream copy interrupted", "slot", e.Slot, "path", r.URL.Path, "error", err.Error())
+		s.logger.Warn("upstream copy interrupted", "slot", e.Slot, "provider", p.Name, "path", r.URL.Path, "error", err.Error())
 	}
 	if e.Kind == KindMessage {
 		e.ResponseID, e.Tokens = sn.result()
 	}
 }
 
-// slotOf maps the credential Bifrost sent to a configured slot.
-func (s *Server) slotOf(r *http.Request) (string, bool) {
-	v := r.Header.Get("x-api-key")
-	if v == "" {
-		if a := r.Header.Get("Authorization"); len(a) > 7 && strings.EqualFold(a[:7], "bearer ") {
-			v = strings.TrimSpace(a[7:])
+// slotOf maps the credential Bifrost sent to a configured slot. Every auth
+// style in the table is tried, so a slot is found wherever its placeholder
+// sits; the slot then decides the provider.
+func (s *Server) slotOf(r *http.Request) (slotRef, bool) {
+	for _, a := range s.providers.auths {
+		if v := a.credential(r); v != "" {
+			if ref, ok := s.slots[v]; ok {
+				return ref, true
+			}
 		}
 	}
-	if v == "" {
-		return "", false
-	}
-	name, ok := s.slots[v]
-	return name, ok
+	return slotRef{}, false
 }
 
-func (s *Server) upstreamLabel() string {
-	if s.upstream == "" {
-		return UpstreamScripted
+// upstreamLabel names how each provider is answered, for /health and logs.
+func (s *Server) upstreamLabel() map[string]string {
+	out := make(map[string]string, len(s.upstreams))
+	for name, up := range s.upstreams {
+		out[name] = up.mode
+		if up.mode == modeReal {
+			out[name] = up.base
+		}
 	}
-	return s.upstream
-}
-
-// classify names a request's kind. Only POST /v1/messages is a conversation
-// request; everything else passes uncounted.
-func classify(r *http.Request) string {
-	p := strings.TrimSuffix(r.URL.Path, "/")
-	switch {
-	case r.Method == http.MethodPost && p == "/v1/messages":
-		return KindMessage
-	case r.Method == http.MethodPost && p == "/v1/messages/count_tokens":
-		return KindCountTokens
-	case r.Method == http.MethodGet && (p == "/v1/models" || strings.HasPrefix(p, "/v1/models/")):
-		return KindModels
-	default:
-		return KindOther
-	}
-}
-
-// writeFault writes Anthropic's error envelope for an injected failure. The
-// run's nonce rides in the message: the only place the agent can ever see it.
-// The call number after it makes each injected message unique, so a Bifrost
-// error row can be joined to exactly one ledger entry.
-func (s *Server) writeFault(w http.ResponseWriter, d decision) {
-	errType, msg := "api_error", "Internal server error."
-	if d.Status == http.StatusServiceUnavailable || d.Status == 529 {
-		errType, msg = "overloaded_error", "Overloaded: the model is temporarily unavailable."
-	}
-	if d.Nonce != "" {
-		msg += " ref " + d.Nonce + " call " + strconv.Itoa(d.Call)
-	}
-	s.writeError(w, d.Status, errType, msg, d.RetryAfterS)
-}
-
-// writeError writes Anthropic's error envelope,
-// {"type":"error","error":{"type":...,"message":...},"request_id":...}.
-func (s *Server) writeError(w http.ResponseWriter, status int, errType, msg string, retryAfterS int) {
-	reqID := utils.NewID("req", 24)
-	w.Header().Set("request-id", reqID)
-	if retryAfterS > 0 {
-		w.Header().Set("retry-after", strconv.Itoa(retryAfterS))
-	}
-	s.writeJSON(w, status, map[string]any{
-		"type":       "error",
-		"error":      map[string]string{"type": errType, "message": msg},
-		"request_id": reqID,
-	})
+	return out
 }
 
 // writeJSON writes v as a JSON response. A failed write means the client went
@@ -374,7 +405,7 @@ func (s *Server) writeJSON(w http.ResponseWriter, status int, v any) {
 	data, err := json.Marshal(v)
 	if err != nil {
 		s.logger.Error("fault proxy encode response", "error", err.Error())
-		http.Error(w, `{"type":"error","error":{"type":"api_error","message":"encode response"}}`, http.StatusInternalServerError)
+		http.Error(w, `{"error":{"message":"encode response"}}`, http.StatusInternalServerError)
 		return
 	}
 	w.Header().Set("Content-Type", "application/json")
@@ -410,13 +441,14 @@ func copyFlushing(w http.ResponseWriter, src io.Reader) error {
 
 // forwardedRequestHeaders are the only request headers sent upstream; the
 // credential is replaced, never copied.
-var forwardedRequestHeaders = []string{"anthropic-version", "anthropic-beta", "content-type", "accept"}
+var forwardedRequestHeaders = []string{"anthropic-version", "anthropic-beta", "openai-beta", "content-type", "accept"}
 
-// droppedResponseHeaders are hop-by-hop or recomputed by net/http.
+// droppedResponseHeaders are hop-by-hop, recomputed by net/http, or name the
+// real account behind the key.
 var droppedResponseHeaders = map[string]bool{
 	"connection": true, "keep-alive": true, "proxy-authenticate": true, "proxy-authorization": true,
 	"te": true, "trailer": true, "transfer-encoding": true, "upgrade": true, "content-length": true,
-	"set-cookie": true,
+	"set-cookie": true, "openai-organization": true, "openai-project": true, "anthropic-organization-id": true,
 }
 
 func newUpstreamClient() *http.Client {
@@ -432,32 +464,97 @@ func newUpstreamClient() *http.Client {
 	return &http.Client{Transport: tr}
 }
 
-func parseUpstream(raw string) (string, error) {
-	if raw == "" || raw == UpstreamScripted {
-		return "", nil
+// resolveUpstreams decides how each provider is answered and reads its key.
+// Keys are never logged.
+func resolveUpstreams(cfg Config, t *providerTable) (map[string]upstream, error) {
+	getenv := cfg.Getenv
+	if getenv == nil {
+		getenv = os.Getenv
 	}
-	u, err := url.Parse(raw)
+	out := make(map[string]upstream, len(t.order))
+	for _, name := range t.order {
+		p := t.byName[name]
+		up := upstream{base: p.BaseURL}
+		if p.KeyEnv != "" {
+			up.key = strings.TrimSpace(getenv(p.KeyEnv))
+		}
+		switch {
+		case up.key != "" || p.Keyless:
+			up.mode = modeReal
+		case p.scriptable():
+			up.mode = modeScripted
+		default:
+			up.mode = modeUnconfigured
+		}
+		out[name] = up
+	}
+	if cfg.Upstream == "" {
+		return out, nil
+	}
+	if _, ok := t.byName[ProviderAnthropic]; !ok {
+		return nil, errors.New("upstream is set but the provider table has no anthropic entry")
+	}
+	if cfg.Upstream == UpstreamScripted {
+		out[ProviderAnthropic] = upstream{mode: modeScripted, base: t.byName[ProviderAnthropic].BaseURL}
+		return out, nil
+	}
+	base, err := parseBaseURL(cfg.Upstream)
 	if err != nil {
-		return "", fmt.Errorf("parse upstream %q: %w", raw, err)
+		return nil, fmt.Errorf("upstream: %w", err)
 	}
-	if (u.Scheme != "http" && u.Scheme != "https") || u.Host == "" {
-		return "", fmt.Errorf("upstream must be %q or an http(s) URL, got %q", UpstreamScripted, raw)
+	if cfg.UpstreamKey == "" {
+		return nil, errors.New("real upstream needs an upstream key")
 	}
-	if u.User != nil || u.RawQuery != "" {
-		return "", errors.New("upstream URL must not carry credentials or a query")
-	}
-	return strings.TrimRight(u.String(), "/"), nil
+	out[ProviderAnthropic] = upstream{mode: modeReal, base: base, key: cfg.UpstreamKey}
+	return out, nil
 }
 
-func indexSlots(cfg []SlotConfig) (map[string]string, map[string]bool, error) {
+// withDefaultSlots adds <prefix>-slot-1..4 (auth = name) for every provider
+// cfg lists no slot for. Slots without a provider are anthropic's.
+func withDefaultSlots(cfg []SlotConfig, t *providerTable) []SlotConfig {
+	out := make([]SlotConfig, 0, len(cfg)+defaultSlotsPerProvider*len(t.order))
+	has := map[string]bool{}
+	for _, sc := range cfg {
+		if sc.Provider == "" {
+			sc.Provider = ProviderAnthropic
+		}
+		has[sc.Provider] = true
+		out = append(out, sc)
+	}
+	for _, name := range t.order {
+		if has[name] {
+			continue
+		}
+		for _, sc := range DefaultSlots(t.byName[name]) {
+			out = append(out, sc)
+		}
+	}
+	return out
+}
+
+// DefaultSlots returns the slots a provider gets when none are configured:
+// <slot_prefix>-slot-1..4, each with its name as the placeholder value.
+func DefaultSlots(p ProviderSpec) []SlotConfig {
+	out := make([]SlotConfig, 0, defaultSlotsPerProvider)
+	for i := 1; i <= defaultSlotsPerProvider; i++ {
+		name := fmt.Sprintf("%s-slot-%d", p.slotPrefix(), i)
+		out = append(out, SlotConfig{Name: name, Auth: name, Provider: p.Name})
+	}
+	return out
+}
+
+func indexSlots(cfg []SlotConfig, t *providerTable) (map[string]slotRef, map[string]bool, error) {
 	if len(cfg) == 0 {
 		return nil, nil, errors.New("no key slots configured")
 	}
-	byAuth := make(map[string]string, len(cfg))
+	byAuth := make(map[string]slotRef, len(cfg))
 	names := make(map[string]bool, len(cfg))
 	for i, sc := range cfg {
 		if sc.Name == "" || sc.Auth == "" {
 			return nil, nil, fmt.Errorf("slot %d needs a name and an auth value", i+1)
+		}
+		if _, ok := t.byName[sc.Provider]; !ok {
+			return nil, nil, fmt.Errorf("slot %q names unknown provider %q", sc.Name, sc.Provider)
 		}
 		if names[sc.Name] {
 			return nil, nil, fmt.Errorf("slot %q configured twice", sc.Name)
@@ -465,7 +562,7 @@ func indexSlots(cfg []SlotConfig) (map[string]string, map[string]bool, error) {
 		if _, dup := byAuth[sc.Auth]; dup {
 			return nil, nil, fmt.Errorf("slot %q reuses another slot's auth value", sc.Name)
 		}
-		byAuth[sc.Auth] = sc.Name
+		byAuth[sc.Auth] = slotRef{name: sc.Name, provider: sc.Provider}
 		names[sc.Name] = true
 	}
 	return byAuth, names, nil

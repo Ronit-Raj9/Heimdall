@@ -167,6 +167,14 @@ type spikeStack struct {
 
 func startSpikeStack(ctx context.Context, t *testing.T) *spikeStack {
 	t.Helper()
+	return startStack(ctx, t, "./spike/proxy", "")
+}
+
+// startStack brings up the spike compose project with the fault proxy built
+// from proxyPkg. proxyEnv is extra YAML for the faultproxy service's
+// environment block, indented for it.
+func startStack(ctx context.Context, t *testing.T, proxyPkg, proxyEnv string) *spikeStack {
+	t.Helper()
 	root, err := filepath.Abs("../..")
 	if err != nil {
 		t.Fatal(err)
@@ -177,7 +185,7 @@ func startSpikeStack(ctx context.Context, t *testing.T) *spikeStack {
 			t.Fatal(err)
 		}
 	}
-	build := exec.CommandContext(ctx, "go", "build", "-o", filepath.Join(st.dir, "out", "faultproxy"), "./spike/proxy")
+	build := exec.CommandContext(ctx, "go", "build", "-o", filepath.Join(st.dir, "out", "faultproxy"), proxyPkg)
 	build.Dir, build.Env = root, append(os.Environ(), "GOWORK=off", "CGO_ENABLED=0")
 	if out, err := build.CombinedOutput(); err != nil {
 		t.Fatalf("build spike proxy: %v\n%s", err, out)
@@ -194,9 +202,11 @@ func startSpikeStack(ctx context.Context, t *testing.T) *spikeStack {
     ports: !override
       - "127.0.0.1:%[2]d:8080"
   faultproxy:
-    ports: !override
+    environment:
+      FP_MODE: scripted
+%[4]s    ports: !override
       - "127.0.0.1:%[3]d:9101"
-`, root, apiPort, ctlPort)
+`, root, apiPort, ctlPort, proxyEnv)
 	writeFile(t, filepath.Join(st.dir, "override.yaml"), override)
 	writeFile(t, filepath.Join(st.dir, "stack.env"), fmt.Sprintf("BIFROST_SETUP_TOKEN=%s\nSPIKE_UID=%d\nSPIKE_GID=%d\n", st.token, os.Getuid(), os.Getgid()))
 	compose := func(ctx context.Context, args ...string) ([]byte, error) {
@@ -417,3 +427,238 @@ func (l testLogger) Debug(msg string, args ...any) { l.t.Log(append([]any{"DEBUG
 func (l testLogger) Info(msg string, args ...any)  { l.t.Log(append([]any{"INFO", msg}, args...)...) }
 func (l testLogger) Warn(msg string, args ...any)  { l.t.Log(append([]any{"WARN", msg}, args...)...) }
 func (l testLogger) Error(msg string, args ...any) { l.t.Log(append([]any{"ERROR", msg}, args...)...) }
+
+// TestIntegrationOpenAI runs the OpenAI path end to end against the spike
+// stack with the bench fault proxy (spike/benchproxy, scripted mode) behind
+// Bifrost's built-in openai provider: chat completions and Responses, JSON
+// and streams, tool calls and tool results, token counting, the model list,
+// a 503 retried to success and a 503 that fails on both attempts. The ledger
+// comes from the proxy's control API. BIFROST_CAPTURE_FIXTURES=<dir> saves
+// the detail rows and the ledger.
+func TestIntegrationOpenAI(t *testing.T) {
+	ctx, cancel := context.WithTimeout(context.Background(), 8*time.Minute)
+	defer cancel()
+	token := "ctl-" + randHex(t, 12)
+	st := startStack(ctx, t, "./spike/benchproxy", "      FP_CONTROL_TOKEN: "+token+"\n")
+	g, err := New(Config{
+		URL: st.url, SetupToken: st.token, FaultProxyURL: "http://faultproxy:9100", MaxRetries: 1,
+		Providers: []ProviderSetup{{Name: "openai", Model: testOpenAIModel,
+			Slots: []Slot{{Name: "oa-slot-1", Value: "oa-slot-1"}, {Name: "oa-slot-2", Value: "oa-slot-2"}}}},
+		EvalNetwork: st.project + "_evalnet", HelperImage: helperImage(ctx, t), Logger: testLogger{t},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	for i := 0; i < 2; i++ {
+		if err := g.Setup(ctx); err != nil {
+			t.Fatalf("Setup %d: %v", i, err)
+		}
+	}
+	checkPreflight(ctx, t, g)
+	if g.ProviderMode("openai") != ModeProxied || g.ProviderMode("anthropic") != "" {
+		t.Errorf("provider modes %q %q", g.ProviderMode("openai"), g.ProviderMode("anthropic"))
+	}
+	rc := runContext(utils.NewID("r", 10), testOpenAIModel)
+	rc.Agent.Gateway.Provider = "openai"
+	key, err := g.MintKey(ctx, rc)
+	if err != nil || key.Provider != "openai" || key.KeySlot != "oa-slot-1" {
+		t.Fatalf("MintKey: %v %+v", err, key)
+	}
+	ctl := benchControl{url: st.control, token: token}
+	sendOpenAITraffic(ctx, t, st, ctl, key, rc.Run.RunID)
+	ledger := ctl.ledger(ctx, t, rc.Run.RunID)
+	log, err := g.FetchRequests(ctx, key, schemas.FetchExpectation{LedgerEntries: ledger, PollEvery: 300 * time.Millisecond})
+	if err != nil {
+		t.Fatalf("FetchRequests: %v", err)
+	}
+	captureFixtures(t, log)
+	captureLedger(t, ledger)
+	checkOpenAILog(t, log)
+	if err := g.RevokeKey(ctx, key); err != nil {
+		t.Fatalf("RevokeKey: %v", err)
+	}
+}
+
+// sendOpenAITraffic makes the OpenAI requests of TestIntegrationOpenAI. Every
+// plan carries the run id so the ledger can be read back by run.
+func sendOpenAITraffic(ctx context.Context, t *testing.T, st *spikeStack, ctl benchControl, key *schemas.RunKey, runID string) {
+	t.Helper()
+	plan := func(p schemas.FaultPlan) {
+		p.RunID = runID
+		ctl.setPlan(ctx, t, key.KeySlot, p)
+	}
+	chatTools := []any{map[string]any{"type": "function", "function": map[string]any{"name": "Read", "description": "Read a file",
+		"parameters": map[string]any{"type": "object", "required": []string{"file_path"}, "properties": map[string]any{"file_path": map[string]any{"type": "string"}}}}}}
+	respTools := []any{map[string]any{"type": "function", "name": "shell", "description": "Run a command",
+		"parameters": map[string]any{"type": "object", "required": []string{"command"}, "properties": map[string]any{"command": map[string]any{"type": "string"}}}}}
+	user := func(text string) []any { return []any{map[string]any{"role": "user", "content": text}} }
+	chat := func(extra map[string]any) map[string]any {
+		b := map[string]any{"model": testOpenAIModel, "messages": user("openai chat")}
+		for k, v := range extra {
+			b[k] = v
+		}
+		return b
+	}
+	resp := func(extra map[string]any) map[string]any {
+		b := map[string]any{"model": testOpenAIModel, "input": "openai responses"}
+		for k, v := range extra {
+			b[k] = v
+		}
+		return b
+	}
+	bearer := func(method, path string, body map[string]any, want int) {
+		st.inferHeaders(ctx, t, method, path, body, want, map[string]string{"Authorization": "Bearer " + key.Value})
+	}
+	plan(schemas.FaultPlan{})
+	bearer(http.MethodPost, "/openai/v1/chat/completions", chat(nil), 200)
+	bearer(http.MethodPost, "/openai/v1/chat/completions", chat(map[string]any{"stream": true, "tools": chatTools}), 200)
+	bearer(http.MethodPost, "/openai/v1/chat/completions", chat(map[string]any{"tools": chatTools, "messages": []any{
+		map[string]any{"role": "user", "content": "read it"},
+		map[string]any{"role": "assistant", "content": nil, "tool_calls": []any{map[string]any{"id": "call_fixture0001", "type": "function",
+			"function": map[string]any{"name": "Read", "arguments": `{"file_path":"a.go"}`}}}},
+		map[string]any{"role": "tool", "tool_call_id": "call_fixture0001", "content": "package a"},
+	}}), 200)
+	bearer(http.MethodPost, "/openai/v1/responses", resp(nil), 200)
+	plan(schemas.FaultPlan{}) // a new plan owes the run a tool call again
+	bearer(http.MethodPost, "/openai/v1/responses", resp(map[string]any{"stream": true, "tools": respTools}), 200)
+	bearer(http.MethodPost, "/openai/v1/responses", resp(map[string]any{"tools": respTools, "input": []any{
+		map[string]any{"role": "user", "content": "run it"},
+		map[string]any{"type": "function_call", "call_id": "call_fixture0002", "name": "shell", "arguments": `{"command":"ls"}`},
+		map[string]any{"type": "function_call_output", "call_id": "call_fixture0002", "output": "a.go"},
+	}}), 200)
+	bearer(http.MethodPost, "/openai/v1/responses", resp(map[string]any{"stream": true}), 200)
+	bearer(http.MethodPost, "/openai/v1/responses/input_tokens", resp(nil), 200)
+	bearer(http.MethodGet, "/openai/v1/models", nil, 200)
+	plan(schemas.FaultPlan{Mode: "once", Call: 1, Status: 503, Nonce: "oaretry" + randHex(t, 4)})
+	bearer(http.MethodPost, "/openai/v1/chat/completions", chat(map[string]any{"messages": user("openai retry ok")}), 200)
+	plan(schemas.FaultPlan{Mode: "persistent", FromCall: 1, Status: 503, Nonce: "oafail" + randHex(t, 4)})
+	bearer(http.MethodPost, "/openai/v1/responses", resp(map[string]any{"input": "openai retry fail"}), 503)
+	plan(schemas.FaultPlan{})
+}
+
+func checkOpenAILog(t *testing.T, log *schemas.RequestLog) {
+	t.Helper()
+	if !log.Complete || log.Reason != "" {
+		t.Fatalf("log complete %t reason %q", log.Complete, log.Reason)
+	}
+	kinds := map[string]int{}
+	attempts := map[int]int{}
+	tools, results, cached := 0, 0, 0
+	for _, r := range log.Requests {
+		kinds[r.Kind]++
+		if r.Kind != "message" {
+			continue
+		}
+		attempts[len(r.Attempts)]++
+		if r.Provider != "openai" {
+			t.Errorf("row %s provider %q", r.ID, r.Provider)
+		}
+		if r.Status == "success" {
+			if r.Tokens == nil || r.ResponseID == "" || r.BifrostUSD == nil {
+				t.Errorf("success row %s lacks tokens, response id or cost: %+v", r.ID, r)
+			} else if r.Tokens.CacheRead > 0 {
+				cached++
+			}
+		}
+		for _, tc := range r.ToolCalls {
+			if strings.HasPrefix(tc.ID, "call_") && len(tc.ArgsHash) == 64 {
+				tools++
+			}
+		}
+		results += len(r.ToolResultIDs)
+	}
+	if kinds["message"] != 9 || kinds["count_tokens"] != 1 || kinds["models"] != 1 {
+		t.Errorf("kinds = %v", kinds)
+	}
+	if attempts[1] != 7 || attempts[2] != 2 || tools != 2 || results != 2 || cached < 6 {
+		t.Errorf("attempt counts %v, tool calls %d, tool results %d, cached rows %d", attempts, tools, results, cached)
+	}
+}
+
+func captureLedger(t *testing.T, ledger []schemas.LedgerEntry) {
+	t.Helper()
+	dir := os.Getenv("BIFROST_CAPTURE_FIXTURES")
+	if dir == "" {
+		return
+	}
+	b, err := json.MarshalIndent(ledger, "", "  ")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(dir, "ledger.json"), b, 0o644); err != nil {
+		t.Fatal(err)
+	}
+}
+
+// inferHeaders is infer with the given auth headers instead of x-api-key.
+func (st *spikeStack) inferHeaders(ctx context.Context, t *testing.T, method, path string, body map[string]any, want int, headers map[string]string) {
+	t.Helper()
+	var rd io.Reader
+	if body != nil {
+		b, err := json.Marshal(body)
+		if err != nil {
+			t.Fatal(err)
+		}
+		rd = bytes.NewReader(b)
+	}
+	req, err := http.NewRequestWithContext(ctx, method, st.url+path, rd)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for k, v := range headers {
+		req.Header.Set(k, v)
+	}
+	req.Header.Set("content-type", "application/json")
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		t.Fatalf("%s %s: %v", method, path, err)
+	}
+	defer resp.Body.Close()
+	out, err := io.ReadAll(resp.Body)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if resp.StatusCode != want {
+		t.Fatalf("%s %s: status %d, want %d: %s", method, path, resp.StatusCode, want, snippet(out))
+	}
+}
+
+// benchControl is the bench fault proxy's control API over plain HTTP; the
+// gateway package does not import the faultproxy package.
+type benchControl struct {
+	url, token string
+}
+
+func (c benchControl) setPlan(ctx context.Context, t *testing.T, slot string, p schemas.FaultPlan) {
+	t.Helper()
+	b, err := json.Marshal(p)
+	if err != nil {
+		t.Fatal(err)
+	}
+	req, err := http.NewRequestWithContext(ctx, http.MethodPut, c.url+"/plans/"+slot, bytes.NewReader(b))
+	if err != nil {
+		t.Fatal(err)
+	}
+	req.Header.Set("Authorization", "Bearer "+c.token)
+	doOK(t, req)
+}
+
+func (c benchControl) ledger(ctx context.Context, t *testing.T, runID string) []schemas.LedgerEntry {
+	t.Helper()
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, c.url+"/ledger?run_id="+runID, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer resp.Body.Close()
+	var out struct {
+		Entries []schemas.LedgerEntry `json:"entries"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&out); err != nil || resp.StatusCode != http.StatusOK {
+		t.Fatalf("ledger: status %d err %v", resp.StatusCode, err)
+	}
+	return out.Entries
+}

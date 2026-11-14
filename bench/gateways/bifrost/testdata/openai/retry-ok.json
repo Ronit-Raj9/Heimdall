@@ -1,0 +1,243 @@
+{
+  "id": "01c610e8-c3e8-4f1c-95ec-32ff21e48529",
+  "inc_number": 10,
+  "parent_request_id": null,
+  "timestamp": "2026-11-13T23:52:00.115795Z",
+  "object": "chat_completion",
+  "provider": "openai",
+  "model": "gpt-5.4-mini",
+  "number_of_retries": 1,
+  "fallback_index": 0,
+  "selected_key_id": "85a3ce7e-0d0c-4f5b-85cf-b2419ccbc970",
+  "selected_key_name": "oa-slot-1",
+  "virtual_key_id": "22f0423c-87b8-4b9c-87d9-39701df5ac53",
+  "virtual_key_name": "r_yegqmia4f0",
+  "routing_rule_id": null,
+  "routing_rule_name": null,
+  "selected_prompt_name": null,
+  "selected_prompt_version": null,
+  "selected_prompt_id": null,
+  "user_id": null,
+  "user_name": null,
+  "team_id": null,
+  "team_name": null,
+  "customer_id": null,
+  "customer_name": null,
+  "business_unit_id": null,
+  "business_unit_name": null,
+  "project_id": null,
+  "project_name": null,
+  "user_agent": "Go-http-client/1.1",
+  "app": "Other",
+  "latency": 105.723119,
+  "upstream_latency": 0.391333,
+  "overhead_latency": 105.331786,
+  "cost": 0.000153825,
+  "cost_breakdown": {
+    "input_cost": 0.000009825,
+    "input_cost_details": {
+      "text_cost": 0.000009,
+      "cached_read_cost": 8.249999999999999e-7
+    },
+    "output_cost": 0.000144,
+    "output_cost_details": {
+      "text_cost": 0.000144
+    },
+    "total_cost": 0.000153825
+  },
+  "status": "success",
+  "stop_reason": "stop",
+  "stream": false,
+  "content_summary": "openai retry ok Scripted reply from the bench fault proxy.",
+  "raw_request": "{\"model\":\"gpt-5.4-mini\",\"input\":[{\"type\":\"message\",\"role\":\"user\",\"content\":\"openai retry ok\"}]}",
+  "raw_response": "{\"created_at\":1794613920,\"error\":null,\"id\":\"resp_i670c80awagc7duc17oaap05\",\"incomplete_details\":null,\"model\":\"gpt-5.4-mini\",\"object\":\"response\",\"output\":[{\"content\":[{\"annotations\":[],\"logprobs\":[],\"text\":\"Scripted reply from the bench fault proxy.\",\"type\":\"output_text\"}],\"id\":\"msg_j7t5eoqm051s5bjxxns28w11\",\"role\":\"assistant\",\"status\":\"completed\",\"type\":\"message\"}],\"parallel_tool_calls\":true,\"status\":\"completed\",\"store\":false,\"tool_choice\":\"auto\",\"tools\":[],\"usage\":{\"input_tokens\":23,\"input_tokens_details\":{\"cached_tokens\":11},\"output_tokens\":32,\"output_tokens_details\":{\"reasoning_tokens\":0},\"total_tokens\":55}}",
+  "routing_engine_logs": "[1794613920115] [governance] [info] - Load balancing provider for model gpt-5.4-mini\n[1794613920115] [governance] [info] - Load balancing model gpt-5.4-mini across 1 available providers: [openai]\n[1794613920115] [governance] [info] - Allowed providers after filtering: [openai]\n[1794613920115] [governance] [info] - Selected provider openai for model gpt-5.4-mini (from 1 weighted: [openai])\n[1794613920130] [core] [info] - Retry 1/1 for openai/gpt-5.4-mini (previous attempt failed: server_error HTTP 503; same key=oa-slot-1)\n[1794613920221] [core] [info] - Request to openai/gpt-5.4-mini succeeded after 1 retry attempt(s)\n",
+  "plugin_logs": "{\"compat\":[{\"plugin_name\":\"compat\",\"level\":\"info\",\"message\":\"model gpt-5.4-mini (openai) does not support reasoning with tool calls on chat_completion, converting request to responses\",\"timestamp\":1794613920115},{\"plugin_name\":\"compat\",\"level\":\"debug\",\"message\":\"no unsupported params to drop for model gpt-5.4-mini\",\"timestamp\":1794613920115},{\"plugin_name\":\"compat\",\"level\":\"debug\",\"message\":\"no param values converted for model gpt-5.4-mini (openai)\",\"timestamp\":1794613920115}]}",
+  "is_large_payload_request": false,
+  "is_large_payload_response": false,
+  "content_hidden": false,
+  "created_at": "2026-11-13T23:52:00.115795Z",
+  "routing_engines_used": [
+    "governance"
+  ],
+  "input_history": [
+    {
+      "role": "user",
+      "content": "openai retry ok"
+    }
+  ],
+  "output_message": {
+    "role": "assistant",
+    "content": "Scripted reply from the bench fault proxy."
+  },
+  "params": {},
+  "token_usage": {
+    "prompt_tokens": 23,
+    "prompt_tokens_details": {
+      "cached_read_tokens": 11,
+      "cached_tokens": 11,
+      "cache_write_tokens": 0
+    },
+    "completion_tokens": 32,
+    "completion_tokens_details": {},
+    "total_tokens": 55,
+    "cost": {
+      "input_cost": 0.000009825,
+      "input_cost_details": {
+        "text_cost": 0.000009,
+        "cached_read_cost": 8.249999999999999e-7
+      },
+      "output_cost": 0.000144,
+      "output_cost_details": {
+        "text_cost": 0.000144
+      },
+      "total_cost": 0.000153825
+    }
+  },
+  "attempt_trail": [
+    {
+      "attempt": 0,
+      "key_id": "85a3ce7e-0d0c-4f5b-85cf-b2419ccbc970",
+      "key_name": "oa-slot-1",
+      "fail_reason": "server_error",
+      "failure_class": "transient",
+      "status_code": 503,
+      "triggered_rotation": false
+    },
+    {
+      "attempt": 1,
+      "key_id": "85a3ce7e-0d0c-4f5b-85cf-b2419ccbc970",
+      "key_name": "oa-slot-1",
+      "triggered_rotation": false
+    }
+  ],
+  "overhead_breakdown": [
+    {
+      "name": "worker-handoff",
+      "duration_us": 4.338
+    },
+    {
+      "name": "plugin.telemetry",
+      "duration_us": 37.266
+    },
+    {
+      "name": "plugin.prompts",
+      "duration_us": 3.033
+    },
+    {
+      "name": "plugin.logging",
+      "duration_us": 59.096
+    },
+    {
+      "name": "plugin.governance",
+      "duration_us": 56.312
+    },
+    {
+      "name": "plugin.compat",
+      "duration_us": 15.971
+    },
+    {
+      "name": "transport-context",
+      "duration_us": 20.704
+    },
+    {
+      "name": "convertor",
+      "duration_us": 30.518
+    },
+    {
+      "name": "handle-setup",
+      "duration_us": 10.011
+    },
+    {
+      "name": "plugin.routing",
+      "duration_us": 28.25
+    },
+    {
+      "name": "plugin.model-catalog-resolver",
+      "duration_us": 2.095
+    },
+    {
+      "name": "miscellaneous",
+      "duration_us": 3.197
+    },
+    {
+      "name": "pipeline-pre",
+      "duration_us": 6.715
+    },
+    {
+      "name": "queue-wait",
+      "duration_us": 5.011
+    },
+    {
+      "name": "worker-setup",
+      "duration_us": 1.534
+    },
+    {
+      "name": "key-pool",
+      "duration_us": 11.502
+    },
+    {
+      "name": "key.selection",
+      "duration_us": 1.018
+    },
+    {
+      "name": "provider-internal",
+      "duration_us": 14045.341
+    },
+    {
+      "name": "attribute-population",
+      "duration_us": 98.976
+    },
+    {
+      "name": "request-marshal",
+      "duration_us": 73.018
+    },
+    {
+      "name": "response-finalize",
+      "duration_us": 19.894
+    },
+    {
+      "name": "response-parse",
+      "duration_us": 47.545
+    },
+    {
+      "name": "pipeline-post",
+      "duration_us": 14.787
+    },
+    {
+      "name": "transport-response-headers",
+      "duration_us": 6.467
+    },
+    {
+      "name": "scheduling",
+      "duration_us": 90729.18699999999
+    }
+  ],
+  "virtual_key": {
+    "agent_grants": null,
+    "allow_all_providers": false,
+    "calendar_aligned": false,
+    "config_hash": "",
+    "created_at": "0001-01-01T00:00:00Z",
+    "id": "22f0423c-87b8-4b9c-87d9-39701df5ac53",
+    "is_active": true,
+    "mcp_configs": null,
+    "name": "r_yegqmia4f0",
+    "provider_configs": null,
+    "relay_grants": null,
+    "updated_at": "0001-01-01T00:00:00Z",
+    "value": ""
+  },
+  "selected_key": {
+    "id": "85a3ce7e-0d0c-4f5b-85cf-b2419ccbc970",
+    "name": "oa-slot-1",
+    "value": {
+      "value": ""
+    },
+    "models": [
+      "gpt-5.4-mini"
+    ],
+    "blacklisted_models": [],
+    "weight": 1
+  }
+}

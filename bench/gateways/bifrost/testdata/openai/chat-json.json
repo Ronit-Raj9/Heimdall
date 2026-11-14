@@ -1,0 +1,234 @@
+{
+  "id": "53bf4705-6978-4305-b4a2-255da3fdaa82",
+  "inc_number": 1,
+  "parent_request_id": null,
+  "timestamp": "2026-11-13T23:51:59.603061Z",
+  "object": "chat_completion",
+  "provider": "openai",
+  "model": "gpt-5.4-mini",
+  "number_of_retries": 0,
+  "fallback_index": 0,
+  "selected_key_id": "85a3ce7e-0d0c-4f5b-85cf-b2419ccbc970",
+  "selected_key_name": "oa-slot-1",
+  "virtual_key_id": "22f0423c-87b8-4b9c-87d9-39701df5ac53",
+  "virtual_key_name": "r_yegqmia4f0",
+  "routing_rule_id": null,
+  "routing_rule_name": null,
+  "selected_prompt_name": null,
+  "selected_prompt_version": null,
+  "selected_prompt_id": null,
+  "user_id": null,
+  "user_name": null,
+  "team_id": null,
+  "team_name": null,
+  "customer_id": null,
+  "customer_name": null,
+  "business_unit_id": null,
+  "business_unit_name": null,
+  "project_id": null,
+  "project_name": null,
+  "user_agent": "Go-http-client/1.1",
+  "app": "Other",
+  "latency": 314.844262,
+  "upstream_latency": 0.387682,
+  "overhead_latency": 314.45658000000003,
+  "cost": 0.000153075,
+  "cost_breakdown": {
+    "input_cost": 0.000009075,
+    "input_cost_details": {
+      "text_cost": 0.00000825,
+      "cached_read_cost": 8.249999999999999e-7
+    },
+    "output_cost": 0.000144,
+    "output_cost_details": {
+      "text_cost": 0.000144
+    },
+    "total_cost": 0.000153075
+  },
+  "status": "success",
+  "stop_reason": "stop",
+  "stream": false,
+  "content_summary": "openai chat Scripted reply from the bench fault proxy.",
+  "raw_request": "{\"model\":\"gpt-5.4-mini\",\"input\":[{\"type\":\"message\",\"role\":\"user\",\"content\":\"openai chat\"}]}",
+  "raw_response": "{\"created_at\":1794613919,\"error\":null,\"id\":\"resp_2ccwuo0064f5t6zihtdmq7i0\",\"incomplete_details\":null,\"model\":\"gpt-5.4-mini\",\"object\":\"response\",\"output\":[{\"content\":[{\"annotations\":[],\"logprobs\":[],\"text\":\"Scripted reply from the bench fault proxy.\",\"type\":\"output_text\"}],\"id\":\"msg_l3v5b07tgbqbuioh8g7e37ns\",\"role\":\"assistant\",\"status\":\"completed\",\"type\":\"message\"}],\"parallel_tool_calls\":true,\"status\":\"completed\",\"store\":false,\"tool_choice\":\"auto\",\"tools\":[],\"usage\":{\"input_tokens\":22,\"input_tokens_details\":{\"cached_tokens\":11},\"output_tokens\":32,\"output_tokens_details\":{\"reasoning_tokens\":0},\"total_tokens\":54}}",
+  "routing_engine_logs": "[1794613919602] [governance] [info] - Load balancing provider for model gpt-5.4-mini\n[1794613919602] [governance] [info] - Load balancing model gpt-5.4-mini across 1 available providers: [openai]\n[1794613919603] [governance] [info] - Allowed providers after filtering: [openai]\n[1794613919603] [governance] [info] - Selected provider openai for model gpt-5.4-mini (from 1 weighted: [openai])\n",
+  "plugin_logs": "{\"compat\":[{\"plugin_name\":\"compat\",\"level\":\"info\",\"message\":\"model gpt-5.4-mini (openai) does not support reasoning with tool calls on chat_completion, converting request to responses\",\"timestamp\":1794613919603},{\"plugin_name\":\"compat\",\"level\":\"debug\",\"message\":\"no unsupported params to drop for model gpt-5.4-mini\",\"timestamp\":1794613919603},{\"plugin_name\":\"compat\",\"level\":\"debug\",\"message\":\"no param values converted for model gpt-5.4-mini (openai)\",\"timestamp\":1794613919603}]}",
+  "is_large_payload_request": false,
+  "is_large_payload_response": false,
+  "content_hidden": false,
+  "created_at": "2026-11-13T23:51:59.603061Z",
+  "routing_engines_used": [
+    "governance"
+  ],
+  "input_history": [
+    {
+      "role": "user",
+      "content": "openai chat"
+    }
+  ],
+  "output_message": {
+    "role": "assistant",
+    "content": "Scripted reply from the bench fault proxy."
+  },
+  "params": {},
+  "token_usage": {
+    "prompt_tokens": 22,
+    "prompt_tokens_details": {
+      "cached_read_tokens": 11,
+      "cached_tokens": 11,
+      "cache_write_tokens": 0
+    },
+    "completion_tokens": 32,
+    "completion_tokens_details": {},
+    "total_tokens": 54,
+    "cost": {
+      "input_cost": 0.000009075,
+      "input_cost_details": {
+        "text_cost": 0.00000825,
+        "cached_read_cost": 8.249999999999999e-7
+      },
+      "output_cost": 0.000144,
+      "output_cost_details": {
+        "text_cost": 0.000144
+      },
+      "total_cost": 0.000153075
+    }
+  },
+  "attempt_trail": [
+    {
+      "attempt": 0,
+      "key_id": "85a3ce7e-0d0c-4f5b-85cf-b2419ccbc970",
+      "key_name": "oa-slot-1",
+      "triggered_rotation": false
+    }
+  ],
+  "overhead_breakdown": [
+    {
+      "name": "worker-handoff",
+      "duration_us": 14.498
+    },
+    {
+      "name": "plugin.telemetry",
+      "duration_us": 161.196
+    },
+    {
+      "name": "plugin.prompts",
+      "duration_us": 5.053
+    },
+    {
+      "name": "plugin.logging",
+      "duration_us": 549.005
+    },
+    {
+      "name": "plugin.governance",
+      "duration_us": 97.953
+    },
+    {
+      "name": "plugin.compat",
+      "duration_us": 35.989
+    },
+    {
+      "name": "transport-context",
+      "duration_us": 21.625
+    },
+    {
+      "name": "convertor",
+      "duration_us": 18623.674
+    },
+    {
+      "name": "handle-setup",
+      "duration_us": 64.18
+    },
+    {
+      "name": "plugin.routing",
+      "duration_us": 86.756
+    },
+    {
+      "name": "plugin.model-catalog-resolver",
+      "duration_us": 3.38
+    },
+    {
+      "name": "miscellaneous",
+      "duration_us": 20.859
+    },
+    {
+      "name": "pipeline-pre",
+      "duration_us": 35.317
+    },
+    {
+      "name": "queue-wait",
+      "duration_us": 5.364
+    },
+    {
+      "name": "worker-setup",
+      "duration_us": 2.292
+    },
+    {
+      "name": "key-pool",
+      "duration_us": 20.059
+    },
+    {
+      "name": "key.selection",
+      "duration_us": 6.393
+    },
+    {
+      "name": "provider-internal",
+      "duration_us": 843.098
+    },
+    {
+      "name": "attribute-population",
+      "duration_us": 5342.839
+    },
+    {
+      "name": "request-marshal",
+      "duration_us": 16374.86
+    },
+    {
+      "name": "response-finalize",
+      "duration_us": 25.583
+    },
+    {
+      "name": "response-parse",
+      "duration_us": 223867.409
+    },
+    {
+      "name": "pipeline-post",
+      "duration_us": 24.209
+    },
+    {
+      "name": "transport-response-headers",
+      "duration_us": 9.433
+    },
+    {
+      "name": "scheduling",
+      "duration_us": 48215.55600000004
+    }
+  ],
+  "virtual_key": {
+    "agent_grants": null,
+    "allow_all_providers": false,
+    "calendar_aligned": false,
+    "config_hash": "",
+    "created_at": "0001-01-01T00:00:00Z",
+    "id": "22f0423c-87b8-4b9c-87d9-39701df5ac53",
+    "is_active": true,
+    "mcp_configs": null,
+    "name": "r_yegqmia4f0",
+    "provider_configs": null,
+    "relay_grants": null,
+    "updated_at": "0001-01-01T00:00:00Z",
+    "value": ""
+  },
+  "selected_key": {
+    "id": "85a3ce7e-0d0c-4f5b-85cf-b2419ccbc970",
+    "name": "oa-slot-1",
+    "value": {
+      "value": ""
+    },
+    "models": [
+      "gpt-5.4-mini"
+    ],
+    "blacklisted_models": [],
+    "weight": 1
+  }
+}

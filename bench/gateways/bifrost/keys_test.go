@@ -133,3 +133,49 @@ func TestRevokeStale(t *testing.T) {
 		t.Errorf("n = %d, left %v", n, f.vks)
 	}
 }
+
+func TestMintKeyByProvider(t *testing.T) {
+	f := newFakeBifrost(t)
+	g, err := New(multiConfig(f.srv.URL))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := g.Setup(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+	ctx := context.Background()
+	oa := runContext("r_oa00001", "")
+	oa.Agent.Gateway.Provider = "openai"
+	k1, err := g.MintKey(ctx, oa)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if k1.Provider != "openai" || k1.KeySlot != "oa-slot-1" || k1.Model != testOpenAIModel || k1.SlotAuth != "" {
+		t.Errorf("openai key = %+v (a direct key must not carry the slot value)", k1)
+	}
+	pc := f.lastBody("POST /api/governance/virtual-keys")["provider_configs"].([]any)[0].(map[string]any)
+	if pc["provider"] != "openai" || pc["key_ids"].([]any)[0] != g.keyIDs["oa-slot-1"] {
+		t.Errorf("virtual key provider config = %v", pc)
+	}
+	k2, err := g.MintKey(ctx, runContext("r_an00001", testModel))
+	if err != nil || k2.Provider != "anthropic" || k2.KeySlot != "fp-slot-1" || k2.SlotAuth != "fp-slot-1" {
+		t.Fatalf("default provider key = %+v, %v", k2, err)
+	}
+	if _, err := g.MintKey(ctx, runContext("r_an00002", testModel)); err == nil || !strings.Contains(err.Error(), "no free key slot for anthropic") {
+		t.Errorf("anthropic pool exhausted: %v", err)
+	}
+	oa2 := runContext("r_oa00002", "gpt-6.1-terra")
+	oa2.Agent.Gateway.Provider = "openai"
+	k3, err := g.MintKey(ctx, oa2)
+	if err != nil || k3.KeySlot != "oa-slot-2" {
+		t.Fatalf("second openai key = %+v, %v", k3, err)
+	}
+	if body := f.lastBody("PUT /api/providers/{p}/keys/{id}"); body["value"] != "sk-real-openai" || len(body["models"].([]any)) != 2 {
+		t.Errorf("model added to direct slot with body %v", body)
+	}
+	gm := runContext("r_gm00001", "")
+	gm.Agent.Gateway.Provider = "gemini"
+	if _, err := g.MintKey(ctx, gm); err == nil || !strings.Contains(err.Error(), "not the gateway provider") {
+		t.Errorf("unconfigured provider: %v", err)
+	}
+}

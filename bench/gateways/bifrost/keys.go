@@ -9,6 +9,7 @@ import (
 	"regexp"
 	"sort"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/maximhq/bifrost/bench/schemas"
@@ -21,8 +22,10 @@ const vkPageSize = 100
 // utils.NewID("r", n). Keys named otherwise are never touched.
 var runIDPattern = regexp.MustCompile(`^r_[a-z0-9]+$`)
 
-// MintKey implements schemas.Gateway. It takes a free key slot and creates
-// the run's virtual key, named after the run id: one provider, that one slot,
+// MintKey implements schemas.Gateway. It takes a free key slot of the run's
+// provider (rc.Agent.Gateway.Provider; anthropic when empty and configured,
+// else the first configured provider) and creates the run's virtual key,
+// named after the run id: one provider, that one slot,
 // the run's model, weight 1 (without a weight a plain model id does not
 // route). The engine never runs more slots than the pool holds, so an empty
 // pool is an error, not a wait.
@@ -34,15 +37,15 @@ func (g *Gateway) MintKey(ctx context.Context, rc *schemas.RunContext) (*schemas
 	if !runIDPattern.MatchString(runID) {
 		return nil, fmt.Errorf("mint key for run %s: run id does not match %s", runID, runIDPattern)
 	}
-	model, err := g.runModel(rc)
+	p, model, err := g.runProvider(rc)
 	if err != nil {
 		return nil, fmt.Errorf("mint key for run %s: %w", runID, err)
 	}
-	slot, keyID, err := g.acquireSlot(runID)
+	slot, keyID, err := g.acquireSlot(p, runID)
 	if err != nil {
 		return nil, fmt.Errorf("mint key for run %s: %w", runID, err)
 	}
-	key, err := g.createVirtualKey(ctx, runID, slot, keyID, model)
+	key, err := g.createVirtualKey(ctx, runID, p, slot, keyID, model)
 	if err != nil {
 		g.releaseSlot(slot.Name, runID)
 		return nil, fmt.Errorf("mint key for run %s: %w", runID, err)
@@ -51,7 +54,8 @@ func (g *Gateway) MintKey(ctx context.Context, rc *schemas.RunContext) (*schemas
 	g.inUse[slot.Name] = key.ID
 	g.minted[key.ID] = mintRecord{slot: slot.Name, at: time.Now()}
 	g.mu.Unlock()
-	g.logger.Info("virtual key minted", "run_id", runID, "virtual_key_id", key.ID, "key_slot", slot.Name, "model", model)
+	g.logger.Info("virtual key minted", "run_id", runID, "virtual_key_id", key.ID, "provider", p.Name,
+		"mode", p.Mode, "key_slot", slot.Name, "model", model)
 	return key, nil
 }
 
@@ -102,41 +106,63 @@ type virtualKey struct {
 	Value string `json:"value"`
 }
 
-// runModel is the model the run's key allows: the agent config's model, or
-// the gateway model when the config names none. A provider other than the
-// gateway's is refused: the slots belong to one provider.
-func (g *Gateway) runModel(rc *schemas.RunContext) (string, error) {
-	model := g.cfg.Model
+// runProvider is the run's provider and the model its key allows: the
+// agent config's model, or the provider's setup model when the config names
+// none. A provider the gateway does not configure is refused.
+func (g *Gateway) runProvider(rc *schemas.RunContext) (ProviderSetup, string, error) {
+	name := ""
 	if rc.Agent != nil {
-		if rc.Agent.Model != "" {
-			model = rc.Agent.Model
-		}
-		if p := rc.Agent.Gateway.Provider; p != "" && p != g.cfg.Provider {
-			return "", fmt.Errorf("agent provider %s is not the gateway provider %s", p, g.cfg.Provider)
+		name = rc.Agent.Gateway.Provider
+	}
+	if name == "" {
+		name = g.providers[0].Name
+		if _, ok := g.provider(DefaultProvider); ok {
+			name = DefaultProvider
 		}
 	}
-	return model, nil
+	p, ok := g.provider(name)
+	if !ok {
+		return ProviderSetup{}, "", fmt.Errorf("agent provider %s is not the gateway provider (configured: %s)", name, g.providerNames())
+	}
+	model := p.Model
+	if rc.Agent != nil && rc.Agent.Model != "" {
+		model = rc.Agent.Model
+	}
+	return p, model, nil
 }
 
-// acquireSlot reserves the first free slot in config order for runID.
-func (g *Gateway) acquireSlot(runID string) (Slot, string, error) {
+func (g *Gateway) providerNames() string {
+	names := make([]string, 0, len(g.providers))
+	for _, p := range g.providers {
+		names = append(names, p.Name)
+	}
+	return strings.Join(names, ", ")
+}
+
+// acquireSlot reserves the provider's first free slot in config order for
+// runID.
+func (g *Gateway) acquireSlot(p ProviderSetup, runID string) (Slot, string, error) {
 	g.mu.Lock()
 	defer g.mu.Unlock()
-	if len(g.keyIDs) == 0 {
-		return Slot{}, "", errors.New("gateway not set up: Setup has not run")
-	}
-	for _, s := range g.cfg.Slots {
-		if _, busy := g.inUse[s.Name]; busy {
+	busy := 0
+	setUp := false
+	for _, s := range p.Slots {
+		if _, used := g.inUse[s.Name]; used {
+			busy++
 			continue
 		}
 		id, ok := g.keyIDs[s.Name]
 		if !ok {
 			continue
 		}
+		setUp = true
 		g.inUse[s.Name] = "pending:" + runID
 		return s, id, nil
 	}
-	return Slot{}, "", fmt.Errorf("no free key slot: %d of %d in use", len(g.inUse), len(g.cfg.Slots))
+	if busy == 0 && !setUp {
+		return Slot{}, "", errors.New("gateway not set up: Setup has not run")
+	}
+	return Slot{}, "", fmt.Errorf("no free key slot for %s: %d of %d in use", p.Name, busy, len(p.Slots))
 }
 
 // releaseSlot frees slot if runID's mint still holds it as pending.
@@ -164,14 +190,14 @@ func (g *Gateway) forget(vkID string) {
 
 // createVirtualKey makes sure the slot's provider key serves model, then
 // creates the run's virtual key on that slot.
-func (g *Gateway) createVirtualKey(ctx context.Context, runID string, slot Slot, keyID, model string) (*schemas.RunKey, error) {
-	if err := g.ensureSlotModel(ctx, slot, keyID, model); err != nil {
+func (g *Gateway) createVirtualKey(ctx context.Context, runID string, p ProviderSetup, slot Slot, keyID, model string) (*schemas.RunKey, error) {
+	if err := g.ensureSlotModel(ctx, p, slot, keyID, model); err != nil {
 		return nil, err
 	}
 	body := map[string]any{
 		"name": runID,
 		"provider_configs": []map[string]any{{
-			"provider":       g.cfg.Provider,
+			"provider":       p.Name,
 			"weight":         1,
 			"allowed_models": []string{model},
 			"key_ids":        []string{keyID},
@@ -188,17 +214,18 @@ func (g *Gateway) createVirtualKey(ctx context.Context, runID string, slot Slot,
 	if vk.ID == "" || vk.Value == "" {
 		return nil, errors.New("create virtual key: bifrost returned no id or value")
 	}
-	return &schemas.RunKey{
-		ID: vk.ID, Name: vk.Name, Value: vk.Value, KeySlot: slot.Name, SlotAuth: slot.Value,
-		Provider: g.cfg.Provider, Model: model,
-	}, nil
+	key := &schemas.RunKey{ID: vk.ID, Name: vk.Name, Value: vk.Value, KeySlot: slot.Name, Provider: p.Name, Model: model}
+	if p.Mode == ModeProxied {
+		key.SlotAuth = slot.Value // a placeholder; a direct slot's value is the real key and stays in Bifrost
+	}
+	return key, nil
 }
 
 // ensureSlotModel adds model to the slot's provider key when an arm runs a
 // model other than the gateway's. A key with an empty model list serves
 // nothing on v2.5.1 ("no keys found that support model"), so the list is
 // always explicit.
-func (g *Gateway) ensureSlotModel(ctx context.Context, slot Slot, keyID, model string) error {
+func (g *Gateway) ensureSlotModel(ctx context.Context, p ProviderSetup, slot Slot, keyID, model string) error {
 	g.mu.Lock()
 	have := g.models[slot.Name][model]
 	current := make([]string, 0, len(g.models[slot.Name]))
@@ -211,7 +238,12 @@ func (g *Gateway) ensureSlotModel(ctx context.Context, slot Slot, keyID, model s
 	}
 	sort.Strings(current)
 	models := mergeModels(current, model)
-	if _, err := g.upsertKey(ctx, slot, keyID, models); err != nil {
+	if p.Mode == ModeDirect {
+		if slot.Value = strings.TrimSpace(g.cfg.Getenv(p.KeyEnv)); slot.Value == "" {
+			return fmt.Errorf("direct provider %s: %s is not set", p.Name, p.KeyEnv)
+		}
+	}
+	if _, err := g.upsertKey(ctx, p.Name, slot, keyID, models); err != nil {
 		return err
 	}
 	g.mu.Lock()

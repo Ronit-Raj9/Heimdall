@@ -135,3 +135,33 @@ func TestFetchRequestsCancelled(t *testing.T) {
 		t.Fatal("want context error")
 	}
 }
+
+// TestFetchRequestsDirect: a direct provider's run has no ledger. Its rows
+// are complete when nothing is processing and two polls match, after the
+// settle time, even though no ledger entry backs them.
+func TestFetchRequestsDirect(t *testing.T) {
+	f := newFakeBifrost(t)
+	for _, name := range []string{"chat-json.json", "responses-stream-tools.json", "retry-fail.json"} {
+		f.rows = append(f.rows, json.RawMessage(readFixture(t, "openai/"+name)))
+	}
+	f.hideLists = 2
+	g, err := New(multiConfig(f.srv.URL))
+	if err != nil {
+		t.Fatal(err)
+	}
+	g.settle = 50 * time.Millisecond
+	key := &schemas.RunKey{ID: "vk-direct", KeySlot: "oa-slot-1", Provider: "openai"}
+	log, err := g.FetchRequests(context.Background(), key, schemas.FetchExpectation{Timeout: 5 * time.Second, PollEvery: 20 * time.Millisecond})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !log.Complete || log.Reason != "" || len(log.Requests) != 3 {
+		t.Fatalf("direct log complete %t reason %q rows %d", log.Complete, log.Reason, len(log.Requests))
+	}
+	// The same rows on a proxied key with an empty ledger do not join.
+	pkey := &schemas.RunKey{ID: "vk-proxied", KeySlot: "fp-slot-1", Provider: "anthropic"}
+	plog, err := g.FetchRequests(context.Background(), pkey, schemas.FetchExpectation{Timeout: 300 * time.Millisecond, PollEvery: 20 * time.Millisecond})
+	if err != nil || plog.Complete || !strings.Contains(plog.Reason, "has no ledger entry") {
+		t.Errorf("proxied key without ledger: complete %t reason %q err %v", plog.Complete, plog.Reason, err)
+	}
+}

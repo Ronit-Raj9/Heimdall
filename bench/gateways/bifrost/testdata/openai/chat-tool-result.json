@@ -1,0 +1,296 @@
+{
+  "id": "819cbd2b-f447-4895-abf0-04e13b315260",
+  "inc_number": 3,
+  "parent_request_id": null,
+  "timestamp": "2026-11-13T23:52:00.023139Z",
+  "object": "chat_completion",
+  "provider": "openai",
+  "model": "gpt-5.4-mini",
+  "number_of_retries": 0,
+  "fallback_index": 0,
+  "selected_key_id": "85a3ce7e-0d0c-4f5b-85cf-b2419ccbc970",
+  "selected_key_name": "oa-slot-1",
+  "virtual_key_id": "22f0423c-87b8-4b9c-87d9-39701df5ac53",
+  "virtual_key_name": "r_yegqmia4f0",
+  "routing_rule_id": null,
+  "routing_rule_name": null,
+  "selected_prompt_name": null,
+  "selected_prompt_version": null,
+  "selected_prompt_id": null,
+  "user_id": null,
+  "user_name": null,
+  "team_id": null,
+  "team_name": null,
+  "customer_id": null,
+  "customer_name": null,
+  "business_unit_id": null,
+  "business_unit_name": null,
+  "project_id": null,
+  "project_name": null,
+  "user_agent": "Go-http-client/1.1",
+  "app": "Other",
+  "latency": 5.773877,
+  "upstream_latency": 0.34725,
+  "overhead_latency": 5.426627,
+  "cost": 0.000198375,
+  "cost_breakdown": {
+    "input_cost": 0.00005437500000000001,
+    "input_cost_details": {
+      "text_cost": 0.000049500000000000004,
+      "cached_read_cost": 0.000004875
+    },
+    "output_cost": 0.000144,
+    "output_cost_details": {
+      "text_cost": 0.000144
+    },
+    "total_cost": 0.000198375
+  },
+  "status": "success",
+  "stop_reason": "stop",
+  "stream": false,
+  "content_summary": "read it package a Scripted reply from the bench fault proxy.",
+  "raw_request": "{\"model\":\"gpt-5.4-mini\",\"input\":[{\"type\":\"message\",\"role\":\"user\",\"content\":\"read it\"},{\"arguments\":\"{\\\"file_path\\\":\\\"a.go\\\"}\",\"id\":\"fc_c433ce40019710a1660ed80b7be5d544275b6d3b7e6d85e74e\",\"type\":\"function_call\",\"call_id\":\"call_fixture0001\",\"name\":\"Read\"},{\"type\":\"function_call_output\",\"call_id\":\"call_fixture0001\",\"output\":\"package a\"}],\"tools\":[{\"type\":\"function\",\"name\":\"Read\",\"description\":\"Read a file\",\"parameters\":{\"type\":\"object\",\"properties\":{\"file_path\":{\"type\":\"string\"}},\"required\":[\"file_path\"]},\"strict\":false}]}",
+  "raw_response": "{\"created_at\":1794613920,\"error\":null,\"id\":\"resp_bh3y9dvcmyll2idudgoxnqp1\",\"incomplete_details\":null,\"model\":\"gpt-5.4-mini\",\"object\":\"response\",\"output\":[{\"content\":[{\"annotations\":[],\"logprobs\":[],\"text\":\"Scripted reply from the bench fault proxy.\",\"type\":\"output_text\"}],\"id\":\"msg_t8pc9vct6jzcc9bb86j39c1a\",\"role\":\"assistant\",\"status\":\"completed\",\"type\":\"message\"}],\"parallel_tool_calls\":true,\"status\":\"completed\",\"store\":false,\"tool_choice\":\"auto\",\"tools\":[],\"usage\":{\"input_tokens\":131,\"input_tokens_details\":{\"cached_tokens\":65},\"output_tokens\":32,\"output_tokens_details\":{\"reasoning_tokens\":0},\"total_tokens\":163}}",
+  "routing_engine_logs": "[1794613920023] [governance] [info] - Load balancing provider for model gpt-5.4-mini\n[1794613920023] [governance] [info] - Load balancing model gpt-5.4-mini across 1 available providers: [openai]\n[1794613920023] [governance] [info] - Allowed providers after filtering: [openai]\n[1794613920023] [governance] [info] - Selected provider openai for model gpt-5.4-mini (from 1 weighted: [openai])\n",
+  "plugin_logs": "{\"compat\":[{\"plugin_name\":\"compat\",\"level\":\"info\",\"message\":\"model gpt-5.4-mini (openai) does not support reasoning with tool calls on chat_completion, converting request to responses\",\"timestamp\":1794613920023},{\"plugin_name\":\"compat\",\"level\":\"debug\",\"message\":\"no unsupported params to drop for model gpt-5.4-mini\",\"timestamp\":1794613920023},{\"plugin_name\":\"compat\",\"level\":\"debug\",\"message\":\"no param values converted for model gpt-5.4-mini (openai)\",\"timestamp\":1794613920023}]}",
+  "is_large_payload_request": false,
+  "is_large_payload_response": false,
+  "content_hidden": false,
+  "created_at": "2026-11-13T23:52:00.023139Z",
+  "routing_engines_used": [
+    "governance"
+  ],
+  "input_history": [
+    {
+      "role": "user",
+      "content": "read it"
+    },
+    {
+      "role": "assistant",
+      "content": null,
+      "refusal": null,
+      "tool_calls": [
+        {
+          "index": 0,
+          "type": "function",
+          "id": "call_fixture0001",
+          "function": {
+            "name": "Read",
+            "arguments": "{\"file_path\":\"a.go\"}"
+          }
+        }
+      ]
+    },
+    {
+      "role": "tool",
+      "content": "package a",
+      "tool_call_id": "call_fixture0001"
+    }
+  ],
+  "output_message": {
+    "role": "assistant",
+    "content": "Scripted reply from the bench fault proxy."
+  },
+  "params": {
+    "tools": [
+      {
+        "function": {
+          "description": "Read a file",
+          "name": "Read",
+          "parameters": {
+            "properties": {
+              "file_path": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "file_path"
+            ],
+            "type": "object"
+          }
+        },
+        "type": "function"
+      }
+    ]
+  },
+  "tools": [
+    {
+      "type": "function",
+      "function": {
+        "name": "Read",
+        "description": "Read a file",
+        "parameters": {
+          "properties": {
+            "file_path": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "file_path"
+          ],
+          "type": "object"
+        }
+      }
+    }
+  ],
+  "token_usage": {
+    "prompt_tokens": 131,
+    "prompt_tokens_details": {
+      "cached_read_tokens": 65,
+      "cached_tokens": 65,
+      "cache_write_tokens": 0
+    },
+    "completion_tokens": 32,
+    "completion_tokens_details": {},
+    "total_tokens": 163,
+    "cost": {
+      "input_cost": 0.00005437500000000001,
+      "input_cost_details": {
+        "text_cost": 0.000049500000000000004,
+        "cached_read_cost": 0.000004875
+      },
+      "output_cost": 0.000144,
+      "output_cost_details": {
+        "text_cost": 0.000144
+      },
+      "total_cost": 0.000198375
+    }
+  },
+  "attempt_trail": [
+    {
+      "attempt": 0,
+      "key_id": "85a3ce7e-0d0c-4f5b-85cf-b2419ccbc970",
+      "key_name": "oa-slot-1",
+      "triggered_rotation": false
+    }
+  ],
+  "overhead_breakdown": [
+    {
+      "name": "worker-handoff",
+      "duration_us": 6.553
+    },
+    {
+      "name": "plugin.telemetry",
+      "duration_us": 34.007
+    },
+    {
+      "name": "plugin.prompts",
+      "duration_us": 3.483
+    },
+    {
+      "name": "plugin.logging",
+      "duration_us": 117.82
+    },
+    {
+      "name": "plugin.governance",
+      "duration_us": 46.456
+    },
+    {
+      "name": "plugin.compat",
+      "duration_us": 19.241
+    },
+    {
+      "name": "transport-context",
+      "duration_us": 18.623
+    },
+    {
+      "name": "convertor",
+      "duration_us": 18.706
+    },
+    {
+      "name": "handle-setup",
+      "duration_us": 11.714
+    },
+    {
+      "name": "plugin.routing",
+      "duration_us": 30.543
+    },
+    {
+      "name": "plugin.model-catalog-resolver",
+      "duration_us": 2.309
+    },
+    {
+      "name": "miscellaneous",
+      "duration_us": 3.685
+    },
+    {
+      "name": "pipeline-pre",
+      "duration_us": 7.111
+    },
+    {
+      "name": "queue-wait",
+      "duration_us": 9.31
+    },
+    {
+      "name": "worker-setup",
+      "duration_us": 1.447
+    },
+    {
+      "name": "key-pool",
+      "duration_us": 13.207
+    },
+    {
+      "name": "key.selection",
+      "duration_us": 1.218
+    },
+    {
+      "name": "provider-internal",
+      "duration_us": 70.132
+    },
+    {
+      "name": "attribute-population",
+      "duration_us": 62.076
+    },
+    {
+      "name": "request-marshal",
+      "duration_us": 109.291
+    },
+    {
+      "name": "response-finalize",
+      "duration_us": 8.376
+    },
+    {
+      "name": "response-parse",
+      "duration_us": 49.563
+    },
+    {
+      "name": "pipeline-post",
+      "duration_us": 15.757
+    },
+    {
+      "name": "transport-response-headers",
+      "duration_us": 6.809
+    },
+    {
+      "name": "scheduling",
+      "duration_us": 4759.19
+    }
+  ],
+  "virtual_key": {
+    "agent_grants": null,
+    "allow_all_providers": false,
+    "calendar_aligned": false,
+    "config_hash": "",
+    "created_at": "0001-01-01T00:00:00Z",
+    "id": "22f0423c-87b8-4b9c-87d9-39701df5ac53",
+    "is_active": true,
+    "mcp_configs": null,
+    "name": "r_yegqmia4f0",
+    "provider_configs": null,
+    "relay_grants": null,
+    "updated_at": "0001-01-01T00:00:00Z",
+    "value": ""
+  },
+  "selected_key": {
+    "id": "85a3ce7e-0d0c-4f5b-85cf-b2419ccbc970",
+    "name": "oa-slot-1",
+    "value": {
+      "value": ""
+    },
+    "models": [
+      "gpt-5.4-mini"
+    ],
+    "blacklisted_models": [],
+    "weight": 1
+  }
+}

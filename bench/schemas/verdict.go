@@ -174,6 +174,7 @@ type Analysis struct {
 	Diagnostics []DiagnosticsRow            `json:"diagnostics"`
 	Meters      []Meter                     `json:"meters"`
 	ArmMetrics  map[string]map[string]Value `json:"arm_metrics"` // arm -> metric -> median per run
+	Policy      *PolicyResult               `json:"policy,omitempty"`
 }
 
 // Reporter writes an analysis in one format.

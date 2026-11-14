@@ -20,6 +20,9 @@ const (
 	testToken = "test-setup-token"
 	testModel = "claude-sonnet-4-6"
 	testProxy = "http://faultproxy:9100"
+	// testOpenAIModel is in the pinned datasheet (deploy/bifrost/datasheet)
+	// and not deprecated there.
+	testOpenAIModel = "gpt-5.4-mini"
 )
 
 // fakeBifrost is an in-memory stand-in for the v2.5.1 management API, shaped
@@ -29,8 +32,10 @@ type fakeBifrost struct {
 	srv *httptest.Server
 
 	mu        sync.Mutex
-	provider  map[string]any
-	keys      []map[string]any
+	provider  map[string]any   // the anthropic provider
+	keys      []map[string]any // the anthropic provider's keys
+	others    map[string]*fakeProvider
+	keySeq    int
 	vks       []map[string]any
 	rows      []json.RawMessage // detail rows of every key
 	hideLists int               // list calls answered with no rows, like an unflushed writer
@@ -125,51 +130,93 @@ func (f *fakeBifrost) getConfig(w http.ResponseWriter, _ *http.Request) {
 	writeJSONT(w, 200, f.config)
 }
 
-func (f *fakeBifrost) getProvider(w http.ResponseWriter, _ *http.Request) {
-	if f.provider == nil {
+// fakeProvider is a provider other than anthropic in the fake.
+type fakeProvider struct {
+	cfg  map[string]any
+	keys []map[string]any
+}
+
+// state returns the named provider's config and keys, anthropic's being
+// f.provider and f.keys.
+func (f *fakeBifrost) state(name string) (*map[string]any, *[]map[string]any) {
+	if name == "anthropic" {
+		return &f.provider, &f.keys
+	}
+	if f.others == nil {
+		f.others = map[string]*fakeProvider{}
+	}
+	p, ok := f.others[name]
+	if !ok {
+		p = &fakeProvider{}
+		f.others[name] = p
+	}
+	return &p.cfg, &p.keys
+}
+
+func (f *fakeBifrost) getProvider(w http.ResponseWriter, r *http.Request) {
+	cfg, _ := f.state(r.PathValue("p"))
+	if *cfg == nil {
 		writeJSONT(w, 404, map[string]any{"error": map[string]any{"message": "Provider not found: not found"}})
 		return
 	}
-	writeJSONT(w, 200, f.provider)
+	writeJSONT(w, 200, *cfg)
 }
 
 func (f *fakeBifrost) postProvider(w http.ResponseWriter, _ *http.Request) {
-	f.provider = f.bodies["POST /api/providers"][len(f.bodies["POST /api/providers"])-1]
-	writeJSONT(w, 200, f.provider)
+	body := f.bodies["POST /api/providers"][len(f.bodies["POST /api/providers"])-1]
+	cfg, _ := f.state(fmt.Sprint(body["provider"]))
+	*cfg = body
+	writeJSONT(w, 200, body)
 }
 
-func (f *fakeBifrost) putProvider(w http.ResponseWriter, _ *http.Request) {
-	f.provider = f.bodies["PUT /api/providers/{p}"][len(f.bodies["PUT /api/providers/{p}"])-1]
-	writeJSONT(w, 200, f.provider)
+func (f *fakeBifrost) putProvider(w http.ResponseWriter, r *http.Request) {
+	cfg, _ := f.state(r.PathValue("p"))
+	*cfg = f.bodies["PUT /api/providers/{p}"][len(f.bodies["PUT /api/providers/{p}"])-1]
+	writeJSONT(w, 200, *cfg)
 }
 
-func (f *fakeBifrost) listKeys(w http.ResponseWriter, _ *http.Request) {
-	if f.provider == nil {
+func (f *fakeBifrost) listKeys(w http.ResponseWriter, r *http.Request) {
+	cfg, keys := f.state(r.PathValue("p"))
+	if *cfg == nil {
 		writeJSONT(w, 404, map[string]any{})
 		return
 	}
-	writeJSONT(w, 200, map[string]any{"keys": f.keys, "total": len(f.keys)})
+	writeJSONT(w, 200, map[string]any{"keys": *keys, "total": len(*keys)})
 }
 
-func (f *fakeBifrost) postKey(w http.ResponseWriter, _ *http.Request) {
+func (f *fakeBifrost) postKey(w http.ResponseWriter, r *http.Request) {
 	body := f.bodies["POST /api/providers/{p}/keys"][len(f.bodies["POST /api/providers/{p}/keys"])-1]
-	for _, k := range f.keys {
-		if k["name"] == body["name"] {
-			writeJSONT(w, 409, map[string]any{"error": map[string]any{"message": "API key names must be unique across providers"}})
-			return
+	for _, name := range append([]string{"anthropic"}, f.otherNames()...) {
+		_, keys := f.state(name)
+		for _, k := range *keys {
+			if k["name"] == body["name"] {
+				writeJSONT(w, 409, map[string]any{"error": map[string]any{"message": "API key names must be unique across providers"}})
+				return
+			}
 		}
 	}
-	body["id"] = fmt.Sprintf("key-%d", len(f.keys)+1)
-	f.keys = append(f.keys, body)
+	_, keys := f.state(r.PathValue("p"))
+	f.keySeq++
+	body["id"] = fmt.Sprintf("key-%d", f.keySeq)
+	*keys = append(*keys, body)
 	writeJSONT(w, 200, body)
+}
+
+func (f *fakeBifrost) otherNames() []string {
+	var out []string
+	for name := range f.others {
+		out = append(out, name)
+	}
+	return out
 }
 
 func (f *fakeBifrost) putKey(w http.ResponseWriter, r *http.Request) {
 	body := f.bodies["PUT /api/providers/{p}/keys/{id}"][len(f.bodies["PUT /api/providers/{p}/keys/{id}"])-1]
-	for i, k := range f.keys {
+	_, keys := f.state(r.PathValue("p"))
+	for i, k := range *keys {
 		if k["id"] == r.PathValue("id") {
 			body["id"] = k["id"]
-			f.keys[i] = body
+			(*keys)[i] = body
 			writeJSONT(w, 200, body)
 			return
 		}
@@ -305,8 +352,8 @@ func TestNew(t *testing.T) {
 			if g.GetName() != "bifrost" || g.GetVersion() != "1.0.0" {
 				t.Errorf("part = %s %s", g.GetName(), g.GetVersion())
 			}
-			if g.cfg.Provider != "anthropic" || g.cfg.URL != "http://127.0.0.1:18080" {
-				t.Errorf("defaults: provider %q url %q", g.cfg.Provider, g.cfg.URL)
+			if len(g.providers) != 1 || g.providers[0].Name != "anthropic" || g.providers[0].Mode != ModeProxied || g.cfg.URL != "http://127.0.0.1:18080" {
+				t.Errorf("defaults: providers %+v url %q", g.providers, g.cfg.URL)
 			}
 		})
 	}
@@ -398,4 +445,86 @@ func TestMergeModels(t *testing.T) {
 // runContext returns a minimal run context for runID.
 func runContext(runID, model string) *schemas.RunContext {
 	return &schemas.RunContext{Run: &schemas.Run{RunID: runID}, Agent: &schemas.AgentConfig{Model: model}}
+}
+
+// multiConfig is a gateway with a proxied anthropic provider and a direct
+// openai provider whose key comes from a fake environment.
+func multiConfig(url string) Config {
+	return Config{
+		URL: url, SetupToken: testToken, FaultProxyURL: testProxy, MaxRetries: 1,
+		Getenv: func(k string) string { return map[string]string{"OPENAI_API_KEY": "sk-real-openai"}[k] },
+		Providers: []ProviderSetup{
+			{Name: "anthropic", Model: testModel, Slots: []Slot{{Name: "fp-slot-1", Value: "fp-slot-1"}}},
+			{Name: "openai", Mode: ModeDirect, KeyEnv: "OPENAI_API_KEY", Model: testOpenAIModel,
+				Slots: []Slot{{Name: "oa-slot-1"}, {Name: "oa-slot-2"}}},
+		},
+	}
+}
+
+func TestSetupProviders(t *testing.T) {
+	f := newFakeBifrost(t)
+	g, err := New(multiConfig(f.srv.URL))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := g.Setup(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+	if g.ProviderMode("anthropic") != ModeProxied || g.ProviderMode("openai") != ModeDirect || g.ProviderMode("gemini") != "" {
+		t.Errorf("modes %q %q %q", g.ProviderMode("anthropic"), g.ProviderMode("openai"), g.ProviderMode("gemini"))
+	}
+	anc, _ := f.provider["network_config"].(map[string]any)
+	if anc["base_url"] != testProxy || anc["allow_private_network"] != true {
+		t.Errorf("anthropic provider = %v", f.provider)
+	}
+	oa := f.others["openai"]
+	onc, _ := oa.cfg["network_config"].(map[string]any)
+	if onc["base_url"] != "" || onc["allow_private_network"] != false || oa.cfg["store_raw_request_response"] != true || onc["max_retries"] != float64(1) {
+		t.Errorf("openai provider = %v", oa.cfg)
+	}
+	if len(oa.keys) != 2 || oa.keys[0]["value"] != "sk-real-openai" || oa.keys[1]["value"] != "sk-real-openai" || f.keys[0]["value"] != "fp-slot-1" {
+		t.Errorf("keys anthropic %v openai %v", f.keys, oa.keys)
+	}
+	// A second Setup changes nothing on the providers.
+	puts := f.count("PUT /api/providers/{p}")
+	if err := g.Setup(context.Background()); err != nil || f.count("PUT /api/providers/{p}") != puts {
+		t.Errorf("second setup: %v, provider PUTs %d -> %d", err, puts, f.count("PUT /api/providers/{p}"))
+	}
+	// A direct provider without its key refuses to set up.
+	cfg := multiConfig(f.srv.URL)
+	cfg.Getenv = func(string) string { return "" }
+	g2, err := New(cfg)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := g2.Setup(context.Background()); err == nil || !strings.Contains(err.Error(), "OPENAI_API_KEY is not set") {
+		t.Errorf("setup without key: %v", err)
+	}
+}
+
+func TestNewProviders(t *testing.T) {
+	tests := []struct {
+		name    string
+		mutate  func(*Config)
+		wantErr string
+	}{
+		{name: "valid", mutate: func(*Config) {}},
+		{name: "duplicate provider", mutate: func(c *Config) { c.Providers = append(c.Providers, c.Providers[0]) }, wantErr: "listed twice"},
+		{name: "slot shared across providers", mutate: func(c *Config) { c.Providers[1].Slots = []Slot{{Name: "fp-slot-1"}} }, wantErr: "slot fp-slot-1 is listed twice"},
+		{name: "bad mode", mutate: func(c *Config) { c.Providers[0].Mode = "mirror" }, wantErr: "mode must be proxied or direct"},
+		{name: "direct without key env", mutate: func(c *Config) { c.Providers[1].KeyEnv = "" }, wantErr: "key env is required"},
+		{name: "proxied without proxy", mutate: func(c *Config) { c.FaultProxyURL = "" }, wantErr: "fault proxy url is required"},
+		{name: "direct only needs no proxy", mutate: func(c *Config) { c.FaultProxyURL, c.Providers = "", c.Providers[1:] }},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			cfg := multiConfig("http://x")
+			cfg.Providers = append([]ProviderSetup{}, cfg.Providers...)
+			tt.mutate(&cfg)
+			_, err := New(cfg)
+			if (tt.wantErr == "") != (err == nil) || (err != nil && !strings.Contains(err.Error(), tt.wantErr)) {
+				t.Fatalf("err = %v, want %q", err, tt.wantErr)
+			}
+		})
+	}
 }

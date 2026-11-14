@@ -1,0 +1,277 @@
+{
+  "id": "e0c254cd-9133-47ae-8ff8-74e4d14657ee",
+  "inc_number": 5,
+  "parent_request_id": null,
+  "timestamp": "2026-11-13T23:52:00.068386Z",
+  "object": "responses_stream",
+  "provider": "openai",
+  "model": "gpt-5.4-mini",
+  "number_of_retries": 0,
+  "fallback_index": 0,
+  "selected_key_id": "85a3ce7e-0d0c-4f5b-85cf-b2419ccbc970",
+  "selected_key_name": "oa-slot-1",
+  "virtual_key_id": "22f0423c-87b8-4b9c-87d9-39701df5ac53",
+  "virtual_key_name": "r_yegqmia4f0",
+  "routing_rule_id": null,
+  "routing_rule_name": null,
+  "selected_prompt_name": null,
+  "selected_prompt_version": null,
+  "selected_prompt_id": null,
+  "user_id": null,
+  "user_name": null,
+  "team_id": null,
+  "team_name": null,
+  "customer_id": null,
+  "customer_name": null,
+  "business_unit_id": null,
+  "business_unit_name": null,
+  "project_id": null,
+  "project_name": null,
+  "user_agent": "Go-http-client/1.1",
+  "app": "Other",
+  "latency": 19.187257,
+  "upstream_latency": 18.267823,
+  "overhead_latency": 0.919434,
+  "cost": 0.00017287500000000001,
+  "cost_breakdown": {
+    "input_cost": 0.000028875,
+    "input_cost_details": {
+      "text_cost": 0.00002625,
+      "cached_read_cost": 0.000002625
+    },
+    "output_cost": 0.000144,
+    "output_cost_details": {
+      "text_cost": 0.000144
+    },
+    "total_cost": 0.00017287500000000001
+  },
+  "status": "success",
+  "stream": true,
+  "content_summary": "openai responses",
+  "raw_request": "{\"model\":\"gpt-5.4-mini\",\"stream\":true,\"input\":[{\"role\":\"user\",\"content\":\"openai responses\"}],\"tools\":[{\"type\":\"function\",\"name\":\"shell\",\"description\":\"Run a command\",\"parameters\":{\"type\":\"object\",\"properties\":{\"command\":{\"type\":\"string\"}},\"required\":[\"command\"]},\"strict\":false}]}",
+  "raw_response": "{\"response\":{\"created_at\":1794613920,\"error\":null,\"id\":\"resp_ft1rkqd5a0c6ijbm3rhzwyv2\",\"incomplete_details\":null,\"model\":\"gpt-5.4-mini\",\"object\":\"response\",\"output\":[],\"parallel_tool_calls\":true,\"status\":\"in_progress\",\"store\":false,\"tool_choice\":\"auto\",\"tools\":[],\"usage\":null},\"sequence_number\":0,\"type\":\"response.created\"}\n\n{\"response\":{\"created_at\":1794613920,\"error\":null,\"id\":\"resp_ft1rkqd5a0c6ijbm3rhzwyv2\",\"incomplete_details\":null,\"model\":\"gpt-5.4-mini\",\"object\":\"response\",\"output\":[],\"parallel_tool_calls\":true,\"status\":\"in_progress\",\"store\":false,\"tool_choice\":\"auto\",\"tools\":[],\"usage\":null},\"sequence_number\":1,\"type\":\"response.in_progress\"}\n\n{\"item\":{\"arguments\":\"\",\"call_id\":\"call_8sllltzu4obuh9rcwbv09z89\",\"id\":\"fc_bq3ydozj1gay0d2knb4zmmcy\",\"name\":\"shell\",\"status\":\"in_progress\",\"type\":\"function_call\"},\"output_index\":0,\"sequence_number\":2,\"type\":\"response.output_item.added\"}\n\n{\"delta\":\"{\\\"command\\\":\\\"\\\"}\",\"item_id\":\"fc_bq3ydozj1gay0d2knb4zmmcy\",\"output_index\":0,\"sequence_number\":3,\"type\":\"response.function_call_arguments.delta\"}\n\n{\"arguments\":\"{\\\"command\\\":\\\"\\\"}\",\"item_id\":\"fc_bq3ydozj1gay0d2knb4zmmcy\",\"output_index\":0,\"sequence_number\":4,\"type\":\"response.function_call_arguments.done\"}\n\n{\"item\":{\"arguments\":\"{\\\"command\\\":\\\"\\\"}\",\"call_id\":\"call_8sllltzu4obuh9rcwbv09z89\",\"id\":\"fc_bq3ydozj1gay0d2knb4zmmcy\",\"name\":\"shell\",\"status\":\"completed\",\"type\":\"function_call\"},\"output_index\":0,\"sequence_number\":5,\"type\":\"response.output_item.done\"}\n\n{\"response\":{\"created_at\":1794613920,\"error\":null,\"id\":\"resp_ft1rkqd5a0c6ijbm3rhzwyv2\",\"incomplete_details\":null,\"model\":\"gpt-5.4-mini\",\"object\":\"response\",\"output\":[{\"arguments\":\"{\\\"command\\\":\\\"\\\"}\",\"call_id\":\"call_8sllltzu4obuh9rcwbv09z89\",\"id\":\"fc_bq3ydozj1gay0d2knb4zmmcy\",\"name\":\"shell\",\"status\":\"completed\",\"type\":\"function_call\"}],\"parallel_tool_calls\":true,\"status\":\"completed\",\"store\":false,\"tool_choice\":\"auto\",\"tools\":[],\"usage\":{\"input_tokens\":70,\"input_tokens_details\":{\"cached_tokens\":35},\"output_tokens\":32,\"output_tokens_details\":{\"reasoning_tokens\":0},\"total_tokens\":102}},\"sequence_number\":6,\"type\":\"response.completed\"}",
+  "routing_engine_logs": "[1794613920068] [governance] [info] - Load balancing provider for model gpt-5.4-mini\n[1794613920068] [governance] [info] - Load balancing model gpt-5.4-mini across 1 available providers: [openai]\n[1794613920068] [governance] [info] - Allowed providers after filtering: [openai]\n[1794613920068] [governance] [info] - Selected provider openai for model gpt-5.4-mini (from 1 weighted: [openai])\n",
+  "plugin_logs": "{\"compat\":[{\"plugin_name\":\"compat\",\"level\":\"debug\",\"message\":\"no unsupported params to drop for model gpt-5.4-mini\",\"timestamp\":1794613920068},{\"plugin_name\":\"compat\",\"level\":\"debug\",\"message\":\"no param values converted for model gpt-5.4-mini (openai)\",\"timestamp\":1794613920068}]}",
+  "is_large_payload_request": false,
+  "is_large_payload_response": false,
+  "content_hidden": false,
+  "created_at": "2026-11-13T23:52:00.068386Z",
+  "routing_engines_used": [
+    "governance"
+  ],
+  "tool_call_names": [
+    "shell"
+  ],
+  "responses_input_history": [
+    {
+      "role": "user",
+      "content": "openai responses"
+    }
+  ],
+  "responses_output": [
+    {
+      "arguments": "{\"command\":\"\"}",
+      "id": "fc_bq3ydozj1gay0d2knb4zmmcy",
+      "type": "function_call",
+      "status": "completed",
+      "call_id": "call_8sllltzu4obuh9rcwbv09z89",
+      "name": "shell"
+    }
+  ],
+  "params": {
+    "tools": [
+      {
+        "description": "Run a command",
+        "name": "shell",
+        "parameters": {
+          "properties": {
+            "command": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "command"
+          ],
+          "type": "object"
+        },
+        "strict": null,
+        "type": "function"
+      }
+    ]
+  },
+  "tools": [
+    {
+      "type": "function",
+      "function": {
+        "name": "shell",
+        "description": "Run a command",
+        "parameters": {
+          "properties": {
+            "command": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "command"
+          ],
+          "type": "object"
+        }
+      }
+    }
+  ],
+  "tool_calls": [
+    {
+      "index": 0,
+      "type": "function",
+      "id": "call_8sllltzu4obuh9rcwbv09z89",
+      "function": {
+        "name": "shell",
+        "arguments": "{\"command\":\"\"}"
+      }
+    }
+  ],
+  "token_usage": {
+    "prompt_tokens": 70,
+    "prompt_tokens_details": {
+      "cached_read_tokens": 35,
+      "cached_tokens": 35,
+      "cache_write_tokens": 0
+    },
+    "completion_tokens": 32,
+    "completion_tokens_details": {},
+    "total_tokens": 102,
+    "cost": {
+      "input_cost": 0.000028875,
+      "input_cost_details": {
+        "text_cost": 0.00002625,
+        "cached_read_cost": 0.000002625
+      },
+      "output_cost": 0.000144,
+      "output_cost_details": {
+        "text_cost": 0.000144
+      },
+      "total_cost": 0.00017287500000000001
+    }
+  },
+  "attempt_trail": [
+    {
+      "attempt": 0,
+      "key_id": "85a3ce7e-0d0c-4f5b-85cf-b2419ccbc970",
+      "key_name": "oa-slot-1",
+      "triggered_rotation": false
+    }
+  ],
+  "overhead_breakdown": [
+    {
+      "name": "response-parse",
+      "duration_us": 116.791
+    },
+    {
+      "name": "stream-client-write",
+      "duration_us": 6.176
+    },
+    {
+      "name": "convertor.stream-out",
+      "duration_us": 0.732
+    },
+    {
+      "name": "plugin.telemetry",
+      "duration_us": 203.127
+    },
+    {
+      "name": "plugin.prompts",
+      "duration_us": 3.733
+    },
+    {
+      "name": "plugin.logging",
+      "duration_us": 311.424
+    },
+    {
+      "name": "plugin.governance",
+      "duration_us": 69.653
+    },
+    {
+      "name": "plugin.compat",
+      "duration_us": 13.181
+    },
+    {
+      "name": "transport-context",
+      "duration_us": 19.367
+    },
+    {
+      "name": "convertor",
+      "duration_us": 13.357
+    },
+    {
+      "name": "plugin.routing",
+      "duration_us": 51.446
+    },
+    {
+      "name": "plugin.model-catalog-resolver",
+      "duration_us": 5.006
+    },
+    {
+      "name": "miscellaneous",
+      "duration_us": 5.844
+    },
+    {
+      "name": "pipeline-pre",
+      "duration_us": 5.031
+    },
+    {
+      "name": "queue-wait",
+      "duration_us": 5.225
+    },
+    {
+      "name": "worker-setup",
+      "duration_us": 1.606
+    },
+    {
+      "name": "key-pool",
+      "duration_us": 11.171
+    },
+    {
+      "name": "key.selection",
+      "duration_us": 1.062
+    },
+    {
+      "name": "attribute-population",
+      "duration_us": 9.79
+    },
+    {
+      "name": "request-marshal",
+      "duration_us": 55.455
+    },
+    {
+      "name": "transport-response-headers",
+      "duration_us": 10.257
+    }
+  ],
+  "virtual_key": {
+    "agent_grants": null,
+    "allow_all_providers": false,
+    "calendar_aligned": false,
+    "config_hash": "",
+    "created_at": "0001-01-01T00:00:00Z",
+    "id": "22f0423c-87b8-4b9c-87d9-39701df5ac53",
+    "is_active": true,
+    "mcp_configs": null,
+    "name": "r_yegqmia4f0",
+    "provider_configs": null,
+    "relay_grants": null,
+    "updated_at": "0001-01-01T00:00:00Z",
+    "value": ""
+  },
+  "selected_key": {
+    "id": "85a3ce7e-0d0c-4f5b-85cf-b2419ccbc970",
+    "name": "oa-slot-1",
+    "value": {
+      "value": ""
+    },
+    "models": [
+      "gpt-5.4-mini"
+    ],
+    "blacklisted_models": [],
+    "weight": 1
+  }
+}

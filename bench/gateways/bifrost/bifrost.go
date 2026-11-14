@@ -1,8 +1,10 @@
 // Package bifrost implements schemas.Gateway against a stock Bifrost over its
 // HTTP management API (docs/DESIGN.md section 13, docs/spike.md).
 //
-// The bench owns one provider (anthropic) whose base URL is the fault proxy,
-// a fixed pool of provider keys ("key slots") and one virtual key per run.
+// The bench owns one or more providers, each with a fixed pool of provider
+// keys ("key slots"), and one virtual key per run on one slot. A proxied
+// provider's base URL is the fault proxy; a direct provider talks to its
+// real API (no ledger, no model faults).
 // Every management call carries the setup token in X-Bifrost-Setup-Token; the
 // token never reaches an agent container. Log rows are read back through
 // /api/logs and joined to the fault proxy ledger, which is the completeness
@@ -15,6 +17,8 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"net/url"
+	"os"
 	"strings"
 	"sync"
 	"time"
@@ -46,20 +50,46 @@ const (
 
 var _ schemas.Gateway = (*Gateway)(nil)
 
-// Config configures a Gateway.
+// Provider modes. A proxied provider's base URL is the fault proxy and its
+// keys are placeholder slots the proxy swaps for the real key; every call is
+// in the proxy ledger and model faults can be injected. A direct provider
+// talks to the real API with the real key held by Bifrost: no proxy, no
+// ledger, no model-outage probe.
+const (
+	ModeProxied = "proxied"
+	ModeDirect  = "direct"
+)
+
+// Config configures a Gateway. Providers lists every provider the bench
+// uses. The single-provider fields Provider, Model and Slots are the older
+// form: when Providers is empty they describe one proxied provider.
 type Config struct {
 	URL           string // Bifrost as the bench host sees it, e.g. http://127.0.0.1:18080
 	SetupToken    string // management credential; never logged, never given to an agent
-	Provider      string // anthropic
-	FaultProxyURL string // the fault proxy as Bifrost sees it, http://faultproxy:9100
-	Model         string // model every key slot serves at setup
-	Slots         []Slot
-	MaxRetries    int    // provider max_retries; 0 lets every fault reach the agent
-	EvalNetwork   string // internal docker network agents run on
-	HelperImage   string // image for the preflight egress probe; needs getent and python3
+	Providers     []ProviderSetup
+	Provider      string              // older form: the one provider, anthropic when empty
+	FaultProxyURL string              // the fault proxy as Bifrost sees it, http://faultproxy:9100
+	Model         string              // older form: model every key slot serves at setup
+	Slots         []Slot              // older form: the provider's key slots
+	MaxRetries    int                 // provider max_retries; 0 lets every fault reach the agent
+	EvalNetwork   string              // internal docker network agents run on
+	HelperImage   string              // image for the preflight egress probe; needs getent and python3
+	Getenv        func(string) string // reads direct providers' keys; os.Getenv when nil
 	Docker        utils.Docker
 	Logger        schemas.Logger
 	HTTP          *http.Client
+}
+
+// ProviderSetup is one Bifrost provider and its key slots. In proxied mode
+// each slot's Value is the placeholder the fault proxy maps back to the slot.
+// In direct mode every slot carries the real key read from KeyEnv at Setup;
+// slot values are ignored and the key is never logged or written to disk.
+type ProviderSetup struct {
+	Name   string // Bifrost provider name: anthropic, openai, gemini, groq, ...
+	Mode   string // proxied (default) | direct
+	Slots  []Slot
+	Model  string // model every slot serves at setup; MintKey adds the run's model
+	KeyEnv string // direct only: environment variable with the real key
 }
 
 // Slot is one provider key in Bifrost. Value is the placeholder credential
@@ -71,9 +101,10 @@ type Slot struct {
 
 // Gateway is the Bifrost client. It is safe for concurrent use.
 type Gateway struct {
-	cfg    Config
-	http   *http.Client
-	logger schemas.Logger
+	cfg       Config
+	providers []ProviderSetup // normalized from cfg, read-only
+	http      *http.Client
+	logger    schemas.Logger
 	// pageSize and settle are the log list page size and emptyLedgerSettle;
 	// fields so tests can shrink them.
 	pageSize int
@@ -97,10 +128,11 @@ type mintRecord struct {
 // configures Bifrost.
 func New(cfg Config) (*Gateway, error) {
 	cfg.URL = strings.TrimRight(cfg.URL, "/")
-	if cfg.Provider == "" {
-		cfg.Provider = DefaultProvider
+	if cfg.Getenv == nil {
+		cfg.Getenv = os.Getenv
 	}
-	if err := validateConfig(cfg); err != nil {
+	providers := normalizeProviders(cfg)
+	if err := validateConfig(cfg, providers); err != nil {
 		return nil, err
 	}
 	client := cfg.HTTP
@@ -112,10 +144,20 @@ func New(cfg Config) (*Gateway, error) {
 		logger = schemas.NoopLogger{}
 	}
 	return &Gateway{
-		cfg: cfg, http: client, logger: logger, pageSize: logPageSize, settle: emptyLedgerSettle,
+		cfg: cfg, providers: providers, http: client, logger: logger, pageSize: logPageSize, settle: emptyLedgerSettle,
 		keyIDs: map[string]string{}, models: map[string]map[string]bool{},
 		inUse: map[string]string{}, minted: map[string]mintRecord{},
 	}, nil
+}
+
+// ProviderMode returns how the named provider is wired, ModeProxied or
+// ModeDirect, or "" when the gateway does not configure it. Probes that
+// inject model faults must refuse a direct provider at plan time.
+func (g *Gateway) ProviderMode(name string) string {
+	if p, ok := g.provider(name); ok {
+		return p.Mode
+	}
+	return ""
 }
 
 // GetName implements schemas.Part.
@@ -124,29 +166,48 @@ func (g *Gateway) GetName() string { return Name }
 // GetVersion implements schemas.Part.
 func (g *Gateway) GetVersion() string { return Version }
 
-// Setup configures the provider and its key slots, as the spike's setup.sh
+// Setup configures every provider and its key slots, as the spike's setup.sh
 // does, and records each slot's key id. It is idempotent: an existing
 // provider is updated in place only when a recorded setting differs (every
-// provider PUT makes Bifrost list models on the proxy for each key), and an
+// provider PUT makes Bifrost list models upstream for each key), and an
 // existing key is updated rather than created, because Bifrost masks key
 // values and its key names are unique across providers.
 func (g *Gateway) Setup(ctx context.Context) error {
-	if err := g.ensureProvider(ctx); err != nil {
+	for _, p := range g.providers {
+		if err := g.setupProvider(ctx, p); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// setupProvider configures one provider and its slots.
+func (g *Gateway) setupProvider(ctx context.Context, p ProviderSetup) error {
+	secret := ""
+	if p.Mode == ModeDirect {
+		if secret = strings.TrimSpace(g.cfg.Getenv(p.KeyEnv)); secret == "" {
+			return fmt.Errorf("direct provider %s: %s is not set", p.Name, p.KeyEnv)
+		}
+	}
+	if err := g.ensureProvider(ctx, p); err != nil {
 		return err
 	}
 	var existing struct {
 		Keys []providerKey `json:"keys"`
 	}
-	if err := g.call(ctx, http.MethodGet, g.providerPath()+"/keys", nil, &existing); err != nil {
-		return fmt.Errorf("list %s keys: %w", g.cfg.Provider, err)
+	if err := g.call(ctx, http.MethodGet, providerPath(p.Name)+"/keys", nil, &existing); err != nil {
+		return fmt.Errorf("list %s keys: %w", p.Name, err)
 	}
 	byName := make(map[string]providerKey, len(existing.Keys))
 	for _, k := range existing.Keys {
 		byName[k.Name] = k
 	}
-	for _, s := range g.cfg.Slots {
-		models := mergeModels(byName[s.Name].Models, g.cfg.Model)
-		id, err := g.upsertKey(ctx, s, byName[s.Name].ID, models)
+	for _, s := range p.Slots {
+		if secret != "" {
+			s.Value = secret
+		}
+		models := mergeModels(byName[s.Name].Models, p.Model)
+		id, err := g.upsertKey(ctx, p.Name, s, byName[s.Name].ID, models)
 		if err != nil {
 			return err
 		}
@@ -155,8 +216,8 @@ func (g *Gateway) Setup(ctx context.Context) error {
 		g.models[s.Name] = toSet(models)
 		g.mu.Unlock()
 	}
-	g.logger.Info("bifrost gateway set up", "provider", g.cfg.Provider, "slots", len(g.cfg.Slots),
-		"base_url", g.cfg.FaultProxyURL, "max_retries", g.cfg.MaxRetries)
+	g.logger.Info("bifrost provider set up", "provider", p.Name, "mode", p.Mode, "slots", len(p.Slots),
+		"base_url", g.baseURL(p), "max_retries", g.cfg.MaxRetries)
 	return nil
 }
 
@@ -183,7 +244,30 @@ type providerConfig struct {
 	StoreRaw bool `json:"store_raw_request_response"`
 }
 
-func validateConfig(cfg Config) error {
+// normalizeProviders turns cfg into the provider list: Providers as given,
+// or the older single-provider fields as one proxied provider. Mode defaults
+// to proxied. It never modifies cfg.
+func normalizeProviders(cfg Config) []ProviderSetup {
+	src := cfg.Providers
+	if len(src) == 0 {
+		name := cfg.Provider
+		if name == "" {
+			name = DefaultProvider
+		}
+		src = []ProviderSetup{{Name: name, Mode: ModeProxied, Slots: cfg.Slots, Model: cfg.Model}}
+	}
+	out := make([]ProviderSetup, 0, len(src))
+	for _, p := range src {
+		if p.Mode == "" {
+			p.Mode = ModeProxied
+		}
+		p.Slots = append([]Slot{}, p.Slots...)
+		out = append(out, p)
+	}
+	return out
+}
+
+func validateConfig(cfg Config, providers []ProviderSetup) error {
 	var errs []error
 	if cfg.URL == "" {
 		errs = append(errs, errors.New("url is required"))
@@ -191,27 +275,12 @@ func validateConfig(cfg Config) error {
 	if cfg.SetupToken == "" {
 		errs = append(errs, errors.New("setup token is required"))
 	}
-	if cfg.FaultProxyURL == "" {
-		errs = append(errs, errors.New("fault proxy url is required"))
-	}
-	if cfg.Model == "" {
-		errs = append(errs, errors.New("model is required"))
-	}
 	if cfg.MaxRetries < 0 {
 		errs = append(errs, fmt.Errorf("max retries %d is negative", cfg.MaxRetries))
 	}
-	if len(cfg.Slots) == 0 {
-		errs = append(errs, errors.New("at least one key slot is required"))
-	}
-	seen := map[string]bool{}
-	for i, s := range cfg.Slots {
-		switch {
-		case s.Name == "" || s.Value == "":
-			errs = append(errs, fmt.Errorf("slot %d needs a name and a value", i))
-		case seen[s.Name]:
-			errs = append(errs, fmt.Errorf("slot %s is listed twice", s.Name))
-		}
-		seen[s.Name] = true
+	names, slots := map[string]bool{}, map[string]bool{}
+	for _, p := range providers {
+		errs = append(errs, validateProvider(cfg, p, names, slots)...)
 	}
 	if len(errs) > 0 {
 		return fmt.Errorf("bifrost gateway config: %w", errors.Join(errs...))
@@ -219,39 +288,80 @@ func validateConfig(cfg Config) error {
 	return nil
 }
 
+func validateProvider(cfg Config, p ProviderSetup, names, slots map[string]bool) []error {
+	var errs []error
+	switch {
+	case p.Name == "":
+		errs = append(errs, errors.New("provider name is required"))
+	case names[p.Name]:
+		errs = append(errs, fmt.Errorf("provider %s is listed twice", p.Name))
+	}
+	names[p.Name] = true
+	switch p.Mode {
+	case ModeProxied:
+		if cfg.FaultProxyURL == "" {
+			errs = append(errs, fmt.Errorf("provider %s: fault proxy url is required", p.Name))
+		}
+	case ModeDirect:
+		if p.KeyEnv == "" {
+			errs = append(errs, fmt.Errorf("direct provider %s: key env is required", p.Name))
+		}
+	default:
+		errs = append(errs, fmt.Errorf("provider %s: mode must be proxied or direct, got %q", p.Name, p.Mode))
+	}
+	if p.Model == "" {
+		errs = append(errs, fmt.Errorf("provider %s: model is required", p.Name))
+	}
+	if len(p.Slots) == 0 {
+		errs = append(errs, fmt.Errorf("provider %s: at least one key slot is required", p.Name))
+	}
+	for i, s := range p.Slots {
+		switch {
+		case s.Name == "" || (s.Value == "" && p.Mode == ModeProxied):
+			errs = append(errs, fmt.Errorf("provider %s: slot %d needs a name and a value", p.Name, i))
+		case slots[s.Name]:
+			errs = append(errs, fmt.Errorf("slot %s is listed twice", s.Name))
+		}
+		slots[s.Name] = true
+	}
+	return errs
+}
+
 // ensureProvider creates the provider, or updates it when a setting the bench
 // owns differs from the wanted value.
-func (g *Gateway) ensureProvider(ctx context.Context) error {
+func (g *Gateway) ensureProvider(ctx context.Context, p ProviderSetup) error {
 	var cur providerConfig
-	err := g.call(ctx, http.MethodGet, g.providerPath(), nil, &cur)
+	err := g.call(ctx, http.MethodGet, providerPath(p.Name), nil, &cur)
 	switch {
 	case isStatus(err, http.StatusNotFound):
-		body := g.providerBody()
-		body["provider"] = g.cfg.Provider
+		body := g.providerBody(p)
+		body["provider"] = p.Name
 		if err := g.call(ctx, http.MethodPost, "/api/providers", body, nil); err != nil {
-			return fmt.Errorf("create provider %s: %w", g.cfg.Provider, err)
+			return fmt.Errorf("create provider %s: %w", p.Name, err)
 		}
 		return nil
 	case err != nil:
-		return fmt.Errorf("get provider %s: %w", g.cfg.Provider, err)
-	case g.providerMatches(cur):
+		return fmt.Errorf("get provider %s: %w", p.Name, err)
+	case g.providerMatches(p, cur):
 		return nil
 	}
-	if err := g.call(ctx, http.MethodPut, g.providerPath(), g.providerBody(), nil); err != nil {
-		return fmt.Errorf("update provider %s: %w", g.cfg.Provider, err)
+	if err := g.call(ctx, http.MethodPut, providerPath(p.Name), g.providerBody(p), nil); err != nil {
+		return fmt.Errorf("update provider %s: %w", p.Name, err)
 	}
 	return nil
 }
 
-// providerBody is the provider definition from the spike: the fault proxy as
-// base URL (a private address, hence allow_private_network), explicit
-// retries with short backoffs, and raw request and response storage, which
-// puts the upstream message id and the request bytes into each log row.
-func (g *Gateway) providerBody() map[string]any {
+// providerBody is the provider definition from the spike: explicit retries
+// with short backoffs and raw request and response storage, which puts the
+// upstream response id and the request bytes into each log row. A proxied
+// provider's base URL is the fault proxy (a private address, hence
+// allow_private_network); a direct provider keeps Bifrost's default base URL
+// (an empty base_url).
+func (g *Gateway) providerBody(p ProviderSetup) map[string]any {
 	return map[string]any{
 		"network_config": map[string]any{
-			"base_url":                           g.cfg.FaultProxyURL,
-			"allow_private_network":              true,
+			"base_url":                           g.baseURL(p),
+			"allow_private_network":              p.Mode == ModeProxied,
 			"max_retries":                        g.cfg.MaxRetries,
 			"retry_backoff_initial":              retryBackoffMS,
 			"retry_backoff_max":                  retryBackoffMaxMS,
@@ -265,23 +375,33 @@ func (g *Gateway) providerBody() map[string]any {
 	}
 }
 
-func (g *Gateway) providerMatches(cur providerConfig) bool {
+func (g *Gateway) providerMatches(p ProviderSetup, cur providerConfig) bool {
 	n := cur.NetworkConfig
-	return n.BaseURL == g.cfg.FaultProxyURL && n.AllowPrivateNetwork && n.MaxRetries == g.cfg.MaxRetries &&
+	return n.BaseURL == g.baseURL(p) && n.AllowPrivateNetwork == (p.Mode == ModeProxied) && n.MaxRetries == g.cfg.MaxRetries &&
 		n.RetryBackoffInitial == retryBackoffMS && n.RetryBackoffMax == retryBackoffMaxMS &&
 		n.RequestTimeoutS == requestTimeoutS && cur.StoreRaw
 }
 
+// baseURL is the base_url the provider must have: the fault proxy, or empty
+// (Bifrost's default) for a direct provider.
+func (g *Gateway) baseURL(p ProviderSetup) string {
+	if p.Mode == ModeDirect {
+		return ""
+	}
+	return g.cfg.FaultProxyURL
+}
+
 // upsertKey creates the slot's provider key, or updates it in place when id
-// is set, and returns the key id. Weight 1 is required for routing.
-func (g *Gateway) upsertKey(ctx context.Context, s Slot, id string, models []string) (string, error) {
+// is set, and returns the key id. Weight 1 is required for routing. The value
+// may be a real key (direct mode); it is sent only in the request body.
+func (g *Gateway) upsertKey(ctx context.Context, provider string, s Slot, id string, models []string) (string, error) {
 	body := map[string]any{"name": s.Name, "value": s.Value, "models": models, "weight": 1, "enabled": true}
 	var out providerKey
 	if id == "" {
-		if err := g.call(ctx, http.MethodPost, g.providerPath()+"/keys", body, &out); err != nil {
+		if err := g.call(ctx, http.MethodPost, providerPath(provider)+"/keys", body, &out); err != nil {
 			return "", fmt.Errorf("create key slot %s: %w", s.Name, err)
 		}
-	} else if err := g.call(ctx, http.MethodPut, g.providerPath()+"/keys/"+id, body, &out); err != nil {
+	} else if err := g.call(ctx, http.MethodPut, providerPath(provider)+"/keys/"+id, body, &out); err != nil {
 		return "", fmt.Errorf("update key slot %s: %w", s.Name, err)
 	}
 	if out.ID == "" {
@@ -293,8 +413,30 @@ func (g *Gateway) upsertKey(ctx context.Context, s Slot, id string, models []str
 	return out.ID, nil
 }
 
-func (g *Gateway) providerPath() string {
-	return "/api/providers/" + g.cfg.Provider
+// provider returns the named provider's setup.
+func (g *Gateway) provider(name string) (ProviderSetup, bool) {
+	for _, p := range g.providers {
+		if p.Name == name {
+			return p, true
+		}
+	}
+	return ProviderSetup{}, false
+}
+
+// slotProvider returns the provider that owns a slot.
+func (g *Gateway) slotProvider(slot string) (ProviderSetup, bool) {
+	for _, p := range g.providers {
+		for _, s := range p.Slots {
+			if s.Name == slot {
+				return p, true
+			}
+		}
+	}
+	return ProviderSetup{}, false
+}
+
+func providerPath(name string) string {
+	return "/api/providers/" + url.PathEscape(name)
 }
 
 // mergeModels returns have plus want, without duplicates, in a stable order.

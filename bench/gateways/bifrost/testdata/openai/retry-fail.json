@@ -1,0 +1,205 @@
+{
+  "id": "b409be78-1fa0-4f6a-9099-722944034dd6",
+  "inc_number": 11,
+  "parent_request_id": null,
+  "timestamp": "2026-11-13T23:52:00.222162Z",
+  "object": "responses",
+  "provider": "openai",
+  "model": "gpt-5.4-mini",
+  "number_of_retries": 1,
+  "fallback_index": 0,
+  "selected_key_id": "",
+  "selected_key_name": "",
+  "virtual_key_id": "22f0423c-87b8-4b9c-87d9-39701df5ac53",
+  "virtual_key_name": "r_yegqmia4f0",
+  "routing_rule_id": null,
+  "routing_rule_name": null,
+  "selected_prompt_name": null,
+  "selected_prompt_version": null,
+  "selected_prompt_id": null,
+  "user_id": null,
+  "user_name": null,
+  "team_id": null,
+  "team_name": null,
+  "customer_id": null,
+  "customer_name": null,
+  "business_unit_id": null,
+  "business_unit_name": null,
+  "project_id": null,
+  "project_name": null,
+  "user_agent": "Go-http-client/1.1",
+  "app": "Other",
+  "latency": 93.974797,
+  "upstream_latency": 0.525041,
+  "overhead_latency": 93.449756,
+  "status": "error",
+  "stream": false,
+  "content_summary": "openai retry fail The server is overloaded or not ready yet. ref oafailfac5c7ed call 2",
+  "raw_request": "{\"model\":\"gpt-5.4-mini\",\"input\":[{\"role\":\"user\",\"content\":\"openai retry fail\"}]}",
+  "raw_response": "{\"error\":{\"code\":null,\"message\":\"The server is overloaded or not ready yet. ref oafailfac5c7ed call 2\",\"type\":\"server_error\"}}",
+  "routing_engine_logs": "[1794613920222] [governance] [info] - Load balancing provider for model gpt-5.4-mini\n[1794613920222] [governance] [info] - Load balancing model gpt-5.4-mini across 1 available providers: [openai]\n[1794613920222] [governance] [info] - Allowed providers after filtering: [openai]\n[1794613920222] [governance] [info] - Selected provider openai for model gpt-5.4-mini (from 1 weighted: [openai])\n[1794613920222] [core] [info] - Retry 1/1 for openai/gpt-5.4-mini (previous attempt failed: server_error HTTP 503; same key=oa-slot-1)\n[1794613920311] [core] [error] - Retries exhausted for openai/gpt-5.4-mini after 2 attempt(s); last error: server_error HTTP 503\n",
+  "plugin_logs": "{\"compat\":[{\"plugin_name\":\"compat\",\"level\":\"debug\",\"message\":\"no unsupported params to drop for model gpt-5.4-mini\",\"timestamp\":1794613920222},{\"plugin_name\":\"compat\",\"level\":\"debug\",\"message\":\"no param values converted for model gpt-5.4-mini (openai)\",\"timestamp\":1794613920222}]}",
+  "is_large_payload_request": false,
+  "is_large_payload_response": false,
+  "content_hidden": false,
+  "created_at": "2026-11-13T23:52:00.222162Z",
+  "routing_engines_used": [
+    "governance"
+  ],
+  "responses_input_history": [
+    {
+      "role": "user",
+      "content": "openai retry fail"
+    }
+  ],
+  "params": {},
+  "error_details": {
+    "is_bifrost_error": false,
+    "status_code": 503,
+    "error": {
+      "type": "server_error",
+      "message": "The server is overloaded or not ready yet. ref oafailfac5c7ed call 2"
+    },
+    "extra_fields": {
+      "routing_info": {
+        "provider": "openai",
+        "model": "gpt-5.4-mini",
+        "key": "oa-slot-1",
+        "requested_model": "gpt-5.4-mini"
+      },
+      "provider": "openai",
+      "original_model_requested": "gpt-5.4-mini",
+      "resolved_model_used": "gpt-5.4-mini",
+      "request_type": "responses"
+    }
+  },
+  "attempt_trail": [
+    {
+      "attempt": 0,
+      "key_id": "85a3ce7e-0d0c-4f5b-85cf-b2419ccbc970",
+      "key_name": "oa-slot-1",
+      "fail_reason": "server_error",
+      "failure_class": "transient",
+      "status_code": 503,
+      "triggered_rotation": false
+    },
+    {
+      "attempt": 1,
+      "key_id": "85a3ce7e-0d0c-4f5b-85cf-b2419ccbc970",
+      "key_name": "oa-slot-1",
+      "fail_reason": "server_error",
+      "failure_class": "transient",
+      "status_code": 503,
+      "triggered_rotation": false
+    }
+  ],
+  "overhead_breakdown": [
+    {
+      "name": "worker-handoff",
+      "duration_us": 8.714
+    },
+    {
+      "name": "plugin.telemetry",
+      "duration_us": 89.572
+    },
+    {
+      "name": "plugin.prompts",
+      "duration_us": 7.122
+    },
+    {
+      "name": "plugin.logging",
+      "duration_us": 92.45
+    },
+    {
+      "name": "plugin.governance",
+      "duration_us": 38.298
+    },
+    {
+      "name": "plugin.compat",
+      "duration_us": 56.676
+    },
+    {
+      "name": "transport-context",
+      "duration_us": 18.516
+    },
+    {
+      "name": "convertor",
+      "duration_us": 31.256
+    },
+    {
+      "name": "handle-setup",
+      "duration_us": 7.905
+    },
+    {
+      "name": "plugin.routing",
+      "duration_us": 30.685
+    },
+    {
+      "name": "plugin.model-catalog-resolver",
+      "duration_us": 4.122
+    },
+    {
+      "name": "miscellaneous",
+      "duration_us": 5.639
+    },
+    {
+      "name": "pipeline-pre",
+      "duration_us": 7.015
+    },
+    {
+      "name": "queue-wait",
+      "duration_us": 5.686
+    },
+    {
+      "name": "worker-setup",
+      "duration_us": 1.547
+    },
+    {
+      "name": "key-pool",
+      "duration_us": 13.012
+    },
+    {
+      "name": "key.selection",
+      "duration_us": 1.062
+    },
+    {
+      "name": "attribute-population",
+      "duration_us": 78.114
+    },
+    {
+      "name": "request-marshal",
+      "duration_us": 105.432
+    },
+    {
+      "name": "response-finalize",
+      "duration_us": 10.009
+    },
+    {
+      "name": "pipeline-post",
+      "duration_us": 18.309
+    },
+    {
+      "name": "transport-response-headers",
+      "duration_us": 7.435
+    },
+    {
+      "name": "scheduling",
+      "duration_us": 92811.18
+    }
+  ],
+  "virtual_key": {
+    "agent_grants": null,
+    "allow_all_providers": false,
+    "calendar_aligned": false,
+    "config_hash": "",
+    "created_at": "0001-01-01T00:00:00Z",
+    "id": "22f0423c-87b8-4b9c-87d9-39701df5ac53",
+    "is_active": true,
+    "mcp_configs": null,
+    "name": "r_yegqmia4f0",
+    "provider_configs": null,
+    "relay_grants": null,
+    "updated_at": "0001-01-01T00:00:00Z",
+    "value": ""
+  }
+}

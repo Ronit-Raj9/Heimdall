@@ -27,6 +27,7 @@ const (
 	SettingContentLogs  = "content_logging"
 	SettingDirectKeys   = "allow_direct_keys"
 	SettingKeySlots     = "key_slots"
+	SettingMode         = "mode" // proxied | direct, per provider
 
 	egressBlocked = "blocked"
 	egressOpen    = "open"
@@ -80,7 +81,7 @@ func (g *Gateway) Preflight(ctx context.Context) (*schemas.GatewayManifest, erro
 		m.Plugins = append([]string{}, plugins.Plugins...)
 		sort.Strings(m.Plugins)
 	}
-	g.checkProvider(ctx, m, problem)
+	g.checkProviders(ctx, m, problem)
 	g.probeEgress(ctx, m, problem)
 	if ctx.Err() != nil {
 		return m, fmt.Errorf("gateway preflight: %w", ctx.Err())
@@ -139,32 +140,47 @@ func (g *Gateway) checkConfig(ctx context.Context, m *schemas.GatewayManifest, p
 	}
 }
 
-// checkProvider checks the provider's base URL, retries and raw storage, and
+// checkProviders checks every provider. The first provider's settings are
+// also recorded under the unprefixed keys, which older manifests used.
+func (g *Gateway) checkProviders(ctx context.Context, m *schemas.GatewayManifest, problem func(string, ...any)) {
+	for i, p := range g.providers {
+		set := func(key, value string) {
+			m.Settings[p.Name+"."+key] = value
+			if i == 0 {
+				m.Settings[key] = value
+			}
+		}
+		g.checkProvider(ctx, p, set, problem)
+	}
+}
+
+// checkProvider checks one provider's base URL, retries and raw storage, and
 // that every key slot exists.
-func (g *Gateway) checkProvider(ctx context.Context, m *schemas.GatewayManifest, problem func(string, ...any)) {
+func (g *Gateway) checkProvider(ctx context.Context, p ProviderSetup, set func(string, string), problem func(string, ...any)) {
+	set(SettingMode, p.Mode)
 	var cur providerConfig
-	if err := g.call(ctx, http.MethodGet, g.providerPath(), nil, &cur); err != nil {
-		problem("provider %s: %v (run Setup)", g.cfg.Provider, err)
+	if err := g.call(ctx, http.MethodGet, providerPath(p.Name), nil, &cur); err != nil {
+		problem("provider %s: %v (run Setup)", p.Name, err)
 		return
 	}
 	n := cur.NetworkConfig
-	m.Settings[SettingBaseURL] = n.BaseURL
-	m.Settings[SettingMaxRetries] = strconv.Itoa(n.MaxRetries)
-	m.Settings[SettingStoreRaw] = strconv.FormatBool(cur.StoreRaw)
-	if n.BaseURL != g.cfg.FaultProxyURL {
-		problem("provider base_url is %q, want the fault proxy %q", n.BaseURL, g.cfg.FaultProxyURL)
+	set(SettingBaseURL, n.BaseURL)
+	set(SettingMaxRetries, strconv.Itoa(n.MaxRetries))
+	set(SettingStoreRaw, strconv.FormatBool(cur.StoreRaw))
+	if want := g.baseURL(p); n.BaseURL != want {
+		problem("provider base_url is %q, want %q (%s, %s)", n.BaseURL, want, p.Name, p.Mode)
 	}
 	if n.MaxRetries != g.cfg.MaxRetries {
-		problem("provider max_retries is %d, want %d", n.MaxRetries, g.cfg.MaxRetries)
+		problem("provider max_retries is %d, want %d (%s)", n.MaxRetries, g.cfg.MaxRetries, p.Name)
 	}
 	if !cur.StoreRaw {
-		problem("provider store_raw_request_response is off; rows cannot be joined to the ledger")
+		problem("provider %s store_raw_request_response is off; rows cannot be joined to the ledger", p.Name)
 	}
 	var keys struct {
 		Keys []providerKey `json:"keys"`
 	}
-	if err := g.call(ctx, http.MethodGet, g.providerPath()+"/keys", nil, &keys); err != nil {
-		problem("provider keys: %v", err)
+	if err := g.call(ctx, http.MethodGet, providerPath(p.Name)+"/keys", nil, &keys); err != nil {
+		problem("provider %s keys: %v", p.Name, err)
 		return
 	}
 	have := map[string]bool{}
@@ -172,14 +188,14 @@ func (g *Gateway) checkProvider(ctx context.Context, m *schemas.GatewayManifest,
 		have[k.Name] = k.Enabled == nil || *k.Enabled
 	}
 	var missing []string
-	for _, s := range g.cfg.Slots {
+	for _, s := range p.Slots {
 		if !have[s.Name] {
 			missing = append(missing, s.Name)
 		}
 	}
-	m.Settings[SettingKeySlots] = strconv.Itoa(len(g.cfg.Slots) - len(missing))
+	set(SettingKeySlots, strconv.Itoa(len(p.Slots)-len(missing)))
 	if len(missing) > 0 {
-		problem("key slots missing or disabled: %s", strings.Join(missing, ", "))
+		problem("provider %s key slots missing or disabled: %s", p.Name, strings.Join(missing, ", "))
 	}
 }
 

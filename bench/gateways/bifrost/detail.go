@@ -171,15 +171,21 @@ func parseDetail(raw []byte) (*parsedRow, error) {
 	return p, nil
 }
 
-// toolCallsFromRaw returns the tool_use blocks of an Anthropic response body,
-// a JSON message or, for a stream, the event payloads Bifrost stored one per
-// blank-line-separated chunk. Streamed input arrives as input_json_delta
-// fragments and is joined before hashing. ArgsHash is the hex sha256 of the
+// toolCallsFromRaw returns the tool calls of an upstream response body: the
+// tool_use blocks of an Anthropic message, the tool_calls of an OpenAI chat
+// completion, or the function_call and custom_tool_call items of an OpenAI
+// Responses object; for an Anthropic stream, it reads
+// the event payloads Bifrost stored one per blank-line-separated chunk.
+// Streamed input arrives as input_json_delta fragments and is joined before
+// hashing. OpenAI streams are read by openAIToolCalls. ArgsHash is the hex sha256 of the
 // canonical input JSON, empty when the input could not be parsed (a cut
 // stream). It is pure.
 func toolCallsFromRaw(rawResponse string, stream bool) ([]schemas.ToolCallRef, error) {
 	if strings.TrimSpace(rawResponse) == "" {
 		return nil, nil
+	}
+	if calls, ok := openAIToolCalls(rawResponse, stream); ok {
+		return calls, nil
 	}
 	if !stream {
 		var msg struct {
@@ -263,16 +269,24 @@ func streamToolCalls(raw string) ([]schemas.ToolCallRef, error) {
 // JSON (an SSE comment or a truncated tail).
 func streamEvents(raw string) []streamEvent {
 	var out []streamEvent
-	for _, chunk := range strings.Split(raw, "\n\n") {
-		payload := ssePayload(chunk)
-		if payload == "" {
-			continue
-		}
+	for _, payload := range streamPayloads(raw) {
 		var ev streamEvent
 		if err := json.Unmarshal([]byte(payload), &ev); err != nil {
 			continue
 		}
 		out = append(out, ev)
+	}
+	return out
+}
+
+// streamPayloads returns the non-empty payload of every stored stream chunk,
+// SSE framing stripped. The OpenAI terminator "[DONE]" is dropped.
+func streamPayloads(raw string) []string {
+	var out []string
+	for _, chunk := range strings.Split(raw, "\n\n") {
+		if payload := ssePayload(chunk); payload != "" && payload != "[DONE]" {
+			out = append(out, payload)
+		}
 	}
 	return out
 }
@@ -332,31 +346,56 @@ func decodeJSON(b []byte) (any, error) {
 	return v, nil
 }
 
-// toolResultIDs returns the tool_use_id of every tool_result block in an
-// Anthropic request body, in order, without repeats.
+// toolResultIDs returns the tool result ids of a request body, in order,
+// without repeats: the tool_use_id of Anthropic tool_result blocks, the
+// tool_call_id of OpenAI chat "tool" messages, and the call_id of OpenAI
+// Responses *_call_output input items (function, custom tool, local shell).
 func toolResultIDs(rawRequest string) []string {
 	if strings.TrimSpace(rawRequest) == "" {
 		return nil
 	}
 	var req struct {
 		Messages []struct {
-			Content json.RawMessage `json:"content"`
+			Role       string          `json:"role"`
+			ToolCallID string          `json:"tool_call_id"`
+			Content    json.RawMessage `json:"content"`
 		} `json:"messages"`
+		Input json.RawMessage `json:"input"`
 	}
 	if err := json.Unmarshal([]byte(rawRequest), &req); err != nil {
 		return nil
 	}
 	var out []string
 	seen := map[string]bool{}
+	add := func(id string) {
+		if id != "" && !seen[id] {
+			seen[id] = true
+			out = append(out, id)
+		}
+	}
+	var items []struct {
+		Type   string `json:"type"`
+		CallID string `json:"call_id"`
+	}
+	if json.Unmarshal(req.Input, &items) == nil {
+		for _, it := range items {
+			if strings.HasSuffix(it.Type, "_call_output") {
+				add(it.CallID)
+			}
+		}
+	}
 	for _, m := range req.Messages {
+		if m.Role == "tool" {
+			add(m.ToolCallID)
+			continue
+		}
 		var blocks []contentBlock
 		if err := json.Unmarshal(m.Content, &blocks); err != nil {
 			continue // string content has no blocks
 		}
 		for _, b := range blocks {
-			if b.Type == "tool_result" && b.ToolUseID != "" && !seen[b.ToolUseID] {
-				seen[b.ToolUseID] = true
-				out = append(out, b.ToolUseID)
+			if b.Type == "tool_result" {
+				add(b.ToolUseID)
 			}
 		}
 	}
@@ -369,27 +408,48 @@ type response struct {
 	model string
 }
 
-// responseInfo reads the upstream message id and model: the top-level
-// message of a JSON body, or the message_start event of a stream.
+// responseInfo reads the upstream response id and model: the top-level
+// Anthropic message, OpenAI chat completion or Responses object of a JSON
+// body; or, in a stream, Anthropic's message_start, the first Responses event
+// that carries the response, or the first chat completion chunk.
 func responseInfo(raw string) response {
 	raw = strings.TrimSpace(raw)
 	if raw == "" {
 		return response{}
 	}
 	var msg struct {
-		Type  string `json:"type"`
-		ID    string `json:"id"`
-		Model string `json:"model"`
+		Type   string `json:"type"`
+		Object string `json:"object"`
+		ID     string `json:"id"`
+		Model  string `json:"model"`
 	}
 	if err := json.Unmarshal([]byte(raw), &msg); err == nil {
-		if msg.Type == "message" {
+		if msg.Type == "message" || msg.Object == "response" || msg.Object == "chat.completion" {
 			return response{id: msg.ID, model: msg.Model}
 		}
 		return response{}
 	}
-	for _, ev := range streamEvents(raw) {
-		if ev.Type == "message_start" && ev.Message != nil {
+	for _, payload := range streamPayloads(raw) {
+		var ev struct {
+			streamEvent
+			Object   string `json:"object"`
+			ID       string `json:"id"`
+			Model    string `json:"model"`
+			Response *struct {
+				ID    string `json:"id"`
+				Model string `json:"model"`
+			} `json:"response"`
+		}
+		if json.Unmarshal([]byte(payload), &ev) != nil {
+			continue
+		}
+		switch {
+		case ev.Type == "message_start" && ev.Message != nil:
 			return response{id: ev.Message.ID, model: ev.Message.Model}
+		case strings.HasPrefix(ev.Type, "response.") && ev.Response != nil && ev.Response.ID != "":
+			return response{id: ev.Response.ID, model: ev.Response.Model}
+		case ev.Object == "chat.completion.chunk" && ev.ID != "":
+			return response{id: ev.ID, model: ev.Model}
 		}
 	}
 	return response{}
