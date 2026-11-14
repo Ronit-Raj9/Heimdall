@@ -1,0 +1,3 @@
+# Keys of bench.ts `AgentList` (GET /agents), one per line.
+# The top-level response adds "mode". Change with bench.ts and schemas/suitesapi.go.
+agents

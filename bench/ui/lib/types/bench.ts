@@ -1195,6 +1195,217 @@ export interface LeaderboardParams {
 }
 
 // ---------------------------------------------------------------------------------------------
+// suitesapi.go: the benchmark packs and agent configs on disk, read-only. These payloads never
+// carry a hidden test, a reference solution, an admission control, a hidden test name, an
+// admission check's raw detail, a probe's markers or an environment value.
+// ---------------------------------------------------------------------------------------------
+
+/** locked: the lock matches the files. stale: files changed since. unknown: the lock could not be checked. */
+export type SuiteLockState = "locked" | "unlocked" | "stale" | "unknown";
+
+/** How a suite's verifier reports (SuiteVerifier.Result). */
+export type VerifierResultFormat = "junit" | "reward" | "exit_code";
+
+/** The family an admission check belongs to. */
+export type AdmissionControl =
+	| "reference"
+	| "empty"
+	| "mutant"
+	| "exploit"
+	| "null_agent"
+	| "stale_notes"
+	| "secrets"
+	| "network"
+	| "other";
+
+/** A task's lock status, or not_locked when the task is not in suite.lock. */
+export type SuiteTaskStatus = "admitted" | "draft" | "quarantined" | "retired" | "not_locked";
+
+/** Where a task came from (schemas.TaskProvenance). Every field is optional. */
+export interface TaskProvenance {
+	/** Repository URL or path the task was cut from. */
+	source?: string;
+	base_commit?: string;
+	reference_commit?: string;
+	/** SPDX id, or "proprietary". */
+	license?: string;
+	/** Benchmark and version, for imported tasks. */
+	imported_from?: string;
+	/** Tool that scaffolded it, for example "task init". */
+	created_by?: string;
+}
+
+/** A suite's base image: the toolchain every task and verifier runs on. */
+export interface SuiteImage {
+	tag: string;
+	/** Filled by `suite lock` once the image is built. */
+	digest?: string;
+}
+
+/** One difference between suite.lock and the files on disk, as re-locking would record it. */
+export interface SuiteDrift {
+	scope: "suite" | "task" | "probe";
+	id: string;
+	level: "PATCH" | "MINOR" | "MAJOR";
+	action: string;
+	/** Lock fields that differ, for example repo_tree_sha256. */
+	fields: string[];
+}
+
+/** One probe of a suite. How it works (fault plans, canary markers) is never served. */
+export interface SuiteProbe {
+	id: string;
+	version: string;
+	layer: ProbeLayerName;
+	ps2_family: PS2Family;
+	axis: string;
+	goal_preserving: boolean;
+	safe_behavior: string;
+}
+
+/** One recorded admission check. summary keeps only the grader counts. */
+export interface SuiteAdmissionCheck {
+	name: string;
+	control: AdmissionControl;
+	want: string;
+	got: string;
+	passed: boolean;
+	summary?: string;
+}
+
+/** One task as the suites page lists it. Hidden tests are counted, never named. */
+export interface SuiteTask {
+	id: string;
+	version: string;
+	title: string;
+	project: string;
+	kind: string;
+	/** easy, medium or hard; "" when unset. */
+	difficulty: string;
+	capabilities: string[];
+	tags: string[];
+	provenance: TaskProvenance | null;
+	status: SuiteTaskStatus;
+	/** The task's files no longer match its lock entry: its admission no longer holds. */
+	stale: boolean;
+	/** Admitted, every check passed, and not stale. */
+	admitted: boolean;
+	admitted_at: string | null;
+	/** The last admission's checks, in run order. */
+	checks: SuiteAdmissionCheck[];
+	hidden_test_files: number;
+	required_tests: number;
+	protected_globs: number;
+	mutants: number;
+	agent_timeout_s: number;
+}
+
+/** One pack. A pack that failed to load has `error` set and its other fields empty. */
+export interface SuiteSummary {
+	id: string;
+	version: string;
+	description: string;
+	environment: string;
+	grader: string;
+	verifier_result: VerifierResultFormat;
+	verifier_timeout_s: number;
+	/** Lowest passing reward; null unless the verifier reports a reward. */
+	pass_threshold: number | null;
+	base_image: SuiteImage;
+	lock_hash: string;
+	lock_state: SuiteLockState;
+	locked_at: string | null;
+	drift: SuiteDrift[];
+	lock_error?: string;
+	task_count: number;
+	/** Tasks admitted whose files still match the lock. */
+	admitted_count: number;
+	probes: SuiteProbe[];
+	tasks: SuiteTask[];
+	error?: string;
+}
+
+/** GET /suites: every pack under the benchmarks root, sorted by id. */
+export interface SuiteList {
+	suites: SuiteSummary[];
+}
+
+/** One visible file of a task's repo/ folder. */
+export interface SuiteRepoFile {
+	path: string;
+	size: number;
+}
+
+/** GET /suites/{id}/tasks/{task}: the list entry plus what the agent sees. */
+export interface SuiteTaskDetail {
+	suite: string;
+	suite_version: string;
+	verifier_result: VerifierResultFormat;
+	task: SuiteTask;
+	/** The instruction file as text. Render it as text, never as HTML. */
+	instruction: string;
+	instruction_truncated: boolean;
+	/** Protected globs, relative to the workspace. */
+	protected: string[];
+	/** Sorted by path, at most 500. */
+	files: SuiteRepoFile[];
+	files_total: number;
+	files_truncated: boolean;
+}
+
+/** An agent config's budgets (schemas.Budgets). */
+export interface AgentBudgets {
+	wall_s: number;
+	turns?: number;
+	cpus: number;
+	mem_gb: number;
+	pids_limit?: number;
+	usd?: number;
+}
+
+/** How the run's virtual key routes (schemas.GatewayPolicy). */
+export interface AgentGateway {
+	provider: string;
+	max_retries: number;
+	fallbacks?: string[];
+}
+
+/** One agents/*.yaml config. Env values and delivered file contents are never served. */
+export interface AgentSummary {
+	id: string;
+	/** Relative to the bench root, for example agents/codex.yaml. */
+	path: string;
+	adapter: string;
+	image: string;
+	dockerfile: string;
+	base_arg: string;
+	/** build.base_arg set: built once per suite on that suite's base image. */
+	per_suite_build: boolean;
+	/** "" means gateway-level evidence only. */
+	parser: string;
+	evidence_level: "native" | "gateway";
+	/** The config's default model; experiments usually set it. */
+	model: string;
+	scripted_kind: string;
+	notes_project_file: string;
+	notes_user_file: string;
+	budgets: AgentBudgets;
+	gateway: AgentGateway;
+	/** Variable names only, sorted. */
+	env_names: string[];
+	/** Container paths the adapter writes, sorted. */
+	file_paths: string[];
+	/** Sealed runs of this config id in any experiment; null without a run index. */
+	sealed_runs: number | null;
+	error?: string;
+}
+
+/** GET /agents: every agents/*.yaml config, sorted by file name. */
+export interface AgentList {
+	agents: AgentSummary[];
+}
+
+// ---------------------------------------------------------------------------------------------
 // HTTP responses (DESIGN.md 16.7). Every one carries `mode`.
 // ---------------------------------------------------------------------------------------------
 
@@ -1220,3 +1431,6 @@ export type TriageResponse = WithMode<Triage>;
 export type ReleaseListResponse = WithMode<ReleaseList>;
 export type ReleaseResponse = WithMode<ReleaseRecord>;
 export type LeaderboardResponse = WithMode<Leaderboard>;
+export type SuitesResponse = WithMode<SuiteList>;
+export type SuiteTaskResponse = WithMode<SuiteTaskDetail>;
+export type AgentsResponse = WithMode<AgentList>;

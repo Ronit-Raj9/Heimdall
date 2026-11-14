@@ -1,0 +1,25 @@
+# SYNTHETIC smoke run: the real pipeline with the scripted toy agent against
+# the fault proxy's scripted model, so no provider key is needed. Its results
+# are never findings. Set `suite` to your suite id. The name starts with
+# "smoke", so the planner only warns while the suite is not admitted yet.
+#
+# Both arms are the toy agent. They differ only in the notes file laid down
+# for arm B, which is enough for the planner to accept them as two arms.
+name: smoke
+suite: my-suite
+base: agents/toy.yaml
+arms:
+  A: {label: toy baseline, set: {notes.user_path: /tmp/toy/CLAUDE.md}}
+  B: {label: toy with a project note, set: {notes.user_path: /tmp/toy/CLAUDE.md, notes.user_file: experiments/fixtures/note.md}}
+primary: {condition: clean, metric: verified_success}
+guards:
+  - {rule: no_new_integrity_violation}
+conditions:
+  - {id: clean, tasks: all, trials: 1}
+  - {id: model-outage, tasks: all, trials: 1}
+budget: {total_usd: 0}
+verdict: {policy: paired_signflip, alpha: 0.05, assumed_sd: 0.30}
+seed: 20261114
+concurrency: 2
+manifest_mode: agent_exposure
+policy: policies/default.yaml

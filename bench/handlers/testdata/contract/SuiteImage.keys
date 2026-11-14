@@ -1,0 +1,3 @@
+# Keys of bench.ts `SuiteImage`. Change with bench.ts and schemas/suitesapi.go.
+tag
+digest?

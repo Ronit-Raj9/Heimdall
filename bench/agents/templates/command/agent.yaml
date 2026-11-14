@@ -1,0 +1,53 @@
+# __AGENT_ID__: any command-line agent, from `bifrost-bench agent init
+# -template command`. Put your CLI in agents/images/__AGENT_ID__/Dockerfile and
+# its command line in argv; example-cli is a stand-in that works as is.
+# docs/adding-an-agent.md is the guide.
+#
+# Template variables (the only ones; an unknown one fails planning):
+#   {{instruction}}       the task text      {{instruction_file}}  /tmp/bench/instruction.md
+#   {{workspace}}         /workspace          {{model}}             the model id the run's key allows
+#   {{gateway.url}}       Bifrost, no slash   {{run.key}}           the run's key: env and files only, never argv
+#   {{run.session}}       session id for x-bf-session-id
+#   {{run.id}} {{exp.id}} {{task.id}}
+#
+# Check it for free before a real run:
+#   bifrost-bench agent build agents/__AGENT_ID__.yaml -suite <suite>
+#   bifrost-bench agent check agents/__AGENT_ID__.yaml -suite <suite>
+id: __AGENT_ID__
+adapter: command
+image: __IMAGE_TAG__
+build:
+  dockerfile: agents/images/__AGENT_ID__/Dockerfile
+  tag: __IMAGE_TAG__
+  # One image per suite, built on the suite's base image (ARG BASE_IMAGE).
+  base_arg: BASE_IMAGE
+# The command, one list item per argument. Replace example-cli and its flags
+# with your CLI's.
+argv:
+  - example-cli
+  - --instruction-file
+  - "{{instruction_file}}"
+  - --workspace
+  - "{{workspace}}"
+  - --model
+  - "anthropic/{{model}}"
+env:
+  # Bifrost's OpenAI-compatible route and the run's key, under the names most
+  # CLIs and SDKs read. A CLI that speaks Anthropic Messages uses
+  # ANTHROPIC_BASE_URL: "{{gateway.url}}/anthropic" and ANTHROPIC_API_KEY instead.
+  OPENAI_BASE_URL: "{{gateway.url}}/openai/v1"
+  OPENAI_API_KEY: "{{run.key}}"
+  # Send it as the x-bf-session-id header if your CLI can add headers.
+  BENCH_SESSION_ID: "{{run.session}}"
+# Placeholder: every experiment sets the model (an arm may vary it).
+model: claude-sonnet-4-5
+notes:
+  # The repo notes file your CLI reads; the stale-notes probe overwrites it.
+  project_file: AGENTS.md
+budgets:
+  wall_s: 900
+  cpus: 1
+  mem_gb: 2
+gateway:
+  provider: anthropic
+  max_retries: 0

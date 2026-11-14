@@ -1,5 +1,6 @@
 import i18n from "@/lib/i18n";
 import type {
+	AgentsResponse,
 	AuditRequest,
 	AuditResponse,
 	CatalogResponse,
@@ -24,6 +25,8 @@ import type {
 	RunEventsResponse,
 	RunReceiptsResponse,
 	RunResponse,
+	SuiteTaskResponse,
+	SuitesResponse,
 	TriageResponse,
 	VerdictResponse,
 } from "@/lib/types/bench";
@@ -151,6 +154,8 @@ export const benchApi = createApi({
 		"BenchRelease",
 		"BenchTriage",
 		"BenchLeaderboard",
+		"BenchSuites",
+		"BenchAgents",
 	],
 	endpoints: (builder) => ({
 		getHealth: builder.query<HealthResponse, void>({
@@ -253,6 +258,21 @@ export const benchApi = createApi({
 			providesTags: ["BenchLeaderboard"],
 		}),
 
+		// Suites and agents: the benchmark packs and agent configs on disk, read-only. Hidden tests,
+		// solutions, controls and environment values are never in these payloads.
+		getSuites: builder.query<SuitesResponse, void>({
+			query: () => "/suites",
+			providesTags: [{ type: "BenchSuites", id: "LIST" }],
+		}),
+		getSuiteTask: builder.query<SuiteTaskResponse, { suite: string; task: string }>({
+			query: ({ suite, task }) => `/suites/${id(suite)}/tasks/${id(task)}`,
+			providesTags: (_result, _error, { suite, task }) => [{ type: "BenchSuites", id: `${suite}/${task}` }],
+		}),
+		getAgents: builder.query<AgentsResponse, void>({
+			query: () => "/agents",
+			providesTags: ["BenchAgents"],
+		}),
+
 		// Analysis
 		auditTable: builder.mutation<AuditResponse, AuditRequest>({
 			query: (body) => ({ url: "/audit", method: "POST", body }),
@@ -290,6 +310,9 @@ export const {
 	useGetPairQuery,
 	useGetTriageQuery,
 	useGetLeaderboardQuery,
+	useGetSuitesQuery,
+	useGetSuiteTaskQuery,
+	useGetAgentsQuery,
 	useListReleasesQuery,
 	useGetReleaseQuery,
 	useCreateReleaseMutation,

@@ -28,6 +28,26 @@ type Pipeline struct {
 	benchRoot string
 	logger    schemas.Logger
 	now       func() time.Time
+	faultMode string // plan mode bound to every run's key slot at prepare
+}
+
+// PipelineOption configures a Pipeline.
+type PipelineOption func(*Pipeline)
+
+// WithFaultMode sets the fault plan mode bound to each run's key slot when
+// no probe binds its own: "none" (the default) tags the run's calls and
+// passes them on; "scripted" makes the fault proxy answer every call of the
+// run from its scripted model, whatever the provider and whether or not it
+// holds a real key. `agent check` uses scripted so a conformance run costs
+// nothing. Under scripted, a run without a fault controller or with a
+// gateway-layer probe (which would bind its own plan and lift the scripted
+// one) is refused before its agent starts.
+func WithFaultMode(mode string) PipelineOption {
+	return func(p *Pipeline) {
+		if mode != "" {
+			p.faultMode = mode
+		}
+	}
 }
 
 // SlotInput is one slot to run.
@@ -69,11 +89,15 @@ type runState struct {
 // notes.user_file of an arm into the absolute host path parts read; the
 // manifest keeps the relative path so config hashes do not depend on the
 // machine.
-func NewPipeline(reg *schemas.Registry, benchRoot string, logger schemas.Logger) *Pipeline {
+func NewPipeline(reg *schemas.Registry, benchRoot string, logger schemas.Logger, opts ...PipelineOption) *Pipeline {
 	if logger == nil {
 		logger = schemas.NoopLogger{}
 	}
-	return &Pipeline{reg: reg, benchRoot: benchRoot, logger: logger, now: time.Now}
+	p := &Pipeline{reg: reg, benchRoot: benchRoot, logger: logger, now: time.Now, faultMode: faultModeNone}
+	for _, o := range opts {
+		o(p)
+	}
+	return p
 }
 
 // RunSlot runs one attempt of a slot to its seal.

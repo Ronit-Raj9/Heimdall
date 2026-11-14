@@ -1,0 +1,7 @@
+# Keys of bench.ts `AgentBudgets` (schemas.Budgets). Change with bench.ts and schemas/agent.go.
+wall_s
+turns?
+cpus
+mem_gb
+pids_limit?
+usd?

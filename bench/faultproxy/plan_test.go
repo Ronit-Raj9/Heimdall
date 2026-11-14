@@ -23,6 +23,9 @@ func TestValidatePlan(t *testing.T) {
 		{"status 600", schemas.FaultPlan{Mode: ModeOnce, Call: 1, Status: 600}, false},
 		{"negative retry", schemas.FaultPlan{Mode: ModeOnce, Call: 1, Status: 503, RetryAfterS: -1}, false},
 		{"unknown mode", schemas.FaultPlan{Mode: "flaky", Status: 503}, false},
+		{"scripted", schemas.FaultPlan{Mode: ModeScripted, RunID: "r"}, true},
+		{"scripted with a status", schemas.FaultPlan{Mode: ModeScripted, Status: 503}, false},
+		{"scripted with a call", schemas.FaultPlan{Mode: ModeScripted, Call: 1}, false},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {

@@ -1,0 +1,17 @@
+# Noop control: changes nothing and exits 0. Admission requires it to fail.
+# Scripted adapter: argv, env and files come from the adapter, not this file.
+id: noop
+adapter: scripted
+image: bench/coding-core-base:1
+scripted:
+  kind: noop
+model: claude-sonnet-4-5
+notes:
+  project_file: CLAUDE.md
+budgets:
+  wall_s: 900
+  cpus: 1
+  mem_gb: 1
+gateway:
+  provider: anthropic
+  max_retries: 0

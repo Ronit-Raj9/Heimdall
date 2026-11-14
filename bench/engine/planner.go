@@ -76,6 +76,19 @@ type Planner struct {
 	upstreams UpstreamChecker // nil: no upstream check
 }
 
+// planMode is what differs between planning an experiment and planning an
+// `agent check`: an experiment needs two arms, a locked suite (a smoke
+// experiment only warns) and, with a checker, reachable upstreams; a check
+// runs one arm on the scripted model, so it needs none of that.
+type planMode struct {
+	minArms       int
+	lockWarnOnly  bool
+	skipUpstreams bool
+}
+
+// experimentMode is how Plan plans an experiment.
+var experimentMode = planMode{minArms: 2}
+
 // condPlan is one condition resolved against the suite.
 type condPlan struct {
 	id     string
@@ -114,13 +127,20 @@ func NewPlanner(reg *schemas.Registry, benchRoot string, logger schemas.Logger, 
 // and reused for every block of that task, so a task-level sign flip stays
 // exact (DESIGN.md 9.3).
 func (p *Planner) Plan(ctx context.Context, exp *schemas.Experiment) (*schemas.Manifest, error) {
+	return p.plan(ctx, exp, experimentMode)
+}
+
+// plan is Plan under a plan mode. Each arm's image is resolved for the suite
+// (ResolveAgentImage) before its config is hashed, and its local image id is
+// recorded when the suite's environment can inspect images.
+func (p *Planner) plan(ctx context.Context, exp *schemas.Experiment, mode planMode) (*schemas.Manifest, error) {
 	if exp == nil {
 		return nil, errors.New("plan: experiment is nil")
 	}
 	if p.reg == nil {
 		return nil, errors.New("plan: registry is nil")
 	}
-	if err := validateExperiment(exp); err != nil {
+	if err := validateExperiment(exp, mode.minArms); err != nil {
 		return nil, fmt.Errorf("plan %s: %w", exp.Name, err)
 	}
 	e := *exp
@@ -142,7 +162,7 @@ func (p *Planner) Plan(ctx context.Context, exp *schemas.Experiment) (*schemas.M
 		}
 	}
 	all := append(append([]condPlan(nil), conds...), compat...)
-	if err := p.checkLock(suite, e.Name, all); err != nil {
+	if err := p.checkLock(suite, e.Name, mode.lockWarnOnly, all); err != nil {
 		return nil, fmt.Errorf("plan %s: %w", e.ID, err)
 	}
 	if err := p.checkParts(&e, suite, all); err != nil {
@@ -162,7 +182,7 @@ func (p *Planner) Plan(ctx context.Context, exp *schemas.Experiment) (*schemas.M
 	if m.PolicyHash, err = p.policyHash(e.Policy); err != nil {
 		return nil, fmt.Errorf("plan %s: %w", e.ID, err)
 	}
-	if m.Arms, err = p.resolveArms(&e, suite, conds); err != nil {
+	if m.Arms, err = p.resolveArms(ctx, &e, suite, conds); err != nil {
 		return nil, fmt.Errorf("plan %s: %w", e.ID, err)
 	}
 	m.BudgetDiffs = schemas.BudgetDiffsOf(&e, m.Arms)
@@ -171,7 +191,7 @@ func (p *Planner) Plan(ctx context.Context, exp *schemas.Experiment) (*schemas.M
 			"field", d.Field, "per_arm", budgetText(d))
 	}
 	if e.Compatibility != nil {
-		c, err := p.resolveArm(CompatArm, e.Compatibility.Agent, nil, suite, compat)
+		c, err := p.resolveArm(ctx, CompatArm, e.Compatibility.Agent, nil, suite, compat)
 		if err != nil {
 			return nil, fmt.Errorf("plan %s: compatibility agent: %w", e.ID, err)
 		}
@@ -180,8 +200,10 @@ func (p *Planner) Plan(ctx context.Context, exp *schemas.Experiment) (*schemas.M
 	if m.Gateway, err = p.preflight(ctx, e.Name); err != nil {
 		return nil, fmt.Errorf("plan %s: %w", e.ID, err)
 	}
-	if err := p.checkUpstreams(ctx, m); err != nil {
-		return nil, fmt.Errorf("plan %s: %w", e.ID, err)
+	if !mode.skipUpstreams {
+		if err := p.checkUpstreams(ctx, m); err != nil {
+			return nil, fmt.Errorf("plan %s: %w", e.ID, err)
+		}
 	}
 	m.ArmOrder = drawArmOrder(e.Seed, suite.TaskIDs, conds, sortedKeys(m.Arms))
 	m.Slots = buildSlots(m, suite, conds, compat)
@@ -192,9 +214,9 @@ func (p *Planner) Plan(ctx context.Context, exp *schemas.Experiment) (*schemas.M
 }
 
 // checkLock refuses an unlocked suite or a selected task that is not
-// admitted. A smoke experiment only warns, so the synthetic run works on a
-// pack that is still being authored.
-func (p *Planner) checkLock(suite *schemas.Suite, name string, conds []condPlan) error {
+// admitted. A smoke experiment (and warnOnly) only warns, so the synthetic
+// run works on a pack that is still being authored.
+func (p *Planner) checkLock(suite *schemas.Suite, name string, warnOnly bool, conds []condPlan) error {
 	var problems []string
 	if suite.Lock == nil {
 		problems = append(problems, fmt.Sprintf("suite %s@%s has no lock", suite.ID, suite.Version))
@@ -212,9 +234,9 @@ func (p *Planner) checkLock(suite *schemas.Suite, name string, conds []condPlan)
 	if len(problems) == 0 {
 		return nil
 	}
-	if strings.HasPrefix(name, "smoke") {
+	if warnOnly || strings.HasPrefix(name, "smoke") {
 		for _, pr := range problems {
-			p.logger.Warn("smoke experiment ignores a suite lock problem", "problem", pr)
+			p.logger.Warn("smoke experiment or agent check ignores a suite lock problem", "problem", pr)
 		}
 		return nil
 	}
@@ -264,7 +286,7 @@ func (p *Planner) checkParts(e *schemas.Experiment, suite *schemas.Suite, conds 
 }
 
 // resolveArms resolves every arm and refuses arms that do not differ.
-func (p *Planner) resolveArms(e *schemas.Experiment, suite *schemas.Suite, conds []condPlan) (map[string]schemas.ArmManifest, error) {
+func (p *Planner) resolveArms(ctx context.Context, e *schemas.Experiment, suite *schemas.Suite, conds []condPlan) (map[string]schemas.ArmManifest, error) {
 	out := map[string]schemas.ArmManifest{}
 	byHash := map[string]string{}
 	for _, id := range sortedKeys(e.Arms) {
@@ -273,7 +295,7 @@ func (p *Planner) resolveArms(e *schemas.Experiment, suite *schemas.Suite, conds
 		if cfgPath == "" {
 			cfgPath = e.Base
 		}
-		am, err := p.resolveArm(spec.Label, cfgPath, spec.Set, suite, conds)
+		am, err := p.resolveArm(ctx, spec.Label, cfgPath, spec.Set, suite, conds)
 		if err != nil {
 			return nil, fmt.Errorf("arm %s: %w", id, err)
 		}
@@ -286,9 +308,12 @@ func (p *Planner) resolveArms(e *schemas.Experiment, suite *schemas.Suite, conds
 	return out, nil
 }
 
-// resolveArm reads one agent config, applies the overrides, hashes it and
-// hashes every file laid down for it per condition.
-func (p *Planner) resolveArm(label, cfgPath string, set map[string]any, suite *schemas.Suite, conds []condPlan) (schemas.ArmManifest, error) {
+// resolveArm reads one agent config, applies the overrides, resolves its
+// image for the suite, hashes it and hashes every file laid down for it per
+// condition. The image is resolved before hashing, so an agent with
+// build.base_arg hashes its per-suite tag and an agent without it hashes
+// exactly what it did before.
+func (p *Planner) resolveArm(ctx context.Context, label, cfgPath string, set map[string]any, suite *schemas.Suite, conds []condPlan) (schemas.ArmManifest, error) {
 	var am schemas.ArmManifest
 	raw, err := os.ReadFile(p.abs(cfgPath))
 	if err != nil {
@@ -301,6 +326,11 @@ func (p *Planner) resolveArm(label, cfgPath string, set map[string]any, suite *s
 	if err := p.checkAgent(&cfg); err != nil {
 		return am, fmt.Errorf("agent config %s: %w", cfgPath, err)
 	}
+	img, err := ResolveAgentImage(&cfg, suite, p.benchRoot)
+	if err != nil {
+		return am, fmt.Errorf("agent config %s: %w", cfgPath, err)
+	}
+	cfg.Image = img.Tag
 	hash, err := utils.HashJSON(&cfg)
 	if err != nil {
 		return am, fmt.Errorf("hash agent config %s: %w", cfgPath, err)
@@ -309,7 +339,30 @@ func (p *Planner) resolveArm(label, cfgPath string, set map[string]any, suite *s
 	if err != nil {
 		return am, err
 	}
-	return schemas.ArmManifest{Label: label, Config: cfg, ConfigHash: hash, Files: files}, nil
+	return schemas.ArmManifest{Label: label, Config: cfg, ConfigHash: hash, Files: files, ImageID: p.imageID(ctx, suite, cfg.Image)}, nil
+}
+
+// imageID returns the local image id of ref when the suite's environment can
+// inspect images, or "" with a warning when it cannot be read. Planning never
+// needs the image to exist: a missing image fails the run, not the plan.
+func (p *Planner) imageID(ctx context.Context, suite *schemas.Suite, ref string) string {
+	if ref == "" {
+		return ""
+	}
+	env, ok := findPart(p.reg.Environments, suite.Environment)
+	if !ok {
+		return ""
+	}
+	ins, ok := any(env).(ImageInspector)
+	if !ok {
+		return ""
+	}
+	id, err := ins.ImageID(ctx, ref)
+	if err != nil {
+		p.logger.Warn("agent image not inspected; the manifest records no image id", "image", ref, "error", err.Error())
+		return ""
+	}
+	return id
 }
 
 func (p *Planner) checkAgent(cfg *schemas.AgentConfig) error {
@@ -582,7 +635,8 @@ func cleanRel(rel string) (string, error) {
 }
 
 // validateExperiment checks the shape of an experiment before any I/O.
-func validateExperiment(e *schemas.Experiment) error {
+// minArms is 2 for an experiment and 1 for an agent check.
+func validateExperiment(e *schemas.Experiment, minArms int) error {
 	var errs []error
 	if e.Name == "" {
 		errs = append(errs, errors.New("name is empty"))
@@ -593,8 +647,8 @@ func validateExperiment(e *schemas.Experiment) error {
 	if e.ID != "" && !validID(e.ID) {
 		errs = append(errs, fmt.Errorf("experiment id %q must match ^[a-z0-9_]+$", e.ID))
 	}
-	if len(e.Arms) < 2 {
-		errs = append(errs, fmt.Errorf("need at least 2 arms, got %d", len(e.Arms)))
+	if len(e.Arms) < minArms {
+		errs = append(errs, fmt.Errorf("need at least %d arms, got %d", minArms, len(e.Arms)))
 	}
 	for id, a := range e.Arms {
 		if id == CompatArm {

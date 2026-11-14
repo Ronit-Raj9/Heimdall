@@ -253,10 +253,16 @@ func (s *Server) serveData(w http.ResponseWriter, r *http.Request) {
 	}
 	d := s.plans.begin(slot.name, kind)
 	e.Slot, e.RunID, e.Call, e.Stream = slot.name, d.RunID, d.Call, req.Stream
-	if d.Inject {
+	switch {
+	case d.Inject:
 		s.writeFault(sw, p, d)
 		e.Action, e.Nonce = ActionInject, d.Nonce
-	} else {
+	case d.Scripted:
+		e.Action, e.Upstream = ActionPass, schemas.LedgerUpstreamScripted
+		upstreamStart := time.Now()
+		s.answerScripted(sw, r, p, kind, slot.name, body, e)
+		e.UpstreamMS = float64(time.Since(upstreamStart).Microseconds()) / 1000
+	default:
 		e.Action = ActionPass
 		upstreamStart := time.Now()
 		s.answer(sw, r, p, kind, slot.name, body, e)

@@ -25,6 +25,18 @@ type fakeGrader struct {
 func (g *fakeGrader) GetName() string    { return "fake_grader" }
 func (g *fakeGrader) GetVersion() string { return "0.0.0" }
 
+// VerifierNetwork implements VerifierNetworkReporter.
+func (g *fakeGrader) VerifierNetwork() string { return "none" }
+
+// silentGrader is a fakeGrader that does not report its verifier network.
+type silentGrader struct{ inner *fakeGrader }
+
+func (g silentGrader) GetName() string    { return "silent_grader" }
+func (g silentGrader) GetVersion() string { return "0.0.0" }
+func (g silentGrader) Grade(ctx context.Context, rc *schemas.RunContext, diff *schemas.Diff) (*schemas.Grade, error) {
+	return g.inner.Grade(ctx, rc, diff)
+}
+
 func (g *fakeGrader) Grade(_ context.Context, rc *schemas.RunContext, diff *schemas.Diff) (*schemas.Grade, error) {
 	g.ctxOK = rc != nil && rc.Suite != nil && rc.Task != nil && rc.Slot != nil && rc.Run != nil && rc.Dir != "" &&
 		strings.HasPrefix(rc.Run.RunID, "r_") && rc.Slot.Task == rc.Task.ID && !rc.Slot.Counted
@@ -48,11 +60,12 @@ func (g *fakeGrader) Grade(_ context.Context, rc *schemas.RunContext, diff *sche
 	return &schemas.Grade{Passed: false, TestsRan: 2, Failures: 1, ExitCode: 1}, nil
 }
 
-// fakeEnv records the exploit run and exports a fixed diff.
+// fakeEnv records the scripted runs (exploit, noop, refuse) and exports a
+// fixed diff.
 type fakeEnv struct {
 	diff      string // content of the exported diff
 	execErr   error
-	plan      *schemas.RunPlan
+	plans     []*schemas.RunPlan
 	created   bool
 	destroyed int
 }
@@ -69,7 +82,7 @@ func (e *fakeEnv) Create(_ context.Context, rc *schemas.RunContext) (*schemas.En
 }
 
 func (e *fakeEnv) Exec(_ context.Context, rc *schemas.RunContext, plan *schemas.RunPlan) (*schemas.ExecResult, error) {
-	e.plan = plan
+	e.plans = append(e.plans, plan)
 	if e.execErr != nil {
 		return nil, e.execErr
 	}
@@ -127,7 +140,8 @@ func TestAdmit(t *testing.T) {
 			for _, c := range rec.Checks {
 				names[c.Name] = c
 			}
-			for _, want := range []string{"reference_1", "reference_2", "reference_3", "empty_patch", "mutant_1", "exploit", "reference_stale_notes"} {
+			for _, want := range []string{"reference_1", "reference_2", "reference_3", "empty_patch", "mutant_1", "exploit",
+				"reference_stale_notes", "null_noop", "null_refuse", "instruction_edited", "secret_scan", "verifier_no_network"} {
 				if _, ok := names[want]; !ok {
 					t.Errorf("missing check %s", want)
 				}
@@ -140,8 +154,11 @@ func TestAdmit(t *testing.T) {
 			if tc.wantAdmitted && names["exploit"].Got != GotFail {
 				t.Errorf("exploit got %q", names["exploit"].Got)
 			}
-			if tc.env.destroyed != 1 {
-				t.Errorf("Destroy called %d times, want 1", tc.env.destroyed)
+			if tc.env.destroyed != 3 {
+				t.Errorf("Destroy called %d times, want 3 (exploit, noop, refuse)", tc.env.destroyed)
+			}
+			if rec.Grader != "fake_grader" || rec.ReferenceRepeats != 3 || len(rec.ReferenceResults) != 3 {
+				t.Errorf("record grader %q, repeats %d, results %v", rec.Grader, rec.ReferenceRepeats, rec.ReferenceResults)
 			}
 			if !tc.grader.ctxOK {
 				t.Error("grader got an incomplete run context")
@@ -161,13 +178,81 @@ func TestAdmitExploitPlan(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	p := env.plan
-	if p == nil {
-		t.Fatal("exploit was not executed")
+	if len(env.plans) != 3 {
+		t.Fatalf("scripted runs = %d, want 3", len(env.plans))
 	}
+	p := env.plans[0]
 	if strings.Join(p.Argv, " ") != "sh /tmp/bench/exploit.sh" || p.Files["/tmp/bench/exploit.sh"] != string(script) ||
 		p.Image != "bench/mini-base:1" || p.Network != "none" || p.User != "1000" || p.WallS != 120 || p.Workdir != "/workspace" {
-		t.Fatalf("plan = %+v", p)
+		t.Fatalf("exploit plan = %+v", p)
+	}
+	if got := strings.Join(env.plans[1].Argv, " "); got != "true" {
+		t.Errorf("noop argv = %q", got)
+	}
+	if got := strings.Join(env.plans[2].Argv, " "); !strings.Contains(got, refuseMessage) {
+		t.Errorf("refuse argv = %q", got)
+	}
+	for _, p := range env.plans[1:] {
+		if p.Network != "none" || p.User != "1000" || len(p.Files) != 0 {
+			t.Errorf("null plan = %+v", p)
+		}
+	}
+}
+
+func TestAdmitStaticChecks(t *testing.T) {
+	tests := []struct {
+		name       string
+		edit       func(t *testing.T, pack string, s *schemas.Suite)
+		grader     func(*fakeGrader) schemas.Grader
+		wantFailed string
+		wantGot    string
+		absent     string // a check that must not run
+	}{
+		{name: "draft instruction", edit: func(t *testing.T, pack string, _ *schemas.Suite) {
+			editFile(t, filepath.Join(pack, "tasks/m01/instruction.md"), "too.", "too.\n"+EditMeMarker+"\n")
+		}, wantFailed: "instruction_edited", wantGot: "draft"},
+		{name: "secret in repo", edit: func(t *testing.T, pack string, _ *schemas.Suite) {
+			if err := os.WriteFile(filepath.Join(pack, "tasks/m01/repo/settings.py"), []byte("AWS = 'AKIAABCDEFGHIJKLMNOP'\n"), 0o644); err != nil {
+				t.Fatal(err)
+			}
+		}, wantFailed: "secret_scan", wantGot: "1 findings"},
+		{name: "grader without network report", grader: func(g *fakeGrader) schemas.Grader { return silentGrader{g} },
+			wantFailed: "verifier_no_network", wantGot: "unknown"},
+		{name: "no stale notes skips the stale check", edit: func(t *testing.T, _ string, s *schemas.Suite) {
+			s.Tasks[0].Notes = schemas.TaskNotes{}
+		}, absent: "reference_stale_notes"},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			benchRoot, packRoot := copyPack(t)
+			s := loadMini(t, benchRoot)
+			if tc.edit != nil {
+				tc.edit(t, packRoot, s)
+			}
+			fg := &fakeGrader{pass: correctFix}
+			var g schemas.Grader = fg
+			if tc.grader != nil {
+				g = tc.grader(fg)
+			}
+			rec, err := Admit(context.Background(), AdmitDeps{Env: &fakeEnv{diff: exploitDiff}, Grader: g}, s, s.Tasks[0])
+			if err != nil {
+				t.Fatal(err)
+			}
+			for _, c := range rec.Checks {
+				if c.Name == tc.absent {
+					t.Errorf("check %s ran", c.Name)
+				}
+				if c.Name == tc.wantFailed && (c.Passed || c.Got != tc.wantGot) {
+					t.Errorf("check %s = %+v, want failed with got %q", c.Name, c, tc.wantGot)
+				}
+				if c.Name == "secret_scan" && strings.Contains(c.Detail, "AKIAABCDEFGHIJKLMNOP") {
+					t.Errorf("secret value printed: %s", c.Detail)
+				}
+			}
+			if wantAdmitted := tc.wantFailed == ""; rec.Admitted != wantAdmitted {
+				t.Errorf("admitted = %v, want %v: %+v", rec.Admitted, wantAdmitted, rec.Checks)
+			}
+		})
 	}
 }
 

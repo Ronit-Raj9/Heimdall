@@ -1,0 +1,40 @@
+# Written by `bifrost-bench task init` from [[.Source]] ([[.BaseShort]]..[[.RefShort]]).
+# verifier/tests holds the test files the reference commit added or changed;
+# review them before admitting the task. Test files that already existed at
+# the base commit stay visible in repo/ and are listed under protected.
+id: [[.ID]]
+version: 1.0.0
+title: [[q .Title]]
+project: [[q .Project]]
+kind: [[.Kind]]
+instruction: instruction.md
+repo_dir: repo
+verifier:
+  tests: verifier/tests
+  required:[[if not .Required]] [][[end]]
+[[- range .Required]]
+    - [[q .]]
+[[- end]]
+protected:[[if not .Protected]] [][[end]]
+[[- range .Protected]]
+  - [[q .]]
+[[- end]]
+controls:
+  reference: solution/reference.diff
+  empty: controls/empty.diff
+  mutants: []
+  exploit: controls/exploit.sh
+timeouts:
+  agent_s: 900
+[[- if .Capabilities]]
+capabilities: [[flow .Capabilities]]
+[[- end]]
+[[- if .Difficulty]]
+difficulty: [[.Difficulty]]
+[[- end]]
+provenance:
+  source: [[q .Source]]
+  base_commit: [[.Base]]
+  reference_commit: [[.Reference]]
+  license: [[q .License]]
+  created_by: task init

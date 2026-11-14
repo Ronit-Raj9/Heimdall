@@ -1,0 +1,31 @@
+# Copy to deploy/.env and fill in. deploy/.env is git-ignored; never commit a
+# real value. docker compose reads it for deploy/docker-compose.yml, and the
+# bench process needs the same values in its environment.
+
+# Bifrost management credential, sent as X-Bifrost-Setup-Token on /api.
+# Never given to an agent container. Generate with: openssl rand -hex 24
+BIFROST_SETUP_TOKEN=replace-with-a-random-token
+
+# Password of Bifrost's Postgres (config and log stores). Postgres sits on
+# bench-upstream only and is not published. Generate with: openssl rand -hex 24
+BIFROST_PG_PASSWORD=replace-with-a-random-password
+
+# Bearer token for the fault proxy control API writes (PUT/DELETE /plans).
+# Shared by the faultproxy service and the bench. Generate with: openssl rand -hex 24
+BENCH_FAULTPROXY_TOKEN=replace-with-a-random-token
+
+# Real Anthropic API key. It lives only in the fault proxy, which swaps it in
+# for the slot placeholder. Leave empty to run the proxy's scripted model.
+ANTHROPIC_API_KEY=
+
+# Real OpenAI API key. Like ANTHROPIC_API_KEY it lives only in the fault
+# proxy, which swaps it in for the oa-slot-* placeholders as
+# "Authorization: Bearer <key>"; Bifrost, the bench and the agents never see
+# it. Leave empty to run the proxy's scripted OpenAI model.
+OPENAI_API_KEY=
+
+# Other proxied providers' keys (fault proxy only). Empty means that
+# provider answers 503 "no key configured"; there is no scripted model for
+# them. GEMINI_API_KEY GROQ_API_KEY MISTRAL_API_KEY XAI_API_KEY
+# OPENROUTER_API_KEY FIREWORKS_API_KEY DEEPSEEK_API_KEY CEREBRAS_API_KEY
+# PERPLEXITY_API_KEY are passed through the same way; set any you use here.

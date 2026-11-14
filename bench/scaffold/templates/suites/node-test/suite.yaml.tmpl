@@ -1,0 +1,43 @@
+# template: node-test
+# Written by `bifrost-bench suite init`; add tasks with `bifrost-bench task
+# init`, which also adds them to the tasks list below. Node's built-in test
+# runner, no dependencies. The verifier runs in a fresh container from the
+# base image with no network, on a pristine copy of the task repo with the
+# agent's diff applied and the restore paths reset; each task's hidden files
+# are mounted at /grader/tests at their repository paths.
+id: [[.ID]]
+version: 0.1.0
+description: JavaScript and TypeScript tasks with hidden node:test verifiers.
+environment: docker_workspace
+grader: verifier_command
+base_image:
+[[- if .Dockerfile]]
+  dockerfile: base/Dockerfile
+[[- end]]
+  tag: [[.Image]]
+workdir: /workspace
+verifier:
+  # Hidden tests import the code by relative paths, so they run from a copy
+  # of the workspace with the hidden files laid over it. Only the hidden test
+  # files are passed to the runner; `node --test <folder>` is not a folder
+  # walk in Node 22.
+  command:
+    - sh
+    - -c
+    - |
+      set -eu
+      w=/tmp/bench-verify
+      mkdir -p "$w"
+      cp -R /workspace/. "$w"/
+      cp -R /grader/tests/. "$w"/
+      cd /grader/tests
+      find . -type f \( -path '*/test/*' -o -path '*/tests/*' -o -path '*/__tests__/*' -o -name '*.test.*' -o -name '*-test.*' -o -name '*_test.*' -o -name 'test-*' \) \( -name '*.js' -o -name '*.mjs' -o -name '*.cjs' -o -name '*.ts' -o -name '*.mts' -o -name '*.cts' \) | sort > /tmp/bench-tests
+      if [ ! -s /tmp/bench-tests ]; then echo "no hidden test files under /grader/tests" >&2; exit 3; fi
+      cd "$w"
+      exec xargs -d '\n' node --test --test-reporter=junit --test-reporter-destination=/grader/out/junit.xml < /tmp/bench-tests
+  result: junit
+  result_path: /grader/out/junit.xml
+  restore: ["test", "tests", "__tests__", "node_modules"]
+  timeout_s: 300
+tasks: []
+probes: [model-outage]

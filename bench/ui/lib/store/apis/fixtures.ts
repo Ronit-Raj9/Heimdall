@@ -8,7 +8,7 @@ export const BENCH_API_BASE = "/api/bench";
 /** One API route and the fixture file that answers it. `{id}` in the file is the path id. */
 export interface FixtureRoute {
 	method: "GET" | "POST";
-	/** Path below BENCH_API_BASE; ":id" matches one path segment. */
+	/** Path below BENCH_API_BASE; ":id" matches one path segment, "*" any one segment (not used in the file name). */
 	pattern: string;
 	file: string;
 }
@@ -42,6 +42,10 @@ export const FIXTURE_ROUTES: readonly FixtureRoute[] = [
 	{ method: "GET", pattern: "/releases", file: "releases.list.json" },
 	// One board for every suite, condition, scope and synthetic filter: the query string is ignored.
 	{ method: "GET", pattern: "/leaderboard", file: "leaderboard.json" },
+	{ method: "GET", pattern: "/suites", file: "suites.json" },
+	// Task ids are unique across the fixture suites, so the file is keyed by the task alone.
+	{ method: "GET", pattern: "/suites/*/tasks/:id", file: "suites.task.{id}.json" },
+	{ method: "GET", pattern: "/agents", file: "agents.json" },
 ];
 
 /** True when the URL has fixture=1 or the build sets VITE_BENCH_FIXTURE=1. */
@@ -73,12 +77,16 @@ function splitPath(path: string): string[] {
 }
 
 // Returns the ":id" segment (decoded), null when the pattern has none, undefined on no match.
+// A "*" segment matches any one safe segment and is not returned.
 function matchPattern(pattern: string[], segments: string[]): string | null | undefined {
 	if (pattern.length !== segments.length) return undefined;
 	let id: string | null = null;
 	for (let i = 0; i < pattern.length; i++) {
 		if (pattern[i] === ":id") {
 			id = decodeURIComponent(segments[i]);
+		} else if (pattern[i] === "*") {
+			const segment = decodeURIComponent(segments[i]);
+			if (!/^[A-Za-z0-9_.-]+$/.test(segment) || /^\.+$/.test(segment)) return undefined;
 		} else if (pattern[i] !== segments[i]) {
 			return undefined;
 		}

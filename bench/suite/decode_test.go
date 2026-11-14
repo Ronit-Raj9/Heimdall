@@ -2,6 +2,7 @@ package suite
 
 import (
 	"path/filepath"
+	"strconv"
 	"strings"
 	"testing"
 
@@ -104,6 +105,60 @@ concurrency: 4
 		}
 		if e.Arms["B"].Set["notes.user_file"] != "fixtures/notes/codewins.md" {
 			t.Errorf("arm set: %+v", e.Arms["B"].Set)
+		}
+	})
+	t.Run("task from task init", func(t *testing.T) {
+		task := `
+id: t01
+version: 1.0.0
+title: "Fix rounding"
+project: "app"
+kind: bugfix
+instruction: instruction.md
+repo_dir: repo
+verifier:
+  tests: verifier/tests
+  required: []
+protected: []
+controls:
+  reference: solution/reference.diff
+  empty: controls/empty.diff
+  mutants: []
+  exploit: controls/exploit.sh
+timeouts:
+  agent_s: 900
+capabilities: ["test_discipline", "planning"]
+difficulty: medium
+provenance:
+  source: "https://example.com/org/app.git"
+  base_commit: 0123456789abcdef0123456789abcdef01234567
+  reference_commit: 89abcdef0123456789abcdef0123456789abcdef
+  license: "proprietary"
+  created_by: task init
+`
+		var tk schemas.Task
+		if err := DecodeYAML([]byte(task), "task.yaml", SchemaTask, &tk); err != nil {
+			t.Fatal(err)
+		}
+		if tk.Difficulty != "medium" || len(tk.Capabilities) != 2 || tk.Provenance == nil || tk.Provenance.CreatedBy != "task init" || tk.Notes.Clean != "" {
+			t.Errorf("decoded %+v", tk)
+		}
+		for _, bad := range []struct{ from, to, want string }{
+			{"difficulty: medium", "difficulty: extreme", "difficulty"},
+			{"created_by: task init", "created_by: task init\n  author: me", "provenance.author: unknown field"},
+			{"base_commit: 0123456789abcdef0123456789abcdef01234567", "base_commit: main", "provenance.base_commit"},
+			{"required: []", "required: [\"just a name\"]", "verifier.required[0]"},
+		} {
+			err := DecodeYAML([]byte(strings.Replace(task, bad.from, bad.to, 1)), "task.yaml", SchemaTask, &schemas.Task{})
+			if err == nil || !strings.Contains(err.Error(), bad.want) {
+				t.Errorf("%s: want error naming %s, got %v", bad.to, bad.want, err)
+			}
+		}
+		for _, id := range []string{"tests/test_a.py::TestC::test_b[1]", "example.com/mod/pkg::TestAdd", "test::adds two numbers"} {
+			ok := strings.Replace(task, "required: []", "required: ["+strconv.Quote(id)+"]", 1)
+			if err := DecodeYAML([]byte(ok), "task.yaml", SchemaTask, &schemas.Task{}); err != nil {
+				t.Errorf("required id %q rejected: %v", id, err)
+			}
 		}
 	})
 	t.Run("agent cpu typo", func(t *testing.T) {

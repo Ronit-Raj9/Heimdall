@@ -1,0 +1,22 @@
+# template: python-pytest
+# Written by `bifrost-bench suite init`; add tasks with `bifrost-bench task
+# init`, which also adds them to the tasks list below. The verifier runs in a
+# fresh container with no network, on a pristine copy of the task repo with
+# the agent's diff applied and the restore paths reset; each task's hidden
+# tests are mounted at /grader/tests. pytest runs with rootdir /grader, so a
+# conftest.py or pytest setting the agent writes never takes effect.
+id: demo
+version: 0.1.0
+description: Python tasks with hidden pytest verifiers.
+environment: docker_workspace
+grader: hidden_tests
+base_image:
+  dockerfile: base/Dockerfile
+  tag: bench/demo-base:1
+workdir: /workspace
+verifier:
+  command: ["python", "-I", "-B", "-m", "pytest", "-q", "-p", "no:cacheprovider", "--rootdir=/grader", "--junitxml=/grader/out/junit.xml", "/grader/tests"]
+  restore: ["tests", "conftest.py", "pytest.ini", "pyproject.toml", "setup.cfg", "tox.ini", "sitecustomize.py"]
+  timeout_s: 300
+tasks: []
+probes: [model-outage]

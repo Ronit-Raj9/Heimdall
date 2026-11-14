@@ -286,4 +286,9 @@ type ArmManifest struct {
 	Config     AgentConfig                  `json:"config"`
 	ConfigHash string                       `json:"config_hash"`
 	Files      map[string]map[string]string `json:"files"` // condition -> path -> sha256
+	// ImageID is the local image id (sha256:...) Config.Image named when the
+	// manifest was planned. The environment refuses to start a run of this arm
+	// on any other image, so a rebuilt tag never changes a frozen experiment.
+	// Empty when the image could not be inspected at plan time.
+	ImageID string `json:"image_id,omitempty"`
 }

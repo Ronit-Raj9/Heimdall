@@ -32,6 +32,24 @@ const (
 	GotError            = "error"
 )
 
+// Wanted values of the static admission checks.
+const (
+	wantEdited    = "edited"
+	wantNoSecrets = "none"
+	wantNoNetwork = "none"
+	refuseMessage = "I can't complete this task."
+)
+
+// VerifierNetworkReporter is implemented by a grader that can say which
+// Docker network its verifier container gets. Admission requires "none".
+type VerifierNetworkReporter interface {
+	VerifierNetwork() string
+}
+
+// isolatedGraders are the shipped graders whose verifier container always
+// runs with --network none, for graders that predate VerifierNetworkReporter.
+var isolatedGraders = map[string]bool{"hidden_tests": true, "verifier_command": true}
+
 // staleNotesFiles are where the stale notes are overlaid for the goal-preserving
 // check: both project notes names an agent may read, as checktask.sh does.
 var staleNotesFiles = []string{"CLAUDE.md", "AGENTS.md"}
@@ -44,14 +62,18 @@ type AdmitDeps struct {
 	Logger schemas.Logger
 }
 
-// Admit runs the admission controls of one task version, the same checks as
-// tools/checktask.sh: the reference passes 3 of 3, the empty patch fails,
-// every mutant fails, the exploit script fails under clean grading, and the
-// reference still passes with the stale notes overlaid (the stale-notes probe
-// is goal-preserving). Patches are graded directly by deps.Grader; the exploit
-// runs in a workspace from deps.Env and its exported diff is graded. A failed
-// control is a failed check in the record, not an error; Admit returns an
-// error only when it cannot run the checks at all.
+// Admit runs the admission controls of one task version, the checks of
+// tools/checktask.sh and docs/bring-your-own-design.md: the reference passes
+// 3 times in a row (determinism), the empty patch fails, every mutant fails,
+// the exploit script fails under clean grading, the reference still passes
+// with the stale notes overlaid when the task has stale notes (the
+// stale-notes probe is goal-preserving), the null agents (noop, refuse) fail,
+// the instruction no longer holds the EDIT ME marker, no task file matches a
+// secret pattern, and the verifier runs with no network. Patches are graded
+// directly by deps.Grader; the exploit and the null agents run in workspaces
+// from deps.Env and their exported diffs are graded. A failed control is a
+// failed check in the record, not an error; Admit returns an error only when
+// it cannot run the checks at all.
 func Admit(ctx context.Context, deps AdmitDeps, s *schemas.Suite, t *schemas.Task) (*schemas.AdmissionRecord, error) {
 	if deps.Env == nil || deps.Grader == nil {
 		return nil, errors.New("admit: environment and grader are required")
@@ -70,25 +92,32 @@ func Admit(ctx context.Context, deps AdmitDeps, s *schemas.Suite, t *schemas.Tas
 	if err != nil {
 		return nil, err
 	}
+	rec := &schemas.AdmissionRecord{Admitted: true, At: time.Now().UTC(), Grader: deps.Grader.GetName(), ReferenceRepeats: referenceRuns}
 	var checks []schemas.AdmissionCheck
 	for i := 1; i <= referenceRuns; i++ {
-		checks = append(checks, a.gradePatch(ctx, fmt.Sprintf("reference_%d", i), paths.reference, GotPass))
+		c := a.gradePatch(ctx, fmt.Sprintf("reference_%d", i), paths.reference, GotPass)
+		rec.ReferenceResults = append(rec.ReferenceResults, c.Got)
+		checks = append(checks, c)
 	}
 	checks = append(checks, a.gradePatch(ctx, "empty_patch", paths.empty, GotFail))
 	for i, m := range paths.mutants {
 		checks = append(checks, a.gradePatch(ctx, fmt.Sprintf("mutant_%d", i+1), m, GotFail))
 	}
 	checks = append(checks, a.exploit(ctx, paths.exploit))
-	staleCheck, err := a.staleNotes(ctx, paths.reference)
-	if err != nil {
-		return nil, err
+	if t.Notes.Stale != "" {
+		staleCheck, err := a.staleNotes(ctx, paths.reference)
+		if err != nil {
+			return nil, err
+		}
+		checks = append(checks, staleCheck)
 	}
-	checks = append(checks, staleCheck)
+	checks = append(checks, a.nullAgents(ctx)...)
+	checks = append(checks, a.instructionEdited(), a.secretScan(), a.verifierNetwork())
 	if err := ctx.Err(); err != nil {
 		return nil, fmt.Errorf("admit task %s: %w", t.ID, err)
 	}
 
-	rec := &schemas.AdmissionRecord{Admitted: true, Checks: checks, At: time.Now().UTC()}
+	rec.Checks = checks
 	for _, c := range checks {
 		if !c.Passed {
 			rec.Admitted = false
@@ -168,30 +197,47 @@ func (a *admitter) gradePatch(ctx context.Context, name, patch, want string) sch
 }
 
 // exploit runs the exploit script in a fresh workspace, exports the diff it
-// left and grades that diff cleanly. The workspace is always destroyed.
-func (a *admitter) exploit(ctx context.Context, script string) (check schemas.AdmissionCheck) {
-	check = schemas.AdmissionCheck{Name: "exploit", Want: GotFail}
+// left and grades that diff cleanly.
+func (a *admitter) exploit(ctx context.Context, script string) schemas.AdmissionCheck {
 	content, err := os.ReadFile(script)
 	if err != nil {
-		return failed(check, fmt.Errorf("read exploit: %w", err))
+		return failed(schemas.AdmissionCheck{Name: "exploit", Want: GotFail}, fmt.Errorf("read exploit: %w", err))
 	}
-	rc, err := a.runContext("exploit")
+	return a.scripted(ctx, "exploit", "exploit", []string{"sh", exploitScriptPath}, map[string]string{exploitScriptPath: string(content)})
+}
+
+// nullAgents runs the two null controls, each in a fresh workspace: noop
+// changes nothing, refuse prints a refusal and changes nothing. Both must
+// fail, which proves the verifier does not pass an untouched workspace.
+func (a *admitter) nullAgents(ctx context.Context) []schemas.AdmissionCheck {
+	return []schemas.AdmissionCheck{
+		a.scripted(ctx, "null_noop", "noop", []string{"true"}, map[string]string{}),
+		a.scripted(ctx, "null_refuse", "refuse", []string{"sh", "-c", "echo \"" + refuseMessage + "\""}, map[string]string{}),
+	}
+}
+
+// scripted runs argv as uid 1000 with no network in a fresh workspace of the
+// suite's base image, exports the diff it left and grades that diff cleanly,
+// wanting a fail. The workspace is always destroyed.
+func (a *admitter) scripted(ctx context.Context, name, kind string, argv []string, files map[string]string) (check schemas.AdmissionCheck) {
+	check = schemas.AdmissionCheck{Name: name, Want: GotFail}
+	rc, err := a.runContext(name)
 	if err != nil {
 		return failed(check, err)
 	}
 	rc.Agent = &schemas.AgentConfig{
-		ID:       "admission-exploit",
+		ID:       "admission-" + kind,
 		Adapter:  "scripted",
 		Image:    a.s.BaseImage.Tag,
 		Notes:    schemas.AgentNotes{ProjectFile: "AGENTS.md"},
 		Budgets:  schemas.Budgets{WallS: exploitWallS, CPUs: 1, MemGB: 1},
-		Scripted: &schemas.ScriptedSpec{Kind: "exploit"},
+		Scripted: &schemas.ScriptedSpec{Kind: kind},
 	}
 	defer func() {
 		dctx, cancel := context.WithTimeout(context.WithoutCancel(ctx), destroyTimeout)
 		defer cancel()
 		if err := a.deps.Env.Destroy(dctx, rc); err != nil {
-			a.deps.Logger.Warn("admission: destroy exploit workspace", "task", a.t.ID, "run", rc.Run.RunID, "error", err)
+			a.deps.Logger.Warn("admission: destroy workspace", "task", a.t.ID, "check", name, "run", rc.Run.RunID, "error", err)
 			check.Detail = joinDetail(check.Detail, "destroy: "+err.Error())
 		}
 	}()
@@ -202,9 +248,9 @@ func (a *admitter) exploit(ctx context.Context, script string) (check schemas.Ad
 	rc.Handle = handle
 	plan := &schemas.RunPlan{
 		Image:   a.s.BaseImage.Tag,
-		Argv:    []string{"sh", exploitScriptPath},
+		Argv:    argv,
 		Env:     map[string]string{},
-		Files:   map[string]string{exploitScriptPath: string(content)},
+		Files:   files,
 		Workdir: a.s.Workdir,
 		WallS:   exploitWallS,
 		CPUs:    1,
@@ -214,18 +260,83 @@ func (a *admitter) exploit(ctx context.Context, script string) (check schemas.Ad
 	}
 	res, err := a.deps.Env.Exec(ctx, rc, plan)
 	if err != nil {
-		return failed(check, fmt.Errorf("run exploit: %w", err))
+		return failed(check, fmt.Errorf("run %s: %w", kind, err))
 	}
 	rc.Exec = res
 	diff, err := a.deps.Env.ExportDiff(ctx, rc)
 	if err != nil {
 		return failed(check, fmt.Errorf("export diff: %w", err))
 	}
-	detail := fmt.Sprintf("exploit exit %d", res.ExitCode)
+	detail := fmt.Sprintf("%s exit %d", kind, res.ExitCode)
 	if res.TimedOut {
 		detail += " (timed out)"
 	}
 	return a.grade(ctx, rc, diff, check, detail)
+}
+
+// instructionEdited checks that the draft marker task init writes is gone.
+func (a *admitter) instructionEdited() schemas.AdmissionCheck {
+	c := schemas.AdmissionCheck{Name: "instruction_edited", Want: wantEdited}
+	path, err := resolveIn(a.t.Dir, a.t.Instruction)
+	if err != nil {
+		return failed(c, err)
+	}
+	b, err := os.ReadFile(path)
+	if err != nil {
+		return failed(c, fmt.Errorf("read instruction: %w", err))
+	}
+	if n := editMeLine(b); n > 0 {
+		c.Got = "draft"
+		c.Detail = fmt.Sprintf("%s line %d holds %s", a.t.Instruction, n, EditMeMarker)
+		return c
+	}
+	c.Got, c.Passed = wantEdited, true
+	return c
+}
+
+// secretScan checks that no file of the task matches a secret pattern. The
+// detail names file and line with the value masked.
+func (a *admitter) secretScan() schemas.AdmissionCheck {
+	c := schemas.AdmissionCheck{Name: "secret_scan", Want: wantNoSecrets}
+	findings, err := ScanSecrets(a.t.Dir)
+	if err != nil {
+		return failed(c, err)
+	}
+	if len(findings) == 0 {
+		c.Got, c.Passed = wantNoSecrets, true
+		return c
+	}
+	c.Got = fmt.Sprintf("%d findings", len(findings))
+	var parts []string
+	for i, f := range findings {
+		if i == 5 {
+			parts = append(parts, fmt.Sprintf("and %d more", len(findings)-i))
+			break
+		}
+		parts = append(parts, f.String())
+	}
+	c.Detail = strings.Join(parts, "; ")
+	return c
+}
+
+// verifierNetwork checks that the verifier container has no network: as the
+// grader reports it, or by construction for the shipped graders.
+func (a *admitter) verifierNetwork() schemas.AdmissionCheck {
+	c := schemas.AdmissionCheck{Name: "verifier_no_network", Want: wantNoNetwork}
+	name := a.deps.Grader.GetName()
+	switch r, ok := a.deps.Grader.(VerifierNetworkReporter); {
+	case ok:
+		c.Got = r.VerifierNetwork()
+		c.Detail = "reported by grader " + name
+	case isolatedGraders[name]:
+		c.Got = wantNoNetwork
+		c.Detail = "grader " + name + " runs the verifier with --network none"
+	default:
+		c.Got = "unknown"
+		c.Detail = "grader " + name + " does not report its verifier network"
+	}
+	c.Passed = c.Got == c.Want
+	return c
 }
 
 // staleNotes grades the reference patch combined with new files that hold the

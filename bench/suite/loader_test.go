@@ -1,6 +1,7 @@
 package suite
 
 import (
+	"bytes"
 	"context"
 	"io/fs"
 	"os"
@@ -193,7 +194,50 @@ func TestLoadCodingCore(t *testing.T) {
 		t.Logf("lint %s %s: %s", p.Severity, p.Path, p.Message)
 	}
 	t.Logf("coding-core: %d tasks, %d probes, %d lint problems", len(s.Tasks), len(s.Probes), len(problems))
-	if _, err := Lock(s, fixedNow); err != nil {
-		t.Errorf("lock coding-core: %v", err)
+	l, err := Lock(s, fixedNow)
+	if err != nil {
+		t.Fatalf("lock coding-core: %v", err)
+	}
+	// Re-locking the unchanged pack must reproduce suite.lock byte for byte,
+	// so no change to the loader or the lock moves the coding-core lock hash.
+	got, err := encodeLock(l)
+	if err != nil {
+		t.Fatal(err)
+	}
+	want, err := os.ReadFile(filepath.Join(benchRoot, "coding-core", LockFile))
+	if err != nil {
+		t.Skipf("coding-core lock not readable: %v", err)
+	}
+	if !bytes.Equal(got, want) {
+		t.Errorf("re-locking coding-core changed suite.lock")
+	}
+	for _, p := range problems {
+		if p.Severity == SeverityError {
+			t.Errorf("coding-core lint error: %s: %s", p.Path, p.Message)
+		}
+	}
+}
+
+func TestLoadTask(t *testing.T) {
+	benchRoot, packRoot := copyPack(t)
+	if err := os.MkdirAll(filepath.Join(packRoot, "tasks", "m02"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(packRoot, "tasks", "m02", TaskFile), []byte("id: m02\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	editFile(t, filepath.Join(packRoot, SuiteFile), "tasks: [m01]", "tasks: [m01, m02]")
+	if _, err := newLocalLoader(benchRoot).Load(context.Background(), "mini"); err == nil {
+		t.Fatal("whole-suite load should fail on the half-written m02")
+	}
+	s, task, err := LoadTask(benchRoot, "mini", "m01")
+	if err != nil {
+		t.Fatalf("LoadTask: %v", err)
+	}
+	if task.ID != "m01" || len(s.Tasks) != 1 || s.Tasks[0] != task || len(s.TaskIDs) != 2 || s.Root != packRoot {
+		t.Fatalf("suite = %+v, task = %+v", s, task)
+	}
+	if _, _, err := LoadTask(benchRoot, "mini", "m02"); err == nil || !strings.Contains(err.Error(), "required field missing") {
+		t.Fatalf("LoadTask m02: %v", err)
 	}
 }

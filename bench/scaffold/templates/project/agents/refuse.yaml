@@ -1,0 +1,18 @@
+# Refuse control: prints "I can't complete this task." and exits 0. Checks
+# that a refusal is graded as a failure and never read as a success claim.
+# Scripted adapter: argv, env and files come from the adapter, not this file.
+id: refuse
+adapter: scripted
+image: bench/coding-core-base:1
+scripted:
+  kind: refuse
+model: claude-sonnet-4-5
+notes:
+  project_file: CLAUDE.md
+budgets:
+  wall_s: 900
+  cpus: 1
+  mem_gb: 1
+gateway:
+  provider: anthropic
+  max_retries: 0

@@ -1,0 +1,195 @@
+{
+	"_comment": "SYNTHETIC fixture for UI development. Not a measurement. Shapes follow handlers/testdata/contract.",
+	"mode": "synthetic",
+	"agents": [
+		{
+			"id": "",
+			"path": "agents/acme-broken.yaml",
+			"adapter": "",
+			"image": "",
+			"dockerfile": "",
+			"base_arg": "",
+			"per_suite_build": false,
+			"parser": "",
+			"evidence_level": "gateway",
+			"model": "",
+			"scripted_kind": "",
+			"notes_project_file": "",
+			"notes_user_file": "",
+			"budgets": {
+				"wall_s": 0,
+				"cpus": 0,
+				"mem_gb": 0
+			},
+			"gateway": {
+				"provider": "",
+				"max_retries": 0
+			},
+			"env_names": [],
+			"file_paths": [],
+			"sealed_runs": 0,
+			"error": "agents/acme-broken.yaml: schema: budgets.wall_s: required field missing"
+		},
+		{
+			"id": "acme-langgraph",
+			"path": "agents/acme-langgraph.yaml",
+			"adapter": "command",
+			"image": "acme/agent-langgraph:2",
+			"dockerfile": "agents/images/acme-langgraph/Dockerfile",
+			"base_arg": "SUITE_BASE",
+			"per_suite_build": true,
+			"parser": "",
+			"evidence_level": "gateway",
+			"model": "claude-sonnet-4-5",
+			"scripted_kind": "",
+			"notes_project_file": "AGENTS.md",
+			"notes_user_file": "",
+			"budgets": {
+				"wall_s": 900,
+				"turns": 40,
+				"cpus": 2,
+				"mem_gb": 4
+			},
+			"gateway": {
+				"provider": "anthropic",
+				"max_retries": 0
+			},
+			"env_names": [
+				"AGENT_HEALTH_URL",
+				"BENCH_API_KEY",
+				"BENCH_BASE_URL",
+				"BENCH_MODEL",
+				"BENCH_SESSION_ID"
+			],
+			"file_paths": [
+				"/opt/bench/launch.sh"
+			],
+			"sealed_runs": 12
+		},
+		{
+			"id": "codex",
+			"path": "agents/codex.yaml",
+			"adapter": "command",
+			"image": "bench/agent-codex:1",
+			"dockerfile": "agents/images/codex/Dockerfile",
+			"base_arg": "",
+			"per_suite_build": false,
+			"parser": "codex",
+			"evidence_level": "native",
+			"model": "gpt-5.6-terra",
+			"scripted_kind": "",
+			"notes_project_file": "AGENTS.md",
+			"notes_user_file": "",
+			"budgets": {
+				"wall_s": 900,
+				"cpus": 2,
+				"mem_gb": 4
+			},
+			"gateway": {
+				"provider": "openai",
+				"max_retries": 0
+			},
+			"env_names": [
+				"BIFROST_API_KEY",
+				"CODEX_HOME",
+				"OPENAI_API_KEY"
+			],
+			"file_paths": [
+				"/home/agent/.codex/config.toml"
+			],
+			"sealed_runs": 249
+		},
+		{
+			"id": "custom-python",
+			"path": "agents/custom-python.yaml",
+			"adapter": "command",
+			"image": "bench/agent-custom-python:1",
+			"dockerfile": "agents/images/custom-python/Dockerfile",
+			"base_arg": "SUITE_BASE",
+			"per_suite_build": true,
+			"parser": "",
+			"evidence_level": "gateway",
+			"model": "claude-sonnet-4-5",
+			"scripted_kind": "",
+			"notes_project_file": "AGENTS.md",
+			"notes_user_file": "",
+			"budgets": {
+				"wall_s": 900,
+				"turns": 40,
+				"cpus": 1,
+				"mem_gb": 2
+			},
+			"gateway": {
+				"provider": "anthropic",
+				"max_retries": 0,
+				"fallbacks": [
+					"openai"
+				]
+			},
+			"env_names": [
+				"BENCH_API_KEY",
+				"BENCH_BASE_URL",
+				"BENCH_INSTRUCTION_FILE",
+				"BENCH_MAX_TURNS",
+				"BENCH_MODEL",
+				"BENCH_SESSION_ID"
+			],
+			"file_paths": [],
+			"sealed_runs": 69
+		},
+		{
+			"id": "noop",
+			"path": "agents/noop.yaml",
+			"adapter": "scripted",
+			"image": "bench/coding-core-base:1",
+			"dockerfile": "",
+			"base_arg": "",
+			"per_suite_build": false,
+			"parser": "",
+			"evidence_level": "gateway",
+			"model": "claude-sonnet-4-5",
+			"scripted_kind": "noop",
+			"notes_project_file": "CLAUDE.md",
+			"notes_user_file": "",
+			"budgets": {
+				"wall_s": 900,
+				"cpus": 1,
+				"mem_gb": 1
+			},
+			"gateway": {
+				"provider": "anthropic",
+				"max_retries": 0
+			},
+			"env_names": [],
+			"file_paths": [],
+			"sealed_runs": 0
+		},
+		{
+			"id": "oracle",
+			"path": "agents/oracle.yaml",
+			"adapter": "scripted",
+			"image": "bench/coding-core-base:1",
+			"dockerfile": "",
+			"base_arg": "",
+			"per_suite_build": false,
+			"parser": "",
+			"evidence_level": "gateway",
+			"model": "claude-sonnet-4-5",
+			"scripted_kind": "oracle",
+			"notes_project_file": "CLAUDE.md",
+			"notes_user_file": "",
+			"budgets": {
+				"wall_s": 900,
+				"cpus": 1,
+				"mem_gb": 1
+			},
+			"gateway": {
+				"provider": "anthropic",
+				"max_retries": 0
+			},
+			"env_names": [],
+			"file_paths": [],
+			"sealed_runs": 24
+		}
+	]
+}

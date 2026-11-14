@@ -119,6 +119,41 @@ func (l *localLoader) Load(ctx context.Context, ref string) (*schemas.Suite, err
 	return &s, nil
 }
 
+// LoadTask reads suite.yaml, suite.lock and the one task taskID of the suite
+// ref names (resolved like Load against benchmarksRoot), so a task can be
+// validated while other tasks of the suite are still being written. The
+// suite's Tasks holds only that task and no probe is loaded. A task missing
+// from the suite's tasks list still loads; Lint reports it.
+func LoadTask(benchmarksRoot, ref, taskID string) (*schemas.Suite, *schemas.Task, error) {
+	dir, wantID, _, err := newLocalLoader(benchmarksRoot).resolve(ref)
+	if err != nil {
+		return nil, nil, err
+	}
+	root, err := filepath.Abs(dir)
+	if err != nil {
+		return nil, nil, fmt.Errorf("resolve suite folder %s: %w", dir, err)
+	}
+	d := displayer{base: filepath.Dir(root)}
+	var s schemas.Suite
+	suitePath := filepath.Join(root, SuiteFile)
+	if err := DecodeYAMLFile(suitePath, d.name(suitePath), SchemaSuite, &s); err != nil {
+		return nil, nil, err
+	}
+	s.Root = root
+	if wantID != "" && s.ID != wantID {
+		return nil, nil, fmt.Errorf("%s: id: got %q, want %q (the folder name)", d.name(suitePath), s.ID, wantID)
+	}
+	t, err := loadTask(root, taskID, d)
+	if err != nil {
+		return nil, nil, err
+	}
+	s.Tasks = []*schemas.Task{t}
+	if err := loadLock(&s, d); err != nil {
+		return nil, nil, err
+	}
+	return &s, t, nil
+}
+
 // resolve maps ref to a folder and, for id refs, the id and version the pack
 // must declare.
 func (l *localLoader) resolve(ref string) (dir, id, version string, err error) {
@@ -160,7 +195,9 @@ func loadTask(root, id string, d displayer) (*schemas.Task, error) {
 	}
 	check("instruction", t.Instruction, false)
 	check("repo_dir", t.RepoDir, true)
-	check("notes.clean", t.Notes.Clean, false)
+	if t.Notes.Clean != "" {
+		check("notes.clean", t.Notes.Clean, false)
+	}
 	if t.Notes.Stale != "" {
 		check("notes.stale", t.Notes.Stale, false)
 	}

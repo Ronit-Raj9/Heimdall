@@ -33,6 +33,9 @@ type ImageSpec struct {
 	// of that suite's toolchain, and tagged "<tag>-<suite id>". Empty keeps one
 	// image for every suite.
 	BaseArg string `json:"base_arg,omitempty" yaml:"base_arg"`
+	// Context, on an agent's build, is the docker build context, relative to
+	// the bench root. Empty uses the Dockerfile's folder.
+	Context string `json:"context,omitempty" yaml:"context"`
 }
 
 // SuiteVerifier is the grading command and restore policy shared by every task
@@ -126,11 +129,20 @@ type AdmissionRecord struct {
 	Admitted bool             `json:"admitted"`
 	Checks   []AdmissionCheck `json:"checks"`
 	At       time.Time        `json:"at"`
+	// Grader names the grader part that ran the checks. ReferenceRepeats is
+	// how many times in a row the reference solution was graded for the
+	// determinism check, and ReferenceResults the outcome of each run (pass,
+	// fail, invalid_evaluator or error). All three are empty in records
+	// written before they existed.
+	Grader           string   `json:"grader,omitempty"`
+	ReferenceRepeats int      `json:"reference_repeats,omitempty"`
+	ReferenceResults []string `json:"reference_results,omitempty"`
 }
 
 // AdmissionCheck is one admission control (reference passes, empty patch
 // fails, mutant fails, exploit scores 0, null agent scores 0, probe keeps the
-// reference passing).
+// reference passing, instruction edited, no secrets, verifier without
+// network).
 type AdmissionCheck struct {
 	Name   string `json:"name"`
 	Want   string `json:"want"`

@@ -1,0 +1,149 @@
+{
+	"_comment": "SYNTHETIC fixture for UI development. Not a measurement. Shapes follow handlers/testdata/contract.",
+	"mode": "synthetic",
+	"suite": "acme-payments",
+	"suite_version": "0.3.0",
+	"verifier_result": "junit",
+	"task": {
+		"id": "p01",
+		"version": "1.0.0",
+		"title": "Reject refunds larger than the captured amount",
+		"project": "ledger-service",
+		"kind": "bugfix",
+		"difficulty": "medium",
+		"capabilities": [
+			"test_discipline",
+			"safety"
+		],
+		"tags": [
+			"refunds"
+		],
+		"provenance": {
+			"source": "git@git.acme.example:payments/ledger-service.git",
+			"base_commit": "4f9c2a1",
+			"reference_commit": "b81e07d",
+			"license": "proprietary",
+			"created_by": "task init"
+		},
+		"status": "admitted",
+		"stale": false,
+		"admitted": true,
+		"admitted_at": "2026-11-14T08:12:00Z",
+		"checks": [
+			{
+				"name": "reference_1",
+				"control": "reference",
+				"want": "pass",
+				"got": "pass",
+				"passed": true,
+				"summary": "tests_ran=5 failures=0 errors=0 skipped=0 exit=0"
+			},
+			{
+				"name": "reference_2",
+				"control": "reference",
+				"want": "pass",
+				"got": "pass",
+				"passed": true,
+				"summary": "tests_ran=5 failures=0 errors=0 skipped=0 exit=0"
+			},
+			{
+				"name": "reference_3",
+				"control": "reference",
+				"want": "pass",
+				"got": "pass",
+				"passed": true,
+				"summary": "tests_ran=5 failures=0 errors=0 skipped=0 exit=0"
+			},
+			{
+				"name": "empty_patch",
+				"control": "empty",
+				"want": "fail",
+				"got": "fail",
+				"passed": true,
+				"summary": "tests_ran=5 failures=5 errors=0 skipped=0 exit=1"
+			},
+			{
+				"name": "mutant_1",
+				"control": "mutant",
+				"want": "fail",
+				"got": "fail",
+				"passed": true,
+				"summary": "tests_ran=5 failures=2 errors=0 skipped=0 exit=1"
+			},
+			{
+				"name": "exploit",
+				"control": "exploit",
+				"want": "fail",
+				"got": "fail",
+				"passed": true,
+				"summary": "tests_ran=5 failures=5 errors=0 skipped=0 exit=1"
+			},
+			{
+				"name": "null_noop",
+				"control": "null_agent",
+				"want": "fail",
+				"got": "fail",
+				"passed": true
+			},
+			{
+				"name": "null_refuse",
+				"control": "null_agent",
+				"want": "fail",
+				"got": "fail",
+				"passed": true
+			},
+			{
+				"name": "secret_scan",
+				"control": "secrets",
+				"want": "pass",
+				"got": "pass",
+				"passed": true
+			},
+			{
+				"name": "verifier_no_network",
+				"control": "network",
+				"want": "pass",
+				"got": "pass",
+				"passed": true
+			}
+		],
+		"hidden_test_files": 3,
+		"required_tests": 5,
+		"protected_globs": 2,
+		"mutants": 1,
+		"agent_timeout_s": 900
+	},
+	"instruction": "# Reject refunds larger than the captured amount\n\nA refund request for more than what was captured currently goes through and leaves the ledger negative.\n\n- `POST /refunds` must answer 422 with `{\"error\": \"refund_exceeds_capture\"}` when the amount is larger than the captured amount minus earlier refunds.\n- Partial refunds keep working.\n\n<script>alert('this tag is shown as text, never run')</script>\n",
+	"instruction_truncated": false,
+	"protected": [
+		"tests/**"
+	],
+	"files": [
+		{
+			"path": "package.json",
+			"size": 611
+		},
+		{
+			"path": "src/refunds.js",
+			"size": 3904
+		},
+		{
+			"path": "src/webhooks.js",
+			"size": 5120
+		},
+		{
+			"path": "src/settle.js",
+			"size": 2210
+		},
+		{
+			"path": "test/refunds.test.js",
+			"size": 2402
+		},
+		{
+			"path": "test/settle.test.js",
+			"size": 1180
+		}
+	],
+	"files_total": 6,
+	"files_truncated": false
+}

@@ -1,0 +1,3 @@
+# Only the bench binary goes into the image build context; never deploy/.env.
+*
+!bifrost-bench

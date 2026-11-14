@@ -1,0 +1,9 @@
+# Sealed run folders and release packs are local evidence.
+/runs/
+/releases/
+# Runs written by `bifrost-bench agent check`.
+/checks/
+# Secrets: copy deploy/.env.example to deploy/.env and fill it in.
+/deploy/.env
+# The bench binary copied in to build the fault proxy image.
+/deploy/bifrost-bench

@@ -8,12 +8,22 @@ import (
 	"github.com/maximhq/bifrost/bench/schemas"
 )
 
-// Plan modes understood by the proxy.
+// Plan modes understood by the proxy. ModeScripted answers every call of
+// the slot's run from the scripted model, whatever the provider and whether
+// or not the proxy holds its real key, and never forwards a request or a key
+// upstream; it injects nothing. `agent check` binds it so a conformance run
+// is free.
 const (
 	ModeNone       = "none"
 	ModePersistent = "persistent"
 	ModeOnce       = "once"
+	ModeScripted   = "scripted"
 )
+
+// PlanModes lists every plan mode this proxy honours, in the order /health
+// reports them. A caller that needs a mode checks for it there first: an
+// older proxy rejects a mode it does not know with 400.
+var PlanModes = []string{ModeNone, ModePersistent, ModeOnce, ModeScripted}
 
 // Request kinds recorded in the ledger. Only KindMessage is counted.
 const (
@@ -39,6 +49,11 @@ func ValidatePlan(p schemas.FaultPlan) error {
 	switch p.Mode {
 	case "", ModeNone:
 		return nil
+	case ModeScripted:
+		if p.FromCall != 0 || p.Call != 0 || p.Status != 0 || p.RetryAfterS != 0 {
+			return errors.New("scripted plan injects nothing; from_call, call, status and retry_after_s must be unset")
+		}
+		return nil
 	case ModePersistent:
 		if p.FromCall < 1 {
 			return errors.New("persistent plan needs from_call >= 1")
@@ -48,7 +63,7 @@ func ValidatePlan(p schemas.FaultPlan) error {
 			return errors.New("once plan needs call >= 1")
 		}
 	default:
-		return fmt.Errorf("mode must be none, persistent or once, got %q", p.Mode)
+		return fmt.Errorf("mode must be none, persistent, once or scripted, got %q", p.Mode)
 	}
 	if p.Status < 400 || p.Status > 599 {
 		return fmt.Errorf("status must be 4xx or 5xx, got %d", p.Status)
@@ -80,6 +95,7 @@ type decision struct {
 	Inject      bool
 	Status      int
 	RetryAfterS int
+	Scripted    bool // the run is bound to ModeScripted: answer from the scripted model, never upstream
 }
 
 func newPlanTable() *planTable {
@@ -125,7 +141,7 @@ func (t *planTable) begin(slot, kind string) decision {
 	t.mu.Lock()
 	defer t.mu.Unlock()
 	st := t.state(slot)
-	d := decision{RunID: st.plan.RunID, Nonce: st.plan.Nonce}
+	d := decision{RunID: st.plan.RunID, Nonce: st.plan.Nonce, Scripted: st.plan.Mode == ModeScripted}
 	if kind != KindMessage {
 		return d
 	}

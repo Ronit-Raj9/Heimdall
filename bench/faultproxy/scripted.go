@@ -46,6 +46,43 @@ type scriptedReply struct {
 	Output     int64
 }
 
+// answerScripted answers one request of a run bound to ModeScripted from the
+// scripted model, in the wire shape the request expects, whatever mode the
+// provider's upstream is in. Nothing is forwarded: no request and no key
+// leaves the proxy for such a run. A shape with no scripted model (Gemini's
+// generateContent) gets a 501 that says so, never a real call.
+func (s *Server) answerScripted(w http.ResponseWriter, r *http.Request, p ProviderSpec, kind, slot string, body []byte, e *schemas.LedgerEntry) {
+	switch ScriptedShape(p, r.URL.Path) {
+	case FormatAnthropic:
+		s.serveScripted(w, r, kind, slot, body, e)
+	case FormatOpenAI:
+		s.serveScriptedOpenAI(w, r, kind, slot, body, e)
+	default:
+		s.writeError(w, p.Format, http.StatusNotImplemented, errUpstream,
+			fmt.Sprintf("fault proxy: plan mode scripted has no scripted model for provider %s (%s format); this run cannot be answered for free", p.Name, p.Format))
+	}
+}
+
+// ScriptedShape is the scripted model's wire shape for a request on provider
+// p: anthropic (Messages, count_tokens and models) for the Anthropic format
+// and for an OpenAI-compatible provider's Anthropic-style /messages route,
+// openai (Chat Completions, Responses, input_tokens and models) for the
+// OpenAI format, and "" for a format with no scripted model (gemini).
+func ScriptedShape(p ProviderSpec, urlPath string) string {
+	switch p.Format {
+	case FormatAnthropic:
+		return FormatAnthropic
+	case FormatOpenAI:
+		clean := strings.TrimSuffix(urlPath, "/")
+		if strings.HasSuffix(clean, "/messages") || strings.HasSuffix(clean, "/messages/count_tokens") {
+			return FormatAnthropic
+		}
+		return FormatOpenAI
+	default:
+		return ""
+	}
+}
+
 // newScriptedReply builds the reply for one Messages request. toolTurn says
 // whether this run still owes its first tool_use; it only matters when the
 // request offers tools.

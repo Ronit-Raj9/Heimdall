@@ -54,12 +54,22 @@ var (
 // HelperImage runs the trusted copy, commit and export steps and must contain
 // git, sh and coreutils (the suite base image does). OutputCapBytes caps each
 // captured agent stream; zero means 50 MB.
+//
+// NetWatch runs a passive network observer next to every agent (`agent
+// check` only): the agent joins the network namespace of a holder container
+// on the evaluation network instead of attaching to it directly, and an
+// observer with only CAP_NET_RAW in that namespace writes what it sees leave
+// the agent (DNS names, connection attempts, HTTP request lines and header
+// names) to netwatch.jsonl in the run folder. The helper image must have
+// python3 and sleep. When the observer cannot start, the agent runs as usual
+// and the file records why.
 type DockerWorkspaceConfig struct {
 	EvalNetwork    string
 	HelperImage    string
 	Logger         schemas.Logger
 	Docker         utils.Docker
 	OutputCapBytes int64
+	NetWatch       bool
 }
 
 // dockerWorkspace keeps each run's workspace in a docker volume and runs every
@@ -109,6 +119,9 @@ func (e *dockerWorkspace) Create(ctx context.Context, rc *schemas.RunContext) (*
 	}
 	protected, err := protectedHashes(repoDir, rc.Task.Protected)
 	if err != nil {
+		return nil, fmt.Errorf("create workspace for run %s: %w", runID, err)
+	}
+	if err := e.checkFrozenImage(ctx, rc); err != nil {
 		return nil, fmt.Errorf("create workspace for run %s: %w", runID, err)
 	}
 	h := &schemas.EnvironmentHandle{
@@ -172,7 +185,12 @@ func (e *dockerWorkspace) Exec(ctx context.Context, rc *schemas.RunContext, plan
 	}
 	name := agentContainer(runID)
 	e.removeContainers(ctx, name)
-	args := agentCreateArgs(name, utils.LabelArgs(expID, runID), plan, rc.Handle, e.network(plan.Network), envFile, l)
+	network := e.network(plan.Network)
+	if w := e.netWatch(ctx, rc, expID, runID, network); w != nil {
+		defer w.close(ctx)
+		network = "container:" + w.holder
+	}
+	args := agentCreateArgs(name, utils.LabelArgs(expID, runID), plan, rc.Handle, network, envFile, l)
 	_, cerr := e.cfg.Docker.MustRun(ctx, args...)
 	if rerr := os.Remove(envFile); rerr != nil {
 		e.cfg.Logger.Warn("remove env file", "path", envFile, "error", rerr)
@@ -190,6 +208,24 @@ func (e *dockerWorkspace) Exec(ctx context.Context, rc *schemas.RunContext, plan
 		return res, fmt.Errorf("exec run %s: %w", runID, err)
 	}
 	return res, nil
+}
+
+// netWatch starts the network observer when NetWatch is on and the agent has
+// a network. A failure is recorded in the run folder and returns nil, so the
+// agent still runs, on the evaluation network itself.
+func (e *dockerWorkspace) netWatch(ctx context.Context, rc *schemas.RunContext, expID, runID, network string) *netWatch {
+	if !e.cfg.NetWatch || network == "none" {
+		return nil
+	}
+	w, err := e.startNetWatch(ctx, rc, expID, runID, network)
+	if err == nil {
+		return w
+	}
+	e.cfg.Logger.Warn("network observer did not start; the agent runs without it", "run", runID, "error", err.Error())
+	if werr := writeNetWatchError(rc.Dir, err); werr != nil {
+		e.cfg.Logger.Warn("record network observer failure", "run", runID, "error", werr.Error())
+	}
+	return nil
 }
 
 // ExportDiff copies the workspace to /tmp inside a trusted helper with no

@@ -1,0 +1,20 @@
+# Keys of bench.ts `AgentSummary`. Environment values are never served, only names. Change with bench.ts and schemas/suitesapi.go.
+id
+path
+adapter
+image
+dockerfile
+base_arg
+per_suite_build
+parser
+evidence_level
+model
+scripted_kind
+notes_project_file
+notes_user_file
+budgets
+gateway
+env_names
+file_paths
+sealed_runs
+error?

@@ -1,0 +1,7 @@
+# Keys of bench.ts `SuiteAdmissionCheck`. The raw detail is never served. Change with bench.ts and schemas/suitesapi.go.
+name
+control
+want
+got
+passed
+summary?

@@ -8,8 +8,11 @@ import (
 	"github.com/maximhq/bifrost/bench/schemas"
 )
 
-// faultModeNone is the fault proxy's pass-through plan mode.
-const faultModeNone = "none"
+// Fault proxy plan modes the pipeline binds at prepare.
+const (
+	faultModeNone     = "none"     // pass-through, tagged with the run id
+	faultModeScripted = "scripted" // every call answered by the proxy's scripted model
+)
 
 // faultPart names the fault proxy in a run's failure list. FaultController
 // is not a Part, so it has no registered name.
@@ -73,14 +76,25 @@ func (p *Pipeline) prepare(ctx context.Context, st *runState) error {
 // key slot, so the fault proxy tags every ledger line of the run even when
 // nothing is injected. Without it a clean run has an empty ledger and the
 // gateway completeness join fails. A gateway-layer probe binds its own plan
-// when it arms, so it is skipped here.
+// when it arms, so it is skipped here. Under the scripted fault mode the
+// plan is what keeps the run off every real provider, so a run that cannot
+// bind it is refused rather than run.
 func (p *Pipeline) bindFaultPlan(ctx context.Context, st *runState) error {
-	if p.reg.Fault == nil || (st.rc.Probe != nil && st.rc.Probe.Layer == schemas.LayerGateway) {
+	gatewayProbe := st.rc.Probe != nil && st.rc.Probe.Layer == schemas.LayerGateway
+	if p.faultMode == faultModeScripted {
+		switch {
+		case p.reg.Fault == nil:
+			return &partError{part: faultPart, err: errors.New("scripted fault mode needs the fault proxy; refusing to run against a real provider")}
+		case gatewayProbe:
+			return &partError{part: faultPart, err: fmt.Errorf("scripted fault mode cannot run gateway-layer probe %s", st.rc.Probe.ID)}
+		}
+	}
+	if p.reg.Fault == nil || gatewayProbe {
 		return nil
 	}
-	plan := schemas.FaultPlan{Mode: faultModeNone, RunID: st.rc.Run.RunID}
+	plan := schemas.FaultPlan{Mode: p.faultMode, RunID: st.rc.Run.RunID}
 	if err := p.reg.Fault.SetPlan(ctx, st.rc.Key.KeySlot, plan); err != nil {
-		return &partError{part: faultPart, err: fmt.Errorf("bind empty plan to key slot %s: %w", st.rc.Key.KeySlot, err)}
+		return &partError{part: faultPart, err: fmt.Errorf("bind %s plan to key slot %s: %w", p.faultMode, st.rc.Key.KeySlot, err)}
 	}
 	return nil
 }
@@ -256,11 +270,15 @@ func (p *Pipeline) gate(ctx context.Context, st *runState) error {
 }
 
 // measure computes every selected metric and writes metrics.json. A metric
-// that fails is recorded as unknown, never zero.
+// that fails is recorded as unknown, never zero. Then every selected metric
+// that is a schemas.DerivedMetric adds its run-time named values (reward
+// dimensions), each only under a name no registered metric uses and no
+// earlier value took, so a derived value never replaces a registered one.
 func (p *Pipeline) measure(ctx context.Context, st *runState) error {
 	var errs []error
 	st.metrics = map[string]schemas.Value{}
-	for _, m := range selectMetrics(p.reg, st.rc.Experiment.Metrics) {
+	selected := selectMetrics(p.reg, st.rc.Experiment.Metrics)
+	for _, m := range selected {
 		v, err := m.Compute(ctx, st.rc, st.ev)
 		if err != nil {
 			errs = append(errs, wrapPart("metric", m, fmt.Errorf("compute: %w", err)))
@@ -268,10 +286,41 @@ func (p *Pipeline) measure(ctx context.Context, st *runState) error {
 		}
 		st.metrics[metricName(m)] = v
 	}
+	errs = append(errs, p.measureDerived(ctx, st, selected)...)
 	if err := p.writeJSON(ctx, st, "metrics.json", st.metrics); err != nil {
 		errs = append(errs, err)
 	}
 	return errors.Join(errs...)
+}
+
+// measureDerived adds the values of every selected DerivedMetric to
+// st.metrics, in sorted name order, skipping a name that is taken: by a
+// registered metric (selected or not) or by an earlier value.
+func (p *Pipeline) measureDerived(ctx context.Context, st *runState, selected []schemas.Metric) []error {
+	reserved := map[string]bool{}
+	for _, m := range p.reg.Metrics {
+		reserved[m.GetName()], reserved[metricName(m)] = true, true
+	}
+	var errs []error
+	for _, m := range selected {
+		d, ok := m.(schemas.DerivedMetric)
+		if !ok {
+			continue
+		}
+		vals, err := d.ComputeDerived(ctx, st.rc, st.ev)
+		if err != nil {
+			errs = append(errs, wrapPart("metric", m, fmt.Errorf("compute derived: %w", err)))
+			continue
+		}
+		for _, name := range sortedKeys(vals) {
+			if _, taken := st.metrics[name]; taken || reserved[name] {
+				p.logger.Warn("derived metric name is taken; value dropped", "run", st.rc.Run.RunID, "metric", m.GetName(), "name", name)
+				continue
+			}
+			st.metrics[name] = vals[name]
+		}
+	}
+	return errs
 }
 
 // receipt completes the probe's receipt from the evidence, merges it with

@@ -1,0 +1,6 @@
+# Keys of bench.ts `SuiteDrift`. Change with bench.ts and schemas/suitesapi.go.
+scope
+id
+level
+action
+fields

@@ -1,0 +1,102 @@
+{
+	"_comment": "SYNTHETIC fixture for UI development. Not a measurement. Shapes follow handlers/testdata/contract.",
+	"mode": "synthetic",
+	"suite": "coding-core",
+	"suite_version": "1.0.0",
+	"verifier_result": "junit",
+	"task": {
+		"id": "t04",
+		"version": "1.0.0",
+		"title": "Make duplicate detection fast without changing its results",
+		"project": "dedupe",
+		"kind": "performance",
+		"difficulty": "hard",
+		"capabilities": [
+			"efficiency"
+		],
+		"tags": [
+			"perf"
+		],
+		"provenance": null,
+		"status": "admitted",
+		"stale": false,
+		"admitted": true,
+		"admitted_at": "2026-11-13T23:16:29Z",
+		"checks": [
+			{
+				"name": "reference_1",
+				"control": "reference",
+				"want": "pass",
+				"got": "pass",
+				"passed": true,
+				"summary": "tests_ran=7 failures=0 errors=0 skipped=0 exit=0"
+			},
+			{
+				"name": "reference_2",
+				"control": "reference",
+				"want": "pass",
+				"got": "pass",
+				"passed": true,
+				"summary": "tests_ran=7 failures=0 errors=0 skipped=0 exit=0"
+			},
+			{
+				"name": "reference_3",
+				"control": "reference",
+				"want": "pass",
+				"got": "pass",
+				"passed": true,
+				"summary": "tests_ran=7 failures=0 errors=0 skipped=0 exit=0"
+			},
+			{
+				"name": "empty_patch",
+				"control": "empty",
+				"want": "fail",
+				"got": "fail",
+				"passed": true,
+				"summary": "tests_ran=7 failures=7 errors=0 skipped=0 exit=1"
+			},
+			{
+				"name": "mutant_1",
+				"control": "mutant",
+				"want": "fail",
+				"got": "fail",
+				"passed": true,
+				"summary": "tests_ran=7 failures=3 errors=0 skipped=0 exit=1"
+			},
+			{
+				"name": "exploit",
+				"control": "exploit",
+				"want": "fail",
+				"got": "fail",
+				"passed": true,
+				"summary": "tests_ran=7 failures=7 errors=0 skipped=0 exit=1"
+			}
+		],
+		"hidden_test_files": 2,
+		"required_tests": 7,
+		"protected_globs": 1,
+		"mutants": 1,
+		"agent_timeout_s": 900
+	},
+	"instruction": "# Make duplicate detection fast without changing its results\n\nSynthetic instruction for the fixture task t04.\n",
+	"instruction_truncated": false,
+	"protected": [
+		"tests/**"
+	],
+	"files": [
+		{
+			"path": "README.md",
+			"size": 512
+		},
+		{
+			"path": "dedupe/core.py",
+			"size": 2780
+		},
+		{
+			"path": "tests/test_core.py",
+			"size": 1420
+		}
+	],
+	"files_total": 3,
+	"files_truncated": false
+}

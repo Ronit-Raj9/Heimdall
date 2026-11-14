@@ -3,10 +3,13 @@ package faultproxy
 import (
 	"bufio"
 	"bytes"
+	"context"
 	"encoding/json"
 	"net/http"
+	"net/http/httptest"
 	"reflect"
 	"strings"
+	"sync"
 	"testing"
 
 	"github.com/maximhq/bifrost/bench/schemas"
@@ -268,5 +271,113 @@ func mustDecode(t *testing.T, data []byte, v any) {
 	t.Helper()
 	if err := json.Unmarshal(data, v); err != nil {
 		t.Fatalf("decode %s: %v", data, err)
+	}
+}
+
+// TestScriptedPlanMode binds plan mode scripted to slots whose providers all
+// hold a real key and point at a sink, then sends every API shape the proxy
+// scripts, streamed and not. Nothing may reach the sink, every ledger line is
+// upstream scripted, and the one shape without a scripted model (Gemini) is
+// refused with a 501 rather than forwarded. Clearing the plan forwards again
+// with the real key, which proves the keys were live all along.
+func TestScriptedPlanMode(t *testing.T) {
+	var hits []*http.Request
+	var mu sync.Mutex
+	sink := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		mu.Lock()
+		hits = append(hits, r.Clone(context.Background()))
+		mu.Unlock()
+		w.Header().Set("Content-Type", "application/json")
+		if _, err := w.Write([]byte(`{"id":"msg_real","type":"message","usage":{"input_tokens":1,"output_tokens":1}}`)); err != nil {
+			t.Errorf("sink write: %v", err)
+		}
+	}))
+	defer sink.Close()
+	var providers []ProviderSpec
+	for _, p := range DefaultProviders() {
+		p.BaseURL = sink.URL
+		providers = append(providers, p)
+	}
+	keys := map[string]string{"ANTHROPIC_API_KEY": "sk-ant-real", "OPENAI_API_KEY": "sk-oa-real", "GEMINI_API_KEY": "gm-real", "GROQ_API_KEY": "gq-real"}
+	env := newTestEnvConfig(t, Config{
+		Providers: providers,
+		Getenv:    func(k string) string { return keys[k] },
+		Slots: []SlotConfig{{Name: "slot-a", Auth: "auth-a"}, {Name: "oa-1", Auth: "oa-auth-1", Provider: ProviderOpenAI},
+			{Name: "gm-1", Auth: "gm-auth-1", Provider: ProviderGemini}, {Name: "gq-1", Auth: "gq-auth-1", Provider: "groq"}},
+	})
+	for _, slot := range []string{"slot-a", "oa-1", "gm-1", "gq-1"} {
+		env.setPlan(t, slot, schemas.FaultPlan{Mode: ModeScripted, RunID: "r_scripted"})
+	}
+	const chatTools = `{"model":"gpt-x","messages":[{"role":"user","content":"hi"}],"tools":[{"type":"function","function":{"name":"run","parameters":{"type":"object","required":["cmd"],"properties":{"cmd":{"type":"string"}}}}}]}`
+	steps := []struct {
+		name, method, path, header, value, body string
+		status                                  int
+		want                                    string // substring of the body
+	}{
+		{"anthropic messages", http.MethodPost, "/v1/messages", "x-api-key", "auth-a", toolsBody, 200, `"tool_use"`},
+		{"anthropic messages stream", http.MethodPost, "/v1/messages", "x-api-key", "auth-a", strings.Replace(toolsBody, `"max_tokens"`, `"stream":true,"max_tokens"`, 1), 200, "event: message_stop"},
+		{"anthropic count_tokens", http.MethodPost, "/v1/messages/count_tokens", "x-api-key", "auth-a", toolsBody, 200, `"input_tokens"`},
+		{"anthropic models", http.MethodGet, "/v1/models", "x-api-key", "auth-a", "", 200, `"data"`},
+		{"anthropic other route", http.MethodPost, "/v1/files", "x-api-key", "auth-a", "{}", 404, "no scripted route"},
+		{"openai chat", http.MethodPost, "/v1/chat/completions", "Authorization", "Bearer oa-auth-1", chatTools, 200, `"tool_calls"`},
+		{"openai chat stream", http.MethodPost, "/v1/chat/completions", "Authorization", "Bearer oa-auth-1",
+			strings.Replace(chatBody, `"model"`, `"stream":true,"stream_options":{"include_usage":true},"model"`, 1), 200, "data: [DONE]"},
+		{"openai responses", http.MethodPost, "/v1/responses", "Authorization", "Bearer oa-auth-1", `{"model":"gpt-x","input":"hi"}`, 200, `"object":"response"`},
+		{"openai responses stream", http.MethodPost, "/v1/responses", "Authorization", "Bearer oa-auth-1", `{"model":"gpt-x","input":"hi","stream":true}`, 200, "response.completed"},
+		{"openai input_tokens", http.MethodPost, "/v1/responses/input_tokens", "Authorization", "Bearer oa-auth-1", `{"model":"gpt-x","input":"hi"}`, 200, `"input_tokens"`},
+		{"openai models", http.MethodGet, "/v1/models", "Authorization", "Bearer oa-auth-1", "", 200, `"list"`},
+		{"openai-compatible groq chat", http.MethodPost, "/v1/chat/completions", "Authorization", "Bearer gq-auth-1", chatBody, 200, `"chat.completion"`},
+		{"gemini has no scripted model", http.MethodPost, "/models/gemini-2.5-pro:generateContent", "x-goog-api-key", "gm-auth-1", `{"contents":[]}`, 501, "no scripted model"},
+	}
+	for _, s := range steps {
+		t.Run(s.name, func(t *testing.T) {
+			resp, body := env.callAs(t, s.method, s.path, s.header, s.value, s.body)
+			if resp.StatusCode != s.status || !strings.Contains(string(body), s.want) {
+				t.Fatalf("status %d body %s, want %d with %q", resp.StatusCode, body, s.status, s.want)
+			}
+			e := env.last(t)
+			if e.Upstream != schemas.LedgerUpstreamScripted || e.Action != ActionPass || e.RunID != "r_scripted" {
+				t.Fatalf("ledger line = %+v", e)
+			}
+		})
+	}
+	mu.Lock()
+	n := len(hits)
+	mu.Unlock()
+	if n != 0 {
+		t.Fatalf("scripted run reached the upstream %d times", n)
+	}
+	env.setPlan(t, "slot-a", schemas.FaultPlan{Mode: ModeNone, RunID: "r_live"})
+	if resp, body := env.callAs(t, http.MethodPost, "/v1/messages", "x-api-key", "auth-a", toolsBody); resp.StatusCode != 200 {
+		t.Fatalf("live call: %d %s", resp.StatusCode, body)
+	}
+	mu.Lock()
+	defer mu.Unlock()
+	if len(hits) != 1 || hits[0].Header.Get("x-api-key") != "sk-ant-real" {
+		t.Fatalf("live call after clearing scripted: %d hits", len(hits))
+	}
+	if e := env.last(t); e.Upstream != schemas.LedgerUpstreamReal {
+		t.Errorf("live ledger line upstream = %q", e.Upstream)
+	}
+}
+
+func TestScriptedShape(t *testing.T) {
+	byName := map[string]ProviderSpec{}
+	for _, p := range DefaultProviders() {
+		byName[p.Name] = p
+	}
+	tests := []struct{ provider, path, want string }{
+		{ProviderAnthropic, "/v1/messages", FormatAnthropic},
+		{ProviderOpenAI, "/v1/chat/completions", FormatOpenAI},
+		{ProviderOpenAI, "/v1/responses", FormatOpenAI},
+		{"fireworks", "/v1/messages", FormatAnthropic},
+		{"fireworks", "/v1/messages/count_tokens/", FormatAnthropic},
+		{"deepseek", "/chat/completions", FormatOpenAI},
+		{ProviderGemini, "/models/x:generateContent", ""},
+	}
+	for _, tt := range tests {
+		if got := ScriptedShape(byName[tt.provider], tt.path); got != tt.want {
+			t.Errorf("ScriptedShape(%s, %s) = %q, want %q", tt.provider, tt.path, got, tt.want)
+		}
 	}
 }

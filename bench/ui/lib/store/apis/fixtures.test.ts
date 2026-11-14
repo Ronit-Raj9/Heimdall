@@ -6,6 +6,8 @@ import {
 	type RunEventsResponse,
 	type RunReceiptsResponse,
 	type RunResponse,
+	type SuiteTaskResponse,
+	type SuitesResponse,
 	type VerdictResponse,
 } from "@/lib/types/bench";
 import fs from "node:fs";
@@ -49,6 +51,11 @@ describe("resolveFixture", () => {
 		{ method: "GET", url: "/pairs/p_abc", want: "pairs.p_abc.json" },
 		{ method: "POST", url: "/audit", want: "audit.json" },
 		{ method: "GET", url: "/leaderboard?suite=coding-core%401.0.0&scope=common", want: "leaderboard.json" },
+		{ method: "GET", url: "/suites", want: "suites.json" },
+		{ method: "GET", url: `${BENCH_API_BASE}/suites/coding-core/tasks/t01`, want: "suites.task.t01.json" },
+		{ method: "GET", url: "/suites/..%2F/tasks/t01", want: null },
+		{ method: "GET", url: "/suites/../tasks/t01", want: null },
+		{ method: "GET", url: "/agents", want: "agents.json" },
 		{ method: "GET", url: "/experiments/plan/extra", want: null },
 		{ method: "DELETE", url: "/health", want: null },
 		{ method: "GET", url: "/runs/..%2F..%2Fsecret", want: null },
@@ -93,6 +100,20 @@ describe("fixture files", () => {
 			const cell = grid.rows.flatMap((row) => row.cells).find((c) => c.run_id === run.run_id);
 			expect(cell?.slot_id).toBe(slot.slot_id);
 		}
+	});
+
+	it("link every suite task to its detail fixture", () => {
+		const { suites } = readFixture<SuitesResponse>("suites.json");
+		const tasks = suites.flatMap((suite) => suite.tasks.map((task) => ({ suite, task })));
+		expect(tasks.length).toBeGreaterThan(0);
+		for (const { suite, task } of tasks) {
+			const detail = readFixture<SuiteTaskResponse>(`suites.task.${task.id}.json`);
+			expect(detail.suite).toBe(suite.id);
+			expect(detail.suite_version).toBe(suite.version);
+			expect(detail.task).toEqual(task);
+			expect(detail.files_total).toBe(detail.files.length);
+		}
+		for (const suite of suites) expect(suite.admitted_count).toBe(suite.tasks.filter((task) => task.admitted).length);
 	});
 
 	it("follow the Go contract for verdicts, events and receipts", () => {
@@ -163,6 +184,27 @@ function contractFor(file: string): { type: string; nested: Record<string, strin
 		"leaderboard.json": { type: "Leaderboard", nested: { "entries[]": "LeaderboardEntry", "excluded[]": "LeaderboardExclusion" } },
 	};
 	if (byFile[file]) return byFile[file];
+	if (file === "suites.json") {
+		return {
+			type: "SuiteList",
+			nested: {
+				"suites[]": "SuiteSummary",
+				"suites[].base_image": "SuiteImage",
+				"suites[].drift[]": "SuiteDrift",
+				"suites[].probes[]": "SuiteProbe",
+				"suites[].tasks[]": "SuiteTask",
+				"suites[].tasks[].checks[]": "SuiteAdmissionCheck",
+				"suites[].tasks[].provenance": "TaskProvenance",
+			},
+		};
+	}
+	if (file.startsWith("suites.task.")) return { type: "SuiteTaskDetail", nested: { task: "SuiteTask", "files[]": "SuiteRepoFile" } };
+	if (file === "agents.json") {
+		return {
+			type: "AgentList",
+			nested: { "agents[]": "AgentSummary", "agents[].budgets": "AgentBudgets", "agents[].gateway": "AgentGateway" },
+		};
+	}
 	if (file.startsWith("pairs.")) return { type: "Pair", nested: { "runs[]": "PairRun" } };
 	if (!file.startsWith("runs.")) return null;
 	if (file.endsWith(".events.json")) return { type: "RunEvents", nested: {} };

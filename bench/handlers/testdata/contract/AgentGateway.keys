@@ -1,0 +1,4 @@
+# Keys of bench.ts `AgentGateway` (schemas.GatewayPolicy). Change with bench.ts and schemas/agent.go.
+provider
+max_retries
+fallbacks?

@@ -199,3 +199,37 @@ func TestClientCheckUpstreams(t *testing.T) {
 		})
 	}
 }
+
+func TestHealthCapabilities(t *testing.T) {
+	env := newTestEnvConfig(t, Config{})
+	h, err := env.client.Capabilities(context.Background())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if h.Status != "ok" || !h.Supports(ModeScripted) || !h.Supports(ModeNone) || h.Supports("flaky") {
+		t.Errorf("health = %+v", h)
+	}
+	for _, p := range []string{ProviderAnthropic, ProviderOpenAI, "groq", "fireworks", "ollama"} {
+		if !h.Scripts(p) {
+			t.Errorf("provider %s should be scriptable: %v", p, h.ScriptedProviders)
+		}
+	}
+	if h.Scripts(ProviderGemini) {
+		t.Errorf("gemini has no scripted model: %v", h.ScriptedProviders)
+	}
+
+	// A proxy older than plan mode scripted answers /health without the lists.
+	old := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		if _, err := w.Write([]byte(`{"status":"ok","slots":4}`)); err != nil {
+			t.Errorf("write: %v", err)
+		}
+	}))
+	defer old.Close()
+	h, err = NewClient(old.URL).Capabilities(context.Background())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if h.Supports(ModeScripted) || h.Scripts(ProviderAnthropic) {
+		t.Errorf("old proxy reported as capable: %+v", h)
+	}
+}

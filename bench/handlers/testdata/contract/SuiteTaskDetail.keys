@@ -1,0 +1,12 @@
+# Keys of bench.ts `SuiteTaskDetail` (GET /suites/{id}/tasks/{task}), one per line; a trailing ? marks an optional key.
+# The top-level response adds "mode". Change with bench.ts and schemas/suitesapi.go.
+suite
+suite_version
+verifier_result
+task
+instruction
+instruction_truncated
+protected
+files
+files_total
+files_truncated

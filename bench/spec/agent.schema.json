@@ -79,9 +79,11 @@
       "additionalProperties": false,
       "required": ["tag"],
       "properties": {
-        "dockerfile": {"type": "string", "minLength": 1},
-        "tag": {"type": "string", "minLength": 1},
-        "digest": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"}
+        "dockerfile": {"type": "string", "minLength": 1, "description": "Dockerfile path, relative to the bench root."},
+        "tag": {"type": "string", "minLength": 1, "description": "Image tag; equals image. With base_arg it needs a tag part (name:tag)."},
+        "digest": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"},
+        "base_arg": {"type": "string", "pattern": "^[A-Za-z_][A-Za-z0-9_]*$", "description": "Dockerfile ARG that receives the suite's base image; the image is built once per suite and tagged <tag>-<suite id>."},
+        "context": {"type": "string", "minLength": 1, "description": "Docker build context, relative to the bench root. Default: the Dockerfile's folder."}
       }
     }
   }

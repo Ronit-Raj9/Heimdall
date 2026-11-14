@@ -1,0 +1,46 @@
+# __AGENT_ID__: a minimal coding agent in one standard-library Python file
+# (agents/images/__AGENT_ID__/agent.py), from `bifrost-bench agent init
+# -template python`. Replace the loop in agent.py with your agent and keep the
+# env contract below. docs/adding-an-agent.md is the guide.
+#
+# It has no parser, so its runs carry gateway-level evidence: success, steps,
+# tokens, cost and time come from Bifrost's rows for the run's key.
+#
+# The agent speaks OpenAI chat completions to Bifrost's /openai/v1 route and
+# Bifrost translates to the provider the run's key allows. To run another
+# provider, override gateway.provider and env.BENCH_MODEL together in an arm:
+#   set: {gateway.provider: openai, model: gpt-5.4-mini, env.BENCH_MODEL: "openai/{{model}}"}
+#
+# Check it for free before a real run:
+#   bifrost-bench agent build agents/__AGENT_ID__.yaml -suite <suite>
+#   bifrost-bench agent check agents/__AGENT_ID__.yaml -suite <suite>
+id: __AGENT_ID__
+adapter: command
+image: __IMAGE_TAG__
+build:
+  dockerfile: agents/images/__AGENT_ID__/Dockerfile
+  tag: __IMAGE_TAG__
+  # One image per suite, built on the suite's base image (ARG BASE_IMAGE).
+  base_arg: BASE_IMAGE
+argv:
+  - bench-agent
+env:
+  BENCH_BASE_URL: "{{gateway.url}}/openai/v1"
+  BENCH_API_KEY: "{{run.key}}"
+  BENCH_MODEL: "anthropic/{{model}}"
+  BENCH_INSTRUCTION_FILE: "{{instruction_file}}"
+  BENCH_SESSION_ID: "{{run.session}}"
+  BENCH_MAX_TURNS: "40"
+  BENCH_SHELL_TIMEOUT_S: "120"
+# Placeholder: every experiment sets the model (an arm may vary it).
+model: claude-sonnet-4-5
+notes:
+  project_file: AGENTS.md
+budgets:
+  wall_s: 900
+  turns: 40
+  cpus: 1
+  mem_gb: 2
+gateway:
+  provider: anthropic
+  max_retries: 0

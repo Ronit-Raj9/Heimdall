@@ -201,7 +201,10 @@ func lockTask(t *schemas.Task) (schemas.TaskLock, error) {
 	if err != nil {
 		return fail("controls", err)
 	}
-	fixtures := []string{t.Notes.Clean}
+	var fixtures []string
+	if t.Notes.Clean != "" {
+		fixtures = append(fixtures, t.Notes.Clean)
+	}
 	if t.Notes.Stale != "" {
 		fixtures = append(fixtures, t.Notes.Stale)
 	}

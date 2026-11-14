@@ -4,6 +4,7 @@ package environments
 
 import (
 	"context"
+	"errors"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -318,4 +319,29 @@ func readFile(t *testing.T, p string) []byte {
 		t.Fatalf("read %s: %v", p, err)
 	}
 	return b
+}
+
+// TestCreateRefusesARebuiltImage checks that a run whose agent tag no longer
+// names the image the manifest froze is refused at Create, before any volume
+// exists, and that the frozen id passes.
+func TestCreateRefusesARebuiltImage(t *testing.T) {
+	ctx := context.Background()
+	e, rc := newRun(t, "clean", 0)
+	id, err := e.ImageID(ctx, testImage)
+	if err != nil || !strings.HasPrefix(id, "sha256:") {
+		t.Fatalf("image id %q %v", id, err)
+	}
+	rc.Agent.Image = testImage
+	rc.Slot.Arm = "A"
+	rc.Manifest = &schemas.Manifest{ExpID: "e_envit", Arms: map[string]schemas.ArmManifest{"A": {ImageID: "sha256:0000000000000000"}}}
+	if _, err := e.Create(ctx, rc); err == nil || !strings.Contains(err.Error(), "was planned with 000000000000") {
+		t.Fatalf("create with a moved tag: %v", err)
+	}
+	rc.Manifest.Arms["A"] = schemas.ArmManifest{ImageID: id}
+	if _, err := e.Create(ctx, rc); err != nil {
+		t.Fatalf("create with the frozen image: %v", err)
+	}
+	if _, err := InspectImage(ctx, e.cfg.Docker, "heimdall-test/no-such-image:0"); !errors.Is(err, ErrImageNotFound) {
+		t.Fatalf("missing image: %v", err)
+	}
 }

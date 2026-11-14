@@ -63,6 +63,26 @@ func TestLockStable(t *testing.T) {
 	}
 }
 
+func TestLockTaskWithoutNotes(t *testing.T) {
+	benchRoot, _ := copyPack(t)
+	s := loadMini(t, benchRoot)
+	s.Tasks[0].Notes = schemas.TaskNotes{}
+	if err := os.RemoveAll(filepath.Join(s.Tasks[0].Dir, "fixtures")); err != nil {
+		t.Fatal(err)
+	}
+	l, err := Lock(s, fixedNow)
+	if err != nil {
+		t.Fatalf("lock a task without notes: %v", err)
+	}
+	empty, err := setHash(s.Tasks[0].Dir, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := l.Tasks["m01"].FixturesSHA256; got != empty {
+		t.Fatalf("fixtures hash = %s, want the empty set %s", got, empty)
+	}
+}
+
 func TestSetHashMatchesTreeHash(t *testing.T) {
 	_, packRoot := copyPack(t)
 	dir := filepath.Join(packRoot, "tasks", "m01")

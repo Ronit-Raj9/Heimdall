@@ -1,0 +1,67 @@
+# [[.Name]]: Heimdall benchmark project
+
+This folder was written by `bifrost-bench init`. It holds everything Heimdall
+(bifrost-bench) needs to benchmark your agents on tasks cut from your own
+repositories: the gateway stack, your agents, your suites, your experiments
+and your release policy. Only the `bifrost-bench` binary and Docker are
+needed to use it. Model calls are the only thing that leaves this machine,
+and they go through Bifrost.
+
+## Layout
+
+```
+deploy/bench.yaml            paths, gateway URL, networks, images
+deploy/docker-compose.yml    Bifrost + Postgres + fault proxy
+deploy/.env.example          copy to deploy/.env and fill in (git-ignored)
+deploy/Dockerfile            the bench image the fault proxy runs
+deploy/helper/Dockerfile     the trusted helper image (git, Python, pytest)
+agents/                      one YAML file per agent; oracle, noop, refuse,
+                             exploit and toy are the free control agents
+benchmarks/<suite>/          suite.yaml, base/Dockerfile, tasks/<task>/
+experiments/                 experiments/<name>.yaml; smoke.yaml needs no key
+policies/default.yaml        the release policy experiments check against
+runs/                        sealed run folders (git-ignored)
+```
+
+Every command takes `-config deploy/bench.yaml`, which is the default when
+you run it from this folder.
+
+## Next commands
+
+Run these from this folder.
+
+1. Fill in the secrets (three random tokens, and a provider key when you
+   want real runs; without one the fault proxy answers from its scripted
+   model):
+
+       cp deploy/.env.example deploy/.env
+
+2. Build the two local images, the bench image (from a static
+   `CGO_ENABLED=0` build of the binary) and the helper image:
+
+       cp "$(command -v bifrost-bench)" deploy/bifrost-bench && docker build -t bench/bifrost-bench:dev deploy && docker build -t bench/coding-core-base:1 deploy/helper
+
+3. Start Bifrost, Postgres and the fault proxy:
+
+       docker compose -f deploy/docker-compose.yml --env-file deploy/.env up -d --wait
+
+4. Create a suite for your language (`python-pytest`, `node-test`,
+   `go-test` or `generic-reward`):
+
+       bifrost-bench suite init my-suite -template python-pytest
+
+5. Cut a task from a commit of your own repository that fixes something and
+   changes its tests, then rewrite `benchmarks/my-suite/tasks/t01/instruction.md`
+   as the request a teammate would send:
+
+       bifrost-bench task init -suite my-suite -id t01 -repo ~/src/app -base <commit before the fix> -reference <fix commit>
+
+6. Check the task, prove it is fit to measure with, and run the free smoke
+   experiment:
+
+       bifrost-bench task validate my-suite/t01 && bifrost-bench task admit my-suite/t01
+       set -a; . deploy/.env; set +a; BENCH_SERVER_MODE=synthetic bifrost-bench run experiments/smoke.yaml
+
+Then add your own agent (`bifrost-bench agent init`), write an experiment
+that compares two versions of it, and gate releases with
+`bifrost-bench check`.

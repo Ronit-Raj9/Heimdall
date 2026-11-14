@@ -68,7 +68,7 @@
         }
       ]
     },
-    "tasks": {"type": "array", "minItems": 1, "items": {"$ref": "#/$defs/id"}},
+    "tasks": {"type": "array", "items": {"$ref": "#/$defs/id"}},
     "probes": {"type": "array", "items": {"$ref": "#/$defs/id"}}
   },
   "$defs": {

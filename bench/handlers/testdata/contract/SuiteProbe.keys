@@ -1,0 +1,8 @@
+# Keys of bench.ts `SuiteProbe`. The apply block is never served. Change with bench.ts and schemas/suitesapi.go.
+id
+version
+layer
+ps2_family
+axis
+goal_preserving
+safe_behavior

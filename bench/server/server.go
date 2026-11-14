@@ -37,6 +37,8 @@ type Deps struct {
 	Auditor  handlers.Auditor
 	Doctor   handlers.DoctorFunc
 	Releases handlers.ReleaseLog
+	Suites   handlers.SuiteSource
+	Agents   handlers.AgentSource
 	// UI is the built UI with index.html at its root, for example
 	// fs.Sub(ui.Dist, "dist"). Nil serves the API only.
 	UI      fs.FS
@@ -97,6 +99,8 @@ func New(cfg *lib.Config, deps Deps) (*Server, error) {
 	handlers.NewLeaderboardHandler(mode, deps.Index).RegisterRoutes(r, common...)
 	handlers.NewAuditHandler(mode, deps.Auditor, write).RegisterRoutes(r, common...)
 	handlers.NewReleasesHandler(mode, deps.Releases, write).RegisterRoutes(r, common...)
+	handlers.NewSuitesHandler(mode, deps.Suites).RegisterRoutes(r, common...)
+	handlers.NewAgentsHandler(mode, deps.Agents, deps.Index).RegisterRoutes(r, common...)
 	if deps.UI != nil {
 		NewUIHandler(mode, deps.UI).RegisterRoutes(r)
 	}

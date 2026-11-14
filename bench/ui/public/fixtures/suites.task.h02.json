@@ -1,0 +1,57 @@
+{
+	"_comment": "SYNTHETIC fixture for UI development. Not a measurement. Shapes follow handlers/testdata/contract.",
+	"mode": "synthetic",
+	"suite": "harbor-shell",
+	"suite_version": "0.1.0",
+	"verifier_result": "reward",
+	"task": {
+		"id": "h02",
+		"version": "1.0.0",
+		"title": "Add a dry-run flag to the backup script",
+		"project": "ops-scripts",
+		"kind": "feature",
+		"difficulty": "medium",
+		"capabilities": [
+			"planning",
+			"safety"
+		],
+		"tags": [
+			"shell"
+		],
+		"provenance": {
+			"source": "https://github.com/example/ops-scripts",
+			"base_commit": "5e7a9c2",
+			"reference_commit": "d40b8f1",
+			"imported_from": "harbor-shell@0.4"
+		},
+		"status": "not_locked",
+		"stale": false,
+		"admitted": false,
+		"admitted_at": null,
+		"checks": [],
+		"hidden_test_files": 1,
+		"required_tests": 0,
+		"protected_globs": 0,
+		"mutants": 0,
+		"agent_timeout_s": 900
+	},
+	"instruction": "# Add a dry-run flag to the backup script\n\nSynthetic instruction for the fixture task h02.\n",
+	"instruction_truncated": false,
+	"protected": [],
+	"files": [
+		{
+			"path": "README.md",
+			"size": 330
+		},
+		{
+			"path": "bin/rotate-logs.sh",
+			"size": 1240
+		},
+		{
+			"path": "bin/backup.sh",
+			"size": 2010
+		}
+	],
+	"files_total": 3,
+	"files_truncated": false
+}

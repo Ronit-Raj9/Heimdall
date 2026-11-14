@@ -1,0 +1,7 @@
+# Keys of bench.ts `TaskProvenance` (schemas/task.go). Every key is optional (Go omitempty).
+source?
+base_commit?
+reference_commit?
+license?
+imported_from?
+created_by?

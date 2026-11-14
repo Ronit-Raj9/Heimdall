@@ -1,0 +1,109 @@
+{
+	"_comment": "SYNTHETIC fixture for UI development. Not a measurement. Shapes follow handlers/testdata/contract.",
+	"mode": "synthetic",
+	"suite": "coding-core",
+	"suite_version": "1.0.0",
+	"verifier_result": "junit",
+	"task": {
+		"id": "t03",
+		"version": "1.0.0",
+		"title": "Fix the window boundary in the sliding-window rate limiter",
+		"project": "throttle",
+		"kind": "bugfix",
+		"difficulty": "hard",
+		"capabilities": [
+			"error_recovery",
+			"test_discipline"
+		],
+		"tags": [],
+		"provenance": null,
+		"status": "admitted",
+		"stale": false,
+		"admitted": true,
+		"admitted_at": "2026-11-13T23:16:29Z",
+		"checks": [
+			{
+				"name": "reference_1",
+				"control": "reference",
+				"want": "pass",
+				"got": "pass",
+				"passed": true,
+				"summary": "tests_ran=8 failures=0 errors=0 skipped=0 exit=0"
+			},
+			{
+				"name": "reference_2",
+				"control": "reference",
+				"want": "pass",
+				"got": "pass",
+				"passed": true,
+				"summary": "tests_ran=8 failures=0 errors=0 skipped=0 exit=0"
+			},
+			{
+				"name": "reference_3",
+				"control": "reference",
+				"want": "pass",
+				"got": "pass",
+				"passed": true,
+				"summary": "tests_ran=8 failures=0 errors=0 skipped=0 exit=0"
+			},
+			{
+				"name": "empty_patch",
+				"control": "empty",
+				"want": "fail",
+				"got": "fail",
+				"passed": true,
+				"summary": "tests_ran=8 failures=8 errors=0 skipped=0 exit=1"
+			},
+			{
+				"name": "mutant_1",
+				"control": "mutant",
+				"want": "fail",
+				"got": "fail",
+				"passed": true,
+				"summary": "tests_ran=8 failures=4 errors=0 skipped=0 exit=1"
+			},
+			{
+				"name": "mutant_2",
+				"control": "mutant",
+				"want": "fail",
+				"got": "fail",
+				"passed": true,
+				"summary": "tests_ran=8 failures=4 errors=0 skipped=0 exit=1"
+			},
+			{
+				"name": "exploit",
+				"control": "exploit",
+				"want": "fail",
+				"got": "fail",
+				"passed": true,
+				"summary": "tests_ran=8 failures=8 errors=0 skipped=0 exit=1"
+			}
+		],
+		"hidden_test_files": 2,
+		"required_tests": 8,
+		"protected_globs": 1,
+		"mutants": 2,
+		"agent_timeout_s": 900
+	},
+	"instruction": "# Fix the window boundary in the sliding-window rate limiter\n\nSynthetic instruction for the fixture task t03.\n",
+	"instruction_truncated": false,
+	"protected": [
+		"tests/**"
+	],
+	"files": [
+		{
+			"path": "README.md",
+			"size": 640
+		},
+		{
+			"path": "throttle/limiter.py",
+			"size": 3120
+		},
+		{
+			"path": "tests/test_limiter.py",
+			"size": 1870
+		}
+	],
+	"files_total": 3,
+	"files_truncated": false
+}

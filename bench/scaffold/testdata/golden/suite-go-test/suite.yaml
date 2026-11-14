@@ -1,0 +1,42 @@
+# template: go-test
+# Written by `bifrost-bench suite init`; add tasks with `bifrost-bench task
+# init`, which also adds them to the tasks list below. The verifier runs in a
+# fresh container from the base image with no network, on a pristine copy of
+# the task repo with the agent's diff applied and the restore paths reset;
+# each task's hidden _test.go files are mounted at /grader/tests at their
+# repository paths.
+id: demo
+version: 0.1.0
+description: Go tasks with hidden go test verifiers.
+environment: docker_workspace
+grader: verifier_command
+base_image:
+  dockerfile: base/Dockerfile
+  tag: bench/demo-base:1
+workdir: /workspace
+verifier:
+  # A _test.go file must sit in its package's folder, so the tests run from a
+  # copy of the workspace with the hidden files laid over it. go-junit (built
+  # into the base image) turns `go test -json` into JUnit XML; a package that
+  # fails to build becomes an errored test case. Test ids for `required` are
+  # "<import path>::<TestName>".
+  command:
+    - sh
+    - -c
+    - |
+      set -u
+      w=/tmp/bench-verify
+      mkdir -p "$w"
+      cp -R /workspace/. "$w"/
+      cp -R /grader/tests/. "$w"/
+      cd "$w"
+      go test -json ./... > /tmp/bench-go-test.json 2>&1
+      code=$?
+      go-junit < /tmp/bench-go-test.json > /grader/out/junit.xml || exit 3
+      exit "$code"
+  result: junit
+  result_path: /grader/out/junit.xml
+  restore: ["go.work", "go.work.sum", "vendor"]
+  timeout_s: 600
+tasks: []
+probes: [model-outage]

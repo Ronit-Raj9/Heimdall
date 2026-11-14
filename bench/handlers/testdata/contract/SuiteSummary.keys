@@ -1,0 +1,21 @@
+# Keys of bench.ts `SuiteSummary`, one per line; a trailing ? marks an optional (Go omitempty) key.
+# Change with bench.ts and schemas/suitesapi.go.
+id
+version
+description
+environment
+grader
+verifier_result
+verifier_timeout_s
+pass_threshold
+base_image
+lock_hash
+lock_state
+locked_at
+drift
+lock_error?
+task_count
+admitted_count
+probes
+tasks
+error?

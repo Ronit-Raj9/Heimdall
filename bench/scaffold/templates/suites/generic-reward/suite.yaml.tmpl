@@ -1,0 +1,29 @@
+# template: generic-reward
+# Written by `bifrost-bench suite init`; add tasks with `bifrost-bench task
+# init`, which also adds them to the tasks list below. The Harbor task shape:
+# each task's verifier/tests/test.sh decides, and writes a number or
+# {"reward": n, "dimensions": {"name": n}} to /grader/out/reward.json. It runs
+# in a fresh container from the base image with no network, on a pristine
+# copy of the task repo with the agent's diff applied and the restore paths
+# reset; the task's hidden files are mounted at /grader/tests. A reward of at
+# least pass_threshold passes; dimensions are reported, never blended in.
+id: [[.ID]]
+version: 0.1.0
+description: Tasks graded by a reward script.
+environment: docker_workspace
+grader: verifier_command
+base_image:
+[[- if .Dockerfile]]
+  dockerfile: base/Dockerfile
+[[- end]]
+  tag: [[.Image]]
+workdir: /workspace
+verifier:
+  command: ["sh", "/grader/tests/test.sh"]
+  result: reward
+  result_path: /grader/out/reward.json
+  pass_threshold: 1
+  restore: ["tests"]
+  timeout_s: 600
+tasks: []
+probes: [model-outage]

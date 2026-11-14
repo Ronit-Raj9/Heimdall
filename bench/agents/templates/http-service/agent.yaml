@@ -1,0 +1,56 @@
+# __AGENT_ID__: an agent that is a server (a LangGraph, FastAPI or Agents SDK
+# app), from `bifrost-bench agent init -template http-service`. The command
+# adapter starts the launcher below; the launcher starts your server in the
+# run container, waits for its health URL, POSTs the task, waits for the
+# answer, prints the final message and exits. agents/images/__AGENT_ID__/
+# server.py is a standard-library stand-in that works as is.
+# docs/adding-an-agent.md is the guide.
+#
+# Check it for free before a real run:
+#   bifrost-bench agent build agents/__AGENT_ID__.yaml -suite <suite>
+#   bifrost-bench agent check agents/__AGENT_ID__.yaml -suite <suite>
+id: __AGENT_ID__
+adapter: command
+image: __IMAGE_TAG__
+build:
+  dockerfile: agents/images/__AGENT_ID__/Dockerfile
+  tag: __IMAGE_TAG__
+  # One image per suite, built on the suite's base image (ARG BASE_IMAGE).
+  base_arg: BASE_IMAGE
+argv:
+  - python3
+  - /tmp/bench/launcher.py
+env:
+  # How to start your server and where it answers. The server listens on
+  # loopback inside the run container.
+  AGENT_SERVER_CMD: "python3 /opt/agent/server.py --port 8765"
+  AGENT_HEALTH_URL: "http://127.0.0.1:8765/health"
+  AGENT_RUN_URL: "http://127.0.0.1:8765/run"
+  # Optional: when POST /run answers 202 {"id": ...}, poll GET <url>/<id>.
+  AGENT_STATUS_URL: ""
+  # Keep both under budgets.wall_s (900), so the launcher reports a timeout
+  # and stops the server before the bench kills the container.
+  AGENT_STARTUP_TIMEOUT_S: "60"
+  AGENT_RUN_TIMEOUT_S: "840"
+  # What the launcher POSTs: base_url, api_key, model, workspace, session_id.
+  BENCH_BASE_URL: "{{gateway.url}}/openai/v1"
+  BENCH_API_KEY: "{{run.key}}"
+  BENCH_MODEL: "anthropic/{{model}}"
+  BENCH_INSTRUCTION_FILE: "{{instruction_file}}"
+  BENCH_WORKSPACE: "{{workspace}}"
+  BENCH_SESSION_ID: "{{run.session}}"
+files:
+  # Written into the run container before argv starts.
+  /tmp/bench/launcher.py: |
+__LAUNCHER__
+# Placeholder: every experiment sets the model (an arm may vary it).
+model: claude-sonnet-4-5
+notes:
+  project_file: AGENTS.md
+budgets:
+  wall_s: 900
+  cpus: 1
+  mem_gb: 2
+gateway:
+  provider: anthropic
+  max_retries: 0

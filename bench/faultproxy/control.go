@@ -10,6 +10,7 @@ import (
 	"io"
 	"net/http"
 	"net/url"
+	"slices"
 	"strings"
 	"time"
 
@@ -31,7 +32,7 @@ const (
 //	PUT    /plans/{slot}     body schemas.FaultPlan; resets the slot's counters
 //	DELETE /plans/{slot}     clears the plan; resets the slot's counters
 //	GET    /ledger?run_id=   {"run_id":..., "entries":[...]}
-//	GET    /health           {"status":"ok", ...}
+//	GET    /health           {"status":"ok", "plan_modes":[...], "scripted_providers":[...], ...}
 //	GET    /upstreams        UpstreamReport: TCP and TLS reachability of each real upstream
 func (s *Server) ControlHandler() http.Handler {
 	mux := http.NewServeMux()
@@ -89,10 +90,27 @@ func (s *Server) handleLedger(w http.ResponseWriter, r *http.Request) {
 	s.writeJSON(w, http.StatusOK, ledgerResponse{RunID: runID, Entries: entries})
 }
 
+// handleHealth reports liveness and what the proxy can do: the plan modes it
+// honours and the providers a ModeScripted run can be answered for. A caller
+// that needs a mode reads it here, because an older proxy answers /health
+// without these fields and rejects an unknown mode only when a plan is set.
 func (s *Server) handleHealth(w http.ResponseWriter, _ *http.Request) {
-	s.writeJSON(w, http.StatusOK, map[string]any{
-		"status": "ok", "upstream": s.upstreamLabel(), "slots": len(s.names),
+	s.writeJSON(w, http.StatusOK, Health{
+		Status: "ok", Upstream: s.upstreamLabel(), Slots: len(s.names),
+		PlanModes: PlanModes, ScriptedProviders: s.scriptedProviders(),
 	})
+}
+
+// scriptedProviders lists, in table order, every provider a ModeScripted run
+// is answered for: those whose format has a scripted model.
+func (s *Server) scriptedProviders() []string {
+	out := []string{}
+	for _, name := range s.providers.order {
+		if ScriptedShape(s.providers.byName[name], "") != "" {
+			out = append(out, name)
+		}
+	}
+	return out
 }
 
 // handleUpstreams checks every real upstream and reports each one. A
@@ -136,6 +154,27 @@ func (s *Server) controlSlot(w http.ResponseWriter, r *http.Request) (string, bo
 
 func (s *Server) controlError(w http.ResponseWriter, status int, msg string) {
 	s.writeJSON(w, status, map[string]string{"error": msg})
+}
+
+// Health is the body of GET /health. PlanModes and ScriptedProviders are
+// empty from a proxy older than plan mode scripted.
+type Health struct {
+	Status            string            `json:"status"`
+	Upstream          map[string]string `json:"upstream"` // provider -> real base URL, scripted or unconfigured
+	Slots             int               `json:"slots"`
+	PlanModes         []string          `json:"plan_modes,omitempty"`
+	ScriptedProviders []string          `json:"scripted_providers,omitempty"`
+}
+
+// Supports reports whether the proxy honours plan mode.
+func (h *Health) Supports(mode string) bool {
+	return slices.Contains(h.PlanModes, mode)
+}
+
+// Scripts reports whether a ModeScripted run on provider is answered by the
+// scripted model.
+func (h *Health) Scripts(provider string) bool {
+	return slices.Contains(h.ScriptedProviders, provider)
 }
 
 // ledgerResponse is the body of GET /ledger.
@@ -214,6 +253,17 @@ func (c *Client) Health(ctx context.Context) error {
 		return fmt.Errorf("fault proxy health: %w", err)
 	}
 	return nil
+}
+
+// Capabilities reads /health: the plan modes the proxy honours and the
+// providers it can script. A proxy older than plan mode scripted answers with
+// neither list, so Supports(ModeScripted) is false for it.
+func (c *Client) Capabilities(ctx context.Context) (*Health, error) {
+	var h Health
+	if err := c.do(ctx, http.MethodGet, "/health", nil, &h); err != nil {
+		return nil, fmt.Errorf("fault proxy health: %w", err)
+	}
+	return &h, nil
 }
 
 // CheckUpstreams asks the proxy to dial every provider it answers from the

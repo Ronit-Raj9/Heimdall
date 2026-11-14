@@ -1,0 +1,20 @@
+# Keys of bench.ts `SuiteTask`. Hidden tests are counted, never named. Change with bench.ts and schemas/suitesapi.go.
+id
+version
+title
+project
+kind
+difficulty
+capabilities
+tags
+provenance
+status
+stale
+admitted
+admitted_at
+checks
+hidden_test_files
+required_tests
+protected_globs
+mutants
+agent_timeout_s
