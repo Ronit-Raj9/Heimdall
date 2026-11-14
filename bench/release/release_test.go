@@ -295,6 +295,42 @@ func TestCreateErrors(t *testing.T) {
 	}
 }
 
+func TestCreateRefusesBrokenSealChain(t *testing.T) {
+	tests := []struct {
+		name    string
+		breakIt func(f *fixture)
+	}{
+		{"seals.log line edited", func(f *fixture) {
+			p := filepath.Join(f.runsRoot, testExp, "seals.log")
+			b, err := os.ReadFile(p)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if err := os.WriteFile(p, append(b, []byte("not a seal line\n")...), 0o644); err != nil {
+				t.Fatal(err)
+			}
+		}},
+		{"sealed run deleted", func(f *fixture) {
+			dir := filepath.Join(f.runsRoot, testExp, "slots", "s_t02_b", "runs")
+			makeWritable(t, dir)
+			if err := os.RemoveAll(filepath.Join(dir, "r_t02_b")); err != nil {
+				t.Fatal(err)
+			}
+		}},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			f := newFixture(t, schemas.ActionShip, "")
+			tt.breakIt(f)
+			_, err := f.log.Create(context.Background(), request("ana", ""))
+			var refused *RefusedError
+			if !errors.As(err, &refused) || !errors.Is(err, schemas.ErrSealMismatch) || !strings.Contains(err.Error(), "seals.log chain") {
+				t.Fatalf("err = %v, want a refusal naming the seals.log chain", err)
+			}
+		})
+	}
+}
+
 func TestNewRefusesRootInsideRuns(t *testing.T) {
 	f := newFixture(t, schemas.ActionShip, "")
 	for _, root := range []string{f.runsRoot, filepath.Join(f.runsRoot, "releases")} {

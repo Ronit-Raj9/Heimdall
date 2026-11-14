@@ -8,6 +8,7 @@ import (
 	"os"
 	"path"
 	"path/filepath"
+	"regexp"
 	"sort"
 	"strings"
 	"time"
@@ -77,9 +78,9 @@ type Planner struct {
 }
 
 // planMode is what differs between planning an experiment and planning an
-// `agent check`: an experiment needs two arms, a locked suite (a smoke
-// experiment only warns) and, with a checker, reachable upstreams; a check
-// runs one arm on the scripted model, so it needs none of that.
+// `agent check`: an experiment needs two arms, a locked suite (an experiment
+// with smoke: true only warns) and, with a checker, reachable upstreams; a
+// check runs one arm on the scripted model, so it needs none of that.
 type planMode struct {
 	minArms       int
 	lockWarnOnly  bool
@@ -120,12 +121,14 @@ func NewPlanner(reg *schemas.Registry, benchRoot string, logger schemas.Logger, 
 // reported unreachable (checkUpstreams).
 //
 // It refuses a suite without a lock, or any selected task that the lock does
-// not mark admitted, unless the experiment name starts with "smoke" (then it
-// warns). It fails when two arms resolve to the same config hash, and when an
-// arm file and a workspace file (clean notes or a probe fixture) would be
-// written to the same path. Arm order is drawn once per task from the seed
-// and reused for every block of that task, so a task-level sign flip stays
-// exact (DESIGN.md 9.3).
+// not mark admitted, unless the experiment sets smoke: true (then it warns;
+// the flag is part of the frozen experiment, so every later reader knows the
+// runs are a synthetic smoke test). The experiment name relaxes nothing. It
+// fails when two arms resolve to the same config hash, when an arm file and
+// a workspace file (clean notes or a probe fixture) would be written to the
+// same path, and when two overlays of one probe write the same workspace
+// path. Arm order is drawn once per task from the seed and reused for every
+// block of that task, so a task-level sign flip stays exact (DESIGN.md 9.3).
 func (p *Planner) Plan(ctx context.Context, exp *schemas.Experiment) (*schemas.Manifest, error) {
 	return p.plan(ctx, exp, experimentMode)
 }
@@ -162,8 +165,11 @@ func (p *Planner) plan(ctx context.Context, exp *schemas.Experiment, mode planMo
 		}
 	}
 	all := append(append([]condPlan(nil), conds...), compat...)
-	if err := p.checkLock(suite, e.Name, mode.lockWarnOnly, all); err != nil {
+	if err := p.checkLock(suite, e.Name, mode.lockWarnOnly || e.Smoke, all); err != nil {
 		return nil, fmt.Errorf("plan %s: %w", e.ID, err)
+	}
+	if e.Smoke {
+		p.logger.Warn("smoke experiment: its runs are a synthetic smoke test, never findings", "experiment", e.ID)
 	}
 	if err := p.checkParts(&e, suite, all); err != nil {
 		return nil, fmt.Errorf("plan %s: %w", e.ID, err)
@@ -214,8 +220,11 @@ func (p *Planner) plan(ctx context.Context, exp *schemas.Experiment, mode planMo
 }
 
 // checkLock refuses an unlocked suite or a selected task that is not
-// admitted. A smoke experiment (and warnOnly) only warns, so the synthetic
-// run works on a pack that is still being authored.
+// admitted. Only warnOnly relaxes it to warnings: an agent check, or an
+// experiment that declares smoke: true, so the synthetic run works on a pack
+// that is still being authored. The experiment name never relaxes it, since
+// any experiment could be named "smoke-..."; a refused experiment whose name
+// starts with "smoke" is told to set the field.
 func (p *Planner) checkLock(suite *schemas.Suite, name string, warnOnly bool, conds []condPlan) error {
 	var problems []string
 	if suite.Lock == nil {
@@ -234,11 +243,14 @@ func (p *Planner) checkLock(suite *schemas.Suite, name string, warnOnly bool, co
 	if len(problems) == 0 {
 		return nil
 	}
-	if warnOnly || strings.HasPrefix(name, "smoke") {
+	if warnOnly {
 		for _, pr := range problems {
-			p.logger.Warn("smoke experiment or agent check ignores a suite lock problem", "problem", pr)
+			p.logger.Warn("smoke experiment or agent check ignores a suite lock problem", "experiment", name, "problem", pr)
 		}
 		return nil
+	}
+	if strings.HasPrefix(strings.ToLower(name), "smoke") {
+		problems = append(problems, "the experiment name does not relax the lock; a synthetic smoke experiment sets smoke: true")
 	}
 	return fmt.Errorf("suite lock: %s", strings.Join(problems, "; "))
 }
@@ -386,8 +398,10 @@ func (p *Planner) checkAgent(cfg *schemas.AgentConfig) error {
 // layFiles returns condition -> path -> sha256 for every file laid down for
 // an arm. Arm files (notes.user_file at notes.user_path, files:) are keyed
 // by container path; workspace files (clean notes, probe fixtures) differ per
-// task and are keyed "<task>:<container path>". Laying down follows DESIGN.md
-// 8.6: arm files first, then the clean notes, then probe fixtures overwrite.
+// task and are keyed "<task>:<container path>", and a probe fixture appended
+// to the user-level notes "<task>:append:<n>:<notes.user_path>" (appendKey).
+// Laying down follows DESIGN.md 8.6: arm files first, then the clean notes,
+// then probe fixtures overwrite.
 func (p *Planner) layFiles(cfg *schemas.AgentConfig, suite *schemas.Suite, conds []condPlan) (map[string]map[string]string, error) {
 	armFiles := map[string]string{}
 	if cfg.Notes.UserFile != "" {
@@ -549,8 +563,18 @@ func (p *Planner) abs(rel string) string {
 	return filepath.Join(p.benchRoot, rel)
 }
 
-// workspaceFiles returns container path -> sha256 of the files laid down in
-// the workspace of one task under one condition, for one agent config.
+// userNotesTarget is the one overlay target that is not a workspace path:
+// the agent's user-level notes file (probes/fixture.go appends there).
+var userNotesTarget = regexp.MustCompile(`^\{\{\s*agent\.notes\.user_path\s*\}\}$`)
+
+// workspaceFiles returns what is laid down for one task under one condition,
+// for one agent config, as key -> sha256 of the source file: the clean notes
+// and every workspace overlay by container path, and every fixture appended
+// to the agent's user-level notes by appendKey. A fixture probe's overlays
+// are all hashed, the single Overlay first and then Overlays in order, as the
+// fixture layer applies them; two overlays writing one workspace path are an
+// error, since only the last would reach the agent. A probe with only the
+// single Overlay hashes exactly what it always did.
 func workspaceFiles(suite *schemas.Suite, task *schemas.Task, probe *schemas.ProbeSpec, cfg *schemas.AgentConfig) (map[string]string, error) {
 	workdir := suite.Workdir
 	if workdir == "" {
@@ -570,38 +594,102 @@ func workspaceFiles(suite *schemas.Suite, task *schemas.Task, probe *schemas.Pro
 			return nil, fmt.Errorf("clean notes: %w", err)
 		}
 	}
-	if probe == nil || probe.Layer != schemas.LayerFixture || probe.Apply.Overlay == nil {
+	if probe == nil || probe.Layer != schemas.LayerFixture {
 		return out, nil
 	}
+	var specs []schemas.OverlaySpec
+	if probe.Apply.Overlay != nil {
+		specs = append(specs, *probe.Apply.Overlay)
+	}
+	specs = append(specs, probe.Apply.Overlays...)
+	written := map[string]int{} // workspace path -> overlay number
+	appends := 0
+	for i, spec := range specs {
+		n := i + 1
+		key, src, err := overlayFile(suite, task, cfg, workdir, spec)
+		if err != nil {
+			return nil, fmt.Errorf("probe %s overlay %d: %w", probe.ID, n, err)
+		}
+		if key == "" && i == 0 && probe.Apply.Overlay != nil {
+			return nil, fmt.Errorf("probe %s overlay 1: the user-level notes target is allowed in overlays only", probe.ID)
+		}
+		if key == "" {
+			appends++
+			key = appendKey(cfg.Notes.UserPath, appends)
+		} else if prev, dup := written[key]; dup {
+			return nil, fmt.Errorf("probe %s: overlays %d and %d both write %s; only the last would reach the agent", probe.ID, prev, n, key)
+		} else {
+			written[key] = n
+		}
+		if out[key], err = utils.SHA256File(src); err != nil {
+			return nil, fmt.Errorf("probe %s fixture: %w", probe.ID, err)
+		}
+	}
+	return out, nil
+}
+
+// overlayFile resolves one overlay the way probes/fixture.go does and returns
+// its workspace container path ("" for an append to the user-level notes)
+// and the host path of its fixture. Path variables are {{task.id}},
+// {{task.project}}, {{task.notes.clean}}, {{task.notes.stale}},
+// {{agent.notes.project_file}} and {{suite.root}}; a from that renders
+// absolute must lie inside the suite folder, any other is relative to the
+// task folder.
+func overlayFile(suite *schemas.Suite, task *schemas.Task, cfg *schemas.AgentConfig, workdir string, spec schemas.OverlaySpec) (string, string, error) {
 	vars := map[string]string{
 		"task.id":                  task.ID,
+		"task.project":             task.Project,
 		"task.notes.clean":         task.Notes.Clean,
 		"task.notes.stale":         task.Notes.Stale,
 		"agent.notes.project_file": cfg.Notes.ProjectFile,
 	}
-	from, err := utils.Render(probe.Apply.Overlay.From, vars)
+	if suite.Root != "" {
+		vars["suite.root"] = filepath.ToSlash(filepath.Clean(suite.Root))
+	}
+	from, err := utils.Render(spec.From, vars)
 	if err != nil {
-		return nil, fmt.Errorf("probe %s overlay from: %w", probe.ID, err)
+		return "", "", fmt.Errorf("from: %w", err)
 	}
-	to, err := utils.Render(probe.Apply.Overlay.To, vars)
+	from = strings.TrimSpace(from)
+	if from == "" {
+		return "", "", fmt.Errorf("from %q resolves to an empty path", spec.From)
+	}
+	var src string
+	if abs := filepath.FromSlash(from); filepath.IsAbs(abs) && suite.Root != "" {
+		rel, err := filepath.Rel(filepath.Clean(suite.Root), filepath.Clean(abs))
+		if err != nil || rel == "." || !filepath.IsLocal(rel) {
+			return "", "", fmt.Errorf("from %q must be inside the suite folder", from)
+		}
+		src = filepath.Join(suite.Root, rel)
+	} else if src, err = hostPath(task.Dir, from); err != nil {
+		return "", "", fmt.Errorf("from: %w", err)
+	}
+	if userNotesTarget.MatchString(strings.TrimSpace(spec.To)) {
+		if !path.IsAbs(strings.TrimSpace(cfg.Notes.UserPath)) {
+			return "", "", fmt.Errorf("to {{agent.notes.user_path}}: agent %s sets no absolute notes.user_path", cfg.ID)
+		}
+		return "", src, nil
+	}
+	to, err := utils.Render(spec.To, vars)
 	if err != nil {
-		return nil, fmt.Errorf("probe %s overlay to: %w", probe.ID, err)
+		return "", "", fmt.Errorf("to: %w", err)
 	}
-	if from == "" || to == "" {
-		return nil, fmt.Errorf("probe %s overlay resolves to an empty path (from %q, to %q)", probe.ID, from, to)
+	if strings.TrimSpace(to) == "" {
+		return "", "", fmt.Errorf("to %q resolves to an empty path", spec.To)
 	}
-	dst, err := containerPath(workdir, to)
+	dst, err := containerPath(workdir, strings.TrimSpace(to))
 	if err != nil {
-		return nil, fmt.Errorf("probe %s overlay to: %w", probe.ID, err)
+		return "", "", fmt.Errorf("to: %w", err)
 	}
-	src, err := hostPath(task.Dir, from)
-	if err != nil {
-		return nil, fmt.Errorf("probe %s overlay from: %w", probe.ID, err)
-	}
-	if out[dst], err = utils.SHA256File(src); err != nil {
-		return nil, fmt.Errorf("probe %s fixture: %w", probe.ID, err)
-	}
-	return out, nil
+	return dst, src, nil
+}
+
+// appendKey is the files-map key of the n-th fixture a probe appends to the
+// agent's user-level notes, "append:<n>:<notes.user_path>". It never equals
+// a container path, so it cannot clash with the arm's own notes.user_file,
+// which the append extends rather than replaces.
+func appendKey(userPath string, n int) string {
+	return fmt.Sprintf("append:%d:%s", n, path.Clean(strings.TrimSpace(userPath)))
 }
 
 // containerPath joins a relative path under a container root.

@@ -598,3 +598,54 @@ func TestGradeSource(t *testing.T) {
 		})
 	}
 }
+
+// costRuns builds three trials per task for one arm on clean, every run
+// passing, with cost_usd base+0.1*task, or unknown at the given (task, trial).
+func costRuns(arm string, base float64, tasks int, unknownAt [2]int) []schemas.SealedRun {
+	var out []schemas.SealedRun
+	for i := range tasks {
+		for trial := 1; trial <= 3; trial++ {
+			r := sealedRun(taskID(i), arm, schemas.ConditionClean, trial, schemas.Observed(1, schemas.EvidenceOutcome))
+			c := schemas.Observed(base+0.1*float64(i), schemas.EvidenceGateway)
+			if unknownAt == [2]int{i + 1, trial} {
+				c = schemas.Unknown("cost ledger missing", schemas.EvidenceGateway)
+			}
+			r.Metrics = map[string]schemas.Value{MetricVerifiedSuccess: r.Metrics[MetricVerifiedSuccess], MetricCostUSD: c}
+			out = append(out, r)
+		}
+	}
+	return out
+}
+
+func TestDecideLowerIsBetterPrimary(t *testing.T) {
+	m := testManifest(ArmBaseline, ArmCandidate)
+	m.Experiment.Primary.Metric = MetricCostUSD
+	none := [2]int{}
+	tests := []struct {
+		name  string
+		runs  []schemas.SealedRun
+		want  schemas.Decision
+		guard schemas.GuardStatus
+	}{
+		{"B cheaper on every task is improved", concat(costRuns(ArmBaseline, 1.0, 8, none), costRuns(ArmCandidate, 0.5, 8, none)),
+			schemas.DecisionImproved, schemas.GuardPass},
+		{"B dearer on every task is regressed", concat(costRuns(ArmBaseline, 0.5, 8, none), costRuns(ArmCandidate, 1.0, 8, none)),
+			schemas.DecisionRegressed, schemas.GuardFail},
+		{"an unbounded unknown cost cannot be directional", concat(costRuns(ArmBaseline, 1.0, 8, [2]int{2, 1}), costRuns(ArmCandidate, 0.5, 8, none)),
+			schemas.DecisionInconclusive, schemas.GuardUndetermined},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			a := decideOrFail(t, m, tt.runs)
+			if a.Verdict.Decision != tt.want {
+				t.Fatalf("decision %s, want %s (invalid %v, effect %+v)", a.Verdict.Decision, tt.want, a.Verdict.InvalidReasons, a.Verdict.Effect)
+			}
+			if len(a.Verdict.Guards) == 0 || a.Verdict.Guards[0].Spec.Rule != RuleNoRegression || a.Verdict.Guards[0].Status != tt.guard {
+				t.Fatalf("guards %+v, want no_regression %s", a.Verdict.Guards, tt.guard)
+			}
+			if got := EffectDecision(a.Verdict.Effect, 0.05); got != tt.want {
+				t.Fatalf("EffectDecision %s, want %s", got, tt.want)
+			}
+		})
+	}
+}

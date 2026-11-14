@@ -30,7 +30,7 @@ func diagnostics(m *schemas.Manifest, idx runIndex, primary schemas.Endpoint) []
 		}
 		eff := pairedEffect(cond, primary.Metric, ArmBaseline, ArmCandidate,
 			idx.cells(cond, ArmBaseline, primary.Metric), idx.cells(cond, ArmCandidate, primary.Metric), isPrimary)
-		if eff.LowerBound.NTasks > 0 {
+		if pairedTasks(eff) > 0 {
 			row.Effect = eff
 		}
 		row.Receipts = receiptRatios(idx, cond)

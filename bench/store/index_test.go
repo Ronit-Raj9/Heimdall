@@ -5,6 +5,7 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
+	"strings"
 	"sync"
 	"testing"
 
@@ -349,5 +350,108 @@ func TestIndexRebuildSwapsAtomically(t *testing.T) {
 	}
 	if _, ok := ix.Run("r_new"); !ok {
 		t.Fatal("new run not indexed")
+	}
+}
+
+func TestSealedRunsVerifiesSeals(t *testing.T) {
+	ctx := context.Background()
+	tests := []struct {
+		name    string
+		tamper  func(t *testing.T, s *FSStore)
+		problem string // in the problems of r_a1_2, "" for none
+	}{
+		{name: "untouched", tamper: func(*testing.T, *FSStore) {}},
+		{name: "metrics.json edited", problem: "file metrics.json changed", tamper: func(t *testing.T, s *FSStore) {
+			dir := filepath.Join(s.Root(), "e_test", "slots", "s_a1", "runs", "r_a1_2")
+			makeWritable(t, dir)
+			writeTampered(t, filepath.Join(dir, "metrics.json"), []byte(`{"verified_success":{"state":"observed","v":0,"evidence":"outcome"}}`))
+		}},
+		{name: "file added", problem: "file notes.txt added", tamper: func(t *testing.T, s *FSStore) {
+			dir := filepath.Join(s.Root(), "e_test", "slots", "s_a1", "runs", "r_a1_2")
+			makeWritable(t, dir)
+			writeTampered(t, filepath.Join(dir, "notes.txt"), []byte("x"))
+		}},
+		{name: "seals.log emptied", problem: "not in seals.log", tamper: func(t *testing.T, s *FSStore) {
+			writeTampered(t, filepath.Join(s.Root(), "e_test", "seals.log"), nil)
+		}},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			s, _ := indexFixture(t)
+			if _, err := s.SealedRuns(ctx, "e_test", "original"); err != nil {
+				t.Fatalf("SealedRuns before: %v", err)
+			}
+			tc.tamper(t, s)
+			got, err := s.SealedRuns(ctx, "e_test", "original")
+			if err != nil {
+				t.Fatalf("SealedRuns: %v", err)
+			}
+			if len(got) != 2 || got[0].Run.RunID != "r_a1_2" {
+				t.Fatalf("got %+v, want r_a1_2 and r_b1", got)
+			}
+			a := got[0]
+			if tc.problem == "" {
+				if len(a.Problems) != 0 || len(a.Metrics) == 0 {
+					t.Fatalf("untouched run: problems %v, metrics %v", a.Problems, a.Metrics)
+				}
+				return
+			}
+			if len(a.Problems) != 1 || !strings.Contains(a.Problems[0], tc.problem) || !strings.Contains(a.Problems[0], "seal does not verify") {
+				t.Fatalf("problems %v, want one naming %q", a.Problems, tc.problem)
+			}
+			if len(a.Metrics) != 0 || a.Grade != nil || a.Gates != nil || a.Gateway != nil {
+				t.Fatalf("a run that does not verify was parsed: %+v", a)
+			}
+		})
+	}
+}
+
+func TestSealedRunsReportsDuplicateCountedRuns(t *testing.T) {
+	ctx := context.Background()
+	s := newTestStore(t, nil)
+	m := mustCreateExp(t, s, "e_test")
+	mustSeal(t, s, mustNewRun(t, s, m, "s_a1", "r_1", 1, schemas.OutcomeAbortedInfra))
+	mustSeal(t, s, mustNewRun(t, s, m, "s_a1", "r_2", 2, schemas.OutcomePass))
+	mustSeal(t, s, mustNewRun(t, s, m, "s_b1", "r_3", 1, schemas.OutcomeFail))
+	mustSeal(t, s, mustNewRun(t, s, m, "s_b1", "r_4", 2, schemas.OutcomePass))
+	got, err := s.SealedRuns(ctx, "e_test", "original")
+	if err != nil {
+		t.Fatalf("SealedRuns: %v", err)
+	}
+	if len(got) != 2 || got[0].Run.RunID != "r_2" || got[1].Run.RunID != "r_3" {
+		t.Fatalf("got %+v, want r_2 and the lowest attempt r_3", got)
+	}
+	if len(got[0].Problems) != 0 {
+		t.Fatalf("an aborted_infra retry is not a second counted run: %v", got[0].Problems)
+	}
+	if len(got[1].Problems) != 1 || !strings.Contains(got[1].Problems[0], "slot s_b1 has 2 counted runs (r_3, r_4)") {
+		t.Fatalf("problems %v, want slot s_b1 has 2 counted runs", got[1].Problems)
+	}
+}
+
+func TestIndexVerifyRun(t *testing.T) {
+	ctx := context.Background()
+	s, _ := indexFixture(t)
+	ix := NewIndex(s)
+	if err := ix.Rebuild(ctx); err != nil {
+		t.Fatalf("Rebuild: %v", err)
+	}
+	if ix.Store() != s {
+		t.Fatal("Store is not the index's store")
+	}
+	for _, id := range []string{"r_a1_2", "r_b1", "r_open"} {
+		if err := ix.VerifyRun(ctx, id); err != nil {
+			t.Fatalf("VerifyRun %s: %v", id, err)
+		}
+	}
+	if err := ix.VerifyRun(ctx, "r_none"); !errors.Is(err, schemas.ErrNotFound) {
+		t.Fatalf("unknown run: err = %v, want ErrNotFound", err)
+	}
+	dir := filepath.Join(s.Root(), "e_test", "slots", "s_a1", "runs", "r_a1_2")
+	makeWritable(t, dir)
+	writeTampered(t, filepath.Join(dir, "gates.json"), []byte(`[]`))
+	err := ix.VerifyRun(ctx, "r_a1_2")
+	if !errors.Is(err, schemas.ErrSealMismatch) || !strings.Contains(err.Error(), "file gates.json changed") {
+		t.Fatalf("tampered run: err = %v, want ErrSealMismatch naming gates.json", err)
 	}
 }

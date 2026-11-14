@@ -71,7 +71,10 @@ func (h *RunsHandler) RegisterRoutes(r *router.Router, middlewares ...lib.Middle
 
 // getRun handles GET /api/bench/runs/{id}: the run record with its grade,
 // metrics, gates and receipts. The grade is the one the run was sealed with;
-// regrades are read through the experiment's analysis.
+// regrades are read through the experiment's analysis. A sealed run is
+// checked against its seal when the index can verify (SealVerifier): a
+// mismatch, or a check that could not run, is reported in seal_error beside
+// the files, never passed over.
 func (h *RunsHandler) getRun(ctx *fasthttp.RequestCtx) {
 	rv, ok := h.lookup(ctx)
 	if !ok {
@@ -81,6 +84,11 @@ func (h *RunsHandler) getRun(ctx *fasthttp.RequestCtx) {
 	out := schemas.RunDetail{
 		Slot: rv.Slot, Run: rv.Run, Sealed: rv.Sealed, SealHash: rv.SealHash, GradeSource: GradeSourceOriginal,
 		Gates: []schemas.GateResult{}, Receipts: []schemas.Receipt{},
+	}
+	if sv, isVerifier := h.index.(SealVerifier); isVerifier && rv.Sealed {
+		if err := sv.VerifySeal(ctx, id); err != nil {
+			out.SealError = err.Error()
+		}
 	}
 	metrics, err := readMetrics(h.index, id)
 	if err != nil {

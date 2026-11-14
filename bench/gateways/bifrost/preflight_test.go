@@ -2,6 +2,7 @@ package bifrost
 
 import (
 	"context"
+	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
@@ -10,13 +11,35 @@ import (
 	"github.com/maximhq/bifrost/bench/utils"
 )
 
-// fakeDocker writes an executable that stands in for the docker CLI: it
-// records its arguments and prints out.
-func fakeDocker(t *testing.T, out string, exit int) (utils.Docker, string) {
+// fakeRun is what one fake docker call prints and exits with.
+type fakeRun struct {
+	out, errOut string
+	exit        int
+}
+
+// fakeDocker writes an executable that stands in for the docker CLI. A call
+// with --network none is the helper self-test and gets self; any other call
+// is the egress probe, gets probe and has its arguments recorded in the
+// returned file.
+func fakeDocker(t *testing.T, self, probe fakeRun) (utils.Docker, string) {
 	t.Helper()
 	dir := t.TempDir()
 	argsFile := filepath.Join(dir, "args")
-	script := "#!/bin/sh\nprintf '%s\\n' \"$@\" > " + argsFile + "\ncat <<'EOF'\n" + out + "\nEOF\nexit " + string(rune('0'+exit)) + "\n"
+	write := func(name, s string) string {
+		p := filepath.Join(dir, name)
+		if err := os.WriteFile(p, []byte(s), 0o644); err != nil {
+			t.Fatal(err)
+		}
+		return p
+	}
+	script := fmt.Sprintf(`#!/bin/sh
+case " $* " in
+  *" --network none "*) cat %q; cat %q >&2; exit %d ;;
+esac
+printf '%%s\n' "$@" > %q
+cat %q; cat %q >&2; exit %d
+`, write("self.out", self.out), write("self.err", self.errOut), self.exit, argsFile,
+		write("probe.out", probe.out), write("probe.err", probe.errOut), probe.exit)
 	bin := filepath.Join(dir, "docker")
 	if err := os.WriteFile(bin, []byte(script), 0o755); err != nil {
 		t.Fatal(err)
@@ -26,9 +49,14 @@ func fakeDocker(t *testing.T, out string, exit int) (utils.Docker, string) {
 
 func TestPreflight(t *testing.T) {
 	allBlocked := "dns blocked\ntcp:1.1.1.1:443 blocked\ntcp:169.254.169.254:80 blocked"
+	lacks := func(tool string) string {
+		return "egress probe not run: helper image bench/coding-core-base:1 has no " + tool + "; set images.helper to the bench helper image"
+	}
 	tests := []struct {
 		name         string
+		self         fakeRun // the helper self-test
 		dockerOut    string
+		dockerErr    string
 		dockerExit   int
 		noNetwork    bool
 		mutate       func(f *fakeBifrost)
@@ -38,8 +66,22 @@ func TestPreflight(t *testing.T) {
 		{name: "healthy and isolated", dockerOut: allBlocked, wantEgress: "blocked"},
 		{name: "dns resolves", dockerOut: strings.Replace(allBlocked, "dns blocked", "dns open", 1), wantEgress: "open",
 			wantProblems: []string{"egress from bench-evalnet is open: dns"}},
-		{name: "no python in helper", dockerOut: "missing python3", wantEgress: "not_run",
-			wantProblems: []string{"egress probe not run: helper image bench/coding-core-base:1 has no python3; set images.helper to the bench helper image"}},
+		{name: "no python in helper", self: fakeRun{out: "missing python3"}, dockerOut: allBlocked, wantEgress: "not_run",
+			wantProblems: []string{lacks("python3")}},
+		// Without the self-test a missing getent printed "dns blocked", the
+		// same as a truly blocked network.
+		{name: "no getent in helper", self: fakeRun{out: "missing getent"}, dockerOut: allBlocked, wantEgress: "not_run",
+			wantProblems: []string{lacks("getent")}},
+		{name: "getent not found while probing", dockerOut: allBlocked, dockerErr: "sh: 3: getent: not found", wantEgress: "not_run",
+			wantProblems: []string{lacks("getent")}},
+		{name: "python3 command not found while probing", dockerOut: "dns blocked", dockerErr: "/bin/sh: line 6: python3: command not found",
+			dockerExit: 127, wantEgress: "not_run", wantProblems: []string{lacks("python3")}},
+		{name: "no sh in helper", self: fakeRun{errOut: `docker: Error response from daemon: failed to create task for container: exec: "sh": executable file not found in $PATH: unknown.`, exit: 127},
+			dockerOut: allBlocked, wantEgress: "not_run", wantProblems: []string{lacks("sh")}},
+		{name: "self-test fails without naming a tool", self: fakeRun{errOut: "No such image: bench/coding-core-base:1", exit: 125},
+			dockerOut: allBlocked, wantEgress: "not_run", wantProblems: []string{"egress probe not run: helper self-test in bench/coding-core-base:1 exited 125: No such image"}},
+		{name: "dns lookup error is no result", dockerOut: strings.Replace(allBlocked, "dns blocked", "dns error 1", 1), wantEgress: "not_run",
+			wantProblems: []string{"egress probe incomplete (exit 0), no result for dns"}},
 		{name: "probe cut short", dockerOut: "dns blocked", dockerExit: 1, wantEgress: "not_run",
 			wantProblems: []string{"egress probe incomplete (exit 1), no result for tcp:1.1.1.1:443, tcp:169.254.169.254:80"}},
 		{name: "open wins over incomplete", dockerOut: "dns open", dockerExit: 1, wantEgress: "open",
@@ -68,7 +110,7 @@ func TestPreflight(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			f := newFakeBifrost(t)
-			docker, argsFile := fakeDocker(t, tt.dockerOut, tt.dockerExit)
+			docker, argsFile := fakeDocker(t, tt.self, fakeRun{out: tt.dockerOut, errOut: tt.dockerErr, exit: tt.dockerExit})
 			cfg := testConfig(f.srv.URL)
 			cfg.Docker, cfg.HelperImage, cfg.EvalNetwork = docker, "bench/coding-core-base:1", "bench-evalnet"
 			if tt.noNetwork {
@@ -131,6 +173,32 @@ func TestPreflight(t *testing.T) {
 				}
 			}
 		})
+	}
+}
+
+func TestMissingTools(t *testing.T) {
+	tests := []struct {
+		name        string
+		out, errOut string
+		want        []string
+	}{
+		{"self-test lines, in list order", "missing getent\nmissing python3\n", "", []string{"python3", "getent"}},
+		{"dash not found", "", "sh: 1: getent: not found", []string{"getent"}},
+		{"bash command not found", "", "/bin/sh: line 2: python3: command not found", []string{"python3"}},
+		{"entrypoint absent", "", `exec: "sh": executable file not found in $PATH`, []string{"sh"}},
+		{"unknown tools and noise ignored", "missing curl\ndns blocked\n", "manifest for x not found", nil},
+		{"shell prefix is not a missing sh", "", "/bin/sh: getent: not found", []string{"getent"}},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := missingTools(&utils.DockerResult{Stdout: []byte(tt.out), Stderr: []byte(tt.errOut)})
+			if strings.Join(got, ",") != strings.Join(tt.want, ",") {
+				t.Fatalf("missingTools = %v, want %v", got, tt.want)
+			}
+		})
+	}
+	if !strings.Contains(HelperSelfTestScript, "getent") || !strings.Contains(egressScript, HelperSelfTestScript) {
+		t.Fatal("the egress probe must repeat the canonical self-test, getent included")
 	}
 }
 

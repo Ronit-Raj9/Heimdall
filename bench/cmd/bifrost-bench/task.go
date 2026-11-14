@@ -133,13 +133,8 @@ func runTaskValidate(args []string) int {
 		return fail("load %s: %v", pos[0], err)
 	}
 	problems := suite.ValidateTask(context.Background(), s, t)
-	errs := 0
-	for _, p := range problems {
-		fmt.Printf("%-7s %s: %s\n", p.Severity, p.Path, p.Message)
-		if p.Severity == suite.SeverityError {
-			errs++
-		}
-	}
+	printProblems(problems)
+	errs := suite.Errors(problems)
 	fmt.Printf("%s/%s: %s\n", s.ID, t.ID, validateSummary(len(problems), errs))
 	if errs > 0 {
 		return 1

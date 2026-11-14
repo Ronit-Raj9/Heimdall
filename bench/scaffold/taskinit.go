@@ -10,6 +10,8 @@ import (
 	"slices"
 	"sort"
 	"strings"
+
+	"github.com/maximhq/bifrost/bench/utils"
 )
 
 // Task init limits.
@@ -503,6 +505,11 @@ func writeTask(ctx context.Context, dir string, src *taskSource, files []File, f
 	if err := streamTree(ctx, src.repo, filepath.Join(tmp, "verifier", "tests"), src.hidden); err != nil {
 		return err
 	}
+	for _, tree := range []string{filepath.Join(tmp, "repo"), filepath.Join(tmp, "verifier", "tests")} {
+		if err := refuseEscapingLinks(tree); err != nil {
+			return err
+		}
+	}
 	if err := WriteFiles(tmp, files, true); err != nil {
 		return err
 	}
@@ -549,6 +556,24 @@ func streamTree(ctx context.Context, repo *gitRepo, dir string, entries []treeEn
 		}
 		return WriteFiles(dir, files, false)
 	})
+}
+
+// refuseEscapingLinks refuses a written tree holding a symlink whose real
+// target leaves it. checkLink judges each link alone; a chain of links that
+// each stay inside on paper (a/l -> .., a/m -> l/..) can still climb out
+// once the first one is resolved, so the written tree is checked again with
+// every link resolved.
+func refuseEscapingLinks(tree string) error {
+	links, err := utils.FindSymlinks(tree, tree)
+	if err != nil {
+		return err
+	}
+	for _, l := range links {
+		if l.Escapes {
+			return fmt.Errorf("symlink %s points outside the repository (%s, through another symlink); refusing", l.Path, l.Target)
+		}
+	}
+	return nil
 }
 
 // checkLink refuses a symlink whose target is absolute or leaves the tree.

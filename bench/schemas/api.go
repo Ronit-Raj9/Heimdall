@@ -131,6 +131,7 @@ type RunDetail struct {
 	Metrics     map[string]Value `json:"metrics"`
 	Gates       []GateResult     `json:"gates"`
 	Receipts    []Receipt        `json:"receipts"`
+	SealError   string           `json:"seal_error,omitempty"` // why a sealed run's files do not match its seal; empty when they do or the run is not sealed
 }
 
 // RunDiff is GET /runs/{id}/diff. Patch is inert text.

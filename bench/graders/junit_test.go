@@ -87,6 +87,9 @@ func TestCheckRequired(t *testing.T) {
 		{name: "go failed", xml: junitGo, required: []string{"example.com/calc::TestSub"}, failed: []string{"example.com/calc::TestSub"}},
 		{name: "go other package", xml: junitGo, required: []string{"example.com/other::TestAdd"}, missing: []string{"example.com/other::TestAdd"}},
 		{name: "node top-level test", xml: junitNode, required: []string{"test::adds"}},
+		{name: "go test never reported", xml: junitGo, required: []string{"example.com/calc::TestMul"}, missing: []string{"example.com/calc::TestMul"}},
+		{name: "node test never reported", xml: junitNode, required: []string{"test::multiplies"}, missing: []string{"test::multiplies"}},
+		{name: "node nested test", xml: junitNode, required: []string{"test::inner"}},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

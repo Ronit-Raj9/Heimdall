@@ -3,13 +3,16 @@ package main
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"flag"
 	"fmt"
 	"os"
 	"os/signal"
+	"path/filepath"
 	"sort"
 	"strings"
 	"syscall"
+	"time"
 
 	"github.com/maximhq/bifrost/bench/engine"
 	"github.com/maximhq/bifrost/bench/policy"
@@ -116,10 +119,11 @@ func runRun(args []string) int {
 	fs := flag.NewFlagSet("run", flag.ContinueOnError)
 	config := fs.String("config", defaultConfig, "bench config")
 	resume := fs.String("resume", "", "resume an existing experiment id instead of planning a new one")
+	allowDrift := fs.Bool("allow-version-drift", false, "resume even when part versions or the price snapshot changed since the freeze; recorded in the experiment's resumes.jsonl")
 	concurrency := fs.Int("concurrency", 0, "override the experiment's concurrency")
 	debug := fs.Bool("debug", false, "debug logging")
 	if err := fs.Parse(args); err != nil || (fs.NArg() != 1 && *resume == "") {
-		fmt.Fprintln(os.Stderr, "usage: bifrost-bench run [-config deploy/bench.yaml] [-concurrency n] experiments/<file>.yaml | -resume <exp_id>")
+		fmt.Fprintln(os.Stderr, "usage: bifrost-bench run [-config deploy/bench.yaml] [-concurrency n] experiments/<file>.yaml | -resume <exp_id> [-allow-version-drift]")
 		return exitUsage
 	}
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
@@ -128,7 +132,7 @@ func runRun(args []string) int {
 	if err != nil {
 		return fail("%v", err)
 	}
-	m, code := a.manifestFor(ctx, fs.Arg(0), *resume)
+	m, code := a.manifestFor(ctx, fs.Arg(0), *resume, *allowDrift)
 	if m == nil {
 		return code
 	}
@@ -149,12 +153,32 @@ func runRun(args []string) int {
 }
 
 // manifestFor plans and creates a new experiment, or loads one to resume.
-func (a *app) manifestFor(ctx context.Context, path, resume string) (*schemas.Manifest, int) {
+// A resume is refused when the bench changed since the freeze (resumeDrift)
+// unless allowDrift is set; an allowed drift is recorded beside the manifest.
+func (a *app) manifestFor(ctx context.Context, path, resume string, allowDrift bool) (*schemas.Manifest, int) {
 	if resume != "" {
 		m, err := a.store.LoadManifest(ctx, resume)
 		if err != nil {
 			return nil, fail("load %s: %v", resume, err)
 		}
+		d, err := a.resumeDrift(m)
+		if err != nil {
+			return nil, fail("resume %s: %v", resume, err)
+		}
+		for _, p := range d.Added {
+			a.logger.Warn("part registered after the freeze; the experiment's slots do not name it", "experiment", resume, "part", p)
+		}
+		if !d.refuses() {
+			return m, exitOK
+		}
+		if !allowDrift {
+			return nil, fail("resume %s: the bench changed since the experiment was frozen, so new runs would not be comparable with the sealed ones:\n  %s\nresume with -allow-version-drift to run anyway (recorded in %s), or start a new experiment",
+				resume, strings.Join(d.lines(), "\n  "), resumesFile)
+		}
+		if err := a.recordDrift(m.ExpID, d); err != nil {
+			return nil, fail("resume %s: record version drift: %v", resume, err)
+		}
+		a.logger.Warn("resuming across a version drift (-allow-version-drift)", "experiment", resume, "drift", strings.Join(d.lines(), "; "))
 		return m, exitOK
 	}
 	exp, err := loadExperiment(path)
@@ -230,7 +254,7 @@ func runCheck(args []string) int {
 	}
 	expID := *exp
 	if expID == "" {
-		m, code := a.manifestFor(ctx, fs.Arg(0), "")
+		m, code := a.manifestFor(ctx, fs.Arg(0), "", false)
 		if m == nil {
 			return code
 		}
@@ -290,4 +314,136 @@ func printPolicy(r *schemas.PolicyResult) {
 		}
 		fmt.Printf("  %-7s %-5s %s: %s\n", c.Status, tag, c.ID, c.Reason)
 	}
+}
+
+// resumesFile is the experiment-level log of resumes that crossed a version
+// drift, one JSON object per line, beside manifest.json and outside every
+// sealed run.
+const resumesFile = "resumes.jsonl"
+
+// versionDrift is what changed between an experiment's freeze and a resume.
+type versionDrift struct {
+	Changed []string `json:"changed,omitempty"` // parts at another version now, or no longer registered
+	Added   []string `json:"added,omitempty"`   // parts registered after the freeze; listed, never refused
+	Prices  string   `json:"prices,omitempty"`  // the price snapshot of the sealed runs differs from the current one
+}
+
+// refuses reports whether the drift makes new runs incomparable: a part the
+// manifest froze changed or is gone, or new runs would be priced with another
+// snapshot. A part added since the freeze is not used by the frozen slots.
+func (d versionDrift) refuses() bool { return len(d.Changed) > 0 || d.Prices != "" }
+
+// lines is the drift as one line per difference.
+func (d versionDrift) lines() []string {
+	out := append([]string(nil), d.Changed...)
+	if d.Prices != "" {
+		out = append(out, d.Prices)
+	}
+	return out
+}
+
+// resumeDrift compares the part versions this binary would run with
+// (engine.PartVersions) with the ones the manifest froze, and the price
+// snapshot it would cost new runs with against the price_ref the sealed
+// runs' cost rows carry. The fault proxy runs as its own service and is not
+// in the part list, so it is not compared.
+func (a *app) resumeDrift(m *schemas.Manifest) (versionDrift, error) {
+	var d versionDrift
+	d.Changed, d.Added = partDrift(m.Parts, engine.PartVersions(a.reg))
+	if a.prices == nil {
+		return d, nil
+	}
+	refs, err := sealedPriceRefs(filepath.Join(a.store.Root(), m.ExpID))
+	if err != nil {
+		return d, err
+	}
+	now := a.prices.Ref()
+	if len(refs) > 1 || (len(refs) == 1 && refs[0] != now) {
+		d.Prices = fmt.Sprintf("price snapshot: sealed runs were costed with %s, this bench costs with %s", strings.Join(refs, ", "), now)
+	}
+	return d, nil
+}
+
+// partDrift returns the frozen parts whose version changed or that are no
+// longer registered, and the parts registered since, each sorted.
+func partDrift(frozen, now map[string]string) (changed, added []string) {
+	for part, v := range frozen {
+		switch cur, ok := now[part]; {
+		case !ok:
+			changed = append(changed, fmt.Sprintf("%s: frozen at %s, no longer registered", part, v))
+		case cur != v:
+			changed = append(changed, fmt.Sprintf("%s: frozen at %s, now %s", part, v, cur))
+		}
+	}
+	for part := range now {
+		if _, ok := frozen[part]; !ok {
+			added = append(added, part)
+		}
+	}
+	sort.Strings(changed)
+	sort.Strings(added)
+	return changed, added
+}
+
+// sealedPriceRefs returns the distinct price_ref values in the cost rows of
+// an experiment's sealed runs, sorted. A run with no cost.json (or no rows)
+// adds none.
+func sealedPriceRefs(expDir string) ([]string, error) {
+	paths, err := filepath.Glob(filepath.Join(expDir, "slots", "*", "runs", "*", "cost.json"))
+	if err != nil {
+		return nil, fmt.Errorf("list cost rows: %w", err)
+	}
+	seen := map[string]bool{}
+	for _, p := range paths {
+		if _, err := os.Stat(filepath.Join(filepath.Dir(p), "seal.json")); err != nil {
+			continue
+		}
+		b, err := os.ReadFile(p)
+		if err != nil {
+			return nil, fmt.Errorf("read %s: %w", p, err)
+		}
+		var rows []struct {
+			PriceRef string `json:"price_ref"`
+		}
+		if err := json.Unmarshal(b, &rows); err != nil {
+			return nil, fmt.Errorf("decode %s: %w", p, err)
+		}
+		for _, r := range rows {
+			if r.PriceRef != "" {
+				seen[r.PriceRef] = true
+			}
+		}
+	}
+	refs := make([]string, 0, len(seen))
+	for r := range seen {
+		refs = append(refs, r)
+	}
+	sort.Strings(refs)
+	return refs, nil
+}
+
+// recordDrift appends an allowed drift to the experiment's resumes.jsonl, so
+// every later reader can see that the runs after this point ran on a bench
+// that differs from the frozen one.
+func (a *app) recordDrift(expID string, d versionDrift) error {
+	rec := struct {
+		ResumedAt  time.Time `json:"resumed_at"`
+		AllowDrift bool      `json:"allow_version_drift"`
+		versionDrift
+	}{ResumedAt: time.Now().UTC(), AllowDrift: true, versionDrift: d}
+	b, err := json.Marshal(rec)
+	if err != nil {
+		return err
+	}
+	f, err := os.OpenFile(filepath.Join(a.store.Root(), expID, resumesFile), os.O_WRONLY|os.O_APPEND|os.O_CREATE, 0o644)
+	if err != nil {
+		return err
+	}
+	if _, err := f.Write(append(b, '\n')); err != nil {
+		return errors.Join(err, f.Close())
+	}
+	if err := f.Sync(); err != nil {
+		return errors.Join(err, f.Close())
+	}
+	return f.Close()
 }

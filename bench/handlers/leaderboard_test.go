@@ -233,6 +233,13 @@ func TestLeaderboardSource(t *testing.T) {
 	if runs, err := withRegrades.RegradedRuns(ctx, testExp, "rg_1"); err != nil || len(runs) != 1 || runs[0].GradeSource != "rg_1" {
 		t.Errorf("regraded runs = %v, %v", runs, err)
 	}
+	if err := plain.(leaderboard.SealSource).VerifySeal(ctx, "r_any"); err != nil {
+		t.Errorf("an index without SealVerifier must trust the seal, got %v", err)
+	}
+	withSeals := LeaderboardSource(sealIndex{leaderboardIndex(), map[string]error{"r_bad": schemas.ErrSealMismatch}}).(leaderboard.SealSource)
+	if err := withSeals.VerifySeal(ctx, "r_bad"); !errors.Is(err, schemas.ErrSealMismatch) {
+		t.Errorf("VerifySeal err = %v, want ErrSealMismatch", err)
+	}
 	withVerdict := LeaderboardSource(verdictIndex{fakeIndex: leaderboardIndex(), decisions: map[string]schemas.Decision{testExp: schemas.DecisionImproved}})
 	if d, ok := withVerdict.LatestDecision(testExp); !ok || d != schemas.DecisionImproved {
 		t.Errorf("decision = %q %v", d, ok)

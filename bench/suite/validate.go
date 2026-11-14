@@ -15,13 +15,52 @@ import (
 	"github.com/maximhq/bifrost/bench/schemas"
 )
 
+// Size limits of task validate: a file over largeFileBytes or a repo with
+// more than maxRepoFiles files is a warning (every run copies them); a task
+// folder over maxTaskBytes is an error.
+const (
+	largeFileBytes = 5 << 20
+	maxRepoFiles   = 5000
+	maxTaskBytes   = 200 << 20
+	maxLargeListed = 10
+)
+
+// StaticValidation is what admission runs before anything starts in Docker:
+// the suite-level part of Lint and ValidateTask for every task of s, or only
+// the task only when it is set. Admission refuses on any error problem.
+// Problems are sorted by path.
+func StaticValidation(ctx context.Context, s *schemas.Suite, only string) []Problem {
+	out := lintSuite(s)
+	for _, t := range s.Tasks {
+		if only != "" && t.ID != only {
+			continue
+		}
+		out = append(out, ValidateTask(ctx, s, t)...)
+	}
+	sort.SliceStable(out, func(i, j int) bool { return out[i].Path < out[j].Path })
+	return out
+}
+
+// Errors counts the error problems in ps.
+func Errors(ps []Problem) int {
+	n := 0
+	for _, p := range ps {
+		if p.Severity == SeverityError {
+			n++
+		}
+	}
+	return n
+}
+
 // ValidateTask runs every check `task validate` reports for one loaded task
-// of s, without Docker: LintTask (which includes the EDIT ME marker and
-// hidden tests visible in the repo), the task listed in suite.yaml, no .git
-// folder in the repo, a secret scan of the whole task folder (findings name
-// file and line and mask the value), a warning to review hidden tests cut
-// from a reference commit, and that the reference diff and every mutant
-// apply cleanly to a temporary copy of the repo. Problems are sorted by path.
+// of s, without Docker: LintTask (which includes the EDIT ME marker, hidden
+// tests visible in the repo and symlinks), the task listed in suite.yaml, no
+// .git folder in the repo, file and folder sizes, a secret scan of the whole
+// task folder (findings name file and line and mask the value), a warning to
+// review hidden tests cut from a reference commit, and that the reference
+// diff and every mutant apply cleanly to a temporary copy of the repo (a
+// warning instead when git is not installed: admission's reference runs
+// still apply it). Problems are sorted by path.
 func ValidateTask(ctx context.Context, s *schemas.Suite, t *schemas.Task) []Problem {
 	out := LintTask(s, t)
 	taskYAML := rel(s.Root, filepath.Join(t.Dir, TaskFile))
@@ -35,6 +74,8 @@ func ValidateTask(ctx context.Context, s *schemas.Suite, t *schemas.Task) []Prob
 	if gitDirs := findGitDirs(repo); len(gitDirs) > 0 {
 		add(rel(s.Root, repo), SeverityError, "holds git metadata (%s); a task repo is a plain snapshot", strings.Join(gitDirs, ", "))
 	}
+	sizes := lintSizes(s.Root, t)
+	out = append(out, sizes...)
 	findings, err := ScanSecrets(t.Dir)
 	if err != nil {
 		add(taskYAML, SeverityError, "%v", err)
@@ -49,14 +90,74 @@ func ValidateTask(ctx context.Context, s *schemas.Suite, t *schemas.Task) []Prob
 			short(t.Provenance.ReferenceCommit))
 	}
 	patches := append([]string{t.Controls.Reference}, t.Controls.Mutants...)
-	for _, p := range patches {
-		if err := ApplyCheck(ctx, repo, filepath.Join(t.Dir, filepath.FromSlash(p))); err != nil {
-			add(rel(s.Root, filepath.Join(t.Dir, filepath.FromSlash(p))), SeverityError, "does not apply cleanly to %s: %v", t.RepoDir, err)
+	_, gitErr := exec.LookPath("git")
+	switch {
+	case Errors(sizes) > 0:
+		// Too large to copy for the apply check; the size error already refuses it.
+	case gitErr != nil:
+		add(taskYAML, SeverityWarning, "git is not installed, so the reference diff and the mutants were not checked to apply; admission's reference runs still apply them")
+	default:
+		for _, p := range patches {
+			if err := ApplyCheck(ctx, repo, filepath.Join(t.Dir, filepath.FromSlash(p))); err != nil {
+				add(rel(s.Root, filepath.Join(t.Dir, filepath.FromSlash(p))), SeverityError, "does not apply cleanly to %s: %v", t.RepoDir, err)
+			}
 		}
 	}
 	sort.SliceStable(out, func(i, j int) bool { return out[i].Path < out[j].Path })
 	return out
 }
+
+// lintSizes warns about files over 5 MB in the task folder and about a repo
+// with more than 5,000 files, and refuses a task folder over 200 MB. Symlinks
+// are not followed and count by their own size.
+func lintSizes(root string, t *schemas.Task) []Problem {
+	var out []Problem
+	var total int64
+	var large []string
+	repo := filepath.Join(t.Dir, filepath.FromSlash(t.RepoDir))
+	repoFiles := 0
+	err := filepath.WalkDir(t.Dir, func(path string, d fs.DirEntry, err error) error {
+		if err != nil {
+			return err
+		}
+		if d.IsDir() {
+			return nil
+		}
+		info, err := d.Info()
+		if err != nil {
+			return err
+		}
+		total += info.Size()
+		if strings.HasPrefix(path, repo+string(filepath.Separator)) {
+			repoFiles++
+		}
+		if info.Mode().IsRegular() && info.Size() > largeFileBytes {
+			large = append(large, path)
+			if len(large) <= maxLargeListed {
+				out = append(out, Problem{Path: rel(root, path), Severity: SeverityWarning,
+					Message: fmt.Sprintf("%.1f MB, over 5 MB; large files slow every run, leave them out of the task if the agent does not need them", mb(info.Size()))})
+			}
+		}
+		return nil
+	})
+	if err != nil {
+		return append(out, Problem{Path: rel(root, t.Dir), Severity: SeverityError, Message: fmt.Sprintf("measure task folder: %v", err)})
+	}
+	if n := len(large) - maxLargeListed; n > 0 {
+		out = append(out, Problem{Path: rel(root, t.Dir), Severity: SeverityWarning, Message: fmt.Sprintf("and %d more files over 5 MB", n)})
+	}
+	if repoFiles > maxRepoFiles {
+		out = append(out, Problem{Path: rel(root, repo), Severity: SeverityWarning,
+			Message: fmt.Sprintf("%d files, over 5,000; every run copies the whole repo, so a smaller snapshot runs faster", repoFiles)})
+	}
+	if total > maxTaskBytes {
+		out = append(out, Problem{Path: rel(root, t.Dir), Severity: SeverityError,
+			Message: fmt.Sprintf("task folder is %.1f MB, over the 200 MB limit; cut the repo down or leave large assets out", mb(total))})
+	}
+	return out
+}
+
+func mb(n int64) float64 { return float64(n) / (1 << 20) }
 
 // ApplyCheck runs `git apply --check -p1` for patch against a temporary copy
 // of repo, outside any git repository, so neither the task folder nor a

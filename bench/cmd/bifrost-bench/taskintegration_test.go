@@ -95,7 +95,7 @@ func assertAdmitted(t *testing.T, path string) {
 	for _, c := range rec.Checks {
 		seen[c.Name] = true
 	}
-	for _, want := range []string{"reference_1", "reference_2", "reference_3", "empty_patch", "exploit", "null_noop", "null_refuse",
+	for _, want := range []string{"static_validation", "reference_1", "reference_2", "reference_3", "empty_patch", "exploit", "null_noop", "null_refuse",
 		"instruction_edited", "secret_scan", "verifier_no_network"} {
 		if !seen[want] {
 			t.Errorf("admission lacks check %s", want)

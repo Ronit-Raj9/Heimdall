@@ -109,7 +109,13 @@ func (e *dockerWorkspace) Create(ctx context.Context, rc *schemas.RunContext) (*
 	if rc.Task == nil || rc.Task.Dir == "" {
 		return nil, fmt.Errorf("create workspace for run %s: run context has no task folder", runID)
 	}
-	repoDir := filepath.Join(rc.Task.Dir, rc.Task.RepoDir)
+	// Resolved right before the bind mount: docker follows symlinks, so a
+	// repo folder swapped for a link after the suite loaded must not mount
+	// a host folder outside the task.
+	repoDir, err := utils.ResolveInside(rc.Task.Dir, rc.Task.RepoDir)
+	if err != nil {
+		return nil, fmt.Errorf("create workspace for run %s: task repo: %w", runID, err)
+	}
 	if st, err := os.Stat(repoDir); err != nil || !st.IsDir() {
 		return nil, fmt.Errorf("create workspace for run %s: task repo %s is not a folder", runID, repoDir)
 	}
@@ -648,7 +654,10 @@ func homeTmpfsOpts(user string) string {
 }
 
 // cleanNotes returns where the clean notes file goes in the workspace and the
-// host file it comes from, or empty strings when nothing is laid down.
+// host file it comes from, or empty strings when nothing is laid down. The
+// host file is the real path inside the task folder, resolved right before
+// it is bind-mounted, so a notes file that is (or became) a symlink to a
+// host file outside the task is refused.
 func cleanNotes(rc *schemas.RunContext) (string, string, error) {
 	if rc.Agent == nil || rc.Agent.Notes.ProjectFile == "" || rc.Task.Notes.Clean == "" || staleNotes(rc) {
 		return "", "", nil
@@ -657,7 +666,11 @@ func cleanNotes(rc *schemas.RunContext) (string, string, error) {
 	if path.IsAbs(rel) || path.Clean(rel) != rel || outsideWorkspace(rel) || rel == "." {
 		return "", "", fmt.Errorf("notes project file %q must be a clean path inside the workspace", rel)
 	}
-	return rel, filepath.Join(rc.Task.Dir, rc.Task.Notes.Clean), nil
+	host, err := utils.ResolveInside(rc.Task.Dir, rc.Task.Notes.Clean)
+	if err != nil {
+		return "", "", fmt.Errorf("task notes.clean: %w", err)
+	}
+	return rel, host, nil
 }
 
 // staleNotes reports whether a fixture probe will overlay the project notes

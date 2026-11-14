@@ -41,6 +41,7 @@ type app struct {
 	reg       *schemas.Registry
 	store     *store.FSStore
 	upstreams engine.UpstreamChecker // the fault proxy's upstream check; nil without the gateway
+	prices    *evidence.PriceTable   // the price snapshot new runs are costed with
 }
 
 // appOptions says which live services a command needs.
@@ -80,6 +81,7 @@ func newApp(ctx context.Context, configPath string, opts appOptions) (*app, erro
 	if err != nil {
 		return nil, fmt.Errorf("load prices: %w", err)
 	}
+	a.prices = prices
 	parsers := adapters.BuiltinParsers()
 	helper := cfg.Images.Helper
 	a.reg = &schemas.Registry{
@@ -191,6 +193,14 @@ func (a *app) analyze(ctx context.Context, expID, gradeSource string) (*schemas.
 // analyzeWith is analyze with a release policy file that overrides the one
 // the experiment froze, for `check -policy`. The policy result is part of the
 // analysis, so the report, the JSON and the verdict route all carry it.
+//
+// Every run SealedRuns returns has been checked against its seal, and a run
+// that does not verify makes the verdict INVALID with a reason naming it and
+// the file. The experiment's seals.log chain is verified here once per
+// analysis: a broken chain (a line edited, a sealed run deleted, a seal
+// missing from the log) makes the verdict INVALID too. The release policy is
+// handed the runs with every missing slot added as an unknown, as the verdict
+// sees them.
 func (a *app) analyzeWith(ctx context.Context, expID, gradeSource, policyOverride string) (*schemas.Analysis, []byte, error) {
 	m, err := a.store.LoadManifest(ctx, expID)
 	if err != nil {
@@ -220,10 +230,20 @@ func (a *app) analyzeWith(ctx context.Context, expID, gradeSource, policyOverrid
 	if err != nil {
 		return nil, nil, fmt.Errorf("decide: %w", err)
 	}
+	if err := a.store.VerifyChain(expID); err != nil {
+		if !errors.Is(err, schemas.ErrSealMismatch) {
+			return nil, nil, fmt.Errorf("verify seal chain: %w", err)
+		}
+		verdict.Invalidate(an, "evidence: seals.log chain does not verify: "+err.Error())
+	}
 	an.AnalysisID = utils.NewID("a", 8)
 	an.Mode = a.cfg.Server.Mode
+	// A declared smoke experiment is never a finding, whatever the server mode.
+	if m.Experiment.Smoke {
+		an.Mode = schemas.ModeSynthetic
+	}
 	an.GradeSource = gradeSource
-	if an.Policy, err = a.releasePolicy(m, an, runs, policyOverride); err != nil {
+	if an.Policy, err = a.releasePolicy(m, an, verdict.CompleteSlots(m, runs), policyOverride); err != nil {
 		return nil, nil, err
 	}
 	var md strings.Builder

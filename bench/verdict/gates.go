@@ -9,13 +9,15 @@ import (
 )
 
 // instrumentGates returns one reason per instrument gate that fired (DESIGN.md
-// 9.4). Any reason makes the experiment INVALID. Coverage is checked on the
-// conditions the decision reads (the primary condition and every
-// no_regression guard condition); the other gates look at every counted run,
-// and egress at every run, counted or not, because a successful outbound
-// connection means the harness itself leaked.
+// 9.4). Any reason makes the experiment INVALID. Evidence problems the store
+// found while loading (a seal that does not verify, a slot with more than one
+// counted run) come first. Coverage is checked on the conditions the decision
+// reads (the primary condition and every no_regression guard condition); the
+// other gates look at every counted run, and egress at every run, counted or
+// not, because a successful outbound connection means the harness itself
+// leaked.
 func instrumentGates(m *schemas.Manifest, cfg settings, idx runIndex, runs []schemas.SealedRun) []string {
-	var reasons []string
+	reasons := evidenceReasons(runs)
 	for _, cond := range decisionConditions(cfg) {
 		reasons = append(reasons, coverageReasons(idx, cond, cfg.primary.Metric)...)
 	}
@@ -206,9 +208,14 @@ func manifestReasons(m *schemas.Manifest, runs []schemas.SealedRun) []string {
 		len(ids), m.Hash, strings.Join(ids, "; "))}
 }
 
-// runLabel names a run for a reason string from its fields.
+// runLabel names a run for a reason string from its fields, or its slot when
+// it is a missing slot's placeholder.
 func runLabel(r schemas.SealedRun) string {
-	return fmt.Sprintf("%s (task %s, arm %s, condition %s, trial %d)", r.Run.RunID, r.Slot.Task, r.Slot.Arm, r.Slot.Condition, r.Slot.Trial)
+	id := r.Run.RunID
+	if id == "" {
+		id = "slot " + r.Slot.SlotID + " with no sealed run"
+	}
+	return fmt.Sprintf("%s (task %s, arm %s, condition %s, trial %d)", id, r.Slot.Task, r.Slot.Arm, r.Slot.Condition, r.Slot.Trial)
 }
 
 // armsWithBase returns A and B followed by any other arm present, sorted.

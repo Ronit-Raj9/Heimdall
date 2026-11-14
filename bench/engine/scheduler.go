@@ -10,6 +10,7 @@ import (
 	"path/filepath"
 	"sort"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/maximhq/bifrost/bench/schemas"
@@ -24,13 +25,20 @@ const (
 	costMetric            = "cost_usd"
 )
 
+// ErrLeaseLost is the cause of a slot context the scheduler cancelled because
+// the slot's lease was lost: another owner holds it, it is gone, or no
+// heartbeat succeeded for longer than the stale threshold, after which any
+// other scheduler may reclaim it.
+var ErrLeaseLost = errors.New("slot lease lost")
+
 // Scheduler leases slots and runs them through the pipeline with a fixed
 // number of workers.
 type Scheduler struct {
-	reg      *schemas.Registry
-	pipeline *Pipeline
-	janitor  *Janitor
-	logger   schemas.Logger
+	reg       *schemas.Registry
+	benchRoot string
+	pipeline  *Pipeline
+	janitor   *Janitor
+	logger    schemas.Logger
 }
 
 // RunOptions configures one scheduler run.
@@ -54,22 +62,33 @@ type Summary struct {
 	Retried       int     `json:"retried"`        // new runs started after aborted_infra
 	Recovered     int     `json:"recovered"`      // interrupted runs sealed on resume
 	LeaseHeld     int     `json:"lease_held"`     // slots another live owner holds
+	LeaseLost     int     `json:"lease_lost"`     // slots whose lease was lost mid-run; that run is sealed aborted_infra
 	Pending       int     `json:"pending"`        // slots not leased because of the spend cap or cancellation
 	Errors        int     `json:"errors"`         // slots that hit a store or seal error
 	BudgetStopped bool    `json:"budget_stopped"` // the spend cap stopped leasing
 	SpentUSD      float64 `json:"spent_usd"`
-	DroppedEvents int     `json:"dropped_events"`
+	// UnknownCostRuns counts runs whose agent started but whose cost could not
+	// be observed; each is counted in SpentUSD at the per-run estimate.
+	UnknownCostRuns int `json:"unknown_cost_runs"`
+	DroppedEvents   int `json:"dropped_events"`
 }
 
-// schedRun is the shared state of one Run call.
+// schedRun is the shared state of one Run call. The spend fields are read
+// and written under mu only, so a reservation, the cap check and a run's
+// recorded cost never interleave.
 type schedRun struct {
-	s       *Scheduler
-	m       *schemas.Manifest
-	suite   *schemas.Suite
-	opts    RunOptions
-	mu      sync.Mutex
-	sum     Summary
-	stopped bool // spend cap reached
+	s        *Scheduler
+	m        *schemas.Manifest
+	suite    *schemas.Suite
+	opts     RunOptions
+	mu       sync.Mutex
+	sum      Summary
+	stopped  bool          // spend cap reached
+	reserved float64       // estimates set aside for slots in flight
+	inflight int           // slots holding a reservation
+	maxCost  float64       // highest observed cost of one run
+	observed bool          // some run's cost was observed
+	freed    chan struct{} // closed and replaced whenever a reservation is released
 }
 
 // NewScheduler returns a scheduler. janitor may be nil (tests, or a host
@@ -78,7 +97,7 @@ func NewScheduler(reg *schemas.Registry, benchRoot string, logger schemas.Logger
 	if logger == nil {
 		logger = schemas.NoopLogger{}
 	}
-	return &Scheduler{reg: reg, pipeline: NewPipeline(reg, benchRoot, logger), janitor: janitor, logger: logger}
+	return &Scheduler{reg: reg, benchRoot: benchRoot, pipeline: NewPipeline(reg, benchRoot, logger), janitor: janitor, logger: logger}
 }
 
 // Run executes every slot of the manifest in OrderIndex order.
@@ -88,9 +107,13 @@ func NewScheduler(reg *schemas.Registry, benchRoot string, logger schemas.Logger
 // to carry the same hash. Either way a slot with a counted sealed run is
 // skipped, an interrupted run is sealed (infra_error when its agent started,
 // aborted_infra otherwise, then a new run), and a run that aborts before its
-// agent starts gets at most two retries. Before each lease the spend so far
-// (cost_usd of every sealed run) is compared with Budget.TotalUSD; at or past
-// the cap no further slot is leased.
+// agent starts gets at most two retries.
+//
+// With Budget.TotalUSD set, a slot is leased only after a reservation
+// (reserve): the spend so far plus every in-flight slot's estimate must be
+// below the cap, and at or past the cap no further slot is leased. A slot
+// whose lease is lost mid-run is cancelled, its run sealed as aborted_infra
+// and never counted, and the slot is left to the owner that holds it.
 func (s *Scheduler) Run(ctx context.Context, m *schemas.Manifest, opts RunOptions) (*Summary, error) {
 	r, err := s.start(ctx, m, opts)
 	if err != nil {
@@ -128,9 +151,9 @@ func (s *Scheduler) Run(ctx context.Context, m *schemas.Manifest, opts RunOption
 	r.mu.Unlock()
 	if stopped {
 		r.s.logger.Warn("spend cap stopped leasing", "experiment", m.ExpID, "cap_usd", m.Experiment.Budget.TotalUSD,
-			"spent_usd", out.SpentUSD, "pending", out.Pending)
-		r.emit(Event{Kind: EventBudgetStop, Message: fmt.Sprintf("spend cap %.2f USD reached at %.4f USD; %d slots not leased",
-			m.Experiment.Budget.TotalUSD, out.SpentUSD, out.Pending)})
+			"spent_usd", out.SpentUSD, "pending", out.Pending, "unknown_cost_runs", out.UnknownCostRuns)
+		r.emit(Event{Kind: EventBudgetStop, Message: fmt.Sprintf("spend cap %.2f USD reached at %.4f USD; %d slots not leased; %d runs had an unknown cost, counted at the per-run estimate",
+			m.Experiment.Budget.TotalUSD, out.SpentUSD, out.Pending, out.UnknownCostRuns)})
 	}
 	r.emit(Event{Kind: EventDone, Message: fmt.Sprintf("sealed %d, skipped %d, pending %d", out.Sealed, out.Skipped, out.Pending)})
 	r.mu.Lock()
@@ -183,45 +206,72 @@ func (s *Scheduler) start(ctx context.Context, m *schemas.Manifest, opts RunOpti
 		opts.HeartbeatEvery = DefaultHeartbeatEvery
 	}
 	if s.janitor != nil {
-		if _, err := s.janitor.Sweep(ctx, map[string]bool{}); err != nil {
-			s.logger.Warn("janitor sweep failed", "experiment", m.ExpID, "error", err.Error())
-		}
+		s.sweep(ctx, m.ExpID, opts.StaleAfter)
 	}
-	r := &schedRun{s: s, m: m, suite: suite, opts: opts, sum: Summary{ExpID: m.ExpID}}
-	spent, err := s.spentSoFar(ctx, m)
-	if err != nil {
+	r := &schedRun{s: s, m: m, suite: suite, opts: opts, sum: Summary{ExpID: m.ExpID}, freed: make(chan struct{})}
+	if err := r.spentSoFar(ctx); err != nil {
 		return nil, err
 	}
-	r.sum.SpentUSD = spent
 	return r, nil
 }
 
-// spentSoFar sums cost_usd over the sealed runs of every slot.
-func (s *Scheduler) spentSoFar(ctx context.Context, m *schemas.Manifest) (float64, error) {
-	var total float64
-	for _, slot := range m.Slots {
-		recs, err := slotRuns(ctx, s.reg.Store, m.ExpID, slot.SlotID)
+// sweep runs the janitor over every run whose lease is not fresh: leases are
+// read under the scheduler's store root and the agent check root, for every
+// experiment and every owner, so a run another live process holds is kept.
+// When the leases cannot be read nothing is swept, since such a run could
+// not be told apart.
+func (s *Scheduler) sweep(ctx context.Context, expID string, staleAfter time.Duration) {
+	roots := []string{s.reg.Store.Root()}
+	if s.benchRoot != "" {
+		roots = append(roots, filepath.Join(s.benchRoot, ChecksRoot))
+	}
+	lv, err := ScanRunLiveness(roots, staleAfter, time.Now())
+	if err != nil {
+		s.logger.Warn("janitor skipped: leases could not be read", "experiment", expID, "error", err.Error())
+		return
+	}
+	if _, err := s.janitor.Sweep(ctx, lv); err != nil {
+		s.logger.Warn("janitor sweep failed", "experiment", expID, "error", err.Error())
+	}
+}
+
+// spentSoFar sums the cost of the sealed runs of every slot into the
+// summary and records the highest observed cost. A run whose cost is unknown
+// is counted at the per-run estimate once every known cost is in.
+func (r *schedRun) spentSoFar(ctx context.Context) error {
+	unknown := 0
+	for _, slot := range r.m.Slots {
+		recs, err := slotRuns(ctx, r.s.reg.Store, r.m.ExpID, slot.SlotID)
 		if err != nil {
-			return 0, err
+			return err
 		}
 		for _, rec := range recs {
 			if !rec.Sealed {
 				continue
 			}
-			c, err := readCost(rec.Dir)
+			c, known, err := readCost(rec.Dir, &rec.Run)
 			if err != nil {
-				s.logger.Warn("unreadable metrics.json", "run", rec.Run.RunID, "error", err.Error())
+				r.s.logger.Warn("unreadable metrics.json", "run", rec.Run.RunID, "error", err.Error())
 			}
-			total += c
+			if !known {
+				unknown++
+				continue
+			}
+			r.observeLocked(c)
 		}
 	}
-	return total, nil
+	for range unknown {
+		r.sum.SpentUSD += r.estimateLocked()
+		r.sum.UnknownCostRuns++
+	}
+	return nil
 }
 
 // process runs one slot to a counted run, or decides it needs none.
 //
 // A slot that already has a counted sealed run is skipped before the budget
-// check, so it is never reported as pending.
+// check, so it is never reported as pending. The slot's reservation is held
+// from before its lease until its last attempt is recorded.
 func (r *schedRun) process(ctx context.Context, slot *schemas.Slot) {
 	if ctx.Err() != nil {
 		r.count(func(s *Summary) { s.Pending++ })
@@ -235,12 +285,14 @@ func (r *schedRun) process(ctx context.Context, slot *schemas.Slot) {
 	if r.skipDone(slot, recs) {
 		return
 	}
-	if r.overBudget() {
+	est, ok := r.reserve(ctx)
+	if !ok {
 		r.count(func(s *Summary) { s.Pending++ })
 		return
 	}
+	defer r.release(est)
 	store := r.s.reg.Store
-	ok, err := store.Lease(ctx, slot.SlotID, r.opts.Owner, r.opts.StaleAfter)
+	ok, err = store.Lease(ctx, slot.SlotID, r.opts.Owner, r.opts.StaleAfter)
 	if err != nil {
 		r.slotError(slot, fmt.Errorf("lease: %w", err))
 		return
@@ -250,16 +302,26 @@ func (r *schedRun) process(ctx context.Context, slot *schemas.Slot) {
 		r.emit(Event{Kind: EventLeaseHeld, SlotID: slot.SlotID})
 		return
 	}
-	stop := r.heartbeat(ctx, slot.SlotID)
+	sctx, stop := r.heartbeat(ctx, slot.SlotID)
 	defer func() {
-		stop()
+		if stop() {
+			r.leaseLost(sctx, slot)
+			return
+		}
 		rctx, cancel := context.WithTimeout(context.WithoutCancel(ctx), cleanupTimeout)
 		defer cancel()
 		if err := store.Release(rctx, slot.SlotID, r.opts.Owner); err != nil {
 			r.s.logger.Warn("release lease", "slot", slot.SlotID, "error", err.Error())
 		}
 	}()
-	attempts, done := r.settle(ctx, slot)
+	r.attempts(sctx, slot, est)
+}
+
+// attempts settles the slot's earlier runs, then runs new attempts until one
+// is not aborted_infra, the attempts are used up, or the slot's context ends
+// (also when its lease is lost: that run is the last).
+func (r *schedRun) attempts(ctx context.Context, slot *schemas.Slot, est float64) {
+	attempts, done := r.settle(ctx, slot, est)
 	if done {
 		return
 	}
@@ -269,7 +331,7 @@ func (r *schedRun) process(ctx context.Context, slot *schemas.Slot) {
 		}
 		attempts++
 		res, err := r.s.pipeline.RunSlot(ctx, r.input(slot, attempts))
-		r.record(res)
+		r.record(res, est)
 		if err != nil {
 			r.slotError(slot, err)
 			return
@@ -280,12 +342,22 @@ func (r *schedRun) process(ctx context.Context, slot *schemas.Slot) {
 	}
 }
 
+// leaseLost counts and reports a slot whose lease was lost while it ran. The
+// lease is not released: it is not this owner's any more.
+func (r *schedRun) leaseLost(sctx context.Context, slot *schemas.Slot) {
+	cause := context.Cause(sctx)
+	r.count(func(s *Summary) { s.LeaseLost++ })
+	r.s.logger.Error("slot lease lost: the slot's run was cancelled, and a run sealed after the loss is aborted_infra, never counted; the slot is left to the owner that holds it",
+		"experiment", r.m.ExpID, "slot", slot.SlotID, "owner", r.opts.Owner, "cause", cause.Error())
+	r.emit(Event{Kind: EventError, SlotID: slot.SlotID, Message: cause.Error()})
+}
+
 // settle reads the slot's runs. It reports done when a counted sealed run
 // exists, when retries are exhausted, or when an interrupted run's agent had
 // started (that run is sealed as infra_error and is the counted run).
 // Otherwise it seals interrupted runs as aborted_infra and returns how many
 // attempts the slot has used.
-func (r *schedRun) settle(ctx context.Context, slot *schemas.Slot) (int, bool) {
+func (r *schedRun) settle(ctx context.Context, slot *schemas.Slot, est float64) (int, bool) {
 	recs, err := slotRuns(ctx, r.s.reg.Store, r.m.ExpID, slot.SlotID)
 	if err != nil {
 		r.slotError(slot, err)
@@ -299,7 +371,7 @@ func (r *schedRun) settle(ctx context.Context, slot *schemas.Slot) (int, bool) {
 			continue
 		}
 		res, err := r.s.pipeline.SealInterrupted(ctx, r.input(slot, rec.Run.Attempt), rec)
-		r.record(res)
+		r.record(res, est)
 		if err != nil {
 			r.slotError(slot, err)
 			return len(recs), true
@@ -341,35 +413,104 @@ func (r *schedRun) input(slot *schemas.Slot, attempt int) SlotInput {
 	return SlotInput{Manifest: r.m, Suite: r.suite, Slot: slot, Attempt: attempt, Emit: r.emit}
 }
 
-// record adds a finished run's cost and counts its seal.
-func (r *schedRun) record(res *SlotResult) {
+// record adds a finished run's cost and counts its seal. A run whose agent
+// started but whose cost is unknown is counted at est, the slot's
+// reservation, or the per-run estimate when that is higher, never as zero.
+func (r *schedRun) record(res *SlotResult, est float64) {
 	if res == nil {
 		return
 	}
-	c := 0.0
-	if v, ok := res.Metrics[costMetric]; ok {
-		c, _ = v.Float()
+	c, known := runCost(res.Metrics, res.Run)
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	if known {
+		r.observeLocked(c)
+	} else {
+		charge := max(est, r.estimateLocked())
+		r.sum.SpentUSD += charge
+		r.sum.UnknownCostRuns++
+		r.s.logger.Warn("run cost unknown; counted at the per-run estimate", "experiment", r.m.ExpID,
+			"run", res.Run.RunID, "counted_usd", charge)
 	}
-	r.count(func(s *Summary) {
-		s.SpentUSD += c
-		if res.Seal != nil {
-			s.Sealed++
-		}
-	})
+	if res.Seal != nil {
+		r.sum.Sealed++
+	}
 }
 
-func (r *schedRun) overBudget() bool {
+// reserve sets aside one run's estimated cost before a slot is leased. With
+// no cap it always succeeds and reserves nothing. Otherwise, under mu: at or
+// past the cap the scheduler stops for good; below it, the slot starts when
+// nothing is in flight or the spend so far plus every in-flight reservation
+// is still below the cap, and else waits for an in-flight slot to finish (or
+// ctx to end). So concurrent workers can never all pass one check, and the
+// cap is passed by at most the last admitted run's error against its
+// estimate.
+func (r *schedRun) reserve(ctx context.Context) (float64, bool) {
 	limit := r.m.Experiment.Budget.TotalUSD
 	if limit <= 0 {
-		return false
+		return 0, true
+	}
+	for {
+		r.mu.Lock()
+		if !r.stopped && r.sum.SpentUSD >= limit {
+			r.stopped, r.sum.BudgetStopped = true, true
+		}
+		if r.stopped {
+			r.mu.Unlock()
+			return 0, false
+		}
+		if r.inflight == 0 || r.sum.SpentUSD+r.reserved < limit {
+			est := r.estimateLocked()
+			r.reserved += est
+			r.inflight++
+			r.mu.Unlock()
+			return est, true
+		}
+		wait := r.freed
+		r.mu.Unlock()
+		select {
+		case <-ctx.Done():
+			return 0, false
+		case <-wait:
+		}
+	}
+}
+
+// release returns a reservation once the slot's last attempt is recorded and
+// wakes every worker waiting in reserve.
+func (r *schedRun) release(est float64) {
+	if r.m.Experiment.Budget.TotalUSD <= 0 {
+		return
 	}
 	r.mu.Lock()
 	defer r.mu.Unlock()
-	if r.sum.SpentUSD >= limit {
-		r.stopped = true
-		r.sum.BudgetStopped = true
+	r.reserved -= est
+	r.inflight--
+	if r.inflight <= 0 {
+		r.inflight, r.reserved = 0, 0 // no float residue once nothing is in flight
 	}
-	return r.stopped
+	close(r.freed)
+	r.freed = make(chan struct{})
+}
+
+// estimateLocked is one run's expected cost: the highest cost observed so
+// far, or budget.reserve_usd when that is higher. Before any cost is observed
+// and with no reserve_usd it is the whole remaining budget, so the first run
+// runs alone until its cost is known. The caller holds mu.
+func (r *schedRun) estimateLocked() float64 {
+	reserve := r.m.Experiment.Budget.ReserveUSD
+	if r.observed || reserve > 0 {
+		return max(r.maxCost, reserve)
+	}
+	return max(r.m.Experiment.Budget.TotalUSD-r.sum.SpentUSD, 0)
+}
+
+// observeLocked adds an observed run cost. The caller holds mu, or owns r
+// alone (start).
+func (r *schedRun) observeLocked(c float64) {
+	r.sum.SpentUSD += c
+	r.maxCost = max(r.maxCost, c)
+	r.observed = true
 }
 
 func (r *schedRun) slotError(slot *schemas.Slot, err error) {
@@ -403,29 +544,68 @@ func (r *schedRun) dropped() {
 	r.count(func(s *Summary) { s.DroppedEvents++ })
 }
 
-// heartbeat keeps the slot's lease fresh until stop is called.
-func (r *schedRun) heartbeat(ctx context.Context, slotID string) (stop func()) {
-	hctx, cancel := context.WithCancel(ctx)
-	done := make(chan struct{})
+// heartbeat keeps the slot's lease fresh and returns the slot's context. On
+// lease loss (leaseLoss) it cancels that context with an ErrLeaseLost cause,
+// so the pipeline stops the run and seals it as aborted_infra. stop ends the
+// heartbeat and reports whether the lease was lost.
+func (r *schedRun) heartbeat(ctx context.Context, slotID string) (context.Context, func() bool) {
+	sctx, cancel := context.WithCancelCause(ctx)
+	quit, done := make(chan struct{}), make(chan struct{})
+	var lost atomic.Bool
 	go func() {
 		defer close(done)
 		t := time.NewTicker(r.opts.HeartbeatEvery)
 		defer t.Stop()
+		last := time.Now()
 		for {
 			select {
-			case <-hctx.Done():
+			case <-quit:
+				return
+			case <-sctx.Done():
 				return
 			case <-t.C:
-				if err := r.s.reg.Store.Heartbeat(hctx, slotID, r.opts.Owner); err != nil && hctx.Err() == nil {
-					r.s.logger.Warn("lease heartbeat", "slot", slotID, "error", err.Error())
-				}
 			}
+			err := r.s.reg.Store.Heartbeat(sctx, slotID, r.opts.Owner)
+			if sctx.Err() != nil {
+				return
+			}
+			if err == nil {
+				last = time.Now()
+				continue
+			}
+			reason := leaseLoss(err, time.Since(last), r.opts.StaleAfter)
+			if reason == "" {
+				r.s.logger.Warn("lease heartbeat failed; retrying", "slot", slotID, "error", err.Error())
+				continue
+			}
+			lost.Store(true)
+			cancel(fmt.Errorf("%w: slot %s, owner %s: %s", ErrLeaseLost, slotID, r.opts.Owner, reason))
+			return
 		}
 	}()
-	return func() {
-		cancel()
+	return sctx, func() bool {
+		close(quit)
 		<-done
+		cancel(nil)
+		return lost.Load()
 	}
+}
+
+// leaseLoss says why a failed heartbeat means the lease is lost, or "" when
+// it may be transient: another owner holds the lease, there is no lease, or
+// no heartbeat has succeeded for longer than staleAfter, after which any
+// other scheduler may reclaim the slot. It is pure.
+func leaseLoss(err error, sinceLast, staleAfter time.Duration) string {
+	switch {
+	case errors.Is(err, schemas.ErrLeaseHeld):
+		return "another owner holds the lease: " + err.Error()
+	case errors.Is(err, schemas.ErrNotFound):
+		return "the lease is gone: " + err.Error()
+	case sinceLast > staleAfter:
+		return fmt.Sprintf("no heartbeat succeeded for %s, past the stale threshold %s: %s",
+			sinceLast.Round(time.Second), staleAfter, err.Error())
+	}
+	return ""
 }
 
 // slotRuns returns a slot's runs; a slot the store has no runs for yet is
@@ -441,21 +621,36 @@ func slotRuns(ctx context.Context, store schemas.Store, expID, slotID string) ([
 	return recs, nil
 }
 
-// readCost returns the observed cost_usd in a run folder's metrics.json, or
-// 0 when the run has no metrics (it aborted before measuring) or the cost
-// is unknown.
-func readCost(dir string) (float64, error) {
+// readCost returns the cost_usd in a run folder's metrics.json and whether
+// it is known (runCost). A run without metrics.json aborted before
+// measuring; an unreadable file leaves the cost to runCost without metrics.
+func readCost(dir string, run *schemas.Run) (float64, bool, error) {
 	b, err := os.ReadFile(filepath.Join(dir, "metrics.json"))
 	if errors.Is(err, fs.ErrNotExist) {
-		return 0, nil
-	}
-	if err != nil {
-		return 0, fmt.Errorf("read metrics: %w", err)
+		c, known := runCost(nil, run)
+		return c, known, nil
 	}
 	var vals map[string]schemas.Value
-	if err := json.Unmarshal(b, &vals); err != nil {
-		return 0, fmt.Errorf("parse %s: %w", filepath.Join(dir, "metrics.json"), err)
+	if err == nil {
+		if err = json.Unmarshal(b, &vals); err != nil {
+			err = fmt.Errorf("parse %s: %w", filepath.Join(dir, "metrics.json"), err)
+		}
+	} else {
+		err = fmt.Errorf("read metrics: %w", err)
 	}
-	c, _ := vals[costMetric].Float()
-	return c, nil
+	c, known := runCost(vals, run)
+	return c, known, err
+}
+
+// runCost is a run's observed cost_usd. A run whose agent never started made
+// no model call, so its cost is a known 0 even with no metrics. Any other
+// run without an observed cost has an unknown cost. It is pure.
+func runCost(metrics map[string]schemas.Value, run *schemas.Run) (float64, bool) {
+	if c, ok := metrics[costMetric].Float(); ok {
+		return c, true
+	}
+	if run == nil || run.Timing.AgentStarted == nil {
+		return 0, true
+	}
+	return 0, false
 }

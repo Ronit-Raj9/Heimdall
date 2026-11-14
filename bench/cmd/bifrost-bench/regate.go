@@ -62,9 +62,10 @@ func runRegate(args []string) int {
 }
 
 // regate recomputes the gates of every counted sealed run of expID and writes
-// them as regrade regradeID. Every run's seal is verified and every regate is
-// computed before anything is written, so a failure leaves no partial
-// regrade. It returns the regrade record and the runs as sealed and as
+// them as regrade regradeID. Every run's seal is verified, and a run with an
+// evidence problem (a seal that does not verify, a slot with more than one
+// counted run) refuses the regate; every regate is computed before anything
+// is written, so a failure leaves no partial regrade. It returns the regrade record and the runs as sealed and as
 // regated. frozenLock is the experiment's suite.lock when the suite's lock has
 // changed since the freeze (see checkSuiteDrift).
 func (a *app) regate(ctx context.Context, expID, regradeID, note, frozenLock string) (*store.RegradeInfo, []schemas.SealedRun, []schemas.SealedRun, error) {
@@ -86,6 +87,9 @@ func (a *app) regate(ctx context.Context, expID, regradeID, note, frozenLock str
 	results := make([]*store.GateRegrade, len(runs))
 	for i := range runs {
 		sr := &runs[i]
+		if len(sr.Problems) > 0 {
+			return nil, nil, nil, fmt.Errorf("run %s: %s", sr.Run.RunID, strings.Join(sr.Problems, "; "))
+		}
 		if err := a.store.Verify(ctx, expID, sr.Run.RunID); err != nil {
 			return nil, nil, nil, fmt.Errorf("run %s: seal does not verify: %w", sr.Run.RunID, err)
 		}

@@ -1,11 +1,13 @@
 # SYNTHETIC smoke run: the real pipeline with the scripted toy agent against
 # the fault proxy's scripted model, so no provider key is needed. Its results
-# are never findings. Set `suite` to your suite id. The name starts with
-# "smoke", so the planner only warns while the suite is not admitted yet.
+# are never findings. Set `suite` to your suite id. `smoke: true` makes the
+# planner only warn while the suite is not admitted yet, and marks the runs
+# as a synthetic smoke test in the manifest; the name alone relaxes nothing.
 #
 # Both arms are the toy agent. They differ only in the notes file laid down
 # for arm B, which is enough for the planner to accept them as two arms.
 name: smoke
+smoke: true
 suite: my-suite
 base: agents/toy.yaml
 arms:

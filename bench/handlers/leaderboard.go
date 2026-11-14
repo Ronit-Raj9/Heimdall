@@ -160,6 +160,15 @@ func (s leaderboardSource) Regrades(ctx context.Context, expID string) ([]leader
 	return nil, nil
 }
 
+// VerifySeal implements leaderboard.SealSource through the index's
+// SealVerifier. An index without one cannot verify and trusts the seal.
+func (s leaderboardSource) VerifySeal(ctx context.Context, runID string) error {
+	if sv, ok := s.index.(SealVerifier); ok {
+		return sv.VerifySeal(ctx, runID)
+	}
+	return nil
+}
+
 // RegradedRuns implements leaderboard.RegradeSource. It is only asked for a
 // regrade Regrades listed, so an index without RegradeIndex is never asked.
 func (s leaderboardSource) RegradedRuns(ctx context.Context, expID, regradeID string) ([]schemas.SealedRun, error) {

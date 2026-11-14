@@ -208,18 +208,11 @@ func TestAdmitStaticChecks(t *testing.T) {
 		wantGot    string
 		absent     string // a check that must not run
 	}{
-		{name: "draft instruction", edit: func(t *testing.T, pack string, _ *schemas.Suite) {
-			editFile(t, filepath.Join(pack, "tasks/m01/instruction.md"), "too.", "too.\n"+EditMeMarker+"\n")
-		}, wantFailed: "instruction_edited", wantGot: "draft"},
-		{name: "secret in repo", edit: func(t *testing.T, pack string, _ *schemas.Suite) {
-			if err := os.WriteFile(filepath.Join(pack, "tasks/m01/repo/settings.py"), []byte("AWS = 'AKIAABCDEFGHIJKLMNOP'\n"), 0o644); err != nil {
-				t.Fatal(err)
-			}
-		}, wantFailed: "secret_scan", wantGot: "1 findings"},
 		{name: "grader without network report", grader: func(g *fakeGrader) schemas.Grader { return silentGrader{g} },
 			wantFailed: "verifier_no_network", wantGot: "unknown"},
 		{name: "no stale notes skips the stale check", edit: func(t *testing.T, _ string, s *schemas.Suite) {
 			s.Tasks[0].Notes = schemas.TaskNotes{}
+			s.ProbeIDs = nil
 		}, absent: "reference_stale_notes"},
 	}
 	for _, tc := range tests {
@@ -245,15 +238,125 @@ func TestAdmitStaticChecks(t *testing.T) {
 				if c.Name == tc.wantFailed && (c.Passed || c.Got != tc.wantGot) {
 					t.Errorf("check %s = %+v, want failed with got %q", c.Name, c, tc.wantGot)
 				}
-				if c.Name == "secret_scan" && strings.Contains(c.Detail, "AKIAABCDEFGHIJKLMNOP") {
-					t.Errorf("secret value printed: %s", c.Detail)
-				}
+			}
+			if rec.Checks[0].Name != StaticValidationCheck || !rec.Checks[0].Passed || rec.Checks[0].Got != "clean" {
+				t.Errorf("first check = %+v, want static_validation passed", rec.Checks[0])
 			}
 			if wantAdmitted := tc.wantFailed == ""; rec.Admitted != wantAdmitted {
 				t.Errorf("admitted = %v, want %v: %+v", rec.Admitted, wantAdmitted, rec.Checks)
 			}
 		})
 	}
+}
+
+// TestAdmitRefusesInvalidTask checks that a task with any static validation
+// error is refused before a workspace is created or a patch is graded, with
+// the messages task validate prints.
+func TestAdmitRefusesInvalidTask(t *testing.T) {
+	if _, err := exec.LookPath("git"); err != nil {
+		t.Skip("git not installed")
+	}
+	write := func(t *testing.T, path, content string) {
+		t.Helper()
+		if err := os.WriteFile(path, []byte(content), 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+	tests := []struct {
+		name       string
+		edit       func(t *testing.T, task string, s *schemas.Suite)
+		wantDetail string
+	}{
+		{"draft instruction", func(t *testing.T, task string, _ *schemas.Suite) {
+			editFile(t, filepath.Join(task, "instruction.md"), "too.", "too.\n"+EditMeMarker+"\n")
+		}, "still holds the " + EditMeMarker + " marker"},
+		{"leaked hidden test", func(t *testing.T, task string, _ *schemas.Suite) {
+			b, err := os.ReadFile(filepath.Join(task, "verifier/tests/test_hidden.py"))
+			if err != nil {
+				t.Fatal(err)
+			}
+			write(t, filepath.Join(task, "repo/tests/test_hidden_copy.py"), string(b))
+		}, "a hidden test must not be readable by the agent"},
+		{"escaping symlink in the repo", func(t *testing.T, task string, _ *schemas.Suite) {
+			outside := filepath.Join(t.TempDir(), "id_rsa")
+			write(t, outside, "not a key\n")
+			if err := os.Symlink(outside, filepath.Join(task, "repo", "calc", "key.txt")); err != nil {
+				t.Fatal(err)
+			}
+		}, "resolves outside the task folder"},
+		{"secret in repo", func(t *testing.T, task string, _ *schemas.Suite) {
+			write(t, filepath.Join(task, "repo/settings.py"), "AWS = 'AKIAABCDEFGHIJKLMNOP'\n")
+		}, "possible AWS access key id"},
+		{"stale notes missing while the suite runs stale-notes", func(t *testing.T, _ string, s *schemas.Suite) {
+			s.Tasks[0].Notes.Stale = ""
+		}, "notes.stale: missing"},
+		{"required id that does not exist", func(t *testing.T, _ string, s *schemas.Suite) {
+			s.Tasks[0].Verifier.Required = []string{"test_hidden.py::test_nope"}
+		}, "no function test_nope"},
+		{"reference does not apply", func(t *testing.T, task string, _ *schemas.Suite) {
+			editFile(t, filepath.Join(task, "repo/calc/core.py"), "def add", "def add_numbers")
+		}, "does not apply cleanly"},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			benchRoot, packRoot := copyPack(t)
+			s := loadMini(t, benchRoot)
+			tc.edit(t, filepath.Join(packRoot, "tasks", "m01"), s)
+			env := &fakeEnv{diff: exploitDiff}
+			fg := &fakeGrader{pass: correctFix}
+			rec, err := Admit(context.Background(), AdmitDeps{Env: env, Grader: fg}, s, s.Tasks[0])
+			if err != nil {
+				t.Fatal(err)
+			}
+			if rec.Admitted || len(rec.Checks) != 1 {
+				t.Fatalf("record = %+v, want one failed check", rec)
+			}
+			c := rec.Checks[0]
+			if c.Name != StaticValidationCheck || c.Passed || !strings.HasSuffix(c.Got, "errors") || !strings.Contains(c.Detail, tc.wantDetail) {
+				t.Errorf("check = %+v, want failed static_validation naming %q", c, tc.wantDetail)
+			}
+			if strings.Contains(c.Detail, "AKIAABCDEFGHIJKLMNOP") {
+				t.Errorf("secret value printed: %s", c.Detail)
+			}
+			if env.created || len(env.plans) > 0 || len(fg.seen) > 0 {
+				t.Errorf("controls ran before static validation refused: created %v, plans %d, graded %d", env.created, len(env.plans), len(fg.seen))
+			}
+		})
+	}
+}
+
+// TestAdmitMissingRequiredDetail checks that a required test id the
+// verifier never reports fails the reference runs and that the check names
+// the id.
+func TestAdmitMissingRequiredDetail(t *testing.T) {
+	benchRoot, _ := copyPack(t)
+	s := loadMini(t, benchRoot)
+	g := &missingRequiredGrader{fakeGrader{pass: correctFix}}
+	rec, err := Admit(context.Background(), AdmitDeps{Env: &fakeEnv{diff: exploitDiff}, Grader: g}, s, s.Tasks[0])
+	if err != nil {
+		t.Fatal(err)
+	}
+	if rec.Admitted {
+		t.Fatal("admitted with a required test that never ran")
+	}
+	for _, c := range rec.Checks {
+		if c.Name == "reference_1" && (c.Passed || !strings.Contains(c.Detail, "missing_required=test_hidden.py::test_add_negative")) {
+			t.Errorf("reference_1 = %+v, want failed naming the missing id", c)
+		}
+	}
+}
+
+// missingRequiredGrader grades like a junit grader whose report lacks the
+// task's required test.
+type missingRequiredGrader struct{ fakeGrader }
+
+func (g *missingRequiredGrader) Grade(ctx context.Context, rc *schemas.RunContext, diff *schemas.Diff) (*schemas.Grade, error) {
+	gr, err := g.fakeGrader.Grade(ctx, rc, diff)
+	if err != nil || !gr.Passed {
+		return gr, err
+	}
+	return &schemas.Grade{TestsRan: 2, MissingRequired: rc.Task.Verifier.Required,
+		Reason: "required tests did not run: " + strings.Join(rc.Task.Verifier.Required, ", ")}, nil
 }
 
 func TestAdmitRequiresDeps(t *testing.T) {

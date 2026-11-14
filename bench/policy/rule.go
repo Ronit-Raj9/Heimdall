@@ -168,26 +168,18 @@ func (ev *evaluator) badTaskRuns(o *ruleOutcome, arm string, sign int) []string 
 }
 
 // direction is +1 when a rise in metric is better and -1 when a rise is a
-// regression. The -1 list is the built-in metrics whose descriptors say
-// higher_is_better false (bench/metrics); any other metric is read as
-// higher-is-better, as the verdict's guards read it.
+// regression, read from verdict.HigherIsBetter so a policy rule and the
+// verdict's guards never disagree on which way is better.
 func direction(metric string) int {
-	switch metric {
-	case "false_completion", "steps", "tool_calls", "tokens", "cost_usd", "wall_time_s", "retry_amplification":
-		return -1
-	default:
+	if verdict.HigherIsBetter(metric) {
 		return 1
 	}
+	return -1
 }
 
-// unitInterval reports whether every value of metric lies in [0, 1]: the
-// built-in rate metrics. For those an unknown run with no bounds can be
+// unitInterval reports whether every value of metric lies in [0, 1]
+// (verdict.RateMetric). For those an unknown run with no bounds can be
 // filled with 0 and with 1 to get the missingness bounds.
 func unitInterval(metric string) bool {
-	switch metric {
-	case "verified_success", "safe_success", "false_completion", "claim_precision":
-		return true
-	default:
-		return false
-	}
+	return verdict.RateMetric(metric)
 }

@@ -1,0 +1,70 @@
+package verdict
+
+// lowerIsBetter lists the built-in metrics whose descriptor says
+// higher_is_better false (bench/metrics). This package may not import the
+// metrics package, so the list is kept here and a test in cmd/bifrost-bench
+// checks it against every registered descriptor.
+var lowerIsBetter = map[string]bool{
+	MetricFalseCompletion:       true,
+	MetricSteps:                 true,
+	MetricToolCalls:             true,
+	MetricTokens:                true,
+	MetricCostUSD:               true,
+	MetricWallTime:              true,
+	"retry_amplification":       true,
+	"memory_note_seen":          true,
+	"pattern_ignored_error":     true,
+	"pattern_loop":              true,
+	"pattern_unverified_finish": true,
+	"secret_in_context":         true,
+	"secret_exposed":            true,
+}
+
+// rateMetrics lists the built-in metrics of kind rate: every value lies in
+// [0, 1], so an unknown value with no bounds of its own is known to lie there.
+// The same cmd/bifrost-bench test keeps it in step with the descriptors.
+var rateMetrics = map[string]bool{
+	MetricVerifiedSuccess:       true,
+	"safe_success":              true,
+	MetricFalseCompletion:       true,
+	MetricClaimPrecision:        true,
+	"memory_trap_disclosed":     true,
+	"memory_note_seen":          true,
+	"pattern_ignored_error":     true,
+	"pattern_loop":              true,
+	"pattern_unverified_finish": true,
+	"secret_exposed":            true,
+}
+
+// HigherIsBetter reports whether a rise in metric is an improvement. The
+// verdict, its guards and the release policy all read B minus A through it,
+// so a fall in cost_usd is an improvement and a rise a regression. A metric
+// it does not know (a derived reward dimension, say) is read as
+// higher-is-better.
+func HigherIsBetter(metric string) bool {
+	return !lowerIsBetter[metric]
+}
+
+// RateMetric reports whether every value of metric lies in [0, 1]. Only for
+// such a metric can an unknown value with no bounds be filled with 0 and with
+// 1 to get the missingness bounds; for any other metric an unbounded unknown
+// leaves the bounds undefined and the effect cannot be directional.
+func RateMetric(metric string) bool {
+	return rateMetrics[metric]
+}
+
+// LowerIsBetterMetrics returns the built-in lower-is-better metrics, sorted,
+// for the test that checks the list against the metric descriptors.
+func LowerIsBetterMetrics() []string { return sortedKeys(lowerIsBetter) }
+
+// RateMetrics returns the built-in rate metrics, sorted, for the same test.
+func RateMetrics() []string { return sortedKeys(rateMetrics) }
+
+// better is +1 when a rise in metric is an improvement and -1 when it is a
+// regression.
+func better(metric string) float64 {
+	if HigherIsBetter(metric) {
+		return 1
+	}
+	return -1
+}

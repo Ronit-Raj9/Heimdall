@@ -74,6 +74,7 @@ type FSStore struct {
 	expLocks keyedMutex // exp id -> serializes seals.log
 	slotLock keyedMutex // slot id -> serializes lease changes in this process
 	slotDirs sync.Map   // slot id -> slot folder, filled on lookup
+	verified *verifyCache
 }
 
 var _ schemas.Store = (*FSStore)(nil)
@@ -93,7 +94,7 @@ func NewFSStore(root string, logger schemas.Logger) (*FSStore, error) {
 	if logger == nil {
 		logger = schemas.NoopLogger{}
 	}
-	return &FSStore{root: abs, logger: logger, now: time.Now}, nil
+	return &FSStore{root: abs, logger: logger, now: time.Now, verified: newVerifyCache()}, nil
 }
 
 // GetName implements schemas.Part.

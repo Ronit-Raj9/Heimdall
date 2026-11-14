@@ -127,6 +127,15 @@ func TestInputs(t *testing.T) {
 		}
 	}
 	g := newHiddenTests(HiddenTestsConfig{})
+	linked := t.TempDir()
+	if err := os.Mkdir(filepath.Join(linked, "repo"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	for name, target := range map[string]string{"tests": taskDir, "hostetc": "/etc"} {
+		if err := os.Symlink(target, filepath.Join(linked, name)); err != nil {
+			t.Fatal(err)
+		}
+	}
 	tests := []struct {
 		name    string
 		rc      *schemas.RunContext
@@ -138,7 +147,11 @@ func TestInputs(t *testing.T) {
 		{"sha mismatch", &schemas.RunContext{Task: task, Suite: suite()}, &schemas.Diff{Path: diffPath, SHA256: "00"}, "export recorded"},
 		{"escaping restore path", &schemas.RunContext{Task: task, Suite: suite("../x")}, &schemas.Diff{Path: diffPath}, "clean relative path"},
 		{"absolute restore path", &schemas.RunContext{Task: task, Suite: suite("/etc")}, &schemas.Diff{Path: diffPath}, "clean relative path"},
-		{"missing tests folder", &schemas.RunContext{Task: &schemas.Task{Dir: taskDir, RepoDir: "repo", Verifier: schemas.TaskVerifier{Tests: "nope"}}, Suite: suite()}, &schemas.Diff{Path: diffPath}, "not a folder"},
+		{"missing tests folder", &schemas.RunContext{Task: &schemas.Task{Dir: taskDir, RepoDir: "repo", Verifier: schemas.TaskVerifier{Tests: "nope"}}, Suite: suite()}, &schemas.Diff{Path: diffPath}, "nope not found"},
+		{"tests folder links out of the task", &schemas.RunContext{Task: &schemas.Task{Dir: linked, RepoDir: "repo", Verifier: schemas.TaskVerifier{Tests: "tests"}}, Suite: suite()}, &schemas.Diff{Path: diffPath},
+			"verifier.tests: tests: resolves outside the folder through a symlink"},
+		{"repo links out of the task", &schemas.RunContext{Task: &schemas.Task{Dir: linked, RepoDir: "hostetc", Verifier: schemas.TaskVerifier{Tests: "repo"}}, Suite: suite()}, &schemas.Diff{Path: diffPath},
+			"task repo: hostetc: resolves outside the folder through a symlink"},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

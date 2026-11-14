@@ -115,6 +115,45 @@ func TestLoadErrors(t *testing.T) {
 		{"suite unknown field", "mini", func(t *testing.T, pack string) {
 			editFile(t, filepath.Join(pack, "suite.yaml"), "workdir:", "work_dir: /x\nworkdir:")
 		}, []string{"mini/suite.yaml", "work_dir: unknown field"}},
+		{"repo_dir is a symlink to /etc", "mini", func(t *testing.T, pack string) {
+			editFile(t, filepath.Join(pack, "tasks/m01/task.yaml"), "repo_dir: repo", "repo_dir: hostetc")
+			symlink(t, "/etc", filepath.Join(pack, "tasks/m01/hostetc"))
+		}, []string{"mini/tasks/m01/task.yaml", "repo_dir: hostetc: resolves outside the folder through a symlink"}},
+		{"notes.clean is a symlink to a file outside", "mini", func(t *testing.T, pack string) {
+			outside := filepath.Join(t.TempDir(), "id_rsa")
+			if err := os.WriteFile(outside, []byte("key\n"), 0o600); err != nil {
+				t.Fatal(err)
+			}
+			clean := filepath.Join(pack, "tasks/m01/fixtures/notes.clean.md")
+			if err := os.Remove(clean); err != nil {
+				t.Fatal(err)
+			}
+			symlink(t, outside, clean)
+		}, []string{"notes.clean: fixtures/notes.clean.md: resolves outside the folder through a symlink"}},
+		{"symlink in the repo climbs out of the task", "mini", func(t *testing.T, pack string) {
+			symlink(t, "../../../../outside.txt", filepath.Join(pack, "tasks/m01/repo/calc/peek.txt"))
+		}, []string{"mini/tasks/m01/repo/calc/peek.txt: symlink -> ../../../../outside.txt resolves outside the task folder"}},
+		{"symlink chain that is inside lexically", "mini", func(t *testing.T, pack string) {
+			symlink(t, "../..", filepath.Join(pack, "tasks/m01/repo/calc/top"))
+			symlink(t, "top/..", filepath.Join(pack, "tasks/m01/repo/calc/climb"))
+		}, []string{"repo/calc/climb", "resolves outside the task folder"}},
+		{"task folder is a symlink out of the suite", "mini", func(t *testing.T, pack string) {
+			elsewhere := filepath.Join(t.TempDir(), "m01")
+			if err := os.Rename(filepath.Join(pack, "tasks/m01"), elsewhere); err != nil {
+				t.Fatal(err)
+			}
+			symlink(t, elsewhere, filepath.Join(pack, "tasks/m01"))
+		}, []string{"task folder: tasks/m01: resolves outside the folder through a symlink"}},
+		{"base Dockerfile folder is a symlink out of the suite", "mini", func(t *testing.T, pack string) {
+			elsewhere := filepath.Join(t.TempDir(), "base")
+			if err := os.Rename(filepath.Join(pack, "base"), elsewhere); err != nil {
+				t.Fatal(err)
+			}
+			symlink(t, elsewhere, filepath.Join(pack, "base"))
+		}, []string{"base_image.dockerfile", "resolves outside the folder through a symlink"}},
+		{"probe fixture symlink out of the suite", "mini", func(t *testing.T, pack string) {
+			symlink(t, "/etc/hostname", filepath.Join(pack, "probes", "planted.md"))
+		}, []string{"mini/probes/planted.md: symlink -> /etc/hostname resolves outside the suite folder"}},
 		{"lock for another suite", "mini", func(t *testing.T, pack string) {
 			if err := os.WriteFile(filepath.Join(pack, LockFile), []byte(`{"suite":"other"}`), 0o644); err != nil {
 				t.Fatal(err)
@@ -137,6 +176,51 @@ func TestLoadErrors(t *testing.T) {
 				}
 			}
 		})
+	}
+}
+
+// symlink creates a link at path holding target.
+func symlink(t *testing.T, target, path string) {
+	t.Helper()
+	if err := os.Symlink(target, path); err != nil {
+		t.Fatal(err)
+	}
+}
+
+// TestLoadInsideSymlinks checks that symlinks that stay inside the task
+// folder load, are listed in one lint warning, and that a named path that is
+// such a link resolves to its real target.
+func TestLoadInsideSymlinks(t *testing.T) {
+	benchRoot, packRoot := copyPack(t)
+	task := filepath.Join(packRoot, "tasks", "m01")
+	symlink(t, "core.py", filepath.Join(task, "repo", "calc", "alias.py"))
+	if err := os.Rename(filepath.Join(task, "fixtures", "notes.clean.md"), filepath.Join(task, "fixtures", "real.md")); err != nil {
+		t.Fatal(err)
+	}
+	symlink(t, "real.md", filepath.Join(task, "fixtures", "notes.clean.md"))
+	s, err := newLocalLoader(benchRoot).Load(context.Background(), "mini")
+	if err != nil {
+		t.Fatalf("inside links must load: %v", err)
+	}
+	var warned bool
+	for _, p := range Lint(s) {
+		if p.Severity == SeverityError {
+			t.Errorf("lint error: %s: %s", p.Path, p.Message)
+		}
+		if p.Path == "tasks/m01" && strings.Contains(p.Message, "2 symlinks stay inside the task folder") &&
+			strings.Contains(p.Message, "repo/calc/alias.py -> core.py") {
+			warned = true
+		}
+	}
+	if !warned {
+		t.Errorf("no warning listing the inside symlinks: %+v", Lint(s))
+	}
+	got, err := resolveIn(task, "fixtures/notes.clean.md")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if want, _ := filepath.EvalSymlinks(filepath.Join(task, "fixtures", "real.md")); got != want {
+		t.Errorf("resolveIn = %q, want %q", got, want)
 	}
 }
 

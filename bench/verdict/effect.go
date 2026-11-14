@@ -48,11 +48,12 @@ const (
 // cell holds one (task, arm) group of runs within one condition, reduced to
 // what the three missingness fills need.
 type cell struct {
-	n      int     // assigned runs
-	nObs   int     // runs with an observed value
-	obsSum float64 // sum of the observed values
-	unkLo  float64 // sum of the lowest possible values of the unknowns
-	unkHi  float64 // sum of the highest possible values of the unknowns
+	n         int     // assigned runs
+	nObs      int     // runs with an observed value
+	obsSum    float64 // sum of the observed values
+	unkLo     float64 // sum of the lowest possible values of the unknowns
+	unkHi     float64 // sum of the highest possible values of the unknowns
+	unbounded int     // unknowns with no bounds of their own on a metric outside [0, 1]
 }
 
 // mean returns the cell's mean under f, and false when the fill leaves no run
@@ -78,9 +79,12 @@ func (c cell) mean(f fill) (float64, bool) {
 }
 
 // add folds one run's value into the cell. Anything not observed, or observed
-// but not finite, is unknown for the effect. An unknown without bounds is
-// taken to lie in [0, 1], which holds for every 0/1 endpoint the verdict reads.
-func (c *cell) add(v schemas.Value) {
+// but not finite, is unknown for the effect. An unknown carrying its own
+// bounds lies within them. An unknown without bounds lies in [0, 1] only on a
+// rate metric (rate); on any other metric (cost, tokens, steps, time) it
+// could be anything, so it is counted as unbounded and the effect gets no
+// missingness bounds (pairedEffect).
+func (c *cell) add(v schemas.Value, rate bool) {
 	c.n++
 	if x, ok := v.Float(); ok && finite(x) {
 		c.nObs++
@@ -88,8 +92,11 @@ func (c *cell) add(v schemas.Value) {
 		return
 	}
 	lo, hi := 0.0, 1.0
-	if v.Bounds != nil {
+	switch {
+	case v.Bounds != nil:
 		lo, hi = v.Bounds[0], v.Bounds[1]
+	case !rate:
+		c.unbounded++
 	}
 	c.unkLo += lo
 	c.unkHi += hi
@@ -124,6 +131,7 @@ func newRunIndex(runs []schemas.SealedRun) runIndex {
 // cells returns task -> cell for one arm and metric within one condition.
 func (idx runIndex) cells(condition, arm, metric string) map[string]cell {
 	out := map[string]cell{}
+	rate := RateMetric(metric)
 	for task, byArm := range idx[condition] {
 		runs, ok := byArm[arm]
 		if !ok {
@@ -131,7 +139,7 @@ func (idx runIndex) cells(condition, arm, metric string) map[string]cell {
 		}
 		var c cell
 		for _, r := range runs {
-			c.add(metricValue(r, metric))
+			c.add(metricValue(r, metric), rate)
 		}
 		out[task] = c
 	}
@@ -165,20 +173,47 @@ func metricValue(r schemas.SealedRun, metric string) schemas.Value {
 // pairedEffect computes the release effect of armB over armA on tasks where
 // both arms ran: the point estimate on observed runs, with the lower bound
 // (unknowns set against B) and the upper bound (unknowns set in favour of B)
-// attached. Inferential effects carry the exact sign-flip p-value; descriptive
-// ones carry none (DESIGN.md 9.2).
+// attached. "Against B" follows the metric's direction: on a lower-is-better
+// metric it is B's unknowns high and A's low. When some paired run has an
+// unknown with no bounds on a metric outside [0, 1], the bounds do not exist
+// and both are left nil, so the effect can never be IMPROVED or REGRESSED.
+// Inferential effects carry the exact sign-flip p-value; descriptive ones
+// carry none (DESIGN.md 9.2).
 func pairedEffect(condition, metric, armA, armB string, a, b map[string]cell, inferential bool) *schemas.Effect {
 	var tasks []string
+	unbounded := false
 	for task := range a {
 		if _, ok := b[task]; ok {
 			tasks = append(tasks, task)
+			unbounded = unbounded || a[task].unbounded > 0 || b[task].unbounded > 0
 		}
 	}
 	sort.Strings(tasks)
 	e := effectAt(condition, metric, armA, armB, tasks, a, b, fillObserved, fillObserved, inferential)
-	e.LowerBound = effectAt(condition, metric, armA, armB, tasks, a, b, fillHigh, fillLow, inferential)
-	e.UpperBound = effectAt(condition, metric, armA, armB, tasks, a, b, fillLow, fillHigh, inferential)
+	if unbounded {
+		return e
+	}
+	low := effectAt(condition, metric, armA, armB, tasks, a, b, fillHigh, fillLow, inferential)
+	high := effectAt(condition, metric, armA, armB, tasks, a, b, fillLow, fillHigh, inferential)
+	if !HigherIsBetter(metric) {
+		low, high = high, low
+	}
+	e.LowerBound, e.UpperBound = low, high
 	return e
+}
+
+// pairedTasks is how many tasks an effect pairs: every task both arms ran,
+// counted at the bounds where unknowns are filled, or the observed estimate's
+// count when the effect has no bounds.
+func pairedTasks(e *schemas.Effect) int {
+	switch {
+	case e == nil:
+		return 0
+	case e.LowerBound != nil:
+		return e.LowerBound.NTasks
+	default:
+		return e.NTasks
+	}
 }
 
 // effectAt computes one effect with A's unknowns filled by fa and B's by fb.

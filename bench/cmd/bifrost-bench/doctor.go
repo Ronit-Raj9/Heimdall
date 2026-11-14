@@ -13,6 +13,7 @@ import (
 
 	"github.com/maximhq/bifrost/bench/engine"
 	"github.com/maximhq/bifrost/bench/faultproxy"
+	"github.com/maximhq/bifrost/bench/gateways/bifrost"
 	"github.com/maximhq/bifrost/bench/schemas"
 	"github.com/maximhq/bifrost/bench/utils"
 )
@@ -232,25 +233,21 @@ func imageNeeds(root, helper string, suites []*schemas.Suite, agents []doctorAge
 	return needs, rows
 }
 
-// helperToolsCheck runs utils.HelperToolsScript in the helper image, with no
-// network, and fails when a tool the bench runs there is missing. A
-// toolchain image set as the helper (a node or golang image) lacks python3,
-// which otherwise shows up as an egress probe or a network observer that
-// "did not run" with no word about the helper.
+// helperToolsCheck runs the canonical helper self-test (bifrost.HelperSelfTest,
+// the same one the egress probe runs before it probes) in the helper image,
+// with no network, and fails when a tool the bench runs there is missing. A
+// toolchain image set as the helper (a node or golang image) lacks python3
+// or getent, which otherwise shows up as an egress probe or a network
+// observer that "did not run" with no word about the helper.
 func (a *app) helperToolsCheck(ctx context.Context) schemas.DoctorCheck {
 	img := a.cfg.Images.Helper
 	row := schemas.DoctorCheck{ID: "helper tools"}
-	args := append([]string{"run", "--rm", "--pull", "never", "--network", "none", "--cap-drop", "ALL",
-		"--security-opt", "no-new-privileges", "--entrypoint", "sh"}, utils.LabelArgs("", "")...)
-	res, err := a.docker.Run(ctx, append(args, img, "-c", utils.HelperToolsScript)...)
-	switch {
-	case err != nil:
-		row.Status, row.Detail = schemas.DoctorFail, fmt.Sprintf("could not run %s: %v", img, err)
-	case res.ExitCode != 0:
-		row.Status, row.Detail = schemas.DoctorFail, fmt.Sprintf("could not run sh in %s (exit %d): %s", img, res.ExitCode, strings.TrimSpace(string(res.Stderr)))
-	default:
-		row.Status, row.Detail = helperToolsResult(img, utils.MissingTools(string(res.Stdout)))
+	missing, err := bifrost.HelperSelfTest(ctx, a.docker, img)
+	if err != nil {
+		row.Status, row.Detail = schemas.DoctorFail, err.Error()
+		return row
 	}
+	row.Status, row.Detail = helperToolsResult(img, missing)
 	return row
 }
 
@@ -259,7 +256,7 @@ func helperToolsResult(img string, missing []string) (schemas.DoctorStatus, stri
 	if len(missing) > 0 {
 		return schemas.DoctorFail, utils.HelperLacks(img, missing...)
 	}
-	return schemas.DoctorPass, strings.Join(utils.HelperTools, ", ") + " present"
+	return schemas.DoctorPass, strings.Join(bifrost.HelperSelfTestTools, ", ") + " present"
 }
 
 // faultProxyChecks checks the fault proxy's control API and then, with the

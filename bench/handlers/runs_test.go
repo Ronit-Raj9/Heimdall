@@ -1,10 +1,25 @@
 package handlers
 
 import (
+	"context"
+	"errors"
+	"fmt"
 	"slices"
 	"strings"
 	"testing"
+
+	"github.com/maximhq/bifrost/bench/schemas"
 )
+
+// sealIndex is a fakeIndex that verifies seals: the listed runs fail.
+type sealIndex struct {
+	*fakeIndex
+	bad map[string]error
+}
+
+func (s sealIndex) VerifySeal(_ context.Context, runID string) error {
+	return s.bad[runID]
+}
 
 func TestRunFileAllowlist(t *testing.T) {
 	idx := testIndex()
@@ -126,5 +141,36 @@ func TestReadEventsRejectsMalformedLine(t *testing.T) {
 	idx.files["r_t01_A"][FileEvents] = []byte("{\"type\":\"claim\"}\nnot json\n")
 	if _, err := readEvents(idx, "r_t01_A"); err == nil || !strings.Contains(err.Error(), "line 2") {
 		t.Fatalf("err = %v, want line 2", err)
+	}
+}
+
+func TestRunDetailSealError(t *testing.T) {
+	mismatch := fmt.Errorf("verify run r_t01_A: file metrics.json changed: %w", schemas.ErrSealMismatch)
+	tests := []struct {
+		name  string
+		index ReadIndex
+		want  string // seal_error, "" for absent
+	}{
+		{"an index that cannot verify", testIndex(), ""},
+		{"a run that verifies", sealIndex{testIndex(), map[string]error{}}, ""},
+		{"a run that does not verify", sealIndex{testIndex(), map[string]error{"r_t01_A": mismatch}}, mismatch.Error()},
+		{"a check that could not run", sealIndex{testIndex(), map[string]error{"r_t01_A": errors.New("read seal.json: permission denied")}}, "read seal.json: permission denied"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			d := fullDeps()
+			d.index = tt.index
+			body := decodeBody(t, newTestClient(t, d).do(t, "GET", "/api/bench/runs/r_t01_A", nil, nil))
+			got, present := body["seal_error"]
+			if tt.want == "" {
+				if present {
+					t.Fatalf("seal_error = %v, want absent", got)
+				}
+				return
+			}
+			if got != tt.want || body["metrics"] == nil {
+				t.Fatalf("seal_error = %v, want %q, with the files still served", got, tt.want)
+			}
+		})
 	}
 }

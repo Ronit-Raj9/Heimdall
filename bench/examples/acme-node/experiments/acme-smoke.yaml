@@ -12,10 +12,12 @@
 # gateway path of acme-agent itself is covered for free by
 # `bifrost-bench agent check` (scripted model).
 #
-# The name starts with "smoke", so the planner only warns while the suite is
-# not locked or a task is not admitted yet. Slots: 4 tasks x 1 trial x 2
+# `smoke: true` makes the planner only warn while the suite is not locked or
+# a task is not admitted yet, and marks the runs as a synthetic smoke test in
+# the manifest; the name alone relaxes nothing. Slots: 4 tasks x 1 trial x 2
 # arms = 8.
 name: smoke-acme
+smoke: true
 suite: acme-orders@1.0.0
 base: agents/oracle.yaml
 arms:

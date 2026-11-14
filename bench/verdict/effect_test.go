@@ -9,10 +9,10 @@ import (
 
 func TestCellMean(t *testing.T) {
 	var c cell
-	c.add(schemas.Observed(1, schemas.EvidenceOutcome))
-	c.add(schemas.Observed(0, schemas.EvidenceOutcome))
-	c.add(schemas.Unknown("no grade", schemas.EvidenceOutcome))
-	c.add(schemas.UnknownWithin("partial", schemas.EvidenceOutcome, 0.25, 0.75))
+	c.add(schemas.Observed(1, schemas.EvidenceOutcome), true)
+	c.add(schemas.Observed(0, schemas.EvidenceOutcome), true)
+	c.add(schemas.Unknown("no grade", schemas.EvidenceOutcome), true)
+	c.add(schemas.UnknownWithin("partial", schemas.EvidenceOutcome, 0.25, 0.75), true)
 	tests := []struct {
 		name string
 		f    fill
@@ -34,7 +34,7 @@ func TestCellMean(t *testing.T) {
 		t.Fatal("an all-unknown cell has an observed mean")
 	}
 	var bad cell
-	bad.add(schemas.Observed(math.NaN(), schemas.EvidenceOutcome))
+	bad.add(schemas.Observed(math.NaN(), schemas.EvidenceOutcome), true)
 	if bad.nObs != 0 || bad.unkHi != 1 {
 		t.Fatalf("a NaN value counted as observed: %+v", bad)
 	}
@@ -75,6 +75,85 @@ func TestPairedEffectBounds(t *testing.T) {
 	}
 	if td := e.PerTask[0]; td.NA != 2 || td.UnknownA != 1 || td.NB != 2 || td.UnknownB != 1 {
 		t.Fatalf("task counts %+v", td)
+	}
+}
+
+func TestCellUnboundedOutsideUnitInterval(t *testing.T) {
+	tests := []struct {
+		name      string
+		v         schemas.Value
+		rate      bool
+		unbounded int
+	}{
+		{"rate unknown lies in [0, 1]", schemas.Unknown("no grade", schemas.EvidenceOutcome), true, 0},
+		{"cost unknown is unbounded", schemas.Unknown("no ledger", schemas.EvidenceGateway), false, 1},
+		{"cost unknown with its own bounds", schemas.UnknownWithin("partial", schemas.EvidenceGateway, 0.1, 0.4), false, 0},
+		{"observed cost", schemas.Observed(2.5, schemas.EvidenceGateway), false, 0},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			var c cell
+			c.add(tt.v, tt.rate)
+			if c.unbounded != tt.unbounded {
+				t.Fatalf("unbounded %d, want %d (%+v)", c.unbounded, tt.unbounded, c)
+			}
+		})
+	}
+}
+
+// cellsOf builds task -> cell from per-task values of one metric.
+func cellsOf(metric string, perTask map[string][]schemas.Value) map[string]cell {
+	out := map[string]cell{}
+	for task, vals := range perTask {
+		var c cell
+		for _, v := range vals {
+			c.add(v, RateMetric(metric))
+		}
+		out[task] = c
+	}
+	return out
+}
+
+func TestPairedEffectBoundsFollowDirection(t *testing.T) {
+	obs := func(x float64) schemas.Value { return schemas.Observed(x, schemas.EvidenceOutcome) }
+	unk := schemas.Unknown("unknown", schemas.EvidenceOutcome)
+	clean := schemas.ConditionClean
+	tests := []struct {
+		name    string
+		metric  string
+		a, b    map[string][]schemas.Value
+		bounded bool
+		against float64 // d_bar with unknowns set against B
+		favour  float64 // d_bar with unknowns set in favour of B
+	}{
+		{"higher is better: against B is A high, B low", MetricVerifiedSuccess,
+			map[string][]schemas.Value{"t01": {obs(0), unk}}, map[string][]schemas.Value{"t01": {obs(1), unk}}, true, 0, 1},
+		{"lower is better: against B is A low, B high", MetricFalseCompletion,
+			map[string][]schemas.Value{"t01": {obs(0), unk}}, map[string][]schemas.Value{"t01": {obs(1), unk}}, true, 1, 0},
+		{"cost with every value observed: bounds are the estimate", MetricCostUSD,
+			map[string][]schemas.Value{"t01": {obs(2), obs(4)}}, map[string][]schemas.Value{"t01": {obs(1), obs(1)}}, true, -2, -2},
+		{"cost with an unbounded unknown: no bounds", MetricCostUSD,
+			map[string][]schemas.Value{"t01": {obs(2), unk}}, map[string][]schemas.Value{"t01": {obs(1), obs(1)}}, false, 0, 0},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			e := pairedEffect(clean, tt.metric, ArmBaseline, ArmCandidate, cellsOf(tt.metric, tt.a), cellsOf(tt.metric, tt.b), true)
+			if !tt.bounded {
+				if e.LowerBound != nil || e.UpperBound != nil {
+					t.Fatalf("bounds %+v / %+v, want none", e.LowerBound, e.UpperBound)
+				}
+				if pairedTasks(e) != 1 {
+					t.Fatalf("paired tasks %d, want 1", pairedTasks(e))
+				}
+				return
+			}
+			if e.LowerBound == nil || e.UpperBound == nil {
+				t.Fatal("bounds missing")
+			}
+			if !near(e.LowerBound.DBar, tt.against, 1e-12) || !near(e.UpperBound.DBar, tt.favour, 1e-12) {
+				t.Fatalf("d_bar against B %v, for B %v; want %v, %v", e.LowerBound.DBar, e.UpperBound.DBar, tt.against, tt.favour)
+			}
+		})
 	}
 }
 

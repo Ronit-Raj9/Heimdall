@@ -196,6 +196,14 @@ func TestFixtureArmErrors(t *testing.T) {
 		"no overlay":      func(rc *schemas.RunContext) { rc.Probe.Apply.Overlay = nil },
 		"missing fixture": func(rc *schemas.RunContext) { rc.Task.Notes.Stale = "fixtures/none.md" },
 		"bad volume":      func(rc *schemas.RunContext) { rc.Handle.Volume = "/host/path" },
+		"fixture symlink out of the task": func(rc *schemas.RunContext) {
+			link(t, outsideFile(t), filepath.Join(rc.Task.Dir, "fixtures", "leak.md"))
+			rc.Task.Notes.Stale = "fixtures/leak.md"
+		},
+		"fixture under a folder symlink out of the task": func(rc *schemas.RunContext) {
+			link(t, filepath.Dir(outsideFile(t)), filepath.Join(rc.Task.Dir, "host"))
+			rc.Task.Notes.Stale = "host/id_rsa"
+		},
 	}
 	for name, mutate := range cases {
 		t.Run(name, func(t *testing.T) {
@@ -205,6 +213,42 @@ func TestFixtureArmErrors(t *testing.T) {
 				t.Fatal("want error")
 			}
 		})
+	}
+}
+
+// TestFixtureArmInsideSymlink checks that a fixture that is a symlink to a
+// file inside the task folder still arms.
+func TestFixtureArmInsideSymlink(t *testing.T) {
+	docker, root := fakeDocker(t)
+	l := newFixtureLayer(Deps{Docker: docker, HelperImage: "helper:1"})
+	rc := fixtureRun(t)
+	link(t, "notes.stale.md", filepath.Join(rc.Task.Dir, "fixtures", "alias.md"))
+	rc.Task.Notes.Stale = "fixtures/alias.md"
+	if _, err := l.Arm(context.Background(), rc); err != nil {
+		t.Fatal(err)
+	}
+	written, err := os.ReadFile(filepath.Join(root, "w", "CLAUDE.md"))
+	if err != nil || !strings.HasPrefix(string(written), "# Notes\n") {
+		t.Fatalf("written %q, %v", written, err)
+	}
+}
+
+// outsideFile writes a file named id_rsa in a folder of its own and returns
+// its path.
+func outsideFile(t *testing.T) string {
+	t.Helper()
+	p := filepath.Join(t.TempDir(), "id_rsa")
+	if err := os.WriteFile(p, []byte("not a key\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	return p
+}
+
+// link creates a symlink at path holding target.
+func link(t *testing.T, target, path string) {
+	t.Helper()
+	if err := os.Symlink(target, path); err != nil {
+		t.Fatal(err)
 	}
 }
 

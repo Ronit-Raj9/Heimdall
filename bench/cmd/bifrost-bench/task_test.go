@@ -47,6 +47,8 @@ func gitFixture(t *testing.T, dir string, args ...string) string {
 }
 
 // pythonSource builds a repository with a bug and its fix plus a new test.
+// It holds a relative symlink that stays inside the repository, which every
+// step (task init, validate, admission) must carry as a link.
 func pythonSource(t *testing.T) (dir, base, ref string) {
 	t.Helper()
 	if _, err := exec.LookPath("git"); err != nil {
@@ -65,6 +67,10 @@ func pythonSource(t *testing.T) (dir, base, ref string) {
 	write("calc/__init__.py", "")
 	write("calc/core.py", "def add(a, b):\n    return abs(a) + abs(b)\n")
 	write("tests/test_core.py", "from calc.core import add\n\n\ndef test_pos():\n    assert add(2, 3) == 5\n")
+	write("docs/notes.md", "Signs matter.\n")
+	if err := os.Symlink("../docs/notes.md", filepath.Join(dir, "calc", "NOTES.md")); err != nil {
+		t.Fatal(err)
+	}
 	gitFixture(t, dir, "init", "-q", "-b", "main")
 	gitFixture(t, dir, "add", "-A")
 	gitFixture(t, dir, "commit", "-q", "-m", "Initial")
@@ -132,4 +138,60 @@ func TestValidateSummary(t *testing.T) {
 			t.Errorf("validateSummary(%d, %d) = %q, want %q", tt.problems, tt.errs, got, tt.want)
 		}
 	}
+}
+
+// TestRunTaskAdmitRefusesInvalidTask checks that `task admit` and `suite
+// admit` run the static validation first and refuse, before any docker
+// command and without writing suite.lock, a draft task and a task with a
+// symlink out of its folder. The docker on PATH here only records that it
+// was called.
+func TestRunTaskAdmitRefusesInvalidTask(t *testing.T) {
+	src, base, ref := pythonSource(t)
+	t.Setenv("GIT_CONFIG_GLOBAL", os.DevNull)
+	bin := t.TempDir()
+	called := filepath.Join(bin, "docker-called")
+	if err := os.WriteFile(filepath.Join(bin, "docker"), []byte("#!/bin/sh\necho \"$@\" >> "+called+"\nexit 1\n"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("PATH", bin+string(os.PathListSeparator)+os.Getenv("PATH"))
+	dir := t.TempDir()
+	if code := runInit([]string{dir}); code != exitOK {
+		t.Fatalf("init exit %d", code)
+	}
+	config := filepath.Join(dir, "deploy", "bench.yaml")
+	if code := runSuite([]string{"init", "py", "-template", "python-pytest", "-config", config}); code != exitOK {
+		t.Fatalf("suite init exit %d", code)
+	}
+	if code := runTask([]string{"init", "-config", config, "-suite", "py", "-id", "t01", "-repo", src, "-base", base, "-reference", ref}); code != exitOK {
+		t.Fatalf("task init exit %d", code)
+	}
+	task := filepath.Join(dir, "benchmarks", "py", "tasks", "t01")
+	lock := filepath.Join(dir, "benchmarks", "py", "suite.lock")
+	admit := func(name string) {
+		t.Helper()
+		if code := runTask([]string{"admit", "-config", config, "py/t01"}); code == exitOK {
+			t.Errorf("%s: task admit exit 0", name)
+		}
+		if code := runSuite([]string{"admit", "-config", config, "py"}); code == exitOK {
+			t.Errorf("%s: suite admit exit 0", name)
+		}
+		if b, err := os.ReadFile(called); err == nil {
+			t.Errorf("%s: docker ran before static validation refused: %s", name, b)
+		}
+		if _, err := os.Stat(lock); !os.IsNotExist(err) {
+			t.Errorf("%s: a refused admission wrote suite.lock", name)
+		}
+	}
+	admit("draft instruction")
+	if err := os.WriteFile(filepath.Join(task, "instruction.md"), []byte("# Keep signs\n\n`add(-2, 3)` returns 5; it should return 1.\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	outside := filepath.Join(t.TempDir(), "id_rsa")
+	if err := os.WriteFile(outside, []byte("not a key\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Symlink(outside, filepath.Join(task, "repo", "calc", "key.txt")); err != nil {
+		t.Fatal(err)
+	}
+	admit("symlink out of the task")
 }

@@ -408,7 +408,14 @@ func TestCountedRunSelection(t *testing.T) {
 			if rec.run.RunID != tt.wantRun || rec.sealed != tt.wantSealed || rec.hash != "h" {
 				t.Errorf("got %s sealed %v hash %s", rec.run.RunID, rec.sealed, rec.hash)
 			}
+			if rec.counted > 1 {
+				t.Errorf("counted %d, want at most 1", rec.counted)
+			}
 		})
+	}
+	dup := newRecord(exp, []Run{run(1, schemas.OutcomePass, true), run(2, schemas.OutcomeFail, true)})
+	if dup.run.RunID != "r1" || dup.counted != 2 || excludeReason(dup) != ReasonDuplicateSlot {
+		t.Errorf("two counted runs: got %s counted %d reason %q", dup.run.RunID, dup.counted, excludeReason(dup))
 	}
 	compat := &expInfo{id: "e", m: &schemas.Manifest{Compatibility: &schemas.ArmManifest{ConfigHash: "h_compat"}}}
 	rec := newRecord(compat, []Run{{Slot: schemas.Slot{Arm: "compat"}, Sealed: true}})

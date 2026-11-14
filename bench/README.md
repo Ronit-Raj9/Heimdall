@@ -222,6 +222,12 @@ Everything that varies is a file, validated by a JSON Schema; everything that co
 - Tool shims run inside the agent's container, so their log is boundary-level evidence the agent could tamper with. "Visible" receipts come from Bifrost's rows, which the agent cannot touch.
 - Docker is not a hard security boundary against a determined attacker; there is no custom seccomp profile or disk quota. Tasks are self-authored and contain no secrets.
 - Seals are local hashes without an external anchor.
+- Every counted run's seal and the experiment's seal chain are verified before analysis, the leaderboard and the run page use them (`docs/evidence-integrity.md`); they still prove only that files did not change after sealing on this machine.
+- The suite lock pins task files, probe files and admission results, but not yet every evaluator setting: the verifier command, required test ids, protected paths, timeouts and image contents are not all bound, and image tags are not all pinned by digest. Change one of those and re-admit before comparing with older runs.
+- The spend cap is exact for one scheduler; two schedulers on the same experiment each see their own spend. A lease lost in the instant after a seal can leave two counted runs for a slot, which the verdict then reports as invalid (`docs/runner-safety.md`).
+- Task folders are checked for symlinks that leave the task and admission validates before any Docker build (`docs/task-safety.md`); hard links are not detected, and hidden tests cut from a reference commit still need a person to review them.
+- The release evidence pack holds the manifest, the analysis and report, `seals.log` and, per run, `seal.json`, `run.json`, `metrics.json`, `gates.json` and `grade.json`. It does not hold the raw gateway rows, proxy ledger, agent stream, receipts or cost rows, so a full re-audit needs the run folders themselves.
+- There is no importer for public benchmark formats yet, and the runtime is built for coding tasks (a workspace and a diff); browser, MCP and stateful-service tasks need sidecars and result channels that do not exist.
 - Scripted-model runs are kept off the live leaderboard by the label the fault proxy writes on its ledger lines (`upstream`: `real` or `scripted`). Runs recorded before that label existed are recognized by a fingerprint of the scripted model (exactly 32 output tokens and a scripted response id format), which is a heuristic.
 - Which agents and providers were actually run, and which are only configured, is listed in `docs/harness-matrix.md`.
 

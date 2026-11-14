@@ -65,9 +65,12 @@ func (p *pairedSignFlipPolicy) GetName() string { return PolicyPairedSignFlip }
 func (p *pairedSignFlipPolicy) GetVersion() string { return pairedSignFlipVersion }
 
 // Decide compares arm B against arm A on the primary endpoint. Only counted
-// runs enter. The decision must hold at both missingness bounds; the paired-t
-// interval is descriptive and never decides. Mode is left for the caller,
-// which knows whether the runs are live, recorded or synthetic.
+// runs enter, and every counted slot of the manifest enters: one without a
+// sealed run is added as an unknown (CompleteSlots), so it widens the
+// missingness bounds and lowers graded coverage instead of vanishing. The
+// decision must hold at both missingness bounds; the paired-t interval is
+// descriptive and never decides. Mode is left for the caller, which knows
+// whether the runs are live, recorded or synthetic.
 func (p *pairedSignFlipPolicy) Decide(ctx context.Context, m *schemas.Manifest, runs []schemas.SealedRun) (*schemas.Analysis, error) {
 	if err := ctx.Err(); err != nil {
 		return nil, fmt.Errorf("decide: %w", err)
@@ -80,6 +83,7 @@ func (p *pairedSignFlipPolicy) Decide(ctx context.Context, m *schemas.Manifest, 
 		return nil, fmt.Errorf("decide experiment %s: manifest needs arms %s and %s", m.ExpID, ArmBaseline, ArmCandidate)
 	}
 	cfg := settingsFor(m)
+	runs = CompleteSlots(m, runs)
 	idx := newRunIndex(runs)
 	v := verdictFor(m, cfg, idx, runs, arms[ArmAA])
 	return &schemas.Analysis{
@@ -101,7 +105,7 @@ func verdictFor(m *schemas.Manifest, cfg settings, idx runIndex, runs []schemas.
 	pc, pm := cfg.primary.Condition, cfg.primary.Metric
 	primary := pairedEffect(pc, pm, ArmBaseline, ArmCandidate, idx.cells(pc, ArmBaseline, pm), idx.cells(pc, ArmCandidate, pm), true)
 	guards := evaluateGuards(cfg, idx)
-	checks := instrumentChecks(m, idx)
+	checks := append(instrumentChecks(m, idx), slotCoverage(m, runs))
 	invalid := append(instrumentGates(m, cfg, idx, runs), instrumentReasons(checks)...)
 	integrity := integrityStatus(idx)
 	decision := decide(invalid, primary, guards, cfg.alpha)
@@ -118,7 +122,7 @@ func verdictFor(m *schemas.Manifest, cfg settings, idx runIndex, runs []schemas.
 		Action:            actionFor(decision, guards, integrity, checks),
 		Effect:            primary,
 		Alpha:             cfg.alpha,
-		MDE:               mdePP(primary.LowerBound.NTasks, sd, cfg.alpha),
+		MDE:               mdePP(pairedTasks(primary), sd, cfg.alpha),
 		MDEAssumedSD:      assumed,
 		SD:                sd,
 		TasksNeeded:       tasksNeeded(primary.DBar, sd, cfg.alpha),
@@ -251,14 +255,26 @@ func holdGuards(guards []schemas.GuardResult) []schemas.GuardResult {
 	return out
 }
 
-// regressedAtBoth reports a significant negative effect at both bounds.
+// regressedAtBoth reports an effect significantly worse for B at both bounds:
+// d_bar below zero on a higher-is-better metric, above zero on a
+// lower-is-better one (HigherIsBetter). An effect without bounds is never
+// directional.
 func regressedAtBoth(e *schemas.Effect, alpha float64) bool {
-	return e != nil && significant(e.LowerBound, alpha, -1) && significant(e.UpperBound, alpha, -1)
+	if e == nil {
+		return false
+	}
+	worse := -better(e.Metric)
+	return significant(e.LowerBound, alpha, worse) && significant(e.UpperBound, alpha, worse)
 }
 
-// improvedAtBoth reports a significant positive effect at both bounds.
+// improvedAtBoth reports an effect significantly better for B at both bounds,
+// in the metric's direction.
 func improvedAtBoth(e *schemas.Effect, alpha float64) bool {
-	return e != nil && significant(e.LowerBound, alpha, 1) && significant(e.UpperBound, alpha, 1)
+	if e == nil {
+		return false
+	}
+	up := better(e.Metric)
+	return significant(e.LowerBound, alpha, up) && significant(e.UpperBound, alpha, up)
 }
 
 // anyGuard reports whether some guard has one of the statuses.
@@ -298,7 +314,8 @@ func evaluateGuards(cfg settings, idx runIndex) []schemas.GuardResult {
 
 // noRegressionGuard is a regression detector, not a proof of equivalence: it
 // fails only when the release effect on its condition is REGRESSED at both
-// bounds, and is undetermined when the bounds disagree.
+// bounds, in the metric's direction, and is undetermined when the bounds
+// disagree or do not exist (an unbounded unknown on a metric outside [0, 1]).
 func noRegressionGuard(g schemas.GuardSpec, cfg settings, idx runIndex) schemas.GuardResult {
 	if g.Condition == "" {
 		g.Condition = schemas.ConditionClean
@@ -309,13 +326,20 @@ func noRegressionGuard(g schemas.GuardSpec, cfg settings, idx runIndex) schemas.
 	eff := pairedEffect(g.Condition, g.Metric, ArmBaseline, ArmCandidate,
 		idx.cells(g.Condition, ArmBaseline, g.Metric), idx.cells(g.Condition, ArmCandidate, g.Metric), true)
 	res := schemas.GuardResult{Spec: g, Effect: eff}
-	if eff.LowerBound.NTasks == 0 {
+	if pairedTasks(eff) == 0 {
 		res.Status = schemas.GuardUndetermined
 		res.Detail = fmt.Sprintf("no task ran in both arms on %s", g.Condition)
 		return res
 	}
-	lo := significant(eff.LowerBound, cfg.alpha, -1)
-	hi := significant(eff.UpperBound, cfg.alpha, -1)
+	if eff.LowerBound == nil || eff.UpperBound == nil {
+		res.Status = schemas.GuardUndetermined
+		res.Detail = fmt.Sprintf("%s on %s has unknown values with no bounds; a metric outside [0, 1] cannot be bounded, so a regression cannot be ruled out",
+			g.Metric, g.Condition)
+		return res
+	}
+	worse := -better(g.Metric)
+	lo := significant(eff.LowerBound, cfg.alpha, worse)
+	hi := significant(eff.UpperBound, cfg.alpha, worse)
 	bounds := fmt.Sprintf("d_bar %+.1f pp at the lower bound, %+.1f pp at the upper bound, %d discordant",
 		100*eff.LowerBound.DBar, 100*eff.UpperBound.DBar, eff.NNonzero)
 	switch {

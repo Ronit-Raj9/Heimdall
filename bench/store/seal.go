@@ -108,6 +108,9 @@ func (s *FSStore) Seal(ctx context.Context, run *schemas.Run) (*schemas.SealReco
 // Verify recomputes a run's seal: every file hash, no file added or removed,
 // and the seal hash present in seals.log. A difference returns
 // schemas.ErrSealMismatch wrapped with the first one found, in path order.
+// The file comparison goes through the store's verification cache
+// (verifycache.go), so verifying an unchanged run again costs one stat per
+// file.
 func (s *FSStore) Verify(ctx context.Context, expID, runID string) error {
 	if err := ctx.Err(); err != nil {
 		return err
@@ -123,7 +126,7 @@ func (s *FSStore) Verify(ctx context.Context, expID, runID string) error {
 	if rec.RunID != runID {
 		return fmt.Errorf("verify run %s: seal.json names run %s: %w", runID, rec.RunID, schemas.ErrSealMismatch)
 	}
-	if err := compareFiles(dir, rec.Files); err != nil {
+	if err := s.verifyRunFiles(dir, rec); err != nil {
 		return fmt.Errorf("verify run %s: %w", runID, err)
 	}
 	entries, err := s.readSealsLog(expID)
@@ -154,6 +157,10 @@ func (s *FSStore) VerifyChain(expID string) error {
 	if len(bad) > 0 {
 		return fmt.Errorf("verify chain %s: seals.log line %d malformed: %w", expID, bad[0], schemas.ErrSealMismatch)
 	}
+	dirs, err := s.runDirsOf(expID)
+	if err != nil {
+		return fmt.Errorf("verify chain %s: %w", expID, err)
+	}
 	prev := ""
 	seen := make(map[string]bool, len(entries))
 	for i, e := range entries {
@@ -161,9 +168,14 @@ func (s *FSStore) VerifyChain(expID string) error {
 			return fmt.Errorf("verify chain %s: line %d: run %s sealed twice: %w", expID, i+1, e.RunID, schemas.ErrSealMismatch)
 		}
 		seen[e.RunID] = true
-		dir, err := s.findRunDir(expID, e.RunID)
-		if err != nil {
-			return fmt.Errorf("verify chain %s: line %d: %w: %w", expID, i+1, err, schemas.ErrSealMismatch)
+		var dir string
+		switch found := dirs[e.RunID]; len(found) {
+		case 0:
+			return fmt.Errorf("verify chain %s: line %d: run %s has no run folder: %w", expID, i+1, e.RunID, schemas.ErrSealMismatch)
+		case 1:
+			dir = found[0]
+		default:
+			return fmt.Errorf("verify chain %s: line %d: run %s found in %d slots: %w", expID, i+1, e.RunID, len(found), schemas.ErrSealMismatch)
 		}
 		rec, err := readSeal(dir)
 		if err != nil {
@@ -179,17 +191,53 @@ func (s *FSStore) VerifyChain(expID string) error {
 		}
 		prev = e.Hash
 	}
-	sealedDirs, err := filepath.Glob(filepath.Join(s.expDir(expID), slotsDir, "*", runsDir, "*", sealFile))
-	if err != nil {
-		return fmt.Errorf("verify chain %s: %w", expID, err)
-	}
-	for _, p := range sealedDirs {
-		runID := filepath.Base(filepath.Dir(p))
-		if !seen[runID] {
-			return fmt.Errorf("verify chain %s: sealed run %s missing from seals.log: %w", expID, runID, schemas.ErrSealMismatch)
+	for _, runID := range sortedRunIDs(dirs) {
+		if seen[runID] {
+			continue
+		}
+		for _, dir := range dirs[runID] {
+			sealed, err := isSealed(dir)
+			if err != nil {
+				return fmt.Errorf("verify chain %s: %w", expID, err)
+			}
+			if sealed {
+				return fmt.Errorf("verify chain %s: sealed run %s missing from seals.log: %w", expID, runID, schemas.ErrSealMismatch)
+			}
 		}
 	}
 	return nil
+}
+
+// runDirsOf lists every run folder of an experiment in one pass, run id ->
+// folders (more than one only when the same id sits in two slots), so
+// VerifyChain looks each logged run up instead of globbing the slots once
+// per line.
+func (s *FSStore) runDirsOf(expID string) (map[string][]string, error) {
+	matches, err := filepath.Glob(filepath.Join(s.expDir(expID), slotsDir, "*", runsDir, "*"))
+	if err != nil {
+		return nil, fmt.Errorf("list run folders: %w", err)
+	}
+	out := make(map[string][]string, len(matches))
+	for _, p := range matches {
+		info, err := os.Lstat(p)
+		if err != nil || !info.IsDir() {
+			continue
+		}
+		id := filepath.Base(p)
+		out[id] = append(out[id], p)
+	}
+	return out, nil
+}
+
+// sortedRunIDs returns the keys of dirs in order, so the first problem
+// reported is always the same one.
+func sortedRunIDs(dirs map[string][]string) []string {
+	ids := make([]string, 0, len(dirs))
+	for id := range dirs {
+		ids = append(ids, id)
+	}
+	sort.Strings(ids)
+	return ids
 }
 
 // resumeSeal handles Seal on a folder that already has seal.json.

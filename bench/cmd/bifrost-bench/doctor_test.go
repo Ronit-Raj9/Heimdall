@@ -11,7 +11,9 @@ import (
 	"sync/atomic"
 	"testing"
 
+	"github.com/maximhq/bifrost/bench/lib"
 	"github.com/maximhq/bifrost/bench/schemas"
+	"github.com/maximhq/bifrost/bench/utils"
 )
 
 // fakeProxy is a fault proxy control API that answers /health and, when
@@ -211,7 +213,41 @@ func TestHelperToolsResult(t *testing.T) {
 		t.Fatalf("got %s %q", st, detail)
 	}
 	st, detail = helperToolsResult("bench/coding-core-base:1", nil)
-	if st != schemas.DoctorPass || detail != "sh, cp, git, python3, sleep present" {
+	if st != schemas.DoctorPass || detail != "sh, cp, git, python3, sleep, getent present" {
 		t.Fatalf("got %s %q", st, detail)
+	}
+}
+
+// TestHelperToolsCheck runs the doctor row against a fake docker that prints
+// what a broken helper image prints: the row names the missing tool, the same
+// self-test the egress probe runs.
+func TestHelperToolsCheck(t *testing.T) {
+	tests := []struct {
+		name   string
+		script string // body of the fake docker
+		want   schemas.DoctorCheck
+	}{
+		{"all present", `exit 0`,
+			schemas.DoctorCheck{ID: "helper tools", Status: schemas.DoctorPass, Detail: "sh, cp, git, python3, sleep, getent present"}},
+		{"no getent", `echo "missing getent"`,
+			schemas.DoctorCheck{ID: "helper tools", Status: schemas.DoctorFail, Detail: "helper image acme/node:22 has no getent; set images.helper to the bench helper image"}},
+		{"command not found", `echo "sh: 1: python3: command not found" >&2; exit 127`,
+			schemas.DoctorCheck{ID: "helper tools", Status: schemas.DoctorFail, Detail: "helper image acme/node:22 has no python3; set images.helper to the bench helper image"}},
+		{"no sh", `echo 'docker: Error response from daemon: exec: "sh": executable file not found in $PATH' >&2; exit 127`,
+			schemas.DoctorCheck{ID: "helper tools", Status: schemas.DoctorFail, Detail: "helper image acme/node:22 has no sh; set images.helper to the bench helper image"}},
+		{"cannot run", `echo "No such image: acme/node:22" >&2; exit 125`,
+			schemas.DoctorCheck{ID: "helper tools", Status: schemas.DoctorFail, Detail: "helper self-test in acme/node:22 exited 125: No such image: acme/node:22"}},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			bin := filepath.Join(t.TempDir(), "docker")
+			if err := os.WriteFile(bin, []byte("#!/bin/sh\n"+tt.script+"\n"), 0o755); err != nil {
+				t.Fatal(err)
+			}
+			a := &app{cfg: &lib.Config{Images: lib.ImagesConfig{Helper: "acme/node:22"}}, docker: utils.Docker{Binary: bin}}
+			if got := a.helperToolsCheck(context.Background()); got != tt.want {
+				t.Fatalf("got %+v, want %+v", got, tt.want)
+			}
+		})
 	}
 }

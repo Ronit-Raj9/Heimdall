@@ -63,6 +63,13 @@ type Store interface {
 	Verify(ctx context.Context, expID, runID string) error
 }
 
+// ChainVerifier is optionally implemented by a Store: VerifyChain checks an
+// experiment's seals.log as one linear chain over its sealed runs.
+// store.FSStore implements it.
+type ChainVerifier interface {
+	VerifyChain(expID string) error
+}
+
 // Deps is what a release log is built from.
 type Deps struct {
 	Store  Store  // the run store; nil allows reads only
@@ -147,7 +154,10 @@ func (l *Log) Root() string { return l.d.Root }
 // evidence pack. It refuses unless the analysis action is ship and the policy
 // decision, when a policy was evaluated, is not block; req.Override, a reason,
 // releases against either and is recorded. Every counted run's seal is
-// verified first and a mismatch refuses whatever the override says.
+// verified first, and so is the experiment's seals.log chain when the store
+// can check it (ChainVerifier); a mismatch, or a run the store loaded with an
+// evidence problem (a slot with more than one counted run), refuses whatever
+// the override says.
 func (l *Log) Create(ctx context.Context, req *schemas.ReleaseRequest) (*schemas.ReleaseRecord, error) {
 	if l.d.Store == nil {
 		return nil, errors.New("create release: no run store")
@@ -170,7 +180,18 @@ func (l *Log) Create(ctx context.Context, req *schemas.ReleaseRequest) (*schemas
 	if err := checkRelease(m, ev, r.Override); err != nil {
 		return nil, err
 	}
+	if cv, ok := l.d.Store.(ChainVerifier); ok {
+		if err := cv.VerifyChain(m.ExpID); err != nil {
+			if errors.Is(err, schemas.ErrSealMismatch) {
+				return nil, &RefusedError{Reason: fmt.Sprintf("seals.log chain of %s does not verify: %v", m.ExpID, err), Err: schemas.ErrSealMismatch}
+			}
+			return nil, fmt.Errorf("create release: verify seal chain of %s: %w", m.ExpID, err)
+		}
+	}
 	for _, run := range ev.runs {
+		if len(run.Problems) > 0 {
+			return nil, &RefusedError{Reason: fmt.Sprintf("run %s: %s", run.Run.RunID, strings.Join(run.Problems, "; ")), Err: schemas.ErrSealMismatch}
+		}
 		if err := l.d.Store.Verify(ctx, m.ExpID, run.Run.RunID); err != nil {
 			if errors.Is(err, schemas.ErrSealMismatch) {
 				return nil, &RefusedError{Reason: fmt.Sprintf("seal of run %s does not verify: %v", run.Run.RunID, err), Err: schemas.ErrSealMismatch}

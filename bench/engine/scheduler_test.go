@@ -3,6 +3,8 @@ package engine
 import (
 	"context"
 	"encoding/json"
+	"errors"
+	"fmt"
 	"strings"
 	"testing"
 	"time"
@@ -245,8 +247,21 @@ func TestSchedulerLeaseHeld(t *testing.T) {
 
 func TestReadCost(t *testing.T) {
 	dir := t.TempDir()
-	if c, err := readCost(dir); c != 0 || err != nil {
-		t.Fatalf("missing metrics: %v %v", c, err)
+	started := time.Now()
+	tests := []struct {
+		name      string
+		run       *schemas.Run
+		wantKnown bool
+	}{
+		{"agent never started: no model call, a known zero", &schemas.Run{}, true},
+		{"agent started, no metrics: unknown, never zero", &schemas.Run{Timing: schemas.RunTiming{AgentStarted: &started}}, false},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if c, known, err := readCost(dir, tt.run); c != 0 || known != tt.wantKnown || err != nil {
+				t.Fatalf("missing metrics: %v %t %v", c, known, err)
+			}
+		})
 	}
 	b := newBench(t)
 	b.w.cost = 0.25
@@ -255,7 +270,145 @@ func TestReadCost(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if c, err := readCost(res.Dir); c != 0.25 || err != nil {
-		t.Fatalf("cost %v err %v", c, err)
+	if c, known, err := readCost(res.Dir, res.Run); c != 0.25 || !known || err != nil {
+		t.Fatalf("cost %v known %t err %v", c, known, err)
+	}
+	b.w.costUnknown = true
+	res, err = NewPipeline(b.reg, b.root, nil).RunSlot(context.Background(), SlotInput{Manifest: m, Suite: b.suite, Slot: &m.Slots[1], Attempt: 1})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, known, err := readCost(res.Dir, res.Run); known || err != nil {
+		t.Fatalf("an unknown cost_usd read as known (err %v)", err)
+	}
+}
+
+// capExperiment is a 16-slot experiment (8 tasks, clean, two arms) with a
+// spend cap of 1.5 USD.
+func capExperiment(reserve float64) *schemas.Experiment {
+	e := testExperiment(schemas.ConditionSpec{ID: "clean", Tasks: schemas.TaskSelector{All: true}, Trials: 1})
+	e.Budget = schemas.BudgetSpec{TotalUSD: 1.5, ReserveUSD: reserve}
+	return e
+}
+
+// TestSchedulerSpendCapConcurrent runs eight workers against a cap that
+// allows three 0.5 USD runs. Every worker checks the budget at once; without
+// a reservation under the lock all eight would pass the check before any
+// cost was recorded. A run whose cost is unknown counts as the estimate, not
+// as zero.
+func TestSchedulerSpendCapConcurrent(t *testing.T) {
+	tests := []struct {
+		name        string
+		reserve     float64
+		costUnknown bool
+		wantUnknown int
+	}{
+		{"configured reserve", 0.5, false, 0},
+		{"no reserve: the first run runs alone until its cost is known", 0, false, 0},
+		{"unknown cost counts as the reserve", 0.5, true, 3},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			b := newBench(t)
+			b.w.cost, b.w.costUnknown, b.w.execDelay = 0.5, tt.costUnknown, 30*time.Millisecond
+			m := b.plan(t, capExperiment(tt.reserve))
+			sum, err := NewScheduler(b.reg, b.root, nil, nil).Run(context.Background(), m, RunOptions{Concurrency: 8})
+			if err != nil {
+				t.Fatal(err)
+			}
+			if n := b.w.count("exec"); n != 3 {
+				t.Fatalf("%d agent runs under a cap that allows 3; summary %+v", n, sum)
+			}
+			if sum.Sealed != 3 || sum.Pending != len(m.Slots)-3 || !sum.BudgetStopped ||
+				sum.SpentUSD < 1.49 || sum.SpentUSD > 1.51 || sum.UnknownCostRuns != tt.wantUnknown {
+				t.Fatalf("summary %+v", sum)
+			}
+		})
+	}
+}
+
+// TestSchedulerResumeCountsUnknownCost resumes an experiment whose sealed
+// runs have no observed cost: they count at the reserve, so the cap still
+// holds after a restart.
+func TestSchedulerResumeCountsUnknownCost(t *testing.T) {
+	b := newBench(t)
+	b.w.costUnknown = true
+	m := b.plan(t, capExperiment(0.5))
+	ctx := context.Background()
+	if _, err := NewScheduler(b.reg, b.root, nil, nil).Run(ctx, m, RunOptions{Concurrency: 1}); err != nil {
+		t.Fatal(err)
+	}
+	resumed, err := NewScheduler(b.reg, b.root, nil, nil).Run(ctx, m, RunOptions{Resume: true, Concurrency: 4})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if b.w.count("exec") != 3 || resumed.UnknownCostRuns != 3 || resumed.SpentUSD < 1.49 || !resumed.BudgetStopped {
+		t.Fatalf("resume counted unknown costs as zero: exec %d, summary %+v", b.w.count("exec"), resumed)
+	}
+}
+
+// TestSchedulerLeaseLost runs slots whose heartbeat reports that another
+// owner took the lease: each run is cancelled, sealed as aborted_infra (never
+// counted, although its agent started), not retried, and the lease is left
+// to its new owner.
+func TestSchedulerLeaseLost(t *testing.T) {
+	b := newBench(t)
+	b.w.execDelay = 10 * time.Second // the run only ends when its context is cancelled
+	b.store.hbErr = fmt.Errorf("heartbeat slot: owner w_thief: %w", schemas.ErrLeaseHeld)
+	m := b.plan(t, testExperiment())
+	start := time.Now()
+	sum, err := NewScheduler(b.reg, b.root, nil, nil).Run(context.Background(), m,
+		RunOptions{Owner: "w_me", Concurrency: 2, HeartbeatEvery: 5 * time.Millisecond})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if time.Since(start) > 5*time.Second {
+		t.Fatal("runs were not cancelled on lease loss")
+	}
+	if sum.LeaseLost != len(m.Slots) || sum.Sealed != len(m.Slots) || sum.Retried != 0 || b.w.count("exec") != len(m.Slots) {
+		t.Fatalf("summary %+v, exec %d", sum, b.w.count("exec"))
+	}
+	for _, s := range m.Slots {
+		runs := b.store.slotRuns(s.SlotID)
+		if len(runs) != 1 {
+			t.Fatalf("slot %s has %d runs", s.SlotID, len(runs))
+		}
+		r := runs[0]
+		if !r.sealed || r.run.Outcome != schemas.OutcomeAbortedInfra || r.run.Timing.AgentStarted == nil {
+			t.Fatalf("slot %s run %+v", s.SlotID, r.run)
+		}
+		found := false
+		for _, f := range r.run.Failures {
+			found = found || strings.Contains(f.Error, "slot lease lost") && strings.Contains(f.Error, "another owner holds the lease")
+		}
+		if !found {
+			t.Fatalf("no lease-lost failure in %+v", r.run.Failures)
+		}
+		if b.store.leases[s.SlotID] != "w_me" {
+			t.Fatalf("slot %s lease released although it was lost", s.SlotID)
+		}
+	}
+}
+
+func TestLeaseLoss(t *testing.T) {
+	transient := errors.New("disk busy")
+	tests := []struct {
+		name      string
+		err       error
+		sinceLast time.Duration
+		want      string
+	}{
+		{"another owner", fmt.Errorf("x: %w", schemas.ErrLeaseHeld), 0, "another owner holds the lease"},
+		{"lease gone", fmt.Errorf("x: %w", schemas.ErrNotFound), 0, "the lease is gone"},
+		{"transient, recent heartbeat", transient, time.Minute, ""},
+		{"transient past the stale threshold", transient, 3 * time.Minute, "no heartbeat succeeded for 3m0s, past the stale threshold 2m0s"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := leaseLoss(tt.err, tt.sinceLast, DefaultStaleAfter)
+			if (tt.want == "") != (got == "") || !strings.Contains(got, tt.want) {
+				t.Fatalf("leaseLoss = %q, want %q", got, tt.want)
+			}
+		})
 	}
 }

@@ -30,6 +30,7 @@ type Experiment struct {
 	Concurrency   int                `json:"concurrency" yaml:"concurrency"`
 	ManifestMode  string             `json:"manifest_mode" yaml:"manifest_mode"` // agent_exposure | stack_resilience
 	Policy        string             `json:"policy,omitempty" yaml:"policy"`     // release policy file, relative to the bench root
+	Smoke         bool               `json:"smoke,omitempty" yaml:"smoke"`       // synthetic smoke experiment: lock problems only warn; results are never findings
 }
 
 // ArmSpec is a base agent config plus dotted-path overrides, for example
@@ -74,8 +75,12 @@ type CompatibilitySpec struct {
 }
 
 // BudgetSpec caps total spend. The scheduler stops leasing slots past it.
+// ReserveUSD is what the scheduler sets aside for a run before any run of the
+// experiment has an observed cost, and what a run with an unknown cost is
+// counted as.
 type BudgetSpec struct {
-	TotalUSD float64 `json:"total_usd" yaml:"total_usd"`
+	TotalUSD   float64 `json:"total_usd" yaml:"total_usd"`
+	ReserveUSD float64 `json:"reserve_usd,omitempty" yaml:"reserve_usd"`
 }
 
 // VerdictSpec configures the verdict policy.

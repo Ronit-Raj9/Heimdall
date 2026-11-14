@@ -13,6 +13,7 @@ import (
 	"github.com/maximhq/bifrost/bench/scaffold"
 	"github.com/maximhq/bifrost/bench/schemas"
 	"github.com/maximhq/bifrost/bench/suite"
+	"github.com/maximhq/bifrost/bench/utils"
 )
 
 func init() {
@@ -147,7 +148,10 @@ func runAdmit(args []string) int {
 // admitSuite admits the tasks of suite ref (only one when only is set) with
 // the environment and grader the suite names, looked up by name in the
 // registry, builds the suite's base image and the helper image first when
-// they are missing, and writes every result to suite.lock.
+// they are missing, and writes every result to suite.lock. Before any image
+// is built or container started it runs the static validation of `task
+// validate` on every task it admits and refuses, writing nothing, on any
+// error.
 func admitSuite(ctx context.Context, config, ref, only string) int {
 	a, err := newApp(ctx, config, appOptions{})
 	if err != nil {
@@ -176,6 +180,12 @@ func admitSuite(ctx context.Context, config, ref, only string) int {
 	}
 	if deps.Grader == nil {
 		return fail("suite %s: grader %q is not registered", s.ID, s.Grader)
+	}
+	problems := suite.StaticValidation(ctx, s, only)
+	printProblems(problems)
+	if n := suite.Errors(problems); n > 0 {
+		return fail("admit refused: static validation found %s; fix them (bifrost-bench task validate <suite>/<task> shows the same list) and admit again",
+			plural(n, "error"))
 	}
 	if err := a.ensureImages(ctx, s); err != nil {
 		return fail("%v", err)
@@ -212,6 +222,14 @@ func admitSuite(ctx context.Context, config, ref, only string) int {
 	return exitOK
 }
 
+// printProblems prints lint and validation problems, one per line, as
+// `task validate` and `suite admit` show them.
+func printProblems(problems []suite.Problem) {
+	for _, p := range problems {
+		fmt.Printf("%-7s %s: %s\n", p.Severity, p.Path, p.Message)
+	}
+}
+
 // printAdmission prints one task's admission checks.
 func printAdmission(id string, rec *schemas.AdmissionRecord) {
 	status := "admitted"
@@ -238,7 +256,13 @@ func printAdmission(id string, rec *schemas.AdmissionRecord) {
 func (a *app) ensureImages(ctx context.Context, s *schemas.Suite) error {
 	suiteDockerfile := ""
 	if s.BaseImage.Dockerfile != "" {
-		suiteDockerfile = filepath.Join(s.Root, filepath.FromSlash(s.BaseImage.Dockerfile))
+		// Resolved again right before the build: the build context is the
+		// Dockerfile's folder, and docker follows a symlink to it.
+		real, err := utils.ResolveInside(s.Root, s.BaseImage.Dockerfile)
+		if err != nil {
+			return fmt.Errorf("suite %s base image: base_image.dockerfile: %w", s.ID, err)
+		}
+		suiteDockerfile = real
 	}
 	if err := a.ensureImage(ctx, s.BaseImage.Tag, suiteDockerfile); err != nil {
 		return fmt.Errorf("suite %s base image: %w", s.ID, err)

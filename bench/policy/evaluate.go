@@ -504,20 +504,24 @@ func noRuns(r schemas.PolicyCheckResult) string {
 	return fmt.Sprintf("arm %s has no counted runs on %s", r.Arm, r.Condition)
 }
 
-// appendEvidence adds one run id while under the cap.
+// appendEvidence adds one run id while under the cap. A slot with no sealed
+// run (the verdict's placeholder, verdict.CompleteSlots) has no run id and is
+// never listed; it is still counted wherever the check counts unknowns.
 func appendEvidence(ids []string, id string) []string {
-	if len(ids) >= maxEvidence {
+	if len(ids) >= maxEvidence || id == "" {
 		return ids
 	}
 	return append(ids, id)
 }
 
-// capEvidence returns at most maxEvidence ids, nil for none.
+// capEvidence returns at most maxEvidence run ids, nil for none, leaving out
+// the empty id of a slot with no sealed run.
 func capEvidence(ids []string) []string {
-	if len(ids) == 0 {
-		return nil
+	var out []string
+	for _, id := range ids {
+		out = appendEvidence(out, id)
 	}
-	return append([]string(nil), ids[:min(len(ids), maxEvidence)]...)
+	return out
 }
 
 // num formats a number without trailing zeros.

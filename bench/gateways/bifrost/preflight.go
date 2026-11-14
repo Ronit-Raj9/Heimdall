@@ -5,6 +5,8 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"regexp"
+	"slices"
 	"sort"
 	"strconv"
 	"strings"
@@ -36,11 +38,32 @@ const (
 	probeTimeout  = 60 * time.Second
 )
 
+// HelperSelfTestTools are the commands the trusted helper image (images.helper)
+// must have: every tool of utils.HelperTools (workspace preparation, diff
+// export, the hidden_tests grader, the network observer's python3 and
+// sleep) plus getent, which the egress probe resolves a public name with.
+// It is the one list the egress probe and doctor's helper tools row check,
+// so neither can pass on an image the other would refuse.
+var HelperSelfTestTools = append(slices.Clone(utils.HelperTools), "getent")
+
+// HelperSelfTestScript is the canonical helper self-test, a POSIX sh script
+// that prints "missing <tool>" for every HelperSelfTestTools entry the image
+// lacks, and nothing else.
+var HelperSelfTestScript = `for t in ` + strings.Join(HelperSelfTestTools, " ") +
+	`; do command -v "$t" >/dev/null 2>&1 || echo "missing $t"; done`
+
 // egressScript tries DNS, a public TCP address and the cloud metadata
 // address, 3 seconds each, and prints one "<check> open|blocked" line per
-// try. It runs inside HelperImage on the evaluation network.
-const egressScript = `if ! command -v python3 >/dev/null 2>&1; then echo "missing python3"; exit 0; fi
-if getent hosts example.com >/dev/null 2>&1; then echo "dns open"; else echo "dns blocked"; fi
+// try. It runs inside HelperImage on the evaluation network. It repeats the
+// helper self-test first and stops after it when a tool is missing, so a
+// missing getent can never read as "dns blocked". getent exits 2 when the
+// name does not resolve, which is the blocked answer; any other failure
+// prints "dns error <code>", which is no result, so the probe is incomplete.
+var egressScript = `missing=$(` + HelperSelfTestScript + `)
+if [ -n "$missing" ]; then echo "$missing"; exit 0; fi
+getent hosts example.com >/dev/null 2>&1
+rc=$?
+case "$rc" in 0) echo "dns open" ;; 2) echo "dns blocked" ;; *) echo "dns error $rc" ;; esac
 python3 -c '
 import socket
 for host, port in (("1.1.1.1", 443), ("169.254.169.254", 80)):
@@ -220,13 +243,14 @@ func (g *Gateway) checkProvider(ctx context.Context, p ProviderSetup, set func(s
 	}
 }
 
-// probeEgress runs egressScript in a short-lived HelperImage container on
-// the evaluation network. The result is "blocked" only when every check
-// failed and "open" when one connected. A probe that could not run, or
-// printed too little, is "not_run" with a problem and the reason in
-// SettingEgressError, because isolation that was not shown is not assumed
-// and a probe that never ran proves nothing either way. A helper image
-// without python3 is named as such, since that is the usual cause.
+// probeEgress runs the helper self-test (HelperSelfTest) and then
+// egressScript in a short-lived HelperImage container on the evaluation
+// network. The result is "blocked" only when every check failed and "open"
+// when one connected. A probe that could not run, or printed too little, is
+// "not_run" with a problem and the reason in SettingEgressError, because
+// isolation that was not shown is not assumed and a probe that never ran
+// proves nothing either way. A helper image that lacks a tool is named with
+// the tool (utils.HelperLacks), never reported blocked or open.
 func (g *Gateway) probeEgress(ctx context.Context, m *schemas.GatewayManifest, problem func(string, ...any)) {
 	m.Settings[SettingEvalNetwork] = g.cfg.EvalNetwork
 	m.Settings[SettingEgressProbe] = egressNotRun
@@ -241,6 +265,15 @@ func (g *Gateway) probeEgress(ctx context.Context, m *schemas.GatewayManifest, p
 	}
 	pctx, cancel := context.WithTimeout(ctx, probeTimeout)
 	defer cancel()
+	missing, err := HelperSelfTest(pctx, g.cfg.Docker, g.cfg.HelperImage)
+	if err != nil {
+		notRun("egress probe not run: %v", err)
+		return
+	}
+	if len(missing) > 0 {
+		notRun("egress probe not run: %s", utils.HelperLacks(g.cfg.HelperImage, missing...))
+		return
+	}
 	args := append([]string{"run", "--rm", "--pull", "never", "--network", g.cfg.EvalNetwork,
 		"--cap-drop", "ALL", "--security-opt", "no-new-privileges", "--pids-limit", "64", "--memory", "128m",
 		"--entrypoint", "sh"}, utils.LabelArgs("", "")...)
@@ -250,31 +283,74 @@ func (g *Gateway) probeEgress(ctx context.Context, m *schemas.GatewayManifest, p
 		notRun("egress probe not run: %v", err)
 		return
 	}
-	if missing := utils.MissingTools(string(res.Stdout)); len(missing) > 0 {
+	if missing := missingTools(res); len(missing) > 0 {
 		notRun("egress probe not run: %s", utils.HelperLacks(g.cfg.HelperImage, missing...))
 		return
 	}
 	results := parseEgress(string(res.Stdout))
-	var open, missing []string
+	var open, noResult []string
 	for _, c := range egressChecks {
 		switch results[c] {
 		case egressBlocked:
 		case egressOpen:
 			open = append(open, c)
 		default:
-			missing = append(missing, c)
+			noResult = append(noResult, c)
 		}
 	}
 	switch {
 	case len(open) > 0:
 		m.Settings[SettingEgressProbe] = egressOpen
 		problem("egress from %s is open: %s", g.cfg.EvalNetwork, strings.Join(open, ", "))
-	case len(missing) > 0:
+	case len(noResult) > 0:
 		notRun("egress probe incomplete (exit %d), no result for %s: %s", res.ExitCode,
-			strings.Join(missing, ", "), snippet(res.Stderr))
+			strings.Join(noResult, ", "), snippet(append(append([]byte(nil), res.Stdout...), res.Stderr...)))
 	default:
 		m.Settings[SettingEgressProbe] = egressBlocked
 	}
+}
+
+// HelperSelfTest runs HelperSelfTestScript in image with no network and
+// returns the tools the image lacks (missingTools), sh included when the
+// image cannot even start it. err is non-nil only when the self-test could
+// not say: docker did not run, or the script failed without naming a tool.
+func HelperSelfTest(ctx context.Context, d utils.Docker, image string) ([]string, error) {
+	args := append([]string{"run", "--rm", "--pull", "never", "--network", "none", "--cap-drop", "ALL",
+		"--security-opt", "no-new-privileges", "--pids-limit", "64", "--memory", "128m",
+		"--entrypoint", "sh"}, utils.LabelArgs("", "")...)
+	res, err := d.Run(ctx, append(args, image, "-c", HelperSelfTestScript)...)
+	if err != nil {
+		return nil, fmt.Errorf("helper self-test in %s: %w", image, err)
+	}
+	if missing := missingTools(res); len(missing) > 0 {
+		return missing, nil
+	}
+	if res.ExitCode != 0 {
+		return nil, fmt.Errorf("helper self-test in %s exited %d: %s", image, res.ExitCode, snippet(res.Stderr))
+	}
+	return nil, nil
+}
+
+// missingTools returns the helper tools a docker run says are missing: the
+// "missing <tool>" lines of the self-test, a shell's "<tool>: not found" or
+// "<tool>: command not found", and docker's `exec: "<tool>": executable file
+// not found` when the entrypoint itself is absent. Only HelperSelfTestTools
+// are recognised, in that order. It is pure.
+func missingTools(res *utils.DockerResult) []string {
+	named := map[string]bool{}
+	for _, t := range utils.MissingTools(string(res.Stdout)) {
+		named[t] = true
+	}
+	out := string(res.Stdout) + "\n" + string(res.Stderr)
+	var missing []string
+	for _, t := range HelperSelfTestTools {
+		q := regexp.QuoteMeta(t)
+		re := regexp.MustCompile(`(^|[\s/:])` + q + `: (command )?not found|exec: "` + q + `": executable file not found`)
+		if named[t] || re.MatchString(out) {
+			missing = append(missing, t)
+		}
+	}
+	return missing
 }
 
 // parseEgress reads "<check> open|blocked" lines.

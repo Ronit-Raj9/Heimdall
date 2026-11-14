@@ -108,12 +108,14 @@ func TestRuleChecks(t *testing.T) {
 
 func TestDirection(t *testing.T) {
 	for metric, want := range map[string]int{"verified_success": 1, "safe_success": 1, "claim_precision": 1, "custom": 1,
-		"false_completion": -1, "steps": -1, "tool_calls": -1, "tokens": -1, "cost_usd": -1, "wall_time_s": -1, "retry_amplification": -1} {
+		"false_completion": -1, "steps": -1, "tool_calls": -1, "tokens": -1, "cost_usd": -1, "wall_time_s": -1, "retry_amplification": -1,
+		// lower-is-better descriptors the policy's own list used to miss
+		"secret_exposed": -1, "secret_in_context": -1, "memory_note_seen": -1, "pattern_loop": -1, "pattern_ignored_error": -1, "pattern_unverified_finish": -1} {
 		if got := direction(metric); got != want {
 			t.Errorf("direction(%s) = %d, want %d", metric, got, want)
 		}
 	}
-	if !unitInterval("verified_success") || unitInterval("steps") {
+	if !unitInterval("verified_success") || unitInterval("steps") || !unitInterval("secret_exposed") || unitInterval("cost_usd") {
 		t.Error("unitInterval")
 	}
 }

@@ -37,8 +37,16 @@ const (
 	wantEdited    = "edited"
 	wantNoSecrets = "none"
 	wantNoNetwork = "none"
+	wantClean     = "clean"
 	refuseMessage = "I can't complete this task."
 )
+
+// StaticValidationCheck is the admission check that records the static
+// validation (ValidateTask) admission ran before any control.
+const StaticValidationCheck = "static_validation"
+
+// maxDetailProblems is how many problems an admission check detail names.
+const maxDetailProblems = 5
 
 // VerifierNetworkReporter is implemented by a grader that can say which
 // Docker network its verifier container gets. Admission requires "none".
@@ -74,12 +82,23 @@ type AdmitDeps struct {
 // from deps.Env and their exported diffs are graded. A failed control is a
 // failed check in the record, not an error; Admit returns an error only when
 // it cannot run the checks at all.
+//
+// Before any control runs, Admit runs ValidateTask, the static validation of
+// `task validate`. A task with an error problem gets a record holding only a
+// failed static_validation check, and nothing is created in Docker; a clean
+// one records static_validation as passed, ahead of the controls.
 func Admit(ctx context.Context, deps AdmitDeps, s *schemas.Suite, t *schemas.Task) (*schemas.AdmissionRecord, error) {
 	if deps.Env == nil || deps.Grader == nil {
 		return nil, errors.New("admit: environment and grader are required")
 	}
 	if deps.Logger == nil {
 		deps.Logger = schemas.NoopLogger{}
+	}
+	static := staticValidation(ValidateTask(ctx, s, t))
+	if !static.Passed {
+		deps.Logger.Warn("task admission refused by static validation", "suite", s.ID, "task", t.ID, "detail", static.Detail)
+		return &schemas.AdmissionRecord{Admitted: false, At: time.Now().UTC(), Grader: deps.Grader.GetName(),
+			Checks: []schemas.AdmissionCheck{static}}, nil
 	}
 	tmp, err := os.MkdirTemp("", "bench-admit-"+t.ID+"-")
 	if err != nil {
@@ -93,7 +112,7 @@ func Admit(ctx context.Context, deps AdmitDeps, s *schemas.Suite, t *schemas.Tas
 		return nil, err
 	}
 	rec := &schemas.AdmissionRecord{Admitted: true, At: time.Now().UTC(), Grader: deps.Grader.GetName(), ReferenceRepeats: referenceRuns}
-	var checks []schemas.AdmissionCheck
+	checks := []schemas.AdmissionCheck{static}
 	for i := 1; i <= referenceRuns; i++ {
 		c := a.gradePatch(ctx, fmt.Sprintf("reference_%d", i), paths.reference, GotPass)
 		rec.ReferenceResults = append(rec.ReferenceResults, c.Got)
@@ -272,6 +291,30 @@ func (a *admitter) scripted(ctx context.Context, name, kind string, argv []strin
 		detail += " (timed out)"
 	}
 	return a.grade(ctx, rc, diff, check, detail)
+}
+
+// staticValidation turns ValidateTask's problems into the static_validation
+// check: passed with no error problem. The detail names the first errors, or
+// counts the warnings.
+func staticValidation(problems []Problem) schemas.AdmissionCheck {
+	c := schemas.AdmissionCheck{Name: StaticValidationCheck, Want: wantClean}
+	var errs []string
+	for _, p := range problems {
+		if p.Severity == SeverityError {
+			errs = append(errs, p.Path+": "+p.Message)
+		}
+	}
+	if len(errs) == 0 {
+		c.Got, c.Passed = wantClean, true
+		c.Detail = fmt.Sprintf("%d warnings", len(problems))
+		return c
+	}
+	c.Got = fmt.Sprintf("%d errors", len(errs))
+	if len(errs) > maxDetailProblems {
+		errs = append(errs[:maxDetailProblems:maxDetailProblems], fmt.Sprintf("and %d more", len(errs)-maxDetailProblems))
+	}
+	c.Detail = strings.Join(errs, "; ")
+	return c
 }
 
 // instructionEdited checks that the draft marker task init writes is gone.

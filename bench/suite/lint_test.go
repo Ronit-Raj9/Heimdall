@@ -70,6 +70,14 @@ func TestLint(t *testing.T) {
 		{"go required id unknown", func(t *testing.T, _ string, s *schemas.Suite) {
 			s.Tasks[0].Verifier.Required = []string{"example.com/calc::TestAddZero"}
 		}, "tasks/m01/task.yaml", "no func TestAddZero", ""},
+		{"required ids with a reward verifier", func(t *testing.T, _ string, s *schemas.Suite) {
+			s.Verifier.Result = schemas.VerifierResultReward
+		}, "tasks/m01/task.yaml", "verifier.required: ignored, because the suite's verifier reports result reward", SeverityWarning},
+		{"symlink out of the task", func(t *testing.T, pack string, _ *schemas.Suite) {
+			if err := os.Symlink("../../../../x", filepath.Join(pack, "tasks/m01/controls/x.diff")); err != nil {
+				t.Fatal(err)
+			}
+		}, "tasks/m01/controls/x.diff", "resolves outside the task folder", ""},
 		{"empty mutants", func(t *testing.T, _ string, s *schemas.Suite) {
 			s.Tasks[0].Controls.Mutants = nil
 		}, "tasks/m01/task.yaml", "controls.mutants: empty", SeverityWarning},

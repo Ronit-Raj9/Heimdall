@@ -14,9 +14,11 @@ func ReleaseEffect(runs []schemas.SealedRun, condition, metric, armA, armB strin
 }
 
 // EffectDecision applies the directional part of DESIGN.md 9.3 item 6 to one
-// effect: REGRESSED when it is significantly negative at alpha at both
-// missingness bounds, IMPROVED when significantly positive at both, and
-// INCONCLUSIVE otherwise. It never returns INVALID; instrument gates are the
+// effect: REGRESSED when it is significantly worse for arm B at alpha at both
+// missingness bounds, IMPROVED when significantly better at both, and
+// INCONCLUSIVE otherwise, including when the effect has no bounds. Better and
+// worse follow the effect's metric (HigherIsBetter): a significant fall in
+// cost_usd is IMPROVED. It never returns INVALID; instrument gates are the
 // verdict's business.
 func EffectDecision(e *schemas.Effect, alpha float64) schemas.Decision {
 	switch {
@@ -31,8 +33,9 @@ func EffectDecision(e *schemas.Effect, alpha float64) schemas.Decision {
 
 // Direction is the sign of one effect when it is significant at alpha: +1
 // for a significant positive d_bar, -1 for a significant negative one, 0
-// otherwise. It reads the effect it is given, not its bounds, so a caller can
-// ask about each missingness bound on its own.
+// otherwise. It is the raw sign, not better or worse: a caller multiplies by
+// the metric's direction (HigherIsBetter). It reads the effect it is given,
+// not its bounds, so a caller can ask about each missingness bound on its own.
 func Direction(e *schemas.Effect, alpha float64) int {
 	switch {
 	case significant(e, alpha, 1):

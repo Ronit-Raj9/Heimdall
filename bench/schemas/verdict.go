@@ -70,7 +70,8 @@ type SealedRun struct {
 	Metrics     map[string]Value `json:"metrics"`
 	Gates       []GateResult     `json:"gates"`
 	Receipts    []Receipt        `json:"receipts,omitempty"`
-	Gateway     *GatewayTally    `json:"gateway,omitempty"` // from evidence.json; nil when the run has no gateway log
+	Gateway     *GatewayTally    `json:"gateway,omitempty"`  // from evidence.json; nil when the run has no gateway log
+	Problems    []string         `json:"problems,omitempty"` // evidence problems found while loading (seal does not verify, slot has more than one counted run); any makes the verdict INVALID
 }
 
 // Effect summarizes paired per-task differences for one condition and metric.

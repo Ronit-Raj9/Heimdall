@@ -129,8 +129,10 @@ func (q Query) Normalize() (Query, error) {
 // sealed and graded (the outcome scores: pass, fail, timeout, budget, crash,
 // refusal, integrity_violation). Every other run of the board's suite and
 // condition is counted in Excluded by reason: its outcome (infra_error,
-// invalid_evaluator, unknown, aborted_infra), "not sealed", or "experiment
-// verdict invalid" when the experiment's newest analysis decided invalid.
+// invalid_evaluator, unknown, aborted_infra), "not sealed", "seal mismatch"
+// when src is a SealSource and the run's files no longer match its seal,
+// "slot has more than one counted run", or "experiment verdict invalid" when
+// the experiment's newest analysis decided invalid.
 // The synthetic filter applies before anything is counted, so a live board
 // never mentions scripted runs and the other way round. With grade source
 // latest each experiment's runs are read from its newest regrade
@@ -210,6 +212,7 @@ type record struct {
 	hash    string                   // resolved agent config hash
 	metrics map[string]schemas.Value // set when read from a regrade; nil: read metrics.json
 	source  string                   // regrade id the run was read from; "" for its original grade
+	counted int                      // sealed runs of the slot that are not aborted_infra; more than one is excluded
 }
 
 // key is the (experiment, config) pair synthetic classification works on.
@@ -270,12 +273,19 @@ func collect(ctx context.Context, src Source) ([]*record, error) {
 func newRecord(exp *expInfo, runs []Run) *record {
 	slices.SortStableFunc(runs, func(x, y Run) int { return cmp.Compare(x.Run.Attempt, y.Run.Attempt) })
 	pick, sealed := runs[len(runs)-1], false
-	if i := slices.IndexFunc(runs, func(r Run) bool { return r.Sealed && r.Run.Outcome != schemas.OutcomeAbortedInfra }); i >= 0 {
+	countedRun := func(r Run) bool { return r.Sealed && r.Run.Outcome != schemas.OutcomeAbortedInfra }
+	if i := slices.IndexFunc(runs, countedRun); i >= 0 {
 		pick, sealed = runs[i], true
 	} else if pick.Sealed {
 		sealed = true
 	}
-	rec := &record{exp: exp, slot: pick.Slot, run: pick.Run, sealed: sealed}
+	counted := 0
+	for _, r := range runs {
+		if countedRun(r) {
+			counted++
+		}
+	}
+	rec := &record{exp: exp, slot: pick.Slot, run: pick.Run, sealed: sealed, counted: counted}
 	if pick.Slot.Arm == "compat" && exp.m.Compatibility != nil {
 		rec.arm = exp.m.Compatibility
 	} else if a, ok := exp.m.Arms[pick.Slot.Arm]; ok {

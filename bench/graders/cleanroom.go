@@ -98,7 +98,11 @@ func (e *tooLargeError) Error() string {
 
 // gatherInputs validates the run context and the diff, and checks the diff
 // file still has the hash the export recorded. image, when set, replaces the
-// suite base image for both the preparation step and the verifier.
+// suite base image for both the preparation step and the verifier. The repo
+// and the hidden tests are bind-mounted by their real paths inside the task
+// folder, resolved here, right before the grade: docker follows symlinks, so
+// a folder swapped for a link after the suite loaded must not mount a host
+// folder outside the task.
 func gatherInputs(rc *schemas.RunContext, diff *schemas.Diff, image string) (*gradeInputs, error) {
 	if rc.Task == nil || rc.Task.Dir == "" || rc.Suite == nil {
 		return nil, errors.New("run context needs a task folder and a suite")
@@ -107,11 +111,9 @@ func gatherInputs(rc *schemas.RunContext, diff *schemas.Diff, image string) (*gr
 		return nil, errors.New("no diff to grade")
 	}
 	in := &gradeInputs{
-		image:    image,
-		repoDir:  filepath.Join(rc.Task.Dir, rc.Task.RepoDir),
-		testsDir: filepath.Join(rc.Task.Dir, rc.Task.Verifier.Tests),
-		command:  rc.Suite.Verifier.Command,
-		timeout:  time.Duration(rc.Suite.Verifier.TimeoutS) * time.Second,
+		image:   image,
+		command: rc.Suite.Verifier.Command,
+		timeout: time.Duration(rc.Suite.Verifier.TimeoutS) * time.Second,
 	}
 	if in.image == "" {
 		in.image = rc.Suite.BaseImage.Tag
@@ -122,6 +124,13 @@ func gatherInputs(rc *schemas.RunContext, diff *schemas.Diff, image string) (*gr
 	}
 	if in.image == "" || len(in.command) == 0 || rc.Task.Verifier.Tests == "" {
 		return nil, errors.New("suite needs an image and a verifier command, and the task a tests folder")
+	}
+	var err error
+	if in.repoDir, err = utils.ResolveInside(rc.Task.Dir, rc.Task.RepoDir); err != nil {
+		return nil, fmt.Errorf("task repo: %w", err)
+	}
+	if in.testsDir, err = utils.ResolveInside(rc.Task.Dir, rc.Task.Verifier.Tests); err != nil {
+		return nil, fmt.Errorf("task verifier.tests: %w", err)
 	}
 	for _, d := range []string{in.repoDir, in.testsDir} {
 		if st, err := os.Stat(d); err != nil || !st.IsDir() {

@@ -51,6 +51,21 @@ const staleNotesProbe = "stale-notes"
 // duplicate ids, probes on a layer the bench does not ship, and every task
 // problem LintTask finds. Problems are sorted by path.
 func Lint(s *schemas.Suite) []Problem {
+	out := lintSuite(s)
+	linted := map[string]bool{}
+	for _, t := range s.Tasks {
+		if linted[t.ID] {
+			continue
+		}
+		linted[t.ID] = true
+		out = append(out, LintTask(s, t)...)
+	}
+	sort.SliceStable(out, func(i, j int) bool { return out[i].Path < out[j].Path })
+	return out
+}
+
+// lintSuite is the part of Lint that concerns the suite itself, not a task.
+func lintSuite(s *schemas.Suite) []Problem {
 	var out []Problem
 	add := func(path, sev, format string, args ...any) {
 		out = append(out, Problem{Path: path, Severity: sev, Message: fmt.Sprintf(format, args...)})
@@ -74,24 +89,17 @@ func Lint(s *schemas.Suite) []Problem {
 			add(rel(s.Root, p.Path), SeverityError, "layer: %q is not a probe layer the bench ships (fixture, gateway, tool_shim)", p.Layer)
 		}
 	}
-	linted := map[string]bool{}
-	for _, t := range s.Tasks {
-		if linted[t.ID] {
-			continue
-		}
-		linted[t.ID] = true
-		out = append(out, LintTask(s, t)...)
-	}
-	sort.SliceStable(out, func(i, j int) bool { return out[i].Path < out[j].Path })
 	return out
 }
 
 // LintTask checks one task folder of s: stale notes when the suite runs the
 // stale-notes probe, mutants, instructions that leak how grading works or
 // still hold the EDIT ME marker, requirements maps that miss a hidden test,
-// required test ids that do not exist, hidden test files that are also in
-// the repo, and repos without visible tests. Mutants and a requirements map
-// are recommended, not required (docs/bring-your-own-design.md).
+// required test ids that do not exist or that the suite's result format
+// ignores, hidden test files that are also in the repo, repos without
+// visible tests, and symlinks in the task folder (an error when one resolves
+// outside it, a warning otherwise). Mutants and a requirements map are
+// recommended, not required (docs/bring-your-own-design.md).
 func LintTask(s *schemas.Suite, t *schemas.Task) []Problem {
 	root := s.Root
 	var out []Problem
@@ -117,7 +125,11 @@ func LintTask(s *schemas.Suite, t *schemas.Task) []Problem {
 	}
 	out = append(out, lintRequirements(root, t, funcs)...)
 	out = append(out, lintRequired(root, t, testsDir)...)
+	if r := s.Verifier.Result; len(t.Verifier.Required) > 0 && (r == schemas.VerifierResultReward || r == schemas.VerifierResultExitCode) {
+		add(taskYAML, SeverityWarning, "verifier.required: ignored, because the suite's verifier reports result %s; only a junit report names the tests that ran", r)
+	}
 	out = append(out, lintEditMe(root, testsDir)...)
+	out = append(out, lintSymlinks(root, t)...)
 
 	repo := filepath.Join(t.Dir, filepath.FromSlash(t.RepoDir))
 	out = append(out, lintLeakedTests(root, repo, testsDir)...)
@@ -155,6 +167,39 @@ func lintInstruction(root string, t *schemas.Task) []Problem {
 	}
 	return out
 }
+
+// lintSymlinks reports every symlink in the task folder whose real target
+// lies outside it (an error: the loader refuses such a task too) and lists
+// the ones that stay inside in one warning. Inside links are allowed: the
+// workspace and the grader copy them as links, never what they point to.
+func lintSymlinks(root string, t *schemas.Task) []Problem {
+	links, err := utils.FindSymlinks(t.Dir, t.Dir)
+	if err != nil {
+		return []Problem{{Path: rel(root, t.Dir), Severity: SeverityError, Message: err.Error()}}
+	}
+	var out []Problem
+	var inside []string
+	for _, l := range links {
+		if l.Escapes {
+			out = append(out, Problem{Path: rel(root, filepath.Join(t.Dir, filepath.FromSlash(l.Path))), Severity: SeverityError,
+				Message: fmt.Sprintf("symlink -> %s resolves outside the task folder; replace it with the file it points to, or remove it", l.Target)})
+			continue
+		}
+		inside = append(inside, l.Path+" -> "+l.Target)
+	}
+	if len(inside) > 0 {
+		shown := inside
+		if len(shown) > maxListedLinks {
+			shown = append(shown[:maxListedLinks:maxListedLinks], fmt.Sprintf("and %d more", len(inside)-maxListedLinks))
+		}
+		out = append(out, Problem{Path: rel(root, t.Dir), Severity: SeverityWarning,
+			Message: fmt.Sprintf("%d symlinks stay inside the task folder (%s); they are copied as links, check that the task needs them", len(inside), strings.Join(shown, ", "))})
+	}
+	return out
+}
+
+// maxListedLinks is how many inside symlinks one lint warning names.
+const maxListedLinks = 5
 
 // lintEditMe reports verifier files that still hold an "EDIT ME" line, such
 // as the test.sh stub of a generic-reward task.

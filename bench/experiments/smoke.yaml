@@ -1,12 +1,14 @@
 # SYNTHETIC smoke run (DESIGN.md 19.1): the real pipeline with the scripted
 # toy agent against the fault proxy's scripted model. Its results are never
-# findings. The name starts with "smoke", so the planner only warns when the
-# suite is not locked or a task is not admitted yet.
+# findings. `smoke: true` marks it as such: the planner only warns when the
+# suite is not locked or a task is not admitted yet, and the flag is frozen in
+# the manifest. The name alone relaxes nothing.
 #
 # Both arms are the toy agent. They differ only in the arm file, so the
 # smoke run also exercises laying down notes.user_file. Slots: 2 tasks x
 # (clean + model-outage) x 1 trial x 2 arms = 8.
 name: smoke
+smoke: true
 suite: coding-core@1.0.0
 base: agents/toy.yaml
 arms:

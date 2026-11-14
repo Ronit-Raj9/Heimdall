@@ -44,7 +44,8 @@
       "additionalProperties": false,
       "required": ["total_usd"],
       "properties": {
-        "total_usd": {"type": "number", "minimum": 0}
+        "total_usd": {"type": "number", "minimum": 0},
+        "reserve_usd": {"type": "number", "minimum": 0, "description": "Spend set aside per run before any run has an observed cost, and counted for a run whose cost is unknown. Without it the first run holds the whole remaining cap until a cost is observed."}
       }
     },
     "verdict": {
@@ -62,7 +63,8 @@
     "seed": {"type": "integer"},
     "concurrency": {"type": "integer", "minimum": 1},
     "manifest_mode": {"enum": ["agent_exposure", "stack_resilience"]},
-    "policy": {"type": "string", "minLength": 1, "description": "Release policy file, relative to the bench root."}
+    "policy": {"type": "string", "minLength": 1, "description": "Release policy file, relative to the bench root."},
+    "smoke": {"type": "boolean", "description": "A synthetic smoke experiment: suite lock problems (no lock, a task not admitted) only warn, and the flag is frozen in the manifest so its results are never presented as findings. The experiment name has no effect."}
   },
   "$defs": {
     "condition_id": {"type": "string", "pattern": "^[a-z0-9][a-z0-9._-]*$", "description": "clean or a probe id."},

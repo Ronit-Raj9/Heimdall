@@ -187,7 +187,9 @@ func (x indexAdapter) Regrades(ctx context.Context, expID string) ([]leaderboard
 
 // RegradedRuns reads an experiment's counted sealed runs with the regrade as
 // grade source, through the store's SealedRuns, so the leaderboard reads a
-// regrade exactly as analysis does, seal and regate hash checks included.
+// regrade exactly as analysis does, seal and regate hash checks included. A
+// run whose seal does not verify comes back with its problem; the board's
+// own seal check (VerifySeal) then leaves it out.
 func (x indexAdapter) RegradedRuns(ctx context.Context, expID, regradeID string) ([]schemas.SealedRun, error) {
 	st, err := x.readStore()
 	if err != nil {
@@ -196,10 +198,14 @@ func (x indexAdapter) RegradedRuns(ctx context.Context, expID, regradeID string)
 	return st.SealedRuns(ctx, expID, regradeID)
 }
 
-// readStore opens the run store at the adapter's root for reading. The root
-// must exist, because opening a store creates a missing root and a read
-// never creates anything.
+// readStore returns the index's own store when the adapter has an index, so
+// a regrade read shares the seal verification cache, or else opens the run
+// store at the adapter's root for reading. The root must exist, because
+// opening a store creates a missing root and a read never creates anything.
 func (x indexAdapter) readStore() (*store.FSStore, error) {
+	if x.ix != nil && x.ix.Store() != nil {
+		return x.ix.Store(), nil
+	}
 	if _, err := os.Stat(x.root); err != nil {
 		return nil, fmt.Errorf("open run store for reading: %w", err)
 	}

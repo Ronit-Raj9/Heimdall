@@ -160,6 +160,12 @@ func (x indexAdapter) Pair(pairID string) []handlers.RunView {
 
 func (x indexAdapter) RunFile(runID, name string) ([]byte, error) { return x.ix.RunFile(runID, name) }
 
+// VerifySeal implements handlers.SealVerifier with the index's cached seal
+// check, so the run detail and the leaderboard report a changed run folder.
+func (x indexAdapter) VerifySeal(ctx context.Context, runID string) error {
+	return x.ix.VerifyRun(ctx, runID)
+}
+
 // analyzerAdapter analyzes on demand and refreshes the index afterwards.
 type analyzerAdapter struct {
 	a  *app

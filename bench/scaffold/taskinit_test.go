@@ -387,6 +387,61 @@ func TestInitTaskWarningsAndExclude(t *testing.T) {
 	}
 }
 
+// TestInitTaskSymlinks checks that a link inside the repository is written
+// as a link and validates, and that a chain of links that each look inside
+// but climb out together is refused before the task folder appears.
+func TestInitTaskSymlinks(t *testing.T) {
+	r := newTestRepo(t)
+	r.write("app.py", "X = 1\n")
+	r.write("docs/guide.md", "guide\n")
+	r.write("tests/test_app.py", "def test_x():\n    pass\n")
+	if err := os.Symlink("../docs/guide.md", filepath.Join(r.dir, "tests", "guide.md")); err != nil {
+		t.Fatal(err)
+	}
+	base := r.commit("base")
+	r.write("app.py", "X = 2\n")
+	r.write("tests/test_app.py", "def test_x():\n    pass\n\n\ndef test_y():\n    pass\n")
+	good := r.commit("fix")
+	if err := os.MkdirAll(filepath.Join(r.dir, "a"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	for link, target := range map[string]string{"a/l": "..", "a/m": "l/.."} {
+		if err := os.Symlink(target, filepath.Join(r.dir, filepath.FromSlash(link))); err != nil {
+			t.Fatal(err)
+		}
+	}
+	chainBase := r.commit("links that climb out together")
+	r.write("app.py", "X = 3\n")
+	r.write("tests/test_app.py", "def test_z():\n    pass\n")
+	chainRef := r.commit("fix again")
+
+	benchRoot, suiteDir := newSuiteDir(t, "py", TemplatePythonPytest)
+	res, err := InitTask(context.Background(), TaskInitOptions{SuiteDir: suiteDir, ID: "ok", Repo: r.dir, Base: base, Reference: good})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if target, err := os.Readlink(filepath.Join(res.Dir, "repo", "tests", "guide.md")); err != nil || target != "../docs/guide.md" {
+		t.Fatalf("inside link = %q, %v", target, err)
+	}
+	s, task, err := suite.LoadTask(benchRoot, "py", "ok")
+	if err != nil {
+		t.Fatalf("a task with an inside link must load: %v", err)
+	}
+	for _, p := range suite.LintTask(s, task) {
+		if strings.Contains(p.Message, "symlink") && p.Severity != suite.SeverityWarning {
+			t.Errorf("inside link reported as %s: %s", p.Severity, p.Message)
+		}
+	}
+
+	_, err = InitTask(context.Background(), TaskInitOptions{SuiteDir: suiteDir, ID: "chain", Repo: r.dir, Base: chainBase, Reference: chainRef})
+	if err == nil || !strings.Contains(err.Error(), "symlink a/m points outside the repository") {
+		t.Fatalf("want the chain refused, got %v", err)
+	}
+	if _, err := os.Stat(filepath.Join(suiteDir, "tasks", "chain")); !os.IsNotExist(err) {
+		t.Error("a refused task left a folder behind")
+	}
+}
+
 func TestCheckLink(t *testing.T) {
 	tests := []struct {
 		path, target string

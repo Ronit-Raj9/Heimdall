@@ -69,6 +69,16 @@ type AnalysisIndex interface {
 	LatestAnalysis(expID string) (string, bool)
 }
 
+// SealVerifier is optionally implemented by a ReadIndex. VerifySeal checks a
+// sealed run's files against its seal.json and its experiment's seals.log
+// and returns an error wrapping schemas.ErrSealMismatch when they differ. The
+// run detail carries the error as seal_error and the leaderboard leaves the
+// run out, so a changed folder is never served as sealed evidence in
+// silence. Implementations cache the result per unchanged folder.
+type SealVerifier interface {
+	VerifySeal(ctx context.Context, runID string) error
+}
+
 // CatalogSource returns every registered part.
 type CatalogSource interface {
 	Catalog() *schemas.Catalog

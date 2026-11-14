@@ -137,6 +137,98 @@ func TestPlanResolvesArms(t *testing.T) {
 	}
 }
 
+// multiOverlayBench adds a suite folder with suite-level fixtures and a
+// fixture probe "multi" with the given overlays to a test bench.
+func multiOverlayBench(t *testing.T, overlay *schemas.OverlaySpec, overlays ...schemas.OverlaySpec) *bench {
+	t.Helper()
+	b := newBench(t)
+	b.suite.Root = filepath.Join(b.root, "benchmarks", "coding-core")
+	for name, body := range map[string]string{"fixtures/plan.md": "release plan\n", "fixtures/memory.md": "from an earlier session\n"} {
+		p := filepath.Join(b.suite.Root, name)
+		if err := os.MkdirAll(filepath.Dir(p), 0o755); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(p, []byte(body), 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+	b.suite.Probes = append(b.suite.Probes, &schemas.ProbeSpec{ID: "multi", Version: "1.0.0", Layer: schemas.LayerFixture,
+		Apply: schemas.ProbeApply{Overlay: overlay, Overlays: overlays}})
+	b.suite.ProbeIDs = append(b.suite.ProbeIDs, "multi")
+	return b
+}
+
+func multiExperiment() *schemas.Experiment {
+	return testExperiment(
+		schemas.ConditionSpec{ID: "clean", Tasks: schemas.TaskSelector{IDs: []string{"t01"}}, Trials: 1},
+		schemas.ConditionSpec{ID: "multi", Tasks: schemas.TaskSelector{IDs: []string{"t01"}}, Trials: 1},
+	)
+}
+
+// TestPlanHashesEveryOverlay checks that every overlay of a fixture probe,
+// suite-level fixtures and user-level appends included, is hashed into the
+// manifest, so editing any planted file changes the manifest.
+func TestPlanHashesEveryOverlay(t *testing.T) {
+	b := multiOverlayBench(t, nil,
+		schemas.OverlaySpec{From: "{{suite.root}}/fixtures/plan.md", To: "notes/plan.md"},
+		schemas.OverlaySpec{From: "fixtures/notes.stale.md", To: "docs/{{task.id}}.md"},
+		schemas.OverlaySpec{From: "{{suite.root}}/fixtures/memory.md", To: "{{agent.notes.user_path}}"},
+	)
+	m := b.plan(t, multiExperiment())
+	sum := func(rel string) string {
+		s, err := utils.SHA256File(filepath.Join(b.root, rel))
+		if err != nil {
+			t.Fatal(err)
+		}
+		return s
+	}
+	want := map[string]string{
+		"t01:/workspace/CLAUDE.md":                   sum("benchmarks/coding-core/tasks/t01/fixtures/notes.clean.md"),
+		"t01:/workspace/notes/plan.md":               sum("benchmarks/coding-core/fixtures/plan.md"),
+		"t01:/workspace/docs/t01.md":                 sum("benchmarks/coding-core/tasks/t01/fixtures/notes.stale.md"),
+		"t01:append:1:/home/agent/.claude/CLAUDE.md": sum("benchmarks/coding-core/fixtures/memory.md"),
+		"/home/agent/.claude/CLAUDE.md":              sum("experiments/fixtures/codewins.md"),
+	}
+	got := m.Arms["B"].Files["multi"]
+	if !reflect.DeepEqual(got, want) {
+		t.Fatalf("arm B multi files\n got %v\nwant %v", got, want)
+	}
+	if err := os.WriteFile(filepath.Join(b.suite.Root, "fixtures/plan.md"), []byte("edited\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	again := b.plan(t, multiExperiment())
+	if again.Arms["A"].Files["multi"]["t01:/workspace/notes/plan.md"] == m.Arms["A"].Files["multi"]["t01:/workspace/notes/plan.md"] {
+		t.Fatal("editing a suite-level fixture did not change the manifest")
+	}
+}
+
+func TestPlanRejectsOverlays(t *testing.T) {
+	tests := []struct {
+		name     string
+		overlay  *schemas.OverlaySpec
+		overlays []schemas.OverlaySpec
+		want     string
+	}{
+		{"two overlays write one path", &schemas.OverlaySpec{From: "{{task.notes.stale}}", To: "notes/plan.md"},
+			[]schemas.OverlaySpec{{From: "{{suite.root}}/fixtures/plan.md", To: "./notes/plan.md"}},
+			"probe multi: overlays 1 and 2 both write /workspace/notes/plan.md"},
+		{"from outside the suite folder", nil, []schemas.OverlaySpec{{From: "{{suite.root}}/../escape.md", To: "x.md"}},
+			"probe multi overlay 1: from"},
+		{"single overlay into the user notes", &schemas.OverlaySpec{From: "{{suite.root}}/fixtures/memory.md", To: "{{agent.notes.user_path}}"}, nil,
+			"the user-level notes target is allowed in overlays only"},
+		{"missing fixture", nil, []schemas.OverlaySpec{{From: "{{suite.root}}/fixtures/none.md", To: "x.md"}}, "probe multi fixture"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			b := multiOverlayBench(t, tt.overlay, tt.overlays...)
+			_, err := NewPlanner(b.reg, b.root, nil).Plan(context.Background(), multiExperiment())
+			if err == nil || !strings.Contains(err.Error(), tt.want) {
+				t.Fatalf("err = %v, want %q", err, tt.want)
+			}
+		})
+	}
+}
+
 func TestPlanRejects(t *testing.T) {
 	tests := []struct {
 		name   string
@@ -310,13 +402,76 @@ func TestPlanPolicyHash(t *testing.T) {
 	}
 }
 
-func TestPlanSmokeIgnoresLock(t *testing.T) {
-	b := newBench(t)
-	b.suite.Lock = nil
-	e := testExperiment()
-	e.Name = "smoke-local"
-	if _, err := NewPlanner(b.reg, b.root, nil).Plan(context.Background(), e); err != nil {
-		t.Fatalf("smoke plan without a lock: %v", err)
+// TestPlanSmokeField checks that only smoke: true relaxes the suite lock, that
+// the experiment name never does, and that the flag is frozen in the manifest
+// (and absent from the manifest of every other experiment, so their hashes
+// stay as they were).
+func TestPlanSmokeField(t *testing.T) {
+	tests := []struct {
+		name    string
+		smoke   bool
+		lock    string // none | draft (t01 not admitted) | ok
+		wantErr string
+	}{
+		{"smoke-local", false, "none", "suite lock: suite coding-core@1.0.0 has no lock; the experiment name does not relax the lock; a synthetic smoke experiment sets smoke: true"},
+		{"smoke-acme", false, "draft", "task t01 is draft, not admitted"},
+		{"Smoke Test", false, "draft", "sets smoke: true"},
+		{"unit", false, "none", "has no lock"},
+		{"unit", true, "none", ""},
+		{"smoke", true, "draft", ""},
+		{"unit", false, "ok", ""},
+	}
+	for _, tt := range tests {
+		t.Run(fmt.Sprintf("%s smoke=%t lock=%s", tt.name, tt.smoke, tt.lock), func(t *testing.T) {
+			b := newBench(t)
+			switch tt.lock {
+			case "none":
+				b.suite.Lock = nil
+			case "draft":
+				b.suite.Lock.Tasks["t01"] = schemas.TaskLock{Version: "1.0.0", Status: schemas.TaskDraft}
+			}
+			e := testExperiment()
+			e.Name, e.Smoke = tt.name, tt.smoke
+			m, err := NewPlanner(b.reg, b.root, nil).Plan(context.Background(), e)
+			if tt.wantErr != "" {
+				if err == nil || !strings.Contains(err.Error(), tt.wantErr) {
+					t.Fatalf("err = %v, want %q", err, tt.wantErr)
+				}
+				return
+			}
+			if err != nil {
+				t.Fatalf("plan: %v", err)
+			}
+			raw, err := json.Marshal(m)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if got := strings.Contains(string(raw), `"smoke":true`); got != tt.smoke || m.Experiment.Smoke != tt.smoke {
+				t.Fatalf("manifest smoke = %t (json %t), want %t", m.Experiment.Smoke, got, tt.smoke)
+			}
+			if !tt.smoke && strings.Contains(string(raw), `"smoke"`) {
+				t.Fatal("a manifest without smoke must not carry the key, or old manifest hashes would change")
+			}
+			if h, _ := ManifestHash(m); h != m.Hash {
+				t.Fatal("manifest hash does not cover the smoke flag")
+			}
+		})
+	}
+}
+
+// TestShippedSmokeExperimentsDeclareSmoke checks every shipped smoke
+// experiment sets the field, now that its name relaxes nothing.
+func TestShippedSmokeExperimentsDeclareSmoke(t *testing.T) {
+	for _, f := range []string{
+		filepath.Join("..", "experiments", "smoke.yaml"),
+		filepath.Join("..", "examples", "acme-node", "experiments", "acme-smoke.yaml"),
+		filepath.Join("..", "scaffold", "templates", "project", "experiments", "smoke.yaml"),
+	} {
+		t.Run(f, func(t *testing.T) {
+			if !loadExperiment(t, f).Smoke {
+				t.Fatalf("%s does not set smoke: true", f)
+			}
+		})
 	}
 }
 

@@ -310,8 +310,9 @@ done
 // Overlays in order. A fixture is read from the task folder, or from the
 // suite folder when its path starts with {{suite.root}}. It returns the
 // workspace files and, apart, the overlays bound for the user-level notes
-// file ({{agent.notes.user_path}}), which only Overlays may name: the planner
-// hashes the single Overlay as a workspace file.
+// file ({{agent.notes.user_path}}), which only Overlays may name. The planner
+// hashes every overlay source into the manifest and refuses two overlays that
+// write the same target.
 func planOverlays(rc *schemas.RunContext, nonce string) ([]plannedFile, []plannedFile, error) {
 	specs := make([]schemas.OverlaySpec, 0, 1+len(rc.Probe.Apply.Overlays))
 	if rc.Probe.Apply.Overlay != nil {
@@ -336,7 +337,10 @@ func planOverlays(rc *schemas.RunContext, nonce string) ([]plannedFile, []planne
 		if single && src.User {
 			return nil, nil, errors.New("overlay 1: the user-level notes target is allowed in overlays only")
 		}
-		raw, err := os.ReadFile(src.Host)
+		// Read through an os.Root of the folder the fixture belongs to: a
+		// fixture that is, or sits under, a symlink out of that folder is
+		// refused, even when the link appeared after the suite was loaded.
+		raw, err := utils.ReadFileInside(src.root, src.rel)
 		if err != nil {
 			return nil, nil, fmt.Errorf("overlay %d: read fixture: %w", i+1, err)
 		}
@@ -360,6 +364,8 @@ type overlaySource struct {
 	Host string // absolute host path of the fixture
 	To   string // workspace-relative target, or the absolute notes.user_path when User
 	User bool   // the target is the agent's user-level notes file, outside the workspace
+	root string // the folder the fixture must stay inside: the task or the suite folder
+	rel  string // the fixture relative to root
 }
 
 // renderOverlay resolves the overlay's template variables and checks that
@@ -410,11 +416,13 @@ func resolveOverlay(spec schemas.OverlaySpec, task *schemas.Task, agent *schemas
 		}
 		src.From = path.Clean(filepath.ToSlash(strings.TrimSpace(from)))
 		src.Host = filepath.Join(suiteRoot, rel)
+		src.root, src.rel = suiteRoot, rel
 	} else {
 		if src.From, err = localPath("overlay from", from); err != nil {
 			return overlaySource{}, err
 		}
 		src.Host = filepath.Join(task.Dir, filepath.FromSlash(src.From))
+		src.root, src.rel = task.Dir, filepath.FromSlash(src.From)
 	}
 	if src.User {
 		return src, nil

@@ -91,6 +91,7 @@ func (l *localLoader) Load(ctx context.Context, ref string) (*schemas.Suite, err
 			errs = append(errs, fmt.Errorf("%s: base_image.dockerfile: %w", d.name(suitePath), err))
 		}
 	}
+	errs = append(errs, suiteSymlinks(&s, d)...)
 
 	for _, id := range s.TaskIDs {
 		if err := ctx.Err(); err != nil {
@@ -189,6 +190,19 @@ func loadTask(root, id string, d displayer) (*schemas.Task, error) {
 	if t.ID != id {
 		errs = append(errs, fmt.Errorf("%s: id: got %q, want %q (the folder name and the suite.yaml tasks entry)", file, t.ID, id))
 	}
+	if _, err := utils.ResolveInside(root, filepath.Join(tasksDir, id)); err != nil {
+		return nil, fmt.Errorf("%s: task folder: %w", file, err)
+	}
+	links, err := utils.FindSymlinks(dir, dir)
+	if err != nil {
+		errs = append(errs, fmt.Errorf("%s: %w", file, err))
+	}
+	for _, l := range links {
+		if l.Escapes {
+			errs = append(errs, fmt.Errorf("%s: symlink -> %s resolves outside the task folder; replace it with the file it points to, or remove it",
+				d.name(filepath.Join(dir, filepath.FromSlash(l.Path))), l.Target))
+		}
+	}
 	check := func(field, rel string, isDir bool) {
 		if err := checkFile(dir, rel, isDir); err != nil {
 			errs = append(errs, fmt.Errorf("%s: %s: %w", file, field, err))
@@ -254,8 +268,40 @@ func loadLock(s *schemas.Suite, d displayer) error {
 	return nil
 }
 
-// checkFile verifies that rel, relative to base, stays inside base and exists
-// as a directory (isDir) or a regular file.
+// suiteSymlinks reports symlinks in the suite folders the bench reads on
+// the host or sends to docker build (probes/, fixtures/ and the folder of the
+// base Dockerfile) that resolve outside the suite folder.
+func suiteSymlinks(s *schemas.Suite, d displayer) []error {
+	dirs := []string{probesDir, "fixtures"}
+	if s.BaseImage.Dockerfile != "" {
+		dirs = append(dirs, filepath.Dir(filepath.FromSlash(s.BaseImage.Dockerfile)))
+	}
+	var errs []error
+	seen := map[string]bool{}
+	for _, rel := range dirs {
+		dir := filepath.Join(s.Root, rel)
+		if seen[dir] {
+			continue
+		}
+		seen[dir] = true
+		links, err := utils.FindSymlinks(s.Root, dir)
+		if err != nil {
+			errs = append(errs, err)
+			continue
+		}
+		for _, l := range links {
+			if l.Escapes {
+				errs = append(errs, fmt.Errorf("%s: symlink -> %s resolves outside the suite folder; replace it with the file it points to, or remove it",
+					d.name(filepath.Join(dir, filepath.FromSlash(l.Path))), l.Target))
+			}
+		}
+	}
+	return errs
+}
+
+// checkFile verifies that rel, relative to base, stays inside base, also
+// after resolving symlinks, and exists as a directory (isDir) or a regular
+// file.
 func checkFile(base, rel string, isDir bool) error {
 	abs, err := resolveIn(base, rel)
 	if err != nil {
@@ -274,21 +320,12 @@ func checkFile(base, rel string, isDir bool) error {
 	return nil
 }
 
-// resolveIn joins rel to base and refuses absolute paths and paths that leave
-// base, so a task can never point the grader at files outside its folder.
+// resolveIn returns the real path of rel inside base and refuses absolute
+// paths, paths that leave base, and paths that leave it through a symlink,
+// so a task can never point the grader or the agent at files outside its
+// folder (utils.ResolveInside).
 func resolveIn(base, rel string) (string, error) {
-	if rel == "" {
-		return "", errors.New("empty path")
-	}
-	if filepath.IsAbs(rel) {
-		return "", fmt.Errorf("%s: want a path relative to the folder", rel)
-	}
-	abs := filepath.Join(base, filepath.FromSlash(rel))
-	inside, err := filepath.Rel(base, abs)
-	if err != nil || inside == ".." || strings.HasPrefix(inside, ".."+string(filepath.Separator)) {
-		return "", fmt.Errorf("%s: path leaves the folder", rel)
-	}
-	return abs, nil
+	return utils.ResolveInside(base, rel)
 }
 
 // displayer shortens absolute paths in messages to "<pack>/tasks/t01/task.yaml".

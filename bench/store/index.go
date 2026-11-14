@@ -8,6 +8,7 @@ import (
 	"os"
 	"path/filepath"
 	"sort"
+	"strings"
 	"sync"
 	"sync/atomic"
 
@@ -50,7 +51,20 @@ var runFileAllowlist = map[string]bool{
 //
 // Per slot, the counted run is the lowest-attempt sealed run that is not
 // aborted_infra. A slot whose runs were all aborted_infra enters with its last
-// attempt once that one is sealed, so a slot is never silently dropped.
+// attempt once that one is sealed. A counted slot with no sealed run yet is
+// left out here; the verdict adds it back from the manifest as an unknown, so
+// it is never silently dropped.
+//
+// SealedRuns is the one place sealed runs are read for analysis, so it is
+// where seals are verified: every returned run was compared with its seal.json
+// and with the seal hash seals.log recorded (Verify's checks, through the
+// verification cache). A run that does not verify is still returned, with no
+// file of it parsed, its metrics empty and the reason in Problems; a slot with
+// more than one counted run returns the lowest attempt with the count in
+// Problems. Callers decide what a problem means: the verdict makes the
+// experiment INVALID, the leaderboard leaves the run out, regate and release
+// refuse. Regrade and analysis folders are child artifacts outside the seals
+// and are checked by their parent_seal and content hash instead.
 func (s *FSStore) SealedRuns(ctx context.Context, expID, gradeSource string) ([]schemas.SealedRun, error) {
 	if err := ctx.Err(); err != nil {
 		return nil, err
@@ -63,6 +77,10 @@ func (s *FSStore) SealedRuns(ctx context.Context, expID, gradeSource string) ([]
 		return nil, fmt.Errorf("sealed runs %s: %w", expID, err)
 	}
 	slots, err := s.listSlots(expID)
+	if err != nil {
+		return nil, fmt.Errorf("sealed runs %s: %w", expID, err)
+	}
+	logged, err := s.loggedSeals(expID)
 	if err != nil {
 		return nil, fmt.Errorf("sealed runs %s: %w", expID, err)
 	}
@@ -79,13 +97,18 @@ func (s *FSStore) SealedRuns(ctx context.Context, expID, gradeSource string) ([]
 		if err != nil {
 			return nil, fmt.Errorf("sealed runs %s: slot %s: %w", expID, slot.SlotID, err)
 		}
-		rec := s.countedRun(slot.SlotID, recs)
+		rec, counted := countedRun(recs)
 		if rec == nil {
 			continue
 		}
-		sr, err := s.loadSealedRun(expID, slot, rec, regradeID)
+		sr, err := s.loadSealedRun(expID, slot, rec, regradeID, logged)
 		if err != nil {
 			return nil, fmt.Errorf("sealed runs %s: run %s: %w", expID, rec.Run.RunID, err)
+		}
+		if len(counted) > 1 {
+			s.logger.Warn("slot has more than one counted run", "slot_id", slot.SlotID, "runs", strings.Join(counted, ","))
+			sr.Problems = append(sr.Problems, fmt.Sprintf("slot %s has %d counted runs (%s); exactly one may count",
+				slot.SlotID, len(counted), strings.Join(counted, ", ")))
 		}
 		out = append(out, *sr)
 	}
@@ -250,6 +273,43 @@ func (ix *Index) RunFile(runID, name string) ([]byte, error) {
 	return b, nil
 }
 
+// VerifyRun checks one indexed run against its seal.json and the seal hash
+// its experiment's seals.log recorded, as SealedRuns does, through the
+// store's verification cache: the first call on a run hashes its files, later
+// calls on an unchanged folder only stat them. An unsealed run has nothing to
+// verify and returns nil; an unknown run is schemas.ErrNotFound; a difference
+// wraps schemas.ErrSealMismatch and names the first file that differs.
+func (ix *Index) VerifyRun(ctx context.Context, runID string) error {
+	if err := ctx.Err(); err != nil {
+		return err
+	}
+	r, ok := ix.snap.Load().byRun[runID]
+	if !ok {
+		return fmt.Errorf("run %s: %w", runID, schemas.ErrNotFound)
+	}
+	if !r.Sealed {
+		return nil
+	}
+	expID := r.Slot.ExpID
+	if expID == "" {
+		expID = r.Run.ExpID
+	}
+	logged, err := ix.store.loggedSeals(expID)
+	if err != nil {
+		return fmt.Errorf("verify run %s: %w", runID, err)
+	}
+	if _, err := ix.store.verifySealedRun(r.Dir, runID, logged); err != nil {
+		return fmt.Errorf("verify run %s: %w", runID, err)
+	}
+	return nil
+}
+
+// Store returns the store the index reads, so a reader that needs the store
+// itself (a regrade's sealed runs) shares its verification cache.
+func (ix *Index) Store() *FSStore {
+	return ix.store
+}
+
 // indexExperiment loads one experiment's manifest and run entries.
 func (s *FSStore) indexExperiment(ctx context.Context, expID string) (*schemas.Manifest, []RunEntry, error) {
 	m, err := s.LoadManifest(ctx, expID)
@@ -335,39 +395,54 @@ func (s *FSStore) resolveGradeSource(expID, gradeSource string) (string, error) 
 }
 
 // countedRun picks the slot's counted run from recs (sorted by attempt), or
-// nil when none is sealed yet.
-func (s *FSStore) countedRun(slotID string, recs []schemas.RunRecord) *schemas.RunRecord {
+// nil when none is sealed yet, and returns the ids of every run the rule
+// counts. aborted_infra retries are never counted, so a slot with retries has
+// one counted run; more than one means the engine's one-counted-run rule was
+// broken and the caller reports it. The pick is always the lowest attempt, so
+// it is deterministic.
+func countedRun(recs []schemas.RunRecord) (*schemas.RunRecord, []string) {
 	var picked *schemas.RunRecord
+	var counted []string
 	for i := range recs {
 		r := &recs[i]
 		if !r.Sealed || r.Run.Outcome == schemas.OutcomeAbortedInfra {
 			continue
 		}
-		if picked != nil {
-			s.logger.Warn("slot has more than one counted run, keeping the first", "slot_id", slotID,
-				"kept", picked.Run.RunID, "ignored", r.Run.RunID)
-			continue
+		counted = append(counted, r.Run.RunID)
+		if picked == nil {
+			picked = r
 		}
-		picked = r
 	}
 	if picked != nil || len(recs) == 0 {
-		return picked
+		return picked, counted
 	}
 	last := &recs[len(recs)-1]
 	if last.Sealed && last.Run.Outcome == schemas.OutcomeAbortedInfra {
-		return last
+		return last, []string{last.Run.RunID}
 	}
-	return nil
+	return nil, nil
 }
 
-// loadSealedRun reads the seal, the chosen grade and the optional evidence
-// summaries of one sealed run. The gateway tally (usage completeness and the
-// drop counter) is derived from evidence.json here rather than stored, so runs
-// sealed before the tally existed are analysed the same way.
-func (s *FSStore) loadSealedRun(expID string, slot *schemas.Slot, rec *schemas.RunRecord, regradeID string) (*schemas.SealedRun, error) {
-	seal, err := readSeal(rec.Dir)
+// loadSealedRun verifies one sealed run against its seal and seals.log
+// (logged), then reads the chosen grade and the optional evidence summaries.
+// A run that does not verify comes back with its slot and run.json only, its
+// metrics empty and the mismatch in Problems: nothing read from a changed
+// folder can be trusted, and a changed file may not even parse. The gateway
+// tally (usage completeness and the drop counter) is derived from
+// evidence.json here rather than stored, so runs sealed before the tally
+// existed are analysed the same way.
+func (s *FSStore) loadSealedRun(expID string, slot *schemas.Slot, rec *schemas.RunRecord, regradeID string, logged map[string]string) (*schemas.SealedRun, error) {
+	seal, err := s.verifySealedRun(rec.Dir, rec.Run.RunID, logged)
 	if err != nil {
-		return nil, err
+		if !errors.Is(err, schemas.ErrSealMismatch) {
+			return nil, err
+		}
+		sr := &schemas.SealedRun{Slot: *slot, Run: rec.Run, Dir: rec.Dir, GradeSource: GradeSourceOriginal,
+			Metrics: map[string]schemas.Value{}, Problems: []string{"seal does not verify: " + err.Error()}}
+		if seal != nil {
+			sr.SealHash = seal.Hash
+		}
+		return sr, nil
 	}
 	sr := &schemas.SealedRun{Slot: *slot, Run: rec.Run, Dir: rec.Dir, SealHash: seal.Hash, Metrics: map[string]schemas.Value{}}
 	if regradeID != "" {

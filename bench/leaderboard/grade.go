@@ -16,9 +16,22 @@ import (
 const (
 	ReasonNotSealed       = "not sealed"
 	ReasonVerdictInvalid  = "experiment verdict invalid"
+	ReasonSealMismatch    = "seal mismatch"
+	ReasonDuplicateSlot   = "slot has more than one counted run"
 	reasonNoOutcome       = "no outcome"
 	metricVerifiedSuccess = "verified_success"
 )
+
+// SealSource is optionally implemented by a Source that can check a sealed
+// run's files against its seal.json and its experiment's seals.log.
+// VerifySeal returns nil when the run verifies and an error wrapping
+// schemas.ErrSealMismatch when it does not; the board then leaves the run out
+// with reason "seal mismatch" rather than rank on files that are not the
+// sealed evidence. Any other error fails the board. A Source without it is
+// trusted as sealed.
+type SealSource interface {
+	VerifySeal(ctx context.Context, runID string) error
+}
 
 // gradedRun is one graded run with the values its entry needs.
 type gradedRun struct {
@@ -37,7 +50,8 @@ type excludedRun struct {
 type pool map[string]map[string][]gradedRun
 
 // grade splits records into graded runs and excluded ones. A run is graded
-// when it is sealed, its experiment's verdict is not invalid, and its
+// when it is sealed, its experiment's verdict is not invalid, its slot has one
+// counted run, its seal verifies (when src is a SealSource), and its
 // outcome scores (schemas.Outcome.Score): intention to treat, so a timeout or
 // a crash counts as a failure and never improves a rank. Success is the
 // run's verified_success metric, the default primary endpoint, and the
@@ -51,7 +65,14 @@ func grade(ctx context.Context, src Source, recs []*record) (pool, []excludedRun
 		if err := ctx.Err(); err != nil {
 			return nil, nil, fmt.Errorf("leaderboard: %w", err)
 		}
-		if reason := excludeReason(r); reason != "" {
+		reason := excludeReason(r)
+		if reason == "" {
+			var err error
+			if reason, err = sealReason(ctx, src, r); err != nil {
+				return nil, nil, err
+			}
+		}
+		if reason != "" {
 			excluded = append(excluded, excludedRun{rec: r, reason: reason})
 			continue
 		}
@@ -88,6 +109,8 @@ func excludeReason(r *record) string {
 		return ReasonVerdictInvalid
 	case !r.sealed:
 		return ReasonNotSealed
+	case r.counted > 1:
+		return ReasonDuplicateSlot
 	}
 	if _, ok := r.run.Outcome.Score(); ok {
 		return ""
@@ -96,6 +119,24 @@ func excludeReason(r *record) string {
 		return reasonNoOutcome
 	}
 	return string(r.run.Outcome)
+}
+
+// sealReason returns ReasonSealMismatch when src can verify seals and the
+// record's sealed run does not verify, "" otherwise.
+func sealReason(ctx context.Context, src Source, r *record) (string, error) {
+	ss, ok := src.(SealSource)
+	if !ok || !r.sealed {
+		return "", nil
+	}
+	err := ss.VerifySeal(ctx, r.run.RunID)
+	switch {
+	case err == nil:
+		return "", nil
+	case errors.Is(err, schemas.ErrSealMismatch):
+		return ReasonSealMismatch, nil
+	default:
+		return "", fmt.Errorf("leaderboard: verify seal of run %s: %w", r.run.RunID, err)
+	}
 }
 
 // exclusions groups the excluded runs of one condition by reason, sorted by

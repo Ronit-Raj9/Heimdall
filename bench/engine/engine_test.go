@@ -19,19 +19,21 @@ import (
 // world holds the fake parts' shared switches and call counters. A test sets
 // fail["<op>"] to make the part behind that op return an error.
 type world struct {
-	mu        sync.Mutex
-	fail      map[string]bool
-	calls     map[string]int
-	timedOut  bool
-	gradePass bool
-	invalid   bool
-	veto      bool
-	cost      float64
-	execs     map[string]int // slot id -> Exec calls
-	agents    []schemas.AgentConfig
-	seq       []string // every op in call order
-	plans     []schemas.FaultPlan
-	ledgers   [][]schemas.LedgerEntry // proxy ledgers handed to collects in order; none after
+	mu          sync.Mutex
+	fail        map[string]bool
+	calls       map[string]int
+	timedOut    bool
+	gradePass   bool
+	invalid     bool
+	veto        bool
+	cost        float64
+	costUnknown bool           // cost_usd is unknown instead of cost
+	execDelay   time.Duration  // Exec waits this long, or until its context ends
+	execs       map[string]int // slot id -> Exec calls
+	agents      []schemas.AgentConfig
+	seq         []string // every op in call order
+	plans       []schemas.FaultPlan
+	ledgers     [][]schemas.LedgerEntry // proxy ledgers handed to collects in order; none after
 }
 
 func newWorld() *world {
@@ -75,12 +77,22 @@ func (e fakeEnv) Create(_ context.Context, rc *schemas.RunContext) (*schemas.Env
 	return &schemas.EnvironmentHandle{Volume: "vol-" + rc.Run.RunID, Workdir: "/workspace"}, nil
 }
 
-func (e fakeEnv) Exec(_ context.Context, rc *schemas.RunContext, _ *schemas.RunPlan) (*schemas.ExecResult, error) {
+func (e fakeEnv) Exec(ctx context.Context, rc *schemas.RunContext, _ *schemas.RunPlan) (*schemas.ExecResult, error) {
 	e.w.mu.Lock()
 	e.w.execs[rc.Slot.SlotID]++
 	e.w.mu.Unlock()
 	if err := e.w.hit("exec"); err != nil {
 		return nil, err
+	}
+	e.w.mu.Lock()
+	delay := e.w.execDelay
+	e.w.mu.Unlock()
+	if delay > 0 {
+		select {
+		case <-time.After(delay):
+		case <-ctx.Done():
+			return nil, ctx.Err()
+		}
 	}
 	now := time.Now()
 	return &schemas.ExecResult{TimedOut: e.w.timedOut, Started: now, Ended: now.Add(time.Second),
@@ -203,6 +215,11 @@ func (m fakeMetric) Compute(_ context.Context, _ *schemas.RunContext, ev *schema
 		return schemas.Value{}, err
 	}
 	if m.name == costMetric {
+		m.w.mu.Lock()
+		defer m.w.mu.Unlock()
+		if m.w.costUnknown {
+			return schemas.Unknown("usage_missing", schemas.EvidenceGateway), nil
+		}
 		return schemas.Observed(m.w.cost, schemas.EvidenceGateway), nil
 	}
 	if ev.Grade != nil && ev.Grade.Passed {
@@ -279,6 +296,7 @@ type fakeStore struct {
 	runs      map[string]*fakeRun
 	bySlot    map[string][]string
 	leases    map[string]string
+	hbErr     error // what every Heartbeat returns
 }
 
 type fakeRun struct {
@@ -376,7 +394,11 @@ func (s *fakeStore) Lease(_ context.Context, slotID, owner string, _ time.Durati
 	return true, nil
 }
 
-func (s *fakeStore) Heartbeat(context.Context, string, string) error { return nil }
+func (s *fakeStore) Heartbeat(context.Context, string, string) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return s.hbErr
+}
 
 func (s *fakeStore) Release(_ context.Context, slotID, owner string) error {
 	s.mu.Lock()

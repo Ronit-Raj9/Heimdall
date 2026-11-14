@@ -1,6 +1,7 @@
 package environments
 
 import (
+	"os"
 	"path/filepath"
 	"reflect"
 	"strings"
@@ -137,7 +138,24 @@ func TestProtectedHashes(t *testing.T) {
 }
 
 func TestCleanNotes(t *testing.T) {
-	task := &schemas.Task{Dir: "/t", Notes: schemas.TaskNotes{Clean: "fixtures/notes.clean.md"}}
+	dir := t.TempDir()
+	if err := os.MkdirAll(filepath.Join(dir, "task", "fixtures"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	for _, f := range []string{"task/fixtures/notes.clean.md", "id_rsa"} {
+		if err := os.WriteFile(filepath.Join(dir, f), []byte("x\n"), 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if err := os.Symlink("../../id_rsa", filepath.Join(dir, "task", "fixtures", "leak.md")); err != nil {
+		t.Fatal(err)
+	}
+	real, err := filepath.EvalSymlinks(filepath.Join(dir, "task"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	task := &schemas.Task{Dir: filepath.Join(dir, "task"), Notes: schemas.TaskNotes{Clean: "fixtures/notes.clean.md"}}
+	leak := &schemas.Task{Dir: task.Dir, Notes: schemas.TaskNotes{Clean: "fixtures/leak.md"}}
 	agent := &schemas.AgentConfig{Notes: schemas.AgentNotes{ProjectFile: "CLAUDE.md"}}
 	overlay := &schemas.ProbeSpec{ID: "custom", Layer: schemas.LayerFixture,
 		Apply: schemas.ProbeApply{Overlay: &schemas.OverlaySpec{From: "{{task.notes.stale}}", To: projectFileTemplate}}}
@@ -148,7 +166,8 @@ func TestCleanNotes(t *testing.T) {
 		wantHost string
 		wantErr  bool
 	}{
-		{"clean", schemas.RunContext{Task: task, Agent: agent, Slot: &schemas.Slot{Condition: "clean"}}, "CLAUDE.md", "/t/fixtures/notes.clean.md", false},
+		{"clean", schemas.RunContext{Task: task, Agent: agent, Slot: &schemas.Slot{Condition: "clean"}}, "CLAUDE.md", filepath.Join(real, "fixtures", "notes.clean.md"), false},
+		{"notes symlink out of the task", schemas.RunContext{Task: leak, Agent: agent, Slot: &schemas.Slot{Condition: "clean"}}, "", "", true},
 		{"stale-notes condition", schemas.RunContext{Task: task, Agent: agent, Slot: &schemas.Slot{Condition: "stale-notes"}}, "", "", false},
 		{"overlay probe on project file", schemas.RunContext{Task: task, Agent: agent, Probe: overlay}, "", "", false},
 		{"no agent notes", schemas.RunContext{Task: task, Agent: &schemas.AgentConfig{}}, "", "", false},
@@ -202,5 +221,21 @@ func TestRunIDs(t *testing.T) {
 				t.Fatalf("got %q, %v", exp, err)
 			}
 		})
+	}
+}
+
+// TestCreateRefusesEscapingRepo checks that a repo folder that is a symlink
+// out of the task is refused before docker is called: the docker binary
+// here does not exist, so any docker call would fail differently.
+func TestCreateRefusesEscapingRepo(t *testing.T) {
+	task := t.TempDir()
+	if err := os.Symlink("/etc", filepath.Join(task, "repo")); err != nil {
+		t.Fatal(err)
+	}
+	e := newDockerWorkspace(DockerWorkspaceConfig{Docker: utils.Docker{Binary: filepath.Join(task, "no-docker")}})
+	rc := &schemas.RunContext{Run: &schemas.Run{RunID: "r_1", ExpID: "e_1"}, Task: &schemas.Task{Dir: task, RepoDir: "repo"}}
+	_, err := e.Create(t.Context(), rc)
+	if err == nil || !strings.Contains(err.Error(), "repo: resolves outside the folder through a symlink") {
+		t.Fatalf("Create = %v, want the escaping repo refused", err)
 	}
 }

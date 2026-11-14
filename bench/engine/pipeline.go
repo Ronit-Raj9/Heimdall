@@ -108,9 +108,12 @@ func NewPipeline(reg *schemas.Registry, benchRoot string, logger schemas.Logger,
 // slot a new run. A failure after the agent starts never reruns the agent:
 // the later stages still run, so as much evidence as possible is kept, and
 // the run is sealed as infra_error. Cleanup always runs, on a fresh context
-// if ctx was cancelled. Stage failures are recorded in the run, not returned;
-// the error is non-nil only when the run folder could not be created or the
-// run could not be sealed.
+// if ctx was cancelled. When ctx was cancelled because the slot's lease was
+// lost (an ErrLeaseLost cause), the run is sealed as aborted_infra whether or
+// not its agent started: another owner may already run the slot, and two
+// counted runs of one slot would bias the ledger. Stage failures are
+// recorded in the run, not returned; the error is non-nil only when the run
+// folder could not be created or the run could not be sealed.
 func (p *Pipeline) RunSlot(ctx context.Context, in SlotInput) (*SlotResult, error) {
 	st, err := p.begin(ctx, in)
 	if err != nil {
@@ -130,6 +133,11 @@ func (p *Pipeline) RunSlot(ctx context.Context, in SlotInput) (*SlotResult, erro
 	p.runStage(cctx, st, schemas.StageCleanup)
 	up := utils.TallyUpstream(st.ev.Ledger, st.ev.Requests)
 	st.rc.Run.Outcome = decideOutcome(st, up)
+	if cause := context.Cause(ctx); errors.Is(cause, ErrLeaseLost) {
+		st.rc.Run.Outcome = schemas.OutcomeAbortedInfra
+		st.rc.Run.Failures = append(st.rc.Run.Failures, schemas.PartFailure{Stage: schemas.StageLeased, Part: "engine",
+			Error: cause.Error() + "; the run was stopped and is not counted, since another owner may run the slot"})
+	}
 	st.rc.Run.Y = scoreOf(st.rc.Run.Outcome)
 	if pf, ok := upstreamFailure(up, st.rc.Run.Outcome); ok {
 		st.rc.Run.Failures = append(st.rc.Run.Failures, pf)

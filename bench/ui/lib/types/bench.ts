@@ -852,6 +852,8 @@ export interface RunDetail {
 	metrics: Record<string, Value>;
 	gates: GateResult[];
 	receipts: Receipt[];
+	/** Why a sealed run's files no longer match its seal.json or seals.log; absent when they match or the run is not sealed. */
+	seal_error?: string;
 }
 
 /** GET /runs/{id}/events */
