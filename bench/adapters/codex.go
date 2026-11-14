@@ -50,6 +50,20 @@ func (p *codexParser) GetName() string { return ParserCodex }
 // GetVersion implements schemas.Part.
 func (p *codexParser) GetVersion() string { return codexVersion }
 
+// ParseExecutionOutput implements schemas.AdapterResultParser.
+func (p *codexParser) ParseExecutionOutput(ctx context.Context, rc *schemas.RunContext, raw []byte) (*schemas.ParseResult, error) {
+	return p.Parse(ctx, rc, raw)
+}
+
+// CollectEvents implements schemas.AdapterEventSource.
+func (p *codexParser) CollectEvents(ctx context.Context, rc *schemas.RunContext, raw []byte) ([]schemas.Event, error) {
+	res, err := p.Parse(ctx, rc, raw)
+	if err != nil || res == nil {
+		return nil, err
+	}
+	return res.Events, nil
+}
+
 // Parse reads `codex exec --json` output: one ThreadEvent per line
 // (thread.started, turn.started, item.started, item.updated, item.completed,
 // turn.completed, turn.failed, error). Items carry an id unique within the
@@ -118,7 +132,9 @@ type codexChange struct {
 }
 
 func newCodexState(rc *schemas.RunContext) *codexState {
-	return &codexState{streamState: newStreamState(rc), turnEv: -1, items: map[string]int{}}
+	st := newStreamState(rc)
+	st.parserVersion = codexVersion
+	return &codexState{streamState: st, turnEv: -1, items: map[string]int{}}
 }
 
 func (st *codexState) handle(obj map[string]json.RawMessage) {

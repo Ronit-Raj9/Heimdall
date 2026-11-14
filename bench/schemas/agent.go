@@ -5,18 +5,21 @@ import "context"
 // AgentConfig is the system under test, read from agents/<id>.yaml and then
 // modified by an arm's `set:` overrides. Its content hash identifies it.
 type AgentConfig struct {
-	ID      string            `json:"id" yaml:"id"`
-	Adapter string            `json:"adapter" yaml:"adapter"` // command | scripted
-	Image   string            `json:"image" yaml:"image"`
-	Build   *ImageSpec        `json:"build,omitempty" yaml:"build"` // optional: how to build Image
-	Argv    []string          `json:"argv" yaml:"argv"`
-	Env     map[string]string `json:"env" yaml:"env"`
-	Files   map[string]string `json:"files,omitempty" yaml:"files"` // container path -> content template
-	Model   string            `json:"model" yaml:"model"`
-	Notes   AgentNotes        `json:"notes" yaml:"notes"`
-	Parser  string            `json:"parser,omitempty" yaml:"parser"` // empty = gateway-level evidence only
-	Budgets Budgets           `json:"budgets" yaml:"budgets"`
-	Gateway GatewayPolicy     `json:"gateway" yaml:"gateway"`
+	ID           string               `json:"id" yaml:"id"`
+	Adapter      string               `json:"adapter" yaml:"adapter"` // command | scripted
+	Image        string               `json:"image" yaml:"image"`
+	Build        *ImageSpec           `json:"build,omitempty" yaml:"build"` // optional: how to build Image
+	Argv         []string             `json:"argv" yaml:"argv"`
+	Env          map[string]string    `json:"env" yaml:"env"`
+	Files        map[string]string    `json:"files,omitempty" yaml:"files"` // container path -> content template
+	Model        string               `json:"model" yaml:"model"`
+	Notes        AgentNotes           `json:"notes" yaml:"notes"`
+	Parser       string               `json:"parser,omitempty" yaml:"parser"` // empty = gateway-level evidence only
+	AgentVersion string               `json:"agent_version,omitempty" yaml:"agent_version,omitempty"`
+	ImageDigest  string               `json:"image_digest,omitempty" yaml:"image_digest,omitempty"`
+	Capabilities *AdapterCapabilities `json:"capabilities,omitempty" yaml:"capabilities,omitempty"`
+	Budgets      Budgets              `json:"budgets" yaml:"budgets"`
+	Gateway      GatewayPolicy        `json:"gateway" yaml:"gateway"`
 	// Scripted is read only by the scripted adapter.
 	Scripted *ScriptedSpec `json:"scripted,omitempty" yaml:"scripted"`
 }
@@ -60,17 +63,18 @@ type AgentAdapter interface {
 
 // RunPlan is a fully resolved container invocation for one run.
 type RunPlan struct {
-	Image   string            `json:"image"`
-	Argv    []string          `json:"argv"`
-	Env     map[string]string `json:"env"`   // secrets are redacted when the plan is written to disk
-	Files   map[string]string `json:"files"` // container path -> resolved content
-	Workdir string            `json:"workdir"`
-	WallS   int               `json:"wall_s"`
-	CPUs    float64           `json:"cpus"`
-	MemGB   float64           `json:"mem_gb"`
-	Pids    int               `json:"pids"`
-	Network string            `json:"network"` // the internal evaluation network, or none
-	User    string            `json:"user"`
+	Image        string               `json:"image"`
+	Argv         []string             `json:"argv"`
+	Env          map[string]string    `json:"env"`   // secrets are redacted when the plan is written to disk
+	Files        map[string]string    `json:"files"` // container path -> resolved content
+	Workdir      string               `json:"workdir"`
+	WallS        int                  `json:"wall_s"`
+	CPUs         float64              `json:"cpus"`
+	MemGB        float64              `json:"mem_gb"`
+	Pids         int                  `json:"pids"`
+	Network      string               `json:"network"` // the internal evaluation network, or none
+	User         string               `json:"user"`
+	Capabilities *AdapterCapabilities `json:"capabilities,omitempty"`
 }
 
 // Parser converts an agent's raw output into normalized events and its final

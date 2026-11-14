@@ -31,6 +31,9 @@
       }
     },
     "parser": {"type": "string", "description": "Empty or absent means gateway-level evidence only."},
+    "agent_version": {"type": "string", "description": "Optional harness version recorded in the run metadata."},
+    "image_digest": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$", "description": "Optional immutable image digest."},
+    "capabilities": {"$ref": "#/$defs/capabilities"},
     "budgets": {
       "type": "object",
       "additionalProperties": false,
@@ -82,6 +85,22 @@
         "dockerfile": {"type": "string", "minLength": 1},
         "tag": {"type": "string", "minLength": 1},
         "digest": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"}
+      }
+    },
+    "capabilities": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "supports_streaming": {"type": "boolean"},
+        "supports_structured_events": {"type": "boolean"},
+        "supports_tool_events": {"type": "boolean"},
+        "supports_notes_file": {"type": "boolean"},
+        "supports_model_override": {"type": "boolean"},
+        "supports_cancellation": {"type": "boolean"},
+        "supports_resume": {"type": "boolean"},
+        "supports_gateway_headers": {"type": "boolean"},
+        "task_types": {"type": "array", "items": {"type": "string", "minLength": 1}},
+        "evidence_levels": {"type": "array", "items": {"type": "string", "minLength": 1}}
       }
     }
   }

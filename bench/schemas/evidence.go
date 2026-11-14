@@ -5,17 +5,35 @@ import "context"
 // Evidence is everything collected about one run. Evidence sources fill their
 // part during the collect stage; later stages read it.
 type Evidence struct {
-	Exec     *ExecResult       `json:"exec,omitempty"`
-	Diff     *Diff             `json:"diff,omitempty"`
-	Requests *RequestLog       `json:"requests,omitempty"` // gateway rows
-	Ledger   []LedgerEntry     `json:"ledger,omitempty"`   // fault proxy
-	Events   []Event           `json:"events,omitempty"`
-	Claim    *Claim            `json:"claim,omitempty"`
-	Cost     []CostRow         `json:"cost,omitempty"`
-	ShimLog  []ShimCall        `json:"shim_log,omitempty"`
-	Grade    *Grade            `json:"grade,omitempty"`
-	Gates    []GateResult      `json:"gates,omitempty"`
-	Protect  map[string]string `json:"protected_after,omitempty"` // sha256 of protected files after the run
+	Contract *RunEvidenceContract `json:"evidence_contract,omitempty"`
+	Exec     *ExecResult          `json:"exec,omitempty"`
+	Diff     *Diff                `json:"diff,omitempty"`
+	Requests *RequestLog          `json:"requests,omitempty"` // gateway rows
+	Ledger   []LedgerEntry        `json:"ledger,omitempty"`   // fault proxy
+	Events   []Event              `json:"events,omitempty"`
+	Claim    *Claim               `json:"claim,omitempty"`
+	Cost     []CostRow            `json:"cost,omitempty"`
+	ShimLog  []ShimCall           `json:"shim_log,omitempty"`
+	Grade    *Grade               `json:"grade,omitempty"`
+	Gates    []GateResult         `json:"gates,omitempty"`
+	Protect  map[string]string    `json:"protected_after,omitempty"` // sha256 of protected files after the run
+}
+
+// EvidenceQuality describes how completely a run's required evidence was observed.
+type EvidenceQuality string
+
+const (
+	EvidenceQualityUnknown  EvidenceQuality = "unknown"
+	EvidenceQualityComplete EvidenceQuality = "complete"
+	EvidenceQualityPartial  EvidenceQuality = "partial"
+)
+
+// RunEvidenceContract declares required and observed evidence for one run.
+type RunEvidenceContract struct {
+	Required  []string        `json:"required,omitempty"`
+	Available []string        `json:"available,omitempty"`
+	Missing   []string        `json:"missing,omitempty"`
+	Quality   EvidenceQuality `json:"quality"`
 }
 
 // EvidenceSource reads one record of what happened and adds it to ev.

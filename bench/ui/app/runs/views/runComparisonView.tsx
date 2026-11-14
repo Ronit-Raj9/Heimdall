@@ -107,6 +107,23 @@ function PairComparison({ pairId, onClear }: { pairId: string; onClear: () => vo
 				</Card>
 			</Section>
 
+			<Section title="Evidence status" description="Required and observed evidence for each run." testId="runs-evidence-section">
+				<div className="grid gap-6 2xl:grid-cols-2">
+					{lanes.map((lane) => (
+						<Card key={lane.pairRun.arm} className="py-0 shadow-none">
+							<CardContent className="space-y-2 px-4 py-4 text-sm">
+								<div className="font-medium">Arm {lane.pairRun.arm}</div>
+								<div data-testid={`runs-evidence-quality-${lane.pairRun.arm}`}>
+									Quality: {lane.detail.data?.evidence_contract?.quality ?? "unknown"}
+								</div>
+								<div>Available: {lane.detail.data?.evidence_contract?.available?.join(", ") || "none"}</div>
+								<div>Missing: {lane.detail.data?.evidence_contract?.missing?.join(", ") || "none"}</div>
+							</CardContent>
+						</Card>
+					))}
+				</div>
+			</Section>
+
 			<Section title={t("runs.claim.title")} description={t("runs.claim.description")} testId="runs-claim-section">
 				<ClaimVsResult rows={lanes.map(toClaimRow)} />
 			</Section>

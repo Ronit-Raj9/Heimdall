@@ -1,6 +1,7 @@
 package environments
 
 import (
+	"bytes"
 	"path/filepath"
 	"reflect"
 	"strings"
@@ -9,6 +10,23 @@ import (
 	"github.com/maximhq/bifrost/bench/schemas"
 	"github.com/maximhq/bifrost/bench/utils"
 )
+
+func TestRedactingWriterHidesSplitSecret(t *testing.T) {
+	var out bytes.Buffer
+	w := newRedactingWriter(&out, "secret-value").(*redactingWriter)
+	if _, err := w.Write([]byte("prefix secret-")); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := w.Write([]byte("value suffix")); err != nil {
+		t.Fatal(err)
+	}
+	if err := w.Flush(); err != nil {
+		t.Fatal(err)
+	}
+	if got := out.String(); got != "prefix [redacted] suffix" {
+		t.Fatalf("output = %q", got)
+	}
+}
 
 func TestAgentCreateArgs(t *testing.T) {
 	plan := &schemas.RunPlan{Image: "img:1", MemGB: 4, CPUs: 1.5, Pids: 0, User: ""}

@@ -2,6 +2,19 @@ package schemas
 
 import "time"
 
+// EventSchemaVersion is the version of the additive common event fields.
+const EventSchemaVersion = "1.0.0"
+
+// EventStatus describes the observed state of an event.
+type EventStatus string
+
+const (
+	EventStatusUnknown EventStatus = "unknown"
+	EventStatusStarted EventStatus = "started"
+	EventStatusSuccess EventStatus = "success"
+	EventStatusError   EventStatus = "error"
+)
+
 // EventType classifies a normalized event.
 type EventType string
 
@@ -19,6 +32,7 @@ const (
 	EventGate          EventType = "gate"
 	EventCompaction    EventType = "compaction"
 	EventError         EventType = "error"
+	EventIntegrity     EventType = "integrity"
 )
 
 // EventSource names the record an event came from.
@@ -45,16 +59,22 @@ type Tokens struct {
 // Event is one normalized event of a run (DESIGN.md 16.4). Event ids are
 // "<run_id>:<source>:<seq>" so independent sources never collide.
 type Event struct {
+	EventVersion  string        `json:"event_version,omitempty"`
 	EventID       string        `json:"event_id"`
 	RunID         string        `json:"run_id"`
 	SlotID        string        `json:"slot_id"`
 	PairID        string        `json:"pair_id"`
 	Seq           int           `json:"seq"` // per source
+	Sequence      int           `json:"sequence,omitempty"`
 	TurnIndex     int           `json:"turn_index"`
 	TS            time.Time     `json:"ts"`
+	Timestamp     time.Time     `json:"timestamp,omitempty"`
 	Type          EventType     `json:"type"`
 	Source        EventSource   `json:"source"`
 	Evidence      EvidenceLevel `json:"evidence"`
+	EvidenceLevel EvidenceLevel `json:"evidence_level,omitempty"`
+	Status        EventStatus   `json:"status,omitempty"`
+	ParserVersion string        `json:"parser_version,omitempty"`
 	RequestID     string        `json:"request_id,omitempty"` // Bifrost row id
 	AttemptNo     *int          `json:"attempt_no,omitempty"`
 	ToolCallID    string        `json:"tool_call_id,omitempty"`
@@ -63,6 +83,8 @@ type Event struct {
 	Target        string        `json:"target,omitempty"` // file path, command or url the action is about; used to align A and B
 	ArgsHash      string        `json:"args_hash,omitempty"`
 	ResultHash    string        `json:"result_hash,omitempty"`
+	DurationMS    *int64        `json:"duration_ms,omitempty"`
+	ExitStatus    *int          `json:"exit_status,omitempty"`
 	IsError       bool          `json:"is_error,omitempty"`
 	Provider      string        `json:"provider,omitempty"`
 	ModelReq      string        `json:"model_requested,omitempty"`

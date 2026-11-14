@@ -97,6 +97,14 @@ func (h *RunsHandler) getRun(ctx *fasthttp.RequestCtx) {
 	if found {
 		out.Grade = &grade
 	}
+	var evidence struct {
+		Contract *schemas.RunEvidenceContract `json:"evidence_contract,omitempty"`
+	}
+	if _, err := readJSONFile(h.index, id, FileEvidence, &evidence); err != nil {
+		sendDepError(ctx, h.mode, "read evidence of run "+id, err)
+		return
+	}
+	out.Evidence = evidence.Contract
 	for name, dst := range map[string]any{FileGates: &out.Gates, FileReceipts: &out.Receipts} {
 		if _, err := readJSONFile(h.index, id, name, dst); err != nil {
 			sendDepError(ctx, h.mode, "read "+name+" of run "+id, err)

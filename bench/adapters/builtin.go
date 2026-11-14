@@ -17,5 +17,8 @@ func BuiltinParsers() []schemas.Parser {
 		newClaudeCodeParser(),
 		newCodexParser(),
 		newOpenCodeParser(),
+		newGenericJSONParser(ParserCustomPython),
+		newGenericJSONParser(ParserGeminiCLI),
+		newGenericJSONParser(ParserMiniSWE),
 	}
 }

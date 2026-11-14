@@ -255,3 +255,22 @@ func TestMiniSWEAgentConfigPlan(t *testing.T) {
 		t.Errorf("gateway %+v, notes %+v, parser %q", agent.Gateway, agent.Notes, agent.Parser)
 	}
 }
+
+func TestAdaptersImplementAdditiveContracts(t *testing.T) {
+	for _, adapter := range Builtin(CommandConfig{GatewayAgentURL: "http://bifrost:8080", EvalNetwork: "bench"}) {
+		t.Run(adapter.GetName(), func(t *testing.T) {
+			if _, ok := adapter.(schemas.AdapterMetadata); !ok {
+				t.Error("missing AdapterMetadata")
+			}
+			if _, ok := adapter.(schemas.AdapterValidator); !ok {
+				t.Error("missing AdapterValidator")
+			}
+			if _, ok := adapter.(schemas.AdapterRunner); !ok {
+				t.Error("missing AdapterRunner")
+			}
+			if _, ok := adapter.(schemas.AdapterCleanup); !ok {
+				t.Error("missing AdapterCleanup")
+			}
+		})
+	}
+}

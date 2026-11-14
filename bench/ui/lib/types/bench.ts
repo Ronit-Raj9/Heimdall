@@ -27,6 +27,15 @@ export type ValueState = "observed" | "unknown" | "not_applicable";
 /** Where a value was observed (DESIGN.md 9.5). */
 export type EvidenceLevel = "outcome" | "gateway" | "native" | "boundary";
 
+export type EvidenceQuality = "unknown" | "complete" | "partial";
+
+export interface RunEvidenceContract {
+	required?: string[];
+	available?: string[];
+	missing?: string[];
+	quality: EvidenceQuality;
+}
+
 /** Every measured number. Unknown is never rendered or aggregated as zero. `v` is a number only when observed. */
 export interface Value {
 	state: ValueState;
@@ -852,6 +861,7 @@ export interface RunDetail {
 	metrics: Record<string, Value>;
 	gates: GateResult[];
 	receipts: Receipt[];
+	evidence_contract?: RunEvidenceContract;
 }
 
 /** GET /runs/{id}/events */

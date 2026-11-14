@@ -122,15 +122,16 @@ type RunEvents struct {
 // and receipts. A file the run has not written yet is null or empty, never
 // zeros. SealHash is empty until the run is sealed.
 type RunDetail struct {
-	Slot        Slot             `json:"slot"`
-	Run         Run              `json:"run"`
-	Sealed      bool             `json:"sealed"`
-	SealHash    string           `json:"seal_hash"`
-	Grade       *Grade           `json:"grade"`
-	GradeSource string           `json:"grade_source"` // "original": the grade the run was sealed with
-	Metrics     map[string]Value `json:"metrics"`
-	Gates       []GateResult     `json:"gates"`
-	Receipts    []Receipt        `json:"receipts"`
+	Slot        Slot                 `json:"slot"`
+	Run         Run                  `json:"run"`
+	Sealed      bool                 `json:"sealed"`
+	SealHash    string               `json:"seal_hash"`
+	Grade       *Grade               `json:"grade"`
+	GradeSource string               `json:"grade_source"` // "original": the grade the run was sealed with
+	Metrics     map[string]Value     `json:"metrics"`
+	Gates       []GateResult         `json:"gates"`
+	Receipts    []Receipt            `json:"receipts"`
+	Evidence    *RunEvidenceContract `json:"evidence_contract,omitempty"`
 }
 
 // RunDiff is GET /runs/{id}/diff. Patch is inert text.

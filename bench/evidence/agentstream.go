@@ -49,14 +49,20 @@ func (s *agentStreamSource) Collect(ctx context.Context, rc *schemas.RunContext,
 		if err != nil {
 			return fmt.Errorf("read agent stdout for run %s: %w", id, err)
 		}
-		res, err := p.Parse(ctx, rc, raw)
-		if err != nil {
-			return fmt.Errorf("parse agent stdout for run %s with %s: %w", id, p.GetName(), err)
+		var res *schemas.ParseResult
+		var parseErr error
+		if parser, ok := p.(schemas.AdapterResultParser); ok {
+			res, parseErr = parser.ParseExecutionOutput(ctx, rc, raw)
+		} else {
+			res, parseErr = p.Parse(ctx, rc, raw)
+		}
+		if parseErr != nil {
+			return fmt.Errorf("parse agent stdout for run %s with %s: %w", id, p.GetName(), parseErr)
 		}
 		if res == nil {
 			return nil
 		}
-		ev.Events = append(ev.Events, stampRun(rc, res.Events)...)
+		ev.Events = append(ev.Events, stampRun(rc, res.Events, p.GetVersion())...)
 		ev.Claim = res.Claim
 		return writeEvents(rc, ev)
 	}
@@ -218,10 +224,11 @@ func readTail(path string, n int64) ([]byte, error) {
 // stampRun fills run, slot and pair ids a parser left empty. Parsers get the
 // run context and normally set them; this keeps one missing id from making an
 // event unjoinable.
-func stampRun(rc *schemas.RunContext, events []schemas.Event) []schemas.Event {
+func stampRun(rc *schemas.RunContext, events []schemas.Event, parserVersion string) []schemas.Event {
 	ids := newEventSeq(rc, schemas.SourceAgentStream, schemas.EvidenceNative)
 	out := slices.Clone(events)
 	for i := range out {
+		out[i].EventVersion = schemas.EventSchemaVersion
 		if out[i].RunID == "" {
 			out[i].RunID = ids.runID
 		}
@@ -233,6 +240,21 @@ func stampRun(rc *schemas.RunContext, events []schemas.Event) []schemas.Event {
 		}
 		if out[i].Source == "" {
 			out[i].Source = schemas.SourceAgentStream
+		}
+		if out[i].Sequence == 0 {
+			out[i].Sequence = out[i].Seq
+		}
+		if out[i].Timestamp.IsZero() {
+			out[i].Timestamp = out[i].TS
+		}
+		if out[i].EvidenceLevel == "" {
+			out[i].EvidenceLevel = out[i].Evidence
+		}
+		if out[i].Status == "" {
+			out[i].Status = schemas.EventStatusUnknown
+		}
+		if out[i].ParserVersion == "" {
+			out[i].ParserVersion = parserVersion
 		}
 	}
 	return out

@@ -93,15 +93,20 @@ func (s *eventSeq) event(typ schemas.EventType, ts time.Time) schemas.Event {
 	seq := s.next
 	s.next++
 	return schemas.Event{
-		EventID:  eventID(s.runID, s.src, seq),
-		RunID:    s.runID,
-		SlotID:   s.slotID,
-		PairID:   s.pairID,
-		Seq:      seq,
-		TS:       ts,
-		Type:     typ,
-		Source:   s.src,
-		Evidence: s.level,
+		EventVersion:  schemas.EventSchemaVersion,
+		EventID:       eventID(s.runID, s.src, seq),
+		RunID:         s.runID,
+		SlotID:        s.slotID,
+		PairID:        s.pairID,
+		Seq:           seq,
+		Sequence:      seq,
+		TS:            ts,
+		Timestamp:     ts,
+		Type:          typ,
+		Source:        s.src,
+		Evidence:      s.level,
+		EvidenceLevel: s.level,
+		Status:        schemas.EventStatusUnknown,
 	}
 }
 

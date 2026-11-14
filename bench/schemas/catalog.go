@@ -33,11 +33,14 @@ type CatalogSuite struct {
 
 // CatalogAgent summarizes an agent config file.
 type CatalogAgent struct {
-	ID      string `json:"id"`
-	Path    string `json:"path"`
-	Adapter string `json:"adapter"`
-	Model   string `json:"model"`
-	Parser  string `json:"parser,omitempty"`
+	ID           string               `json:"id"`
+	Path         string               `json:"path"`
+	Adapter      string               `json:"adapter"`
+	Model        string               `json:"model"`
+	Parser       string               `json:"parser,omitempty"`
+	AgentVersion string               `json:"agent_version,omitempty"`
+	ImageDigest  string               `json:"image_digest,omitempty"`
+	Capabilities *AdapterCapabilities `json:"capabilities,omitempty"`
 }
 
 // CatalogGate summarizes a gate.

@@ -234,7 +234,8 @@ func (c *catalogSource) build() *schemas.Catalog {
 			continue
 		}
 		rel, _ := filepath.Rel(a.cfg.Root, f)
-		cat.Agents = append(cat.Agents, schemas.CatalogAgent{ID: cfg.ID, Path: rel, Adapter: cfg.Adapter, Model: cfg.Model, Parser: cfg.Parser})
+		cat.Agents = append(cat.Agents, schemas.CatalogAgent{ID: cfg.ID, Path: rel, Adapter: cfg.Adapter, Model: cfg.Model, Parser: cfg.Parser,
+			AgentVersion: cfg.AgentVersion, ImageDigest: cfg.ImageDigest, Capabilities: cfg.Capabilities})
 	}
 	for _, m := range a.reg.Metrics {
 		cat.Metrics = append(cat.Metrics, m.Descriptor())

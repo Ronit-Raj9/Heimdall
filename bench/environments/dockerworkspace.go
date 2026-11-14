@@ -4,10 +4,12 @@
 package environments
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"os"
 	"os/exec"
 	"path"
@@ -185,7 +187,11 @@ func (e *dockerWorkspace) Exec(ctx context.Context, rc *schemas.RunContext, plan
 	if plan.WallS <= 0 {
 		wall = defaultWallS * time.Second
 	}
-	res, err := e.attach(ctx, name, rc.Dir, wall)
+	secret := ""
+	if rc.Key != nil {
+		secret = rc.Key.Value
+	}
+	res, err := e.attach(ctx, name, rc.Dir, wall, secret)
 	if err != nil {
 		return res, fmt.Errorf("exec run %s: %w", runID, err)
 	}
@@ -423,7 +429,7 @@ func (e *dockerWorkspace) imagePath(ctx context.Context, plan *schemas.RunPlan) 
 
 // attach starts the created container attached, streams its output into the
 // run folder and enforces the wall budget.
-func (e *dockerWorkspace) attach(ctx context.Context, name, dir string, wall time.Duration) (*schemas.ExecResult, error) {
+func (e *dockerWorkspace) attach(ctx context.Context, name, dir string, wall time.Duration, secrets ...string) (*schemas.ExecResult, error) {
 	res := &schemas.ExecResult{
 		StdoutPath: filepath.Join(dir, "agent.stream.jsonl"),
 		StderrPath: filepath.Join(dir, "agent.stderr.txt"),
@@ -438,8 +444,8 @@ func (e *dockerWorkspace) attach(ctx context.Context, name, dir string, wall tim
 		return nil, fmt.Errorf("open %s: %w", res.StderrPath, err)
 	}
 	defer errF.Close()
-	stdout := &cappedWriter{w: outF, limit: e.cfg.OutputCapBytes}
-	stderr := &cappedWriter{w: errF, limit: e.cfg.OutputCapBytes}
+	stdout := &cappedWriter{w: newRedactingWriter(outF, secrets...), limit: e.cfg.OutputCapBytes}
+	stderr := &cappedWriter{w: newRedactingWriter(errF, secrets...), limit: e.cfg.OutputCapBytes}
 	cmd := exec.Command(dockerBinary(e.cfg.Docker), "start", "-a", name)
 	cmd.Stdout, cmd.Stderr = stdout, stderr
 	res.Started = time.Now().UTC()
@@ -449,7 +455,7 @@ func (e *dockerWorkspace) attach(ctx context.Context, name, dir string, wall tim
 	res.TimedOut = e.waitOrKill(ctx, cmd, name, wall)
 	res.Ended = time.Now().UTC()
 	res.Truncated = stdout.truncated || stderr.truncated
-	if err := firstErr(stdout.err, stderr.err, outF.Sync(), errF.Sync()); err != nil {
+	if err := firstErr(stdout.err, stderr.err, stdout.w.(*redactingWriter).Flush(), stderr.w.(*redactingWriter).Flush(), outF.Sync(), errF.Sync()); err != nil {
 		return res, fmt.Errorf("capture agent output: %w", err)
 	}
 	if ctx.Err() != nil {
@@ -461,6 +467,40 @@ func (e *dockerWorkspace) attach(ctx context.Context, name, dir string, wall tim
 	}
 	res.ExitCode = code
 	return res, nil
+}
+
+// redactingWriter removes known credentials before bytes reach run artifacts.
+// It buffers the capped stream so credentials split across writes are hidden.
+type redactingWriter struct {
+	w       io.Writer
+	secret  []byte
+	pending []byte
+}
+
+func newRedactingWriter(w io.Writer, secrets ...string) io.Writer {
+	for _, secret := range secrets {
+		if secret != "" {
+			return &redactingWriter{w: w, secret: []byte(secret)}
+		}
+	}
+	return &redactingWriter{w: w}
+}
+
+func (w *redactingWriter) Write(p []byte) (int, error) {
+	if len(w.secret) == 0 {
+		return w.w.Write(p)
+	}
+	w.pending = append(w.pending, p...)
+	return len(p), nil
+}
+
+func (w *redactingWriter) Flush() error {
+	if len(w.pending) == 0 {
+		return nil
+	}
+	_, err := w.w.Write(bytes.ReplaceAll(w.pending, w.secret, []byte("[redacted]")))
+	w.pending = nil
+	return err
 }
 
 // waitOrKill waits for the attached CLI, killing the container when the wall
