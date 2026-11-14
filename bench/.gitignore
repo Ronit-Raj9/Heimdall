@@ -10,3 +10,4 @@
 /releases/
 # The repo-level .gitignore drops *.test (Go test binaries); this is the py.test shim.
 !/probes/shims/py.test
+/checks/
