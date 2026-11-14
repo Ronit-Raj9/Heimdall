@@ -46,6 +46,7 @@ const (
 	leaseLockFile   = "lease.lock"
 	sealsLogFile    = "seals.log"
 	regradeFile     = "regrade.json"
+	regateFile      = "regate.json"
 	verdictFile     = "verdict.json"
 	slotsDir        = "slots"
 	runsDir         = "runs"

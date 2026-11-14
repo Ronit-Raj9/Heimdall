@@ -94,6 +94,10 @@ func packFiles(runsRoot string, rec *schemas.ReleaseRecord, ev *evidence) ([]pac
 			if err := add("runs/"+id+"/regrade.grade.json", src, false); err != nil {
 				return nil, err
 			}
+			src = filepath.Join(expDir, "regrades", run.GradeSource, "runs", id, "regate.json")
+			if err := add("runs/"+id+"/regrade.regate.json", src, false); err != nil {
+				return nil, err
+			}
 		}
 	}
 	return files, nil
@@ -162,6 +166,11 @@ func readme(rec *schemas.ReleaseRecord, nRuns int, hasPolicy bool) string {
 	line("                           byte-for-byte copies of those sealed run files")
 	line("  runs/<run_id>/regrade.grade.json")
 	line("                           the regrade grade, when the analysis used a regrade")
+	line("  runs/<run_id>/regrade.regate.json")
+	line("                           the gates recomputed after the fact from the sealed")
+	line("                           evidence, when the analysis used a regate; they")
+	line("                           replace gates.json, the outcome and the metrics")
+	line("                           listed in it")
 	line("")
 	line("How to verify")
 	line("  1. Seals. For each run, sha256sum runs/<run_id>/seal.json. The hash must be")

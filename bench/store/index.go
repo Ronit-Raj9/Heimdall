@@ -41,10 +41,12 @@ var runFileAllowlist = map[string]bool{
 // SealedRuns loads every counted, sealed run of an experiment for analysis,
 // in slot order. gradeSource is "" or "original" for the runs' own grades, or
 // a regrade id: then a run's regrade grade is used when the regrade has one
-// for it, and the original otherwise; SealedRun.GradeSource says which. A
-// regrade grade whose parent_seal is not the run's seal hash fails with
-// schemas.ErrSealMismatch. metrics.json, gates.json, receipts.json and
-// grade.json are optional.
+// for it, and the original otherwise; when the regrade recomputed gates
+// (regate.json), its gates, outcome, Y and changed metrics replace the sealed
+// ones. SealedRun.GradeSource says which source the run used. A regrade file
+// whose parent_seal is not the run's seal hash, or a regate whose content hash
+// does not match, fails with schemas.ErrSealMismatch. metrics.json,
+// gates.json, receipts.json and grade.json are optional.
 //
 // Per slot, the counted run is the lowest-attempt sealed run that is not
 // aborted_infra. A slot whose runs were all aborted_infra enters with its last
@@ -399,6 +401,11 @@ func (s *FSStore) loadSealedRun(expID string, slot *schemas.Slot, rec *schemas.R
 	if _, err := readOptionalJSON(filepath.Join(rec.Dir, gatesFile), &sr.Gates); err != nil {
 		return nil, err
 	}
+	if regradeID != "" {
+		if err := s.overlayRegate(sr, expID, regradeID, seal.Hash); err != nil {
+			return nil, fmt.Errorf("regrade %s: %w", regradeID, err)
+		}
+	}
 	if _, err := readOptionalJSON(filepath.Join(rec.Dir, receiptsFile), &sr.Receipts); err != nil {
 		return nil, err
 	}
@@ -410,4 +417,29 @@ func (s *FSStore) loadSealedRun(expID string, slot *schemas.Slot, rec *schemas.R
 	}
 	sr.Gateway = ev.Requests.Tally()
 	return sr, nil
+}
+
+// overlayRegate replaces the sealed gates, outcome, Y and gate-dependent
+// metrics of sr with the regrade's regate.json when it has one for the run.
+// Only the in-memory copy changes; the sealed files are never written.
+func (s *FSStore) overlayRegate(sr *schemas.SealedRun, expID, regradeID, sealHash string) error {
+	var r GateRegrade
+	p := filepath.Join(s.expDir(expID), regradesDir, regradeID, runsDir, sr.Run.RunID, regateFile)
+	found, err := readOptionalJSON(p, &r)
+	if err != nil || !found {
+		return err
+	}
+	if err := verifyGateRegrade(&r, sealHash); err != nil {
+		return fmt.Errorf("regate of run %s: %w", sr.Run.RunID, err)
+	}
+	sr.Gates = r.Gates
+	sr.Run.Outcome, sr.Run.Y = r.Outcome, r.Y
+	if sr.Metrics == nil {
+		sr.Metrics = map[string]schemas.Value{}
+	}
+	for name, v := range r.Metrics {
+		sr.Metrics[name] = v
+	}
+	sr.GradeSource = regradeID
+	return nil
 }

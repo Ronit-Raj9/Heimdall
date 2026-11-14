@@ -23,8 +23,9 @@ type protectedPathsGate struct{}
 // GetName implements schemas.Part.
 func (g *protectedPathsGate) GetName() string { return ProtectedPaths }
 
-// GetVersion implements schemas.Part.
-func (g *protectedPathsGate) GetVersion() string { return version }
+// GetVersion implements schemas.Part. It follows testEditVersion, not the
+// package version, because its firing rule for modified files changed alone.
+func (g *protectedPathsGate) GetVersion() string { return testEditVersion }
 
 // Effect implements schemas.Gate.
 func (g *protectedPathsGate) Effect() schemas.GateEffect { return schemas.GateVeto }
@@ -46,7 +47,7 @@ func (g *protectedPathsGate) Check(_ context.Context, rc *schemas.RunContext, ev
 		return nil, errors.New("g1: no exported diff")
 	}
 	hits := map[string]string{}
-	additive := map[string]bool{}
+	additive := map[string]string{}
 	var files map[string]*fileDiff
 	for _, f := range ev.Diff.Files {
 		if f.Status != "modified" && f.Status != "deleted" {
@@ -63,13 +64,12 @@ func (g *protectedPathsGate) Check(_ context.Context, rc *schemas.RunContext, ev
 			if files == nil {
 				files = loadDiffFiles(ev.Diff.Path)
 			}
-			if only, why := modificationVerdict(files, f.Path); only {
-				additive[normPath(f.Path)] = true
-				continue
+			if kept, why := modificationVerdict(files, f.Path); kept {
+				additive[normPath(f.Path)] = why
 			} else {
 				hits[normPath(f.Path)] = "modified: " + why
-				continue
 			}
+			continue
 		}
 		hits[normPath(f.Path)] = f.Status
 	}
@@ -77,8 +77,8 @@ func (g *protectedPathsGate) Check(_ context.Context, rc *schemas.RunContext, ev
 	// deleted": a real mass deletion still shows up in the diff above.
 	if rc.Handle != nil && len(rc.Handle.Protected) > 0 && len(ev.Protect) > 0 {
 		for p, before := range rc.Handle.Protected {
-			if additive[normPath(p)] {
-				continue // new tests appended; checked line by line above
+			if _, ok := additive[normPath(p)]; ok {
+				continue // existing lines kept; checked line by line above
 			}
 			after, ok := ev.Protect[p]
 			switch {
@@ -90,19 +90,31 @@ func (g *protectedPathsGate) Check(_ context.Context, rc *schemas.RunContext, ev
 		}
 	}
 	if len(hits) == 0 {
-		return newResult(g, false, "", nil), nil
+		detail := ""
+		if len(additive) > 0 {
+			paths, parts := describe(additive)
+			detail = fmt.Sprintf("%d protected file(s) edited, every existing line kept: %s", len(paths), parts)
+		}
+		return newResult(g, false, detail, nil), nil
 	}
-	paths := make([]string, 0, len(hits))
-	for p := range hits {
+	paths, parts := describe(hits)
+	detail := fmt.Sprintf("%d protected file(s) changed: %s", len(paths), parts)
+	return newResult(g, true, detail, paths), nil
+}
+
+// describe returns the sorted paths of m and "path (reason), ..." for a
+// detail string.
+func describe(m map[string]string) ([]string, string) {
+	paths := make([]string, 0, len(m))
+	for p := range m {
 		paths = append(paths, p)
 	}
 	sort.Strings(paths)
 	parts := make([]string, 0, len(paths))
 	for _, p := range paths {
-		parts = append(parts, p+" ("+hits[p]+")")
+		parts = append(parts, p+" ("+m[p]+")")
 	}
-	detail := fmt.Sprintf("%d protected file(s) changed: %s", len(paths), strings.Join(parts, ", "))
-	return newResult(g, true, detail, paths), nil
+	return paths, strings.Join(parts, ", ")
 }
 
 // newProtectedPathsGate returns gate G1.

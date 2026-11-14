@@ -935,8 +935,9 @@ runs/<exp_id>/
       grade.json                # the original grade                           (grader)
       seal.json                 # sha256 of every other file, manifest hash, previous seal hash
   regrades/<regrade_id>/        # never inside a sealed run
-    regrade.json                # suite version, grader version, time
+    regrade.json                # suite version, grader version, time; for a re-gate also gate_versions, suite_lock_hash, note
     runs/<run_id>/grade.json    # the new grade, with the parent run's seal hash
+    runs/<run_id>/regate.json   # or: gates recomputed from the sealed evidence (`bifrost-bench regate`), parent_seal and content hash
   analysis/<analysis_id>/       # derived and recomputable: verdict.json, diagnostics.json, report.md
                                 # names the grade source of each run: original, or a regrade id
 ```

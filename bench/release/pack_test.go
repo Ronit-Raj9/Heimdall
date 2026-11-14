@@ -10,8 +10,10 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/maximhq/bifrost/bench/schemas"
+	"github.com/maximhq/bifrost/bench/store"
 	"github.com/maximhq/bifrost/bench/utils"
 )
 
@@ -130,6 +132,52 @@ func checkPackFiles(t *testing.T, f *fixture, rec *schemas.ReleaseRecord, files 
 		if !strings.Contains(readme, want) {
 			t.Errorf("README.txt lacks %q", want)
 		}
+	}
+}
+
+func TestEvidencePackRegate(t *testing.T) {
+	ctx := context.Background()
+	f := newFixture(t, schemas.ActionShip, "")
+	info := store.RegradeInfo{GateVersions: map[string]string{"g1_protected_paths": "1.1.0"}}
+	regate := &store.GateRegrade{Outcome: schemas.OutcomePass, SealedOutcome: schemas.OutcomeIntegrityViolation,
+		Y: schemas.Observed(1, schemas.EvidenceOutcome), Gates: []schemas.GateResult{}}
+	if err := f.st.WriteGateRegrade(ctx, testExp, "rg_x", "r_t01_a", info, regate); err != nil {
+		t.Fatalf("WriteGateRegrade: %v", err)
+	}
+	a := &schemas.Analysis{AnalysisID: "a_rg", ExpID: testExp, GradeSource: "rg_x", CreatedAt: time.Date(2026, 11, 14, 11, 0, 0, 0, time.UTC),
+		Verdict: schemas.Verdict{Decision: schemas.DecisionImproved, Action: schemas.ActionShip, ManifestHash: f.m.Hash,
+			Effect: &schemas.Effect{ArmA: "A", ArmB: "B"}}}
+	if err := f.st.WriteAnalysis(ctx, a, nil); err != nil {
+		t.Fatalf("WriteAnalysis: %v", err)
+	}
+	m, err := f.st.LoadManifest(ctx, testExp)
+	if err != nil {
+		t.Fatal(err)
+	}
+	ev, err := f.log.loadEvidence(ctx, m, "a_rg")
+	if err != nil {
+		t.Fatal(err)
+	}
+	rec, err := newRecord(m, ev, *request("ana", ""), f.log.d.Now())
+	if err != nil {
+		t.Fatal(err)
+	}
+	files, err := packFiles(f.runsRoot, rec, ev)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var got []byte
+	for _, pf := range files {
+		if pf.name == "runs/r_t01_b/regrade.regate.json" {
+			t.Fatal("a run without a regate got one in the pack")
+		}
+		if pf.name == "runs/r_t01_a/regrade.regate.json" {
+			got = pf.data
+		}
+	}
+	disk, err := os.ReadFile(filepath.Join(f.runsRoot, testExp, "regrades", "rg_x", "runs", "r_t01_a", "regate.json"))
+	if err != nil || !bytes.Equal(got, disk) {
+		t.Fatalf("regate in pack differs from disk (err %v):\n%s", err, got)
 	}
 }
 

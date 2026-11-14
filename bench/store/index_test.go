@@ -3,6 +3,8 @@ package store
 import (
 	"context"
 	"errors"
+	"os"
+	"path/filepath"
 	"sync"
 	"testing"
 
@@ -119,6 +121,63 @@ func TestSealedRuns(t *testing.T) {
 				t.Fatalf("gateway tally = %+v", gw)
 			}
 		})
+	}
+}
+
+func TestSealedRunsRegate(t *testing.T) {
+	ctx := context.Background()
+	s, seals := indexFixture(t)
+	info := RegradeInfo{SuiteVersion: "1.0.0", GateVersions: map[string]string{"g1": "1.1.0"}}
+	regate := &GateRegrade{
+		Gates:         []schemas.GateResult{{Gate: "g1", Version: "1.1.0", Effect: schemas.GateVeto, Fired: true}},
+		Recomputed:    []string{"g1"},
+		SealedOutcome: schemas.OutcomePass,
+		Outcome:       schemas.OutcomeIntegrityViolation,
+		Y:             schemas.Observed(0, schemas.EvidenceOutcome),
+		Metrics:       map[string]schemas.Value{"verified_success": schemas.Observed(0, schemas.EvidenceOutcome)},
+	}
+	if err := s.WriteGateRegrade(ctx, "e_test", "rg_g", "r_a1_2", info, regate); err != nil {
+		t.Fatalf("WriteGateRegrade: %v", err)
+	}
+	got, err := s.SealedRuns(ctx, "e_test", "rg_g")
+	if err != nil {
+		t.Fatalf("SealedRuns: %v", err)
+	}
+	a, b := got[0], got[1]
+	if a.GradeSource != "rg_g" || a.Run.Outcome != schemas.OutcomeIntegrityViolation || len(a.Gates) != 1 || !a.Gates[0].Fired || a.Gates[0].Version != "1.1.0" {
+		t.Fatalf("regated run = %+v", a)
+	}
+	if v := a.Metrics["verified_success"]; v.V == nil || *v.V != 0 {
+		t.Fatalf("metric not replaced: %+v", a.Metrics)
+	}
+	if a.Grade == nil || !a.Grade.Passed || a.SealHash != seals["r_a1_2"].Hash {
+		t.Fatalf("sealed grade must stay: %+v", a.Grade)
+	}
+	if b.GradeSource != "original" || b.Run.Outcome != schemas.OutcomeFail {
+		t.Fatalf("run without a regate = %+v", b)
+	}
+	orig, err := s.SealedRuns(ctx, "e_test", "original")
+	if err != nil || orig[0].Run.Outcome != schemas.OutcomePass || orig[0].Gates[0].Fired {
+		t.Fatalf("original source changed: %+v, %v", orig, err)
+	}
+	if err := s.Verify(ctx, "e_test", "r_a1_2"); err != nil {
+		t.Fatalf("sealed run changed: %v", err)
+	}
+	p := filepath.Join(s.Root(), "e_test", "regrades", "rg_g", "runs", "r_a1_2", "regate.json")
+	var r GateRegrade
+	if err := readJSON(p, &r); err != nil {
+		t.Fatal(err)
+	}
+	r.Outcome = schemas.OutcomePass
+	b2, err := marshalIndent(&r)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(p, b2, 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := s.SealedRuns(ctx, "e_test", "rg_g"); !errors.Is(err, schemas.ErrSealMismatch) {
+		t.Fatalf("edited regate: err = %v, want ErrSealMismatch", err)
 	}
 }
 

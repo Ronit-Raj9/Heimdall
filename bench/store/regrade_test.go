@@ -80,6 +80,87 @@ func TestWriteRegrade(t *testing.T) {
 	}
 }
 
+func TestWriteGateRegrade(t *testing.T) {
+	ctx := context.Background()
+	s := newTestStore(t, nil)
+	m := mustCreateExp(t, s, "e_test")
+	r1, seal1 := sealedRun(t, s, m, "s_a1", "r_1")
+	r2, _ := sealedRun(t, s, m, "s_b1", "r_2")
+	open := mustNewRun(t, s, m, "s_c1", "r_open", 1, schemas.OutcomePass)
+	if err := s.WriteRegrade(ctx, "e_test", "rg_grades", r1.RunID, &schemas.Grade{SuiteVersion: "1.0.0", GraderVersion: "1.0.0"}); err != nil {
+		t.Fatal(err)
+	}
+	v11 := map[string]string{"g1_protected_paths": "1.1.0"}
+	info := func(v map[string]string) RegradeInfo {
+		return RegradeInfo{SuiteVersion: "1.0.0", GateVersions: v, Note: "rule 1.1.0"}
+	}
+	res := func() *GateRegrade {
+		return &GateRegrade{Outcome: schemas.OutcomePass, SealedOutcome: schemas.OutcomeIntegrityViolation,
+			Y: schemas.Observed(1, schemas.EvidenceOutcome), Gates: []schemas.GateResult{{Gate: "g1_protected_paths", Version: "1.1.0"}}}
+	}
+	tests := []struct {
+		name    string
+		regrade string
+		runID   string
+		info    RegradeInfo
+		r       *GateRegrade
+		wantErr error
+		anyErr  bool
+	}{
+		{name: "first regate", regrade: "rg_gates", runID: r1.RunID, info: info(v11), r: res()},
+		{name: "same run twice", regrade: "rg_gates", runID: r1.RunID, info: info(v11), r: res(), wantErr: schemas.ErrExists},
+		{name: "other gate versions", regrade: "rg_gates", runID: r2.RunID, info: info(map[string]string{"g1_protected_paths": "1.2.0"}), r: res(), anyErr: true},
+		{name: "regrade id that holds grades", regrade: "rg_grades", runID: r2.RunID, info: info(v11), r: res(), anyErr: true},
+		{name: "no gate versions", regrade: "rg_other", runID: r2.RunID, info: info(nil), r: res(), anyErr: true},
+		{name: "unsealed run", regrade: "rg_gates", runID: open.RunID, info: info(v11), r: res(), wantErr: schemas.ErrNotFound},
+		{name: "wrong parent seal", regrade: "rg_gates", runID: r2.RunID, info: info(v11), r: &GateRegrade{ParentSeal: seal1.Hash}, wantErr: schemas.ErrSealMismatch},
+		{name: "nil result", regrade: "rg_gates", runID: r2.RunID, info: info(v11), anyErr: true},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			err := s.WriteGateRegrade(ctx, "e_test", tc.regrade, tc.runID, tc.info, tc.r)
+			switch {
+			case tc.wantErr != nil:
+				if !errors.Is(err, tc.wantErr) {
+					t.Fatalf("err = %v, want %v", err, tc.wantErr)
+				}
+			case tc.anyErr:
+				if err == nil {
+					t.Fatal("want error")
+				}
+			case err != nil:
+				t.Fatalf("WriteGateRegrade: %v", err)
+			case tc.r.ParentSeal != "" || tc.r.Hash != "":
+				t.Fatal("WriteGateRegrade modified the caller's result")
+			}
+		})
+	}
+	var got GateRegrade
+	if err := readJSON(filepath.Join(s.Root(), "e_test", "regrades", "rg_gates", "runs", "r_1", "regate.json"), &got); err != nil {
+		t.Fatal(err)
+	}
+	if err := verifyGateRegrade(&got, seal1.Hash); err != nil || got.Outcome != schemas.OutcomePass {
+		t.Fatalf("regate.json = %+v, verify: %v", got, err)
+	}
+	got.Outcome = schemas.OutcomeFail
+	if err := verifyGateRegrade(&got, seal1.Hash); !errors.Is(err, schemas.ErrSealMismatch) {
+		t.Fatalf("edited regate verified: %v", err)
+	}
+	info2, err := s.RegradeInfo(ctx, "e_test", "rg_gates")
+	if err != nil || info2.GateVersions["g1_protected_paths"] != "1.1.0" || info2.GraderVersion != "" || info2.Note != "rule 1.1.0" || info2.CreatedAt.IsZero() {
+		t.Fatalf("regrade.json = %+v, %v", info2, err)
+	}
+	if _, err := s.RegradeInfo(ctx, "e_test", "rg_none"); !errors.Is(err, schemas.ErrNotFound) {
+		t.Fatalf("missing regrade: %v", err)
+	}
+	if err := s.WriteRegrade(ctx, "e_test", "rg_gates", r2.RunID, &schemas.Grade{SuiteVersion: "1.0.0"}); err == nil {
+		t.Fatal("a grade was written into a regrade that holds gates")
+	}
+	if err := s.Verify(ctx, "e_test", r1.RunID); err != nil {
+		t.Fatalf("regate touched the sealed run: %v", err)
+	}
+}
+
 func TestWriteAnalysis(t *testing.T) {
 	ctx := context.Background()
 	s := newTestStore(t, nil)

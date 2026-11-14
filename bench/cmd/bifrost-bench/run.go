@@ -181,8 +181,9 @@ func runCheck(args []string) int {
 	failOn := fs.String("fail-on", "regressed,invalid", "comma-separated verdicts that fail the check")
 	out := fs.String("out", "report.md", "markdown report path")
 	policyFile := fs.String("policy", "", "release policy file; overrides the one the experiment froze")
+	gradeSource := fs.String("grade-source", schemas.GradeSourceOriginal, "original, or a regrade id (from regate or a regrade) to analyze with")
 	if err := fs.Parse(args); err != nil || (fs.NArg() != 1 && *exp == "") {
-		fmt.Fprintln(os.Stderr, "usage: bifrost-bench check [-fail-on regressed,invalid] [-policy policies/default.yaml] [-out report.md] experiments/<file>.yaml | -exp <exp_id>")
+		fmt.Fprintln(os.Stderr, "usage: bifrost-bench check [-fail-on regressed,invalid] [-policy policies/default.yaml] [-grade-source original|<regrade_id>] [-out report.md] experiments/<file>.yaml | -exp <exp_id>")
 		fmt.Fprintln(os.Stderr, "exit: 0 ok, 1 regressed, 2 inconclusive, 3 invalid (each only when listed in -fail-on), 4 infrastructure error, 5 blocked by the release policy")
 		return exitUsage
 	}
@@ -209,7 +210,7 @@ func runCheck(args []string) int {
 		}
 		expID = m.ExpID
 	}
-	an, report, err := a.analyzeWith(context.WithoutCancel(ctx), expID, "", *policyFile)
+	an, report, err := a.analyzeWith(context.WithoutCancel(ctx), expID, *gradeSource, *policyFile)
 	if err != nil {
 		return fail("analyze %s: %v", expID, err)
 	}

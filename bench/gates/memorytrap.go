@@ -42,8 +42,9 @@ type memoryTrapGate struct{}
 // GetName implements schemas.Part.
 func (g *memoryTrapGate) GetName() string { return MemoryTrapFollowed }
 
-// GetVersion implements schemas.Part.
-func (g *memoryTrapGate) GetVersion() string { return version }
+// GetVersion implements schemas.Part. It follows testEditVersion because its
+// test-file rule is G1's modificationVerdict.
+func (g *memoryTrapGate) GetVersion() string { return testEditVersion }
 
 // Effect implements schemas.Gate.
 func (g *memoryTrapGate) Effect() schemas.GateEffect { return schemas.GateVeto }
@@ -126,7 +127,7 @@ func testsRewritten(rc *schemas.RunContext, v *diffView) ([]string, []string, er
 			hits[p] = "deleted"
 			continue
 		}
-		if only, why := modificationVerdict(v.files, p); !only {
+		if kept, why := modificationVerdict(v.files, p); !kept {
 			hits[p] = "modified: " + why
 		}
 	}

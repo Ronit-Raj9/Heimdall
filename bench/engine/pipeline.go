@@ -335,21 +335,27 @@ func (p *Pipeline) emit(st *runState, ev Event) {
 	st.in.Emit(ev)
 }
 
-// decideOutcome maps what the run observed to its outcome. A fired veto gate
-// is an observed fact and wins over a later infrastructure failure.
+// decideOutcome maps what the run observed to its outcome.
 func decideOutcome(st *runState) schemas.Outcome {
+	return outcomeFrom(st.aborted, st.broken, st.ev.Gates, st.ev.Grade, st.rc.Exec)
+}
+
+// outcomeFrom maps what a run observed to its outcome. A fired veto gate is an
+// observed fact and wins over a later infrastructure failure. Regate uses it
+// too, so a recomputed gate list decides an outcome the same way.
+func outcomeFrom(aborted, broken bool, gates []schemas.GateResult, grade *schemas.Grade, exec *schemas.ExecResult) schemas.Outcome {
 	switch {
-	case st.aborted:
+	case aborted:
 		return schemas.OutcomeAbortedInfra
-	case vetoFired(st.ev.Gates):
+	case vetoFired(gates):
 		return schemas.OutcomeIntegrityViolation
-	case st.broken, st.ev.Grade == nil:
+	case broken, grade == nil:
 		return schemas.OutcomeInfraError
-	case st.ev.Grade.InvalidEvaluator:
+	case grade.InvalidEvaluator:
 		return schemas.OutcomeInvalidEvaluator
-	case st.ev.Grade.Passed:
+	case grade.Passed:
 		return schemas.OutcomePass
-	case st.rc.Exec != nil && st.rc.Exec.TimedOut:
+	case exec != nil && exec.TimedOut:
 		return schemas.OutcomeTimeout
 	default:
 		return schemas.OutcomeFail

@@ -4,8 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"sort"
-	"strings"
 
 	"github.com/maximhq/bifrost/bench/schemas"
 )
@@ -26,8 +24,9 @@ type regradeGate struct{}
 // GetName implements schemas.Part.
 func (g *regradeGate) GetName() string { return Regrade }
 
-// GetVersion implements schemas.Part.
-func (g *regradeGate) GetVersion() string { return version }
+// GetVersion implements schemas.Part. It follows testEditVersion, not the
+// package version, because its firing rule for modified files changed alone.
+func (g *regradeGate) GetVersion() string { return testEditVersion }
 
 // Effect implements schemas.Gate.
 func (g *regradeGate) Effect() schemas.GateEffect { return schemas.GateVeto }
@@ -43,37 +42,65 @@ func (g *regradeGate) Check(_ context.Context, rc *schemas.RunContext, ev *schem
 	if ev == nil || ev.Diff == nil {
 		return nil, errors.New("g4: no exported diff")
 	}
-	var hits []string
+	hits := map[string]string{}
+	status := map[string]string{}
+	kept := map[string]string{}
 	var files map[string]*fileDiff
 	for _, f := range ev.Diff.Files {
 		if f.Status != "modified" && f.Status != "deleted" {
 			continue
 		}
-		if f.Status == "modified" {
-			if files == nil {
-				files = loadDiffFiles(ev.Diff.Path)
-			}
-			if only, _ := modificationVerdict(files, f.Path); only {
-				continue // only new lines; the regrade restores the file anyway
-			}
+		restored, err := g.restored(rc.Suite, f.Path)
+		if err != nil {
+			return nil, err
 		}
-		for _, root := range rc.Suite.Verifier.Restore {
-			ok, err := underPath(root, f.Path)
-			if err != nil {
-				return nil, fmt.Errorf("g4: suite %s restore: %w", rc.Suite.ID, err)
-			}
-			if ok {
-				hits = append(hits, normPath(f.Path)+" ("+f.Status+")")
-				break
-			}
+		if !restored {
+			continue
+		}
+		status[normPath(f.Path)] = f.Status
+		if f.Status == "deleted" {
+			hits[normPath(f.Path)] = "deleted"
+			continue
+		}
+		if files == nil {
+			files = loadDiffFiles(ev.Diff.Path)
+		}
+		// Existing lines kept; the regrade restores the file anyway.
+		if ok, why := modificationVerdict(files, f.Path); ok {
+			kept[normPath(f.Path)] = why
+		} else {
+			hits[normPath(f.Path)] = "modified: " + why
 		}
 	}
 	if len(hits) == 0 {
-		return newResult(g, false, "", nil), nil
+		detail := ""
+		if len(kept) > 0 {
+			paths, parts := describe(kept)
+			detail = fmt.Sprintf("%d restored file(s) edited, every existing line kept: %s", len(paths), parts)
+		}
+		return newResult(g, false, detail, nil), nil
 	}
-	sort.Strings(hits)
-	detail := fmt.Sprintf("%d restored file(s) edited or deleted: %s", len(hits), strings.Join(hits, ", "))
-	return newResult(g, true, detail, hits), nil
+	paths, parts := describe(hits)
+	evidence := make([]string, len(paths))
+	for i, p := range paths {
+		evidence[i] = p + " (" + status[p] + ")"
+	}
+	detail := fmt.Sprintf("%d restored file(s) edited or deleted: %s", len(paths), parts)
+	return newResult(g, true, detail, evidence), nil
+}
+
+// restored reports whether p lies under one of the suite's restore paths.
+func (g *regradeGate) restored(suite *schemas.Suite, p string) (bool, error) {
+	for _, root := range suite.Verifier.Restore {
+		ok, err := underPath(root, p)
+		if err != nil {
+			return false, fmt.Errorf("g4: suite %s restore: %w", suite.ID, err)
+		}
+		if ok {
+			return true, nil
+		}
+	}
+	return false, nil
 }
 
 // newRegradeGate returns gate G4.

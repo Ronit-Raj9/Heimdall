@@ -113,7 +113,8 @@ func loadExperiment(path string) (*schemas.Experiment, error) {
 }
 
 // analyze runs the experiment's verdict policy over its sealed runs, writes
-// the analysis and its markdown report, and returns both.
+// the analysis and its markdown report, and returns both. A grade source that
+// recomputed gates adds a Gate source section to the report.
 func (a *app) analyze(ctx context.Context, expID, gradeSource string) (*schemas.Analysis, []byte, error) {
 	return a.analyzeWith(ctx, expID, gradeSource, "")
 }
@@ -164,10 +165,15 @@ func (a *app) analyzeWith(ctx context.Context, expID, gradeSource, policyOverrid
 			}
 		}
 	}
-	if err := a.store.WriteAnalysis(ctx, an, map[string][]byte{"report.md": []byte(md.String())}); err != nil {
+	sec, err := a.gateSourceSection(ctx, m, gradeSource, runs)
+	if err != nil {
+		return nil, nil, fmt.Errorf("gate source: %w", err)
+	}
+	report := insertSection(md.String(), sec)
+	if err := a.store.WriteAnalysis(ctx, an, map[string][]byte{"report.md": []byte(report)}); err != nil {
 		return nil, nil, fmt.Errorf("save analysis: %w", err)
 	}
-	return an, []byte(md.String()), nil
+	return an, []byte(report), nil
 }
 
 // releasePolicy evaluates the release policy over the analysis: the override
