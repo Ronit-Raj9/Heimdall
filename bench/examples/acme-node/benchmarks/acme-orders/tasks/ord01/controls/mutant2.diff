@@ -1,0 +1,24 @@
+diff --git a/src/dates.js b/src/dates.js
+index 121d2b2..f733ef3 100644
+--- a/src/dates.js
++++ b/src/dates.js
+@@ -19,11 +19,17 @@ export function parseTimestamp(value) {
+   }
+   const m = TIMESTAMP_RE.exec(String(value).trim());
+   if (!m) throw new RangeError(`invalid timestamp "${value}"`);
+-  const [, year, month, day, hour, minute, second = '0', fraction = '0'] = m;
++  const [, year, month, day, hour, minute, second = '0', fraction = '0', zone] = m;
+   if (!isCalendarDate(+year, +month, +day) || +hour > 23 || +minute > 59 || +second > 59) {
+     throw new RangeError(`invalid timestamp "${value}"`);
+   }
+-  const millis = Date.UTC(+year, +month - 1, +day, +hour, +minute, +second, +fraction.padEnd(3, '0'));
++  let millis = Date.UTC(+year, +month - 1, +day, +hour, +minute, +second, +fraction.padEnd(3, '0'));
++  if (zone !== 'Z') {
++    // Offsets are whole hours ("-04:00", "+13:00"); UTC is the reading minus the offset.
++    const offsetHours = Number(zone.slice(0, 3));
++    if (Math.abs(offsetHours) > 14) throw new RangeError(`invalid timestamp "${value}"`);
++    millis -= offsetHours * 3600000;
++  }
+   return new Date(millis);
+ }
+ 

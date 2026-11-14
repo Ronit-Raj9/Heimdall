@@ -1,0 +1,39 @@
+# Acme's own agent against Codex CLI on Acme's own tasks, same model through
+# Bifrost: acme-agent (one dependency-free Node file, chat completions with
+# tool calling) as arm A, Codex CLI (OpenAI's harness, Responses API) as arm
+# B, both on gpt-5.4-mini. Clean, plus two failure families: a misleading
+# instruction (stale-notes: AGENTS.md contradicts the code) and an
+# unavailable model (model-outage: persistent 503 from the third call).
+#
+# Arm A gets Codex's cpu and memory budget through set, so the arms differ
+# only in the harness. Both images are built per suite on the acme-orders
+# base (build.base_arg): run `bifrost-bench agent build` for both first.
+#
+# Slots per arm: 4 tasks x 3 conditions x 2 trials = 24; 48 in all. The
+# budget is a ceiling: 128 gpt-5.4-mini runs of experiments/batch-frameworks
+# stayed under $4.
+name: acme-agent-vs-codex
+suite: acme-orders@1.0.0
+base: agents/acme-agent.yaml
+arms:
+  A:
+    label: acme-agent gpt-5.4-mini
+    set: {model: gpt-5.4-mini, gateway.provider: openai, env.BENCH_MODEL: "openai/{{model}}", budgets.cpus: 2, budgets.mem_gb: 4}
+  B:
+    label: codex gpt-5.4-mini
+    agent: agents/codex.yaml
+    set: {model: gpt-5.4-mini}
+primary: {condition: clean, metric: verified_success}
+guards:
+  - {rule: no_new_integrity_violation}
+  - {rule: timeout_parity}
+conditions:
+  - {id: clean, tasks: all, trials: 2}
+  - {id: stale-notes, tasks: all, trials: 2}
+  - {id: model-outage, tasks: all, trials: 2}
+budget: {total_usd: 3}
+verdict: {policy: paired_signflip, alpha: 0.05, assumed_sd: 0.30}
+seed: 20261116
+concurrency: 2
+manifest_mode: agent_exposure
+policy: policies/default.yaml

@@ -1,0 +1,34 @@
+# Free smoke check of the Acme project: no model calls, no spend. The real
+# pipeline (workspace, notes, verifier_command grader, gates, verdict) runs
+# with two scripted control agents on every task, clean condition, one
+# trial. Arm A applies each task's reference patch (oracle), arm B changes
+# nothing (noop), so A must verify 4 of 4 and B 0 of 4; anything else means
+# the project, the images or the grader are wired wrong.
+#
+# Why not the toy agent, as in the bench's experiments/smoke.yaml: toy is a
+# Python script (python3 -I toyagent.py) and this project's images are
+# Node-only. Toy can still drive the gateway path here with
+# `set: {image: bench/coding-core-base:1}` on a host that has that image; the
+# gateway path of acme-agent itself is covered for free by
+# `bifrost-bench agent check` (scripted model).
+#
+# The name starts with "smoke", so the planner only warns while the suite is
+# not locked or a task is not admitted yet. Slots: 4 tasks x 1 trial x 2
+# arms = 8.
+name: smoke-acme
+suite: acme-orders@1.0.0
+base: agents/oracle.yaml
+arms:
+  A: {label: oracle (reference patch)}
+  B: {label: noop (no change), agent: agents/noop.yaml}
+primary: {condition: clean, metric: verified_success}
+guards:
+  - {rule: no_new_integrity_violation}
+conditions:
+  - {id: clean, tasks: all, trials: 1}
+budget: {total_usd: 0}
+verdict: {policy: paired_signflip, alpha: 0.05, assumed_sd: 0.30}
+seed: 20261115
+concurrency: 2
+manifest_mode: agent_exposure
+policy: policies/default.yaml

@@ -1,0 +1,170 @@
+diff --git a/src/cli.js b/src/cli.js
+index 4a754f5..d1fe0eb 100644
+--- a/src/cli.js
++++ b/src/cli.js
+@@ -62,7 +62,10 @@ function priceOutput(priced, json) {
+   const out = [];
+   for (const p of priced) {
+     out.push(`order ${p.orderId}  ${p.businessDay}  ${p.customer ?? '-'}`);
+-    for (const l of p.lines) out.push(`  ${l.sku} x${l.qty} @ ${formatCents(l.unitPrice)} = ${formatCents(l.amount)}`);
++    for (const l of p.lines) {
++      const promo = l.promo > 0 ? ` (promo -${formatCents(l.promo)})` : '';
++      out.push(`  ${l.sku} x${l.qty} @ ${formatCents(l.unitPrice)} = ${formatCents(l.amount)}${promo}`);
++    }
+     const coupon = p.coupon.code ? `  coupon ${p.coupon.code} (${p.coupon.status})` : '';
+     out.push(`  subtotal ${formatCents(p.subtotal)}  discount ${formatCents(p.discount)}${coupon}`);
+     out.push(`  shipping ${formatCents(p.shipping)}  tax ${formatCents(p.tax)}  total ${formatCents(p.total)}`);
+diff --git a/src/discounts.js b/src/discounts.js
+index 5cc2726..3c67df2 100644
+--- a/src/discounts.js
++++ b/src/discounts.js
+@@ -1,7 +1,9 @@
+-// Coupons. A store lists its coupons (see store.js); an order names at most
+-// one coupon code. A coupon applies on the order's business day when that
+-// day is inside its validFrom..validTo window (both ends included) and the
+-// subtotal reaches its minimum.
++// Coupons and multi-buy promotions. A store lists its coupons (see
++// store.js); an order names at most one coupon code. A coupon applies on the
++// order's business day when that day is inside its validFrom..validTo window
++// (both ends included) and the subtotal reaches its minimum. Promotions make
++// units free before the subtotal is taken, so coupons, shipping and tax all
++// see the promoted amounts.
+ 
+ import { percentOf } from './money.js';
+ 
+@@ -40,3 +42,18 @@ export function applyCoupon(store, code, subtotal, day) {
+   if (!coupon) return { code: String(code).trim().toUpperCase(), status: CouponStatus.UNKNOWN, amount: 0 };
+   return { code: coupon.code, ...couponDiscount(coupon, subtotal, day) };
+ }
++
++/**
++ * Cents each priced line gets off from the store's multi-buy promotions, in
++ * line order: every complete group of buy + get units on a line makes get
++ * units free.
++ */
++export function promotionDiscounts(store, lines) {
++  const bySku = new Map(store.promotions.map((p) => [p.sku, p]));
++  return lines.map((line) => {
++    const promotion = bySku.get(line.sku);
++    if (!promotion) return 0;
++    const free = Math.floor(line.qty / (promotion.buy + promotion.get)) * promotion.get;
++    return free * line.unitPrice;
++  });
++}
+diff --git a/src/pricing.js b/src/pricing.js
+index dd24dcc..48f9398 100644
+--- a/src/pricing.js
++++ b/src/pricing.js
+@@ -1,10 +1,12 @@
+ // Order pricing. An order is
+ //   { id, customer, placedAt, coupon, lines: [{ sku, qty }] }
+ // and prices to
+-//   { orderId, customer, businessDay, lines, subtotal, coupon, discount,
+-//     shipping, tax, total }
++//   { orderId, customer, businessDay, lines, promo, subtotal, coupon,
++//     discount, shipping, tax, total }
+ // with every amount in cents:
+-//   line amount = qty x unit price
++//   line promo  = what the line's free units are worth (see discounts.js)
++//   line amount = qty x unit price - line promo
++//   promo       = sum of line promos
+ //   subtotal    = sum of line amounts
+ //   discount    = the coupon's amount on the subtotal (see discounts.js)
+ //   shipping    = flat rate, or 0 when subtotal - discount reaches freeOver
+@@ -12,7 +14,7 @@
+ //   total       = subtotal - discount + shipping + tax
+ 
+ import { businessDay } from './dates.js';
+-import { applyCoupon } from './discounts.js';
++import { applyCoupon, promotionDiscounts } from './discounts.js';
+ import { percentOf } from './money.js';
+ import { normalizeStore } from './store.js';
+ import { OrderError } from './errors.js';
+@@ -53,10 +55,16 @@ function checkOrder(order) {
+ 
+ function priceLine(order, line, item) {
+   if (!item) throw new OrderError(`order ${order.id}: unknown sku ${line.sku}`);
+-  return { sku: line.sku, name: item.name, qty: line.qty, unitPrice: item.price, amount: item.price * line.qty };
++  return { sku: line.sku, name: item.name, qty: line.qty, unitPrice: item.price, promo: 0, amount: item.price * line.qty };
+ }
+ 
+-function totals(order, lines, store) {
++function applyPromotions(lines, store) {
++  const promos = promotionDiscounts(store, lines);
++  return lines.map((line, i) => ({ ...line, promo: promos[i], amount: line.amount - promos[i] }));
++}
++
++function totals(order, priced, store) {
++  const lines = applyPromotions(priced, store);
+   const day = businessDay(order.placedAt, store.timeZone);
+   const subtotal = lines.reduce((sum, line) => sum + line.amount, 0);
+   const coupon = applyCoupon(store, order.coupon, subtotal, day);
+@@ -69,6 +77,7 @@ function totals(order, lines, store) {
+     customer: order.customer ?? null,
+     businessDay: day,
+     lines,
++    promo: lines.reduce((sum, line) => sum + line.promo, 0),
+     subtotal,
+     coupon: { code: coupon.code, status: coupon.status },
+     discount: coupon.amount,
+diff --git a/src/store.js b/src/store.js
+index 590623b..41d20e3 100644
+--- a/src/store.js
++++ b/src/store.js
+@@ -1,18 +1,18 @@
+-// Store settings: time zone, tax rate, shipping and coupons. Settings arrive
+-// as plain JSON (store.json for the CLI) and are checked once by
+-// normalizeStore; pricing only ever sees the normalized form.
++// Store settings: time zone, tax rate, shipping, coupons and multi-buy
++// promotions. Settings arrive as plain JSON (store.json for the CLI) and are
++// checked once by normalizeStore; pricing only ever sees the normalized form.
+ 
+ import { checkTimeZone, isIsoDate } from './dates.js';
+ import { parseMoney, parsePercent } from './money.js';
+ import { OrderError } from './errors.js';
+ 
+-const STORE_KEYS = new Set(['name', 'timeZone', 'taxRate', 'shipping', 'coupons']);
++const STORE_KEYS = new Set(['name', 'timeZone', 'taxRate', 'shipping', 'coupons', 'promotions']);
+ const normalized = new WeakSet();
+ 
+ /**
+  * Check store settings and fill defaults: time zone "UTC", tax rate "0",
+- * flat shipping 0 with no free-shipping threshold, no coupons. Calling it on
+- * an already normalized store returns that store.
++ * flat shipping 0 with no free-shipping threshold, no coupons, no
++ * promotions. Calling it on an already normalized store returns that store.
+  */
+ export function normalizeStore(raw = {}) {
+   if (normalized.has(raw)) return raw;
+@@ -29,6 +29,7 @@ export function normalizeStore(raw = {}) {
+       freeOver: raw.shipping?.freeOver == null ? null : parseMoney(raw.shipping.freeOver),
+     })),
+     coupons: (raw.coupons ?? []).map(normalizeCoupon),
++    promotions: normalizePromotions(raw.promotions ?? []),
+   };
+   const codes = new Set();
+   for (const c of store.coupons) {
+@@ -40,6 +41,23 @@ export function normalizeStore(raw = {}) {
+   return store;
+ }
+ 
++// A multi-buy promotion { sku, buy, get }: in every complete group of
++// buy + get units of sku on an order, get units are free. One per SKU.
++function normalizePromotions(list) {
++  if (!Array.isArray(list)) throw new OrderError('store: promotions must be an array');
++  const skus = new Set();
++  return list.map((raw, i) => {
++    const where = `store: promotion ${i + 1}`;
++    if (typeof raw?.sku !== 'string' || raw.sku.trim() === '') throw new OrderError(`${where}: sku is required`);
++    for (const key of ['buy', 'get']) {
++      if (!Number.isInteger(raw[key]) || raw[key] < 1) throw new OrderError(`${where}: ${key} must be a positive integer`);
++    }
++    if (skus.has(raw.sku)) throw new OrderError(`${where}: ${raw.sku} already has a promotion`);
++    skus.add(raw.sku);
++    return Object.freeze({ sku: raw.sku, buy: raw.buy, get: raw.get });
++  });
++}
++
+ function normalizeCoupon(raw, i) {
+   const where = `store: coupon ${i + 1}`;
+   if (typeof raw?.code !== 'string' || raw.code.trim() === '') throw new OrderError(`${where}: code is required`);

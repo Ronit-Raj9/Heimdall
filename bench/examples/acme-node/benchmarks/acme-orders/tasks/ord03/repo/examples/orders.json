@@ -1,0 +1,17 @@
+{
+  "orders": [
+    {
+      "id": "W-2001",
+      "placedAt": "2026-03-14T18:20:00Z",
+      "customer": "dee@example.com",
+      "coupon": "WELCOME5",
+      "lines": [{ "sku": "POT-01", "qty": 1 }, { "sku": "TEA-01", "qty": 1 }]
+    },
+    {
+      "id": "W-2002",
+      "placedAt": "2026-03-14T19:05:00Z",
+      "customer": "eve@example.com",
+      "lines": [{ "sku": "TEA-02", "qty": 2 }]
+    }
+  ]
+}

@@ -1,0 +1,90 @@
+diff --git a/src/pricing.js b/src/pricing.js
+index dd24dcc..20cf4e7 100644
+--- a/src/pricing.js
++++ b/src/pricing.js
+@@ -10,6 +10,10 @@
+ //   shipping    = flat rate, or 0 when subtotal - discount reaches freeOver
+ //   tax         = taxRate % of (subtotal - discount), rounded half up
+ //   total       = subtotal - discount + shipping + tax
++//
++// Catalog lookups are round trips to the pricing database in production, so
++// every distinct SKU is looked up once, in batches of at most LOOKUP_BATCH
++// through getMany when the catalog has it, and kept for later calls.
+ 
+ import { businessDay } from './dates.js';
+ import { applyCoupon } from './discounts.js';
+@@ -17,23 +21,32 @@ import { percentOf } from './money.js';
+ import { normalizeStore } from './store.js';
+ import { OrderError } from './errors.js';
+ 
++/** Most SKUs one getMany call may ask for (the pricing database's limit). */
++export const LOOKUP_BATCH = 100;
++
++const cache = new WeakMap(); // catalog -> Map<sku, item>
++
+ /**
+  * Price one order. options.catalog is required (an object with get(sku));
+  * options.store holds the store settings (see store.js) and defaults to a
+  * UTC store with no tax.
+  */
+ export function priceOrder(order, options = {}) {
+-  const { catalog, store } = checkOptions(options);
+-  checkOrder(order);
+-  const lines = order.lines.map((line) => priceLine(order, line, catalog.get(line.sku)));
+-  return totals(order, lines, store);
++  return priceOrders([order], options)[0];
+ }
+ 
+-/** Price a batch of orders with the same options, in input order. */
++/**
++ * Price a batch of orders with the same options, in input order. Errors are
++ * the ones pricing the orders one at a time would throw first.
++ */
+ export function priceOrders(orders, options = {}) {
+   if (!Array.isArray(orders)) throw new TypeError('orders must be an array');
+-  const checked = checkOptions(options);
+-  return orders.map((order) => priceOrder(order, checked));
++  const { catalog, store } = checkOptions(options);
++  const items = lookUp(catalog, orders.flatMap(skusOf));
++  return orders.map((order) => {
++    checkOrder(order);
++    return totals(order, order.lines.map((line) => priceLine(order, line, items.get(line.sku))), store);
++  });
+ }
+ 
+ function checkOptions(options) {
+@@ -41,6 +54,34 @@ function checkOptions(options) {
+   return { catalog: options.catalog, store: normalizeStore(options.store) };
+ }
+ 
++// SKUs of an order that may not be valid yet; checkOrder reports problems
++// later, in input order, so lookups never change which error is thrown.
++function skusOf(order) {
++  return Array.isArray(order?.lines) ? order.lines.map((line) => line?.sku) : [];
++}
++
++// One lookup per distinct SKU: getMany in batches when the catalog has it,
++// else get. Returns a Map of the SKUs the catalog knows, shared by every
++// call with the same catalog.
++function lookUp(catalog, skus) {
++  if (!cache.has(catalog)) cache.set(catalog, new Map());
++  const items = cache.get(catalog);
++  const distinct = [...new Set(skus)].filter((sku) => !items.has(sku));
++  const keep = (sku, item) => {
++    if (item) items.set(sku, item);
++  };
++  if (typeof catalog.getMany === 'function') {
++    for (let i = 0; i < distinct.length; i += LOOKUP_BATCH) {
++      const batch = distinct.slice(i, i + LOOKUP_BATCH);
++      const found = catalog.getMany(batch);
++      for (const sku of batch) keep(sku, found.get(sku));
++    }
++  } else {
++    for (const sku of distinct) keep(sku, catalog.get(sku));
++  }
++  return items;
++}
++
+ function checkOrder(order) {
+   if (typeof order?.id !== 'string' || order.id === '') throw new OrderError('order: id is required');
+   if (!Array.isArray(order.lines) || order.lines.length === 0) throw new OrderError(`order ${order.id}: no lines`);

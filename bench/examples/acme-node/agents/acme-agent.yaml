@@ -1,0 +1,47 @@
+# acme-agent: Acme's own coding agent, benchmarked with this YAML and no Go
+# code. One dependency-free Node.js file (agents/images/acme-agent/agent.mjs)
+# speaking OpenAI chat completions with tool calling (run_shell, read_file,
+# write_file) to Bifrost's /openai/v1 route.
+#
+# It has no parser, so its runs carry gateway-level evidence: success, steps,
+# tokens, cost and time come from Bifrost's rows for the run's virtual key,
+# tool calls from the gateway's content logs. Its stdout (one JSON line per
+# step, then the final message) is kept as raw output and its tail is read
+# as the completion claim.
+#
+# build.base_arg: the image is built once per suite on that suite's base
+# image and tagged "<tag>-<suite id>" (heimdall-example/acme-agent:1-acme-orders
+# for this project's suite), so the agent runs inside the suite's toolchain.
+#
+# The model id Bifrost routes is provider/model. To run on another provider,
+# override gateway.provider and env.BENCH_MODEL together, e.g.
+#   set: {gateway.provider: openai, model: gpt-5.4-mini, env.BENCH_MODEL: "openai/{{model}}"}
+id: acme-agent
+adapter: command
+image: heimdall-example/acme-agent:1
+build:
+  dockerfile: agents/images/acme-agent/Dockerfile
+  tag: heimdall-example/acme-agent:1
+  base_arg: BASE_IMAGE
+argv:
+  - acme-agent
+env:
+  BENCH_BASE_URL: "{{gateway.url}}/openai/v1"
+  BENCH_API_KEY: "{{run.key}}"
+  BENCH_MODEL: "anthropic/{{model}}"
+  BENCH_INSTRUCTION_FILE: "{{instruction_file}}"
+  BENCH_SESSION_ID: "{{run.session}}"
+  BENCH_MAX_TURNS: "40"
+  BENCH_SHELL_TIMEOUT_S: "120"
+# Placeholder: every experiment sets the model (an arm may vary it).
+model: claude-sonnet-4-5
+notes:
+  project_file: AGENTS.md
+budgets:
+  wall_s: 900
+  turns: 40
+  cpus: 1
+  mem_gb: 2
+gateway:
+  provider: anthropic
+  max_retries: 0

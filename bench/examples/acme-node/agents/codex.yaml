@@ -1,0 +1,112 @@
+# OpenAI Codex CLI, headless, through the bench's Bifrost gateway.
+#
+# Copied from the bench's agents/codex.yaml with one change: the image is
+# built per suite on the suite's base image (build.base_arg), from
+# agents/images/codex/Dockerfile in this project, so Codex works inside the
+# Node toolchain of acme-orders. Built tag for this suite:
+# heimdall-example/agent-codex:1-acme-orders. Everything else is the
+# bench file unchanged.
+#
+# Launch pattern taken from Bifrost's own CLI harness and checked against
+# codex-cli 0.169.0 (`codex exec --help`, captures in adapters/testdata):
+# - argv: tests/e2e/clis/matrix_test.go and runner_test.go run
+#   `codex exec --json --skip-git-repo-check --model <m> <prompt>`. The bench
+#   adds --dangerously-bypass-approvals-and-sandbox (never prompt, no Codex
+#   sandbox: the hardened container is the sandbox, and Codex's bubblewrap
+#   sandbox cannot start without capabilities), --ephemeral (no session files)
+#   and --strict-config (an unknown config key fails the run instead of being
+#   ignored). `--` keeps an instruction that starts with "-" a prompt.
+# - routing and auth: cli/internal/harness/native_config.go codexWriteConfigTOML
+#   and tests/e2e/clis/matrix_test.go codexPreLaunch. Codex ignores
+#   OPENAI_BASE_URL and its built-in openai provider wants ChatGPT auth, so a
+#   custom "bifrost" provider is declared: Responses wire API, API-key auth
+#   from env_key, plain HTTP POST (no websockets), base_url ending in /v1
+#   because Codex appends /responses to it.
+# - session headers: the provider's http_headers table (verified on the wire).
+# - the run key is excluded from the environment of commands the agent runs;
+#   Codex itself still reads it through env_key.
+# - allow_login_shell = false: Codex runs commands with `/bin/sh -lc` by
+#   default, and the login profile resets PATH, which would drop the bench's
+#   tool-shim folder.
+# - web_search = "disabled": the hosted search tool runs at the provider and
+#   would reach the internet past the evaluation network.
+# - retries: Codex's own stay at their defaults (request_max_retries 4,
+#   stream_max_retries 5), so a persistent fault costs 30 attempts per request.
+#   HTTP-level retries print nothing; stream retries print "Reconnecting...".
+# - no telemetry: analytics and feedback off, no OpenTelemetry exporter, no
+#   update check; no history file, no memories. Codex 0.169.0 does not read
+#   CODEX_DISABLE_TELEMETRY, so it is not set.
+id: codex
+adapter: command
+image: heimdall-example/agent-codex:1
+build:
+  dockerfile: agents/images/codex/Dockerfile
+  tag: heimdall-example/agent-codex:1
+  base_arg: BASE_IMAGE
+argv:
+  - codex
+  - exec
+  - --json
+  - --skip-git-repo-check
+  - --dangerously-bypass-approvals-and-sandbox
+  - --ephemeral
+  - --strict-config
+  - --model
+  - "{{model}}"
+  - --
+  - "{{instruction}}"
+env:
+  CODEX_HOME: /home/agent/.codex
+  BIFROST_API_KEY: "{{run.key}}"
+  OPENAI_API_KEY: ""
+files:
+  /home/agent/.codex/config.toml: |
+    model = "{{model}}"
+    model_provider = "bifrost"
+    allow_login_shell = false
+    check_for_update_on_startup = false
+    web_search = "disabled"
+
+    [analytics]
+    enabled = false
+
+    [feedback]
+    enabled = false
+
+    [history]
+    persistence = "none"
+
+    [otel]
+    exporter = "none"
+    log_user_prompt = false
+
+    [features]
+    memories = false
+
+    [shell_environment_policy]
+    exclude = ["BIFROST_API_KEY"]
+
+    [model_providers.bifrost]
+    name = "Bifrost"
+    base_url = "{{gateway.url}}/openai/v1"
+    wire_api = "responses"
+    env_key = "BIFROST_API_KEY"
+    requires_openai_auth = false
+    supports_websockets = false
+
+    [model_providers.bifrost.http_headers]
+    x-bf-session-id = "{{run.session}}"
+    x-bf-session-affinity = "off"
+# Placeholder: every experiment sets the model (an arm may vary it).
+model: gpt-5.6-terra
+notes:
+  project_file: AGENTS.md
+  user_path: /home/agent/.codex/AGENTS.md
+parser: codex
+budgets:
+  wall_s: 900
+  cpus: 2
+  mem_gb: 4
+gateway:
+  provider: openai
+  max_retries: 0

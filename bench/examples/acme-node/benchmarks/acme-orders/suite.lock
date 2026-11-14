@@ -1,0 +1,465 @@
+{
+  "suite": "acme-orders",
+  "version": "1.0.0",
+  "base_image": {
+    "dockerfile": "base/Dockerfile",
+    "tag": "heimdall-example/acme-orders-base:1"
+  },
+  "tasks": {
+    "ord01": {
+      "version": "1.0.0",
+      "instruction_sha256": "8d27a3c98d2b7cd52851fcefb3468da37501f2e4341259660baa2059bc3d9050",
+      "repo_tree_sha256": "ea5e0461a13402b14770e376404179944cea11757c6798a0766ffb4f3883d18d",
+      "verifier_sha256": "e14a4f144671360cebeafa8fc1ab1ac23efd8a5dfbc53f841fbfd9cc1bb98b53",
+      "controls_sha256": "854b645e6f48d5340d5b10663a4936ac927d3ddca5346934400a719557d634a4",
+      "fixtures_sha256": "8beb572309f614f16f183c1eb344ed7bcd6af18e5408b55211005c8fa19df10a",
+      "status": "admitted",
+      "admission": {
+        "admitted": true,
+        "checks": [
+          {
+            "name": "reference_1",
+            "want": "pass",
+            "got": "pass",
+            "passed": true,
+            "detail": "solution/reference.diff; tests_ran=10 failures=0 errors=0 skipped=0 exit=0 reason=passed (10 tests)"
+          },
+          {
+            "name": "reference_2",
+            "want": "pass",
+            "got": "pass",
+            "passed": true,
+            "detail": "solution/reference.diff; tests_ran=10 failures=0 errors=0 skipped=0 exit=0 reason=passed (10 tests)"
+          },
+          {
+            "name": "reference_3",
+            "want": "pass",
+            "got": "pass",
+            "passed": true,
+            "detail": "solution/reference.diff; tests_ran=10 failures=0 errors=0 skipped=0 exit=0 reason=passed (10 tests)"
+          },
+          {
+            "name": "empty_patch",
+            "want": "fail",
+            "got": "fail",
+            "passed": true,
+            "detail": "controls/empty.diff; tests_ran=10 failures=9 errors=0 skipped=0 exit=1 reason=exit 1; 9 failures; required tests failed: test::business_day_uses_store_zone_for_offset_timestamps, test::same_instant_written_with_different_offsets, test::daylight_saving_time_is_respected, test::priced_order_reports_business_day, test::cli_report_and_price_use_store_business_day, test::coupon_valid_through_last_local_day, test::coupon_valid_from_first_local_day, test::offset_timestamps_name_one_instant, test::importers_return_the_instant"
+          },
+          {
+            "name": "mutant_1",
+            "want": "fail",
+            "got": "fail",
+            "passed": true,
+            "detail": "controls/mutant1.diff; tests_ran=10 failures=9 errors=0 skipped=0 exit=1 reason=exit 1; 9 failures; required tests failed: test::business_day_uses_store_zone_for_offset_timestamps, test::same_instant_written_with_different_offsets, test::daylight_saving_time_is_respected, test::priced_order_reports_business_day, test::cli_report_and_price_use_store_business_day, test::coupon_valid_through_last_local_day, test::coupon_valid_from_first_local_day, test::offset_timestamps_name_one_instant, test::importers_return_the_instant"
+          },
+          {
+            "name": "mutant_2",
+            "want": "fail",
+            "got": "fail",
+            "passed": true,
+            "detail": "controls/mutant2.diff; tests_ran=10 failures=6 errors=0 skipped=0 exit=1 reason=exit 1; 6 failures; required tests failed: test::business_day_uses_store_zone_for_offset_timestamps, test::same_instant_written_with_different_offsets, test::cli_report_and_price_use_store_business_day, test::coupon_valid_from_first_local_day, test::offset_timestamps_name_one_instant, test::importers_return_the_instant"
+          },
+          {
+            "name": "exploit",
+            "want": "fail",
+            "got": "fail",
+            "passed": true,
+            "detail": "exploit exit 0; tests_ran=10 failures=9 errors=0 skipped=0 exit=1 reason=exit 1; 9 failures; required tests failed: test::business_day_uses_store_zone_for_offset_timestamps, test::same_instant_written_with_different_offsets, test::daylight_saving_time_is_respected, test::priced_order_reports_business_day, test::cli_report_and_price_use_store_business_day, test::coupon_valid_through_last_local_day, test::coupon_valid_from_first_local_day, test::offset_timestamps_name_one_instant, test::importers_return_the_instant"
+          },
+          {
+            "name": "reference_stale_notes",
+            "want": "pass",
+            "got": "pass",
+            "passed": true,
+            "detail": "reference + fixtures/notes.stale.md as CLAUDE.md, AGENTS.md; tests_ran=10 failures=0 errors=0 skipped=0 exit=0 reason=passed (10 tests)"
+          },
+          {
+            "name": "null_noop",
+            "want": "fail",
+            "got": "fail",
+            "passed": true,
+            "detail": "noop exit 0; tests_ran=10 failures=9 errors=0 skipped=0 exit=1 reason=exit 1; 9 failures; required tests failed: test::business_day_uses_store_zone_for_offset_timestamps, test::same_instant_written_with_different_offsets, test::daylight_saving_time_is_respected, test::priced_order_reports_business_day, test::cli_report_and_price_use_store_business_day, test::coupon_valid_through_last_local_day, test::coupon_valid_from_first_local_day, test::offset_timestamps_name_one_instant, test::importers_return_the_instant"
+          },
+          {
+            "name": "null_refuse",
+            "want": "fail",
+            "got": "fail",
+            "passed": true,
+            "detail": "refuse exit 0; tests_ran=10 failures=9 errors=0 skipped=0 exit=1 reason=exit 1; 9 failures; required tests failed: test::business_day_uses_store_zone_for_offset_timestamps, test::same_instant_written_with_different_offsets, test::daylight_saving_time_is_respected, test::priced_order_reports_business_day, test::cli_report_and_price_use_store_business_day, test::coupon_valid_through_last_local_day, test::coupon_valid_from_first_local_day, test::offset_timestamps_name_one_instant, test::importers_return_the_instant"
+          },
+          {
+            "name": "instruction_edited",
+            "want": "edited",
+            "got": "edited",
+            "passed": true
+          },
+          {
+            "name": "secret_scan",
+            "want": "none",
+            "got": "none",
+            "passed": true
+          },
+          {
+            "name": "verifier_no_network",
+            "want": "none",
+            "got": "none",
+            "passed": true,
+            "detail": "reported by grader verifier_command"
+          }
+        ],
+        "at": "2026-11-14T18:54:35.506739948Z",
+        "grader": "verifier_command",
+        "reference_repeats": 3,
+        "reference_results": [
+          "pass",
+          "pass",
+          "pass"
+        ]
+      }
+    },
+    "ord02": {
+      "version": "1.0.0",
+      "instruction_sha256": "4aaae1c864b18bc53fa4c715c4be388c9493ee2ae7884a1c5da396745db007f0",
+      "repo_tree_sha256": "afa5749b1aca82b7740df37e50cee727463a16fdabb9e84dc53b20f9d33ddb67",
+      "verifier_sha256": "3220c67f7e474c0ecf979e870a4ddca5dc543e9100e34d4a5449b20a38e63008",
+      "controls_sha256": "0c88415ea23d8ad9c9e055ab016a8b0a75feba455c7bc8a41d70ce82ae36091d",
+      "fixtures_sha256": "6d8363066dd2a20a3834246b39fe90e81bdf888406aa49eff655a968ad4af8f9",
+      "status": "admitted",
+      "admission": {
+        "admitted": true,
+        "checks": [
+          {
+            "name": "reference_1",
+            "want": "pass",
+            "got": "pass",
+            "passed": true,
+            "detail": "solution/reference.diff; tests_ran=9 failures=0 errors=0 skipped=0 exit=0 reason=passed (9 tests)"
+          },
+          {
+            "name": "reference_2",
+            "want": "pass",
+            "got": "pass",
+            "passed": true,
+            "detail": "solution/reference.diff; tests_ran=9 failures=0 errors=0 skipped=0 exit=0 reason=passed (9 tests)"
+          },
+          {
+            "name": "reference_3",
+            "want": "pass",
+            "got": "pass",
+            "passed": true,
+            "detail": "solution/reference.diff; tests_ran=9 failures=0 errors=0 skipped=0 exit=0 reason=passed (9 tests)"
+          },
+          {
+            "name": "empty_patch",
+            "want": "fail",
+            "got": "fail",
+            "passed": true,
+            "detail": "controls/empty.diff; tests_ran=9 failures=8 errors=0 skipped=0 exit=1 reason=exit 1; 8 failures; required tests failed: test::cli_price_shows_promotions, test::free_units_per_complete_group, test::units_counted_across_lines_free_from_last_line, test::order_promo_and_subtotal_after_promotions, test::coupon_minimum_and_amount_use_subtotal_after_promotions, test::shipping_and_tax_use_subtotal_after_promotions, test::stores_without_promotions_unchanged, test::valid_promotions_accepted"
+          },
+          {
+            "name": "mutant_1",
+            "want": "fail",
+            "got": "fail",
+            "passed": true,
+            "detail": "controls/mutant1.diff; tests_ran=9 failures=1 errors=0 skipped=0 exit=1 reason=exit 1; 1 failures; required tests failed: test::units_counted_across_lines_free_from_last_line"
+          },
+          {
+            "name": "mutant_2",
+            "want": "fail",
+            "got": "fail",
+            "passed": true,
+            "detail": "controls/mutant2.diff; tests_ran=9 failures=4 errors=0 skipped=0 exit=1 reason=exit 1; 4 failures; required tests failed: test::free_units_per_complete_group, test::units_counted_across_lines_free_from_last_line, test::coupon_minimum_and_amount_use_subtotal_after_promotions, test::shipping_and_tax_use_subtotal_after_promotions"
+          },
+          {
+            "name": "exploit",
+            "want": "fail",
+            "got": "fail",
+            "passed": true,
+            "detail": "exploit exit 0; tests_ran=9 failures=8 errors=0 skipped=0 exit=1 reason=exit 1; 8 failures; required tests failed: test::cli_price_shows_promotions, test::free_units_per_complete_group, test::units_counted_across_lines_free_from_last_line, test::order_promo_and_subtotal_after_promotions, test::coupon_minimum_and_amount_use_subtotal_after_promotions, test::shipping_and_tax_use_subtotal_after_promotions, test::stores_without_promotions_unchanged, test::valid_promotions_accepted"
+          },
+          {
+            "name": "reference_stale_notes",
+            "want": "pass",
+            "got": "pass",
+            "passed": true,
+            "detail": "reference + fixtures/notes.stale.md as CLAUDE.md, AGENTS.md; tests_ran=9 failures=0 errors=0 skipped=0 exit=0 reason=passed (9 tests)"
+          },
+          {
+            "name": "null_noop",
+            "want": "fail",
+            "got": "fail",
+            "passed": true,
+            "detail": "noop exit 0; tests_ran=9 failures=8 errors=0 skipped=0 exit=1 reason=exit 1; 8 failures; required tests failed: test::cli_price_shows_promotions, test::free_units_per_complete_group, test::units_counted_across_lines_free_from_last_line, test::order_promo_and_subtotal_after_promotions, test::coupon_minimum_and_amount_use_subtotal_after_promotions, test::shipping_and_tax_use_subtotal_after_promotions, test::stores_without_promotions_unchanged, test::valid_promotions_accepted"
+          },
+          {
+            "name": "null_refuse",
+            "want": "fail",
+            "got": "fail",
+            "passed": true,
+            "detail": "refuse exit 0; tests_ran=9 failures=8 errors=0 skipped=0 exit=1 reason=exit 1; 8 failures; required tests failed: test::cli_price_shows_promotions, test::free_units_per_complete_group, test::units_counted_across_lines_free_from_last_line, test::order_promo_and_subtotal_after_promotions, test::coupon_minimum_and_amount_use_subtotal_after_promotions, test::shipping_and_tax_use_subtotal_after_promotions, test::stores_without_promotions_unchanged, test::valid_promotions_accepted"
+          },
+          {
+            "name": "instruction_edited",
+            "want": "edited",
+            "got": "edited",
+            "passed": true
+          },
+          {
+            "name": "secret_scan",
+            "want": "none",
+            "got": "none",
+            "passed": true
+          },
+          {
+            "name": "verifier_no_network",
+            "want": "none",
+            "got": "none",
+            "passed": true,
+            "detail": "reported by grader verifier_command"
+          }
+        ],
+        "at": "2026-11-14T18:54:53.845323248Z",
+        "grader": "verifier_command",
+        "reference_repeats": 3,
+        "reference_results": [
+          "pass",
+          "pass",
+          "pass"
+        ]
+      }
+    },
+    "ord03": {
+      "version": "1.0.0",
+      "instruction_sha256": "77a664d7e31dbbdd9ae8adbfa49d37ca0c1333898e909d8e624f75cd6e45ed9f",
+      "repo_tree_sha256": "d4249c835c5ca0543dae2afbb34ddb5fbee1295ad14b23ee28ee49ad99cbb8dc",
+      "verifier_sha256": "f83d22f7cc6aa83f8a3ae9b63668e34f49570e19b697e883a198289660bad9fd",
+      "controls_sha256": "000a3aca52f98a424c5df5915fdebe26c2b5eb69e1d0e0284349f58160c31bd0",
+      "fixtures_sha256": "89294a6ac4336fa58a230435f8e597f50bb0c813b8e5deebdca68f55a86c37d0",
+      "status": "admitted",
+      "admission": {
+        "admitted": true,
+        "checks": [
+          {
+            "name": "reference_1",
+            "want": "pass",
+            "got": "pass",
+            "passed": true,
+            "detail": "solution/reference.diff; tests_ran=10 failures=0 errors=0 skipped=0 exit=0 reason=passed (10 tests)"
+          },
+          {
+            "name": "reference_2",
+            "want": "pass",
+            "got": "pass",
+            "passed": true,
+            "detail": "solution/reference.diff; tests_ran=10 failures=0 errors=0 skipped=0 exit=0 reason=passed (10 tests)"
+          },
+          {
+            "name": "reference_3",
+            "want": "pass",
+            "got": "pass",
+            "passed": true,
+            "detail": "solution/reference.diff; tests_ran=10 failures=0 errors=0 skipped=0 exit=0 reason=passed (10 tests)"
+          },
+          {
+            "name": "empty_patch",
+            "want": "fail",
+            "got": "fail",
+            "passed": true,
+            "detail": "controls/empty.diff; tests_ran=10 failures=7 errors=0 skipped=0 exit=1 reason=exit 1; 7 failures; required tests failed: test::options_form_prices_like_positional, test::format_cents_replaces_format_money, test::positional_forms_warn_once_with_code, test::priceorders_positional_warns_first, test::format_money_warns_once_independently, test::new_forms_do_not_warn, test::throw_deprecation_flag_makes_warnings_fatal"
+          },
+          {
+            "name": "mutant_1",
+            "want": "fail",
+            "got": "fail",
+            "passed": true,
+            "detail": "controls/mutant1.diff; tests_ran=10 failures=1 errors=0 skipped=0 exit=1 reason=exit 1; 1 failures; required tests failed: test::format_money_warns_once_independently"
+          },
+          {
+            "name": "mutant_2",
+            "want": "fail",
+            "got": "fail",
+            "passed": true,
+            "detail": "controls/mutant2.diff; tests_ran=10 failures=1 errors=0 skipped=0 exit=1 reason=exit 1; 1 failures; required tests failed: test::cli_uses_no_deprecated_api"
+          },
+          {
+            "name": "exploit",
+            "want": "fail",
+            "got": "fail",
+            "passed": true,
+            "detail": "exploit exit 0; tests_ran=10 failures=7 errors=0 skipped=0 exit=1 reason=exit 1; 7 failures; required tests failed: test::options_form_prices_like_positional, test::format_cents_replaces_format_money, test::positional_forms_warn_once_with_code, test::priceorders_positional_warns_first, test::format_money_warns_once_independently, test::new_forms_do_not_warn, test::throw_deprecation_flag_makes_warnings_fatal"
+          },
+          {
+            "name": "reference_stale_notes",
+            "want": "pass",
+            "got": "pass",
+            "passed": true,
+            "detail": "reference + fixtures/notes.stale.md as CLAUDE.md, AGENTS.md; tests_ran=10 failures=0 errors=0 skipped=0 exit=0 reason=passed (10 tests)"
+          },
+          {
+            "name": "null_noop",
+            "want": "fail",
+            "got": "fail",
+            "passed": true,
+            "detail": "noop exit 0; tests_ran=10 failures=7 errors=0 skipped=0 exit=1 reason=exit 1; 7 failures; required tests failed: test::options_form_prices_like_positional, test::format_cents_replaces_format_money, test::positional_forms_warn_once_with_code, test::priceorders_positional_warns_first, test::format_money_warns_once_independently, test::new_forms_do_not_warn, test::throw_deprecation_flag_makes_warnings_fatal"
+          },
+          {
+            "name": "null_refuse",
+            "want": "fail",
+            "got": "fail",
+            "passed": true,
+            "detail": "refuse exit 0; tests_ran=10 failures=7 errors=0 skipped=0 exit=1 reason=exit 1; 7 failures; required tests failed: test::options_form_prices_like_positional, test::format_cents_replaces_format_money, test::positional_forms_warn_once_with_code, test::priceorders_positional_warns_first, test::format_money_warns_once_independently, test::new_forms_do_not_warn, test::throw_deprecation_flag_makes_warnings_fatal"
+          },
+          {
+            "name": "instruction_edited",
+            "want": "edited",
+            "got": "edited",
+            "passed": true
+          },
+          {
+            "name": "secret_scan",
+            "want": "none",
+            "got": "none",
+            "passed": true
+          },
+          {
+            "name": "verifier_no_network",
+            "want": "none",
+            "got": "none",
+            "passed": true,
+            "detail": "reported by grader verifier_command"
+          }
+        ],
+        "at": "2026-11-14T18:55:22.600416087Z",
+        "grader": "verifier_command",
+        "reference_repeats": 3,
+        "reference_results": [
+          "pass",
+          "pass",
+          "pass"
+        ]
+      }
+    },
+    "ord04": {
+      "version": "1.0.0",
+      "instruction_sha256": "df68a19c336885a469f117659d8eb3df7494a46bee1c5339a67670e0868cd491",
+      "repo_tree_sha256": "afa5749b1aca82b7740df37e50cee727463a16fdabb9e84dc53b20f9d33ddb67",
+      "verifier_sha256": "70b1f551fd27226c38dfb8d72033bfb5b5f0e50615caa396dd1082e9d14c45cd",
+      "controls_sha256": "060c6d73cd60611cf4a649fe86aac823f645d23c538eaf64235420827cc0d46e",
+      "fixtures_sha256": "b73992c56f0a8709225828b93f34ac37686eb43e092142d2e5d5129c4d704b95",
+      "status": "admitted",
+      "admission": {
+        "admitted": true,
+        "checks": [
+          {
+            "name": "reference_1",
+            "want": "pass",
+            "got": "pass",
+            "passed": true,
+            "detail": "solution/reference.diff; tests_ran=8 failures=0 errors=0 skipped=0 exit=0 reason=passed (8 tests)"
+          },
+          {
+            "name": "reference_2",
+            "want": "pass",
+            "got": "pass",
+            "passed": true,
+            "detail": "solution/reference.diff; tests_ran=8 failures=0 errors=0 skipped=0 exit=0 reason=passed (8 tests)"
+          },
+          {
+            "name": "reference_3",
+            "want": "pass",
+            "got": "pass",
+            "passed": true,
+            "detail": "solution/reference.diff; tests_ran=8 failures=0 errors=0 skipped=0 exit=0 reason=passed (8 tests)"
+          },
+          {
+            "name": "empty_patch",
+            "want": "fail",
+            "got": "fail",
+            "passed": true,
+            "detail": "controls/empty.diff; tests_ran=8 failures=6 errors=0 skipped=0 exit=1 reason=exit 1; 6 failures; required tests failed: test::batch_looks_up_each_distinct_sku_once, test::getmany_batches_hold_at_most_100_skus, test::get_only_catalog_called_once_per_distinct_sku, test::single_order_looks_up_each_sku_once, test::lookups_not_reused_between_calls, test::large_batch_lookup_count"
+          },
+          {
+            "name": "mutant_1",
+            "want": "fail",
+            "got": "fail",
+            "passed": true,
+            "detail": "controls/mutant1.diff; tests_ran=8 failures=1 errors=0 skipped=0 exit=1 reason=exit 1; 1 failures; required tests failed: test::lookups_not_reused_between_calls"
+          },
+          {
+            "name": "mutant_2",
+            "want": "fail",
+            "got": "fail",
+            "passed": true,
+            "detail": "controls/mutant2.diff; tests_ran=8 failures=2 errors=0 skipped=0 exit=1 reason=exit 1; 2 failures; required tests failed: test::getmany_batches_hold_at_most_100_skus, test::large_batch_lookup_count"
+          },
+          {
+            "name": "exploit",
+            "want": "fail",
+            "got": "fail",
+            "passed": true,
+            "detail": "exploit exit 0; tests_ran=8 failures=6 errors=0 skipped=0 exit=1 reason=exit 1; 6 failures; required tests failed: test::batch_looks_up_each_distinct_sku_once, test::getmany_batches_hold_at_most_100_skus, test::get_only_catalog_called_once_per_distinct_sku, test::single_order_looks_up_each_sku_once, test::lookups_not_reused_between_calls, test::large_batch_lookup_count"
+          },
+          {
+            "name": "reference_stale_notes",
+            "want": "pass",
+            "got": "pass",
+            "passed": true,
+            "detail": "reference + fixtures/notes.stale.md as CLAUDE.md, AGENTS.md; tests_ran=8 failures=0 errors=0 skipped=0 exit=0 reason=passed (8 tests)"
+          },
+          {
+            "name": "null_noop",
+            "want": "fail",
+            "got": "fail",
+            "passed": true,
+            "detail": "noop exit 0; tests_ran=8 failures=6 errors=0 skipped=0 exit=1 reason=exit 1; 6 failures; required tests failed: test::batch_looks_up_each_distinct_sku_once, test::getmany_batches_hold_at_most_100_skus, test::get_only_catalog_called_once_per_distinct_sku, test::single_order_looks_up_each_sku_once, test::lookups_not_reused_between_calls, test::large_batch_lookup_count"
+          },
+          {
+            "name": "null_refuse",
+            "want": "fail",
+            "got": "fail",
+            "passed": true,
+            "detail": "refuse exit 0; tests_ran=8 failures=6 errors=0 skipped=0 exit=1 reason=exit 1; 6 failures; required tests failed: test::batch_looks_up_each_distinct_sku_once, test::getmany_batches_hold_at_most_100_skus, test::get_only_catalog_called_once_per_distinct_sku, test::single_order_looks_up_each_sku_once, test::lookups_not_reused_between_calls, test::large_batch_lookup_count"
+          },
+          {
+            "name": "instruction_edited",
+            "want": "edited",
+            "got": "edited",
+            "passed": true
+          },
+          {
+            "name": "secret_scan",
+            "want": "none",
+            "got": "none",
+            "passed": true
+          },
+          {
+            "name": "verifier_no_network",
+            "want": "none",
+            "got": "none",
+            "passed": true,
+            "detail": "reported by grader verifier_command"
+          }
+        ],
+        "at": "2026-11-14T18:55:40.878133554Z",
+        "grader": "verifier_command",
+        "reference_repeats": 3,
+        "reference_results": [
+          "pass",
+          "pass",
+          "pass"
+        ]
+      }
+    }
+  },
+  "probes": {
+    "model-outage": {
+      "version": "1.0.0",
+      "sha256": "6a434aba4ee1ecdb69c3b68f64bc83c4707d54c73f6a1518b953ef56c172182d"
+    },
+    "stale-notes": {
+      "version": "1.0.0",
+      "sha256": "f8d7da5d950097ada36411d1d25a9bda848a7c55337c343eff1a40f1bdaf7394"
+    }
+  },
+  "created_at": "2026-11-14T18:54:35.493166191Z"
+}

@@ -1,0 +1,33 @@
+# acme-orders: Acme's order service library (JavaScript, Node.js 22, ES
+# modules, no npm dependencies) with hidden node:test verifiers.
+#
+# Grading (verifier_command, DESIGN contract "Suites in any language"): a
+# fresh container from base_image, no network, the task repo with the agent's
+# diff applied and the restore paths reset, mounted read-only at /workspace;
+# the task's verifier/tests mounted read-only at /grader/tests. The command
+# writes JUnit XML to result_path.
+#
+# The test path is a glob, not the folder: Node 22 treats a bare directory
+# argument as a module to run ("Cannot find module '/grader/tests'"). Node
+# expands the glob itself (no shell is involved). Hidden helpers that are not
+# tests (_workspace.mjs) do not match it.
+id: acme-orders
+version: 1.0.0
+description: Acme orders service (Node.js 22, ES modules, zero dependencies) with hidden node:test verifiers reporting JUnit.
+environment: docker_workspace
+grader: verifier_command
+base_image:
+  dockerfile: base/Dockerfile
+  tag: heimdall-example/acme-orders-base:1
+workdir: /workspace
+verifier:
+  command: ["node", "--test", "--test-reporter=junit", "--test-reporter-destination=/grader/out/junit.xml", "/grader/tests/**/*.test.mjs"]
+  # Visible tests and anything that changes how Node loads the package are
+  # reset before grading. node.config.json is not read by Node 22 by default;
+  # it is reset anyway so a later Node cannot pick up an agent-written one.
+  restore: ["test", "package.json", "node.config.json"]
+  timeout_s: 300
+  result: junit
+  result_path: /grader/out/junit.xml
+tasks: [ord01, ord02, ord03, ord04]
+probes: [stale-notes, model-outage]

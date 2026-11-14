@@ -1,0 +1,6 @@
+order_id,placed_at,customer,sku,qty,coupon
+A-1001,2026-03-12T14:05:00Z,ana@example.com,TEA-01,2,
+A-1001,,,MUG-01,1,
+A-1002,2026-03-12T16:40:00Z,ben@example.com,POT-01,1,SPRING10
+A-1002,,,TEA-02,3,
+A-1003,2026-03-13T15:00:00Z,cy@example.com,FLT-01,4,WELCOME5

@@ -1,0 +1,7 @@
+[
+  { "sku": "TEA-01", "name": "Green tea, 100 g", "price": "4.50" },
+  { "sku": "TEA-02", "name": "Black tea, 250 g", "price": "7.25" },
+  { "sku": "MUG-01", "name": "Stoneware mug", "price": "12.00" },
+  { "sku": "POT-01", "name": "Glass teapot, 1 l", "price": "29.90" },
+  { "sku": "FLT-01", "name": "Paper filters, 100", "price": "2.15" }
+]
