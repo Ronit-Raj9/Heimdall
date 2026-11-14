@@ -94,7 +94,7 @@ With a provider key in `deploy/.env` (only the fault proxy ever sees it):
 ```bash
 ./bin/bifrost-bench plan experiments/codewins.reduced.yaml   # slots, sizes; nothing runs
 ./bin/bifrost-bench run  experiments/codewins.reduced.yaml   # freeze, run, analyze, print report.md
-./bin/bifrost-bench check experiments/codewins.yaml --fail-on regressed,invalid   # CI: exit 1 regressed, 2 inconclusive, 3 invalid
+./bin/bifrost-bench check -fail-on regressed,invalid experiments/codewins.yaml   # CI: exit 1 regressed, 2 inconclusive, 3 invalid
 ./bin/bifrost-bench audit testdata/audit/maxim-tb21.csv     # verdict for a published per-task table
 ```
 

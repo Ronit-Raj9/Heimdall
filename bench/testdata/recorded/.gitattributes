@@ -1,0 +1,2 @@
+# Seals are sha256 over raw bytes: never convert line endings in the bundle.
+* -text

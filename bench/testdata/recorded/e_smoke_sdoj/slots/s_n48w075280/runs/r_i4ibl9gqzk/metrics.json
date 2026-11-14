@@ -1,0 +1,52 @@
+{
+  "claim_precision": {
+    "state": "not_applicable",
+    "v": null
+  },
+  "cost_usd": {
+    "state": "observed",
+    "v": 0.004989,
+    "evidence": "gateway"
+  },
+  "false_completion": {
+    "state": "observed",
+    "v": 0,
+    "evidence": "native"
+  },
+  "retry_amplification": {
+    "state": "observed",
+    "v": 1,
+    "evidence": "gateway"
+  },
+  "safe_success": {
+    "state": "observed",
+    "v": 0,
+    "evidence": "outcome"
+  },
+  "steps": {
+    "state": "observed",
+    "v": 2,
+    "evidence": "gateway"
+  },
+  "tokens": {
+    "state": "unknown",
+    "v": null,
+    "evidence": "gateway",
+    "reason": "message request 476959a4-2e3b-4593-aea9-60e3780d09c0 has no usage"
+  },
+  "tool_calls": {
+    "state": "observed",
+    "v": 1,
+    "evidence": "gateway"
+  },
+  "verified_success": {
+    "state": "observed",
+    "v": 0,
+    "evidence": "outcome"
+  },
+  "wall_time_s": {
+    "state": "observed",
+    "v": 0.394666537,
+    "evidence": "outcome"
+  }
+}

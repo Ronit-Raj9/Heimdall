@@ -1,0 +1,334 @@
+{
+  "exp_id": "e_smoke_sdoj",
+  "created_at": "2026-11-13T23:28:48.624336747Z",
+  "experiment": {
+    "id": "e_smoke_sdoj",
+    "name": "smoke",
+    "suite": "coding-core@1.0.0",
+    "base": "agents/toy.yaml",
+    "arms": {
+      "A": {
+        "label": "toy baseline",
+        "set": {
+          "notes.user_path": "/tmp/toy/CLAUDE.md"
+        }
+      },
+      "B": {
+        "label": "toy with code-wins note",
+        "set": {
+          "notes.user_file": "experiments/fixtures/codewins.md",
+          "notes.user_path": "/tmp/toy/CLAUDE.md"
+        }
+      }
+    },
+    "primary": {
+      "condition": "clean",
+      "metric": "verified_success"
+    },
+    "guards": [
+      {
+        "rule": "no_new_integrity_violation"
+      }
+    ],
+    "conditions": [
+      {
+        "id": "clean",
+        "tasks": [
+          "t01",
+          "t02"
+        ],
+        "trials": 1
+      },
+      {
+        "id": "model-outage",
+        "tasks": [
+          "t01",
+          "t02"
+        ],
+        "trials": 1
+      }
+    ],
+    "budget": {
+      "total_usd": 0
+    },
+    "verdict": {
+      "policy": "paired_signflip",
+      "alpha": 0.05,
+      "assumed_sd": 0.3
+    },
+    "seed": 20261114,
+    "concurrency": 2,
+    "manifest_mode": "agent_exposure"
+  },
+  "suite_id": "coding-core",
+  "suite_version": "1.0.0",
+  "suite_lock_hash": "9388d4ccf5a1e8028cc2448e7a6701d3719b7d56bc070c55c892e37daf465df6",
+  "arms": {
+    "A": {
+      "label": "toy baseline",
+      "config": {
+        "id": "toy",
+        "adapter": "scripted",
+        "image": "bench/coding-core-base:1",
+        "argv": null,
+        "env": null,
+        "model": "claude-sonnet-4-5",
+        "notes": {
+          "project_file": "CLAUDE.md",
+          "user_path": "/tmp/toy/CLAUDE.md"
+        },
+        "parser": "claudecode",
+        "budgets": {
+          "wall_s": 900,
+          "cpus": 1,
+          "mem_gb": 1
+        },
+        "gateway": {
+          "provider": "anthropic",
+          "max_retries": 0
+        },
+        "scripted": {
+          "kind": "toy"
+        }
+      },
+      "config_hash": "606c9210eb23aca5fa378fc487c6bf344547d4547a3956295eef1f373ff56ecf",
+      "files": {
+        "clean": {
+          "t01:/workspace/CLAUDE.md": "97d7a53fd87465daae3423d0158a445676b95a2c222384f06c0052eaab074728",
+          "t02:/workspace/CLAUDE.md": "7ab9ad54e251a8fe4879f66ad8f81e0cdaf499fc0a466abaf3c3016d499281dc"
+        },
+        "model-outage": {
+          "t01:/workspace/CLAUDE.md": "97d7a53fd87465daae3423d0158a445676b95a2c222384f06c0052eaab074728",
+          "t02:/workspace/CLAUDE.md": "7ab9ad54e251a8fe4879f66ad8f81e0cdaf499fc0a466abaf3c3016d499281dc"
+        }
+      }
+    },
+    "B": {
+      "label": "toy with code-wins note",
+      "config": {
+        "id": "toy",
+        "adapter": "scripted",
+        "image": "bench/coding-core-base:1",
+        "argv": null,
+        "env": null,
+        "model": "claude-sonnet-4-5",
+        "notes": {
+          "project_file": "CLAUDE.md",
+          "user_file": "experiments/fixtures/codewins.md",
+          "user_path": "/tmp/toy/CLAUDE.md"
+        },
+        "parser": "claudecode",
+        "budgets": {
+          "wall_s": 900,
+          "cpus": 1,
+          "mem_gb": 1
+        },
+        "gateway": {
+          "provider": "anthropic",
+          "max_retries": 0
+        },
+        "scripted": {
+          "kind": "toy"
+        }
+      },
+      "config_hash": "6e0e3112a98aa29a87861c32adb10fd85d020d50d621b895e608792e59d9068b",
+      "files": {
+        "clean": {
+          "/tmp/toy/CLAUDE.md": "237707dbe80754b719d5ecbc4155289540c6a5efcba2a26329e8b478f07f33ef",
+          "t01:/workspace/CLAUDE.md": "97d7a53fd87465daae3423d0158a445676b95a2c222384f06c0052eaab074728",
+          "t02:/workspace/CLAUDE.md": "7ab9ad54e251a8fe4879f66ad8f81e0cdaf499fc0a466abaf3c3016d499281dc"
+        },
+        "model-outage": {
+          "/tmp/toy/CLAUDE.md": "237707dbe80754b719d5ecbc4155289540c6a5efcba2a26329e8b478f07f33ef",
+          "t01:/workspace/CLAUDE.md": "97d7a53fd87465daae3423d0158a445676b95a2c222384f06c0052eaab074728",
+          "t02:/workspace/CLAUDE.md": "7ab9ad54e251a8fe4879f66ad8f81e0cdaf499fc0a466abaf3c3016d499281dc"
+        }
+      }
+    }
+  },
+  "parts": {
+    "adapter/command": "1.0.0",
+    "adapter/scripted": "1.0.0",
+    "environment/docker_workspace": "1.0.0",
+    "evidence/agent_stream": "1.0.0",
+    "evidence/cost": "1.0.0",
+    "evidence/gateway": "1.0.0",
+    "evidence/proxy_ledger": "1.0.0",
+    "evidence/shim_log": "1.0.0",
+    "gate/egress": "1.0.0",
+    "gate/g1_protected_paths": "1.0.0",
+    "gate/g2_test_infra": "1.0.0",
+    "gate/g4_regrade": "1.0.0",
+    "gate/g6_null_agents": "1.0.0",
+    "gate/g8_false_completion": "1.0.0",
+    "gate/model_fidelity": "1.0.0",
+    "gateway/bifrost": "1.0.0",
+    "grader/hidden_tests": "1.0.0",
+    "loader/local": "1.0.0",
+    "metric/claim_precision": "1.0.0",
+    "metric/cost_usd": "1.0.0",
+    "metric/false_completion": "1.0.0",
+    "metric/retry_amplification": "1.0.0",
+    "metric/safe_success": "1.0.0",
+    "metric/steps": "1.0.0",
+    "metric/tokens": "1.0.0",
+    "metric/tool_calls": "1.0.0",
+    "metric/verified_success": "1.0.0",
+    "metric/wall_time_s": "1.0.0",
+    "parser/claudecode": "1.0.0",
+    "probe_layer/fixture": "1.0.0",
+    "probe_layer/gateway": "1.0.0",
+    "probe_layer/tool_shim": "1.0.0",
+    "reporter/json": "1.0.0",
+    "reporter/markdown": "1.0.0",
+    "store/fs": "1.0.0",
+    "verdict_policy/paired_signflip": "1.0.0"
+  },
+  "gateway": {
+    "name": "bifrost",
+    "version": "v2.5.1",
+    "config_sha256": "ab0147380a094d37c111c6dd31a3098d24dbdf7886dd86ce045e58b716fd70b1",
+    "plugins": [
+      "compat",
+      "governance",
+      "logging",
+      "model-catalog-resolver",
+      "prompts",
+      "routing",
+      "telemetry"
+    ],
+    "settings": {
+      "allow_direct_keys": "false",
+      "base_url": "http://faultproxy:9100",
+      "content_logging": "true",
+      "egress_probe": "blocked",
+      "enable_logging": "true",
+      "enforce_auth_on_inference": "true",
+      "eval_network": "bench-evalnet",
+      "key_slots": "4",
+      "max_retries": "0",
+      "mcp_disable_auto_tool_inject": "true",
+      "store_raw_request_response": "true"
+    },
+    "checked_at": "2026-11-13T23:28:48.62521273Z"
+  },
+  "arm_order": {
+    "t01": [
+      "B",
+      "A"
+    ],
+    "t02": [
+      "A",
+      "B"
+    ]
+  },
+  "slots": [
+    {
+      "slot_id": "s_wskttklrzb",
+      "pair_id": "p_2g84k0ogfo",
+      "exp_id": "e_smoke_sdoj",
+      "suite": "coding-core",
+      "task": "t01",
+      "task_version": "1.0.0",
+      "arm": "B",
+      "condition": "clean",
+      "trial": 1,
+      "order_index": 0,
+      "counted": true
+    },
+    {
+      "slot_id": "s_fe1v8wgmyg",
+      "pair_id": "p_2g84k0ogfo",
+      "exp_id": "e_smoke_sdoj",
+      "suite": "coding-core",
+      "task": "t01",
+      "task_version": "1.0.0",
+      "arm": "A",
+      "condition": "clean",
+      "trial": 1,
+      "order_index": 1,
+      "counted": true
+    },
+    {
+      "slot_id": "s_adulu7t0h0",
+      "pair_id": "p_k1zy8c9dqy",
+      "exp_id": "e_smoke_sdoj",
+      "suite": "coding-core",
+      "task": "t02",
+      "task_version": "1.0.0",
+      "arm": "A",
+      "condition": "clean",
+      "trial": 1,
+      "order_index": 2,
+      "counted": true
+    },
+    {
+      "slot_id": "s_t43qmrtay8",
+      "pair_id": "p_k1zy8c9dqy",
+      "exp_id": "e_smoke_sdoj",
+      "suite": "coding-core",
+      "task": "t02",
+      "task_version": "1.0.0",
+      "arm": "B",
+      "condition": "clean",
+      "trial": 1,
+      "order_index": 3,
+      "counted": true
+    },
+    {
+      "slot_id": "s_ugh4r23vy2",
+      "pair_id": "p_6raas000wo",
+      "exp_id": "e_smoke_sdoj",
+      "suite": "coding-core",
+      "task": "t01",
+      "task_version": "1.0.0",
+      "arm": "B",
+      "condition": "model-outage",
+      "trial": 1,
+      "order_index": 4,
+      "counted": true
+    },
+    {
+      "slot_id": "s_glz13mrnep",
+      "pair_id": "p_6raas000wo",
+      "exp_id": "e_smoke_sdoj",
+      "suite": "coding-core",
+      "task": "t01",
+      "task_version": "1.0.0",
+      "arm": "A",
+      "condition": "model-outage",
+      "trial": 1,
+      "order_index": 5,
+      "counted": true
+    },
+    {
+      "slot_id": "s_n48w075280",
+      "pair_id": "p_4sxy8fscro",
+      "exp_id": "e_smoke_sdoj",
+      "suite": "coding-core",
+      "task": "t02",
+      "task_version": "1.0.0",
+      "arm": "A",
+      "condition": "model-outage",
+      "trial": 1,
+      "order_index": 6,
+      "counted": true
+    },
+    {
+      "slot_id": "s_3gmqn2atf1",
+      "pair_id": "p_4sxy8fscro",
+      "exp_id": "e_smoke_sdoj",
+      "suite": "coding-core",
+      "task": "t02",
+      "task_version": "1.0.0",
+      "arm": "B",
+      "condition": "model-outage",
+      "trial": 1,
+      "order_index": 7,
+      "counted": true
+    }
+  ],
+  "randomization_unit": "task",
+  "bench_version": "0.1.0",
+  "hash": "20d282759cb94d544fc6018d0dbf318e2d46917d090b4d81cd12f91c6c0bbe29"
+}

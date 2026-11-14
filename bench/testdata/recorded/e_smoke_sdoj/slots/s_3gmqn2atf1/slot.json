@@ -1,0 +1,13 @@
+{
+  "slot_id": "s_3gmqn2atf1",
+  "pair_id": "p_4sxy8fscro",
+  "exp_id": "e_smoke_sdoj",
+  "suite": "coding-core",
+  "task": "t02",
+  "task_version": "1.0.0",
+  "arm": "B",
+  "condition": "model-outage",
+  "trial": 1,
+  "order_index": 7,
+  "counted": true
+}

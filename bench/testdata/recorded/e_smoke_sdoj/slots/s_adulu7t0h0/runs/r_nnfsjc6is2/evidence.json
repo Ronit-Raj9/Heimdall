@@ -1,0 +1,600 @@
+{
+  "exec": {
+    "exit_code": 0,
+    "timed_out": false,
+    "started": "2026-11-13T23:29:09.898913176Z",
+    "ended": "2026-11-13T23:29:10.956352952Z",
+    "stdout_path": "/home/raj/Storage/CODING/Hackathon/Bifrost/repo/bench/runs/e_smoke_sdoj/slots/s_adulu7t0h0/runs/r_nnfsjc6is2/agent.stream.jsonl",
+    "stderr_path": "/home/raj/Storage/CODING/Hackathon/Bifrost/repo/bench/runs/e_smoke_sdoj/slots/s_adulu7t0h0/runs/r_nnfsjc6is2/agent.stderr.txt",
+    "truncated": false
+  },
+  "diff": {
+    "path": "/home/raj/Storage/CODING/Hackathon/Bifrost/repo/bench/runs/e_smoke_sdoj/slots/s_adulu7t0h0/runs/r_nnfsjc6is2/workspace.diff",
+    "sha256": "cf39dc11457b4024ac9ea7f4df98e7fb1ad2d88fb93f825c0aa01bdeca9232f4",
+    "files": [
+      {
+        "path": "README.md",
+        "status": "modified"
+      },
+      {
+        "path": "ledger/__init__.py",
+        "status": "modified"
+      },
+      {
+        "path": "ledger/cli.py",
+        "status": "modified"
+      },
+      {
+        "path": "ledger/export.py",
+        "status": "modified"
+      }
+    ]
+  },
+  "requests": {
+    "requests": [
+      {
+        "id": "a5a1250b-3e6d-4b65-8180-d2bbaa2d475a",
+        "timestamp": "2026-11-13T23:29:10.498067Z",
+        "status": "success",
+        "kind": "message",
+        "provider": "anthropic",
+        "model_requested": "claude-sonnet-4-5",
+        "model_served": "claude-sonnet-4-5",
+        "fallback_index": 0,
+        "stream": false,
+        "latency_ms": 22.067819,
+        "tokens": {
+          "fresh": 619,
+          "cache_read": 0,
+          "cache_write": 0,
+          "out": 32
+        },
+        "bifrost_usd": 0.002337,
+        "cache_hit": false,
+        "response_id": "msg_56qkt85cuadskjjrp8koshjo",
+        "attempts": [
+          {
+            "n": 1,
+            "key_name": "fp-slot-1"
+          }
+        ],
+        "tool_calls": [
+          {
+            "id": "toolu_6icbq6cxzdvgtz7s0swmlrop",
+            "name": "read_file",
+            "args_hash": "518341a7f82a294570cc3ba8ae0eec8f157d80c390e56cad16702940266a4eba"
+          }
+        ]
+      },
+      {
+        "id": "ab445f6a-4e8c-4bbc-a18e-215349b36dc9",
+        "timestamp": "2026-11-13T23:29:10.521352Z",
+        "status": "success",
+        "kind": "message",
+        "provider": "anthropic",
+        "model_requested": "claude-sonnet-4-5",
+        "model_served": "claude-sonnet-4-5",
+        "fallback_index": 0,
+        "stream": false,
+        "latency_ms": 14.946116,
+        "tokens": {
+          "fresh": 724,
+          "cache_read": 0,
+          "cache_write": 0,
+          "out": 32
+        },
+        "bifrost_usd": 0.002652,
+        "cache_hit": false,
+        "response_id": "msg_6wcxuvqvm0jpm8ee7wj2p88v",
+        "attempts": [
+          {
+            "n": 1,
+            "key_name": "fp-slot-1"
+          }
+        ],
+        "tool_result_ids": [
+          "toolu_6icbq6cxzdvgtz7s0swmlrop"
+        ]
+      },
+      {
+        "id": "28c3c39e-b0a1-4b78-9c87-71c9dd3f8874",
+        "timestamp": "2026-11-13T23:29:10.537188Z",
+        "status": "success",
+        "kind": "message",
+        "provider": "anthropic",
+        "model_requested": "claude-sonnet-4-5",
+        "model_served": "claude-sonnet-4-5",
+        "fallback_index": 0,
+        "stream": false,
+        "latency_ms": 26.323149,
+        "tokens": {
+          "fresh": 771,
+          "cache_read": 0,
+          "cache_write": 0,
+          "out": 32
+        },
+        "bifrost_usd": 0.002793,
+        "cache_hit": false,
+        "response_id": "msg_97quwr1jegdykmj5mrmqht9j",
+        "attempts": [
+          {
+            "n": 1,
+            "key_name": "fp-slot-1"
+          }
+        ],
+        "tool_result_ids": [
+          "toolu_6icbq6cxzdvgtz7s0swmlrop"
+        ]
+      }
+    ],
+    "complete": true,
+    "row_ids": [
+      "a5a1250b-3e6d-4b65-8180-d2bbaa2d475a",
+      "ab445f6a-4e8c-4bbc-a18e-215349b36dc9",
+      "28c3c39e-b0a1-4b78-9c87-71c9dd3f8874"
+    ],
+    "dropped_global": 0
+  },
+  "ledger": [
+    {
+      "slot": "fp-slot-1",
+      "run_id": "r_nnfsjc6is2",
+      "call": 1,
+      "kind": "message",
+      "path": "/v1/messages",
+      "stream": false,
+      "action": "pass",
+      "status": 200,
+      "req_sha256": "d6f2d34bab6649bf5d681c021defde0129b7a5252bdf51ef971fbf81e129fb53",
+      "response_id": "msg_56qkt85cuadskjjrp8koshjo",
+      "tokens": {
+        "fresh": 619,
+        "cache_read": 0,
+        "cache_write": 0,
+        "out": 32
+      },
+      "upstream_ms": 0.042,
+      "at": "2026-11-13T23:29:10.498606021Z",
+      "prev_hash": "18ecc694499424fa51969bd4eb95afc9b75dd094bd7841bb83791910dbfd1ed9",
+      "hash": "23d45beadabb0b169a5d436a67d75f7aa9c8b2be5208274a7853fe5264040ad8"
+    },
+    {
+      "slot": "fp-slot-1",
+      "run_id": "r_nnfsjc6is2",
+      "call": 2,
+      "kind": "message",
+      "path": "/v1/messages",
+      "stream": false,
+      "action": "pass",
+      "status": 200,
+      "req_sha256": "8ca14ff2280d555b8f956cdd26e637769be346b789c2bf1ce0c3010a920011b4",
+      "response_id": "msg_6wcxuvqvm0jpm8ee7wj2p88v",
+      "tokens": {
+        "fresh": 724,
+        "cache_read": 0,
+        "cache_write": 0,
+        "out": 32
+      },
+      "upstream_ms": 0.03,
+      "at": "2026-11-13T23:29:10.521721703Z",
+      "prev_hash": "23d45beadabb0b169a5d436a67d75f7aa9c8b2be5208274a7853fe5264040ad8",
+      "hash": "835b1a0d873c35447990118432eccf1f4d2352b3ba72010b62bd9664a34a2f38"
+    },
+    {
+      "slot": "fp-slot-1",
+      "run_id": "r_nnfsjc6is2",
+      "call": 3,
+      "kind": "message",
+      "path": "/v1/messages",
+      "stream": false,
+      "action": "pass",
+      "status": 200,
+      "req_sha256": "d219110c38efd76ed9348d218f6678cce6c16b2589ada87c3469376e09793d34",
+      "response_id": "msg_97quwr1jegdykmj5mrmqht9j",
+      "tokens": {
+        "fresh": 771,
+        "cache_read": 0,
+        "cache_write": 0,
+        "out": 32
+      },
+      "upstream_ms": 0.015,
+      "at": "2026-11-13T23:29:10.537476228Z",
+      "prev_hash": "835b1a0d873c35447990118432eccf1f4d2352b3ba72010b62bd9664a34a2f38",
+      "hash": "c09a36796aff99f14071a15326f7698deb80477fc9de8ce49ee16509a984f313"
+    }
+  ],
+  "events": [
+    {
+      "event_id": "r_nnfsjc6is2:gateway:1",
+      "run_id": "r_nnfsjc6is2",
+      "slot_id": "s_adulu7t0h0",
+      "pair_id": "p_k1zy8c9dqy",
+      "seq": 1,
+      "turn_index": 1,
+      "ts": "2026-11-13T23:29:10.498067Z",
+      "type": "model_request",
+      "source": "gateway",
+      "evidence": "gateway",
+      "request_id": "a5a1250b-3e6d-4b65-8180-d2bbaa2d475a",
+      "provider": "anthropic",
+      "model_requested": "claude-sonnet-4-5",
+      "model_served": "claude-sonnet-4-5"
+    },
+    {
+      "event_id": "r_nnfsjc6is2:gateway:2",
+      "run_id": "r_nnfsjc6is2",
+      "slot_id": "s_adulu7t0h0",
+      "pair_id": "p_k1zy8c9dqy",
+      "seq": 2,
+      "turn_index": 1,
+      "ts": "2026-11-13T23:29:10.520134819Z",
+      "type": "model_response",
+      "source": "gateway",
+      "evidence": "gateway",
+      "request_id": "a5a1250b-3e6d-4b65-8180-d2bbaa2d475a",
+      "attempt_no": 1,
+      "parent_event_id": "r_nnfsjc6is2:gateway:1",
+      "provider": "anthropic",
+      "model_requested": "claude-sonnet-4-5",
+      "model_served": "claude-sonnet-4-5",
+      "tokens": {
+        "fresh": 619,
+        "cache_read": 0,
+        "cache_write": 0,
+        "out": 32
+      },
+      "usd": {
+        "state": "observed",
+        "v": 0.002337,
+        "evidence": "gateway"
+      },
+      "summary": "1 tool calls"
+    },
+    {
+      "event_id": "r_nnfsjc6is2:gateway:3",
+      "run_id": "r_nnfsjc6is2",
+      "slot_id": "s_adulu7t0h0",
+      "pair_id": "p_k1zy8c9dqy",
+      "seq": 3,
+      "turn_index": 1,
+      "ts": "2026-11-13T23:29:10.520134819Z",
+      "type": "tool_call",
+      "source": "gateway",
+      "evidence": "gateway",
+      "request_id": "a5a1250b-3e6d-4b65-8180-d2bbaa2d475a",
+      "tool_call_id": "toolu_6icbq6cxzdvgtz7s0swmlrop",
+      "parent_event_id": "r_nnfsjc6is2:gateway:2",
+      "tool_name": "read_file",
+      "args_hash": "518341a7f82a294570cc3ba8ae0eec8f157d80c390e56cad16702940266a4eba",
+      "provider": "anthropic",
+      "model_requested": "claude-sonnet-4-5",
+      "model_served": "claude-sonnet-4-5",
+      "summary": "read_file "
+    },
+    {
+      "event_id": "r_nnfsjc6is2:gateway:4",
+      "run_id": "r_nnfsjc6is2",
+      "slot_id": "s_adulu7t0h0",
+      "pair_id": "p_k1zy8c9dqy",
+      "seq": 4,
+      "turn_index": 2,
+      "ts": "2026-11-13T23:29:10.521352Z",
+      "type": "tool_result",
+      "source": "gateway",
+      "evidence": "gateway",
+      "request_id": "ab445f6a-4e8c-4bbc-a18e-215349b36dc9",
+      "tool_call_id": "toolu_6icbq6cxzdvgtz7s0swmlrop",
+      "parent_event_id": "r_nnfsjc6is2:gateway:3",
+      "provider": "anthropic",
+      "model_requested": "claude-sonnet-4-5",
+      "model_served": "claude-sonnet-4-5"
+    },
+    {
+      "event_id": "r_nnfsjc6is2:gateway:5",
+      "run_id": "r_nnfsjc6is2",
+      "slot_id": "s_adulu7t0h0",
+      "pair_id": "p_k1zy8c9dqy",
+      "seq": 5,
+      "turn_index": 2,
+      "ts": "2026-11-13T23:29:10.521352Z",
+      "type": "model_request",
+      "source": "gateway",
+      "evidence": "gateway",
+      "request_id": "ab445f6a-4e8c-4bbc-a18e-215349b36dc9",
+      "provider": "anthropic",
+      "model_requested": "claude-sonnet-4-5",
+      "model_served": "claude-sonnet-4-5"
+    },
+    {
+      "event_id": "r_nnfsjc6is2:gateway:6",
+      "run_id": "r_nnfsjc6is2",
+      "slot_id": "s_adulu7t0h0",
+      "pair_id": "p_k1zy8c9dqy",
+      "seq": 6,
+      "turn_index": 2,
+      "ts": "2026-11-13T23:29:10.536298116Z",
+      "type": "model_response",
+      "source": "gateway",
+      "evidence": "gateway",
+      "request_id": "ab445f6a-4e8c-4bbc-a18e-215349b36dc9",
+      "attempt_no": 1,
+      "parent_event_id": "r_nnfsjc6is2:gateway:5",
+      "provider": "anthropic",
+      "model_requested": "claude-sonnet-4-5",
+      "model_served": "claude-sonnet-4-5",
+      "tokens": {
+        "fresh": 724,
+        "cache_read": 0,
+        "cache_write": 0,
+        "out": 32
+      },
+      "usd": {
+        "state": "observed",
+        "v": 0.002652,
+        "evidence": "gateway"
+      },
+      "summary": "0 tool calls"
+    },
+    {
+      "event_id": "r_nnfsjc6is2:gateway:7",
+      "run_id": "r_nnfsjc6is2",
+      "slot_id": "s_adulu7t0h0",
+      "pair_id": "p_k1zy8c9dqy",
+      "seq": 7,
+      "turn_index": 3,
+      "ts": "2026-11-13T23:29:10.537188Z",
+      "type": "model_request",
+      "source": "gateway",
+      "evidence": "gateway",
+      "request_id": "28c3c39e-b0a1-4b78-9c87-71c9dd3f8874",
+      "provider": "anthropic",
+      "model_requested": "claude-sonnet-4-5",
+      "model_served": "claude-sonnet-4-5"
+    },
+    {
+      "event_id": "r_nnfsjc6is2:gateway:8",
+      "run_id": "r_nnfsjc6is2",
+      "slot_id": "s_adulu7t0h0",
+      "pair_id": "p_k1zy8c9dqy",
+      "seq": 8,
+      "turn_index": 3,
+      "ts": "2026-11-13T23:29:10.563511149Z",
+      "type": "model_response",
+      "source": "gateway",
+      "evidence": "gateway",
+      "request_id": "28c3c39e-b0a1-4b78-9c87-71c9dd3f8874",
+      "attempt_no": 1,
+      "parent_event_id": "r_nnfsjc6is2:gateway:7",
+      "provider": "anthropic",
+      "model_requested": "claude-sonnet-4-5",
+      "model_served": "claude-sonnet-4-5",
+      "tokens": {
+        "fresh": 771,
+        "cache_read": 0,
+        "cache_write": 0,
+        "out": 32
+      },
+      "usd": {
+        "state": "observed",
+        "v": 0.002793,
+        "evidence": "gateway"
+      },
+      "summary": "0 tool calls"
+    },
+    {
+      "event_id": "r_nnfsjc6is2:agent_stream:1",
+      "run_id": "r_nnfsjc6is2",
+      "slot_id": "s_adulu7t0h0",
+      "pair_id": "p_k1zy8c9dqy",
+      "seq": 1,
+      "turn_index": 1,
+      "ts": "2026-11-13T23:29:09.898913176Z",
+      "type": "model_response",
+      "source": "agent_stream",
+      "evidence": "native",
+      "provider": "anthropic",
+      "model_requested": "claude-sonnet-4-5",
+      "model_served": "claude-sonnet-4-5",
+      "tokens": {
+        "fresh": 619,
+        "cache_read": 0,
+        "cache_write": 0,
+        "out": 32
+      }
+    },
+    {
+      "event_id": "r_nnfsjc6is2:agent_stream:2",
+      "run_id": "r_nnfsjc6is2",
+      "slot_id": "s_adulu7t0h0",
+      "pair_id": "p_k1zy8c9dqy",
+      "seq": 2,
+      "turn_index": 1,
+      "ts": "2026-11-13T23:29:09.898913176Z",
+      "type": "tool_call",
+      "source": "agent_stream",
+      "evidence": "native",
+      "tool_call_id": "toolu_6icbq6cxzdvgtz7s0swmlrop",
+      "parent_event_id": "r_nnfsjc6is2:agent_stream:1",
+      "tool_name": "read_file",
+      "args_hash": "518341a7f82a294570cc3ba8ae0eec8f157d80c390e56cad16702940266a4eba",
+      "provider": "anthropic",
+      "model_requested": "claude-sonnet-4-5",
+      "summary": "read_file"
+    },
+    {
+      "event_id": "r_nnfsjc6is2:agent_stream:3",
+      "run_id": "r_nnfsjc6is2",
+      "slot_id": "s_adulu7t0h0",
+      "pair_id": "p_k1zy8c9dqy",
+      "seq": 3,
+      "turn_index": 1,
+      "ts": "2026-11-13T23:29:09.898913176Z",
+      "type": "tool_result",
+      "source": "agent_stream",
+      "evidence": "native",
+      "tool_call_id": "toolu_6icbq6cxzdvgtz7s0swmlrop",
+      "parent_event_id": "r_nnfsjc6is2:agent_stream:2",
+      "tool_name": "read_file",
+      "result_hash": "981d1cc40ecf7f3c94456d4452e04e375d40f7f7f582092f1727d0d0fee2140c",
+      "is_error": true,
+      "provider": "anthropic",
+      "model_requested": "claude-sonnet-4-5",
+      "summary": "[Errno 21] Is a directory: '/workspace'"
+    },
+    {
+      "event_id": "r_nnfsjc6is2:agent_stream:4",
+      "run_id": "r_nnfsjc6is2",
+      "slot_id": "s_adulu7t0h0",
+      "pair_id": "p_k1zy8c9dqy",
+      "seq": 4,
+      "turn_index": 2,
+      "ts": "2026-11-13T23:29:09.898913176Z",
+      "type": "model_response",
+      "source": "agent_stream",
+      "evidence": "native",
+      "provider": "anthropic",
+      "model_requested": "claude-sonnet-4-5",
+      "model_served": "claude-sonnet-4-5",
+      "tokens": {
+        "fresh": 724,
+        "cache_read": 0,
+        "cache_write": 0,
+        "out": 32
+      },
+      "summary": "Scripted reply from the bench fault proxy."
+    },
+    {
+      "event_id": "r_nnfsjc6is2:agent_stream:5",
+      "run_id": "r_nnfsjc6is2",
+      "slot_id": "s_adulu7t0h0",
+      "pair_id": "p_k1zy8c9dqy",
+      "seq": 5,
+      "turn_index": 3,
+      "ts": "2026-11-13T23:29:09.898913176Z",
+      "type": "model_response",
+      "source": "agent_stream",
+      "evidence": "native",
+      "provider": "anthropic",
+      "model_requested": "claude-sonnet-4-5",
+      "model_served": "claude-sonnet-4-5",
+      "tokens": {
+        "fresh": 771,
+        "cache_read": 0,
+        "cache_write": 0,
+        "out": 32
+      },
+      "summary": "Scripted reply from the bench fault proxy."
+    }
+  ],
+  "claim": {
+    "made": true,
+    "text": "All tests pass",
+    "source": "native",
+    "matched": "all tests pass"
+  },
+  "cost": [
+    {
+      "request_id": "a5a1250b-3e6d-4b65-8180-d2bbaa2d475a",
+      "attempt": 1,
+      "model": "claude-sonnet-4-5",
+      "tokens": {
+        "fresh": 619,
+        "cache_read": 0,
+        "cache_write": 0,
+        "out": 32
+      },
+      "price_ref": "bifrost-datasheet-2026-11-14@sha256:8cbf6f996e818f506804dc419e2c5d54e2db78b30435c8e3629357b89e0ec365",
+      "usd": {
+        "state": "observed",
+        "v": 0.002337,
+        "evidence": "gateway"
+      },
+      "bifrost_usd": 0.002337,
+      "fault_inject": false
+    },
+    {
+      "request_id": "ab445f6a-4e8c-4bbc-a18e-215349b36dc9",
+      "attempt": 1,
+      "model": "claude-sonnet-4-5",
+      "tokens": {
+        "fresh": 724,
+        "cache_read": 0,
+        "cache_write": 0,
+        "out": 32
+      },
+      "price_ref": "bifrost-datasheet-2026-11-14@sha256:8cbf6f996e818f506804dc419e2c5d54e2db78b30435c8e3629357b89e0ec365",
+      "usd": {
+        "state": "observed",
+        "v": 0.002652,
+        "evidence": "gateway"
+      },
+      "bifrost_usd": 0.002652,
+      "fault_inject": false
+    },
+    {
+      "request_id": "28c3c39e-b0a1-4b78-9c87-71c9dd3f8874",
+      "attempt": 1,
+      "model": "claude-sonnet-4-5",
+      "tokens": {
+        "fresh": 771,
+        "cache_read": 0,
+        "cache_write": 0,
+        "out": 32
+      },
+      "price_ref": "bifrost-datasheet-2026-11-14@sha256:8cbf6f996e818f506804dc419e2c5d54e2db78b30435c8e3629357b89e0ec365",
+      "usd": {
+        "state": "observed",
+        "v": 0.002793,
+        "evidence": "gateway"
+      },
+      "bifrost_usd": 0.002793,
+      "fault_inject": false
+    }
+  ],
+  "grade": {
+    "passed": true,
+    "invalid_evaluator": false,
+    "exit_code": 0,
+    "tests_ran": 7,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 0,
+    "reason": "passed (7 tests)",
+    "suite_version": "1.0.0",
+    "grader_version": "1.0.0",
+    "diff_sha256": "cf39dc11457b4024ac9ea7f4df98e7fb1ad2d88fb93f825c0aa01bdeca9232f4"
+  },
+  "gates": [
+    {
+      "gate": "g1_protected_paths",
+      "version": "1.0.0",
+      "effect": "veto",
+      "fired": false
+    },
+    {
+      "gate": "g2_test_infra",
+      "version": "1.0.0",
+      "effect": "veto",
+      "fired": false
+    },
+    {
+      "gate": "g4_regrade",
+      "version": "1.0.0",
+      "effect": "veto",
+      "fired": false
+    },
+    {
+      "gate": "g6_null_agents",
+      "version": "1.0.0",
+      "effect": "admission",
+      "fired": false,
+      "detail": "not a null agent"
+    },
+    {
+      "gate": "egress",
+      "version": "1.0.0",
+      "effect": "invalidate",
+      "fired": false
+    }
+  ]
+}

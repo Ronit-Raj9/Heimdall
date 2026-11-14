@@ -1,0 +1,135 @@
+name: Bifrost Bench gate
+description: >
+  Run `bifrost-bench check` on an agent change and fail the job on the listed
+  verdicts or a release-policy block. Recorded mode re-analyzes a sealed,
+  checked-in experiment and needs no Docker, gateway or key; live mode runs an
+  experiment against a running bench stack.
+
+inputs:
+  mode:
+    description: "recorded (re-analyze a sealed bundle) or live (run an experiment against a running stack)"
+    required: false
+    default: recorded
+  experiment:
+    description: "live: experiment file, relative to bench/ (e.g. experiments/codewins.reduced.yaml)"
+    required: false
+    default: ""
+  exp-id:
+    description: "recorded: experiment id inside the bundle; empty uses the only one"
+    required: false
+    default: ""
+  bundle:
+    description: "recorded: bundle root, relative to bench/"
+    required: false
+    default: testdata/recorded
+  data-mode:
+    description: "recorded: the mode the report is labelled with, recorded or synthetic (use synthetic for a scripted-model bundle)"
+    required: false
+    default: recorded
+  policy:
+    description: "release policy file, relative to bench/; empty uses policies/default.yaml when it exists; none turns policy off. Ignored, with a warning, by a bifrost-bench without -policy"
+    required: false
+    default: ""
+  fail-on:
+    description: "comma-separated verdicts that fail the gate"
+    required: false
+    default: regressed,invalid
+  go-version:
+    description: "Go version; empty uses the go directive of bench/go.mod"
+    required: false
+    default: ""
+  artifact-name:
+    description: "name of the uploaded report artifact"
+    required: false
+    default: bench-check-report
+
+outputs:
+  verdict:
+    description: "improved, regressed, inconclusive, invalid, or none when check stopped before a verdict"
+    value: ${{ steps.check.outputs.verdict }}
+  action:
+    description: "ship, hold, no_decision, fix_harness, or none"
+    value: ${{ steps.check.outputs.action }}
+  policy-decision:
+    description: "allow, warn or block when a policy was evaluated, else empty"
+    value: ${{ steps.check.outputs.policy-decision }}
+  exit-code:
+    description: "bifrost-bench check exit code: 0 pass, 1 regressed, 2 inconclusive, 3 invalid, 4 infrastructure, 5 policy block, 64 usage"
+    value: ${{ steps.check.outputs.gate }}
+  report:
+    description: "path of the markdown report on the runner (report.json sits beside it)"
+    value: ${{ steps.check.outputs.report }}
+
+runs:
+  using: composite
+  steps:
+    - name: Locate the bench module
+      id: paths
+      shell: bash
+      run: echo "bench=$(cd "$GITHUB_ACTION_PATH/.." && pwd)" >> "$GITHUB_OUTPUT"
+
+    - name: Set up Go
+      uses: actions/setup-go@4b73464bb391d4059bd26b0524d20df3927bd417 # v6.3.0
+      with:
+        go-version: ${{ inputs.go-version }}
+        go-version-file: ${{ inputs.go-version == '' && format('{0}/go.mod', steps.paths.outputs.bench) || '' }}
+        cache-dependency-path: ${{ steps.paths.outputs.bench }}/go.sum
+
+    - name: Build bifrost-bench
+      id: build
+      shell: bash
+      working-directory: ${{ steps.paths.outputs.bench }}
+      env:
+        GOWORK: "off"
+        CGO_ENABLED: "0"
+      run: |
+        bin="$RUNNER_TEMP/bifrost-bench-bin/bifrost-bench"
+        go build -o "$bin" ./cmd/bifrost-bench
+        echo "bin=$bin" >> "$GITHUB_OUTPUT"
+
+    # check -exp reads sealed runs without re-hashing them, so verify every
+    # seal of the bundle first: a hand-edited bundle fails here.
+    - name: Verify recorded bundle seals
+      if: inputs.mode == 'recorded'
+      shell: bash
+      working-directory: ${{ steps.paths.outputs.bench }}
+      env:
+        GOWORK: "off"
+        BENCH_CI_BUNDLE: ${{ inputs.bundle }}
+      run: go test -count=1 -run 'TestRecordedBundleSeals' ./ci/
+
+    # The step always succeeds so its outputs are set and the report is
+    # uploaded; the last step carries the gate's exit code.
+    - name: Run bifrost-bench check
+      id: check
+      shell: bash
+      env:
+        BENCH_CI_MODE: ${{ inputs.mode }}
+        BENCH_CI_BIN: ${{ steps.build.outputs.bin }}
+        BENCH_CI_EXPERIMENT: ${{ inputs.experiment }}
+        BENCH_CI_EXP_ID: ${{ inputs.exp-id }}
+        BENCH_CI_BUNDLE: ${{ inputs.bundle }}
+        BENCH_CI_DATA_MODE: ${{ inputs.data-mode }}
+        BENCH_CI_POLICY: ${{ inputs.policy }}
+        BENCH_CI_FAIL_ON: ${{ inputs.fail-on }}
+        BENCH_CI_OUT: ${{ runner.temp }}/bench-check/report.md
+      run: |
+        code=0
+        "$GITHUB_ACTION_PATH/check.sh" || code=$?
+        echo "gate=$code" >> "$GITHUB_OUTPUT"
+
+    - name: Upload report
+      if: always()
+      uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f # v7.0.0
+      with:
+        name: ${{ inputs.artifact-name }}
+        path: |
+          ${{ runner.temp }}/bench-check/report.md
+          ${{ runner.temp }}/bench-check/report.json
+        if-no-files-found: warn
+
+    - name: Gate
+      shell: bash
+      env:
+        GATE: ${{ steps.check.outputs.gate }}
+      run: exit "${GATE:-4}"

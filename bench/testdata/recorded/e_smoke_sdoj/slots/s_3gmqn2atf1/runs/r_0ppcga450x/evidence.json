@@ -1,0 +1,601 @@
+{
+  "exec": {
+    "exit_code": 1,
+    "timed_out": false,
+    "started": "2026-11-13T23:29:29.118331755Z",
+    "ended": "2026-11-13T23:29:29.507220288Z",
+    "stdout_path": "/home/raj/Storage/CODING/Hackathon/Bifrost/repo/bench/runs/e_smoke_sdoj/slots/s_3gmqn2atf1/runs/r_0ppcga450x/agent.stream.jsonl",
+    "stderr_path": "/home/raj/Storage/CODING/Hackathon/Bifrost/repo/bench/runs/e_smoke_sdoj/slots/s_3gmqn2atf1/runs/r_0ppcga450x/agent.stderr.txt",
+    "truncated": false
+  },
+  "diff": {
+    "path": "/home/raj/Storage/CODING/Hackathon/Bifrost/repo/bench/runs/e_smoke_sdoj/slots/s_3gmqn2atf1/runs/r_0ppcga450x/workspace.diff",
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "files": null
+  },
+  "requests": {
+    "requests": [
+      {
+        "id": "7660a35a-b325-4441-81ab-557a3988c49b",
+        "timestamp": "2026-11-13T23:29:29.387625Z",
+        "status": "success",
+        "kind": "message",
+        "provider": "anthropic",
+        "model_requested": "claude-sonnet-4-5",
+        "model_served": "claude-sonnet-4-5",
+        "fallback_index": 0,
+        "stream": false,
+        "latency_ms": 3.561342,
+        "tokens": {
+          "fresh": 619,
+          "cache_read": 0,
+          "cache_write": 0,
+          "out": 32
+        },
+        "bifrost_usd": 0.002337,
+        "cache_hit": false,
+        "response_id": "msg_dvimkra0resgf3rxw26q65hu",
+        "attempts": [
+          {
+            "n": 1,
+            "key_name": "fp-slot-2"
+          }
+        ],
+        "tool_calls": [
+          {
+            "id": "toolu_3vlt0uem10k01s7vrg4y06tx",
+            "name": "read_file",
+            "args_hash": "518341a7f82a294570cc3ba8ae0eec8f157d80c390e56cad16702940266a4eba"
+          }
+        ]
+      },
+      {
+        "id": "fdbeec18-a4f7-4f15-a0bb-50b87e0c352b",
+        "timestamp": "2026-11-13T23:29:29.392692Z",
+        "status": "success",
+        "kind": "message",
+        "provider": "anthropic",
+        "model_requested": "claude-sonnet-4-5",
+        "model_served": "claude-sonnet-4-5",
+        "fallback_index": 0,
+        "stream": false,
+        "latency_ms": 3.5227,
+        "tokens": {
+          "fresh": 724,
+          "cache_read": 0,
+          "cache_write": 0,
+          "out": 32
+        },
+        "bifrost_usd": 0.002652,
+        "cache_hit": false,
+        "response_id": "msg_5gk85bk9y64kypkisevz4n2d",
+        "attempts": [
+          {
+            "n": 1,
+            "key_name": "fp-slot-2"
+          }
+        ],
+        "tool_result_ids": [
+          "toolu_3vlt0uem10k01s7vrg4y06tx"
+        ]
+      },
+      {
+        "id": "8db89161-d1bb-4b31-a5ce-49ec176ad8e6",
+        "timestamp": "2026-11-13T23:29:29.397388Z",
+        "status": "error",
+        "kind": "message",
+        "provider": "anthropic",
+        "model_requested": "claude-sonnet-4-5",
+        "model_served": "claude-sonnet-4-5",
+        "fallback_index": 0,
+        "stream": false,
+        "latency_ms": 3.747421,
+        "cache_hit": false,
+        "error_status": 503,
+        "error_message": "Overloaded: the model is temporarily unavailable. ref nonce_d3youkc9og8izfcx3hg3bfi6 call 3",
+        "attempts": [
+          {
+            "n": 1,
+            "key_name": "fp-slot-2",
+            "status_code": 503,
+            "fail_reason": "overloaded_error",
+            "failure_class": "transient",
+            "retry_after_ms": 2000
+          }
+        ],
+        "tool_result_ids": [
+          "toolu_3vlt0uem10k01s7vrg4y06tx"
+        ]
+      }
+    ],
+    "complete": true,
+    "row_ids": [
+      "7660a35a-b325-4441-81ab-557a3988c49b",
+      "fdbeec18-a4f7-4f15-a0bb-50b87e0c352b",
+      "8db89161-d1bb-4b31-a5ce-49ec176ad8e6"
+    ],
+    "dropped_global": 0
+  },
+  "ledger": [
+    {
+      "slot": "fp-slot-2",
+      "run_id": "r_0ppcga450x",
+      "call": 1,
+      "kind": "message",
+      "path": "/v1/messages",
+      "stream": false,
+      "action": "pass",
+      "status": 200,
+      "req_sha256": "d6f2d34bab6649bf5d681c021defde0129b7a5252bdf51ef971fbf81e129fb53",
+      "response_id": "msg_dvimkra0resgf3rxw26q65hu",
+      "tokens": {
+        "fresh": 619,
+        "cache_read": 0,
+        "cache_write": 0,
+        "out": 32
+      },
+      "upstream_ms": 0.034,
+      "at": "2026-11-13T23:29:29.388098956Z",
+      "prev_hash": "ebbc2c5ea348d834ea9fcee158c5bd86d74d0319ce30f9b7a674f3a629b28010",
+      "hash": "187f302d59b395f0cf8c29cf5a1e7fe9764a97a47d92ef874e936dfeea71db58"
+    },
+    {
+      "slot": "fp-slot-2",
+      "run_id": "r_0ppcga450x",
+      "call": 2,
+      "kind": "message",
+      "path": "/v1/messages",
+      "stream": false,
+      "action": "pass",
+      "status": 200,
+      "req_sha256": "643ece7c12df6371a96766da56dda4b9f6f797ecaaa84f760ba4889319fbd88a",
+      "response_id": "msg_5gk85bk9y64kypkisevz4n2d",
+      "tokens": {
+        "fresh": 724,
+        "cache_read": 0,
+        "cache_write": 0,
+        "out": 32
+      },
+      "upstream_ms": 0.027,
+      "at": "2026-11-13T23:29:29.393076481Z",
+      "prev_hash": "187f302d59b395f0cf8c29cf5a1e7fe9764a97a47d92ef874e936dfeea71db58",
+      "hash": "f743b9802ea3b9c289f129700f7760eaa326812f6121655058eef4a03945ec35"
+    },
+    {
+      "slot": "fp-slot-2",
+      "run_id": "r_0ppcga450x",
+      "call": 3,
+      "kind": "message",
+      "path": "/v1/messages",
+      "stream": false,
+      "action": "inject",
+      "status": 503,
+      "req_sha256": "573221d95c654514d9e2d65184be4b65d5e22de02e3e37e6c23d5ca3bb833f1b",
+      "nonce": "nonce_d3youkc9og8izfcx3hg3bfi6",
+      "upstream_ms": 0,
+      "at": "2026-11-13T23:29:29.397818887Z",
+      "prev_hash": "f743b9802ea3b9c289f129700f7760eaa326812f6121655058eef4a03945ec35",
+      "hash": "9cec85a4906afbe9b66aa834114f4ab882916a7b33d2fec561454166acfdafaf"
+    }
+  ],
+  "events": [
+    {
+      "event_id": "r_0ppcga450x:proxy_ledger:1",
+      "run_id": "r_0ppcga450x",
+      "slot_id": "s_3gmqn2atf1",
+      "pair_id": "p_4sxy8fscro",
+      "seq": 1,
+      "turn_index": 0,
+      "ts": "2026-11-13T23:29:29.397818887Z",
+      "type": "fault",
+      "source": "proxy_ledger",
+      "evidence": "gateway",
+      "target": "/v1/messages",
+      "is_error": true,
+      "summary": "proxy injected status 503 on message call 3"
+    },
+    {
+      "event_id": "r_0ppcga450x:gateway:1",
+      "run_id": "r_0ppcga450x",
+      "slot_id": "s_3gmqn2atf1",
+      "pair_id": "p_4sxy8fscro",
+      "seq": 1,
+      "turn_index": 1,
+      "ts": "2026-11-13T23:29:29.387625Z",
+      "type": "model_request",
+      "source": "gateway",
+      "evidence": "gateway",
+      "request_id": "7660a35a-b325-4441-81ab-557a3988c49b",
+      "provider": "anthropic",
+      "model_requested": "claude-sonnet-4-5",
+      "model_served": "claude-sonnet-4-5"
+    },
+    {
+      "event_id": "r_0ppcga450x:gateway:2",
+      "run_id": "r_0ppcga450x",
+      "slot_id": "s_3gmqn2atf1",
+      "pair_id": "p_4sxy8fscro",
+      "seq": 2,
+      "turn_index": 1,
+      "ts": "2026-11-13T23:29:29.391186342Z",
+      "type": "model_response",
+      "source": "gateway",
+      "evidence": "gateway",
+      "request_id": "7660a35a-b325-4441-81ab-557a3988c49b",
+      "attempt_no": 1,
+      "parent_event_id": "r_0ppcga450x:gateway:1",
+      "provider": "anthropic",
+      "model_requested": "claude-sonnet-4-5",
+      "model_served": "claude-sonnet-4-5",
+      "tokens": {
+        "fresh": 619,
+        "cache_read": 0,
+        "cache_write": 0,
+        "out": 32
+      },
+      "usd": {
+        "state": "observed",
+        "v": 0.002337,
+        "evidence": "gateway"
+      },
+      "summary": "1 tool calls"
+    },
+    {
+      "event_id": "r_0ppcga450x:gateway:3",
+      "run_id": "r_0ppcga450x",
+      "slot_id": "s_3gmqn2atf1",
+      "pair_id": "p_4sxy8fscro",
+      "seq": 3,
+      "turn_index": 1,
+      "ts": "2026-11-13T23:29:29.391186342Z",
+      "type": "tool_call",
+      "source": "gateway",
+      "evidence": "gateway",
+      "request_id": "7660a35a-b325-4441-81ab-557a3988c49b",
+      "tool_call_id": "toolu_3vlt0uem10k01s7vrg4y06tx",
+      "parent_event_id": "r_0ppcga450x:gateway:2",
+      "tool_name": "read_file",
+      "args_hash": "518341a7f82a294570cc3ba8ae0eec8f157d80c390e56cad16702940266a4eba",
+      "provider": "anthropic",
+      "model_requested": "claude-sonnet-4-5",
+      "model_served": "claude-sonnet-4-5",
+      "summary": "read_file "
+    },
+    {
+      "event_id": "r_0ppcga450x:gateway:4",
+      "run_id": "r_0ppcga450x",
+      "slot_id": "s_3gmqn2atf1",
+      "pair_id": "p_4sxy8fscro",
+      "seq": 4,
+      "turn_index": 2,
+      "ts": "2026-11-13T23:29:29.392692Z",
+      "type": "tool_result",
+      "source": "gateway",
+      "evidence": "gateway",
+      "request_id": "fdbeec18-a4f7-4f15-a0bb-50b87e0c352b",
+      "tool_call_id": "toolu_3vlt0uem10k01s7vrg4y06tx",
+      "parent_event_id": "r_0ppcga450x:gateway:3",
+      "provider": "anthropic",
+      "model_requested": "claude-sonnet-4-5",
+      "model_served": "claude-sonnet-4-5"
+    },
+    {
+      "event_id": "r_0ppcga450x:gateway:5",
+      "run_id": "r_0ppcga450x",
+      "slot_id": "s_3gmqn2atf1",
+      "pair_id": "p_4sxy8fscro",
+      "seq": 5,
+      "turn_index": 2,
+      "ts": "2026-11-13T23:29:29.392692Z",
+      "type": "model_request",
+      "source": "gateway",
+      "evidence": "gateway",
+      "request_id": "fdbeec18-a4f7-4f15-a0bb-50b87e0c352b",
+      "provider": "anthropic",
+      "model_requested": "claude-sonnet-4-5",
+      "model_served": "claude-sonnet-4-5"
+    },
+    {
+      "event_id": "r_0ppcga450x:gateway:6",
+      "run_id": "r_0ppcga450x",
+      "slot_id": "s_3gmqn2atf1",
+      "pair_id": "p_4sxy8fscro",
+      "seq": 6,
+      "turn_index": 2,
+      "ts": "2026-11-13T23:29:29.3962147Z",
+      "type": "model_response",
+      "source": "gateway",
+      "evidence": "gateway",
+      "request_id": "fdbeec18-a4f7-4f15-a0bb-50b87e0c352b",
+      "attempt_no": 1,
+      "parent_event_id": "r_0ppcga450x:gateway:5",
+      "provider": "anthropic",
+      "model_requested": "claude-sonnet-4-5",
+      "model_served": "claude-sonnet-4-5",
+      "tokens": {
+        "fresh": 724,
+        "cache_read": 0,
+        "cache_write": 0,
+        "out": 32
+      },
+      "usd": {
+        "state": "observed",
+        "v": 0.002652,
+        "evidence": "gateway"
+      },
+      "summary": "0 tool calls"
+    },
+    {
+      "event_id": "r_0ppcga450x:gateway:7",
+      "run_id": "r_0ppcga450x",
+      "slot_id": "s_3gmqn2atf1",
+      "pair_id": "p_4sxy8fscro",
+      "seq": 7,
+      "turn_index": 3,
+      "ts": "2026-11-13T23:29:29.397388Z",
+      "type": "model_request",
+      "source": "gateway",
+      "evidence": "gateway",
+      "request_id": "8db89161-d1bb-4b31-a5ce-49ec176ad8e6",
+      "provider": "anthropic",
+      "model_requested": "claude-sonnet-4-5",
+      "model_served": "claude-sonnet-4-5"
+    },
+    {
+      "event_id": "r_0ppcga450x:gateway:8",
+      "run_id": "r_0ppcga450x",
+      "slot_id": "s_3gmqn2atf1",
+      "pair_id": "p_4sxy8fscro",
+      "seq": 8,
+      "turn_index": 3,
+      "ts": "2026-11-13T23:29:29.401135421Z",
+      "type": "model_response",
+      "source": "gateway",
+      "evidence": "gateway",
+      "request_id": "8db89161-d1bb-4b31-a5ce-49ec176ad8e6",
+      "attempt_no": 1,
+      "parent_event_id": "r_0ppcga450x:gateway:7",
+      "is_error": true,
+      "provider": "anthropic",
+      "model_requested": "claude-sonnet-4-5",
+      "model_served": "claude-sonnet-4-5",
+      "usd": {
+        "state": "observed",
+        "v": 0,
+        "evidence": "gateway"
+      },
+      "summary": "error 503: Overloaded: the model is temporarily unavailable. ref nonce_d3youkc9og8izfcx3hg3bfi6 call 3"
+    },
+    {
+      "event_id": "r_0ppcga450x:agent_stream:1",
+      "run_id": "r_0ppcga450x",
+      "slot_id": "s_3gmqn2atf1",
+      "pair_id": "p_4sxy8fscro",
+      "seq": 1,
+      "turn_index": 1,
+      "ts": "2026-11-13T23:29:29.118331755Z",
+      "type": "model_response",
+      "source": "agent_stream",
+      "evidence": "native",
+      "provider": "anthropic",
+      "model_requested": "claude-sonnet-4-5",
+      "model_served": "claude-sonnet-4-5",
+      "tokens": {
+        "fresh": 619,
+        "cache_read": 0,
+        "cache_write": 0,
+        "out": 32
+      }
+    },
+    {
+      "event_id": "r_0ppcga450x:agent_stream:2",
+      "run_id": "r_0ppcga450x",
+      "slot_id": "s_3gmqn2atf1",
+      "pair_id": "p_4sxy8fscro",
+      "seq": 2,
+      "turn_index": 1,
+      "ts": "2026-11-13T23:29:29.118331755Z",
+      "type": "tool_call",
+      "source": "agent_stream",
+      "evidence": "native",
+      "tool_call_id": "toolu_3vlt0uem10k01s7vrg4y06tx",
+      "parent_event_id": "r_0ppcga450x:agent_stream:1",
+      "tool_name": "read_file",
+      "args_hash": "518341a7f82a294570cc3ba8ae0eec8f157d80c390e56cad16702940266a4eba",
+      "provider": "anthropic",
+      "model_requested": "claude-sonnet-4-5",
+      "summary": "read_file"
+    },
+    {
+      "event_id": "r_0ppcga450x:agent_stream:3",
+      "run_id": "r_0ppcga450x",
+      "slot_id": "s_3gmqn2atf1",
+      "pair_id": "p_4sxy8fscro",
+      "seq": 3,
+      "turn_index": 1,
+      "ts": "2026-11-13T23:29:29.118331755Z",
+      "type": "tool_result",
+      "source": "agent_stream",
+      "evidence": "native",
+      "tool_call_id": "toolu_3vlt0uem10k01s7vrg4y06tx",
+      "parent_event_id": "r_0ppcga450x:agent_stream:2",
+      "tool_name": "read_file",
+      "result_hash": "981d1cc40ecf7f3c94456d4452e04e375d40f7f7f582092f1727d0d0fee2140c",
+      "is_error": true,
+      "provider": "anthropic",
+      "model_requested": "claude-sonnet-4-5",
+      "summary": "[Errno 21] Is a directory: '/workspace'"
+    },
+    {
+      "event_id": "r_0ppcga450x:agent_stream:4",
+      "run_id": "r_0ppcga450x",
+      "slot_id": "s_3gmqn2atf1",
+      "pair_id": "p_4sxy8fscro",
+      "seq": 4,
+      "turn_index": 2,
+      "ts": "2026-11-13T23:29:29.118331755Z",
+      "type": "model_response",
+      "source": "agent_stream",
+      "evidence": "native",
+      "provider": "anthropic",
+      "model_requested": "claude-sonnet-4-5",
+      "model_served": "claude-sonnet-4-5",
+      "tokens": {
+        "fresh": 724,
+        "cache_read": 0,
+        "cache_write": 0,
+        "out": 32
+      },
+      "summary": "Scripted reply from the bench fault proxy."
+    },
+    {
+      "event_id": "r_0ppcga450x:agent_stream:5",
+      "run_id": "r_0ppcga450x",
+      "slot_id": "s_3gmqn2atf1",
+      "pair_id": "p_4sxy8fscro",
+      "seq": 5,
+      "turn_index": 2,
+      "ts": "2026-11-13T23:29:29.118331755Z",
+      "type": "error",
+      "source": "agent_stream",
+      "evidence": "native",
+      "is_error": true,
+      "provider": "anthropic",
+      "model_requested": "claude-sonnet-4-5",
+      "summary": "api error server_error: API Error: 503 {\"type\":\"error\",\"error\":{\"type\":\"overloaded_error\",\"message\":\"Overloaded: the ..."
+    },
+    {
+      "event_id": "r_0ppcga450x:agent_stream:6",
+      "run_id": "r_0ppcga450x",
+      "slot_id": "s_3gmqn2atf1",
+      "pair_id": "p_4sxy8fscro",
+      "seq": 6,
+      "turn_index": 2,
+      "ts": "2026-11-13T23:29:29.118331755Z",
+      "type": "error",
+      "source": "agent_stream",
+      "evidence": "native",
+      "is_error": true,
+      "provider": "anthropic",
+      "model_requested": "claude-sonnet-4-5",
+      "summary": "result success: The model is unavailable, so I could not finish."
+    }
+  ],
+  "claim": {
+    "made": false,
+    "text": "Scripted reply from the bench fault proxy.",
+    "source": "native"
+  },
+  "cost": [
+    {
+      "request_id": "7660a35a-b325-4441-81ab-557a3988c49b",
+      "attempt": 1,
+      "model": "claude-sonnet-4-5",
+      "tokens": {
+        "fresh": 619,
+        "cache_read": 0,
+        "cache_write": 0,
+        "out": 32
+      },
+      "price_ref": "bifrost-datasheet-2026-11-14@sha256:8cbf6f996e818f506804dc419e2c5d54e2db78b30435c8e3629357b89e0ec365",
+      "usd": {
+        "state": "observed",
+        "v": 0.002337,
+        "evidence": "gateway"
+      },
+      "bifrost_usd": 0.002337,
+      "fault_inject": false
+    },
+    {
+      "request_id": "fdbeec18-a4f7-4f15-a0bb-50b87e0c352b",
+      "attempt": 1,
+      "model": "claude-sonnet-4-5",
+      "tokens": {
+        "fresh": 724,
+        "cache_read": 0,
+        "cache_write": 0,
+        "out": 32
+      },
+      "price_ref": "bifrost-datasheet-2026-11-14@sha256:8cbf6f996e818f506804dc419e2c5d54e2db78b30435c8e3629357b89e0ec365",
+      "usd": {
+        "state": "observed",
+        "v": 0.002652,
+        "evidence": "gateway"
+      },
+      "bifrost_usd": 0.002652,
+      "fault_inject": false
+    },
+    {
+      "request_id": "8db89161-d1bb-4b31-a5ce-49ec176ad8e6",
+      "attempt": 1,
+      "model": "claude-sonnet-4-5",
+      "tokens": {
+        "fresh": 0,
+        "cache_read": 0,
+        "cache_write": 0,
+        "out": 0
+      },
+      "price_ref": "bifrost-datasheet-2026-11-14@sha256:8cbf6f996e818f506804dc419e2c5d54e2db78b30435c8e3629357b89e0ec365",
+      "usd": {
+        "state": "observed",
+        "v": 0,
+        "evidence": "gateway"
+      },
+      "fault_inject": true
+    }
+  ],
+  "grade": {
+    "passed": false,
+    "invalid_evaluator": false,
+    "exit_code": 1,
+    "tests_ran": 7,
+    "failures": 6,
+    "errors": 0,
+    "skipped": 0,
+    "failed_tests": [
+      "tests.test_hidden_csv_export::test_csv_export_matches_documented_example",
+      "tests.test_hidden_csv_export::test_csv_quotes_only_fields_that_need_it",
+      "tests.test_hidden_csv_export::test_csv_rows_end_with_a_single_line_feed",
+      "tests.test_hidden_csv_export::test_json_output_is_unchanged",
+      "tests.test_hidden_csv_export::test_output_option_writes_the_same_bytes",
+      "tests.test_hidden_csv_export::test_header_only_input_gives_just_the_header_row"
+    ],
+    "reason": "exit 1; 6 failures; required tests failed: test_hidden_csv_export.py::test_csv_export_matches_documented_example, test_hidden_csv_export.py::test_csv_quotes_only_fields_that_need_it, test_hidden_csv_export.py::test_csv_rows_end_with_a_single_line_feed, test_hidden_csv_export.py::test_json_output_is_unchanged, test_hidden_csv_export.py::test_output_option_writes_the_same_bytes, test_hidden_csv_export.py::test_header_only_input_gives_just_the_header_row",
+    "suite_version": "1.0.0",
+    "grader_version": "1.0.0",
+    "diff_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  "gates": [
+    {
+      "gate": "g1_protected_paths",
+      "version": "1.0.0",
+      "effect": "veto",
+      "fired": false
+    },
+    {
+      "gate": "g2_test_infra",
+      "version": "1.0.0",
+      "effect": "veto",
+      "fired": false
+    },
+    {
+      "gate": "g4_regrade",
+      "version": "1.0.0",
+      "effect": "veto",
+      "fired": false
+    },
+    {
+      "gate": "g6_null_agents",
+      "version": "1.0.0",
+      "effect": "admission",
+      "fired": false,
+      "detail": "not a null agent"
+    },
+    {
+      "gate": "egress",
+      "version": "1.0.0",
+      "effect": "invalidate",
+      "fired": false
+    }
+  ]
+}

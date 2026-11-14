@@ -1,0 +1,13 @@
+{
+  "slot_id": "s_glz13mrnep",
+  "pair_id": "p_6raas000wo",
+  "exp_id": "e_smoke_sdoj",
+  "suite": "coding-core",
+  "task": "t01",
+  "task_version": "1.0.0",
+  "arm": "A",
+  "condition": "model-outage",
+  "trial": 1,
+  "order_index": 5,
+  "counted": true
+}

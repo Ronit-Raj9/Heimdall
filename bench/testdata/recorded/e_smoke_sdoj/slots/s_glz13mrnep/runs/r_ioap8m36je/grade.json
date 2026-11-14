@@ -1,0 +1,22 @@
+{
+  "passed": false,
+  "invalid_evaluator": false,
+  "exit_code": 1,
+  "tests_ran": 7,
+  "failures": 7,
+  "errors": 0,
+  "skipped": 0,
+  "failed_tests": [
+    "tests.test_hidden_rounding::test_line_amount_half_cent_rounds_up",
+    "tests.test_hidden_rounding::test_line_amount_is_exact_for_decimal_quantities",
+    "tests.test_hidden_rounding::test_subtotal_is_sum_of_rounded_line_amounts",
+    "tests.test_hidden_rounding::test_tax_half_cent_rounds_up",
+    "tests.test_hidden_rounding::test_tax_is_exact_for_decimal_rates",
+    "tests.test_hidden_rounding::test_percentage_discount_half_cent_rounds_up_before_tax",
+    "tests.test_hidden_rounding::test_cli_export_and_summary_follow_rounding_rules"
+  ],
+  "reason": "exit 1; 7 failures; required tests failed: test_hidden_rounding.py::test_line_amount_half_cent_rounds_up, test_hidden_rounding.py::test_line_amount_is_exact_for_decimal_quantities, test_hidden_rounding.py::test_subtotal_is_sum_of_rounded_line_amounts, test_hidden_rounding.py::test_tax_half_cent_rounds_up, test_hidden_rounding.py::test_tax_is_exact_for_decimal_rates, test_hidden_rounding.py::test_percentage_discount_half_cent_rounds_up_before_tax, test_hidden_rounding.py::test_cli_export_and_summary_follow_rounding_rules",
+  "suite_version": "1.0.0",
+  "grader_version": "1.0.0",
+  "diff_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+}

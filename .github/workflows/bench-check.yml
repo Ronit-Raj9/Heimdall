@@ -1,0 +1,110 @@
+name: Bench Check
+
+# The agent release gate of Bifrost Bench (bench/docs/ci.md). Every pull
+# request that changes an agent (its config, prompt, notes file, model or
+# tools), an experiment, a release policy, a benchmark or the bench code runs
+# `bifrost-bench check` through the composite action in bench/ci. A verdict
+# listed in fail-on, or a release-policy block, fails the build.
+#
+# The recorded job replays a sealed, checked-in experiment: no Docker, no
+# gateway, no provider key and no secret. The live job at the bottom runs a
+# real experiment on a self-hosted runner and is commented out.
+on:
+  pull_request:
+    paths:
+      - "bench/agents/**"
+      - "bench/experiments/**"
+      - "bench/policies/**"
+      - "bench/benchmarks/**"
+      - "bench/**/*.go"
+      - "bench/ci/**"
+      - "bench/testdata/recorded/**"
+      - ".github/workflows/bench-check.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: bench-check-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  recorded:
+    name: Agent gate (recorded)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Harden Runner
+        uses: step-security/harden-runner@fe104658747b27e96e4f7e80cd0a94068e53901d # v2.16.1
+        with:
+          egress-policy: audit
+
+      - name: Checkout repository
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          persist-credentials: false
+
+      # The bundle is the SYNTHETIC smoke run (toy agent, scripted model, real
+      # Bifrost v2.5.1), so the report is labelled synthetic. Switch data-mode
+      # to recorded and set exp-id when a real recorded run joins the bundle.
+      # policy left empty uses bench/policies/default.yaml when
+      # `bifrost-bench check` has -policy; "none" turns it off. On this
+      # 8-run bundle the default policy blocks (false-completion-ceiling sees
+      # 2 observed runs, min_n is 10) and the job exits 5; with "none" it
+      # gates on the verdict only.
+      - name: Bifrost Bench gate
+        id: gate
+        uses: ./bench/ci
+        with:
+          mode: recorded
+          bundle: testdata/recorded
+          exp-id: e_smoke_sdoj
+          data-mode: synthetic
+          policy: ""
+          fail-on: regressed,invalid
+
+  # live:
+  #   name: Agent gate (live)
+  #   # A self-hosted runner labelled bifrost-bench with Docker, Go 1.26+ and
+  #   # Node 22. The job starts the stack, runs a real experiment and stops it.
+  #   # The provider key comes from a repository (or environment) secret and is
+  #   # handed only to `make up`, so only the fault proxy container sees it.
+  #   # Pull requests from forks never get this job: their code would run next
+  #   # to the key. The bench-live environment can require a reviewer.
+  #   if: github.event_name == 'workflow_dispatch' || github.event.pull_request.head.repo.full_name == github.repository
+  #   runs-on: [self-hosted, linux, bifrost-bench]
+  #   environment: bench-live
+  #   timeout-minutes: 180
+  #   steps:
+  #     - name: Checkout repository
+  #       uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+  #       with:
+  #         persist-credentials: false
+  #
+  #     # make env writes deploy/.env (mode 600) with random gateway, Postgres
+  #     # and fault proxy tokens; the provider key never goes into that file.
+  #     - name: Start the bench stack
+  #       working-directory: bench
+  #       env:
+  #         ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+  #         OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+  #       run: |
+  #         make env
+  #         make up
+  #         make doctor
+  #
+  #     - name: Bifrost Bench gate
+  #       uses: ./bench/ci
+  #       env:
+  #         BENCH_CI_ENV_FILE: deploy/.env
+  #       with:
+  #         mode: live
+  #         experiment: experiments/codewins.reduced.yaml
+  #         policy: policies/default.yaml
+  #         fail-on: regressed,invalid
+  #
+  #     - name: Stop the bench stack
+  #       if: always()
+  #       working-directory: bench
+  #       run: make down

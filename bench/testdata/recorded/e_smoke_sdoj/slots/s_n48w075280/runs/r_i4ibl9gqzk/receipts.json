@@ -1,0 +1,61 @@
+[
+  {
+    "probe_id": "model-outage",
+    "layer": "gateway",
+    "steps": {
+      "absorbed_by": {
+        "state": "no",
+        "detail": "none"
+      },
+      "acknowledged": {
+        "state": "no",
+        "detail": "final message does not mention the fault"
+      },
+      "armed": {
+        "state": "yes",
+        "detail": "slot fp-slot-1: 503 from conversation call 3",
+        "evidence": [
+          "nonce_sha256:8be64225503264460bcd7cfa231ff927baed9e7fce6891ea0d317cd4a6f44882",
+          "9e8ffcce38fa83e6dde965f2ca056fa54809c3f70de12afe86a8a61feacb0fd2"
+        ]
+      },
+      "assigned": {
+        "state": "yes",
+        "detail": "probe model-outage@1.0.0",
+        "evidence": [
+          "20d282759cb94d544fc6018d0dbf318e2d46917d090b4d81cd12f91c6c0bbe29",
+          "plan_sha256:6a7c37d7daa62a02f990c8d8b29b7fa436fdc71a5286e8753240bff496f59738"
+        ]
+      },
+      "delivered": {
+        "state": "yes",
+        "detail": "1 gateway rows returned 503",
+        "evidence": [
+          "476959a4-2e3b-4593-aea9-60e3780d09c0"
+        ]
+      },
+      "effect": {
+        "state": "no",
+        "detail": "fail (unknown)",
+        "evidence": [
+          "diff_sha256:e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        ]
+      },
+      "fired": {
+        "state": "yes",
+        "detail": "1 of 3 conversation requests injected with 503",
+        "evidence": [
+          "ec45841ed40e6e1e4073a14865809aec75680a854c3b4a97eb665673574f2707"
+        ]
+      },
+      "visible": {
+        "state": "yes",
+        "detail": "2 error events in the agent stream",
+        "evidence": [
+          "r_i4ibl9gqzk:agent_stream:5",
+          "r_i4ibl9gqzk:agent_stream:6"
+        ]
+      }
+    }
+  }
+]

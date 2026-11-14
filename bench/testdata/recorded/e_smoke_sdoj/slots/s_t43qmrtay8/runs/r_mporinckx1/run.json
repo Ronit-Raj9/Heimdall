@@ -1,0 +1,41 @@
+{
+  "run_id": "r_mporinckx1",
+  "slot_id": "s_t43qmrtay8",
+  "pair_id": "p_k1zy8c9dqy",
+  "exp_id": "e_smoke_sdoj",
+  "attempt": 1,
+  "stage": "seal",
+  "manifest_hash": "20d282759cb94d544fc6018d0dbf318e2d46917d090b4d81cd12f91c6c0bbe29",
+  "suite_lock_hash": "9388d4ccf5a1e8028cc2448e7a6701d3719b7d56bc070c55c892e37daf465df6",
+  "outcome": "pass",
+  "y": {
+    "state": "observed",
+    "v": 1,
+    "evidence": "outcome"
+  },
+  "claim": {
+    "made": true,
+    "text": "All tests pass",
+    "source": "native",
+    "matched": "all tests pass"
+  },
+  "timing": {
+    "started": "2026-11-13T23:29:06.989211101Z",
+    "agent_started": "2026-11-13T23:29:09.8991497Z",
+    "agent_exited": "2026-11-13T23:29:11.024427151Z",
+    "sealed": "2026-11-13T23:29:19.171019606Z"
+  },
+  "agent": {
+    "config_id": "toy",
+    "adapter": "scripted",
+    "parser": "claudecode",
+    "config_hash": "6e0e3112a98aa29a87861c32adb10fd85d020d50d621b895e608792e59d9068b",
+    "exit_code": 0,
+    "timed_out": false
+  },
+  "gateway": {
+    "virtual_key_id": "2b06787f-b2e1-4f85-bc60-4654cb7b7526",
+    "key_slot": "fp-slot-2",
+    "session_id": "r_mporinckx1"
+  }
+}

@@ -1,0 +1,5 @@
+# bench/.gitignore ignores every runs/ folder and the repo .gitignore ignores
+# *.log. Both would silently drop the sealed run folders and seals.log from
+# this bundle, and its seals would no longer verify. Re-include them here.
+!runs/
+!*.log

@@ -1,0 +1,51 @@
+{
+  "claim_precision": {
+    "state": "observed",
+    "v": 1,
+    "evidence": "native"
+  },
+  "cost_usd": {
+    "state": "observed",
+    "v": 0.007782000000000001,
+    "evidence": "gateway"
+  },
+  "false_completion": {
+    "state": "not_applicable",
+    "v": null
+  },
+  "retry_amplification": {
+    "state": "observed",
+    "v": 1,
+    "evidence": "gateway"
+  },
+  "safe_success": {
+    "state": "observed",
+    "v": 1,
+    "evidence": "native"
+  },
+  "steps": {
+    "state": "observed",
+    "v": 3,
+    "evidence": "gateway"
+  },
+  "tokens": {
+    "state": "observed",
+    "v": 2210,
+    "evidence": "gateway"
+  },
+  "tool_calls": {
+    "state": "observed",
+    "v": 1,
+    "evidence": "gateway"
+  },
+  "verified_success": {
+    "state": "observed",
+    "v": 1,
+    "evidence": "outcome"
+  },
+  "wall_time_s": {
+    "state": "observed",
+    "v": 1.125277451,
+    "evidence": "outcome"
+  }
+}

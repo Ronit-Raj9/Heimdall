@@ -1,0 +1,13 @@
+{
+  "slot_id": "s_fe1v8wgmyg",
+  "pair_id": "p_2g84k0ogfo",
+  "exp_id": "e_smoke_sdoj",
+  "suite": "coding-core",
+  "task": "t01",
+  "task_version": "1.0.0",
+  "arm": "A",
+  "condition": "clean",
+  "trial": 1,
+  "order_index": 1,
+  "counted": true
+}

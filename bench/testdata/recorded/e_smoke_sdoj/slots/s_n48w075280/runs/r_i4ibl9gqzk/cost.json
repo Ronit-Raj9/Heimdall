@@ -1,0 +1,58 @@
+[
+  {
+    "request_id": "ae6b20c4-6709-4450-a143-12609985d3af",
+    "attempt": 1,
+    "model": "claude-sonnet-4-5",
+    "tokens": {
+      "fresh": 619,
+      "cache_read": 0,
+      "cache_write": 0,
+      "out": 32
+    },
+    "price_ref": "bifrost-datasheet-2026-11-14@sha256:8cbf6f996e818f506804dc419e2c5d54e2db78b30435c8e3629357b89e0ec365",
+    "usd": {
+      "state": "observed",
+      "v": 0.002337,
+      "evidence": "gateway"
+    },
+    "bifrost_usd": 0.002337,
+    "fault_inject": false
+  },
+  {
+    "request_id": "8ce646ac-5362-4646-b919-c9f64ba35df7",
+    "attempt": 1,
+    "model": "claude-sonnet-4-5",
+    "tokens": {
+      "fresh": 724,
+      "cache_read": 0,
+      "cache_write": 0,
+      "out": 32
+    },
+    "price_ref": "bifrost-datasheet-2026-11-14@sha256:8cbf6f996e818f506804dc419e2c5d54e2db78b30435c8e3629357b89e0ec365",
+    "usd": {
+      "state": "observed",
+      "v": 0.002652,
+      "evidence": "gateway"
+    },
+    "bifrost_usd": 0.002652,
+    "fault_inject": false
+  },
+  {
+    "request_id": "476959a4-2e3b-4593-aea9-60e3780d09c0",
+    "attempt": 1,
+    "model": "claude-sonnet-4-5",
+    "tokens": {
+      "fresh": 0,
+      "cache_read": 0,
+      "cache_write": 0,
+      "out": 0
+    },
+    "price_ref": "bifrost-datasheet-2026-11-14@sha256:8cbf6f996e818f506804dc419e2c5d54e2db78b30435c8e3629357b89e0ec365",
+    "usd": {
+      "state": "observed",
+      "v": 0,
+      "evidence": "gateway"
+    },
+    "fault_inject": true
+  }
+]

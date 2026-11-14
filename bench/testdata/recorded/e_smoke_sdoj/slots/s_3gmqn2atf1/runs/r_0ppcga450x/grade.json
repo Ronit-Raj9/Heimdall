@@ -1,0 +1,21 @@
+{
+  "passed": false,
+  "invalid_evaluator": false,
+  "exit_code": 1,
+  "tests_ran": 7,
+  "failures": 6,
+  "errors": 0,
+  "skipped": 0,
+  "failed_tests": [
+    "tests.test_hidden_csv_export::test_csv_export_matches_documented_example",
+    "tests.test_hidden_csv_export::test_csv_quotes_only_fields_that_need_it",
+    "tests.test_hidden_csv_export::test_csv_rows_end_with_a_single_line_feed",
+    "tests.test_hidden_csv_export::test_json_output_is_unchanged",
+    "tests.test_hidden_csv_export::test_output_option_writes_the_same_bytes",
+    "tests.test_hidden_csv_export::test_header_only_input_gives_just_the_header_row"
+  ],
+  "reason": "exit 1; 6 failures; required tests failed: test_hidden_csv_export.py::test_csv_export_matches_documented_example, test_hidden_csv_export.py::test_csv_quotes_only_fields_that_need_it, test_hidden_csv_export.py::test_csv_rows_end_with_a_single_line_feed, test_hidden_csv_export.py::test_json_output_is_unchanged, test_hidden_csv_export.py::test_output_option_writes_the_same_bytes, test_hidden_csv_export.py::test_header_only_input_gives_just_the_header_row",
+  "suite_version": "1.0.0",
+  "grader_version": "1.0.0",
+  "diff_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+}

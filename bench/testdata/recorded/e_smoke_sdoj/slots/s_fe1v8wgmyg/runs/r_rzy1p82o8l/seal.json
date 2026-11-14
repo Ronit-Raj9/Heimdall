@@ -1,0 +1,23 @@
+{
+  "run_id": "r_rzy1p82o8l",
+  "manifest_hash": "20d282759cb94d544fc6018d0dbf318e2d46917d090b4d81cd12f91c6c0bbe29",
+  "files": {
+    "agent.stderr.txt": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "agent.stream.jsonl": "b573129fcb330b70e6449f32874aef39b8e58870f89970eff0e18cb743789a27",
+    "cost.json": "6dcc4f899b92f5abf8aeacfb6b81cd5690a912b3272bc4de181e157236050995",
+    "events.jsonl": "be1992afb0657f35c9cbaf5002e331572fcfc0cf7d25e6cdb432747ef081fad9",
+    "evidence.json": "9d383baa24b5cf9468f082d94644572997caa5efa155489a658b01c8e124526e",
+    "gates.json": "a6557b97e79f239429fd9f94a58cfbd94a1a07773614a0ee680f76ffc74921b5",
+    "gateway.requests.jsonl": "43155caa02c377d060d5ae2b6d41325cd9827b775aeedbb6a41202ca250da8b1",
+    "grade.json": "2cb2472860c12057f4daa0e94d1d0b84eb7acbd7dd84852dcb7d711bb7f22d49",
+    "metrics.json": "fc22247de1db0b5c4b99587f7d4fee6e3ff28cc6ba71e74eea928714ab20d34c",
+    "plan.json": "c80c7392d76adc8105b8b3770472cdb4bf33da5b596feeed756eee0001fd2150",
+    "proxy.ledger.jsonl": "264e3a3e30a4bbf0eeee978f24ed4b5c16f22234293aeb901ababd66a9bcc7ce",
+    "receipts.json": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+    "run.json": "d9189c09f87a8fd3473d5d985a781df5034eb9d48df76cb6d9da2741ee0e6ea8",
+    "transitions.jsonl": "6f246b2b855e43c16f83b889bfdbc7d7f1f1a983509f15fef4a6e253212022be",
+    "workspace.diff": "44e46cfe8d01adc4723398a46a43540294d96653a048482941cc0bc5f7531b75"
+  },
+  "prev_seal": "9943ed8f63c560f67f8f2c8ea732f7d3ca9d9f5aaf3c1a952fb86c087505704a",
+  "sealed_at": "2026-11-13T23:29:06.898399757Z"
+}
