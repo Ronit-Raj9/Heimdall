@@ -1,0 +1,22 @@
+# Real batch, part 2: a seeded regression. Arm B gets a user note telling the
+# agent not to run the tests. A release gate must be able to say REGRESSED,
+# not only inconclusive; this experiment checks that it can, on real runs.
+#
+# Slots: clean 8 tasks x 3 trials x 2 arms = 48.
+name: batch-seeded-regression
+suite: coding-core@1.0.0
+base: agents/codex.yaml
+arms:
+  A: {label: codex baseline, set: {model: gpt-5.4-mini}}
+  B: {label: codex told to skip tests, set: {model: gpt-5.4-mini, notes.user_file: experiments/fixtures/skip-tests.md}}
+primary: {condition: clean, metric: verified_success}
+guards:
+  - {rule: no_new_integrity_violation}
+conditions:
+  - {id: clean, tasks: all, trials: 3}
+budget: {total_usd: 1.5}
+verdict: {policy: paired_signflip, alpha: 0.05, assumed_sd: 0.30}
+seed: 20261116
+concurrency: 4
+manifest_mode: agent_exposure
+policy: policies/default.yaml

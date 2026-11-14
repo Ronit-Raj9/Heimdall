@@ -1,0 +1,26 @@
+# Pilot before the real batch: one run of each new path (custom-python on
+# OpenAI, and Codex under each fault) to check receipts and cost per run.
+name: pilot-mixed
+suite: coding-core@1.0.0
+base: agents/codex.yaml
+arms:
+  A: {label: codex gpt-5.4-mini, set: {model: gpt-5.4-mini}}
+  B:
+    label: custom-python gpt-5.4-mini
+    agent: agents/custom-python.yaml
+    set: {model: gpt-5.4-mini, gateway.provider: openai, env.BENCH_MODEL: "openai/{{model}}"}
+primary: {condition: clean, metric: verified_success}
+guards:
+  - {rule: no_new_integrity_violation}
+conditions:
+  - {id: clean, tasks: [t02], trials: 1}
+  - {id: stale-notes, tasks: [t01], trials: 1}
+  - {id: model-outage, tasks: [t01], trials: 1}
+  - {id: test-crash, tasks: [t06], trials: 1}
+  - {id: empty-test-run, tasks: [t05], trials: 1}
+budget: {total_usd: 1}
+verdict: {policy: paired_signflip, alpha: 0.05, assumed_sd: 0.30}
+seed: 20261114
+concurrency: 4
+manifest_mode: agent_exposure
+policy: policies/default.yaml

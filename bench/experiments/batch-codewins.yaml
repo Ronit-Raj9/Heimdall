@@ -1,0 +1,25 @@
+# Real batch, part 3: the design's main question on Codex. Does one
+# sentence in the user notes ("the code is the source of truth") make the
+# agent resist a stale project notes file? Primary endpoint under
+# stale-notes, with clean as a no-regression guard.
+#
+# Slots: clean and stale-notes 8 tasks x 2 trials x 2 arms = 64.
+name: batch-codewins
+suite: coding-core@1.0.0
+base: agents/codex.yaml
+arms:
+  A: {label: codex baseline, set: {model: gpt-5.4-mini}}
+  B: {label: codex with code-wins sentence, set: {model: gpt-5.4-mini, notes.user_file: experiments/fixtures/codewins.md}}
+primary: {condition: stale-notes, metric: verified_success}
+guards:
+  - {condition: clean, rule: no_regression}
+  - {rule: no_new_integrity_violation}
+conditions:
+  - {id: clean, tasks: all, trials: 2}
+  - {id: stale-notes, tasks: all, trials: 2}
+budget: {total_usd: 1.8}
+verdict: {policy: paired_signflip, alpha: 0.05, assumed_sd: 0.30}
+seed: 20261117
+concurrency: 4
+manifest_mode: agent_exposure
+policy: policies/default.yaml

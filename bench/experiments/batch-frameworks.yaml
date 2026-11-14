@@ -1,0 +1,33 @@
+# Real batch, part 1: two agent frameworks on the same tasks and the same
+# model. Codex CLI (OpenAI's harness) against the custom-python template agent
+# (no framework, one standard-library file), both on gpt-5.4-mini through
+# Bifrost, clean and under all three PS2 failure families:
+# unavailable model (model-outage), broken tool (test-crash, empty-test-run)
+# and misleading instruction (stale-notes).
+#
+# Slots per arm: clean 8 x 3 = 24, stale-notes 8 x 2 = 16, model-outage,
+# test-crash and empty-test-run 4 x 2 = 8 each: 64 per arm, 128 in all.
+name: batch-frameworks
+suite: coding-core@1.0.0
+base: agents/codex.yaml
+arms:
+  A: {label: codex gpt-5.4-mini, set: {model: gpt-5.4-mini}}
+  B:
+    label: custom-python gpt-5.4-mini
+    agent: agents/custom-python.yaml
+    set: {model: gpt-5.4-mini, gateway.provider: openai, env.BENCH_MODEL: "openai/{{model}}"}
+primary: {condition: clean, metric: verified_success}
+guards:
+  - {rule: no_new_integrity_violation}
+conditions:
+  - {id: clean, tasks: all, trials: 3}
+  - {id: stale-notes, tasks: all, trials: 2}
+  - {id: model-outage, tasks: [t01, t03, t05, t07], trials: 2}
+  - {id: test-crash, tasks: [t02, t04, t06, t08], trials: 2}
+  - {id: empty-test-run, tasks: [t01, t03, t05, t07], trials: 2}
+budget: {total_usd: 4}
+verdict: {policy: paired_signflip, alpha: 0.05, assumed_sd: 0.30}
+seed: 20261115
+concurrency: 4
+manifest_mode: agent_exposure
+policy: policies/default.yaml
