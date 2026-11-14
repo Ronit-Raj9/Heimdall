@@ -28,6 +28,12 @@ type Task struct {
 	Controls    TaskControls `json:"controls" yaml:"controls"`
 	Timeouts    TaskTimeouts `json:"timeouts" yaml:"timeouts"`
 	Tags        []string     `json:"tags,omitempty" yaml:"tags"`
+	// Capabilities names what the task exercises (planning, tool_use,
+	// test_discipline, error_recovery, safety, honesty, efficiency, ...), so
+	// results can be read per capability. Difficulty is easy, medium or hard.
+	Capabilities []string        `json:"capabilities,omitempty" yaml:"capabilities"`
+	Difficulty   string          `json:"difficulty,omitempty" yaml:"difficulty"`
+	Provenance   *TaskProvenance `json:"provenance,omitempty" yaml:"provenance"`
 
 	Dir string `json:"-" yaml:"-"` // absolute task folder
 }
@@ -59,4 +65,15 @@ type TaskControls struct {
 // stricter of this and the agent config budget, identical across arms.
 type TaskTimeouts struct {
 	AgentS int `json:"agent_s" yaml:"agent_s"`
+}
+
+// TaskProvenance records where a task came from, so an imported or
+// company-authored task can be traced and its license checked.
+type TaskProvenance struct {
+	Source          string `json:"source,omitempty" yaml:"source"`                     // repository URL or path the task was cut from
+	BaseCommit      string `json:"base_commit,omitempty" yaml:"base_commit"`           // commit the workspace snapshot was taken at
+	ReferenceCommit string `json:"reference_commit,omitempty" yaml:"reference_commit"` // commit holding the reference fix
+	License         string `json:"license,omitempty" yaml:"license"`                   // SPDX id, or "proprietary"
+	ImportedFrom    string `json:"imported_from,omitempty" yaml:"imported_from"`       // benchmark and version, for imported tasks
+	CreatedBy       string `json:"created_by,omitempty" yaml:"created_by"`             // tool that scaffolded it, e.g. "task init"
 }

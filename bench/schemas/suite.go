@@ -28,6 +28,11 @@ type ImageSpec struct {
 	Dockerfile string `json:"dockerfile,omitempty" yaml:"dockerfile"` // relative to the suite root
 	Tag        string `json:"tag" yaml:"tag"`
 	Digest     string `json:"digest,omitempty" yaml:"digest"` // filled by `suite lock`
+	// BaseArg, on an agent's build, names a Dockerfile ARG that receives the
+	// suite's base image. The agent image is then built once per suite, on top
+	// of that suite's toolchain, and tagged "<tag>-<suite id>". Empty keeps one
+	// image for every suite.
+	BaseArg string `json:"base_arg,omitempty" yaml:"base_arg"`
 }
 
 // SuiteVerifier is the grading command and restore policy shared by every task
@@ -36,7 +41,24 @@ type SuiteVerifier struct {
 	Command  []string `json:"command" yaml:"command"`
 	Restore  []string `json:"restore" yaml:"restore"` // paths reset to the pristine repo before grading
 	TimeoutS int      `json:"timeout_s" yaml:"timeout_s"`
+
+	// Result is how the command reports, so a suite in any language can be
+	// graded: "junit" (default; a JUnit XML file), "reward" (a file holding a
+	// number, or a JSON object {"reward": n, "dimensions": {...}}) or
+	// "exit_code" (0 passes). ResultPath is the file inside the verifier
+	// container (default /grader/out/junit.xml or /grader/out/reward.json).
+	// PassThreshold is the lowest reward that passes (default 1).
+	Result        string  `json:"result,omitempty" yaml:"result"`
+	ResultPath    string  `json:"result_path,omitempty" yaml:"result_path"`
+	PassThreshold float64 `json:"pass_threshold,omitempty" yaml:"pass_threshold"`
 }
+
+// Verifier result formats (SuiteVerifier.Result).
+const (
+	VerifierResultJUnit    = "junit"
+	VerifierResultReward   = "reward"
+	VerifierResultExitCode = "exit_code"
+)
 
 // TaskByID returns the loaded task with id, or nil.
 func (s *Suite) TaskByID(id string) *Task {

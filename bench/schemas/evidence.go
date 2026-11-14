@@ -63,6 +63,15 @@ type Grade struct {
 	GraderVersion    string   `json:"grader_version"`
 	DiffSHA256       string   `json:"diff_sha256"`
 	ParentSeal       string   `json:"parent_seal,omitempty"` // set on regrades
+
+	// ResultFormat says how the verifier reported: junit (default), reward or
+	// exit_code (SuiteVerifier.Result). Reward is the verifier's own number
+	// when it wrote one, and Dimensions its named sub-scores (correctness,
+	// safety, performance, ...). Dimensions are reported side by side and are
+	// never blended into Passed.
+	ResultFormat string             `json:"result_format,omitempty"`
+	Reward       *float64           `json:"reward,omitempty"`
+	Dimensions   map[string]float64 `json:"dimensions,omitempty"`
 }
 
 // Grader decides the outcome from the exported diff, never from the agent's
