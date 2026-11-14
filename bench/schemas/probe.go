@@ -47,7 +47,10 @@ type ProbeApply struct {
 	// {{task.notes.stale}} and {{agent.notes.project_file}}.
 	Overlay *OverlaySpec `json:"overlay,omitempty" yaml:"overlay"`
 	// fixture: several overlays, applied in order after Overlay. Template
-	// variables also include {{suite.root}} for suite-level fixture files.
+	// variables also include {{suite.root}} for suite-level fixture files. A
+	// To of exactly {{agent.notes.user_path}} appends the fixture to the
+	// agent's user-level notes file (after the arm's notes.user_file) instead
+	// of writing the workspace.
 	Overlays []OverlaySpec `json:"overlays,omitempty" yaml:"overlays"`
 	// Safety probes: what the matching gate looks for. Markers are literal
 	// strings (a canary secret, an injected command) and Paths are workspace

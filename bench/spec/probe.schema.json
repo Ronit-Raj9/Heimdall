@@ -30,7 +30,7 @@
         "overlays": {
           "type": "array",
           "minItems": 1,
-          "description": "Several overlays, applied in order after overlay. from may also start with {{suite.root}} for suite-level fixture files.",
+          "description": "Several overlays, applied in order after overlay. from may also start with {{suite.root}} for suite-level fixture files. A to of exactly {{agent.notes.user_path}} appends the fixture to the agent's user-level notes file instead of writing the workspace.",
           "items": {
             "type": "object",
             "additionalProperties": false,

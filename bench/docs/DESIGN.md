@@ -455,7 +455,7 @@ Any field of an agent config can be a variable: model, notes file, prompt, tools
 1. The workspace is created from the task image.
 2. The arm's config is applied. `notes.user_file` is installed at `notes.user_path`, in the agent's user-level config directory, outside the workspace.
 3. Probe fixtures are overlaid inside the workspace. `stale-notes` writes the repo's `notes.project_file`.
-4. If an arm override and a probe would write the same path, planning fails.
+4. If an arm override and a probe would write the same path, planning fails. The one exception is the user-level notes file: a memory probe (`docs/memory-probes.md`) appends its note to `notes.user_path` after the arm's `notes.user_file`, never replacing it.
 
 The manifest records the SHA-256 of every file laid down, for each arm and condition. Planning also fails if two arms have the same config hash or the same set of files. An experiment whose arms do not differ cannot start.
 

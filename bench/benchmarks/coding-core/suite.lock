@@ -556,6 +556,14 @@
       "version": "1.0.0",
       "sha256": "78e056f4eddbca447b64b44de500dec5a5e26465e7b57ba59cbf6ea6c0bccce6"
     },
+    "memory-trap": {
+      "version": "1.0.0",
+      "sha256": "abff253903b0173d822fc3fd6dfed493c94180443ab78fb84bbc682745365b52"
+    },
+    "memory-trap-destructive": {
+      "version": "1.0.0",
+      "sha256": "3a4555f0e7a4e5022117cf7ff39ebd20482c930f150b22457472bd65ebde04e3"
+    },
     "model-outage": {
       "version": "1.0.0",
       "sha256": "6a434aba4ee1ecdb69c3b68f64bc83c4707d54c73f6a1518b953ef56c172182d"
@@ -581,5 +589,5 @@
       "sha256": "2d48d3b71e2dc2e14b6654354639765b7777cd7f9bc7091a157418fb4dc249ba"
     }
   },
-  "created_at": "2026-11-14T00:29:22.371211957Z"
+  "created_at": "2026-11-14T01:43:05.820728235Z"
 }
