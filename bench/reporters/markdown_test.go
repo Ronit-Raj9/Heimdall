@@ -34,6 +34,15 @@ func testAnalysis() *schemas.Analysis {
 					Effect: &schemas.Effect{DBar: 0.0417, NTasks: 8, NNonzero: 2}},
 				{Spec: schemas.GuardSpec{Rule: "no_new_integrity_violation"}, Status: schemas.GuardPass, Detail: "0 | 0 runs"},
 			},
+			Instruments: []schemas.InstrumentCheck{
+				{Name: "usage_completeness", Status: schemas.InstrumentPass, Threshold: ">= 0.95 in every arm, arms at most 5 pp apart",
+					PerArm: map[string]schemas.Ratio{"A": {Num: 120, Den: 120}, "B": {Num: 117, Den: 118, Unknown: 1}},
+					Detail: "usage completeness arm A 1.000, arm B 0.992"},
+				{Name: "dropped_logs", Status: schemas.InstrumentUnknown, Threshold: "no rise over the experiment",
+					Detail: "gateway drop counter not recorded in 1 of 48 runs; no rise in the 47 readings, counter 0 to 0"},
+				{Name: "timeout_parity", Status: schemas.InstrumentWarn, Threshold: "timeout rates at most 10 pp apart, or both at most 20%",
+					PerArm: map[string]schemas.Ratio{"A": {Num: 1, Den: 24}, "B": {Num: 9, Den: 24}}, Detail: "gap +33.3 pp | on every condition"},
+			},
 			Integrity: schemas.IntegrityClean, ManifestHash: "sha256:9f2ce1", FrozenAt: frozen,
 		},
 		Naive: map[string]schemas.Ratio{"A": {Num: 11, Den: 24}, "B": {Num: 19, Den: 24}},
@@ -156,6 +165,48 @@ func TestMarkdownPolicy(t *testing.T) {
 			for _, w := range tt.notWant {
 				if strings.Contains(out, w) {
 					t.Errorf("report has %q", w)
+				}
+			}
+		})
+	}
+}
+
+func TestMarkdownInstruments(t *testing.T) {
+	render := func(m *schemas.Manifest) string {
+		var buf bytes.Buffer
+		if err := newMarkdownReporter().Write(context.Background(), testAnalysis(), m, &buf); err != nil {
+			t.Fatal(err)
+		}
+		return buf.String()
+	}
+	arms := map[string]schemas.ArmManifest{"A": {}, "B": {}}
+	tests := []struct {
+		name string
+		m    *schemas.Manifest
+		want []string
+	}{
+		{"rows and shares", &schemas.Manifest{Arms: arms}, []string{
+			"| Check | Status | A | B | Threshold | Detail |",
+			"| usage_completeness | PASS | 120/120 (100.0%) | 117/118 (99.2%), 1 unknown |",
+			"| dropped_logs | UNKNOWN | - | - | no rise over the experiment |",
+			"| timeout_parity | WARN | 1/24 (4.2%) | 9/24 (37.5%) |",
+			`gap +33.3 pp \| on every condition`,
+			"| gateway_hygiene | UNKNOWN | - | - |",
+		}},
+		{"clean hygiene", &schemas.Manifest{Arms: arms, Gateway: &schemas.GatewayManifest{Hygiene: &schemas.GatewayHygiene{MCPAutoToolInjectOff: true}}},
+			[]string{"| gateway_hygiene | PASS | - | - | no MCP auto-inject with MCP clients, no semantic cache, no multi-target routing | " +
+				"MCP clients 0, auto-inject off; semantic cache off; 0 enabled routing rule(s); multi-target none |"}},
+		{"hygiene violations", &schemas.Manifest{Arms: arms, Gateway: &schemas.GatewayManifest{Hygiene: &schemas.GatewayHygiene{
+			MCPClients: 1, SemanticCache: true, RoutingRules: 1, MultiTarget: []string{"routing rule r"},
+			Violations: []string{"semantic cache plugin semantic_cache is loaded"}}}},
+			[]string{"| gateway_hygiene | FAIL |", "MCP clients 1, auto-inject on; semantic cache on; 1 enabled routing rule(s); multi-target routing rule r; violations: semantic cache"}},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			out := render(tt.m)
+			for _, w := range tt.want {
+				if !strings.Contains(out, w) {
+					t.Errorf("report lacks %q:\n%s", w, out)
 				}
 			}
 		})

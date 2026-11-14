@@ -34,6 +34,8 @@ export const POLICY_STATUS_TONE = {
 const AGGREGATE_KIND: Record<string, ValueKind> = {
 	integrity_violations: "count",
 	cost_per_verified_success: "usd",
+	// rule timeout_parity: the arm's timeout rate.
+	timeout_rate: "rate",
 };
 
 /** Run ids shown per check before "+n more". */

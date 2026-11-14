@@ -94,7 +94,7 @@
       "required": ["rule"],
       "properties": {
         "condition": {"$ref": "#/$defs/condition_id"},
-        "rule": {"enum": ["no_regression", "no_new_integrity_violation"]},
+        "rule": {"enum": ["no_regression", "no_new_integrity_violation", "timeout_parity"], "description": "timeout_parity holds the release when the arms' timeout rates on condition (every condition when it is absent) are more than 10 pp apart and either is above 20%."},
         "metric": {"type": "string", "minLength": 1}
       },
       "if": {"properties": {"rule": {"const": "no_regression"}}},

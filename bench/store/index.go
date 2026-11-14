@@ -359,7 +359,9 @@ func (s *FSStore) countedRun(slotID string, recs []schemas.RunRecord) *schemas.R
 }
 
 // loadSealedRun reads the seal, the chosen grade and the optional evidence
-// summaries of one sealed run.
+// summaries of one sealed run. The gateway tally (usage completeness and the
+// drop counter) is derived from evidence.json here rather than stored, so runs
+// sealed before the tally existed are analysed the same way.
 func (s *FSStore) loadSealedRun(expID string, slot *schemas.Slot, rec *schemas.RunRecord, regradeID string) (*schemas.SealedRun, error) {
 	seal, err := readSeal(rec.Dir)
 	if err != nil {
@@ -400,5 +402,12 @@ func (s *FSStore) loadSealedRun(expID string, slot *schemas.Slot, rec *schemas.R
 	if _, err := readOptionalJSON(filepath.Join(rec.Dir, receiptsFile), &sr.Receipts); err != nil {
 		return nil, err
 	}
+	var ev struct {
+		Requests *schemas.RequestLog `json:"requests"`
+	}
+	if _, err := readOptionalJSON(filepath.Join(rec.Dir, evidenceFile), &ev); err != nil {
+		return nil, err
+	}
+	sr.Gateway = ev.Requests.Tally()
 	return sr, nil
 }

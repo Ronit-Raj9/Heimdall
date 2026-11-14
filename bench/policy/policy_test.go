@@ -102,6 +102,9 @@ func TestParse(t *testing.T) {
 		{"duplicate id", head + "  - {id: a, metric: steps, max: 1}\n  - {id: a, metric: tokens, max: 1}\n", []string{"duplicate id"}},
 		{"rule on aggregate", head + "  - {id: a, metric: integrity_violations, rule: no_regression}\n", []string{"needs a per-run metric"}},
 		{"rule on baseline arm", head + "  - {id: a, metric: verified_success, rule: improved, arm: A}\n", []string{"arm cannot be A"}},
+		{"valid timeout parity", head + "  - {id: a, metric: timeout_rate, rule: timeout_parity, condition: all}\n", nil},
+		{"timeout parity on another metric", head + "  - {id: a, metric: steps, rule: timeout_parity}\n", []string{"reads metric timeout_rate, not steps"}},
+		{"timeout rate without its rule", head + "  - {id: a, metric: timeout_rate, max: 0.2}\n", []string{"only read by rule timeout_parity"}},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

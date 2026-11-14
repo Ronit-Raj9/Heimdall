@@ -42,18 +42,45 @@ type fakeBifrost struct {
 	config    map[string]any
 	calls     map[string]int // "METHOD /pattern" -> count
 	bodies    map[string][]map[string]any
+
+	// Hygiene state (hygiene.go): loaded plugins, plugin config rows, MCP
+	// clients, routing rules and model routers (nil: the route answers 404).
+	loaded     []string
+	pluginRows []map[string]any
+	mcpClients int
+	rules      []map[string]any
+	routers    []map[string]any
+	down       map[string]bool // "METHOD /pattern" answered with 500
+	dropped    map[string]any  // GET /api/logs/dropped answer; nil: dropped_requests 0
 }
 
 func newFakeBifrost(t *testing.T) *fakeBifrost {
 	t.Helper()
-	f := &fakeBifrost{t: t, calls: map[string]int{}, bodies: map[string][]map[string]any{}, config: goodConfig()}
+	f := &fakeBifrost{t: t, calls: map[string]int{}, bodies: map[string][]map[string]any{}, config: goodConfig(),
+		loaded: []string{"logging", "governance"}}
 	mux := http.NewServeMux()
 	routes := map[string]http.HandlerFunc{
 		"GET /health":      f.health,
 		"GET /api/version": func(w http.ResponseWriter, _ *http.Request) { writeJSONT(w, 200, "v2.5.1") },
 		"GET /api/config":  f.getConfig,
 		"GET /api/plugins/loaded": func(w http.ResponseWriter, _ *http.Request) {
-			writeJSONT(w, 200, map[string]any{"plugins": []string{"logging", "governance"}})
+			writeJSONT(w, 200, map[string]any{"plugins": f.loaded})
+		},
+		"GET /api/plugins": func(w http.ResponseWriter, _ *http.Request) {
+			writeJSONT(w, 200, map[string]any{"plugins": orEmpty(f.pluginRows), "count": len(f.pluginRows)})
+		},
+		"GET /api/mcp/clients": func(w http.ResponseWriter, _ *http.Request) {
+			writeJSONT(w, 200, map[string]any{"clients": []any{}, "count": 0, "total_count": f.mcpClients, "limit": 25, "offset": 0})
+		},
+		"GET /api/routing/rules": func(w http.ResponseWriter, _ *http.Request) {
+			writeJSONT(w, 200, map[string]any{"rules": orEmpty(f.rules), "count": len(f.rules), "total_count": len(f.rules)})
+		},
+		"GET /api/routing/model-routers": func(w http.ResponseWriter, _ *http.Request) {
+			if f.routers == nil {
+				writeJSONT(w, 404, map[string]any{"error": map[string]any{"message": "Route not found: /api/routing/model-routers"}})
+				return
+			}
+			writeJSONT(w, 200, map[string]any{"routers": f.routers, "count": len(f.routers)})
 		},
 		"GET /api/providers/{p}":                   f.getProvider,
 		"POST /api/providers":                      f.postProvider,
@@ -66,6 +93,10 @@ func newFakeBifrost(t *testing.T) *fakeBifrost {
 		"DELETE /api/governance/virtual-keys/{id}": f.deleteVK,
 		"GET /api/logs":                            f.listLogs,
 		"GET /api/logs/dropped": func(w http.ResponseWriter, _ *http.Request) {
+			if f.dropped != nil {
+				writeJSONT(w, 200, f.dropped)
+				return
+			}
 			writeJSONT(w, 200, map[string]any{"dropped_requests": 0})
 		},
 		"GET /api/logs/{id}": f.getLog,
@@ -76,6 +107,14 @@ func newFakeBifrost(t *testing.T) *fakeBifrost {
 	f.srv = httptest.NewServer(mux)
 	t.Cleanup(f.srv.Close)
 	return f
+}
+
+// orEmpty answers an empty JSON list instead of null.
+func orEmpty(rows []map[string]any) []map[string]any {
+	if rows == nil {
+		return []map[string]any{}
+	}
+	return rows
 }
 
 func goodConfig() map[string]any {
@@ -102,6 +141,10 @@ func (f *fakeBifrost) guard(pattern string, h http.HandlerFunc) http.HandlerFunc
 		}
 		f.mu.Lock()
 		defer f.mu.Unlock()
+		if f.down[pattern] {
+			writeJSONT(w, 500, map[string]any{"error": map[string]any{"message": "down"}})
+			return
+		}
 		h(w, r)
 	}
 }

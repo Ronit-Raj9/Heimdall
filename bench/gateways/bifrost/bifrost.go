@@ -14,6 +14,7 @@ package bifrost
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"net/http"
@@ -223,11 +224,12 @@ func (g *Gateway) setupProvider(ctx context.Context, p ProviderSetup) error {
 
 // providerKey is one provider key as Bifrost lists it. The value is masked.
 type providerKey struct {
-	ID      string   `json:"id"`
-	Name    string   `json:"name"`
-	Models  []string `json:"models"`
-	Weight  float64  `json:"weight"`
-	Enabled *bool    `json:"enabled"`
+	ID      string                     `json:"id"`
+	Name    string                     `json:"name"`
+	Models  []string                   `json:"models"`
+	Weight  float64                    `json:"weight"`
+	Enabled *bool                      `json:"enabled"`
+	Aliases map[string]json.RawMessage `json:"aliases,omitempty"` // model -> inference profile; read by the hygiene check
 }
 
 // providerConfig is the subset of GET /api/providers/{provider} the bench
@@ -241,7 +243,8 @@ type providerConfig struct {
 		RequestTimeoutS     int    `json:"default_request_timeout_in_seconds"`
 		AllowPrivateNetwork bool   `json:"allow_private_network"`
 	} `json:"network_config"`
-	StoreRaw bool `json:"store_raw_request_response"`
+	StoreRaw      bool              `json:"store_raw_request_response"`
+	InjectedTools []json.RawMessage `json:"injected_tools,omitempty"` // read by the hygiene check
 }
 
 // normalizeProviders turns cfg into the provider list: Providers as given,

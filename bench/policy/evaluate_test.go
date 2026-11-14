@@ -162,6 +162,57 @@ func TestEvaluateChecks(t *testing.T) {
 	}
 }
 
+func TestEvaluateTimeoutParity(t *testing.T) {
+	clean := schemas.ConditionClean
+	timeouts := func(runs []schemas.SealedRun, n int) []schemas.SealedRun {
+		out := append([]schemas.SealedRun(nil), runs...)
+		for i := 0; i < n && i < len(out); i++ {
+			out[i].Run.Outcome = schemas.OutcomeTimeout
+		}
+		return out
+	}
+	ten := func(cond, arm string) []schemas.SealedRun {
+		return series(cond, arm, "verified_success", repeatValue(obs(0), 10)...)
+	}
+	check := schemas.PolicyCheck{ID: "tp", Metric: MetricTimeoutRate, Rule: RuleTimeoutParity}
+	tests := []struct {
+		name     string
+		check    schemas.PolicyCheck
+		runs     []schemas.SealedRun
+		status   schemas.PolicyStatus
+		observed *float64
+		evidence []string
+		reason   string
+	}{
+		{"equal rates pass", check, append(ten(clean, "A"), ten(clean, "B")...), schemas.PolicyPass, ptr(0), nil,
+			"timeout rate arm A 0.0% (0 of 10), arm B 0.0% (0 of 10)"},
+		{"a 30 pp gap fails with the timed-out runs", check, append(ten(clean, "A"), timeouts(ten(clean, "B"), 3)...), schemas.PolicyFail, ptr(0.3),
+			[]string{"r_clean_t01_B_1", "r_clean_t02_B_1", "r_clean_t03_B_1"}, "more than 10 pp apart"},
+		{"all pools every condition", schemas.PolicyCheck{ID: "tp", Metric: MetricTimeoutRate, Rule: RuleTimeoutParity, Condition: ConditionAll},
+			append(append(ten(clean, "A"), ten(clean, "B")...), append(ten(condStale, "A"), timeouts(ten(condStale, "B"), 10)...)...),
+			schemas.PolicyFail, ptr(0.5), nil, "on every condition"},
+		{"no runs of arm A is unknown", check, ten(clean, "B"), schemas.PolicyUnknown, nil, nil, "timeout parity needs both"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			r := Evaluate(single(tt.check), "h", testManifest(), nil, tt.runs).Checks[0]
+			if r.Status != tt.status {
+				t.Fatalf("status %s, want %s: %s", r.Status, tt.status, r.Reason)
+			}
+			x, ok := r.Observed.Float()
+			if (tt.observed == nil) == ok || (ok && !near(x, *tt.observed)) {
+				t.Fatalf("observed = %+v, want %v", r.Observed, tt.observed)
+			}
+			if tt.evidence != nil && !slices.Equal(r.Evidence, tt.evidence) {
+				t.Fatalf("evidence = %v, want %v", r.Evidence, tt.evidence)
+			}
+			if !strings.Contains(r.Reason, tt.reason) || r.Threshold == "" {
+				t.Fatalf("reason %q threshold %q, want %q", r.Reason, r.Threshold, tt.reason)
+			}
+		})
+	}
+}
+
 func TestEvaluateDecision(t *testing.T) {
 	unknownCheck := schemas.PolicyCheck{ID: "u", Metric: "nope", Max: ptr(1)}
 	smallCheck := schemas.PolicyCheck{ID: "s", Metric: "false_completion", Max: ptr(1), MinN: 10}

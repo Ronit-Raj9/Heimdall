@@ -207,15 +207,16 @@ func (m fakeMetric) Compute(_ context.Context, _ *schemas.RunContext, ev *schema
 
 type fakeGateway struct {
 	part
-	w      *world
-	active map[string]bool
+	w       *world
+	active  map[string]bool
+	hygiene *schemas.GatewayHygiene
 }
 
 func (g *fakeGateway) Preflight(context.Context) (*schemas.GatewayManifest, error) {
 	if err := g.w.hit("preflight"); err != nil {
 		return nil, err
 	}
-	return &schemas.GatewayManifest{Name: "fake", Version: "1.0.0", ConfigSHA256: "cfg"}, nil
+	return &schemas.GatewayManifest{Name: "fake", Version: "1.0.0", ConfigSHA256: "cfg", Hygiene: g.hygiene}, nil
 }
 
 func (g *fakeGateway) MintKey(_ context.Context, rc *schemas.RunContext) (*schemas.RunKey, error) {
@@ -488,7 +489,7 @@ func newBench(t *testing.T) *bench {
 		t.Fatal(err)
 	}
 	write("policies/default.yaml", string(policy))
-	suite :=&schemas.Suite{ID: "coding-core", Version: "1.0.0", Environment: "docker_workspace", Grader: "hidden_tests",
+	suite := &schemas.Suite{ID: "coding-core", Version: "1.0.0", Environment: "docker_workspace", Grader: "hidden_tests",
 		Workdir: "/workspace", LockHash: "lock-abc",
 		Lock: &schemas.SuiteLock{Suite: "coding-core", Version: "1.0.0", Tasks: map[string]schemas.TaskLock{}}}
 	for i := 1; i <= 8; i++ {

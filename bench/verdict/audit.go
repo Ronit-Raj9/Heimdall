@@ -80,7 +80,7 @@ func Audit(rows []AuditRow, alpha float64) (*schemas.Verdict, error) {
 	return &schemas.Verdict{
 		Primary:           schemas.Endpoint{Condition: AuditCondition, Metric: AuditMetric},
 		Decision:          decision,
-		Action:            actionFor(decision, nil, ""),
+		Action:            actionFor(decision, nil, "", nil),
 		Effect:            eff,
 		Alpha:             alpha,
 		MDE:               mdePP(eff.NTasks, sd, alpha),

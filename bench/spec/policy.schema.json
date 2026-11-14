@@ -25,7 +25,7 @@
         "metric": {
           "type": "string",
           "pattern": "^[a-z0-9][a-z0-9_]*$",
-          "description": "A per-run metric name, or an aggregate: integrity_violations, cost_per_verified_success."
+          "description": "A per-run metric name, or an aggregate: integrity_violations, cost_per_verified_success, or timeout_rate with rule timeout_parity."
         },
         "condition": {
           "type": "string",
@@ -33,7 +33,7 @@
           "description": "clean, a probe id, or all for every condition. Default: the experiment's primary condition."
         },
         "arm": {"type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9_-]*$", "description": "Default B, the candidate."},
-        "rule": {"enum": ["no_regression", "improved"]},
+        "rule": {"enum": ["no_regression", "improved", "timeout_parity"], "description": "timeout_parity reads metric timeout_rate: the arm's and arm A's timeout rates must not be more than 10 pp apart while either is above 20%."},
         "max": {"type": "number"},
         "min": {"type": "number"},
         "equals": {"type": "number"},

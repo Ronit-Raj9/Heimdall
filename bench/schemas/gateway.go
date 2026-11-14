@@ -41,7 +41,22 @@ type GatewayManifest struct {
 	PriceSHA256  string            `json:"price_sha256,omitempty"`
 	Settings     map[string]string `json:"settings,omitempty"` // auto tool inject, auth on inference, logging, retries
 	CheckedAt    time.Time         `json:"checked_at"`
-	Problems     []string          `json:"problems,omitempty"` // preflight failures
+	Problems     []string          `json:"problems,omitempty"`     // preflight failures
+	Hygiene      *GatewayHygiene   `json:"hygiene,omitempty"`      // features that could change a run's traffic; any violation refuses the plan
+	DroppedLogs  *int64            `json:"dropped_logs,omitempty"` // Bifrost's global drop counter at preflight, the experiment's baseline
+}
+
+// GatewayHygiene records the live gateway features that could change what a
+// run's model requests carry or where they go, as preflight read them. The
+// planner refuses an experiment with any violation, and the values are frozen
+// in the manifest so the verdict page shows what was checked.
+type GatewayHygiene struct {
+	MCPClients           int      `json:"mcp_clients"`                  // MCP clients configured on the gateway
+	MCPAutoToolInjectOff bool     `json:"mcp_disable_auto_tool_inject"` // client_config.mcp_disable_auto_tool_inject
+	SemanticCache        bool     `json:"semantic_cache"`               // the semantic cache plugin is enabled
+	RoutingRules         int      `json:"routing_rules"`                // enabled routing rules
+	MultiTarget          []string `json:"multi_target,omitempty"`       // rules or configs that can send a model to another target
+	Violations           []string `json:"violations,omitempty"`
 }
 
 // RunKey is a run's virtual key. Value is a secret and is never written to disk.
@@ -61,7 +76,39 @@ type RequestLog struct {
 	Complete bool             `json:"complete"`
 	Reason   string           `json:"reason,omitempty"` // why it is incomplete
 	RowIDs   []string         `json:"row_ids"`
-	Dropped  *int64           `json:"dropped_global,omitempty"` // Bifrost's global drop counter, a warning signal only
+	Dropped  *int64           `json:"dropped_global,omitempty"` // Bifrost's global drop counter at collect time; analysis checks it rose by 0 over the experiment
+}
+
+// GatewayTally is the part of a run's gateway log that analysis reads: how
+// many model requests carry usage, and Bifrost's global drop counter. The
+// store derives it from evidence.json when it loads a run, so runs sealed
+// before it existed carry it too.
+type GatewayTally struct {
+	Requests  int    `json:"requests"`                 // message rows that should carry usage: every one except error rows
+	WithUsage int    `json:"with_usage"`               // of those, the rows with token counts
+	Complete  bool   `json:"complete"`                 // the log was complete when collected
+	Dropped   *int64 `json:"dropped_global,omitempty"` // nil when the counter was not read
+}
+
+// Tally counts the log's usage completeness. Only rows of kind message are
+// model requests. An error row is left out: a refused or failed request has
+// no usage to record, and an injected fault is billed as zero. A processing
+// row stays in and has no usage, because its usage never arrived.
+func (l *RequestLog) Tally() *GatewayTally {
+	if l == nil {
+		return nil
+	}
+	t := &GatewayTally{Complete: l.Complete, Dropped: l.Dropped}
+	for _, r := range l.Requests {
+		if r.Kind != "message" || r.Status == "error" {
+			continue
+		}
+		t.Requests++
+		if r.Tokens != nil {
+			t.WithUsage++
+		}
+	}
+	return t
 }
 
 // GatewayRequest is one Bifrost log row with its detail fields.

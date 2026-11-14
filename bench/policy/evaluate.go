@@ -140,6 +140,8 @@ func (ev *evaluator) check(c schemas.PolicyCheck) schemas.PolicyCheckResult {
 	switch {
 	case thresholds(c) != 1:
 		return unknown(base, "the check needs exactly one of rule, max, min or equals", 0, nil)
+	case c.Rule == RuleTimeoutParity:
+		return ev.timeoutParity(base)
 	case c.Rule != "":
 		return ev.rule(c, base, minN)
 	case c.Metric == MetricIntegrityViolations:
@@ -457,6 +459,8 @@ func thresholdText(c schemas.PolicyCheck) string {
 		return ThresholdNoRegression
 	case c.Rule == RuleImproved:
 		return ThresholdImproved
+	case c.Rule == RuleTimeoutParity:
+		return verdict.TimeoutParityThreshold
 	case c.Max != nil:
 		return "<= " + num(*c.Max)
 	case c.Min != nil:
@@ -466,6 +470,33 @@ func thresholdText(c schemas.PolicyCheck) string {
 	default:
 		return c.Rule
 	}
+}
+
+// timeoutParity applies the verdict's timeout_parity rule to the check's arm
+// against arm A on the check's condition ("all" pools every condition). The
+// observed value is the arm's timeout rate; a failure lists the arm's
+// timed-out runs. An arm without runs is unknown, never a pass.
+func (ev *evaluator) timeoutParity(base schemas.PolicyCheckResult) schemas.PolicyCheckResult {
+	status, per, detail := verdict.TimeoutParity(ev.runs, base.Condition, BaselineArm, base.Arm)
+	res := base
+	r := per[base.Arm]
+	res.N = r.Den
+	res.Reason = detail
+	switch status {
+	case schemas.GuardPass:
+		res.Status = schemas.PolicyPass
+	case schemas.GuardFail:
+		res.Status = schemas.PolicyFail
+		for _, run := range ev.selectRuns(base.Condition, base.Arm) {
+			if verdict.TimedOut(run) {
+				res.Evidence = appendEvidence(res.Evidence, run.Run.RunID)
+			}
+		}
+	default:
+		return unknown(res, detail, r.Den, nil)
+	}
+	res.Observed = schemas.Observed(float64(r.Num)/float64(r.Den), schemas.EvidenceOutcome)
+	return res
 }
 
 // noRuns is the reason for an arm with no counted runs on the condition.

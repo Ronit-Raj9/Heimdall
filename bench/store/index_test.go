@@ -27,6 +27,11 @@ func indexFixture(t *testing.T) (*FSStore, map[string]*schemas.SealRecord) {
 	mustWrite(t, s, pass, "metrics.json", `{"verified_success":{"state":"observed","v":1,"evidence":"outcome"}}`)
 	mustWrite(t, s, pass, "gates.json", `[{"gate":"g1","version":"1.0.0","effect":"veto","fired":false}]`)
 	mustWrite(t, s, pass, "receipts.json", `[{"probe_id":"stale_notes","layer":"fixture","steps":{}}]`)
+	mustWrite(t, s, pass, "evidence.json", `{"requests":{"complete":true,"row_ids":["q1","q2","q3","q4"],"dropped_global":3,"requests":[`+
+		`{"id":"q1","kind":"message","status":"success","tokens":{"fresh":10,"cache_read":0,"cache_write":0,"out":2}},`+
+		`{"id":"q2","kind":"message","status":"success"},`+
+		`{"id":"q3","kind":"message","status":"error","error_status":503},`+
+		`{"id":"q4","kind":"count_tokens","status":"success"}]}}`)
 	seals[pass.RunID] = mustSeal(t, s, pass)
 
 	b := mustNewRun(t, s, m, "s_b1", "r_b1", 1, schemas.OutcomeFail)
@@ -104,8 +109,14 @@ func TestSealedRuns(t *testing.T) {
 			if tc.gradeSource == "rg_1" && first.Grade.ParentSeal != seals["r_a1_2"].Hash {
 				t.Fatalf("regrade parent_seal = %s", first.Grade.ParentSeal)
 			}
-			if len(got[1].Metrics) != 0 || got[1].Gates != nil {
+			if len(got[1].Metrics) != 0 || got[1].Gates != nil || got[1].Gateway != nil {
 				t.Fatalf("missing optional files: %+v", got[1])
+			}
+			// One success row with usage, one without, an error row and a
+			// count_tokens row: two model requests should carry usage.
+			gw := first.Gateway
+			if gw == nil || gw.Requests != 2 || gw.WithUsage != 1 || !gw.Complete || gw.Dropped == nil || *gw.Dropped != 3 {
+				t.Fatalf("gateway tally = %+v", gw)
 			}
 		})
 	}

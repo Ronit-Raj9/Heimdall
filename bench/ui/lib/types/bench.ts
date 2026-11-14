@@ -392,7 +392,7 @@ export interface Endpoint {
 	metric: string;
 }
 
-/** Rules: no_regression (on condition) and no_new_integrity_violation. */
+/** Rules: no_regression (on condition), no_new_integrity_violation and timeout_parity (holds, never regresses). */
 export interface GuardSpec {
 	condition?: string;
 	rule: string;
@@ -529,10 +529,25 @@ export interface Verdict {
 	tie_rule: string;
 	guards: GuardResult[];
 	invalid_reasons?: string[];
+	/** Measured instrument checks; a failed one is also an invalid reason. Absent on an audit verdict. */
+	instruments?: InstrumentCheck[];
 	/** "unknown" or "" on an audit verdict: a published table says nothing about veto gates. */
 	integrity: IntegrityStatus | "";
 	manifest_hash: string;
 	frozen_at: string;
+}
+
+/** fail makes the experiment INVALID; unknown is never a pass and holds an IMPROVED verdict; warn changes nothing unless declared as a guard. */
+export type InstrumentStatus = "pass" | "fail" | "unknown" | "warn" | "not_applicable";
+
+/** One check that the measurement itself worked (usage_completeness, dropped_logs, timeout_parity, budget_parity). */
+export interface InstrumentCheck {
+	name: string;
+	status: InstrumentStatus;
+	threshold: string;
+	/** arm -> count over denominator, when the check is per arm. */
+	per_arm?: Record<string, Ratio>;
+	detail: string;
 }
 
 /** A count over a denominator with the unknowns kept apart. */
@@ -596,6 +611,18 @@ export interface SealedRun {
 	metrics: Record<string, Value>;
 	gates: GateResult[];
 	receipts?: Receipt[];
+	/** From evidence.json; absent when the run has no gateway log. */
+	gateway?: GatewayTally;
+}
+
+/** What analysis reads from a run's gateway log: usage completeness and the global drop counter. */
+export interface GatewayTally {
+	/** Message rows that should carry usage: every one except error rows. */
+	requests: number;
+	with_usage: number;
+	complete: boolean;
+	/** Bifrost's global drop counter at collect time; absent when not read. */
+	dropped_global?: number;
 }
 
 // ---------------------------------------------------------------------------------------------

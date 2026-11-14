@@ -111,7 +111,7 @@ func TestMeters(t *testing.T) {
 	clean := schemas.ConditionClean
 	runs := concat(
 		withVeto(passes(clean, ArmBaseline, 1, 1, 1, 0, 0), taskID(0), ArmBaseline),
-		passes(clean, ArmCandidate, 1, 1, 1, 1, 1),
+		withTimeouts(passes(clean, ArmCandidate, 1, 1, 1, 1, 1), ArmCandidate, 1),
 	)
 	ms := meters(newRunIndex(runs))
 	byName := map[string]schemas.Meter{}
@@ -129,6 +129,8 @@ func TestMeters(t *testing.T) {
 		{"veto gates per run in B", MeterVetoGatesPerRun, ArmCandidate, schemas.ValueObserved, 0},
 		{"cost unknown without a cost metric", MeterCostPerVerifiedSuccess, ArmCandidate, schemas.ValueUnknown, 0},
 		{"steps unknown without a steps metric", MeterStepsMedian, ArmBaseline, schemas.ValueUnknown, 0},
+		{"timeout rate in B", MeterTimeoutRate, ArmCandidate, schemas.ValueObserved, 0.25},
+		{"timeout rate in A", MeterTimeoutRate, ArmBaseline, schemas.ValueObserved, 0},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -145,8 +147,8 @@ func TestMeters(t *testing.T) {
 			}
 		})
 	}
-	if len(ms) != 8 {
-		t.Fatalf("%d meters, want 8", len(ms))
+	if len(ms) != 9 {
+		t.Fatalf("%d meters, want 9", len(ms))
 	}
 }
 

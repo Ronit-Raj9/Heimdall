@@ -70,6 +70,7 @@ type SealedRun struct {
 	Metrics     map[string]Value `json:"metrics"`
 	Gates       []GateResult     `json:"gates"`
 	Receipts    []Receipt        `json:"receipts,omitempty"`
+	Gateway     *GatewayTally    `json:"gateway,omitempty"` // from evidence.json; nil when the run has no gateway log
 }
 
 // Effect summarizes paired per-task differences for one condition and metric.
@@ -113,23 +114,50 @@ type GuardResult struct {
 
 // Verdict is the release decision on the primary endpoint.
 type Verdict struct {
-	Primary           Endpoint        `json:"primary"`
-	Decision          Decision        `json:"decision"`
-	Action            Action          `json:"action"`
-	Effect            *Effect         `json:"effect,omitempty"`
-	Alpha             float64         `json:"alpha"`
-	MDE               float64         `json:"mde"` // percentage points
-	MDEAssumedSD      bool            `json:"mde_assumed_sd"`
-	SD                float64         `json:"sd"`
-	TasksNeeded       int             `json:"tasks_needed,omitempty"`      // for a new experiment to detect |d_bar|
-	TasksNeededOver   int             `json:"tasks_needed_over,omitempty"` // set when even this many tasks would not be enough
-	RandomizationUnit string          `json:"randomization_unit"`          // "task"
-	TieRule           string          `json:"tie_rule"`
-	Guards            []GuardResult   `json:"guards"`
-	InvalidReasons    []string        `json:"invalid_reasons,omitempty"`
-	Integrity         IntegrityStatus `json:"integrity"`
-	ManifestHash      string          `json:"manifest_hash"`
-	FrozenAt          time.Time       `json:"frozen_at"`
+	Primary           Endpoint          `json:"primary"`
+	Decision          Decision          `json:"decision"`
+	Action            Action            `json:"action"`
+	Effect            *Effect           `json:"effect,omitempty"`
+	Alpha             float64           `json:"alpha"`
+	MDE               float64           `json:"mde"` // percentage points
+	MDEAssumedSD      bool              `json:"mde_assumed_sd"`
+	SD                float64           `json:"sd"`
+	TasksNeeded       int               `json:"tasks_needed,omitempty"`      // for a new experiment to detect |d_bar|
+	TasksNeededOver   int               `json:"tasks_needed_over,omitempty"` // set when even this many tasks would not be enough
+	RandomizationUnit string            `json:"randomization_unit"`          // "task"
+	TieRule           string            `json:"tie_rule"`
+	Guards            []GuardResult     `json:"guards"`
+	InvalidReasons    []string          `json:"invalid_reasons,omitempty"`
+	Instruments       []InstrumentCheck `json:"instruments,omitempty"` // measured instrument checks; a failed one is also an invalid reason
+	Integrity         IntegrityStatus   `json:"integrity"`
+	ManifestHash      string            `json:"manifest_hash"`
+	FrozenAt          time.Time         `json:"frozen_at"`
+}
+
+// InstrumentStatus is one instrument check's state.
+type InstrumentStatus string
+
+// Instrument statuses. A failed check makes the experiment INVALID. An
+// unknown one is never read as a pass: an IMPROVED verdict holds. A warning
+// (a parity check) is shown and changes nothing unless the experiment
+// declares the matching guard.
+const (
+	InstrumentPass          InstrumentStatus = "pass"
+	InstrumentFail          InstrumentStatus = "fail"
+	InstrumentUnknown       InstrumentStatus = "unknown"
+	InstrumentWarn          InstrumentStatus = "warn"
+	InstrumentNotApplicable InstrumentStatus = "not_applicable"
+)
+
+// InstrumentCheck is one check that the measurement itself worked, with the
+// numbers behind it, such as usage completeness or the gateway's dropped log
+// rows.
+type InstrumentCheck struct {
+	Name      string           `json:"name"`
+	Status    InstrumentStatus `json:"status"`
+	Threshold string           `json:"threshold"`
+	PerArm    map[string]Ratio `json:"per_arm,omitempty"` // arm -> count over denominator, when the check is per arm
+	Detail    string           `json:"detail"`
 }
 
 // DiagnosticsRow is one condition's behaviour per arm. Rows come from the

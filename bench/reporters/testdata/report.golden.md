@@ -27,6 +27,15 @@ Experiment `e_codewins`, analysis `a_1`, grade source `original`.
 
 None.
 
+## Instrument checks
+
+| Check | Status | A | B | Threshold | Detail |
+|---|---|---|---|---|---|
+| usage_completeness | PASS | 120/120 (100.0%) | 117/118 (99.2%), 1 unknown | &gt;= 0.95 in every arm, arms at most 5 pp apart | usage completeness arm A 1.000, arm B 0.992 |
+| dropped_logs | UNKNOWN | - | - | no rise over the experiment | gateway drop counter not recorded in 1 of 48 runs; no rise in the 47 readings, counter 0 to 0 |
+| timeout_parity | WARN | 1/24 (4.2%) | 9/24 (37.5%) | timeout rates at most 10 pp apart, or both at most 20% | gap +33.3 pp \| on every condition |
+| gateway_hygiene | UNKNOWN | - | - | no MCP auto-inject with MCP clients, no semantic cache, no multi-target routing | not recorded: the manifest predates the hygiene check or names no gateway |
+
 ## Release policy
 
 Policy `enterprise-default`, hash `4f1c2a9b7d3e`: **BLOCK**. A policy only adds requirements; the baseline gates always run.

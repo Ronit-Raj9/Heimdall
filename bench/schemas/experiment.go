@@ -4,6 +4,8 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"sort"
+	"strconv"
 	"time"
 
 	"gopkg.in/yaml.v3"
@@ -45,7 +47,10 @@ type Endpoint struct {
 }
 
 // GuardSpec is a release guard. Rules: no_regression (the release effect on
-// Condition must not be REGRESSED) and no_new_integrity_violation.
+// Condition must not be REGRESSED), no_new_integrity_violation, and
+// timeout_parity (the arms' timeout rates on Condition, or on every condition
+// when it is empty, must not differ by more than 10 pp while either is above
+// 20%; a failure holds the release and never makes it REGRESSED or INVALID).
 type GuardSpec struct {
 	Condition string `json:"condition,omitempty" yaml:"condition"`
 	Rule      string `json:"rule" yaml:"rule"`
@@ -189,8 +194,89 @@ type Manifest struct {
 	Slots          []Slot                 `json:"slots"`
 	RandomizationU string                 `json:"randomization_unit"` // "task"
 	BenchVersion   string                 `json:"bench_version"`
-	PolicyHash     string                 `json:"policy_hash,omitempty"` // sha256 of the policy file named by the experiment
-	Hash           string                 `json:"hash"`                  // sha256 of the canonical JSON with Hash empty
+	PolicyHash     string                 `json:"policy_hash,omitempty"`  // sha256 of the policy file named by the experiment
+	BudgetDiffs    []BudgetDiff           `json:"budget_diffs,omitempty"` // budgets that differ between arms with no arm setting them
+	Hash           string                 `json:"hash"`                   // sha256 of the canonical JSON with Hash empty
+}
+
+// BudgetDiff is one agent budget that differs between arms although no arm
+// declares it with `set:`, so it is not the experiment's variable. The
+// planner warns and records it; it never refuses the plan, because a
+// comparison of two agent configs can differ in budgets on purpose.
+type BudgetDiff struct {
+	Field  string            `json:"field"`   // dotted path, e.g. budgets.cpus
+	PerArm map[string]string `json:"per_arm"` // arm -> value as written in the resolved config
+}
+
+// parityBudgets are the agent budgets that must match between arms unless an
+// arm declares them with `set:` (DESIGN.md 9.4): container resources and
+// limits alone can move a success rate.
+var parityBudgets = []string{"wall_s", "turns", "cpus", "mem_gb"}
+
+// BudgetDiffsOf returns every parity budget whose resolved value differs
+// between the arms while no arm sets it (`budgets.<field>` or `budgets`). A
+// budget an arm sets is the declared variable and may differ. The planner
+// records the result in the manifest; the verdict recomputes it from the
+// manifest's resolved arms, so manifests written before the field existed are
+// checked too.
+func BudgetDiffsOf(e *Experiment, arms map[string]ArmManifest) []BudgetDiff {
+	ids := make([]string, 0, len(arms))
+	for id := range arms {
+		ids = append(ids, id)
+	}
+	sort.Strings(ids)
+	var out []BudgetDiff
+	for _, field := range parityBudgets {
+		if budgetDeclared(e, field) {
+			continue
+		}
+		per := map[string]string{}
+		values := map[string]bool{}
+		for _, id := range ids {
+			v := budgetValue(arms[id].Config.Budgets, field)
+			per[id] = v
+			values[v] = true
+		}
+		if len(values) > 1 {
+			out = append(out, BudgetDiff{Field: "budgets." + field, PerArm: per})
+		}
+	}
+	return out
+}
+
+// budgetDeclared reports whether some arm sets the budget with `set:`.
+func budgetDeclared(e *Experiment, field string) bool {
+	if e == nil {
+		return false
+	}
+	for _, a := range e.Arms {
+		for path := range a.Set {
+			if path == "budgets" || path == "budgets."+field {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+// budgetValue is one budget as text. An unset optional budget (turns) reads
+// "unset", so 0 and "no limit" are told apart.
+func budgetValue(b Budgets, field string) string {
+	switch field {
+	case "wall_s":
+		return strconv.Itoa(b.WallS)
+	case "turns":
+		if b.Turns == 0 {
+			return "unset"
+		}
+		return strconv.Itoa(b.Turns)
+	case "cpus":
+		return strconv.FormatFloat(b.CPUs, 'g', -1, 64)
+	case "mem_gb":
+		return strconv.FormatFloat(b.MemGB, 'g', -1, 64)
+	default:
+		return ""
+	}
 }
 
 // ArmManifest is one arm's resolved config and the hashes of every file laid

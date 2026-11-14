@@ -32,11 +32,17 @@ import (
 // Version is the only policy_version this package reads.
 const Version = 1
 
-// Rules a check can name instead of a threshold.
+// Rules a check can name instead of a threshold. timeout_parity is the
+// verdict's guard rule of the same name and reads metric timeout_rate.
 const (
-	RuleNoRegression = "no_regression"
-	RuleImproved     = "improved"
+	RuleNoRegression  = "no_regression"
+	RuleImproved      = "improved"
+	RuleTimeoutParity = "timeout_parity"
 )
+
+// MetricTimeoutRate is the metric a timeout_parity check names: the share of
+// an arm's runs that hit the wall-clock budget, computed from the outcomes.
+const MetricTimeoutRate = "timeout_rate"
 
 // Aggregate metrics computed over an arm's runs rather than read per run.
 const (
@@ -151,6 +157,12 @@ func validate(p *schemas.Policy) error {
 		seen[c.ID] = true
 		if n := thresholds(c); n != 1 {
 			errs = append(errs, fmt.Errorf("%s: want exactly one of rule, max, min or equals, got %d", where, n))
+		}
+		if c.Rule == RuleTimeoutParity && c.Metric != MetricTimeoutRate {
+			errs = append(errs, fmt.Errorf("%s: rule %s reads metric %s, not %s", where, c.Rule, MetricTimeoutRate, c.Metric))
+		}
+		if c.Rule != RuleTimeoutParity && c.Metric == MetricTimeoutRate {
+			errs = append(errs, fmt.Errorf("%s: metric %s is only read by rule %s", where, MetricTimeoutRate, RuleTimeoutParity))
 		}
 		if c.Rule != "" && isAggregate(c.Metric) {
 			errs = append(errs, fmt.Errorf("%s: rule %s needs a per-run metric, not the aggregate %s", where, c.Rule, c.Metric))

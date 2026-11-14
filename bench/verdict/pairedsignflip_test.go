@@ -63,7 +63,47 @@ func sealedRun(task, arm, cond string, trial int, y schemas.Value) schemas.Seale
 		Run:         schemas.Run{RunID: id, ManifestHash: testManifestHash, Outcome: out},
 		GradeSource: "original",
 		Metrics:     map[string]schemas.Value{MetricVerifiedSuccess: y},
+		Gateway:     cleanTally(),
 	}
+}
+
+// cleanTally is a complete gateway log: two model requests, both with usage,
+// and a drop counter of 0.
+func cleanTally() *schemas.GatewayTally {
+	zero := int64(0)
+	return &schemas.GatewayTally{Requests: 2, WithUsage: 2, Complete: true, Dropped: &zero}
+}
+
+// withTimeouts marks the first n runs of arm as timed out, keeping their grade.
+func withTimeouts(runs []schemas.SealedRun, arm string, n int) []schemas.SealedRun {
+	out := append([]schemas.SealedRun(nil), runs...)
+	for i := range out {
+		if n > 0 && out[i].Slot.Arm == arm {
+			out[i].Run.Agent.TimedOut = true
+			n--
+		}
+	}
+	return out
+}
+
+// withGateway sets the gateway tally of every run of arm with f.
+func withGateway(runs []schemas.SealedRun, arm string, f func(i int) *schemas.GatewayTally) []schemas.SealedRun {
+	out := append([]schemas.SealedRun(nil), runs...)
+	i := 0
+	for k := range out {
+		if out[k].Slot.Arm == arm {
+			out[k].Gateway = f(i)
+			i++
+		}
+	}
+	return out
+}
+
+// dropped is a complete gateway tally whose drop counter reads n.
+func dropped(n int64) *schemas.GatewayTally {
+	t := cleanTally()
+	t.Dropped = &n
+	return t
 }
 
 // pattern builds runs for one arm and condition from one string per task:
@@ -224,6 +264,64 @@ func TestDecide(t *testing.T) {
 			decision: schemas.DecisionInconclusive, action: schemas.ActionNoDecision, integrity: schemas.IntegrityClean,
 			p: 2.0 / 256, dbar: 1,
 		},
+		{
+			name: "usage below 0.95 in one arm is invalid",
+			m:    testManifest(ArmBaseline, ArmCandidate),
+			runs: concat(passes(clean, ArmBaseline, 3, none...),
+				withGateway(passes(clean, ArmCandidate, 3, all...), ArmCandidate, func(i int) *schemas.GatewayTally {
+					t := cleanTally()
+					if i < 3 {
+						t.WithUsage = 1
+					}
+					return t
+				})),
+			decision: schemas.DecisionInvalid, action: schemas.ActionFixHarness, integrity: schemas.IntegrityClean,
+			p: -1, reason: "usage completeness 0.938 (45 of 48 model requests carry usage, 0 in runs with a missing or incomplete log) in arm B is below 0.95",
+		},
+		{
+			name: "a rise in the gateway drop counter is invalid",
+			m:    testManifest(ArmBaseline, ArmCandidate),
+			runs: concat(passes(clean, ArmBaseline, 3, none...),
+				withGateway(passes(clean, ArmCandidate, 3, all...), ArmCandidate, func(i int) *schemas.GatewayTally { return dropped(int64(i / 20)) })),
+			decision: schemas.DecisionInvalid, action: schemas.ActionFixHarness, integrity: schemas.IntegrityClean,
+			p: -1, reason: "gateway dropped 1 log rows during the experiment",
+		},
+		{
+			name: "a missing drop counter holds an improvement",
+			m:    testManifest(ArmBaseline, ArmCandidate),
+			runs: concat(passes(clean, ArmBaseline, 3, none...),
+				withGateway(passes(clean, ArmCandidate, 3, all...), ArmCandidate, func(i int) *schemas.GatewayTally {
+					t := cleanTally()
+					if i == 0 {
+						t.Dropped = nil
+					}
+					return t
+				})),
+			decision: schemas.DecisionImproved, action: schemas.ActionHold, integrity: schemas.IntegrityClean,
+			p: 2.0 / 256, dbar: 1,
+		},
+		{
+			name: "a timeout parity failure holds an improvement and never regresses it",
+			m: func() *schemas.Manifest {
+				m := testManifest(ArmBaseline, ArmCandidate)
+				m.Experiment.Guards = []schemas.GuardSpec{{Rule: RuleTimeoutParity}}
+				return m
+			}(),
+			runs:     concat(passes(clean, ArmBaseline, 3, none...), withTimeouts(passes(clean, ArmCandidate, 3, all...), ArmCandidate, 6)),
+			decision: schemas.DecisionImproved, action: schemas.ActionHold, integrity: schemas.IntegrityClean,
+			p: 2.0 / 256, dbar: 1,
+		},
+		{
+			name: "a timeout parity failure holds an inconclusive verdict",
+			m: func() *schemas.Manifest {
+				m := testManifest(ArmBaseline, ArmCandidate)
+				m.Experiment.Guards = []schemas.GuardSpec{{Rule: RuleTimeoutParity}}
+				return m
+			}(),
+			runs:     concat(passes(clean, ArmBaseline, 3, workedA...), withTimeouts(passes(clean, ArmCandidate, 3, workedB...), ArmCandidate, 6)),
+			decision: schemas.DecisionInconclusive, action: schemas.ActionHold, integrity: schemas.IntegrityClean,
+			p: 0.125, dbar: 1.0 / 6,
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -368,23 +466,33 @@ func TestDecideNaiveAndCompatibility(t *testing.T) {
 func TestActionFor(t *testing.T) {
 	pass := []schemas.GuardResult{{Status: schemas.GuardPass}}
 	undetermined := []schemas.GuardResult{{Status: schemas.GuardUndetermined}}
+	parityFail := []schemas.GuardResult{{Spec: schemas.GuardSpec{Rule: RuleTimeoutParity}, Status: schemas.GuardFail}}
+	parityUndetermined := []schemas.GuardResult{{Spec: schemas.GuardSpec{Rule: RuleTimeoutParity}, Status: schemas.GuardUndetermined}}
+	ok := []schemas.InstrumentCheck{{Name: InstrumentUsageCompleteness, Status: schemas.InstrumentPass}}
+	unknown := []schemas.InstrumentCheck{{Name: InstrumentDroppedLogs, Status: schemas.InstrumentUnknown}}
 	tests := []struct {
 		name      string
 		d         schemas.Decision
 		guards    []schemas.GuardResult
 		integrity schemas.IntegrityStatus
+		checks    []schemas.InstrumentCheck
 		want      schemas.Action
 	}{
-		{"invalid", schemas.DecisionInvalid, pass, schemas.IntegrityClean, schemas.ActionFixHarness},
-		{"regressed", schemas.DecisionRegressed, pass, schemas.IntegrityClean, schemas.ActionHold},
-		{"improved, all pass", schemas.DecisionImproved, pass, schemas.IntegrityAlert, schemas.ActionShip},
-		{"improved, integrity regressed", schemas.DecisionImproved, pass, schemas.IntegrityRegressed, schemas.ActionHold},
-		{"improved, guard undetermined", schemas.DecisionImproved, undetermined, schemas.IntegrityClean, schemas.ActionHold},
-		{"inconclusive", schemas.DecisionInconclusive, pass, schemas.IntegrityClean, schemas.ActionNoDecision},
+		{"invalid", schemas.DecisionInvalid, pass, schemas.IntegrityClean, ok, schemas.ActionFixHarness},
+		{"regressed", schemas.DecisionRegressed, pass, schemas.IntegrityClean, ok, schemas.ActionHold},
+		{"improved, all pass", schemas.DecisionImproved, pass, schemas.IntegrityAlert, ok, schemas.ActionShip},
+		{"improved, integrity regressed", schemas.DecisionImproved, pass, schemas.IntegrityRegressed, ok, schemas.ActionHold},
+		{"improved, guard undetermined", schemas.DecisionImproved, undetermined, schemas.IntegrityClean, ok, schemas.ActionHold},
+		{"improved, instrument unknown", schemas.DecisionImproved, pass, schemas.IntegrityClean, unknown, schemas.ActionHold},
+		{"improved, timeout parity failed", schemas.DecisionImproved, parityFail, schemas.IntegrityClean, ok, schemas.ActionHold},
+		{"inconclusive", schemas.DecisionInconclusive, pass, schemas.IntegrityClean, ok, schemas.ActionNoDecision},
+		{"inconclusive, instrument unknown", schemas.DecisionInconclusive, pass, schemas.IntegrityClean, unknown, schemas.ActionNoDecision},
+		{"inconclusive, timeout parity failed", schemas.DecisionInconclusive, parityFail, schemas.IntegrityClean, ok, schemas.ActionHold},
+		{"inconclusive, timeout parity undetermined", schemas.DecisionInconclusive, parityUndetermined, schemas.IntegrityClean, ok, schemas.ActionNoDecision},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if got := actionFor(tt.d, tt.guards, tt.integrity); got != tt.want {
+			if got := actionFor(tt.d, tt.guards, tt.integrity, tt.checks); got != tt.want {
 				t.Fatalf("got %s, want %s", got, tt.want)
 			}
 		})
@@ -430,6 +538,9 @@ func TestGuards(t *testing.T) {
 			withVeto(base, taskID(1), ArmCandidate), schemas.GuardPass},
 		{"no runs on the guard condition is undetermined", schemas.GuardSpec{Condition: condStale, Rule: RuleNoRegression}, base, schemas.GuardUndetermined},
 		{"unknown rule is undetermined", schemas.GuardSpec{Rule: "no_slowdown"}, base, schemas.GuardUndetermined},
+		{"timeout parity passes with no timeouts", schemas.GuardSpec{Rule: RuleTimeoutParity}, base, schemas.GuardPass},
+		{"timeout parity fails on a 50 pp gap", schemas.GuardSpec{Rule: RuleTimeoutParity}, withTimeouts(base, ArmCandidate, 2), schemas.GuardFail},
+		{"timeout parity on a condition with no runs is undetermined", schemas.GuardSpec{Condition: condStale, Rule: RuleTimeoutParity}, base, schemas.GuardUndetermined},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

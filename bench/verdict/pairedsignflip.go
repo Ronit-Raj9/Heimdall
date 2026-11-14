@@ -16,7 +16,7 @@ import (
 // PolicyPairedSignFlip is the name of the paired sign-flip verdict policy.
 const PolicyPairedSignFlip = "paired_signflip"
 
-// Guard rules (DESIGN.md 9.2).
+// Guard rules (DESIGN.md 9.2). RuleTimeoutParity is in timeoutparity.go.
 const (
 	RuleNoRegression            = "no_regression"
 	RuleNoNewIntegrityViolation = "no_new_integrity_violation"
@@ -95,13 +95,14 @@ func (p *pairedSignFlipPolicy) Decide(ctx context.Context, m *schemas.Manifest, 
 	}, nil
 }
 
-// verdictFor assembles the verdict: primary effect, guards, instrument gates,
-// integrity, decision, action and the minimal detectable effect.
+// verdictFor assembles the verdict: primary effect, guards, instrument gates
+// and checks, integrity, decision, action and the minimal detectable effect.
 func verdictFor(m *schemas.Manifest, cfg settings, idx runIndex, runs []schemas.SealedRun, hasAA bool) schemas.Verdict {
 	pc, pm := cfg.primary.Condition, cfg.primary.Metric
 	primary := pairedEffect(pc, pm, ArmBaseline, ArmCandidate, idx.cells(pc, ArmBaseline, pm), idx.cells(pc, ArmCandidate, pm), true)
 	guards := evaluateGuards(cfg, idx)
-	invalid := instrumentGates(m, cfg, idx, runs)
+	checks := instrumentChecks(m, idx)
+	invalid := append(instrumentGates(m, cfg, idx, runs), instrumentReasons(checks)...)
 	integrity := integrityStatus(idx)
 	decision := decide(invalid, primary, guards, cfg.alpha)
 
@@ -114,7 +115,7 @@ func verdictFor(m *schemas.Manifest, cfg settings, idx runIndex, runs []schemas.
 	return schemas.Verdict{
 		Primary:           cfg.primary,
 		Decision:          decision,
-		Action:            actionFor(decision, guards, integrity),
+		Action:            actionFor(decision, guards, integrity, checks),
 		Effect:            primary,
 		Alpha:             cfg.alpha,
 		MDE:               mdePP(primary.LowerBound.NTasks, sd, cfg.alpha),
@@ -125,6 +126,7 @@ func verdictFor(m *schemas.Manifest, cfg settings, idx runIndex, runs []schemas.
 		TieRule:           tieRule,
 		Guards:            guards,
 		InvalidReasons:    invalid,
+		Instruments:       checks,
 		Integrity:         integrity,
 		ManifestHash:      m.Hash,
 		FrozenAt:          m.CreatedAt,
@@ -179,36 +181,74 @@ func settingsFor(m *schemas.Manifest) settings {
 }
 
 // decide applies DESIGN.md 9.3 item 6. A directional decision must hold at
-// both missingness bounds, and IMPROVED needs every guard to pass, so an
-// undetermined guard blocks it.
+// both missingness bounds, and IMPROVED needs every decision guard to pass, so
+// an undetermined one blocks it. Hold-only guards (timeout_parity) never move
+// the decision; actionFor reads them.
 func decide(invalid []string, primary *schemas.Effect, guards []schemas.GuardResult, alpha float64) schemas.Decision {
+	gating := decisionGuards(guards)
 	switch {
 	case len(invalid) > 0:
 		return schemas.DecisionInvalid
-	case regressedAtBoth(primary, alpha) || anyGuard(guards, schemas.GuardFail):
+	case regressedAtBoth(primary, alpha) || anyGuard(gating, schemas.GuardFail):
 		return schemas.DecisionRegressed
-	case improvedAtBoth(primary, alpha) && !anyGuard(guards, schemas.GuardFail, schemas.GuardUndetermined):
+	case improvedAtBoth(primary, alpha) && !anyGuard(gating, schemas.GuardFail, schemas.GuardUndetermined):
 		return schemas.DecisionImproved
 	default:
 		return schemas.DecisionInconclusive
 	}
 }
 
-// actionFor maps a decision to the release table (DESIGN.md 9.4).
-func actionFor(d schemas.Decision, guards []schemas.GuardResult, integrity schemas.IntegrityStatus) schemas.Action {
+// actionFor maps a decision to the release table (DESIGN.md 9.4). IMPROVED
+// ships only when every guard passed, integrity did not regress and no
+// instrument check is unknown, since an unknown is never read as a pass. A
+// failed hold-only guard (timeout_parity) also holds an INCONCLUSIVE verdict:
+// the comparison ran under unequal pressure and needs a look before a rerun.
+func actionFor(d schemas.Decision, guards []schemas.GuardResult, integrity schemas.IntegrityStatus, checks []schemas.InstrumentCheck) schemas.Action {
 	switch d {
 	case schemas.DecisionInvalid:
 		return schemas.ActionFixHarness
 	case schemas.DecisionRegressed:
 		return schemas.ActionHold
 	case schemas.DecisionImproved:
-		if anyGuard(guards, schemas.GuardFail, schemas.GuardUndetermined) || integrity == schemas.IntegrityRegressed {
+		if anyGuard(guards, schemas.GuardFail, schemas.GuardUndetermined) || integrity == schemas.IntegrityRegressed ||
+			anyInstrument(checks, schemas.InstrumentUnknown) {
 			return schemas.ActionHold
 		}
 		return schemas.ActionShip
 	default:
+		if anyGuard(holdGuards(guards), schemas.GuardFail) {
+			return schemas.ActionHold
+		}
 		return schemas.ActionNoDecision
 	}
+}
+
+// holdOnly reports whether a guard rule only holds a release and never moves
+// the decision.
+func holdOnly(rule string) bool {
+	return rule == RuleTimeoutParity
+}
+
+// decisionGuards returns the guards that can move the decision.
+func decisionGuards(guards []schemas.GuardResult) []schemas.GuardResult {
+	var out []schemas.GuardResult
+	for _, g := range guards {
+		if !holdOnly(g.Spec.Rule) {
+			out = append(out, g)
+		}
+	}
+	return out
+}
+
+// holdGuards returns the hold-only guards.
+func holdGuards(guards []schemas.GuardResult) []schemas.GuardResult {
+	var out []schemas.GuardResult
+	for _, g := range guards {
+		if holdOnly(g.Spec.Rule) {
+			out = append(out, g)
+		}
+	}
+	return out
 }
 
 // regressedAtBoth reports a significant negative effect at both bounds.
@@ -243,6 +283,8 @@ func evaluateGuards(cfg settings, idx runIndex) []schemas.GuardResult {
 			out = append(out, noRegressionGuard(g, cfg, idx))
 		case RuleNoNewIntegrityViolation:
 			out = append(out, integrityGuard(g, idx))
+		case RuleTimeoutParity:
+			out = append(out, timeoutParityGuard(g, idx))
 		default:
 			out = append(out, schemas.GuardResult{
 				Spec:   g,

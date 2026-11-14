@@ -47,6 +47,8 @@ func meters(idx runIndex) []schemas.Meter {
 			schemas.KindDuration, medianOf(MetricWallTime)},
 		{MeterCostPerVerifiedSuccess, "Cost per verified success", "cost_usd summed over every counted run", "verified successes",
 			schemas.KindUSD, costPerVerifiedSuccess},
+		{MeterTimeoutRate, "Timeout rate", "runs that hit the wall-clock budget (outcome timeout or agent timed out)", "counted runs",
+			schemas.KindRate, timeoutRate},
 	}
 	arms := armsIn(idx, "")
 	out := make([]schemas.Meter, 0, len(defs))

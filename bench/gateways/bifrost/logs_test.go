@@ -165,3 +165,55 @@ func TestFetchRequestsDirect(t *testing.T) {
 		t.Errorf("proxied key without ledger: complete %t reason %q err %v", plog.Complete, plog.Reason, err)
 	}
 }
+
+// TestDroppedLogs: the counter is dropped_requests alone (the maintenance
+// count is a subset of it), and a counter that cannot be read is an error at
+// preflight and a nil counter on the run's log, never 0.
+func TestDroppedLogs(t *testing.T) {
+	tests := []struct {
+		name    string
+		answer  map[string]any
+		down    bool
+		want    int64
+		wantErr string
+	}{
+		{name: "zero", answer: map[string]any{"dropped_requests": 0}, want: 0},
+		{name: "maintenance is a subset, not added", answer: map[string]any{"dropped_requests": 7, "dropped_during_maintenance": 2}, want: 7},
+		{name: "no dropped_requests field", answer: map[string]any{"dropped_during_maintenance": 2}, wantErr: "answer has no dropped_requests"},
+		{name: "server error", down: true, wantErr: "read dropped log counter: bifrost GET /api/logs/dropped: status 500"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			f, g := fakeWithRows(t)
+			f.dropped = tt.answer
+			if tt.down {
+				f.down = map[string]bool{"GET /api/logs/dropped": true}
+			}
+			got, err := g.DroppedLogs(context.Background())
+			if tt.wantErr != "" {
+				if err == nil || !strings.Contains(err.Error(), tt.wantErr) {
+					t.Fatalf("err = %v, want %q", err, tt.wantErr)
+				}
+			} else if err != nil || got != tt.want {
+				t.Fatalf("got %d, %v, want %d", got, err, tt.want)
+			}
+			log := g.finish(context.Background(), &schemas.RequestLog{Complete: true})
+			if tt.wantErr != "" && log.Dropped != nil {
+				t.Fatalf("unreadable counter recorded as %d", *log.Dropped)
+			}
+			if tt.wantErr == "" && (log.Dropped == nil || *log.Dropped != tt.want) {
+				t.Fatalf("log counter = %v, want %d", log.Dropped, tt.want)
+			}
+			m, err := g.Preflight(context.Background())
+			if err != nil {
+				t.Fatalf("Preflight: %v", err)
+			}
+			if tt.wantErr == "" && (m.DroppedLogs == nil || *m.DroppedLogs != tt.want) {
+				t.Fatalf("preflight baseline = %v, want %d", m.DroppedLogs, tt.want)
+			}
+			if tt.wantErr != "" && (m.DroppedLogs != nil || !strings.Contains(strings.Join(m.Problems, "\n"), "dropped log counter: ")) {
+				t.Fatalf("preflight baseline %v, problems %q", m.DroppedLogs, m.Problems)
+			}
+		})
+	}
+}

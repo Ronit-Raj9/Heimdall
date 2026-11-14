@@ -52,6 +52,7 @@ func (r *markdownReporter) Write(ctx context.Context, a *schemas.Analysis, m *sc
 	writePrimary(bw, &a.Verdict)
 	writeGuards(bw, a.Verdict.Guards)
 	writeInvalid(bw, a.Verdict.InvalidReasons)
+	writeInstruments(bw, a.Verdict.Instruments, m, arms)
 	writePolicy(bw, a.Policy)
 	writeNaive(bw, a.Naive, arms)
 	writeDiagnostics(bw, a.Diagnostics, arms)
@@ -132,6 +133,76 @@ func writeInvalid(w *bufio.Writer, reasons []string) {
 		fmt.Fprintf(w, "- %s\n", cell(r))
 	}
 	w.WriteString("\n")
+}
+
+// hygieneName is the instrument row of the gateway hygiene record, which
+// comes from the manifest rather than from the runs.
+const hygieneName = "gateway_hygiene"
+
+// writeInstruments writes one row per instrument check of the verdict
+// (usage completeness, dropped logs, timeout and budget parity), then the
+// gateway hygiene record frozen in the manifest. A per-arm cell is the count
+// over its denominator with the share. A check that could not be made reads
+// UNKNOWN, never PASS.
+func writeInstruments(w *bufio.Writer, checks []schemas.InstrumentCheck, m *schemas.Manifest, arms []string) {
+	w.WriteString("## Instrument checks\n\n| Check | Status |")
+	for _, arm := range arms {
+		w.WriteString(" " + cell(arm) + " |")
+	}
+	w.WriteString(" Threshold | Detail |\n|---|---|" + strings.Repeat("---|", len(arms)) + "---|---|\n")
+	for _, c := range checks {
+		fmt.Fprintf(w, "| %s | %s |", cell(c.Name), strings.ToUpper(orUnknown(string(c.Status))))
+		for _, arm := range arms {
+			text := "-"
+			if r, ok := c.PerArm[arm]; ok {
+				text = shareText(r)
+			}
+			w.WriteString(" " + text + " |")
+		}
+		fmt.Fprintf(w, " %s | %s |\n", cell(orDash(c.Threshold)), cell(orDash(c.Detail)))
+	}
+	status, detail := hygieneText(m)
+	fmt.Fprintf(w, "| %s | %s |%s %s | %s |\n\n", hygieneName, status, strings.Repeat(" - |", len(arms)),
+		"no MCP auto-inject with MCP clients, no semantic cache, no multi-target routing", cell(detail))
+}
+
+// shareText is "num/den (share)", with the part of the denominator whose
+// value is unknown named.
+func shareText(r schemas.Ratio) string {
+	if r.Den == 0 {
+		return "n/a"
+	}
+	text := fmt.Sprintf("%d/%d (%.1f%%)", r.Num, r.Den, 100*float64(r.Num)/float64(r.Den))
+	if r.Unknown > 0 {
+		text += fmt.Sprintf(", %d %s", r.Unknown, unknownText)
+	}
+	return text
+}
+
+// hygieneText is the status and summary of the manifest's hygiene record.
+func hygieneText(m *schemas.Manifest) (string, string) {
+	if m == nil || m.Gateway == nil || m.Gateway.Hygiene == nil {
+		return "UNKNOWN", "not recorded: the manifest predates the hygiene check or names no gateway"
+	}
+	h := m.Gateway.Hygiene
+	inject := "off"
+	if !h.MCPAutoToolInjectOff {
+		inject = "on"
+	}
+	cache := "off"
+	if h.SemanticCache {
+		cache = "on"
+	}
+	multi := "none"
+	if len(h.MultiTarget) > 0 {
+		multi = strings.Join(h.MultiTarget, "; ")
+	}
+	detail := fmt.Sprintf("MCP clients %d, auto-inject %s; semantic cache %s; %d enabled routing rule(s); multi-target %s",
+		h.MCPClients, inject, cache, h.RoutingRules, multi)
+	if len(h.Violations) > 0 {
+		return "FAIL", detail + "; violations: " + strings.Join(h.Violations, "; ")
+	}
+	return "PASS", detail
 }
 
 // writePolicy writes the release policy result: the decision, then one row

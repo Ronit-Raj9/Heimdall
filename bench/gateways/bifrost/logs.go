@@ -186,19 +186,36 @@ func (g *Gateway) fetchDetail(ctx context.Context, id string) (*parsedRow, error
 	return parseDetail(raw)
 }
 
-// finish attaches Bifrost's global drop counter, a warning signal only: it
-// counts every key, so it never decides completeness.
-func (g *Gateway) finish(ctx context.Context, log *schemas.RequestLog) *schemas.RequestLog {
-	var dropped struct {
+// DroppedLogs reads Bifrost's global count of log rows it dropped since the
+// process started (GET /api/logs/dropped, dropped_requests). The count covers
+// every key, so it never decides one run's completeness; the verdict reads its
+// rise over the whole experiment. dropped_during_maintenance is a subset of
+// dropped_requests and is not added.
+func (g *Gateway) DroppedLogs(ctx context.Context) (int64, error) {
+	var out struct {
 		DroppedRequests *int64 `json:"dropped_requests"`
 	}
-	if err := g.call(ctx, http.MethodGet, "/api/logs/dropped", nil, &dropped); err != nil {
+	if err := g.call(ctx, http.MethodGet, "/api/logs/dropped", nil, &out); err != nil {
+		return 0, fmt.Errorf("read dropped log counter: %w", err)
+	}
+	if out.DroppedRequests == nil {
+		return 0, errors.New("read dropped log counter: answer has no dropped_requests")
+	}
+	return *out.DroppedRequests, nil
+}
+
+// finish attaches Bifrost's global drop counter to the run's log at collect
+// time. A counter that cannot be read stays nil, which the verdict reads as
+// unknown, never as 0.
+func (g *Gateway) finish(ctx context.Context, log *schemas.RequestLog) *schemas.RequestLog {
+	n, err := g.DroppedLogs(ctx)
+	if err != nil {
 		g.logger.Warn("bifrost dropped counter unavailable", "error", err.Error())
 		return log
 	}
-	log.Dropped = dropped.DroppedRequests
-	if log.Dropped != nil && *log.Dropped > 0 {
-		g.logger.Warn("bifrost reports dropped log rows", "dropped_requests", *log.Dropped)
+	log.Dropped = &n
+	if n > 0 {
+		g.logger.Warn("bifrost reports dropped log rows", "dropped_requests", n)
 	}
 	return log
 }

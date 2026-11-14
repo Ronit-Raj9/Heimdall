@@ -24,6 +24,7 @@ const armOrderStream = 0x62696672 // "bifr"
 const (
 	GuardNoRegression            = "no_regression"
 	GuardNoNewIntegrityViolation = "no_new_integrity_violation"
+	GuardTimeoutParity           = "timeout_parity"
 )
 
 // Planner turns an experiment into a frozen, hashed manifest. Nothing runs.
@@ -52,6 +53,10 @@ func NewPlanner(reg *schemas.Registry, benchRoot string, logger schemas.Logger) 
 
 // Plan validates the experiment against the suite and the registry, resolves
 // every arm, lays out the slots and returns the hashed manifest.
+//
+// It refuses a gateway whose preflight found a hygiene violation (MCP tools
+// auto-injected, semantic cache, multi-target routing), and records, with a
+// warning, every budget that differs between arms without a `set:` override.
 //
 // It refuses a suite without a lock, or any selected task that the lock does
 // not mark admitted, unless the experiment name starts with "smoke" (then it
@@ -111,6 +116,11 @@ func (p *Planner) Plan(ctx context.Context, exp *schemas.Experiment) (*schemas.M
 	}
 	if m.Arms, err = p.resolveArms(&e, suite, conds); err != nil {
 		return nil, fmt.Errorf("plan %s: %w", e.ID, err)
+	}
+	m.BudgetDiffs = schemas.BudgetDiffsOf(&e, m.Arms)
+	for _, d := range m.BudgetDiffs {
+		p.logger.Warn("arm budgets differ without a set: override; the comparison includes the budget", "experiment", e.ID,
+			"field", d.Field, "per_arm", budgetText(d))
 	}
 	if e.Compatibility != nil {
 		c, err := p.resolveArm(CompatArm, e.Compatibility.Agent, nil, suite, compat)
@@ -309,6 +319,10 @@ func (p *Planner) layFiles(cfg *schemas.AgentConfig, suite *schemas.Suite, conds
 	return out, nil
 }
 
+// preflight checks the gateway. Problems are warnings, but a hygiene
+// violation refuses the plan: a gateway feature that rewrites, caches or
+// reroutes a run's model requests would make the arms measure the gateway
+// instead of the agent, and no analysis can undo that after the runs.
 func (p *Planner) preflight(ctx context.Context, name string) (*schemas.GatewayManifest, error) {
 	if p.reg.Gateway == nil {
 		return nil, errors.New("no gateway registered")
@@ -320,7 +334,19 @@ func (p *Planner) preflight(ctx context.Context, name string) (*schemas.GatewayM
 	for _, pr := range gm.Problems {
 		p.logger.Warn("gateway preflight problem", "experiment", name, "problem", pr)
 	}
+	if h := gm.Hygiene; h != nil && len(h.Violations) > 0 {
+		return nil, fmt.Errorf("gateway hygiene check failed, fix the gateway config before planning: %s", strings.Join(h.Violations, "; "))
+	}
 	return gm, nil
+}
+
+// budgetText is "A=2, B=1" for a log line.
+func budgetText(d schemas.BudgetDiff) string {
+	parts := make([]string, 0, len(d.PerArm))
+	for _, arm := range sortedKeys(d.PerArm) {
+		parts = append(parts, arm+"="+d.PerArm[arm])
+	}
+	return strings.Join(parts, ", ")
 }
 
 // policyHash freezes the release policy the experiment names: the sha256 of
@@ -474,6 +500,10 @@ func validateExperiment(e *schemas.Experiment) error {
 				errs = append(errs, fmt.Errorf("guard %s: condition %q is not one of the conditions", g.Rule, g.Condition))
 			}
 		case GuardNoNewIntegrityViolation:
+		case GuardTimeoutParity:
+			if g.Condition != "" && !conds[g.Condition] {
+				errs = append(errs, fmt.Errorf("guard %s: condition %q is not one of the conditions", g.Rule, g.Condition))
+			}
 		default:
 			errs = append(errs, fmt.Errorf("unknown guard rule %q", g.Rule))
 		}

@@ -41,6 +41,7 @@ const (
 	metricsFile     = "metrics.json"
 	gatesFile       = "gates.json"
 	receiptsFile    = "receipts.json"
+	evidenceFile    = "evidence.json"
 	leaseFile       = "lease.json"
 	leaseLockFile   = "lease.lock"
 	sealsLogFile    = "seals.log"

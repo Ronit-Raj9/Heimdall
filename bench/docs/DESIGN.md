@@ -475,6 +475,7 @@ The manifest records the SHA-256 of every file laid down, for each arm and condi
 
 - The experiment declares exactly one primary endpoint: a condition and a metric. The default is `clean` and `verified_success`.
 - It declares guards. The default guards: the clean condition must not regress, and no new integrity violation.
+- **`timeout_parity`** is an optional guard (and a release policy rule with `metric: timeout_rate`). It fails when the arms' timeout rates on its condition (every condition when none is named) are more than 10 pp apart while either is above 20%. A timed-out run is one whose outcome is `timeout` or whose agent hit its wall budget. A failure **holds** the release: IMPROVED stays IMPROVED with action hold, INCONCLUSIVE gets action hold. It never makes the verdict REGRESSED or INVALID, because a timeout gap says the arms ran under unequal pressure, not which one is better.
 - **`no_regression` is a regression detector, not a proof of equivalence.** It fails only when the release effect on that condition is REGRESSED by the rule in 9.3. It is computed on all assigned slots at both missingness bounds. If the bounds disagree the guard is `undetermined`, and the verdict cannot be IMPROVED. The page always shows the interval the guard could not rule out.
 - The manifest (experiment, suite lock, agent config hashes, part versions, seed, primary endpoint) is hashed **before the first run**. The verdict page shows that hash and its time. Changing anything makes a new experiment.
 - Every other condition and metric is descriptive: counts, paired differences, intervals marked approximate. No verdicts, no p-values.
@@ -517,7 +518,18 @@ For the demo experiment (a sentence telling the agent that code beats stale note
 
 Probes explain weaknesses. They change the action only when declared as a guard.
 
-**Instrument gates that force INVALID:** graded coverage below 0.90 in either arm or a gap above 5 pp; served model differs from requested, or an unplanned fallback, or a cache hit, in more than 5% of runs; verifier hash or task version differs between arms; budgets or resources differ when not the declared variable; usage completeness below 95%; an outbound connection from an agent container to any host other than the gateway succeeded; manifest mismatch.
+**Instrument gates that force INVALID:** graded coverage below 0.90 in either arm or a gap above 5 pp; served model differs from requested, or an unplanned fallback, or a cache hit, in more than 5% of runs; verifier hash or task version differs between arms; usage completeness below 95% in any arm or a gap above 5 pp; a rise in the gateway's dropped-log counter; an outbound connection from an agent container to any host other than the gateway succeeded; manifest mismatch.
+
+**Instrument checks.** The verdict carries `instruments`, one entry per measured check with its status, per-arm counts, threshold and detail. The report shows them under "Instrument checks", with the gateway hygiene record from the manifest as a last row.
+
+| Check | Measures | Status rules | Effect |
+|---|---|---|---|
+| `usage_completeness` | Per arm, over every counted run: model requests (gateway message rows, error rows left out because a failed or injected request has no usage) that carry token counts, over all model requests. A run whose request log is missing or incomplete has unknown usage (13.4): every row it has, and at least one, counts as a request without usage. A run that never reached its agent and has no log is left out | fail when any arm is below 0.95 or the arms are more than 5 pp apart; not applicable when no arm made a model request; unknown when no counted run has a gateway log | fail: INVALID, the reason names the arm and the numbers |
+| `dropped_logs` | Bifrost's global `dropped_requests` counter (`GET /api/logs/dropped`), read at preflight (the baseline, `manifest.gateway.dropped_logs`) and at collect time in every run (`evidence.requests.dropped_global`) | fail when max minus min over the readings is above 0; unknown when any run lacks the counter and no rise is seen, or one reading is above 0; pass otherwise | fail: INVALID, "gateway dropped N log rows during the experiment". The counter is global, so traffic outside the experiment also fails it: the lost row could be any run's |
+| `timeout_parity` | Timeout rate of B against A over every condition | warn on the guard's rule (10 pp and 20%) | Shown only. It holds the release only when declared as a guard |
+| `budget_parity` | `wall_s`, `turns`, `cpus`, `mem_gb` that differ between the manifest's resolved arms while no arm sets them with `set:` (recomputed from the manifest, so old manifests are checked too) | warn on any difference | Shown only. The planner also warns and records the difference in `manifest.budget_diffs`. Two agent configs may differ in budgets on purpose, so this is not INVALID, but the reader must know the comparison includes them |
+
+An unknown instrument check is never a pass: an IMPROVED verdict holds until it is known. Not applicable and warn change nothing.
 
 ### 9.5 Metrics, including the six PS2 requires
 
@@ -561,6 +573,7 @@ P0 shows one row per condition that ran, plus three always-on meters. Rows come 
 | Honesty meter | False-completion rate, claim precision | Every run | Yes |
 | Safety meter | Gates fired, egress attempts | Every run | Yes |
 | Efficiency meter | Steps, tool calls, tokens, cost per verified success, time | Every run | Yes |
+| Timeout rate | Runs that hit the wall-clock budget over counted runs, per arm (`timeout_rate` meter) | Every run | Yes |
 
 The full skill profile (solve, tools, memory, resilience, judgment, honesty, safety, efficiency, each with several probes) is the same table with more probe files. It is roadmap, and adding to it needs no engine change.
 
@@ -710,13 +723,26 @@ A fixed wait is not proof, and `/api/logs/dropped` is one global counter.
 2. Stop when no row is `processing`, every row matches exactly one proxy ledger entry and every ledger entry matches a row, and two polls in a row are identical. A matching count with an unmatched row is incomplete. The join key is set by spike S5.
 3. Persist the exact row ids, then fetch each detail row for `attempt_trail`.
 4. On a 60-second timeout, usage for the run is `unknown` and the run is flagged. That flag feeds the 95% usage-completeness gate.
-5. The global drop counter is read once per experiment as a warning signal only.
+5. The global drop counter (`dropped_requests`; `dropped_during_maintenance` is a subset of it) is read at preflight as the experiment's baseline and again after each run's rows settle. It never decides one run's completeness. Any rise over the experiment makes it INVALID through the `dropped_logs` instrument check (9.4); a run without the counter makes that check unknown, never a pass. A gateway restart resets the counter to 0: a fall from a nonzero reading also fails the check, which is the conservative reading, so a restart mid-experiment needs a manual look.
 
 Rows are joined by virtual key id, never by the session header alone, because an agent can set that header.
 
 ### 13.5 Gateway settings
 
 `mcp_disable_auto_tool_inject: true`, `enforce_auth_on_inference: true`, session affinity off per request, no semantic cache key, one provider and one key per virtual key, pinned price file, content logging on, Postgres log store. A fallback is allowed only when the arm's gateway policy declares it.
+
+**Hygiene preflight.** Before the first run, gateway preflight reads the live config through the management API and records `manifest.gateway.hygiene`, so the values are sealed with the manifest. Any violation is also a preflight problem, and the planner refuses the experiment with `gateway hygiene check failed, fix the gateway config before planning: ...`. A feature that cannot be read is a violation, because hygiene that was not shown is not assumed.
+
+| Hazard | Read from (Bifrost v2.5.1) | Violation |
+|---|---|---|
+| MCP tools auto-injected | `GET /api/config` `client_config.mcp_disable_auto_tool_inject`; `GET /api/mcp/clients` `total_count` | auto-inject not disabled while any MCP client exists |
+| Server-side tools on a bench provider | `GET /api/providers/{p}` `injected_tools` (not gated by the flag above) | any injected tool |
+| Semantic cache | `GET /api/plugins/loaded` (runtime list); `GET /api/plugins` rows `{name, enabled}` | `semantic_cache` loaded, or enabled in the plugin config |
+| Multi-target routing | `GET /api/routing/rules` (alias `/api/governance/routing-rules`) `rules[].enabled` (absent means enabled), `targets[]{provider, model, key_id, weight}`, `fallbacks` | an enabled rule with more than one target, any fallback, or a target that pins a provider, model or key. CEL is not evaluated, so scope does not exempt a rule |
+| Model routers | `GET /api/routing/model-routers` `routers[].routing.enabled` (404 on v2.5.1: none) | an enabled router |
+| Model aliases | `GET /api/providers/{p}/keys` `keys[].aliases` on the bench's key slots | any alias: the wire model would differ from the run's model |
+
+Resuming an experiment (`run -resume`) does not run preflight again.
 
 ### 13.6 Bifrost features used
 

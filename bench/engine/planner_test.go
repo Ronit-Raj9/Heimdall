@@ -3,8 +3,10 @@ package engine
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"os"
 	"path/filepath"
+	"reflect"
 	"regexp"
 	"strings"
 	"testing"
@@ -175,6 +177,9 @@ func TestPlanRejects(t *testing.T) {
 		{"missing user file", func(_ *bench, e *schemas.Experiment) {
 			e.Arms["B"] = schemas.ArmSpec{Set: map[string]any{"notes.user_file": "experiments/fixtures/missing.md"}}
 		}, "notes.user_file"},
+		{"timeout parity on a condition that does not run", func(_ *bench, e *schemas.Experiment) {
+			e.Guards = []schemas.GuardSpec{{Rule: GuardTimeoutParity, Condition: "stale-notes"}}
+		}, `guard timeout_parity: condition "stale-notes" is not one of the conditions`},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -184,6 +189,72 @@ func TestPlanRejects(t *testing.T) {
 			_, err := NewPlanner(b.reg, b.root, nil).Plan(context.Background(), e)
 			if err == nil || !strings.Contains(err.Error(), tt.want) {
 				t.Fatalf("err = %v, want it to contain %q", err, tt.want)
+			}
+		})
+	}
+}
+
+func TestPlanGatewayHygiene(t *testing.T) {
+	tests := []struct {
+		name    string
+		hygiene *schemas.GatewayHygiene
+		want    string // substring of the error; empty means the plan succeeds
+	}{
+		{name: "clean gateway", hygiene: &schemas.GatewayHygiene{MCPAutoToolInjectOff: true}},
+		{name: "no hygiene record from this gateway"},
+		{name: "violations refuse the plan", hygiene: &schemas.GatewayHygiene{SemanticCache: true, Violations: []string{
+			"semantic cache plugin semantic_cache is loaded", "routing rule r1 (id 1) is enabled: 2 targets"}},
+			want: "gateway hygiene check failed, fix the gateway config before planning: semantic cache plugin semantic_cache is loaded; routing rule r1"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			b := newBench(t)
+			b.gw.hygiene = tt.hygiene
+			m, err := NewPlanner(b.reg, b.root, nil).Plan(context.Background(), testExperiment())
+			if tt.want != "" {
+				if err == nil || !strings.Contains(err.Error(), tt.want) {
+					t.Fatalf("err = %v, want it to contain %q", err, tt.want)
+				}
+				return
+			}
+			if err != nil {
+				t.Fatalf("plan: %v", err)
+			}
+			if m.Gateway.Hygiene != tt.hygiene {
+				t.Fatalf("hygiene %+v not recorded in the manifest", m.Gateway.Hygiene)
+			}
+		})
+	}
+}
+
+func TestPlanBudgetDiffs(t *testing.T) {
+	small := strings.Replace(fmt.Sprintf(testAgentYAML, "small", "command", "CLAUDE.md", "/home/agent/.claude/CLAUDE.md"),
+		"budgets: {wall_s: 900, cpus: 2, mem_gb: 4}", "budgets: {wall_s: 900, turns: 40, cpus: 1, mem_gb: 4}", 1)
+	tests := []struct {
+		name string
+		arm  schemas.ArmSpec
+		want []schemas.BudgetDiff
+	}{
+		{name: "same budgets", arm: schemas.ArmSpec{Set: map[string]any{"model": "claude-other"}}},
+		{name: "another agent config with other budgets", arm: schemas.ArmSpec{Agent: "agents/small.yaml"}, want: []schemas.BudgetDiff{
+			{Field: "budgets.turns", PerArm: map[string]string{"A": "unset", "B": "40"}},
+			{Field: "budgets.cpus", PerArm: map[string]string{"A": "2", "B": "1"}},
+		}},
+		{name: "a set: path declares the budget", arm: schemas.ArmSpec{Agent: "agents/small.yaml", Set: map[string]any{"budgets.cpus": 1}},
+			want: []schemas.BudgetDiff{{Field: "budgets.turns", PerArm: map[string]string{"A": "unset", "B": "40"}}}},
+		{name: "setting budgets declares every budget", arm: schemas.ArmSpec{Set: map[string]any{"budgets": map[string]any{"wall_s": 600, "cpus": 2, "mem_gb": 4}}}},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			b := newBench(t)
+			if err := os.WriteFile(filepath.Join(b.root, "agents/small.yaml"), []byte(small), 0o644); err != nil {
+				t.Fatal(err)
+			}
+			e := testExperiment()
+			e.Arms["B"] = tt.arm
+			m := b.plan(t, e)
+			if !reflect.DeepEqual(m.BudgetDiffs, tt.want) {
+				t.Fatalf("budget diffs = %+v, want %+v", m.BudgetDiffs, tt.want)
 			}
 		})
 	}

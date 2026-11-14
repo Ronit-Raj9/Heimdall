@@ -14,6 +14,7 @@ randomization_unit
 tie_rule
 guards
 invalid_reasons?
+instruments?
 integrity
 manifest_hash
 frozen_at

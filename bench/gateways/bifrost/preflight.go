@@ -57,11 +57,15 @@ var egressChecks = []string{"dns", "tcp:1.1.1.1:443", "tcp:169.254.169.254:80"}
 
 // Preflight implements schemas.Gateway. It records the version, the sha256 of
 // the canonical /api/config, the loaded plugins and the settings the bench
-// relies on, and probes egress from the evaluation network. Anything wrong is
-// a Problem in the manifest; only a cancelled context is an error.
+// relies on, the hygiene record (checkHygiene) and the global drop counter as
+// the experiment's baseline, and probes egress from the evaluation network.
+// Anything wrong is a Problem in the manifest; a hygiene violation is also
+// one, and the planner refuses it. Only a cancelled context is an error.
 func (g *Gateway) Preflight(ctx context.Context) (*schemas.GatewayManifest, error) {
-	m := &schemas.GatewayManifest{Name: Name, Settings: map[string]string{}, CheckedAt: time.Now().UTC()}
+	m := &schemas.GatewayManifest{Name: Name, Settings: map[string]string{}, CheckedAt: time.Now().UTC(),
+		Hygiene: &schemas.GatewayHygiene{}}
 	problem := func(format string, args ...any) { m.Problems = append(m.Problems, fmt.Sprintf(format, args...)) }
+	hygiene := &hygieneFindings{h: m.Hygiene}
 	var health struct {
 		Status string `json:"status"`
 	}
@@ -77,11 +81,21 @@ func (g *Gateway) Preflight(ctx context.Context) (*schemas.GatewayManifest, erro
 	var plugins struct {
 		Plugins []string `json:"plugins"`
 	}
-	if err := g.call(ctx, http.MethodGet, "/api/plugins/loaded", nil, &plugins); err == nil {
+	pluginsErr := g.call(ctx, http.MethodGet, pathPluginsLoaded, nil, &plugins)
+	if pluginsErr == nil {
 		m.Plugins = append([]string{}, plugins.Plugins...)
 		sort.Strings(m.Plugins)
 	}
-	g.checkProviders(ctx, m, problem)
+	g.checkProviders(ctx, m, hygiene, problem)
+	g.checkHygiene(ctx, m, hygiene, m.Plugins, pluginsErr)
+	for _, v := range m.Hygiene.Violations {
+		problem("hygiene: %s", v)
+	}
+	if n, err := g.DroppedLogs(ctx); err != nil {
+		problem("dropped log counter: %v", err)
+	} else {
+		m.DroppedLogs = &n
+	}
 	g.probeEgress(ctx, m, problem)
 	if ctx.Err() != nil {
 		return m, fmt.Errorf("gateway preflight: %w", ctx.Err())
@@ -142,7 +156,7 @@ func (g *Gateway) checkConfig(ctx context.Context, m *schemas.GatewayManifest, p
 
 // checkProviders checks every provider. The first provider's settings are
 // also recorded under the unprefixed keys, which older manifests used.
-func (g *Gateway) checkProviders(ctx context.Context, m *schemas.GatewayManifest, problem func(string, ...any)) {
+func (g *Gateway) checkProviders(ctx context.Context, m *schemas.GatewayManifest, hygiene *hygieneFindings, problem func(string, ...any)) {
 	for i, p := range g.providers {
 		set := func(key, value string) {
 			m.Settings[p.Name+"."+key] = value
@@ -150,17 +164,19 @@ func (g *Gateway) checkProviders(ctx context.Context, m *schemas.GatewayManifest
 				m.Settings[key] = value
 			}
 		}
-		g.checkProvider(ctx, p, set, problem)
+		g.checkProvider(ctx, p, set, hygiene, problem)
 	}
 }
 
 // checkProvider checks one provider's base URL, retries and raw storage, and
-// that every key slot exists.
-func (g *Gateway) checkProvider(ctx context.Context, p ProviderSetup, set func(string, string), problem func(string, ...any)) {
+// that every key slot exists, and adds its injected tools and key aliases to
+// the hygiene record.
+func (g *Gateway) checkProvider(ctx context.Context, p ProviderSetup, set func(string, string), hygiene *hygieneFindings, problem func(string, ...any)) {
 	set(SettingMode, p.Mode)
 	var cur providerConfig
 	if err := g.call(ctx, http.MethodGet, providerPath(p.Name), nil, &cur); err != nil {
 		problem("provider %s: %v (run Setup)", p.Name, err)
+		hygiene.violate("provider %s could not be read: %v", p.Name, err)
 		return
 	}
 	n := cur.NetworkConfig
@@ -181,8 +197,10 @@ func (g *Gateway) checkProvider(ctx context.Context, p ProviderSetup, set func(s
 	}
 	if err := g.call(ctx, http.MethodGet, providerPath(p.Name)+"/keys", nil, &keys); err != nil {
 		problem("provider %s keys: %v", p.Name, err)
+		hygiene.violate("provider %s keys could not be read: %v", p.Name, err)
 		return
 	}
+	checkProviderHygiene(hygiene, p.Name, cur, p.Slots, keys.Keys)
 	have := map[string]bool{}
 	for _, k := range keys.Keys {
 		have[k.Name] = k.Enabled == nil || *k.Enabled
