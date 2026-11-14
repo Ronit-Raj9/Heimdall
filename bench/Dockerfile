@@ -4,7 +4,10 @@
 #
 #   CGO_ENABLED=0 GOWORK=off go build -o bin/bifrost-bench ./cmd/bifrost-bench
 #   docker build -t bench/bifrost-bench:dev .
-FROM alpine:3.20
+#
+# The base is pinned by digest (tag kept for reading) to the image the bench
+# was tested with.
+FROM alpine:3.20@sha256:d9e853e87e55526f6b2917df91a2115c36dd7c696a35be12163d44e6e2a4b6bc
 
 # Non-root user. /var/lib/bench/ledger is created here, owned by that user,
 # so a named volume mounted on it starts writable.

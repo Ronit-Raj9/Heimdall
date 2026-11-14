@@ -27,7 +27,7 @@ volumes:
 
 services:
   postgres:
-    image: postgres:18
+    image: postgres:18@sha256:979bccfde35445db618c65107d27d08c6c21339d8dc3ad4c830c6633947be0e4
     labels: *labels
     environment:
       POSTGRES_USER: bifrost
@@ -36,14 +36,17 @@ services:
     volumes:
       - pgdata:/var/lib/postgresql
     networks: [upstream]
+    # Over TCP on purpose: the image's entrypoint runs a temporary init server
+    # on the Unix socket only, so a socket check can pass before the real
+    # server is up and Bifrost then fails its first connection.
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U bifrost -d bifrost"]
+      test: ["CMD-SHELL", "pg_isready -h 127.0.0.1 -p 5432 -U bifrost -d bifrost"]
       interval: 2s
       timeout: 3s
       retries: 30
 
   faultproxy:
-    image: alpine:3.20
+    image: alpine:3.20@sha256:d9e853e87e55526f6b2917df91a2115c36dd7c696a35be12163d44e6e2a4b6bc
     labels: *labels
     user: "${SPIKE_UID:-1000}:${SPIKE_GID:-1000}"
     command: ["/usr/local/bin/faultproxy"]
@@ -63,7 +66,7 @@ services:
       - "127.0.0.1:19101:9101"
 
   bifrost:
-    image: maximhq/bifrost:v2.5.1
+    image: maximhq/bifrost:v2.5.1@sha256:5ec9873acaf1687556b6e4dd854b92b539d9debf87a5a683b66338648b84d3c8
     labels: *labels
     environment:
       BIFROST_SETUP_TOKEN: ${BIFROST_SETUP_TOKEN:?set BIFROST_SETUP_TOKEN}
@@ -84,7 +87,7 @@ services:
   # S1 offline boot checks: attached to evalnet only, so no route to the internet.
   bifrost-offline-default:
     profiles: [offline]
-    image: maximhq/bifrost:v2.5.1
+    image: maximhq/bifrost:v2.5.1@sha256:5ec9873acaf1687556b6e4dd854b92b539d9debf87a5a683b66338648b84d3c8
     labels: *labels
     environment:
       BIFROST_SETUP_TOKEN: ${BIFROST_SETUP_TOKEN:?set BIFROST_SETUP_TOKEN}
@@ -96,7 +99,7 @@ services:
 
   bifrost-offline-pinned:
     profiles: [offline]
-    image: maximhq/bifrost:v2.5.1
+    image: maximhq/bifrost:v2.5.1@sha256:5ec9873acaf1687556b6e4dd854b92b539d9debf87a5a683b66338648b84d3c8
     labels: *labels
     environment:
       BIFROST_SETUP_TOKEN: ${BIFROST_SETUP_TOKEN:?set BIFROST_SETUP_TOKEN}

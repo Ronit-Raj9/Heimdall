@@ -22,7 +22,44 @@ import (
 
 	"github.com/maximhq/bifrost/bench/schemas"
 	"github.com/maximhq/bifrost/bench/utils"
+	"gopkg.in/yaml.v3"
 )
+
+// TestIntegrationComposeWaitsForPostgres checks that both compose files start
+// Bifrost only once Postgres takes TCP connections. The postgres image's
+// entrypoint first runs a temporary init server on the Unix socket alone, so
+// a socket-only pg_isready can pass before the real server is up; Bifrost
+// then fails its first database connection on a fresh volume.
+func TestIntegrationComposeWaitsForPostgres(t *testing.T) {
+	tests := []struct{ name, file string }{
+		{"spike", "../../spike/compose.yaml"},
+		{"deploy", "../../deploy/docker-compose.yml"},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			b, err := os.ReadFile(tc.file)
+			if err != nil {
+				t.Fatal(err)
+			}
+			var c struct {
+				Services map[string]struct {
+					DependsOn   map[string]struct{ Condition string } `yaml:"depends_on"`
+					Healthcheck struct{ Test []string }               `yaml:"healthcheck"`
+				} `yaml:"services"`
+			}
+			if err := yaml.Unmarshal(b, &c); err != nil {
+				t.Fatalf("parse %s: %v", tc.file, err)
+			}
+			check := strings.Join(c.Services["postgres"].Healthcheck.Test, " ")
+			if !strings.Contains(check, "pg_isready") || !strings.Contains(check, "-h 127.0.0.1") {
+				t.Errorf("postgres healthcheck %q does not check readiness over TCP", check)
+			}
+			if got := c.Services["bifrost"].DependsOn["postgres"].Condition; got != "service_healthy" {
+				t.Errorf("bifrost depends_on postgres condition = %q, want service_healthy", got)
+			}
+		})
+	}
+}
 
 // TestIntegrationSpikeStack runs the gateway against the spike stack
 // (bench/spike/compose.yaml: Bifrost v2.5.1, Postgres 18, the spike fault
@@ -221,8 +258,12 @@ func startStack(ctx context.Context, t *testing.T, proxyPkg, proxyEnv string) *s
 			t.Errorf("compose down: %v\n%s", err, out)
 		}
 	})
-	if out, err := compose(ctx, "up", "-d"); err != nil {
-		t.Fatalf("compose up: %v\n%s", err, out)
+	// --wait returns once every started service is running (healthy where it
+	// has a healthcheck) and fails at once if one exits, so a Bifrost that
+	// lost its database at boot shows up here with its logs.
+	if out, err := compose(ctx, "up", "-d", "--wait", "--wait-timeout", "180"); err != nil {
+		logs, _ := compose(ctx, "logs", "--tail", "40", "postgres", "bifrost")
+		t.Fatalf("compose up: %v\n%s\n%s", err, out, logs)
 	}
 	if err := waitHealth(ctx, st.url, 2*time.Minute); err != nil {
 		logs, _ := compose(ctx, "logs", "--tail", "40", "bifrost")

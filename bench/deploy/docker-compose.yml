@@ -21,6 +21,11 @@
 # then fails closed: Postgres refuses to initialise without a password,
 # Bifrost answers 403 on every /api call without a setup token, and the proxy
 # generates a control token nobody else knows.
+#
+# Third-party images are pinned by digest (tag kept for reading) to the bits
+# the bench was tested with. The fault proxy image is built locally by
+# `make images`, so it stays on its tag: a digest there would go stale on
+# every rebuild.
 name: bifrost-bench
 
 x-labels: &labels
@@ -47,7 +52,7 @@ volumes:
 
 services:
   postgres:
-    image: postgres:18
+    image: postgres:18@sha256:979bccfde35445db618c65107d27d08c6c21339d8dc3ad4c830c6633947be0e4
     labels: *labels
     environment:
       POSTGRES_USER: bifrost
@@ -56,8 +61,11 @@ services:
     volumes:
       - pgdata:/var/lib/postgresql
     networks: [upstream]
+    # Over TCP on purpose: the image's entrypoint runs a temporary init server
+    # on the Unix socket only, so a socket check can pass before the real
+    # server is up and Bifrost then fails its first connection.
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U bifrost -d bifrost"]
+      test: ["CMD-SHELL", "pg_isready -h 127.0.0.1 -p 5432 -U bifrost -d bifrost"]
       interval: 2s
       timeout: 3s
       retries: 30
@@ -107,7 +115,7 @@ services:
     restart: unless-stopped
 
   bifrost:
-    image: maximhq/bifrost:v2.5.1
+    image: maximhq/bifrost:v2.5.1@sha256:5ec9873acaf1687556b6e4dd854b92b539d9debf87a5a683b66338648b84d3c8
     labels: *labels
     environment:
       BIFROST_SETUP_TOKEN: ${BIFROST_SETUP_TOKEN:-}
