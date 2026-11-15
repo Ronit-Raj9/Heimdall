@@ -37,6 +37,7 @@ func goodCheckInput() *checkInput {
 			{T: environments.NetWatchHTTP, Dst: "127.0.0.1", Port: 8765, Method: "POST", Path: "/run", Host: "127.0.0.1:8765"},
 		},
 		gatewayHost: "bifrost", gatewayPort: 8080, wallS: 900,
+		observers: goodObservers(),
 	}
 }
 

@@ -38,8 +38,9 @@ func TestBuiltin(t *testing.T) {
 		{name: AnswerCorrect, kind: schemas.KindRate, higher: true, min: schemas.EvidenceOutcome}, {name: JudgeCostUSD, kind: schemas.KindUSD, min: schemas.EvidenceGateway}, // answer tasks
 		{name: ToolCallsProxied, kind: schemas.KindCount, min: schemas.EvidenceBoundary}, {name: ToolErrorRate, kind: schemas.KindRate, min: schemas.EvidenceBoundary}, {name: ToolRecovery, kind: schemas.KindRate, higher: true, min: schemas.EvidenceBoundary}, {name: DistinctTools, kind: schemas.KindCount, min: schemas.EvidenceBoundary}, // tool proxy ledger
 		{name: ExternalCalls, kind: schemas.KindCount, min: schemas.EvidenceBoundary}, {name: ExternalUnmatched, kind: schemas.KindCount, min: schemas.EvidenceBoundary}, {name: ExternalErrorRate, kind: schemas.KindRate, min: schemas.EvidenceBoundary}, // external API rows of the tool proxy ledger
-		{name: SkillFilesRead, kind: schemas.KindCount, higher: true, min: schemas.EvidenceNative}, // skills
-		{name: CheatingRate, kind: schemas.KindRate, min: schemas.EvidenceOutcome},                 // impossible tasks
+		{name: SkillFilesRead, kind: schemas.KindCount, higher: true, min: schemas.EvidenceNative},                                                                                                                                                                                                                                                                                                                         // skills
+		{name: CheatingRate, kind: schemas.KindRate, min: schemas.EvidenceOutcome},                                                                                                                                                                                                                                                                                                                                         // impossible tasks
+		{name: AgentSteps, kind: schemas.KindCount, min: schemas.EvidenceGateway}, {name: CommandsExecuted, kind: schemas.KindCount, min: schemas.EvidenceBoundary}, {name: FilesChangedEvents, kind: schemas.KindCount, min: schemas.EvidenceBoundary}, {name: ModelAttempts, kind: schemas.KindCount, min: schemas.EvidenceGateway}, {name: ToolCallsUnwitnessed, kind: schemas.KindCount, min: schemas.EvidenceGateway}, // agent steps
 	}
 	got := Builtin()
 	if len(got) != len(tests) {
@@ -52,8 +53,12 @@ func TestBuiltin(t *testing.T) {
 			if m.GetName() != tt.name || d.Name != tt.name {
 				t.Errorf("position %d: name %q, descriptor %q, want %q", i, m.GetName(), d.Name, tt.name)
 			}
-			if m.GetVersion() != "1.0.0" || d.Version != "1.0.0" {
-				t.Errorf("version %q, descriptor %q, want 1.0.0", m.GetVersion(), d.Version)
+			want := "1.0.0"
+			if tt.name == ToolCallsExecuted {
+				want = toolCallsExecutedVersion // ledger and observer witnesses count since 1.1.0
+			}
+			if m.GetVersion() != want || d.Version != want {
+				t.Errorf("version %q, descriptor %q, want %s", m.GetVersion(), d.Version, want)
 			}
 			if d.Kind != tt.kind || d.HigherIsBetter != tt.higher || d.MinEvidence != tt.min || d.PS2 != tt.ps2 {
 				t.Errorf("descriptor = %+v, want kind %q higher %v min %q ps2 %v", d, tt.kind, tt.higher, tt.min, tt.ps2)

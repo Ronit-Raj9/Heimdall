@@ -1284,6 +1284,23 @@ class ModelMatrix(TypedDict):
     tasks: int
 
 
+class _ObserverStatusRequired(TypedDict):
+    observer: str
+    records: int
+    state: str
+
+
+class ObserverStatus(_ObserverStatusRequired, total=False):
+    dropped: int
+    interval_ms: int
+    mode: str
+    observer_coverage: str
+    pids_allocated: int
+    pids_seen: int
+    reason: str
+    session: int
+
+
 class OutcomeDiff(TypedDict):
     common_tasks: int
     counts: ClassCounts
@@ -1809,6 +1826,18 @@ class RunReviews(_RunReviewsRequired, total=False):
     current: Optional[Review]
 
 
+class _RunStepsRequired(TypedDict):
+    available: bool
+    observers: List[ObserverStatus]
+    run_id: str
+    steps: List[StepRecord]
+
+
+class RunSteps(_RunStepsRequired, total=False):
+    skipped_lines: int
+    truncated: bool
+
+
 class _RunTimingRequired(TypedDict):
     started: str
 
@@ -1945,6 +1974,36 @@ class _StateFileRequired(TypedDict):
 
 class StateFile(_StateFileRequired, total=False):
     error: str
+
+
+class _StepRecordRequired(TypedDict):
+    kind: str
+    proof: str
+    seq: int
+    source: str
+    summary: str
+    ts: str
+    turn: int
+
+
+class StepRecord(_StepRecordRequired, total=False):
+    attempt: int
+    conflict: str
+    counted: bool
+    duration_ms: Optional[int]
+    execution: str
+    exit_code: Optional[int]
+    is_error: bool
+    op: str
+    path: str
+    pid: int
+    ppid: int
+    request_id: str
+    session: int
+    tool_call_id: str
+    tool_name: str
+    witness_of: int
+    witnessed_by: List[int]
 
 
 class _SuiteAdmissionCheckRequired(TypedDict):
@@ -2186,6 +2245,7 @@ class _ToolCallRecordRequired(TypedDict):
 
 class ToolCallRecord(_ToolCallRecordRequired, total=False):
     execution_id: str
+    proof: str
     tool_name: str
     unknown_reason: str
 
@@ -2534,6 +2594,10 @@ class RunReviewsResponse(RunReviews):
     mode: Mode
 
 
+class RunStepsResponse(RunSteps):
+    mode: Mode
+
+
 class SuiteHealthResponse(SuiteHealth):
     mode: Mode
 
@@ -2697,6 +2761,7 @@ __all__ = [
     'MetricDelta',
     'MetricDescriptor',
     'ModelMatrix',
+    'ObserverStatus',
     'OutcomeDiff',
     'OutcomeVariance',
     'OutputSpec',
@@ -2743,6 +2808,7 @@ __all__ = [
     'RunRef',
     'RunRef_agentdiff',
     'RunReviews',
+    'RunSteps',
     'RunTiming',
     'ScriptedSpec',
     'ServiceResult',
@@ -2755,6 +2821,7 @@ __all__ = [
     'SlotProgress',
     'StateExport',
     'StateFile',
+    'StepRecord',
     'SuiteAdmissionCheck',
     'SuiteDrift',
     'SuiteHealth',
@@ -2828,6 +2895,7 @@ __all__ = [
     'RunEventsResponse',
     'RunReceiptsResponse',
     'RunReviewsResponse',
+    'RunStepsResponse',
     'SuiteHealthResponse',
     'SuiteListResponse',
     'SuiteTaskDetailResponse',

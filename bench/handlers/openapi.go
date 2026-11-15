@@ -98,6 +98,7 @@ var APIRoutes = []RouteDoc{
 	{Method: "GET", Path: APIPrefix + "/runs/{id}/artifacts/{artifact}/{name}", Tag: "runs", Summary: "One file of a run's output artifact, raw and sandboxed", Raw: "application/octet-stream"},
 	{Method: "GET", Path: APIPrefix + "/runs/{id}/otlp", Tag: "runs", Summary: "A sealed run as an OpenTelemetry trace (OTLP/JSON download); ?payloads=true adds redacted, capped tool payloads",
 		Query: []QueryDoc{{Name: "payloads", Description: "true to include tool arguments and results, redacted and capped"}}, Raw: "application/json"},
+	{Method: "GET", Path: APIPrefix + "/runs/{id}/steps", Tag: "runs", Summary: "Unified agent step timeline of a run with its observer status; available false for runs recorded before it", Response: RunSteps{}},
 	{Method: "GET", Path: APIPrefix + "/pairs/{id}", Tag: "runs", Summary: "Both arms of a pair with their aligned steps", Response: schemas.Pair{}},
 
 	{Method: "GET", Path: APIPrefix + "/leaderboard", Tag: "leaderboard", Summary: "Leaderboard over sealed runs", Response: schemas.Leaderboard{}, Query: []QueryDoc{

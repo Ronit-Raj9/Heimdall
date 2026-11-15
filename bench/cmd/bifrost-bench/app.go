@@ -89,6 +89,8 @@ func newApp(ctx context.Context, configPath string, opts appOptions) (*app, erro
 		Environments: environments.Builtin(environments.DockerWorkspaceConfig{
 			EvalNetwork: cfg.Networks.Eval, HelperImage: helper, Logger: logger, Docker: a.docker,
 			ToolProxyImage: cfg.Images.ToolProxy,
+			// Agent steps area: trusted step observers, on unless switched off.
+			ProcessWatch: cfg.Observers.ProcessOn(), WorkspaceWatch: cfg.Observers.WorkspaceOn(), WatchIntervalMS: cfg.Observers.IntervalMS,
 		}),
 		Adapters: adapters.Builtin(adapters.CommandConfig{
 			GatewayAgentURL: cfg.Gateway.AgentURL, EvalNetwork: cfg.Networks.Eval, BenchRoot: cfg.Root,

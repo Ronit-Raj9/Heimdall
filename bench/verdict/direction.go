@@ -25,6 +25,9 @@ var lowerIsBetter = map[string]bool{
 
 	// External API rows of the tool proxy ledger.
 	"external_calls": true, "external_unmatched": true, "external_error_rate": true,
+
+	// Agent steps: the step timeline and the trusted observers.
+	"agent_steps": true, "commands_executed": true, "files_changed_events": true, "model_attempts": true, "tool_calls_unwitnessed": true,
 }
 
 // rateMetrics lists the built-in metrics of kind rate: every value lies in

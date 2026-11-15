@@ -36,6 +36,11 @@ type Config struct {
 	// area, docs/held-out-and-canaries.md). Off by default.
 	HeldOut HeldOutConfig `yaml:"held_out" json:"held_out,omitzero"`
 
+	// Observers configures the trusted step observers beside every agent
+	// session (Agent steps area, docs/steps-and-evidence.md). Both are on
+	// unless switched off.
+	Observers ObserversConfig `yaml:"observers" json:"observers,omitzero"`
+
 	Root string `yaml:"-" json:"-"` // bench root that relative paths resolve against
 }
 
@@ -216,3 +221,18 @@ func setFromEnv(fv reflect.Value, raw string) error {
 	}
 	return nil
 }
+
+// ObserversConfig switches the process and workspace observers and sets the
+// process observer's poll interval. Nil means on; zero interval means the
+// default (environments.DefaultWatchIntervalMS).
+type ObserversConfig struct {
+	Process    *bool `yaml:"process,omitempty" json:"process,omitempty"`
+	Workspace  *bool `yaml:"workspace,omitempty" json:"workspace,omitempty"`
+	IntervalMS int   `yaml:"interval_ms,omitempty" json:"interval_ms,omitempty"`
+}
+
+// ProcessOn reports whether the process observer runs.
+func (o ObserversConfig) ProcessOn() bool { return o.Process == nil || *o.Process }
+
+// WorkspaceOn reports whether the workspace observer runs.
+func (o ObserversConfig) WorkspaceOn() bool { return o.Workspace == nil || *o.Workspace }

@@ -1126,6 +1126,94 @@ export interface RunEvents {
 	events: BenchEvent[];
 }
 
+// Agent step timeline (schemas/steps.go, handlers/runsteps.go).
+/** The independent witness a timeline row came from. */
+export type StepSource =
+	| "gateway"
+	| "tool_proxy"
+	| "process_observer"
+	| "workspace_observer"
+	| "agent_stream"
+	| "shim"
+	| "network_observer";
+export type StepKind =
+	| "model_turn"
+	| "model_attempt"
+	| "tool_request"
+	| "tool_execution"
+	| "command"
+	| "file_change"
+	| "network"
+	| "agent_event";
+/** How a requested tool call is known to have run. */
+export type StepExecution = "executed_with_proof" | "executed_agent_reported" | "no_witness";
+
+/**
+ * One row of the unified step timeline: one observation by one witness, in time order. Every
+ * string (summary, path, tool_name, conflict) is agent-influenced: render as inert text only.
+ */
+export interface StepRecord {
+	seq: number;
+	ts: string;
+	kind: StepKind;
+	source: StepSource;
+	proof: EvidenceStrength;
+	/** The logical model step whose response came before this row; 0 before the first response. */
+	turn: number;
+	session?: number;
+	summary: string;
+	request_id?: string;
+	attempt?: number;
+	tool_call_id?: string;
+	tool_name?: string;
+	pid?: number;
+	ppid?: number;
+	path?: string;
+	op?: string;
+	exit_code?: number;
+	duration_ms?: number;
+	is_error?: boolean;
+	/** tool_request rows only. */
+	execution?: StepExecution;
+	/** tool_request rows: seq of the rows that witness its execution. */
+	witnessed_by?: number[];
+	/** seq of the counted row this row witnesses. */
+	witness_of?: number;
+	/** The row counts toward the steps metric. */
+	counted?: boolean;
+	/** Witnesses disagree about this row. */
+	conflict?: string;
+}
+
+/** Whether one trusted observer ran for one session. Missing is evidence with a reason, never zero activity. */
+export interface ObserverStatus {
+	observer: "process" | "workspace";
+	session?: number;
+	state: "observed" | "off" | "missing";
+	reason?: string;
+	mode?: string;
+	interval_ms?: number;
+	observer_coverage?: string;
+	records: number;
+	dropped?: number;
+	pids_allocated?: number;
+	pids_seen?: number;
+}
+
+/** GET /runs/{id}/steps. available is false for a run recorded before the timeline; lists are then empty. */
+export interface RunSteps {
+	run_id: string;
+	available: boolean;
+	steps: StepRecord[];
+	observers: ObserverStatus[];
+	/** The timeline was longer than one response carries; the first rows are sent. */
+	truncated?: boolean;
+	/** Lines of steps.jsonl that did not parse. */
+	skipped_lines?: number;
+}
+
+export type RunStepsResponse = WithMode<RunSteps>;
+
 /** GET /runs/{id}/diff */
 export interface RunDiff {
 	run_id: string;

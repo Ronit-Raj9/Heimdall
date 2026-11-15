@@ -68,6 +68,12 @@ var (
 //
 // ToolProxyImage (images.toolproxy) runs the per-run tool proxy when a run
 // has proxied services; empty means DefaultToolProxyImage.
+//
+// ProcessWatch and WorkspaceWatch run the trusted step observers beside each
+// agent session (observers.go, docs/steps-and-evidence.md): a process
+// observer in the agent's PID namespace polling /proc every WatchIntervalMS
+// (zero means DefaultWatchIntervalMS), and an inotify observer on the
+// workspace volume. The bench config turns both on by default.
 type DockerWorkspaceConfig struct {
 	EvalNetwork    string
 	HelperImage    string
@@ -76,6 +82,11 @@ type DockerWorkspaceConfig struct {
 	OutputCapBytes int64
 	NetWatch       bool
 	ToolProxyImage string
+
+	// Agent steps area: the trusted step observers.
+	ProcessWatch    bool
+	WorkspaceWatch  bool
+	WatchIntervalMS int
 }
 
 // dockerWorkspace keeps each run's workspace in a docker volume and runs every
@@ -255,6 +266,9 @@ func (e *dockerWorkspace) Exec(ctx context.Context, rc *schemas.RunContext, plan
 		defer w.close(ctx)
 		network, joiner = "container:"+w.holder, w.holder
 	}
+	// Agent steps area: trusted process and workspace observers (observers.go); never fail the run.
+	obs := e.startObservers(ctx, rc, plan, expID, runID)
+	defer obs.finish(ctx, rc, nil)
 	args := agentCreateArgs(name, utils.LabelArgs(expID, runID), plan, rc.Handle, network, envFile, l, mounts, snapshotMode(rc) || root)
 	_, cerr := e.cfg.Docker.MustRun(ctx, args...)
 	if rerr := os.Remove(envFile); rerr != nil {
@@ -287,7 +301,9 @@ func (e *dockerWorkspace) Exec(ctx context.Context, rc *schemas.RunContext, plan
 		secret = rc.Key.Value
 	}
 	stdout, stderr, session := streamPaths(rc)
+	obs.watchAgent(ctx, rc, expID, runID, name)
 	res, err := e.attach(ctx, name, stdout, stderr, wall, secret)
+	obs.finish(ctx, rc, res)
 	if err != nil {
 		keep = false
 		return res, fmt.Errorf("exec run %s: %w", runID, err)
