@@ -1,0 +1,10 @@
+# Hand-written fixture in the shape of AgentDojo's pyproject.toml.
+[project]
+name = "agentdojo"
+version = "0.1.35"
+description = "fixture"
+readme = "README.md"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"

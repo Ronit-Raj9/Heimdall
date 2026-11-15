@@ -84,6 +84,7 @@ func (a *app) doctor(ctx context.Context) []schemas.DoctorCheck {
 		add("eval network", schemas.DoctorPass, a.cfg.Networks.Eval+" is internal")
 	}
 	out = append(out, suiteRows...)
+	out = append(out, workerModeCheck(a.cfg.ListenIsLoopback())) // Remote area: worker mode row (worker.go)
 
 	if a.reg.Gateway == nil {
 		add("gateway", schemas.DoctorSkip, "offline")

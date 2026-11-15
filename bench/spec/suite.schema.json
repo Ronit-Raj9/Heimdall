@@ -22,8 +22,8 @@
     "description": {"type": "string"},
     "environment": {"$ref": "#/$defs/part_name", "description": "Environment part name, e.g. docker_workspace."},
     "grader": {
-      "enum": ["hidden_tests", "verifier_command"],
-      "description": "Grader part name. hidden_tests: pytest JUnit at /grader/out/junit.xml, the original Python grader. verifier_command: any language, reporting as junit, reward or exit_code (docs/verifiers.md)."
+      "enum": ["hidden_tests", "verifier_command", "answer_match", "judge"],
+      "description": "Grader part name. hidden_tests: pytest JUnit at /grader/out/junit.xml, the original Python grader. verifier_command: any language, reporting as junit, reward or exit_code (docs/verifiers.md). answer_match and judge: answer tasks (docs/scenarios-design.md)."
     },
     "base_image": {"$ref": "#/$defs/image"},
     "workdir": {"type": "string", "pattern": "^/", "description": "Absolute workspace path inside containers."},
@@ -55,7 +55,8 @@
           "maximum": 1000000000,
           "default": 1,
           "description": "Lowest reward that passes (result reward only)."
-        }
+        },
+        "mode": {"enum": ["clean_room", "snapshot"], "description": "clean_room (default) or snapshot (docs/scenarios-design.md)."}
       },
       "allOf": [
         {
@@ -69,7 +70,36 @@
       ]
     },
     "tasks": {"type": "array", "items": {"$ref": "#/$defs/id"}},
-    "probes": {"type": "array", "items": {"$ref": "#/$defs/id"}}
+    "probes": {"type": "array", "items": {"$ref": "#/$defs/id"}},
+    "track": {"enum": ["coding", "terminal", "tool_use", "mcp", "memory", "skills", "safety", "qa"], "description": "Leaderboard track; empty means coding."},
+    "grading": {"enum": ["verified", "judged"], "description": "verified (default) or judged; a judged suite needs judge."},
+    "output": {"$ref": "task.schema.json#/$defs/output"},
+    "services": {"type": "array", "items": {"$ref": "task.schema.json#/$defs/service"}, "description": "Started beside the agent in every run; paths relative to the suite root."},
+    "judge": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["provider", "model", "prompt_version"],
+      "properties": {
+        "provider": {"type": "string", "minLength": 1},
+        "model": {"type": "string", "minLength": 1},
+        "prompt_version": {"type": "string", "minLength": 1},
+        "votes": {"type": "integer", "minimum": 1},
+        "max_tokens": {"type": "integer", "minimum": 1}
+      }
+    },
+    "imported": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["importer", "benchmark", "source", "license", "at"],
+      "properties": {
+        "importer": {"type": "string", "minLength": 1},
+        "benchmark": {"type": "string", "minLength": 1},
+        "source": {"type": "string", "minLength": 1},
+        "revision": {"type": "string"},
+        "license": {"type": "string", "minLength": 1},
+        "at": {"type": "string", "minLength": 1}
+      }
+    }
   },
   "$defs": {
     "id": {"type": "string", "pattern": "^[a-z0-9][a-z0-9._-]*$"},

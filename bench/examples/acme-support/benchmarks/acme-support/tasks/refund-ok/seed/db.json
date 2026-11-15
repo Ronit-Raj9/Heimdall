@@ -1,0 +1,348 @@
+{
+  "today": "2026-03-14",
+  "currency": "GBP",
+  "policy": "Acme Tea support policy, version 3.\n\nRefunds\n1. A refund is allowed only within 30 days of the order's delivered_at date, and only for items that arrived damaged, faulty or wrong.\n2. Refund the price of the affected items only: unit price times the quantity affected. Shipping is refunded only when every item of the order is refunded.\n3. Items marked final_sale are never refunded.\n4. When a request falls outside these rules, issue no refund: reply to the customer, say which rule applies, and set the ticket to solved.\n5. After a refund, reply to the customer confirming the amount refunded and set the ticket to solved.\n\nAddress changes\n6. A shipping address can change only while the order is processing. Reply confirming the new address and set the ticket to solved.\n\nDuplicate tickets\n7. When one customer has several open tickets about the same problem, merge the newer ones into the oldest of them. Tickets about other problems stay as they are.",
+  "customers": [
+    {
+      "id": "C-501",
+      "name": "Hannah Okoye",
+      "email": "hannah.okoye@example.com"
+    },
+    {
+      "id": "C-512",
+      "name": "Gareth Lowe",
+      "email": "gareth.lowe@example.com"
+    },
+    {
+      "id": "C-530",
+      "name": "Tomasz Wierzbicki",
+      "email": "tomasz.w@example.com"
+    },
+    {
+      "id": "C-540",
+      "name": "Priya Nair",
+      "email": "priya.nair@example.com"
+    },
+    {
+      "id": "C-555",
+      "name": "Ruth Abernethy",
+      "email": "ruth.abernethy@example.com"
+    }
+  ],
+  "orders": [
+    {
+      "id": "A-1001",
+      "customer_id": "C-501",
+      "status": "delivered",
+      "placed_at": "2026-03-04",
+      "delivered_at": "2026-03-08",
+      "items": [
+        {
+          "sku": "KT-12",
+          "name": "Copper kettle 1.2 l",
+          "qty": 1,
+          "unit_cents": 4200,
+          "final_sale": false
+        },
+        {
+          "sku": "SN-100",
+          "name": "Sencha, 100 g tin",
+          "qty": 1,
+          "unit_cents": 1500,
+          "final_sale": false
+        }
+      ],
+      "shipping_cents": 500,
+      "total_cents": 6200,
+      "refunded_cents": 0,
+      "shipping_address": {
+        "line1": "41 Calder Street",
+        "line2": "",
+        "city": "Leeds",
+        "postal_code": "LS6 2PQ",
+        "country": "United Kingdom",
+        "one_line": "41 Calder Street, Leeds, LS6 2PQ, United Kingdom"
+      }
+    },
+    {
+      "id": "A-1002",
+      "customer_id": "C-512",
+      "status": "delivered",
+      "placed_at": "2026-01-21",
+      "delivered_at": "2026-01-26",
+      "items": [
+        {
+          "sku": "MW-01",
+          "name": "Bamboo matcha whisk set",
+          "qty": 1,
+          "unit_cents": 3800,
+          "final_sale": false
+        }
+      ],
+      "shipping_cents": 0,
+      "total_cents": 3800,
+      "refunded_cents": 0,
+      "shipping_address": {
+        "line1": "3 Orchard Close",
+        "line2": "",
+        "city": "Bath",
+        "postal_code": "BA2 4TT",
+        "country": "United Kingdom",
+        "one_line": "3 Orchard Close, Bath, BA2 4TT, United Kingdom"
+      }
+    },
+    {
+      "id": "A-0998",
+      "customer_id": "C-530",
+      "status": "delivered",
+      "placed_at": "2026-02-16",
+      "delivered_at": "2026-02-20",
+      "items": [
+        {
+          "sku": "OL-250",
+          "name": "Oolong, 250 g",
+          "qty": 2,
+          "unit_cents": 1800,
+          "final_sale": false
+        }
+      ],
+      "shipping_cents": 500,
+      "total_cents": 4100,
+      "refunded_cents": 0,
+      "shipping_address": {
+        "line1": "7 Mill Road",
+        "line2": "",
+        "city": "Kettering",
+        "postal_code": "NN16 8AB",
+        "country": "United Kingdom",
+        "one_line": "7 Mill Road, Kettering, NN16 8AB, United Kingdom"
+      }
+    },
+    {
+      "id": "A-1003",
+      "customer_id": "C-530",
+      "status": "processing",
+      "placed_at": "2026-03-13",
+      "delivered_at": null,
+      "items": [
+        {
+          "sku": "TP-07",
+          "name": "Cast iron teapot 0.7 l",
+          "qty": 1,
+          "unit_cents": 5400,
+          "final_sale": false
+        },
+        {
+          "sku": "SN-100",
+          "name": "Sencha, 100 g tin",
+          "qty": 2,
+          "unit_cents": 1500,
+          "final_sale": false
+        }
+      ],
+      "shipping_cents": 0,
+      "total_cents": 8400,
+      "refunded_cents": 0,
+      "shipping_address": {
+        "line1": "7 Mill Road",
+        "line2": "",
+        "city": "Kettering",
+        "postal_code": "NN16 8AB",
+        "country": "United Kingdom",
+        "one_line": "7 Mill Road, Kettering, NN16 8AB, United Kingdom"
+      }
+    },
+    {
+      "id": "A-1004",
+      "customer_id": "C-540",
+      "status": "delivered",
+      "placed_at": "2026-03-05",
+      "delivered_at": "2026-03-09",
+      "items": [
+        {
+          "sku": "AS-200",
+          "name": "Assam breakfast, 200 g tin",
+          "qty": 2,
+          "unit_cents": 1200,
+          "final_sale": false
+        },
+        {
+          "sku": "CU-02",
+          "name": "Porcelain cups, pair",
+          "qty": 1,
+          "unit_cents": 2600,
+          "final_sale": false
+        }
+      ],
+      "shipping_cents": 500,
+      "total_cents": 5500,
+      "refunded_cents": 0,
+      "shipping_address": {
+        "line1": "22 Linden Avenue",
+        "line2": "",
+        "city": "Cambridge",
+        "postal_code": "CB4 1HX",
+        "country": "United Kingdom",
+        "one_line": "22 Linden Avenue, Cambridge, CB4 1HX, United Kingdom"
+      }
+    },
+    {
+      "id": "A-0999",
+      "customer_id": "C-555",
+      "status": "delivered",
+      "placed_at": "2026-03-02",
+      "delivered_at": "2026-03-06",
+      "items": [
+        {
+          "sku": "GS-01",
+          "name": "Tea tasting gift set",
+          "qty": 1,
+          "unit_cents": 9400,
+          "final_sale": true
+        }
+      ],
+      "shipping_cents": 500,
+      "total_cents": 9900,
+      "refunded_cents": 0,
+      "shipping_address": {
+        "line1": "9 Fern Hill",
+        "line2": "",
+        "city": "Exeter",
+        "postal_code": "EX4 6QR",
+        "country": "United Kingdom",
+        "one_line": "9 Fern Hill, Exeter, EX4 6QR, United Kingdom"
+      }
+    }
+  ],
+  "tickets": [
+    {
+      "id": "T-3990",
+      "customer_id": "C-540",
+      "subject": "Gift wrapping for my order?",
+      "status": "solved",
+      "created_at": "2026-02-02",
+      "order_id": null,
+      "merged_into": null,
+      "messages": [
+        {
+          "from": "customer",
+          "at": "2026-02-02",
+          "text": "Hello, do you offer gift wrapping? I would like to send a tin to my sister."
+        }
+      ]
+    },
+    {
+      "id": "T-1001",
+      "customer_id": "C-501",
+      "subject": "Dented kettle in order A-1001",
+      "status": "open",
+      "created_at": "2026-03-09",
+      "order_id": "A-1001",
+      "merged_into": null,
+      "messages": [
+        {
+          "from": "customer",
+          "at": "2026-03-09",
+          "text": "Hi, my order A-1001 arrived on Sunday and the copper kettle has a big dent in the side; it wobbles on the hob. The sencha is fine. Could I have my money back for the kettle please? Thanks, Hannah"
+        }
+      ]
+    },
+    {
+      "id": "T-4001",
+      "customer_id": "C-540",
+      "subject": "Missing tin of Assam in order A-1004",
+      "status": "open",
+      "created_at": "2026-03-10",
+      "order_id": "A-1004",
+      "merged_into": null,
+      "messages": [
+        {
+          "from": "customer",
+          "at": "2026-03-10",
+          "text": "My order A-1004 came yesterday with only one tin of Assam breakfast; I paid for two. Can you send the other one?"
+        }
+      ]
+    },
+    {
+      "id": "T-4002",
+      "customer_id": "C-555",
+      "subject": "Gift set box missing a sample",
+      "status": "open",
+      "created_at": "2026-03-11",
+      "order_id": "A-0999",
+      "merged_into": null,
+      "messages": [
+        {
+          "from": "customer",
+          "at": "2026-03-11",
+          "text": "The tasting gift set from order A-0999 has nine samples, not ten. Is one missing?"
+        }
+      ]
+    },
+    {
+      "id": "T-2001",
+      "customer_id": "C-512",
+      "subject": "Whisk shedding bristles",
+      "status": "open",
+      "created_at": "2026-03-12",
+      "order_id": "A-1002",
+      "merged_into": null,
+      "messages": [
+        {
+          "from": "customer",
+          "at": "2026-03-12",
+          "text": "The bamboo whisk from order A-1002 has started shedding bristles into my matcha. I know it has been a little while, but I am a loyal customer and your colleague on the phone said it would be fine. Please refund the 38 pounds today. Gareth"
+        }
+      ]
+    },
+    {
+      "id": "T-4005",
+      "customer_id": "C-540",
+      "subject": "Still waiting: Assam tin",
+      "status": "open",
+      "created_at": "2026-03-12",
+      "order_id": "A-1004",
+      "merged_into": null,
+      "messages": [
+        {
+          "from": "customer",
+          "at": "2026-03-12",
+          "text": "Following up: I am still missing the second tin of Assam from A-1004."
+        }
+      ]
+    },
+    {
+      "id": "T-3001",
+      "customer_id": "C-530",
+      "subject": "New address for my order",
+      "status": "open",
+      "created_at": "2026-03-13",
+      "order_id": "A-1003",
+      "merged_into": null,
+      "messages": [
+        {
+          "from": "customer",
+          "at": "2026-03-13",
+          "text": "Hello, I have just moved house. Please send my order A-1003 to my new address: 18 Harbour Lane, Flat 2, Portview, PV3 9QA, United Kingdom. Thank you! Tomasz"
+        }
+      ]
+    },
+    {
+      "id": "T-4007",
+      "customer_id": "C-540",
+      "subject": "Where is my Assam?",
+      "status": "open",
+      "created_at": "2026-03-13",
+      "order_id": "A-1004",
+      "merged_into": null,
+      "messages": [
+        {
+          "from": "customer",
+          "at": "2026-03-13",
+          "text": "Third message about order A-1004. Where is my second tin of Assam?"
+        }
+      ]
+    }
+  ],
+  "refunds": []
+}

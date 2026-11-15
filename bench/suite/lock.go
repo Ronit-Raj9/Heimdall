@@ -71,7 +71,7 @@ func Lock(s *schemas.Suite, now time.Time) (*schemas.SuiteLock, error) {
 		CreatedAt: now.UTC(),
 	}
 	for _, t := range s.Tasks {
-		tl, err := lockTask(t)
+		tl, err := lockTask(s, t)
 		if err != nil {
 			return nil, err
 		}
@@ -175,8 +175,11 @@ func Diff(a, b *schemas.SuiteLock) []Change {
 // lockTask computes one task's hashes. The controls hash covers the reference,
 // the empty patch, every mutant and the exploit together; the fixtures hash
 // covers both notes files and the fixtures/ folder when present. Both use the
-// utils.TreeHash line format over paths relative to the task folder.
-func lockTask(t *schemas.Task) (schemas.TaskLock, error) {
+// utils.TreeHash line format over paths relative to the task folder. Scenario
+// content (scenarioParts) is folded into the hash whose change level it
+// shares, and only when present, so a task without it hashes as it always
+// did.
+func lockTask(s *schemas.Suite, t *schemas.Task) (schemas.TaskLock, error) {
 	fail := func(what string, err error) (schemas.TaskLock, error) {
 		return schemas.TaskLock{}, fmt.Errorf("lock task %s: %s: %w", t.ID, what, err)
 	}
@@ -215,6 +218,14 @@ func lockTask(t *schemas.Task) (schemas.TaskLock, error) {
 	if err != nil {
 		return fail("fixtures", err)
 	}
+	extra, err := scenarioParts(s, t)
+	if err != nil {
+		return fail("scenario", err)
+	}
+	instrSum = foldHash(instrSum, extra.instruction)
+	repoSum = foldHash(repoSum, extra.repo)
+	verSum = foldHash(verSum, extra.verifier)
+	fixSum = foldHash(fixSum, extra.fixtures)
 	return schemas.TaskLock{
 		Version:           t.Version,
 		InstructionSHA256: instrSum,

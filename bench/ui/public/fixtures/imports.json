@@ -1,0 +1,50 @@
+{
+	"_comment": "SYNTHETIC fixture for UI development. Not a measurement. Shapes follow handlers/testdata/contract.",
+	"mode": "synthetic",
+	"importers": [
+		{
+			"name": "harbor",
+			"benchmarks": [
+				"terminal-bench@2.x"
+			],
+			"source": "git clone --depth 1 <upstream repository> datasets/terminal-bench",
+			"license": "varies",
+			"track": "terminal",
+			"grading": "verified",
+			"needs": [
+				"a per-task image built from each task's Dockerfile",
+				"snapshot grading: the verifier runs on a frozen copy of the agent container"
+			],
+			"summary": "Harbor task folders: one Dockerfile, instruction and tests/test.sh per task."
+		},
+		{
+			"name": "longmemeval",
+			"benchmarks": [
+				"longmemeval"
+			],
+			"source": "download the dataset file into datasets/longmemeval",
+			"license": "varies",
+			"track": "memory",
+			"grading": "judged",
+			"needs": [
+				"a judge model key on the gateway, separate from the agent's",
+				"several sessions per task"
+			],
+			"summary": "Long-term memory questions over multi-session chat histories."
+		},
+		{
+			"name": "tau2",
+			"benchmarks": [
+				"tau2-bench"
+			],
+			"source": "git clone --depth 1 <upstream repository> datasets/tau2",
+			"license": "varies",
+			"track": "tool_use",
+			"grading": "verified",
+			"needs": [
+				"the domain's tool service image"
+			],
+			"summary": "Tool-use domains with a simulated user; the final database state is checked."
+		}
+	]
+}

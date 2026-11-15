@@ -4,7 +4,9 @@
 	"suite": "coding-core@1.0.0",
 	"suites": [
 		"coding-core@1.0.0",
-		"coding-core@0.9.0"
+		"coding-core@0.9.0",
+		"support-desk@0.2.0",
+		"memory-recall@0.1.0"
 	],
 	"condition": "clean",
 	"conditions": [

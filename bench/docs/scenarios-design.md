@@ -1,7 +1,9 @@
 # Scenarios: design contract
 
-Status: in progress (15 Nov 2026). This file fixes the names, shapes and
-ownership every part agrees on. The types are in `schemas/scenario.go`; where
+Status: implemented (15 Nov 2026) and checked with scripted controls through
+the full pipeline; the user guide is `docs/scenarios.md` and the state of each
+importer is in the README. This file fixes the names, shapes and ownership
+every part agrees on. The types are in `schemas/scenario.go`; where
 this file and the code differ, the code wins and this file is corrected.
 
 ## Goal
@@ -58,6 +60,18 @@ The agent must run inside that image. An agent whose build declares
 `build.base_arg` is built once per task image and tagged
 `<tag>-<suite>-<task>`. An agent without `base_arg` runs in its own image and
 sees only the workspace files; `doctor` and `agent check` warn.
+
+`environment.user: root` (the only accepted value) runs the agent, a scripted
+control and the verifier as root inside the task's own image; it is ignored
+for a task without one. Imported Harbor tasks set it, because upstream tasks
+install packages and change files under `/etc`. The trade is plain: a root
+agent can change anything in its container, its root file system is
+writable, and it gets back the capabilities a package install needs
+(`utils.RootCaps`: chown, dac_override, fowner, fsetid, kill, setuid,
+setgid, setfcap, net_bind_service, sys_chroot, audit_write). It still has no
+privileged mode, no host mounts, no docker socket, only the internal
+networks, and no-new-privileges; a container escape would start from root
+instead of uid 1000. The plan records the user (`plan.json`).
 
 ### 2. Verifier modes (`SuiteVerifier.Mode`)
 

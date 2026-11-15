@@ -1,0 +1,62 @@
+[
+  {
+    "id": "1",
+    "description": {"purpose": null, "relevant_policies": null, "notes": null},
+    "user_scenario": {
+      "persona": null,
+      "instructions": {"domain": "retail", "reason_for_call": "You want to return the lamp of order #W1.", "known_info": "You are bo_ng_2.", "unknown_info": null, "task_instructions": "."}
+    },
+    "initial_state": null,
+    "evaluation_criteria": {
+      "actions": [{"action_id": "1_0", "name": "return_items", "arguments": {"order_id": "#W1", "item_ids": ["11"]}, "info": null}],
+      "communicate_info": [],
+      "nl_assertions": null,
+      "reward_basis": ["DB", "NL_ASSERTION"]
+    }
+  },
+  {
+    "id": "2",
+    "description": {"purpose": null, "relevant_policies": null, "notes": null},
+    "user_scenario": {
+      "persona": null,
+      "instructions": {"domain": "retail", "reason_for_call": "You want to return the kettle of order #W2.", "known_info": "You are cy_ho_3.", "unknown_info": "You do not remember your email.", "task_instructions": "."}
+    },
+    "initial_state": null,
+    "evaluation_criteria": {
+      "actions": [{"action_id": "2_0", "name": "return_items", "arguments": {"order_id": "#W2", "item_ids": ["22"]}, "info": null}],
+      "communicate_info": ["refund"],
+      "nl_assertions": ["Agent states the refund goes to the original card."],
+      "reward_basis": ["DB", "NL_ASSERTION"]
+    }
+  },
+  {
+    "id": "3",
+    "description": {"purpose": null, "relevant_policies": null, "notes": null},
+    "user_scenario": {
+      "persona": null,
+      "instructions": {"domain": "retail", "reason_for_call": "You want to return the mug of order #W3.", "known_info": "You are di_ma_4.", "unknown_info": null, "task_instructions": "."}
+    },
+    "initial_state": null,
+    "evaluation_criteria": {
+      "actions": [{"action_id": "3_0", "name": "return_items", "arguments": {"order_id": "#W3", "item_ids": ["33"]}, "info": null}],
+      "communicate_info": [],
+      "nl_assertions": null,
+      "reward_basis": ["DB", "NL_ASSERTION"]
+    }
+  },
+  {
+    "id": "4",
+    "description": {"purpose": null, "relevant_policies": null, "notes": null},
+    "user_scenario": {
+      "persona": null,
+      "instructions": {"domain": "retail", "reason_for_call": "You want to return the fan of order #W4.", "known_info": "You are ed_ku_5.", "unknown_info": null, "task_instructions": "."}
+    },
+    "initial_state": null,
+    "evaluation_criteria": {
+      "actions": [{"action_id": "4_0", "name": "return_items", "arguments": {"order_id": "#W4", "item_ids": ["44"]}, "info": null}],
+      "communicate_info": [],
+      "nl_assertions": null,
+      "reward_basis": ["DB"]
+    }
+  }
+]

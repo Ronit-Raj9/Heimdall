@@ -1,0 +1,36 @@
+{
+  "image": "bench/agent-opencode:1",
+  "argv": [
+    "opencode",
+    "run",
+    "--format",
+    "json",
+    "--pure",
+    "--title",
+    "t01",
+    "# Fix rounding\n\nAmounts must round half up. Literal {{braces}} stay.\n"
+  ],
+  "env": {
+    "BENCH_MCP_SERVERS": "{\"kb\":{\"url\":\"http://kb:8000/rpc\"},\"tickets\":{\"url\":\"http://toolproxy:9200/s/tickets/mcp\"}}",
+    "BENCH_MODEL": "anthropic/claude-sonnet-4-5",
+    "BIFROST_API_KEY": "sk-bf-v1-secretvalue0123456789",
+    "OPENCODE_CONFIG": "/tmp/bench/opencode.json",
+    "OPENCODE_DISABLE_AUTOUPDATE": "1",
+    "OPENCODE_DISABLE_CLAUDE_CODE": "1",
+    "OPENCODE_DISABLE_DEFAULT_PLUGINS": "1",
+    "OPENCODE_DISABLE_EXTERNAL_SKILLS": "1",
+    "OPENCODE_DISABLE_LSP_DOWNLOAD": "1",
+    "OPENCODE_DISABLE_MODELS_FETCH": "1"
+  },
+  "files": {
+    "/tmp/bench/instruction.md": "# Fix rounding\n\nAmounts must round half up. Literal {{braces}} stay.\n",
+    "/tmp/bench/opencode.json": "{\n  \"$schema\": \"https://opencode.ai/config.json\",\n  \"autoupdate\": false,\n  \"enabled_providers\": [\n    \"bifrost\"\n  ],\n  \"mcp\": {\n    \"kb\": {\n      \"enabled\": true,\n      \"type\": \"remote\",\n      \"url\": \"http://kb:8000/rpc\"\n    },\n    \"tickets\": {\n      \"enabled\": true,\n      \"type\": \"remote\",\n      \"url\": \"http://toolproxy:9200/s/tickets/mcp\"\n    }\n  },\n  \"model\": \"bifrost/{env:BENCH_MODEL}\",\n  \"permission\": \"allow\",\n  \"provider\": {\n    \"bifrost\": {\n      \"models\": {\n        \"{env:BENCH_MODEL}\": {\n          \"name\": \"{env:BENCH_MODEL}\"\n        }\n      },\n      \"name\": \"Bifrost\",\n      \"npm\": \"@ai-sdk/openai-compatible\",\n      \"options\": {\n        \"apiKey\": \"{env:BIFROST_API_KEY}\",\n        \"baseURL\": \"http://bifrost:8080/openai/v1\",\n        \"headers\": {\n          \"x-bf-session-affinity\": \"off\",\n          \"x-bf-session-id\": \"r_p20fj3s8wa\"\n        }\n      }\n    }\n  },\n  \"share\": \"disabled\",\n  \"small_model\": \"bifrost/{env:BENCH_MODEL}\"\n}\n"
+  },
+  "workdir": "/workspace",
+  "wall_s": 600,
+  "cpus": 2,
+  "mem_gb": 4,
+  "pids": 512,
+  "network": "bench-eval-net",
+  "user": "1000"
+}

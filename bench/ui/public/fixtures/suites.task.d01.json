@@ -1,0 +1,91 @@
+{
+	"_comment": "SYNTHETIC fixture for UI development. Not a measurement. Shapes follow handlers/testdata/contract.",
+	"mode": "synthetic",
+	"suite": "support-desk",
+	"suite_version": "0.2.0",
+	"verifier_result": "exit_code",
+	"task": {
+		"id": "d01",
+		"version": "1.0.0",
+		"title": "Refund the duplicate charge and close the ticket",
+		"project": "support",
+		"kind": "tool_use",
+		"difficulty": "easy",
+		"capabilities": [
+			"tool_use",
+			"error_recovery"
+		],
+		"tags": [
+			"mcp"
+		],
+		"provenance": {
+			"license": "proprietary",
+			"created_by": "task init"
+		},
+		"status": "not_locked",
+		"stale": false,
+		"admitted": false,
+		"admitted_at": null,
+		"checks": [],
+		"hidden_test_files": 1,
+		"required_tests": 0,
+		"protected_globs": 0,
+		"mutants": 0,
+		"agent_timeout_s": 900,
+		"environment": {
+			"image": "bench/task-support-desk-d01:9f2c4a1b7e30",
+			"workspace_path": "/app"
+		},
+		"services": [
+			{
+				"id": "crm",
+				"role": "mcp",
+				"image": "bench/crm-mcp:1",
+				"port": 8080,
+				"export": [
+					{
+						"id": "tickets",
+						"path": "/data/tickets.json"
+					}
+				],
+				"mcp": {
+					"path": "/mcp"
+				},
+				"proxy": true
+			},
+			{
+				"id": "ledger-db",
+				"role": "data",
+				"image": "postgres:16",
+				"port": 5432,
+				"export": [
+					{
+						"id": "dump"
+					}
+				],
+				"hidden": true
+			}
+		],
+		"output": {
+			"kind": "state"
+		},
+		"skills": [
+			"refund-policy"
+		]
+	},
+	"instruction": "Ticket 4182: the customer was charged twice. Refund the duplicate through the CRM tools, add a note, and close the ticket.\n",
+	"instruction_truncated": false,
+	"protected": [],
+	"files": [
+		{
+			"path": "notes/refund-policy.md",
+			"size": 1830
+		},
+		{
+			"path": "notes/ticket-4182.md",
+			"size": 664
+		}
+	],
+	"files_total": 2,
+	"files_truncated": false
+}

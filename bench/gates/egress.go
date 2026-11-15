@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	"github.com/maximhq/bifrost/bench/schemas"
+	"github.com/maximhq/bifrost/bench/utils"
 )
 
 // Egress is the name of the egress gate.
@@ -71,7 +72,7 @@ func (g *egressGate) Check(_ context.Context, rc *schemas.RunContext, _ *schemas
 		problems = append(problems, fmt.Sprintf("run network %q is not the eval network %q", got, want))
 	}
 	if len(problems) == 0 {
-		return newResult(g, false, "", nil), nil
+		return newResult(g, false, utils.RemoteEgressNote(rc), nil), nil // Remote area: records the one host a remote_http agent may reach; "" otherwise
 	}
 	return newResult(g, true, strings.Join(problems, "; "), []string{"network:" + got}), nil
 }

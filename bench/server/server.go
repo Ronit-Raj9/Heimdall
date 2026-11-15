@@ -39,6 +39,7 @@ type Deps struct {
 	Releases handlers.ReleaseLog
 	Suites   handlers.SuiteSource
 	Agents   handlers.AgentSource
+	Workers  handlers.WorkerAPI // Remote area: remote worker coordinator; nil turns worker mode off (handlers/workers.go)
 	// UI is the built UI with index.html at its root, for example
 	// fs.Sub(ui.Dist, "dist"). Nil serves the API only.
 	UI      fs.FS
@@ -101,6 +102,9 @@ func New(cfg *lib.Config, deps Deps) (*Server, error) {
 	handlers.NewReleasesHandler(mode, deps.Releases, write).RegisterRoutes(r, common...)
 	handlers.NewSuitesHandler(mode, deps.Suites).RegisterRoutes(r, common...)
 	handlers.NewAgentsHandler(mode, deps.Agents, deps.Index).RegisterRoutes(r, common...)
+	handlers.NewImportsHandler(mode).RegisterRoutes(r, common...) // UI area: importer catalog (handlers/imports.go)
+	// Remote area: worker API, off unless BENCH_WORKER_TOKEN is set (handlers/workers.go).
+	handlers.NewWorkersHandler(mode, deps.Workers).RegisterRoutes(r, common...)
 	if deps.UI != nil {
 		NewUIHandler(mode, deps.UI).RegisterRoutes(r)
 	}

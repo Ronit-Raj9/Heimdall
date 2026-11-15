@@ -83,6 +83,11 @@ type TaskEnvironment struct {
 	// BuildNetwork allows network during the image build only (most upstream
 	// Dockerfiles install packages). The run itself never gets it.
 	BuildNetwork bool `json:"build_network,omitempty" yaml:"build_network"`
+	// User "root" runs the agent (and a scripted control, and the verifier)
+	// as root inside the task's own image, for tasks that install packages or
+	// change files under /etc. Empty keeps the unprivileged user. It is
+	// honoured only when the task has its own image.
+	User string `json:"user,omitempty" yaml:"user"`
 }
 
 // ServiceSpec is one container started beside the agent for a run and removed
@@ -204,6 +209,9 @@ type JudgeRecord struct {
 	PromptSHA256  string   `json:"prompt_sha256"`
 	Votes         []string `json:"votes"` // each call's verdict: correct | incorrect | unparsable
 	USD           Value    `json:"usd"`   // judge cost; never added to the agent's cost
+
+	// PriceRef names the price snapshot USD was priced from.
+	PriceRef string `json:"price_ref,omitempty"`
 }
 
 // ImportRecord says where an imported suite came from (Suite.Imported).
@@ -281,6 +289,7 @@ type ToolCall struct {
 	Nonce        string    `json:"nonce,omitempty"`
 	Started      time.Time `json:"started"`
 	LatencyMS    int64     `json:"latency_ms"`
+	Undelivered  bool      `json:"undelivered,omitempty"` // the proxy could not hand the answer to the agent (it hung up first)
 }
 
 // ToolFault is a fault the tool proxy injects for one run (ProbeApply.Tool,

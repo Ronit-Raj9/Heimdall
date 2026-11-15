@@ -49,6 +49,10 @@ type TaskInitResult struct {
 	Required    []string // required test ids written to task.yaml
 	Warnings    []string
 	SuiteEdited bool // the id was added to suite.yaml
+	// From and EditMe are set by InitScenarioTask: the task whose shape was
+	// copied, and the files that got an EDIT ME marker.
+	From   string
+	EditMe []string
 }
 
 // taskSource is everything read from git for one task.

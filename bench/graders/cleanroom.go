@@ -63,6 +63,15 @@ type gradeInputs struct {
 	restore   []string
 	timeout   time.Duration
 	workdir   string // where the verifier sees the workspace; empty keeps /workspace and the image's working directory
+
+	// Scenario inputs (applyScenario), all empty for a plain task.
+	seedImage  string // task image whose seedPath folder is the pristine workspace (instead of repoDir)
+	seedPath   string
+	snapshot   string // snapshot mode: image id of the frozen agent container, the verifier image
+	workspace  string // snapshot mode: the run's workspace volume, mounted read-only
+	stateDir   string // <run folder>/state, mounted read-only at /grader/state
+	answerFile string // <run folder>/answer.txt, mounted read-only at /grader/answer.txt
+	root       bool   // the task runs as root (environment.user root): so does its verifier
 }
 
 // gradeJob names the docker objects of one grade.
@@ -72,6 +81,7 @@ type gradeJob struct {
 	workspace    string
 	out          string
 	container    string
+	pristine     string // volume holding the task image's workspace folder, when the task has one
 }
 
 // cleanResult is what one clean-room run observed.
@@ -126,13 +136,17 @@ func gatherInputs(rc *schemas.RunContext, diff *schemas.Diff, image string) (*gr
 		return nil, errors.New("suite needs an image and a verifier command, and the task a tests folder")
 	}
 	var err error
-	if in.repoDir, err = utils.ResolveInside(rc.Task.Dir, rc.Task.RepoDir); err != nil {
-		return nil, fmt.Errorf("task repo: %w", err)
+	dirs := []string{}
+	if !seededFromImage(rc) && utils.VerifierMode(rc.Suite) != schemas.VerifierSnapshot {
+		if in.repoDir, err = utils.ResolveInside(rc.Task.Dir, rc.Task.RepoDir); err != nil {
+			return nil, fmt.Errorf("task repo: %w", err)
+		}
+		dirs = append(dirs, in.repoDir)
 	}
 	if in.testsDir, err = utils.ResolveInside(rc.Task.Dir, rc.Task.Verifier.Tests); err != nil {
 		return nil, fmt.Errorf("task verifier.tests: %w", err)
 	}
-	for _, d := range []string{in.repoDir, in.testsDir} {
+	for _, d := range append(dirs, in.testsDir) {
 		if st, err := os.Stat(d); err != nil || !st.IsDir() {
 			return nil, fmt.Errorf("%s is not a folder", d)
 		}
@@ -166,7 +180,7 @@ func gatherInputs(rc *schemas.RunContext, diff *schemas.Diff, image string) (*gr
 // suffix keeps a regrade of the same run from colliding with a leftover.
 func newGradeJob(expID, runID string, in *gradeInputs) *gradeJob {
 	sfx := strings.TrimPrefix(utils.NewID("g", 6), "g_")
-	return &gradeJob{
+	j := &gradeJob{
 		expID:     expID,
 		runID:     runID,
 		in:        in,
@@ -174,6 +188,10 @@ func newGradeJob(expID, runID string, in *gradeInputs) *gradeJob {
 		out:       "bench-gout-" + runID + "-" + sfx,
 		container: "bench-" + runID + "-verify-" + sfx,
 	}
+	if in.seedImage != "" && in.snapshot == "" {
+		j.pristine = "bench-gsrc-" + runID + "-" + sfx
+	}
+	return j
 }
 
 // run creates the grade's volumes, fills the workspace, runs the verifier
@@ -184,13 +202,19 @@ func newGradeJob(expID, runID string, in *gradeInputs) *gradeJob {
 // container and volume it creates is removed before it returns.
 func (c *cleanRoom) run(ctx context.Context, j *gradeJob, collect collectFunc) (cleanResult, error) {
 	defer c.cleanup(ctx, j)
-	for _, v := range []string{j.workspace, j.out} {
+	for _, v := range j.volumes() {
 		args := append([]string{"volume", "create"}, utils.LabelArgs(j.expID, j.runID)...)
 		if _, err := c.docker.MustRun(ctx, append(args, v)...); err != nil {
 			return cleanResult{}, fmt.Errorf("create volume %s: %w", v, err)
 		}
 	}
-	applied, err := c.prepare(ctx, j)
+	var applied bool
+	var err error
+	if j.in.snapshot != "" {
+		applied, err = true, c.prepareSnapshot(ctx, j)
+	} else {
+		applied, err = c.prepare(ctx, j)
+	}
 	if err != nil || !applied {
 		return cleanResult{}, err
 	}
@@ -231,6 +255,13 @@ chown -R 1000:1000 /workspace /grader/out
 // prepare fills the grading volume. It reports false when the patch does not
 // apply.
 func (c *cleanRoom) prepare(ctx context.Context, j *gradeJob) (bool, error) {
+	src := j.in.repoDir
+	if j.pristine != "" {
+		if err := c.seedPristine(ctx, j); err != nil {
+			return false, err
+		}
+		src = j.pristine
+	}
 	args := []string{"run", "--rm", "--name", j.container + "-prep"}
 	args = append(args, utils.LabelArgs(j.expID, j.runID)...)
 	args = append(args, "--network", "none", "--user", "0", "--cap-drop", "ALL",
@@ -238,7 +269,7 @@ func (c *cleanRoom) prepare(ctx context.Context, j *gradeJob) (bool, error) {
 		"--security-opt", "no-new-privileges", "--pids-limit", "256", "--memory", "2g", "--log-driver", "none",
 		"-v", j.workspace+":/workspace",
 		"-v", j.out+":/grader/out",
-		"-v", j.in.repoDir+":/bench-src:ro")
+		"-v", src+":/bench-src:ro")
 	if !j.in.empty {
 		args = append(args, "-v", j.in.diffPath+":/bench-patch/workspace.diff:ro", "-e", "BENCH_PATCH=/bench-patch/workspace.diff")
 	}
@@ -268,22 +299,33 @@ func (c *cleanRoom) verify(ctx context.Context, j *gradeJob) (int, bool, error) 
 	if j.in.workdir != "" {
 		mount = j.in.workdir
 	}
+	image, access := j.in.image, ":ro"
+	if j.in.snapshot != "" {
+		// The grade's own copy of the run's workspace: writable, thrown away.
+		image, access = j.in.snapshot, ""
+	}
 	args := []string{"create", "--name", j.container}
 	args = append(args, utils.LabelArgs(j.expID, j.runID)...)
+	if j.in.snapshot == "" {
+		// A snapshot verifier keeps the frozen /tmp and a writable root of
+		// its own (discarded with the container): the agent's result can
+		// live anywhere in that file system.
+		args = append(args, "--read-only", "--tmpfs", "/tmp:exec,size=512m")
+	}
+	args = append(args, "--network", verifierNetwork)
+	args = append(args, verifierIdentity(j.in.root)...)
 	args = append(args,
-		"--network", verifierNetwork, "--user", verifierUser,
-		"--cap-drop", "ALL", "--security-opt", "no-new-privileges",
+		"--security-opt", "no-new-privileges",
 		"--pids-limit", "512", "--memory", "2g", "--memory-swap", "2g", "--cpus", strconv.Itoa(min(2, runtime.NumCPU())),
-		"--read-only", "--tmpfs", "/tmp:exec,size=512m", "--tmpfs", "/home/agent:exec,size=64m,mode=0700,uid=1000,gid=1000",
-		"-e", "HOME=/home/agent",
-		"-v", j.workspace+":"+mount+":ro",
+		"-v", j.workspace+":"+mount+access,
 		"-v", j.in.testsDir+":/grader/tests:ro",
 		"-v", j.out+":/grader/out",
 		"--log-driver", "none")
+	args = append(args, scenarioMounts(j.in)...)
 	if j.in.workdir != "" {
 		args = append(args, "--workdir", j.in.workdir)
 	}
-	args = append(args, "--entrypoint", j.in.command[0], j.in.image)
+	args = append(args, "--entrypoint", j.in.command[0], image)
 	args = append(args, j.in.command[1:]...)
 	if _, err := c.docker.MustRun(ctx, args...); err != nil {
 		return 0, false, fmt.Errorf("create verifier container: %w", err)
@@ -418,14 +460,181 @@ func readTarFile(r io.Reader, limit int64) ([]byte, error) {
 func (c *cleanRoom) cleanup(ctx context.Context, j *gradeJob) {
 	cctx, cancel := context.WithTimeout(context.WithoutCancel(ctx), cleanupTimeout)
 	defer cancel()
-	if res, err := c.docker.Run(cctx, "rm", "-f", "-v", j.container, j.container+"-prep"); err != nil {
+	if res, err := c.docker.Run(cctx, "rm", "-f", "-v", j.container, j.container+"-prep", j.container+"-src", j.container+"-seed"); err != nil {
 		c.logger.Warn("remove grading containers", "run", j.runID, "error", err)
 	} else if res.ExitCode != 0 && !strings.Contains(string(res.Stderr), "No such container") {
 		c.logger.Warn("remove grading containers", "run", j.runID, "stderr", strings.TrimSpace(string(res.Stderr)))
 	}
-	if _, err := c.docker.MustRun(cctx, "volume", "rm", "-f", j.workspace, j.out); err != nil {
+	if _, err := c.docker.MustRun(cctx, append([]string{"volume", "rm", "-f"}, j.volumes()...)...); err != nil {
 		c.logger.Warn("remove grading volumes", "run", j.runID, "error", err)
 	}
+}
+
+// volumes are the grade's own volumes: the grading workspace (in snapshot
+// mode a copy of the run's), the out folder, and the pristine copy when the
+// grade builds one.
+func (j *gradeJob) volumes() []string {
+	vols := []string{j.workspace, j.out}
+	if j.pristine != "" {
+		vols = append(vols, j.pristine)
+	}
+	return vols
+}
+
+// snapshotRefFile is the run file environments.Snapshot writes (the frozen
+// agent container's image id); a Grader sees only the run context and the
+// diff, so the snapshot reaches it through the run folder.
+const snapshotRefFile = "snapshot.ref"
+
+var snapshotRefRe = regexp.MustCompile(`^sha256:[0-9a-f]{64}$`)
+
+// applyScenario adds a scenario task's inputs to a grade: in snapshot mode
+// the frozen agent container (from snapshot.ref) and the run's workspace
+// volume replace the clean-room build; a task with its own image is
+// verified in its verifier_image, else its task image, and when the image
+// seeds the workspace the pristine copy comes from it too; the exported
+// service state and answer are mounted when the run folder holds them. A
+// plain task is left as it was.
+func applyScenario(rc *schemas.RunContext, in *gradeInputs) error {
+	in.root = utils.TaskRunsAsRoot(rc.Task)
+	if img, ok, err := utils.TaskImage(rc.Suite.ID, rc.Task); err != nil {
+		return err
+	} else if ok {
+		in.image = img.Tag
+		if v := rc.Task.Environment.VerifierImage; v != "" {
+			in.image = v
+		}
+		if wp := rc.Task.Environment.WorkspacePath; wp != "" {
+			if _, err := verifierWorkdir(wp); err != nil {
+				return fmt.Errorf("task workspace_path: %w", err)
+			}
+			in.seedImage, in.seedPath = img.Tag, wp
+			in.workdir = wp
+		}
+	}
+	if utils.VerifierMode(rc.Suite) == schemas.VerifierSnapshot {
+		ref, err := readSnapshotRef(rc.Dir)
+		if err != nil {
+			return err
+		}
+		if rc.Handle == nil || rc.Handle.Volume == "" {
+			return errors.New("snapshot grading needs the run's workspace volume")
+		}
+		in.snapshot, in.workspace = ref, rc.Handle.Volume
+	}
+	if rc.Dir == "" {
+		return nil
+	}
+	if st, err := os.Lstat(filepath.Join(rc.Dir, "state")); err == nil && st.IsDir() {
+		in.stateDir = filepath.Join(rc.Dir, "state")
+	}
+	if st, err := os.Lstat(filepath.Join(rc.Dir, "answer.txt")); err == nil && st.Mode().IsRegular() {
+		in.answerFile = filepath.Join(rc.Dir, "answer.txt")
+	}
+	for _, p := range []*string{&in.stateDir, &in.answerFile} {
+		if *p == "" {
+			continue
+		}
+		abs, err := filepath.Abs(*p)
+		if err != nil {
+			return fmt.Errorf("run folder file %s: %w", *p, err)
+		}
+		*p = abs
+	}
+	return nil
+}
+
+// seededFromImage reports whether the task's workspace comes from a folder
+// of its own image rather than its repo folder.
+func seededFromImage(rc *schemas.RunContext) bool {
+	return rc.Task != nil && rc.Task.Environment != nil && rc.Task.Environment.WorkspacePath != ""
+}
+
+// readSnapshotRef reads the image id Snapshot left in the run folder.
+func readSnapshotRef(dir string) (string, error) {
+	if dir == "" {
+		return "", errors.New("snapshot grading needs the run folder")
+	}
+	raw, err := os.ReadFile(filepath.Join(dir, snapshotRefFile))
+	if err != nil {
+		return "", fmt.Errorf("snapshot grading: %w", err)
+	}
+	ref := strings.TrimSpace(string(raw))
+	if !snapshotRefRe.MatchString(ref) {
+		return "", fmt.Errorf("snapshot grading: %s holds %q, not an image id", snapshotRefFile, truncate(ref, 80))
+	}
+	return ref, nil
+}
+
+// verifierIdentity is the verifier's user, capabilities and home: uid 1000
+// with none and a tmpfs home, or, for a task that runs as root, root with
+// utils.RootCaps and its own /root as home (upstream test scripts expect
+// both). It is pure.
+func verifierIdentity(root bool) []string {
+	if !root {
+		return []string{"--user", verifierUser, "--cap-drop", "ALL",
+			"--tmpfs", "/home/agent:exec,size=64m,mode=0700,uid=1000,gid=1000", "-e", "HOME=/home/agent"}
+	}
+	args := []string{"--user", "0:0", "--cap-drop", "ALL"}
+	for _, c := range utils.RootCaps {
+		args = append(args, "--cap-add", c)
+	}
+	return append(args, "-e", "HOME=/root")
+}
+
+// scenarioMounts are the verifier's read-only mounts of the run's exported
+// state and answer. It is pure.
+func scenarioMounts(in *gradeInputs) []string {
+	var args []string
+	if in.stateDir != "" {
+		args = append(args, "-v", in.stateDir+":/grader/state:ro")
+	}
+	if in.answerFile != "" {
+		args = append(args, "-v", in.answerFile+":/grader/answer.txt:ro")
+	}
+	return args
+}
+
+// prepareSnapshot copies the run's workspace volume (read-only) into the
+// grade's own workspace volume and hands the fresh /grader/out to the
+// verifier user. The verifier gets the copy, writable, because upstream test
+// scripts write into their working folder; the run's volume is never
+// changed, and the diff was exported from it before grading.
+func (c *cleanRoom) prepareSnapshot(ctx context.Context, j *gradeJob) error {
+	args := []string{"run", "--rm", "--name", j.container + "-prep"}
+	args = append(args, utils.LabelArgs(j.expID, j.runID)...)
+	args = append(args, "--network", "none", "--user", "0", "--cap-drop", "ALL",
+		"--cap-add", "CHOWN", "--cap-add", "DAC_OVERRIDE", "--cap-add", "DAC_READ_SEARCH", "--cap-add", "FOWNER", "--cap-add", "FSETID",
+		"--security-opt", "no-new-privileges", "--pids-limit", "256", "--memory", "2g", "--log-driver", "none",
+		"-v", j.in.workspace+":/bench-src:ro", "-v", j.workspace+":/workspace", "-v", j.out+":/grader/out",
+		"--entrypoint", "/bin/sh", j.in.prepImage, "-c", "set -eu; cp -a /bench-src/. /workspace/; chown 1000:1000 /grader/out")
+	if _, err := c.docker.MustRun(ctx, args...); err != nil {
+		return fmt.Errorf("prepare snapshot grading workspace: %w", err)
+	}
+	return nil
+}
+
+// seedPristine copies the task image's workspace folder into the grade's
+// pristine volume. The image is created, never started, and the tar stream
+// goes from docker cp straight into a trusted helper.
+func (c *cleanRoom) seedPristine(ctx context.Context, j *gradeJob) error {
+	src := j.container + "-src"
+	create := append([]string{"create", "--name", src}, utils.LabelArgs(j.expID, j.runID)...)
+	create = append(create, "--network", "none", "--entrypoint", "/bench-none", j.in.seedImage)
+	if _, err := c.docker.MustRun(ctx, create...); err != nil {
+		return fmt.Errorf("create task image container: %w", err)
+	}
+	to := []string{"run", "-i", "--rm", "--name", j.container + "-seed"}
+	to = append(to, utils.LabelArgs(j.expID, j.runID)...)
+	to = append(to, "--network", "none", "--user", "0", "--cap-drop", "ALL",
+		"--cap-add", "CHOWN", "--cap-add", "DAC_OVERRIDE", "--cap-add", "FOWNER",
+		"--security-opt", "no-new-privileges", "--pids-limit", "256", "--memory", "2g", "--log-driver", "none",
+		"-v", j.pristine+":/bench-src", "--entrypoint", "tar", j.in.prepImage, "-x", "-f", "-", "-C", "/bench-src")
+	from := []string{"cp", src + ":" + strings.TrimSuffix(j.in.seedPath, "/") + "/.", "-"}
+	if _, err := c.docker.Pipe(ctx, from, to); err != nil {
+		return fmt.Errorf("copy pristine workspace from %s:%s: %w", j.in.seedImage, j.in.seedPath, err)
+	}
+	return nil
 }
 
 // timedOutReason is the fail reason of a verifier that hit its timeout. The

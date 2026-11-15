@@ -151,3 +151,60 @@ func TestGatewayHostPort(t *testing.T) {
 		}
 	}
 }
+
+func TestReadCheckScenario(t *testing.T) {
+	dir := t.TempDir()
+	write := func(name, body string) {
+		t.Helper()
+		if err := os.WriteFile(filepath.Join(dir, name), []byte(body), 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+	s := &schemas.Suite{ID: "desk"}
+	task := &schemas.Task{ID: "t1", Services: []schemas.ServiceSpec{{ID: "desk", Role: schemas.ServiceRoleMCP}}}
+	sc := readCheckScenario(dir, &schemas.Evidence{}, s, task)
+	if sc.tools != nil || !strings.Contains(sc.toolsErr, "tools.jsonl missing") || sc.services != nil || sc.answer != nil {
+		t.Fatalf("empty run folder: %+v", sc)
+	}
+	write("services.json", `[{"id":"desk","image":"acme/desk:1","ready":true,"proxied":true}]`)
+	write("sessions.json", `[{"id":"s1","index":1,"exit_code":0,"timed_out":false,"started":"2026-11-15T10:00:00Z","ended":"2026-11-15T10:00:01Z","stdout_path":"agent.stream.1.jsonl"}]`)
+	write("tools.jsonl", `{"seq":1,"server":"desk","tool":"tools/list","protocol":"mcp","args_sha256":"a","result_sha256":"b","is_error":false,"started":"2026-11-15T10:00:00Z","latency_ms":3}`+"\n\n")
+	write("answer.txt", "42\n")
+	sc = readCheckScenario(dir, &schemas.Evidence{}, s, task)
+	if len(sc.services) != 1 || !sc.services[0].Ready || len(sc.sessions) != 1 || len(sc.tools) != 1 || sc.toolsErr != "" ||
+		sc.answer == nil || sc.answer.Text != "42\n" || sc.answer.Source != "file" {
+		t.Fatalf("run folder: %+v", sc)
+	}
+	ev := &schemas.Evidence{Answer: &schemas.Answer{Text: "x", Source: "final_message"}, ToolCalls: []schemas.ToolCall{}}
+	if sc := readCheckScenario(dir, ev, s, task); sc.answer.Source != "final_message" || len(sc.tools) != 0 || sc.toolsErr != "" {
+		t.Errorf("evidence first: %+v", sc)
+	}
+	write("tools.jsonl", "{not json\n")
+	if _, why := readToolLedger(filepath.Join(dir, "tools.jsonl")); !strings.Contains(why, "line 1 does not parse") {
+		t.Errorf("bad ledger: %q", why)
+	}
+	if !isScenarioTask(s, task) || isScenarioTask(&schemas.Suite{}, &schemas.Task{}) {
+		t.Error("isScenarioTask")
+	}
+}
+
+func TestOwnImageRow(t *testing.T) {
+	pass := checkRow{ID: rowImage, Status: checkPass, Detail: "built x"}
+	own := &schemas.Task{ID: "tb1", Environment: &schemas.TaskEnvironment{Dockerfile: "environment/Dockerfile"}}
+	plain := &schemas.Task{ID: "t1"}
+	cmdAgent := &schemas.AgentConfig{Adapter: "command"}
+	perSuite := &schemas.AgentConfig{Adapter: "command", Build: &schemas.ImageSpec{BaseArg: "BASE_IMAGE"}}
+	if r := ownImageRow(pass, cmdAgent, own); r.Status != checkWarn || !strings.Contains(r.Detail, "task tb1 has its own image") || r.Fix == "" {
+		t.Errorf("own image, no base_arg: %+v", r)
+	}
+	for name, r := range map[string]checkRow{
+		"base_arg":      ownImageRow(pass, perSuite, own),
+		"no task image": ownImageRow(pass, cmdAgent, plain),
+		"scripted":      ownImageRow(pass, &schemas.AgentConfig{Adapter: "scripted"}, own),
+		"failed row":    ownImageRow(checkRow{Status: checkFail}, cmdAgent, own),
+	} {
+		if r.Status == checkWarn {
+			t.Errorf("%s: warned: %+v", name, r)
+		}
+	}
+}

@@ -15,10 +15,12 @@ import { LeaderboardFilters } from "@/components/leaderboard/leaderboardFilters"
 import { LeaderboardFootnote } from "@/components/leaderboard/leaderboardFootnote";
 import { LeaderboardTable } from "@/components/leaderboard/leaderboardTable";
 import { ModeBadge } from "@/components/modeBadge";
+import { GradingBadge, JudgedNotice } from "@/components/scenario/scenarioBadges";
+import { groupSuitesByTrack, isJudgedSuite, suiteFactsById } from "@/components/scenario/scenario.utils";
 import { BlockSkeleton, EmptyNote, LoadError, Section } from "@/components/runs/screenStates";
 import { Button } from "@/components/ui/button";
 import { getLocale } from "@/lib/i18n";
-import { useGetLeaderboardQuery } from "@/lib/store";
+import { useGetLeaderboardQuery, useGetSuitesQuery } from "@/lib/store";
 import type { LeaderboardParams, LeaderboardResponse } from "@/lib/types/bench";
 import { cn } from "@/lib/utils";
 import { parseAsString, parseAsStringLiteral, useQueryState } from "nuqs";
@@ -26,9 +28,10 @@ import { useMemo } from "react";
 import { useTranslation } from "react-i18next";
 
 /**
- * The leaderboard: /leaderboard?suite=&condition=&scope=&synthetic=&sort=&dir=. The first four go
- * to the server; an absent one takes the server default, so "newest suite" stays a live default.
- * sort and dir order the rows on the client; the rank is always the board's.
+ * The leaderboard: /leaderboard?track=&suite=&condition=&scope=&synthetic=&sort=&dir=. suite,
+ * condition, scope and synthetic go to the server; an absent one takes the server default, so
+ * "newest suite" stays a live default. track narrows the suite picker to one track, from the
+ * suites on disk; sort and dir order the rows on the client; the rank is always the board's.
  */
 export default function LeaderboardView() {
 	const { t } = useTranslation("bench");
@@ -36,14 +39,19 @@ export default function LeaderboardView() {
 	const [condition, setCondition] = useQueryState("condition", parseAsString);
 	const [scope, setScope] = useQueryState("scope", parseAsStringLiteral(LEADERBOARD_SCOPES));
 	const [synthetic, setSynthetic] = useQueryState("synthetic", parseAsStringLiteral(LEADERBOARD_SYNTHETIC));
+	const [track, setTrack] = useQueryState("track", parseAsString);
+	// Track and grading come from the suites on disk; the board itself carries neither.
+	const suitesQuery = useGetSuitesQuery();
+	const facts = useMemo(() => suiteFactsById(suitesQuery.data?.suites ?? []), [suitesQuery.data]);
 
 	const params = useMemo<LeaderboardParams>(
 		() => ({ suite: suite ?? undefined, condition: condition ?? undefined, scope: scope ?? undefined, synthetic: synthetic ?? undefined }),
 		[suite, condition, scope, synthetic],
 	);
 	const board = useGetLeaderboardQuery(params);
-	const hasFilters = Boolean(suite || condition || scope || synthetic);
+	const hasFilters = Boolean(suite || condition || scope || synthetic || track);
 	const resetFilters = () => {
+		void setTrack(null);
 		void setSuite(null);
 		void setCondition(null);
 		void setScope(null);
@@ -52,6 +60,17 @@ export default function LeaderboardView() {
 
 	const data = board.data;
 	const showBanner = synthetic === "only" || data?.synthetic === "only" || data?.mode === "synthetic";
+	const trackGroups = useMemo(() => groupSuitesByTrack(data?.suites ?? [], facts), [data?.suites, facts]);
+	const judged = isJudgedSuite(data?.suite, facts);
+	const onTrack = (next: string | null) => {
+		void setTrack(next);
+		// A board outside the chosen track moves to that track's newest suite.
+		const group = trackGroups.find((g) => g.track === next);
+		if (group && data && !group.suites.includes(data.suite)) {
+			void setSuite(group.suites[0]);
+			void setCondition(null);
+		}
+	};
 
 	return (
 		<section className="flex min-w-0 flex-col gap-6" data-testid="leaderboard-screen">
@@ -59,6 +78,7 @@ export default function LeaderboardView() {
 				<div className="flex flex-wrap items-center gap-3">
 					<h1 className="text-foreground text-xl font-semibold tracking-tight">{t("leaderboard.title")}</h1>
 					<ModeBadge mode={data?.mode} isLoading={board.isLoading} isError={board.isError && !data} />
+					{judged && <GradingBadge grading="judged" testId="leaderboard-judged-badge" />}
 				</div>
 				<p className="text-muted-foreground max-w-3xl text-sm" data-testid="leaderboard-explainer">
 					{t("leaderboard.subtitle")}
@@ -66,6 +86,9 @@ export default function LeaderboardView() {
 			</header>
 
 			{showBanner && <LeaderboardSyntheticBanner />}
+			{judged && (
+				<JudgedNotice title={t("leaderboard.judged.title")} body={t("leaderboard.judged.body")} testId="leaderboard-judged-note" />
+			)}
 
 			<LeaderboardFilters
 				suite={data?.suite ?? suite ?? ""}
@@ -83,6 +106,9 @@ export default function LeaderboardView() {
 				onScope={(next) => void setScope(next)}
 				onSynthetic={(next) => void setSynthetic(next)}
 				disabled={board.isLoading}
+				trackGroups={trackGroups}
+				track={track}
+				onTrack={onTrack}
 			/>
 
 			{board.isLoading ? (

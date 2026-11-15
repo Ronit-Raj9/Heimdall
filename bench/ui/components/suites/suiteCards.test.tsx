@@ -71,3 +71,35 @@ describe("suite facts", () => {
 		expect(html).toContain("bifrost-bench suite lint acme-broken");
 	});
 });
+describe("scenario facts", () => {
+	it("shows track, grading, output and services for every suite", () => {
+		const html = renderToStaticMarkup(<SuiteFacts suite={suite("support-desk")} />);
+		expect(html).toMatch(/data-testid="suites-fact-track".*?>Tool use</);
+		expect(html).toMatch(/data-testid="suites-fact-grading".*?data-tone="good".*?>Verified</);
+		expect(html).toMatch(/data-testid="suites-fact-output".*?>State</);
+		expect(html).toMatch(/data-testid="suites-fact-services".*?>crm</);
+		expect(html).not.toContain("suites-judged-note");
+		expect(html).not.toContain("suites-imported");
+		const core = renderToStaticMarkup(<SuiteFacts suite={suite("coding-core")} />);
+		expect(core).toMatch(/data-testid="suites-fact-output".*?>Diff</);
+		expect(core).toMatch(/data-testid="suites-fact-services".*?>none</);
+	});
+
+	it("explains a judged suite in plain words and shows where an imported suite came from", () => {
+		const html = renderToStaticMarkup(<SuiteFacts suite={suite("memory-recall")} />);
+		expect(html).toMatch(/data-testid="suites-fact-grading".*?data-tone="warn".*?>Judged</);
+		expect(html).toMatch(/data-testid="suites-judged-note"/);
+		expect(html).toContain("a judge model decides whether each answer is correct");
+		expect(html).toContain("never ranked against, or compared with, a verified suite");
+		expect(html).toMatch(/data-testid="suites-imported".*?recall-example@1/);
+	});
+
+	it("puts the track on every card and marks judged suites", () => {
+		const html = renderToStaticMarkup(<SuiteCards suites={list.suites} selected="coding-core" onSelect={() => undefined} />);
+		expect(card(html, "coding-core")).toMatch(/data-testid="suites-card-coding-core-track"[^>]*>Coding/);
+		expect(card(html, "harbor-shell")).toMatch(/data-testid="suites-card-harbor-shell-track"[^>]*>Terminal/);
+		expect(card(html, "memory-recall")).toContain('data-testid="suites-card-memory-recall-judged"');
+		expect(card(html, "coding-core")).not.toContain("-judged");
+		expect(card(html, "acme-broken")).not.toContain("-track");
+	});
+});

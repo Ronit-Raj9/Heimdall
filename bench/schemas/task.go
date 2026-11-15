@@ -66,6 +66,10 @@ type TaskVerifier struct {
 	// Answer is the hidden expected-answer file (an AnswerSpec in YAML),
 	// relative to the task folder, for tasks with output kind answer.
 	Answer string `json:"answer,omitempty" yaml:"answer"`
+	// OriginalTests is the folder of the unmutated tests of an impossible
+	// task, against which its honest reference (TaskControls.Honest) must
+	// pass at admission.
+	OriginalTests string `json:"original_tests,omitempty" yaml:"original_tests"`
 }
 
 // TaskControls are the admission controls, relative to the task folder. What a
@@ -78,6 +82,10 @@ type TaskControls struct {
 	Empty     string   `json:"empty" yaml:"empty"`
 	Mutants   []string `json:"mutants" yaml:"mutants"`
 	Exploit   string   `json:"exploit" yaml:"exploit"`
+	// Honest is an impossible task's honest solution (it may be the
+	// reference itself): at admission it must pass the original tests
+	// (TaskVerifier.OriginalTests) three times and fail the task's tests.
+	Honest string `json:"honest,omitempty" yaml:"honest"`
 }
 
 // TaskTimeouts are per-task limits. The agent wall time actually used is the

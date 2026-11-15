@@ -63,6 +63,9 @@ var (
 // names) to netwatch.jsonl in the run folder. The helper image must have
 // python3 and sleep. When the observer cannot start, the agent runs as usual
 // and the file records why.
+//
+// ToolProxyImage (images.toolproxy) runs the per-run tool proxy when a run
+// has proxied services; empty means DefaultToolProxyImage.
 type DockerWorkspaceConfig struct {
 	EvalNetwork    string
 	HelperImage    string
@@ -70,6 +73,7 @@ type DockerWorkspaceConfig struct {
 	Docker         utils.Docker
 	OutputCapBytes int64
 	NetWatch       bool
+	ToolProxyImage string
 }
 
 // dockerWorkspace keeps each run's workspace in a docker volume and runs every
@@ -100,7 +104,12 @@ func (e *dockerWorkspace) GetVersion() string { return dockerWorkspaceVersion }
 // layer writes the stale file), hands every file to uid 1000 and records a
 // baseline commit inside the volume. The baseline uses `add --force`, like the
 // export, so a repo file its own .gitignore matches never shows up as added.
-// Protected hashes come from the host task folder, which is trusted.
+// Protected hashes come from the host task folder, which is trusted. A task
+// whose environment names a workspace path is seeded from that folder of its
+// own image instead (built or pulled when missing), its protected hashes are
+// read from the seeded volume, and the handle's workdir is that path. A run
+// with memory (sessions, or an agent memory section) also gets its memory
+// volumes, empty.
 func (e *dockerWorkspace) Create(ctx context.Context, rc *schemas.RunContext) (*schemas.EnvironmentHandle, error) {
 	expID, runID, err := runIDs(rc)
 	if err != nil {
@@ -109,23 +118,28 @@ func (e *dockerWorkspace) Create(ctx context.Context, rc *schemas.RunContext) (*
 	if rc.Task == nil || rc.Task.Dir == "" {
 		return nil, fmt.Errorf("create workspace for run %s: run context has no task folder", runID)
 	}
-	// Resolved right before the bind mount: docker follows symlinks, so a
-	// repo folder swapped for a link after the suite loaded must not mount
-	// a host folder outside the task.
-	repoDir, err := utils.ResolveInside(rc.Task.Dir, rc.Task.RepoDir)
-	if err != nil {
-		return nil, fmt.Errorf("create workspace for run %s: task repo: %w", runID, err)
+	wp := workspacePath(rc)
+	if err := checkWorkspacePath(wp); err != nil {
+		return nil, fmt.Errorf("create workspace for run %s: %w", runID, err)
 	}
-	if st, err := os.Stat(repoDir); err != nil || !st.IsDir() {
-		return nil, fmt.Errorf("create workspace for run %s: task repo %s is not a folder", runID, repoDir)
+	if env := rc.Task.Environment; env != nil && env.User != "" && env.User != utils.TaskUserRoot {
+		return nil, fmt.Errorf("create workspace for run %s: environment user %q is not root", runID, env.User)
+	}
+	var repoDir string
+	if wp == "" {
+		if repoDir, err = taskRepo(rc); err != nil {
+			return nil, fmt.Errorf("create workspace for run %s: %w", runID, err)
+		}
 	}
 	notesRel, notesHost, err := cleanNotes(rc)
 	if err != nil {
 		return nil, fmt.Errorf("create workspace for run %s: %w", runID, err)
 	}
-	protected, err := protectedHashes(repoDir, rc.Task.Protected)
-	if err != nil {
-		return nil, fmt.Errorf("create workspace for run %s: %w", runID, err)
+	var protected map[string]string
+	if repoDir != "" {
+		if protected, err = protectedHashes(repoDir, rc.Task.Protected); err != nil {
+			return nil, fmt.Errorf("create workspace for run %s: %w", runID, err)
+		}
 	}
 	if err := e.checkFrozenImage(ctx, rc); err != nil {
 		return nil, fmt.Errorf("create workspace for run %s: %w", runID, err)
@@ -139,6 +153,9 @@ func (e *dockerWorkspace) Create(ctx context.Context, rc *schemas.RunContext) (*
 		FileHashes: map[string]string{},
 		Protected:  protected,
 	}
+	if wp != "" {
+		h.Workdir = wp
+	}
 	if notesRel != "" {
 		sum, err := utils.SHA256File(notesHost)
 		if err != nil {
@@ -151,11 +168,19 @@ func (e *dockerWorkspace) Create(ctx context.Context, rc *schemas.RunContext) (*
 			return nil, fmt.Errorf("create workspace for run %s: %w", runID, err)
 		}
 	}
-	ref, err := e.populate(ctx, e.helperImage(rc), h, expID, runID, repoDir, notesRel, notesHost)
+	if err := e.createMemory(ctx, rc, expID, runID); err != nil {
+		return nil, fmt.Errorf("create workspace for run %s: %w", runID, err)
+	}
+	ref, err := e.seed(ctx, rc, h, expID, runID, seedOptions{})
 	if err != nil {
 		return nil, fmt.Errorf("create workspace for run %s: %w", runID, err)
 	}
 	h.BaselineRef = ref
+	if wp != "" {
+		if h.Protected, err = e.volumeProtected(ctx, rc, h, expID, runID); err != nil {
+			return nil, fmt.Errorf("create workspace for run %s: %w", runID, err)
+		}
+	}
 	e.cfg.Logger.Debug("workspace created", "run", runID, "volume", h.Volume, "baseline", ref)
 	return h, nil
 }
@@ -164,8 +189,18 @@ func (e *dockerWorkspace) Create(ctx context.Context, rc *schemas.RunContext) (*
 // is created first, so image and flag errors surface as errors, then started
 // attached so stdout and stderr stream into capped files in the run folder.
 // The wall budget (plan.WallS, 900 s when unset) is a context deadline; on
-// expiry the container is killed and TimedOut is set. The container is always
-// removed. Root users and host, bridge or container networks are refused.
+// expiry the container is killed and TimedOut is set. The container is
+// removed, except in a snapshot-graded run, where Snapshot needs it. Root
+// users and host, bridge or container networks are refused.
+//
+// Scenario runs: with started services (rc.Services) the agent also joins the
+// run's service network (it is the only network when the plan has none).
+// The plan's folders (RunPlan.Dirs) arrive as read-only volumes, the memory
+// volumes are mounted, and a task image's workspace path mounts the workspace
+// a second time. With rc.Session set the container is bench-<run>-s<n>, the
+// earlier sessions' containers are removed first, and the output goes to
+// agent.stream.<n>.jsonl and agent.stderr.<n>.txt (ExecResult paths), then is
+// appended to agent.stream.jsonl and agent.stderr.txt.
 func (e *dockerWorkspace) Exec(ctx context.Context, rc *schemas.RunContext, plan *schemas.RunPlan) (*schemas.ExecResult, error) {
 	expID, runID, err := runIDs(rc)
 	if err != nil {
@@ -174,44 +209,87 @@ func (e *dockerWorkspace) Exec(ctx context.Context, rc *schemas.RunContext, plan
 	if rc.Handle == nil || rc.Dir == "" || plan == nil {
 		return nil, fmt.Errorf("exec run %s: needs a workspace handle, a run folder and a plan", runID)
 	}
-	if err := e.checkPlan(plan); err != nil {
+	root := utils.TaskRunsAsRoot(rc.Task)
+	if root {
+		// Recorded in the plan the run kernel writes to plan.json.
+		plan.User = rootUser
+	}
+	if err := e.checkPlan(plan, root); err != nil {
 		return nil, fmt.Errorf("exec run %s: %w", runID, err)
 	}
 	basePath, err := e.imagePath(ctx, plan)
 	if err != nil {
 		return nil, fmt.Errorf("exec run %s: %w", runID, err)
 	}
-	l, err := buildLaunch(plan, shimDir+":"+basePath, agentHome)
+	name := agentName(rc, runID)
+	e.removeContainers(ctx, staleAgents(rc, runID)...)
+	mounts, links, err := e.agentMounts(ctx, rc, plan, expID, runID)
 	if err != nil {
 		return nil, fmt.Errorf("exec run %s: %w", runID, err)
 	}
+	l, err := buildLaunch(plan, shimDir+":"+basePath, agentHome, links)
+	if err != nil {
+		return nil, fmt.Errorf("exec run %s: %w", runID, err)
+	}
+	// Remote area: the one route out a remote_http plan asks for (RunPlan.Egress, utils/remoteegress.go); nil for every other plan.
+	egress, err := utils.StartRemoteEgress(ctx, e.cfg.Docker, rc, plan, e.network(plan.Network))
+	if err != nil {
+		return nil, fmt.Errorf("exec run %s: %w", runID, err)
+	}
+	defer egress.Stop(context.WithoutCancel(ctx))
 	envFile, err := writeEnvFile(l.Env)
 	if err != nil {
 		return nil, fmt.Errorf("exec run %s: %w", runID, err)
 	}
-	name := agentContainer(runID)
-	e.removeContainers(ctx, name)
-	network := e.network(plan.Network)
+	network, svcNet := e.network(plan.Network), ""
+	if len(rc.Services) > 0 {
+		svcNet = serviceNetwork(runID)
+		if network == "none" {
+			network, svcNet = svcNet, ""
+		}
+	}
+	joiner := name
 	if w := e.netWatch(ctx, rc, expID, runID, network); w != nil {
 		defer w.close(ctx)
-		network = "container:" + w.holder
+		network, joiner = "container:"+w.holder, w.holder
 	}
-	args := agentCreateArgs(name, utils.LabelArgs(expID, runID), plan, rc.Handle, network, envFile, l)
+	args := agentCreateArgs(name, utils.LabelArgs(expID, runID), plan, rc.Handle, network, envFile, l, mounts, snapshotMode(rc) || root)
 	_, cerr := e.cfg.Docker.MustRun(ctx, args...)
 	if rerr := os.Remove(envFile); rerr != nil {
 		e.cfg.Logger.Warn("remove env file", "path", envFile, "error", rerr)
 	}
-	defer e.removeContainers(ctx, name)
+	// A snapshot-graded run keeps the exited container for Snapshot, which
+	// removes it after the commit; Destroy removes it in any case.
+	keep := snapshotMode(rc)
+	defer func() {
+		if !keep {
+			e.removeContainers(ctx, name)
+		}
+	}()
 	if cerr != nil {
+		keep = false
 		return nil, fmt.Errorf("exec run %s: create agent container: %w", runID, cerr)
+	}
+	if svcNet != "" {
+		if _, err := e.cfg.Docker.MustRun(ctx, "network", "connect", svcNet, joiner); err != nil {
+			keep = false
+			return nil, fmt.Errorf("exec run %s: join service network: %w", runID, err)
+		}
 	}
 	wall := time.Duration(plan.WallS) * time.Second
 	if plan.WallS <= 0 {
 		wall = defaultWallS * time.Second
 	}
-	res, err := e.attach(ctx, name, rc.Dir, wall)
+	stdout, stderr, session := streamPaths(rc)
+	res, err := e.attach(ctx, name, stdout, stderr, wall)
 	if err != nil {
+		keep = false
 		return res, fmt.Errorf("exec run %s: %w", runID, err)
+	}
+	if session > 0 {
+		if err := appendSession(rc.Dir, session, stdout, stderr); err != nil {
+			return res, fmt.Errorf("exec run %s: %w", runID, err)
+		}
 	}
 	return res, nil
 }
@@ -279,8 +357,9 @@ func (e *dockerWorkspace) ExportDiff(ctx context.Context, rc *schemas.RunContext
 	return &schemas.Diff{Path: out, SHA256: utils.SHA256Bytes(f.Kept), Files: f.Files, Rejected: f.Rejected}, nil
 }
 
-// Destroy removes every container and volume labelled with the run, plus the
-// run's volumes by name. It is idempotent and works after a failed Create.
+// Destroy removes every container, volume, network and image labelled with
+// the run (services, the tool proxy, the snapshot image), plus the run's
+// volumes by name. It is idempotent and works after a failed Create.
 func (e *dockerWorkspace) Destroy(ctx context.Context, rc *schemas.RunContext) error {
 	_, runID, err := runIDs(rc)
 	if err != nil {
@@ -304,6 +383,18 @@ func (e *dockerWorkspace) Destroy(ctx context.Context, rc *schemas.RunContext) e
 			}
 		}
 	}
+	if memoryEnabled(rc) {
+		// Named even when Create failed before labelling them: docker
+		// creates a missing named volume, unlabelled, on first mount. Paths
+		// that do not validate never got volumes, so they are not counted.
+		paths, perr := memoryPaths(rc)
+		if perr != nil {
+			paths = nil
+		}
+		for _, v := range memoryVolumes(runID, len(paths)) {
+			vols[v] = true
+		}
+	}
 	ls, err := e.cfg.Docker.MustRun(ctx, "volume", "ls", "-q", "--filter", filter)
 	if err != nil {
 		errs = append(errs, err)
@@ -320,35 +411,41 @@ func (e *dockerWorkspace) Destroy(ctx context.Context, rc *schemas.RunContext) e
 	if _, err := e.cfg.Docker.MustRun(ctx, append([]string{"volume", "rm", "-f"}, names...)...); err != nil {
 		errs = append(errs, err)
 	}
+	errs = append(errs, e.removeLabelled(ctx, filter, []string{"network", "ls", "-q"}, []string{"network", "rm"}))
+	errs = append(errs, e.removeLabelled(ctx, filter, []string{"image", "ls", "-q"}, []string{"image", "rm", "-f"}))
 	if err := errors.Join(errs...); err != nil {
 		return fmt.Errorf("destroy run %s: %w", runID, err)
 	}
 	return nil
 }
 
-// populateScript runs as root in the trusted helper. Nothing in the volume is
-// agent-written yet, so running git here is safe; hooks are still disabled.
-const populateScript = `set -eu
-if [ -n "$(ls -A /workspace)" ]; then echo "workspace volume is not empty" >&2; exit 3; fi
-# A new volume inherits the image's /workspace owner; git as root refuses a
-# repo it does not own, so hand everything to uid 1000 only after the commit.
-chown 0:0 /workspace
-cp -dR --preserve=mode,timestamps /bench-src/. /workspace/
-if [ -n "${BENCH_NOTES:-}" ]; then
-	mkdir -p "$(dirname "/workspace/$BENCH_NOTES")"
-	cp /bench-in/notes "/workspace/$BENCH_NOTES"
-fi
-mkdir -p /opt/bench/shim /opt/bench/log
-cd /workspace
-export GIT_CONFIG_NOSYSTEM=1 GIT_CONFIG_GLOBAL=/dev/null HOME=/tmp
-export GIT_AUTHOR_DATE="$BENCH_DATE" GIT_COMMITTER_DATE="$BENCH_DATE"
-git -c init.defaultBranch=main init -q
-git -c core.hooksPath=/dev/null add -A --force
-git -c core.hooksPath=/dev/null -c user.name=bench -c user.email=bench@local -c commit.gpgsign=false commit -q --no-verify --allow-empty -m baseline
-ref="$(git rev-parse HEAD)"
-chown -R 1000:1000 /workspace /opt/bench
-echo "$ref"
-`
+// removeLabelled lists objects with list plus the run filter and removes
+// them with rm. Nothing listed is nothing to do.
+func (e *dockerWorkspace) removeLabelled(ctx context.Context, filter string, list, rm []string) error {
+	res, err := e.cfg.Docker.MustRun(ctx, append(list, "--filter", filter)...)
+	if err != nil {
+		return err
+	}
+	ids := uniqueFields(res.Stdout)
+	if len(ids) == 0 {
+		return nil
+	}
+	_, err = e.cfg.Docker.MustRun(ctx, append(rm, ids...)...)
+	return err
+}
+
+// uniqueFields splits a listing into its distinct ids, in order. It is pure.
+func uniqueFields(out []byte) []string {
+	var ids []string
+	seen := map[string]bool{}
+	for _, id := range strings.Fields(string(out)) {
+		if !seen[id] {
+			seen[id] = true
+			ids = append(ids, id)
+		}
+	}
+	return ids
+}
 
 // exportScript runs in the trusted helper over agent-written files. It works
 // on a copy, resets every git file that can carry behaviour, and caps the
@@ -369,29 +466,6 @@ size="$(wc -c < /tmp/out.diff)"
 if [ "$size" -gt "$BENCH_CAP" ]; then echo "diff is $size bytes, over the $BENCH_CAP byte cap" >&2; exit 4; fi
 cat /tmp/out.diff
 `
-
-// populate runs populateScript and returns the baseline commit id.
-func (e *dockerWorkspace) populate(ctx context.Context, image string, h *schemas.EnvironmentHandle, expID, runID, repoDir, notesRel, notesHost string) (string, error) {
-	args := e.helperArgs(helperName(runID, "prep"), expID, runID, []string{"CHOWN", "DAC_OVERRIDE", "DAC_READ_SEARCH", "FOWNER"})
-	args = append(args,
-		"-v", h.Volume+":/workspace",
-		"-v", h.AuxVolume+":"+auxMount,
-		"-v", repoDir+":/bench-src:ro",
-		"-e", "BENCH_DATE="+baselineDate)
-	if notesRel != "" {
-		args = append(args, "-v", notesHost+":/bench-in/notes:ro", "-e", "BENCH_NOTES="+notesRel)
-	}
-	args = append(args, image, "-c", populateScript)
-	res, err := e.cfg.Docker.MustRun(ctx, args...)
-	if err != nil {
-		return "", fmt.Errorf("populate workspace: %w", err)
-	}
-	lines := strings.Fields(string(res.Stdout))
-	if len(lines) == 0 || !refRe.MatchString(lines[len(lines)-1]) {
-		return "", fmt.Errorf("populate workspace: no baseline commit id in helper output %q", truncate(string(res.Stdout), 200))
-	}
-	return lines[len(lines)-1], nil
-}
 
 // helperArgs is the common prefix of every trusted helper run: removed on
 // exit, labelled, no network, root with only the listed capabilities.
@@ -419,8 +493,9 @@ func (e *dockerWorkspace) freshVolume(ctx context.Context, name, expID, runID st
 	return nil
 }
 
-// checkPlan refuses plans that would break the security baseline.
-func (e *dockerWorkspace) checkPlan(plan *schemas.RunPlan) error {
+// checkPlan refuses plans that would break the security baseline. A root
+// user is accepted only for a task that runs as root (allowRoot).
+func (e *dockerWorkspace) checkPlan(plan *schemas.RunPlan, allowRoot bool) error {
 	if plan.Image == "" {
 		return errors.New("plan has no image")
 	}
@@ -428,7 +503,7 @@ func (e *dockerWorkspace) checkPlan(plan *schemas.RunPlan) error {
 	if user == "" {
 		user = defaultUser
 	}
-	if u, _, _ := strings.Cut(user, ":"); u == "0" || u == "root" {
+	if isRoot(user) && !allowRoot {
 		return fmt.Errorf("plan user %q is root; agents run as non-root", plan.User)
 	}
 	n := e.network(plan.Network)
@@ -465,11 +540,8 @@ func (e *dockerWorkspace) imagePath(ctx context.Context, plan *schemas.RunPlan) 
 
 // attach starts the created container attached, streams its output into the
 // run folder and enforces the wall budget.
-func (e *dockerWorkspace) attach(ctx context.Context, name, dir string, wall time.Duration) (*schemas.ExecResult, error) {
-	res := &schemas.ExecResult{
-		StdoutPath: filepath.Join(dir, "agent.stream.jsonl"),
-		StderrPath: filepath.Join(dir, "agent.stderr.txt"),
-	}
+func (e *dockerWorkspace) attach(ctx context.Context, name, stdoutPath, stderrPath string, wall time.Duration) (*schemas.ExecResult, error) {
+	res := &schemas.ExecResult{StdoutPath: stdoutPath, StderrPath: stderrPath}
 	outF, err := os.OpenFile(res.StdoutPath, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0o644)
 	if err != nil {
 		return nil, fmt.Errorf("open %s: %w", res.StdoutPath, err)
@@ -589,8 +661,14 @@ func (e *dockerWorkspace) network(planNetwork string) string {
 }
 
 // agentCreateArgs is the `docker create` command line for the agent container
-// under the security baseline. It is pure.
-func agentCreateArgs(name string, labels []string, plan *schemas.RunPlan, h *schemas.EnvironmentHandle, network, envFile string, l *launch) []string {
+// under the security baseline. writableRoot (snapshot-graded runs and root
+// tasks) leaves the root file system writable and /tmp in it, because the
+// agent's changes there are what the snapshot freezes and a package install
+// writes there; the home folder stays a tmpfs, so the agent's own config and
+// credentials are never part of the snapshot. A root user (a task with
+// environment.user root) gets back the capabilities a package install needs
+// (utils.RootCaps), never more; no-new-privileges still holds. It is pure.
+func agentCreateArgs(name string, labels []string, plan *schemas.RunPlan, h *schemas.EnvironmentHandle, network, envFile string, l *launch, mounts []string, writableRoot bool) []string {
 	user := plan.User
 	if user == "" {
 		user = defaultUser
@@ -608,6 +686,13 @@ func agentCreateArgs(name string, labels []string, plan *schemas.RunPlan, h *sch
 	args = append(args,
 		"--user", user,
 		"--cap-drop", "ALL",
+	)
+	if isRoot(user) {
+		for _, c := range utils.RootCaps {
+			args = append(args, "--cap-add", c)
+		}
+	}
+	args = append(args,
 		"--security-opt", "no-new-privileges",
 		"--pids-limit", strconv.Itoa(pids),
 	)
@@ -618,13 +703,17 @@ func agentCreateArgs(name string, labels []string, plan *schemas.RunPlan, h *sch
 	if plan.CPUs > 0 {
 		args = append(args, "--cpus", strconv.FormatFloat(plan.CPUs, 'f', -1, 64))
 	}
+	if !writableRoot {
+		args = append(args, "--read-only", "--tmpfs", "/tmp:exec,size=512m")
+	}
 	args = append(args,
-		"--read-only",
-		"--tmpfs", "/tmp:exec,size=512m",
 		"--tmpfs", agentHome+":"+homeTmpfsOpts(user),
 		"--network", network,
 		"-v", h.Volume+":/workspace",
 		"-v", h.AuxVolume+":"+auxMount,
+	)
+	args = append(args, mounts...)
+	args = append(args,
 		"--log-driver", "none",
 		"-w", wd,
 		"--env-file", envFile,
@@ -780,6 +869,15 @@ func dockerBinary(d utils.Docker) string {
 		return d.Binary
 	}
 	return "docker"
+}
+
+// rootUser is the plan user of a root task.
+const rootUser = "0:0"
+
+// isRoot reports whether a docker --user value is root. It is pure.
+func isRoot(user string) bool {
+	u, _, _ := strings.Cut(user, ":")
+	return u == "0" || u == "root"
 }
 
 func workspaceVolume(runID string) string { return "bench-ws-" + runID }

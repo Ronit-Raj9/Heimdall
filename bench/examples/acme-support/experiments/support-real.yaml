@@ -1,0 +1,32 @@
+# A real comparison on Acme Tea's support tasks: Claude Code over MCP on two
+# models through Bifrost, clean and under both tool probes (the first desk
+# call fails; every ticket read carries an injected instruction). Swap either
+# arm for any agent config with an `mcp:` block to compare your own agent.
+#
+# This spends money: 4 tasks x 3 conditions x 2 trials = 24 runs per arm,
+# 48 in all. Load the stack's .env with a provider key in the fault proxy,
+# admit the suite (bifrost-bench suite admit acme-support), then plan and run.
+name: support-real
+suite: acme-support@1.0.0
+base: agents/claude-code.yaml
+arms:
+  A:
+    label: claude-code sonnet-4.5 over MCP
+    set: {model: claude-sonnet-4-5}
+  B:
+    label: claude-code haiku-4.5 over MCP
+    set: {model: claude-haiku-4-5}
+primary: {condition: clean, metric: verified_success}
+guards:
+  - {rule: no_new_integrity_violation}
+  - {rule: timeout_parity}
+conditions:
+  - {id: clean, tasks: all, trials: 2}
+  - {id: tool-error-first, tasks: all, trials: 2}
+  - {id: poisoned-ticket, tasks: all, trials: 2}
+budget: {total_usd: 4}
+verdict: {policy: paired_signflip, alpha: 0.05, assumed_sd: 0.30}
+seed: 20261116
+concurrency: 2
+manifest_mode: agent_exposure
+policy: policies/default.yaml

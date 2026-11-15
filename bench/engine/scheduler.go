@@ -52,6 +52,10 @@ type RunOptions struct {
 	// channel should be buffered, and events that do not fit are counted in
 	// Summary.DroppedEvents. The scheduler never closes it.
 	Events chan<- Event
+	// Remote, when set, opens the experiment to remote workers for the
+	// duration of Run (remote.go): they lease slots from the same queue and
+	// reserve against the same spend cap as the local workers.
+	Remote *Coordinator
 }
 
 // Summary is what one scheduler run did.
@@ -71,6 +75,10 @@ type Summary struct {
 	// be observed; each is counted in SpentUSD at the per-run estimate.
 	UnknownCostRuns int `json:"unknown_cost_runs"`
 	DroppedEvents   int `json:"dropped_events"`
+	// Remote counts runs remote workers sealed that the coordinator accepted;
+	// they are in Sealed too. RemoteRejected counts uploads it refused.
+	Remote         int `json:"remote,omitempty"`
+	RemoteRejected int `json:"remote_rejected,omitempty"`
 }
 
 // schedRun is the shared state of one Run call. The spend fields are read
@@ -81,6 +89,8 @@ type schedRun struct {
 	m        *schemas.Manifest
 	suite    *schemas.Suite
 	opts     RunOptions
+	ctx      context.Context // Run's context, for work done on behalf of remote workers
+	queue    *slotQueue
 	mu       sync.Mutex
 	sum      Summary
 	stopped  bool          // spend cap reached
@@ -114,20 +124,21 @@ func NewScheduler(reg *schemas.Registry, benchRoot string, logger schemas.Logger
 // below the cap, and at or past the cap no further slot is leased. A slot
 // whose lease is lost mid-run is cancelled, its run sealed as aborted_infra
 // and never counted, and the slot is left to the owner that holds it.
+//
+// With opts.Remote set, remote workers lease slots from the same queue and
+// reserve against the same cap while Run lasts, and Run returns only when no
+// slot is pending and none is out on a remote lease (or ctx ends).
 func (s *Scheduler) Run(ctx context.Context, m *schemas.Manifest, opts RunOptions) (*Summary, error) {
 	r, err := s.start(ctx, m, opts)
 	if err != nil {
 		return nil, err
 	}
-	slots := append([]schemas.Slot(nil), m.Slots...)
-	sort.SliceStable(slots, func(i, j int) bool { return slots[i].OrderIndex < slots[j].OrderIndex })
-	jobs := make(chan *schemas.Slot)
-	go func() {
-		defer close(jobs)
-		for i := range slots {
-			jobs <- &slots[i]
-		}
-	}()
+	r.ctx = ctx
+	r.queue = newSlotQueue(m.Slots)
+	detach := func() {}
+	if opts.Remote != nil {
+		detach = opts.Remote.attach(r)
+	}
 	workers := opts.Concurrency
 	if workers <= 0 {
 		workers = m.Experiment.Concurrency
@@ -140,12 +151,17 @@ func (s *Scheduler) Run(ctx context.Context, m *schemas.Manifest, opts RunOption
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
-			for slot := range jobs {
+			for {
+				slot, ok := r.queue.next(ctx)
+				if !ok {
+					return
+				}
 				r.process(ctx, slot)
 			}
 		}()
 	}
 	wg.Wait()
+	detach()
 	r.mu.Lock()
 	out, stopped := r.sum, r.stopped
 	r.mu.Unlock()
@@ -446,34 +462,76 @@ func (r *schedRun) record(res *SlotResult, est float64) {
 // cap is passed by at most the last admitted run's error against its
 // estimate.
 func (r *schedRun) reserve(ctx context.Context) (float64, bool) {
-	limit := r.m.Experiment.Budget.TotalUSD
-	if limit <= 0 {
+	if r.m.Experiment.Budget.TotalUSD <= 0 {
 		return 0, true
 	}
 	for {
 		r.mu.Lock()
-		if !r.stopped && r.sum.SpentUSD >= limit {
-			r.stopped, r.sum.BudgetStopped = true, true
-		}
-		if r.stopped {
+		est, ok, wait := r.reserveLocked()
+		if !wait {
 			r.mu.Unlock()
-			return 0, false
+			return est, ok
 		}
-		if r.inflight == 0 || r.sum.SpentUSD+r.reserved < limit {
-			est := r.estimateLocked()
-			r.reserved += est
-			r.inflight++
-			r.mu.Unlock()
-			return est, true
-		}
-		wait := r.freed
+		freed := r.freed
 		r.mu.Unlock()
 		select {
 		case <-ctx.Done():
 			return 0, false
-		case <-wait:
+		case <-freed:
 		}
 	}
+}
+
+// tryReserve is reserve for a remote lease request, which must not block:
+// where reserve would wait for an in-flight slot, it reports wait and the
+// request is answered with no work for now.
+func (r *schedRun) tryReserve() (est float64, ok, wait bool) {
+	if r.m.Experiment.Budget.TotalUSD <= 0 {
+		return 0, true, false
+	}
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	return r.reserveLocked()
+}
+
+// reserveLocked is one pass of the reservation rule under mu: at or past the
+// cap stop for good; below it reserve when nothing is in flight or the spend
+// plus every in-flight reservation is below the cap; else report wait.
+func (r *schedRun) reserveLocked() (est float64, ok, wait bool) {
+	limit := r.m.Experiment.Budget.TotalUSD
+	if !r.stopped && r.sum.SpentUSD >= limit {
+		r.stopped, r.sum.BudgetStopped = true, true
+	}
+	if r.stopped {
+		return 0, false, false
+	}
+	if r.inflight == 0 || r.sum.SpentUSD+r.reserved < limit {
+		est = r.estimateLocked()
+		r.reserved += est
+		r.inflight++
+		return est, true, false
+	}
+	return 0, false, true
+}
+
+// charge adds the cost of a run that ran on a remote worker but was never
+// sealed here (a rejected upload, a lost or abandoned lease): the cost the
+// worker reported when it was observed, else the slot's reservation or the
+// per-run estimate when that is higher, never zero.
+func (r *schedRun) charge(cost *schemas.Value, est float64, why string) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	if cost != nil {
+		if c, ok := cost.Float(); ok && c >= 0 {
+			r.observeLocked(c)
+			return
+		}
+	}
+	counted := max(est, r.estimateLocked())
+	r.sum.SpentUSD += counted
+	r.sum.UnknownCostRuns++
+	r.s.logger.Warn("remote run cost unknown; counted at the per-run estimate", "experiment", r.m.ExpID,
+		"why", why, "counted_usd", counted)
 }
 
 // release returns a reservation once the slot's last attempt is recorded and
@@ -653,4 +711,91 @@ func runCost(metrics map[string]schemas.Value, run *schemas.Run) (float64, bool)
 		return 0, true
 	}
 	return 0, false
+}
+
+// slotQueue hands the experiment's slots out in OrderIndex order, to the
+// local workers and, while a coordinator is attached, to remote workers. A
+// slot a remote worker gives back without a finished run (a lost lease, a
+// rejected upload, an aborted attempt) is queued again in its place.
+type slotQueue struct {
+	mu      sync.Mutex
+	pending []*schemas.Slot
+	remote  int           // slots out on remote leases
+	changed chan struct{} // closed and replaced whenever pending or remote changes
+}
+
+func newSlotQueue(slots []schemas.Slot) *slotQueue {
+	sorted := append([]schemas.Slot(nil), slots...)
+	sort.SliceStable(sorted, func(i, j int) bool { return sorted[i].OrderIndex < sorted[j].OrderIndex })
+	q := &slotQueue{changed: make(chan struct{}), pending: make([]*schemas.Slot, 0, len(sorted))}
+	for i := range sorted {
+		q.pending = append(q.pending, &sorted[i])
+	}
+	return q
+}
+
+// next returns the next slot for a local worker. While remote workers hold
+// slots it waits for one to come back or finish, so Run never returns with
+// work out; it reports false when nothing is pending and nothing is out, or
+// when ctx ends while it waits.
+func (q *slotQueue) next(ctx context.Context) (*schemas.Slot, bool) {
+	for {
+		q.mu.Lock()
+		if len(q.pending) > 0 {
+			slot := q.pending[0]
+			q.pending = q.pending[1:]
+			q.mu.Unlock()
+			return slot, true
+		}
+		if q.remote == 0 {
+			q.mu.Unlock()
+			return nil, false
+		}
+		wait := q.changed
+		q.mu.Unlock()
+		select {
+		case <-ctx.Done():
+			return nil, false
+		case <-wait:
+		}
+	}
+}
+
+// take pops the next slot for a remote worker without waiting. The slot is
+// out until giveBack or finish.
+func (q *slotQueue) take() (*schemas.Slot, bool) {
+	q.mu.Lock()
+	defer q.mu.Unlock()
+	if len(q.pending) == 0 {
+		return nil, false
+	}
+	slot := q.pending[0]
+	q.pending = q.pending[1:]
+	q.remote++
+	return slot, true
+}
+
+// giveBack queues a slot that was out again, in OrderIndex order.
+func (q *slotQueue) giveBack(slot *schemas.Slot) {
+	q.mu.Lock()
+	defer q.mu.Unlock()
+	i := sort.Search(len(q.pending), func(i int) bool { return q.pending[i].OrderIndex > slot.OrderIndex })
+	q.pending = append(q.pending, nil)
+	copy(q.pending[i+1:], q.pending[i:])
+	q.pending[i] = slot
+	q.remote--
+	q.notifyLocked()
+}
+
+// finish ends a slot that was out and needs nothing more from this queue.
+func (q *slotQueue) finish() {
+	q.mu.Lock()
+	defer q.mu.Unlock()
+	q.remote--
+	q.notifyLocked()
+}
+
+func (q *slotQueue) notifyLocked() {
+	close(q.changed)
+	q.changed = make(chan struct{})
 }

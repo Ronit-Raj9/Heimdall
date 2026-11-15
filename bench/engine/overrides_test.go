@@ -5,6 +5,8 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"github.com/maximhq/bifrost/bench/schemas"
 )
 
 const baseAgent = `id: claude-code
@@ -146,5 +148,29 @@ func TestExperimentArmsResolve(t *testing.T) {
 				t.Fatalf("%s compatibility agent: %v", f, err)
 			}
 		}
+	}
+}
+
+func TestPlanSkillsArmSet(t *testing.T) {
+	b := newBench(t)
+	e := testExperiment()
+	e.Arms = map[string]schemas.ArmSpec{
+		"A": {Label: "without skills", Set: map[string]any{"skills.enabled": false, "mcp.format": "env", "memory.paths": []any{"/home/agent/.mem"}}},
+		"B": {Label: "default"},
+	}
+	m := b.plan(t, e)
+	a, bm := m.Arms["A"], m.Arms["B"]
+	if a.ConfigHash == bm.ConfigHash {
+		t.Fatal("arms with and without skills have the same config hash")
+	}
+	if a.Config.Skills == nil || a.Config.Skills.Enabled == nil || *a.Config.Skills.Enabled ||
+		a.Config.MCP == nil || a.Config.MCP.Format != "env" || a.Config.Memory == nil || len(a.Config.Memory.Paths) != 1 {
+		t.Fatalf("overrides not applied: %+v %+v %+v", a.Config.Skills, a.Config.MCP, a.Config.Memory)
+	}
+	if bm.Config.Skills != nil {
+		t.Errorf("arm B got skills %+v", bm.Config.Skills)
+	}
+	if _, err := ResolveAgentConfig([]byte("id: x\n"), map[string]any{"skills.enable": false}); err == nil {
+		t.Error("a misspelled skills key was accepted")
 	}
 }

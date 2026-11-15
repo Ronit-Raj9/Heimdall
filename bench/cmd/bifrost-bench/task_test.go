@@ -195,3 +195,49 @@ func TestRunTaskAdmitRefusesInvalidTask(t *testing.T) {
 	}
 	admit("symlink out of the task")
 }
+
+func TestRunScenarioTaskInit(t *testing.T) {
+	dir := t.TempDir()
+	if code := runInit([]string{dir}); code != exitOK {
+		t.Fatalf("init exit %d", code)
+	}
+	config := filepath.Join(dir, "deploy", "bench.yaml")
+	for _, args := range [][]string{
+		{"init", "desk", "-template", "mcp", "-config", config},
+		{"init", "py", "-template", "python-pytest", "-config", config},
+	} {
+		if code := runSuite(args); code != exitOK {
+			t.Fatalf("suite %v: exit %d", args, code)
+		}
+	}
+	if code := runTask([]string{"validate", "-config", config, "desk/restock"}); code != exitOK {
+		t.Fatalf("validate the sample: exit %d", code)
+	}
+	if code := runTask([]string{"init", "-config", config, "-suite", "desk", "-id", "t02"}); code != exitOK {
+		t.Fatalf("task init t02: exit %d", code)
+	}
+	if code := runTask([]string{"validate", "-config", config, "desk/t02"}); code != 1 {
+		t.Fatalf("validate a copied task with EDIT ME markers: exit %d, want 1", code)
+	}
+	if code := runTask([]string{"init", "-config", config, "-suite", "desk", "-id", "t03", "-kind", "mcp", "-from", "t02", "-license", "MIT"}); code != exitOK {
+		t.Fatalf("task init -kind mcp -from t02: exit %d", code)
+	}
+	meta, err := os.ReadFile(filepath.Join(dir, "benchmarks", "desk", "tasks", "t03", "task.yaml"))
+	if err != nil || !strings.Contains(string(meta), "license: MIT") || !strings.Contains(string(meta), "from task t02") {
+		t.Fatalf("t03 task.yaml: %v\n%s", err, meta)
+	}
+	suiteYAML, err := os.ReadFile(filepath.Join(dir, "benchmarks", "desk", "suite.yaml"))
+	if err != nil || !strings.Contains(string(suiteYAML), "tasks: [restock, t02, t03]") {
+		t.Fatalf("suite.yaml tasks: %v\n%s", err, suiteYAML)
+	}
+	for _, bad := range [][]string{
+		{"init", "-config", config, "-suite", "desk", "-id", "t04", "-kind", "qa"},
+		{"init", "-config", config, "-suite", "py", "-id", "t01"},
+		{"init", "-config", config, "-suite", "desk", "-id", "t05", "-kind", "mcp", "-repo", dir},
+		{"init", "-config", config, "-suite", "desk", "-id", "t02"},
+	} {
+		if code := runTask(bad); code == exitOK {
+			t.Errorf("task %v: exit 0", bad)
+		}
+	}
+}

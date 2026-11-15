@@ -64,6 +64,7 @@ func runServe(args []string) int {
 	if !*offline {
 		deps.Launcher = newLauncher(a, ix)
 	}
+	deps.Launcher, deps.Workers = withWorkers(a, deps.Launcher) // Remote area: worker mode when BENCH_WORKER_TOKEN is set (worker.go)
 	srv, err := server.New(a.cfg, deps)
 	if err != nil {
 		return fail("server: %v", err)

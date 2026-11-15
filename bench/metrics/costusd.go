@@ -78,6 +78,11 @@ func (m *costUSDMetric) Compute(_ context.Context, _ *schemas.RunContext, ev *sc
 // noCostReason explains a missing cost ledger. Zero rows never mean zero
 // spend: either nothing was recorded, or requests exist that were not priced.
 func noCostReason(log *schemas.RequestLog) string {
+	if log != nil && !log.Complete && log.Reason != "" && len(log.Requests) == 0 {
+		// The log itself says why it holds nothing, e.g. a remote agent whose
+		// model calls never pass this gateway.
+		return log.Reason
+	}
 	if log == nil || len(log.Requests) == 0 {
 		return "no cost evidence"
 	}

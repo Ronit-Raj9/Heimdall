@@ -13,6 +13,7 @@ import (
 	"strings"
 
 	"github.com/maximhq/bifrost/bench/schemas"
+	"github.com/maximhq/bifrost/bench/utils"
 )
 
 // Size limits of task validate: a file over largeFileBytes or a repo with
@@ -92,6 +93,8 @@ func ValidateTask(ctx context.Context, s *schemas.Suite, t *schemas.Task) []Prob
 	patches := append([]string{t.Controls.Reference}, t.Controls.Mutants...)
 	_, gitErr := exec.LookPath("git")
 	switch {
+	case utils.ControlKind(s, t) != utils.ControlPatch:
+		// Script and answer controls are not patches; admission runs them.
 	case Errors(sizes) > 0:
 		// Too large to copy for the apply check; the size error already refuses it.
 	case gitErr != nil:

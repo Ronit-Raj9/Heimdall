@@ -65,3 +65,16 @@ describe("TaskDetailBody", () => {
 		expect(html).toContain(`Showing the first ${d.files.length} of 900 files.`);
 	});
 });
+describe("TaskDetailBody scenario", () => {
+	it("shows the scenario block before the instruction for a scenario task", () => {
+		const d = detail("d01");
+		const html = renderToStaticMarkup(<TaskDetailBody detail={d} suiteVersion={d.suite_version} suiteOutput="state" />);
+		expect(html.indexOf('data-testid="suites-task-scenario"')).toBeGreaterThan(-1);
+		expect(html.indexOf('data-testid="suites-task-scenario"')).toBeLessThan(html.indexOf('data-testid="suites-task-instruction"'));
+		expect(html).toContain("bench/task-support-desk-d01:9f2c4a1b7e30");
+	});
+
+	it("leaves the block out for a plain repository task", () => {
+		expect(render("t01")).not.toContain("suites-task-scenario");
+	});
+});

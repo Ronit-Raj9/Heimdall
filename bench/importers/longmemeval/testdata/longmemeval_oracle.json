@@ -1,0 +1,79 @@
+[
+  {
+    "question_id": "fx_temporal_1",
+    "question_type": "temporal-reasoning",
+    "question": "Which did I buy first, the red kettle or the blue toaster?",
+    "answer": "The blue toaster",
+    "question_date": "2024/03/20 (Wed) 09:00",
+    "haystack_dates": ["2024/03/12 (Tue) 18:30", "2024/03/02 (Sat) 10:15", "2024/03/07 (Thu) 21:05"],
+    "haystack_session_ids": ["answer_fx1_2", "answer_fx1_1", "fx1_filler"],
+    "haystack_sessions": [
+      [
+        {"role": "user", "content": "I finally bought a red kettle today, it matches the kitchen.", "has_answer": true},
+        {"role": "assistant", "content": "A red kettle sounds lovely. Enjoy your tea!"}
+      ],
+      [
+        {"role": "user", "content": "Got a blue toaster this morning at the market.", "has_answer": true},
+        {"role": "assistant", "content": "Nice! Blue appliances are fun."}
+      ],
+      [
+        {"role": "user", "content": "Can you suggest a quick pasta recipe?"},
+        {"role": "assistant", "content": "Try garlic, olive oil and chili with spaghetti."}
+      ]
+    ],
+    "answer_session_ids": ["answer_fx1_1", "answer_fx1_2"]
+  },
+  {
+    "question_id": "fx_count_1",
+    "question_type": "multi-session",
+    "question": "How many concerts did I go to in May?",
+    "answer": 3,
+    "question_date": "2024/06/01 (Sat) 12:00",
+    "haystack_dates": ["2024/05/03 (Fri) 22:00", "2024/05/28 (Tue) 23:10"],
+    "haystack_session_ids": ["answer_fx2_1", "answer_fx2_2"],
+    "haystack_sessions": [
+      [{"role": "user", "content": "Back from a jazz concert, my second this month!", "has_answer": true}, {"role": "assistant", "content": "Two already, great."}],
+      [{"role": "user", "content": "One more concert tonight, an orchestra this time.", "has_answer": true}, {"role": "assistant", "content": "That makes it a busy May."}]
+    ],
+    "answer_session_ids": ["answer_fx2_1", "answer_fx2_2"]
+  },
+  {
+    "question_id": "fx_pref_1",
+    "question_type": "single-session-preference",
+    "question": "Can you suggest something to cook tonight?",
+    "answer": "The user would prefer vegetarian recipes, since they mentioned they stopped eating meat.",
+    "question_date": "2024/04/10 (Wed) 18:00",
+    "haystack_dates": ["2024/04/01 (Mon) 08:00"],
+    "haystack_session_ids": ["answer_fx3_1"],
+    "haystack_sessions": [
+      [{"role": "user", "content": "I stopped eating meat last week.", "has_answer": true}, {"role": "assistant", "content": "Noted, happy to help with vegetarian ideas."}]
+    ],
+    "answer_session_ids": ["answer_fx3_1"]
+  },
+  {
+    "question_id": "fx_update_1_abs",
+    "question_type": "knowledge-update",
+    "question": "What is the name of my hamster?",
+    "answer": "You never mentioned a hamster. You mentioned a cat named Pixel.",
+    "question_date": "2024/02/02 (Fri) 10:00",
+    "haystack_dates": ["2024/01/15 (Mon) 09:30"],
+    "haystack_session_ids": ["fx4_1"],
+    "haystack_sessions": [
+      [{"role": "user", "content": "My cat Pixel knocked over a plant again."}, {"role": "assistant", "content": "Cats love plants, unfortunately."}]
+    ],
+    "answer_session_ids": []
+  },
+  {
+    "question_id": "fx_user_1",
+    "question_type": "single-session-user",
+    "question": "Where did I say I wanted to travel this summer?",
+    "answer": "Lisbon",
+    "question_date": "2024/05/05 (Sun) 11:00",
+    "haystack_dates": ["2024/04/20 (Sat) 14:00"],
+    "haystack_session_ids": ["answer_fx5_1"],
+    "haystack_sessions": [
+      [{"role": "user", "content": "I really want to visit Lisbon this summer.", "has_answer": true}, {"role": "assistant", "content": "Lisbon is wonderful in summer."}]
+    ],
+    "answer_session_ids": ["answer_fx5_1"]
+  }
+]

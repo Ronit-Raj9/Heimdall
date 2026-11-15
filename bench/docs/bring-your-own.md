@@ -94,7 +94,10 @@ Each writes `benchmarks/<suite>/suite.yaml`, `base/Dockerfile` (the suite's
 toolchain image), a README and the `model-outage` probe. Templates:
 `python-pytest`, `node-test`, `go-test`, `generic-reward`; what each verifier
 runs is in [`tasks-from-your-repo.md`](tasks-from-your-repo.md) and
-[`verifiers.md`](verifiers.md). The walkthrough changed `base_image.tag` in
+[`verifiers.md`](verifiers.md). For an agent that does not edit a repository
+(one that calls tools or MCP servers, remembers across sessions or answers
+questions) the templates `tool-use`, `mcp`, `memory` and `qa` are described
+in [`scenarios.md`](scenarios.md). The walkthrough changed `base_image.tag` in
 both `suite.yaml` files to `heimdall-test/pyapp-base:1` and
 `heimdall-test/webapp-base:1`, so its images were easy to find and remove;
 use your own registry name.

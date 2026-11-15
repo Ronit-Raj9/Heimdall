@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"path"
 	"path/filepath"
 	"strings"
 	"time"
@@ -83,6 +84,18 @@ type AdmitDeps struct {
 // failed check in the record, not an error; Admit returns an error only when
 // it cannot run the checks at all.
 //
+// An impossible task with an honest solution (controls.honest) must also
+// show it is possible without its mutation: the honest solution passes the
+// original tests (verifier.original_tests) 3 times in a row and fails the
+// task's own tests. When the honest solution is the reference itself, the
+// reference is not required to pass the task's tests (and the stale-notes
+// check, which grades the reference, is skipped); a separate reference (a
+// gaming solution) keeps its checks.
+//
+// A task whose controls are scripts or answers (utils.ControlKind) runs its
+// controls through the real environment instead (admitScenario); a patch
+// task is admitted exactly as before.
+//
 // Before any control runs, Admit runs ValidateTask, the static validation of
 // `task validate`. A task with an error problem gets a record holding only a
 // failed static_validation check, and nothing is created in Docker; a clean
@@ -106,6 +119,10 @@ func Admit(ctx context.Context, deps AdmitDeps, s *schemas.Suite, t *schemas.Tas
 	}
 	defer os.RemoveAll(tmp)
 	a := &admitter{deps: deps, s: s, t: t, tmp: tmp, expID: utils.NewID("e", 10)}
+	if utils.ControlKind(s, t) != utils.ControlPatch {
+		rec := &schemas.AdmissionRecord{Admitted: true, At: time.Now().UTC(), Grader: deps.Grader.GetName(), ReferenceRepeats: referenceRuns}
+		return a.admitScenario(ctx, rec, []schemas.AdmissionCheck{static})
+	}
 
 	paths, err := a.controlPaths()
 	if err != nil {
@@ -113,17 +130,34 @@ func Admit(ctx context.Context, deps AdmitDeps, s *schemas.Suite, t *schemas.Tas
 	}
 	rec := &schemas.AdmissionRecord{Admitted: true, At: time.Now().UTC(), Grader: deps.Grader.GetName(), ReferenceRepeats: referenceRuns}
 	checks := []schemas.AdmissionCheck{static}
-	for i := 1; i <= referenceRuns; i++ {
-		c := a.gradePatch(ctx, fmt.Sprintf("reference_%d", i), paths.reference, GotPass)
-		rec.ReferenceResults = append(rec.ReferenceResults, c.Got)
-		checks = append(checks, c)
+	honest, honestIsRef, err := a.honestControl()
+	if err != nil {
+		return nil, err
+	}
+	if !honestIsRef {
+		for i := 1; i <= referenceRuns; i++ {
+			c := a.gradePatch(ctx, fmt.Sprintf("reference_%d", i), paths.reference, GotPass)
+			rec.ReferenceResults = append(rec.ReferenceResults, c.Got)
+			checks = append(checks, c)
+		}
+	}
+	if honest != "" {
+		orig := a.originalTask()
+		for i := 1; i <= referenceRuns; i++ {
+			c := a.gradePatchFor(ctx, fmt.Sprintf("honest_original_%d", i), honest, GotPass, orig)
+			if honestIsRef {
+				rec.ReferenceResults = append(rec.ReferenceResults, c.Got)
+			}
+			checks = append(checks, c)
+		}
+		checks = append(checks, a.gradePatchFor(ctx, "honest_mutated", honest, GotFail, a.t))
 	}
 	checks = append(checks, a.gradePatch(ctx, "empty_patch", paths.empty, GotFail))
 	for i, m := range paths.mutants {
 		checks = append(checks, a.gradePatch(ctx, fmt.Sprintf("mutant_%d", i+1), m, GotFail))
 	}
 	checks = append(checks, a.exploit(ctx, paths.exploit))
-	if t.Notes.Stale != "" {
+	if t.Notes.Stale != "" && !honestIsRef {
 		staleCheck, err := a.staleNotes(ctx, paths.reference)
 		if err != nil {
 			return nil, err
@@ -203,11 +237,18 @@ func (a *admitter) controlPaths() (controlPaths, error) {
 
 // gradePatch grades one control patch file and compares the result to want.
 func (a *admitter) gradePatch(ctx context.Context, name, patch, want string) schemas.AdmissionCheck {
+	return a.gradePatchFor(ctx, name, patch, want, a.t)
+}
+
+// gradePatchFor is gradePatch against the verifier of task, a copy of the
+// admitted task that may name other tests (originalTask).
+func (a *admitter) gradePatchFor(ctx context.Context, name, patch, want string, task *schemas.Task) schemas.AdmissionCheck {
 	check := schemas.AdmissionCheck{Name: name, Want: want}
 	rc, err := a.runContext(name)
 	if err != nil {
 		return failed(check, err)
 	}
+	rc.Task = task
 	diff, err := patchDiff(patch)
 	if err != nil {
 		return failed(check, err)
@@ -571,4 +612,27 @@ func joinDetail(a, b string) string {
 	default:
 		return a + "; " + b
 	}
+}
+
+// honestControl returns the absolute path of an impossible task's honest
+// solution and whether it is the reference itself; "" when the task is not
+// impossible or names none.
+func (a *admitter) honestControl() (string, bool, error) {
+	if !a.t.Impossible || a.t.Controls.Honest == "" {
+		return "", false, nil
+	}
+	abs, err := resolveIn(a.t.Dir, a.t.Controls.Honest)
+	if err != nil {
+		return "", false, fmt.Errorf("admit task %s: controls.honest: %w", a.t.ID, err)
+	}
+	same := path.Clean(filepath.ToSlash(a.t.Controls.Honest)) == path.Clean(filepath.ToSlash(a.t.Controls.Reference))
+	return abs, same, nil
+}
+
+// originalTask is a copy of the admitted task whose verifier runs the
+// original, unmutated tests.
+func (a *admitter) originalTask() *schemas.Task {
+	orig := *a.t
+	orig.Verifier.Tests = a.t.Verifier.OriginalTests
+	return &orig
 }

@@ -8,6 +8,7 @@ func Builtin(cfg CommandConfig) []schemas.AgentAdapter {
 	return []schemas.AgentAdapter{
 		newCommandAdapter(cfg),
 		newScriptedAdapter(cfg),
+		newRemoteHTTPAdapter(cfg), // Remote area: agents that are deployed services (remotehttp.go)
 	}
 }
 

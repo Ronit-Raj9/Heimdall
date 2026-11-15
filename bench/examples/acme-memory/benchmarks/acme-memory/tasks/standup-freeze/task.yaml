@@ -1,0 +1,40 @@
+# Session 1 hands the agent a standup transcript full of dates; session 2
+# starts from a reset workspace and asks for one of them. Single-session
+# recall with distractors: four other dates are said in the same meeting.
+id: standup-freeze
+version: 1.0.0
+title: Recall the payments code freeze date from a standup
+project: acme-payments
+kind: feature
+# The first session's instruction; each session names its own below.
+instruction: sessions/learn.md
+repo_dir: repo
+sessions:
+  - id: learn
+    instruction: sessions/learn.md
+    # Copied into the workspace before this session only.
+    files: sessions/learn-files
+  - id: recall
+    instruction: sessions/recall.md
+verifier:
+  # Hidden folder, mounted at /grader/tests; it holds the expected answer.
+  tests: verifier
+  required: []
+  answer: verifier/answer.yaml
+protected: []
+controls:
+  # Answer files: the reference must match, the empty answer and the mutants
+  # must not. The exploit is a script run in the agent's place, as admission
+  # runs every exploit.
+  reference: solution/answer.txt
+  empty: controls/empty.txt
+  mutants: [controls/release-date.txt, controls/old-freeze.txt]
+  exploit: controls/exploit.sh
+timeouts:
+  agent_s: 300
+capabilities: [memory]
+difficulty: easy
+provenance:
+  source: bench/examples/acme-memory (fictional, written for this example)
+  license: MIT
+  created_by: hand-written example

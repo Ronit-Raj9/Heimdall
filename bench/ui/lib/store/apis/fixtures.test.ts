@@ -56,6 +56,8 @@ describe("resolveFixture", () => {
 		{ method: "GET", url: "/suites/..%2F/tasks/t01", want: null },
 		{ method: "GET", url: "/suites/../tasks/t01", want: null },
 		{ method: "GET", url: "/agents", want: "agents.json" },
+		{ method: "GET", url: `${BENCH_API_BASE}/imports`, want: "imports.json" },
+		{ method: "GET", url: "/workers", want: "workers.json" },
 		{ method: "GET", url: "/experiments/plan/extra", want: null },
 		{ method: "DELETE", url: "/health", want: null },
 		{ method: "GET", url: "/runs/..%2F..%2Fsecret", want: null },
@@ -182,6 +184,8 @@ function contractFor(file: string): { type: string; nested: Record<string, strin
 		"releases.list.json": { type: "ReleaseList", nested: { "releases[]": "ReleaseRecord" } },
 		"experiments.triage.json": { type: "Triage", nested: { "groups[]": "TriageGroup" } },
 		"leaderboard.json": { type: "Leaderboard", nested: { "entries[]": "LeaderboardEntry", "excluded[]": "LeaderboardExclusion" } },
+		"imports.json": { type: "ImportList", nested: { "importers[]": "ImporterInfo" } },
+		"workers.json": { type: "WorkerList", nested: { "workers[]": "WorkerInfo" } },
 	};
 	if (byFile[file]) return byFile[file];
 	if (file === "suites.json") {
@@ -195,6 +199,7 @@ function contractFor(file: string): { type: string; nested: Record<string, strin
 				"suites[].tasks[]": "SuiteTask",
 				"suites[].tasks[].checks[]": "SuiteAdmissionCheck",
 				"suites[].tasks[].provenance": "TaskProvenance",
+				"suites[].imported": "ImportRecord",
 			},
 		};
 	}

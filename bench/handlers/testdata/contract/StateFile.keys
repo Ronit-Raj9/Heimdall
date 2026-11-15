@@ -1,0 +1,7 @@
+# Keys of bench.ts `StateFile` (schemas/scenario.go), in RunDetail.state.
+service
+id
+path
+sha256
+bytes
+error?

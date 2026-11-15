@@ -1,0 +1,24 @@
+id: recall
+version: 1.0.0
+title: Recall the number
+project: e2e
+kind: feature
+instruction: instruction.md
+repo_dir: repo
+verifier:
+  tests: verifier/tests
+  required: []
+controls:
+  reference: controls/answer.txt
+  empty: controls/empty.txt
+  mutants: []
+  exploit: controls/exploit.sh
+timeouts:
+  agent_s: 120
+sessions:
+  - id: tell
+    instruction: sessions/tell.md
+  - id: ask
+    instruction: sessions/ask.md
+output:
+  kind: answer

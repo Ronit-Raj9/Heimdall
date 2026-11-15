@@ -53,6 +53,9 @@ func Builtin(deps Deps) []schemas.ProbeLayer {
 		newFixtureLayer(deps),
 		newToolShimLayer(deps),
 		newGatewayLayer(deps.Fault, deps.Logger),
+		newToolFaultLayer(deps), // tool proxy faults (Tool proxy and MCP)
+		// condition data planted in services (Tool safety)
+		newServiceLayer(deps.Logger),
 	}
 }
 

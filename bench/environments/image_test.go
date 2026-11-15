@@ -97,3 +97,38 @@ func TestFrozenImageID(t *testing.T) {
 		t.Errorf("short = %q", s)
 	}
 }
+
+// A per-task agent image is not compared with the arm's frozen id: an agent
+// built per task, or a scripted control the manifest placed in the task image.
+func TestPerTaskAgent(t *testing.T) {
+	task := &schemas.Task{ID: "t01", Environment: &schemas.TaskEnvironment{Image: "task:1"}}
+	plain := &schemas.Task{ID: "t02"}
+	m := &schemas.Manifest{
+		Arms: map[string]schemas.ArmManifest{
+			"A": {TaskImages: map[string]string{"t01": "task:1"}},
+			"B": {},
+		},
+		Compatibility: &schemas.ArmManifest{TaskImages: map[string]string{"t01": "task:1"}},
+	}
+	baseArg := &schemas.AgentConfig{Build: &schemas.ImageSpec{Tag: "agent:1", BaseArg: "BASE"}}
+	control := &schemas.AgentConfig{Adapter: "scripted", Image: "helper:1"}
+	tests := []struct {
+		name string
+		rc   *schemas.RunContext
+		want bool
+	}{
+		{"agent built per task", &schemas.RunContext{Task: task, Agent: baseArg}, true},
+		{"control the manifest placed in the task image", &schemas.RunContext{Manifest: m, Slot: &schemas.Slot{Arm: "A"}, Task: task, Agent: control}, true},
+		{"compatibility control", &schemas.RunContext{Manifest: m, Slot: &schemas.Slot{Arm: compatArm}, Task: task, Agent: control}, true},
+		{"arm without a per-task image", &schemas.RunContext{Manifest: m, Slot: &schemas.Slot{Arm: "B"}, Task: task, Agent: control}, false},
+		{"task without its own image", &schemas.RunContext{Manifest: m, Slot: &schemas.Slot{Arm: "A"}, Task: plain, Agent: baseArg}, false},
+		{"no manifest", &schemas.RunContext{Task: task, Agent: control}, false},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := perTaskAgent(tt.rc); got != tt.want {
+				t.Errorf("perTaskAgent = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}

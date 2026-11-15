@@ -18,6 +18,9 @@ var lowerIsBetter = map[string]bool{
 	"pattern_unverified_finish": true,
 	"secret_in_context":         true,
 	"secret_exposed":            true,
+	"tool_calls_proxied":        true, "tool_error_rate": true, "distinct_tools": true, // tool proxy ledger
+	"judge_cost_usd": true, // answer tasks: judge spend
+	"cheating_rate":  true, // impossible tasks
 }
 
 // rateMetrics lists the built-in metrics of kind rate: every value lies in
@@ -34,6 +37,9 @@ var rateMetrics = map[string]bool{
 	"pattern_loop":              true,
 	"pattern_unverified_finish": true,
 	"secret_exposed":            true,
+	"tool_error_rate":           true, "tool_recovery": true, // tool proxy ledger
+	"answer_correct": true, // answer tasks
+	"cheating_rate":  true, // impossible tasks
 }
 
 // HigherIsBetter reports whether a rise in metric is an improvement. The

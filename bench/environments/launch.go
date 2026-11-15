@@ -37,6 +37,13 @@ type launch struct {
 	Env        []string // KEY=VALUE lines for --env-file
 }
 
+// link is a symlink the wrapper makes before the agent starts: dst, in a
+// folder the agent user owns, points at src, where a volume is mounted.
+type link struct {
+	dst string
+	src string
+}
+
 // wrapEnv is a variable the wrapper exports after decoding it, because its
 // value cannot travel in an env file line.
 type wrapEnv struct {
@@ -50,10 +57,17 @@ type wrapEnv struct {
 // them and then execs the argv. No plan content is ever spliced into the
 // script: the script names only the generated variables, and the argv is
 // passed as positional parameters. pathValue replaces PATH; home is the
-// default HOME. It is pure.
-func buildLaunch(plan *schemas.RunPlan, pathValue, home string) (*launch, error) {
+// default HOME. links are made first, as the agent user, so a plan file
+// under a link's parent lands in a folder the agent owns. It is pure.
+func buildLaunch(plan *schemas.RunPlan, pathValue, home string, links []link) (*launch, error) {
 	l := &launch{}
 	var budget int
+	for i, k := range links {
+		if !path.IsAbs(k.dst) || path.Clean(k.dst) != k.dst || !path.IsAbs(k.src) || strings.ContainsAny(k.dst+k.src, "\x00\n") {
+			return nil, fmt.Errorf("link %q -> %q must join absolute clean paths", k.dst, k.src)
+		}
+		l.Env = append(l.Env, fmt.Sprintf("%sL%d_DST=%s", wrapPrefix, i, k.dst), fmt.Sprintf("%sL%d_SRC=%s", wrapPrefix, i, k.src))
+	}
 	fileChunks, err := encodeFiles(plan.Files, &l.Env, &budget)
 	if err != nil {
 		return nil, err
@@ -91,17 +105,17 @@ func buildLaunch(plan *schemas.RunPlan, pathValue, home string) (*launch, error)
 	if budget > maxWrapBytes {
 		return nil, fmt.Errorf("plan files and long env values total %d bytes, over the %d byte limit", budget, maxWrapBytes)
 	}
-	if len(fileChunks) == 0 && len(wrapped) == 0 {
+	if len(fileChunks) == 0 && len(wrapped) == 0 && len(links) == 0 {
 		if len(plan.Argv) > 0 {
 			l.Entrypoint, l.Args = plan.Argv[0], append([]string(nil), plan.Argv[1:]...)
 		}
 		return l, nil
 	}
 	if len(plan.Argv) == 0 {
-		return nil, fmt.Errorf("plan has files or multi-line env but no argv to exec")
+		return nil, fmt.Errorf("plan has files, folders, memory paths or multi-line env but no argv to exec")
 	}
 	l.Entrypoint = wrapShell
-	l.Args = append([]string{"-c", wrapScript(fileChunks, wrapped), wrapName}, plan.Argv...)
+	l.Args = append([]string{"-c", wrapScript(len(links), fileChunks, wrapped), wrapName}, plan.Argv...)
 	return l, nil
 }
 
@@ -142,12 +156,19 @@ func appendChunks(env *[]string, prefix string, data []byte) int {
 	}
 }
 
-// wrapScript is the `sh -c` program that writes the plan files, exports the
-// wrapped variables, removes every BENCH_WRAP_* variable and execs "$@".
-func wrapScript(fileChunks []int, envs []wrapEnv) string {
+// wrapScript is the `sh -c` program that makes the links, writes the plan
+// files, exports the wrapped variables, removes every BENCH_WRAP_* variable
+// and execs "$@".
+func wrapScript(links int, fileChunks []int, envs []wrapEnv) string {
 	var b strings.Builder
 	var unset []string
 	b.WriteString("set -e\n")
+	for i := 0; i < links; i++ {
+		prefix := fmt.Sprintf("%sL%d_", wrapPrefix, i)
+		fmt.Fprintf(&b, "mkdir -p \"$(dirname \"$%sDST\")\"\n", prefix)
+		fmt.Fprintf(&b, "ln -sfn \"$%sSRC\" \"$%sDST\"\n", prefix, prefix)
+		unset = append(unset, prefix+"DST", prefix+"SRC")
+	}
 	for i, n := range fileChunks {
 		prefix := fmt.Sprintf("%sF%d_", wrapPrefix, i)
 		fmt.Fprintf(&b, "%sP=\"$%sPATH\"\n", wrapPrefix, prefix)

@@ -125,6 +125,15 @@ type SuiteTask struct {
 	ProtectedGlobs  int                   `json:"protected_globs"`   // globs of visible files that must not change
 	Mutants         int                   `json:"mutants"`           // mutant controls declared
 	AgentTimeoutS   int                   `json:"agent_timeout_s"`
+
+	// Scenario fields (scenario.go); each is empty for a repository task.
+	// Services carry no environment, seed files or commands.
+	Environment *TaskEnvironment `json:"environment,omitempty"` // the task's own image
+	Services    []ServiceSpec    `json:"services,omitempty"`    // started beside the agent, after the suite's
+	Sessions    []SessionSpec    `json:"sessions,omitempty"`    // in run order; empty means one session
+	Output      *OutputSpec      `json:"output,omitempty"`      // the task's own output; empty uses the suite's
+	Skills      []string         `json:"skills,omitempty"`      // skill folder names, each holding a SKILL.md
+	Impossible  bool             `json:"impossible,omitempty"`  // no honest solution exists: a pass is an integrity violation
 }
 
 // SuiteAdmissionCheck is one recorded admission check. Summary keeps only the

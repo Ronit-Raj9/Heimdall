@@ -77,7 +77,8 @@ func Regate(ctx context.Context, reg *schemas.Registry, m *schemas.Manifest, sui
 	}
 	out := &Regated{}
 	out.Gates, out.Recomputed, out.Notes = regateGates(ctx, reg, rc, ev, sr.Gates)
-	out.Outcome = regateOutcome(&sr.Run, out.Gates, ev.Grade, ev.Exec, utils.TallyUpstream(ev.Ledger, ev.Requests))
+	ended := sessionsEnded(ev.Sessions, len(rc.Task.Sessions))
+	out.Outcome = regateOutcome(&sr.Run, ended, out.Gates, ev.Grade, ev.Exec, utils.TallyUpstream(ev.Ledger, ev.Requests))
 	out.Y = scoreOf(out.Outcome)
 	if out.Metrics, err = regateMetrics(ctx, reg, rc, ev, sr, out.Gates); err != nil {
 		return nil, fmt.Errorf("regate run %s: %w", sr.Run.RunID, err)
@@ -87,7 +88,8 @@ func Regate(ctx context.Context, reg *schemas.Registry, m *schemas.Manifest, sui
 
 // sealedEvidence reads evidence.json from the run folder and points the diff
 // at the folder's workspace.diff, whose sha256 must match the one recorded.
-// The recorded path is ignored: the run folder may have moved since.
+// The recorded path is ignored: the run folder may have moved since. The
+// scenario evidence is read from the folder too (sealedScenario).
 func sealedEvidence(sr *schemas.SealedRun) (*schemas.Evidence, error) {
 	b, err := os.ReadFile(filepath.Join(sr.Dir, "evidence.json"))
 	if err != nil {
@@ -108,6 +110,9 @@ func sealedEvidence(sr *schemas.SealedRun) (*schemas.Evidence, error) {
 				return nil, fmt.Errorf("workspace.diff sha256 %s, evidence records %s: %w", sum, ev.Diff.SHA256, schemas.ErrSealMismatch)
 			}
 		}
+	}
+	if err := sealedScenario(sr.Dir, &ev); err != nil {
+		return nil, err
 	}
 	ev.Grade, ev.Gates = sr.Grade, nil
 	return &ev, nil
@@ -201,14 +206,14 @@ func regateGates(ctx context.Context, reg *schemas.Registry, rc *schemas.RunCont
 
 // regateOutcome is the run's outcome under the new gates and the upstream
 // rule (see Regate).
-func regateOutcome(run *schemas.Run, gates []schemas.GateResult, grade *schemas.Grade, exec *schemas.ExecResult, up utils.UpstreamTally) schemas.Outcome {
+func regateOutcome(run *schemas.Run, ended schemas.Outcome, gates []schemas.GateResult, grade *schemas.Grade, exec *schemas.ExecResult, up utils.UpstreamTally) schemas.Outcome {
 	switch {
 	case run.Outcome == schemas.OutcomeAbortedInfra:
 		return run.Outcome
 	case vetoFired(gates):
 		return schemas.OutcomeIntegrityViolation
 	case run.Outcome == schemas.OutcomeIntegrityViolation:
-		o := outcomeFrom(false, len(run.Failures) > 0, gates, grade, exec, up)
+		o := outcomeFrom(false, len(run.Failures) > 0, ended, gates, grade, exec, up)
 		if o == schemas.OutcomeAbortedInfra {
 			return schemas.OutcomeInfraError
 		}
@@ -257,4 +262,102 @@ func sameValue(a, b schemas.Value) bool {
 	x, errX := json.Marshal(a)
 	y, errY := json.Marshal(b)
 	return errX == nil && errY == nil && bytes.Equal(x, y)
+}
+
+// sealedScenario completes a scenario run's evidence from its sealed run
+// folder, so gates see what the run saw: answer.txt (its sha256 must match
+// the one recorded) and each exported state file (likewise), and the tool
+// ledger (tools.jsonl), sessions.json and services.json when evidence.json
+// holds none. A sealed tools.jsonl without calls gives an empty, non-nil
+// call list, so a metric reads zero calls, not unknown. A run without
+// scenario files is left as it is.
+func sealedScenario(dir string, ev *schemas.Evidence) error {
+	if a := ev.Answer; a != nil {
+		b, err := os.ReadFile(filepath.Join(dir, FileAnswer))
+		if err != nil {
+			return fmt.Errorf("read answer: %w", err)
+		}
+		if a.SHA256 != "" && utils.SHA256Bytes(b) != a.SHA256 {
+			return fmt.Errorf("%s sha256 differs from the one evidence records: %w", FileAnswer, schemas.ErrSealMismatch)
+		}
+		a.Text = string(b)
+	}
+	for _, f := range ev.State {
+		if f.Error != "" || f.Path == "" || f.SHA256 == "" {
+			continue
+		}
+		p, err := utils.ResolveInside(dir, f.Path)
+		if err != nil {
+			return fmt.Errorf("state %s/%s: %w", f.Service, f.ID, err)
+		}
+		sum, err := utils.SHA256File(p)
+		if err != nil {
+			return fmt.Errorf("state %s/%s: %w", f.Service, f.ID, err)
+		}
+		if sum != f.SHA256 {
+			return fmt.Errorf("state %s sha256 differs from the one evidence records: %w", f.Path, schemas.ErrSealMismatch)
+		}
+	}
+	if len(ev.ToolCalls) == 0 {
+		calls, err := readToolLedger(filepath.Join(dir, fileToolLedger))
+		if err != nil {
+			return err
+		}
+		ev.ToolCalls = calls
+	}
+	if len(ev.Sessions) == 0 {
+		if err := readOptional(filepath.Join(dir, FileSessions), &ev.Sessions); err != nil {
+			return err
+		}
+	}
+	if len(ev.Services) == 0 {
+		if err := readOptional(filepath.Join(dir, FileServices), &ev.Services); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// fileToolLedger is the tool proxy's ledger in the run folder.
+const fileToolLedger = "tools.jsonl"
+
+// readToolLedger reads one schemas.ToolCall per line. A missing file is nil
+// (the calls are unknown); a present file without calls is an empty, non-nil
+// list (no call was made), which evidence.json cannot tell apart because the
+// field is omitted when empty.
+func readToolLedger(path string) ([]schemas.ToolCall, error) {
+	b, err := os.ReadFile(path)
+	if errors.Is(err, os.ErrNotExist) {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, fmt.Errorf("read tool ledger: %w", err)
+	}
+	out := []schemas.ToolCall{}
+	for i, line := range bytes.Split(b, []byte("\n")) {
+		if len(bytes.TrimSpace(line)) == 0 {
+			continue
+		}
+		var c schemas.ToolCall
+		if err := json.Unmarshal(line, &c); err != nil {
+			return nil, fmt.Errorf("tool ledger line %d: %w", i+1, err)
+		}
+		out = append(out, c)
+	}
+	return out, nil
+}
+
+// readOptional decodes a JSON file into v; a missing file leaves v as is.
+func readOptional(path string, v any) error {
+	b, err := os.ReadFile(path)
+	if errors.Is(err, os.ErrNotExist) {
+		return nil
+	}
+	if err != nil {
+		return fmt.Errorf("read %s: %w", filepath.Base(path), err)
+	}
+	if err := json.Unmarshal(b, v); err != nil {
+		return fmt.Errorf("decode %s: %w", filepath.Base(path), err)
+	}
+	return nil
 }

@@ -81,6 +81,11 @@ type RunPlan struct {
 	// read-only for the agent, before it starts. It carries what is too large
 	// for Files, such as agent skills.
 	Dirs map[string]string `json:"dirs,omitempty"`
+	// Egress lists host:port destinations outside the evaluation network the
+	// container may reach, each through a per-run forwarder that connects
+	// only there (utils/remoteegress.go). Only the remote_http adapter sets
+	// it; the run records it and the egress gate reports it.
+	Egress []string `json:"egress,omitempty"`
 }
 
 // Parser converts an agent's raw output into normalized events and its final

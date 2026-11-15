@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/maximhq/bifrost/bench/schemas"
+	"github.com/maximhq/bifrost/bench/utils"
 )
 
 // GatewaySource is the name of the gateway request log source.
@@ -60,6 +61,7 @@ func (s *gatewaySource) Collect(ctx context.Context, rc *schemas.RunContext, ev 
 		return fmt.Errorf("fetch gateway requests for run %s: %w", id, errNoLog)
 	}
 	ev.Requests = log
+	utils.MarkExternalTraffic(rc, log) // Remote area: a remote_http agent's external model calls leave tokens, cost and steps unknown
 	if err := writeJSONL(rc.Dir, requestsFile, log.Requests); err != nil {
 		return fmt.Errorf("write gateway requests for run %s: %w", id, err)
 	}

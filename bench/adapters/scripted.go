@@ -6,6 +6,7 @@ import (
 	"fmt"
 
 	"github.com/maximhq/bifrost/bench/schemas"
+	"github.com/maximhq/bifrost/bench/utils"
 )
 
 // AdapterScripted is the name of the scripted adapter.
@@ -13,7 +14,7 @@ const AdapterScripted = "scripted"
 
 // Scripted control agent kinds (agents/<kind>.yaml, `scripted.kind`).
 const (
-	ScriptedOracle  = "oracle"  // applies the task's reference patch
+	ScriptedOracle  = "oracle"  // applies the task's reference patch, runs its reference script or writes its reference answer
 	ScriptedNoop    = "noop"    // changes nothing, exits 0
 	ScriptedRefuse  = "refuse"  // declines in words, exits 0
 	ScriptedExploit = "exploit" // runs the task's exploit control
@@ -26,10 +27,16 @@ const RefusalText = "I can't complete this task."
 const (
 	scriptedVersion = "1.0.0"
 
-	referencePatchFile = "/tmp/bench/reference.diff"
-	exploitFile        = "/tmp/bench/exploit.sh"
-	toyAgentFile       = "/tmp/bench/toyagent.py"
+	referencePatchFile  = "/tmp/bench/reference.diff"
+	referenceScriptFile = "/tmp/bench/reference.sh"
+	referenceAnswerFile = "/tmp/bench/reference.answer"
+	exploitFile         = "/tmp/bench/exploit.sh"
+	toyAgentFile        = "/tmp/bench/toyagent.py"
 )
+
+// writeAnswer copies the reference answer ($2) to the answer path ($1),
+// creating its folder. The paths are arguments, never part of the script.
+const writeAnswer = `mkdir -p "$(dirname "$1")" && cp "$2" "$1"`
 
 // gitApply works whether or not /workspace is a git repository and whoever
 // owns it; safe.directory is honoured from the command line. No shell, so the
@@ -59,7 +66,14 @@ func (a *scriptedAdapter) GetVersion() string { return scriptedVersion }
 //
 // Every control except toy runs with no network at all: it needs none, and a
 // control that could reach the gateway would blur what admission measured.
-// Task files (patch, exploit) are delivered through Files, never mounted.
+// Task files (patch, script, answer, exploit) are delivered through Files,
+// never mounted. A task with services still reaches them: the environment
+// puts a "none" container on the run's service network only.
+//
+// The oracle follows the task's control kind (utils.ControlKind): it applies
+// a reference patch, runs a reference script (.sh) in the agent's place with
+// the services up and the run's environment variables set, or writes the
+// reference answer of an answer task to the answer path.
 func (a *scriptedAdapter) Plan(ctx context.Context, rc *schemas.RunContext) (*schemas.RunPlan, error) {
 	if err := checkRunContext(rc); err != nil {
 		return nil, err
@@ -79,12 +93,21 @@ func (a *scriptedAdapter) Plan(ctx context.Context, rc *schemas.RunContext) (*sc
 	case ScriptedRefuse:
 		argv = []string{"echo", RefusalText}
 	case ScriptedOracle:
-		patch, err := readTaskFile(rc.Task, rc.Task.Controls.Reference)
+		ref, err := readTaskFile(rc.Task, rc.Task.Controls.Reference)
 		if err != nil {
 			return nil, fmt.Errorf("plan run %s: oracle: %w", rc.Run.RunID, err)
 		}
-		files[referencePatchFile] = patch
-		argv = append([]string(nil), gitApply...)
+		switch utils.ControlKind(rc.Suite, rc.Task) {
+		case utils.ControlScript:
+			files[referenceScriptFile] = ref
+			argv = []string{"sh", referenceScriptFile}
+		case utils.ControlAnswer:
+			files[referenceAnswerFile] = ref
+			argv = []string{"sh", "-c", writeAnswer, "write-answer", utils.AnswerContainerPath(rc.Suite, rc.Task), referenceAnswerFile}
+		default:
+			files[referencePatchFile] = ref
+			argv = append([]string(nil), gitApply...)
+		}
 	case ScriptedExploit:
 		script, err := readTaskFile(rc.Task, rc.Task.Controls.Exploit)
 		if err != nil {

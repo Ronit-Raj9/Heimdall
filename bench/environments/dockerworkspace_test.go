@@ -15,7 +15,7 @@ func TestAgentCreateArgs(t *testing.T) {
 	plan := &schemas.RunPlan{Image: "img:1", MemGB: 4, CPUs: 1.5, Pids: 0, User: ""}
 	h := &schemas.EnvironmentHandle{Volume: "bench-ws-r_1", AuxVolume: "bench-aux-r_1"}
 	l := &launch{Entrypoint: "claude", Args: []string{"-p", "x"}}
-	args := agentCreateArgs("bench-r_1", utils.LabelArgs("e_1", "r_1"), plan, h, "evalnet", "/tmp/envf", l)
+	args := agentCreateArgs("bench-r_1", utils.LabelArgs("e_1", "r_1"), plan, h, "evalnet", "/tmp/envf", l, nil, false)
 	joined := strings.Join(args, " ")
 	for _, want := range []string{
 		"create --name bench-r_1",
@@ -59,6 +59,20 @@ func TestAgentCreateArgs(t *testing.T) {
 	}
 }
 
+func TestAgentCreateArgsScenario(t *testing.T) {
+	plan := &schemas.RunPlan{Image: "img:1"}
+	h := &schemas.EnvironmentHandle{Volume: "bench-ws-r_1", AuxVolume: "bench-aux-r_1"}
+	mounts := []string{"-v", "bench-mem-r_1:/memory", "-v", "bench-dir-r_1-0:/opt/skills:ro"}
+	args := agentCreateArgs("bench-r_1-s1", nil, plan, h, "evalnet", "/tmp/envf", &launch{}, mounts, true)
+	joined := strings.Join(args, " ")
+	if !strings.Contains(joined, "-v bench-aux-r_1:/opt/bench -v bench-mem-r_1:/memory -v bench-dir-r_1-0:/opt/skills:ro --log-driver none") {
+		t.Fatalf("mounts not after the aux volume: %s", joined)
+	}
+	if strings.Contains(joined, "--read-only") || strings.Contains(joined, "--tmpfs /tmp") || !strings.Contains(joined, "--tmpfs /home/agent:") {
+		t.Fatalf("writable root: %s", joined)
+	}
+}
+
 func TestCheckPlan(t *testing.T) {
 	e := newDockerWorkspace(DockerWorkspaceConfig{EvalNetwork: "evalnet"})
 	tests := []struct {
@@ -79,7 +93,7 @@ func TestCheckPlan(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			err := e.checkPlan(&tt.plan)
+			err := e.checkPlan(&tt.plan, false)
 			if tt.wantErr == "" {
 				if err != nil {
 					t.Fatalf("unexpected error %v", err)
@@ -90,6 +104,44 @@ func TestCheckPlan(t *testing.T) {
 				t.Fatalf("err = %v, want %q", err, tt.wantErr)
 			}
 		})
+	}
+}
+
+func TestRootTask(t *testing.T) {
+	e := newDockerWorkspace(DockerWorkspaceConfig{})
+	if err := e.checkPlan(&schemas.RunPlan{Image: "i", User: rootUser}, true); err != nil {
+		t.Fatalf("root task refused: %v", err)
+	}
+	plan := &schemas.RunPlan{Image: "img:1", User: rootUser}
+	h := &schemas.EnvironmentHandle{Volume: "v", AuxVolume: "a"}
+	joined := strings.Join(agentCreateArgs("bench-r_1", nil, plan, h, "evalnet", "/tmp/envf", &launch{}, nil, true), " ")
+	for _, want := range []string{"--user 0:0 --cap-drop ALL --cap-add AUDIT_WRITE --cap-add CHOWN", "--cap-add SETUID --cap-add SYS_CHROOT --security-opt no-new-privileges", "--tmpfs /home/agent:exec,size=512m,mode=0700,uid=0,gid=0"} {
+		if !strings.Contains(joined, want) {
+			t.Errorf("args missing %q:\n%s", want, joined)
+		}
+	}
+	for _, bad := range []string{"--privileged", "SYS_ADMIN", "NET_RAW", "docker.sock", "--read-only"} {
+		if strings.Contains(joined, bad) {
+			t.Errorf("args contain %q:\n%s", bad, joined)
+		}
+	}
+	plain := strings.Join(agentCreateArgs("bench-r_1", nil, &schemas.RunPlan{Image: "img:1"}, h, "evalnet", "/tmp/envf", &launch{}, nil, false), " ")
+	if strings.Contains(plain, "--cap-add") || !strings.Contains(plain, "--user 1000") {
+		t.Fatalf("default task args: %s", plain)
+	}
+	img := &schemas.TaskEnvironment{Image: "tb/x:1", User: "root"}
+	for _, tt := range []struct {
+		task *schemas.Task
+		want bool
+	}{
+		{&schemas.Task{Environment: img}, true},
+		{&schemas.Task{Environment: &schemas.TaskEnvironment{WorkspacePath: "/app", User: "root"}}, false},
+		{&schemas.Task{Environment: &schemas.TaskEnvironment{Image: "tb/x:1"}}, false},
+		{&schemas.Task{}, false},
+	} {
+		if got := utils.TaskRunsAsRoot(tt.task); got != tt.want {
+			t.Errorf("TaskRunsAsRoot(%+v) = %v", tt.task.Environment, got)
+		}
 	}
 }
 

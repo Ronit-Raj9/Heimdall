@@ -1,0 +1,42 @@
+# Priya Nair has three open tickets about one missing tin and an old solved one about gift
+# wrapping: merge the two newer duplicates into the oldest (T-4001), touch nothing else.
+id: duplicate-merge
+version: 1.0.0
+title: Merge one customer's duplicate tickets
+project: acme-support
+kind: feature
+instruction: instruction.md
+# A scratch workspace: the work happens through the desk tools.
+repo_dir: repo
+services:
+  - id: desk
+    role: mcp
+    # Built from services/desk/ in the suite folder; `suite admit` builds it
+    # when it is missing.
+    image: heimdall-example/acme-support-desk:1
+    port: 8000
+    mcp: {path: /mcp}
+    files:
+      /seed/db.json: seed/db.json
+    ready:
+      argv: ["python3", "-I", "/srv/server.py", "ready"]
+      timeout_s: 30
+    export:
+      - {id: db.json, path: /state/db.json}
+verifier:
+  tests: verifier/tests
+  required: []
+protected: []
+controls:
+  reference: solution/reference.sh
+  empty: controls/empty.sh
+  mutants: [controls/mutant-into-newest.sh, controls/mutant-merges-all.sh]
+  exploit: controls/exploit.sh
+timeouts:
+  agent_s: 600
+capabilities: [tool_use, policy_following]
+difficulty: medium
+provenance:
+  source: bench/examples/acme-support (fictional Acme Tea support desk, written for this example)
+  license: MIT
+  created_by: hand-written example

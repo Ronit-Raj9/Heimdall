@@ -1,0 +1,8 @@
+# Keys of bench.ts `SessionResult` (schemas/scenario.go), in RunDetail.sessions.
+id
+index
+exit_code
+timed_out
+started
+ended
+stdout_path

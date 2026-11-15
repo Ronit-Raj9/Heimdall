@@ -187,12 +187,20 @@ func TestSuite(t *testing.T) {
 			if DetectTemplate(byPath["suite.yaml"]) != tmpl {
 				t.Errorf("suite.yaml does not name template %s", tmpl)
 			}
-			validSuite(t, byPath["suite.yaml"], "bench/demo-base:1", true)
+			probes := []string{"model-outage"}
+			if stateTemplate(tmpl) {
+				probes = append(probes, "tool-error")
+			}
+			validSuite(t, byPath["suite.yaml"], "bench/demo-base:1", true, probes...)
 			if !bytes.Contains(byPath["base/Dockerfile"], []byte("-u 1000")) && !bytes.Contains(byPath["base/Dockerfile"], []byte("usermod -l agent")) {
 				t.Error("base/Dockerfile does not set up the uid 1000 user")
 			}
 			if !bytes.Equal(byPath["probes/model-outage.yaml"], readRepo(t, "benchmarks/coding-core/probes/model-outage.yaml")) {
 				t.Error("model-outage probe differs from coding-core's")
+			}
+			if IsScenarioTemplate(tmpl) {
+				goldenManifest(t, "suite-"+tmpl, files)
+				return
 			}
 			golden(t, "suite-"+tmpl, files)
 		})
@@ -298,8 +306,9 @@ func TestRenderFile(t *testing.T) {
 }
 
 // validSuite checks a generated suite.yaml against the suite schema once a
-// task is listed (the schema wants at least one).
-func validSuite(t *testing.T, raw []byte, image string, dockerfile bool) {
+// task is listed (the schema wants at least one). probes defaults to
+// model-outage alone.
+func validSuite(t *testing.T, raw []byte, image string, dockerfile bool, probes ...string) {
 	t.Helper()
 	listed, _, err := AddTaskID(raw, "t01")
 	if err != nil {
@@ -312,8 +321,11 @@ func validSuite(t *testing.T, raw []byte, image string, dockerfile bool) {
 	if s.ID != "demo" || s.BaseImage.Tag != image || (s.BaseImage.Dockerfile != "") != dockerfile || s.Workdir != "/workspace" {
 		t.Errorf("suite = %+v", s)
 	}
-	if len(s.ProbeIDs) != 1 || s.ProbeIDs[0] != "model-outage" {
-		t.Errorf("probes = %v", s.ProbeIDs)
+	if len(probes) == 0 {
+		probes = []string{"model-outage"}
+	}
+	if !reflect.DeepEqual(s.ProbeIDs, probes) {
+		t.Errorf("probes = %v, want %v", s.ProbeIDs, probes)
 	}
 }
 
@@ -350,12 +362,18 @@ func TestProjectGolden(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	goldenManifest(t, "project", files)
+}
+
+// goldenManifest pins files by a manifest of path, mode and sha256.
+func goldenManifest(t *testing.T, name string, files []File) {
+	t.Helper()
 	var b strings.Builder
 	for _, f := range files {
 		sum := sha256.Sum256(f.Data)
 		fmt.Fprintf(&b, "%s %o %s\n", f.Path, f.Mode, hex.EncodeToString(sum[:]))
 	}
-	golden(t, "project", []File{{Path: "manifest.txt", Data: []byte(b.String()), Mode: 0o644}})
+	golden(t, name, []File{{Path: "manifest.txt", Data: []byte(b.String()), Mode: 0o644}})
 }
 
 func readRepo(t *testing.T, rel string) []byte {

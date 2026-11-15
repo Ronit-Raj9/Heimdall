@@ -164,7 +164,13 @@ function SuiteDetail({ suite }: { suite: SuiteSummary }) {
 				</Section>
 				{openTask && (
 					<div className="min-w-0 2xl:sticky 2xl:top-4 2xl:self-start">
-						<TaskDetailPanel suiteId={suite.id} suiteVersion={suite.version} taskId={openTask} onClose={() => void setQ({ task: null })} />
+						<TaskDetailPanel
+							suiteId={suite.id}
+							suiteVersion={suite.version}
+							taskId={openTask}
+							suiteOutput={suite.output}
+							onClose={() => void setQ({ task: null })}
+						/>
 					</div>
 				)}
 			</div>

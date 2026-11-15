@@ -8,6 +8,7 @@ func TestBuiltin(t *testing.T) {
 	}{
 		{HiddenTestsType, hiddenTestsVersion},
 		{VerifierCommandType, verifierCommandVersion},
+		{AnswerMatchType, answerMatchVersion}, {JudgeType, judgeVersion}, // answer tasks
 	}
 	gs := Builtin(HiddenTestsConfig{})
 	if len(gs) != len(tests) {

@@ -97,15 +97,17 @@ var templateCommentRE = regexp.MustCompile(`(?m)^#\s*template:\s*([a-z0-9-]+)\s*
 
 // DetectTemplate names the suite template a suite.yaml was written from: the
 // "# template: <name>" comment `suite init` writes, otherwise a guess from
-// the grader and the verifier command. It returns "" when it cannot tell.
+// the track (scenario suites), the grader and the verifier command. It
+// returns "" when it cannot tell.
 func DetectTemplate(suiteYAML []byte) string {
 	if m := templateCommentRE.FindSubmatch(suiteYAML); m != nil {
-		if _, ok := defaultTestGlobs[string(m[1])]; ok {
+		if _, ok := defaultTestGlobs[string(m[1])]; ok || IsScenarioTemplate(string(m[1])) {
 			return string(m[1])
 		}
 	}
 	var s struct {
 		Grader   string `yaml:"grader"`
+		Track    string `yaml:"track"`
 		Verifier struct {
 			Command []string `yaml:"command"`
 			Result  string   `yaml:"result"`
@@ -115,6 +117,16 @@ func DetectTemplate(suiteYAML []byte) string {
 		return ""
 	}
 	cmd := strings.Join(s.Verifier.Command, " ")
+	switch s.Track {
+	case "mcp":
+		return TemplateMCP
+	case "tool_use":
+		return TemplateToolUse
+	case "memory":
+		return TemplateMemory
+	case "qa":
+		return TemplateQA
+	}
 	switch {
 	case s.Grader == graderHiddenTests || strings.Contains(cmd, "pytest"):
 		return TemplatePythonPytest

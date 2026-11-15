@@ -1,0 +1,37 @@
+# template: mcp
+# acme-support: Acme Tea's support desk agent, tested through an MCP server
+# over its ticket and orders database. Acme Tea, its customers, orders and
+# tickets are fictional.
+#
+# Each task starts its own desk server (services: in task.yaml) from the
+# image built from services/desk/, seeded with the task's seed/db.json (one
+# shared fictional world: five customers, six orders, eight tickets). The
+# agent is told about the server in its own MCP config format and reaches it
+# through the per-run tool proxy, which records every call in tools.jsonl and
+# arms the tool probes. After the agent exits the desk's database is exported
+# and the task's hidden verifier (verifier/tests/verify.py with checks.py)
+# reads it at /grader/state/desk/db.json and writes a reward.
+#
+# The base image is the bench's helper image (python3 and git, uid 1000),
+# which `bifrost-bench init` builds from deploy/helper/Dockerfile: the
+# verifier needs nothing else, so this suite builds no toolchain image.
+id: acme-support
+version: 1.0.0
+description: Acme Tea support desk (fictional) over MCP; graded on the desk database after the run.
+track: mcp
+environment: docker_workspace
+grader: verifier_command
+base_image:
+  tag: bench/coding-core-base:1
+workdir: /workspace
+output:
+  kind: state
+verifier:
+  command: ["python3", "/grader/tests/verify.py"]
+  result: reward
+  result_path: /grader/out/reward.json
+  pass_threshold: 1
+  restore: []
+  timeout_s: 120
+tasks: [refund-ok, refund-denied, address-change, duplicate-merge]
+probes: [model-outage, tool-error-first, poisoned-ticket]

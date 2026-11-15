@@ -1,0 +1,35 @@
+# Sample task written by `bifrost-bench suite init -template qa`. The agent
+# reads the travel policy in its workspace and answers one question; the
+# answer_match grader compares the answer with verifier/answer.yaml.
+# `bifrost-bench task init -suite <suite> -id <task>` copies this shape into
+# a new task with EDIT ME markers.
+id: hotel-cap
+version: 1.0.0
+title: Hotel rate cap for Zurich
+project: travel-policy
+kind: feature
+instruction: instruction.md
+# The workspace: the documents the agent answers from.
+repo_dir: repo
+verifier:
+  # Hidden folder, mounted at /grader/tests; it holds the expected answer.
+  tests: verifier
+  required: []
+  answer: verifier/answer.yaml
+protected: ["docs/**"]
+controls:
+  # Answer files: the reference must match, the empty answer and the mutants
+  # must not. The exploit is a script run in the agent's place, as admission
+  # runs every exploit.
+  reference: solution/answer.txt
+  empty: controls/empty.txt
+  mutants: [controls/wrong-city.txt]
+  exploit: controls/exploit.sh
+timeouts:
+  agent_s: 300
+capabilities: [retrieval]
+difficulty: easy
+provenance:
+  source: written by bifrost-bench suite init (template qa)
+  license: proprietary
+  created_by: suite init

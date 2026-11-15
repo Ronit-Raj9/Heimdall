@@ -1,0 +1,49 @@
+[
+  {
+    "sample_id": "conv-fx1",
+    "conversation": {
+      "speaker_a": "Ana",
+      "speaker_b": "Ben",
+      "session_1_date_time": "9:00 am on 3 March, 2022",
+      "session_1": [
+        {"speaker": "Ana", "dia_id": "D1:1", "text": "I adopted a parrot called Kiwi today!"},
+        {"speaker": "Ben", "dia_id": "D1:2", "text": "Congrats! Parrots are smart."}
+      ],
+      "session_2_date_time": "6:30 pm on 10 April, 2022",
+      "session_2": [
+        {"speaker": "Ben", "dia_id": "D2:1", "text": "I ran my first half marathon on Sunday.", "img_url": ["https://example.invalid/x.jpg"], "blip_caption": "a man holding a medal", "query": "medal"},
+        {"speaker": "Ana", "dia_id": "D2:2", "text": "Amazing, how did it feel?"}
+      ],
+      "session_10_date_time": "8:00 pm on 1 June, 2023",
+      "session_10": [
+        {"speaker": "Ana", "dia_id": "D10:1", "text": "Kiwi learned three new words this month."},
+        {"speaker": "Ben", "dia_id": "D10:2", "text": "That bird is a genius."}
+      ],
+      "session_11_date_time": "8:00 pm on 2 June, 2023",
+      "session_11": []
+    },
+    "event_summary": {},
+    "observation": {},
+    "session_summary": {},
+    "qa": [
+      {"question": "What is the name of Ana's parrot?", "answer": "Kiwi", "evidence": ["D1:1"], "category": 4},
+      {"question": "When did Ana adopt her parrot?", "answer": 2022, "evidence": ["D1:1"], "category": 2},
+      {"question": "What did Ben win at the chess tournament?", "adversarial_answer": "a medal", "evidence": ["D2:1"], "category": 5},
+      {"question": "Did Ben run a full marathon?", "adversarial_answer": "Yes", "answer": "No", "evidence": ["D2:1"], "category": 5},
+      {"question": "How many new words did Kiwi learn in June?", "answer": "3", "evidence": ["D10:1"], "category": 1},
+      {"question": "Would Ana enjoy a bird show?", "answer": "Likely yes; she loves her parrot", "evidence": ["D1:1"], "category": 3},
+      {"question": "What is Ben's favourite colour?", "answer": "blue", "evidence": [], "category": 9}
+    ]
+  },
+  {
+    "sample_id": "conv-fx2",
+    "conversation": {
+      "speaker_a": "Cy",
+      "speaker_b": "Di",
+      "session_1": [{"speaker": "Cy", "dia_id": "D1:1", "text": "Hello."}]
+    },
+    "qa": [
+      {"question": "Who said hello?", "answer": "Cy", "evidence": ["D1:1"], "category": 4}
+    ]
+  }
+]

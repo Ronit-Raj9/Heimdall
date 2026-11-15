@@ -1,0 +1,32 @@
+# Free smoke check of the Acme memory project: no model calls, no spend. The
+# real pipeline (sessions in order with a workspace reset between them, the
+# memory volume, the answer export, the answer_match grade, gates, verdict)
+# runs with two scripted control agents on every task, clean condition, one
+# trial. Arm A writes each task's reference answer in the graded last
+# session (oracle), arm B does nothing in every session (noop), so A must
+# pass 3 of 3 and B 0 of 3; anything else means the project, the images or
+# the grader are wired wrong. The oracle proves the plumbing, not memory:
+# it never needs to remember anything.
+#
+# `smoke: true` makes the planner only warn while the suite is not locked or
+# a task is not admitted yet, and marks the runs as a synthetic smoke test in
+# the manifest; the name alone relaxes nothing. Slots: 3 tasks x 1 trial x 2
+# arms = 6.
+name: smoke-acme-memory
+smoke: true
+suite: acme-memory@1.0.0
+base: agents/oracle.yaml
+arms:
+  A: {label: oracle (reference answer)}
+  B: {label: noop (no answer), agent: agents/noop.yaml}
+primary: {condition: clean, metric: verified_success}
+guards:
+  - {rule: no_new_integrity_violation}
+conditions:
+  - {id: clean, tasks: all, trials: 1}
+budget: {total_usd: 0}
+verdict: {policy: paired_signflip, alpha: 0.05, assumed_sd: 0.30}
+seed: 20261115
+concurrency: 2
+manifest_mode: agent_exposure
+policy: policies/default.yaml

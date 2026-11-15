@@ -1,0 +1,33 @@
+# template: memory
+# Written by `bifrost-bench suite init`. A memory suite tests an agent that
+# must remember across sessions. Each task runs the agent once per session,
+# in order (sessions: in task.yaml). Between sessions the workspace is reset
+# to the task's starting state, so what the agent learned survives only in
+# its memory: the /memory volume (path in BENCH_MEMORY_DIR) and the agent's
+# own memory.paths. Only the last session's answer is graded: the agent
+# writes it to answer.txt (path in BENCH_ANSWER_PATH), or its final message
+# is used, and the answer_match grader checks it against the task's hidden
+# verifier/answer.yaml with no model. Add tasks with
+# `bifrost-bench task init -suite [[.ID]] -id <task>`, which copies the shape
+# of the first task below and adds the id to the tasks list.
+id: [[.ID]]
+version: 0.1.0
+description: Multi-session memory tasks; the last session's answer is matched against a hidden expected answer.
+track: memory
+environment: docker_workspace
+grader: answer_match
+base_image:
+[[- if .Dockerfile]]
+  dockerfile: base/Dockerfile
+[[- end]]
+  tag: [[.Image]]
+workdir: /workspace
+output:
+  kind: answer
+  answer_path: answer.txt
+# answer_match grades without running a command; the schema still wants one.
+verifier:
+  command: ["true"]
+  timeout_s: 60
+tasks: [launch-date]
+probes: [model-outage]

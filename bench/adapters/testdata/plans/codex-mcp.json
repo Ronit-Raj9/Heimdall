@@ -1,0 +1,33 @@
+{
+  "image": "bench/agent-codex:1",
+  "argv": [
+    "codex",
+    "exec",
+    "--json",
+    "--skip-git-repo-check",
+    "--dangerously-bypass-approvals-and-sandbox",
+    "--ephemeral",
+    "--strict-config",
+    "--model",
+    "gpt-5.6-terra",
+    "--",
+    "# Fix rounding\n\nAmounts must round half up. Literal {{braces}} stay.\n"
+  ],
+  "env": {
+    "BENCH_MCP_SERVERS": "{\"kb\":{\"url\":\"http://kb:8000/rpc\"},\"tickets\":{\"url\":\"http://toolproxy:9200/s/tickets/mcp\"}}",
+    "BIFROST_API_KEY": "sk-bf-v1-secretvalue0123456789",
+    "CODEX_HOME": "/home/agent/.codex",
+    "OPENAI_API_KEY": ""
+  },
+  "files": {
+    "/home/agent/.codex/config.toml": "model = \"gpt-5.6-terra\"\nmodel_provider = \"bifrost\"\nallow_login_shell = false\ncheck_for_update_on_startup = false\nweb_search = \"disabled\"\n\n[analytics]\nenabled = false\n\n[feedback]\nenabled = false\n\n[history]\npersistence = \"none\"\n\n[otel]\nexporter = \"none\"\nlog_user_prompt = false\n\n[features]\nmemories = false\n\n[shell_environment_policy]\nexclude = [\"BIFROST_API_KEY\"]\n\n[model_providers.bifrost]\nname = \"Bifrost\"\nbase_url = \"http://bifrost:8080/openai/v1\"\nwire_api = \"responses\"\nenv_key = \"BIFROST_API_KEY\"\nrequires_openai_auth = false\nsupports_websockets = false\n\n[model_providers.bifrost.http_headers]\nx-bf-session-id = \"r_p20fj3s8wa\"\nx-bf-session-affinity = \"off\"\n\n[mcp_servers.kb]\nurl = \"http://kb:8000/rpc\"\n\n[mcp_servers.tickets]\nurl = \"http://toolproxy:9200/s/tickets/mcp\"\n",
+    "/tmp/bench/instruction.md": "# Fix rounding\n\nAmounts must round half up. Literal {{braces}} stay.\n"
+  },
+  "workdir": "/workspace",
+  "wall_s": 600,
+  "cpus": 2,
+  "mem_gb": 4,
+  "pids": 512,
+  "network": "bench-eval-net",
+  "user": "1000"
+}

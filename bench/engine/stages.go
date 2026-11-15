@@ -48,10 +48,13 @@ func (p *Pipeline) do(ctx context.Context, st *runState, stage schemas.Stage) er
 	}
 }
 
-// prepare resolves the run's parts, creates the workspace and mints the
-// run's virtual key.
+// prepare resolves the run's parts, creates the workspace, starts the run's
+// services and mints the run's virtual key.
 func (p *Pipeline) prepare(ctx context.Context, st *runState) error {
 	if err := p.resolveParts(st); err != nil {
+		return err
+	}
+	if err := p.checkTaskAgentImage(ctx, st); err != nil {
 		return err
 	}
 	h, err := st.env.Create(ctx, st.rc)
@@ -59,6 +62,9 @@ func (p *Pipeline) prepare(ctx context.Context, st *runState) error {
 		return wrapPart("environment", st.env, fmt.Errorf("create workspace: %w", err))
 	}
 	st.rc.Handle = h
+	if err := p.startServices(ctx, st); err != nil {
+		return err
+	}
 	key, err := p.reg.Gateway.MintKey(ctx, st.rc)
 	if err != nil {
 		return wrapPart("gateway", p.reg.Gateway, fmt.Errorf("mint key: %w", err))
@@ -141,52 +147,6 @@ func (p *Pipeline) arm(ctx context.Context, st *runState) error {
 	return nil
 }
 
-// runAgent plans the container and executes it. run.json is checkpointed
-// with AgentStarted before Exec is called, so a resumed run can always tell
-// whether its agent may have started and must never be rerun.
-func (p *Pipeline) runAgent(ctx context.Context, st *runState) error {
-	plan, err := st.adapter.Plan(ctx, st.rc)
-	if err != nil {
-		return wrapPart("adapter", st.adapter, fmt.Errorf("plan: %w", err))
-	}
-	if plan == nil {
-		return wrapPart("adapter", st.adapter, errors.New("plan returned no plan"))
-	}
-	st.plan = plan
-	run := st.rc.Run
-	started := p.now().UTC()
-	run.Timing.AgentStarted = &started
-	if err := p.writeJSON(ctx, st, "run.json", run); err != nil {
-		run.Timing.AgentStarted = nil
-		return fmt.Errorf("checkpoint before agent start: %w", err)
-	}
-	st.agentStarted = true
-	res, err := st.env.Exec(ctx, st.rc, plan)
-	exited := p.now().UTC()
-	run.Timing.AgentExited = &exited
-	if res != nil {
-		st.rc.Exec, st.ev.Exec = res, res
-		code := res.ExitCode
-		run.Agent.ExitCode = &code
-		run.Agent.TimedOut = res.TimedOut
-		if !res.Started.IsZero() {
-			s := res.Started.UTC()
-			run.Timing.AgentStarted = &s
-		}
-		if !res.Ended.IsZero() {
-			e := res.Ended.UTC()
-			run.Timing.AgentExited = &e
-		}
-	}
-	if err != nil {
-		return wrapPart("environment", st.env, fmt.Errorf("exec agent: %w", err))
-	}
-	if res == nil {
-		return wrapPart("environment", st.env, errors.New("exec returned no result"))
-	}
-	return nil
-}
-
 // disarm disarms the probe's layer. P0 arms one layer per run, so reverse
 // order is that one layer.
 func (p *Pipeline) disarm(ctx context.Context, st *runState) error {
@@ -208,7 +168,7 @@ func (p *Pipeline) export(ctx context.Context, st *runState) error {
 		return wrapPart("environment", st.env, errors.New("export diff returned no diff"))
 	}
 	st.ev.Diff = d
-	return nil
+	return p.exportScenario(ctx, st)
 }
 
 // collect runs every evidence source in registry order into one Evidence. A
@@ -223,12 +183,25 @@ func (p *Pipeline) collect(ctx context.Context, st *runState) error {
 	if st.ev.Claim != nil {
 		st.rc.Run.Claim = st.ev.Claim
 	}
+	if err := p.finishAnswer(ctx, st); err != nil {
+		errs = append(errs, err)
+	}
 	return errors.Join(errs...)
 }
 
+// grade runs the grader on the exported diff. A scenario run whose state or
+// answer was not exported is not graded: its grade is invalid_evaluator with
+// the reason (scenarioGradeProblem). A grade that is not a clean-room diff
+// grade carries its mode.
 func (p *Pipeline) grade(ctx context.Context, st *runState) error {
 	if st.ev.Diff == nil {
 		return errors.New("no exported diff to grade")
+	}
+	mode := gradeMode(st.rc)
+	if why := scenarioGradeProblem(st.rc, st.ev); why != "" {
+		st.ev.Grade = &schemas.Grade{InvalidEvaluator: true, Reason: why, Mode: mode, SuiteVersion: st.rc.Suite.Version,
+			GraderVersion: st.grader.GetVersion(), DiffSHA256: st.ev.Diff.SHA256}
+		return nil
 	}
 	g, err := st.grader.Grade(ctx, st.rc, st.ev.Diff)
 	if err != nil {
@@ -236,6 +209,9 @@ func (p *Pipeline) grade(ctx context.Context, st *runState) error {
 	}
 	if g == nil {
 		return wrapPart("grader", st.grader, errors.New("grade returned no grade"))
+	}
+	if g.Mode == "" {
+		g.Mode = mode
 	}
 	st.ev.Grade = g
 	return nil

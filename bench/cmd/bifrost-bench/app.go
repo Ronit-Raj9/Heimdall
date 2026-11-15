@@ -88,6 +88,7 @@ func newApp(ctx context.Context, configPath string, opts appOptions) (*app, erro
 		Loaders: suite.Builtin(cfg.Path(cfg.BenchmarksRoot)),
 		Environments: environments.Builtin(environments.DockerWorkspaceConfig{
 			EvalNetwork: cfg.Networks.Eval, HelperImage: helper, Logger: logger, Docker: a.docker,
+			ToolProxyImage: cfg.Images.ToolProxy,
 		}),
 		Adapters: adapters.Builtin(adapters.CommandConfig{
 			GatewayAgentURL: cfg.Gateway.AgentURL, EvalNetwork: cfg.Networks.Eval, BenchRoot: cfg.Root,
@@ -97,7 +98,7 @@ func newApp(ctx context.Context, configPath string, opts appOptions) (*app, erro
 		Evidence: evidence.Builtin(evidence.Deps{
 			Gateway: gw, Fault: fault, Parsers: parsers, Docker: a.docker, HelperImage: helper, Prices: prices, Logger: logger,
 		}),
-		Graders:   graders.Builtin(graders.HiddenTestsConfig{Image: helper, Logger: logger, Docker: a.docker}),
+		Graders:   append([]schemas.Grader{graders.NewJudge(graders.JudgeConfig{Gateway: gw, URL: cfg.Gateway.URL, Price: graders.PricesFrom(prices.Lookup), PriceRef: prices.Ref(), Logger: logger})}, graders.Builtin(graders.HiddenTestsConfig{Image: helper, Logger: logger, Docker: a.docker})...), // Memory and answers: the wired judge, ahead of Builtin's unwired one
 		Gates:     gates.Builtin(),
 		Metrics:   metrics.Builtin(),
 		Policies:  verdict.Builtin(),

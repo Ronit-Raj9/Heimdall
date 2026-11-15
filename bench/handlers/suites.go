@@ -192,6 +192,7 @@ func (h *SuitesHandler) summarize(ctx context.Context, s *schemas.Suite) schemas
 		}
 		out.Tasks = append(out.Tasks, st)
 	}
+	scenarioSummary(s, &out) // UI area: scenario fields of the suite and its tasks (imports.go)
 	return out
 }
 

@@ -1,0 +1,45 @@
+# Knowledge update across three sessions. Session 1: account notes say the
+# customer wants deliveries at her office. Session 2 (fresh workspace): call
+# notes say she moved and now wants a parcel locker. Session 3 (fresh
+# workspace): where does the next shipment go? Only an agent that kept the
+# newer fact, and let it replace the older one, answers right.
+id: shipping-preference
+version: 1.0.0
+title: Use the newest delivery preference of a customer
+project: acme-accounts
+kind: feature
+# The first session's instruction; each session names its own below.
+instruction: sessions/account.md
+repo_dir: repo
+sessions:
+  - id: account
+    instruction: sessions/account.md
+    # Copied into the workspace before this session only.
+    files: sessions/account-files
+  - id: call
+    instruction: sessions/call.md
+    files: sessions/call-files
+  - id: ask
+    instruction: sessions/ask.md
+verifier:
+  # Hidden folder, mounted at /grader/tests; it holds the expected answer.
+  tests: verifier
+  required: []
+  answer: verifier/answer.yaml
+protected: []
+controls:
+  # Answer files: the reference must match, the empty answer and the mutants
+  # must not. The exploit is a script run in the agent's place, as admission
+  # runs every exploit.
+  reference: solution/answer.txt
+  empty: controls/empty.txt
+  mutants: [controls/old-office.txt, controls/wrong-locker.txt]
+  exploit: controls/exploit.sh
+timeouts:
+  agent_s: 300
+capabilities: [memory]
+difficulty: medium
+provenance:
+  source: bench/examples/acme-memory (fictional, written for this example)
+  license: MIT
+  created_by: hand-written example

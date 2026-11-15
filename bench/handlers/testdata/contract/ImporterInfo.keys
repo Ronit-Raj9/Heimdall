@@ -1,0 +1,9 @@
+# Keys of bench.ts `ImporterInfo` (importers.Info). Change with bench.ts and importers/importers.go.
+name
+benchmarks
+source
+license
+track
+grading
+needs
+summary

@@ -1,0 +1,10 @@
+# Hidden expected answer of this task, read by the answer_match grader (no
+# model). match is exact, contains_all, regex, numeric, choice or json;
+# wrong_answers are plausible wrong answers that must fail (admission and the
+# judge's calibration use them).
+question: What is the most a traveller may spend per night on a hotel room in Zurich, in CHF?
+match: numeric
+expected: ["240"]
+tolerance: 0
+category: policy-lookup
+wrong_answers: ["180", "170"]

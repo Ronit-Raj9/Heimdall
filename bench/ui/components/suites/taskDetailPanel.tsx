@@ -3,19 +3,22 @@ import { Button } from "@/components/ui/button";
 import { formatDateTime } from "@/components/verdict/verdict.utils";
 import { getLocale } from "@/lib/i18n";
 import { useGetSuiteTaskQuery } from "@/lib/store";
-import type { SuiteTaskDetail } from "@/lib/types/bench";
+import type { OutputKind, SuiteTaskDetail } from "@/lib/types/bench";
 import { cn } from "@/lib/utils";
 import { Link } from "@tanstack/react-router";
 import { CircleCheck, CircleDashed, CircleX, EyeOff, X } from "lucide-react";
 import { useEffect, useRef } from "react";
 import { useTranslation } from "react-i18next";
 import { AdmissionBadge } from "./suiteBadges";
+import { TaskScenario } from "./suiteScenario";
 import { controlRows, formatBytes, type ControlRow } from "./suites.utils";
 
 export interface TaskDetailPanelProps {
 	suiteId: string;
 	suiteVersion: string;
 	taskId: string;
+	/** The suite's output kind, shown when the task does not set its own. */
+	suiteOutput?: OutputKind;
 	onClose: () => void;
 }
 
@@ -23,7 +26,7 @@ export interface TaskDetailPanelProps {
  * The open task: fetched on demand, so the list stays light. Focus moves to the heading when a
  * task opens, and Escape closes the panel.
  */
-export function TaskDetailPanel({ suiteId, suiteVersion, taskId, onClose }: TaskDetailPanelProps) {
+export function TaskDetailPanel({ suiteId, suiteVersion, taskId, suiteOutput, onClose }: TaskDetailPanelProps) {
 	const { t } = useTranslation("bench");
 	const query = useGetSuiteTaskQuery({ suite: suiteId, task: taskId });
 	const heading = useRef<HTMLHeadingElement>(null);
@@ -63,14 +66,22 @@ export function TaskDetailPanel({ suiteId, suiteVersion, taskId, onClose }: Task
 					testId="suites-task-detail-error"
 				/>
 			) : (
-				<TaskDetailBody detail={query.data} suiteVersion={suiteVersion} />
+				<TaskDetailBody detail={query.data} suiteVersion={suiteVersion} suiteOutput={suiteOutput} />
 			)}
 		</section>
 	);
 }
 
-/** The task's instruction, provenance, admission checklist, hidden counts, protected paths and files. */
-export function TaskDetailBody({ detail, suiteVersion }: { detail: SuiteTaskDetail; suiteVersion: string }) {
+/** The task's scenario, instruction, provenance, admission checklist, hidden counts, protected paths and files. */
+export function TaskDetailBody({
+	detail,
+	suiteVersion,
+	suiteOutput,
+}: {
+	detail: SuiteTaskDetail;
+	suiteVersion: string;
+	suiteOutput?: OutputKind;
+}) {
 	const { t } = useTranslation("bench");
 	const locale = getLocale();
 	const task = detail.task;
@@ -82,6 +93,8 @@ export function TaskDetailBody({ detail, suiteVersion }: { detail: SuiteTaskDeta
 					{task.kind} / v{task.version}
 				</span>
 			</div>
+
+			<TaskScenario task={task} suiteOutput={suiteOutput} />
 
 			<DetailBlock title={t("suites.detail.instruction")} hint={t("suites.detail.instructionHint")} testId="suites-task-instruction">
 				{detail.instruction ? (

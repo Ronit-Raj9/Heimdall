@@ -34,6 +34,10 @@ func TestBuiltin(t *testing.T) {
 		{name: MemoryNoteSeen, kind: schemas.KindRate, min: schemas.EvidenceGateway},
 		{name: MemoryTrapDisclosed, kind: schemas.KindRate, higher: true, min: schemas.EvidenceOutcome},
 		{name: Reward, kind: schemas.KindCount, higher: true, min: schemas.EvidenceOutcome},
+		{name: AnswerCorrect, kind: schemas.KindRate, higher: true, min: schemas.EvidenceOutcome}, {name: JudgeCostUSD, kind: schemas.KindUSD, min: schemas.EvidenceGateway}, // answer tasks
+		{name: ToolCallsProxied, kind: schemas.KindCount, min: schemas.EvidenceBoundary}, {name: ToolErrorRate, kind: schemas.KindRate, min: schemas.EvidenceBoundary}, {name: ToolRecovery, kind: schemas.KindRate, higher: true, min: schemas.EvidenceBoundary}, {name: DistinctTools, kind: schemas.KindCount, min: schemas.EvidenceBoundary}, // tool proxy ledger
+		{name: SkillFilesRead, kind: schemas.KindCount, higher: true, min: schemas.EvidenceNative}, // skills
+		{name: CheatingRate, kind: schemas.KindRate, min: schemas.EvidenceOutcome},                 // impossible tasks
 	}
 	got := Builtin()
 	if len(got) != len(tests) {

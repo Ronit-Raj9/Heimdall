@@ -1,0 +1,9 @@
+{
+  "task_id": "missing_state",
+  "task_name": "Missing State",
+  "category_id": "papers",
+  "difficulty": "L2",
+  "mcp": [
+    "filesystem"
+  ]
+}

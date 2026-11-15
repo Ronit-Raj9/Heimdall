@@ -31,6 +31,14 @@ type AgentImage struct {
 	Dockerfile string            // absolute; empty when the config has no build section
 	Context    string            // absolute build context: build.context, else the Dockerfile's folder
 	BuildArgs  map[string]string // build.base_arg -> the suite's base image tag; empty without base_arg
+	// PerTask is set when the image is built on a task's own image
+	// (ResolveTaskAgentImage): Tag is "<build.tag>-<suite id>-<task id>" and
+	// BuildArgs carries the task image. OwnImage is set when the task has its
+	// own image but the agent has no build.base_arg: the agent runs in its
+	// own image and sees only the workspace files, which doctor and agent
+	// check warn about.
+	PerTask  bool
+	OwnImage bool
 }
 
 // ImageInspector is implemented by an environment that can say which local
@@ -76,6 +84,31 @@ func ResolveAgentImage(cfg *schemas.AgentConfig, suite *schemas.Suite, benchRoot
 	out.Tag, out.PerSuite = tag, true
 	out.BuildArgs = map[string]string{b.BaseArg: suite.BaseImage.Tag}
 	return out, nil
+}
+
+// ResolveTaskAgentImage derives the image cfg runs for one task of suite.
+// For a task without its own image (taskImage empty) it is ResolveAgentImage.
+// For a task with one, an agent whose build declares build.base_arg is built
+// on the task image (the ARG receives taskImage) and tagged
+// "<build.tag>-<suite id>-<task id>", so the agent runs inside the task's own
+// environment; an agent without base_arg keeps its own image (OwnImage).
+func ResolveTaskAgentImage(cfg *schemas.AgentConfig, suite *schemas.Suite, task *schemas.Task, taskImage, benchRoot string) (AgentImage, error) {
+	img, err := ResolveAgentImage(cfg, suite, benchRoot)
+	if err != nil || taskImage == "" || task == nil {
+		return img, err
+	}
+	if !img.PerSuite {
+		img.OwnImage = true
+		return img, nil
+	}
+	tag := img.Tag + "-" + task.ID
+	_, part, _ := strings.Cut(tag[strings.LastIndex(tag, "/")+1:], ":")
+	if !tagRe.MatchString(part) || len(part) > maxTagLength {
+		return AgentImage{}, fmt.Errorf("agent %s: per-task tag %q is not a valid docker tag", cfg.ID, tag)
+	}
+	img.Tag, img.PerTask = tag, true
+	img.BuildArgs = map[string]string{cfg.Build.BaseArg: taskImage}
+	return img, nil
 }
 
 // perSuiteTag validates a base_arg build and returns "<build.tag>-<suite id>".

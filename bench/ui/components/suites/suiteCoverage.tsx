@@ -136,6 +136,7 @@ function familyLabel(family: string, t: T): string {
 		case "unavailable_model":
 		case "broken_tool":
 		case "misleading_instruction":
+		case "hostile_tool":
 			return t(`suites.probes.family.${family}`);
 		default:
 			return family;
@@ -147,6 +148,8 @@ function layerLabel(layer: string, t: T): string {
 		case "fixture":
 		case "gateway":
 		case "tool_shim":
+		case "tool":
+		case "service":
 			return t(`suites.probes.layer.${layer}`);
 		default:
 			return layer;

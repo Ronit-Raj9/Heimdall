@@ -32,6 +32,8 @@ var knownLayers = map[schemas.ProbeLayerName]bool{
 	schemas.LayerFixture:  true,
 	schemas.LayerGateway:  true,
 	schemas.LayerToolShim: true,
+	schemas.LayerTool:     true,
+	schemas.LayerService:  true,
 }
 
 // leakTerms are words an instruction must not contain: naming the hidden
@@ -86,9 +88,10 @@ func lintSuite(s *schemas.Suite) []Problem {
 	}
 	for _, p := range s.Probes {
 		if !knownLayers[p.Layer] {
-			add(rel(s.Root, p.Path), SeverityError, "layer: %q is not a probe layer the bench ships (fixture, gateway, tool_shim)", p.Layer)
+			add(rel(s.Root, p.Path), SeverityError, "layer: %q is not a probe layer the bench ships (fixture, gateway, tool_shim, tool, service)", p.Layer)
 		}
 	}
+	out = append(out, lintScenarioSuite(s)...)
 	return out
 }
 
@@ -117,13 +120,17 @@ func LintTask(s *schemas.Suite, t *schemas.Task) []Problem {
 		add(taskYAML, SeverityWarning, "controls.mutants: empty; a mutant that fails the hidden tests shows they catch a near miss")
 	}
 	out = append(out, lintInstruction(root, t)...)
+	out = append(out, lintScenarioTask(s, t)...)
+	output := utils.OutputKind(s, t)
 
 	testsDir := filepath.Join(t.Dir, filepath.FromSlash(t.Verifier.Tests))
 	funcs, err := hiddenTests(testsDir)
 	if err != nil {
 		add(taskYAML, SeverityError, "verifier.tests: %v", err)
 	}
-	out = append(out, lintRequirements(root, t, funcs)...)
+	if output != schemas.OutputAnswer {
+		out = append(out, lintRequirements(root, t, funcs)...)
+	}
 	out = append(out, lintRequired(root, t, testsDir)...)
 	if r := s.Verifier.Result; len(t.Verifier.Required) > 0 && (r == schemas.VerifierResultReward || r == schemas.VerifierResultExitCode) {
 		add(taskYAML, SeverityWarning, "verifier.required: ignored, because the suite's verifier reports result %s; only a junit report names the tests that ran", r)
@@ -135,7 +142,7 @@ func LintTask(s *schemas.Suite, t *schemas.Task) []Problem {
 	out = append(out, lintLeakedTests(root, repo, testsDir)...)
 	if n, err := countVisibleTests(repo); err != nil {
 		add(taskYAML, SeverityError, "repo_dir: %v", err)
-	} else if n == 0 {
+	} else if n == 0 && output == schemas.OutputDiff && !repoInImage(t) {
 		sev := SeverityWarning
 		if s.Grader == "hidden_tests" {
 			sev = SeverityError

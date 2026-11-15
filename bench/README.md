@@ -25,6 +25,34 @@ bifrost-bench agent check agents/pybot.yaml -suite pyapp       # builds the imag
 
 The guide, with real output from a fresh-project walkthrough, the CI gate and the limits: [`docs/bring-your-own.md`](docs/bring-your-own.md). A complete example project (four Node tasks, a custom agent, Codex): [`examples/acme-node`](examples/acme-node/README.md).
 
+## Scenarios: tools, MCP, memory, answers
+
+Not every agent edits a repository. A suite can also start tool servers beside the agent and grade their final state, run the agent over several sessions with the workspace wiped in between, or grade a written answer with no model. Four more templates each write a suite with one complete sample task, and `task init` copies its shape into new tasks:
+
+```bash
+bifrost-bench suite init support -template mcp      # or tool-use, memory, qa
+bifrost-bench task init -suite support -id t02      # copy of the sample's shape, with EDIT ME markers
+bifrost-bench task validate support/t02 && bifrost-bench task admit support/t02
+```
+
+The guide (layouts, state verifiers, seeding services, tool faults, sessions and memory, answers, judged suites, importing public benchmarks, limits): [`docs/scenarios.md`](docs/scenarios.md). Examples: [`examples/acme-support`](examples/acme-support/README.md) (a support desk agent on an MCP server) and [`examples/acme-memory`](examples/acme-memory/README.md) (multi-session recall, with an abstention task).
+
+## Public benchmarks
+
+`bifrost-bench import list` shows the importers; `bifrost-bench import <format> -from <local copy> -suite <id>` turns upstream tasks into an ordinary suite. An imported task is trusted only after `suite admit` proves, on this machine, that its own reference passes and its empty and exploit controls fail. Upstream data is never committed here: imported suites are git-ignored.
+
+| Importer | Benchmarks | Track | Checked here (15 Nov 2026) |
+|---|---|---|---|
+| `harbor` | Terminal-Bench 2.0, SkillsBench | terminal, skills | 5 and 3 real tasks admitted; in a full pipeline run the reference control passed 5 of 5 and 3 of 3, the no-change control 0. 54 of 89 and 70 of 87 tasks import; the rest download things at solve or test time and are skipped with the reason |
+| `swebench` | SWE-rebench, SWE-bench-Live | coding | 1 real SWE-rebench task admitted |
+| `impossiblebench` | ImpossibleBench | safety | 5 real tasks admitted; in a full pipeline run the `impossible_pass` gate turned 3 of 3 gamed passes into integrity violations |
+| `tau2` | tau2-bench airline, retail | tool use | 3 real tasks admitted through the tool proxy. The user is scripted, so results are not comparable with the published leaderboard |
+| `agentdojo` | AgentDojo 1.2.2 | safety | 2 real banking tasks admitted, with an injection probe in the suite |
+| `mcpmark` | MCPMark, filesystem family | MCP | 40 real tasks import and lint clean. Upstream ships no reference solutions, so none is admitted until a reference is written |
+| `longmemeval`, `locomo` | LongMemEval, LoCoMo | memory | 2 real LongMemEval tasks with exact-match answers admitted. The judged path has only been tested against a fake judge. LoCoMo is CC BY-NC 4.0 |
+
+Every check in this table used scripted controls and cost nothing. No real model has been run on an imported benchmark or on any scenario track yet. Guides: [`docs/importing-harbor.md`](docs/importing-harbor.md), [`docs/importing-swe.md`](docs/importing-swe.md), [`docs/importing-tau2.md`](docs/importing-tau2.md), [`docs/importing-agentdojo.md`](docs/importing-agentdojo.md), [`docs/importing-mcpmark.md`](docs/importing-mcpmark.md), [`docs/importing-memory.md`](docs/importing-memory.md). Running slots on other machines: [`docs/remote-execution.md`](docs/remote-execution.md).
+
 ## Why it is different
 
 Most evaluation tools show traces, token charts and a pass rate. Teams already have those. What they cannot get is a trustworthy answer:
@@ -102,6 +130,7 @@ The three batches with a regate give the same verdict on the sealed gates and on
 | Repeatable task suites (optional) | `benchmarks/coding-core/` (8 tasks with hidden verifiers and a lock file); `bifrost-bench suite lint\|lock\|admit`, where `admit` runs the admission controls (the reference passes 3 of 3; the empty patch, every mutant and the exploit fail); YAML validated by `spec/` | `benchmarks/coding-core/suite.lock` (sha256 `8d94484578c0`): 8 of 8 tasks admitted, 60 of 60 controls as expected: 24 reference runs and 8 reference-under-stale-notes runs pass; 8 empty patches, 12 mutants and 8 exploits fail |
 | Execution traces (optional) | Bifrost's log is the trace of record (`gateways/bifrost/`), joined with the fault proxy's hash-chained ledger (`faultproxy/`) and the agent's own stream (parsers in `adapters/`) into `events.jsonl` | `r_zhtlq3br1h` (Codex, t01, model-outage, `e_batch_frameworks_9z0h`): 112 events, 68 from Bifrost's log, 30 from the proxy ledger, 14 from the Codex stream. The whole batch: 6,334 events (gateway 4,420, agent stream 1,629, proxy ledger 248, shim log 37) |
 | Comparative dashboards (optional) | `/verdict` (verdict, action, diagnostics table), `/leaderboard`, `/triage`, `/releases` | `e_batch_frameworks_9z0h`: regressed, hold. Seeded regression, code-wins, memory trap and both pilots: inconclusive, no decision. Policy block on the 4 batches, warn on `e_pilot_mixed_nc93`, none set on `e_pilot_codex_elat`. Table in "Results from real runs" |
+| Agents beyond repository edits: tools, MCP, memory, answers (beyond PS2) | `suite init -template tool-use\|mcp\|memory\|qa` (`scaffold/`), services and the per-run tool proxy, sessions with a kept memory volume, state and answer outputs (`docs/scenarios.md`); examples in `examples/acme-support/` and `examples/acme-memory/` | `suite admit` in Docker, 15 Nov 2026: 4 of 4 `acme-support` tasks admitted through the tool proxy (reference 3 of 3 `reward 1`; empty, 2 mutants, exploit, noop and refuse `reward 0`) and 3 of 3 `acme-memory` tasks over 2 to 3 sessions (reference 3 of 3; empty, mutants, wrong answers, exploit, noop and refuse fail) |
 
 ## Features
 
@@ -114,6 +143,7 @@ The three batches with a regate give the same verdict on the sealed gates and on
 | Safety probes | `destructive-bait`, `protected-path` and `prompt-injection` (veto gates G10 to G12) and `secret-canary` (report-only metrics) plant a trap per run; `experiments/safety.yaml` | `docs/safety-probes.md` |
 | Bring your own agent and tasks | `init` scaffolds a project folder; `suite init` writes a suite for Python, Node, Go or a reward script; `task init` cuts a task from a fix commit of your repository (hidden tests from the commit's tests), `task validate` and `task admit` prove it fit; `agent init` writes an agent from a template (`command`, `python`, `http-service`), `agent build` builds it per suite, `agent check` runs a free conformance check on the scripted model. `doctor` checks every suite, base image and agent image of the project | `docs/bring-your-own.md` |
 | Suites and Agents pages | `/suites` lists every suite with its grader, lock state and admitted tasks; `/suites/{id}/tasks/{task}` shows a task's provenance, admission checks, instruction and visible files (never a hidden test, solution or control); `/agents` lists every agent config with its image, per-suite build and evidence level. API: `GET /api/bench/suites`, `/suites/{id}/tasks/{task}`, `/agents` | `docs/bring-your-own.md` |
+| Scenarios: tools, MCP, memory, answers | `suite init -template tool-use\|mcp\|memory\|qa` writes a suite with a complete sample task: a tool server (HTTP or MCP) started beside the agent and graded on its exported final state, multi-session tasks with the workspace reset between sessions, or answers matched by `answer_match` with no model. `task init -suite <id> -id <task>` copies a task's shape with EDIT ME markers; `suite admit` builds missing service images; tool faults are probes of layer `tool` | `docs/scenarios.md` |
 | Leaderboard | Ranks agent configs (one per resolved config hash) over every sealed run of one suite version and condition, across experiments, by verified success with cost, tokens and steps beside it and no blended score. Each entry is compared with the leader by the exact sign-flip test on shared tasks, Holm-adjusted (tier 1: cannot be told apart, tier 2: significantly behind). Invalid experiments, infra errors and unsealed runs are left out and counted; scripted agents and scripted-model runs appear only with `-synthetic only`, under a SYNTHETIC banner. `bifrost-bench leaderboard`, `GET /api/bench/leaderboard`, `/leaderboard` | `docs/leaderboard.md` |
 
 ## How it works
@@ -195,6 +225,7 @@ If the provider becomes unreachable during a run anyway, the run is sealed as in
 | `suite/` | Suite loading, lint, lock and admission controls |
 | `scaffold/`, `agents/templates/` | Project, suite and task generators (`init`, `suite init`, `task init`); agent templates (`agent init`) |
 | `examples/acme-node/` | A complete bring-your-own project: a Node suite of four tasks, a custom agent, Codex |
+| `examples/acme-support/`, `examples/acme-memory/` | Scenario projects: a support desk agent on an MCP server (four state-graded tasks, tool-fault and poisoned-result probes), and three multi-session memory tasks graded by `answer_match` |
 | `store/` | Sealed run folders, transitions, leases, seal chain, read index |
 | `server/`, `handlers/`, `lib/`, `reporters/` | HTTP API (Bifrost's fasthttp handler style) and reports |
 | `ui/` | Web UI (React, TanStack Router, RTK Query, Bifrost's UI primitives), embedded in the binary |
@@ -211,6 +242,9 @@ Everything that varies is a file, validated by a JSON Schema; everything that co
 |---|---|---|
 | A task | A folder under `benchmarks/<suite>/tasks/`, or `bifrost-bench task init` from a fix commit of your repository, then `bifrost-bench task admit` | No |
 | A benchmark | A folder with `suite.yaml` | No, if its environment and grader types exist |
+| A tool-using or MCP task | `bifrost-bench suite init <id> -template tool-use` or `-template mcp`, then `task init -suite <id> -id <task>`: a seed data file, an instruction, `checks.py` for the final state and a reference script; see `docs/scenarios.md` | No |
+| A memory or QA task | `bifrost-bench suite init <id> -template memory` or `-template qa`, then `task init`: session instructions and files, a hidden `answer.yaml` and a reference answer | No |
+| A public benchmark | `bifrost-bench import <format> -from <local copy> -suite <id>`, then `suite admit` (`bifrost-bench import list` names the formats) | No, if its importer exists |
 | A probe | One YAML in `benchmarks/<suite>/probes/` | No, for an existing layer |
 | An agent | One YAML in `agents/` (any CLI or custom agent that accepts a base URL); see `docs/adding-an-agent.md` | No |
 | A variable | A `set:` override on an arm in the experiment file | No |
@@ -224,10 +258,16 @@ Everything that varies is a file, validated by a JSON Schema; everything that co
 - Seals are local hashes without an external anchor.
 - Every counted run's seal and the experiment's seal chain are verified before analysis, the leaderboard and the run page use them (`docs/evidence-integrity.md`); they still prove only that files did not change after sealing on this machine.
 - The suite lock pins task files, probe files and admission results, but not yet every evaluator setting: the verifier command, required test ids, protected paths, timeouts and image contents are not all bound, and image tags are not all pinned by digest. Change one of those and re-admit before comparing with older runs.
-- The spend cap is exact for one scheduler; two schedulers on the same experiment each see their own spend. A lease lost in the instant after a seal can leave two counted runs for a slot, which the verdict then reports as invalid (`docs/runner-safety.md`).
+- The spend cap is exact for one scheduler and for remote workers, which lease from that scheduler; two separate schedulers on the same experiment each see their own spend. A lease lost in the instant after a seal can leave two counted runs for a slot, which the verdict then reports as invalid (`docs/runner-safety.md`).
 - Task folders are checked for symlinks that leave the task and admission validates before any Docker build (`docs/task-safety.md`); hard links are not detected, and hidden tests cut from a reference commit still need a person to review them.
 - The release evidence pack holds the manifest, the analysis and report, `seals.log` and, per run, `seal.json`, `run.json`, `metrics.json`, `gates.json` and `grade.json`. It does not hold the raw gateway rows, proxy ledger, agent stream, receipts or cost rows, so a full re-audit needs the run folders themselves.
-- There is no importer for public benchmark formats yet, and the runtime is built for coding tasks (a workspace and a diff); browser, MCP and stateful-service tasks need sidecars and result channels that do not exist.
+- Scenario tracks (tool use, MCP, memory, skills, terminal, safety) and the importers are new and have only been exercised with scripted controls: no real model has run on them, and the numbers in "Results from real runs" are all from the coding track.
+- Snapshot grading (terminal tasks) is weaker evidence than a clean-room grade: the verifier runs on a frozen copy of the agent's own file system, so the agent could have changed the tools the verifier calls. Tasks imported from Harbor run the agent as root inside its container, without privileged mode, host mounts or network (`docs/runner-safety.md`).
+- A judged suite's outcomes come from a judge model. The judge grader has only been tested against a fake judge, its spend is not under the experiment's spend cap, and a judged suite is never compared with a verified one.
+- Remote workers need the same project at the same commit and their own stack, are authenticated by one shared token, and have no built-in TLS (`docs/remote-execution.md`). They are tested with two processes on one machine, not across machines. Cloud sandboxes (Kubernetes, hosted sandboxes) are not supported.
+- Deployed agents (`remote_http`) can only take answer tasks, and their tokens, cost and steps are unknown unless their model calls are pointed at this gateway.
+- AgentDojo state is exported as a Python pickle and read back in the verifier by an unpickler that accepts only the benchmark's own types, in a container with no network.
+- Not built: user accounts, roles and audit logs; scheduled runs and alerts; tasks cut from production traces and trace export; browser and computer-use agents; multi-agent tasks; a model-played user for tau2; the MCPMark Postgres family.
 - Scripted-model runs are kept off the live leaderboard by the label the fault proxy writes on its ledger lines (`upstream`: `real` or `scripted`). Runs recorded before that label existed are recognized by a fingerprint of the scripted model (exactly 32 output tokens and a scripted response id format), which is a heuristic.
 - Which agents and providers were actually run, and which are only configured, is listed in `docs/harness-matrix.md`.
 

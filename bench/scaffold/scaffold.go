@@ -1,5 +1,8 @@
 // Package scaffold writes the files of a new Heimdall project, suite or task:
-// `bifrost-bench init`, `suite init` and `task init`.
+// `bifrost-bench init`, `suite init` and `task init`. Besides the repository
+// templates it has scenario templates (tool-use, mcp, memory, qa) that write
+// a suite with a complete sample task, and InitScenarioTask copies a task's
+// shape into a new one (docs/scenarios.md).
 //
 // Every file a fresh project needs and that otherwise lives only in the bench
 // repository (the gateway stack, the pricing snapshot and Bifrost's
@@ -54,6 +57,17 @@ const (
 	TemplateGenericReward = "generic-reward"
 )
 
+// Scenario suite template names (`suite init -template`, `task init -kind`).
+// Each writes a suite with one complete sample task whose result is not a
+// diff: a tool server's final state (tool-use, mcp) or an answer (memory,
+// qa). docs/scenarios.md is the user guide.
+const (
+	TemplateToolUse = "tool-use"
+	TemplateMCP     = "mcp"
+	TemplateMemory  = "memory"
+	TemplateQA      = "qa"
+)
+
 // Grader part names the suite templates select.
 const (
 	graderHiddenTests     = "hidden_tests"
@@ -65,7 +79,35 @@ var idRE = regexp.MustCompile(`^[a-z0-9][a-z0-9._-]*$`)
 
 // SuiteTemplates lists the suite templates in a stable order.
 func SuiteTemplates() []string {
-	return []string{TemplatePythonPytest, TemplateNodeTest, TemplateGoTest, TemplateGenericReward}
+	return append([]string{TemplatePythonPytest, TemplateNodeTest, TemplateGoTest, TemplateGenericReward}, ScenarioTemplates()...)
+}
+
+// ScenarioTemplates lists the scenario suite templates in a stable order.
+func ScenarioTemplates() []string {
+	return []string{TemplateToolUse, TemplateMCP, TemplateMemory, TemplateQA}
+}
+
+// IsScenarioTemplate reports whether tmpl is a scenario suite template.
+func IsScenarioTemplate(tmpl string) bool {
+	_, ok := scenarioSamples[tmpl]
+	return ok
+}
+
+// ScenarioSample names the sample task a scenario template writes, or "".
+func ScenarioSample(tmpl string) string { return scenarioSamples[tmpl] }
+
+// scenarioSamples names the sample task each scenario template writes.
+var scenarioSamples = map[string]string{
+	TemplateToolUse: "restock",
+	TemplateMCP:     "restock",
+	TemplateMemory:  "launch-date",
+	TemplateQA:      "hotel-cap",
+}
+
+// stateTemplate reports whether a scenario template grades a tool server's
+// final state (as opposed to an answer).
+func stateTemplate(tmpl string) bool {
+	return tmpl == TemplateToolUse || tmpl == TemplateMCP
 }
 
 // ValidID reports whether id is usable as a suite or task id (and folder).
@@ -129,6 +171,18 @@ var suiteAbout = map[string]string{
 		"`<import path>::<TestName>`.",
 	TemplateGenericReward: "Each task's verifier/tests/test.sh decides and writes a reward to /grader/out/reward.json\n" +
 		"(the Harbor task shape). A reward of at least `pass_threshold` passes.",
+	TemplateToolUse: "Each task starts an HTTP tool server beside the agent, seeded with the task's data. The agent\n" +
+		"reaches it through the per-run tool proxy (every call lands in the run's tools.jsonl), and the\n" +
+		"hidden verifier checks the server's final state, exported after the agent exits.",
+	TemplateMCP: "Each task starts an MCP server (streamable HTTP) beside the agent, seeded with the task's data.\n" +
+		"The agent is told about it in its own config format and reaches it through the per-run tool\n" +
+		"proxy (every call lands in the run's tools.jsonl); the hidden verifier checks the server's\n" +
+		"final state, exported after the agent exits.",
+	TemplateMemory: "Each task runs the agent once per session, resetting the workspace in between, so only the\n" +
+		"agent's memory carries facts forward. The last session's answer is matched against the\n" +
+		"task's hidden answer.yaml by the answer_match grader, with no model.",
+	TemplateQA: "Each task asks one question about the documents in the workspace. The answer is matched\n" +
+		"against the task's hidden answer.yaml by the answer_match grader, with no model.",
 }
 
 // Suite returns the files of a new suite folder from a template: suite.yaml,
@@ -153,6 +207,7 @@ func Suite(opts SuiteOptions) ([]File, error) {
 	data := map[string]any{
 		"ID": opts.ID, "Template": opts.Template, "Image": image,
 		"Dockerfile": strings.TrimSpace(opts.Image) == "", "About": about, "Build": build,
+		"Sample": scenarioSamples[opts.Template], "State": stateTemplate(opts.Template), "Memory": opts.Template == TemplateMemory,
 	}
 	files, err := renderTree("templates/suites/"+opts.Template, data)
 	if err != nil {
@@ -161,6 +216,11 @@ func Suite(opts SuiteOptions) ([]File, error) {
 	common, err := renderTree("templates/suites/common", data)
 	if err != nil {
 		return nil, err
+	}
+	if IsScenarioTemplate(opts.Template) {
+		if common, err = scenarioCommon(opts.Template, common, data); err != nil {
+			return nil, err
+		}
 	}
 	files = append(files, common...)
 	if strings.TrimSpace(opts.Image) != "" {
@@ -174,6 +234,35 @@ func Suite(opts SuiteOptions) ([]File, error) {
 	}
 	sortFiles(files)
 	return files, nil
+}
+
+// scenarioCommon swaps the repository-task README of common for the
+// scenario README and adds what every scenario template shares: the base
+// Dockerfile, and for state templates the tool-error probe and the state
+// verifier of the sample task.
+func scenarioCommon(tmpl string, common []File, data map[string]any) ([]File, error) {
+	shared, err := renderTree("templates/scenario", data)
+	if err != nil {
+		return nil, err
+	}
+	out := common[:0]
+	for _, f := range common {
+		if f.Path != "README.md" {
+			out = append(out, f)
+		}
+	}
+	for _, f := range shared {
+		switch {
+		case f.Path == "README.md" || f.Path == "base/Dockerfile":
+		case stateTemplate(tmpl) && f.Path == "probes/tool-error.yaml":
+		case stateTemplate(tmpl) && f.Path == "verify.py":
+			f.Path = "tasks/" + scenarioSamples[tmpl] + "/verifier/tests/verify.py"
+		default:
+			continue
+		}
+		out = append(out, f)
+	}
+	return out, nil
 }
 
 // WriteFiles writes files under dir, creating folders as needed. An existing

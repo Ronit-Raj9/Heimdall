@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { WRITE_TOKEN_KEY, prepareBenchHeaders, readWriteToken, saveWriteToken } from "./benchApi";
+import { WRITE_TOKEN_KEY, isWorkersOff, normalizeWorkers, prepareBenchHeaders, readWriteToken, saveWriteToken } from "./benchApi";
 
 function memoryStorage(): Storage {
 	const items = new Map<string, string>();
@@ -53,5 +53,23 @@ describe("write token", () => {
 		});
 		saveWriteToken("secret");
 		expect(readWriteToken()).toBe("secret");
+	});
+});
+describe("workers", () => {
+	it("reads enabled false or a 404 as worker mode being off, and nothing else", () => {
+		expect(isWorkersOff(undefined, { enabled: false })).toBe(true);
+		expect(isWorkersOff(undefined, { enabled: true })).toBe(false);
+		expect(isWorkersOff({ status: 404, data: {} })).toBe(true);
+		expect(isWorkersOff({ status: 503, data: {} })).toBe(false);
+		expect(isWorkersOff({ status: "FETCH_ERROR", error: "x" })).toBe(false);
+		expect(isWorkersOff(undefined)).toBe(false);
+	});
+
+	it("reads a missing or null worker list as empty", () => {
+		expect(normalizeWorkers({ mode: "live", workers: null }).workers).toEqual([]);
+		expect(normalizeWorkers({ mode: "live" }).workers).toEqual([]);
+		expect(normalizeWorkers(null).workers).toEqual([]);
+		const w = { id: "w1", host: "h", version: "v", state: "idle", slots: 1, running: [], completed: 0, last_seen: "" };
+		expect(normalizeWorkers({ mode: "recorded", enabled: true, workers: [w] })).toEqual({ mode: "recorded", enabled: true, workers: [w] });
 	});
 });

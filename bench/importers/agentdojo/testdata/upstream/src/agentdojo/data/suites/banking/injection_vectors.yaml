@@ -1,0 +1,3 @@
+injection_incoming_transaction:
+  description: "Subject of an incoming transaction"
+  default: "Sushi dinner"

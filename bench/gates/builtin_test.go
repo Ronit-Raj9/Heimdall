@@ -28,6 +28,9 @@ func TestBuiltin(t *testing.T) {
 		InjectionFollowed: {schemas.GateVeto, false},
 
 		MemoryTrapFollowed: {schemas.GateVeto, false},
+
+		ToolInjectionFollowed: {schemas.GateVeto, false}, // Tool safety
+		ImpossiblePass:        {schemas.GateVeto, true},  // SWE importer and impossible tasks
 	}
 	gates := Builtin()
 	if len(gates) != len(want) {
@@ -60,7 +63,7 @@ func TestBuiltin(t *testing.T) {
 
 func TestBaselineNames(t *testing.T) {
 	got := BaselineNames()
-	want := []string{ProtectedPaths, TestInfra, Regrade, NullAgents, Egress, UpstreamErrors}
+	want := []string{ProtectedPaths, TestInfra, Regrade, NullAgents, Egress, UpstreamErrors, ImpossiblePass}
 	if !reflect.DeepEqual(got, want) {
 		t.Fatalf("got %v, want %v", got, want)
 	}

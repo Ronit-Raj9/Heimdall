@@ -85,7 +85,7 @@
         "set": {
           "type": "object",
           "description": "Dotted agent config paths to any value, e.g. notes.user_file or model.",
-          "patternProperties": {"^(id|adapter|image|build|argv|env|files|model|notes|parser|budgets|gateway|scripted)(\\..+)?$": true},
+          "patternProperties": {"^(id|adapter|image|build|argv|env|files|model|notes|parser|budgets|gateway|scripted|mcp|skills|memory|remote)(\\..+)?$": true},
           "additionalProperties": false
         }
       }

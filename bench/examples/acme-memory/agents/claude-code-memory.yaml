@@ -1,0 +1,83 @@
+# Claude Code, headless, through the bench's Bifrost gateway, with its own
+# memory switched on: the agent this example's memory tasks are written for.
+#
+# Copied from the bench's agents/claude-code.yaml (the image is the bench's
+# bench/agent-claude-code:1, built on bench/coding-core-base:1, which is also
+# this project's suite base; its Dockerfile is copied to
+# agents/images/claude-code/). Three changes:
+# - CLAUDE_CODE_DISABLE_AUTO_MEMORY is "0" instead of "1", so Claude Code
+#   may keep notes in its auto memory under CLAUDE_CONFIG_DIR.
+# - memory.paths keeps /home/agent/.claude (CLAUDE_CONFIG_DIR, where that
+#   auto memory lives) between the sessions of a task. The bench also keeps
+#   the /memory volume (BENCH_MEMORY_DIR), which the instructions mention.
+# - The id is claude-code-memory, so its runs never mix with the bench's own
+#   claude-code config on the leaderboard.
+#
+# Everything that keeps Claude Code off every network but the gateway is
+# unchanged: web tools disallowed, telemetry, error reporting, update checks
+# and nonessential traffic off.
+#
+# Launch pattern taken from Bifrost's own CLI harness:
+# - argv: tests/e2e/clis/matrix_test.go and runner_test.go run
+#   `claude -p --dangerously-skip-permissions --model <m> <prompt>`; the
+#   stream-json driver adds `--output-format stream-json --verbose` (stream-json
+#   output requires --verbose).
+# - auth: cli/internal/harness/harness.go (AuthTokenEnv ANTHROPIC_AUTH_TOKEN for
+#   a virtual key) and cli/internal/runtime/runtime.go (ANTHROPIC_API_KEY is
+#   cleared so no other credential wins).
+# - model: cli/internal/harness/native_config.go pins ANTHROPIC_MODEL and every
+#   tier (sonnet, opus, haiku), so subagents and background calls use the one
+#   model the run's virtual key allows.
+# The bench adds the session headers, an isolated config directory and the
+# switches that keep Claude Code off every network but the gateway.
+id: claude-code-memory
+adapter: command
+image: bench/agent-claude-code:1
+build:
+  dockerfile: agents/images/claude-code/Dockerfile
+  tag: bench/agent-claude-code:1
+argv:
+  - claude
+  - -p
+  - --dangerously-skip-permissions
+  - --output-format
+  - stream-json
+  - --verbose
+  # Provider-side web tools would reach the internet past the internal
+  # network and could fetch task answers, so they are switched off.
+  - --disallowedTools
+  - WebSearch,WebFetch
+  - --model
+  - "{{model}}"
+  - "{{instruction}}"
+env:
+  ANTHROPIC_BASE_URL: "{{gateway.url}}/anthropic"
+  ANTHROPIC_AUTH_TOKEN: "{{run.key}}"
+  ANTHROPIC_API_KEY: ""
+  ANTHROPIC_MODEL: "{{model}}"
+  ANTHROPIC_DEFAULT_SONNET_MODEL: "{{model}}"
+  ANTHROPIC_DEFAULT_OPUS_MODEL: "{{model}}"
+  ANTHROPIC_DEFAULT_HAIKU_MODEL: "{{model}}"
+  ANTHROPIC_CUSTOM_HEADERS: "x-bf-session-id: {{run.session}}\nx-bf-session-affinity: off"
+  CLAUDE_CONFIG_DIR: /home/agent/.claude
+  CLAUDE_CODE_DISABLE_AUTO_MEMORY: "0"
+  DISABLE_AUTOUPDATER: "1"
+  DISABLE_TELEMETRY: "1"
+  CLAUDE_CODE_DISABLE_TELEMETRY: "1"
+  CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC: "1"
+  DISABLE_ERROR_REPORTING: "1"
+# Placeholder: every experiment sets the model (an arm may vary it).
+model: claude-sonnet-4-5
+notes:
+  project_file: CLAUDE.md
+  user_path: /home/agent/.claude/CLAUDE.md
+parser: claudecode
+memory:
+  paths: [/home/agent/.claude]
+budgets:
+  wall_s: 900
+  cpus: 2
+  mem_gb: 4
+gateway:
+  provider: anthropic
+  max_retries: 0

@@ -1,0 +1,8 @@
+schema_version: 3
+language: en
+domains:
+  airline:
+    source: registry
+  retail:
+    source: registry
+    tasks_file: retail_tasks_en.json

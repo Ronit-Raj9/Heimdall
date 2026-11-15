@@ -12,6 +12,7 @@ import type {
 	Experiment,
 	GridResponse,
 	HealthResponse,
+	ImportsResponse,
 	LeaderboardParams,
 	LeaderboardResponse,
 	PairResponse,
@@ -29,6 +30,7 @@ import type {
 	SuitesResponse,
 	TriageResponse,
 	VerdictResponse,
+	WorkersResponse,
 } from "@/lib/types/bench";
 import { createApi, fetchBaseQuery, type BaseQueryFn, type FetchArgs, type FetchBaseQueryError } from "@reduxjs/toolkit/query/react";
 import { BENCH_API_BASE, detectFixtureMode, resolveFixture } from "./fixtures";
@@ -132,6 +134,21 @@ const fixtureBaseQuery: BenchBaseQuery = async (args) => {
 const id = (value: string) => encodeURIComponent(value);
 
 /**
+ * True when GET /workers says worker mode is off rather than broken: the list answers enabled
+ * false (BENCH_WORKER_TOKEN unset), or a server without the route answers 404.
+ */
+export function isWorkersOff(error: unknown, data?: { enabled?: boolean }): boolean {
+	if (data && data.enabled === false) return true;
+	return Boolean(error && typeof error === "object" && "status" in error && (error as { status: unknown }).status === 404);
+}
+
+/** GET /workers with a missing or null list read as empty, so the table never has to tell null from none. */
+export function normalizeWorkers(raw: unknown): WorkersResponse {
+	const body = (raw ?? {}) as WorkersResponse;
+	return { ...body, workers: Array.isArray(body.workers) ? body.workers : [] };
+}
+
+/**
  * Every route of DESIGN.md 16.7. Tags are per entity and per id, so a regrade refreshes one
  * experiment's analysis and nothing else.
  */
@@ -156,6 +173,8 @@ export const benchApi = createApi({
 		"BenchLeaderboard",
 		"BenchSuites",
 		"BenchAgents",
+		"BenchImports",
+		"BenchWorkers",
 	],
 	endpoints: (builder) => ({
 		getHealth: builder.query<HealthResponse, void>({
@@ -272,6 +291,17 @@ export const benchApi = createApi({
 			query: () => "/agents",
 			providesTags: ["BenchAgents"],
 		}),
+		// Importers the server links: what each converts and what a run of it needs. Read-only.
+		getImports: builder.query<ImportsResponse, void>({
+			query: () => "/imports",
+			providesTags: ["BenchImports"],
+		}),
+		// Remote workers. enabled false, or a 404 from a server without the route, means worker mode is off (isWorkersOff).
+		getWorkers: builder.query<WorkersResponse, void>({
+			query: () => "/workers",
+			transformResponse: (raw: unknown) => normalizeWorkers(raw),
+			providesTags: ["BenchWorkers"],
+		}),
 
 		// Analysis
 		auditTable: builder.mutation<AuditResponse, AuditRequest>({
@@ -313,6 +343,8 @@ export const {
 	useGetSuitesQuery,
 	useGetSuiteTaskQuery,
 	useGetAgentsQuery,
+	useGetImportsQuery,
+	useGetWorkersQuery,
 	useListReleasesQuery,
 	useGetReleaseQuery,
 	useCreateReleaseMutation,

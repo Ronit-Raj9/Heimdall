@@ -87,6 +87,25 @@ export interface Grade {
 	diff_sha256: string;
 	/** Set on regrades. */
 	parent_seal?: string;
+	/** How the grade was reached when it is not a clean-room diff grade: snapshot, answer or state. */
+	mode?: string;
+	/** A judge model decided `passed` (a judged suite). */
+	judged?: boolean;
+	judge?: JudgeRecord;
+	/** The task's answer category, for breakdowns. */
+	category?: string;
+}
+
+/** What one judged grade rested on (schemas.JudgeRecord). The judge's cost is never the agent's. */
+export interface JudgeRecord {
+	model: string;
+	prompt_version: string;
+	prompt_sha256: string;
+	/** Each call's verdict: correct, incorrect or unparsable. */
+	votes: string[];
+	usd: Value;
+	/** Price snapshot the judge cost was priced from. */
+	price_ref?: string;
 }
 
 // ---------------------------------------------------------------------------------------------
@@ -854,6 +873,16 @@ export interface RunDetail {
 	receipts: Receipt[];
 	/** Why a sealed run's files no longer match its seal.json or seals.log; absent when they match or the run is not sealed. */
 	seal_error?: string;
+	// Scenario evidence (scenario.go). Each is absent for a plain diff run.
+	/** The tool proxy ledger, in call order. */
+	tool_calls?: ToolCall[];
+	/** One per session of a multi-session run, in order. */
+	sessions?: SessionResult[];
+	answer?: Answer;
+	/** Service state exported after the agent exited. */
+	state?: StateFile[];
+	/** Services that ran beside the agent. */
+	services?: ServiceResult[];
 }
 
 /** GET /runs/{id}/events */
@@ -1300,6 +1329,19 @@ export interface SuiteTask {
 	protected_globs: number;
 	mutants: number;
 	agent_timeout_s: number;
+	// Scenario fields (scenario.go). Each is absent for a repository task.
+	/** The task's own image instead of the suite's base image plus a repo folder. */
+	environment?: TaskEnvironment;
+	/** Started beside the agent, after the suite's. Served without environment, seed files or commands. */
+	services?: ServiceSpec[];
+	/** In run order; absent means one session from the instruction. */
+	sessions?: SessionSpec[];
+	/** The task's own output; absent uses the suite's. */
+	output?: OutputSpec;
+	/** Skill folder names, each holding a SKILL.md. */
+	skills?: string[];
+	/** No honest solution exists: a pass can only come from cheating. */
+	impossible?: boolean;
 }
 
 /** One pack. A pack that failed to load has `error` set and its other fields empty. */
@@ -1325,6 +1367,17 @@ export interface SuiteSummary {
 	probes: SuiteProbe[];
 	tasks: SuiteTask[];
 	error?: string;
+	// Scenario fields (scenario.go).
+	/** Leaderboard track; the server sends coding when the suite sets none. */
+	track?: Track;
+	/** verified, or judged: outcomes from a pinned judge model, never compared with verified suites. */
+	grading?: Grading;
+	/** What the verifier reads; absent means diff. */
+	output?: OutputKind;
+	/** Ids of the suite's services, started in every run. */
+	services?: string[];
+	/** Where an imported suite came from. */
+	imported?: ImportRecord;
 }
 
 /** GET /suites: every pack under the benchmarks root, sorted by id. */
@@ -1408,6 +1461,244 @@ export interface AgentList {
 }
 
 // ---------------------------------------------------------------------------------------------
+// scenario.go: tasks beyond "edit a repository and pass hidden tests" (docs/scenarios-design.md).
+// Every field added to an older type for scenarios is optional here, as it is omitempty there.
+// ---------------------------------------------------------------------------------------------
+
+/** Suite tracks group suites on the leaderboard (Suite.Track). */
+export type Track = "coding" | "terminal" | "tool_use" | "mcp" | "memory" | "skills" | "safety" | "qa";
+
+/** The tracks in display order. */
+export const TRACKS: readonly Track[] = ["coding", "terminal", "tool_use", "mcp", "memory", "skills", "safety", "qa"];
+
+/** verified: a deterministic check. judged: a pinned judge model decides; never compared with verified. */
+export type Grading = "verified" | "judged";
+
+/** What the verifier reads (OutputSpec.Kind). */
+export type OutputKind = "diff" | "answer" | "state";
+
+/** A task's own container image (schemas.TaskEnvironment). */
+export interface TaskEnvironment {
+	image?: string;
+	/** Relative to the task folder; builds the image when `image` is empty. */
+	dockerfile?: string;
+	context?: string;
+	/** Folder inside the image that seeds the workspace volume. */
+	workspace_path?: string;
+	verifier_image?: string;
+	/** Network during the image build only; the run never gets it. */
+	build_network?: boolean;
+}
+
+/** An image to build or pull (schemas.ImageSpec). */
+export interface ImageSpec {
+	dockerfile?: string;
+	tag: string;
+	digest?: string;
+	base_arg?: string;
+	context?: string;
+}
+
+/** When a service is ready (schemas.ReadyCheck). */
+export interface ReadyCheck {
+	argv?: string[];
+	http?: string;
+	timeout_s?: number;
+}
+
+/** One piece of a service's final state read after the agent exits (schemas.StateExport). */
+export interface StateExport {
+	id: string;
+	argv?: string[];
+	path?: string;
+	max_bytes?: number;
+}
+
+/** How an MCP service is reached (schemas.MCPEndpoint). */
+export interface MCPEndpoint {
+	transport?: string;
+	path?: string;
+}
+
+export type ServiceRole = "data" | "tool" | "mcp" | "user";
+
+/**
+ * One container started beside the agent (schemas.ServiceSpec). The suites API serves it without
+ * env, files or argv, and with export ids and paths only.
+ */
+export interface ServiceSpec {
+	id: string;
+	role?: ServiceRole;
+	image?: string;
+	build?: ImageSpec;
+	argv?: string[];
+	env?: Record<string, string>;
+	files?: Record<string, string>;
+	port?: number;
+	ready?: ReadyCheck;
+	export?: StateExport[];
+	mcp?: MCPEndpoint;
+	/** Routed through the per-run tool proxy; absent means true for tool and mcp services. */
+	proxy?: boolean;
+	/** Off the agent's network: only the verifier and other services reach it. */
+	hidden?: boolean;
+}
+
+/** One agent session of a multi-session task (schemas.SessionSpec). */
+export interface SessionSpec {
+	id: string;
+	/** Instruction file, relative to the task folder. */
+	instruction: string;
+	/** Folder copied into the workspace before the session starts. */
+	files?: string;
+	/** Keeps the previous session's workspace instead of resetting it. */
+	keep_workspace?: boolean;
+	wall_s?: number;
+}
+
+/** What the verifier reads (schemas.OutputSpec). */
+export interface OutputSpec {
+	kind?: OutputKind;
+	/** Where the agent writes its answer, relative to the workspace (default answer.txt). */
+	answer_path?: string;
+}
+
+/** Where an imported suite came from (schemas.ImportRecord). */
+export interface ImportRecord {
+	importer: string;
+	/** For example terminal-bench@2.1. */
+	benchmark: string;
+	/** Repository or dataset URL. */
+	source: string;
+	revision?: string;
+	/** SPDX id as upstream states it. */
+	license: string;
+	at: string;
+}
+
+/** The injected fault that answered instead of the tool server. */
+export type ToolFaultMode = "error" | "timeout" | "poison";
+
+/**
+ * One tool invocation recorded by the per-run tool proxy (schemas.ToolCall). Arguments and results
+ * are agent- and tool-written: inert text, never parsed or rendered as HTML.
+ */
+export interface ToolCall {
+	/** 1-based order within the run. */
+	seq: number;
+	session?: string;
+	/** Service id. */
+	server: string;
+	/** Tool name; for plain HTTP tool servers the method and path. */
+	tool: string;
+	protocol: string;
+	arguments?: string;
+	args_sha256: string;
+	result?: string;
+	result_sha256: string;
+	is_error: boolean;
+	/** HTTP status from the tool server. */
+	status?: number;
+	fault?: ToolFaultMode;
+	nonce?: string;
+	started: string;
+	latency_ms: number;
+	/** The proxy could not hand the answer to the agent (it hung up first). */
+	undelivered?: boolean;
+}
+
+/** Where the exported answer came from. */
+export type AnswerSource = "file" | "final_message" | "missing";
+
+/** The agent's exported answer (schemas.Answer). Inert text. */
+export interface Answer {
+	text: string;
+	source: AnswerSource;
+	sha256: string;
+	truncated?: boolean;
+}
+
+/** How one session of a multi-session run ended (schemas.SessionResult). */
+export interface SessionResult {
+	id: string;
+	/** 1-based. */
+	index: number;
+	exit_code: number;
+	timed_out: boolean;
+	started: string;
+	ended: string;
+	/** agent.stream.<index>.jsonl in the run folder. */
+	stdout_path: string;
+}
+
+/** One service of a run: what ran and whether it came up (schemas.ServiceResult). */
+export interface ServiceResult {
+	id: string;
+	role?: ServiceRole;
+	image: string;
+	image_id?: string;
+	ready: boolean;
+	error?: string;
+	proxied?: boolean;
+}
+
+/** One exported piece of service state in the run folder (schemas.StateFile). */
+export interface StateFile {
+	service: string;
+	id: string;
+	/** Relative to the run folder: state/<service>/<id>. */
+	path: string;
+	sha256: string;
+	bytes: number;
+	error?: string;
+}
+
+/** One importer as `bifrost-bench import list` prints it (importers.Info). */
+export interface ImporterInfo {
+	/** Format name, for example harbor. */
+	name: string;
+	/** Upstream benchmarks in this format, for example terminal-bench@2.1. */
+	benchmarks: string[];
+	/** Where to get the data: a clone or download command. */
+	source: string;
+	/** As upstream states it; "varies" when per task. */
+	license: string;
+	track: Track;
+	grading: Grading;
+	/** What a run needs beyond the default stack, in plain words. */
+	needs: string[];
+	summary: string;
+}
+
+/** GET /imports: every importer the server links, sorted by name. */
+export interface ImportList {
+	importers: ImporterInfo[];
+}
+
+export type WorkerState = "idle" | "running" | "lost";
+
+/** One remote worker (schemas.WorkerInfo). */
+export interface WorkerInfo {
+	id: string;
+	host: string;
+	/** Bench build the worker runs. */
+	version: string;
+	state: WorkerState;
+	/** Concurrent runs it offers. */
+	slots: number;
+	/** Slot ids it holds. */
+	running: string[];
+	completed: number;
+	last_seen: string;
+}
+
+/** GET /workers. enabled false means worker mode is off (BENCH_WORKER_TOKEN unset); so does a 404 from an older server. */
+export interface WorkerList {
+	enabled: boolean;
+	workers: WorkerInfo[];
+}
+
+// ---------------------------------------------------------------------------------------------
 // HTTP responses (DESIGN.md 16.7). Every one carries `mode`.
 // ---------------------------------------------------------------------------------------------
 
@@ -1436,3 +1727,5 @@ export type LeaderboardResponse = WithMode<Leaderboard>;
 export type SuitesResponse = WithMode<SuiteList>;
 export type SuiteTaskResponse = WithMode<SuiteTaskDetail>;
 export type AgentsResponse = WithMode<AgentList>;
+export type ImportsResponse = WithMode<ImportList>;
+export type WorkersResponse = WithMode<WorkerList>;

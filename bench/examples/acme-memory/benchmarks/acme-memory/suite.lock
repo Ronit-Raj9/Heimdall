@@ -1,0 +1,398 @@
+{
+  "suite": "acme-memory",
+  "version": "1.0.0",
+  "base_image": {
+    "tag": "bench/coding-core-base:1"
+  },
+  "tasks": {
+    "shipping-preference": {
+      "version": "1.0.0",
+      "instruction_sha256": "53cbedd81835a4459a216c3da0e4bd75090a6459d7fc912dc36bbec5ff1c5355",
+      "repo_tree_sha256": "e41db661d8c186a34861c307ef783747ca2983f78c8dfe5a96e5da6ef24b73fe",
+      "verifier_sha256": "91254baa56e0a5345548d256ba99a175caec7fc9823c2035b6c61e1327fb74be",
+      "controls_sha256": "ff1861e7655c4dd97b79f2f0da4328ddcc5b99b76cc877b574d5fd6571e24d0e",
+      "fixtures_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "status": "admitted",
+      "admission": {
+        "admitted": true,
+        "checks": [
+          {
+            "name": "static_validation",
+            "want": "clean",
+            "got": "clean",
+            "passed": true,
+            "detail": "0 warnings"
+          },
+          {
+            "name": "reference_1",
+            "want": "pass",
+            "got": "pass",
+            "passed": true,
+            "detail": "solution/answer.txt exit 0; tests_ran=0 failures=0 errors=0 skipped=0 exit=0 reason=contains_all: answer matches"
+          },
+          {
+            "name": "reference_2",
+            "want": "pass",
+            "got": "pass",
+            "passed": true,
+            "detail": "solution/answer.txt exit 0; tests_ran=0 failures=0 errors=0 skipped=0 exit=0 reason=contains_all: answer matches"
+          },
+          {
+            "name": "reference_3",
+            "want": "pass",
+            "got": "pass",
+            "passed": true,
+            "detail": "solution/answer.txt exit 0; tests_ran=0 failures=0 errors=0 skipped=0 exit=0 reason=contains_all: answer matches"
+          },
+          {
+            "name": "empty_control",
+            "want": "fail",
+            "got": "fail",
+            "passed": true,
+            "detail": "controls/empty.txt exit 0; tests_ran=0 failures=0 errors=0 skipped=0 exit=0 reason=no answer: answer.txt is empty"
+          },
+          {
+            "name": "mutant_1",
+            "want": "fail",
+            "got": "fail",
+            "passed": true,
+            "detail": "controls/old-office.txt exit 0; tests_ran=0 failures=0 errors=0 skipped=0 exit=0 reason=contains_all: answer does not match; got \"41 Quarry Road, Unit 3, Millbrook, MB4 2TT\""
+          },
+          {
+            "name": "mutant_2",
+            "want": "fail",
+            "got": "fail",
+            "passed": true,
+            "detail": "controls/wrong-locker.txt exit 0; tests_ran=0 failures=0 errors=0 skipped=0 exit=0 reason=contains_all: answer does not match; got \"The parcel locker at Millbrook Station\""
+          },
+          {
+            "name": "wrong_answer_1",
+            "want": "fail",
+            "got": "fail",
+            "passed": true,
+            "detail": "wrong answer from the answer spec exit 0; tests_ran=0 failures=0 errors=0 skipped=0 exit=0 reason=contains_all: answer does not match; got \"41 Quarry Road, Unit 3, Millbrook, MB4 2TT\""
+          },
+          {
+            "name": "wrong_answer_2",
+            "want": "fail",
+            "got": "fail",
+            "passed": true,
+            "detail": "wrong answer from the answer spec exit 0; tests_ran=0 failures=0 errors=0 skipped=0 exit=0 reason=contains_all: answer does not match; got \"Rosa's office on Quarry Road\""
+          },
+          {
+            "name": "exploit",
+            "want": "fail",
+            "got": "fail",
+            "passed": true,
+            "detail": "controls/exploit.sh exit 0; tests_ran=0 failures=0 errors=0 skipped=0 exit=0 reason=contains_all: answer does not match; got \"Either 41 Quarry Road or a locker; check with the customer.\""
+          },
+          {
+            "name": "null_noop",
+            "want": "fail",
+            "got": "fail",
+            "passed": true,
+            "detail": "noop exit 0; tests_ran=0 failures=0 errors=0 skipped=0 exit=0 reason=no answer: answer.txt is empty"
+          },
+          {
+            "name": "null_refuse",
+            "want": "fail",
+            "got": "fail",
+            "passed": true,
+            "detail": "refuse exit 0; tests_ran=0 failures=0 errors=0 skipped=0 exit=0 reason=contains_all: answer does not match; got \"I can't complete this task.\""
+          },
+          {
+            "name": "instruction_edited",
+            "want": "edited",
+            "got": "edited",
+            "passed": true
+          },
+          {
+            "name": "secret_scan",
+            "want": "none",
+            "got": "none",
+            "passed": true
+          },
+          {
+            "name": "verifier_no_network",
+            "want": "none",
+            "got": "none",
+            "passed": true,
+            "detail": "reported by grader answer_match"
+          }
+        ],
+        "at": "2026-11-15T09:13:37.244709239Z",
+        "grader": "answer_match",
+        "reference_repeats": 3,
+        "reference_results": [
+          "pass",
+          "pass",
+          "pass"
+        ]
+      }
+    },
+    "standup-freeze": {
+      "version": "1.0.0",
+      "instruction_sha256": "16501ae486c1d1be54bd0b3fec839c5dc1a4cf75c022b39e0f0fef6a6c0b9d58",
+      "repo_tree_sha256": "e41db661d8c186a34861c307ef783747ca2983f78c8dfe5a96e5da6ef24b73fe",
+      "verifier_sha256": "150bdd68712ab0078556118054aa253df5646da7ffc432b9e650668db174d869",
+      "controls_sha256": "9cd275c9a99f7403afe842fc381e049a59272d097a5bd4192a2e1f1bdf2c4341",
+      "fixtures_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "status": "admitted",
+      "admission": {
+        "admitted": true,
+        "checks": [
+          {
+            "name": "static_validation",
+            "want": "clean",
+            "got": "clean",
+            "passed": true,
+            "detail": "0 warnings"
+          },
+          {
+            "name": "reference_1",
+            "want": "pass",
+            "got": "pass",
+            "passed": true,
+            "detail": "solution/answer.txt exit 0; tests_ran=0 failures=0 errors=0 skipped=0 exit=0 reason=exact: answer matches"
+          },
+          {
+            "name": "reference_2",
+            "want": "pass",
+            "got": "pass",
+            "passed": true,
+            "detail": "solution/answer.txt exit 0; tests_ran=0 failures=0 errors=0 skipped=0 exit=0 reason=exact: answer matches"
+          },
+          {
+            "name": "reference_3",
+            "want": "pass",
+            "got": "pass",
+            "passed": true,
+            "detail": "solution/answer.txt exit 0; tests_ran=0 failures=0 errors=0 skipped=0 exit=0 reason=exact: answer matches"
+          },
+          {
+            "name": "empty_control",
+            "want": "fail",
+            "got": "fail",
+            "passed": true,
+            "detail": "controls/empty.txt exit 0; tests_ran=0 failures=0 errors=0 skipped=0 exit=0 reason=no answer: answer.txt is empty"
+          },
+          {
+            "name": "mutant_1",
+            "want": "fail",
+            "got": "fail",
+            "passed": true,
+            "detail": "controls/release-date.txt exit 0; tests_ran=0 failures=0 errors=0 skipped=0 exit=0 reason=exact: answer does not match; got \"2026-06-04\""
+          },
+          {
+            "name": "mutant_2",
+            "want": "fail",
+            "got": "fail",
+            "passed": true,
+            "detail": "controls/old-freeze.txt exit 0; tests_ran=0 failures=0 errors=0 skipped=0 exit=0 reason=exact: answer does not match; got \"2026-05-20\""
+          },
+          {
+            "name": "wrong_answer_1",
+            "want": "fail",
+            "got": "fail",
+            "passed": true,
+            "detail": "wrong answer from the answer spec exit 0; tests_ran=0 failures=0 errors=0 skipped=0 exit=0 reason=exact: answer does not match; got \"2026-05-20\""
+          },
+          {
+            "name": "wrong_answer_2",
+            "want": "fail",
+            "got": "fail",
+            "passed": true,
+            "detail": "wrong answer from the answer spec exit 0; tests_ran=0 failures=0 errors=0 skipped=0 exit=0 reason=exact: answer does not match; got \"2026-06-04\""
+          },
+          {
+            "name": "wrong_answer_3",
+            "want": "fail",
+            "got": "fail",
+            "passed": true,
+            "detail": "wrong answer from the answer spec exit 0; tests_ran=0 failures=0 errors=0 skipped=0 exit=0 reason=exact: answer does not match; got \"2026-05-28\""
+          },
+          {
+            "name": "exploit",
+            "want": "fail",
+            "got": "fail",
+            "passed": true,
+            "detail": "controls/exploit.sh exit 0; tests_ran=0 failures=0 errors=0 skipped=0 exit=0 reason=exact: answer does not match; got \"2026-05-20, 2026-05-26 or 2026-05-28\""
+          },
+          {
+            "name": "null_noop",
+            "want": "fail",
+            "got": "fail",
+            "passed": true,
+            "detail": "noop exit 0; tests_ran=0 failures=0 errors=0 skipped=0 exit=0 reason=no answer: answer.txt is empty"
+          },
+          {
+            "name": "null_refuse",
+            "want": "fail",
+            "got": "fail",
+            "passed": true,
+            "detail": "refuse exit 0; tests_ran=0 failures=0 errors=0 skipped=0 exit=0 reason=exact: answer does not match; got \"I can't complete this task.\""
+          },
+          {
+            "name": "instruction_edited",
+            "want": "edited",
+            "got": "edited",
+            "passed": true
+          },
+          {
+            "name": "secret_scan",
+            "want": "none",
+            "got": "none",
+            "passed": true
+          },
+          {
+            "name": "verifier_no_network",
+            "want": "none",
+            "got": "none",
+            "passed": true,
+            "detail": "reported by grader answer_match"
+          }
+        ],
+        "at": "2026-11-15T09:12:34.001094053Z",
+        "grader": "answer_match",
+        "reference_repeats": 3,
+        "reference_results": [
+          "pass",
+          "pass",
+          "pass"
+        ]
+      }
+    },
+    "vendor-phone": {
+      "version": "1.0.0",
+      "instruction_sha256": "54fad1e8be547accc6df46ed1e58eb1be9c694f0ea46119e2d5f68aab4289902",
+      "repo_tree_sha256": "e41db661d8c186a34861c307ef783747ca2983f78c8dfe5a96e5da6ef24b73fe",
+      "verifier_sha256": "fe81411e7cd75e42c9781fa0226b1f8928834c01d378b9a04ff8622eeb4018db",
+      "controls_sha256": "153566435f2458961766401a93f75d884c2e052db4366a439732fc633831f13d",
+      "fixtures_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "status": "admitted",
+      "admission": {
+        "admitted": true,
+        "checks": [
+          {
+            "name": "static_validation",
+            "want": "clean",
+            "got": "clean",
+            "passed": true,
+            "detail": "0 warnings"
+          },
+          {
+            "name": "reference_1",
+            "want": "pass",
+            "got": "pass",
+            "passed": true,
+            "detail": "solution/answer.txt exit 0; tests_ran=0 failures=0 errors=0 skipped=0 exit=0 reason=answer says it is not known, as expected"
+          },
+          {
+            "name": "reference_2",
+            "want": "pass",
+            "got": "pass",
+            "passed": true,
+            "detail": "solution/answer.txt exit 0; tests_ran=0 failures=0 errors=0 skipped=0 exit=0 reason=answer says it is not known, as expected"
+          },
+          {
+            "name": "reference_3",
+            "want": "pass",
+            "got": "pass",
+            "passed": true,
+            "detail": "solution/answer.txt exit 0; tests_ran=0 failures=0 errors=0 skipped=0 exit=0 reason=answer says it is not known, as expected"
+          },
+          {
+            "name": "empty_control",
+            "want": "fail",
+            "got": "fail",
+            "passed": true,
+            "detail": "controls/empty.txt exit 0; tests_ran=0 failures=0 errors=0 skipped=0 exit=0 reason=no answer: answer.txt is empty"
+          },
+          {
+            "name": "mutant_1",
+            "want": "fail",
+            "got": "fail",
+            "passed": true,
+            "detail": "controls/made-up-number.txt exit 0; tests_ran=0 failures=0 errors=0 skipped=0 exit=0 reason=expected the answer to say it is not known; got \"+49 69 5500 1840\""
+          },
+          {
+            "name": "mutant_2",
+            "want": "fail",
+            "got": "fail",
+            "passed": true,
+            "detail": "controls/email-instead.txt exit 0; tests_ran=0 failures=0 errors=0 skipped=0 exit=0 reason=expected the answer to say it is not known; got \"support@northwind-archive.example\""
+          },
+          {
+            "name": "wrong_answer_1",
+            "want": "fail",
+            "got": "fail",
+            "passed": true,
+            "detail": "wrong answer from the answer spec exit 0; tests_ran=0 failures=0 errors=0 skipped=0 exit=0 reason=expected the answer to say it is not known; got \"+49 69 5500 1840\""
+          },
+          {
+            "name": "wrong_answer_2",
+            "want": "fail",
+            "got": "fail",
+            "passed": true,
+            "detail": "wrong answer from the answer spec exit 0; tests_ran=0 failures=0 errors=0 skipped=0 exit=0 reason=expected the answer to say it is not known; got \"support@northwind-archive.example\""
+          },
+          {
+            "name": "exploit",
+            "want": "fail",
+            "got": "fail",
+            "passed": true,
+            "detail": "controls/exploit.sh exit 0; tests_ran=0 failures=0 errors=0 skipped=0 exit=0 reason=expected the answer to say it is not known; got \"Maybe +49 69 5500 1840\""
+          },
+          {
+            "name": "null_noop",
+            "want": "fail",
+            "got": "fail",
+            "passed": true,
+            "detail": "noop exit 0; tests_ran=0 failures=0 errors=0 skipped=0 exit=0 reason=no answer: answer.txt is empty"
+          },
+          {
+            "name": "null_refuse",
+            "want": "fail",
+            "got": "fail",
+            "passed": true,
+            "detail": "refuse exit 0; tests_ran=0 failures=0 errors=0 skipped=0 exit=0 reason=expected the answer to say it is not known; got \"I can't complete this task.\""
+          },
+          {
+            "name": "instruction_edited",
+            "want": "edited",
+            "got": "edited",
+            "passed": true
+          },
+          {
+            "name": "secret_scan",
+            "want": "none",
+            "got": "none",
+            "passed": true
+          },
+          {
+            "name": "verifier_no_network",
+            "want": "none",
+            "got": "none",
+            "passed": true,
+            "detail": "reported by grader answer_match"
+          }
+        ],
+        "at": "2026-11-15T09:14:46.853252839Z",
+        "grader": "answer_match",
+        "reference_repeats": 3,
+        "reference_results": [
+          "pass",
+          "pass",
+          "pass"
+        ]
+      }
+    }
+  },
+  "probes": {
+    "model-outage": {
+      "version": "1.0.0",
+      "sha256": "6a434aba4ee1ecdb69c3b68f64bc83c4707d54c73f6a1518b953ef56c172182d"
+    }
+  },
+  "created_at": "2026-11-15T08:06:15.151169516Z"
+}

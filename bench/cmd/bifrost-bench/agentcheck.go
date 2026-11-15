@@ -45,6 +45,15 @@ const (
 	rowEgress    = "egress"
 	rowEvidence  = "evidence"
 	rowClaim     = "claim"
+
+	// Scenario rows, present only when the task has what they check
+	// (docs/scenarios.md): services, an MCP server, a proxied service,
+	// several sessions, an answer output.
+	rowServices = "services"
+	rowMCP      = "mcp_config"
+	rowToolCall = "tool_call"
+	rowSessions = "sessions"
+	rowAnswer   = "answer"
 )
 
 // defaultChecksRoot holds check runs, apart from runs/: a check never enters
@@ -66,6 +75,11 @@ var rowTitles = map[string]string{
 	rowEgress:    "no egress outside the gateway",
 	rowEvidence:  "evidence level",
 	rowClaim:     "completion claim captured",
+	rowServices:  "services ready",
+	rowMCP:       "MCP config rendered",
+	rowToolCall:  "tool call reached the proxy",
+	rowSessions:  "sessions ran in order, memory kept",
+	rowAnswer:    "answer exported",
 }
 
 // checkRow is one line of the conformance report.
@@ -118,6 +132,22 @@ type checkInput struct {
 	gatewayPort int
 	stderr      string // tail of the agent's stderr
 	wallS       int
+	plan        schemas.RunPlan
+	scenario    *checkScenario // nil for a repository task
+}
+
+// checkScenario is what the scenario rows read: the task's declared shape and
+// what the run folder recorded about its services, tool calls, sessions and
+// answer. A record that is missing stays nil (with the reason in its *Err),
+// so a row can say it is unknown instead of reading it as empty.
+type checkScenario struct {
+	suite    *schemas.Suite
+	task     *schemas.Task
+	services []schemas.ServiceResult
+	tools    []schemas.ToolCall
+	toolsErr string // why there is no tool ledger; empty when it was read
+	sessions []schemas.SessionResult
+	answer   *schemas.Answer
 }
 
 // runAgentCheck runs `agent check` and prints the report. Exit 0: no FAIL;
@@ -177,15 +207,17 @@ func agentCheck(ctx context.Context, opts checkOptions, log io.Writer) *checkRep
 	if rep.Task == "" && len(s.TaskIDs) > 0 {
 		rep.Task = s.TaskIDs[0]
 	}
-	if s.TaskByID(rep.Task) == nil {
+	task := s.TaskByID(rep.Task)
+	if task == nil {
 		return rep.fail(fmt.Errorf("task %q is not in suite %s", rep.Task, s.ID))
 	}
 	img, info, row := checkImage(ctx, utils.Docker{}, cfg.Root, agent, s, opts.noBuild, log)
 	rep.Image, rep.ImageID = img.Tag, info.ID
 	if row.Status == checkFail {
-		rep.Rows = append([]checkRow{row}, skippedRows(rowOrder[1:], "the image is not available")...)
+		rep.Rows = append([]checkRow{row}, skippedRows(withScenarioRows(rowOrder[1:], s, task), "the image is not available")...)
 		return rep.finish()
 	}
+	row = ownImageRow(row, agent, task)
 	if err := checkScriptedProxy(ctx, cfg.FaultProxy.ControlURL, os.Getenv("BENCH_FAULTPROXY_TOKEN"), agent.Gateway.Provider); err != nil {
 		return rep.fail(err)
 	}
@@ -208,6 +240,7 @@ func runCheckSlot(ctx context.Context, opts checkOptions, rep *checkReport) (*ch
 	}
 	a.reg.Environments = environments.Builtin(environments.DockerWorkspaceConfig{
 		EvalNetwork: a.cfg.Networks.Eval, HelperImage: a.cfg.Images.Helper, Logger: a.logger, Docker: a.docker, NetWatch: true,
+		ToolProxyImage: a.cfg.Images.ToolProxy, // lead: tool proxy image for runs with proxied services
 	})
 	st, err := store.NewFSStore(a.cfg.Path(opts.runs), a.logger)
 	if err != nil {
@@ -240,7 +273,59 @@ func runCheckSlot(ctx context.Context, opts checkOptions, rep *checkReport) (*ch
 	resolved := m.Arms[engine.CheckArm].Config
 	in := readCheckRun(res.Dir, res.Run, &resolved)
 	in.gatewayHost, in.gatewayPort = gatewayHostPort(a.cfg.Gateway.AgentURL)
+	if t := s.TaskByID(rep.Task); t != nil && isScenarioTask(s, t) {
+		in.scenario = readCheckScenario(res.Dir, &in.ev, s, t)
+	}
 	return in, nil
+}
+
+// isScenarioTask reports whether the task has anything a scenario row
+// checks: services, several sessions or an output other than a diff.
+func isScenarioTask(s *schemas.Suite, t *schemas.Task) bool {
+	return len(utils.TaskServices(s, t)) > 0 || len(t.Sessions) > 1 || utils.OutputKind(s, t) != schemas.OutputDiff
+}
+
+// readCheckScenario reads the scenario records of a sealed check run: from
+// evidence.json when its sources filled them, else from the run folder's own
+// files (services.json, tools.jsonl, sessions.json, answer.txt).
+func readCheckScenario(dir string, ev *schemas.Evidence, s *schemas.Suite, t *schemas.Task) *checkScenario {
+	sc := &checkScenario{suite: s, task: t, services: ev.Services, tools: ev.ToolCalls, sessions: ev.Sessions, answer: ev.Answer}
+	if sc.services == nil {
+		readJSONFile(filepath.Join(dir, "services.json"), &sc.services)
+	}
+	if sc.sessions == nil {
+		readJSONFile(filepath.Join(dir, "sessions.json"), &sc.sessions)
+	}
+	if sc.tools == nil {
+		sc.tools, sc.toolsErr = readToolLedger(filepath.Join(dir, "tools.jsonl"))
+	}
+	if sc.answer == nil {
+		if b, err := os.ReadFile(filepath.Join(dir, "answer.txt")); err == nil {
+			sc.answer = &schemas.Answer{Text: string(b), Source: "file"}
+		}
+	}
+	return sc
+}
+
+// readToolLedger reads the tool proxy's ledger (one schemas.ToolCall per
+// line). A missing file is reported, never read as zero calls.
+func readToolLedger(path string) ([]schemas.ToolCall, string) {
+	b, err := os.ReadFile(path)
+	if err != nil {
+		return nil, "tools.jsonl missing from the run folder (" + err.Error() + ")"
+	}
+	calls := []schemas.ToolCall{}
+	for i, line := range strings.Split(string(b), "\n") {
+		if strings.TrimSpace(line) == "" {
+			continue
+		}
+		var c schemas.ToolCall
+		if err := json.Unmarshal([]byte(line), &c); err != nil {
+			return nil, fmt.Sprintf("tools.jsonl line %d does not parse: %v", i+1, err)
+		}
+		calls = append(calls, c)
+	}
+	return calls, ""
 }
 
 // checkImage is the image row: build the per-suite image (or inspect the
@@ -269,6 +354,24 @@ func checkImage(ctx context.Context, d utils.Docker, root string, agent *schemas
 	}
 	row.Status, row.Detail = checkPass, fmt.Sprintf("prebuilt %s (%s)", img.Tag, shortID(info.ID))
 	return img, info, row
+}
+
+// ownImageRow turns a passing image row into a WARN when the task brings its
+// own image (environment:) and the agent has no build.base_arg: such an agent
+// runs in its own image (engine.AgentImage.OwnImage) and sees only the
+// workspace files, not the tools the task's image installs.
+func ownImageRow(row checkRow, agent *schemas.AgentConfig, task *schemas.Task) checkRow {
+	env := task.Environment
+	if row.Status != checkPass || env == nil || (env.Image == "" && env.Dockerfile == "") {
+		return row
+	}
+	if agent.Adapter == "scripted" || (agent.Build != nil && agent.Build.BaseArg != "") {
+		return row
+	}
+	row.Status = checkWarn
+	row.Detail += fmt.Sprintf("; task %s has its own image, but this agent has no build.base_arg, so it runs in its own image and sees only the workspace files", task.ID)
+	row.Fix = "add build.base_arg (an ARG the Dockerfile builds FROM) so the agent is built on each task's image"
+	return row
 }
 
 // checkScriptedProxy refuses the check unless the fault proxy honours plan
@@ -302,9 +405,8 @@ func readCheckRun(dir string, run *schemas.Run, cfg *schemas.AgentConfig) *check
 	in := &checkInput{agent: cfg, run: run, wallS: cfg.Budgets.WallS}
 	readJSONFile(filepath.Join(dir, "evidence.json"), &in.ev)
 	readJSONFile(filepath.Join(dir, "gates.json"), &in.gates)
-	var plan schemas.RunPlan
-	if readJSONFile(filepath.Join(dir, "plan.json"), &plan) && plan.WallS > 0 {
-		in.wallS = plan.WallS
+	if readJSONFile(filepath.Join(dir, "plan.json"), &in.plan) && in.plan.WallS > 0 {
+		in.wallS = in.plan.WallS
 	}
 	in.net, in.netErr = readNetWatch(filepath.Join(dir, environments.NetWatchFile))
 	if b, err := os.ReadFile(filepath.Join(dir, "agent.stderr.txt")); err == nil {

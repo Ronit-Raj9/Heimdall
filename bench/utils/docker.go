@@ -5,6 +5,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"os"
 	"os/exec"
 	"strings"
 )
@@ -31,11 +32,7 @@ type Docker struct {
 // Run executes `docker args...`. A non-zero exit is returned in ExitCode with a
 // nil error; err is non-nil only when docker could not run or ctx ended.
 func (d Docker) Run(ctx context.Context, args ...string) (*DockerResult, error) {
-	bin := d.Binary
-	if bin == "" {
-		bin = "docker"
-	}
-	cmd := exec.CommandContext(ctx, bin, args...)
+	cmd := exec.CommandContext(ctx, d.bin(), args...)
 	var stdout, stderr bytes.Buffer
 	cmd.Stdout = &stdout
 	cmd.Stderr = &stderr
@@ -63,6 +60,49 @@ func (d Docker) MustRun(ctx context.Context, args ...string) (*DockerResult, err
 		return res, fmt.Errorf("docker %s: exit %d: %s", firstArg(args), res.ExitCode, strings.TrimSpace(string(res.Stderr)))
 	}
 	return res, nil
+}
+
+// Pipe runs `docker from...` with its stdout connected to the stdin of
+// `docker to...`, so a tar stream moves from one container (or image) to
+// another without touching the host file system, and returns the stdout of
+// `docker to`. Both commands must exit 0; the error carries the stderr of the
+// one that failed.
+func (d Docker) Pipe(ctx context.Context, from, to []string) ([]byte, error) {
+	src := exec.CommandContext(ctx, d.bin(), from...)
+	dst := exec.CommandContext(ctx, d.bin(), to...)
+	var srcErr, dstOut, dstErr bytes.Buffer
+	src.Stderr, dst.Stdout, dst.Stderr = &srcErr, &dstOut, &dstErr
+	r, err := src.StdoutPipe()
+	if err != nil {
+		return nil, fmt.Errorf("docker %s: %w", firstArg(from), err)
+	}
+	dst.Stdin = r
+	if err := src.Start(); err != nil {
+		return nil, fmt.Errorf("docker %s: %w", firstArg(from), err)
+	}
+	derr := dst.Run()
+	if derr != nil {
+		// The reader is gone; stop the writer so it does not block forever.
+		if kerr := src.Process.Kill(); kerr != nil && !errors.Is(kerr, os.ErrProcessDone) {
+			derr = errors.Join(derr, kerr)
+		}
+	}
+	serr := src.Wait()
+	switch {
+	case serr != nil && (derr == nil || srcErr.Len() > 0):
+		return nil, fmt.Errorf("docker %s: %w: %s", firstArg(from), serr, strings.TrimSpace(srcErr.String()))
+	case derr != nil:
+		return nil, fmt.Errorf("docker %s: %w: %s", firstArg(to), derr, strings.TrimSpace(dstErr.String()))
+	}
+	return dstOut.Bytes(), nil
+}
+
+// bin is the docker binary to run.
+func (d Docker) bin() string {
+	if d.Binary == "" {
+		return "docker"
+	}
+	return d.Binary
 }
 
 // LabelArgs returns --label flags for the bench label set.

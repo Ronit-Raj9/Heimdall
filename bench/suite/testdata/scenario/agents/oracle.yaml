@@ -1,0 +1,12 @@
+id: oracle
+adapter: scripted
+image: bench/coding-core-base:1
+argv: []
+env: {}
+model: none
+notes:
+  project_file: AGENTS.md
+budgets: {wall_s: 120, cpus: 1, mem_gb: 1}
+gateway: {provider: anthropic, max_retries: 0}
+scripted:
+  kind: oracle

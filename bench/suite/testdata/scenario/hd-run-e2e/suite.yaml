@@ -1,0 +1,14 @@
+id: hd-run-e2e
+version: 1.0.0
+environment: docker_workspace
+grader: verifier_command
+base_image:
+  tag: bench/coding-core-base:1
+workdir: /workspace
+verifier:
+  command: ["sh", "/grader/tests/check.sh"]
+  timeout_s: 60
+  result: exit_code
+track: tool_use
+tasks: [state, recall]
+probes: []

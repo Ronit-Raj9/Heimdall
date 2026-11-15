@@ -1,0 +1,9 @@
+{
+  "task_id": "rename_table",
+  "task_name": "Rename Table",
+  "category_id": "chinook",
+  "difficulty": "L2",
+  "mcp": [
+    "postgres"
+  ]
+}

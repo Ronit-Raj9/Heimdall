@@ -1,6 +1,7 @@
 package main
 
 import (
+	"encoding/json"
 	"fmt"
 	"sort"
 	"strings"
@@ -8,6 +9,7 @@ import (
 
 	"github.com/maximhq/bifrost/bench/environments"
 	"github.com/maximhq/bifrost/bench/schemas"
+	"github.com/maximhq/bifrost/bench/utils"
 )
 
 // maxListed bounds how many hosts or paths a row detail lists.
@@ -19,18 +21,112 @@ const sessionVar = "{{run.session}}"
 // checkRows evaluates every row after the image row from one sealed check
 // run. It is pure: everything it reads is in in.
 func checkRows(in *checkInput) []checkRow {
-	net := summarizeNet(in.net, in.gatewayHost, in.gatewayPort)
-	return []checkRow{
+	net := summarizeNet(in.net, in.gatewayHost, in.gatewayPort, runHosts(in.scenario)...)
+	rows := []checkRow{
 		userRow(in),
 		modelCallRow(in, net),
 		sessionRow(in, net),
 		exitRow(in),
 		diffRow(in),
-		egressRow(in, net),
-		evidenceRow(in),
-		claimRow(in),
 	}
+	rows = append(rows, scenarioRows(in)...)
+	return append(rows, egressRow(in, net), evidenceRow(in), claimRow(in))
 }
+
+// withScenarioRows inserts the scenario rows the task has after the diff
+// row of ids, in the order checkRows reports them.
+func withScenarioRows(ids []string, s *schemas.Suite, t *schemas.Task) []string {
+	extra := scenarioRowIDs(s, t)
+	if len(extra) == 0 {
+		return ids
+	}
+	var out []string
+	for _, id := range ids {
+		out = append(out, id)
+		if id == rowDiff {
+			out = append(out, extra...)
+		}
+	}
+	return out
+}
+
+// scenarioRowIDs lists the scenario rows a task has: services when it has
+// any, the MCP config when one is an mcp service the agent sees, the tool
+// call when one is proxied, sessions when there are several, the answer for
+// an answer task.
+func scenarioRowIDs(s *schemas.Suite, t *schemas.Task) []string {
+	var out []string
+	services := utils.TaskServices(s, t)
+	mcp, proxied := false, false
+	for _, sv := range services {
+		mcp = mcp || (sv.Role == schemas.ServiceRoleMCP && !sv.Hidden)
+		proxied = proxied || (utils.ServiceProxied(sv) && !sv.Hidden)
+	}
+	if len(services) > 0 {
+		out = append(out, rowServices)
+	}
+	if mcp {
+		out = append(out, rowMCP)
+	}
+	if proxied {
+		out = append(out, rowToolCall)
+	}
+	if len(t.Sessions) > 1 {
+		out = append(out, rowSessions)
+	}
+	if utils.OutputKind(s, t) == schemas.OutputAnswer {
+		out = append(out, rowAnswer)
+	}
+	return out
+}
+
+// scenarioRows evaluates the scenario rows of the check run's task.
+func scenarioRows(in *checkInput) []checkRow {
+	sc := in.scenario
+	if sc == nil {
+		return nil
+	}
+	var rows []checkRow
+	for _, id := range scenarioRowIDs(sc.suite, sc.task) {
+		switch id {
+		case rowServices:
+			rows = append(rows, servicesRow(sc))
+		case rowMCP:
+			rows = append(rows, mcpConfigRow(in))
+		case rowToolCall:
+			rows = append(rows, toolCallRow(sc))
+		case rowSessions:
+			rows = append(rows, sessionsRow(in))
+		case rowAnswer:
+			rows = append(rows, answerRow(sc))
+		}
+	}
+	return rows
+}
+
+// runHosts are the host names the agent may reach besides the gateway: the
+// tool proxy and every service on the run's network that is not hidden.
+func runHosts(sc *checkScenario) []string {
+	if sc == nil {
+		return nil
+	}
+	var hosts []string
+	proxied := false
+	for _, sv := range utils.TaskServices(sc.suite, sc.task) {
+		if sv.Hidden {
+			continue
+		}
+		hosts = append(hosts, strings.ToLower(sv.ID))
+		proxied = proxied || utils.ServiceProxied(sv)
+	}
+	if proxied {
+		hosts = append(hosts, toolProxyHost)
+	}
+	return hosts
+}
+
+// toolProxyHost is the per-run tool proxy's host name on the run network.
+const toolProxyHost = "toolproxy"
 
 // netSummary is the observer's records sorted into gateway traffic and
 // everything else.
@@ -42,10 +138,20 @@ type netSummary struct {
 // summarizeNet splits the observer's records. The gateway is its host name
 // and the addresses that name resolved to (or that HTTP requests naming it
 // were sent to). Loopback traffic (an agent talking to its own server) is
-// local. Any other DNS name, connection attempt, datagram or HTTP request
+// local, and so is traffic to allowed, the run's own tool proxy and
+// services. Any other DNS name, connection attempt, datagram or HTTP request
 // is an egress attempt.
-func summarizeNet(recs []environments.NetWatchRecord, host string, port int) netSummary {
+func summarizeNet(recs []environments.NetWatchRecord, host string, port int, allowed ...string) netSummary {
 	gwIPs := map[string]bool{}
+	runIPs := map[string]bool{}
+	isRunHost := func(name string) bool {
+		for _, a := range allowed {
+			if isGatewayName(name, a) {
+				return true
+			}
+		}
+		return false
+	}
 	for _, r := range recs {
 		switch {
 		case r.T == environments.NetWatchDNSAnswer && isGatewayName(r.Name, host):
@@ -54,6 +160,12 @@ func summarizeNet(recs []environments.NetWatchRecord, host string, port int) net
 			}
 		case r.T == environments.NetWatchHTTP && isGatewayName(hostOnly(r.Host), host):
 			gwIPs[r.Dst] = true
+		case r.T == environments.NetWatchDNSAnswer && isRunHost(r.Name):
+			for _, ip := range r.IPs {
+				runIPs[ip] = true
+			}
+		case r.T == environments.NetWatchHTTP && isRunHost(hostOnly(r.Host)):
+			runIPs[r.Dst] = true
 		}
 	}
 	var s netSummary
@@ -67,11 +179,11 @@ func summarizeNet(recs []environments.NetWatchRecord, host string, port int) net
 	for _, r := range recs {
 		switch r.T {
 		case environments.NetWatchDNS:
-			if !isGatewayName(r.Name, host) && r.Name != "localhost" && !strings.HasSuffix(r.Name, ".localhost") {
+			if !isGatewayName(r.Name, host) && !isRunHost(r.Name) && r.Name != "localhost" && !strings.HasSuffix(r.Name, ".localhost") {
 				attempt(r.Name)
 			}
 		case environments.NetWatchSYN:
-			if !isLoopback(r.Dst) && !(gwIPs[r.Dst] && r.Port == port) {
+			if !isLoopback(r.Dst) && !(gwIPs[r.Dst] && r.Port == port) && !runIPs[r.Dst] {
 				attempt(fmt.Sprintf("%s:%d", r.Dst, r.Port))
 			}
 		case environments.NetWatchUDP:
@@ -82,6 +194,7 @@ func summarizeNet(recs []environments.NetWatchRecord, host string, port int) net
 			switch {
 			case gwIPs[r.Dst] || isGatewayName(hostOnly(r.Host), host):
 				s.gatewayReqs = append(s.gatewayReqs, r)
+			case runIPs[r.Dst] || isRunHost(hostOnly(r.Host)):
 			case !isLoopback(r.Dst):
 				attempt(fmt.Sprintf("http://%s%s", firstNonEmpty(r.Host, r.Dst), r.Path))
 			}
@@ -342,6 +455,203 @@ func claimRow(in *checkInput) checkRow {
 		claim = "success claimed (" + c.Matched + ")"
 	}
 	return row.set(checkPass, fmt.Sprintf("%q, %s, from %s", excerptText(lastLineOf(c.Text), 60), claim, c.Source), "")
+}
+
+// servicesRow: every service of the task started and passed its ready check.
+func servicesRow(sc *checkScenario) checkRow {
+	row := newRow(rowServices)
+	want := utils.TaskServices(sc.suite, sc.task)
+	if sc.services == nil {
+		return row.set(checkFail, "no service record in the run (services.json and evidence are empty): unknown whether the services started",
+			"run bifrost-bench doctor and check that the environment supports services; the run folder should hold services.json")
+	}
+	byID := map[string]schemas.ServiceResult{}
+	for _, r := range sc.services {
+		byID[r.ID] = r
+	}
+	var ready, bad []string
+	for _, sv := range want {
+		r, ok := byID[sv.ID]
+		switch {
+		case !ok:
+			bad = append(bad, sv.ID+" (not started)")
+		case !r.Ready:
+			bad = append(bad, fmt.Sprintf("%s (%s)", sv.ID, firstNonEmpty(r.Error, "ready check failed")))
+		default:
+			label := sv.ID
+			if r.Proxied {
+				label += " via the tool proxy"
+			}
+			ready = append(ready, label)
+		}
+	}
+	if len(bad) > 0 {
+		return row.set(checkFail, fmt.Sprintf("%d of %d services not ready: %s", len(bad), len(want), listed(bad)),
+			"build the service image (bifrost-bench suite admit builds it) and run its ready check by hand: docker run, then the ready argv")
+	}
+	return row.set(checkPass, fmt.Sprintf("%s ready: %s", plural(len(ready), "service"), listed(ready)), "")
+}
+
+// mcpConfigRow: the run's MCP servers reached the agent, in BENCH_MCP_SERVERS
+// and, unless the agent takes them from the environment only, in its own
+// config file.
+func mcpConfigRow(in *checkInput) checkRow {
+	row := newRow(rowMCP)
+	raw := in.plan.Env[utils.EnvMCPServers]
+	var servers map[string]struct {
+		URL string `json:"url"`
+	}
+	if raw == "" || json.Unmarshal([]byte(raw), &servers) != nil || len(servers) == 0 {
+		return row.set(checkFail, "the agent's plan carries no "+utils.EnvMCPServers+": the agent was not told about the MCP server",
+			"the bench sets it for every mcp service the agent sees; check the service's role (mcp) and that it is not hidden")
+	}
+	ids := make([]string, 0, len(servers))
+	for id := range servers {
+		ids = append(ids, id)
+	}
+	sort.Strings(ids)
+	var files []string
+	for p, content := range in.plan.Files {
+		all := true
+		for _, id := range ids {
+			all = all && strings.Contains(content, servers[id].URL)
+		}
+		if all {
+			files = append(files, p)
+		}
+	}
+	sort.Strings(files)
+	format := ""
+	if in.agent.MCP != nil {
+		format = in.agent.MCP.Format
+	}
+	switch {
+	case len(files) > 0:
+		return row.set(checkPass, fmt.Sprintf("%s (%s) written to %s and %s", strings.Join(ids, ", "), servers[ids[0]].URL, listed(files), utils.EnvMCPServers), "")
+	case format == "env" || in.agent.Adapter == "scripted":
+		return row.set(checkPass, fmt.Sprintf("%s in %s only (mcp.format env)", strings.Join(ids, ", "), utils.EnvMCPServers), "")
+	default:
+		return row.set(checkWarn, fmt.Sprintf("%s in %s, but no config file of the agent names %s", strings.Join(ids, ", "), utils.EnvMCPServers, servers[ids[0]].URL),
+			"set mcp.format (codex_toml, claude_json, opencode_json, generic_json with mcp.config_path) or read "+utils.EnvMCPServers+" yourself")
+	}
+}
+
+// toolCallRow: the tool proxy recorded the agent's traffic to a proxied
+// service. The scripted model calls only the first tool an agent offers, so
+// an agent whose first tool is built in lists the server's tools but calls
+// none; that is still proof the proxy path works.
+func toolCallRow(sc *checkScenario) checkRow {
+	row := newRow(rowToolCall)
+	if sc.tools == nil {
+		return row.set(checkFail, "no tool ledger: "+firstNonEmpty(sc.toolsErr, "the run recorded none")+"; tool metrics are unknown, not zero",
+			"check that the tool proxy started (services row) and that images.toolproxy is the current bench image")
+	}
+	var calls, lists, faulted int
+	tools := map[string]bool{}
+	servers := map[string]bool{}
+	for _, c := range sc.tools {
+		servers[c.Server] = true
+		switch {
+		case c.Tool == "tools/list":
+			lists++
+		default:
+			calls++
+			tools[c.Tool] = true
+		}
+		if c.Fault != "" {
+			faulted++
+		}
+	}
+	names := make([]string, 0, len(tools))
+	for n := range tools {
+		names = append(names, n)
+	}
+	sort.Strings(names)
+	srv := make([]string, 0, len(servers))
+	for n := range servers {
+		srv = append(srv, n)
+	}
+	sort.Strings(srv)
+	mcp := false
+	for _, sv := range utils.TaskServices(sc.suite, sc.task) {
+		mcp = mcp || sv.Role == schemas.ServiceRoleMCP
+	}
+	switch {
+	case calls > 0:
+		return row.set(checkPass, fmt.Sprintf("%s recorded on %s (%s), %d tool lists", plural(calls, "tool call"), strings.Join(srv, ", "), listed(names), lists), "")
+	case lists > 0:
+		return row.set(checkPass, fmt.Sprintf("the agent listed the tools of %s through the proxy (%d tools/list); no tools/call, as expected: the scripted model calls only the first tool offered", strings.Join(srv, ", "), lists), "")
+	case mcp:
+		return row.set(checkFail, "the proxy recorded nothing: the agent never contacted the MCP server",
+			"make the agent load its MCP config at start (see the MCP config row) and connect before its first model call")
+	default:
+		return row.set(checkWarn, "the proxy recorded no call: with the scripted model an agent calls an HTTP tool only if the model asks it to",
+			"nothing to fix for the scripted model; a real model must reach the service at http://toolproxy:9200/s/<service id>/")
+	}
+}
+
+// sessionsRow: every session ran, in order, each exiting by itself; the
+// memory volume (and the agent's memory.paths) were kept between them.
+func sessionsRow(in *checkInput) checkRow {
+	row := newRow(rowSessions)
+	sc := in.scenario
+	want := sc.task.Sessions
+	if len(sc.sessions) == 0 {
+		return row.set(checkFail, fmt.Sprintf("no session record (sessions.json): unknown whether the %d sessions ran", len(want)),
+			"the run folder should hold sessions.json; check that the environment supports sessions")
+	}
+	var ids []string
+	for i, r := range sc.sessions {
+		ids = append(ids, r.ID)
+		switch {
+		case i >= len(want) || r.ID != want[i].ID || r.Index != i+1:
+			return row.set(checkFail, fmt.Sprintf("session %d is %q (index %d), want %q", i+1, r.ID, r.Index, sessionID(want, i)),
+				"sessions must run in the order task.yaml lists them")
+		case i > 0 && r.Started.Before(sc.sessions[i-1].Ended):
+			return row.set(checkFail, fmt.Sprintf("session %s started before session %s ended", r.ID, sc.sessions[i-1].ID), "sessions must not overlap")
+		case r.TimedOut:
+			return row.set(checkFail, fmt.Sprintf("session %s hit its wall budget", r.ID), "exit when the session's work is done")
+		case r.ExitCode != 0:
+			return row.set(checkFail, fmt.Sprintf("session %s exited with code %d", r.ID, r.ExitCode), "exit 0 at the end of every session")
+		}
+	}
+	if len(sc.sessions) < len(want) {
+		return row.set(checkFail, fmt.Sprintf("%d of %d sessions ran (%s)", len(sc.sessions), len(want), strings.Join(ids, ", ")),
+			"a session that crashes or times out ends the run; see the exit row")
+	}
+	kept := utils.DefaultMemoryDir + " (" + utils.EnvMemoryDir + ")"
+	if in.agent.Memory == nil || len(in.agent.Memory.Paths) == 0 {
+		return row.set(checkWarn, fmt.Sprintf("%d sessions ran in order (%s); only %s was kept between them: the agent declares no memory.paths",
+			len(sc.sessions), strings.Join(ids, ", "), kept),
+			"if the agent keeps memory anywhere but "+utils.DefaultMemoryDir+", list that folder under memory.paths, or it is lost between sessions")
+	}
+	return row.set(checkPass, fmt.Sprintf("%d sessions ran in order (%s); kept between them: %s and %s",
+		len(sc.sessions), strings.Join(ids, ", "), kept, strings.Join(in.agent.Memory.Paths, ", ")), "")
+}
+
+func sessionID(want []schemas.SessionSpec, i int) string {
+	if i < len(want) {
+		return want[i].ID
+	}
+	return "none"
+}
+
+// answerRow: the answer was exported, from the answer file, else the final
+// message.
+func answerRow(sc *checkScenario) checkRow {
+	row := newRow(rowAnswer)
+	file := utils.AnswerPath(sc.suite, sc.task)
+	a := sc.answer
+	switch {
+	case a == nil || a.Source == "missing":
+		return row.set(checkFail, "no answer: neither "+file+" nor a final message",
+			"write the answer to $"+utils.EnvAnswerPath+" ("+file+" in the workspace) or print it as the final message")
+	case a.Source == "final_message":
+		return row.set(checkWarn, fmt.Sprintf("no %s; the final message was used (%q)", file, excerptText(a.Text, 60)),
+			"write the answer to $"+utils.EnvAnswerPath+"; a final message carries whatever else the agent said too")
+	default:
+		return row.set(checkPass, fmt.Sprintf("%s written (%d bytes): %q", file, len(a.Text), excerptText(a.Text, 60)), "")
+	}
 }
 
 func newRow(id string) checkRow {

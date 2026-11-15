@@ -1,0 +1,1 @@
+{"task_id": "toy_0", "solution": "def add_digits(n: int) -> int:\n    return sum(int(c) for c in str(n))\n"}

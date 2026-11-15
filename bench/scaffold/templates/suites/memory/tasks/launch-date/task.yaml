@@ -1,0 +1,41 @@
+# Sample task written by `bifrost-bench suite init -template memory`. Session
+# 1 gives the agent meeting notes to remember; session 2 starts from a reset
+# workspace and asks about them. `bifrost-bench task init -suite <suite> -id
+# <task>` copies this shape into a new task with EDIT ME markers.
+id: launch-date
+version: 1.0.0
+title: Recall a launch date from an earlier session
+project: fernway
+kind: feature
+# The first session's instruction; each session names its own below.
+instruction: sessions/learn.md
+repo_dir: repo
+sessions:
+  - id: learn
+    instruction: sessions/learn.md
+    # Copied into the workspace before this session only.
+    files: sessions/learn-files
+  - id: recall
+    instruction: sessions/recall.md
+verifier:
+  # Hidden folder, mounted at /grader/tests; it holds the expected answer.
+  tests: verifier
+  required: []
+  answer: verifier/answer.yaml
+protected: []
+controls:
+  # Answer files: the reference must match, the empty answer and the mutants
+  # must not. The exploit is a script run in the agent's place, as admission
+  # runs every exploit.
+  reference: solution/answer.txt
+  empty: controls/empty.txt
+  mutants: [controls/old-date.txt]
+  exploit: controls/exploit.sh
+timeouts:
+  agent_s: 300
+capabilities: [memory]
+difficulty: easy
+provenance:
+  source: written by bifrost-bench suite init (template memory)
+  license: proprietary
+  created_by: suite init

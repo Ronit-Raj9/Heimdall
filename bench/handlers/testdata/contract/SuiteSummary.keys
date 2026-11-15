@@ -19,3 +19,9 @@ admitted_count
 probes
 tasks
 error?
+# Scenario keys (schemas/scenario.go).
+track?
+grading?
+output?
+services?
+imported?

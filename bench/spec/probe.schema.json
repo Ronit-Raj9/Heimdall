@@ -10,7 +10,7 @@
     "id": {"type": "string", "pattern": "^[a-z0-9][a-z0-9._-]*$", "description": "Equals the file name without .yaml."},
     "version": {"type": "string", "pattern": "^(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)$"},
     "axis": {"type": "string", "minLength": 1, "description": "Diagnostics row label, e.g. memory, tools, resilience."},
-    "ps2_family": {"enum": ["unavailable_model", "broken_tool", "misleading_instruction"]},
+    "ps2_family": {"enum": ["unavailable_model", "broken_tool", "misleading_instruction", "hostile_tool"]},
     "layer": {"type": "string", "pattern": "^[a-z][a-z0-9_]*$"},
     "goal_preserving": {"type": "boolean"},
     "apply": {
@@ -70,6 +70,31 @@
             "exit_code": {"type": "integer", "minimum": 0, "maximum": 255},
             "output": {"type": "string"}
           }
+        },
+        "tool": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["mode"],
+          "description": "Layer tool: the fault the per-run tool proxy injects. Mirrors schemas.ToolFault.",
+          "properties": {
+            "mode": {"enum": ["error", "timeout", "poison"]},
+            "server": {"type": "string", "description": "Service id; absent matches every server."},
+            "tool": {"type": "string", "description": "Tool name; absent matches every tool."},
+            "from_call": {"type": "integer", "minimum": 1},
+            "calls": {"type": "integer", "minimum": 0, "description": "How many matching calls are affected; 0 means all from from_call."},
+            "message": {"type": "string"},
+            "timeout_s": {"type": "integer", "minimum": 1},
+            "text": {"type": "string", "description": "poison: appended to the real result; {{nonce}} is replaced per run."}
+          },
+          "allOf": [
+            {"if": {"properties": {"mode": {"const": "poison"}}}, "then": {"required": ["text"]}}
+          ]
+        },
+        "service_env": {
+          "type": "object",
+          "minProperties": 1,
+          "description": "Layer service: environment variables added to the named services for this condition (service id, then variable, then value).",
+          "additionalProperties": {"type": "object", "minProperties": 1, "additionalProperties": {"type": "string"}}
         }
       }
     },
@@ -88,6 +113,14 @@
     {
       "if": {"required": ["layer"], "properties": {"layer": {"const": "tool_shim"}}},
       "then": {"properties": {"apply": {"required": ["shim"]}}}
+    },
+    {
+      "if": {"required": ["layer"], "properties": {"layer": {"const": "tool"}}},
+      "then": {"properties": {"apply": {"required": ["tool"]}}}
+    },
+    {
+      "if": {"required": ["layer"], "properties": {"layer": {"const": "service"}}},
+      "then": {"properties": {"apply": {"required": ["service_env"]}}}
     }
   ]
 }

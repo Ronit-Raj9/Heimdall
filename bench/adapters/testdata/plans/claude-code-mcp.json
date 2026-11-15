@@ -1,0 +1,45 @@
+{
+  "image": "bench/agent-claude-code:1",
+  "argv": [
+    "claude",
+    "-p",
+    "--dangerously-skip-permissions",
+    "--output-format",
+    "stream-json",
+    "--verbose",
+    "--disallowedTools",
+    "WebSearch,WebFetch",
+    "--model",
+    "claude-sonnet-4-5",
+    "# Fix rounding\n\nAmounts must round half up. Literal {{braces}} stay.\n"
+  ],
+  "env": {
+    "ANTHROPIC_API_KEY": "",
+    "ANTHROPIC_AUTH_TOKEN": "sk-bf-v1-secretvalue0123456789",
+    "ANTHROPIC_BASE_URL": "http://bifrost:8080/anthropic",
+    "ANTHROPIC_CUSTOM_HEADERS": "x-bf-session-id: r_p20fj3s8wa\nx-bf-session-affinity: off",
+    "ANTHROPIC_DEFAULT_HAIKU_MODEL": "claude-sonnet-4-5",
+    "ANTHROPIC_DEFAULT_OPUS_MODEL": "claude-sonnet-4-5",
+    "ANTHROPIC_DEFAULT_SONNET_MODEL": "claude-sonnet-4-5",
+    "ANTHROPIC_MODEL": "claude-sonnet-4-5",
+    "BENCH_MCP_SERVERS": "{\"kb\":{\"url\":\"http://kb:8000/rpc\"},\"tickets\":{\"url\":\"http://toolproxy:9200/s/tickets/mcp\"}}",
+    "CLAUDE_CODE_DISABLE_AUTO_MEMORY": "1",
+    "CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC": "1",
+    "CLAUDE_CODE_DISABLE_TELEMETRY": "1",
+    "CLAUDE_CONFIG_DIR": "/home/agent/.claude",
+    "DISABLE_AUTOUPDATER": "1",
+    "DISABLE_ERROR_REPORTING": "1",
+    "DISABLE_TELEMETRY": "1"
+  },
+  "files": {
+    "/home/agent/.claude/.claude.json": "{\n  \"mcpServers\": {\n    \"kb\": {\n      \"type\": \"http\",\n      \"url\": \"http://kb:8000/rpc\"\n    },\n    \"tickets\": {\n      \"type\": \"http\",\n      \"url\": \"http://toolproxy:9200/s/tickets/mcp\"\n    }\n  }\n}\n",
+    "/tmp/bench/instruction.md": "# Fix rounding\n\nAmounts must round half up. Literal {{braces}} stay.\n"
+  },
+  "workdir": "/workspace",
+  "wall_s": 600,
+  "cpus": 2,
+  "mem_gb": 4,
+  "pids": 512,
+  "network": "bench-eval-net",
+  "user": "1000"
+}

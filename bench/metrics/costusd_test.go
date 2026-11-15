@@ -76,6 +76,7 @@ func TestNoCostReason(t *testing.T) {
 		{name: "nil log", log: nil, want: "no cost evidence"},
 		{name: "empty log", log: completeLog(), want: "no cost evidence"},
 		{name: "incomplete log with rows", log: &schemas.RequestLog{Requests: []schemas.GatewayRequest{okMsg("a")}}, want: "no cost rows for 1 gateway requests"},
+		{name: "empty log that says why", log: &schemas.RequestLog{Reason: "model calls go outside this gateway"}, want: "model calls go outside this gateway"},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

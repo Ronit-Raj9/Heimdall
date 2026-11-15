@@ -1,0 +1,9 @@
+{
+  "task_id": "open_issue",
+  "task_name": "Open Issue",
+  "category_id": "repo",
+  "difficulty": "L1",
+  "mcp": [
+    "github"
+  ]
+}

@@ -48,6 +48,7 @@ func Builtin(deps Deps) []schemas.EvidenceSource {
 		newAgentStreamSource(deps),
 		newShimLogSource(deps),
 		newCostSource(deps),
+		newToolLedgerSource(deps), // tool proxy ledger (Tool proxy and MCP)
 	}
 }
 

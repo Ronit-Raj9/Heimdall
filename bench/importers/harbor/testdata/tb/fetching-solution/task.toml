@@ -1,0 +1,21 @@
+schema_version = "1.1"
+
+[task]
+name = "terminal-bench/fetching-solution"
+description = "Fixture task fetching-solution."
+
+[metadata]
+difficulty = "medium"
+category = "fixtures"
+
+
+[verifier]
+timeout_sec = 600.0
+
+[agent]
+timeout_sec = 1200.0
+
+[environment]
+cpus = 1
+gpus = 0
+allow_internet = true

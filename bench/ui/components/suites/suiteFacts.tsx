@@ -1,3 +1,5 @@
+import { GradingBadge, JudgedNotice, OutputBadge, TrackBadge } from "@/components/scenario/scenarioBadges";
+import { suiteGrading, suiteTrack } from "@/components/scenario/scenario.utils";
 import { formatDateTime, shortHash } from "@/components/verdict/verdict.utils";
 import { getLocale } from "@/lib/i18n";
 import type { SuiteSummary } from "@/lib/types/bench";
@@ -6,14 +8,29 @@ import { AlertTriangle, CircleX } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { CopyCodeBlock } from "./copyCodeBlock";
 import { LockBadge, VerifierBadge } from "./suiteBadges";
+import { ImportedFrom } from "./suiteScenario";
 import { leaderboardSuite } from "./suites.utils";
 
-/** The suite's settings as a definition list, with a link to its leaderboard. */
+/**
+ * The suite's settings as a definition list, with a link to its leaderboard: track, grading (a
+ * judged suite says in plain words what that means), output and services, then the verifier and
+ * lock facts, and where an imported suite came from.
+ */
 export function SuiteFacts({ suite }: { suite: SuiteSummary }) {
 	const { t } = useTranslation("bench");
 	const locale = getLocale();
 	const none = <span className="text-muted-foreground">{t("suites.facts.none")}</span>;
+	const grading = suiteGrading(suite);
+	const services = suite.services ?? [];
 	const facts: { label: string; value: React.ReactNode; testId: string }[] = [
+		{ label: t("suites.facts.track"), value: <TrackBadge track={suiteTrack(suite)} />, testId: "track" },
+		{ label: t("suites.facts.grading"), value: <GradingBadge grading={grading} />, testId: "grading" },
+		{ label: t("suites.facts.output"), value: <OutputBadge output={suite.output || "diff"} />, testId: "output" },
+		{
+			label: t("suites.facts.services"),
+			value: services.length > 0 ? <span className="break-all">{services.join(", ")}</span> : none,
+			testId: "services",
+		},
 		{ label: t("suites.facts.environment"), value: <code>{suite.environment}</code>, testId: "environment" },
 		{ label: t("suites.facts.grader"), value: <code>{suite.grader}</code>, testId: "grader" },
 		{ label: t("suites.facts.verifier"), value: <VerifierBadge format={suite.verifier_result} />, testId: "verifier" },
@@ -59,6 +76,8 @@ export function SuiteFacts({ suite }: { suite: SuiteSummary }) {
 					</div>
 				))}
 			</dl>
+			{grading === "judged" && <JudgedNotice testId="suites-judged-note" />}
+			{suite.imported && <ImportedFrom record={suite.imported} />}
 		</div>
 	);
 }

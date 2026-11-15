@@ -1,0 +1,41 @@
+# A real memory comparison on Acme's memory tasks. This experiment calls a
+# model and spends money; nothing else in this project does.
+#
+# Both arms are Claude Code with the same model, the same image and the same
+# budgets (agents/claude-code-memory.yaml). Arm A keeps Claude Code's auto
+# memory on, as the config file sets it. Arm B switches it off with one env
+# override (CLAUDE_CODE_DISABLE_AUTO_MEMORY=1). What arm B still has: the
+# /memory volume (BENCH_MEMORY_DIR), which the learn-session instructions
+# mention, and the kept memory.paths, so B is "the agent's own memory off",
+# not "no memory at all". The question is whether the built-in memory helps
+# over plain notes in a folder.
+#
+# Three tasks cannot reach significance; the verdict will read inconclusive
+# and the report says how many tasks a decision needs. Build the agent image
+# first (bifrost-bench agent build agents/claude-code-memory.yaml -suite
+# acme-memory) and run `bifrost-bench agent check` on it.
+#
+# Slots per arm: 3 tasks x 1 condition x 2 trials = 6; 12 in all, each two
+# or three short sessions. The budget is a ceiling.
+name: acme-memory-auto-vs-folder
+suite: acme-memory@1.0.0
+base: agents/claude-code-memory.yaml
+arms:
+  A:
+    label: claude-code auto memory on
+    set: {model: claude-sonnet-4-5}
+  B:
+    label: claude-code auto memory off
+    set: {model: claude-sonnet-4-5, env.CLAUDE_CODE_DISABLE_AUTO_MEMORY: "1"}
+primary: {condition: clean, metric: verified_success}
+guards:
+  - {rule: no_new_integrity_violation}
+  - {rule: timeout_parity}
+conditions:
+  - {id: clean, tasks: all, trials: 2}
+budget: {total_usd: 2}
+verdict: {policy: paired_signflip, alpha: 0.05, assumed_sd: 0.30}
+seed: 20261117
+concurrency: 2
+manifest_mode: agent_exposure
+policy: policies/default.yaml

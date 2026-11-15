@@ -17,7 +17,7 @@ func TestBuildLaunchPlain(t *testing.T) {
 		Argv: []string{"claude", "-p", "fix it; rm -rf / $(whoami)"},
 		Env:  map[string]string{"TOKEN": "s3cr3t", "SPACED": " a b "},
 	}
-	l, err := buildLaunch(plan, "/opt/bench/shim:/usr/bin", "/home/agent")
+	l, err := buildLaunch(plan, "/opt/bench/shim:/usr/bin", "/home/agent", nil)
 	if err != nil {
 		t.Fatalf("buildLaunch: %v", err)
 	}
@@ -46,7 +46,7 @@ func TestBuildLaunchErrors(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			_, err := buildLaunch(&tt.plan, "/usr/bin", "/home/agent")
+			_, err := buildLaunch(&tt.plan, "/usr/bin", "/home/agent", nil)
 			if err == nil || !strings.Contains(err.Error(), tt.want) {
 				t.Fatalf("err = %v, want it to contain %q", err, tt.want)
 			}
@@ -65,7 +65,7 @@ func TestBuildLaunchWrapperEncoding(t *testing.T) {
 			"/tmp/empty":            "",
 		},
 	}
-	l, err := buildLaunch(plan, "/usr/bin:/bin", "/home/agent")
+	l, err := buildLaunch(plan, "/usr/bin:/bin", "/home/agent", nil)
 	if err != nil {
 		t.Fatalf("buildLaunch: %v", err)
 	}
@@ -195,5 +195,32 @@ func TestWriteEnvFile(t *testing.T) {
 	}
 	if string(got) != "A=1\nB=two words\n" {
 		t.Fatalf("content %q", got)
+	}
+}
+
+func TestBuildLaunchLinks(t *testing.T) {
+	plan := &schemas.RunPlan{Argv: []string{"claude", "-p", "x"}, Files: map[string]string{"/home/agent/.claude/settings.json": "{}"}}
+	l, err := buildLaunch(plan, "/usr/bin", "/home/agent", []link{{dst: "/home/agent/.claude/skills/pdf", src: "/bench/dirs/0"}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	env := strings.Join(l.Env, "\n")
+	if !strings.Contains(env, "BENCH_WRAP_L0_DST=/home/agent/.claude/skills/pdf") || !strings.Contains(env, "BENCH_WRAP_L0_SRC=/bench/dirs/0") {
+		t.Fatalf("env %s", env)
+	}
+	script := l.Args[1]
+	linkAt := strings.Index(script, `ln -sfn "$BENCH_WRAP_L0_SRC" "$BENCH_WRAP_L0_DST"`)
+	fileAt := strings.Index(script, "base64 -d")
+	if l.Entrypoint != wrapShell || linkAt < 0 || fileAt < linkAt || !strings.Contains(script, "BENCH_WRAP_L0_DST BENCH_WRAP_L0_SRC") {
+		t.Fatalf("script:\n%s", script)
+	}
+	if strings.Contains(script, "/home/agent") {
+		t.Fatal("a path was spliced into the script")
+	}
+	if _, err := buildLaunch(&schemas.RunPlan{}, "/usr/bin", "/home/agent", []link{{dst: "/home/agent/x", src: "/bench/dirs/0"}}); err == nil {
+		t.Fatal("links without argv accepted")
+	}
+	if _, err := buildLaunch(plan, "/usr/bin", "/home/agent", []link{{dst: "rel", src: "/bench/dirs/0"}}); err == nil {
+		t.Fatal("relative link accepted")
 	}
 }

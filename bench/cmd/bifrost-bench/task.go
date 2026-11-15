@@ -19,6 +19,8 @@ func init() {
 const taskUsage = `usage: bifrost-bench task init -suite <suite> -id <task> -repo <git repo> -base <commit> -reference <commit>
            [-tests <glob,...>] [-license <spdx|proprietary>] [-capabilities a,b] [-difficulty easy|medium|hard]
            [-kind bugfix|feature|refactor|performance] [-force] [-config deploy/bench.yaml]
+       bifrost-bench task init -suite <suite> -id <task> [-kind tool-use|mcp|memory|qa] [-from <task>]
+           [-license <spdx|proprietary>] [-force] [-config deploy/bench.yaml]
        bifrost-bench task validate [-config deploy/bench.yaml] <suite>/<task>
        bifrost-bench task admit [-config deploy/bench.yaml] <suite>/<task>`
 
@@ -54,9 +56,22 @@ func runTaskInit(args []string) int {
 	license := fs.String("license", "proprietary", "SPDX license id of the repository, or proprietary")
 	caps := fs.String("capabilities", "", "comma-separated capabilities the task exercises")
 	difficulty := fs.String("difficulty", "", "easy, medium or hard")
-	kind := fs.String("kind", "bugfix", "bugfix, feature, refactor or performance")
+	kind := fs.String("kind", "bugfix", "bugfix, feature, refactor or performance; or tool-use, mcp, memory or qa for a scenario suite")
+	from := fs.String("from", "", "scenario suites: task whose shape is copied (default: the suite's first task)")
 	force := fs.Bool("force", false, "replace an existing task folder")
 	pos, err := parseArgs(fs, args)
+	if err == nil && len(pos) == 0 && *suiteID != "" && *id != "" && (*repo == "" || scaffold.IsScenarioTemplate(*kind)) {
+		if *repo != "" || *base != "" || *ref != "" {
+			return fail("-kind %s scaffolds from the suite's sample task; leave out -repo, -base and -reference", *kind)
+		}
+		explicit := ""
+		if flagSet(fs, "kind") {
+			explicit = *kind
+		}
+		return runScenarioTaskInit(fs, *config, *suiteID, scaffold.ScenarioTaskOptions{
+			ID: *id, Kind: explicit, From: *from, License: flagValue(fs, "license"), Force: *force,
+		})
+	}
 	if err != nil || len(pos) != 0 || *suiteID == "" || *id == "" || *repo == "" || *base == "" || *ref == "" {
 		fmt.Fprintln(os.Stderr, taskUsage)
 		return exitUsage
@@ -82,6 +97,54 @@ func runTaskInit(args []string) int {
 	}
 	printTaskInit(res, *suiteID, *id)
 	return exitOK
+}
+
+// runScenarioTaskInit writes a new task in a tool-use, mcp, memory or qa
+// suite from the shape of an existing task (scaffold.InitScenarioTask).
+func runScenarioTaskInit(fs *flag.FlagSet, config, suiteID string, opts scaffold.ScenarioTaskOptions) int {
+	root, _, err := benchmarksRoot(fs, "", config)
+	if err != nil {
+		return fail("%v", err)
+	}
+	if !scaffold.ValidID(suiteID) {
+		return fail("suite id %q is not valid", suiteID)
+	}
+	opts.SuiteDir = filepath.Join(root, suiteID)
+	res, err := scaffold.InitScenarioTask(opts)
+	if err != nil {
+		return fail("task init: %v", err)
+	}
+	fmt.Printf("wrote %s (template %s, shape of %s)\n", res.Dir, res.Template, res.From)
+	if res.SuiteEdited {
+		fmt.Printf("  added %s to the tasks list of suite.yaml\n", opts.ID)
+	}
+	for _, w := range res.Warnings {
+		fmt.Printf("warning: %s\n", w)
+	}
+	findings, err := suite.ScanSecrets(res.Dir)
+	if err != nil {
+		fmt.Printf("warning: %v\n", err)
+	}
+	for _, f := range findings {
+		fmt.Printf("warning: %s; remove it before admitting\n", f)
+	}
+	fmt.Println("\nnext:")
+	step := 1
+	for _, rel := range res.EditMe {
+		fmt.Printf("  %d. edit %s and delete its EDIT ME line\n", step, filepath.Join(res.Dir, filepath.FromSlash(rel)))
+		step++
+	}
+	fmt.Printf("  %d. review the rest of %s (seed data, session files, controls)\n", step, res.Dir)
+	fmt.Printf("  %d. bifrost-bench task validate %s/%s\n  %d. bifrost-bench task admit %s/%s\n", step+1, suiteID, opts.ID, step+2, suiteID, opts.ID)
+	return exitOK
+}
+
+// flagValue is the value of flag name when it was given, else "".
+func flagValue(fs *flag.FlagSet, name string) string {
+	if !flagSet(fs, name) {
+		return ""
+	}
+	return fs.Lookup(name).Value.String()
 }
 
 // printTaskInit reports what task init wrote, its warnings and a secret scan

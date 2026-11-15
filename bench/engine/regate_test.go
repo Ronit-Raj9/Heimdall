@@ -251,7 +251,7 @@ func TestOutcomeFrom(t *testing.T) {
 	}
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
-			if got := outcomeFrom(c.aborted, c.broken, c.gates, c.grade, c.exec, c.up); got != c.want {
+			if got := outcomeFrom(c.aborted, c.broken, "", c.gates, c.grade, c.exec, c.up); got != c.want {
 				t.Fatalf("got %s, want %s", got, c.want)
 			}
 		})
@@ -286,7 +286,7 @@ func TestRegateOutcomeUpstream(t *testing.T) {
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
 			run := &schemas.Run{Outcome: c.sealed}
-			if got := regateOutcome(run, c.gates, fail, nil, c.up); got != c.want {
+			if got := regateOutcome(run, "", c.gates, fail, nil, c.up); got != c.want {
 				t.Fatalf("got %s, want %s", got, c.want)
 			}
 		})
@@ -346,5 +346,63 @@ func TestRegateRunWithoutGateStage(t *testing.T) {
 				t.Fatalf("regated %+v", got)
 			}
 		})
+	}
+}
+
+func TestSealedScenario(t *testing.T) {
+	dir := t.TempDir()
+	write := func(name, content string) {
+		p := filepath.Join(dir, filepath.FromSlash(name))
+		if err := os.MkdirAll(filepath.Dir(p), 0o755); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(p, []byte(content), 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+	write(FileAnswer, "42")
+	write("state/db/dump", "rows\n")
+	write(fileToolLedger, `{"seq":1,"server":"db","tool":"query","protocol":"mcp","args_sha256":"a","result_sha256":"b","is_error":false,"started":"2026-11-15T00:00:00Z","latency_ms":3}`+"\n")
+	write(FileSessions, `[{"id":"s1","index":1,"exit_code":0,"timed_out":false,"started":"2026-11-15T00:00:00Z","ended":"2026-11-15T00:00:01Z","stdout_path":"agent.stream.1.jsonl"}]`)
+	ev := &schemas.Evidence{
+		Answer: &schemas.Answer{Source: AnswerFromFile, SHA256: utils.SHA256Bytes([]byte("42"))},
+		State:  []schemas.StateFile{{Service: "db", ID: "dump", Path: "state/db/dump", SHA256: utils.SHA256Bytes([]byte("rows\n"))}},
+	}
+	if err := sealedScenario(dir, ev); err != nil {
+		t.Fatal(err)
+	}
+	if ev.Answer.Text != "42" || len(ev.ToolCalls) != 1 || ev.ToolCalls[0].Tool != "query" || len(ev.Sessions) != 1 {
+		t.Fatalf("evidence %+v", ev)
+	}
+
+	bad := &schemas.Evidence{Answer: &schemas.Answer{SHA256: utils.SHA256Bytes([]byte("41"))}}
+	if err := sealedScenario(dir, bad); !errors.Is(err, schemas.ErrSealMismatch) {
+		t.Fatalf("changed answer: got %v", err)
+	}
+	badState := &schemas.Evidence{State: []schemas.StateFile{{Service: "db", ID: "dump", Path: "state/db/dump", SHA256: "0"}}}
+	if err := sealedScenario(dir, badState); !errors.Is(err, schemas.ErrSealMismatch) {
+		t.Fatalf("changed state: got %v", err)
+	}
+	plain := &schemas.Evidence{}
+	if err := sealedScenario(t.TempDir(), plain); err != nil || plain.ToolCalls != nil || plain.Sessions != nil {
+		t.Fatalf("plain run changed: %+v %v", plain, err)
+	}
+
+	// An empty ledger round-trips through evidence.json (omitempty) as no
+	// field; the sealed tools.jsonl says the run made zero calls.
+	noCalls := t.TempDir()
+	if err := os.WriteFile(filepath.Join(noCalls, fileToolLedger), nil, 0o644); err != nil {
+		t.Fatal(err)
+	}
+	b, err := json.Marshal(schemas.Evidence{ToolCalls: []schemas.ToolCall{}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	var reloaded schemas.Evidence
+	if err := json.Unmarshal(b, &reloaded); err != nil {
+		t.Fatal(err)
+	}
+	if err := sealedScenario(noCalls, &reloaded); err != nil || reloaded.ToolCalls == nil || len(reloaded.ToolCalls) != 0 {
+		t.Fatalf("empty ledger reloaded as %#v (%v), want an empty list", reloaded.ToolCalls, err)
 	}
 }

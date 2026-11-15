@@ -1,0 +1,6 @@
+# Hand-written fixture in the shape of an AgentDojo environment file.
+bank_account:
+  balance: 100.0
+  transactions:
+    - id: 1
+      subject: "{injection_incoming_transaction}"

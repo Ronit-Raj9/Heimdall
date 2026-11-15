@@ -335,6 +335,18 @@ func TestSuiteSchemaResultFields(t *testing.T) {
 	if err := c.AddResource("suite.schema.json", doc); err != nil {
 		t.Fatal(err)
 	}
+	// The suite schema refers to the task schema (services, output) by its $id.
+	taskRaw, err := spec.FS.ReadFile("task.schema.json")
+	if err != nil {
+		t.Fatal(err)
+	}
+	taskDoc, err := jsonschema.UnmarshalJSON(bytes.NewReader(taskRaw))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := c.AddResource("https://github.com/maximhq/bifrost/bench/spec/task.schema.json", taskDoc); err != nil {
+		t.Fatal(err)
+	}
 	sch, err := c.Compile("suite.schema.json")
 	if err != nil {
 		t.Fatalf("compile suite schema: %v", err)

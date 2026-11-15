@@ -71,7 +71,11 @@ func (g *verifierCommand) VerifierNetwork() string { return verifierNetwork }
 // Grade prepares the workspace as hidden_tests does (pristine repo, diff,
 // restore list) with the configured helper image, runs the suite's verifier
 // command on the suite base image with the workspace read-only at the suite
-// workdir, and scores the result format the suite names. A diff that does not
+// workdir, and scores the result format the suite names. A task with its own
+// image is verified in its verifier_image or task image; in snapshot mode the
+// verifier runs on the frozen agent container instead, with the run's own
+// workspace (applyScenario). Exported service state and the answer are
+// mounted at /grader/state and /grader/answer.txt when the run has them. A diff that does not
 // apply, a timeout, or a missing, oversized or unparseable result file are
 // fails: the reference solution passed this verifier at admission. Only a
 // broken required-test list (junit) makes the evaluator invalid; any other
@@ -91,6 +95,9 @@ func (g *verifierCommand) Grade(ctx context.Context, rc *schemas.RunContext, dif
 		GraderVersion: verifierCommandVersion,
 		DiffSHA256:    in.diffSHA,
 		ResultFormat:  spec.format,
+	}
+	if in.snapshot != "" {
+		grade.Mode = schemas.VerifierSnapshot
 	}
 	var out resultRead
 	res, err := g.room.run(ctx, newGradeJob(expID, runID, in), func(ctx context.Context, container string) error {
@@ -139,6 +146,9 @@ func (g *verifierCommand) inputs(rc *schemas.RunContext, diff *schemas.Diff) (*g
 		return nil, resultSpec{}, errors.New("suite needs a base image to run its verifier")
 	}
 	if in.workdir, err = verifierWorkdir(rc.Suite.Workdir); err != nil {
+		return nil, resultSpec{}, err
+	}
+	if err := applyScenario(rc, in); err != nil {
 		return nil, resultSpec{}, err
 	}
 	spec, err := resultSettings(rc.Suite.Verifier)

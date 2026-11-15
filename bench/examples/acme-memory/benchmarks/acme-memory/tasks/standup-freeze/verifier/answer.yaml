@@ -1,0 +1,10 @@
+# Hidden expected answer, read by the answer_match grader (no model). The
+# freeze was first planned for 2026-05-20 and moved to 2026-05-26 in the
+# same meeting; the release (2026-06-04) and the release candidate
+# (2026-05-28) are distractors.
+question: On which date does the payments code freeze start?
+match: exact
+expected: ["2026-05-26"]
+normalize: [trim]
+category: single-session-recall
+wrong_answers: ["2026-05-20", "2026-06-04", "2026-05-28"]

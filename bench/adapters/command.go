@@ -53,7 +53,9 @@ func (a *commandAdapter) GetName() string { return AdapterCommand }
 // GetVersion implements schemas.Part.
 func (a *commandAdapter) GetVersion() string { return commandVersion }
 
-// Plan renders the agent's argv, env and files and resolves its budgets.
+// Plan renders the agent's argv, env and files and resolves its budgets. A
+// scenario run also gets its skills (addSkills) and its MCP servers (mcpVars,
+// addMCP); a run with neither gets exactly the plan it always did.
 //
 // The run key is a secret: it may appear only in the rendered env and files,
 // which the Environment hands to the container and redacts on disk. A config
@@ -75,6 +77,9 @@ func (a *commandAdapter) Plan(ctx context.Context, rc *schemas.RunContext) (*sch
 		return nil, fmt.Errorf("plan run %s: %w", rc.Run.RunID, err)
 	}
 	vars := templateVars(rc, a.cfg, instruction)
+	if err := mcpVars(vars, rc); err != nil {
+		return nil, fmt.Errorf("plan run %s: %w", rc.Run.RunID, err)
+	}
 
 	argv, err := renderList(rc.Agent.Argv, vars)
 	if err != nil {
@@ -114,6 +119,12 @@ func (a *commandAdapter) Plan(ctx context.Context, rc *schemas.RunContext) (*sch
 	plan.Argv = argv
 	plan.Env = env
 	plan.Files = files
+	if err := addSkills(plan, a.cfg.BenchRoot, rc); err != nil {
+		return nil, fmt.Errorf("plan run %s: %w", rc.Run.RunID, err)
+	}
+	if err := addMCP(plan, rc); err != nil {
+		return nil, fmt.Errorf("plan run %s: %w", rc.Run.RunID, err)
+	}
 	return plan, nil
 }
 

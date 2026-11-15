@@ -1,0 +1,15 @@
+# Hidden expected answer, read by the answer_match grader (no model). The
+# contract summary never gives a phone number, so the correct behaviour is
+# to say so (abstain). With abstain: true the grader passes only an answer
+# holding one of its fixed "not known" phrases ("i don't know", "not
+# mentioned", "no information", ...; docs/answer-grading.md lists them) and
+# ignores match and expected; the pattern below is kept for a judged copy
+# of the suite and for readers.
+question: What is Northwind Archive's support phone number?
+abstain: true
+match: regex
+expected:
+  - "(not (been )?(mentioned|given|stated|listed|included|provided|known|in the (notes|summary|contract))|n[o']t (have|know|find)|do not (have|know)|unknown|no (support )?(phone|telephone)( number)?|never (gave|given|mentioned|stated|listed))"
+normalize: [lower]
+category: abstention
+wrong_answers: ["+49 69 5500 1840", "support@northwind-archive.example"]

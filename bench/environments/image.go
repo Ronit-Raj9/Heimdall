@@ -114,8 +114,11 @@ func (e *dockerWorkspace) ImageID(ctx context.Context, ref string) (string, erro
 // frozen experiment measures. A manifest without an image id (planned before
 // ids were recorded, or without docker) is not checked.
 func (e *dockerWorkspace) checkFrozenImage(ctx context.Context, rc *schemas.RunContext) error {
+	if err := e.checkFrozenTaskImage(ctx, rc); err != nil {
+		return err
+	}
 	want := frozenImageID(rc)
-	if want == "" || rc.Agent == nil || rc.Agent.Image == "" {
+	if want == "" || rc.Agent == nil || rc.Agent.Image == "" || perTaskAgent(rc) {
 		return nil
 	}
 	got, err := e.ImageID(ctx, rc.Agent.Image)
@@ -127,6 +130,64 @@ func (e *dockerWorkspace) checkFrozenImage(ctx context.Context, rc *schemas.RunC
 			rc.Agent.Image, short(got), rc.Manifest.ExpID, short(want))
 	}
 	return nil
+}
+
+// checkFrozenTaskImage refuses a run whose task image tag no longer names
+// the image id the manifest recorded for the task (Manifest.TaskImages). A
+// task without its own image, or a manifest without the id, is not checked;
+// a missing image is left to Create, which builds it.
+func (e *dockerWorkspace) checkFrozenTaskImage(ctx context.Context, rc *schemas.RunContext) error {
+	if rc.Manifest == nil || rc.Task == nil || rc.Manifest.TaskImages[rc.Task.ID] == "" {
+		return nil
+	}
+	suiteID := ""
+	if rc.Suite != nil {
+		suiteID = rc.Suite.ID
+	}
+	img, ok, err := utils.TaskImage(suiteID, rc.Task)
+	if err != nil || !ok {
+		return err
+	}
+	got, found, err := e.cfg.Docker.ImageID(ctx, img.Tag)
+	if err != nil || !found {
+		return err
+	}
+	if want := rc.Manifest.TaskImages[rc.Task.ID]; got != want {
+		return fmt.Errorf("task image %s is now %s but experiment %s was planned with %s; restore that image or plan a new experiment",
+			img.Tag, short(got), rc.Manifest.ExpID, short(want))
+	}
+	return nil
+}
+
+// perTaskAgent reports whether the run's agent image is chosen per task: the
+// task has its own image and either the agent build declares base_arg, or the
+// manifest recorded a per-task image for the run's arm (a scripted control
+// runs in the task image itself). The arm's frozen id is the per-suite
+// image's, so it is not compared; the task image is (checkFrozenTaskImage),
+// and the engine compares the per-task image with the id it recorded.
+func perTaskAgent(rc *schemas.RunContext) bool {
+	if rc.Task == nil || rc.Task.Environment == nil || rc.Agent == nil {
+		return false
+	}
+	if rc.Agent.Build != nil && rc.Agent.Build.BaseArg != "" {
+		return true
+	}
+	return armTaskImage(rc) != ""
+}
+
+// armTaskImage is the per-task image the manifest recorded for the run's arm
+// and task, or empty.
+func armTaskImage(rc *schemas.RunContext) string {
+	if rc.Manifest == nil || rc.Slot == nil {
+		return ""
+	}
+	if rc.Slot.Arm == compatArm {
+		if rc.Manifest.Compatibility == nil {
+			return ""
+		}
+		return rc.Manifest.Compatibility.TaskImages[rc.Task.ID]
+	}
+	return rc.Manifest.Arms[rc.Slot.Arm].TaskImages[rc.Task.ID]
 }
 
 // frozenImageID is the image id the manifest recorded for the run's arm.

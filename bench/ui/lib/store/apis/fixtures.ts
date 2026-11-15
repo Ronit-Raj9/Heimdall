@@ -46,6 +46,9 @@ export const FIXTURE_ROUTES: readonly FixtureRoute[] = [
 	// Task ids are unique across the fixture suites, so the file is keyed by the task alone.
 	{ method: "GET", pattern: "/suites/*/tasks/:id", file: "suites.task.{id}.json" },
 	{ method: "GET", pattern: "/agents", file: "agents.json" },
+	{ method: "GET", pattern: "/imports", file: "imports.json" },
+	// Workers on: the page shows the table. A server with the worker API off answers 404 instead.
+	{ method: "GET", pattern: "/workers", file: "workers.json" },
 ];
 
 /** True when the URL has fixture=1 or the build sets VITE_BENCH_FIXTURE=1. */

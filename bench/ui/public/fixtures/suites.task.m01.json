@@ -1,0 +1,68 @@
+{
+	"_comment": "SYNTHETIC fixture for UI development. Not a measurement. Shapes follow handlers/testdata/contract.",
+	"mode": "synthetic",
+	"suite": "memory-recall",
+	"suite_version": "0.1.0",
+	"verifier_result": "exit_code",
+	"task": {
+		"id": "m01",
+		"version": "1.0.0",
+		"title": "Recall the dinner plan agreed three sessions earlier",
+		"project": "recall",
+		"kind": "recall",
+		"difficulty": "medium",
+		"capabilities": [
+			"memory"
+		],
+		"tags": [
+			"multi-session"
+		],
+		"provenance": {
+			"source": "https://example.com/recall-dataset",
+			"license": "CC-BY-4.0",
+			"imported_from": "recall-example@1"
+		},
+		"status": "not_locked",
+		"stale": false,
+		"admitted": false,
+		"admitted_at": null,
+		"checks": [],
+		"hidden_test_files": 1,
+		"required_tests": 0,
+		"protected_globs": 0,
+		"mutants": 0,
+		"agent_timeout_s": 600,
+		"sessions": [
+			{
+				"id": "chat-1",
+				"instruction": "sessions/chat-1.md",
+				"files": "sessions/chat-1"
+			},
+			{
+				"id": "chat-2",
+				"instruction": "sessions/chat-2.md",
+				"files": "sessions/chat-2"
+			},
+			{
+				"id": "question",
+				"instruction": "sessions/question.md",
+				"wall_s": 300
+			}
+		],
+		"output": {
+			"kind": "answer",
+			"answer_path": "answer.txt"
+		}
+	},
+	"instruction": "Answer the question in the last session from what you remember of the earlier chats. Write the answer to answer.txt.\n",
+	"instruction_truncated": false,
+	"protected": [],
+	"files": [
+		{
+			"path": "README.md",
+			"size": 412
+		}
+	],
+	"files_total": 1,
+	"files_truncated": false
+}

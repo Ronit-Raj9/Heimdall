@@ -6,8 +6,10 @@ import { GatewayLane } from "@/components/runs/gatewayLane";
 import { IncompleteNotice } from "@/components/runs/incompleteNotice";
 import { MetricStrip } from "@/components/runs/metricStrip";
 import { PairPicker } from "@/components/runs/pairPicker";
+import { RunScenarioEvidence } from "@/components/runs/runScenario";
 import { indexEvents, stripMetricKinds } from "@/components/runs/runs.utils";
 import { BlockSkeleton, EmptyNote, LoadError, Section } from "@/components/runs/screenStates";
+import { hasScenarioEvidence } from "@/components/scenario/scenario.utils";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -85,6 +87,8 @@ function PairComparison({ pairId, onClear }: { pairId: string; onClear: () => vo
 	}
 
 	const data = pair.data;
+	// Only lanes whose run recorded scenario evidence get a tab; a plain diff pair gets no section.
+	const scenarioLanes = lanes.filter((lane) => lane.detail.data && hasScenarioEvidence(lane.detail.data));
 	if (lanes.length === 0) {
 		return (
 			<div className="flex flex-col gap-4">
@@ -139,6 +143,25 @@ function PairComparison({ pairId, onClear }: { pairId: string; onClear: () => vo
 					))}
 				</Tabs>
 			</Section>
+
+			{scenarioLanes.length > 0 && (
+				<Section title={t("runs.scenario.title")} description={t("runs.scenario.description")} testId="runs-scenario-section">
+					<Tabs defaultValue={scenarioLanes[0].pairRun.arm}>
+						<TabsList>
+							{scenarioLanes.map((lane) => (
+								<TabsTrigger key={lane.pairRun.arm} value={lane.pairRun.arm} data-testid={`runs-scenario-tab-${lane.pairRun.arm}`}>
+									{t("runs.arm", { arm: lane.pairRun.arm })}
+								</TabsTrigger>
+							))}
+						</TabsList>
+						{scenarioLanes.map((lane) => (
+							<TabsContent key={lane.pairRun.arm} value={lane.pairRun.arm}>
+								<RunScenarioEvidence detail={lane.detail.data!} arm={lane.pairRun.arm} />
+							</TabsContent>
+						))}
+					</Tabs>
+				</Section>
+			)}
 		</div>
 	);
 }

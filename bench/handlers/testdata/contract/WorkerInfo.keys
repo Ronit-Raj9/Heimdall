@@ -1,0 +1,9 @@
+# Keys of bench.ts `WorkerInfo` (schemas/scenario.go). Change with bench.ts and schemas.
+id
+host
+version
+state
+slots
+running
+completed
+last_seen

@@ -1,3 +1,5 @@
+import { GradingBadge, TrackBadge } from "@/components/scenario/scenarioBadges";
+import { suiteGrading, suiteTrack } from "@/components/scenario/scenario.utils";
 import { shortHash } from "@/components/verdict/verdict.utils";
 import type { SuiteSummary } from "@/lib/types/bench";
 import { cn } from "@/lib/utils";
@@ -63,6 +65,8 @@ function SuiteCard({ suite, pressed, onSelect }: { suite: SuiteSummary; pressed:
 				<>
 					{suite.description && <span className="text-muted-foreground line-clamp-2 text-xs">{suite.description}</span>}
 					<span className="flex flex-wrap items-center gap-1.5">
+						<TrackBadge track={suiteTrack(suite)} testId={`suites-card-${suite.id}-track`} />
+						{suiteGrading(suite) === "judged" && <GradingBadge grading="judged" testId={`suites-card-${suite.id}-judged`} />}
 						<LockBadge state={suite.lock_state} testId={`suites-card-${suite.id}-lock`} />
 						<ToneBadge
 							tone={allAdmitted ? "good" : suite.admitted_count > 0 ? "warn" : "neutral"}

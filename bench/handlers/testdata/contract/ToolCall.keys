@@ -1,0 +1,17 @@
+# Keys of bench.ts `ToolCall` (schemas/scenario.go): one tool proxy ledger line in RunDetail.tool_calls.
+seq
+session?
+server
+tool
+protocol
+arguments?
+args_sha256
+result?
+result_sha256
+is_error
+status?
+fault?
+nonce?
+started
+latency_ms
+undelivered?

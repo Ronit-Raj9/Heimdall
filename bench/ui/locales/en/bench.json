@@ -13,7 +13,9 @@
 		"receipts": "Receipts",
 		"newExperiment": "New experiment",
 		"triage": "Triage",
-		"releases": "Releases"
+		"releases": "Releases",
+		"imports": "Imports",
+		"workers": "Workers"
 	},
 	"mode": {
 		"live": "LIVE",
@@ -71,7 +73,10 @@
 			"syntheticExcludeHint": "Live runs only.",
 			"syntheticOnly": "Synthetic",
 			"syntheticOnlyHint": "Scripted agent or scripted model runs only.",
-			"noSuites": "No suites"
+			"noSuites": "No suites",
+			"track": "Track",
+			"allTracks": "All tracks",
+			"trackOther": "Not on disk"
 		},
 		"table": {
 			"title": "Ranking",
@@ -169,6 +174,11 @@
 			"notApplicable": "n/a",
 			"notRun": "not run",
 			"tierValue": "{{tier}} ({{reason}})"
+		},
+		"judged": {
+			"badge": "Judged suite",
+			"title": "Outcomes on this board come from a pinned judge model",
+			"body": "Success here is a judge model's majority vote, not a deterministic check. Do not compare this board with a verified suite's board."
 		}
 	},
 	"verdict": {
@@ -495,6 +505,84 @@
 			"files": "Files",
 			"rejected": "Left out of the export",
 			"loadError": "Could not load the diff."
+		},
+		"scenario": {
+			"title": "Scenario evidence",
+			"description": "What the run recorded beyond the diff: tool calls, sessions, the answer, exported state and services.",
+			"tools": {
+				"title": "Tool calls",
+				"description": "Every call through the per-run tool proxy, in order. Arguments and results are shown as plain text.",
+				"label": "Tool calls of arm {{arm}}",
+				"summary_one": "{{count}} call",
+				"summary_other": "{{count}} calls",
+				"errors_one": "{{count}} error",
+				"errors_other": "{{count}} errors",
+				"faults_one": "{{count}} injected fault",
+				"faults_other": "{{count}} injected faults",
+				"seq": "#",
+				"server": "Server",
+				"tool": "Tool",
+				"result": "Result",
+				"latency": "Latency",
+				"details": "Details",
+				"ok": "ok",
+				"error": "error",
+				"status": "HTTP {{status}}",
+				"fault": "injected {{fault}}",
+				"faultHint": "The tool proxy answered with an injected fault instead of the server.",
+				"undelivered": "not delivered",
+				"undeliveredHint": "The agent hung up before the answer reached it.",
+				"ms": "{{value}} ms",
+				"show": "Show",
+				"hide": "Hide",
+				"showAria": "Show arguments and result of call {{seq}}",
+				"hideAria": "Hide arguments and result of call {{seq}}",
+				"arguments": "Arguments",
+				"resultText": "Result",
+				"none": "(none recorded)",
+				"session": "session {{session}}",
+				"hash": "sha256 {{hash}}"
+			},
+			"sessions": {
+				"title": "Sessions",
+				"description": "Each session ran as a fresh agent process, in this order. Only the last one's output was graded.",
+				"label": "Sessions of arm {{arm}}",
+				"index": "Session {{index}}",
+				"exit": "exit {{code}}",
+				"timedOut": "timed out",
+				"duration": "{{value}} s",
+				"stream": "stream {{path}}"
+			},
+			"answer": {
+				"title": "Answer",
+				"description": "What the verifier read, shown as plain text.",
+				"source": "Source",
+				"file": "the answer file",
+				"final_message": "the agent's final message (no answer file was written)",
+				"missing": "missing: no answer file and no final message",
+				"truncated": "Cut at the size cap; the hash covers the whole answer.",
+				"hash": "sha256 {{hash}}",
+				"empty": "(empty answer)"
+			},
+			"state": {
+				"title": "Exported state",
+				"description": "Read from the services after the agent exited, sealed, and mounted read-only for the verifier.",
+				"label": "Exported state of arm {{arm}}",
+				"service": "Service",
+				"file": "Export",
+				"size": "Size",
+				"hash": "sha256",
+				"failed": "export failed: {{error}}"
+			},
+			"services": {
+				"title": "Services",
+				"description": "What ran beside the agent and whether it passed its ready check. A service that never came up aborts the run as an infrastructure failure, not an agent failure.",
+				"label": "Services of arm {{arm}}",
+				"ready": "ready",
+				"notReady": "not ready",
+				"proxied": "proxied",
+				"image": "image {{image}}"
+			}
 		}
 	},
 	"receipts": {
@@ -897,7 +985,11 @@
 			"lockedAt": "Locked at",
 			"seconds": "{{count}} s",
 			"none": "none",
-			"leaderboard": "Leaderboard for this suite"
+			"leaderboard": "Leaderboard for this suite",
+			"track": "Track",
+			"grading": "Grading",
+			"output": "Output",
+			"services": "Services"
 		},
 		"drift": {
 			"title": "What changed since the lock",
@@ -988,12 +1080,15 @@
 			"family": {
 				"unavailable_model": "Unavailable model",
 				"broken_tool": "Broken tool",
-				"misleading_instruction": "Misleading instruction"
+				"misleading_instruction": "Misleading instruction",
+				"hostile_tool": "Hostile tool"
 			},
 			"layer": {
 				"fixture": "fixture",
 				"gateway": "gateway",
-				"tool_shim": "tool shim"
+				"tool_shim": "tool shim",
+				"tool": "tool proxy",
+				"service": "service"
 			},
 			"axis": "axis {{axis}}"
 		},
@@ -1082,6 +1177,53 @@
 				"check": "Conformance check that costs nothing: one task against the scripted model, PASS, WARN or FAIL per row.",
 				"contract": "Your agent only has to send its model calls to the URL and key it is given. No SDK."
 			}
+		},
+		"imported": {
+			"title": "Imported from",
+			"description": "Written by bifrost-bench import from a local copy of a public benchmark. The upstream data is not committed, and each task counts only after its own admission passes here.",
+			"label": "Import record",
+			"importer": "Importer",
+			"benchmark": "Benchmark",
+			"source": "Source",
+			"license": "License",
+			"revision": "Revision",
+			"at": "Imported at",
+			"notRecorded": "not recorded"
+		},
+		"scenario": {
+			"title": "Scenario",
+			"hint": "What runs beside the agent and what the verifier reads.",
+			"image": "Environment image",
+			"imageHint": "The task brings its own image instead of the suite's base image and a repo folder.",
+			"builtFrom": "built from {{dockerfile}}",
+			"workspacePath": "workspace seeded from {{path}}",
+			"verifierImage": "verifier runs in {{image}}",
+			"buildNetwork": "network during the image build only",
+			"services": "Services",
+			"servicesHint": "Started beside the agent, after the suite's services, on a network no other run can reach. Environment values and seed files stay on the server.",
+			"proxied": "through the tool proxy",
+			"proxiedHint": "The agent's calls pass the per-run tool proxy, which records them and can inject faults.",
+			"direct": "reached directly",
+			"hidden": "hidden from the agent",
+			"hiddenHint": "Only the verifier and other services reach it.",
+			"port": "port {{port}}",
+			"exports": "exports {{exports}}",
+			"sessions": "Sessions",
+			"sessionsHint": "Each session is a fresh agent process, run in this order. Only the last session's output is graded.",
+			"persists": "Carried between sessions: the /memory volume and the agent's own memory paths. Nothing else, unless a session keeps the workspace.",
+			"sessionLabel": "Session {{index}}: {{id}}",
+			"keepsWorkspace": "keeps the previous workspace",
+			"resetsWorkspace": "workspace reset to the starting state",
+			"sessionFiles": "adds {{files}} to the workspace",
+			"sessionWall": "{{count}} s budget",
+			"instruction": "instruction {{file}}",
+			"output": "Output",
+			"fromSuite": "from the suite",
+			"answerPath": "answer written to {{path}}",
+			"skills": "Skills",
+			"skillsHint": "Installed in the agent's skills folder, unless the run turns skills off.",
+			"impossible": "Impossible task",
+			"impossibleBody": "Its tests contradict its instruction, so no honest solution exists. A pass can only come from cheating, such as editing the tests or special-casing the checks, and the impossible_pass gate records it as an integrity violation."
 		}
 	},
 	"agents": {
@@ -1120,5 +1262,98 @@
 		"runs": "Sealed runs",
 		"runsHint": "Sealed runs of this config id in any experiment, including dry runs against the scripted model. The leaderboard separates live from synthetic.",
 		"runsUnknown": "unknown"
+	},
+	"scenario": {
+		"track": {
+			"label": "Track",
+			"coding": "Coding",
+			"terminal": "Terminal",
+			"tool_use": "Tool use",
+			"mcp": "MCP",
+			"memory": "Memory",
+			"skills": "Skills",
+			"safety": "Safety",
+			"qa": "Q&A",
+			"codingHint": "Edit a repository; hidden tests decide.",
+			"terminalHint": "Work in a whole container; its state is checked afterwards.",
+			"tool_useHint": "Call tools against a service; the final state is checked.",
+			"mcpHint": "Tools reached over the Model Context Protocol.",
+			"memoryHint": "Several sessions; recall is checked in the last one.",
+			"skillsHint": "The same task with and without agent skills.",
+			"safetyHint": "Attacks delivered through tool results or files.",
+			"qaHint": "A written answer, matched or judged.",
+			"otherHint": "A track this version of the UI does not know."
+		},
+		"grading": {
+			"label": "Grading",
+			"verified": "Verified",
+			"judged": "Judged",
+			"verifiedHint": "A deterministic check decides every outcome. No model grades.",
+			"judgedHint": "A pinned judge model decides each outcome, not a deterministic check. Judged results are never compared with verified ones.",
+			"judgedTitle": "Judged, not verified",
+			"judgedBody": "In this suite a judge model decides whether each answer is correct. The model, its prompt version and its number of votes are pinned in suite.yaml and hashed into every manifest, and its cost is reported apart from the agent's. Results here are never ranked against, or compared with, a verified suite."
+		},
+		"output": {
+			"label": "Output",
+			"diff": "Diff",
+			"answer": "Answer",
+			"state": "State",
+			"diffHint": "The verifier reads the agent's workspace patch.",
+			"answerHint": "The verifier reads the answer the agent wrote.",
+			"stateHint": "The verifier reads files exported from the services after the run."
+		},
+		"role": {
+			"data": "data",
+			"tool": "tool",
+			"mcp": "MCP",
+			"user": "simulated user"
+		}
+	},
+	"imports": {
+		"title": "Imports",
+		"subtitle": "Public benchmarks this bench can turn into suites. An importer reads a local copy of the upstream data and writes an ordinary suite; nothing upstream is committed.",
+		"synthetic": "Synthetic fixture data. These importers are examples for checking the screen, not what this server links.",
+		"loadError": "Could not load the importers.",
+		"empty": "This server links no importers.",
+		"label": "Importers",
+		"untrusted": "Upstream data is untrusted input: it is read as data, never run on this machine, and an imported task counts only after its own reference passes and its empty control fails here.",
+		"benchmarks": "Benchmarks",
+		"license": "License",
+		"licenseVaries": "varies per task: check each task's provenance",
+		"fetch": "How to fetch",
+		"needs": "What a run needs",
+		"needsNone": "Nothing beyond the default stack.",
+		"command": "Import, lock and admit",
+		"commandLabel": "Import command for {{name}}"
+	},
+	"workers": {
+		"title": "Workers",
+		"subtitle": "Other machines that lease slots from this server, run them with the normal pipeline, and upload sealed run folders. This server keeps the spend cap and the lease table.",
+		"synthetic": "Synthetic fixture data. These workers are examples for checking the screen.",
+		"loadError": "Could not load the workers.",
+		"offTitle": "Remote workers are not enabled",
+		"offBody": "The worker API is off unless the server starts with BENCH_WORKER_TOKEN set, so every run happens on this machine.",
+		"offHow": "To add a worker, set BENCH_WORKER_TOKEN on the server, then on the other machine (same project, same commit, its own stack):",
+		"offCommand": "Start a worker",
+		"empty": "The worker API is on, but no worker has registered yet.",
+		"label": "Remote workers",
+		"id": "Worker",
+		"host": "Host",
+		"version": "Build",
+		"state": "State",
+		"slots": "Slots",
+		"running": "Running",
+		"completed": "Completed",
+		"lastSeen": "Last seen",
+		"runningCell": "{{count}} of {{slots}}",
+		"never": "never",
+		"states": {
+			"idle": "Idle",
+			"running": "Running",
+			"lost": "Lost",
+			"idleHint": "Registered and waiting for a slot.",
+			"runningHint": "Holding at least one slot.",
+			"lostHint": "Stopped answering; its leases go back to the queue."
+		}
 	}
 }

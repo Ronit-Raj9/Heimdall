@@ -18,3 +18,10 @@ required_tests
 protected_globs
 mutants
 agent_timeout_s
+# Scenario keys (schemas/scenario.go); absent for a repository task.
+environment?
+services?
+sessions?
+output?
+skills?
+impossible?

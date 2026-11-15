@@ -3,6 +3,7 @@ package adapters
 import (
 	"context"
 	"encoding/json"
+	"flag"
 	"os"
 	"path/filepath"
 	"strings"
@@ -274,5 +275,128 @@ func TestCommandPlanNetworkAndPids(t *testing.T) {
 	}
 	if plan.Pids != 128 {
 		t.Errorf("pids = %d, want 128", plan.Pids)
+	}
+}
+
+var updatePlans = flag.Bool("update", false, "rewrite the golden plans under testdata/plans")
+
+// TestPlanGolden pins the whole plan of each shipped CLI config, and of a
+// generic command agent, with and without skills and MCP servers. The plain
+// golden of each is the plan as it was before skills and MCP existed, so a
+// run with neither must keep producing it byte for byte. Host folders are
+// written as $TASK and $BENCH. Run with -update to rewrite them.
+func TestPlanGolden(t *testing.T) {
+	agents := map[string]func(t *testing.T) *schemas.AgentConfig{
+		"codex": func(t *testing.T) *schemas.AgentConfig {
+			return loadAgent(t, filepath.Join("..", "agents", "codex.yaml"))
+		},
+		"claude-code": func(t *testing.T) *schemas.AgentConfig {
+			return loadAgent(t, filepath.Join("..", "agents", "claude-code.yaml"))
+		},
+		"opencode": func(t *testing.T) *schemas.AgentConfig {
+			return loadAgent(t, filepath.Join("..", "agents", "opencode.yaml"))
+		},
+		"command": func(t *testing.T) *schemas.AgentConfig {
+			a := commandAgent()
+			a.Argv = append(a.Argv, "--mcp-servers", "{{mcp.servers_json}}")
+			return a
+		},
+	}
+	cases := []struct {
+		name        string
+		skills, mcp bool
+	}{
+		{name: "plain"},
+		{name: "skills", skills: true},
+		{name: "mcp", mcp: true},
+		{name: "skills-mcp", skills: true, mcp: true},
+	}
+	for id, load := range agents {
+		for _, c := range cases {
+			t.Run(id+"-"+c.name, func(t *testing.T) {
+				agent := load(t)
+				rc, cfg := fixture(t, agent)
+				if c.skills {
+					writeTree(t, rc.Task.Dir, map[string]string{"skills/pdf/SKILL.md": "p", "skills/xlsx/SKILL.md": "x"})
+					writeTree(t, cfg.BenchRoot, map[string]string{"skills/house-style/SKILL.md": "h"})
+					rc.Task.Skills = "skills"
+					agent.Skills = &schemas.AgentSkills{Extra: []string{"skills/house-style"}}
+				}
+				if c.mcp {
+					rc.Services = mcpServices()
+				}
+				plan, err := newCommandAdapter(cfg).Plan(context.Background(), rc)
+				if err != nil {
+					t.Fatal(err)
+				}
+				checkGolden(t, filepath.Join("testdata", "plans", id+"-"+c.name+".json"), planJSON(t, plan, rc.Task.Dir, cfg.BenchRoot))
+			})
+		}
+	}
+}
+
+// TestPlanUnchangedWithoutScenario checks that every way of having no skills
+// and no MCP servers gives the plain plan: skills disabled on a task that has
+// some, and services that include no MCP server.
+func TestPlanUnchangedWithoutScenario(t *testing.T) {
+	for _, id := range []string{"codex", "claude-code", "opencode"} {
+		t.Run(id, func(t *testing.T) {
+			agent := loadAgent(t, filepath.Join("..", "agents", id+".yaml"))
+			rc, cfg := fixture(t, agent)
+			plain, err := newCommandAdapter(cfg).Plan(context.Background(), rc)
+			if err != nil {
+				t.Fatal(err)
+			}
+			writeTree(t, rc.Task.Dir, map[string]string{"skills/pdf/SKILL.md": "p"})
+			rc.Task.Skills = "skills"
+			agent.Skills = &schemas.AgentSkills{Enabled: boolPtr(false)}
+			rc.Services = mcpServices()[2:3]
+			other, err := newCommandAdapter(cfg).Plan(context.Background(), rc)
+			if err != nil {
+				t.Fatal(err)
+			}
+			a := planJSON(t, plain, rc.Task.Dir, cfg.BenchRoot)
+			b := planJSON(t, other, rc.Task.Dir, cfg.BenchRoot)
+			if a != b {
+				t.Fatalf("plan changed:\n%s\n%s", a, b)
+			}
+		})
+	}
+}
+
+// planJSON is a plan as indented JSON with the test's host folders replaced.
+func planJSON(t *testing.T, plan *schemas.RunPlan, taskDir, benchRoot string) string {
+	t.Helper()
+	b, err := json.MarshalIndent(plan, "", "  ")
+	if err != nil {
+		t.Fatal(err)
+	}
+	s := string(b) + "\n"
+	for dir, name := range map[string]string{taskDir: "$TASK", benchRoot: "$BENCH"} {
+		if real, err := filepath.EvalSymlinks(dir); err == nil {
+			s = strings.ReplaceAll(s, real, name)
+		}
+		s = strings.ReplaceAll(s, dir, name)
+	}
+	return s
+}
+
+func checkGolden(t *testing.T, path, got string) {
+	t.Helper()
+	if *updatePlans {
+		if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(path, []byte(got), 0o644); err != nil {
+			t.Fatal(err)
+		}
+		return
+	}
+	want, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatalf("%v (run with -update to create it)", err)
+	}
+	if string(want) != got {
+		t.Fatalf("plan differs from %s:\n got:\n%s\nwant:\n%s", path, got, want)
 	}
 }

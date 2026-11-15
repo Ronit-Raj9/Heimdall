@@ -20,7 +20,7 @@ func init() {
 	register("suite", "create, lint, lock or admit a benchmark pack: suite init|lint|lock|admit <id>", runSuite)
 }
 
-const suiteUsage = `usage: bifrost-bench suite init <suite id> -template python-pytest|node-test|go-test|generic-reward [-image <existing image>] [-config deploy/bench.yaml]
+const suiteUsage = `usage: bifrost-bench suite init <suite id> -template python-pytest|node-test|go-test|generic-reward|tool-use|mcp|memory|qa [-image <existing image>] [-config deploy/bench.yaml]
        bifrost-bench suite lint|lock [-config deploy/bench.yaml | -root benchmarks] <suite id>
        bifrost-bench suite admit [-config deploy/bench.yaml] [-task t01] <suite id>`
 
@@ -117,6 +117,12 @@ func runSuiteInit(args []string) int {
 	for _, f := range files {
 		fmt.Printf("wrote %s\n", filepath.Join(dir, filepath.FromSlash(f.Path)))
 	}
+	if scaffold.IsScenarioTemplate(*tmpl) {
+		sample := scaffold.ScenarioSample(*tmpl)
+		fmt.Printf("\nnext: read %s, then\n  bifrost-bench task validate %s/%s\n  bifrost-bench task admit %s/%s\n  bifrost-bench task init -suite %s -id t02\n",
+			filepath.Join(dir, "README.md"), pos[0], sample, pos[0], sample, pos[0])
+		return exitOK
+	}
 	fmt.Printf("\nnext: bifrost-bench task init -suite %s -id t01 -repo <git repo> -base <commit> -reference <commit>\n", pos[0])
 	return exitOK
 }
@@ -163,6 +169,11 @@ func admitSuite(ctx context.Context, config, ref, only string) int {
 	}
 	if only != "" && s.TaskByID(only) == nil {
 		return fail("suite %s has no task %q in its tasks list", s.ID, only)
+	}
+	if s.Grading == schemas.GradingJudged { // run kernel: the judge grader calls its model through the gateway
+		if a, err = newApp(ctx, config, appOptions{gateway: true}); err != nil {
+			return fail("%v", err)
+		}
 	}
 	deps := suite.AdmitDeps{Logger: a.logger}
 	for _, e := range a.reg.Environments {
@@ -267,6 +278,9 @@ func (a *app) ensureImages(ctx context.Context, s *schemas.Suite) error {
 	if err := a.ensureImage(ctx, s.BaseImage.Tag, suiteDockerfile); err != nil {
 		return fmt.Errorf("suite %s base image: %w", s.ID, err)
 	}
+	if err := a.ensureServiceImages(ctx, s); err != nil {
+		return err
+	}
 	if helper := a.cfg.Images.Helper; helper != "" && helper != s.BaseImage.Tag {
 		helperDockerfile := filepath.Join(a.cfg.Root, "deploy", "helper", "Dockerfile")
 		if _, err := os.Stat(helperDockerfile); err != nil {
@@ -277,6 +291,68 @@ func (a *app) ensureImages(ctx context.Context, s *schemas.Suite) error {
 		}
 	}
 	return nil
+}
+
+// ensureServiceImages builds every missing service image of the suite and
+// its tasks, each once: from build.dockerfile when the service has a build
+// section (relative to the suite root for suite services, the task folder
+// for task services), else, for a service that names only an image, from
+// services/<service id>/Dockerfile in the suite folder when it exists (the
+// layout `suite init -template tool-use|mcp` writes).
+func (a *app) ensureServiceImages(ctx context.Context, s *schemas.Suite) error {
+	done := map[string]bool{}
+	for _, b := range serviceBuilds(s) {
+		if done[b.tag] {
+			continue
+		}
+		done[b.tag] = true
+		dockerfile := ""
+		if b.dockerfile != "" {
+			real, err := utils.ResolveInside(b.root, b.dockerfile)
+			if err != nil {
+				return fmt.Errorf("service %s: build.dockerfile: %w", b.service, err)
+			}
+			dockerfile = real
+		}
+		if err := a.ensureImage(ctx, b.tag, dockerfile); err != nil {
+			return fmt.Errorf("service %s image: %w", b.service, err)
+		}
+	}
+	return nil
+}
+
+// serviceBuild is one service image ensureServiceImages looks after.
+type serviceBuild struct {
+	service, tag string
+	root         string // folder the Dockerfile must stay inside
+	dockerfile   string // relative to root; empty when nothing builds it
+}
+
+// serviceBuilds lists the service images of a suite, suite services first.
+func serviceBuilds(s *schemas.Suite) []serviceBuild {
+	var out []serviceBuild
+	add := func(sv schemas.ServiceSpec, root string) {
+		switch {
+		case sv.Build != nil && sv.Build.Tag != "":
+			out = append(out, serviceBuild{service: sv.ID, tag: sv.Build.Tag, root: root, dockerfile: sv.Build.Dockerfile})
+		case sv.Image != "":
+			b := serviceBuild{service: sv.ID, tag: sv.Image, root: s.Root}
+			conv := filepath.Join("services", sv.ID, "Dockerfile")
+			if _, err := os.Stat(filepath.Join(s.Root, conv)); err == nil {
+				b.dockerfile = conv
+			}
+			out = append(out, b)
+		}
+	}
+	for _, sv := range s.Services {
+		add(sv, s.Root)
+	}
+	for _, t := range s.Tasks {
+		for _, sv := range t.Services {
+			add(sv, t.Dir)
+		}
+	}
+	return out
 }
 
 // ensureImage builds tag from dockerfile (in the Dockerfile's folder) when

@@ -281,3 +281,64 @@ func countEvents(events []schemas.Event) map[schemas.EventType]int {
 	}
 	return out
 }
+
+func TestScriptedOracleControlKinds(t *testing.T) {
+	tests := []struct {
+		name     string
+		ref      string
+		content  string
+		output   *schemas.OutputSpec
+		argv     []string
+		fileName string
+	}{
+		{"script reference", "controls/reference.sh", "#!/bin/sh\necho ok > /workspace/x\n", nil,
+			[]string{"sh", referenceScriptFile}, referenceScriptFile},
+		{"answer reference", "controls/answer.txt", "42\n", &schemas.OutputSpec{Kind: schemas.OutputAnswer, AnswerPath: "out/a.txt"},
+			[]string{"sh", "-c", writeAnswer, "write-answer", "/work/out/a.txt", referenceAnswerFile}, referenceAnswerFile},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			rc, cfg := fixture(t, scriptedAgent(ScriptedOracle))
+			rc.Suite = &schemas.Suite{Workdir: "/work"}
+			rc.Task.Controls.Reference = tc.ref
+			rc.Task.Output = tc.output
+			p := filepath.Join(rc.Task.Dir, filepath.FromSlash(tc.ref))
+			if err := os.MkdirAll(filepath.Dir(p), 0o755); err != nil {
+				t.Fatal(err)
+			}
+			if err := os.WriteFile(p, []byte(tc.content), 0o644); err != nil {
+				t.Fatal(err)
+			}
+			plan, err := newScriptedAdapter(cfg).Plan(context.Background(), rc)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if strings.Join(plan.Argv, "\x00") != strings.Join(tc.argv, "\x00") {
+				t.Errorf("argv = %q, want %q", plan.Argv, tc.argv)
+			}
+			if plan.Files[tc.fileName] != tc.content || len(plan.Files) != 1 || plan.Network != "none" {
+				t.Errorf("files %v network %s", plan.Files, plan.Network)
+			}
+		})
+	}
+}
+
+// TestScriptedWriteAnswer runs the answer oracle's shell line on the host:
+// it creates the answer folder and copies the reference answer there.
+func TestScriptedWriteAnswer(t *testing.T) {
+	if _, err := exec.LookPath("sh"); err != nil {
+		t.Skip("no sh")
+	}
+	dir := t.TempDir()
+	src := filepath.Join(dir, "ref")
+	if err := os.WriteFile(src, []byte("42\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	dst := filepath.Join(dir, "out", "a.txt")
+	if out, err := exec.Command("sh", "-c", writeAnswer, "write-answer", dst, src).CombinedOutput(); err != nil {
+		t.Fatalf("%v: %s", err, out)
+	}
+	if b, err := os.ReadFile(dst); err != nil || string(b) != "42\n" {
+		t.Fatalf("answer %q %v", b, err)
+	}
+}

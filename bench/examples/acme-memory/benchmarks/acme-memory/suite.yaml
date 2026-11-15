@@ -1,0 +1,35 @@
+# template: memory
+# acme-memory: can an agent remember what it learned in an earlier session?
+# Each task runs the agent once per session, in order (sessions: in each
+# task.yaml). Between sessions the workspace is reset to the task's starting
+# state, so the material of an early session is gone by the last one: the
+# only way to carry it forward is the agent's memory, the /memory volume
+# (path in BENCH_MEMORY_DIR) and the agent's own memory.paths. Only the last
+# session's answer is graded: the agent writes it to answer.txt in the
+# workspace (path in BENCH_ANSWER_PATH), or its final message is used and
+# the source is recorded. The answer_match grader compares it with the
+# task's hidden verifier/answer.yaml, with no model.
+#
+# The base image is the bench helper image, bench/coding-core-base:1 (uid
+# 1000 user "agent", git, python3, /workspace and /grader/out owned by
+# agent). `bifrost-bench init` builds it from deploy/helper/Dockerfile, so
+# this suite needs no Dockerfile of its own, and the Claude Code agent image
+# (built on the same base) runs here unchanged.
+id: acme-memory
+version: 1.0.0
+description: Acme account team memory tasks (fictional); two or three sessions each, the last session's answer matched without a model.
+track: memory
+environment: docker_workspace
+grader: answer_match
+base_image:
+  tag: bench/coding-core-base:1
+workdir: /workspace
+output:
+  kind: answer
+  answer_path: answer.txt
+# answer_match grades without running a command; the schema still wants one.
+verifier:
+  command: ["true"]
+  timeout_s: 60
+tasks: [standup-freeze, shipping-preference, vendor-phone]
+probes: [model-outage]

@@ -8,7 +8,7 @@
   "required": ["id", "adapter"],
   "properties": {
     "id": {"type": "string", "pattern": "^[a-z0-9][a-z0-9._-]*$"},
-    "adapter": {"enum": ["command", "scripted"]},
+    "adapter": {"enum": ["command", "scripted", "remote_http"]},
     "image": {"type": "string", "minLength": 1},
     "build": {"$ref": "#/$defs/image"},
     "argv": {"type": "array", "items": {"type": "string"}},
@@ -61,6 +61,45 @@
       "properties": {
         "kind": {"enum": ["oracle", "noop", "exploit", "refuse", "toy"]}
       }
+    },
+    "mcp": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "How the agent is told about the run's MCP servers. Mirrors schemas.AgentMCP.",
+      "properties": {
+        "format": {"enum": ["codex_toml", "claude_json", "opencode_json", "generic_json", "env"]},
+        "config_path": {"type": "string", "pattern": "^/"}
+      }
+    },
+    "skills": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "Agent skills. Mirrors schemas.AgentSkills.",
+      "properties": {
+        "enabled": {"type": "boolean", "description": "Default true; false installs no skills."},
+        "dir": {"type": "string", "pattern": "^/", "description": "Container folder the agent reads skills from."},
+        "extra": {"type": "array", "items": {"type": "string", "minLength": 1}, "description": "Skill folders relative to the bench root."}
+      }
+    },
+    "memory": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "Container paths kept between the sessions of a multi-session task. Mirrors schemas.AgentMemory.",
+      "properties": {
+        "paths": {"type": "array", "items": {"type": "string", "pattern": "^/"}}
+      }
+    },
+    "remote": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["url"],
+      "description": "A deployed agent, read by the remote_http adapter. Mirrors schemas.RemoteAgent.",
+      "properties": {
+        "url": {"type": "string", "pattern": "^https?://"},
+        "auth_env": {"type": "string", "pattern": "^[A-Za-z_][A-Za-z0-9_]*$", "description": "Host environment variable holding the bearer token."},
+        "timeout_s": {"type": "integer", "minimum": 1},
+        "model_traffic": {"enum": ["gateway", "external"]}
+      }
     }
   },
   "allOf": [
@@ -71,6 +110,10 @@
     {
       "if": {"required": ["adapter"], "properties": {"adapter": {"const": "scripted"}}},
       "then": {"required": ["scripted"]}
+    },
+    {
+      "if": {"required": ["adapter"], "properties": {"adapter": {"const": "remote_http"}}},
+      "then": {"required": ["remote"]}
     }
   ],
   "$defs": {

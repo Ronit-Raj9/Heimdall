@@ -222,3 +222,129 @@ func TestHelperFix(t *testing.T) {
 		t.Error("an open probe is not the helper's fault")
 	}
 }
+
+// scenarioCheckInput is a passing check run of an MCP task with two sessions
+// and an answer output: every row, the scenario rows included, passes.
+func scenarioCheckInput() *checkInput {
+	in := goodCheckInput()
+	start := time.Date(2026, 11, 15, 10, 0, 0, 0, time.UTC)
+	s := &schemas.Suite{ID: "desk", Output: &schemas.OutputSpec{Kind: schemas.OutputAnswer}}
+	task := &schemas.Task{ID: "t1",
+		Services: []schemas.ServiceSpec{{ID: "desk", Role: schemas.ServiceRoleMCP, Port: 8000}},
+		Sessions: []schemas.SessionSpec{{ID: "learn"}, {ID: "recall"}}}
+	in.agent.Memory = &schemas.AgentMemory{Paths: []string{"/home/agent/.claude"}}
+	in.plan = schemas.RunPlan{
+		Env:   map[string]string{"BENCH_MCP_SERVERS": `{"desk":{"url":"http://toolproxy:9200/s/desk/mcp"}}`},
+		Files: map[string]string{"/home/agent/.claude/.claude.json": `{"mcpServers":{"desk":{"type":"http","url":"http://toolproxy:9200/s/desk/mcp"}}}`},
+	}
+	in.net = append(in.net,
+		environments.NetWatchRecord{T: environments.NetWatchDNS, Name: "toolproxy"},
+		environments.NetWatchRecord{T: environments.NetWatchDNSAnswer, Name: "toolproxy", IPs: []string{"172.21.0.5"}},
+		environments.NetWatchRecord{T: environments.NetWatchSYN, Dst: "172.21.0.5", Port: 9200},
+		environments.NetWatchRecord{T: environments.NetWatchHTTP, Dst: "172.21.0.5", Port: 9200, Method: "POST", Path: "/s/desk/mcp", Host: "toolproxy:9200"})
+	in.scenario = &checkScenario{suite: s, task: task,
+		services: []schemas.ServiceResult{{ID: "desk", Role: "mcp", Ready: true, Proxied: true}},
+		tools:    []schemas.ToolCall{{Seq: 1, Server: "desk", Tool: "tools/list", Protocol: "mcp"}, {Seq: 2, Server: "desk", Tool: "get_ticket", Protocol: "mcp"}},
+		sessions: []schemas.SessionResult{
+			{ID: "learn", Index: 1, Started: start, Ended: start.Add(time.Second)},
+			{ID: "recall", Index: 2, Started: start.Add(2 * time.Second), Ended: start.Add(3 * time.Second)}},
+		answer: &schemas.Answer{Text: "2026-04-09\n", Source: "file"},
+	}
+	return in
+}
+
+func TestScenarioCheckRows(t *testing.T) {
+	tests := []struct {
+		name   string
+		mutate func(in *checkInput)
+		want   map[string]string // row id -> status; every other row PASS
+		detail string            // substring of the first non-PASS row's detail
+	}{
+		{name: "all pass", mutate: func(*checkInput) {}},
+		{name: "service not ready", mutate: func(in *checkInput) {
+			in.scenario.services[0].Ready, in.scenario.services[0].Error = false, "ready check timed out after 30s"
+		}, want: map[string]string{rowServices: checkFail}, detail: "ready check timed out"},
+		{name: "no service record", mutate: func(in *checkInput) { in.scenario.services = nil },
+			want: map[string]string{rowServices: checkFail}, detail: "unknown whether the services started"},
+		{name: "no mcp env", mutate: func(in *checkInput) { in.plan.Env = nil },
+			want: map[string]string{rowMCP: checkFail}, detail: "not told about the MCP server"},
+		{name: "env but no config file", mutate: func(in *checkInput) { in.plan.Files = nil },
+			want: map[string]string{rowMCP: checkWarn}, detail: "no config file"},
+		{name: "env format", mutate: func(in *checkInput) {
+			in.plan.Files, in.agent.MCP = nil, &schemas.AgentMCP{Format: "env"}
+		}},
+		{name: "only tools/list", mutate: func(in *checkInput) { in.scenario.tools = in.scenario.tools[:1] }},
+		{name: "proxy recorded nothing", mutate: func(in *checkInput) { in.scenario.tools = []schemas.ToolCall{} },
+			want: map[string]string{rowToolCall: checkFail}, detail: "never contacted the MCP server"},
+		{name: "no ledger", mutate: func(in *checkInput) {
+			in.scenario.tools, in.scenario.toolsErr = nil, "tools.jsonl missing from the run folder"
+		}, want: map[string]string{rowToolCall: checkFail}, detail: "unknown, not zero"},
+		{name: "session out of order", mutate: func(in *checkInput) {
+			s := in.scenario.sessions
+			s[0], s[1] = s[1], s[0]
+		}, want: map[string]string{rowSessions: checkFail}, detail: `want "learn"`},
+		{name: "session crashed", mutate: func(in *checkInput) { in.scenario.sessions[1].ExitCode = 3 },
+			want: map[string]string{rowSessions: checkFail}, detail: "recall exited with code 3"},
+		{name: "one session missing", mutate: func(in *checkInput) { in.scenario.sessions = in.scenario.sessions[:1] },
+			want: map[string]string{rowSessions: checkFail}, detail: "1 of 2 sessions ran"},
+		{name: "no memory paths", mutate: func(in *checkInput) { in.agent.Memory = nil },
+			want: map[string]string{rowSessions: checkWarn}, detail: "declares no memory.paths"},
+		{name: "answer from final message", mutate: func(in *checkInput) {
+			in.scenario.answer = &schemas.Answer{Text: "It is 2026-04-09.", Source: "final_message"}
+		}, want: map[string]string{rowAnswer: checkWarn}, detail: "final message was used"},
+		{name: "no answer", mutate: func(in *checkInput) { in.scenario.answer = nil },
+			want: map[string]string{rowAnswer: checkFail}, detail: "neither answer.txt"},
+		{name: "unexpected host", mutate: func(in *checkInput) {
+			in.net = append(in.net, environments.NetWatchRecord{T: environments.NetWatchDNS, Name: "pypi.org"})
+		}, want: map[string]string{rowEgress: checkFail}, detail: "pypi.org"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			in := scenarioCheckInput()
+			tt.mutate(in)
+			rows := checkRows(in)
+			want := withScenarioRows(rowOrder[1:], in.scenario.suite, in.scenario.task)
+			if len(rows) != len(want) {
+				t.Fatalf("got %d rows, want %d", len(rows), len(want))
+			}
+			first := ""
+			for i, r := range rows {
+				if r.ID != want[i] || r.Title == "" {
+					t.Errorf("row %d = %s %q, want %s", i, r.ID, r.Title, want[i])
+				}
+				status := checkPass
+				if s, ok := tt.want[r.ID]; ok {
+					status = s
+				}
+				if r.Status != status {
+					t.Errorf("%s = %s (%s), want %s", r.ID, r.Status, r.Detail, status)
+				}
+				if r.Status != checkPass && first == "" {
+					first = r.Detail
+					if r.Fix == "" {
+						t.Errorf("%s: %s without a fix", r.ID, r.Status)
+					}
+				}
+			}
+			if tt.detail != "" && !strings.Contains(first, tt.detail) {
+				t.Errorf("detail %q does not contain %q", first, tt.detail)
+			}
+		})
+	}
+}
+
+func TestScenarioRowIDs(t *testing.T) {
+	repo := &schemas.Task{ID: "t"}
+	if got := withScenarioRows(rowOrder[1:], &schemas.Suite{}, repo); len(got) != len(rowOrder)-1 {
+		t.Errorf("repository task got scenario rows: %v", got)
+	}
+	tool := &schemas.Task{Services: []schemas.ServiceSpec{{ID: "inv", Role: schemas.ServiceRoleTool}}}
+	got := scenarioRowIDs(&schemas.Suite{Output: &schemas.OutputSpec{Kind: schemas.OutputState}}, tool)
+	if strings.Join(got, ",") != rowServices+","+rowToolCall {
+		t.Errorf("tool task rows = %v", got)
+	}
+	hidden := &schemas.Task{Services: []schemas.ServiceSpec{{ID: "db", Role: schemas.ServiceRoleMCP, Hidden: true}}}
+	if got := scenarioRowIDs(&schemas.Suite{}, hidden); strings.Join(got, ",") != rowServices {
+		t.Errorf("hidden service rows = %v", got)
+	}
+}

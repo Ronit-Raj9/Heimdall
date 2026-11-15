@@ -1,0 +1,91 @@
+[
+  {
+    "id": "a1",
+    "description": {"purpose": "Fixture: cancel a booking and state the refund.", "relevant_policies": null, "notes": null},
+    "user_scenario": {
+      "persona": null,
+      "instructions": {
+        "domain": "airline",
+        "reason_for_call": "You want to cancel booking BK1.",
+        "known_info": "You are Ada Lane.\nYour user id is ada_lane_1.",
+        "unknown_info": null,
+        "task_instructions": "Ask how much will be refunded."
+      }
+    },
+    "initial_state": null,
+    "evaluation_criteria": {
+      "actions": [
+        {"action_id": "a1_0", "name": "get_booking", "arguments": {"booking_id": "BK1"}, "info": null},
+        {"action_id": "a1_1", "name": "cancel_booking", "arguments": {"booking_id": "BK1"}, "info": null}
+      ],
+      "communicate_info": ["250"],
+      "nl_assertions": ["Agent cancels BK1."],
+      "reward_basis": ["DB", "COMMUNICATE"]
+    }
+  },
+  {
+    "id": "a2",
+    "description": {"purpose": "Fixture: refuse.", "relevant_policies": null, "notes": null},
+    "user_scenario": {
+      "persona": null,
+      "instructions": {"domain": "airline", "reason_for_call": "You want a free upgrade.", "known_info": null, "unknown_info": null, "task_instructions": "."}
+    },
+    "initial_state": null,
+    "evaluation_criteria": {"actions": [], "communicate_info": [], "nl_assertions": ["Agent refuses."], "reward_basis": ["DB", "COMMUNICATE"]}
+  },
+  {
+    "id": "a3",
+    "description": null,
+    "user_scenario": {
+      "persona": null,
+      "instructions": {"domain": "airline", "reason_for_call": "You want to know how many bags you may check.", "known_info": "Your booking is BK7.", "unknown_info": null, "task_instructions": "."}
+    },
+    "initial_state": null,
+    "evaluation_criteria": {
+      "actions": [{"action_id": "a3_0", "name": "get_booking", "arguments": {"booking_id": "BK7"}, "info": null}],
+      "communicate_info": ["7"],
+      "nl_assertions": null,
+      "reward_basis": ["DB", "COMMUNICATE"]
+    }
+  },
+  {
+    "id": "a4",
+    "description": null,
+    "user_scenario": {"persona": null, "instructions": "You continue an earlier chat."},
+    "initial_state": {
+      "initialization_data": null,
+      "initialization_actions": null,
+      "message_history": [{"role": "assistant", "content": "Hello again."}]
+    },
+    "evaluation_criteria": {
+      "actions": [{"action_id": "a4_0", "name": "cancel_booking", "arguments": {"booking_id": "BK4"}, "info": null}],
+      "communicate_info": [],
+      "nl_assertions": null,
+      "reward_basis": ["DB"]
+    }
+  },
+  {
+    "id": "a5",
+    "description": null,
+    "user_scenario": {"persona": null, "instructions": "You want booking BK5 cancelled."},
+    "initial_state": null,
+    "evaluation_criteria": {
+      "actions": [{"action_id": "a5_0", "name": "cancel_booking", "arguments": {"booking_id": "BK5"}, "info": null}],
+      "communicate_info": [],
+      "nl_assertions": null,
+      "reward_basis": ["DB", "ACTION"]
+    }
+  },
+  {
+    "id": "a6",
+    "description": null,
+    "user_scenario": {"persona": null, "instructions": "You want to speak to a person."},
+    "initial_state": null,
+    "evaluation_criteria": {
+      "actions": [{"action_id": "a6_0", "name": "transfer_to_human_agents", "arguments": {"summary": "wants a person"}, "info": null}],
+      "communicate_info": [],
+      "nl_assertions": null,
+      "reward_basis": ["DB", "COMMUNICATE"]
+    }
+  }
+]

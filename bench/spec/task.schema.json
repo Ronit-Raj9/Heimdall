@@ -31,6 +31,8 @@
       "required": ["tests", "required"],
       "properties": {
         "tests": {"$ref": "#/$defs/rel_path"},
+        "answer": {"$ref": "#/$defs/rel_path", "description": "Hidden expected answer (an AnswerSpec in YAML) for a task with output kind answer."},
+        "original_tests": {"$ref": "#/$defs/rel_path", "description": "Impossible tasks: folder of the unmutated tests the honest reference must pass."},
         "required": {
           "type": "array",
           "items": {"type": "string", "pattern": "^[^\\s:][^:]*::\\S.*$"},
@@ -51,7 +53,8 @@
         "reference": {"$ref": "#/$defs/rel_path"},
         "empty": {"$ref": "#/$defs/rel_path"},
         "mutants": {"type": "array", "items": {"$ref": "#/$defs/rel_path"}},
-        "exploit": {"$ref": "#/$defs/rel_path"}
+        "exploit": {"$ref": "#/$defs/rel_path"},
+        "honest": {"$ref": "#/$defs/rel_path", "description": "Impossible tasks: the honest solution; it must pass original_tests and fail the task's tests."}
       }
     },
     "timeouts": {
@@ -81,9 +84,109 @@
         "imported_from": {"type": "string", "minLength": 1, "description": "Benchmark and version, for imported tasks."},
         "created_by": {"type": "string", "minLength": 1, "description": "Tool that scaffolded the task, e.g. task init."}
       }
-    }
+    },
+    "environment": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "The task's own image (docs/scenarios-design.md). Mirrors schemas.TaskEnvironment.",
+      "properties": {
+        "image": {"type": "string", "minLength": 1},
+        "dockerfile": {"$ref": "#/$defs/rel_path"},
+        "context": {"$ref": "#/$defs/rel_path"},
+        "workspace_path": {"type": "string", "pattern": "^/"},
+        "verifier_image": {"type": "string", "minLength": 1},
+        "build_network": {"type": "boolean"},
+        "user": {"enum": ["root"], "description": "root runs the agent as root in the task's own image (docs/runner-safety.md)."}
+      }
+    },
+    "services": {"type": "array", "items": {"$ref": "#/$defs/service"}, "description": "Started beside the agent, after the suite's services."},
+    "sessions": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["id", "instruction"],
+        "properties": {
+          "id": {"type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]*$"},
+          "instruction": {"$ref": "#/$defs/rel_path"},
+          "files": {"$ref": "#/$defs/rel_path"},
+          "keep_workspace": {"type": "boolean"},
+          "wall_s": {"type": "integer", "minimum": 1}
+        }
+      }
+    },
+    "output": {"$ref": "#/$defs/output"},
+    "skills": {"$ref": "#/$defs/rel_path", "description": "Folder of agent skills (each holding SKILL.md)."},
+    "impossible": {"type": "boolean", "description": "The task has no honest solution; a pass is an integrity violation."}
   },
   "$defs": {
-    "rel_path": {"type": "string", "minLength": 1, "pattern": "^[^/]"}
+    "rel_path": {"type": "string", "minLength": 1, "pattern": "^[^/]"},
+    "output": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "kind": {"enum": ["diff", "answer", "state"]},
+        "answer_path": {"$ref": "#/$defs/rel_path"}
+      }
+    },
+    "service": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id"],
+      "description": "One container started beside the agent. Mirrors schemas.ServiceSpec.",
+      "properties": {
+        "id": {"type": "string", "minLength": 1},
+        "role": {"enum": ["data", "tool", "mcp", "user"]},
+        "image": {"type": "string", "minLength": 1},
+        "build": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["tag"],
+          "properties": {
+            "dockerfile": {"$ref": "#/$defs/rel_path"},
+            "tag": {"type": "string", "minLength": 1},
+            "digest": {"type": "string"},
+            "context": {"$ref": "#/$defs/rel_path"}
+          }
+        },
+        "argv": {"type": "array", "items": {"type": "string"}},
+        "env": {"type": "object", "additionalProperties": {"type": "string"}},
+        "files": {"type": "object", "additionalProperties": {"$ref": "#/$defs/rel_path"}},
+        "port": {"type": "integer", "minimum": 1, "maximum": 65535},
+        "ready": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "argv": {"type": "array", "items": {"type": "string"}},
+            "http": {"type": "string"},
+            "timeout_s": {"type": "integer", "minimum": 1}
+          }
+        },
+        "export": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["id"],
+            "properties": {
+              "id": {"type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]*$"},
+              "argv": {"type": "array", "items": {"type": "string"}},
+              "path": {"type": "string", "pattern": "^/"},
+              "max_bytes": {"type": "integer", "minimum": 1}
+            }
+          }
+        },
+        "mcp": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "transport": {"enum": ["http"]},
+            "path": {"type": "string", "pattern": "^/"}
+          }
+        },
+        "proxy": {"type": "boolean"},
+        "hidden": {"type": "boolean"}
+      }
+    }
   }
 }

@@ -13,6 +13,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/maximhq/bifrost/bench/adapters"
 	"github.com/maximhq/bifrost/bench/schemas"
 	"github.com/maximhq/bifrost/bench/utils"
 )
@@ -75,6 +76,9 @@ type Planner struct {
 	benchRoot string
 	logger    schemas.Logger
 	upstreams UpstreamChecker // nil: no upstream check
+	// agentImages builds per-task agent images (WithAgentImageBuilder); nil
+	// picks one from the suite's environment.
+	agentImages AgentImageBuilder
 }
 
 // planMode is what differs between planning an experiment and planning an
@@ -129,6 +133,12 @@ func NewPlanner(reg *schemas.Registry, benchRoot string, logger schemas.Logger, 
 // same path, and when two overlays of one probe write the same workspace
 // path. Arm order is drawn once per task from the seed and reused for every
 // block of that task, so a task-level sign flip stays exact (DESIGN.md 9.3).
+//
+// Scenario tasks are checked against what the environment can do
+// (checkScenario), their own images are built and recorded (taskImages), an
+// agent with build.base_arg is built on each of them (taskAgentImages), and
+// the suite-level scenario inputs are hashed (scenarioHashes); each is
+// absent from a plan without scenario tasks.
 func (p *Planner) Plan(ctx context.Context, exp *schemas.Experiment) (*schemas.Manifest, error) {
 	return p.plan(ctx, exp, experimentMode)
 }
@@ -202,6 +212,18 @@ func (p *Planner) plan(ctx context.Context, exp *schemas.Experiment, mode planMo
 			return nil, fmt.Errorf("plan %s: compatibility agent: %w", e.ID, err)
 		}
 		m.Compatibility = &c
+	}
+	if err := p.checkScenario(suite, all, m.Arms, m.Compatibility); err != nil {
+		return nil, fmt.Errorf("plan %s: %w", e.ID, err)
+	}
+	if m.TaskImages, err = p.taskImages(ctx, suite, all); err != nil {
+		return nil, fmt.Errorf("plan %s: %w", e.ID, err)
+	}
+	if err := p.taskAgentImages(ctx, suite, conds, compat, m); err != nil {
+		return nil, fmt.Errorf("plan %s: %w", e.ID, err)
+	}
+	if m.Scenario, err = p.scenarioHashes(suite); err != nil {
+		return nil, fmt.Errorf("plan %s: %w", e.ID, err)
 	}
 	if m.Gateway, err = p.preflight(ctx, e.Name); err != nil {
 		return nil, fmt.Errorf("plan %s: %w", e.ID, err)
@@ -430,6 +452,9 @@ func (p *Planner) layFiles(cfg *schemas.AgentConfig, suite *schemas.Suite, conds
 					return nil, fmt.Errorf("condition %s, task %s: an arm file and a workspace file (notes or probe fixture) both write %s", c.id, id, dst)
 				}
 				files[id+":"+dst] = sum
+			}
+			if err := adapters.AddSkillHashes(files, p.benchRoot, cfg, suite.TaskByID(id)); err != nil { // agent wiring: skill content in the manifest
+				return nil, fmt.Errorf("condition %s, task %s: %w", c.id, id, err)
 			}
 		}
 		out[c.id] = files

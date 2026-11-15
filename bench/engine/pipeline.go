@@ -81,8 +81,9 @@ type runState struct {
 	receipts     []schemas.Receipt
 	metrics      map[string]schemas.Value
 	agentStarted bool
-	aborted      bool // a stage failed before the agent started
-	broken       bool // a stage failed after the agent started
+	aborted      bool   // a stage failed before the agent started
+	broken       bool   // a stage failed after the agent started
+	taskImageID  string // id the manifest froze for the per-task agent image; empty when the run has none
 }
 
 // NewPipeline returns a pipeline. benchRoot resolves the relative
@@ -197,6 +198,10 @@ func (p *Pipeline) begin(ctx context.Context, in SlotInput) (*runState, error) {
 		return nil, err
 	}
 	cfg := arm.Config
+	taskTag, taskImageID := taskAgentImage(arm, slot.Task)
+	if taskTag != "" {
+		cfg.Image = taskTag
+	}
 	if cfg.Notes.UserFile != "" && !filepath.IsAbs(cfg.Notes.UserFile) {
 		cfg.Notes.UserFile = filepath.Join(p.benchRoot, cfg.Notes.UserFile)
 	}
@@ -220,7 +225,8 @@ func (p *Pipeline) begin(ctx context.Context, in SlotInput) (*runState, error) {
 			Experiment: &in.Manifest.Experiment, Manifest: in.Manifest, Suite: in.Suite,
 			Task: in.Suite.TaskByID(slot.Task), Slot: slot, Run: run, Agent: &cfg, Dir: dir, Logger: p.logger,
 		},
-		ev: &schemas.Evidence{},
+		ev:          &schemas.Evidence{},
+		taskImageID: taskImageID,
 	}
 	if slot.Condition != schemas.ConditionClean {
 		st.rc.Probe = in.Suite.ProbeByID(slot.Condition)
@@ -323,7 +329,8 @@ func (p *Pipeline) seal(ctx context.Context, st *runState) (*SlotResult, error) 
 }
 
 // writeArtifacts writes run.json, evidence.json, gates.json, grade.json and
-// plan.json. Secrets in the plan's env are redacted.
+// plan.json, and for a scenario run sessions.json and services.json. Secrets
+// in the plan's env are redacted.
 func (p *Pipeline) writeArtifacts(ctx context.Context, st *runState) error {
 	gates := st.ev.Gates
 	if gates == nil {
@@ -338,6 +345,18 @@ func (p *Pipeline) writeArtifacts(ctx context.Context, st *runState) error {
 		{"grade.json", st.ev.Grade},
 		{"plan.json", redactPlan(st.plan)},
 		{"run.json", st.rc.Run},
+	}
+	if len(st.ev.Sessions) > 0 {
+		files = append(files, struct {
+			name string
+			v    any
+		}{FileSessions, st.ev.Sessions})
+	}
+	if len(st.ev.Services) > 0 {
+		files = append(files, struct {
+			name string
+			v    any
+		}{FileServices, st.ev.Services})
 	}
 	for _, f := range files {
 		if err := p.writeJSON(ctx, st, f.name, f.v); err != nil {
@@ -379,7 +398,11 @@ func (p *Pipeline) emit(st *runState, ev Event) {
 
 // decideOutcome maps what the run observed to its outcome.
 func decideOutcome(st *runState, up utils.UpstreamTally) schemas.Outcome {
-	return outcomeFrom(st.aborted, st.broken, st.ev.Gates, st.ev.Grade, st.rc.Exec, up)
+	var ended schemas.Outcome
+	if st.rc.Task != nil {
+		ended = sessionsEnded(st.ev.Sessions, len(st.rc.Task.Sessions))
+	}
+	return outcomeFrom(st.aborted, st.broken, ended, st.ev.Gates, st.ev.Grade, st.rc.Exec, up)
 }
 
 // outcomeFrom maps what a run observed to its outcome. A fired veto gate is an
@@ -398,7 +421,12 @@ func decideOutcome(st *runState, up utils.UpstreamTally) schemas.Outcome {
 //
 // Upstream errors the agent recovered from (a later call was answered and the
 // run ended on it) change nothing; the upstream_errors gate reports them.
-func outcomeFrom(aborted, broken bool, gates []schemas.GateResult, grade *schemas.Grade, exec *schemas.ExecResult, up utils.UpstreamTally) schemas.Outcome {
+//
+// ended is the outcome a session of a multi-session run ended it with before
+// its last session (sessionsEnded), empty otherwise. Like a veto it is an
+// observed fact about the agent, so it wins over a later infrastructure
+// failure and over the grade of a run whose last session never ran.
+func outcomeFrom(aborted, broken bool, ended schemas.Outcome, gates []schemas.GateResult, grade *schemas.Grade, exec *schemas.ExecResult, up utils.UpstreamTally) schemas.Outcome {
 	switch {
 	case aborted:
 		return schemas.OutcomeAbortedInfra
@@ -406,6 +434,8 @@ func outcomeFrom(aborted, broken bool, gates []schemas.GateResult, grade *schema
 		return schemas.OutcomeIntegrityViolation
 	case up.NeverAnswered():
 		return schemas.OutcomeAbortedInfra
+	case ended != "":
+		return ended
 	case broken, grade == nil:
 		return schemas.OutcomeInfraError
 	case grade.InvalidEvaluator:

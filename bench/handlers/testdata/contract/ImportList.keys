@@ -1,0 +1,2 @@
+# Keys of bench.ts `ImportList`: GET /imports (handlers/imports.go). The top-level response adds "mode".
+importers

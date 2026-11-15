@@ -80,6 +80,9 @@ func (g *hiddenTests) Grade(ctx context.Context, rc *schemas.RunContext, diff *s
 		GraderVersion: hiddenTestsVersion,
 		DiffSHA256:    in.diffSHA,
 	}
+	if in.snapshot != "" {
+		grade.Mode = schemas.VerifierSnapshot
+	}
 	var report []byte
 	res, err := g.room.run(ctx, newGradeJob(expID, runID, in), func(ctx context.Context, container string) error {
 		var rerr error
@@ -104,9 +107,17 @@ func (g *hiddenTests) Grade(ctx context.Context, rc *schemas.RunContext, diff *s
 }
 
 // inputs validates the run context and the diff for this grader: the
-// configured image, or else the suite base image, prepares and verifies.
+// configured image, or else the suite base image, prepares and verifies; a
+// scenario task's own image or snapshot verifies (applyScenario).
 func (g *hiddenTests) inputs(rc *schemas.RunContext, diff *schemas.Diff) (*gradeInputs, error) {
-	return gatherInputs(rc, diff, g.cfg.Image)
+	in, err := gatherInputs(rc, diff, g.cfg.Image)
+	if err != nil {
+		return nil, err
+	}
+	if err := applyScenario(rc, in); err != nil {
+		return nil, err
+	}
+	return in, nil
 }
 
 // scoreGrade fills grade from the verifier exit code and its JUnit report,

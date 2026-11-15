@@ -92,6 +92,13 @@ func (l *localLoader) Load(ctx context.Context, ref string) (*schemas.Suite, err
 		}
 	}
 	errs = append(errs, suiteSymlinks(&s, d)...)
+	for i, sv := range s.Services {
+		for _, dst := range sortedKeys(sv.Files) {
+			if err := checkFile(root, sv.Files[dst], false); err != nil {
+				errs = append(errs, fmt.Errorf("%s: services[%d].files[%s]: %w", d.name(suitePath), i, dst, err))
+			}
+		}
+	}
 
 	for _, id := range s.TaskIDs {
 		if err := ctx.Err(); err != nil {
@@ -223,6 +230,7 @@ func loadTask(root, id string, d displayer) (*schemas.Task, error) {
 		check(fmt.Sprintf("controls.mutants[%d]", i), m, false)
 	}
 	check("controls.exploit", t.Controls.Exploit, false)
+	errs = append(errs, scenarioLoadErrors(&t, file)...)
 	if len(errs) > 0 {
 		return nil, errors.Join(errs...)
 	}

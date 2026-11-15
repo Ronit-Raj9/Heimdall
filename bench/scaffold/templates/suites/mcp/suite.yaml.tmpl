@@ -1,0 +1,35 @@
+# template: mcp
+# Written by `bifrost-bench suite init`. An mcp suite tests an agent that
+# uses tools over the Model Context Protocol. Each task starts its own MCP
+# server (services: in task.yaml) from the image built from
+# services/inventory/, seeded with the task's seed/db.json. The agent is told
+# about the server in its own config format (agent `mcp:`) and reaches it
+# through the per-run tool proxy, which records every call in tools.jsonl and
+# can inject tool faults (probes/tool-error.yaml). After the agent exits the
+# server's state is exported and the hidden verifier (verifier/tests/verify.py
+# with the task's checks.py) reads it at /grader/state and writes a reward.
+# Add tasks with `bifrost-bench task init -suite [[.ID]] -id <task>`, which
+# copies the shape of the first task below and adds the id to the tasks list.
+id: [[.ID]]
+version: 0.1.0
+description: MCP tool-use tasks graded on the tool server's final state.
+track: mcp
+environment: docker_workspace
+grader: verifier_command
+base_image:
+[[- if .Dockerfile]]
+  dockerfile: base/Dockerfile
+[[- end]]
+  tag: [[.Image]]
+workdir: /workspace
+output:
+  kind: state
+verifier:
+  command: ["python3", "/grader/tests/verify.py"]
+  result: reward
+  result_path: /grader/out/reward.json
+  pass_threshold: 1
+  restore: []
+  timeout_s: 120
+tasks: [restock]
+probes: [model-outage, tool-error]

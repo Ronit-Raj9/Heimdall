@@ -1,0 +1,19 @@
+version = "1.1"
+
+[metadata]
+author_name = "Fixture Author"
+difficulty = "hard"
+category = "industrial-physical-systems"
+task_type = ["calculation"]
+tags = ["binary-parsing", "3d-geometry"]
+
+[verifier]
+timeout_sec = 900.0
+
+[agent]
+timeout_sec = 900.0
+
+[environment]
+build_timeout_sec = 600.0
+cpus = 1
+memory_mb = 4096

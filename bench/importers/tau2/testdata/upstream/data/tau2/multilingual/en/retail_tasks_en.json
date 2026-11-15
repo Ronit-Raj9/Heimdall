@@ -1,0 +1,17 @@
+[
+  {
+    "id": "1",
+    "description": {"purpose": null, "relevant_policies": null, "notes": null},
+    "user_scenario": {
+      "persona": null,
+      "instructions": {"domain": "retail", "reason_for_call": "You want to return the lamp of order #W1 (reviewed English version).", "known_info": "You are bo_ng_2.\nYour first name is Bo.", "unknown_info": null, "task_instructions": "."}
+    },
+    "initial_state": null,
+    "evaluation_criteria": {
+      "actions": [{"action_id": "1_0", "name": "return_items", "arguments": {"order_id": "#W1", "item_ids": ["11"]}, "info": null}],
+      "communicate_info": [],
+      "nl_assertions": null,
+      "reward_basis": ["DB", "NL_ASSERTION"]
+    }
+  }
+]

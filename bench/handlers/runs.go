@@ -118,6 +118,10 @@ func (h *RunsHandler) getRun(ctx *fasthttp.RequestCtx) {
 	if out.Receipts == nil {
 		out.Receipts = []schemas.Receipt{}
 	}
+	if err := fillScenario(h.index, id, &out); err != nil {
+		sendDepError(ctx, h.mode, "read scenario evidence of run "+id, err)
+		return
+	}
 	lib.SendJSON(ctx, h.mode, fasthttp.StatusOK, out)
 }
 

@@ -1,0 +1,10 @@
+# Hidden expected answer of this task, read by the answer_match grader (no
+# model). match is exact, contains_all, regex, numeric, choice or json;
+# wrong_answers are plausible wrong answers that must fail (admission and the
+# judge's calibration use them).
+question: On which date is the Fernway public launch planned now?
+match: exact
+expected: ["2026-04-09"]
+normalize: [trim]
+category: knowledge-update
+wrong_answers: ["2026-04-02"]

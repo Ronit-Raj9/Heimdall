@@ -1,0 +1,16 @@
+{
+  "task_id": "count_demo",
+  "task_name": "Count Demo",
+  "category_id": "file_context",
+  "category_name": "File Context",
+  "description": "Fixture task.",
+  "author": "fixture",
+  "created_at": "2026-11-15",
+  "difficulty": "L1",
+  "tags": [
+    "data extraction"
+  ],
+  "mcp": [
+    "filesystem"
+  ]
+}

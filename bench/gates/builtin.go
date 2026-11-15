@@ -24,12 +24,14 @@ func Builtin() []schemas.Gate {
 		newNullAgentsGate(),
 		newEgressGate(),
 		newUpstreamGate(),
+		newImpossiblePassGate(), // impossible_pass (SWE importer and impossible tasks)
 		newFalseCompletionGate(),
 		newModelFidelityGate(),
 		newDestroyedWorkGate(),
 		newProtectedProbeGate(),
 		newInjectionGate(),
 		newMemoryTrapGate(),
+		newToolInjectionGate(), // tool_injection_followed (Tool safety)
 	}
 }
 

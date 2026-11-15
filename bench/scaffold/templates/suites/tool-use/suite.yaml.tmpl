@@ -1,0 +1,35 @@
+# template: tool-use
+# Written by `bifrost-bench suite init`. A tool-use suite tests an agent that
+# calls an HTTP tool server. Each task starts its own server (services: in
+# task.yaml) from the image built from services/inventory/, seeded with the
+# task's seed/db.json. The agent reaches it through the per-run tool proxy at
+# http://toolproxy:9200/s/inventory/, which records every call in
+# tools.jsonl and can inject tool faults (probes/tool-error.yaml). After the
+# agent exits the server's state is exported and the hidden verifier
+# (verifier/tests/verify.py with the task's checks.py) reads it at
+# /grader/state and writes a reward. Add tasks with
+# `bifrost-bench task init -suite [[.ID]] -id <task>`, which copies the shape
+# of the first task below and adds the id to the tasks list.
+id: [[.ID]]
+version: 0.1.0
+description: Tool-use tasks over an HTTP tool server, graded on its final state.
+track: tool_use
+environment: docker_workspace
+grader: verifier_command
+base_image:
+[[- if .Dockerfile]]
+  dockerfile: base/Dockerfile
+[[- end]]
+  tag: [[.Image]]
+workdir: /workspace
+output:
+  kind: state
+verifier:
+  command: ["python3", "/grader/tests/verify.py"]
+  result: reward
+  result_path: /grader/out/reward.json
+  pass_threshold: 1
+  restore: []
+  timeout_s: 120
+tasks: [restock]
+probes: [model-outage, tool-error]

@@ -202,6 +202,10 @@ type Manifest struct {
 	PolicyHash     string                 `json:"policy_hash,omitempty"`  // sha256 of the policy file named by the experiment
 	BudgetDiffs    []BudgetDiff           `json:"budget_diffs,omitempty"` // budgets that differ between arms with no arm setting them
 	Hash           string                 `json:"hash"`                   // sha256 of the canonical JSON with Hash empty
+
+	// Scenario inputs (scenario.go), each empty for a plan without them.
+	TaskImages map[string]string `json:"task_images,omitempty"` // task id -> image id of the task's own image, built at plan time
+	Scenario   map[string]string `json:"scenario,omitempty"`    // scenario input -> sha256: suite services, judge, output, verifier mode, agent skills
 }
 
 // BudgetDiff is one agent budget that differs between arms although no arm
@@ -296,4 +300,11 @@ type ArmManifest struct {
 	// on any other image, so a rebuilt tag never changes a frozen experiment.
 	// Empty when the image could not be inspected at plan time.
 	ImageID string `json:"image_id,omitempty"`
+
+	// TaskImages and TaskImageIDs name, per task with its own image, the
+	// agent image built on that task image (engine.ResolveTaskAgentImage) and
+	// its image id at plan time. Runs of those tasks start that tag and are
+	// refused when it names another image. Empty for an arm without them.
+	TaskImages   map[string]string `json:"task_images,omitempty"`
+	TaskImageIDs map[string]string `json:"task_image_ids,omitempty"`
 }

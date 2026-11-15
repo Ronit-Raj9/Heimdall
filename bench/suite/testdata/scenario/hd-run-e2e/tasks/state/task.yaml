@@ -1,0 +1,33 @@
+id: state
+version: 1.0.0
+title: Mark the record done
+project: e2e
+kind: feature
+instruction: instruction.md
+repo_dir: repo
+verifier:
+  tests: verifier/tests
+  required: []
+controls:
+  reference: controls/reference.sh
+  empty: controls/empty.sh
+  mutants: []
+  exploit: controls/exploit.sh
+timeouts:
+  agent_s: 120
+services:
+  - id: db
+    role: data
+    image: python:3.12-slim
+    argv: ["python3", "/srv/server.py"]
+    port: 8000
+    files:
+      /srv/server.py: services/server.py
+    ready:
+      argv: ["python3", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/')"]
+      timeout_s: 60
+    export:
+      - id: state
+        argv: ["sh", "-c", "cat /tmp/state.json 2>/dev/null || echo '{}'"]
+output:
+  kind: state

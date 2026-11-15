@@ -115,7 +115,7 @@ func removals(t *testing.T, logPath string) []string {
 	}
 	var removed []string
 	for _, line := range strings.Split(strings.TrimSpace(string(raw)), "\n") {
-		if strings.HasPrefix(line, "rm ") || strings.HasPrefix(line, "volume rm ") || strings.HasPrefix(line, "network rm ") {
+		if strings.HasPrefix(line, "rm ") || strings.HasPrefix(line, "volume rm ") || strings.HasPrefix(line, "network rm ") || strings.HasPrefix(line, "image rm ") {
 			removed = append(removed, line)
 		}
 		if strings.Contains(line, " ls") || strings.HasPrefix(line, "ps") {
@@ -302,5 +302,43 @@ func TestSchedulerSweepKeepsForeignLiveRun(t *testing.T) {
 	}
 	if !b.gw.active["r_foreign"] || !b.gw.active["r_check"] || b.gw.active["r_crashed"] {
 		t.Fatalf("keys kept for %v", b.gw.active)
+	}
+}
+
+// TestJanitorSweepsSnapshotImages checks the image kind: an image listing
+// cannot print labels, so labelled images are read with inspect, and only a
+// dead run's snapshot image goes; a live run's stays.
+func TestJanitorSweepsSnapshotImages(t *testing.T) {
+	now := time.Date(2026, 11, 15, 12, 0, 0, 0, time.UTC)
+	runs, checks := leaseWorld(t, now)
+	lv, err := ScanRunLiveness([]string{runs, checks}, DefaultStaleAfter, now)
+	if err != nil {
+		t.Fatal(err)
+	}
+	docker, logPath := fakeDocker(t, "none", map[string]string{
+		"ps -a":         "",
+		"volume ls":     "",
+		"network ls":    "",
+		"image ls":      "sha256:aaa\nsha256:bbb\nsha256:aaa\n",
+		"image inspect": "sha256:aaa\tr_stale\t" + inspectTime(now) + "\nsha256:bbb\tr_live\t" + inspectTime(now.Add(-48*time.Hour)) + "\n",
+	})
+	j := NewJanitor(nil, docker, nil)
+	j.now = func() time.Time { return now }
+	rep, err := j.Sweep(context.Background(), lv)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if rep.Images != 1 {
+		t.Fatalf("report %+v, want one image", *rep)
+	}
+	if got := removals(t, logPath); strings.Join(got, "|") != "image rm -f sha256:aaa" {
+		t.Fatalf("removed %v", got)
+	}
+	raw, err := os.ReadFile(logPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(raw), "image inspect --format") || strings.Count(string(raw), "sha256:aaa") != 2 {
+		t.Fatalf("calls:\n%s", raw)
 	}
 }

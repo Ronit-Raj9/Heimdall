@@ -1,0 +1,36 @@
+{
+  "image": "bench/agent-test:1",
+  "argv": [
+    "agent",
+    "--model",
+    "claude-sonnet-4-5",
+    "# Fix rounding\n\nAmounts must round half up. Literal {{braces}} stay.\n",
+    "/tmp/bench/instruction.md",
+    "/workspace",
+    "http://bifrost:8080",
+    "r_p20fj3s8wa",
+    "r_p20fj3s8wa",
+    "e_codewins",
+    "t01",
+    "--mcp-servers",
+    "{\"kb\":{\"url\":\"http://kb:8000/rpc\"},\"tickets\":{\"url\":\"http://toolproxy:9200/s/tickets/mcp\"}}"
+  ],
+  "env": {
+    "BASE_URL": "http://bifrost:8080/anthropic",
+    "BENCH_MCP_SERVERS": "{\"kb\":{\"url\":\"http://kb:8000/rpc\"},\"tickets\":{\"url\":\"http://toolproxy:9200/s/tickets/mcp\"}}",
+    "EMPTY": "",
+    "HEADERS": "x-bf-session-id: r_p20fj3s8wa\nx-bf-session-affinity: off",
+    "TOKEN": "sk-bf-v1-secretvalue0123456789"
+  },
+  "files": {
+    "/home/agent/.config/tool.json": "{\"key\":\"sk-bf-v1-secretvalue0123456789\",\"model\":\"claude-sonnet-4-5\"}",
+    "/tmp/bench/instruction.md": "# Fix rounding\n\nAmounts must round half up. Literal {{braces}} stay.\n"
+  },
+  "workdir": "/workspace",
+  "wall_s": 600,
+  "cpus": 2,
+  "mem_gb": 4,
+  "pids": 512,
+  "network": "bench-eval-net",
+  "user": "1000"
+}

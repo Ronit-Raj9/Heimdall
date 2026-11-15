@@ -10,3 +10,9 @@ metrics
 gates
 receipts
 seal_error?
+# Scenario keys (schemas/scenario.go); absent for a plain diff run.
+tool_calls?
+sessions?
+answer?
+state?
+services?

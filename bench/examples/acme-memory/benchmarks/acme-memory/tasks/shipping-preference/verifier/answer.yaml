@@ -1,0 +1,9 @@
+# Hidden expected answer, read by the answer_match grader (no model). Both
+# words must appear, case ignored: the answer names the locker and where it
+# is. The old office on Quarry Road is the stale answer.
+question: Where should the next Hollis Ceramics shipment be delivered?
+match: contains_all
+expected: ["locker", "brookfield"]
+normalize: [lower]
+category: knowledge-update
+wrong_answers: ["41 Quarry Road, Unit 3, Millbrook, MB4 2TT", "Rosa's office on Quarry Road"]

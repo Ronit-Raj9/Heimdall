@@ -72,6 +72,7 @@ type SweepReport struct {
 	Networks   int `json:"networks"`
 	Keys       int `json:"keys"`
 	KeptYoung  int `json:"kept_young,omitempty"` // runs with no lease information kept because they are younger than the grace
+	Images     int `json:"images,omitempty"`     // snapshot images of runs graded from a frozen agent container
 }
 
 // RunLiveness is what the lease files under the store roots say about runs.
@@ -84,20 +85,24 @@ type RunLiveness struct {
 }
 
 // dockerKind is one kind of docker object the janitor sweeps, in removal
-// order: containers hold volumes and networks, so they go first. A kind
-// whose listing has no creation time (volumes) is aged with inspect.
+// order: containers hold volumes, networks and images, so they go first. A
+// kind whose listing has no creation time (volumes) is aged with inspect. An
+// image listing cannot print labels at all (images), so each labelled image
+// is read with inspect: its run label and its creation time.
 type dockerKind struct {
 	name    string
 	list    []string
 	idField string
 	created bool // the listing can print {{.CreatedAt}}
 	rm      []string
+	inspect bool // the listing prints ids only; run and age come from image inspect
 }
 
 var dockerKinds = []dockerKind{
-	{"containers", []string{"ps", "-a"}, "{{.ID}}", true, []string{"rm", "-f"}},
-	{"volumes", []string{"volume", "ls"}, "{{.Name}}", false, []string{"volume", "rm", "-f"}},
-	{"networks", []string{"network", "ls"}, "{{.ID}}", true, []string{"network", "rm"}},
+	{"containers", []string{"ps", "-a"}, "{{.ID}}", true, []string{"rm", "-f"}, false},
+	{"volumes", []string{"volume", "ls"}, "{{.Name}}", false, []string{"volume", "rm", "-f"}, false},
+	{"networks", []string{"network", "ls"}, "{{.ID}}", true, []string{"network", "rm"}, false},
+	{"images", []string{"image", "ls", "-q", "--no-trunc"}, "", false, []string{"image", "rm", "-f"}, true},
 }
 
 // dockerObject is one labelled object with its run and creation time (zero
@@ -167,7 +172,7 @@ func (j *Janitor) Sweep(ctx context.Context, lv RunLiveness) (*SweepReport, erro
 		objects[i] = objs
 	}
 	keep, remove := j.decide(lv, objects, listed, rep)
-	counts := []*int{&rep.Containers, &rep.Volumes, &rep.Networks}
+	counts := []*int{&rep.Containers, &rep.Volumes, &rep.Networks, &rep.Images}
 	for i, k := range dockerKinds {
 		n, err := j.remove(ctx, k, objects[i], remove)
 		*counts[i] = n
@@ -186,9 +191,9 @@ func (j *Janitor) Sweep(ctx context.Context, lv RunLiveness) (*SweepReport, erro
 			errs = append(errs, fmt.Errorf("revoke stale keys: %w", err))
 		}
 	}
-	if rep.Containers+rep.Volumes+rep.Networks+rep.Keys > 0 {
+	if rep.Containers+rep.Volumes+rep.Networks+rep.Images+rep.Keys > 0 {
 		j.logger.Info("janitor removed leftovers", "containers", rep.Containers, "volumes", rep.Volumes,
-			"networks", rep.Networks, "keys", rep.Keys, "kept_young", rep.KeptYoung)
+			"networks", rep.Networks, "images", rep.Images, "keys", rep.Keys, "kept_young", rep.KeptYoung)
 	}
 	return rep, errors.Join(errs...)
 }
@@ -241,6 +246,9 @@ func (j *Janitor) decide(lv RunLiveness, objects [][]dockerObject, listed bool, 
 // list returns the kind's labelled objects that carry a run label, with
 // their creation times.
 func (j *Janitor) list(ctx context.Context, k dockerKind) ([]dockerObject, error) {
+	if k.inspect {
+		return j.listImages(ctx, k)
+	}
 	format := k.idField + "\t{{.Label \"" + utils.LabelRun + "\"}}"
 	if k.created {
 		format += "\t{{.CreatedAt}}"
@@ -255,6 +263,35 @@ func (j *Janitor) list(ctx context.Context, k dockerKind) ([]dockerObject, error
 		return objs, nil
 	}
 	return j.inspectVolumes(ctx, objs), nil
+}
+
+// listImages lists the labelled images that carry a run label (snapshot
+// images; shared task, service and agent images carry no run label) and
+// reads each one's run and creation time with image inspect. An inspect that
+// fails is a failed listing: an image it could not see might be a live
+// run's.
+func (j *Janitor) listImages(ctx context.Context, k dockerKind) ([]dockerObject, error) {
+	args := append(append([]string(nil), k.list...), "--filter", "label="+utils.LabelBench+"=1", "--filter", "label="+utils.LabelRun)
+	res, err := j.docker.MustRun(ctx, args...)
+	if err != nil {
+		return nil, fmt.Errorf("list %s: %w", k.name, err)
+	}
+	seen := map[string]bool{}
+	inspect := []string{"image", "inspect", "--format", "{{.Id}}\t{{index .Config.Labels \"" + utils.LabelRun + "\"}}\t{{.Created}}"}
+	for _, id := range strings.Fields(string(res.Stdout)) {
+		if !seen[id] {
+			seen[id] = true
+			inspect = append(inspect, id)
+		}
+	}
+	if len(seen) == 0 {
+		return nil, nil
+	}
+	ires, err := j.docker.MustRun(ctx, inspect...)
+	if err != nil {
+		return nil, fmt.Errorf("inspect %s: %w", k.name, err)
+	}
+	return parseObjects(ires.Stdout), nil
 }
 
 // inspectVolumes fills each volume's creation time from docker volume

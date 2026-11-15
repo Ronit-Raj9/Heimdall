@@ -1,0 +1,8 @@
+{
+  "benchmark_version": "text-v1",
+  "mode": "text",
+  "task_subsets": {
+    "airline": {"name": "airline_50", "sha256": "fixture"},
+    "retail": {"name": "retail_50", "sha256": "fixture"}
+  }
+}

@@ -63,6 +63,9 @@ type NetworksConfig struct {
 // ImagesConfig names the trusted helper images.
 type ImagesConfig struct {
 	Helper string `yaml:"helper" json:"helper"`
+	// ToolProxy is the image that runs `bifrost-bench toolproxy` beside a run
+	// with proxied services. Empty uses the environment's default.
+	ToolProxy string `yaml:"toolproxy" json:"toolproxy,omitempty"`
 }
 
 // LoadConfig reads the YAML file at path, applies BENCH_<SECTION>_<KEY>

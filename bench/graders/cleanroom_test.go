@@ -4,7 +4,9 @@ import (
 	"archive/tar"
 	"bytes"
 	"errors"
+	"os"
 	"path/filepath"
+	"reflect"
 	"strings"
 	"testing"
 	"time"
@@ -117,5 +119,131 @@ func TestTimedOutReason(t *testing.T) {
 				t.Fatalf("got %q", got)
 			}
 		})
+	}
+}
+
+func TestApplyScenario(t *testing.T) {
+	ref := "sha256:" + strings.Repeat("ab", 32)
+	mkRun := func(t *testing.T, files map[string]string) string {
+		dir := t.TempDir()
+		for rel, c := range files {
+			p := filepath.Join(dir, rel)
+			if err := os.MkdirAll(filepath.Dir(p), 0o755); err != nil {
+				t.Fatal(err)
+			}
+			if err := os.WriteFile(p, []byte(c), 0o644); err != nil {
+				t.Fatal(err)
+			}
+		}
+		return dir
+	}
+	t.Run("plain task is unchanged", func(t *testing.T) {
+		in := &gradeInputs{image: "base:1", workdir: "/workspace"}
+		rc := &schemas.RunContext{Suite: &schemas.Suite{ID: "s"}, Task: &schemas.Task{ID: "t"}, Dir: t.TempDir()}
+		if err := applyScenario(rc, in); err != nil || !reflect.DeepEqual(in, &gradeInputs{image: "base:1", workdir: "/workspace"}) {
+			t.Fatalf("in %+v %v", in, err)
+		}
+	})
+	t.Run("task image verifies, verifier image wins, workspace path seeds", func(t *testing.T) {
+		in := &gradeInputs{image: "base:1"}
+		task := &schemas.Task{ID: "t", Environment: &schemas.TaskEnvironment{Image: "tb/x:1", WorkspacePath: "/app"}}
+		if err := applyScenario(&schemas.RunContext{Suite: &schemas.Suite{ID: "s"}, Task: task}, in); err != nil {
+			t.Fatal(err)
+		}
+		if in.image != "tb/x:1" || in.seedImage != "tb/x:1" || in.seedPath != "/app" || in.workdir != "/app" {
+			t.Fatalf("in %+v", in)
+		}
+		task.Environment.VerifierImage = "tb/x-verify:1"
+		if err := applyScenario(&schemas.RunContext{Suite: &schemas.Suite{ID: "s"}, Task: task}, in); err != nil || in.image != "tb/x-verify:1" {
+			t.Fatalf("verifier image: %+v %v", in, err)
+		}
+		task.Environment.WorkspacePath = "/grader/x"
+		if err := applyScenario(&schemas.RunContext{Suite: &schemas.Suite{ID: "s"}, Task: task}, &gradeInputs{}); err == nil {
+			t.Fatal("workspace path under /grader accepted")
+		}
+	})
+	t.Run("snapshot reads the ref and mounts state and answer", func(t *testing.T) {
+		dir := mkRun(t, map[string]string{"snapshot.ref": ref + "\n", "state/kv/dump": "{}", "answer.txt": "42"})
+		rc := &schemas.RunContext{Suite: &schemas.Suite{ID: "s", Verifier: schemas.SuiteVerifier{Mode: schemas.VerifierSnapshot}},
+			Task: &schemas.Task{ID: "t"}, Handle: &schemas.EnvironmentHandle{Volume: "bench-ws-r_1"}, Dir: dir}
+		in := &gradeInputs{}
+		if err := applyScenario(rc, in); err != nil {
+			t.Fatal(err)
+		}
+		if in.snapshot != ref || in.workspace != "bench-ws-r_1" || in.stateDir != filepath.Join(dir, "state") || in.answerFile != filepath.Join(dir, "answer.txt") {
+			t.Fatalf("in %+v", in)
+		}
+		want := []string{"-v", filepath.Join(dir, "state") + ":/grader/state:ro", "-v", filepath.Join(dir, "answer.txt") + ":/grader/answer.txt:ro"}
+		if got := scenarioMounts(in); !reflect.DeepEqual(got, want) {
+			t.Fatalf("mounts %v", got)
+		}
+		j := &gradeJob{in: in, workspace: "w", out: "o"}
+		if !reflect.DeepEqual(j.volumes(), []string{"w", "o"}) {
+			t.Fatalf("snapshot volumes %v", j.volumes())
+		}
+		if in.root {
+			t.Fatal("default task verifies as root")
+		}
+	})
+	for name, files := range map[string]map[string]string{
+		"missing ref": {},
+		"bad ref":     {"snapshot.ref": "bench/snap-r_1:latest\n"},
+	} {
+		t.Run(name, func(t *testing.T) {
+			rc := &schemas.RunContext{Suite: &schemas.Suite{ID: "s", Verifier: schemas.SuiteVerifier{Mode: schemas.VerifierSnapshot}},
+				Task: &schemas.Task{ID: "t"}, Handle: &schemas.EnvironmentHandle{Volume: "v"}, Dir: mkRun(t, files)}
+			if err := applyScenario(rc, &gradeInputs{}); err == nil || !strings.Contains(err.Error(), "snapshot grading") {
+				t.Fatalf("err %v", err)
+			}
+		})
+	}
+}
+
+func TestGradeJobVolumes(t *testing.T) {
+	plain := newGradeJob("e", "r_1", &gradeInputs{})
+	if v := plain.volumes(); len(v) != 2 || plain.pristine != "" {
+		t.Fatalf("plain volumes %v", v)
+	}
+	seeded := newGradeJob("e", "r_1", &gradeInputs{seedImage: "tb/x:1", seedPath: "/app"})
+	if v := seeded.volumes(); len(v) != 3 || !strings.HasPrefix(seeded.pristine, "bench-gsrc-r_1-") {
+		t.Fatalf("seeded volumes %v", v)
+	}
+}
+
+// TestGatherInputsSkipsRepo checks that a task seeded from its image, or
+// graded from a snapshot, needs no repo folder.
+func TestGatherInputsSkipsRepo(t *testing.T) {
+	task := t.TempDir()
+	if err := os.MkdirAll(filepath.Join(task, "verifier", "tests"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	diff := filepath.Join(t.TempDir(), "workspace.diff")
+	if err := os.WriteFile(diff, nil, 0o644); err != nil {
+		t.Fatal(err)
+	}
+	suite := &schemas.Suite{ID: "s", BaseImage: schemas.ImageSpec{Tag: "b:1"}, Verifier: schemas.SuiteVerifier{Command: []string{"sh"}}}
+	tk := &schemas.Task{ID: "t", Dir: task, Verifier: schemas.TaskVerifier{Tests: "verifier/tests"}}
+	if _, err := gatherInputs(&schemas.RunContext{Suite: suite, Task: tk}, &schemas.Diff{Path: diff}, ""); err == nil {
+		t.Fatal("plain task without a repo folder accepted")
+	}
+	tk.Environment = &schemas.TaskEnvironment{Image: "tb/x:1", WorkspacePath: "/app"}
+	if in, err := gatherInputs(&schemas.RunContext{Suite: suite, Task: tk}, &schemas.Diff{Path: diff}, ""); err != nil || in.repoDir != "" {
+		t.Fatalf("image-seeded task: %+v %v", in, err)
+	}
+}
+
+func TestVerifierIdentity(t *testing.T) {
+	plain := strings.Join(verifierIdentity(false), " ")
+	if plain != "--user 1000:1000 --cap-drop ALL --tmpfs /home/agent:exec,size=64m,mode=0700,uid=1000,gid=1000 -e HOME=/home/agent" {
+		t.Fatalf("default: %s", plain)
+	}
+	root := strings.Join(verifierIdentity(true), " ")
+	if !strings.HasPrefix(root, "--user 0:0 --cap-drop ALL --cap-add AUDIT_WRITE") || !strings.HasSuffix(root, "-e HOME=/root") || strings.Contains(root, "SYS_ADMIN") {
+		t.Fatalf("root: %s", root)
+	}
+	in := &gradeInputs{}
+	task := &schemas.Task{ID: "t", Environment: &schemas.TaskEnvironment{Image: "tb/x:1", User: "root"}}
+	if err := applyScenario(&schemas.RunContext{Suite: &schemas.Suite{ID: "s"}, Task: task}, in); err != nil || !in.root {
+		t.Fatalf("root task: %+v %v", in, err)
 	}
 }
