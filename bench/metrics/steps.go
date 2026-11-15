@@ -27,11 +27,11 @@ func (m *stepsMetric) Descriptor() schemas.MetricDescriptor {
 	return schemas.MetricDescriptor{
 		Name:           Steps,
 		Version:        version,
-		Label:          "Steps (model turns)",
+		Label:          "Steps (model turns answered)",
 		Kind:           schemas.KindCount,
 		HigherIsBetter: false,
 		MinEvidence:    schemas.EvidenceGateway,
-		Description:    "Model turns per run: logical message requests answered by the model, with retries and fallbacks of one request counted once, averaged over runs with a complete gateway log.",
+		Description:    "Model turns that got an answer per run (logical message requests answered by the model, retries and fallbacks of one request counted once; not everything the agent did: failed turns are model_turns_failed, physical retries and fallbacks model_attempts, commands, file changes and tool calls between turns agent_steps), averaged over runs with a complete gateway log.",
 		PS2:            true,
 	}
 }

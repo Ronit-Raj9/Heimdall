@@ -230,6 +230,17 @@ loop or server with your agent and keep its env contract; the rules (what
 an agent must and must not do, the YAML fields, framework base URLs) are in
 [`adding-an-agent.md`](adding-an-agent.md).
 
+The output above was recorded before the trusted step observers existed.
+`agent check` now prints two more rows after the egress row:
+`process_observer` ("process observer saw the agent's commands") passes when
+the process observer ran and recorded at least one process, fails when it ran
+but recorded none, warns when it was missing (with the reason) and is
+skipped when it was off; `workspace_observer` ("workspace observer saw file
+changes") passes on at least one file event, warns on zero events (an agent
+that changes no file legitimately shows none, and the scripted model asks for
+no edit) and fails on zero events while the diff changed files. What the
+observers record: [`steps-and-evidence.md`](steps-and-evidence.md).
+
 `doctor` now checks the whole project: the helper image and the tools the
 bench runs in it, every suite's base image and lock, and every image named
 by `agents/*.yaml`, per suite for per-suite agents:

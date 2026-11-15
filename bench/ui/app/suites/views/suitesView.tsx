@@ -4,6 +4,7 @@ import { AddYourOwnPanel } from "@/components/suites/addYourOwnPanel";
 import { SuiteCards } from "@/components/suites/suiteCards";
 import { CapabilityCoverage, LicenseSummary, ProbeList } from "@/components/suites/suiteCoverage";
 import { BrokenSuite, SuiteDriftNotice, SuiteFacts } from "@/components/suites/suiteFacts";
+import { FingerprintDriftNotice } from "@/components/suites/suiteLockKind";
 import { SuiteHealthSummary } from "@/components/suites/suiteHealth";
 import { healthState, isRedacted } from "@/components/suites/suiteHealth.utils";
 import { SuiteTaskFilters } from "@/components/suites/suiteTaskFilters";
@@ -139,6 +140,7 @@ function SuiteDetail({ suite }: { suite: SuiteSummary }) {
 		<div className="flex min-w-0 flex-col gap-6" data-testid={`suites-detail-${suite.id}`}>
 			<SuiteFacts suite={suite} />
 			<SuiteDriftNotice suite={suite} />
+			<FingerprintDriftNotice suite={suite} />
 			<SuiteHealthSummary suite={suite} health={health} />
 			<div className={cn("grid min-w-0 grid-cols-1 gap-4", openTask && "2xl:grid-cols-[minmax(0,1fr)_minmax(0,30rem)]")}>
 				<Section title={t("suites.tasks.title")} description={t("suites.tasks.description")} testId="suites-tasks" className="min-w-0">

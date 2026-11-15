@@ -111,13 +111,14 @@ function ExperimentVerdict({ expId }: { expId: string }) {
 		<div className="flex flex-col gap-6" data-testid="verdict-content" data-exp-id={payload.exp_id}>
 			<VerdictHeaderStrip payload={payload} />
 
-			<Section title={t("verdict.configDiff.title")} description={t("verdict.configDiff.description")} testId="verdict-config-diff">
-				<ConfigDiff changes={payload.config_diff} armLabels={arms.length === 2 ? { a: arms[0], b: arms[1] } : undefined} />
-			</Section>
+			{/* The decision opens the page; what changed and the naive count sit beside each other under it. */}
+			<VerdictCard verdict={payload.verdict} metricLabel={metrics[payload.verdict.primary.metric]?.label} />
 
-			<div className="grid grid-cols-1 items-start gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(0,2fr)]">
+			<div className="grid grid-cols-1 items-start gap-4 lg:grid-cols-[minmax(0,2fr)_minmax(0,1fr)]">
+				<Section title={t("verdict.configDiff.title")} description={t("verdict.configDiff.description")} testId="verdict-config-diff">
+					<ConfigDiff changes={payload.config_diff} armLabels={arms.length === 2 ? { a: arms[0], b: arms[1] } : undefined} />
+				</Section>
 				<NaiveScoreboard naive={payload.naive} arms={arms} />
-				<VerdictCard verdict={payload.verdict} metricLabel={metrics[payload.verdict.primary.metric]?.label} />
 			</div>
 
 			<Section title={t("policy.title")} description={t("policy.description")} testId="verdict-policy">
@@ -218,10 +219,10 @@ function VerdictSkeleton() {
 	return (
 		<div className="flex flex-col gap-6" data-testid="verdict-loading">
 			<Skeleton className="h-6 w-2/3" />
-			<Skeleton className="h-24 w-full" />
-			<div className="grid grid-cols-1 gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(0,2fr)]">
-				<Skeleton className="h-48 w-full" />
-				<Skeleton className="h-80 w-full" />
+			<Skeleton className="h-64 w-full" />
+			<div className="grid grid-cols-1 gap-4 lg:grid-cols-[minmax(0,2fr)_minmax(0,1fr)]">
+				<Skeleton className="h-40 w-full" />
+				<Skeleton className="h-40 w-full" />
 			</div>
 			<Skeleton className="h-64 w-full" />
 		</div>

@@ -428,7 +428,23 @@
 			],
 			"track": "coding",
 			"grading": "verified",
-			"output": "diff"
+			"output": "diff",
+			"lock_kind": "fingerprinted",
+			"fingerprint_drift": [
+				{
+					"scope": "suite",
+					"id": "acme-payments",
+					"part": "settings",
+					"fields": [
+						"verifier"
+					]
+				},
+				{
+					"scope": "task",
+					"id": "p02",
+					"part": "files"
+				}
+			]
 		},
 		{
 			"id": "coding-core",
@@ -865,7 +881,8 @@
 			],
 			"track": "coding",
 			"grading": "verified",
-			"output": "diff"
+			"output": "diff",
+			"lock_kind": "fingerprinted"
 		},
 		{
 			"id": "harbor-shell",

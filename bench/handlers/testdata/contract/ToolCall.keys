@@ -15,3 +15,13 @@ nonce?
 started
 latency_ms
 undelivered?
+# Rows that are not tool calls, and traffic recorded opaque (schemas/toolrows.go, docs/tool-proxy.md).
+kind?
+http_method?
+path?
+content_type?
+response_content_type?
+request_bytes?
+response_bytes?
+unparsed?
+unparsed_reason?

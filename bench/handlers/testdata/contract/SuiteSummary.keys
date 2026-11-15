@@ -30,3 +30,6 @@ imported?
 held_out_count?
 quarantined_count?
 has_canary?
+# Lock fingerprint keys (docs/lock-fingerprints.md).
+lock_kind?
+fingerprint_drift?

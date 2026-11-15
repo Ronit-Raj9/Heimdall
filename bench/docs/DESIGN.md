@@ -552,8 +552,15 @@ An unknown instrument check is never a pass: an IMPROVED verdict holds until it 
 | `cost_usd` | Sum over physical attempts at pinned prices | gateway plus proxy ledger |
 | `wall_time_s` | Agent container start to exit | outcome |
 | `false_completion` | A success claim was made and the verifier failed | native, or the tail of stdout |
+| `model_attempts` | Physical upstream attempts on message rows: every attempt in Bifrost's attempt trail plus every fallback row (a row without a trail is one attempt), so the retries `steps` collapses stay visible | gateway |
+| `tool_calls_executed` | Tool calls with an execution witness, deduplicated: each requested call with a witness counts once; tool proxy ledger rows (tool listings excluded), shim calls and agent-stream tool results that match no requested call count one each. Unknown when calls were requested and nothing witnessed any. Version 1.1.0; runs without a step timeline compute as 1.0.0 did | boundary when a trusted witness contributed, native when only agent-stream tool results did |
+| `tool_calls_unwitnessed` | Requested calls with no witness at all (`no_witness`). Unknown when no witness source was available | gateway |
+| `commands_executed` | Command trees the process observer saw: a process whose parent is an agent runtime process, or unseen, counts once with all its descendants (`bash -c "ls \| grep x"` is 1) | boundary |
+| `files_changed_events` | Workspace observer events (create, modify, delete, rename) after its exclusions, dropped ones included, so the count is exact | boundary |
+| `agent_steps` | Every agent action with a trusted or native witness, each once: model turns, plus requested tool calls with an execution witness, plus command trees linked to no tool call, plus file changes linked to no tool call and outside every counted command's lifetime (one per distinct path per turn). Unknown, never zero, when no witness beyond the gateway exists and no observer ran | boundary, or native when an agent-stream witness was used |
 
 - A step is one model turn, and tool calls are counted separately. One turn that issues three tool calls is 1 step and 3 tool calls.
+- **Agent steps.** `steps` stays model turns, so older runs compare. `agent_steps` counts what the agent did between turns as well. One turn that requests `bash -lc "pytest -q"`, which starts Python, is 2 agent steps: 1 model turn and 1 tool call `executed_with_proof` through the process observer; the Python child belongs to the same command tree and is not counted. Definitions, linking rules, worked examples and measured coverage: [steps-and-evidence.md](steps-and-evidence.md).
 - **Aggregation.** Per run: the value. Per arm: median and mean, with "n observed of n". Between arms: the paired per-task difference. Steps and tool calls are compared within a task only, because solved runs are longer than failed ones across tasks [L10-050].
 - **Missing data.** A value that could not be observed is `unknown`, shown hatched, never zero.
 
@@ -564,9 +571,25 @@ An unknown instrument check is never a pass: an IMPROVED verdict holds until it 
 | `outcome` | Verifier and the engine's clock | Every agent |
 | `gateway` | Bifrost rows and the proxy ledger | Every agent that accepts a base URL, with no adapter code |
 | `native` | The agent's own event stream, through a parser | Agents with a parser |
-| `boundary` | Tool shims and fixture counters | Probes that use them |
+| `boundary` | Tool shims and fixture counters; the tool proxy ledger; the process and workspace observers | Probes that use them; tasks with proxied tools; every local agent (observers on by default) |
 
 This is the framework-independence claim, stated exactly: **any agent that accepts the gateway base URL gets success, steps, tokens, cost and time with one YAML file and no code.** Tool calls the model requested are read from the gateway's content logs, which spike S8 must confirm against the agent's own stream. Tool durations, executed side effects and the final claim need a parser. The second agent's runs are a gateway-level compatibility run, not a second full benchmark.
+
+Amendment (step timeline): executed side effects no longer need a parser. Two trusted observers run beside every local agent container, so commands and workspace changes, and whether a requested tool call ran, are known for any framework with no adapter code. Durations of tools outside the tool proxy and the final claim still need a parser.
+
+**Witnesses.** Every row of a run's step timeline (`steps.jsonl`) names the witness it came from:
+
+| Source | Trust | Records |
+|---|---|---|
+| `gateway` | trusted | Bifrost's request log: model turns, physical attempts, retries, fallbacks, and the tool calls the model requested (name, arguments hash, target) |
+| `tool_proxy` | trusted | The per-run tool proxy's ledger (`tools.jsonl`): every MCP, HTTP and external tool call actually made |
+| `process_observer` | trusted | A helper container in the agent's PID namespace (`--pid=container:<agent>`), root with only `CAP_SYS_PTRACE`, no network, read-only root, pids and memory limits. Polls `/proc` every 20 ms (`observers.interval_ms`): pid, ppid, uid, argv (capped, secrets redacted by the bench), cwd, kernel start time, end time (an upper bound), exit code when caught as a zombie. Reports `pids_allocated` against `pids_seen` from the namespace's `ns_last_pid`, so its misses are bounded, never hidden |
+| `workspace_observer` | trusted | A helper container with the workspace volume mounted read-only: inotify create, modify, delete and rename with path and size, caches and `.git` internals excluded; sees only the workspace volume |
+| `network_observer` | trusted | The netwatch helper; `agent check` only. Not in the timeline: its records carry no timestamps |
+| `shim` | boundary | The tool shim log, inside the agent's container |
+| `agent_stream` | agent-reported | The parsed native stream of Codex, Claude Code and OpenCode; the weakest witness |
+
+Each row also carries a proof level, the strength of its own source: `verified` for process observer, workspace observer, tool proxy and shim rows; `strong` for gateway rows (model turns, attempts, tool requests); `partial` for agent-stream rows. How a row is linked shows in `witness_of` and `witnessed_by`, not in its proof. Each requested tool call is `executed_with_proof` (a witness other than the agent stream saw it run, the shim log included), `executed_agent_reported` (only the agent stream says so) or `no_witness`; disagreements between witnesses are recorded on the row, not hidden. An observer that fails never fails the run: `observers.json` marks it `missing` with a reason, and the metrics that need it are unknown; one switched off in config writes no status, and its metrics are unknown too. `remote_http` agents get `off` for both observers, and those metrics are not applicable. Pure in-process reasoning and framework-internal calls that cross no process, workspace file, network, tool proxy or model boundary cannot be seen by this or any outside observer. Full definitions: [steps-and-evidence.md](steps-and-evidence.md).
 
 ### 9.6 Diagnostics table
 

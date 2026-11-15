@@ -80,6 +80,23 @@ result = c.check(exp_id)
 sys.exit(1 if result.blocked else 0)
 ```
 
+## Reporting agent events
+
+`heimdall.events` lets an agent under test report its own internal steps (plans, tool calls and results, subagents, handoffs, memory and retrieval) in the format of `bench/spec/agent-event.schema.json`. The bench shows them as agent-reported evidence beside what it observed itself; they never raise a trusted metric or decide an outcome.
+
+```python
+from heimdall import events
+
+plan = events.emit("plan", "fix the failing test", output="run the tests, read the failure, patch")
+call = events.emit("tool_call", "run_shell", parent_id=plan, tool_call_id="call_1", input={"command": "pytest -q"})
+events.emit("tool_result", "run_shell", parent_id=call, tool_call_id="call_1", output="1 failed", status="error")
+
+with events.step("subagent_start", "reviewer", parent_id=plan) as sub:   # timed; status error if the block raises
+    sub.output = "the fixture is stale"
+```
+
+Delivery follows the variables the bench sets in the agent container: `BENCH_EVENTS_URL` (a POST of JSON lines, 2 second timeout), else `BENCH_EVENTS_FILE` (one JSON object appended per line). A failed POST falls back to the file when both are set, and the URL is then skipped for 30 seconds. With neither set every call is a no-op that still returns an id, and nothing ever raises into the agent. `emit` returns the event id (a uuid4 in hex unless you pass `id`); nest events by passing it as `parent_id`. `input` and `output` take any JSON value and are cut to 8 KiB of text. `events.stdout_line(...)` returns the `@@heimdall-event ` line for an agent that can only print. Full example: `bench/clients/examples/agent_events.py`.
+
 ## Tests
 
 ```sh

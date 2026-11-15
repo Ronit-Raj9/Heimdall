@@ -7,6 +7,7 @@ import (
 	"os"
 	"regexp"
 	"strconv"
+	"strings"
 
 	"github.com/maximhq/bifrost/bench/schemas"
 	"github.com/maximhq/bifrost/bench/utils"
@@ -83,9 +84,12 @@ func (a *remoteHTTPAdapter) Cleanup(context.Context, *schemas.RunContext) error 
 
 // Plan returns the launcher's plan.
 //
-// Only a task whose output kind is answer can run: the agent is not beside
-// the workspace, so the answer is all it can produce (the planner refuses
-// other tasks too; this is the adapter's own check). The bearer token is read
+// An answer task always runs. The agent is not beside the workspace, so a
+// state task runs only with remote.tools expose (it changes the services
+// through the published tool proxy, rc.RemoteTools), an artifact task only
+// with remote.artifacts inline (the files arrive in the response), and a diff
+// task never (utils.RemoteOutputAllowed; the planner refuses them too, this
+// is the adapter's own check). The bearer token is read
 // from the host environment variable the config names and reaches the
 // container only through env (BENCH_REMOTE_TOKEN, redacted in plan.json),
 // never argv or files. The plan asks for egress to exactly the URL's host and
@@ -101,8 +105,15 @@ func (a *remoteHTTPAdapter) Plan(_ context.Context, rc *schemas.RunContext) (*sc
 	if spec == nil {
 		return nil, fmt.Errorf("plan run %s: agent %s has no remote block", rc.Run.RunID, rc.Agent.ID)
 	}
-	if kind := utils.OutputKind(rc.Suite, rc.Task); kind != schemas.OutputAnswer {
-		return nil, fmt.Errorf("plan run %s: adapter remote_http runs only tasks with output kind answer; task %s is %s", rc.Run.RunID, rc.Task.ID, kind)
+	if err := utils.CheckRemoteAgent(spec); err != nil {
+		return nil, fmt.Errorf("plan run %s: %w", rc.Run.RunID, err)
+	}
+	kind := utils.OutputKind(rc.Suite, rc.Task)
+	if ok, why := utils.RemoteOutputAllowed(spec, kind); !ok {
+		return nil, fmt.Errorf("plan run %s: adapter remote_http cannot run task %s (output %s): %s", rc.Run.RunID, rc.Task.ID, kind, why)
+	}
+	if kind == schemas.OutputState && rc.RemoteTools == nil {
+		return nil, fmt.Errorf("plan run %s: task %s is a state task and remote.tools is expose, but no tool proxy was published to the agent (the task has no proxied service or external API)", rc.Run.RunID, rc.Task.ID)
 	}
 	target, err := utils.RemoteEgressTarget(spec.URL)
 	if err != nil {
@@ -127,7 +138,7 @@ func (a *remoteHTTPAdapter) Plan(_ context.Context, rc *schemas.RunContext) (*sc
 	if err != nil {
 		return nil, err
 	}
-	env, err := a.remoteEnv(rc, spec, traffic, plan.WallS)
+	env, err := a.remoteEnv(rc, spec, traffic, plan.WallS, kind)
 	if err != nil {
 		return nil, fmt.Errorf("plan run %s: %w", rc.Run.RunID, err)
 	}
@@ -139,7 +150,7 @@ func (a *remoteHTTPAdapter) Plan(_ context.Context, rc *schemas.RunContext) (*sc
 }
 
 // remoteEnv is the launcher's environment.
-func (a *remoteHTTPAdapter) remoteEnv(rc *schemas.RunContext, spec *schemas.RemoteAgent, traffic string, wallS int) (map[string]string, error) {
+func (a *remoteHTTPAdapter) remoteEnv(rc *schemas.RunContext, spec *schemas.RemoteAgent, traffic string, wallS int, kind string) (map[string]string, error) {
 	timeout := spec.TimeoutS
 	if limit := wallS - remoteTimeoutMargin; timeout <= 0 || (limit > 0 && timeout > limit) {
 		timeout = max(limit, 1)
@@ -157,6 +168,7 @@ func (a *remoteHTTPAdapter) remoteEnv(rc *schemas.RunContext, spec *schemas.Remo
 		"BENCH_REMOTE_SESSION_INDEX": strconv.Itoa(sessionIndex),
 		"BENCH_REMOTE_FILES_DIR":     Workspace,
 		"BENCH_REMOTE_TRAFFIC":       traffic,
+		"BENCH_REMOTE_OUTPUT":        kind,
 		utils.EnvAnswerPath:          utils.AnswerContainerPath(rc.Suite, rc.Task),
 	}
 	if spec.AuthEnv != "" {
@@ -174,8 +186,14 @@ func (a *remoteHTTPAdapter) remoteEnv(rc *schemas.RunContext, spec *schemas.Remo
 			return nil, fmt.Errorf("model_traffic gateway needs the run key, and the run has none")
 		}
 		env["BENCH_REMOTE_GATEWAY_URL"] = templateVars(rc, a.cfg, "")["gateway.url"]
+		if a.cfg.GatewayPublicURL != "" {
+			env["BENCH_REMOTE_GATEWAY_URL"] = strings.TrimRight(a.cfg.GatewayPublicURL, "/")
+		}
 		env["BENCH_REMOTE_RUN_KEY"] = rc.Key.Value
 		env["BENCH_REMOTE_MODEL"] = rc.Agent.Model
+	}
+	if err := remoteCoverageEnv(rc, spec, env); err != nil {
+		return nil, err
 	}
 	return env, nil
 }

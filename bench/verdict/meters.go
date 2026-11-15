@@ -50,6 +50,7 @@ func meters(idx runIndex) []schemas.Meter {
 		{MeterTimeoutRate, "Timeout rate", "runs that hit the wall-clock budget (outcome timeout or agent timed out)", "counted runs",
 			schemas.KindRate, timeoutRate},
 	}
+	defs = withStepFamily(idx, defs)
 	arms := armsIn(idx, "")
 	out := make([]schemas.Meter, 0, len(defs))
 	for _, d := range defs {
@@ -58,6 +59,81 @@ func meters(idx runIndex) []schemas.Meter {
 			mt.PerArm[arm] = d.compute(idx.armRuns("", arm))
 		}
 		out = append(out, mt)
+	}
+	return out
+}
+
+// Meters of the step family (docs/steps-and-evidence.md): shown beside the
+// steps meter so steps, model turns that got an answer, is never read as
+// everything the agent did.
+const (
+	MeterModelTurnsFailedMedian = "model_turns_failed_median"
+	MeterModelAttemptsMedian    = "model_attempts_median"
+	MeterAgentStepsMedian       = "agent_steps_median"
+	MeterToolProofRate          = "tool_proof_rate"
+	MeterToolTrafficUnparsed    = "tool_traffic_unparsed_median"
+)
+
+// stepFamilyGate is the metric whose presence in any counted run turns the
+// step family meters on. Runs sealed before it existed never carry it, so an
+// analysis of them encodes exactly as before.
+const stepFamilyGate = "model_turns_failed"
+
+// withStepFamily inserts the step family meters right after the steps meter
+// when some counted run recorded them: failed turns, physical attempts and
+// agent steps beside turns answered, then how the requested tool calls were
+// proven and how much proxied traffic could not be parsed.
+func withStepFamily(idx runIndex, defs []meterDef) []meterDef {
+	recorded := func(metric string) bool {
+		for _, byTask := range idx {
+			for _, byArm := range byTask {
+				for _, runs := range byArm {
+					for _, r := range runs {
+						if _, ok := r.Metrics[metric]; ok {
+							return true
+						}
+					}
+				}
+			}
+		}
+		return false
+	}
+	var family []meterDef
+	if recorded(stepFamilyGate) {
+		family = append(family,
+			meterDef{MeterModelTurnsFailedMedian, "Model turns failed, median", "median of model turns whose final attempt failed per run", "runs with observed failed turns",
+				schemas.KindCount, medianOf("model_turns_failed")},
+			meterDef{MeterModelAttemptsMedian, "Model attempts (incl. retries, fallbacks), median", "median of physical model attempts per run", "runs with observed attempts",
+				schemas.KindCount, medianOf("model_attempts")},
+			meterDef{MeterAgentStepsMedian, "Agent steps (all witnessed actions), median", "median of agent steps per run", "runs with observed agent steps",
+				schemas.KindCount, medianOf("agent_steps")})
+	}
+	if recorded("tool_proof_rate") {
+		family = append(family, meterDef{MeterToolProofRate, "Tool calls with trusted proof", "requested tool calls a bench-side witness saw run, mean of the per-run share", "runs with requested tool calls and a trusted witness available",
+			schemas.KindRate, meanOf("tool_proof_rate")})
+		for _, c := range []struct{ metric, label string }{
+			{"tool_proof_proxy", "proxy witnessed"}, {"tool_proof_process", "process witnessed"}, {"tool_proof_file_effect", "file effect witnessed"},
+			{"tool_proof_shim", "shim witnessed"}, {"tool_proof_result_returned", "result returned only"}, {"tool_proof_none", "no witness"},
+		} {
+			if recorded(c.metric) {
+				family = append(family, meterDef{c.metric, "Tool call proof: " + c.label, "requested tool calls of this proof class, mean of the per-run share", "runs with requested tool calls",
+					schemas.KindRate, meanOf(c.metric)})
+			}
+		}
+	}
+	if recorded("tool_traffic_unparsed") {
+		family = append(family, meterDef{MeterToolTrafficUnparsed, "Tool traffic unparsed, median", "median of proxied requests recorded opaque per run", "runs with a tool ledger",
+			schemas.KindCount, medianOf("tool_traffic_unparsed")})
+	}
+	if len(family) == 0 {
+		return defs
+	}
+	out := make([]meterDef, 0, len(defs)+len(family))
+	for _, d := range defs {
+		out = append(out, d)
+		if d.name == MeterStepsMedian {
+			out = append(out, family...)
+		}
 	}
 	return out
 }

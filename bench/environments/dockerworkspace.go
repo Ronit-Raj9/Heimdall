@@ -68,6 +68,12 @@ var (
 //
 // ToolProxyImage (images.toolproxy) runs the per-run tool proxy when a run
 // has proxied services; empty means DefaultToolProxyImage.
+//
+// ProcessWatch and WorkspaceWatch run the trusted step observers beside each
+// agent session (observers.go, docs/steps-and-evidence.md): a process
+// observer in the agent's PID namespace polling /proc every WatchIntervalMS
+// (zero means DefaultWatchIntervalMS), and an inotify observer on the
+// workspace volume. The bench config turns both on by default.
 type DockerWorkspaceConfig struct {
 	EvalNetwork    string
 	HelperImage    string
@@ -76,6 +82,20 @@ type DockerWorkspaceConfig struct {
 	OutputCapBytes int64
 	NetWatch       bool
 	ToolProxyImage string
+
+	// Agent steps area: the trusted step observers.
+	ProcessWatch    bool
+	WorkspaceWatch  bool
+	WatchIntervalMS int
+
+	// Remote coverage: where a remote agent's tool gate is published
+	// (remote_tools.listen, remote_tools.public_url; remotetools.go).
+	RemoteToolsListen    string
+	RemoteToolsPublicURL string
+
+	// Agent events area: the per-run agent event collector, the events file
+	// and the OpenTelemetry variables (eventcollector.go).
+	EventsCollector bool
 }
 
 // dockerWorkspace keeps each run's workspace in a docker volume and runs every
@@ -242,12 +262,15 @@ func (e *dockerWorkspace) Exec(ctx context.Context, rc *schemas.RunContext, plan
 		return nil, fmt.Errorf("exec run %s: %w", runID, err)
 	}
 	defer egress.Stop(context.WithoutCancel(ctx))
+	e.ensureEventCollector(ctx, rc, plan, expID, runID) // Agent events area: the collector, started before the first session (eventcollector.go)
+	defer e.copyAgentEvents(context.WithoutCancel(ctx), runID, rc.Dir)
+	l.Env = e.eventEnv(rc, runID, l.Env) // Agent events area: BENCH_EVENTS_* and OTEL_* (eventcollector.go)
 	envFile, err := writeEnvFile(l.Env)
 	if err != nil {
 		return nil, fmt.Errorf("exec run %s: %w", runID, err)
 	}
 	network, svcNet := e.network(plan.Network), ""
-	if len(rc.Services) > 0 {
+	if len(rc.Services) > 0 || collectorRunning(runID) { // Agent events area: the collector is on the service network
 		svcNet = serviceNetwork(runID)
 		if network == "none" {
 			network, svcNet = svcNet, ""
@@ -258,6 +281,10 @@ func (e *dockerWorkspace) Exec(ctx context.Context, rc *schemas.RunContext, plan
 		defer w.close(ctx)
 		network, joiner = "container:"+w.holder, w.holder
 	}
+	// Agent steps area: trusted process and workspace observers (observers.go); never fail the run.
+	e.prepareEventsDir(ctx, rc, expID, runID) // Agent events area: the events file folder (eventcollector.go)
+	obs := e.startObservers(ctx, rc, plan, expID, runID)
+	defer obs.finish(ctx, rc, nil)
 	args := agentCreateArgs(name, utils.LabelArgs(expID, runID), plan, rc.Handle, network, envFile, l, mounts, snapshotMode(rc) || root)
 	_, cerr := e.cfg.Docker.MustRun(ctx, args...)
 	if rerr := os.Remove(envFile); rerr != nil {
@@ -297,10 +324,13 @@ func (e *dockerWorkspace) Exec(ctx context.Context, rc *schemas.RunContext, plan
 	}
 	stdout, stderr, session := streamPaths(rc)
 	faultToken := ""
-	if rc.FaultRuntime != nil {
-		faultToken = rc.FaultRuntime.Token
-	}
-	res, err := e.attach(ctx, name, stdout, stderr, wall, secret, faultToken)
+  if rc.FaultRuntime != nil {
+      faultToken = rc.FaultRuntime.Token
+  }
+
+  obs.watchAgent(ctx, rc, expID, runID, name)
+  res, err := e.attach(ctx, name, stdout, stderr, wall, secret, faultToken)
+  obs.finish(ctx, rc, res)
 	if err != nil {
 		keep = false
 		return res, fmt.Errorf("exec run %s: %w", runID, err)

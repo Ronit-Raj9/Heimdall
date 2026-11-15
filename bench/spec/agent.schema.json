@@ -103,7 +103,10 @@
         "url": {"type": "string", "pattern": "^https?://"},
         "auth_env": {"type": "string", "pattern": "^[A-Za-z_][A-Za-z0-9_]*$", "description": "Host environment variable holding the bearer token."},
         "timeout_s": {"type": "integer", "minimum": 1},
-        "model_traffic": {"enum": ["gateway", "external"]}
+        "model_traffic": {"enum": ["gateway", "external"]},
+        "tools": {"enum": ["expose", "off"], "description": "expose publishes the run's tool proxy to the deployment behind a per-run bearer token (docs/remote-execution.md)."},
+        "artifacts": {"enum": ["inline", "none"], "description": "inline: the deployment returns artifact files in its response."},
+        "sign_env": {"type": "string", "pattern": "^[A-Za-z_][A-Za-z0-9_]*$", "description": "Host environment variable holding the HMAC secret each request body is signed with."}
       }
     }
   },

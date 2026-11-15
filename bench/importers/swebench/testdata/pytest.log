@@ -1,0 +1,9 @@
+============================= test session starts ==============================
+collected 3 items
+
+tests/test_core.py ..F                                                   [100%]
+
+=========================== short test summary info ============================
+PASSED tests/test_core.py::test_zero
+PASSED tests/test_core.py::test_add[a b]
+FAILED tests/test_core.py::test_sub - AssertionError: assert 1 == 2

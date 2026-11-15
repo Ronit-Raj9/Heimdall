@@ -1,4 +1,5 @@
 import { Badge } from "@/components/ui/badge";
+import { CopyId } from "@/components/ui/copyId";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { formatCount, formatDateTime } from "@/components/verdict/verdict.utils";
 import { getLocale } from "@/lib/i18n";
@@ -22,7 +23,7 @@ export function ClustersTable({ clusters, selected, onSelect }: ClustersTablePro
 	const locale = getLocale();
 
 	return (
-		<Table data-testid="clusters-table" aria-label={t("clusters.table.label")}>
+		<Table stickyColumns={1} data-testid="clusters-table" aria-label={t("clusters.table.label")}>
 			<TableHeader>
 				<TableRow>
 					<TableHead>{t("clusters.table.cluster")}</TableHead>
@@ -55,7 +56,7 @@ export function ClustersTable({ clusters, selected, onSelect }: ClustersTablePro
 									>
 										{cluster.title}
 									</button>
-									<span className="text-muted-foreground font-mono text-[11px]">{cluster.signature}</span>
+									<CopyId value={cluster.signature} className="text-muted-foreground text-[11px]" />
 									{cluster.after_config_change && (
 										<span
 											className="text-chart-warning-ink inline-flex items-center gap-1 text-[11px] font-medium"

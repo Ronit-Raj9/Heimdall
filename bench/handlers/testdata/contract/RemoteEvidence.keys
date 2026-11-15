@@ -1,0 +1,6 @@
+# Keys of bench.ts `RemoteEvidence` (schemas/remote.go), in RunRemote.remote.
+channels
+trusted?
+agent_reported?
+unknown?
+reported?

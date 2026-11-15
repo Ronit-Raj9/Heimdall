@@ -119,6 +119,9 @@ func summarizeAgent(f AgentConfigFile, counts map[string]int) schemas.AgentSumma
 	if c.Parser != "" {
 		out.EvidenceLevel = agentEvidenceNative
 	}
+	if c.Parser == "generic_jsonl" { // Agent events area: native agent events on stdout
+		out.ReportsEvents = "native"
+	}
 	for name := range c.Env {
 		out.EnvNames = append(out.EnvNames, name)
 	}

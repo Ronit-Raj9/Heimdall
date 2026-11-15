@@ -96,12 +96,20 @@ export function hasScenarioEvidence(
 }
 
 /** Counts for the tool-call trace header. */
-export function toolCallCounts(calls: readonly ToolCall[]): { calls: number; errors: number; faults: number } {
+export function toolCallCounts(calls: readonly ToolCall[]): { calls: number; errors: number; faults: number; other: number; unparsed: number } {
+	const tools = calls.filter(isToolCallRow);
 	return {
-		calls: calls.length,
-		errors: calls.filter((call) => call.is_error).length,
-		faults: calls.filter((call) => Boolean(call.fault)).length,
+		calls: tools.length,
+		errors: tools.filter((call) => call.is_error).length,
+		faults: tools.filter((call) => Boolean(call.fault)).length,
+		other: calls.length - tools.length,
+		unparsed: calls.filter((call) => call.unparsed).length,
 	};
+}
+
+/** Whether a ledger row is a tool call (schemas.ToolCall.IsToolCall): no kind, and not a tools/list row written before kinds existed. */
+export function isToolCallRow(call: ToolCall): boolean {
+	return !call.kind && !(call.protocol === "mcp" && call.tool === "tools/list");
 }
 
 /** Whole seconds between two timestamps, or null when either is missing or unparsable. */

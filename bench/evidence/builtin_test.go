@@ -28,7 +28,7 @@ func testRC(t *testing.T) *schemas.RunContext {
 
 func TestBuiltinOrder(t *testing.T) {
 	got := Builtin(Deps{})
-	want := []string{ProxyLedger, GatewaySource, AgentStream, ShimLog, Cost, ToolLedger, "adapter_fault"}
+	want := []string{ProxyLedger, GatewaySource, AgentStream, ShimLog, Cost, ToolLedger, "adapter_fault", AgentEvents, StepTimeline}
 	if len(got) != len(want) {
 		t.Fatalf("Builtin returned %d sources, want %d", len(got), len(want))
 	}

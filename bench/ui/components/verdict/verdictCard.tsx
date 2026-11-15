@@ -1,9 +1,10 @@
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { getLocale } from "@/lib/i18n";
-import type { Action, Effect, GuardResult, Verdict } from "@/lib/types/bench";
+import type { Action, Decision, Effect, GuardResult, Verdict } from "@/lib/types/bench";
 import { cn } from "@/lib/utils";
 import type { TFunction } from "i18next";
+import { Ban, CircleCheck, CircleHelp, CircleX, type LucideIcon } from "lucide-react";
 import type { ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 import { MethodHint } from "./methodHint";
@@ -30,6 +31,29 @@ const ACTION_TONE = {
 	fix_harness: "neutral",
 } as const satisfies Record<Action, Tone>;
 
+// The decision's shape, so it reads without colour.
+const DECISION_ICON = {
+	improved: CircleCheck,
+	regressed: CircleX,
+	inconclusive: CircleHelp,
+	invalid: Ban,
+} as const satisfies Record<Decision, LucideIcon>;
+
+// Hero surface per tone: a faint wash of the status hue behind the decision and the action.
+const HERO_SURFACE = {
+	good: "bg-chart-success/[0.07] border-chart-success/40",
+	bad: "bg-chart-error/[0.07] border-chart-error/40",
+	warn: "bg-chart-warning/[0.08] border-chart-warning/45",
+	neutral: "bg-muted/60 border-border",
+} as const satisfies Record<Tone, string>;
+
+const TONE_INK = {
+	good: "text-chart-success-ink",
+	bad: "text-chart-error-ink",
+	warn: "text-chart-warning-ink",
+	neutral: "text-foreground",
+} as const satisfies Record<Tone, string>;
+
 export interface VerdictCardProps {
 	verdict: Verdict;
 	/** Display label of the primary metric, from the catalog; the metric id when absent. */
@@ -51,40 +75,37 @@ export function VerdictCard({ verdict, metricLabel, className }: VerdictCardProp
 	const integrity = integrityView(verdict.integrity);
 
 	return (
-		<Card
-			className={cn(
-				"gap-5 border-l-4",
-				tone === "good" && "border-l-chart-success",
-				tone === "bad" && "border-l-chart-error",
-				tone === "warn" && "border-l-chart-warning",
-				className,
-			)}
-			data-testid="verdict-card"
-			data-decision={verdict.decision}
-		>
-			<CardHeader>
-				<CardTitle className="text-muted-foreground text-xs font-medium tracking-wide uppercase">
-					{t("verdict.card.title", { metric: metricLabel ?? verdict.primary.metric, condition: verdict.primary.condition })}
-				</CardTitle>
-			</CardHeader>
-			<CardContent className="flex flex-col gap-5">
-				<div className="flex flex-wrap items-center gap-x-5 gap-y-2">
-					<span
-						className={cn("rounded-md border px-3 py-1 text-3xl font-bold tracking-tight", TONE_CLASS[tone])}
-						data-testid="verdict-decision"
-						data-tone={tone}
-					>
-						{t(`verdict.card.decision.${verdict.decision}`)}
-					</span>
-					<span className="flex flex-col" data-testid="verdict-effect">
-						<span className="text-2xl font-semibold tabular-nums">
-							{effect ? t("verdict.card.pp", { value: formatSignedPp(effect.d_bar, locale) }) : t("verdict.card.noEffect")}
+		<Card className={cn("gap-0 overflow-hidden py-0", className)} data-testid="verdict-card" data-decision={verdict.decision}>
+			<div
+				className={cn("grid grid-cols-1 gap-5 border-b p-6 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)] lg:items-center", HERO_SURFACE[tone])}
+			>
+				<div className="flex flex-col gap-3">
+					<CardHeader className="px-0">
+						<CardTitle className="text-muted-foreground text-xs font-medium tracking-[0.06em] uppercase">
+							{t("verdict.card.title", { metric: metricLabel ?? verdict.primary.metric, condition: verdict.primary.condition })}
+						</CardTitle>
+					</CardHeader>
+					<div className="flex flex-wrap items-end gap-x-6 gap-y-3">
+						<span
+							className={cn("inline-flex items-center gap-2.5 text-4xl leading-none font-bold tracking-[-0.02em]", TONE_INK[tone])}
+							data-testid="verdict-decision"
+							data-tone={tone}
+						>
+							<DecisionIcon decision={verdict.decision} />
+							{t(`verdict.card.decision.${verdict.decision}`)}
 						</span>
-						<span className="text-muted-foreground text-xs">{t("verdict.card.releaseEffect")}</span>
-					</span>
+						<span className="flex flex-col gap-0.5" data-testid="verdict-effect">
+							<span className="text-foreground text-2xl leading-none font-semibold tabular-nums">
+								{effect ? t("verdict.card.pp", { value: formatSignedPp(effect.d_bar, locale) }) : t("verdict.card.noEffect")}
+							</span>
+							<span className="text-muted-foreground text-xs">{t("verdict.card.releaseEffect")}</span>
+						</span>
+					</div>
 				</div>
-
-				<dl className="grid grid-cols-1 gap-x-6 gap-y-3 text-sm sm:grid-cols-2">
+				<ActionLine verdict={verdict} />
+			</div>
+			<CardContent className="flex flex-col gap-6 py-6">
+				<dl className="grid grid-cols-1 gap-x-8 gap-y-4 text-sm sm:grid-cols-2 xl:grid-cols-3">
 					<Stat
 						label={t("verdict.card.interval")}
 						hint={<DescriptiveTag title={t("verdict.card.intervalHint")} label={t("verdict.card.descriptive")} />}
@@ -164,11 +185,14 @@ export function VerdictCard({ verdict, metricLabel, className }: VerdictCardProp
 						{t(`verdict.card.integrityStatus.${integrity}`)}
 					</Badge>
 				</div>
-
-				<ActionLine verdict={verdict} />
 			</CardContent>
 		</Card>
 	);
+}
+
+function DecisionIcon({ decision }: { decision: Decision }) {
+	const Icon = DECISION_ICON[decision];
+	return <Icon className="size-8 shrink-0" strokeWidth={2.25} aria-hidden="true" />;
 }
 
 function Stat({ label, hint, testId, children }: { label: string; hint?: ReactNode; testId: string; children: ReactNode }) {
@@ -178,7 +202,7 @@ function Stat({ label, hint, testId, children }: { label: string; hint?: ReactNo
 				{label}
 				{hint}
 			</dt>
-			<dd className="font-medium tabular-nums">{children}</dd>
+			<dd className="text-foreground text-[15px] font-medium tabular-nums">{children}</dd>
 		</div>
 	);
 }
@@ -272,14 +296,14 @@ function ActionLine({ verdict }: { verdict: Verdict }) {
 	const tone = ACTION_TONE[verdict.action];
 	return (
 		<div
-			className={cn("flex flex-col gap-1 rounded-md border px-4 py-3", TONE_CLASS[tone])}
+			className={cn("flex flex-col gap-1.5 rounded-lg border border-l-4 px-4 py-3.5 shadow-(--shadow-card)", TONE_CLASS[tone], "bg-card")}
 			data-testid="verdict-action"
 			data-action={verdict.action}
 		>
-			<p className="text-lg font-bold tracking-wide">
+			<p className="text-base font-bold tracking-[0.04em]">
 				{t("verdict.card.actionLine", { action: t(`verdict.card.actionValue.${verdict.action}`) })}
 			</p>
-			<p className="text-foreground/80 text-sm">{actionHint(verdict, t)}</p>
+			<p className="text-foreground/85 text-sm leading-relaxed">{actionHint(verdict, t)}</p>
 		</div>
 	);
 }

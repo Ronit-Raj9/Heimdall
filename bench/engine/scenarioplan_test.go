@@ -52,7 +52,7 @@ func TestPlanScenarioChecks(t *testing.T) {
 		{"judged suite needs a judge", false, func(s *schemas.Suite, _ *schemas.Task) {
 			s.Grading = schemas.GradingJudged
 		}, "", "is judged but names no judge"},
-		{"remote agent only answers", false, func(*schemas.Suite, *schemas.Task) {}, "remote", "run a remote agent, which can only answer"},
+		{"remote agent only answers", false, func(*schemas.Suite, *schemas.Task) {}, "remote", "runs a remote agent: a remote agent is not beside the workspace"},
 	}
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {

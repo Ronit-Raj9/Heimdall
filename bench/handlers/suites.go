@@ -52,6 +52,10 @@ type SuiteSource interface {
 	// LockDrift lists what no longer matches s.Lock: what `suite lock` would
 	// change. It is only asked about a suite with a lock.
 	LockDrift(ctx context.Context, s *schemas.Suite) ([]schemas.SuiteDrift, error)
+	// FingerprintDrift lists what no longer matches the fingerprints s.Lock
+	// recorded (docs/lock-fingerprints.md); empty for a legacy lock. It is
+	// only asked about a suite whose lock has fingerprints.
+	FingerprintDrift(ctx context.Context, s *schemas.Suite) ([]schemas.FingerprintDrift, error)
 }
 
 // SuitesHandler serves the benchmark packs on disk: what each suite holds,
@@ -183,6 +187,7 @@ func (h *SuitesHandler) summarize(ctx context.Context, s *schemas.Suite) schemas
 		default:
 			out.LockState = schemas.SuiteLocked
 		}
+		h.fingerprintSummary(ctx, s, &out)
 	}
 	for _, p := range s.Probes {
 		out.Probes = append(out.Probes, schemas.SuiteProbe{
@@ -201,6 +206,29 @@ func (h *SuitesHandler) summarize(ctx context.Context, s *schemas.Suite) schemas
 	scenarioSummary(s, &out) // UI area: scenario fields of the suite and its tasks (imports.go)
 	h.healthSummary(s, &out) // Suite health area: quarantine, held-out split, canary (suitehealth.go)
 	return out
+}
+
+// fingerprintSummary sets the lock kind and the fingerprint drift of a
+// locked suite (docs/lock-fingerprints.md). Fingerprint drift refuses
+// planning, so a lock that was otherwise current reads as stale.
+func (h *SuitesHandler) fingerprintSummary(ctx context.Context, s *schemas.Suite, out *schemas.SuiteSummary) {
+	if s.Lock.Fingerprints == nil {
+		out.LockKind = schemas.LockKindLegacy
+		return
+	}
+	out.LockKind = schemas.LockKindFingerprinted
+	drift, err := h.suites.FingerprintDrift(ctx, s)
+	switch {
+	case err != nil:
+		if out.LockState != schemas.SuiteLockErr {
+			out.LockState, out.LockError = schemas.SuiteLockErr, err.Error()
+		}
+	case len(drift) > 0:
+		out.FingerprintDrift = drift
+		if out.LockState == schemas.SuiteLocked {
+			out.LockState = schemas.SuiteStale
+		}
+	}
 }
 
 // brokenSuite is the list entry of a pack that failed to load.

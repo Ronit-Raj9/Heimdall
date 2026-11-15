@@ -35,7 +35,7 @@ export function LeaderboardTable({ rows, faults, sort, onSort, alpha }: Leaderbo
 	);
 
 	return (
-		<Table data-testid="leaderboard-table" aria-label={t("leaderboard.table.label")} containerClassName="rounded-sm">
+		<Table data-testid="leaderboard-table" aria-label={t("leaderboard.table.label")} containerClassName="rounded-sm" stickyColumns={3}>
 			<TableHeader>
 				<TableRow className="hover:bg-transparent">
 					{head("rank", t("leaderboard.table.rank"), undefined, "left")}
@@ -66,18 +66,21 @@ export function LeaderboardTable({ rows, faults, sort, onSort, alpha }: Leaderbo
 									<TableCell
 										colSpan={columnCount}
 										className={cn(
-											"bg-muted/40 text-muted-foreground py-1 text-[11px] font-medium tracking-wide uppercase",
+											"bg-muted/50 text-muted-foreground py-1.5 text-[11px] font-medium tracking-[0.06em] uppercase",
 											index > 0 && "border-foreground/20 border-t-2",
 										)}
 									>
-										{groupTier === 1 ? t("leaderboard.tier.groupOne") : t("leaderboard.tier.groupTwo", { alpha })}
+										{/* Sticky inside the full-width cell, so the label stays in view while the table scrolls sideways. */}
+										<span className="sticky left-4">
+											{groupTier === 1 ? t("leaderboard.tier.groupOne") : t("leaderboard.tier.groupTwo", { alpha })}
+										</span>
 									</TableCell>
 								</TableRow>
 							)}
 							<TableRow data-testid={`leaderboard-row-${entry.rank}`} data-tier={tier} data-config-hash={entry.config_hash}>
 								<TableCell
 									className={cn(
-										"text-foreground align-top font-semibold tabular-nums",
+										"text-foreground align-top text-[15px] font-semibold tabular-nums",
 										// A thin band on the row edge keeps the tier visible when sorted by another column.
 										tier === 1 ? "shadow-[inset_3px_0_0_var(--chart-success)]" : "shadow-[inset_3px_0_0_var(--chart-neutral)]",
 									)}

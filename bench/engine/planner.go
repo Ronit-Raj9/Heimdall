@@ -16,6 +16,7 @@ import (
 
 	"github.com/maximhq/bifrost/bench/adapters"
 	"github.com/maximhq/bifrost/bench/schemas"
+	suitepkg "github.com/maximhq/bifrost/bench/suite"
 	"github.com/maximhq/bifrost/bench/utils"
 )
 
@@ -188,6 +189,9 @@ func (p *Planner) plan(ctx context.Context, exp *schemas.Experiment, mode planMo
 	if err := p.checkLock(suite, e.Name, mode.lockWarnOnly || e.Smoke, all); err != nil {
 		return nil, fmt.Errorf("plan %s: %w", e.ID, err)
 	}
+	if err := checkFingerprints(ctx, p.reg, suite, p.logger, mode.lockWarnOnly || e.Smoke, "plan", e.ID); err != nil { // Lock fingerprints (fingerprints.go)
+		return nil, fmt.Errorf("plan %s: %w", e.ID, err)
+	}
 	if e.Smoke {
 		p.logger.Warn("smoke experiment: its runs are a synthetic smoke test, never findings", "experiment", e.ID)
 	}
@@ -206,6 +210,11 @@ func (p *Planner) plan(ctx context.Context, exp *schemas.Experiment, mode planMo
 		BenchVersion:   BenchVersion,
 	}
 	m.HeldOutTasks = heldOutTasks(suite, all) // Suite health area: held-out split (taskscreen.go)
+
+	// Lock fingerprints (fingerprints.go): the exact evaluator settings.
+	if m.FingerprintHash, err = lockFingerprintHash(suite); err != nil {
+		return nil, fmt.Errorf("plan %s: %w", e.ID, err)
+	}
 	if m.PolicyHash, err = p.policyHash(e.Policy); err != nil {
 		return nil, fmt.Errorf("plan %s: %w", e.ID, err)
 	}
@@ -254,6 +263,7 @@ func (p *Planner) plan(ctx context.Context, exp *schemas.Experiment, mode planMo
 	if m.TaskImages, err = p.taskImages(ctx, suite, all); err != nil {
 		return nil, fmt.Errorf("plan %s: %w", e.ID, err)
 	}
+	m.SuiteImages = p.suiteImages(ctx, suite) // Lock fingerprints: frozen suite image ids (suiteimages.go)
 	if err := p.taskAgentImages(ctx, suite, conds, compat, m); err != nil {
 		return nil, fmt.Errorf("plan %s: %w", e.ID, err)
 	}
@@ -302,6 +312,8 @@ func (p *Planner) checkLock(suite *schemas.Suite, name string, warnOnly bool, co
 				problems = append(problems, fmt.Sprintf("task %s is not in the suite lock", id))
 			case tl.Status != schemas.TaskAdmitted:
 				problems = append(problems, fmt.Sprintf("task %s is %s, not admitted", id, tl.Status))
+			case !suitepkg.AdmissionCurrent(suite.Lock, id, tl.Admission):
+				problems = append(problems, fmt.Sprintf("task %s admission was recorded for other lock fingerprints, so it is no longer admitted; run suite admit", id))
 			}
 		}
 	}

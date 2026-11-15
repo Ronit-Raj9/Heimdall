@@ -34,11 +34,20 @@ type exchange struct {
 // track starts the record of one call. A duplicate id in one request is
 // recorded but only the first is matched to an answer.
 func (x *exchange) track(key, tool string, args []byte) *pending {
+	return x.trackAs("", key, tool, args)
+}
+
+// trackAs starts the record of one message of the request: a tool call when
+// kind is empty, else a row of that kind (schemas.ToolRowMCPMethod and the
+// rest). A message with an id waits for its answer; one without is done when
+// the server accepts the request.
+func (x *exchange) trackAs(kind, key, tool string, args []byte) *pending {
 	p := &pending{key: key, row: schemas.ToolCall{
 		Server:   x.route.Service,
 		Tool:     tool,
 		Protocol: ProtocolMCP,
 		Started:  x.started,
+		Kind:     kind,
 	}}
 	p.row.Arguments, p.row.ArgsSHA256 = Capture(args)
 	if key == "" {
@@ -65,13 +74,16 @@ func (p *pending) answer(result []byte, isError bool, status int, now time.Time)
 // unknown ids) and whether the message was rewritten.
 func (x *exchange) answerMessage(it rpcItem, status int) (json.RawMessage, *pending, bool) {
 	if it.msg.Method != "" {
+		x.s.serverMessage(x.route, it, status)
 		return it.raw, nil, false
 	}
 	key := idKey(it.msg.ID)
 	p := x.byKey[key]
 	if key == "" || p == nil || p.answered {
+		x.s.serverMessage(x.route, it, status)
 		return it.raw, nil, false
 	}
+	p.row.ResponseBytes = int64(len(it.raw))
 	now := x.s.now()
 	if e := bytes.TrimSpace(it.msg.Error); len(e) > 0 && string(e) != "null" {
 		p.answer(e, true, status, now)
@@ -136,6 +148,24 @@ func (x *exchange) unanswered(status int, body []byte) {
 			continue
 		}
 		p.answer(body, true, status, now)
+	}
+}
+
+// unparsedAnswer closes every call that has no answer yet when part of the
+// answer went by unparsed (over the parse cap): the answer may be in it, so
+// the row says it was not recorded rather than that the call failed. sha and
+// n cover the unparsed part.
+func (x *exchange) unparsedAnswer(status int, reason, sha string, n int64) {
+	now := x.s.now()
+	for _, p := range x.order {
+		if p.answered {
+			continue
+		}
+		p.answer(nil, status >= 400, status, now)
+		if !p.noReply {
+			p.row.ResultSHA256, p.row.ResponseBytes = sha, n
+			p.row.Unparsed, p.row.UnparsedReason = true, reason
+		}
 	}
 }
 

@@ -21,7 +21,7 @@ func init() {
 }
 
 const suiteUsage = `usage: bifrost-bench suite init <suite id> -template python-pytest|node-test|go-test|generic-reward|tool-use|mcp|browser|memory|qa|artifact|external-api|computer-use [-image <existing image>] [-config deploy/bench.yaml]
-       bifrost-bench suite lint|lock [-config deploy/bench.yaml | -root benchmarks] <suite id>
+       bifrost-bench suite lint|lock [-config deploy/bench.yaml | -root benchmarks] [-pin-local-images] <suite id>
        bifrost-bench suite admit [-config deploy/bench.yaml] [-task t01] <suite id>
        bifrost-bench suite health|quarantine|restore|canary|canary-check ... (run one with -h for its flags)`
 
@@ -43,12 +43,13 @@ func runSuite(args []string) int {
 	fs := flag.NewFlagSet("suite "+sub, flag.ContinueOnError)
 	root := fs.String("root", "", "benchmarks folder (default: benchmarks_root of the config, else benchmarks)")
 	config := fs.String("config", defaultConfig, "bench config")
+	pinLocal := fs.Bool("pin-local-images", false, "lock: record local image ids of locally built images (valid only on this machine); default: tag only, kept as the previous lock did when the flag is not given")
 	pos, err := parseArgs(fs, args[1:])
 	if err != nil || len(pos) != 1 {
 		fmt.Fprintln(os.Stderr, suiteUsage)
 		return exitUsage
 	}
-	benchRoot, _, err := benchmarksRoot(fs, *root, *config)
+	benchRoot, cfg, err := benchmarksRoot(fs, *root, *config)
 	if err != nil {
 		return fail("%v", err)
 	}
@@ -70,15 +71,26 @@ func runSuite(args []string) int {
 		}
 		return exitOK
 	case "lock":
-		lock, err := suite.Lock(s, time.Now().UTC())
+		pin := suite.LockPinsLocal(s.Lock) // Lock fingerprints: pinning is sticky unless the flag says otherwise
+		if flagSet(fs, "pin-local-images") {
+			pin = *pinLocal
+		}
+		lock, err := suite.LockWith(s, time.Now().UTC(), lockFingerprintOptions(context.Background(), cfg, utils.Docker{}, pin))
 		if err != nil {
 			return fail("lock: %v", err)
 		}
+		printLockChanges(os.Stdout, s, lock) // Lock fingerprints: drift as a diff (lockfingerprints.go)
 		path := filepath.Join(s.Root, "suite.lock")
 		if _, err := suite.WriteLock(path, lock); err != nil {
 			return fail("write %s: %v", path, err)
 		}
-		fmt.Printf("wrote %s (%d tasks, %d probes)\n", path, len(lock.Tasks), len(lock.Probes))
+		admitted := 0
+		for _, tl := range lock.Tasks {
+			if tl.Status == schemas.TaskAdmitted {
+				admitted++
+			}
+		}
+		fmt.Printf("wrote %s (%d tasks, %d admitted, %d probes, fingerprinted)\n", path, len(lock.Tasks), admitted, len(lock.Probes))
 		return exitOK
 	default:
 		fmt.Fprintf(os.Stderr, "unknown suite subcommand %q\n%s\n", sub, suiteUsage)
@@ -205,7 +217,7 @@ func admitSuite(ctx context.Context, config, ref, only string) int {
 	if err := a.ensureImages(ctx, s); err != nil {
 		return fail("%v", err)
 	}
-	lock, err := suite.Lock(s, time.Now().UTC())
+	lock, err := suite.LockWith(s, time.Now().UTC(), lockFingerprintOptions(ctx, a.cfg, a.docker, suite.LockPinsLocal(s.Lock)))
 	if err != nil {
 		return fail("lock: %v", err)
 	}

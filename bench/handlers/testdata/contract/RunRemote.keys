@@ -1,0 +1,4 @@
+# Keys of bench.ts `RunRemote` (handlers/runremote.go).
+run_id
+available
+remote

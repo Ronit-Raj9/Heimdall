@@ -275,6 +275,7 @@ function contractFor(file: string): { type: string; nested: Record<string, strin
 				"suites[]": "SuiteSummary",
 				"suites[].base_image": "SuiteImage",
 				"suites[].drift[]": "SuiteDrift",
+				"suites[].fingerprint_drift[]": "FingerprintDrift",
 				"suites[].probes[]": "SuiteProbe",
 				"suites[].tasks[]": "SuiteTask",
 				"suites[].tasks[].checks[]": "SuiteAdmissionCheck",
@@ -317,6 +318,7 @@ function contractFor(file: string): { type: string; nested: Record<string, strin
 	if (file.endsWith(".events.json")) return { type: "RunEvents", nested: {} };
 	if (file.endsWith(".diff.json")) return { type: "RunDiff", nested: {} };
 	if (file.endsWith(".receipts.json")) return { type: "RunReceipts", nested: {} };
+	if (file.endsWith(".steps.json")) return { type: "RunSteps", nested: { "steps[]": "StepRecord", "observers[]": "ObserverStatus" } };
 	if (file.endsWith(".reviews.json")) return { type: "RunReviews", nested: { "reviews[]": "Review" } };
 	return { type: "RunDetail", nested: {} };
 }

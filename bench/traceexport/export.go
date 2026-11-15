@@ -2,7 +2,8 @@
 // OTLP/JSON, so a run can be read in any OTLP backend (Maxim, Langfuse,
 // Jaeger, an OpenTelemetry Collector). The run is the root span; sessions,
 // model requests, tool calls, the grade and each gate are child spans, and
-// injected faults are span events. Model and tool spans follow the
+// injected faults are span events. The commands and file changes the trusted
+// observers saw are child spans of the model turn they follow. Model and tool spans follow the
 // OpenTelemetry GenAI semantic conventions (gen_ai.*); everything else is
 // under heimdall.*. docs/trace-export.md lists every span and attribute.
 //
@@ -95,6 +96,7 @@ func Build(in Input, opts Options) (*TracesData, error) {
 	b.sessionSpans()
 	b.modelSpans()
 	b.toolSpans()
+	b.stepSpans()
 	b.gradeSpan()
 	b.gateSpans()
 	b.faultEvents()
@@ -117,7 +119,8 @@ func TraceID(runID string) string {
 // SpanID returns the span id of the record key within a run: the first 8
 // bytes of sha256("heimdall/span/" + run id + "/" + key), in hex. Keys are
 // "run", "session:<index>", "model:<logical request id>", "tool_call:<tool
-// call id>", "tool:<ledger seq>", "grade" and "gate:<index>:<gate>".
+// call id>", "tool:<ledger seq>", "step:<timeline seq>", "grade" and
+// "gate:<index>:<gate>".
 func SpanID(runID, key string) string {
 	return hashID("heimdall/span/"+runID+"/"+key, 8)
 }
@@ -155,6 +158,7 @@ type modelRef struct {
 	spanID string
 	index  int // into builder.spans
 	window window
+	step   int // logical step number, for parenting timeline rows by turn
 }
 
 // builder carries the state of one Build.

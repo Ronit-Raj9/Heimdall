@@ -74,12 +74,13 @@ func TestIntegrationAgentCheck(t *testing.T) {
 	want := map[string]string{
 		rowImage: checkPass, rowUser: checkPass, rowModelCall: checkFail, rowSession: checkWarn,
 		rowExit: checkFail, rowDiff: checkPass, rowEgress: checkFail, rowEvidence: checkPass, rowClaim: checkPass,
+		rowProcObserver: checkPass, rowFSObserver: checkWarn, // the broken agent writes no file
 	}
 	if rep.Result != checkFail || checkReportExit(rep) != 1 {
 		t.Errorf("broken agent: result %s exit %d, want FAIL and 1", rep.Result, checkReportExit(rep))
 	}
 	for _, r := range rep.Rows {
-		if r.Status != want[r.ID] {
+		if r.Status != want[r.ID] && !tooShortToObserve(r) {
 			t.Errorf("broken agent row %s = %s, want %s: %s", r.ID, r.Status, want[r.ID], r.Detail)
 		}
 	}
@@ -113,11 +114,16 @@ func checkTemplate(ctx context.Context, t *testing.T, st *agentITStack, root, cf
 	}
 	rep := agentCheck(ctx, checkOptions{config: cfgPath, agent: agentPath, suite: "coding-core", task: "t01", runs: "checks", noBuild: build}, io.Discard)
 	logReport(t, rep)
-	if rep.Result != checkPass || rep.Image != built {
+	// The scripted model asks for no edit, so a template agent writes no
+	// file and the workspace observer row is a WARN that says so.
+	noFileEvent := func(r checkRow) bool {
+		return r.ID == rowFSObserver && r.Status == checkWarn && strings.Contains(r.Detail, "legitimately shows none")
+	}
+	if (rep.Result != checkPass && rep.Result != checkWarn) || rep.Image != built {
 		t.Errorf("template %s: result %s image %s, want PASS on %s", tmpl, rep.Result, rep.Image, built)
 	}
 	for _, r := range rep.Rows {
-		if r.Status != checkPass {
+		if r.Status != checkPass && !noFileEvent(r) && !tooShortToObserve(r) {
 			t.Errorf("template %s row %s = %s: %s", tmpl, r.ID, r.Status, r.Detail)
 		}
 	}
@@ -353,4 +359,11 @@ func agentITWrite(t *testing.T, path, content string) {
 	if err := os.WriteFile(path, []byte(content), 0o644); err != nil {
 		t.Fatal(err)
 	}
+}
+
+// tooShortToObserve reports a process observer row that warns because the
+// agent exited (in well under a second here) before the observer could
+// join its PID namespace: honest missing evidence, not a broken observer.
+func tooShortToObserve(r checkRow) bool {
+	return r.ID == rowProcObserver && r.Status == checkWarn && strings.Contains(r.Detail, "before the process observer could join")
 }

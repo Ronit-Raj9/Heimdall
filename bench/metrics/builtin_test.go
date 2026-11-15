@@ -41,7 +41,13 @@ func TestBuiltin(t *testing.T) {
 		{name: SkillFilesRead, kind: schemas.KindCount, higher: true, min: schemas.EvidenceNative}, // skills
 		{name: CheatingRate, kind: schemas.KindRate, min: schemas.EvidenceOutcome},                 // impossible tasks
 		{name: AdapterFaultIssued, kind: schemas.KindCount, min: schemas.EvidenceBoundary},
-		{name: AdapterFaultRecovery, kind: schemas.KindRate, higher: true, min: schemas.EvidenceNative},
+		{name: AdapterFaultRecovery, kind: schemas.KindRate, higher: true, min: schemas.EvidenceNative},                                                                                                                                                                                                                                                                                                                                       // impossible tasks
+		{name: ToolTrafficUnparsed, kind: schemas.KindCount, min: schemas.EvidenceBoundary},                                                                                                                                                                                                                                                                                                                                // tool proxy traffic relayed without being parsed
+		{name: AgentSteps, kind: schemas.KindCount, min: schemas.EvidenceGateway}, {name: CommandsExecuted, kind: schemas.KindCount, min: schemas.EvidenceBoundary}, {name: FilesChangedEvents, kind: schemas.KindCount, min: schemas.EvidenceBoundary}, {name: ModelAttempts, kind: schemas.KindCount, min: schemas.EvidenceGateway}, {name: ToolCallsUnwitnessed, kind: schemas.KindCount, min: schemas.EvidenceGateway}, // agent steps
+		{name: ModelTurnsFailed, kind: schemas.KindCount, min: schemas.EvidenceGateway}, {name: ModelTurnsTotal, kind: schemas.KindCount, min: schemas.EvidenceGateway}, {name: ModelRetries, kind: schemas.KindCount, min: schemas.EvidenceGateway}, {name: ModelFallbacks, kind: schemas.KindCount, min: schemas.EvidenceGateway}, // model turn family beside steps
+		{name: ToolProofRate, kind: schemas.KindRate, higher: true, min: schemas.EvidenceBoundary}, {name: ToolProofProxy, kind: schemas.KindRate, higher: true, min: schemas.EvidenceBoundary}, {name: ToolProofProcess, kind: schemas.KindRate, higher: true, min: schemas.EvidenceBoundary}, {name: ToolProofFileEffect, kind: schemas.KindRate, higher: true, min: schemas.EvidenceBoundary}, {name: ToolProofShim, kind: schemas.KindRate, higher: true, min: schemas.EvidenceBoundary}, {name: ToolProofResultReturned, kind: schemas.KindRate, min: schemas.EvidenceBoundary}, {name: ToolProofNone, kind: schemas.KindRate, min: schemas.EvidenceBoundary}, // proof classes of requested tool calls
+		{name: ReportedTokens, kind: schemas.KindCount, min: schemas.EvidenceNative}, {name: ReportedCostUSD, kind: schemas.KindUSD, min: schemas.EvidenceNative}, // Remote coverage: agent-reported usage
+		{name: ReportedSteps, kind: schemas.KindCount, min: schemas.EvidenceNative}, {name: ReportedToolCalls, kind: schemas.KindCount, min: schemas.EvidenceNative}, {name: SubagentsSpawned, kind: schemas.KindCount, min: schemas.EvidenceNative}, {name: EventsDropped, kind: schemas.KindCount, min: schemas.EvidenceNative}, // Agent events area
 	}
 	got := Builtin()
 	if len(got) != len(tests) {
@@ -54,8 +60,12 @@ func TestBuiltin(t *testing.T) {
 			if m.GetName() != tt.name || d.Name != tt.name {
 				t.Errorf("position %d: name %q, descriptor %q, want %q", i, m.GetName(), d.Name, tt.name)
 			}
-			if m.GetVersion() != "1.0.0" || d.Version != "1.0.0" {
-				t.Errorf("version %q, descriptor %q, want 1.0.0", m.GetVersion(), d.Version)
+			want := "1.0.0"
+			if tt.name == ToolCallsExecuted {
+				want = toolCallsExecutedVersion // ledger and observer witnesses count since 1.1.0
+			}
+			if m.GetVersion() != want || d.Version != want {
+				t.Errorf("version %q, descriptor %q, want %s", m.GetVersion(), d.Version, want)
 			}
 			if d.Kind != tt.kind || d.HigherIsBetter != tt.higher || d.MinEvidence != tt.min || d.PS2 != tt.ps2 {
 				t.Errorf("descriptor = %+v, want kind %q higher %v min %q ps2 %v", d, tt.kind, tt.higher, tt.min, tt.ps2)

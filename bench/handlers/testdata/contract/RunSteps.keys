@@ -1,0 +1,9 @@
+# Keys of bench.ts `RunSteps` (handlers/runsteps.go), GET /runs/{id}/steps.
+# The top-level response adds "mode". Change with bench.ts and handlers/runsteps.go.
+run_id
+available
+steps
+observers
+truncated?
+skipped_lines?
+agent_events?

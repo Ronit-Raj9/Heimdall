@@ -21,7 +21,7 @@
 		"build": "tsc -p tsconfig.json --outDir dist --declaration --noEmit false",
 		"typecheck": "tsc -p tsconfig.json --noEmit",
 		"typecheck:test": "tsc -p tsconfig.test.json --noEmit",
-		"test": "node --experimental-strip-types --test test/client.test.ts test/live.test.ts",
+		"test": "node --experimental-strip-types --test test/client.test.ts test/live.test.ts test/events.test.ts",
 		"sync-types": "node scripts/sync-types.mjs",
 		"check-types": "node scripts/sync-types.mjs --check"
 	}

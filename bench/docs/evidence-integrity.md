@@ -39,7 +39,7 @@ It does not prove:
 
 - **Anything against someone with write access to the run folder.** The hashes are local. Whoever can rewrite a file can rewrite `seal.json` and `seals.log` to match, and the checks pass. There is no external anchor: no signature, no timestamping service, no copy of the chain held elsewhere. Publishing the `seals.log` tail (or a release record, whose own chain covers the seal hashes it used) somewhere the operator cannot edit is the way to get one.
 - **That the evidence was right when it was sealed.** A seal freezes what the harness wrote. A wrong grade, a missed gateway row or a bug in a metric is sealed as faithfully as a correct one. The gateway log, the hidden-test regrade and the instrument checks are what speak to correctness.
-- **Anything about files outside run folders.** The manifest is protected by its own hash, which every run records; regrades and analyses by their parent seal and content hashes; the suite by its lock hash.
+- **Anything about files outside run folders.** The manifest is protected by its own hash, which every run records; regrades and analyses by their parent seal and content hashes; the suite by its lock hash. A lock with a fingerprints section also binds every evaluator setting and file of the suite, and the manifest records `fingerprint_hash` and the image ids it planned with (`suite_images`), so plan and run refuse a suite, task, probe or image that drifted from it (`docs/lock-fingerprints.md`). A legacy lock binds only its selected files. Adding fingerprints to a lock keeps its legacy fields byte for byte, so an experiment planned under the legacy lock still resumes and regates, and analysis of sealed runs never reads the live lock.
 
 ## Slot coverage
 

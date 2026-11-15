@@ -81,7 +81,21 @@ type SuiteSummary struct {
 	HeldOutCount     int  `json:"held_out_count,omitempty"`    // tasks with split held_out
 	QuarantinedCount int  `json:"quarantined_count,omitempty"` // tasks in suite.health.json
 	HasCanary        bool `json:"has_canary,omitempty"`        // suite.yaml sets a canary
+
+	// Lock fingerprints (docs/lock-fingerprints.md). LockKind is
+	// fingerprinted when suite.lock binds evaluator settings, legacy when it
+	// has no fingerprints section, empty when unlocked. FingerprintDrift
+	// lists what no longer matches the recorded fingerprints; planning
+	// refuses while it is not empty.
+	LockKind         string             `json:"lock_kind,omitempty"`
+	FingerprintDrift []FingerprintDrift `json:"fingerprint_drift,omitempty"`
 }
+
+// Lock kinds (SuiteSummary.LockKind).
+const (
+	LockKindFingerprinted = "fingerprinted"
+	LockKindLegacy        = "legacy"
+)
 
 // SuiteImage is a suite's base image: the toolchain every task and verifier
 // runs on.
@@ -214,4 +228,9 @@ type AgentSummary struct {
 	FilePaths        []string      `json:"file_paths"`      // container paths the adapter writes, sorted
 	SealedRuns       *int          `json:"sealed_runs"`     // sealed runs of this config id; null without a run index
 	Error            string        `json:"error,omitempty"` // why the config failed to decode
+	// ReportsEvents says how the agent reports its own steps when its config
+	// shows it: "native" for the generic_jsonl parser. Empty means not
+	// known from the config; agent check shows what a run actually reported
+	// (docs/agent-events.md).
+	ReportsEvents string `json:"reports_events,omitempty"`
 }

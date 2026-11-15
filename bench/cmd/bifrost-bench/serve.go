@@ -56,7 +56,7 @@ func runServe(args []string) int {
 		Auditor:  auditor{},
 		Doctor:   a.doctor,
 		Releases: serveReleaseLog(a),
-		Suites:   serveSuites{root: a.cfg.Path(a.cfg.BenchmarksRoot)},
+		Suites:   serveSuites{root: a.cfg.Path(a.cfg.BenchmarksRoot), cfg: a.cfg},
 		Agents:   serveAgents{root: a.cfg.Root},
 		UI:       builtUI(),
 		Logger:   a.logger,

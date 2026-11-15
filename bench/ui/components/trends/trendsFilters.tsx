@@ -145,7 +145,7 @@ function SyntheticSwitch({
 			<div
 				role="group"
 				aria-labelledby={id}
-				className="bg-muted inline-flex h-9 items-center gap-0.5 rounded-sm border p-0.5"
+				className="bg-muted inline-flex h-9 w-fit items-center gap-0.5 rounded-md border p-0.5"
 				data-testid="trends-synthetic"
 			>
 				{TREND_SYNTHETIC.map((option) => {
@@ -163,7 +163,7 @@ function SyntheticSwitch({
 							data-testid={`trends-synthetic-${option}`}
 							className={cn(
 								"focus-visible:ring-ring/50 h-full cursor-pointer rounded-sm px-3 text-xs font-medium transition-colors focus-visible:ring-[3px] focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-50",
-								active ? "bg-background text-foreground shadow-sm dark:bg-zinc-800" : "text-muted-foreground hover:text-foreground",
+								active ? "bg-card text-foreground shadow-sm dark:bg-accent" : "text-muted-foreground hover:text-foreground",
 							)}
 						>
 							{t(`trends.filters.syntheticOption.${option}`)}

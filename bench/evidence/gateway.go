@@ -61,6 +61,7 @@ func (s *gatewaySource) GetVersion() string { return version }
 // expectation (DESIGN.md 13.4). An incomplete set is kept and marked by the
 // gateway; it also becomes an error event so the trace shows the gap.
 func (s *gatewaySource) Collect(ctx context.Context, rc *schemas.RunContext, ev *schemas.Evidence) error {
+	CollectRemote(rc, ev) // Remote coverage: a remote agent's channel summary and self-report (remotereport.go); no-op otherwise
 	if s.gateway == nil {
 		return nil
 	}

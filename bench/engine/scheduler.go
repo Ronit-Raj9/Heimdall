@@ -14,6 +14,7 @@ import (
 	"time"
 
 	"github.com/maximhq/bifrost/bench/schemas"
+	suitepkg "github.com/maximhq/bifrost/bench/suite"
 	"github.com/maximhq/bifrost/bench/utils"
 )
 
@@ -209,8 +210,11 @@ func (s *Scheduler) start(ctx context.Context, m *schemas.Manifest, opts RunOpti
 	if err != nil {
 		return nil, err
 	}
-	if suite.LockHash != m.SuiteLockHash {
+	if !suitepkg.LockHashMatches(suite, m.SuiteLockHash) { // Lock fingerprints: a lock that only gained fingerprints still matches (fingerprints.go)
 		return nil, fmt.Errorf("suite %s lock hash %q differs from the manifest's %q", suite.ID, suite.LockHash, m.SuiteLockHash)
+	}
+	if err := checkFingerprints(ctx, s.reg, suite, s.logger, m.Experiment.Smoke, "run", m.ExpID); err != nil {
+		return nil, fmt.Errorf("run %s: %w", m.ExpID, err)
 	}
 	if opts.Owner == "" {
 		opts.Owner = utils.NewID("w", 8)

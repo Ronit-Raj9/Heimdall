@@ -63,7 +63,7 @@ const defaultChecksRoot = "checks"
 // stderrTail is how much of the agent's stderr a failing row quotes.
 const stderrTail = 2048
 
-var rowOrder = []string{rowImage, rowUser, rowModelCall, rowSession, rowExit, rowDiff, rowEgress, rowEvidence, rowClaim}
+var rowOrder = []string{rowImage, rowUser, rowModelCall, rowSession, rowExit, rowDiff, rowEgress, rowProcObserver, rowFSObserver, rowEvidence, rowClaim, rowAgentEvents} // Agent events area: rowAgentEvents
 
 var rowTitles = map[string]string{
 	rowImage:     "image builds",
@@ -133,7 +133,8 @@ type checkInput struct {
 	stderr      string // tail of the agent's stderr
 	wallS       int
 	plan        schemas.RunPlan
-	scenario    *checkScenario // nil for a repository task
+	scenario    *checkScenario   // nil for a repository task
+	observers   *observerRecords // process and workspace observers (agentobservers.go)
 }
 
 // checkScenario is what the scenario rows read: the task's declared shape and
@@ -241,6 +242,9 @@ func runCheckSlot(ctx context.Context, opts checkOptions, rep *checkReport) (*ch
 	a.reg.Environments = environments.Builtin(environments.DockerWorkspaceConfig{
 		EvalNetwork: a.cfg.Networks.Eval, HelperImage: a.cfg.Images.Helper, Logger: a.logger, Docker: a.docker, NetWatch: true,
 		ToolProxyImage: a.cfg.Images.ToolProxy, // lead: tool proxy image for runs with proxied services
+		// Agent steps area: trusted step observers, on unless switched off.
+		ProcessWatch: a.cfg.Observers.ProcessOn(), WorkspaceWatch: a.cfg.Observers.WorkspaceOn(), WatchIntervalMS: a.cfg.Observers.IntervalMS,
+		EventsCollector: a.cfg.Events.CollectorOn(), // Agent events area
 	})
 	st, err := store.NewFSStore(a.cfg.Path(opts.runs), a.logger)
 	if err != nil {
@@ -409,6 +413,7 @@ func readCheckRun(dir string, run *schemas.Run, cfg *schemas.AgentConfig) *check
 		in.wallS = in.plan.WallS
 	}
 	in.net, in.netErr = readNetWatch(filepath.Join(dir, environments.NetWatchFile))
+	in.observers = readObservers(dir, &in.ev)
 	if b, err := os.ReadFile(filepath.Join(dir, "agent.stderr.txt")); err == nil {
 		in.stderr = string(b[max(0, len(b)-stderrTail):])
 	}

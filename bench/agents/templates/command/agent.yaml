@@ -13,6 +13,17 @@
 # Check it for free before a real run:
 #   bifrost-bench agent build agents/__AGENT_ID__.yaml -suite <suite>
 #   bifrost-bench agent check agents/__AGENT_ID__.yaml -suite <suite>
+#
+# Optional agent events (docs/agent-events.md): a CLI that can only print
+# reports its own steps as stdout lines that start with "@@heimdall-event "
+# and carry one JSON object (spec/agent-event.schema.json), for example from a
+# shell wrapper around your CLI:
+#   printf '%s\n' '@@heimdall-event {"type":"plan","name":"fix the test","output":"run the tests, then patch"}'
+#   echo '@@heimdall-event {"type":"tool_call","name":"pytest","status":"ok"}'
+# A CLI that can write files appends the same objects, one per line, to
+# BENCH_EVENTS_FILE, or POSTs them as JSON lines to BENCH_EVENTS_URL; the bench
+# sets those when it collects events. Events are the agent's own word: shown
+# beside the bench's own evidence, never counted as proof.
 id: __AGENT_ID__
 adapter: command
 image: __IMAGE_TAG__

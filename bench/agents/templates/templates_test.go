@@ -203,6 +203,136 @@ func TestHTTPServiceTemplate(t *testing.T) {
 	}
 }
 
+// helperScript runs only a template's report_event (its imports, the
+// EVENTS_* settings and the helper functions, never the agent itself) and
+// prints the id of the first event it reports.
+const helperScript = `import ast, sys
+tree = ast.parse(open(sys.argv[1]).read())
+def keep(n):
+    if isinstance(n, (ast.Import, ast.ImportFrom)):
+        return True
+    if isinstance(n, ast.FunctionDef):
+        return n.name in ("report_event", "now_rfc3339")
+    return isinstance(n, ast.Assign) and any(getattr(t, "id", "") in ("EVENTS_URL", "EVENTS_FILE") for t in n.targets)
+ns = {}
+exec(compile(ast.Module(body=[n for n in tree.body if keep(n)], type_ignores=[]), sys.argv[1], "exec"), ns)
+first = ns["report_event"]("plan", "p", output={"steps": 2})
+ns["report_event"]("tool_result", "t", parent_id=first, output="x" * 9000, status="ok")
+print(first or "")
+`
+
+// TestTemplateEventHelpers checks the agent events helpers of the python and
+// http-service templates: nothing is reported without BENCH_EVENTS_URL or
+// BENCH_EVENTS_FILE, events go to the URL when it answers and to the file
+// otherwise. The command template prints prefixed stdout lines only when the
+// bench collects events.
+func TestTemplateEventHelpers(t *testing.T) {
+	py := python(t)
+	run := func(t *testing.T, file string, env ...string) (string, string) {
+		t.Helper()
+		src := filepath.Join(t.TempDir(), filepath.Base(file))
+		copyFile(t, file, src)
+		cmd := exec.Command(py, "-I", "-B", "-c", helperScript, src)
+		cmd.Env = append([]string{"PATH=" + os.Getenv("PATH")}, env...)
+		var stdout, stderr strings.Builder
+		cmd.Stdout, cmd.Stderr = &stdout, &stderr
+		if err := cmd.Run(); err != nil {
+			t.Fatalf("%s: %v\n%s", file, err, stderr.String())
+		}
+		return strings.TrimSpace(stdout.String()), stderr.String()
+	}
+	readEvents := func(t *testing.T, body string) []map[string]any {
+		t.Helper()
+		var out []map[string]any
+		for _, line := range strings.Split(strings.TrimSpace(body), "\n") {
+			var ev map[string]any
+			if err := json.Unmarshal([]byte(line), &ev); err != nil {
+				t.Fatalf("event line %q: %v", line, err)
+			}
+			out = append(out, ev)
+		}
+		return out
+	}
+	check := func(t *testing.T, evs []map[string]any, first string) {
+		t.Helper()
+		if len(evs) != 2 || evs[0]["type"] != "plan" || evs[0]["id"] != first || evs[0]["name"] != "p" ||
+			evs[1]["parent_id"] != first || evs[1]["status"] != "ok" {
+			t.Fatalf("events = %v (first id %s)", evs, first)
+		}
+		if start, _ := evs[0]["start_time"].(string); len(start) != len("2026-01-02T03:04:05.678Z") || !strings.HasSuffix(start, "Z") {
+			t.Errorf("start_time %q is not RFC 3339 UTC with milliseconds", start)
+		}
+		if out, _ := evs[1]["output"].(string); len(out) > 4000 {
+			t.Errorf("output not capped: %d bytes", len(out))
+		}
+	}
+	for _, file := range []string{"python/image/agent.py", "http-service/launcher.py"} {
+		t.Run(file, func(t *testing.T) {
+			dir := t.TempDir()
+			events := filepath.Join(dir, "events.jsonl")
+			if first, _ := run(t, file); len(first) != 32 {
+				t.Errorf("no-op returned id %q", first)
+			}
+			if _, err := os.Stat(events); !os.IsNotExist(err) {
+				t.Fatalf("events file written without the variables: %v", err)
+			}
+
+			first, _ := run(t, file, "BENCH_EVENTS_FILE="+events)
+			b, err := os.ReadFile(events)
+			if err != nil {
+				t.Fatal(err)
+			}
+			check(t, readEvents(t, string(b)), first)
+
+			var mu sync.Mutex
+			var posted strings.Builder
+			status := http.StatusAccepted
+			col := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				body, _ := io.ReadAll(r.Body)
+				mu.Lock()
+				defer mu.Unlock()
+				if r.Method != http.MethodPost || r.Header.Get("Content-Type") != "application/x-ndjson" {
+					t.Errorf("%s with content type %q", r.Method, r.Header.Get("Content-Type"))
+				}
+				posted.Write(body)
+				w.WriteHeader(status)
+				fmt.Fprint(w, `{"accepted":1,"dropped":0}`)
+			}))
+			defer col.Close()
+			urlFile := filepath.Join(dir, "url.jsonl")
+			first, _ = run(t, file, "BENCH_EVENTS_URL="+col.URL+"/events", "BENCH_EVENTS_FILE="+urlFile)
+			mu.Lock()
+			check(t, readEvents(t, posted.String()), first)
+			posted.Reset()
+			status = http.StatusInternalServerError
+			mu.Unlock()
+			if _, err := os.Stat(urlFile); !os.IsNotExist(err) {
+				t.Errorf("delivered events also written to the file: %v", err)
+			}
+			first, _ = run(t, file, "BENCH_EVENTS_URL="+col.URL+"/events", "BENCH_EVENTS_FILE="+urlFile)
+			if b, err = os.ReadFile(urlFile); err != nil {
+				t.Fatalf("failed POST did not fall back to the file: %v", err)
+			}
+			check(t, readEvents(t, string(b)), first)
+		})
+	}
+	t.Run("command/image/example-cli.py", func(t *testing.T) {
+		if out, _ := run(t, "command/image/example-cli.py"); out != "" {
+			t.Errorf("stdout without the variables: %q", out)
+		}
+		out, _ := run(t, "command/image/example-cli.py", "BENCH_EVENTS_FILE=/opt/bench/events/events.jsonl")
+		var evs []map[string]any
+		for _, line := range strings.Split(out, "\n") {
+			if rest, ok := strings.CutPrefix(line, "@@heimdall-event "); ok {
+				evs = append(evs, readEvents(t, rest)...)
+			}
+		}
+		if len(evs) != 2 || evs[0]["type"] != "plan" || evs[1]["type"] != "tool_result" || evs[1]["status"] != "ok" {
+			t.Errorf("stdout events = %v\n%s", evs, out)
+		}
+	})
+}
+
 func files0() fs.FS { return files }
 
 func python(t *testing.T) string {

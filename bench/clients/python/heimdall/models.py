@@ -110,6 +110,19 @@ class AgentConfig(_AgentConfigRequired, total=False):
     skills: Optional[AgentSkills]
 
 
+class _AgentEventStatusRequired(TypedDict):
+    collector: str
+    kept: int
+    received: int
+
+
+class AgentEventStatus(_AgentEventStatusRequired, total=False):
+    channels: Dict[str, int]
+    dropped: int
+    kinds: Dict[str, int]
+    reason: str
+
+
 class AgentList(TypedDict):
     agents: List[AgentSummary]
 
@@ -161,6 +174,7 @@ class _AgentSummaryRequired(TypedDict):
 
 class AgentSummary(_AgentSummaryRequired, total=False):
     error: str
+    reports_events: str
 
 
 class AlignedStep(TypedDict):
@@ -663,6 +677,7 @@ class Event(_EventRequired, total=False):
     args_hash: str
     attempt_id: str
     attempt_no: Optional[int]
+    channel: str
     duration_ms: Optional[int]
     event_version: str
     evidence_level: str
@@ -676,6 +691,9 @@ class Event(_EventRequired, total=False):
     parent_event_id: str
     parser_version: str
     provider: str
+    reported_id: str
+    reported_parent: str
+    reported_type: str
     request_id: str
     result_hash: str
     sequence: int
@@ -840,6 +858,16 @@ class Filters(TypedDict):
     since: str
     suite: str
     synthetic: str
+
+
+class _FingerprintDriftRequired(TypedDict):
+    id: str
+    part: str
+    scope: str
+
+
+class FingerprintDrift(_FingerprintDriftRequired, total=False):
+    fields: List[str]
 
 
 class FirstDivergence(TypedDict):
@@ -1243,11 +1271,13 @@ class Manifest(_ManifestRequired, total=False):
     budget_parity: Optional[BudgetParityResult]
     capability_gaps: Dict[str, List[str]]
     compatibility: Optional[ArmManifest]
+    fingerprint_hash: str
     gateway: Optional[GatewayManifest]
     held_out_tasks: List[str]
     policy_hash: str
     run_inputs: Dict[str, RunInputIdentity]
     scenario: Dict[str, str]
+    suite_images: Dict[str, str]
     task_identities: List[CanonicalTaskIdentity]
     task_images: Dict[str, str]
 
@@ -1339,6 +1369,23 @@ class ModelMatrix(TypedDict):
     suite: str
     synthetic: bool
     tasks: int
+
+
+class _ObserverStatusRequired(TypedDict):
+    observer: str
+    records: int
+    state: str
+
+
+class ObserverStatus(_ObserverStatusRequired, total=False):
+    dropped: int
+    interval_ms: int
+    mode: str
+    observer_coverage: str
+    pids_allocated: int
+    pids_seen: int
+    reason: str
+    session: int
 
 
 class OutcomeDiff(TypedDict):
@@ -1592,9 +1639,32 @@ class _RemoteAgentRequired(TypedDict):
 
 
 class RemoteAgent(_RemoteAgentRequired, total=False):
+    artifacts: str
     auth_env: str
     model_traffic: str
+    sign_env: str
     timeout_s: int
+    tools: str
+
+
+class RemoteChannels(TypedDict):
+    model_traffic: str
+    self_report: str
+    tools: str
+
+
+class _RemoteEvidenceRequired(TypedDict):
+    channels: RemoteChannels
+
+
+class RemoteEvidence(_RemoteEvidenceRequired, total=False):
+    agent_reported: List[str]
+    reported: Optional[RemoteReport]
+    trusted: List[str]
+    unknown: List[str]
+
+
+RemoteReport = TypedDict('RemoteReport', {'artifacts': "List[str]", 'async': "bool", 'build': "str", 'cost_usd': "Optional[float]", 'events': "int", 'events_dropped': "int", 'input_tokens': "Optional[int]", 'model': "str", 'notes': "List[str]", 'output_tokens': "Optional[int]", 'total_tokens': "Optional[int]", 'version': "str"}, total=False)
 
 
 class Report(TypedDict):
@@ -1873,6 +1943,12 @@ class RunRef_agentdiff(TypedDict):
     run_id: str
 
 
+class RunRemote(TypedDict):
+    available: bool
+    remote: Optional[RemoteEvidence]
+    run_id: str
+
+
 class _RunReviewsRequired(TypedDict):
     exp_id: str
     outcome: str
@@ -1885,6 +1961,19 @@ class _RunReviewsRequired(TypedDict):
 
 class RunReviews(_RunReviewsRequired, total=False):
     current: Optional[Review]
+
+
+class _RunStepsRequired(TypedDict):
+    available: bool
+    observers: List[ObserverStatus]
+    run_id: str
+    steps: List[StepRecord]
+
+
+class RunSteps(_RunStepsRequired, total=False):
+    agent_events: Optional[AgentEventStatus]
+    skipped_lines: int
+    truncated: bool
 
 
 class _RunTimingRequired(TypedDict):
@@ -2025,6 +2114,42 @@ class StateFile(_StateFileRequired, total=False):
     error: str
 
 
+class _StepRecordRequired(TypedDict):
+    kind: str
+    proof: str
+    seq: int
+    source: str
+    summary: str
+    ts: str
+    turn: int
+
+
+class StepRecord(_StepRecordRequired, total=False):
+    attempt: int
+    channel: str
+    conflict: str
+    corroboration: str
+    counted: bool
+    duration_ms: Optional[int]
+    event_type: str
+    execution: str
+    exit_code: Optional[int]
+    is_error: bool
+    op: str
+    parent_seq: int
+    path: str
+    pid: int
+    ppid: int
+    proof_class: str
+    report_id: str
+    request_id: str
+    session: int
+    tool_call_id: str
+    tool_name: str
+    witness_of: int
+    witnessed_by: List[int]
+
+
 class _SuiteAdmissionCheckRequired(TypedDict):
     control: str
     got: str
@@ -2107,11 +2232,13 @@ class _SuiteSummaryRequired(TypedDict):
 class SuiteSummary(_SuiteSummaryRequired, total=False):
     artifacts: List[ArtifactSpec]
     error: str
+    fingerprint_drift: List[FingerprintDrift]
     grading: str
     has_canary: bool
     held_out_count: int
     imported: Optional[ImportRecord]
     lock_error: str
+    lock_kind: str
     output: str
     quarantined_count: int
     services: List[str]
@@ -2242,14 +2369,23 @@ class _ToolCallRequired(TypedDict):
 class ToolCall(_ToolCallRequired, total=False):
     arguments: str
     blocked: bool
+    content_type: str
     fault: str
+    http_method: str
+    kind: str
     nonce: str
+    path: str
     replayed: bool
+    request_bytes: int
+    response_bytes: int
+    response_content_type: str
     result: str
     session: str
     status: int
     undelivered: bool
     unmatched: bool
+    unparsed: bool
+    unparsed_reason: str
 
 
 class _ToolCallRecordRequired(TypedDict):
@@ -2264,6 +2400,8 @@ class _ToolCallRecordRequired(TypedDict):
 
 class ToolCallRecord(_ToolCallRecordRequired, total=False):
     execution_id: str
+    proof: str
+    proof_class: str
     tool_name: str
     unknown_reason: str
 
@@ -2608,7 +2746,15 @@ class RunReceiptsResponse(RunReceipts):
     mode: Mode
 
 
+class RunRemoteResponse(RunRemote):
+    mode: Mode
+
+
 class RunReviewsResponse(RunReviews):
+    mode: Mode
+
+
+class RunStepsResponse(RunSteps):
     mode: Mode
 
 
@@ -2668,6 +2814,7 @@ __all__ = [
     'AdapterFaultHook',
     'AdapterFaultRule',
     'AgentConfig',
+    'AgentEventStatus',
     'AgentList',
     'AgentMCP',
     'AgentMemory',
@@ -2737,6 +2884,7 @@ __all__ = [
     'FieldChange',
     'FileChange',
     'Filters',
+    'FingerprintDrift',
     'FirstDivergence',
     'Forecast',
     'ForecastRange',
@@ -2779,6 +2927,7 @@ __all__ = [
     'MetricDelta',
     'MetricDescriptor',
     'ModelMatrix',
+    'ObserverStatus',
     'OutcomeDiff',
     'OutcomeVariance',
     'OutputSpec',
@@ -2804,6 +2953,9 @@ __all__ = [
     'ReleaseRecord',
     'ReleaseRequest',
     'RemoteAgent',
+    'RemoteChannels',
+    'RemoteEvidence',
+    'RemoteReport',
     'Report',
     'Report_agentdiff',
     'Response',
@@ -2825,7 +2977,9 @@ __all__ = [
     'RunReceipts',
     'RunRef',
     'RunRef_agentdiff',
+    'RunRemote',
     'RunReviews',
+    'RunSteps',
     'RunTiming',
     'ScriptedSpec',
     'ServiceResult',
@@ -2838,6 +2992,7 @@ __all__ = [
     'SlotProgress',
     'StateExport',
     'StateFile',
+    'StepRecord',
     'SuiteAdmissionCheck',
     'SuiteDrift',
     'SuiteHealth',
@@ -2910,7 +3065,9 @@ __all__ = [
     'RunDiffResponse',
     'RunEventsResponse',
     'RunReceiptsResponse',
+    'RunRemoteResponse',
     'RunReviewsResponse',
+    'RunStepsResponse',
     'SuiteHealthResponse',
     'SuiteListResponse',
     'SuiteTaskDetailResponse',

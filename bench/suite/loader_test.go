@@ -292,7 +292,7 @@ func TestLoadCodingCore(t *testing.T) {
 	if err != nil {
 		t.Skipf("coding-core lock not readable: %v", err)
 	}
-	if !bytes.Equal(got, want) {
+	if !bytes.Equal(got, legacyLockBytes(t, want)) { // Lock fingerprints: legacy fields only (scenario_test.go)
 		t.Errorf("re-locking coding-core changed suite.lock")
 	}
 	for _, p := range problems {

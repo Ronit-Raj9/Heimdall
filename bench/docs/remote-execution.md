@@ -5,7 +5,7 @@ Two features let an experiment run beyond one machine's agent containers:
 - **Remote workers.** `bifrost-bench worker` runs on another machine, leases slots from a coordinator over HTTP, runs them with the normal pipeline and uploads each sealed run folder. The coordinator verifies the worker's seal before it accepts the run.
 - **Remote agents.** Adapter `remote_http` runs an agent that is a deployed service: the run posts the instruction to the service's URL and grades the answer it returns.
 
-Code: `engine/remote.go` (coordinator), `engine/remoteworker.go` (worker), `engine/remotearchive.go` (archive and seal checks), `engine/scheduler.go` (shared slot queue), `handlers/workers.go` (HTTP routes), `cmd/bifrost-bench/worker.go` (CLI), `adapters/remotehttp.go` and `adapters/remotehttp.py` (remote agents), `utils/remoteegress.go` (the remote agent's one route out).
+Code: `engine/remote.go` (coordinator), `engine/remoteworker.go` (worker), `engine/remotearchive.go` (archive and seal checks), `engine/scheduler.go` (shared slot queue), `handlers/workers.go` (HTTP routes), `cmd/bifrost-bench/worker.go` (CLI), `adapters/remotehttp.go`, `adapters/remotehttp.py` and `adapters/remotecoverage.go` (remote agents), `utils/remoteegress.go` (the remote agent's one route out), `utils/remotetools.go`, `environments/remotetools.go` and `toolproxy/remotegate.go` (the published tool gate), `evidence/remotereport.go` and `metrics/remotereported.go` (channel summary and self-report).
 
 ## Remote workers
 
@@ -116,7 +116,7 @@ Every lease, refusal, rejection, release and loss is a line of `<runs root>/.rem
 
 ## Remote agents: adapter `remote_http`
 
-An agent that is a deployed service is configured with `adapter: remote_http` and a `remote` block (`schemas.RemoteAgent`):
+An agent that is a deployed service is configured with `adapter: remote_http` and a `remote` block (`schemas.RemoteAgent`). The bench does not control that service: it sends the session, waits for the answer and grades it. Three optional channels make more of the run measurable. Each needs something from the operator and each has its own evidence strength.
 
 ```yaml
 id: support-bot
@@ -127,12 +127,34 @@ remote:
   url: https://agent.example.com/v1/answer
   auth_env: SUPPORT_BOT_TOKEN     # host environment variable holding the bearer token
   timeout_s: 300
-  model_traffic: external         # or gateway
+  model_traffic: gateway          # channel 1; default external
+  tools: expose                   # channel 2; default off
+  artifacts: inline               # the response may carry artifact files; default none
+  sign_env: SUPPORT_BOT_SIGNING   # optional HMAC secret for request signing
 budgets: {wall_s: 600, cpus: 1, mem_gb: 1}
 gateway: {provider: anthropic, max_retries: 0}
 ```
 
-Only tasks whose output kind is `answer` can run against it: the agent is not beside the workspace, so the answer is all it produces. The adapter refuses any other task when it plans the run, before anything starts, so such a run ends `aborted_infra` with the reason; refusing the experiment at plan time is the planner's check.
+### The three channels
+
+| Channel | Config | What the operator must do (deployment on another machine) | What becomes measurable | Strength |
+|---|---|---|---|---|
+| 1. Model traffic through this gateway | `remote.model_traffic: gateway` | Make the gateway reachable from the deployment: a reverse tunnel or a published, TLS-fronted address, and set `gateway.public_url` to that address. The deployment must use the request's `gateway.key` as its API key for every model call. | `tokens`, `cost_usd`, model turns, retries and fallbacks, on the run key only | trusted (gateway rows) |
+| 2. Tools through this bench | `remote.tools: expose` | Make the run's tool gate reachable: either a reverse tunnel to `remote_tools.listen` and `remote_tools.public_url` set to the tunnel's address, or a reachable interface in `remote_tools.listen` with `{port}` in `remote_tools.public_url`. The deployment must call the URLs in the request's `tools` block with their bearer token. | every call to the run's proxied tool and MCP services and external APIs, in the tool ledger like a local agent's; `state` tasks become runnable; browser and computer-use services work the same way | trusted (tool proxy ledger) |
+| 3. Self-reported telemetry | none; the deployment adds fields to its answer | Nothing. | `reported_tokens`, `reported_cost_usd`, agent-reported timeline events, self-declared `version` and `build`, inline artifacts for `artifact` tasks | agent_reported (the agent's own word) |
+
+Without channel 1, `tokens`, `cost_usd` and `steps` stay unknown with the external traffic reason, whatever the agent reports. Without channel 2, no tool call of the deployment is seen and only `answer` (and, with `artifacts: inline`, `artifact`) tasks run.
+
+Which tasks a remote agent can run (`utils.RemoteOutputAllowed`, checked when the experiment is planned and again when the adapter plans a run):
+
+| Output kind | Allowed when | Why |
+|---|---|---|
+| `answer` | always | the answer comes back in the response |
+| `state` | `tools: expose` and the task has a proxied service or external API | the deployment changes the services only through the published tool proxy |
+| `artifact` | `artifacts: inline` | the files arrive only inline in the response; a response without them leaves the artifact missing, which the grade reports |
+| `diff` | never | the workspace is not beside a remote agent |
+
+`agent check` with a remote agent adds a row, "remote agent: measured channels", that names which channels were active in the check run and what is therefore trusted, agent-reported or unknown; `evidence.json` carries the same summary under `remote`.
 
 ### The request
 
@@ -141,16 +163,78 @@ The run's container is the bench's own launcher (`adapters/remotehttp.py`); noth
 ```
 POST <remote.url>
 Authorization: Bearer <value of $auth_env>      (only when auth_env is set)
+X-Heimdall-Timestamp: <unix seconds>            (only when sign_env is set)
+X-Heimdall-Signature: sha256=<hex>              (only when sign_env is set)
 Content-Type: application/json
 
-{"instruction": "...", "session_id": "...", "session_index": 1,
- "files": {"notes/chat.txt": "..."},             (small text files of the workspace, when present)
- "gateway": {"url": "...", "key": "...", "model": "..."}}   (only with model_traffic gateway)
+{"instruction": "...", "session_id": "...", "session_index": 1, "output": "answer",
+ "files": {"notes/chat.txt": "..."},                         (small text files of the workspace, when present)
+ "gateway": {"url": "...", "key": "...", "model": "..."},   (only with model_traffic gateway)
+ "tools": {"notes": {"url": "https://.../r/<run id>/s/notes/mcp", "protocol": "mcp", "token": "..."},
+           "weather": {"url": "https://.../r/<run id>/x/weather", "protocol": "external", "token": "..."}}}
+                                                             (only with tools expose)
 ```
 
-and waits up to `timeout_s` (default: the wall budget less 5 s). The answer is a JSON object with a string `answer` (another JSON value is written as JSON), or a `text/plain` body; it is written to the task's answer path. A non-2xx status, a body without an answer, or a timeout ends the session as the agent's failure. `session_id` is the session's id in a multi-session task (the run id otherwise) and `session_index` is 1-based, so a stateful deployment can tell a task's sessions apart. `files` holds up to 100 small UTF-8 files of the workspace (256 KiB in all, hidden folders skipped), such as a session's transcript; past those caps it is left out.
+and waits up to `timeout_s` (default: the wall budget less 5 s). `session_id` is the session's id in a multi-session task (the run id otherwise) and `session_index` is 1-based. `output` is the task's output kind. `files` holds up to 100 small UTF-8 files of the workspace (256 KiB in all, hidden folders skipped); past those caps it is left out.
 
-The token is read from the host environment when the run is planned and reaches the launcher only through its environment (`BENCH_REMOTE_TOKEN`), which the plan written to `plan.json` redacts; it is never in argv or files, and the launcher never prints it.
+**Request signing.** With `remote.sign_env` naming a host environment variable (at least 16 characters), every request carries `X-Heimdall-Timestamp` and `X-Heimdall-Signature: sha256=<hex HMAC-SHA256 of "<timestamp>.<raw body>">`. The deployment recomputes the HMAC over the exact bytes it received, compares in constant time and refuses a timestamp more than a few minutes old. That proves the caller holds the secret; it does not hide the body, so keep TLS on the URL.
+
+**Secrets.** The bearer token, the run key, the tool token and the signing secret reach the launcher only through its environment (`BENCH_REMOTE_TOKEN`, `BENCH_REMOTE_RUN_KEY`, `BENCH_REMOTE_TOOLS_TOKEN`, `BENCH_REMOTE_SIGN_SECRET`), which `plan.json` redacts; they are never in argv or files, and the launcher never prints them.
+
+### The answer
+
+The answer is a JSON object with a string `answer` (another JSON value is written as JSON), or a `text/plain` body; it is written to the task's answer path. For a `state` or `artifact` task the `answer` field is optional. A non-2xx status, an answer task without an answer, `"status": "failed"`, or a timeout ends the session as the agent's failure.
+
+The JSON object may also carry what the deployment says about itself. All of it is agent-reported: shown, never trusted, never deciding an outcome.
+
+```json
+{"answer": "...",
+ "usage": {"input_tokens": 1200, "output_tokens": 300, "total_tokens": 1500, "model": "...", "cost_usd": 0.004},
+ "events": [{"type": "tool_call", "name": "search", "input": {"q": "..."}}],
+ "artifacts": {"out/report.csv": "<base64>"},
+ "version": "2.3.1", "build": "abc123"}
+```
+
+- `usage` fills `reported_tokens` (`total_tokens`, else input plus output) and `reported_cost_usd`, summed over sessions. These are separate metrics with `source: agent_reported`. `tokens` and `cost_usd` never read them: with external traffic they stay unknown with the external traffic reason, and the spend cap keeps charging the per-run estimate.
+- `events` is a list of native agent events (`spec/agent-event.schema.json`), a JSON lines string of them, or an OTLP JSON trace (`resourceSpans`; each span becomes one event). The launcher prints each as an `@@heimdall-event ` stdout line, where the agent event collector (`docs/agent-events.md`) normalizes it into an agent-reported timeline row. At most 500 events of 8 KiB each; the rest are counted as dropped. Strings that look like keys are redacted.
+- `artifacts` is `{path: base64}` or `[{"path", "content_base64"}]`, honoured only with `remote.artifacts: inline`: each file is written into the workspace at its relative path, where the artifact export picks it up like a local agent's file. Absolute paths, `..`, hidden segments, symlinks, more than 50 files or more than 16 MiB in all are refused and noted. The files are the deployment's output, graded like any agent's.
+- `version` and `build` are recorded as self-declared, capped and stripped of control characters.
+
+The launcher sums all of this in one `remote_report` stdout line; `evidence.json` holds it under `remote.reported`.
+
+**Metrics.** Two metrics hold the self-report. Both are lower-is-better (`verdict/direction.go`), carry `source: agent_reported` and evidence level `native`, and are kept apart from `tokens` and `cost_usd`:
+
+| Metric | Kind | Better | Value | Unknown when | Not applicable when |
+|---|---|---|---|---|---|
+| `reported_tokens` | count | lower | `total_tokens`, else `input_tokens` plus `output_tokens`, summed over sessions | the remote agent reported no token count | the agent is not a remote agent |
+| `reported_cost_usd` | usd | lower | `cost_usd`, summed over sessions | the remote agent reported no cost | the agent is not a remote agent |
+
+**Async agents.** A `202` answer is followed on the same host: the status URL is the `Location` header, else `status_url` in the body, else `<remote.url>/<id>` for an `id` in the body. A status URL on another host, scheme or port is refused (the run's egress allows only the URL's host and port). The launcher polls with `GET`, the same bearer token, every `Retry-After` seconds (1 to 30, default 2), until the answer is no longer `202` and its `status` is not `queued`, `pending` or `running`, or the timeout passes. The final document is read like a direct answer.
+
+### Channel 2 in detail: the published tool gate
+
+With `tools: expose` and a task that has proxied services or external APIs, the environment starts, after the tool proxy, a gate container `bench-rt-<run id>` (the tool proxy image, `bifrost-bench toolproxy gate`):
+
+- It is the only container of the run with a published port. It sits on its own bridge network `bench-rt-<run id>` for that port and joins the run's internal service network, where it forwards to `http://toolproxy:9200` only. The tool proxy keeps no route out.
+- It publishes on `remote_tools.listen` (default `127.0.0.1:0`: loopback, a free port per run). The deployment is told `<base>/r/<run id>/s/<id>/<mcp path>` for an MCP service, `<base>/r/<run id>/s/<id>` for an HTTP tool service and `<base>/r/<run id>/x/<id>` for an external API, where `<base>` is `remote_tools.public_url` (with `{port}` replaced) or `http://<listen host>:<port>`.
+- Every request needs `Authorization: Bearer <token>`. The engine mints the token per run (32 random bytes), keeps it in memory only and hands it to the launcher through redacted env; the gate holds only its sha256 and compares in constant time. No token or a wrong one answers 401, another run id 404, a call after the run's deadline (wall budget plus 10 minutes) 410. The gate drops the token and cookies before forwarding, caps request bodies at 8 MiB and requests at 20 per second (burst 40); the tool proxy's own caps apply behind it.
+- Hidden services are never published: they have no proxy route. Browser and computer-use services are MCP services and are published the same way, so a remote agent can drive the bench's browser or desktop.
+- Every call lands in `tools.jsonl` exactly like a local agent's. `remote_tools.json` in the run folder records where the gate was published and until when, never the token. `Destroy` removes the gate and its network with the run.
+
+The gate needs the tool proxy image rebuilt from this tree (`images.toolproxy`, default `bench/bifrost-bench:dev`). `bifrost-bench doctor` shows a `remote tools` row: where a gate would be published, and a warning when that is beyond loopback.
+
+### Two machines: what the operator does
+
+The bench host runs `bifrost-bench`; the deployment runs elsewhere.
+
+1. **Reach the deployment.** `remote.url` must resolve and be reachable from the bench host; the per-run egress forwarder connects there and nowhere else.
+2. **Channel 1.** Expose the gateway to the deployment, for example `ssh -R 18081:127.0.0.1:<gateway port> deploy-host` from the bench host (the deployment then calls `http://127.0.0.1:18081`), or a TLS reverse proxy in front of the gateway. Set `gateway.public_url` in `deploy/bench.yaml` to the address the deployment uses (`http://127.0.0.1:18081` in the tunnel example). The deployment must send its model calls to `gateway.url` from the request with `gateway.key` as its API key; any call with another key is not the run's and is not counted.
+3. **Channel 2.** Pick one:
+   - **Tunnel, one run at a time.** Set `remote_tools.listen: 127.0.0.1:9400` and `remote_tools.public_url: http://127.0.0.1:19400`, and keep `ssh -R 19400:127.0.0.1:9400 deploy-host` open. A fixed port serves one run at a time: a second concurrent remote-tools run fails to publish and ends `aborted_infra` with the reason, so run such experiments with concurrency 1.
+   - **Reachable interface, concurrent runs.** Set `remote_tools.listen` to an address of the bench host the deployment can route to (a VPN or private LAN address, never a public one without a firewall), port 0, and `remote_tools.public_url: http://<that address>:{port}`. Each run gets its own port.
+   The bearer token is the gate's only authentication and the gate has no TLS of its own: on anything but a tunnel or a private network put a TLS reverse proxy in front and point `public_url` at it.
+4. **Channel 3.** Nothing on the bench side; the deployment adds `usage`, `events`, `version` and `build` (and `artifacts` with `artifacts: inline`) to its answer.
+5. **Signing (optional).** Export the secret on the bench host under the name in `remote.sign_env`, give the deployment the same secret, and have it verify `X-Heimdall-Signature`.
 
 ### The one route out
 
@@ -158,5 +242,12 @@ The launcher stays on the internal evaluation network like any agent. The plan a
 
 ### Model traffic
 
-- **`external` (the default).** The deployment calls its model providers itself, out of the bench's sight. The run's gateway log is marked incomplete with that reason, so `tokens`, `cost_usd` and `steps` are unknown, never zero, and the spend cap counts the run at the per-run estimate. Set `budget.reserve_usd` to a realistic per-run cost.
-- **`gateway`.** The deployment sends its model calls through this bench's gateway with the run's key, so they are measured like any agent's. The request carries a `gateway` block: `url` is the gateway as agents reach it on the evaluation network (`gateway.agent_url`), `key` the run's virtual key, `model` the agent config's model. A deployment outside the host must reach the gateway at an address it can route to (a tunnel or a published port of the gateway, which the bench does not set up) and must use `key` as its API key for every model call of that request; calls made with any other key are not the run's and are not counted. The key is revoked when the run ends and carries the per-run budget backstop, but it is sent to the deployment, so use `gateway` only with a deployment you control.
+- **`external` (the default).** The deployment calls its model providers itself, out of the bench's sight. The run's gateway log is marked incomplete with that reason, so `tokens`, `cost_usd` and `steps` are unknown, never zero, and the spend cap counts the run at the per-run estimate. Set `budget.reserve_usd` to a realistic per-run cost. A self-reported `usage` fills only `reported_tokens` and `reported_cost_usd`.
+- **`gateway`.** The deployment sends its model calls through this bench's gateway with the run's key, so they are measured like any agent's. The request carries a `gateway` block: `url` is `gateway.public_url` when set, else the gateway as agents reach it on the evaluation network (`gateway.agent_url`), `key` the run's virtual key, `model` the agent config's model. The key is revoked when the run ends and carries the per-run budget backstop, but it is sent to the deployment, so use `gateway` only with a deployment you control.
+
+### What stays impossible
+
+- **The deployment's own tools, files and internal steps.** A remote agent's local tool calls, file writes, subprocesses and reasoning happen on a machine the bench does not see. Only what crosses the gateway (channel 1) or the tool gate (channel 2) is observed; everything else is at best agent-reported (channel 3). No process or workspace observer runs for a remote agent.
+- **Tokens and cost without channel 1.** They are only self-reported, in separate metrics, and never verified.
+- **Which build answered.** Nothing proves the deployment is the version its owner claims. `version` and `build` in the answer are recorded as self-declared and nothing more. Pin what you can on your side (an immutable deployment URL per version, the signing secret per deployment).
+- **Calls outside the run's key or token.** A model call with another key, or a tool the deployment runs by itself, is not the run's and is not counted.

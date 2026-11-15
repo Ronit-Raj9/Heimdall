@@ -60,7 +60,8 @@ func (b *builder) modelSpans() {
 			sp.Attributes = append(sp.Attributes, Bool("heimdall.gateway.incomplete", true))
 		}
 		stepSpan[st.id] = sp.SpanID
-		b.models = append(b.models, modelRef{spanID: sp.SpanID, index: i, window: w})
+		number, _, _, _ := b.stepCounts(st)
+		b.models = append(b.models, modelRef{spanID: sp.SpanID, index: i, window: w, step: number})
 	}
 	b.requestedToolSpans(steps, stepSpan)
 }

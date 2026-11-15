@@ -15,6 +15,7 @@ import {
 	suiteIdOf,
 	suiteTrack,
 	toolCallCounts,
+	isToolCallRow,
 } from "./scenario.utils";
 
 const list = JSON.parse(fs.readFileSync(path.resolve(__dirname, "../../public/fixtures/suites.json"), "utf8")) as SuiteList;
@@ -123,7 +124,28 @@ describe("helpers", () => {
 			calls: 3,
 			errors: 2,
 			faults: 1,
+			other: 0,
+			unparsed: 0,
 		});
+	});
+
+	it("counts only tool calls as calls: handshakes, listings, notifications and opaque traffic are other rows", () => {
+		const rows = [
+			call(1, { kind: "mcp_method", tool: "initialize" }),
+			call(2, { tool: "tools/list" }),
+			call(3),
+			call(4, { kind: "mcp_notification", tool: "notifications/initialized" }),
+			call(5, {
+				kind: "opaque",
+				tool: "unparsed",
+				unparsed: true,
+				unparsed_reason: "request content type application/octet-stream is not JSON",
+				is_error: true,
+			}),
+			call(6, { is_error: true }),
+		];
+		expect(toolCallCounts(rows)).toEqual({ calls: 2, errors: 1, faults: 0, other: 4, unparsed: 1 });
+		expect(rows.map(isToolCallRow)).toEqual([false, false, true, false, false, true]);
 	});
 
 	it("measures a session in whole seconds, and nothing when a time is missing or runs backwards", () => {

@@ -23,9 +23,19 @@ var lowerIsBetter = map[string]bool{
 	"cheating_rate":       true, // impossible tasks
 	"tool_calls_executed": true, // tool calls with an execution witness
 
+	// Remote coverage: agent-reported usage of a remote agent.
+	"reported_tokens": true, "reported_cost_usd": true,
+
 	// External API rows of the tool proxy ledger.
 	"external_calls": true, "external_unmatched": true, "external_error_rate": true,
 	"adapter_faults_issued": true,
+	"tool_traffic_unparsed": true, // tool proxy traffic relayed without being parsed
+
+	// Agent steps: the step timeline and the trusted observers.
+	"agent_steps": true, "commands_executed": true, "files_changed_events": true, "model_attempts": true, "tool_calls_unwitnessed": true,
+	"model_turns_failed": true, "model_turns_total": true, "model_retries": true, "model_fallbacks": true, // model turn family beside steps
+	"reported_steps": true, "reported_tool_calls": true, "subagents_spawned": true, "events_dropped": true, // Agent events area: agent-reported
+	"tool_proof_result_returned": true, "tool_proof_none": true, // proof classes of requested tool calls
 }
 
 // rateMetrics lists the built-in metrics of kind rate: every value lies in
@@ -48,6 +58,8 @@ var rateMetrics = map[string]bool{
 
 	"external_error_rate":         true, // external API rows of the tool proxy ledger
 	"adapter_fault_recovery_rate": true,
+	// Proof classes of requested tool calls.
+	"tool_proof_rate": true, "tool_proof_proxy": true, "tool_proof_process": true, "tool_proof_file_effect": true, "tool_proof_shim": true, "tool_proof_result_returned": true, "tool_proof_none": true,
 }
 
 // HigherIsBetter reports whether a rise in metric is an improvement. The

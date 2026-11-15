@@ -169,6 +169,34 @@ func (tp *testProxy) setFault(t *testing.T, fault string) {
 	}
 }
 
+// callRows returns the rows that were all the proxy recorded before row
+// kinds existed: tool calls and tools/list.
+func (tp *testProxy) callRows(t *testing.T) []schemas.ToolCall {
+	t.Helper()
+	var out []schemas.ToolCall
+	for _, r := range tp.rows(t) {
+		if r.Kind == "" || r.Tool == methodToolsList {
+			out = append(out, r)
+		}
+	}
+	return out
+}
+
+// waitRows waits until the ledger holds at least n rows: a relayed row is
+// written right after the answer reaches the agent, so a test can read the
+// ledger a moment too early.
+func (tp *testProxy) waitRows(t *testing.T, n int) []schemas.ToolCall {
+	t.Helper()
+	deadline := time.Now().Add(3 * time.Second)
+	for {
+		rows := tp.rows(t)
+		if len(rows) >= n || time.Now().After(deadline) {
+			return rows
+		}
+		time.Sleep(10 * time.Millisecond)
+	}
+}
+
 func (tp *testProxy) rows(t *testing.T) []schemas.ToolCall {
 	t.Helper()
 	f, err := os.Open(tp.ledger)
@@ -236,7 +264,7 @@ func TestProxyMCPRecordsCalls(t *testing.T) {
 				t.Fatalf("batch body %q", body)
 			}
 
-			rows := tp.rows(t)
+			rows := tp.callRows(t)
 			want := []struct {
 				tool    string
 				isError bool
@@ -246,7 +274,7 @@ func TestProxyMCPRecordsCalls(t *testing.T) {
 			}
 			for i, w := range want {
 				r := rows[i]
-				if r.Seq != i+1 || r.Tool != w.tool || r.IsError != w.isError || r.Server != "fs" || r.Protocol != ProtocolMCP || r.Status != 200 {
+				if (i > 0 && r.Seq <= rows[i-1].Seq) || r.Tool != w.tool || r.IsError != w.isError || r.Server != "fs" || r.Protocol != ProtocolMCP || r.Status != 200 {
 					t.Errorf("row %d = %+v, want tool %s error %v", i, r, w.tool, w.isError)
 				}
 				if r.ArgsSHA256 == "" || r.ResultSHA256 == "" || r.Started.IsZero() || r.Undelivered || r.Fault != "" {
@@ -291,7 +319,7 @@ func TestProxyCapsImageResult(t *testing.T) {
 			if !strings.Contains(string(answer.Result), strings.Repeat("iVBORw0KGgo", 20000)) {
 				t.Fatal("image data was cut on the way to the agent")
 			}
-			rows := tp.rows(t)
+			rows := tp.callRows(t)
 			if len(rows) != 1 {
 				t.Fatalf("got %d rows, want 1", len(rows))
 			}
@@ -354,7 +382,7 @@ func TestProxyFaults(t *testing.T) {
 				if tt.wantHold > 0 && (len(holds) != 1 || holds[0] != tt.wantHold) {
 					t.Errorf("holds = %v, want one of %v", holds, tt.wantHold)
 				}
-				rows := tp.rows(t)
+				rows := tp.callRows(t)
 				if len(rows) != 2 {
 					t.Fatalf("got %d rows", len(rows))
 				}
@@ -391,7 +419,7 @@ func TestProxyBatchPartialFault(t *testing.T) {
 			if got := up.toolCalls(); len(got) != 1 || got[0] != "echo" {
 				t.Fatalf("tool server got %v, want only echo", got)
 			}
-			rows := tp.rows(t)
+			rows := tp.callRows(t)
 			faults := map[string]string{}
 			for _, r := range rows {
 				faults[r.Tool] = r.Fault
@@ -450,11 +478,35 @@ func TestProxyRoutingAndMalformed(t *testing.T) {
 			}
 		})
 	}
-	if _, err := os.Stat(tp.ledger); err != nil {
-		t.Fatal(err)
+	// Every request that reached the service has a row: the two bodies the
+	// proxy cannot parse as opaque rows, the GET as a transport row, the
+	// POST to another path as an opaque row (it is not the MCP endpoint).
+	rows := tp.waitRows(t, 4)
+	want := []struct {
+		kind, tool, method, path string
+		unparsed                 bool
+		status                   int
+	}{
+		{schemas.ToolRowOpaque, schemas.ToolRowUnparsedTool, "POST", "/mcp", true, 400},
+		{schemas.ToolRowOpaque, schemas.ToolRowUnparsedTool, "POST", "/mcp", true, 400},
+		{schemas.ToolRowTransport, "GET /mcp", "GET", "/mcp", false, 405},
+		{schemas.ToolRowOpaque, schemas.ToolRowUnparsedTool, "POST", "/other", true, 200},
 	}
-	if rows := tp.rows(t); len(rows) != 0 {
-		t.Fatalf("unrecorded traffic made rows: %+v", rows)
+	if len(rows) != len(want) {
+		t.Fatalf("got %d rows, want %d: %+v", len(rows), len(want), rows)
+	}
+	bodies := []string{"hello", `[{"id":1`, "", `{"jsonrpc":"2.0","id":1,"method":"tools/call","params":{"name":"echo"}}`}
+	for i, w := range want {
+		r := rows[i]
+		if r.Kind != w.kind || r.Tool != w.tool || r.HTTPMethod != w.method || r.Path != w.path || r.Unparsed != w.unparsed || r.Status != w.status || r.IsToolCall() {
+			t.Errorf("row %d = %+v, want %+v", i, r, w)
+		}
+		if r.ArgsSHA256 != sha256Hex([]byte(bodies[i])) || r.RequestBytes != int64(len(bodies[i])) || r.ResponseBytes == 0 || r.ResultSHA256 == "" {
+			t.Errorf("row %d hash or size: %+v", i, r)
+		}
+		if w.unparsed && r.UnparsedReason == "" {
+			t.Errorf("row %d has no reason", i)
+		}
 	}
 }
 

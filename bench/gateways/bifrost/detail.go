@@ -328,6 +328,7 @@ func toolCallRef(id, name string, input json.RawMessage) schemas.ToolCallRef {
 			}
 		}
 	}
+	ref.Command, ref.Paths = toolInputHints(v, ref.Target) // Proof classes: matching hints Target lacks (toolinput.go)
 	return ref
 }
 

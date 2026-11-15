@@ -153,4 +153,11 @@ type ToolCallRef struct {
 	Name     string `json:"name"`
 	ArgsHash string `json:"args_hash"`
 	Target   string `json:"target,omitempty"`
+	// Matching hints the timeline links executions with, set only where
+	// Target does not already carry them: the shell command of a tool whose
+	// command is a "cmd" field or an argv array, and the file paths of a tool
+	// whose paths are a "filePath" or "notebook_path" field or a patch, one
+	// per line (a string, so the struct stays comparable).
+	Command string `json:"command,omitempty"`
+	Paths   string `json:"paths,omitempty"`
 }

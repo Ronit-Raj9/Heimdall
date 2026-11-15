@@ -219,7 +219,18 @@ export interface ToolCallRecord {
 	evidence_level: EvidenceStrength;
 	execution_id?: string;
 	unknown_reason?: string;
+	/** The strongest witness of the call; absent on runs recorded before proof classes. */
+	proof_class?: ToolProofClass;
 }
+
+/** Proof class of a requested tool call: its strongest witness, one class per call (evidence/toolproof.go). result_returned proves only that a result went back to the model. */
+export type ToolProofClass =
+	| "proxy_witnessed"
+	| "process_witnessed"
+	| "file_effect_witnessed"
+	| "shim_witnessed"
+	| "result_returned"
+	| "no_witness";
 
 export interface ConflictRecord {
 	conflict_type: string;
@@ -1176,6 +1187,179 @@ export interface RunEvents {
 	events: BenchEvent[];
 }
 
+// Agent step timeline (schemas/steps.go, handlers/runsteps.go).
+/** The independent witness a timeline row came from. */
+export type StepSource =
+	| "gateway"
+	| "tool_proxy"
+	| "process_observer"
+	| "workspace_observer"
+	| "agent_stream"
+	| "shim"
+	| "network_observer"
+	| "agent_reported";
+export type StepKind =
+	| "model_turn"
+	| "model_attempt"
+	| "tool_request"
+	| "tool_execution"
+	| "command"
+	| "file_change"
+	| "network"
+	| "agent_event";
+/** How a requested tool call is known to have run. */
+export type StepExecution = "executed_with_proof" | "executed_agent_reported" | "no_witness";
+
+/**
+ * One row of the unified step timeline: one observation by one witness, in time order. Every
+ * string (summary, path, tool_name, conflict) is agent-influenced: render as inert text only.
+ */
+export interface StepRecord {
+	seq: number;
+	ts: string;
+	kind: StepKind;
+	source: StepSource;
+	proof: EvidenceStrength;
+	/** The logical model step whose response came before this row; 0 before the first response. */
+	turn: number;
+	session?: number;
+	summary: string;
+	request_id?: string;
+	attempt?: number;
+	tool_call_id?: string;
+	tool_name?: string;
+	pid?: number;
+	ppid?: number;
+	path?: string;
+	op?: string;
+	exit_code?: number;
+	duration_ms?: number;
+	is_error?: boolean;
+	/** tool_request rows only. */
+	execution?: StepExecution;
+	/** tool_request rows: the strongest witness of the call (docs/steps-and-evidence.md, proof class); trusted classes are proxy, process and file effect. */
+	proof_class?: ToolProofClass;
+	/** tool_request rows: seq of the rows that witness its execution. */
+	witnessed_by?: number[];
+	/** seq of the counted row this row witnesses. */
+	witness_of?: number;
+	/** The row counts toward agent_steps (every witnessed action, each once), not toward steps (model turns answered). */
+	counted?: boolean;
+	/** Witnesses disagree about this row. */
+	conflict?: string;
+	// Agent-reported rows (source agent_reported, schemas/agentevents.go): the agent's own word,
+	// the weakest witness. event_type and report_id are agent-chosen display text.
+	/** The type the agent reported: plan, tool_call, subagent_start, ... Unknown values are shown as text. */
+	event_type?: string;
+	/** How the report arrived. */
+	channel?: StepReportChannel;
+	/** The agent's own id for the event. */
+	report_id?: string;
+	/** seq of the reported parent row: nesting of subagent spans and handoffs. */
+	parent_seq?: number;
+	/** Whether a trusted witness saw the reported action. */
+	corroboration?: StepCorroboration;
+}
+
+/** Channels an agent-reported row arrived on. Other values may appear and are shown as text. */
+export type StepReportChannel = "otlp" | "native" | "file" | "stdout" | (string & {});
+/** Whether a trusted witness backs an agent-reported row. */
+export type StepCorroboration = "corroborated" | "agent_reported_only" | "conflicts";
+
+/**
+ * What a run's agent reported about itself and what was kept (schemas/agentevents.go,
+ * evidence.json agent_events). collector is "on", "off" or "missing"; dropped counts events refused
+ * at a cap or because they did not parse; received counts every event seen, dropped ones included.
+ */
+export interface AgentEventStatus {
+	collector: "on" | "off" | "missing";
+	reason?: string;
+	received: number;
+	kept: number;
+	dropped?: number;
+	/** Kept events per channel. */
+	channels?: Record<string, number>;
+	/** Kept events per reported type (agent-chosen keys: display text only). */
+	kinds?: Record<string, number>;
+}
+
+/** Whether one trusted observer ran for one session. Missing is evidence with a reason, never zero activity. */
+export interface ObserverStatus {
+	observer: "process" | "workspace";
+	session?: number;
+	state: "observed" | "off" | "missing";
+	reason?: string;
+	mode?: string;
+	interval_ms?: number;
+	observer_coverage?: string;
+	records: number;
+	dropped?: number;
+	pids_allocated?: number;
+	pids_seen?: number;
+}
+
+/** GET /runs/{id}/steps. available is false for a run recorded before the timeline; lists are then empty. */
+export interface RunSteps {
+	run_id: string;
+	available: boolean;
+	steps: StepRecord[];
+	observers: ObserverStatus[];
+	/** The timeline was longer than one response carries; the first rows are sent. */
+	truncated?: boolean;
+	/** Lines of steps.jsonl that did not parse. */
+	skipped_lines?: number;
+	/** What the agent reported about itself (docs/agent-events.md); absent when no collector ran and nothing was reported. */
+	agent_events?: AgentEventStatus;
+}
+
+export type RunStepsResponse = WithMode<RunSteps>;
+
+/** State of one remote coverage channel: on, off, or missing (on in config, but nothing arrived). */
+export type RemoteChannelState = "on" | "off" | "missing";
+
+/** Which channels of a remote agent's run were active (schemas/remote.go). */
+export interface RemoteChannels {
+	model_traffic: RemoteChannelState;
+	tools: RemoteChannelState;
+	self_report: RemoteChannelState;
+}
+
+/** What a remote agent said about itself in its answer. Every field is the agent's own word: inert display text, never trusted. */
+export interface RemoteReport {
+	input_tokens?: number;
+	output_tokens?: number;
+	total_tokens?: number;
+	cost_usd?: number;
+	model?: string;
+	/** Self-declared. */
+	version?: string;
+	/** Self-declared. */
+	build?: string;
+	events?: number;
+	events_dropped?: number;
+	artifacts?: string[];
+	async?: boolean;
+	notes?: string[];
+}
+
+/** A remote agent's channel summary: what is trusted, agent-reported or unknown. */
+export interface RemoteEvidence {
+	channels: RemoteChannels;
+	trusted?: string[];
+	agent_reported?: string[];
+	unknown?: string[];
+	reported?: RemoteReport;
+}
+
+/** GET /runs/{id}/remote. available is false (remote null) for a run of an agent that is not remote. */
+export interface RunRemote {
+	run_id: string;
+	available: boolean;
+	remote: RemoteEvidence | null;
+}
+
+export type RunRemoteResponse = WithMode<RunRemote>;
+
 /** GET /runs/{id}/diff */
 export interface RunDiff {
 	run_id: string;
@@ -1809,6 +1993,19 @@ export interface SuiteDrift {
 	fields: string[];
 }
 
+/** fingerprinted: suite.lock binds every evaluator setting; legacy: it has no fingerprints section. */
+export type LockKind = "fingerprinted" | "legacy";
+
+/** One difference between the fingerprints suite.lock recorded and the files on disk. Planning refuses while any exists. */
+export interface FingerprintDrift {
+	scope: "suite" | "task" | "probe";
+	id: string;
+	/** settings (a suite.yaml, task.yaml or probe setting), files (a file they name) or image (an image id). */
+	part: "settings" | "files" | "image";
+	/** The settings keys or image roles that differ; absent for files. */
+	fields?: string[];
+}
+
 /** One probe of a suite. How it works (fault plans, canary markers) is never served. */
 export interface SuiteProbe {
 	id: string;
@@ -1921,6 +2118,11 @@ export interface SuiteSummary {
 	quarantined_count?: number;
 	/** suite.yaml sets a canary. */
 	has_canary?: boolean;
+	// Lock fingerprint fields (docs/lock-fingerprints.md).
+	/** Absent when the suite is unlocked. */
+	lock_kind?: LockKind;
+	/** What no longer matches the recorded fingerprints; absent when nothing drifted or the lock is legacy. */
+	fingerprint_drift?: FingerprintDrift[];
 }
 
 /** GET /suites: every pack under the benchmarks root, sorted by id. */
@@ -2155,6 +2357,8 @@ export interface AgentSummary {
 	/** Sealed runs of this config id in any experiment; null without a run index. */
 	sealed_runs: number | null;
 	error?: string;
+	/** How the agent reports its own steps when its config shows it ("native" for the generic_jsonl parser); absent when not known from the config. */
+	reports_events?: "native";
 }
 
 /** GET /agents: every agents/*.yaml config, sorted by file name. */
@@ -2344,7 +2548,23 @@ export interface ToolCall {
 	latency_ms: number;
 	/** The proxy could not hand the answer to the agent (it hung up first). */
 	undelivered?: boolean;
+	/** Row kind (schemas/toolrows.go): absent for a tool call; otherwise an MCP handshake, listing, notification, server request, response, transport request or opaque traffic, never counted as a tool call. */
+	kind?: ToolRowKind;
+	http_method?: string;
+	path?: string;
+	/** Content type of the request. */
+	content_type?: string;
+	response_content_type?: string;
+	/** Bytes relayed, counted over the whole body even when it was not kept. */
+	request_bytes?: number;
+	response_bytes?: number;
+	/** The proxy relayed this traffic without parsing it; the reason says why. */
+	unparsed?: boolean;
+	unparsed_reason?: string;
 }
+
+/** Kinds of tool proxy ledger rows that are not tool calls (schemas/toolrows.go). */
+export type ToolRowKind = "mcp_method" | "mcp_notification" | "mcp_server_request" | "mcp_response" | "transport" | "opaque";
 
 /** Where the exported answer came from. */
 export type AnswerSource = "file" | "final_message" | "missing";

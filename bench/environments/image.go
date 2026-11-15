@@ -109,12 +109,25 @@ func (e *dockerWorkspace) ImageID(ctx context.Context, ref string) (string, erro
 	return info.ID, nil
 }
 
+// ImageRepoDigests implements engine.ImageDigester: the registry digests of
+// ref, empty for an image built locally.
+func (e *dockerWorkspace) ImageRepoDigests(ctx context.Context, ref string) ([]string, error) {
+	info, err := InspectImage(ctx, e.cfg.Docker, ref)
+	if err != nil {
+		return nil, err
+	}
+	return info.RepoDigests, nil
+}
+
 // checkFrozenImage refuses a run whose agent image tag no longer names the
 // image the manifest froze for its arm, so a rebuilt tag never changes what a
 // frozen experiment measures. A manifest without an image id (planned before
 // ids were recorded, or without docker) is not checked.
 func (e *dockerWorkspace) checkFrozenImage(ctx context.Context, rc *schemas.RunContext) error {
 	if err := e.checkFrozenTaskImage(ctx, rc); err != nil {
+		return err
+	}
+	if err := e.checkFrozenSuiteImages(ctx, rc); err != nil { // Lock fingerprints: frozen suite image ids (docs/lock-fingerprints.md)
 		return err
 	}
 	want := frozenImageID(rc)
@@ -157,6 +170,109 @@ func (e *dockerWorkspace) checkFrozenTaskImage(ctx context.Context, rc *schemas.
 			img.Tag, short(got), rc.Manifest.ExpID, short(want))
 	}
 	return nil
+}
+
+// ImageRoles implements engine.ImageRoler: the images this environment
+// starts beside the suite's own, by role. Lock fingerprints bind them and a
+// plan records their ids (Manifest.SuiteImages).
+func (e *dockerWorkspace) ImageRoles() map[string]string {
+	out := map[string]string{}
+	if e.cfg.HelperImage != "" {
+		out[roleHelper] = e.cfg.HelperImage
+	}
+	if e.cfg.ToolProxyImage != "" {
+		out[roleToolProxy] = e.cfg.ToolProxyImage
+	}
+	return out
+}
+
+// Image roles of Manifest.SuiteImages; services use "service/<id>". They
+// mirror suite.ImageBase, ImageHelper and ImageToolProxy, which this package
+// does not import.
+const (
+	roleBase      = "base"
+	roleHelper    = "helper"
+	roleToolProxy = "toolproxy"
+	roleService   = "service/"
+)
+
+// checkFrozenSuiteImages refuses a run when a tag the manifest froze by id
+// (Manifest.SuiteImages: base, helper, tool proxy, services) now names
+// another image, so a rebuilt toolchain, helper, proxy or tool server never
+// changes what a frozen experiment measures. A manifest without the map
+// checks nothing; a role whose tag is unknown here, or whose image is
+// missing or cannot be inspected, is not checked and logs a warning, never a
+// refusal, because CI and fresh clones have no images and Create builds or
+// pulls what is missing.
+func (e *dockerWorkspace) checkFrozenSuiteImages(ctx context.Context, rc *schemas.RunContext) error {
+	if rc == nil || rc.Manifest == nil || len(rc.Manifest.SuiteImages) == 0 {
+		return nil
+	}
+	roles := make([]string, 0, len(rc.Manifest.SuiteImages))
+	for role := range rc.Manifest.SuiteImages {
+		roles = append(roles, role)
+	}
+	sort.Strings(roles)
+	for _, role := range roles {
+		want := rc.Manifest.SuiteImages[role]
+		tag := e.suiteImageTag(rc, role)
+		if tag == "" || want == "" {
+			e.cfg.Logger.Warn("frozen image not checked: this run does not name it", "experiment", rc.Manifest.ExpID, "role", role)
+			continue
+		}
+		got, found, err := e.cfg.Docker.ImageID(ctx, tag)
+		if err != nil || !found {
+			msg := "image missing"
+			if err != nil {
+				msg = err.Error()
+			}
+			e.cfg.Logger.Warn("frozen image not checked: it cannot be inspected", "experiment", rc.Manifest.ExpID, "role", role, "image", tag, "error", msg)
+			continue
+		}
+		if got != want {
+			return fmt.Errorf("%s image %s is now %s but experiment %s was planned with %s; restore that image or plan a new experiment",
+				role, tag, short(got), rc.Manifest.ExpID, short(want))
+		}
+	}
+	return nil
+}
+
+// suiteImageTag is the tag a run uses for an image role: the suite's base
+// image, the configured helper and tool proxy images, or a service image of
+// the suite (first) or the task. Empty when the run does not name it.
+func (e *dockerWorkspace) suiteImageTag(rc *schemas.RunContext, role string) string {
+	switch role {
+	case roleBase:
+		if rc.Suite != nil {
+			return rc.Suite.BaseImage.Tag
+		}
+		return ""
+	case roleHelper:
+		return e.cfg.HelperImage
+	case roleToolProxy:
+		return e.cfg.ToolProxyImage
+	}
+	id, ok := strings.CutPrefix(role, roleService)
+	if !ok || id == "" {
+		return ""
+	}
+	var services []schemas.ServiceSpec
+	if rc.Suite != nil {
+		services = append(services, rc.Suite.Services...)
+	}
+	if rc.Task != nil {
+		services = append(services, rc.Task.Services...)
+	}
+	for _, sv := range services {
+		if sv.ID != id {
+			continue
+		}
+		if sv.Build != nil && sv.Build.Tag != "" {
+			return sv.Build.Tag
+		}
+		return sv.Image
+	}
+	return ""
 }
 
 // perTaskAgent reports whether the run's agent image is chosen per task: the

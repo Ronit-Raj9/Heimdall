@@ -1,0 +1,12 @@
+# Keys of bench.ts `ObserverStatus` (schemas/steps.go), in RunSteps.observers.
+observer
+state
+records
+session?
+reason?
+mode?
+interval_ms?
+observer_coverage?
+dropped?
+pids_allocated?
+pids_seen?

@@ -183,11 +183,17 @@ func Admit(ctx context.Context, deps AdmitDeps, s *schemas.Suite, t *schemas.Tas
 // RecordAdmission stores rec in the lock entry of taskID and sets its status:
 // admitted when every check passed, draft otherwise. Call it on a lock made by
 // Lock from the same loaded suite Admit checked, so the record pins exactly
-// the hashes that were admitted.
+// the hashes that were admitted. A lock made by LockWith also stamps the
+// record with the suite and task fingerprints it admitted
+// (AdmissionFingerprint), so a later change to any evaluator setting of the
+// task un-admits it.
 func RecordAdmission(l *schemas.SuiteLock, taskID string, rec *schemas.AdmissionRecord) error {
 	tl, ok := l.Tasks[taskID]
 	if !ok {
 		return fmt.Errorf("record admission: task %s is not in the lock", taskID)
+	}
+	if rec != nil && l.Fingerprints != nil {
+		rec.Fingerprint = AdmissionFingerprint(l.Fingerprints, taskID)
 	}
 	tl.Admission = rec
 	tl.Status = schemas.TaskDraft

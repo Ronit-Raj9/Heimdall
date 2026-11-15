@@ -9,6 +9,7 @@
 Every response carries the server ``mode`` (live, recorded or synthetic).
 """
 
+from . import events
 from . import models
 from .client import (
     API_PREFIX,

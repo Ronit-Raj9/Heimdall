@@ -4,10 +4,51 @@ import { cn } from "@/lib/utils";
 
 interface TableProps extends React.ComponentProps<"table"> {
 	containerClassName?: string;
+	/**
+	 * Leading columns that stay in place while the table scrolls sideways, so a row always shows
+	 * whose numbers it holds. Offsets are measured from the header row.
+	 */
+	stickyColumns?: number;
 }
 
-function Table({ className, containerClassName, ...props }: TableProps) {
+/** Marks the first `count` columns of every row as sticky and sets their left offsets. */
+function pinLeadingColumns(table: HTMLTableElement, count: number) {
+	const headRow = table.tHead?.rows[0] ?? table.rows[0];
+	if (!headRow) return;
+	const offsets: number[] = [];
+	let x = 0;
+	let col = 0;
+	for (const cell of Array.from(headRow.cells)) {
+		if (col >= count) break;
+		for (let i = 0; i < cell.colSpan && col < count; i++, col++) offsets.push(x);
+		x += cell.getBoundingClientRect().width;
+	}
+	// Header rows under a rowSpan start mid-table, so only the first header row is pinned.
+	const rows = [headRow, ...Array.from(table.tBodies).flatMap((body) => Array.from(body.rows))];
+	for (const row of rows) {
+		let index = 0;
+		for (const cell of Array.from(row.cells)) {
+			const end = index + cell.colSpan;
+			const pinned = end <= count;
+			if (pinned) {
+				cell.setAttribute("data-sticky", "");
+				cell.style.left = `${offsets[index] ?? 0}px`;
+				if (end === count) cell.setAttribute("data-sticky-edge", "");
+				else cell.removeAttribute("data-sticky-edge");
+			} else if (cell.hasAttribute("data-sticky")) {
+				cell.removeAttribute("data-sticky");
+				cell.removeAttribute("data-sticky-edge");
+				cell.style.left = "";
+			}
+			index = end;
+			if (index >= count && !pinned) break;
+		}
+	}
+}
+
+function Table({ className, containerClassName, stickyColumns = 0, ...props }: TableProps) {
 	const containerRef = React.useRef<HTMLDivElement>(null);
+	const tableRef = React.useRef<HTMLTableElement>(null);
 	const [isScrollable, setIsScrollable] = React.useState(false);
 
 	// A horizontally scrolling region must be reachable by keyboard (WCAG 2.1.1), but only
@@ -23,20 +64,50 @@ function Table({ className, containerClassName, ...props }: TableProps) {
 		return () => observer.disconnect();
 	}, []);
 
+	// The edge shadow after the pinned columns shows only once the table has moved sideways.
+	React.useEffect(() => {
+		const container = containerRef.current;
+		if (!container || stickyColumns <= 0) return;
+		const onScroll = () => container.toggleAttribute("data-scrolled", container.scrollLeft > 1);
+		onScroll();
+		container.addEventListener("scroll", onScroll, { passive: true });
+		return () => container.removeEventListener("scroll", onScroll);
+	}, [stickyColumns]);
+
+	// Re-measure after every render (rows change with sorting and filters) and on resize.
+	React.useLayoutEffect(() => {
+		const table = tableRef.current;
+		if (!table || stickyColumns <= 0) return;
+		pinLeadingColumns(table, stickyColumns);
+	});
+	React.useEffect(() => {
+		const table = tableRef.current;
+		if (!table || stickyColumns <= 0 || typeof ResizeObserver === "undefined") return;
+		const observer = new ResizeObserver(() => pinLeadingColumns(table, stickyColumns));
+		observer.observe(table);
+		return () => observer.disconnect();
+	}, [stickyColumns]);
+
 	return (
 		<div
 			ref={containerRef}
 			data-slot="table-container"
-			className={cn("relative w-full overflow-x-auto", containerClassName)}
+			className={cn(
+				"relative w-full overflow-x-auto overscroll-x-contain",
+				// A pinned table also caps its height near the viewport, so a long one scrolls inside
+				// itself and keeps its header row in view.
+				stickyColumns > 0 && "max-h-[max(24rem,calc(100dvh-10rem))] overflow-y-auto",
+				containerClassName,
+			)}
 			tabIndex={isScrollable ? 0 : undefined}
 		>
-			<table data-slot="table" className={cn("w-full caption-bottom text-sm", className)} {...props} />
+			<table ref={tableRef} data-slot="table" className={cn("w-full caption-bottom text-sm", className)} {...props} />
 		</div>
 	);
 }
 
 function TableHeader({ className, ...props }: React.ComponentProps<"thead">) {
-	return <thead data-slot="table-header" className={cn("bg-muted/50 [&_tr]:border-b", className)} {...props} />;
+	return <thead data-slot="table-header" className={cn("[&_tr]:border-b", className)} {...props} />;
 }
 
 function TableBody({ className, ...props }: React.ComponentProps<"tbody">) {
@@ -51,7 +122,7 @@ function TableRow({ className, ...props }: React.ComponentProps<"tr">) {
 	return (
 		<tr
 			data-slot="table-row"
-			className={cn("hover:bg-muted/50 dark:hover:bg-muted/75 data-[state=selected]:bg-muted border-b transition-colors", className)}
+			className={cn("hover:bg-(--table-hover-bg) data-[state=selected]:bg-muted border-b transition-colors duration-100", className)}
 			{...props}
 		/>
 	);
@@ -62,7 +133,7 @@ function TableHead({ className, ...props }: React.ComponentProps<"th">) {
 		<th
 			data-slot="table-head"
 			className={cn(
-				"text-foreground h-10 px-4 text-left align-middle font-medium whitespace-nowrap [&:has([role=checkbox])]:pr-0 [&>[role=checkbox]]:translate-y-[2px]",
+				"text-muted-foreground h-9 px-4 text-left align-middle text-xs font-medium tracking-[0.01em] whitespace-nowrap [&:has([role=checkbox])]:pr-0 [&>[role=checkbox]]:translate-y-[2px]",
 				className,
 			)}
 			{...props}
@@ -75,7 +146,7 @@ function TableCell({ className, ...props }: React.ComponentProps<"td">) {
 		<td
 			data-slot="table-cell"
 			className={cn(
-				"px-4 py-2 align-middle whitespace-nowrap [&:has([role=checkbox])]:pr-0 [&>[role=checkbox]]:translate-y-[2px]",
+				"px-4 py-2.5 align-middle whitespace-nowrap tabular-nums [&:has([role=checkbox])]:pr-0 [&>[role=checkbox]]:translate-y-[2px]",
 				className,
 			)}
 			{...props}

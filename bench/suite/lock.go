@@ -56,10 +56,44 @@ type Change struct {
 // exact task version it checked. When nothing but the time would change, the
 // previous created_at is kept, so re-locking an unchanged pack leaves the
 // lock file and its hash identical.
+//
+// Lock writes no fingerprints section (a legacy lock); LockWith adds one.
 func Lock(s *schemas.Suite, now time.Time) (*schemas.SuiteLock, error) {
+	return lock(s, now, nil)
+}
+
+// LockWith is Lock plus the fingerprints section (fingerprint.go). An
+// admission record is kept only when, besides the five content hashes, the
+// suite and task fingerprints (settings and files) are unchanged from a
+// previous fingerprinted lock and the record's own fingerprint, when it has
+// one, still matches; against a legacy lock the content hashes decide, so
+// adding fingerprints to an admitted pack keeps its admissions. created_at
+// is kept when only the fingerprints section changed, so the lock without
+// that section re-encodes to the previous bytes (LegacyLockHash).
+func LockWith(s *schemas.Suite, now time.Time, opts FingerprintOptions) (*schemas.SuiteLock, error) {
+	return lock(s, now, &opts)
+}
+
+func lock(s *schemas.Suite, now time.Time, opts *FingerprintOptions) (*schemas.SuiteLock, error) {
 	prev := s.Lock
 	if prev != nil && prev.Suite != s.ID {
 		prev = nil
+	}
+	var fps *schemas.LockFingerprints
+	if opts != nil {
+		var err error
+		if fps, err = Fingerprints(s, *opts); err != nil {
+			return nil, err
+		}
+		if prev != nil && prev.Fingerprints != nil {
+			fps.Suite.Images = carryImages(prev.Fingerprints.Suite.Images, fps.Suite.Images, *opts)
+			for id, fp := range fps.Tasks {
+				if old, ok := prev.Fingerprints.Tasks[id]; ok {
+					fp.Images = carryImages(old.Images, fp.Images, *opts)
+					fps.Tasks[id] = fp
+				}
+			}
+		}
 	}
 	imageSame := prev != nil && sameImage(prev.BaseImage, s.BaseImage)
 	l := &schemas.SuiteLock{
@@ -75,7 +109,7 @@ func Lock(s *schemas.Suite, now time.Time) (*schemas.SuiteLock, error) {
 		if err != nil {
 			return nil, err
 		}
-		if old, ok := prevTask(prev, t.ID); ok && imageSame && sameContent(old, tl) {
+		if old, ok := prevTask(prev, t.ID); ok && imageSame && sameContent(old, tl) && sameFingerprint(prev, fps, t.ID) {
 			tl.Status = old.Status
 			tl.Admission = old.Admission
 		}
@@ -88,10 +122,36 @@ func Lock(s *schemas.Suite, now time.Time) (*schemas.SuiteLock, error) {
 		}
 		l.Probes[p.ID] = schemas.ProbeLock{Version: p.Version, SHA256: sum}
 	}
-	if prev != nil && equalIgnoringTime(prev, l) {
+	if prev != nil && equalIgnoringTime(withoutFingerprints(prev), l) {
 		l.CreatedAt = prev.CreatedAt
 	}
+	l.Fingerprints = fps
 	return l, nil
+}
+
+// sameFingerprint reports whether task id's admission still holds under the
+// new fingerprints fps: always without fingerprints on either side (the
+// content hashes decide, as before), else when the suite and task settings
+// and files are unchanged from prev's and the admission record's own
+// fingerprint, when it has one, matches fps.
+func sameFingerprint(prev *schemas.SuiteLock, fps *schemas.LockFingerprints, id string) bool {
+	if fps == nil {
+		return true
+	}
+	if rec := prev.Tasks[id].Admission; rec != nil && rec.Fingerprint != "" && rec.Fingerprint != AdmissionFingerprint(fps, id) {
+		return false
+	}
+	if prev.Fingerprints == nil {
+		return true
+	}
+	return AdmissionFingerprint(prev.Fingerprints, id) == AdmissionFingerprint(fps, id) && AdmissionFingerprint(fps, id) != ""
+}
+
+// withoutFingerprints is a shallow copy of l with no fingerprints section.
+func withoutFingerprints(l *schemas.SuiteLock) *schemas.SuiteLock {
+	c := *l
+	c.Fingerprints = nil
+	return &c
 }
 
 // WriteLock writes l to path as indented JSON with sorted keys and a trailing
@@ -169,7 +229,87 @@ func Diff(a, b *schemas.SuiteLock) []Change {
 			out = append(out, Change{Scope: ScopeProbe, ID: id, Level: LevelPatch, Action: ActionReuse, Fields: []string{"version"}})
 		}
 	}
+	return diffFingerprints(out, a, b)
+}
+
+// diffFingerprints adds the fingerprint differences between a and b to out
+// (docs/lock-fingerprints.md). Any drift of settings, files or an image is
+// MAJOR: it can change what a run measures, so old results are rerun. Its
+// fields are named fingerprint.settings.<key>, fingerprint.files and
+// fingerprint.image.<role>, merged into the change of the same scope and id
+// when the legacy fields differ too. A section added or removed is one
+// suite-level PATCH change. Without a section on either side nothing is
+// added, so a diff of two legacy locks is what it always was.
+func diffFingerprints(out []Change, a, b *schemas.SuiteLock) []Change {
+	switch {
+	case a.Fingerprints == nil && b.Fingerprints == nil:
+		return out
+	case a.Fingerprints == nil || b.Fingerprints == nil:
+		field := "fingerprints added"
+		if b.Fingerprints == nil {
+			field = "fingerprints removed"
+		}
+		return append(out, Change{Scope: ScopeSuite, ID: b.Suite, Level: LevelPatch, Action: ActionReuse, Fields: []string{field}})
+	}
+	fa, fb := a.Fingerprints, b.Fingerprints
+	var drift []schemas.FingerprintDrift
+	add := func(scope, id string, x, y schemas.Fingerprint) {
+		d, _ := compareFingerprint(scope, id, x, y, nil)
+		drift = append(drift, d...)
+	}
+	add(ScopeSuite, b.Suite, fa.Suite, fb.Suite)
+	for _, id := range unionKeys(fa.Tasks, fb.Tasks) {
+		x, inA := fa.Tasks[id]
+		y, inB := fb.Tasks[id]
+		if inA && inB {
+			add(ScopeTask, id, x, y)
+		}
+	}
+	for _, id := range unionKeys(fa.Probes, fb.Probes) {
+		x, inA := fa.Probes[id]
+		y, inB := fb.Probes[id]
+		if inA && inB {
+			add(ScopeProbe, id, x, y)
+		}
+	}
+	for _, d := range drift {
+		fields := []string{"fingerprint." + d.Part}
+		if len(d.Fields) > 0 {
+			fields = fields[:0]
+			for _, f := range d.Fields {
+				fields = append(fields, "fingerprint."+d.Part+"."+f)
+			}
+		}
+		merged := false
+		for i := range out {
+			if out[i].Scope == d.Scope && out[i].ID == d.ID {
+				out[i].Fields = append(out[i].Fields, fields...)
+				out[i].Level, out[i].Action = LevelMajor, ActionRerun
+				merged = true
+				break
+			}
+		}
+		if !merged {
+			out = append(out, Change{Scope: d.Scope, ID: d.ID, Level: LevelMajor, Action: ActionRerun, Fields: fields})
+		}
+	}
+	sort.SliceStable(out, func(i, j int) bool {
+		if out[i].Scope != out[j].Scope {
+			return scopeRank(out[i].Scope) < scopeRank(out[j].Scope)
+		}
+		return out[i].ID < out[j].ID
+	})
 	return out
+}
+
+func scopeRank(scope string) int {
+	switch scope {
+	case ScopeSuite:
+		return 0
+	case ScopeTask:
+		return 1
+	}
+	return 2
 }
 
 // lockTask computes one task's hashes. The controls hash covers the reference,

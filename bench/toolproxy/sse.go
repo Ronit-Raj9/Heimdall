@@ -3,6 +3,7 @@ package toolproxy
 import (
 	"bufio"
 	"bytes"
+	"errors"
 	"io"
 )
 
@@ -75,31 +76,77 @@ func dataValue(line []byte) ([]byte, bool) {
 	return bytes.TrimPrefix(v, []byte(" ")), true
 }
 
-// sseReader splits a stream into events.
+// sseReader splits a stream into events, keeping at most limit bytes of
+// one event in memory.
 type sseReader struct {
-	rd *bufio.Reader
+	rd      *bufio.Reader
+	limit   int
+	midLine bool // the last event returned over the limit ended inside a line
 }
 
-// newSSEReader reads events from r.
-func newSSEReader(r io.Reader) *sseReader {
-	return &sseReader{rd: bufio.NewReaderSize(r, 64<<10)}
+// newSSEReader reads events from r, at most limit bytes of one event.
+func newSSEReader(r io.Reader, limit int) *sseReader {
+	return &sseReader{rd: bufio.NewReaderSize(r, 64<<10), limit: limit}
 }
 
 // next returns the next event. At the end of the stream it returns what it
-// has (possibly a partial event) and the read error.
-func (s *sseReader) next() (sseEvent, error) {
-	var ev sseEvent
+// has (possibly a partial event) and the read error. An event that grows
+// over the limit comes back with big set as soon as it does, holding the
+// bytes read so far (its last line may be cut); the caller relays them and
+// then streams the rest of the event with rest.
+func (s *sseReader) next() (ev sseEvent, big bool, err error) {
+	size := 0
+	var cur []byte
 	for {
-		line, err := s.rd.ReadBytes('\n')
-		if len(line) > 0 {
-			if len(bytes.TrimRight(line, "\r\n")) == 0 {
-				ev.end = line
-				return ev, nil
+		frag, err := s.rd.ReadSlice('\n')
+		cur = append(cur, frag...)
+		size += len(frag)
+		if errors.Is(err, bufio.ErrBufferFull) {
+			if size > s.limit {
+				ev.lines, s.midLine = append(ev.lines, cur), true
+				return ev, true, nil
 			}
-			ev.lines = append(ev.lines, line)
+			continue
+		}
+		if len(cur) > 0 {
+			if err == nil && len(bytes.TrimRight(cur, "\r\n")) == 0 {
+				ev.end = cur
+				return ev, false, nil
+			}
+			ev.lines = append(ev.lines, cur)
+			cur = nil
+			if size > s.limit && err == nil {
+				s.midLine = false
+				return ev, true, nil
+			}
 		}
 		if err != nil {
-			return ev, err
+			return ev, false, err
+		}
+	}
+}
+
+// rest streams the remainder of an event next returned with big set, up to
+// and including its blank line, to emit. It returns the read error that
+// ended the stream, or nil at the end of the event.
+func (s *sseReader) rest(emit func([]byte)) error {
+	atStart := !s.midLine
+	for {
+		frag, err := s.rd.ReadSlice('\n')
+		if len(frag) > 0 {
+			blank := atStart && err == nil && len(bytes.TrimRight(frag, "\r\n")) == 0
+			emit(frag)
+			if blank {
+				return nil
+			}
+		}
+		switch {
+		case err == nil:
+			atStart = true
+		case errors.Is(err, bufio.ErrBufferFull):
+			atStart = false
+		default:
+			return err
 		}
 	}
 }

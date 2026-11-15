@@ -38,6 +38,10 @@ type CommandConfig struct {
 	GatewayAgentURL string // how agents reach Bifrost from inside the eval network, e.g. http://bifrost:8080
 	EvalNetwork     string // the internal evaluation network agents attach to
 	BenchRoot       string // folder that agent-config-relative paths (notes.user_file) resolve against
+
+	// GatewayPublicURL is how a remote agent on another machine reaches
+	// Bifrost (gateway.public_url); remote_http only. Empty uses GatewayAgentURL.
+	GatewayPublicURL string
 }
 
 type commandAdapter struct {
