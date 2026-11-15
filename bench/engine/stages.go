@@ -398,6 +398,7 @@ func (p *Pipeline) measureDerived(ctx context.Context, st *runState, selected []
 // receipt completes the probe's receipt from the evidence, merges it with
 // the arm-time receipt and writes receipts.json.
 func (p *Pipeline) receipt(ctx context.Context, st *runState) error {
+	defer clearGatewayRequestBodies(st.ev)
 	var errs []error
 	st.receipts = []schemas.Receipt{}
 	if st.layer != nil {
@@ -411,6 +412,17 @@ func (p *Pipeline) receipt(ctx context.Context, st *runState) error {
 		errs = append(errs, err)
 	}
 	return errors.Join(errs...)
+}
+
+// clearGatewayRequestBodies releases transient gateway payloads after probe
+// receipts consume them. trimEvidence remains the persistence boundary.
+func clearGatewayRequestBodies(ev *schemas.Evidence) {
+	if ev == nil || ev.Requests == nil {
+		return
+	}
+	for i := range ev.Requests.Requests {
+		ev.Requests.Requests[i].Raw = nil
+	}
 }
 
 // cleanup destroys the workspace, clears the key slot's fault plan and

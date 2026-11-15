@@ -9,6 +9,70 @@ import (
 	"github.com/maximhq/bifrost/bench/schemas"
 )
 
+type rawReceiptLayer struct {
+	sawRaw bool
+	fail   bool
+}
+
+func (l *rawReceiptLayer) GetName() string    { return string(schemas.LayerFixture) }
+func (l *rawReceiptLayer) GetVersion() string { return "test" }
+func (l *rawReceiptLayer) Steps() []schemas.ReceiptStep {
+	return []schemas.ReceiptStep{schemas.StepVisible}
+}
+func (l *rawReceiptLayer) Arm(context.Context, *schemas.RunContext) (*schemas.Receipt, error) {
+	return nil, nil
+}
+func (l *rawReceiptLayer) Disarm(context.Context, *schemas.RunContext) error { return nil }
+func (l *rawReceiptLayer) Receipts(_ context.Context, _ *schemas.RunContext, ev *schemas.Evidence) (*schemas.Receipt, error) {
+	if ev != nil && ev.Requests != nil && len(ev.Requests.Requests) > 0 {
+		l.sawRaw = len(ev.Requests.Requests[0].Raw) > 0
+	}
+	if l.fail {
+		return nil, errors.New("receipt failed")
+	}
+	return &schemas.Receipt{Steps: map[schemas.ReceiptStep]schemas.ReceiptEntry{
+		schemas.StepVisible: {State: schemas.StepYes},
+	}}, nil
+}
+
+func TestReceiptUsesTransientRawAndClearsIt(t *testing.T) {
+	for _, fail := range []bool{false, true} {
+		t.Run(map[bool]string{false: "success", true: "error"}[fail], func(t *testing.T) {
+			b := newBench(t)
+			layer := &rawReceiptLayer{fail: fail}
+			run := &schemas.Run{RunID: "r_1"}
+			slot := &schemas.Slot{ExpID: "e_1", SlotID: "s_1"}
+			dir, err := b.store.NewRun(context.Background(), slot, run)
+			if err != nil {
+				t.Fatal(err)
+			}
+			st := &runState{
+				rc: &schemas.RunContext{
+					Manifest: &schemas.Manifest{Hash: "manifest"},
+					Run:      run,
+					Probe:    &schemas.ProbeSpec{ID: "p_1", Layer: schemas.LayerFixture},
+					Dir:      dir,
+				},
+				layer: layer,
+				ev: &schemas.Evidence{Requests: &schemas.RequestLog{Complete: true, Requests: []schemas.GatewayRequest{{
+					Raw: []byte(`{"text":"nonce"}`),
+				}}}},
+			}
+			p := NewPipeline(b.reg, b.root, nil)
+			err = p.receipt(context.Background(), st)
+			if (err != nil) != fail {
+				t.Fatalf("err = %v, want failure %v", err, fail)
+			}
+			if !layer.sawRaw {
+				t.Fatal("probe receipt did not see transient raw request body")
+			}
+			if got := st.ev.Requests.Requests[0].Raw; got != nil {
+				t.Fatalf("raw request body remained after receipt: %q", got)
+			}
+		})
+	}
+}
+
 func TestMergeReceipt(t *testing.T) {
 	b, m, slot := pipelineFixture(t, "stale-notes")
 	st := &runState{

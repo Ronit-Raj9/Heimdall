@@ -199,6 +199,34 @@ func TestNormalizeRequestsEdges(t *testing.T) {
 }
 
 func TestGatewayCollect(t *testing.T) {
+	t.Run("keeps raw rows transiently for probe receipts", func(t *testing.T) {
+		rc := testRC(t)
+		rc.Key = &schemas.RunKey{ID: "vk_1"}
+		const nonce = "nonce_gateway_visible"
+		log := &schemas.RequestLog{Complete: true, Requests: []schemas.GatewayRequest{{
+			ID: "req1", Kind: "message", Status: "success",
+			Raw:          []byte(`{"messages":[{"text":"` + nonce + `"}]}`),
+			ErrorMessage: "Authorization: Bearer sk-probe012345678901234567890123",
+		}}}
+		ev := &schemas.Evidence{}
+		if err := newGatewaySource(Deps{Gateway: &fakeGateway{log: log}}).Collect(context.Background(), rc, ev); err != nil {
+			t.Fatal(err)
+		}
+		if got := string(ev.Requests.Requests[0].Raw); !strings.Contains(got, nonce) {
+			t.Fatalf("raw request = %q, want nonce", got)
+		}
+		if strings.Contains(ev.Requests.Requests[0].ErrorMessage, "sk-probe012345678901234567890123") {
+			t.Fatalf("in-memory error message was not redacted: %q", ev.Requests.Requests[0].ErrorMessage)
+		}
+		persisted, err := os.ReadFile(filepath.Join(rc.Dir, requestsFile))
+		if err != nil {
+			t.Fatal(err)
+		}
+		if strings.Contains(string(persisted), nonce) || strings.Contains(string(persisted), "sk-probe012345678901234567890123") || strings.Contains(string(persisted), `"raw"`) {
+			t.Fatalf("persisted gateway rows contain transient payload data: %s", persisted)
+		}
+	})
+
 	t.Run("fetches with ledger, writes rows, appends events", func(t *testing.T) {
 		rc := testRC(t)
 		rc.Key = &schemas.RunKey{ID: "vk_1"}

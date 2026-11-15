@@ -62,10 +62,10 @@ func (s *gatewaySource) Collect(ctx context.Context, rc *schemas.RunContext, ev 
 	}
 	ev.Requests = log
 	ev.LogicalSteps, ev.Attempts, ev.Retries, ev.Fallbacks, ev.RequestedTools = NormalizeRequestRecords(log)
-	log = redactRequestLog(log)
-	ev.Requests = log
 	utils.MarkExternalTraffic(rc, log) // Remote area: a remote_http agent's external model calls leave tokens, cost and steps unknown
-	if err := writeJSONL(rc.Dir, requestsFile, log.Requests); err != nil {
+	redactRequestErrors(log)
+	redacted := redactRequestLog(log)
+	if err := writeJSONL(rc.Dir, requestsFile, redacted.Requests); err != nil {
 		return fmt.Errorf("write gateway requests for run %s: %w", id, err)
 	}
 	events := NormalizeRequests(rc, log)
@@ -75,6 +75,18 @@ func (s *gatewaySource) Collect(ctx context.Context, rc *schemas.RunContext, ev 
 	}
 	ev.Events = append(ev.Events, events...)
 	return writeEvents(rc, ev)
+}
+
+// redactRequestErrors removes secrets from the request log that stays in
+// memory. Raw bodies remain available until probe receipts run, then the
+// pipeline clears them before evidence is persisted.
+func redactRequestErrors(log *schemas.RequestLog) {
+	if log == nil {
+		return
+	}
+	for i := range log.Requests {
+		log.Requests[i].ErrorMessage = utils.RedactSecrets(log.Requests[i].ErrorMessage)
+	}
 }
 
 func redactRequestLog(log *schemas.RequestLog) *schemas.RequestLog {
