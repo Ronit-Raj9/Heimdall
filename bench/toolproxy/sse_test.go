@@ -8,7 +8,7 @@ import (
 
 func TestSSEReader(t *testing.T) {
 	stream := "event: message\r\nid: 1\r\ndata: {\"a\":\r\ndata: 1}\r\n\r\n: comment\n\ndata: tail"
-	rd := newSSEReader(strings.NewReader(stream))
+	rd := newSSEReader(strings.NewReader(stream), defaultParseCap)
 	tests := []struct {
 		name     string
 		wantData string
@@ -22,7 +22,7 @@ func TestSSEReader(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			ev, err := rd.next()
+			ev, _, err := rd.next()
 			if (err != nil) != tt.wantErr {
 				t.Fatalf("err = %v", err)
 			}

@@ -196,3 +196,26 @@ func TestParseStepLinesCaps(t *testing.T) {
 		t.Fatalf("empty input: %#v %v %d", steps, truncated, skipped)
 	}
 }
+
+// The steps response carries the run's agent event status, from
+// agent_events.json or, when the file is not served, from evidence.json.
+func TestRunStepsAgentEvents(t *testing.T) {
+	ix := stepsFixture(t)
+	dir := filepath.Join(ix.root, "r_t01_B")
+	if err := os.WriteFile(filepath.Join(dir, schemas.AgentEventsStatusFile), []byte(`{"collector":"on","received":3,"kept":2,"dropped":1,"channels":{"otlp":2},"kinds":{"plan":2}}`), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	out, err := readRunSteps(ix, "r_t01_B")
+	if err != nil || out.AgentEvents == nil || out.AgentEvents.Kept != 2 || out.AgentEvents.Channels["otlp"] != 2 {
+		t.Fatalf("%v %+v", err, out.AgentEvents)
+	}
+	if err := os.WriteFile(filepath.Join(ix.root, "r_t02_A", FileEvidence), []byte(`{"agent_events":{"collector":"on","received":0,"kept":0}}`), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if out, err := readRunSteps(ix, "r_t02_A"); err != nil || out.AgentEvents == nil || out.AgentEvents.Collector != "on" {
+		t.Fatalf("evidence fallback: %v %+v", err, out.AgentEvents)
+	}
+	if out, _ := readRunSteps(ix, "r_t01_A"); out.AgentEvents != nil {
+		t.Fatalf("run without agent events: %+v", out.AgentEvents)
+	}
+}

@@ -80,6 +80,14 @@ export function ToolCallTable({ calls, arm, initialOpen = [] }: ToolCallTablePro
 				<span className={counts.faults > 0 ? "text-chart-warning-ink" : undefined}>
 					{t("runs.scenario.tools.faults", { count: counts.faults })}
 				</span>
+				{counts.other > 0 && (
+					<span title={t("runs.scenario.tools.otherHint")}>{t("runs.scenario.tools.other", { count: counts.other })}</span>
+				)}
+				{counts.unparsed > 0 && (
+					<span className="text-chart-warning-ink" title={t("runs.scenario.tools.unparsedHint")}>
+						{t("runs.scenario.tools.unparsed", { count: counts.unparsed })}
+					</span>
+				)}
 			</p>
 			<div className="min-w-0 rounded-sm border">
 				<Table aria-label={t("runs.scenario.tools.label", { arm })} data-testid={`run-tools-${arm}-table`}>
@@ -138,6 +146,16 @@ function ToolCallRows({
 				<TableCell className="align-top font-mono text-xs">{call.server}</TableCell>
 				<TableCell className="max-w-xs align-top font-mono text-xs break-all whitespace-normal">
 					{call.tool}
+					{call.kind && (
+						<span className="text-muted-foreground ml-2 font-sans" data-testid={`run-tool-call-${call.seq}-kind`}>
+							{t(`runs.scenario.tools.kind.${call.kind}`, { defaultValue: call.kind })}
+						</span>
+					)}
+					{call.unparsed && (
+						<ToneBadge tone="warn" hint={call.unparsed_reason} testId={`run-tool-call-${call.seq}-unparsed`}>
+							{t("runs.scenario.tools.unparsedBadge")}
+						</ToneBadge>
+					)}
 					{call.session && (
 						<span className="text-muted-foreground ml-2 font-sans">{t("runs.scenario.tools.session", { session: call.session })}</span>
 					)}

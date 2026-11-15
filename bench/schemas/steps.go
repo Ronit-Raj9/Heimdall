@@ -142,4 +142,28 @@ type StepRecord struct {
 	WitnessOf   int              `json:"witness_of,omitempty"`   // seq of the counted row this row witnesses
 	Counted     bool             `json:"counted,omitempty"`
 	Conflict    string           `json:"conflict,omitempty"` // witnesses disagree about this row
+	// Agent-reported rows (agentevents.go, docs/agent-events.md).
+	EventType     string `json:"event_type,omitempty"`    // the reported type: plan, tool_call, subagent_start, ...
+	Channel       string `json:"channel,omitempty"`       // otlp | native | file | stdout
+	ReportID      string `json:"report_id,omitempty"`     // the agent's own id for the event
+	ParentSeq     int    `json:"parent_seq,omitempty"`    // seq of the reported parent row (nesting)
+	Corroboration string `json:"corroboration,omitempty"` // corroborated | agent_reported_only | conflicts
+	// ProofClass is the strongest witness of a tool_request row's execution
+	// (ProofProxy and the other proof classes below).
+	ProofClass string `json:"proof_class,omitempty"`
 }
+
+// Proof classes of a requested tool call: the strongest witness of its
+// execution, in this order. Every call has exactly one class. The first three
+// are trusted: the bench observed them outside the agent's container. A shim
+// call is recorded inside the agent's container. ProofResultReturned only
+// proves that a result for the call reached the model (a later model request
+// carried it, or the agent's stream reported one), not that the tool ran.
+const (
+	ProofProxy          = "proxy_witnessed"       // a tool proxy ledger row
+	ProofProcess        = "process_witnessed"     // a command tree the process observer saw
+	ProofFileEffect     = "file_effect_witnessed" // a workspace change on the requested path
+	ProofShim           = "shim_witnessed"        // a tool shim call with the same tool-call id
+	ProofResultReturned = "result_returned"       // a result reached the model; nothing shows the tool ran
+	ProofNone           = "no_witness"            // nothing at all
+)

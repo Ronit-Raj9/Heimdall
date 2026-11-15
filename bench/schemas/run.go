@@ -186,4 +186,9 @@ type RunContext struct {
 	Services     []ServiceHandle // started services, including the tool proxy's view of them
 	Session      *SessionSpec    // the session being run; nil for a single-session task
 	SessionIndex int             // 0-based index of Session
+
+	// RemoteTools is the published tool proxy of a remote agent's run with
+	// remote.tools expose (remote.go); nil otherwise. It holds the run's
+	// bearer token and is never written to disk.
+	RemoteTools *RemoteToolsAccess
 }

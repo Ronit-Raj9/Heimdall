@@ -3,23 +3,31 @@ import { ToneBadge } from "@/components/suites/suiteBadges";
 import { formatCount } from "@/components/verdict/verdict.utils";
 import { getLocale } from "@/lib/i18n";
 import { useGetRunStepsQuery } from "@/lib/store/apis/runStepsApi";
-import type { ObserverStatus, RunSteps, StepRecord } from "@/lib/types/bench";
+import type { AgentEventStatus, ObserverStatus, RunSteps, StepRecord } from "@/lib/types/bench";
 import { cn } from "@/lib/utils";
-import { AlertTriangle, CircleCheck, Eye, EyeOff } from "lucide-react";
+import { AlertTriangle, CircleCheck, Eye, EyeOff, Megaphone } from "lucide-react";
 import { useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import {
+	CORROBORATION_TONE,
 	EXECUTION_TONE,
 	OBSERVER_TONE,
 	PROOF_TONE,
+	REPORTED_SOURCE,
 	clipText,
 	countedSteps,
+	eventEntries,
 	filterSteps,
 	groupStepsByTurn,
+	knownChannel,
+	knownCorroboration,
+	knownEventType,
 	observerDegraded,
 	presentSources,
+	safeCount,
 	sourceCounts,
 	sourceTone,
+	stepDepths,
 	stepTime,
 	type TurnGroup,
 } from "./stepTimeline.utils";
@@ -55,9 +63,11 @@ export interface StepTimelineProps {
 /**
  * The unified agent step timeline, grouped by logical model step: each model turn, then the
  * commands, file changes and tool calls it caused. Every row names its witness (source) and how
- * strong the proof is; requested tool calls say whether a witness saw them run. Agent-influenced
- * strings (summary, path, tool name, conflict) are React text nodes only: never HTML, never a
- * link, never passed through a translation, and clipped.
+ * strong the proof is; requested tool calls say whether a witness saw them run. Rows the agent
+ * reported about itself carry a dashed badge with their channel and corroboration, and indent under
+ * their reported parent (subagents, handoffs). Agent-influenced strings (summary, path, tool
+ * name, conflict, reported type, report id, channel) are React text nodes only: never HTML, never
+ * a link, never passed through a translation, and clipped.
  */
 export function StepTimeline({ data, arm, initialHidden = [] }: StepTimelineProps) {
 	const { t } = useTranslation("bench");
@@ -67,6 +77,7 @@ export function StepTimeline({ data, arm, initialHidden = [] }: StepTimelineProp
 	const counts = useMemo(() => sourceCounts(data.steps), [data.steps]);
 	const visible = useMemo(() => filterSteps(data.steps, hidden), [data.steps, hidden]);
 	const groups = useMemo(() => groupStepsByTurn(visible), [visible]);
+	const depths = useMemo(() => stepDepths(data.steps), [data.steps]);
 
 	if (!data.available) {
 		return <EmptyNote testId={`step-timeline-${arm}-unavailable`}>{t("runs.steps.unavailable")}</EmptyNote>;
@@ -83,6 +94,7 @@ export function StepTimeline({ data, arm, initialHidden = [] }: StepTimelineProp
 	return (
 		<div className="flex min-w-0 flex-col gap-3" data-testid={`step-timeline-${arm}`}>
 			<ObserverStatusLine observers={data.observers} arm={arm} locale={locale} />
+			{data.agent_events && <AgentEventsLine status={data.agent_events} arm={arm} locale={locale} />}
 			<p className="text-muted-foreground flex flex-wrap gap-x-4 text-xs" data-testid={`step-timeline-${arm}-summary`}>
 				<span className="text-foreground font-medium">{t("runs.steps.counted", { count: countedSteps(data.steps) })}</span>
 				<span>{t("runs.steps.shown", { shown: formatCount(visible.length, locale), total: formatCount(data.steps.length, locale) })}</span>
@@ -132,7 +144,7 @@ export function StepTimeline({ data, arm, initialHidden = [] }: StepTimelineProp
 			) : (
 				<ol className="flex min-w-0 flex-col gap-2" aria-label={t("runs.steps.label", { arm })}>
 					{groups.map((group) => (
-						<TurnBlock key={group.key} group={group} arm={arm} />
+						<TurnBlock key={group.key} group={group} arm={arm} depths={depths} />
 					))}
 				</ol>
 			)}
@@ -146,7 +158,7 @@ function sourceLabel(t: TFn, source: string): string {
 	return t(`runs.steps.source.${source}`, { defaultValue: clipText(source, 40) });
 }
 
-function TurnBlock({ group, arm }: { group: TurnGroup; arm: string }) {
+function TurnBlock({ group, arm, depths }: { group: TurnGroup; arm: string; depths: ReadonlyMap<number, number> }) {
 	const { t } = useTranslation("bench");
 	return (
 		<li className="min-w-0 rounded-sm border" data-testid={`step-turn-${arm}-${group.session ?? 0}-${group.turn}`} data-turn={group.turn}>
@@ -158,28 +170,107 @@ function TurnBlock({ group, arm }: { group: TurnGroup; arm: string }) {
 			</div>
 			<ul className="divide-y">
 				{group.model.map((step) => (
-					<StepRow key={step.seq} step={step} arm={arm} model />
+					<StepRow key={step.seq} step={step} arm={arm} model depth={depths.get(step.seq) ?? 0} />
 				))}
 				{group.caused.map((step) => (
-					<StepRow key={step.seq} step={step} arm={arm} />
+					<StepRow key={step.seq} step={step} arm={arm} depth={depths.get(step.seq) ?? 0} />
 				))}
 			</ul>
 		</li>
 	);
 }
 
-function StepRow({ step, arm, model = false }: { step: StepRecord; arm: string; model?: boolean }) {
+/**
+ * The reported event type: a translated label for the known types, else the agent's own value as
+ * clipped text (never a translation key, never interpolated).
+ */
+function ReportedEventType({ value, testId }: { value: string; testId: string }) {
+	const { t } = useTranslation("bench");
+	const known = knownEventType(value);
+	return (
+		<span className="text-muted-foreground font-mono" data-testid={testId}>
+			{known ? (
+				t(`runs.steps.reported.eventType.${known}`)
+			) : (
+				<>
+					<span className="sr-only">{t("runs.steps.reported.type")} </span>
+					{clipText(value, 40)}
+				</>
+			)}
+		</span>
+	);
+}
+
+/**
+ * The source badge of an agent-reported row: dashed and marked, so it never reads like a trusted
+ * witness or the agent's stream, with the channel the report arrived on.
+ */
+function ReportedSourceBadge({ channel, testId }: { channel?: string; testId: string }) {
+	const { t } = useTranslation("bench");
+	const known = knownChannel(channel);
+	const channelText = known ? t(`runs.steps.reported.channel.${known}`) : clipText(channel, 24);
+	return (
+		<ToneBadge
+			tone={sourceTone(REPORTED_SOURCE)}
+			icon={Megaphone}
+			hint={t("runs.steps.sourceHint.agent_reported")}
+			testId={testId}
+			className="border-dashed"
+		>
+			{t("runs.steps.source.agent_reported")}
+			{channelText && (
+				<span className="border-l border-current/30 pl-1 font-mono" data-testid={`${testId}-channel`}>
+					{channelText}
+				</span>
+			)}
+		</ToneBadge>
+	);
+}
+
+/** Whether a trusted witness backs an agent-reported row. An unknown value is shown as neutral text. */
+function CorroborationBadge({ value, testId }: { value: string; testId: string }) {
+	const { t } = useTranslation("bench");
+	const known = knownCorroboration(value);
+	if (!known) {
+		return (
+			<ToneBadge tone="neutral" testId={testId}>
+				{clipText(value, 40)}
+			</ToneBadge>
+		);
+	}
+	return (
+		<ToneBadge
+			tone={CORROBORATION_TONE[known]}
+			icon={known === "conflicts" ? AlertTriangle : undefined}
+			hint={t(`runs.steps.reported.corroborationHint.${known}`)}
+			testId={testId}
+		>
+			{t(`runs.steps.reported.corroboration.${known}`)}
+		</ToneBadge>
+	);
+}
+
+function StepRow({ step, arm, model = false, depth = 0 }: { step: StepRecord; arm: string; model?: boolean; depth?: number }) {
 	const { t } = useTranslation("bench");
 	const summary = clipText(step.summary);
 	const toolName = clipText(step.tool_name, 80);
 	const path = clipText(step.path, 160);
 	const conflict = clipText(step.conflict);
+	const reported = step.source === REPORTED_SOURCE;
+	const reportId = clipText(step.report_id, 80);
 	return (
 		<li
-			className={cn("flex min-w-0 flex-col gap-1 px-3 py-2 text-xs", !model && "pl-6", step.is_error && "bg-chart-error/5")}
+			className={cn(
+				"flex min-w-0 flex-col gap-1 px-3 py-2 text-xs",
+				!model && "pl-6",
+				reported && "border-l-chart-warning/60 border-l-2 border-dashed",
+				step.is_error && "bg-chart-error/5",
+			)}
+			style={depth > 0 ? { marginLeft: `${depth * 1.25}rem` } : undefined}
 			data-testid={`step-row-${arm}-${step.seq}`}
 			data-kind={step.kind}
 			data-source={step.source}
+			data-depth={depth}
 		>
 			<div className="flex min-w-0 flex-wrap items-center gap-1.5">
 				<span className="text-muted-foreground w-8 shrink-0 text-right font-mono tabular-nums">#{step.seq}</span>
@@ -187,9 +278,15 @@ function StepRow({ step, arm, model = false }: { step: StepRecord; arm: string; 
 				<span className={cn("font-medium", model && "text-foreground")}>
 					{t(`runs.steps.kind.${step.kind}`, { defaultValue: clipText(step.kind, 40) })}
 				</span>
-				<ToneBadge tone={sourceTone(step.source)} hint={t(`runs.steps.sourceHint.${step.source}`, { defaultValue: "" }) || undefined}>
-					{sourceLabel(t, step.source)}
-				</ToneBadge>
+				{step.event_type && <ReportedEventType value={step.event_type} testId={`step-row-${arm}-${step.seq}-event-type`} />}
+				{reported ? (
+					<ReportedSourceBadge channel={step.channel} testId={`step-row-${arm}-${step.seq}-reported`} />
+				) : (
+					<ToneBadge tone={sourceTone(step.source)} hint={t(`runs.steps.sourceHint.${step.source}`, { defaultValue: "" }) || undefined}>
+						{sourceLabel(t, step.source)}
+					</ToneBadge>
+				)}
+				{step.corroboration && <CorroborationBadge value={step.corroboration} testId={`step-row-${arm}-${step.seq}-corroboration`} />}
 				<ToneBadge tone={PROOF_TONE[step.proof] ?? "neutral"} testId={`step-row-${arm}-${step.seq}-proof`}>
 					{t("runs.steps.proof", { level: t(`runs.steps.proofLevel.${step.proof}`, { defaultValue: clipText(step.proof, 20) }) })}
 				</ToneBadge>
@@ -236,6 +333,16 @@ function StepRow({ step, arm, model = false }: { step: StepRecord; arm: string; 
 					<span className="text-muted-foreground tabular-nums">{t("runs.steps.ms", { value: step.duration_ms })}</span>
 				)}
 				{step.witness_of ? <span className="text-muted-foreground">{t("runs.steps.witnessOf", { seq: step.witness_of })}</span> : null}
+				{step.parent_seq ? (
+					<span className="text-muted-foreground" data-testid={`step-row-${arm}-${step.seq}-parent`}>
+						{t("runs.steps.reported.parent", { seq: step.parent_seq })}
+					</span>
+				) : null}
+				{reportId && (
+					<span className="text-muted-foreground" data-testid={`step-row-${arm}-${step.seq}-report-id`}>
+						{t("runs.steps.reported.reportId")} <span className="font-mono break-all">{reportId}</span>
+					</span>
+				)}
 				{step.witnessed_by && step.witnessed_by.length > 0 && (
 					<span className="text-muted-foreground">
 						{t("runs.steps.witnessedBy", { seqs: step.witnessed_by.map((seq) => `#${seq}`).join(", ") })}
@@ -308,4 +415,110 @@ export function ObserverStatusLine({ observers, arm, locale }: { observers: read
 			))}
 		</ul>
 	);
+}
+
+const COLLECTOR_STATES = ["on", "off", "missing"] as const;
+
+/**
+ * One line on what the agent reported about itself: how many events were kept, on which channels
+ * and of which types, how many were dropped, and why the collector is missing. Marked
+ * agent-reported like the reported rows. Channel and type keys and the reason are agent-influenced:
+ * clipped React text, never a translation key.
+ */
+export function AgentEventsLine({ status, arm, locale }: { status: AgentEventStatus; arm: string; locale: string }) {
+	const { t } = useTranslation("bench");
+	const kept = safeCount(status.kept);
+	const dropped = safeCount(status.dropped);
+	const channels = eventEntries(status.channels);
+	const kinds = eventEntries(status.kinds);
+	const collector = (COLLECTOR_STATES as readonly string[]).includes(status.collector) ? status.collector : undefined;
+	const missing = collector === "missing";
+	const reason = clipText(status.reason, 160);
+	return (
+		<p
+			className="text-muted-foreground flex min-w-0 flex-wrap items-center gap-x-2 gap-y-0.5 text-xs"
+			aria-label={t("runs.steps.agentEvents.label")}
+			data-testid={`step-agent-events-${arm}`}
+			data-collector={collector ?? "unknown"}
+			data-kept={kept}
+		>
+			<ToneBadge
+				tone={sourceTone(REPORTED_SOURCE)}
+				icon={Megaphone}
+				hint={t("runs.steps.sourceHint.agent_reported")}
+				className="border-dashed"
+				testId={`step-agent-events-${arm}-badge`}
+			>
+				{t("runs.steps.source.agent_reported")}
+			</ToneBadge>
+			{kept > 0 ? (
+				<span className="text-foreground font-medium">
+					{t("runs.steps.agentEvents.kept", { count: kept, value: formatCount(kept, locale) })}
+				</span>
+			) : (
+				<span className="text-foreground">{t("runs.steps.agentEvents.nothing")}</span>
+			)}
+			{kept > 0 && channels.entries.length > 0 && (
+				<span data-testid={`step-agent-events-${arm}-channels`}>
+					{t("runs.steps.agentEvents.via")}{" "}
+					<EventCounts
+						counts={channels}
+						locale={locale}
+						label={(key) => {
+							const known = knownChannel(key);
+							return known ? t(`runs.steps.reported.channel.${known}`) : clipText(key, 24);
+						}}
+					/>
+				</span>
+			)}
+			{kept > 0 && kinds.entries.length > 0 && (
+				<span data-testid={`step-agent-events-${arm}-kinds`}>
+					{t("runs.steps.agentEvents.types")}{" "}
+					<EventCounts
+						counts={kinds}
+						locale={locale}
+						label={(key) => {
+							const known = knownEventType(key);
+							return known ? t(`runs.steps.reported.eventType.${known}`) : clipText(key, 40);
+						}}
+					/>
+				</span>
+			)}
+			{dropped > 0 && (
+				<span
+					className="text-chart-warning-ink"
+					title={t("runs.steps.agentEvents.droppedHint")}
+					data-testid={`step-agent-events-${arm}-dropped`}
+				>
+					{t("runs.steps.agentEvents.dropped", { value: formatCount(dropped, locale) })}
+				</span>
+			)}
+			{collector && collector !== "on" && (
+				<ToneBadge tone={missing ? "bad" : "neutral"} testId={`step-agent-events-${arm}-collector`}>
+					{t(`runs.steps.agentEvents.collector.${collector}`)}
+				</ToneBadge>
+			)}
+			{reason && (
+				<span className={missing ? "text-chart-error-ink" : undefined} data-testid={`step-agent-events-${arm}-reason`}>
+					{t("runs.steps.agentEvents.reason")} <span>{reason}</span>
+				</span>
+			)}
+		</p>
+	);
+}
+
+/** "OTLP 3, native 1, +2 more": labels from the caller, counts formatted, keys never rendered as anything but text. */
+function EventCounts({
+	counts,
+	locale,
+	label,
+}: {
+	counts: { entries: [string, number][]; rest: number };
+	locale: string;
+	label: (key: string) => string;
+}) {
+	const { t } = useTranslation("bench");
+	const parts = counts.entries.map(([key, n]) => `${label(key)} ${formatCount(n, locale)}`);
+	if (counts.rest > 0) parts.push(t("runs.steps.agentEvents.more", { value: formatCount(counts.rest, locale) }));
+	return <span className="text-foreground">{parts.join(", ")}</span>;
 }

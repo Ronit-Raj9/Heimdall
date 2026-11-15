@@ -63,7 +63,7 @@ const defaultChecksRoot = "checks"
 // stderrTail is how much of the agent's stderr a failing row quotes.
 const stderrTail = 2048
 
-var rowOrder = []string{rowImage, rowUser, rowModelCall, rowSession, rowExit, rowDiff, rowEgress, rowProcObserver, rowFSObserver, rowEvidence, rowClaim}
+var rowOrder = []string{rowImage, rowUser, rowModelCall, rowSession, rowExit, rowDiff, rowEgress, rowProcObserver, rowFSObserver, rowEvidence, rowClaim, rowAgentEvents} // Agent events area: rowAgentEvents
 
 var rowTitles = map[string]string{
 	rowImage:     "image builds",
@@ -244,6 +244,7 @@ func runCheckSlot(ctx context.Context, opts checkOptions, rep *checkReport) (*ch
 		ToolProxyImage: a.cfg.Images.ToolProxy, // lead: tool proxy image for runs with proxied services
 		// Agent steps area: trusted step observers, on unless switched off.
 		ProcessWatch: a.cfg.Observers.ProcessOn(), WorkspaceWatch: a.cfg.Observers.WorkspaceOn(), WatchIntervalMS: a.cfg.Observers.IntervalMS,
+		EventsCollector: a.cfg.Events.CollectorOn(), // Agent events area
 	})
 	st, err := store.NewFSStore(a.cfg.Path(opts.runs), a.logger)
 	if err != nil {

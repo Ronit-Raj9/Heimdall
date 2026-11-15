@@ -275,7 +275,7 @@
 			"cost_per_success": "Cost / success",
 			"cost_per_successHint": "Total observed cost over verified successes. n/a with no success.",
 			"steps": "Steps (model turns)",
-			"stepsHint": "Median over runs.",
+			"stepsHint": "Median over runs of model turns that got an answer. Failed turns, retries, fallbacks and the actions between turns are not in it: the run page shows them beside it.",
 			"tool_calls": "Tool calls",
 			"tool_callsHint": "Median over runs.",
 			"tokens": "Tokens",
@@ -615,14 +615,52 @@
 		},
 		"metrics": {
 			"title": "Per-run metrics",
-			"description": "Each value carries the evidence level it was observed at. Unknown is hatched, never zero.",
+			"description": "Each value carries the evidence level it was observed at. Unknown is hatched, never zero. Steps counts model turns that got an answer, not everything the agent did: the rows under it count failed turns, physical attempts and every witnessed action.",
 			"metric": "Metric",
-			"steps": "Steps (model turns)",
+			"steps": "Steps (model turns answered)",
+			"model_turns_failed": "Model turns failed",
+			"model_attempts": "Model attempts (incl. retries, fallbacks)",
+			"agent_steps": "Agent steps (all witnessed actions)",
 			"tool_calls": "Tool calls",
+			"tool_proof_rate": "With trusted proof",
+			"tool_proof_proxy": "Proof: tool proxy",
+			"tool_proof_process": "Proof: process observer",
+			"tool_proof_file_effect": "Proof: file effect",
+			"tool_proof_shim": "Proof: shim only",
+			"tool_proof_result_returned": "Result returned only",
+			"tool_proof_none": "No witness",
+			"tool_traffic_unparsed": "Tool traffic recorded opaque",
+			"reported_steps": "Agent-reported steps",
+			"reported_tool_calls": "Agent-reported tool calls",
+			"subagents_spawned": "Subagents spawned (agent-reported)",
+			"events_dropped": "Agent events dropped",
 			"tokens": "Tokens",
 			"cost_usd": "Cost",
 			"wall_time_s": "Wall time",
-			"verified_success": "Verified success"
+			"verified_success": "Verified success",
+			"help": {
+				"steps": "Model turns that got an answer: logical model requests the model answered, retries and fallbacks of one request counted once. Not counted here: failed turns, physical attempts, and the commands, file changes and tool calls between turns.",
+				"model_turns_failed": "Logical model requests whose final attempt failed: no attempt, retries and fallbacks included, got an answer. Steps plus this is every model turn.",
+				"model_attempts": "Physical upstream attempts: every attempt in Bifrost's retry trail plus every fallback row. The retries and fallbacks steps folds into one turn are counted here.",
+				"agent_steps": "Every agent action a trusted or agent-reported witness saw, each once: answered model turns, executed tool calls, command trees and file changes no tool call explains.",
+				"tool_calls": "Tool calls the model requested, by distinct tool-call id. A request is not proof that the tool ran: the rows under it say how each call was proven.",
+				"tool_proof_rate": "Share of requested tool calls a bench-side witness saw run: the tool proxy, the process observer or the workspace observer.",
+				"tool_proof_proxy": "Share of requested tool calls whose strongest witness is a tool proxy ledger row.",
+				"tool_proof_process": "Share of requested tool calls whose strongest witness is a command the process observer saw.",
+				"tool_proof_file_effect": "Share of requested tool calls whose strongest witness is a file change the workspace observer saw.",
+				"tool_proof_shim": "Share of requested tool calls seen only by a tool shim, whose log lives inside the agent's container.",
+				"tool_proof_result_returned": "Share of requested tool calls with only a tool result in the agent's stream: a result was returned to the model, which does not prove the tool ran.",
+				"tool_proof_none": "Share of requested tool calls nothing shows ran.",
+				"reported_steps": "Steps the agent reported about itself, through OTLP spans, the native event protocol, an events file or stdout. The agent's own word: counted apart, never added to a trusted metric.",
+				"reported_tool_calls": "Tool calls the agent reported about itself. A report is not proof that a tool ran: the step timeline says which reports a trusted witness corroborated.",
+				"subagents_spawned": "Subagent runs the agent reported starting. Agent-reported only: no bench-side witness sees a subagent.",
+				"events_dropped": "Agent-reported events the collector refused at a cap or because they did not parse. Above zero, the agent-reported rows are incomplete.",
+				"tool_traffic_unparsed": "Requests through the tool proxy it forwarded but could not parse (not JSON, not JSON-RPC, binary, too large, undecodable): recorded with sizes and hashes only.",
+				"tokens": "Fresh input, cache read, cache write and output tokens over every physical attempt.",
+				"cost_usd": "Every physical attempt at the pinned price snapshot.",
+				"wall_time_s": "Agent container start to exit.",
+				"verified_success": "The hidden verifier passed and no integrity gate vetoed the run."
+			}
 		},
 		"claim": {
 			"title": "Agent said, beside the hidden result",
@@ -701,7 +739,7 @@
 			"label": "Step timeline of arm {{arm}}",
 			"unavailable": "No step timeline recorded for this run",
 			"loadError": "Could not load the step timeline.",
-			"counted": "Steps (model turns): {{count}}",
+			"counted": "Agent steps (all witnessed actions): {{count}}",
 			"shown": "{{shown}} of {{total}} rows shown",
 			"truncated": "The timeline is longer than one response carries: the first {{count}} rows are shown.",
 			"skipped_one": "{{count}} line of the timeline file did not parse and is left out.",
@@ -715,7 +753,7 @@
 			"noRows": "No rows from the selected sources.",
 			"proof": "proof {{level}}",
 			"countedBadge": "counted",
-			"countedHint": "Counts toward Steps (model turns).",
+			"countedHint": "Counts toward Agent steps (all witnessed actions), each action once. Steps (model turns answered) counts only the model turn rows.",
 			"conflict": "conflict",
 			"conflictHint": "Witnesses disagree",
 			"error": "error",
@@ -732,7 +770,8 @@
 				"workspace_observer": "workspace observer",
 				"agent_stream": "agent stream",
 				"shim": "shim",
-				"network_observer": "network observer"
+				"network_observer": "network observer",
+				"agent_reported": "agent reported"
 			},
 			"sourceHint": {
 				"gateway": "Bifrost request log (trusted)",
@@ -741,7 +780,61 @@
 				"workspace_observer": "Workspace activity observer (trusted)",
 				"agent_stream": "The agent's own stream (agent-reported)",
 				"shim": "Tool shim log (boundary)",
-				"network_observer": "Passive network observer (trusted)"
+				"network_observer": "Passive network observer (trusted)",
+				"agent_reported": "What the agent reported about itself, through OTLP spans or the native event protocol (agent-reported, the weakest witness)"
+			},
+			"agentEvents": {
+				"label": "Agent-reported events",
+				"kept_one": "Agent reported {{value}} event",
+				"kept_other": "Agent reported {{value}} events",
+				"nothing": "The agent reported nothing (gateway and observer evidence only)",
+				"via": "via",
+				"types": "types",
+				"more": "+{{value}} more",
+				"dropped": "{{value}} dropped",
+				"droppedHint": "Events the collector refused at a cap or because they did not parse. The agent-reported rows are incomplete.",
+				"collector": {
+					"on": "collector on",
+					"off": "collector off",
+					"missing": "collector missing"
+				},
+				"reason": "reason:"
+			},
+			"reported": {
+				"channel": {
+					"otlp": "OTLP",
+					"native": "native",
+					"file": "events file",
+					"stdout": "stdout"
+				},
+				"eventType": {
+					"plan": "plan",
+					"thought_summary": "thought summary",
+					"tool_call": "tool call",
+					"tool_result": "tool result",
+					"subagent_start": "subagent start",
+					"subagent_end": "subagent end",
+					"handoff": "handoff",
+					"memory_read": "memory read",
+					"memory_write": "memory write",
+					"retrieval": "retrieval",
+					"message": "message",
+					"error": "error",
+					"custom": "custom"
+				},
+				"type": "reported type",
+				"reportId": "report id",
+				"parent": "inside #{{seq}}",
+				"corroboration": {
+					"corroborated": "corroborated",
+					"agent_reported_only": "reported only",
+					"conflicts": "conflicts"
+				},
+				"corroborationHint": {
+					"corroborated": "A trusted witness saw the same action.",
+					"agent_reported_only": "Only the agent says this happened. It never raises a trusted metric.",
+					"conflicts": "A trusted witness saw the action and disagrees with the report."
+				}
 			},
 			"proofLevel": {
 				"verified": "verified",
@@ -796,7 +889,7 @@
 			"description": "What the run recorded beyond the diff: tool calls, sessions, the answer, exported state and services.",
 			"tools": {
 				"title": "Tool calls",
-				"description": "Every call through the per-run tool proxy, in order. Arguments and results are shown as plain text.",
+				"description": "Every request through the per-run tool proxy, in order: the tool calls, and the handshakes, listings, notifications and opaque traffic around them, which are labelled and never counted as calls. Arguments and results are shown as plain text.",
 				"label": "Tool calls of arm {{arm}}",
 				"summary_one": "{{count}} call",
 				"summary_other": "{{count}} calls",
@@ -804,6 +897,21 @@
 				"errors_other": "{{count}} errors",
 				"faults_one": "{{count}} injected fault",
 				"faults_other": "{{count}} injected faults",
+				"other_one": "{{count}} other row",
+				"other_other": "{{count}} other rows",
+				"otherHint": "Rows that are not tool calls: MCP handshakes, listings, notifications, server requests, transport requests and opaque traffic. They are recorded so nothing through the proxy is invisible, and never counted as tool calls.",
+				"unparsed_one": "{{count}} recorded opaque",
+				"unparsed_other": "{{count}} recorded opaque",
+				"unparsedHint": "Traffic the proxy forwarded but could not parse: recorded with byte counts and sha256 only.",
+				"unparsedBadge": "opaque",
+				"kind": {
+					"mcp_method": "MCP request",
+					"mcp_notification": "notification",
+					"mcp_server_request": "server request",
+					"mcp_response": "response",
+					"transport": "transport",
+					"opaque": "unparsed"
+				},
 				"seq": "#",
 				"server": "Server",
 				"tool": "Tool",
@@ -883,6 +991,30 @@
 				"proxied": "proxied",
 				"image": "image {{image}}"
 			}
+		},
+		"remote": {
+			"title": "Remote agent: measured channels",
+			"channels": "Channels",
+			"channel": {
+				"model_traffic": "Model traffic through the gateway",
+				"tools": "Tools through the bench",
+				"self_report": "Self-report"
+			},
+			"state": {
+				"on": "on",
+				"off": "off",
+				"missing": "missing"
+			},
+			"trusted": "Trusted:",
+			"agentReported": "Agent-reported:",
+			"unknown": "Unknown:",
+			"reportedBadge": "agent-reported",
+			"reportedHint": "The agent's own word, from its answer. Never verified, never part of tokens or cost, never decides an outcome.",
+			"reportedTokens": "{{value}} tokens",
+			"reportedCost": "${{value}}",
+			"version": "version {{version}}, build {{build}} (self-declared)",
+			"events_one": "{{count}} event",
+			"events_other": "{{count}} events"
 		}
 	},
 	"receipts": {
@@ -1906,6 +2038,8 @@
 		"pulled": "pulled, not built",
 		"evidence": "Evidence",
 		"evidenceNative": "native parser {{parser}}",
+		"reportsEventsNative": "reports events (native)",
+		"reportsEventsHint": "Any agent can also report its own steps as OpenTelemetry spans or native events; agent check shows whether a run did (reports events: OTLP or native). Agent-reported steps are shown and counted apart from trusted evidence.",
 		"evidenceGateway": "gateway only",
 		"evidenceGatewayHint": "No parser: success, steps, tokens, cost and time come from Bifrost's rows for the run's key.",
 		"model": "Default model",

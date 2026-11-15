@@ -148,6 +148,8 @@ type row struct {
 	linked    bool
 	args      string
 	server    string
+	cmd       string   // tool request: the command it names (toolproof.go)
+	paths     []string // tool request: the file paths it names
 }
 
 // turnSpan is one answered logical model request.
@@ -173,6 +175,8 @@ func BuildTimeline(ev *schemas.Evidence) ([]schemas.StepRecord, []schemas.ToolCa
 	if ev == nil {
 		return nil, nil
 	}
+	ev = sortedInputs(ev) // order independence (toolproof.go)
+	aliases, returned := streamIDAliases(ev), returnedResults(ev)
 	var rows []row
 	add := func(r row) int {
 		rows = append(rows, r)
@@ -212,7 +216,7 @@ func BuildTimeline(ev *schemas.Evidence) ([]schemas.StepRecord, []schemas.ToolCa
 	// Tool proxy ledger.
 	var ledgerRows []int
 	for _, c := range ev.ToolCalls {
-		if c.Protocol == "mcp" && c.Tool == "tools/list" {
+		if !c.IsToolCall() { // listings, handshakes, notifications, opaque traffic: not tool calls (schemas/toolrows.go)
 			continue
 		}
 		d := c.LatencyMS
@@ -240,6 +244,9 @@ func BuildTimeline(ev *schemas.Evidence) ([]schemas.StepRecord, []schemas.ToolCa
 	for _, e := range ev.Events {
 		if e.Source != schemas.SourceAgentStream || (e.Type != schemas.EventToolResult && e.Type != schemas.EventToolCall) {
 			continue
+		}
+		if id, ok := aliases[e.ToolCallID]; ok {
+			e.ToolCallID = id // a stream with its own call ids, paired with the gateway's (toolproof.go)
 		}
 		if e.Type == schemas.EventToolCall {
 			if _, ok := requestedIDs[e.ToolCallID]; ok || !gatewayComplete || e.ToolCallID == "" {
@@ -312,8 +319,8 @@ func BuildTimeline(ev *schemas.Evidence) ([]schemas.StepRecord, []schemas.ToolCa
 				}
 			}
 		}
-		if req.target != "" {
-			if pj := matchProcess(rows, procRows, req.target, lo, hi, inWindow); pj >= 0 {
+		if req.cmd != "" {
+			if pj := matchProcess(rows, procRows, req.cmd, lo, hi, inWindow); pj >= 0 {
 				link(pj, ri)
 				req.proven = true
 				for _, k := range procRows {
@@ -322,12 +329,11 @@ func BuildTimeline(ev *schemas.Evidence) ([]schemas.StepRecord, []schemas.ToolCa
 					}
 				}
 			}
-			rel := relPath(req.target)
-			for _, fj := range fileRows {
-				if !rows[fj].linked && rel != "" && (rows[fj].Path == rel || strings.HasSuffix(req.target, "/"+rows[fj].Path)) && inWindow(rows[fj].TS, lo, hi) {
-					link(fj, ri)
-					req.proven = true
-				}
+		}
+		for _, fj := range fileRows {
+			if !rows[fj].linked && pathFits(rows[fj].Path, req.paths) && inWindow(rows[fj].TS, lo, hi) {
+				link(fj, ri)
+				req.proven = true
 			}
 		}
 		switch {
@@ -335,13 +341,14 @@ func BuildTimeline(ev *schemas.Evidence) ([]schemas.StepRecord, []schemas.ToolCa
 			req.Execution = schemas.ExecutedWithProof
 		case req.reported:
 			req.Execution = schemas.ExecutedAgentReported
-			if req.target != "" && shellToolRe.MatchString(req.ToolName) && observed(ev.Observers, schemas.ObserverProc) {
+			if req.cmd != "" && shellToolRe.MatchString(req.ToolName) && observed(ev.Observers, schemas.ObserverProc) {
 				req.Conflict = "only the agent stream says this command ran; the process observer saw no matching command"
 			}
 		default:
 			req.Execution = schemas.ExecutionNoWitness
 		}
 		req.Counted = req.Execution != schemas.ExecutionNoWitness
+		req.ProofClass = proofClass(rows, req, returned) // strongest witness (toolproof.go)
 	}
 	// Witnesses not linked to a request: a shim call is a witness of the
 	// command it ran in; the rest count on their own.
@@ -412,7 +419,7 @@ func BuildTimeline(ev *schemas.Evidence) ([]schemas.StepRecord, []schemas.ToolCa
 		firstOf[key] = fj
 		f.Counted = true
 	}
-	return finishRows(rows), markRequested(ev.RequestedTools, rows, requestRows)
+	return joinReported(finishRows(rows), ev), markRequested(ev.RequestedTools, rows, requestRows) // Agent events area: reported rows (stepsreported.go)
 }
 
 // gatewayRows adds a model turn row per logical model request, an attempt
@@ -506,6 +513,7 @@ func gatewayRows(ev *schemas.Evidence, add func(row) int) ([]turnSpan, []int) {
 				}
 				seenTool[id] = true
 				tr := row{order: 2, target: utils.RedactSecrets(tc.Target), args: tc.ArgsHash}
+				tr.cmd, tr.paths = requestHints(tc, tr.target)
 				tr.TS, tr.Kind, tr.Source, tr.Proof = l.end, schemas.StepToolRequest, schemas.StepSourceGateway, schemas.EvidenceStrong
 				if tr.TS.IsZero() {
 					tr.TS = gr.Timestamp
@@ -639,8 +647,7 @@ func matchProcess(rows []row, procs []int, target string, lo, hi time.Time, inWi
 		if p.linked || p.Op == "runtime" || p.root != j+1 || !inWindow(p.TS, lo, hi) {
 			continue
 		}
-		got := strings.Join(strings.Fields(p.target), " ")
-		if strings.Contains(got, want) {
+		if commandFits(p.target, want) {
 			return j
 		}
 	}
@@ -726,6 +733,7 @@ func markRequested(recs []schemas.ToolCallRecord, rows []row, requests []int) []
 			continue
 		}
 		out[i].Proof = r.Execution
+		out[i].ProofClass = r.ProofClass
 		switch r.Execution {
 		case schemas.ExecutedWithProof:
 			out[i].Executed = true

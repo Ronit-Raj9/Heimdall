@@ -49,27 +49,63 @@ checked, upstreams must be http or https URLs, and a service may appear once.
 
 ## What is recorded
 
-One `schemas.ToolCall` JSON line per call, appended and fsynced before the
+One `schemas.ToolCall` JSON line per row, appended and fsynced before the
 next row is numbered. `seq` is 1-based and keeps counting after a proxy
 restart. Arguments and the result are kept up to 64 KiB each; the sha256 on
 the row always covers the whole value.
 
-**MCP** (streamable HTTP). Only POSTs to the service's MCP path are read.
-The body is JSON-RPC, one message or a batch.
+**Nothing passes unrecorded.** Every request the proxy relays to a service
+gets at least one row. A row with an empty `kind` is a tool call, as every
+row was before kinds existed; every other row has a `kind`
+(`schemas/toolrows.go`) and is never counted as a tool call
+(`schemas.ToolCall.IsToolCall`):
+
+| `kind` | `tool` | What it is |
+|---|---|---|
+| (empty) | the tool name, or `GET /items` | A tool call: an MCP `tools/call`, a plain HTTP tool request, an external API call |
+| `mcp_method` | the method | Any other client request with an id: `initialize`, `tools/list`, `resources/list`, `resources/read`, `prompts/list`, `prompts/get`, `ping`, `completion/complete`, `logging/setLevel` |
+| `mcp_notification` | the method | A notification either way: `notifications/initialized` and `notifications/cancelled` from the client, `notifications/progress`, `notifications/message` and the list-changed ones from the server |
+| `mcp_server_request` | the method | A request the server sends the client: `sampling/createMessage`, `elicitation/create`, `roots/list` |
+| `mcp_response` | `response` | A JSON-RPC answer to no request the proxy tracked: the client's answer to a server request, or a server answer on a standalone stream |
+| `transport` | method and path | A request with no body: the GET that opens the server's event stream, the DELETE that ends a session |
+| `opaque` | `unparsed` | Traffic relayed without being parsed (below) |
+
+Rows of a non-call kind and opaque rows also carry `http_method`, `path`,
+`content_type` (of the request), `response_content_type`, `request_bytes` and
+`response_bytes` where they apply. Byte counts and hashes are taken while the
+body streams through, so they cover every byte however much was kept.
+
+**MCP** (streamable HTTP). POSTs to the service's MCP path are parsed. The
+body is JSON-RPC, one message or a batch; each element of a batch gets its
+own row, and an element that is not a JSON-RPC message gets an opaque row.
 
 - Every `tools/call` with an id becomes a row when its answer has been relayed:
   `tool` is the tool name, `arguments` the call's arguments, `result` the
   result object (or the JSON-RPC error), `is_error` true for a JSON-RPC error
   or a result with `isError: true`, `status` the tool server's HTTP status.
-- `tools/list` is noted as a row with tool `tools/list`. It is discovery, not
-  a call: the tool metrics skip it.
+- `tools/list` is noted as a row with tool `tools/list` (kind `mcp_method`).
+  It is discovery, not a call: the tool metrics skip it, as they skip every
+  row with a kind.
 - Answers may come as plain JSON or as a server-sent event stream. A stream is
-  relayed event by event and flushed, with server notifications and requests
-  passed through untouched.
+  relayed event by event and flushed, parsed one event at a time; server
+  notifications and requests in it are relayed untouched and each gets a row.
 - Headers pass through both ways (the `Mcp-Session-Id`, the protocol version,
-  authorization), except hop-by-hop ones. `Accept-Encoding` is not forwarded,
-  so the proxy always reads plain bodies.
-- GET streams, session DELETEs and other paths pass through unrecorded.
+  authorization), except hop-by-hop ones. The agent's `Accept-Encoding` is not
+  forwarded on parsed requests: the proxy's transport asks for gzip itself and
+  undoes it, so the agent gets those answers uncompressed.
+- **Compressed bodies.** A request body with `Content-Encoding: gzip` or
+  `deflate` is decoded to be parsed (at most 16 MiB decoded) and forwarded
+  exactly as sent; only a batch the proxy rebuilt (a fault took part of it) is
+  sent plain, without the header. An answer the server compressed anyway
+  (`deflate`, or `gzip` it was not asked for) is decoded to be parsed and
+  relayed as sent, unless a fault rewrote it. A compressed event stream is
+  decoded and relayed decoded. Any other coding (`br`, `zstd`) is not read: an
+  opaque row.
+- A GET that opens the server's event stream is a `transport` row written when
+  the stream ends; each message on the stream is parsed one event at a time as
+  it is relayed and gets a row of its own. A session DELETE is a `transport`
+  row. A request with a body to any other path, or with another method, is an
+  opaque row.
 
 **HTTP**. Every request is one call: `tool` is the method and path
 (`GET /items`), `arguments` the query (as `?a=1`) and the body, `result` the
@@ -81,9 +117,39 @@ ended, the body was not JSON-RPC) is a row with `is_error` true. A row the
 proxy could not hand to the agent, because the agent hung up first, has
 `undelivered: true`.
 
-**Traffic it does not understand passes through.** A body that is not
-JSON-RPC, or one over the 32 MiB parse cap, is forwarded as it is and makes no
-row; nothing in the proxy panics on malformed input.
+**Traffic it does not understand passes through, recorded.** A body that
+is not JSON or not JSON-RPC (binary, plain text, an empty batch), of a
+declared content type that is not JSON, in a coding it does not read, or over
+the parse cap is forwarded byte for byte and recorded as one `opaque` row with
+`unparsed: true` and `unparsed_reason`; its `args_sha256` and `request_bytes`
+cover the whole request and its `result_sha256` and `response_bytes` the whole
+answer. Nothing in the proxy panics on malformed input.
+
+**The parse cap.** The proxy keeps at most 16 MiB of one MCP message in
+memory to parse it: one request body, one JSON answer, or one event of a
+stream (a full-page screenshot as base64 is a few MiB, so this leaves room).
+Beyond it nothing is cut: the traffic is still relayed whole, streamed with
+32 KiB buffers, hashed and counted. A request whose `Content-Length` is over
+the cap is streamed without buffering any of it; a chunked one buffers up to
+the cap first. Measured in `TestRecordStreamedHugeBody`: relaying 50 MiB
+allocated 0.3 MiB with a `Content-Length` and 3.6 MiB chunked (cap lowered to
+1 MiB in the test). What happens over the cap:
+
+- a request: an opaque row;
+- a JSON answer: the calls it answers get `unparsed: true`, the answer's hash
+  and size, and `is_error` false (the answer may hold a result; the proxy does
+  not claim the call failed);
+- one event of an answer stream: an opaque row for the event, and the calls
+  still unanswered when the stream ends get `unparsed: true` instead of being
+  recorded as failed;
+- one event of a GET stream: an opaque row for the event.
+
+Plain HTTP tool routes keep their 32 MiB cap: a request over it is still a
+tool call row, with `unparsed: true`, no arguments, and the hash and size of
+the whole body; an answer over it is relayed whole, with the result cut.
+
+Not recorded: a request to an unknown service id (answered 404, never
+relayed) and the proxy's own `/healthz`.
 
 ## Faults
 
@@ -144,8 +210,8 @@ row, fired is "no".
 
 ## Metrics
 
-All four read `Evidence.ToolCalls` (tool listings excluded) and are
-boundary-level evidence. They are not applicable to a task without a proxied
+All four read `Evidence.ToolCalls` (tool listings and every row with a
+`kind` excluded: only tool calls count) and are boundary-level evidence. They are not applicable to a task without a proxied
 service, and unknown, never zero, when the task has one and the ledger is
 missing.
 
@@ -167,6 +233,14 @@ included, on a task that has both.
 | `external_calls` | count | lower | calls to the run's external APIs, allowed, refused, replayed and unmatched alike |
 | `external_unmatched` | count | lower | replay calls the cassette held no answer for (status 599) |
 | `external_error_rate` | rate | lower | failed external calls (refused, unmatched, faulted, 4xx and 5xx) over external calls |
+
+`tool_traffic_unparsed` (count, lower is better, boundary) counts the rows
+marked `unparsed: true`: traffic whose content no metric could read, though
+every byte of it was relayed, hashed and counted. It is not applicable to a
+task with neither a proxied service nor an external API, unknown when the
+ledger is missing, and unknown for a ledger written before the proxy recorded
+every request (no row carries a kind, a byte count or a content type; an
+empty ledger of that age reads 0).
 
 ## External routes
 
@@ -252,8 +326,17 @@ GOWORK=off go test -tags integration -run TestIntegrationProxyContainer ./toolpr
 
 The unit tests run the proxy against an in-process MCP server that answers in
 JSON and in SSE, with every fault mode, batches and malformed traffic, and run
-the bridge against the test binary acting as a stdio server. The integration
-test builds the binary into the bench image, starts it in a proxy container in
-front of a tiny MCP server on an internal network, calls a tool with a raw
-JSON-RPC client, arms and disarms a fault with `docker cp`, and checks the
-ledger rows.
+the bridge against the test binary acting as a stdio server.
+`toolproxy/recording_test.go` covers what is recorded beyond tool calls: every
+MCP message kind (handshake, listings, resources, prompts, ping,
+notifications both ways, sampling and elicitation requests on an answer
+stream and on a GET stream), a 50 MiB request streamed with and without a
+`Content-Length` under a memory bound, chunked requests, answers and stream
+events over the parse cap, binary and unknown bodies, gzip and deflate both
+ways, a fault on a gzip batch, and batch elements that are not JSON-RPC. The
+integration test builds the binary into the bench image, starts it in a proxy
+container in front of a tiny MCP server on an internal network, calls a tool
+with a raw JSON-RPC client, arms and disarms a fault with `docker cp`, opens a
+GET stream, posts 1 MiB of binary, and checks the ledger rows. Set
+`BENCH_TEST_PREFIX` to change the name prefix of the Docker objects it
+creates (default `hd-tool`).

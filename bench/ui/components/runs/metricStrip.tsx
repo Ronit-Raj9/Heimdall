@@ -2,14 +2,18 @@ import { ValueCell } from "@/components/valueCell";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import type { Value, ValueKind } from "@/lib/types/bench";
 import { useTranslation } from "react-i18next";
-import { STRIP_METRICS, type StripMetricName } from "./runs.utils";
+import { type StripMetricName, visibleStripMetrics } from "./runs.utils";
 
 export interface MetricStripProps {
 	lanes: readonly { arm: string; metrics: Record<string, Value> }[];
 	kinds: Record<StripMetricName, ValueKind>;
 }
 
-/** Steps, tool calls, tokens, cost, wall time and verified success of each run, side by side, through ValueCell. */
+/**
+ * Steps, tool calls, tokens, cost, wall time and verified success of each run, side by side, through ValueCell. Steps carries
+ * its family under it (failed turns, attempts, agent steps) and tool calls its proof classes, each with the help text that says
+ * what it counts, so no one number is read as everything the agent did.
+ */
 export function MetricStrip({ lanes, kinds }: MetricStripProps) {
 	const { t } = useTranslation("bench");
 	return (
@@ -25,22 +29,30 @@ export function MetricStrip({ lanes, kinds }: MetricStripProps) {
 				</TableRow>
 			</TableHeader>
 			<TableBody>
-				{STRIP_METRICS.map(({ name }) => (
-					<TableRow key={name} data-testid={`run-metric-${name}`}>
-						<TableCell className="text-muted-foreground">{t(`runs.metrics.${name}`)}</TableCell>
-						{lanes.map(({ arm, metrics }) => {
-							const value = metrics[name];
-							return (
-								<TableCell key={`${name}-${arm}`} className="text-right">
-									<span className="inline-flex items-baseline gap-2">
-										<ValueCell value={value} kind={kinds[name]} testId={`run-metric-${name}-${arm}`} />
-										{value?.evidence && <span className="text-muted-foreground font-mono text-[10px]">{value.evidence}</span>}
-									</span>
-								</TableCell>
-							);
-						})}
-					</TableRow>
-				))}
+				{visibleStripMetrics(lanes).map((metric) => {
+					const { name } = metric;
+					const family = "family" in metric && metric.family;
+					return (
+						<TableRow key={name} data-testid={`run-metric-${name}`}>
+							<TableCell className={family ? "text-muted-foreground pl-6 text-xs" : "text-muted-foreground"}>
+								<span title={t(`runs.metrics.help.${name}`)} data-testid={`run-metric-help-${name}`}>
+									{t(`runs.metrics.${name}`)}
+								</span>
+							</TableCell>
+							{lanes.map(({ arm, metrics }) => {
+								const value = metrics[name];
+								return (
+									<TableCell key={`${name}-${arm}`} className="text-right">
+										<span className="inline-flex items-baseline gap-2">
+											<ValueCell value={value} kind={kinds[name]} testId={`run-metric-${name}-${arm}`} />
+											{value?.evidence && <span className="text-muted-foreground font-mono text-[10px]">{value.evidence}</span>}
+										</span>
+									</TableCell>
+								);
+							})}
+						</TableRow>
+					);
+				})}
 			</TableBody>
 		</Table>
 	);

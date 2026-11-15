@@ -40,8 +40,10 @@ export function AgentCard({ agent }: { agent: AgentSummary }) {
 		{
 			key: "evidence",
 			label: t("agents.evidence"),
-			value: agent.parser ? t("agents.evidenceNative", { parser: agent.parser }) : t("agents.evidenceGateway"),
-			hint: agent.parser ? undefined : t("agents.evidenceGatewayHint"),
+			value:
+				(agent.parser ? t("agents.evidenceNative", { parser: agent.parser }) : t("agents.evidenceGateway")) +
+				(agent.reports_events === "native" ? `, ${t("agents.reportsEventsNative")}` : ""),
+			hint: agent.parser ? t("agents.reportsEventsHint") : t("agents.evidenceGatewayHint"),
 		},
 		{ key: "model", label: t("agents.model"), value: <code>{agent.model}</code>, hint: t("agents.modelHint") },
 		{ key: "notes", label: t("agents.notes"), value: <code>{agent.notes_project_file}</code> },

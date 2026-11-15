@@ -33,6 +33,10 @@ type RunSteps struct {
 	Truncated bool `json:"truncated,omitempty"`
 	// SkippedLines counts lines of steps.jsonl that did not parse as a row.
 	SkippedLines int `json:"skipped_lines,omitempty"`
+	// AgentEvents says what the agent reported about itself
+	// (agent_events.json, docs/agent-events.md); absent when no collector
+	// ran and nothing was reported.
+	AgentEvents *schemas.AgentEventStatus `json:"agent_events,omitempty"`
 }
 
 // getRunSteps handles GET /api/bench/runs/{id}/steps. The timeline is read
@@ -93,13 +97,24 @@ func readRunSteps(index ReadIndex, runID string) (RunSteps, error) {
 		}
 	}
 	out.Available = stepsFound || obsFound
+	// Agent events area: the run's agent event status; a file that does not
+	// parse is left out rather than failing the timeline.
+	if data, found, err := readInternal(index, runID, schemas.AgentEventsStatusFile); err == nil && found {
+		var st schemas.AgentEventStatus
+		if json.Unmarshal(data, &st) == nil {
+			out.AgentEvents = &st
+		}
+	} else if ev, err := readStepEvidence(index, runID); err == nil && ev.AgentEvents != nil {
+		out.AgentEvents = ev.AgentEvents
+	}
 	return out, nil
 }
 
 // stepEvidence is the part of evidence.json the step timeline reads.
 type stepEvidence struct {
-	Steps     []schemas.StepRecord     `json:"steps"`
-	Observers []schemas.ObserverStatus `json:"observers"`
+	Steps       []schemas.StepRecord      `json:"steps"`
+	Observers   []schemas.ObserverStatus  `json:"observers"`
+	AgentEvents *schemas.AgentEventStatus `json:"agent_events"`
 }
 
 // readStepEvidence reads the steps and observers of evidence.json. A run

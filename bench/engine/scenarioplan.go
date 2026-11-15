@@ -25,9 +25,11 @@ type TaskImageEnsurer interface {
 
 // checkScenario refuses a plan whose tasks need more than the suite's
 // environment can do (services, sessions, a snapshot, an answer export),
-// a judged suite without its judge, and a remote agent on a task that is not
-// an answer task: a remote agent never sits beside the workspace, so only an
-// answer can be graded.
+// a judged suite without its judge, and a remote agent on a task whose
+// output it cannot produce: a remote agent never sits beside the workspace,
+// so it runs answer tasks, state tasks only with remote.tools expose (and a
+// proxied service or external API to change), artifact tasks only with
+// remote.artifacts inline, and never diff tasks (utils.RemoteOutputAllowed).
 func (p *Planner) checkScenario(suite *schemas.Suite, conds []condPlan, arms map[string]schemas.ArmManifest, compat *schemas.ArmManifest) error {
 	var errs []error
 	if utils.Grading(suite) == schemas.GradingJudged && suite.Judge == nil {
@@ -35,14 +37,17 @@ func (p *Planner) checkScenario(suite *schemas.Suite, conds []condPlan, arms map
 	}
 	env, _ := findPart(p.reg.Environments, suite.Environment)
 	var remote []string
+	remoteCfg := map[string]*schemas.RemoteAgent{}
 	for _, id := range sortedKeys(arms) {
 		am := arms[id]
 		if isRemote(&am.Config) {
 			remote = append(remote, id)
+			remoteCfg[id] = am.Config.Remote
 		}
 	}
 	if compat != nil && isRemote(&compat.Config) {
 		remote = append(remote, CompatArm)
+		remoteCfg[CompatArm] = compat.Config.Remote
 	}
 	for _, id := range usedTasks(conds) {
 		t := suite.TaskByID(id)
@@ -54,10 +59,7 @@ func (p *Planner) checkScenario(suite *schemas.Suite, conds []condPlan, arms map
 				errs = append(errs, fmt.Errorf("task %s needs %s, which environment %s cannot provide", id, strings.Join(missing, ", "), env.GetName()))
 			}
 		}
-		if len(remote) > 0 && utils.OutputKind(suite, t) != schemas.OutputAnswer {
-			errs = append(errs, fmt.Errorf("task %s has output %s, but arms %s run a remote agent, which can only answer (output answer)",
-				id, utils.OutputKind(suite, t), strings.Join(remote, ", ")))
-		}
+		errs = append(errs, remoteTaskErrs(suite, t, remote, remoteCfg)...) // Remote coverage (scenarioremote.go)
 	}
 	return errors.Join(errs...)
 }

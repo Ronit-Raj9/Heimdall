@@ -18,3 +18,4 @@ env_names
 file_paths
 sealed_runs
 error?
+reports_events?

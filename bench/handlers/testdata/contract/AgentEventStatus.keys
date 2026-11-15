@@ -1,0 +1,9 @@
+# Keys of bench.ts `AgentEventStatus` (schemas/agentevents.go), evidence.json agent_events.
+# Keys of channels and kinds are agent-influenced display text: rendered as inert text only.
+collector
+received
+kept
+reason?
+dropped?
+channels?
+kinds?

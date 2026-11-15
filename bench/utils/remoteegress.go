@@ -200,8 +200,12 @@ func RemoteEgressNote(rc *schemas.RunContext) string {
 	if err != nil {
 		return "remote_http agent with an invalid url: " + err.Error()
 	}
-	return "remote_http agent: outbound traffic allowed to exactly " + target +
+	note := "remote_http agent: outbound traffic allowed to exactly " + target +
 		" through a per-run forwarder (" + RemoteEgressFile + " in the run folder); every other destination stays blocked"
+	if RemoteToolsExposed(rc.Agent) {
+		note += "; inbound, the run's tool proxy may be published to the agent through a per-run gate behind a bearer token (" + schemas.RemoteToolsFile + " in the run folder when it was)"
+	}
+	return note
 }
 
 func checkHostPort(hp string) error {

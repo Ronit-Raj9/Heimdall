@@ -86,6 +86,8 @@ func (a *app) doctor(ctx context.Context) []schemas.DoctorCheck {
 	}
 	out = append(out, suiteRows...)
 	out = append(out, workerModeCheck(a.cfg.ListenIsLoopback())) // Remote area: worker mode row (worker.go)
+	// Remote coverage: published tool gate row (agentremote.go).
+	out = append(out, remoteToolsCheck(a.cfg.RemoteTools.Listen, a.cfg.RemoteTools.PublicURL))
 
 	if a.reg.Gateway == nil {
 		add("gateway", schemas.DoctorSkip, "offline")

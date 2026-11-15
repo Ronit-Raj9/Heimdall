@@ -19,14 +19,58 @@ changed, as a fix (version 1.1.0).
 
 | Metric | What it counts | Witness | Evidence level | Unknown when |
 |---|---|---|---|---|
-| `steps` ("Steps (model turns)") | Logical model requests the model answered. Retries and fallbacks of one request count once; a request that only ever failed is not a turn | Gateway | gateway | The gateway log is missing or incomplete |
+| `steps` ("Steps (model turns answered)") | Logical model requests the model answered. Retries and fallbacks of one request count once; a request that only ever failed is not a turn | Gateway | gateway | The gateway log is missing or incomplete, or a request is still processing |
+| `model_turns_failed` | Logical model requests whose final attempt failed: no row of the request, fallbacks included, returned a response | Gateway | gateway | As `steps` |
+| `model_turns_total` | `steps` plus `model_turns_failed`: every finished logical model request | Gateway | gateway | As `steps` |
 | `model_attempts` | Physical upstream attempts on message rows: every attempt in Bifrost's attempt trail plus every fallback row (a row without a trail is one attempt). The retries `steps` collapses stay visible here | Gateway | gateway | The gateway log is missing or incomplete |
+| `model_retries` | Attempts after the first in each message row's attempt trail (Bifrost retries, on the original row and on fallback rows) | Gateway | gateway | The gateway log is missing or incomplete |
+| `model_fallbacks` | Message rows of a logical request after its first row (Bifrost fallbacks to another provider or model) | Gateway | gateway | The gateway log is missing or incomplete |
 | `tool_calls` | Tool calls the model requested, by distinct tool-call id | Gateway (agent stream when the log is incomplete) | gateway, or native | Neither a complete log nor parsed stream tool calls |
 | `tool_calls_executed` (1.1.0) | Tool calls with an execution witness, deduplicated: each requested call with a witness counts once; tool proxy ledger rows (tool listings excluded), shim calls and agent-stream tool results that match no requested call (and, for a shim call, no command) count one each | Tool proxy, shim, process observer, workspace observer, agent stream | boundary when any trusted witness contributed, native when only agent-stream tool results did | Nothing was counted while calls were requested, or no witness source was available |
 | `tool_calls_unwitnessed` | Requested calls with no witness at all (`no_witness`) | Gateway, checked against every witness | gateway | The gateway log is missing or incomplete, the run has no step timeline, or no witness source was available (no observer ran, no ledger, no shim log, no agent stream) |
+| `tool_proof_rate` | Share of requested calls whose strongest witness is trusted: tool proxy, process observer or workspace observer ([proof classes](#proof-class-of-every-requested-tool-call)) | All witnesses | boundary | The gateway log is missing or incomplete, the run has no step timeline, no call was requested, or no trusted witness was available (no observer ran, no ledger) |
+| `tool_proof_proxy`, `tool_proof_process`, `tool_proof_file_effect`, `tool_proof_shim`, `tool_proof_result_returned`, `tool_proof_none` | Share of requested calls in each proof class; one class per call, so the six sum to 1 | All witnesses | boundary | As `tool_proof_rate`, except a missing trusted witness |
+| `tool_traffic_unparsed` | Requests through the tool proxy it relayed but could not parse, recorded as opaque rows with sizes and hashes ([tool-proxy.md](tool-proxy.md)) | Tool proxy | boundary | No ledger, or a ledger written before row kinds existed; not applicable without a proxied service |
 | `commands_executed` | Command trees the process observer saw: a process whose parent is an agent runtime process (or a parent the observer never saw) counts once, together with all its descendants. `bash -c "ls \| grep x"` is 1 | Process observer | boundary | The process observer was switched off, has no status, or was missing in any session; not applicable to remote agents |
 | `files_changed_events` | Workspace observer events after the exclusions below, dropped ones included: the count is exact (recorded plus dropped) | Workspace observer | boundary | The workspace observer was switched off, has no status, or was missing in any session; not applicable to remote agents |
 | `agent_steps` | Every agent action with a trusted or native witness, each action once (rule below) | All of them | boundary, or native when an agent-stream witness was used | The gateway log is missing or incomplete, the run has no step timeline, or no witness beyond the gateway exists and no observer ran |
+
+### What `steps` does not count
+
+`steps` keeps its meaning, model turns that got an answer, and its value: it
+was recomputed on all 18 sealed runs of the recorded bundle
+(`testdata/recorded`) and matches the sealed `metrics.json` on every one
+(`metrics/modelturnsrecorded_test.go`). It is narrow on purpose, and the
+numbers beside it count what it leaves out:
+
+| Left out of `steps` | Counted by |
+|---|---|
+| A logical request that never got an answer (every attempt failed, fallbacks included) | `model_turns_failed`; `model_turns_total` = `steps` + `model_turns_failed` |
+| Bifrost retries inside one request | `model_retries`, and `model_attempts` |
+| Bifrost fallbacks of one request | `model_fallbacks`, and `model_attempts` |
+| A retry the agent's SDK or CLI makes itself | A new logical request: a turn in `steps` when answered, in `model_turns_failed` when not |
+| Commands, file changes and tool calls between turns, and framework actions with no model call | `agent_steps`, `commands_executed`, `files_changed_events`, `tool_calls_executed` |
+| Agent-internal planning or reasoning that crosses no boundary | Nothing outside the agent can count it; see [Limits](#limits) |
+
+Identities, checked by `metrics/modelturns_test.go` on hand-built logs and
+on every recorded run: `model_turns_total = steps + model_turns_failed` and
+`model_attempts = model_turns_total + model_fallbacks + model_retries`. On
+the recorded model-outage run of Codex (`r_gevv5gsi7b`) the family reads
+`steps` 2, `model_turns_failed` 30, `model_turns_total` 32,
+`model_attempts` 32: the CLI retried a request the gateway answered with 503
+thirty times, each retry a new logical request, and `steps` alone would read
+as a two-turn run.
+
+The family shows together wherever `steps` shows: on the run page the rows
+"Model turns failed", "Model attempts (incl. retries, fallbacks)" and "Agent
+steps (all witnessed actions)" sit right under "Steps (model turns
+answered)", each with help text that says what it counts
+(`ui/components/runs/runs.utils.ts`, `STRIP_METRICS`); in the verdict and
+its Markdown report the meters `model_turns_failed_median`,
+`model_attempts_median` and `agent_steps_median` follow `steps_median`
+(`verdict/meters.go`, `withStepFamily`). Both appear only for runs that
+recorded the family, so a run or an analysis of runs sealed before it shows
+and encodes exactly as before.
 
 **Versions.** `tool_calls_executed` is version 1.1.0: on a run with a step
 timeline it counts the timeline as above. A run without one (recorded before
@@ -61,6 +105,7 @@ Every row of the timeline names the witness it came from (`source`).
 | `network_observer` | trusted | DNS queries, connection attempts, plain HTTP request lines. Not in the timeline: netwatch records carry no timestamps, so they cannot be placed in a turn | The netwatch helper; it stays `agent check` only ([adding-an-agent.md](adding-an-agent.md)) |
 | `shim` | boundary | Calls to the bench's tool shims (`pytest` and others under a probe) | Inside the agent's container, so the agent could tamper with its log |
 | `agent_stream` | agent-reported | The parsed native stream of Codex, Claude Code and OpenCode: tool calls, tool results, messages | Written by the agent itself; the weakest witness |
+| `agent_reported` | agent-reported | Steps the agent reports about itself through the event collector (OpenTelemetry spans, native events), the events file or prefixed stdout: plans, subagent runs, handoffs, memory operations, internal tool calls ([agent-events.md](agent-events.md)) | Written by the agent itself; shown and counted apart, never counted in `agent_steps` |
 
 The two observers are new and universal: they run beside every local agent
 container, whatever the framework, with no adapter code.
@@ -210,6 +255,10 @@ per session (n 1-based); the unindexed files hold every session in order.
 - **Run page.** The "Agent steps" section shows the timeline with a filter per
   source, so one witness can be hidden or shown at a time
   (`ui/components/runs/stepTimeline.tsx`).
+- **Agent-reported rows.** Steps the agent reported about itself join the
+  timeline as `agent_event` rows of source `agent_reported`, with their
+  nesting (`parent_seq`), channel and corroboration, under the model turn
+  they followed ([agent-events.md](agent-events.md)).
 - **Trace export.** The OTLP export adds commands and file changes as child
   spans of the model turn they follow ([trace-export.md](trace-export.md)).
 - **Agent check.** `agent check` has a `process_observer` and a
@@ -248,7 +297,7 @@ proof.
 |---|---|
 | `verified` | `process_observer`, `workspace_observer`, `tool_proxy` and `shim` rows: a record of the action itself |
 | `strong` | `gateway` rows (`model_turn`, `model_attempt`, `tool_request`): the trusted record of what the model was asked and answered, not of what then ran |
-| `partial` | `agent_stream` rows: the agent's own word |
+| `partial` | `agent_stream` and `agent_reported` rows: the agent's own word |
 
 The timeline does not use `inferred`.
 
@@ -261,9 +310,9 @@ is matched against the execution witnesses:
 |---|---|
 | Tool proxy ledger row | Not yet linked, inside the turn window, and the tool name fits (the proxied tool's name, or a framework's prefixed form of it: `mcp__docs__search`, `docs.search`, `docs_search`); a row with an equal arguments hash wins over the first fitting row |
 | Shim call | The tool-call id matches |
-| Process observer command | A command root (not a runtime process), not yet linked, started inside the turn window, whose argv, whitespace normalized, contains the request's target (the command it names). Its descendants are linked to the same request |
-| Workspace observer change | The request's target is a single path (no spaces or shell characters), and the changed path equals it relative to `/workspace` (or the target ends with `/` plus the changed path), inside the turn window |
-| Agent-stream tool result | The tool-call id matches |
+| Process observer command | A command root (not a runtime process), not yet linked, started inside the turn window, whose argv, whitespace normalized, contains the command the request names (its `command` hint: Codex `cmd`, or an argv array with a `bash -lc` wrapper reduced to its script; else its target), compared again with quotes and backslashes removed when the plain comparison fails. Its descendants are linked to the same request |
+| Workspace observer change | The changed path equals one of the paths the request names (its `paths` hint: `file_path`, `filePath`, `notebook_path`, the file headers of a Codex patch; else a target that is a single path) relative to `/workspace`, or a requested absolute path ends with `/` plus the changed path, inside the turn window |
+| Agent-stream tool result | The tool-call id matches; a stream that numbers its calls on its own (Codex `item_N`) is first paired with the gateway's ids by command or path, then in order when both sides have the same count |
 
 The request row lists its witnesses in `witnessed_by`; each witness row
 points back with `witness_of` and is not counted again.
@@ -315,6 +364,13 @@ once:
    of a command tree already counted (on its own, or through the tool call it
    witnesses), from its start to 500 ms after its end, grouped as one action
    per distinct path per turn and session.
+
+Agent-reported rows (`agent_reported`, [agent-events.md](agent-events.md))
+are never counted here and never make this metric known: a reported action a
+trusted witness also saw is already counted through that witness (the
+reported row links to it with `witness_of` and is marked `corroborated`),
+and one no trusted witness saw has nothing trusted to count. They are
+counted on their own in `reported_steps`.
 
 Its evidence level is the weakest witness used: native when a counted
 agent-stream row or an `executed_agent_reported` call is in it, else
@@ -445,6 +501,153 @@ lasts longer than that; a very short helper inside a pipeline can be missed,
 and each run's `pids_allocated` against `pids_seen` says how many PIDs went
 unseen.
 
+## Tool coverage: what sees which tool
+
+Which witness can see each kind of tool an agent uses, how strong it is, and
+what it can miss. Anchors are `file:line` under `bench/` at the time of
+writing; the function named next to each is the stable reference.
+
+| Tool kind | Witness | Strength | What can be missed | Anchors |
+|---|---|---|---|---|
+| MCP servers (any tool server the task routes) | Tool proxy ledger: every request through `/s/<id>/` is a row. `tools/call` is a tool call; `initialize`, `tools/list`, `resources/*`, `prompts/*`, `ping`, notifications, server-to-client requests (sampling, elicitation, roots) and client responses are rows of their own `kind`; a body the proxy cannot parse is an opaque row with sizes, sha256 and the reason | trusted (`verified` rows), outside the agent's container | Nothing the agent sends through the proxy goes unrecorded. Bytes over the parse cap are forwarded, counted and hashed but not kept, so their arguments are not readable on the row (`unparsed_reason`). An MCP server the agent reaches without the proxy is invisible: tasks wire services only through it | `toolproxy/proxy.go:219` (`serveMCP`), `toolproxy/opaque.go:227` (`forwardOpaque`), `toolproxy/proxy.go:722` (`pass`), [tool-proxy.md](tool-proxy.md) |
+| Plain HTTP tool servers | Tool proxy ledger: method and path are the tool, query and body the arguments | trusted | As for MCP: over-cap bodies are hashed and counted, not kept | `toolproxy/proxy.go:581` (`serveHTTPTool`) |
+| External APIs (record or replay) | Tool proxy ledger, `protocol` `external`, behind the allowlist | trusted | Calls to hosts off the allowlist are refused and recorded as `blocked`; nothing else leaves the run network | `toolproxy/external.go:144` (`serveExternal`), [external-apis.md](external-apis.md) |
+| Browser actions | The browser service is an MCP server (Playwright MCP) reached only through the tool proxy, so every browser action (navigate, click, type, snapshot) is a `tools/call` row | trusted | Actions a page's own scripts take inside Chromium are the browser's, not the agent's; the hidden web application's state export shows their effect | [browser-tasks.md](browser-tasks.md) (route `toolproxy:9200/s/browser/mcp`), `toolproxy/proxy.go:219` |
+| Desktop actions (computer use) | The desktop service is an MCP server reached only through the tool proxy: every screenshot, click and keystroke is a `tools/call` row | trusted | Same as browser: what the desktop apps do on their own is seen only in the state export | [computer-use.md](computer-use.md) (route `toolproxy:9200/s/desktop/mcp`) |
+| Local shell tools and binaries (`bash`, `pytest`, `git`, a compiled helper) | Process observer: every process in the agent's PID namespace with argv, cwd, start and end; the command tree is linked to the requested call by argv | trusted | Processes shorter than the poll interval (20 ms default), bounded per run by `pids_allocated` against `pids_seen`; an agent that ends before the observer joins; a root agent can kill the observer (then marked missing) | `environments/observers.go:280` (`watchAgent`), `environments/procwatch.py:102` (`scan`), `evidence/steps.go:640` (`matchProcess`) |
+| File effects of any tool (edit and write tools, shell redirects, framework file I/O) | Workspace observer: create, modify, delete, rename in the workspace volume, linked to the requested call by path | trusted | Writes outside the workspace volume (`/tmp`, the home tmpfs, a snapshot-graded root file system); reads (they change nothing); a file written in a just-created folder before its watch exists | `environments/observers.go:241` (`startObservers`), `environments/fswatch.py:55` (`emit`) |
+| Bench tool shims (`pytest` and others under a probe) | Shim log | boundary: the log is inside the agent's container | An agent that tampers with its own container could forge or hide shim rows; shim-only calls are their own proof class and never count as trusted proof | `evidence/shimlog.go:97` (`ParseShimLog`) |
+| Model-side tool requests of any kind | Gateway request log: name, arguments hash, target, tool-call id | trusted record of what was asked, not of what ran | Nothing about execution: a request is never proof a tool ran | `evidence/gateway.go:337` (`toolCalls`) |
+| Tool results the model was told | Agent stream tool results (Codex, Claude Code, OpenCode parsers) and the tool result ids in the next gateway request | agent-reported for the stream; the gateway shows only that a result id went back | A result proves the model was told one, not that the tool ran: class `result_returned`, never trusted proof | `evidence/agentstream.go:42` (`Collect`), `evidence/gateway.go:279` (`toolResults`) |
+| SDK callbacks and in-process tools (a Python function the framework calls, an internal planner step, a framework's own retry) | Only the agent's own report: the agent event protocol and OTLP ingest ([agent-events.md](agent-events.md), built by a sibling change) turn such reports into `agent_reported` rows | agent-reported; never upgrades a trusted metric, never decides an outcome | Everything the agent does not report. If the callback touches a process, a workspace file, the tool proxy or the model, that boundary's witness sees the effect; if it touches none, no outside observer can see it | [agent-events.md](agent-events.md); [Limits](#limits) |
+| Network traffic outside the proxy | Network observer (DNS, connections, plain HTTP request lines) | trusted | Runs only for `agent check`, and its records carry no timestamps, so connections are not in the timeline; run networks are internal, so the proxy is the only way out | [adding-an-agent.md](adding-an-agent.md) |
+
+## Proof class of every requested tool call
+
+There is no universal proof that a requested tool call ran. A tool that
+runs inside the agent's own process (an SDK callback, a framework's built-in
+function) can leave no trace outside it, and the bench says so instead of
+guessing. What exists is made measurable: every requested call
+(`Evidence.RequestedTools`, one `tool_request` row each) gets exactly one
+proof class, its strongest witness, in this order:
+
+| Class (`proof_class`) | Strongest witness | Trusted | What it proves |
+|---|---|---|---|
+| `proxy_witnessed` | A tool proxy ledger row linked to the call | yes | The call reached the tool server through the bench's proxy, with its result |
+| `process_witnessed` | A command tree the process observer saw, linked by argv | yes | A process running the requested command started in the agent's namespace |
+| `file_effect_witnessed` | A workspace change on a requested path | yes | The requested file changed in the call's turn window |
+| `shim_witnessed` | A shim call with the same tool-call id | no: the shim log is inside the agent's container | The shim recorded the call |
+| `result_returned` | Only a tool result: in the agent's stream, or the call id among the tool results the next model request carried (`GatewayRequest.ToolResultIDs`) | no | A result was returned to the model. It does not prove the tool ran: the agent can answer a call without running anything |
+| `no_witness` | Nothing | | Nothing shows the call ran, or that a result went back |
+
+The class sits on the `tool_request` row of `steps.jsonl` and on the
+requested call record (`proof_class`, `schemas/steps.go:153`),
+and is computed in `evidence/toolproof.go:221` (`proofClass`).
+It never changes the execution state: a call whose only witness is a
+returned result in the gateway log stays `no_witness` in `execution`, and
+`agent_steps`, `tool_calls_executed` and `tool_calls_unwitnessed` count as
+before.
+
+Metrics (`metrics/toolproof.go:98`), all rates over
+the run's requested calls:
+
+| Metric | Value | Direction | Unknown when |
+|---|---|---|---|
+| `tool_proof_rate` | Share in a trusted class (`proxy_witnessed`, `process_witnessed`, `file_effect_witnessed`) | higher is better | Gateway log missing or incomplete, no step timeline, no requested calls, or no trusted witness available at all (no observer ran and no tool ledger) |
+| `tool_proof_proxy`, `tool_proof_process`, `tool_proof_file_effect`, `tool_proof_shim` | Share of each class | higher is better | As above, except a missing trusted witness |
+| `tool_proof_result_returned`, `tool_proof_none` | Share of each class | lower is better | As above, except a missing trusted witness |
+
+The shares of one run sum to 1. They show on the run page under "Tool
+calls" and in the verdict's meters (`tool_proof_rate` and each recorded
+class), only for runs that recorded them.
+
+### Matching rules, reviewed
+
+The rules that link a requested call to a witness were checked against the
+gateway parser, the stream parsers and the recorded real runs:
+
+| Rule | Gap found | Fix | Anchor |
+|---|---|---|---|
+| Shell commands of Codex | The gateway target reads only string fields (`file_path`, `path`, `command`, `pattern`). Codex `exec_command` sends `{"cmd": ...}` and `shell` / `local_shell` send `command` as an argv array, so the target was empty and no Codex call could match a process (all 7 calls of the recorded run `r_hcxe5gwzej` had no target) | The gateway parser adds a `command` hint where the target lacks one: `cmd`, or the argv array with a `bash -lc "<script>"` wrapper reduced to its script; capped at 2 KiB and redacted. The target itself, and the metrics and gates that read it, do not move | `gateways/bifrost/toolinput.go:31`, `gateways/bifrost/toolinput.go:99` |
+| Shell commands of Claude Code and OpenCode | `Bash` / `bash` send `{"command": ...}` (already the target), but Claude Code runs it through its own shell wrapper that re-quotes it, so a plain substring of the argv failed | `commandFits`: a whitespace-normalised substring first, then the same with quotes and backslashes removed from both sides | `evidence/toolproof.go:44` |
+| Edit and write tools | Claude Code `Edit` / `Write` / `MultiEdit` send `file_path` (already the target), but OpenCode `edit` / `write` send `filePath`, notebooks `notebook_path`, and Codex `apply_patch` names its files only inside the patch (`*** Add File:`, `*** Update File:`, `*** Delete File:`, `*** Move to:`), so those calls had no path to match | A `paths` hint, one path per line, from those fields and patch headers (also a patch inside a `cmd` heredoc); `pathFits` matches a change against every requested path | `gateways/bifrost/toolinput.go:108`, `evidence/toolproof.go:63` |
+| Agent-stream ids | Codex's exec stream numbers its calls `item_N` while the gateway's are `call_...`, so no Codex stream result ever linked to its request: each raised a false conflict and was counted on its own | `streamIDAliases` pairs the two id sets only when they are fully disjoint, by command or path text first, then in order when both sides hold the same number of calls. It joins the agent's own word to the request and never makes a call proven | `evidence/toolproof.go:131` |
+| Order independence | Command roots assumed processes arrive in start order, and first-match linking depended on stored order | Witness lists are sorted by time (ledger by start then sequence, shim by time, processes by session, start and pid, file events by time) before linking | `evidence/toolproof.go:81` |
+| Parallel calls in one turn | Already correct: each witness links to at most one request, the first that fits | Covered by tests | `evidence/toolproof_test.go:181` |
+| Retries of the same call | Already correct: the same tool-call id on a retry or fallback row is one request row | Covered by tests | `evidence/steps.go:514` |
+| Time windows | Unchanged: end of response k minus 1 s to the start of request k + 1 plus 1 s | | `evidence/steps.go:196` |
+
+Property tests (`evidence/toolproof_test.go:222`):
+200 random runs, each built three times from shuffled witness lists, give
+identical timelines; no witness row is linked to two requests; a witness
+row is never counted; the class always matches the strongest linked
+witness. A golden test on two recorded real runs
+(`evidence/toolproof_test.go:344`) keeps the
+classification stable.
+
+On the 18 recorded runs every requested call is `result_returned`: they were
+recorded before the observers and carry no tool ledger, so a returned
+result is all that exists. Their sealed values do not move. Rebuilt with the
+fixed matcher, `tool_calls_unwitnessed` of the Codex runs would fall (7, 6,
+6, 5 and 2 to 0, their stream results now pair with their requests) and 26
+false conflicts would go; `tool_calls_executed` and `agent_steps` would not
+change.
+
+What stays out of reach: two calls that write the same path in one turn
+cannot be told apart by a file change (the first takes every event on that
+path), and a tool that runs in the agent's process and touches nothing
+outside it has no witness but the agent's report.
+
+## Audit findings GAP-04, GAP-05, GAP-06
+
+The findings were written before the step recording on this page existed.
+Each line says what that work had already closed, what this round closed,
+and what cannot be closed, with the code a reviewer can check.
+
+### GAP-04: narrow step definition
+
+> `steps` counts successful logical model turns. Retries and fallbacks
+> collapse into one. Failed turns, planning actions, and internal framework
+> steps are omitted.
+
+| Part of the finding | Closed before this round (step recording) | Closed in this round | Cannot be closed |
+|---|---|---|---|
+| `steps` counts only answered turns | The meaning was kept on purpose; `agent_steps` counts every witnessed action beside it (`metrics/agentsteps.go:58`) | `steps` unchanged in name, version and value (recomputed equal on all 18 recorded runs, `metrics/modelturnsrecorded_test.go:16`); its label is now "Steps (model turns answered)" and its description names what it leaves out and where that is counted (`metrics/steps.go:30`) | |
+| Retries and fallbacks collapse into one | `model_attempts` counts every physical attempt, retries and fallbacks included (`metrics/agentsteps.go:203`); each retry and fallback is a `model_attempt` row in `steps.jsonl` (`evidence/steps.go:492`) | Separate counts `model_retries` (`metrics/modelturns.go:130`) and `model_fallbacks` (`metrics/modelturns.go:164`); the identity `model_attempts = model_turns_total + model_fallbacks + model_retries` is tested (`metrics/modelturns_test.go:24`) | |
+| Failed turns are omitted | A request that never got an answer was already a `model_turn` row marked as an error, not counted (`evidence/steps.go:474`), but no metric counted it | `model_turns_failed` and `model_turns_total` (`metrics/modelturns.go:32`); on the recorded Codex model-outage run they read 30 and 32 against `steps` 2 | |
+| `steps` read as everything the agent did | | Run page: the family rows sit under steps with help text (`ui/components/runs/runs.utils.ts:9`, `ui/components/runs/metricStrip.tsx:38`); verdict and Markdown report: family meters after `steps_median` (`verdict/meters.go:86`); the step timeline header called its counted rows "Steps (model turns)" although they are `agent_steps`: it now says "Agent steps (all witnessed actions)" (`ui/locales/en/bench.json`, `runs.steps.counted`) | |
+| Planning actions and internal framework steps | Framework actions that start a process, write a workspace file, call a proxied tool or the model are counted in `agent_steps` | | Planning and framework steps that cross no process, file, network, tool proxy or model boundary leave nothing an outside observer can see. They can only be agent-reported ([agent-events.md](agent-events.md)), and an agent-reported row never changes `steps` or any trusted metric |
+
+### GAP-05: incomplete tool execution metrics
+
+> Requested calls come from gateway rows or native events. Executed calls
+> need a shim log or tool-result event. There is no universal
+> request-to-execution proof.
+
+| Part of the finding | Closed before this round (step recording) | Closed in this round | Cannot be closed |
+|---|---|---|---|
+| Requested calls come from gateway rows or native events | The gateway log is the trusted record of requests; the agent stream stands in only when it is incomplete, and the value says so (evidence native) (`metrics/toolcalls.go:45`). This is the right order and stays | The gateway parser also records what a call names for matching (`command`, `paths` hints) so Codex shell calls and patch or OpenCode edits can be linked (`gateways/bifrost/toolinput.go:31`) | |
+| Executed calls need a shim log or tool-result event | `tool_calls_executed` 1.1.0 counts tool proxy rows and process and workspace observer witnesses as well (`metrics/toolexecuted.go:95`); every requested call is `executed_with_proof`, `executed_agent_reported` or `no_witness` (`evidence/steps.go:341`) | Every requested call gets a proof class, its strongest witness; a tool result is named for what it is, `result_returned` (the model was told a result, not proof the tool ran); `tool_proof_rate` and the six class shares measure it per run (`metrics/toolproof.go:98`); matcher gaps fixed (Codex commands, quoting, edit paths, Codex stream ids, order independence; see [Matching rules, reviewed](#matching-rules-reviewed)) | |
+| No universal request-to-execution proof | Three trusted witnesses outside the agent (tool proxy, process observer, workspace observer) cover every tool that crosses a process, file or network boundary | The coverage of each tool kind is stated in [Tool coverage](#tool-coverage-what-sees-which-tool), and the share of calls with trusted proof is a number, not a claim | A tool that runs inside the agent's own process and touches no process, workspace file, proxied service or model has no outside witness, in this bench or any other; only the agent's report ([agent-events.md](agent-events.md)) can show it, and that report never counts as proof |
+
+### GAP-06: limited tool observation
+
+> The proxy covers MCP and HTTP services. Oversized or non-JSON MCP traffic
+> passes unrecorded. Local tools, SDK callbacks, browser actions, and
+> internal tools remain invisible.
+
+| Part of the finding | Closed before this round (step recording) | Closed in this round | Cannot be closed |
+|---|---|---|---|
+| Oversized or non-JSON MCP traffic passes unrecorded | | Every request through the proxy gets a ledger row. A body the proxy cannot parse (not JSON, not JSON-RPC, over the parse cap, an unknown content type, binary, an encoding it cannot decode) is relayed unchanged and recorded as an opaque row: `kind` `opaque`, tool `unparsed`, method, path, content types, request and response byte counts, sha256 over the whole bodies computed while streaming, status, latency, `unparsed: true` and the reason (`toolproxy/opaque.go:227`, `toolproxy/opaque.go:206`). Request over the cap: `toolproxy/proxy.go:233`; answer over the cap: `toolproxy/proxy.go:373`; one stream event over the cap: `toolproxy/sse.go:97` and `toolproxy/proxy.go:517` | |
+| Memory for large traffic | | At most 16 MiB of one MCP message (a request body, a JSON answer, one stream event) is kept to parse it (`toolproxy/opaque.go:31`); beyond that the bytes are streamed, counted and hashed, never kept, so memory stays bounded. A 50 MiB body was relayed with 0.3 MiB allocated with a Content-Length and 3.6 MiB chunked (`toolproxy/recording_test.go:231`) | |
+| Compressed bodies | | gzip and deflate request and answer bodies are decoded for parsing when `Content-Encoding` says so and forwarded unchanged (`toolproxy/opaque.go:253`); an encoding the proxy cannot read is an opaque row (`toolproxy/recording_test.go:411`) | |
+| MCP traffic that is not a tool call | `tools/list` rows only | `initialize`, `tools/list`, `resources/*`, `prompts/*`, `ping` (`mcp_method`), notifications either way (`mcp_notification`), server-to-client requests such as sampling, elicitation and roots (`mcp_server_request`), unmatched responses (`mcp_response`), and GET stream opens and session DELETEs (`transport`) are rows of their own kind (`toolproxy/proxy.go:533`, `toolproxy/proxy.go:552`, `toolproxy/proxy.go:722`); metrics count only `tools/call` as tool calls (`IsToolCall`, `schemas/toolrows.go:42`; `metrics/toolledger.go:214`; `evidence/steps.go:219`); faults still match only tool calls (`toolproxy/recording_test.go:102`) | Requests to an unknown service id (answered 404, never relayed) and `/healthz` get no row: nothing reached a tool server |
+| How much traffic was opaque | | `tool_traffic_unparsed`, lower is better: rows with `unparsed: true` (`metrics/tooltraffic.go:45`); on the run page under "Tool calls" and in the verdict meters | Unknown for a ledger written before this change, which carries no `kind` |
+| Local tools | Process observer (commands) and workspace observer (file effects), outside the agent's container (`environments/observers.go:280`, `environments/observers.go:241`) | Shell calls of Codex now carry the command the process match needs, and edit tools of OpenCode and Codex the paths ([Matching rules, reviewed](#matching-rules-reviewed)) | Processes shorter than the poll interval (bounded per run), writes outside the workspace volume |
+| Browser actions | The browser service is an MCP server behind the proxy | Every browser MCP message, not only `tools/call`, is now a row; nothing it exchanges with the agent passes unrecorded | What page scripts do inside the browser on their own |
+| Desktop actions | The computer-use desktop is an MCP server behind the proxy | As browser | What desktop apps do on their own |
+| SDK callbacks and internal tools | | Stated in [Tool coverage](#tool-coverage-what-sees-which-tool): visible only when the agent reports them ([agent-events.md](agent-events.md), a sibling change) | A function the framework calls in its own process that touches no process, workspace file, proxied service or model leaves no trace outside the agent; the agent's report is the only witness, and it never counts as proof |
+
 ## Limits
 
 - **Some actions cannot be seen from outside any agent.** Pure in-process
@@ -454,7 +657,10 @@ unseen.
   and a read changes nothing. This limit applies to every external
   benchmark, not just this one: anything that crosses no process, file,
   network or model boundary leaves nothing an outside observer can see, and
-  only the agent's own report (a weaker witness) could show it.
+  only the agent's own report (a weaker witness) could show it. The agent
+  event protocol ([agent-events.md](agent-events.md)) is that report: any
+  agent can send OpenTelemetry spans or native events, shown and counted
+  as agent-reported, never as trusted.
 - **Short processes can be missed.** A process shorter than the poll
   interval can start and end between two polls, and so can the agent's first
   few milliseconds before the observer starts. The miss is bounded per run by
@@ -479,4 +685,9 @@ unseen.
 - **Root agents can stop the process observer.** The run then reports the
   process evidence as missing with the reason, never as zero commands.
 - **Not for remote agents.** `remote_http` agents act outside the bench; both
-  observers are off for them.
+  observers are off for them. What a remote agent's run can still show comes
+  from the gateway (`remote.model_traffic: gateway`), the published tool gate
+  (`remote.tools: expose`, rows in the tool ledger like a local agent's) and
+  its self-report (events as agent-reported rows, usage in `reported_tokens`
+  and `reported_cost_usd` only); `evidence.json` summarizes which channels
+  were active under `remote` (docs/remote-execution.md).

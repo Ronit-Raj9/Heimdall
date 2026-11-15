@@ -289,6 +289,17 @@ type RemoteAgent struct {
 	AuthEnv      string `json:"auth_env,omitempty" yaml:"auth_env"` // name of the host environment variable holding the bearer token
 	TimeoutS     int    `json:"timeout_s,omitempty" yaml:"timeout_s"`
 	ModelTraffic string `json:"model_traffic,omitempty" yaml:"model_traffic"` // gateway | external (default)
+
+	// Remote coverage (remote.go, docs/remote-execution.md). All optional.
+	// Tools "expose" publishes the run's tool proxy to the deployment behind
+	// a per-run bearer token, which also lets it run state tasks. Artifacts
+	// "inline" declares that the deployment returns artifact files in its
+	// response, which lets it run artifact tasks. SignEnv names the host
+	// environment variable holding the secret the launcher signs each
+	// request body with (HMAC-SHA256).
+	Tools     string `json:"tools,omitempty" yaml:"tools"`         // expose | off (default)
+	Artifacts string `json:"artifacts,omitempty" yaml:"artifacts"` // inline | none (default)
+	SignEnv   string `json:"sign_env,omitempty" yaml:"sign_env"`
 }
 
 // ToolCall is one tool invocation recorded by the per-run tool proxy
@@ -317,6 +328,19 @@ type ToolCall struct {
 	Replayed  bool `json:"replayed,omitempty"`  // answered from the task's cassette, no network
 	Unmatched bool `json:"unmatched,omitempty"` // replay mode and the cassette holds no matching call; the agent got a 599
 	Blocked   bool `json:"blocked,omitempty"`   // refused by the proxy: not on the allowlist, or over a call or size cap
+
+	// Rows that are not tool calls, and traffic the proxy could not parse
+	// (schemas/toolrows.go). Kind is empty on a tool call, as on every row
+	// written before kinds existed.
+	Kind                string `json:"kind,omitempty"`
+	HTTPMethod          string `json:"http_method,omitempty"`
+	Path                string `json:"path,omitempty"`
+	ContentType         string `json:"content_type,omitempty"`          // of the request
+	ResponseContentType string `json:"response_content_type,omitempty"` // of the answer
+	RequestBytes        int64  `json:"request_bytes,omitempty"`         // every byte of the request body, counted while streamed
+	ResponseBytes       int64  `json:"response_bytes,omitempty"`        // every byte of the answer body, counted while streamed
+	Unparsed            bool   `json:"unparsed,omitempty"`              // the proxy relayed this traffic without parsing all of it
+	UnparsedReason      string `json:"unparsed_reason,omitempty"`
 }
 
 // ToolFault is a fault the tool proxy injects for one run (ProbeApply.Tool,

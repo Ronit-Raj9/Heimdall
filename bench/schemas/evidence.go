@@ -41,6 +41,13 @@ type Evidence struct {
 	FileEvents []FileEvent      `json:"file_events,omitempty"` // workspace observer
 	Observers  []ObserverStatus `json:"observers,omitempty"`   // one per observer and session
 	Steps      []StepRecord     `json:"steps,omitempty"`       // unified timeline, also steps.jsonl
+
+	// AgentEvents says what the agent reported about itself (agentevents.go);
+	// the events are in Events with source agent_reported.
+	AgentEvents *AgentEventStatus `json:"agent_events,omitempty"`
+
+	// Remote is a remote agent's channel summary and self-report (remote.go).
+	Remote *RemoteEvidence `json:"remote,omitempty"`
 }
 
 // EvidenceQuality describes how completely a run's required evidence was observed.

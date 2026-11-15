@@ -135,6 +135,49 @@
 			"summary": "claude-haiku-4-5 answered: done",
 			"request_id": "req_fmw1z7ouim_2",
 			"counted": true
+		},
+		{
+			"seq": 12,
+			"ts": "2026-11-14T18:41:18Z",
+			"kind": "agent_event",
+			"source": "agent_reported",
+			"proof": "partial",
+			"turn": 3,
+			"summary": "plan: fix the parser, then rerun the tests",
+			"event_type": "plan",
+			"channel": "otlp",
+			"report_id": "span-7f2a",
+			"corroboration": "agent_reported_only"
+		},
+		{
+			"seq": 13,
+			"ts": "2026-11-14T18:41:19Z",
+			"kind": "agent_event",
+			"source": "agent_reported",
+			"proof": "partial",
+			"turn": 3,
+			"summary": "subagent reviewer started",
+			"event_type": "subagent_start",
+			"channel": "otlp",
+			"report_id": "span-7f2b",
+			"parent_seq": 12,
+			"corroboration": "agent_reported_only"
+		},
+		{
+			"seq": 14,
+			"ts": "2026-11-14T18:41:20Z",
+			"kind": "tool_execution",
+			"source": "agent_reported",
+			"proof": "partial",
+			"turn": 3,
+			"summary": "shell: pytest -q",
+			"tool_name": "shell",
+			"event_type": "tool_call",
+			"channel": "native",
+			"report_id": "evt-3",
+			"parent_seq": 13,
+			"witness_of": 3,
+			"corroboration": "corroborated"
 		}
 	],
 	"observers": [

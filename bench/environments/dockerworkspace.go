@@ -87,6 +87,15 @@ type DockerWorkspaceConfig struct {
 	ProcessWatch    bool
 	WorkspaceWatch  bool
 	WatchIntervalMS int
+
+	// Remote coverage: where a remote agent's tool gate is published
+	// (remote_tools.listen, remote_tools.public_url; remotetools.go).
+	RemoteToolsListen    string
+	RemoteToolsPublicURL string
+
+	// Agent events area: the per-run agent event collector, the events file
+	// and the OpenTelemetry variables (eventcollector.go).
+	EventsCollector bool
 }
 
 // dockerWorkspace keeps each run's workspace in a docker volume and runs every
@@ -250,12 +259,15 @@ func (e *dockerWorkspace) Exec(ctx context.Context, rc *schemas.RunContext, plan
 		return nil, fmt.Errorf("exec run %s: %w", runID, err)
 	}
 	defer egress.Stop(context.WithoutCancel(ctx))
+	e.ensureEventCollector(ctx, rc, plan, expID, runID) // Agent events area: the collector, started before the first session (eventcollector.go)
+	defer e.copyAgentEvents(context.WithoutCancel(ctx), runID, rc.Dir)
+	l.Env = e.eventEnv(rc, runID, l.Env) // Agent events area: BENCH_EVENTS_* and OTEL_* (eventcollector.go)
 	envFile, err := writeEnvFile(l.Env)
 	if err != nil {
 		return nil, fmt.Errorf("exec run %s: %w", runID, err)
 	}
 	network, svcNet := e.network(plan.Network), ""
-	if len(rc.Services) > 0 {
+	if len(rc.Services) > 0 || collectorRunning(runID) { // Agent events area: the collector is on the service network
 		svcNet = serviceNetwork(runID)
 		if network == "none" {
 			network, svcNet = svcNet, ""
@@ -267,6 +279,7 @@ func (e *dockerWorkspace) Exec(ctx context.Context, rc *schemas.RunContext, plan
 		network, joiner = "container:"+w.holder, w.holder
 	}
 	// Agent steps area: trusted process and workspace observers (observers.go); never fail the run.
+	e.prepareEventsDir(ctx, rc, expID, runID) // Agent events area: the events file folder (eventcollector.go)
 	obs := e.startObservers(ctx, rc, plan, expID, runID)
 	defer obs.finish(ctx, rc, nil)
 	args := agentCreateArgs(name, utils.LabelArgs(expID, runID), plan, rc.Handle, network, envFile, l, mounts, snapshotMode(rc) || root)

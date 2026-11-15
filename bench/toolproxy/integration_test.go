@@ -26,7 +26,8 @@ import (
 // It needs Docker, the bench image (BENCH_IMAGE, default
 // bench/bifrost-bench:dev, used as the base the fresh binary is copied onto)
 // and a Python image (BENCH_PYTHON_IMAGE, default python:3.12-slim). Every
-// object it creates is named hd-tool-<random> and removed at the end.
+// object it creates is named <prefix>-<random> and removed at the end; the
+// prefix is hd-tool unless BENCH_TEST_PREFIX sets another.
 
 const tinyMCP = `
 import json
@@ -62,7 +63,7 @@ HTTPServer(("", 8000), H).serve_forever()
 // status, the session header and the body; with argv[1] "health" it polls
 // /healthz until it answers.
 const rawClient = `
-import sys, time, urllib.request
+import sys, time, urllib.request, urllib.error
 base = "http://toolproxy:9200"
 if sys.argv[1] == "health":
     for _ in range(100):
@@ -71,6 +72,22 @@ if sys.argv[1] == "health":
         except Exception:
             time.sleep(0.1)
     sys.exit(1)
+if sys.argv[1] == "get":
+    try:
+        urllib.request.urlopen(urllib.request.Request(base + "/s/tiny/mcp", headers={"Accept": "text/event-stream"}), timeout=30)
+    except urllib.error.HTTPError as e:
+        print(e.code)
+    sys.exit(0)
+if sys.argv[1] == "binary":
+    req = urllib.request.Request(base + "/s/tiny/mcp", data=bytes(range(256)) * 4096, method="POST",
+        headers={"Content-Type": "application/octet-stream"})
+    try:
+        urllib.request.urlopen(req, timeout=30)
+    except urllib.error.HTTPError as e:
+        print(e.code)
+    except Exception as e:
+        print("error", e)
+    sys.exit(0)
 req = urllib.request.Request(base + "/s/tiny/mcp", data=sys.argv[1].encode(), method="POST",
     headers={"Content-Type": "application/json", "Accept": "application/json, text/event-stream", "Mcp-Session-Id": "s1"})
 with urllib.request.urlopen(req, timeout=30) as r:
@@ -87,7 +104,7 @@ func TestIntegrationProxyContainer(t *testing.T) {
 			t.Skipf("image %s not available: %v", img, err)
 		}
 	}
-	id := strings.ToLower(utils.NewID("hd-tool", 8))
+	id := strings.ToLower(utils.NewID(envOrDefault("BENCH_TEST_PREFIX", "hd-tool"), 8))
 	image, network := id+":test", id+"-net"
 	tp, mcp, cfg, ledger := id+"-tp", id+"-tiny", id+"-cfg", id+"-ledger"
 	t.Cleanup(func() {
@@ -159,10 +176,26 @@ func TestIntegrationProxyContainer(t *testing.T) {
 		t.Fatalf("call after disarm: %s", out)
 	}
 
+	if out := client("get"); out != "405" {
+		t.Fatalf("GET stream: %s", out)
+	}
+	client("binary") // 1 MiB of binary: relayed, recorded as one opaque row
+
 	res := mustDocker(t, d, "exec", tp, "cat", "/ledger/tools.jsonl")
-	rows, bad := ReadLedger(bufio.NewReader(bytes.NewReader(res.Stdout)))
-	if bad != 0 || len(rows) != 4 {
-		t.Fatalf("ledger has %d rows, %d bad:\n%s", len(rows), bad, res.Stdout)
+	all, bad := ReadLedger(bufio.NewReader(bytes.NewReader(res.Stdout)))
+	// Every request has a row: the initialize handshake and a GET that
+	// opens the server's stream (refused by this server) are rows of their
+	// own kind, never tool calls; the rest is what the proxy always recorded.
+	var rows []schemas.ToolCall
+	kinds := map[string]int{}
+	for _, r := range all {
+		kinds[r.Kind+" "+r.Tool]++
+		if r.Kind == "" || r.Tool == "tools/list" {
+			rows = append(rows, r)
+		}
+	}
+	if bad != 0 || len(rows) != 4 || kinds[schemas.ToolRowMCPMethod+" initialize"] != 1 || kinds[schemas.ToolRowTransport+" GET /mcp"] != 1 || kinds[schemas.ToolRowOpaque+" "+schemas.ToolRowUnparsedTool] != 1 {
+		t.Fatalf("ledger has %d rows (%v), %d bad:\n%s", len(all), kinds, bad, res.Stdout)
 	}
 	want := []schemas.ToolCall{
 		{Seq: 1, Tool: "tools/list"},
@@ -172,7 +205,7 @@ func TestIntegrationProxyContainer(t *testing.T) {
 	}
 	for i, w := range want {
 		r := rows[i]
-		if r.Seq != w.Seq || r.Tool != w.Tool || r.IsError != w.IsError || r.Fault != w.Fault || r.Nonce != w.Nonce || r.Server != "tiny" || r.Protocol != ProtocolMCP {
+		if (i > 0 && r.Seq <= rows[i-1].Seq) || r.Tool != w.Tool || r.IsError != w.IsError || r.Fault != w.Fault || r.Nonce != w.Nonce || r.Server != "tiny" || r.Protocol != ProtocolMCP {
 			t.Errorf("row %d = %+v, want %+v", i+1, r, w)
 		}
 		if w.Arguments != "" && r.Arguments != w.Arguments {

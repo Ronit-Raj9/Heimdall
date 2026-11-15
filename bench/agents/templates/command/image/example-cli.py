@@ -6,6 +6,10 @@ the bench needs from any CLI: take the task file, the workspace and the model
 as arguments, read the base URL and key from the environment variables most
 SDKs read (OPENAI_BASE_URL, OPENAI_API_KEY), edit the workspace, print the
 final message last and exit 0. Standard library only.
+
+Optionally, a CLI reports its own steps as stdout lines that start with
+"@@heimdall-event " (docs/agent-events.md); report_event shows how. The bench
+shows them as agent-reported evidence beside what it observed itself.
 """
 import argparse
 import json
@@ -17,6 +21,23 @@ WRITE_FILE = {"type": "function", "function": {
     "name": "write_file", "description": "Write a whole file; the path is relative to the workspace.",
     "parameters": {"type": "object", "properties": {"path": {"type": "string"}, "content": {"type": "string"}},
                    "required": ["path", "content"]}}}
+
+
+def report_event(type, name=None, **fields):
+    """Print one of the CLI's own steps as a stdout line: "@@heimdall-event " and one JSON object.
+
+    Printed only when the bench collects events for the run (it then sets
+    BENCH_EVENTS_FILE or BENCH_EVENTS_URL), so stdout is unchanged otherwise.
+    """
+    if not (os.environ.get("BENCH_EVENTS_FILE") or os.environ.get("BENCH_EVENTS_URL")):
+        return
+    event = dict({"type": type}, **fields)
+    if name is not None:
+        event["name"] = name
+    for k in ("input", "output"):
+        if isinstance(event.get(k), str):
+            event[k] = event[k][:4000]
+    print("@@heimdall-event " + json.dumps(event, default=str), flush=True)
 
 
 def chat(messages):
@@ -55,6 +76,8 @@ def main():
                 result = write_file(args["path"], args["content"])
             except (ValueError, KeyError, TypeError, OSError) as e:
                 result = f"tool error: {e}"
+            report_event("tool_result", "write_file", tool_call_id=c["id"], output=result,
+                         status="ok" if result == "ok" else "error")
             messages.append({"role": "tool", "tool_call_id": c["id"], "content": result})
     print("Stopped: turn cap reached without a final answer.")
     return 0

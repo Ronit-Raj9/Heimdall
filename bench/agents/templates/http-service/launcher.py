@@ -15,7 +15,14 @@ the id; otherwise "/<id>" is appended) until its status is no longer
 on stdout, where the bench reads the completion claim, stops the server and
 exits 0 when the status is completed (or absent on a 200), 1 otherwise. The
 server's own output goes to stderr. Standard library only.
+
+Optionally, steps are reported as agent events (docs/agent-events.md): the
+launcher reports its handoff to the server with report_event, and the server
+inherits BENCH_EVENTS_URL and BENCH_EVENTS_FILE in its environment, so it can
+report its own steps the same way (heimdall.events in bench/clients/python).
+With neither variable set nothing is reported.
 """
+import datetime
 import json
 import os
 import shlex
@@ -25,6 +32,7 @@ import sys
 import time
 import urllib.error
 import urllib.request
+import uuid
 
 SERVER_CMD = os.environ["AGENT_SERVER_CMD"]
 HEALTH_URL = os.environ["AGENT_HEALTH_URL"]
@@ -38,6 +46,47 @@ PENDING = ("queued", "pending", "running", "in_progress")
 
 def log(msg):
     print("launcher: " + msg, file=sys.stderr, flush=True)
+
+
+EVENTS_URL = os.environ.get("BENCH_EVENTS_URL", "")
+EVENTS_FILE = os.environ.get("BENCH_EVENTS_FILE", "")
+
+
+def now_rfc3339():
+    return datetime.datetime.now(datetime.timezone.utc).isoformat(timespec="milliseconds").replace("+00:00", "Z")
+
+
+def report_event(type, name=None, **fields):
+    """Report one agent step (spec/agent-event.schema.json) and return its id.
+
+    POSTs one JSON line to BENCH_EVENTS_URL, else (or when that fails) appends
+    it to BENCH_EVENTS_FILE. Does nothing when the bench sets neither, and
+    never raises.
+    """
+    event = dict({"type": type, "id": uuid.uuid4().hex, "start_time": now_rfc3339()}, **fields)
+    if name is not None:
+        event["name"] = name
+    if not (EVENTS_URL or EVENTS_FILE):
+        return event["id"]
+    for k in ("input", "output"):
+        if k in event:
+            v = event[k] if isinstance(event[k], str) else json.dumps(event[k], default=str)
+            event[k] = v[:4000]
+    line = (json.dumps(event, ensure_ascii=False, default=str) + "\n").encode()
+    try:
+        if EVENTS_URL:
+            req = urllib.request.Request(EVENTS_URL, data=line, method="POST", headers={"Content-Type": "application/x-ndjson"})
+            urllib.request.urlopen(req, timeout=2).close()
+            return event["id"]
+    except Exception:
+        pass
+    try:
+        if EVENTS_FILE:
+            with open(EVENTS_FILE, "ab") as f:
+                f.write(line)
+    except OSError:
+        pass
+    return event["id"]
 
 
 def start_server():
@@ -112,16 +161,21 @@ def main():
     proc = start_server()
     try:
         wait_healthy(proc, start + STARTUP_TIMEOUT_S)
+        handoff_start = now_rfc3339()
         body = run(start + RUN_TIMEOUT_S)
     except (RuntimeError, urllib.error.URLError, OSError, ValueError, KeyError) as e:
         log(str(e))
+        report_event("error", "launcher", output=str(e), status="error")
         print(f"Stopped: {e}")
         return 1
     finally:
         stop_server(proc)
     final = body.get("final_message") or body.get("output") or body.get("message") or ""
+    completed = str(body.get("status", "completed")).lower() == "completed"
+    report_event("handoff", "agent-server", input={"run_url": RUN_URL}, output=final, status="ok" if completed else "error",
+                 start_time=handoff_start, end_time=now_rfc3339())
     print(final if isinstance(final, str) else json.dumps(final))
-    return 0 if str(body.get("status", "completed")).lower() == "completed" else 1
+    return 0 if completed else 1
 
 
 if __name__ == "__main__":

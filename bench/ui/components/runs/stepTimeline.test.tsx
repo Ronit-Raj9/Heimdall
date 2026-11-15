@@ -1,13 +1,28 @@
 import "@/lib/i18n";
 
 import { runStepsPath } from "@/lib/store/apis/runStepsApi";
-import type { RunSteps, StepRecord } from "@/lib/types/bench";
+import type { AgentEventStatus, RunSteps, StepRecord } from "@/lib/types/bench";
 import fs from "node:fs";
 import path from "node:path";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
-import { ObserverStatusLine, StepTimeline } from "./stepTimeline";
-import { clipText, countedSteps, filterSteps, groupStepsByTurn, presentSources, stepTime } from "./stepTimeline.utils";
+import { AgentEventsLine, ObserverStatusLine, StepTimeline } from "./stepTimeline";
+import {
+	MAX_DEPTH,
+	MAX_EVENT_ENTRIES,
+	clipText,
+	countedSteps,
+	eventEntries,
+	filterSteps,
+	groupStepsByTurn,
+	knownChannel,
+	knownCorroboration,
+	knownEventType,
+	presentSources,
+	safeCount,
+	stepDepths,
+	stepTime,
+} from "./stepTimeline.utils";
 
 const FIXTURES = path.resolve(__dirname, "../../public/fixtures");
 
@@ -122,7 +137,7 @@ describe("StepTimeline", () => {
 	it("renders turns, badges, conflict and the steps label", () => {
 		const html = renderToStaticMarkup(<StepTimeline data={data} arm="A" />);
 		expect(html).toContain('data-testid="step-timeline-A"');
-		expect(html).toContain("Steps (model turns): 2");
+		expect(html).toContain("Agent steps (all witnessed actions): 2");
 		expect(html).toContain("Before the first model response");
 		expect(html).toContain("Turn 1");
 		expect(html).toContain("Turn 2");
@@ -186,9 +201,11 @@ describe("StepTimeline", () => {
 	it("renders the fixtures", () => {
 		const read = (file: string) => JSON.parse(fs.readFileSync(path.join(FIXTURES, file), "utf8")) as RunSteps;
 		const withSteps = renderToStaticMarkup(<StepTimeline data={read("runs.r_fmw1z7ouim.steps.json")} arm="A" />);
-		expect(withSteps).toContain("Steps (model turns): 3");
+		expect(withSteps).toContain("Agent steps (all witnessed actions): 3");
+		expect(withSteps).toContain('data-testid="step-row-A-12-reported"');
+		expect(withSteps).toMatch(/data-testid="step-row-A-14"[^>]*data-depth="2"/);
 		const missing = renderToStaticMarkup(<StepTimeline data={read("runs.r_pww2l7yame.steps.json")} arm="B" />);
-		expect(missing).toContain("Steps (model turns): 2");
+		expect(missing).toContain("Agent steps (all witnessed actions): 2");
 		expect(missing).toContain("inotify watch limit reached");
 	});
 });
@@ -209,5 +226,209 @@ describe("ObserverStatusLine", () => {
 	it("says when no observer status was recorded", () => {
 		const html = renderToStaticMarkup(<ObserverStatusLine observers={[]} arm="A" locale="en" />);
 		expect(html).toContain("No observer status recorded for this run.");
+	});
+});
+
+describe("agent-reported rows", () => {
+	const reported = (over: Partial<StepRecord> & Pick<StepRecord, "seq" | "kind" | "turn">): StepRecord =>
+		row({ source: "agent_reported", proof: "partial", channel: "otlp", ...over });
+
+	const withReports: StepRecord[] = [
+		...steps,
+		reported({ seq: 9, kind: "agent_event", turn: 2, event_type: "plan", report_id: "span-1", corroboration: "agent_reported_only" }),
+		reported({ seq: 10, kind: "agent_event", turn: 2, event_type: "subagent_start", parent_seq: 9, channel: "native" }),
+		reported({
+			seq: 11,
+			kind: "tool_execution",
+			turn: 2,
+			event_type: "tool_call",
+			parent_seq: 10,
+			corroboration: "corroborated",
+			witness_of: 8,
+		}),
+		reported({
+			seq: 12,
+			kind: "agent_event",
+			turn: 2,
+			event_type: "<img src=x onerror=alert(1)>{{count}}",
+			report_id: "javascript:alert(3)",
+			parent_seq: 11,
+			corroboration: "conflicts",
+			channel: "<b>pigeon</b>",
+			summary: "<script>alert('sub')</script>",
+		}),
+	];
+	const reportData: RunSteps = { ...data, steps: withReports };
+
+	it("computes nesting depth from the parent chain", () => {
+		const depths = stepDepths(withReports);
+		expect(depths.get(1)).toBe(0);
+		expect(depths.get(9)).toBe(0);
+		expect(depths.get(10)).toBe(1);
+		expect(depths.get(11)).toBe(2);
+		expect(depths.get(12)).toBe(3);
+	});
+
+	it("guards depth against cycles, missing parents and long chains", () => {
+		const cycle = stepDepths([
+			reported({ seq: 1, kind: "agent_event", turn: 0, parent_seq: 2 }),
+			reported({ seq: 2, kind: "agent_event", turn: 0, parent_seq: 1 }),
+			reported({ seq: 3, kind: "agent_event", turn: 0, parent_seq: 3 }),
+		]);
+		expect(cycle.get(1)).toBe(1);
+		expect(cycle.get(2)).toBe(1);
+		expect(cycle.get(3)).toBe(0);
+
+		const missing = stepDepths([reported({ seq: 5, kind: "agent_event", turn: 0, parent_seq: 99 })]);
+		expect(missing.get(5)).toBe(0);
+
+		const chain = Array.from({ length: 20 }, (_, i) =>
+			reported({ seq: i + 1, kind: "agent_event", turn: 0, parent_seq: i === 0 ? undefined : i }),
+		);
+		const deep = stepDepths(chain);
+		expect(deep.get(1)).toBe(0);
+		expect(deep.get(5)).toBe(4);
+		expect(deep.get(20)).toBe(MAX_DEPTH);
+	});
+
+	it("knows only the listed types, channels and corroboration states", () => {
+		expect(knownEventType("subagent_end")).toBe("subagent_end");
+		expect(knownEventType("llm")).toBeUndefined();
+		expect(knownEventType("toString")).toBeUndefined();
+		expect(knownChannel("stdout")).toBe("stdout");
+		expect(knownChannel("carrier pigeon")).toBeUndefined();
+		expect(knownCorroboration("conflicts")).toBe("conflicts");
+		expect(knownCorroboration("toString")).toBeUndefined();
+		expect(knownCorroboration(undefined)).toBeUndefined();
+	});
+
+	it("lists agent_reported last in the source filter and filters it", () => {
+		expect(presentSources(withReports)).toEqual(["gateway", "process_observer", "workspace_observer", "agent_stream", "agent_reported"]);
+		expect(filterSteps(withReports, new Set(["agent_reported"])).map((s) => s.seq)).toEqual([1, 2, 3, 4, 5, 6, 7, 8]);
+
+		const html = renderToStaticMarkup(<StepTimeline data={reportData} arm="A" />);
+		expect(html).toMatch(/aria-pressed="true"[^>]*data-testid="step-filter-A-agent_reported"/);
+		expect(html).toContain("12 of 12 rows shown");
+
+		const hidden = renderToStaticMarkup(<StepTimeline data={reportData} arm="A" initialHidden={["agent_reported"]} />);
+		expect(hidden).toMatch(/aria-pressed="false"[^>]*data-testid="step-filter-A-agent_reported"/);
+		expect(hidden).not.toContain('data-testid="step-row-A-9"');
+		expect(hidden).toContain('data-testid="step-row-A-8"');
+		expect(hidden).toContain("8 of 12 rows shown");
+	});
+
+	it("renders the reported badge, channel, corroboration and nesting", () => {
+		const html = renderToStaticMarkup(<StepTimeline data={reportData} arm="A" />);
+		// Distinct from the agent stream badge: its own testid, dashed, with the channel.
+		expect(html).toMatch(/class="[^"]*border-dashed[^"]*"[^>]*data-testid="step-row-A-9-reported"/);
+		expect(html).not.toContain('data-testid="step-row-A-5-reported"');
+		expect(html).toContain("agent reported");
+		expect(html).toMatch(/data-testid="step-row-A-9-reported-channel">OTLP</);
+		expect(html).toMatch(/data-testid="step-row-A-10-reported-channel">native</);
+		expect(html).toMatch(/data-testid="step-row-A-9-event-type">plan</);
+		expect(html).toMatch(/data-testid="step-row-A-10-event-type">subagent start</);
+		expect(html).toMatch(/data-testid="step-row-A-9-corroboration" data-tone="warn"/);
+		expect(html).toContain("reported only");
+		expect(html).toMatch(/data-testid="step-row-A-11-corroboration" data-tone="good"/);
+		expect(html).toMatch(/data-testid="step-row-A-12-corroboration" data-tone="bad"/);
+		expect(html).not.toContain('data-testid="step-row-A-10-corroboration"');
+		expect(html).toMatch(/data-testid="step-row-A-9"[^>]*data-depth="0"/);
+		expect(html).toMatch(/style="margin-left:1.25rem"[^>]*data-testid="step-row-A-10"[^>]*data-depth="1"/);
+		expect(html).toMatch(/style="margin-left:3.75rem"[^>]*data-testid="step-row-A-12"[^>]*data-depth="3"/);
+		expect(html).toContain("inside #11");
+		expect(html).toMatch(/data-testid="step-row-A-9-report-id">report id <span[^>]*>span-1</);
+		// Reported rows are not counted (the label of the count is tested above).
+		expect(countedSteps(withReports)).toBe(countedSteps(steps));
+		expect(html).not.toMatch(/data-testid="step-row-A-9"[^>]*>(?:(?!<\/li>).)*counted</);
+	});
+
+	it("renders agent-chosen type, channel and id as inert text", () => {
+		const html = renderToStaticMarkup(<StepTimeline data={reportData} arm="A" />);
+		expect(html).not.toContain("<img");
+		expect(html).not.toContain("<b>");
+		expect(html).not.toContain("<script>");
+		expect(html).not.toContain("href=");
+		expect(html).toContain("&lt;img src=x onerror=alert(1)&gt;{{count}}");
+		expect(html).toContain("&lt;b&gt;pigeon&lt;/b&gt;");
+		expect(html).toContain("javascript:alert(3)");
+		expect(html).toContain("&lt;script&gt;alert(&#x27;sub&#x27;)&lt;/script&gt;");
+	});
+});
+
+describe("agent events status", () => {
+	it("shows nothing when the run carries no status", () => {
+		const html = renderToStaticMarkup(<StepTimeline data={data} arm="A" />);
+		expect(html).not.toContain("step-agent-events-");
+		expect(html).not.toContain("The agent reported nothing");
+	});
+
+	it("summarises kept events, channels, types and drops, marked agent-reported", () => {
+		const status: AgentEventStatus = {
+			collector: "on",
+			received: 9,
+			kept: 7,
+			dropped: 2,
+			channels: { native: 2, otlp: 5, "<b>pigeon</b>": 0 },
+			kinds: { tool_call: 4, plan: 1, "{{count}}<img src=x>": 2 },
+		};
+		const html = renderToStaticMarkup(<StepTimeline data={{ ...data, agent_events: status }} arm="A" />);
+		expect(html).toMatch(/data-testid="step-agent-events-A" data-collector="on" data-kept="7"/);
+		expect(html).toMatch(/class="[^"]*border-dashed[^"]*"[^>]*data-testid="step-agent-events-A-badge"/);
+		expect(html).toContain("Agent reported 7 events");
+		expect(html).toMatch(/data-testid="step-agent-events-A-channels">via <span[^>]*>OTLP 5, native 2</);
+		expect(html).toMatch(/data-testid="step-agent-events-A-kinds">types <span[^>]*>tool call 4, \{\{count\}\}&lt;img src=x&gt; 2, plan 1</);
+		expect(html).toMatch(/data-testid="step-agent-events-A-dropped">2 dropped</);
+		expect(html).not.toContain("pigeon");
+		expect(html).not.toContain("<img");
+		expect(html).not.toContain('data-testid="step-agent-events-A-collector"');
+		expect(html).not.toContain("The agent reported nothing");
+		// The status line sits above the rows.
+		expect(html.indexOf("step-agent-events-A")).toBeLessThan(html.indexOf('data-testid="step-row-A-1"'));
+
+		const one = renderToStaticMarkup(<AgentEventsLine status={{ collector: "on", received: 1, kept: 1 }} arm="B" locale="en" />);
+		expect(one).toContain("Agent reported 1 event<");
+		expect(one).not.toContain("step-agent-events-B-dropped");
+	});
+
+	it("says when the agent reported nothing", () => {
+		const html = renderToStaticMarkup(<StepTimeline data={{ ...data, agent_events: { collector: "on", received: 0, kept: 0 } }} arm="A" />);
+		expect(html).toContain("The agent reported nothing (gateway and observer evidence only)");
+		expect(html).not.toContain("Agent reported 0");
+		expect(html).not.toContain("step-agent-events-A-channels");
+		expect(html).not.toContain("step-agent-events-A-reason");
+	});
+
+	it("adds the reason, as plain text, when the collector is missing", () => {
+		const status: AgentEventStatus = {
+			collector: "missing",
+			reason: "<script>alert('r')</script> port 4318 busy\nnext",
+			received: 0,
+			kept: 0,
+		};
+		const html = renderToStaticMarkup(<AgentEventsLine status={status} arm="A" locale="en" />);
+		expect(html).toContain('data-collector="missing"');
+		expect(html).toContain("The agent reported nothing");
+		expect(html).toMatch(/data-testid="step-agent-events-A-collector" data-tone="bad">collector missing</);
+		expect(html).toContain("&lt;script&gt;alert(&#x27;r&#x27;)&lt;/script&gt; port 4318 busy next");
+		expect(html).not.toContain("<script>");
+		expect(html).toMatch(/class="text-chart-error-ink" data-testid="step-agent-events-A-reason"/);
+	});
+
+	it("orders and caps the per-channel counts", () => {
+		expect(eventEntries(undefined)).toEqual({ entries: [], rest: 0 });
+		expect(eventEntries({ stdout: 1, otlp: 1, zz: 1, native: 3, bad: "x" as unknown as number, neg: -2 })).toEqual({
+			entries: [
+				["native", 3],
+				["otlp", 1],
+				["stdout", 1],
+				["zz", 1],
+			],
+			rest: 0,
+		});
+		const many = Object.fromEntries(Array.from({ length: MAX_EVENT_ENTRIES + 3 }, (_, i) => [`k${i}`, 1]));
+		expect(eventEntries(many).entries.length).toBe(MAX_EVENT_ENTRIES);
+		expect(eventEntries(many).rest).toBe(3);
+		expect(safeCount(Number.NaN)).toBe(0);
+		expect(safeCount(4.7)).toBe(4);
 	});
 });

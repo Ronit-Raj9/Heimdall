@@ -164,7 +164,7 @@ func TestProxyInFrontOfBridge(t *testing.T) {
 	if !strings.Contains(body, "read_file") {
 		t.Fatalf("body %q", body)
 	}
-	rows := tp.rows(t)
+	rows := tp.callRows(t)
 	if len(rows) != 1 || rows[0].Tool != "read_file" || rows[0].IsError || rows[0].Status != 200 {
 		t.Fatalf("rows = %+v", rows)
 	}

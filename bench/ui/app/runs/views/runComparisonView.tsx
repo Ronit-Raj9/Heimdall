@@ -7,6 +7,7 @@ import { GatewayLane } from "@/components/runs/gatewayLane";
 import { IncompleteNotice } from "@/components/runs/incompleteNotice";
 import { MetricStrip } from "@/components/runs/metricStrip";
 import { PairPicker } from "@/components/runs/pairPicker";
+import { RunRemoteCoverage } from "@/components/runs/remoteCoverage";
 import { RunScenarioEvidence } from "@/components/runs/runScenario";
 import { TraceDownloadLink } from "@/components/runs/runTraceLink";
 import { RunStepTimeline } from "@/components/runs/stepTimeline";
@@ -188,6 +189,7 @@ function PairComparison({ pairId, onClear }: { pairId: string; onClear: () => vo
 					</TabsList>
 					{lanes.map((lane) => (
 						<TabsContent key={lane.pairRun.arm} value={lane.pairRun.arm}>
+							<RunRemoteCoverage runId={lane.pairRun.run.run_id} arm={lane.pairRun.arm} />
 							<RunStepTimeline runId={lane.pairRun.run.run_id} arm={lane.pairRun.arm} />
 						</TabsContent>
 					))}

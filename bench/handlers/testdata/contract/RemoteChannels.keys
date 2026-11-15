@@ -1,0 +1,4 @@
+# Keys of bench.ts `RemoteChannels` (schemas/remote.go).
+model_traffic
+tools
+self_report

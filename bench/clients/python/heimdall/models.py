@@ -55,6 +55,19 @@ class AgentConfig(_AgentConfigRequired, total=False):
     skills: Optional[AgentSkills]
 
 
+class _AgentEventStatusRequired(TypedDict):
+    collector: str
+    kept: int
+    received: int
+
+
+class AgentEventStatus(_AgentEventStatusRequired, total=False):
+    channels: Dict[str, int]
+    dropped: int
+    kinds: Dict[str, int]
+    reason: str
+
+
 class AgentList(TypedDict):
     agents: List[AgentSummary]
 
@@ -106,6 +119,7 @@ class _AgentSummaryRequired(TypedDict):
 
 class AgentSummary(_AgentSummaryRequired, total=False):
     error: str
+    reports_events: str
 
 
 class AlignedStep(TypedDict):
@@ -606,6 +620,7 @@ class Event(_EventRequired, total=False):
     args_hash: str
     attempt_id: str
     attempt_no: Optional[int]
+    channel: str
     duration_ms: Optional[int]
     event_version: str
     evidence_level: str
@@ -619,6 +634,9 @@ class Event(_EventRequired, total=False):
     parent_event_id: str
     parser_version: str
     provider: str
+    reported_id: str
+    reported_parent: str
+    reported_type: str
     request_id: str
     result_hash: str
     sequence: int
@@ -1547,9 +1565,32 @@ class _RemoteAgentRequired(TypedDict):
 
 
 class RemoteAgent(_RemoteAgentRequired, total=False):
+    artifacts: str
     auth_env: str
     model_traffic: str
+    sign_env: str
     timeout_s: int
+    tools: str
+
+
+class RemoteChannels(TypedDict):
+    model_traffic: str
+    self_report: str
+    tools: str
+
+
+class _RemoteEvidenceRequired(TypedDict):
+    channels: RemoteChannels
+
+
+class RemoteEvidence(_RemoteEvidenceRequired, total=False):
+    agent_reported: List[str]
+    reported: Optional[RemoteReport]
+    trusted: List[str]
+    unknown: List[str]
+
+
+RemoteReport = TypedDict('RemoteReport', {'artifacts': "List[str]", 'async': "bool", 'build': "str", 'cost_usd': "Optional[float]", 'events': "int", 'events_dropped': "int", 'input_tokens': "Optional[int]", 'model': "str", 'notes': "List[str]", 'output_tokens': "Optional[int]", 'total_tokens': "Optional[int]", 'version': "str"}, total=False)
 
 
 class Report(TypedDict):
@@ -1824,6 +1865,12 @@ class RunRef_agentdiff(TypedDict):
     run_id: str
 
 
+class RunRemote(TypedDict):
+    available: bool
+    remote: Optional[RemoteEvidence]
+    run_id: str
+
+
 class _RunReviewsRequired(TypedDict):
     exp_id: str
     outcome: str
@@ -1846,6 +1893,7 @@ class _RunStepsRequired(TypedDict):
 
 
 class RunSteps(_RunStepsRequired, total=False):
+    agent_events: Optional[AgentEventStatus]
     skipped_lines: int
     truncated: bool
 
@@ -2000,16 +2048,22 @@ class _StepRecordRequired(TypedDict):
 
 class StepRecord(_StepRecordRequired, total=False):
     attempt: int
+    channel: str
     conflict: str
+    corroboration: str
     counted: bool
     duration_ms: Optional[int]
+    event_type: str
     execution: str
     exit_code: Optional[int]
     is_error: bool
     op: str
+    parent_seq: int
     path: str
     pid: int
     ppid: int
+    proof_class: str
+    report_id: str
     request_id: str
     session: int
     tool_call_id: str
@@ -2237,14 +2291,23 @@ class _ToolCallRequired(TypedDict):
 class ToolCall(_ToolCallRequired, total=False):
     arguments: str
     blocked: bool
+    content_type: str
     fault: str
+    http_method: str
+    kind: str
     nonce: str
+    path: str
     replayed: bool
+    request_bytes: int
+    response_bytes: int
+    response_content_type: str
     result: str
     session: str
     status: int
     undelivered: bool
     unmatched: bool
+    unparsed: bool
+    unparsed_reason: str
 
 
 class _ToolCallRecordRequired(TypedDict):
@@ -2260,6 +2323,7 @@ class _ToolCallRecordRequired(TypedDict):
 class ToolCallRecord(_ToolCallRecordRequired, total=False):
     execution_id: str
     proof: str
+    proof_class: str
     tool_name: str
     unknown_reason: str
 
@@ -2604,6 +2668,10 @@ class RunReceiptsResponse(RunReceipts):
     mode: Mode
 
 
+class RunRemoteResponse(RunRemote):
+    mode: Mode
+
+
 class RunReviewsResponse(RunReviews):
     mode: Mode
 
@@ -2664,6 +2732,7 @@ __all__ = [
     "Mode",
     'AdapterCapabilities',
     'AgentConfig',
+    'AgentEventStatus',
     'AgentList',
     'AgentMCP',
     'AgentMemory',
@@ -2801,6 +2870,9 @@ __all__ = [
     'ReleaseRecord',
     'ReleaseRequest',
     'RemoteAgent',
+    'RemoteChannels',
+    'RemoteEvidence',
+    'RemoteReport',
     'Report',
     'Report_agentdiff',
     'Response',
@@ -2822,6 +2894,7 @@ __all__ = [
     'RunReceipts',
     'RunRef',
     'RunRef_agentdiff',
+    'RunRemote',
     'RunReviews',
     'RunSteps',
     'RunTiming',
@@ -2909,6 +2982,7 @@ __all__ = [
     'RunDiffResponse',
     'RunEventsResponse',
     'RunReceiptsResponse',
+    'RunRemoteResponse',
     'RunReviewsResponse',
     'RunStepsResponse',
     'SuiteHealthResponse',

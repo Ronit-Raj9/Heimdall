@@ -38,7 +38,14 @@ func Builtin() []schemas.Metric {
 		newExternalCallsMetric(), newExternalUnmatchedMetric(), newExternalErrorRateMetric(), // external API rows of the tool proxy ledger
 		newSkillFilesReadMetric(), // skills: installed skill files the agent read
 		newCheatingRateMetric(),   // impossible tasks: passes before the impossible_pass veto
+		// Tool proxy traffic relayed without being parsed.
+		newToolTrafficUnparsedMetric(),
 		// Agent steps: the step timeline and the trusted observers.
 		newAgentStepsMetric(), newCommandsExecutedMetric(), newFilesChangedMetric(), newModelAttemptsMetric(), newToolCallsUnwitnessedMetric(),
+		newModelTurnsFailedMetric(), newModelTurnsTotalMetric(), newModelRetriesMetric(), newModelFallbacksMetric(), // model turn family beside steps
+		newToolProofMetric(ToolProofRate), newToolProofMetric(ToolProofProxy), newToolProofMetric(ToolProofProcess), newToolProofMetric(ToolProofFileEffect), newToolProofMetric(ToolProofShim), newToolProofMetric(ToolProofResultReturned), newToolProofMetric(ToolProofNone), // proof class of every requested tool call
+		// Remote coverage: agent-reported usage of a remote agent, apart from tokens and cost_usd.
+		newReportedTokensMetric(), newReportedCostMetric(),
+		newReportedStepsMetric(), newReportedToolCallsMetric(), newSubagentsSpawnedMetric(), newEventsDroppedMetric(), // Agent events area: agent-reported (reported.go)
 	}
 }

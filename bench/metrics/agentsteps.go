@@ -65,7 +65,7 @@ func (m *agentStepsMetric) Compute(_ context.Context, _ *schemas.RunContext, ev 
 	}
 	n, native, beyond := 0, false, false
 	for _, s := range ev.Steps {
-		if s.Kind == schemas.StepModelTurn && s.IsError {
+		if (s.Kind == schemas.StepModelTurn && s.IsError) || s.Source == schemas.StepSourceReported { // Agent events area: reported rows are never a witness here
 			continue
 		}
 		switch {

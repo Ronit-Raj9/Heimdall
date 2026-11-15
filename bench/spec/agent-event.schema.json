@@ -1,0 +1,30 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://heimdall.dev/spec/agent-event.schema.json",
+  "title": "Heimdall agent event",
+  "description": "One step an agent reports about itself (docs/agent-events.md). Send one object per line to BENCH_EVENTS_URL (POST, JSON lines, a JSON array or one object), append one per line to BENCH_EVENTS_FILE, or print one per stdout line after the prefix '@@heimdall-event '. Every field is the agent's own word: the bench caps, redacts and shows it as agent-reported evidence, which never raises a trusted metric or decides an outcome.",
+  "type": "object",
+  "required": ["type"],
+  "properties": {
+    "type": {
+      "type": "string",
+      "enum": ["plan", "thought_summary", "tool_call", "tool_result", "subagent_start", "subagent_end", "handoff", "memory_read", "memory_write", "retrieval", "message", "error", "custom"],
+      "description": "What kind of step this is. An unknown value is kept as custom."
+    },
+    "id": {"type": "string", "maxLength": 128, "description": "The agent's id for this event, unique within the run. Other events name it in parent_id."},
+    "parent_id": {"type": "string", "maxLength": 128, "description": "id of the enclosing event (a subagent_start, a plan), for nesting."},
+    "name": {"type": "string", "maxLength": 256, "description": "Tool name, subagent name, handoff target, memory key or a short label."},
+    "tool_call_id": {"type": "string", "maxLength": 128, "description": "The model's tool call id, when the step answers one; links the report to the gateway's record."},
+    "input": {"description": "Input of the step (tool arguments, query). Any JSON; kept as text up to 2 KiB."},
+    "output": {"description": "Output of the step (tool result, plan text). Any JSON; kept as text up to 2 KiB."},
+    "status": {"type": "string", "enum": ["ok", "error", "started", "unknown"]},
+    "start_time": {"description": "When the step started: an RFC 3339 string or Unix milliseconds. Missing means the time it was received.", "type": ["string", "number"]},
+    "end_time": {"description": "When the step ended: an RFC 3339 string or Unix milliseconds.", "type": ["string", "number"]},
+    "attributes": {
+      "type": "object",
+      "description": "Extra key-value pairs; values are strings, numbers or booleans. At most 32 are kept.",
+      "additionalProperties": {"type": ["string", "number", "boolean"]}
+    }
+  },
+  "additionalProperties": true
+}

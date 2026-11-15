@@ -23,9 +23,10 @@ func goodCheckInput() *checkInput {
 			Timing: schemas.RunTiming{AgentStarted: &start, AgentExited: &end},
 			Claim:  &schemas.Claim{Text: "step\nAll tests pass.", Made: true, Matched: "all tests pass", Source: schemas.EvidenceOutcome}},
 		ev: schemas.Evidence{
-			Requests: &schemas.RequestLog{Complete: true, Requests: []schemas.GatewayRequest{{Kind: "message", Status: "success"}, {Kind: "models", Status: "success"}}},
-			Ledger:   []schemas.LedgerEntry{{Upstream: schemas.LedgerUpstreamScripted, Action: "pass"}},
-			Diff:     &schemas.Diff{Files: []schemas.DiffFile{{Path: "a.py", Status: "modified"}}, Rejected: []schemas.DiffReject{{Path: "__pycache__/x", Reason: environments.RejectCache}}},
+			AgentEvents: &schemas.AgentEventStatus{Collector: "on", Kept: 2, Channels: map[string]int{"otlp": 2}, Kinds: map[string]int{"tool_call": 2}}, // Agent events area
+			Requests:    &schemas.RequestLog{Complete: true, Requests: []schemas.GatewayRequest{{Kind: "message", Status: "success"}, {Kind: "models", Status: "success"}}},
+			Ledger:      []schemas.LedgerEntry{{Upstream: schemas.LedgerUpstreamScripted, Action: "pass"}},
+			Diff:        &schemas.Diff{Files: []schemas.DiffFile{{Path: "a.py", Status: "modified"}}, Rejected: []schemas.DiffReject{{Path: "__pycache__/x", Reason: environments.RejectCache}}},
 		},
 		gates: []schemas.GateResult{{Gate: "egress"}},
 		net: []environments.NetWatchRecord{

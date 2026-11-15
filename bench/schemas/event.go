@@ -99,4 +99,10 @@ type Event struct {
 	Tokens           *Tokens          `json:"tokens,omitempty"`
 	USD              *Value           `json:"usd,omitempty"`
 	Summary          string           `json:"summary,omitempty"` // short inert text for display
+	// Agent-reported events (agentevents.go): the type the agent named, its
+	// own ids and the channel the event arrived on. All agent-chosen text.
+	ReportedType   string `json:"reported_type,omitempty"`
+	ReportedID     string `json:"reported_id,omitempty"`
+	ReportedParent string `json:"reported_parent,omitempty"`
+	Channel        string `json:"channel,omitempty"`
 }

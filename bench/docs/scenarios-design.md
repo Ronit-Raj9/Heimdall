@@ -191,8 +191,13 @@ it is recorded in `suite.lock` like any admission.
   and `BENCH_MCP_SERVERS` for `command` agents).
 - `memory.paths`: kept between sessions.
 - `remote`: adapter `remote_http`, for agents that are deployed services.
-  Only `answer` tasks. With `model_traffic: external` tokens, cost and steps
-  are unknown.
+  `answer` tasks always; `state` tasks only with `tools: expose` (the run's
+  tool proxy is published to the deployment behind a per-run bearer token)
+  and a proxied service or external API; `artifact` tasks only with
+  `artifacts: inline`; never `diff` tasks. The planner and the adapter both
+  apply `utils.RemoteOutputAllowed`. With `model_traffic: external` tokens,
+  cost and steps are unknown; a self-reported `usage` fills only
+  `reported_tokens` and `reported_cost_usd` (docs/remote-execution.md).
 
 ### 8. Importers (`bench/importers`, command `bifrost-bench import`)
 

@@ -30,7 +30,9 @@ func checkRows(in *checkInput) []checkRow {
 		diffRow(in),
 	}
 	rows = append(rows, scenarioRows(in)...)
-	return append(rows, egressRow(in, net), processObserverRow(in), workspaceObserverRow(in), evidenceRow(in), claimRow(in))
+	rows = append(rows, remoteRows(in)...) // Remote coverage: channel summary of a remote agent (agentremote.go)
+	// Agent events area: agentEventsRow (agentevents.go) comes last.
+	return append(rows, egressRow(in, net), processObserverRow(in), workspaceObserverRow(in), evidenceRow(in), claimRow(in), agentEventsRow(in))
 }
 
 // withScenarioRows inserts the scenario rows the task has after the diff

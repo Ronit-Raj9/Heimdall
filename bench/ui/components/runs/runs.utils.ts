@@ -1,16 +1,42 @@
 import type { BenchEvent, GridRow, MetricDescriptor, Outcome, Tokens, Value, ValueKind } from "@/lib/types/bench";
 
-/** The per-run metrics shown side by side (DESIGN.md 9.5, 18 screen 2), with the kind used when the catalog has no descriptor. */
+/**
+ * The per-run metrics shown side by side (DESIGN.md 9.5, 18 screen 2), with the kind used when the catalog has no descriptor.
+ * `family` rows sit under the row before them (steps: turns answered, then failed turns, attempts and agent steps, so steps is
+ * never read as everything the agent did; tool calls: how each requested call was proven). `optional` rows show only when some
+ * run recorded the metric: runs sealed before it existed never carry it, and a row of blanks would read as unknown.
+ */
 export const STRIP_METRICS = [
 	{ name: "steps", kind: "count" },
+	{ name: "model_turns_failed", kind: "count", family: true, optional: true },
+	{ name: "model_attempts", kind: "count", family: true, optional: true },
+	{ name: "agent_steps", kind: "count", family: true, optional: true },
 	{ name: "tool_calls", kind: "count" },
+	{ name: "tool_proof_rate", kind: "rate", family: true, optional: true },
+	{ name: "tool_proof_proxy", kind: "rate", family: true, optional: true },
+	{ name: "tool_proof_process", kind: "rate", family: true, optional: true },
+	{ name: "tool_proof_file_effect", kind: "rate", family: true, optional: true },
+	{ name: "tool_proof_shim", kind: "rate", family: true, optional: true },
+	{ name: "tool_proof_result_returned", kind: "rate", family: true, optional: true },
+	{ name: "tool_proof_none", kind: "rate", family: true, optional: true },
+	{ name: "tool_traffic_unparsed", kind: "count", family: true, optional: true },
+	// Agent events area: what the agent reported about itself (agent-reported, never trusted).
+	{ name: "reported_steps", kind: "count", family: true, optional: true },
+	{ name: "reported_tool_calls", kind: "count", family: true, optional: true },
+	{ name: "subagents_spawned", kind: "count", family: true, optional: true },
+	{ name: "events_dropped", kind: "count", family: true, optional: true },
 	{ name: "tokens", kind: "tokens" },
 	{ name: "cost_usd", kind: "usd" },
 	{ name: "wall_time_s", kind: "duration" },
 	{ name: "verified_success", kind: "rate" },
-] as const satisfies readonly { name: string; kind: ValueKind }[];
+] as const satisfies readonly { name: string; kind: ValueKind; family?: boolean; optional?: boolean }[];
 
 export type StripMetricName = (typeof STRIP_METRICS)[number]["name"];
+
+/** The strip rows to show: every fixed row, and an optional row only when some lane recorded it. */
+export function visibleStripMetrics(lanes: readonly { metrics: Record<string, Value | undefined> }[]): (typeof STRIP_METRICS)[number][] {
+	return STRIP_METRICS.filter((m) => !("optional" in m && m.optional) || lanes.some((lane) => lane.metrics[m.name] !== undefined));
+}
 
 /** The catalog's kind for each strip metric, so a changed descriptor changes the renderer. */
 export function stripMetricKinds(catalogMetrics: readonly MetricDescriptor[] | undefined): Record<StripMetricName, ValueKind> {

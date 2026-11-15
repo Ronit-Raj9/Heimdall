@@ -148,6 +148,7 @@ func (e *dockerWorkspace) StartServices(ctx context.Context, rc *schemas.RunCont
 	}
 	routes = append(routes, externalRoutes(runID, ext)...) // External APIs area
 	if len(routes) == 0 {
+		e.startEventCollector(ctx, rc, expID, runID, probe) // Agent events area: the collector alone (eventcollector.go)
 		return handles, results, nil
 	}
 	if err := e.startExternalEgress(ctx, rc, expID, runID, ext); err != nil { // External APIs area: forwarders for live and record APIs
@@ -156,6 +157,7 @@ func (e *dockerWorkspace) StartServices(ctx context.Context, rc *schemas.RunCont
 	if err := e.startToolProxy(ctx, rc, expID, runID, routes, probe, ext); err != nil {
 		return handles, results, &ServiceError{Service: ToolProxyHost, Err: err}
 	}
+	e.markCollector(runID) // Agent events area: the tool proxy serves the collector (eventcollector.go)
 	for i := range handles {
 		if proxied(handles[i].Spec) {
 			handles[i].URL = toolProxyURL(handles[i].Spec.ID)
@@ -164,6 +166,9 @@ func (e *dockerWorkspace) StartServices(ctx context.Context, rc *schemas.RunCont
 	}
 	xh, xr := externalHandles(runID, e.toolProxyImage(), ext) // External APIs area
 	handles, results = append(handles, xh...), append(results, xr...)
+	if err := e.startRemoteTools(ctx, rc, expID, runID, handles); err != nil { // Remote coverage: publish the tool proxy to a remote agent (remotetools.go)
+		return handles, results, &ServiceError{Service: "remote_tools", Err: err}
+	}
 	e.cfg.Logger.Debug("services ready", "run", runID, "services", len(handles), "proxied", len(routes))
 	return handles, results, nil
 }
@@ -204,6 +209,7 @@ func (e *dockerWorkspace) ExportState(ctx context.Context, rc *schemas.RunContex
 			e.cfg.Logger.Warn("tool proxy ledger not copied; tool evidence is unknown", "run", runID, "error", err.Error())
 		}
 	}
+	e.copyAgentEvents(ctx, runID, rc.Dir)                    // Agent events area: the collector's ledger (eventcollector.go)
 	if err := e.exportExternal(ctx, rc, runID); err != nil { // External APIs area: record mode cassettes
 		return files, fmt.Errorf("export state for run %s: %w", runID, err)
 	}

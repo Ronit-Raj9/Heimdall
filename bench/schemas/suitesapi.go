@@ -228,4 +228,9 @@ type AgentSummary struct {
 	FilePaths        []string      `json:"file_paths"`      // container paths the adapter writes, sorted
 	SealedRuns       *int          `json:"sealed_runs"`     // sealed runs of this config id; null without a run index
 	Error            string        `json:"error,omitempty"` // why the config failed to decode
+	// ReportsEvents says how the agent reports its own steps when its config
+	// shows it: "native" for the generic_jsonl parser. Empty means not
+	// known from the config; agent check shows what a run actually reported
+	// (docs/agent-events.md).
+	ReportsEvents string `json:"reports_events,omitempty"`
 }

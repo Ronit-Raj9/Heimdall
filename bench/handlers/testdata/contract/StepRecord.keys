@@ -24,3 +24,11 @@ witnessed_by?
 witness_of?
 counted?
 conflict?
+# Agent-reported rows (source agent_reported, schemas/agentevents.go).
+event_type?
+channel?
+report_id?
+parent_seq?
+corroboration?
+# Tool request rows: the strongest witness of the execution (docs/steps-and-evidence.md).
+proof_class?

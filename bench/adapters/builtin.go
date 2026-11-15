@@ -21,5 +21,6 @@ func BuiltinParsers() []schemas.Parser {
 		newGenericJSONParser(ParserCustomPython),
 		newGenericJSONParser(ParserGeminiCLI),
 		newGenericJSONParser(ParserMiniSWE),
+		newGenericJSONLParser(), // Agent events area: native agent events on stdout (genericjsonl.go)
 	}
 }

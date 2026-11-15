@@ -171,6 +171,9 @@ type ToolCallRecord struct {
 	// executed_agent_reported or no_witness (steps.go). Empty on runs
 	// recorded before the step timeline.
 	Proof string `json:"proof,omitempty"`
+	// ProofClass is the strongest witness of the execution (ProofProxy and
+	// the other proof classes, steps.go). Empty on runs recorded before it.
+	ProofClass string `json:"proof_class,omitempty"`
 }
 
 // ConflictRecord records contradictory observations for one joined fact.

@@ -107,6 +107,8 @@ func eventRank(event schemas.Event) int {
 		return 3
 	case schemas.SourceAgentStream:
 		return 1
+	case schemas.SourceAgentReported: // Agent events area: the agent's own report, the weakest
+		return 0
 	default:
 		return 2
 	}
@@ -120,6 +122,8 @@ func eventOrigin(source schemas.EventSource) schemas.EvidenceOrigin {
 		return schemas.EvidenceSourceFaultProxy
 	case schemas.SourceAgentStream:
 		return schemas.EvidenceSourceAgentStream
+	case schemas.SourceAgentReported: // Agent events area
+		return schemas.EvidenceSourceAgentReported
 	case schemas.SourceToolRunner, schemas.SourceShimLog:
 		return schemas.EvidenceSourceToolRunner
 	case schemas.SourceWorkspace:
@@ -139,7 +143,7 @@ func eventStrength(source schemas.EventSource) schemas.EvidenceStrength {
 		return schemas.EvidenceVerified
 	case schemas.SourceGateway, schemas.SourceProxyLedger:
 		return schemas.EvidenceStrong
-	case schemas.SourceAgentStream:
+	case schemas.SourceAgentStream, schemas.SourceAgentReported: // Agent events area: agent-reported
 		return schemas.EvidencePartial
 	default:
 		return schemas.EvidenceUnknown

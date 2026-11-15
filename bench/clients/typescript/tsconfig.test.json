@@ -4,5 +4,5 @@
 		"types": ["node"],
 		"typeRoots": ["../../ui/node_modules/@types"]
 	},
-	"include": ["src", "test", "../examples/ci-gate.ts"]
+	"include": ["src", "test", "../examples/ci-gate.ts", "../examples/agent-events.ts"]
 }

@@ -13,13 +13,20 @@ provider/model, e.g. anthropic/claude-sonnet-4-5). stdout is one JSON line per
 step, then the final message as plain text, so the bench reads the completion
 claim from the end of stdout without a parser. Replace the loop with yours and
 keep the env contract.
+
+Optionally, the agent reports its own steps (tool calls, results, errors)
+with report_event: the bench shows them as agent-reported evidence beside
+what it observed itself (docs/agent-events.md). With no events variable set
+it does nothing, so the agent runs the same with or without it.
 """
+import datetime
 import json
 import os
 import subprocess
 import sys
 import urllib.error
 import urllib.request
+import uuid
 
 BASE_URL = os.environ["BENCH_BASE_URL"].rstrip("/")
 API_KEY = os.environ["BENCH_API_KEY"]
@@ -54,6 +61,44 @@ SYSTEM = (
 
 def emit(obj):
     print(json.dumps(obj, ensure_ascii=False), flush=True)
+
+
+EVENTS_URL = os.environ.get("BENCH_EVENTS_URL", "")
+EVENTS_FILE = os.environ.get("BENCH_EVENTS_FILE", "")
+
+
+def report_event(type, name=None, **fields):
+    """Report one of the agent's own steps (spec/agent-event.schema.json) and return its id.
+
+    POSTs one JSON line to BENCH_EVENTS_URL, else (or when that fails) appends
+    it to BENCH_EVENTS_FILE. Does nothing when the bench sets neither, and
+    never raises. heimdall.events in bench/clients/python is the full version.
+    """
+    now = datetime.datetime.now(datetime.timezone.utc).isoformat(timespec="milliseconds").replace("+00:00", "Z")
+    event = dict({"type": type, "id": uuid.uuid4().hex, "start_time": now}, **fields)
+    if name is not None:
+        event["name"] = name
+    if not (EVENTS_URL or EVENTS_FILE):
+        return event["id"]
+    for k in ("input", "output"):
+        if k in event:
+            v = event[k] if isinstance(event[k], str) else json.dumps(event[k], default=str)
+            event[k] = v[:4000]
+    line = (json.dumps(event, ensure_ascii=False, default=str) + "\n").encode()
+    try:
+        if EVENTS_URL:
+            req = urllib.request.Request(EVENTS_URL, data=line, method="POST", headers={"Content-Type": "application/x-ndjson"})
+            urllib.request.urlopen(req, timeout=2).close()
+            return event["id"]
+    except Exception:
+        pass
+    try:
+        if EVENTS_FILE:
+            with open(EVENTS_FILE, "ab") as f:
+                f.write(line)
+    except OSError:
+        pass
+    return event["id"]
 
 
 def chat(messages):
@@ -120,6 +165,7 @@ def main():
             resp = chat(messages)
         except (urllib.error.URLError, OSError, ValueError) as e:
             emit({"type": "error", "turn": turn, "error": str(e)})
+            report_event("error", "chat", output=str(e), status="error", attributes={"turn": turn})
             print(f"Stopped: model call failed on turn {turn}: {e}")
             return 1
         msg = resp["choices"][0]["message"]
@@ -131,7 +177,10 @@ def main():
             print(msg.get("content") or "")
             return 0
         for c in calls:
-            result = call_tool(c["function"]["name"], c["function"].get("arguments"))
+            name, raw_args = c["function"]["name"], c["function"].get("arguments")
+            call_id = report_event("tool_call", name, tool_call_id=c["id"], input=raw_args, attributes={"turn": turn})
+            result = call_tool(name, raw_args)
+            report_event("tool_result", name, parent_id=call_id, tool_call_id=c["id"], output=result)
             messages.append({"role": "tool", "tool_call_id": c["id"], "content": result})
     print(f"Stopped: reached the turn cap of {MAX_TURNS} without a final answer.")
     return 0

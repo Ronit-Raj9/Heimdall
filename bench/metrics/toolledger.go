@@ -211,7 +211,8 @@ func (m *distinctToolsMetric) Compute(_ context.Context, rc *schemas.RunContext,
 // newDistinctToolsMetric returns the distinct_tools metric.
 func newDistinctToolsMetric() *distinctToolsMetric { return &distinctToolsMetric{} }
 
-// proxiedCalls returns the ledger's calls without tool listings, or the
+// proxiedCalls returns the ledger's tool calls (schemas.ToolCall.IsToolCall),
+// without tool listings or rows of another kind, or the
 // value to report instead and false: not applicable for a task without a
 // proxied service, unknown when the ledger is missing.
 func proxiedCalls(rc *schemas.RunContext, ev *schemas.Evidence) ([]schemas.ToolCall, schemas.Value, bool) {
@@ -224,8 +225,8 @@ func proxiedCalls(rc *schemas.RunContext, ev *schemas.Evidence) ([]schemas.ToolC
 	}
 	calls := make([]schemas.ToolCall, 0, len(ev.ToolCalls))
 	for _, c := range ev.ToolCalls {
-		if c.Protocol == "mcp" && c.Tool == toolsListTool {
-			continue
+		if c.Protocol == "mcp" && c.Tool == toolsListTool || !c.IsToolCall() {
+			continue // listings, handshakes, notifications and opaque traffic are not tool calls
 		}
 		calls = append(calls, c)
 	}

@@ -91,9 +91,12 @@ func newApp(ctx context.Context, configPath string, opts appOptions) (*app, erro
 			ToolProxyImage: cfg.Images.ToolProxy,
 			// Agent steps area: trusted step observers, on unless switched off.
 			ProcessWatch: cfg.Observers.ProcessOn(), WorkspaceWatch: cfg.Observers.WorkspaceOn(), WatchIntervalMS: cfg.Observers.IntervalMS,
+			EventsCollector:   cfg.Events.CollectorOn(),                                                // Agent events area
+			RemoteToolsListen: cfg.RemoteTools.Listen, RemoteToolsPublicURL: cfg.RemoteTools.PublicURL, // Remote coverage
 		}),
 		Adapters: adapters.Builtin(adapters.CommandConfig{
 			GatewayAgentURL: cfg.Gateway.AgentURL, EvalNetwork: cfg.Networks.Eval, BenchRoot: cfg.Root,
+			GatewayPublicURL: cfg.Gateway.PublicURL, // Remote coverage: the gateway as a remote agent reaches it
 		}),
 		Parsers:     parsers,
 		ProbeLayers: probes.Builtin(probes.Deps{Docker: a.docker, HelperImage: helper, Fault: fault, Logger: logger}),

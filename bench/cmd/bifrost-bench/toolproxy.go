@@ -22,6 +22,9 @@ func runToolProxy(args []string) int {
 	if len(args) > 0 && args[0] == "bridge" {
 		return runToolBridge(args[1:])
 	}
+	if len(args) > 0 && args[0] == "gate" { // Remote coverage: the published gate of a remote agent's run (toolproxygate.go)
+		return runToolGate(args[1:])
+	}
 	fs := flag.NewFlagSet("toolproxy", flag.ContinueOnError)
 	listen := fs.String("listen", ":9200", "address the agent reaches the proxy on")
 	routes := fs.String("routes", "/cfg/routes.json", "routes file: which services are proxied and how")

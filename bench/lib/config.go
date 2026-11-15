@@ -41,6 +41,16 @@ type Config struct {
 	// unless switched off.
 	Observers ObserversConfig `yaml:"observers" json:"observers,omitzero"`
 
+	// Events configures the per-run agent event collector, the events file
+	// and the OpenTelemetry variables given to the agent (Agent events area,
+	// docs/agent-events.md). On unless switched off.
+	Events EventsConfig `yaml:"events" json:"events,omitzero"`
+
+	// RemoteTools is where a remote agent's published tool proxy listens
+	// (Remote coverage, docs/remote-execution.md). Used only by runs of a
+	// remote_http agent with remote.tools expose.
+	RemoteTools RemoteToolsConfig `yaml:"remote_tools" json:"remote_tools,omitzero"`
+
 	Root string `yaml:"-" json:"-"` // bench root that relative paths resolve against
 }
 
@@ -59,6 +69,22 @@ type GatewayConfig struct {
 	AdminTokenEnv string   `yaml:"admin_token_env" json:"admin_token_env"`
 	Provider      string   `yaml:"provider" json:"provider"`
 	KeySlots      []string `yaml:"key_slots" json:"key_slots"`
+	// PublicURL is the gateway as a remote agent on another machine reaches
+	// it (a reverse tunnel or a published address the operator sets up).
+	// When set, a remote_http agent with model_traffic gateway is sent this
+	// URL instead of AgentURL.
+	PublicURL string `yaml:"public_url" json:"public_url,omitempty"`
+}
+
+// RemoteToolsConfig is the remote_tools section. Listen is the bench-host
+// address a run's tool gate is published on, host:port, where port 0 picks a
+// free port per run; default 127.0.0.1:0, loopback only. PublicURL is the
+// base URL a remote agent is told, when it reaches the gate through a tunnel
+// or a published address; "{port}" in it is replaced with the run's port.
+// Empty uses http://<listen host>:<port>.
+type RemoteToolsConfig struct {
+	Listen    string `yaml:"listen" json:"listen,omitempty"`
+	PublicURL string `yaml:"public_url" json:"public_url,omitempty"`
 }
 
 // FaultProxyConfig points at the fault proxy control API.
@@ -236,3 +262,11 @@ func (o ObserversConfig) ProcessOn() bool { return o.Process == nil || *o.Proces
 
 // WorkspaceOn reports whether the workspace observer runs.
 func (o ObserversConfig) WorkspaceOn() bool { return o.Workspace == nil || *o.Workspace }
+
+// EventsConfig switches the agent event collector. Nil means on.
+type EventsConfig struct {
+	Collector *bool `yaml:"collector,omitempty" json:"collector,omitempty"`
+}
+
+// CollectorOn reports whether the agent event collector runs.
+func (o EventsConfig) CollectorOn() bool { return o.Collector == nil || *o.Collector }

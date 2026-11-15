@@ -8,9 +8,12 @@
 //
 // The proxy uses net/http, like the fault proxy, because it streams: MCP
 // servers may answer a POST with a server-sent event stream. It never crashes
-// on traffic it does not understand: a body that is not JSON-RPC is passed
-// through unrecorded, and a call whose answer never arrives is recorded as
-// failed.
+// on traffic it does not understand and lets nothing through unrecorded:
+// every request gets a ledger row. A body that is not JSON-RPC, is over the
+// parse cap, or is of a content type or encoding the proxy does not read is
+// relayed unchanged and recorded as an opaque row whose hash and byte count
+// cover every byte (opaque.go), and a call whose answer never arrives is
+// recorded as failed.
 package toolproxy
 
 import (
@@ -25,7 +28,6 @@ import (
 	"io"
 	"net"
 	"net/http"
-	"net/http/httputil"
 	"net/url"
 	"strings"
 	"time"
@@ -33,8 +35,9 @@ import (
 	"github.com/maximhq/bifrost/bench/schemas"
 )
 
-// maxBody caps a request or response body the proxy reads into memory to
-// parse. A larger body is passed through as a stream.
+// maxBody caps a request or response body of a plain HTTP tool server the
+// proxy reads into memory to record. A larger body is passed through as a
+// stream. MCP traffic uses Server.parseCap (defaultParseCap, opaque.go).
 const maxBody = 32 << 20
 
 // Config is what the proxy needs to start.
@@ -63,6 +66,10 @@ type Server struct {
 	logger  schemas.Logger
 	now     func() time.Time
 	hold    func(ctx context.Context, d time.Duration) error
+
+	// parseCap is the most kept in memory to parse one MCP message
+	// (defaultParseCap; tests lower it).
+	parseCap int64
 
 	// external holds the external routes (external.go); they are never in
 	// routes, so /s/<id> cannot reach them.
@@ -105,9 +112,10 @@ func newServer(cfg Config, rs *Routes) (*Server, error) {
 			MaxIdleConnsPerHost: 16,
 			IdleConnTimeout:     90 * time.Second,
 		}},
-		logger: cfg.Logger,
-		now:    time.Now,
-		hold:   sleepCtx,
+		logger:   cfg.Logger,
+		now:      time.Now,
+		hold:     sleepCtx,
+		parseCap: defaultParseCap,
 	}
 	s.external = map[string]*externalRoute{}
 	for _, r := range rs.Routes {
@@ -175,6 +183,9 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		_, _ = io.WriteString(w, "ok\n")
 		return
 	}
+	if s.serveCollectorPath(w, r) { // Agent events area: POST /events and /otlp/v1/traces (collector.go)
+		return
+	}
 	if rest, ok := strings.CutPrefix(r.URL.Path, "/x/"); ok {
 		s.serveExternal(w, r, rest) // External APIs area: real HTTP APIs behind the allowlist (external.go)
 		return
@@ -197,7 +208,7 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	case rt.Protocol == ProtocolHTTP:
 		s.serveHTTPTool(w, r, rt, path)
 	default:
-		s.pass(w, r, rt, path, r.Body)
+		s.pass(w, r, rt, path)
 	}
 }
 
@@ -206,20 +217,49 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 // or timeout fault takes with a tool error instead of forwarding them, and
 // forwards the rest.
 func (s *Server) serveMCP(w http.ResponseWriter, r *http.Request, rt Route, path string) {
-	body, err := readUpTo(r.Body, maxBody)
+	// Every byte of the request goes through req, so an opaque row's hash
+	// and count cover the whole body however much of it was kept.
+	req := newMeter()
+	in := io.TeeReader(r.Body, req)
+	var body []byte
+	var err error
+	if r.ContentLength <= s.parseCap {
+		body, err = readUpTo(in, s.parseCap)
+	} else {
+		err = errTooLarge
+	}
 	if errors.Is(err, errTooLarge) {
-		s.logger.Warn("mcp request over the parse cap; passed through unrecorded", "service", rt.Service)
-		s.pass(w, r, rt, path, io.MultiReader(bytes.NewReader(body), r.Body))
+		s.logger.Warn("mcp request over the parse cap; relayed unparsed", "service", rt.Service)
+		s.forwardOpaque(w, r, rt, path, io.MultiReader(bytes.NewReader(body), in), req, fmt.Sprintf("request body over the %d MiB parse cap", s.parseCap>>20))
 		return
 	}
 	if err != nil {
+		row := s.baseRow(rt, r, path, schemas.ToolRowOpaque, schemas.ToolRowUnparsedTool)
+		row.Unparsed, row.UnparsedReason = true, "reading the request failed: "+err.Error()
 		http.Error(w, "read request: "+err.Error(), http.StatusBadRequest)
+		s.finishRow(&row, req, relayed{status: http.StatusBadRequest, sha: emptySHA})
 		return
 	}
-	items, batch, ok := parseRPC(body)
-	if !ok {
-		s.logger.Debug("mcp request is not JSON-RPC; passed through unrecorded", "service", rt.Service)
-		s.pass(w, r, rt, path, bytes.NewReader(body))
+	text, decoded := body, false
+	if enc := contentEncoding(r.Header); enc != "" {
+		d, derr := decodeBody(body, enc, s.parseCap)
+		if derr != nil {
+			s.forwardOpaque(w, r, rt, path, bytes.NewReader(body), req, "request content encoding "+enc+": "+derr.Error())
+			return
+		}
+		text, decoded = d, true
+	}
+	if mt := notJSONType(r.Header.Get("Content-Type")); mt != "" {
+		s.forwardOpaque(w, r, rt, path, bytes.NewReader(body), req, "request content type "+mt+" is not JSON")
+		return
+	}
+	items, batch, ok := parseRPC(text)
+	if !ok || len(items) == 0 {
+		reason := "request body is not JSON-RPC"
+		if ok {
+			reason = "request body is an empty JSON-RPC batch"
+		}
+		s.forwardOpaque(w, r, rt, path, bytes.NewReader(body), req, reason)
 		return
 	}
 	x := s.newExchange(rt)
@@ -228,14 +268,17 @@ func (s *Server) serveMCP(w http.ResponseWriter, r *http.Request, rt Route, path
 	hold := 0
 	for _, it := range items {
 		key := idKey(it.msg.ID)
-		switch it.msg.Method {
-		case methodToolsList:
-			if key != "" {
-				x.track(key, methodToolsList, it.msg.Params)
-			}
-		case methodToolsCall:
+		switch m := it.msg; {
+		case m.Method != methodToolsCall:
+			// Everything else the client sends gets a row of its own kind,
+			// so the handshake, listings, resources, prompts, notifications
+			// and answers to server requests are visible; none is a tool call.
+			p := s.clientMessage(x, it, key)
+			p.row.RequestBytes = int64(len(it.raw))
+		default:
 			name, args := readToolParams(it.msg.Params)
 			p := x.track(key, name, args)
+			p.row.RequestBytes = int64(len(it.raw))
 			ft, hit := s.faults.decide(rt.Service, name)
 			switch {
 			case hit && ft.Mode == FaultPoison:
@@ -277,7 +320,11 @@ func (s *Server) serveMCP(w http.ResponseWriter, r *http.Request, rt Route, path
 	if len(forward) != len(items) {
 		out = encodeBatch(forward)
 	}
-	resp, err := s.client.Do(s.upstreamRequest(r, rt, path, out))
+	upReq := s.upstreamRequest(r, rt, path, out)
+	if decoded && len(forward) != len(items) {
+		upReq.Header.Del("Content-Encoding") // the rebuilt batch is sent plain
+	}
+	resp, err := s.client.Do(upReq)
 	if err != nil {
 		msg := "tool server unreachable: " + transportError(err)
 		x.unanswered(http.StatusBadGateway, []byte(msg))
@@ -300,7 +347,7 @@ func (s *Server) serveMCP(w http.ResponseWriter, r *http.Request, rt Route, path
 // a tracked call and rewriting poisoned results. Synthetic answers to faulted
 // calls of a batch are added to the batch's answer.
 func (s *Server) relayJSON(w http.ResponseWriter, resp *http.Response, x *exchange, synthetic []json.RawMessage) {
-	raw, err := readUpTo(resp.Body, maxBody)
+	raw, err := readUpTo(resp.Body, s.parseCap)
 	if err != nil && !errors.Is(err, errTooLarge) {
 		x.unanswered(resp.StatusCode, []byte("read tool server answer: "+err.Error()))
 		copyHeaders(w.Header(), resp.Header, false)
@@ -310,17 +357,37 @@ func (s *Server) relayJSON(w http.ResponseWriter, resp *http.Response, x *exchan
 		return
 	}
 	if errors.Is(err, errTooLarge) {
-		x.unanswered(resp.StatusCode, []byte("answer over the parse cap; not recorded"))
+		// Relayed whole and streamed; the hash and count cover every byte.
+		// Synthetic answers to faulted calls of the batch cannot be merged
+		// into an answer the proxy does not parse; those calls were already
+		// recorded as answered by the fault.
 		copyHeaders(w.Header(), resp.Header, true)
 		w.WriteHeader(resp.StatusCode)
+		m := newMeter()
+		m.Write(raw)
 		_, werr := w.Write(raw)
 		if werr == nil {
-			_, werr = io.Copy(w, resp.Body)
+			_, werr = io.Copy(w, io.TeeReader(resp.Body, m))
 		}
+		sha, n := m.sum()
+		x.unparsedAnswer(resp.StatusCode, fmt.Sprintf("answer over the %d MiB parse cap; relayed whole, not parsed", s.parseCap>>20), sha, n)
 		x.commitAll(werr != nil)
 		return
 	}
-	items, _, ok := parseRPC(raw)
+	text := raw
+	if enc := contentEncoding(resp.Header); enc != "" {
+		d, derr := decodeBody(raw, enc, s.parseCap)
+		if derr != nil {
+			x.unparsedAnswer(resp.StatusCode, "answer content encoding "+enc+": "+derr.Error(), sha256Hex(raw), int64(len(raw)))
+			copyHeaders(w.Header(), resp.Header, false)
+			w.WriteHeader(resp.StatusCode)
+			_, werr := w.Write(raw)
+			x.commitAll(werr != nil)
+			return
+		}
+		text = d
+	}
+	items, _, ok := parseRPC(text)
 	changed := false
 	var all []json.RawMessage
 	if ok {
@@ -338,14 +405,17 @@ func (s *Server) relayJSON(w http.ResponseWriter, resp *http.Response, x *exchan
 		out = encodeBatch(append(all, synthetic...))
 	case len(synthetic) > 0:
 		out, status = encodeBatch(synthetic), http.StatusOK
-	case changed && len(all) == 1 && bytes.TrimSpace(raw)[0] != '[':
+	case changed && len(all) == 1 && bytes.TrimSpace(text)[0] != '[':
 		out = all[0]
 	case changed:
 		out = encodeBatch(all)
 	}
-	x.unanswered(resp.StatusCode, raw)
+	x.unanswered(resp.StatusCode, text)
 	rewritten := len(synthetic) > 0 || changed
 	copyHeaders(w.Header(), resp.Header, rewritten)
+	if rewritten {
+		w.Header().Del("Content-Encoding") // a rewritten answer is sent plain
+	}
 	if len(synthetic) > 0 && !ok {
 		w.Header().Set("Content-Type", "application/json")
 	}
@@ -360,6 +430,17 @@ func (s *Server) relayJSON(w http.ResponseWriter, resp *http.Response, x *exchan
 func (s *Server) relaySSE(w http.ResponseWriter, r *http.Request, resp *http.Response, x *exchange, synthetic []json.RawMessage) {
 	flusher, _ := w.(http.Flusher)
 	copyHeaders(w.Header(), resp.Header, true)
+	var src io.Reader = resp.Body
+	undecodable := ""
+	if enc := contentEncoding(resp.Header); enc != "" {
+		// A compressed stream is decoded to be parsed and relayed decoded.
+		if d, err := decodeReader(resp.Body, enc); err == nil {
+			src = d
+			w.Header().Del("Content-Encoding")
+		} else {
+			undecodable = "answer stream content encoding " + enc + ": " + err.Error()
+		}
+	}
 	w.WriteHeader(resp.StatusCode)
 	var werr error
 	write := func(b []byte) {
@@ -378,9 +459,34 @@ func (s *Server) relaySSE(w http.ResponseWriter, r *http.Request, resp *http.Res
 		write([]byte("event: message\ndata: " + string(m) + "\n\n"))
 	}
 	x.commitFaulted(werr != nil)
-	rd := newSSEReader(resp.Body)
+	if undecodable != "" {
+		m := newMeter()
+		_, _ = io.Copy(writerFunc(func(b []byte) { m.Write(b); write(b) }), src)
+		sha, n := m.sum()
+		x.unparsedAnswer(resp.StatusCode, undecodable, sha, n)
+		x.commitAll(werr != nil || r.Context().Err() != nil)
+		return
+	}
+	rd := newSSEReader(src, int(s.parseCap))
+	var bigSHA string
+	var bigN int64
 	for {
-		ev, err := rd.next()
+		ev, big, err := rd.next()
+		if big {
+			// One event over the parse cap: relayed whole as it streams,
+			// hashed and counted, recorded as an opaque row.
+			m := newMeter()
+			b := ev.bytes()
+			m.Write(b)
+			write(b)
+			rerr := rd.rest(func(p []byte) { m.Write(p); write(p) })
+			bigSHA, bigN = m.sum()
+			s.oversizedEvent(x.route, resp, bigSHA, bigN)
+			if rerr != nil {
+				break
+			}
+			continue
+		}
 		if len(ev.lines) > 0 || len(ev.end) > 0 {
 			done := x.answerEvent(&ev, resp.StatusCode)
 			write(ev.bytes())
@@ -394,8 +500,79 @@ func (s *Server) relaySSE(w http.ResponseWriter, r *http.Request, resp *http.Res
 		}
 	}
 	gone := werr != nil || r.Context().Err() != nil
+	if bigN > 0 {
+		x.unparsedAnswer(resp.StatusCode, fmt.Sprintf("an event of the answer stream was over the %d MiB parse cap; relayed whole, not parsed", s.parseCap>>20), bigSHA, bigN)
+	}
 	x.unanswered(resp.StatusCode, []byte("the event stream ended before an answer"))
 	x.commitAll(gone)
+}
+
+// writerFunc adapts a function to io.Writer.
+type writerFunc func([]byte)
+
+func (f writerFunc) Write(p []byte) (int, error) { f(p); return len(p), nil }
+
+// oversizedEvent records one event of a server's stream that was over the
+// parse cap as an opaque row.
+func (s *Server) oversizedEvent(rt Route, resp *http.Response, sha string, n int64) {
+	row := schemas.ToolCall{
+		Server: rt.Service, Tool: schemas.ToolRowUnparsedTool, Protocol: rt.Protocol, Kind: schemas.ToolRowOpaque,
+		Started: s.now(), Status: resp.StatusCode, ResponseContentType: resp.Header.Get("Content-Type"),
+		ArgsSHA256: emptySHA, ResultSHA256: sha, ResponseBytes: n, Unparsed: true,
+		UnparsedReason: fmt.Sprintf("event stream event over the %d MiB parse cap; relayed whole, not parsed", s.parseCap>>20),
+	}
+	if resp.Request != nil {
+		row.HTTPMethod, row.Path = resp.Request.Method, resp.Request.URL.Path
+	}
+	s.append(&row)
+}
+
+// clientMessage starts the row of a message the client sent that is not a
+// tools/call: a request of another method, a notification, an answer to a
+// server request, or something that is not a JSON-RPC message at all.
+func (s *Server) clientMessage(x *exchange, it rpcItem, key string) *pending {
+	m := it.msg
+	switch {
+	case m.Method != "" && key != "":
+		return x.trackAs(schemas.ToolRowMCPMethod, key, m.Method, m.Params)
+	case m.Method != "":
+		return x.trackAs(schemas.ToolRowNotification, "", m.Method, m.Params)
+	case key != "" || len(m.Result) > 0 || len(m.Error) > 0:
+		return x.trackAs(schemas.ToolRowResponse, "", "response", it.raw)
+	}
+	p := x.trackAs(schemas.ToolRowOpaque, "", schemas.ToolRowUnparsedTool, it.raw)
+	p.row.Unparsed, p.row.UnparsedReason = true, "batch element is not a JSON-RPC message"
+	return p
+}
+
+// serverMessage records a message the server sent that answers no call the
+// proxy tracked: a request to the client (sampling, elicitation, roots), a
+// notification (progress, log messages, list changes), or an answer to an id
+// it does not know. It is written at once.
+func (s *Server) serverMessage(rt Route, it rpcItem, status int) {
+	m := it.msg
+	row := schemas.ToolCall{Server: rt.Service, Protocol: rt.Protocol, Started: s.now(), Status: status, ResponseBytes: int64(len(it.raw))}
+	switch {
+	case m.Method != "" && idKey(m.ID) != "":
+		row.Kind, row.Tool = schemas.ToolRowServerRequest, m.Method
+		row.Arguments, row.ArgsSHA256 = Capture(m.Params)
+		row.ResultSHA256 = emptySHA
+	case m.Method != "":
+		row.Kind, row.Tool = schemas.ToolRowNotification, m.Method
+		row.Arguments, row.ArgsSHA256 = Capture(m.Params)
+		row.ResultSHA256 = emptySHA
+	case idKey(m.ID) != "" || len(m.Result) > 0 || len(m.Error) > 0:
+		row.Kind, row.Tool = schemas.ToolRowResponse, "response"
+		row.ArgsSHA256 = emptySHA
+		row.Result, row.ResultSHA256 = Capture(it.raw)
+		row.IsError = len(bytes.TrimSpace(m.Error)) > 0 && string(bytes.TrimSpace(m.Error)) != "null"
+	default:
+		row.Kind, row.Tool = schemas.ToolRowOpaque, schemas.ToolRowUnparsedTool
+		row.ArgsSHA256 = emptySHA
+		row.Result, row.ResultSHA256 = Capture(it.raw)
+		row.Unparsed, row.UnparsedReason = true, "server message is not a JSON-RPC message"
+	}
+	s.append(&row)
 }
 
 // serveHTTPTool handles one request to a plain HTTP tool server: the method
@@ -404,11 +581,19 @@ func (s *Server) relaySSE(w http.ResponseWriter, r *http.Request, resp *http.Res
 func (s *Server) serveHTTPTool(w http.ResponseWriter, r *http.Request, rt Route, path string) {
 	started := s.now()
 	row := schemas.ToolCall{Server: rt.Service, Tool: r.Method + " " + path, Protocol: ProtocolHTTP, Started: started}
-	body, err := readUpTo(r.Body, maxBody)
+	req := newMeter()
+	in := io.TeeReader(r.Body, req)
+	body, err := readUpTo(in, maxBody)
 	if errors.Is(err, errTooLarge) {
+		// Still a tool call; its arguments are not kept, but the hash and
+		// count cover the whole request body, streamed.
 		s.logger.Warn("http tool request over the parse cap; arguments not recorded", "service", rt.Service)
-		resp, perr := s.client.Do(s.upstreamStream(r, rt, path, io.MultiReader(bytes.NewReader(body), r.Body)))
+		row.Unparsed, row.UnparsedReason = true, fmt.Sprintf("request body over the %d MiB cap; arguments not kept", maxBody>>20)
+		sb := newSignalBody(io.MultiReader(bytes.NewReader(body), in))
+		resp, perr := s.client.Do(s.upstreamStream(r, rt, path, sb))
 		if perr != nil {
+			sb.wait(bodyWait)
+			row.ArgsSHA256, row.RequestBytes = req.sum()
 			row.IsError, row.Status = true, http.StatusBadGateway
 			row.Result, row.ResultSHA256 = Capture([]byte("tool server unreachable: " + transportError(perr)))
 			http.Error(w, row.Result, http.StatusBadGateway)
@@ -416,7 +601,7 @@ func (s *Server) serveHTTPTool(w http.ResponseWriter, r *http.Request, rt Route,
 			return
 		}
 		defer resp.Body.Close()
-		s.relayHTTPTool(w, resp, &row, nil)
+		s.relayHTTPTool(w, resp, &row, nil, func() { sb.wait(bodyWait); row.ArgsSHA256, row.RequestBytes = req.sum() })
 		return
 	}
 	if err != nil {
@@ -431,6 +616,7 @@ func (s *Server) serveHTTPTool(w http.ResponseWriter, r *http.Request, rt Route,
 		}
 	}
 	row.Arguments, row.ArgsSHA256 = Capture(args)
+	row.RequestBytes = int64(len(body))
 	ft, hit := s.faults.decide(rt.Service, row.Tool)
 	if hit && ft.Mode != FaultPoison {
 		row.Fault, row.Nonce, row.IsError = ft.Mode, ft.Nonce, true
@@ -468,16 +654,20 @@ func (s *Server) serveHTTPTool(w http.ResponseWriter, r *http.Request, rt Route,
 	if hit {
 		poison = &ft
 	}
-	s.relayHTTPTool(w, resp, &row, poison)
+	s.relayHTTPTool(w, resp, &row, poison, nil)
 }
 
 // relayHTTPTool relays a plain HTTP tool server's answer and records it. An
 // event stream or a body over the parse cap is streamed; its hash still
 // covers every byte relayed.
-func (s *Server) relayHTTPTool(w http.ResponseWriter, resp *http.Response, row *schemas.ToolCall, poison *schemas.ToolFault) {
+func (s *Server) relayHTTPTool(w http.ResponseWriter, resp *http.Response, row *schemas.ToolCall, poison *schemas.ToolFault, reqDone func()) {
 	row.Status = resp.StatusCode
 	row.IsError = resp.StatusCode >= 400
+	row.ResponseContentType = resp.Header.Get("Content-Type")
 	defer func() {
+		if reqDone != nil {
+			reqDone()
+		}
 		row.LatencyMS = s.now().Sub(row.Started).Milliseconds()
 		s.append(row)
 	}()
@@ -485,8 +675,8 @@ func (s *Server) relayHTTPTool(w http.ResponseWriter, resp *http.Response, row *
 		copyHeaders(w.Header(), resp.Header, true)
 		w.WriteHeader(resp.StatusCode)
 		h := sha256.New()
-		_, err := io.Copy(flushWriter{w}, io.TeeReader(resp.Body, h))
-		row.ResultSHA256 = hex.EncodeToString(h.Sum(nil))
+		n, err := io.Copy(flushWriter{w}, io.TeeReader(resp.Body, h))
+		row.ResultSHA256, row.ResponseBytes = hex.EncodeToString(h.Sum(nil)), n
 		row.Undelivered = err != nil && !errors.Is(err, io.EOF)
 		return
 	}
@@ -498,10 +688,12 @@ func (s *Server) relayHTTPTool(w http.ResponseWriter, resp *http.Response, row *
 		h.Write(raw)
 		row.Result = clip(raw, MaxRecorded)
 		_, werr := w.Write(raw)
+		var n int64
 		if werr == nil {
-			_, werr = io.Copy(w, io.TeeReader(resp.Body, h))
+			n, werr = io.Copy(w, io.TeeReader(resp.Body, h))
 		}
-		row.ResultSHA256 = hex.EncodeToString(h.Sum(nil))
+		row.ResultSHA256, row.ResponseBytes = hex.EncodeToString(h.Sum(nil)), int64(len(raw))+n
+		row.Unparsed, row.UnparsedReason = true, fmt.Sprintf("answer over the %d MiB cap; relayed whole, result cut", maxBody>>20)
 		row.Undelivered = werr != nil
 		return
 	}
@@ -514,32 +706,70 @@ func (s *Server) relayHTTPTool(w http.ResponseWriter, resp *http.Response, row *
 		row.Fault, row.Nonce, changed = FaultPoison, poison.Nonce, true
 	}
 	row.Result, row.ResultSHA256 = Capture(raw)
+	row.ResponseBytes = int64(len(raw))
 	copyHeaders(w.Header(), resp.Header, changed)
 	w.WriteHeader(resp.StatusCode)
 	_, werr := w.Write(raw)
 	row.Undelivered = werr != nil
 }
 
-// pass forwards a request unrecorded and streams the answer back: MCP GET
+// pass forwards a request unchanged and streams the answer back: MCP GET
 // streams, session DELETEs, and any path of an MCP service that is not its
-// endpoint.
-func (s *Server) pass(w http.ResponseWriter, r *http.Request, rt Route, path string, body io.Reader) {
-	target := s.targets[rt.Service]
-	rp := &httputil.ReverseProxy{
-		Rewrite: func(pr *httputil.ProxyRequest) {
-			pr.Out.URL.Scheme, pr.Out.URL.Host = target.Scheme, target.Host
-			pr.Out.URL.Path, pr.Out.URL.RawPath = strings.TrimRight(target.Path, "/")+path, ""
-			pr.Out.Host = target.Host
-		},
-		Transport:     s.client.Transport,
-		FlushInterval: -1,
-		ErrorHandler: func(w http.ResponseWriter, _ *http.Request, err error) {
-			http.Error(w, "tool server unreachable: "+transportError(err), http.StatusBadGateway)
-		},
+// endpoint. It writes one row: transport for a request without a body, opaque
+// for one with a body (it was not parsed). The messages of a server's event
+// stream are parsed one event at a time as they are relayed, and each gets a
+// row of its own.
+func (s *Server) pass(w http.ResponseWriter, r *http.Request, rt Route, path string) {
+	req := newMeter()
+	var body io.Reader
+	if r.ContentLength != 0 && r.Body != nil && r.Body != http.NoBody {
+		body = io.TeeReader(r.Body, req)
 	}
-	r2 := r.Clone(r.Context())
-	r2.Body = io.NopCloser(body)
-	rp.ServeHTTP(w, r2)
+	row := s.baseRow(rt, r, path, schemas.ToolRowTransport, r.Method+" "+path)
+	notParsed, compressed := 0, false
+	res := s.relayRecorded(w, r, rt, path, body, func(resp *http.Response) io.Writer {
+		h, status := resp.Header, resp.StatusCode
+		if !isEventStream(h) {
+			return nil
+		}
+		if contentEncoding(h) != "" {
+			compressed = true
+			return nil
+		}
+		return &sseSplitter{
+			limit: int(s.parseCap),
+			onEvent: func(b []byte) {
+				ev := eventOf(b)
+				data, ok := ev.data()
+				if !ok {
+					return // a comment or keep-alive
+				}
+				items, _, ok := parseRPC(data)
+				if !ok {
+					notParsed++
+					return
+				}
+				for _, it := range items {
+					s.serverMessage(rt, it, status)
+				}
+			},
+			onOver: func(sha string, n int64) {
+				notParsed++
+				s.oversizedEvent(rt, resp, sha, n)
+			},
+		}
+	})
+	if _, n := req.sum(); n > 0 {
+		row.Kind, row.Tool = schemas.ToolRowOpaque, schemas.ToolRowUnparsedTool
+		row.Unparsed, row.UnparsedReason = true, fmt.Sprintf("%s %s is not a POST to the MCP endpoint; body relayed unparsed", r.Method, path)
+	}
+	switch {
+	case compressed:
+		row.Unparsed, row.UnparsedReason = true, "compressed event stream relayed unparsed"
+	case notParsed > 0 && !row.Unparsed:
+		row.Unparsed, row.UnparsedReason = true, fmt.Sprintf("%d events of the stream carried no parsable JSON-RPC message", notParsed)
+	}
+	s.finishRow(&row, req, res)
 }
 
 // append writes a row to the ledger. A write failure is logged and shows on
@@ -574,13 +804,22 @@ func (s *Server) upstreamStream(r *http.Request, rt Route, path string, body io.
 		ProtoMajor:    1,
 		ProtoMinor:    1,
 		Header:        http.Header{},
-		Body:          io.NopCloser(body),
+		Body:          readCloser(body),
 		ContentLength: -1,
 		Host:          u.Host,
 	}).WithContext(r.Context())
 	copyHeaders(req.Header, r.Header, true)
 	req.Header.Del("Accept-Encoding")
 	return req
+}
+
+// readCloser keeps a body's own Close (a signalBody says when the transport
+// is done with it) and adds a no-op one otherwise.
+func readCloser(r io.Reader) io.ReadCloser {
+	if rc, ok := r.(io.ReadCloser); ok {
+		return rc
+	}
+	return io.NopCloser(r)
 }
 
 // newExchange starts the record of one request.
