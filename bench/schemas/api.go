@@ -132,6 +132,13 @@ type RunDetail struct {
 	Gates       []GateResult     `json:"gates"`
 	Receipts    []Receipt        `json:"receipts"`
 	SealError   string           `json:"seal_error,omitempty"` // why a sealed run's files do not match its seal; empty when they do or the run is not sealed
+
+	// Scenario evidence (scenario.go); each is empty for a plain diff run.
+	ToolCalls []ToolCall      `json:"tool_calls,omitempty"`
+	Sessions  []SessionResult `json:"sessions,omitempty"`
+	Answer    *Answer         `json:"answer,omitempty"`
+	State     []StateFile     `json:"state,omitempty"`
+	Services  []ServiceResult `json:"services,omitempty"`
 }
 
 // RunDiff is GET /runs/{id}/diff. Patch is inert text.

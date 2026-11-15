@@ -19,6 +19,12 @@ type AgentConfig struct {
 	Gateway GatewayPolicy     `json:"gateway" yaml:"gateway"`
 	// Scripted is read only by the scripted adapter.
 	Scripted *ScriptedSpec `json:"scripted,omitempty" yaml:"scripted"`
+
+	// Scenario fields (scenario.go). All optional.
+	MCP    *AgentMCP    `json:"mcp,omitempty" yaml:"mcp"`       // how the agent is told about MCP servers
+	Skills *AgentSkills `json:"skills,omitempty" yaml:"skills"` // agent skills and where they are installed
+	Memory *AgentMemory `json:"memory,omitempty" yaml:"memory"` // paths kept between sessions
+	Remote *RemoteAgent `json:"remote,omitempty" yaml:"remote"` // read only by the remote_http adapter
 }
 
 // AgentNotes says which notes files the agent reads (DESIGN.md 8.6).

@@ -169,4 +169,9 @@ type RunContext struct {
 	Exec       *ExecResult
 	Dir        string // the run folder
 	Logger     Logger
+
+	// Scenario state (scenario.go), set by the engine as the run proceeds.
+	Services     []ServiceHandle // started services, including the tool proxy's view of them
+	Session      *SessionSpec    // the session being run; nil for a single-session task
+	SessionIndex int             // 0-based index of Session
 }

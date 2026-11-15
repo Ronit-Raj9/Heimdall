@@ -1,0 +1,400 @@
+package schemas
+
+import (
+	"context"
+	"time"
+)
+
+// This file is the contract for scenarios: tasks that are more than "edit a
+// repository and pass hidden tests". A scenario is a workspace (optional),
+// services that run beside the agent, one or more sessions, an output, and a
+// verifier. docs/scenarios-design.md explains every type here. Every field
+// added to an older struct for scenarios is optional and omitted when empty,
+// so manifests, locks and seals written before scenarios keep their hashes.
+
+// Suite tracks group suites on the leaderboard and in reports (Suite.Track).
+const (
+	TrackCoding   = "coding"   // edit a repository, hidden tests (the default)
+	TrackTerminal = "terminal" // work in a whole container, state checked afterwards
+	TrackToolUse  = "tool_use" // call tools against a service, final state checked
+	TrackMCP      = "mcp"      // tools reached over the Model Context Protocol
+	TrackMemory   = "memory"   // several sessions, recall checked in the last one
+	TrackSkills   = "skills"   // the same task with and without agent skills
+	TrackSafety   = "safety"   // attacks delivered through tool results or files
+	TrackQA       = "qa"       // a written answer, matched or judged
+)
+
+// Grading levels (Suite.Grading). A judged suite's outcomes come from a
+// pinned judge model, not a deterministic check; reports and the leaderboard
+// label it and never place judged and verified results in one comparison.
+const (
+	GradingVerified = "verified"
+	GradingJudged   = "judged"
+)
+
+// Output kinds (OutputSpec.Kind): what the verifier reads.
+const (
+	OutputDiff   = "diff"   // the exported workspace patch (the default)
+	OutputAnswer = "answer" // a text answer the agent wrote
+	OutputState  = "state"  // files exported from services after the run
+)
+
+// Verifier modes (SuiteVerifier.Mode).
+const (
+	// VerifierCleanRoom grades a pristine copy of the task repo with the
+	// agent's diff applied (the default).
+	VerifierCleanRoom = "clean_room"
+	// VerifierSnapshot grades a frozen copy of the agent's whole container
+	// file system, taken after the agent exited, in a fresh container with no
+	// network. It is for tasks whose result lives outside the workspace
+	// (installed packages, files under /etc, a built binary). The agent
+	// process is gone and the hidden files arrive only then, but the agent
+	// could have changed the tools the verifier calls, so a snapshot grade is
+	// weaker evidence than a clean-room grade and is labelled.
+	VerifierSnapshot = "snapshot"
+)
+
+// Service roles (ServiceSpec.Role).
+const (
+	ServiceRoleData = "data" // a database or file store the agent or its tools change
+	ServiceRoleTool = "tool" // an HTTP tool server
+	ServiceRoleMCP  = "mcp"  // a Model Context Protocol server
+	ServiceRoleUser = "user" // a simulated user the agent converses with
+)
+
+// TaskEnvironment gives a task its own container image instead of the suite's
+// base image plus a repo folder. It is how tasks from benchmarks that ship one
+// image or Dockerfile per task are run.
+type TaskEnvironment struct {
+	// Image is a prebuilt image tag. Dockerfile (relative to the task folder)
+	// builds one when Image is empty; it is tagged
+	// bench/task-<suite>-<task>:<content hash>. Context is the build context,
+	// relative to the task folder (default: the Dockerfile's folder).
+	Image      string `json:"image,omitempty" yaml:"image"`
+	Dockerfile string `json:"dockerfile,omitempty" yaml:"dockerfile"`
+	Context    string `json:"context,omitempty" yaml:"context"`
+	// WorkspacePath is the folder inside the image whose content seeds the
+	// workspace volume (for example /app or /testbed). Empty seeds the
+	// workspace from the task's repo folder as before.
+	WorkspacePath string `json:"workspace_path,omitempty" yaml:"workspace_path"`
+	// VerifierImage is the image the verifier runs in under clean_room mode.
+	// Empty uses the task image.
+	VerifierImage string `json:"verifier_image,omitempty" yaml:"verifier_image"`
+	// BuildNetwork allows network during the image build only (most upstream
+	// Dockerfiles install packages). The run itself never gets it.
+	BuildNetwork bool `json:"build_network,omitempty" yaml:"build_network"`
+}
+
+// ServiceSpec is one container started beside the agent for a run and removed
+// after it. The agent reaches it by its ID as a host name; no other run can,
+// and a service has no route out of the evaluation network.
+type ServiceSpec struct {
+	ID    string            `json:"id" yaml:"id"`
+	Role  string            `json:"role,omitempty" yaml:"role"` // data | tool | mcp | user
+	Image string            `json:"image,omitempty" yaml:"image"`
+	Build *ImageSpec        `json:"build,omitempty" yaml:"build"` // Dockerfile relative to the suite root (suite services) or the task folder (task services)
+	Argv  []string          `json:"argv,omitempty" yaml:"argv"`
+	Env   map[string]string `json:"env,omitempty" yaml:"env"`
+	// Files maps a container path to a file relative to the task folder (or
+	// the suite root for suite services). They are copied in before start and
+	// are how a task seeds a database or a tool server's data.
+	Files map[string]string `json:"files,omitempty" yaml:"files"`
+	Port  int               `json:"port,omitempty" yaml:"port"` // the port the service listens on
+	Ready *ReadyCheck       `json:"ready,omitempty" yaml:"ready"`
+	// Export lists what is read from the service after the agent exits. Each
+	// entry lands in the run folder at state/<service id>/<export id>, is
+	// sealed, and is mounted read-only in the verifier at
+	// /grader/state/<service id>/<export id>.
+	Export []StateExport `json:"export,omitempty" yaml:"export"`
+	// MCP describes the endpoint when Role is mcp. Proxy routes the agent's
+	// calls through the per-run tool proxy, which records and can fault them;
+	// it defaults to true for tool and mcp services.
+	MCP   *MCPEndpoint `json:"mcp,omitempty" yaml:"mcp"`
+	Proxy *bool        `json:"proxy,omitempty" yaml:"proxy"`
+	// Hidden keeps the service off the agent's network: only the verifier and
+	// other services reach it.
+	Hidden bool `json:"hidden,omitempty" yaml:"hidden"`
+}
+
+// ReadyCheck says when a service is ready. Exactly one of Argv (run inside
+// the service container, exit 0 means ready) or HTTP (a path on Port that
+// must answer 2xx) is set.
+type ReadyCheck struct {
+	Argv     []string `json:"argv,omitempty" yaml:"argv"`
+	HTTP     string   `json:"http,omitempty" yaml:"http"`
+	TimeoutS int      `json:"timeout_s,omitempty" yaml:"timeout_s"` // default 60
+}
+
+// StateExport reads one piece of a service's final state: the stdout of Argv
+// run inside the service container (a database dump, a JSON query), or the
+// file or folder at Path (stored as a tar when a folder).
+type StateExport struct {
+	ID       string   `json:"id" yaml:"id"`
+	Argv     []string `json:"argv,omitempty" yaml:"argv"`
+	Path     string   `json:"path,omitempty" yaml:"path"`
+	MaxBytes int64    `json:"max_bytes,omitempty" yaml:"max_bytes"` // default 16 MiB; a larger export fails the run's grade as invalid_evaluator
+}
+
+// MCPEndpoint is how an MCP service is reached. Transport is "http"
+// (streamable HTTP at Path on the service's Port). A server that only speaks
+// stdio is wrapped by a bridge inside its own service image.
+type MCPEndpoint struct {
+	Transport string `json:"transport,omitempty" yaml:"transport"` // http (default)
+	Path      string `json:"path,omitempty" yaml:"path"`           // default /mcp
+}
+
+// SessionSpec is one agent session of a multi-session task. Sessions run in
+// order, each as a fresh agent process. The agent's memory paths
+// (AgentMemory.Paths) and the /memory volume persist between them; nothing
+// else does unless KeepWorkspace is set.
+type SessionSpec struct {
+	ID          string `json:"id" yaml:"id"`
+	Instruction string `json:"instruction" yaml:"instruction"` // file relative to the task folder
+	// Files is a folder (relative to the task folder) copied into the
+	// workspace before the session starts, for example a chat transcript to
+	// read and remember.
+	Files string `json:"files,omitempty" yaml:"files"`
+	// KeepWorkspace keeps the workspace from the previous session. The
+	// default resets it to the task's starting state, so the only way to
+	// carry knowledge forward is the agent's memory.
+	KeepWorkspace bool `json:"keep_workspace,omitempty" yaml:"keep_workspace"`
+	WallS         int  `json:"wall_s,omitempty" yaml:"wall_s"` // session wall budget; default the agent's budget
+}
+
+// OutputSpec says what the verifier reads. For kind answer the agent writes
+// its answer to AnswerPath in the workspace (default answer.txt); when the
+// file is missing the final message is used and the source is recorded.
+type OutputSpec struct {
+	Kind       string `json:"kind,omitempty" yaml:"kind"` // diff | answer | state
+	AnswerPath string `json:"answer_path,omitempty" yaml:"answer_path"`
+}
+
+// AnswerSpec is the hidden expected answer of a task with output kind answer,
+// read from the task's verifier folder (TaskVerifier.Answer, default
+// answer.yaml). The answer_match grader checks it without a model.
+type AnswerSpec struct {
+	// Match is exact, contains_all, regex, numeric, choice or json.
+	Match     string   `json:"match" yaml:"match"`
+	Expected  []string `json:"expected" yaml:"expected"`                     // exact/choice: any one matches; contains_all: every one must appear; regex: any one matches
+	Normalize []string `json:"normalize,omitempty" yaml:"normalize"`         // lower, strip_punct, collapse_space, trim
+	Tolerance float64  `json:"tolerance,omitempty" yaml:"tolerance"`         // numeric: absolute tolerance
+	Category  string   `json:"category,omitempty" yaml:"category"`           // reported as a breakdown, e.g. temporal-reasoning
+	Question  string   `json:"question,omitempty" yaml:"question"`           // the question, for the judge prompt
+	Rubric    string   `json:"rubric,omitempty" yaml:"rubric"`               // judge grader: what a correct answer must contain
+	Abstain   bool     `json:"abstain,omitempty" yaml:"abstain"`             // the correct behaviour is to say the answer is not known
+	WrongOnes []string `json:"wrong_answers,omitempty" yaml:"wrong_answers"` // admission controls: answers that must fail
+}
+
+// JudgeSpec pins the judge model of a judged suite (Suite.Judge). Every field
+// is hashed into the manifest. Judge calls go through the gateway on their
+// own key, never the run's, and their cost is reported apart from the
+// agent's.
+type JudgeSpec struct {
+	Provider      string `json:"provider" yaml:"provider"`
+	Model         string `json:"model" yaml:"model"`
+	PromptVersion string `json:"prompt_version" yaml:"prompt_version"` // names the embedded prompt template
+	Votes         int    `json:"votes,omitempty" yaml:"votes"`         // odd number of independent calls, majority decides; default 1
+	MaxTokens     int    `json:"max_tokens,omitempty" yaml:"max_tokens"`
+}
+
+// JudgeRecord is what one judged grade rested on (Grade.Judge).
+type JudgeRecord struct {
+	Model         string   `json:"model"`
+	PromptVersion string   `json:"prompt_version"`
+	PromptSHA256  string   `json:"prompt_sha256"`
+	Votes         []string `json:"votes"` // each call's verdict: correct | incorrect | unparsable
+	USD           Value    `json:"usd"`   // judge cost; never added to the agent's cost
+}
+
+// ImportRecord says where an imported suite came from (Suite.Imported).
+type ImportRecord struct {
+	Importer  string    `json:"importer" yaml:"importer"`           // importer name, e.g. harbor
+	Benchmark string    `json:"benchmark" yaml:"benchmark"`         // e.g. terminal-bench@2.1
+	Source    string    `json:"source" yaml:"source"`               // repository or dataset URL
+	Revision  string    `json:"revision,omitempty" yaml:"revision"` // commit or dataset revision imported
+	License   string    `json:"license" yaml:"license"`             // SPDX id as upstream states it
+	At        time.Time `json:"at" yaml:"at"`
+}
+
+// AgentMCP says how an agent is told about the run's MCP servers. The engine
+// resolves every proxied mcp service to a URL and the adapter renders them in
+// the agent's own format. Template variables for argv, env and files:
+// {{mcp.servers_json}} (a JSON object {"<id>": {"url": "..."}}) and
+// {{mcp.<id>.url}}. The same JSON is always set in BENCH_MCP_SERVERS.
+type AgentMCP struct {
+	// Format is codex_toml, claude_json, opencode_json, generic_json or env.
+	// Empty lets the adapter choose its native format.
+	Format string `json:"format,omitempty" yaml:"format"`
+	// ConfigPath is the container path the rendered config is written to.
+	// Empty uses the adapter's native path.
+	ConfigPath string `json:"config_path,omitempty" yaml:"config_path"`
+}
+
+// AgentSkills controls agent skills (folders holding a SKILL.md). A task can
+// carry skills (Task.Skills) and a config can add its own (Extra). Enabled
+// false installs none: an arm that sets skills.enabled to false is the
+// "without skills" arm of a skill comparison.
+type AgentSkills struct {
+	Enabled *bool    `json:"enabled,omitempty" yaml:"enabled"` // default true
+	Dir     string   `json:"dir,omitempty" yaml:"dir"`         // container folder the agent reads skills from; empty uses the adapter's native folder
+	Extra   []string `json:"extra,omitempty" yaml:"extra"`     // skill folders relative to the bench root, installed for every task
+}
+
+// AgentMemory names the container paths that hold the agent's own memory.
+// They are kept between the sessions of a multi-session task and are empty at
+// the first session. The /memory volume is always kept and its path is given
+// in BENCH_MEMORY_DIR.
+type AgentMemory struct {
+	Paths []string `json:"paths,omitempty" yaml:"paths"`
+}
+
+// RemoteAgent describes an agent that is a deployed service instead of a
+// container image (adapter remote_http). Only tasks with output kind answer
+// can run against it: the agent is not beside the workspace. ModelTraffic
+// says where its model calls go: "gateway" when the deployment is pointed at
+// this bench's gateway with the run key, "external" when they are out of
+// sight, in which case tokens, cost and steps are unknown, never zero.
+type RemoteAgent struct {
+	URL          string `json:"url" yaml:"url"`
+	AuthEnv      string `json:"auth_env,omitempty" yaml:"auth_env"` // name of the host environment variable holding the bearer token
+	TimeoutS     int    `json:"timeout_s,omitempty" yaml:"timeout_s"`
+	ModelTraffic string `json:"model_traffic,omitempty" yaml:"model_traffic"` // gateway | external (default)
+}
+
+// ToolCall is one tool invocation recorded by the per-run tool proxy
+// (tools.jsonl in the run folder). Arguments and results are kept in full up
+// to a size cap; larger ones are truncated and their hash still covers the
+// whole value.
+type ToolCall struct {
+	Seq          int       `json:"seq"` // 1-based order within the run
+	Session      string    `json:"session,omitempty"`
+	Server       string    `json:"server"`   // service id
+	Tool         string    `json:"tool"`     // tool name; for plain HTTP tool servers the method and path
+	Protocol     string    `json:"protocol"` // mcp | http
+	Arguments    string    `json:"arguments,omitempty"`
+	ArgsSHA256   string    `json:"args_sha256"`
+	Result       string    `json:"result,omitempty"`
+	ResultSHA256 string    `json:"result_sha256"`
+	IsError      bool      `json:"is_error"`
+	Status       int       `json:"status,omitempty"` // HTTP status from the tool server
+	Fault        string    `json:"fault,omitempty"`  // the injected fault that answered instead of the server: error | timeout | poison
+	Nonce        string    `json:"nonce,omitempty"`
+	Started      time.Time `json:"started"`
+	LatencyMS    int64     `json:"latency_ms"`
+}
+
+// ToolFault is a fault the tool proxy injects for one run (ProbeApply.Tool,
+// probe layer LayerTool). Mode error answers the matching calls with a tool
+// error, timeout delays them past TimeoutS and then errors, poison lets the
+// real call through and appends Text to its result (an injected instruction).
+type ToolFault struct {
+	Mode     string `json:"mode" yaml:"mode"`                     // error | timeout | poison
+	Server   string `json:"server,omitempty" yaml:"server"`       // service id; empty matches every server
+	Tool     string `json:"tool,omitempty" yaml:"tool"`           // tool name; empty matches every tool
+	FromCall int    `json:"from_call,omitempty" yaml:"from_call"` // first affected matching call, 1-based (default 1)
+	Calls    int    `json:"calls,omitempty" yaml:"calls"`         // how many matching calls are affected; 0 means all from FromCall
+	Message  string `json:"message,omitempty" yaml:"message"`     // error text
+	TimeoutS int    `json:"timeout_s,omitempty" yaml:"timeout_s"`
+	Text     string `json:"text,omitempty" yaml:"text"` // poison: appended to the result; {{nonce}} is replaced per run
+	Nonce    string `json:"nonce,omitempty" yaml:"-"`
+}
+
+// LayerTool is the probe layer of tool faults: it acts in the tool proxy.
+const LayerTool ProbeLayerName = "tool"
+
+// FamilyHostileTool is the failure family of attacks delivered through a tool
+// result. It is not one of the three PS2 families.
+const FamilyHostileTool PS2Family = "hostile_tool"
+
+// Answer is the agent's exported answer (answer.txt in the run folder).
+type Answer struct {
+	Text      string `json:"text"`
+	Source    string `json:"source"` // file | final_message | missing
+	SHA256    string `json:"sha256"`
+	Truncated bool   `json:"truncated,omitempty"`
+}
+
+// SessionResult is how one session of a multi-session run ended.
+type SessionResult struct {
+	ID       string    `json:"id"`
+	Index    int       `json:"index"` // 1-based
+	ExitCode int       `json:"exit_code"`
+	TimedOut bool      `json:"timed_out"`
+	Started  time.Time `json:"started"`
+	Ended    time.Time `json:"ended"`
+	Stdout   string    `json:"stdout_path"` // agent.stream.<index>.jsonl in the run folder
+}
+
+// ServiceResult is one service of a run: what ran and whether it came up.
+type ServiceResult struct {
+	ID      string `json:"id"`
+	Role    string `json:"role,omitempty"`
+	Image   string `json:"image"`
+	ImageID string `json:"image_id,omitempty"`
+	Ready   bool   `json:"ready"`
+	Error   string `json:"error,omitempty"`
+	Proxied bool   `json:"proxied,omitempty"`
+}
+
+// StateFile is one exported piece of service state in the run folder.
+type StateFile struct {
+	Service string `json:"service"`
+	ID      string `json:"id"`
+	Path    string `json:"path"` // relative to the run folder: state/<service>/<id>
+	SHA256  string `json:"sha256"`
+	Bytes   int64  `json:"bytes"`
+	Error   string `json:"error,omitempty"`
+}
+
+// ServiceHandle is a started service as the rest of the run sees it.
+type ServiceHandle struct {
+	Spec      ServiceSpec `json:"spec"`
+	Container string      `json:"container"`
+	Host      string      `json:"host"` // host name on the run's network (the service id)
+	// URL is where the agent reaches the service: the tool proxy's address
+	// for a proxied service, the service's own otherwise.
+	URL      string `json:"url,omitempty"`
+	Upstream string `json:"upstream,omitempty"` // the service's own address, behind the proxy
+}
+
+// ServiceEnvironment is implemented by environments that can run services
+// beside the agent. StartServices is called in the prepare stage after
+// Create; ExportState in the export stage after the agent exited;
+// Destroy removes the services with everything else.
+type ServiceEnvironment interface {
+	StartServices(ctx context.Context, rc *RunContext) ([]ServiceHandle, []ServiceResult, error)
+	ExportState(ctx context.Context, rc *RunContext) ([]StateFile, error)
+}
+
+// SessionEnvironment is implemented by environments that can run several
+// sessions in one run. BeginSession prepares the workspace for session index
+// (0-based): it resets it unless the session keeps it, lays the session's
+// files, and leaves the memory volume and memory paths untouched.
+type SessionEnvironment interface {
+	BeginSession(ctx context.Context, rc *RunContext, index int) error
+}
+
+// SnapshotEnvironment is implemented by environments that can freeze the
+// agent container's file system after it exited, for snapshot grading. The
+// returned image reference is removed by Destroy.
+type SnapshotEnvironment interface {
+	Snapshot(ctx context.Context, rc *RunContext) (string, error)
+}
+
+// AnswerEnvironment is implemented by environments that can read the agent's
+// answer file from the workspace in a trusted container.
+type AnswerEnvironment interface {
+	ExportAnswer(ctx context.Context, rc *RunContext) (*Answer, error)
+}
+
+// WorkerInfo is one remote worker as GET /workers lists it.
+type WorkerInfo struct {
+	ID        string    `json:"id"`
+	Host      string    `json:"host"`
+	Version   string    `json:"version"` // bench build the worker runs
+	State     string    `json:"state"`   // idle | running | lost
+	Slots     int       `json:"slots"`   // concurrent runs it offers
+	Running   []string  `json:"running"` // slot ids it holds
+	Completed int       `json:"completed"`
+	LastSeen  time.Time `json:"last_seen"`
+}

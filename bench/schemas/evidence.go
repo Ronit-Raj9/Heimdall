@@ -16,6 +16,14 @@ type Evidence struct {
 	Grade    *Grade            `json:"grade,omitempty"`
 	Gates    []GateResult      `json:"gates,omitempty"`
 	Protect  map[string]string `json:"protected_after,omitempty"` // sha256 of protected files after the run
+
+	// Scenario evidence (scenario.go).
+	ToolCalls []ToolCall      `json:"tool_calls,omitempty"` // tool proxy ledger
+	Sessions  []SessionResult `json:"sessions,omitempty"`   // one per session of a multi-session run
+	Answer    *Answer         `json:"answer,omitempty"`     // the exported answer
+	State     []StateFile     `json:"state,omitempty"`      // exported service state
+	Services  []ServiceResult `json:"services,omitempty"`   // services that ran beside the agent
+	Snapshot  string          `json:"snapshot,omitempty"`   // image reference of the frozen agent container, for snapshot grading
 }
 
 // EvidenceSource reads one record of what happened and adds it to ev.
@@ -72,6 +80,15 @@ type Grade struct {
 	ResultFormat string             `json:"result_format,omitempty"`
 	Reward       *float64           `json:"reward,omitempty"`
 	Dimensions   map[string]float64 `json:"dimensions,omitempty"`
+
+	// Mode is how the grade was reached when it is not a clean-room diff
+	// grade: snapshot, answer or state. Judged is true when a judge model
+	// decided Passed, and Judge records what it rested on. Category is the
+	// task's answer category, for breakdowns.
+	Mode     string       `json:"mode,omitempty"`
+	Judged   bool         `json:"judged,omitempty"`
+	Judge    *JudgeRecord `json:"judge,omitempty"`
+	Category string       `json:"category,omitempty"`
 }
 
 // Grader decides the outcome from the exported diff, never from the agent's

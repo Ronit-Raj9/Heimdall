@@ -61,6 +61,8 @@ type ProbeApply struct {
 	Fault *FaultPlan `json:"fault,omitempty" yaml:"fault"`
 	// tool_shim: which command to wrap and how to break it.
 	Shim *ShimSpec `json:"shim,omitempty" yaml:"shim"`
+	// tool: the fault the per-run tool proxy injects (scenario.go).
+	Tool *ToolFault `json:"tool,omitempty" yaml:"tool"`
 }
 
 // OverlaySpec copies From (relative to the task folder) to To (relative to the

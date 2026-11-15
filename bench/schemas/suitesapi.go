@@ -64,6 +64,13 @@ type SuiteSummary struct {
 	Probes           []SuiteProbe `json:"probes"`
 	Tasks            []SuiteTask  `json:"tasks"`
 	Error            string       `json:"error,omitempty"` // why the pack failed to load
+
+	// Scenario fields (scenario.go).
+	Track    string        `json:"track,omitempty"`    // coding when the suite sets none
+	Grading  string        `json:"grading,omitempty"`  // verified | judged
+	Output   string        `json:"output,omitempty"`   // diff | answer | state
+	Services []string      `json:"services,omitempty"` // ids of the suite's services
+	Imported *ImportRecord `json:"imported,omitempty"` // where an imported suite came from
 }
 
 // SuiteImage is a suite's base image: the toolchain every task and verifier

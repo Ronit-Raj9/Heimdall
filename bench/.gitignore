@@ -11,3 +11,5 @@
 # The repo-level .gitignore drops *.test (Go test binaries); this is the py.test shim.
 !/probes/shims/py.test
 /checks/
+# Upstream benchmark clones and datasets fetched for `bifrost-bench import`.
+/datasets/

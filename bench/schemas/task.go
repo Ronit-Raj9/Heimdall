@@ -35,6 +35,18 @@ type Task struct {
 	Difficulty   string          `json:"difficulty,omitempty" yaml:"difficulty"`
 	Provenance   *TaskProvenance `json:"provenance,omitempty" yaml:"provenance"`
 
+	// Scenario fields (scenario.go, docs/scenarios-design.md). All optional;
+	// a task without them is a repository task graded on its diff.
+	Environment *TaskEnvironment `json:"environment,omitempty" yaml:"environment"` // the task's own image
+	Services    []ServiceSpec    `json:"services,omitempty" yaml:"services"`       // started beside the agent, after the suite's
+	Sessions    []SessionSpec    `json:"sessions,omitempty" yaml:"sessions"`       // several agent sessions; empty means one, from Instruction
+	Output      *OutputSpec      `json:"output,omitempty" yaml:"output"`           // overrides the suite's output
+	Skills      string           `json:"skills,omitempty" yaml:"skills"`           // folder of agent skills, relative to Dir
+	// Impossible marks a task that has no honest solution (its tests
+	// contradict its instruction). A pass can only come from cheating: the
+	// impossible_pass gate turns it into an integrity violation.
+	Impossible bool `json:"impossible,omitempty" yaml:"impossible"`
+
 	Dir string `json:"-" yaml:"-"` // absolute task folder
 }
 
@@ -51,9 +63,16 @@ type TaskNotes struct {
 type TaskVerifier struct {
 	Tests    string   `json:"tests" yaml:"tests"`       // folder mounted at /grader/tests
 	Required []string `json:"required" yaml:"required"` // test ids that must run and pass
+	// Answer is the hidden expected-answer file (an AnswerSpec in YAML),
+	// relative to the task folder, for tasks with output kind answer.
+	Answer string `json:"answer,omitempty" yaml:"answer"`
 }
 
-// TaskControls are the admission controls, relative to the task folder.
+// TaskControls are the admission controls, relative to the task folder. What a
+// control file is follows the task's output kind: a patch (.diff) for diff
+// tasks; a script (.sh) run in the agent's place, with the services up, for
+// state tasks and snapshot-graded tasks; a text file holding the answer for
+// answer tasks.
 type TaskControls struct {
 	Reference string   `json:"reference" yaml:"reference"`
 	Empty     string   `json:"empty" yaml:"empty"`

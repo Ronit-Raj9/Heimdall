@@ -16,6 +16,14 @@ type Suite struct {
 	TaskIDs     []string      `json:"tasks" yaml:"tasks"`
 	ProbeIDs    []string      `json:"probes" yaml:"probes"`
 
+	// Scenario fields (scenario.go). All optional.
+	Track    string        `json:"track,omitempty" yaml:"track"`       // leaderboard track; empty means coding
+	Grading  string        `json:"grading,omitempty" yaml:"grading"`   // verified (default) | judged
+	Output   *OutputSpec   `json:"output,omitempty" yaml:"output"`     // what the verifier reads; default diff
+	Services []ServiceSpec `json:"services,omitempty" yaml:"services"` // started beside the agent in every run
+	Judge    *JudgeSpec    `json:"judge,omitempty" yaml:"judge"`       // required when Grading is judged
+	Imported *ImportRecord `json:"imported,omitempty" yaml:"imported"` // set by `bifrost-bench import`
+
 	Root     string       `json:"-" yaml:"-"` // absolute folder of the pack
 	Tasks    []*Task      `json:"-" yaml:"-"` // loaded tasks, in TaskIDs order
 	Probes   []*ProbeSpec `json:"-" yaml:"-"` // loaded probes, in ProbeIDs order
@@ -54,6 +62,9 @@ type SuiteVerifier struct {
 	Result        string  `json:"result,omitempty" yaml:"result"`
 	ResultPath    string  `json:"result_path,omitempty" yaml:"result_path"`
 	PassThreshold float64 `json:"pass_threshold,omitempty" yaml:"pass_threshold"`
+
+	// Mode is clean_room (default) or snapshot (scenario.go).
+	Mode string `json:"mode,omitempty" yaml:"mode"`
 }
 
 // Verifier result formats (SuiteVerifier.Result).
