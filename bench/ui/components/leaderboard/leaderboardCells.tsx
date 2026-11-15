@@ -1,4 +1,6 @@
 import { Badge } from "@/components/ui/badge";
+import { CopyId } from "@/components/ui/copyId";
+import { EmptyMark } from "@/components/ui/emptyMark";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { ValueCell } from "@/components/valueCell";
 import { formatValueNumber } from "@/components/valueCell.utils";
@@ -7,6 +9,7 @@ import { getLocale } from "@/lib/i18n";
 import type { LeaderboardEntry, Value } from "@/lib/types/bench";
 import { cn } from "@/lib/utils";
 import { Link } from "@tanstack/react-router";
+import { ArrowDownRight, ArrowUpRight } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { observedNumber, resilienceTone, successBar, tierOf } from "./leaderboard.utils";
 
@@ -68,9 +71,12 @@ export function AgentCell({
 			<span className="text-muted-foreground font-mono text-xs">{entry.model}</span>
 			<div className="text-muted-foreground flex items-center gap-2 text-xs">
 				{entry.label && <span className="max-w-56 truncate">{entry.label}</span>}
-				<span className="font-mono text-[11px]" title={t("leaderboard.cell.configHash", { hash: entry.config_hash })}>
-					{shortHash(entry.config_hash)}
-				</span>
+				<CopyId
+					value={entry.config_hash}
+					display={shortHash(entry.config_hash)}
+					title={t("leaderboard.cell.configHash", { hash: entry.config_hash })}
+					className="text-[11px]"
+				/>
 				<Link to="/agents/diff" search={{ b: entry.config_hash }} className="text-primary hover:underline">
 					{t("agentDiff.link.diff")}
 				</Link>
@@ -150,21 +156,21 @@ export function ReliabilityCell({ entry }: { entry: Pick<LeaderboardEntry, "rank
 export function ResilienceCell({ value, condition, testId }: { value: Value | undefined; condition: string; testId: string }) {
 	const { t } = useTranslation("bench");
 	if (!value) {
-		return (
-			<span className="text-muted-foreground text-xs" title={t("leaderboard.cell.notRunHint", { condition })} data-testid={testId}>
-				{t("leaderboard.cell.notRun")}
-			</span>
-		);
+		return <EmptyMark label={t("leaderboard.cell.notRun")} hint={t("leaderboard.cell.notRunHint", { condition })} testId={testId} />;
 	}
 	const points = observedNumber(value);
 	if (points === null) return <ValueCell value={value} kind="rate" testId={testId} />;
+	const tone = resilienceTone(points);
+	// The arrow repeats the sign for readers who cannot tell the colours apart.
+	const Arrow = tone === "good" ? ArrowUpRight : tone === "bad" ? ArrowDownRight : null;
 	return (
 		<span
-			className={cn("font-medium tabular-nums", TONE_TEXT[resilienceTone(points)])}
+			className={cn("inline-flex items-center justify-end gap-0.5 font-medium tabular-nums", TONE_TEXT[tone])}
 			data-testid={testId}
-			data-tone={resilienceTone(points)}
+			data-tone={tone}
 		>
 			{t("leaderboard.cell.points", { value: formatSignedPp(points, getLocale()) })}
+			{Arrow && <Arrow className="size-3.5 shrink-0" aria-hidden="true" />}
 		</span>
 	);
 }

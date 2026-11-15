@@ -76,7 +76,10 @@ describe("LeaderboardTable", () => {
 		expect(html).toMatch(/data-testid="leaderboard-resilience-4-test-crash" data-tone="good">\+12\.5 pts</);
 		expect(html).toMatch(/data-testid="leaderboard-resilience-4-stale-notes" data-tone="neutral">0 pts</);
 		expect(html).toMatch(/data-state="unknown"[^>]*data-testid="leaderboard-resilience-2-test-crash"/);
-		expect(html).toMatch(/data-testid="leaderboard-resilience-3-test-crash">not run</);
+		// Not run is a quiet mark whose accessible text still says "not run", never a number.
+		expect(html).toMatch(
+			/data-testid="leaderboard-resilience-3-test-crash"><span aria-hidden="true"[^>]*><\/span><span class="sr-only">not run</,
+		);
 		expect(html).toContain(">model-outage vs clean<");
 	});
 

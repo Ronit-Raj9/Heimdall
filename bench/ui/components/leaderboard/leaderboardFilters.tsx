@@ -195,7 +195,7 @@ function Segmented<T extends string>({ label, value, options, onChange, disabled
 			<div
 				role="group"
 				aria-labelledby={id}
-				className="bg-muted inline-flex h-9 items-center gap-0.5 rounded-sm border p-0.5"
+				className="bg-muted inline-flex h-9 w-fit items-center gap-0.5 rounded-md border p-0.5"
 				data-testid={testId}
 			>
 				{options.map((option) => {
@@ -212,8 +212,8 @@ function Segmented<T extends string>({ label, value, options, onChange, disabled
 							}}
 							data-testid={`${testId}-${option.value}`}
 							className={cn(
-								"focus-visible:ring-ring/50 h-full cursor-pointer rounded-sm px-3 text-xs font-medium transition-colors focus-visible:ring-[3px] focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-50",
-								active ? "bg-background text-foreground shadow-sm dark:bg-zinc-800" : "text-muted-foreground hover:text-foreground",
+								"focus-visible:ring-ring/50 h-full cursor-pointer rounded-[5px] px-3 text-xs font-medium transition-colors duration-100 focus-visible:ring-[3px] focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-50",
+								active ? "bg-card text-foreground shadow-sm dark:bg-accent" : "text-muted-foreground hover:text-foreground",
 							)}
 						>
 							{option.label}

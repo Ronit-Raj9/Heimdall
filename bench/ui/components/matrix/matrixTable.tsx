@@ -18,7 +18,7 @@ export const MATRIX_METRIC_COLUMNS = [
 export function MatrixTable({ rows }: { rows: readonly MatrixRow[] }) {
 	const { t } = useTranslation("bench");
 	return (
-		<Table data-testid="matrix-table" aria-label={t("matrix.table.label")} containerClassName="rounded-sm">
+		<Table stickyColumns={4} data-testid="matrix-table" aria-label={t("matrix.table.label")} containerClassName="rounded-sm">
 			<TableHeader>
 				<TableRow className="hover:bg-transparent">
 					<TableHead>{t("leaderboard.table.rank")}</TableHead>

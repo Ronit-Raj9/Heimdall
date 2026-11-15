@@ -1,6 +1,7 @@
 import { CopyCodeBlock } from "@/components/suites/copyCodeBlock";
 import { ToneBadge } from "@/components/suites/suiteBadges";
 import type { Tone } from "@/components/suites/suites.utils";
+import { CopyId } from "@/components/ui/copyId";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { formatCount, formatDateTime } from "@/components/verdict/verdict.utils";
 import { getLocale } from "@/lib/i18n";
@@ -38,7 +39,7 @@ export function WorkersTable({ workers }: { workers: readonly WorkerInfo[] }) {
 	const locale = getLocale();
 	return (
 		<div className="min-w-0 rounded-sm border">
-			<Table aria-label={t("workers.label")} data-testid="workers-table">
+			<Table stickyColumns={1} aria-label={t("workers.label")} data-testid="workers-table">
 				<TableHeader>
 					<TableRow>
 						<TableHead scope="col">{t("workers.id")}</TableHead>
@@ -57,7 +58,9 @@ export function WorkersTable({ workers }: { workers: readonly WorkerInfo[] }) {
 				<TableBody>
 					{workers.map((worker) => (
 						<TableRow key={worker.id} data-testid={`workers-row-${worker.id}`} data-state={worker.state}>
-							<TableCell className="font-mono text-xs">{worker.id}</TableCell>
+							<TableCell className="max-w-56 text-xs">
+								<CopyId value={worker.id} />
+							</TableCell>
 							<TableCell className="font-mono text-xs">{worker.host}</TableCell>
 							<TableCell className="font-mono text-xs">{worker.version}</TableCell>
 							<TableCell>

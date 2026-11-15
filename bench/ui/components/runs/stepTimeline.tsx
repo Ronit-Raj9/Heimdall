@@ -125,7 +125,7 @@ export function StepTimeline({ data, arm, initialHidden = [] }: StepTimelineProp
 								data-testid={`step-filter-${arm}-${source}`}
 								data-on={on}
 								className={cn(
-									"focus-visible:ring-ring/50 inline-flex cursor-pointer items-center gap-1 rounded-sm border px-2 py-0.5 text-xs font-medium transition-colors focus-visible:ring-[3px] focus-visible:outline-none",
+									"focus-visible:ring-ring/50 inline-flex h-6 cursor-pointer items-center gap-1 rounded-full border px-2.5 text-xs font-medium transition-colors focus-visible:ring-[3px] focus-visible:outline-none",
 									on ? "border-primary bg-primary/10 text-foreground" : "text-muted-foreground hover:bg-accent line-through",
 								)}
 							>
@@ -142,7 +142,11 @@ export function StepTimeline({ data, arm, initialHidden = [] }: StepTimelineProp
 			) : groups.length === 0 ? (
 				<EmptyNote testId={`step-timeline-${arm}-filtered`}>{t("runs.steps.noRows")}</EmptyNote>
 			) : (
-				<ol className="flex min-w-0 flex-col gap-2" aria-label={t("runs.steps.label", { arm })}>
+				// A rail down the left joins the turns, so the list reads as one timeline.
+				<ol
+					className="before:bg-border relative flex min-w-0 flex-col gap-3 pl-5 before:absolute before:top-3 before:bottom-3 before:left-[5px] before:w-px"
+					aria-label={t("runs.steps.label", { arm })}
+				>
 					{groups.map((group) => (
 						<TurnBlock key={group.key} group={group} arm={arm} depths={depths} />
 					))}
@@ -161,14 +165,18 @@ function sourceLabel(t: TFn, source: string): string {
 function TurnBlock({ group, arm, depths }: { group: TurnGroup; arm: string; depths: ReadonlyMap<number, number> }) {
 	const { t } = useTranslation("bench");
 	return (
-		<li className="min-w-0 rounded-sm border" data-testid={`step-turn-${arm}-${group.session ?? 0}-${group.turn}`} data-turn={group.turn}>
-			<div className="bg-muted/40 text-muted-foreground flex flex-wrap items-center gap-2 border-b px-3 py-1.5 text-xs">
+		<li
+			className="bg-card after:bg-muted-foreground/60 after:ring-card relative min-w-0 rounded-lg border shadow-(--shadow-card) after:absolute after:top-3 after:-left-[19px] after:size-[9px] after:rounded-full after:ring-4"
+			data-testid={`step-turn-${arm}-${group.session ?? 0}-${group.turn}`}
+			data-turn={group.turn}
+		>
+			<div className="bg-muted/50 text-muted-foreground flex flex-wrap items-center gap-2 rounded-t-lg border-b px-3 py-2 text-xs">
 				<span className="text-foreground font-semibold">
 					{group.turn === 0 ? t("runs.steps.beforeFirst") : t("runs.steps.turn", { turn: group.turn })}
 				</span>
 				{group.session ? <span>{t("runs.steps.session", { session: group.session })}</span> : null}
 			</div>
-			<ul className="divide-y">
+			<ul className="divide-border/70 divide-y">
 				{group.model.map((step) => (
 					<StepRow key={step.seq} step={step} arm={arm} model depth={depths.get(step.seq) ?? 0} />
 				))}
@@ -261,10 +269,10 @@ function StepRow({ step, arm, model = false, depth = 0 }: { step: StepRecord; ar
 	return (
 		<li
 			className={cn(
-				"flex min-w-0 flex-col gap-1 px-3 py-2 text-xs",
+				"hover:bg-muted/40 flex min-w-0 flex-col gap-1 px-3 py-2 text-xs transition-colors duration-100",
 				!model && "pl-6",
 				reported && "border-l-chart-warning/60 border-l-2 border-dashed",
-				step.is_error && "bg-chart-error/5",
+				step.is_error && "bg-chart-error/5 shadow-[inset_2px_0_0_var(--chart-error)]",
 			)}
 			style={depth > 0 ? { marginLeft: `${depth * 1.25}rem` } : undefined}
 			data-testid={`step-row-${arm}-${step.seq}`}

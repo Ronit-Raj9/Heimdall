@@ -48,9 +48,11 @@ export function ValueCell({ value, kind, className, testId }: ValueCellProps) {
 				data-testid={testId ?? "value-cell-not-applicable"}
 				aria-label={hint}
 				title={hint}
-				className={cn("text-muted-foreground", className)}
+				className={cn("text-muted-foreground/70 inline-flex items-center", className)}
 			>
-				{t("value.notApplicable")}
+				{/* A quiet rule, not repeated words; the text stays for screen readers. Never a zero. */}
+				<span aria-hidden="true" className="inline-block h-px w-3 rounded-full bg-current opacity-70" />
+				<span className="sr-only">{t("value.notApplicable")}</span>
 			</span>
 		);
 	}
@@ -70,7 +72,7 @@ export function ValueCell({ value, kind, className, testId }: ValueCellProps) {
 					tabIndex={0}
 					aria-label={hint}
 					className={cn(
-						"bench-hatched text-muted-foreground focus-visible:ring-ring/50 inline-flex cursor-help items-center rounded-sm border border-dashed px-1.5 text-xs italic focus-visible:ring-[3px]",
+						"bench-hatched text-muted-foreground focus-visible:ring-ring/50 inline-flex h-5 cursor-help items-center rounded-[4px] border border-dashed px-1.5 text-[11px] leading-none focus-visible:ring-[3px]",
 						className,
 					)}
 				>

@@ -20,7 +20,7 @@ export interface ReviewQueueTableProps {
 export function ReviewQueueTable({ items, selectedRunId, onSelect }: ReviewQueueTableProps) {
 	const { t } = useTranslation("bench");
 	return (
-		<Table data-testid="review-queue-table">
+		<Table stickyColumns={1} data-testid="review-queue-table">
 			<TableHeader>
 				<TableRow>
 					<TableHead>{t("review.queue.columns.run")}</TableHead>

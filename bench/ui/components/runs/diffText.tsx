@@ -28,7 +28,7 @@ export function DiffText({ runDiff, arm }: { runDiff: RunDiff; arm: string }) {
 					<span className="text-muted-foreground text-xs font-medium">{t("runs.diff.files")}</span>
 					<ul className="flex flex-wrap gap-1.5">
 						{diff.files.map((file) => (
-							<li key={file.path} className="bg-muted/50 rounded-sm border px-1.5 py-0.5 font-mono text-[11px]">
+							<li key={file.path} className="bg-muted/60 rounded-md border px-1.5 py-0.5 font-mono text-[11px]">
 								<span className="text-muted-foreground mr-1.5">{file.status}</span>
 								{file.path}
 							</li>
@@ -57,11 +57,7 @@ export function DiffText({ runDiff, arm }: { runDiff: RunDiff; arm: string }) {
 					{t("runs.diff.empty")}
 				</p>
 			) : (
-				<pre
-					className="bg-muted/30 max-h-[28rem] overflow-auto rounded-sm border py-2 font-mono text-xs leading-5"
-					data-testid={`diff-${arm}-patch`}
-					tabIndex={0}
-				>
+				<pre className="bench-mono-block max-h-[28rem] overflow-auto py-2" data-testid={`diff-${arm}-patch`} tabIndex={0}>
 					<code>
 						{lines.map((line, i) => (
 							// Lines repeat, so the position is the only stable key.

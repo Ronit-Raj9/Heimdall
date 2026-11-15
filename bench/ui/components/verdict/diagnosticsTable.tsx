@@ -36,7 +36,7 @@ export function DiagnosticsTable({ diagnostics, arms, metrics, className }: Diag
 function ConditionTable({ rows, arms }: { rows: DiagnosticsRow[]; arms: string[] }) {
 	const { t } = useTranslation("bench");
 	return (
-		<Table data-testid="verdict-diagnostics-table">
+		<Table stickyColumns={1} data-testid="verdict-diagnostics-table">
 			<TableHeader>
 				<TableRow>
 					<TableHead>{t("verdict.diagnostics.condition")}</TableHead>
@@ -162,7 +162,7 @@ function MeterTable({ diagnostics, arms, metrics }: Omit<DiagnosticsTableProps, 
 	);
 
 	return (
-		<Table data-testid="verdict-meters-table">
+		<Table stickyColumns={1} data-testid="verdict-meters-table">
 			<TableHeader>
 				<TableRow>
 					<TableHead>{t("verdict.diagnostics.meters")}</TableHead>

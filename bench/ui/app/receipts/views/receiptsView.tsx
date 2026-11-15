@@ -215,7 +215,7 @@ function RunsTable({
 }) {
 	const { t } = useTranslation("bench");
 	return (
-		<Table data-testid="receipts-runs-table">
+		<Table stickyColumns={1} data-testid="receipts-runs-table">
 			<TableHeader>
 				<TableRow>
 					<TableHead>{t("receipts.runs.task")}</TableHead>
