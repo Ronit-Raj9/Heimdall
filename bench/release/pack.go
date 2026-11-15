@@ -99,6 +99,11 @@ func packFiles(runsRoot string, rec *schemas.ReleaseRecord, ev *evidence) ([]pac
 				return nil, err
 			}
 		}
+		if run.Review != nil { // human review the outcome came from (docs/human-review.md)
+			if err := add("runs/"+id+"/review.json", filepath.Join(expDir, "reviews", run.Review.ReviewID, "review.json"), true); err != nil {
+				return nil, err
+			}
+		}
 	}
 	return files, nil
 }

@@ -35,3 +35,35 @@ func TestRunDetailScenario(t *testing.T) {
 		}
 	}
 }
+
+func TestRunDetailArtifacts(t *testing.T) {
+	idx := testIndex()
+	idx.files["r_t01_A"][FileEvidence] = []byte(`{"requests":{"complete":true},
+"artifacts":[{"id":"report","name":"report.csv","path":"artifacts/report/report.csv","source":"out/report.csv","sha256":"abc","bytes":12},
+{"id":"chart","source":"out/*.svg","bytes":0,"error":"missing"}]}`)
+	d := fullDeps()
+	d.index = idx
+	c := newTestClient(t, d)
+	body := decodeBody(t, c.do(t, "GET", "/api/bench/runs/r_t01_A", nil, nil))
+	files, _ := body["artifacts"].([]any)
+	if len(files) != 2 {
+		t.Fatalf("artifacts = %v", body["artifacts"])
+	}
+	first, _ := files[0].(map[string]any)
+	if first["id"] != "report" || first["name"] != "report.csv" || first["path"] != "artifacts/report/report.csv" ||
+		first["sha256"] != "abc" || first["bytes"] != float64(12) {
+		t.Errorf("artifacts[0] = %v", first)
+	}
+	second, _ := files[1].(map[string]any)
+	if second["error"] != "missing" {
+		t.Errorf("artifacts[1] = %v", second)
+	}
+	if _, ok := second["path"]; ok {
+		t.Errorf("failed artifact has a path: %v", second)
+	}
+
+	plain := decodeBody(t, c.do(t, "GET", "/api/bench/runs/r_t02_A", nil, nil))
+	if _, ok := plain["artifacts"]; ok {
+		t.Errorf("plain run has artifacts: %v", plain["artifacts"])
+	}
+}

@@ -1,0 +1,5 @@
+# Keys of bench.ts `PerRunRanges`, one per line; a trailing ? marks an optional (Go omitempty) key.
+# Change with bench.ts and schemas/forecast.go.
+cost_usd
+tokens
+wall_s

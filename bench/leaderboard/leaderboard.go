@@ -90,6 +90,10 @@ type Query struct {
 	K           int       // k of pass^k for every entry; 0: each entry's default (defaultK)
 	Alpha       float64   // significance level for tiers
 	Now         time.Time // GeneratedAt
+
+	// Split is public (default) or held_out: the board counts runs of that
+	// split's tasks only (split.go).
+	Split string
 }
 
 // Normalize fills the defaults and checks every field. Its error wraps
@@ -115,12 +119,14 @@ func (q Query) Normalize() (Query, error) {
 		return q, fmt.Errorf("%w: scope %q is not all or common", ErrBadQuery, q.Scope)
 	case q.Synthetic != SyntheticExclude && q.Synthetic != SyntheticOnly:
 		return q, fmt.Errorf("%w: synthetic %q is not exclude or only", ErrBadQuery, q.Synthetic)
-	case q.GradeSource != GradeSourceOriginal && q.GradeSource != GradeSourceLatest:
-		return q, fmt.Errorf("%w: grade source %q is not original or latest", ErrBadQuery, q.GradeSource)
+	case q.GradeSource != GradeSourceOriginal && q.GradeSource != GradeSourceLatest && q.GradeSource != GradeSourceReviewed:
+		return q, fmt.Errorf("%w: grade source %q is not original, latest or reviewed", ErrBadQuery, q.GradeSource)
 	case q.K < 0 || q.K == 1:
 		return q, fmt.Errorf("%w: k %d is not 0 (each entry's default) or 2 or more", ErrBadQuery, q.K)
 	case !(q.Alpha > 0 && q.Alpha < 1):
 		return q, fmt.Errorf("%w: alpha %v is not in (0, 1)", ErrBadQuery, q.Alpha)
+	case !validSplit(q.Split): // Suite health area (split.go)
+		return q, fmt.Errorf("%w: split %q is not public or held_out", ErrBadQuery, q.Split)
 	}
 	return q, nil
 }
@@ -152,7 +158,7 @@ func Build(ctx context.Context, src Source, q Query) (*schemas.Leaderboard, erro
 	}
 	kept := make([]*record, 0, len(recs))
 	for _, r := range recs {
-		if synthetic[r.key()] == (q.Synthetic == SyntheticOnly) {
+		if synthetic[r.key()] == (q.Synthetic == SyntheticOnly) && inSplit(r, q.Split) { // Suite health area: held-out board is separate (split.go)
 			kept = append(kept, r)
 		}
 	}
@@ -162,6 +168,7 @@ func Build(ctx context.Context, src Source, q Query) (*schemas.Leaderboard, erro
 		Conditions: []string{}, CommonTasks: []string{}, Entries: []schemas.LeaderboardEntry{}, Excluded: []schemas.LeaderboardExclusion{},
 	}
 	lb.Suite = q.Suite
+	lb.Split = boardSplit(q.Split) // Suite health area (split.go)
 	if lb.Suite == "" && len(lb.Suites) > 0 {
 		lb.Suite = lb.Suites[0]
 	}
@@ -176,6 +183,7 @@ func Build(ctx context.Context, src Source, q Query) (*schemas.Leaderboard, erro
 		return nil, err
 	}
 	lb.GradeSources = gradeSourceList(inSuite, q.Condition)
+	lb.ReviewedRuns, lb.ReviewChangedRuns = reviewCounts(inSuite, q.Condition) // human review (review.go)
 	graded, excluded, err := grade(ctx, src, inSuite)
 	if err != nil {
 		return nil, err
@@ -213,6 +221,7 @@ type record struct {
 	metrics map[string]schemas.Value // set when read from a regrade; nil: read metrics.json
 	source  string                   // regrade id the run was read from; "" for its original grade
 	counted int                      // sealed runs of the slot that are not aborted_infra; more than one is excluded
+	review  *schemas.Review          // the human review the outcome came from under grade source reviewed (review.go)
 }
 
 // key is the (experiment, config) pair synthetic classification works on.

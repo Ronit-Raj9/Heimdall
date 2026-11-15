@@ -54,6 +54,9 @@ func newestRegrade(rs []Regrade) (Regrade, bool) {
 // A regrade that fails to read, for example a regate whose hash or parent
 // seal does not verify, fails the board rather than falling back silently.
 func readGradeSource(ctx context.Context, src Source, recs []*record, source string) error {
+	if source == GradeSourceReviewed {
+		return readReviews(ctx, src, recs) // human review (review.go)
+	}
 	if source != GradeSourceLatest {
 		return nil
 	}
@@ -126,6 +129,9 @@ func gradeSourceList(recs []*record, condition string) []schemas.LeaderboardGrad
 		gs.Runs++
 		if r.source != "" {
 			gs.RegradedRuns++
+		}
+		if r.review != nil {
+			gs.ReviewedRuns++ // human review (review.go)
 		}
 	}
 	exps := make([]*expInfo, 0, len(byExp))

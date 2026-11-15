@@ -126,6 +126,8 @@ func DetectTemplate(suiteYAML []byte) string {
 		return TemplateMemory
 	case "qa":
 		return TemplateQA
+	case "artifact":
+		return TemplateArtifact
 	}
 	switch {
 	case s.Grader == graderHiddenTests || strings.Contains(cmd, "pytest"):

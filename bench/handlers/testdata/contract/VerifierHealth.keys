@@ -1,0 +1,4 @@
+# Keys of bench.ts `VerifierHealth`. Change with bench.ts and schemas/suitehealth.go.
+flaky
+checks
+evidence

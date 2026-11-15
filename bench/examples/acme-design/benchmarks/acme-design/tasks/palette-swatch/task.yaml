@@ -1,0 +1,37 @@
+# A client's brand brief lists five colours by name and hex value; the
+# studio needs a swatch sheet as an SVG file, one labelled square per colour
+# in the brief's order. Graded on the parsed SVG: well formed, the exact
+# colours and names in order, and a layout where no swatch hides another.
+id: palette-swatch
+version: 1.0.0
+title: Draw a brand palette swatch sheet as SVG
+project: acme-design
+kind: feature
+instruction: instruction.md
+# The workspace holds the brand brief; the agent writes palette.svg next to
+# it.
+repo_dir: repo
+output:
+  kind: artifact
+  artifacts:
+    # Mounted read-only for the verifier at /grader/artifacts/swatch/palette.svg.
+    - {id: swatch, path: palette.svg, required: true, max_bytes: 262144}
+verifier:
+  # Hidden folder, mounted at /grader/tests. The expected palette lives in
+  # verify.py; it never reads the workspace's brief.
+  tests: verifier/tests
+  required: []
+protected: []
+controls:
+  reference: solution/reference.sh
+  empty: controls/empty.sh
+  mutants: [controls/mutant-coral-off-by-one.sh, controls/mutant-swapped-order.sh]
+  exploit: controls/exploit.sh
+timeouts:
+  agent_s: 600
+capabilities: [visual_design, file_output]
+difficulty: easy
+provenance:
+  source: bench/examples/acme-design (fictional Acme Design studio, written for this example)
+  license: MIT
+  created_by: hand-written example

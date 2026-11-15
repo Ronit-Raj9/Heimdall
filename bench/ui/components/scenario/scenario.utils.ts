@@ -23,7 +23,7 @@ export function isServiceRole(value: string | undefined): value is ServiceRole {
 }
 
 export function isOutputKind(value: string | undefined): value is OutputKind {
-	return value === "diff" || value === "answer" || value === "state";
+	return value === "diff" || value === "answer" || value === "state" || value === "artifact";
 }
 
 /** A suite's track: the server sends coding when the suite sets none, and so does an older server's absence. */
@@ -82,8 +82,17 @@ export function groupSuitesByTrack(boardSuites: readonly string[], facts: Map<st
 }
 
 /** Whether a run detail carries any scenario evidence. A plain diff run has none, and its sections are left out. */
-export function hasScenarioEvidence(detail: Pick<RunDetail, "tool_calls" | "sessions" | "answer" | "state" | "services">): boolean {
-	return Boolean(detail.tool_calls?.length || detail.sessions?.length || detail.answer || detail.state?.length || detail.services?.length);
+export function hasScenarioEvidence(
+	detail: Pick<RunDetail, "tool_calls" | "sessions" | "answer" | "state" | "services" | "artifacts">,
+): boolean {
+	return Boolean(
+		detail.tool_calls?.length ||
+			detail.sessions?.length ||
+			detail.answer ||
+			detail.state?.length ||
+			detail.services?.length ||
+			detail.artifacts?.length,
+	);
 }
 
 /** Counts for the tool-call trace header. */

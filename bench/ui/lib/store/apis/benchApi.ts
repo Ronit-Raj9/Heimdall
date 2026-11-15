@@ -4,6 +4,9 @@ import type {
 	AuditRequest,
 	AuditResponse,
 	CatalogResponse,
+	ClusterDetailResponse,
+	ClusterListResponse,
+	ClusterParams,
 	DiagnosticsResponse,
 	DoctorResponse,
 	ExperimentCreatedResponse,
@@ -15,6 +18,9 @@ import type {
 	ImportsResponse,
 	LeaderboardParams,
 	LeaderboardResponse,
+	ForecastResponse,
+	ModelMatrixParams,
+	ModelMatrixResponse,
 	PairResponse,
 	PlanResponse,
 	RegradeRequest,
@@ -22,11 +28,17 @@ import type {
 	ReleaseListResponse,
 	ReleaseRequest,
 	ReleaseResponse,
+	ReviewLogResponse,
+	ReviewQueueResponse,
+	ReviewRequest,
+	ReviewResponse,
 	RunDiffResponse,
 	RunEventsResponse,
 	RunReceiptsResponse,
 	RunResponse,
+	RunReviewsResponse,
 	SuiteTaskResponse,
+	SuiteHealthResponse,
 	SuitesResponse,
 	TriageResponse,
 	VerdictResponse,
@@ -133,6 +145,18 @@ const fixtureBaseQuery: BenchBaseQuery = async (args) => {
 
 const id = (value: string) => encodeURIComponent(value);
 
+/** The verdict query's argument when it names a grade source. */
+export interface VerdictArgs {
+	expId: string;
+	/** original, a regrade id, or reviewed; absent takes the server default (original). */
+	gradeSource?: string;
+}
+
+/** The verdict query's argument in object form. */
+export function verdictArgs(arg: string | VerdictArgs): VerdictArgs {
+	return typeof arg === "string" ? { expId: arg } : arg;
+}
+
 /**
  * True when GET /workers says worker mode is off rather than broken: the list answers enabled
  * false (BENCH_WORKER_TOKEN unset), or a server without the route answers 404.
@@ -146,6 +170,33 @@ export function isWorkersOff(error: unknown, data?: { enabled?: boolean }): bool
 export function normalizeWorkers(raw: unknown): WorkersResponse {
 	const body = (raw ?? {}) as WorkersResponse;
 	return { ...body, workers: Array.isArray(body.workers) ? body.workers : [] };
+}
+
+/**
+ * GET /suites/{id}/health with null lists and maps (Go nil) read as empty, so the suite page never
+ * has to tell null from none.
+ */
+export function normalizeSuiteHealth(raw: unknown): SuiteHealthResponse {
+	const body = (raw ?? {}) as SuiteHealthResponse;
+	const list = <T>(value: T[] | null | undefined): T[] => (Array.isArray(value) ? value : []);
+	return {
+		...body,
+		counts: body.counts && typeof body.counts === "object" ? body.counts : {},
+		notes: list(body.notes),
+		tasks: list(body.tasks).map((task) => ({
+			...task,
+			quarantine: task.quarantine ?? null,
+			flags: list(task.flags),
+			verifier: { ...task.verifier, evidence: list(task.verifier?.evidence) },
+			variance: { ...task.variance, per_config: list(task.variance?.per_config) },
+		})),
+	};
+}
+
+/** A clusters request: empty, zero and absent params are left out so the server default applies. */
+export function clusterRequest(url: string, params: ClusterParams): string | FetchArgs {
+	const search = Object.fromEntries(Object.entries(params).filter(([, value]) => Boolean(value)));
+	return Object.keys(search).length > 0 ? { url, params: search } : url;
 }
 
 /**
@@ -175,6 +226,9 @@ export const benchApi = createApi({
 		"BenchAgents",
 		"BenchImports",
 		"BenchWorkers",
+		"BenchReviews",
+		"BenchMatrix",
+		"BenchClusters",
 	],
 	endpoints: (builder) => ({
 		getHealth: builder.query<HealthResponse, void>({
@@ -198,6 +252,10 @@ export const benchApi = createApi({
 		planExperiment: builder.mutation<PlanResponse, Experiment>({
 			query: (experiment) => ({ url: "/experiments/plan", method: "POST", body: experiment }),
 		}),
+		// Expected cost and time from sealed history; same body and write token as the plan. Writes nothing.
+		estimateExperiment: builder.mutation<ForecastResponse, Experiment>({
+			query: (experiment) => ({ url: "/estimate", method: "POST", body: experiment }),
+		}),
 		createExperiment: builder.mutation<ExperimentCreatedResponse, Experiment>({
 			query: (experiment) => ({ url: "/experiments", method: "POST", body: experiment }),
 			invalidatesTags: [{ type: "BenchExperiment", id: "LIST" }],
@@ -213,13 +271,27 @@ export const benchApi = createApi({
 			query: (expId) => `/experiments/${id(expId)}`,
 			providesTags: (_result, _error, expId) => [{ type: "BenchExperiment", id: expId }],
 		}),
-		getVerdict: builder.query<VerdictResponse, string>({
-			query: (expId) => `/experiments/${id(expId)}/verdict`,
-			providesTags: (_result, _error, expId) => [{ type: "BenchVerdict", id: expId }],
+		// A string asks for the default grade source; an object may name one (original, a regrade id, reviewed).
+		getVerdict: builder.query<VerdictResponse, string | VerdictArgs>({
+			query: (arg) => {
+				const { expId, gradeSource } = verdictArgs(arg);
+				const url = `/experiments/${id(expId)}/verdict`;
+				return gradeSource ? { url, params: { grade_source: gradeSource } } : url;
+			},
+			providesTags: (_result, _error, arg) => [{ type: "BenchVerdict", id: verdictArgs(arg).expId }],
 		}),
 		getDiagnostics: builder.query<DiagnosticsResponse, string>({
 			query: (expId) => `/experiments/${id(expId)}/diagnostics`,
 			providesTags: (_result, _error, expId) => [{ type: "BenchDiagnostics", id: expId }],
+		}),
+		// Every arm on one condition with every pair tested. An absent or empty param uses the server default.
+		getModelMatrix: builder.query<ModelMatrixResponse, ModelMatrixParams>({
+			query: ({ expId, ...params }) => {
+				const search = Object.fromEntries(Object.entries(params).filter(([, value]) => Boolean(value)));
+				const url = `/experiments/${id(expId)}/matrix`;
+				return Object.keys(search).length > 0 ? { url, params: search } : url;
+			},
+			providesTags: (_result, _error, { expId }) => [{ type: "BenchMatrix", id: expId }],
 		}),
 		getGrid: builder.query<GridResponse, string>({
 			query: (expId) => `/experiments/${id(expId)}/grid`,
@@ -251,6 +323,15 @@ export const benchApi = createApi({
 		getTriage: builder.query<TriageResponse, string>({
 			query: (expId) => `/experiments/${id(expId)}/triage`,
 			providesTags: (_result, _error, expId) => [{ type: "BenchTriage", id: expId }],
+		}),
+		// Failure clusters across experiments; one cluster and its runs. Empty params take the server default.
+		getClusters: builder.query<ClusterListResponse, ClusterParams | void>({
+			query: (params) => clusterRequest("/clusters", params ?? {}),
+			providesTags: [{ type: "BenchClusters", id: "LIST" }],
+		}),
+		getCluster: builder.query<ClusterDetailResponse, ClusterParams & { signature: string }>({
+			query: ({ signature, ...params }) => clusterRequest(`/clusters/${id(signature)}`, params),
+			providesTags: (_result, _error, { signature }) => [{ type: "BenchClusters", id: signature }],
 		}),
 
 		// Releases: the hash-chained release log.
@@ -287,6 +368,12 @@ export const benchApi = createApi({
 			query: ({ suite, task }) => `/suites/${id(suite)}/tasks/${id(task)}`,
 			providesTags: (_result, _error, { suite, task }) => [{ type: "BenchSuites", id: `${suite}/${task}` }],
 		}),
+		// Suite health from sealed runs across experiments. 503 when the server has no run store.
+		getSuiteHealth: builder.query<SuiteHealthResponse, string>({
+			query: (suite) => `/suites/${id(suite)}/health`,
+			transformResponse: (raw: unknown) => normalizeSuiteHealth(raw),
+			providesTags: (_result, _error, suite) => [{ type: "BenchSuites", id: `${suite}/health` }],
+		}),
 		getAgents: builder.query<AgentsResponse, void>({
 			query: () => "/agents",
 			providesTags: ["BenchAgents"],
@@ -303,6 +390,41 @@ export const benchApi = createApi({
 			providesTags: ["BenchWorkers"],
 		}),
 
+		// Human review: the queue of runs to look at, the hash-chained review log, one run's reviews,
+		// and posting a review (a write: write token, refused in recorded and synthetic mode).
+		getReviewQueue: builder.query<ReviewQueueResponse, { expId: string; reason?: string }>({
+			query: ({ expId, reason }) => {
+				const url = `/experiments/${id(expId)}/reviews/queue`;
+				return reason ? { url, params: { reason } } : url;
+			},
+			providesTags: (_result, _error, { expId }) => [{ type: "BenchReviews", id: `queue:${expId}` }],
+		}),
+		getReviewLog: builder.query<ReviewLogResponse, string>({
+			query: (expId) => `/experiments/${id(expId)}/reviews`,
+			providesTags: (_result, _error, expId) => [{ type: "BenchReviews", id: `log:${expId}` }],
+		}),
+		getRunReviews: builder.query<RunReviewsResponse, string>({
+			query: (runId) => `/runs/${id(runId)}/reviews`,
+			providesTags: (_result, _error, runId) => [{ type: "BenchReviews", id: `run:${runId}` }],
+		}),
+		createReview: builder.mutation<ReviewResponse, ReviewRequest>({
+			query: (body) => ({ url: "/reviews", method: "POST", body }),
+			invalidatesTags: (result, _error, { run_id, exp_id }) => {
+				const expId = result?.exp_id ?? exp_id;
+				return [
+					{ type: "BenchReviews", id: `run:${run_id}` },
+					...(expId
+						? [
+								{ type: "BenchReviews" as const, id: `queue:${expId}` },
+								{ type: "BenchReviews" as const, id: `log:${expId}` },
+								{ type: "BenchVerdict" as const, id: expId },
+							]
+						: []),
+					"BenchLeaderboard",
+				];
+			},
+		}),
+
 		// Analysis
 		auditTable: builder.mutation<AuditResponse, AuditRequest>({
 			query: (body) => ({ url: "/audit", method: "POST", body }),
@@ -315,6 +437,7 @@ export const benchApi = createApi({
 				{ type: "BenchDiagnostics", id: exp_id },
 				{ type: "BenchGrid", id: exp_id },
 				{ type: "BenchTriage", id: exp_id },
+				{ type: "BenchMatrix", id: exp_id },
 				"BenchLeaderboard",
 			],
 		}),
@@ -327,6 +450,8 @@ export const {
 	useGetCatalogQuery,
 	useListExperimentsQuery,
 	usePlanExperimentMutation,
+	useEstimateExperimentMutation,
+	useGetModelMatrixQuery,
 	useCreateExperimentMutation,
 	useStartExperimentMutation,
 	useGetExperimentQuery,
@@ -339,9 +464,12 @@ export const {
 	useGetRunReceiptsQuery,
 	useGetPairQuery,
 	useGetTriageQuery,
+	useGetClustersQuery,
+	useGetClusterQuery,
 	useGetLeaderboardQuery,
 	useGetSuitesQuery,
 	useGetSuiteTaskQuery,
+	useGetSuiteHealthQuery,
 	useGetAgentsQuery,
 	useGetImportsQuery,
 	useGetWorkersQuery,
@@ -350,4 +478,8 @@ export const {
 	useCreateReleaseMutation,
 	useAuditTableMutation,
 	useRegradeMutation,
+	useGetReviewQueueQuery,
+	useGetReviewLogQuery,
+	useGetRunReviewsQuery,
+	useCreateReviewMutation,
 } = benchApi;

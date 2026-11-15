@@ -1,0 +1,7 @@
+# Keys of bench.ts `TaskQuarantine` (suite.health.json), one per line; a trailing ? marks an optional (Go omitempty) key.
+# Change with bench.ts and schemas/suitehealth.go.
+reason
+at
+source
+task_version?
+evidence?

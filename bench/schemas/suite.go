@@ -23,6 +23,8 @@ type Suite struct {
 	Services []ServiceSpec `json:"services,omitempty" yaml:"services"` // started beside the agent in every run
 	Judge    *JudgeSpec    `json:"judge,omitempty" yaml:"judge"`       // required when Grading is judged
 	Imported *ImportRecord `json:"imported,omitempty" yaml:"imported"` // set by `bifrost-bench import`
+	External []ExternalAPI `json:"external,omitempty" yaml:"external"` // real HTTP APIs every task's agent may call through the tool proxy
+	Canary   string        `json:"canary,omitempty" yaml:"canary"`     // contamination canary GUID, set by `suite canary` (docs/held-out-and-canaries.md)
 
 	Root     string       `json:"-" yaml:"-"` // absolute folder of the pack
 	Tasks    []*Task      `json:"-" yaml:"-"` // loaded tasks, in TaskIDs order

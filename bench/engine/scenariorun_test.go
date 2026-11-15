@@ -32,6 +32,8 @@ type scenarioWorld struct {
 	plans        []schemas.RunPlan
 	instructions []string // rc.Task.Instruction seen by each Exec
 	snapshots    int
+	artifacts    []schemas.ArtifactFile // what ExportArtifacts returns; files without Error are written
+	artifactErr  error                  // ExportArtifacts fails with it
 }
 
 func (e fakeScenarioEnv) StartServices(_ context.Context, rc *schemas.RunContext) ([]schemas.ServiceHandle, []schemas.ServiceResult, error) {
@@ -95,6 +97,28 @@ func (e fakeScenarioEnv) ExportAnswer(context.Context, *schemas.RunContext) (*sc
 		return nil, err
 	}
 	return e.s.answer, nil
+}
+
+func (e fakeScenarioEnv) ExportArtifacts(_ context.Context, rc *schemas.RunContext) ([]schemas.ArtifactFile, error) {
+	if err := e.w.hit("export_artifacts"); err != nil {
+		return nil, err
+	}
+	if e.s.artifactErr != nil {
+		return nil, e.s.artifactErr
+	}
+	for _, f := range e.s.artifacts {
+		if f.Error != "" {
+			continue
+		}
+		p := filepath.Join(rc.Dir, filepath.FromSlash(f.Path))
+		if err := os.MkdirAll(filepath.Dir(p), 0o755); err != nil {
+			return nil, err
+		}
+		if err := os.WriteFile(p, []byte("data"), 0o644); err != nil {
+			return nil, err
+		}
+	}
+	return e.s.artifacts, nil
 }
 
 func (e fakeScenarioEnv) Exec(ctx context.Context, rc *schemas.RunContext, plan *schemas.RunPlan) (*schemas.ExecResult, error) {
@@ -424,5 +448,110 @@ func TestSessionsEnded(t *testing.T) {
 				t.Errorf("got %q, want %q", got, tc.want)
 			}
 		})
+	}
+}
+
+// withArtifacts makes t01 an artifact task with a required report and an
+// optional plot.
+func withArtifacts(_ *schemas.Suite, task *schemas.Task) {
+	task.Output = &schemas.OutputSpec{Kind: schemas.OutputArtifact, Artifacts: []schemas.ArtifactSpec{
+		{ID: "report", Path: "out/*.csv", Required: true}, {ID: "plot", Path: "plot.svg"}}}
+}
+
+func TestRunSlotArtifacts(t *testing.T) {
+	report := schemas.ArtifactFile{ID: "report", Name: "r.csv", Path: "artifacts/report/r.csv", Source: "out/r.csv",
+		SHA256: "3a6eb0790f39ac87c94f3856b2dd2c5d110e6811602261a9a923d3bb23adc8b7", Bytes: 4}
+	noReport := schemas.ArtifactFile{ID: "report", Source: "out/*.csv", Error: "missing: no file matches out/*.csv"}
+	noPlot := schemas.ArtifactFile{ID: "plot", Source: "plot.svg", Error: "missing: no file matches plot.svg"}
+	tests := []struct {
+		name      string
+		files     []schemas.ArtifactFile
+		exportErr error
+		outcome   schemas.Outcome
+		graded    bool   // the grader ran
+		reason    string // wanted in the grade reason when the grader did not run
+	}{
+		{name: "required artifact present, optional missing: the verifier grades", files: []schemas.ArtifactFile{report, noPlot},
+			outcome: schemas.OutcomePass, graded: true},
+		{name: "required artifact missing fails without the verifier", files: []schemas.ArtifactFile{noReport, noPlot},
+			outcome: schemas.OutcomeFail, reason: "artifact output: required artifact missing: report (out/*.csv: missing: no file matches out/*.csv)"},
+		// A failed export stage would make the run infra_error instead.
+		{name: "export machinery error is invalid_evaluator", exportErr: errors.New("helper exit 1: no python3"),
+			outcome: schemas.OutcomeInvalidEvaluator, reason: "artifact output: export failed: helper exit 1: no python3"},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			b, sw, m, slot := scenarioBench(t, withArtifacts)
+			sw.artifacts, sw.artifactErr = tc.files, tc.exportErr
+			res, err := runOne(context.Background(), t, b, m, slot)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if res.Run.Outcome != tc.outcome || b.w.count("export_artifacts") != 1 {
+				t.Fatalf("outcome %s, exports %d", res.Run.Outcome, b.w.count("export_artifacts"))
+			}
+			if got := b.w.count("grade") == 1; got != tc.graded {
+				t.Fatalf("grader ran: %v, want %v", got, tc.graded)
+			}
+			var ev schemas.Evidence
+			if err := json.Unmarshal([]byte(readRunFile(t, res.Dir, "evidence.json")), &ev); err != nil || ev.Grade == nil {
+				t.Fatalf("evidence %+v %v", ev, err)
+			}
+			if ev.Grade.Mode != schemas.OutputArtifact || (!tc.graded && ev.Grade.Reason != tc.reason) {
+				t.Fatalf("grade %+v", ev.Grade)
+			}
+			if tc.exportErr == nil && len(ev.Artifacts) != len(tc.files) {
+				t.Fatalf("evidence artifacts %+v", ev.Artifacts)
+			}
+		})
+	}
+}
+
+func TestRunSlotPlainTaskExportsNoArtifacts(t *testing.T) {
+	b, _, m, slot := scenarioBench(t, func(*schemas.Suite, *schemas.Task) {})
+	res, err := runOne(context.Background(), t, b, m, slot)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if b.w.count("export_artifacts") != 0 {
+		t.Error("artifacts exported for a plain task")
+	}
+	var ev schemas.Evidence
+	if err := json.Unmarshal([]byte(readRunFile(t, res.Dir, "evidence.json")), &ev); err != nil || ev.Artifacts != nil || ev.Grade == nil || ev.Grade.Mode != "" {
+		t.Fatalf("plain evidence %+v %v", ev, err)
+	}
+}
+
+func TestScenarioGradeProblemArtifacts(t *testing.T) {
+	rc := &schemas.RunContext{Suite: &schemas.Suite{}, Task: &schemas.Task{Output: &schemas.OutputSpec{Kind: schemas.OutputArtifact}}}
+	if got := scenarioGradeProblem(rc, &schemas.Evidence{}, ""); got != "" {
+		t.Fatalf("clean export reported %q", got)
+	}
+	if got := scenarioGradeProblem(rc, &schemas.Evidence{}, "environment docker_workspace cannot export artifacts"); got != "artifact output: environment docker_workspace cannot export artifacts" {
+		t.Fatalf("got %q", got)
+	}
+	plain := &schemas.RunContext{Suite: &schemas.Suite{}, Task: &schemas.Task{}}
+	if got := scenarioGradeProblem(plain, &schemas.Evidence{}, "ignored"); got != "" {
+		t.Fatalf("plain task reported %q", got)
+	}
+}
+
+// plainArtifactEnv is a scenario env without ExportArtifacts.
+type plainArtifactEnv struct{ fakeEnv }
+
+func TestExportArtifactsWithoutSupport(t *testing.T) {
+	b := newBench(t)
+	st := &runState{rc: &schemas.RunContext{Run: &schemas.Run{RunID: "r_1"}, Suite: b.suite, Task: &schemas.Task{ID: "t"}},
+		env: plainArtifactEnv{fakeEnv{part{"plain"}, b.w}}, ev: &schemas.Evidence{}}
+	withArtifacts(nil, st.rc.Task)
+	p := NewPipeline(b.reg, b.root, nil)
+	if err := p.exportScenario(context.Background(), st); err != nil {
+		t.Fatalf("export stage failed: %v", err)
+	}
+	if st.artifactErr != "environment plain cannot export artifacts" || st.ev.Artifacts != nil {
+		t.Fatalf("artifactErr %q", st.artifactErr)
+	}
+	if got := scenarioGradeProblem(st.rc, st.ev, st.artifactErr); got != "artifact output: environment plain cannot export artifacts" {
+		t.Fatalf("reason %q", got)
 	}
 }

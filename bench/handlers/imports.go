@@ -52,12 +52,13 @@ func (h *ImportsHandler) getImports(ctx *fasthttp.RequestCtx) {
 }
 
 // scenarioSummary fills the scenario fields of a suite summary and of each of
-// its tasks for the suites page: track, grading, output, services and import
-// record of the suite; image, services, sessions, output, skills and the
-// impossible flag of each task. It lives here, beside the other UI-only
-// payload, and is called once from SuitesHandler.summarize. A repository
-// suite gets only its track and grading; every other field stays empty and is
-// omitted, so the payload of a plain suite is unchanged.
+// its tasks for the suites page: track, grading, output, declared output
+// artifacts, services and import record of the suite; image, services,
+// sessions, output, skills and the impossible flag of each task. It lives
+// here, beside the other UI-only payload, and is called once from
+// SuitesHandler.summarize. A repository suite gets only its track and
+// grading; every other field stays empty and is omitted, so the payload of a
+// plain suite is unchanged.
 func scenarioSummary(s *schemas.Suite, out *schemas.SuiteSummary) {
 	out.Track = s.Track
 	if out.Track == "" {
@@ -69,6 +70,9 @@ func scenarioSummary(s *schemas.Suite, out *schemas.SuiteSummary) {
 	}
 	if s.Output != nil {
 		out.Output = s.Output.Kind
+		if len(s.Output.Artifacts) > 0 {
+			out.Artifacts = slices.Clone(s.Output.Artifacts)
+		}
 	}
 	for _, sv := range s.Services {
 		out.Services = append(out.Services, sv.ID)

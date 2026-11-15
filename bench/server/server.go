@@ -16,6 +16,7 @@ import (
 	"github.com/maximhq/bifrost/bench/handlers"
 	"github.com/maximhq/bifrost/bench/lib"
 	"github.com/maximhq/bifrost/bench/schemas"
+	"github.com/maximhq/bifrost/bench/taskhealth"
 	"github.com/valyala/fasthttp"
 )
 
@@ -40,6 +41,14 @@ type Deps struct {
 	Suites   handlers.SuiteSource
 	Agents   handlers.AgentSource
 	Workers  handlers.WorkerAPI // Remote area: remote worker coordinator; nil turns worker mode off (handlers/workers.go)
+	// Index and trends area: trends over the derived results index; nil answers 503 (handlers/trends.go).
+	Trends handlers.TrendSource
+	// Human review area: review queue, review history and new reviews; nil answers 503 (handlers/reviews.go).
+	Reviews handlers.ReviewSource
+	// Forecast and matrix area: POST /estimate and GET /experiments/{id}/matrix; nil answers 503 (handlers/forecast.go).
+	Forecast handlers.ForecastSource
+	// Suite health area: sealed runs for GET /suites/{id}/health; nil answers 503 (handlers/suitehealth.go).
+	Health taskhealth.Source
 	// UI is the built UI with index.html at its root, for example
 	// fs.Sub(ui.Dist, "dist"). Nil serves the API only.
 	UI      fs.FS
@@ -98,13 +107,24 @@ func New(cfg *lib.Config, deps Deps) (*Server, error) {
 	handlers.NewPairsHandler(mode, deps.Index).RegisterRoutes(r, common...)
 	handlers.NewTriageHandler(mode, deps.Index, deps.Catalog).RegisterRoutes(r, common...)
 	handlers.NewLeaderboardHandler(mode, deps.Index).RegisterRoutes(r, common...)
+	handlers.NewClustersHandler(mode, deps.Index).RegisterRoutes(r, common...) // Failure clusters area (handlers/clusters.go)
 	handlers.NewAuditHandler(mode, deps.Auditor, write).RegisterRoutes(r, common...)
 	handlers.NewReleasesHandler(mode, deps.Releases, write).RegisterRoutes(r, common...)
-	handlers.NewSuitesHandler(mode, deps.Suites).RegisterRoutes(r, common...)
+	handlers.NewSuitesHandler(mode, deps.Suites).WithHeldOutVisible(cfg.HeldOut.Visible).RegisterRoutes(r, common...) // Suite health area: held_out.visible
+	handlers.NewSuiteHealthHandler(mode, deps.Suites, deps.Health).RegisterRoutes(r, common...)                       // Suite health area (handlers/suitehealth.go)
 	handlers.NewAgentsHandler(mode, deps.Agents, deps.Index).RegisterRoutes(r, common...)
+	// Agent diff area: two versions of an agent config compared (handlers/agentdiff.go, docs/agent-diff.md).
+	handlers.NewAgentDiffHandler(mode, deps.Index, cfg.Root).RegisterRoutes(r, common...)
 	handlers.NewImportsHandler(mode).RegisterRoutes(r, common...) // UI area: importer catalog (handlers/imports.go)
+	// Forecast and matrix area: POST /estimate and GET /experiments/{id}/matrix (handlers/forecast.go, docs/forecast.md).
+	handlers.NewForecastHandler(mode, deps.Forecast, write).RegisterRoutes(r, common...)
 	// Remote area: worker API, off unless BENCH_WORKER_TOKEN is set (handlers/workers.go).
 	handlers.NewWorkersHandler(mode, deps.Workers).RegisterRoutes(r, common...)
+	handlers.NewOpenAPIHandler(mode, deps.Version).RegisterRoutes(r, common...) // Clients area: API description (handlers/openapi.go, docs/clients.md)
+	// Index and trends area: GET /trends over the derived results index (handlers/trends.go, docs/trends.md).
+	handlers.NewTrendsHandler(mode, deps.Trends).RegisterRoutes(r, common...)
+	// Human review area: review queue and history, POST /reviews behind the write token (handlers/reviews.go, docs/human-review.md).
+	handlers.NewReviewsHandler(mode, deps.Reviews, write).RegisterRoutes(r, common...)
 	if deps.UI != nil {
 		NewUIHandler(mode, deps.UI).RegisterRoutes(r)
 	}

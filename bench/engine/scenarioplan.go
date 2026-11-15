@@ -65,7 +65,7 @@ func (p *Planner) checkScenario(suite *schemas.Suite, conds []condPlan, arms map
 // envMissing lists what task t needs that env does not implement.
 func envMissing(env schemas.Environment, suite *schemas.Suite, t *schemas.Task) []string {
 	var out []string
-	if len(utils.TaskServices(suite, t)) > 0 {
+	if len(utils.TaskServices(suite, t)) > 0 || len(utils.ExternalAPIs(suite, t)) > 0 { // External APIs area: external APIs need the tool proxy
 		if _, ok := env.(schemas.ServiceEnvironment); !ok {
 			out = append(out, "services")
 		}
@@ -83,6 +83,11 @@ func envMissing(env schemas.Environment, suite *schemas.Suite, t *schemas.Task) 
 	if utils.OutputKind(suite, t) == schemas.OutputAnswer {
 		if _, ok := env.(schemas.AnswerEnvironment); !ok {
 			out = append(out, "an answer export")
+		}
+	}
+	if utils.OutputKind(suite, t) == schemas.OutputArtifact {
+		if _, ok := env.(schemas.ArtifactEnvironment); !ok {
+			out = append(out, "an artifact export")
 		}
 	}
 	return out
@@ -168,6 +173,9 @@ func (p *Planner) scenarioHashes(suite *schemas.Suite) (map[string]string, error
 	}
 	if suite.Verifier.Mode != "" {
 		put("suite.verifier.mode", suite.Verifier.Mode)
+	}
+	if len(suite.External) > 0 {
+		put("suite.external", suite.External) // External APIs area: suite-level external APIs
 	}
 	if len(errs) > 0 {
 		return nil, errors.Join(errs...)

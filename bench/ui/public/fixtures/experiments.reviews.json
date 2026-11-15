@@ -1,0 +1,45 @@
+{
+	"_comment": "SYNTHETIC fixture for UI development. Not a benchmark result. GET /experiments/{id}/reviews (schemas.ReviewLog).",
+	"mode": "synthetic",
+	"exp_id": "e_synthetic-codewins",
+	"reviews": [
+		{
+			"review_id": "rv_synth0001",
+			"exp_id": "e_synthetic-codewins",
+			"run_id": "r_pww2l7yame",
+			"parent_seal": "sha256:40d705b189548bd2d5c8e36f2a73fa31b8a683d47261a1e59be0eee8a107ccb0",
+			"decision": "flag_only",
+			"reason": "The diff passes the tests but also rewrites the notes file the task said to leave alone. Someone should look before this counts.",
+			"reviewer": "lee",
+			"created_at": "2026-11-14T10:12:00Z",
+			"sealed_outcome": "pass",
+			"previous_outcome": "pass",
+			"evidence": [
+				"workspace.diff",
+				"notes/README.md"
+			],
+			"prev_hash": "",
+			"hash": "542150d5dff5104d940f17d539b9ae694586ba9b7f2ae993f492cfc8c8bc486d"
+		},
+		{
+			"review_id": "rv_synth0002",
+			"exp_id": "e_synthetic-codewins",
+			"run_id": "r_fmw1z7ouim",
+			"parent_seal": "sha256:4fd47830d83cd73533ad18dabeb81ae5e6a39ac8c68c2211ab50ee427338a94c",
+			"decision": "pass",
+			"reason": "The two failing tests assert the old date format that the task asked the agent to change. The change itself is correct, so the verifier is too strict here.",
+			"reviewer": "maya",
+			"created_at": "2026-11-14T11:40:00Z",
+			"sealed_outcome": "fail",
+			"previous_outcome": "fail",
+			"evidence": [
+				"grade.json failed_tests",
+				"workspace.diff"
+			],
+			"prev_hash": "542150d5dff5104d940f17d539b9ae694586ba9b7f2ae993f492cfc8c8bc486d",
+			"hash": "04a09f51588a00105cf0f8fdfe123aa47edc9b2a1e0e87bfd8c58fdf3be1f067"
+		}
+	],
+	"verified": true,
+	"problems": []
+}

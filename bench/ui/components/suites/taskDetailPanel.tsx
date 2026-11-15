@@ -3,14 +3,16 @@ import { Button } from "@/components/ui/button";
 import { formatDateTime } from "@/components/verdict/verdict.utils";
 import { getLocale } from "@/lib/i18n";
 import { useGetSuiteTaskQuery } from "@/lib/store";
-import type { OutputKind, SuiteTaskDetail } from "@/lib/types/bench";
+import type { ArtifactSpec, OutputKind, SuiteTaskDetail, TaskQuarantine } from "@/lib/types/bench";
 import { cn } from "@/lib/utils";
 import { Link } from "@tanstack/react-router";
 import { CircleCheck, CircleDashed, CircleX, EyeOff, X } from "lucide-react";
 import { useEffect, useRef } from "react";
 import { useTranslation } from "react-i18next";
 import { AdmissionBadge } from "./suiteBadges";
+import type { HealthState } from "./suiteHealth.utils";
 import { TaskScenario } from "./suiteScenario";
+import { TaskHealthBlock } from "./taskHealthBlock";
 import { controlRows, formatBytes, type ControlRow } from "./suites.utils";
 
 export interface TaskDetailPanelProps {
@@ -19,14 +21,29 @@ export interface TaskDetailPanelProps {
 	taskId: string;
 	/** The suite's output kind, shown when the task does not set its own. */
 	suiteOutput?: OutputKind;
+	/** The suite's declared artifacts, shown for an artifact task that declares none of its own. */
+	suiteArtifacts?: readonly ArtifactSpec[];
 	onClose: () => void;
+	/** Suite health; when given, the task's health is shown above its detail, even when the detail is not served. */
+	health?: HealthState;
+	/** The task's quarantine from the suite list. */
+	quarantine?: TaskQuarantine | null;
 }
 
 /**
  * The open task: fetched on demand, so the list stays light. Focus moves to the heading when a
  * task opens, and Escape closes the panel.
  */
-export function TaskDetailPanel({ suiteId, suiteVersion, taskId, suiteOutput, onClose }: TaskDetailPanelProps) {
+export function TaskDetailPanel({
+	suiteId,
+	suiteVersion,
+	taskId,
+	suiteOutput,
+	suiteArtifacts,
+	onClose,
+	health,
+	quarantine = null,
+}: TaskDetailPanelProps) {
 	const { t } = useTranslation("bench");
 	const query = useGetSuiteTaskQuery({ suite: suiteId, task: taskId });
 	const heading = useRef<HTMLHeadingElement>(null);
@@ -56,6 +73,7 @@ export function TaskDetailPanel({ suiteId, suiteVersion, taskId, suiteOutput, on
 					<X aria-hidden="true" />
 				</Button>
 			</div>
+			{health && <TaskHealthBlock taskId={taskId} quarantine={quarantine} health={health} />}
 			{query.isLoading ? (
 				<BlockSkeleton rows={6} testId="suites-task-detail-loading" />
 			) : query.isError || !query.data ? (
@@ -66,7 +84,7 @@ export function TaskDetailPanel({ suiteId, suiteVersion, taskId, suiteOutput, on
 					testId="suites-task-detail-error"
 				/>
 			) : (
-				<TaskDetailBody detail={query.data} suiteVersion={suiteVersion} suiteOutput={suiteOutput} />
+				<TaskDetailBody detail={query.data} suiteVersion={suiteVersion} suiteOutput={suiteOutput} suiteArtifacts={suiteArtifacts} />
 			)}
 		</section>
 	);
@@ -77,10 +95,12 @@ export function TaskDetailBody({
 	detail,
 	suiteVersion,
 	suiteOutput,
+	suiteArtifacts,
 }: {
 	detail: SuiteTaskDetail;
 	suiteVersion: string;
 	suiteOutput?: OutputKind;
+	suiteArtifacts?: readonly ArtifactSpec[];
 }) {
 	const { t } = useTranslation("bench");
 	const locale = getLocale();
@@ -94,7 +114,7 @@ export function TaskDetailBody({
 				</span>
 			</div>
 
-			<TaskScenario task={task} suiteOutput={suiteOutput} />
+			<TaskScenario task={task} suiteOutput={suiteOutput} suiteArtifacts={suiteArtifacts} />
 
 			<DetailBlock title={t("suites.detail.instruction")} hint={t("suites.detail.instructionHint")} testId="suites-task-instruction">
 				{detail.instruction ? (

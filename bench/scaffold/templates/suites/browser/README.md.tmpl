@@ -1,0 +1,82 @@
+# [[.ID]]
+
+A Heimdall suite written by `bifrost-bench suite init -template browser`,
+with one complete sample task (`tasks/new-customer`). The user guides are
+`docs/browser-tasks.md` and `docs/scenarios.md` in the bench repository.
+
+[[.About]]
+
+## What to edit
+
+1. `services/webapp/server.py`: replace the customer console with your own
+   pages, or point the `webapp` service of every task.yaml at your own web
+   application image (any image that serves HTTP on a port, loads its seed
+   from a file the task copies in, and writes its state to a file or prints
+   it from a command for `export:`).
+2. `tasks/<task>/seed/db.json`: the data the web application starts with.
+3. `tasks/<task>/instruction.md`: the request, as a user would write it.
+4. `tasks/<task>/verifier/tests/checks.py`: what the web application's final
+   database must hold (`verify.py` beside it documents every check), and
+   `ATTACK_CHECKS`, what it holds when the hostile banner was obeyed.
+5. `tasks/<task>/solution/reference.sh`: the steps a correct agent takes in
+   the browser. Admission runs it in the agent's place, through the same
+   browser and tool proxy, and the verifier must pass it.
+
+`controls/` holds what admission requires to fail: the empty control, an
+exploit (it posts to the web application directly and plants reward files)
+and a plausible wrong action (a mutant script).
+
+## Layout
+
+```
+suite.yaml                       the suite: image, grader, output, tasks, probes
+base/Dockerfile                  the toolchain image the workspace and verifier run on
+services/webapp/                 the web application: Dockerfile and server.py
+services/browser/Dockerfile      the browser: Playwright MCP with headless Chromium (about 1.5 GB)
+probes/browser-error-first.yaml  a tool fault: the first browser_navigate fails
+probes/browser-slow.yaml         a tool fault: two browser calls time out after 20 s
+probes/hostile-banner.yaml       hostile page content: an injected notice on every page
+probes/model-outage.yaml         a gateway fault: the model answers 503 from call 3
+tasks/<task>/task.yaml           one task: services, hidden verifier, controls
+tasks/<task>/instruction.md      what the agent is asked to do
+tasks/<task>/repo/               the workspace the agent starts from (no .git)
+tasks/<task>/seed/db.json        the data the web application starts with
+tasks/<task>/verifier/tests/     hidden: verify.py and checks.py, at /grader/tests
+tasks/<task>/solution/           the reference script that must pass
+tasks/<task>/controls/           empty, exploit and mutant scripts that must fail
+```
+
+## Commands
+
+Run from the project root.
+
+```sh
+[[.Build]]
+docker build -t bench/[[.ID]]-webapp:1 benchmarks/[[.ID]]/services/webapp
+docker build -t bench/[[.ID]]-browser:1 benchmarks/[[.ID]]/services/browser
+bifrost-bench suite lint [[.ID]]
+bifrost-bench task validate [[.ID]]/new-customer
+bifrost-bench suite lock [[.ID]]
+bifrost-bench suite admit [[.ID]]
+```
+
+`suite admit` builds both service images when they are missing (the browser
+image pulls about 1.5 GB once). An agent needs an `mcp:` block in its config
+to be told about the browser; `bifrost-bench agent check <agent.yaml> -suite
+[[.ID]] -task new-customer` shows whether it reached it.
+
+## Held-out tasks and canaries
+
+Add `split: held_out` to a task's `task.yaml` to keep it out of `tasks: all`,
+out of the public leaderboard and out of what the UI and API serve. To detect
+later whether this suite leaked into a model's training data, give it a
+contamination canary:
+
+    bifrost-bench suite canary [[.ID]]          # sets canary: <guid> in suite.yaml
+    bifrost-bench suite canary -stamp [[.ID]]   # also writes it into every instruction file
+    bifrost-bench suite canary-check -text model-output.txt
+
+Stamping changes instruction hashes, so run `suite lock` and `suite admit`
+again afterwards; stamp before the first published results, not after. A
+canary only catches verbatim copies of stamped text. The bench guide
+`docs/held-out-and-canaries.md` has the details.

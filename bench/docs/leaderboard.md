@@ -10,7 +10,7 @@ There is **no blended score**. Entries are ordered by verified success; steps, t
 |---|---|
 | Compute and Markdown | `leaderboard/` (pure: reads manifests, runs, `metrics.json` and `proxy.ledger.jsonl` through `leaderboard.Source`, and regrades through `leaderboard.RegradeSource`) |
 | API | `GET /api/bench/leaderboard?suite=&condition=&scope=&synthetic=&grade_source=&k=`, `handlers/leaderboard.go`, returns `schemas.Leaderboard` plus `mode` |
-| CLI | `bifrost-bench leaderboard [-config deploy/bench.yaml] [-suite id@version] [-condition clean] [-scope all\|common] [-synthetic exclude\|only] [-grade-source original\|latest] [-k n] [-format md\|json] [-out file]` |
+| CLI | `bifrost-bench leaderboard [-config deploy/bench.yaml] [-suite id@version] [-condition clean] [-scope all\|common] [-synthetic exclude\|only] [-grade-source original\|latest\|reviewed] [-k n] [-format md\|json] [-out file]` |
 | Contract | `schemas/leaderboard.go`, `handlers/testdata/contract/Leaderboard*.keys`, `ui/lib/types/bench.ts` |
 
 Absent parameters take the defaults: the newest suite with runs, `clean`, `all`, `exclude`, grade source `original`, and each entry's own k. A malformed parameter is a 400 (CLI: exit 64): so is a `grade_source` other than `original` or `latest` (a regrade id is not accepted here; `latest` picks one per experiment), and a `k` that is not an integer of 2 or more. A well-formed suite or condition with no runs is an empty board, so the picker still lists what exists. The CLI reads the run folder only: no gateway, no Docker, and it writes nothing into it.
@@ -33,6 +33,7 @@ Every other run of the board's suite and condition is counted in `excluded`, by 
 | `not sealed` | The slot's run is still in flight |
 | `infra_error`, `invalid_evaluator`, `unknown` | The outcome gives no score (the bench, the gateway or the grader failed, or the provider became unreachable and the run ended on it: `docs/upstream-failures.md`) |
 | `aborted_infra` | Every attempt failed on infrastructure: before the agent started, or with no model call answered because the provider was unreachable |
+| `external APIs live (not repeatable)` | The experiment set `external: live` or `external: record`, so its runs called real external hosts and cannot be repeated (`docs/external-apis.md`). Replay runs count normally |
 
 A run's success is its `verified_success` metric (the default primary endpoint: hidden verifier passed under the clean regrade and no veto gate fired), read from `metrics.json`; a run measured before that metric existed falls back to its outcome. Which outcome and metrics a run is read with is the grade source, below.
 
@@ -120,5 +121,6 @@ Every list on a board (suites, conditions, entries, exclusions) is computed afte
 - **The success interval is descriptive.** The paired-t interval over tasks is approximate, as in the verdict, and takes no part in the tiers.
 - **Synthetic detection on older runs is a fingerprint.** Runs recorded by a fault proxy that predates the ledger `upstream` field are classified by the scripted model's fixed usage and id format; newer runs use the field.
 - **Entries can differ in k.** The default k follows each entry's own experiments, so a 2-trial entry and a 3-trial entry report pass^2 and pass^3. Compare reliability across entries only at the same k, or pass `k`.
+- **Grade source `reviewed`** applies human reviews on top of the sealed grades and never reads a regrade; `latest` never applies reviews. The board then reports `reviewed_runs` and `review_changed_runs`, and `reviewed_runs` per experiment in `grade_sources` (`docs/human-review.md`).
 - **Regrades are per experiment.** With grade source `latest`, an experiment that was never regated reads as sealed beside experiments that were. `grade_sources` says which is which.
 - **Computed on request.** Every request reads each run's `metrics.json` and, for live configs, `proxy.ledger.jsonl`; with grade source `latest`, each regated experiment's sealed runs once more through the store's reader. That is fine for hundreds of runs; a very large run folder would want a cache.

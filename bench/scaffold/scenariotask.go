@@ -247,6 +247,8 @@ func reshapeTask(files []File, opts ScenarioTaskOptions, tmpl, from string, res 
 	}
 	if stateTemplate(tmpl) {
 		mark(path.Join(shape.Verifier.Tests, "checks.py"), markComment("write the checks this task's final state must pass"))
+	} else if tmpl == TemplateArtifact {
+		mark(path.Join(shape.Verifier.Tests, "verify.py"), markComment("write the checks this task's artifact files must pass"))
 	} else if shape.Verifier.Answer != "" {
 		mark(shape.Verifier.Answer, markComment("write this task's expected answer and how it is matched"))
 	}

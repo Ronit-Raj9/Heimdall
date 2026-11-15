@@ -1,0 +1,40 @@
+# The studio manager wants the autumn invoices summarised per client, as a
+# CSV for the spreadsheet and a JSON file for the dashboard. Void invoices
+# do not count, and a client with only void invoices is left out. Graded on
+# the exact numbers in both files.
+id: invoice-summary
+version: 1.0.0
+title: Summarise invoices per client as CSV and JSON
+project: acme-design
+kind: feature
+instruction: instruction.md
+# The workspace holds data/invoices.csv; the agent writes the two summary
+# files next to it.
+repo_dir: repo
+output:
+  kind: artifact
+  artifacts:
+    # Mounted read-only for the verifier at
+    # /grader/artifacts/summary_csv/summary.csv and
+    # /grader/artifacts/summary_json/summary.json.
+    - {id: summary_csv, path: summary.csv, required: true, max_bytes: 65536}
+    - {id: summary_json, path: summary.json, required: true, max_bytes: 65536}
+verifier:
+  # Hidden folder, mounted at /grader/tests. The expected numbers live in
+  # verify.py; it never reads the workspace's input.
+  tests: verifier/tests
+  required: []
+protected: []
+controls:
+  reference: solution/reference.sh
+  empty: controls/empty.sh
+  mutants: [controls/mutant-counts-void.sh, controls/mutant-open-is-total.sh]
+  exploit: controls/exploit.sh
+timeouts:
+  agent_s: 600
+capabilities: [data_analysis, file_output]
+difficulty: easy
+provenance:
+  source: bench/examples/acme-design (fictional Acme Design studio, written for this example)
+  license: MIT
+  created_by: hand-written example

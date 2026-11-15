@@ -84,6 +84,7 @@ type runState struct {
 	aborted      bool   // a stage failed before the agent started
 	broken       bool   // a stage failed after the agent started
 	taskImageID  string // id the manifest froze for the per-task agent image; empty when the run has none
+	artifactErr  string // why an artifact task's files could not be exported; the grade is then invalid_evaluator
 }
 
 // NewPipeline returns a pipeline. benchRoot resolves the relative

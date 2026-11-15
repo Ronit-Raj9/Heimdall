@@ -4,6 +4,8 @@ import { AddYourOwnPanel } from "@/components/suites/addYourOwnPanel";
 import { SuiteCards } from "@/components/suites/suiteCards";
 import { CapabilityCoverage, LicenseSummary, ProbeList } from "@/components/suites/suiteCoverage";
 import { BrokenSuite, SuiteDriftNotice, SuiteFacts } from "@/components/suites/suiteFacts";
+import { SuiteHealthSummary } from "@/components/suites/suiteHealth";
+import { healthState, isRedacted } from "@/components/suites/suiteHealth.utils";
 import { SuiteTaskFilters } from "@/components/suites/suiteTaskFilters";
 import { SuiteTaskTable } from "@/components/suites/suiteTaskTable";
 import {
@@ -20,7 +22,7 @@ import {
 	type TaskSortKey,
 } from "@/components/suites/suites.utils";
 import { TaskDetailPanel } from "@/components/suites/taskDetailPanel";
-import { useGetSuitesQuery } from "@/lib/store";
+import { useGetSuiteHealthQuery, useGetSuitesQuery } from "@/lib/store";
 import type { SuiteSummary } from "@/lib/types/bench";
 import { cn } from "@/lib/utils";
 import { AlertTriangle } from "lucide-react";
@@ -119,6 +121,11 @@ function SuiteDetail({ suite }: { suite: SuiteSummary }) {
 		[suite.tasks, q.kind, q.difficulty, q.cap, q.status, q.sort, q.dir],
 	);
 	const openTask = q.task && suite.tasks.some((task) => task.id === q.task) ? q.task : null;
+	// Health is a separate request: a failure or a 503 (no run store) shows "health unavailable" and never blocks the page.
+	const healthQuery = useGetSuiteHealthQuery(suite.id, { skip: Boolean(suite.error) });
+	const health = healthState(healthQuery);
+	// Withheld held-out tasks carry no capabilities or license, so coverage and licenses leave them out.
+	const publicTasks = useMemo(() => suite.tasks.filter((task) => !isRedacted(task)), [suite.tasks]);
 
 	if (suite.error) return <BrokenSuite suite={suite} />;
 
@@ -132,6 +139,7 @@ function SuiteDetail({ suite }: { suite: SuiteSummary }) {
 		<div className="flex min-w-0 flex-col gap-6" data-testid={`suites-detail-${suite.id}`}>
 			<SuiteFacts suite={suite} />
 			<SuiteDriftNotice suite={suite} />
+			<SuiteHealthSummary suite={suite} health={health} />
 			<div className={cn("grid min-w-0 grid-cols-1 gap-4", openTask && "2xl:grid-cols-[minmax(0,1fr)_minmax(0,30rem)]")}>
 				<Section title={t("suites.tasks.title")} description={t("suites.tasks.description")} testId="suites-tasks" className="min-w-0">
 					<SuiteTaskFilters
@@ -153,6 +161,7 @@ function SuiteDetail({ suite }: { suite: SuiteSummary }) {
 								onSort={onSort}
 								selected={openTask}
 								onOpen={(id) => void setQ({ task: id === openTask ? null : id })}
+								health={health}
 							/>
 							{rows.length < suite.tasks.length && (
 								<p className="text-muted-foreground text-xs" data-testid="suites-tasks-showing">
@@ -169,14 +178,17 @@ function SuiteDetail({ suite }: { suite: SuiteSummary }) {
 							suiteVersion={suite.version}
 							taskId={openTask}
 							suiteOutput={suite.output}
+							suiteArtifacts={suite.artifacts}
 							onClose={() => void setQ({ task: null })}
+							health={health}
+							quarantine={suite.tasks.find((task) => task.id === openTask)?.quarantine ?? null}
 						/>
 					</div>
 				)}
 			</div>
 			<div className="grid min-w-0 grid-cols-1 gap-6 lg:grid-cols-2">
-				<CapabilityCoverage tasks={suite.tasks} />
-				<LicenseSummary tasks={suite.tasks} />
+				<CapabilityCoverage tasks={publicTasks} />
+				<LicenseSummary tasks={publicTasks} />
 			</div>
 			<ProbeList probes={suite.probes} />
 		</div>

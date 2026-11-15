@@ -35,6 +35,15 @@ type Leaderboard struct {
 	// (graded or excluded), which source its runs were read from, newest
 	// experiment first.
 	GradeSources []LeaderboardGradeSource `json:"grade_sources"`
+	// ReviewedRuns counts runs on the board whose outcome came from a human
+	// review (grade source reviewed), and ReviewChangedRuns those whose
+	// outcome the review changed. Absent under any other grade source.
+	ReviewedRuns      int `json:"reviewed_runs,omitempty"`
+	ReviewChangedRuns int `json:"review_changed_runs,omitempty"`
+	// Split is held_out on a held-out board (runs of held-out tasks only,
+	// from experiments that selected them); empty on the public board, which
+	// never counts a held-out task (docs/held-out-and-canaries.md).
+	Split string `json:"split,omitempty"`
 }
 
 // LeaderboardEntry is one agent configuration on the board.
@@ -97,4 +106,7 @@ type LeaderboardGradeSource struct {
 	Source       string `json:"source"`        // "original" or the regrade id read
 	Runs         int    `json:"runs"`          // the experiment's runs on the board, graded or excluded
 	RegradedRuns int    `json:"regraded_runs"` // of Runs, those read from the regrade
+	// ReviewedRuns is, of Runs, those whose outcome came from a human
+	// review (grade source reviewed).
+	ReviewedRuns int `json:"reviewed_runs,omitempty"`
 }

@@ -211,6 +211,7 @@ func (h *ExperimentsHandler) getVerdict(ctx *fasthttp.RequestCtx) {
 	lib.SendJSON(ctx, h.mode, fasthttp.StatusOK, schemas.VerdictPayload{
 		ExpID: m.ExpID, AnalysisID: a.AnalysisID, GradeSource: a.GradeSource, Suite: m.Experiment.Suite,
 		Verdict: a.Verdict, Naive: a.Naive, Gates: gates, ConfigDiff: diff, Policy: a.Policy,
+		ReviewedRuns: a.ReviewedRuns, ReviewChangedRuns: a.ReviewChangedRuns, // human review counts (docs/human-review.md)
 	})
 }
 

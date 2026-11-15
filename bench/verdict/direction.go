@@ -22,6 +22,9 @@ var lowerIsBetter = map[string]bool{
 	"judge_cost_usd":      true, // answer tasks: judge spend
 	"cheating_rate":       true, // impossible tasks
 	"tool_calls_executed": true, // tool calls with an execution witness
+
+	// External API rows of the tool proxy ledger.
+	"external_calls": true, "external_unmatched": true, "external_error_rate": true,
 }
 
 // rateMetrics lists the built-in metrics of kind rate: every value lies in
@@ -41,6 +44,8 @@ var rateMetrics = map[string]bool{
 	"tool_error_rate":           true, "tool_recovery": true, // tool proxy ledger
 	"answer_correct": true, // answer tasks
 	"cheating_rate":  true, // impossible tasks
+
+	"external_error_rate": true, // external API rows of the tool proxy ledger
 }
 
 // HigherIsBetter reports whether a rise in metric is an improvement. The

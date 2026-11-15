@@ -406,3 +406,34 @@ func TestSealedScenario(t *testing.T) {
 		t.Fatalf("empty ledger reloaded as %#v (%v), want an empty list", reloaded.ToolCalls, err)
 	}
 }
+
+func TestSealedScenarioArtifacts(t *testing.T) {
+	dir := t.TempDir()
+	if err := os.MkdirAll(filepath.Join(dir, "artifacts", "mesh"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	body := []byte("v 0 0 0\x00\xff")
+	if err := os.WriteFile(filepath.Join(dir, "artifacts", "mesh", "m.obj"), body, 0o644); err != nil {
+		t.Fatal(err)
+	}
+	good := schemas.ArtifactFile{ID: "mesh", Name: "m.obj", Path: "artifacts/mesh/m.obj", Source: "m.obj", SHA256: utils.SHA256Bytes(body), Bytes: int64(len(body))}
+	refused := schemas.ArtifactFile{ID: "mesh", Name: "x.obj", Source: "x.obj", Error: "outside the workspace"}
+	if err := sealedScenario(dir, &schemas.Evidence{Artifacts: []schemas.ArtifactFile{good, refused}}); err != nil {
+		t.Fatal(err)
+	}
+	changed := good
+	changed.SHA256 = utils.SHA256Bytes([]byte("other"))
+	if err := sealedScenario(dir, &schemas.Evidence{Artifacts: []schemas.ArtifactFile{changed}}); !errors.Is(err, schemas.ErrSealMismatch) {
+		t.Fatalf("changed artifact: got %v", err)
+	}
+	escape := good
+	escape.Path = "../outside"
+	if err := sealedScenario(dir, &schemas.Evidence{Artifacts: []schemas.ArtifactFile{escape}}); err == nil {
+		t.Fatal("artifact path outside the run folder accepted")
+	}
+	gone := good
+	gone.Path = "artifacts/mesh/gone.obj"
+	if err := sealedScenario(dir, &schemas.Evidence{Artifacts: []schemas.ArtifactFile{gone}}); err == nil {
+		t.Fatal("missing artifact file accepted")
+	}
+}

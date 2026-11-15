@@ -1,0 +1,6 @@
+# Keys of bench.ts `ClusterLayer`, one per line; a trailing ? marks an optional (Go omitempty) key.
+# Change with bench.ts and clusters/signature.go.
+kind
+label
+items?
+source?

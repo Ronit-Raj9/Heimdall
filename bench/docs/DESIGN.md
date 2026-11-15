@@ -1056,6 +1056,7 @@ concurrency: 4
 | `GET /experiments/{id}/diagnostics` | Per-condition rows and meters |
 | `GET /experiments/{id}/grid` | Task x trial outcomes, discordant first |
 | `GET /runs/{id}`, `GET /runs/{id}/events`, `GET /runs/{id}/diff`, `GET /runs/{id}/receipts` | One run |
+| `GET /runs/{id}/artifacts/{artifact}/{name}` | One artifact file of a sealed artifact-task run, only when the evidence lists it and its sha256 matches the evidence and the seal. Always a download (`application/octet-stream`, `nosniff`, attachment, CSP sandbox), never rendered: the agent wrote it |
 | `GET /pairs/{pair_id}` | Matched runs, aligned, with first divergence |
 | `POST /audit` | Verdict for a pasted per-task table |
 | `POST /regrade` | Regrade stored diffs under a new suite version (stretch) |

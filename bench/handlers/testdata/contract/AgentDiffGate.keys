@@ -1,0 +1,7 @@
+# Keys of bench.ts `AgentDiffGate`, one per line; a trailing ? marks an optional (Go omitempty) key.
+# Change with bench.ts and agentdiff/agentdiff.go.
+gate
+fired_a
+fired_b
+new
+tasks

@@ -295,6 +295,9 @@ func TestScriptedOracleControlKinds(t *testing.T) {
 			[]string{"sh", referenceScriptFile}, referenceScriptFile},
 		{"answer reference", "controls/answer.txt", "42\n", &schemas.OutputSpec{Kind: schemas.OutputAnswer, AnswerPath: "out/a.txt"},
 			[]string{"sh", "-c", writeAnswer, "write-answer", "/work/out/a.txt", referenceAnswerFile}, referenceAnswerFile},
+		{"artifact task runs its reference script", "controls/reference.sh", "#!/bin/sh\nmkdir -p out && echo a,b > out/r.csv\n",
+			&schemas.OutputSpec{Kind: schemas.OutputArtifact, Artifacts: []schemas.ArtifactSpec{{ID: "report", Path: "out/*.csv", Required: true}}},
+			[]string{"sh", referenceScriptFile}, referenceScriptFile},
 	}
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
@@ -340,5 +343,19 @@ func TestScriptedWriteAnswer(t *testing.T) {
 	}
 	if b, err := os.ReadFile(dst); err != nil || string(b) != "42\n" {
 		t.Fatalf("answer %q %v", b, err)
+	}
+}
+
+// TestScriptedNoopArtifactTask: noop leaves an artifact task's files
+// unwritten, so its required artifacts are missing and the run fails.
+func TestScriptedNoopArtifactTask(t *testing.T) {
+	rc, cfg := fixture(t, scriptedAgent(ScriptedNoop))
+	rc.Task.Output = &schemas.OutputSpec{Kind: schemas.OutputArtifact, Artifacts: []schemas.ArtifactSpec{{ID: "report", Path: "out/*.csv", Required: true}}}
+	plan, err := newScriptedAdapter(cfg).Plan(context.Background(), rc)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if strings.Join(plan.Argv, " ") != "true" || len(plan.Files) != 0 || plan.Network != "none" {
+		t.Fatalf("noop plan %v %v %s", plan.Argv, plan.Files, plan.Network)
 	}
 }

@@ -35,6 +35,7 @@ func runServe(args []string) int {
 	config := fs.String("config", defaultConfig, "bench config")
 	offline := fs.Bool("offline", false, "serve recorded runs only: no gateway, no launching")
 	debug := fs.Bool("debug", false, "debug logging")
+	extras := addServeExtras(fs) // Index and trends area: trends API and -schedules daemon flag (serveextras.go)
 	if err := fs.Parse(args); err != nil {
 		return exitUsage
 	}
@@ -65,6 +66,15 @@ func runServe(args []string) int {
 		deps.Launcher = newLauncher(a, ix)
 	}
 	deps.Launcher, deps.Workers = withWorkers(a, deps.Launcher) // Remote area: worker mode when BENCH_WORKER_TOKEN is set (worker.go)
+	deps.Reviews = reviewSource{st: a.store}                    // Human review (review.go)
+	// Forecast and matrix area: estimate and matrix routes (estimate.go, matrix.go).
+	deps.Forecast = serveForecast{a: a}
+	// Index and trends area: trends source and optional schedule daemon (serveextras.go).
+	if err := extras.apply(ctx, a, &deps, *offline); err != nil {
+		return fail("%v", err)
+	}
+	// Suite health area: GET /suites/{id}/health reads the run store (suitehealth.go).
+	deps.Health = serveHealthSource(a.cfg)
 	srv, err := server.New(a.cfg, deps)
 	if err != nil {
 		return fail("server: %v", err)
@@ -160,6 +170,11 @@ func (x indexAdapter) Pair(pairID string) []handlers.RunView {
 }
 
 func (x indexAdapter) RunFile(runID, name string) ([]byte, error) { return x.ix.RunFile(runID, name) }
+
+// RunArtifact implements handlers.ArtifactReader (store/runartifact.go).
+func (x indexAdapter) RunArtifact(runID, id, name string) ([]byte, error) {
+	return x.ix.RunArtifact(runID, id, name)
+}
 
 // VerifySeal implements handlers.SealVerifier with the index's cached seal
 // check, so the run detail and the leaderboard report a changed run folder.

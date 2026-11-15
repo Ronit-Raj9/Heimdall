@@ -156,6 +156,73 @@ missing.
 | `tool_recovery` | rate | higher | failed calls followed by a later success on the same server, over failed calls; not applicable with no failure |
 | `distinct_tools` | count | lower | different (server, tool) pairs called |
 
+External API calls (protocol `external`, below) have three metrics of their
+own, not applicable to a task without an external API and unknown when it
+has one and the ledger is missing. The four tool metrics above count only
+proxied services' calls on a task without them, and every row, external ones
+included, on a task that has both.
+
+| Metric | Kind | Better | Per run |
+|---|---|---|---|
+| `external_calls` | count | lower | calls to the run's external APIs, allowed, refused, replayed and unmatched alike |
+| `external_unmatched` | count | lower | replay calls the cassette held no answer for (status 599) |
+| `external_error_rate` | rate | lower | failed external calls (refused, unmatched, faulted, 4xx and 5xx) over external calls |
+
+## External routes
+
+A task can declare real HTTP APIs outside the bench (`external:` on the task
+or the suite; the guide is [external-apis.md](external-apis.md)). Each one
+becomes a route of protocol `external`, and the agent reaches it at
+`http://toolproxy:9200/x/<id>/<path>`, never under `/s/`:
+
+```json
+{"service": "acme", "upstream": "https://api.acme.example/v1", "protocol": "external",
+ "external": {"mode": "replay", "allow": [{"methods": ["GET"], "path_prefix": "/rates"}],
+              "headers": {"Accept": "application/json"}, "auth_env": "ACME_KEY", "auth_scheme": "Bearer",
+              "cassette": "/cfg/external/acme.cassette.jsonl", "max_calls": 200, "max_bytes": 4194304, "timeout_s": 30}}
+```
+
+What the proxy enforces on every call:
+
+- The allowlist. A call passes only when its method (default GET) and its
+  path after `/x/<id>` match an entry; a prefix matches on a path segment
+  boundary, so `/rates` allows `/rates/today` but not `/rates-admin`.
+  Anything else is answered 403 and recorded with `blocked: true`.
+- The host. The upstream host is always the route's. A request that names its
+  own host (an absolute request target), and paths holding `..`, `//`,
+  `://`, backslashes or encoded slashes, dots or percent signs, are answered
+  400 and recorded as blocked. Redirects are never followed: a 3xx goes back
+  to the agent as it came.
+- Headers. Hop-by-hop headers, `Accept-Encoding`, forwarding headers and the
+  agent's own `Authorization`, `Proxy-Authorization`, `Cookie` and auth header
+  are dropped; the route's static headers are added; in live and record mode
+  the value of the variable `auth_env` in the proxy's own environment is sent
+  in `auth_header` (default `Authorization`), after `auth_scheme` and a space.
+- Caps. More than `max_calls` calls get 429, a request body over `max_bytes`
+  gets 413 and an answer over it 502, all recorded as blocked; an answer that
+  takes longer than `timeout_s` gets 504.
+- Secrecy. The credential is replaced by `[REDACTED]` wherever it appears in
+  what the agent receives, in the ledger, in a cassette and in log lines.
+
+Each call is one ledger row with protocol `external`, `server` the API id and
+`tool` the method and path (`GET /rates`). In live mode the proxy dials
+`connect` (the run's egress forwarder) in place of the upstream host while the
+TLS server name and the Host header stay the upstream's. In record mode it
+also appends each answered call to `record_to` as one cassette line
+(`method`, `path`, normalized `query`, `body_sha256` of the request body,
+`status`, a few response `headers`, and the `body`, base64 when it is not
+UTF-8). In replay mode it opens no connection at all: a call is answered from
+the entries with the same method, path, normalized query and body hash, in
+recorded order with the last one repeating, and the row says `replayed`. A
+call the cassette does not hold gets status 599 and a row marked `unmatched`:
+it is the agent's call, not an infrastructure failure. A replay route whose
+cassette is missing or does not parse stops the proxy from starting.
+
+Tool faults apply to external routes like any other: `server` is the API id
+and `tool` the method and path. An error or timeout fault answers without
+reaching the API or the cassette; a poison fault appends its text to the real
+or replayed answer.
+
 ## Serving a stdio-only MCP server
 
 Many MCP servers speak only stdio. Their service image runs them behind

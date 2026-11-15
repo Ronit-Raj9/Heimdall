@@ -1,0 +1,9 @@
+# Keys of bench.ts `ArtifactFile` (schemas/scenario.go), in RunDetail.artifacts.
+# The file is agent-written content: offered for download, never rendered.
+id
+name?
+path?
+source
+sha256?
+bytes
+error?

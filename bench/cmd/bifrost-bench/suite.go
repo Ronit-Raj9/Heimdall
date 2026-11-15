@@ -20,9 +20,10 @@ func init() {
 	register("suite", "create, lint, lock or admit a benchmark pack: suite init|lint|lock|admit <id>", runSuite)
 }
 
-const suiteUsage = `usage: bifrost-bench suite init <suite id> -template python-pytest|node-test|go-test|generic-reward|tool-use|mcp|memory|qa [-image <existing image>] [-config deploy/bench.yaml]
+const suiteUsage = `usage: bifrost-bench suite init <suite id> -template python-pytest|node-test|go-test|generic-reward|tool-use|mcp|browser|memory|qa|artifact|external-api|computer-use [-image <existing image>] [-config deploy/bench.yaml]
        bifrost-bench suite lint|lock [-config deploy/bench.yaml | -root benchmarks] <suite id>
-       bifrost-bench suite admit [-config deploy/bench.yaml] [-task t01] <suite id>`
+       bifrost-bench suite admit [-config deploy/bench.yaml] [-task t01] <suite id>
+       bifrost-bench suite health|quarantine|restore|canary|canary-check ... (run one with -h for its flags)`
 
 func runSuite(args []string) int {
 	if len(args) < 2 {
@@ -30,6 +31,9 @@ func runSuite(args []string) int {
 		return exitUsage
 	}
 	sub := args[0]
+	if run, ok := suiteSubcommands[sub]; ok { // Suite health area: health, quarantine, restore, canary, canary-check (suitehealth.go)
+		return run(args[1:])
+	}
 	switch sub {
 	case "admit":
 		return runAdmit(args[1:])

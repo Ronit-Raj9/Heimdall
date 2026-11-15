@@ -1,0 +1,81 @@
+# [[.ID]]
+
+A Heimdall suite written by `bifrost-bench suite init -template computer-use`,
+with one complete sample task (`tasks/[[.Sample]]`). The user guides are
+`docs/computer-use.md` and `docs/scenarios.md` in the bench repository.
+
+[[.About]]
+
+## What to edit
+
+1. `tasks/<task>/task.yaml`: the desktop service's `env:` picks the app
+   (`DESKTOP_APP`: editor, files or form) and what it opens
+   (`DESKTOP_OPEN`); `files:` seeds the home folder (paths under
+   `/seed/home` are copied into `/home/desk` at start).
+2. `tasks/<task>/seed/`: the files the desktop starts with.
+3. `tasks/<task>/instruction.md`: the request, as a user would write it.
+4. `tasks/<task>/verifier/tests/checks.py`: what the desktop's final state
+   must hold (`verify.py` beside it documents every check, and
+   `services/desktop/desktop.py` documents the state dump; neither needs a
+   change).
+5. `tasks/<task>/solution/reference.sh`: the steps a correct agent takes,
+   through the same MCP server. Prefer keyboard steps: they do not depend on
+   pixel positions. Admission runs it in the agent's place and the verifier
+   must pass it three times.
+
+`controls/` holds what admission requires to fail: the empty control, an
+exploit and plausible wrong actions (mutant scripts).
+
+## Layout
+
+```
+suite.yaml                       the suite: image, grader, output, tasks, probes
+base/Dockerfile                  the toolchain image the workspace and verifier run on
+services/desktop/                the desktop: Dockerfile, desktop.py (MCP server, apps, state dump), tests
+probes/screenshot-error.yaml     a tool fault: the first screenshot fails
+probes/hostile-dialog.yaml       a service condition: a notice dialog urges a harmful click
+probes/model-outage.yaml         a gateway fault: the model answers 503 from call 3
+tasks/<task>/task.yaml           one task: the desktop service, hidden verifier, controls
+tasks/<task>/instruction.md      what the agent is asked to do
+tasks/<task>/repo/               the workspace the agent starts from (no .git)
+tasks/<task>/seed/               the files the desktop starts with
+tasks/<task>/verifier/tests/     hidden: verify.py and checks.py, at /grader/tests
+tasks/<task>/solution/           the reference script that must pass
+tasks/<task>/controls/           empty, exploit and mutant scripts that must fail
+```
+
+## Commands
+
+Run from the project root. The desktop image installs its apps with apt, so
+its build needs the network once (`task admit` runs a plain `docker build`
+when the image is missing); runs never get the network.
+
+    [[.Build]]
+    docker build -t bench/[[.ID]]-desktop:1 benchmarks/[[.ID]]/services/desktop
+    docker run --rm bench/[[.ID]]-desktop:1 python3 -m unittest discover -s /opt/desktop
+    bifrost-bench task validate [[.ID]]/[[.Sample]]
+    bifrost-bench task admit [[.ID]]/[[.Sample]]
+    bifrost-bench task init -suite [[.ID]] -id t02
+    bifrost-bench suite lint [[.ID]]
+
+`task admit` records the result in `suite.lock`. A task that was not
+admitted cannot be planned. `task init` copies the first task's shape into
+`tasks/t02` with EDIT ME markers; `task validate` fails until every marker
+is gone. A computer-use run needs an agent that accepts images in tool
+results (the screenshot tool answers with a PNG).
+
+## Held-out tasks and canaries
+
+Add `split: held_out` to a task's `task.yaml` to keep it out of `tasks: all`,
+out of the public leaderboard and out of what the UI and API serve. To detect
+later whether this suite leaked into a model's training data, give it a
+contamination canary:
+
+    bifrost-bench suite canary [[.ID]]          # sets canary: <guid> in suite.yaml
+    bifrost-bench suite canary -stamp [[.ID]]   # also writes it into every instruction file
+    bifrost-bench suite canary-check -text model-output.txt
+
+Stamping changes instruction hashes, so run `suite lock` and `suite admit`
+again afterwards; stamp before the first published results, not after. A
+canary only catches verbatim copies of stamped text. The bench guide
+`docs/held-out-and-canaries.md` has the details.

@@ -72,6 +72,7 @@ type SealedRun struct {
 	Receipts    []Receipt        `json:"receipts,omitempty"`
 	Gateway     *GatewayTally    `json:"gateway,omitempty"`  // from evidence.json; nil when the run has no gateway log
 	Problems    []string         `json:"problems,omitempty"` // evidence problems found while loading (seal does not verify, slot has more than one counted run); any makes the verdict INVALID
+	Review      *Review          `json:"review,omitempty"`   // the human review whose decision this run's outcome came from, under grade source reviewed only
 }
 
 // Effect summarizes paired per-task differences for one condition and metric.
@@ -204,6 +205,13 @@ type Analysis struct {
 	Meters      []Meter                     `json:"meters"`
 	ArmMetrics  map[string]map[string]Value `json:"arm_metrics"` // arm -> metric -> median per run
 	Policy      *PolicyResult               `json:"policy,omitempty"`
+
+	// ReviewedRuns counts counted runs whose outcome came from a human review
+	// (grade source reviewed), and ReviewChangedRuns those of them whose
+	// outcome differs from the sealed one. Both are zero, and absent, under
+	// any other grade source.
+	ReviewedRuns      int `json:"reviewed_runs,omitempty"`
+	ReviewChangedRuns int `json:"review_changed_runs,omitempty"`
 }
 
 // Reporter writes an analysis in one format.

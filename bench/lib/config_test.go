@@ -94,3 +94,22 @@ func TestIsLoopbackHost(t *testing.T) {
 		}
 	}
 }
+
+// TestHeldOutConfig checks held-out tasks stay hidden unless the config or
+// BENCH_HELD_OUT_VISIBLE turns them on.
+func TestHeldOutConfig(t *testing.T) {
+	cfg, err := LoadConfig("../deploy/bench.yaml")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if cfg.HeldOut.Visible {
+		t.Fatal("held-out tasks must be hidden by default")
+	}
+	t.Setenv("BENCH_HELD_OUT_VISIBLE", "true")
+	if cfg, err = LoadConfig("../deploy/bench.yaml"); err != nil {
+		t.Fatal(err)
+	}
+	if !cfg.HeldOut.Visible {
+		t.Fatal("BENCH_HELD_OUT_VISIBLE=true not applied")
+	}
+}

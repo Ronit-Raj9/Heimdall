@@ -79,6 +79,7 @@ func scenarioParts(s *schemas.Suite, t *schemas.Task) (scenarioHashParts, error)
 		errs = append(errs, serviceCode(p.fixtures, "suite.services.code", s.Root, utils.TaskServices(s, t))...)
 	}
 	errs = append(errs, serviceCode(p.fixtures, "services.code", t.Dir, t.Services)...)
+	errs = append(errs, externalParts(p.fixtures, s, t)...) // External APIs area: specs and cassettes (external.go)
 	if t.Skills != "" {
 		sum, err := treeHashRel(t.Dir, t.Skills)
 		put(p.fixtures, "skills", sum, err)
@@ -239,6 +240,48 @@ func lintScenarioSuite(s *schemas.Suite) []Problem {
 	}
 	seen := map[string]string{}
 	out = append(out, lintServices(SuiteFile, "services", s.Root, s.Services, seen)...)
+	out = append(out, lintExternalSuite(s)...) // External APIs area (external.go)
+	if o := s.Output; o != nil {
+		if o.Kind == schemas.OutputArtifact && s.Grader != "verifier_command" {
+			add(SeverityError, "output: artifact files are read by verifier_command (from %s), not by %s", utils.GraderArtifactsDir, s.Grader)
+		}
+		out = append(out, lintArtifacts(SuiteFile, "output", o.Kind, o.Artifacts)...)
+	}
+	return out
+}
+
+// lintArtifacts checks the artifacts one file declares: at most
+// utils.MaxArtifactSpecs, ids unique, each spec well formed
+// (utils.CheckArtifactSpec), and a warning when they are declared under an
+// output kind that never reads them.
+func lintArtifacts(file, field, kind string, specs []schemas.ArtifactSpec) []Problem {
+	var out []Problem
+	add := func(sev, format string, args ...any) {
+		out = append(out, Problem{Path: file, Severity: sev, Message: fmt.Sprintf(format, args...)})
+	}
+	if len(specs) == 0 {
+		return nil
+	}
+	if kind != schemas.OutputArtifact {
+		k := kind
+		if k == "" {
+			k = "unset"
+		}
+		add(SeverityWarning, "%s.artifacts: declared, but output kind is %s; only output kind artifact exports them", field, k)
+	}
+	if len(specs) > utils.MaxArtifactSpecs {
+		add(SeverityError, "%s.artifacts: %d declared, at most %d", field, len(specs), utils.MaxArtifactSpecs)
+	}
+	ids := map[string]bool{}
+	for i, a := range specs {
+		if a.ID != "" && ids[a.ID] {
+			add(SeverityError, "%s.artifacts[%d].id: %q is used by an earlier artifact", field, i, a.ID)
+		}
+		ids[a.ID] = true
+		if err := utils.CheckArtifactSpec(a); err != nil {
+			add(SeverityError, "%s.artifacts[%d]: %v", field, i, err)
+		}
+	}
 	return out
 }
 
@@ -270,6 +313,18 @@ func lintScenarioTask(s *schemas.Suite, t *schemas.Task) []Problem {
 		if s.Grader == "hidden_tests" {
 			add(SeverityError, "output: state is read by verifier_command (from /grader/state), not by hidden_tests")
 		}
+	case schemas.OutputArtifact:
+		// A suite-level kind artifact with the wrong grader is reported once,
+		// against suite.yaml (lintScenarioSuite).
+		if s.Grader != "verifier_command" && t.Output != nil && t.Output.Kind == schemas.OutputArtifact {
+			add(SeverityError, "output: artifact files are read by verifier_command (from %s), not by %s", utils.GraderArtifactsDir, s.Grader)
+		}
+		if len(utils.OutputArtifacts(s, t)) == 0 {
+			add(SeverityError, "output: artifact needs at least one artifact (output.artifacts in task.yaml or %s)", SuiteFile)
+		}
+	}
+	if t.Output != nil {
+		out = append(out, lintArtifacts(taskYAML, "output", utils.OutputKind(s, t), t.Output.Artifacts)...)
 	}
 	if t.Environment != nil && t.Environment.Image == "" && t.Environment.Dockerfile == "" {
 		add(SeverityError, "environment: needs image or dockerfile")
@@ -287,6 +342,7 @@ func lintScenarioTask(s *schemas.Suite, t *schemas.Task) []Problem {
 		seen[sv.ID] = SuiteFile
 	}
 	out = append(out, lintServices(taskYAML, "services", t.Dir, t.Services, seen)...)
+	out = append(out, lintExternalTask(s, t, taskYAML)...) // External APIs area (external.go)
 	sessions := map[string]bool{}
 	for i, sess := range t.Sessions {
 		if sessions[sess.ID] {
@@ -403,12 +459,30 @@ func scenarioPathProblems(root string, t *schemas.Task) []Problem {
 }
 
 // lintControlKind checks that the controls are what the output kind needs:
-// scripts for a script-control task, and a readable reference answer for an
-// answer task.
+// scripts for a script-control or artifact task, and a readable reference
+// answer for an answer task.
 func lintControlKind(s *schemas.Suite, t *schemas.Task, taskYAML string) []Problem {
 	var out []Problem
 	add := func(sev, format string, args ...any) {
 		out = append(out, Problem{Path: taskYAML, Severity: sev, Message: fmt.Sprintf(format, args...)})
+	}
+	if utils.OutputKind(s, t) == schemas.OutputArtifact {
+		// The artifact files are what the agent leaves in the workspace, so
+		// every control is a script run in the agent's place that leaves them
+		// (or fails to).
+		const why = "is not a script; an artifact task's controls run in the agent's place and leave the artifact files"
+		if !strings.HasSuffix(t.Controls.Reference, ".sh") {
+			add(SeverityError, "controls.reference: %s %s", t.Controls.Reference, why)
+		}
+		if t.Controls.Empty != "" && !strings.HasSuffix(t.Controls.Empty, ".sh") {
+			add(SeverityError, "controls.empty: %s %s", t.Controls.Empty, why)
+		}
+		for i, m := range t.Controls.Mutants {
+			if !strings.HasSuffix(m, ".sh") {
+				add(SeverityError, "controls.mutants[%d]: %s %s", i, m, why)
+			}
+		}
+		return out
 	}
 	switch utils.ControlKind(s, t) {
 	case utils.ControlScript:

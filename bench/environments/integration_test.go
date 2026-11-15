@@ -796,3 +796,147 @@ test "$(cat /home/agent/.claude/projects/note)" = mem
 		t.Fatalf("memory path not kept: %+v %v", res, err)
 	}
 }
+
+// artifactRun is scenarioRun for the artifact tests: its run id, and so the
+// names of its docker objects, carry the hd-art- prefix.
+func artifactRun(t *testing.T, files map[string]string) (*dockerWorkspace, *schemas.RunContext) {
+	t.Helper()
+	taskDir := t.TempDir()
+	writeTree(t, taskDir, files)
+	e := newDockerWorkspace(DockerWorkspaceConfig{HelperImage: testImage})
+	runID := strings.Replace(utils.NewID("r", 8), "r_", "hd-art-", 1)
+	rc := &schemas.RunContext{
+		Run:   &schemas.Run{RunID: runID, ExpID: "e_hdart"},
+		Slot:  &schemas.Slot{Condition: schemas.ConditionClean},
+		Suite: &schemas.Suite{ID: "hd-art-suite", Version: "1.0.0", Workdir: "/workspace", BaseImage: schemas.ImageSpec{Tag: testImage}, Root: taskDir},
+		Task:  &schemas.Task{ID: "t1", Dir: taskDir, RepoDir: "repo", Verifier: schemas.TaskVerifier{Tests: "verifier/tests"}},
+		Agent: &schemas.AgentConfig{},
+		Dir:   t.TempDir(),
+	}
+	t.Cleanup(func() {
+		if err := e.Destroy(context.Background(), rc); err != nil {
+			t.Errorf("destroy: %v", err)
+		}
+		assertNoLeftovers(t, runID)
+		filter := "label=" + utils.LabelRun + "=" + runID
+		for _, args := range [][]string{{"network", "ls", "-q", "--filter", filter}, {"image", "ls", "-q", "--filter", filter}} {
+			out, err := exec.Command("docker", args...).Output()
+			if err != nil || strings.TrimSpace(string(out)) != "" {
+				t.Errorf("leftover %s for %s: %q %v", args[0], runID, out, err)
+			}
+		}
+	})
+	return e, rc
+}
+
+// artifactAgent leaves a report, a binary mesh, a symlink out of the
+// workspace and a file over its cap.
+const artifactAgent = `set -e
+cd /workspace
+mkdir -p out
+printf 'id,v\n1,2\n' > out/report.csv
+python3 -c 'import sys; sys.stdout.buffer.write(bytes(range(256)) * 4)' > mesh.bin
+ln -s /etc/passwd out/leak.csv
+head -c 2048 /dev/zero > big.dat
+`
+
+// artifactCheck is the exit_code verifier: it reads the copied files
+// read-only, sees no refused file and has no network.
+const artifactCheck = `set -e
+test "$(cat /grader/artifacts/report/report.csv)" = "$(printf 'id,v\n1,2')"
+python3 -I -c 'import sys; sys.exit(open("/grader/artifacts/mesh/mesh.bin", "rb").read() != bytes(range(256)) * 4)'
+test ! -e /grader/artifacts/report/leak.csv
+test ! -e /grader/artifacts/big
+test ! -e /grader/artifacts/plot
+if touch /grader/artifacts/report/x 2>/dev/null; then echo "artifacts are writable" >&2; exit 3; fi
+if python3 -I -c 'import socket; socket.create_connection(("1.1.1.1", 53), 2)' 2>/dev/null; then echo "verifier has network" >&2; exit 4; fi
+`
+
+// artifactReward is the reward verifier: one dimension per artifact read.
+const artifactReward = `set -e
+python3 -I -c '
+import json
+rows = open("/grader/artifacts/report/report.csv").read().splitlines()[1:]
+mesh = open("/grader/artifacts/mesh/mesh.bin", "rb").read() == bytes(range(256)) * 4
+dims = {"rows": len(rows), "mesh": 1.0 if mesh else 0.0}
+json.dump({"reward": 1.0 if rows and mesh else 0.0, "dimensions": dims}, open("/grader/out/reward.json", "w"))
+'
+`
+
+// TestArtifactsExportAndVerifier exports an artifact task's files from a
+// real workspace volume and grades them twice, clean room (exit_code) and
+// snapshot (reward with dimensions), with the verifier reading
+// /grader/artifacts.
+func TestArtifactsExportAndVerifier(t *testing.T) {
+	ctx := context.Background()
+	e, rc := artifactRun(t, map[string]string{
+		"repo/README.md":           "task\n",
+		"verifier/tests/check.sh":  artifactCheck,
+		"verifier/tests/reward.sh": artifactReward,
+	})
+	rc.Suite.Grader = graders.VerifierCommandType
+	// Snapshot mode keeps the agent container for the snapshot grade; the
+	// clean room grade below switches the mode off.
+	rc.Suite.Verifier.Mode = schemas.VerifierSnapshot
+	rc.Task.Output = &schemas.OutputSpec{Kind: schemas.OutputArtifact, Artifacts: []schemas.ArtifactSpec{
+		{ID: "report", Path: "out/*.csv", Required: true},
+		{ID: "mesh", Path: "mesh.bin", Required: true},
+		{ID: "big", Path: "big.dat", MaxBytes: 1024},
+		{ID: "plot", Path: "plot.svg"},
+	}}
+	h, err := e.Create(ctx, rc)
+	if err != nil {
+		t.Fatalf("create: %v", err)
+	}
+	rc.Handle = h
+	if res, err := e.Exec(ctx, rc, shPlan(artifactAgent, 60)); err != nil || res.ExitCode != 0 {
+		t.Fatalf("exec: %+v %v\n%s", res, err, readFile(t, filepath.Join(rc.Dir, "agent.stderr.txt")))
+	}
+	if _, err := e.Snapshot(ctx, rc); err != nil {
+		t.Fatalf("snapshot: %v", err)
+	}
+	files, err := e.ExportArtifacts(ctx, rc)
+	if err != nil {
+		t.Fatalf("export artifacts: %v", err)
+	}
+	type row struct{ id, source, path, err string }
+	var got []row
+	for _, f := range files {
+		got = append(got, row{f.ID, f.Source, f.Path, f.Error})
+	}
+	want := []row{
+		{"report", "out/leak.csv", "", "outside the workspace"},
+		{"report", "out/report.csv", "artifacts/report/report.csv", ""},
+		{"mesh", "mesh.bin", "artifacts/mesh/mesh.bin", ""},
+		{"big", "big.dat", "", "over the per-file cap of 1024 bytes"},
+		{"plot", "plot.svg", "", "missing: no file matches plot.svg"},
+	}
+	if !reflect.DeepEqual(got, want) {
+		t.Fatalf("artifacts\n%+v\nwant\n%+v", got, want)
+	}
+	mesh := readFile(t, filepath.Join(rc.Dir, "artifacts", "mesh", "mesh.bin"))
+	if len(mesh) != 1024 || mesh[0] != 0 || mesh[255] != 255 || files[2].SHA256 != utils.SHA256Bytes(mesh) || files[2].Bytes != 1024 {
+		t.Fatalf("mesh %d bytes, entry %+v", len(mesh), files[2])
+	}
+	if strings.Contains(string(readFile(t, filepath.Join(rc.Dir, "artifacts", "report", "report.csv"))), "root:") {
+		t.Fatal("symlink target copied")
+	}
+	if missing := utils.MissingArtifacts(utils.OutputArtifacts(rc.Suite, rc.Task), files); len(missing) != 0 {
+		t.Fatalf("missing %v", missing)
+	}
+	d, err := e.ExportDiff(ctx, rc)
+	if err != nil {
+		t.Fatalf("export diff: %v", err)
+	}
+	rc.Suite.Verifier = schemas.SuiteVerifier{Command: []string{"sh", "/grader/tests/check.sh"}, Result: schemas.VerifierResultExitCode, TimeoutS: 60}
+	if g := gradeWith(t, rc, d); !g.Passed || g.InvalidEvaluator {
+		t.Fatalf("clean room grade %+v", g)
+	}
+	rc.Suite.Verifier = schemas.SuiteVerifier{Command: []string{"sh", "/grader/tests/reward.sh"}, Result: schemas.VerifierResultReward, TimeoutS: 60,
+		Mode: schemas.VerifierSnapshot}
+	g := gradeWith(t, rc, d)
+	if !g.Passed || g.Mode != schemas.VerifierSnapshot || g.Reward == nil || *g.Reward != 1 ||
+		!reflect.DeepEqual(g.Dimensions, map[string]float64{"rows": 1, "mesh": 1}) {
+		t.Fatalf("snapshot grade %+v", g)
+	}
+}

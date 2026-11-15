@@ -4,6 +4,8 @@ import { cn } from "@/lib/utils";
 import { ArrowDown, ArrowUp, ArrowUpDown } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { AdmissionBadge } from "./suiteBadges";
+import { HeldOutBadge, TaskHealthCell } from "./suiteHealth";
+import { isHeldOut, isRedacted, type HealthState } from "./suiteHealth.utils";
 import { taskLicense, type TaskSort, type TaskSortKey } from "./suites.utils";
 
 export interface SuiteTaskTableProps {
@@ -15,10 +17,15 @@ export interface SuiteTaskTableProps {
 	/** The task whose detail is open, if any. */
 	selected: string | null;
 	onOpen: (taskId: string) => void;
+	/** Suite health; when given, the table gets a health column. */
+	health?: HealthState;
 }
 
-/** One row per task. Each sortable header is a button with aria-sort; the task id opens its detail. */
-export function SuiteTaskTable({ suiteId, rows, sort, onSort, selected, onOpen }: SuiteTaskTableProps) {
+/**
+ * One row per task. Each sortable header is a button with aria-sort; the task id opens its detail.
+ * A held-out task the server withholds shows its id and a "held out" badge only, with no detail link.
+ */
+export function SuiteTaskTable({ suiteId, rows, sort, onSort, selected, onOpen, health }: SuiteTaskTableProps) {
 	const { t } = useTranslation("bench");
 	const head = (key: TaskSortKey, label: string, align: "left" | "right" = "left") => (
 		<SortableHead sortKey={key} label={label} sort={sort} onSort={onSort} align={align} />
@@ -34,10 +41,12 @@ export function SuiteTaskTable({ suiteId, rows, sort, onSort, selected, onOpen }
 					{head("admission", t("suites.tasks.admission"))}
 					{head("license", t("suites.tasks.license"))}
 					{head("hidden", t("suites.tasks.hiddenTests"), "right")}
+					{health && <TableHead data-testid="suites-head-health">{t("suiteHealth.column")}</TableHead>}
 				</TableRow>
 			</TableHeader>
 			<TableBody>
 				{rows.map((task) => {
+					if (isRedacted(task)) return <RedactedRow key={task.id} task={task} health={health} />;
 					const license = taskLicense(task);
 					const passed = task.checks.filter((check) => check.passed).length;
 					return (
@@ -59,6 +68,7 @@ export function SuiteTaskTable({ suiteId, rows, sort, onSort, selected, onOpen }
 									<span className="text-primary font-mono text-xs group-hover:underline">{task.id}</span>
 									<span className="text-foreground text-sm">{task.title}</span>
 								</button>
+								{isHeldOut(task) && <HeldOutBadge task={task} testId={`suites-task-held-out-${task.id}`} className="mt-1" />}
 							</TableCell>
 							<TableCell className="align-top font-mono text-xs">{task.kind}</TableCell>
 							<TableCell className="align-top text-xs">
@@ -105,11 +115,48 @@ export function SuiteTaskTable({ suiteId, rows, sort, onSort, selected, onOpen }
 							<TableCell className="text-muted-foreground text-right align-top text-xs tabular-nums">
 								{t("suites.tasks.hiddenTestsCell", { files: task.hidden_test_files, required: task.required_tests })}
 							</TableCell>
+							{health && (
+								<TableCell className="max-w-72 align-top whitespace-normal">
+									<TaskHealthCell task={task} health={health} />
+								</TableCell>
+							)}
 						</TableRow>
 					);
 				})}
 			</TableBody>
 		</Table>
+	);
+}
+
+/**
+ * A held-out task the server serves by id only: its id and a "held out" badge, no link to a detail
+ * the server would refuse, its admission state, and one note where the withheld columns would be.
+ */
+function RedactedRow({ task, health }: { task: SuiteTask; health?: HealthState }) {
+	const { t } = useTranslation("bench");
+	return (
+		<TableRow data-testid={`suites-task-row-${task.id}`} data-redacted="true">
+			<TableCell className="max-w-80 min-w-48 align-top whitespace-normal">
+				<span className="flex flex-col items-start gap-1">
+					<span className="text-foreground font-mono text-xs">{task.id}</span>
+					<HeldOutBadge task={task} testId={`suites-task-held-out-${task.id}`} />
+				</span>
+			</TableCell>
+			<TableCell colSpan={3} className="text-muted-foreground align-top text-xs whitespace-normal">
+				{t("suiteHealth.heldOutRow")}
+			</TableCell>
+			<TableCell className="align-top">
+				<AdmissionBadge task={task} testId={`suites-task-admission-${task.id}`} />
+			</TableCell>
+			<TableCell colSpan={2} className="text-muted-foreground align-top text-xs">
+				{t("suiteHealth.withheld")}
+			</TableCell>
+			{health && (
+				<TableCell className="max-w-72 align-top whitespace-normal">
+					<TaskHealthCell task={task} health={health} />
+				</TableCell>
+			)}
+		</TableRow>
 	);
 }
 

@@ -42,7 +42,7 @@ func sessionStreamFile(n int) string {
 // the run is aborted_infra with the service named; the agent never starts.
 func (p *Pipeline) startServices(ctx context.Context, st *runState) error {
 	rc := st.rc
-	if len(utils.TaskServices(rc.Suite, rc.Task)) == 0 {
+	if len(utils.TaskServices(rc.Suite, rc.Task)) == 0 && len(utils.ExternalAPIs(rc.Suite, rc.Task)) == 0 { // External APIs area: external APIs run through the tool proxy
 		return nil
 	}
 	se, ok := st.env.(schemas.ServiceEnvironment)
@@ -247,6 +247,9 @@ func scenarioEnv(rc *schemas.RunContext) (map[string]string, error) {
 			return nil, err
 		}
 		env[utils.EnvMCPServers] = servers
+		if err := utils.AddExternalEnv(env, rc.Services); err != nil { // External APIs area: BENCH_EXTERNAL_APIS
+			return nil, err
+		}
 	}
 	if utils.OutputKind(rc.Suite, rc.Task) == schemas.OutputAnswer {
 		env[utils.EnvAnswerPath] = utils.AnswerContainerPath(rc.Suite, rc.Task)
@@ -300,12 +303,14 @@ func (p *Pipeline) snapshot(ctx context.Context, st *runState) error {
 
 // exportScenario reads what the verifier needs beyond the diff: the services'
 // state (which also copies the tool ledger) whenever the run had services,
-// and the answer file of an answer task. The answer is finished, with the
-// final-message fallback, after collect (finishAnswer).
+// the answer file of an answer task and the artifact files of an artifact
+// task. The answer is finished, with the final-message fallback, after
+// collect (finishAnswer). An artifact export that breaks does not fail the
+// stage (exportArtifacts).
 func (p *Pipeline) exportScenario(ctx context.Context, st *runState) error {
 	rc := st.rc
 	var errs []error
-	if len(utils.TaskServices(rc.Suite, rc.Task)) > 0 {
+	if len(utils.TaskServices(rc.Suite, rc.Task)) > 0 || len(utils.ExternalAPIs(rc.Suite, rc.Task)) > 0 { // External APIs area: copies the ledger and recorded cassettes
 		if se, ok := st.env.(schemas.ServiceEnvironment); !ok {
 			errs = append(errs, wrapPart("environment", st.env, errors.New("export state: environment cannot run services")))
 		} else if files, err := se.ExportState(ctx, rc); err != nil {
@@ -324,7 +329,34 @@ func (p *Pipeline) exportScenario(ctx context.Context, st *runState) error {
 			st.ev.Answer = a
 		}
 	}
+	if utils.OutputKind(rc.Suite, rc.Task) == schemas.OutputArtifact {
+		p.exportArtifacts(ctx, st)
+	}
 	return errors.Join(errs...)
+}
+
+// exportArtifacts copies an artifact task's files into the run folder
+// through the environment's ArtifactEnvironment and records them in the
+// evidence. When the environment cannot export artifacts, or the export
+// itself breaks, the reason is kept in st.artifactErr instead of failing the
+// stage: the agent's work is done and the rest of its evidence is still
+// collected, and the grade becomes invalid_evaluator with that reason
+// (scenarioGradeProblem). The verifier's input is the bench's to produce,
+// so its loss is never the agent's fail. A file the agent got wrong is not
+// such a break: it is an entry with Error set, judged at grade time.
+func (p *Pipeline) exportArtifacts(ctx context.Context, st *runState) {
+	ae, ok := st.env.(schemas.ArtifactEnvironment)
+	if !ok {
+		st.artifactErr = fmt.Sprintf("environment %s cannot export artifacts", st.env.GetName())
+		return
+	}
+	files, err := ae.ExportArtifacts(ctx, st.rc)
+	if err != nil {
+		st.artifactErr = "export failed: " + err.Error()
+		p.logger.Warn("artifact export failed; the run's grade is invalid_evaluator", "run", st.rc.Run.RunID, "err", err)
+		return
+	}
+	st.ev.Artifacts = files
 }
 
 // finishAnswer settles an answer task's answer after the evidence is
@@ -355,10 +387,12 @@ func (p *Pipeline) finishAnswer(ctx context.Context, st *runState) error {
 }
 
 // scenarioGradeProblem says why a scenario run cannot be graded although
-// the agent finished: the state of a state task or the answer of an answer
-// task was not exported. Such a run is invalid_evaluator with that reason,
-// never a fail: the missing input is the bench's, not the agent's.
-func scenarioGradeProblem(rc *schemas.RunContext, ev *schemas.Evidence) string {
+// the agent finished: the state of a state task, the answer of an answer
+// task or the artifact files of an artifact task (artifactErr, set by
+// exportArtifacts) were not exported. Such a run is invalid_evaluator with
+// that reason, never a fail: the missing input is the bench's, not the
+// agent's.
+func scenarioGradeProblem(rc *schemas.RunContext, ev *schemas.Evidence, artifactErr string) string {
 	switch utils.OutputKind(rc.Suite, rc.Task) {
 	case schemas.OutputState:
 		if len(ev.State) == 0 {
@@ -377,8 +411,25 @@ func scenarioGradeProblem(rc *schemas.RunContext, ev *schemas.Evidence) string {
 		if ev.Answer == nil {
 			return "answer output: no answer was exported"
 		}
+	case schemas.OutputArtifact:
+		if artifactErr != "" {
+			return "artifact output: " + artifactErr
+		}
 	}
 	return ""
+}
+
+// missingArtifactsReason is the fail reason of an artifact task whose
+// required artifacts have no usable file, empty when every one has. The
+// agent was asked to leave those files, so their absence is the agent's
+// fail, graded without running the verifier, the same way an answer task
+// with no answer is graded on an empty answer. It is pure.
+func missingArtifactsReason(rc *schemas.RunContext, ev *schemas.Evidence) string {
+	missing := utils.MissingArtifacts(utils.OutputArtifacts(rc.Suite, rc.Task), ev.Artifacts)
+	if len(missing) == 0 {
+		return ""
+	}
+	return "artifact output: required artifact missing: " + strings.Join(missing, "; ")
 }
 
 // gradeMode is Grade.Mode for a run that is not a clean-room diff grade.

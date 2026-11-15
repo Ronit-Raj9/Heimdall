@@ -1,0 +1,9 @@
+# Keys of bench.ts `AgentDiffVersionInfo`, one per line; a trailing ? marks an optional (Go omitempty) key.
+# Change with bench.ts and agentdiff/agentdiff.go.
+config_hash
+agent_id
+label
+suites
+arms
+sealed_runs
+latest_at

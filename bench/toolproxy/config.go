@@ -8,12 +8,17 @@ import (
 	"os"
 	"regexp"
 	"strings"
+
+	"github.com/maximhq/bifrost/bench/schemas"
 )
 
 // Protocols a route can speak (Route.Protocol).
 const (
 	ProtocolMCP  = "mcp"  // MCP streamable HTTP: JSON-RPC over POST, JSON or SSE answers
 	ProtocolHTTP = "http" // a plain HTTP tool server: every request is one call
+	// ProtocolExternal is a real HTTP API outside the bench (external.go).
+	// The agent reaches it at /x/<id>/<path>, never at /s/.
+	ProtocolExternal = "external"
 )
 
 // DefaultMCPPath is the MCP endpoint path when a route does not name one.
@@ -33,6 +38,30 @@ type Route struct {
 	Upstream string `json:"upstream"`           // e.g. http://fs:8080
 	Protocol string `json:"protocol"`           // mcp | http
 	MCPPath  string `json:"mcp_path,omitempty"` // default /mcp
+	// External holds the allowlist, credential, mode and caps of an
+	// external route (Protocol external); nil for every other route.
+	External *ExternalRoute `json:"external,omitempty"`
+}
+
+// ExternalRoute is how the proxy fronts one external API
+// (schemas.ExternalAPI, docs/external-apis.md). The environment kernel
+// resolves the mode and the paths; zero caps mean the utils defaults.
+type ExternalRoute struct {
+	Mode       string                  `json:"mode"` // live | record | replay
+	Allow      []schemas.ExternalAllow `json:"allow,omitempty"`
+	Headers    map[string]string       `json:"headers,omitempty"`
+	AuthEnv    string                  `json:"auth_env,omitempty"` // variable in the proxy's own environment; read only in live and record mode
+	AuthHeader string                  `json:"auth_header,omitempty"`
+	AuthScheme string                  `json:"auth_scheme,omitempty"`
+	Cassette   string                  `json:"cassette,omitempty"`  // replay: the cassette inside the proxy container
+	RecordTo   string                  `json:"record_to,omitempty"` // record: the cassette the proxy writes
+	// Connect is the TCP address dialed in place of the upstream host (the
+	// run's egress forwarder); the Host header and the TLS server name stay
+	// the upstream's.
+	Connect  string `json:"connect,omitempty"`
+	MaxCalls int    `json:"max_calls,omitempty"`
+	MaxBytes int64  `json:"max_bytes,omitempty"`
+	TimeoutS int    `json:"timeout_s,omitempty"`
 }
 
 var serviceID = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9_.-]*$`)
@@ -79,8 +108,12 @@ func ParseRoutes(b []byte) (*Routes, error) {
 		case "":
 			r.Protocol = ProtocolMCP
 		case ProtocolMCP, ProtocolHTTP:
+		case ProtocolExternal:
+			if err := checkExternalRoute(r); err != nil {
+				return nil, fmt.Errorf("route %s: %w", r.Service, err)
+			}
 		default:
-			return nil, fmt.Errorf("route %s: protocol %q is not mcp or http", r.Service, r.Protocol)
+			return nil, fmt.Errorf("route %s: protocol %q is not mcp, http or external", r.Service, r.Protocol)
 		}
 		if r.MCPPath == "" {
 			r.MCPPath = DefaultMCPPath
@@ -90,4 +123,40 @@ func ParseRoutes(b []byte) (*Routes, error) {
 		}
 	}
 	return &rs, nil
+}
+
+// checkExternalRoute checks the external block of an external route: a known
+// mode, the cassette a replay reads or the file a record writes, allowlist
+// prefixes that start with /, no negative cap and an upstream without a
+// query. It is pure.
+func checkExternalRoute(r *Route) error {
+	x := r.External
+	if x == nil {
+		return errors.New("external route has no external block")
+	}
+	if u, err := url.Parse(r.Upstream); err != nil || u.RawQuery != "" || u.Fragment != "" || u.User != nil {
+		return fmt.Errorf("external upstream %q must be http(s)://host[:port][/path]", r.Upstream)
+	}
+	switch x.Mode {
+	case schemas.ExternalLive:
+	case schemas.ExternalRecord:
+		if x.RecordTo == "" {
+			return errors.New("record mode needs record_to")
+		}
+	case schemas.ExternalReplay:
+		if x.Cassette == "" {
+			return errors.New("replay mode needs a cassette")
+		}
+	default:
+		return fmt.Errorf("external mode %q is not live, record or replay", x.Mode)
+	}
+	for i, a := range x.Allow {
+		if !strings.HasPrefix(a.PathPrefix, "/") {
+			return fmt.Errorf("allow %d: path_prefix %q must start with /", i+1, a.PathPrefix)
+		}
+	}
+	if x.MaxCalls < 0 || x.MaxBytes < 0 || x.TimeoutS < 0 {
+		return errors.New("max_calls, max_bytes and timeout_s must not be negative")
+	}
+	return nil
 }

@@ -71,6 +71,16 @@ type SuiteSummary struct {
 	Output   string        `json:"output,omitempty"`   // diff | answer | state
 	Services []string      `json:"services,omitempty"` // ids of the suite's services
 	Imported *ImportRecord `json:"imported,omitempty"` // where an imported suite came from
+	// Artifacts are the suite's declared output artifacts (output kind
+	// artifact); a task without its own list uses them.
+	Artifacts []ArtifactSpec `json:"artifacts,omitempty"`
+
+	// Suite health fields (suitehealth.go). Held-out tasks are listed by id
+	// with their counts only, unless the server config sets
+	// held_out.visible.
+	HeldOutCount     int  `json:"held_out_count,omitempty"`    // tasks with split held_out
+	QuarantinedCount int  `json:"quarantined_count,omitempty"` // tasks in suite.health.json
+	HasCanary        bool `json:"has_canary,omitempty"`        // suite.yaml sets a canary
 }
 
 // SuiteImage is a suite's base image: the toolchain every task and verifier
@@ -134,6 +144,11 @@ type SuiteTask struct {
 	Output      *OutputSpec      `json:"output,omitempty"`      // the task's own output; empty uses the suite's
 	Skills      []string         `json:"skills,omitempty"`      // skill folder names, each holding a SKILL.md
 	Impossible  bool             `json:"impossible,omitempty"`  // no honest solution exists: a pass is an integrity violation
+
+	// Suite health fields (suitehealth.go).
+	Split      string          `json:"split,omitempty"`      // held_out; empty for public
+	Redacted   bool            `json:"redacted,omitempty"`   // held-out task served by id only: title, files and checks withheld
+	Quarantine *TaskQuarantine `json:"quarantine,omitempty"` // set while the task is out of new plans
 }
 
 // SuiteAdmissionCheck is one recorded admission check. Summary keeps only the

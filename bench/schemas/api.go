@@ -35,6 +35,10 @@ type VerdictPayload struct {
 	Gates       []GateSummary    `json:"gates"`
 	ConfigDiff  []ConfigChange   `json:"config_diff"`
 	Policy      *PolicyResult    `json:"policy,omitempty"`
+
+	// Human review counts of the analysis (Analysis.ReviewedRuns).
+	ReviewedRuns      int `json:"reviewed_runs,omitempty"`
+	ReviewChangedRuns int `json:"review_changed_runs,omitempty"`
 }
 
 // DiagnosticsPayload is GET /experiments/{id}/diagnostics.
@@ -141,6 +145,7 @@ type RunDetail struct {
 	Answer    *Answer         `json:"answer,omitempty"`
 	State     []StateFile     `json:"state,omitempty"`
 	Services  []ServiceResult `json:"services,omitempty"`
+	Artifacts []ArtifactFile  `json:"artifacts,omitempty"`
 }
 
 // RunDiff is GET /runs/{id}/diff. Patch is inert text.

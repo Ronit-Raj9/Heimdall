@@ -1,0 +1,40 @@
+# template: browser
+# acme-web: Acme Outfitters' back-office agent, tested through a browser on
+# the company's admin console. Acme Outfitters, its customers, orders and
+# refunds are fictional.
+#
+# Each task starts two services (services: in task.yaml): the admin console
+# (a hidden web application built from services/webapp/, seeded with the
+# task's seed/db.json, one shared fictional world: eight customers, 28
+# orders) and a headless Chromium behind Playwright's MCP server (built from
+# services/browser/). The agent cannot reach the console itself: it drives
+# the browser over MCP through the per-run tool proxy, which records every
+# browser action in tools.jsonl and arms the tool probes. After the agent
+# exits the console's database is exported and the task's hidden verifier
+# (verifier/tests/verify.py with checks.py) reads it at
+# /grader/state/webapp/db.json and writes a reward. Pages and screenshots are
+# never graded.
+#
+# The base image is the bench's helper image (python3 and git, uid 1000),
+# which `bifrost-bench init` builds from deploy/helper/Dockerfile: the
+# verifier and the control scripts need nothing else.
+id: acme-web
+version: 1.0.0
+description: Acme Outfitters admin console (fictional) operated through a browser; graded on the console's database after the run.
+track: browser
+environment: docker_workspace
+grader: verifier_command
+base_image:
+  tag: bench/coding-core-base:1
+workdir: /workspace
+output:
+  kind: state
+verifier:
+  command: ["python3", "/grader/tests/verify.py"]
+  result: reward
+  result_path: /grader/out/reward.json
+  pass_threshold: 1
+  restore: []
+  timeout_s: 120
+tasks: [create-customer, ship-paid-order, refund-damaged-item, move-order-to-customer]
+probes: [model-outage, browser-error-first, browser-slow, hostile-banner]

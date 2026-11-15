@@ -1,0 +1,261 @@
+{
+	"_comment": "SYNTHETIC fixture for UI development. Not a benchmark result: every number is made up.",
+	"mode": "synthetic",
+	"exp_id": "e_synthetic-matrix",
+	"suite": "coding-core@1.0.0",
+	"condition": "clean",
+	"conditions": [
+		"clean",
+		"stale-notes"
+	],
+	"grade_source": "original",
+	"alpha": 0.05,
+	"tasks": 4,
+	"separable": false,
+	"note": "Cannot separate any two arms: with 4 common tasks no pair can reach p < 0.05 after Holm adjustment, whatever the results.",
+	"synthetic": true,
+	"rows": [
+		{
+			"arm": "A",
+			"provider": "anthropic",
+			"rank": 1,
+			"tier": 1,
+			"p_vs_leader": null,
+			"tier_reason": "leader",
+			"config_hash": "sha256:a1b2c3d4e5f60718293a4b5c6d7e8f90a1b2c3d4e5f60718293a4b5c6d7e8f90",
+			"agent": "codex",
+			"model": "claude-sonnet-4-6",
+			"label": "codex / claude-sonnet-4-6",
+			"synthetic": true,
+			"experiments": [
+				"e_synthetic-matrix"
+			],
+			"tasks": 4,
+			"runs": 12,
+			"trials": 3,
+			"success": {
+				"state": "observed",
+				"v": 0.75,
+				"evidence": "outcome",
+				"bounds": [
+					0.36,
+					1.0
+				]
+			},
+			"passes": {
+				"num": 9,
+				"den": 12,
+				"unknown": 0
+			},
+			"reliability": {
+				"state": "observed",
+				"v": 0.5,
+				"evidence": "outcome"
+			},
+			"metrics": {
+				"cost_per_success": {
+					"state": "observed",
+					"v": 0.061,
+					"evidence": "gateway"
+				},
+				"tokens": {
+					"state": "observed",
+					"v": 52000,
+					"evidence": "gateway"
+				},
+				"wall_time_s": {
+					"state": "observed",
+					"v": 210,
+					"evidence": "outcome"
+				},
+				"false_completion": {
+					"state": "observed",
+					"v": 0.0,
+					"evidence": "native"
+				},
+				"cost_usd": {
+					"state": "observed",
+					"v": 0.0457,
+					"evidence": "gateway"
+				}
+			},
+			"resilience": {}
+		},
+		{
+			"arm": "B",
+			"provider": "openai",
+			"rank": 2,
+			"tier": 1,
+			"p_vs_leader": 1.0,
+			"tier_reason": "p 1 on 4 common tasks",
+			"config_hash": "sha256:67cd7a069ba6e6141a645638240d97c5062022fa81126e36300d8bc0006730cd",
+			"agent": "codex",
+			"model": "gpt-5.4-mini",
+			"label": "codex / gpt-5.4-mini",
+			"synthetic": true,
+			"experiments": [
+				"e_synthetic-matrix"
+			],
+			"tasks": 4,
+			"runs": 12,
+			"trials": 3,
+			"success": {
+				"state": "observed",
+				"v": 0.583,
+				"evidence": "outcome",
+				"bounds": [
+					0.2,
+					0.97
+				]
+			},
+			"passes": {
+				"num": 7,
+				"den": 12,
+				"unknown": 0
+			},
+			"reliability": {
+				"state": "observed",
+				"v": 0.25,
+				"evidence": "outcome"
+			},
+			"metrics": {
+				"cost_per_success": {
+					"state": "observed",
+					"v": 0.042,
+					"evidence": "gateway"
+				},
+				"tokens": {
+					"state": "observed",
+					"v": 41000,
+					"evidence": "gateway"
+				},
+				"wall_time_s": {
+					"state": "observed",
+					"v": 184,
+					"evidence": "outcome"
+				},
+				"false_completion": {
+					"state": "observed",
+					"v": 0.083,
+					"evidence": "native"
+				},
+				"cost_usd": {
+					"state": "observed",
+					"v": 0.0245,
+					"evidence": "gateway"
+				}
+			},
+			"resilience": {}
+		},
+		{
+			"arm": "C",
+			"provider": "vertex",
+			"rank": 3,
+			"tier": 1,
+			"p_vs_leader": 0.75,
+			"tier_reason": "p 0.75 on 4 common tasks",
+			"config_hash": "sha256:0f9e8d7c6b5a49382716051f0e9d8c7b6a5948372615041f0e9d8c7b6a594837",
+			"agent": "codex",
+			"model": "gemini-2.5-flash",
+			"label": "codex / gemini-2.5-flash",
+			"synthetic": true,
+			"experiments": [
+				"e_synthetic-matrix"
+			],
+			"tasks": 4,
+			"runs": 12,
+			"trials": 3,
+			"success": {
+				"state": "observed",
+				"v": 0.5,
+				"evidence": "outcome",
+				"bounds": [
+					0.1,
+					0.9
+				]
+			},
+			"passes": {
+				"num": 6,
+				"den": 12,
+				"unknown": 0
+			},
+			"reliability": {
+				"state": "observed",
+				"v": 0.25,
+				"evidence": "outcome"
+			},
+			"metrics": {
+				"cost_per_success": {
+					"state": "observed",
+					"v": 0.018,
+					"evidence": "gateway"
+				},
+				"tokens": {
+					"state": "observed",
+					"v": 38000,
+					"evidence": "gateway"
+				},
+				"wall_time_s": {
+					"state": "observed",
+					"v": 160,
+					"evidence": "outcome"
+				},
+				"false_completion": {
+					"state": "observed",
+					"v": 0.167,
+					"evidence": "native"
+				},
+				"cost_usd": {
+					"state": "observed",
+					"v": 0.009,
+					"evidence": "gateway"
+				}
+			},
+			"resilience": {}
+		}
+	],
+	"pairs": [
+		{
+			"arm_x": "A",
+			"arm_y": "B",
+			"tasks": 4,
+			"n_nonzero": 2,
+			"mean_diff": 0.1667,
+			"p": 0.5,
+			"p_adjusted": 1.0,
+			"significant": false,
+			"reason": "cannot separate: too few differing tasks (2 of 4)"
+		},
+		{
+			"arm_x": "A",
+			"arm_y": "C",
+			"tasks": 4,
+			"n_nonzero": 3,
+			"mean_diff": 0.25,
+			"p": 0.25,
+			"p_adjusted": 0.75,
+			"significant": false,
+			"reason": "cannot separate: too few differing tasks (3 of 4)"
+		},
+		{
+			"arm_x": "B",
+			"arm_y": "C",
+			"tasks": 4,
+			"n_nonzero": 1,
+			"mean_diff": 0.0833,
+			"p": 1.0,
+			"p_adjusted": 1.0,
+			"significant": false,
+			"reason": "cannot separate: too few differing tasks (1 of 4)"
+		}
+	],
+	"excluded": [
+		{
+			"reason": "infra_error",
+			"runs": 1,
+			"experiments": [
+				"e_synthetic-matrix"
+			]
+		}
+	]
+}

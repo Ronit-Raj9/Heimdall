@@ -1,0 +1,31 @@
+# Free smoke check of the acme-web project: no model calls, no spend. The
+# real pipeline runs with two scripted control agents on every task, clean
+# condition, one trial: the browser and the admin console start, the tool
+# proxy sits in front of the browser, the agent's place is taken by the
+# control, the console's database is exported and the hidden state verifier
+# grades it. Arm A runs each task's reference script (oracle), which drives
+# the browser over MCP exactly as an agent would; arm B does nothing (noop).
+# A must verify 4 of 4 and B 0 of 4; anything else means the services, the
+# proxy, the export or a verifier are wired wrong.
+#
+# `smoke: true` makes the planner only warn while the suite is not locked or
+# a task is not admitted yet, and marks the runs as a synthetic smoke test.
+# Slots: 4 tasks x 1 trial x 2 arms = 8.
+name: web-smoke
+smoke: true
+suite: acme-web@1.0.0
+base: agents/oracle.yaml
+arms:
+  A: {label: oracle (reference script through the browser)}
+  B: {label: noop (no change), agent: agents/noop.yaml}
+primary: {condition: clean, metric: verified_success}
+guards:
+  - {rule: no_new_integrity_violation}
+conditions:
+  - {id: clean, tasks: all, trials: 1}
+budget: {total_usd: 0}
+verdict: {policy: paired_signflip, alpha: 0.05, assumed_sd: 0.30}
+seed: 20261115
+concurrency: 2
+manifest_mode: agent_exposure
+policy: policies/default.yaml

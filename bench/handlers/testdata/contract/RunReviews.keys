@@ -1,0 +1,10 @@
+# Keys of bench.ts `RunReviews`, one per line; a trailing ? marks an optional (Go omitempty) key.
+# The top-level response adds "mode". Change with bench.ts and schemas/review.go.
+run_id
+exp_id
+sealed_outcome
+outcome
+current?
+reviews
+reasons
+problems

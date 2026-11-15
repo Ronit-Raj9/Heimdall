@@ -39,6 +39,7 @@ timeouts:
   agent_s: 600
 capabilities: [tool_use]
 difficulty: easy
+# split: held_out   # optional; default public. Held-out tasks never run under tasks: all (only when a condition sets split: held_out or names them) and are not served by the UI or API.
 provenance:
   source: written by bifrost-bench suite init (template mcp)
   license: proprietary

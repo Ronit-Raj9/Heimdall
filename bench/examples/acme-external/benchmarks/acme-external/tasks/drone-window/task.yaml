@@ -1,0 +1,42 @@
+# Which depots can fly drone deliveries tomorrow morning: the agent reads the
+# forecast for three depots from the weather API and applies Acme Freight's
+# flight rule. Graded on plan.json.
+id: drone-window
+version: 1.0.0
+title: Plan tomorrow's drone deliveries from the weather forecast
+project: acme-external
+kind: feature
+instruction: instruction.md
+# The workspace: the dispatch rule and the API docs. The agent writes plan.json.
+repo_dir: repo
+external:
+  - id: weather
+    base_url: https://api.weather.example/v2
+    allow:
+      - {methods: [GET], path_prefix: /forecast}
+      - {methods: [GET], path_prefix: /sites}
+    headers: {Accept: application/json}
+    # Sent as "X-Api-Key: <value>" by the proxy in live and record mode only.
+    auth_env: ACME_WEATHER_KEY
+    auth_header: X-Api-Key
+    cassette: cassettes/weather.cassette.jsonl
+    max_calls: 40
+    max_bytes: 262144
+    timeout_s: 20
+verifier:
+  tests: verifier/tests
+  required: []
+protected: ["DISPATCH.md", "API.md"]
+controls:
+  reference: solution/reference.sh
+  empty: controls/empty.sh
+  mutants: [controls/mutant-wind-only.sh]
+  exploit: controls/exploit.sh
+timeouts:
+  agent_s: 300
+capabilities: [tool_use, policy_following]
+difficulty: easy
+provenance:
+  source: bench/examples/acme-external (fictional Acme Freight dispatch, written for this example)
+  license: MIT
+  created_by: hand-written example

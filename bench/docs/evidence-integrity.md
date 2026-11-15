@@ -23,7 +23,7 @@ Two checks follow from that:
 
 A run that does not verify is still returned by `SealedRuns`, with its slot and `run.json` only: none of its files are parsed, its metrics are empty and the reason is in `Problems`. Nothing read from a changed folder can be trusted, and a changed file may not even parse, so failing closed this way keeps a tampered folder from crashing the analysis instead of invalidating it.
 
-Regrades and analyses are child artifacts outside every seal (DESIGN.md 16.1). They are not in `seal.json` and adding one never breaks a seal. A regrade's `grade.json` carries the parent run's seal hash and a regate carries a content hash; `SealedRuns` checks both when a regrade is the grade source.
+Regrades and analyses are child artifacts outside every seal (DESIGN.md 16.1). They are not in `seal.json` and adding one never breaks a seal. A regrade's `grade.json` carries the parent run's seal hash and a regate carries a content hash; `SealedRuns` checks both when a regrade is the grade source. Human reviews (`docs/human-review.md`) are child artifacts the same way: `reviews/<review_id>/review.json` carries the run's seal hash and its own content hash, and `reviews.log` chains the records; a review that does not verify is ignored and reported, and reviews apply only under grade source `reviewed`.
 
 ### Cost and the verification cache
 

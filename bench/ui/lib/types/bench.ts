@@ -638,6 +638,8 @@ export interface ConditionSpec {
 	id: string;
 	tasks: TaskSelector;
 	trials: number;
+	/** Which tasks `tasks: all` means: public (the default) or held_out. An explicit id list is taken as written. */
+	split?: TaskSplit;
 }
 
 export interface CompatibilitySpec {
@@ -831,6 +833,10 @@ export interface Analysis {
 	arm_metrics: Record<string, Record<string, Value>>;
 	/** The release policy result; absent when the experiment has no policy. */
 	policy?: PolicyResult;
+	/** Counted runs whose outcome came from a human review (grade source reviewed); absent otherwise. */
+	reviewed_runs?: number;
+	/** Of reviewed_runs, those whose outcome differs from the sealed one. */
+	review_changed_runs?: number;
 }
 
 /** A sealed run as analysis reads it, with the grade source chosen. */
@@ -846,6 +852,8 @@ export interface SealedRun {
 	receipts?: Receipt[];
 	/** From evidence.json; absent when the run has no gateway log. */
 	gateway?: GatewayTally;
+	/** The human review this run's outcome came from, under grade source reviewed only. */
+	review?: Review;
 }
 
 /** What analysis reads from a run's gateway log: usage completeness and the global drop counter. */
@@ -935,6 +943,10 @@ export interface VerdictPayload {
 	config_diff: ConfigChange[];
 	/** The release policy result; absent when the experiment has no policy. */
 	policy?: PolicyResult;
+	/** Counted runs whose outcome came from a human review (grade source reviewed); absent otherwise. */
+	reviewed_runs?: number;
+	/** Of reviewed_runs, those whose outcome differs from the sealed one. */
+	review_changed_runs?: number;
 }
 
 // ---------------------------------------------------------------------------------------------
@@ -1097,6 +1109,8 @@ export interface RunDetail {
 	state?: StateFile[];
 	/** Services that ran beside the agent. */
 	services?: ServiceResult[];
+	/** Files an artifact task's agent produced, copied into the sealed run folder. */
+	artifacts?: ArtifactFile[];
 	evidence_contract?: RunEvidenceContract;
 	canonical?: CanonicalRun;
 }
@@ -1334,8 +1348,11 @@ export type LeaderboardScope = "all" | "common";
 /** exclude: live runs only. only: scripted agent or scripted model runs only. */
 export type LeaderboardSynthetic = "exclude" | "only";
 
-/** original: every run as sealed. latest: each experiment's newest regrade, where it has a result for the run. */
-export type LeaderboardGradeSourceMode = "original" | "latest";
+/**
+ * original: every run as sealed. latest: each experiment's newest regrade, where it has a result for the run.
+ * reviewed: the sealed grades with human reviews applied on top (never the regrades).
+ */
+export type LeaderboardGradeSourceMode = "original" | "latest" | "reviewed";
 
 /**
  * One agent configuration on the board (schemas.LeaderboardEntry), one per resolved config hash.
@@ -1400,6 +1417,8 @@ export interface LeaderboardGradeSource {
 	runs: number;
 	/** Of runs, those read from the regrade; the rest keep their original grade. */
 	regraded_runs: number;
+	/** Of runs, those whose outcome came from a human review (grade source reviewed). */
+	reviewed_runs?: number;
 }
 
 /** GET /leaderboard: every sealed run of one suite version under one condition, across experiments. */
@@ -1428,6 +1447,12 @@ export interface Leaderboard {
 	grade_source: LeaderboardGradeSourceMode;
 	/** Per experiment with runs on the board, the source its runs were read from, newest experiment first. */
 	grade_sources: LeaderboardGradeSource[];
+	/** Runs on the board whose outcome came from a human review (grade source reviewed); absent otherwise. */
+	reviewed_runs?: number;
+	/** Of reviewed_runs, those whose outcome the review changed. */
+	review_changed_runs?: number;
+	/** held_out on the held-out board (runs of held-out tasks only); absent on the public board, which never counts a held-out task. */
+	split?: TaskSplit;
 }
 
 /** Query of GET /leaderboard. An absent field takes the server default: newest suite, clean, all, exclude, original, each entry's k. */
@@ -1439,6 +1464,238 @@ export interface LeaderboardParams {
 	grade_source?: LeaderboardGradeSourceMode;
 	/** k of the pass^k reliability for every entry, 2 or more. */
 	k?: number;
+	/** held_out asks for the held-out board; absent is the public board. */
+	split?: "held_out";
+}
+
+// ---------------------------------------------------------------------------------------------
+// review.go: human review. A person's decision about one sealed run, kept as a hash-chained child
+// artifact beside the run; it never edits sealed evidence and applies only under grade source reviewed.
+// ---------------------------------------------------------------------------------------------
+
+/** pass, fail and invalid replace the outcome under grade source reviewed; flag_only changes nothing. */
+export type ReviewDecision = "pass" | "fail" | "invalid" | "flag_only";
+
+/** Every review decision, in form order. */
+export const REVIEW_DECISIONS: readonly ReviewDecision[] = ["pass", "fail", "invalid", "flag_only"];
+
+/** Why a run is in the review queue. */
+export type ReviewReason = "split_votes" | "unparsable_votes" | "invalid_evaluator" | "veto" | "false_completion" | "flagged";
+
+/** Every queue reason, in display order (schemas.ReviewReasons). */
+export const REVIEW_REASONS: readonly ReviewReason[] = [
+	"split_votes",
+	"unparsable_votes",
+	"invalid_evaluator",
+	"veto",
+	"false_completion",
+	"flagged",
+];
+
+/** One review record (schemas.Review): <exp>/reviews/<review_id>/review.json. */
+export interface Review {
+	review_id: string;
+	exp_id: string;
+	run_id: string;
+	/** The run's seal hash when the review was written. */
+	parent_seal: string;
+	decision: ReviewDecision;
+	/** Plain text. Inert. */
+	reason: string;
+	/** Self-declared name; there is no authentication. */
+	reviewer: string;
+	created_at: string;
+	sealed_outcome: Outcome;
+	/** The outcome in effect before this review: the sealed one or the superseded review's. */
+	previous_outcome: Outcome;
+	/** The earlier decision review of the run this one replaces. */
+	supersedes?: string;
+	/** What the reviewer cited: files, gate names, judge votes, free text. */
+	evidence?: string[];
+	/** Hash on the previous reviews.log line, "" for the first. */
+	prev_hash: string;
+	hash: string;
+}
+
+/** POST /reviews body. */
+export interface ReviewRequest {
+	exp_id?: string;
+	run_id: string;
+	decision: ReviewDecision;
+	reason: string;
+	reviewer: string;
+	evidence?: string[];
+}
+
+/** One run the queue asks a person to look at. */
+export interface ReviewQueueItem {
+	run_id: string;
+	exp_id: string;
+	pair_id: string;
+	task: string;
+	arm: string;
+	condition: string;
+	trial: number;
+	reasons: string[];
+	sealed_outcome: Outcome;
+	/** The newest valid decision review's outcome, else the sealed one. */
+	outcome: Outcome;
+	/** Valid reviews of the run, flags included. */
+	reviews: number;
+	/** The newest valid decision review's decision; absent when none. */
+	decision?: ReviewDecision;
+}
+
+/** GET /experiments/{id}/reviews/queue */
+export interface ReviewQueue {
+	exp_id: string;
+	items: ReviewQueueItem[];
+	/** Every queue reason, for the filter. */
+	reasons: string[];
+	/** Reviews ignored because they do not verify, runs whose seal does not verify. */
+	problems: string[];
+}
+
+/** GET /runs/{id}/reviews: every valid review in log order, oldest first, and the one in effect. */
+export interface RunReviews {
+	run_id: string;
+	exp_id: string;
+	sealed_outcome: Outcome;
+	/** The outcome under grade source reviewed. */
+	outcome: Outcome;
+	/** The newest valid decision review; absent when none. */
+	current?: Review;
+	reviews: Review[];
+	/** Queue reasons that apply to the run. */
+	reasons: string[];
+	/** Reviews of this run that were ignored, and why. */
+	problems: string[];
+}
+
+/** GET /experiments/{id}/reviews: the whole chain and whether it verifies. */
+export interface ReviewLog {
+	exp_id: string;
+	reviews: Review[];
+	verified: boolean;
+	problems: string[];
+}
+
+// ---------------------------------------------------------------------------------------------
+// trends (bench/trends/types.go): time series per agent config lineage, read from the derived
+// results index. A monitoring signal only: no verdict, leaderboard or release reads it.
+// ---------------------------------------------------------------------------------------------
+
+/** Chartable trend metric ids, the leaderboard's ids. */
+export type TrendMetric = "verified_success" | "cost_per_success" | "tokens" | "wall_time_s" | "false_completion";
+
+/** exclude: live runs only (default). include: live and synthetic. only: synthetic runs only. */
+export type TrendSynthetic = "exclude" | "include" | "only";
+
+/** A point against the previous point of its lineage, by the exact sign-flip test on common tasks. */
+export type TrendStatus = "regressed" | "improved" | "no_change" | "cannot_tell" | "first";
+
+/** The exact sign-flip test of a point's per-task success rates against the previous point's (trends.Regression). */
+export interface TrendRegression {
+	status: TrendStatus;
+	/** Two-sided p; null when not tested. */
+	p: number | null;
+	/** Tasks both points ran. */
+	common_tasks: number;
+	/** Common tasks whose success rate changed. */
+	discordant: number;
+	/** Mean per-task change in success, newer minus older; null when not tested. */
+	delta: number | null;
+	/** Experiment of the previous point; "" for the first. */
+	against: string;
+	/** Plain words, for example "p 0.03 on 9 common tasks". */
+	reason: string;
+}
+
+/** One config hash of a lineage in one experiment (trends.Point). Numbers are null when no run observed them, never zero. */
+export interface TrendPoint {
+	experiment: string;
+	/** The experiment's creation time. */
+	date: string;
+	/** id@version. */
+	suite: string;
+	arm: string;
+	config_hash: string;
+	/** The config hash differs from the previous point's. */
+	config_changed: boolean;
+	synthetic: boolean;
+	/** Distinct tasks with a scored run. */
+	tasks: number;
+	/** Scored runs. */
+	runs: number;
+	/** The charted metric (Trends.metric). */
+	value: number | null;
+	success: number | null;
+	/** Descriptive 95% t interval over task rates; null under 2 tasks. */
+	success_low: number | null;
+	success_high: number | null;
+	cost_per_success: number | null;
+	/** Median per run. */
+	tokens: number | null;
+	/** Median per run, seconds. */
+	wall_time_s: number | null;
+	/** Share of runs whose claim and outcome are known. */
+	false_completion: number | null;
+	/** Newest analysis verdict decision; "" with no analysis. */
+	decision: string;
+	/** Newest analysis policy decision; "" with none. */
+	policy: string;
+	/** regressed: the release verdict was REGRESSED. blocked: the release policy blocked it. "" otherwise. */
+	release: "" | "regressed" | "blocked";
+	regression: TrendRegression;
+}
+
+/** Every config of one agent id and model, across experiments (trends.Lineage). */
+export interface TrendLineage {
+	/** "<agent>|<model>". */
+	key: string;
+	agent: string;
+	/** "" when unknown. */
+	model: string;
+	synthetic: boolean;
+	/** Ordered by experiment date. */
+	points: TrendPoint[];
+	/** The newest point against the one before it. */
+	regression: TrendRegression;
+}
+
+/** GET /trends: points grouped into lineages, one per (agent config id, model). */
+export interface Trends {
+	/** id@version filter, "" for every suite. */
+	suite: string;
+	/** Agent config id filter, "" for every agent. */
+	agent: string;
+	metric: TrendMetric;
+	condition: string;
+	synthetic: TrendSynthetic;
+	/** Significance level of the regression flag. */
+	alpha: number;
+	metrics: TrendMetric[];
+	suites: string[];
+	agents: string[];
+	conditions: string[];
+	/** Ordered by agent then model. */
+	lineages: TrendLineage[];
+	/** Points over every lineage; the page shows an empty state below 2. */
+	points: number;
+	/** Runs the index lists as rejected (seal failed); never charted. */
+	rejected: number;
+	/** When the index was last written. */
+	indexed_at: string;
+	generated_at: string;
+}
+
+/** Query of GET /trends. An absent field takes the server default: every suite, every agent, verified_success, clean, exclude. */
+export interface TrendsParams {
+	suite?: string;
+	agent?: string;
+	metric?: TrendMetric;
+	condition?: string;
+	synthetic?: TrendSynthetic;
 }
 
 // ---------------------------------------------------------------------------------------------
@@ -1558,6 +1815,13 @@ export interface SuiteTask {
 	skills?: string[];
 	/** No honest solution exists: a pass can only come from cheating. */
 	impossible?: boolean;
+	// Suite health fields (suitehealth.go).
+	/** held_out for a held-out task; absent for a public one. */
+	split?: TaskSplit;
+	/** A held-out task served by id only: title, files and checks are withheld. */
+	redacted?: boolean;
+	/** Set while the task is kept out of new plans. */
+	quarantine?: TaskQuarantine;
 }
 
 /** One pack. A pack that failed to load has `error` set and its other fields empty. */
@@ -1590,10 +1854,20 @@ export interface SuiteSummary {
 	grading?: Grading;
 	/** What the verifier reads; absent means diff. */
 	output?: OutputKind;
+	/** The suite's declared output artifacts (output kind artifact); a task without its own list uses these. */
+	artifacts?: ArtifactSpec[];
 	/** Ids of the suite's services, started in every run. */
 	services?: string[];
 	/** Where an imported suite came from. */
 	imported?: ImportRecord;
+	// Suite health fields (suitehealth.go). Held-out tasks are listed by id with their counts only
+	// unless the server config sets held_out.visible.
+	/** Tasks with split held_out. */
+	held_out_count?: number;
+	/** Tasks in suite.health.json, kept out of new plans. */
+	quarantined_count?: number;
+	/** suite.yaml sets a canary. */
+	has_canary?: boolean;
 }
 
 /** GET /suites: every pack under the benchmarks root, sorted by id. */
@@ -1622,6 +1896,165 @@ export interface SuiteTaskDetail {
 	files: SuiteRepoFile[];
 	files_total: number;
 	files_truncated: boolean;
+}
+
+// ---------------------------------------------------------------------------------------------
+// suitehealth.go: GET /suites/{id}/health, read from sealed runs across experiments. Verifier
+// health is about the grader; outcome variance is about the agents. They are kept apart: a config
+// that sometimes passes and sometimes fails is ordinary agent variance, while a verifier that
+// grades the same output differently corrupts verdicts.
+
+/** A task's split. An absent split is public. */
+export type TaskSplit = "public" | "held_out";
+
+/** Who quarantined a task: `suite quarantine` (manual) or `suite health -auto-quarantine` (auto). */
+export type QuarantineSource = "manual" | "auto";
+
+/** Why a task is kept out of new plans (schemas.TaskQuarantine). */
+export interface TaskQuarantine {
+	reason: string;
+	at: string;
+	source: QuarantineSource;
+	/** The task version quarantined. */
+	task_version?: string;
+	/** Verifier evidence lines behind an auto quarantine. */
+	evidence?: string[];
+}
+
+/** Task health flags (TaskHealth.flags). */
+export type HealthFlag =
+	| "flaky_verifier"
+	| "saturated"
+	| "dead"
+	| "no_discrimination"
+	| "difficulty_mismatch"
+	| "infra_trouble"
+	| "timeouts"
+	| "insufficient_data";
+
+/** Kinds of verifier evidence (VerifierEvidence.kind). */
+export type VerifierEvidenceKind = "regrade_disagrees" | "same_output_differs" | "admission_reference" | "oracle_failed";
+
+/** The cut-offs a health report applied, so a reader can see what "hard" or "infra trouble" meant. */
+export interface HealthThresholds {
+	/** Scored non-synthetic runs before difficulty is labelled. */
+	min_runs: number;
+	/** Distinct agent configs before difficulty is labelled. */
+	min_configs: number;
+	/** Pass rate at or above: easy. */
+	easy_above: number;
+	/** Pass rate at or below: hard. */
+	hard_below: number;
+	/** Infra share above: infra_trouble. */
+	infra_rate: number;
+	/** Timeout share above: timeouts. */
+	timeout_rate: number;
+	/** Confidence of the Wilson interval, for example 0.95. */
+	interval_level: number;
+}
+
+/** One observation of the verifier disagreeing with itself or rejecting the reference. */
+export interface VerifierEvidence {
+	kind: VerifierEvidenceKind;
+	detail: string;
+	exp_id?: string;
+	run_ids?: string[];
+}
+
+/** Evidence that the verifier, not the agent, is unstable. checks counts the comparisons that could have shown it. */
+export interface VerifierHealth {
+	flaky: boolean;
+	checks: number;
+	evidence: VerifierEvidence[];
+}
+
+/** One agent config's record on one task, non-synthetic runs only. */
+export interface ConfigOutcome {
+	/** Agent config id. */
+	config: string;
+	/** The identity runs are grouped by. */
+	config_hash: string;
+	/** Scored runs. */
+	trials: number;
+	passes: number;
+	pass_rate: number;
+}
+
+/**
+ * Agent variance per (task, agent config): how often the same config both passed and failed.
+ * unstable counts configs with a pass rate strictly between 0 and 1. Normal for agents, not a defect.
+ */
+export interface OutcomeVariance {
+	configs: number;
+	unstable: number;
+	/** Mean Bernoulli variance p(1-p) over configs with at least two scored trials. */
+	mean_variance: number;
+	per_config: ConfigOutcome[];
+}
+
+/** Runs that ended for reasons outside the agent. attempts includes infra retries and synthetic runs. */
+export interface InfraHealth {
+	attempts: number;
+	aborted_infra: number;
+	infra_error: number;
+	invalid_evaluator: number;
+	/** The agent hit its wall-time cap. */
+	timeouts: number;
+	/** (aborted_infra + infra_error + invalid_evaluator) / attempts. */
+	rate: number;
+	timeout_rate: number;
+}
+
+/** Observed difficulty label. unknown below the run or config minimum. */
+export type ObservedDifficulty = "easy" | "medium" | "hard" | "unknown";
+
+/** Declared against observed difficulty. */
+export type DifficultyMatch = "match" | "mismatch" | "undeclared" | "unknown";
+
+/** Whether a task separates agents at all. always_pass and always_fail carry no information. */
+export type Discrimination = "discriminating" | "always_pass" | "always_fail" | "single_config" | "unknown";
+
+/** Empirical difficulty from non-synthetic runs; interval is the Wilson score interval of pass_rate. */
+export interface DifficultyHealth {
+	/** task.yaml difficulty; "" when unset. */
+	declared: string;
+	observed: ObservedDifficulty;
+	match: DifficultyMatch;
+	pass_rate: number | null;
+	interval: [number, number] | null;
+	runs: number;
+	configs: number;
+	discrimination: Discrimination;
+	/** Best minus worst config pass rate. */
+	spread: number | null;
+}
+
+/** One task's health. */
+export interface TaskHealth {
+	task: string;
+	split: TaskSplit;
+	quarantine: TaskQuarantine | null;
+	verifier: VerifierHealth;
+	variance: OutcomeVariance;
+	infra: InfraHealth;
+	difficulty: DifficultyHealth;
+	flags: HealthFlag[];
+}
+
+/** GET /suites/{id}/health and `suite health -json`. A reading of the record, never part of a lock. */
+export interface SuiteHealth {
+	suite: string;
+	version: string;
+	computed_at: string;
+	/** Experiments of this suite id that were read. */
+	experiments: number;
+	/** Sealed attempts read, synthetic included. */
+	runs: number;
+	thresholds: HealthThresholds;
+	tasks: TaskHealth[];
+	/** Flag to the number of tasks carrying it. */
+	counts: Record<string, number>;
+	notes: string[];
 }
 
 /** An agent config's budgets (schemas.Budgets). */
@@ -1682,16 +2115,39 @@ export interface AgentList {
 // ---------------------------------------------------------------------------------------------
 
 /** Suite tracks group suites on the leaderboard (Suite.Track). */
-export type Track = "coding" | "terminal" | "tool_use" | "mcp" | "memory" | "skills" | "safety" | "qa";
+export type Track =
+	| "coding"
+	| "terminal"
+	| "tool_use"
+	| "mcp"
+	| "memory"
+	| "skills"
+	| "safety"
+	| "qa"
+	| "browser"
+	| "computer_use"
+	| "artifact";
 
 /** The tracks in display order. */
-export const TRACKS: readonly Track[] = ["coding", "terminal", "tool_use", "mcp", "memory", "skills", "safety", "qa"];
+export const TRACKS: readonly Track[] = [
+	"coding",
+	"terminal",
+	"tool_use",
+	"mcp",
+	"memory",
+	"skills",
+	"safety",
+	"qa",
+	"browser",
+	"computer_use",
+	"artifact",
+];
 
 /** verified: a deterministic check. judged: a pinned judge model decides; never compared with verified. */
 export type Grading = "verified" | "judged";
 
 /** What the verifier reads (OutputSpec.Kind). */
-export type OutputKind = "diff" | "answer" | "state";
+export type OutputKind = "diff" | "answer" | "state" | "artifact";
 
 /** A task's own container image (schemas.TaskEnvironment). */
 export interface TaskEnvironment {
@@ -1777,6 +2233,20 @@ export interface OutputSpec {
 	kind?: OutputKind;
 	/** Where the agent writes its answer, relative to the workspace (default answer.txt). */
 	answer_path?: string;
+	/** The files a task with output kind artifact must produce. */
+	artifacts?: ArtifactSpec[];
+}
+
+/** One file, or a glob of files, an artifact task expects in the workspace (schemas.ArtifactSpec). */
+export interface ArtifactSpec {
+	/** Names the folder artifacts/<id> in the run folder. */
+	id: string;
+	/** Relative to the workspace root; may use *, ? and [...]. */
+	path: string;
+	/** A required artifact without one usable file fails the run's grade. */
+	required?: boolean;
+	/** Per file; absent means the default cap (32 MiB). */
+	max_bytes?: number;
 }
 
 /** Where an imported suite came from (schemas.ImportRecord). */
@@ -1869,6 +2339,25 @@ export interface StateFile {
 	error?: string;
 }
 
+/**
+ * One artifact file of a run (schemas.ArtifactFile). Agent-written content: it is offered for
+ * download from GET /runs/{id}/artifacts/{artifact}/{name} and never rendered.
+ */
+export interface ArtifactFile {
+	/** The ArtifactSpec it matched. */
+	id: string;
+	/** Base name of the file; absent when the spec matched nothing. */
+	name?: string;
+	/** Relative to the run folder: artifacts/<id>/<name>; absent when not copied. */
+	path?: string;
+	/** Where it was read, relative to the workspace root (the spec's path when nothing matched). */
+	source: string;
+	sha256?: string;
+	bytes: number;
+	/** Why it was not copied: missing, outside the workspace, not a regular file, over a size cap. */
+	error?: string;
+}
+
 /** One importer as `bifrost-bench import list` prints it (importers.Info). */
 export interface ImporterInfo {
 	/** Format name, for example harbor. */
@@ -1940,8 +2429,573 @@ export type TriageResponse = WithMode<Triage>;
 export type ReleaseListResponse = WithMode<ReleaseList>;
 export type ReleaseResponse = WithMode<ReleaseRecord>;
 export type LeaderboardResponse = WithMode<Leaderboard>;
+export type TrendsResponse = WithMode<Trends>;
 export type SuitesResponse = WithMode<SuiteList>;
 export type SuiteTaskResponse = WithMode<SuiteTaskDetail>;
+export type SuiteHealthResponse = WithMode<SuiteHealth>;
 export type AgentsResponse = WithMode<AgentList>;
 export type ImportsResponse = WithMode<ImportList>;
 export type WorkersResponse = WithMode<WorkerList>;
+export type ReviewQueueResponse = WithMode<ReviewQueue>;
+export type ReviewLogResponse = WithMode<ReviewLog>;
+export type RunReviewsResponse = WithMode<RunReviews>;
+export type ReviewResponse = WithMode<Review>;
+
+// ---------------------------------------------------------------------------------------------
+// Forecast (POST /estimate, schemas/forecast.go, docs/forecast.md) and model matrix
+// (GET /experiments/{id}/matrix, schemas/matrix.go, docs/model-matrix.md).
+// ---------------------------------------------------------------------------------------------
+
+/** What a forecast range holds: a range from history, an upper bound only, or nothing. */
+export type ForecastRangeKind = "history" | "upper_bound" | "unknown";
+
+/**
+ * A low, median and high estimate (schemas.ForecastRange). history: all three set. upper_bound:
+ * only high. unknown: none, and reason says why. A planning range, not a confidence interval.
+ */
+export interface ForecastRange {
+	kind: ForecastRangeKind;
+	low: number | null;
+	median: number | null;
+	high: number | null;
+	reason?: string;
+}
+
+/** The 10th, 50th and 90th percentiles of one run over the arm's history, pooled across tasks. */
+export interface PerRunRanges {
+	cost_usd: ForecastRange;
+	tokens: ForecastRange;
+	wall_s: ForecastRange;
+}
+
+/** Where an arm's forecast comes from, in order of preference. */
+export type ForecastBasis = "config_hash" | "agent_model" | "budget_bound" | "none";
+
+/** One arm's forecast (schemas.ArmForecast). */
+export interface ArmForecast {
+	arm: string;
+	label: string;
+	agent: string;
+	model: string;
+	config_hash: string;
+	/** Slots of this arm. */
+	runs: number;
+	basis: ForecastBasis;
+	/** Plain words, for example "14 sealed runs of config 3f2a91c0 in 2 experiments". */
+	basis_text: string;
+	/** Sealed runs the estimate rests on. */
+	history_runs: number;
+	/** Experiments those runs came from. */
+	experiments: string[];
+	/** Planned tasks estimated from their own history; the rest come from the suite-wide history. */
+	task_level: number;
+	per_run: PerRunRanges;
+	cost_usd: ForecastRange;
+	tokens: ForecastRange;
+	agent_time_s: ForecastRange;
+}
+
+/** The judge model's expected cost on a judged suite. Never part of the agent cost. */
+export interface JudgeForecast {
+	/** Runs that will be judged. */
+	runs: number;
+	/** Past judge records it rests on. */
+	history_runs: number;
+	cost_usd: ForecastRange;
+	basis_text: string;
+}
+
+/** Forecast fit against budget.total_usd. */
+export type ForecastFit = "fits" | "may_exceed" | "likely_exceeds" | "exceeds" | "unknown" | "no_budget";
+
+/**
+ * Expected cost and time of a planned experiment, from the sealed history of the same agent
+ * configs on the same suite (schemas.Forecast). A planner refusal answers fit "unknown" with the
+ * reason in notes.
+ */
+export interface Forecast {
+	exp_id: string;
+	/** id@version */
+	suite: string;
+	generated_at: string;
+	/** Price snapshot the per-run bounds were checked against. */
+	price_ref?: string;
+	arms: ArmForecast[];
+	/** Agent cost of every slot; judge cost is separate. */
+	cost_usd: ForecastRange;
+	/** Sum of run wall times. */
+	agent_time_s: ForecastRange;
+	/** Agent time over concurrency, no queueing assumed. */
+	wall_clock_s: ForecastRange;
+	concurrency: number;
+	/** Judged suites only. */
+	judge?: JudgeForecast;
+	/** budget.total_usd; 0 when none is set. */
+	budget_usd: number;
+	fit: ForecastFit;
+	fit_reason: string;
+	/** One sentence: where the numbers come from. */
+	basis: string;
+	notes: string[];
+}
+
+/** One arm of a model matrix: the arm id and its gateway provider beside the leaderboard entry numbers. */
+export interface MatrixRow extends LeaderboardEntry {
+	arm: string;
+	provider: string;
+}
+
+/** The paired comparison of two arms. mean_diff is the mean over common tasks of arm_x's success rate minus arm_y's. */
+export interface MatrixPair {
+	arm_x: string;
+	arm_y: string;
+	/** Common tasks. */
+	tasks: number;
+	/** Common tasks where the rates differ. */
+	n_nonzero: number;
+	mean_diff: number;
+	/** Raw exact two-sided sign-flip p; null without common tasks. */
+	p: number | null;
+	/** Holm-adjusted across all pairs; null without common tasks. */
+	p_adjusted: number | null;
+	significant: boolean;
+	/** Plain words, for example "cannot separate: too few differing tasks (2 of 6)". */
+	reason: string;
+}
+
+/** Every arm of one experiment on one condition, with every pair tested (schemas.ModelMatrix). */
+export interface ModelMatrix {
+	exp_id: string;
+	/** id@version */
+	suite: string;
+	condition: string;
+	/** Conditions of the experiment with a graded run. */
+	conditions: string[];
+	grade_source: string;
+	alpha: number;
+	/** Tasks every arm has a graded run on. */
+	tasks: number;
+	/** False when no pair could reach alpha after Holm, whatever the results. */
+	separable: boolean;
+	/** Plain words: why nothing can be separated, or what the tiers mean. */
+	note: string;
+	/** Scripted agent, scripted model or smoke experiment: numbers are not findings. */
+	synthetic: boolean;
+	/** In rank order. */
+	rows: MatrixRow[];
+	/** Every pair of rows, in rank order of the first then the second. */
+	pairs: MatrixPair[];
+	excluded: LeaderboardExclusion[];
+}
+
+/** GET /experiments/{id}/matrix query. An absent or empty param is left out so the server default applies. */
+export interface ModelMatrixParams {
+	expId: string;
+	condition?: string;
+	/** "original" or a regrade id. */
+	grade_source?: string;
+	alpha?: string;
+}
+
+export type ForecastResponse = WithMode<Forecast>;
+export type ModelMatrixResponse = WithMode<ModelMatrix>;
+
+// ---------------------------------------------------------------------------------------------
+// clusters: failure clusters. Failed verified runs grouped by a deterministic signature built from
+// their recorded evidence (docs/failure-clusters.md). A cluster is an observation, not a root cause.
+// ---------------------------------------------------------------------------------------------
+
+/** exclude: live runs only. include: live and synthetic. only: scripted agent or scripted model runs only. */
+export type ClusterSynthetic = "exclude" | "include" | "only";
+
+/** Every synthetic filter value, in switch order. */
+export const CLUSTER_SYNTHETIC = ["exclude", "include", "only"] as const satisfies readonly ClusterSynthetic[];
+
+/** How far a cluster reaches: one run, one agent on one task, one agent, one task, or many agents and tasks. */
+export type ClusterScope = "single_run" | "agent_and_task" | "agent" | "task" | "systemic";
+
+/** The layers a signature is built from, most specific first. */
+export type ClusterLayerKind =
+	| "outcome"
+	| "failed_tests"
+	| "failed_dimensions"
+	| "answer_category"
+	| "state_checks"
+	| "gates"
+	| "loop"
+	| "error"
+	| "provider"
+	| "last_tool"
+	| "condition";
+
+/** The filters a cluster list or detail was computed with, as the server resolved them. */
+export interface ClusterFilters {
+	suite: string;
+	agent: string;
+	experiments: string[];
+	since: string;
+	min: number;
+	synthetic: string;
+}
+
+/** Runs left out for one reason: "synthetic", "not sealed", "seal does not verify", "not counted" or "evidence problem". */
+export interface ClusterExclusion {
+	reason: string;
+	runs: number;
+}
+
+/** One part of a signature. items holds ids (hidden test ids, gate names); source says where an error line came from. */
+export interface ClusterLayer {
+	kind: ClusterLayerKind;
+	label: string;
+	items?: string[];
+	source?: string;
+}
+
+/** Another cluster that shares part of this one's signature. */
+export interface ClusterRelated {
+	signature: string;
+	title: string;
+	count: number;
+	reason: string;
+}
+
+/** The agent's config hash changed and the cluster's runs all came after the change. */
+export interface ClusterConfigChange {
+	agent: string;
+	from_hash: string;
+	to_hash: string;
+	/** RFC3339 */
+	at: string;
+}
+
+/** One failure cluster (clusters.Cluster). */
+export interface ClusterSummary {
+	/** "c_" + 16 hex; safe in a URL. */
+	signature: string;
+	title: string;
+	outcome: Outcome;
+	/** Most specific first. */
+	layers: ClusterLayer[];
+	count: number;
+	/** 0..1 of the failures in scope. */
+	share: number;
+	/** "suite/task" */
+	tasks: string[];
+	/** Agent config ids. */
+	agents: string[];
+	config_hashes: string[];
+	conditions: string[];
+	experiments: string[];
+	/** RFC3339 */
+	first_seen: string;
+	/** RFC3339 */
+	last_seen: string;
+	/** Up to 3 run ids. */
+	examples: string[];
+	scope: ClusterScope;
+	after_config_change?: ClusterConfigChange;
+	related?: ClusterRelated[];
+	/** The normalized error fingerprint. Agent-controlled text: render inert, never as markup or a link. */
+	error_text?: string;
+}
+
+/** GET /clusters: failures among verified, counted, sealed runs, grouped by signature. */
+export interface ClusterList {
+	/** RFC3339 */
+	generated_at: string;
+	filters: ClusterFilters;
+	/** Verified, counted, sealed runs in scope, passing ones included. */
+	runs: number;
+	/** Of runs, those that did not pass. */
+	failures: number;
+	/** Experiments read. */
+	experiments: string[];
+	/** Sorted by count, largest first. */
+	clusters: ClusterSummary[];
+	/** Clusters below min, not listed. */
+	hidden: number;
+	/** Runs left out, by reason. */
+	excluded: ClusterExclusion[];
+}
+
+/** One run of a cluster. */
+export interface ClusterRun {
+	run_id: string;
+	/** The run's matched pair, for the run page link (/runs?pair=). Absent when the run has none. */
+	pair_id?: string;
+	exp_id: string;
+	suite: string;
+	task: string;
+	arm: string;
+	condition: string;
+	agent: string;
+	config_hash: string;
+	outcome: Outcome;
+	/** RFC3339 */
+	at: string;
+	last_tool?: string;
+	last_tool_errored?: boolean;
+	/** The run's normalized error line. Agent-controlled text: render inert. */
+	error_text?: string;
+}
+
+/** GET /clusters/{signature}: one cluster and its runs. 404 when the signature is not in the filtered set. */
+export interface ClusterDetail {
+	/** RFC3339 */
+	generated_at: string;
+	filters: ClusterFilters;
+	failures: number;
+	cluster: ClusterSummary;
+	runs: ClusterRun[];
+}
+
+/** Query of GET /clusters and GET /clusters/{signature}. An absent or empty field takes the server default. */
+export interface ClusterParams {
+	suite?: string;
+	agent?: string;
+	/** Experiment ids, comma separated. */
+	exp?: string;
+	since?: string;
+	min?: number;
+	synthetic?: ClusterSynthetic;
+}
+
+export type ClusterListResponse = WithMode<ClusterList>;
+export type ClusterDetailResponse = WithMode<ClusterDetail>;
+
+// ---------------------------------------------------------------------------------------------
+// Agent diff (agentdiff/agentdiff.go): what changed between version A and version B of an
+// agent, and which tasks flipped. GET /agents/diff and GET /agents/diff/versions.
+// ---------------------------------------------------------------------------------------------
+
+/** Config groups, in the order the report lists them. */
+export const AGENT_DIFF_GROUPS = ["model", "prompt_notes", "tools", "budgets", "gateway", "image", "other"] as const;
+export type AgentDiffGroupId = (typeof AGENT_DIFF_GROUPS)[number];
+
+/** Task classes: stable flips, unstable moves, and the unchanged rest. */
+export const AGENT_DIFF_CLASSES = [
+	"flipped_to_pass",
+	"flipped_to_fail",
+	"moved_to_pass",
+	"moved_to_fail",
+	"unstable_in_both",
+	"unchanged_pass",
+	"unchanged_fail",
+] as const;
+export type AgentDiffClass = (typeof AGENT_DIFF_CLASSES)[number];
+
+/** Conclusion of the exact paired sign-flip test on per-task pass rate differences B minus A. */
+export type AgentDiffConclusion = "b_better" | "b_worse" | "no_clear_difference" | "cannot_tell";
+/** A metric delta read with the metric's direction. */
+export type AgentDiffDirection = "better" | "worse" | "same" | "unknown";
+/** Change kind of a config field or a laid-down file. */
+export type AgentDiffKind = "changed" | "added" | "removed";
+
+/** Runs of a version left out for one reason. */
+export interface AgentDiffExclusion {
+	reason: string;
+	runs: number;
+}
+
+/** One side of the diff. */
+export interface AgentDiffVersion {
+	/** As asked: a config hash, a prefix, or <exp_id>:<arm>. */
+	selector: string;
+	config_hash: string;
+	agent_id: string;
+	label: string;
+	/** Set when picked by <exp_id>:<arm>; only that arm's runs count. */
+	exp_id?: string;
+	arm?: string;
+	/** Experiments whose verified runs entered. */
+	experiments: string[];
+	/** Verified runs on the suite and condition. */
+	runs: number;
+	excluded: AgentDiffExclusion[];
+}
+
+/** One dotted config path that differs. old is null when added, new is null when removed. */
+export interface AgentDiffFieldChange {
+	path: string;
+	kind: AgentDiffKind;
+	old: JsonValue;
+	new: JsonValue;
+	/** Both sides read "[redacted]". */
+	redacted?: boolean;
+}
+
+/** One laid-down file whose hash differs. diff is unified text; diff_note says why there is none. */
+export interface AgentDiffFileChange {
+	path: string;
+	kind: AgentDiffKind;
+	old_hash?: string;
+	new_hash?: string;
+	/** Unified diff text. Inert: render as text only. */
+	diff?: string;
+	diff_note?: string;
+	/** The diff was cut at the line cap. */
+	truncated?: boolean;
+}
+
+/** The changes of one config group. */
+export interface AgentDiffConfigGroup {
+	id: AgentDiffGroupId;
+	fields: AgentDiffFieldChange[];
+	files: AgentDiffFileChange[];
+}
+
+/** The config half of the report. */
+export interface AgentDiffConfig {
+	identical: boolean;
+	/** Field and file changes over every group. */
+	changes: number;
+	/** Non-empty groups in AGENT_DIFF_GROUPS order. */
+	groups: AgentDiffConfigGroup[];
+}
+
+/** Common tasks per class. */
+export type AgentDiffClassCounts = Record<AgentDiffClass, number>;
+
+/** The exact paired sign-flip test. p is null when there is no common task. */
+export interface AgentDiffSignTest {
+	n_tasks: number;
+	n_nonzero: number;
+	n_positive: number;
+	n_negative: number;
+	p: number | null;
+	exact: boolean;
+	/** Smallest p the changed tasks allow. */
+	min_possible_p: number;
+	alpha: number;
+	conclusion: AgentDiffConclusion;
+}
+
+/** One sealed run. pair_id opens it in the run comparison view. */
+export interface AgentDiffRunRef {
+	run_id: string;
+	exp_id: string;
+	pair_id: string;
+	outcome: string;
+}
+
+/** One run of each version on a task. pair_id is set when both runs are one experiment pair. */
+export interface AgentDiffRunPair {
+	a: AgentDiffRunRef;
+	b: AgentDiffRunRef;
+	pair_id?: string;
+}
+
+/** One common task. */
+export interface AgentDiffTask {
+	task: string;
+	class: AgentDiffClass;
+	pass_a: number;
+	n_a: number;
+	pass_b: number;
+	n_b: number;
+	rate_a: number;
+	rate_b: number;
+	/** Representative runs; set for flipped and moved tasks. */
+	pair?: AgentDiffRunPair;
+}
+
+/** One metric over the common tasks, paired per task. */
+export interface AgentDiffMetric {
+	metric: string;
+	higher_is_better: boolean;
+	a: number | null;
+	b: number | null;
+	/** B minus A. */
+	delta: number | null;
+	/** Tasks with an observed value on both sides. */
+	tasks: number;
+	unknown_a: number;
+	unknown_b: number;
+	direction: AgentDiffDirection;
+}
+
+/** One gate that fired in either version. new: fired in B and never in A; tasks: where it did. */
+export interface AgentDiffGate {
+	gate: string;
+	fired_a: number;
+	fired_b: number;
+	new: boolean;
+	tasks: string[];
+}
+
+/** The outcome half of the report. */
+export interface AgentDiffOutcome {
+	common_tasks: number;
+	/** Tasks only A ran (verified) on the suite and condition. */
+	only_a: string[];
+	only_b: string[];
+	/** Mean per-task pass rate over the common tasks. */
+	pass_rate_a: number;
+	pass_rate_b: number;
+	counts: AgentDiffClassCounts;
+	/** flipped_to_pass minus flipped_to_fail. */
+	net: number;
+	test: AgentDiffSignTest;
+	/** Flips first, then moves, unstable, unchanged; by task id within a class. */
+	tasks: AgentDiffTask[];
+	metrics: AgentDiffMetric[];
+	gates: AgentDiffGate[];
+}
+
+/** GET /agents/diff */
+export interface AgentDiffReport {
+	a: AgentDiffVersion;
+	b: AgentDiffVersion;
+	/** id@version */
+	suite: string;
+	condition: string;
+	synthetic: boolean;
+	config: AgentDiffConfig;
+	outcome: AgentDiffOutcome;
+	/** One plain sentence or three. */
+	summary: string;
+}
+
+/** One experiment arm that resolved to a config hash. */
+export interface AgentDiffArmRef {
+	exp_id: string;
+	arm: string;
+	label: string;
+	suite: string;
+	created_at: string;
+}
+
+/** One config hash with the arms that ran it. */
+export interface AgentDiffVersionInfo {
+	config_hash: string;
+	agent_id: string;
+	/** Newest arm's label. */
+	label: string;
+	suites: string[];
+	/** Newest first. */
+	arms: AgentDiffArmRef[];
+	/** Sealed runs, not yet seal-verified. */
+	sealed_runs: number;
+	latest_at: string;
+}
+
+/** GET /agents/diff/versions: every config hash the run folder knows. */
+export interface AgentDiffVersionList {
+	versions: AgentDiffVersionInfo[];
+}
+
+/** GET /agents/diff query. An absent or empty param is left out so the server default applies. */
+export interface AgentDiffParams {
+	a?: string;
+	b?: string;
+	suite?: string;
+	condition?: string;
+	/** With a and b empty: the two newest config hashes of this agent id. */
+	agent?: string;
+	/** "1" includes synthetic runs. */
+	synthetic?: string;
+}
+
+export type AgentDiffResponse = WithMode<AgentDiffReport>;
+export type AgentDiffVersionsResponse = WithMode<AgentDiffVersionList>;

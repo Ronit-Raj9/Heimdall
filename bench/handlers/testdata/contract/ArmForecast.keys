@@ -1,0 +1,17 @@
+# Keys of bench.ts `ArmForecast`, one per line; a trailing ? marks an optional (Go omitempty) key.
+# Change with bench.ts and schemas/forecast.go.
+arm
+label
+agent
+model
+config_hash
+runs
+basis
+basis_text
+history_runs
+experiments
+task_level
+per_run
+cost_usd
+tokens
+agent_time_s

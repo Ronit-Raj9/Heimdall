@@ -1,0 +1,30 @@
+# Free smoke check of the acme-design project: no model calls, no spend.
+# The real pipeline runs with two scripted control agents on every task,
+# clean condition, one trial: the agent's place is taken by the control, the
+# files it left in the workspace are exported as the task's artifacts and
+# the hidden verifier grades them. Arm A runs each task's reference script
+# (oracle), arm B does nothing (noop), so A must verify 3 of 3 and B 0 of 3;
+# anything else means the artifact export, the grader mount or a verifier is
+# wired wrong.
+#
+# `smoke: true` makes the planner only warn while the suite is not locked or
+# a task is not admitted yet, and marks the runs as a synthetic smoke test.
+# Slots: 3 tasks x 1 trial x 2 arms = 6.
+name: design-smoke
+smoke: true
+suite: acme-design@1.0.0
+base: agents/oracle.yaml
+arms:
+  A: {label: oracle (reference script)}
+  B: {label: noop (no change), agent: agents/noop.yaml}
+primary: {condition: clean, metric: verified_success}
+guards:
+  - {rule: no_new_integrity_violation}
+conditions:
+  - {id: clean, tasks: all, trials: 1}
+budget: {total_usd: 0}
+verdict: {policy: paired_signflip, alpha: 0.05, assumed_sd: 0.30}
+seed: 20261115
+concurrency: 2
+manifest_mode: agent_exposure
+policy: policies/default.yaml

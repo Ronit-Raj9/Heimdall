@@ -1,0 +1,15 @@
+# Keys of bench.ts `ModelMatrix`, one per line; a trailing ? marks an optional (Go omitempty) key.
+# The top-level response adds "mode". Change with bench.ts and schemas/matrix.go.
+exp_id
+suite
+condition
+conditions
+grade_source
+alpha
+tasks
+separable
+note
+synthetic
+rows
+pairs
+excluded

@@ -1,3 +1,4 @@
+import { ArtifactFiles } from "@/components/runs/runArtifacts";
 import { durationSeconds, hasScenarioEvidence, isServiceRole, toolCallCounts } from "@/components/scenario/scenario.utils";
 import { ToneBadge } from "@/components/suites/suiteBadges";
 import { formatBytes } from "@/components/suites/suites.utils";
@@ -11,9 +12,9 @@ import { Fragment, useId, useState } from "react";
 import { useTranslation } from "react-i18next";
 
 /**
- * A run's scenario evidence: tool calls, sessions, answer, exported state and services. Each part
- * renders only when the run recorded it, and a plain diff run renders nothing at all, so a screen
- * never shows an empty box for evidence that does not apply.
+ * A run's scenario evidence: tool calls, sessions, answer, exported state, artifact files and
+ * services. Each part renders only when the run recorded it, and a plain diff run renders nothing
+ * at all, so a screen never shows an empty box for evidence that does not apply.
  */
 export function RunScenarioEvidence({ detail, arm }: { detail: RunDetail; arm: string }) {
 	if (!hasScenarioEvidence(detail)) return null;
@@ -24,6 +25,9 @@ export function RunScenarioEvidence({ detail, arm }: { detail: RunDetail; arm: s
 			{detail.tool_calls && detail.tool_calls.length > 0 && <ToolCallTable calls={detail.tool_calls} arm={arm} />}
 			{detail.answer && <AnswerBlock answer={detail.answer} />}
 			{detail.state && detail.state.length > 0 && <StateFiles files={detail.state} arm={arm} />}
+			{detail.artifacts && detail.artifacts.length > 0 && (
+				<ArtifactFiles files={detail.artifacts} runId={detail.run.run_id} arm={arm} sealed={detail.sealed} sealError={detail.seal_error} />
+			)}
 		</div>
 	);
 }

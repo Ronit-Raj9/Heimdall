@@ -79,6 +79,12 @@ type Planner struct {
 	// agentImages builds per-task agent images (WithAgentImageBuilder); nil
 	// picks one from the suite's environment.
 	agentImages AgentImageBuilder
+	prices      func(model string) bool // Forecast and matrix area: price snapshot lookup for matrix models (matrixplan.go)
+
+	// Suite health area: explicit task lists may name quarantined tasks;
+	// a worker's replan ignores quarantine (taskscreen.go).
+	includeQuarantined bool
+	ignoreQuarantine   bool
 }
 
 // planMode is what differs between planning an experiment and planning an
@@ -140,7 +146,7 @@ func NewPlanner(reg *schemas.Registry, benchRoot string, logger schemas.Logger, 
 // the suite-level scenario inputs are hashed (scenarioHashes); each is
 // absent from a plan without scenario tasks.
 func (p *Planner) Plan(ctx context.Context, exp *schemas.Experiment) (*schemas.Manifest, error) {
-	return p.plan(ctx, exp, experimentMode)
+	return p.planMatrix(ctx, exp, experimentMode) // Forecast and matrix area: expands matrix sugar first, else exactly plan (matrixplan.go)
 }
 
 // plan is Plan under a plan mode. Each arm's image is resolved for the suite
@@ -174,6 +180,9 @@ func (p *Planner) plan(ctx context.Context, exp *schemas.Experiment, mode planMo
 			return nil, fmt.Errorf("plan %s: compatibility: %w", e.ID, err)
 		}
 	}
+	if conds, compat, err = p.screenAll(suite, &e, conds, compat, mode.lockWarnOnly); err != nil { // Suite health area: split and quarantine (taskscreen.go)
+		return nil, fmt.Errorf("plan %s: %w", e.ID, err)
+	}
 	all := append(append([]condPlan(nil), conds...), compat...)
 	if err := p.checkLock(suite, e.Name, mode.lockWarnOnly || e.Smoke, all); err != nil {
 		return nil, fmt.Errorf("plan %s: %w", e.ID, err)
@@ -195,6 +204,7 @@ func (p *Planner) plan(ctx context.Context, exp *schemas.Experiment, mode planMo
 		RandomizationU: RandomizationUnit,
 		BenchVersion:   BenchVersion,
 	}
+	m.HeldOutTasks = heldOutTasks(suite, all) // Suite health area: held-out split (taskscreen.go)
 	if m.PolicyHash, err = p.policyHash(e.Policy); err != nil {
 		return nil, fmt.Errorf("plan %s: %w", e.ID, err)
 	}
@@ -235,6 +245,9 @@ func (p *Planner) plan(ctx context.Context, exp *schemas.Experiment, mode planMo
 		}
 	}
 	if err := p.checkScenario(suite, all, m.Arms, m.Compatibility); err != nil {
+		return nil, fmt.Errorf("plan %s: %w", e.ID, err)
+	}
+	if err := p.checkExternal(&e, suite, all); err != nil { // External APIs area: modes and cassettes (externalplan.go)
 		return nil, fmt.Errorf("plan %s: %w", e.ID, err)
 	}
 	if m.TaskImages, err = p.taskImages(ctx, suite, all); err != nil {

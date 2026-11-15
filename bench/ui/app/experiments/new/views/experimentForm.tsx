@@ -1,5 +1,6 @@
 import { readWriteToken, saveWriteToken } from "@/components/experiments/experiments.utils";
 import { PlanResult, planBlocksStart } from "@/components/experiments/planResult";
+import { PlanEstimate } from "@/components/experiments/planEstimate";
 import { LoadError } from "@/components/runs/screenStates";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -419,6 +420,7 @@ export function ExperimentForm({ catalog, defaults, onStarted }: ExperimentFormP
 						)}
 						{actionError && <LoadError title={actionError.title} error={actionError.error} testId="experiment-action-error" />}
 						{planned && <PlanResult plan={planned.plan} className={cn(stale && "opacity-60")} />}
+						{planned && <PlanEstimate experiment={planned.experiment} className={cn(stale && "opacity-60")} />}
 					</CardContent>
 				</Card>
 			</aside>

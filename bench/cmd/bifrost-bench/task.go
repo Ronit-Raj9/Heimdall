@@ -19,10 +19,11 @@ func init() {
 const taskUsage = `usage: bifrost-bench task init -suite <suite> -id <task> -repo <git repo> -base <commit> -reference <commit>
            [-tests <glob,...>] [-license <spdx|proprietary>] [-capabilities a,b] [-difficulty easy|medium|hard]
            [-kind bugfix|feature|refactor|performance] [-force] [-config deploy/bench.yaml]
-       bifrost-bench task init -suite <suite> -id <task> [-kind tool-use|mcp|memory|qa] [-from <task>]
+       bifrost-bench task init -suite <suite> -id <task> [-kind tool-use|mcp|browser|memory|qa|artifact|external-api|computer-use] [-from <task>]
            [-license <spdx|proprietary>] [-force] [-config deploy/bench.yaml]
        bifrost-bench task validate [-config deploy/bench.yaml] <suite>/<task>
-       bifrost-bench task admit [-config deploy/bench.yaml] <suite>/<task>`
+       bifrost-bench task admit [-config deploy/bench.yaml] <suite>/<task>
+       bifrost-bench task from-trace -suite <suite> -id <task> -trace <file> [-kind qa|tool-use|mcp|memory] [-redact=false]`
 
 func runTask(args []string) int {
 	if len(args) == 0 {
@@ -36,6 +37,8 @@ func runTask(args []string) int {
 		return runTaskValidate(args[1:])
 	case "admit":
 		return runTaskAdmit(args[1:])
+	case "from-trace": // task from-trace: draft a task from a recorded session (taskfromtrace.go)
+		return runTaskFromTrace(args[1:])
 	default:
 		fmt.Fprintf(os.Stderr, "unknown task subcommand %q\n%s\n", args[0], taskUsage)
 		return exitUsage
@@ -56,7 +59,7 @@ func runTaskInit(args []string) int {
 	license := fs.String("license", "proprietary", "SPDX license id of the repository, or proprietary")
 	caps := fs.String("capabilities", "", "comma-separated capabilities the task exercises")
 	difficulty := fs.String("difficulty", "", "easy, medium or hard")
-	kind := fs.String("kind", "bugfix", "bugfix, feature, refactor or performance; or tool-use, mcp, memory or qa for a scenario suite")
+	kind := fs.String("kind", "bugfix", "bugfix, feature, refactor or performance; or tool-use, mcp, memory, qa or artifact for a scenario suite")
 	from := fs.String("from", "", "scenario suites: task whose shape is copied (default: the suite's first task)")
 	force := fs.Bool("force", false, "replace an existing task folder")
 	pos, err := parseArgs(fs, args)

@@ -180,7 +180,7 @@ func sameEntry(what string, frozen, now any) error {
 // built here rather than by the markdown reporter because it reads the
 // regrade record and the sealed gates, which the analysis does not carry.
 func (a *app) gateSourceSection(ctx context.Context, m *schemas.Manifest, gradeSource string, regated []schemas.SealedRun) (string, error) {
-	if gradeSource == "" || gradeSource == schemas.GradeSourceOriginal {
+	if gradeSource == "" || gradeSource == schemas.GradeSourceOriginal || gradeSource == schemas.GradeSourceReviewed { // reviewed is not a regrade (review.go)
 		return "", nil
 	}
 	expID := m.ExpID

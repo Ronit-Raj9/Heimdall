@@ -74,6 +74,7 @@ func (h *LeaderboardHandler) getLeaderboard(ctx *fasthttp.RequestCtx) {
 		Scope:       string(args.Peek("scope")),
 		Synthetic:   string(args.Peek("synthetic")),
 		GradeSource: string(args.Peek("grade_source")),
+		Split:       string(args.Peek("split")), // Suite health area: held-out board (leaderboard/split.go)
 		K:           k,
 		Now:         h.now(),
 	}

@@ -1,0 +1,6 @@
+# Keys of bench.ts `VerifierEvidence`, one per line; a trailing ? marks an optional (Go omitempty) key.
+# Change with bench.ts and schemas/suitehealth.go.
+kind
+detail
+exp_id?
+run_ids?

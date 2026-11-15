@@ -1,0 +1,511 @@
+package handlers
+
+import (
+	"cmp"
+	"encoding/json"
+	"fmt"
+	"path"
+	"reflect"
+	"regexp"
+	"slices"
+	"sort"
+	"strings"
+	"sync"
+	"time"
+
+	"github.com/fasthttp/router"
+	"github.com/maximhq/bifrost/bench/clusters"
+	"github.com/maximhq/bifrost/bench/importers"
+	"github.com/maximhq/bifrost/bench/lib"
+	"github.com/maximhq/bifrost/bench/schemas"
+	"github.com/valyala/fasthttp"
+)
+
+// OpenAPIPath serves the machine-readable description of the bench API.
+const OpenAPIPath = APIPrefix + "/openapi.json"
+
+// Route auth: who may call a route.
+const (
+	AuthNone   = ""       // anyone the host guard lets in
+	AuthWrite  = "write"  // Authorization: Bearer <BENCH_WRITE_TOKEN>
+	AuthWorker = "worker" // Authorization: Bearer <BENCH_WORKER_TOKEN>
+)
+
+// RouteDoc describes one route of the bench API for the OpenAPI description.
+// Request and Response hold a zero value of the JSON body type; the schema is
+// derived from it by reflection, so it cannot drift from the Go type.
+type RouteDoc struct {
+	Method      string
+	Path        string // router pattern, e.g. /api/bench/runs/{id}
+	Tag         string
+	Summary     string
+	Auth        string
+	Query       []QueryDoc
+	Request     any      // JSON request body, nil when there is none
+	RequestAlso []string // other request media types the route accepts, e.g. application/yaml
+	RawRequest  string   // media type of a non-JSON request body
+	Status      int      // success status; 0 means 200
+	Response    any      // JSON success body; the server adds "mode"
+	Raw         string   // media type of a non-JSON success body
+	AlsoRaw     string   // a second media type the route can answer with, e.g. text/event-stream
+	NoContent   bool     // the route may also answer 204 with no body
+}
+
+// QueryDoc is one query parameter.
+type QueryDoc struct {
+	Name        string
+	Description string
+}
+
+// APIRoutes is the description table: one entry per route the server
+// registers. TestOpenAPICoversEveryRoute in openapi_test.go fails, listing
+// the routes, when the server registers a route this table lacks.
+var APIRoutes = []RouteDoc{
+	{Method: "GET", Path: APIPrefix + "/health", Tag: "health", Summary: "Liveness and server version", Response: schemas.Health{}},
+	{Method: "GET", Path: APIPrefix + "/doctor", Tag: "health", Summary: "Preflight checks", Response: schemas.Doctor{}},
+	{Method: "GET", Path: APIPrefix + "/catalog", Tag: "catalog", Summary: "Every registered suite, probe, agent and metric", Response: schemas.Catalog{}},
+	{Method: "GET", Path: OpenAPIPath, Tag: "meta", Summary: "This OpenAPI 3.1 description", Raw: "application/json"},
+
+	{Method: "GET", Path: APIPrefix + "/experiments", Tag: "experiments", Summary: "List experiments with their status", Response: schemas.ExperimentList{}},
+	{Method: "POST", Path: APIPrefix + "/experiments", Tag: "experiments", Summary: "Plan, freeze and create an experiment; nothing runs until start",
+		Auth: AuthWrite, Request: schemas.Experiment{}, RequestAlso: experimentMediaTypes, Status: fasthttp.StatusCreated, Response: schemas.ExperimentCreated{}},
+	{Method: "POST", Path: APIPrefix + "/experiments/plan", Tag: "experiments", Summary: "Size an experiment without running anything; planner errors come back in errors with 200",
+		Auth: AuthWrite, Request: schemas.Experiment{}, RequestAlso: experimentMediaTypes, Response: schemas.ExperimentPlan{}},
+	{Method: "POST", Path: APIPrefix + "/experiments/{id}/start", Tag: "experiments", Summary: "Start a created experiment",
+		Auth: AuthWrite, Status: fasthttp.StatusAccepted, Response: schemas.ExperimentStatus{}},
+	{Method: "GET", Path: APIPrefix + "/experiments/{id}", Tag: "experiments", Summary: "Experiment status", Response: schemas.ExperimentStatus{}},
+	{Method: "GET", Path: APIPrefix + "/experiments/{id}/verdict", Tag: "analysis", Summary: "Release verdict, gate checklist, config diff and policy result",
+		Query: []QueryDoc{gradeSourceQuery}, Response: schemas.VerdictPayload{}},
+	{Method: "GET", Path: APIPrefix + "/experiments/{id}/diagnostics", Tag: "analysis", Summary: "Diagnostics table, meters and per-arm metrics",
+		Query: []QueryDoc{gradeSourceQuery}, Response: schemas.DiagnosticsPayload{}},
+	{Method: "GET", Path: APIPrefix + "/experiments/{id}/grid", Tag: "experiments", Summary: "Task by trial grid of slots and runs", Response: schemas.Grid{}},
+	{Method: "GET", Path: APIPrefix + "/experiments/{id}/events", Tag: "experiments", Summary: "Live events: server-sent events for Accept text/event-stream, else a poll",
+		Query: []QueryDoc{{Name: "since", Description: "Return events after this sequence number"}}, Response: schemas.EventsPoll{}, AlsoRaw: "text/event-stream"},
+	{Method: "GET", Path: APIPrefix + "/experiments/{id}/triage", Tag: "analysis", Summary: "Runs grouped by failure pattern per arm", Response: schemas.Triage{}},
+	{Method: "POST", Path: APIPrefix + "/estimate", Tag: "experiments", Summary: "Forecast an experiment's cost and time from sealed history; nothing is frozen, a refused plan comes back with fit unknown and 200",
+		Auth: AuthWrite, Request: schemas.Experiment{}, RequestAlso: experimentMediaTypes, Response: schemas.Forecast{}}, // Forecast and matrix area (forecast.go)
+	{Method: "GET", Path: APIPrefix + "/experiments/{id}/matrix", Tag: "analysis", Summary: "Every arm compared: success, pass^k, cost per success, pairwise sign-flip p values with Holm", Response: schemas.ModelMatrix{}, Query: []QueryDoc{
+		{Name: "condition", Description: "Condition; default the experiment's primary condition"}, gradeSourceQuery,
+		{Name: "k", Description: "pass^k depth, 2 or more"}, {Name: "alpha", Description: "Significance level; default 0.05"},
+	}}, // Forecast and matrix area (forecast.go)
+
+	{Method: "GET", Path: APIPrefix + "/runs/{id}", Tag: "runs", Summary: "One run with seal, grade, metrics, gates and receipts", Response: schemas.RunDetail{}},
+	{Method: "GET", Path: APIPrefix + "/runs/{id}/events", Tag: "runs", Summary: "Canonical event log of a run", Response: schemas.RunEvents{}},
+	{Method: "GET", Path: APIPrefix + "/runs/{id}/diff", Tag: "runs", Summary: "Patch the agent produced; ?format=text answers the raw patch",
+		Query: []QueryDoc{{Name: "format", Description: "text for the raw patch as text/plain"}}, Response: schemas.RunDiff{}, AlsoRaw: "text/plain"},
+	{Method: "GET", Path: APIPrefix + "/runs/{id}/receipts", Tag: "runs", Summary: "Fault receipts of a run", Response: schemas.RunReceipts{}},
+	{Method: "GET", Path: APIPrefix + "/runs/{id}/files/{name}", Tag: "runs", Summary: "One allowlisted run file, raw; mode in X-Bench-Mode", Raw: "application/octet-stream"},
+	{Method: "GET", Path: APIPrefix + "/runs/{id}/artifacts/{artifact}/{name}", Tag: "runs", Summary: "One file of a run's output artifact, raw and sandboxed", Raw: "application/octet-stream"},
+	{Method: "GET", Path: APIPrefix + "/runs/{id}/otlp", Tag: "runs", Summary: "A sealed run as an OpenTelemetry trace (OTLP/JSON download); ?payloads=true adds redacted, capped tool payloads",
+		Query: []QueryDoc{{Name: "payloads", Description: "true to include tool arguments and results, redacted and capped"}}, Raw: "application/json"},
+	{Method: "GET", Path: APIPrefix + "/pairs/{id}", Tag: "runs", Summary: "Both arms of a pair with their aligned steps", Response: schemas.Pair{}},
+
+	{Method: "GET", Path: APIPrefix + "/leaderboard", Tag: "leaderboard", Summary: "Leaderboard over sealed runs", Response: schemas.Leaderboard{}, Query: []QueryDoc{
+		{Name: "suite", Description: "Suite id; default the newest suite with runs"},
+		{Name: "condition", Description: "Condition; default clean"},
+		{Name: "scope", Description: "Which runs count; default all"},
+		{Name: "synthetic", Description: "exclude (default) or include synthetic runs"},
+		{Name: "grade_source", Description: "original (default) or latest"},
+		{Name: "split", Description: "public (default) or held_out: the separate held-out board"},
+		{Name: "k", Description: "pass@k and pass^k depth, 2 or more"},
+	}},
+	// Failure clusters area (handlers/clusters.go).
+	{Method: "GET", Path: APIPrefix + "/clusters", Tag: "analysis", Summary: "Failed runs across experiments grouped by cause (docs/failure-clusters.md)", Response: clusters.Report{}, Query: ClusterQueryDocs},
+	{Method: "GET", Path: APIPrefix + "/clusters/{signature}", Tag: "analysis", Summary: "One failure cluster with its runs", Response: clusters.Detail{}, Query: ClusterQueryDocs},
+	// Index and trends area (handlers/trends.go).
+	TrendsRouteDoc,
+	{Method: "POST", Path: APIPrefix + "/audit", Tag: "analysis", Summary: "Verdict for a published per-task table (JSON rows or CSV)",
+		Auth: AuthWrite, Request: schemas.AuditRequest{}, RequestAlso: []string{"text/csv"}, Response: schemas.Verdict{}},
+
+	{Method: "POST", Path: APIPrefix + "/releases", Tag: "releases", Summary: "Record a release decision in the hash-chained log",
+		Auth: AuthWrite, Request: schemas.ReleaseRequest{}, Status: fasthttp.StatusCreated, Response: schemas.ReleaseRecord{}},
+	{Method: "GET", Path: APIPrefix + "/releases", Tag: "releases", Summary: "Release log", Response: schemas.ReleaseList{}},
+	{Method: "GET", Path: APIPrefix + "/releases/{id}", Tag: "releases", Summary: "One release record", Response: schemas.ReleaseRecord{}},
+	{Method: "GET", Path: APIPrefix + "/releases/{id}/evidence", Tag: "releases", Summary: "Evidence pack of a release (zip)", Raw: "application/zip"},
+
+	// Human review area (reviews.go, docs/human-review.md).
+	{Method: "GET", Path: APIPrefix + "/experiments/{id}/reviews/queue", Tag: "reviews", Summary: "Runs that need a human review: split or unparsable judge votes, undecided grader, fired veto, false completion, flagged",
+		Query: []QueryDoc{{Name: "reason", Description: "Keep only runs with this queue reason"}}, Response: schemas.ReviewQueue{}},
+	{Method: "GET", Path: APIPrefix + "/experiments/{id}/reviews", Tag: "reviews", Summary: "The experiment's hash-chained review log and whether it verifies", Response: schemas.ReviewLog{}},
+	{Method: "GET", Path: APIPrefix + "/runs/{id}/reviews", Tag: "reviews", Summary: "Every review of a run, oldest first, and the one in effect", Response: schemas.RunReviews{}},
+	{Method: "POST", Path: APIPrefix + "/reviews", Tag: "reviews", Summary: "Record a human review of a sealed run; refused (403) outside live mode; the reviewer name is self-declared",
+		Auth: AuthWrite, Request: schemas.ReviewRequest{}, Status: fasthttp.StatusCreated, Response: schemas.Review{}},
+
+	{Method: "GET", Path: APIPrefix + "/suites", Tag: "suites", Summary: "Suites with their tasks", Response: schemas.SuiteList{}},
+	{Method: "GET", Path: APIPrefix + "/suites/{id}/tasks/{task}", Tag: "suites", Summary: "One task of a suite", Response: schemas.SuiteTaskDetail{}},
+	{Method: "GET", Path: APIPrefix + "/suites/{id}/health", Tag: "suites", Summary: "Task health of a suite: verifier flakiness, agent variance, infra, observed difficulty", Response: schemas.SuiteHealth{}}, // Suite health area (suitehealth.go)
+	{Method: "GET", Path: APIPrefix + "/agents", Tag: "agents", Summary: "Agent configs", Response: schemas.AgentList{}},
+	AgentDiffRouteDoc, AgentDiffVersionsRouteDoc, // Agent diff area (agentdiff.go)
+	{Method: "GET", Path: APIPrefix + "/imports", Tag: "imports", Summary: "Importers the binary links", Response: ImportList{Importers: []importers.Info{}}},
+
+	{Method: "GET", Path: APIPrefix + "/workers", Tag: "workers", Summary: "Remote workers; enabled is false when worker mode is off", Response: WorkersList{}},
+	{Method: "POST", Path: APIPrefix + "/workers/register", Tag: "workers", Summary: "Register a remote worker",
+		Auth: AuthWorker, Request: schemas.WorkerRegister{}, Response: schemas.WorkerRegistered{}},
+	{Method: "POST", Path: APIPrefix + "/workers/lease", Tag: "workers", Summary: "Lease the next slot; 204 when there is none",
+		Auth: AuthWorker, Request: schemas.WorkerLeaseRequest{}, Response: schemas.WorkerLease{}, NoContent: true},
+	{Method: "GET", Path: APIPrefix + "/workers/manifests/{exp_id}", Tag: "workers", Summary: "Frozen manifest of a leased experiment",
+		Auth: AuthWorker, Query: []QueryDoc{workerIDQuery}, Response: schemas.Manifest{}},
+	{Method: "POST", Path: APIPrefix + "/workers/leases/{lease_id}/heartbeat", Tag: "workers", Summary: "Keep a lease alive",
+		Auth: AuthWorker, Request: schemas.WorkerHeartbeat{}, Status: fasthttp.StatusNoContent},
+	{Method: "POST", Path: APIPrefix + "/workers/leases/{lease_id}/upload", Tag: "workers", Summary: "Append a chunk of the run bundle at offset",
+		Auth: AuthWorker, RawRequest: "application/octet-stream", Response: schemas.WorkerUploadState{},
+		Query: []QueryDoc{workerIDQuery, {Name: "offset", Description: "Byte offset of this chunk"}}},
+	{Method: "POST", Path: APIPrefix + "/workers/leases/{lease_id}/complete", Tag: "workers", Summary: "Finish a lease and ingest the uploaded run",
+		Auth: AuthWorker, Request: schemas.WorkerComplete{}, Response: schemas.WorkerResult{}},
+	{Method: "POST", Path: APIPrefix + "/workers/leases/{lease_id}/release", Tag: "workers", Summary: "Give a lease back unfinished",
+		Auth: AuthWorker, Request: schemas.WorkerRelease{}, Status: fasthttp.StatusNoContent},
+}
+
+var (
+	experimentMediaTypes = []string{"application/yaml"}
+	gradeSourceQuery     = QueryDoc{Name: "grade_source", Description: "original (default) or a regrade id"}
+	workerIDQuery        = QueryDoc{Name: "worker_id", Description: "Id the worker registered with"}
+)
+
+// OpenAPIHandler serves the OpenAPI description. It reads the routes the
+// router holds when the first request arrives, after every handler has
+// registered, so the document covers exactly what the server serves.
+type OpenAPIHandler struct {
+	mode    schemas.Mode
+	version string
+	routes  func() map[string][]string
+	once    sync.Once
+	doc     []byte
+	err     error
+}
+
+// NewOpenAPIHandler creates the description handler.
+func NewOpenAPIHandler(mode schemas.Mode, version string) *OpenAPIHandler {
+	return &OpenAPIHandler{mode: mode, version: version}
+}
+
+// RegisterRoutes registers GET /openapi.json and keeps the router to list
+// its routes later.
+func (h *OpenAPIHandler) RegisterRoutes(r *router.Router, middlewares ...lib.Middleware) {
+	h.routes = r.List
+	r.GET(OpenAPIPath, lib.ChainMiddlewares(h.getOpenAPI, middlewares...))
+}
+
+// getOpenAPI handles GET /api/bench/openapi.json. The document is plain
+// OpenAPI, so mode travels in X-Bench-Mode and x-bench-mode, not as a
+// top-level "mode" key that would make the document invalid.
+func (h *OpenAPIHandler) getOpenAPI(ctx *fasthttp.RequestCtx) {
+	h.once.Do(func() {
+		doc, _ := BuildOpenAPI(h.routes(), h.version, h.mode)
+		h.doc, h.err = json.MarshalIndent(doc, "", "  ")
+	})
+	if h.err != nil {
+		lib.SendError(ctx, h.mode, fasthttp.StatusInternalServerError, lib.ErrTypeInternal, "encode openapi: "+h.err.Error())
+		return
+	}
+	ctx.SetStatusCode(fasthttp.StatusOK)
+	ctx.SetContentType("application/json; charset=utf-8")
+	ctx.Response.Header.Set(lib.ModeHeader, string(h.mode))
+	ctx.Response.Header.Set("Cache-Control", "no-store")
+	ctx.SetBody(h.doc)
+}
+
+// BuildOpenAPI builds the OpenAPI 3.1 document for the registered routes
+// (method -> router patterns, as router.List returns them). Only /api/
+// routes are described. A registered route missing from APIRoutes still
+// appears, as a bare operation, and is returned in undocumented as
+// "METHOD /path"; the document lists them under x-bench-undocumented too.
+// It is pure.
+func BuildOpenAPI(registered map[string][]string, version string, mode schemas.Mode) (doc map[string]any, undocumented []string) {
+	table := map[string]RouteDoc{}
+	for _, rd := range APIRoutes {
+		table[rd.Method+" "+rd.Path] = rd
+	}
+	g := newSchemaGen()
+	paths := map[string]map[string]any{}
+	for method, list := range registered {
+		for _, p := range list {
+			if !strings.HasPrefix(p, "/api/") {
+				continue
+			}
+			rd, ok := table[method+" "+p]
+			if !ok {
+				undocumented = append(undocumented, method+" "+p)
+				rd = RouteDoc{Method: method, Path: p, Tag: "undocumented", Summary: "Not yet described in handlers/openapi.go"}
+			}
+			op := g.operation(rd)
+			key := openAPIPath(p)
+			if paths[key] == nil {
+				paths[key] = map[string]any{}
+			}
+			paths[key][strings.ToLower(method)] = op
+		}
+	}
+	sort.Strings(undocumented)
+	listed := []string{}
+	listed = append(listed, undocumented...)
+	g.components["ModeField"] = map[string]any{
+		"type": "object", "required": []string{"mode"},
+		"properties": map[string]any{"mode": map[string]any{
+			"type": "string", "enum": []string{string(schemas.ModeLive), string(schemas.ModeRecorded), string(schemas.ModeSynthetic)},
+			"description": "Where the data came from. Only live is a real measurement; recorded replays a stored bundle and synthetic is made up.",
+		}},
+	}
+	doc = map[string]any{
+		"openapi": "3.1.0",
+		"info": map[string]any{
+			"title":       "Heimdall bench API",
+			"version":     cmp.Or(version, "dev"),
+			"description": "Every JSON response is the payload object plus a top-level mode field. Raw responses carry mode in the X-Bench-Mode header.",
+		},
+		"paths": paths,
+		"components": map[string]any{
+			"schemas": g.components,
+			"securitySchemes": map[string]any{
+				"writeToken":  map[string]any{"type": "http", "scheme": "bearer", "description": "BENCH_WRITE_TOKEN; required on every write route"},
+				"workerToken": map[string]any{"type": "http", "scheme": "bearer", "description": "BENCH_WORKER_TOKEN; required on the worker routes"},
+			},
+		},
+		"x-bench-mode":         string(mode),
+		"x-bench-undocumented": listed,
+	}
+	return doc, undocumented
+}
+
+// routeParam matches a router path parameter, with an optional regexp or
+// catch-all suffix after a colon.
+var routeParam = regexp.MustCompile(`\{([A-Za-z0-9_]+)(:[^}]*)?\??\}`)
+
+// openAPIPath turns a router pattern into an OpenAPI path template.
+func openAPIPath(p string) string {
+	return routeParam.ReplaceAllString(p, "{$1}")
+}
+
+// schemaGen derives JSON Schemas from Go types into a shared components map.
+type schemaGen struct {
+	components map[string]any
+	names      map[reflect.Type]string
+}
+
+func newSchemaGen() *schemaGen {
+	return &schemaGen{components: map[string]any{}, names: map[reflect.Type]string{}}
+}
+
+// operation builds one OpenAPI operation object.
+func (g *schemaGen) operation(rd RouteDoc) map[string]any {
+	op := map[string]any{
+		"operationId": operationID(rd.Method, rd.Path),
+		"summary":     rd.Summary,
+		"tags":        []string{rd.Tag},
+	}
+	var params []any
+	for _, m := range routeParam.FindAllStringSubmatch(rd.Path, -1) {
+		params = append(params, map[string]any{"name": m[1], "in": "path", "required": true, "schema": map[string]any{"type": "string"}})
+	}
+	for _, q := range rd.Query {
+		params = append(params, map[string]any{"name": q.Name, "in": "query", "description": q.Description, "schema": map[string]any{"type": "string"}})
+	}
+	if len(params) > 0 {
+		op["parameters"] = params
+	}
+	switch rd.Auth {
+	case AuthWrite:
+		op["security"] = []any{map[string]any{"writeToken": []string{}}}
+	case AuthWorker:
+		op["security"] = []any{map[string]any{"workerToken": []string{}}}
+	}
+	if body := g.requestBody(rd); body != nil {
+		op["requestBody"] = body
+	}
+	op["responses"] = g.responses(rd)
+	return op
+}
+
+// requestBody describes the request body, or returns nil.
+func (g *schemaGen) requestBody(rd RouteDoc) map[string]any {
+	content := map[string]any{}
+	if rd.Request != nil {
+		content["application/json"] = map[string]any{"schema": g.schema(reflect.TypeOf(rd.Request))}
+	}
+	for _, mt := range rd.RequestAlso {
+		content[mt] = map[string]any{"schema": map[string]any{"type": "string"}}
+	}
+	if rd.RawRequest != "" {
+		content[rd.RawRequest] = map[string]any{"schema": map[string]any{"type": "string", "format": "binary"}}
+	}
+	if len(content) == 0 {
+		return nil
+	}
+	return map[string]any{"required": true, "content": content}
+}
+
+// responses describes the success answer and the one error shape.
+func (g *schemaGen) responses(rd RouteDoc) map[string]any {
+	status := cmp.Or(rd.Status, fasthttp.StatusOK)
+	ok := map[string]any{"description": fasthttp.StatusMessage(status)}
+	content := map[string]any{}
+	if rd.Response != nil {
+		content["application/json"] = map[string]any{"schema": map[string]any{"allOf": []any{
+			g.schema(reflect.TypeOf(rd.Response)), map[string]any{"$ref": "#/components/schemas/ModeField"},
+		}}}
+	}
+	for _, mt := range []string{rd.Raw, rd.AlsoRaw} {
+		if mt != "" {
+			content[mt] = map[string]any{"schema": map[string]any{"type": "string"}}
+		}
+	}
+	if len(content) > 0 {
+		ok["content"] = content
+	}
+	out := map[string]any{fmt.Sprint(status): ok}
+	if rd.NoContent && status != fasthttp.StatusNoContent {
+		out["204"] = map[string]any{"description": fasthttp.StatusMessage(fasthttp.StatusNoContent)}
+	}
+	out["default"] = map[string]any{
+		"description": "Error: {mode, error: {message, type}}",
+		"content":     map[string]any{"application/json": map[string]any{"schema": g.schema(reflect.TypeOf(lib.ErrorBody{}))}},
+	}
+	return out
+}
+
+// operationID derives a stable id: method plus the path's static segments,
+// with "By" before each parameter, e.g. getExperimentsByIdVerdict.
+func operationID(method, route string) string {
+	var b strings.Builder
+	b.WriteString(strings.ToLower(method))
+	for _, seg := range strings.Split(strings.TrimPrefix(route, APIPrefix), "/") {
+		if seg == "" {
+			continue
+		}
+		if m := routeParam.FindStringSubmatch(seg); m != nil {
+			b.WriteString("By")
+			seg = m[1]
+		}
+		for _, part := range strings.FieldsFunc(seg, func(r rune) bool { return r == '_' || r == '-' || r == '.' }) {
+			b.WriteString(strings.ToUpper(part[:1]) + part[1:])
+		}
+	}
+	return b.String()
+}
+
+var (
+	timeType      = reflect.TypeOf(time.Time{})
+	rawJSONType   = reflect.TypeOf(json.RawMessage{})
+	marshalerType = reflect.TypeOf((*json.Marshaler)(nil)).Elem()
+)
+
+// customSchemas covers the types with their own JSON encoding, which
+// reflection would describe wrongly.
+var customSchemas = map[reflect.Type]map[string]any{
+	reflect.TypeOf(schemas.TaskSelector{}): {
+		"description": `"all", a list of task ids, or {"all": bool, "ids": [...]}`,
+		"oneOf": []any{
+			map[string]any{"type": "string", "enum": []string{"all"}},
+			map[string]any{"type": "array", "items": map[string]any{"type": "string"}},
+			map[string]any{"type": "object", "properties": map[string]any{
+				"all": map[string]any{"type": "boolean"}, "ids": map[string]any{"type": "array", "items": map[string]any{"type": "string"}},
+			}},
+		},
+	},
+	reflect.TypeOf(schemas.MatrixModel{}): {
+		"description": `a model name, or {"model", "provider"}`,
+		"oneOf":       []any{map[string]any{"type": "string"}, map[string]any{"type": "object"}},
+	},
+}
+
+// schema returns the JSON Schema of t, registering structs as components.
+func (g *schemaGen) schema(t reflect.Type) map[string]any {
+	if s, ok := customSchemas[t]; ok {
+		return s
+	}
+	switch {
+	case t == timeType:
+		return map[string]any{"type": "string", "format": "date-time"}
+	case t == rawJSONType:
+		return map[string]any{}
+	case t.Kind() != reflect.Pointer && t.Kind() != reflect.Interface && (t.Implements(marshalerType) || reflect.PointerTo(t).Implements(marshalerType)):
+		return map[string]any{"description": "custom JSON encoding"}
+	}
+	switch t.Kind() {
+	case reflect.Pointer:
+		return map[string]any{"anyOf": []any{g.schema(t.Elem()), map[string]any{"type": "null"}}}
+	case reflect.Bool:
+		return map[string]any{"type": "boolean"}
+	case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64,
+		reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64:
+		return map[string]any{"type": "integer"}
+	case reflect.Float32, reflect.Float64:
+		return map[string]any{"type": "number"}
+	case reflect.String:
+		return map[string]any{"type": "string"}
+	case reflect.Slice, reflect.Array:
+		if t.Elem().Kind() == reflect.Uint8 {
+			return map[string]any{"type": "string", "contentEncoding": "base64"}
+		}
+		return map[string]any{"type": "array", "items": g.schema(t.Elem())}
+	case reflect.Map:
+		return map[string]any{"type": "object", "additionalProperties": g.schema(t.Elem())}
+	case reflect.Struct:
+		return map[string]any{"$ref": "#/components/schemas/" + g.component(t)}
+	default:
+		return map[string]any{}
+	}
+}
+
+// component registers a struct type once and returns its component name.
+// The name is reserved before the fields are walked, so recursive types end.
+func (g *schemaGen) component(t reflect.Type) string {
+	if name, ok := g.names[t]; ok {
+		return name
+	}
+	name := componentName(t)
+	if _, taken := g.components[name]; taken {
+		// Same name in two packages: suffix the package name, keeping the
+		// key a plain identifier that client generators can use as a type.
+		name = componentName(t) + "_" + path.Base(t.PkgPath())
+	}
+	g.names[t] = name
+	g.components[name] = map[string]any{}
+	props, required := map[string]any{}, []string{}
+	g.fields(t, props, &required)
+	s := map[string]any{"type": "object", "properties": props}
+	if len(required) > 0 {
+		slices.Sort(required)
+		s["required"] = required
+	}
+	g.components[name] = s
+	return name
+}
+
+// fields adds the JSON fields of struct t, flattening untagged embedded
+// structs as encoding/json does.
+func (g *schemaGen) fields(t reflect.Type, props map[string]any, required *[]string) {
+	for i := range t.NumField() {
+		f := t.Field(i)
+		tag := f.Tag.Get("json")
+		if tag == "-" || (!f.IsExported() && !f.Anonymous) {
+			continue
+		}
+		name, opts, _ := strings.Cut(tag, ",")
+		ft := f.Type
+		if f.Anonymous && name == "" {
+			if ft.Kind() == reflect.Pointer {
+				ft = ft.Elem()
+			}
+			if ft.Kind() == reflect.Struct {
+				g.fields(ft, props, required)
+				continue
+			}
+		}
+		if !f.IsExported() {
+			continue
+		}
+		if name == "" {
+			name = f.Name
+		}
+		props[name] = g.schema(ft)
+		if !strings.Contains(opts, "omitempty") && !strings.Contains(opts, "omitzero") {
+			*required = append(*required, name)
+		}
+	}
+}
+
+// componentName is a type's name made safe for a component key.
+func componentName(t reflect.Type) string {
+	return strings.NewReplacer("[", "_", "]", "", "/", "_", ".", "_", "*", "", ",", "_", " ", "").Replace(t.Name())
+}

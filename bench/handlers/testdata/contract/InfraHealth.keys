@@ -1,0 +1,8 @@
+# Keys of bench.ts `InfraHealth`. Change with bench.ts and schemas/suitehealth.go.
+attempts
+aborted_infra
+infra_error
+invalid_evaluator
+timeouts
+rate
+timeout_rate

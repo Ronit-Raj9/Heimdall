@@ -69,6 +69,9 @@ describe("LeaderboardFilters track filter", () => {
 	it("labels tracks, suites not on disk and newer tracks", () => {
 		const t = i18n.getFixedT("en", "bench");
 		expect(trackLabel("tool_use", t)).toBe("Tool use");
+		expect(trackLabel("browser", t)).toBe("Browser");
+		expect(trackLabel("computer_use", t)).toBe("Computer use");
+		expect(trackLabel("artifact", t)).toBe("Artifacts");
 		expect(trackLabel(UNKNOWN_TRACK, t)).toBe("Not on disk");
 		expect(trackLabel("robotics", t)).toBe("robotics");
 		expect(ALL_TRACKS).not.toBe("");

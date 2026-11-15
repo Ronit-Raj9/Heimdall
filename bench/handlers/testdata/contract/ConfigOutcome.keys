@@ -1,0 +1,6 @@
+# Keys of bench.ts `ConfigOutcome`. Change with bench.ts and schemas/suitehealth.go.
+config
+config_hash
+trials
+passes
+pass_rate

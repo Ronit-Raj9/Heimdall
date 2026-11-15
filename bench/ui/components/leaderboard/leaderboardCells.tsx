@@ -71,6 +71,9 @@ export function AgentCell({
 				<span className="font-mono text-[11px]" title={t("leaderboard.cell.configHash", { hash: entry.config_hash })}>
 					{shortHash(entry.config_hash)}
 				</span>
+				<Link to="/agents/diff" search={{ b: entry.config_hash }} className="text-primary hover:underline">
+					{t("agentDiff.link.diff")}
+				</Link>
 			</div>
 		</div>
 	);

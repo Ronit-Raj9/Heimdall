@@ -1,0 +1,5 @@
+# Keys of bench.ts `OutcomeVariance`: agent variance, kept apart from verifier health. Change with bench.ts and schemas/suitehealth.go.
+configs
+unstable
+mean_variance
+per_config

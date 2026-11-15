@@ -117,16 +117,66 @@
     },
     "output": {"$ref": "#/$defs/output"},
     "skills": {"$ref": "#/$defs/rel_path", "description": "Folder of agent skills (each holding SKILL.md)."},
-    "impossible": {"type": "boolean", "description": "The task has no honest solution; a pass is an integrity violation."}
+    "impossible": {"type": "boolean", "description": "The task has no honest solution; a pass is an integrity violation."},
+    "external": {"type": "array", "items": {"$ref": "#/$defs/external_api"}, "description": "Real HTTP APIs the agent may call through the tool proxy, after the suite's (docs/external-apis.md); cassette paths relative to the task folder."},
+    "split": {"enum": ["public", "held_out"], "description": "public (default) or held_out: tasks: all selects public tasks only, and the API never serves a held-out task's instruction or files (docs/held-out-and-canaries.md)."}
   },
   "$defs": {
     "rel_path": {"type": "string", "minLength": 1, "pattern": "^[^/]"},
+    "external_api": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "base_url"],
+      "properties": {
+        "id": {"type": "string", "pattern": "^[a-z0-9]([a-z0-9-]{0,40}[a-z0-9])?$", "description": "Host-name safe; the agent reaches the API at http://toolproxy:9200/x/<id>/<path>."},
+        "base_url": {"type": "string", "pattern": "^https?://[^/?#@]+(/[^?#]*)?$", "description": "The real API; its host is fixed."},
+        "allow": {
+          "type": "array",
+          "description": "Allowlist; empty allows nothing.",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["path_prefix"],
+            "properties": {
+              "methods": {"type": "array", "items": {"type": "string", "pattern": "^[A-Z]+$"}, "description": "Default GET."},
+              "path_prefix": {"type": "string", "pattern": "^/", "description": "Matched against the path after the base URL."}
+            }
+          }
+        },
+        "headers": {"type": "object", "additionalProperties": {"type": "string"}, "description": "Static headers added to every call."},
+        "auth_env": {"type": "string", "pattern": "^[A-Za-z_][A-Za-z0-9_]*$", "description": "Host environment variable holding the credential; the agent never sees it."},
+        "auth_header": {"type": "string", "minLength": 1, "description": "Header the credential is sent in; default Authorization."},
+        "auth_scheme": {"type": "string", "minLength": 1, "description": "Prefix of the credential, e.g. Bearer."},
+        "mode": {"enum": ["live", "record", "replay"], "description": "Default replay when the cassette exists; live and record need the experiment to opt in."},
+        "cassette": {"$ref": "#/$defs/rel_path", "description": "Recorded calls (JSONL) replay mode answers from."},
+        "max_calls": {"type": "integer", "minimum": 0},
+        "max_bytes": {"type": "integer", "minimum": 0},
+        "timeout_s": {"type": "integer", "minimum": 0}
+      }
+    },
     "output": {
       "type": "object",
       "additionalProperties": false,
       "properties": {
-        "kind": {"enum": ["diff", "answer", "state"]},
-        "answer_path": {"$ref": "#/$defs/rel_path"}
+        "kind": {"enum": ["diff", "answer", "state", "artifact"]},
+        "answer_path": {"$ref": "#/$defs/rel_path"},
+        "artifacts": {
+          "type": "array",
+          "maxItems": 32,
+          "description": "Files a task with output kind artifact must leave in the workspace; each is exported to /grader/artifacts/<id>/.",
+          "items": {"$ref": "#/$defs/artifact"}
+        }
+      }
+    },
+    "artifact": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "path"],
+      "properties": {
+        "id": {"type": "string", "pattern": "^[a-z0-9][a-z0-9_-]{0,62}$"},
+        "path": {"allOf": [{"$ref": "#/$defs/rel_path"}, {"not": {"pattern": "\\*\\*"}}], "description": "File or glob (*, ?, [...]) relative to the workspace root."},
+        "required": {"type": "boolean"},
+        "max_bytes": {"type": "integer", "minimum": 0, "maximum": 134217728}
       }
     },
     "service": {

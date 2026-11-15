@@ -1,0 +1,39 @@
+# The studio's engineer needs the blank of a mounting bracket as a mesh:
+# a solid 40 x 25 x 10 mm block with one corner at the origin, written as an
+# ASCII Wavefront OBJ. Graded on the geometry (bounding box and enclosed
+# volume) and on the mesh being closed with outward-facing faces.
+id: bracket-mesh
+version: 1.0.0
+title: Model a bracket blank as a closed OBJ mesh
+project: acme-design
+kind: feature
+instruction: instruction.md
+# The workspace holds the engineer's drawing note; the agent writes
+# bracket.obj next to it.
+repo_dir: repo
+output:
+  kind: artifact
+  artifacts:
+    # Copied out of the workspace after the agent exits and mounted
+    # read-only for the verifier at /grader/artifacts/mesh/bracket.obj.
+    - {id: mesh, path: bracket.obj, required: true, max_bytes: 1048576}
+verifier:
+  # Hidden folder, mounted at /grader/tests.
+  tests: verifier/tests
+  required: []
+protected: []
+controls:
+  # Scripts run in the agent's place: the reference must pass three times,
+  # the empty control, every mutant and the exploit must fail.
+  reference: solution/reference.sh
+  empty: controls/empty.sh
+  mutants: [controls/mutant-too-tall.sh, controls/mutant-open-top.sh]
+  exploit: controls/exploit.sh
+timeouts:
+  agent_s: 600
+capabilities: [cad_modelling, file_output]
+difficulty: easy
+provenance:
+  source: bench/examples/acme-design (fictional Acme Design studio, written for this example)
+  license: MIT
+  created_by: hand-written example

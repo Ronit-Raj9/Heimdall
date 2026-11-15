@@ -65,6 +65,13 @@ func (f *fakeMCP) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			}
 			_ = json.Unmarshal(args, &a)
 			switch name {
+			case "screenshot":
+				// A browser screenshot: a text block, then an image block
+				// whose base64 data is far over MaxRecorded.
+				result = map[string]any{"content": []any{
+					map[string]any{"type": "text", "text": "### Result\nTook the viewport screenshot"},
+					map[string]any{"type": "image", "mimeType": "image/png", "data": strings.Repeat("iVBORw0KGgo", 20000)},
+				}, "isError": false}
 			case "fail":
 				result = map[string]any{"content": []any{map[string]any{"type": "text", "text": "disk full"}}, "isError": true}
 			case "rpcerr":
@@ -256,6 +263,47 @@ func TestProxyMCPRecordsCalls(t *testing.T) {
 				if s != "sess-1" {
 					t.Errorf("request %d reached the server with session %q", i+2, s)
 				}
+			}
+		})
+	}
+}
+
+// TestProxyCapsImageResult checks that a result carrying a large image
+// content block (a browser screenshot) reaches the agent whole while its
+// ledger row keeps at most MaxRecorded bytes and a hash of the whole result.
+func TestProxyCapsImageResult(t *testing.T) {
+	for _, sse := range []bool{false, true} {
+		t.Run(fmt.Sprintf("sse=%v", sse), func(t *testing.T) {
+			upstream := httptest.NewServer(&fakeMCP{sse: sse})
+			defer upstream.Close()
+			tp := newTestProxy(t, upstream.URL, ProtocolMCP)
+			_, _, body := post(t, tp.front.URL, "/s/fs/mcp", callBody(1, "screenshot", ""), nil)
+			if sse {
+				lines := strings.Split(strings.TrimSpace(body), "\n")
+				body = strings.TrimPrefix(lines[len(lines)-1], "data: ")
+			}
+			var answer struct {
+				Result json.RawMessage `json:"result"`
+			}
+			if err := json.Unmarshal([]byte(body), &answer); err != nil {
+				t.Fatalf("answer did not reach the agent whole: %v", err)
+			}
+			if !strings.Contains(string(answer.Result), strings.Repeat("iVBORw0KGgo", 20000)) {
+				t.Fatal("image data was cut on the way to the agent")
+			}
+			rows := tp.rows(t)
+			if len(rows) != 1 {
+				t.Fatalf("got %d rows, want 1", len(rows))
+			}
+			r := rows[0]
+			if len(r.Result) > MaxRecorded || len(r.Result) < MaxRecorded-4 {
+				t.Errorf("recorded result is %d bytes, want about %d", len(r.Result), MaxRecorded)
+			}
+			if _, sum := Capture(answer.Result); r.ResultSHA256 != sum {
+				t.Errorf("result hash %s does not cover the whole result (%s)", r.ResultSHA256, sum)
+			}
+			if r.Tool != "screenshot" || r.IsError {
+				t.Errorf("row = %+v", r)
 			}
 		})
 	}

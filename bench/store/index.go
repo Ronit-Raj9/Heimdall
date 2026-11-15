@@ -73,6 +73,9 @@ func (s *FSStore) SealedRuns(ctx context.Context, expID, gradeSource string) ([]
 	if err := validateID("exp_id", expID); err != nil {
 		return nil, fmt.Errorf("sealed runs: %w", err)
 	}
+	if gradeSource == GradeSourceReviewed {
+		return s.reviewedRuns(ctx, expID) // human review: sealed grades with reviews applied (reviewed.go)
+	}
 	regradeID, err := s.resolveGradeSource(expID, gradeSource)
 	if err != nil {
 		return nil, fmt.Errorf("sealed runs %s: %w", expID, err)

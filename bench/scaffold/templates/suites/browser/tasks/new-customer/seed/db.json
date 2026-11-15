@@ -1,0 +1,7 @@
+{
+  "customers": [
+    {"id": "C-1001", "name": "Ada Park", "email": "ada.park@northwind.example", "plan": "team", "notes": ""},
+    {"id": "C-1002", "name": "Tomas Reyes", "email": "tomas@reyes-bikes.example", "plan": "free", "notes": "Trial ends in April"},
+    {"id": "C-1003", "name": "Lena Vogt", "email": "lena.vogt@harbor.example", "plan": "business", "notes": ""}
+  ]
+}

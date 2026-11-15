@@ -43,8 +43,14 @@ what a run is made of and what its verifier reads.
    repository ships importers, small hand-written fixtures in upstream
    format, and docs.
 7. **Nothing reaches the network at run time** except model calls through the
-   gateway. Services, the tool proxy and verifiers have no route out. Image
-   builds may use the network when a task says `build_network: true`.
+   gateway and declared external API routes through the tool proxy.
+   Services, the agent and verifiers have no route out. The tool proxy has
+   one only for an external API (`Task.External`, `docs/external-apis.md`)
+   in an experiment that opts in to `external: live` or `record`, and then
+   only to that API's host and port through a per-run forwarder; those runs
+   are labelled not repeatable. In replay mode, the default, the proxy has
+   no route out either. Image builds may use the network when a task says
+   `build_network: true`.
 
 ## The seven pieces
 
@@ -98,6 +104,11 @@ sealed, and mounted read-only in the verifier at `/grader/state/...`. The
 existing `verifier_command` grader then decides, in any of its three result
 formats: a state verifier is an ordinary verifier that reads `/grader/state`.
 
+Track `browser` (`schemas.TrackBrowser`) is built from these pieces only: a
+proxied `mcp` service running Playwright MCP with a headless Chromium, and
+the web application as a `hidden` service that only the browser reaches,
+graded on the web application's export (`docs/browser-tasks.md`).
+
 ### 4. Tool proxy (`bench/toolproxy`, command `bifrost-bench toolproxy`)
 
 One per run, started as a service by the engine when any service is proxied.
@@ -134,6 +145,26 @@ the last session's output is graded.
 | `diff` (default) | `workspace.diff` | `hidden_tests`, `verifier_command` |
 | `state` | `state/<service>/<export>` (and the diff) | `verifier_command` |
 | `answer` | `answer.txt` (from `answer_path`, else the final message; source recorded) | `answer_match`, `judge`, `verifier_command` (answer mounted at `/grader/answer.txt`) |
+| `artifact` | `artifacts/<id>/<name>`: the files `output.artifacts` names (a file or a glob, relative to the workspace), copied by a trusted helper (and the diff) | `verifier_command` (mounted read-only at `/grader/artifacts/<id>/<name>`) |
+
+An artifact task's files are copied after the agent exits by a trusted helper
+with no network and the workspace read-only. A match that resolves outside
+the workspace through a symlink, is not a regular file, has a name outside
+`[A-Za-z0-9_][A-Za-z0-9._-]*`, or is over the per-file cap (`max_bytes`,
+default 32 MiB) or the run's total cap (128 MiB) is recorded in
+`Evidence.Artifacts` with its error and not copied; a glob copies at most 64
+files. The outcome follows the answer kind: output the agent did not
+produce is the agent's failure, so a `required` artifact without one usable
+file fails the run with the reason `artifact output: required artifact
+missing: ...` and the verifier is not run; an export that broke on the
+bench's side (the helper could not run, its output was malformed) is
+`invalid_evaluator` with the reason `artifact output: export failed: ...`,
+because the verifier's input is the bench's to deliver. Artifact files are
+sealed with the run folder, `regate` checks their sha256 against the
+evidence, and the API serves them only as downloads
+(`application/octet-stream`, `nosniff`, attachment), never rendered.
+Admission controls of an artifact task are scripts (`.sh`) run in the
+agent's place that write the files.
 
 `answer_match` checks the hidden `AnswerSpec` (exact, contains_all, regex,
 numeric, choice, json) with no model. `judge` asks the suite's pinned

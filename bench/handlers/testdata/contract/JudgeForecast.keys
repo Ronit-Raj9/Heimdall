@@ -1,0 +1,6 @@
+# Keys of bench.ts `JudgeForecast`, one per line; a trailing ? marks an optional (Go omitempty) key.
+# Change with bench.ts and schemas/forecast.go.
+runs
+history_runs
+cost_usd
+basis_text

@@ -1,0 +1,11 @@
+# Keys of bench.ts `AgentDiffSignTest`, one per line; a trailing ? marks an optional (Go omitempty) key.
+# Change with bench.ts and agentdiff/agentdiff.go.
+n_tasks
+n_nonzero
+n_positive
+n_negative
+p
+exact
+min_possible_p
+alpha
+conclusion

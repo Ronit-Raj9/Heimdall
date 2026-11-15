@@ -1,0 +1,54 @@
+# Sample task written by `bifrost-bench suite init -template external-api`.
+# The agent converts an invoice total with the rates of an external currency
+# API (fictional: api.fx.example never resolves) and writes quote.json; the
+# verifier checks the numbers. The API is reached only through the per-run
+# tool proxy and, without an experiment that opts in to live calls, answered
+# from cassettes/fx.cassette.jsonl with no network.
+# `bifrost-bench task init -suite <suite> -id <task>` copies this shape into
+# a new task with EDIT ME markers.
+id: invoice-fx
+version: 1.0.0
+title: Quote an invoice in USD and JPY from the fx API
+project: invoicing
+kind: feature
+instruction: instruction.md
+# The workspace: the API docs the agent reads. The agent writes quote.json.
+repo_dir: repo
+external:
+  - id: fx
+    base_url: https://api.fx.example/v1
+    # Default deny: only these methods and path prefixes reach the API.
+    allow:
+      - {methods: [GET], path_prefix: /rates}
+      - {methods: [GET], path_prefix: /currencies}
+    headers: {Accept: application/json}
+    # Host environment variable with the API key, sent as
+    # "Authorization: Bearer <value>" by the proxy in live and record mode.
+    # The agent never sees it; it is redacted from the ledger and cassettes.
+    auth_env: FX_API_KEY
+    auth_scheme: Bearer
+    # No mode: replay when the cassette exists. An experiment overrides it
+    # with external: live | record | replay.
+    cassette: cassettes/fx.cassette.jsonl
+    max_calls: 50
+    timeout_s: 20
+verifier:
+  # Hidden folder, mounted at /grader/tests.
+  tests: verifier/tests
+  required: []
+protected: ["API.md"]
+controls:
+  # Scripts run in the agent's place with the tool proxy up, in replay mode.
+  reference: solution/reference.sh
+  empty: controls/empty.sh
+  mutants: [controls/mutant-inverted.sh]
+  exploit: controls/exploit.sh
+timeouts:
+  agent_s: 300
+capabilities: [tool_use]
+difficulty: easy
+# split: held_out   # optional; default public. Held-out tasks never run under tasks: all (only when a condition sets split: held_out or names them) and are not served by the UI or API.
+provenance:
+  source: written by bifrost-bench suite init (template external-api)
+  license: proprietary
+  created_by: suite init

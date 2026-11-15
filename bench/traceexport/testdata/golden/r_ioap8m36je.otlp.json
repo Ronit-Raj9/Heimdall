@@ -1,0 +1,1073 @@
+{
+  "resourceSpans": [
+    {
+      "resource": {
+        "attributes": [
+          {
+            "key": "service.name",
+            "value": {
+              "stringValue": "heimdall"
+            }
+          },
+          {
+            "key": "service.version",
+            "value": {
+              "stringValue": "test"
+            }
+          },
+          {
+            "key": "heimdall.experiment",
+            "value": {
+              "stringValue": "e_smoke_sdoj"
+            }
+          },
+          {
+            "key": "heimdall.run.id",
+            "value": {
+              "stringValue": "r_ioap8m36je"
+            }
+          }
+        ]
+      },
+      "scopeSpans": [
+        {
+          "scope": {
+            "name": "github.com/maximhq/bifrost/bench/traceexport",
+            "version": "1.0.0"
+          },
+          "spans": [
+            {
+              "traceId": "1aa9130d0d48f75454f59b2cd75ad2bf",
+              "spanId": "16c9c0924f4bed25",
+              "name": "heimdall.run t01",
+              "kind": 1,
+              "startTimeUnixNano": "1794612559430535264",
+              "endTimeUnixNano": "1794612568371297737",
+              "attributes": [
+                {
+                  "key": "heimdall.run.id",
+                  "value": {
+                    "stringValue": "r_ioap8m36je"
+                  }
+                },
+                {
+                  "key": "heimdall.experiment",
+                  "value": {
+                    "stringValue": "e_smoke_sdoj"
+                  }
+                },
+                {
+                  "key": "heimdall.slot",
+                  "value": {
+                    "stringValue": "s_glz13mrnep"
+                  }
+                },
+                {
+                  "key": "heimdall.pair",
+                  "value": {
+                    "stringValue": "p_6raas000wo"
+                  }
+                },
+                {
+                  "key": "heimdall.suite",
+                  "value": {
+                    "stringValue": "coding-core"
+                  }
+                },
+                {
+                  "key": "heimdall.task",
+                  "value": {
+                    "stringValue": "t01"
+                  }
+                },
+                {
+                  "key": "heimdall.task.version",
+                  "value": {
+                    "stringValue": "1.0.0"
+                  }
+                },
+                {
+                  "key": "heimdall.arm",
+                  "value": {
+                    "stringValue": "A"
+                  }
+                },
+                {
+                  "key": "heimdall.condition",
+                  "value": {
+                    "stringValue": "model-outage"
+                  }
+                },
+                {
+                  "key": "heimdall.trial",
+                  "value": {
+                    "intValue": "1"
+                  }
+                },
+                {
+                  "key": "heimdall.run.attempt",
+                  "value": {
+                    "intValue": "1"
+                  }
+                },
+                {
+                  "key": "heimdall.agent.config_id",
+                  "value": {
+                    "stringValue": "toy"
+                  }
+                },
+                {
+                  "key": "heimdall.agent.config_hash",
+                  "value": {
+                    "stringValue": "606c9210eb23aca5fa378fc487c6bf344547d4547a3956295eef1f373ff56ecf"
+                  }
+                },
+                {
+                  "key": "heimdall.agent.adapter",
+                  "value": {
+                    "stringValue": "scripted"
+                  }
+                },
+                {
+                  "key": "gen_ai.agent.name",
+                  "value": {
+                    "stringValue": "toy"
+                  }
+                },
+                {
+                  "key": "gen_ai.conversation.id",
+                  "value": {
+                    "stringValue": "r_ioap8m36je"
+                  }
+                },
+                {
+                  "key": "heimdall.outcome",
+                  "value": {
+                    "stringValue": "fail"
+                  }
+                },
+                {
+                  "key": "heimdall.verified_success",
+                  "value": {
+                    "boolValue": false
+                  }
+                },
+                {
+                  "key": "heimdall.cost_usd",
+                  "value": {
+                    "doubleValue": 0.004484999999999999
+                  }
+                },
+                {
+                  "key": "heimdall.manifest_hash",
+                  "value": {
+                    "stringValue": "20d282759cb94d544fc6018d0dbf318e2d46917d090b4d81cd12f91c6c0bbe29"
+                  }
+                },
+                {
+                  "key": "heimdall.suite_lock_hash",
+                  "value": {
+                    "stringValue": "9388d4ccf5a1e8028cc2448e7a6701d3719b7d56bc070c55c892e37daf465df6"
+                  }
+                },
+                {
+                  "key": "heimdall.seal_hash",
+                  "value": {
+                    "stringValue": "0b3079b4dcc406ae68dd4b7ebc059c258ff718a4390c0e043e0a4476b7ec2401"
+                  }
+                },
+                {
+                  "key": "heimdall.agent.exit_code",
+                  "value": {
+                    "intValue": "1"
+                  }
+                },
+                {
+                  "key": "heimdall.agent.timed_out",
+                  "value": {
+                    "boolValue": false
+                  }
+                },
+                {
+                  "key": "heimdall.claim.made",
+                  "value": {
+                    "boolValue": false
+                  }
+                },
+                {
+                  "key": "heimdall.gateway.log_complete",
+                  "value": {
+                    "boolValue": true
+                  }
+                },
+                {
+                  "key": "heimdall.metric.cost_usd",
+                  "value": {
+                    "doubleValue": 0.004484999999999999
+                  }
+                },
+                {
+                  "key": "heimdall.metric.false_completion",
+                  "value": {
+                    "doubleValue": 0
+                  }
+                },
+                {
+                  "key": "heimdall.metric.retry_amplification",
+                  "value": {
+                    "doubleValue": 1
+                  }
+                },
+                {
+                  "key": "heimdall.metric.safe_success",
+                  "value": {
+                    "doubleValue": 0
+                  }
+                },
+                {
+                  "key": "heimdall.metric.steps",
+                  "value": {
+                    "doubleValue": 2
+                  }
+                },
+                {
+                  "key": "heimdall.metric.tool_calls",
+                  "value": {
+                    "doubleValue": 1
+                  }
+                },
+                {
+                  "key": "heimdall.metric.verified_success",
+                  "value": {
+                    "doubleValue": 0
+                  }
+                },
+                {
+                  "key": "heimdall.metric.wall_time_s",
+                  "value": {
+                    "doubleValue": 0.965472694
+                  }
+                }
+              ]
+            },
+            {
+              "traceId": "1aa9130d0d48f75454f59b2cd75ad2bf",
+              "spanId": "9745dfe60d21f195",
+              "parentSpanId": "16c9c0924f4bed25",
+              "name": "invoke_agent toy",
+              "kind": 1,
+              "startTimeUnixNano": "1794612562250233476",
+              "endTimeUnixNano": "1794612563215706170",
+              "attributes": [
+                {
+                  "key": "gen_ai.operation.name",
+                  "value": {
+                    "stringValue": "invoke_agent"
+                  }
+                },
+                {
+                  "key": "gen_ai.agent.name",
+                  "value": {
+                    "stringValue": "toy"
+                  }
+                },
+                {
+                  "key": "gen_ai.conversation.id",
+                  "value": {
+                    "stringValue": "r_ioap8m36je"
+                  }
+                },
+                {
+                  "key": "heimdall.session.index",
+                  "value": {
+                    "intValue": "1"
+                  }
+                },
+                {
+                  "key": "heimdall.session.exit_code",
+                  "value": {
+                    "intValue": "1"
+                  }
+                },
+                {
+                  "key": "heimdall.session.timed_out",
+                  "value": {
+                    "boolValue": false
+                  }
+                }
+              ],
+              "status": {
+                "code": 2,
+                "message": "exit code 1"
+              }
+            },
+            {
+              "traceId": "1aa9130d0d48f75454f59b2cd75ad2bf",
+              "spanId": "e1e444b3c1e3adf6",
+              "parentSpanId": "9745dfe60d21f195",
+              "name": "chat claude-sonnet-4-5",
+              "kind": 3,
+              "startTimeUnixNano": "1794612562864995000",
+              "endTimeUnixNano": "1794612562884404525",
+              "attributes": [
+                {
+                  "key": "gen_ai.operation.name",
+                  "value": {
+                    "stringValue": "chat"
+                  }
+                },
+                {
+                  "key": "gen_ai.provider.name",
+                  "value": {
+                    "stringValue": "anthropic"
+                  }
+                },
+                {
+                  "key": "gen_ai.system",
+                  "value": {
+                    "stringValue": "anthropic"
+                  }
+                },
+                {
+                  "key": "heimdall.gateway.provider",
+                  "value": {
+                    "stringValue": "anthropic"
+                  }
+                },
+                {
+                  "key": "gen_ai.request.model",
+                  "value": {
+                    "stringValue": "claude-sonnet-4-5"
+                  }
+                },
+                {
+                  "key": "gen_ai.response.model",
+                  "value": {
+                    "stringValue": "claude-sonnet-4-5"
+                  }
+                },
+                {
+                  "key": "gen_ai.response.id",
+                  "value": {
+                    "stringValue": "msg_maix4fqt9ahy9os2ocisopex"
+                  }
+                },
+                {
+                  "key": "gen_ai.request.stream",
+                  "value": {
+                    "boolValue": false
+                  }
+                },
+                {
+                  "key": "gen_ai.conversation.id",
+                  "value": {
+                    "stringValue": "r_ioap8m36je"
+                  }
+                },
+                {
+                  "key": "gen_ai.usage.input_tokens",
+                  "value": {
+                    "intValue": "535"
+                  }
+                },
+                {
+                  "key": "gen_ai.usage.output_tokens",
+                  "value": {
+                    "intValue": "32"
+                  }
+                },
+                {
+                  "key": "gen_ai.usage.cache_read.input_tokens",
+                  "value": {
+                    "intValue": "0"
+                  }
+                },
+                {
+                  "key": "gen_ai.usage.cache_write.input_tokens",
+                  "value": {
+                    "intValue": "0"
+                  }
+                },
+                {
+                  "key": "heimdall.logical_step",
+                  "value": {
+                    "intValue": "1"
+                  }
+                },
+                {
+                  "key": "heimdall.logical_request_id",
+                  "value": {
+                    "stringValue": "8f0b0630-5e9f-4cff-8f2c-786448f55f94"
+                  }
+                },
+                {
+                  "key": "heimdall.gateway.request_ids",
+                  "value": {
+                    "arrayValue": {
+                      "values": [
+                        {
+                          "stringValue": "8f0b0630-5e9f-4cff-8f2c-786448f55f94"
+                        }
+                      ]
+                    }
+                  }
+                },
+                {
+                  "key": "heimdall.attempts",
+                  "value": {
+                    "intValue": "1"
+                  }
+                },
+                {
+                  "key": "heimdall.retries",
+                  "value": {
+                    "intValue": "0"
+                  }
+                },
+                {
+                  "key": "heimdall.fallbacks",
+                  "value": {
+                    "intValue": "0"
+                  }
+                },
+                {
+                  "key": "heimdall.cost_usd",
+                  "value": {
+                    "doubleValue": 0.002085
+                  }
+                }
+              ]
+            },
+            {
+              "traceId": "1aa9130d0d48f75454f59b2cd75ad2bf",
+              "spanId": "7167fecfaf6563f9",
+              "parentSpanId": "9745dfe60d21f195",
+              "name": "chat claude-sonnet-4-5",
+              "kind": 3,
+              "startTimeUnixNano": "1794612562885437000",
+              "endTimeUnixNano": "1794612562920989333",
+              "attributes": [
+                {
+                  "key": "gen_ai.operation.name",
+                  "value": {
+                    "stringValue": "chat"
+                  }
+                },
+                {
+                  "key": "gen_ai.provider.name",
+                  "value": {
+                    "stringValue": "anthropic"
+                  }
+                },
+                {
+                  "key": "gen_ai.system",
+                  "value": {
+                    "stringValue": "anthropic"
+                  }
+                },
+                {
+                  "key": "heimdall.gateway.provider",
+                  "value": {
+                    "stringValue": "anthropic"
+                  }
+                },
+                {
+                  "key": "gen_ai.request.model",
+                  "value": {
+                    "stringValue": "claude-sonnet-4-5"
+                  }
+                },
+                {
+                  "key": "gen_ai.response.model",
+                  "value": {
+                    "stringValue": "claude-sonnet-4-5"
+                  }
+                },
+                {
+                  "key": "gen_ai.response.id",
+                  "value": {
+                    "stringValue": "msg_1mqtpwq2sttn0xcqk1v60i2a"
+                  }
+                },
+                {
+                  "key": "gen_ai.request.stream",
+                  "value": {
+                    "boolValue": false
+                  }
+                },
+                {
+                  "key": "gen_ai.conversation.id",
+                  "value": {
+                    "stringValue": "r_ioap8m36je"
+                  }
+                },
+                {
+                  "key": "gen_ai.usage.input_tokens",
+                  "value": {
+                    "intValue": "640"
+                  }
+                },
+                {
+                  "key": "gen_ai.usage.output_tokens",
+                  "value": {
+                    "intValue": "32"
+                  }
+                },
+                {
+                  "key": "gen_ai.usage.cache_read.input_tokens",
+                  "value": {
+                    "intValue": "0"
+                  }
+                },
+                {
+                  "key": "gen_ai.usage.cache_write.input_tokens",
+                  "value": {
+                    "intValue": "0"
+                  }
+                },
+                {
+                  "key": "heimdall.logical_step",
+                  "value": {
+                    "intValue": "2"
+                  }
+                },
+                {
+                  "key": "heimdall.logical_request_id",
+                  "value": {
+                    "stringValue": "5edf0132-9cd0-47af-a2e1-2afa535f6b76"
+                  }
+                },
+                {
+                  "key": "heimdall.gateway.request_ids",
+                  "value": {
+                    "arrayValue": {
+                      "values": [
+                        {
+                          "stringValue": "5edf0132-9cd0-47af-a2e1-2afa535f6b76"
+                        }
+                      ]
+                    }
+                  }
+                },
+                {
+                  "key": "heimdall.attempts",
+                  "value": {
+                    "intValue": "1"
+                  }
+                },
+                {
+                  "key": "heimdall.retries",
+                  "value": {
+                    "intValue": "0"
+                  }
+                },
+                {
+                  "key": "heimdall.fallbacks",
+                  "value": {
+                    "intValue": "0"
+                  }
+                },
+                {
+                  "key": "heimdall.cost_usd",
+                  "value": {
+                    "doubleValue": 0.0024
+                  }
+                }
+              ]
+            },
+            {
+              "traceId": "1aa9130d0d48f75454f59b2cd75ad2bf",
+              "spanId": "6edcaa25fe7e4f98",
+              "parentSpanId": "9745dfe60d21f195",
+              "name": "chat claude-sonnet-4-5",
+              "kind": 3,
+              "startTimeUnixNano": "1794612562921902000",
+              "endTimeUnixNano": "1794612562933369392",
+              "attributes": [
+                {
+                  "key": "gen_ai.operation.name",
+                  "value": {
+                    "stringValue": "chat"
+                  }
+                },
+                {
+                  "key": "gen_ai.provider.name",
+                  "value": {
+                    "stringValue": "anthropic"
+                  }
+                },
+                {
+                  "key": "gen_ai.system",
+                  "value": {
+                    "stringValue": "anthropic"
+                  }
+                },
+                {
+                  "key": "heimdall.gateway.provider",
+                  "value": {
+                    "stringValue": "anthropic"
+                  }
+                },
+                {
+                  "key": "gen_ai.request.model",
+                  "value": {
+                    "stringValue": "claude-sonnet-4-5"
+                  }
+                },
+                {
+                  "key": "gen_ai.response.model",
+                  "value": {
+                    "stringValue": "claude-sonnet-4-5"
+                  }
+                },
+                {
+                  "key": "gen_ai.request.stream",
+                  "value": {
+                    "boolValue": false
+                  }
+                },
+                {
+                  "key": "gen_ai.conversation.id",
+                  "value": {
+                    "stringValue": "r_ioap8m36je"
+                  }
+                },
+                {
+                  "key": "heimdall.logical_step",
+                  "value": {
+                    "intValue": "3"
+                  }
+                },
+                {
+                  "key": "heimdall.logical_request_id",
+                  "value": {
+                    "stringValue": "53349a88-bd8f-4f23-b323-f44a4dad091b"
+                  }
+                },
+                {
+                  "key": "heimdall.gateway.request_ids",
+                  "value": {
+                    "arrayValue": {
+                      "values": [
+                        {
+                          "stringValue": "53349a88-bd8f-4f23-b323-f44a4dad091b"
+                        }
+                      ]
+                    }
+                  }
+                },
+                {
+                  "key": "heimdall.attempts",
+                  "value": {
+                    "intValue": "1"
+                  }
+                },
+                {
+                  "key": "heimdall.retries",
+                  "value": {
+                    "intValue": "0"
+                  }
+                },
+                {
+                  "key": "heimdall.fallbacks",
+                  "value": {
+                    "intValue": "0"
+                  }
+                },
+                {
+                  "key": "heimdall.cost_usd",
+                  "value": {
+                    "doubleValue": 0
+                  }
+                },
+                {
+                  "key": "heimdall.fault_injected",
+                  "value": {
+                    "boolValue": true
+                  }
+                },
+                {
+                  "key": "error.type",
+                  "value": {
+                    "stringValue": "503"
+                  }
+                }
+              ],
+              "events": [
+                {
+                  "timeUnixNano": "1794612562922204271",
+                  "name": "heimdall.fault",
+                  "attributes": [
+                    {
+                      "key": "heimdall.fault.source",
+                      "value": {
+                        "stringValue": "proxy_ledger"
+                      }
+                    },
+                    {
+                      "key": "heimdall.fault.summary",
+                      "value": {
+                        "stringValue": "proxy injected status 503 on message call 3"
+                      }
+                    },
+                    {
+                      "key": "heimdall.fault.target",
+                      "value": {
+                        "stringValue": "/v1/messages"
+                      }
+                    },
+                    {
+                      "key": "heimdall.event.id",
+                      "value": {
+                        "stringValue": "r_ioap8m36je:proxy_ledger:1"
+                      }
+                    }
+                  ]
+                }
+              ],
+              "status": {
+                "code": 2,
+                "message": "error 503: Overloaded: the model is temporarily unavailable. ref nonce_[redacted] call 3"
+              }
+            },
+            {
+              "traceId": "1aa9130d0d48f75454f59b2cd75ad2bf",
+              "spanId": "1e3c8a3f4fe8dfb7",
+              "parentSpanId": "e1e444b3c1e3adf6",
+              "name": "tool_call read_file",
+              "kind": 1,
+              "startTimeUnixNano": "1794612562884404525",
+              "endTimeUnixNano": "1794612562885437000",
+              "attributes": [
+                {
+                  "key": "gen_ai.tool.name",
+                  "value": {
+                    "stringValue": "read_file"
+                  }
+                },
+                {
+                  "key": "gen_ai.tool.call.id",
+                  "value": {
+                    "stringValue": "toolu_eq0o4aqgg1znyz6l14f70uds"
+                  }
+                },
+                {
+                  "key": "gen_ai.tool.type",
+                  "value": {
+                    "stringValue": "function"
+                  }
+                },
+                {
+                  "key": "heimdall.tool.source",
+                  "value": {
+                    "stringValue": "model_request"
+                  }
+                },
+                {
+                  "key": "heimdall.tool.args_sha256",
+                  "value": {
+                    "stringValue": "518341a7f82a294570cc3ba8ae0eec8f157d80c390e56cad16702940266a4eba"
+                  }
+                },
+                {
+                  "key": "heimdall.tool.result_returned",
+                  "value": {
+                    "boolValue": true
+                  }
+                }
+              ]
+            },
+            {
+              "traceId": "1aa9130d0d48f75454f59b2cd75ad2bf",
+              "spanId": "67c64017f866b211",
+              "parentSpanId": "16c9c0924f4bed25",
+              "name": "heimdall.grade",
+              "kind": 1,
+              "startTimeUnixNano": "1794612566115764171",
+              "endTimeUnixNano": "1794612568221895025",
+              "attributes": [
+                {
+                  "key": "heimdall.grade.passed",
+                  "value": {
+                    "boolValue": false
+                  }
+                },
+                {
+                  "key": "heimdall.grade.invalid_evaluator",
+                  "value": {
+                    "boolValue": false
+                  }
+                },
+                {
+                  "key": "heimdall.grade.exit_code",
+                  "value": {
+                    "intValue": "1"
+                  }
+                },
+                {
+                  "key": "heimdall.grade.tests_ran",
+                  "value": {
+                    "intValue": "7"
+                  }
+                },
+                {
+                  "key": "heimdall.grade.failures",
+                  "value": {
+                    "intValue": "7"
+                  }
+                },
+                {
+                  "key": "heimdall.grade.errors",
+                  "value": {
+                    "intValue": "0"
+                  }
+                },
+                {
+                  "key": "heimdall.grade.skipped",
+                  "value": {
+                    "intValue": "0"
+                  }
+                },
+                {
+                  "key": "heimdall.grade.reason",
+                  "value": {
+                    "stringValue": "exit 1; 7 failures; required tests failed: test_hidden_rounding.py::test_line_amount_half_cent_rounds_up, test_hidden_rounding.py::test_line_amount_is_exact_for_decimal_quantities, test_hidden_rounding.py::test_subtotal_is_sum_of_rounded_line_amounts, test_hidden_rounding.py::test_tax_half_cent_rounds_up, test_hidden_rounding.py::test_tax_is_exact_for_decimal_rates, test_hidden_rounding.py::test_percentage_discount_half_cent_rounds_up_before_tax, test_hidden_rounding.py::test_cli_export_and_summ [truncated]"
+                  }
+                },
+                {
+                  "key": "heimdall.grade.failed_tests",
+                  "value": {
+                    "arrayValue": {
+                      "values": [
+                        {
+                          "stringValue": "tests.test_hidden_rounding::test_line_amount_half_cent_rounds_up"
+                        },
+                        {
+                          "stringValue": "tests.test_hidden_rounding::test_line_amount_is_exact_for_decimal_quantities"
+                        },
+                        {
+                          "stringValue": "tests.test_hidden_rounding::test_subtotal_is_sum_of_rounded_line_amounts"
+                        },
+                        {
+                          "stringValue": "tests.test_hidden_rounding::test_tax_half_cent_rounds_up"
+                        },
+                        {
+                          "stringValue": "tests.test_hidden_rounding::test_tax_is_exact_for_decimal_rates"
+                        },
+                        {
+                          "stringValue": "tests.test_hidden_rounding::test_percentage_discount_half_cent_rounds_up_before_tax"
+                        },
+                        {
+                          "stringValue": "tests.test_hidden_rounding::test_cli_export_and_summary_follow_rounding_rules"
+                        }
+                      ]
+                    }
+                  }
+                },
+                {
+                  "key": "heimdall.grade.suite_version",
+                  "value": {
+                    "stringValue": "1.0.0"
+                  }
+                },
+                {
+                  "key": "heimdall.grade.grader_version",
+                  "value": {
+                    "stringValue": "1.0.0"
+                  }
+                },
+                {
+                  "key": "heimdall.grade.diff_sha256",
+                  "value": {
+                    "stringValue": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+                  }
+                }
+              ]
+            },
+            {
+              "traceId": "1aa9130d0d48f75454f59b2cd75ad2bf",
+              "spanId": "60dd2210cd715376",
+              "parentSpanId": "16c9c0924f4bed25",
+              "name": "heimdall.gate g1_protected_paths",
+              "kind": 1,
+              "startTimeUnixNano": "1794612568225888349",
+              "endTimeUnixNano": "1794612568237671524",
+              "attributes": [
+                {
+                  "key": "heimdall.gate.name",
+                  "value": {
+                    "stringValue": "g1_protected_paths"
+                  }
+                },
+                {
+                  "key": "heimdall.gate.version",
+                  "value": {
+                    "stringValue": "1.0.0"
+                  }
+                },
+                {
+                  "key": "heimdall.gate.effect",
+                  "value": {
+                    "stringValue": "veto"
+                  }
+                },
+                {
+                  "key": "heimdall.gate.fired",
+                  "value": {
+                    "boolValue": false
+                  }
+                }
+              ]
+            },
+            {
+              "traceId": "1aa9130d0d48f75454f59b2cd75ad2bf",
+              "spanId": "5f6e47fa7eec26fd",
+              "parentSpanId": "16c9c0924f4bed25",
+              "name": "heimdall.gate g2_test_infra",
+              "kind": 1,
+              "startTimeUnixNano": "1794612568225888349",
+              "endTimeUnixNano": "1794612568237671524",
+              "attributes": [
+                {
+                  "key": "heimdall.gate.name",
+                  "value": {
+                    "stringValue": "g2_test_infra"
+                  }
+                },
+                {
+                  "key": "heimdall.gate.version",
+                  "value": {
+                    "stringValue": "1.0.0"
+                  }
+                },
+                {
+                  "key": "heimdall.gate.effect",
+                  "value": {
+                    "stringValue": "veto"
+                  }
+                },
+                {
+                  "key": "heimdall.gate.fired",
+                  "value": {
+                    "boolValue": false
+                  }
+                }
+              ]
+            },
+            {
+              "traceId": "1aa9130d0d48f75454f59b2cd75ad2bf",
+              "spanId": "c7826eab09bdbf87",
+              "parentSpanId": "16c9c0924f4bed25",
+              "name": "heimdall.gate g4_regrade",
+              "kind": 1,
+              "startTimeUnixNano": "1794612568225888349",
+              "endTimeUnixNano": "1794612568237671524",
+              "attributes": [
+                {
+                  "key": "heimdall.gate.name",
+                  "value": {
+                    "stringValue": "g4_regrade"
+                  }
+                },
+                {
+                  "key": "heimdall.gate.version",
+                  "value": {
+                    "stringValue": "1.0.0"
+                  }
+                },
+                {
+                  "key": "heimdall.gate.effect",
+                  "value": {
+                    "stringValue": "veto"
+                  }
+                },
+                {
+                  "key": "heimdall.gate.fired",
+                  "value": {
+                    "boolValue": false
+                  }
+                }
+              ]
+            },
+            {
+              "traceId": "1aa9130d0d48f75454f59b2cd75ad2bf",
+              "spanId": "b47836cb04fcd2c3",
+              "parentSpanId": "16c9c0924f4bed25",
+              "name": "heimdall.gate g6_null_agents",
+              "kind": 1,
+              "startTimeUnixNano": "1794612568225888349",
+              "endTimeUnixNano": "1794612568237671524",
+              "attributes": [
+                {
+                  "key": "heimdall.gate.name",
+                  "value": {
+                    "stringValue": "g6_null_agents"
+                  }
+                },
+                {
+                  "key": "heimdall.gate.version",
+                  "value": {
+                    "stringValue": "1.0.0"
+                  }
+                },
+                {
+                  "key": "heimdall.gate.effect",
+                  "value": {
+                    "stringValue": "admission"
+                  }
+                },
+                {
+                  "key": "heimdall.gate.fired",
+                  "value": {
+                    "boolValue": false
+                  }
+                },
+                {
+                  "key": "heimdall.gate.detail",
+                  "value": {
+                    "stringValue": "not a null agent"
+                  }
+                }
+              ]
+            },
+            {
+              "traceId": "1aa9130d0d48f75454f59b2cd75ad2bf",
+              "spanId": "bdbe22d0bba3a8da",
+              "parentSpanId": "16c9c0924f4bed25",
+              "name": "heimdall.gate egress",
+              "kind": 1,
+              "startTimeUnixNano": "1794612568225888349",
+              "endTimeUnixNano": "1794612568237671524",
+              "attributes": [
+                {
+                  "key": "heimdall.gate.name",
+                  "value": {
+                    "stringValue": "egress"
+                  }
+                },
+                {
+                  "key": "heimdall.gate.version",
+                  "value": {
+                    "stringValue": "1.0.0"
+                  }
+                },
+                {
+                  "key": "heimdall.gate.effect",
+                  "value": {
+                    "stringValue": "invalidate"
+                  }
+                },
+                {
+                  "key": "heimdall.gate.fired",
+                  "value": {
+                    "boolValue": false
+                  }
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

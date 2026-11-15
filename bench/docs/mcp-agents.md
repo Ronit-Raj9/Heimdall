@@ -12,6 +12,8 @@ A task's services of role `mcp` are Model Context Protocol servers the agent sho
 
 The variables work in `argv`, `env` and `files` of any command-adapter config. The endpoint is the service's URL plus its MCP path (default `/mcp`) when the URL does not already end with it.
 
+A task with external HTTP APIs (`external:`, [`external-apis.md`](external-apis.md)) adds the same three for them: `BENCH_EXTERNAL_APIS` (`{"<id>": {"url": "http://toolproxy:9200/x/<id>"}}`, set only when the run has one), `{{external.apis_json}}` (`{}` when it has none) and `{{external.<id>.url}}`.
+
 ## Native config
 
 ```yaml

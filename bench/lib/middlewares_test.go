@@ -98,6 +98,21 @@ func TestSecurityHeaders(t *testing.T) {
 			t.Errorf("missing %s", k)
 		}
 	}
+	if strings.Contains(string(h.Peek("Content-Security-Policy")), "sandbox") {
+		t.Errorf("plain response got a sandbox")
+	}
+}
+
+func TestSecurityHeadersKeepsSandbox(t *testing.T) {
+	sandboxed := func(ctx *fasthttp.RequestCtx) {
+		ctx.Response.Header.Set("Content-Security-Policy", "sandbox")
+		ctx.SetStatusCode(200)
+	}
+	ctx := run(SecurityHeaders()(sandboxed), nil)
+	csp := string(ctx.Response.Header.Peek("Content-Security-Policy"))
+	if !strings.HasPrefix(csp, ContentSecurityPolicy) || !strings.HasSuffix(csp, "; sandbox") {
+		t.Errorf("csp = %q", csp)
+	}
 }
 
 func TestHostGuard(t *testing.T) {

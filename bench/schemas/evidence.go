@@ -33,6 +33,7 @@ type Evidence struct {
 	State     []StateFile     `json:"state,omitempty"`      // exported service state
 	Services  []ServiceResult `json:"services,omitempty"`   // services that ran beside the agent
 	Snapshot  string          `json:"snapshot,omitempty"`   // image reference of the frozen agent container, for snapshot grading
+	Artifacts []ArtifactFile  `json:"artifacts,omitempty"`  // exported artifact files of an artifact task
 }
 
 // EvidenceQuality describes how completely a run's required evidence was observed.
@@ -113,7 +114,7 @@ type Grade struct {
 	Dimensions   map[string]float64 `json:"dimensions,omitempty"`
 
 	// Mode is how the grade was reached when it is not a clean-room diff
-	// grade: snapshot, answer or state. Judged is true when a judge model
+	// grade: snapshot, answer, state or artifact. Judged is true when a judge model
 	// decided Passed, and Judge records what it rested on. Category is the
 	// task's answer category, for breakdowns.
 	Mode     string       `json:"mode,omitempty"`

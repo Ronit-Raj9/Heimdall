@@ -1,0 +1,32 @@
+{
+	"_comment": "SYNTHETIC fixture for UI development. Not a benchmark result. GET /runs/{id}/reviews (schemas.RunReviews).",
+	"mode": "synthetic",
+	"run_id": "r_pww2l7yame",
+	"exp_id": "e_synthetic-codewins",
+	"sealed_outcome": "pass",
+	"outcome": "pass",
+	"reviews": [
+		{
+			"review_id": "rv_synth0001",
+			"exp_id": "e_synthetic-codewins",
+			"run_id": "r_pww2l7yame",
+			"parent_seal": "sha256:40d705b189548bd2d5c8e36f2a73fa31b8a683d47261a1e59be0eee8a107ccb0",
+			"decision": "flag_only",
+			"reason": "The diff passes the tests but also rewrites the notes file the task said to leave alone. Someone should look before this counts.",
+			"reviewer": "lee",
+			"created_at": "2026-11-14T10:12:00Z",
+			"sealed_outcome": "pass",
+			"previous_outcome": "pass",
+			"evidence": [
+				"workspace.diff",
+				"notes/README.md"
+			],
+			"prev_hash": "",
+			"hash": "542150d5dff5104d940f17d539b9ae694586ba9b7f2ae993f492cfc8c8bc486d"
+		}
+	],
+	"reasons": [
+		"flagged"
+	],
+	"problems": []
+}

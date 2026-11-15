@@ -1,0 +1,68 @@
+# Sample task written by `bifrost-bench suite init -template browser`. The
+# agent creates a customer through a web form, driving a headless browser over
+# MCP; the hidden verifier checks the web application's final database.
+# `bifrost-bench task init -suite [[.ID]] -id <task>` copies this shape into a
+# new task with EDIT ME markers.
+id: new-customer
+version: 1.0.0
+title: Create a customer through the console's form
+project: customer-console
+kind: feature
+instruction: instruction.md
+# The workspace: a scratch folder. The work happens in the browser.
+repo_dir: repo
+services:
+  # The browser: Playwright MCP with headless Chromium, the agent's only tool.
+  # Proxied (the default for role mcp), so every browser action is a row of
+  # the run's tools.jsonl and the tool probes can fault it. Built from
+  # services/browser/ in the suite folder; `suite admit` builds it when it is
+  # missing. argv adds the server flags to the image's entrypoint: listen on
+  # 8931 on every interface, accept requests addressed to browser:8931 (the
+  # tool proxy forwards with that host), and let the browser load pages from
+  # the web application's origin only. The run's networks are internal, so
+  # nothing else is reachable anyway; the origin list also keeps the browser
+  # off the tool proxy and the agent's own container. With no ready check
+  # the browser is ready when its port accepts a connection; Chromium starts
+  # at the first tool call.
+  - id: browser
+    role: mcp
+    image: bench/[[.ID]]-browser:1
+    port: 8931
+    mcp: {path: /mcp}
+    argv: ["--isolated", "--host", "0.0.0.0", "--port", "8931", "--allowed-hosts", "browser:8931", "--allowed-origins", "http://webapp:8000", "--block-service-workers"]
+  # The web application. Hidden: it sits only on a network the agent is not
+  # on, so the agent cannot reach it except through the browser. Its id is
+  # its host name; keep it a name no browser upgrades to HTTPS (not app, dev,
+  # page or another top-level domain on Chromium's HSTS preload list).
+  - id: webapp
+    role: data
+    hidden: true
+    image: bench/[[.ID]]-webapp:1
+    port: 8000
+    files:
+      /seed/db.json: seed/db.json
+    ready:
+      argv: ["python3", "-I", "/srv/server.py", "ready"]
+      timeout_s: 30
+    export:
+      - {id: db.json, path: /state/db.json}
+verifier:
+  tests: verifier/tests
+  required: []
+protected: []
+controls:
+  # Scripts run in the agent's place with the services up. They drive the
+  # same browser through the tool proxy (raw MCP JSON-RPC over HTTP).
+  reference: solution/reference.sh
+  empty: controls/empty.sh
+  mutants: [controls/mutant-wrong-plan.sh]
+  exploit: controls/exploit.sh
+timeouts:
+  agent_s: 600
+capabilities: [tool_use, browser]
+difficulty: easy
+# split: held_out   # optional; default public. Held-out tasks never run under tasks: all (only when a condition sets split: held_out or names them) and are not served by the UI or API.
+provenance:
+  source: written by bifrost-bench suite init (template browser)
+  license: proprietary
+  created_by: suite init

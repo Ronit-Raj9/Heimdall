@@ -1,0 +1,21 @@
+# Oracle control: runs the task's reference script (controls.reference) in
+# the agent's place, so the files it writes in the workspace are exported as
+# the task's artifacts and the verifier must pass them.
+# Scripted adapter: argv, env and files come from the adapter, not this file.
+# Copied from the bench's agents/oracle.yaml; the image is the bench helper
+# image, which has the python3 the reference scripts need.
+id: oracle
+adapter: scripted
+image: bench/coding-core-base:1
+scripted:
+  kind: oracle
+model: claude-sonnet-4-5
+notes:
+  project_file: CLAUDE.md
+budgets:
+  wall_s: 600
+  cpus: 1
+  mem_gb: 1
+gateway:
+  provider: anthropic
+  max_retries: 0

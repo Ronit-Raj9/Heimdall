@@ -54,6 +54,8 @@ func runAgent(args []string) int {
 		return runAgentBuild(args[1:], os.Stdout)
 	case "check":
 		return runAgentCheck(args[1:], os.Stdout)
+	case "diff": // Agent diff area: two versions of an agent config (agentdiff.go)
+		return runAgentDiff(args[1:], os.Stdout)
 	default:
 		fmt.Fprintf(os.Stderr, "unknown agent subcommand %q\n\n%s\n", args[0], agentUsage)
 		return exitUsage

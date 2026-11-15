@@ -61,6 +61,9 @@ type SuiteSource interface {
 type SuitesHandler struct {
 	mode   schemas.Mode
 	suites SuiteSource
+
+	// Suite health area: serve held-out tasks like public ones (suitehealth.go).
+	heldOutVisible bool
 }
 
 // NewSuitesHandler creates the suites handler. suites may be nil.
@@ -136,6 +139,9 @@ func (h *SuitesHandler) getSuiteTask(ctx *fasthttp.RequestCtx) {
 		sendNotFound(ctx, h.mode, "task", id+"/"+taskID)
 		return
 	}
+	if h.refuseHeldOut(ctx, id, t) { // Suite health area: held-out tasks are not served (suitehealth.go)
+		return
+	}
 	sum := h.summarize(work, s)
 	detail, err := taskDetail(s, t, sum)
 	if err != nil {
@@ -193,6 +199,7 @@ func (h *SuitesHandler) summarize(ctx context.Context, s *schemas.Suite) schemas
 		out.Tasks = append(out.Tasks, st)
 	}
 	scenarioSummary(s, &out) // UI area: scenario fields of the suite and its tasks (imports.go)
+	h.healthSummary(s, &out) // Suite health area: quarantine, held-out split, canary (suitehealth.go)
 	return out
 }
 

@@ -49,6 +49,8 @@ func (r *markdownReporter) Write(ctx context.Context, a *schemas.Analysis, m *sc
 	bw := bufio.NewWriter(w)
 	arms := reportArms(a, m)
 	writeHeader(bw, a)
+	writeExternal(bw, m) // External APIs area: live or record runs are labelled not repeatable (external.go)
+	writeSplit(bw, m)    // Suite health area: held-out experiments state their split (split.go)
 	writePrimary(bw, &a.Verdict)
 	writeGuards(bw, a.Verdict.Guards)
 	writeInvalid(bw, a.Verdict.InvalidReasons)

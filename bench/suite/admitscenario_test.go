@@ -2,6 +2,7 @@ package suite
 
 import (
 	"context"
+	"errors"
 	"os"
 	"path/filepath"
 	"strings"
@@ -365,5 +366,126 @@ func TestAdmitImpossibleHonestScript(t *testing.T) {
 	}
 	if _, ok := names["reference_1"]; ok {
 		t.Error("the honest reference was required to pass the mutated tests")
+	}
+}
+
+// artifactAdmitEnv exports artifacts by the script a control ran: an empty
+// script (or none) leaves no file, any other script leaves report.csv
+// holding the script's content. exportErr makes the export itself break.
+type artifactAdmitEnv struct {
+	*scenarioAdmitEnv
+	exportErr error
+}
+
+func (e *artifactAdmitEnv) ExportArtifacts(_ context.Context, rc *schemas.RunContext) ([]schemas.ArtifactFile, error) {
+	if e.exportErr != nil {
+		return nil, e.exportErr
+	}
+	s := strings.TrimSpace(e.script[rc.Run.RunID])
+	if s == "" {
+		return []schemas.ArtifactFile{{ID: "report", Source: "report.csv", Error: "missing"}}, nil
+	}
+	p := filepath.Join(rc.Dir, "artifacts", "report", "report.csv")
+	if err := os.MkdirAll(filepath.Dir(p), 0o755); err != nil {
+		return nil, err
+	}
+	if err := os.WriteFile(p, []byte(s), 0o644); err != nil {
+		return nil, err
+	}
+	return []schemas.ArtifactFile{{ID: "report", Name: "report.csv", Path: "artifacts/report/report.csv", Source: "report.csv", Bytes: int64(len(s))}}, nil
+}
+
+// countingGrader counts the grades it was asked for.
+type countingGrader struct {
+	fileGrader
+	n *int
+}
+
+func (g countingGrader) Grade(ctx context.Context, rc *schemas.RunContext, d *schemas.Diff) (*schemas.Grade, error) {
+	*g.n++
+	return g.fileGrader.Grade(ctx, rc, d)
+}
+
+// artifactAdmitTask is the mini pack's task as an artifact task with script
+// controls: the reference leaves "good", the mutant "almost good" and the
+// empty control nothing.
+func artifactAdmitTask(t *testing.T) (*schemas.Suite, *schemas.Task) {
+	t.Helper()
+	benchRoot, pack := copyPack(t)
+	writeFiles(t, filepath.Join(pack, "tasks", "m01"), map[string]string{
+		"controls/ref.sh":   "good",
+		"controls/empty.sh": "",
+		"controls/m1.sh":    "almost good",
+	})
+	s := loadMini(t, benchRoot)
+	s.Grader = "verifier_command"
+	tk := s.Tasks[0]
+	tk.Output = &schemas.OutputSpec{Kind: schemas.OutputArtifact, Artifacts: []schemas.ArtifactSpec{{ID: "report", Path: "report.csv", Required: true}}}
+	tk.Controls = schemas.TaskControls{Reference: "controls/ref.sh", Empty: "controls/empty.sh", Mutants: []string{"controls/m1.sh"}, Exploit: "controls/exploit.sh"}
+	return s, tk
+}
+
+func TestAdmitArtifactTask(t *testing.T) {
+	s, tk := artifactAdmitTask(t)
+	env := &artifactAdmitEnv{scenarioAdmitEnv: newScenarioAdmitEnv()}
+	graded := 0
+	g := countingGrader{fileGrader{"verifier_command", "artifacts/report/report.csv", "good"}, &graded}
+	rec, err := Admit(context.Background(), AdmitDeps{Env: env, Grader: g}, s, tk)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !rec.Admitted {
+		t.Fatalf("not admitted: %+v", rec.Checks)
+	}
+	names := checksByName(rec)
+	for _, n := range []string{"reference_1", "reference_2", "reference_3", "empty_control", "mutant_1", "exploit", "null_noop", "null_refuse"} {
+		if c, ok := names[n]; !ok || !c.Passed {
+			t.Errorf("check %s: %+v", n, c)
+		}
+	}
+	for _, n := range []string{"empty_control", "null_noop", "null_refuse"} {
+		c := names[n]
+		if c.Got != GotFail || !strings.Contains(c.Detail, "artifact output: required artifact missing: report (report.csv: missing)") {
+			t.Errorf("check %s: want a fail for the missing artifact, got %+v", n, c)
+		}
+	}
+	if c := names["mutant_1"]; c.Got != GotFail || strings.Contains(c.Detail, "missing") {
+		t.Errorf("mutant graded wrong: %+v", c)
+	}
+	// The verifier runs for the three references, the mutant and the
+	// exploit; never for a control whose required artifact is missing.
+	if graded != 5 {
+		t.Errorf("verifier ran %d times, want 5", graded)
+	}
+	if strings.Join(rec.ReferenceResults, ",") != "pass,pass,pass" {
+		t.Errorf("reference results %v", rec.ReferenceResults)
+	}
+}
+
+func TestAdmitArtifactExportFailed(t *testing.T) {
+	s, tk := artifactAdmitTask(t)
+	env := &artifactAdmitEnv{scenarioAdmitEnv: newScenarioAdmitEnv(), exportErr: errors.New("helper container exited 1")}
+	rec, err := Admit(context.Background(), AdmitDeps{Env: env, Grader: fileGrader{"verifier_command", "artifacts/report/report.csv", "good"}}, s, tk)
+	if err != nil {
+		t.Fatal(err)
+	}
+	c := checksByName(rec)["reference_1"]
+	if rec.Admitted || c.Got != GotInvalidEvaluator || !strings.Contains(c.Detail, "artifact output: export failed: helper container exited 1") {
+		t.Fatalf("admitted %v reference %+v", rec.Admitted, c)
+	}
+	if c := checksByName(rec)["empty_control"]; c.Got != GotInvalidEvaluator || c.Passed {
+		t.Errorf("an export failure must not count as the empty control failing: %+v", c)
+	}
+}
+
+func TestAdmitArtifactNeedsEnvironment(t *testing.T) {
+	s, tk := artifactAdmitTask(t)
+	rec, err := Admit(context.Background(), AdmitDeps{Env: newScenarioAdmitEnv(), Grader: fileGrader{"verifier_command", "artifacts/report/report.csv", "good"}}, s, tk)
+	if err != nil {
+		t.Fatal(err)
+	}
+	c := checksByName(rec)["reference_1"]
+	if rec.Admitted || c.Got != GotError || !strings.Contains(c.Detail, "cannot export artifacts") {
+		t.Fatalf("admitted %v reference %+v", rec.Admitted, c)
 	}
 }

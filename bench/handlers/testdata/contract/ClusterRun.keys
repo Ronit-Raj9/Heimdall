@@ -1,0 +1,16 @@
+# Keys of bench.ts `ClusterRun`, one per line; a trailing ? marks an optional (Go omitempty) key.
+# Change with bench.ts and clusters/clusters.go.
+run_id
+pair_id?
+exp_id
+suite
+task
+arm
+condition
+agent
+config_hash
+outcome
+at
+last_tool?
+last_tool_errored?
+error_text?

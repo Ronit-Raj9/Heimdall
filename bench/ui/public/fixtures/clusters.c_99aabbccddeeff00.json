@@ -1,0 +1,90 @@
+{
+	"_comment": "SYNTHETIC fixture for UI development. Not a benchmark result.",
+	"mode": "synthetic",
+	"generated_at": "2026-11-15T10:00:00Z",
+	"filters": {
+		"suite": "",
+		"agent": "",
+		"experiments": [],
+		"since": "",
+		"min": 2,
+		"synthetic": "exclude"
+	},
+	"failures": 12,
+	"cluster": {
+		"signature": "c_99aabbccddeeff00",
+		"title": "tool error: desk.refund amount must be positive",
+		"outcome": "fail",
+		"layers": [
+			{
+				"kind": "outcome",
+				"label": "fail"
+			},
+			{
+				"kind": "error",
+				"label": "desk.refund amount must be positive",
+				"source": "tool_proxy"
+			},
+			{
+				"kind": "last_tool",
+				"label": "desk.refund errored"
+			}
+		],
+		"count": 2,
+		"share": 0.1667,
+		"tasks": [
+			"support-desk/refund-01"
+		],
+		"agents": [
+			"claude-code-sonnet"
+		],
+		"config_hashes": [
+			"sha256:cccccccccccccccc3333"
+		],
+		"conditions": [
+			"tool-fault"
+		],
+		"experiments": [
+			"e_synthetic-codewins",
+			"e_second"
+		],
+		"first_seen": "2026-11-12T10:00:00Z",
+		"last_seen": "2026-11-12T11:00:00Z",
+		"examples": [
+			"r_fmw1z7ouim",
+			"r_tool000001"
+		],
+		"scope": "agent_and_task",
+		"error_text": "desk.refund <img src=x onerror=\"alert(1)\"> amount must be positive https://example.invalid/x **bold**"
+	},
+	"runs": [
+		{
+			"run_id": "r_fmw1z7ouim",
+			"pair_id": "p_ltosmymyqy",
+			"exp_id": "e_synthetic-codewins",
+			"suite": "support-desk",
+			"task": "refund-01",
+			"arm": "A",
+			"condition": "tool-fault",
+			"agent": "claude-code-sonnet",
+			"config_hash": "sha256:cccccccccccccccc3333",
+			"outcome": "fail",
+			"at": "2026-11-12T10:00:00Z",
+			"last_tool": "desk.refund",
+			"last_tool_errored": true,
+			"error_text": "desk.refund <img src=x onerror=\"alert(1)\"> amount must be positive"
+		},
+		{
+			"run_id": "r_tool000001",
+			"exp_id": "e_second",
+			"suite": "support-desk",
+			"task": "refund-01",
+			"arm": "B",
+			"condition": "tool-fault",
+			"agent": "claude-code-sonnet",
+			"config_hash": "sha256:cccccccccccccccc3333",
+			"outcome": "fail",
+			"at": "2026-11-12T11:00:00Z"
+		}
+	]
+}

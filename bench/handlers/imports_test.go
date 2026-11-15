@@ -277,3 +277,55 @@ func TestWorkersListMatchesUIContract(t *testing.T) {
 		t.Errorf("enabled = %v, want false with no coordinator", body["enabled"])
 	}
 }
+
+// TestSuitesArtifactSummary pins the suite's declared output artifacts in the
+// suite list: copied for an artifact suite, absent for any other.
+func TestSuitesArtifactSummary(t *testing.T) {
+	suites := scenarioSuites(t)
+	dir := filepath.Join(t.TempDir(), "plots")
+	a01 := newTestTask(t, dir, "a01", "repo", map[string]string{"instruction.md": "Plot.\n", "repo/a.py": "a\n"})
+	declared := []schemas.ArtifactSpec{
+		{ID: "chart", Path: "out/*.svg", Required: true, MaxBytes: 1 << 20},
+		{ID: "table", Path: "out/table.csv"},
+	}
+	plots := &schemas.Suite{
+		ID: "plots", Version: "1.0.0", Environment: "docker_workspace", Grader: "hidden_tests",
+		BaseImage: schemas.ImageSpec{Tag: "bench/plots:1"}, Root: dir,
+		TaskIDs: []string{"a01"}, Tasks: []*schemas.Task{a01},
+		Output: &schemas.OutputSpec{Kind: schemas.OutputArtifact, Artifacts: declared},
+	}
+	suites.ids = append(suites.ids, "plots")
+	suites.suites["plots"] = plots
+	c := newSuitesClient(t, suites, fakeAgents{}, testIndex())
+	body := decodeBody(t, c.do(t, "GET", APIPrefix+"/suites", nil, nil))
+
+	s := suiteByID(t, body, "plots")
+	checkKeys(t, "SuiteSummary plots", s, loadKeys(t, "SuiteSummary"), false)
+	if s["output"] != schemas.OutputArtifact {
+		t.Errorf("output = %v", s["output"])
+	}
+	got, _ := s["artifacts"].([]any)
+	if len(got) != 2 {
+		t.Fatalf("artifacts = %v", s["artifacts"])
+	}
+	chart, _ := got[0].(map[string]any)
+	if chart["id"] != "chart" || chart["path"] != "out/*.svg" || chart["required"] != true || chart["max_bytes"] != float64(1<<20) {
+		t.Errorf("artifacts[0] = %v", chart)
+	}
+	table, _ := got[1].(map[string]any)
+	if _, ok := table["required"]; ok || table["id"] != "table" {
+		t.Errorf("artifacts[1] = %v", table)
+	}
+	// The summary holds a copy: changing it never reaches the loaded suite.
+	var sum schemas.SuiteSummary
+	scenarioSummary(plots, &sum)
+	sum.Artifacts[0].ID = "changed"
+	if plots.Output.Artifacts[0].ID != "chart" {
+		t.Errorf("summary shares the suite's artifacts: %v", plots.Output.Artifacts)
+	}
+	for _, id := range []string{"plain", "memo"} {
+		if _, ok := suiteByID(t, body, id)["artifacts"]; ok {
+			t.Errorf("suite %s has artifacts", id)
+		}
+	}
+}

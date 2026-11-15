@@ -24,6 +24,9 @@ func Markdown(lb *schemas.Leaderboard) string {
 	if lb.Synthetic == SyntheticOnly {
 		b.WriteString("> **SYNTHETIC.** Scripted agent or scripted model runs only. These numbers exercise the pipeline; they are not findings.\n\n")
 	}
+	if lb.Split == schemas.SplitHeldOut { // Suite health area (split.go)
+		b.WriteString("> **HELD-OUT BOARD.** Runs of held-out tasks only. Kept apart from the public board; never compare the two directly.\n\n")
+	}
 	scope := "each entry over its own tasks"
 	if lb.Scope == ScopeCommon {
 		scope = "every entry over the common tasks only"
@@ -135,6 +138,10 @@ func writeExcluded(b *strings.Builder, excluded []schemas.LeaderboardExclusion) 
 // writeGradeSources writes the footnote on where each experiment's grades
 // came from: one line under original, one line per experiment under latest.
 func writeGradeSources(b *strings.Builder, lb *schemas.Leaderboard) {
+	if lb.GradeSource == GradeSourceReviewed {
+		writeReviewedSources(b, lb) // human review (review.go)
+		return
+	}
 	exps := make([]string, 0, len(lb.GradeSources))
 	for _, gs := range lb.GradeSources {
 		exps = append(exps, gs.Experiment)

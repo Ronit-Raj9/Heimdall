@@ -1,0 +1,11 @@
+# Keys of bench.ts `MatrixPair`, one per line; a trailing ? marks an optional (Go omitempty) key.
+# Change with bench.ts and schemas/matrix.go.
+arm_x
+arm_y
+tasks
+n_nonzero
+mean_diff
+p
+p_adjusted
+significant
+reason

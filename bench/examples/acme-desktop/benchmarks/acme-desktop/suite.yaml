@@ -1,0 +1,38 @@
+# template: computer-use
+# acme-desktop: an office desktop at the fictional Acme company, operated by
+# a computer-use agent through screenshots, mouse and keyboard.
+#
+# Each task starts its own desktop service (services: in task.yaml) from the
+# image built from services/desktop/: a virtual display with the openbox
+# window manager and one GUI app (the mousepad text editor, the xfe file
+# manager or a small form app), seeded with the task's files. The agent
+# drives it through the desktop's MCP server (screenshot, click, type, key,
+# ...), told about it in its own MCP config format and reached through the
+# per-run tool proxy, which records every call in tools.jsonl and arms the
+# tool probes. Grading never looks at a screenshot: after the agent exits
+# the desktop's state (files, the form's submissions) is dumped as JSON and
+# the task's hidden verifier (verifier/tests/verify.py with checks.py) reads
+# it at /grader/state/desktop/state.json and writes a reward.
+#
+# The base image is the bench's helper image (python3 and git, uid 1000):
+# the verifier needs nothing else, so this suite builds no toolchain image.
+id: acme-desktop
+version: 1.0.0
+description: Acme office desktop (fictional) driven through screenshots, mouse and keyboard; graded on the apps' saved state.
+track: computer_use
+environment: docker_workspace
+grader: verifier_command
+base_image:
+  tag: bench/coding-core-base:1
+workdir: /workspace
+output:
+  kind: state
+verifier:
+  command: ["python3", "/grader/tests/verify.py"]
+  result: reward
+  result_path: /grader/out/reward.json
+  pass_threshold: 1
+  restore: []
+  timeout_s: 120
+tasks: [edit-config, file-inbox, expense-form]
+probes: [model-outage, screenshot-error-first, hostile-dialog]

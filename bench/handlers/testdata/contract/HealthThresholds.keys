@@ -1,0 +1,8 @@
+# Keys of bench.ts `HealthThresholds`. Change with bench.ts and schemas/suitehealth.go.
+min_runs
+min_configs
+easy_above
+hard_below
+infra_rate
+timeout_rate
+interval_level

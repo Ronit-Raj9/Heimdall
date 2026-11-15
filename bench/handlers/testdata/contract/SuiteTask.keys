@@ -25,3 +25,7 @@ sessions?
 output?
 skills?
 impossible?
+# Suite health keys (schemas/suitehealth.go); absent for a public task that is not quarantined.
+split?
+redacted?
+quarantine?

@@ -30,3 +30,19 @@ Run from the project root.
 
 `task admit` builds the base image when it is missing and records the
 result in `suite.lock`. A task that was not admitted cannot be planned.
+
+## Held-out tasks and canaries
+
+Add `split: held_out` to a task's `task.yaml` to keep it out of `tasks: all`,
+out of the public leaderboard and out of what the UI and API serve. To detect
+later whether this suite leaked into a model's training data, give it a
+contamination canary:
+
+    bifrost-bench suite canary [[.ID]]          # sets canary: <guid> in suite.yaml
+    bifrost-bench suite canary -stamp [[.ID]]   # also writes it into every instruction file
+    bifrost-bench suite canary-check -text model-output.txt
+
+Stamping changes instruction hashes, so run `suite lock` and `suite admit`
+again afterwards; stamp before the first published results, not after. A
+canary only catches verbatim copies of stamped text. The bench guide
+`docs/held-out-and-canaries.md` has the details.

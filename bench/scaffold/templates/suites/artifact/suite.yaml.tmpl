@@ -1,0 +1,35 @@
+# template: artifact
+# Written by `bifrost-bench suite init`. An artifact suite tests an agent
+# whose result is files it writes in its workspace: a report, a chart, a
+# model, a document. Each task lists the files it expects under
+# output.artifacts. After the agent exits a trusted helper copies them out
+# of the workspace into the run folder, and the task's hidden verifier
+# (verifier/tests/verify.py) reads them read-only at
+# /grader/artifacts/<artifact id>/<file name> and writes a reward. A
+# required artifact that is missing fails the run without running the
+# verifier. Add tasks with `bifrost-bench task init -suite [[.ID]] -id <task>`,
+# which copies the shape of the first task below and adds the id to the
+# tasks list.
+id: [[.ID]]
+version: 0.1.0
+description: Tasks graded on the files the agent writes, read by a hidden verifier.
+track: artifact
+environment: docker_workspace
+grader: verifier_command
+base_image:
+[[- if .Dockerfile]]
+  dockerfile: base/Dockerfile
+[[- end]]
+  tag: [[.Image]]
+workdir: /workspace
+output:
+  kind: artifact
+verifier:
+  command: ["python3", "/grader/tests/verify.py"]
+  result: reward
+  result_path: /grader/out/reward.json
+  pass_threshold: 1
+  restore: []
+  timeout_s: 120
+tasks: [sales-report]
+probes: [model-outage]

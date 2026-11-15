@@ -64,7 +64,9 @@ export default function VerdictView() {
 function ExperimentVerdict({ expId }: { expId: string }) {
 	const { t } = useTranslation("bench");
 	const navigate = useNavigate();
-	const verdict = useGetVerdictQuery(expId);
+	// ?grade= names a grade source (a regrade id, or reviewed for human reviews); absent is the sealed original.
+	const [grade] = useQueryState("grade", parseAsString);
+	const verdict = useGetVerdictQuery(grade ? { expId, gradeSource: grade } : expId);
 	const diagnostics = useGetDiagnosticsQuery(expId);
 	const grid = useGetGridQuery(expId);
 	const catalog = useGetCatalogQuery();

@@ -17,7 +17,7 @@ import (
 	"github.com/maximhq/bifrost/bench/store"
 )
 
-const leaderboardUsage = `usage: bifrost-bench leaderboard [-config deploy/bench.yaml] [-suite id@version] [-condition clean] [-scope all|common] [-synthetic exclude|only] [-grade-source original|latest] [-k n] [-format md|json] [-out file]
+const leaderboardUsage = `usage: bifrost-bench leaderboard [-config deploy/bench.yaml] [-suite id@version] [-condition clean] [-scope all|common] [-synthetic exclude|only] [-grade-source original|latest|reviewed] [-k n] [-format md|json] [-out file]
 Ranks agent configurations by verified success over every sealed run of one suite version under one condition, across experiments. Reads the run folder only; no gateway is needed.`
 
 // regradesDir is the folder of an experiment that holds its regrades.
@@ -36,9 +36,11 @@ func runLeaderboard(args []string) int {
 	condition := fs.String("condition", schemas.ConditionClean, "condition: clean or a probe id")
 	scope := fs.String("scope", leaderboard.ScopeAll, "all: each entry over its own tasks; common: every entry over the common tasks")
 	synthetic := fs.String("synthetic", leaderboard.SyntheticExclude, "exclude: live runs only; only: scripted agent or scripted model runs only")
-	gradeSource := fs.String("grade-source", leaderboard.GradeSourceOriginal, "original: runs as sealed; latest: each experiment's newest regrade")
+	gradeSource := fs.String("grade-source", leaderboard.GradeSourceOriginal, "original: runs as sealed; latest: each experiment's newest regrade; reviewed: runs as sealed with human reviews applied")
 	k := fs.Int("k", 0, "k of the pass^k reliability for every entry, 2 or more (default: per entry, min(3, trials per task))")
 	format := fs.String("format", "md", "md or json")
+	// Suite health area: the held-out board is separate (leaderboard/split.go).
+	split := fs.String("split", "public", "public: public tasks only; held_out: the separate held-out board")
 	out := fs.String("out", "", "write to this file instead of stdout")
 	if err := fs.Parse(args); err != nil || fs.NArg() != 0 {
 		fmt.Fprintln(os.Stderr, leaderboardUsage)
@@ -50,6 +52,7 @@ func runLeaderboard(args []string) int {
 	}
 	q := leaderboard.Query{
 		Suite: *suiteFlag, Condition: *condition, Scope: *scope, Synthetic: *synthetic, GradeSource: *gradeSource, K: *k,
+		Split: *split,
 	}
 	if _, err := q.Normalize(); err != nil {
 		fmt.Fprintf(os.Stderr, "%v\n%s\n", err, leaderboardUsage)

@@ -87,10 +87,11 @@ type runService struct {
 
 // toolRoute is one entry of the tool proxy's routes.json.
 type toolRoute struct {
-	Service  string `json:"service"`
-	Upstream string `json:"upstream"`
-	Protocol string `json:"protocol"`
-	MCPPath  string `json:"mcp_path,omitempty"`
+	Service  string         `json:"service"`
+	Upstream string         `json:"upstream"`
+	Protocol string         `json:"protocol"`
+	MCPPath  string         `json:"mcp_path,omitempty"`
+	External *externalRoute `json:"external,omitempty"` // External APIs area: set for protocol external (external.go)
 }
 
 // StartServices starts the run's services, suite services first and then
@@ -108,8 +109,16 @@ func (e *dockerWorkspace) StartServices(ctx context.Context, rc *schemas.RunCont
 		return nil, nil, err
 	}
 	svcs, err := runServices(rc)
-	if err != nil || len(svcs) == 0 {
+	if err != nil {
 		return nil, nil, err
+	}
+	// External APIs area: the run's external APIs (external.go); nil for a run without them.
+	ext, err := externalAPIs(rc, svcs)
+	if err != nil {
+		return nil, nil, &ServiceError{Service: "external", Err: err}
+	}
+	if len(svcs) == 0 && len(ext) == 0 {
+		return nil, nil, nil
 	}
 	hidden := false
 	for _, s := range svcs {
@@ -134,10 +143,17 @@ func (e *dockerWorkspace) StartServices(ctx context.Context, rc *schemas.RunCont
 		handles = append(handles, h)
 	}
 	routes, err := proxyRoutes(svcs)
-	if err != nil || len(routes) == 0 {
+	if err != nil {
 		return handles, results, err
 	}
-	if err := e.startToolProxy(ctx, rc, expID, runID, routes, probe); err != nil {
+	routes = append(routes, externalRoutes(runID, ext)...) // External APIs area
+	if len(routes) == 0 {
+		return handles, results, nil
+	}
+	if err := e.startExternalEgress(ctx, rc, expID, runID, ext); err != nil { // External APIs area: forwarders for live and record APIs
+		return handles, results, &ServiceError{Service: "external", Err: err}
+	}
+	if err := e.startToolProxy(ctx, rc, expID, runID, routes, probe, ext); err != nil {
 		return handles, results, &ServiceError{Service: ToolProxyHost, Err: err}
 	}
 	for i := range handles {
@@ -146,6 +162,8 @@ func (e *dockerWorkspace) StartServices(ctx context.Context, rc *schemas.RunCont
 			results[i].Proxied = true
 		}
 	}
+	xh, xr := externalHandles(runID, e.toolProxyImage(), ext) // External APIs area
+	handles, results = append(handles, xh...), append(results, xr...)
 	e.cfg.Logger.Debug("services ready", "run", runID, "services", len(handles), "proxied", len(routes))
 	return handles, results, nil
 }
@@ -180,10 +198,14 @@ func (e *dockerWorkspace) ExportState(ctx context.Context, rc *schemas.RunContex
 			files = append(files, f)
 		}
 	}
+	anyProxied = anyProxied || len(utils.ExternalAPIs(rc.Suite, rc.Task)) > 0 // External APIs area
 	if anyProxied {
 		if err := e.copyLedger(ctx, runID, rc.Dir); err != nil {
 			e.cfg.Logger.Warn("tool proxy ledger not copied; tool evidence is unknown", "run", runID, "error", err.Error())
 		}
+	}
+	if err := e.exportExternal(ctx, rc, runID); err != nil { // External APIs area: record mode cassettes
+		return files, fmt.Errorf("export state for run %s: %w", runID, err)
 	}
 	return files, nil
 }
@@ -534,11 +556,8 @@ func (e *dockerWorkspace) logTail(ctx context.Context, name string) string {
 // host name toolproxy, its routes in a config volume at /cfg (the tool probe
 // layer later copies fault.json there) and its ledger in a volume at /ledger,
 // and waits for GET /healthz.
-func (e *dockerWorkspace) startToolProxy(ctx context.Context, rc *schemas.RunContext, expID, runID string, routes []toolRoute, probe string) error {
-	image := e.cfg.ToolProxyImage
-	if image == "" {
-		image = DefaultToolProxyImage
-	}
+func (e *dockerWorkspace) startToolProxy(ctx context.Context, rc *schemas.RunContext, expID, runID string, routes []toolRoute, probe string, ext []externalAPI) error {
+	image := e.toolProxyImage()
 	info, err := InspectImage(ctx, e.cfg.Docker, image)
 	if err != nil {
 		return fmt.Errorf("tool proxy image (images.toolproxy): %w", err)
@@ -558,8 +577,9 @@ func (e *dockerWorkspace) startToolProxy(ctx context.Context, rc *schemas.RunCon
 	args = append(args, "--network", serviceNetwork(runID), "--network-alias", ToolProxyHost, "--hostname", ToolProxyHost,
 		"--cap-drop", "ALL", "--security-opt", "no-new-privileges", "--read-only", "--tmpfs", "/tmp:size=64m",
 		"--pids-limit", "256", "--memory", "512m", "--log-driver", "json-file", "--log-opt", "max-size=1m",
-		"-v", ledger+":/ledger", "-v", cfgVol+":"+toolProxyCfg,
-		"--entrypoint", "bifrost-bench", image,
+		"-v", ledger+":/ledger", "-v", cfgVol+":"+toolProxyCfg)
+	args = append(args, externalProxyEnv(ext)...) // External APIs area: credential names only, values from the bench's environment
+	args = append(args, "--entrypoint", "bifrost-bench", image,
 		"toolproxy", "-listen", ":"+strconv.Itoa(ToolProxyPort), "-routes", toolProxyCfg+"/routes.json",
 		"-fault", toolProxyCfg+"/fault.json", "-ledger", toolProxyLedger)
 	if _, err := e.cfg.Docker.MustRun(ctx, args...); err != nil {
@@ -574,6 +594,9 @@ func (e *dockerWorkspace) startToolProxy(ctx context.Context, rc *schemas.RunCon
 	}
 	if err := e.copyBytes(ctx, name, toolProxyCfg, "routes.json", raw); err != nil {
 		return fmt.Errorf("write routes: %w", err)
+	}
+	if err := e.prepareExternal(ctx, name, runID, info.User, ext); err != nil { // External APIs area
+		return err
 	}
 	if _, err := e.cfg.Docker.MustRun(ctx, "start", name); err != nil {
 		return fmt.Errorf("start tool proxy: %w", err)

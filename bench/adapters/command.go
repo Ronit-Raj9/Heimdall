@@ -109,6 +109,9 @@ func (a *commandAdapter) Plan(ctx context.Context, rc *schemas.RunContext) (*sch
 	if err := mcpVars(vars, rc); err != nil {
 		return nil, fmt.Errorf("plan run %s: %w", rc.Run.RunID, err)
 	}
+	if err := externalVars(vars, rc); err != nil { // External APIs area: {{external.<id>.url}}, {{external.apis_json}}
+		return nil, fmt.Errorf("plan run %s: %w", rc.Run.RunID, err)
+	}
 
 	argv, err := renderList(rc.Agent.Argv, vars)
 	if err != nil {

@@ -71,10 +71,12 @@
     },
     "tasks": {"type": "array", "items": {"$ref": "#/$defs/id"}},
     "probes": {"type": "array", "items": {"$ref": "#/$defs/id"}},
-    "track": {"enum": ["coding", "terminal", "tool_use", "mcp", "memory", "skills", "safety", "qa"], "description": "Leaderboard track; empty means coding."},
+    "track": {"enum": ["coding", "terminal", "tool_use", "mcp", "memory", "skills", "safety", "qa", "browser", "computer_use", "artifact"], "description": "Leaderboard track; empty means coding."},
     "grading": {"enum": ["verified", "judged"], "description": "verified (default) or judged; a judged suite needs judge."},
     "output": {"$ref": "task.schema.json#/$defs/output"},
     "services": {"type": "array", "items": {"$ref": "task.schema.json#/$defs/service"}, "description": "Started beside the agent in every run; paths relative to the suite root."},
+    "external": {"type": "array", "items": {"$ref": "task.schema.json#/$defs/external_api"}, "description": "Real HTTP APIs every task's agent may call through the tool proxy (docs/external-apis.md); cassette paths relative to the suite root."},
+    "canary": {"type": "string", "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$", "description": "Contamination canary GUID, set by `suite canary` (docs/held-out-and-canaries.md)."},
     "judge": {
       "type": "object",
       "additionalProperties": false,

@@ -38,6 +38,23 @@ func TestParseRoutes(t *testing.T) {
 		{name: "duplicate service", in: `{"routes":[{"service":"a","upstream":"http://a:1"},{"service":"a","upstream":"http://a:2"}]}`, wantErr: true},
 		{name: "bad upstream", in: `{"routes":[{"service":"a","upstream":"ftp://a"}]}`, wantErr: true},
 		{name: "bad protocol", in: `{"routes":[{"service":"a","upstream":"http://a:1","protocol":"grpc"}]}`, wantErr: true},
+		{
+			name: "external route",
+			in:   `{"routes":[{"service":"acme","upstream":"https://api.acme.test/v1/","protocol":"external","external":{"mode":"replay","cassette":"/cfg/external/acme.cassette.jsonl","allow":[{"methods":["GET"],"path_prefix":"/rates"}]}}]}`,
+			check: func(t *testing.T, rs *Routes) {
+				r := rs.Routes[0]
+				if r.Protocol != ProtocolExternal || r.External == nil || r.External.Mode != "replay" || r.Upstream != "https://api.acme.test/v1" || r.External.Allow[0].PathPrefix != "/rates" {
+					t.Fatalf("got %+v", r)
+				}
+			},
+		},
+		{name: "external without block", in: `{"routes":[{"service":"a","upstream":"https://a","protocol":"external"}]}`, wantErr: true},
+		{name: "external replay without cassette", in: `{"routes":[{"service":"a","upstream":"https://a","protocol":"external","external":{"mode":"replay"}}]}`, wantErr: true},
+		{name: "external record without record_to", in: `{"routes":[{"service":"a","upstream":"https://a","protocol":"external","external":{"mode":"record"}}]}`, wantErr: true},
+		{name: "external bad mode", in: `{"routes":[{"service":"a","upstream":"https://a","protocol":"external","external":{"mode":"sometimes"}}]}`, wantErr: true},
+		{name: "external relative prefix", in: `{"routes":[{"service":"a","upstream":"https://a","protocol":"external","external":{"mode":"live","allow":[{"path_prefix":"rates"}]}}]}`, wantErr: true},
+		{name: "external upstream with query", in: `{"routes":[{"service":"a","upstream":"https://a/?k=1","protocol":"external","external":{"mode":"live"}}]}`, wantErr: true},
+		{name: "external negative cap", in: `{"routes":[{"service":"a","upstream":"https://a","protocol":"external","external":{"mode":"live","max_calls":-1}}]}`, wantErr: true},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

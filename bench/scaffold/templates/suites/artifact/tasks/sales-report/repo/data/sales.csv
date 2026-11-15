@@ -1,0 +1,14 @@
+order_id,region,units,unit_price,status
+S-1001,North,3,19.99,complete
+S-1002,South,5,4.50,complete
+S-1003,East,2,120.00,complete
+S-1004,North,1,250.00,refunded
+S-1005,West,10,2.25,complete
+S-1006,South,4,19.99,complete
+S-1007,East,6,4.50,complete
+S-1008,West,2,120.00,complete
+S-1009,North,8,4.50,complete
+S-1010,South,1,250.00,complete
+S-1011,East,3,19.99,refunded
+S-1012,West,7,19.99,complete
+S-1013,North,2,120.00,complete

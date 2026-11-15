@@ -266,7 +266,8 @@ func sameValue(a, b schemas.Value) bool {
 
 // sealedScenario completes a scenario run's evidence from its sealed run
 // folder, so gates see what the run saw: answer.txt (its sha256 must match
-// the one recorded) and each exported state file (likewise), and the tool
+// the one recorded), each exported state file and each copied artifact
+// file (likewise), and the tool
 // ledger (tools.jsonl), sessions.json and services.json when evidence.json
 // holds none. A sealed tools.jsonl without calls gives an empty, non-nil
 // call list, so a metric reads zero calls, not unknown. A run without
@@ -296,6 +297,22 @@ func sealedScenario(dir string, ev *schemas.Evidence) error {
 		}
 		if sum != f.SHA256 {
 			return fmt.Errorf("state %s sha256 differs from the one evidence records: %w", f.Path, schemas.ErrSealMismatch)
+		}
+	}
+	for _, f := range ev.Artifacts {
+		if f.Error != "" || f.Path == "" || f.SHA256 == "" {
+			continue
+		}
+		p, err := utils.ResolveInside(dir, f.Path)
+		if err != nil {
+			return fmt.Errorf("artifact %s: %w", f.Path, err)
+		}
+		sum, err := utils.SHA256File(p)
+		if err != nil {
+			return fmt.Errorf("artifact %s: %w", f.Path, err)
+		}
+		if sum != f.SHA256 {
+			return fmt.Errorf("artifact %s sha256 differs from the one evidence records: %w", f.Path, schemas.ErrSealMismatch)
 		}
 	}
 	if len(ev.ToolCalls) == 0 {

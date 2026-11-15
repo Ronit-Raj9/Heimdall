@@ -1,0 +1,14 @@
+# Keys of bench.ts `ReviewQueueItem`, one per line; a trailing ? marks an optional (Go omitempty) key.
+# Change with bench.ts and schemas/review.go.
+run_id
+exp_id
+pair_id
+task
+arm
+condition
+trial
+reasons
+sealed_outcome
+outcome
+reviews
+decision?

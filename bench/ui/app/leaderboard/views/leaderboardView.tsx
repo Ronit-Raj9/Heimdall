@@ -10,11 +10,14 @@ import {
 	sortEntries,
 	type SortKey,
 } from "@/components/leaderboard/leaderboard.utils";
+import { HeldOutBoardToggle, LeaderboardHeldOutBanner } from "@/components/leaderboard/heldOutBoard";
 import { LeaderboardSyntheticBanner } from "@/components/leaderboard/leaderboardBanner";
 import { LeaderboardFilters } from "@/components/leaderboard/leaderboardFilters";
 import { LeaderboardFootnote } from "@/components/leaderboard/leaderboardFootnote";
 import { LeaderboardTable } from "@/components/leaderboard/leaderboardTable";
 import { ModeBadge } from "@/components/modeBadge";
+import { GRADE_SOURCE_MODES, GradeSourcePicker } from "@/components/review/gradeSourcePicker";
+import { ReviewedBadge } from "@/components/review/reviewedBadge";
 import { GradingBadge, JudgedNotice } from "@/components/scenario/scenarioBadges";
 import { groupSuitesByTrack, isJudgedSuite, suiteFactsById } from "@/components/scenario/scenario.utils";
 import { BlockSkeleton, EmptyNote, LoadError, Section } from "@/components/runs/screenStates";
@@ -40,22 +43,34 @@ export default function LeaderboardView() {
 	const [scope, setScope] = useQueryState("scope", parseAsStringLiteral(LEADERBOARD_SCOPES));
 	const [synthetic, setSynthetic] = useQueryState("synthetic", parseAsStringLiteral(LEADERBOARD_SYNTHETIC));
 	const [track, setTrack] = useQueryState("track", parseAsString);
+	const [gradeSource, setGradeSource] = useQueryState("grade_source", parseAsStringLiteral(GRADE_SOURCE_MODES));
+	// held_out shows the separate held-out board; absent is the public board (suite health area).
+	const [split, setSplit] = useQueryState("split", parseAsStringLiteral(["held_out"] as const));
 	// Track and grading come from the suites on disk; the board itself carries neither.
 	const suitesQuery = useGetSuitesQuery();
 	const facts = useMemo(() => suiteFactsById(suitesQuery.data?.suites ?? []), [suitesQuery.data]);
 
 	const params = useMemo<LeaderboardParams>(
-		() => ({ suite: suite ?? undefined, condition: condition ?? undefined, scope: scope ?? undefined, synthetic: synthetic ?? undefined }),
-		[suite, condition, scope, synthetic],
+		() => ({
+			suite: suite ?? undefined,
+			condition: condition ?? undefined,
+			scope: scope ?? undefined,
+			synthetic: synthetic ?? undefined,
+			grade_source: gradeSource ?? undefined,
+			split: split ?? undefined,
+		}),
+		[suite, condition, scope, synthetic, gradeSource, split],
 	);
 	const board = useGetLeaderboardQuery(params);
-	const hasFilters = Boolean(suite || condition || scope || synthetic || track);
+	const hasFilters = Boolean(suite || condition || scope || synthetic || track || gradeSource || split);
 	const resetFilters = () => {
+		void setSplit(null);
 		void setTrack(null);
 		void setSuite(null);
 		void setCondition(null);
 		void setScope(null);
 		void setSynthetic(null);
+		void setGradeSource(null);
 	};
 
 	const data = board.data;
@@ -79,6 +94,12 @@ export default function LeaderboardView() {
 					<h1 className="text-foreground text-xl font-semibold tracking-tight">{t("leaderboard.title")}</h1>
 					<ModeBadge mode={data?.mode} isLoading={board.isLoading} isError={board.isError && !data} />
 					{judged && <GradingBadge grading="judged" testId="leaderboard-judged-badge" />}
+					<ReviewedBadge
+						reviewed={data?.reviewed_runs}
+						changed={data?.review_changed_runs}
+						gradeSource={data?.grade_source}
+						testId="leaderboard-reviewed-badge"
+					/>
 				</div>
 				<p className="text-muted-foreground max-w-3xl text-sm" data-testid="leaderboard-explainer">
 					{t("leaderboard.subtitle")}
@@ -86,6 +107,7 @@ export default function LeaderboardView() {
 			</header>
 
 			{showBanner && <LeaderboardSyntheticBanner />}
+			{data?.split === "held_out" && <LeaderboardHeldOutBanner />}
 			{judged && (
 				<JudgedNotice title={t("leaderboard.judged.title")} body={t("leaderboard.judged.body")} testId="leaderboard-judged-note" />
 			)}
@@ -110,6 +132,13 @@ export default function LeaderboardView() {
 				track={track}
 				onTrack={onTrack}
 			/>
+			<GradeSourcePicker
+				value={data?.grade_source ?? gradeSource ?? "original"}
+				onChange={(next) => void setGradeSource(next === "original" ? null : next)}
+				disabled={board.isLoading}
+				testId="leaderboard-grade-source"
+			/>
+			<HeldOutBoardToggle heldOut={split === "held_out"} onChange={(next) => void setSplit(next ? "held_out" : null)} disabled={board.isLoading} />
 
 			{board.isLoading ? (
 				<BlockSkeleton rows={6} testId="leaderboard-loading" />

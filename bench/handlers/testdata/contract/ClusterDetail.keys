@@ -1,0 +1,7 @@
+# Keys of bench.ts `ClusterDetail`, one per line; a trailing ? marks an optional (Go omitempty) key.
+# The top-level response adds "mode". Change with bench.ts and clusters/clusters.go.
+generated_at
+filters
+failures
+cluster
+runs

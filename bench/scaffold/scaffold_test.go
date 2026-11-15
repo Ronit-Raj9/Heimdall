@@ -188,7 +188,14 @@ func TestSuite(t *testing.T) {
 				t.Errorf("suite.yaml does not name template %s", tmpl)
 			}
 			probes := []string{"model-outage"}
-			if stateTemplate(tmpl) {
+			switch {
+			case tmpl == TemplateBrowser:
+				probes = append(probes, "browser-error-first", "browser-slow", "hostile-banner")
+			case tmpl == TemplateExternal:
+				probes = append(probes, "fx-error-first")
+			case tmpl == TemplateComputerUse:
+				probes = append(probes, "screenshot-error", "hostile-dialog")
+			case stateTemplate(tmpl):
 				probes = append(probes, "tool-error")
 			}
 			validSuite(t, byPath["suite.yaml"], "bench/demo-base:1", true, probes...)

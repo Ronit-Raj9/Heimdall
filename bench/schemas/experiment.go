@@ -32,7 +32,12 @@ type Experiment struct {
 	ManifestMode  string                 `json:"manifest_mode" yaml:"manifest_mode"` // agent_exposure | stack_resilience
 	Policy        string                 `json:"policy,omitempty" yaml:"policy"`     // release policy file, relative to the bench root
 	Requirements  CapabilityRequirements `json:"requirements,omitzero" yaml:"requirements"`
-	Smoke         bool                   `json:"smoke,omitempty" yaml:"smoke"` // synthetic smoke experiment: lock problems only warn; results are never findings
+	Smoke         bool                   `json:"smoke,omitempty" yaml:"smoke"`       // synthetic smoke experiment: lock problems only warn; results are never findings
+	External      string                 `json:"external,omitempty" yaml:"external"` // live | record | replay: overrides every external API's mode for this experiment's runs
+
+	// Forecast and matrix area: the matrix sugar expands into arms at plan
+	// time (matrix.go, engine/matrixplan.go); nil for every other experiment.
+	Matrix *MatrixSpec `json:"matrix,omitempty" yaml:"matrix,omitempty"`
 }
 
 // CapabilityRequirements separates plan-blocking capabilities from optional
@@ -72,6 +77,9 @@ type ConditionSpec struct {
 	ID     string       `json:"id" yaml:"id"` // "clean" or a probe id
 	Tasks  TaskSelector `json:"tasks" yaml:"tasks"`
 	Trials int          `json:"trials" yaml:"trials"`
+	// Split picks which tasks `tasks: all` means: public (default) or
+	// held_out. An explicit id list is taken as written, whatever the split.
+	Split string `json:"split,omitempty" yaml:"split"`
 }
 
 // CompatibilitySpec runs a second agent at gateway-level evidence. Its runs
@@ -219,6 +227,11 @@ type Manifest struct {
 	// Scenario inputs (scenario.go), each empty for a plan without them.
 	TaskImages map[string]string `json:"task_images,omitempty"` // task id -> image id of the task's own image, built at plan time
 	Scenario   map[string]string `json:"scenario,omitempty"`    // scenario input -> sha256: suite services, judge, output, verifier mode, agent skills
+
+	// HeldOutTasks lists the held-out tasks the plan selected, sorted; empty
+	// for a public-only plan. Reports and the leaderboard state the split
+	// from it, so a held-out score is never mixed into a public board.
+	HeldOutTasks []string `json:"held_out_tasks,omitempty"`
 }
 
 // BudgetDiff is one agent budget that differs between arms although no arm

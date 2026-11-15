@@ -2,11 +2,12 @@ import { OutputBadge } from "@/components/scenario/scenarioBadges";
 import { isServiceRole } from "@/components/scenario/scenario.utils";
 import { formatDateTime } from "@/components/verdict/verdict.utils";
 import { getLocale } from "@/lib/i18n";
-import type { ImportRecord, OutputKind, ServiceSpec, SuiteTask } from "@/lib/types/bench";
+import type { ArtifactSpec, ImportRecord, OutputKind, ServiceSpec, SuiteTask } from "@/lib/types/bench";
 import { cn } from "@/lib/utils";
 import { Ban, Download, EyeOff, Network } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { ToneBadge } from "./suiteBadges";
+import { DeclaredArtifacts } from "./taskArtifacts";
 
 /** Where an imported suite came from: benchmark, source, license, revision, importer and when. */
 export function ImportedFrom({ record }: { record: ImportRecord }) {
@@ -55,13 +56,23 @@ export function hasTaskScenario(task: SuiteTask): boolean {
 /**
  * A task's scenario facts: its own image, services, sessions with what carries over, output,
  * skills, and the impossible flag explained. Each part shows only when the task declares it;
- * a plain repository task renders nothing.
+ * a plain repository task renders nothing. An artifact task without its own artifact list shows
+ * the suite's (suiteArtifacts), labelled as the suite's.
  */
-export function TaskScenario({ task, suiteOutput }: { task: SuiteTask; suiteOutput?: OutputKind }) {
+export function TaskScenario({
+	task,
+	suiteOutput,
+	suiteArtifacts,
+}: {
+	task: SuiteTask;
+	suiteOutput?: OutputKind;
+	suiteArtifacts?: readonly ArtifactSpec[];
+}) {
 	const { t } = useTranslation("bench");
-	if (!hasTaskScenario(task)) return null;
-	const env = task.environment;
 	const output = task.output?.kind ?? suiteOutput;
+	const inherited = output === "artifact" && !task.output?.artifacts?.length && suiteArtifacts?.length ? suiteArtifacts : null;
+	if (!hasTaskScenario(task) && !inherited) return null;
+	const env = task.environment;
 	return (
 		<section className="flex min-w-0 flex-col gap-3" data-testid="suites-task-scenario">
 			<div className="flex flex-col gap-0.5">
@@ -157,6 +168,8 @@ export function TaskScenario({ task, suiteOutput }: { task: SuiteTask; suiteOutp
 							</span>
 						)}
 					</span>
+					{task.output?.artifacts && task.output.artifacts.length > 0 && <DeclaredArtifacts artifacts={task.output.artifacts} />}
+					{inherited && <DeclaredArtifacts artifacts={inherited} fromSuite />}
 				</Part>
 			)}
 

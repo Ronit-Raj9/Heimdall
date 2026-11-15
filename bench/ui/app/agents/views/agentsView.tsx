@@ -1,3 +1,4 @@
+import { CompareVersionsLink } from "@/components/agentdiff/agentDiffLinks";
 import { AgentCard } from "@/components/agents/agentCard";
 import { ModeBadge } from "@/components/modeBadge";
 import { BlockSkeleton, EmptyNote, LoadError } from "@/components/runs/screenStates";
@@ -17,6 +18,7 @@ export default function AgentsView() {
 				<div className="flex flex-wrap items-center gap-3">
 					<h1 className="text-foreground text-xl font-semibold tracking-tight">{t("agents.title")}</h1>
 					<ModeBadge mode={data?.mode} isLoading={query.isLoading} isError={query.isError && !data} />
+					<CompareVersionsLink className="ml-auto" />
 				</div>
 				<p className="text-muted-foreground max-w-3xl text-sm">{t("agents.subtitle")}</p>
 			</header>

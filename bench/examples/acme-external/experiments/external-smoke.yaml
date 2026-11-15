@@ -1,0 +1,31 @@
+# Free smoke check of the acme-external project: no model calls, no spend,
+# no network. The real pipeline runs with two scripted control agents on the
+# task, clean condition, one trial: the tool proxy starts with the weather
+# API's route in replay mode (no `external:` here, and the task's cassette
+# exists), the control calls the API through the proxy, every call lands in
+# tools.jsonl marked replayed, and the hidden verifier grades plan.json. Arm A
+# runs the reference script (oracle), arm B does nothing (noop), so A must
+# verify 1 of 1 and B 0 of 1; anything else means the proxy route, the
+# cassette or the verifier is wired wrong.
+#
+# `smoke: true` makes the planner only warn while the suite is not locked or
+# the task is not admitted yet, and marks the runs as a synthetic smoke test.
+# Slots: 1 task x 1 trial x 2 arms = 2.
+name: external-smoke
+smoke: true
+suite: acme-external@1.0.0
+base: agents/oracle.yaml
+arms:
+  A: {label: oracle (reference script)}
+  B: {label: noop (no change), agent: agents/noop.yaml}
+primary: {condition: clean, metric: verified_success}
+guards:
+  - {rule: no_new_integrity_violation}
+conditions:
+  - {id: clean, tasks: all, trials: 1}
+budget: {total_usd: 0}
+verdict: {policy: paired_signflip, alpha: 0.05, assumed_sd: 0.30}
+seed: 20261115
+concurrency: 1
+manifest_mode: agent_exposure
+policy: policies/default.yaml

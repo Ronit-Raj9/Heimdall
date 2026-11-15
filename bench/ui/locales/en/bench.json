@@ -1,4 +1,183 @@
 {
+	"agentDiff": {
+		"title": "Agent diff",
+		"subtitle": "What changed between version A and version B of an agent, and which tasks flipped. Only verified sealed runs on one suite version and one condition count.",
+		"synthetic": "Synthetic runs: scripted agents or models, or fixture data. The numbers show the screen works; they are not findings.",
+		"loadError": "Could not compute the agent diff.",
+		"versionsError": "Could not load the agent versions for the pickers.",
+		"noVersions": "No agent version has sealed runs yet. Run an experiment, then compare its arms here.",
+		"pick": "Pick version A and version B to compare, or open this page from an agent with \"Compare versions\".",
+		"pickA": "{{agent}} has no older version to compare with. Pick version A.",
+		"picker": {
+			"label": "Versions to compare",
+			"a": "Version A (before)",
+			"b": "Version B (after)",
+			"placeholder": "Pick a version",
+			"noAgent": "No agent id",
+			"optionHint_one": "{{hash}}, {{count}} sealed run",
+			"optionHint_other": "{{hash}}, {{count}} sealed runs",
+			"swap": "Swap A and B",
+			"scope": "Suite and condition",
+			"suite": "Suite",
+			"suitePlaceholder": "newest both ran",
+			"condition": "Condition",
+			"conditionPlaceholder": "clean",
+			"apply": "Apply",
+			"synthetic": "Include synthetic runs",
+			"syntheticHint": "Count runs of scripted agents, scripted models and smoke experiments. Their numbers are not findings.",
+			"suggested": "A is the previous version of {{agent}} ({{version}}). Pick another A to change it.",
+			"agentMode": "Comparing the two newest versions of {{agent}}. Pick A or B to pin them."
+		},
+		"summary": {
+			"net": "Net {{value}} tasks",
+			"passRate_one": "Pass rate {{a}} to {{b}} over {{count}} common task",
+			"passRate_other": "Pass rate {{a}} to {{b}} over {{count}} common tasks",
+			"counts": "Common tasks by class"
+		},
+		"test": {
+			"p": "Paired sign-flip test: p = {{p}} at alpha {{alpha}}, {{changed}} of {{total}} tasks changed.",
+			"noP": "No p value: there is no common task.",
+			"approx": "(approximate)",
+			"minP_one": "With {{count}} changed task the smallest possible p is {{p}}, so no result could reach alpha {{alpha}}.",
+			"minP_other": "With {{count}} changed tasks the smallest possible p is {{p}}, so no result could reach alpha {{alpha}}."
+		},
+		"conclusion": {
+			"b_better": "B is better",
+			"b_worse": "B is worse",
+			"no_clear_difference": "No clear difference",
+			"cannot_tell": "Cannot tell"
+		},
+		"class": {
+			"flipped_to_pass": "flipped to pass",
+			"flipped_to_fail": "flipped to fail",
+			"moved_to_pass": "moved to pass",
+			"moved_to_fail": "moved to fail",
+			"unstable_in_both": "unstable in both",
+			"unchanged_pass": "pass in both",
+			"unchanged_fail": "fail in both"
+		},
+		"classHint": {
+			"flipped_to_pass": "A failed every trial, B passed every trial.",
+			"flipped_to_fail": "A passed every trial, B failed every trial.",
+			"moved_to_pass": "B's pass rate is higher, but one side is unstable, so it is not a clean flip.",
+			"moved_to_fail": "B's pass rate is lower, but one side is unstable, so it is not a clean flip.",
+			"unstable_in_both": "Both versions passed some trials and failed others.",
+			"unchanged_pass": "Both versions passed every trial.",
+			"unchanged_fail": "Both versions failed every trial."
+		},
+		"version": {
+			"scope": "Suite {{suite}}, condition {{condition}}.",
+			"syntheticIncluded": "Synthetic runs included.",
+			"a": "A",
+			"b": "B",
+			"agent": "Agent",
+			"arm": "Arm",
+			"armValue": "{{arm}} of {{exp}}",
+			"runs": "Verified runs",
+			"experiments": "Experiments",
+			"noExperiments": "none",
+			"excluded": "Left out",
+			"noneExcluded": "No run left out",
+			"excludedItem_one": "{{reason}}: {{count}} run",
+			"excludedItem_other": "{{reason}}: {{count}} runs"
+		},
+		"config": {
+			"title": "Config diff",
+			"description_one": "{{count}} change between the two resolved configs, field by field. Files compare by hash; small text files show their diff.",
+			"description_other": "{{count}} changes between the two resolved configs, field by field. Files compare by hash; small text files show their diff.",
+			"identical": "Same resolved config: A and B differ only in their runs.",
+			"changes_one": "{{count}} change",
+			"changes_other": "{{count}} changes",
+			"group": {
+				"model": "Model",
+				"prompt_notes": "Prompt and notes",
+				"tools": "Tools",
+				"budgets": "Budgets",
+				"gateway": "Gateway policy",
+				"image": "Image",
+				"other": "Other"
+			},
+			"path": "Path",
+			"kind": "Change",
+			"old": "A",
+			"new": "B",
+			"unset": "unset",
+			"redacted": "redacted",
+			"redactedHint": "A secret-bearing value: only that it changed is shown.",
+			"files": "Changed files",
+			"hashChange": "{{old}} to {{new}}",
+			"none": "none",
+			"showDiff": "Show text diff",
+			"hashOnly": "Compared by hash only.",
+			"truncated": "The diff was cut at the line cap; the rest is not shown."
+		},
+		"kind": {
+			"changed": "changed",
+			"added": "added",
+			"removed": "removed"
+		},
+		"tasks": {
+			"title": "Tasks that flipped",
+			"description": "Passes over verified trials per common task. A flip is a stable pass becoming a stable fail or back; a move is a rate change where one side is unstable.",
+			"noCommon": "No common task: A and B ran no task in common on this suite and condition.",
+			"noneChanged": "No task flipped or moved between A and B.",
+			"task": "Task",
+			"class": "Class",
+			"a": "A passes",
+			"b": "B passes",
+			"runs": "Runs",
+			"passOf": "{{pass}}/{{n}}",
+			"showAll_one": "Show all {{count}} task",
+			"showAll_other": "Show all {{count}} tasks",
+			"showChanged": "Show only flips and moves",
+			"noRuns": "no linked run",
+			"openPair": "Compare runs",
+			"openPairAria": "Compare the runs of A and B on {{task}}",
+			"openA": "A run",
+			"openAAria": "Open the run of A on {{task}}",
+			"openB": "B run",
+			"openBAria": "Open the run of B on {{task}}",
+			"onlyA_one": "Only A ran {{count}} task, left out of the comparison: {{list}}.",
+			"onlyA_other": "Only A ran {{count}} tasks, left out of the comparison: {{list}}.",
+			"onlyB_one": "Only B ran {{count}} task, left out of the comparison: {{list}}.",
+			"onlyB_other": "Only B ran {{count}} tasks, left out of the comparison: {{list}}."
+		},
+		"metrics": {
+			"title": "Metric deltas",
+			"description": "Means over the tasks where both versions observed the metric; delta is B minus A, read with the metric's direction.",
+			"empty": "No metric was observed on both sides.",
+			"metric": "Metric",
+			"a": "A",
+			"b": "B",
+			"delta": "Delta",
+			"direction": "Reading",
+			"tasks": "Tasks",
+			"higher": "higher is better",
+			"lower": "lower is better",
+			"dir": {
+				"better": "better",
+				"worse": "worse",
+				"same": "same",
+				"unknown": "unknown"
+			},
+			"unknown": "unknown",
+			"unknownCounts": "{{a}} unknown in A, {{b}} in B"
+		},
+		"gates": {
+			"title": "Gate firings",
+			"description": "Gates that fired in either version on the common tasks. New means it fires in B and never in A.",
+			"empty": "No gate fired in either version.",
+			"new": "new in B",
+			"counts": "fired A {{a}}, B {{b}}",
+			"tasks": "New in B on: {{list}}"
+		},
+		"link": {
+			"compare": "Compare versions",
+			"compareHint": "What changed between two versions of an agent, and which tasks flipped.",
+			"diff": "Diff",
+			"diffHint": "Compare this config with its previous version"
+		}
+	},
 	"app": {
 		"name": "Bifrost Bench",
 		"tagline": "Agent benchmarking"
@@ -6,6 +185,7 @@
 	"nav": {
 		"label": "Bench navigation",
 		"leaderboard": "Leaderboard",
+		"review": "Review",
 		"suites": "Suites",
 		"agents": "Agents",
 		"verdict": "Verdict",
@@ -13,9 +193,12 @@
 		"receipts": "Receipts",
 		"newExperiment": "New experiment",
 		"triage": "Triage",
+		"clusters": "Failure clusters",
+		"matrix": "Model matrix",
 		"releases": "Releases",
 		"imports": "Imports",
-		"workers": "Workers"
+		"workers": "Workers",
+		"trends": "Trends"
 	},
 	"mode": {
 		"live": "LIVE",
@@ -396,6 +579,12 @@
 	"runs": {
 		"title": "Run comparison",
 		"subtitle": "Two matched runs of one task, condition and trial, aligned step by step.",
+		"trace": {
+			"download": "Download trace (OTLP)",
+			"downloadAria": "Download the OpenTelemetry trace of run {{run}} (arm {{arm}}) as OTLP/JSON",
+			"unsealed": "Trace export needs a sealed run",
+			"sealMismatch": "Trace not offered: the run does not match its seal"
+		},
 		"empty": "No pair selected.",
 		"pairHeading": "{{task}} under {{condition}}, trial {{trial}}",
 		"pairId": "pair {{id}}",
@@ -574,6 +763,21 @@
 				"hash": "sha256",
 				"failed": "export failed: {{error}}"
 			},
+			"artifacts": {
+				"title": "Artifacts",
+				"description": "Files the agent produced, copied out of the workspace after it exited, sealed, and mounted read-only for the verifier. They are agent-written content: download them, they are never opened here.",
+				"label": "Artifacts of arm {{arm}}",
+				"artifact": "Artifact",
+				"file": "File",
+				"size": "Size",
+				"hash": "sha256",
+				"download": "Download",
+				"downloadAria": "Download {{name}} (artifact {{artifact}})",
+				"from": "from {{source}}",
+				"failed": "not exported: {{error}}",
+				"unsealed": "downloadable once the run is sealed",
+				"sealMismatch": "not served: the run folder does not match its seal"
+			},
 			"services": {
 				"title": "Services",
 				"description": "What ran beside the agent and whether it passed its ready check. A service that never came up aborts the run as an infrastructure failure, not an agent failure.",
@@ -663,6 +867,39 @@
 			"close": "Close"
 		}
 	},
+	"matrix": {
+		"title": "Model matrix",
+		"subtitle": "Every arm of one experiment on one condition, ranked by verified success. Every pair is tested on the tasks both ran with the exact sign-flip test, Holm-adjusted across all pairs.",
+		"experiment": "Experiment {{id}}",
+		"noExperiments": "No experiments yet. Plan and run one, then compare its arms here.",
+		"listError": "Could not load experiments",
+		"loadError": "Could not load the model matrix",
+		"condition": "Condition",
+		"gradeSource": "Grades: {{source}}",
+		"facts": "{{suite}}, common tasks {{tasks}}, alpha {{alpha}}",
+		"notSeparable": "Cannot separate",
+		"synthetic": "Synthetic data: scripted agent, scripted model or smoke experiment. These numbers are not findings.",
+		"openVerdict": "Open verdict",
+		"table": {
+			"title": "Arms",
+			"description": "Rank and tier come from the server. Success shows its 95% interval over tasks; unknown values are hatched, never 0.",
+			"label": "Arms ranked by verified success",
+			"arm": "Arm",
+			"provider": "Provider"
+		},
+		"grid": {
+			"title": "Pairwise tests",
+			"description": "Each cell is the Holm-adjusted p of the row arm against the column arm. Bold and coloured: significant at alpha {{alpha}}. Hover a cell for the reason.",
+			"label": "Holm-adjusted p for every pair of arms",
+			"rowVsColumn": "row vs column",
+			"same": "same arm",
+			"noTest": "no test",
+			"hint": "{{row}} vs {{column}}: {{reason}}. Row minus column {{diff}} pp on {{tasks}} common tasks, {{nonzero}} differ. Raw p {{p}}, Holm-adjusted p {{pAdjusted}}.",
+			"noP": "none"
+		},
+		"excluded": "Left out: {{reason}} ({{runs}} runs)",
+		"empty": "No arm has a graded run on this condition yet."
+	},
 	"triage": {
 		"title": "Failure triage",
 		"subtitle": "Deterministic failure patterns per arm, each linked to the runs and events that show it.",
@@ -705,6 +942,136 @@
 			"loadError": "Could not load this run's metrics.",
 			"noReason": "No event ids recorded for this run.",
 			"moreEvents": "+{{count}} more"
+		}
+	},
+	"clusters": {
+		"title": "Failure clusters",
+		"subtitle": "Failed verified runs across experiments, grouped by a signature built from their recorded evidence: failed hidden tests, gates, loops, error lines and the last tool.",
+		"banner": "Observed groupings, not root causes.",
+		"bannerHint": "A signature is a fixed rule over a run's grade and evidence. Runs in one cluster failed the same recorded way; read their traces before naming a cause.",
+		"loadError": "Could not load the failure clusters.",
+		"resetFilters": "Reset filters",
+		"generatedAt": "Computed {{at}}",
+		"summary": {
+			"failures_one": "{{count}} failure",
+			"failures_other": "{{count}} failures",
+			"runs_one": "{{count}} verified run",
+			"runs_other": "{{count}} verified runs",
+			"line": "{{failures}} in {{runs}}",
+			"experiments_one": "from {{count}} experiment",
+			"experiments_other": "from {{count}} experiments",
+			"excluded": "Left out:",
+			"excludedNone": "No runs left out.",
+			"excludedRuns_one": "{{count}} run",
+			"excludedRuns_other": "{{count}} runs",
+			"hidden_one": "{{count}} cluster below the minimum of {{min}} runs is not listed.",
+			"hidden_other": "{{count}} clusters below the minimum of {{min}} runs are not listed."
+		},
+		"filters": {
+			"label": "Cluster filters",
+			"suite": "Suite",
+			"suitePlaceholder": "every suite",
+			"agent": "Agent",
+			"agentPlaceholder": "every agent",
+			"exp": "Experiments",
+			"expPlaceholder": "e_one,e_two",
+			"since": "Since",
+			"sincePlaceholder": "2026-11-01",
+			"min": "Minimum runs",
+			"apply": "Press Enter or leave the field to apply.",
+			"synthetic": "Runs",
+			"syntheticExclude": "Live",
+			"syntheticExcludeHint": "Live runs only. Scripted agent and scripted model runs are left out.",
+			"syntheticInclude": "All",
+			"syntheticIncludeHint": "Live and synthetic runs together.",
+			"syntheticOnly": "Synthetic",
+			"syntheticOnlyHint": "Scripted agent and scripted model runs only. They show the pipeline works, not how agents fail."
+		},
+		"table": {
+			"title": "Clusters",
+			"description": "Largest first. Share is of the failures in scope. Open a cluster to see its signature layers and runs.",
+			"label": "Failure clusters",
+			"cluster": "Cluster",
+			"count": "Runs",
+			"share": "Share",
+			"scope": "Scope",
+			"tasks": "Tasks",
+			"agents": "Agents",
+			"conditions": "Conditions",
+			"experiments": "Experiments",
+			"lastSeen": "Last seen",
+			"more": "+{{count}} more",
+			"afterChange": "after config change",
+			"show": "Details",
+			"showAria": "Show the cluster {{title}}",
+			"hideAria": "Hide the cluster {{title}}"
+		},
+		"scope": {
+			"single_run": "One run",
+			"agent_and_task": "One agent, one task",
+			"agent": "One agent",
+			"task": "One task",
+			"systemic": "Systemic",
+			"hint": {
+				"single_run": "Only one run failed this way.",
+				"agent_and_task": "Every run is one agent config on one task.",
+				"agent": "One agent config, more than one task.",
+				"task": "One task, more than one agent config.",
+				"systemic": "More than one agent config on more than one task."
+			}
+		},
+		"empty": {
+			"noRuns": "No verified runs match these filters.",
+			"noFailures_one": "No failures: the {{count}} verified run in scope passed.",
+			"noFailures_other": "No failures: all {{count}} verified runs in scope passed.",
+			"allHidden": "Every cluster is below the minimum count. Lower the minimum to list them.",
+			"showSynthetic": "Include synthetic runs"
+		},
+		"detail": {
+			"close": "Close",
+			"loading": "Loading the cluster",
+			"loadError": "Could not load this cluster.",
+			"notFound": "This cluster is not in the filtered set. Change the filters or close it.",
+			"signature": "Signature",
+			"counts_one": "{{count}} run, {{share}} of failures",
+			"counts_other": "{{count}} runs, {{share}} of failures",
+			"seen": "First seen {{first}}, last seen {{last}}",
+			"layers": "Signature layers",
+			"layersHint": "Most specific first. Each layer is read from the run's grade, gates, metrics or evidence.",
+			"source": "from {{source}}",
+			"layer": {
+				"outcome": "Outcome",
+				"failed_tests": "Failed hidden tests",
+				"failed_dimensions": "Failed reward dimensions",
+				"answer_category": "Answer category",
+				"state_checks": "Failed state checks",
+				"gates": "Gates fired",
+				"loop": "Repeated call",
+				"error": "Error",
+				"provider": "Provider status",
+				"last_tool": "Last tool",
+				"condition": "Condition"
+			},
+			"errorText": "Normalized error",
+			"errorTextHint": "Recorded output, shown as plain text.",
+			"afterChangeTitle": "After a config change",
+			"afterChange": "Every run here came after {{agent}} changed config from {{from}} to {{to}} on {{at}}. The change may be related; this is an observation, not a cause.",
+			"related": "Related clusters",
+			"relatedRuns_one": "{{count}} run",
+			"relatedRuns_other": "{{count}} runs",
+			"runs": "Runs",
+			"runsHint": "Each run id opens its matched pair on the run page.",
+			"noRuns": "No runs in this cluster.",
+			"run": "Run",
+			"where": "Task",
+			"agent": "Agent",
+			"outcome": "Outcome",
+			"at": "When",
+			"lastTool": "Last tool",
+			"lastToolErrored": "errored",
+			"runError": "Error line",
+			"arm": "arm {{arm}}",
+			"noPair": "Pair not in the grid"
 		}
 	},
 	"experiments": {
@@ -801,6 +1168,39 @@
 				"errors": "Blocks the start",
 				"warnings": "Warnings",
 				"noIssues": "No errors and no warnings."
+			},
+			"estimate": {
+				"title": "Estimate",
+				"description": "Expected cost and time from sealed runs of the same agent configs on this suite. Nothing has run.",
+				"loadError": "Could not estimate cost and time",
+				"cost": "Agent cost",
+				"agentTime": "Agent time",
+				"wallClock": "Wall clock",
+				"wallClockHint": "Agent time over a concurrency of {{concurrency}}, no queueing assumed.",
+				"budget": "Budget {{budget}}",
+				"priceRef": "Prices checked against {{ref}}.",
+				"range": {
+					"history": "{{low}} to {{high}} (median {{median}})",
+					"upperBound": "at most {{high}}",
+					"unknown": "no history, cannot estimate"
+				},
+				"fit": {
+					"fits": "Fits the budget",
+					"may_exceed": "May exceed the budget",
+					"likely_exceeds": "Likely exceeds the budget",
+					"exceeds": "Exceeds the budget",
+					"unknown": "Fit unknown",
+					"no_budget": "No budget set"
+				},
+				"perArm": "Per arm",
+				"arm": "Arm",
+				"label": "Label",
+				"model": "Model",
+				"runs": "Runs",
+				"basis": "Basis",
+				"armCost": "Cost",
+				"judge": "Judge, separate from the agent cost: {{runs}} runs, {{cost}}.",
+				"notes": "Notes"
 			},
 			"progress": {
 				"title": "Experiment {{id}}",
@@ -1220,10 +1620,164 @@
 			"output": "Output",
 			"fromSuite": "from the suite",
 			"answerPath": "answer written to {{path}}",
+			"artifacts": "Expected artifacts",
+			"artifactsHint": "Files the agent must leave in the workspace. After the run each match is copied to artifacts/<id>/ in the run folder, sealed, and read by the verifier.",
+			"artifactRequired": "required",
+			"artifactOptional": "optional",
+			"artifactMaxBytes": "up to {{size}} per file",
+			"artifactDefaultMax": "up to 32 MiB per file (default)",
 			"skills": "Skills",
 			"skillsHint": "Installed in the agent's skills folder, unless the run turns skills off.",
 			"impossible": "Impossible task",
 			"impossibleBody": "Its tests contradict its instruction, so no honest solution exists. A pass can only come from cheating, such as editing the tests or special-casing the checks, and the impossible_pass gate records it as an integrity violation."
+		}
+	},
+	"suiteHealth": {
+		"title": "Suite health",
+		"description": "Read from sealed runs across experiments. A flaky verifier corrupts verdicts and is a defect; agent variance is normal and is shown apart from it.",
+		"column": "Health",
+		"loading": "Loading health",
+		"unavailable": "Health unavailable",
+		"unavailableCell": "n/a",
+		"reason": {
+			"no_store": "The server has no run store, so health cannot be read from sealed runs.",
+			"not_found": "The server has no health report for this suite.",
+			"error": "The health request failed: {{message}}"
+		},
+		"computed": "Computed {{when}} from {{runs}} sealed runs across {{experiments}} experiments.",
+		"thresholds": "Difficulty is labelled after {{minRuns}} scored runs from {{minConfigs}} agent configs: easy at or above a {{easy}} pass rate, hard at or below {{hard}}. Intervals are Wilson score intervals at {{level}}. Infra trouble means infra failures above {{infra}}; timeouts means timeouts above {{timeout}}.",
+		"stats": {
+			"label": "Suite health counts",
+			"heldOut": "Held out",
+			"heldOutHint": "Tasks whose instruction and files are not served.",
+			"quarantined": "Quarantined",
+			"quarantinedHint": "Tasks kept out of new plans.",
+			"canary": "Canary",
+			"canarySet": "set",
+			"canaryNone": "none"
+		},
+		"noFlags": "No task carries a health flag.",
+		"notes": "Notes",
+		"flags": {
+			"flaky_verifier": "Flaky verifier",
+			"difficulty_mismatch": "Difficulty mismatch",
+			"no_discrimination": "No information",
+			"saturated": "Saturated",
+			"dead": "Dead",
+			"infra_trouble": "Infra trouble",
+			"timeouts": "Timeouts",
+			"insufficient_data": "Too few runs",
+			"quarantined": "Quarantined"
+		},
+		"flagHints": {
+			"flaky_verifier": "The verifier graded the same output differently, or the reference did not always pass. Verdicts on this task are not trustworthy.",
+			"difficulty_mismatch": "Observed difficulty differs from the declared one.",
+			"no_discrimination": "Every agent config always passes, or always fails: the task says nothing about which agent is better.",
+			"saturated": "Every scored run of every agent config passed.",
+			"dead": "Every scored run of every agent config failed.",
+			"infra_trouble": "Infra failures above the threshold.",
+			"timeouts": "Agents hit the wall-time cap more often than the threshold.",
+			"insufficient_data": "Too few scored runs or agent configs to label difficulty.",
+			"quarantined": "Kept out of new plans."
+		},
+		"chip": {
+			"flaky": "Flaky verifier ({{count}})",
+			"mismatch": "Declared {{declared}}, observed {{observed}}",
+			"infra": "Infra {{rate}}",
+			"timeouts": "Timeouts {{rate}}"
+		},
+		"noRuns": "No runs yet",
+		"noRunsHint": "No sealed run of this task was found.",
+		"noIssues": "No issues",
+		"variance": "Agent variance: {{unstable}} of {{configs}} configs mixed",
+		"varianceHint": "How often the same agent config both passed and failed. Normal for agents, not a task defect.",
+		"heldOut": "Held out",
+		"heldOutHint": "Held-out task: its instruction and files are not served (server config held_out.visible is false).",
+		"heldOutVisibleHint": "Held-out task, shown because the server config sets held_out.visible.",
+		"heldOutRow": "Title, files and checks are withheld for a held-out task.",
+		"withheld": "withheld",
+		"board": {
+			"toggle": "Held-out board",
+			"toggleHint": "Show the separate board of held-out tasks. The public board never counts a held-out task.",
+			"banner": "Held-out board",
+			"bannerHint": "Scores from held-out tasks only, from experiments that selected them. They are never mixed into the public board."
+		},
+		"quarantine": {
+			"hint": "Kept out of new plans since {{when}} ({{source}}): {{reason}}",
+			"source": {
+				"manual": "manual",
+				"auto": "auto, from verifier evidence"
+			}
+		},
+		"card": {
+			"heldOut": "{{count}} held out",
+			"quarantined": "{{count}} quarantined"
+		},
+		"detail": {
+			"title": "Health",
+			"noRuns": "No sealed run of this task was found, so there is no health to show yet.",
+			"quarantineTitle": "Quarantine",
+			"quarantineBody": "Kept out of new plans. Results already recorded stay valid.",
+			"reason": "Reason",
+			"source": "Source",
+			"at": "Since",
+			"version": "Task version",
+			"evidence": "Evidence",
+			"verifierTitle": "Verifier",
+			"flakyBody_one": "Flaky verifier: {{count}} piece of evidence from {{checks}} checks. Verdicts on this task are not trustworthy until the verifier is fixed.",
+			"flakyBody_other": "Flaky verifier: {{count}} pieces of evidence from {{checks}} checks. Verdicts on this task are not trustworthy until the verifier is fixed.",
+			"verifierStable_one": "No disagreement found in {{count}} check.",
+			"verifierStable_other": "No disagreement found in {{count}} checks.",
+			"verifierUnchecked": "Nothing could have shown a flaky verifier yet: no regrades, repeated outputs, oracle runs or reference repeats.",
+			"evidenceKind": {
+				"regrade_disagrees": "Regrade disagrees",
+				"same_output_differs": "Same output, different verdict",
+				"admission_reference": "Reference failed at admission",
+				"oracle_failed": "Oracle run failed"
+			},
+			"evidenceExp": "experiment {{exp}}",
+			"evidenceRuns": "runs {{runs}}",
+			"difficultyTitle": "Difficulty",
+			"declared": "Declared",
+			"observed": "Observed",
+			"passRate": "Pass rate",
+			"interval": "Interval ({{level}})",
+			"intervalValue": "{{low}} to {{high}}",
+			"runs": "Scored runs",
+			"configs": "Agent configs",
+			"spread": "Spread (best minus worst config)",
+			"unset": "unset",
+			"unknown": "unknown",
+			"observedValue": {
+				"easy": "easy",
+				"medium": "medium",
+				"hard": "hard",
+				"unknown": "unknown"
+			},
+			"match": {
+				"match": "Matches the declared difficulty.",
+				"mismatch": "Differs from the declared difficulty.",
+				"undeclared": "No difficulty is declared.",
+				"unknown": "Too few runs to compare."
+			},
+			"discriminationTitle": "Discrimination",
+			"discrimination": {
+				"discriminating": "Separates agents: configs differ.",
+				"always_pass": "No information: every agent config always passes.",
+				"always_fail": "No information: every agent config always fails.",
+				"single_config": "Only one agent config ran, so there is nothing to separate.",
+				"unknown": "Too few runs to tell."
+			},
+			"varianceTitle": "Agent variance (normal)",
+			"varianceBody": "How often the same agent config both passed and failed across trials. This is ordinary agent behavior, not a defect of the task or its verifier.",
+			"varianceSummary": "{{unstable}} of {{configs}} configs mixed; mean variance {{mean}}.",
+			"varianceConfig": "{{passes}}/{{trials}} passed",
+			"varianceNone": "No agent config has scored trials yet.",
+			"infraTitle": "Infra and timeouts",
+			"infraRate": "Infra failures",
+			"timeoutRate": "Timeouts at the cap",
+			"rateValue": "{{rate}} ({{count}} of {{attempts}} attempts)",
+			"infraBreakdown": "{{aborted}} aborted, {{errors}} infra errors, {{invalid}} invalid evaluator"
 		}
 	},
 	"agents": {
@@ -1274,6 +1828,9 @@
 			"skills": "Skills",
 			"safety": "Safety",
 			"qa": "Q&A",
+			"browser": "Browser",
+			"computer_use": "Computer use",
+			"artifact": "Artifacts",
 			"codingHint": "Edit a repository; hidden tests decide.",
 			"terminalHint": "Work in a whole container; its state is checked afterwards.",
 			"tool_useHint": "Call tools against a service; the final state is checked.",
@@ -1282,6 +1839,9 @@
 			"skillsHint": "The same task with and without agent skills.",
 			"safetyHint": "Attacks delivered through tool results or files.",
 			"qaHint": "A written answer, matched or judged.",
+			"browserHint": "A web application operated through a browser; its final state is checked.",
+			"computer_useHint": "A desktop operated through screenshots, mouse and keyboard; its final state is checked.",
+			"artifactHint": "Produce files, such as a report, a chart or a model, graded on their content.",
 			"otherHint": "A track this version of the UI does not know."
 		},
 		"grading": {
@@ -1300,7 +1860,9 @@
 			"state": "State",
 			"diffHint": "The verifier reads the agent's workspace patch.",
 			"answerHint": "The verifier reads the answer the agent wrote.",
-			"stateHint": "The verifier reads files exported from the services after the run."
+			"stateHint": "The verifier reads files exported from the services after the run.",
+			"artifact": "Artifacts",
+			"artifactHint": "The verifier reads files the agent left in the workspace, copied out and sealed after the run."
 		},
 		"role": {
 			"data": "data",
@@ -1354,6 +1916,240 @@
 			"idleHint": "Registered and waiting for a slot.",
 			"runningHint": "Holding at least one slot.",
 			"lostHint": "Stopped answering; its leases go back to the queue."
+		}
+	},
+	"trends": {
+		"title": "Trends",
+		"subtitle": "Each agent config lineage (agent and model) over experiments, one point per config hash. A slow regression shows here even when no single release verdict caught it.",
+		"loadError": "Could not load the trends.",
+		"resetFilters": "Reset filters",
+		"unknown": "not observed",
+		"empty_one": "Only {{count}} point matches these filters. A trend needs at least 2 points to draw a line.",
+		"empty_other": "{{count}} points match these filters. A trend needs at least 2 points to draw a line.",
+		"includeSynthetic": "Include synthetic runs",
+		"filters": {
+			"label": "Trend filters",
+			"suite": "Suite",
+			"allSuites": "All suites",
+			"agent": "Agent",
+			"allAgents": "All agents",
+			"metric": "Metric",
+			"condition": "Condition",
+			"synthetic": "Runs",
+			"syntheticOption": {
+				"exclude": "Live",
+				"include": "All",
+				"only": "Synthetic"
+			},
+			"syntheticHint": {
+				"exclude": "Live runs only. Scripted agents and the scripted model are left out.",
+				"include": "Live and synthetic runs together.",
+				"only": "Scripted agent or scripted model runs only. Their numbers are not findings."
+			}
+		},
+		"metric": {
+			"verified_success": "Verified success",
+			"cost_per_success": "Cost per success",
+			"tokens": "Tokens per run",
+			"wall_time_s": "Wall time per run",
+			"false_completion": "False completion"
+		},
+		"status": {
+			"regressed": "Regressed",
+			"improved": "Improved",
+			"no_change": "No change detected",
+			"cannot_tell": "Cannot tell",
+			"first": "First point"
+		},
+		"release": {
+			"regressed": "Release regressed",
+			"blocked": "Release blocked"
+		},
+		"lineages": {
+			"title": "Latest change per lineage",
+			"description": "Newest point against the one before it, by the exact sign-flip test on the tasks both ran (alpha {{alpha}}). Too few tasks says cannot tell, never regressed.",
+			"points_one": "{{count}} point",
+			"points_other": "{{count}} points"
+		},
+		"chart": {
+			"title": "{{metric}} over time",
+			"description": "One line per lineage. A gap means the metric was not observed for that point.",
+			"summary_one": "{{metric}} over time: {{lineages}} lineages, {{count}} point.",
+			"summary_other": "{{metric}} over time: {{lineages}} lineages, {{count}} points.",
+			"latest": "Latest: {{latest}}.",
+			"noValues": "No point has a value for this metric.",
+			"configChanged": "Config hash changed",
+			"legendConfigChanged": "Diamond: config hash changed from the previous point",
+			"legendRelease": "Red ring: release verdict regressed or blocked",
+			"legendInterval": "Bar: descriptive 95% interval over task success rates"
+		},
+		"table": {
+			"title": "Every point",
+			"description": "The chart's numbers. Medians per run for tokens and wall time; false completion is a share of runs.",
+			"caption": "Trend points by lineage, oldest first",
+			"lineage": "Lineage",
+			"experiment": "Experiment",
+			"date": "Date",
+			"arm": "Arm",
+			"config": "Config",
+			"configChanged": "changed",
+			"value": "{{metric}}",
+			"success": "Verified success",
+			"interval": "[{{lo}}, {{hi}}]",
+			"costPerSuccess": "Cost per success",
+			"tokens": "Tokens",
+			"wallTime": "Wall time",
+			"falseCompletion": "False completion",
+			"verdict": "Verdict",
+			"noAnalysis": "no analysis",
+			"policy": "policy {{decision}}",
+			"regression": "Against previous"
+		},
+		"footnote": {
+			"source": "Read from the results index, which is derived from sealed run folders and can be rebuilt at any time. A trend is a monitoring signal; release verdicts, the leaderboard and releases read the sealed files, never this index.",
+			"indexedAt": "Index written {{time}}.",
+			"rejected_one": "{{count}} run is listed as rejected because its seal did not verify. It is never charted.",
+			"rejected_other": "{{count}} runs are listed as rejected because their seals did not verify. They are never charted."
+		}
+	},
+	"review": {
+		"title": "Human review",
+		"subtitle": "Runs a person should look at: split or unparsable judge votes, undecided graders, fired veto gates, false completions and flags. A review is a hash-chained record beside the sealed run. It never edits sealed evidence and changes results only where an analysis asks for grade source reviewed.",
+		"picker": {
+			"label": "Experiment",
+			"placeholder": "Pick an experiment",
+			"loadError": "Could not load the experiments."
+		},
+		"noExperiments": "No experiment yet. Run one first; its runs that need a person show up here.",
+		"verdictLink": "Verdict with reviews applied",
+		"filter": {
+			"label": "Reason",
+			"all": "All reasons"
+		},
+		"queue": {
+			"title": "Queue",
+			"description": "Sealed runs whose grade a person should check, with the outcome in effect under grade source reviewed.",
+			"loadError": "Could not load the review queue.",
+			"empty": "No run of this experiment needs review.",
+			"emptyFiltered": "No run of this experiment has this reason.",
+			"problems": "Not applied",
+			"problemsHint": "Reviews that failed their hash, chain or parent seal check are ignored, and runs whose seal does not verify are left out. Nothing here changes a result.",
+			"columns": {
+				"run": "Run",
+				"task": "Task",
+				"arm": "Arm",
+				"condition": "Condition",
+				"trial": "Trial",
+				"reasons": "Reasons",
+				"sealed": "Sealed",
+				"current": "In effect",
+				"decision": "Decision",
+				"reviews": "Reviews"
+			},
+			"noDecision": "none",
+			"select": "Review run {{id}}"
+		},
+		"reason": {
+			"split_votes": "Split judge votes",
+			"unparsable_votes": "Unparsable judge vote",
+			"invalid_evaluator": "Grader undecided",
+			"veto": "Veto gate fired",
+			"false_completion": "False completion",
+			"flagged": "Flagged"
+		},
+		"decision": {
+			"pass": "Pass",
+			"fail": "Fail",
+			"invalid": "Invalid",
+			"flag_only": "Flag only"
+		},
+		"decisionHint": {
+			"pass": "The run succeeded. Also overrules a veto gate that fired. Counts as 1, at evidence level reviewed.",
+			"fail": "The run did not succeed. Counts as 0.",
+			"invalid": "The evidence cannot decide, for example a broken judge or verifier. Counts as unknown.",
+			"flag_only": "Records a concern for someone else to look at. The outcome stays as it is."
+		},
+		"panel": {
+			"title": "Run {{id}}",
+			"select": "Pick a run in the queue to see its evidence and record a review.",
+			"loadError": "Could not load run {{id}}.",
+			"openPair": "Open in run comparison",
+			"grade": "Grade",
+			"passed": "passed",
+			"failed": "failed",
+			"undecided": "grader undecided",
+			"gradeReason": "Grader reason",
+			"failedTests": "Failed tests",
+			"judge": "Judge",
+			"judgeVotes": "Votes",
+			"notJudged": "Not judged: the verifier decided.",
+			"gates": "Fired gates",
+			"noGates": "No gate fired.",
+			"answer": "Answer",
+			"noAnswer": "No answer recorded.",
+			"diff": "Workspace diff",
+			"claim": "Agent claim",
+			"claimMade": "claimed success",
+			"claimNone": "no success claim",
+			"sealHash": "Seal"
+		},
+		"timeline": {
+			"title": "Reviews",
+			"description": "Every valid review of this run in log order, oldest first. A later decision supersedes an earlier one; nothing is deleted.",
+			"empty": "No review of this run yet.",
+			"loadError": "Could not load the reviews of this run.",
+			"current": "in effect",
+			"superseded": "superseded",
+			"flag": "flag",
+			"by": "{{reviewer}}, {{time}}",
+			"change": "{{from}} before, {{to}} under this review",
+			"supersedes": "Supersedes {{id}}.",
+			"evidence": "Cited",
+			"problems": "Ignored reviews",
+			"sealed": "Sealed outcome",
+			"effective": "Outcome under reviews",
+			"hash": "Record hash {{hash}}"
+		},
+		"form": {
+			"title": "Record a review",
+			"decision": "Decision",
+			"reason": "Reason",
+			"reasonPlaceholder": "What the grade got wrong, and what you looked at.",
+			"reviewer": "Reviewer",
+			"reviewerPlaceholder": "Your name",
+			"evidence": "Evidence cited (optional, one per line)",
+			"evidencePlaceholder": "grade.json failed_tests\nworkspace.diff",
+			"token": "Write token",
+			"tokenHint": "The server's write token (BENCH_WRITE_TOKEN). Kept in this tab only.",
+			"tokenPlaceholder": "paste the token",
+			"submit": "Record review",
+			"error": "Could not record the review: {{error}}",
+			"created": "Review {{id}} recorded.",
+			"reasonRequired": "A reason is required.",
+			"reviewerRequired": "A reviewer name is required.",
+			"decisionRequired": "Pick a decision.",
+			"readOnly": "This server runs in {{mode}} mode, which refuses reviews. Only a live run folder takes new reviews.",
+			"noAuth": "There is no login. The reviewer name is what you type here, and the write token is the only guard."
+		},
+		"badge": {
+			"reviewed_one": "{{count}} run human-reviewed",
+			"reviewed_other": "{{count}} runs human-reviewed",
+			"changed": "{{count}} changed",
+			"hint": "These outcomes come from a person's review, not from the verifier. They are evidence level reviewed, never verified.",
+			"noneApplied": "Grade source reviewed, no review applied"
+		},
+		"gradeSource": {
+			"label": "Grades",
+			"original": "Original",
+			"latest": "Newest regrade",
+			"reviewed": "Human reviewed",
+			"originalHint": "Every run as sealed.",
+			"latestHint": "Each experiment's newest regrade, where it has a result for the run.",
+			"reviewedHint": "The sealed grades with human reviews applied on top. Regrades are not applied."
+		},
+		"runs": {
+			"title": "Human reviews",
+			"description": "Reviews of each arm's run. They apply only under grade source reviewed."
 		}
 	}
 }

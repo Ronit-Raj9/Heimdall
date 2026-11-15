@@ -72,7 +72,11 @@ func (g *egressGate) Check(_ context.Context, rc *schemas.RunContext, _ *schemas
 		problems = append(problems, fmt.Sprintf("run network %q is not the eval network %q", got, want))
 	}
 	if len(problems) == 0 {
-		return newResult(g, false, utils.RemoteEgressNote(rc), nil), nil // Remote area: records the one host a remote_http agent may reach; "" otherwise
+		note := utils.RemoteEgressNote(rc) // Remote area: records the one host a remote_http agent may reach; "" otherwise
+		if ext := externalEgressNote(rc); ext != "" {
+			note = strings.TrimPrefix(note+"; "+ext, "; ")
+		}
+		return newResult(g, false, note, nil), nil
 	}
 	return newResult(g, true, strings.Join(problems, "; "), []string{"network:" + got}), nil
 }
@@ -80,4 +84,38 @@ func (g *egressGate) Check(_ context.Context, rc *schemas.RunContext, _ *schemas
 // newEgressGate returns the egress gate.
 func newEgressGate() *egressGate {
 	return &egressGate{}
+}
+
+// externalEgressNote records the external APIs a run declared (Suite.External,
+// Task.External): each one's host and the mode it ran in. They are allowed
+// by design, not a leak: only the tool proxy reaches them, and only in live
+// or record mode, each through a per-run forwarder to exactly that host; in
+// replay mode nothing leaves the bench. It is "" for a run without external
+// APIs.
+func externalEgressNote(rc *schemas.RunContext) string {
+	if rc == nil {
+		return ""
+	}
+	refs := utils.ExternalAPIs(rc.Suite, rc.Task)
+	if len(refs) == 0 {
+		return ""
+	}
+	parts := make([]string, 0, len(refs))
+	for _, r := range refs {
+		target, err := utils.ExternalTarget(r.API.BaseURL)
+		if err != nil {
+			target = "invalid base_url"
+		}
+		how := ""
+		switch mode, err := utils.RunExternalMode(rc, r); {
+		case err != nil:
+			how = "mode unresolved: " + err.Error()
+		case mode == schemas.ExternalReplay:
+			how = "replay, no egress"
+		default:
+			how = mode + ", tool proxy only, through a per-run forwarder; not repeatable"
+		}
+		parts = append(parts, r.API.ID+" -> "+target+" ("+how+")")
+	}
+	return "external APIs: " + strings.Join(parts, "; ")
 }

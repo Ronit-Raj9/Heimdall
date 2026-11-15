@@ -1,0 +1,40 @@
+# Model comparison matrix: the same Codex config on three OpenAI models from
+# the pinned price snapshot (deploy/pricing-snapshot.json). `matrix:` expands
+# at plan time into arms A, B and C, one per model, labelled with the model
+# name (docs/model-matrix.md). The paired verdict still compares B with A; the
+# matrix view (`bifrost-bench matrix -exp <id>`) compares every pair, with
+# Holm adjustment across all three pairs.
+#
+# Not run: it calls real models and costs money.
+#
+# Slots: clean, 8 tasks x 2 trials x 3 arms = 48 runs, 16 per arm.
+#
+# Expected spend (`bifrost-bench estimate experiments/matrix-models.yaml`,
+# docs/forecast.md): only gpt-5.4-mini has history with this agent on
+# coding-core@1.0.0, the "codex baseline" config of the recorded batches
+# (docs/results/leaderboard-clean.md: median $0.0264 and 23.7 s per run over
+# 83 runs). That arm's forecast is about 16 x $0.026 = $0.42, from the
+# history's 10th to 90th percentile per run. gpt-5.4-nano and gpt-5.4 have
+# no sealed runs with this agent, and the Codex config sets no budgets.usd,
+# so the forecast says "no history, cannot estimate" for arms B and C and the
+# budget fit is unknown. Run a pilot of those two arms first, or set
+# budgets.usd for an upper bound, before raising budget.total_usd.
+name: matrix-models
+suite: coding-core@1.0.0
+base: agents/codex.yaml
+matrix:
+  models:
+    - gpt-5.4-mini
+    - {model: gpt-5.4-nano, provider: openai}
+    - gpt-5.4
+primary: {condition: clean, metric: verified_success}
+guards:
+  - {rule: no_new_integrity_violation}
+conditions:
+  - {id: clean, tasks: all, trials: 2}
+budget: {total_usd: 3}
+verdict: {policy: paired_signflip, alpha: 0.05, assumed_sd: 0.30}
+seed: 20261115
+concurrency: 3
+manifest_mode: agent_exposure
+policy: policies/default.yaml

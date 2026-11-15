@@ -1,0 +1,236 @@
+{
+	"_comment": "SYNTHETIC fixture for UI development. Not a benchmark result: every value is made up.",
+	"mode": "synthetic",
+	"a": {
+		"selector": "sha256:895fa8468a3bcbdb1351f9dcdc550dc492c5df1daf7bbd092e4543f5c1c83758",
+		"config_hash": "sha256:895fa8468a3bcbdb1351f9dcdc550dc492c5df1daf7bbd092e4543f5c1c83758",
+		"agent_id": "codex",
+		"label": "A: baseline",
+		"experiments": ["e_synthetic-codewins", "e_synthetic-providers"],
+		"runs": 9,
+		"excluded": [
+			{
+				"reason": "seal does not verify",
+				"runs": 1
+			}
+		]
+	},
+	"b": {
+		"selector": "e_synthetic-codewins:B",
+		"config_hash": "sha256:67cd7a069ba6e6141a645638240d97c5062022fa81126e36300d8bc0006730cd",
+		"agent_id": "codex",
+		"label": "B: code-wins note",
+		"exp_id": "e_synthetic-codewins",
+		"arm": "B",
+		"experiments": ["e_synthetic-codewins"],
+		"runs": 12,
+		"excluded": []
+	},
+	"suite": "coding-core@1.0.0",
+	"condition": "clean",
+	"synthetic": true,
+	"config": {
+		"identical": false,
+		"changes": 5,
+		"groups": [
+			{
+				"id": "prompt_notes",
+				"fields": [
+					{
+						"path": "notes.mode",
+						"kind": "changed",
+						"old": "append",
+						"new": "replace"
+					}
+				],
+				"files": [
+					{
+						"path": "CLAUDE.md",
+						"kind": "changed",
+						"old_hash": "sha256:1f2e3d4c5b6a79881f2e3d4c5b6a79881f2e3d4c5b6a79881f2e3d4c5b6a7988",
+						"new_hash": "sha256:9a8b7c6d5e4f30219a8b7c6d5e4f30219a8b7c6d5e4f30219a8b7c6d5e4f3021",
+						"diff": "--- a/CLAUDE.md\n+++ b/CLAUDE.md\n@@ -1,3 +1,4 @@\n # Project notes\n-Prefer the documented approach.\n+When the code and the docs disagree, the code wins.\n+Read the code before you edit it.\n Run the tests before you finish.\n"
+					}
+				]
+			},
+			{
+				"id": "tools",
+				"fields": [],
+				"files": [
+					{
+						"path": "tools/search.py",
+						"kind": "added",
+						"new_hash": "sha256:4d5e6f708192a3b44d5e6f708192a3b44d5e6f708192a3b44d5e6f708192a3b4",
+						"diff_note": "content not at hand; compared by hash"
+					}
+				]
+			},
+			{
+				"id": "budgets",
+				"fields": [
+					{
+						"path": "budgets.turns",
+						"kind": "added",
+						"old": null,
+						"new": 40
+					}
+				],
+				"files": []
+			},
+			{
+				"id": "gateway",
+				"fields": [
+					{
+						"path": "gateway.headers.x-api-key",
+						"kind": "changed",
+						"old": "[redacted]",
+						"new": "[redacted]",
+						"redacted": true
+					}
+				],
+				"files": []
+			}
+		]
+	},
+	"outcome": {
+		"common_tasks": 3,
+		"only_a": [],
+		"only_b": ["t04"],
+		"pass_rate_a": 0.6667,
+		"pass_rate_b": 0.7778,
+		"counts": {
+			"flipped_to_pass": 1,
+			"flipped_to_fail": 0,
+			"unchanged_pass": 1,
+			"unchanged_fail": 0,
+			"unstable_in_both": 0,
+			"moved_to_pass": 0,
+			"moved_to_fail": 1
+		},
+		"net": 1,
+		"test": {
+			"n_tasks": 3,
+			"n_nonzero": 2,
+			"n_positive": 1,
+			"n_negative": 1,
+			"p": 1,
+			"exact": true,
+			"min_possible_p": 0.5,
+			"alpha": 0.05,
+			"conclusion": "cannot_tell"
+		},
+		"tasks": [
+			{
+				"task": "t02",
+				"class": "flipped_to_pass",
+				"pass_a": 0,
+				"n_a": 3,
+				"pass_b": 3,
+				"n_b": 3,
+				"rate_a": 0,
+				"rate_b": 1,
+				"pair": {
+					"a": {
+						"run_id": "r_fmw1z7ouim",
+						"exp_id": "e_synthetic-codewins",
+						"pair_id": "p_ltosmymyqy",
+						"outcome": "fail"
+					},
+					"b": {
+						"run_id": "r_pww2l7yame",
+						"exp_id": "e_synthetic-codewins",
+						"pair_id": "p_ltosmymyqy",
+						"outcome": "pass"
+					},
+					"pair_id": "p_ltosmymyqy"
+				}
+			},
+			{
+				"task": "t03",
+				"class": "moved_to_fail",
+				"pass_a": 3,
+				"n_a": 3,
+				"pass_b": 1,
+				"n_b": 3,
+				"rate_a": 1,
+				"rate_b": 0.3333,
+				"pair": {
+					"a": {
+						"run_id": "r_synthprova3",
+						"exp_id": "e_synthetic-providers",
+						"pair_id": "p_synthprov03",
+						"outcome": "pass"
+					},
+					"b": {
+						"run_id": "r_synthcodeb3",
+						"exp_id": "e_synthetic-codewins",
+						"pair_id": "p_synthcode03",
+						"outcome": "fail"
+					}
+				}
+			},
+			{
+				"task": "t01",
+				"class": "unchanged_pass",
+				"pass_a": 3,
+				"n_a": 3,
+				"pass_b": 3,
+				"n_b": 3,
+				"rate_a": 1,
+				"rate_b": 1
+			}
+		],
+		"metrics": [
+			{
+				"metric": "cost_usd",
+				"higher_is_better": false,
+				"a": 0.051,
+				"b": 0.042,
+				"delta": -0.009,
+				"tasks": 3,
+				"unknown_a": 0,
+				"unknown_b": 0,
+				"direction": "better"
+			},
+			{
+				"metric": "steps",
+				"higher_is_better": false,
+				"a": 18,
+				"b": 21,
+				"delta": 3,
+				"tasks": 3,
+				"unknown_a": 0,
+				"unknown_b": 0,
+				"direction": "worse"
+			},
+			{
+				"metric": "tokens",
+				"higher_is_better": false,
+				"a": null,
+				"b": null,
+				"delta": null,
+				"tasks": 0,
+				"unknown_a": 3,
+				"unknown_b": 3,
+				"direction": "unknown"
+			}
+		],
+		"gates": [
+			{
+				"gate": "budget.turns",
+				"fired_a": 1,
+				"fired_b": 1,
+				"new": false,
+				"tasks": []
+			},
+			{
+				"gate": "policy.no_network",
+				"fired_a": 0,
+				"fired_b": 1,
+				"new": true,
+				"tasks": ["t03"]
+			}
+		]
+	},
+	"summary": "B (B: code-wins note) passes one more task than A (A: baseline) on coding-core@1.0.0, clean: t02 flipped to pass, t03 moved to fail. With 2 of 3 common tasks changed the test cannot tell them apart. One gate fires in B and never in A."
+}

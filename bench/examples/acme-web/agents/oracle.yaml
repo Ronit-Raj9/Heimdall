@@ -1,0 +1,20 @@
+# Oracle control: runs the task's reference script (controls.reference) in
+# the agent's place, with the browser and the admin console up, so the verifier must pass it.
+# Scripted adapter: argv, env and files come from the adapter, not this file.
+# Copied from the bench's agents/oracle.yaml; the image is the bench helper
+# image, which has the python3 the reference scripts need (they speak MCP to the browser with the standard library).
+id: oracle
+adapter: scripted
+image: bench/coding-core-base:1
+scripted:
+  kind: oracle
+model: claude-sonnet-4-5
+notes:
+  project_file: CLAUDE.md
+budgets:
+  wall_s: 600
+  cpus: 1
+  mem_gb: 1
+gateway:
+  provider: anthropic
+  max_retries: 0

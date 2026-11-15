@@ -181,6 +181,52 @@ func TestEvidencePackRegate(t *testing.T) {
 	}
 }
 
+// TestEvidencePackReview checks that an analysis on grade source reviewed
+// packs the review each reviewed run's outcome came from.
+func TestEvidencePackReview(t *testing.T) {
+	ctx := context.Background()
+	f := newFixture(t, schemas.ActionShip, "")
+	rv, err := f.st.AddReview(ctx, testExp, &schemas.ReviewRequest{RunID: "r_t01_a", Decision: schemas.ReviewFail, Reason: "empty diff", Reviewer: "ana"})
+	if err != nil {
+		t.Fatalf("AddReview: %v", err)
+	}
+	a := &schemas.Analysis{AnalysisID: "a_rv", ExpID: testExp, GradeSource: schemas.GradeSourceReviewed, CreatedAt: time.Date(2026, 11, 14, 11, 0, 0, 0, time.UTC),
+		Verdict: schemas.Verdict{Decision: schemas.DecisionImproved, Action: schemas.ActionShip, ManifestHash: f.m.Hash,
+			Effect: &schemas.Effect{ArmA: "A", ArmB: "B"}}}
+	if err := f.st.WriteAnalysis(ctx, a, nil); err != nil {
+		t.Fatalf("WriteAnalysis: %v", err)
+	}
+	m, err := f.st.LoadManifest(ctx, testExp)
+	if err != nil {
+		t.Fatal(err)
+	}
+	ev, err := f.log.loadEvidence(ctx, m, "a_rv")
+	if err != nil {
+		t.Fatal(err)
+	}
+	rec, err := newRecord(m, ev, *request("ana", ""), f.log.d.Now())
+	if err != nil {
+		t.Fatal(err)
+	}
+	files, err := packFiles(f.runsRoot, rec, ev)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var got []byte
+	for _, pf := range files {
+		if pf.name == "runs/r_t01_b/review.json" {
+			t.Fatal("a run without a review got one in the pack")
+		}
+		if pf.name == "runs/r_t01_a/review.json" {
+			got = pf.data
+		}
+	}
+	disk, err := os.ReadFile(filepath.Join(f.runsRoot, testExp, "reviews", rv.ReviewID, "review.json"))
+	if err != nil || !bytes.Equal(got, disk) {
+		t.Fatalf("review in pack differs from disk (err %v):\n%s", err, got)
+	}
+}
+
 func TestEvidencePackDeterministic(t *testing.T) {
 	f := newFixture(t, schemas.ActionShip, schemas.PolicyWarn)
 	m, err := f.st.LoadManifest(context.Background(), testExp)

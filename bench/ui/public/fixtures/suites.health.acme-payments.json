@@ -1,0 +1,176 @@
+{
+	"_comment": "SYNTHETIC fixture for UI development. Not a measurement. Shapes follow handlers/testdata/contract.",
+	"mode": "synthetic",
+	"suite": "acme-payments",
+	"version": "0.3.0",
+	"computed_at": "2026-11-15T10:30:00Z",
+	"experiments": 4,
+	"runs": 74,
+	"thresholds": {
+		"min_runs": 10,
+		"min_configs": 2,
+		"easy_above": 0.8,
+		"hard_below": 0.2,
+		"infra_rate": 0.1,
+		"timeout_rate": 0.1,
+		"interval_level": 0.95
+	},
+	"tasks": [
+		{
+			"task": "p01",
+			"split": "public",
+			"quarantine": null,
+			"verifier": {
+				"flaky": false,
+				"checks": 12,
+				"evidence": []
+			},
+			"variance": {
+				"configs": 3,
+				"unstable": 2,
+				"mean_variance": 0.17,
+				"per_config": [
+					{ "config": "codex", "config_hash": "sha256:1a2b3c4d5e6f", "trials": 8, "passes": 6, "pass_rate": 0.75 },
+					{ "config": "claude-code", "config_hash": "sha256:2b3c4d5e6f7a", "trials": 8, "passes": 5, "pass_rate": 0.625 },
+					{ "config": "baseline", "config_hash": "sha256:3c4d5e6f7a8b", "trials": 8, "passes": 1, "pass_rate": 0.125 }
+				]
+			},
+			"infra": {
+				"attempts": 26,
+				"aborted_infra": 1,
+				"infra_error": 1,
+				"invalid_evaluator": 0,
+				"timeouts": 1,
+				"rate": 0.077,
+				"timeout_rate": 0.038
+			},
+			"difficulty": {
+				"declared": "medium",
+				"observed": "medium",
+				"match": "match",
+				"pass_rate": 0.5,
+				"interval": [0.31, 0.69],
+				"runs": 24,
+				"configs": 3,
+				"discrimination": "discriminating",
+				"spread": 0.625
+			},
+			"flags": []
+		},
+		{
+			"task": "p02",
+			"split": "public",
+			"quarantine": {
+				"reason": "verifier graded the same output differently",
+				"at": "2026-11-15T10:30:00Z",
+				"source": "auto",
+				"task_version": "1.0.0",
+				"evidence": ["regrade_disagrees: e_7k2m r_q1w2e3 pass then fail at grader 1.2.0"]
+			},
+			"verifier": {
+				"flaky": true,
+				"checks": 9,
+				"evidence": [
+					{
+						"kind": "regrade_disagrees",
+						"detail": "regrade at the same suite and grader version flipped pass to fail",
+						"exp_id": "e_7k2m",
+						"run_ids": ["r_q1w2e3"]
+					},
+					{
+						"kind": "same_output_differs",
+						"detail": "2 runs with output hash 9f8e7d got pass and fail",
+						"exp_id": "e_7k2m",
+						"run_ids": ["r_a1s2d3", "r_z9x8c7"]
+					},
+					{
+						"kind": "same_output_differs",
+						"detail": "2 runs with output hash 4b5c6d got pass and fail",
+						"exp_id": "e_8p3n",
+						"run_ids": ["r_m4n5b6", "r_v7c8x9"]
+					}
+				]
+			},
+			"variance": {
+				"configs": 2,
+				"unstable": 1,
+				"mean_variance": 0.09,
+				"per_config": [
+					{ "config": "codex", "config_hash": "sha256:1a2b3c4d5e6f", "trials": 6, "passes": 5, "pass_rate": 0.833 },
+					{ "config": "claude-code", "config_hash": "sha256:2b3c4d5e6f7a", "trials": 6, "passes": 6, "pass_rate": 1 }
+				]
+			},
+			"infra": {
+				"attempts": 16,
+				"aborted_infra": 2,
+				"infra_error": 1,
+				"invalid_evaluator": 0,
+				"timeouts": 3,
+				"rate": 0.1875,
+				"timeout_rate": 0.1875
+			},
+			"difficulty": {
+				"declared": "hard",
+				"observed": "easy",
+				"match": "mismatch",
+				"pass_rate": 0.917,
+				"interval": [0.646, 0.985],
+				"runs": 12,
+				"configs": 2,
+				"discrimination": "discriminating",
+				"spread": 0.167
+			},
+			"flags": ["flaky_verifier", "difficulty_mismatch", "infra_trouble", "timeouts"]
+		},
+		{
+			"task": "p03",
+			"split": "public",
+			"quarantine": null,
+			"verifier": {
+				"flaky": false,
+				"checks": 4,
+				"evidence": []
+			},
+			"variance": {
+				"configs": 3,
+				"unstable": 0,
+				"mean_variance": 0,
+				"per_config": [
+					{ "config": "codex", "config_hash": "sha256:1a2b3c4d5e6f", "trials": 6, "passes": 6, "pass_rate": 1 },
+					{ "config": "claude-code", "config_hash": "sha256:2b3c4d5e6f7a", "trials": 6, "passes": 6, "pass_rate": 1 },
+					{ "config": "baseline", "config_hash": "sha256:3c4d5e6f7a8b", "trials": 6, "passes": 6, "pass_rate": 1 }
+				]
+			},
+			"infra": {
+				"attempts": 18,
+				"aborted_infra": 0,
+				"infra_error": 0,
+				"invalid_evaluator": 0,
+				"timeouts": 0,
+				"rate": 0,
+				"timeout_rate": 0
+			},
+			"difficulty": {
+				"declared": "easy",
+				"observed": "easy",
+				"match": "match",
+				"pass_rate": 1,
+				"interval": [0.824, 1],
+				"runs": 18,
+				"configs": 3,
+				"discrimination": "always_pass",
+				"spread": 0
+			},
+			"flags": ["saturated", "no_discrimination"]
+		}
+	],
+	"counts": {
+		"flaky_verifier": 1,
+		"difficulty_mismatch": 1,
+		"infra_trouble": 1,
+		"timeouts": 1,
+		"saturated": 1,
+		"no_discrimination": 1
+	},
+	"notes": ["Synthetic runs count toward infra and verifier checks only, never toward difficulty."]
+}

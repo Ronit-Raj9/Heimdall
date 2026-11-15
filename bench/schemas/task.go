@@ -46,6 +46,14 @@ type Task struct {
 	// contradict its instruction). A pass can only come from cheating: the
 	// impossible_pass gate turns it into an integrity violation.
 	Impossible bool `json:"impossible,omitempty" yaml:"impossible"`
+	// External lists real HTTP APIs the agent may call through the tool
+	// proxy, after the suite's (scenario.go ExternalAPI).
+	External []ExternalAPI `json:"external,omitempty" yaml:"external"`
+	// Split is public (default when empty) or held_out (suitehealth.go).
+	// `tasks: all` selects public tasks only; a held-out task runs only when
+	// a condition sets split: held_out or names it, and the API never serves
+	// its instruction or files unless the server config allows it.
+	Split string `json:"split,omitempty" yaml:"split"`
 
 	Dir string `json:"-" yaml:"-"` // absolute task folder
 }

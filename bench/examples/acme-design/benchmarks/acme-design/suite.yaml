@@ -1,0 +1,41 @@
+# template: artifact
+# acme-design: Acme Design's studio assistant, tested on the files it
+# produces. Acme Design, its clients, invoices and brand colours are
+# fictional.
+#
+# Each task gives the agent a brief and some input files in the workspace and
+# asks for one or more output files: a CAD mesh, a CSV and JSON summary, an
+# SVG swatch sheet. After the agent exits a trusted helper copies each file
+# the task declares (output.artifacts in task.yaml) out of the workspace, and
+# the task's hidden verifier (verifier/tests/verify.py, Python standard
+# library only) reads it read-only at /grader/artifacts/<id>/<base name> and
+# writes a reward with one dimension per property it checks. The verifier
+# never reads the workspace itself, so a reward file or a fake output the
+# agent leaves there counts for nothing.
+#
+# The track is artifact: the agent produces files, graded on their
+# content, and the leaderboard keeps these tasks on a board of their own.
+#
+# The base image is the bench's helper image (python3 and git, uid 1000),
+# which `bifrost-bench init` builds from deploy/helper/Dockerfile: the
+# verifiers need nothing else, so this suite builds no toolchain image.
+id: acme-design
+version: 1.0.0
+description: Acme Design studio tasks (fictional); graded on the files the agent writes.
+track: artifact
+environment: docker_workspace
+grader: verifier_command
+base_image:
+  tag: bench/coding-core-base:1
+workdir: /workspace
+output:
+  kind: artifact
+verifier:
+  command: ["python3", "/grader/tests/verify.py"]
+  result: reward
+  result_path: /grader/out/reward.json
+  pass_threshold: 1
+  restore: []
+  timeout_s: 120
+tasks: [bracket-mesh, invoice-summary, palette-swatch]
+probes: [model-outage]

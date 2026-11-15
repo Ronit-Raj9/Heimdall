@@ -1,0 +1,11 @@
+# Keys of bench.ts `AgentDiffTask`, one per line; a trailing ? marks an optional (Go omitempty) key.
+# Change with bench.ts and agentdiff/agentdiff.go.
+task
+class
+pass_a
+n_a
+pass_b
+n_b
+rate_a
+rate_b
+pair?

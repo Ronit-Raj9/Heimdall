@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"math"
+	"os"
 	"path/filepath"
 	"reflect"
 	"strings"
@@ -407,5 +408,34 @@ func TestSuiteSchemaResultFields(t *testing.T) {
 				}
 			}
 		})
+	}
+}
+
+// TestVerifierCommandArtifactInputs: the run's artifacts folder reaches the
+// verifier read-only at /grader/artifacts.
+func TestVerifierCommandArtifactInputs(t *testing.T) {
+	taskDir, err := filepath.Abs("testdata/task")
+	if err != nil {
+		t.Fatal(err)
+	}
+	dir := t.TempDir()
+	if err := os.MkdirAll(filepath.Join(dir, "artifacts", "report"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(dir, "artifacts", "report", "out.csv"), []byte("a,b\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	task := &schemas.Task{Dir: taskDir, RepoDir: "repo", Verifier: schemas.TaskVerifier{Tests: "verifier/tests"},
+		Output: &schemas.OutputSpec{Kind: schemas.OutputArtifact, Artifacts: []schemas.ArtifactSpec{{ID: "report", Path: "out.csv", Required: true}}}}
+	suite := &schemas.Suite{Version: "1.0.0", BaseImage: schemas.ImageSpec{Tag: "py:1"},
+		Verifier: schemas.SuiteVerifier{Result: "exit_code", Command: []string{"sh", "/grader/tests/test.sh"}}}
+	in, _, err := newVerifierCommand(HiddenTestsConfig{}).inputs(&schemas.RunContext{Task: task, Suite: suite, Dir: dir},
+		&schemas.Diff{Path: filepath.Join("testdata", "patches", "pass.diff")})
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := []string{"-v", filepath.Join(dir, "artifacts") + ":/grader/artifacts:ro"}
+	if got := scenarioMounts(in); !reflect.DeepEqual(got, want) {
+		t.Fatalf("mounts %v, want %v", got, want)
 	}
 }

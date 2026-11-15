@@ -93,13 +93,19 @@ func BodyLimit(mode schemas.Mode, limit int) Middleware {
 }
 
 // SecurityHeaders sets the CSP and the usual hardening headers on every
-// response, API and UI alike.
+// response, API and UI alike. A handler that asked for a sandboxed response
+// (a CSP of exactly "sandbox", as the artifact download does for
+// agent-produced files) keeps the sandbox on top of the global policy.
 func SecurityHeaders() Middleware {
 	return func(next fasthttp.RequestHandler) fasthttp.RequestHandler {
 		return func(ctx *fasthttp.RequestCtx) {
 			next(ctx)
 			h := &ctx.Response.Header
-			h.Set("Content-Security-Policy", ContentSecurityPolicy)
+			csp := ContentSecurityPolicy
+			if string(h.Peek("Content-Security-Policy")) == "sandbox" {
+				csp += "; sandbox"
+			}
+			h.Set("Content-Security-Policy", csp)
 			h.Set("X-Content-Type-Options", "nosniff")
 			h.Set("X-Frame-Options", "DENY")
 			h.Set("Referrer-Policy", "no-referrer")

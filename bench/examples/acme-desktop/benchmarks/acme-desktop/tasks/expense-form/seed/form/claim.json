@@ -1,0 +1,44 @@
+{
+  "title": "Acme expense claim",
+  "submit_label": "Submit claim",
+  "output": "/home/desk/form/submitted.json",
+  "fields": [
+    {
+      "id": "employee",
+      "label": "Employee name",
+      "required": true
+    },
+    {
+      "id": "date",
+      "label": "Date (YYYY-MM-DD)",
+      "required": true
+    },
+    {
+      "id": "amount",
+      "label": "Amount (EUR)",
+      "required": true
+    },
+    {
+      "id": "category",
+      "label": "Category",
+      "kind": "choice",
+      "required": true,
+      "options": [
+        "Travel",
+        "Meals",
+        "Office supplies",
+        "Training"
+      ]
+    },
+    {
+      "id": "description",
+      "label": "Description",
+      "required": true
+    },
+    {
+      "id": "receipt",
+      "label": "Receipt attached",
+      "kind": "check"
+    }
+  ]
+}

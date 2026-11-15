@@ -71,7 +71,10 @@ type gradeInputs struct {
 	workspace  string // snapshot mode: the run's workspace volume, mounted read-only
 	stateDir   string // <run folder>/state, mounted read-only at /grader/state
 	answerFile string // <run folder>/answer.txt, mounted read-only at /grader/answer.txt
-	root       bool   // the task runs as root (environment.user root): so does its verifier
+	// artifactsDir is <run folder>/artifacts, mounted read-only at
+	// /grader/artifacts.
+	artifactsDir string
+	root         bool // the task runs as root (environment.user root): so does its verifier
 }
 
 // gradeJob names the docker objects of one grade.
@@ -493,8 +496,8 @@ var snapshotRefRe = regexp.MustCompile(`^sha256:[0-9a-f]{64}$`)
 // volume replace the clean-room build; a task with its own image is
 // verified in its verifier_image, else its task image, and when the image
 // seeds the workspace the pristine copy comes from it too; the exported
-// service state and answer are mounted when the run folder holds them. A
-// plain task is left as it was.
+// service state, answer and artifact files are mounted when the run folder
+// holds them. A plain task is left as it was.
 func applyScenario(rc *schemas.RunContext, in *gradeInputs) error {
 	in.root = utils.TaskRunsAsRoot(rc.Task)
 	if img, ok, err := utils.TaskImage(rc.Suite.ID, rc.Task); err != nil {
@@ -531,7 +534,10 @@ func applyScenario(rc *schemas.RunContext, in *gradeInputs) error {
 	if st, err := os.Lstat(filepath.Join(rc.Dir, "answer.txt")); err == nil && st.Mode().IsRegular() {
 		in.answerFile = filepath.Join(rc.Dir, "answer.txt")
 	}
-	for _, p := range []*string{&in.stateDir, &in.answerFile} {
+	if st, err := os.Lstat(filepath.Join(rc.Dir, utils.ArtifactsDir)); err == nil && st.IsDir() {
+		in.artifactsDir = filepath.Join(rc.Dir, utils.ArtifactsDir)
+	}
+	for _, p := range []*string{&in.stateDir, &in.answerFile, &in.artifactsDir} {
 		if *p == "" {
 			continue
 		}
@@ -583,7 +589,7 @@ func verifierIdentity(root bool) []string {
 }
 
 // scenarioMounts are the verifier's read-only mounts of the run's exported
-// state and answer. It is pure.
+// state, answer and artifact files. It is pure.
 func scenarioMounts(in *gradeInputs) []string {
 	var args []string
 	if in.stateDir != "" {
@@ -591,6 +597,9 @@ func scenarioMounts(in *gradeInputs) []string {
 	}
 	if in.answerFile != "" {
 		args = append(args, "-v", in.answerFile+":/grader/answer.txt:ro")
+	}
+	if in.artifactsDir != "" {
+		args = append(args, "-v", in.artifactsDir+":"+utils.GraderArtifactsDir+":ro")
 	}
 	return args
 }

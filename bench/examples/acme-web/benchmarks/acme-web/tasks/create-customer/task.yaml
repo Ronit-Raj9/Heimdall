@@ -1,0 +1,50 @@
+# A new wholesale contact: create the customer with every field given, on the gold tier.
+id: create-customer
+version: 1.0.0
+title: Create a customer through the console's form
+project: acme-web
+kind: feature
+instruction: instruction.md
+# A scratch workspace: the work happens in the browser.
+repo_dir: repo
+services:
+  # The browser (Playwright MCP, headless Chromium), the agent's only tool:
+  # proxied, so every browser action is a row of the run's tools.jsonl.
+  # Built from services/browser/ in the suite folder; `suite admit` builds it
+  # when it is missing. Pages load only from the web application's origin.
+  - id: browser
+    role: mcp
+    image: heimdall-example/acme-web-browser:1
+    port: 8931
+    mcp: {path: /mcp}
+    argv: ["--isolated", "--host", "0.0.0.0", "--port", "8931", "--allowed-hosts", "browser:8931", "--allowed-origins", "http://webapp:8000", "--block-service-workers"]
+  # The admin console. Hidden: the agent reaches it only through the browser.
+  - id: webapp
+    role: data
+    hidden: true
+    image: heimdall-example/acme-web-webapp:1
+    port: 8000
+    files:
+      /seed/db.json: seed/db.json
+    ready:
+      argv: ["python3", "-I", "/srv/server.py", "ready"]
+      timeout_s: 30
+    export:
+      - {id: db.json, path: /state/db.json}
+verifier:
+  tests: verifier/tests
+  required: []
+protected: []
+controls:
+  reference: solution/reference.sh
+  empty: controls/empty.sh
+  mutants: [controls/mutant-standard-tier.sh]
+  exploit: controls/exploit.sh
+timeouts:
+  agent_s: 600
+capabilities: [tool_use, browser, policy_following]
+difficulty: easy
+provenance:
+  source: bench/examples/acme-web (fictional Acme Outfitters admin console, written for this example)
+  license: MIT
+  created_by: hand-written example

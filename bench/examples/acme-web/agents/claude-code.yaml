@@ -1,0 +1,63 @@
+# Claude Code, headless, as a browser-using back-office agent.
+#
+# Copied from the bench's agents/claude-code.yaml (see its comments for the
+# launch pattern, auth and egress switches) with two changes for this suite:
+# - mcp: the run's MCP servers (here the browser service, Playwright MCP,
+#   through the per-run tool proxy) are written into Claude Code's user-level
+#   config, $CLAUDE_CONFIG_DIR/.claude.json, in its own "mcpServers" format.
+#   The admin console itself is hidden from the agent's network: every page
+#   it sees and every click it makes is a browser tool call in tools.jsonl. Any agent with an `mcp:` block (Codex:
+#   codex_toml, OpenCode: opencode_json, your own: generic_json or env with
+#   BENCH_MCP_SERVERS) can take this file's place.
+# - the image is the bench's prebuilt bench/agent-claude-code:1 (build it in
+#   the bench repository: docker build -t bench/agent-claude-code:1
+#   agents/images/claude-code). It runs in its own image: the tasks need only
+#   the browser tools, not the suite's toolchain.
+id: claude-code
+adapter: command
+image: bench/agent-claude-code:1
+argv:
+  - claude
+  - -p
+  - --dangerously-skip-permissions
+  - --output-format
+  - stream-json
+  - --verbose
+  # Provider-side web tools would reach the internet past the internal
+  # network and could fetch task answers, so they are switched off.
+  - --disallowedTools
+  - WebSearch,WebFetch
+  - --model
+  - "{{model}}"
+  - "{{instruction}}"
+env:
+  ANTHROPIC_BASE_URL: "{{gateway.url}}/anthropic"
+  ANTHROPIC_AUTH_TOKEN: "{{run.key}}"
+  ANTHROPIC_API_KEY: ""
+  ANTHROPIC_MODEL: "{{model}}"
+  ANTHROPIC_DEFAULT_SONNET_MODEL: "{{model}}"
+  ANTHROPIC_DEFAULT_OPUS_MODEL: "{{model}}"
+  ANTHROPIC_DEFAULT_HAIKU_MODEL: "{{model}}"
+  ANTHROPIC_CUSTOM_HEADERS: "x-bf-session-id: {{run.session}}\nx-bf-session-affinity: off"
+  CLAUDE_CONFIG_DIR: /home/agent/.claude
+  CLAUDE_CODE_DISABLE_AUTO_MEMORY: "1"
+  DISABLE_AUTOUPDATER: "1"
+  DISABLE_TELEMETRY: "1"
+  CLAUDE_CODE_DISABLE_TELEMETRY: "1"
+  CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC: "1"
+  DISABLE_ERROR_REPORTING: "1"
+mcp:
+  format: claude_json
+# Placeholder: every experiment sets the model (an arm may vary it).
+model: claude-sonnet-4-5
+notes:
+  project_file: CLAUDE.md
+  user_path: /home/agent/.claude/CLAUDE.md
+parser: claudecode
+budgets:
+  wall_s: 900
+  cpus: 2
+  mem_gb: 4
+gateway:
+  provider: anthropic
+  max_retries: 0

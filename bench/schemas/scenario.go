@@ -14,14 +14,17 @@ import (
 
 // Suite tracks group suites on the leaderboard and in reports (Suite.Track).
 const (
-	TrackCoding   = "coding"   // edit a repository, hidden tests (the default)
-	TrackTerminal = "terminal" // work in a whole container, state checked afterwards
-	TrackToolUse  = "tool_use" // call tools against a service, final state checked
-	TrackMCP      = "mcp"      // tools reached over the Model Context Protocol
-	TrackMemory   = "memory"   // several sessions, recall checked in the last one
-	TrackSkills   = "skills"   // the same task with and without agent skills
-	TrackSafety   = "safety"   // attacks delivered through tool results or files
-	TrackQA       = "qa"       // a written answer, matched or judged
+	TrackCoding      = "coding"       // edit a repository, hidden tests (the default)
+	TrackTerminal    = "terminal"     // work in a whole container, state checked afterwards
+	TrackToolUse     = "tool_use"     // call tools against a service, final state checked
+	TrackMCP         = "mcp"          // tools reached over the Model Context Protocol
+	TrackMemory      = "memory"       // several sessions, recall checked in the last one
+	TrackSkills      = "skills"       // the same task with and without agent skills
+	TrackSafety      = "safety"       // attacks delivered through tool results or files
+	TrackQA          = "qa"           // a written answer, matched or judged
+	TrackBrowser     = "browser"      // a web application operated through a browser, final state checked
+	TrackComputerUse = "computer_use" // a desktop operated through screenshots, mouse and keyboard, app state checked
+	TrackArtifact    = "artifact"     // produce files (a report, a chart, a model) graded on their content
 )
 
 // Grading levels (Suite.Grading). A judged suite's outcomes come from a
@@ -34,9 +37,10 @@ const (
 
 // Output kinds (OutputSpec.Kind): what the verifier reads.
 const (
-	OutputDiff   = "diff"   // the exported workspace patch (the default)
-	OutputAnswer = "answer" // a text answer the agent wrote
-	OutputState  = "state"  // files exported from services after the run
+	OutputDiff     = "diff"     // the exported workspace patch (the default)
+	OutputAnswer   = "answer"   // a text answer the agent wrote
+	OutputState    = "state"    // files exported from services after the run
+	OutputArtifact = "artifact" // files the agent produced in the workspace (a report, an image, a model)
 )
 
 // Verifier modes (SuiteVerifier.Mode).
@@ -168,10 +172,28 @@ type SessionSpec struct {
 
 // OutputSpec says what the verifier reads. For kind answer the agent writes
 // its answer to AnswerPath in the workspace (default answer.txt); when the
-// file is missing the final message is used and the source is recorded.
+// file is missing the final message is used and the source is recorded. For
+// kind artifact the agent leaves the files Artifacts lists in the workspace.
 type OutputSpec struct {
-	Kind       string `json:"kind,omitempty" yaml:"kind"` // diff | answer | state
+	Kind       string `json:"kind,omitempty" yaml:"kind"` // diff | answer | state | artifact
 	AnswerPath string `json:"answer_path,omitempty" yaml:"answer_path"`
+	// Artifacts are the files a task with output kind artifact must produce.
+	Artifacts []ArtifactSpec `json:"artifacts,omitempty" yaml:"artifacts"`
+}
+
+// ArtifactSpec is one file, or a glob of files, that a task with output kind
+// artifact expects the agent to leave in the workspace. Path is relative to
+// the workspace root and may use the glob patterns *, ? and [...] (no
+// recursive **). After the agent exits a trusted helper copies each match to
+// artifacts/<id>/<base name> in the run folder, where the seal covers it, and
+// the verifier reads it read-only at /grader/artifacts/<id>/<base name>. A
+// match that leaves the workspace through a symlink, is not a regular file,
+// or is over MaxBytes is recorded with an error and not copied.
+type ArtifactSpec struct {
+	ID       string `json:"id" yaml:"id"`
+	Path     string `json:"path" yaml:"path"`
+	Required bool   `json:"required,omitempty" yaml:"required"`   // a required artifact without one usable file fails the run's grade
+	MaxBytes int64  `json:"max_bytes,omitempty" yaml:"max_bytes"` // per file; default 32 MiB
 }
 
 // AnswerSpec is the hidden expected answer of a task with output kind answer,
@@ -278,7 +300,7 @@ type ToolCall struct {
 	Session      string    `json:"session,omitempty"`
 	Server       string    `json:"server"`   // service id
 	Tool         string    `json:"tool"`     // tool name; for plain HTTP tool servers the method and path
-	Protocol     string    `json:"protocol"` // mcp | http
+	Protocol     string    `json:"protocol"` // mcp | http | external
 	Arguments    string    `json:"arguments,omitempty"`
 	ArgsSHA256   string    `json:"args_sha256"`
 	Result       string    `json:"result,omitempty"`
@@ -290,6 +312,11 @@ type ToolCall struct {
 	Started      time.Time `json:"started"`
 	LatencyMS    int64     `json:"latency_ms"`
 	Undelivered  bool      `json:"undelivered,omitempty"` // the proxy could not hand the answer to the agent (it hung up first)
+
+	// External API calls (Protocol external) only.
+	Replayed  bool `json:"replayed,omitempty"`  // answered from the task's cassette, no network
+	Unmatched bool `json:"unmatched,omitempty"` // replay mode and the cassette holds no matching call; the agent got a 599
+	Blocked   bool `json:"blocked,omitempty"`   // refused by the proxy: not on the allowlist, or over a call or size cap
 }
 
 // ToolFault is a fault the tool proxy injects for one run (ProbeApply.Tool,
@@ -359,6 +386,20 @@ type StateFile struct {
 	Error   string `json:"error,omitempty"`
 }
 
+// ArtifactFile is one artifact file of a run (Evidence.Artifacts). A spec
+// that matched nothing has one entry with Error set and no Path. The file is
+// content the agent produced: it is graded and offered for download, never
+// rendered.
+type ArtifactFile struct {
+	ID     string `json:"id"`             // the ArtifactSpec it matched
+	Name   string `json:"name,omitempty"` // base name of the file
+	Path   string `json:"path,omitempty"` // relative to the run folder: artifacts/<id>/<name>; empty when not copied
+	Source string `json:"source"`         // where it was read, relative to the workspace root (the spec's path when nothing matched)
+	SHA256 string `json:"sha256,omitempty"`
+	Bytes  int64  `json:"bytes"`
+	Error  string `json:"error,omitempty"` // why it was not copied: missing, outside the workspace, not a regular file, over a size cap, too many matches
+}
+
 // ServiceHandle is a started service as the rest of the run sees it.
 type ServiceHandle struct {
 	Spec      ServiceSpec `json:"spec"`
@@ -400,6 +441,15 @@ type AnswerEnvironment interface {
 	ExportAnswer(ctx context.Context, rc *RunContext) (*Answer, error)
 }
 
+// ArtifactEnvironment is implemented by environments that can copy the
+// agent's artifact files (OutputSpec.Artifacts) out of the workspace in a
+// trusted container into artifacts/ in the run folder. A file the agent got
+// wrong is an entry with Error set; an error return means the export itself
+// broke.
+type ArtifactEnvironment interface {
+	ExportArtifacts(ctx context.Context, rc *RunContext) ([]ArtifactFile, error)
+}
+
 // WorkerInfo is one remote worker as GET /workers lists it.
 type WorkerInfo struct {
 	ID        string    `json:"id"`
@@ -410,4 +460,54 @@ type WorkerInfo struct {
 	Running   []string  `json:"running"` // slot ids it holds
 	Completed int       `json:"completed"`
 	LastSeen  time.Time `json:"last_seen"`
+}
+
+// External API modes (ExternalAPI.Mode, Experiment.External). Live and record
+// runs reach the real host and are not repeatable; replay runs are answered
+// from a cassette with no network and count like any other run.
+const (
+	ExternalLive   = "live"   // every allowed call goes to the real host
+	ExternalRecord = "record" // as live, and each call is written to a cassette in the run folder
+	ExternalReplay = "replay" // every call is answered from the cassette; nothing leaves the bench
+)
+
+// ServiceRoleExternal is the role of the handle a run gets for each external
+// API it may call (ServiceHandle.Spec.Role, ServiceResult.Role). It is never
+// a role a task declares for a service.
+const ServiceRoleExternal = "external"
+
+// ExternalAPI is a real HTTP API outside the bench that a task's agent may
+// call (Suite.External, Task.External; docs/external-apis.md). The agent
+// reaches it only through the per-run tool proxy at
+// http://toolproxy:9200/x/<id>/<path>; the proxy enforces the allowlist and
+// caps, injects the credential, records every call in the tool ledger, and
+// in replay mode answers from the cassette without any network.
+type ExternalAPI struct {
+	ID      string `json:"id" yaml:"id"`             // host-name safe; the path segment after /x/
+	BaseURL string `json:"base_url" yaml:"base_url"` // http(s)://host[:port][/path]; the host is fixed
+	// Allow is the allowlist: a call passes when its method and path (after
+	// the base URL) match one entry. Empty allows nothing.
+	Allow   []ExternalAllow   `json:"allow,omitempty" yaml:"allow"`
+	Headers map[string]string `json:"headers,omitempty" yaml:"headers"` // static headers the proxy adds to every call
+	// AuthEnv names a host environment variable whose value the proxy sends
+	// in AuthHeader (default Authorization), after AuthScheme and a space
+	// when AuthScheme is set. The agent never sees it, and it is redacted
+	// from the ledger, the cassette and the logs.
+	AuthEnv    string `json:"auth_env,omitempty" yaml:"auth_env"`
+	AuthHeader string `json:"auth_header,omitempty" yaml:"auth_header"`
+	AuthScheme string `json:"auth_scheme,omitempty" yaml:"auth_scheme"` // e.g. Bearer
+	// Mode is live, record or replay. Empty means replay when the cassette
+	// exists; live and record also need the experiment to opt in with
+	// `external:`.
+	Mode     string `json:"mode,omitempty" yaml:"mode"`
+	Cassette string `json:"cassette,omitempty" yaml:"cassette"`   // JSONL, relative to the task folder (task APIs) or the suite root (suite APIs)
+	MaxCalls int    `json:"max_calls,omitempty" yaml:"max_calls"` // calls per run; default 200
+	MaxBytes int64  `json:"max_bytes,omitempty" yaml:"max_bytes"` // per request and per response body; default 4 MiB
+	TimeoutS int    `json:"timeout_s,omitempty" yaml:"timeout_s"` // per call; default 30
+}
+
+// ExternalAllow is one allowlist entry of an external API.
+type ExternalAllow struct {
+	Methods    []string `json:"methods,omitempty" yaml:"methods"` // default GET
+	PathPrefix string   `json:"path_prefix" yaml:"path_prefix"`   // matched against the path after the base URL, e.g. /rates
 }

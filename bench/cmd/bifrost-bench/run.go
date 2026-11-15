@@ -29,8 +29,11 @@ func init() {
 func runPlan(args []string) int {
 	fs := flag.NewFlagSet("plan", flag.ContinueOnError)
 	config := fs.String("config", defaultConfig, "bench config")
+	allowUnpriced := fs.Bool("allow-unpriced", false, "plan matrix models the price snapshot does not list") // Forecast and matrix area (estimate.go)
+	// Suite health area: -include-quarantined (suitehealth.go).
+	fs.BoolVar(&includeQuarantined, "include-quarantined", false, "let an explicit task list name a quarantined task")
 	if err := fs.Parse(args); err != nil || fs.NArg() != 1 {
-		fmt.Fprintln(os.Stderr, "usage: bifrost-bench plan [-config deploy/bench.yaml] experiments/<file>.yaml")
+		fmt.Fprintln(os.Stderr, "usage: bifrost-bench plan [-config deploy/bench.yaml] [-allow-unpriced] experiments/<file>.yaml")
 		return exitUsage
 	}
 	ctx := context.Background()
@@ -43,6 +46,7 @@ func runPlan(args []string) int {
 	if err != nil {
 		return fail("%v", err)
 	}
+	allowUnpricedModels(exp, *allowUnpriced) // Forecast and matrix area (estimate.go)
 	if err := a.validatePolicy(exp); err != nil {
 		return fail("%v", err)
 	}
@@ -51,6 +55,7 @@ func runPlan(args []string) int {
 		return fail("plan: %v", err)
 	}
 	printPlan(m)
+	a.printEstimate(ctx, m) // Forecast and matrix area: cost and time forecast from sealed history (estimate.go)
 	return exitOK
 }
 
@@ -122,6 +127,8 @@ func runRun(args []string) int {
 	allowDrift := fs.Bool("allow-version-drift", false, "resume even when part versions or the price snapshot changed since the freeze; recorded in the experiment's resumes.jsonl")
 	concurrency := fs.Int("concurrency", 0, "override the experiment's concurrency")
 	debug := fs.Bool("debug", false, "debug logging")
+	// Suite health area: -include-quarantined (suitehealth.go).
+	fs.BoolVar(&includeQuarantined, "include-quarantined", false, "let an explicit task list name a quarantined task")
 	if err := fs.Parse(args); err != nil || (fs.NArg() != 1 && *resume == "") {
 		fmt.Fprintln(os.Stderr, "usage: bifrost-bench run [-config deploy/bench.yaml] [-concurrency n] experiments/<file>.yaml | -resume <exp_id> [-allow-version-drift]")
 		return exitUsage
@@ -210,6 +217,7 @@ func (a *app) execute(ctx context.Context, m *schemas.Manifest, concurrency int)
 				continue
 			}
 			fmt.Fprintln(os.Stderr, progressLine(ev))
+			indexOnSeal(ctx, a, m.ExpID, ev) // Index and trends area: results index update when a run seals (index.go)
 		}
 	}()
 	janitor := engine.NewJanitor(a.reg.Gateway, a.docker, a.logger)
@@ -234,9 +242,9 @@ func runCheck(args []string) int {
 	failOn := fs.String("fail-on", "regressed,invalid", "comma-separated verdicts that fail the check")
 	out := fs.String("out", "report.md", "markdown report path")
 	policyFile := fs.String("policy", "", "release policy file; overrides the one the experiment froze")
-	gradeSource := fs.String("grade-source", schemas.GradeSourceOriginal, "original, or a regrade id (from regate or a regrade) to analyze with")
+	gradeSource := fs.String("grade-source", schemas.GradeSourceOriginal, "original, reviewed (human reviews applied, see docs/human-review.md), or a regrade id (from regate or a regrade) to analyze with")
 	if err := fs.Parse(args); err != nil || (fs.NArg() != 1 && *exp == "") {
-		fmt.Fprintln(os.Stderr, "usage: bifrost-bench check [-fail-on regressed,invalid] [-policy policies/default.yaml] [-grade-source original|<regrade_id>] [-out report.md] experiments/<file>.yaml | -exp <exp_id>")
+		fmt.Fprintln(os.Stderr, "usage: bifrost-bench check [-fail-on regressed,invalid] [-policy policies/default.yaml] [-grade-source original|reviewed|<regrade_id>] [-out report.md] experiments/<file>.yaml | -exp <exp_id>")
 		fmt.Fprintln(os.Stderr, "exit: 0 ok, 1 regressed, 2 inconclusive, 3 invalid (each only when listed in -fail-on), 4 infrastructure error, 5 blocked by the release policy")
 		return exitUsage
 	}

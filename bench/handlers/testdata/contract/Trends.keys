@@ -1,0 +1,16 @@
+# GET /trends (trends.Response, docs/trends.md)
+suite
+agent
+metric
+condition
+synthetic
+alpha
+metrics
+suites
+agents
+conditions
+lineages
+points
+rejected
+indexed_at
+generated_at

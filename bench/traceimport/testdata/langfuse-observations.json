@@ -1,0 +1,8 @@
+{
+  "data": [
+    {"id": "o-a1", "traceId": "lf-a", "type": "GENERATION", "name": "chat", "startTime": "2026-11-13T10:00:00Z", "endTime": "2026-11-13T10:00:01Z", "model": "claude-x", "input": [{"role": "user", "content": "Summarize ticket T-17."}], "output": "Ticket T-17 is a duplicate of T-12.", "level": "DEFAULT"},
+    {"id": "o-b1", "traceId": "lf-b", "type": "GENERATION", "name": "chat", "startTime": "2026-11-13T11:00:00Z", "endTime": "2026-11-13T11:00:01Z", "model": "claude-x", "input": {"messages": [{"role": "user", "content": "Close ticket T-18."}]}, "output": {"role": "assistant", "tool_calls": [{"id": "t1", "type": "function", "function": {"name": "close_ticket", "arguments": "{\"id\":\"T-18\"}"}}]}, "level": "DEFAULT"},
+    {"id": "o-b2", "traceId": "lf-b", "type": "TOOL", "name": "close_ticket", "startTime": "2026-11-13T11:00:02Z", "input": {"id": "T-18"}, "output": null, "level": "ERROR", "statusMessage": "403 forbidden"}
+  ],
+  "meta": {"cursor": null}
+}

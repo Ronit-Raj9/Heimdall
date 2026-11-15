@@ -23,5 +23,10 @@ error?
 track?
 grading?
 output?
+artifacts?
 services?
 imported?
+# Suite health keys (schemas/suitehealth.go).
+held_out_count?
+quarantined_count?
+has_canary?

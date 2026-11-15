@@ -1,0 +1,38 @@
+# template: external-api
+# Written by `bifrost-bench suite init`. An external-api suite tests an agent
+# that calls a real HTTP API outside the bench (a rates service, a weather
+# service, a SaaS endpoint). The agent never reaches the internet: it calls
+# http://toolproxy:9200/x/<id>/<path> (BENCH_EXTERNAL_APIS holds every URL),
+# and the per-run tool proxy enforces the task's allowlist, adds the
+# credential the agent never sees, and records every call in tools.jsonl.
+#
+# By default a run is answered from the task's cassette (replay mode): no
+# network, the same answers every time, so results repeat. An experiment can
+# opt in to live calls (external: live) or record a new cassette
+# (external: record); both reach the real host and are labelled not
+# repeatable. docs/external-apis.md is the user guide. Add tasks with
+# `bifrost-bench task init -suite [[.ID]] -id <task>`, which copies the shape
+# of the first task below and adds the id to the tasks list.
+id: [[.ID]]
+version: 0.1.0
+description: Tasks whose agent calls an external HTTP API through the tool proxy, replayed from a cassette.
+track: tool_use
+environment: docker_workspace
+grader: verifier_command
+base_image:
+[[- if .Dockerfile]]
+  dockerfile: base/Dockerfile
+[[- end]]
+  tag: [[.Image]]
+workdir: /workspace
+# The verifier reads the file the agent wrote (quote.json), from a pristine
+# copy of the workspace with the agent's diff applied, and writes a reward.
+verifier:
+  command: ["python3", "/grader/tests/verify.py"]
+  result: reward
+  result_path: /grader/out/reward.json
+  pass_threshold: 1
+  restore: []
+  timeout_s: 120
+tasks: [invoice-fx]
+probes: [model-outage, fx-error-first]

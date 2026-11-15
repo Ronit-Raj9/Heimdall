@@ -1,4 +1,5 @@
 import { ModeBadge } from "@/components/modeBadge";
+import { ReviewedBadge } from "@/components/review/reviewedBadge";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { formatDateTime, shortHash } from "@/components/verdict/verdict.utils";
 import { getLocale } from "@/lib/i18n";
@@ -50,6 +51,12 @@ export function VerdictHeaderStrip({ payload }: VerdictHeaderStripProps) {
 				<span className="text-muted-foreground">{t("verdict.header.gradeSource")}</span>
 				<span className="font-mono text-xs">{gradeSource}</span>
 			</span>
+			<ReviewedBadge
+				reviewed={payload.reviewed_runs}
+				changed={payload.review_changed_runs}
+				gradeSource={payload.grade_source}
+				testId="verdict-reviewed-badge"
+			/>
 		</div>
 	);
 }

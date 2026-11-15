@@ -1,0 +1,22 @@
+[build-system]
+requires = ["setuptools>=61"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "heimdall-bench"
+version = "0.1.0"
+description = "Thin client for the Heimdall bench API: plan, run, wait and gate releases from code and CI"
+readme = "README.md"
+requires-python = ">=3.9"
+license = { text = "Apache-2.0" }
+dependencies = []
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "Typing :: Typed",
+]
+
+[tool.setuptools]
+packages = ["heimdall"]
+
+[tool.setuptools.package-data]
+heimdall = ["py.typed"]

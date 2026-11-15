@@ -1,0 +1,71 @@
+# [[.ID]]
+
+A Heimdall suite written by `bifrost-bench suite init -template [[.Template]]`,
+with one complete sample task (`tasks/[[.Sample]]`). The user guide is
+`docs/external-apis.md` in the bench repository.
+
+[[.About]]
+
+## What to edit
+
+1. `tasks/<task>/task.yaml`, `external:`: the API's `base_url`, the
+   allowlist (`allow`: methods and path prefixes the agent may call; anything
+   else is refused), static `headers`, and `auth_env`, the name of the host
+   environment variable holding the credential. The proxy adds it; the agent
+   never sees it, and it is redacted from the ledger and the cassette.
+2. `tasks/<task>/cassettes/<id>.cassette.jsonl`: the recorded calls a
+   replay run is answered from, one JSON object per line. Record a real one
+   with an experiment that sets `external: record`, then copy
+   `runs/<exp>/<run>/external/<id>.cassette.jsonl` here (see the guide).
+3. `tasks/<task>/repo/`: what the agent starts with (here the API's docs).
+4. `tasks/<task>/instruction.md`: the request, as a user would write it.
+5. `tasks/<task>/verifier/tests/verify.py`: what the agent's output must hold.
+6. `tasks/<task>/solution/reference.sh`: the calls a correct agent makes,
+   through the proxy. Admission runs it in the agent's place, in replay
+   mode, and the verifier must pass it.
+
+`controls/` holds what admission requires to fail: the empty control, a
+mutant (a plausible wrong result) and an exploit that tries to leave the
+allowlist (another path, another host through the proxy) and fakes a result.
+
+## Layout
+
+```
+suite.yaml                               track tool_use, verifier_command with a reward
+probes/model-outage.yaml                 gateway fault
+probes/fx-error-first.yaml               tool fault on the external API's first call
+tasks/[[.Sample]]/task.yaml              external: the fx API, allowlist, cassette
+tasks/[[.Sample]]/cassettes/             recorded API calls (replay mode)
+tasks/[[.Sample]]/repo/API.md            the API docs the agent reads
+tasks/[[.Sample]]/verifier/tests/        hidden verifier
+tasks/[[.Sample]]/solution/reference.sh  reference control
+tasks/[[.Sample]]/controls/              empty, mutant and exploit controls
+```
+
+## Check it
+
+```
+bifrost-bench suite lint [[.ID]]
+bifrost-bench suite lock [[.ID]]
+bifrost-bench suite admit [[.ID]]
+```
+
+Admission and every run that does not opt in use replay mode: no call
+leaves the bench. Live mode costs repeatability: the API may answer
+differently tomorrow, so reports and the leaderboard label or exclude it.
+
+## Held-out tasks and canaries
+
+Add `split: held_out` to a task's `task.yaml` to keep it out of `tasks: all`,
+out of the public leaderboard and out of what the UI and API serve. To detect
+later whether this suite leaked into a model's training data, give it a
+contamination canary:
+
+    bifrost-bench suite canary [[.ID]]          # sets canary: <guid> in suite.yaml
+    bifrost-bench suite canary -stamp [[.ID]]   # also writes it into every instruction file
+    bifrost-bench suite canary-check -text model-output.txt
+
+Stamping changes instruction hashes, so run `suite lock` and `suite admit`
+again afterwards; stamp before the first published results, not after. A
+canary only catches verbatim copies of stamped text. The bench guide
+`docs/held-out-and-canaries.md` has the details.

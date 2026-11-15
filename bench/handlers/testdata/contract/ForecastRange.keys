@@ -1,0 +1,7 @@
+# Keys of bench.ts `ForecastRange`, one per line; a trailing ? marks an optional (Go omitempty) key.
+# Change with bench.ts and schemas/forecast.go.
+kind
+low
+median
+high
+reason?

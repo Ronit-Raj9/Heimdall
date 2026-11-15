@@ -41,6 +41,8 @@ describe("resolveFixture", () => {
 		{ method: "GET", url: "/health", want: "health.json" },
 		{ method: "GET", url: `${BENCH_API_BASE}/catalog`, want: "catalog.json" },
 		{ method: "POST", url: "/experiments/plan", want: "experiments.plan.json" },
+		{ method: "POST", url: `${BENCH_API_BASE}/estimate`, want: "estimate.json" },
+		{ method: "GET", url: "/experiments/e_x/matrix?condition=clean&grade_source=original", want: "experiments.matrix.json" },
 		{ method: "POST", url: "/experiments", want: "experiments.create.json" },
 		{ method: "post", url: "/experiments/e_x/start", want: "experiments.start.json" },
 		{ method: "GET", url: "/experiments/e_x", want: "experiments.get.json" },
@@ -51,13 +53,21 @@ describe("resolveFixture", () => {
 		{ method: "GET", url: "/pairs/p_abc", want: "pairs.p_abc.json" },
 		{ method: "POST", url: "/audit", want: "audit.json" },
 		{ method: "GET", url: "/leaderboard?suite=coding-core%401.0.0&scope=common", want: "leaderboard.json" },
+		{ method: "GET", url: `${BENCH_API_BASE}/trends?metric=tokens&agent=codex`, want: "trends.json" },
 		{ method: "GET", url: "/suites", want: "suites.json" },
 		{ method: "GET", url: `${BENCH_API_BASE}/suites/coding-core/tasks/t01`, want: "suites.task.t01.json" },
 		{ method: "GET", url: "/suites/..%2F/tasks/t01", want: null },
 		{ method: "GET", url: "/suites/../tasks/t01", want: null },
+		{ method: "GET", url: `${BENCH_API_BASE}/suites/acme-payments/health`, want: "suites.health.acme-payments.json" },
 		{ method: "GET", url: "/agents", want: "agents.json" },
+		{ method: "GET", url: `${BENCH_API_BASE}/agents/diff?a=sha256:abc&b=e_x:B`, want: "agents.diff.json" },
+		{ method: "GET", url: "/agents/diff/versions", want: "agents.diff.versions.json" },
 		{ method: "GET", url: `${BENCH_API_BASE}/imports`, want: "imports.json" },
 		{ method: "GET", url: "/workers", want: "workers.json" },
+		{ method: "GET", url: "/experiments/e_x/reviews/queue?reason=veto", want: "experiments.reviews.queue.json" },
+		{ method: "GET", url: "/experiments/e_x/reviews", want: "experiments.reviews.json" },
+		{ method: "GET", url: "/runs/r_abc/reviews", want: "runs.r_abc.reviews.json" },
+		{ method: "POST", url: "/reviews", want: "reviews.create.json" },
 		{ method: "GET", url: "/experiments/plan/extra", want: null },
 		{ method: "DELETE", url: "/health", want: null },
 		{ method: "GET", url: "/runs/..%2F..%2Fsecret", want: null },
@@ -174,6 +184,28 @@ function contractFor(file: string): { type: string; nested: Record<string, strin
 		"audit.json": { type: "Verdict", nested: {} },
 		"regrade.json": { type: "RegradeResult", nested: {} },
 		"experiments.plan.json": { type: "ExperimentPlan", nested: {} },
+		"estimate.json": {
+			type: "Forecast",
+			nested: {
+				"arms[]": "ArmForecast",
+				"arms[].per_run": "PerRunRanges",
+				"arms[].per_run.cost_usd": "ForecastRange",
+				"arms[].per_run.tokens": "ForecastRange",
+				"arms[].per_run.wall_s": "ForecastRange",
+				"arms[].cost_usd": "ForecastRange",
+				"arms[].tokens": "ForecastRange",
+				"arms[].agent_time_s": "ForecastRange",
+				cost_usd: "ForecastRange",
+				agent_time_s: "ForecastRange",
+				wall_clock_s: "ForecastRange",
+				judge: "JudgeForecast",
+				"judge.cost_usd": "ForecastRange",
+			},
+		},
+		"experiments.matrix.json": {
+			type: "ModelMatrix",
+			nested: { "rows[]": "MatrixRow", "pairs[]": "MatrixPair", "excluded[]": "LeaderboardExclusion" },
+		},
 		"experiments.create.json": { type: "ExperimentCreated", nested: {} },
 		"experiments.get.json": { type: "ExperimentStatus", nested: { slots: "SlotProgress" } },
 		"experiments.start.json": { type: "ExperimentStatus", nested: { slots: "SlotProgress" } },
@@ -183,9 +215,57 @@ function contractFor(file: string): { type: string; nested: Record<string, strin
 		"experiments.grid.json": { type: "Grid", nested: { "rows[]": "GridRow", "rows[].cells[]": "GridCell" } },
 		"releases.list.json": { type: "ReleaseList", nested: { "releases[]": "ReleaseRecord" } },
 		"experiments.triage.json": { type: "Triage", nested: { "groups[]": "TriageGroup" } },
+		"clusters.json": {
+			type: "ClusterList",
+			nested: {
+				filters: "ClusterFilters",
+				"clusters[]": "ClusterSummary",
+				"clusters[].layers[]": "ClusterLayer",
+				"clusters[].related[]": "ClusterRelated",
+				"clusters[].after_config_change": "ClusterConfigChange",
+				"excluded[]": "ClusterExclusion",
+			},
+		},
 		"leaderboard.json": { type: "Leaderboard", nested: { "entries[]": "LeaderboardEntry", "excluded[]": "LeaderboardExclusion" } },
+		"trends.json": {
+			type: "Trends",
+			nested: {
+				"lineages[]": "TrendLineage",
+				"lineages[].points[]": "TrendPoint",
+				"lineages[].points[].regression": "TrendRegression",
+				"lineages[].regression": "TrendRegression",
+			},
+		},
 		"imports.json": { type: "ImportList", nested: { "importers[]": "ImporterInfo" } },
 		"workers.json": { type: "WorkerList", nested: { "workers[]": "WorkerInfo" } },
+		"agents.diff.versions.json": {
+			type: "AgentDiffVersionList",
+			nested: { "versions[]": "AgentDiffVersionInfo", "versions[].arms[]": "AgentDiffArmRef" },
+		},
+		"agents.diff.json": {
+			type: "AgentDiffReport",
+			nested: {
+				a: "AgentDiffVersion",
+				b: "AgentDiffVersion",
+				"a.excluded[]": "AgentDiffExclusion",
+				config: "AgentDiffConfig",
+				"config.groups[]": "AgentDiffConfigGroup",
+				"config.groups[].fields[]": "AgentDiffFieldChange",
+				"config.groups[].files[]": "AgentDiffFileChange",
+				outcome: "AgentDiffOutcome",
+				"outcome.counts": "AgentDiffClassCounts",
+				"outcome.test": "AgentDiffSignTest",
+				"outcome.tasks[]": "AgentDiffTask",
+				"outcome.tasks[].pair": "AgentDiffRunPair",
+				"outcome.tasks[].pair.a": "AgentDiffRunRef",
+				"outcome.tasks[].pair.b": "AgentDiffRunRef",
+				"outcome.metrics[]": "AgentDiffMetric",
+				"outcome.gates[]": "AgentDiffGate",
+			},
+		},
+		"experiments.reviews.queue.json": { type: "ReviewQueue", nested: { "items[]": "ReviewQueueItem" } },
+		"experiments.reviews.json": { type: "ReviewLog", nested: { "reviews[]": "Review" } },
+		"reviews.create.json": { type: "Review", nested: {} },
 	};
 	if (byFile[file]) return byFile[file];
 	if (file === "suites.json") {
@@ -204,10 +284,32 @@ function contractFor(file: string): { type: string; nested: Record<string, strin
 		};
 	}
 	if (file.startsWith("suites.task.")) return { type: "SuiteTaskDetail", nested: { task: "SuiteTask", "files[]": "SuiteRepoFile" } };
+	if (file.startsWith("suites.health.")) {
+		return {
+			type: "SuiteHealth",
+			nested: {
+				thresholds: "HealthThresholds",
+				"tasks[]": "TaskHealth",
+				"tasks[].quarantine": "TaskQuarantine",
+				"tasks[].verifier": "VerifierHealth",
+				"tasks[].verifier.evidence[]": "VerifierEvidence",
+				"tasks[].variance": "OutcomeVariance",
+				"tasks[].variance.per_config[]": "ConfigOutcome",
+				"tasks[].infra": "InfraHealth",
+				"tasks[].difficulty": "DifficultyHealth",
+			},
+		};
+	}
 	if (file === "agents.json") {
 		return {
 			type: "AgentList",
 			nested: { "agents[]": "AgentSummary", "agents[].budgets": "AgentBudgets", "agents[].gateway": "AgentGateway" },
+		};
+	}
+	if (file.startsWith("clusters.")) {
+		return {
+			type: "ClusterDetail",
+			nested: { filters: "ClusterFilters", cluster: "ClusterSummary", "cluster.layers[]": "ClusterLayer", "runs[]": "ClusterRun" },
 		};
 	}
 	if (file.startsWith("pairs.")) return { type: "Pair", nested: { "runs[]": "PairRun" } };
@@ -215,6 +317,7 @@ function contractFor(file: string): { type: string; nested: Record<string, strin
 	if (file.endsWith(".events.json")) return { type: "RunEvents", nested: {} };
 	if (file.endsWith(".diff.json")) return { type: "RunDiff", nested: {} };
 	if (file.endsWith(".receipts.json")) return { type: "RunReceipts", nested: {} };
+	if (file.endsWith(".reviews.json")) return { type: "RunReviews", nested: { "reviews[]": "Review" } };
 	return { type: "RunDetail", nested: {} };
 }
 

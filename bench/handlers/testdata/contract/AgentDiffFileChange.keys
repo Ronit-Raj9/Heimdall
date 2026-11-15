@@ -1,0 +1,9 @@
+# Keys of bench.ts `AgentDiffFileChange`, one per line; a trailing ? marks an optional (Go omitempty) key.
+# Change with bench.ts and agentdiff/agentdiff.go.
+path
+kind
+old_hash?
+new_hash?
+diff?
+diff_note?
+truncated?

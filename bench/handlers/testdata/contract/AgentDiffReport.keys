@@ -1,0 +1,10 @@
+# Keys of bench.ts `AgentDiffReport`, one per line; a trailing ? marks an optional (Go omitempty) key.
+# Change with bench.ts and agentdiff/agentdiff.go.
+a
+b
+suite
+condition
+synthetic
+config
+outcome
+summary

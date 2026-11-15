@@ -1,0 +1,16 @@
+# Keys of bench.ts `Review`, one per line; a trailing ? marks an optional (Go omitempty) key.
+# The top-level response (POST /reviews) adds "mode". Change with bench.ts and schemas/review.go.
+review_id
+exp_id
+run_id
+parent_seal
+decision
+reason
+reviewer
+created_at
+sealed_outcome
+previous_outcome
+supersedes?
+evidence?
+prev_hash
+hash

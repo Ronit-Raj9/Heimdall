@@ -46,6 +46,9 @@ func TestPlanScenarioChecks(t *testing.T) {
 		{"answer needs an answer environment", true, func(_ *schemas.Suite, task *schemas.Task) {
 			task.Output = &schemas.OutputSpec{Kind: schemas.OutputAnswer}
 		}, "", "needs an answer export"},
+		{"artifact needs an artifact environment", true, func(_ *schemas.Suite, task *schemas.Task) {
+			task.Output = &schemas.OutputSpec{Kind: schemas.OutputArtifact, Artifacts: []schemas.ArtifactSpec{{ID: "r", Path: "r.csv"}}}
+		}, "", "needs an artifact export"},
 		{"judged suite needs a judge", false, func(s *schemas.Suite, _ *schemas.Task) {
 			s.Grading = schemas.GradingJudged
 		}, "", "is judged but names no judge"},

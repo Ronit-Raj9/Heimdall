@@ -1,0 +1,4 @@
+# Keys of bench.ts `ClusterExclusion`, one per line; a trailing ? marks an optional (Go omitempty) key.
+# Change with bench.ts and clusters/clusters.go.
+reason
+runs

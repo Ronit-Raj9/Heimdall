@@ -1,0 +1,11 @@
+# Keys of bench.ts `DifficultyHealth`. pass_rate, interval and spread are null when unknown.
+# Change with bench.ts and schemas/suitehealth.go.
+declared
+observed
+match
+pass_rate
+interval
+runs
+configs
+discrimination
+spread

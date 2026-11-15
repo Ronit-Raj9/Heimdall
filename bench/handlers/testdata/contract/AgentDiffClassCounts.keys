@@ -1,0 +1,9 @@
+# Keys of bench.ts `AgentDiffClassCounts`, one per line; a trailing ? marks an optional (Go omitempty) key.
+# Change with bench.ts and agentdiff/agentdiff.go.
+flipped_to_pass
+flipped_to_fail
+unchanged_pass
+unchanged_fail
+unstable_in_both
+moved_to_pass
+moved_to_fail

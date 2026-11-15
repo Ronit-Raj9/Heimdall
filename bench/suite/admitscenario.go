@@ -252,7 +252,7 @@ func (a *admitter) runControl(ctx context.Context, c control, image string) (che
 	if res.TimedOut {
 		detail += " (timed out)"
 	}
-	diff, why, err := a.exportControl(ctx, rc, res)
+	diff, why, fail, err := a.exportControl(ctx, rc, res)
 	switch {
 	case err != nil:
 		check.Detail = detail
@@ -260,13 +260,20 @@ func (a *admitter) runControl(ctx context.Context, c control, image string) (che
 	case why != "":
 		check.Got, check.Detail = GotInvalidEvaluator, joinDetail(detail, why)
 		return check
+	case fail != "":
+		// The grader's input is the agent's own result and it is incomplete:
+		// a fail, decided without running the verifier, as in a real run.
+		check.Got, check.Detail = GotFail, joinDetail(detail, fail)
+		check.Passed = check.Got == check.Want
+		a.deps.Logger.Info("admission check", "task", a.t.ID, "check", check.Name, "want", check.Want, "got", check.Got)
+		return check
 	}
 	return a.grade(ctx, rc, diff, check, detail)
 }
 
 // startServices starts the task's services for one control run.
 func (a *admitter) startServices(ctx context.Context, rc *schemas.RunContext) error {
-	if len(utils.TaskServices(a.s, a.t)) == 0 {
+	if len(utils.TaskServices(a.s, a.t)) == 0 && len(utils.ExternalAPIs(a.s, a.t)) == 0 { // External APIs area: external APIs run through the tool proxy
 		return nil
 	}
 	se, ok := a.deps.Env.(schemas.ServiceEnvironment)
@@ -310,49 +317,64 @@ func (a *admitter) beginSessions(ctx context.Context, rc *schemas.RunContext) er
 	return nil
 }
 
-// exportControl exports the diff, the services' state and the answer, takes
-// the snapshot of a snapshot-graded suite, and writes answer.txt (the
-// control's stdout when it wrote no answer file, as the run's final message
-// would be). why is set when the grader's input is missing.
-func (a *admitter) exportControl(ctx context.Context, rc *schemas.RunContext, res *schemas.ExecResult) (*schemas.Diff, string, error) {
+// exportControl exports the diff, the services' state, the answer and the
+// artifact files, takes the snapshot of a snapshot-graded suite, and writes
+// answer.txt (the control's stdout when it wrote no answer file, as the run's
+// final message would be). why is set when the grader's input is missing
+// through no fault of the control (an evaluator problem); fail is set when
+// the control's own result is incomplete (a required artifact is missing),
+// which fails it without running the verifier.
+func (a *admitter) exportControl(ctx context.Context, rc *schemas.RunContext, res *schemas.ExecResult) (diff *schemas.Diff, why, fail string, err error) {
 	if utils.VerifierMode(a.s) == schemas.VerifierSnapshot {
 		sn, ok := a.deps.Env.(schemas.SnapshotEnvironment)
 		if !ok {
-			return nil, "", fmt.Errorf("suite grades snapshots, but environment %s cannot take one", a.deps.Env.GetName())
+			return nil, "", "", fmt.Errorf("suite grades snapshots, but environment %s cannot take one", a.deps.Env.GetName())
 		}
 		if _, err := sn.Snapshot(ctx, rc); err != nil {
-			return nil, "", fmt.Errorf("snapshot: %w", err)
+			return nil, "", "", fmt.Errorf("snapshot: %w", err)
 		}
 	}
-	diff, err := a.deps.Env.ExportDiff(ctx, rc)
+	diff, err = a.deps.Env.ExportDiff(ctx, rc)
 	if err != nil {
-		return nil, "", fmt.Errorf("export diff: %w", err)
+		return nil, "", "", fmt.Errorf("export diff: %w", err)
 	}
 	var state []schemas.StateFile
 	if len(rc.Services) > 0 {
 		se := a.deps.Env.(schemas.ServiceEnvironment)
 		if state, err = se.ExportState(ctx, rc); err != nil {
-			return nil, "", fmt.Errorf("export state: %w", err)
+			return nil, "", "", fmt.Errorf("export state: %w", err)
 		}
 	}
 	switch utils.OutputKind(a.s, a.t) {
 	case schemas.OutputState:
 		if len(state) == 0 {
-			return diff, "state output: no service state was exported", nil
+			return diff, "state output: no service state was exported", "", nil
 		}
 		for _, f := range state {
 			if f.Error != "" {
-				return diff, "state output: export failed: " + f.Service + "/" + f.ID + ": " + f.Error, nil
+				return diff, "state output: export failed: " + f.Service + "/" + f.ID + ": " + f.Error, "", nil
 			}
+		}
+	case schemas.OutputArtifact:
+		ae, ok := a.deps.Env.(schemas.ArtifactEnvironment)
+		if !ok {
+			return nil, "", "", fmt.Errorf("task %s has artifact output, but environment %s cannot export artifacts", a.t.ID, a.deps.Env.GetName())
+		}
+		files, err := ae.ExportArtifacts(ctx, rc)
+		if err != nil {
+			return diff, "artifact output: export failed: " + err.Error(), "", nil
+		}
+		if missing := utils.MissingArtifacts(utils.OutputArtifacts(a.s, rc.Task), files); len(missing) > 0 {
+			return diff, "", "artifact output: required artifact missing: " + strings.Join(missing, ", "), nil
 		}
 	case schemas.OutputAnswer:
 		ae, ok := a.deps.Env.(schemas.AnswerEnvironment)
 		if !ok {
-			return nil, "", fmt.Errorf("environment %s cannot read answers", a.deps.Env.GetName())
+			return nil, "", "", fmt.Errorf("environment %s cannot read answers", a.deps.Env.GetName())
 		}
 		ans, err := ae.ExportAnswer(ctx, rc)
 		if err != nil {
-			return nil, "", fmt.Errorf("export answer: %w", err)
+			return nil, "", "", fmt.Errorf("export answer: %w", err)
 		}
 		text := ""
 		if ans != nil && ans.Source != "missing" && ans.Source != "" {
@@ -361,10 +383,10 @@ func (a *admitter) exportControl(ctx context.Context, rc *schemas.RunContext, re
 			text = strings.TrimSpace(string(b))
 		}
 		if err := os.WriteFile(filepath.Join(rc.Dir, answerFile), []byte(text), 0o644); err != nil {
-			return nil, "", fmt.Errorf("write answer: %w", err)
+			return nil, "", "", fmt.Errorf("write answer: %w", err)
 		}
 	}
-	return diff, "", nil
+	return diff, "", "", nil
 }
 
 // controlEnv is the environment a control gets, as a run's agent would:
@@ -377,6 +399,9 @@ func controlEnv(rc *schemas.RunContext) (map[string]string, error) {
 			return nil, err
 		}
 		env[utils.EnvMCPServers] = servers
+		if err := utils.AddExternalEnv(env, rc.Services); err != nil { // External APIs area: BENCH_EXTERNAL_APIS
+			return nil, err
+		}
 	}
 	if utils.OutputKind(rc.Suite, rc.Task) == schemas.OutputAnswer {
 		env[utils.EnvAnswerPath] = utils.AnswerContainerPath(rc.Suite, rc.Task)

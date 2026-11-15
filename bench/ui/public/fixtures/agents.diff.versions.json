@@ -1,0 +1,81 @@
+{
+	"_comment": "SYNTHETIC fixture for UI development. Not a benchmark result: every value is made up.",
+	"mode": "synthetic",
+	"versions": [
+		{
+			"config_hash": "sha256:67cd7a069ba6e6141a645638240d97c5062022fa81126e36300d8bc0006730cd",
+			"agent_id": "codex",
+			"label": "B: code-wins note",
+			"suites": ["coding-core@1.0.0"],
+			"arms": [
+				{
+					"exp_id": "e_synthetic-codewins",
+					"arm": "B",
+					"label": "B: code-wins note",
+					"suite": "coding-core@1.0.0",
+					"created_at": "2026-11-14T10:20:00Z"
+				}
+			],
+			"sealed_runs": 24,
+			"latest_at": "2026-11-14T10:20:00Z"
+		},
+		{
+			"config_hash": "sha256:895fa8468a3bcbdb1351f9dcdc550dc492c5df1daf7bbd092e4543f5c1c83758",
+			"agent_id": "codex",
+			"label": "A: baseline",
+			"suites": ["coding-core@1.0.0", "coding-core@0.9.0"],
+			"arms": [
+				{
+					"exp_id": "e_synthetic-codewins",
+					"arm": "A",
+					"label": "A: baseline",
+					"suite": "coding-core@1.0.0",
+					"created_at": "2026-11-14T10:20:00Z"
+				},
+				{
+					"exp_id": "e_synthetic-providers",
+					"arm": "A",
+					"label": "A: baseline",
+					"suite": "coding-core@1.0.0",
+					"created_at": "2026-11-12T08:00:00Z"
+				}
+			],
+			"sealed_runs": 48,
+			"latest_at": "2026-11-13T09:00:00Z"
+		},
+		{
+			"config_hash": "sha256:e885efa97a924a21c4c94a63979a83b2267e1daedc256eca02c5986999d1ac10",
+			"agent_id": "claude-code-gpt",
+			"label": "B: gpt-5.1 via openai",
+			"suites": ["coding-core@1.0.0"],
+			"arms": [
+				{
+					"exp_id": "e_synthetic-providers",
+					"arm": "B",
+					"label": "B: gpt-5.1 via openai",
+					"suite": "coding-core@1.0.0",
+					"created_at": "2026-11-12T08:00:00Z"
+				}
+			],
+			"sealed_runs": 24,
+			"latest_at": "2026-11-12T08:00:00Z"
+		},
+		{
+			"config_hash": "sha256:62bb7b463f077bde2075ceb0404476411f8597c92ec7ba596d10030eb0dce0c4",
+			"agent_id": "custom-python",
+			"label": "A: custom template",
+			"suites": ["coding-core@1.0.0"],
+			"arms": [
+				{
+					"exp_id": "e_synthetic-custom",
+					"arm": "A",
+					"label": "A: custom template",
+					"suite": "coding-core@1.0.0",
+					"created_at": "2026-11-11T15:30:00Z"
+				}
+			],
+			"sealed_runs": 12,
+			"latest_at": "2026-11-11T15:30:00Z"
+		}
+	]
+}

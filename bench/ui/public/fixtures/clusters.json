@@ -1,0 +1,176 @@
+{
+	"_comment": "SYNTHETIC fixture for UI development. Not a benchmark result.",
+	"mode": "synthetic",
+	"generated_at": "2026-11-15T10:00:00Z",
+	"filters": {
+		"suite": "",
+		"agent": "",
+		"experiments": [],
+		"since": "",
+		"min": 2,
+		"synthetic": "exclude"
+	},
+	"runs": 30,
+	"failures": 12,
+	"experiments": [
+		"e_synthetic-codewins",
+		"e_second"
+	],
+	"clusters": [
+		{
+			"signature": "c_0f3a9b2c4d5e6f70",
+			"title": "fails test_limiter_window",
+			"outcome": "fail",
+			"layers": [
+				{
+					"kind": "outcome",
+					"label": "fail"
+				},
+				{
+					"kind": "failed_tests",
+					"label": "test_limiter_window",
+					"items": [
+						"test_limiter_window"
+					]
+				}
+			],
+			"count": 6,
+			"share": 0.5,
+			"tasks": [
+				"coding-core/t03",
+				"coding-core/t04",
+				"coding-core/t01"
+			],
+			"agents": [
+				"claude-code-sonnet",
+				"codex-default"
+			],
+			"config_hashes": [
+				"sha256:aaaaaaaaaaaaaaaa1111",
+				"sha256:bbbbbbbbbbbbbbbb2222"
+			],
+			"conditions": [
+				"clean"
+			],
+			"experiments": [
+				"e_synthetic-codewins"
+			],
+			"first_seen": "2026-11-10T08:00:00Z",
+			"last_seen": "2026-11-14T17:30:00Z",
+			"examples": [
+				"r_fmw1z7ouim",
+				"r_pww2l7yame"
+			],
+			"scope": "systemic",
+			"after_config_change": {
+				"agent": "claude-code-sonnet",
+				"from_hash": "sha256:aaaaaaaaaaaaaaaa1111",
+				"to_hash": "sha256:cccccccccccccccc3333",
+				"at": "2026-11-12T09:15:00Z"
+			},
+			"related": [
+				{
+					"signature": "c_1122334455667788",
+					"title": "timeout after repeated bash \"pytest -q\"",
+					"count": 3,
+					"reason": "same task t03"
+				}
+			]
+		},
+		{
+			"signature": "c_1122334455667788",
+			"title": "timeout after repeated bash \"pytest -q\"",
+			"outcome": "timeout",
+			"layers": [
+				{
+					"kind": "outcome",
+					"label": "timeout"
+				},
+				{
+					"kind": "loop",
+					"label": "bash \"pytest -q\""
+				}
+			],
+			"count": 3,
+			"share": 0.25,
+			"tasks": [
+				"coding-core/t03"
+			],
+			"agents": [
+				"codex-default"
+			],
+			"config_hashes": [
+				"sha256:bbbbbbbbbbbbbbbb2222"
+			],
+			"conditions": [
+				"clean"
+			],
+			"experiments": [
+				"e_synthetic-codewins"
+			],
+			"first_seen": "2026-11-11T08:00:00Z",
+			"last_seen": "2026-11-13T12:00:00Z",
+			"examples": [
+				"r_qolshdu5jg"
+			],
+			"scope": "agent_and_task"
+		},
+		{
+			"signature": "c_99aabbccddeeff00",
+			"title": "tool error: desk.refund amount must be positive",
+			"outcome": "fail",
+			"layers": [
+				{
+					"kind": "outcome",
+					"label": "fail"
+				},
+				{
+					"kind": "error",
+					"label": "desk.refund amount must be positive",
+					"source": "tool_proxy"
+				},
+				{
+					"kind": "last_tool",
+					"label": "desk.refund errored"
+				}
+			],
+			"count": 2,
+			"share": 0.1667,
+			"tasks": [
+				"support-desk/refund-01"
+			],
+			"agents": [
+				"claude-code-sonnet"
+			],
+			"config_hashes": [
+				"sha256:cccccccccccccccc3333"
+			],
+			"conditions": [
+				"tool-fault"
+			],
+			"experiments": [
+				"e_synthetic-codewins",
+				"e_second"
+			],
+			"first_seen": "2026-11-12T10:00:00Z",
+			"last_seen": "2026-11-12T11:00:00Z",
+			"examples": [
+				"r_fmw1z7ouim",
+				"r_tool000001"
+			],
+			"scope": "agent_and_task",
+			"error_text": "desk.refund <img src=x onerror=\"alert(1)\"> amount must be positive https://example.invalid/x **bold**"
+		}
+	],
+	"hidden": 1,
+	"excluded": [
+		{
+			"reason": "not sealed",
+			"runs": 2
+		},
+		{
+			"reason": "synthetic",
+			"runs": 1
+		}
+	]
+}

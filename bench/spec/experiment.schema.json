@@ -5,7 +5,8 @@
   "description": "experiments/<name>.yaml: arms, conditions, endpoint and verdict policy. Mirrors schemas.Experiment (DESIGN.md 16.6).",
   "type": "object",
   "additionalProperties": false,
-  "required": ["name", "suite", "base", "arms", "primary", "conditions"],
+  "required": ["name", "suite", "primary", "conditions"],
+  "anyOf": [{"required": ["base", "arms"]}, {"required": ["matrix"]}],
   "properties": {
     "id": {"type": "string", "pattern": "^e_[a-z0-9][a-z0-9_]*$", "description": "Set by the planner when absent."},
     "name": {"type": "string", "minLength": 1},
@@ -65,7 +66,21 @@
     "manifest_mode": {"enum": ["agent_exposure", "stack_resilience"]},
     "policy": {"type": "string", "minLength": 1, "description": "Release policy file, relative to the bench root."},
     "smoke": {"type": "boolean", "description": "A synthetic smoke experiment: suite lock problems (no lock, a task not admitted) only warn, and the flag is frozen in the manifest so its results are never presented as findings. The experiment name has no effect."},
-    "requirements": {"$ref": "#/$defs/requirements"}
+    "requirements": {"$ref": "#/$defs/requirements"},
+    "external": {"enum": ["live", "record", "replay"], "description": "Overrides every external API's mode for this experiment's runs. live and record call the real hosts: the results are not repeatable, and reports and the leaderboard label or exclude them (docs/external-apis.md)."},
+    "matrix": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "Model comparison matrix (docs/model-matrix.md): expands at plan time into one arm per combination of agent config and model, with generated labels. Replaces arms; without agents every arm uses base.",
+      "properties": {
+        "models": {"type": "array", "items": {"anyOf": [
+          {"type": "string", "minLength": 1},
+          {"type": "object", "additionalProperties": false, "required": ["model"], "properties": {"model": {"type": "string", "minLength": 1}, "provider": {"type": "string", "minLength": 1}}}
+        ]}},
+        "agents": {"type": "array", "items": {"type": "string", "minLength": 1}, "description": "Agent config paths, relative to the bench root."},
+        "allow_unpriced": {"type": "boolean", "description": "Plan a model the price snapshot does not list; its cost per success will be unknown."}
+      }
+    }
   },
   "$defs": {
     "condition_id": {"type": "string", "pattern": "^[a-z0-9][a-z0-9._-]*$", "description": "clean or a probe id."},
@@ -110,7 +125,8 @@
       "properties": {
         "id": {"$ref": "#/$defs/condition_id"},
         "tasks": {"$ref": "#/$defs/task_selector"},
-        "trials": {"type": "integer", "minimum": 1}
+        "trials": {"type": "integer", "minimum": 1},
+        "split": {"enum": ["public", "held_out"], "description": "Which tasks `tasks: all` means: public (default) or held_out. An explicit id list is taken as written (docs/held-out-and-canaries.md)."}
       }
     },
     "requirements": {

@@ -1,0 +1,35 @@
+# A real comparison on the Acme desktop tasks: Claude Code as a computer-use
+# agent (screenshots in, clicks and keys out, over MCP) on two models through
+# Bifrost, clean and under both probes (the first screenshot fails; a
+# hostile notice dialog sits on top of the app at start). Swap either arm for
+# any agent config with an `mcp:` block whose model accepts images in tool
+# results to compare your own agent.
+#
+# This spends money, and computer use is token heavy (every screenshot is an
+# image input): 3 tasks x 3 conditions x 2 trials = 18 runs per arm, 36 in
+# all. Load the stack's .env with a provider key in the fault proxy, admit
+# the suite (bifrost-bench suite admit acme-desktop), then plan and run.
+name: desktop-real
+suite: acme-desktop@1.0.0
+base: agents/claude-code.yaml
+arms:
+  A:
+    label: claude-code sonnet-4.5 on the desktop
+    set: {model: claude-sonnet-4-5}
+  B:
+    label: claude-code haiku-4.5 on the desktop
+    set: {model: claude-haiku-4-5}
+primary: {condition: clean, metric: verified_success}
+guards:
+  - {rule: no_new_integrity_violation}
+  - {rule: timeout_parity}
+conditions:
+  - {id: clean, tasks: all, trials: 2}
+  - {id: screenshot-error-first, tasks: all, trials: 2}
+  - {id: hostile-dialog, tasks: all, trials: 2}
+budget: {total_usd: 10}
+verdict: {policy: paired_signflip, alpha: 0.05, assumed_sd: 0.30}
+seed: 20261116
+concurrency: 2
+manifest_mode: agent_exposure
+policy: policies/default.yaml

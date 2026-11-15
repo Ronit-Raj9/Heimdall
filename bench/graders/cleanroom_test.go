@@ -185,6 +185,30 @@ func TestApplyScenario(t *testing.T) {
 			t.Fatal("default task verifies as root")
 		}
 	})
+	t.Run("artifacts folder is mounted read-only in both modes", func(t *testing.T) {
+		for _, mode := range []string{schemas.VerifierCleanRoom, schemas.VerifierSnapshot} {
+			dir := mkRun(t, map[string]string{"snapshot.ref": ref + "\n", "artifacts/report/out.csv": "a,b\n"})
+			rc := &schemas.RunContext{Suite: &schemas.Suite{ID: "s", Verifier: schemas.SuiteVerifier{Mode: mode}},
+				Task: &schemas.Task{ID: "t"}, Handle: &schemas.EnvironmentHandle{Volume: "bench-ws-r_1"}, Dir: dir}
+			in := &gradeInputs{}
+			if err := applyScenario(rc, in); err != nil {
+				t.Fatal(err)
+			}
+			if in.artifactsDir != filepath.Join(dir, "artifacts") || in.stateDir != "" || in.answerFile != "" {
+				t.Fatalf("%s: in %+v", mode, in)
+			}
+			want := []string{"-v", filepath.Join(dir, "artifacts") + ":/grader/artifacts:ro"}
+			if got := scenarioMounts(in); !reflect.DeepEqual(got, want) {
+				t.Fatalf("%s: mounts %v", mode, got)
+			}
+		}
+		// A file named artifacts is not the exported folder.
+		dir := mkRun(t, map[string]string{"artifacts": "x"})
+		in := &gradeInputs{}
+		if err := applyScenario(&schemas.RunContext{Suite: &schemas.Suite{ID: "s"}, Task: &schemas.Task{ID: "t"}, Dir: dir}, in); err != nil || in.artifactsDir != "" {
+			t.Fatalf("artifacts file mounted: %+v %v", in, err)
+		}
+	})
 	for name, files := range map[string]map[string]string{
 		"missing ref": {},
 		"bad ref":     {"snapshot.ref": "bench/snap-r_1:latest\n"},

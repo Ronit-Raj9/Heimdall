@@ -24,6 +24,7 @@ export const FIXTURE_ROUTES: readonly FixtureRoute[] = [
 	{ method: "GET", pattern: "/doctor", file: "doctor.json" },
 	{ method: "GET", pattern: "/catalog", file: "catalog.json" },
 	{ method: "POST", pattern: "/experiments/plan", file: "experiments.plan.json" },
+	{ method: "POST", pattern: "/estimate", file: "estimate.json" },
 	{ method: "POST", pattern: "/experiments", file: "experiments.create.json" },
 	{ method: "POST", pattern: "/experiments/:id/start", file: "experiments.start.json" },
 	{ method: "GET", pattern: "/experiments", file: "experiments.list.json" },
@@ -32,6 +33,15 @@ export const FIXTURE_ROUTES: readonly FixtureRoute[] = [
 	{ method: "GET", pattern: "/experiments/:id/diagnostics", file: "experiments.diagnostics.json" },
 	{ method: "GET", pattern: "/experiments/:id/grid", file: "experiments.grid.json" },
 	{ method: "GET", pattern: "/experiments/:id/triage", file: "experiments.triage.json" },
+	// Failure clusters: one list for every filter; one cluster's detail per signature, others answer 404.
+	{ method: "GET", pattern: "/clusters", file: "clusters.json" },
+	{ method: "GET", pattern: "/clusters/:id", file: "clusters.{id}.json" },
+	// Human review: the queue, the review log, one run's reviews and the created review.
+	{ method: "GET", pattern: "/experiments/:id/reviews/queue", file: "experiments.reviews.queue.json" },
+	{ method: "GET", pattern: "/experiments/:id/reviews", file: "experiments.reviews.json" },
+	{ method: "GET", pattern: "/runs/:id/reviews", file: "runs.{id}.reviews.json" },
+	{ method: "POST", pattern: "/reviews", file: "reviews.create.json" },
+	{ method: "GET", pattern: "/experiments/:id/matrix", file: "experiments.matrix.json" },
 	{ method: "GET", pattern: "/runs/:id", file: "runs.{id}.json" },
 	{ method: "GET", pattern: "/runs/:id/events", file: "runs.{id}.events.json" },
 	{ method: "GET", pattern: "/runs/:id/diff", file: "runs.{id}.diff.json" },
@@ -42,10 +52,16 @@ export const FIXTURE_ROUTES: readonly FixtureRoute[] = [
 	{ method: "GET", pattern: "/releases", file: "releases.list.json" },
 	// One board for every suite, condition, scope and synthetic filter: the query string is ignored.
 	{ method: "GET", pattern: "/leaderboard", file: "leaderboard.json" },
+	{ method: "GET", pattern: "/trends", file: "trends.json" }, // Index and trends area: one response for every filter
 	{ method: "GET", pattern: "/suites", file: "suites.json" },
 	// Task ids are unique across the fixture suites, so the file is keyed by the task alone.
 	{ method: "GET", pattern: "/suites/*/tasks/:id", file: "suites.task.{id}.json" },
+	// Suite health per suite id; a suite with no file answers 404, which the page shows as health unavailable.
+	{ method: "GET", pattern: "/suites/:id/health", file: "suites.health.{id}.json" },
 	{ method: "GET", pattern: "/agents", file: "agents.json" },
+	// Agent diff: one report for every a, b, suite and condition (the query string is ignored).
+	{ method: "GET", pattern: "/agents/diff", file: "agents.diff.json" },
+	{ method: "GET", pattern: "/agents/diff/versions", file: "agents.diff.versions.json" },
 	{ method: "GET", pattern: "/imports", file: "imports.json" },
 	// Workers on: the page shows the table. A server with the worker API off answers 404 instead.
 	{ method: "GET", pattern: "/workers", file: "workers.json" },

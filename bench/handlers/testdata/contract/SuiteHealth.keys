@@ -1,0 +1,11 @@
+# Keys of bench.ts `SuiteHealth` (GET /suites/{id}/health), one per line; a trailing ? marks an optional key.
+# The top-level response adds "mode". Change with bench.ts and schemas/suitehealth.go.
+suite
+version
+computed_at
+experiments
+runs
+thresholds
+tasks
+counts
+notes

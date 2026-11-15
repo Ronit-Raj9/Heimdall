@@ -17,6 +17,7 @@ import (
 	"bytes"
 	"context"
 	"crypto/sha256"
+	"crypto/x509"
 	"encoding/hex"
 	"encoding/json"
 	"errors"
@@ -43,6 +44,11 @@ type Config struct {
 	FaultPath  string // fault.json; may be absent at start and come and go
 	LedgerPath string // tools.jsonl
 	Logger     schemas.Logger
+	// RootCAs, when set, replaces the system roots external routes trust
+	// (tests). Getenv, when set, replaces os.Getenv for external route
+	// credentials (tests).
+	RootCAs *x509.CertPool
+	Getenv  func(string) string
 }
 
 // Server is a running tool proxy.
@@ -57,6 +63,10 @@ type Server struct {
 	logger  schemas.Logger
 	now     func() time.Time
 	hold    func(ctx context.Context, d time.Duration) error
+
+	// external holds the external routes (external.go); they are never in
+	// routes, so /s/<id> cannot reach them.
+	external map[string]*externalRoute
 }
 
 // New loads the routes, opens the ledger and returns a server ready to
@@ -99,10 +109,20 @@ func newServer(cfg Config, rs *Routes) (*Server, error) {
 		now:    time.Now,
 		hold:   sleepCtx,
 	}
+	s.external = map[string]*externalRoute{}
 	for _, r := range rs.Routes {
+		if r.Protocol == ProtocolExternal {
+			x, err := newExternalRoute(cfg, r)
+			if err != nil {
+				_ = s.Close()
+				return nil, err
+			}
+			s.external[r.Service] = x
+			continue
+		}
 		u, err := url.Parse(r.Upstream)
 		if err != nil {
-			_ = l.Close()
+			_ = s.Close()
 			return nil, fmt.Errorf("route %s: %w", r.Service, err)
 		}
 		s.routes[r.Service], s.targets[r.Service] = r, u
@@ -125,7 +145,7 @@ func (s *Server) ListenAndServe(ctx context.Context) error {
 	shut, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 	serr := srv.Shutdown(shut)
-	if err := s.ledger.Close(); err != nil {
+	if err := s.Close(); err != nil {
 		return err
 	}
 	if serr != nil && !errors.Is(serr, http.ErrServerClosed) {
@@ -134,8 +154,15 @@ func (s *Server) ListenAndServe(ctx context.Context) error {
 	return nil
 }
 
-// Close closes the ledger. Tests that use the server as a handler call it.
-func (s *Server) Close() error { return s.ledger.Close() }
+// Close closes the ledger and the record cassettes. Tests that use the
+// server as a handler call it.
+func (s *Server) Close() error {
+	errs := []error{s.ledger.Close()}
+	for _, x := range s.external {
+		errs = append(errs, x.close())
+	}
+	return errors.Join(errs...)
+}
 
 // ServeHTTP implements http.Handler: /healthz and /s/<service>/<path>.
 func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
@@ -146,6 +173,10 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		}
 		w.Header().Set("Content-Type", "text/plain; charset=utf-8")
 		_, _ = io.WriteString(w, "ok\n")
+		return
+	}
+	if rest, ok := strings.CutPrefix(r.URL.Path, "/x/"); ok {
+		s.serveExternal(w, r, rest) // External APIs area: real HTTP APIs behind the allowlist (external.go)
 		return
 	}
 	rest, ok := strings.CutPrefix(r.URL.Path, "/s/")

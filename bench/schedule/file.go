@@ -1,0 +1,261 @@
+package schedule
+
+import (
+	"bytes"
+	"errors"
+	"fmt"
+	"io"
+	"io/fs"
+	"os"
+	"path/filepath"
+	"regexp"
+	"slices"
+	"strings"
+	"time"
+
+	"github.com/maximhq/bifrost/bench/alerts"
+	"github.com/maximhq/bifrost/bench/schemas"
+	"gopkg.in/yaml.v3"
+)
+
+// DefaultFile is the schedules file name under the project (bench) root.
+const DefaultFile = "schedules.yaml"
+
+// namePattern is what a schedule name may look like: it names lock files and
+// ledger keys, so it stays a plain token.
+var namePattern = regexp.MustCompile(`^[a-z0-9][a-z0-9_-]{0,63}$`)
+
+// File is schedules.yaml. Alerts apply to every schedule, in addition to a
+// schedule's own.
+type File struct {
+	Alerts    []alerts.Config `json:"alerts,omitempty" yaml:"alerts,omitempty"`
+	Schedules []Schedule      `json:"schedules" yaml:"schedules"`
+}
+
+// Schedule is one experiment on a timetable.
+type Schedule struct {
+	Name         string          `json:"name" yaml:"name"`
+	Experiment   string          `json:"experiment" yaml:"experiment"`                               // experiment file, relative to the project root
+	Cron         string          `json:"cron" yaml:"cron"`                                           // 5-field cron expression
+	Timezone     string          `json:"timezone,omitempty" yaml:"timezone,omitempty"`               // IANA name the cron and the spend day use; empty is the host's local zone
+	Policy       string          `json:"policy,omitempty" yaml:"policy,omitempty"`                   // release policy file overriding the experiment's, relative to the project root
+	MaxUSDPerDay float64         `json:"max_usd_per_day,omitempty" yaml:"max_usd_per_day,omitempty"` // daily spend cap; required unless the experiment is a smoke experiment
+	FailOn       []string        `json:"fail_on,omitempty" yaml:"fail_on,omitempty"`                 // verdict decisions recorded as a failed check; empty is regressed and invalid
+	Alerts       []alerts.Config `json:"alerts,omitempty" yaml:"alerts,omitempty"`
+}
+
+// DefaultFailOn is the verdicts a scheduled check fails on when FailOn is
+// empty, the same default as `check -fail-on`.
+var DefaultFailOn = []string{string(schemas.DecisionRegressed), string(schemas.DecisionInvalid)}
+
+// ExperimentLoader reads an experiment file; the CLI passes its strict,
+// schema-checked loader.
+type ExperimentLoader func(path string) (*schemas.Experiment, error)
+
+// Load reads a schedules file strictly: an unknown key is an error, so a
+// misspelled max_usd_per_day can never pass as no cap. A missing file is an
+// empty File, so the first `schedule add` creates it.
+func Load(path string) (*File, error) {
+	data, err := os.ReadFile(path)
+	if errors.Is(err, fs.ErrNotExist) {
+		return &File{}, nil
+	}
+	if err != nil {
+		return nil, fmt.Errorf("read schedules %s: %w", path, err)
+	}
+	f := &File{}
+	dec := yaml.NewDecoder(bytes.NewReader(data))
+	dec.KnownFields(true)
+	if err := dec.Decode(f); err != nil && !errors.Is(err, io.EOF) {
+		return nil, fmt.Errorf("parse schedules %s: %w", path, err)
+	}
+	return f, nil
+}
+
+// Save writes the file atomically: a temporary file in the same folder, then
+// a rename, so a reader never sees half a file.
+func Save(path string, f *File) error {
+	data, err := yaml.Marshal(f)
+	if err != nil {
+		return fmt.Errorf("encode schedules: %w", err)
+	}
+	header := []byte("# Scheduled experiments (docs/schedules-and-alerts.md). Alerts name environment\n# variables only; never put a webhook URL or a secret in this file.\n")
+	tmp, err := os.CreateTemp(filepath.Dir(path), ".schedules-*.yaml")
+	if err != nil {
+		return fmt.Errorf("save schedules %s: %w", path, err)
+	}
+	_, werr := tmp.Write(append(header, data...))
+	if werr == nil {
+		werr = tmp.Sync()
+	}
+	if err := errors.Join(werr, tmp.Close()); err != nil {
+		return errors.Join(fmt.Errorf("save schedules %s: %w", path, err), os.Remove(tmp.Name()))
+	}
+	if err := os.Rename(tmp.Name(), path); err != nil {
+		return errors.Join(fmt.Errorf("save schedules %s: %w", path, err), os.Remove(tmp.Name()))
+	}
+	return nil
+}
+
+// Find returns the schedule named name.
+func (f *File) Find(name string) (Schedule, bool) {
+	for _, s := range f.Schedules {
+		if s.Name == name {
+			return s, true
+		}
+	}
+	return Schedule{}, false
+}
+
+// Add appends s. A name already in the file is an error.
+func (f *File) Add(s Schedule) error {
+	if _, ok := f.Find(s.Name); ok {
+		return fmt.Errorf("schedule %q already exists; remove it first", s.Name)
+	}
+	f.Schedules = append(f.Schedules, s)
+	return nil
+}
+
+// Remove deletes the schedule named name.
+func (f *File) Remove(name string) error {
+	i := slices.IndexFunc(f.Schedules, func(s Schedule) bool { return s.Name == name })
+	if i < 0 {
+		return fmt.Errorf("schedule %q: %w", name, schemas.ErrNotFound)
+	}
+	f.Schedules = slices.Delete(slices.Clone(f.Schedules), i, i+1)
+	return nil
+}
+
+// AlertsFor returns the receivers of one schedule: the file's alerts, then
+// the schedule's own, then extra (the server config's), in that order.
+func (f *File) AlertsFor(s Schedule, extra []alerts.Config) []alerts.Config {
+	out := slices.Clone(f.Alerts)
+	out = append(out, s.Alerts...)
+	return append(out, extra...)
+}
+
+// Validate checks every schedule against the project at root: names unique
+// and well formed, cron expressions that fire, a timezone that loads, the
+// experiment file and the policy file present, and a daily spend cap on
+// every experiment that can spend. load reads each experiment file.
+func (f *File) Validate(root string, load ExperimentLoader) error {
+	var errs []error
+	for _, a := range f.Alerts {
+		if err := a.Validate(); err != nil {
+			errs = append(errs, fmt.Errorf("alerts: %w", err))
+		}
+	}
+	seen := map[string]bool{}
+	for _, s := range f.Schedules {
+		if seen[s.Name] {
+			errs = append(errs, fmt.Errorf("schedule %q appears more than once", s.Name))
+		}
+		seen[s.Name] = true
+		if err := s.Validate(root, load); err != nil {
+			errs = append(errs, err)
+		}
+	}
+	return errors.Join(errs...)
+}
+
+// Validate checks one schedule (see File.Validate).
+//
+// A non-smoke experiment needs max_usd_per_day and its own spend cap
+// (budget.total_usd): the daemon refuses a run whose cap would take the
+// day's spend past max_usd_per_day, so an experiment without a cap could not
+// be bounded and a forgotten schedule could spend without limit. A smoke
+// experiment runs scripted parts and is exempt; a cap set on one still holds.
+func (s Schedule) Validate(root string, load ExperimentLoader) error {
+	if !namePattern.MatchString(s.Name) {
+		return fmt.Errorf("schedule %q: name must be lowercase letters, digits, - or _, starting with a letter or digit, at most 64 characters", s.Name)
+	}
+	wrap := func(format string, args ...any) error {
+		return fmt.Errorf("schedule %s: "+format, append([]any{s.Name}, args...)...)
+	}
+	c, err := ParseCron(s.Cron)
+	if err != nil {
+		return wrap("%w", err)
+	}
+	loc, err := s.Location()
+	if err != nil {
+		return wrap("%w", err)
+	}
+	if c.Next(time.Now().In(loc)).IsZero() {
+		return wrap("cron %q never fires", s.Cron)
+	}
+	if s.MaxUSDPerDay < 0 {
+		return wrap("max_usd_per_day %v is negative", s.MaxUSDPerDay)
+	}
+	for _, d := range s.FailOn {
+		switch schemas.Decision(d) {
+		case schemas.DecisionRegressed, schemas.DecisionInconclusive, schemas.DecisionInvalid, schemas.DecisionImproved:
+		default:
+			return wrap("fail_on %q is not a verdict decision", d)
+		}
+	}
+	for _, a := range s.Alerts {
+		if err := a.Validate(); err != nil {
+			return wrap("%w", err)
+		}
+	}
+	if s.Policy != "" {
+		if _, err := os.Stat(Resolve(root, s.Policy)); err != nil {
+			return wrap("policy file: %w", err)
+		}
+	}
+	if s.Experiment == "" {
+		return wrap("experiment file is empty")
+	}
+	if _, err := os.Stat(Resolve(root, s.Experiment)); err != nil {
+		return wrap("experiment file: %w", err)
+	}
+	if load == nil {
+		return nil
+	}
+	exp, err := load(Resolve(root, s.Experiment))
+	if err != nil {
+		return wrap("%w", err)
+	}
+	if exp.Smoke {
+		return nil
+	}
+	if s.MaxUSDPerDay <= 0 {
+		return wrap("max_usd_per_day is required for a non-smoke experiment, so a forgotten schedule cannot spend without limit")
+	}
+	if exp.Budget.TotalUSD <= 0 {
+		return wrap("experiment %s has no spend cap (budget.total_usd); a scheduled non-smoke experiment needs one so max_usd_per_day can hold", s.Experiment)
+	}
+	if exp.Budget.TotalUSD > s.MaxUSDPerDay {
+		return wrap("experiment spend cap %.2f USD is above max_usd_per_day %.2f USD, so no run could ever start", exp.Budget.TotalUSD, s.MaxUSDPerDay)
+	}
+	return nil
+}
+
+// Location returns the schedule's timezone.
+func (s Schedule) Location() (*time.Location, error) {
+	if s.Timezone == "" {
+		return time.Local, nil
+	}
+	loc, err := time.LoadLocation(s.Timezone)
+	if err != nil {
+		return nil, fmt.Errorf("timezone %q: %w", s.Timezone, err)
+	}
+	return loc, nil
+}
+
+// FailDecisions returns FailOn, or DefaultFailOn when it is empty.
+func (s Schedule) FailDecisions() []string {
+	if len(s.FailOn) == 0 {
+		return DefaultFailOn
+	}
+	return s.FailOn
+}
+
+// Resolve joins a project-relative path to root; an absolute path stays. The
+// CLI uses it to find a schedule's experiment and policy files.
+func Resolve(root, p string) string {
+	if p == "" || filepath.IsAbs(p) || root == "" {
+		return p
+	}
+	return filepath.Join(root, filepath.FromSlash(strings.TrimPrefix(p, "./")))
+}

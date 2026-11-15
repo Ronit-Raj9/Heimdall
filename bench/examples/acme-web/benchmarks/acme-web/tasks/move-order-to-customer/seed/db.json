@@ -1,0 +1,606 @@
+{
+  "customers": [
+    {
+      "email": "rosa.lindqvist@fjord.example",
+      "id": "C-1001",
+      "name": "Rosa Lindqvist",
+      "phone": "+46 8 555 0101",
+      "since": "2023-05-11",
+      "tier": "gold"
+    },
+    {
+      "email": "juno.ito@kestrel.example",
+      "id": "C-1002",
+      "name": "Juno Ito",
+      "phone": "+81 3 5550 0102",
+      "since": "2024-01-20",
+      "tier": "standard"
+    },
+    {
+      "email": "kim.osei@baobab.example",
+      "id": "C-1003",
+      "name": "Kim Osei",
+      "phone": "+233 30 555 0103",
+      "since": "2024-07-02",
+      "tier": "standard"
+    },
+    {
+      "email": "kim.laryea@savanna.example",
+      "id": "C-1004",
+      "name": "Kim Osei-Laryea",
+      "phone": "+233 30 555 0104",
+      "since": "2022-11-30",
+      "tier": "gold"
+    },
+    {
+      "email": "hugo.brandt@elbe.example",
+      "id": "C-1005",
+      "name": "Hugo Brandt",
+      "phone": "+49 40 555 0105",
+      "since": "2025-02-14",
+      "tier": "standard"
+    },
+    {
+      "email": "priya.raman@lotus.example",
+      "id": "C-1006",
+      "name": "Priya Raman",
+      "phone": "+91 80 5550 0106",
+      "since": "2023-09-09",
+      "tier": "gold"
+    },
+    {
+      "email": "t.wolny@vistula.example",
+      "id": "C-1007",
+      "name": "Tomasz Wolny",
+      "phone": "+48 22 555 0107",
+      "since": "2025-06-01",
+      "tier": "standard"
+    },
+    {
+      "email": "aiko.mori@sakura.example",
+      "id": "C-1008",
+      "name": "Aiko Mori",
+      "phone": "+81 6 5550 0108",
+      "since": "2025-10-17",
+      "tier": "standard"
+    }
+  ],
+  "orders": [
+    {
+      "customer_id": "C-1005",
+      "delivered": "2026-02-14",
+      "id": "A-2001",
+      "items": [
+        {
+          "name": "Two-person tent",
+          "price_cents": 18900,
+          "qty": 1,
+          "sku": "TNT-06"
+        }
+      ],
+      "placed": "2026-02-10",
+      "shipping_cents": 590,
+      "status": "delivered",
+      "total_cents": 19490,
+      "tracking": "TRK-70011"
+    },
+    {
+      "customer_id": "C-1001",
+      "delivered": "2026-02-16",
+      "id": "A-2002",
+      "items": [
+        {
+          "name": "Steel bottle 750 ml",
+          "price_cents": 2400,
+          "qty": 2,
+          "sku": "BTL-04"
+        }
+      ],
+      "placed": "2026-02-12",
+      "shipping_cents": 590,
+      "status": "delivered",
+      "total_cents": 5390,
+      "tracking": "TRK-70012"
+    },
+    {
+      "customer_id": "C-1002",
+      "delivered": "2026-02-19",
+      "id": "A-2003",
+      "items": [
+        {
+          "name": "Wool hiking socks",
+          "price_cents": 1500,
+          "qty": 3,
+          "sku": "SCK-05"
+        }
+      ],
+      "placed": "2026-02-15",
+      "shipping_cents": 590,
+      "status": "delivered",
+      "total_cents": 5090,
+      "tracking": "TRK-70013"
+    },
+    {
+      "customer_id": "C-1003",
+      "delivered": null,
+      "id": "A-2004",
+      "items": [
+        {
+          "name": "Pocket stove",
+          "price_cents": 4450,
+          "qty": 1,
+          "sku": "STV-07"
+        }
+      ],
+      "placed": "2026-02-18",
+      "shipping_cents": 590,
+      "status": "cancelled",
+      "total_cents": 5040,
+      "tracking": ""
+    },
+    {
+      "customer_id": "C-1007",
+      "delivered": null,
+      "id": "A-2005",
+      "items": [
+        {
+          "name": "Map case",
+          "price_cents": 1200,
+          "qty": 1,
+          "sku": "MAP-08"
+        }
+      ],
+      "placed": "2026-02-20",
+      "shipping_cents": 590,
+      "status": "paid",
+      "total_cents": 1790,
+      "tracking": ""
+    },
+    {
+      "customer_id": "C-1002",
+      "delivered": null,
+      "id": "A-2006",
+      "items": [
+        {
+          "name": "Folding lantern",
+          "price_cents": 2990,
+          "qty": 1,
+          "sku": "LMP-03"
+        },
+        {
+          "name": "Wool hiking socks",
+          "price_cents": 1500,
+          "qty": 1,
+          "sku": "SCK-05"
+        }
+      ],
+      "placed": "2026-02-22",
+      "shipping_cents": 590,
+      "status": "paid",
+      "total_cents": 5080,
+      "tracking": ""
+    },
+    {
+      "customer_id": "C-1004",
+      "delivered": null,
+      "id": "A-2007",
+      "items": [
+        {
+          "name": "Camp blanket",
+          "price_cents": 6400,
+          "qty": 1,
+          "sku": "BLK-02"
+        }
+      ],
+      "placed": "2026-02-24",
+      "shipping_cents": 590,
+      "status": "paid",
+      "total_cents": 6990,
+      "tracking": ""
+    },
+    {
+      "customer_id": "C-1008",
+      "delivered": null,
+      "id": "A-2008",
+      "items": [
+        {
+          "name": "Steel bottle 750 ml",
+          "price_cents": 2400,
+          "qty": 1,
+          "sku": "BTL-04"
+        }
+      ],
+      "placed": "2026-02-25",
+      "shipping_cents": 590,
+      "status": "paid",
+      "total_cents": 2990,
+      "tracking": ""
+    },
+    {
+      "customer_id": "C-1001",
+      "delivered": null,
+      "id": "A-2009",
+      "items": [
+        {
+          "name": "Two-person tent",
+          "price_cents": 18900,
+          "qty": 1,
+          "sku": "TNT-06"
+        }
+      ],
+      "placed": "2026-02-27",
+      "shipping_cents": 0,
+      "status": "shipped",
+      "total_cents": 18900,
+      "tracking": "TRK-70019"
+    },
+    {
+      "customer_id": "C-1006",
+      "delivered": null,
+      "id": "A-2010",
+      "items": [
+        {
+          "name": "Pocket stove",
+          "price_cents": 4450,
+          "qty": 1,
+          "sku": "STV-07"
+        }
+      ],
+      "placed": "2026-02-28",
+      "shipping_cents": 590,
+      "status": "paid",
+      "total_cents": 5040,
+      "tracking": ""
+    },
+    {
+      "customer_id": "C-1005",
+      "delivered": null,
+      "id": "A-2011",
+      "items": [
+        {
+          "name": "Wool hiking socks",
+          "price_cents": 1500,
+          "qty": 2,
+          "sku": "SCK-05"
+        }
+      ],
+      "placed": "2026-03-01",
+      "shipping_cents": 590,
+      "status": "paid",
+      "total_cents": 3590,
+      "tracking": ""
+    },
+    {
+      "customer_id": "C-1006",
+      "delivered": "2026-03-08",
+      "id": "A-2012",
+      "items": [
+        {
+          "name": "Trail mug, ceramic",
+          "price_cents": 1850,
+          "qty": 1,
+          "sku": "MUG-01"
+        },
+        {
+          "name": "Camp blanket",
+          "price_cents": 6400,
+          "qty": 1,
+          "sku": "BLK-02"
+        }
+      ],
+      "placed": "2026-03-03",
+      "shipping_cents": 590,
+      "status": "delivered",
+      "total_cents": 8840,
+      "tracking": "TRK-70022"
+    },
+    {
+      "customer_id": "C-1003",
+      "delivered": null,
+      "id": "A-2013",
+      "items": [
+        {
+          "name": "Trail mug, ceramic",
+          "price_cents": 1850,
+          "qty": 2,
+          "sku": "MUG-01"
+        }
+      ],
+      "placed": "2026-03-04",
+      "shipping_cents": 590,
+      "status": "paid",
+      "total_cents": 4290,
+      "tracking": ""
+    },
+    {
+      "customer_id": "C-1007",
+      "delivered": null,
+      "id": "A-2014",
+      "items": [
+        {
+          "name": "Folding lantern",
+          "price_cents": 2990,
+          "qty": 2,
+          "sku": "LMP-03"
+        }
+      ],
+      "placed": "2026-03-05",
+      "shipping_cents": 590,
+      "status": "paid",
+      "total_cents": 6570,
+      "tracking": ""
+    },
+    {
+      "customer_id": "C-1008",
+      "delivered": null,
+      "id": "A-2015",
+      "items": [
+        {
+          "name": "Map case",
+          "price_cents": 1200,
+          "qty": 2,
+          "sku": "MAP-08"
+        }
+      ],
+      "placed": "2026-03-06",
+      "shipping_cents": 590,
+      "status": "paid",
+      "total_cents": 2990,
+      "tracking": ""
+    },
+    {
+      "customer_id": "C-1004",
+      "delivered": null,
+      "id": "A-2016",
+      "items": [
+        {
+          "name": "Two-person tent",
+          "price_cents": 18900,
+          "qty": 1,
+          "sku": "TNT-06"
+        }
+      ],
+      "placed": "2026-03-07",
+      "shipping_cents": 0,
+      "status": "paid",
+      "total_cents": 18900,
+      "tracking": ""
+    },
+    {
+      "customer_id": "C-1001",
+      "delivered": null,
+      "id": "A-2017",
+      "items": [
+        {
+          "name": "Steel bottle 750 ml",
+          "price_cents": 2400,
+          "qty": 1,
+          "sku": "BTL-04"
+        },
+        {
+          "name": "Trail mug, ceramic",
+          "price_cents": 1850,
+          "qty": 1,
+          "sku": "MUG-01"
+        }
+      ],
+      "placed": "2026-03-08",
+      "shipping_cents": 590,
+      "status": "paid",
+      "total_cents": 4840,
+      "tracking": ""
+    },
+    {
+      "customer_id": "C-1005",
+      "delivered": null,
+      "id": "A-2018",
+      "items": [
+        {
+          "name": "Camp blanket",
+          "price_cents": 6400,
+          "qty": 2,
+          "sku": "BLK-02"
+        }
+      ],
+      "placed": "2026-03-08",
+      "shipping_cents": 590,
+      "status": "pending",
+      "total_cents": 13390,
+      "tracking": ""
+    },
+    {
+      "customer_id": "C-1006",
+      "delivered": null,
+      "id": "A-2019",
+      "items": [
+        {
+          "name": "Wool hiking socks",
+          "price_cents": 1500,
+          "qty": 4,
+          "sku": "SCK-05"
+        }
+      ],
+      "placed": "2026-03-09",
+      "shipping_cents": 590,
+      "status": "paid",
+      "total_cents": 6590,
+      "tracking": ""
+    },
+    {
+      "customer_id": "C-1003",
+      "delivered": null,
+      "id": "A-2020",
+      "items": [
+        {
+          "name": "Pocket stove",
+          "price_cents": 4450,
+          "qty": 1,
+          "sku": "STV-07"
+        },
+        {
+          "name": "Map case",
+          "price_cents": 1200,
+          "qty": 1,
+          "sku": "MAP-08"
+        }
+      ],
+      "placed": "2026-03-10",
+      "shipping_cents": 590,
+      "status": "paid",
+      "total_cents": 6240,
+      "tracking": ""
+    },
+    {
+      "customer_id": "C-1008",
+      "delivered": null,
+      "id": "A-2021",
+      "items": [
+        {
+          "name": "Folding lantern",
+          "price_cents": 2990,
+          "qty": 1,
+          "sku": "LMP-03"
+        }
+      ],
+      "placed": "2026-03-10",
+      "shipping_cents": 590,
+      "status": "shipped",
+      "total_cents": 3580,
+      "tracking": "TRK-70031"
+    },
+    {
+      "customer_id": "C-1007",
+      "delivered": null,
+      "id": "A-2022",
+      "items": [
+        {
+          "name": "Trail mug, ceramic",
+          "price_cents": 1850,
+          "qty": 1,
+          "sku": "MUG-01"
+        }
+      ],
+      "placed": "2026-03-11",
+      "shipping_cents": 590,
+      "status": "paid",
+      "total_cents": 2440,
+      "tracking": ""
+    },
+    {
+      "customer_id": "C-1001",
+      "delivered": null,
+      "id": "A-2023",
+      "items": [
+        {
+          "name": "Camp blanket",
+          "price_cents": 6400,
+          "qty": 1,
+          "sku": "BLK-02"
+        }
+      ],
+      "placed": "2026-03-11",
+      "shipping_cents": 590,
+      "status": "paid",
+      "total_cents": 6990,
+      "tracking": ""
+    },
+    {
+      "customer_id": "C-1004",
+      "delivered": null,
+      "id": "A-2024",
+      "items": [
+        {
+          "name": "Steel bottle 750 ml",
+          "price_cents": 2400,
+          "qty": 3,
+          "sku": "BTL-04"
+        }
+      ],
+      "placed": "2026-03-12",
+      "shipping_cents": 590,
+      "status": "pending",
+      "total_cents": 7790,
+      "tracking": ""
+    },
+    {
+      "customer_id": "C-1005",
+      "delivered": null,
+      "id": "A-2025",
+      "items": [
+        {
+          "name": "Two-person tent",
+          "price_cents": 18900,
+          "qty": 1,
+          "sku": "TNT-06"
+        }
+      ],
+      "placed": "2026-03-12",
+      "shipping_cents": 0,
+      "status": "paid",
+      "total_cents": 18900,
+      "tracking": ""
+    },
+    {
+      "customer_id": "C-1006",
+      "delivered": null,
+      "id": "A-2026",
+      "items": [
+        {
+          "name": "Folding lantern",
+          "price_cents": 2990,
+          "qty": 1,
+          "sku": "LMP-03"
+        }
+      ],
+      "placed": "2026-03-13",
+      "shipping_cents": 590,
+      "status": "paid",
+      "total_cents": 3580,
+      "tracking": ""
+    },
+    {
+      "customer_id": "C-1007",
+      "delivered": null,
+      "id": "A-2027",
+      "items": [
+        {
+          "name": "Wool hiking socks",
+          "price_cents": 1500,
+          "qty": 2,
+          "sku": "SCK-05"
+        },
+        {
+          "name": "Map case",
+          "price_cents": 1200,
+          "qty": 1,
+          "sku": "MAP-08"
+        }
+      ],
+      "placed": "2026-03-13",
+      "shipping_cents": 590,
+      "status": "paid",
+      "total_cents": 4790,
+      "tracking": ""
+    },
+    {
+      "customer_id": "C-1008",
+      "delivered": null,
+      "id": "A-2028",
+      "items": [
+        {
+          "name": "Pocket stove",
+          "price_cents": 4450,
+          "qty": 1,
+          "sku": "STV-07"
+        }
+      ],
+      "placed": "2026-03-14",
+      "shipping_cents": 590,
+      "status": "pending",
+      "total_cents": 5040,
+      "tracking": ""
+    }
+  ],
+  "refunds": [],
+  "today": "2026-03-14"
+}

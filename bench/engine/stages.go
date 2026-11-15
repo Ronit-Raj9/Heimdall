@@ -278,17 +278,24 @@ func availableEvidence(ev *schemas.Evidence) []string {
 	return out
 }
 
-// grade runs the grader on the exported diff. A scenario run whose state or
-// answer was not exported is not graded: its grade is invalid_evaluator with
-// the reason (scenarioGradeProblem). A grade that is not a clean-room diff
-// grade carries its mode.
+// grade runs the grader on the exported diff. A scenario run whose state,
+// answer or artifact files were not exported is not graded: its grade is
+// invalid_evaluator with the reason (scenarioGradeProblem). An artifact task
+// whose required artifacts are missing fails without running the verifier
+// (missingArtifactsReason). A grade that is not a clean-room diff grade
+// carries its mode.
 func (p *Pipeline) grade(ctx context.Context, st *runState) error {
 	if st.ev.Diff == nil {
 		return errors.New("no exported diff to grade")
 	}
 	mode := gradeMode(st.rc)
-	if why := scenarioGradeProblem(st.rc, st.ev); why != "" {
+	if why := scenarioGradeProblem(st.rc, st.ev, st.artifactErr); why != "" {
 		st.ev.Grade = &schemas.Grade{InvalidEvaluator: true, Reason: why, Mode: mode, SuiteVersion: st.rc.Suite.Version,
+			GraderVersion: st.grader.GetVersion(), DiffSHA256: st.ev.Diff.SHA256}
+		return nil
+	}
+	if why := missingArtifactsReason(st.rc, st.ev); why != "" {
+		st.ev.Grade = &schemas.Grade{Passed: false, Reason: why, Mode: mode, SuiteVersion: st.rc.Suite.Version,
 			GraderVersion: st.grader.GetVersion(), DiffSHA256: st.ev.Diff.SHA256}
 		return nil
 	}

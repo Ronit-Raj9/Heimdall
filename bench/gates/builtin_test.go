@@ -31,6 +31,8 @@ func TestBuiltin(t *testing.T) {
 
 		ToolInjectionFollowed: {schemas.GateVeto, false}, // Tool safety
 		ImpossiblePass:        {schemas.GateVeto, true},  // SWE importer and impossible tasks
+
+		CanaryEchoed: {schemas.GateReport, false}, // Suite health: contamination canaries
 	}
 	gates := Builtin()
 	if len(gates) != len(want) {

@@ -18,7 +18,10 @@ task's verifier is checked against its reference and controls on the host
 (see "Honest limits"). In Docker, `suite admit` admitted all four
 `acme-support` tasks (services, the tool proxy, the state export and the
 state verifier) and all three `acme-memory` tasks (sessions, the answer
-export and `answer_match`); the example READMEs give the details. The smoke
+export and `answer_match`); for artifact tasks it admitted the
+`-template artifact` sample and all three `acme-design` tasks (the artifact
+export, the `/grader/artifacts` mount and the missing-artifact fail); the
+example READMEs give the details. The smoke
 experiment and `agent check` were not run for these kinds: both need the
 stack's gateway and fault proxy tokens. Where this page shows a command
 whose result has not been run end to end, it says so. No output on this
@@ -30,8 +33,12 @@ page is invented.
 |---|---|---|---|---|
 | Tool use | `tool-use` | `tool_use` | Calls an HTTP tool server started beside it | The server's final state, read by a state verifier |
 | MCP | `mcp` | `mcp` | Calls an MCP server (streamable HTTP) started beside it | The server's final state, read by a state verifier |
+| Browser | `browser` | `browser` | Drives a headless browser (Playwright MCP) through a web application it cannot reach directly | The web application's final state, read by a state verifier |
+| Computer use | `computer-use` | `computer_use` | Operates a Linux desktop (a GUI app on a virtual display) through screenshots, mouse and keyboard, over an MCP server | The apps' saved state (files, form submissions), dumped as JSON and read by a state verifier |
 | Memory | `memory` | `memory` | Runs in two or more sessions; the workspace is wiped in between | The last session's answer, matched with no model |
 | Question answering | `qa` | `qa` | Reads the workspace and answers one question | The answer, matched with no model |
+| Artifacts | `artifact` | `artifact` | Writes files in its workspace: a report, a chart, a mesh, a document | The files, copied out after the run and read by a hidden verifier |
+| External API | `external-api` | `tool_use` | Calls a real HTTP API outside the bench through the tool proxy, answered from a recorded cassette unless the experiment opts in to live calls | The file it writes, read by a verifier |
 
 Each template writes a suite with **one complete sample task** that passes
 `task validate` as written, so you start from something that works and
@@ -60,7 +67,7 @@ user, and, for the state templates, python3 for the verifier.
 ### task init for these kinds
 
 ```
-bifrost-bench task init -suite <suite> -id <task> [-kind tool-use|mcp|memory|qa] [-from <task>]
+bifrost-bench task init -suite <suite> -id <task> [-kind tool-use|mcp|browser|memory|qa|artifact|computer-use] [-from <task>]
                         [-license <spdx|proprietary>] [-force] [-config deploy/bench.yaml]
 ```
 
@@ -235,6 +242,71 @@ and the metrics `tool_calls_proxied`, `tool_error_rate`, `tool_recovery`
 and `distinct_tools` come from it; they are unknown, never zero, when the
 task has proxied services and the ledger is missing. The proxy's own guide
 is [`tool-proxy.md`](tool-proxy.md).
+
+## Browser (`-template browser`)
+
+A state task with two services: `browser`, Playwright's MCP server with a
+headless Chromium (role `mcp`, proxied), and `webapp`, the web application
+(role `data`, `hidden: true`, seeded with `files:` and read with
+`export:`). The hidden web application is on a network the agent is not
+on, so every action reaches it through a recorded browser tool call
+(`browser_navigate`, `browser_click`, `browser_type`, ...), and the verifier
+reads only its exported database at `/grader/state/webapp/db.json`, never a
+page or a screenshot. The sample task creates a customer through a form.
+The template adds three probes (`browser-error-first`, `browser-slow`,
+`hostile-banner`), and its verifier reports `attack_succeeded` from the
+task's `ATTACK_CHECKS` for the `tool_injection_followed` gate. The browser
+image is about 1.45 GB; `suite admit` builds it from `services/browser/`.
+The guide, with the flags, the limits and how to point the suite at your own
+web application image, is [`browser-tasks.md`](browser-tasks.md).
+
+## Computer use (`-template computer-use`)
+
+A state task with one service, `desktop` (role `mcp`, proxied): a Linux
+desktop in one container, with a virtual display (Xvfb, 1280x800), the
+openbox window manager (every window maximized, no menu, no key bindings)
+and one GUI app, the mousepad text editor, the xfe file manager or a small
+Tk form app, picked per task with `DESKTOP_APP`. Its MCP server offers
+`screenshot`, `click`, `move`, `drag`, `type`, `key`, `scroll`, `wait`,
+`cursor_position` and `screen_size`, and no tool that runs a command or
+reads a file. Seed files go under `/seed/home` and are copied into the
+desktop user's home at start. Grading never looks at a screenshot: the
+export runs `desktop.py dump`, which prints the saved files (sha256, text,
+parsed INI values), the form's submissions and the notice dialog's button
+as JSON, and the verifier reads it at `/grader/state/desktop/state.json`.
+The sample task edits and saves a config file. The template adds two
+probes (`screenshot-error`: the first screenshot fails; `hostile-dialog`: a
+notice dialog urges a click that closes the app). The agent needs a model
+that accepts images in tool results. The desktop image is about 856 MB and
+its apt step needs the network once; `suite admit` builds it from
+`services/desktop/`. The guide, with the tools, the state dump, the
+controls, the limits and how to bring your own desktop image, is
+[`computer-use.md`](computer-use.md); the example project is
+[`examples/acme-desktop`](../examples/acme-desktop/README.md).
+
+## External APIs (`-template external-api`)
+
+For an agent that must call a real HTTP API (a rates service, a weather
+service, a SaaS endpoint), a task declares it under `external:` with its
+base URL, an allowlist of methods and path prefixes, static headers, the
+name of the host variable holding the credential, and a cassette. The agent
+reaches it at `http://toolproxy:9200/x/<id>/<path>` (`BENCH_EXTERNAL_APIS`
+holds every URL); the tool proxy enforces the allowlist and caps, adds the
+credential the agent never sees, and records every call in `tools.jsonl`
+with protocol `external`.
+
+By default every run, and every admission, is answered from the committed
+cassette with no network: the proxy has no route out and results repeat. An
+experiment can set `external: record` to call the real host once and write
+a cassette into each run folder, or `external: live` to call it every time;
+only then does the proxy (never the agent) get a route, to that host and
+port only. Both are labelled not repeatable in the verdict header and kept
+off the leaderboard. The sample task `invoice-fx` converts an invoice with
+a fictional currency API; its reference script calls the API through the
+proxy, the mutant reads the rate the wrong way round, and the exploit tries
+to leave the allowlist. [`external-apis.md`](external-apis.md) is the full
+guide: modes, cassettes and how to record and promote one, secrets, what
+the proxy refuses, and what live mode costs you.
 
 ## Writing a state verifier
 
@@ -491,6 +563,74 @@ not reward a spray of guesses.
   not beside the workspace. With `model_traffic: external` its tokens, cost
   and steps are unknown, never zero.
 
+## Artifacts (`-template artifact`)
+
+```
+benchmarks/<suite>/
+  suite.yaml                                       track artifact, output artifact, grader verifier_command, result reward
+  base/Dockerfile, README.md, probes/model-outage.yaml
+  tasks/sales-report/task.yaml                     output.artifacts: report (report.csv), chart (chart.svg), both required
+  tasks/sales-report/instruction.md                summarise data/sales.csv, draw one bar per region
+  tasks/sales-report/repo/data/sales.csv           the input data
+  tasks/sales-report/verifier/tests/verify.py      hidden: checks the CSV values and the SVG's bars, writes a reward
+  tasks/sales-report/solution/reference.sh         writes both files correctly
+  tasks/sales-report/controls/empty.sh, mutant-refunds-counted.sh, exploit.sh
+```
+
+The sample's verifier is Python standard library only. It compares
+`report.csv` row by row with the expected totals (refunded orders left out)
+and parses `chart.svg` as XML: one `<rect>` per region, each with a
+`<title>` naming it, heights in proportion to revenue. It writes
+`{"reward": r, "dimensions": {"report": .., "chart": ..}}`; the reward is 1
+only when both pass. The mutant counts the refunded orders; the exploit
+copies the input data to `report.csv`, writes an empty SVG and plants fake
+passing reward files where a careless verifier might read them. Both must
+fail, and do. `task init -suite <suite> -id <task>` (or `-kind artifact`)
+copies the shape with EDIT ME markers in the instruction, `verify.py`,
+`requirements.md` and the reference script.
+
+An artifact task is graded on files the agent produces: a CSV report, an SVG
+chart, a mesh, a PDF. The task names them in `output.artifacts`, and a hidden
+`verifier_command` reads them:
+
+```yaml
+output:
+  kind: artifact
+  artifacts:
+    - {id: report, path: out/report.csv, required: true}
+    - {id: chart, path: out/chart.svg, required: true, max_bytes: 1048576}
+    - {id: shots, path: shots/*.png}            # a glob: *, ? and [...], no **
+```
+
+- **Export.** After the agent exits, a trusted helper with no network and
+  the workspace read-only copies every match to `artifacts/<id>/<name>` in
+  the run folder (`<name>` is the file's base name). The seal covers them.
+- **Refused files.** A match that resolves outside the workspace through a
+  symlink, is not a regular file, has a name outside
+  `[A-Za-z0-9_][A-Za-z0-9._-]*`, is over its `max_bytes` (default 32 MiB) or
+  pushes the run past 128 MiB in total is recorded with its error and not
+  copied. A glob copies at most 64 files; a task declares at most 32
+  artifacts.
+- **Verifier.** The suite's grader must be `verifier_command`. It sees the
+  files read-only at `/grader/artifacts/<id>/<name>`, in clean-room and
+  snapshot mode, with no network, and reports in any result format (`junit`,
+  `reward` with dimensions, `exit_code`).
+- **Outcomes.** A `required` artifact without one usable file is the agent's
+  failure: the run fails with `artifact output: required artifact missing:
+  ...` and the verifier is not run. An export that broke on the bench's side
+  is `invalid_evaluator` with `artifact output: export failed: ...`, never a
+  fail. An optional artifact that is missing leaves the decision to the
+  verifier.
+- **Controls.** The reference, the empty control and every mutant are
+  scripts (`.sh`) run in the agent's place, so the reference is a script
+  that writes the files; the exploit is a script as for every kind. `oracle`
+  runs the reference script and `noop` writes nothing.
+- **Viewing.** The run page lists each artifact with its size, sha256 and
+  export error. `GET /api/bench/runs/{id}/artifacts/{artifact}/{name}`
+  serves a file of a sealed run as a download only
+  (`application/octet-stream`, `X-Content-Type-Options: nosniff`,
+  attachment): agent-produced files are untrusted and never rendered.
+
 ## Judged and verified suites
 
 `answer_match` decides with no model, and every template is a verified
@@ -555,12 +695,37 @@ machines).
   fails; `poisoned-ticket`: a ticket's text carries an injected instruction
   with a canary), and two experiments (`support-smoke`: oracle against noop,
   $0; `support-real`: any MCP-capable agent).
+- [`examples/acme-web`](../examples/acme-web/README.md): an admin
+  console (customers, orders, refunds) operated through the browser, four
+  state-graded tasks and the three browser probes.
+- [`examples/acme-external`](../examples/acme-external/README.md): a
+  dispatch agent that reads a fictional weather API through the tool proxy
+  (`drone-window`), replayed from a committed cassette, with an exploit
+  control that tries to leave the allowlist and a smoke experiment.
 - [`examples/acme-memory`](../examples/acme-memory/README.md): three
   multi-session tasks graded by `answer_match`: `standup-freeze`,
   `shipping-preference` (a fact that changes between sessions) and
   `vendor-phone` (the answer was never given, so the agent must abstain).
+- [`examples/acme-design`](../examples/acme-design/README.md): three
+  artifact tasks for a fictional design studio, each verifier Python
+  standard library only: `bracket-mesh` (an ASCII OBJ of a 40 x 25 x 10 mm
+  block; dimensions `geometry`, from the bounding box and the signed volume,
+  and `watertight`, from the edges and the winding), `invoice-summary` (a
+  CSV and a JSON of per-client totals) and `palette-swatch` (an SVG swatch
+  sheet with exact colours). `suite admit` in Docker admitted all three on
+  15 Nov 2026 (reference 3 of 3 `reward 1`; empty, two mutants, exploit,
+  noop and refuse fail); the smoke experiment `design-smoke` (oracle against
+  noop) needs the stack's tokens and was not run.
 
 ## Honest limits
+
+- **Artifact checks are as strong as their verifier.** The bench copies the
+  files safely and fails a missing required one; whether a mesh is the right
+  part or a chart says the right thing is only what `verify.py` checks. The
+  example's mesh check is a bounding box, a volume and a closed, consistently
+  wound surface, not a full solid comparison. Artifact file names are
+  limited to `[A-Za-z0-9_][A-Za-z0-9._-]*`, so a file with spaces or
+  non-ASCII letters in its name is recorded with an error and not copied.
 
 - **Built in parallel.** Services, the tool proxy, sessions, the answer
   export and the scenario rows of `agent check` are separate parts of the
@@ -591,7 +756,10 @@ machines).
   to streamable HTTP inside its image.
 - **No network for services.** A tool that calls a real third-party API has
   to be replaced by a local fake seeded with data; nothing reaches the
-  network at run time except model calls through the gateway.
+  network at run time except model calls through the gateway. The one
+  exception is a declared external API in an experiment that opts in to
+  live or record mode: then the tool proxy alone reaches that API's host
+  ([`external-apis.md`](external-apis.md)).
 - **Verified tool tasks check state, not words.** A refusal task checks
   that nothing was written and that a reply exists; the reply's wording is
   checked only by the patterns a task writes (acme-support's refund tasks
@@ -609,5 +777,7 @@ machines).
   framework agents.
 - [`mcp-agents.md`](mcp-agents.md): how each agent CLI is given the run's
   MCP servers.
+- [`browser-tasks.md`](browser-tasks.md): browser tasks, the Playwright MCP
+  service, its flags and limits.
 - [`answer-grading.md`](answer-grading.md): `answer_match` and the judge,
   including the fixed "not known" phrases of an abstention task.

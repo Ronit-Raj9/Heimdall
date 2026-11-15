@@ -16,10 +16,11 @@ import (
 const FileToolLedger = "tools.jsonl"
 
 // fillScenario adds a scenario run's evidence to its detail: tool calls,
-// sessions, answer, exported state and services. evidence.json holds them
-// once the run is sealed; before that the tool ledger is read from its own
-// file when it exists. A plain diff run has none, and its detail is
-// unchanged.
+// sessions, answer, exported state, services and artifact files.
+// evidence.json holds them once the run is sealed; before that the tool
+// ledger is read from its own file when it exists. A plain diff run has none,
+// and its detail is unchanged. Artifact files are listed only; their bytes
+// are served by getRunArtifact.
 func fillScenario(index ReadIndex, runID string, out *schemas.RunDetail) error {
 	var ev struct {
 		ToolCalls []schemas.ToolCall      `json:"tool_calls"`
@@ -27,6 +28,7 @@ func fillScenario(index ReadIndex, runID string, out *schemas.RunDetail) error {
 		Answer    *schemas.Answer         `json:"answer"`
 		State     []schemas.StateFile     `json:"state"`
 		Services  []schemas.ServiceResult `json:"services"`
+		Artifacts []schemas.ArtifactFile  `json:"artifacts"`
 	}
 	data, found, err := readInternal(index, runID, FileEvidence)
 	if err != nil {
@@ -43,6 +45,7 @@ func fillScenario(index ReadIndex, runID string, out *schemas.RunDetail) error {
 		}
 	}
 	out.ToolCalls, out.Sessions, out.Answer, out.State, out.Services = ev.ToolCalls, ev.Sessions, ev.Answer, ev.State, ev.Services
+	out.Artifacts = ev.Artifacts
 	return nil
 }
 

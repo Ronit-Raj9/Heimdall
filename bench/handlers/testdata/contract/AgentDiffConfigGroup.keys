@@ -1,0 +1,5 @@
+# Keys of bench.ts `AgentDiffConfigGroup`, one per line; a trailing ? marks an optional (Go omitempty) key.
+# Change with bench.ts and agentdiff/agentdiff.go.
+id
+fields
+files

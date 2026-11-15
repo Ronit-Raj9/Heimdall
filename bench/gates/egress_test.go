@@ -2,6 +2,8 @@ package gates
 
 import (
 	"context"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 
@@ -45,5 +47,43 @@ func TestEgress(t *testing.T) {
 				t.Fatalf("fired=%v detail=%q, want %v containing %q", res.Fired, res.Detail, c.fired, c.detail)
 			}
 		})
+	}
+}
+
+func TestEgressExternalNote(t *testing.T) {
+	dir := t.TempDir()
+	if err := os.WriteFile(filepath.Join(dir, "acme.cassette.jsonl"), []byte("{}\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	task := &schemas.Task{Dir: dir, External: []schemas.ExternalAPI{{ID: "acme", BaseURL: "https://api.acme.test/v1", Cassette: "acme.cassette.jsonl"}}}
+	settings := map[string]string{"egress_probe": "blocked", "eval_network": "bench-eval"}
+	rc := func(external string) *schemas.RunContext {
+		return &schemas.RunContext{
+			Manifest: &schemas.Manifest{Experiment: schemas.Experiment{External: external}, Gateway: &schemas.GatewayManifest{Settings: settings}},
+			Handle:   &schemas.EnvironmentHandle{Network: "bench-eval"},
+			Task:     task,
+		}
+	}
+	cases := []struct {
+		name, external, want string
+	}{
+		{"replay from cassette", "", "external APIs: acme -> api.acme.test:443 (replay, no egress)"},
+		{"live opt in", "live", "acme -> api.acme.test:443 (live, tool proxy only"},
+		{"record opt in", "record", "(record, tool proxy only"},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			res, err := newEgressGate().Check(context.Background(), rc(c.external), &schemas.Evidence{})
+			if err != nil {
+				t.Fatal(err)
+			}
+			if res.Fired || !strings.Contains(res.Detail, c.want) {
+				t.Fatalf("fired=%v detail=%q, want not fired containing %q", res.Fired, res.Detail, c.want)
+			}
+		})
+	}
+	noTask := &schemas.RunContext{Manifest: &schemas.Manifest{Gateway: &schemas.GatewayManifest{Settings: settings}}, Handle: &schemas.EnvironmentHandle{Network: "bench-eval"}}
+	if res, _ := newEgressGate().Check(context.Background(), noTask, &schemas.Evidence{}); res.Detail != "" {
+		t.Fatalf("run without external APIs has note %q", res.Detail)
 	}
 }

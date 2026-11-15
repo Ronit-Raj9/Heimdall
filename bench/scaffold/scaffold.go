@@ -1,6 +1,6 @@
 // Package scaffold writes the files of a new Heimdall project, suite or task:
 // `bifrost-bench init`, `suite init` and `task init`. Besides the repository
-// templates it has scenario templates (tool-use, mcp, memory, qa) that write
+// templates it has scenario templates (tool-use, mcp, browser, memory, qa) that write
 // a suite with a complete sample task, and InitScenarioTask copies a task's
 // shape into a new one (docs/scenarios.md).
 //
@@ -59,13 +59,24 @@ const (
 
 // Scenario suite template names (`suite init -template`, `task init -kind`).
 // Each writes a suite with one complete sample task whose result is not a
-// diff: a tool server's final state (tool-use, mcp) or an answer (memory,
-// qa). docs/scenarios.md is the user guide.
+// diff: a tool server's final state (tool-use, mcp), a web application's
+// final state reached through a browser (browser), or an answer (memory,
+// qa). docs/scenarios.md and docs/browser-tasks.md are the user guides.
 const (
 	TemplateToolUse = "tool-use"
 	TemplateMCP     = "mcp"
+	TemplateBrowser = "browser"
 	TemplateMemory  = "memory"
 	TemplateQA      = "qa"
+	// TemplateExternal writes a task whose agent calls an external HTTP API
+	// through the tool proxy, replayed from a cassette (docs/external-apis.md).
+	TemplateExternal = "external-api"
+	// TemplateArtifact writes a task graded on the files the agent leaves in
+	// its workspace (output kind artifact).
+	TemplateArtifact = "artifact"
+	// TemplateComputerUse writes a task whose agent operates a desktop
+	// service through screenshots, mouse and keyboard (docs/computer-use.md).
+	TemplateComputerUse = "computer-use"
 )
 
 // Grader part names the suite templates select.
@@ -84,7 +95,7 @@ func SuiteTemplates() []string {
 
 // ScenarioTemplates lists the scenario suite templates in a stable order.
 func ScenarioTemplates() []string {
-	return []string{TemplateToolUse, TemplateMCP, TemplateMemory, TemplateQA}
+	return []string{TemplateToolUse, TemplateMCP, TemplateBrowser, TemplateMemory, TemplateQA, TemplateExternal, TemplateArtifact, TemplateComputerUse}
 }
 
 // IsScenarioTemplate reports whether tmpl is a scenario suite template.
@@ -98,15 +109,27 @@ func ScenarioSample(tmpl string) string { return scenarioSamples[tmpl] }
 
 // scenarioSamples names the sample task each scenario template writes.
 var scenarioSamples = map[string]string{
-	TemplateToolUse: "restock",
-	TemplateMCP:     "restock",
-	TemplateMemory:  "launch-date",
-	TemplateQA:      "hotel-cap",
+	TemplateToolUse:  "restock",
+	TemplateMCP:      "restock",
+	TemplateBrowser:  "new-customer",
+	TemplateMemory:   "launch-date",
+	TemplateQA:       "hotel-cap",
+	TemplateExternal: "invoice-fx",
+	TemplateArtifact: "sales-report",
+
+	TemplateComputerUse: "edit-config",
 }
 
-// stateTemplate reports whether a scenario template grades a tool server's
+// stateTemplate reports whether a scenario template grades a service's
 // final state (as opposed to an answer).
 func stateTemplate(tmpl string) bool {
+	return tmpl == TemplateToolUse || tmpl == TemplateMCP || tmpl == TemplateBrowser || tmpl == TemplateComputerUse
+}
+
+// inventoryTemplate reports whether a state template is built on the shared
+// inventory tool server, its tool-error probe and the shared state verifier.
+// The browser template brings its own services, probes, verifier and README.
+func inventoryTemplate(tmpl string) bool {
 	return tmpl == TemplateToolUse || tmpl == TemplateMCP
 }
 
@@ -178,11 +201,28 @@ var suiteAbout = map[string]string{
 		"The agent is told about it in its own config format and reaches it through the per-run tool\n" +
 		"proxy (every call lands in the run's tools.jsonl); the hidden verifier checks the server's\n" +
 		"final state, exported after the agent exits.",
+	TemplateBrowser: "Each task starts a web application and a headless browser (Playwright MCP) beside the agent.\n" +
+		"The web application is hidden from the agent: the agent drives the browser over MCP through the\n" +
+		"per-run tool proxy (every navigate, click and type lands in the run's tools.jsonl), and the\n" +
+		"hidden verifier checks the web application's database, exported after the agent exits.",
 	TemplateMemory: "Each task runs the agent once per session, resetting the workspace in between, so only the\n" +
 		"agent's memory carries facts forward. The last session's answer is matched against the\n" +
 		"task's hidden answer.yaml by the answer_match grader, with no model.",
 	TemplateQA: "Each task asks one question about the documents in the workspace. The answer is matched\n" +
 		"against the task's hidden answer.yaml by the answer_match grader, with no model.",
+	TemplateArtifact: "Each task's result is files the agent writes in its workspace. After the agent exits the\n" +
+		"bench copies the files the task lists under output.artifacts into the run folder, and the\n" +
+		"hidden verifier reads them read-only at /grader/artifacts/<id>/<file name>. A required\n" +
+		"artifact that is missing fails the run before the verifier runs.",
+	TemplateExternal: "Each task lets the agent call an external HTTP API, reached only through the per-run tool\n" +
+		"proxy, which enforces an allowlist, adds the credential and records every call in tools.jsonl.\n" +
+		"Runs replay the task's cassette with no network unless an experiment opts in to live calls;\n" +
+		"the hidden verifier checks the file the agent wrote.",
+	TemplateComputerUse: "Each task starts a desktop beside the agent: a virtual display, a window manager and one GUI\n" +
+		"app, seeded with the task's files. The agent sees it only through screenshots and acts with\n" +
+		"mouse and keyboard tools over MCP, through the per-run tool proxy (every call lands in the\n" +
+		"run's tools.jsonl). Grading never reads a screenshot: the hidden verifier checks the\n" +
+		"desktop's state (saved files, app data), dumped as JSON after the agent exits.",
 }
 
 // Suite returns the files of a new suite folder from a template: suite.yaml,
@@ -208,6 +248,7 @@ func Suite(opts SuiteOptions) ([]File, error) {
 		"ID": opts.ID, "Template": opts.Template, "Image": image,
 		"Dockerfile": strings.TrimSpace(opts.Image) == "", "About": about, "Build": build,
 		"Sample": scenarioSamples[opts.Template], "State": stateTemplate(opts.Template), "Memory": opts.Template == TemplateMemory,
+		"Artifact": opts.Template == TemplateArtifact,
 	}
 	files, err := renderTree("templates/suites/"+opts.Template, data)
 	if err != nil {
@@ -238,8 +279,9 @@ func Suite(opts SuiteOptions) ([]File, error) {
 
 // scenarioCommon swaps the repository-task README of common for the
 // scenario README and adds what every scenario template shares: the base
-// Dockerfile, and for state templates the tool-error probe and the state
-// verifier of the sample task.
+// Dockerfile, and for the inventory templates the tool-error probe and the
+// state verifier of the sample task. The browser template keeps its own
+// README and verifier and takes only the base Dockerfile.
 func scenarioCommon(tmpl string, common []File, data map[string]any) ([]File, error) {
 	shared, err := renderTree("templates/scenario", data)
 	if err != nil {
@@ -253,9 +295,10 @@ func scenarioCommon(tmpl string, common []File, data map[string]any) ([]File, er
 	}
 	for _, f := range shared {
 		switch {
-		case f.Path == "README.md" || f.Path == "base/Dockerfile":
-		case stateTemplate(tmpl) && f.Path == "probes/tool-error.yaml":
-		case stateTemplate(tmpl) && f.Path == "verify.py":
+		case f.Path == "base/Dockerfile":
+		case f.Path == "README.md" && tmpl != TemplateBrowser && tmpl != TemplateExternal && tmpl != TemplateComputerUse:
+		case inventoryTemplate(tmpl) && f.Path == "probes/tool-error.yaml":
+		case (inventoryTemplate(tmpl) || tmpl == TemplateComputerUse) && f.Path == "verify.py":
 			f.Path = "tasks/" + scenarioSamples[tmpl] + "/verifier/tests/verify.py"
 		default:
 			continue

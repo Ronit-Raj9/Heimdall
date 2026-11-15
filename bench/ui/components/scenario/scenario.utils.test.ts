@@ -35,6 +35,9 @@ const call = (seq: number, extra: Partial<ToolCall> = {}): ToolCall => ({
 describe("track and grading", () => {
 	it("knows the scenario tracks and shows a newer one as sent", () => {
 		expect(isTrack("tool_use")).toBe(true);
+		expect(isTrack("browser")).toBe(true);
+		expect(isTrack("computer_use")).toBe(true);
+		expect(isTrack("artifact")).toBe(true);
 		expect(isTrack("robotics")).toBe(false);
 		expect(isTrack(undefined)).toBe(false);
 	});
@@ -93,7 +96,7 @@ describe("groupSuitesByTrack", () => {
 });
 
 describe("hasScenarioEvidence", () => {
-	const plain: Pick<RunDetail, "tool_calls" | "sessions" | "answer" | "state" | "services"> = {};
+	const plain: Pick<RunDetail, "tool_calls" | "sessions" | "answer" | "state" | "services" | "artifacts"> = {};
 	const cases = [
 		{ name: "plain diff run", detail: plain, want: false },
 		{ name: "empty arrays", detail: { tool_calls: [], sessions: [], state: [], services: [] }, want: false },
@@ -106,6 +109,8 @@ describe("hasScenarioEvidence", () => {
 		{ name: "answer run", detail: { answer: { text: "", source: "missing" as const, sha256: "" } }, want: true },
 		{ name: "state run", detail: { state: [{ service: "db", id: "dump", path: "state/db/dump", sha256: "x", bytes: 1 }] }, want: true },
 		{ name: "services only", detail: { services: [{ id: "db", image: "postgres:16", ready: true }] }, want: true },
+		{ name: "artifact run", detail: { artifacts: [{ id: "report", source: "out/*.csv", bytes: 0, error: "missing" }] }, want: true },
+		{ name: "empty artifacts", detail: { artifacts: [] }, want: false },
 	];
 	for (const c of cases) {
 		it(c.name, () => expect(hasScenarioEvidence(c.detail)).toBe(c.want));

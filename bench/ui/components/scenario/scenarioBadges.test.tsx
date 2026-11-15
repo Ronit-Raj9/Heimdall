@@ -5,6 +5,12 @@ import { describe, expect, it } from "vitest";
 import { GradingBadge, JudgedNotice, OutputBadge, TrackBadge } from "./scenarioBadges";
 
 describe("TrackBadge", () => {
+	it("names the artifact track with what it means", () => {
+		const html = renderToStaticMarkup(<TrackBadge track="artifact" />);
+		expect(html).toContain(">Artifacts<");
+		expect(html).toContain("graded on their content");
+	});
+
 	it("names a known track with what it means", () => {
 		const html = renderToStaticMarkup(<TrackBadge track="tool_use" testId="t" />);
 		expect(html).toContain(">Tool use<");
@@ -39,6 +45,12 @@ describe("OutputBadge", () => {
 		expect(renderToStaticMarkup(<OutputBadge output="state" />)).toContain("files exported from the services");
 		expect(renderToStaticMarkup(<OutputBadge output="answer" />)).toContain(">Answer<");
 		expect(renderToStaticMarkup(<OutputBadge output="video" />)).toContain(">video<");
+	});
+
+	it("names the artifact kind with what the verifier reads", () => {
+		const html = renderToStaticMarkup(<OutputBadge output="artifact" />);
+		expect(html).toContain(">Artifacts<");
+		expect(html).toContain("files the agent left in the workspace");
 	});
 });
 

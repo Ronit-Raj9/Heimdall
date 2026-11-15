@@ -32,6 +32,7 @@ func Builtin() []schemas.Gate {
 		newInjectionGate(),
 		newMemoryTrapGate(),
 		newToolInjectionGate(), // tool_injection_followed (Tool safety)
+		newCanaryEchoedGate(),  // canary_echoed (Suite health: contamination canaries, report only)
 	}
 }
 

@@ -12,6 +12,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/maximhq/bifrost/bench/alerts"
 	"github.com/maximhq/bifrost/bench/schemas"
 	"gopkg.in/yaml.v3"
 )
@@ -29,6 +30,11 @@ type Config struct {
 	FaultProxy     FaultProxyConfig `yaml:"faultproxy" json:"faultproxy"`
 	Networks       NetworksConfig   `yaml:"networks" json:"networks"`
 	Images         ImagesConfig     `yaml:"images" json:"images"`
+	Alerts         []alerts.Config  `yaml:"alerts,omitempty" json:"-"` // Index and trends area: webhook receivers for scheduled runs, env var names only (docs/schedules-and-alerts.md)
+
+	// HeldOut controls whether the API serves held-out tasks (Suite health
+	// area, docs/held-out-and-canaries.md). Off by default.
+	HeldOut HeldOutConfig `yaml:"held_out" json:"held_out,omitzero"`
 
 	Root string `yaml:"-" json:"-"` // bench root that relative paths resolve against
 }
@@ -66,6 +72,15 @@ type ImagesConfig struct {
 	// ToolProxy is the image that runs `bifrost-bench toolproxy` beside a run
 	// with proxied services. Empty uses the environment's default.
 	ToolProxy string `yaml:"toolproxy" json:"toolproxy,omitempty"`
+}
+
+// HeldOutConfig is the held_out section. Visible true serves held-out
+// tasks' instruction text, visible files and detail like public ones; false
+// (the default) lists them by id and counts only. It guards against
+// accidental leaks through the UI, screenshots and API clients, not against
+// anyone who can read the benchmarks folder.
+type HeldOutConfig struct {
+	Visible bool `yaml:"visible" json:"visible"`
 }
 
 // LoadConfig reads the YAML file at path, applies BENCH_<SECTION>_<KEY>

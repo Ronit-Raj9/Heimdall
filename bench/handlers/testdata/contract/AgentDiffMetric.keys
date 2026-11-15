@@ -1,0 +1,11 @@
+# Keys of bench.ts `AgentDiffMetric`, one per line; a trailing ? marks an optional (Go omitempty) key.
+# Change with bench.ts and agentdiff/agentdiff.go.
+metric
+higher_is_better
+a
+b
+delta
+tasks
+unknown_a
+unknown_b
+direction

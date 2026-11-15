@@ -1,4 +1,5 @@
 import { ModeBadge } from "@/components/modeBadge";
+import { RunReviewsBlock } from "@/components/review/runReviewsBlock";
 import { AlignedLanes } from "@/components/runs/alignedLanes";
 import { ClaimVsResult, type ClaimRow } from "@/components/runs/claimVsResult";
 import { DiffText } from "@/components/runs/diffText";
@@ -7,6 +8,7 @@ import { IncompleteNotice } from "@/components/runs/incompleteNotice";
 import { MetricStrip } from "@/components/runs/metricStrip";
 import { PairPicker } from "@/components/runs/pairPicker";
 import { RunScenarioEvidence } from "@/components/runs/runScenario";
+import { TraceDownloadLink } from "@/components/runs/runTraceLink";
 import { indexEvents, stripMetricKinds } from "@/components/runs/runs.utils";
 import { BlockSkeleton, EmptyNote, LoadError, Section } from "@/components/runs/screenStates";
 import { hasScenarioEvidence } from "@/components/scenario/scenario.utils";
@@ -131,6 +133,14 @@ function PairComparison({ pairId, onClear }: { pairId: string; onClear: () => vo
 								<div>
 									Tools requested / executed: {lane.detail.data?.canonical?.tool_calls?.filter((call) => call.requested).length ?? "unknown"} / {lane.detail.data?.canonical?.tool_calls?.filter((call) => call.executed).length ?? "unknown"}
 								</div>
+								{lane.detail.data && (
+									<TraceDownloadLink
+										runId={lane.pairRun.run.run_id}
+										arm={lane.pairRun.arm}
+										sealed={lane.detail.data.sealed}
+										sealError={lane.detail.data.seal_error}
+									/>
+								)}
 							</CardContent>
 						</Card>
 					))}
@@ -139,6 +149,19 @@ function PairComparison({ pairId, onClear }: { pairId: string; onClear: () => vo
 
 			<Section title={t("runs.claim.title")} description={t("runs.claim.description")} testId="runs-claim-section">
 				<ClaimVsResult rows={lanes.map(toClaimRow)} />
+			</Section>
+
+			<Section title={t("review.runs.title")} description={t("review.runs.description")} testId="runs-reviews-section">
+				<div className="grid gap-6 2xl:grid-cols-2">
+					{lanes.map((lane) => (
+						<Card key={lane.pairRun.arm} className="py-0 shadow-none">
+							<CardContent className="flex flex-col gap-2 px-4 py-4">
+								<div className="text-sm font-medium">{t("runs.arm", { arm: lane.pairRun.arm })}</div>
+								<RunReviewsBlock runId={lane.pairRun.run.run_id} testId={`runs-reviews-${lane.pairRun.arm}`} />
+							</CardContent>
+						</Card>
+					))}
+				</div>
 			</Section>
 
 			<Section title={t("runs.lanes.title")} description={t("runs.lanes.description")} testId="runs-lanes-section">

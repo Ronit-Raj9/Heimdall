@@ -1,0 +1,59 @@
+# The agent renames and moves two files with the xfe file manager into a
+# required layout; the checks read the folder tree after the run.
+id: file-inbox
+version: 1.0.0
+title: Rename and move files in a file manager
+project: acme-desktop
+kind: feature
+instruction: instruction.md
+# A scratch workspace: the work happens on the desktop, through its tools.
+repo_dir: repo
+services:
+  - id: desktop
+    role: mcp
+    # Built from services/desktop/ in the suite folder; `suite admit` builds
+    # it when it is missing (the apt step needs the network once).
+    image: heimdall-example/acme-desktop:1
+    port: 8000
+    mcp: {path: /mcp}
+    env:
+      DESKTOP_APP: files
+      DESKTOP_OPEN: /home/desk/Documents/Inbox
+    files:
+      # Copied under /seed/home; the desktop copies that into /home/desk at
+      # start, as the desktop user.
+      /seed/home/Documents/Inbox/IMG_2031.jpg: seed/Documents/Inbox/IMG_2031.jpg
+      /seed/home/Documents/Inbox/notes.txt: seed/Documents/Inbox/notes.txt
+      /seed/home/Documents/Inbox/scan_0042.pdf: seed/Documents/Inbox/scan_0042.pdf
+      /seed/home/Documents/Invoices/2026/invoice-0041.pdf: seed/Documents/Invoices/2026/invoice-0041.pdf
+      /seed/home/Documents/Photos/team-2025.jpg: seed/Documents/Photos/team-2025.jpg
+    ready:
+      # Ready once the MCP server answers and the app's window is up and
+      # focused.
+      argv: ["python3", "-I", "/opt/desktop/desktop.py", "ready"]
+      timeout_s: 120
+    export:
+      # The desktop's final state as one JSON document (see desktop.py).
+      - id: state.json
+        argv: ["python3", "-I", "/opt/desktop/desktop.py", "dump"]
+verifier:
+  tests: verifier/tests
+  required: []
+protected: []
+controls:
+  # Scripts run in the agent's place with the desktop up. They drive it
+  # through the same MCP server the agent gets, keyboard first: the layout
+  # is fixed (one maximized window on a 1280x800 screen) and the app has the
+  # focus when the service is ready.
+  reference: solution/reference.sh
+  empty: controls/empty.sh
+  mutants: [controls/mutant-not-renamed.sh, controls/mutant-copied.sh]
+  exploit: controls/exploit.sh
+timeouts:
+  agent_s: 1800
+capabilities: [computer_use, file_management]
+difficulty: medium
+provenance:
+  source: bench/examples/acme-desktop (fictional Acme office desktop, written for this example)
+  license: MIT
+  created_by: hand-written example

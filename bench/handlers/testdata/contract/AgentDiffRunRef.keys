@@ -1,0 +1,6 @@
+# Keys of bench.ts `AgentDiffRunRef`, one per line; a trailing ? marks an optional (Go omitempty) key.
+# Change with bench.ts and agentdiff/agentdiff.go.
+run_id
+exp_id
+pair_id
+outcome

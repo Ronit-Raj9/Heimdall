@@ -35,6 +35,7 @@ func Builtin() []schemas.Metric {
 		newRewardMetric(),
 		newAnswerCorrectMetric(), newJudgeCostMetric(), // answer tasks: per-category success, judge spend
 		newToolCallsProxiedMetric(), newToolErrorRateMetric(), newToolRecoveryMetric(), newDistinctToolsMetric(), // tool proxy ledger
+		newExternalCallsMetric(), newExternalUnmatchedMetric(), newExternalErrorRateMetric(), // external API rows of the tool proxy ledger
 		newSkillFilesReadMetric(), // skills: installed skill files the agent read
 		newCheatingRateMetric(),   // impossible tasks: passes before the impossible_pass veto
 	}

@@ -10,11 +10,13 @@ import { CopyCodeBlock } from "./copyCodeBlock";
 import { LockBadge, VerifierBadge } from "./suiteBadges";
 import { ImportedFrom } from "./suiteScenario";
 import { leaderboardSuite } from "./suites.utils";
+import { DeclaredArtifacts } from "./taskArtifacts";
 
 /**
  * The suite's settings as a definition list, with a link to its leaderboard: track, grading (a
  * judged suite says in plain words what that means), output and services, then the verifier and
- * lock facts, and where an imported suite came from.
+ * lock facts, the declared output artifacts of an artifact suite, and where an imported suite came
+ * from.
  */
 export function SuiteFacts({ suite }: { suite: SuiteSummary }) {
 	const { t } = useTranslation("bench");
@@ -76,6 +78,7 @@ export function SuiteFacts({ suite }: { suite: SuiteSummary }) {
 					</div>
 				))}
 			</dl>
+			{suite.artifacts && suite.artifacts.length > 0 && <DeclaredArtifacts artifacts={suite.artifacts} testId="suites-artifacts" />}
 			{grading === "judged" && <JudgedNotice testId="suites-judged-note" />}
 			{suite.imported && <ImportedFrom record={suite.imported} />}
 		</div>

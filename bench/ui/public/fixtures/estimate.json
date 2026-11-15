@@ -1,0 +1,155 @@
+{
+	"_comment": "SYNTHETIC fixture for UI development. Not a benchmark result: every number is made up.",
+	"mode": "synthetic",
+	"exp_id": "e_synthetic-codewins",
+	"suite": "coding-core@1.0.0",
+	"generated_at": "2026-11-15T10:20:00Z",
+	"price_ref": "prices-2026-11-01",
+	"arms": [
+		{
+			"arm": "A",
+			"label": "A: baseline",
+			"agent": "codex",
+			"model": "gpt-5.4-mini",
+			"config_hash": "sha256:3f2a91c0b7e45d0c9f1a2b3c4d5e6f708192a3b4c5d6e7f8091a2b3c4d5e6f70",
+			"runs": 24,
+			"basis": "config_hash",
+			"basis_text": "24 sealed runs of config 3f2a91c0 in 2 experiments",
+			"history_runs": 24,
+			"experiments": [
+				"e_synthetic-codewins",
+				"e_synthetic-providers"
+			],
+			"task_level": 4,
+			"per_run": {
+				"cost_usd": {
+					"kind": "history",
+					"low": 0.09,
+					"median": 0.125,
+					"high": 0.18
+				},
+				"tokens": {
+					"kind": "history",
+					"low": 28000,
+					"median": 41000,
+					"high": 66000
+				},
+				"wall_s": {
+					"kind": "history",
+					"low": 120,
+					"median": 184,
+					"high": 300
+				}
+			},
+			"cost_usd": {
+				"kind": "history",
+				"low": 2.16,
+				"median": 3.0,
+				"high": 4.32
+			},
+			"tokens": {
+				"kind": "history",
+				"low": 672000,
+				"median": 984000,
+				"high": 1584000
+			},
+			"agent_time_s": {
+				"kind": "history",
+				"low": 2880,
+				"median": 4416,
+				"high": 7200
+			}
+		},
+		{
+			"arm": "B",
+			"label": "B: code-wins note",
+			"agent": "codex",
+			"model": "gpt-5.4-mini",
+			"config_hash": "sha256:67cd7a069ba6e6141a645638240d97c5062022fa81126e36300d8bc0006730cd",
+			"runs": 24,
+			"basis": "budget_bound",
+			"basis_text": "no sealed runs of this config or of codex with gpt-5.4-mini: 24 runs at the $0.50 per-run budget, an upper bound only",
+			"history_runs": 0,
+			"experiments": [],
+			"task_level": 0,
+			"per_run": {
+				"cost_usd": {
+					"kind": "upper_bound",
+					"low": null,
+					"median": null,
+					"high": 0.5
+				},
+				"tokens": {
+					"kind": "unknown",
+					"low": null,
+					"median": null,
+					"high": null,
+					"reason": "no history, cannot estimate"
+				},
+				"wall_s": {
+					"kind": "upper_bound",
+					"low": null,
+					"median": null,
+					"high": 600
+				}
+			},
+			"cost_usd": {
+				"kind": "upper_bound",
+				"low": null,
+				"median": null,
+				"high": 12.0
+			},
+			"tokens": {
+				"kind": "unknown",
+				"low": null,
+				"median": null,
+				"high": null,
+				"reason": "no history, cannot estimate"
+			},
+			"agent_time_s": {
+				"kind": "upper_bound",
+				"low": null,
+				"median": null,
+				"high": 14400
+			}
+		}
+	],
+	"cost_usd": {
+		"kind": "upper_bound",
+		"low": null,
+		"median": null,
+		"high": 16.32
+	},
+	"agent_time_s": {
+		"kind": "upper_bound",
+		"low": null,
+		"median": null,
+		"high": 21600
+	},
+	"wall_clock_s": {
+		"kind": "upper_bound",
+		"low": null,
+		"median": null,
+		"high": 5400
+	},
+	"concurrency": 4,
+	"judge": {
+		"runs": 48,
+		"history_runs": 30,
+		"cost_usd": {
+			"kind": "history",
+			"low": 0.12,
+			"median": 0.19,
+			"high": 0.31
+		},
+		"basis_text": "30 past judge records on coding-core@1.0.0"
+	},
+	"budget_usd": 8,
+	"fit": "may_exceed",
+	"fit_reason": "Arm B has only a per-run budget bound: at most $16.32 in total, over the $8.00 budget.",
+	"basis": "Arm A from 24 sealed runs of its config; arm B from its per-run budget, since it has no history.",
+	"notes": [
+		"Low and high are sums of per-run 10th and 90th percentiles: a planning range, not a confidence interval.",
+		"Judge cost is separate from the agent cost."
+	]
+}

@@ -1,0 +1,20 @@
+# Keys of bench.ts `ClusterSummary`, one per line; a trailing ? marks an optional (Go omitempty) key.
+# Change with bench.ts and clusters/clusters.go.
+signature
+title
+outcome
+layers
+count
+share
+tasks
+agents
+config_hashes
+conditions
+experiments
+first_seen
+last_seen
+examples
+scope
+after_config_change?
+related?
+error_text?

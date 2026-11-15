@@ -3,6 +3,7 @@ package suite
 import (
 	"bytes"
 	"context"
+	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
@@ -288,6 +289,64 @@ func TestLintScenario(t *testing.T) {
 			tk.Output = &schemas.OutputSpec{Kind: schemas.OutputState}
 			tk.Services = []schemas.ServiceSpec{{ID: "db", Image: "x", Export: []schemas.StateExport{{ID: "a", Path: "/a"}}}}
 		}, "usually needs a script reference", SeverityWarning},
+		{"artifact with hidden_tests", func(_ *schemas.Suite, tk *schemas.Task) {
+			tk.Output = &schemas.OutputSpec{Kind: schemas.OutputArtifact, Artifacts: []schemas.ArtifactSpec{{ID: "report", Path: "report.csv"}}}
+		}, "output: artifact files are read by verifier_command (from /grader/artifacts), not by hidden_tests", ""},
+		{"suite artifact with hidden_tests", func(s *schemas.Suite, _ *schemas.Task) {
+			s.Output = &schemas.OutputSpec{Kind: schemas.OutputArtifact, Artifacts: []schemas.ArtifactSpec{{ID: "report", Path: "report.csv"}}}
+		}, "output: artifact files are read by verifier_command", ""},
+		{"artifact without artifacts", func(s *schemas.Suite, tk *schemas.Task) {
+			s.Grader = "verifier_command"
+			tk.Output = &schemas.OutputSpec{Kind: schemas.OutputArtifact}
+		}, "output: artifact needs at least one artifact", ""},
+		{"artifact id used twice", func(s *schemas.Suite, tk *schemas.Task) {
+			s.Grader = "verifier_command"
+			tk.Output = &schemas.OutputSpec{Kind: schemas.OutputArtifact, Artifacts: []schemas.ArtifactSpec{{ID: "r", Path: "a.csv"}, {ID: "r", Path: "b.csv"}}}
+		}, `output.artifacts[1].id: "r" is used by an earlier artifact`, ""},
+		{"artifact path escapes", func(s *schemas.Suite, tk *schemas.Task) {
+			s.Grader = "verifier_command"
+			tk.Output = &schemas.OutputSpec{Kind: schemas.OutputArtifact, Artifacts: []schemas.ArtifactSpec{{ID: "r", Path: "../secret.csv"}}}
+		}, "output.artifacts[0]: artifact r: path \"../secret.csv\" must be clean and stay inside the workspace", ""},
+		{"artifact path absolute", func(s *schemas.Suite, tk *schemas.Task) {
+			s.Grader = "verifier_command"
+			tk.Output = &schemas.OutputSpec{Kind: schemas.OutputArtifact, Artifacts: []schemas.ArtifactSpec{{ID: "r", Path: "/workspace/out.csv"}}}
+		}, "must be relative to the workspace root", ""},
+		{"artifact bad id", func(s *schemas.Suite, tk *schemas.Task) {
+			s.Grader = "verifier_command"
+			tk.Output = &schemas.OutputSpec{Kind: schemas.OutputArtifact, Artifacts: []schemas.ArtifactSpec{{ID: "Report", Path: "r.csv"}}}
+		}, `artifact id "Report" is not`, ""},
+		{"too many artifacts", func(s *schemas.Suite, tk *schemas.Task) {
+			s.Grader = "verifier_command"
+			var specs []schemas.ArtifactSpec
+			for i := 0; i <= utils.MaxArtifactSpecs; i++ {
+				specs = append(specs, schemas.ArtifactSpec{ID: fmt.Sprintf("a%d", i), Path: fmt.Sprintf("a%d.txt", i)})
+			}
+			tk.Output = &schemas.OutputSpec{Kind: schemas.OutputArtifact, Artifacts: specs}
+		}, fmt.Sprintf("output.artifacts: %d declared, at most %d", utils.MaxArtifactSpecs+1, utils.MaxArtifactSpecs), ""},
+		{"suite artifact path escapes", func(s *schemas.Suite, _ *schemas.Task) {
+			s.Grader = "verifier_command"
+			s.Output = &schemas.OutputSpec{Kind: schemas.OutputArtifact, Artifacts: []schemas.ArtifactSpec{{ID: "r", Path: "a/../../b"}}}
+		}, "output.artifacts[0]: artifact r", ""},
+		{"artifact patch reference", func(s *schemas.Suite, tk *schemas.Task) {
+			s.Grader = "verifier_command"
+			tk.Output = &schemas.OutputSpec{Kind: schemas.OutputArtifact, Artifacts: []schemas.ArtifactSpec{{ID: "r", Path: "r.csv"}}}
+		}, "controls.reference: solution/patch.diff is not a script; an artifact task's controls run in the agent's place", ""},
+		{"artifact patch empty control", func(s *schemas.Suite, tk *schemas.Task) {
+			s.Grader = "verifier_command"
+			tk.Output = &schemas.OutputSpec{Kind: schemas.OutputArtifact, Artifacts: []schemas.ArtifactSpec{{ID: "r", Path: "r.csv"}}}
+			tk.Controls.Reference = "controls/exploit.sh"
+		}, "controls.empty:", ""},
+		{"artifact patch mutant", func(s *schemas.Suite, tk *schemas.Task) {
+			s.Grader = "verifier_command"
+			tk.Output = &schemas.OutputSpec{Kind: schemas.OutputArtifact, Artifacts: []schemas.ArtifactSpec{{ID: "r", Path: "r.csv"}}}
+			tk.Controls.Reference = "controls/exploit.sh"
+		}, "controls.mutants[0]:", ""},
+		{"artifacts under another kind", func(_ *schemas.Suite, tk *schemas.Task) {
+			tk.Output = &schemas.OutputSpec{Artifacts: []schemas.ArtifactSpec{{ID: "r", Path: "r.csv"}}}
+		}, "output.artifacts: declared, but output kind is diff", SeverityWarning},
+		{"suite artifacts under another kind", func(s *schemas.Suite, _ *schemas.Task) {
+			s.Output = &schemas.OutputSpec{Kind: schemas.OutputAnswer, Artifacts: []schemas.ArtifactSpec{{ID: "r", Path: "r.csv"}}}
+		}, "output.artifacts: declared, but output kind is answer", SeverityWarning},
 	}
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
@@ -456,5 +515,78 @@ func TestLockFoldsServiceCode(t *testing.T) {
 	writeFiles(t, filepath.Join(pack, "tasks", "m01"), map[string]string{"services/desk/extra.py": "1\n"})
 	if got := lockOf(withDesk); got.FixturesSHA256 == v2.FixturesSHA256 {
 		t.Error("the task's services/desk did not change the lock")
+	}
+}
+
+// TestLockArtifactOutput: an output spec without artifacts hashes as it did
+// before the artifacts field existed, and declaring or changing an artifact
+// moves only the verifier hash.
+func TestLockArtifactOutput(t *testing.T) {
+	sum, err := utils.HashJSON(&schemas.OutputSpec{Kind: schemas.OutputState})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if want := utils.SHA256Bytes([]byte(`{"kind":"state"}`)); sum != want {
+		b, _ := utils.CanonicalJSON(&schemas.OutputSpec{Kind: schemas.OutputState})
+		t.Errorf("output spec without artifacts hashes differently: %s", b)
+	}
+	benchRoot, pack := copyPack(t)
+	task := filepath.Join(pack, "tasks", "m01")
+	lockWith := func(output string) *schemas.SuiteLock {
+		t.Helper()
+		orig, err := os.ReadFile(filepath.Join(task, TaskFile))
+		if err != nil {
+			t.Fatal(err)
+		}
+		defer func() {
+			if err := os.WriteFile(filepath.Join(task, TaskFile), orig, 0o644); err != nil {
+				t.Fatal(err)
+			}
+		}()
+		editFile(t, filepath.Join(task, TaskFile), "timeouts:", output+"timeouts:")
+		l, err := Lock(loadMini(t, benchRoot), fixedNow)
+		if err != nil {
+			t.Fatal(err)
+		}
+		return l
+	}
+	plain := lockWith("output:\n  kind: artifact\n").Tasks["m01"]
+	one := lockWith("output:\n  kind: artifact\n  artifacts:\n    - {id: report, path: report.csv, required: true}\n").Tasks["m01"]
+	other := lockWith("output:\n  kind: artifact\n  artifacts:\n    - {id: report, path: out/report.csv, required: true}\n").Tasks["m01"]
+	if plain.VerifierSHA256 == one.VerifierSHA256 || one.VerifierSHA256 == other.VerifierSHA256 {
+		t.Errorf("artifacts did not change the verifier hash: %s %s %s", plain.VerifierSHA256, one.VerifierSHA256, other.VerifierSHA256)
+	}
+	if plain.InstructionSHA256 != one.InstructionSHA256 || plain.RepoTreeSHA256 != one.RepoTreeSHA256 || plain.ControlsSHA256 != one.ControlsSHA256 {
+		t.Errorf("artifacts changed a hash other than the verifier's")
+	}
+}
+
+func TestLintScenarioCleanArtifactTask(t *testing.T) {
+	benchRoot, pack := copyPack(t)
+	writeFiles(t, filepath.Join(pack, "tasks", "m01"), map[string]string{
+		"controls/ref.sh":   "#!/bin/sh\necho total > report.csv\n",
+		"controls/empty.sh": "#!/bin/sh\nexit 0\n",
+		"controls/m1.sh":    "#!/bin/sh\necho wrong > report.csv\n",
+	})
+	s := loadMini(t, benchRoot)
+	s.Grader = "verifier_command"
+	s.ProbeIDs, s.Probes = nil, nil
+	tk := s.Tasks[0]
+	tk.Output = &schemas.OutputSpec{Kind: schemas.OutputArtifact, Artifacts: []schemas.ArtifactSpec{
+		{ID: "report", Path: "report.csv", Required: true, MaxBytes: 1 << 20},
+		{ID: "charts", Path: "charts/*.svg"},
+	}}
+	tk.Controls = schemas.TaskControls{Reference: "controls/ref.sh", Empty: "controls/empty.sh", Mutants: []string{"controls/m1.sh"}, Exploit: "controls/exploit.sh"}
+	for _, p := range Lint(s) {
+		if p.Severity == SeverityError || strings.Contains(p.Message, "artifact") {
+			t.Errorf("unexpected problem: %s: %s: %s", p.Severity, p.Path, p.Message)
+		}
+	}
+	// The same artifacts declared once in suite.yaml serve every task.
+	s.Output, tk.Output = tk.Output, &schemas.OutputSpec{Kind: schemas.OutputArtifact}
+	for _, p := range Lint(s) {
+		if p.Severity == SeverityError {
+			t.Errorf("suite-level artifacts: unexpected error: %s: %s", p.Path, p.Message)
+		}
 	}
 }

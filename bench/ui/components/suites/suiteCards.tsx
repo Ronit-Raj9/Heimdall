@@ -3,7 +3,7 @@ import { suiteGrading, suiteTrack } from "@/components/scenario/scenario.utils";
 import { shortHash } from "@/components/verdict/verdict.utils";
 import type { SuiteSummary } from "@/lib/types/bench";
 import { cn } from "@/lib/utils";
-import { CircleAlert, CircleX } from "lucide-react";
+import { CircleAlert, CircleX, EyeOff, ShieldOff } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { LockBadge, ToneBadge, VerifierBadge } from "./suiteBadges";
 
@@ -77,6 +77,16 @@ function SuiteCard({ suite, pressed, onSelect }: { suite: SuiteSummary; pressed:
 						{suite.drift.length > 0 && (
 							<ToneBadge tone="warn" icon={CircleAlert} testId={`suites-card-${suite.id}-drift`}>
 								{t("suites.card.drift", { count: suite.drift.length })}
+							</ToneBadge>
+						)}
+						{(suite.held_out_count ?? 0) > 0 && (
+							<ToneBadge tone="neutral" icon={EyeOff} testId={`suites-card-${suite.id}-held-out`}>
+								{t("suiteHealth.card.heldOut", { count: suite.held_out_count })}
+							</ToneBadge>
+						)}
+						{(suite.quarantined_count ?? 0) > 0 && (
+							<ToneBadge tone="warn" icon={ShieldOff} testId={`suites-card-${suite.id}-quarantined`}>
+								{t("suiteHealth.card.quarantined", { count: suite.quarantined_count })}
 							</ToneBadge>
 						)}
 						<VerifierBadge format={suite.verifier_result} />

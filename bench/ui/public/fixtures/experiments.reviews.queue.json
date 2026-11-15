@@ -1,0 +1,47 @@
+{
+	"_comment": "SYNTHETIC fixture for UI development. Not a benchmark result. GET /experiments/{id}/reviews/queue (schemas.ReviewQueue).",
+	"mode": "synthetic",
+	"exp_id": "e_synthetic-codewins",
+	"items": [
+		{
+			"run_id": "r_fmw1z7ouim",
+			"exp_id": "e_synthetic-codewins",
+			"pair_id": "p_ltosmymyqy",
+			"task": "t02",
+			"arm": "A",
+			"condition": "stale-notes",
+			"trial": 1,
+			"reasons": [
+				"false_completion"
+			],
+			"sealed_outcome": "fail",
+			"outcome": "pass",
+			"reviews": 1,
+			"decision": "pass"
+		},
+		{
+			"run_id": "r_pww2l7yame",
+			"exp_id": "e_synthetic-codewins",
+			"pair_id": "p_ltosmymyqy",
+			"task": "t02",
+			"arm": "B",
+			"condition": "stale-notes",
+			"trial": 1,
+			"reasons": [
+				"flagged"
+			],
+			"sealed_outcome": "pass",
+			"outcome": "pass",
+			"reviews": 1
+		}
+	],
+	"reasons": [
+		"split_votes",
+		"unparsable_votes",
+		"invalid_evaluator",
+		"veto",
+		"false_completion",
+		"flagged"
+	],
+	"problems": []
+}

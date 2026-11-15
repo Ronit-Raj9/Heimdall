@@ -1,0 +1,6 @@
+# Keys of bench.ts `ReviewLog`, one per line; a trailing ? marks an optional (Go omitempty) key.
+# The top-level response adds "mode". Change with bench.ts and schemas/review.go.
+exp_id
+reviews
+verified
+problems

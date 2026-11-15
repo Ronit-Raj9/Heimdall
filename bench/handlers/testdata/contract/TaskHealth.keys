@@ -1,0 +1,9 @@
+# Keys of bench.ts `TaskHealth`. Change with bench.ts and schemas/suitehealth.go.
+task
+split
+quarantine
+verifier
+variance
+infra
+difficulty
+flags

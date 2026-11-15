@@ -1,0 +1,20 @@
+{
+	"_comment": "SYNTHETIC fixture for UI development. Not a benchmark result. POST /reviews (schemas.Review).",
+	"mode": "synthetic",
+	"review_id": "rv_synth0002",
+	"exp_id": "e_synthetic-codewins",
+	"run_id": "r_fmw1z7ouim",
+	"parent_seal": "sha256:4fd47830d83cd73533ad18dabeb81ae5e6a39ac8c68c2211ab50ee427338a94c",
+	"decision": "pass",
+	"reason": "The two failing tests assert the old date format that the task asked the agent to change. The change itself is correct, so the verifier is too strict here.",
+	"reviewer": "maya",
+	"created_at": "2026-11-14T11:40:00Z",
+	"sealed_outcome": "fail",
+	"previous_outcome": "fail",
+	"evidence": [
+		"grade.json failed_tests",
+		"workspace.diff"
+	],
+	"prev_hash": "542150d5dff5104d940f17d539b9ae694586ba9b7f2ae993f492cfc8c8bc486d",
+	"hash": "04a09f51588a00105cf0f8fdfe123aa47edc9b2a1e0e87bfd8c58fdf3be1f067"
+}

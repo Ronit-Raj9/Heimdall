@@ -1,0 +1,38 @@
+# template: computer-use
+# Written by `bifrost-bench suite init`. A computer-use suite tests an agent
+# that operates a graphical desktop through screenshots, mouse and keyboard.
+# Each task starts its own desktop service (services: in task.yaml) from the
+# image built from services/desktop/: a virtual display, a window manager and
+# one GUI app, seeded with the task's files. The agent drives it through the
+# desktop's MCP server (screenshot, click, type, key, ...), told about it in
+# its own config format (agent `mcp:`) and reached through the per-run tool
+# proxy, which records every call in tools.jsonl and can inject tool faults
+# (probes/screenshot-error.yaml). Grading never looks at a screenshot: after
+# the agent exits the desktop's state is dumped as JSON and the hidden
+# verifier (verifier/tests/verify.py with the task's checks.py) reads it at
+# /grader/state/desktop/state.json and writes a reward.
+# Add tasks with `bifrost-bench task init -suite [[.ID]] -id <task>`, which
+# copies the shape of the first task below and adds the id to the tasks list.
+id: [[.ID]]
+version: 0.1.0
+description: Computer-use tasks on a desktop, graded on the apps' saved state.
+track: computer_use
+environment: docker_workspace
+grader: verifier_command
+base_image:
+[[- if .Dockerfile]]
+  dockerfile: base/Dockerfile
+[[- end]]
+  tag: [[.Image]]
+workdir: /workspace
+output:
+  kind: state
+verifier:
+  command: ["python3", "/grader/tests/verify.py"]
+  result: reward
+  result_path: /grader/out/reward.json
+  pass_threshold: 1
+  restore: []
+  timeout_s: 120
+tasks: [edit-config]
+probes: [model-outage, screenshot-error, hostile-dialog]

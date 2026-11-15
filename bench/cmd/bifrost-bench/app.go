@@ -149,6 +149,9 @@ func (a *app) newPlanner() *engine.Planner {
 	if a.upstreams != nil {
 		opts = append(opts, engine.WithUpstreamChecker(a.upstreams))
 	}
+	opts = append(opts, engine.WithModelPrices(a.priced)) // Forecast and matrix area: refuse unpriced matrix models (estimate.go)
+	// Suite health area: -include-quarantined (suitehealth.go).
+	opts = append(opts, engine.WithIncludeQuarantined(includeQuarantined))
 	return engine.NewPlanner(a.reg, a.cfg.Root, a.logger, opts...)
 }
 
@@ -260,6 +263,7 @@ func (a *app) analyzeWith(ctx context.Context, expID, gradeSource, policyOverrid
 		return nil, nil, fmt.Errorf("gate source: %w", err)
 	}
 	report := insertSection(md.String(), sec)
+	report = a.reviewSummary(ctx, an, runs, report) // human review: counts and report section (review.go)
 	if err := a.store.WriteAnalysis(ctx, an, map[string][]byte{"report.md": []byte(report)}); err != nil {
 		return nil, nil, fmt.Errorf("save analysis: %w", err)
 	}
