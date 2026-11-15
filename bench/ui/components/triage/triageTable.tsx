@@ -27,7 +27,7 @@ export function TriageTable({ groups, arms, selected, onSelect }: TriageTablePro
 	const showDiff = arms.length >= 2;
 
 	return (
-		<Table data-testid="triage-table" aria-label={t("triage.table.label")}>
+		<Table stickyColumns={1} data-testid="triage-table" aria-label={t("triage.table.label")}>
 			<TableHeader>
 				<TableRow>
 					<TableHead>{t("triage.table.pattern")}</TableHead>

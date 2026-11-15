@@ -32,7 +32,12 @@ export function TaskFlipsTable({ outcome }: { outcome: AgentDiffOutcome }) {
 						<EmptyNote testId="agentdiff-tasks-none-changed">{t("agentDiff.tasks.noneChanged")}</EmptyNote>
 					) : (
 						<div className="min-w-0 rounded-sm border">
-							<Table data-testid="agentdiff-tasks-table" aria-label={t("agentDiff.tasks.title")} containerClassName="rounded-sm">
+							<Table
+								stickyColumns={1}
+								data-testid="agentdiff-tasks-table"
+								aria-label={t("agentDiff.tasks.title")}
+								containerClassName="rounded-sm"
+							>
 								<TableHeader>
 									<TableRow className="hover:bg-transparent">
 										<TableHead>{t("agentDiff.tasks.task")}</TableHead>

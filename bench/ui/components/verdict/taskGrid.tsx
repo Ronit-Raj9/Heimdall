@@ -46,7 +46,7 @@ export function TaskGrid({ grid, onOpenPair, className }: TaskGridProps) {
 
 	return (
 		<div className={cn("flex flex-col gap-3", className)}>
-			<Table data-testid="verdict-grid-table">
+			<Table stickyColumns={1} data-testid="verdict-grid-table">
 				<TableHeader>
 					<TableRow>
 						<TableHead rowSpan={2}>{t("verdict.grid.task")}</TableHead>

@@ -52,7 +52,7 @@ export function PairPicker({ expParam, onPick }: PairPickerProps) {
 function PairTable({ rows, arms, onPick }: { rows: readonly GridRow[]; arms: readonly string[]; onPick: (pairId: string) => void }) {
 	const { t } = useTranslation("bench");
 	return (
-		<Table data-testid="pair-picker-table">
+		<Table stickyColumns={1} data-testid="pair-picker-table">
 			<TableHeader>
 				<TableRow>
 					<TableHead>{t("runs.picker.task")}</TableHead>

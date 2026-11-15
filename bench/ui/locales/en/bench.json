@@ -179,11 +179,21 @@
 		}
 	},
 	"app": {
-		"name": "Bifrost Bench",
-		"tagline": "Agent benchmarking"
+		"name": "Heimdall",
+		"tagline": "The release gate for AI agents, built on Bifrost",
+		"groups": {
+			"results": "Results",
+			"runs": "Runs",
+			"setup": "Setup",
+			"more": "More"
+		},
+		"collapseNav": "Collapse navigation",
+		"expandNav": "Expand navigation",
+		"skipToContent": "Skip to content",
+		"copyId": "Copy {{id}}"
 	},
 	"nav": {
-		"label": "Bench navigation",
+		"label": "Heimdall navigation",
 		"leaderboard": "Leaderboard",
 		"review": "Review",
 		"suites": "Suites",
