@@ -231,6 +231,8 @@ Every value carries the level it was observed at (DESIGN.md 9.5). With one YAML 
 
 Gateway level is the framework-independence claim: any agent that accepts the gateway base URL gets success, steps, tokens, cost and time with no adapter code. A parser (`schemas.Parser`, one file in `adapters/` and one line in `BuiltinParsers()`) adds the native level; targets let the diagnostics table align what arm A and arm B did on the same task. A parser is pure, skips lines it does not understand and never fails a run. `adapters/opencode.go` is a short example; test it on output captured from the pinned harness version (`adapters/testdata/`).
 
+For framework-neutral structured detail, an agent can print one `bifrost.agent.event` version `1` JSON object per line. Records use `type` values such as `model_response`, `tool_call`, `tool_result`, `retry`, `error`, `compaction` and `claim`; tool records may include `tool`, `target`, `args_sha256`, `result_sha256` and `summary`. The bench stamps run identity and records trace quality. Malformed or oversized captured lines remain in the raw stream and are reported in diagnostics. See the [protocol examples and limits](agent-event-protocol.md).
+
 ## Build the image well
 
 - Build on the suite base (`base_arg`), so the agent sees the same Python, pytest and git the grader uses.

@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
 	"strings"
 	"time"
 
@@ -14,7 +15,7 @@ import (
 // ParserOpenCode is the name of the OpenCode JSON event parser.
 const ParserOpenCode = "opencode"
 
-const openCodeVersion = "1.0.0"
+const openCodeVersion = "1.1.0"
 
 // openCodeTargetKeys are the tool input fields that name what a call acts on,
 // in priority order. OpenCode's built-in tools use camelCase: read, edit and
@@ -42,10 +43,10 @@ func (p *openCodeParser) ParseExecutionOutput(ctx context.Context, rc *schemas.R
 // CollectEvents implements schemas.AdapterEventSource.
 func (p *openCodeParser) CollectEvents(ctx context.Context, rc *schemas.RunContext, raw []byte) ([]schemas.Event, error) {
 	res, err := p.Parse(ctx, rc, raw)
-	if err != nil || res == nil {
+	if res == nil {
 		return nil, err
 	}
-	return res.Events, nil
+	return res.Events, err
 }
 
 // Parse reads `opencode run --format json` output.
@@ -60,21 +61,32 @@ func (p *openCodeParser) CollectEvents(ctx context.Context, rc *schemas.RunConte
 // failed API call or session error. Lines that are not JSON or not understood
 // are skipped: the parser adds detail and must never fail a run.
 func (p *openCodeParser) Parse(ctx context.Context, rc *schemas.RunContext, raw []byte) (*schemas.ParseResult, error) {
+	return p.ParseReader(ctx, rc, bytes.NewReader(raw))
+}
+
+func (p *openCodeParser) ParseReader(ctx context.Context, rc *schemas.RunContext, raw io.Reader) (*schemas.ParseResult, error) {
+	if err := ctx.Err(); err != nil {
+		return nil, err
+	}
 	base := newStreamState(rc)
 	base.parserVersion = openCodeVersion
 	st := &openCodeStream{streamState: base, step: -1}
-	for _, line := range bytes.Split(raw, []byte("\n")) {
-		line = bytes.TrimSpace(line)
+	d, scanErr := scanReader(ctx, raw, func(line []byte) parsedLine {
 		if len(line) == 0 || line[0] != '{' {
-			continue
+			return parsedLine{}
 		}
 		var ev openCodeEvent
 		if err := json.Unmarshal(line, &ev); err != nil {
-			continue
+			return parsedLine{malformed: true}
 		}
+		recognized := ev.Type == "step_start" || ev.Type == "step_finish" || ev.Type == "tool_use" || ev.Type == "text" || ev.Type == "reasoning" || ev.Type == "error"
+		before := len(st.events)
 		st.handle(&ev)
-	}
-	return &schemas.ParseResult{Events: st.events, Claim: st.claim()}, nil
+		return parsedLine{recognized: recognized, emitted: len(st.events) - before}
+	})
+	d.Source, d.Parser, d.ParserVersion = schemas.TraceSourceNative, p.GetName(), p.GetVersion()
+	d.Quality = traceQuality(d)
+	return &schemas.ParseResult{Events: st.events, Claim: st.claim(), Diagnostics: &d}, scanErr
 }
 
 // openCodeEvent is one line of OpenCode's JSON output.

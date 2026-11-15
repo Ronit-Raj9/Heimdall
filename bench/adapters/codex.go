@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
 	"regexp"
 	"strconv"
 	"strings"
@@ -16,7 +17,7 @@ import (
 // ParserCodex is the name of the Codex CLI `exec --json` parser.
 const ParserCodex = "codex"
 
-const codexVersion = "1.0.0"
+const codexVersion = "1.1.0"
 
 // Codex item types (codex-rs/exec/src/exec_events.rs).
 const (
@@ -58,10 +59,10 @@ func (p *codexParser) ParseExecutionOutput(ctx context.Context, rc *schemas.RunC
 // CollectEvents implements schemas.AdapterEventSource.
 func (p *codexParser) CollectEvents(ctx context.Context, rc *schemas.RunContext, raw []byte) ([]schemas.Event, error) {
 	res, err := p.Parse(ctx, rc, raw)
-	if err != nil || res == nil {
+	if res == nil {
 		return nil, err
 	}
-	return res.Events, nil
+	return res.Events, err
 }
 
 // Parse reads `codex exec --json` output: one ThreadEvent per line
@@ -81,19 +82,37 @@ func (p *codexParser) CollectEvents(ctx context.Context, rc *schemas.RunContext,
 // fires ("Reconnecting... n/m"); its HTTP-level retries print nothing.
 // Lines that are not JSON or not understood are skipped.
 func (p *codexParser) Parse(ctx context.Context, rc *schemas.RunContext, raw []byte) (*schemas.ParseResult, error) {
+	return p.ParseReader(ctx, rc, bytes.NewReader(raw))
+}
+
+func (p *codexParser) ParseReader(ctx context.Context, rc *schemas.RunContext, raw io.Reader) (*schemas.ParseResult, error) {
+	if err := ctx.Err(); err != nil {
+		return nil, err
+	}
 	st := newCodexState(rc)
-	for _, line := range bytes.Split(raw, []byte("\n")) {
-		line = bytes.TrimSpace(line)
+	d, scanErr := scanReader(ctx, raw, func(line []byte) parsedLine {
 		if len(line) == 0 || line[0] != '{' {
-			continue
+			return parsedLine{}
 		}
 		var obj map[string]json.RawMessage
 		if err := json.Unmarshal(line, &obj); err != nil {
-			continue
+			return parsedLine{malformed: true}
 		}
+		typ, _ := rawString(obj["type"])
+		recognized := typ == "thread.started" || typ == "turn.started" || typ == "turn.completed" || typ == "item.started" || typ == "item.updated" || typ == "item.completed" || typ == "turn.failed" || typ == "error"
+		if strings.HasPrefix(typ, "item.") && recognized {
+			var item codexItem
+			if json.Unmarshal(obj["item"], &item) != nil || item.ID == "" || item.Type == "" {
+				return parsedLine{recognized: true, malformed: true}
+			}
+		}
+		before := len(st.events)
 		st.handle(obj)
-	}
-	return &schemas.ParseResult{Events: st.events, Claim: st.claim()}, nil
+		return parsedLine{recognized: recognized, emitted: len(st.events) - before}
+	})
+	d.Source, d.Parser, d.ParserVersion = schemas.TraceSourceNative, p.GetName(), p.GetVersion()
+	d.Quality = traceQuality(d)
+	return &schemas.ParseResult{Events: st.events, Claim: st.claim(), Diagnostics: &d}, scanErr
 }
 
 // codexState reuses the Claude Code stream state for event identity,

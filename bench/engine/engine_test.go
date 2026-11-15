@@ -377,9 +377,13 @@ func (s *fakeStore) WriteRunFile(_ context.Context, run *schemas.Run, name strin
 		return err
 	}
 	if name == "run.json" {
-		if err := json.Unmarshal(data, &r.run); err != nil {
+		// NewRun's shallow copy shares immutable manifest identity pointers.
+		// Decode into a fresh value so updates cannot mutate another run's maps.
+		var updated schemas.Run
+		if err := json.Unmarshal(data, &updated); err != nil {
 			return err
 		}
+		r.run = updated
 	}
 	return os.WriteFile(filepath.Join(r.dir, name), data, 0o644)
 }

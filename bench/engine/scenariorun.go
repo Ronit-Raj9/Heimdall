@@ -115,6 +115,7 @@ func (p *Pipeline) runSessions(ctx context.Context, st *runState) error {
 	sessions := orig.Sessions
 	var stream bytes.Buffer
 	var last *schemas.ExecResult
+	truncated := false
 	for i := range sessions {
 		sess := &sessions[i]
 		if err := se.BeginSession(ctx, rc, i); err != nil {
@@ -125,6 +126,8 @@ func (p *Pipeline) runSessions(ctx context.Context, st *runState) error {
 		rc.Task, rc.Session, rc.SessionIndex = &task, sess, i
 		res, err := p.execOnce(ctx, st, sess)
 		if res != nil {
+			truncated = truncated || res.Truncated
+			res.Truncated = truncated
 			n := i + 1
 			out, rerr := p.keepSessionStream(ctx, st, res, n)
 			if rerr != nil && err == nil {

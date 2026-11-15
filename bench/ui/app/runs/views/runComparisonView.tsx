@@ -8,6 +8,7 @@ import { IncompleteNotice } from "@/components/runs/incompleteNotice";
 import { MetricStrip } from "@/components/runs/metricStrip";
 import { PairPicker } from "@/components/runs/pairPicker";
 import { RunScenarioEvidence } from "@/components/runs/runScenario";
+import { TraceQualityDetails } from "@/components/runs/traceQuality";
 import { TraceDownloadLink } from "@/components/runs/runTraceLink";
 import { indexEvents, stripMetricKinds } from "@/components/runs/runs.utils";
 import { BlockSkeleton, EmptyNote, LoadError, Section } from "@/components/runs/screenStates";
@@ -127,11 +128,15 @@ function PairComparison({ pairId, onClear }: { pairId: string; onClear: () => vo
 								<div>Task hash: {lane.detail.data?.canonical?.task.task_hash || "unknown"}</div>
 								<div>Run input hash: {lane.detail.data?.canonical?.run_input.run_input_hash || "unknown"}</div>
 								<div>Evidence level: {lane.detail.data?.canonical?.evidence_status.level || "unknown"}</div>
+								<TraceQualityDetails
+									arm={lane.pairRun.arm}
+									trace={lane.detail.data?.run.agent.trace_diagnostics || lane.detail.data?.canonical?.agent_trace}
+								/>
+								<div>Unknown reasons: {lane.detail.data?.canonical?.evidence_status.unknown_reasons?.join(", ") || "none"}</div>
 								<div>
-									Unknown reasons: {lane.detail.data?.canonical?.evidence_status.unknown_reasons?.join(", ") || "none"}
-								</div>
-								<div>
-									Tools requested / executed: {lane.detail.data?.canonical?.tool_calls?.filter((call) => call.requested).length ?? "unknown"} / {lane.detail.data?.canonical?.tool_calls?.filter((call) => call.executed).length ?? "unknown"}
+									Tools requested / executed:{" "}
+									{lane.detail.data?.canonical?.tool_calls?.filter((call) => call.requested).length ?? "unknown"} /{" "}
+									{lane.detail.data?.canonical?.tool_calls?.filter((call) => call.executed).length ?? "unknown"}
 								</div>
 								{lane.detail.data && (
 									<TraceDownloadLink

@@ -421,6 +421,16 @@ func helperFix(detail string) (string, bool) {
 // evidenceRow: which evidence level the agent's runs carry.
 func evidenceRow(in *checkInput) checkRow {
 	row := newRow(rowEvidence)
+	if in.ev.AgentTrace != nil {
+		d := in.ev.AgentTrace
+		if d.Quality != schemas.TraceQualityComplete || d.Emitted == 0 {
+			return row.set(checkWarn, fmt.Sprintf("%s trace: %s (%d events, %d malformed, %d oversized)", d.Source, d.Quality, d.Emitted, d.Malformed, d.Oversized),
+				"emit bifrost.agent.event records or configure a parser matching the harness output")
+		}
+		if d.Emitted > 0 {
+			return row.set(checkPass, fmt.Sprintf("%s trace: %s (%s)", d.Source, d.Quality, plural(d.Emitted, "event")), "")
+		}
+	}
 	if in.agent.Parser != "" {
 		native := 0
 		for _, e := range in.ev.Events {

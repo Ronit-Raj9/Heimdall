@@ -213,6 +213,11 @@ func (p *Pipeline) collect(ctx context.Context, st *runState) error {
 		}
 	}
 	st.ev.Contract.Conflicts = append(st.ev.Contract.Conflicts, joined.Conflicts...)
+	if trace := st.ev.AgentTrace; trace != nil && trace.Quality != schemas.TraceQualityComplete {
+		st.ev.Status.UnknownReasons = append(st.ev.Status.UnknownReasons, "agent trace: "+string(trace.Quality))
+		st.ev.Contract.OptionalMissing = append(st.ev.Contract.OptionalMissing, "complete_agent_trace")
+		st.ev.Status.Level = schemas.EvidencePartial
+	}
 	if len(joined.Conflicts) > 0 {
 		st.ev.Status.Level = schemas.EvidencePartial
 	}
@@ -272,8 +277,14 @@ func availableEvidence(ev *schemas.Evidence) []string {
 	if len(ev.ShimLog) > 0 {
 		out = append(out, "tool_execution")
 	}
-	if len(ev.Events) > 0 {
-		out = append(out, "agent_events")
+	for _, event := range ev.Events {
+		if event.Source == schemas.SourceAgentStream && event.Type != schemas.EventClaim {
+			out = append(out, "agent_events")
+			break
+		}
+	}
+	if ev.AgentTrace != nil && ev.AgentTrace.Quality != schemas.TraceQualityUnavailable {
+		out = append(out, "agent_trace")
 	}
 	return out
 }

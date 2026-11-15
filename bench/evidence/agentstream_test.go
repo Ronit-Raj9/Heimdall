@@ -8,6 +8,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/maximhq/bifrost/bench/adapters"
 	"github.com/maximhq/bifrost/bench/schemas"
 )
 
@@ -126,6 +127,68 @@ func TestAgentStreamCollect(t *testing.T) {
 			t.Errorf("events = %+v", ev.Events)
 		}
 	})
+	t.Run("common protocol works without a configured parser", func(t *testing.T) {
+		rc := testRC(t)
+		writeStdout(t, rc, `{"schema":"bifrost.agent.event","version":"1","type":"tool_call","tool":"shell"}`+"\n")
+		ev := &schemas.Evidence{}
+		if err := newAgentStreamSource(Deps{Parsers: adapters.BuiltinParsers()}).Collect(context.Background(), rc, ev); err != nil {
+			t.Fatal(err)
+		}
+		if ev.AgentTrace == nil || ev.AgentTrace.Source != schemas.TraceSourceProtocol || ev.AgentTrace.Quality != schemas.TraceQualityComplete || len(ev.Events) != 1 {
+			t.Fatalf("trace = %+v events = %+v", ev.AgentTrace, ev.Events)
+		}
+	})
+	t.Run("ordinary stdout remains a claim-only fallback", func(t *testing.T) {
+		rc := testRC(t)
+		writeStdout(t, rc, "All tests pass.")
+		ev := &schemas.Evidence{}
+		if err := newAgentStreamSource(Deps{Parsers: adapters.BuiltinParsers()}).Collect(context.Background(), rc, ev); err != nil {
+			t.Fatal(err)
+		}
+		if ev.AgentTrace.Quality != schemas.TraceQualityClaimOnly || ev.AgentTrace.Malformed != 0 || ev.AgentTrace.Unrecognized != 1 {
+			t.Fatalf("trace=%+v", ev.AgentTrace)
+		}
+	})
+	t.Run("tool output is not a protocol completion claim", func(t *testing.T) {
+		rc := testRC(t)
+		writeStdout(t, rc, `{"schema":"bifrost.agent.event","version":"1","type":"tool_result","summary":"All tests pass."}`)
+		ev := &schemas.Evidence{}
+		if err := newAgentStreamSource(Deps{Parsers: adapters.BuiltinParsers()}).Collect(context.Background(), rc, ev); err != nil {
+			t.Fatal(err)
+		}
+		if ev.Claim != nil {
+			t.Fatalf("tool result became a completion claim: %+v", ev.Claim)
+		}
+	})
+	t.Run("partial events survive a parser error and capture truncation", func(t *testing.T) {
+		rc := testRC(t)
+		writeStdout(t, rc, "All tests pass.")
+		rc.Agent = &schemas.AgentConfig{Parser: "partial"}
+		rc.Exec.Truncated = true
+		parser := &fakeParser{name: "partial", err: errors.New("failed"), res: &schemas.ParseResult{
+			Events:      []schemas.Event{{Seq: 1, EventID: "r_1:agent_stream:1", Type: schemas.EventToolResult}},
+			Diagnostics: &schemas.ParseDiagnostics{Source: schemas.TraceSourceNative, Quality: schemas.TraceQualityPartial, Malformed: 2},
+		}}
+		ev := &schemas.Evidence{}
+		if err := newAgentStreamSource(Deps{Parsers: []schemas.Parser{parser}}).Collect(context.Background(), rc, ev); err != nil {
+			t.Fatal(err)
+		}
+		if len(ev.Events) != 1 || ev.Claim == nil || !ev.Claim.Made || ev.AgentTrace.Malformed != 2 || !ev.AgentTrace.Truncated || ev.AgentTrace.Quality != schemas.TraceQualityDegraded || rc.Run.Agent.TraceDiagnostics != ev.AgentTrace {
+			t.Fatalf("evidence=%+v trace=%+v", ev, ev.AgentTrace)
+		}
+	})
+	t.Run("protocol takes priority over a configured native parser", func(t *testing.T) {
+		rc := testRC(t)
+		writeStdout(t, rc, `{"schema":"bifrost.agent.event","version":"1","type":"claim","claim":{"made":false,"text":"Unable to complete","source":"native"}}`)
+		rc.Agent = &schemas.AgentConfig{Parser: "codex"}
+		ev := &schemas.Evidence{}
+		if err := newAgentStreamSource(Deps{Parsers: adapters.BuiltinParsers()}).Collect(context.Background(), rc, ev); err != nil {
+			t.Fatal(err)
+		}
+		if len(ev.Events) != 1 || ev.Events[0].Type != schemas.EventClaim || ev.Claim.Made || ev.AgentTrace.Source != schemas.TraceSourceProtocol {
+			t.Fatalf("evidence=%+v trace=%+v", ev, ev.AgentTrace)
+		}
+	})
 	t.Run("unregistered parser falls back to the tail", func(t *testing.T) {
 		rc := testRC(t)
 		writeStdout(t, rc, "Service unavailable.")
@@ -157,9 +220,10 @@ func TestAgentStreamCollect(t *testing.T) {
 		writeStdout(t, rc2, "x")
 		rc2.Agent = &schemas.AgentConfig{Parser: "bad"}
 		p := &fakeParser{name: "bad", err: errors.New("bad json")}
-		err := newAgentStreamSource(Deps{Parsers: []schemas.Parser{p}}).Collect(context.Background(), rc2, &schemas.Evidence{})
-		if err == nil || !strings.Contains(err.Error(), "bad json") {
-			t.Errorf("parser error: err = %v", err)
+		ev := &schemas.Evidence{}
+		err := newAgentStreamSource(Deps{Parsers: []schemas.Parser{p}}).Collect(context.Background(), rc2, ev)
+		if err != nil || ev.AgentTrace == nil || ev.AgentTrace.Quality != schemas.TraceQualityDegraded {
+			t.Errorf("parser error: err = %v trace = %+v", err, ev.AgentTrace)
 		}
 	})
 }

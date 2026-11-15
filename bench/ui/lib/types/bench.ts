@@ -70,6 +70,25 @@ export interface AdapterCapabilities {
 	evidence_levels?: EvidenceLevel[];
 }
 
+export type TraceSource = "protocol" | "native_parser" | "generic_parser" | "stdout_tail" | "none";
+export type TraceQuality = "complete" | "partial" | "degraded" | "claim_only" | "unavailable";
+
+export interface ParseDiagnostics {
+	source?: TraceSource;
+	quality?: TraceQuality;
+	parser?: string;
+	parser_version?: string;
+	bytes?: number;
+	lines?: number;
+	recognized?: number;
+	emitted?: number;
+	malformed?: number;
+	oversized?: number;
+	unrecognized?: number;
+	truncated?: boolean;
+	reason?: string;
+}
+
 export type EvidenceQuality = "unknown" | "complete" | "partial";
 
 export interface RunEvidenceContract {
@@ -232,6 +251,7 @@ export interface CanonicalRun {
 	gates?: GateResult[];
 	metrics?: Record<string, Value>;
 	evidence_status: EvidenceStatus;
+	agent_trace?: ParseDiagnostics;
 	logical_steps?: LogicalRequest[];
 	attempts?: AttemptRecord[];
 	retries?: RetryRecord[];
@@ -388,6 +408,10 @@ export interface RunAgentInfo {
 	config_id: string;
 	adapter: string;
 	parser?: string;
+	parser_version?: string;
+	trace_source?: TraceSource;
+	trace_quality?: TraceQuality;
+	trace_diagnostics?: ParseDiagnostics;
 	config_hash: string;
 	exit_code?: number;
 	timed_out: boolean;

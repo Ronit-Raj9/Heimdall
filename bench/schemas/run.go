@@ -112,17 +112,20 @@ type RunTiming struct {
 
 // RunAgentInfo identifies the system under test for this run.
 type RunAgentInfo struct {
-	ConfigID       string               `json:"config_id"`
-	Adapter        string               `json:"adapter"`
-	Parser         string               `json:"parser,omitempty"`
-	ConfigHash     string               `json:"config_hash"`
-	AgentVersion   string               `json:"agent_version,omitempty"`
-	ImageDigest    string               `json:"image_digest,omitempty"`
-	ParserVersion  string               `json:"parser_version,omitempty"`
-	Capabilities   *AdapterCapabilities `json:"capabilities,omitempty"`
-	CapabilityGaps []string             `json:"capability_gaps,omitempty"`
-	ExitCode       *int                 `json:"exit_code,omitempty"`
-	TimedOut       bool                 `json:"timed_out"`
+	ConfigID         string               `json:"config_id"`
+	Adapter          string               `json:"adapter"`
+	Parser           string               `json:"parser,omitempty"`
+	ConfigHash       string               `json:"config_hash"`
+	AgentVersion     string               `json:"agent_version,omitempty"`
+	ImageDigest      string               `json:"image_digest,omitempty"`
+	ParserVersion    string               `json:"parser_version,omitempty"`
+	TraceSource      TraceSource          `json:"trace_source,omitempty"`
+	TraceQuality     TraceQuality         `json:"trace_quality,omitempty"`
+	TraceDiagnostics *ParseDiagnostics    `json:"trace_diagnostics,omitempty"`
+	Capabilities     *AdapterCapabilities `json:"capabilities,omitempty"`
+	CapabilityGaps   []string             `json:"capability_gaps,omitempty"`
+	ExitCode         *int                 `json:"exit_code,omitempty"`
+	TimedOut         bool                 `json:"timed_out"`
 }
 
 // RunGatewayInfo links the run to its gateway records.

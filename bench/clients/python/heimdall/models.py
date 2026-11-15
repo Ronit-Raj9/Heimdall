@@ -309,6 +309,7 @@ class _CanonicalRunRequired(TypedDict):
 
 
 class CanonicalRun(_CanonicalRunRequired, total=False):
+    agent_trace: Optional[ParseDiagnostics]
     attempts: List[AttemptRecord]
     events: List[Event]
     fallbacks: List[FallbackRecord]
@@ -1332,6 +1333,22 @@ class PairRun(TypedDict):
     slot: Slot
 
 
+class ParseDiagnostics(TypedDict, total=False):
+    bytes: int
+    emitted: int
+    lines: int
+    malformed: int
+    oversized: int
+    parser: str
+    parser_version: str
+    quality: str
+    reason: str
+    recognized: int
+    source: str
+    truncated: bool
+    unrecognized: int
+
+
 class PartFailure(TypedDict):
     error: str
     part: str
@@ -1682,6 +1699,9 @@ class RunAgentInfo(_RunAgentInfoRequired, total=False):
     image_digest: str
     parser: str
     parser_version: str
+    trace_diagnostics: Optional[ParseDiagnostics]
+    trace_quality: str
+    trace_source: str
 
 
 class _RunDetailRequired(TypedDict):
@@ -2703,6 +2723,7 @@ __all__ = [
     'OverlaySpec',
     'Pair',
     'PairRun',
+    'ParseDiagnostics',
     'PartFailure',
     'PerRunRanges',
     'PlanCondition',

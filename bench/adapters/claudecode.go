@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
 	"regexp"
 	"strings"
 	"time"
@@ -18,7 +19,7 @@ import (
 const ParserClaudeCode = "claudecode"
 
 const (
-	claudeCodeVersion = "1.0.0"
+	claudeCodeVersion = "1.1.0"
 	summaryMax        = 120
 	targetMax         = 500
 	claimTextMax      = 300
@@ -51,10 +52,10 @@ func (p *claudeCodeParser) ParseExecutionOutput(ctx context.Context, rc *schemas
 // CollectEvents implements schemas.AdapterEventSource.
 func (p *claudeCodeParser) CollectEvents(ctx context.Context, rc *schemas.RunContext, raw []byte) ([]schemas.Event, error) {
 	res, err := p.Parse(ctx, rc, raw)
-	if err != nil || res == nil {
+	if res == nil {
 		return nil, err
 	}
-	return res.Events, nil
+	return res.Events, err
 }
 
 // Parse reads `claude -p --output-format stream-json --verbose` output.
@@ -69,19 +70,38 @@ func (p *claudeCodeParser) CollectEvents(ctx context.Context, rc *schemas.RunCon
 // Lines that are not JSON or not understood are skipped: the parser adds
 // detail and must never fail a run.
 func (p *claudeCodeParser) Parse(ctx context.Context, rc *schemas.RunContext, raw []byte) (*schemas.ParseResult, error) {
+	return p.ParseReader(ctx, rc, bytes.NewReader(raw))
+}
+
+func (p *claudeCodeParser) ParseReader(ctx context.Context, rc *schemas.RunContext, raw io.Reader) (*schemas.ParseResult, error) {
+	if err := ctx.Err(); err != nil {
+		return nil, err
+	}
 	st := newStreamState(rc)
-	for _, line := range bytes.Split(raw, []byte("\n")) {
-		line = bytes.TrimSpace(line)
+	st.parserVersion = claudeCodeVersion
+	d, scanErr := scanReader(ctx, raw, func(line []byte) parsedLine {
 		if len(line) == 0 || line[0] != '{' {
-			continue
+			return parsedLine{}
 		}
 		var obj map[string]json.RawMessage
 		if err := json.Unmarshal(line, &obj); err != nil {
-			continue
+			return parsedLine{malformed: true}
 		}
+		typ, _ := rawString(obj["type"])
+		recognized := typ == "assistant" || typ == "user" || typ == "system" || typ == "result"
+		if typ == "assistant" || typ == "user" {
+			var message map[string]json.RawMessage
+			if json.Unmarshal(obj["message"], &message) != nil || message == nil {
+				return parsedLine{recognized: true, malformed: true}
+			}
+		}
+		before := len(st.events)
 		st.handle(obj)
-	}
-	return &schemas.ParseResult{Events: st.events, Claim: st.claim()}, nil
+		return parsedLine{recognized: recognized, emitted: len(st.events) - before}
+	})
+	d.Source, d.Parser, d.ParserVersion = schemas.TraceSourceNative, p.GetName(), p.GetVersion()
+	d.Quality = traceQuality(d)
+	return &schemas.ParseResult{Events: st.events, Claim: st.claim(), Diagnostics: &d}, scanErr
 }
 
 // ClaimFromText decides whether free text asserts success, for agents whose

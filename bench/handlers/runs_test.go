@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"slices"
@@ -187,6 +188,34 @@ func TestRunEventsAndDetail(t *testing.T) {
 	body = decodeBody(t, c.do(t, "GET", "/api/bench/runs/r_t01_A/receipts", nil, nil))
 	if receipts, _ := body["receipts"].([]any); len(receipts) != 1 {
 		t.Errorf("receipts = %v", body)
+	}
+}
+
+func TestRunDetailExposesTraceCoverage(t *testing.T) {
+	idx := testIndex()
+	diagnostics := &schemas.ParseDiagnostics{Source: schemas.TraceSourceProtocol, Quality: schemas.TraceQualityPartial,
+		Parser: "bifrost-agent-event", ParserVersion: "1.0.0", Emitted: 2, Malformed: 1}
+	for i := range idx.runs {
+		if idx.runs[i].Run.RunID == "r_t01_A" {
+			idx.runs[i].Run.Agent.TraceSource = diagnostics.Source
+			idx.runs[i].Run.Agent.TraceQuality = diagnostics.Quality
+			idx.runs[i].Run.Agent.TraceDiagnostics = diagnostics
+		}
+	}
+	canonical, err := json.Marshal(schemas.CanonicalRun{AgentTrace: diagnostics})
+	if err != nil {
+		t.Fatal(err)
+	}
+	idx.files["r_t01_A"][FileCanonical] = canonical
+	d := fullDeps()
+	d.index = idx
+	resp := newTestClient(t, d).do(t, "GET", "/api/bench/runs/r_t01_A", nil, nil)
+	var detail schemas.RunDetail
+	if err := json.Unmarshal(resp.Body(), &detail); err != nil {
+		t.Fatal(err)
+	}
+	if resp.StatusCode() != 200 || detail.Run.Agent.TraceQuality != diagnostics.Quality || detail.Canonical == nil || detail.Canonical.AgentTrace == nil || detail.Canonical.AgentTrace.Malformed != 1 {
+		t.Fatalf("trace metadata missing: %s", resp.Body())
 	}
 }
 

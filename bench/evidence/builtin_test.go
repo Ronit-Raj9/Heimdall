@@ -37,8 +37,12 @@ func TestBuiltinOrder(t *testing.T) {
 			if s.GetName() != want[i] {
 				t.Errorf("source %d is %q, want %q", i, s.GetName(), want[i])
 			}
-			if s.GetVersion() != "1.0.0" {
-				t.Errorf("version %q, want 1.0.0", s.GetVersion())
+			wantVersion := "1.0.0"
+			if s.GetName() == AgentStream {
+				wantVersion = "1.1.0"
+			}
+			if s.GetVersion() != wantVersion {
+				t.Errorf("version %q, want %s", s.GetVersion(), wantVersion)
 			}
 		})
 	}

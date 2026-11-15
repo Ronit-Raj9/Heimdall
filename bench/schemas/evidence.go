@@ -13,6 +13,7 @@ type Evidence struct {
 	Ledger       []LedgerEntry        `json:"ledger,omitempty"`   // fault proxy
 	Events       []Event              `json:"events,omitempty"`
 	Claim        *Claim               `json:"claim,omitempty"`
+	AgentTrace   *ParseDiagnostics    `json:"agent_trace,omitempty"`
 	Cost         []CostRow            `json:"cost,omitempty"`
 	ShimLog      []ShimCall           `json:"shim_log,omitempty"`
 	Grade        *Grade               `json:"grade,omitempty"`

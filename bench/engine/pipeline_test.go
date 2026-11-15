@@ -8,6 +8,8 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/maximhq/bifrost/bench/adapters"
+	"github.com/maximhq/bifrost/bench/evidence"
 	"github.com/maximhq/bifrost/bench/schemas"
 )
 
@@ -28,6 +30,63 @@ func pipelineFixture(t *testing.T, cond string) (*bench, *schemas.Manifest, *sch
 	}
 	t.Fatalf("no slot for B/%s", cond)
 	return nil, nil, nil
+}
+
+type traceOutputEnvironment struct{ schemas.Environment }
+
+func (e traceOutputEnvironment) Exec(ctx context.Context, rc *schemas.RunContext, plan *schemas.RunPlan) (*schemas.ExecResult, error) {
+	res, err := e.Environment.Exec(ctx, rc, plan)
+	if err != nil {
+		return res, err
+	}
+	raw := `{"schema":"bifrost.agent.event","version":"1","type":"model_response","summary":"answer"}` + "\n{bad-json\n"
+	if err := os.WriteFile(res.StdoutPath, []byte(raw), 0o644); err != nil {
+		return res, err
+	}
+	return res, nil
+}
+
+func TestRunSlotPersistsTraceDiagnostics(t *testing.T) {
+	b, m, slot := pipelineFixture(t, "clean")
+	b.reg.Environments[0] = traceOutputEnvironment{b.reg.Environments[0]}
+	for _, source := range evidence.Builtin(evidence.Deps{Parsers: adapters.BuiltinParsers()}) {
+		if source.GetName() == evidence.AgentStream {
+			b.reg.Evidence = append(b.reg.Evidence, source)
+		}
+	}
+	res, err := runOne(context.Background(), t, b, m, slot)
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := res.Run.Agent.TraceDiagnostics
+	if want == nil || want.Source != schemas.TraceSourceProtocol || want.Quality != schemas.TraceQualityPartial || want.Malformed != 1 || res.Run.Outcome != schemas.OutcomePass {
+		t.Fatalf("run=%+v diagnostics=%+v", res.Run, want)
+	}
+	for _, name := range []string{"run.json", "evidence.json", "canonical.json"} {
+		data, err := os.ReadFile(filepath.Join(res.Dir, name))
+		if err != nil {
+			t.Fatal(err)
+		}
+		var trace *schemas.ParseDiagnostics
+		if name == "run.json" {
+			var run schemas.Run
+			if err := json.Unmarshal(data, &run); err != nil {
+				t.Fatal(err)
+			}
+			trace = run.Agent.TraceDiagnostics
+		} else {
+			var envelope struct {
+				Trace *schemas.ParseDiagnostics `json:"agent_trace"`
+			}
+			if err := json.Unmarshal(data, &envelope); err != nil {
+				t.Fatal(err)
+			}
+			trace = envelope.Trace
+		}
+		if trace == nil || trace.Source != want.Source || trace.Quality != want.Quality || trace.Malformed != want.Malformed {
+			t.Fatalf("%s: trace=%+v want=%+v", name, trace, want)
+		}
+	}
 }
 
 func runOne(ctx context.Context, t *testing.T, b *bench, m *schemas.Manifest, slot *schemas.Slot) (*SlotResult, error) {

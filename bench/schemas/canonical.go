@@ -205,6 +205,7 @@ type CanonicalRun struct {
 	Gates            []GateResult          `json:"gates,omitempty"`
 	Metrics          map[string]Value      `json:"metrics,omitempty"`
 	EvidenceStatus   EvidenceStatus        `json:"evidence_status"`
+	AgentTrace       *ParseDiagnostics     `json:"agent_trace,omitempty"`
 	LogicalSteps     []LogicalRequest      `json:"logical_steps,omitempty"`
 	Attempts         []AttemptRecord       `json:"attempts,omitempty"`
 	Retries          []RetryRecord         `json:"retries,omitempty"`

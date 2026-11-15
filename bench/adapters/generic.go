@@ -1,10 +1,10 @@
 package adapters
 
 import (
-	"bufio"
 	"bytes"
 	"context"
 	"encoding/json"
+	"io"
 	"strconv"
 	"strings"
 	"time"
@@ -12,7 +12,7 @@ import (
 	"github.com/maximhq/bifrost/bench/schemas"
 )
 
-const genericParserVersion = "1.0.0"
+const genericParserVersion = "1.1.0"
 
 const (
 	ParserCustomPython = "custom-python"
@@ -28,30 +28,49 @@ func (p *genericJSONParser) GetName() string    { return p.name }
 func (p *genericJSONParser) GetVersion() string { return genericParserVersion }
 
 func (p *genericJSONParser) Parse(ctx context.Context, rc *schemas.RunContext, raw []byte) (*schemas.ParseResult, error) {
-	_ = ctx
+	return p.ParseReader(ctx, rc, bytes.NewReader(raw))
+}
+
+func (p *genericJSONParser) ParseReader(ctx context.Context, rc *schemas.RunContext, raw io.Reader) (*schemas.ParseResult, error) {
 	result := &schemas.ParseResult{}
-	seq := 0
-	for scanner := bufio.NewScanner(bytes.NewReader(raw)); scanner.Scan(); {
-		line := strings.TrimSpace(scanner.Text())
-		if line == "" {
-			continue
+	protocol := newProtocolState(rc)
+	protocolSeen, heuristicLines := false, 0
+	last := ""
+	d, err := scanReader(ctx, raw, func(line []byte) parsedLine {
+		last = lastText(line)
+		if protocolLine(line) {
+			protocolSeen = true
+			return protocol.line(line)
 		}
 		var obj map[string]json.RawMessage
-		if json.Unmarshal([]byte(line), &obj) != nil {
-			continue
+		if json.Unmarshal(line, &obj) != nil {
+			return parsedLine{malformed: true}
 		}
 		typ := firstString(obj, "type", "event", "kind")
 		if typ == "" {
-			continue
+			return parsedLine{}
 		}
-		seq++
-		e := genericEvent(rc, p.name, seq, typ, obj)
-		result.Events = append(result.Events, e)
+		result.Events = append(result.Events, genericEvent(rc, p.name, len(result.Events)+1, typ, obj))
+		heuristicLines++
+		return parsedLine{recognized: true, emitted: 1}
+	})
+	if protocolSeen {
+		d.Recognized -= heuristicLines
+		d.Unrecognized += heuristicLines
+		return protocol.finish(d), err
 	}
-	if text := lastText(raw); text != "" {
-		result.Claim = ClaimFromText(text)
+	result.Claim = ClaimFromText(last)
+	d.Source, d.Parser, d.ParserVersion = schemas.TraceSourceGeneric, p.GetName(), p.GetVersion()
+	if d.Emitted > 0 {
+		d.Quality = schemas.TraceQualityDegraded
+		d.Reason = "event types inferred from unversioned JSON fields"
+	} else if result.Claim != nil && d.Malformed == 0 && d.Oversized == 0 {
+		d.Quality = schemas.TraceQualityClaimOnly
+	} else {
+		d.Quality = traceQuality(d)
 	}
-	return result, nil
+	result.Diagnostics = &d
+	return result, err
 }
 
 func (p *genericJSONParser) ParseExecutionOutput(ctx context.Context, rc *schemas.RunContext, raw []byte) (*schemas.ParseResult, error) {
@@ -86,7 +105,10 @@ func genericEvent(rc *schemas.RunContext, parser string, seq int, typ string, ob
 	case strings.Contains(lower, "retry"):
 		eventType = schemas.EventRetry
 	}
-	ts := time.Now().UTC()
+	ts := time.Time{}
+	if rc != nil && rc.Exec != nil {
+		ts = rc.Exec.Started
+	}
 	if value := firstString(obj, "timestamp", "time"); value != "" {
 		if parsed, err := time.Parse(time.RFC3339Nano, value); err == nil {
 			ts = parsed
@@ -98,6 +120,7 @@ func genericEvent(rc *schemas.RunContext, parser string, seq int, typ string, ob
 		Seq: seq, Sequence: seq, TS: ts, Timestamp: ts, Type: eventType, Source: schemas.SourceAgentStream,
 		Evidence: schemas.EvidenceNative, EvidenceLevel: schemas.EvidenceNative, Status: schemas.EventStatusUnknown,
 		ParserVersion: genericParserVersion, ToolName: firstString(obj, "tool", "tool_name", "name"),
+		EvidenceSource: schemas.EvidenceSourceInferred, EvidenceStrength: schemas.EvidenceInferred,
 		Summary: clip(firstString(obj, "message", "text", "output", "error"), summaryMax),
 	}
 }
@@ -113,13 +136,15 @@ func firstString(obj map[string]json.RawMessage, keys ...string) string {
 }
 
 func lastText(raw []byte) string {
-	lines := strings.Split(string(raw), "\n")
-	for i := len(lines) - 1; i >= 0; i-- {
-		if text := strings.TrimSpace(lines[i]); text != "" {
-			return text
-		}
+	// Claims never retain a stream-sized JSON record.
+	if len(raw) > 4096 {
+		raw = raw[len(raw)-4096:]
 	}
-	return ""
+	raw = bytes.TrimSpace(raw)
+	if i := bytes.LastIndexByte(raw, '\n'); i >= 0 {
+		raw = raw[i+1:]
+	}
+	return string(raw)
 }
 
 func fmtEventID(runID string, source schemas.EventSource, seq int) string {
