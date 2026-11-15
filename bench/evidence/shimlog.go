@@ -67,6 +67,9 @@ func (s *shimLogSource) Collect(ctx context.Context, rc *schemas.RunContext, ev 
 		return fmt.Errorf("read shim log for run %s: %w", id, err)
 	}
 	calls, bad := ParseShimLog(raw)
+	for i := range calls {
+		calls[i].Argv = utils.RedactSecrets(calls[i].Argv)
+	}
 	ev.ShimLog = calls
 	events := shimEvents(rc, calls)
 	if bad > 0 {

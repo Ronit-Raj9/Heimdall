@@ -46,6 +46,9 @@ const (
 	SourceShimLog     EventSource = "shim_log"
 	SourceGrader      EventSource = "grader"
 	SourceEngine      EventSource = "engine"
+	SourceToolRunner  EventSource = "tool_runner"
+	SourceWorkspace   EventSource = "workspace_diff"
+	SourceProcess     EventSource = "process_result"
 )
 
 // Tokens holds four disjoint token buckets.
@@ -59,37 +62,41 @@ type Tokens struct {
 // Event is one normalized event of a run (DESIGN.md 16.4). Event ids are
 // "<run_id>:<source>:<seq>" so independent sources never collide.
 type Event struct {
-	EventVersion  string        `json:"event_version,omitempty"`
-	EventID       string        `json:"event_id"`
-	RunID         string        `json:"run_id"`
-	SlotID        string        `json:"slot_id"`
-	PairID        string        `json:"pair_id"`
-	Seq           int           `json:"seq"` // per source
-	Sequence      int           `json:"sequence,omitempty"`
-	TurnIndex     int           `json:"turn_index"`
-	TS            time.Time     `json:"ts"`
-	Timestamp     time.Time     `json:"timestamp,omitempty"`
-	Type          EventType     `json:"type"`
-	Source        EventSource   `json:"source"`
-	Evidence      EvidenceLevel `json:"evidence"`
-	EvidenceLevel EvidenceLevel `json:"evidence_level,omitempty"`
-	Status        EventStatus   `json:"status,omitempty"`
-	ParserVersion string        `json:"parser_version,omitempty"`
-	RequestID     string        `json:"request_id,omitempty"` // Bifrost row id
-	AttemptNo     *int          `json:"attempt_no,omitempty"`
-	ToolCallID    string        `json:"tool_call_id,omitempty"`
-	ParentEventID string        `json:"parent_event_id,omitempty"`
-	ToolName      string        `json:"tool_name,omitempty"`
-	Target        string        `json:"target,omitempty"` // file path, command or url the action is about; used to align A and B
-	ArgsHash      string        `json:"args_hash,omitempty"`
-	ResultHash    string        `json:"result_hash,omitempty"`
-	DurationMS    *int64        `json:"duration_ms,omitempty"`
-	ExitStatus    *int          `json:"exit_status,omitempty"`
-	IsError       bool          `json:"is_error,omitempty"`
-	Provider      string        `json:"provider,omitempty"`
-	ModelReq      string        `json:"model_requested,omitempty"`
-	ModelServed   string        `json:"model_served,omitempty"`
-	Tokens        *Tokens       `json:"tokens,omitempty"`
-	USD           *Value        `json:"usd,omitempty"`
-	Summary       string        `json:"summary,omitempty"` // short inert text for display
+	EventVersion     string           `json:"event_version,omitempty"`
+	EventID          string           `json:"event_id"`
+	RunID            string           `json:"run_id"`
+	SlotID           string           `json:"slot_id"`
+	PairID           string           `json:"pair_id"`
+	Seq              int              `json:"seq"` // per source
+	Sequence         int              `json:"sequence,omitempty"`
+	TurnIndex        int              `json:"turn_index"`
+	TS               time.Time        `json:"ts"`
+	Timestamp        time.Time        `json:"timestamp,omitempty"`
+	Type             EventType        `json:"type"`
+	Source           EventSource      `json:"source"`
+	Evidence         EvidenceLevel    `json:"evidence"`
+	EvidenceLevel    EvidenceLevel    `json:"evidence_level,omitempty"`
+	EvidenceSource   EvidenceOrigin   `json:"evidence_source,omitempty"`
+	EvidenceStrength EvidenceStrength `json:"evidence_strength,omitempty"`
+	Status           EventStatus      `json:"status,omitempty"`
+	ParserVersion    string           `json:"parser_version,omitempty"`
+	RequestID        string           `json:"request_id,omitempty"` // Bifrost row id
+	LogicalStepID    string           `json:"logical_step_id,omitempty"`
+	AttemptID        string           `json:"attempt_id,omitempty"`
+	AttemptNo        *int             `json:"attempt_no,omitempty"`
+	ToolCallID       string           `json:"tool_call_id,omitempty"`
+	ParentEventID    string           `json:"parent_event_id,omitempty"`
+	ToolName         string           `json:"tool_name,omitempty"`
+	Target           string           `json:"target,omitempty"` // file path, command or url the action is about; used to align A and B
+	ArgsHash         string           `json:"args_hash,omitempty"`
+	ResultHash       string           `json:"result_hash,omitempty"`
+	DurationMS       *int64           `json:"duration_ms,omitempty"`
+	ExitStatus       *int             `json:"exit_status,omitempty"`
+	IsError          bool             `json:"is_error,omitempty"`
+	Provider         string           `json:"provider,omitempty"`
+	ModelReq         string           `json:"model_requested,omitempty"`
+	ModelServed      string           `json:"model_served,omitempty"`
+	Tokens           *Tokens          `json:"tokens,omitempty"`
+	USD              *Value           `json:"usd,omitempty"`
+	Summary          string           `json:"summary,omitempty"` // short inert text for display
 }

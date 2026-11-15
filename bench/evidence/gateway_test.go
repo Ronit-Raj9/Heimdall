@@ -20,6 +20,21 @@ type fakeGateway struct {
 	expect schemas.FetchExpectation
 }
 
+func TestNormalizeRequestRecordsSeparatesLogicalAttemptsAndTools(t *testing.T) {
+	log := &schemas.RequestLog{Complete: true, Requests: []schemas.GatewayRequest{
+		{ID: "r1", Kind: "message", Status: "error", Provider: "p", ModelRequested: "m", Attempts: []schemas.Attempt{{N: 1, StatusCode: 503}, {N: 2, StatusCode: 200, FailReason: "retry"}}},
+		{ID: "r2", ParentID: "r1", Kind: "message", Status: "success", Provider: "p2", ModelRequested: "m", ModelServed: "m2", FallbackIndex: 1,
+			ToolCalls: []schemas.ToolCallRef{{ID: "tool-1", Name: "shell"}}},
+	}}
+	logical, attempts, retries, fallbacks, tools := NormalizeRequestRecords(log)
+	if len(logical) != 1 || len(attempts) != 3 || len(retries) != 1 || len(fallbacks) != 1 || len(tools) != 1 {
+		t.Fatalf("records = logical %d attempts %d retries %d fallbacks %d tools %d", len(logical), len(attempts), len(retries), len(fallbacks), len(tools))
+	}
+	if attempts[0].LogicalRequestID != logical[0].LogicalRequestID || tools[0].ExecutionSource != schemas.EvidenceSourceUnknown {
+		t.Fatalf("records not linked: %+v %+v", attempts, tools)
+	}
+}
+
 func (g *fakeGateway) GetName() string    { return "fake" }
 func (g *fakeGateway) GetVersion() string { return "0" }
 func (g *fakeGateway) Preflight(context.Context) (*schemas.GatewayManifest, error) {

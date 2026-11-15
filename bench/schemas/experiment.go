@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"sort"
 	"strconv"
+	"strings"
 	"time"
 
 	"gopkg.in/yaml.v3"
@@ -13,23 +14,31 @@ import (
 
 // Experiment is read from experiments/<name>.yaml (DESIGN.md 16.6).
 type Experiment struct {
-	ID            string             `json:"id" yaml:"id"` // e_<slug>; set by the planner when empty
-	Name          string             `json:"name" yaml:"name"`
-	Suite         string             `json:"suite" yaml:"suite"` // e.g. coding-core@1.0.0
-	Base          string             `json:"base" yaml:"base"`   // agent config path for every arm
-	Arms          map[string]ArmSpec `json:"arms" yaml:"arms"`
-	Primary       Endpoint           `json:"primary" yaml:"primary"`
-	Guards        []GuardSpec        `json:"guards" yaml:"guards"`
-	Conditions    []ConditionSpec    `json:"conditions" yaml:"conditions"`
-	Compatibility *CompatibilitySpec `json:"compatibility,omitempty" yaml:"compatibility"`
-	Budget        BudgetSpec         `json:"budget" yaml:"budget"`
-	Verdict       VerdictSpec        `json:"verdict" yaml:"verdict"`
-	Metrics       []string           `json:"metrics,omitempty" yaml:"metrics"`         // subset; empty = all
-	ExtraGates    []string           `json:"extra_gates,omitempty" yaml:"extra_gates"` // baseline gates are always on
-	Seed          int64              `json:"seed" yaml:"seed"`
-	Concurrency   int                `json:"concurrency" yaml:"concurrency"`
-	ManifestMode  string             `json:"manifest_mode" yaml:"manifest_mode"` // agent_exposure | stack_resilience
-	Policy        string             `json:"policy,omitempty" yaml:"policy"`     // release policy file, relative to the bench root
+	ID            string                 `json:"id" yaml:"id"` // e_<slug>; set by the planner when empty
+	Name          string                 `json:"name" yaml:"name"`
+	Suite         string                 `json:"suite" yaml:"suite"` // e.g. coding-core@1.0.0
+	Base          string                 `json:"base" yaml:"base"`   // agent config path for every arm
+	Arms          map[string]ArmSpec     `json:"arms" yaml:"arms"`
+	Primary       Endpoint               `json:"primary" yaml:"primary"`
+	Guards        []GuardSpec            `json:"guards" yaml:"guards"`
+	Conditions    []ConditionSpec        `json:"conditions" yaml:"conditions"`
+	Compatibility *CompatibilitySpec     `json:"compatibility,omitempty" yaml:"compatibility"`
+	Budget        BudgetSpec             `json:"budget" yaml:"budget"`
+	Verdict       VerdictSpec            `json:"verdict" yaml:"verdict"`
+	Metrics       []string               `json:"metrics,omitempty" yaml:"metrics"`         // subset; empty = all
+	ExtraGates    []string               `json:"extra_gates,omitempty" yaml:"extra_gates"` // baseline gates are always on
+	Seed          int64                  `json:"seed" yaml:"seed"`
+	Concurrency   int                    `json:"concurrency" yaml:"concurrency"`
+	ManifestMode  string                 `json:"manifest_mode" yaml:"manifest_mode"` // agent_exposure | stack_resilience
+	Policy        string                 `json:"policy,omitempty" yaml:"policy"`     // release policy file, relative to the bench root
+	Requirements  CapabilityRequirements `json:"requirements,omitempty" yaml:"requirements"`
+}
+
+// CapabilityRequirements separates plan-blocking capabilities from optional
+// evidence capabilities.
+type CapabilityRequirements struct {
+	Required []string `json:"required,omitempty" yaml:"required,omitempty"`
+	Optional []string `json:"optional,omitempty" yaml:"optional,omitempty"`
 }
 
 // ArmSpec is a base agent config plus dotted-path overrides, for example
@@ -180,23 +189,27 @@ func (s TaskSelector) Resolve(all []string) []string {
 // Manifest is the frozen plan of an experiment, hashed before the first run.
 // Changing anything makes a new experiment.
 type Manifest struct {
-	ExpID          string                 `json:"exp_id"`
-	CreatedAt      time.Time              `json:"created_at"`
-	Experiment     Experiment             `json:"experiment"`
-	SuiteID        string                 `json:"suite_id"`
-	SuiteVersion   string                 `json:"suite_version"`
-	SuiteLockHash  string                 `json:"suite_lock_hash"`
-	Arms           map[string]ArmManifest `json:"arms"`
-	Compatibility  *ArmManifest           `json:"compatibility,omitempty"`
-	Parts          map[string]string      `json:"parts"` // "<kind>/<name>" -> version
-	Gateway        *GatewayManifest       `json:"gateway,omitempty"`
-	ArmOrder       map[string][]string    `json:"arm_order"` // task id -> arm ids in run order, drawn once per task from Seed
-	Slots          []Slot                 `json:"slots"`
-	RandomizationU string                 `json:"randomization_unit"` // "task"
-	BenchVersion   string                 `json:"bench_version"`
-	PolicyHash     string                 `json:"policy_hash,omitempty"`  // sha256 of the policy file named by the experiment
-	BudgetDiffs    []BudgetDiff           `json:"budget_diffs,omitempty"` // budgets that differ between arms with no arm setting them
-	Hash           string                 `json:"hash"`                   // sha256 of the canonical JSON with Hash empty
+	ExpID          string                      `json:"exp_id"`
+	CreatedAt      time.Time                   `json:"created_at"`
+	Experiment     Experiment                  `json:"experiment"`
+	SuiteID        string                      `json:"suite_id"`
+	SuiteVersion   string                      `json:"suite_version"`
+	SuiteLockHash  string                      `json:"suite_lock_hash"`
+	Arms           map[string]ArmManifest      `json:"arms"`
+	TaskIdentities []CanonicalTaskIdentity     `json:"task_identities,omitempty"`
+	RunInputs      map[string]RunInputIdentity `json:"run_inputs,omitempty"`
+	Compatibility  *ArmManifest                `json:"compatibility,omitempty"`
+	Parts          map[string]string           `json:"parts"` // "<kind>/<name>" -> version
+	Gateway        *GatewayManifest            `json:"gateway,omitempty"`
+	ArmOrder       map[string][]string         `json:"arm_order"` // task id -> arm ids in run order, drawn once per task from Seed
+	Slots          []Slot                      `json:"slots"`
+	RandomizationU string                      `json:"randomization_unit"` // "task"
+	BenchVersion   string                      `json:"bench_version"`
+	PolicyHash     string                      `json:"policy_hash,omitempty"`  // sha256 of the policy file named by the experiment
+	BudgetDiffs    []BudgetDiff                `json:"budget_diffs,omitempty"` // budgets that differ between arms with no arm setting them
+	BudgetParity   *BudgetParityResult         `json:"budget_parity,omitempty"`
+	CapabilityGaps map[string][]string         `json:"capability_gaps,omitempty"`
+	Hash           string                      `json:"hash"` // sha256 of the canonical JSON with Hash empty
 }
 
 // BudgetDiff is one agent budget that differs between arms although no arm
@@ -244,6 +257,79 @@ func BudgetDiffsOf(e *Experiment, arms map[string]ArmManifest) []BudgetDiff {
 	return out
 }
 
+// BudgetParityOf compares configured and effective limits. It is additive to
+// BudgetDiffsOf, which keeps the legacy warning calculation unchanged.
+func BudgetParityOf(e *Experiment, arms map[string]ArmManifest) BudgetParityResult {
+	configured := budgetDiffsForFields(arms, func(a ArmManifest, field string) string {
+		return budgetValueExtended(a.Config.Budgets, field)
+	})
+	effective := budgetDiffsForFields(arms, func(a ArmManifest, field string) string {
+		if a.BudgetSnapshot == nil {
+			return "unset"
+		}
+		return budgetValueExtended(a.BudgetSnapshot.Effective, field)
+	})
+	if len(configured) == 0 && len(effective) == 0 {
+		return BudgetParityResult{Status: BudgetParityEqual}
+	}
+	all := append(append([]BudgetDiff(nil), configured...), effective...)
+	if len(unexpectedBudgetDiffs(e, configured, effective)) == 0 {
+		return BudgetParityResult{Status: BudgetParityDeclaredDifference, Diffs: all, ConfiguredDiffs: configured, EffectiveDiffs: effective}
+	}
+	return BudgetParityResult{Status: BudgetParityUnexpectedDifference, Diffs: all, ConfiguredDiffs: configured, EffectiveDiffs: effective}
+}
+
+func budgetDiffsForFields(arms map[string]ArmManifest, value func(ArmManifest, string) string) []BudgetDiff {
+	ids := make([]string, 0, len(arms))
+	for id := range arms {
+		ids = append(ids, id)
+	}
+	sort.Strings(ids)
+	var out []BudgetDiff
+	for _, field := range []string{"wall_s", "turns", "cpus", "mem_gb", "pids_limit", "usd", "max_retries", "max_tool_calls"} {
+		per := map[string]string{}
+		values := map[string]bool{}
+		for _, id := range ids {
+			v := value(arms[id], field)
+			per[id], values[v] = v, true
+		}
+		if len(values) > 1 {
+			out = append(out, BudgetDiff{Field: "budgets." + field, PerArm: per})
+		}
+	}
+	return out
+}
+
+func unexpectedBudgetDiffs(e *Experiment, configured, effective []BudgetDiff) []BudgetDiff {
+	declared := map[string]bool{}
+	if e != nil {
+		for _, arm := range e.Arms {
+			if arm.Agent != "" {
+				for _, field := range []string{"wall_s", "turns", "cpus", "mem_gb", "pids_limit", "usd", "max_retries", "max_tool_calls"} {
+					declared["budgets."+field] = true
+				}
+			}
+			for path := range arm.Set {
+				if path == "budgets" {
+					for _, field := range []string{"wall_s", "turns", "cpus", "mem_gb", "pids_limit", "usd", "max_retries", "max_tool_calls"} {
+						declared["budgets."+field] = true
+					}
+				}
+				if strings.HasPrefix(path, "budgets.") {
+					declared[path] = true
+				}
+			}
+		}
+	}
+	var out []BudgetDiff
+	for _, diff := range append(append([]BudgetDiff(nil), configured...), effective...) {
+		if !declared[diff.Field] {
+			out = append(out, diff)
+		}
+	}
+	return out
+}
+
 // budgetDeclared reports whether some arm sets the budget with `set:`.
 func budgetDeclared(e *Experiment, field string) bool {
 	if e == nil {
@@ -262,6 +348,10 @@ func budgetDeclared(e *Experiment, field string) bool {
 // budgetValue is one budget as text. An unset optional budget (turns) reads
 // "unset", so 0 and "no limit" are told apart.
 func budgetValue(b Budgets, field string) string {
+	return budgetValueExtended(b, field)
+}
+
+func budgetValueExtended(b Budgets, field string) string {
 	switch field {
 	case "wall_s":
 		return strconv.Itoa(b.WallS)
@@ -274,6 +364,26 @@ func budgetValue(b Budgets, field string) string {
 		return strconv.FormatFloat(b.CPUs, 'g', -1, 64)
 	case "mem_gb":
 		return strconv.FormatFloat(b.MemGB, 'g', -1, 64)
+	case "pids_limit":
+		if b.PidsLimit == 0 {
+			return "unset"
+		}
+		return strconv.Itoa(b.PidsLimit)
+	case "usd":
+		if b.USD == 0 {
+			return "unset"
+		}
+		return strconv.FormatFloat(b.USD, 'g', -1, 64)
+	case "max_retries":
+		if b.MaxRetries == 0 {
+			return "unset"
+		}
+		return strconv.Itoa(b.MaxRetries)
+	case "max_tool_calls":
+		if b.MaxToolCalls == 0 {
+			return "unset"
+		}
+		return strconv.Itoa(b.MaxToolCalls)
 	default:
 		return ""
 	}
@@ -282,8 +392,11 @@ func budgetValue(b Budgets, field string) string {
 // ArmManifest is one arm's resolved config and the hashes of every file laid
 // down for it, per condition.
 type ArmManifest struct {
-	Label      string                       `json:"label"`
-	Config     AgentConfig                  `json:"config"`
-	ConfigHash string                       `json:"config_hash"`
-	Files      map[string]map[string]string `json:"files"` // condition -> path -> sha256
+	Label          string                       `json:"label"`
+	Config         AgentConfig                  `json:"config"`
+	ConfigHash     string                       `json:"config_hash"`
+	Identity       *CanonicalArmIdentity        `json:"identity,omitempty"`
+	BudgetSnapshot *BudgetSnapshot              `json:"budget_snapshot,omitempty"`
+	CapabilityGaps []string                     `json:"capability_gaps,omitempty"`
+	Files          map[string]map[string]string `json:"files"` // condition -> path -> sha256
 }

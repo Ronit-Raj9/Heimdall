@@ -27,6 +27,49 @@ export type ValueState = "observed" | "unknown" | "not_applicable";
 /** Where a value was observed (DESIGN.md 9.5). */
 export type EvidenceLevel = "outcome" | "gateway" | "native" | "boundary";
 
+export type EvidenceSource =
+	| "hidden_grader"
+	| "bifrost_log"
+	| "fault_proxy"
+	| "tool_runner"
+	| "agent_stream"
+	| "workspace_diff"
+	| "process_result"
+	| "inferred"
+	| "unknown";
+
+export type EvidenceStrength = "verified" | "strong" | "partial" | "inferred" | "unknown";
+
+export interface Budgets {
+	wall_s: number;
+	turns?: number;
+	cpus: number;
+	mem_gb: number;
+	pids_limit?: number;
+	usd?: number;
+	max_retries?: number;
+	max_tool_calls?: number;
+}
+
+export interface GatewayPolicy {
+	provider: string;
+	max_retries: number;
+	fallbacks?: string[];
+}
+
+export interface AdapterCapabilities {
+	supports_streaming?: boolean;
+	supports_structured_events?: boolean;
+	supports_tool_events?: boolean;
+	supports_notes_file?: boolean;
+	supports_model_override?: boolean;
+	supports_cancellation?: boolean;
+	supports_resume?: boolean;
+	supports_gateway_headers?: boolean;
+	task_types?: string[];
+	evidence_levels?: EvidenceLevel[];
+}
+
 export type EvidenceQuality = "unknown" | "complete" | "partial";
 
 export interface RunEvidenceContract {
@@ -34,6 +77,8 @@ export interface RunEvidenceContract {
 	available?: string[];
 	missing?: string[];
 	quality: EvidenceQuality;
+	sources?: EvidenceSource[];
+	optional_missing?: string[];
 }
 
 /** Every measured number. Unknown is never rendered or aggregated as zero. `v` is a number only when observed. */
@@ -41,10 +86,157 @@ export interface Value {
 	state: ValueState;
 	v: number | null;
 	evidence?: EvidenceLevel;
+	source?: EvidenceSource;
+	evidence_level?: EvidenceStrength;
 	/** Smallest and largest value the unknown could take, in the metric's unit. */
 	bounds?: [number, number];
 	/** Machine reason code, for example "telemetry_incomplete". */
 	reason?: string;
+}
+
+export interface CanonicalTaskIdentity {
+	suite_id: string;
+	suite_version: string;
+	task_id: string;
+	task_version: string;
+	task_hash: string;
+	condition: string;
+	trial: number;
+}
+
+export interface RunInputIdentity {
+	task_hash: string;
+	run_input_hash: string;
+	condition: string;
+	probe_hash?: string;
+	arm_config_hash: string;
+	model_requested?: string;
+	gateway_provider?: string;
+	gateway_policy_hash?: string;
+	environment_policy_hash?: string;
+}
+
+export interface CanonicalArmIdentity {
+	agent_config_id: string;
+	agent_config_hash: string;
+	adapter_version?: string;
+	agent_version?: string;
+	image_digest?: string;
+	parser_version?: string;
+	model_requested?: string;
+	gateway_provider?: string;
+	gateway_policy: GatewayPolicy;
+	budgets: Budgets;
+	budget_snapshot?: BudgetSnapshot;
+	capabilities?: AdapterCapabilities;
+}
+
+export interface BudgetSnapshot {
+	configured: Budgets;
+	effective: Budgets;
+	source?: Record<string, string>;
+}
+
+export type BudgetParity = "equal" | "declared_difference" | "unexpected_difference";
+
+export interface BudgetParityResult {
+	status: BudgetParity;
+	diffs?: Array<{ field: string; per_arm: Record<string, string> }>;
+	configured_diffs?: Array<{ field: string; per_arm: Record<string, string> }>;
+	effective_diffs?: Array<{ field: string; per_arm: Record<string, string> }>;
+}
+
+export interface MetricEvidence {
+	name: string;
+	value: Value;
+	source: EvidenceSource;
+	evidence_level: EvidenceStrength;
+	unknown_reason?: string;
+}
+
+export interface LogicalRequest {
+	logical_request_id: string;
+	logical_step: number;
+	request_id?: string;
+	status?: string;
+}
+
+export interface AttemptRecord {
+	attempt_id: string;
+	logical_request_id: string;
+	attempt_number: number;
+	reason?: string;
+	provider?: string;
+	model?: string;
+	status?: string;
+	retry_type?: string;
+}
+
+export interface RetryRecord extends AttemptRecord {
+	retry_type: string;
+}
+
+export interface FallbackRecord {
+	fallback_index: number;
+	logical_request_id: string;
+	requested_provider?: string;
+	served_provider?: string;
+	requested_model?: string;
+	served_model?: string;
+	reason?: string;
+}
+
+export interface ToolCallRecord {
+	tool_call_id: string;
+	logical_step: number;
+	tool_name?: string;
+	requested: boolean;
+	executed: boolean;
+	request_source: EvidenceSource;
+	execution_source: EvidenceSource;
+	evidence_level: EvidenceStrength;
+	execution_id?: string;
+	unknown_reason?: string;
+}
+
+export interface ConflictRecord {
+	conflict_type: string;
+	sources: EvidenceSource[];
+	values: string[];
+	resolution: string;
+	confidence: EvidenceStrength;
+}
+
+export interface EvidenceStatus {
+	level: EvidenceStrength;
+	sources?: EvidenceSource[];
+	unknown_reasons?: string[];
+	conflicts?: ConflictRecord[];
+}
+
+export interface CanonicalRun {
+	canonical_version: string;
+	schema_version: string;
+	generated_at: string;
+	run_id: string;
+	experiment: string;
+	task: CanonicalTaskIdentity;
+	run_input: RunInputIdentity;
+	arm: string;
+	agent: CanonicalArmIdentity;
+	budgets: BudgetSnapshot;
+	model_requested?: string;
+	model_served?: string;
+	events?: BenchEvent[];
+	grade?: Grade;
+	gates?: GateResult[];
+	metrics?: Record<string, Value>;
+	evidence_status: EvidenceStatus;
+	logical_steps?: LogicalRequest[];
+	attempts?: AttemptRecord[];
+	retries?: RetryRecord[];
+	fallbacks?: FallbackRecord[];
+	tool_calls?: ToolCallRecord[];
 }
 
 // ---------------------------------------------------------------------------------------------
@@ -110,6 +302,8 @@ export interface Slot {
 	suite: string;
 	task: string;
 	task_version: string;
+	task_hash?: string;
+	run_input_hash?: string;
 	/** Arm id, or "compat" for the compatibility agent. */
 	arm: string;
 	/** "clean" or a probe id. */
@@ -178,6 +372,7 @@ export interface RunAgentInfo {
 	config_hash: string;
 	exit_code?: number;
 	timed_out: boolean;
+	capability_gaps?: string[];
 }
 
 export interface RunGatewayInfo {
@@ -202,11 +397,15 @@ export interface Run {
 	stage: Stage;
 	manifest_hash: string;
 	suite_lock_hash: string;
+	task_hash?: string;
+	run_input_hash?: string;
 	outcome: Outcome;
 	y: Value;
 	claim?: Claim;
 	timing: RunTiming;
 	agent: RunAgentInfo;
+	arm_identity?: CanonicalArmIdentity;
+	budget_snapshot?: BudgetSnapshot;
 	gateway: RunGatewayInfo;
 	failures?: PartFailure[];
 }
@@ -440,6 +639,11 @@ export interface VerdictSpec {
 	assumed_sd: number;
 }
 
+export interface CapabilityRequirements {
+	required?: string[];
+	optional?: string[];
+}
+
 export interface Experiment {
 	/** e_<slug>; set by the planner when empty. */
 	id: string;
@@ -460,6 +664,7 @@ export interface Experiment {
 	concurrency: number;
 	/** agent_exposure | stack_resilience */
 	manifest_mode: string;
+	requirements?: CapabilityRequirements;
 }
 
 // ---------------------------------------------------------------------------------------------
@@ -862,6 +1067,7 @@ export interface RunDetail {
 	gates: GateResult[];
 	receipts: Receipt[];
 	evidence_contract?: RunEvidenceContract;
+	canonical?: CanonicalRun;
 }
 
 /** GET /runs/{id}/events */

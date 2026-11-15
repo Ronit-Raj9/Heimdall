@@ -33,12 +33,14 @@ type AgentNotes struct {
 
 // Budgets are identical across arms unless they are the declared variable.
 type Budgets struct {
-	WallS     int     `json:"wall_s" yaml:"wall_s"`
-	Turns     int     `json:"turns,omitempty" yaml:"turns"`
-	CPUs      float64 `json:"cpus" yaml:"cpus"`
-	MemGB     float64 `json:"mem_gb" yaml:"mem_gb"`
-	PidsLimit int     `json:"pids_limit,omitempty" yaml:"pids_limit"`
-	USD       float64 `json:"usd,omitempty" yaml:"usd"` // per-run virtual key budget, a backstop only
+	WallS        int     `json:"wall_s" yaml:"wall_s"`
+	Turns        int     `json:"turns,omitempty" yaml:"turns"`
+	CPUs         float64 `json:"cpus" yaml:"cpus"`
+	MemGB        float64 `json:"mem_gb" yaml:"mem_gb"`
+	PidsLimit    int     `json:"pids_limit,omitempty" yaml:"pids_limit"`
+	USD          float64 `json:"usd,omitempty" yaml:"usd"` // per-run virtual key budget, a backstop only
+	MaxRetries   int     `json:"max_retries,omitempty" yaml:"max_retries"`
+	MaxToolCalls int     `json:"max_tool_calls,omitempty" yaml:"max_tool_calls"`
 }
 
 // GatewayPolicy is how the run's virtual key routes. A fallback is allowed only

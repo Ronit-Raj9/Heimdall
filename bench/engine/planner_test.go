@@ -261,6 +261,80 @@ func TestPlanBudgetDiffs(t *testing.T) {
 	}
 }
 
+func TestPlanFreezesTaskAndRunInputHashes(t *testing.T) {
+	b := newBench(t)
+	e := testExperiment(
+		schemas.ConditionSpec{ID: "clean", Tasks: schemas.TaskSelector{IDs: []string{"t01"}}, Trials: 2},
+		schemas.ConditionSpec{ID: "stale-notes", Tasks: schemas.TaskSelector{IDs: []string{"t01"}}, Trials: 1},
+	)
+	e.Arms["B"] = schemas.ArmSpec{Set: map[string]any{"model": "claude-other"}}
+	m := b.plan(t, e)
+	if len(m.TaskIdentities) != 3 {
+		t.Fatalf("task identities = %d, want 3", len(m.TaskIdentities))
+	}
+	for _, identity := range m.TaskIdentities {
+		if identity.TaskHash == "" {
+			t.Fatalf("empty task hash: %+v", identity)
+		}
+	}
+	var cleanA, cleanB string
+	for _, slot := range m.Slots {
+		if !slot.Counted || slot.Condition != schemas.ConditionClean || slot.Trial != 1 {
+			continue
+		}
+		if slot.TaskHash == "" || slot.RunInputHash == "" {
+			t.Fatalf("slot hashes missing: %+v", slot)
+		}
+		if _, ok := m.RunInputs[slot.SlotID]; !ok {
+			t.Fatalf("slot %s has no manifest run input", slot.SlotID)
+		}
+		if slot.Arm == "A" {
+			cleanA = slot.RunInputHash
+		} else if slot.Arm == "B" {
+			cleanB = slot.RunInputHash
+		}
+	}
+	if cleanA == "" || cleanB == "" || cleanA == cleanB {
+		t.Fatalf("run input hashes do not distinguish arms: A=%q B=%q", cleanA, cleanB)
+	}
+	if m.Arms["A"].Identity == nil || m.Arms["B"].Identity == nil || m.Arms["A"].Identity.AgentConfigHash == "" || m.Arms["B"].Identity.AgentConfigHash == "" {
+		t.Fatalf("resolved arm identities missing: %+v", m.Arms)
+	}
+}
+
+func TestPlanCapabilityRequirements(t *testing.T) {
+	tests := []struct {
+		name     string
+		required []string
+		optional []string
+		wantErr  string
+		wantGap  string
+	}{
+		{name: "required capability rejects", required: []string{"structured_events"}, wantErr: "lacks required capability"},
+		{name: "optional capability records gap", optional: []string{"structured_events"}, wantGap: "structured_events"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			b := newBench(t)
+			e := testExperiment()
+			e.Requirements = schemas.CapabilityRequirements{Required: tt.required, Optional: tt.optional}
+			m, err := NewPlanner(b.reg, b.root, nil).Plan(context.Background(), e)
+			if tt.wantErr != "" {
+				if err == nil || !strings.Contains(err.Error(), tt.wantErr) {
+					t.Fatalf("err = %v, want %q", err, tt.wantErr)
+				}
+				return
+			}
+			if err != nil {
+				t.Fatal(err)
+			}
+			if !strings.Contains(strings.Join(m.CapabilityGaps["A"], ","), tt.wantGap) {
+				t.Fatalf("capability gaps = %+v", m.CapabilityGaps)
+			}
+		})
+	}
+}
+
 func TestPlanPolicyHash(t *testing.T) {
 	const policyYAML = "policy_version: 1\nname: p\nchecks:\n  - {id: a, metric: steps, max: 1}\n"
 	tests := []struct {

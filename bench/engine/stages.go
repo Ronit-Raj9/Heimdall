@@ -7,6 +7,7 @@ import (
 	"slices"
 	"strings"
 
+	"github.com/maximhq/bifrost/bench/evidence"
 	"github.com/maximhq/bifrost/bench/schemas"
 )
 
@@ -224,6 +225,9 @@ func (p *Pipeline) collect(ctx context.Context, st *runState) error {
 	if st.rc.Agent != nil && st.rc.Agent.Capabilities != nil && st.rc.Agent.Capabilities.SupportsToolEvents {
 		st.ev.Contract.Required = append(st.ev.Contract.Required, "tool_execution")
 	}
+	if st.rc.Run != nil && len(st.rc.Run.Agent.CapabilityGaps) > 0 {
+		st.ev.Contract.OptionalMissing = append([]string(nil), st.rc.Run.Agent.CapabilityGaps...)
+	}
 	for _, src := range p.reg.Evidence {
 		if err := src.Collect(ctx, st.rc, st.ev); err != nil {
 			errs = append(errs, wrapPart("evidence", src, fmt.Errorf("collect: %w", err)))
@@ -234,14 +238,26 @@ func (p *Pipeline) collect(ctx context.Context, st *runState) error {
 	}
 	st.ev.Contract.Available = availableEvidence(st.ev)
 	st.ev.Events = append(st.ev.Events, gatewayIntegrityEvents(st.rc, st.ev.Requests)...)
+	joined := evidence.JoinEvents(st.ev.Events)
+	st.ev.Events = joined.Events
+	st.ev.Status = &schemas.EvidenceStatus{Level: schemas.EvidenceStrong, Conflicts: joined.Conflicts}
+	for _, event := range joined.Events {
+		if event.EvidenceSource != "" && !slices.Contains(st.ev.Contract.Sources, event.EvidenceSource) {
+			st.ev.Contract.Sources = append(st.ev.Contract.Sources, event.EvidenceSource)
+		}
+	}
+	st.ev.Contract.Conflicts = append(st.ev.Contract.Conflicts, joined.Conflicts...)
+	if len(joined.Conflicts) > 0 {
+		st.ev.Status.Level = schemas.EvidencePartial
+	}
 	for _, required := range st.ev.Contract.Required {
 		if !slices.Contains(st.ev.Contract.Available, required) {
 			st.ev.Contract.Missing = append(st.ev.Contract.Missing, required)
 		}
 	}
-	if len(st.ev.Contract.Missing) == 0 {
+	if len(st.ev.Contract.Missing) == 0 && len(st.ev.Contract.OptionalMissing) == 0 {
 		st.ev.Contract.Quality = schemas.EvidenceQualityComplete
-	} else if len(st.ev.Contract.Available) > 0 {
+	} else if len(st.ev.Contract.Available) > 0 || len(st.ev.Contract.OptionalMissing) > 0 || len(joined.Conflicts) > 0 {
 		st.ev.Contract.Quality = schemas.EvidenceQualityPartial
 	}
 	return errors.Join(errs...)

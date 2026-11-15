@@ -29,7 +29,8 @@ const (
 	FileSeal     = "seal.json"
 	// FileEvidence is read internally for the gateway completeness flag and
 	// never served: it holds the gateway rows.
-	FileEvidence = "evidence.json"
+	FileEvidence  = "evidence.json"
+	FileCanonical = "canonical.json"
 )
 
 // runFileTypes is the allowlist of run files the API serves, with the type
@@ -37,15 +38,16 @@ const (
 // left out on purpose: content logs can hold secrets the agent printed and
 // stay local (DESIGN.md 14). Nothing is ever served as HTML.
 var runFileTypes = map[string]string{
-	FileRun:      "application/json; charset=utf-8",
-	FileEvents:   "application/x-ndjson; charset=utf-8",
-	FileDiff:     "text/plain; charset=utf-8",
-	FileReceipts: "application/json; charset=utf-8",
-	FileMetrics:  "application/json; charset=utf-8",
-	FileGates:    "application/json; charset=utf-8",
-	FileGrade:    "application/json; charset=utf-8",
-	FileCost:     "application/json; charset=utf-8",
-	FileSeal:     "application/json; charset=utf-8",
+	FileRun:       "application/json; charset=utf-8",
+	FileEvents:    "application/x-ndjson; charset=utf-8",
+	FileDiff:      "text/plain; charset=utf-8",
+	FileReceipts:  "application/json; charset=utf-8",
+	FileMetrics:   "application/json; charset=utf-8",
+	FileGates:     "application/json; charset=utf-8",
+	FileGrade:     "application/json; charset=utf-8",
+	FileCost:      "application/json; charset=utf-8",
+	FileSeal:      "application/json; charset=utf-8",
+	FileCanonical: "application/json; charset=utf-8",
 }
 
 // RunsHandler serves one run: its record, events, diff, receipts and files.
@@ -105,6 +107,15 @@ func (h *RunsHandler) getRun(ctx *fasthttp.RequestCtx) {
 		return
 	}
 	out.Evidence = evidence.Contract
+	var canonical schemas.CanonicalRun
+	if found, err := readJSONFile(h.index, id, FileCanonical, &canonical); err != nil {
+		sendDepError(ctx, h.mode, "read canonical run "+id, err)
+		return
+	} else if found {
+		out.Canonical = &canonical
+	} else {
+		out.Canonical = legacyCanonicalView(rv)
+	}
 	for name, dst := range map[string]any{FileGates: &out.Gates, FileReceipts: &out.Receipts} {
 		if _, err := readJSONFile(h.index, id, name, dst); err != nil {
 			sendDepError(ctx, h.mode, "read "+name+" of run "+id, err)
@@ -119,6 +130,33 @@ func (h *RunsHandler) getRun(ctx *fasthttp.RequestCtx) {
 		out.Receipts = []schemas.Receipt{}
 	}
 	lib.SendJSON(ctx, h.mode, fasthttp.StatusOK, out)
+}
+
+// legacyCanonicalView gives old sealed runs a read-only canonical shape. It
+// carries only identity that was already stored in the legacy run and marks
+// the missing evidence explicitly. It never writes or upgrades the old run.
+func legacyCanonicalView(rv *RunView) *schemas.CanonicalRun {
+	if rv == nil {
+		return nil
+	}
+	run := rv.Run
+	return &schemas.CanonicalRun{
+		CanonicalVersion: "legacy",
+		SchemaVersion:    "legacy",
+		RunID:            run.RunID,
+		Experiment:       run.ExpID,
+		Task: schemas.CanonicalTaskIdentity{
+			SuiteID:     rv.Slot.Suite,
+			TaskID:      rv.Slot.Task,
+			TaskVersion: rv.Slot.TaskVersion,
+			TaskHash:    rv.Slot.TaskHash,
+			Condition:   rv.Slot.Condition,
+			Trial:       rv.Slot.Trial,
+		},
+		Arm:            rv.Slot.Arm,
+		ModelRequested: "",
+		EvidenceStatus: schemas.EvidenceStatus{Level: schemas.EvidenceUnknown, UnknownReasons: []string{"legacy run has no canonical.json"}},
+	}
 }
 
 // getRunEvents handles GET /api/bench/runs/{id}/events.

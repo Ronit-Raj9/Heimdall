@@ -132,6 +132,7 @@ type RunDetail struct {
 	Gates       []GateResult         `json:"gates"`
 	Receipts    []Receipt            `json:"receipts"`
 	Evidence    *RunEvidenceContract `json:"evidence_contract,omitempty"`
+	Canonical   *CanonicalRun        `json:"canonical,omitempty"`
 }
 
 // RunDiff is GET /runs/{id}/diff. Patch is inert text.

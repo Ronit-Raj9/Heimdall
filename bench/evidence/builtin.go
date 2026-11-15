@@ -156,7 +156,14 @@ const eventsFile = "events.jsonl"
 // set after the last source and stays whole when a source is removed or
 // fails (DESIGN.md 16.1 assigns the file to evidence).
 func writeEvents(rc *schemas.RunContext, ev *schemas.Evidence) error {
-	if err := writeJSONL(rc.Dir, eventsFile, ev.Events); err != nil {
+	events := make([]schemas.Event, len(ev.Events))
+	copy(events, ev.Events)
+	for i := range events {
+		events[i].Summary = utils.RedactSecrets(events[i].Summary)
+		events[i].Target = utils.RedactSecrets(events[i].Target)
+	}
+	ev.Events = events
+	if err := writeJSONL(rc.Dir, eventsFile, events); err != nil {
 		return fmt.Errorf("write events for run %s: %w", runID(rc), err)
 	}
 	return nil

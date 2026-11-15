@@ -10,3 +10,4 @@ metrics
 gates
 receipts
 evidence_contract?
+canonical?

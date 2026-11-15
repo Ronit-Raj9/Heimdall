@@ -44,7 +44,9 @@
         "cpus": {"type": "number", "exclusiveMinimum": 0},
         "mem_gb": {"type": "number", "exclusiveMinimum": 0},
         "pids_limit": {"type": "integer", "minimum": 0},
-        "usd": {"type": "number", "minimum": 0}
+        "usd": {"type": "number", "minimum": 0},
+        "max_retries": {"type": "integer", "minimum": 0},
+        "max_tool_calls": {"type": "integer", "minimum": 0}
       }
     },
     "gateway": {

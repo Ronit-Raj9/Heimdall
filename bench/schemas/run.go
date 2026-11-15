@@ -4,17 +4,19 @@ import "time"
 
 // Slot is one assigned (task, arm, condition, trial). A slot is never dropped.
 type Slot struct {
-	SlotID      string `json:"slot_id"`
-	PairID      string `json:"pair_id"` // the slots of all arms for one (task, condition, trial)
-	ExpID       string `json:"exp_id"`
-	Suite       string `json:"suite"`
-	Task        string `json:"task"`
-	TaskVersion string `json:"task_version"`
-	Arm         string `json:"arm"`       // arm id, or "compat" for the compatibility agent
-	Condition   string `json:"condition"` // clean or a probe id
-	Trial       int    `json:"trial"`     // 1-based
-	OrderIndex  int    `json:"order_index"`
-	Counted     bool   `json:"counted"` // false for compatibility runs; they never enter the verdict
+	SlotID       string `json:"slot_id"`
+	PairID       string `json:"pair_id"` // the slots of all arms for one (task, condition, trial)
+	ExpID        string `json:"exp_id"`
+	Suite        string `json:"suite"`
+	Task         string `json:"task"`
+	TaskVersion  string `json:"task_version"`
+	TaskHash     string `json:"task_hash,omitempty"`
+	RunInputHash string `json:"run_input_hash,omitempty"`
+	Arm          string `json:"arm"`       // arm id, or "compat" for the compatibility agent
+	Condition    string `json:"condition"` // clean or a probe id
+	Trial        int    `json:"trial"`     // 1-based
+	OrderIndex   int    `json:"order_index"`
+	Counted      bool   `json:"counted"` // false for compatibility runs; they never enter the verdict
 }
 
 // Stage is one step of the slot pipeline (DESIGN.md 8.2). This list is the
@@ -78,21 +80,26 @@ func (o Outcome) Score() (y float64, ok bool) {
 
 // Run is one execution of a slot. A slot has exactly one counted run.
 type Run struct {
-	RunID         string         `json:"run_id"`
-	SlotID        string         `json:"slot_id"`
-	PairID        string         `json:"pair_id"`
-	ExpID         string         `json:"exp_id"`
-	Attempt       int            `json:"attempt"` // 1-based; >1 only after aborted_infra
-	Stage         Stage          `json:"stage"`   // last completed stage
-	ManifestHash  string         `json:"manifest_hash"`
-	SuiteLockHash string         `json:"suite_lock_hash"`
-	Outcome       Outcome        `json:"outcome"`
-	Y             Value          `json:"y"`
-	Claim         *Claim         `json:"claim,omitempty"`
-	Timing        RunTiming      `json:"timing"`
-	Agent         RunAgentInfo   `json:"agent"`
-	Gateway       RunGatewayInfo `json:"gateway"`
-	Failures      []PartFailure  `json:"failures,omitempty"`
+	RunID          string                `json:"run_id"`
+	SlotID         string                `json:"slot_id"`
+	PairID         string                `json:"pair_id"`
+	ExpID          string                `json:"exp_id"`
+	Attempt        int                   `json:"attempt"` // 1-based; >1 only after aborted_infra
+	Stage          Stage                 `json:"stage"`   // last completed stage
+	ManifestHash   string                `json:"manifest_hash"`
+	SuiteLockHash  string                `json:"suite_lock_hash"`
+	TaskHash       string                `json:"task_hash,omitempty"`
+	RunInputHash   string                `json:"run_input_hash,omitempty"`
+	CanonicalHash  string                `json:"canonical_hash,omitempty"`
+	Outcome        Outcome               `json:"outcome"`
+	Y              Value                 `json:"y"`
+	Claim          *Claim                `json:"claim,omitempty"`
+	Timing         RunTiming             `json:"timing"`
+	Agent          RunAgentInfo          `json:"agent"`
+	ArmIdentity    *CanonicalArmIdentity `json:"arm_identity,omitempty"`
+	BudgetSnapshot *BudgetSnapshot       `json:"budget_snapshot,omitempty"`
+	Gateway        RunGatewayInfo        `json:"gateway"`
+	Failures       []PartFailure         `json:"failures,omitempty"`
 }
 
 // RunTiming records when the run passed its milestones.
@@ -105,16 +112,17 @@ type RunTiming struct {
 
 // RunAgentInfo identifies the system under test for this run.
 type RunAgentInfo struct {
-	ConfigID      string               `json:"config_id"`
-	Adapter       string               `json:"adapter"`
-	Parser        string               `json:"parser,omitempty"`
-	ConfigHash    string               `json:"config_hash"`
-	AgentVersion  string               `json:"agent_version,omitempty"`
-	ImageDigest   string               `json:"image_digest,omitempty"`
-	ParserVersion string               `json:"parser_version,omitempty"`
-	Capabilities  *AdapterCapabilities `json:"capabilities,omitempty"`
-	ExitCode      *int                 `json:"exit_code,omitempty"`
-	TimedOut      bool                 `json:"timed_out"`
+	ConfigID       string               `json:"config_id"`
+	Adapter        string               `json:"adapter"`
+	Parser         string               `json:"parser,omitempty"`
+	ConfigHash     string               `json:"config_hash"`
+	AgentVersion   string               `json:"agent_version,omitempty"`
+	ImageDigest    string               `json:"image_digest,omitempty"`
+	ParserVersion  string               `json:"parser_version,omitempty"`
+	Capabilities   *AdapterCapabilities `json:"capabilities,omitempty"`
+	CapabilityGaps []string             `json:"capability_gaps,omitempty"`
+	ExitCode       *int                 `json:"exit_code,omitempty"`
+	TimedOut       bool                 `json:"timed_out"`
 }
 
 // RunGatewayInfo links the run to its gateway records.

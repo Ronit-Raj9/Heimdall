@@ -58,3 +58,21 @@ func TestTaskSelectorYAMLRoundTrip(t *testing.T) {
 		}
 	}
 }
+
+func TestBudgetParityIncludesConfiguredAndEffectiveLimits(t *testing.T) {
+	e := &Experiment{Arms: map[string]ArmSpec{"A": {}, "B": {}}}
+	base := func(wall int, retries int) ArmManifest {
+		return ArmManifest{Config: AgentConfig{Budgets: Budgets{WallS: wall, MaxRetries: retries}}, BudgetSnapshot: &BudgetSnapshot{
+			Configured: Budgets{WallS: wall, MaxRetries: retries}, Effective: Budgets{WallS: wall, MaxRetries: retries},
+		}}
+	}
+	parity := BudgetParityOf(e, map[string]ArmManifest{"A": base(60, 1), "B": base(30, 2)})
+	if parity.Status != BudgetParityUnexpectedDifference || len(parity.ConfiguredDiffs) == 0 || len(parity.EffectiveDiffs) == 0 {
+		t.Fatalf("parity = %+v", parity)
+	}
+	e.Arms["B"] = ArmSpec{Set: map[string]any{"budgets.wall_s": 30, "budgets.max_retries": 2}}
+	parity = BudgetParityOf(e, map[string]ArmManifest{"A": base(60, 1), "B": base(30, 2)})
+	if parity.Status != BudgetParityDeclaredDifference {
+		t.Fatalf("declared parity = %+v", parity)
+	}
+}
