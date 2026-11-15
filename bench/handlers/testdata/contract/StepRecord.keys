@@ -1,0 +1,26 @@
+# Keys of bench.ts `StepRecord` (schemas/steps.go), in RunSteps.steps.
+# Every string is agent-influenced display text: rendered as inert text only.
+seq
+ts
+kind
+source
+proof
+turn
+summary
+session?
+request_id?
+attempt?
+tool_call_id?
+tool_name?
+pid?
+ppid?
+path?
+op?
+exit_code?
+duration_ms?
+is_error?
+execution?
+witnessed_by?
+witness_of?
+counted?
+conflict?

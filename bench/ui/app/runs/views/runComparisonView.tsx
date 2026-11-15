@@ -9,6 +9,7 @@ import { MetricStrip } from "@/components/runs/metricStrip";
 import { PairPicker } from "@/components/runs/pairPicker";
 import { RunScenarioEvidence } from "@/components/runs/runScenario";
 import { TraceDownloadLink } from "@/components/runs/runTraceLink";
+import { RunStepTimeline } from "@/components/runs/stepTimeline";
 import { indexEvents, stripMetricKinds } from "@/components/runs/runs.utils";
 import { BlockSkeleton, EmptyNote, LoadError, Section } from "@/components/runs/screenStates";
 import { hasScenarioEvidence } from "@/components/scenario/scenario.utils";
@@ -174,6 +175,23 @@ function PairComparison({ pairId, onClear }: { pairId: string; onClear: () => vo
 						<GatewayLaneBlock key={lane.pairRun.arm} lane={lane} />
 					))}
 				</div>
+			</Section>
+
+			<Section title={t("runs.steps.title")} description={t("runs.steps.description")} testId="runs-steps-section">
+				<Tabs defaultValue={lanes[0].pairRun.arm}>
+					<TabsList>
+						{lanes.map((lane) => (
+							<TabsTrigger key={lane.pairRun.arm} value={lane.pairRun.arm} data-testid={`runs-steps-tab-${lane.pairRun.arm}`}>
+								{t("runs.arm", { arm: lane.pairRun.arm })}
+							</TabsTrigger>
+						))}
+					</TabsList>
+					{lanes.map((lane) => (
+						<TabsContent key={lane.pairRun.arm} value={lane.pairRun.arm}>
+							<RunStepTimeline runId={lane.pairRun.run.run_id} arm={lane.pairRun.arm} />
+						</TabsContent>
+					))}
+				</Tabs>
 			</Section>
 
 			<Section title={t("runs.diff.title")} description={t("runs.diff.description")} testId="runs-diff-section">

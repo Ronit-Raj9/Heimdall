@@ -46,6 +46,7 @@ export const FIXTURE_ROUTES: readonly FixtureRoute[] = [
 	{ method: "GET", pattern: "/runs/:id/events", file: "runs.{id}.events.json" },
 	{ method: "GET", pattern: "/runs/:id/diff", file: "runs.{id}.diff.json" },
 	{ method: "GET", pattern: "/runs/:id/receipts", file: "runs.{id}.receipts.json" },
+	{ method: "GET", pattern: "/runs/:id/steps", file: "runs.{id}.steps.json" }, // Agent step timeline (stepTimeline.tsx)
 	{ method: "GET", pattern: "/pairs/:id", file: "pairs.{id}.json" },
 	{ method: "POST", pattern: "/audit", file: "audit.json" },
 	{ method: "POST", pattern: "/regrade", file: "regrade.json" },

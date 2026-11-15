@@ -49,6 +49,8 @@ func Builtin(deps Deps) []schemas.EvidenceSource {
 		newShimLogSource(deps),
 		newCostSource(deps),
 		newToolLedgerSource(deps), // tool proxy ledger (Tool proxy and MCP)
+		// Agent steps area: observers and the unified step timeline; runs last.
+		newStepTimelineSource(deps),
 	}
 }
 

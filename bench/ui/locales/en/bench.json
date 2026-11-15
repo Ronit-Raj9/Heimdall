@@ -274,7 +274,7 @@
 			"reliabilityHint": "pass^k: the chance that all k tries of a task succeed, mean over tasks. k is min(3, the fewest trials per task among the experiments that repeat tasks) unless the query sets it.",
 			"cost_per_success": "Cost / success",
 			"cost_per_successHint": "Total observed cost over verified successes. n/a with no success.",
-			"steps": "Steps",
+			"steps": "Steps (model turns)",
 			"stepsHint": "Median over runs.",
 			"tool_calls": "Tool calls",
 			"tool_callsHint": "Median over runs.",
@@ -694,6 +694,102 @@
 			"files": "Files",
 			"rejected": "Left out of the export",
 			"loadError": "Could not load the diff."
+		},
+		"steps": {
+			"title": "Agent steps",
+			"description": "Every witness on one timeline, grouped by model turn: the turn, then the commands, file changes and tool calls it caused. Agent-written text is shown as plain text.",
+			"label": "Step timeline of arm {{arm}}",
+			"unavailable": "No step timeline recorded for this run",
+			"loadError": "Could not load the step timeline.",
+			"counted": "Steps (model turns): {{count}}",
+			"shown": "{{shown}} of {{total}} rows shown",
+			"truncated": "The timeline is longer than one response carries: the first {{count}} rows are shown.",
+			"skipped_one": "{{count}} line of the timeline file did not parse and is left out.",
+			"skipped_other": "{{count}} lines of the timeline file did not parse and are left out.",
+			"filter": "Sources",
+			"filterAria": "Show or hide rows from {{source}}",
+			"turn": "Turn {{turn}}",
+			"beforeFirst": "Before the first model response",
+			"session": "session {{session}}",
+			"empty": "The timeline has no rows.",
+			"noRows": "No rows from the selected sources.",
+			"proof": "proof {{level}}",
+			"countedBadge": "counted",
+			"countedHint": "Counts toward Steps (model turns).",
+			"conflict": "conflict",
+			"conflictHint": "Witnesses disagree",
+			"error": "error",
+			"exit": "exit {{code}}",
+			"pid": "pid {{pid}}",
+			"attempt": "attempt {{attempt}}",
+			"ms": "{{value}} ms",
+			"witnessOf": "witnesses #{{seq}}",
+			"witnessedBy": "witnessed by {{seqs}}",
+			"source": {
+				"gateway": "gateway",
+				"tool_proxy": "tool proxy",
+				"process_observer": "process observer",
+				"workspace_observer": "workspace observer",
+				"agent_stream": "agent stream",
+				"shim": "shim",
+				"network_observer": "network observer"
+			},
+			"sourceHint": {
+				"gateway": "Bifrost request log (trusted)",
+				"tool_proxy": "Per-run tool proxy ledger (trusted)",
+				"process_observer": "Process observer beside the agent (trusted)",
+				"workspace_observer": "Workspace activity observer (trusted)",
+				"agent_stream": "The agent's own stream (agent-reported)",
+				"shim": "Tool shim log (boundary)",
+				"network_observer": "Passive network observer (trusted)"
+			},
+			"proofLevel": {
+				"verified": "verified",
+				"strong": "strong",
+				"partial": "partial",
+				"inferred": "inferred",
+				"unknown": "unknown"
+			},
+			"kind": {
+				"model_turn": "model turn",
+				"model_attempt": "model attempt",
+				"tool_request": "tool request",
+				"tool_execution": "tool execution",
+				"command": "command",
+				"file_change": "file change",
+				"network": "network",
+				"agent_event": "agent event"
+			},
+			"execution": {
+				"executed_with_proof": "executed, witnessed",
+				"executed_agent_reported": "executed, agent-reported only",
+				"no_witness": "no witness"
+			},
+			"executionHint": {
+				"executed_with_proof": "A trusted witness saw the call run.",
+				"executed_agent_reported": "Only the agent's own stream says the call ran.",
+				"no_witness": "Nothing shows the call ran."
+			},
+			"observers": {
+				"title": "Observers",
+				"none": "No observer status recorded for this run.",
+				"name": {
+					"process": "Process observer",
+					"workspace": "Workspace observer"
+				},
+				"state": {
+					"observed": "observed",
+					"off": "off",
+					"missing": "missing"
+				},
+				"interval": "every {{value}} ms",
+				"coverage": "coverage",
+				"records_one": "{{value}} record",
+				"records_other": "{{value}} records",
+				"dropped": "{{value}} dropped",
+				"pids": "{{seen}} of {{allocated}} PIDs seen",
+				"reason": "reason:"
+			}
 		},
 		"scenario": {
 			"title": "Scenario evidence",

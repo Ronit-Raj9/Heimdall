@@ -167,6 +167,10 @@ type ToolCallRecord struct {
 	Evidence        EvidenceStrength `json:"evidence_level"`
 	ExecutionID     string           `json:"execution_id,omitempty"`
 	UnknownReason   string           `json:"unknown_reason,omitempty"`
+	// Proof says how the execution is known: executed_with_proof,
+	// executed_agent_reported or no_witness (steps.go). Empty on runs
+	// recorded before the step timeline.
+	Proof string `json:"proof,omitempty"`
 }
 
 // ConflictRecord records contradictory observations for one joined fact.

@@ -105,6 +105,8 @@ bytes, and a re-export to a backend lands on the same trace.
 | `chat <model>` | client | the session whose time holds it, else run | gateway rows of one logical model request (a fallback row joins the row it fell back from) | first request to last response |
 | `tool_call <tool>` | internal | the `chat` span that asked for it | a tool call the model requested (`Evidence.RequestedTools`, else the gateway rows) | from the response that asked for it to the first later request that carried its result back; zero length if the result never came back |
 | `execute_tool <tool>` | internal | its session, else run | the tool proxy ledger (`Evidence.ToolCalls`): what actually ran | call start plus latency |
+| `command <program>` | internal | the `chat` span of the row's turn; turn 0 (before the first response), or a turn with no `chat` span, under its session span, else run | a `command` row of the step timeline (`Evidence.Steps`, the process observer); the program is the first word of the row's summary without its directory | process start plus its recorded duration; zero length when it has none |
+| `file_change <op>` | internal | as for `command` | a `file_change` row of the step timeline (the workspace observer) | zero length, at the time the observer saw it |
 | `heimdall.grade` | internal | run | `Evidence.Grade` | the grade stage (`transitions.jsonl`) |
 | `heimdall.gate <gate>` | internal | run | `Evidence.Gates`, one per gate | the gate stage |
 
@@ -121,7 +123,14 @@ Status: a `chat` span whose last row failed, an `execute_tool` span with a tool
 error, a session that crashed or timed out, a fired veto or invalidate gate, an
 invalid evaluator, and a run whose outcome is `infra_error`, `aborted_infra`,
 `invalid_evaluator` or `integrity_violation` have status ERROR. Nothing is
-marked OK.
+marked OK. A `command` span with a non-zero exit code has status ERROR too.
+
+Timeline spans (`command`, `file_change`) come from the run's step timeline
+([steps-and-evidence.md](steps-and-evidence.md)), one per row, including the
+rows that witness a tool call and are not counted again by `agent_steps`. A
+file change happens after the turn's response, outside the `chat` span's own
+window, so it is a child span rather than an event of that span. Their span id
+key is `step:<seq>`. A run without a timeline adds none.
 
 ### Attributes
 
@@ -170,6 +179,13 @@ Everything else is under `heimdall.*`:
   `undelivered` when true.
 - `tool_call`: `heimdall.tool.args_sha256`, `heimdall.tool.result_returned`,
   `heimdall.tool.executed` (only when an execution source recorded it).
+- `command` and `file_change`: `heimdall.step.kind`, `heimdall.step.seq`,
+  `heimdall.step.turn`, `heimdall.step.source`, `heimdall.step.proof`,
+  `heimdall.step.summary` (redacted, capped), `heimdall.step.counted` (when
+  true), `heimdall.step.witness_of` (when set), `heimdall.step.conflict` (when
+  set), `heimdall.session.index` (multi-session runs). `command` adds
+  `process.pid`, `process.parent_pid` and `process.exit.code` (each when
+  known); `file_change` adds `heimdall.file.op` and `file.path`.
 - Grade and gates: `heimdall.grade.*` (passed, invalid evaluator, test counts,
   reason, mode, reward, `dimension.<name>`, failed tests) and
   `heimdall.gate.*` (name, version, effect, fired, detail, evidence).

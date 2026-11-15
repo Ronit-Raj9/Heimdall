@@ -71,6 +71,7 @@ func (h *RunsHandler) RegisterRoutes(r *router.Router, middlewares ...lib.Middle
 	r.GET(p+"/files/{name}", lib.ChainMiddlewares(h.getRunFile, middlewares...))
 	r.GET(p+"/artifacts/{artifact}/{name}", lib.ChainMiddlewares(h.getRunArtifact, middlewares...)) // artifact files (handlers/runartifacts.go)
 	r.GET(p+"/otlp", lib.ChainMiddlewares(h.getRunOTLP, middlewares...))                            // OpenTelemetry trace download (handlers/runotlp.go)
+	r.GET(p+"/steps", lib.ChainMiddlewares(h.getRunSteps, middlewares...))                          // unified step timeline (handlers/runsteps.go)
 }
 
 // getRun handles GET /api/bench/runs/{id}: the run record with its grade,
