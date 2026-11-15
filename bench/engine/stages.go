@@ -188,6 +188,9 @@ func (p *Pipeline) collect(ctx context.Context, st *runState) error {
 	if st.rc.Agent != nil && st.rc.Agent.Capabilities != nil && st.rc.Agent.Capabilities.SupportsToolEvents {
 		st.ev.Contract.Required = append(st.ev.Contract.Required, "tool_execution")
 	}
+	if st.rc.Probe != nil && st.rc.Probe.Layer == schemas.LayerAdapter {
+		st.ev.Contract.Required = append(st.ev.Contract.Required, "adapter_fault_controller")
+	}
 	if st.rc.Run != nil && len(st.rc.Run.Agent.CapabilityGaps) > 0 {
 		st.ev.Contract.OptionalMissing = append([]string(nil), st.rc.Run.Agent.CapabilityGaps...)
 	}
@@ -285,6 +288,9 @@ func availableEvidence(ev *schemas.Evidence) []string {
 	}
 	if ev.AgentTrace != nil && ev.AgentTrace.Quality != schemas.TraceQualityUnavailable {
 		out = append(out, "agent_trace")
+	}
+	if ev.AdapterFault != nil && ev.AdapterFault.Complete {
+		out = append(out, "adapter_fault_controller")
 	}
 	return out
 }
@@ -441,6 +447,11 @@ func clearGatewayRequestBodies(ev *schemas.Evidence) {
 // after a failed Create.
 func (p *Pipeline) cleanup(ctx context.Context, st *runState) error {
 	var errs []error
+	if p.reg.AdapterFaults != nil {
+		if err := p.reg.AdapterFaults.Cleanup(ctx, st.rc); err != nil {
+			errs = append(errs, &partError{part: "adapter_faults", err: fmt.Errorf("cleanup: %w", err)})
+		}
+	}
 	if cleanup, ok := st.adapter.(schemas.AdapterCleanup); ok {
 		if err := cleanup.Cleanup(ctx, st.rc); err != nil {
 			errs = append(errs, wrapPart("adapter", st.adapter, fmt.Errorf("cleanup: %w", err)))

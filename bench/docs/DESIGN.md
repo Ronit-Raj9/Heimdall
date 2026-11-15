@@ -295,7 +295,7 @@ The engine is a fixed pipeline of stages. Each stage calls the registered parts 
 | Environment | `Environment` | `docker_workspace` | `suite.yaml` |
 | Agent | `AgentAdapter` | `command` (any CLI in a container), `scripted` | `agents/*.yaml` |
 | Agent output parser | `Parser` | `claudecode` | `agents/*.yaml` (`parser:`) |
-| Probe layer | `ProbeLayer` | `fixture`, `gateway`, `tool_shim` | `benchmarks/<name>/probes/*.yaml` |
+| Probe layer | `ProbeLayer` | `fixture`, `gateway`, `tool_shim`, `adapter` | `benchmarks/<name>/probes/*.yaml` |
 | Evidence source | `EvidenceSource` | `gateway`, `proxy_ledger`, `agent_stream`, `shim_log` | Always on |
 | Grader | `Grader` | `hidden_tests` | `suite.yaml` |
 | Gate | `Gate` | G1, G2, G4, G6, G8, egress | Baseline gates are always on. `experiment.yaml` (`extra_gates:`) can only add |

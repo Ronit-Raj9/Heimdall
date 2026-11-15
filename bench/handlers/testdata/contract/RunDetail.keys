@@ -19,3 +19,4 @@ services?
 artifacts?
 evidence_contract?
 canonical?
+adapter_fault?

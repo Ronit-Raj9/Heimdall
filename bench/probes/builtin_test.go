@@ -13,7 +13,7 @@ import (
 
 func TestBuiltin(t *testing.T) {
 	layers := Builtin(Deps{HelperImage: "helper:1"})
-	want := []schemas.ProbeLayerName{schemas.LayerFixture, schemas.LayerToolShim, schemas.LayerGateway, schemas.LayerTool, schemas.LayerService}
+	want := []schemas.ProbeLayerName{schemas.LayerFixture, schemas.LayerToolShim, schemas.LayerGateway, schemas.LayerTool, schemas.LayerService, schemas.LayerAdapter}
 	if len(layers) != len(want) {
 		t.Fatalf("got %d layers, want %d", len(layers), len(want))
 	}

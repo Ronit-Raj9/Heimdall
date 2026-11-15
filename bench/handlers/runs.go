@@ -112,13 +112,15 @@ func (h *RunsHandler) getRun(ctx *fasthttp.RequestCtx) {
 		out.Grade = &grade
 	}
 	var evidence struct {
-		Contract *schemas.RunEvidenceContract `json:"evidence_contract,omitempty"`
+		Contract     *schemas.RunEvidenceContract  `json:"evidence_contract,omitempty"`
+		AdapterFault *schemas.AdapterFaultEvidence `json:"adapter_fault,omitempty"`
 	}
 	if _, err := readJSONFile(h.index, id, FileEvidence, &evidence); err != nil {
 		sendDepError(ctx, h.mode, "read evidence of run "+id, err)
 		return
 	}
 	out.Evidence = evidence.Contract
+	out.AdapterFault = evidence.AdapterFault
 	var canonical schemas.CanonicalRun
 	if found, err := readJSONFile(h.index, id, FileCanonical, &canonical); err != nil {
 		sendDepError(ctx, h.mode, "read canonical run "+id, err)
@@ -322,7 +324,7 @@ func (h *RunsHandler) getRunEvidence(ctx *fasthttp.RequestCtx) {
 // session index emitted by the scenario runner.
 func rawEvidenceNameOK(name string) bool {
 	switch name {
-	case "gateway.raw.jsonl", "gateway.requests.jsonl", "proxy.ledger.jsonl", "tools.jsonl", "agent.stream.jsonl", "agent.stderr.txt":
+	case "gateway.raw.jsonl", "gateway.requests.jsonl", "proxy.ledger.jsonl", "tools.jsonl", "agent.stream.jsonl", "agent.stderr.txt", "adapter.fault.json", "adapter.fault.jsonl":
 		return true
 	}
 	for _, prefix := range []string{"agent.stream.", "agent.stderr."} {

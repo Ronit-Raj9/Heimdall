@@ -171,19 +171,21 @@ type Lease struct {
 
 // RunContext is everything a part needs for one run. The engine builds it.
 type RunContext struct {
-	Experiment *Experiment
-	Manifest   *Manifest
-	Suite      *Suite
-	Task       *Task
-	Slot       *Slot
-	Run        *Run
-	Agent      *AgentConfig // resolved config for the slot's arm
-	Probe      *ProbeSpec   // nil for clean
-	Handle     *EnvironmentHandle
-	Key        *RunKey
-	Exec       *ExecResult
-	Dir        string // the run folder
-	Logger     Logger
+	FaultRuntime  *AdapterFaultRuntime // ephemeral secrets; never serialized
+	FaultSessions []string             // sessions actually started
+	Experiment    *Experiment
+	Manifest      *Manifest
+	Suite         *Suite
+	Task          *Task
+	Slot          *Slot
+	Run           *Run
+	Agent         *AgentConfig // resolved config for the slot's arm
+	Probe         *ProbeSpec   // nil for clean
+	Handle        *EnvironmentHandle
+	Key           *RunKey
+	Exec          *ExecResult
+	Dir           string // the run folder
+	Logger        Logger
 
 	// Scenario state (scenario.go), set by the engine as the run proceeds.
 	Services     []ServiceHandle // started services, including the tool proxy's view of them

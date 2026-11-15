@@ -438,6 +438,7 @@ func (p *Pipeline) canonicalRun(st *runState, gates []schemas.GateResult) (*sche
 		Grade: st.ev.Grade, Gates: append([]schemas.GateResult(nil), gates...), Metrics: st.metrics,
 		EvidenceStatus: status, AgentTrace: st.ev.AgentTrace, LogicalSteps: st.ev.LogicalSteps, Attempts: st.ev.Attempts,
 		Retries: st.ev.Retries, Fallbacks: st.ev.Fallbacks, ToolCalls: st.ev.RequestedTools,
+		AdapterFault: st.ev.AdapterFault,
 	}, nil
 }
 

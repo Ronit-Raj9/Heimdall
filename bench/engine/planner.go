@@ -2,6 +2,7 @@ package engine
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"math/rand/v2"
@@ -335,6 +336,16 @@ func (p *Planner) checkParts(e *schemas.Experiment, suite *schemas.Suite, conds 
 		if _, ok := findPart(p.reg.ProbeLayers, string(c.probe.Layer)); !ok {
 			errs = append(errs, fmt.Errorf("probe %s: layer %q is not registered", c.id, c.probe.Layer))
 		}
+		if c.probe.Layer == schemas.LayerAdapter {
+			if p.reg.AdapterFaults == nil {
+				errs = append(errs, fmt.Errorf("probe %s: adapter fault controller is not registered", c.id))
+			}
+			if c.probe.Apply.AdapterFault == nil {
+				errs = append(errs, fmt.Errorf("probe %s: adapter_fault rule is required", c.id))
+			} else if err := validateAdapterFaultSupport(p.reg, c.probe.Apply.AdapterFault, e); err != nil {
+				errs = append(errs, fmt.Errorf("probe %s: %w", c.id, err))
+			}
+		}
 	}
 	for _, g := range e.ExtraGates {
 		if _, ok := findPart(p.reg.Gates, g); !ok {
@@ -359,6 +370,39 @@ func (p *Planner) checkParts(e *schemas.Experiment, suite *schemas.Suite, conds 
 		}
 	}
 	return errors.Join(errs...)
+}
+
+func validateAdapterFaultSupport(reg *schemas.Registry, rule *schemas.AdapterFaultRule, e *schemas.Experiment) error {
+	if err := validateAdapterFaultRule(*rule); err != nil {
+		return err
+	}
+	_ = reg
+	_ = e
+	return nil
+}
+
+func validateAdapterFaultRule(r schemas.AdapterFaultRule) error {
+	if r.Kind != "tool" && r.Kind != "memory" && r.Kind != "browser" && r.Kind != "retry" {
+		return fmt.Errorf("unsupported adapter fault kind %q", r.Kind)
+	}
+	if r.Name == "" {
+		return fmt.Errorf("adapter fault operation name is required")
+	}
+	if r.Mode != "error" && r.Mode != "timeout" && r.Mode != "replace" {
+		return fmt.Errorf("unsupported adapter fault mode %q", r.Mode)
+	}
+	if r.FromCall < 0 || r.Calls < 0 {
+		return fmt.Errorf("adapter fault call bounds must be non-negative")
+	}
+	if r.Mode == "timeout" && (r.TimeoutMS < 1 || r.TimeoutMS > 3600000) {
+		return fmt.Errorf("adapter fault timeout_ms must be 1..3600000")
+	}
+	if b, err := json.Marshal(r.Result); err != nil {
+		return fmt.Errorf("invalid replacement: %w", err)
+	} else if len(b) > 64<<10 {
+		return fmt.Errorf("adapter fault replacement exceeds 64KiB")
+	}
+	return nil
 }
 
 // resolveArms resolves every arm and refuses arms that do not differ.
@@ -401,6 +445,29 @@ func (p *Planner) resolveArm(ctx context.Context, label, cfgPath string, set map
 	}
 	if err := p.checkAgent(&cfg); err != nil {
 		return am, fmt.Errorf("agent config %s: %w", cfgPath, err)
+	}
+	for _, c := range conds {
+		if c.probe == nil || c.probe.Layer != schemas.LayerAdapter || c.probe.Apply.AdapterFault == nil {
+			continue
+		}
+		wall := cfg.Budgets.WallS * 1000
+		if err := utils.ValidateAdapterFault(*c.probe.Apply.AdapterFault, wall); err != nil {
+			return am, fmt.Errorf("adapter fault rule: %w", err)
+		}
+		if cfg.Adapter == "remote_http" {
+			return am, fmt.Errorf("agent config %s: remote_http agents are not supported by adapter fault hooks", cfgPath)
+		}
+		injector, ok := findPart(p.reg.Adapters, cfg.Adapter)
+		if !ok {
+			return am, fmt.Errorf("agent adapter %q is not registered", cfg.Adapter)
+		}
+		if fi, ok := injector.(schemas.AdapterFaultInjector); ok {
+			if err := fi.ValidateFault(&cfg, *c.probe.Apply.AdapterFault); err != nil {
+				return am, fmt.Errorf("adapter fault capability: %w", err)
+			}
+		} else {
+			return am, fmt.Errorf("adapter %s does not support adapter fault hooks", cfg.Adapter)
+		}
 	}
 	img, err := ResolveAgentImage(&cfg, suite, p.benchRoot)
 	if err != nil {

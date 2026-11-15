@@ -6,6 +6,7 @@ package adapters
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"os"
 	"path"
@@ -41,6 +42,53 @@ type CommandConfig struct {
 
 type commandAdapter struct {
 	cfg CommandConfig
+}
+
+// ValidateFault implements the strict opt-in adapter contract. A command is
+// eligible only when its image explicitly declares the requested hook.
+func (a *commandAdapter) ValidateFault(cfg *schemas.AgentConfig, rule schemas.AdapterFaultRule) error {
+	if cfg == nil || cfg.Capabilities == nil || cfg.Capabilities.FaultProtocolVersion != schemas.AdapterFaultProtocol {
+		return fmt.Errorf("command adapter does not declare fault protocol %s", schemas.AdapterFaultProtocol)
+	}
+	for _, h := range cfg.Capabilities.FaultHooks {
+		if h.Kind == rule.Kind && h.Name == rule.Name {
+			for _, m := range h.Modes {
+				if m == rule.Mode {
+					return nil
+				}
+			}
+			return fmt.Errorf("hook %s/%s does not support mode %s", rule.Kind, rule.Name, rule.Mode)
+		}
+	}
+	return fmt.Errorf("hook %s/%s is not declared by agent", rule.Kind, rule.Name)
+}
+
+// BindFaultRuntime adds scoped runtime settings after the normal plan is
+// rendered. Tokens never enter argv or persisted adapter configuration.
+func (a *commandAdapter) BindFaultRuntime(rc *schemas.RunContext, plan *schemas.RunPlan) error {
+	if rc == nil || rc.FaultRuntime == nil {
+		return fmt.Errorf("adapter fault runtime is not bound")
+	}
+	if plan.Env == nil {
+		plan.Env = map[string]string{}
+	}
+	plan.Env["BENCH_FAULT_PROTOCOL"] = schemas.AdapterFaultProtocol
+	plan.Env["BENCH_FAULT_URL"] = rc.FaultRuntime.URL
+	plan.Env["BENCH_FAULT_TOKEN"] = rc.FaultRuntime.Token
+	plan.Env["BENCH_FAULT_RUN_ID"] = rc.Run.RunID
+	if rc.Session != nil {
+		plan.Env["BENCH_FAULT_SESSION"] = rc.Session.ID
+	} else {
+		plan.Env["BENCH_FAULT_SESSION"] = "default"
+	}
+	if rc.Agent != nil && rc.Agent.Capabilities != nil {
+		hooks, err := json.Marshal(rc.Agent.Capabilities.FaultHooks)
+		if err != nil {
+			return fmt.Errorf("encode fault hooks: %w", err)
+		}
+		plan.Env["BENCH_FAULT_HOOKS"] = string(hooks)
+	}
+	return nil
 }
 
 func newCommandAdapter(cfg CommandConfig) *commandAdapter {

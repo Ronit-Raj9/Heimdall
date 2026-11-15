@@ -101,7 +101,7 @@ func eventRank(event schemas.Event) int {
 	switch event.Source {
 	case schemas.SourceGrader:
 		return 5
-	case schemas.SourceGateway, schemas.SourceProxyLedger:
+	case schemas.SourceGateway, schemas.SourceProxyLedger, schemas.SourceAdapterFault:
 		return 4
 	case schemas.SourceToolRunner, schemas.SourceShimLog, schemas.SourceWorkspace, schemas.SourceProcess:
 		return 3
@@ -126,6 +126,8 @@ func eventOrigin(source schemas.EventSource) schemas.EvidenceOrigin {
 		return schemas.EvidenceSourceWorkspaceDiff
 	case schemas.SourceProcess:
 		return schemas.EvidenceSourceProcessResult
+	case schemas.SourceAdapterFault:
+		return schemas.EvidenceSourceAdapterFault
 	case schemas.SourceGrader:
 		return schemas.EvidenceSourceHiddenGrader
 	default:
@@ -140,6 +142,8 @@ func eventStrength(source schemas.EventSource) schemas.EvidenceStrength {
 	case schemas.SourceGateway, schemas.SourceProxyLedger:
 		return schemas.EvidenceStrong
 	case schemas.SourceAgentStream:
+		return schemas.EvidencePartial
+	case schemas.SourceAdapterFault:
 		return schemas.EvidencePartial
 	default:
 		return schemas.EvidenceUnknown

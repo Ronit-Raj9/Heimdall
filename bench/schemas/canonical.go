@@ -23,6 +23,7 @@ const (
 	EvidenceSourceProcessResult EvidenceOrigin = "process_result"
 	EvidenceSourceInferred      EvidenceOrigin = "inferred"
 	EvidenceSourceUnknown       EvidenceOrigin = "unknown"
+	EvidenceSourceAdapterFault  EvidenceOrigin = "adapter_fault_controller"
 )
 
 // EvidenceStrength describes how directly a source proves a value.
@@ -188,6 +189,7 @@ type EvidenceStatus struct {
 
 // CanonicalRun is the framework-neutral record written before sealing.
 type CanonicalRun struct {
+	AdapterFault     *AdapterFaultEvidence `json:"adapter_fault,omitempty"`
 	CanonicalVersion string                `json:"canonical_version"`
 	SchemaVersion    string                `json:"schema_version"`
 	GeneratedAt      time.Time             `json:"generated_at"`

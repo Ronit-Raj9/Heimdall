@@ -83,6 +83,7 @@ func newApp(ctx context.Context, configPath string, opts appOptions) (*app, erro
 	}
 	a.prices = prices
 	parsers := adapters.BuiltinParsers()
+	adapterFaults := environments.NewAdapterFaultController(environments.DockerWorkspaceConfig{Docker: a.docker, Logger: logger, HelperImage: cfg.Images.Helper, ToolProxyImage: cfg.Images.ToolProxy})
 	helper := cfg.Images.Helper
 	a.reg = &schemas.Registry{
 		Loaders: suite.Builtin(cfg.Path(cfg.BenchmarksRoot)),
@@ -94,18 +95,19 @@ func newApp(ctx context.Context, configPath string, opts appOptions) (*app, erro
 			GatewayAgentURL: cfg.Gateway.AgentURL, EvalNetwork: cfg.Networks.Eval, BenchRoot: cfg.Root,
 		}),
 		Parsers:     parsers,
-		ProbeLayers: probes.Builtin(probes.Deps{Docker: a.docker, HelperImage: helper, Fault: fault, Logger: logger}),
+		ProbeLayers: probes.Builtin(probes.Deps{Docker: a.docker, HelperImage: helper, Fault: fault, AdapterFault: adapterFaults, Logger: logger}),
 		Evidence: evidence.Builtin(evidence.Deps{
 			Gateway: gw, Fault: fault, Parsers: parsers, Docker: a.docker, HelperImage: helper, Prices: prices, Logger: logger,
 		}),
-		Graders:   append([]schemas.Grader{graders.NewJudge(graders.JudgeConfig{Gateway: gw, URL: cfg.Gateway.URL, Price: graders.PricesFrom(prices.Lookup), PriceRef: prices.Ref(), Logger: logger})}, graders.Builtin(graders.HiddenTestsConfig{Image: helper, Logger: logger, Docker: a.docker})...), // Memory and answers: the wired judge, ahead of Builtin's unwired one
-		Gates:     gates.Builtin(),
-		Metrics:   metrics.Builtin(),
-		Policies:  verdict.Builtin(),
-		Reporters: reporters.Builtin(),
-		Gateway:   gw,
-		Fault:     fault,
-		Store:     st,
+		Graders:       append([]schemas.Grader{graders.NewJudge(graders.JudgeConfig{Gateway: gw, URL: cfg.Gateway.URL, Price: graders.PricesFrom(prices.Lookup), PriceRef: prices.Ref(), Logger: logger})}, graders.Builtin(graders.HiddenTestsConfig{Image: helper, Logger: logger, Docker: a.docker})...), // Memory and answers: the wired judge, ahead of Builtin's unwired one
+		Gates:         gates.Builtin(),
+		Metrics:       metrics.Builtin(),
+		Policies:      verdict.Builtin(),
+		Reporters:     reporters.Builtin(),
+		Gateway:       gw,
+		Fault:         fault,
+		AdapterFaults: adapterFaults,
+		Store:         st,
 	}
 	if fault == nil {
 		a.reg.Fault = nil // a typed nil would look non-nil to the engine

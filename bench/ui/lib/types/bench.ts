@@ -1110,6 +1110,7 @@ export interface Pair {
 
 /** GET /runs/{id}: one run with its seal, grade, metrics, gates and receipts. Unwritten files are null or empty. */
 export interface RunDetail {
+	adapter_fault?: AdapterFaultEvidence;
 	slot: Slot;
 	run: Run;
 	sealed: boolean;
@@ -1137,6 +1138,31 @@ export interface RunDetail {
 	artifacts?: ArtifactFile[];
 	evidence_contract?: RunEvidenceContract;
 	canonical?: CanonicalRun;
+}
+
+export interface AdapterFaultEvidence {
+	version: string;
+	run_id: string;
+	rule_hash: string;
+	complete: boolean;
+	reason?: string;
+	ledger_hash: string;
+	entries: AdapterFaultEntry[];
+}
+export interface AdapterFaultEntry {
+	seq: number;
+	at: string;
+	run_id: string;
+	session: string;
+	operation_id?: string;
+	kind?: string;
+	name?: string;
+	phase: string;
+	mode?: string;
+	success?: boolean;
+	prev_hash: string;
+	hash: string;
+	message?: string;
 }
 
 /** GET /runs/{id}/events */

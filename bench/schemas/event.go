@@ -40,15 +40,16 @@ type EventSource string
 
 // Event sources.
 const (
-	SourceGateway     EventSource = "gateway"
-	SourceProxyLedger EventSource = "proxy_ledger"
-	SourceAgentStream EventSource = "agent_stream"
-	SourceShimLog     EventSource = "shim_log"
-	SourceGrader      EventSource = "grader"
-	SourceEngine      EventSource = "engine"
-	SourceToolRunner  EventSource = "tool_runner"
-	SourceWorkspace   EventSource = "workspace_diff"
-	SourceProcess     EventSource = "process_result"
+	SourceGateway      EventSource = "gateway"
+	SourceProxyLedger  EventSource = "proxy_ledger"
+	SourceAgentStream  EventSource = "agent_stream"
+	SourceShimLog      EventSource = "shim_log"
+	SourceGrader       EventSource = "grader"
+	SourceEngine       EventSource = "engine"
+	SourceToolRunner   EventSource = "tool_runner"
+	SourceWorkspace    EventSource = "workspace_diff"
+	SourceProcess      EventSource = "process_result"
+	SourceAdapterFault EventSource = "adapter_fault_controller"
 )
 
 // Tokens holds four disjoint token buckets.

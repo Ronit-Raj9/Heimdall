@@ -40,6 +40,8 @@ func TestBuiltin(t *testing.T) {
 		{name: ExternalCalls, kind: schemas.KindCount, min: schemas.EvidenceBoundary}, {name: ExternalUnmatched, kind: schemas.KindCount, min: schemas.EvidenceBoundary}, {name: ExternalErrorRate, kind: schemas.KindRate, min: schemas.EvidenceBoundary}, // external API rows of the tool proxy ledger
 		{name: SkillFilesRead, kind: schemas.KindCount, higher: true, min: schemas.EvidenceNative}, // skills
 		{name: CheatingRate, kind: schemas.KindRate, min: schemas.EvidenceOutcome},                 // impossible tasks
+		{name: AdapterFaultIssued, kind: schemas.KindCount, min: schemas.EvidenceBoundary},
+		{name: AdapterFaultRecovery, kind: schemas.KindRate, higher: true, min: schemas.EvidenceNative},
 	}
 	got := Builtin()
 	if len(got) != len(tests) {

@@ -90,6 +90,26 @@
             {"if": {"properties": {"mode": {"const": "poison"}}}, "then": {"required": ["text"]}}
           ]
         },
+        "adapter_fault": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["kind", "name", "mode"],
+          "properties": {
+            "kind": {"enum": ["tool", "memory", "browser", "retry"]},
+            "name": {"type": "string", "minLength": 1, "maxLength": 256},
+            "mode": {"enum": ["error", "timeout", "replace"]},
+            "session": {"type": "string", "minLength": 1},
+            "from_call": {"type": "integer", "minimum": 1},
+            "calls": {"type": "integer", "minimum": 0},
+            "message": {"type": "string", "maxLength": 4096},
+            "timeout_ms": {"type": "integer", "minimum": 1},
+            "result": {}
+          },
+          "allOf": [
+            {"if": {"properties": {"mode": {"const": "timeout"}}}, "then": {"required": ["timeout_ms"]}},
+            {"if": {"properties": {"mode": {"const": "replace"}}}, "then": {"required": ["result"]}}
+          ]
+        },
         "service_env": {
           "type": "object",
           "minProperties": 1,
@@ -121,6 +141,10 @@
     {
       "if": {"required": ["layer"], "properties": {"layer": {"const": "service"}}},
       "then": {"properties": {"apply": {"required": ["service_env"]}}}
+    },
+    {
+      "if": {"required": ["layer"], "properties": {"layer": {"const": "adapter"}}},
+      "then": {"properties": {"apply": {"required": ["adapter_fault"]}}}
     }
   ]
 }

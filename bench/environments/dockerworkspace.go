@@ -101,6 +101,9 @@ func (e *dockerWorkspace) GetName() string { return DockerWorkspaceType }
 // GetVersion implements schemas.Part.
 func (e *dockerWorkspace) GetVersion() string { return dockerWorkspaceVersion }
 
+// SupportsAdapterFaults reports support for isolated per-run hook controllers.
+func (e *dockerWorkspace) SupportsAdapterFaults() bool { return true }
+
 // Create fills a new workspace volume from the trusted task folder, lays down
 // the clean notes file (except under the stale-notes condition, whose fixture
 // layer writes the stale file), hands every file to uid 1000 and records a
@@ -278,6 +281,12 @@ func (e *dockerWorkspace) Exec(ctx context.Context, rc *schemas.RunContext, plan
 			return nil, fmt.Errorf("exec run %s: join service network: %w", runID, err)
 		}
 	}
+	if rc.FaultRuntime != nil {
+		if _, err := e.cfg.Docker.MustRun(ctx, "network", "connect", rc.FaultRuntime.Network, joiner); err != nil {
+			keep = false
+			return nil, fmt.Errorf("join adapter fault network: %w", err)
+		}
+	}
 	wall := time.Duration(plan.WallS) * time.Second
 	if plan.WallS <= 0 {
 		wall = defaultWallS * time.Second
@@ -287,7 +296,11 @@ func (e *dockerWorkspace) Exec(ctx context.Context, rc *schemas.RunContext, plan
 		secret = rc.Key.Value
 	}
 	stdout, stderr, session := streamPaths(rc)
-	res, err := e.attach(ctx, name, stdout, stderr, wall, secret)
+	faultToken := ""
+	if rc.FaultRuntime != nil {
+		faultToken = rc.FaultRuntime.Token
+	}
+	res, err := e.attach(ctx, name, stdout, stderr, wall, secret, faultToken)
 	if err != nil {
 		keep = false
 		return res, fmt.Errorf("exec run %s: %w", runID, err)
@@ -587,21 +600,22 @@ func (e *dockerWorkspace) attach(ctx context.Context, name, stdoutPath, stderrPa
 // It buffers the capped stream so credentials split across writes are hidden.
 type redactingWriter struct {
 	w       io.Writer
-	secret  []byte
+	secrets [][]byte
 	pending []byte
 }
 
 func newRedactingWriter(w io.Writer, secrets ...string) io.Writer {
+	rw := &redactingWriter{w: w}
 	for _, secret := range secrets {
 		if secret != "" {
-			return &redactingWriter{w: w, secret: []byte(secret)}
+			rw.secrets = append(rw.secrets, []byte(secret))
 		}
 	}
-	return &redactingWriter{w: w}
+	return rw
 }
 
 func (w *redactingWriter) Write(p []byte) (int, error) {
-	if len(w.secret) == 0 {
+	if len(w.secrets) == 0 {
 		return w.w.Write(p)
 	}
 	w.pending = append(w.pending, p...)
@@ -612,7 +626,11 @@ func (w *redactingWriter) Flush() error {
 	if len(w.pending) == 0 {
 		return nil
 	}
-	_, err := w.w.Write(bytes.ReplaceAll(w.pending, w.secret, []byte("[redacted]")))
+	data := w.pending
+	for _, secret := range w.secrets {
+		data = bytes.ReplaceAll(data, secret, []byte("[redacted]"))
+	}
+	_, err := w.w.Write(data)
 	w.pending = nil
 	return err
 }

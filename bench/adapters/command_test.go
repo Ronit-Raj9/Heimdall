@@ -12,6 +12,21 @@ import (
 	"github.com/maximhq/bifrost/bench/schemas"
 )
 
+func TestCommandFaultCapability(t *testing.T) {
+	a := newCommandAdapter(CommandConfig{})
+	rule := schemas.AdapterFaultRule{Kind: "tool", Name: "search", Mode: "error"}
+	if err := a.ValidateFault(&schemas.AgentConfig{}, rule); err == nil {
+		t.Fatal("undeclared fault hook accepted")
+	}
+	cfg := &schemas.AgentConfig{Capabilities: &schemas.AdapterCapabilities{FaultProtocolVersion: schemas.AdapterFaultProtocol, FaultHooks: []schemas.AdapterFaultHook{{Kind: "tool", Name: "search", Modes: []string{"error"}}}}}
+	if err := a.ValidateFault(cfg, rule); err != nil {
+		t.Fatal(err)
+	}
+	if err := a.ValidateFault(cfg, schemas.AdapterFaultRule{Kind: "tool", Name: "search", Mode: "timeout", TimeoutMS: 1}); err == nil {
+		t.Fatal("unsupported mode accepted")
+	}
+}
+
 const (
 	testKey         = "sk-bf-v1-secretvalue0123456789"
 	testGateway     = "http://bifrost:8080"

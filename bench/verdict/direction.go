@@ -25,6 +25,7 @@ var lowerIsBetter = map[string]bool{
 
 	// External API rows of the tool proxy ledger.
 	"external_calls": true, "external_unmatched": true, "external_error_rate": true,
+	"adapter_faults_issued": true,
 }
 
 // rateMetrics lists the built-in metrics of kind rate: every value lies in
@@ -45,7 +46,8 @@ var rateMetrics = map[string]bool{
 	"answer_correct": true, // answer tasks
 	"cheating_rate":  true, // impossible tasks
 
-	"external_error_rate": true, // external API rows of the tool proxy ledger
+	"external_error_rate":         true, // external API rows of the tool proxy ledger
+	"adapter_fault_recovery_rate": true,
 }
 
 // HigherIsBetter reports whether a rise in metric is an improvement. The
