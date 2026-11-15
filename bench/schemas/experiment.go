@@ -232,6 +232,16 @@ type Manifest struct {
 	// for a public-only plan. Reports and the leaderboard state the split
 	// from it, so a held-out score is never mixed into a public board.
 	HeldOutTasks []string `json:"held_out_tasks,omitempty"`
+
+	// Lock fingerprints (docs/lock-fingerprints.md), each empty for a plan
+	// of a legacy lock or without docker. FingerprintHash is the sha256 of
+	// the canonical JSON of the suite lock's fingerprints section, so a run
+	// traces to the exact evaluator settings it ran under. SuiteImages maps
+	// an image role (base, helper, toolproxy, service/<id>) to the local
+	// image id seen at plan time; a run refuses when a recorded id no longer
+	// matches.
+	FingerprintHash string            `json:"fingerprint_hash,omitempty"`
+	SuiteImages     map[string]string `json:"suite_images,omitempty"`
 }
 
 // BudgetDiff is one agent budget that differs between arms although no arm

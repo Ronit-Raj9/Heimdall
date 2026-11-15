@@ -33,6 +33,8 @@ type fakeSuites struct {
 	loadErrs map[string]error
 	drift    map[string][]schemas.SuiteDrift
 	driftErr map[string]error
+	fpDrift  map[string][]schemas.FingerprintDrift
+	fpErr    map[string]error
 	listErr  error
 }
 
@@ -51,6 +53,10 @@ func (f *fakeSuites) LoadSuite(_ context.Context, id string) (*schemas.Suite, er
 
 func (f *fakeSuites) LockDrift(_ context.Context, s *schemas.Suite) ([]schemas.SuiteDrift, error) {
 	return f.drift[s.ID], f.driftErr[s.ID]
+}
+
+func (f *fakeSuites) FingerprintDrift(_ context.Context, s *schemas.Suite) ([]schemas.FingerprintDrift, error) {
+	return f.fpDrift[s.ID], f.fpErr[s.ID]
 }
 
 // writeFiles writes rel -> content under dir.
@@ -332,6 +338,55 @@ func TestSuitesLockStates(t *testing.T) {
 	if task := taskByID(t, s, "d01"); task["status"] != "not_locked" || task["admitted_at"] != nil {
 		t.Errorf("d01 = %v", task)
 	}
+}
+
+func TestSuitesLockFingerprints(t *testing.T) {
+	f := testSuites(t)
+	fps := &schemas.LockFingerprints{Version: schemas.LockFingerprintsVersion, Suite: schemas.Fingerprint{Settings: "s", Files: "f"}}
+	f.suites["canary"].Lock.Fingerprints = fps
+	body := decodeBody(t, newSuitesClient(t, f, nil, nil).do(t, "GET", APIPrefix+"/suites", nil, nil))
+	t.Run("a legacy lock is legacy, locked and has no fingerprint drift", func(t *testing.T) {
+		s := suiteByID(t, body, "drifted")
+		if s["lock_kind"] != "legacy" {
+			t.Errorf("lock_kind = %v, want legacy", s["lock_kind"])
+		}
+		if _, ok := s["fingerprint_drift"]; ok {
+			t.Errorf("fingerprint_drift on a legacy lock: %v", s["fingerprint_drift"])
+		}
+	})
+	t.Run("an unchanged fingerprinted lock is locked", func(t *testing.T) {
+		s := suiteByID(t, body, "canary")
+		if s["lock_kind"] != "fingerprinted" || s["lock_state"] != "locked" {
+			t.Errorf("canary = lock_kind %v, lock_state %v", s["lock_kind"], s["lock_state"])
+		}
+		if _, ok := s["fingerprint_drift"]; ok {
+			t.Errorf("fingerprint_drift = %v, want none", s["fingerprint_drift"])
+		}
+		checkKeys(t, "SuiteSummary canary", s, loadKeys(t, "SuiteSummary"), false)
+	})
+	t.Run("fingerprint drift lists the part and marks the lock stale", func(t *testing.T) {
+		f.fpDrift = map[string][]schemas.FingerprintDrift{"canary": {{Scope: "suite", ID: "canary", Part: "settings", Fields: []string{"verifier"}}}}
+		body := decodeBody(t, newSuitesClient(t, f, nil, nil).do(t, "GET", APIPrefix+"/suites", nil, nil))
+		s := suiteByID(t, body, "canary")
+		if s["lock_state"] != "stale" || s["lock_kind"] != "fingerprinted" {
+			t.Errorf("canary = lock_kind %v, lock_state %v", s["lock_kind"], s["lock_state"])
+		}
+		drift := objectsAt(t, s, "fingerprint_drift[]")
+		if len(drift) != 1 || drift[0]["scope"] != "suite" || drift[0]["part"] != "settings" || fmt.Sprint(drift[0]["fields"]) != "[verifier]" {
+			t.Errorf("fingerprint_drift = %v", drift)
+		}
+		checkKeys(t, "FingerprintDrift", drift[0], loadKeys(t, "FingerprintDrift"), false)
+		checkKeys(t, "SuiteSummary canary", s, loadKeys(t, "SuiteSummary"), false)
+	})
+	t.Run("a fingerprint check error is unknown with its reason", func(t *testing.T) {
+		f.fpDrift = nil
+		f.fpErr = map[string]error{"canary": errors.New("check fingerprints of suite canary: version 2")}
+		body := decodeBody(t, newSuitesClient(t, f, nil, nil).do(t, "GET", APIPrefix+"/suites", nil, nil))
+		s := suiteByID(t, body, "canary")
+		if s["lock_state"] != "unknown" || !strings.Contains(fmt.Sprint(s["lock_error"]), "version 2") {
+			t.Errorf("canary = lock_state %v, lock_error %v", s["lock_state"], s["lock_error"])
+		}
+	})
 }
 
 func TestSuiteTaskDetail(t *testing.T) {

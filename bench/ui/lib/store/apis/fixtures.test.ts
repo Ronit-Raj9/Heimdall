@@ -275,6 +275,7 @@ function contractFor(file: string): { type: string; nested: Record<string, strin
 				"suites[]": "SuiteSummary",
 				"suites[].base_image": "SuiteImage",
 				"suites[].drift[]": "SuiteDrift",
+				"suites[].fingerprint_drift[]": "FingerprintDrift",
 				"suites[].probes[]": "SuiteProbe",
 				"suites[].tasks[]": "SuiteTask",
 				"suites[].tasks[].checks[]": "SuiteAdmissionCheck",

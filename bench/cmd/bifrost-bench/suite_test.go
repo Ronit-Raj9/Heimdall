@@ -1,6 +1,7 @@
 package main
 
 import (
+	"encoding/json"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -82,6 +83,25 @@ func TestSuiteLintLockWithConfig(t *testing.T) {
 	after, err := os.ReadFile(filepath.Join(dst, "suite.lock"))
 	if err != nil {
 		t.Fatal(err)
+	}
+	// Lock fingerprints: the first lock of a legacy lock adds the
+	// fingerprints section and leaves the legacy fields byte for byte
+	// (lockfingerprints_test.go); from then on re-locking is a no-op.
+	if !strings.Contains(string(before), `"fingerprints"`) {
+		var l schemas.SuiteLock
+		if err := json.Unmarshal(after, &l); err != nil {
+			t.Fatal(err)
+		}
+		if h, err := suite.LegacyLockHash(&l); err != nil || h != utils.SHA256Bytes(before) {
+			t.Fatalf("adding fingerprints changed the legacy lock fields: %s vs %s (%v)", h, utils.SHA256Bytes(before), err)
+		}
+		before = after
+		if code := runSuite([]string{"lock", "coding-core", "-config", config}); code != exitOK {
+			t.Fatalf("lock exit %d", code)
+		}
+		if after, err = os.ReadFile(filepath.Join(dst, "suite.lock")); err != nil {
+			t.Fatal(err)
+		}
 	}
 	if string(before) != string(after) {
 		t.Error("re-locking an unchanged coding-core copy changed suite.lock")

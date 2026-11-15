@@ -1759,6 +1759,19 @@ export interface SuiteDrift {
 	fields: string[];
 }
 
+/** fingerprinted: suite.lock binds every evaluator setting; legacy: it has no fingerprints section. */
+export type LockKind = "fingerprinted" | "legacy";
+
+/** One difference between the fingerprints suite.lock recorded and the files on disk. Planning refuses while any exists. */
+export interface FingerprintDrift {
+	scope: "suite" | "task" | "probe";
+	id: string;
+	/** settings (a suite.yaml, task.yaml or probe setting), files (a file they name) or image (an image id). */
+	part: "settings" | "files" | "image";
+	/** The settings keys or image roles that differ; absent for files. */
+	fields?: string[];
+}
+
 /** One probe of a suite. How it works (fault plans, canary markers) is never served. */
 export interface SuiteProbe {
 	id: string;
@@ -1871,6 +1884,11 @@ export interface SuiteSummary {
 	quarantined_count?: number;
 	/** suite.yaml sets a canary. */
 	has_canary?: boolean;
+	// Lock fingerprint fields (docs/lock-fingerprints.md).
+	/** Absent when the suite is unlocked. */
+	lock_kind?: LockKind;
+	/** What no longer matches the recorded fingerprints; absent when nothing drifted or the lock is legacy. */
+	fingerprint_drift?: FingerprintDrift[];
 }
 
 /** GET /suites: every pack under the benchmarks root, sorted by id. */

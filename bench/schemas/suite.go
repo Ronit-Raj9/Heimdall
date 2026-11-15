@@ -105,6 +105,45 @@ type SuiteLock struct {
 	Tasks     map[string]TaskLock  `json:"tasks"`
 	Probes    map[string]ProbeLock `json:"probes"`
 	CreatedAt time.Time            `json:"created_at"`
+
+	// Fingerprints binds every evaluator setting, every file the suite,
+	// its tasks and probes name, and the image identities
+	// (docs/lock-fingerprints.md). Nil in a legacy lock, which then encodes
+	// byte for byte as it did before the section existed.
+	Fingerprints *LockFingerprints `json:"fingerprints,omitempty"`
+}
+
+// LockFingerprintsVersion is the fingerprint format `suite lock` writes.
+const LockFingerprintsVersion = 1
+
+// LockFingerprints is the versioned fingerprint section of a suite lock.
+type LockFingerprints struct {
+	Version int                    `json:"version"`
+	Suite   Fingerprint            `json:"suite"`
+	Tasks   map[string]Fingerprint `json:"tasks"`
+	Probes  map[string]Fingerprint `json:"probes"`
+}
+
+// Fingerprint pins one suite, task or probe. Settings is the sha256 of the
+// canonical JSON of its evaluator settings and Fields the sha256 of each
+// top-level setting, so drift names the setting that changed. Files is the
+// sha256 over every file and folder the settings name, volatile junk
+// excluded. Images maps an image role to its identity: "<tag>@<local image
+// id>", or "tag only: <tag>" when the image could not be inspected.
+type Fingerprint struct {
+	Settings string            `json:"settings"`
+	Fields   map[string]string `json:"fields,omitempty"`
+	Files    string            `json:"files"`
+	Images   map[string]string `json:"images,omitempty"`
+}
+
+// FingerprintDrift is one difference between the fingerprints a lock
+// recorded and the ones computed from the files on disk.
+type FingerprintDrift struct {
+	Scope  string   `json:"scope"`            // suite | task | probe
+	ID     string   `json:"id"`               // suite, task or probe id
+	Part   string   `json:"part"`             // settings | files | image
+	Fields []string `json:"fields,omitempty"` // settings keys or image roles that differ
 }
 
 // TaskLock pins one task version. A comparison is valid only between runs of
@@ -150,6 +189,11 @@ type AdmissionRecord struct {
 	Grader           string   `json:"grader,omitempty"`
 	ReferenceRepeats int      `json:"reference_repeats,omitempty"`
 	ReferenceResults []string `json:"reference_results,omitempty"`
+	// Fingerprint is the sha256 of the suite and task fingerprints (settings
+	// and files) the checks ran against; empty in a record written before
+	// lock fingerprints existed. A record whose fingerprint no longer matches
+	// the lock admits nothing.
+	Fingerprint string `json:"fingerprint,omitempty"`
 }
 
 // AdmissionCheck is one admission control (reference passes, empty patch

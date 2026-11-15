@@ -785,6 +785,16 @@ class Filters(TypedDict):
     synthetic: str
 
 
+class _FingerprintDriftRequired(TypedDict):
+    id: str
+    part: str
+    scope: str
+
+
+class FingerprintDrift(_FingerprintDriftRequired, total=False):
+    fields: List[str]
+
+
 class FirstDivergence(TypedDict):
     index: int
     note: str
@@ -1186,11 +1196,13 @@ class Manifest(_ManifestRequired, total=False):
     budget_parity: Optional[BudgetParityResult]
     capability_gaps: Dict[str, List[str]]
     compatibility: Optional[ArmManifest]
+    fingerprint_hash: str
     gateway: Optional[GatewayManifest]
     held_out_tasks: List[str]
     policy_hash: str
     run_inputs: Dict[str, RunInputIdentity]
     scenario: Dict[str, str]
+    suite_images: Dict[str, str]
     task_identities: List[CanonicalTaskIdentity]
     task_images: Dict[str, str]
 
@@ -2029,11 +2041,13 @@ class _SuiteSummaryRequired(TypedDict):
 class SuiteSummary(_SuiteSummaryRequired, total=False):
     artifacts: List[ArtifactSpec]
     error: str
+    fingerprint_drift: List[FingerprintDrift]
     grading: str
     has_canary: bool
     held_out_count: int
     imported: Optional[ImportRecord]
     lock_error: str
+    lock_kind: str
     output: str
     quarantined_count: int
     services: List[str]
@@ -2655,6 +2669,7 @@ __all__ = [
     'FieldChange',
     'FileChange',
     'Filters',
+    'FingerprintDrift',
     'FirstDivergence',
     'Forecast',
     'ForecastRange',

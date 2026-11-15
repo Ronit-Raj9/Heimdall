@@ -1,0 +1,593 @@
+{
+  "suite": "coding-core",
+  "version": "1.0.0",
+  "base_image": {
+    "dockerfile": "base/Dockerfile",
+    "tag": "bench/coding-core-base:1"
+  },
+  "tasks": {
+    "t01": {
+      "version": "1.0.0",
+      "instruction_sha256": "a0380419508c239c658112734605de0d984bb31d9af5cb1dcda091b85dca99cf",
+      "repo_tree_sha256": "709a0adeac85865f2b1c8e2d16b18f282d5c3380ca06d1ce9f9ee2c1506827cf",
+      "verifier_sha256": "e1fb107c4a70fe0d6348c542e073fdec5f77a821f0c7c85529216f45e1bb4a13",
+      "controls_sha256": "3d66cd215d7b2f5f002edb2eddaf107caf3742946414fe28fe7676cef3435d81",
+      "fixtures_sha256": "cc2ef31ceeb656460104c09e370f1cb091112727c6797d780e70f803ae3fc693",
+      "status": "admitted",
+      "admission": {
+        "admitted": true,
+        "checks": [
+          {
+            "name": "reference_1",
+            "want": "pass",
+            "got": "pass",
+            "passed": true,
+            "detail": "solution/patch.diff; tests_ran=7 failures=0 errors=0 skipped=0 exit=0 reason=passed (7 tests)"
+          },
+          {
+            "name": "reference_2",
+            "want": "pass",
+            "got": "pass",
+            "passed": true,
+            "detail": "solution/patch.diff; tests_ran=7 failures=0 errors=0 skipped=0 exit=0 reason=passed (7 tests)"
+          },
+          {
+            "name": "reference_3",
+            "want": "pass",
+            "got": "pass",
+            "passed": true,
+            "detail": "solution/patch.diff; tests_ran=7 failures=0 errors=0 skipped=0 exit=0 reason=passed (7 tests)"
+          },
+          {
+            "name": "empty_patch",
+            "want": "fail",
+            "got": "fail",
+            "passed": true,
+            "detail": "controls/empty.diff; tests_ran=7 failures=7 errors=0 skipped=0 exit=1 reason=exit 1; 7 failures; required tests failed: test_hidden_rounding.py::test_line_amount_half_cent_rounds_up, test_hidden_rounding.py::test_line_amount_is_exact_for_decimal_quantities, test_hidden_rounding.py::test_subtotal_is_sum_of_rounded_line_amounts, test_hidden_rounding.py::test_tax_half_cent_rounds_up, test_hidden_rounding.py::test_tax_is_exact_for_decimal_rates, test_hidden_rounding.py::test_percentage_discount_half_cent_rounds_up_before_tax, test_hidden_rounding.py::test_cli_export_and_summary_follow_rounding_rules"
+          },
+          {
+            "name": "mutant_1",
+            "want": "fail",
+            "got": "fail",
+            "passed": true,
+            "detail": "controls/mutant1.diff; tests_ran=7 failures=4 errors=0 skipped=0 exit=1 reason=exit 1; 4 failures; required tests failed: test_hidden_rounding.py::test_line_amount_is_exact_for_decimal_quantities, test_hidden_rounding.py::test_subtotal_is_sum_of_rounded_line_amounts, test_hidden_rounding.py::test_tax_is_exact_for_decimal_rates, test_hidden_rounding.py::test_cli_export_and_summary_follow_rounding_rules"
+          },
+          {
+            "name": "mutant_2",
+            "want": "fail",
+            "got": "fail",
+            "passed": true,
+            "detail": "controls/mutant2.diff; tests_ran=7 failures=2 errors=0 skipped=0 exit=1 reason=exit 1; 2 failures; required tests failed: test_hidden_rounding.py::test_subtotal_is_sum_of_rounded_line_amounts, test_hidden_rounding.py::test_cli_export_and_summary_follow_rounding_rules"
+          },
+          {
+            "name": "exploit",
+            "want": "fail",
+            "got": "fail",
+            "passed": true,
+            "detail": "exploit exit 0; tests_ran=7 failures=7 errors=0 skipped=0 exit=1 reason=exit 1; 7 failures; required tests failed: test_hidden_rounding.py::test_line_amount_half_cent_rounds_up, test_hidden_rounding.py::test_line_amount_is_exact_for_decimal_quantities, test_hidden_rounding.py::test_subtotal_is_sum_of_rounded_line_amounts, test_hidden_rounding.py::test_tax_half_cent_rounds_up, test_hidden_rounding.py::test_tax_is_exact_for_decimal_rates, test_hidden_rounding.py::test_percentage_discount_half_cent_rounds_up_before_tax, test_hidden_rounding.py::test_cli_export_and_summary_follow_rounding_rules"
+          },
+          {
+            "name": "reference_stale_notes",
+            "want": "pass",
+            "got": "pass",
+            "passed": true,
+            "detail": "reference + fixtures/notes.stale.md as CLAUDE.md, AGENTS.md; tests_ran=7 failures=0 errors=0 skipped=0 exit=0 reason=passed (7 tests)"
+          }
+        ],
+        "at": "2026-11-14T13:23:01.990117527Z"
+      }
+    },
+    "t02": {
+      "version": "1.0.0",
+      "instruction_sha256": "b2b80fbd6118c658e4134c3c05fd12601742039bf69fcacef9ce2125823ef5c3",
+      "repo_tree_sha256": "b9912c64120dad774359609f70b186c7e6c5199febe9eaa57148f318cda1726b",
+      "verifier_sha256": "846b7a68207b9950d4171a6458f6cd9661881588d9cad35ff2f43a6ba9b536db",
+      "controls_sha256": "3e9ca41ca7621e78622a4777986cea2bc2559678283fcd6bde281acd4ea998fe",
+      "fixtures_sha256": "91516c4bdf9576356b46651f67250cb79c2e9e109bd5d09cef7c7bac295ac00f",
+      "status": "admitted",
+      "admission": {
+        "admitted": true,
+        "checks": [
+          {
+            "name": "reference_1",
+            "want": "pass",
+            "got": "pass",
+            "passed": true,
+            "detail": "solution/patch.diff; tests_ran=7 failures=0 errors=0 skipped=0 exit=0 reason=passed (7 tests)"
+          },
+          {
+            "name": "reference_2",
+            "want": "pass",
+            "got": "pass",
+            "passed": true,
+            "detail": "solution/patch.diff; tests_ran=7 failures=0 errors=0 skipped=0 exit=0 reason=passed (7 tests)"
+          },
+          {
+            "name": "reference_3",
+            "want": "pass",
+            "got": "pass",
+            "passed": true,
+            "detail": "solution/patch.diff; tests_ran=7 failures=0 errors=0 skipped=0 exit=0 reason=passed (7 tests)"
+          },
+          {
+            "name": "empty_patch",
+            "want": "fail",
+            "got": "fail",
+            "passed": true,
+            "detail": "controls/empty.diff; tests_ran=7 failures=6 errors=0 skipped=0 exit=1 reason=exit 1; 6 failures; required tests failed: test_hidden_csv_export.py::test_csv_export_matches_documented_example, test_hidden_csv_export.py::test_csv_quotes_only_fields_that_need_it, test_hidden_csv_export.py::test_csv_rows_end_with_a_single_line_feed, test_hidden_csv_export.py::test_json_output_is_unchanged, test_hidden_csv_export.py::test_output_option_writes_the_same_bytes, test_hidden_csv_export.py::test_header_only_input_gives_just_the_header_row"
+          },
+          {
+            "name": "mutant_1",
+            "want": "fail",
+            "got": "fail",
+            "passed": true,
+            "detail": "controls/mutant1.diff; tests_ran=7 failures=5 errors=0 skipped=0 exit=1 reason=exit 1; 5 failures; required tests failed: test_hidden_csv_export.py::test_csv_export_matches_documented_example, test_hidden_csv_export.py::test_csv_quotes_only_fields_that_need_it, test_hidden_csv_export.py::test_csv_rows_end_with_a_single_line_feed, test_hidden_csv_export.py::test_output_option_writes_the_same_bytes, test_hidden_csv_export.py::test_header_only_input_gives_just_the_header_row"
+          },
+          {
+            "name": "mutant_2",
+            "want": "fail",
+            "got": "fail",
+            "passed": true,
+            "detail": "controls/mutant2.diff; tests_ran=7 failures=4 errors=0 skipped=0 exit=1 reason=exit 1; 4 failures; required tests failed: test_hidden_csv_export.py::test_csv_export_matches_documented_example, test_hidden_csv_export.py::test_csv_quotes_only_fields_that_need_it, test_hidden_csv_export.py::test_output_option_writes_the_same_bytes, test_hidden_csv_export.py::test_header_only_input_gives_just_the_header_row"
+          },
+          {
+            "name": "exploit",
+            "want": "fail",
+            "got": "fail",
+            "passed": true,
+            "detail": "exploit exit 0; tests_ran=7 failures=6 errors=0 skipped=0 exit=1 reason=exit 1; 6 failures; required tests failed: test_hidden_csv_export.py::test_csv_export_matches_documented_example, test_hidden_csv_export.py::test_csv_quotes_only_fields_that_need_it, test_hidden_csv_export.py::test_csv_rows_end_with_a_single_line_feed, test_hidden_csv_export.py::test_json_output_is_unchanged, test_hidden_csv_export.py::test_output_option_writes_the_same_bytes, test_hidden_csv_export.py::test_header_only_input_gives_just_the_header_row"
+          },
+          {
+            "name": "reference_stale_notes",
+            "want": "pass",
+            "got": "pass",
+            "passed": true,
+            "detail": "reference + fixtures/notes.stale.md as CLAUDE.md, AGENTS.md; tests_ran=7 failures=0 errors=0 skipped=0 exit=0 reason=passed (7 tests)"
+          }
+        ],
+        "at": "2026-11-14T13:23:11.392164432Z"
+      }
+    },
+    "t03": {
+      "version": "1.0.0",
+      "instruction_sha256": "81107db6f275cf41732ed711a7a4708bb2895f99b95dc92a0d1c4e94cca0b197",
+      "repo_tree_sha256": "b9912c64120dad774359609f70b186c7e6c5199febe9eaa57148f318cda1726b",
+      "verifier_sha256": "6ee9f035826684c5ac4afab53dbf9baed6e1f28729439e289d59fa2f8599872b",
+      "controls_sha256": "9bb5c482f941d56e18da386928857803a10a6bdce8f41e73efa9cba4777d9621",
+      "fixtures_sha256": "a46e918367efca87caee7c0ee9d504fe87b065e580d9f4ecc8ed0d6b4840c9d8",
+      "status": "admitted",
+      "admission": {
+        "admitted": true,
+        "checks": [
+          {
+            "name": "reference_1",
+            "want": "pass",
+            "got": "pass",
+            "passed": true,
+            "detail": "solution/patch.diff; tests_ran=8 failures=0 errors=0 skipped=0 exit=0 reason=passed (8 tests)"
+          },
+          {
+            "name": "reference_2",
+            "want": "pass",
+            "got": "pass",
+            "passed": true,
+            "detail": "solution/patch.diff; tests_ran=8 failures=0 errors=0 skipped=0 exit=0 reason=passed (8 tests)"
+          },
+          {
+            "name": "reference_3",
+            "want": "pass",
+            "got": "pass",
+            "passed": true,
+            "detail": "solution/patch.diff; tests_ran=8 failures=0 errors=0 skipped=0 exit=0 reason=passed (8 tests)"
+          },
+          {
+            "name": "empty_patch",
+            "want": "fail",
+            "got": "fail",
+            "passed": true,
+            "detail": "controls/empty.diff; tests_ran=8 failures=4 errors=0 skipped=0 exit=1 reason=exit 1; 4 failures; required tests failed: test_hidden_dates.py::test_day_first_slash_dates_are_accepted, test_hidden_dates.py::test_two_digit_year_is_ambiguous, test_hidden_dates.py::test_same_date_in_both_formats_agrees, test_hidden_dates.py::test_cli_exports_iso_dates_and_rejects_ambiguous_ones"
+          },
+          {
+            "name": "mutant_1",
+            "want": "fail",
+            "got": "fail",
+            "passed": true,
+            "detail": "controls/mutant1.diff; tests_ran=8 failures=3 errors=0 skipped=0 exit=1 reason=exit 1; 3 failures; required tests failed: test_hidden_dates.py::test_two_digit_year_is_ambiguous, test_hidden_dates.py::test_malformed_and_impossible_dates_are_invalid, test_hidden_dates.py::test_same_date_in_both_formats_agrees"
+          },
+          {
+            "name": "mutant_2",
+            "want": "fail",
+            "got": "fail",
+            "passed": true,
+            "detail": "controls/mutant2.diff; tests_ran=8 failures=1 errors=0 skipped=0 exit=1 reason=exit 1; 1 failures; required tests failed: test_hidden_dates.py::test_same_date_in_both_formats_agrees"
+          },
+          {
+            "name": "exploit",
+            "want": "fail",
+            "got": "fail",
+            "passed": true,
+            "detail": "exploit exit 0; tests_ran=8 failures=4 errors=0 skipped=0 exit=1 reason=exit 1; 4 failures; required tests failed: test_hidden_dates.py::test_day_first_slash_dates_are_accepted, test_hidden_dates.py::test_two_digit_year_is_ambiguous, test_hidden_dates.py::test_same_date_in_both_formats_agrees, test_hidden_dates.py::test_cli_exports_iso_dates_and_rejects_ambiguous_ones"
+          },
+          {
+            "name": "reference_stale_notes",
+            "want": "pass",
+            "got": "pass",
+            "passed": true,
+            "detail": "reference + fixtures/notes.stale.md as CLAUDE.md, AGENTS.md; tests_ran=8 failures=0 errors=0 skipped=0 exit=0 reason=passed (8 tests)"
+          }
+        ],
+        "at": "2026-11-14T13:23:17.926003769Z"
+      }
+    },
+    "t04": {
+      "version": "1.0.0",
+      "instruction_sha256": "fd0e8657d375309a6ed4b7bb66a53d7833b471555a9814bf7ae40430083e3e31",
+      "repo_tree_sha256": "b9912c64120dad774359609f70b186c7e6c5199febe9eaa57148f318cda1726b",
+      "verifier_sha256": "7a759d246c6998ea6aadf5339588231e471db291df0274ec2474c24db6698030",
+      "controls_sha256": "a2f65857212e88e5d27e33bb878598a27e00036752f5eb97c845b42b7d01ace1",
+      "fixtures_sha256": "e1092e194c62bfcdb1c18baade811e96b2fc85019487d0e8f5976032514083b5",
+      "status": "admitted",
+      "admission": {
+        "admitted": true,
+        "checks": [
+          {
+            "name": "reference_1",
+            "want": "pass",
+            "got": "pass",
+            "passed": true,
+            "detail": "solution/patch.diff; tests_ran=8 failures=0 errors=0 skipped=0 exit=0 reason=passed (8 tests)"
+          },
+          {
+            "name": "reference_2",
+            "want": "pass",
+            "got": "pass",
+            "passed": true,
+            "detail": "solution/patch.diff; tests_ran=8 failures=0 errors=0 skipped=0 exit=0 reason=passed (8 tests)"
+          },
+          {
+            "name": "reference_3",
+            "want": "pass",
+            "got": "pass",
+            "passed": true,
+            "detail": "solution/patch.diff; tests_ran=8 failures=0 errors=0 skipped=0 exit=0 reason=passed (8 tests)"
+          },
+          {
+            "name": "empty_patch",
+            "want": "fail",
+            "got": "fail",
+            "passed": true,
+            "detail": "controls/empty.diff; tests_ran=8 failures=5 errors=0 skipped=0 exit=1 reason=exit 1; 5 failures; required tests failed: test_hidden_discounts.py::test_add_discount_accepts_several_in_order, test_hidden_discounts.py::test_percentages_apply_before_fixed_discounts, test_hidden_discounts.py::test_percentages_compound_and_round_at_each_step, test_hidden_discounts.py::test_stacked_discounts_never_exceed_subtotal, test_hidden_discounts.py::test_csv_discount_column_takes_plus_separated_discounts"
+          },
+          {
+            "name": "mutant_1",
+            "want": "fail",
+            "got": "fail",
+            "passed": true,
+            "detail": "controls/mutant1.diff; tests_ran=8 failures=2 errors=0 skipped=0 exit=1 reason=exit 1; 2 failures; required tests failed: test_hidden_discounts.py::test_percentages_apply_before_fixed_discounts, test_hidden_discounts.py::test_csv_discount_column_takes_plus_separated_discounts"
+          },
+          {
+            "name": "mutant_2",
+            "want": "fail",
+            "got": "fail",
+            "passed": true,
+            "detail": "controls/mutant2.diff; tests_ran=8 failures=1 errors=0 skipped=0 exit=1 reason=exit 1; 1 failures; required tests failed: test_hidden_discounts.py::test_percentages_compound_and_round_at_each_step"
+          },
+          {
+            "name": "exploit",
+            "want": "fail",
+            "got": "fail",
+            "passed": true,
+            "detail": "exploit exit 0; tests_ran=8 failures=5 errors=0 skipped=0 exit=1 reason=exit 1; 5 failures; required tests failed: test_hidden_discounts.py::test_add_discount_accepts_several_in_order, test_hidden_discounts.py::test_percentages_apply_before_fixed_discounts, test_hidden_discounts.py::test_percentages_compound_and_round_at_each_step, test_hidden_discounts.py::test_stacked_discounts_never_exceed_subtotal, test_hidden_discounts.py::test_csv_discount_column_takes_plus_separated_discounts"
+          },
+          {
+            "name": "reference_stale_notes",
+            "want": "pass",
+            "got": "pass",
+            "passed": true,
+            "detail": "reference + fixtures/notes.stale.md as CLAUDE.md, AGENTS.md; tests_ran=8 failures=0 errors=0 skipped=0 exit=0 reason=passed (8 tests)"
+          }
+        ],
+        "at": "2026-11-14T13:23:24.81669193Z"
+      }
+    },
+    "t05": {
+      "version": "1.0.0",
+      "instruction_sha256": "6355d503f11abfac274ed79dceb3fed39ec9b39aed76a26b0112470b7e1fa1f5",
+      "repo_tree_sha256": "46326b76c6be6d1b92a756778fc0c40ff01100ef0d7d71e80e40fdca95d8e431",
+      "verifier_sha256": "c045c7cb364bf4ec93eb263d6e549cd0d7c2792586ba42482d0ad8bd1f2287c5",
+      "controls_sha256": "7bb51ec4db47077804e031189bda74c163d36ac96c9ae95e936fd632428745e4",
+      "fixtures_sha256": "38f6428b38212b0554ca7d01e67cf5055db52e557d37cca2dfa47fef52ac7b06",
+      "status": "admitted",
+      "admission": {
+        "admitted": true,
+        "checks": [
+          {
+            "name": "reference_1",
+            "want": "pass",
+            "got": "pass",
+            "passed": true,
+            "detail": "solution/patch.diff; tests_ran=6 failures=0 errors=0 skipped=0 exit=0 reason=passed (6 tests)"
+          },
+          {
+            "name": "reference_2",
+            "want": "pass",
+            "got": "pass",
+            "passed": true,
+            "detail": "solution/patch.diff; tests_ran=6 failures=0 errors=0 skipped=0 exit=0 reason=passed (6 tests)"
+          },
+          {
+            "name": "reference_3",
+            "want": "pass",
+            "got": "pass",
+            "passed": true,
+            "detail": "solution/patch.diff; tests_ran=6 failures=0 errors=0 skipped=0 exit=0 reason=passed (6 tests)"
+          },
+          {
+            "name": "empty_patch",
+            "want": "fail",
+            "got": "fail",
+            "passed": true,
+            "detail": "controls/empty.diff; tests_ran=6 failures=6 errors=0 skipped=0 exit=1 reason=exit 1; 6 failures; required tests failed: test_window_boundary.py::test_request_exactly_window_old_no_longer_counts, test_window_boundary.py::test_request_just_inside_window_still_counts, test_window_boundary.py::test_remaining_uses_the_same_boundary, test_window_boundary.py::test_retry_after_is_exact_and_sufficient, test_window_boundary.py::test_refused_requests_are_not_recorded, test_window_boundary.py::test_simulate_cli_follows_the_rule"
+          },
+          {
+            "name": "mutant_1",
+            "want": "fail",
+            "got": "fail",
+            "passed": true,
+            "detail": "controls/mutant1.diff; tests_ran=6 failures=2 errors=0 skipped=0 exit=1 reason=exit 1; 2 failures; required tests failed: test_window_boundary.py::test_remaining_uses_the_same_boundary, test_window_boundary.py::test_retry_after_is_exact_and_sufficient"
+          },
+          {
+            "name": "exploit",
+            "want": "fail",
+            "got": "fail",
+            "passed": true,
+            "detail": "exploit exit 0; tests_ran=6 failures=6 errors=0 skipped=0 exit=1 reason=exit 1; 6 failures; required tests failed: test_window_boundary.py::test_request_exactly_window_old_no_longer_counts, test_window_boundary.py::test_request_just_inside_window_still_counts, test_window_boundary.py::test_remaining_uses_the_same_boundary, test_window_boundary.py::test_retry_after_is_exact_and_sufficient, test_window_boundary.py::test_refused_requests_are_not_recorded, test_window_boundary.py::test_simulate_cli_follows_the_rule"
+          },
+          {
+            "name": "reference_stale_notes",
+            "want": "pass",
+            "got": "pass",
+            "passed": true,
+            "detail": "reference + fixtures/notes.stale.md as CLAUDE.md, AGENTS.md; tests_ran=6 failures=0 errors=0 skipped=0 exit=0 reason=passed (6 tests)"
+          }
+        ],
+        "at": "2026-11-14T13:23:30.715312689Z"
+      }
+    },
+    "t06": {
+      "version": "1.0.0",
+      "instruction_sha256": "2769e7c1cfe93cc6bfc8172725942d3a1c15f49f071ec16ea96cc895578b7143",
+      "repo_tree_sha256": "866c40d53bf656454c0b0324f7e0a5e2772b9886df2ecf025071be711ab9b4d1",
+      "verifier_sha256": "b941dac839328fd4e0a16a3eec5cfe388c3f1e5da9d50c9f51eb8272726a84f0",
+      "controls_sha256": "2f52681cb35c970eaaa1c0b4dbe6dc472e37f44c4ec662fa6bef5e9edf645ed2",
+      "fixtures_sha256": "f358da4eac77306fca19193d45b8019afe480da512c25cd23512501e1e4cecd0",
+      "status": "admitted",
+      "admission": {
+        "admitted": true,
+        "checks": [
+          {
+            "name": "reference_1",
+            "want": "pass",
+            "got": "pass",
+            "passed": true,
+            "detail": "solution/patch.diff; tests_ran=7 failures=0 errors=0 skipped=0 exit=0 reason=passed (7 tests)"
+          },
+          {
+            "name": "reference_2",
+            "want": "pass",
+            "got": "pass",
+            "passed": true,
+            "detail": "solution/patch.diff; tests_ran=7 failures=0 errors=0 skipped=0 exit=0 reason=passed (7 tests)"
+          },
+          {
+            "name": "reference_3",
+            "want": "pass",
+            "got": "pass",
+            "passed": true,
+            "detail": "solution/patch.diff; tests_ran=7 failures=0 errors=0 skipped=0 exit=0 reason=passed (7 tests)"
+          },
+          {
+            "name": "empty_patch",
+            "want": "fail",
+            "got": "fail",
+            "passed": true,
+            "detail": "controls/empty.diff; tests_ran=7 failures=2 errors=0 skipped=0 exit=1 reason=exit 1; 2 failures; required tests failed: test_dedupe_fast.py::test_find_duplicates_large_input_is_fast_and_exact, test_dedupe_fast.py::test_drop_duplicates_large_input_is_fast_and_exact"
+          },
+          {
+            "name": "mutant_1",
+            "want": "fail",
+            "got": "fail",
+            "passed": true,
+            "detail": "controls/mutant1.diff; tests_ran=7 failures=3 errors=0 skipped=0 exit=1 reason=exit 1; 3 failures; required tests failed: test_dedupe_fast.py::test_matching_is_transitive_and_groups_are_ordered, test_dedupe_fast.py::test_find_duplicates_large_input_is_fast_and_exact, test_dedupe_fast.py::test_drop_duplicates_large_input_is_fast_and_exact"
+          },
+          {
+            "name": "exploit",
+            "want": "fail",
+            "got": "fail",
+            "passed": true,
+            "detail": "exploit exit 0; tests_ran=7 failures=2 errors=0 skipped=0 exit=1 reason=exit 1; 2 failures; required tests failed: test_dedupe_fast.py::test_find_duplicates_large_input_is_fast_and_exact, test_dedupe_fast.py::test_drop_duplicates_large_input_is_fast_and_exact"
+          },
+          {
+            "name": "reference_stale_notes",
+            "want": "pass",
+            "got": "pass",
+            "passed": true,
+            "detail": "reference + fixtures/notes.stale.md as CLAUDE.md, AGENTS.md; tests_ran=7 failures=0 errors=0 skipped=0 exit=0 reason=passed (7 tests)"
+          }
+        ],
+        "at": "2026-11-14T13:24:26.793600975Z"
+      }
+    },
+    "t07": {
+      "version": "1.0.0",
+      "instruction_sha256": "febe4217347abd994319162c456dcfc7a72900a348f03e42fcc9c6f5e4db047c",
+      "repo_tree_sha256": "8184463649fff83bae8b34ee3f65ed890eb6bb501ed8c88436e80914f43e4fec",
+      "verifier_sha256": "05e0cc66908bdf77e4acd211dc8abc1fdae84b1de075263736716a3016ae4315",
+      "controls_sha256": "fbc0149495ada20e678d163aac25629b18fefc8ebc1350cef819215e498f53b0",
+      "fixtures_sha256": "91415485f2a7ef8dccc75b5da1b479abcb17305fff1afd76abfa4abe4c4a9311",
+      "status": "admitted",
+      "admission": {
+        "admitted": true,
+        "checks": [
+          {
+            "name": "reference_1",
+            "want": "pass",
+            "got": "pass",
+            "passed": true,
+            "detail": "solution/patch.diff; tests_ran=8 failures=0 errors=0 skipped=0 exit=0 reason=passed (8 tests)"
+          },
+          {
+            "name": "reference_2",
+            "want": "pass",
+            "got": "pass",
+            "passed": true,
+            "detail": "solution/patch.diff; tests_ran=8 failures=0 errors=0 skipped=0 exit=0 reason=passed (8 tests)"
+          },
+          {
+            "name": "reference_3",
+            "want": "pass",
+            "got": "pass",
+            "passed": true,
+            "detail": "solution/patch.diff; tests_ran=8 failures=0 errors=0 skipped=0 exit=0 reason=passed (8 tests)"
+          },
+          {
+            "name": "empty_patch",
+            "want": "fail",
+            "got": "fail",
+            "passed": true,
+            "detail": "controls/empty.diff; tests_ran=8 failures=8 errors=0 skipped=0 exit=1 reason=exit 1; 8 failures; required tests failed: test_env_config.py::test_environment_beats_file_beats_defaults, test_env_config.py::test_variable_names_for_nested_and_top_level_settings, test_env_config.py::test_boolean_values, test_env_config.py::test_numeric_values, test_env_config.py::test_unconvertible_value_raises_config_error_naming_the_variable, test_env_config.py::test_variables_that_name_no_setting_are_ignored, test_env_config.py::test_env_none_reads_os_environ_and_a_mapping_replaces_it, test_env_config.py::test_cli_config_reflects_the_process_environment"
+          },
+          {
+            "name": "mutant_1",
+            "want": "fail",
+            "got": "fail",
+            "passed": true,
+            "detail": "controls/mutant1.diff; tests_ran=8 failures=2 errors=0 skipped=0 exit=1 reason=exit 1; 2 failures; required tests failed: test_env_config.py::test_environment_beats_file_beats_defaults, test_env_config.py::test_cli_config_reflects_the_process_environment"
+          },
+          {
+            "name": "exploit",
+            "want": "fail",
+            "got": "fail",
+            "passed": true,
+            "detail": "exploit exit 0; tests_ran=8 failures=8 errors=0 skipped=0 exit=1 reason=exit 1; 8 failures; required tests failed: test_env_config.py::test_environment_beats_file_beats_defaults, test_env_config.py::test_variable_names_for_nested_and_top_level_settings, test_env_config.py::test_boolean_values, test_env_config.py::test_numeric_values, test_env_config.py::test_unconvertible_value_raises_config_error_naming_the_variable, test_env_config.py::test_variables_that_name_no_setting_are_ignored, test_env_config.py::test_env_none_reads_os_environ_and_a_mapping_replaces_it, test_env_config.py::test_cli_config_reflects_the_process_environment"
+          },
+          {
+            "name": "reference_stale_notes",
+            "want": "pass",
+            "got": "pass",
+            "passed": true,
+            "detail": "reference + fixtures/notes.stale.md as CLAUDE.md, AGENTS.md; tests_ran=8 failures=0 errors=0 skipped=0 exit=0 reason=passed (8 tests)"
+          }
+        ],
+        "at": "2026-11-14T13:24:32.758136585Z"
+      }
+    },
+    "t08": {
+      "version": "1.0.0",
+      "instruction_sha256": "710a68a208bcba5b99d1b61be869f5d20f75ad2047e96347c18b215d9075ccf6",
+      "repo_tree_sha256": "b04dfb3dba05403ca8fff527c99d346a597b64cfe80f36dc08fa718cbacc1586",
+      "verifier_sha256": "13085b611123d6667bff467aa383de858a1164b2b18cba8198a3a634cc977eb4",
+      "controls_sha256": "93542bfdd90aa936333f4af873bd81fc3d9242be9ce2b466b80862bf951c5d2d",
+      "fixtures_sha256": "88ca41d6afc5ec53762eee75baf980b01c75d612a0027e922ecf8e159795ace5",
+      "status": "admitted",
+      "admission": {
+        "admitted": true,
+        "checks": [
+          {
+            "name": "reference_1",
+            "want": "pass",
+            "got": "pass",
+            "passed": true,
+            "detail": "solution/patch.diff; tests_ran=7 failures=0 errors=0 skipped=0 exit=0 reason=passed (7 tests)"
+          },
+          {
+            "name": "reference_2",
+            "want": "pass",
+            "got": "pass",
+            "passed": true,
+            "detail": "solution/patch.diff; tests_ran=7 failures=0 errors=0 skipped=0 exit=0 reason=passed (7 tests)"
+          },
+          {
+            "name": "reference_3",
+            "want": "pass",
+            "got": "pass",
+            "passed": true,
+            "detail": "solution/patch.diff; tests_ran=7 failures=0 errors=0 skipped=0 exit=0 reason=passed (7 tests)"
+          },
+          {
+            "name": "empty_patch",
+            "want": "fail",
+            "got": "fail",
+            "passed": true,
+            "detail": "controls/empty.diff; tests_ran=7 failures=6 errors=0 skipped=0 exit=1 reason=exit 1; 6 failures; required tests failed: test_rename_shim.py::test_new_name_is_public, test_rename_shim.py::test_new_name_returns_tuples_and_takes_keys_by_keyword_only, test_rename_shim.py::test_every_call_to_old_name_warns_once_with_exact_message, test_rename_shim.py::test_warning_points_at_the_caller, test_rename_shim.py::test_rest_of_the_api_does_not_warn, test_rename_shim.py::test_import_and_cli_do_not_warn_and_cli_output_is_unchanged"
+          },
+          {
+            "name": "mutant_1",
+            "want": "fail",
+            "got": "fail",
+            "passed": true,
+            "detail": "controls/mutant1.diff; tests_ran=7 failures=3 errors=0 skipped=0 exit=1 reason=exit 1; 3 failures; required tests failed: test_rename_shim.py::test_warning_points_at_the_caller, test_rename_shim.py::test_rest_of_the_api_does_not_warn, test_rename_shim.py::test_import_and_cli_do_not_warn_and_cli_output_is_unchanged"
+          },
+          {
+            "name": "exploit",
+            "want": "fail",
+            "got": "fail",
+            "passed": true,
+            "detail": "exploit exit 0; tests_ran=7 failures=6 errors=0 skipped=0 exit=1 reason=exit 1; 6 failures; required tests failed: test_rename_shim.py::test_new_name_is_public, test_rename_shim.py::test_new_name_returns_tuples_and_takes_keys_by_keyword_only, test_rename_shim.py::test_every_call_to_old_name_warns_once_with_exact_message, test_rename_shim.py::test_warning_points_at_the_caller, test_rename_shim.py::test_rest_of_the_api_does_not_warn, test_rename_shim.py::test_import_and_cli_do_not_warn_and_cli_output_is_unchanged"
+          },
+          {
+            "name": "reference_stale_notes",
+            "want": "pass",
+            "got": "pass",
+            "passed": true,
+            "detail": "reference + fixtures/notes.stale.md as CLAUDE.md, AGENTS.md; tests_ran=7 failures=0 errors=0 skipped=0 exit=0 reason=passed (7 tests)"
+          }
+        ],
+        "at": "2026-11-14T13:24:38.60119956Z"
+      }
+    }
+  },
+  "probes": {
+    "destructive-bait": {
+      "version": "1.0.0",
+      "sha256": "a78b6712cd16a1fdfb94ac0132e77b119c29368cb342debb6172af9532b67d8d"
+    },
+    "empty-test-run": {
+      "version": "1.0.0",
+      "sha256": "78e056f4eddbca447b64b44de500dec5a5e26465e7b57ba59cbf6ea6c0bccce6"
+    },
+    "memory-trap": {
+      "version": "1.0.0",
+      "sha256": "abff253903b0173d822fc3fd6dfed493c94180443ab78fb84bbc682745365b52"
+    },
+    "memory-trap-destructive": {
+      "version": "1.0.0",
+      "sha256": "3a4555f0e7a4e5022117cf7ff39ebd20482c930f150b22457472bd65ebde04e3"
+    },
+    "model-outage": {
+      "version": "1.0.0",
+      "sha256": "6a434aba4ee1ecdb69c3b68f64bc83c4707d54c73f6a1518b953ef56c172182d"
+    },
+    "prompt-injection": {
+      "version": "1.0.0",
+      "sha256": "f0c4cf1bf84bb14ffd81d82469ac273b9d15e0a76aaed78e6d850535ac0b6e76"
+    },
+    "protected-path": {
+      "version": "1.0.0",
+      "sha256": "37f1ccc26a3196b99121f2ac573d0f43220d50f27bd30488d83ceafe7d8f2a10"
+    },
+    "secret-canary": {
+      "version": "1.0.0",
+      "sha256": "2399e37141f0d0aac4067f79b243b0243bb9a10e3c75bba8a641590a830c1c51"
+    },
+    "stale-notes": {
+      "version": "1.0.0",
+      "sha256": "f8d7da5d950097ada36411d1d25a9bda848a7c55337c343eff1a40f1bdaf7394"
+    },
+    "test-crash": {
+      "version": "1.0.0",
+      "sha256": "2d48d3b71e2dc2e14b6654354639765b7777cd7f9bc7091a157418fb4dc249ba"
+    }
+  },
+  "created_at": "2026-11-14T01:43:05.820728235Z"
+}

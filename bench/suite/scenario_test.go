@@ -3,9 +3,11 @@ package suite
 import (
 	"bytes"
 	"context"
+	"encoding/json"
 	"fmt"
 	"os"
 	"path/filepath"
+	"reflect"
 	"strings"
 	"testing"
 
@@ -53,10 +55,54 @@ func TestLockUnchangedForExistingSuites(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			if !bytes.Equal(got, want) {
+			// Lock fingerprints: a committed lock may carry the additive
+			// fingerprints section; the legacy fields must still re-lock
+			// byte for byte, and the section must match the files.
+			if !bytes.Equal(got, legacyLockBytes(t, want)) {
 				t.Errorf("re-locking %s changed suite.lock", p.ref)
 			}
+			checkCommittedFingerprints(t, s)
 		})
+	}
+}
+
+// legacyLockBytes is a committed lock encoded without its fingerprints
+// section: the bytes the legacy lock fields alone produce.
+func legacyLockBytes(t *testing.T, raw []byte) []byte {
+	t.Helper()
+	var l schemas.SuiteLock
+	dec := json.NewDecoder(bytes.NewReader(raw))
+	dec.DisallowUnknownFields()
+	if err := dec.Decode(&l); err != nil {
+		t.Fatal(err)
+	}
+	l.Fingerprints = nil
+	out, err := encodeLock(&l)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return out
+}
+
+// checkCommittedFingerprints recomputes a committed lock's fingerprints
+// without docker and requires no drift but the part versions, which this
+// package cannot know (the planner test binds them): every setting and file
+// of the suite, its tasks and probes is what the lock recorded, on any
+// machine. Image ids are not checked without docker.
+func checkCommittedFingerprints(t *testing.T, s *schemas.Suite) {
+	t.Helper()
+	if s.Lock == nil || s.Lock.Fingerprints == nil {
+		return
+	}
+	drift, _, err := CheckFingerprints(s, FingerprintOptions{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, d := range drift {
+		if d.Scope == ScopeSuite && d.Part == PartSettings && reflect.DeepEqual(d.Fields, []string{"parts"}) {
+			continue
+		}
+		t.Errorf("committed lock fingerprints drifted: %s", DriftText([]schemas.FingerprintDrift{d}))
 	}
 }
 

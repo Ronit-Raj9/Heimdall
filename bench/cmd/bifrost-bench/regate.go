@@ -127,7 +127,7 @@ func (a *app) regate(ctx context.Context, expID, regradeID, note, frozenLock str
 // both locks, so the protected paths and the tests the gates compare against
 // did not move.
 func checkSuiteDrift(m *schemas.Manifest, suite *schemas.Suite, frozenLock string) error {
-	if suite.LockHash == m.SuiteLockHash {
+	if lockMatches(suite, m.SuiteLockHash) { // Lock fingerprints: a lock that only gained fingerprints still matches (lockfingerprints.go)
 		return nil
 	}
 	if frozenLock == "" {

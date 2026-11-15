@@ -1398,6 +1398,18 @@
 			"fix": "Re-lock and re-admit:",
 			"lockError": "The lock could not be checked: {{error}}"
 		},
+		"lockKind": {
+			"fingerprinted": "Fingerprinted lock",
+			"legacy": "Legacy lock",
+			"fingerprintedHint": "suite.lock binds every evaluator setting, every file the suite, tasks and probes name, and the image ids. A change refuses new plans until the suite is locked and admitted again.",
+			"legacyHint": "Evaluator settings are not bound; run suite lock to add fingerprints."
+		},
+		"fingerprintDrift": {
+			"title": "Lock fingerprint drift",
+			"description": "These no longer match the fingerprints in suite.lock, so new plans and resumed runs are refused.",
+			"row": "{{scope}} {{id}}: {{part}}",
+			"rowFields": "{{scope}} {{id}}: {{part}} ({{fields}})"
+		},
 		"broken": {
 			"title": "This suite failed to load",
 			"hint": "Fix the file and field named below, then run `bifrost-bench suite lint {{suite}}`."

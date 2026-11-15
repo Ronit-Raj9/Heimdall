@@ -1,11 +1,16 @@
 package environments
 
 import (
+	"fmt"
+	"os"
+	"path/filepath"
 	"reflect"
 	"strings"
+	"sync"
 	"testing"
 
 	"github.com/maximhq/bifrost/bench/schemas"
+	"github.com/maximhq/bifrost/bench/utils"
 )
 
 func TestBuildArgs(t *testing.T) {
@@ -131,4 +136,126 @@ func TestPerTaskAgent(t *testing.T) {
 			}
 		})
 	}
+}
+
+// imageIDDocker is a docker stand-in whose `image inspect --format {{.Id}}
+// <ref>` prints ids[ref] and reports any other ref as missing.
+func imageIDDocker(t *testing.T, ids map[string]string) utils.Docker {
+	t.Helper()
+	dir := t.TempDir()
+	cases := ""
+	for ref, id := range ids {
+		cases += fmt.Sprintf("  %q) echo %q; exit 0 ;;\n", ref, id)
+	}
+	script := "#!/bin/sh\ncase \"$5\" in\n" + cases + "esac\necho \"Error: No such image: $5\" >&2\nexit 1\n"
+	bin := filepath.Join(dir, "docker")
+	if err := os.WriteFile(bin, []byte(script), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	return utils.Docker{Binary: bin}
+}
+
+// warnLines records Warn calls.
+type warnLines struct {
+	schemas.NoopLogger
+	mu    sync.Mutex
+	lines []string
+}
+
+func (l *warnLines) Warn(msg string, kv ...any) {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	l.lines = append(l.lines, fmt.Sprint(append([]any{msg, " "}, kv...)...))
+}
+
+func (l *warnLines) joined() string {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	return strings.Join(l.lines, "\n")
+}
+
+func TestImageRoles(t *testing.T) {
+	got := newDockerWorkspace(DockerWorkspaceConfig{HelperImage: "bench/helper:1", ToolProxyImage: "bench/bifrost-bench:dev"}).ImageRoles()
+	want := map[string]string{"helper": "bench/helper:1", "toolproxy": "bench/bifrost-bench:dev"}
+	if !reflect.DeepEqual(got, want) {
+		t.Fatalf("got %v, want %v", got, want)
+	}
+	if got := newDockerWorkspace(DockerWorkspaceConfig{}).ImageRoles(); len(got) != 0 {
+		t.Fatalf("empty config got %v", got)
+	}
+}
+
+func TestCheckFrozenSuiteImages(t *testing.T) {
+	docker := imageIDDocker(t, map[string]string{
+		"bench/base:1": "sha256:base0000000000000", "bench/helper:1": "sha256:helper000000000",
+		"bench/tp:dev": "sha256:tp00000000000000", "bench/db:1": "sha256:db00000000000000", "bench/mcp:1": "sha256:mcp0000000000000",
+	})
+	suite := &schemas.Suite{ID: "s", BaseImage: schemas.ImageSpec{Tag: "bench/base:1"},
+		Services: []schemas.ServiceSpec{{ID: "db", Image: "bench/db:1"}}}
+	task := &schemas.Task{ID: "t01", Services: []schemas.ServiceSpec{{ID: "mcp", Build: &schemas.ImageSpec{Tag: "bench/mcp:1"}}}}
+	rc := func(images map[string]string) *schemas.RunContext {
+		return &schemas.RunContext{Manifest: &schemas.Manifest{ExpID: "e_1", SuiteImages: images}, Suite: suite, Task: task}
+	}
+	tests := []struct {
+		name    string
+		images  map[string]string
+		wantErr string
+		warn    string
+	}{
+		{"no frozen images", nil, "", ""},
+		{"every id matches", map[string]string{"base": "sha256:base0000000000000", "helper": "sha256:helper000000000",
+			"toolproxy": "sha256:tp00000000000000", "service/db": "sha256:db00000000000000", "service/mcp": "sha256:mcp0000000000000"}, "", ""},
+		{"rebuilt base refused", map[string]string{"base": "sha256:old0000000000000"},
+			"base image bench/base:1 is now base00000000 but experiment e_1 was planned with old000000000; restore that image or plan a new experiment", ""},
+		{"rebuilt helper refused", map[string]string{"helper": "sha256:old0000000000000"}, "helper image bench/helper:1 is now", ""},
+		{"rebuilt task service refused", map[string]string{"service/mcp": "sha256:old0000000000000"}, "service/mcp image bench/mcp:1 is now", ""},
+		{"role this run does not name warns", map[string]string{"service/gone": "sha256:x"}, "", "frozen image not checked: this run does not name it"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			log := &warnLines{}
+			e := newDockerWorkspace(DockerWorkspaceConfig{Docker: docker, HelperImage: "bench/helper:1", ToolProxyImage: "bench/tp:dev", Logger: log})
+			err := e.checkFrozenSuiteImages(t.Context(), rc(tt.images))
+			switch {
+			case tt.wantErr == "" && err != nil:
+				t.Fatalf("refused: %v", err)
+			case tt.wantErr != "" && (err == nil || !strings.Contains(err.Error(), tt.wantErr)):
+				t.Fatalf("err %v, want %q", err, tt.wantErr)
+			}
+			if tt.warn == "" && log.joined() != "" {
+				t.Fatalf("unexpected warning %q", log.joined())
+			}
+			if tt.warn != "" && !strings.Contains(log.joined(), tt.warn) {
+				t.Fatalf("warnings %q, want %q", log.joined(), tt.warn)
+			}
+		})
+	}
+
+	t.Run("missing image warns, never refuses", func(t *testing.T) {
+		log := &warnLines{}
+		e := newDockerWorkspace(DockerWorkspaceConfig{Docker: imageIDDocker(t, nil), HelperImage: "bench/helper:1", Logger: log})
+		if err := e.checkFrozenSuiteImages(t.Context(), rc(map[string]string{"base": "sha256:a", "helper": "sha256:b"})); err != nil {
+			t.Fatalf("refused: %v", err)
+		}
+		if got := log.joined(); strings.Count(got, "frozen image not checked: it cannot be inspected") != 2 {
+			t.Fatalf("warnings %q", got)
+		}
+	})
+	t.Run("no docker warns, never refuses", func(t *testing.T) {
+		log := &warnLines{}
+		e := newDockerWorkspace(DockerWorkspaceConfig{Docker: utils.Docker{Binary: filepath.Join(t.TempDir(), "no-docker")}, Logger: log})
+		if err := e.checkFrozenSuiteImages(t.Context(), rc(map[string]string{"base": "sha256:a"})); err != nil {
+			t.Fatalf("refused: %v", err)
+		}
+		if !strings.Contains(log.joined(), "cannot be inspected") {
+			t.Fatalf("warnings %q", log.joined())
+		}
+	})
+	t.Run("checkFrozenImage runs it", func(t *testing.T) {
+		e := newDockerWorkspace(DockerWorkspaceConfig{Docker: docker})
+		err := e.checkFrozenImage(t.Context(), rc(map[string]string{"base": "sha256:old0000000000000"}))
+		if err == nil || !strings.Contains(err.Error(), "base image bench/base:1 is now") {
+			t.Fatalf("err %v", err)
+		}
+	})
 }

@@ -1,0 +1,5 @@
+# Keys of bench.ts `FingerprintDrift`. Change with bench.ts and schemas/suite.go.
+scope
+id
+part
+fields?

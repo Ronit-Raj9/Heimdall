@@ -120,5 +120,81 @@
       "sha256": "c8f3a4a9a8dacbab9614664493cbb676110571ca861454b44e4bd53b272c16d1"
     }
   },
-  "created_at": "2026-11-15T10:49:20.780892261Z"
+  "created_at": "2026-11-15T10:49:20.780892261Z",
+  "fingerprints": {
+    "version": 1,
+    "suite": {
+      "settings": "0a21c4e85c4e4b41c3d574c3c4bb480a7b1cb4dc3e08af1aad353a1b46e232ba",
+      "fields": {
+        "base_image": "0d0192aa22c9741cd1c16dc6d4b2ca36e7be6aab202c7cfac4ebe3a7fb69084e",
+        "environment": "2075abc096d17738fba811b8518f8a3cbd1a5621abd0fd833170c50f4f9bbe4b",
+        "grader": "47789364c3ef10b8c5e96f4a5397a4297f3b5ffd83bbf1f3a18dad282737362d",
+        "id": "3385b4ac2a39e7fd9ee90e4dfe9cd2b4ccddb5b0999af53efee2514c6b4146d7",
+        "parts": "68df612014fc627742a5c7276caf6fc051723f0f8362b14ad74b8f18fd752328",
+        "probes": "0096c146a6964bce68043d52bd197046f4be67a99d0c77b8e5a6cb378613dab6",
+        "tasks": "5b8efaaef24b7e563fc166f7513380ec60904c2b4fe397163de3ffa0004b3dbe",
+        "track": "2ea06e16082e89486ae012b8e8d7b0949cea064ad35edc07765cf6f84ed8f35e",
+        "verifier": "386f602bb15950286e29e80fc9c473bb22db23a6cc0433730694cbb7b39abc32",
+        "version": "39fe4a40977d0585fd5704359e3685b0ada5cf5ee061e5d97385601d120cd0ec",
+        "workdir": "4384b4849b7f004db243393653c15565c0a2ab2a8951d8513646c37d2a14a51f"
+      },
+      "files": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "images": {
+        "base": "tag only: bench/coding-core-base:1",
+        "helper": "tag only: bench/coding-core-base:1"
+      }
+    },
+    "tasks": {
+      "drone-window": {
+        "settings": "a9225acf09c93f44d62a2f2c680c92c8c4697389f441f957bbf86d4134ea9e6d",
+        "fields": {
+          "capabilities": "633f989a5483eb56d51e247e2d2d869279684c62bce9044ecacbff1411bdab7c",
+          "controls": "7192e2c302f74e7b39f1e52761ba5ab002cb4738f3c55ce7763072f3f5022cc7",
+          "difficulty": "3ed870088e7410ee05d36e4fc20bf73104130ef98000b268b11378d0800d1703",
+          "external": "efacfd15c95777ecad97459c232f12f32c95129ec3a2c1b5b859986c50df59c4",
+          "id": "022387ba91218dddd5dc13c672df3d3d93db7c7bf94e0368eefb8d58bf3184c0",
+          "instruction": "d22404e1bdcc17d8b42ec5950fe47a8a98ed7ccdf46bdc43121a724676b65198",
+          "kind": "1ff4393bcd872405377779cd81a787a54906f836cdd1d316ed2c5710d98d925b",
+          "project": "3385b4ac2a39e7fd9ee90e4dfe9cd2b4ccddb5b0999af53efee2514c6b4146d7",
+          "protected": "f0cf0fd97c0f3a940f4b6498d5c848194051ef3a60e030c2b0fa6c9e8264fb98",
+          "provenance": "3e16825be50fe97bdea6d985322d9f81e89fb0894e1a4f98defcc2ec71f73185",
+          "repo_dir": "a22b0355c8c3954692a2626bc83ff8ea3b7b65119e407c324883e2ed95c1fbe6",
+          "timeouts": "9f83a610bc0778eac5699c6a3231f06aad018396bad58bb40de11b55b1c29087",
+          "title": "d203c3848c0f8c4367daa8f5a9e50a6559901349eb5f88cebc0dd899e77204ec",
+          "verifier": "3c0c9efd04d308ebf9f4569298c7d6c6f448e083dacf0c4b9ce1b504ac56bb65",
+          "version": "39fe4a40977d0585fd5704359e3685b0ada5cf5ee061e5d97385601d120cd0ec"
+        },
+        "files": "cea3747c65c1c1acf9f1d104f0f25ca5a8778d9be41f2a5af5533c653bcff19e"
+      }
+    },
+    "probes": {
+      "model-outage": {
+        "settings": "e30ef6fa85e8082125543d472c15e0b16d023078d05ee40850105dbd8c44f8db",
+        "fields": {
+          "apply": "b7e753793a84a57de81592a1bc1a7be169fca45467c30261f9e209e2e2286bd5",
+          "axis": "7298afcba5a3541d2af5349f1bb3cfad78757dad43a967f82b3491f15b3bc89c",
+          "id": "0e84cff85388dc586790dfcc9272b4e2a876107a80a0a822db32d8e2fe73b26e",
+          "layer": "319ea077fe98008cd260c55907ede9e9576c5d8646e6bcfa0320fc2fd6a1d148",
+          "ps2_family": "029b04a11d4f0a3faba46780dd8f67ab1c7c75a57df07eb6918e795867ead912",
+          "safe_behavior": "6eacd64e31d70398d853a23aee39418970fc9cf0191f022f81190075b70580f0",
+          "version": "39fe4a40977d0585fd5704359e3685b0ada5cf5ee061e5d97385601d120cd0ec"
+        },
+        "files": "0d333bc0ad4c49a452889660ac248f22dd9cec0b604614cfc1e2bbc612b66887"
+      },
+      "weather-error-first": {
+        "settings": "21328614a0d183768ea224db3d44be9bfccf5881897f4241ea05c611e46c9c19",
+        "fields": {
+          "apply": "b3fedb4f640be19868bd84e6635d2d0ada7898e2bac8caecf10ce9d5ee660457",
+          "axis": "fb820f9ce611c76faf43866c47f10209f5bf67dbee3752c9f4fa8e69029f1b38",
+          "goal_preserving": "b5bea41b6c623f7c09f1bf24dcae58ebab3c0cdd90ad966bc43a45b44867e12b",
+          "id": "44d5e4bd1a83276b069ba4f156d03fd156d37f4d58a0b7c6c9f0387b924914a5",
+          "layer": "dd04afac1bebb050783a245ed0d88633759f352c85d4ab3bea3d416bf2019c75",
+          "ps2_family": "fbefc43216342dd1be3802e7d74808d1b7a62d6875e8f20bab3fd7a568009ff4",
+          "safe_behavior": "c485866d204178a37fb0d6e45c66073c1850f556f1334aeb9359a1ba3b6187b8",
+          "version": "39fe4a40977d0585fd5704359e3685b0ada5cf5ee061e5d97385601d120cd0ec"
+        },
+        "files": "c1e52214c09686fc60c4ff529b93aefb000e89d34f56c1b2f36cdf0e8e450232"
+      }
+    }
+  }
 }

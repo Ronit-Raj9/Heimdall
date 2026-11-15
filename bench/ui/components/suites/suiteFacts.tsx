@@ -8,6 +8,7 @@ import { AlertTriangle, CircleX } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { CopyCodeBlock } from "./copyCodeBlock";
 import { LockBadge, VerifierBadge } from "./suiteBadges";
+import { LockKindBadge } from "./suiteLockKind";
 import { ImportedFrom } from "./suiteScenario";
 import { leaderboardSuite } from "./suites.utils";
 import { DeclaredArtifacts } from "./taskArtifacts";
@@ -61,6 +62,7 @@ export function SuiteFacts({ suite }: { suite: SuiteSummary }) {
 		<div className="flex min-w-0 flex-col gap-3" data-testid="suites-facts">
 			<div className="flex flex-wrap items-center gap-2">
 				<LockBadge state={suite.lock_state} testId="suites-facts-lock" />
+				<LockKindBadge kind={suite.lock_kind} testId="suites-facts-lock-kind" />
 				<Link
 					to="/leaderboard"
 					search={{ suite: leaderboardSuite(suite) }}

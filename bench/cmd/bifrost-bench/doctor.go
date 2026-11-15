@@ -15,6 +15,7 @@ import (
 	"github.com/maximhq/bifrost/bench/faultproxy"
 	"github.com/maximhq/bifrost/bench/gateways/bifrost"
 	"github.com/maximhq/bifrost/bench/schemas"
+	"github.com/maximhq/bifrost/bench/suite"
 	"github.com/maximhq/bifrost/bench/utils"
 )
 
@@ -126,6 +127,10 @@ func (a *app) doctorSuites(ctx context.Context) ([]*schemas.Suite, []schemas.Doc
 		}
 		suites = append(suites, s)
 		rows = append(rows, suiteRow(s))
+		if s.Lock != nil { // Lock fingerprints: drift refuses plans (lockfingerprints.go)
+			drift, warns, err := suite.CheckFingerprints(s, lockFingerprintOptions(ctx, a.cfg, a.docker, false))
+			rows = append(rows, fingerprintRow(s, drift, warns, err))
+		}
 	}
 	return suites, rows
 }

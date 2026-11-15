@@ -42,6 +42,17 @@ validation itself and records it as the first check in the lock, named
 `static_validation` (want `clean`). A task with errors gets a record holding
 only that failed check, and no workspace is created for it.
 
+Both commands write a fingerprinted lock (`docs/lock-fingerprints.md`): the
+admission record stores `fingerprint`, the sha256 of the suite and task
+fingerprints (every evaluator setting of `suite.yaml` and `task.yaml`, the
+grader and environment versions, and every file of the task folder and of
+the suite's build contexts and fixtures) it checked. A later change to any
+of them, a verifier command, a required test id, a protected path, a
+timeout, a hidden test file, un-admits the task: plan and run refuse until
+`suite lock` and `suite admit` record the new version. A record from before
+fingerprints existed has no `fingerprint` and is kept while the legacy
+content hashes are unchanged.
+
 Required test ids: for JUnit suites (`hidden_tests`, and `verifier_command`
 with `result: junit`), an id in `verifier.required` that never appears in the
 verifier's report makes the grade fail with `required tests did not run:
