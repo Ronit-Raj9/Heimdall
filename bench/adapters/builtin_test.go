@@ -109,8 +109,24 @@ func TestShippedAgentConfigs(t *testing.T) {
 			if adapter == nil {
 				t.Fatalf("no adapter %q", agent.Adapter)
 			}
-			if _, err := adapter.Plan(context.Background(), rc); err != nil {
-				t.Fatalf("plan: %v", err)
+			validator, ok := adapter.(schemas.AdapterValidator)
+			if !ok {
+				t.Fatal("adapter does not implement AdapterValidator")
+			}
+			if err := validator.Validate(context.Background(), rc); err != nil {
+				t.Fatalf("validate: %v", err)
+			}
+			runner, ok := adapter.(schemas.AdapterRunner)
+			if !ok {
+				t.Fatal("adapter does not implement AdapterRunner")
+			}
+			if plan, err := runner.BuildExecutionPlan(context.Background(), rc); err != nil || plan == nil {
+				t.Fatalf("build execution plan: plan=%v err=%v", plan, err)
+			}
+			if cleanup, ok := adapter.(schemas.AdapterCleanup); ok {
+				if err := cleanup.Cleanup(context.Background(), rc); err != nil {
+					t.Fatalf("cleanup: %v", err)
+				}
 			}
 		})
 	}

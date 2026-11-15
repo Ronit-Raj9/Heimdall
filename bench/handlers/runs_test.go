@@ -81,8 +81,9 @@ func TestRunEventsAndDetail(t *testing.T) {
 	metrics, _ := body["metrics"].(map[string]any)
 	gates, _ := body["gates"].([]any)
 	receipts, _ := body["receipts"].([]any)
+	canonical, _ := body["canonical"].(map[string]any)
 	if len(gates) != 1 || len(receipts) != 1 || metrics["steps"] == nil || body["grade"] != nil ||
-		body["grade_source"] != "original" || body["sealed"] != true || body["seal_hash"] != "sha256:seal" {
+		body["grade_source"] != "original" || body["sealed"] != true || body["seal_hash"] != "sha256:seal" || canonical["canonical_version"] != "legacy" {
 		t.Errorf("run detail = %v", body)
 	}
 	idx.files["r_t02_A"][FileGrade] = []byte(`{"passed":true}`)

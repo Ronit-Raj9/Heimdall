@@ -118,6 +118,15 @@ function PairComparison({ pairId, onClear }: { pairId: string; onClear: () => vo
 								</div>
 								<div>Available: {lane.detail.data?.evidence_contract?.available?.join(", ") || "none"}</div>
 								<div>Missing: {lane.detail.data?.evidence_contract?.missing?.join(", ") || "none"}</div>
+								<div>Task hash: {lane.detail.data?.canonical?.task.task_hash || "unknown"}</div>
+								<div>Run input hash: {lane.detail.data?.canonical?.run_input.run_input_hash || "unknown"}</div>
+								<div>Evidence level: {lane.detail.data?.canonical?.evidence_status.level || "unknown"}</div>
+								<div>
+									Unknown reasons: {lane.detail.data?.canonical?.evidence_status.unknown_reasons?.join(", ") || "none"}
+								</div>
+								<div>
+									Tools requested / executed: {lane.detail.data?.canonical?.tool_calls?.filter((call) => call.requested).length ?? "unknown"} / {lane.detail.data?.canonical?.tool_calls?.filter((call) => call.executed).length ?? "unknown"}
+								</div>
 							</CardContent>
 						</Card>
 					))}
