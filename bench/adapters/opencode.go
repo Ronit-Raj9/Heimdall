@@ -34,6 +34,20 @@ func (p *openCodeParser) GetName() string { return ParserOpenCode }
 // GetVersion implements schemas.Part.
 func (p *openCodeParser) GetVersion() string { return openCodeVersion }
 
+// ParseExecutionOutput implements schemas.AdapterResultParser.
+func (p *openCodeParser) ParseExecutionOutput(ctx context.Context, rc *schemas.RunContext, raw []byte) (*schemas.ParseResult, error) {
+	return p.Parse(ctx, rc, raw)
+}
+
+// CollectEvents implements schemas.AdapterEventSource.
+func (p *openCodeParser) CollectEvents(ctx context.Context, rc *schemas.RunContext, raw []byte) ([]schemas.Event, error) {
+	res, err := p.Parse(ctx, rc, raw)
+	if err != nil || res == nil {
+		return nil, err
+	}
+	return res.Events, nil
+}
+
 // Parse reads `opencode run --format json` output.
 //
 // The format is one JSON object per line with a type, a millisecond
@@ -46,7 +60,9 @@ func (p *openCodeParser) GetVersion() string { return openCodeVersion }
 // failed API call or session error. Lines that are not JSON or not understood
 // are skipped: the parser adds detail and must never fail a run.
 func (p *openCodeParser) Parse(ctx context.Context, rc *schemas.RunContext, raw []byte) (*schemas.ParseResult, error) {
-	st := &openCodeStream{streamState: newStreamState(rc), step: -1}
+	base := newStreamState(rc)
+	base.parserVersion = openCodeVersion
+	st := &openCodeStream{streamState: base, step: -1}
 	for _, line := range bytes.Split(raw, []byte("\n")) {
 		line = bytes.TrimSpace(line)
 		if len(line) == 0 || line[0] != '{' {

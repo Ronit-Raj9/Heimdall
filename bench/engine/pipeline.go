@@ -210,9 +210,12 @@ func (p *Pipeline) begin(ctx context.Context, in SlotInput) (*runState, error) {
 		RunID: runID, SlotID: slot.SlotID, PairID: slot.PairID, ExpID: slot.ExpID,
 		Attempt: max(in.Attempt, 1), Stage: schemas.StageLeased,
 		ManifestHash: in.Manifest.Hash, SuiteLockHash: in.Manifest.SuiteLockHash,
+		TaskHash: slot.TaskHash, RunInputHash: slot.RunInputHash, ArmIdentity: arm.Identity, BudgetSnapshot: arm.BudgetSnapshot,
 		Outcome: schemas.OutcomeUnknown, Y: schemas.Unknown("not_finished", schemas.EvidenceOutcome),
-		Timing:  schemas.RunTiming{Started: p.now().UTC()},
-		Agent:   schemas.RunAgentInfo{ConfigID: cfg.ID, Adapter: cfg.Adapter, Parser: cfg.Parser, ConfigHash: arm.ConfigHash},
+		Timing: schemas.RunTiming{Started: p.now().UTC()},
+		Agent: schemas.RunAgentInfo{ConfigID: cfg.ID, Adapter: cfg.Adapter, Parser: cfg.Parser, ConfigHash: arm.ConfigHash,
+			AgentVersion: cfg.AgentVersion, ImageDigest: cfg.ImageDigest, Capabilities: cfg.Capabilities, CapabilityGaps: arm.CapabilityGaps,
+			ParserVersion: p.parserVersion(cfg.Parser)},
 		Gateway: schemas.RunGatewayInfo{SessionID: runID},
 	}
 	dir, err := p.reg.Store.NewRun(ctx, slot, run)
@@ -236,6 +239,18 @@ func (p *Pipeline) begin(ctx context.Context, in SlotInput) (*runState, error) {
 		p.fail(ctx, st, schemas.StageLeased, err)
 	}
 	return st, nil
+}
+
+func (p *Pipeline) parserVersion(name string) string {
+	if name == "" {
+		return ""
+	}
+	for _, parser := range p.reg.Parsers {
+		if parser != nil && parser.GetName() == name {
+			return parser.GetVersion()
+		}
+	}
+	return ""
 }
 
 // runStage runs one stage between its started and completed or failed
@@ -328,14 +343,27 @@ func (p *Pipeline) seal(ctx context.Context, st *runState) (*SlotResult, error) 
 	return res, nil
 }
 
-// writeArtifacts writes run.json, evidence.json, gates.json, grade.json and
-// plan.json, and for a scenario run sessions.json and services.json. Secrets
-// in the plan's env are redacted.
+// writeArtifacts writes canonical.json first, then run.json, evidence.json,
+// gates.json, grade.json and plan.json, and for a scenario run sessions.json
+// and services.json. The canonical document is hashed into run.json before
+// the store seals the run. Secrets in the plan's env are redacted.
 func (p *Pipeline) writeArtifacts(ctx context.Context, st *runState) error {
 	gates := st.ev.Gates
 	if gates == nil {
 		gates = []schemas.GateResult{}
 	}
+	canonical, err := p.canonicalRun(st, gates)
+	if err != nil {
+		return err
+	}
+	canonicalBytes, err := json.MarshalIndent(canonical, "", "  ")
+	if err != nil {
+		return fmt.Errorf("encode canonical run %s: %w", st.rc.Run.RunID, err)
+	}
+	if err := p.reg.Store.WriteRunFile(ctx, st.rc.Run, "canonical.json", canonicalBytes); err != nil {
+		return wrapPart("store", p.reg.Store, fmt.Errorf("write canonical.json: %w", err))
+	}
+	st.rc.Run.CanonicalHash = "sha256:" + utils.SHA256Bytes(canonicalBytes)
 	files := []struct {
 		name string
 		v    any
@@ -364,6 +392,70 @@ func (p *Pipeline) writeArtifacts(ctx context.Context, st *runState) error {
 		}
 	}
 	return nil
+}
+
+func (p *Pipeline) canonicalRun(st *runState, gates []schemas.GateResult) (*schemas.CanonicalRun, error) {
+	run := st.rc.Run
+	arm, err := armConfig(st.in.Manifest, st.rc.Slot)
+	if err != nil {
+		return nil, err
+	}
+	identity := schemas.CanonicalTaskIdentity{SuiteID: st.rc.Suite.ID, SuiteVersion: st.rc.Suite.Version,
+		TaskID: st.rc.Slot.Task, TaskVersion: st.rc.Slot.TaskVersion, TaskHash: st.rc.Slot.TaskHash,
+		Condition: st.rc.Slot.Condition, Trial: st.rc.Slot.Trial}
+	for _, candidate := range st.in.Manifest.TaskIdentities {
+		if candidate.TaskID == identity.TaskID && candidate.Condition == identity.Condition && candidate.Trial == identity.Trial {
+			identity = candidate
+			break
+		}
+	}
+	input := st.in.Manifest.RunInputs[st.rc.Slot.SlotID]
+	if input.RunInputHash == "" {
+		input = schemas.RunInputIdentity{TaskHash: run.TaskHash, RunInputHash: run.RunInputHash, Condition: runSlotCondition(st), ArmConfigHash: arm.ConfigHash, ModelRequested: arm.Config.Model, GatewayProvider: arm.Config.Gateway.Provider}
+	}
+	armIdentity := schemas.CanonicalArmIdentity{}
+	if arm.Identity != nil {
+		armIdentity = *arm.Identity
+	}
+	budget := schemas.BudgetSnapshot{}
+	if arm.BudgetSnapshot != nil {
+		budget = *arm.BudgetSnapshot
+	}
+	status := schemas.EvidenceStatus{Level: schemas.EvidenceUnknown}
+	if st.ev.Status != nil {
+		status = *st.ev.Status
+	}
+	generatedAt := time.Time{}
+	if run.Timing.Sealed != nil {
+		generatedAt = *run.Timing.Sealed
+	}
+	return &schemas.CanonicalRun{
+		CanonicalVersion: schemas.CanonicalVersion, SchemaVersion: schemas.CanonicalSchemaVersion,
+		GeneratedAt: generatedAt, RunID: run.RunID, Experiment: run.ExpID, Task: identity,
+		RunInput: input, Arm: st.rc.Slot.Arm, Agent: armIdentity, Budgets: budget,
+		ModelRequested: runModelRequested(st), ModelServed: runModelServed(st), Events: append([]schemas.Event(nil), st.ev.Events...),
+		Grade: st.ev.Grade, Gates: append([]schemas.GateResult(nil), gates...), Metrics: st.metrics,
+		EvidenceStatus: status, LogicalSteps: st.ev.LogicalSteps, Attempts: st.ev.Attempts,
+		Retries: st.ev.Retries, Fallbacks: st.ev.Fallbacks, ToolCalls: st.ev.RequestedTools,
+	}, nil
+}
+
+func runSlotCondition(st *runState) string { return st.rc.Slot.Condition }
+
+func runModelRequested(st *runState) string {
+	if st.rc.Agent == nil {
+		return ""
+	}
+	return st.rc.Agent.Model
+}
+
+func runModelServed(st *runState) string {
+	for _, event := range st.ev.Events {
+		if event.ModelServed != "" {
+			return event.ModelServed
+		}
+	}
+	return ""
 }
 
 func (p *Pipeline) writeJSON(ctx context.Context, st *runState, name string, v any) error {

@@ -23,11 +23,13 @@ const (
 
 // Value is every measured number in the bench. Use the constructors.
 type Value struct {
-	State    ValueState    `json:"state"`
-	V        *float64      `json:"v"`
-	Evidence EvidenceLevel `json:"evidence,omitempty"`
-	Bounds   *[2]float64   `json:"bounds,omitempty"`
-	Reason   string        `json:"reason,omitempty"`
+	State         ValueState       `json:"state"`
+	V             *float64         `json:"v"`
+	Evidence      EvidenceLevel    `json:"evidence,omitempty"` // legacy coverage tier
+	Source        EvidenceOrigin   `json:"source,omitempty"`
+	EvidenceLevel EvidenceStrength `json:"evidence_level,omitempty"`
+	Bounds        *[2]float64      `json:"bounds,omitempty"`
+	Reason        string           `json:"reason,omitempty"`
 }
 
 // Observed returns an observed value.

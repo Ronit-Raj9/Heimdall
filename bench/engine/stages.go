@@ -4,7 +4,10 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"slices"
+	"strings"
 
+	"github.com/maximhq/bifrost/bench/evidence"
 	"github.com/maximhq/bifrost/bench/schemas"
 )
 
@@ -71,6 +74,12 @@ func (p *Pipeline) prepare(ctx context.Context, st *runState) error {
 	}
 	if key == nil {
 		return wrapPart("gateway", p.reg.Gateway, errors.New("mint key returned no key"))
+	}
+	if st.rc.Agent != nil && st.rc.Agent.Gateway.Provider != "" && key.Provider != "" && key.Provider != st.rc.Agent.Gateway.Provider {
+		return &partError{part: "gateway", err: fmt.Errorf("gateway provider mismatch before execution: expected %s, got %s", st.rc.Agent.Gateway.Provider, key.Provider)}
+	}
+	if st.rc.Agent != nil && st.rc.Agent.Model != "" && key.Model != "" && key.Model != st.rc.Agent.Model && !strings.HasPrefix(key.Model, st.rc.Agent.Model+"/") {
+		return &partError{part: "gateway", err: fmt.Errorf("gateway model mismatch before execution: expected %s, got %s", st.rc.Agent.Model, key.Model)}
 	}
 	st.rc.Key = key
 	st.rc.Run.Gateway.VirtualKeyID = key.ID
@@ -175,6 +184,13 @@ func (p *Pipeline) export(ctx context.Context, st *runState) error {
 // failing source does not stop the others.
 func (p *Pipeline) collect(ctx context.Context, st *runState) error {
 	var errs []error
+	st.ev.Contract = &schemas.RunEvidenceContract{Required: []string{"gateway_requests"}, Quality: schemas.EvidenceQualityUnknown}
+	if st.rc.Agent != nil && st.rc.Agent.Capabilities != nil && st.rc.Agent.Capabilities.SupportsToolEvents {
+		st.ev.Contract.Required = append(st.ev.Contract.Required, "tool_execution")
+	}
+	if st.rc.Run != nil && len(st.rc.Run.Agent.CapabilityGaps) > 0 {
+		st.ev.Contract.OptionalMissing = append([]string(nil), st.rc.Run.Agent.CapabilityGaps...)
+	}
 	for _, src := range p.reg.Evidence {
 		if err := src.Collect(ctx, st.rc, st.ev); err != nil {
 			errs = append(errs, wrapPart("evidence", src, fmt.Errorf("collect: %w", err)))
@@ -186,7 +202,80 @@ func (p *Pipeline) collect(ctx context.Context, st *runState) error {
 	if err := p.finishAnswer(ctx, st); err != nil {
 		errs = append(errs, err)
 	}
+	st.ev.Contract.Available = availableEvidence(st.ev)
+	st.ev.Events = append(st.ev.Events, gatewayIntegrityEvents(st.rc, st.ev.Requests)...)
+	joined := evidence.JoinEvents(st.ev.Events)
+	st.ev.Events = joined.Events
+	st.ev.Status = &schemas.EvidenceStatus{Level: schemas.EvidenceStrong, Conflicts: joined.Conflicts}
+	for _, event := range joined.Events {
+		if event.EvidenceSource != "" && !slices.Contains(st.ev.Contract.Sources, event.EvidenceSource) {
+			st.ev.Contract.Sources = append(st.ev.Contract.Sources, event.EvidenceSource)
+		}
+	}
+	st.ev.Contract.Conflicts = append(st.ev.Contract.Conflicts, joined.Conflicts...)
+	if len(joined.Conflicts) > 0 {
+		st.ev.Status.Level = schemas.EvidencePartial
+	}
+	for _, required := range st.ev.Contract.Required {
+		if !slices.Contains(st.ev.Contract.Available, required) {
+			st.ev.Contract.Missing = append(st.ev.Contract.Missing, required)
+		}
+	}
+	if len(st.ev.Contract.Missing) == 0 && len(st.ev.Contract.OptionalMissing) == 0 {
+		st.ev.Contract.Quality = schemas.EvidenceQualityComplete
+	} else if len(st.ev.Contract.Available) > 0 || len(st.ev.Contract.OptionalMissing) > 0 || len(joined.Conflicts) > 0 {
+		st.ev.Contract.Quality = schemas.EvidenceQualityPartial
+	}
 	return errors.Join(errs...)
+}
+
+func gatewayIntegrityEvents(rc *schemas.RunContext, log *schemas.RequestLog) []schemas.Event {
+	if rc == nil || rc.Run == nil || rc.Agent == nil || log == nil {
+		return nil
+	}
+	seq := 1
+	var events []schemas.Event
+	for _, req := range log.Requests {
+		if rc.Agent.Gateway.Provider != "" && req.Provider != "" && req.Provider != rc.Agent.Gateway.Provider {
+			e := schemas.Event{EventVersion: schemas.EventSchemaVersion, EventID: fmt.Sprintf("%s:%s:%d", rc.Run.RunID, schemas.SourceGateway, seq), RunID: rc.Run.RunID, SlotID: rc.Run.SlotID, PairID: rc.Run.PairID, Seq: seq, Sequence: seq, TS: req.Timestamp, Timestamp: req.Timestamp, Type: schemas.EventIntegrity, Source: schemas.SourceGateway, Evidence: schemas.EvidenceGateway, EvidenceLevel: schemas.EvidenceGateway}
+			seq++
+			e.Status = schemas.EventStatusError
+			e.RequestID, e.Provider, e.ModelReq, e.ModelServed = req.ID, req.Provider, req.ModelRequested, req.ModelServed
+			e.Summary = fmt.Sprintf("gateway provider mismatch: expected %s, got %s", rc.Agent.Gateway.Provider, req.Provider)
+			events = append(events, e)
+		}
+		if rc.Agent.Model != "" && req.ModelRequested != "" && req.ModelRequested != rc.Agent.Model && !strings.HasSuffix(req.ModelRequested, "/"+rc.Agent.Model) {
+			e := schemas.Event{EventVersion: schemas.EventSchemaVersion, EventID: fmt.Sprintf("%s:%s:%d", rc.Run.RunID, schemas.SourceGateway, seq), RunID: rc.Run.RunID, SlotID: rc.Run.SlotID, PairID: rc.Run.PairID, Seq: seq, Sequence: seq, TS: req.Timestamp, Timestamp: req.Timestamp, Type: schemas.EventIntegrity, Source: schemas.SourceGateway, Evidence: schemas.EvidenceGateway, EvidenceLevel: schemas.EvidenceGateway}
+			seq++
+			e.Status = schemas.EventStatusError
+			e.RequestID, e.Provider, e.ModelReq, e.ModelServed = req.ID, req.Provider, req.ModelRequested, req.ModelServed
+			e.Summary = fmt.Sprintf("gateway model mismatch: expected %s, got %s", rc.Agent.Model, req.ModelRequested)
+			events = append(events, e)
+		}
+		if req.FallbackIndex > 0 {
+			e := schemas.Event{EventVersion: schemas.EventSchemaVersion, EventID: fmt.Sprintf("%s:%s:%d", rc.Run.RunID, schemas.SourceGateway, seq), RunID: rc.Run.RunID, SlotID: rc.Run.SlotID, PairID: rc.Run.PairID, Seq: seq, Sequence: seq, TS: req.Timestamp, Timestamp: req.Timestamp, Type: schemas.EventIntegrity, Source: schemas.SourceGateway, Evidence: schemas.EvidenceGateway, EvidenceLevel: schemas.EvidenceGateway}
+			seq++
+			e.Status = schemas.EventStatusError
+			e.RequestID = req.ID
+			e.Summary = "unplanned gateway fallback"
+			events = append(events, e)
+		}
+	}
+	return events
+}
+
+func availableEvidence(ev *schemas.Evidence) []string {
+	var out []string
+	if ev.Requests != nil {
+		out = append(out, "gateway_requests")
+	}
+	if len(ev.ShimLog) > 0 {
+		out = append(out, "tool_execution")
+	}
+	if len(ev.Events) > 0 {
+		out = append(out, "agent_events")
+	}
+	return out
 }
 
 // grade runs the grader on the exported diff. A scenario run whose state or
@@ -322,6 +411,11 @@ func (p *Pipeline) receipt(ctx context.Context, st *runState) error {
 // after a failed Create.
 func (p *Pipeline) cleanup(ctx context.Context, st *runState) error {
 	var errs []error
+	if cleanup, ok := st.adapter.(schemas.AdapterCleanup); ok {
+		if err := cleanup.Cleanup(ctx, st.rc); err != nil {
+			errs = append(errs, wrapPart("adapter", st.adapter, fmt.Errorf("cleanup: %w", err)))
+		}
+	}
 	if st.env != nil {
 		if err := st.env.Destroy(ctx, st.rc); err != nil {
 			errs = append(errs, wrapPart("environment", st.env, fmt.Errorf("destroy: %w", err)))

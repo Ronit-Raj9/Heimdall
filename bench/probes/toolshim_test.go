@@ -344,7 +344,11 @@ func TestShimRealToolMissing(t *testing.T) {
 		t.Fatal(err)
 	}
 	// Keep only the shim and fake bin so a system py.test is not found.
-	pathEnv = filepath.Join(root, "shim") + ":" + filepath.Join(root, "bin") + ":/usr/bin:/bin"
+	dirnamePath, err := exec.LookPath("dirname")
+	if err != nil {
+		t.Fatalf("find dirname: %v", err)
+	}
+	pathEnv = filepath.Join(root, "shim") + ":" + filepath.Join(root, "bin") + ":" + filepath.Dir(dirnamePath)
 	for _, d := range []string{"/usr/bin", "/bin"} {
 		if _, err := os.Stat(filepath.Join(d, "py.test")); err == nil {
 			t.Skip("a system py.test exists")

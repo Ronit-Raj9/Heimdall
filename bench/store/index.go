@@ -35,6 +35,7 @@ var runFileAllowlist = map[string]bool{
 	"grade.json":             true,
 	"plan.json":              true,
 	"evidence.json":          true,
+	"canonical.json":         true,
 	"seal.json":              true,
 	"transitions.jsonl":      true,
 }
@@ -443,6 +444,9 @@ func (s *FSStore) loadSealedRun(expID string, slot *schemas.Slot, rec *schemas.R
 			sr.SealHash = seal.Hash
 		}
 		return sr, nil
+	}
+	if err := verifyCanonicalFile(rec.Dir, &rec.Run); err != nil {
+		return nil, fmt.Errorf("verify canonical run %s: %w", rec.Run.RunID, err)
 	}
 	sr := &schemas.SealedRun{Slot: *slot, Run: rec.Run, Dir: rec.Dir, SealHash: seal.Hash, Metrics: map[string]schemas.Value{}}
 	if regradeID != "" {

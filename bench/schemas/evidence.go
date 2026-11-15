@@ -5,17 +5,26 @@ import "context"
 // Evidence is everything collected about one run. Evidence sources fill their
 // part during the collect stage; later stages read it.
 type Evidence struct {
-	Exec     *ExecResult       `json:"exec,omitempty"`
-	Diff     *Diff             `json:"diff,omitempty"`
-	Requests *RequestLog       `json:"requests,omitempty"` // gateway rows
-	Ledger   []LedgerEntry     `json:"ledger,omitempty"`   // fault proxy
-	Events   []Event           `json:"events,omitempty"`
-	Claim    *Claim            `json:"claim,omitempty"`
-	Cost     []CostRow         `json:"cost,omitempty"`
-	ShimLog  []ShimCall        `json:"shim_log,omitempty"`
-	Grade    *Grade            `json:"grade,omitempty"`
-	Gates    []GateResult      `json:"gates,omitempty"`
-	Protect  map[string]string `json:"protected_after,omitempty"` // sha256 of protected files after the run
+	Contract     *RunEvidenceContract `json:"evidence_contract,omitempty"`
+	Status       *EvidenceStatus      `json:"evidence_status,omitempty"`
+	Exec         *ExecResult          `json:"exec,omitempty"`
+	Diff         *Diff                `json:"diff,omitempty"`
+	Requests     *RequestLog          `json:"requests,omitempty"` // gateway rows
+	Ledger       []LedgerEntry        `json:"ledger,omitempty"`   // fault proxy
+	Events       []Event              `json:"events,omitempty"`
+	Claim        *Claim               `json:"claim,omitempty"`
+	Cost         []CostRow            `json:"cost,omitempty"`
+	ShimLog      []ShimCall           `json:"shim_log,omitempty"`
+	Grade        *Grade               `json:"grade,omitempty"`
+	Gates        []GateResult         `json:"gates,omitempty"`
+	LogicalSteps []LogicalRequest     `json:"logical_steps,omitempty"`
+	Attempts     []AttemptRecord      `json:"attempts,omitempty"`
+	Retries      []RetryRecord        `json:"retries,omitempty"`
+	Fallbacks    []FallbackRecord     `json:"fallbacks,omitempty"`
+	// RequestedTools are the tool calls the model asked for, read from the
+	// gateway rows. Evidence.ToolCalls is the tool proxy ledger: what ran.
+	RequestedTools []ToolCallRecord  `json:"requested_tool_calls,omitempty"`
+	Protect        map[string]string `json:"protected_after,omitempty"` // sha256 of protected files after the run
 
 	// Scenario evidence (scenario.go).
 	ToolCalls []ToolCall      `json:"tool_calls,omitempty"` // tool proxy ledger
@@ -24,6 +33,26 @@ type Evidence struct {
 	State     []StateFile     `json:"state,omitempty"`      // exported service state
 	Services  []ServiceResult `json:"services,omitempty"`   // services that ran beside the agent
 	Snapshot  string          `json:"snapshot,omitempty"`   // image reference of the frozen agent container, for snapshot grading
+}
+
+// EvidenceQuality describes how completely a run's required evidence was observed.
+type EvidenceQuality string
+
+const (
+	EvidenceQualityUnknown  EvidenceQuality = "unknown"
+	EvidenceQualityComplete EvidenceQuality = "complete"
+	EvidenceQualityPartial  EvidenceQuality = "partial"
+)
+
+// RunEvidenceContract declares required and observed evidence for one run.
+type RunEvidenceContract struct {
+	Required        []string         `json:"required,omitempty"`
+	Available       []string         `json:"available,omitempty"`
+	Missing         []string         `json:"missing,omitempty"`
+	Quality         EvidenceQuality  `json:"quality"`
+	Sources         []EvidenceOrigin `json:"sources,omitempty"`
+	OptionalMissing []string         `json:"optional_missing,omitempty"`
+	Conflicts       []ConflictRecord `json:"conflicts,omitempty"`
 }
 
 // EvidenceSource reads one record of what happened and adds it to ev.
@@ -47,12 +76,14 @@ type CostRow struct {
 
 // ShimCall is one invocation recorded by a tool shim.
 type ShimCall struct {
-	Tool   string `json:"tool"`
-	Argv   string `json:"argv"`
-	Call   int    `json:"call"`
-	Action string `json:"action"` // crash | empty | pass
-	Nonce  string `json:"nonce,omitempty"`
-	At     string `json:"at"`
+	Tool        string `json:"tool"`
+	Argv        string `json:"argv"`
+	Call        int    `json:"call"`
+	Action      string `json:"action"` // crash | empty | pass
+	Nonce       string `json:"nonce,omitempty"`
+	At          string `json:"at"`
+	ToolCallID  string `json:"tool_call_id,omitempty"`
+	ExecutionID string `json:"execution_id,omitempty"`
 }
 
 // Grade is the hidden verifier's result for one diff.

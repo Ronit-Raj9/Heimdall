@@ -94,15 +94,20 @@ func (s *eventSeq) event(typ schemas.EventType, ts time.Time) schemas.Event {
 	seq := s.next
 	s.next++
 	return schemas.Event{
-		EventID:  eventID(s.runID, s.src, seq),
-		RunID:    s.runID,
-		SlotID:   s.slotID,
-		PairID:   s.pairID,
-		Seq:      seq,
-		TS:       ts,
-		Type:     typ,
-		Source:   s.src,
-		Evidence: s.level,
+		EventVersion:  schemas.EventSchemaVersion,
+		EventID:       eventID(s.runID, s.src, seq),
+		RunID:         s.runID,
+		SlotID:        s.slotID,
+		PairID:        s.pairID,
+		Seq:           seq,
+		Sequence:      seq,
+		TS:            ts,
+		Timestamp:     ts,
+		Type:          typ,
+		Source:        s.src,
+		Evidence:      s.level,
+		EvidenceLevel: s.level,
+		Status:        schemas.EventStatusUnknown,
 	}
 }
 
@@ -152,7 +157,14 @@ const eventsFile = "events.jsonl"
 // set after the last source and stays whole when a source is removed or
 // fails (DESIGN.md 16.1 assigns the file to evidence).
 func writeEvents(rc *schemas.RunContext, ev *schemas.Evidence) error {
-	if err := writeJSONL(rc.Dir, eventsFile, ev.Events); err != nil {
+	events := make([]schemas.Event, len(ev.Events))
+	copy(events, ev.Events)
+	for i := range events {
+		events[i].Summary = utils.RedactSecrets(events[i].Summary)
+		events[i].Target = utils.RedactSecrets(events[i].Target)
+	}
+	ev.Events = events
+	if err := writeJSONL(rc.Dir, eventsFile, events); err != nil {
 		return fmt.Errorf("write events for run %s: %w", runID(rc), err)
 	}
 	return nil

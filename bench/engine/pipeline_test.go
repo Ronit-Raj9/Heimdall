@@ -62,10 +62,14 @@ func TestRunSlotHappyPath(t *testing.T) {
 	if got := transitionsOf(rec); strings.Join(got, " ") != strings.Join(want, " ") {
 		t.Fatalf("transitions\n got %v\nwant %v", got, want)
 	}
-	for _, f := range []string{"run.json", "evidence.json", "gates.json", "grade.json", "plan.json", "metrics.json", "receipts.json"} {
+	for _, f := range []string{"run.json", "evidence.json", "gates.json", "grade.json", "plan.json", "metrics.json", "receipts.json", "canonical.json"} {
 		if _, err := os.Stat(filepath.Join(res.Dir, f)); err != nil {
 			t.Errorf("missing %s: %v", f, err)
 		}
+	}
+	canonical, err := os.ReadFile(filepath.Join(res.Dir, "canonical.json"))
+	if err != nil || !strings.Contains(string(canonical), `"canonical_version"`) || run.CanonicalHash == "" {
+		t.Fatalf("canonical artifact missing or untracked: err=%v hash=%q", err, run.CanonicalHash)
 	}
 	plan, _ := os.ReadFile(filepath.Join(res.Dir, "plan.json"))
 	if strings.Contains(string(plan), "sk-") || !strings.Contains(string(plan), "visible") {

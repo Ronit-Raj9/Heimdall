@@ -12,6 +12,7 @@ import (
 	"path/filepath"
 	"sort"
 	"strings"
+	"unicode/utf8"
 
 	"github.com/maximhq/bifrost/bench/schemas"
 	"github.com/maximhq/bifrost/bench/utils"
@@ -71,6 +72,9 @@ func (s *FSStore) Seal(ctx context.Context, run *schemas.Run) (*schemas.SealReco
 	if sealed {
 		return s.resumeSeal(dir, run.RunID, log, entries)
 	}
+	if err := scanRunSecrets(dir); err != nil {
+		return nil, fmt.Errorf("seal run %s: %w", run.RunID, err)
+	}
 	files, err := hashRunFiles(dir)
 	if err != nil {
 		return nil, fmt.Errorf("seal run %s: %w", run.RunID, err)
@@ -105,6 +109,40 @@ func (s *FSStore) Seal(ctx context.Context, run *schemas.Run) (*schemas.SealReco
 	return rec, nil
 }
 
+// scanRunSecrets checks text artifacts before the first seal. Existing sealed
+// runs are never rescanned during reads. Binary files are ignored because
+// their bytes are evidence, not text that can be safely redacted here.
+func scanRunSecrets(dir string) error {
+	var paths []string
+	err := filepath.WalkDir(dir, func(path string, d fs.DirEntry, err error) error {
+		if err != nil {
+			return err
+		}
+		if d.IsDir() || filepath.Base(path) == sealFile {
+			return nil
+		}
+		paths = append(paths, path)
+		return nil
+	})
+	if err != nil {
+		return fmt.Errorf("scan artifacts: %w", err)
+	}
+	sort.Strings(paths)
+	for _, path := range paths {
+		b, err := os.ReadFile(path)
+		if err != nil {
+			return fmt.Errorf("scan %s: %w", filepath.Base(path), err)
+		}
+		if !utf8.Valid(b) {
+			continue
+		}
+		if utils.HasUnredactedSecrets(string(b)) {
+			return fmt.Errorf("unredacted secret in %s: %w", filepath.Base(path), schemas.ErrSealMismatch)
+		}
+	}
+	return nil
+}
+
 // Verify recomputes a run's seal: every file hash, no file added or removed,
 // and the seal hash present in seals.log. A difference returns
 // schemas.ErrSealMismatch wrapped with the first one found, in path order.
@@ -129,6 +167,13 @@ func (s *FSStore) Verify(ctx context.Context, expID, runID string) error {
 	if err := s.verifyRunFiles(dir, rec); err != nil {
 		return fmt.Errorf("verify run %s: %w", runID, err)
 	}
+	var run schemas.Run
+	if err := readJSON(filepath.Join(dir, runFile), &run); err != nil {
+		return fmt.Errorf("verify run %s: read run: %w", runID, err)
+	}
+	if err := verifyCanonicalFile(dir, &run); err != nil {
+		return fmt.Errorf("verify run %s: %w", runID, err)
+	}
 	entries, err := s.readSealsLog(expID)
 	if err != nil {
 		return fmt.Errorf("verify run %s: %w", runID, err)
@@ -139,6 +184,25 @@ func (s *FSStore) Verify(ctx context.Context, expID, runID string) error {
 		}
 	}
 	return fmt.Errorf("verify run %s: seal hash %s not in seals.log: %w", runID, rec.Hash, schemas.ErrSealMismatch)
+}
+
+// verifyCanonicalFile checks the canonical record when a run was written by
+// the current format. Older sealed runs do not have canonical.json or a
+// canonical hash and remain readable.
+func verifyCanonicalFile(dir string, run *schemas.Run) error {
+	if run == nil || run.CanonicalHash == "" {
+		return nil
+	}
+	path := filepath.Join(dir, canonicalFile)
+	b, err := os.ReadFile(path)
+	if err != nil {
+		return fmt.Errorf("read canonical.json: %w", err)
+	}
+	want := "sha256:" + utils.SHA256Bytes(b)
+	if want != run.CanonicalHash {
+		return fmt.Errorf("canonical hash %s, run.json has %s: %w", want, run.CanonicalHash, schemas.ErrSealMismatch)
+	}
+	return nil
 }
 
 // VerifyChain checks that seals.log is one linear chain: every line is well

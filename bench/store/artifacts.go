@@ -42,6 +42,7 @@ const (
 	gatesFile       = "gates.json"
 	receiptsFile    = "receipts.json"
 	evidenceFile    = "evidence.json"
+	canonicalFile   = "canonical.json"
 	leaseFile       = "lease.json"
 	leaseLockFile   = "lease.lock"
 	sealsLogFile    = "seals.log"

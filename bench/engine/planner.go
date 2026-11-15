@@ -201,6 +201,22 @@ func (p *Planner) plan(ctx context.Context, exp *schemas.Experiment, mode planMo
 	if m.Arms, err = p.resolveArms(ctx, &e, suite, conds); err != nil {
 		return nil, fmt.Errorf("plan %s: %w", e.ID, err)
 	}
+	if m.BudgetParity = parityPtr(schemas.BudgetParityOf(&e, m.Arms)); m.BudgetParity.Status == schemas.BudgetParityUnexpectedDifference {
+		return nil, fmt.Errorf("plan %s: unexpected budget difference: %s", e.ID, budgetParityText(*m.BudgetParity))
+	}
+	if gaps, err := checkCapabilities(&e.Requirements, m.Arms); err != nil {
+		return nil, fmt.Errorf("plan %s: %w", e.ID, err)
+	} else {
+		m.CapabilityGaps = gaps
+		for armID, armGaps := range gaps {
+			arm := m.Arms[armID]
+			arm.CapabilityGaps = append([]string(nil), armGaps...)
+			m.Arms[armID] = arm
+		}
+	}
+	if m.TaskIdentities, err = p.taskIdentities(suite, all); err != nil {
+		return nil, fmt.Errorf("plan %s: task identities: %w", e.ID, err)
+	}
 	m.BudgetDiffs = schemas.BudgetDiffsOf(&e, m.Arms)
 	for _, d := range m.BudgetDiffs {
 		p.logger.Warn("arm budgets differ without a set: override; the comparison includes the budget", "experiment", e.ID,
@@ -212,6 +228,11 @@ func (p *Planner) plan(ctx context.Context, exp *schemas.Experiment, mode planMo
 			return nil, fmt.Errorf("plan %s: compatibility agent: %w", e.ID, err)
 		}
 		m.Compatibility = &c
+		if gaps, err := checkCapabilities(&e.Requirements, map[string]schemas.ArmManifest{CompatArm: c}); err != nil {
+			return nil, fmt.Errorf("plan %s: compatibility capabilities: %w", e.ID, err)
+		} else if len(gaps[CompatArm]) > 0 {
+			m.Compatibility.CapabilityGaps = append([]string(nil), gaps[CompatArm]...)
+		}
 	}
 	if err := p.checkScenario(suite, all, m.Arms, m.Compatibility); err != nil {
 		return nil, fmt.Errorf("plan %s: %w", e.ID, err)
@@ -235,6 +256,14 @@ func (p *Planner) plan(ctx context.Context, exp *schemas.Experiment, mode planMo
 	}
 	m.ArmOrder = drawArmOrder(e.Seed, suite.TaskIDs, conds, sortedKeys(m.Arms))
 	m.Slots = buildSlots(m, suite, conds, compat)
+	if m.RunInputs, err = p.runInputs(m, suite, all); err != nil {
+		return nil, fmt.Errorf("plan %s: run inputs: %w", e.ID, err)
+	}
+	for i := range m.Slots {
+		if input, ok := m.RunInputs[m.Slots[i].SlotID]; ok {
+			m.Slots[i].RunInputHash = input.RunInputHash
+		}
+	}
 	if m.Hash, err = ManifestHash(m); err != nil {
 		return nil, err
 	}
@@ -373,7 +402,10 @@ func (p *Planner) resolveArm(ctx context.Context, label, cfgPath string, set map
 	if err != nil {
 		return am, err
 	}
-	return schemas.ArmManifest{Label: label, Config: cfg, ConfigHash: hash, Files: files, ImageID: p.imageID(ctx, suite, cfg.Image)}, nil
+	snapshot := effectiveBudgetSnapshot(&cfg, suite, conds)
+	identity := p.armIdentity(&cfg, hash)
+	identity.BudgetSnapshot = &snapshot
+	return schemas.ArmManifest{Label: label, Config: cfg, ConfigHash: hash, Identity: &identity, BudgetSnapshot: &snapshot, Files: files, ImageID: p.imageID(ctx, suite, cfg.Image)}, nil
 }
 
 // imageID returns the local image id of ref when the suite's environment can
@@ -397,6 +429,248 @@ func (p *Planner) imageID(ctx context.Context, suite *schemas.Suite, ref string)
 		return ""
 	}
 	return id
+}
+
+func (p *Planner) armIdentity(cfg *schemas.AgentConfig, hash string) schemas.CanonicalArmIdentity {
+	identity := schemas.CanonicalArmIdentity{
+		AgentConfigID: cfg.ID, AgentConfigHash: hash, AgentVersion: cfg.AgentVersion,
+		ImageDigest: cfg.ImageDigest, ModelRequested: cfg.Model, GatewayProvider: cfg.Gateway.Provider,
+		GatewayPolicy: cfg.Gateway, Budgets: cfg.Budgets, Capabilities: cfg.Capabilities,
+	}
+	if adapter, ok := findPart(p.reg.Adapters, cfg.Adapter); ok {
+		identity.AdapterVersion = adapter.GetVersion()
+	}
+	if cfg.Parser != "" {
+		if parser, ok := findPart(p.reg.Parsers, cfg.Parser); ok {
+			identity.ParserVersion = parser.GetVersion()
+		}
+	}
+	return identity
+}
+
+func parityPtr(v schemas.BudgetParityResult) *schemas.BudgetParityResult { return &v }
+
+func budgetParityText(p schemas.BudgetParityResult) string {
+	parts := make([]string, 0, len(p.ConfiguredDiffs)+len(p.EffectiveDiffs))
+	for _, diff := range append(append([]schemas.BudgetDiff(nil), p.ConfiguredDiffs...), p.EffectiveDiffs...) {
+		parts = append(parts, budgetText(diff))
+	}
+	return strings.Join(parts, "; ")
+}
+
+func effectiveBudgetSnapshot(cfg *schemas.AgentConfig, suite *schemas.Suite, conds []condPlan) schemas.BudgetSnapshot {
+	effective := cfg.Budgets
+	sources := map[string]string{
+		"wall_s": "agent_config", "turns": "agent_config", "cpus": "agent_config", "mem_gb": "agent_config",
+		"pids_limit": "agent_config", "usd": "agent_config", "max_retries": "agent_config", "max_tool_calls": "agent_config",
+	}
+	if effective.MaxRetries == 0 && cfg.Gateway.MaxRetries > 0 {
+		effective.MaxRetries = cfg.Gateway.MaxRetries
+		sources["max_retries"] = "gateway_policy"
+	}
+	minTaskWall := 0
+	if suite != nil {
+		for _, cond := range conds {
+			for _, id := range cond.tasks {
+				task := suite.TaskByID(id)
+				if task == nil || task.Timeouts.AgentS <= 0 {
+					continue
+				}
+				if minTaskWall == 0 || task.Timeouts.AgentS < minTaskWall {
+					minTaskWall = task.Timeouts.AgentS
+				}
+			}
+		}
+	}
+	if minTaskWall > 0 && (effective.WallS <= 0 || minTaskWall < effective.WallS) {
+		effective.WallS = minTaskWall
+		sources["wall_s"] = "task_limit"
+	}
+	return schemas.BudgetSnapshot{Configured: cfg.Budgets, Effective: effective, Source: sources}
+}
+
+func checkCapabilities(req *schemas.CapabilityRequirements, arms map[string]schemas.ArmManifest) (map[string][]string, error) {
+	gaps := map[string][]string{}
+	if req == nil {
+		return gaps, nil
+	}
+	for armID, arm := range arms {
+		for _, name := range req.Required {
+			if !capabilitySupported(arm.Config.Capabilities, name) {
+				return nil, fmt.Errorf("arm %s lacks required capability %q", armID, name)
+			}
+		}
+		for _, name := range req.Optional {
+			if !capabilitySupported(arm.Config.Capabilities, name) {
+				gaps[armID] = append(gaps[armID], name)
+			}
+		}
+	}
+	return gaps, nil
+}
+
+func capabilitySupported(c *schemas.AdapterCapabilities, name string) bool {
+	if c == nil {
+		return false
+	}
+	switch name {
+	case "streaming":
+		return c.SupportsStreaming
+	case "structured_events":
+		return c.SupportsStructuredEvents
+	case "tool_event_ids":
+		return c.SupportsToolEvents
+	case "notes_file":
+		return c.SupportsNotesFile
+	case "model_override":
+		return c.SupportsModelOverride
+	case "cancellation":
+		return c.SupportsCancellation
+	case "resume":
+		return c.SupportsResume
+	case "gateway_headers":
+		return c.SupportsGatewayHeaders
+	case "external_tool_runner":
+		return c.SupportsToolEvents
+	default:
+		return false
+	}
+}
+
+type taskHashInput struct {
+	SuiteID          string                `json:"suite_id"`
+	SuiteVersion     string                `json:"suite_version"`
+	Task             schemas.Task          `json:"task"`
+	TaskPackageHash  string                `json:"task_package_hash"`
+	TaskLock         taskContentHashes     `json:"task_lock"`
+	SuiteEnvironment string                `json:"suite_environment"`
+	SuiteWorkdir     string                `json:"suite_workdir"`
+	SuiteBaseImage   schemas.ImageSpec     `json:"suite_base_image"`
+	SuiteVerifier    schemas.SuiteVerifier `json:"suite_verifier"`
+	GraderVersion    string                `json:"grader_version"`
+	RequiredEnv      []string              `json:"required_environment,omitempty"`
+}
+
+type taskContentHashes struct {
+	Instruction string `json:"instruction"`
+	Repo        string `json:"repo"`
+	Verifier    string `json:"verifier"`
+	Controls    string `json:"controls"`
+	Fixtures    string `json:"fixtures"`
+}
+
+// taskHash returns the identity of the task package. It excludes conditions,
+// probes, arms, models and run-specific values; those belong to run_input_hash.
+func (p *Planner) taskHash(suite *schemas.Suite, task *schemas.Task) (string, error) {
+	if suite == nil || task == nil {
+		return "", errors.New("task hash: suite and task are required")
+	}
+	packageHash, err := utils.CanonicalTreeHash(task.Dir)
+	if err != nil {
+		return "", fmt.Errorf("hash task package %s: %w", task.ID, err)
+	}
+	var hashes taskContentHashes
+	if suite.Lock != nil {
+		lock := suite.Lock.Tasks[task.ID]
+		hashes = taskContentHashes{Instruction: lock.InstructionSHA256, Repo: lock.RepoTreeSHA256,
+			Verifier: lock.VerifierSHA256, Controls: lock.ControlsSHA256, Fixtures: lock.FixturesSHA256}
+	}
+	graderVersion := ""
+	if grader, ok := findPart(p.reg.Graders, suite.Grader); ok {
+		graderVersion = grader.GetVersion()
+	}
+	required := append([]string(nil), task.Verifier.Required...)
+	sort.Strings(required)
+	input := taskHashInput{SuiteID: suite.ID, SuiteVersion: suite.Version, Task: *task, TaskPackageHash: packageHash, TaskLock: hashes,
+		SuiteEnvironment: suite.Environment, SuiteWorkdir: suite.Workdir, SuiteBaseImage: suite.BaseImage,
+		SuiteVerifier: suite.Verifier, GraderVersion: graderVersion, RequiredEnv: required}
+	hash, err := utils.HashJSON(input)
+	if err != nil {
+		return "", fmt.Errorf("hash task %s: %w", task.ID, err)
+	}
+	return hash, nil
+}
+
+func (p *Planner) taskIdentities(suite *schemas.Suite, conds []condPlan) ([]schemas.CanonicalTaskIdentity, error) {
+	var out []schemas.CanonicalTaskIdentity
+	for _, c := range conds {
+		for trial := 1; trial <= c.trials; trial++ {
+			for _, id := range c.tasks {
+				task := suite.TaskByID(id)
+				hash, err := p.taskHash(suite, task)
+				if err != nil {
+					return nil, err
+				}
+				out = append(out, schemas.CanonicalTaskIdentity{SuiteID: suite.ID, SuiteVersion: suite.Version,
+					TaskID: task.ID, TaskVersion: task.Version, TaskHash: hash, Condition: c.id, Trial: trial})
+			}
+		}
+	}
+	return out, nil
+}
+
+func taskHashFor(m *schemas.Manifest, task, condition string) string {
+	for _, identity := range m.TaskIdentities {
+		if identity.TaskID == task && identity.Condition == condition {
+			return identity.TaskHash
+		}
+	}
+	return ""
+}
+
+func (p *Planner) runInputs(m *schemas.Manifest, suite *schemas.Suite, conds []condPlan) (map[string]schemas.RunInputIdentity, error) {
+	inputs := make(map[string]schemas.RunInputIdentity, len(m.Slots))
+	for i := range m.Slots {
+		slot := &m.Slots[i]
+		arm, err := armConfig(m, slot)
+		if err != nil {
+			return nil, err
+		}
+		probe := suite.ProbeByID(slot.Condition)
+		probeHash := ""
+		if probe != nil {
+			probeHash, err = utils.HashJSON(probe)
+			if err != nil {
+				return nil, fmt.Errorf("hash probe %s: %w", probe.ID, err)
+			}
+		}
+		policyHash, err := utils.HashJSON(arm.Config.Gateway)
+		if err != nil {
+			return nil, fmt.Errorf("hash gateway policy for arm %s: %w", slot.Arm, err)
+		}
+		envHash, err := environmentPolicyHash(arm.Config.Env)
+		if err != nil {
+			return nil, fmt.Errorf("hash environment policy for arm %s: %w", slot.Arm, err)
+		}
+		identity := schemas.RunInputIdentity{TaskHash: taskHashFor(m, slot.Task, slot.Condition), Condition: slot.Condition,
+			ProbeHash: probeHash, ArmConfigHash: arm.ConfigHash, ModelRequested: arm.Config.Model,
+			GatewayProvider: arm.Config.Gateway.Provider, GatewayPolicyHash: policyHash, EnvironmentPolicyHash: envHash}
+		hash, err := utils.HashJSON(struct {
+			Identity schemas.RunInputIdentity `json:"identity"`
+			Budgets  schemas.Budgets          `json:"budgets"`
+			Suite    string                   `json:"suite"`
+			Workdir  string                   `json:"workdir"`
+		}{Identity: identity, Budgets: arm.Config.Budgets, Suite: suite.Environment, Workdir: suite.Workdir})
+		if err != nil {
+			return nil, fmt.Errorf("hash run input for slot %s: %w", slot.SlotID, err)
+		}
+		identity.RunInputHash = hash
+		inputs[slot.SlotID] = identity
+	}
+	return inputs, nil
+}
+
+func environmentPolicyHash(env map[string]string) (string, error) {
+	policy := make(map[string]string, len(env))
+	for name, value := range env {
+		upper := strings.ToUpper(name)
+		if strings.Contains(upper, "KEY") || strings.Contains(upper, "TOKEN") || strings.Contains(upper, "SECRET") || strings.Contains(upper, "PASSWORD") || strings.Contains(upper, "AUTH") {
+			policy[name] = "[redacted]"
+			continue
+		}
+		policy[name] = value
+	}
+	return utils.HashJSON(policy)
 }
 
 func (p *Planner) checkAgent(cfg *schemas.AgentConfig) error {
@@ -916,6 +1190,7 @@ func buildSlots(m *schemas.Manifest, suite *schemas.Suite, conds, compat []condP
 			Suite:       suite.ID,
 			Task:        task,
 			TaskVersion: suite.TaskByID(task).Version,
+			TaskHash:    taskHashFor(m, task, c.id),
 			Arm:         arm,
 			Condition:   c.id,
 			Trial:       trial,

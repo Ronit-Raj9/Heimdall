@@ -109,8 +109,24 @@ func TestShippedAgentConfigs(t *testing.T) {
 			if adapter == nil {
 				t.Fatalf("no adapter %q", agent.Adapter)
 			}
-			if _, err := adapter.Plan(context.Background(), rc); err != nil {
-				t.Fatalf("plan: %v", err)
+			validator, ok := adapter.(schemas.AdapterValidator)
+			if !ok {
+				t.Fatal("adapter does not implement AdapterValidator")
+			}
+			if err := validator.Validate(context.Background(), rc); err != nil {
+				t.Fatalf("validate: %v", err)
+			}
+			runner, ok := adapter.(schemas.AdapterRunner)
+			if !ok {
+				t.Fatal("adapter does not implement AdapterRunner")
+			}
+			if plan, err := runner.BuildExecutionPlan(context.Background(), rc); err != nil || plan == nil {
+				t.Fatalf("build execution plan: plan=%v err=%v", plan, err)
+			}
+			if cleanup, ok := adapter.(schemas.AdapterCleanup); ok {
+				if err := cleanup.Cleanup(context.Background(), rc); err != nil {
+					t.Fatalf("cleanup: %v", err)
+				}
 			}
 		})
 	}
@@ -253,5 +269,24 @@ func TestMiniSWEAgentConfigPlan(t *testing.T) {
 	}
 	if agent.Gateway.Provider != "openai" || agent.Notes.ProjectFile != "AGENTS.md" || agent.Parser != "" {
 		t.Errorf("gateway %+v, notes %+v, parser %q", agent.Gateway, agent.Notes, agent.Parser)
+	}
+}
+
+func TestAdaptersImplementAdditiveContracts(t *testing.T) {
+	for _, adapter := range Builtin(CommandConfig{GatewayAgentURL: "http://bifrost:8080", EvalNetwork: "bench"}) {
+		t.Run(adapter.GetName(), func(t *testing.T) {
+			if _, ok := adapter.(schemas.AdapterMetadata); !ok {
+				t.Error("missing AdapterMetadata")
+			}
+			if _, ok := adapter.(schemas.AdapterValidator); !ok {
+				t.Error("missing AdapterValidator")
+			}
+			if _, ok := adapter.(schemas.AdapterRunner); !ok {
+				t.Error("missing AdapterRunner")
+			}
+			if _, ok := adapter.(schemas.AdapterCleanup); !ok {
+				t.Error("missing AdapterCleanup")
+			}
+		})
 	}
 }

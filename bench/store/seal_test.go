@@ -92,6 +92,34 @@ func TestSealAndVerify(t *testing.T) {
 	}
 }
 
+func TestVerifyCanonicalFile(t *testing.T) {
+	dir := t.TempDir()
+	canonical := []byte(`{"canonical_version":"1.0"}`)
+	if err := os.WriteFile(filepath.Join(dir, "canonical.json"), canonical, 0o644); err != nil {
+		t.Fatal(err)
+	}
+	run := &schemas.Run{RunID: "r_1", CanonicalHash: "sha256:" + utils.SHA256Bytes(canonical)}
+	if err := verifyCanonicalFile(dir, run); err != nil {
+		t.Fatalf("verify canonical: %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(dir, "canonical.json"), []byte(`{"canonical_version":"2.0"}`), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := verifyCanonicalFile(dir, run); !errors.Is(err, schemas.ErrSealMismatch) {
+		t.Fatalf("tampered canonical err = %v, want ErrSealMismatch", err)
+	}
+}
+
+func TestSealRejectsUnredactedSecret(t *testing.T) {
+	s := newTestStore(t, nil)
+	m := mustCreateExp(t, s, "e_secret")
+	r := mustNewRun(t, s, m, "s_a1", "r_secret", 1, schemas.OutcomePass)
+	mustWrite(t, s, r, "events.jsonl", `{"authorization":"Bearer live-secret"}`+"\n")
+	if _, err := s.Seal(context.Background(), r); !errors.Is(err, schemas.ErrSealMismatch) {
+		t.Fatalf("seal err = %v, want ErrSealMismatch", err)
+	}
+}
+
 func TestVerifyDetectsTampering(t *testing.T) {
 	ctx := context.Background()
 	tests := []struct {

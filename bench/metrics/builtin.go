@@ -18,6 +18,7 @@ func Builtin() []schemas.Metric {
 		newSafeSuccessMetric(),
 		newStepsMetric(),
 		newToolCallsMetric(),
+		newToolCallsExecutedMetric(),
 		newTokensMetric(),
 		newCostUSDMetric(),
 		newWallTimeMetric(),

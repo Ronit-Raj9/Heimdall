@@ -43,6 +43,20 @@ func (p *claudeCodeParser) GetName() string { return ParserClaudeCode }
 // GetVersion implements schemas.Part.
 func (p *claudeCodeParser) GetVersion() string { return claudeCodeVersion }
 
+// ParseExecutionOutput implements schemas.AdapterResultParser.
+func (p *claudeCodeParser) ParseExecutionOutput(ctx context.Context, rc *schemas.RunContext, raw []byte) (*schemas.ParseResult, error) {
+	return p.Parse(ctx, rc, raw)
+}
+
+// CollectEvents implements schemas.AdapterEventSource.
+func (p *claudeCodeParser) CollectEvents(ctx context.Context, rc *schemas.RunContext, raw []byte) ([]schemas.Event, error) {
+	res, err := p.Parse(ctx, rc, raw)
+	if err != nil || res == nil {
+		return nil, err
+	}
+	return res.Events, nil
+}
+
 // Parse reads `claude -p --output-format stream-json --verbose` output.
 //
 // The format is the Agent SDK's SDKMessage union, one JSON object per line
@@ -81,6 +95,7 @@ func ClaimFromText(s string) *schemas.Claim {
 type streamState struct {
 	runID, slotID, pairID string
 	provider, modelReq    string
+	parserVersion         string
 
 	events    []schemas.Event
 	seq       int
@@ -142,18 +157,24 @@ func (st *streamState) handle(obj map[string]json.RawMessage) {
 func (st *streamState) newEvent(typ schemas.EventType, turn int) int {
 	st.seq++
 	st.events = append(st.events, schemas.Event{
-		EventID:   fmt.Sprintf("%s:%s:%d", st.runID, schemas.SourceAgentStream, st.seq),
-		RunID:     st.runID,
-		SlotID:    st.slotID,
-		PairID:    st.pairID,
-		Seq:       st.seq,
-		TurnIndex: turn,
-		TS:        st.ts,
-		Type:      typ,
-		Source:    schemas.SourceAgentStream,
-		Evidence:  schemas.EvidenceNative,
-		Provider:  st.provider,
-		ModelReq:  st.modelReq,
+		EventVersion:  schemas.EventSchemaVersion,
+		EventID:       fmt.Sprintf("%s:%s:%d", st.runID, schemas.SourceAgentStream, st.seq),
+		RunID:         st.runID,
+		SlotID:        st.slotID,
+		PairID:        st.pairID,
+		Seq:           st.seq,
+		Sequence:      st.seq,
+		TurnIndex:     turn,
+		TS:            st.ts,
+		Timestamp:     st.ts,
+		Type:          typ,
+		Source:        schemas.SourceAgentStream,
+		Evidence:      schemas.EvidenceNative,
+		EvidenceLevel: schemas.EvidenceNative,
+		Status:        schemas.EventStatusUnknown,
+		ParserVersion: st.parserVersion,
+		Provider:      st.provider,
+		ModelReq:      st.modelReq,
 	})
 	return len(st.events) - 1
 }

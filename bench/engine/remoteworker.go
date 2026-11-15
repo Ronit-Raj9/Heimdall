@@ -346,8 +346,16 @@ func (w *Worker) check(ctx context.Context, lease *schemas.WorkerLease, m *schem
 func adoptUnrepeatable(local, remote *schemas.Manifest) {
 	local.CreatedAt = remote.CreatedAt
 	if len(local.Slots) == len(remote.Slots) {
+		// The run inputs are keyed by slot id, so they follow the adopted ids.
+		inputs := make(map[string]schemas.RunInputIdentity, len(local.RunInputs))
 		for i := range local.Slots {
+			if in, ok := local.RunInputs[local.Slots[i].SlotID]; ok {
+				inputs[remote.Slots[i].SlotID] = in
+			}
 			local.Slots[i].SlotID, local.Slots[i].PairID = remote.Slots[i].SlotID, remote.Slots[i].PairID
+		}
+		if local.RunInputs != nil {
+			local.RunInputs = inputs
 		}
 	}
 	local.Gateway = remote.Gateway

@@ -20,6 +20,7 @@ func TestBuiltin(t *testing.T) {
 		{name: SafeSuccess, kind: schemas.KindRate, higher: true, min: schemas.EvidenceOutcome},
 		{name: Steps, kind: schemas.KindCount, min: schemas.EvidenceGateway, ps2: true},
 		{name: ToolCalls, kind: schemas.KindCount, min: schemas.EvidenceGateway, ps2: true},
+		{name: ToolCallsExecuted, kind: schemas.KindCount, min: schemas.EvidenceBoundary},
 		{name: Tokens, kind: schemas.KindTokens, min: schemas.EvidenceGateway, ps2: true},
 		{name: CostUSD, kind: schemas.KindUSD, min: schemas.EvidenceGateway, ps2: true},
 		{name: WallTimeS, kind: schemas.KindDuration, min: schemas.EvidenceOutcome, ps2: true},

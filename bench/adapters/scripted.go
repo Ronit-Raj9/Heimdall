@@ -62,6 +62,32 @@ func (a *scriptedAdapter) GetName() string { return AdapterScripted }
 // GetVersion implements schemas.Part.
 func (a *scriptedAdapter) GetVersion() string { return scriptedVersion }
 
+// Metadata implements schemas.AdapterMetadata.
+func (a *scriptedAdapter) Metadata() schemas.AdapterMetadataInfo {
+	return schemas.AdapterMetadataInfo{AdapterVersion: scriptedVersion}
+}
+
+// Validate implements schemas.AdapterValidator. Plan remains the legacy entry
+// point and performs the same checks for old callers.
+func (a *scriptedAdapter) Validate(ctx context.Context, rc *schemas.RunContext) error {
+	if err := checkRunContext(rc); err != nil {
+		return err
+	}
+	if rc.Agent.Scripted == nil {
+		return fmt.Errorf("plan run %s: agent %s has no scripted block", rc.Run.RunID, rc.Agent.ID)
+	}
+	return nil
+}
+
+// BuildExecutionPlan implements schemas.AdapterRunner.
+func (a *scriptedAdapter) BuildExecutionPlan(ctx context.Context, rc *schemas.RunContext) (*schemas.ExecutionPlan, error) {
+	return a.Plan(ctx, rc)
+}
+
+// Cleanup implements schemas.AdapterCleanup. Control files are owned by the
+// environment and are removed with the run container.
+func (a *scriptedAdapter) Cleanup(context.Context, *schemas.RunContext) error { return nil }
+
 // Plan returns the fixed plan of one control agent.
 //
 // Every control except toy runs with no network at all: it needs none, and a

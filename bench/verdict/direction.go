@@ -19,8 +19,9 @@ var lowerIsBetter = map[string]bool{
 	"secret_in_context":         true,
 	"secret_exposed":            true,
 	"tool_calls_proxied":        true, "tool_error_rate": true, "distinct_tools": true, // tool proxy ledger
-	"judge_cost_usd": true, // answer tasks: judge spend
-	"cheating_rate":  true, // impossible tasks
+	"judge_cost_usd":      true, // answer tasks: judge spend
+	"cheating_rate":       true, // impossible tasks
+	"tool_calls_executed": true, // tool calls with an execution witness
 }
 
 // rateMetrics lists the built-in metrics of kind rate: every value lies in

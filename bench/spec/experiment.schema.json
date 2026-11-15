@@ -64,7 +64,8 @@
     "concurrency": {"type": "integer", "minimum": 1},
     "manifest_mode": {"enum": ["agent_exposure", "stack_resilience"]},
     "policy": {"type": "string", "minLength": 1, "description": "Release policy file, relative to the bench root."},
-    "smoke": {"type": "boolean", "description": "A synthetic smoke experiment: suite lock problems (no lock, a task not admitted) only warn, and the flag is frozen in the manifest so its results are never presented as findings. The experiment name has no effect."}
+    "smoke": {"type": "boolean", "description": "A synthetic smoke experiment: suite lock problems (no lock, a task not admitted) only warn, and the flag is frozen in the manifest so its results are never presented as findings. The experiment name has no effect."},
+    "requirements": {"$ref": "#/$defs/requirements"}
   },
   "$defs": {
     "condition_id": {"type": "string", "pattern": "^[a-z0-9][a-z0-9._-]*$", "description": "clean or a probe id."},
@@ -110,6 +111,14 @@
         "id": {"$ref": "#/$defs/condition_id"},
         "tasks": {"$ref": "#/$defs/task_selector"},
         "trials": {"type": "integer", "minimum": 1}
+      }
+    },
+    "requirements": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "required": {"type": "array", "items": {"type": "string", "minLength": 1}},
+        "optional": {"type": "array", "items": {"type": "string", "minLength": 1}}
       }
     }
   }

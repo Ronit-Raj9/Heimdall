@@ -61,6 +61,9 @@ func (s *gatewaySource) Collect(ctx context.Context, rc *schemas.RunContext, ev 
 		return fmt.Errorf("fetch gateway requests for run %s: %w", id, errNoLog)
 	}
 	ev.Requests = log
+	ev.LogicalSteps, ev.Attempts, ev.Retries, ev.Fallbacks, ev.RequestedTools = NormalizeRequestRecords(log)
+	log = redactRequestLog(log)
+	ev.Requests = log
 	utils.MarkExternalTraffic(rc, log) // Remote area: a remote_http agent's external model calls leave tokens, cost and steps unknown
 	if err := writeJSONL(rc.Dir, requestsFile, log.Requests); err != nil {
 		return fmt.Errorf("write gateway requests for run %s: %w", id, err)
@@ -72,6 +75,20 @@ func (s *gatewaySource) Collect(ctx context.Context, rc *schemas.RunContext, ev 
 	}
 	ev.Events = append(ev.Events, events...)
 	return writeEvents(rc, ev)
+}
+
+func redactRequestLog(log *schemas.RequestLog) *schemas.RequestLog {
+	if log == nil {
+		return nil
+	}
+	out := *log
+	out.Requests = make([]schemas.GatewayRequest, len(log.Requests))
+	for i, row := range log.Requests {
+		out.Requests[i] = row
+		out.Requests[i].Raw = nil
+		out.Requests[i].ErrorMessage = utils.RedactSecrets(row.ErrorMessage)
+	}
+	return &out
 }
 
 var (
@@ -114,6 +131,87 @@ func NormalizeRequests(rc *schemas.RunContext, log *schemas.RequestLog) []schema
 		n.row(r, rootOf(r, parent))
 	}
 	return n.events
+}
+
+// NormalizeRequestRecords extracts logical requests, physical attempts,
+// retries, fallbacks and requested tools from the gateway rows. It is pure.
+func NormalizeRequestRecords(log *schemas.RequestLog) ([]schemas.LogicalRequest, []schemas.AttemptRecord, []schemas.RetryRecord, []schemas.FallbackRecord, []schemas.ToolCallRecord) {
+	if log == nil {
+		return nil, nil, nil, nil, nil
+	}
+	rows := messageRowsInOrder(log.Requests)
+	parents := map[string]string{}
+	for _, row := range rows {
+		if row.ID != "" {
+			parents[row.ID] = row.ParentID
+		}
+	}
+	logical := []schemas.LogicalRequest{}
+	attempts := []schemas.AttemptRecord{}
+	retries := []schemas.RetryRecord{}
+	fallbacks := []schemas.FallbackRecord{}
+	tools := []schemas.ToolCallRecord{}
+	steps := map[string]int{}
+	seenTools := map[string]bool{}
+	for rowIndex, row := range rows {
+		root := rootOf(row, parents)
+		if root == "" {
+			root = fmt.Sprintf("request:%d", rowIndex)
+		}
+		step, ok := steps[root]
+		if !ok {
+			step = len(logical) + 1
+			steps[root] = step
+			logical = append(logical, schemas.LogicalRequest{LogicalRequestID: root, LogicalStep: step, RequestID: root, Status: row.Status})
+		}
+		trail := row.Attempts
+		if len(trail) == 0 {
+			trail = []schemas.Attempt{{N: 1, StatusCode: rowStatusCode(row)}}
+		}
+		for attemptIndex, attempt := range trail {
+			n := attempt.N
+			if n == 0 {
+				n = attemptIndex + 1
+			}
+			attemptID := fmt.Sprintf("%s:attempt:%d", root, n)
+			status := fmt.Sprintf("%d", attempt.StatusCode)
+			if attempt.StatusCode == 0 {
+				status = row.Status
+			}
+			attempts = append(attempts, schemas.AttemptRecord{AttemptID: attemptID, LogicalRequestID: root, AttemptNumber: n,
+				Reason: attempt.FailReason, Provider: row.Provider, Model: row.ModelServed, Status: status, RetryType: "bifrost"})
+			if attemptIndex > 0 {
+				retries = append(retries, schemas.RetryRecord{AttemptID: attemptID, LogicalRequestID: root, AttemptNumber: n,
+					Reason: attempt.FailReason, Provider: row.Provider, Model: row.ModelServed, Status: status, RetryType: "bifrost"})
+			}
+		}
+		if row.FallbackIndex > 0 {
+			fallbacks = append(fallbacks, schemas.FallbackRecord{FallbackIndex: row.FallbackIndex, LogicalRequestID: root,
+				RequestedProvider: row.Provider, ServedProvider: row.Provider, RequestedModel: row.ModelRequested,
+				ServedModel: row.ModelServed, Reason: "gateway fallback"})
+		}
+		for callIndex, call := range row.ToolCalls {
+			id := call.ID
+			if id == "" {
+				id = fmt.Sprintf("%s:tool:%d", root, callIndex)
+			}
+			if seenTools[id] {
+				continue
+			}
+			seenTools[id] = true
+			tools = append(tools, schemas.ToolCallRecord{ToolCallID: id, LogicalStep: step, ToolName: call.Name,
+				Requested: true, RequestSource: schemas.EvidenceSourceBifrostLog, ExecutionSource: schemas.EvidenceSourceUnknown,
+				Evidence: schemas.EvidenceStrong})
+		}
+	}
+	return logical, attempts, retries, fallbacks, tools
+}
+
+func rowStatusCode(row schemas.GatewayRequest) int {
+	if row.Status == statusSuccess {
+		return 200
+	}
+	return row.ErrorStatus
 }
 
 // normalizer carries the state NormalizeRequests needs across rows.

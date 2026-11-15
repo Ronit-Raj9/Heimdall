@@ -53,6 +53,35 @@ func (a *commandAdapter) GetName() string { return AdapterCommand }
 // GetVersion implements schemas.Part.
 func (a *commandAdapter) GetVersion() string { return commandVersion }
 
+// Metadata implements schemas.AdapterMetadata.
+func (a *commandAdapter) Metadata() schemas.AdapterMetadataInfo {
+	return schemas.AdapterMetadataInfo{AdapterVersion: commandVersion}
+}
+
+// Validate implements schemas.AdapterValidator. Plan remains the legacy
+// entry point and performs the same checks for old callers.
+func (a *commandAdapter) Validate(ctx context.Context, rc *schemas.RunContext) error {
+	if err := checkRunContext(rc); err != nil {
+		return err
+	}
+	if rc.Key == nil || rc.Key.Value == "" {
+		return fmt.Errorf("plan run %s: no run key", rc.Run.RunID)
+	}
+	if a.cfg.GatewayAgentURL == "" {
+		return fmt.Errorf("plan run %s: gateway agent url not configured", rc.Run.RunID)
+	}
+	return nil
+}
+
+// BuildExecutionPlan implements schemas.AdapterRunner.
+func (a *commandAdapter) BuildExecutionPlan(ctx context.Context, rc *schemas.RunContext) (*schemas.ExecutionPlan, error) {
+	return a.Plan(ctx, rc)
+}
+
+// Cleanup implements schemas.AdapterCleanup. The command adapter has no
+// adapter-owned files outside the environment's run folder.
+func (a *commandAdapter) Cleanup(context.Context, *schemas.RunContext) error { return nil }
+
 // Plan renders the agent's argv, env and files and resolves its budgets. A
 // scenario run also gets its skills (addSkills) and its MCP servers (mcpVars,
 // addMCP); a run with neither gets exactly the plan it always did.

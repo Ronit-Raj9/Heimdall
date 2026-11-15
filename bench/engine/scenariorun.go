@@ -161,7 +161,21 @@ func (p *Pipeline) runSessions(ctx context.Context, st *runState) error {
 // plan's. Scenario variables are added to the plan's environment only when
 // the run has any (scenarioEnv), so a plain task's plan is unchanged.
 func (p *Pipeline) execOnce(ctx context.Context, st *runState, sess *schemas.SessionSpec) (*schemas.ExecResult, error) {
-	plan, err := st.adapter.Plan(ctx, st.rc)
+	// An adapter that implements the harness-neutral contract is validated
+	// first and asked for its execution plan; any other adapter is planned
+	// through the legacy entry point.
+	if validator, ok := st.adapter.(schemas.AdapterValidator); ok {
+		if err := validator.Validate(ctx, st.rc); err != nil {
+			return nil, wrapPart("adapter", st.adapter, fmt.Errorf("validate: %w", err))
+		}
+	}
+	var plan *schemas.RunPlan
+	var err error
+	if runner, ok := st.adapter.(schemas.AdapterRunner); ok {
+		plan, err = runner.BuildExecutionPlan(ctx, st.rc)
+	} else {
+		plan, err = st.adapter.Plan(ctx, st.rc)
+	}
 	if err != nil {
 		return nil, wrapPart("adapter", st.adapter, fmt.Errorf("plan: %w", err))
 	}

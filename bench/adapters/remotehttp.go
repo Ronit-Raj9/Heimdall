@@ -55,6 +55,32 @@ func (a *remoteHTTPAdapter) GetName() string { return AdapterRemoteHTTP }
 // GetVersion implements schemas.Part.
 func (a *remoteHTTPAdapter) GetVersion() string { return remoteHTTPVersion }
 
+// Metadata implements schemas.AdapterMetadata.
+func (a *remoteHTTPAdapter) Metadata() schemas.AdapterMetadataInfo {
+	return schemas.AdapterMetadataInfo{AdapterVersion: remoteHTTPVersion}
+}
+
+// Validate implements schemas.AdapterValidator. Plan remains the legacy entry
+// point and performs the same checks, and more, for old callers.
+func (a *remoteHTTPAdapter) Validate(_ context.Context, rc *schemas.RunContext) error {
+	if err := checkRunContext(rc); err != nil {
+		return err
+	}
+	if rc.Agent.Remote == nil {
+		return fmt.Errorf("plan run %s: agent %s has no remote block", rc.Run.RunID, rc.Agent.ID)
+	}
+	return nil
+}
+
+// BuildExecutionPlan implements schemas.AdapterRunner.
+func (a *remoteHTTPAdapter) BuildExecutionPlan(ctx context.Context, rc *schemas.RunContext) (*schemas.ExecutionPlan, error) {
+	return a.Plan(ctx, rc)
+}
+
+// Cleanup implements schemas.AdapterCleanup. The launcher's files live in the
+// run container and are removed with it.
+func (a *remoteHTTPAdapter) Cleanup(context.Context, *schemas.RunContext) error { return nil }
+
 // Plan returns the launcher's plan.
 //
 // Only a task whose output kind is answer can run: the agent is not beside
