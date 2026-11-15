@@ -54,18 +54,19 @@ type CatalogGate struct {
 // Registry is the set of parts main.go assembles. Each slice comes from one
 // package's Builtin(). It is built once and read-only afterwards.
 type Registry struct {
-	Loaders      []SuiteLoader
-	Environments []Environment
-	Adapters     []AgentAdapter
-	Parsers      []Parser
-	ProbeLayers  []ProbeLayer
-	Evidence     []EvidenceSource
-	Graders      []Grader
-	Gates        []Gate
-	Metrics      []Metric
-	Policies     []VerdictPolicy
-	Reporters    []Reporter
-	Gateway      Gateway
-	Fault        FaultController // nil when no fault proxy is configured
-	Store        Store
+	Loaders       []SuiteLoader
+	Environments  []Environment
+	Adapters      []AgentAdapter
+	Parsers       []Parser
+	ProbeLayers   []ProbeLayer
+	Evidence      []EvidenceSource
+	Graders       []Grader
+	Gates         []Gate
+	Metrics       []Metric
+	Policies      []VerdictPolicy
+	Reporters     []Reporter
+	Gateway       Gateway
+	AdapterFaults AdapterFaultController
+	Fault         FaultController // nil when no fault proxy is configured
+	Store         Store
 }

@@ -36,10 +36,11 @@ const maxHelperArg = 96 << 10
 
 // Deps are the services the probe layers need. main.go builds it once.
 type Deps struct {
-	Docker      utils.Docker            // runs the docker CLI
-	HelperImage string                  // trusted image with sh, base64, sha256sum, head
-	Fault       schemas.FaultController // the fault proxy's control API, for the gateway layer
-	Logger      schemas.Logger
+	Docker       utils.Docker            // runs the docker CLI
+	HelperImage  string                  // trusted image with sh, base64, sha256sum, head
+	Fault        schemas.FaultController // the fault proxy's control API, for the gateway layer
+	AdapterFault schemas.AdapterFaultController
+	Logger       schemas.Logger
 }
 
 // Builtin returns the probe layers that ship with the bench, in arming order.
@@ -56,6 +57,7 @@ func Builtin(deps Deps) []schemas.ProbeLayer {
 		newToolFaultLayer(deps), // tool proxy faults (Tool proxy and MCP)
 		// condition data planted in services (Tool safety)
 		newServiceLayer(deps.Logger),
+		newAdapterLayer(deps.AdapterFault),
 	}
 }
 

@@ -436,8 +436,9 @@ func (p *Pipeline) canonicalRun(st *runState, gates []schemas.GateResult) (*sche
 		RunInput: input, Arm: st.rc.Slot.Arm, Agent: armIdentity, Budgets: budget,
 		ModelRequested: runModelRequested(st), ModelServed: runModelServed(st), Events: append([]schemas.Event(nil), st.ev.Events...),
 		Grade: st.ev.Grade, Gates: append([]schemas.GateResult(nil), gates...), Metrics: st.metrics,
-		EvidenceStatus: status, LogicalSteps: st.ev.LogicalSteps, Attempts: st.ev.Attempts,
+		EvidenceStatus: status, AgentTrace: st.ev.AgentTrace, LogicalSteps: st.ev.LogicalSteps, Attempts: st.ev.Attempts,
 		Retries: st.ev.Retries, Fallbacks: st.ev.Fallbacks, ToolCalls: st.ev.RequestedTools,
+		AdapterFault: st.ev.AdapterFault,
 	}, nil
 }
 
@@ -591,8 +592,9 @@ func afterContext(ctx context.Context) (context.Context, context.CancelFunc) {
 	return context.WithTimeout(context.WithoutCancel(ctx), cleanupTimeout)
 }
 
-// trimEvidence drops the large raw gateway rows; gateway.requests.jsonl keeps
-// them.
+// trimEvidence drops the large raw gateway rows; gateway.raw.jsonl keeps a
+// secret-scanned audit copy and gateway.requests.jsonl keeps the redacted
+// summary rows.
 func trimEvidence(ev *schemas.Evidence) schemas.Evidence {
 	out := *ev
 	if ev.Requests != nil {

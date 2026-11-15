@@ -38,6 +38,7 @@ func Builtin() []schemas.Metric {
 		newExternalCallsMetric(), newExternalUnmatchedMetric(), newExternalErrorRateMetric(), // external API rows of the tool proxy ledger
 		newSkillFilesReadMetric(), // skills: installed skill files the agent read
 		newCheatingRateMetric(),   // impossible tasks: passes before the impossible_pass veto
+		&adapterFaultIssuedMetric{}, &adapterFaultRecoveryMetric{},
 		// Tool proxy traffic relayed without being parsed.
 		newToolTrafficUnparsedMetric(),
 		// Agent steps: the step timeline and the trusted observers.

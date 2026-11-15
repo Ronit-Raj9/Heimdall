@@ -15,6 +15,7 @@ func Builtin(cfg CommandConfig) []schemas.AgentAdapter {
 // BuiltinParsers lists every agent output parser shipped with the bench.
 func BuiltinParsers() []schemas.Parser {
 	return []schemas.Parser{
+		newProtocolParser(),
 		newClaudeCodeParser(),
 		newCodexParser(),
 		newOpenCodeParser(),

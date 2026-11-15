@@ -103,6 +103,12 @@ func TestCheckRows(t *testing.T) {
 				environments.NetWatchRecord{T: environments.NetWatchSYN, Dst: "172.20.0.9", Port: 443})
 		}, want: map[string]string{rowEgress: checkFail}, detail: "2 hosts other than the gateway: 172.20.0.9:443, telemetry.example.com"},
 		{name: "parser read nothing", mutate: func(in *checkInput) { in.agent.Parser = "codex" }, want: map[string]string{rowEvidence: checkWarn}, detail: "parser codex read no events"},
+		{name: "protocol trace with malformed records", mutate: func(in *checkInput) {
+			in.ev.AgentTrace = &schemas.ParseDiagnostics{Source: schemas.TraceSourceProtocol, Quality: schemas.TraceQualityPartial, Emitted: 2, Malformed: 1}
+		}, want: map[string]string{rowEvidence: checkWarn}, detail: "protocol trace: partial"},
+		{name: "no captured trace", mutate: func(in *checkInput) {
+			in.ev.AgentTrace = &schemas.ParseDiagnostics{Source: schemas.TraceSourceNone, Quality: schemas.TraceQualityUnavailable}
+		}, want: map[string]string{rowEvidence: checkWarn}, detail: "none trace: unavailable"},
 		{name: "incomplete gateway rows", mutate: func(in *checkInput) {
 			in.ev.Requests.Complete, in.ev.Requests.Reason = false, "1 of 2 ledger entries have no row"
 		}, want: map[string]string{rowEvidence: checkWarn}, detail: "1 of 2 ledger entries"},

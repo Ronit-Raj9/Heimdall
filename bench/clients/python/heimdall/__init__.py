@@ -23,6 +23,7 @@ from .client import (
     RawResponse,
     mode_of,
 )
+from .faults import FaultSession, FaultControlError, InjectedFaultError, InjectedTimeoutError, hook
 
 __version__ = "0.1.0"
 
@@ -39,4 +40,5 @@ __all__ = [
     "mode_of",
     "models",
     "__version__",
+    "FaultSession", "FaultControlError", "InjectedFaultError", "InjectedTimeoutError", "hook",
 ]

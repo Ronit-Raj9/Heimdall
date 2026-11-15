@@ -80,6 +80,9 @@ func PartVersions(reg *schemas.Registry) map[string]string {
 	if reg.Store != nil {
 		out["store/"+reg.Store.GetName()] = reg.Store.GetVersion()
 	}
+	if reg.AdapterFaults != nil {
+		out["adapter_faults/"+reg.AdapterFaults.GetName()] = reg.AdapterFaults.GetVersion()
+	}
 	return out
 }
 

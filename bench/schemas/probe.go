@@ -10,6 +10,7 @@ type ProbeLayerName string
 
 // Probe layers shipped in P0.
 const (
+	LayerAdapter  ProbeLayerName = "adapter"   // cooperative runtime hooks
 	LayerFixture  ProbeLayerName = "fixture"   // files overlaid in the workspace
 	LayerGateway  ProbeLayerName = "gateway"   // fault proxy behind Bifrost
 	LayerToolShim ProbeLayerName = "tool_shim" // a wrapper around a tool binary
@@ -43,6 +44,7 @@ type ProbeSpec struct {
 // ProbeApply holds the layer-specific parameters. Only the block matching the
 // probe's layer is read.
 type ProbeApply struct {
+	AdapterFault *AdapterFaultRule `json:"adapter_fault,omitempty" yaml:"adapter_fault"`
 	// fixture: copy a task fixture over a workspace path. Template variables:
 	// {{task.notes.stale}} and {{agent.notes.project_file}}.
 	Overlay *OverlaySpec `json:"overlay,omitempty" yaml:"overlay"`

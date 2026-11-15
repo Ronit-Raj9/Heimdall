@@ -295,7 +295,7 @@ The engine is a fixed pipeline of stages. Each stage calls the registered parts 
 | Environment | `Environment` | `docker_workspace` | `suite.yaml` |
 | Agent | `AgentAdapter` | `command` (any CLI in a container), `scripted` | `agents/*.yaml` |
 | Agent output parser | `Parser` | `claudecode` | `agents/*.yaml` (`parser:`) |
-| Probe layer | `ProbeLayer` | `fixture`, `gateway`, `tool_shim` | `benchmarks/<name>/probes/*.yaml` |
+| Probe layer | `ProbeLayer` | `fixture`, `gateway`, `tool_shim`, `adapter` | `benchmarks/<name>/probes/*.yaml` |
 | Evidence source | `EvidenceSource` | `gateway`, `proxy_ledger`, `agent_stream`, `shim_log` | Always on |
 | Grader | `Grader` | `hidden_tests` | `suite.yaml` |
 | Gate | `Gate` | G1, G2, G4, G6, G8, egress | Baseline gates are always on. `experiment.yaml` (`extra_gates:`) can only add |
@@ -397,6 +397,15 @@ type Reporter interface {
 	Write(ctx context.Context, analysis *Analysis, out io.Writer) error
 }
 ```
+
+Agents may also emit the framework-neutral `bifrost.agent.event` version `1`
+as one JSON object per stdout line. The collector accepts model, tool, retry,
+error, compaction and claim records without a framework-specific parser and
+stamps the run identity before writing normalized events. Parsers use a 1 MiB
+line limit; malformed or oversized lines are counted in trace diagnostics and
+degrade trace quality without failing the run. Every run records whether its
+agent trace came from the common protocol, a native parser, a generic parser,
+or only the stdout claim tail.
 
 Registration, one per package:
 
@@ -949,6 +958,7 @@ runs/<exp_id>/
       agent.stream.jsonl        # raw agent output                             (engine)
       workspace.diff            # exported patch                               (environment)
       gateway.requests.jsonl    # Bifrost rows and detail rows                 (evidence)
+      gateway.raw.jsonl         # secret-scanned raw gateway detail rows       (evidence)
       proxy.ledger.jsonl        # fault proxy decisions                        (evidence)
       events.jsonl              # normalized events from all sources           (evidence)
       receipts.json             # R0-R7 per probe                              (probe layers)

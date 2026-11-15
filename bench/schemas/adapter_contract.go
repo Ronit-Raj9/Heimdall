@@ -55,16 +55,18 @@ type AdapterMetadataInfo struct {
 // empty list means that support is not declared; it does not change legacy
 // adapter behavior.
 type AdapterCapabilities struct {
-	SupportsStreaming        bool            `json:"supports_streaming,omitempty" yaml:"supports_streaming,omitempty"`
-	SupportsStructuredEvents bool            `json:"supports_structured_events,omitempty" yaml:"supports_structured_events,omitempty"`
-	SupportsToolEvents       bool            `json:"supports_tool_events,omitempty" yaml:"supports_tool_events,omitempty"`
-	SupportsNotesFile        bool            `json:"supports_notes_file,omitempty" yaml:"supports_notes_file,omitempty"`
-	SupportsModelOverride    bool            `json:"supports_model_override,omitempty" yaml:"supports_model_override,omitempty"`
-	SupportsCancellation     bool            `json:"supports_cancellation,omitempty" yaml:"supports_cancellation,omitempty"`
-	SupportsResume           bool            `json:"supports_resume,omitempty" yaml:"supports_resume,omitempty"`
-	SupportsGatewayHeaders   bool            `json:"supports_gateway_headers,omitempty" yaml:"supports_gateway_headers,omitempty"`
-	TaskTypes                []string        `json:"task_types,omitempty" yaml:"task_types,omitempty"`
-	EvidenceLevels           []EvidenceLevel `json:"evidence_levels,omitempty" yaml:"evidence_levels,omitempty"`
+	FaultProtocolVersion     string             `json:"fault_protocol_version,omitempty" yaml:"fault_protocol_version,omitempty"`
+	FaultHooks               []AdapterFaultHook `json:"fault_hooks,omitempty" yaml:"fault_hooks,omitempty"`
+	SupportsStreaming        bool               `json:"supports_streaming,omitempty" yaml:"supports_streaming,omitempty"`
+	SupportsStructuredEvents bool               `json:"supports_structured_events,omitempty" yaml:"supports_structured_events,omitempty"`
+	SupportsToolEvents       bool               `json:"supports_tool_events,omitempty" yaml:"supports_tool_events,omitempty"`
+	SupportsNotesFile        bool               `json:"supports_notes_file,omitempty" yaml:"supports_notes_file,omitempty"`
+	SupportsModelOverride    bool               `json:"supports_model_override,omitempty" yaml:"supports_model_override,omitempty"`
+	SupportsCancellation     bool               `json:"supports_cancellation,omitempty" yaml:"supports_cancellation,omitempty"`
+	SupportsResume           bool               `json:"supports_resume,omitempty" yaml:"supports_resume,omitempty"`
+	SupportsGatewayHeaders   bool               `json:"supports_gateway_headers,omitempty" yaml:"supports_gateway_headers,omitempty"`
+	TaskTypes                []string           `json:"task_types,omitempty" yaml:"task_types,omitempty"`
+	EvidenceLevels           []EvidenceLevel    `json:"evidence_levels,omitempty" yaml:"evidence_levels,omitempty"`
 }
 
 // ExecutionPlan is the additive name for the existing RunPlan. The alias

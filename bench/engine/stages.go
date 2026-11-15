@@ -188,6 +188,9 @@ func (p *Pipeline) collect(ctx context.Context, st *runState) error {
 	if st.rc.Agent != nil && st.rc.Agent.Capabilities != nil && st.rc.Agent.Capabilities.SupportsToolEvents {
 		st.ev.Contract.Required = append(st.ev.Contract.Required, "tool_execution")
 	}
+	if st.rc.Probe != nil && st.rc.Probe.Layer == schemas.LayerAdapter {
+		st.ev.Contract.Required = append(st.ev.Contract.Required, "adapter_fault_controller")
+	}
 	if st.rc.Run != nil && len(st.rc.Run.Agent.CapabilityGaps) > 0 {
 		st.ev.Contract.OptionalMissing = append([]string(nil), st.rc.Run.Agent.CapabilityGaps...)
 	}
@@ -213,6 +216,11 @@ func (p *Pipeline) collect(ctx context.Context, st *runState) error {
 		}
 	}
 	st.ev.Contract.Conflicts = append(st.ev.Contract.Conflicts, joined.Conflicts...)
+	if trace := st.ev.AgentTrace; trace != nil && trace.Quality != schemas.TraceQualityComplete {
+		st.ev.Status.UnknownReasons = append(st.ev.Status.UnknownReasons, "agent trace: "+string(trace.Quality))
+		st.ev.Contract.OptionalMissing = append(st.ev.Contract.OptionalMissing, "complete_agent_trace")
+		st.ev.Status.Level = schemas.EvidencePartial
+	}
 	if len(joined.Conflicts) > 0 {
 		st.ev.Status.Level = schemas.EvidencePartial
 	}
@@ -272,8 +280,17 @@ func availableEvidence(ev *schemas.Evidence) []string {
 	if len(ev.ShimLog) > 0 {
 		out = append(out, "tool_execution")
 	}
-	if len(ev.Events) > 0 {
-		out = append(out, "agent_events")
+	for _, event := range ev.Events {
+		if event.Source == schemas.SourceAgentStream && event.Type != schemas.EventClaim {
+			out = append(out, "agent_events")
+			break
+		}
+	}
+	if ev.AgentTrace != nil && ev.AgentTrace.Quality != schemas.TraceQualityUnavailable {
+		out = append(out, "agent_trace")
+	}
+	if ev.AdapterFault != nil && ev.AdapterFault.Complete {
+		out = append(out, "adapter_fault_controller")
 	}
 	return out
 }
@@ -398,6 +415,7 @@ func (p *Pipeline) measureDerived(ctx context.Context, st *runState, selected []
 // receipt completes the probe's receipt from the evidence, merges it with
 // the arm-time receipt and writes receipts.json.
 func (p *Pipeline) receipt(ctx context.Context, st *runState) error {
+	defer clearGatewayRequestBodies(st.ev)
 	var errs []error
 	st.receipts = []schemas.Receipt{}
 	if st.layer != nil {
@@ -413,11 +431,27 @@ func (p *Pipeline) receipt(ctx context.Context, st *runState) error {
 	return errors.Join(errs...)
 }
 
+// clearGatewayRequestBodies releases transient gateway payloads after probe
+// receipts consume them. trimEvidence remains the persistence boundary.
+func clearGatewayRequestBodies(ev *schemas.Evidence) {
+	if ev == nil || ev.Requests == nil {
+		return
+	}
+	for i := range ev.Requests.Requests {
+		ev.Requests.Requests[i].Raw = nil
+	}
+}
+
 // cleanup destroys the workspace, clears the key slot's fault plan and
 // revokes the key. It runs after every run, failed or not; Destroy is safe
 // after a failed Create.
 func (p *Pipeline) cleanup(ctx context.Context, st *runState) error {
 	var errs []error
+	if p.reg.AdapterFaults != nil {
+		if err := p.reg.AdapterFaults.Cleanup(ctx, st.rc); err != nil {
+			errs = append(errs, &partError{part: "adapter_faults", err: fmt.Errorf("cleanup: %w", err)})
+		}
+	}
 	if cleanup, ok := st.adapter.(schemas.AdapterCleanup); ok {
 		if err := cleanup.Cleanup(ctx, st.rc); err != nil {
 			errs = append(errs, wrapPart("adapter", st.adapter, fmt.Errorf("cleanup: %w", err)))

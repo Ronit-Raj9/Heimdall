@@ -70,6 +70,25 @@ export interface AdapterCapabilities {
 	evidence_levels?: EvidenceLevel[];
 }
 
+export type TraceSource = "protocol" | "native_parser" | "generic_parser" | "stdout_tail" | "none";
+export type TraceQuality = "complete" | "partial" | "degraded" | "claim_only" | "unavailable";
+
+export interface ParseDiagnostics {
+	source?: TraceSource;
+	quality?: TraceQuality;
+	parser?: string;
+	parser_version?: string;
+	bytes?: number;
+	lines?: number;
+	recognized?: number;
+	emitted?: number;
+	malformed?: number;
+	oversized?: number;
+	unrecognized?: number;
+	truncated?: boolean;
+	reason?: string;
+}
+
 export type EvidenceQuality = "unknown" | "complete" | "partial";
 
 export interface RunEvidenceContract {
@@ -243,6 +262,7 @@ export interface CanonicalRun {
 	gates?: GateResult[];
 	metrics?: Record<string, Value>;
 	evidence_status: EvidenceStatus;
+	agent_trace?: ParseDiagnostics;
 	logical_steps?: LogicalRequest[];
 	attempts?: AttemptRecord[];
 	retries?: RetryRecord[];
@@ -399,6 +419,10 @@ export interface RunAgentInfo {
 	config_id: string;
 	adapter: string;
 	parser?: string;
+	parser_version?: string;
+	trace_source?: TraceSource;
+	trace_quality?: TraceQuality;
+	trace_diagnostics?: ParseDiagnostics;
 	config_hash: string;
 	exit_code?: number;
 	timed_out: boolean;
@@ -1097,6 +1121,7 @@ export interface Pair {
 
 /** GET /runs/{id}: one run with its seal, grade, metrics, gates and receipts. Unwritten files are null or empty. */
 export interface RunDetail {
+	adapter_fault?: AdapterFaultEvidence;
 	slot: Slot;
 	run: Run;
 	sealed: boolean;
@@ -1124,6 +1149,31 @@ export interface RunDetail {
 	artifacts?: ArtifactFile[];
 	evidence_contract?: RunEvidenceContract;
 	canonical?: CanonicalRun;
+}
+
+export interface AdapterFaultEvidence {
+	version: string;
+	run_id: string;
+	rule_hash: string;
+	complete: boolean;
+	reason?: string;
+	ledger_hash: string;
+	entries: AdapterFaultEntry[];
+}
+export interface AdapterFaultEntry {
+	seq: number;
+	at: string;
+	run_id: string;
+	session: string;
+	operation_id?: string;
+	kind?: string;
+	name?: string;
+	phase: string;
+	mode?: string;
+	success?: boolean;
+	prev_hash: string;
+	hash: string;
+	message?: string;
 }
 
 /** GET /runs/{id}/events */

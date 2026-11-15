@@ -17,13 +17,15 @@ import (
 // AgentStream is the name of the agent stream source.
 const AgentStream = "agent_stream"
 
+const protocolParserName = "bifrost-agent-event"
+
 // tailBytes is how much of the end of stdout the fallback claim rule reads.
 const tailBytes = 4096
 
 var _ schemas.EvidenceSource = (*agentStreamSource)(nil)
 
-// agentStreamSource reads the agent's own output: through the agent's parser
-// when it has one, else only the final claim from the tail of stdout.
+// agentStreamSource reads the agent's own output through a configured parser,
+// the common protocol, or the legacy final-claim fallback.
 type agentStreamSource struct {
 	parsers []schemas.Parser
 	logger  schemas.Logger
@@ -33,56 +35,126 @@ type agentStreamSource struct {
 func (s *agentStreamSource) GetName() string { return AgentStream }
 
 // GetVersion implements schemas.Part.
-func (s *agentStreamSource) GetVersion() string { return version }
+func (s *agentStreamSource) GetVersion() string { return "1.1.0" }
 
-// Collect implements schemas.EvidenceSource. With no stdout recorded the claim
-// stays nil, which metrics read as unknown. A configured parser that is not
-// registered is a setup mistake; it is logged and the tail rule still gives
-// the run a claim, at the weaker outcome level.
+// Collect preserves partial traces and records parse failures as degradation.
+// Only capture I/O, cancellation and artifact-write failures fail collection.
 func (s *agentStreamSource) Collect(ctx context.Context, rc *schemas.RunContext, ev *schemas.Evidence) error {
+	if err := ctx.Err(); err != nil {
+		return err
+	}
 	if rc.Exec == nil || rc.Exec.StdoutPath == "" {
+		setAgentTrace(rc, ev, &schemas.ParseDiagnostics{Source: schemas.TraceSourceNone,
+			Quality: schemas.TraceQualityUnavailable, Reason: "no agent stdout recorded"})
 		return nil
 	}
-	id := runID(rc)
-	if p := s.parserFor(rc); p != nil {
-		raw, err := os.ReadFile(rc.Exec.StdoutPath)
-		if err != nil {
-			return fmt.Errorf("read agent stdout for run %s: %w", id, err)
-		}
-		var res *schemas.ParseResult
-		var parseErr error
-		if parser, ok := p.(schemas.AdapterResultParser); ok {
-			res, parseErr = parser.ParseExecutionOutput(ctx, rc, raw)
-		} else {
-			res, parseErr = p.Parse(ctx, rc, raw)
-		}
-		if parseErr != nil {
-			return fmt.Errorf("parse agent stdout for run %s with %s: %w", id, p.GetName(), parseErr)
-		}
-		if res == nil {
-			return nil
-		}
-		ev.Events = append(ev.Events, stampRun(rc, res.Events, p.GetVersion())...)
-		ev.Claim = res.Claim
-		return writeEvents(rc, ev)
-	}
-	if rc.Agent != nil && rc.Agent.Parser != "" {
-		pickLogger(s.logger, rc).Warn("agent parser not registered; using stdout tail", "run_id", id, "parser", rc.Agent.Parser)
-	}
-	tail, err := readTail(rc.Exec.StdoutPath, tailBytes)
+	info, err := os.Stat(rc.Exec.StdoutPath)
 	if err != nil {
-		return fmt.Errorf("read agent stdout tail for run %s: %w", id, err)
+		setAgentTrace(rc, ev, &schemas.ParseDiagnostics{Source: schemas.TraceSourceNone,
+			Quality: schemas.TraceQualityUnavailable, Reason: "agent stdout could not be read"})
+		return fmt.Errorf("read agent stdout for run %s: %w", runID(rc), err)
 	}
-	claim := ClaimFromTail(tail)
-	ev.Claim = claim
-	if claim.Made {
-		seq := newEventSeq(rc, schemas.SourceAgentStream, schemas.EvidenceOutcome)
-		e := seq.event(schemas.EventClaim, rc.Exec.Ended)
-		e.Summary = clip(claim.Matched, 200)
-		ev.Events = append(ev.Events, e)
-		return writeEvents(rc, ev)
+	var res *schemas.ParseResult
+	var selected schemas.Parser
+	var parseErr error
+	// A declared common protocol takes priority over native or heuristic
+	// parsing. Other stdout lines remain counted as unrecognized records.
+	if p := s.parserByName(protocolParserName); p != nil {
+		protocol, err := parseAgentFile(ctx, p, rc)
+		if ctx.Err() != nil {
+			return ctx.Err()
+		}
+		if protocol != nil {
+			res = protocol // retain scan counts even when stdout has no envelope
+			if protocol.Diagnostics != nil && protocol.Diagnostics.Recognized > 0 {
+				selected, parseErr = p, err
+			}
+		}
 	}
-	return nil
+	missingParser := false
+	if selected == nil && rc.Agent != nil && rc.Agent.Parser != "" {
+		selected = s.parserFor(rc)
+		if selected != nil {
+			res, parseErr = parseAgentFile(ctx, selected, rc)
+			if ctx.Err() != nil {
+				return ctx.Err()
+			}
+		} else {
+			missingParser = true
+			pickLogger(s.logger, rc).Warn("agent parser not registered; using stdout tail", "run_id", runID(rc), "parser", rc.Agent.Parser)
+		}
+	}
+	if res == nil {
+		res = &schemas.ParseResult{}
+	}
+	d := schemas.ParseDiagnostics{Bytes: info.Size()}
+	if res.Diagnostics != nil {
+		d = *res.Diagnostics
+	}
+	if selected != nil {
+		d.Parser, d.ParserVersion = selected.GetName(), selected.GetVersion()
+		if d.Source == "" {
+			d.Source = schemas.TraceSourceNative
+		}
+		if res.Diagnostics == nil {
+			d.Quality, d.Reason = schemas.TraceQualityDegraded, "parser supplied no coverage diagnostics"
+		}
+	}
+	d.Emitted = len(res.Events)
+	if len(res.Events) == 0 || (res.Claim == nil && parseErr != nil) {
+		// Keep the conservative tail rule for legacy agents. An explicit
+		// protocol/native claim, including a negative claim, always wins.
+		if res.Claim == nil {
+			tail, err := readTail(rc.Exec.StdoutPath, tailBytes)
+			if err != nil {
+				return fmt.Errorf("read agent stdout tail: %w", err)
+			}
+			res.Claim = ClaimFromTail(tail)
+		}
+		if len(res.Events) == 0 {
+			d.Source, d.Quality = schemas.TraceSourceTail, schemas.TraceQualityClaimOnly
+			if info.Size() == 0 {
+				d.Source, d.Quality = schemas.TraceSourceNone, schemas.TraceQualityUnavailable
+			}
+			if d.Reason == "" {
+				d.Reason = "no structured agent events"
+			}
+			if res.Claim.Made {
+				seq := newEventSeq(rc, schemas.SourceAgentStream, schemas.EvidenceOutcome)
+				e := seq.event(schemas.EventClaim, rc.Exec.Ended)
+				e.Summary = clip(res.Claim.Matched, 200)
+				res.Events = append(res.Events, e)
+			}
+		}
+	}
+	if missingParser || parseErr != nil || d.Malformed > 0 || d.Oversized > 0 {
+		if d.Emitted == 0 || parseErr != nil || missingParser {
+			d.Quality = schemas.TraceQualityDegraded
+		} else if d.Quality == schemas.TraceQualityComplete {
+			d.Quality = schemas.TraceQualityPartial
+		}
+		if missingParser {
+			d.Reason = "configured parser is not registered"
+		} else if parseErr != nil {
+			d.Reason = "parser failed; partial events and stdout claim retained"
+		}
+	}
+	if rc.Exec.Truncated {
+		d.Truncated = true
+		if d.Quality == schemas.TraceQualityComplete {
+			d.Quality = schemas.TraceQualityPartial
+		} else if d.Emitted == 0 {
+			d.Quality = schemas.TraceQualityDegraded
+		}
+		if d.Reason != "" {
+			d.Reason += "; "
+		}
+		d.Reason += "captured output was truncated"
+	}
+	ev.Events = append(ev.Events, stampRun(rc, res.Events, d.ParserVersion)...)
+	ev.Claim = res.Claim
+	setAgentTrace(rc, ev, &d)
+	return writeEvents(rc, ev)
 }
 
 // ClaimFromTail decides whether the end of an agent's stdout asserts success.
@@ -123,6 +195,48 @@ func (s *agentStreamSource) parserFor(rc *schemas.RunContext) schemas.Parser {
 		}
 	}
 	return nil
+}
+
+func (s *agentStreamSource) parserByName(name string) schemas.Parser {
+	for _, p := range s.parsers {
+		if p != nil && p.GetName() == name {
+			return p
+		}
+	}
+	return nil
+}
+
+func parseAgentFile(ctx context.Context, p schemas.Parser, rc *schemas.RunContext) (*schemas.ParseResult, error) {
+	file, err := os.Open(rc.Exec.StdoutPath)
+	if err != nil {
+		return nil, err
+	}
+	defer file.Close()
+	if streaming, ok := p.(schemas.ReaderParser); ok {
+		return streaming.ParseReader(ctx, rc, file)
+	}
+	// Preserve the original byte-slice interface for external parsers. The
+	// legacy allocation is bounded by the existing capture limit.
+	raw, err := io.ReadAll(io.LimitReader(file, 50<<20+1))
+	if err != nil {
+		return nil, err
+	}
+	if len(raw) > 50<<20 {
+		return &schemas.ParseResult{Diagnostics: &schemas.ParseDiagnostics{Quality: schemas.TraceQualityDegraded, Truncated: true, Reason: "legacy parser input exceeds capture limit"}}, nil
+	}
+	if parser, ok := p.(schemas.AdapterResultParser); ok {
+		return parser.ParseExecutionOutput(ctx, rc, raw)
+	}
+	return p.Parse(ctx, rc, raw)
+}
+
+func setAgentTrace(rc *schemas.RunContext, ev *schemas.Evidence, d *schemas.ParseDiagnostics) {
+	ev.AgentTrace = d
+	if rc == nil || rc.Run == nil || d == nil {
+		return
+	}
+	rc.Run.Agent.TraceSource, rc.Run.Agent.TraceQuality = d.Source, d.Quality
+	rc.Run.Agent.TraceDiagnostics = d
 }
 
 // successPhrase returns the success phrase in sentence and true when the

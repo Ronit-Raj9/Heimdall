@@ -28,7 +28,7 @@ func testRC(t *testing.T) *schemas.RunContext {
 
 func TestBuiltinOrder(t *testing.T) {
 	got := Builtin(Deps{})
-	want := []string{ProxyLedger, GatewaySource, AgentStream, ShimLog, Cost, ToolLedger, AgentEvents, StepTimeline}
+	want := []string{ProxyLedger, GatewaySource, AgentStream, ShimLog, Cost, ToolLedger, "adapter_fault", AgentEvents, StepTimeline}
 	if len(got) != len(want) {
 		t.Fatalf("Builtin returned %d sources, want %d", len(got), len(want))
 	}
@@ -37,8 +37,12 @@ func TestBuiltinOrder(t *testing.T) {
 			if s.GetName() != want[i] {
 				t.Errorf("source %d is %q, want %q", i, s.GetName(), want[i])
 			}
-			if s.GetVersion() != "1.0.0" {
-				t.Errorf("version %q, want 1.0.0", s.GetVersion())
+			wantVersion := "1.0.0"
+			if s.GetName() == AgentStream {
+				wantVersion = "1.1.0"
+			}
+			if s.GetVersion() != wantVersion {
+				t.Errorf("version %q, want %s", s.GetVersion(), wantVersion)
 			}
 		})
 	}
@@ -164,7 +168,7 @@ func TestBuiltinCollectAll(t *testing.T) {
 	if priced != 4 {
 		t.Errorf("%d model_response events carry usd on disk, want 4", priced)
 	}
-	for _, name := range []string{ledgerFile, requestsFile, costFile} {
+	for _, name := range []string{ledgerFile, requestsFile, rawRequestsFile, costFile} {
 		if _, err := os.Stat(filepath.Join(rc.Dir, name)); err != nil {
 			t.Errorf("%s not written: %v", name, err)
 		}

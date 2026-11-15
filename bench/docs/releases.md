@@ -58,12 +58,12 @@ A line must be exactly the canonical JSON of its record: an added field, a refor
 | `analysis/verdict.json`, `analysis/report.md` | the cited analysis and its report |
 | `analysis/policy.json` | the policy result, when one was evaluated |
 | `seals.log` | the experiment's seal chain |
-| `runs/<run_id>/seal.json`, `run.json`, `metrics.json`, `gates.json`, `grade.json` | each counted run's seal and files, byte for byte |
+| `runs/<run_id>/seal.json` and every path listed by that seal | each counted run's complete sealed folder, copied byte for byte; this includes events, cost rows, tool ledgers, gateway request evidence, agent streams and stderr when present |
 | `runs/<run_id>/regrade.grade.json` | the regrade grade, when the analysis used a regrade |
 
-Every entry has the same fixed time (1980-01-01 UTC) and mode, and runs are in run id order, so the same record and files always give the same zip bytes.
+Every entry has the same fixed time (1980-01-01 UTC) and mode, and runs are in run id order, so the same record and files always give the same zip bytes. The pack is the audit copy: a file is included because it is named in that run's `seal.json`, rather than because it happens to be one of a fixed set of summary files.
 
-To check a pack by hand: `sha256sum runs/<run_id>/seal.json` must appear on that run's line in `seals.log`; each copied run file must hash to its entry under `files` in `seal.json`; the sorted seal hashes, newline-terminated, must hash to `seals_digest`; and the zip's own sha256 must equal the record's `evidence_sha256` in `releases.jsonl`.
+To check a pack by hand: `sha256sum runs/<run_id>/seal.json` must appear on that run's line in `seals.log`; every path under `seal.json.files` must be present below `runs/<run_id>/` and hash to its listed value; the sorted seal hashes, newline-terminated, must hash to `seals_digest`; and the zip's own sha256 must equal the record's `evidence_sha256` in `releases.jsonl`.
 
 ## CLI
 
@@ -84,6 +84,8 @@ bifrost-bench release export <release_id> [-o path]
 | `GET /api/bench/releases` | `schemas.ReleaseList`: records in log order (oldest first) and `chain_ok` |
 | `GET /api/bench/releases/{id}` | one record |
 | `GET /api/bench/releases/{id}/evidence` | the zip, `application/zip`, as an attachment; an error if it no longer matches its record |
+
+Raw run evidence remains excluded from the ordinary `/runs/{id}/files/{name}` allowlist. An explicit `GET /api/bench/runs/{id}/evidence/{name}` download serves `gateway.raw.jsonl`, the redacted `gateway.requests.jsonl`, `proxy.ledger.jsonl`, `tools.jsonl`, `agent.stream*.jsonl` and `agent.stderr*.txt` only after the run is sealed and its seal verifies. The response is an attachment with `application/octet-stream`, `Cache-Control: no-store` and `X-Content-Type-Options: nosniff`; unknown names, unsealed runs and seal mismatches are refused.
 
 The handler depends on the small `handlers.ReleaseLog` interface; `cmd/bifrost-bench` wires in `release.Log`. A refusal is any error with a `ReleaseRefused() bool` method, so `handlers` does not import `release`.
 

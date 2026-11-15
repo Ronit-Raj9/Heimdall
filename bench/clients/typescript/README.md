@@ -15,6 +15,10 @@ if (result.blocked) process.exit(1);
 
 Every JSON response carries the server `mode` (`live`, `recorded` or `synthetic`); raw downloads (`runPatch`, `runFile`, `releaseEvidence`) resolve to a `RawResponse` whose `mode` comes from `X-Bench-Mode`. `{ requireLive: true }` rejects every answer that is not live with `ModeError`.
 
+Agent images can import `FaultSession` and wrap tool, memory, browser or retry
+callbacks. The wrapper is pass-through without `BENCH_FAULT_*`; configured
+control-plane failures throw `FaultControlError`.
+
 `token` is sent as `Authorization: Bearer <token>`: the server requires its write token (`BENCH_WRITE_TOKEN`) on every POST route; reads need none. The worker routes (`BENCH_WORKER_TOKEN`) are not wrapped.
 
 Errors reject with `HeimdallError` (`status`, `type`, `serverMessage`, `mode`); `HeimdallTimeout` covers `timeoutMs` (default 30000) and `waitForExperiment`. Reads retry `readRetries` times (default 2) on network errors, 502 and 504; writes never retry.

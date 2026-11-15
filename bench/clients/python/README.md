@@ -22,6 +22,10 @@ print(status["mode"], decision, action, policy and policy["decision"])
 
 Every JSON method returns the server's object as a dict with a top-level `mode`: `live`, `recorded` or `synthetic`. Only `live` is a real measurement. Raw downloads (`run_patch`, `run_file`, `release_evidence`) return a `RawResponse` whose `mode` comes from the `X-Bench-Mode` header. `mode_of(response)` reads either. `Client(..., require_live=True)` raises `ModeError` on any answer that is not live, so a CI job cannot pass on a recorded demo.
 
+Agent images can use `heimdall.FaultSession` for adapter fault probes. It is
+pass-through when `BENCH_FAULT_*` is absent and fails closed when a configured
+controller cannot be reached.
+
 ## Auth
 
 `token` is sent as `Authorization: Bearer <token>`. The server requires its write token (`BENCH_WRITE_TOKEN`, printed once at start when unset) on every POST route: plan, create, start, audit and releases. Read routes need no token. The remote worker routes use a separate bearer (`BENCH_WORKER_TOKEN`) and are not wrapped here.

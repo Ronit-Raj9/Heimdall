@@ -30,6 +30,11 @@ func indexFixture(t *testing.T) (*FSStore, map[string]*schemas.SealRecord) {
 	mustWrite(t, s, pass, "metrics.json", `{"verified_success":{"state":"observed","v":1,"evidence":"outcome"}}`)
 	mustWrite(t, s, pass, "gates.json", `[{"gate":"g1","version":"1.0.0","effect":"veto","fired":false}]`)
 	mustWrite(t, s, pass, "receipts.json", `[{"probe_id":"stale_notes","layer":"fixture","steps":{}}]`)
+	mustWrite(t, s, pass, "gateway.raw.jsonl", "{}\n")
+	mustWrite(t, s, pass, "tools.jsonl", "{}\n")
+	mustWrite(t, s, pass, "agent.stderr.txt", "stderr\n")
+	mustWrite(t, s, pass, "agent.stream.2.jsonl", "{}\n")
+	mustWrite(t, s, pass, "agent.stderr.2.txt", "stderr\n")
 	mustWrite(t, s, pass, "evidence.json", `{"requests":{"complete":true,"row_ids":["q1","q2","q3","q4"],"dropped_global":3,"requests":[`+
 		`{"id":"q1","kind":"message","status":"success","tokens":{"fresh":10,"cache_read":0,"cache_write":0,"out":2}},`+
 		`{"id":"q2","kind":"message","status":"success"},`+
@@ -275,6 +280,11 @@ func TestIndexRunFile(t *testing.T) {
 		{name: "run.json", runID: "r_a1_2", file: "run.json"},
 		{name: "seal.json", runID: "r_a1_2", file: "seal.json"},
 		{name: "metrics.json", runID: "r_a1_2", file: "metrics.json"},
+		{name: "gateway.raw.jsonl", runID: "r_a1_2", file: "gateway.raw.jsonl"},
+		{name: "tools.jsonl", runID: "r_a1_2", file: "tools.jsonl"},
+		{name: "agent.stderr.txt", runID: "r_a1_2", file: "agent.stderr.txt"},
+		{name: "agent.stream.2.jsonl", runID: "r_a1_2", file: "agent.stream.2.jsonl"},
+		{name: "agent.stderr.2.txt", runID: "r_a1_2", file: "agent.stderr.2.txt"},
 		{name: "allowed but missing", runID: "r_b1", file: "metrics.json", wantErr: schemas.ErrNotFound},
 		{name: "not in allowlist", runID: "r_a1_2", file: "notes.txt", wantErr: schemas.ErrNotFound},
 		{name: "traversal", runID: "r_a1_2", file: "../../../manifest.json", wantErr: schemas.ErrNotFound},

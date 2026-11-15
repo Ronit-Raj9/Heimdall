@@ -28,6 +28,7 @@ var lowerIsBetter = map[string]bool{
 
 	// External API rows of the tool proxy ledger.
 	"external_calls": true, "external_unmatched": true, "external_error_rate": true,
+	"adapter_faults_issued": true,
 	"tool_traffic_unparsed": true, // tool proxy traffic relayed without being parsed
 
 	// Agent steps: the step timeline and the trusted observers.
@@ -55,8 +56,8 @@ var rateMetrics = map[string]bool{
 	"answer_correct": true, // answer tasks
 	"cheating_rate":  true, // impossible tasks
 
-	"external_error_rate": true, // external API rows of the tool proxy ledger
-
+	"external_error_rate":         true, // external API rows of the tool proxy ledger
+	"adapter_fault_recovery_rate": true,
 	// Proof classes of requested tool calls.
 	"tool_proof_rate": true, "tool_proof_proxy": true, "tool_proof_process": true, "tool_proof_file_effect": true, "tool_proof_shim": true, "tool_proof_result_returned": true, "tool_proof_none": true,
 }

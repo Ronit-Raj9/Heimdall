@@ -9,6 +9,7 @@ import { MetricStrip } from "@/components/runs/metricStrip";
 import { PairPicker } from "@/components/runs/pairPicker";
 import { RunRemoteCoverage } from "@/components/runs/remoteCoverage";
 import { RunScenarioEvidence } from "@/components/runs/runScenario";
+import { TraceQualityDetails } from "@/components/runs/traceQuality";
 import { TraceDownloadLink } from "@/components/runs/runTraceLink";
 import { RunStepTimeline } from "@/components/runs/stepTimeline";
 import { indexEvents, stripMetricKinds } from "@/components/runs/runs.utils";
@@ -18,7 +19,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useGetCatalogQuery, useGetPairQuery, useGetRunDiffQuery, useGetRunEventsQuery, useGetRunQuery } from "@/lib/store/apis/benchApi";
-import type { Pair, PairResponse, PairRun } from "@/lib/types/bench";
+import type { AdapterFaultEvidence, Pair, PairResponse, PairRun } from "@/lib/types/bench";
 import { skipToken } from "@reduxjs/toolkit/query/react";
 import { ArrowLeft } from "lucide-react";
 import { parseAsString, useQueryState } from "nuqs";
@@ -129,11 +130,16 @@ function PairComparison({ pairId, onClear }: { pairId: string; onClear: () => vo
 								<div>Task hash: {lane.detail.data?.canonical?.task.task_hash || "unknown"}</div>
 								<div>Run input hash: {lane.detail.data?.canonical?.run_input.run_input_hash || "unknown"}</div>
 								<div>Evidence level: {lane.detail.data?.canonical?.evidence_status.level || "unknown"}</div>
+								{lane.detail.data?.adapter_fault && <AdapterFaultSummary evidence={lane.detail.data.adapter_fault} />}
+								<TraceQualityDetails
+									arm={lane.pairRun.arm}
+									trace={lane.detail.data?.run.agent.trace_diagnostics || lane.detail.data?.canonical?.agent_trace}
+								/>
+								<div>Unknown reasons: {lane.detail.data?.canonical?.evidence_status.unknown_reasons?.join(", ") || "none"}</div>
 								<div>
-									Unknown reasons: {lane.detail.data?.canonical?.evidence_status.unknown_reasons?.join(", ") || "none"}
-								</div>
-								<div>
-									Tools requested / executed: {lane.detail.data?.canonical?.tool_calls?.filter((call) => call.requested).length ?? "unknown"} / {lane.detail.data?.canonical?.tool_calls?.filter((call) => call.executed).length ?? "unknown"}
+									Tools requested / executed:{" "}
+									{lane.detail.data?.canonical?.tool_calls?.filter((call) => call.requested).length ?? "unknown"} /{" "}
+									{lane.detail.data?.canonical?.tool_calls?.filter((call) => call.executed).length ?? "unknown"}
 								</div>
 								{lane.detail.data && (
 									<TraceDownloadLink
@@ -231,6 +237,19 @@ function PairComparison({ pairId, onClear }: { pairId: string; onClear: () => vo
 					</Tabs>
 				</Section>
 			)}
+		</div>
+	);
+}
+
+function AdapterFaultSummary({ evidence }: { evidence: AdapterFaultEvidence }) {
+	const decisions = evidence.entries.filter((entry) => entry.phase === "decision");
+	const applied = evidence.entries.filter((entry) => entry.phase === "applied");
+	return (
+		<div className="rounded border p-2 text-xs" data-testid="runs-adapter-fault-evidence">
+			<div className="font-medium">Adapter fault instrumentation: {evidence.complete ? "complete" : "incomplete"}</div>
+			<div>Controller decisions: {decisions.length}</div>
+			<div>SDK acknowledgements: {applied.length}</div>
+			{evidence.reason && <div className="text-destructive">{evidence.reason}</div>}
 		</div>
 	);
 }

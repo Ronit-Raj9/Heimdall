@@ -70,7 +70,17 @@ func newFixture(t *testing.T, action schemas.Action, policy schemas.PolicyDecisi
 		if _, err := st.NewRun(ctx, &sl, r); err != nil {
 			t.Fatalf("NewRun: %v", err)
 		}
-		for name, data := range map[string]string{"metrics.json": `{"steps":{"state":"observed","v":3,"evidence":"native"}}`, "gates.json": `[]`, "grade.json": `{"passed":true}`, "agent.stream.jsonl": "x"} {
+		for name, data := range map[string]string{
+			"agent.stderr.txt":   "stderr",
+			"agent.stream.jsonl": "x",
+			"cost.json":          `{"total":1}`,
+			"events.jsonl":       "{}\n",
+			"gateway.raw.jsonl":  `{"raw_available":true}` + "\n",
+			"gates.json":         `[]`,
+			"grade.json":         `{"passed":true}`,
+			"metrics.json":       `{"steps":{"state":"observed","v":3,"evidence":"native"}}`,
+			"tools.jsonl":        "{}\n",
+		} {
 			if err := st.WriteRunFile(ctx, r, name, []byte(data)); err != nil {
 				t.Fatalf("WriteRunFile: %v", err)
 			}

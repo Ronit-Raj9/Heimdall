@@ -115,6 +115,7 @@ func (p *Pipeline) runSessions(ctx context.Context, st *runState) error {
 	sessions := orig.Sessions
 	var stream bytes.Buffer
 	var last *schemas.ExecResult
+	truncated := false
 	for i := range sessions {
 		sess := &sessions[i]
 		if err := se.BeginSession(ctx, rc, i); err != nil {
@@ -125,6 +126,8 @@ func (p *Pipeline) runSessions(ctx context.Context, st *runState) error {
 		rc.Task, rc.Session, rc.SessionIndex = &task, sess, i
 		res, err := p.execOnce(ctx, st, sess)
 		if res != nil {
+			truncated = truncated || res.Truncated
+			res.Truncated = truncated
 			n := i + 1
 			out, rerr := p.keepSessionStream(ctx, st, res, n)
 			if rerr != nil && err == nil {
@@ -161,6 +164,19 @@ func (p *Pipeline) runSessions(ctx context.Context, st *runState) error {
 // plan's. Scenario variables are added to the plan's environment only when
 // the run has any (scenarioEnv), so a plain task's plan is unchanged.
 func (p *Pipeline) execOnce(ctx context.Context, st *runState, sess *schemas.SessionSpec) (*schemas.ExecResult, error) {
+	if st.rc.Probe != nil && st.rc.Probe.Layer == schemas.LayerAdapter {
+		rule := st.rc.Probe.Apply.AdapterFault
+		if rule == nil {
+			return nil, fmt.Errorf("adapter fault probe has no rule")
+		}
+		if env, ok := st.env.(schemas.AdapterFaultEnvironment); !ok || !env.SupportsAdapterFaults() {
+			return nil, fmt.Errorf("environment does not support adapter fault hooks")
+		} else if injector, ok := st.adapter.(schemas.AdapterFaultInjector); !ok {
+			return nil, fmt.Errorf("adapter %s does not support fault hooks", st.adapter.GetName())
+		} else if err := injector.ValidateFault(st.rc.Agent, *rule); err != nil {
+			return nil, fmt.Errorf("adapter fault capability: %w", err)
+		}
+	}
 	// An adapter that implements the harness-neutral contract is validated
 	// first and asked for its execution plan; any other adapter is planned
 	// through the legacy entry point.
@@ -197,6 +213,13 @@ func (p *Pipeline) execOnce(ctx context.Context, st *runState, sess *schemas.Ses
 	if sess != nil && sess.WallS > 0 {
 		plan.WallS = sess.WallS
 	}
+	if st.rc.Probe != nil && st.rc.Probe.Layer == schemas.LayerAdapter {
+		if injector, ok := st.adapter.(schemas.AdapterFaultInjector); ok {
+			if err := injector.BindFaultRuntime(st.rc, plan); err != nil {
+				return nil, fmt.Errorf("bind adapter fault runtime: %w", err)
+			}
+		}
+	}
 	st.plan = plan
 	run := st.rc.Run
 	first := !st.agentStarted
@@ -208,6 +231,22 @@ func (p *Pipeline) execOnce(ctx context.Context, st *runState, sess *schemas.Ses
 			return nil, fmt.Errorf("checkpoint before agent start: %w", err)
 		}
 		st.agentStarted = true
+	}
+	if st.rc.Probe != nil && st.rc.Probe.Layer == schemas.LayerAdapter {
+		sessionID := "default"
+		if sess != nil {
+			sessionID = sess.ID
+		}
+		seen := false
+		for _, id := range st.rc.FaultSessions {
+			if id == sessionID {
+				seen = true
+				break
+			}
+		}
+		if !seen {
+			st.rc.FaultSessions = append(st.rc.FaultSessions, sessionID)
+		}
 	}
 	res, err := st.env.Exec(ctx, st.rc, plan)
 	exited := p.now().UTC()

@@ -1,6 +1,78 @@
 package schemas
 
-import "context"
+import (
+	"context"
+	"io"
+	"time"
+)
+
+// Agent event protocol identifiers. Agents may emit these records as NDJSON
+// on stdout; the bench stamps run identity and normalizes them into Event.
+const (
+	AgentEventSchema  = "bifrost.agent.event"
+	AgentEventVersion = "1"
+)
+
+// TraceSource identifies the source and parser used for agent-stream detail.
+type TraceSource string
+
+const (
+	TraceSourceProtocol TraceSource = "protocol"
+	TraceSourceNative   TraceSource = "native_parser"
+	TraceSourceGeneric  TraceSource = "generic_parser"
+	TraceSourceTail     TraceSource = "stdout_tail"
+	TraceSourceNone     TraceSource = "none"
+)
+
+// TraceQuality records how much structured agent-stream evidence was usable.
+type TraceQuality string
+
+const (
+	TraceQualityComplete    TraceQuality = "complete"
+	TraceQualityPartial     TraceQuality = "partial"
+	TraceQualityDegraded    TraceQuality = "degraded"
+	TraceQualityClaimOnly   TraceQuality = "claim_only"
+	TraceQualityUnavailable TraceQuality = "unavailable"
+)
+
+// ParseDiagnostics describes parser coverage without turning malformed agent
+// output into a failed benchmark run.
+type ParseDiagnostics struct {
+	Source        TraceSource  `json:"source,omitempty"`
+	Quality       TraceQuality `json:"quality,omitempty"`
+	Parser        string       `json:"parser,omitempty"`
+	ParserVersion string       `json:"parser_version,omitempty"`
+	Bytes         int64        `json:"bytes,omitempty"`
+	Lines         int          `json:"lines,omitempty"`
+	Recognized    int          `json:"recognized,omitempty"`
+	Emitted       int          `json:"emitted,omitempty"`
+	Malformed     int          `json:"malformed,omitempty"`
+	Oversized     int          `json:"oversized,omitempty"`
+	Unrecognized  int          `json:"unrecognized,omitempty"`
+	Truncated     bool         `json:"truncated,omitempty"`
+	Reason        string       `json:"reason,omitempty"`
+}
+
+// AgentEventRecord is the framework-neutral line protocol. Identity fields
+// such as run_id and event_id are assigned by the collector, not the agent.
+type AgentEventRecord struct {
+	Schema        string      `json:"schema"`
+	Version       string      `json:"version"`
+	Type          EventType   `json:"type"`
+	Timestamp     time.Time   `json:"timestamp,omitzero"`
+	ID            string      `json:"id,omitempty"`
+	ToolCallID    string      `json:"tool_call_id,omitempty"`
+	ParentEventID string      `json:"parent_event_id,omitempty"`
+	ToolName      string      `json:"tool,omitempty"`
+	Target        string      `json:"target,omitempty"`
+	ArgsSHA256    string      `json:"args_sha256,omitempty"`
+	ResultSHA256  string      `json:"result_sha256,omitempty"`
+	Summary       string      `json:"summary,omitempty"`
+	Status        EventStatus `json:"status,omitempty"`
+	IsError       bool        `json:"is_error,omitempty"`
+	Tokens        *Tokens     `json:"tokens,omitempty"`
+	Claim         *Claim      `json:"claim,omitempty"`
+}
 
 // AgentConfig is the system under test, read from agents/<id>.yaml and then
 // modified by an arm's `set:` overrides. Its content hash identifies it.
@@ -101,10 +173,18 @@ type Parser interface {
 	Parse(ctx context.Context, rc *RunContext, raw []byte) (*ParseResult, error)
 }
 
+// ReaderParser is an optional streaming extension. Legacy Parser and
+// AdapterResultParser implementations keep their byte-slice entry points.
+type ReaderParser interface {
+	Parser
+	ParseReader(ctx context.Context, rc *RunContext, raw io.Reader) (*ParseResult, error)
+}
+
 // ParseResult is what a parser extracts from an agent's raw output.
 type ParseResult struct {
-	Events []Event `json:"events"`
-	Claim  *Claim  `json:"claim,omitempty"`
+	Events      []Event           `json:"events"`
+	Claim       *Claim            `json:"claim,omitempty"`
+	Diagnostics *ParseDiagnostics `json:"diagnostics,omitempty"`
 }
 
 // Claim is the agent's statement about its own result.

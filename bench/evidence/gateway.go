@@ -2,6 +2,7 @@ package evidence
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"slices"
@@ -16,6 +17,20 @@ const GatewaySource = "gateway"
 
 // requestsFile is the run folder file holding the gateway's rows.
 const requestsFile = "gateway.requests.jsonl"
+
+// rawRequestsFile is the sealed audit copy of the gateway detail rows. It is
+// separate from requestsFile because the latter is safe for normal inspection.
+const rawRequestsFile = "gateway.raw.jsonl"
+
+// rawGatewayRow preserves one Bifrost detail row for an audit pack. RawDetail
+// is the compact JSON returned by Bifrost with common secret fields redacted,
+// or null when the gateway did not store the body. The outer row remains a
+// byte-for-byte sealed artifact after it is written.
+type rawGatewayRow struct {
+	RequestID    string          `json:"request_id"`
+	RawAvailable bool            `json:"raw_available"`
+	RawDetail    json.RawMessage `json:"raw_detail"`
+}
 
 // Gateway request kinds and statuses this package reads.
 const (
@@ -63,11 +78,14 @@ func (s *gatewaySource) Collect(ctx context.Context, rc *schemas.RunContext, ev 
 	}
 	ev.Requests = log
 	ev.LogicalSteps, ev.Attempts, ev.Retries, ev.Fallbacks, ev.RequestedTools = NormalizeRequestRecords(log)
-	log = redactRequestLog(log)
-	ev.Requests = log
 	utils.MarkExternalTraffic(rc, log) // Remote area: a remote_http agent's external model calls leave tokens, cost and steps unknown
-	if err := writeJSONL(rc.Dir, requestsFile, log.Requests); err != nil {
+	redactRequestErrors(log)
+	redacted := redactRequestLog(log)
+	if err := writeJSONL(rc.Dir, requestsFile, redacted.Requests); err != nil {
 		return fmt.Errorf("write gateway requests for run %s: %w", id, err)
+	}
+	if err := writeJSONL(rc.Dir, rawRequestsFile, rawGatewayRows(log)); err != nil {
+		return fmt.Errorf("write raw gateway requests for run %s: %w", id, err)
 	}
 	events := NormalizeRequests(rc, log)
 	if !log.Complete {
@@ -76,6 +94,33 @@ func (s *gatewaySource) Collect(ctx context.Context, rc *schemas.RunContext, ev 
 	}
 	ev.Events = append(ev.Events, events...)
 	return writeEvents(rc, ev)
+}
+
+func rawGatewayRows(log *schemas.RequestLog) []rawGatewayRow {
+	if log == nil {
+		return nil
+	}
+	rows := make([]rawGatewayRow, len(log.Requests))
+	for i, request := range log.Requests {
+		raw := request.Raw
+		if len(raw) > 0 {
+			raw = json.RawMessage(utils.RedactSecrets(string(raw)))
+		}
+		rows[i] = rawGatewayRow{RequestID: request.ID, RawAvailable: len(raw) > 0, RawDetail: raw}
+	}
+	return rows
+}
+
+// redactRequestErrors removes secrets from the request log that stays in
+// memory. Raw bodies remain available until probe receipts run, then the
+// pipeline clears them before evidence is persisted.
+func redactRequestErrors(log *schemas.RequestLog) {
+	if log == nil {
+		return
+	}
+	for i := range log.Requests {
+		log.Requests[i].ErrorMessage = utils.RedactSecrets(log.Requests[i].ErrorMessage)
+	}
 }
 
 func redactRequestLog(log *schemas.RequestLog) *schemas.RequestLog {

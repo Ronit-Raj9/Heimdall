@@ -95,6 +95,7 @@ var APIRoutes = []RouteDoc{
 		Query: []QueryDoc{{Name: "format", Description: "text for the raw patch as text/plain"}}, Response: schemas.RunDiff{}, AlsoRaw: "text/plain"},
 	{Method: "GET", Path: APIPrefix + "/runs/{id}/receipts", Tag: "runs", Summary: "Fault receipts of a run", Response: schemas.RunReceipts{}},
 	{Method: "GET", Path: APIPrefix + "/runs/{id}/files/{name}", Tag: "runs", Summary: "One allowlisted run file, raw; mode in X-Bench-Mode", Raw: "application/octet-stream"},
+	{Method: "GET", Path: APIPrefix + "/runs/{id}/evidence/{name}", Tag: "runs", Summary: "Raw audit evidence from a sealed, verified run", Raw: "application/octet-stream"},
 	{Method: "GET", Path: APIPrefix + "/runs/{id}/artifacts/{artifact}/{name}", Tag: "runs", Summary: "One file of a run's output artifact, raw and sandboxed", Raw: "application/octet-stream"},
 	{Method: "GET", Path: APIPrefix + "/runs/{id}/otlp", Tag: "runs", Summary: "A sealed run as an OpenTelemetry trace (OTLP/JSON download); ?payloads=true adds redacted, capped tool payloads",
 		Query: []QueryDoc{{Name: "payloads", Description: "true to include tool arguments and results, redacted and capped"}}, Raw: "application/json"},

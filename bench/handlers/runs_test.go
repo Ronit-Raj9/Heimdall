@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"slices"
@@ -55,6 +56,78 @@ func TestRunFileAllowlist(t *testing.T) {
 		if slices.Contains(idx.asked, name) {
 			t.Errorf("index was asked for %q", name)
 		}
+	}
+}
+
+func TestRunEvidenceDownload(t *testing.T) {
+	idx := testIndex()
+	for _, name := range []string{"gateway.raw.jsonl", "tools.jsonl", "agent.stream.jsonl", "agent.stderr.txt", "agent.stream.2.jsonl", "agent.stderr.2.txt"} {
+		idx.files["r_t01_A"][name] = []byte("raw-" + name)
+	}
+	d := fullDeps()
+	d.index = sealIndex{fakeIndex: idx, bad: map[string]error{}}
+	c := newTestClient(t, d)
+	for _, name := range []string{"gateway.raw.jsonl", "tools.jsonl", "agent.stream.jsonl", "agent.stderr.txt", "agent.stream.2.jsonl", "agent.stderr.2.txt"} {
+		resp := c.do(t, "GET", APIPrefix+"/runs/r_t01_A/evidence/"+name, nil, nil)
+		if resp.StatusCode() != 200 {
+			t.Fatalf("%s: status = %d: %s", name, resp.StatusCode(), resp.Body())
+		}
+		if got := string(resp.Body()); got != "raw-"+name {
+			t.Errorf("%s: body = %q", name, got)
+		}
+		for k, want := range map[string]string{
+			"Content-Type":           "application/octet-stream",
+			"Content-Disposition":    `attachment; filename="` + name + `"`,
+			"Cache-Control":          "no-store",
+			"X-Content-Type-Options": "nosniff",
+			"X-Bench-Mode":           string(testMode),
+		} {
+			if got := string(resp.Header.Peek(k)); got != want {
+				t.Errorf("%s: header %s = %q, want %q", name, k, got, want)
+			}
+		}
+	}
+}
+
+func TestRunEvidenceRefuses(t *testing.T) {
+	tests := []struct {
+		name    string
+		index   ReadIndex
+		run     string
+		path    string
+		status  int
+		message string
+	}{
+		{name: "unknown name", index: testIndex(), run: "r_t01_A", path: "secret.txt", status: 404},
+		{name: "path traversal", index: testIndex(), run: "r_t01_A", path: "..%2Ftools.jsonl", status: 404},
+		{name: "missing file", index: sealIndex{fakeIndex: testIndex(), bad: map[string]error{}}, run: "r_t01_A", path: "tools.jsonl", status: 404},
+		{name: "unsealed", index: sealIndex{fakeIndex: testIndex(), bad: map[string]error{}}, run: "r_t02_A", path: "tools.jsonl", status: 409, message: "not sealed"},
+		{name: "seal mismatch", index: sealIndex{fakeIndex: testIndex(), bad: map[string]error{"r_t01_A": fmt.Errorf("changed: %w", schemas.ErrSealMismatch)}}, run: "r_t01_A", path: "tools.jsonl", status: 409, message: "does not match its seal"},
+		{name: "no verifier", index: testIndex(), run: "r_t01_A", path: "tools.jsonl", status: 503},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if tt.name == "unsealed" {
+				idx := tt.index.(sealIndex).fakeIndex
+				for i := range idx.runs {
+					if idx.runs[i].Run.RunID == tt.run {
+						idx.runs[i].Sealed, idx.runs[i].SealHash = false, ""
+					}
+				}
+			}
+			d := fullDeps()
+			d.index = tt.index
+			resp := newTestClient(t, d).do(t, "GET", APIPrefix+"/runs/"+tt.run+"/evidence/"+tt.path, nil, nil)
+			if resp.StatusCode() != tt.status {
+				t.Fatalf("status = %d, want %d: %s", resp.StatusCode(), tt.status, resp.Body())
+			}
+			if tt.message != "" && !strings.Contains(string(resp.Body()), tt.message) {
+				t.Fatalf("body %s lacks %q", resp.Body(), tt.message)
+			}
+			if strings.Contains(string(resp.Header.Peek("Content-Disposition")), "attachment") {
+				t.Fatal("a refused file was offered as a download")
+			}
+		})
 	}
 }
 
@@ -115,6 +188,34 @@ func TestRunEventsAndDetail(t *testing.T) {
 	body = decodeBody(t, c.do(t, "GET", "/api/bench/runs/r_t01_A/receipts", nil, nil))
 	if receipts, _ := body["receipts"].([]any); len(receipts) != 1 {
 		t.Errorf("receipts = %v", body)
+	}
+}
+
+func TestRunDetailExposesTraceCoverage(t *testing.T) {
+	idx := testIndex()
+	diagnostics := &schemas.ParseDiagnostics{Source: schemas.TraceSourceProtocol, Quality: schemas.TraceQualityPartial,
+		Parser: "bifrost-agent-event", ParserVersion: "1.0.0", Emitted: 2, Malformed: 1}
+	for i := range idx.runs {
+		if idx.runs[i].Run.RunID == "r_t01_A" {
+			idx.runs[i].Run.Agent.TraceSource = diagnostics.Source
+			idx.runs[i].Run.Agent.TraceQuality = diagnostics.Quality
+			idx.runs[i].Run.Agent.TraceDiagnostics = diagnostics
+		}
+	}
+	canonical, err := json.Marshal(schemas.CanonicalRun{AgentTrace: diagnostics})
+	if err != nil {
+		t.Fatal(err)
+	}
+	idx.files["r_t01_A"][FileCanonical] = canonical
+	d := fullDeps()
+	d.index = idx
+	resp := newTestClient(t, d).do(t, "GET", "/api/bench/runs/r_t01_A", nil, nil)
+	var detail schemas.RunDetail
+	if err := json.Unmarshal(resp.Body(), &detail); err != nil {
+		t.Fatal(err)
+	}
+	if resp.StatusCode() != 200 || detail.Run.Agent.TraceQuality != diagnostics.Quality || detail.Canonical == nil || detail.Canonical.AgentTrace == nil || detail.Canonical.AgentTrace.Malformed != 1 {
+		t.Fatalf("trace metadata missing: %s", resp.Body())
 	}
 }
 

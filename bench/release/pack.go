@@ -14,18 +14,12 @@ import (
 	"time"
 
 	"github.com/maximhq/bifrost/bench/schemas"
+	"github.com/maximhq/bifrost/bench/utils"
 )
 
 // packTime is the modified time of every file in a pack. A fixed time, a
 // fixed file order and fixed modes make the same inputs give the same bytes.
 var packTime = time.Date(1980, 1, 1, 0, 0, 0, 0, time.UTC)
-
-// Sealed run files copied into the pack, in this order. seal.json and
-// run.json are required; the others are copied when the run wrote them.
-var (
-	requiredRunFiles = []string{"seal.json", "run.json"}
-	optionalRunFiles = []string{"metrics.json", "gates.json", "grade.json"}
-)
 
 // packFile is one file of an evidence pack.
 type packFile struct {
@@ -51,6 +45,7 @@ func packFiles(runsRoot string, rec *schemas.ReleaseRecord, ev *evidence) ([]pac
 		{"README.txt", []byte(readme(rec, len(runs), ev.policyJSON != nil))},
 		{"release.json", append(recJSON, '\n')},
 	}
+	usedNames := map[string]bool{"README.txt": true, "release.json": true}
 	add := func(name, src string, required bool) error {
 		b, err := os.ReadFile(src)
 		if errors.Is(err, fs.ErrNotExist) && !required {
@@ -59,6 +54,10 @@ func packFiles(runsRoot string, rec *schemas.ReleaseRecord, ev *evidence) ([]pac
 		if err != nil {
 			return fmt.Errorf("read %s: %w", name, err)
 		}
+		if usedNames[name] {
+			return fmt.Errorf("duplicate pack file %s", name)
+		}
+		usedNames[name] = true
 		files = append(files, packFile{name, b})
 		return nil
 	}
@@ -79,15 +78,53 @@ func packFiles(runsRoot string, rec *schemas.ReleaseRecord, ev *evidence) ([]pac
 	}
 	for _, run := range runs {
 		id := run.Run.RunID
-		for _, name := range requiredRunFiles {
-			if err := add("runs/"+id+"/"+name, filepath.Join(run.Dir, name), true); err != nil {
-				return nil, err
+		sealPath := filepath.Join(run.Dir, "seal.json")
+		sealBytes, err := os.ReadFile(sealPath)
+		if err != nil {
+			return nil, fmt.Errorf("read runs/%s/seal.json: %w", id, err)
+		}
+		if run.SealHash != "" {
+			got := utils.SHA256Bytes(sealBytes)
+			want := strings.TrimPrefix(run.SealHash, "sha256:")
+			if got != want {
+				return nil, fmt.Errorf("runs/%s/seal.json hashes to %s, run records %s: %w", id, got, run.SealHash, schemas.ErrSealMismatch)
 			}
 		}
-		for _, name := range optionalRunFiles {
-			if err := add("runs/"+id+"/"+name, filepath.Join(run.Dir, name), false); err != nil {
-				return nil, err
+		sealName := "runs/" + id + "/seal.json"
+		if usedNames[sealName] {
+			return nil, fmt.Errorf("duplicate pack file %s", sealName)
+		}
+		usedNames[sealName] = true
+		files = append(files, packFile{sealName, sealBytes})
+		var seal schemas.SealRecord
+		if err := json.Unmarshal(sealBytes, &seal); err != nil {
+			return nil, fmt.Errorf("parse runs/%s/seal.json: %w", id, err)
+		}
+		if seal.RunID != "" && seal.RunID != id {
+			return nil, fmt.Errorf("runs/%s/seal.json names run %q", id, seal.RunID)
+		}
+		paths := make([]string, 0, len(seal.Files))
+		for name := range seal.Files {
+			if err := validateSealedRunPath(name); err != nil {
+				return nil, fmt.Errorf("runs/%s/seal.json file %q: %w", id, name, err)
 			}
+			paths = append(paths, name)
+		}
+		sort.Strings(paths)
+		for _, name := range paths {
+			packName := "runs/" + id + "/" + name
+			data, err := os.ReadFile(filepath.Join(run.Dir, filepath.FromSlash(name)))
+			if err != nil {
+				return nil, fmt.Errorf("read %s: %w", packName, err)
+			}
+			if got, want := utils.SHA256Bytes(data), seal.Files[name]; got != want {
+				return nil, fmt.Errorf("%s hashes to %s, seal lists %s: %w", packName, got, want, schemas.ErrSealMismatch)
+			}
+			if usedNames[packName] {
+				return nil, fmt.Errorf("duplicate pack file %s", packName)
+			}
+			usedNames[packName] = true
+			files = append(files, packFile{packName, data})
 		}
 		if run.GradeSource != "" && run.GradeSource != schemas.GradeSourceOriginal {
 			src := filepath.Join(expDir, "regrades", run.GradeSource, "runs", id, "grade.json")
@@ -106,6 +143,23 @@ func packFiles(runsRoot string, rec *schemas.ReleaseRecord, ev *evidence) ([]pac
 		}
 	}
 	return files, nil
+}
+
+// validateSealedRunPath accepts only a relative path inside a run folder. A
+// seal is persisted input, so pack construction validates it before using it
+// as either a filesystem path or an archive entry name.
+func validateSealedRunPath(name string) error {
+	if name == "" || strings.ContainsRune(name, '\x00') || strings.Contains(name, "\\") {
+		return errors.New("invalid relative path")
+	}
+	clean := filepath.Clean(filepath.FromSlash(name))
+	if filepath.IsAbs(clean) || clean == "." || clean == ".." || strings.HasPrefix(clean, ".."+string(filepath.Separator)) {
+		return errors.New("path escapes run folder")
+	}
+	if filepath.ToSlash(clean) != name {
+		return errors.New("path is not canonical")
+	}
+	return nil
 }
 
 // buildPack zips files in the given order with fixed times and modes.
@@ -167,8 +221,10 @@ func readme(rec *schemas.ReleaseRecord, nRuns int, hasPolicy bool) string {
 	line("  seals.log                the experiment's seal chain: \"<run_id> <seal hash>\"")
 	line("  runs/<run_id>/seal.json  each counted run's seal: every file of the sealed")
 	line("                           run folder with its sha256")
-	line("  runs/<run_id>/run.json, metrics.json, gates.json, grade.json")
-	line("                           byte-for-byte copies of those sealed run files")
+	line("  runs/<run_id>/<every file named by seal.json>")
+	line("                           byte-for-byte copies of every sealed run file,")
+	line("                           including raw agent streams, gateway requests,")
+	line("                           tool ledgers, events, and cost rows when present")
 	line("  runs/<run_id>/regrade.grade.json")
 	line("                           the regrade grade, when the analysis used a regrade")
 	line("  runs/<run_id>/regrade.regate.json")

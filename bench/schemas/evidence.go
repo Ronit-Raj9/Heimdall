@@ -5,22 +5,24 @@ import "context"
 // Evidence is everything collected about one run. Evidence sources fill their
 // part during the collect stage; later stages read it.
 type Evidence struct {
-	Contract     *RunEvidenceContract `json:"evidence_contract,omitempty"`
-	Status       *EvidenceStatus      `json:"evidence_status,omitempty"`
-	Exec         *ExecResult          `json:"exec,omitempty"`
-	Diff         *Diff                `json:"diff,omitempty"`
-	Requests     *RequestLog          `json:"requests,omitempty"` // gateway rows
-	Ledger       []LedgerEntry        `json:"ledger,omitempty"`   // fault proxy
-	Events       []Event              `json:"events,omitempty"`
-	Claim        *Claim               `json:"claim,omitempty"`
-	Cost         []CostRow            `json:"cost,omitempty"`
-	ShimLog      []ShimCall           `json:"shim_log,omitempty"`
-	Grade        *Grade               `json:"grade,omitempty"`
-	Gates        []GateResult         `json:"gates,omitempty"`
-	LogicalSteps []LogicalRequest     `json:"logical_steps,omitempty"`
-	Attempts     []AttemptRecord      `json:"attempts,omitempty"`
-	Retries      []RetryRecord        `json:"retries,omitempty"`
-	Fallbacks    []FallbackRecord     `json:"fallbacks,omitempty"`
+	AdapterFault *AdapterFaultEvidence `json:"adapter_fault,omitempty"`
+	Contract     *RunEvidenceContract  `json:"evidence_contract,omitempty"`
+	Status       *EvidenceStatus       `json:"evidence_status,omitempty"`
+	Exec         *ExecResult           `json:"exec,omitempty"`
+	Diff         *Diff                 `json:"diff,omitempty"`
+	Requests     *RequestLog           `json:"requests,omitempty"` // gateway rows
+	Ledger       []LedgerEntry         `json:"ledger,omitempty"`   // fault proxy
+	Events       []Event               `json:"events,omitempty"`
+	Claim        *Claim                `json:"claim,omitempty"`
+	AgentTrace   *ParseDiagnostics     `json:"agent_trace,omitempty"`
+	Cost         []CostRow             `json:"cost,omitempty"`
+	ShimLog      []ShimCall            `json:"shim_log,omitempty"`
+	Grade        *Grade                `json:"grade,omitempty"`
+	Gates        []GateResult          `json:"gates,omitempty"`
+	LogicalSteps []LogicalRequest      `json:"logical_steps,omitempty"`
+	Attempts     []AttemptRecord       `json:"attempts,omitempty"`
+	Retries      []RetryRecord         `json:"retries,omitempty"`
+	Fallbacks    []FallbackRecord      `json:"fallbacks,omitempty"`
 	// RequestedTools are the tool calls the model asked for, read from the
 	// gateway rows. Evidence.ToolCalls is the tool proxy ledger: what ran.
 	RequestedTools []ToolCallRecord  `json:"requested_tool_calls,omitempty"`

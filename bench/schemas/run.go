@@ -112,17 +112,20 @@ type RunTiming struct {
 
 // RunAgentInfo identifies the system under test for this run.
 type RunAgentInfo struct {
-	ConfigID       string               `json:"config_id"`
-	Adapter        string               `json:"adapter"`
-	Parser         string               `json:"parser,omitempty"`
-	ConfigHash     string               `json:"config_hash"`
-	AgentVersion   string               `json:"agent_version,omitempty"`
-	ImageDigest    string               `json:"image_digest,omitempty"`
-	ParserVersion  string               `json:"parser_version,omitempty"`
-	Capabilities   *AdapterCapabilities `json:"capabilities,omitempty"`
-	CapabilityGaps []string             `json:"capability_gaps,omitempty"`
-	ExitCode       *int                 `json:"exit_code,omitempty"`
-	TimedOut       bool                 `json:"timed_out"`
+	ConfigID         string               `json:"config_id"`
+	Adapter          string               `json:"adapter"`
+	Parser           string               `json:"parser,omitempty"`
+	ConfigHash       string               `json:"config_hash"`
+	AgentVersion     string               `json:"agent_version,omitempty"`
+	ImageDigest      string               `json:"image_digest,omitempty"`
+	ParserVersion    string               `json:"parser_version,omitempty"`
+	TraceSource      TraceSource          `json:"trace_source,omitempty"`
+	TraceQuality     TraceQuality         `json:"trace_quality,omitempty"`
+	TraceDiagnostics *ParseDiagnostics    `json:"trace_diagnostics,omitempty"`
+	Capabilities     *AdapterCapabilities `json:"capabilities,omitempty"`
+	CapabilityGaps   []string             `json:"capability_gaps,omitempty"`
+	ExitCode         *int                 `json:"exit_code,omitempty"`
+	TimedOut         bool                 `json:"timed_out"`
 }
 
 // RunGatewayInfo links the run to its gateway records.
@@ -168,19 +171,21 @@ type Lease struct {
 
 // RunContext is everything a part needs for one run. The engine builds it.
 type RunContext struct {
-	Experiment *Experiment
-	Manifest   *Manifest
-	Suite      *Suite
-	Task       *Task
-	Slot       *Slot
-	Run        *Run
-	Agent      *AgentConfig // resolved config for the slot's arm
-	Probe      *ProbeSpec   // nil for clean
-	Handle     *EnvironmentHandle
-	Key        *RunKey
-	Exec       *ExecResult
-	Dir        string // the run folder
-	Logger     Logger
+	FaultRuntime  *AdapterFaultRuntime // ephemeral secrets; never serialized
+	FaultSessions []string             // sessions actually started
+	Experiment    *Experiment
+	Manifest      *Manifest
+	Suite         *Suite
+	Task          *Task
+	Slot          *Slot
+	Run           *Run
+	Agent         *AgentConfig // resolved config for the slot's arm
+	Probe         *ProbeSpec   // nil for clean
+	Handle        *EnvironmentHandle
+	Key           *RunKey
+	Exec          *ExecResult
+	Dir           string // the run folder
+	Logger        Logger
 
 	// Scenario state (scenario.go), set by the engine as the run proceeds.
 	Services     []ServiceHandle // started services, including the tool proxy's view of them

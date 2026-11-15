@@ -18,6 +18,8 @@ Mode = Literal["live", "recorded", "synthetic"]
 
 class AdapterCapabilities(TypedDict, total=False):
     evidence_levels: List[str]
+    fault_hooks: List[AdapterFaultHook]
+    fault_protocol_version: str
     supports_cancellation: bool
     supports_gateway_headers: bool
     supports_model_override: bool
@@ -27,6 +29,59 @@ class AdapterCapabilities(TypedDict, total=False):
     supports_structured_events: bool
     supports_tool_events: bool
     task_types: List[str]
+
+
+class _AdapterFaultEntryRequired(TypedDict):
+    at: str
+    hash: str
+    phase: str
+    prev_hash: str
+    run_id: str
+    seq: int
+    session: str
+
+
+class AdapterFaultEntry(_AdapterFaultEntryRequired, total=False):
+    kind: str
+    message: str
+    mode: str
+    name: str
+    operation_id: str
+    success: bool
+
+
+class _AdapterFaultEvidenceRequired(TypedDict):
+    complete: bool
+    entries: List[AdapterFaultEntry]
+    ledger_hash: str
+    rule_hash: str
+    run_id: str
+    version: str
+
+
+class AdapterFaultEvidence(_AdapterFaultEvidenceRequired, total=False):
+    reason: str
+
+
+class AdapterFaultHook(TypedDict):
+    kind: str
+    modes: List[str]
+    name: str
+
+
+class _AdapterFaultRuleRequired(TypedDict):
+    kind: str
+    mode: str
+    name: str
+
+
+class AdapterFaultRule(_AdapterFaultRuleRequired, total=False):
+    calls: int
+    from_call: int
+    message: str
+    result: Any
+    session: str
+    timeout_ms: int
 
 
 class _AgentConfigRequired(TypedDict):
@@ -323,6 +378,8 @@ class _CanonicalRunRequired(TypedDict):
 
 
 class CanonicalRun(_CanonicalRunRequired, total=False):
+    adapter_fault: Optional[AdapterFaultEvidence]
+    agent_trace: Optional[ParseDiagnostics]
     attempts: List[AttemptRecord]
     events: List[Event]
     fallbacks: List[FallbackRecord]
@@ -1379,6 +1436,22 @@ class PairRun(TypedDict):
     slot: Slot
 
 
+class ParseDiagnostics(TypedDict, total=False):
+    bytes: int
+    emitted: int
+    lines: int
+    malformed: int
+    oversized: int
+    parser: str
+    parser_version: str
+    quality: str
+    reason: str
+    recognized: int
+    source: str
+    truncated: bool
+    unrecognized: int
+
+
 class PartFailure(TypedDict):
     error: str
     part: str
@@ -1448,6 +1521,7 @@ class PolicyResult(TypedDict):
 
 
 class ProbeApply(TypedDict, total=False):
+    adapter_fault: Optional[AdapterFaultRule]
     fault: Optional[FaultPlan]
     markers: List[str]
     overlay: Optional[OverlaySpec]
@@ -1752,6 +1826,9 @@ class RunAgentInfo(_RunAgentInfoRequired, total=False):
     image_digest: str
     parser: str
     parser_version: str
+    trace_diagnostics: Optional[ParseDiagnostics]
+    trace_quality: str
+    trace_source: str
 
 
 class _RunDetailRequired(TypedDict):
@@ -1767,6 +1844,7 @@ class _RunDetailRequired(TypedDict):
 
 
 class RunDetail(_RunDetailRequired, total=False):
+    adapter_fault: Optional[AdapterFaultEvidence]
     answer: Optional[Answer]
     artifacts: List[ArtifactFile]
     canonical: Optional[CanonicalRun]
@@ -2731,6 +2809,10 @@ class WorkersListResponse(WorkersList):
 __all__ = [
     "Mode",
     'AdapterCapabilities',
+    'AdapterFaultEntry',
+    'AdapterFaultEvidence',
+    'AdapterFaultHook',
+    'AdapterFaultRule',
     'AgentConfig',
     'AgentEventStatus',
     'AgentList',
@@ -2852,6 +2934,7 @@ __all__ = [
     'OverlaySpec',
     'Pair',
     'PairRun',
+    'ParseDiagnostics',
     'PartFailure',
     'PerRunRanges',
     'PlanCondition',

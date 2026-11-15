@@ -23,12 +23,13 @@ const FileToolLedger = "tools.jsonl"
 // are served by getRunArtifact.
 func fillScenario(index ReadIndex, runID string, out *schemas.RunDetail) error {
 	var ev struct {
-		ToolCalls []schemas.ToolCall      `json:"tool_calls"`
-		Sessions  []schemas.SessionResult `json:"sessions"`
-		Answer    *schemas.Answer         `json:"answer"`
-		State     []schemas.StateFile     `json:"state"`
-		Services  []schemas.ServiceResult `json:"services"`
-		Artifacts []schemas.ArtifactFile  `json:"artifacts"`
+		AdapterFault *schemas.AdapterFaultEvidence `json:"adapter_fault"`
+		ToolCalls    []schemas.ToolCall            `json:"tool_calls"`
+		Sessions     []schemas.SessionResult       `json:"sessions"`
+		Answer       *schemas.Answer               `json:"answer"`
+		State        []schemas.StateFile           `json:"state"`
+		Services     []schemas.ServiceResult       `json:"services"`
+		Artifacts    []schemas.ArtifactFile        `json:"artifacts"`
 	}
 	data, found, err := readInternal(index, runID, FileEvidence)
 	if err != nil {
@@ -45,6 +46,7 @@ func fillScenario(index ReadIndex, runID string, out *schemas.RunDetail) error {
 		}
 	}
 	out.ToolCalls, out.Sessions, out.Answer, out.State, out.Services = ev.ToolCalls, ev.Sessions, ev.Answer, ev.State, ev.Services
+	out.AdapterFault = ev.AdapterFault
 	out.Artifacts = ev.Artifacts
 	return nil
 }
