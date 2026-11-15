@@ -63,6 +63,10 @@ type ProbeApply struct {
 	Shim *ShimSpec `json:"shim,omitempty" yaml:"shim"`
 	// tool: the fault the per-run tool proxy injects (scenario.go).
 	Tool *ToolFault `json:"tool,omitempty" yaml:"tool"`
+	// service: environment variables added to the named services for this
+	// condition (service id -> variable -> value). It is how a condition
+	// plants hostile or broken data inside a tool's own data.
+	ServiceEnv map[string]map[string]string `json:"service_env,omitempty" yaml:"service_env"`
 }
 
 // OverlaySpec copies From (relative to the task folder) to To (relative to the

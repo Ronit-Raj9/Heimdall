@@ -302,6 +302,10 @@ type ToolFault struct {
 // LayerTool is the probe layer of tool faults: it acts in the tool proxy.
 const LayerTool ProbeLayerName = "tool"
 
+// LayerService is the probe layer that changes how the run's services start
+// (ProbeApply.ServiceEnv).
+const LayerService ProbeLayerName = "service"
+
 // FamilyHostileTool is the failure family of attacks delivered through a tool
 // result. It is not one of the three PS2 families.
 const FamilyHostileTool PS2Family = "hostile_tool"

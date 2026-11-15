@@ -77,6 +77,10 @@ type RunPlan struct {
 	Pids    int               `json:"pids"`
 	Network string            `json:"network"` // the internal evaluation network, or none
 	User    string            `json:"user"`
+	// Dirs maps a container path to a host folder copied into the container,
+	// read-only for the agent, before it starts. It carries what is too large
+	// for Files, such as agent skills.
+	Dirs map[string]string `json:"dirs,omitempty"`
 }
 
 // Parser converts an agent's raw output into normalized events and its final
