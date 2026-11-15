@@ -205,7 +205,7 @@ func TestGatewayCollect(t *testing.T) {
 		const nonce = "nonce_gateway_visible"
 		log := &schemas.RequestLog{Complete: true, Requests: []schemas.GatewayRequest{{
 			ID: "req1", Kind: "message", Status: "success",
-			Raw:          []byte(`{"messages":[{"text":"` + nonce + `"}]}`),
+			Raw:          []byte(`{"messages":[{"text":"` + nonce + `"}],"api_key":"raw-secret"}`),
 			ErrorMessage: "Authorization: Bearer sk-probe012345678901234567890123",
 		}}}
 		ev := &schemas.Evidence{}
@@ -224,6 +224,16 @@ func TestGatewayCollect(t *testing.T) {
 		}
 		if strings.Contains(string(persisted), nonce) || strings.Contains(string(persisted), "sk-probe012345678901234567890123") || strings.Contains(string(persisted), `"raw"`) {
 			t.Fatalf("persisted gateway rows contain transient payload data: %s", persisted)
+		}
+		raw, err := os.ReadFile(filepath.Join(rc.Dir, rawRequestsFile))
+		if err != nil {
+			t.Fatal(err)
+		}
+		if !strings.Contains(string(raw), nonce) || !strings.Contains(string(raw), `"raw_available":true`) {
+			t.Fatalf("raw gateway rows = %s", raw)
+		}
+		if strings.Contains(string(raw), "raw-secret") {
+			t.Fatalf("raw gateway rows contain an unredacted secret: %s", raw)
 		}
 	})
 

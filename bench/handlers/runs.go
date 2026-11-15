@@ -8,6 +8,7 @@ import (
 	"errors"
 	"fmt"
 	"io/fs"
+	"strconv"
 	"strings"
 
 	"github.com/fasthttp/router"
@@ -69,6 +70,7 @@ func (h *RunsHandler) RegisterRoutes(r *router.Router, middlewares ...lib.Middle
 	r.GET(p+"/diff", lib.ChainMiddlewares(h.getRunDiff, middlewares...))
 	r.GET(p+"/receipts", lib.ChainMiddlewares(h.getRunReceipts, middlewares...))
 	r.GET(p+"/files/{name}", lib.ChainMiddlewares(h.getRunFile, middlewares...))
+	r.GET(p+"/evidence/{name}", lib.ChainMiddlewares(h.getRunEvidence, middlewares...))
 	r.GET(p+"/artifacts/{artifact}/{name}", lib.ChainMiddlewares(h.getRunArtifact, middlewares...)) // artifact files (handlers/runartifacts.go)
 	r.GET(p+"/otlp", lib.ChainMiddlewares(h.getRunOTLP, middlewares...))                            // OpenTelemetry trace download (handlers/runotlp.go)
 }
@@ -258,6 +260,94 @@ func (h *RunsHandler) getRunFile(ctx *fasthttp.RequestCtx) {
 		return
 	}
 	h.sendRaw(ctx, name, data)
+}
+
+// getRunEvidence handles explicit raw audit evidence downloads. These files
+// are excluded from the ordinary run-file allowlist because they contain
+// agent and service content. A caller must name one of the supported evidence
+// files, and the run must still be sealed and verify against its seal.
+func (h *RunsHandler) getRunEvidence(ctx *fasthttp.RequestCtx) {
+	name := pathParam(ctx, "name")
+	if !rawEvidenceNameOK(name) {
+		sendNotFound(ctx, h.mode, "raw run evidence", name)
+		return
+	}
+	rv, ok := h.lookup(ctx)
+	if !ok {
+		return
+	}
+	runID := rv.Run.RunID
+	if !rv.Sealed {
+		lib.SendError(ctx, h.mode, fasthttp.StatusConflict, lib.ErrTypeConflict,
+			"run "+runID+" is not sealed: raw evidence is served only from a sealed run")
+		return
+	}
+	sv, isVerifier := h.index.(SealVerifier)
+	if !isVerifier {
+		sendUnavailable(ctx, h.mode, "seal verifier")
+		return
+	}
+	wctx, cancel := workContext(ctx, readTimeout)
+	err := sv.VerifySeal(wctx, runID)
+	cancel()
+	if err != nil {
+		if errors.Is(err, schemas.ErrSealMismatch) {
+			lib.SendError(ctx, h.mode, fasthttp.StatusConflict, lib.ErrTypeConflict,
+				"run "+runID+" does not match its seal and raw evidence is not served: "+err.Error())
+			return
+		}
+		sendDepError(ctx, h.mode, "verify seal of run "+runID, err)
+		return
+	}
+	data, err := h.index.RunFile(runID, name)
+	if err != nil {
+		if errors.Is(err, fs.ErrNotExist) || errors.Is(err, schemas.ErrNotFound) {
+			sendNotFound(ctx, h.mode, "raw run evidence", name)
+			return
+		}
+		sendDepError(ctx, h.mode, "read "+name+" of run "+runID, err)
+		return
+	}
+	ctx.SetStatusCode(fasthttp.StatusOK)
+	ctx.SetContentType("application/octet-stream")
+	ctx.Response.Header.Set(lib.ModeHeader, string(h.mode))
+	ctx.Response.Header.Set("Cache-Control", "no-store")
+	ctx.Response.Header.Set("X-Content-Type-Options", "nosniff")
+	ctx.Response.Header.Set("Content-Disposition", `attachment; filename="`+name+`"`)
+	ctx.SetBody(data)
+}
+
+// rawEvidenceNameOK keeps the raw endpoint narrow and prevents path input
+// from reaching a store implementation. Session files use the positive
+// session index emitted by the scenario runner.
+func rawEvidenceNameOK(name string) bool {
+	switch name {
+	case "gateway.raw.jsonl", "gateway.requests.jsonl", "proxy.ledger.jsonl", "tools.jsonl", "agent.stream.jsonl", "agent.stderr.txt":
+		return true
+	}
+	for _, prefix := range []string{"agent.stream.", "agent.stderr."} {
+		if !strings.HasPrefix(name, prefix) {
+			continue
+		}
+		suffix := strings.TrimPrefix(name, prefix)
+		if strings.HasSuffix(suffix, ".jsonl") && prefix == "agent.stream." {
+			suffix = strings.TrimSuffix(suffix, ".jsonl")
+		} else if strings.HasSuffix(suffix, ".txt") && prefix == "agent.stderr." {
+			suffix = strings.TrimSuffix(suffix, ".txt")
+		} else {
+			return false
+		}
+		return positiveSessionIndex(suffix)
+	}
+	return false
+}
+
+func positiveSessionIndex(s string) bool {
+	if s == "" || (len(s) > 1 && s[0] == '0') || strings.Trim(s, "0123456789") != "" {
+		return false
+	}
+	i, err := strconv.Atoi(s)
+	return err == nil && i > 0
 }
 
 // DiffSummary describes a unified git diff: its sha256 and every changed

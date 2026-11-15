@@ -8,6 +8,7 @@ import (
 	"os"
 	"path/filepath"
 	"sort"
+	"strconv"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -24,8 +25,11 @@ const GradeSourceOriginal = "original"
 var runFileAllowlist = map[string]bool{
 	"run.json":               true,
 	"agent.stream.jsonl":     true,
+	"agent.stderr.txt":       true,
 	"workspace.diff":         true,
 	"gateway.requests.jsonl": true,
+	"gateway.raw.jsonl":      true,
+	"tools.jsonl":            true,
 	"proxy.ledger.jsonl":     true,
 	"events.jsonl":           true,
 	"receipts.json":          true,
@@ -252,7 +256,7 @@ func (ix *Index) Pair(pairID string) ([]RunEntry, bool) {
 // in the fixed allowlist are served, and only regular files; anything else is
 // schemas.ErrNotFound, so the API cannot be walked to other paths.
 func (ix *Index) RunFile(runID, name string) ([]byte, error) {
-	if !runFileAllowlist[name] {
+	if !runFileAllowed(name) {
 		return nil, fmt.Errorf("run file %q: not served: %w", name, schemas.ErrNotFound)
 	}
 	r, ok := ix.snap.Load().byRun[runID]
@@ -275,6 +279,29 @@ func (ix *Index) RunFile(runID, name string) ([]byte, error) {
 		return nil, fmt.Errorf("run %s file %s: %w", runID, name, err)
 	}
 	return b, nil
+}
+
+func runFileAllowed(name string) bool {
+	if runFileAllowlist[name] {
+		return true
+	}
+	if strings.HasPrefix(name, "agent.stream.") && strings.HasSuffix(name, ".jsonl") {
+		n := strings.TrimSuffix(strings.TrimPrefix(name, "agent.stream."), ".jsonl")
+		return positiveSessionIndex(n)
+	}
+	if strings.HasPrefix(name, "agent.stderr.") && strings.HasSuffix(name, ".txt") {
+		n := strings.TrimSuffix(strings.TrimPrefix(name, "agent.stderr."), ".txt")
+		return positiveSessionIndex(n)
+	}
+	return false
+}
+
+func positiveSessionIndex(s string) bool {
+	if s == "" || (len(s) > 1 && s[0] == '0') || strings.Trim(s, "0123456789") != "" {
+		return false
+	}
+	i, err := strconv.Atoi(s)
+	return err == nil && i > 0
 }
 
 // VerifyRun checks one indexed run against its seal.json and the seal hash

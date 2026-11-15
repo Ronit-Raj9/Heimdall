@@ -164,7 +164,7 @@ func TestBuiltinCollectAll(t *testing.T) {
 	if priced != 4 {
 		t.Errorf("%d model_response events carry usd on disk, want 4", priced)
 	}
-	for _, name := range []string{ledgerFile, requestsFile, costFile} {
+	for _, name := range []string{ledgerFile, requestsFile, rawRequestsFile, costFile} {
 		if _, err := os.Stat(filepath.Join(rc.Dir, name)); err != nil {
 			t.Errorf("%s not written: %v", name, err)
 		}

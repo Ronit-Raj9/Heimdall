@@ -8,6 +8,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"sort"
 	"strings"
 	"testing"
 	"time"
@@ -72,8 +73,23 @@ func TestEvidencePackContents(t *testing.T) {
 			}
 			want = append(want, "seals.log")
 			for _, id := range []string{"r_t01_a", "r_t01_b", "r_t02_a", "r_t02_b"} {
-				for _, n := range []string{"seal.json", "run.json", "metrics.json", "gates.json", "grade.json"} {
-					want = append(want, "runs/"+id+"/"+n)
+				sealPath := filepath.Join(f.runsRoot, testExp, "slots", "s_"+strings.TrimPrefix(id, "r_"), "runs", id, "seal.json")
+				sealBytes, err := os.ReadFile(sealPath)
+				if err != nil {
+					t.Fatal(err)
+				}
+				var seal schemas.SealRecord
+				if err := json.Unmarshal(sealBytes, &seal); err != nil {
+					t.Fatal(err)
+				}
+				want = append(want, "runs/"+id+"/seal.json")
+				sealedNames := make([]string, 0, len(seal.Files))
+				for name := range seal.Files {
+					sealedNames = append(sealedNames, name)
+				}
+				sort.Strings(sealedNames)
+				for _, name := range sealedNames {
+					want = append(want, "runs/"+id+"/"+name)
 				}
 			}
 			if strings.Join(names, ",") != strings.Join(want, ",") {
@@ -112,6 +128,24 @@ func checkPackFiles(t *testing.T, f *fixture, rec *schemas.ReleaseRecord, files 
 		}
 		if !bytes.Equal(disk, files[name]) {
 			t.Errorf("%s differs from %s", name, src)
+		}
+	}
+	for _, run := range f.runs {
+		sealName := "runs/" + run.RunID + "/seal.json"
+		var seal schemas.SealRecord
+		if err := json.Unmarshal(files[sealName], &seal); err != nil {
+			t.Fatalf("parse %s: %v", sealName, err)
+		}
+		dir := filepath.Join(expDir, "slots", run.SlotID, "runs", run.RunID)
+		for name := range seal.Files {
+			disk, err := os.ReadFile(filepath.Join(dir, filepath.FromSlash(name)))
+			if err != nil {
+				t.Fatalf("read sealed file %s: %v", name, err)
+			}
+			packedName := "runs/" + run.RunID + "/" + name
+			if !bytes.Equal(disk, files[packedName]) {
+				t.Errorf("%s differs from sealed file %s", packedName, name)
+			}
 		}
 	}
 	// The digest in the record recomputes from the packed seals alone.

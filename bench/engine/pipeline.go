@@ -591,8 +591,9 @@ func afterContext(ctx context.Context) (context.Context, context.CancelFunc) {
 	return context.WithTimeout(context.WithoutCancel(ctx), cleanupTimeout)
 }
 
-// trimEvidence drops the large raw gateway rows; gateway.requests.jsonl keeps
-// them.
+// trimEvidence drops the large raw gateway rows; gateway.raw.jsonl keeps a
+// secret-scanned audit copy and gateway.requests.jsonl keeps the redacted
+// summary rows.
 func trimEvidence(ev *schemas.Evidence) schemas.Evidence {
 	out := *ev
 	if ev.Requests != nil {
