@@ -376,7 +376,9 @@ func TestSchedulerLeaseLost(t *testing.T) {
 			t.Fatalf("slot %s has %d runs", s.SlotID, len(runs))
 		}
 		r := runs[0]
-		if !r.sealed || r.run.Outcome != schemas.OutcomeAbortedInfra || r.run.Timing.AgentStarted == nil {
+		// The agent has usually started by the time the loss is seen, but a
+		// 5 ms heartbeat can win the race; either way the run is not counted.
+		if !r.sealed || r.run.Outcome != schemas.OutcomeAbortedInfra {
 			t.Fatalf("slot %s run %+v", s.SlotID, r.run)
 		}
 		found := false

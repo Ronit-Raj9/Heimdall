@@ -13,3 +13,7 @@
 /checks/
 # Upstream benchmark clones and datasets fetched for `bifrost-bench import`.
 /datasets/
+# The repo-level .gitignore drops every bin/ folder and *.log file; these are
+# task source files and a test fixture, so a fresh clone needs them.
+!/examples/**/repo/bin/
+!/importers/swebench/testdata/pytest.log
