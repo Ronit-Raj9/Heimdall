@@ -7,6 +7,7 @@ import (
 
 // AdapterFaultIssued counts controller decisions.
 const AdapterFaultIssued = "adapter_faults_issued"
+
 // AdapterFaultRecovery measures later unmodified success after a fault.
 const AdapterFaultRecovery = "adapter_fault_recovery_rate"
 

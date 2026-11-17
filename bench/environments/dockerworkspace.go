@@ -324,13 +324,13 @@ func (e *dockerWorkspace) Exec(ctx context.Context, rc *schemas.RunContext, plan
 	}
 	stdout, stderr, session := streamPaths(rc)
 	faultToken := ""
-  if rc.FaultRuntime != nil {
-      faultToken = rc.FaultRuntime.Token
-  }
+	if rc.FaultRuntime != nil {
+		faultToken = rc.FaultRuntime.Token
+	}
 
-  obs.watchAgent(ctx, rc, expID, runID, name)
-  res, err := e.attach(ctx, name, stdout, stderr, wall, secret, faultToken)
-  obs.finish(ctx, rc, res)
+	obs.watchAgent(ctx, rc, expID, runID, name)
+	res, err := e.attach(ctx, name, stdout, stderr, wall, secret, faultToken)
+	obs.finish(ctx, rc, res)
 	if err != nil {
 		keep = false
 		return res, fmt.Errorf("exec run %s: %w", runID, err)

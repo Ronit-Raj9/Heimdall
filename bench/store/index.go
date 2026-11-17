@@ -42,8 +42,8 @@ var runFileAllowlist = map[string]bool{
 	"canonical.json":         true,
 	"seal.json":              true,
 	"transitions.jsonl":      true,
-	"adapter.fault.json":    true,
-	"adapter.fault.jsonl":   true,
+	"adapter.fault.json":     true,
+	"adapter.fault.jsonl":    true,
 }
 
 // SealedRuns loads every counted, sealed run of an experiment for analysis,
