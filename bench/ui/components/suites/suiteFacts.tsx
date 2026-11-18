@@ -19,7 +19,17 @@ import { DeclaredArtifacts } from "./taskArtifacts";
  * lock facts, the declared output artifacts of an artifact suite, and where an imported suite came
  * from.
  */
-export function SuiteFacts({ suite }: { suite: SuiteSummary }) {
+export function SuiteFacts({
+	suite,
+	showLeaderboard = true,
+	showImported = true,
+}: {
+	suite: SuiteSummary;
+	/** The link to the suite's leaderboard; the suite page has it in its header. */
+	showLeaderboard?: boolean;
+	/** Where an imported suite came from; the suite page shows it on its Import and export tab. */
+	showImported?: boolean;
+}) {
 	const { t } = useTranslation("bench");
 	const locale = getLocale();
 	const none = <span className="text-muted-foreground">{t("suites.facts.none")}</span>;
@@ -63,14 +73,16 @@ export function SuiteFacts({ suite }: { suite: SuiteSummary }) {
 			<div className="flex flex-wrap items-center gap-2">
 				<LockBadge state={suite.lock_state} testId="suites-facts-lock" />
 				<LockKindBadge kind={suite.lock_kind} testId="suites-facts-lock-kind" />
-				<Link
-					to="/leaderboard"
-					search={{ suite: leaderboardSuite(suite) }}
-					className="text-primary text-xs underline-offset-4 hover:underline"
-					data-testid="suites-leaderboard-link"
-				>
-					{t("suites.facts.leaderboard")}
-				</Link>
+				{showLeaderboard && (
+					<Link
+						to="/leaderboard"
+						search={{ suite: leaderboardSuite(suite) }}
+						className="text-primary text-xs underline-offset-4 hover:underline"
+						data-testid="suites-leaderboard-link"
+					>
+						{t("suites.facts.leaderboard")}
+					</Link>
+				)}
 			</div>
 			<dl className="grid min-w-0 grid-cols-1 gap-x-6 gap-y-2 text-xs sm:grid-cols-2 xl:grid-cols-3" aria-label={t("suites.facts.label")}>
 				{facts.map((fact) => (
@@ -82,7 +94,7 @@ export function SuiteFacts({ suite }: { suite: SuiteSummary }) {
 			</dl>
 			{suite.artifacts && suite.artifacts.length > 0 && <DeclaredArtifacts artifacts={suite.artifacts} testId="suites-artifacts" />}
 			{grading === "judged" && <JudgedNotice testId="suites-judged-note" />}
-			{suite.imported && <ImportedFrom record={suite.imported} />}
+			{showImported && suite.imported && <ImportedFrom record={suite.imported} />}
 		</div>
 	);
 }

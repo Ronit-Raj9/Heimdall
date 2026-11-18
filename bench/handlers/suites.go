@@ -205,6 +205,8 @@ func (h *SuitesHandler) summarize(ctx context.Context, s *schemas.Suite) schemas
 	}
 	scenarioSummary(s, &out) // UI area: scenario fields of the suite and its tasks (imports.go)
 	h.healthSummary(s, &out) // Suite health area: quarantine, held-out split, canary (suitehealth.go)
+	// U3: tiers (suitetiers.go).
+	out.Tiers = suiteTiers(s)
 	return out
 }
 

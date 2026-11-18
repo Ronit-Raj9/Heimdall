@@ -6,7 +6,6 @@ import {
 	admissionState,
 	capabilityCoverage,
 	controlRows,
-	defaultSuiteId,
 	filterOptions,
 	filterTasks,
 	formatBytes,
@@ -116,12 +115,6 @@ describe("summaries", () => {
 });
 
 describe("small helpers", () => {
-	it("pick the first suite that loaded", () => {
-		expect(defaultSuiteId(list.suites)).toBe("acme-payments");
-		expect(defaultSuiteId([list.suites[0]])).toBe("acme-broken");
-		expect(defaultSuiteId([])).toBeNull();
-	});
-
 	it("name the leaderboard suite and format sizes", () => {
 		expect(leaderboardSuite(core)).toBe("coding-core@1.0.0");
 		expect(formatBytes(512, "en")).toBe("512 B");

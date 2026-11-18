@@ -1,4 +1,5 @@
 import { Badge } from "@/components/ui/badge";
+import { EntityLink } from "@/components/shell";
 import { releaseEvidenceUrl } from "@/lib/store/apis/benchApi";
 import type { ReleaseRecord } from "@/lib/types/bench";
 import { cn } from "@/lib/utils";
@@ -74,9 +75,7 @@ function ReleaseEntry({ record, linked }: { record: ReleaseRecord; linked: boole
 			</div>
 			<dl className="mt-2 grid grid-cols-[max-content_1fr] gap-x-4 gap-y-1">
 				<Row label={t("releases.timeline.experiment")}>
-					<span className="font-mono text-xs" data-testid={`release-exp-${id}`}>
-						{record.exp_id}
-					</span>
+					<EntityLink kind="experiment" id={record.exp_id} className="text-xs" testId={`release-exp-${id}`} />
 				</Row>
 				<Row label={t("releases.timeline.config")}>
 					<span data-testid={`release-config-${id}`}>

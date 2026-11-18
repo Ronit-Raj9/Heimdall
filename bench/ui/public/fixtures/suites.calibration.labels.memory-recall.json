@@ -1,0 +1,29 @@
+{
+	"_comment": "SYNTHETIC fixture for UI development. Not a measurement. Shapes follow handlers/testdata/contract.",
+	"mode": "synthetic",
+	"suite": "memory-recall",
+	"set_sha256": "9a1f0c3e5b7d2a4c6e8f0a1b3c5d7e9f1a3b5c7d9e1f3a5b7c9d1e3f5a7b9c1d",
+	"items": [
+		{
+			"id": "0f3a9c1b2d4e6f80",
+			"task": "q-017",
+			"answer": "Max",
+			"label": "correct",
+			"labeller": "suite admission controls",
+			"note": "expected answer (admission control, weak seed)",
+			"source": "admission_control",
+			"ref": "answer.yaml",
+			"at": "2026-11-16T09:00:00Z"
+		},
+		{
+			"id": "a1b2c3d4e5f60718",
+			"task": "q-017",
+			"answer": "Your dog is called Rex.",
+			"label": "incorrect",
+			"labeller": "ana",
+			"source": "human_review",
+			"ref": "rv_k2m9q4w1z0",
+			"at": "2026-11-17T08:00:00Z"
+		}
+	]
+}

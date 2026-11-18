@@ -38,11 +38,36 @@ type LeaderboardHandler struct {
 	mode  schemas.Mode
 	index ReadIndex
 	now   func() time.Time
+
+	// heldOutVisible serves the held-out board (split=held_out); false, the
+	// default, refuses it, as the suites API refuses held-out task detail.
+	heldOutVisible bool
 }
 
 // NewLeaderboardHandler creates the leaderboard handler. index may be nil.
 func NewLeaderboardHandler(mode schemas.Mode, index ReadIndex) *LeaderboardHandler {
 	return &LeaderboardHandler{mode: mode, index: index, now: time.Now}
+}
+
+// WithHeldOutVisible sets whether the held-out board is served (server
+// config held_out.visible). The public board never counts a held-out run
+// either way.
+func (h *LeaderboardHandler) WithHeldOutVisible(visible bool) *LeaderboardHandler {
+	h.heldOutVisible = visible
+	return h
+}
+
+// refuseHeldOutBoard answers 404 for split=held_out unless held-out tasks are
+// visible, and reports whether it did. Without the setting nothing about a
+// held-out task leaves the server beyond its id and lock status, the board's
+// per-task success rates and the experiments that ran it included.
+func refuseHeldOutBoard(ctx *fasthttp.RequestCtx, mode schemas.Mode, visible bool, split string) bool {
+	if visible || split != schemas.SplitHeldOut {
+		return false
+	}
+	lib.SendError(ctx, mode, fasthttp.StatusNotFound, lib.ErrTypeNotFound,
+		"the held-out board is not served (server config held_out.visible is false)")
+	return true
 }
 
 // RegisterRoutes registers GET /leaderboard.
@@ -63,6 +88,9 @@ func (h *LeaderboardHandler) getLeaderboard(ctx *fasthttp.RequestCtx) {
 		return
 	}
 	args := ctx.QueryArgs()
+	if refuseHeldOutBoard(ctx, h.mode, h.heldOutVisible, string(args.Peek("split"))) {
+		return
+	}
 	k, err := queryK(string(args.Peek("k")))
 	if err != nil {
 		lib.SendError(ctx, h.mode, fasthttp.StatusBadRequest, lib.ErrTypeBadRequest, err.Error())

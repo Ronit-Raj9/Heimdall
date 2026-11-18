@@ -1,7 +1,7 @@
 import { formatDateTime } from "@/components/verdict/verdict.utils";
+import { EntityLink } from "@/components/shell";
 import { getLocale } from "@/lib/i18n";
 import type { Leaderboard } from "@/lib/types/bench";
-import { Link } from "@tanstack/react-router";
 import { useTranslation } from "react-i18next";
 
 export interface LeaderboardFootnoteProps {
@@ -66,15 +66,7 @@ export function LeaderboardFootnote({ board, hasResilience }: LeaderboardFootnot
 									{(group.experiments ?? []).length > 0 && (
 										<span className="flex flex-wrap gap-x-2">
 											{(group.experiments ?? []).map((id) => (
-												<Link
-													key={id}
-													to="/verdict"
-													search={{ exp: id }}
-													aria-label={t("leaderboard.cell.openVerdict", { id })}
-													className="text-primary font-mono text-[11px] underline-offset-4 hover:underline"
-												>
-													{id}
-												</Link>
+												<EntityLink key={id} kind="experiment" id={id} className="text-[11px]" />
 											))}
 										</span>
 									)}

@@ -1,6 +1,9 @@
-import { createFileRoute } from "@tanstack/react-router";
-import ImportsPage from "./page";
+import { importsRedirect } from "@/lib/routing/u3Redirects";
+import { createFileRoute, redirect } from "@tanstack/react-router";
 
+// UI regroup (U3): the importers are the Add a suite flow under Suites.
 export const Route = createFileRoute("/imports")({
-	component: ImportsPage,
+	beforeLoad: () => {
+		throw redirect({ ...importsRedirect(), replace: true } as never);
+	},
 });

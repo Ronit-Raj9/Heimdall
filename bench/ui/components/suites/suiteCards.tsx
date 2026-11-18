@@ -3,21 +3,20 @@ import { suiteGrading, suiteTrack } from "@/components/scenario/scenario.utils";
 import { shortHash } from "@/components/verdict/verdict.utils";
 import type { SuiteSummary } from "@/lib/types/bench";
 import { cn } from "@/lib/utils";
+import { Link } from "@tanstack/react-router";
 import { CircleAlert, CircleX, EyeOff, ShieldOff } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { LockBadge, ToneBadge, VerifierBadge } from "./suiteBadges";
 
 export interface SuiteCardsProps {
 	suites: readonly SuiteSummary[];
-	selected: string | null;
-	onSelect: (id: string) => void;
 }
 
 /**
  * One card per suite: lock state, how many tasks are admitted, drift, verifier format and base
- * image. Cards are toggle buttons in a labelled group; the pressed one is the suite shown below.
+ * image. Each card is a link to the suite's page, /suites/$suiteId.
  */
-export function SuiteCards({ suites, selected, onSelect }: SuiteCardsProps) {
+export function SuiteCards({ suites }: SuiteCardsProps) {
 	const { t } = useTranslation("bench");
 	return (
 		<ul
@@ -27,27 +26,25 @@ export function SuiteCards({ suites, selected, onSelect }: SuiteCardsProps) {
 		>
 			{suites.map((suite) => (
 				<li key={suite.id} className="min-w-0">
-					<SuiteCard suite={suite} pressed={suite.id === selected} onSelect={() => onSelect(suite.id)} />
+					<SuiteCard suite={suite} />
 				</li>
 			))}
 		</ul>
 	);
 }
 
-function SuiteCard({ suite, pressed, onSelect }: { suite: SuiteSummary; pressed: boolean; onSelect: () => void }) {
+function SuiteCard({ suite }: { suite: SuiteSummary }) {
 	const { t } = useTranslation("bench");
 	const allAdmitted = suite.task_count > 0 && suite.admitted_count === suite.task_count;
 	return (
-		<button
-			type="button"
-			aria-pressed={pressed}
+		<Link
+			to="/suites/$suiteId"
+			params={{ suiteId: suite.id }}
 			title={t("suites.card.select", { suite: suite.version ? `${suite.id}@${suite.version}` : suite.id })}
-			onClick={onSelect}
 			data-testid={`suites-card-${suite.id}`}
 			data-state={suite.error ? "error" : suite.lock_state}
 			className={cn(
-				"bg-card focus-visible:ring-ring/50 flex h-full w-full min-w-0 cursor-pointer flex-col gap-2 rounded-sm border p-3 text-left transition-colors focus-visible:ring-[3px] focus-visible:outline-none",
-				pressed ? "border-foreground/40 ring-foreground/20 ring-1" : "hover:border-foreground/25",
+				"bg-card focus-visible:ring-ring/50 hover:border-foreground/25 flex h-full w-full min-w-0 flex-col gap-2 rounded-sm border p-3 text-left transition-colors focus-visible:ring-[3px] focus-visible:outline-none",
 			)}
 		>
 			<span className="flex min-w-0 flex-wrap items-baseline gap-x-2 gap-y-0.5">
@@ -99,6 +96,6 @@ function SuiteCard({ suite, pressed, onSelect }: { suite: SuiteSummary; pressed:
 					</span>
 				</>
 			)}
-		</button>
+		</Link>
 	);
 }

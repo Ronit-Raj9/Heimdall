@@ -1,9 +1,11 @@
 import "@/lib/i18n";
 
 import { renderToStaticMarkup } from "react-dom/server";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { CANARY_LIST_FIXTURE } from "./canary.fixtures";
 import { CanaryList } from "./canaryList";
+
+vi.mock("@tanstack/react-router", async () => (await import("@/lib/testing/routerMock")).routerMock);
 
 const rows = (html: string) => [...html.matchAll(/data-testid="canary-row-([^"]+)"/g)].map((m) => m[1]);
 

@@ -33,12 +33,23 @@ type CostExplainHandler struct {
 	source CostExplainSource
 	index  ReadIndex
 	now    func() time.Time
+
+	// heldOutVisible serves the held-out board's plane (split=held_out), as
+	// LeaderboardHandler does.
+	heldOutVisible bool
 }
 
 // NewCostExplainHandler creates the handler; a nil source answers 503 on the
 // experiment routes, a nil index on the board route.
 func NewCostExplainHandler(mode schemas.Mode, source CostExplainSource, index ReadIndex) *CostExplainHandler {
 	return &CostExplainHandler{mode: mode, source: source, index: index, now: time.Now}
+}
+
+// WithHeldOutVisible sets whether the held-out board's plane is served
+// (server config held_out.visible).
+func (h *CostExplainHandler) WithHeldOutVisible(visible bool) *CostExplainHandler {
+	h.heldOutVisible = visible
+	return h
 }
 
 // RegisterRoutes registers GET /experiments/{id}/cost-explain,
@@ -115,6 +126,9 @@ func (h *CostExplainHandler) getBoardPareto(ctx *fasthttp.RequestCtx) {
 		return
 	}
 	args := ctx.QueryArgs()
+	if refuseHeldOutBoard(ctx, h.mode, h.heldOutVisible, string(args.Peek("split"))) {
+		return
+	}
 	k, err := queryK(string(args.Peek("k")))
 	if err != nil {
 		lib.SendError(ctx, h.mode, fasthttp.StatusBadRequest, lib.ErrTypeBadRequest, err.Error())

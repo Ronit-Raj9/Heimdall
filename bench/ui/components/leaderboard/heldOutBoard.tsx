@@ -1,3 +1,5 @@
+import { Button } from "@/components/ui/button";
+import type { SuiteSummary } from "@/lib/types/bench";
 import { cn } from "@/lib/utils";
 import { EyeOff } from "lucide-react";
 import { useTranslation } from "react-i18next";
@@ -47,5 +49,39 @@ export function HeldOutBoardToggle({
 			<EyeOff className="size-3.5 shrink-0" aria-hidden="true" />
 			{t("suiteHealth.board.toggle")}
 		</button>
+	);
+}
+/**
+ * U3: whether to offer the held-out board. The server serves it only with held_out.visible, which
+ * the suites API shows: held-out tasks are listed redacted without it. So the toggle shows when some
+ * suite has held-out tasks and none of them is redacted.
+ */
+export function heldOutBoardOffered(suites: readonly Pick<SuiteSummary, "held_out_count" | "tasks">[]): boolean {
+	const withHeldOut = suites.filter((suite) => (suite.held_out_count ?? 0) > 0);
+	return withHeldOut.length > 0 && withHeldOut.every((suite) => suite.tasks.every((task) => !task.redacted));
+}
+
+/** An RTK Query error that is a 404 from the server. */
+export function isNotFoundError(error: unknown): boolean {
+	return typeof error === "object" && error !== null && (error as { status?: unknown }).status === 404;
+}
+
+/** U3: the held-out board was asked for on a server that does not serve it (held_out.visible false). */
+export function HeldOutBoardOff({ onBack }: { onBack: () => void }) {
+	const { t } = useTranslation("bench");
+	return (
+		<div
+			role="note"
+			className="border-chart-info/50 bg-chart-info/10 flex flex-col items-start gap-3 rounded-sm border px-4 py-3 text-sm"
+			data-testid="leaderboard-held-out-off"
+		>
+			<p className="text-foreground flex items-start gap-2">
+				<EyeOff className="text-chart-info-ink mt-0.5 size-4 shrink-0" aria-hidden="true" />
+				{t("suiteHealth.board.off")}
+			</p>
+			<Button variant="outline" size="sm" onClick={onBack} dataTestId="leaderboard-held-out-back">
+				{t("suiteHealth.board.backToPublic")}
+			</Button>
+		</div>
 	);
 }

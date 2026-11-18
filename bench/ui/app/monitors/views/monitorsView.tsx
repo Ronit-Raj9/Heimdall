@@ -1,5 +1,6 @@
 import { MonitorCertDetail, MonitorCertList } from "@/components/integrity/monitorCertification";
 import { LoadError } from "@/components/runs/screenStates";
+import { PageHeader } from "@/components/shell";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -15,12 +16,15 @@ export default function MonitorsView() {
 	const [cert] = useQueryState("cert", parseAsString);
 	return (
 		<section className="flex flex-col gap-6" data-testid="monitors-screen">
-			<div className="flex flex-col gap-1">
-				<h1 className="text-foreground text-xl font-semibold tracking-tight">{t("integrity.monitors.title")}</h1>
-				<p className="text-muted-foreground max-w-3xl text-sm">{t("integrity.monitors.subtitle")}</p>
-				<p className="text-muted-foreground max-w-3xl text-xs">{t("integrity.monitors.disclaimer")}</p>
-			</div>
+			<PageHeader
+				title={t("integrity.monitors.title")}
+				subtitle={t("integrity.monitors.subtitle")}
+				breadcrumbs={cert ? [{ label: t("integrity.monitors.title"), to: "/monitors" }, { label: cert }] : undefined}
+			/>
 			{cert ? <CertificationScreen certId={cert} /> : <CertificationList />}
+			<p className="text-muted-foreground max-w-3xl text-xs" data-testid="monitors-disclaimer">
+				{t("integrity.monitors.disclaimer")}
+			</p>
 		</section>
 	);
 }

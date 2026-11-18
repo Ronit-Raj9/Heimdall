@@ -1,4 +1,5 @@
 import { ReviewForm } from "@/components/review/reviewForm";
+import { EntityLink } from "@/components/shell";
 import { RunEvidenceSummary } from "@/components/review/runEvidenceSummary";
 import { RunReviewsBlock } from "@/components/review/runReviewsBlock";
 import { BlockSkeleton, LoadError } from "@/components/runs/screenStates";
@@ -27,7 +28,11 @@ export function ReviewRunPanel({ item }: { item: ReviewQueueItem }) {
 			<Card className="gap-4">
 				<CardHeader>
 					<div className="flex flex-wrap items-center justify-between gap-2">
-						<CardTitle className="font-mono text-sm">{t("review.panel.title", { id: item.run_id })}</CardTitle>
+						<CardTitle className="text-sm">
+							<EntityLink kind="run" id={item.run_id} testId="review-run-link">
+								<span className="font-mono">{t("review.panel.title", { id: item.run_id })}</span>
+							</EntityLink>
+						</CardTitle>
 						<Button variant="outline" size="sm" asChild>
 							<Link to="/runs" search={{ pair: item.pair_id, exp: item.exp_id }} data-testid="review-open-pair">
 								{t("review.panel.openPair")}

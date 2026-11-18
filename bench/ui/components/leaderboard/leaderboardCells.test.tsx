@@ -5,13 +5,7 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it, vi } from "vitest";
 import { AgentCell, ExperimentLinks, ReliabilityCell, ResilienceCell, SuccessCell, TierBadge } from "./leaderboardCells";
 
-vi.mock("@tanstack/react-router", () => ({
-	Link: ({ to, search, children, ...rest }: { to: string; search: { exp: string }; children: React.ReactNode }) => (
-		<a href={`${to}?exp=${search.exp}`} {...rest}>
-			{children}
-		</a>
-	),
-}));
+vi.mock("@tanstack/react-router", async () => (await import("@/lib/testing/routerMock")).routerMock);
 
 const HASH = "sha256:52b5454d0000000000000000000000000000000000000000000000000000933a";
 const unknown: Value = { state: "unknown", v: null, reason: "no graded run" };
@@ -93,10 +87,10 @@ describe("ResilienceCell", () => {
 describe("ExperimentLinks", () => {
 	it("links the newest experiments and counts the rest", () => {
 		const html = renderToStaticMarkup(<ExperimentLinks entry={{ rank: 1, experiments: ["e_c", "e_b", "e_a"] }} />);
-		expect(html).toContain('href="/verdict?exp=e_c"');
-		expect(html).toContain('href="/verdict?exp=e_b"');
-		expect(html).not.toContain('href="/verdict?exp=e_a"');
+		expect(html).toContain('href="/experiments/e_c"');
+		expect(html).toContain('href="/experiments/e_b"');
+		expect(html).not.toContain('href="/experiments/e_a"');
 		expect(html).toContain(">+1 more<");
-		expect(html).toContain('aria-label="Open the verdict of e_c"');
+		expect(html).toContain('title="Open experiment e_c"');
 	});
 });

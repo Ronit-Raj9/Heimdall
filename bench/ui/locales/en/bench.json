@@ -117,7 +117,7 @@
 	},
 	"agentDiff": {
 		"title": "Agent diff",
-		"subtitle": "What changed between version A and version B of an agent, and which tasks flipped. Only verified sealed runs on one suite version and one condition count.",
+		"subtitle": "What changed between two versions of an agent and which tasks flipped, over verified sealed runs of one suite and condition.",
 		"synthetic": "Synthetic runs: scripted agents or models, or fixture data. The numbers show the screen works; they are not findings.",
 		"loadError": "Could not compute the agent diff.",
 		"versionsError": "Could not load the agent versions for the pickers.",
@@ -290,8 +290,7 @@
 		"link": {
 			"compare": "Compare versions",
 			"compareHint": "What changed between two versions of an agent, and which tasks flipped.",
-			"diff": "Diff",
-			"diffHint": "Compare this config with its previous version"
+			"diff": "Diff"
 		}
 	},
 	"app": {
@@ -366,7 +365,7 @@
 	},
 	"leaderboard": {
 		"title": "Leaderboard",
-		"subtitle": "Agent configurations ranked by verified success. Tier 1 = cannot be told apart from the leader (exact sign-flip test on common tasks, Holm-adjusted, alpha 0.05). No blended score.",
+		"subtitle": "Tier 1 cannot be told apart from the leader (exact sign-flip test on common tasks, Holm-adjusted, alpha 0.05). No blended score.",
 		"banner": "Synthetic data. These numbers come from scripted agents or scripted models: they are not findings.",
 		"bannerHint": "Use this board to check the screen, not to choose an agent.",
 		"loadError": "Could not load the leaderboard.",
@@ -449,7 +448,6 @@
 			"notRun": "not run",
 			"notRunHint": "This configuration did not run {{condition}}.",
 			"tasksRuns": "{{tasks}} / {{runs}}",
-			"openVerdict": "Open the verdict of {{id}}",
 			"moreExperiments": "+{{count}} more"
 		},
 		"copy": {
@@ -492,9 +490,14 @@
 			"tierValue": "{{tier}} ({{reason}})"
 		},
 		"judged": {
-			"badge": "Judged suite",
 			"title": "Outcomes on this board come from a pinned judge model",
 			"body": "Success here is a judge model's majority vote, not a deterministic check. Do not compare this board with a verified suite's board."
+		},
+		"pageSubtitle": "Agent configs ranked by verified success, and how they move over time.",
+		"tabs": {
+			"label": "Leaderboard views",
+			"board": "Leaderboard",
+			"trends": "Trends"
 		}
 	},
 	"verdict": {
@@ -1483,11 +1486,9 @@
 		"empty": "No arm has a graded run on this condition yet."
 	},
 	"triage": {
-		"title": "Failure triage",
 		"subtitle": "Deterministic failure patterns per arm, each linked to the runs and events that show it.",
 		"banner": "Observed patterns, not root causes.",
 		"bannerHint": "Each pattern is a fixed rule over a run's events. A pattern that is more common in one arm is a lead to read in the trace, not the reason the arm is worse.",
-		"experiment": "Experiment {{id}}",
 		"noExperiments": "No experiments yet. Plan one to see its failure patterns.",
 		"listError": "Could not load the experiment list.",
 		"loadError": "Could not load the triage.",
@@ -1524,11 +1525,15 @@
 			"loadError": "Could not load this run's metrics.",
 			"noReason": "No event ids recorded for this run.",
 			"moreEvents": "+{{count}} more"
-		}
+		},
+		"picker": {
+			"label": "Experiment",
+			"placeholder": "Pick an experiment"
+		},
+		"newExperiment": "New experiment"
 	},
 	"clusters": {
-		"title": "Failure clusters",
-		"subtitle": "Failed verified runs across experiments, grouped by a signature built from their recorded evidence: failed hidden tests, gates, loops, error lines and the last tool.",
+		"subtitle": "Failed verified runs across experiments, grouped by a signature built from their recorded evidence.",
 		"banner": "Observed groupings, not root causes.",
 		"bannerHint": "A signature is a fixed rule over a run's grade and evidence. Runs in one cluster failed the same recorded way; read their traces before naming a cause.",
 		"loadError": "Could not load the failure clusters.",
@@ -1611,7 +1616,6 @@
 		},
 		"detail": {
 			"close": "Close",
-			"loading": "Loading the cluster",
 			"loadError": "Could not load this cluster.",
 			"notFound": "This cluster is not in the filtered set. Change the filters or close it.",
 			"signature": "Signature",
@@ -1910,7 +1914,7 @@
 	},
 	"canaries": {
 		"title": "Drift canaries",
-		"subtitle": "A small pinned suite re-run on a schedule through the gateway and tested against a known-good baseline, so an agent that gets worse with no change by its team (a model updated behind its alias, a degraded route) is caught. A drift alerts only after two consecutive looks flag the same target and metric.",
+		"subtitle": "A small pinned suite re-run on a schedule and tested against a known-good baseline, so silent drift is caught.",
 		"loadError": "Could not load the drift canaries.",
 		"detailError": "Could not load canary {{name}}.",
 		"empty": "No canaries yet. Write one with `heimdall canary init`, then pin a baseline with `heimdall canary baseline`.",
@@ -2052,7 +2056,7 @@
 	},
 	"inbox": {
 		"title": "Failure inbox",
-		"subtitle": "Production traces that failed, grouped by signature. Accept one to draft a regression task from it, reject it with a reason, or snooze it. A drafted task is a starting point: a person finishes it before it is admitted.",
+		"subtitle": "Production traces that failed, one row per signature: accept one as a draft regression task, reject it or snooze it.",
 		"loadError": "Could not load the failure inbox.",
 		"regressionTasks_one": "{{count}} regression task drafted from the inbox",
 		"regressionTasks_other": "{{count}} regression tasks drafted from the inbox",
@@ -2238,6 +2242,13 @@
 			"editMe": "Files to edit (marked EDIT ME)",
 			"next": "Next steps",
 			"warnings": "Warnings"
+		},
+		"pageSubtitle": "Failures from production traces and from benchmark runs, grouped so they can become regression tasks.",
+		"tabs": {
+			"label": "Failure views",
+			"inbox": "Inbox",
+			"clusters": "Clusters",
+			"triage": "Triage"
 		}
 	},
 	"notFound": {
@@ -2252,10 +2263,10 @@
 	},
 	"suites": {
 		"title": "Suites",
-		"subtitle": "Every benchmark pack in this project: your own tasks, in any language, next to the built-in ones. A task counts only once admission proved its hidden verifier is fair and its lock still matches the files.",
+		"subtitle": "Every benchmark pack in this project, with its lock and admission state.",
 		"synthetic": "Synthetic fixture data. These suites are examples for checking the screen, not your project.",
 		"loadError": "Could not load the suites.",
-		"empty": "No suites yet. Add one with the commands below.",
+		"empty": "No suites in this project yet.",
 		"pickerLabel": "Suites",
 		"card": {
 			"admitted": "{{admitted}} of {{total}} tasks admitted",
@@ -2454,7 +2465,11 @@
 			"filesTruncated": "Showing the first {{shown}} of {{total}} files.",
 			"filesEmpty": "The repo folder is empty.",
 			"runs": "Runs",
-			"runsHint": "Runs are not filtered by task yet. The leaderboard shows this suite's results."
+			"runsHint": "Runs are not filtered by task yet. The leaderboard shows this suite's results.",
+			"notFound": "There is no suite {{suite}} in this project.",
+			"allSuites": "All suites",
+			"settings": "Settings",
+			"settingsHint": "environment, grader, verifier, image and lock"
 		},
 		"controls": {
 			"reference": "Reference solution passes, 3 times in a row",
@@ -2556,6 +2571,40 @@
 			"skillsHint": "Installed in the agent's skills folder, unless the run turns skills off.",
 			"impossible": "Impossible task",
 			"impossibleBody": "Its tests contradict its instruction, so no honest solution exists. A pass can only come from cheating, such as editing the tests or special-casing the checks, and the impossible_pass gate records it as an integrity violation."
+		},
+		"addSuite": "Add a suite",
+		"tabs": {
+			"label": "Suite views",
+			"tasks": "Tasks",
+			"health": "Health",
+			"tiers": "Tiers",
+			"calibration": "Calibration",
+			"export": "Import and export"
+		},
+		"tiers": {
+			"none": "This suite defines no tiers, so every experiment runs all its tasks (nightly).",
+			"tasks_one": "{{count}} task",
+			"tasks_other": "{{count}} tasks",
+			"implicit": "not in suite.yaml",
+			"purpose": {
+				"pr": "A small, fast, discriminating set for every pull request.",
+				"nightly": "Every task, for the nightly or post-merge run.",
+				"headroom": "Tasks the agent still fails often."
+			},
+			"error": "Planning refuses this tier: {{error}}.",
+			"useTitle": "Run a tier",
+			"useDescription": "An experiment picks a tier; tasks: all then means the tier's tasks.",
+			"suggest": "Suggest tiers from task health and wall time"
+		},
+		"importExport": {
+			"importTitle": "Imported from",
+			"notImported": "This suite was written here, not imported.",
+			"exportTitle": "Export",
+			"exportDescription": "The suite as Harbor task folders, hidden verifiers withheld."
+		},
+		"addFlow": {
+			"title": "Add a suite",
+			"subtitle": "Import a public benchmark or bring your own tasks."
 		}
 	},
 	"suiteHealth": {
@@ -2626,7 +2675,9 @@
 			"toggle": "Held-out board",
 			"toggleHint": "Show the separate board of held-out tasks. The public board never counts a held-out task.",
 			"banner": "Held-out board",
-			"bannerHint": "Scores from held-out tasks only, from experiments that selected them. They are never mixed into the public board."
+			"bannerHint": "Scores from held-out tasks only, from experiments that selected them. They are never mixed into the public board.",
+			"off": "This server does not serve the held-out board: its config sets held_out.visible to false.",
+			"backToPublic": "Show the public board"
 		},
 		"quarantine": {
 			"hint": "Kept out of new plans since {{when}} ({{source}}): {{reason}}",
@@ -2708,14 +2759,13 @@
 	},
 	"agents": {
 		"title": "Agents",
-		"subtitle": "Every agent config in agents/: the system under test. Anything that runs in a container, edits the workspace and sends its model calls through Bifrost can be benchmarked.",
+		"subtitle": "Every agent config in agents/, the systems under test.",
 		"synthetic": "Synthetic fixture data. These agent configs are examples for checking the screen.",
 		"loadError": "Could not load the agent configs.",
 		"empty": "No agent configs yet. Run `bifrost-bench agent init <id> -template command`.",
 		"secretNote": "Environment values are never shown, only variable names. Delivered files are listed by path, never by content.",
 		"label": "Agent configs",
 		"loadFailed": "Failed to load",
-		"adapter": "Adapter",
 		"image": "Image",
 		"build": "Build",
 		"perSuite": "per suite, on {{arg}}",
@@ -2743,7 +2793,55 @@
 		"files": "Delivered files",
 		"runs": "Sealed runs",
 		"runsHint": "Sealed runs of this config id in any experiment, including dry runs against the scripted model. The leaderboard separates live from synthetic.",
-		"runsUnknown": "unknown"
+		"runsUnknown": "unknown",
+		"tabs": {
+			"label": "Agent views",
+			"configs": "Configs",
+			"diff": "Diff",
+			"frameworks": "Frameworks"
+		},
+		"table": {
+			"config": "Config",
+			"adapter": "Adapter",
+			"evidence": "Evidence",
+			"model": "Default model",
+			"runs": "Sealed runs",
+			"native": "native ({{parser}})",
+			"gateway": "gateway"
+		},
+		"versions": {
+			"title": "Versions",
+			"description": "Each config hash that ran, newest first.",
+			"error": "Could not load the versions.",
+			"empty": "No sealed run of this config yet.",
+			"runs_one": "{{count}} sealed run",
+			"runs_other": "{{count}} sealed runs",
+			"more": "and {{count}} more"
+		},
+		"frameworks": {
+			"label": "Agent configs by framework and evidence",
+			"configs_one": "{{count}} config",
+			"configs_other": "{{count}} configs",
+			"nativeCount": "{{count}} with a native trace",
+			"scriptedCount": "{{count}} scripted",
+			"nativeTrace": "Native trace",
+			"selfReported": "Reports steps",
+			"provider": "Gateway provider",
+			"build": "Image",
+			"fallbacks_one": "(+{{count}} fallback)",
+			"fallbacks_other": "(+{{count}} fallbacks)",
+			"yes": "yes",
+			"no": "no",
+			"buildKind": {
+				"perSuite": "built per suite",
+				"oneImage": "built once",
+				"pulled": "pulled"
+			},
+			"note": "Read from the configs. Pinned framework versions and conformance check results are in docs/harness-matrix.md.",
+			"kind": "Kind",
+			"agentKind": "agent"
+		},
+		"missing": "There is no config {{agent}} in agents/; it may have been renamed or removed since its runs."
 	},
 	"scenario": {
 		"track": {
@@ -2803,7 +2901,7 @@
 	},
 	"imports": {
 		"title": "Imports",
-		"subtitle": "Public benchmarks this bench can turn into suites. An importer reads a local copy of the upstream data and writes an ordinary suite; nothing upstream is committed.",
+		"subtitle": "Public benchmarks an importer turns into an ordinary suite from a local copy of the upstream data.",
 		"synthetic": "Synthetic fixture data. These importers are examples for checking the screen, not what this server links.",
 		"loadError": "Could not load the importers.",
 		"empty": "This server links no importers.",
@@ -2820,7 +2918,7 @@
 	},
 	"workers": {
 		"title": "Workers",
-		"subtitle": "Other machines that lease slots from this server, run them with the normal pipeline, and upload sealed run folders. This server keeps the spend cap and the lease table.",
+		"subtitle": "Other machines that lease slots from this server and upload sealed run folders.",
 		"synthetic": "Synthetic fixture data. These workers are examples for checking the screen.",
 		"loadError": "Could not load the workers.",
 		"offTitle": "Remote workers are not enabled",
@@ -2833,7 +2931,6 @@
 		"host": "Host",
 		"version": "Build",
 		"state": "State",
-		"slots": "Slots",
 		"running": "Running",
 		"completed": "Completed",
 		"lastSeen": "Last seen",
@@ -2849,8 +2946,7 @@
 		}
 	},
 	"trends": {
-		"title": "Trends",
-		"subtitle": "Each agent config lineage (agent and model) over experiments, one point per config hash. A slow regression shows here even when no single release verdict caught it.",
+		"subtitle": "Each agent and model over experiments, one point per config hash, so a slow regression shows.",
 		"loadError": "Could not load the trends.",
 		"resetFilters": "Reset filters",
 		"unknown": "not observed",
@@ -2944,10 +3040,8 @@
 	},
 	"review": {
 		"title": "Human review",
-		"subtitle": "Runs a person should look at: split or unparsable judge votes, undecided graders, fired veto gates, false completions and flags. A review is a hash-chained record beside the sealed run. It never edits sealed evidence and changes results only where an analysis asks for grade source reviewed.",
+		"subtitle": "Runs a person should look at; a review sits beside the sealed run and never edits its evidence.",
 		"picker": {
-			"label": "Experiment",
-			"placeholder": "Pick an experiment",
 			"loadError": "Could not load the experiments."
 		},
 		"noExperiments": "No experiment yet. Run one first; its runs that need a person show up here.",
@@ -3017,7 +3111,6 @@
 			"gates": "Fired gates",
 			"noGates": "No gate fired.",
 			"answer": "Answer",
-			"noAnswer": "No answer recorded.",
 			"diff": "Workspace diff",
 			"claim": "Agent claim",
 			"claimMade": "claimed success",
@@ -3185,10 +3278,7 @@
 		"unmatched": "{{mean}} searches per run were not in the recording (the agent got an error): widen the cassette"
 	},
 	"calibration": {
-		"title": "Judge calibration",
-		"subtitle": "How often a judged suite's judge agrees with people. A judged verdict is capped at INCONCLUSIVE until the judge has a calibration record, and is INVALID when the judge is shown unreliable.",
-		"pickSuite": "Judged suite",
-		"noJudgedSuites": "No suite is judged. A verified suite's outcomes come from a deterministic check and need no calibration.",
+		"subtitle": "How often this suite's judge agrees with people; a judged verdict stays inconclusive until the judge is calibrated.",
 		"loadError": "Calibration could not be loaded",
 		"cardTitle": "Judge of {{suite}}",
 		"judge": "Judge {{provider}}/{{model}}, prompt {{prompt}}",
@@ -3302,7 +3392,7 @@
 	},
 	"live": {
 		"title": "Live traffic",
-		"subtitle": "Real sessions read from the Bifrost gateway (read-only), scored without ground truth, two live versions compared with an always-valid sequential test, failures sent to the failure inbox.",
+		"subtitle": "Real sessions read from the Bifrost gateway, scored without ground truth and compared between two live versions.",
 		"loadError": "Could not load live scoring",
 		"pull": "Pull now",
 		"pulled": "Pulled: {{sessions}} sessions scored",
@@ -3667,5 +3757,65 @@
 		"samples": "{{count}} samples every {{ms}} ms",
 		"noSampler": "No host-side samples: the sampler was off or the agent never started.",
 		"samplerError": "Sampler: {{error}}"
+	},
+	"shell": {
+		"breadcrumbs": "Breadcrumb",
+		"entity": {
+			"experiment": "Open experiment {{id}}",
+			"run": "Open run {{id}}",
+			"suite": "Open suite {{id}}",
+			"task": "Open task {{id}}",
+			"agent": "Open agent {{id}}"
+		},
+		"status": {
+			"noDecision": "No verdict",
+			"state": {
+				"created": "Created",
+				"running": "Running",
+				"analyzing": "Analyzing",
+				"done": "Done",
+				"failed": "Failed",
+				"cancelled": "Cancelled"
+			},
+			"decision": {
+				"improved": "Improved",
+				"regressed": "Regressed",
+				"inconclusive": "Inconclusive",
+				"invalid": "Invalid"
+			}
+		},
+		"newExperiment": "New experiment",
+		"openMenu": "Open navigation",
+		"closeMenu": "Close navigation",
+		"groupToggle": "Show or hide {{group}}",
+		"groups": {
+			"benchmark": "Benchmark",
+			"build": "Build",
+			"production": "Production",
+			"govern": "Govern",
+			"operate": "Operate"
+		},
+		"nav": {
+			"home": "Home",
+			"experiments": "Experiments",
+			"runs": "Runs",
+			"leaderboard": "Leaderboard",
+			"agents": "Agents",
+			"suites": "Suites",
+			"canaries": "Drift canaries",
+			"live": "Live traffic",
+			"inbox": "Failure inbox",
+			"review": "Review queue",
+			"releases": "Releases",
+			"monitors": "Monitors",
+			"workers": "Runners",
+			"settings": "Settings"
+		},
+		"backHome": "Go to Home",
+		"error": {
+			"title": "This page failed to load",
+			"description": "Something in this page broke while it rendered; the rest of the app still works.",
+			"retry": "Try again"
+		}
 	}
 }

@@ -1,4 +1,5 @@
 import { Badge } from "@/components/ui/badge";
+import { EntityLink } from "@/components/shell";
 import { CopyId } from "@/components/ui/copyId";
 import { EmptyMark } from "@/components/ui/emptyMark";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
@@ -56,7 +57,7 @@ export function AgentCell({
 	return (
 		<div className="flex min-w-48 flex-col gap-0.5" data-testid={`leaderboard-agent-${entry.rank}`}>
 			<div className="flex items-center gap-1.5">
-				<span className="text-foreground font-medium">{entry.agent}</span>
+				<EntityLink kind="agent" id={entry.agent} className="font-sans font-medium" />
 				{entry.synthetic && (
 					<Badge
 						variant="warning"
@@ -77,7 +78,7 @@ export function AgentCell({
 					title={t("leaderboard.cell.configHash", { hash: entry.config_hash })}
 					className="text-[11px]"
 				/>
-				<Link to="/agents/diff" search={{ b: entry.config_hash }} className="text-primary hover:underline">
+				<Link to="/agents" search={{ tab: "diff", b: entry.config_hash }} className="text-primary hover:underline">
 					{t("agentDiff.link.diff")}
 				</Link>
 			</div>
@@ -175,7 +176,7 @@ export function ResilienceCell({ value, condition, testId }: { value: Value | un
 	);
 }
 
-/** Links to the verdict of each contributing experiment, newest first; long lists are cut. */
+/** Links to each contributing experiment, newest first; long lists are cut. */
 export function ExperimentLinks({ entry, max = 2 }: { entry: Pick<LeaderboardEntry, "rank" | "experiments">; max?: number }) {
 	const { t } = useTranslation("bench");
 	const experiments = entry.experiments ?? [];
@@ -184,16 +185,7 @@ export function ExperimentLinks({ entry, max = 2 }: { entry: Pick<LeaderboardEnt
 	return (
 		<div className="flex flex-col items-start gap-0.5" data-testid={`leaderboard-experiments-${entry.rank}`}>
 			{shown.map((id) => (
-				<Link
-					key={id}
-					to="/verdict"
-					search={{ exp: id }}
-					aria-label={t("leaderboard.cell.openVerdict", { id })}
-					className="text-primary font-mono text-xs underline-offset-4 hover:underline"
-					data-testid={`leaderboard-experiment-${entry.rank}-${id}`}
-				>
-					{id}
-				</Link>
+				<EntityLink key={id} kind="experiment" id={id} className="text-xs" testId={`leaderboard-experiment-${entry.rank}-${id}`} />
 			))}
 			{rest.length > 0 && (
 				<span className="text-muted-foreground text-xs" title={rest.join(", ")}>

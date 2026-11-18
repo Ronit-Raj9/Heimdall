@@ -1,5 +1,6 @@
 import { LiveBody } from "@/components/livescore/livePanel";
 import { ModeBadge } from "@/components/modeBadge";
+import { PageHeader } from "@/components/shell";
 import { BlockSkeleton, LoadError } from "@/components/runs/screenStates";
 import { Button } from "@/components/ui/button";
 import { useGetLivescoreQuery, usePullLivescoreMutation } from "@/lib/store/apis/livescoreApi";
@@ -15,13 +16,11 @@ export default function LiveView() {
 	const data = status.data;
 	return (
 		<section className="flex min-w-0 flex-col gap-6" data-testid="live-screen">
-			<header className="flex flex-col gap-1">
-				<div className="flex flex-wrap items-center gap-3">
-					<h1 className="text-foreground text-xl font-semibold tracking-tight">{t("live.title")}</h1>
-					<ModeBadge mode={data?.mode} isLoading={status.isLoading} isError={status.isError && !data} />
-				</div>
-				<p className="text-muted-foreground max-w-3xl text-sm">{t("live.subtitle")}</p>
-			</header>
+			<PageHeader
+				title={t("live.title")}
+				subtitle={t("live.subtitle")}
+				meta={<ModeBadge mode={data?.mode} isLoading={status.isLoading} isError={status.isError && !data} />}
+			/>
 			{status.isLoading ? (
 				<BlockSkeleton rows={5} testId="live-loading" />
 			) : status.error || !data ? (

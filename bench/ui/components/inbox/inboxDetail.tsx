@@ -1,7 +1,7 @@
 import { Badge } from "@/components/ui/badge";
+import { EntityLink } from "@/components/shell";
 import { Button } from "@/components/ui/button";
 import type { InboxItem, InboxItemDetail } from "@/lib/types/bench";
-import { Link } from "@tanstack/react-router";
 import { X } from "lucide-react";
 import type { ReactNode } from "react";
 import { useTranslation } from "react-i18next";
@@ -225,16 +225,7 @@ function ItemOutcome({ item }: { item: InboxItem }) {
 					</Badge>
 					<span className="text-muted-foreground">{t("inbox.detail.release")}</span>
 					<ReleaseBadge release={item.release} testId="inbox-detail-release" />
-					{item.release?.experiment && (
-						<Link
-							to="/verdict"
-							search={{ exp: item.release.experiment }}
-							className="text-primary font-mono underline-offset-2 hover:underline"
-							data-testid="inbox-detail-release-link"
-						>
-							{item.release.experiment}
-						</Link>
-					)}
+					{item.release?.experiment && <EntityLink kind="experiment" id={item.release.experiment} testId="inbox-detail-release-link" />}
 				</div>
 				{(item.recurrences ?? 0) > 0 && (
 					<p className="text-chart-warning-ink text-xs" data-testid="inbox-detail-recurrences">

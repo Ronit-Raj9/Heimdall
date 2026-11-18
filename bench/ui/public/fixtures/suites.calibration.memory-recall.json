@@ -1,0 +1,144 @@
+{
+	"_comment": "SYNTHETIC fixture for UI development. Not a measurement. Shapes follow handlers/testdata/contract.",
+	"mode": "synthetic",
+	"suite": "memory-recall",
+	"judged": true,
+	"provider": "openai",
+	"model": "gpt-4o-2024-08-06",
+	"prompt_version": "longmemeval-v1",
+	"prompt_sha256": "4d2c3ab1e0f7aa31c0de9bb1f1e2a3b4c5d6e7f8091a2b3c4d5e6f708192a3b4",
+	"state": "calibrated",
+	"detail": "agreement 0.950 [0.831, 0.994] (38/40) (lower bound must be at least 0.75), TNR 0.944 [0.727, 0.999] (17/18) (lower bound must be at least 0.60), false-positive rate at most 27.3%, kappa 0.90",
+	"set_sha256": "9a1f0c3e5b7d2a4c6e8f0a1b3c5d7e9f1a3b5c7d9e1f3a5b7c9d1e3f5a7b9c1d",
+	"labels": 46,
+	"human_labels": 40,
+	"seed_items": 6,
+	"disputed": 0,
+	"latest": {
+		"record_id": "cr_7k2m9q4w1z",
+		"suite": "longmem-s",
+		"suite_version": "1.0.0",
+		"provider": "openai",
+		"model": "gpt-4o-2024-08-06",
+		"prompt_version": "longmemeval-v1",
+		"prompt_sha256": "4d2c3ab1e0f7aa31c0de9bb1f1e2a3b4c5d6e7f8091a2b3c4d5e6f708192a3b4",
+		"templates": {
+			"longmemeval-v1-standard": "aa11",
+			"longmemeval-v1-temporal": "bb22"
+		},
+		"votes": 3,
+		"served_models": [
+			"gpt-4o-2024-08-06"
+		],
+		"set_sha256": "9a1f0c3e5b7d2a4c6e8f0a1b3c5d7e9f1a3b5c7d9e1f3a5b7c9d1e3f5a7b9c1d",
+		"set_rows": 46,
+		"human_labels": 40,
+		"seed_items": 6,
+		"disputed": 0,
+		"labellers": [
+			"ana",
+			"bo"
+		],
+		"human": {
+			"items": 40,
+			"positives": 22,
+			"negatives": 18,
+			"tp": 21,
+			"fp": 1,
+			"fn": 1,
+			"tn": 17,
+			"undecided": 0,
+			"agreement": {
+				"k": 38,
+				"n": 40,
+				"value": 0.95,
+				"lo": 0.8308,
+				"hi": 0.9939
+			},
+			"tpr": {
+				"k": 21,
+				"n": 22,
+				"value": 0.9545454545454546,
+				"lo": 0.7716,
+				"hi": 0.9988
+			},
+			"tnr": {
+				"k": 17,
+				"n": 18,
+				"value": 0.9444444444444444,
+				"lo": 0.7271,
+				"hi": 0.9986
+			},
+			"fpr": {
+				"k": 1,
+				"n": 18,
+				"value": 0.05555555555555555,
+				"lo": 0.0014,
+				"hi": 0.2729
+			},
+			"kappa": 0.8989
+		},
+		"consistency": {
+			"votes": 3,
+			"unanimous_items": {
+				"k": 44,
+				"n": 46,
+				"value": 0.9565217391304348,
+				"lo": 0.8516,
+				"hi": 0.9947
+			},
+			"repeat_agreement": {
+				"k": 45,
+				"n": 46,
+				"value": 0.9782608695652174,
+				"lo": 0.8847,
+				"hi": 0.9994
+			}
+		},
+		"perturbations": [
+			{
+				"name": "whitespace",
+				"flips": {
+					"k": 0,
+					"n": 46,
+					"value": 0,
+					"lo": 0,
+					"hi": 0.0771
+				}
+			},
+			{
+				"name": "preamble",
+				"flips": {
+					"k": 2,
+					"n": 46,
+					"value": 0.043478260869565216,
+					"lo": 0.0053,
+					"hi": 0.1484
+				}
+			}
+		],
+		"items": null,
+		"calls": 552,
+		"usd": {
+			"state": "observed",
+			"v": 0.41,
+			"evidence": "gateway"
+		},
+		"price_ref": "pricing-snapshot@sha256:1f2e",
+		"created_at": "2026-11-17T10:12:00Z",
+		"prev_hash": "",
+		"hash": "c0ffee00c0ffee00c0ffee00c0ffee00c0ffee00c0ffee00c0ffee00c0ffee00"
+	},
+	"records": 1,
+	"thresholds": {
+		"min_agreement": 0.75,
+		"min_tnr": 0.6,
+		"min_labels": 30,
+		"max_age_days": 90,
+		"source": "defaults"
+	},
+	"reminders": [
+		"labels changed since calibration cr_7k2m9q4w1z: rerun judge calibrate to measure the judge on them"
+	],
+	"problems": []
+}

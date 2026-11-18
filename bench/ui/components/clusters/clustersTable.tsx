@@ -1,4 +1,5 @@
 import { Badge } from "@/components/ui/badge";
+import { EntityLink } from "@/components/shell";
 import { CopyId } from "@/components/ui/copyId";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { formatCount, formatDateTime } from "@/components/verdict/verdict.utils";
@@ -81,10 +82,10 @@ export function ClustersTable({ clusters, selected, onSelect }: ClustersTablePro
 								<ClusterScopeBadge scope={cluster.scope} testId={`clusters-scope-${cluster.signature}`} />
 							</TableCell>
 							<TableCell className="align-top">
-								<CompactList items={cluster.tasks} />
+								<CompactList items={cluster.tasks} kind="task" />
 							</TableCell>
 							<TableCell className="align-top">
-								<CompactList items={cluster.agents} />
+								<CompactList items={cluster.agents} kind="agent" />
 							</TableCell>
 							<TableCell className="align-top">
 								<CompactList items={cluster.conditions} />
@@ -146,8 +147,11 @@ export function ClusterScopeBadge({ scope, testId }: { scope: string; testId?: s
 	);
 }
 
-/** The first two items in mono, then "+N more" with every item in the title. */
-function CompactList({ items }: { items: readonly string[] | null | undefined }) {
+/**
+ * The first two items in mono, then "+N more" with every item in the title. Tasks ("suite/task")
+ * and agents are links to their pages.
+ */
+function CompactList({ items, kind }: { items: readonly string[] | null | undefined; kind?: "task" | "agent" }) {
 	const { t } = useTranslation("bench");
 	const { shown, more } = shownItems(items);
 	if (shown.length === 0) return <span className="text-muted-foreground text-xs">-</span>;
@@ -155,10 +159,24 @@ function CompactList({ items }: { items: readonly string[] | null | undefined })
 		<ul className="flex flex-col gap-0.5" title={more > 0 ? (items ?? []).join("\n") : undefined}>
 			{shown.map((item) => (
 				<li key={item} className="font-mono text-[11px] break-all">
-					{item}
+					<CompactItem item={item} kind={kind} />
 				</li>
 			))}
 			{more > 0 && <li className="text-muted-foreground text-[11px]">{t("clusters.table.more", { count: more })}</li>}
 		</ul>
 	);
+}
+
+/** One list item: a task "suite/task" or an agent id as a link, anything else as text. */
+function CompactItem({ item, kind }: { item: string; kind?: "task" | "agent" }) {
+	if (kind === "agent") return <EntityLink kind="agent" id={item} className="text-[11px]" />;
+	const slash = item.indexOf("/");
+	if (kind === "task" && slash > 0) {
+		return (
+			<EntityLink kind="task" id={item.slice(slash + 1)} suite={item.slice(0, slash)} className="text-[11px]">
+				{item}
+			</EntityLink>
+		);
+	}
+	return <>{item}</>;
 }

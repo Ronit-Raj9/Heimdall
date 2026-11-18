@@ -1,80 +1,31 @@
 import { ModeBadge } from "@/components/modeBadge";
-import { BlockSkeleton, EmptyNote, LoadError, Section } from "@/components/runs/screenStates";
-import { AddYourOwnPanel } from "@/components/suites/addYourOwnPanel";
+import { BlockSkeleton, LoadError } from "@/components/runs/screenStates";
+import { EmptyState, PageHeader } from "@/components/shell";
 import { SuiteCards } from "@/components/suites/suiteCards";
-import { CapabilityCoverage, LicenseSummary, ProbeList } from "@/components/suites/suiteCoverage";
-import { BrokenSuite, SuiteDriftNotice, SuiteFacts } from "@/components/suites/suiteFacts";
-import { FingerprintDriftNotice } from "@/components/suites/suiteLockKind";
-import { SuiteHealthSummary } from "@/components/suites/suiteHealth";
-import { healthState, isRedacted } from "@/components/suites/suiteHealth.utils";
-import { SuiteTaskFilters } from "@/components/suites/suiteTaskFilters";
-import { SuiteTaskTable } from "@/components/suites/suiteTaskTable";
-import {
-	ADMISSION_STATES,
-	DEFAULT_TASK_SORT,
-	SORT_DIRS,
-	defaultSuiteId,
-	filterOptions,
-	filterTasks,
-	nextTaskSort,
-	parseTaskSort,
-	sortTasks,
-	type TaskFilters,
-	type TaskSortKey,
-} from "@/components/suites/suites.utils";
-import { TaskDetailPanel } from "@/components/suites/taskDetailPanel";
-import { SuiteExportMenu } from "@/components/export/exportMenu"; // W10 export
-import { useGetSuiteHealthQuery, useGetSuitesQuery } from "@/lib/store";
-import type { SuiteSummary } from "@/lib/types/bench";
+import { Button } from "@/components/ui/button";
+import { useGetSuitesQuery } from "@/lib/store";
 import { cn } from "@/lib/utils";
-import { AlertTriangle } from "lucide-react";
-import { parseAsString, parseAsStringLiteral, useQueryState, useQueryStates } from "nuqs";
-import { useMemo } from "react";
+import { Link } from "@tanstack/react-router";
+import { AlertTriangle, Boxes, Plus } from "lucide-react";
 import { useTranslation } from "react-i18next";
 
-/** URL state of the task table: filters, sort and the open task, all per suite. */
-const TASK_QUERY = {
-	kind: parseAsString,
-	difficulty: parseAsString,
-	cap: parseAsString,
-	status: parseAsStringLiteral(ADMISSION_STATES),
-	sort: parseAsString,
-	dir: parseAsStringLiteral(SORT_DIRS),
-	task: parseAsString,
-};
-
 /**
- * The suites screen: /suites?suite=&kind=&difficulty=&cap=&status=&sort=&dir=&task=. Every pack in
- * the project with its lock state and admission record, and how to add your own.
+ * The suites list: every pack in the project with its lock state and admission record, each card
+ * a link to /suites/$suiteId. The old /suites?suite=X redirects to that suite's page.
  */
 export default function SuitesView() {
 	const { t } = useTranslation("bench");
 	const query = useGetSuitesQuery();
-	const [suiteParam, setSuiteParam] = useQueryState("suite", parseAsString);
-	const [, setTaskQuery] = useQueryStates(TASK_QUERY);
 	const data = query.data;
-	const suites = useMemo(() => data?.suites ?? [], [data]);
-	const selectedId = suites.some((s) => s.id === suiteParam) ? suiteParam : defaultSuiteId(suites);
-	const selected = suites.find((s) => s.id === selectedId) ?? null;
-
-	const selectSuite = (id: string) => {
-		// Filters, sort and the open task belong to the suite they were set on.
-		void setSuiteParam(id === defaultSuiteId(suites) ? null : id);
-		void setTaskQuery(null);
-	};
-
+	const suites = data?.suites ?? [];
 	return (
 		<section className="flex min-w-0 flex-col gap-6" data-testid="suites-screen">
-			<header className="flex flex-col gap-1">
-				<div className="flex flex-wrap items-center gap-3">
-					<h1 className="text-foreground text-xl font-semibold tracking-tight">{t("suites.title")}</h1>
-					<ModeBadge mode={data?.mode} isLoading={query.isLoading} isError={query.isError && !data} />
-				</div>
-				<p className="text-muted-foreground max-w-3xl text-sm" data-testid="suites-explainer">
-					{t("suites.subtitle")}
-				</p>
-			</header>
-
+			<PageHeader
+				title={t("suites.title")}
+				subtitle={t("suites.subtitle")}
+				meta={<ModeBadge mode={data?.mode} isLoading={query.isLoading} isError={query.isError && !data} />}
+				actions={<AddSuiteButton />}
+			/>
 			{data?.mode === "synthetic" && (
 				<p
 					role="note"
@@ -85,117 +36,35 @@ export default function SuitesView() {
 					{t("suites.synthetic")}
 				</p>
 			)}
-
 			{query.isLoading ? (
 				<BlockSkeleton rows={6} testId="suites-loading" />
 			) : query.isError || !data ? (
 				<LoadError title={t("suites.loadError")} error={query.error} onRetry={() => void query.refetch()} testId="suites-error" />
 			) : suites.length === 0 ? (
-				<EmptyNote testId="suites-empty">{t("suites.empty")}</EmptyNote>
+				<EmptyState
+					icon={Boxes}
+					message={t("suites.empty")}
+					action={{ label: t("suites.addSuite"), to: "/suites/add" }}
+					testId="suites-empty"
+				/>
 			) : (
-				<div
-					className={cn("flex min-w-0 flex-col gap-6 transition-opacity", query.isFetching && "opacity-60")}
-					aria-busy={query.isFetching}
-				>
-					<SuiteCards suites={suites} selected={selectedId} onSelect={selectSuite} />
-					{selected && <SuiteDetail key={selected.id} suite={selected} />}
+				<div className={cn("min-w-0 transition-opacity", query.isFetching && "opacity-60")} aria-busy={query.isFetching}>
+					<SuiteCards suites={suites} />
 				</div>
 			)}
-
-			<AddYourOwnPanel />
 		</section>
 	);
 }
 
-/** One suite: its facts, drift, task table with the open task, coverage, licenses and probes. */
-function SuiteDetail({ suite }: { suite: SuiteSummary }) {
+/** The header's "Add a suite": the import and bring-your-own flow. */
+export function AddSuiteButton() {
 	const { t } = useTranslation("bench");
-	const [q, setQ] = useQueryStates(TASK_QUERY);
-	const filters: TaskFilters = { kind: q.kind, difficulty: q.difficulty, capability: q.cap, status: q.status };
-	const sort = parseTaskSort(q.sort, q.dir);
-	const options = useMemo(() => filterOptions(suite.tasks), [suite.tasks]);
-	const rows = useMemo(
-		() =>
-			sortTasks(
-				filterTasks(suite.tasks, { kind: q.kind, difficulty: q.difficulty, capability: q.cap, status: q.status }),
-				parseTaskSort(q.sort, q.dir),
-			),
-		[suite.tasks, q.kind, q.difficulty, q.cap, q.status, q.sort, q.dir],
-	);
-	const openTask = q.task && suite.tasks.some((task) => task.id === q.task) ? q.task : null;
-	// Health is a separate request: a failure or a 503 (no run store) shows "health unavailable" and never blocks the page.
-	const healthQuery = useGetSuiteHealthQuery(suite.id, { skip: Boolean(suite.error) });
-	const health = healthState(healthQuery);
-	// Withheld held-out tasks carry no capabilities or license, so coverage and licenses leave them out.
-	const publicTasks = useMemo(() => suite.tasks.filter((task) => !isRedacted(task)), [suite.tasks]);
-
-	if (suite.error) return <BrokenSuite suite={suite} />;
-
-	const onSort = (key: TaskSortKey) => {
-		const next = nextTaskSort(sort, key);
-		const isDefault = next.key === DEFAULT_TASK_SORT.key && next.dir === DEFAULT_TASK_SORT.dir;
-		void setQ({ sort: isDefault ? null : next.key, dir: isDefault ? null : next.dir });
-	};
-
 	return (
-		<div className="flex min-w-0 flex-col gap-6" data-testid={`suites-detail-${suite.id}`}>
-			<SuiteFacts suite={suite} />
-			<SuiteDriftNotice suite={suite} />
-			<FingerprintDriftNotice suite={suite} />
-			<SuiteHealthSummary suite={suite} health={health} />
-			<div className={cn("grid min-w-0 grid-cols-1 gap-4", openTask && "2xl:grid-cols-[minmax(0,1fr)_minmax(0,30rem)]")}>
-				<Section title={t("suites.tasks.title")} description={t("suites.tasks.description")} testId="suites-tasks" className="min-w-0">
-					<SuiteTaskFilters
-						filters={filters}
-						options={options}
-						onChange={(next) => void setQ({ kind: next.kind, difficulty: next.difficulty, cap: next.capability, status: next.status })}
-						onReset={() => void setQ({ kind: null, difficulty: null, cap: null, status: null })}
-					/>
-					{suite.tasks.length === 0 ? (
-						<EmptyNote testId="suites-tasks-empty">{t("suites.tasks.empty")}</EmptyNote>
-					) : rows.length === 0 ? (
-						<EmptyNote testId="suites-tasks-no-match">{t("suites.tasks.noMatch")}</EmptyNote>
-					) : (
-						<>
-							<SuiteTaskTable
-								suiteId={suite.id}
-								rows={rows}
-								sort={sort}
-								onSort={onSort}
-								selected={openTask}
-								onOpen={(id) => void setQ({ task: id === openTask ? null : id })}
-								health={health}
-							/>
-							{rows.length < suite.tasks.length && (
-								<p className="text-muted-foreground text-xs" data-testid="suites-tasks-showing">
-									{t("suites.tasks.showing", { shown: rows.length, total: suite.tasks.length })}
-								</p>
-							)}
-						</>
-					)}
-				</Section>
-				{openTask && (
-					<div className="min-w-0 2xl:sticky 2xl:top-4 2xl:self-start">
-						<TaskDetailPanel
-							suiteId={suite.id}
-							suiteVersion={suite.version}
-							taskId={openTask}
-							suiteOutput={suite.output}
-							suiteArtifacts={suite.artifacts}
-							onClose={() => void setQ({ task: null })}
-							health={health}
-							quarantine={suite.tasks.find((task) => task.id === openTask)?.quarantine ?? null}
-						/>
-					</div>
-				)}
-			</div>
-			<div className="grid min-w-0 grid-cols-1 gap-6 lg:grid-cols-2">
-				<CapabilityCoverage tasks={publicTasks} />
-				<LicenseSummary tasks={publicTasks} />
-			</div>
-			<ProbeList probes={suite.probes} />
-			{/* W10 export: the suite as Harbor task folders, verifiers withheld */}
-			<SuiteExportMenu suiteId={suite.id} />
-		</div>
+		<Button size="sm" asChild>
+			<Link to="/suites/add" data-testid="suites-add-link">
+				<Plus className="size-4" aria-hidden="true" />
+				{t("suites.addSuite")}
+			</Link>
+		</Button>
 	);
 }
