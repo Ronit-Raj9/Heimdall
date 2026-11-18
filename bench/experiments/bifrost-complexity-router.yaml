@@ -1,0 +1,52 @@
+# B2 Bifrost features under test (docs/bifrost-features.md): the complexity
+# router. Bifrost's classifier gives each request a tier, published to
+# routing rules as complexity_tier. The classifier is gateway-wide (on
+# v2.5.1: reference phrases embedded by an embedding provider, with an
+# optional LLM fallback; GET /api/routing/complexity-analyzer-status), but a
+# rule that reads the tier can be scoped to one run's key, so the arm is a W9
+# routing policy of strategy rule (docs/routing-experiments.md). The planner
+# refuses the arm while the analyzer is disabled: the rule would never match
+# and the arm would test nothing.
+#
+#   A  fixed claude-sonnet-4-5.
+#   B  the agent asks for claude-haiku-4-5; requests the classifier calls
+#      COMPLEX go to claude-sonnet-4-5 (cheap by default, strong when hard).
+# Only requests with user text get a tier: in an agent loop that is mostly
+# the first turn, and later turns (tool results only) keep the agent's model
+# unless the analyzer's session state carries the tier forward.
+#
+# Forecast (not run; assumptions): 8 tasks x 2 trials x 2 arms = 32 runs,
+# about $1.5 (scaled from the 14 Nov gpt-5.4-mini runs by list price). The
+# coding tasks' instructions are long multi-step requests that the shipped
+# phrases are expected to class as MEDIUM or COMPLEX, so expect the first turn
+# of most B runs on sonnet and the rest on haiku: routed_target shares near
+# 1/turns for sonnet, cost in B well below A, and success in B near haiku's
+# own rate. The classifier's embedding calls are gateway spend outside the
+# run's key. In the $0 proof (e_b2_complexity_router_proof, bag-of-words
+# embeddings from a scripted upstream) the support instructions were classed
+# COMPLEX and only those first turns were routed.
+name: bifrost-complexity-router
+suite: coding-core@1.0.0
+base: agents/custom-python.yaml
+arms:
+  A:
+    label: fixed sonnet
+    set:
+      gateway.routing: {strategy: fixed, targets: [{model: claude-sonnet-4-5}]}
+  B:
+    label: haiku, complex requests to sonnet
+    set:
+      model: claude-haiku-4-5
+      gateway.routing: {strategy: rule, when: 'complexity_tier == "COMPLEX"', targets: [{model: claude-sonnet-4-5}]}
+primary: {condition: clean, metric: verified_success}
+extra_gates: [model_fidelity]
+guards:
+  - {rule: no_new_integrity_violation}
+conditions:
+  - {id: clean, tasks: all, trials: 2}
+budget: {total_usd: 2}
+verdict: {policy: paired_signflip, alpha: 0.05, assumed_sd: 0.30}
+seed: 20261118
+concurrency: 2
+manifest_mode: agent_exposure
+policy: policies/default.yaml

@@ -1,0 +1,45 @@
+# B2 Bifrost features under test (docs/bifrost-features.md): auto prompt
+# caching per request. Bifrost marks the first cacheable block of a request
+# that carries no cache markers when the request says
+# x-bf-prompt-cache-auto-inject: true (docs/features/prompt-caching.mdx). The
+# header works only on a provider whose Bifrost config has a prompt_cache
+# block (configure {"auto_inject": false} on it once, gateway-wide; the
+# planner refuses the arm otherwise), and it changes nothing for a client
+# that sends its own markers: Claude Code does, so this experiment uses the
+# mcploop agent, a plain tool loop that sends none and forwards
+# BENCH_GATEWAY_HEADERS.
+#
+#   A  no header: no marker, every turn pays fresh input.
+#   B  gateway.bifrost.prompt_cache: auto_inject on this arm only.
+#
+# Run from bench/:
+#   BENCH_BENCHMARKS_ROOT=examples/acme-support/benchmarks \
+#     bifrost-bench plan experiments/bifrost-prompt-cache.yaml
+#
+# Forecast (not run on a real model; assumptions): 4 tasks x 3 trials x 2
+# arms = 24 runs of 4 to 6 model turns on claude-haiku-4-5, about $0.005 to
+# $0.01 per run, under $0.30 in all. The $0 proof (e_b2_prompt_cache_proof_37dq,
+# a scripted upstream that simulates provider caching) read 46% to 52% of B's
+# input from cache at about 38% lower cost and the same success; a real
+# provider caches only prefixes above its minimum length (1024 tokens on
+# Anthropic's smaller models), so the real share depends on the prompt.
+# Success should not move; cost per verified success and cache_read_share are
+# the measurement. mcploop runs count as scripted-agent runs on the
+# leaderboard.
+name: bifrost-prompt-cache
+suite: acme-support@1.0.0
+base: agents/mcploop.yaml
+arms:
+  A: {label: no cache header, set: {model: claude-haiku-4-5}}
+  B: {label: auto prompt caching on, set: {model: claude-haiku-4-5, gateway.bifrost: {prompt_cache: auto_inject}}}
+primary: {condition: clean, metric: verified_success}
+guards:
+  - {rule: no_new_integrity_violation}
+conditions:
+  - {id: clean, tasks: all, trials: 3}
+budget: {total_usd: 1}
+verdict: {policy: paired_signflip, alpha: 0.05, assumed_sd: 0.30}
+seed: 20261118
+concurrency: 2
+manifest_mode: agent_exposure
+policy: policies/default.yaml

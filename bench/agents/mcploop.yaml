@@ -1,0 +1,27 @@
+# MCP loop agent for SYNTHETIC runs of Bifrost feature experiments (B2,
+# docs/bifrost-features.md): a standard-library tool loop over the run's MCP
+# servers, offering their tools to the model on every Anthropic Messages call
+# through the gateway and executing each tool call over MCP. It reads
+# BENCH_MCP_SERVERS (direct to the tool proxy, or through Bifrost's MCP gateway
+# with gateway.bifrost.mcp) and sends BENCH_GATEWAY_HEADERS (prompt cache,
+# semantic cache) on every model call. Its model is the scripted upstream
+# toolscript (bifrostfeatures/testdata/toolscript) on a throwaway stack, so
+# its results are never findings.
+# Scripted adapter: argv, env and files come from the adapter, not this file.
+id: mcploop
+adapter: scripted
+image: bench/coding-core-base:1
+scripted:
+  kind: mcploop
+model: claude-sonnet-4-5
+notes:
+  project_file: CLAUDE.md
+parser: claudecode
+budgets:
+  wall_s: 600
+  turns: 12
+  cpus: 1
+  mem_gb: 1
+gateway:
+  provider: anthropic
+  max_retries: 0

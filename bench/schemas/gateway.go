@@ -74,6 +74,12 @@ type GatewayHygiene struct {
 	MultiTarget          []string `json:"multi_target,omitempty"`       // rules or configs that can send a model to another target
 	Violations           []string `json:"violations,omitempty"`
 	BenchRouting         []string `json:"bench_routing,omitempty"` // W9: routing rules the bench created for one run's key; expected, not violations
+	// B2 Bifrost features: the semantic cache plugin's default_cache_key is
+	// set (it then caches requests that send no key, so no arm can opt out),
+	// and the semantic cache findings the planner accepted because an arm
+	// under test opts in with its own cache key header.
+	SemanticCacheDefaultKey bool     `json:"semantic_cache_default_key,omitempty"`
+	BenchSemanticCache      []string `json:"bench_semantic_cache,omitempty"`
 }
 
 // RunKey is a run's virtual key. Value is a secret and is never written to disk.
@@ -168,6 +174,16 @@ type GatewayRequest struct {
 	// Bifrost logged in the row's metadata. Both are empty otherwise.
 	AgentID    string `json:"agent_id,omitempty"`
 	AgentLabel string `json:"agent_label,omitempty"`
+	// B2 Bifrost features: Bifrost's own split of the row's latency
+	// (overhead_latency and upstream_latency on v2.5.1 detail rows, in ms):
+	// time spent inside the gateway, and time waiting for the upstream. Nil
+	// when the row does not carry them. Complexity tier and semantic cache
+	// hit type, when Bifrost logged them (docs/bifrost-features.md).
+	OverheadMS     *float64 `json:"overhead_ms,omitempty"`
+	UpstreamMS     *float64 `json:"upstream_ms,omitempty"`
+	ComplexityTier string   `json:"complexity_tier,omitempty"`
+	CacheHitType   string   `json:"cache_hit_type,omitempty"`
+	CacheID        string   `json:"cache_id,omitempty"` // the semantic cache entry a row stored (miss) or was served from (hit)
 }
 
 // Attempt is one physical upstream try of a request, from Bifrost's attempt

@@ -52,6 +52,8 @@ func meters(idx runIndex) []schemas.Meter {
 	}
 	defs = withStepFamily(idx, defs)
 	defs = withSafetyFamily(idx, defs) // Safety probes area (S1): outage behaviour and silent compromise (safetymeters.go)
+	// B2 Bifrost features: gateway overhead, MCP witness agreement (bifrostmeters.go).
+	defs = withBifrostFamily(idx, defs)
 	arms := armsIn(idx, "")
 	out := make([]schemas.Meter, 0, len(defs))
 	for _, d := range defs {

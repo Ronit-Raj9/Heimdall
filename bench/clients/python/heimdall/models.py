@@ -713,6 +713,26 @@ class BiasAdjustedRate(_BiasAdjustedRateRequired, total=False):
     note: str
 
 
+class BifrostFeatures(TypedDict, total=False):
+    mcp: Optional[BifrostMCP]
+    prompt_cache: str
+    semantic_cache: Optional[BifrostSemanticCache]
+
+
+class BifrostMCP(TypedDict):
+    code_mode: bool
+
+
+class _BifrostSemanticCacheRequired(TypedDict):
+    mode: str
+    scope: str
+
+
+class BifrostSemanticCache(_BifrostSemanticCacheRequired, total=False):
+    threshold: float
+    ttl: str
+
+
 class _BlameRequired(TypedDict):
     detail: str
     failed: bool
@@ -2044,7 +2064,9 @@ class _GatewayHygieneRequired(TypedDict):
 
 class GatewayHygiene(_GatewayHygieneRequired, total=False):
     bench_routing: List[str]
+    bench_semantic_cache: List[str]
     multi_target: List[str]
+    semantic_cache_default_key: bool
     violations: List[str]
 
 
@@ -2072,6 +2094,7 @@ class _GatewayPolicyRequired(TypedDict):
 
 
 class GatewayPolicy(_GatewayPolicyRequired, total=False):
+    bifrost: Optional[BifrostFeatures]
     fallbacks: List[str]
     models: List[str]
     routing: Optional[RoutingPolicy]
@@ -2709,6 +2732,7 @@ class _ManifestRequired(TypedDict):
 
 class Manifest(_ManifestRequired, total=False):
     adaptive: Optional[AdaptivePlan]
+    bifrost_features: Dict[str, str]
     budget_diffs: List[BudgetDiff]
     budget_parity: Optional[BudgetParityResult]
     capability_gaps: Dict[str, List[str]]
@@ -5795,6 +5819,9 @@ __all__ = [
     'Baseline',
     'Behaviour',
     'BiasAdjustedRate',
+    'BifrostFeatures',
+    'BifrostMCP',
+    'BifrostSemanticCache',
     'Blame',
     'Budget',
     'BudgetDiff',

@@ -100,6 +100,11 @@ type detailRow struct {
 	RoutingEngines  []string       `json:"routing_engines_used"`
 	VirtualKeyID    string         `json:"virtual_key_id"` // which key the call came in on (team runs, team.go)
 	Metadata        map[string]any `json:"metadata"`       // logging headers, x-bf-lh-* labels
+	// B2 Bifrost features (bifrostfeatures.go): the gateway's own latency
+	// split, the complexity tier and the cache hit type.
+	OverheadLatency *float64 `json:"overhead_latency"`
+	UpstreamLatency *float64 `json:"upstream_latency"`
+	ComplexityTier  *string  `json:"complexity_tier"`
 }
 
 type tokenUsage struct {
@@ -180,6 +185,7 @@ func parseDetail(raw []byte) (*parsedRow, error) {
 	r.ToolCalls = d.toolCalls()
 	r.ToolResultIDs = toolResultIDs(d.RawRequest)
 	r.AgentLabel = agentLabel(d.Metadata) // Multi-agent area: a declared agent header (team.go)
+	featureFields(&r, d, raw)             // B2 Bifrost features: overhead split, complexity tier, cache hit type (bifrostfeatures.go)
 	p := &parsedRow{Req: r, Upstream: len(d.AttemptTrail) > 0, KeyID: d.VirtualKeyID}
 	if d.RawRequest != "" && !d.LargeRequest {
 		p.ReqSHA256 = utils.SHA256Bytes([]byte(d.RawRequest))

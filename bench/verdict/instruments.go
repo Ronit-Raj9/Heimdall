@@ -53,6 +53,9 @@ func instrumentChecks(m *schemas.Manifest, idx runIndex) []schemas.InstrumentChe
 	if m != nil && m.Gateway.Deferred() { // Tenancy area: the runners' records stand in for the server's preflight
 		checks = append(checks, runnerGatewayHygiene(idx), runnerGatewayVersions(idx), runnerImages(idx)) // Deploy area: runner_images
 	}
+	// B2: Bifrost's MCP log must agree with the tool ledger (bifrostmeters.go).
+	checks = withBifrostMCPWitness(checks, idx)
+
 	return withHardwareParity(checks, idx) // X7: GPU runs on different GPU models make the experiment INVALID (hardwareparity.go)
 }
 

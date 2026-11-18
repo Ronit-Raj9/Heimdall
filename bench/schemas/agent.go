@@ -145,6 +145,11 @@ type GatewayPolicy struct {
 	// for them as declared, and the planner refuses an entry the provider
 	// cannot serve. Empty keeps the single-model key.
 	Models []string `json:"models,omitempty" yaml:"models,omitempty"`
+
+	// B2 Bifrost features under test (bifrostfeatures.go): MCP through
+	// Bifrost (classic or Code Mode), prompt cache and semantic cache headers
+	// for this arm only. Nil keeps the plain key.
+	Bifrost *BifrostFeatures `json:"bifrost,omitempty" yaml:"bifrost,omitempty"`
 }
 
 // W9 routing policy under test (docs/routing-experiments.md). Additive: an

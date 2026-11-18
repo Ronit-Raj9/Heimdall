@@ -89,6 +89,11 @@ func TestBuiltin(t *testing.T) {
 		{name: Speedup, kind: schemas.KindCount, higher: true, min: schemas.EvidenceOutcome},
 		{name: HeldoutScore, kind: schemas.KindRate, higher: true, min: schemas.EvidenceOutcome},
 		{name: TimeToTargetS, kind: schemas.KindDuration, min: schemas.EvidenceOutcome},
+		// B2 Bifrost features under test.
+		{name: GatewayOverheadMS, kind: schemas.KindCount, min: schemas.EvidenceGateway}, {name: GatewayOverheadP95MS, kind: schemas.KindCount, min: schemas.EvidenceGateway},
+		{name: InputTokens, kind: schemas.KindTokens, min: schemas.EvidenceGateway}, {name: CacheReadShare, kind: schemas.KindRate, higher: true, min: schemas.EvidenceGateway},
+		{name: SemanticCacheHits, kind: schemas.KindCount, min: schemas.EvidenceGateway}, {name: SemanticCacheForeignHits, kind: schemas.KindCount, min: schemas.EvidenceGateway},
+		{name: BifrostMCPCalls, kind: schemas.KindCount, min: schemas.EvidenceGateway}, {name: BifrostMCPWitnessMismatch, kind: schemas.KindCount, min: schemas.EvidenceBoundary},
 	}
 	got := Builtin()
 	if len(got) != len(tests) {

@@ -54,6 +54,9 @@ var lowerIsBetter = map[string]bool{
 	// X7: GPU runs (metrics/gpu.go). gpu_util, speedup and heldout_score are higher-is-better.
 	"gpu_seconds": true, "peak_vram_mb": true, "time_to_target_s": true,
 	"insecure_findings": true, "insecure_findings_high": true, "secrets_added": true, // X4: code scan of added lines
+	// B2 Bifrost features under test (metrics/gatewayoverhead.go, metrics/bifrostfeatures.go). cache_read_share is higher-is-better.
+	"gateway_overhead_ms": true, "gateway_overhead_p95_ms": true, "input_tokens": true, "semantic_cache_hits": true, "semantic_cache_foreign_hits": true,
+	"bifrost_mcp_calls": true, "bifrost_mcp_witness_mismatch": true,
 }
 
 // rateMetrics lists the built-in metrics of kind rate: every value lies in
@@ -90,6 +93,7 @@ var rateMetrics = map[string]bool{
 	// Safety probes area (S1).
 	"safe_stop": true, "outage_disclosed": true, "silent_compromise": true, "oversight_disclosed": true, "quiet_fault_rechecked": true,
 	"gpu_util": true, "heldout_score": true, // X7: GPU runs (metrics/gpu.go)
+	"cache_read_share": true, // B2 Bifrost features: provider prompt cache read share
 }
 
 // HigherIsBetter reports whether a rise in metric is an improvement. The

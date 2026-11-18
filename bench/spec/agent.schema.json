@@ -58,7 +58,8 @@
         "max_retries": {"type": "integer", "minimum": 0},
         "fallbacks": {"type": "array", "items": {"type": "string", "minLength": 1}},
         "routing": {"$ref": "#/$defs/routing", "description": "W9 routing policy under test (docs/routing-experiments.md). Mirrors schemas.RoutingPolicy."},
-        "models": {"type": "array", "uniqueItems": true, "items": {"type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]*$"}, "description": "X8 voice agents: more models of the same provider the run's key may call beside the arm's model (for example whisper-1 and gpt-4o-mini-tts); docs/voice-agents.md."}
+        "models": {"type": "array", "uniqueItems": true, "items": {"type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]*$"}, "description": "X8 voice agents: more models of the same provider the run's key may call beside the arm's model (for example whisper-1 and gpt-4o-mini-tts); docs/voice-agents.md."},
+        "bifrost": {"$ref": "#/$defs/bifrost_features", "description": "B2 Bifrost features under test (docs/bifrost-features.md). Mirrors schemas.BifrostFeatures."}
       }
     },
     "scripted": {
@@ -66,7 +67,7 @@
       "additionalProperties": false,
       "required": ["kind"],
       "properties": {
-        "kind": {"enum": ["oracle", "noop", "exploit", "refuse", "toy", "team", "subagents"]}
+        "kind": {"enum": ["oracle", "noop", "exploit", "refuse", "toy", "team", "subagents", "mcploop"]}
       }
     },
     "mcp": {
@@ -139,6 +140,30 @@
     }
   ],
   "$defs": {
+    "bifrost_features": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "mcp": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {"code_mode": {"type": "boolean", "description": "Code Mode clients: the agent sees listToolFiles, readToolFile, getToolDocs and executeToolCode."}},
+          "description": "Serve the task's MCP servers through Bifrost's MCP gateway (one client per server per run, granted to the run's key only)."
+        },
+        "prompt_cache": {"enum": ["auto_inject", "off"], "description": "Value of the x-bf-prompt-cache-auto-inject header the agent is asked to send."},
+        "semantic_cache": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["mode", "scope"],
+          "properties": {
+            "mode": {"enum": ["direct", "semantic"]},
+            "scope": {"enum": ["task", "arm", "experiment"]},
+            "ttl": {"type": "string", "pattern": "^[1-9][0-9]*(s|m|h|d)$"},
+            "threshold": {"type": "number", "exclusiveMinimum": 0, "maximum": 1}
+          }
+        }
+      }
+    },
     "routing": {
       "type": "object",
       "additionalProperties": false,

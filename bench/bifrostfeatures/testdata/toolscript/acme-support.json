@@ -1,0 +1,57 @@
+{
+  "default_text": "Done.",
+  "simulate_prompt_cache": true,
+  "tasks": [
+    {
+      "id": "refund-ok",
+      "match": "ticket T-1001",
+      "classic": [
+        {"tool": "get_ticket", "input": {"ticket_id": "T-1001"}},
+        {"tool": "get_order", "input": {"order_id": "A-1001"}},
+        {"tool": "get_refund_policy", "input": {}},
+        {"tool": "issue_refund", "input": {"order_id": "A-1001", "amount_cents": 4200, "reason": "Kettle arrived dented (ticket T-1001)"}},
+        {"tool": "reply_to_ticket", "input": {"ticket_id": "T-1001", "status": "solved", "message": "Sorry about the dented kettle, Hannah. I have refunded GBP 42.00 for it to your original payment method."}},
+        {"text": "Refunded GBP 42.00 for the kettle on A-1001 and solved T-1001."}
+      ],
+      "code_mode": [
+        {"tool": "listToolFiles", "input": {}},
+        {"tool": "readToolFile", "input": {"fileName": "servers/{{server}}.pyi"}},
+        {"code": "t = {{server}}.get_ticket(ticket_id=\"T-1001\")\no = {{server}}.get_order(order_id=t[\"order_id\"])\np = {{server}}.get_refund_policy()\nk = [i for i in o[\"items\"] if i[\"sku\"] == \"KT-12\"][0]\n{{server}}.issue_refund(order_id=o[\"id\"], amount_cents=k[\"unit_cents\"], reason=\"Kettle arrived dented (ticket T-1001)\")\n{{server}}.reply_to_ticket(ticket_id=\"T-1001\", status=\"solved\", message=\"Sorry about the dented kettle, Hannah. I have refunded GBP 42.00 for it to your original payment method.\")\nresult = {\"refunded_cents\": k[\"unit_cents\"]}"},
+        {"text": "Refunded GBP 42.00 for the kettle on A-1001 and solved T-1001."}
+      ]
+    },
+    {
+      "id": "address-change",
+      "match": "ticket T-3001",
+      "classic": [
+        {"tool": "get_ticket", "input": {"ticket_id": "T-3001"}},
+        {"tool": "get_order", "input": {"order_id": "A-1003"}},
+        {"tool": "update_shipping_address", "input": {"order_id": "A-1003", "line1": "18 Harbour Lane", "line2": "Flat 2", "city": "Portview", "postal_code": "PV3 9QA", "country": "United Kingdom"}},
+        {"tool": "reply_to_ticket", "input": {"ticket_id": "T-3001", "status": "solved", "message": "Done, Tomasz: order A-1003 will go to 18 Harbour Lane, Flat 2, Portview, PV3 9QA, United Kingdom."}},
+        {"text": "Changed the address of A-1003 and solved T-3001."}
+      ],
+      "code_mode": [
+        {"tool": "listToolFiles", "input": {}},
+        {"tool": "readToolFile", "input": {"fileName": "servers/{{server}}.pyi"}},
+        {"code": "t = {{server}}.get_ticket(ticket_id=\"T-3001\")\no = {{server}}.get_order(order_id=\"A-1003\")\nif o[\"status\"] != \"processing\":\n    fail(\"order already shipped\")\n{{server}}.update_shipping_address(order_id=\"A-1003\", line1=\"18 Harbour Lane\", line2=\"Flat 2\", city=\"Portview\", postal_code=\"PV3 9QA\", country=\"United Kingdom\")\n{{server}}.reply_to_ticket(ticket_id=\"T-3001\", status=\"solved\", message=\"Done, Tomasz: order A-1003 will go to 18 Harbour Lane, Flat 2, Portview, PV3 9QA, United Kingdom.\")\nresult = {\"order\": \"A-1003\"}"},
+        {"text": "Changed the address of A-1003 and solved T-3001."}
+      ]
+    },
+    {
+      "id": "duplicate-merge",
+      "match": "priya.nair@example.com",
+      "classic": [
+        {"tool": "search_tickets", "input": {"customer_email": "priya.nair@example.com", "status": "open"}},
+        {"tool": "merge_tickets", "input": {"primary_ticket_id": "T-4001", "duplicate_ticket_id": "T-4005"}},
+        {"tool": "merge_tickets", "input": {"primary_ticket_id": "T-4001", "duplicate_ticket_id": "T-4007"}},
+        {"text": "Merged T-4005 and T-4007 into T-4001."}
+      ],
+      "code_mode": [
+        {"tool": "listToolFiles", "input": {}},
+        {"tool": "readToolFile", "input": {"fileName": "servers/{{server}}.pyi"}},
+        {"code": "found = {{server}}.search_tickets(customer_email=\"priya.nair@example.com\", status=\"open\")[\"tickets\"]\ndupes = sorted([t for t in found if t[\"order_id\"] == \"A-1004\"], key=lambda t: t[\"created_at\"])\nfor t in dupes[1:]:\n    {{server}}.merge_tickets(primary_ticket_id=dupes[0][\"id\"], duplicate_ticket_id=t[\"id\"])\nresult = {\"merged\": [t[\"id\"] for t in dupes[1:]]}"},
+        {"text": "Merged T-4005 and T-4007 into T-4001."}
+      ]
+    }
+  ]
+}

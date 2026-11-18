@@ -643,6 +643,7 @@ func redactPlan(plan *schemas.RunPlan) *schemas.RunPlan {
 		}
 		out.Env[k] = v
 	}
+	redactBearer(&out) // B2 MCP through Bifrost: the run key in MCP auth headers (bifrostfeatures.go)
 	return &out
 }
 

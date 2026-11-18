@@ -157,7 +157,7 @@ func MCPServers(services []schemas.ServiceHandle) map[string]string {
 			p = h.Spec.MCP.Path
 		}
 		u := strings.TrimRight(h.URL, "/")
-		if !strings.HasSuffix(u, p) {
+		if !strings.HasSuffix(u, p) && !h.GatewayAuth { // B2 MCP through Bifrost: the URL is already the gateway's endpoint for the server
 			u += p
 		}
 		out[h.Spec.ID] = u

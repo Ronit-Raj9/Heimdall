@@ -22,6 +22,7 @@ const (
 	// Multi-agent controls (docs/multi-agent.md); deterministic, no model calls.
 	ScriptedTeam      = "team"      // every team member runs teamcontrol.py: the lead sends tasks through the mailbox, workers write files and reply
 	ScriptedSubagents = "subagents" // one container reporting a planner, two parallel workers, a handoff and a reviewer as native events
+	ScriptedMCPLoop   = "mcploop"   // B2 Bifrost features: a real tool loop over the run's MCP servers, driven by a scripted model upstream (mcploopagent.py)
 )
 
 // RefusalText is what the refuse control prints.
@@ -37,6 +38,7 @@ const (
 	toyAgentFile        = "/tmp/bench/toyagent.py"
 	teamControlFile     = "/tmp/bench/teamcontrol.py"
 	subagentsFile       = "/tmp/bench/subagentscontrol.py"
+	mcpLoopFile         = "/tmp/bench/mcploopagent.py" // B2
 )
 
 // writeAnswer copies the reference answer ($2) to the answer path ($1),
@@ -56,6 +58,9 @@ var teamControlSource string
 
 //go:embed subagentscontrol.py
 var subagentsSource string
+
+//go:embed mcploopagent.py
+var mcpLoopSource string // B2 Bifrost features
 
 type scriptedAdapter struct {
 	cfg CommandConfig
@@ -167,6 +172,13 @@ func (a *scriptedAdapter) Plan(ctx context.Context, rc *schemas.RunContext) (*sc
 		files[subagentsFile] = subagentsSource
 		env["BENCH_WORKSPACE"] = Workspace
 		argv = []string{"python3", "-I", subagentsFile}
+	case ScriptedMCPLoop: // B2 Bifrost features (mcploopagent.py)
+		var err error
+		network, err = a.mcpLoopPlan(rc, files, env)
+		if err != nil {
+			return nil, fmt.Errorf("plan run %s: mcploop: %w", rc.Run.RunID, err)
+		}
+		argv = []string{"python3", "-I", mcpLoopFile}
 	default:
 		return nil, fmt.Errorf("plan run %s: unknown scripted kind %q", rc.Run.RunID, kind)
 	}
@@ -178,6 +190,12 @@ func (a *scriptedAdapter) Plan(ctx context.Context, rc *schemas.RunContext) (*sc
 	plan.Argv = argv
 	plan.Env = env
 	plan.Files = files
+	if kind == ScriptedMCPLoop { // B2: the MCP servers (direct or through Bifrost) and the gateway feature headers
+		if err := addMCP(plan, rc); err != nil {
+			return nil, fmt.Errorf("plan run %s: mcploop: %w", rc.Run.RunID, err)
+		}
+		addBifrostEnv(plan, rc)
+	}
 	return plan, nil
 }
 
@@ -216,5 +234,40 @@ func (a *scriptedAdapter) toyPlan(rc *schemas.RunContext, files, env map[string]
 	env["BENCH_INSTRUCTION"] = InstructionFile
 	env["BENCH_PATCH"] = referencePatchFile
 	env["BENCH_WORKSPACE"] = Workspace
+	return network, nil
+}
+
+// mcpLoopPlan fills files and env for the MCP loop agent (B2) and returns its
+// network: the toy's gateway wiring plus a step cap.
+func (a *scriptedAdapter) mcpLoopPlan(rc *schemas.RunContext, files, env map[string]string) (string, error) {
+	if rc.Key == nil || rc.Key.Value == "" {
+		return "", fmt.Errorf("no run key")
+	}
+	if a.cfg.GatewayAgentURL == "" {
+		return "", fmt.Errorf("gateway agent url not configured")
+	}
+	network := a.cfg.EvalNetwork
+	if network == "" && rc.Handle != nil {
+		network = rc.Handle.Network
+	}
+	if network == "" {
+		return "", fmt.Errorf("no evaluation network")
+	}
+	instruction, err := readTaskFile(rc.Task, rc.Task.Instruction)
+	if err != nil {
+		return "", err
+	}
+	vars := templateVars(rc, a.cfg, instruction)
+	files[mcpLoopFile] = mcpLoopSource
+	files[InstructionFile] = instruction
+	env["BENCH_GATEWAY_URL"] = vars["gateway.url"]
+	env["BENCH_RUN_KEY"] = vars["run.key"]
+	env["BENCH_MODEL"] = vars["model"]
+	env["BENCH_SESSION"] = vars["run.session"]
+	env["BENCH_INSTRUCTION"] = InstructionFile
+	env["BENCH_MAX_STEPS"] = "12"
+	if rc.Agent.Budgets.Turns > 0 {
+		env["BENCH_MAX_STEPS"] = fmt.Sprint(rc.Agent.Budgets.Turns)
+	}
 	return network, nil
 }
