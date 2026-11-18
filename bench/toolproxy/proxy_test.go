@@ -505,31 +505,49 @@ func TestProxyRoutingAndMalformed(t *testing.T) {
 	// Every request that reached the service has a row: the two bodies the
 	// proxy cannot parse as opaque rows, the GET as a transport row, the
 	// POST to another path as an opaque row (it is not the MCP endpoint).
+	// A row is written once its answer has gone back, and seq numbers rows
+	// in the order they are written (docs/tool-proxy.md), not the order the
+	// requests arrived, so rows are matched to requests by their body hash
+	// (each body differs) and the seqs only have to be 1..n.
 	rows := tp.waitRows(t, 4)
 	want := []struct {
+		body                     string
 		kind, tool, method, path string
 		unparsed                 bool
 		status                   int
 	}{
-		{schemas.ToolRowOpaque, schemas.ToolRowUnparsedTool, "POST", "/mcp", true, 400},
-		{schemas.ToolRowOpaque, schemas.ToolRowUnparsedTool, "POST", "/mcp", true, 400},
-		{schemas.ToolRowTransport, "GET /mcp", "GET", "/mcp", false, 405},
-		{schemas.ToolRowOpaque, schemas.ToolRowUnparsedTool, "POST", "/other", true, 200},
+		{"hello", schemas.ToolRowOpaque, schemas.ToolRowUnparsedTool, "POST", "/mcp", true, 400},
+		{`[{"id":1`, schemas.ToolRowOpaque, schemas.ToolRowUnparsedTool, "POST", "/mcp", true, 400},
+		{"", schemas.ToolRowTransport, "GET /mcp", "GET", "/mcp", false, 405},
+		{`{"jsonrpc":"2.0","id":1,"method":"tools/call","params":{"name":"echo"}}`, schemas.ToolRowOpaque, schemas.ToolRowUnparsedTool, "POST", "/other", true, 200},
 	}
 	if len(rows) != len(want) {
 		t.Fatalf("got %d rows, want %d: %+v", len(rows), len(want), rows)
 	}
-	bodies := []string{"hello", `[{"id":1`, "", `{"jsonrpc":"2.0","id":1,"method":"tools/call","params":{"name":"echo"}}`}
-	for i, w := range want {
-		r := rows[i]
-		if r.Kind != w.kind || r.Tool != w.tool || r.HTTPMethod != w.method || r.Path != w.path || r.Unparsed != w.unparsed || r.Status != w.status || r.IsToolCall() {
-			t.Errorf("row %d = %+v, want %+v", i, r, w)
+	bySHA, seqs := map[string]schemas.ToolCall{}, map[int]bool{}
+	for _, r := range rows {
+		bySHA[r.ArgsSHA256] = r
+		seqs[r.Seq] = true
+	}
+	for i := 1; i <= len(want); i++ {
+		if !seqs[i] {
+			t.Errorf("no row with seq %d: %+v", i, rows)
 		}
-		if r.ArgsSHA256 != sha256Hex([]byte(bodies[i])) || r.RequestBytes != int64(len(bodies[i])) || r.ResponseBytes == 0 || r.ResultSHA256 == "" {
-			t.Errorf("row %d hash or size: %+v", i, r)
+	}
+	for i, w := range want {
+		r, ok := bySHA[sha256Hex([]byte(w.body))]
+		if !ok {
+			t.Errorf("request %d (%q) has no row: %+v", i, w.body, rows)
+			continue
+		}
+		if r.Kind != w.kind || r.Tool != w.tool || r.HTTPMethod != w.method || r.Path != w.path || r.Unparsed != w.unparsed || r.Status != w.status || r.IsToolCall() {
+			t.Errorf("request %d row = %+v, want %+v", i, r, w)
+		}
+		if r.RequestBytes != int64(len(w.body)) || r.ResponseBytes == 0 || r.ResultSHA256 == "" {
+			t.Errorf("request %d row size: %+v", i, r)
 		}
 		if w.unparsed && r.UnparsedReason == "" {
-			t.Errorf("row %d has no reason", i)
+			t.Errorf("request %d row has no reason", i)
 		}
 	}
 }

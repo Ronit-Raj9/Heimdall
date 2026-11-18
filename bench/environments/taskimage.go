@@ -79,6 +79,15 @@ git -c core.hooksPath=/dev/null add -A --force
 git -c core.hooksPath=/dev/null -c user.name=bench -c user.email=bench@local -c commit.gpgsign=false commit -q --no-verify --allow-empty -m baseline
 ref="$(git rev-parse HEAD)"
 chown -R 1000:1000 /workspace /opt/bench
+# Agent events area: the events file folder, root-owned and sticky so any
+# agent user can append and none can remove another's file. It is made here,
+# by the helper that already holds DAC_OVERRIDE, because /opt/bench now
+# belongs to uid 1000 and a later root helper without it could not mkdir.
+if [ -n "${BENCH_EVENTS:-}" ]; then
+	mkdir -p /opt/bench/events
+	chown 0:0 /opt/bench/events
+	chmod 1777 /opt/bench/events
+fi
 echo "$ref"
 `
 
@@ -98,6 +107,9 @@ func (e *dockerWorkspace) seed(ctx context.Context, rc *schemas.RunContext, h *s
 		"-e", "BENCH_DATE="+baselineDate)
 	if o.clear {
 		args = append(args, "-e", "BENCH_CLEAR=1")
+	}
+	if e.cfg.EventsCollector {
+		args = append(args, "-e", "BENCH_EVENTS=1") // Agent events area: the events folder (populateScript)
 	}
 	if notesRel != "" {
 		args = append(args, "-v", notesHost+":/bench-in/notes:ro", "-e", "BENCH_NOTES="+notesRel)

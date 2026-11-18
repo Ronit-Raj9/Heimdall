@@ -447,6 +447,44 @@ func tarNames(t *testing.T, b []byte) map[string]bool {
 	}
 }
 
+// TestDriverTaskEnv checks that a task's environment variables
+// (environment.env) reach the agent's env secret under the plan's own, as
+// under Docker, and that plan-time refusals let such a task through while a
+// compose task (whose only service is the workspace) stays refused.
+func TestDriverTaskEnv(t *testing.T) {
+	f := newFakeAPI(t)
+	d := testDriver(t, f)
+	rc := testRun(t)
+	rc.Task.Environment = &schemas.TaskEnvironment{Env: map[string]string{"TASK_FLAG": "on", "BENCH_RUN_KEY": "from-task"}}
+	slot := environments.DriverSlot{Suite: rc.Suite, Task: rc.Task, Agent: rc.Agent}
+	if r := refusals(slot); len(r) != 0 {
+		t.Fatalf("a task that only sets environment.env is refused: %v", r)
+	}
+	h, err := d.Create(t.Context(), rc)
+	if err != nil {
+		t.Fatal(err)
+	}
+	rc.Handle = h
+	plan := &schemas.RunPlan{Image: "img", Argv: []string{"true"}, Network: "none", Env: map[string]string{"BENCH_RUN_KEY": "sk-bf-runkey"}}
+	if _, err := d.Exec(t.Context(), rc, plan); err != nil {
+		t.Fatal(err)
+	}
+	var sec Secret
+	raw, _ := json.Marshal(f.objs["/api/v1/namespaces/heimdall-run-r-test1/secrets/agent-env"])
+	json.Unmarshal(raw, &sec)
+	if string(sec.Data["TASK_FLAG"]) != "on" || string(sec.Data["BENCH_RUN_KEY"]) != "sk-bf-runkey" {
+		t.Fatalf("agent env: TASK_FLAG %q BENCH_RUN_KEY %q", sec.Data["TASK_FLAG"], sec.Data["BENCH_RUN_KEY"])
+	}
+	if len(plan.Env) != 1 {
+		t.Fatalf("the plan was changed: %v", plan.Env)
+	}
+	composed := slot
+	composed.Task = &schemas.Task{Compose: "compose.yaml", Environment: &schemas.TaskEnvironment{Image: "app:1", WorkspacePath: "/app", Env: map[string]string{"A": "b"}}}
+	if got := strings.Join(refusals(composed), "|"); !strings.Contains(got, RefuseCompose) || !strings.Contains(got, RefuseTaskImage) {
+		t.Fatalf("compose task refusals: %q", got)
+	}
+}
+
 func TestDriverCollectorSidecar(t *testing.T) {
 	f := newFakeAPI(t)
 	d := testDriver(t, f)

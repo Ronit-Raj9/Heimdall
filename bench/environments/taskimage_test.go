@@ -42,6 +42,30 @@ func TestEnsureTaskImage(t *testing.T) {
 	}
 }
 
+// TestSeedPreparesEventsFolder checks that the seeding helper makes the
+// agent events folder when the events feature is on, after the aux volume is
+// handed to uid 1000 (a root helper without DAC_OVERRIDE cannot mkdir there
+// afterwards), and leaves it out when the feature is off.
+func TestSeedPreparesEventsFolder(t *testing.T) {
+	chown := strings.Index(populateScript, "chown -R 1000:1000 /workspace /opt/bench")
+	mk := strings.Index(populateScript, "mkdir -p /opt/bench/events")
+	if chown < 0 || mk < chown || !strings.Contains(populateScript[mk:], "chmod 1777 /opt/bench/events") {
+		t.Fatalf("populate script does not make the events folder after the aux chown:\n%s", populateScript)
+	}
+	for _, on := range []bool{true, false} {
+		docker, logPath := fakeDocker(t)
+		e := newDockerWorkspace(DockerWorkspaceConfig{Docker: docker, HelperImage: "helper:1", EventsCollector: on})
+		rc := &schemas.RunContext{Run: &schemas.Run{RunID: "r_1"}, Suite: &schemas.Suite{ID: "s"},
+			Task: &schemas.Task{ID: "t", Dir: t.TempDir(), Environment: &schemas.TaskEnvironment{Image: "tb/x:1", WorkspacePath: "/app"}}}
+		h := &schemas.EnvironmentHandle{Volume: "bench-ws-r_1", AuxVolume: "bench-aux-r_1"}
+		_, _ = e.seed(t.Context(), rc, h, "", "r_1", seedOptions{})
+		got := callWith(calls(t, logPath), "run -i --rm --name bench-r_1-prep", "BENCH_EVENTS=1") != ""
+		if got != on {
+			t.Fatalf("events feature %v: BENCH_EVENTS=1 passed %v", on, got)
+		}
+	}
+}
+
 // TestSeedFromImageWithFakeDocker checks that a task image's workspace path
 // is streamed from a created (never started) container into the helper.
 func TestSeedFromImageWithFakeDocker(t *testing.T) {

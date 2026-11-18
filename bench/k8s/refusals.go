@@ -2,6 +2,7 @@ package k8s
 
 import (
 	"fmt"
+	"reflect"
 
 	"github.com/maximhq/bifrost/bench/environments"
 	"github.com/maximhq/bifrost/bench/schemas"
@@ -29,6 +30,19 @@ const (
 	RefuseGPU         = "GPU tasks are not supported (no GPU request is passed to the pod)"
 	RefuseCompose     = "compose tasks are not supported (their services run as Docker containers)"
 )
+
+// ownEnvironment reports whether a task environment sets anything besides
+// its variables (environment.env): an image, a build, a workspace path, a
+// user. Variables alone are applied to the agent's env secret (Exec), so a
+// repository task that only sets them runs.
+func ownEnvironment(e *schemas.TaskEnvironment) bool {
+	if e == nil {
+		return false
+	}
+	rest := *e
+	rest.Env = nil
+	return !reflect.DeepEqual(rest, schemas.TaskEnvironment{})
+}
 
 // Refusals implements environments.Driver.
 func (d *Driver) Refusals(s environments.DriverSlot) []string {
@@ -63,7 +77,7 @@ func refusals(s environments.DriverSlot) []string {
 		if t.Compose != "" {
 			add(RefuseCompose)
 		}
-		if t.Environment != nil {
+		if ownEnvironment(t.Environment) {
 			if utils.TaskRunsAsRoot(t) {
 				add(RefuseRoot)
 			} else {

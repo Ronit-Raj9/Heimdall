@@ -102,7 +102,7 @@ Every container drops all capabilities except those listed, has a read-only root
 
 Order: `prep` holds the pod until the bench has seeded the workspace through exec; the sidecars then start one by one, each held by a startup probe until its ready line (or its error, so a broken observer is missing evidence, never a blocked run), and only then the agent. The agent's first process is a gate (`IFS= read -r _; exec "$@" </dev/null`): the bench attaches to the agent container and releases it with one line on stdin, so not one byte of output is written before it is captured. stdout and stderr arrive on separate attach streams and go, capped and with the run key redacted, into the same `agent.stream.jsonl` and `agent.stderr.txt` as under Docker. The exit code comes from the container's terminated state.
 
-The agent's argv and environment are the Docker driver's: the same launch wrapper (`BENCH_WRAP_*` variables decoded by `sh -c`) for plan files and long values, the same `PATH` with the shim folder first, the same `HOME`. They travel in an immutable secret loaded with `envFrom`, never in the pod spec.
+The agent's argv and environment are the Docker driver's: the same launch wrapper (`BENCH_WRAP_*` variables decoded by `sh -c`) for plan files and long values, the same `PATH` with the shim folder first, the same `HOME`, and the task's own variables (`environment.env`) under the plan's, as under Docker. They travel in an immutable secret loaded with `envFrom`, never in the pod spec.
 
 ### Observers in a shared PID namespace
 
@@ -147,12 +147,12 @@ At plan time, with the reason, before anything is frozen (`k8s/refusals.go`); `C
 | Multi-session tasks, agent memory sections | no session reset or memory volume between agent containers |
 | Agent skills folders | plan folders are copied into Docker volumes |
 | Snapshot grading | the agent's root file system is never committed |
-| Tasks with their own image, workspace path or root user | the workspace is seeded from the task repo only; agents never run as root |
+| Tasks with their own image, workspace path or root user (a task that only sets `environment.env` runs) | the workspace is seeded from the task repo only; agents never run as root |
 | `remote_http` agents | they need the Docker egress forwarder |
 | `realism: neutral` | the neutral view renames Docker objects |
 | Adapter-layer probes (hook faults) and member-targeted probes | the hook controller joins the agent's Docker network; there are no teams |
 | GPU tasks (`resources.gpu`) | no GPU request is passed to the pod |
-| Compose tasks (`compose`) | their services run as Docker containers |
+| Compose tasks (`compose`), even one whose only service is the workspace | their services run as Docker containers, and the workspace service is a task image |
 | `bifrost-bench agent check` | stays on Docker (its network observer is Docker-only) |
 
 All three of PS2's failure families run under this driver: the unavailable model (`model-outage`, gateway layer), the broken tool (`test-crash`, `empty-test-run`, tool shim layer) and the misleading instruction (`stale-notes`, fixture layer); see "Probes".

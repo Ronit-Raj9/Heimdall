@@ -332,7 +332,9 @@ func (d *Driver) Exec(ctx context.Context, rc *schemas.RunContext, plan *schemas
 	if err != nil {
 		return nil, fmt.Errorf("exec run %s: %w", r.runID, err)
 	}
-	launch, err := d.launch(ctx, rc, r, plan, in.Collector)
+	// The task environment's variables (environment.env) reach the agent
+	// under the plan's own, as under Docker; plan.json keeps the plan.
+	launch, err := d.launch(ctx, rc, r, environments.WithTaskEnv(rc, plan), in.Collector)
 	if err != nil {
 		return nil, fmt.Errorf("exec run %s: %w", r.runID, err)
 	}

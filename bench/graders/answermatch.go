@@ -245,9 +245,9 @@ func ValidateAnswerSpec(spec *schemas.AnswerSpec) error {
 			return errors.New("normalize: the gaia mode applies GAIA's own normalisation; leave normalize empty")
 		}
 	case "":
-		return errors.New("match: empty (want exact, contains_all, regex, numeric, choice or json)")
+		return errors.New("match: empty (want exact, contains_all, regex, numeric, choice, json or gaia)")
 	default:
-		return fmt.Errorf("match: unknown mode %q (want exact, contains_all, regex, numeric, choice or json)", spec.Match)
+		return fmt.Errorf("match: unknown mode %q (want exact, contains_all, regex, numeric, choice, json or gaia)", spec.Match)
 	}
 	return nil
 }

@@ -87,6 +87,8 @@ func TestAnswerMatchGrade(t *testing.T) {
 		{name: "empty answer fails", spec: "match: exact\nexpected: [a]\n", answer: strp(" \n\t"), reason: "answer.txt is empty"},
 		{name: "missing spec is invalid", spec: "", answer: strp("a"), invalid: true, reason: "answer spec"},
 		{name: "unknown mode is invalid", spec: "match: fuzzy\nexpected: [a]\n", answer: strp("a"), invalid: true, reason: "unknown mode"},
+		{name: "unknown mode names gaia", spec: "match: fuzzy\nexpected: [a]\n", answer: strp("a"), invalid: true, reason: "choice, json or gaia)"},
+		{name: "empty mode names gaia", spec: "expected: [a]\n", answer: strp("a"), invalid: true, reason: "choice, json or gaia)"},
 		{name: "unknown key is invalid", spec: "match: exact\nexpected: [a]\nexpect: [b]\n", answer: strp("a"), invalid: true, reason: "expect"},
 		{name: "bad regex is invalid", spec: "match: regex\nexpected: ['(']\n", answer: strp("a"), invalid: true, reason: "expected[0]"},
 		{name: "bad number is invalid", spec: "match: numeric\nexpected: [four]\n", answer: strp("4"), invalid: true, reason: "not a number"},
