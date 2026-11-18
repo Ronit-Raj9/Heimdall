@@ -51,6 +51,8 @@ type settings struct {
 	alpha     float64
 	assumedSD float64
 	guards    []schemas.GuardSpec
+
+	decisionAlpha float64 // W7: alpha of the primary decision when it differs from alpha (sequential_verdict.go)
 }
 
 // newPairedSignFlipPolicy returns the paired_signflip verdict policy.
@@ -83,9 +85,12 @@ func (p *pairedSignFlipPolicy) Decide(ctx context.Context, m *schemas.Manifest, 
 		return nil, fmt.Errorf("decide experiment %s: manifest needs arms %s and %s", m.ExpID, ArmBaseline, ArmCandidate)
 	}
 	cfg := settingsFor(m)
-	runs = CompleteSlots(m, runs)
+	raw := runs
+	runs = CompleteSlots(m, AdaptiveRuns(m, runs))                           // W7 adaptive trials: slots the frozen rule never released are not missing (sequential.go)
+	cfg.decisionAlpha = DecisionAlpha(m, cfg.alpha, ReplayAdaptive(m, runs)) // W7: look alpha or first-stage alpha
 	idx := newRunIndex(runs)
 	v := verdictFor(m, cfg, idx, runs, arms[ArmAA])
+	w7Verdict(m, cfg, raw, runs, idx, &v) // W7 adaptive report, tier, buy more evidence (sequential_verdict.go)
 	return &schemas.Analysis{
 		AnalysisID:  utils.NewID("a", 10),
 		ExpID:       m.ExpID,
@@ -108,7 +113,7 @@ func verdictFor(m *schemas.Manifest, cfg settings, idx runIndex, runs []schemas.
 	checks := append(instrumentChecks(m, idx), slotCoverage(m, runs))
 	invalid := append(instrumentGates(m, cfg, idx, runs), instrumentReasons(checks)...)
 	integrity := integrityStatus(idx)
-	decision := decide(invalid, primary, guards, cfg.alpha)
+	decision := decide(invalid, primary, guards, cfg.primaryAlpha()) // W7: alpha of the primary decision (sequential_verdict.go)
 
 	sd, assumed := cfg.assumedSD, true
 	if hasAA {

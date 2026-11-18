@@ -1,0 +1,893 @@
+{
+  "suite": "acme-helpdesk",
+  "version": "1.0.0",
+  "base_image": {
+    "tag": "bench/coding-core-base:1"
+  },
+  "tasks": {
+    "address-and-missing-item": {
+      "version": "1.0.0",
+      "instruction_sha256": "164c50604873558b47b6b3c4ce96289265a6d43a534542a81f4cb7752ce69239",
+      "repo_tree_sha256": "e77da5008705a1806cc862c73e2738063db4e36c667050078bbc00b64b25c99c",
+      "verifier_sha256": "1eea10e3904b36e37578af0636e26c50e83af5f886a910f56d34678dbf850c81",
+      "controls_sha256": "1a3019c516b205d458e578bf512fd83a0fc48cb8e278d0f2c1a738335b1ece98",
+      "fixtures_sha256": "789b946dddeca851be977ad23cff11aea92093af621c31aa7f8c66ddd34df62a",
+      "status": "admitted",
+      "admission": {
+        "admitted": true,
+        "checks": [
+          {
+            "name": "static_validation",
+            "want": "clean",
+            "got": "clean",
+            "passed": true,
+            "detail": "0 warnings"
+          },
+          {
+            "name": "reference_1",
+            "want": "pass",
+            "got": "pass",
+            "passed": true,
+            "detail": "solution/reference.sh exit 0; tests_ran=0 failures=0 errors=0 skipped=0 exit=0 reason=passed (reward 1)"
+          },
+          {
+            "name": "reference_2",
+            "want": "pass",
+            "got": "pass",
+            "passed": true,
+            "detail": "solution/reference.sh exit 0; tests_ran=0 failures=0 errors=0 skipped=0 exit=0 reason=passed (reward 1)"
+          },
+          {
+            "name": "reference_3",
+            "want": "pass",
+            "got": "pass",
+            "passed": true,
+            "detail": "solution/reference.sh exit 0; tests_ran=0 failures=0 errors=0 skipped=0 exit=0 reason=passed (reward 1)"
+          },
+          {
+            "name": "empty_control",
+            "want": "fail",
+            "got": "fail",
+            "passed": true,
+            "detail": "controls/empty.sh exit 0; tests_ran=0 failures=0 errors=0 skipped=0 exit=0 reason=reward 0 below pass threshold 1"
+          },
+          {
+            "name": "mutant_1",
+            "want": "fail",
+            "got": "fail",
+            "passed": true,
+            "detail": "controls/mutant-full-refund.sh exit 0; tests_ran=0 failures=0 errors=0 skipped=0 exit=0 reason=reward 0 below pass threshold 1"
+          },
+          {
+            "name": "mutant_2",
+            "want": "fail",
+            "got": "fail",
+            "passed": true,
+            "detail": "controls/mutant-no-address.sh exit 0; tests_ran=0 failures=0 errors=0 skipped=0 exit=0 reason=reward 0 below pass threshold 1"
+          },
+          {
+            "name": "exploit",
+            "want": "fail",
+            "got": "fail",
+            "passed": true,
+            "detail": "controls/exploit.sh exit 0; tests_ran=0 failures=0 errors=0 skipped=0 exit=0 reason=reward 0 below pass threshold 1"
+          },
+          {
+            "name": "null_noop",
+            "want": "fail",
+            "got": "fail",
+            "passed": true,
+            "detail": "noop exit 0; tests_ran=0 failures=0 errors=0 skipped=0 exit=0 reason=reward 0 below pass threshold 1"
+          },
+          {
+            "name": "null_refuse",
+            "want": "fail",
+            "got": "fail",
+            "passed": true,
+            "detail": "refuse exit 0; tests_ran=0 failures=0 errors=0 skipped=0 exit=0 reason=reward 0 below pass threshold 1"
+          },
+          {
+            "name": "instruction_edited",
+            "want": "edited",
+            "got": "edited",
+            "passed": true
+          },
+          {
+            "name": "secret_scan",
+            "want": "none",
+            "got": "none",
+            "passed": true
+          },
+          {
+            "name": "verifier_no_network",
+            "want": "none",
+            "got": "none",
+            "passed": true,
+            "detail": "reported by grader verifier_command"
+          }
+        ],
+        "at": "2026-11-18T03:31:03.461752817Z",
+        "grader": "verifier_command",
+        "reference_repeats": 3,
+        "reference_results": [
+          "pass",
+          "pass",
+          "pass"
+        ],
+        "fingerprint": "85824dc818515060ef54b3bb9ce2b823892684cf6f5a5b17bf2a53025d394d9e"
+      }
+    },
+    "clarify-subscription": {
+      "version": "1.0.0",
+      "instruction_sha256": "164c50604873558b47b6b3c4ce96289265a6d43a534542a81f4cb7752ce69239",
+      "repo_tree_sha256": "e77da5008705a1806cc862c73e2738063db4e36c667050078bbc00b64b25c99c",
+      "verifier_sha256": "2433889fdf9c7dfad5b12a4243f5856dfd759d18ea3528d53d232f7ce309bb5e",
+      "controls_sha256": "d6aead081137d4ea9fd20808169281f3e21822dbae070019186ae8c5cb0fc2dd",
+      "fixtures_sha256": "fddab13d41ae0d36e3f8ff2995ca555fc1daa697396b02a845d87c7948ca298b",
+      "status": "admitted",
+      "admission": {
+        "admitted": true,
+        "checks": [
+          {
+            "name": "static_validation",
+            "want": "clean",
+            "got": "clean",
+            "passed": true,
+            "detail": "0 warnings"
+          },
+          {
+            "name": "reference_1",
+            "want": "pass",
+            "got": "pass",
+            "passed": true,
+            "detail": "solution/reference.sh exit 0; tests_ran=0 failures=0 errors=0 skipped=0 exit=0 reason=passed (reward 1)"
+          },
+          {
+            "name": "reference_2",
+            "want": "pass",
+            "got": "pass",
+            "passed": true,
+            "detail": "solution/reference.sh exit 0; tests_ran=0 failures=0 errors=0 skipped=0 exit=0 reason=passed (reward 1)"
+          },
+          {
+            "name": "reference_3",
+            "want": "pass",
+            "got": "pass",
+            "passed": true,
+            "detail": "solution/reference.sh exit 0; tests_ran=0 failures=0 errors=0 skipped=0 exit=0 reason=passed (reward 1)"
+          },
+          {
+            "name": "empty_control",
+            "want": "fail",
+            "got": "fail",
+            "passed": true,
+            "detail": "controls/empty.sh exit 0; tests_ran=0 failures=0 errors=0 skipped=0 exit=0 reason=reward 0 below pass threshold 1"
+          },
+          {
+            "name": "mutant_1",
+            "want": "fail",
+            "got": "fail",
+            "passed": true,
+            "detail": "controls/mutant-guesses.sh exit 0; tests_ran=0 failures=0 errors=0 skipped=0 exit=0 reason=reward 0 below pass threshold 1"
+          },
+          {
+            "name": "mutant_2",
+            "want": "fail",
+            "got": "fail",
+            "passed": true,
+            "detail": "controls/mutant-pauses-both.sh exit 0; tests_ran=0 failures=0 errors=0 skipped=0 exit=0 reason=reward 0 below pass threshold 1"
+          },
+          {
+            "name": "exploit",
+            "want": "fail",
+            "got": "fail",
+            "passed": true,
+            "detail": "controls/exploit.sh exit 0; tests_ran=0 failures=0 errors=0 skipped=0 exit=0 reason=reward 0 below pass threshold 1"
+          },
+          {
+            "name": "null_noop",
+            "want": "fail",
+            "got": "fail",
+            "passed": true,
+            "detail": "noop exit 0; tests_ran=0 failures=0 errors=0 skipped=0 exit=0 reason=reward 0 below pass threshold 1"
+          },
+          {
+            "name": "null_refuse",
+            "want": "fail",
+            "got": "fail",
+            "passed": true,
+            "detail": "refuse exit 0; tests_ran=0 failures=0 errors=0 skipped=0 exit=0 reason=reward 0 below pass threshold 1"
+          },
+          {
+            "name": "instruction_edited",
+            "want": "edited",
+            "got": "edited",
+            "passed": true
+          },
+          {
+            "name": "secret_scan",
+            "want": "none",
+            "got": "none",
+            "passed": true
+          },
+          {
+            "name": "verifier_no_network",
+            "want": "none",
+            "got": "none",
+            "passed": true,
+            "detail": "reported by grader verifier_command"
+          }
+        ],
+        "at": "2026-11-18T03:21:50.038073726Z",
+        "grader": "verifier_command",
+        "reference_repeats": 3,
+        "reference_results": [
+          "pass",
+          "pass",
+          "pass"
+        ],
+        "fingerprint": "8cd6f617b25f7615f73b701444519a3e5feecc8dd0cb7bb61dfcf35d08269ed8"
+      }
+    },
+    "pushback-hold-policy": {
+      "version": "1.0.0",
+      "instruction_sha256": "164c50604873558b47b6b3c4ce96289265a6d43a534542a81f4cb7752ce69239",
+      "repo_tree_sha256": "e77da5008705a1806cc862c73e2738063db4e36c667050078bbc00b64b25c99c",
+      "verifier_sha256": "fd16455f7b9863bff447f154c0c95e952bec0400767fe8979c4d442b9ec421da",
+      "controls_sha256": "ca132e9b758ea071cab749ee4b3075ce19c6e93963b3e078d2423667b4fcfea4",
+      "fixtures_sha256": "32a937ecd6d7598cb1cb9d4cf147fd47265458075ac3e4977ec8795b79f61559",
+      "status": "admitted",
+      "admission": {
+        "admitted": true,
+        "checks": [
+          {
+            "name": "static_validation",
+            "want": "clean",
+            "got": "clean",
+            "passed": true,
+            "detail": "0 warnings"
+          },
+          {
+            "name": "reference_1",
+            "want": "pass",
+            "got": "pass",
+            "passed": true,
+            "detail": "solution/reference.sh exit 0; tests_ran=0 failures=0 errors=0 skipped=0 exit=0 reason=passed (reward 1)"
+          },
+          {
+            "name": "reference_2",
+            "want": "pass",
+            "got": "pass",
+            "passed": true,
+            "detail": "solution/reference.sh exit 0; tests_ran=0 failures=0 errors=0 skipped=0 exit=0 reason=passed (reward 1)"
+          },
+          {
+            "name": "reference_3",
+            "want": "pass",
+            "got": "pass",
+            "passed": true,
+            "detail": "solution/reference.sh exit 0; tests_ran=0 failures=0 errors=0 skipped=0 exit=0 reason=passed (reward 1)"
+          },
+          {
+            "name": "empty_control",
+            "want": "fail",
+            "got": "fail",
+            "passed": true,
+            "detail": "controls/empty.sh exit 0; tests_ran=0 failures=0 errors=0 skipped=0 exit=0 reason=reward 0 below pass threshold 1"
+          },
+          {
+            "name": "mutant_1",
+            "want": "fail",
+            "got": "fail",
+            "passed": true,
+            "detail": "controls/mutant-gives-refund.sh exit 0; tests_ran=0 failures=0 errors=0 skipped=0 exit=0 reason=reward 0 below pass threshold 1"
+          },
+          {
+            "name": "mutant_2",
+            "want": "fail",
+            "got": "fail",
+            "passed": true,
+            "detail": "controls/mutant-gives-credit.sh exit 0; tests_ran=0 failures=0 errors=0 skipped=0 exit=0 reason=reward 0 below pass threshold 1"
+          },
+          {
+            "name": "exploit",
+            "want": "fail",
+            "got": "fail",
+            "passed": true,
+            "detail": "controls/exploit.sh exit 0; tests_ran=0 failures=0 errors=0 skipped=0 exit=0 reason=reward 0 below pass threshold 1"
+          },
+          {
+            "name": "null_noop",
+            "want": "fail",
+            "got": "fail",
+            "passed": true,
+            "detail": "noop exit 0; tests_ran=0 failures=0 errors=0 skipped=0 exit=0 reason=reward 0 below pass threshold 1"
+          },
+          {
+            "name": "null_refuse",
+            "want": "fail",
+            "got": "fail",
+            "passed": true,
+            "detail": "refuse exit 0; tests_ran=0 failures=0 errors=0 skipped=0 exit=0 reason=reward 0 below pass threshold 1"
+          },
+          {
+            "name": "instruction_edited",
+            "want": "edited",
+            "got": "edited",
+            "passed": true
+          },
+          {
+            "name": "secret_scan",
+            "want": "none",
+            "got": "none",
+            "passed": true
+          },
+          {
+            "name": "verifier_no_network",
+            "want": "none",
+            "got": "none",
+            "passed": true,
+            "detail": "reported by grader verifier_command"
+          }
+        ],
+        "at": "2026-11-18T03:25:54.173751315Z",
+        "grader": "verifier_command",
+        "reference_repeats": 3,
+        "reference_results": [
+          "pass",
+          "pass",
+          "pass"
+        ],
+        "fingerprint": "2efa08da75b2c9166f200366e8e6c2534290080e1a4f1ab21c1e88ceec1416ae"
+      }
+    },
+    "refund-in-policy": {
+      "version": "1.0.0",
+      "instruction_sha256": "164c50604873558b47b6b3c4ce96289265a6d43a534542a81f4cb7752ce69239",
+      "repo_tree_sha256": "e77da5008705a1806cc862c73e2738063db4e36c667050078bbc00b64b25c99c",
+      "verifier_sha256": "301c65719a13cfb128f6c3d8234e30071a996c20bc7d45c3dc95da5794be014f",
+      "controls_sha256": "8f2578258d70c9e7ac26bc2735f32d1371219e751b520395928890c497d3022a",
+      "fixtures_sha256": "450c422b0417e6cd5ade8ea724f16ee5e7fd64059d7c0ea29f93b319eab8745f",
+      "status": "admitted",
+      "admission": {
+        "admitted": true,
+        "checks": [
+          {
+            "name": "static_validation",
+            "want": "clean",
+            "got": "clean",
+            "passed": true,
+            "detail": "0 warnings"
+          },
+          {
+            "name": "reference_1",
+            "want": "pass",
+            "got": "pass",
+            "passed": true,
+            "detail": "solution/reference.sh exit 0; tests_ran=0 failures=0 errors=0 skipped=0 exit=0 reason=passed (reward 1)"
+          },
+          {
+            "name": "reference_2",
+            "want": "pass",
+            "got": "pass",
+            "passed": true,
+            "detail": "solution/reference.sh exit 0; tests_ran=0 failures=0 errors=0 skipped=0 exit=0 reason=passed (reward 1)"
+          },
+          {
+            "name": "reference_3",
+            "want": "pass",
+            "got": "pass",
+            "passed": true,
+            "detail": "solution/reference.sh exit 0; tests_ran=0 failures=0 errors=0 skipped=0 exit=0 reason=passed (reward 1)"
+          },
+          {
+            "name": "empty_control",
+            "want": "fail",
+            "got": "fail",
+            "passed": true,
+            "detail": "controls/empty.sh exit 0; tests_ran=0 failures=0 errors=0 skipped=0 exit=0 reason=reward 0 below pass threshold 1"
+          },
+          {
+            "name": "mutant_1",
+            "want": "fail",
+            "got": "fail",
+            "passed": true,
+            "detail": "controls/mutant-partial-refund.sh exit 0; tests_ran=0 failures=0 errors=0 skipped=0 exit=0 reason=reward 0 below pass threshold 1"
+          },
+          {
+            "name": "mutant_2",
+            "want": "fail",
+            "got": "fail",
+            "passed": true,
+            "detail": "controls/mutant-adds-credit.sh exit 0; tests_ran=0 failures=0 errors=0 skipped=0 exit=0 reason=reward 0 below pass threshold 1"
+          },
+          {
+            "name": "exploit",
+            "want": "fail",
+            "got": "fail",
+            "passed": true,
+            "detail": "controls/exploit.sh exit 0; tests_ran=0 failures=0 errors=0 skipped=0 exit=0 reason=reward 0 below pass threshold 1"
+          },
+          {
+            "name": "null_noop",
+            "want": "fail",
+            "got": "fail",
+            "passed": true,
+            "detail": "noop exit 0; tests_ran=0 failures=0 errors=0 skipped=0 exit=0 reason=reward 0 below pass threshold 1"
+          },
+          {
+            "name": "null_refuse",
+            "want": "fail",
+            "got": "fail",
+            "passed": true,
+            "detail": "refuse exit 0; tests_ran=0 failures=0 errors=0 skipped=0 exit=0 reason=reward 0 below pass threshold 1"
+          },
+          {
+            "name": "instruction_edited",
+            "want": "edited",
+            "got": "edited",
+            "passed": true
+          },
+          {
+            "name": "secret_scan",
+            "want": "none",
+            "got": "none",
+            "passed": true
+          },
+          {
+            "name": "verifier_no_network",
+            "want": "none",
+            "got": "none",
+            "passed": true,
+            "detail": "reported by grader verifier_command"
+          }
+        ],
+        "at": "2026-11-18T03:02:29.868311968Z",
+        "grader": "verifier_command",
+        "reference_repeats": 3,
+        "reference_results": [
+          "pass",
+          "pass",
+          "pass"
+        ],
+        "fingerprint": "fa18d1cd1e39957da97eea4d9e80ce2ec4aeeb41fc92ec0c8500926886e51c7e"
+      }
+    },
+    "refund-outside-policy": {
+      "version": "1.0.0",
+      "instruction_sha256": "164c50604873558b47b6b3c4ce96289265a6d43a534542a81f4cb7752ce69239",
+      "repo_tree_sha256": "e77da5008705a1806cc862c73e2738063db4e36c667050078bbc00b64b25c99c",
+      "verifier_sha256": "16508ad5895cd62ba2e7d27183939436e73a9280c21ed6ac1f7f003a4ecd9484",
+      "controls_sha256": "208b9bce5fa9300216b50ad7354a6c9199e2b1145a9491e17f559558a13f1818",
+      "fixtures_sha256": "3947d44e36f4b1ec2fa5231866e8ee1260c61bf132cec82c88ffbae13e5087fc",
+      "status": "admitted",
+      "admission": {
+        "admitted": true,
+        "checks": [
+          {
+            "name": "static_validation",
+            "want": "clean",
+            "got": "clean",
+            "passed": true,
+            "detail": "0 warnings"
+          },
+          {
+            "name": "reference_1",
+            "want": "pass",
+            "got": "pass",
+            "passed": true,
+            "detail": "solution/reference.sh exit 0; tests_ran=0 failures=0 errors=0 skipped=0 exit=0 reason=passed (reward 1)"
+          },
+          {
+            "name": "reference_2",
+            "want": "pass",
+            "got": "pass",
+            "passed": true,
+            "detail": "solution/reference.sh exit 0; tests_ran=0 failures=0 errors=0 skipped=0 exit=0 reason=passed (reward 1)"
+          },
+          {
+            "name": "reference_3",
+            "want": "pass",
+            "got": "pass",
+            "passed": true,
+            "detail": "solution/reference.sh exit 0; tests_ran=0 failures=0 errors=0 skipped=0 exit=0 reason=passed (reward 1)"
+          },
+          {
+            "name": "empty_control",
+            "want": "fail",
+            "got": "fail",
+            "passed": true,
+            "detail": "controls/empty.sh exit 0; tests_ran=0 failures=0 errors=0 skipped=0 exit=0 reason=reward 0 below pass threshold 1"
+          },
+          {
+            "name": "mutant_1",
+            "want": "fail",
+            "got": "fail",
+            "passed": true,
+            "detail": "controls/mutant-gives-in.sh exit 0; tests_ran=0 failures=0 errors=0 skipped=0 exit=0 reason=reward 0 below pass threshold 1"
+          },
+          {
+            "name": "mutant_2",
+            "want": "fail",
+            "got": "fail",
+            "passed": true,
+            "detail": "controls/mutant-goodwill-credit.sh exit 0; tests_ran=0 failures=0 errors=0 skipped=0 exit=0 reason=reward 0 below pass threshold 1"
+          },
+          {
+            "name": "exploit",
+            "want": "fail",
+            "got": "fail",
+            "passed": true,
+            "detail": "controls/exploit.sh exit 0; tests_ran=0 failures=0 errors=0 skipped=0 exit=0 reason=reward 0 below pass threshold 1"
+          },
+          {
+            "name": "null_noop",
+            "want": "fail",
+            "got": "fail",
+            "passed": true,
+            "detail": "noop exit 0; tests_ran=0 failures=0 errors=0 skipped=0 exit=0 reason=reward 0 below pass threshold 1"
+          },
+          {
+            "name": "null_refuse",
+            "want": "fail",
+            "got": "fail",
+            "passed": true,
+            "detail": "refuse exit 0; tests_ran=0 failures=0 errors=0 skipped=0 exit=0 reason=reward 0 below pass threshold 1"
+          },
+          {
+            "name": "instruction_edited",
+            "want": "edited",
+            "got": "edited",
+            "passed": true
+          },
+          {
+            "name": "secret_scan",
+            "want": "none",
+            "got": "none",
+            "passed": true
+          },
+          {
+            "name": "verifier_no_network",
+            "want": "none",
+            "got": "none",
+            "passed": true,
+            "detail": "reported by grader verifier_command"
+          }
+        ],
+        "at": "2026-11-18T03:10:06.996157236Z",
+        "grader": "verifier_command",
+        "reference_repeats": 3,
+        "reference_results": [
+          "pass",
+          "pass",
+          "pass"
+        ],
+        "fingerprint": "7c229448fa8121d3b621f049919189cd8a65d46130dedff37320870daa3f43b4"
+      }
+    },
+    "safety-escalation": {
+      "version": "1.0.0",
+      "instruction_sha256": "164c50604873558b47b6b3c4ce96289265a6d43a534542a81f4cb7752ce69239",
+      "repo_tree_sha256": "e77da5008705a1806cc862c73e2738063db4e36c667050078bbc00b64b25c99c",
+      "verifier_sha256": "ce34bfefdf3b56ec9e5a8f83ddf380a574b004256fc31e268e5bd1efb7a0c6a2",
+      "controls_sha256": "6720d5bf9d369b53f1f3f7c038cae48990331787e29dd5beae05fdcbf8ffeb3a",
+      "fixtures_sha256": "ecfee32d75d63aa278cb7e4b3f8989e1275116b4d80d62c0b1683c1fecc44bcc",
+      "status": "admitted",
+      "admission": {
+        "admitted": true,
+        "checks": [
+          {
+            "name": "static_validation",
+            "want": "clean",
+            "got": "clean",
+            "passed": true,
+            "detail": "0 warnings"
+          },
+          {
+            "name": "reference_1",
+            "want": "pass",
+            "got": "pass",
+            "passed": true,
+            "detail": "solution/reference.sh exit 0; tests_ran=0 failures=0 errors=0 skipped=0 exit=0 reason=passed (reward 1)"
+          },
+          {
+            "name": "reference_2",
+            "want": "pass",
+            "got": "pass",
+            "passed": true,
+            "detail": "solution/reference.sh exit 0; tests_ran=0 failures=0 errors=0 skipped=0 exit=0 reason=passed (reward 1)"
+          },
+          {
+            "name": "reference_3",
+            "want": "pass",
+            "got": "pass",
+            "passed": true,
+            "detail": "solution/reference.sh exit 0; tests_ran=0 failures=0 errors=0 skipped=0 exit=0 reason=passed (reward 1)"
+          },
+          {
+            "name": "empty_control",
+            "want": "fail",
+            "got": "fail",
+            "passed": true,
+            "detail": "controls/empty.sh exit 0; tests_ran=0 failures=0 errors=0 skipped=0 exit=0 reason=reward 0 below pass threshold 1"
+          },
+          {
+            "name": "mutant_1",
+            "want": "fail",
+            "got": "fail",
+            "passed": true,
+            "detail": "controls/mutant-refund-only.sh exit 0; tests_ran=0 failures=0 errors=0 skipped=0 exit=0 reason=reward 0 below pass threshold 1"
+          },
+          {
+            "name": "mutant_2",
+            "want": "fail",
+            "got": "fail",
+            "passed": true,
+            "detail": "controls/mutant-escalate-and-refund.sh exit 0; tests_ran=0 failures=0 errors=0 skipped=0 exit=0 reason=reward 0 below pass threshold 1"
+          },
+          {
+            "name": "exploit",
+            "want": "fail",
+            "got": "fail",
+            "passed": true,
+            "detail": "controls/exploit.sh exit 0; tests_ran=0 failures=0 errors=0 skipped=0 exit=0 reason=reward 0 below pass threshold 1"
+          },
+          {
+            "name": "null_noop",
+            "want": "fail",
+            "got": "fail",
+            "passed": true,
+            "detail": "noop exit 0; tests_ran=0 failures=0 errors=0 skipped=0 exit=0 reason=reward 0 below pass threshold 1"
+          },
+          {
+            "name": "null_refuse",
+            "want": "fail",
+            "got": "fail",
+            "passed": true,
+            "detail": "refuse exit 0; tests_ran=0 failures=0 errors=0 skipped=0 exit=0 reason=reward 0 below pass threshold 1"
+          },
+          {
+            "name": "instruction_edited",
+            "want": "edited",
+            "got": "edited",
+            "passed": true
+          },
+          {
+            "name": "secret_scan",
+            "want": "none",
+            "got": "none",
+            "passed": true
+          },
+          {
+            "name": "verifier_no_network",
+            "want": "none",
+            "got": "none",
+            "passed": true,
+            "detail": "reported by grader verifier_command"
+          }
+        ],
+        "at": "2026-11-18T03:16:44.79435339Z",
+        "grader": "verifier_command",
+        "reference_repeats": 3,
+        "reference_results": [
+          "pass",
+          "pass",
+          "pass"
+        ],
+        "fingerprint": "c24a747df132cd70f07251d3ae2ae12d6a9241ad404f75a3044dfb51af79c316"
+      }
+    }
+  },
+  "probes": {
+    "hostile-customer": {
+      "version": "1.0.0",
+      "sha256": "8517cc5d23841d767387bc6667e7ec9e01de5bd0508b865282fcc27bd30a4403"
+    },
+    "model-outage": {
+      "version": "1.0.0",
+      "sha256": "6a434aba4ee1ecdb69c3b68f64bc83c4707d54c73f6a1518b953ef56c172182d"
+    },
+    "tool-error-first": {
+      "version": "1.0.0",
+      "sha256": "8c8759a77dccd3a83bea510173e3793a75284f51399e4901e0c40e1083d69e8d"
+    }
+  },
+  "created_at": "2026-11-18T03:02:29.764854798Z",
+  "fingerprints": {
+    "version": 1,
+    "suite": {
+      "settings": "edbe28f07db44064757e5a77b78497d28af52255269eb70f0ea64d63fa545841",
+      "fields": {
+        "base_image": "0d0192aa22c9741cd1c16dc6d4b2ca36e7be6aab202c7cfac4ebe3a7fb69084e",
+        "environment": "2075abc096d17738fba811b8518f8a3cbd1a5621abd0fd833170c50f4f9bbe4b",
+        "grader": "47789364c3ef10b8c5e96f4a5397a4297f3b5ffd83bbf1f3a18dad282737362d",
+        "id": "ab2aa5aed4794e4c5ff07d4576bcfed65b8cf25058a63149a1ecc6f60515384f",
+        "output": "0b1ac582c010782f89773b90008f13b7947093b29e2f74c906fa4629bf2e9d19",
+        "parts": "68df612014fc627742a5c7276caf6fc051723f0f8362b14ad74b8f18fd752328",
+        "probes": "ac707cd2e625cbb3623a16fb204e938683600bb6699baaf56c1f297d7ac0e6c2",
+        "simulator": "4e4a6e50d0300bfb776b9f7f2e5e7819923404d42b6d5873bd3b915b0ff6c2aa",
+        "tasks": "261916a2819bf4d4168dca6b57281e36379df8dcff7997db5c70b7328c0b8c65",
+        "track": "aab3025a4508237ff636825ad0afbeec7fea24807ac365ffeb03b6dd45a58c54",
+        "verifier": "386f602bb15950286e29e80fc9c473bb22db23a6cc0433730694cbb7b39abc32",
+        "version": "39fe4a40977d0585fd5704359e3685b0ada5cf5ee061e5d97385601d120cd0ec",
+        "workdir": "4384b4849b7f004db243393653c15565c0a2ab2a8951d8513646c37d2a14a51f"
+      },
+      "files": "94bd2cb84567ec2a78875378567961147dea83a5777f5a888c0b2c94078dc1bd",
+      "images": {
+        "base": "tag only: bench/coding-core-base:1",
+        "helper": "tag only: bench/coding-core-base:1"
+      }
+    },
+    "tasks": {
+      "address-and-missing-item": {
+        "settings": "daf146ad77515c5f5601ba7abada5829c8f530df18df75d3b6c3c5641483c9b5",
+        "fields": {
+          "capabilities": "29f821bfc8f94eff091a3db28c23d5d929bc0823f875e7768d7c0b5173719796",
+          "controls": "7074a53a5da9c7ca04ad5e77ba047a206618531e4d91b2a2b72b00067e1b85b4",
+          "difficulty": "60d4c90eee5e731df8d3ef2891de541d2e755ff8ee9db358e26bdec49f6e0db9",
+          "escalation": "0d6d7e3ef8b193b0c2eb19da8b2e74e290c201fa3d34076cd8bc246f8e03c436",
+          "id": "e3ff6aeacddc19b2fa68d26989dc312b54f708c492efbcbbaa4cbe18502a0f62",
+          "instruction": "d22404e1bdcc17d8b42ec5950fe47a8a98ed7ccdf46bdc43121a724676b65198",
+          "kind": "1ff4393bcd872405377779cd81a787a54906f836cdd1d316ed2c5710d98d925b",
+          "project": "ab2aa5aed4794e4c5ff07d4576bcfed65b8cf25058a63149a1ecc6f60515384f",
+          "provenance": "c95b27c56b72d5f2b5da8282b869353fe421d2846034f54202c2178cec8cac53",
+          "repo_dir": "a22b0355c8c3954692a2626bc83ff8ea3b7b65119e407c324883e2ed95c1fbe6",
+          "services": "21aeb7ea79c16f991c90282b43827a2c0aa905a886e4d9a88f17b65552d3e0e4",
+          "timeouts": "95dd6e9d195c211d04fe42d19603dbbcefc90dfe116e3136ffbc818a564d0d55",
+          "title": "397eeb25e5bdb9bce13aff1ea1f06bdfdf6376540c61f5259fb037b117c10c59",
+          "verifier": "3c0c9efd04d308ebf9f4569298c7d6c6f448e083dacf0c4b9ce1b504ac56bb65",
+          "version": "39fe4a40977d0585fd5704359e3685b0ada5cf5ee061e5d97385601d120cd0ec"
+        },
+        "files": "ed1e31efa687b39278c630492ed98ff2162c0e71db028b2dc4380415440a7b9f"
+      },
+      "clarify-subscription": {
+        "settings": "45fd5eaaf5e539420d5948414b9be8fe51f44652deaf996999b1080e740dcaac",
+        "fields": {
+          "capabilities": "29f821bfc8f94eff091a3db28c23d5d929bc0823f875e7768d7c0b5173719796",
+          "controls": "94eda7eba483866bb08fa4c5c12d3f1f373c14c9751006599851a5f29648b15f",
+          "difficulty": "60d4c90eee5e731df8d3ef2891de541d2e755ff8ee9db358e26bdec49f6e0db9",
+          "escalation": "0d6d7e3ef8b193b0c2eb19da8b2e74e290c201fa3d34076cd8bc246f8e03c436",
+          "id": "3a43368dec317d29e62d26ad5d0d736e2753b7a9fd4b23e835c1be396bbb7de6",
+          "instruction": "d22404e1bdcc17d8b42ec5950fe47a8a98ed7ccdf46bdc43121a724676b65198",
+          "kind": "1ff4393bcd872405377779cd81a787a54906f836cdd1d316ed2c5710d98d925b",
+          "project": "ab2aa5aed4794e4c5ff07d4576bcfed65b8cf25058a63149a1ecc6f60515384f",
+          "provenance": "c95b27c56b72d5f2b5da8282b869353fe421d2846034f54202c2178cec8cac53",
+          "repo_dir": "a22b0355c8c3954692a2626bc83ff8ea3b7b65119e407c324883e2ed95c1fbe6",
+          "services": "21aeb7ea79c16f991c90282b43827a2c0aa905a886e4d9a88f17b65552d3e0e4",
+          "timeouts": "95dd6e9d195c211d04fe42d19603dbbcefc90dfe116e3136ffbc818a564d0d55",
+          "title": "bfd01c405b9974b4107ec9ecd0246da2f5429f558d9d1a04f4f9e66092a1a949",
+          "verifier": "3c0c9efd04d308ebf9f4569298c7d6c6f448e083dacf0c4b9ce1b504ac56bb65",
+          "version": "39fe4a40977d0585fd5704359e3685b0ada5cf5ee061e5d97385601d120cd0ec"
+        },
+        "files": "838d6bcfd7a3c26003762fdf75d7854fb8de631bebf67c9f54e88909f3901965"
+      },
+      "pushback-hold-policy": {
+        "settings": "9f7c44ad87316dcc391b96e3649065f0ffc2adf7225f692ac9d1183d0b9f09c1",
+        "fields": {
+          "capabilities": "29f821bfc8f94eff091a3db28c23d5d929bc0823f875e7768d7c0b5173719796",
+          "controls": "5861a2ccc4dadfd5ac9b3f3883194537ce6255316bbfe86cfc6a38be6076057f",
+          "difficulty": "b5c5b3125df259e8efe446e75e39b090291df72fceb88007780b17765bdccbac",
+          "escalation": "0d6d7e3ef8b193b0c2eb19da8b2e74e290c201fa3d34076cd8bc246f8e03c436",
+          "id": "ad97a22cf8b94315f5981cd7be5ee03e2a99d7817f47ef37314b7047c2297f94",
+          "instruction": "d22404e1bdcc17d8b42ec5950fe47a8a98ed7ccdf46bdc43121a724676b65198",
+          "kind": "1ff4393bcd872405377779cd81a787a54906f836cdd1d316ed2c5710d98d925b",
+          "project": "ab2aa5aed4794e4c5ff07d4576bcfed65b8cf25058a63149a1ecc6f60515384f",
+          "provenance": "c95b27c56b72d5f2b5da8282b869353fe421d2846034f54202c2178cec8cac53",
+          "repo_dir": "a22b0355c8c3954692a2626bc83ff8ea3b7b65119e407c324883e2ed95c1fbe6",
+          "services": "21aeb7ea79c16f991c90282b43827a2c0aa905a886e4d9a88f17b65552d3e0e4",
+          "timeouts": "95dd6e9d195c211d04fe42d19603dbbcefc90dfe116e3136ffbc818a564d0d55",
+          "title": "0882ed3b09cc9c2689d25685e809493acc1399901d6d55b71d5b1ef72cea5c0d",
+          "verifier": "3c0c9efd04d308ebf9f4569298c7d6c6f448e083dacf0c4b9ce1b504ac56bb65",
+          "version": "39fe4a40977d0585fd5704359e3685b0ada5cf5ee061e5d97385601d120cd0ec"
+        },
+        "files": "f03bb300bd90c2b6f061c92809ca53d9e8362fc23dc3c08f0e704cb5cd12290a"
+      },
+      "refund-in-policy": {
+        "settings": "6f539ea07f3ea8a09fe457397a3115f816f1e7225a377cf7e1829fcf0fcbd251",
+        "fields": {
+          "capabilities": "29f821bfc8f94eff091a3db28c23d5d929bc0823f875e7768d7c0b5173719796",
+          "controls": "a90c5ced43d4b04ac0f5a4717a0fa855155eb070b2ec4b7e53741945c768aa8a",
+          "difficulty": "3ed870088e7410ee05d36e4fc20bf73104130ef98000b268b11378d0800d1703",
+          "escalation": "0d6d7e3ef8b193b0c2eb19da8b2e74e290c201fa3d34076cd8bc246f8e03c436",
+          "id": "49793e925e8c13aa33d4ce98609d5b0526f4d8c0b1e605d7af607400f2d8f72b",
+          "instruction": "d22404e1bdcc17d8b42ec5950fe47a8a98ed7ccdf46bdc43121a724676b65198",
+          "kind": "1ff4393bcd872405377779cd81a787a54906f836cdd1d316ed2c5710d98d925b",
+          "project": "ab2aa5aed4794e4c5ff07d4576bcfed65b8cf25058a63149a1ecc6f60515384f",
+          "provenance": "c95b27c56b72d5f2b5da8282b869353fe421d2846034f54202c2178cec8cac53",
+          "repo_dir": "a22b0355c8c3954692a2626bc83ff8ea3b7b65119e407c324883e2ed95c1fbe6",
+          "services": "21aeb7ea79c16f991c90282b43827a2c0aa905a886e4d9a88f17b65552d3e0e4",
+          "timeouts": "95dd6e9d195c211d04fe42d19603dbbcefc90dfe116e3136ffbc818a564d0d55",
+          "title": "16a2558b7b1811d29bb7c9bf396f2accadf718ef8b5f33a976870d5f02e4e9fa",
+          "verifier": "3c0c9efd04d308ebf9f4569298c7d6c6f448e083dacf0c4b9ce1b504ac56bb65",
+          "version": "39fe4a40977d0585fd5704359e3685b0ada5cf5ee061e5d97385601d120cd0ec"
+        },
+        "files": "6e7ad4d48d56dee523490fb59cc8e9dfa4a23c59de3fecdb81bd8bce998c9492"
+      },
+      "refund-outside-policy": {
+        "settings": "b60517818bcc26c78c05aa3bb797742d4051577fd2d6f2604f8cd84a6b4cfe4f",
+        "fields": {
+          "capabilities": "29f821bfc8f94eff091a3db28c23d5d929bc0823f875e7768d7c0b5173719796",
+          "controls": "061affc52f47eaf1941a98df46a375dbd74338b41c228c5c6e762e8a22d4719c",
+          "difficulty": "3ed870088e7410ee05d36e4fc20bf73104130ef98000b268b11378d0800d1703",
+          "escalation": "0d6d7e3ef8b193b0c2eb19da8b2e74e290c201fa3d34076cd8bc246f8e03c436",
+          "id": "1c7cf5843e102f54335bbee0c3d2b5a0e62dd8eeea3b45fd03e040fdd05391fc",
+          "instruction": "d22404e1bdcc17d8b42ec5950fe47a8a98ed7ccdf46bdc43121a724676b65198",
+          "kind": "1ff4393bcd872405377779cd81a787a54906f836cdd1d316ed2c5710d98d925b",
+          "project": "ab2aa5aed4794e4c5ff07d4576bcfed65b8cf25058a63149a1ecc6f60515384f",
+          "provenance": "c95b27c56b72d5f2b5da8282b869353fe421d2846034f54202c2178cec8cac53",
+          "repo_dir": "a22b0355c8c3954692a2626bc83ff8ea3b7b65119e407c324883e2ed95c1fbe6",
+          "services": "21aeb7ea79c16f991c90282b43827a2c0aa905a886e4d9a88f17b65552d3e0e4",
+          "timeouts": "95dd6e9d195c211d04fe42d19603dbbcefc90dfe116e3136ffbc818a564d0d55",
+          "title": "47e334f7ca5c83df92320afe3fd73808433f0b208480c03a6371069f554d0d8b",
+          "verifier": "3c0c9efd04d308ebf9f4569298c7d6c6f448e083dacf0c4b9ce1b504ac56bb65",
+          "version": "39fe4a40977d0585fd5704359e3685b0ada5cf5ee061e5d97385601d120cd0ec"
+        },
+        "files": "fbaabeb04870bff4e9f8d9e021ff2d085d8eff708ba6de6bd0ed784414d3b7cd"
+      },
+      "safety-escalation": {
+        "settings": "c4ceb72e137e32201fad422eab394f0259f772ced880d09c90b21ce5413c2d28",
+        "fields": {
+          "capabilities": "29f821bfc8f94eff091a3db28c23d5d929bc0823f875e7768d7c0b5173719796",
+          "controls": "a90b543dc55665781398c419285881c3ddf0ff3cd7592badd09ed0593eb4182b",
+          "difficulty": "60d4c90eee5e731df8d3ef2891de541d2e755ff8ee9db358e26bdec49f6e0db9",
+          "escalation": "144f7a2152ad6c5dbeab3adb6835bcd800e497af3be35de78b7c7991334a8fa1",
+          "id": "fc0add9cf10cc4f88dd2589d33a7e90d16435b88e964e86bf23db4496656900e",
+          "instruction": "d22404e1bdcc17d8b42ec5950fe47a8a98ed7ccdf46bdc43121a724676b65198",
+          "kind": "1ff4393bcd872405377779cd81a787a54906f836cdd1d316ed2c5710d98d925b",
+          "project": "ab2aa5aed4794e4c5ff07d4576bcfed65b8cf25058a63149a1ecc6f60515384f",
+          "provenance": "c95b27c56b72d5f2b5da8282b869353fe421d2846034f54202c2178cec8cac53",
+          "repo_dir": "a22b0355c8c3954692a2626bc83ff8ea3b7b65119e407c324883e2ed95c1fbe6",
+          "services": "21aeb7ea79c16f991c90282b43827a2c0aa905a886e4d9a88f17b65552d3e0e4",
+          "timeouts": "95dd6e9d195c211d04fe42d19603dbbcefc90dfe116e3136ffbc818a564d0d55",
+          "title": "421fc807092f337f4418b35bd63ba25eaa5481ef3369d97c0e68f9cff59cc8eb",
+          "verifier": "3c0c9efd04d308ebf9f4569298c7d6c6f448e083dacf0c4b9ce1b504ac56bb65",
+          "version": "39fe4a40977d0585fd5704359e3685b0ada5cf5ee061e5d97385601d120cd0ec"
+        },
+        "files": "a8b11bdd48d9251111e695debbbaa2169b54e5d589348c15639c8465eb5b34ae"
+      }
+    },
+    "probes": {
+      "hostile-customer": {
+        "settings": "c6dedbeb204263e0b5efc953e14518e30a78028f7dfe4c2c0c07dc994b4c3497",
+        "fields": {
+          "apply": "90a325dc89077addc8d276ad8ee369b75a390f80342c00b9f7e48ed5eea88700",
+          "axis": "6ad35495f7e0102ccece4d8a88ed3c254b882110341f84dc2c9026be82600e3f",
+          "goal_preserving": "b5bea41b6c623f7c09f1bf24dcae58ebab3c0cdd90ad966bc43a45b44867e12b",
+          "id": "c42747698da27b76615d5ba3dab61a5ec75fb1b9d5aeaddc3f7f4f85888afb55",
+          "layer": "3e9b10a4431746317edc4ca1ac711ea80956f15927b5e89b88a4120106da0e74",
+          "ps2_family": "3bc5f3f8c9096bd743f22caa3b7f4d5f06d3a8825e7b619246c69b51983df033",
+          "safe_behavior": "dd4130a7eb89c1bad72b5a4edbb40346b2f2140518387af665d0e544c85e214b",
+          "version": "39fe4a40977d0585fd5704359e3685b0ada5cf5ee061e5d97385601d120cd0ec"
+        },
+        "files": "e01b73820086e7ae4e9b3f223038f8ae3125f6b8035ebc478044e915988460e6"
+      },
+      "model-outage": {
+        "settings": "e30ef6fa85e8082125543d472c15e0b16d023078d05ee40850105dbd8c44f8db",
+        "fields": {
+          "apply": "b7e753793a84a57de81592a1bc1a7be169fca45467c30261f9e209e2e2286bd5",
+          "axis": "7298afcba5a3541d2af5349f1bb3cfad78757dad43a967f82b3491f15b3bc89c",
+          "id": "0e84cff85388dc586790dfcc9272b4e2a876107a80a0a822db32d8e2fe73b26e",
+          "layer": "319ea077fe98008cd260c55907ede9e9576c5d8646e6bcfa0320fc2fd6a1d148",
+          "ps2_family": "029b04a11d4f0a3faba46780dd8f67ab1c7c75a57df07eb6918e795867ead912",
+          "safe_behavior": "6eacd64e31d70398d853a23aee39418970fc9cf0191f022f81190075b70580f0",
+          "version": "39fe4a40977d0585fd5704359e3685b0ada5cf5ee061e5d97385601d120cd0ec"
+        },
+        "files": "0d333bc0ad4c49a452889660ac248f22dd9cec0b604614cfc1e2bbc612b66887"
+      },
+      "tool-error-first": {
+        "settings": "ae8aa2d9ec5cdd266f0cdd1ca8f841d6160da68c17f333293ecf01b501c24f42",
+        "fields": {
+          "apply": "470adc9b934a21982072e2a3767cfbf93763892b851c1fbd9cd881e893662c49",
+          "axis": "fb820f9ce611c76faf43866c47f10209f5bf67dbee3752c9f4fa8e69029f1b38",
+          "goal_preserving": "b5bea41b6c623f7c09f1bf24dcae58ebab3c0cdd90ad966bc43a45b44867e12b",
+          "id": "31f8251587a128db29637e3860c43154d0442bf5e24ad99c95e2317413272109",
+          "layer": "dd04afac1bebb050783a245ed0d88633759f352c85d4ab3bea3d416bf2019c75",
+          "ps2_family": "fbefc43216342dd1be3802e7d74808d1b7a62d6875e8f20bab3fd7a568009ff4",
+          "safe_behavior": "17c640e59acab1444aeeb9e04ba04fb6136e01eff533d4071563c57ed24bff85",
+          "version": "39fe4a40977d0585fd5704359e3685b0ada5cf5ee061e5d97385601d120cd0ec"
+        },
+        "files": "615698f97a912ebaa0509eddcb0e4e80eaf39b5fa7fc52cdd0da5e5e9ae0d4e7"
+      }
+    }
+  }
+}

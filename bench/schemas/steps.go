@@ -151,6 +151,9 @@ type StepRecord struct {
 	// ProofClass is the strongest witness of a tool_request row's execution
 	// (ProofProxy and the other proof classes below).
 	ProofClass string `json:"proof_class,omitempty"`
+	// ModelSwitch (W9) marks a model_turn row answered by another model than
+	// the previous answered turn: "<previous> to <this>", from Bifrost rows.
+	ModelSwitch string `json:"model_switch,omitempty"`
 }
 
 // Proof classes of a requested tool call: the strongest witness of its

@@ -1,0 +1,31 @@
+# W7 preset: the nightly run of every task (docs/suite-tiers.md). The
+# `nightly` tier means every task when the suite does not define it. A fixed
+# design (three trials per arm on clean): in the simulations of
+# docs/adaptive-trials.md a fixed design of equal cost had at least the power
+# of the adaptive task rule, so the nightly run spends its budget evenly. It
+# declares an extension rule before its first run: its own verdict decides at
+# alpha 0.025, and an INCONCLUSIVE result can be followed up with
+# `heimdall extend -exp <id> -tasks N` and decided together at the other 0.025.
+name: nightly
+suite: coding-core@1.0.0
+tier: nightly
+base: agents/claude-code.yaml
+arms:
+  A: {label: baseline}
+  B: {label: candidate, set: {notes.user_file: experiments/fixtures/codewins.md}}
+primary: {condition: clean, metric: verified_success}
+guards:
+  - {condition: clean, rule: no_regression}
+  - {rule: no_new_integrity_violation}
+conditions:
+  - {id: clean, tasks: all, trials: 3}
+  - {id: stale-notes, tasks: all, trials: 1}
+trials:
+  mode: fixed
+  extension: {rule: inverse_normal, alpha_first: 0.025, weight_first: 0.5}
+budget: {total_usd: 50}
+verdict: {policy: paired_signflip, alpha: 0.05, assumed_sd: 0.30}
+seed: 20261118
+concurrency: 4
+manifest_mode: agent_exposure
+policy: policies/default.yaml

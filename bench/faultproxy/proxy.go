@@ -251,7 +251,7 @@ func (s *Server) serveData(w http.ResponseWriter, r *http.Request) {
 	if p.Format == FormatGemini && strings.Contains(r.URL.Path, ":streamGenerateContent") {
 		req.Stream = true
 	}
-	d := s.plans.begin(slot.name, kind)
+	d := s.plans.beginModel(slot.name, kind, requestModel(p, r, kind, body)) // W9: the model lets a plan fail one target
 	e.Slot, e.RunID, e.Call, e.Stream = slot.name, d.RunID, d.Call, req.Stream
 	switch {
 	case d.Inject:
@@ -277,6 +277,8 @@ func (s *Server) serveData(w http.ResponseWriter, r *http.Request) {
 func (s *Server) answer(w http.ResponseWriter, r *http.Request, p ProviderSpec, kind, slot string, body []byte, e *schemas.LedgerEntry) {
 	up := s.upstreams[p.Name]
 	switch {
+	case up.mode == modeReal && isWebSocketUpgrade(r): // X8 voice agents: a Realtime session (realtime.go)
+		s.relayWebSocket(w, r, p, up, e)
 	case up.mode == modeReal:
 		s.forward(w, r, p, up, body, e)
 	case up.mode == modeScripted && p.Format == FormatOpenAI:

@@ -1,0 +1,23 @@
+# The cascaded reference agent against the Realtime bridge (speech to speech
+# through the gateway's /v1/realtime WebSocket, relayed by the fault proxy),
+# through the real pipeline. Like voice-cascaded-fake.yaml, run it only on a
+# stack whose openai provider is the scripted fake (docs/voice-agents.md);
+# with a real OpenAI key these are paid calls. The fake's Realtime session
+# answers from the same conversation scripts as its chat completions.
+# Slots: 3 tasks x 2 arms = 6.
+name: voice-realtime-fake
+suite: acme-voice-desk@1.0.0
+base: agents/voice-cascaded.yaml
+arms:
+  A: {label: "cascaded (STT, chat, TTS)"}
+  B: {label: realtime (speech to speech), agent: agents/voice-realtime.yaml}
+primary: {condition: clean, metric: verified_success}
+guards:
+  - {rule: no_new_integrity_violation}
+conditions:
+  - {id: clean, tasks: [refund-in-policy, safety-escalation, refund-outside-policy], trials: 1}
+budget: {total_usd: 0.5}
+verdict: {policy: paired_signflip, alpha: 0.05, assumed_sd: 0.30}
+seed: 20261118
+concurrency: 1
+manifest_mode: agent_exposure

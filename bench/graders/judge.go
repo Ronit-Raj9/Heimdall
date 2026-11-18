@@ -176,6 +176,10 @@ func (g *judge) Grade(ctx context.Context, rc *schemas.RunContext, diff *schemas
 		return nil, fmt.Errorf("%s: %w", JudgeType, err)
 	}
 	rec.PromptSHA256 = utils.SHA256Bytes([]byte(tmpl))
+	rec.Calibration = calibrationRef(rc.Suite, spec.Model, rec.PromptSHA256) // W8 judge calibration: the record in force (judgecalibration.go)
+	if spec.Auditor != nil {                                                 // W8 judge calibration: the auditor never decides
+		rec.Audit = g.audit(ctx, rc, spec, renderJudgePrompt(tmpl, ans, answer), rec.Votes)
+	}
 	grade.Judged, grade.Judge = true, rec
 	grade.Passed, grade.InvalidEvaluator, grade.Reason = tally(rec.Votes, tmplName)
 	return grade, nil
@@ -216,6 +220,9 @@ func (g *judge) check(rc *schemas.RunContext) (schemas.JudgeSpec, error) {
 	case rc.Run == nil || !judgeKeyNameRe.MatchString(rc.Run.RunID):
 		return spec, errors.New("run context has no usable run id for the judge's key name")
 	}
+	if err := checkAuditor(spec); err != nil { // W8 judge calibration (judgecalibration.go)
+		return spec, err
+	}
 	return spec, nil
 }
 
@@ -240,11 +247,14 @@ func (g *judge) vote(ctx context.Context, rc *schemas.RunContext, spec schemas.J
 	var usd float64
 	priced, unpriced := true, ""
 	for i := 0; i < spec.Votes; i++ {
-		verdict, tok, err := g.call(ctx, key, spec, prompt)
+		verdict, tok, served, err := g.call(ctx, key, spec, prompt)
 		if err != nil {
 			return nil, fmt.Errorf("judge vote %d of %d: %w", i+1, spec.Votes, err)
 		}
 		rec.Votes = append(rec.Votes, verdict)
+		if rec.ServedModel == "" { // W8 judge calibration: drift of the alias's served model
+			rec.ServedModel = served
+		}
 		switch {
 		case tok == nil:
 			priced, unpriced = false, "a judge response carried no usage"
@@ -306,11 +316,11 @@ type chatResponse struct {
 	} `json:"usage"`
 }
 
-// call sends one vote and returns its verdict and token usage (nil when the
-// response has none). A transport failure, a non-2xx status, a body that is
-// not a chat completion, or a response from another model than the pinned
-// one is an error.
-func (g *judge) call(ctx context.Context, key *schemas.RunKey, spec schemas.JudgeSpec, prompt string) (string, *schemas.Tokens, error) {
+// call sends one vote and returns its verdict, token usage (nil when the
+// response has none) and the model id the response named. A transport
+// failure, a non-2xx status, a body that is not a chat completion, or a
+// response from another model than the pinned one is an error.
+func (g *judge) call(ctx context.Context, key *schemas.RunKey, spec schemas.JudgeSpec, prompt string) (string, *schemas.Tokens, string, error) {
 	maxTokens := spec.MaxTokens
 	if maxTokens == 0 {
 		maxTokens = defaultJudgeTokens
@@ -322,32 +332,32 @@ func (g *judge) call(ctx context.Context, key *schemas.RunKey, spec schemas.Judg
 		MaxTokens:   maxTokens,
 	})
 	if err != nil {
-		return "", nil, fmt.Errorf("encode request: %w", err)
+		return "", nil, "", fmt.Errorf("encode request: %w", err)
 	}
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost, g.cfg.URL+chatCompletionsPath, bytes.NewReader(body))
 	if err != nil {
-		return "", nil, fmt.Errorf("build request: %w", err)
+		return "", nil, "", fmt.Errorf("build request: %w", err)
 	}
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set(virtualKeyHeader, key.Value)
 	resp, err := g.cfg.HTTP.Do(req)
 	if err != nil {
-		return "", nil, fmt.Errorf("call gateway: %w", err)
+		return "", nil, "", fmt.Errorf("call gateway: %w", err)
 	}
 	defer resp.Body.Close()
 	raw, err := io.ReadAll(io.LimitReader(resp.Body, maxJudgeResponseBody))
 	if err != nil {
-		return "", nil, fmt.Errorf("read response: %w", err)
+		return "", nil, "", fmt.Errorf("read response: %w", err)
 	}
 	if resp.StatusCode/100 != 2 {
-		return "", nil, fmt.Errorf("gateway answered %d: %s", resp.StatusCode, quote(string(raw)))
+		return "", nil, "", fmt.Errorf("gateway answered %d: %s", resp.StatusCode, quote(string(raw)))
 	}
 	var out chatResponse
 	if err := json.Unmarshal(raw, &out); err != nil {
-		return "", nil, fmt.Errorf("decode response: %w", err)
+		return "", nil, "", fmt.Errorf("decode response: %w", err)
 	}
 	if !sameModel(out.Model, spec.Model) {
-		return "", nil, fmt.Errorf("gateway served model %s, the judge is pinned to %s", out.Model, spec.Model)
+		return "", nil, "", fmt.Errorf("gateway served model %s, the judge is pinned to %s", out.Model, spec.Model)
 	}
 	verdict := VoteUnparsable
 	if len(out.Choices) > 0 {
@@ -361,7 +371,7 @@ func (g *judge) call(ctx context.Context, key *schemas.RunKey, spec schemas.Judg
 		}
 		tok = &schemas.Tokens{Fresh: max(u.PromptTokens-cached, 0), CacheRead: cached, Out: u.CompletionTokens}
 	}
-	return verdict, tok, nil
+	return verdict, tok, out.Model, nil
 }
 
 // ParseVerdict reads a judge reply strictly: after trimming spaces, one

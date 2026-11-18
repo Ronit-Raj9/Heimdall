@@ -1,0 +1,10 @@
+# livescore.SourceView (X6 live scoring, docs/live-scoring.md); ? marks an omitempty key
+url
+token_env?
+read_only
+last_pull?
+since?
+last_error?
+last_scored
+warnings?
+schedule?

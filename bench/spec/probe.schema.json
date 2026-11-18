@@ -52,7 +52,8 @@
             "from_call": {"type": "integer", "minimum": 1},
             "call": {"type": "integer", "minimum": 1},
             "status": {"type": "integer", "minimum": 100, "maximum": 599},
-            "retry_after_s": {"type": "integer", "minimum": 0}
+            "retry_after_s": {"type": "integer", "minimum": 0},
+            "model": {"type": "string", "minLength": 1, "description": "W9: fail only requests for this model; \"*\" fails every model. Empty: every model, or a routed run's primary target."}
           },
           "allOf": [
             {"if": {"properties": {"mode": {"const": "persistent"}}}, "then": {"required": ["from_call", "status"]}},

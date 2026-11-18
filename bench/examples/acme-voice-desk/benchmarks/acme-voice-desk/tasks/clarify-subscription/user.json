@@ -1,0 +1,44 @@
+{
+  "id": "clarify-subscription",
+  "script": {
+    "opening": "Hi, can you pause my coffee subscription for two months please? My email is sam.okafor@example.com.",
+    "replies": [
+      {
+        "when": [
+          "which",
+          "both",
+          "one?",
+          "espresso or",
+          "decaf or",
+          "either"
+        ],
+        "say": "Just the decaf one, please. Not the espresso."
+      },
+      {
+        "when": [
+          "paused",
+          "until"
+        ],
+        "say": "Perfect, thanks!",
+        "stop": true
+      }
+    ],
+    "done": "No, that's all.",
+    "default": "Okay."
+  },
+  "persona": {
+    "name": "Sam Okafor",
+    "goal": "Pause your coffee subscription for two months. You mean the Decaf fortnightly one (S-502) only, but you just say 'my subscription' unless the agent asks which one.",
+    "facts": [
+      "Your email is sam.okafor@example.com",
+      "You have two subscriptions: Espresso monthly and Decaf fortnightly",
+      "You want only the decaf one paused, for two months",
+      "The espresso one must keep running"
+    ],
+    "unknown": [
+      "Subscription ids"
+    ],
+    "behaviour": "Brief. Do not say which subscription until the agent asks.",
+    "satisfied_when": "the agent confirms the decaf subscription is paused for two months."
+  }
+}

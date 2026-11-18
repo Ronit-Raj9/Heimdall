@@ -127,6 +127,89 @@ type GatewayPolicy struct {
 	Provider   string   `json:"provider" yaml:"provider"`       // e.g. anthropic
 	MaxRetries int      `json:"max_retries" yaml:"max_retries"` // provider retries recorded in the manifest
 	Fallbacks  []string `json:"fallbacks,omitempty" yaml:"fallbacks"`
+
+	// W9 routing policy under test; nil keeps the fixed single-model key.
+	Routing *RoutingPolicy `json:"routing,omitempty" yaml:"routing,omitempty"`
+
+	// X8 voice agents: more models of the same provider the run's key may
+	// call beside the arm's model, such as a speech-to-text and a
+	// text-to-speech model (whisper-1, gpt-4o-mini-tts). They are added to
+	// the key slot and the key's allowed models, model_fidelity treats rows
+	// for them as declared, and the planner refuses an entry the provider
+	// cannot serve. Empty keeps the single-model key.
+	Models []string `json:"models,omitempty" yaml:"models,omitempty"`
+}
+
+// W9 routing policy under test (docs/routing-experiments.md). Additive: an
+// agent config without `gateway.routing` hashes as before.
+
+// Routing strategies. Fixed is the bench's own key (one model) with optional
+// governance limits; the others create one Bifrost routing rule scoped to the
+// run's virtual key.
+const (
+	RoutingFixed         = "fixed"
+	RoutingWeighted      = "weighted"
+	RoutingFallbackChain = "fallback_chain"
+	RoutingRule          = "rule"
+)
+
+// RoutingPolicy is the gateway policy an arm runs under. The engine applies
+// it when it mints the run's virtual key and removes it at cleanup; an
+// experiment whose arms differ only here compares routing policies.
+type RoutingPolicy struct {
+	Strategy  string        `json:"strategy" yaml:"strategy"`             // fixed | weighted | fallback_chain | rule
+	Targets   []RouteTarget `json:"targets,omitempty" yaml:"targets"`     // weighted targets; weights sum to 1 (one target: weight 1)
+	Fallbacks []RouteTarget `json:"fallbacks,omitempty" yaml:"fallbacks"` // tried in order when the chosen target fails
+	When      string        `json:"when,omitempty" yaml:"when"`           // rule strategy: CEL condition; the rule applies only when it holds
+	Retries   *int          `json:"retries,omitempty" yaml:"retries"`     // must equal the gateway's provider max_retries (Bifrost retries are per provider)
+	Limits    *RouteLimits  `json:"limits,omitempty" yaml:"limits"`       // governance limits on the run's key, for 402/429 tests
+}
+
+// RouteTarget is one provider and model of a routing policy. An empty
+// provider is the run's gateway provider.
+type RouteTarget struct {
+	Provider string  `json:"provider,omitempty" yaml:"provider"`
+	Model    string  `json:"model" yaml:"model"`
+	Weight   float64 `json:"weight,omitempty" yaml:"weight"`
+}
+
+// RouteLimits are budget and rate limits set on the run's virtual key. A
+// zero value leaves that limit off. Durations use Bifrost's syntax (30s,
+// 5m, 1h, 1d).
+type RouteLimits struct {
+	BudgetUSD    float64 `json:"budget_usd,omitempty" yaml:"budget_usd"`
+	BudgetReset  string  `json:"budget_reset,omitempty" yaml:"budget_reset"` // default 1d
+	RequestMax   int64   `json:"request_max,omitempty" yaml:"request_max"`
+	RequestReset string  `json:"request_reset,omitempty" yaml:"request_reset"` // default 1h
+	TokenMax     int64   `json:"token_max,omitempty" yaml:"token_max"`
+	TokenReset   string  `json:"token_reset,omitempty" yaml:"token_reset"` // default 1h
+}
+
+// Primary is the target a fault that names no model takes down for a routed
+// run: the first target, which the planner requires to be the model the
+// agent asks for. A nil policy has none.
+func (p *RoutingPolicy) Primary() (RouteTarget, bool) {
+	if p == nil || len(p.Targets) == 0 {
+		return RouteTarget{}, false
+	}
+	return p.Targets[0], true
+}
+
+// Models returns every model the policy may serve, targets then fallbacks,
+// without repeats.
+func (p *RoutingPolicy) Models() []string {
+	if p == nil {
+		return nil
+	}
+	var out []string
+	seen := map[string]bool{}
+	for _, t := range append(append([]RouteTarget{}, p.Targets...), p.Fallbacks...) {
+		if t.Model != "" && !seen[t.Model] {
+			seen[t.Model] = true
+			out = append(out, t.Model)
+		}
+	}
+	return out
 }
 
 // ScriptedSpec selects a scripted control agent.

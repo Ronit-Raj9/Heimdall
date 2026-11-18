@@ -18,6 +18,7 @@ import (
 	"strings"
 	"unicode"
 
+	"github.com/maximhq/bifrost/bench/importers/gaia/gaiascore" // X5a
 	"github.com/maximhq/bifrost/bench/schemas"
 	"github.com/maximhq/bifrost/bench/utils"
 	"gopkg.in/yaml.v3"
@@ -34,6 +35,9 @@ const (
 	MatchNumeric     = "numeric"
 	MatchChoice      = "choice"
 	MatchJSON        = "json"
+	// X5a GAIA importer: GAIA's quasi-exact match (importers/gaia/gaiascore),
+	// which brings its own normalisation, so normalize must stay empty.
+	MatchGAIA = "gaia"
 )
 
 // Normalizers an AnswerSpec may name (AnswerSpec.Normalize). They always run
@@ -236,6 +240,10 @@ func ValidateAnswerSpec(spec *schemas.AnswerSpec) error {
 				return fmt.Errorf("expected[%d]: %w", i, err)
 			}
 		}
+	case MatchGAIA: // X5a
+		if len(spec.Normalize) > 0 {
+			return errors.New("normalize: the gaia mode applies GAIA's own normalisation; leave normalize empty")
+		}
 	case "":
 		return errors.New("match: empty (want exact, contains_all, regex, numeric, choice or json)")
 	default:
@@ -309,6 +317,11 @@ func MatchAnswer(spec *schemas.AnswerSpec, answer string) (bool, string) {
 		ok = matchChoice(spec, answer)
 	case MatchJSON:
 		return matchJSON(spec, answer)
+	case MatchGAIA: // X5a: the text after a FINAL ANSWER: line, else the whole answer
+		got := gaiascore.Extract(answer)
+		for _, e := range spec.Expected {
+			ok = ok || gaiascore.Score(got, e)
+		}
 	}
 	if ok {
 		return true, spec.Match + ": answer matches"

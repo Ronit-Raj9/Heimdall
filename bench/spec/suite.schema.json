@@ -22,8 +22,8 @@
     "description": {"type": "string"},
     "environment": {"$ref": "#/$defs/part_name", "description": "Environment part name, e.g. docker_workspace."},
     "grader": {
-      "enum": ["hidden_tests", "verifier_command", "answer_match", "judge"],
-      "description": "Grader part name. hidden_tests: pytest JUnit at /grader/out/junit.xml, the original Python grader. verifier_command: any language, reporting as junit, reward or exit_code (docs/verifiers.md). answer_match and judge: answer tasks (docs/scenarios-design.md)."
+      "enum": ["hidden_tests", "verifier_command", "answer_match", "judge", "visual"],
+      "description": "Grader part name. hidden_tests: pytest JUnit at /grader/out/junit.xml, the original Python grader. verifier_command: any language, reporting as junit, reward or exit_code (docs/verifiers.md). answer_match and judge: answer tasks (docs/scenarios-design.md). visual: output.visual, images the bench captures (X1, docs/visual-grading.md)."
     },
     "base_image": {"$ref": "#/$defs/image"},
     "workdir": {"type": "string", "pattern": "^/", "description": "Absolute workspace path inside containers."},
@@ -71,7 +71,9 @@
     },
     "tasks": {"type": "array", "items": {"$ref": "#/$defs/id"}},
     "probes": {"type": "array", "items": {"$ref": "#/$defs/id"}},
-    "track": {"enum": ["coding", "terminal", "tool_use", "mcp", "memory", "skills", "safety", "qa", "browser", "computer_use", "artifact"], "description": "Leaderboard track; empty means coding."},
+    "track": {"enum": ["coding", "terminal", "tool_use", "mcp", "memory", "skills", "safety", "qa", "browser", "computer_use", "artifact", "support", "research", "voice"], "description": "Leaderboard track; empty means coding. support: W3 customer support. research: W4 research with Tavily. voice: X8 voice agents."},
+    "simulator": {"$ref": "#/$defs/simulator", "description": "W3 customer support: the user simulator, pinned like a judge (docs/customer-support.md)."},
+    "tiers": {"type": "object", "description": "W7 suite tiers: tier name to the scalar all or a list of task ids, e.g. pr, nightly, headroom (docs/suite-tiers.md).", "propertyNames": {"pattern": "^[a-z0-9][a-z0-9_-]*$"}, "additionalProperties": {"anyOf": [{"const": "all"}, {"type": "array", "minItems": 1, "items": {"$ref": "#/$defs/id"}}]}},
     "grading": {"enum": ["verified", "judged"], "description": "verified (default) or judged; a judged suite needs judge."},
     "output": {"$ref": "task.schema.json#/$defs/output"},
     "services": {"type": "array", "items": {"$ref": "task.schema.json#/$defs/service"}, "description": "Started beside the agent in every run; paths relative to the suite root."},
@@ -86,7 +88,18 @@
         "model": {"type": "string", "minLength": 1},
         "prompt_version": {"type": "string", "minLength": 1},
         "votes": {"type": "integer", "minimum": 1},
-        "max_tokens": {"type": "integer", "minimum": 1}
+        "max_tokens": {"type": "integer", "minimum": 1},
+        "auditor": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["provider", "model"],
+          "description": "W8 judge calibration: an optional second judge from another provider. Its disagreement marks a run contested for human review; it never changes a grade (docs/judge-calibration.md).",
+          "properties": {
+            "provider": {"type": "string", "minLength": 1},
+            "model": {"type": "string", "minLength": 1},
+            "votes": {"type": "integer", "minimum": 1}
+          }
+        }
       }
     },
     "imported": {
@@ -108,6 +121,19 @@
     "part_name": {"type": "string", "pattern": "^[a-z][a-z0-9_]*$"},
     "semver": {"type": "string", "pattern": "^(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)$"},
     "rel_path": {"type": "string", "minLength": 1, "pattern": "^[^/]"},
+    "simulator": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "W3 customer support: user simulator settings (schemas.SimulatorSpec).",
+      "properties": {
+        "mode": {"enum": ["scripted", "llm"]},
+        "provider": {"type": "string", "minLength": 1},
+        "model": {"type": "string", "minLength": 1},
+        "prompt_version": {"type": "string", "minLength": 1},
+        "max_turns": {"type": "integer", "minimum": 1, "maximum": 100},
+        "seed": {"type": "integer"}
+      }
+    },
     "image": {
       "type": "object",
       "additionalProperties": false,

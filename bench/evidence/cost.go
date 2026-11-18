@@ -201,6 +201,14 @@ func priceAttempt(a physAttempt, led *schemas.LedgerEntry, prices *PriceTable) s
 	}
 	injected := (led != nil && led.Action == actionInject) || a.status >= 500
 	switch {
+	case r.Kind == kindAudio && injected: // X8 voice agents: an injected audio fault (an STT outage) is not billed
+		row.USD = schemas.Observed(0, schemas.EvidenceGateway)
+		row.FaultInject = true
+	case r.Kind == kindAudio && a.status >= 400:
+		row.USD = schemas.Observed(0, schemas.EvidenceGateway)
+	case r.Kind == kindAudio && r.Status != statusProcessing: // X8 voice agents (priceAudio)
+		row.Tokens, row.USD = priceAudio(r, a)
+		row.PriceRef = audioPriceRef
 	case r.Kind != kindMessage:
 		row.USD = schemas.NotApplicable()
 		row.USD.Reason = "not billed: " + r.Kind + " request"
@@ -293,4 +301,26 @@ func requestTotals(rows []schemas.CostRow) map[string]schemas.Value {
 // newCostSource returns the cost source.
 func newCostSource(deps Deps) *costSource {
 	return &costSource{prices: deps.Prices, logger: deps.Logger}
+}
+
+// X8 voice agents: an audio row (speech, transcription, a Realtime turn) is
+// priced by seconds of audio, characters or Realtime tokens, which the
+// bench's token price snapshot does not carry. Its cost is Bifrost's own
+// price for the row, from the pricing datasheet the gateway pins
+// (deploy/bifrost/datasheet/pricing.json), labelled with audioPriceRef; a
+// row without one is unknown, never zero.
+const audioPriceRef = "bifrost-row-cost"
+
+func priceAudio(r schemas.GatewayRequest, a physAttempt) (schemas.Tokens, schemas.Value) {
+	var tok schemas.Tokens
+	if r.Tokens != nil {
+		tok = *r.Tokens
+	}
+	if !a.final {
+		return tok, schemas.Unknown(fmt.Sprintf("audio attempt %d failed without a status", a.n), schemas.EvidenceGateway)
+	}
+	if r.BifrostUSD == nil {
+		return tok, schemas.Unknown("audio row without Bifrost's price (the bench's token price snapshot has no audio prices)", schemas.EvidenceGateway)
+	}
+	return tok, schemas.Observed(*r.BifrostUSD, schemas.EvidenceGateway)
 }

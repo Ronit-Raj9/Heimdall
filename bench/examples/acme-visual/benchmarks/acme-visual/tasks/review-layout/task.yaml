@@ -1,0 +1,78 @@
+# A reviewer wants the text editor set up for review: line numbers on and
+# the status bar shown. The setting lives only on screen (the editor keeps
+# it in memory), so no saved file can show it: this is the case vision
+# grading is for. The bench screenshots the desktop through its own
+# screenshot tool after the agent exits; the state verifier checks the
+# note itself was left alone.
+id: review-layout
+version: 1.0.0
+title: Set up the editor for review (line numbers and status bar)
+project: acme-visual
+kind: feature
+instruction: instruction.md
+# A scratch workspace: the work happens on the desktop, through its tools.
+repo_dir: repo
+services:
+  - id: desktop
+    role: mcp
+    # The acme-desktop example's image (examples/acme-desktop, about 860 MB):
+    # Xvfb 1280x800x24, openbox, the mousepad editor and the desktop MCP
+    # server. Build it with `docker build -t heimdall-example/acme-desktop:1
+    # examples/acme-desktop/benchmarks/acme-desktop/services/desktop`.
+    image: heimdall-example/acme-desktop:1
+    port: 8000
+    mcp: {path: /mcp}
+    env:
+      DESKTOP_APP: editor
+      DESKTOP_OPEN: /home/desk/Documents/note.txt
+    files:
+      /seed/home/Documents/note.txt: seed/Documents/note.txt
+    ready:
+      argv: ["python3", "-I", "/opt/desktop/desktop.py", "ready"]
+      timeout_s: 120
+    export:
+      - id: state.json
+        argv: ["python3", "-I", "/opt/desktop/desktop.py", "dump"]
+output:
+  kind: state
+  visual:
+    # After the agent exits the bench calls the desktop's own screenshot
+    # tool (the one the agent used), after parking the pointer in the
+    # bottom-right corner: a 1280 x 800 PNG.
+    capture: {kind: desktop, service: desktop}
+    # Hidden: the screen after a correct change.
+    reference: verifier/reference.png
+    # The screen must match the reference closely (mean SSIM).
+    method: ssim
+    threshold: 0.99
+    # The status bar's line and column follow the text cursor, which a
+    # careful agent may move: every check ignores them.
+    masks:
+      - {x: 1104, y: 776, w: 130, h: 22}
+    checks:
+      # The line-number gutter, cut from the reference, is at the left edge
+      # of the text area.
+      - {id: line-numbers, method: region, crop: {x: 0, y: 50, w: 26, h: 90}, at: {x: 0, y: 50}, max_offset: 1}
+      # The status bar, cut from the reference (file type and encoding), is
+      # at the bottom of the window.
+      - {id: status-bar, method: region, crop: {x: 936, y: 774, w: 166, h: 26}, at: {x: 936, y: 774}, max_offset: 1}
+verifier:
+  # Hidden folder, mounted at /grader/tests: the state check.
+  tests: verifier/tests
+  required: []
+protected: []
+controls:
+  # Scripts run in the agent's place with the desktop up, driving it through
+  # the same MCP server the agent gets (BENCH_MCP_SERVERS).
+  reference: solution/reference.sh
+  empty: controls/empty.sh
+  mutants: [controls/mutant-no-statusbar.sh, controls/mutant-toolbar.sh]
+  exploit: controls/exploit.sh
+timeouts:
+  agent_s: 900
+capabilities: [computer_use, visual_layout]
+difficulty: easy
+provenance:
+  source: bench/examples/acme-visual (fictional Acme review note, written for this example)
+  license: MIT
+  created_by: hand-written example

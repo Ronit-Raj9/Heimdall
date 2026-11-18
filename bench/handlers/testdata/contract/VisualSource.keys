@@ -1,0 +1,13 @@
+# Keys of bench.ts `VisualSource` (schemas/visual.go): how the bench took the capture.
+kind
+service?
+url?
+artifact?
+renderer?
+width?
+height?
+scale?
+full_page?
+fonts_sha256?
+format
+pointer_parked?

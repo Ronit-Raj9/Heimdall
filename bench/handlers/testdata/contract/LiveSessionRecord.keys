@@ -1,0 +1,18 @@
+# livescore.SessionRecord (X6 live scoring, docs/live-scoring.md); ? marks an omitempty key
+seq
+id
+version
+evidence
+grouping
+concurrent?
+started
+ended
+scored_at
+requests
+model?
+last_row?
+signals
+flags?
+severity?
+signature?
+inbox_item?

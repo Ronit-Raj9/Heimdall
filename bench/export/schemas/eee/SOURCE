@@ -1,0 +1,5 @@
+eval.schema.json is the aggregate schema of Every Eval Ever (EvalEval Coalition),
+copied unchanged from https://github.com/evaleval/every_eval_ever at commit
+0791adc3c2488cc8c91d109b3c541da492238e49 (main on 18 Nov 2026), file
+every_eval_ever/schemas/eval.schema.json (schema "version": "0.3.0").
+MIT licence: see LICENSE in this folder (copied from the same commit).

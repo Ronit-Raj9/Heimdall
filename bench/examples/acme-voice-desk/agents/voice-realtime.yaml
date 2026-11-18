@@ -1,0 +1,36 @@
+# Heimdall's reference speech-to-speech agent: the Realtime bridge
+# (bench/voice/realtimebridge.py) between the caller and the gateway's
+# /v1/realtime WebSocket, which Bifrost v2.5.1 relays to the provider's
+# Realtime API. Barge-in comes from the provider's server-side voice activity
+# detection (speech_started: the bridge clears the caller's queue and cancels
+# the response); helpdesk tools are Realtime function calls the bridge runs
+# over MCP. Bifrost logs one row per Realtime turn (no audio, no input
+# transcript), so this agent's transcripts are agent-reported: weaker
+# evidence than the cascaded agent's gateway rows (docs/voice-agents.md).
+#
+# The same caution as voice-cascaded.yaml: on Heimdall's test stack the
+# provider is the scripted fake; with a real key these are paid calls.
+id: voice-realtime
+adapter: command
+image: heimdall-example/voice-agent:1
+build:
+  dockerfile: agents/images/voice-agent/Dockerfile
+  tag: heimdall-example/voice-agent:1
+argv: ["python3", "/opt/voice-agent/realtimebridge.py", "{{instruction}}"]
+env:
+  VOICE_GATEWAY_URL: "{{gateway.url}}"
+  VOICE_GATEWAY_KEY: "{{run.key}}"
+  VOICE_SESSION: "{{run.session}}"
+  VOICE_REALTIME_MODEL: "openai/{{model}}"
+model: gpt-realtime
+notes:
+  project_file: AGENTS.md
+mcp:
+  format: env
+budgets:
+  wall_s: 420
+  cpus: 1
+  mem_gb: 1
+gateway:
+  provider: openai
+  max_retries: 0

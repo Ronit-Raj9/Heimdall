@@ -228,7 +228,7 @@ func lintScenarioSuite(s *schemas.Suite) []Problem {
 	}
 	grading := utils.Grading(s)
 	switch {
-	case grading == schemas.GradingJudged && s.Judge == nil:
+	case grading == schemas.GradingJudged && s.Judge == nil && !utils.VisualJudged(s): // X1 vision grading: a rubric's pinned vision judge stands in
 		add(SeverityError, "grading: judged needs a judge (provider, model, prompt_version)")
 	case grading != schemas.GradingJudged && s.Grader == "judge":
 		add(SeverityError, "grader: judge decides outcomes, so the suite must declare grading: judged")
@@ -238,11 +238,15 @@ func lintScenarioSuite(s *schemas.Suite) []Problem {
 	if s.Judge != nil && s.Judge.Votes > 0 && s.Judge.Votes%2 == 0 {
 		add(SeverityError, "judge.votes: %d is even; the majority needs an odd number of votes", s.Judge.Votes)
 	}
+	if a := lintJudgeAuditor(s.Judge); a != "" { // W8 judge calibration: the auditor comes from another vendor
+		add(SeverityError, "%s", a)
+	}
 	seen := map[string]string{}
 	out = append(out, lintServices(SuiteFile, "services", s.Root, s.Services, seen)...)
-	out = append(out, lintExternalSuite(s)...) // External APIs area (external.go)
+	out = append(out, lintExternalSuite(s)...)  // External APIs area (external.go)
+	out = append(out, lintSimulatorSuite(s)...) // W3 customer support: the user simulator (simulatorlint.go)
 	if o := s.Output; o != nil {
-		if o.Kind == schemas.OutputArtifact && s.Grader != "verifier_command" {
+		if o.Kind == schemas.OutputArtifact && s.Grader != "verifier_command" && !visualReadsArtifacts(s.Grader) { // X1 vision grading: grader visual reads artifacts too
 			add(SeverityError, "output: artifact files are read by verifier_command (from %s), not by %s", utils.GraderArtifactsDir, s.Grader)
 		}
 		out = append(out, lintArtifacts(SuiteFile, "output", o.Kind, o.Artifacts)...)
@@ -316,7 +320,7 @@ func lintScenarioTask(s *schemas.Suite, t *schemas.Task) []Problem {
 	case schemas.OutputArtifact:
 		// A suite-level kind artifact with the wrong grader is reported once,
 		// against suite.yaml (lintScenarioSuite).
-		if s.Grader != "verifier_command" && t.Output != nil && t.Output.Kind == schemas.OutputArtifact {
+		if s.Grader != "verifier_command" && !visualReadsArtifacts(s.Grader) && t.Output != nil && t.Output.Kind == schemas.OutputArtifact { // X1 vision grading: grader visual reads artifacts too
 			add(SeverityError, "output: artifact files are read by verifier_command (from %s), not by %s", utils.GraderArtifactsDir, s.Grader)
 		}
 		if len(utils.OutputArtifacts(s, t)) == 0 {
@@ -326,6 +330,7 @@ func lintScenarioTask(s *schemas.Suite, t *schemas.Task) []Problem {
 	if t.Output != nil {
 		out = append(out, lintArtifacts(taskYAML, "output", utils.OutputKind(s, t), t.Output.Artifacts)...)
 	}
+	out = append(out, lintVisualTask(s, t)...) // X1 vision grading (visuallint.go)
 	if t.Environment != nil && t.Environment.Image == "" && t.Environment.Dockerfile == "" {
 		add(SeverityError, "environment: needs image or dockerfile")
 	}
@@ -343,6 +348,7 @@ func lintScenarioTask(s *schemas.Suite, t *schemas.Task) []Problem {
 	}
 	out = append(out, lintServices(taskYAML, "services", t.Dir, t.Services, seen)...)
 	out = append(out, lintExternalTask(s, t, taskYAML)...) // External APIs area (external.go)
+	out = append(out, lintSimulatorTask(t, taskYAML)...)   // W3 customer support: the simulated user's file (simulatorlint.go)
 	sessions := map[string]bool{}
 	for i, sess := range t.Sessions {
 		if sessions[sess.ID] {

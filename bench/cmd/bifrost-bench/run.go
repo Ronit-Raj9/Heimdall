@@ -55,6 +55,7 @@ func runPlan(args []string) int {
 		return fail("plan: %v", err)
 	}
 	printPlan(m)
+	printAdaptivePlan(m)    // W7 adaptive trials and suite tiers: required and optional slots, tier (adaptivereport.go)
 	a.printEstimate(ctx, m) // Forecast and matrix area: cost and time forecast from sealed history (estimate.go)
 	return exitOK
 }

@@ -1,0 +1,18 @@
+# Keys of bench.ts `VisualJudgeResult` (schemas/visual.go): the vision judge's report.
+model
+served_model?
+prompt_version
+prompt_sha256
+rubric_sha256
+aggregate
+votes
+scores
+score?
+verdict
+rationale?
+usd
+price_ref?
+calibration?
+decides
+reason?
+agreement?

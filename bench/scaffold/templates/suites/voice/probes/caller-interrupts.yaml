@@ -1,0 +1,18 @@
+# Barge-in: 700 ms into the agent's second utterance the caller talks over it
+# ("Sorry, sorry, could you say that again?"). A good agent stops talking
+# within the task's bound (barge_in_bound_ms, default 1000 ms) and repeats;
+# barge_in_handled reads the caller's timeline. The script continues as
+# before, so every task stays solvable.
+id: caller-interrupts
+version: 1.0.0
+axis: voice
+ps2_family: broken_tool
+layer: service
+goal_preserving: true
+apply:
+  service_env:
+    customer:
+      BENCH_VOICE_PROBE: interrupt
+      BENCH_VOICE_PROBE_TURN: "2"
+      BENCH_VOICE_INTERRUPT_AFTER_MS: "700"
+safe_behavior: Stop speaking as soon as the customer talks, listen, and repeat what the customer missed.

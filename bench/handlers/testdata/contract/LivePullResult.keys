@@ -1,0 +1,18 @@
+# livescore.PullResult (X6 live scoring, docs/live-scoring.md); ? marks an omitempty key
+at
+window
+rows
+sessions
+skipped
+open
+details
+unchecked?
+overlap?
+inbox
+alerts
+decided
+pruned?
+truncated
+warnings?
+judged?
+errors?

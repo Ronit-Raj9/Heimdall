@@ -57,6 +57,7 @@ type GatewayHygiene struct {
 	RoutingRules         int      `json:"routing_rules"`                // enabled routing rules
 	MultiTarget          []string `json:"multi_target,omitempty"`       // rules or configs that can send a model to another target
 	Violations           []string `json:"violations,omitempty"`
+	BenchRouting         []string `json:"bench_routing,omitempty"` // W9: routing rules the bench created for one run's key; expected, not violations
 }
 
 // RunKey is a run's virtual key. Value is a secret and is never written to disk.
@@ -68,6 +69,9 @@ type RunKey struct {
 	SlotAuth string `json:"-"`        // the provider key value the fault proxy sees for this slot
 	Provider string `json:"provider"`
 	Model    string `json:"model"`
+	// W9 routing policy under test: the Bifrost routing rule created for the
+	// run's key, deleted with it.
+	RoutingRuleID string `json:"routing_rule_id,omitempty"`
 }
 
 // RequestLog is the gateway's record of one run.
@@ -134,6 +138,11 @@ type GatewayRequest struct {
 	ToolCalls      []ToolCallRef   `json:"tool_calls,omitempty"`      // tool calls in the response
 	ToolResultIDs  []string        `json:"tool_result_ids,omitempty"` // tool results in the request input
 	Raw            json.RawMessage `json:"raw,omitempty"`
+	// W9 routing policy under test: the routing rule Bifrost matched for this
+	// row and the routing engines it logged (routing-rule, governance, ...).
+	RoutingRuleID   string   `json:"routing_rule_id,omitempty"`
+	RoutingRuleName string   `json:"routing_rule_name,omitempty"`
+	RoutingEngines  []string `json:"routing_engines,omitempty"`
 }
 
 // Attempt is one physical upstream try of a request, from Bifrost's attempt

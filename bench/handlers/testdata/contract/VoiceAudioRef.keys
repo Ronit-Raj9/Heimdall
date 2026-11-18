@@ -1,0 +1,5 @@
+# Keys of bench.ts `VoiceAudioRef` (X8 voice agents, voice.AudioRef). Change with bench.ts and the Go type.
+file?
+sha256
+bytes?
+truncated?

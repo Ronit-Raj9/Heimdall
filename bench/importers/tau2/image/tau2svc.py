@@ -182,6 +182,59 @@ class ScriptedUser:
         return [s for s in sentences(self.known) if words(s) & q]
 
 
+class LLMUserAdapter:
+    """upstream's model-played user, through bench/simuser (simuser.py).
+
+    The prompt is tau2-user-v1: upstream's text user guidelines and scenario
+    block (see simuser/prompts/tau2-user-v1.txt for the source and commit),
+    filled from the task's user scenario, sent through the gateway on this
+    service's own virtual key. Every call is recorded in the transcript's
+    sim_calls; a failed call is a tool error the agent sees, counted in
+    simulator_errors, never a customer reply.
+    """
+
+    def __init__(self, user, transcript):
+        self.user, self.transcript = user, transcript
+
+    def reply(self, message):
+        import simuser
+
+        try:
+            text, meta = self.user.reply(message, None)
+        except simuser.SimulatorError as e:
+            self.transcript["simulator_errors"] = self.transcript.get("simulator_errors", 0) + 1
+            self.transcript.setdefault("sim_calls", []).append({"ok": False, "error": str(e)})
+            raise
+        if "model_served" in meta:
+            self.transcript.setdefault("sim_calls", []).append(dict(meta, ok=True))
+        return text
+
+
+def llm_user(instructions, max_turns, transcript):
+    """Build the model-played user from the bench's environment."""
+    sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+    import simuser
+
+    env = os.environ
+    version = env.get("BENCH_SIM_PROMPT_VERSION") or "tau2-user-v1"
+    template, sha = simuser.prompt_text(version)
+    want = env.get("BENCH_SIM_PROMPT_SHA256") or ""
+    if want and want != sha:
+        raise SystemExit(f"tau2svc: prompt {version} hashes to {sha}, the manifest pinned {want}")
+    how = (getattr(instructions, "task_instructions", "") or "").strip()
+    persona = {
+        "goal": getattr(instructions, "reason_for_call", None) or str(instructions),
+        "facts": [getattr(instructions, "known_info", None) or "(nothing)"],
+        "unknown": [getattr(instructions, "unknown_info", None) or "(nothing)"],
+        "behaviour": how if how and how != "." else "(none)",
+    }
+    seed = int(env.get("BENCH_SIM_SEED") or 0)
+    client = simuser.GatewayClient(env.get("BENCH_SVC_GATEWAY_URL"), env.get("BENCH_SVC_GATEWAY_KEY"), env.get("BENCH_SVC_MODEL"), seed)
+    os.environ.pop("BENCH_SVC_GATEWAY_KEY", None)
+    transcript.update({"model": client.model, "prompt_version": version, "prompt_sha256": sha, "seed": seed, "simulator_errors": 0, "sim_calls": []})
+    return LLMUserAdapter(simuser.LLMUser(persona, max_turns, client, template, env.get("BENCH_SIM_HOSTILE") or ""), transcript)
+
+
 class Session:
     """One task's live domain: the environment, the user, and the transcript."""
 
@@ -194,11 +247,9 @@ class Session:
         self.lock = threading.Lock()
         self.env = make_env(self.domain)
         apply_initial_state(self.env, self.task)
-        mode = scenario.get("user", "scripted")
-        if mode != "scripted":
-            raise SystemExit(f"user mode {mode!r} is not built; only scripted is")
-        self.user = ScriptedUser(self.task.user_scenario.instructions, int(scenario.get("max_user_turns", 30)))
-        self.tools = self._tool_list()
+        # The bench's simulator settings (BENCH_SIM_*) win over the import's.
+        mode = os.environ.get("BENCH_SIM_MODE") or scenario.get("user", "scripted")
+        max_turns = int(os.environ.get("BENCH_SIM_MAX_TURNS") or scenario.get("max_user_turns", 30))
         self.transcript = {
             "task_id": self.task.id,
             "domain": self.domain,
@@ -206,6 +257,13 @@ class Session:
             "ended_by": None,
             "events": [],
         }
+        if mode == "scripted":
+            self.user = ScriptedUser(self.task.user_scenario.instructions, max_turns)
+        elif mode == "llm":
+            self.user = llm_user(self.task.user_scenario.instructions, max_turns, self.transcript)
+        else:
+            raise SystemExit(f"user mode {mode!r} is not scripted or llm")
+        self.tools = self._tool_list()
         os.makedirs(state_dir, exist_ok=True)
         self._persist(db=True)
 
@@ -235,7 +293,13 @@ class Session:
             self._persist(db=False)
             return "The customer has left the conversation. End your session.", False
         self.transcript["events"].append(ev)
-        reply = self.user.reply(msg)
+        try:
+            reply = self.user.reply(msg)
+        except Exception as e:  # simuser.SimulatorError: the model-played user failed
+            if type(e).__name__ != "SimulatorError":
+                raise
+            self._persist(db=False)
+            return "The customer did not answer (the user simulator failed). Try again.", True
         self.transcript["events"].append({"seq": len(self.transcript["events"]) + 1, "role": "user", "content": reply})
         for tok in STOP_TOKENS:
             if tok in reply:

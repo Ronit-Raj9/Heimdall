@@ -101,12 +101,14 @@ const (
 	ReviewReasonVeto             = "veto"              // a veto gate fired
 	ReviewReasonFalseCompletion  = "false_completion"  // the agent claimed success on a failed run
 	ReviewReasonFlagged          = "flagged"           // a flag_only review asked for a look
+	ReviewReasonContested        = "contested"         // W8 judge calibration: split votes, an auditor or a human review disagreeing with the judge
 )
 
 // ReviewReasons lists the queue reasons in display order.
 var ReviewReasons = []string{
 	ReviewReasonSplitVotes, ReviewReasonUnparsableVotes, ReviewReasonInvalidEvaluator,
 	ReviewReasonVeto, ReviewReasonFalseCompletion, ReviewReasonFlagged,
+	ReviewReasonContested, // W8 judge calibration
 }
 
 // ReviewQueueItem is one run the queue asks a person to look at.

@@ -1,0 +1,47 @@
+{
+	"_comment": "SYNTHETIC fixture for UI development. Not a benchmark result.",
+	"item": {
+		"id": "inc-3f9a1c2b7d10",
+		"state": "new",
+		"source": "prod-langfuse",
+		"source_kind": "langfuse",
+		"trace_id": "abc123",
+		"link": "https://cloud.langfuse.com/project/p1/traces/abc123",
+		"title": "Please refund order A-<n>, the tent arrived torn.",
+		"flagged": ["score helpfulness = 0 (below 0.5)", "observation \"issue_refund\" level ERROR: timeout"],
+		"signature": "f_3f9a1c2b7d10aa00",
+		"signature_parts": { "request": "q_ab12cd34ef56", "tool": "issue_refund", "error": "timeout after <n>s" },
+		"occurrences": 3,
+		"first_seen": "2026-11-14T09:12:00Z",
+		"last_seen": "2026-11-17T18:40:00Z",
+		"traces": [
+			{
+				"id": "abc101",
+				"source": "prod-langfuse",
+				"at": "2026-11-14T09:12:00Z",
+				"link": "https://cloud.langfuse.com/project/p1/traces/abc101"
+			},
+			{
+				"id": "abc117",
+				"source": "prod-langfuse",
+				"at": "2026-11-16T11:03:00Z",
+				"link": "https://cloud.langfuse.com/project/p1/traces/abc117"
+			},
+			{
+				"id": "abc123",
+				"source": "prod-langfuse",
+				"at": "2026-11-17T18:40:00Z",
+				"link": "https://cloud.langfuse.com/project/p1/traces/abc123"
+			}
+		],
+		"suggested_kind": "mcp",
+		"suggested_suite": "support",
+		"tools": ["lookup_order", "issue_refund"],
+		"model": "gpt-x",
+		"outcome": "error",
+		"redacted": { "email": 1 },
+		"updated": "2026-11-17T18:40:00Z"
+	},
+	"preview": "# Trace abc123 (prod-langfuse)\n\nFlagged: score helpfulness = 0 (below 0.5); observation \"issue_refund\" level ERROR: timeout\n\n## user\n\nPlease refund order A-1042, the tent arrived torn. Reach me at [REDACTED:email].\n\n## tool call: lookup_order\n\n{\"order\": \"A-1042\"}\n\n## tool result: lookup_order\n\n{\"status\": \"delivered\", \"total\": 189.00}\n\n## tool call: issue_refund\n\n{\"order\": \"A-1042\", \"amount\": 189.00}\n\n## tool result: issue_refund (ERROR)\n\ntimeout after 30s\n\n## assistant\n\nSorry, I could not process the refund right now. Please try again later.\n",
+	"mode": "synthetic"
+}

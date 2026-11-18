@@ -1,0 +1,22 @@
+# Oracle control: runs the task's reference script (controls.reference) in
+# the agent's place: it edits the page, writes the chart or drives the
+# desktop the way a correct agent would, and the visual grader must pass
+# what the bench then captures.
+# Scripted adapter: argv, env and files come from the adapter, not this file.
+# The image is the bench helper image, which has the python3 the reference
+# scripts need.
+id: oracle
+adapter: scripted
+image: bench/coding-core-base:1
+scripted:
+  kind: oracle
+model: claude-sonnet-4-5
+notes:
+  project_file: CLAUDE.md
+budgets:
+  wall_s: 600
+  cpus: 1
+  mem_gb: 1
+gateway:
+  provider: anthropic
+  max_retries: 0

@@ -32,7 +32,7 @@ type TaskImageEnsurer interface {
 // remote.artifacts inline, and never diff tasks (utils.RemoteOutputAllowed).
 func (p *Planner) checkScenario(suite *schemas.Suite, conds []condPlan, arms map[string]schemas.ArmManifest, compat *schemas.ArmManifest) error {
 	var errs []error
-	if utils.Grading(suite) == schemas.GradingJudged && suite.Judge == nil {
+	if utils.Grading(suite) == schemas.GradingJudged && suite.Judge == nil && !utils.VisualJudged(suite) { // X1 vision grading: a rubric's pinned vision judge stands in
 		errs = append(errs, fmt.Errorf("suite %s is judged but names no judge", suite.ID))
 	}
 	env, _ := findPart(p.reg.Environments, suite.Environment)

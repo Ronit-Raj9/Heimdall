@@ -1,0 +1,40 @@
+# Sample task written by `bifrost-bench suite init -template research`.
+# `bifrost-bench task init -suite <suite> -id <task>` copies this shape into
+# a new task with EDIT ME markers.
+# Year the Marlow to Skerry ferry began regular service (single hop). The agent searches the web
+# through the suite's websearch tool (Tavily, replayed from the suite's
+# cassette), writes answer.txt and sources.json, and the hidden verifier
+# checks the answer and the cited sources (verifier/tests/research.json).
+id: ferry-start
+version: 1.0.0
+title: Year the Marlow to Skerry ferry began regular service
+project: research
+kind: feature
+instruction: instruction.md
+# The workspace: the house rules for research answers.
+repo_dir: repo
+output:
+  kind: artifact
+  artifacts:
+    - {id: answer, path: answer.txt, required: true, max_bytes: 65536}
+    - {id: sources, path: sources.json, max_bytes: 65536}
+verifier:
+  tests: verifier/tests
+  required: []
+protected: ["RESEARCH.md"]
+controls:
+  # Scripts run in the agent's place with the websearch service and the
+  # Tavily route up, in replay mode.
+  reference: solution/reference.sh
+  empty: controls/empty.sh
+  mutants: [controls/mutant-brannock.sh]
+  exploit: controls/exploit.sh
+timeouts:
+  agent_s: 600
+capabilities: [research, web_search, citation]
+difficulty: easy
+# split: held_out   # optional; default public. Held-out tasks never run under tasks: all (only when a condition sets split: held_out or names them) and are not served by the UI or API.
+provenance:
+  source: written by bifrost-bench suite init (template research)
+  license: proprietary
+  created_by: suite init

@@ -195,6 +195,12 @@ func TestSuite(t *testing.T) {
 				probes = append(probes, "fx-error-first")
 			case tmpl == TemplateComputerUse:
 				probes = append(probes, "screenshot-error", "hostile-dialog")
+			case tmpl == TemplateSupport: // W3 customer support
+				probes = append(probes, "tool-error-first", "hostile-customer")
+			case tmpl == TemplateResearch: // W4 research with Tavily
+				probes = append(probes, "search-outage", "stale-results", "hostile-page")
+			case tmpl == TemplateVoice: // X8 voice agents
+				probes = append(probes, "caller-interrupts", "caller-noise", "caller-silent", "caller-speed", "stt-outage")
 			case stateTemplate(tmpl):
 				probes = append(probes, "tool-error")
 			}

@@ -99,7 +99,8 @@ type FaultPlan struct {
 	Call        int    `json:"call,omitempty" yaml:"call"`           // once: the failing call, 1-based
 	Status      int    `json:"status,omitempty" yaml:"status"`       // e.g. 503
 	RetryAfterS int    `json:"retry_after_s,omitempty" yaml:"retry_after_s"`
-	Nonce       string `json:"nonce,omitempty" yaml:"-"` // secret per run, set when armed, never from YAML
+	Model       string `json:"model,omitempty" yaml:"model,omitempty"` // W9: fail only requests for this model ("*" = all); a routed run's gateway probe sets its primary target when empty
+	Nonce       string `json:"nonce,omitempty" yaml:"-"`               // secret per run, set when armed, never from YAML
 	RunID       string `json:"run_id,omitempty" yaml:"-"`
 }
 

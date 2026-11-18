@@ -1,0 +1,4 @@
+# Keys of bench.ts `RouteTarget` (schemas.RouteTarget, W9). Change with bench.ts and schemas/agent.go.
+provider?
+model
+weight?

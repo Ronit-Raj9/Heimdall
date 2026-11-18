@@ -45,8 +45,21 @@ type Deps struct {
 	Trends handlers.TrendSource
 	// Human review area: review queue, review history and new reviews; nil answers 503 (handlers/reviews.go).
 	Reviews handlers.ReviewSource
+	// Failure inbox area: inbox items, accept/reject/snooze and the webhook; nil answers 503 (handlers/inbox.go).
+	Inbox handlers.InboxSource
+	// W8 judge calibration: calibration card and labels of judged suites; nil answers 503 (handlers/calibration.go).
+	Calibration handlers.CalibrationSource
+	// W5 drift canary: canaries, their looks and a run behind the write token; nil answers 503 (handlers/canary.go).
+	Canaries handlers.CanarySource
 	// Forecast and matrix area: POST /estimate and GET /experiments/{id}/matrix; nil answers 503 (handlers/forecast.go).
 	Forecast handlers.ForecastSource
+	// W6 migration report and cost explanation: GET /experiments/{id}/migration, /cost-explain and /pareto; nil answers 503 (handlers/migration.go, handlers/costexplain.go).
+	Migration   handlers.MigrationSource
+	CostExplain handlers.CostExplainSource
+	// W10 export: GET /experiments/{id}/export and /suites/{id}/export; nil answers 503 (handlers/export.go).
+	Export handlers.ExportSource
+	// X6 live scoring: status, sessions, comparison and a pull behind the write token; nil answers 503 (handlers/livescore.go).
+	Livescore handlers.LivescoreSource
 	// Suite health area: sealed runs for GET /suites/{id}/health; nil answers 503 (handlers/suitehealth.go).
 	Health taskhealth.Source
 	// UI is the built UI with index.html at its root, for example
@@ -125,6 +138,22 @@ func New(cfg *lib.Config, deps Deps) (*Server, error) {
 	handlers.NewTrendsHandler(mode, deps.Trends).RegisterRoutes(r, common...)
 	// Human review area: review queue and history, POST /reviews behind the write token (handlers/reviews.go, docs/human-review.md).
 	handlers.NewReviewsHandler(mode, deps.Reviews, write).RegisterRoutes(r, common...)
+	handlers.NewInboxHandler(mode, deps.Inbox, write).RegisterRoutes(r, common...) // Failure inbox area (handlers/inbox.go, docs/failure-inbox.md)
+	handlers.NewRoutingHandler(mode, deps.Index).RegisterRoutes(r, common...)      // W9 routing policy under test (handlers/routing.go)
+	handlers.NewSupportHandler(mode, deps.Index).RegisterRoutes(r, common...)      // W3 customer support scorecard (handlers/support.go)
+	handlers.NewResearchHandler(mode, deps.Index).RegisterRoutes(r, common...)     // W4 research with Tavily scorecard (handlers/research.go)
+	// W7 adaptive trials and suite tiers: the trials and tier panel (handlers/adaptive.go, docs/adaptive-trials.md).
+	handlers.NewAdaptiveHandler(mode, deps.Index, deps.Analyzer).RegisterRoutes(r, common...)
+	// W8 judge calibration: calibration card and labels (handlers/calibration.go, docs/judge-calibration.md).
+	handlers.NewCalibrationHandler(mode, deps.Calibration, write).RegisterRoutes(r, common...)
+	// W5 drift canary: GET /canaries, GET /canaries/{name}, POST /canaries/{name}/run (handlers/canary.go, docs/drift-canary.md).
+	handlers.NewCanaryHandler(mode, deps.Canaries, write).RegisterRoutes(r, common...)
+	// W6 migration report, cost explanation and Pareto planes (handlers/migration.go, handlers/costexplain.go, docs/model-migration.md, docs/cost-explain.md).
+	handlers.NewMigrationHandler(mode, deps.Migration).RegisterRoutes(r, common...)
+	handlers.NewCostExplainHandler(mode, deps.CostExplain, deps.Index).RegisterRoutes(r, common...)
+	handlers.NewExportHandler(mode, deps.Export).RegisterRoutes(r, common...) // W10 export (handlers/export.go, docs/export.md)
+	// X6 live scoring: GET /livescore, /livescore/sessions, /livescore/compare, POST /livescore/pull (handlers/livescore.go, docs/live-scoring.md).
+	handlers.NewLivescoreHandler(mode, deps.Livescore, write).RegisterRoutes(r, common...)
 	if deps.UI != nil {
 		NewUIHandler(mode, deps.UI).RegisterRoutes(r)
 	}

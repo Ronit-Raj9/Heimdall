@@ -94,6 +94,7 @@ func newApp(ctx context.Context, configPath string, opts appOptions) (*app, erro
 			ProcessWatch: cfg.Observers.ProcessOn(), WorkspaceWatch: cfg.Observers.WorkspaceOn(), WatchIntervalMS: cfg.Observers.IntervalMS,
 			EventsCollector:   cfg.Events.CollectorOn(),                                                // Agent events area
 			RemoteToolsListen: cfg.RemoteTools.Listen, RemoteToolsPublicURL: cfg.RemoteTools.PublicURL, // Remote coverage
+			ServiceGateway: environments.ServiceGatewayConfig{Gateway: gw, AgentURL: cfg.Gateway.AgentURL, Fault: fault, Price: graders.PricesFrom(prices.Lookup), PriceRef: prices.Ref()}, // W3 customer support: services' own keys
 		}),
 		Adapters: adapters.Builtin(adapters.CommandConfig{
 			GatewayAgentURL: cfg.Gateway.AgentURL, EvalNetwork: cfg.Networks.Eval, BenchRoot: cfg.Root,
@@ -117,6 +118,7 @@ func newApp(ctx context.Context, configPath string, opts appOptions) (*app, erro
 	if fault == nil {
 		a.reg.Fault = nil // a typed nil would look non-nil to the engine
 	}
+	a.reg.Graders = withGrader(a.reg.Graders, graders.NewVisual(graders.VisualConfig{Inner: graders.HiddenTestsConfig{Image: helper, Logger: logger, Docker: a.docker}, Judge: graders.JudgeConfig{Gateway: gw, URL: cfg.Gateway.URL, Price: graders.PricesFrom(prices.Lookup), PriceRef: prices.Ref(), Logger: logger}, Logger: logger})) // X1 vision grading: the wired visual grader replaces Builtin's unwired one (visual.go)
 	return a, nil
 }
 
@@ -247,6 +249,7 @@ func (a *app) analyzeWith(ctx context.Context, expID, gradeSource, policyOverrid
 		}
 		verdict.Invalidate(an, "evidence: seals.log chain does not verify: "+err.Error())
 	}
+	a.judgeCalibration(ctx, m, an, runs, policyOverride) // W8 judge calibration: judge_calibration instrument of judged experiments (judge.go)
 	an.AnalysisID = utils.NewID("a", 8)
 	an.Mode = a.cfg.Server.Mode
 	// A declared smoke experiment is never a finding, whatever the server mode.
@@ -271,6 +274,11 @@ func (a *app) analyzeWith(ctx context.Context, expID, gradeSource, policyOverrid
 	}
 	report := insertSection(md.String(), sec)
 	report = a.reviewSummary(ctx, an, runs, report) // human review: counts and report section (review.go)
+	report = a.unreviewedSection(ctx, m, report)    // First workflow: "N of M tasks have unreviewed instructions" (compare.go)
+	report = a.incidentSection(runs, report)        // Failure inbox area: regressions of production incidents (inbox.go)
+	report = adaptiveSection(an, report)            // W7 adaptive trials and tiers: trials used, runs saved, stop reason, more evidence (adaptivereport.go)
+	// W8 judge calibration: report section (judge.go).
+	report = a.judgeCalibrationSection(an, report)
 	if err := a.store.WriteAnalysis(ctx, an, map[string][]byte{"report.md": []byte(report)}); err != nil {
 		return nil, nil, fmt.Errorf("save analysis: %w", err)
 	}

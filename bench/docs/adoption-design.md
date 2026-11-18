@@ -58,6 +58,8 @@ Schema additions (all optional):
 | `schemas/scenario.go` tracks | `TrackSupport = "support"`, `TrackResearch = "research"` | W3, W4 |
 | `ServiceSpec` | `Gateway *ServiceGateway{Provider, Model, BudgetUSD}`: the service gets its own virtual key and may call models through the gateway; its spend is reported apart from the agent's | W3 |
 | `Suite` | `Simulator *SimulatorSpec` (user simulator settings, pinned like a judge) | W3 |
+| `Experiment`, `Manifest` | `Simulator *SimulatorSpec`: the experiment's override for every arm, and the effective settings frozen at plan time (`SimulatorSpec` also has `Mode scripted|llm`) | W3 |
+| `Task`, `StateFile` | `Escalation expected|not_expected` (read by `escalation_correct`); `Gateway *ServiceGatewayUsage` on a service's `_gateway.json` export (its own spend) | W3 |
 | `Suite` | `Tiers map[string]TaskSelector` (e.g. `pr`, `nightly`, `headroom`) | W7 |
 | `Experiment` | `Tier string`, `Trials *TrialsPolicy{Mode fixed|adaptive, Min, Max, ...}` | W7 |
 | `GatewayPolicy` (agent config) | `Routing *RoutingPolicy` (targets with weights, fallback chain, rule name) | W9 |
@@ -89,7 +91,7 @@ resolution.
 | W7 | Adaptive trials and tiers | `engine/adaptive*.go`, `verdict/sequential*.go`, `suite/tiers.go`, `experiments/presets/` |
 | W8 | Judge calibration | `bench/calibration/`, `graders/judgecalibration.go`, `cmd/bifrost-bench/judge.go`, `handlers/calibration.go` |
 | W9 | Routing policy under test | `gateways/bifrost/routing*.go`, `engine/routingplan.go`, `metrics/routing.go`, `experiments/routing-*.yaml`, `docs/routing-experiments.md` |
-| W10 | Export | `bench/export/`, additions in `cmd/bifrost-bench/export.go` |
+| W10 | Export | `bench/export/`, additions in `cmd/bifrost-bench/export.go`, `handlers/export.go`, `ui/components/export/`, `ui/lib/store/apis/exportApi.ts`, `docs/export.md` |
 | W11 | Failure inbox | `bench/traceinbox/`, `cmd/bifrost-bench/inbox.go`, `handlers/inbox.go` |
 
 Shared files (`schemas/*`, `metrics/builtin.go`, `verdict/direction.go`,

@@ -7,6 +7,7 @@ import (
 	"slices"
 	"strings"
 
+	"github.com/maximhq/bifrost/bench/calibration" // W8 judge calibration: contested runs
 	"github.com/maximhq/bifrost/bench/schemas"
 )
 
@@ -228,6 +229,9 @@ func QueueReasons(sr *schemas.SealedRun, reviews []schemas.Review) []string {
 	}
 	if slices.ContainsFunc(reviews, func(r schemas.Review) bool { return r.Decision == schemas.ReviewFlagOnly }) {
 		out = append(out, schemas.ReviewReasonFlagged)
+	}
+	if calibration.Contested(sr, reviews) { // W8 judge calibration: split votes, auditor or a review disagreeing with the judge
+		out = append(out, schemas.ReviewReasonContested)
 	}
 	return out
 }

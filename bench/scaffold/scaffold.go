@@ -36,6 +36,9 @@ import (
 	"sort"
 	"strings"
 	"text/template"
+
+	"github.com/maximhq/bifrost/bench/simuser"
+	"github.com/maximhq/bifrost/bench/voice" // X8 voice agents
 )
 
 //go:embed all:templates
@@ -77,6 +80,16 @@ const (
 	// TemplateComputerUse writes a task whose agent operates a desktop
 	// service through screenshots, mouse and keyboard (docs/computer-use.md).
 	TemplateComputerUse = "computer-use"
+	// TemplateSupport writes a customer support suite: a helpdesk MCP
+	// server and a simulated customer (W3, docs/customer-support.md).
+	TemplateSupport = "support"
+	// TemplateResearch writes a research suite: web search through Tavily,
+	// replayed from a cassette, answers with cited sources (W4,
+	// docs/research-tasks.md).
+	TemplateResearch = "research"
+	// TemplateVoice writes a voice agent suite: a helpdesk MCP server and a
+	// voice caller the agent talks to in audio (X8, docs/voice-agents.md).
+	TemplateVoice = "voice"
 )
 
 // Grader part names the suite templates select.
@@ -95,7 +108,7 @@ func SuiteTemplates() []string {
 
 // ScenarioTemplates lists the scenario suite templates in a stable order.
 func ScenarioTemplates() []string {
-	return []string{TemplateToolUse, TemplateMCP, TemplateBrowser, TemplateMemory, TemplateQA, TemplateExternal, TemplateArtifact, TemplateComputerUse}
+	return []string{TemplateToolUse, TemplateMCP, TemplateBrowser, TemplateMemory, TemplateQA, TemplateExternal, TemplateArtifact, TemplateComputerUse, TemplateSupport, TemplateResearch, TemplateVoice} // W4 research; X8 voice
 }
 
 // IsScenarioTemplate reports whether tmpl is a scenario suite template.
@@ -118,12 +131,17 @@ var scenarioSamples = map[string]string{
 	TemplateArtifact: "sales-report",
 
 	TemplateComputerUse: "edit-config",
+	TemplateSupport:     "refund-in-policy", // W3 customer support
+	TemplateResearch:    "ferry-start",      // W4 research with Tavily
+
+	TemplateVoice: "refund-in-policy", // X8 voice agents
 }
 
 // stateTemplate reports whether a scenario template grades a service's
 // final state (as opposed to an answer).
 func stateTemplate(tmpl string) bool {
-	return tmpl == TemplateToolUse || tmpl == TemplateMCP || tmpl == TemplateBrowser || tmpl == TemplateComputerUse
+	return tmpl == TemplateToolUse || tmpl == TemplateMCP || tmpl == TemplateBrowser || tmpl == TemplateComputerUse || tmpl == TemplateSupport ||
+		tmpl == TemplateVoice // X8 voice agents
 }
 
 // inventoryTemplate reports whether a state template is built on the shared
@@ -223,6 +241,19 @@ var suiteAbout = map[string]string{
 		"mouse and keyboard tools over MCP, through the per-run tool proxy (every call lands in the\n" +
 		"run's tools.jsonl). Grading never reads a screenshot: the hidden verifier checks the\n" +
 		"desktop's state (saved files, app data), dumped as JSON after the agent exits.",
+	TemplateResearch: "Each task asks a research question the agent answers by searching the web through Tavily, reached\n" + // W4 research with Tavily
+		"only through the per-run tool proxy (every search and result lands in tools.jsonl) and replayed\n" +
+		"from the suite's cassette with no network. The hidden verifier checks the answer and that the\n" +
+		"cited sources are real pages holding the evidence, with no judge.",
+	TemplateSupport: "Each task starts a helpdesk MCP server and a simulated customer (the user simulator) beside\n" +
+		"the agent. The agent talks to the customer only with respond_to_user and works the helpdesk\n" +
+		"through the per-run tool proxy; the hidden verifier scores the helpdesk's final state, the\n" +
+		"support policy and what the customer was told (docs/customer-support.md).",
+	TemplateVoice: "Each task starts a helpdesk MCP server and a voice caller beside the agent. The agent dials\n" + // X8 voice agents
+		"the caller (heimdall-voice/1 over WebSocket), hears the customer's speech and answers in audio,\n" +
+		"and works the helpdesk through the per-run tool proxy. The caller's timeline gives the voice\n" +
+		"metrics; the hidden verifier scores the helpdesk's final state, the policy and what the\n" +
+		"customer heard (docs/voice-agents.md).",
 }
 
 // Suite returns the files of a new suite folder from a template: suite.yaml,
@@ -264,6 +295,19 @@ func Suite(opts SuiteOptions) ([]File, error) {
 		}
 	}
 	files = append(files, common...)
+	if opts.Template == TemplateSupport { // W3 customer support: the user simulator beside the helpdesk server
+		for rel, b := range simuser.Files() {
+			files = append(files, File{Path: "services/helpdesk/" + rel, Data: b, Mode: 0o644})
+		}
+	}
+	if opts.Template == TemplateVoice { // X8 voice agents: the text simulator and the voice caller beside the helpdesk server
+		for rel, b := range simuser.Files() {
+			files = append(files, File{Path: "services/helpdesk/" + rel, Data: b, Mode: 0o644})
+		}
+		for rel, b := range voice.Files(voice.CallerFiles) {
+			files = append(files, File{Path: "services/helpdesk/" + rel, Data: b, Mode: 0o644})
+		}
+	}
 	if strings.TrimSpace(opts.Image) != "" {
 		kept := files[:0]
 		for _, f := range files {
@@ -296,7 +340,7 @@ func scenarioCommon(tmpl string, common []File, data map[string]any) ([]File, er
 	for _, f := range shared {
 		switch {
 		case f.Path == "base/Dockerfile":
-		case f.Path == "README.md" && tmpl != TemplateBrowser && tmpl != TemplateExternal && tmpl != TemplateComputerUse:
+		case f.Path == "README.md" && tmpl != TemplateBrowser && tmpl != TemplateExternal && tmpl != TemplateComputerUse && tmpl != TemplateResearch && tmpl != TemplateSupport && tmpl != TemplateVoice: // W3: support brings its own README; X8: voice too
 		case inventoryTemplate(tmpl) && f.Path == "probes/tool-error.yaml":
 		case (inventoryTemplate(tmpl) || tmpl == TemplateComputerUse) && f.Path == "verify.py":
 			f.Path = "tasks/" + scenarioSamples[tmpl] + "/verifier/tests/verify.py"

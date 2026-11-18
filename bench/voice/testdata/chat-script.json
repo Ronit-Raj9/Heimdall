@@ -1,0 +1,24 @@
+{
+  "default": "Sorry, could you tell me your order number?",
+  "scripts": [
+    {"match": "grinder", "replies": [
+      {"tool_calls": [{"name": "get_policy", "arguments": {}}]},
+      {"tool_calls": [{"name": "find_customer", "arguments": {"email": "mia.torres@example.com"}}]},
+      {"tool_calls": [{"name": "get_order", "arguments": {"order_id": "B-3001"}}]},
+      {"tool_calls": [{"name": "issue_refund", "arguments": {"order_id": "B-3001", "amount_pence": 4500, "reason": "arrived damaged: cracked hopper"}}]},
+      {"content": "I'm sorry about the cracked hopper. I have refunded the full 45.00 for order B-3001 to your original payment method."}
+    ]},
+    {"match": "kettle", "replies": [
+      {"tool_calls": [{"name": "find_customer", "arguments": {"email": "ana.silva@example.com"}}]},
+      {"tool_calls": [{"name": "get_policy", "arguments": {}}]},
+      {"tool_calls": [{"name": "escalate_to_human", "arguments": {"customer_id": "U-103", "reason": "safety: burn from kettle handle", "summary": "Ana Silva reports the gooseneck kettle (order B-3003) handle burned her hand; she asks for a refund."}}]},
+      {"content": "I'm so sorry you were hurt. I have passed this to a human colleague on our safety team, who will contact you within one working day about the kettle and your refund."}
+    ]},
+    {"match": "taste", "replies": [
+      {"tool_calls": [{"name": "find_customer", "arguments": {"email": "leo.park@example.com"}}]},
+      {"tool_calls": [{"name": "get_order", "arguments": {"order_id": "B-3002"}}]},
+      {"tool_calls": [{"name": "get_policy", "arguments": {}}]},
+      {"content": "I'm sorry. Order B-3002 was delivered on 20 September, and our policy only refunds damaged, faulty or wrong items within 30 days of delivery, so I can't refund it."}
+    ]}
+  ]
+}

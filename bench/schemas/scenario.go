@@ -25,6 +25,9 @@ const (
 	TrackBrowser     = "browser"      // a web application operated through a browser, final state checked
 	TrackComputerUse = "computer_use" // a desktop operated through screenshots, mouse and keyboard, app state checked
 	TrackArtifact    = "artifact"     // produce files (a report, a chart, a model) graded on their content
+	TrackSupport     = "support"      // W3 customer support: a helpdesk conversation with a simulated user, final state and policy checked
+	TrackResearch    = "research"     // W4 research: web search through Tavily (recorded and replayed), answer and cited sources checked
+	TrackVoice       = "voice"        // X8 voice agents: a spoken call with a voice caller, final state checked
 )
 
 // Grading levels (Suite.Grading). A judged suite's outcomes come from a
@@ -123,6 +126,45 @@ type ServiceSpec struct {
 	// Hidden keeps the service off the agent's network: only the verifier and
 	// other services reach it.
 	Hidden bool `json:"hidden,omitempty" yaml:"hidden"`
+
+	// W3 customer support: Gateway lets the service call models through the
+	// gateway on its own virtual key, never the agent's (servicegateway.go).
+	Gateway *ServiceGateway `json:"gateway,omitempty" yaml:"gateway"`
+}
+
+// W3 customer support: service gateway access and the user simulator.
+
+// ServiceGateway gives a service its own virtual key for model calls (a
+// model-played user, a model-backed tool). The environment mints the key
+// when the service starts, passes BENCH_SVC_GATEWAY_URL, BENCH_SVC_GATEWAY_KEY
+// and BENCH_SVC_MODEL to the service only, revokes the key at cleanup and
+// records the service's spend from the gateway rows apart from the agent's.
+// For a role user service in llm simulator mode an empty Provider and Model
+// come from the effective SimulatorSpec.
+type ServiceGateway struct {
+	Provider  string  `json:"provider,omitempty" yaml:"provider"`
+	Model     string  `json:"model,omitempty" yaml:"model"`
+	BudgetUSD float64 `json:"budget_usd,omitempty" yaml:"budget_usd"` // the key's spend cap; 0 means the bench default
+}
+
+// User simulator modes (SimulatorSpec.Mode).
+const (
+	SimulatorScripted = "scripted" // a deterministic script per task (the default)
+	SimulatorLLM      = "llm"      // a pinned model plays the user from a persona
+)
+
+// SimulatorSpec pins the user simulator of a suite (Suite.Simulator), like a
+// judge: every field is hashed into the manifest with the prompt's sha256.
+// An experiment may override any of its fields (Experiment.Simulator) for
+// the whole experiment, never per arm, so scripted-user and llm-user runs
+// are never in one comparison.
+type SimulatorSpec struct {
+	Mode          string `json:"mode,omitempty" yaml:"mode"` // scripted (default) | llm
+	Provider      string `json:"provider,omitempty" yaml:"provider"`
+	Model         string `json:"model,omitempty" yaml:"model"`
+	PromptVersion string `json:"prompt_version,omitempty" yaml:"prompt_version"` // names the shipped user prompt (simuser)
+	MaxTurns      int    `json:"max_turns,omitempty" yaml:"max_turns"`           // user replies before the user leaves; default 12
+	Seed          int64  `json:"seed,omitempty" yaml:"seed"`                     // sent with every simulator call; temperature is always 0
 }
 
 // ReadyCheck says when a service is ready. Exactly one of Argv (run inside
@@ -179,6 +221,8 @@ type OutputSpec struct {
 	AnswerPath string `json:"answer_path,omitempty" yaml:"answer_path"`
 	// Artifacts are the files a task with output kind artifact must produce.
 	Artifacts []ArtifactSpec `json:"artifacts,omitempty" yaml:"artifacts"`
+
+	Visual *VisualCheck `json:"visual,omitempty" yaml:"visual"` // X1 vision grading: graded by grader visual (visual.go)
 }
 
 // ArtifactSpec is one file, or a glob of files, that a task with output kind
@@ -222,6 +266,8 @@ type JudgeSpec struct {
 	PromptVersion string `json:"prompt_version" yaml:"prompt_version"` // names the embedded prompt template
 	Votes         int    `json:"votes,omitempty" yaml:"votes"`         // odd number of independent calls, majority decides; default 1
 	MaxTokens     int    `json:"max_tokens,omitempty" yaml:"max_tokens"`
+
+	Auditor *JudgeAuditorSpec `json:"auditor,omitempty" yaml:"auditor"` // W8 judge calibration: optional second judge from another provider; disagreement marks a run contested, never overrules
 }
 
 // JudgeRecord is what one judged grade rested on (Grade.Judge).
@@ -234,6 +280,13 @@ type JudgeRecord struct {
 
 	// PriceRef names the price snapshot USD was priced from.
 	PriceRef string `json:"price_ref,omitempty"`
+
+	// W8 judge calibration: the model id the gateway reported, the
+	// calibration record in force at grading ("<record id>@<hash>", empty
+	// when none), and the auditor's opinion when the suite names one.
+	ServedModel string      `json:"served_model,omitempty"`
+	Calibration string      `json:"calibration,omitempty"`
+	Audit       *JudgeAudit `json:"audit,omitempty"`
 }
 
 // ImportRecord says where an imported suite came from (Suite.Imported).
@@ -408,6 +461,29 @@ type StateFile struct {
 	SHA256  string `json:"sha256"`
 	Bytes   int64  `json:"bytes"`
 	Error   string `json:"error,omitempty"`
+
+	// W3 customer support: set on the service gateway export
+	// (state/<service>/_gateway.json): the service's own model spend.
+	Gateway *ServiceGatewayUsage `json:"gateway,omitempty"`
+}
+
+// ServiceGatewayUsage is what a service's own virtual key spent in one run,
+// read from the gateway rows of that key (W3 customer support,
+// environments/servicegateway.go). It is never part of the agent's cost.
+type ServiceGatewayUsage struct {
+	Provider   string  `json:"provider"`
+	Model      string  `json:"model"`
+	KeyID      string  `json:"virtual_key_id,omitempty"`
+	Requests   int     `json:"requests"`
+	Errors     int     `json:"errors,omitempty"`
+	Tokens     Tokens  `json:"tokens"`
+	USD        Value   `json:"usd"`
+	PriceRef   string  `json:"price_ref,omitempty"`
+	BudgetUSD  float64 `json:"budget_usd,omitempty"`
+	OverBudget bool    `json:"over_budget,omitempty"`
+	Complete   bool    `json:"complete"`
+	Reason     string  `json:"reason,omitempty"`     // why the rows are incomplete or the spend unknown
+	FaultMode  string  `json:"fault_mode,omitempty"` // scripted: answered by the fault proxy's scripted model (smoke experiments)
 }
 
 // ArtifactFile is one artifact file of a run (Evidence.Artifacts). A spec

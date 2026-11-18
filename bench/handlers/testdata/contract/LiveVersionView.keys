@@ -1,0 +1,7 @@
+# livescore.VersionView (X6 live scoring, docs/live-scoring.md); ? marks an omitempty key
+name
+selector
+sessions
+flagged
+last_24h
+series

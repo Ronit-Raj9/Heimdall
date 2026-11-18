@@ -1,0 +1,68 @@
+# Framework matrix: the same model (gpt-5.4-mini through Bifrost's openai
+# provider) behind eight agents built different ways, on the same tasks:
+# Codex CLI (the reference arm, with real history), a no-framework loop on the
+# OpenAI SDK, LangGraph, the OpenAI Agents SDK, CrewAI, Pydantic AI,
+# LlamaIndex and the Vercel AI SDK (Node). Every framework agent runs
+# unchanged: its YAML only points the standard OpenAI variables at the
+# gateway (docs/frameworks.md, docs/harness-matrix.md). `matrix:` expands at
+# plan time into arms A to H, one per agent, in the order listed
+# (docs/model-matrix.md).
+#
+# NOT RUN: it calls a real model and costs money. Each framework agent passed
+# `agent check` on the scripted model ($0), and the same eight arms minus
+# Codex ran through plan, run and seal on the scripted model in
+# experiments/matrix-frameworks-smoke.yaml ($0, SYNTHETIC).
+#
+# Slots: clean, 8 tasks x 2 trials x 8 arms = 128 runs, 16 per arm.
+#
+# Forecast (`bifrost-bench estimate experiments/matrix-frameworks.yaml`,
+# docs/forecast.md), run on 18 Nov against the sealed runs of
+# e_batch_frameworks_9z0h: only arm A (Codex) has history, 64 sealed runs of
+# the same config (dfd6f713e64a, "codex baseline"), every planned task
+# estimated from its own runs: $0.23 to $0.61 for its 16 runs (median
+# $0.45), agent time 4m53s to 14m22s. Arms B to H have no sealed runs and set
+# no budgets.usd, so each says "no history, cannot estimate", the total cost
+# is unknown and the budget fit is unknown. Agent time is at most 4 h per
+# arm (16 runs x wall_s 900).
+# The nearest history is custom-python, the bench's own no-framework loop on
+# the same model: $0.0333 per verified success over 25 clean runs with 18
+# passes (leaderboard-clean.md), so about $0.024 per run and $0.38 per 16-run
+# arm. That is a reference, not a forecast: frameworks differ in how much
+# context they resend per turn, which is what this matrix measures.
+# budget.total_usd: 6 is about twice eight arms at those rates; the scheduler
+# stops leasing slots past it. Run a one-trial pilot first.
+#
+# What it can and cannot say: with 8 arms the paired tests form 28 pairs.
+# On 8 tasks the smallest possible sign-flip p is 2/2^8 = 0.0078, and Holm
+# across 28 pairs makes it 0.22, so no pair can be separated on success
+# whatever the results (`bifrost-bench matrix` prints that note). Read it for
+# cost per verified success, tokens, steps, wall time and false completion
+# per framework on the same model, which the gateway measures the same way
+# for every arm. The paired verdict compares only B (plain OpenAI SDK) with A
+# (Codex).
+name: matrix-frameworks
+suite: coding-core@1.0.0
+base: agents/codex.yaml
+matrix:
+  agents:
+    - agents/codex.yaml
+    - agents/fw-plain-openai.yaml
+    - agents/fw-langgraph.yaml
+    - agents/fw-openai-agents.yaml
+    - agents/fw-crewai.yaml
+    - agents/fw-pydantic-ai.yaml
+    - agents/fw-llamaindex.yaml
+    - agents/fw-ai-sdk.yaml
+  models:
+    - {model: gpt-5.4-mini, provider: openai}
+primary: {condition: clean, metric: verified_success}
+guards:
+  - {rule: no_new_integrity_violation}
+conditions:
+  - {id: clean, tasks: all, trials: 2}
+budget: {total_usd: 6}
+verdict: {policy: paired_signflip, alpha: 0.05, assumed_sd: 0.30}
+seed: 20261118
+concurrency: 3
+manifest_mode: agent_exposure
+policy: policies/default.yaml

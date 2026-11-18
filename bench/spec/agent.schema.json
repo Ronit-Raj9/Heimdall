@@ -56,7 +56,9 @@
       "properties": {
         "provider": {"type": "string", "minLength": 1},
         "max_retries": {"type": "integer", "minimum": 0},
-        "fallbacks": {"type": "array", "items": {"type": "string", "minLength": 1}}
+        "fallbacks": {"type": "array", "items": {"type": "string", "minLength": 1}},
+        "routing": {"$ref": "#/$defs/routing", "description": "W9 routing policy under test (docs/routing-experiments.md). Mirrors schemas.RoutingPolicy."},
+        "models": {"type": "array", "uniqueItems": true, "items": {"type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]*$"}, "description": "X8 voice agents: more models of the same provider the run's key may call beside the arm's model (for example whisper-1 and gpt-4o-mini-tts); docs/voice-agents.md."}
       }
     },
     "scripted": {
@@ -125,6 +127,40 @@
     }
   ],
   "$defs": {
+    "routing": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["strategy"],
+      "properties": {
+        "strategy": {"enum": ["fixed", "weighted", "fallback_chain", "rule"]},
+        "targets": {"type": "array", "items": {"$ref": "#/$defs/route_target"}},
+        "fallbacks": {"type": "array", "items": {"$ref": "#/$defs/route_target"}},
+        "when": {"type": "string", "description": "rule strategy: CEL condition (Bifrost routing-rule variables)."},
+        "retries": {"type": "integer", "minimum": 0, "description": "Must equal the gateway provider's max_retries; Bifrost sets retries per provider."},
+        "limits": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "budget_usd": {"type": "number", "minimum": 0},
+            "budget_reset": {"type": "string"},
+            "request_max": {"type": "integer", "minimum": 0},
+            "request_reset": {"type": "string"},
+            "token_max": {"type": "integer", "minimum": 0},
+            "token_reset": {"type": "string"}
+          }
+        }
+      }
+    },
+    "route_target": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["model"],
+      "properties": {
+        "provider": {"type": "string"},
+        "model": {"type": "string", "minLength": 1},
+        "weight": {"type": "number", "minimum": 0}
+      }
+    },
     "image": {
       "type": "object",
       "additionalProperties": false,

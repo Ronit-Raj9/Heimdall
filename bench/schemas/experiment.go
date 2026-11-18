@@ -38,6 +38,17 @@ type Experiment struct {
 	// Forecast and matrix area: the matrix sugar expands into arms at plan
 	// time (matrix.go, engine/matrixplan.go); nil for every other experiment.
 	Matrix *MatrixSpec `json:"matrix,omitempty" yaml:"matrix,omitempty"`
+
+	// W3 customer support: overrides the suite's user simulator mode,
+	// provider and model for every arm of this experiment (scenario.go).
+	Simulator *SimulatorSpec `json:"simulator,omitempty" yaml:"simulator,omitempty"`
+
+	// W7 adaptive trials and suite tiers (trials.go): the suite tier whose
+	// tasks `tasks: all` means, the pre-registered trials design, and the
+	// experiment this one extends (set by `extend`).
+	Tier    string        `json:"tier,omitempty" yaml:"tier,omitempty"`
+	Trials  *TrialsPolicy `json:"trials,omitempty" yaml:"trials,omitempty"`
+	Extends *ExtendsRef   `json:"extends,omitempty" yaml:"extends,omitempty"`
 }
 
 // CapabilityRequirements separates plan-blocking capabilities from optional
@@ -105,6 +116,8 @@ type VerdictSpec struct {
 	Policy    string  `json:"policy" yaml:"policy"` // paired_signflip
 	Alpha     float64 `json:"alpha" yaml:"alpha"`
 	AssumedSD float64 `json:"assumed_sd" yaml:"assumed_sd"`
+
+	AllowUncalibratedJudge bool `json:"allow_uncalibrated_judge,omitempty" yaml:"allow_uncalibrated_judge"` // W8 judge calibration: an uncalibrated judge is labelled instead of capping the verdict at INCONCLUSIVE
 }
 
 // ConditionClean is the id of the unperturbed condition.
@@ -242,6 +255,20 @@ type Manifest struct {
 	// matches.
 	FingerprintHash string            `json:"fingerprint_hash,omitempty"`
 	SuiteImages     map[string]string `json:"suite_images,omitempty"`
+
+	// W9 routing policy under test: arm id -> sha256 of the arm's canonical
+	// gateway.routing, for arms that declare one; empty for other plans.
+	Routing map[string]string `json:"routing,omitempty"`
+
+	// W7 adaptive trials and suite tiers (trials.go): the frozen adaptive
+	// design and the tier the tasks were drawn from; nil for other plans.
+	Adaptive *AdaptivePlan `json:"adaptive,omitempty"`
+	Tier     *TierPlan     `json:"tier,omitempty"`
+
+	// W3 customer support: the effective user simulator settings of the
+	// plan (the suite's, with the experiment's override), frozen so reports
+	// label simulated-user results; nil for a plan without a simulated user.
+	Simulator *SimulatorSpec `json:"simulator,omitempty"`
 }
 
 // BudgetDiff is one agent budget that differs between arms although no arm

@@ -1,0 +1,44 @@
+# [[.ID]]
+
+A Heimdall voice agent suite written by `bifrost-bench suite init -template
+voice`, with one complete sample task (`tasks/[[.Sample]]`). The user guides
+are `docs/voice-agents.md` (what is measured) and `docs/voice-protocol.md`
+(the audio protocol your agent speaks) in the bench repository.
+
+[[.About]]
+
+## Build the service image first
+
+The caller image carries local speech engines (Piper and a small Whisper
+model, about 1.1 GB with its base). Build it once from the project root;
+`bifrost-bench suite admit` builds it when it is missing:
+
+    docker build -t bench/[[.ID]]-voicedesk:1 benchmarks/[[.ID]]/services/helpdesk
+
+The build downloads Piper, its voice and the Whisper model from their
+upstream sources and checks each against a pinned sha256. The running
+containers have no network.
+
+## What to edit
+
+1. `services/helpdesk/server.py`: replace the helpdesk tools with your own.
+2. `tasks/<task>/seed/db.json`: the data the helpdesk starts with.
+3. `tasks/<task>/user.json`: what the caller says. `script` drives the
+   scripted caller (an opening, reply rules matched on words in what the
+   caller heard the agent say, a closing rule, a default); `persona` drives
+   a model-played caller. Keep the lines short and speakable: the caller
+   says them with text to speech, and your agent hears them through its own
+   speech to text.
+4. `tasks/<task>/verifier/tests/checks.py`: `DB`, `POLICY` and `COMMUNICATE`
+   checks. `agent_says` matches the agent's words as the caller transcribed
+   them, so allow the ways speech to text writes a number ("45" or "forty
+   five").
+5. `voice:` in task.yaml: the caller service, the voice probes the script
+   can take, and the bounds of `barge_in_handled` and `dead_air_s`.
+6. `tasks/<task>/solution/reference.sh`: the call a correct agent makes. It
+   speaks in tone code (the bench's test codec, which the caller reads
+   exactly), so admission needs no speech model.
+
+Then `bifrost-bench voice check -suite [[.ID]]` checks every voice task and
+the caller image, and `bifrost-bench suite admit [[.ID]]` proves the
+reference passes and the controls fail.

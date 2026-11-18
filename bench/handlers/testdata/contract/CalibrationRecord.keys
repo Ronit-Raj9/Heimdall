@@ -1,0 +1,30 @@
+# Keys of bench.ts `CalibrationRecord`, one per line; a trailing ? marks an optional (Go omitempty) key.
+# W8 judge calibration (calibration/record.go, docs/judge-calibration.md). Change with bench.ts.
+record_id
+suite
+suite_version
+provider
+model
+prompt_version
+prompt_sha256
+templates
+votes
+served_models?
+set_sha256
+set_rows
+human_labels
+seed_items
+disputed
+labellers?
+human
+seed?
+categories?
+consistency
+perturbations?
+items
+calls
+usd
+price_ref?
+created_at
+prev_hash
+hash

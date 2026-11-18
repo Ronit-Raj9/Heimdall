@@ -1,0 +1,74 @@
+# template: research
+# acme-research: a research agent answers questions about the Calder Coast
+# (a fictional region) by searching the web through Tavily, and cites its
+# sources. Every place, person and figure is invented, so no model can answer
+# from memory: the answer has to come from the search results.
+#
+# Search goes through Tavily's API, reached only through the per-run tool
+# proxy (external API `tavily`: POST /search and POST /extract only; the
+# proxy injects TAVILY_API_KEY as "Authorization: Bearer <key>" in live and
+# record mode, and the agent never sees it). The agent uses the websearch MCP
+# server (web_search, fetch_page), which calls that route, or calls the route
+# itself (BENCH_EXTERNAL_APIS). Every search and every result lands in
+# tools.jsonl.
+#
+# Runs replay the committed cassette (cassettes/tavily.cassette.jsonl) with
+# no network. The cassette was recorded through the real tool proxy code in
+# record mode FROM THE TAVILY STAND-IN (bench/research/standin, a fixed
+# corpus of 80 hand-written pages), not from the live web, and no real Tavily
+# call has been made: see docs/research-tasks.md for re-recording with a key.
+#
+# Each task writes answer.txt and sources.json; the hidden verifier
+# (verifier/tests/verify.py with research.json) checks the answer like the
+# answer_match grader and the citations deterministically, with no judge.
+id: acme-research
+version: 1.0.0
+description: Research questions about a fictional coast, answered through Tavily web search (replayed from a stand-in recording) with cited sources.
+track: research
+environment: docker_workspace
+grader: verifier_command
+base_image:
+  tag: bench/coding-core-base:1
+workdir: /workspace
+output:
+  kind: artifact
+verifier:
+  command: ["python3", "/grader/tests/verify.py"]
+  result: reward
+  result_path: /grader/out/reward.json
+  pass_threshold: 1
+  restore: []
+  timeout_s: 120
+services:
+  - id: websearch
+    role: mcp
+    # Built from services/websearch/ in this folder; `suite admit` builds it
+    # when it is missing. Its source is bench/research/websearch/.
+    image: bench/acme-research-websearch:1
+    port: 8000
+    mcp: {path: /mcp}
+    env:
+      TAVILY_URL: http://toolproxy:9200/x/tavily
+    ready:
+      argv: ["python3", "-I", "/srv/server.py", "ready"]
+      timeout_s: 30
+external:
+  - id: tavily
+    base_url: https://api.tavily.com
+    allow:
+      - {methods: [POST], path_prefix: /search}
+      - {methods: [POST], path_prefix: /extract}
+    headers: {Content-Type: application/json}
+    # Live and record mode only: the bench passes TAVILY_API_KEY by name to
+    # the proxy, which sends "Authorization: Bearer <key>". Replay never
+    # reads it.
+    auth_env: TAVILY_API_KEY
+    auth_header: Authorization
+    auth_scheme: Bearer
+    mode: replay
+    cassette: cassettes/tavily.cassette.jsonl
+    max_calls: 60
+    max_bytes: 262144
+    timeout_s: 30
+tasks: [ferry-start, bridge-mayor, county-town-population, tunnel-length, festival-date, aquarium-opening-day, mooring-fee, last-keeper]
+probes: [model-outage, search-outage, stale-results, hostile-page]

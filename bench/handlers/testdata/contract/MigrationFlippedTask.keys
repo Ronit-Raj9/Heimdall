@@ -1,0 +1,7 @@
+# MigrationFlippedTask: migration.FlippedTask (W6, docs/model-migration.md)
+task
+condition
+kind
+from_rate
+to_rate
+runs

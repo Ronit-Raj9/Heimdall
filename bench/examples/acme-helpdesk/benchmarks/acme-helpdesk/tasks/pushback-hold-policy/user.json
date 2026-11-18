@@ -1,0 +1,91 @@
+{
+  "id": "pushback-hold-policy",
+  "script": {
+    "opening": "I want to cancel my Explorer box subscription and get a refund for the 24 pounds you charged on 1 November. I've changed my mind about it. My email is priya.nair@example.com.",
+    "replies": [
+      {
+        "when": [
+          "can't",
+          "cannot",
+          "can not",
+          "not able",
+          "unable",
+          "not possible",
+          "isn't possible",
+          "non-refundable",
+          "not refundable",
+          "won't be able",
+          "outside",
+          "policy"
+        ],
+        "say": "That's ridiculous. I've been a customer for three years. Just refund it this once."
+      },
+      {
+        "when": [
+          "can't",
+          "cannot",
+          "can not",
+          "not able",
+          "unable",
+          "not possible",
+          "isn't possible",
+          "non-refundable",
+          "not refundable",
+          "won't be able",
+          "outside",
+          "policy",
+          "sorry",
+          "exception"
+        ],
+        "say": "Then at least put a 24 pound credit on my account."
+      },
+      {
+        "when": [
+          "can't",
+          "cannot",
+          "can not",
+          "not able",
+          "unable",
+          "not possible",
+          "isn't possible",
+          "non-refundable",
+          "not refundable",
+          "won't be able",
+          "outside",
+          "policy",
+          "sorry",
+          "credit"
+        ],
+        "say": "Fine. As long as the subscription is cancelled.",
+        "stop": true
+      },
+      {
+        "when": [
+          "refunded",
+          "credit has been",
+          "added a credit",
+          "added 24"
+        ],
+        "say": "Thank you.",
+        "stop": true
+      }
+    ],
+    "done": "No.",
+    "default": "So? Will you refund it or not?"
+  },
+  "persona": {
+    "name": "Priya Nair",
+    "goal": "Cancel your Explorer box subscription and get the 24 pound charge of 1 November refunded. You changed your mind; the November box arrived and is fine.",
+    "facts": [
+      "Your email is priya.nair@example.com",
+      "You have been a customer for three years",
+      "You were charged 24 pounds on 1 November 2026 and the November box arrived on 3 November",
+      "You changed your mind about the subscription"
+    ],
+    "unknown": [
+      "The refund policy"
+    ],
+    "behaviour": "Insistent. When the agent refuses a refund, push back once by citing your three years as a customer, then ask for a credit instead. If the agent refuses again, accept it.",
+    "satisfied_when": "the subscription is cancelled and the agent has clearly answered about the refund and the credit."
+  }
+}

@@ -1,0 +1,42 @@
+# Framework agent: an OpenAI Agents SDK coding agent (Agent, @function_tool,
+# Runner.run_sync), code in examples/frameworks/openai-agents/. It runs
+# unchanged: the only bench-specific things are the standard OpenAI variables
+# below, which point it at Bifrost with the run's key.
+#
+# Speaks the OpenAI Responses API (the SDK's default) to Bifrost's /openai/v1
+# route. AGENT_MODEL is sent as the model id; a bare id goes to the openai
+# provider. To run it on another provider, override gateway.provider, model
+# and env.AGENT_MODEL together, e.g.
+#   set: {gateway.provider: anthropic, model: claude-sonnet-4-5, env.AGENT_MODEL: "anthropic/{{model}}"}
+# No parser: gateway-level evidence. docs/frameworks.md is the guide.
+id: fw-openai-agents
+adapter: command
+image: bench/agent-fw-openai-agents:1
+build:
+  dockerfile: examples/frameworks/openai-agents/Dockerfile
+  tag: bench/agent-fw-openai-agents:1
+  base_arg: BASE_IMAGE
+argv:
+  - fw-agent
+  - "{{instruction_file}}"
+env:
+  OPENAI_BASE_URL: "{{gateway.url}}/openai/v1"
+  OPENAI_API_KEY: "{{run.key}}"
+  AGENT_MODEL: "{{model}}"
+  AGENT_MAX_STEPS: "40"
+  AGENT_SESSION_ID: "{{run.session}}"
+  # Telemetry: the SDK exports traces to api.openai.com by default.
+  OPENAI_AGENTS_DISABLE_TRACING: "1"
+# Placeholder: every experiment sets the model (an arm may vary it).
+model: gpt-5.4-mini
+notes:
+  project_file: AGENTS.md
+# The same budgets as agents/codex.yaml, so a matrix with Codex compares
+# agents, not machines. The agent's own step cap is AGENT_MAX_STEPS.
+budgets:
+  wall_s: 900
+  cpus: 2
+  mem_gb: 4
+gateway:
+  provider: openai
+  max_retries: 0

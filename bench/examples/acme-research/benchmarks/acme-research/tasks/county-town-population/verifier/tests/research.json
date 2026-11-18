@@ -1,0 +1,22 @@
+{
+  "question": "What was the population, at the most recent census, of the county town of the county in which Greyholt Observatory stands?",
+  "category": "multi_hop",
+  "match": "numeric",
+  "expected": [
+    "48310"
+  ],
+  "tolerance": 0,
+  "evidence_urls": [
+    "https://greyholt-observatory.example/about",
+    "https://caldercoast-council.example/counties/westmere",
+    "https://calder-stats.example/census/2024/ashcombe",
+    "https://caldercoast-council.example/counties",
+    "https://coastwiki.example/wiki/Tor_Hill"
+  ],
+  "require_grounding": true,
+  "wrong_answers": [
+    "44,950",
+    "61,200",
+    "1,240"
+  ]
+}

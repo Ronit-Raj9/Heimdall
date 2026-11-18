@@ -39,6 +39,8 @@ type VerdictPayload struct {
 	// Human review counts of the analysis (Analysis.ReviewedRuns).
 	ReviewedRuns      int `json:"reviewed_runs,omitempty"`
 	ReviewChangedRuns int `json:"review_changed_runs,omitempty"`
+
+	JudgeCalibration *JudgeCalibrationVerdict `json:"judge_calibration,omitempty"` // W8 judge calibration: judged experiments only (Analysis.JudgeCalibration)
 }
 
 // DiagnosticsPayload is GET /experiments/{id}/diagnostics.

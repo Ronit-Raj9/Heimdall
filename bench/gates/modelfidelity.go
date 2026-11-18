@@ -46,10 +46,24 @@ func (g *modelFidelityGate) Check(_ context.Context, rc *schemas.RunContext, ev 
 	var fallbacks []string
 	if rc != nil && rc.Agent != nil {
 		fallbacks = rc.Agent.Gateway.Fallbacks
+		if pol := rc.Agent.Gateway.Routing; pol != nil { // W9: the arm's routing policy decides which models may serve (modelfidelityrouting.go)
+			return g.checkRouted(rc.Agent.Model, pol, ev), nil
+		}
 	}
 	var swapped, undeclared, cached int
 	var evidence []string
+	var declared []string // X8 voice agents: gateway.models
+	if rc != nil && rc.Agent != nil {
+		declared = rc.Agent.Gateway.Models
+	}
 	for _, r := range ev.Requests.Requests {
+		if r.Kind == "audio" { // X8 voice agents: an audio row is a swap only when the served model is neither the requested nor a declared one
+			if r.ModelServed != "" && !sameModel(r.ModelRequested, r.ModelServed) && !declaredModel(declared, r.ModelServed) {
+				swapped++
+				evidence = append(evidence, r.ID)
+			}
+			continue
+		}
 		if r.Kind != "message" && r.Kind != "" {
 			continue
 		}
@@ -113,4 +127,15 @@ func declaredFallback(r schemas.GatewayRequest, fallbacks []string) bool {
 func dropProvider(m string) (string, bool) {
 	_, rest, ok := strings.Cut(m, "/")
 	return rest, ok
+}
+
+// declaredModel reports whether model is one of the agent's declared extra
+// models (X8 voice agents: gateway.models).
+func declaredModel(declared []string, model string) bool {
+	for _, d := range declared {
+		if sameModel(d, model) {
+			return true
+		}
+	}
+	return false
 }

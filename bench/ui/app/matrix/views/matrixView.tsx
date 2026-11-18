@@ -1,5 +1,7 @@
 import { useExperimentId } from "@/components/experiments/useExperimentId";
 import { MatrixReport } from "@/components/matrix/matrixReport";
+import { CostExplainPanel } from "@/components/migration/costWaterfall"; // W6 cost explanation
+import { ExperimentParetoPanel } from "@/components/migration/migrationReport"; // W6 cost against verified success
 import { ModeBadge } from "@/components/modeBadge";
 import { BlockSkeleton, EmptyNote, LoadError } from "@/components/runs/screenStates";
 import { useGetModelMatrixQuery } from "@/lib/store/apis/benchApi";
@@ -67,6 +69,9 @@ function ExperimentMatrix({ expId }: { expId: string }) {
 				</Link>
 			</div>
 			<MatrixReport matrix={matrix.data} onCondition={(next) => void setCondition(next)} />
+			{/* W6 cost against verified success and why arm B cost more than arm A */}
+			<ExperimentParetoPanel expId={expId} condition={condition ?? undefined} />
+			<CostExplainPanel expId={expId} condition={condition ?? undefined} />
 		</div>
 	);
 }

@@ -1,0 +1,50 @@
+# template: support
+# acme-helpdesk: Acme Brew Club's customer support desk (fictional), six chats
+# that cover the shapes a support agent meets: resolve within policy, refuse
+# outside policy, must escalate, ask a clarifying question, hold the policy
+# under pushback, and two state changes in one chat. Acme Brew Club, its
+# customers, orders and subscriptions are fictional.
+# Written from `bifrost-bench suite init -template support`. A support suite
+# tests a customer support agent in a conversation (docs/customer-support.md).
+# Each task starts two MCP servers from the image built from
+# services/helpdesk/: the helpdesk (orders, subscriptions, the support
+# policy), seeded with the task's seed/db.json, and the customer, the user
+# simulator, driven by the task's user.json (a script and a persona). The
+# agent talks to the customer only with respond_to_user and reaches both
+# servers through the per-run tool proxy, which records every call in
+# tools.jsonl. After the agent exits the helpdesk database and the
+# conversation are exported and the hidden verifier (verifier/tests/verify.py
+# with the task's checks.py) scores three dimensions: db, policy and
+# communicate.
+#
+# simulator: the user simulator. mode scripted (the default) replays each
+# task's script deterministically and calls no model. mode llm has a pinned
+# model play the customer from the persona: set provider and model here or in
+# an experiment's simulator: block; its calls go through the gateway on the
+# simulator's own key and are reported as simulator_cost_usd, apart from the
+# agent's cost. Results from an llm user are labelled "simulated user
+# (model: X)" and never compared with scripted-user runs.
+id: acme-helpdesk
+version: 1.0.0
+description: Customer support conversations graded on the helpdesk's final state, the policy and what the customer was told.
+track: support
+environment: docker_workspace
+grader: verifier_command
+base_image:
+  tag: bench/coding-core-base:1
+workdir: /workspace
+output:
+  kind: state
+simulator:
+  mode: scripted
+  prompt_version: user-v1
+  max_turns: 12
+verifier:
+  command: ["python3", "/grader/tests/verify.py"]
+  result: reward
+  result_path: /grader/out/reward.json
+  pass_threshold: 1
+  restore: []
+  timeout_s: 120
+tasks: [refund-in-policy, refund-outside-policy, safety-escalation, clarify-subscription, pushback-hold-policy, address-and-missing-item]
+probes: [model-outage, tool-error-first, hostile-customer]

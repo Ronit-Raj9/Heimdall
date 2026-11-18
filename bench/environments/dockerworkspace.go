@@ -96,6 +96,9 @@ type DockerWorkspaceConfig struct {
 	// Agent events area: the per-run agent event collector, the events file
 	// and the OpenTelemetry variables (eventcollector.go).
 	EventsCollector bool
+
+	// W3 customer support: services' own gateway access (servicegateway.go).
+	ServiceGateway ServiceGatewayConfig
 }
 
 // dockerWorkspace keeps each run's workspace in a docker volume and runs every
@@ -414,6 +417,7 @@ func (e *dockerWorkspace) Destroy(ctx context.Context, rc *schemas.RunContext) e
 	if err != nil {
 		return err
 	}
+	e.revokeServiceKeys(ctx, runID) // W3 customer support: any service key still live (servicegateway.go)
 	filter := "label=" + utils.LabelRun + "=" + runID
 	var errs []error
 	ps, err := e.cfg.Docker.MustRun(ctx, "ps", "-aq", "--filter", filter)

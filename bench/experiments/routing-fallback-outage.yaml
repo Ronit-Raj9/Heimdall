@@ -1,0 +1,57 @@
+# W9 routing policy under test (docs/routing-experiments.md), experiment (a):
+# does a Bifrost fallback chain keep the task alive when the primary model is
+# down, and at what success and cost?
+#
+# Arms differ only in gateway.routing (the agent, prompt, budgets and tasks
+# are the same):
+#   A  fixed: the run key allows claude-sonnet-4-5 only; no routing rule.
+#   B  fallback_chain: one Bifrost routing rule scoped to the run's virtual
+#      key, target anthropic/claude-sonnet-4-5, fallback
+#      anthropic/claude-haiku-4-5. The key allows both models.
+# Under model-outage the gateway probe narrows the outage to the arm's
+# primary target (the model the agent asks for, claude-sonnet-4-5), so the
+# fallback target stays healthy; for arm A that is every call it makes.
+#
+# What it reads: verified_success on model-outage (primary endpoint), and per
+# arm fallback_used, served_model_switches, routed_target_<target> (share of
+# turns), routed_cost_usd_<target>, cost_usd, model_retries; model_fidelity
+# reports arm B's haiku turns as expected switches and fires on anything else.
+#
+# Forecast (not run for real; assumptions, not history: custom-python on
+# Anthropic about $0.10 per clean run on sonnet and $0.03 on haiku, scaled
+# from the 14 Nov gpt-5.4-mini runs at about $0.024 per run with list prices
+# 4x and 1.3x higher): 2 conditions x 8 tasks x 2 trials x 2 arms = 64 runs.
+# Arm A about $1.9 (outage runs stop at call 3), arm B about $2.3. Expected:
+# arm A 0/16 under outage (as the 14 Nov model-outage runs, 0/8 vs 0/8), arm B
+# near its haiku clean rate, so the primary endpoint should read IMPROVED for
+# B, with fallback_used about 1 on outage and 0 on clean. `bifrost-bench
+# estimate` gives the history-based forecast once runs exist. The $0 proof of
+# this design with scripted agents is in docs/routing-experiments.md.
+name: routing-fallback-outage
+suite: coding-core@1.0.0
+base: agents/custom-python.yaml
+arms:
+  A:
+    label: fixed sonnet
+    set:
+      gateway.routing: {strategy: fixed, targets: [{model: claude-sonnet-4-5}]}
+  B:
+    label: fallback chain sonnet then haiku
+    set:
+      gateway.routing: {strategy: fallback_chain, targets: [{model: claude-sonnet-4-5}], fallbacks: [{model: claude-haiku-4-5}]}
+primary: {condition: model-outage, metric: verified_success}
+# model_fidelity is not a baseline gate: routing experiments switch it on, so a
+# served model outside the arm\'s policy fires and policy switches are counted.
+extra_gates: [model_fidelity]
+guards:
+  - {rule: no_new_integrity_violation}
+  - {rule: no_regression, condition: clean}
+conditions:
+  - {id: clean, tasks: all, trials: 2}
+  - {id: model-outage, tasks: all, trials: 2}
+budget: {total_usd: 6}
+verdict: {policy: paired_signflip, alpha: 0.05, assumed_sd: 0.30}
+seed: 20261118
+concurrency: 2
+manifest_mode: agent_exposure
+policy: policies/default.yaml

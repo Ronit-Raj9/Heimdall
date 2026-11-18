@@ -23,6 +23,7 @@ import {
 	type TaskSortKey,
 } from "@/components/suites/suites.utils";
 import { TaskDetailPanel } from "@/components/suites/taskDetailPanel";
+import { SuiteExportMenu } from "@/components/export/exportMenu"; // W10 export
 import { useGetSuiteHealthQuery, useGetSuitesQuery } from "@/lib/store";
 import type { SuiteSummary } from "@/lib/types/bench";
 import { cn } from "@/lib/utils";
@@ -193,6 +194,8 @@ function SuiteDetail({ suite }: { suite: SuiteSummary }) {
 				<LicenseSummary tasks={publicTasks} />
 			</div>
 			<ProbeList probes={suite.probes} />
+			{/* W10 export: the suite as Harbor task folders, verifiers withheld */}
+			<SuiteExportMenu suiteId={suite.id} />
 		</div>
 	);
 }

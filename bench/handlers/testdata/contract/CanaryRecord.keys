@@ -1,0 +1,27 @@
+# Keys of bench.ts `CanaryRecord`, one per line; a trailing ? marks an optional (Go omitempty) key.
+# W5 drift canary (handlers/canary.go, bench/canary, docs/drift-canary.md). Change with bench.ts.
+id
+canary
+kind
+started
+finished
+exp_id?
+manifest_hash?
+fingerprint?
+baseline?
+injected?
+smoke?
+outcome
+state
+reason?
+cost_usd
+forecast_usd?
+runs
+run_errors
+comparison?
+changes?
+equivalence?
+served?
+invalid?
+alerts?
+points?

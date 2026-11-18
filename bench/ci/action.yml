@@ -42,6 +42,10 @@ inputs:
     description: "name of the uploaded report artifact"
     required: false
     default: bench-check-report
+  bin:
+    description: "path of a prebuilt bifrost-bench (or heimdall) binary; empty builds one from this checkout. Set BENCH_CI_BENCH_DIR in the step env to run in another project folder (heimdall ci install does both)"
+    required: false
+    default: ""
 
 outputs:
   verdict:
@@ -82,7 +86,12 @@ runs:
       env:
         GOWORK: "off"
         CGO_ENABLED: "0"
+        PREBUILT: ${{ inputs.bin }}
       run: |
+        if [ -n "$PREBUILT" ]; then
+          echo "bin=$PREBUILT" >> "$GITHUB_OUTPUT"
+          exit 0
+        fi
         bin="$RUNNER_TEMP/bifrost-bench-bin/bifrost-bench"
         go build -o "$bin" ./cmd/bifrost-bench
         echo "bin=$bin" >> "$GITHUB_OUTPUT"

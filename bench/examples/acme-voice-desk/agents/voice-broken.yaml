@@ -1,0 +1,39 @@
+# A deliberately bad voice agent, for checking the benchmark itself
+# (bench/voice/cascadedagent.py --mode broken): it talks over the caller,
+# leaves 4.5 s of dead air before every answer, and refunds half of what
+# the model decided. Every voice metric and the refund tasks must show it.
+#
+# Models are openai/<name> through the gateway. On Heimdall's own test stack
+# the gateway's openai provider points at the scripted audio and chat fake
+# (bench/voice/fakeopenai.py), so nothing is spent; with a real provider key
+# these are paid calls. Never run it on a shared stack whose openai provider
+# holds a real key unless you mean to.
+id: voice-broken
+adapter: command
+image: heimdall-example/voice-agent:1
+build:
+  dockerfile: agents/images/voice-agent/Dockerfile
+  tag: heimdall-example/voice-agent:1
+argv: ["python3", "/opt/voice-agent/cascadedagent.py", "--mode", "broken", "{{instruction}}"]
+env:
+  VOICE_GATEWAY_URL: "{{gateway.url}}"
+  VOICE_GATEWAY_KEY: "{{run.key}}"
+  VOICE_SESSION: "{{run.session}}"
+  VOICE_CHAT_MODEL: "openai/{{model}}"
+  VOICE_STT_MODEL: openai/whisper-1
+  VOICE_TTS_MODEL: openai/gpt-4o-mini-tts
+  VOICE_TTS_VOICE: alloy
+model: gpt-4o-mini
+notes:
+  project_file: AGENTS.md
+mcp:
+  format: env
+budgets:
+  wall_s: 420
+  cpus: 1
+  mem_gb: 1
+gateway:
+  provider: openai
+  max_retries: 0
+  # X8: the speech-to-text and text-to-speech models the run's key may also call.
+  models: [whisper-1, gpt-4o-mini-tts]

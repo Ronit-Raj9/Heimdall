@@ -1,0 +1,14 @@
+# CostExplanation: costexplain.Explanation (W6, docs/cost-explain.md)
+exp_id
+suite
+condition
+conditions
+price_ref
+synthetic
+a
+b
+per_run
+per_success
+apart
+cache
+notes

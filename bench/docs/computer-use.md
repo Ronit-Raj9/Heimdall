@@ -655,6 +655,10 @@ every admission check above went through the proxy.
   starts a fresh container from the image and the task's seed files.
 - **No visual grading.** Outcomes come from the state dump. A result that is
   only visible on screen is not graded, which is why an unsaved edit fails.
+  X1 vision grading adds that: with `grader: visual` and `output.visual`
+  the bench takes its own screenshot after the session and checks it
+  against a hidden reference, beside the state checks
+  ([`visual-grading.md`](visual-grading.md)).
 - **Commands through the GUI.** xfe's "Execute command" lets the desktop
   user run commands inside the desktop container; see "Bring your own
   desktop image".

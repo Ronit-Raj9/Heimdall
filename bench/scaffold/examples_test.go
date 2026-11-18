@@ -90,6 +90,9 @@ func TestExampleStateControls(t *testing.T) {
 			if !strings.HasSuffix(task.Controls.Reference, ".sh") || len(task.Services) == 0 {
 				continue
 			}
+			if task.Voice != nil { // X8 voice agents: the controls dial the voice caller; voice/voice_test.py and suite admit run them
+				continue
+			}
 			ran++
 			t.Run(s.ID+"/"+task.ID, func(t *testing.T) {
 				runExampleControls(t, s, task)
@@ -102,6 +105,9 @@ func TestExampleStateControls(t *testing.T) {
 }
 
 func runExampleControls(t *testing.T, s *schemas.Suite, task *schemas.Task) {
+	if s.Track == schemas.TrackSupport {
+		t.Skip("support tasks run two services; TestSupportControls runs their controls")
+	}
 	sv := task.Services[0]
 	server := filepath.Join(s.Root, "services", sv.ID, "server.py")
 	if _, err := os.Stat(server); err != nil {

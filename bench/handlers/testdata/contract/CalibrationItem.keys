@@ -1,0 +1,13 @@
+# Keys of bench.ts `CalibrationItem`, one per line; a trailing ? marks an optional (Go omitempty) key.
+# W8 judge calibration. Change with bench.ts.
+id
+task
+answer
+label
+labeller
+note?
+source
+ref?
+at
+# X1 vision grading: sha256 of a labelled image (calibration/images/<sha256>.png).
+image?

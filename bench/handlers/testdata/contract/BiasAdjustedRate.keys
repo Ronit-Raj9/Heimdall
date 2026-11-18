@@ -1,0 +1,6 @@
+# Keys of bench.ts `BiasAdjustedRate`, one per line; a trailing ? marks an optional (Go omitempty) key. W8 judge calibration.
+raw
+estimate
+lo
+hi
+note?

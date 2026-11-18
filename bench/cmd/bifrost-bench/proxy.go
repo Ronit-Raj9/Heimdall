@@ -42,6 +42,13 @@ func runProxy(args []string) int {
 		LedgerPath:    *ledger,
 		Logger:        logger,
 	}
+	if file := os.Getenv("BENCH_FAULTPROXY_PROVIDERS"); file != "" { // X8: the provider table file the compose files pass (faultproxy.LoadProviders)
+		list, err := faultproxy.LoadProviders(file)
+		if err != nil {
+			return fail("%v", err)
+		}
+		cfg.Providers = list
+	}
 	for _, s := range strings.Split(*slots, ",") {
 		if s = strings.TrimSpace(s); s != "" {
 			cfg.Slots = append(cfg.Slots, faultproxy.SlotConfig{Name: s, Auth: s})

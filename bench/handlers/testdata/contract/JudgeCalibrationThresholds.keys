@@ -1,0 +1,6 @@
+# Keys of bench.ts `JudgeCalibrationThresholds`, one per line. W8 judge calibration. Change with bench.ts.
+min_agreement
+min_tnr
+min_labels
+max_age_days
+source

@@ -1,0 +1,23 @@
+# W7 preset: the headroom tracker (docs/suite-tiers.md): the suite's
+# `headroom` tier, tasks whose observed pass rate is below about 0.5, where a
+# capability change shows first. Fixed three trials: headroom tasks are mixed
+# by definition, so the task rule would save little. Run it weekly or on a
+# model release; it is a capability signal, not a merge gate.
+name: headroom
+suite: coding-core@1.0.0
+tier: headroom
+base: agents/claude-code.yaml
+arms:
+  A: {label: baseline}
+  B: {label: candidate, set: {notes.user_file: experiments/fixtures/codewins.md}}
+primary: {condition: clean, metric: verified_success}
+guards:
+  - {rule: no_new_integrity_violation}
+conditions:
+  - {id: clean, tasks: all, trials: 3}
+budget: {total_usd: 30}
+verdict: {policy: paired_signflip, alpha: 0.05, assumed_sd: 0.30}
+seed: 20261118
+concurrency: 4
+manifest_mode: agent_exposure
+policy: policies/default.yaml

@@ -1,0 +1,11 @@
+# Keys of bench.ts `RunRoutingRow` (schemas.RunRoutingRow, W9). Change with bench.ts and schemas/routing.go.
+id
+parent_id?
+provider
+model_served
+fallback_index
+status
+error_status?
+latency_ms
+routing_rule_name?
+routing_engines?

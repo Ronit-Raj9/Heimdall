@@ -1,0 +1,11 @@
+# Keys of bench.ts `TrialsPolicy` (schemas/trials.go, W7). Change with bench.ts.
+mode
+rule?
+min?
+max?
+conditions?
+looks?
+alpha_split?
+alphas?
+futility?
+extension?

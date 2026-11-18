@@ -56,6 +56,7 @@ type gatewayArm struct {
 	slot      string
 	nonce     string
 	nonceHash string
+	model     string // W9: the model the plan was narrowed to, empty for every model
 }
 
 // newGatewayLayer returns the gateway probe layer. ctrl is the fault proxy's
@@ -127,10 +128,11 @@ func (l *gatewayLayer) Arm(ctx context.Context, rc *schemas.RunContext) (*schema
 	}
 	plan.RunID = rc.Run.RunID
 	plan.Nonce = utils.NewNonce()
+	plan.Model = routedFaultModel(plan, rc) // W9: a routed run's outage takes down its primary target only (docs/routing-experiments.md)
 	if err := l.ctrl.SetPlan(ctx, slot, plan); err != nil {
 		return nil, fmt.Errorf("arm probe %s on slot %s: %w", rc.Probe.ID, slot, err)
 	}
-	arm := gatewayArm{slot: slot, nonce: plan.Nonce, nonceHash: utils.SHA256Bytes([]byte(plan.Nonce))}
+	arm := gatewayArm{slot: slot, nonce: plan.Nonce, nonceHash: utils.SHA256Bytes([]byte(plan.Nonce)), model: plan.Model}
 	l.mu.Lock()
 	l.armed[plan.RunID] = arm
 	l.mu.Unlock()
@@ -174,6 +176,9 @@ func (l *gatewayLayer) Receipts(_ context.Context, rc *schemas.RunContext, ev *s
 	l.mu.Lock()
 	arm, haveArm := l.armed[rc.Run.RunID]
 	l.mu.Unlock()
+	if haveArm {
+		plan.Model = arm.model // W9: receipts describe the plan as bound
+	}
 	g := newGatewayFacts(rc, ev, plan, arm, haveArm)
 
 	steps := map[schemas.ReceiptStep]schemas.ReceiptEntry{}
@@ -497,6 +502,11 @@ func gatewayAckPhrase(text string, status int) string {
 
 // gatewayPlanText describes a plan without its nonce.
 func gatewayPlanText(slot string, p schemas.FaultPlan) string {
+	if p.Model != "" && p.Model != "*" { // W9: a model-filtered plan names its model
+		q := p
+		q.Model = ""
+		return gatewayPlanText(slot, q) + ", model " + p.Model + " only"
+	}
 	switch p.Mode {
 	case "persistent":
 		return fmt.Sprintf("slot %s: %d from conversation call %d", slot, p.Status, p.FromCall)
@@ -530,4 +540,23 @@ func gatewayOr(s, fallback string) string {
 		return fallback
 	}
 	return s
+}
+
+// routedFaultModel is the model a gateway fault plan is narrowed to (W9). A
+// model the probe names is kept ("*" fails every model). For a run with a
+// routing policy, a persistent or once plan that names none fails only the
+// policy's primary target, the model the agent asks for, so its fallbacks
+// stay up and the probe tests the policy, not a provider-wide outage.
+// Unrouted runs keep the plan as written.
+func routedFaultModel(plan schemas.FaultPlan, rc *schemas.RunContext) string {
+	if plan.Model != "" {
+		return plan.Model
+	}
+	if rc == nil || rc.Agent == nil || (plan.Mode != "persistent" && plan.Mode != "once") {
+		return ""
+	}
+	if t, ok := rc.Agent.Gateway.Routing.Primary(); ok {
+		return t.Model
+	}
+	return ""
 }

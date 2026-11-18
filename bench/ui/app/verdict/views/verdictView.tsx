@@ -1,4 +1,11 @@
 import { ConfigDiff } from "@/components/configDiff";
+import { ExperimentGatewayPolicy } from "@/components/routing/gatewayPolicyCard"; // W9 routing policy under test
+import { ExperimentSupportScorecard } from "@/components/support/supportScorecard"; // W3 customer support
+import { ExperimentResearchScorecard } from "@/components/research/researchScorecard"; // W4 research with Tavily
+import { ExperimentTrialsPanel } from "@/components/adaptive/trialsPanel"; // W7 adaptive trials and suite tiers
+import { ExperimentExportMenu } from "@/components/export/exportMenu"; // W10 export
+import { VerdictCalibration } from "@/components/calibration/calibrationPanel"; // W8 judge calibration
+import { CostExplainPanel } from "@/components/migration/costWaterfall"; // W6 cost explanation
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -128,6 +135,22 @@ function ExperimentVerdict({ expId }: { expId: string }) {
 			<Section title={t("verdict.gates.title")} description={t("verdict.gates.description")} testId="verdict-gates">
 				<GateChecklist gates={payload.gates} />
 			</Section>
+
+			{/* W9 routing policy under test: nothing for fixed-key experiments */}
+			<ExperimentGatewayPolicy expId={payload.exp_id} />
+
+			{/* W3 customer support: resolution and escalation cards; nothing for a non-support suite */}
+			<ExperimentSupportScorecard expId={payload.exp_id} />
+			{/* W4 research with Tavily: nothing for experiments whose runs made no Tavily searches */}
+			<ExperimentResearchScorecard expId={payload.exp_id} />
+			{/* W7 adaptive trials and suite tiers: nothing for a fixed experiment with no tier */}
+			<ExperimentTrialsPanel expId={payload.exp_id} />
+			{/* W6 cost explanation: why arm B cost more than arm A */}
+			<CostExplainPanel expId={payload.exp_id} />
+			{/* W10 export: EEE records and the run table as downloads */}
+			<ExperimentExportMenu expId={payload.exp_id} />
+			{/* W8 judge calibration: nothing for a verified suite */}
+			{payload.judge_calibration && <VerdictCalibration jc={payload.judge_calibration} />}
 
 			<Section title={t("verdict.diagnostics.title")} description={t("verdict.diagnostics.description")} testId="verdict-diagnostics">
 				{diagnostics.isLoading ? (

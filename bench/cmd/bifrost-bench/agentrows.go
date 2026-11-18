@@ -21,7 +21,7 @@ const sessionVar = "{{run.session}}"
 // checkRows evaluates every row after the image row from one sealed check
 // run. It is pure: everything it reads is in in.
 func checkRows(in *checkInput) []checkRow {
-	net := summarizeNet(in.net, in.gatewayHost, in.gatewayPort, runHosts(in.scenario)...)
+	net := summarizeNet(in.net, in.gatewayHost, in.gatewayPort, append(runHosts(in.scenario), collectorHosts(in)...)...) // Framework agents (W2): the bench's own event collector is not egress
 	rows := []checkRow{
 		userRow(in),
 		modelCallRow(in, net),
@@ -129,6 +129,18 @@ func runHosts(sc *checkScenario) []string {
 
 // toolProxyHost is the per-run tool proxy's host name on the run network.
 const toolProxyHost = "toolproxy"
+
+// collectorHosts is the per-run event collector's host when it ran for the
+// run. The bench itself points OTEL_EXPORTER_OTLP_* and BENCH_EVENTS_URL at
+// it (it is served by the tool proxy), so an agent that exports its
+// OpenTelemetry spans there has not left the run's network. Framework agents
+// (W2).
+func collectorHosts(in *checkInput) []string {
+	if st := in.ev.AgentEvents; st != nil && st.Collector == "on" {
+		return []string{toolProxyHost}
+	}
+	return nil
+}
 
 // netSummary is the observer's records sorted into gateway traffic and
 // everything else.

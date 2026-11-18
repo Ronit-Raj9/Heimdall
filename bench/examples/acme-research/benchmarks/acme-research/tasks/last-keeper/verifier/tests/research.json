@@ -1,0 +1,24 @@
+{
+  "question": "Who was the last resident keeper of Gull Point Lighthouse?",
+  "category": "single_hop",
+  "match": "contains_all",
+  "expected": [
+    "tomas venn"
+  ],
+  "normalize": [
+    "lower",
+    "strip_punct",
+    "collapse_space"
+  ],
+  "evidence_urls": [
+    "https://gullpoint-heritage.example/history",
+    "https://calder-gazette.example/1991/10/gull-point-goes-automatic",
+    "https://gullpoint-heritage.example/keepers"
+  ],
+  "require_grounding": true,
+  "wrong_answers": [
+    "Harold Mace",
+    "Walter Crane",
+    "Josiah Venn"
+  ]
+}

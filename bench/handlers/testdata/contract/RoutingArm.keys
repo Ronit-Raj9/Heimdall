@@ -1,0 +1,8 @@
+# Keys of bench.ts `RoutingArm` (schemas.RoutingArm, W9). Change with bench.ts and schemas/routing.go.
+arm
+label
+model
+policy?
+policy_hash?
+summary
+conditions

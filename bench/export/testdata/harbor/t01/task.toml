@@ -1,0 +1,28 @@
+schema_version = "1.4"
+source = "heimdall:coding-core@1.0.0/t01@1.0.0"
+
+[task]
+name = "heimdall/coding-core-t01"
+description = "Fix half-cent rounding in invoice totals"
+
+[metadata]
+category = "bugfix"
+heimdall_suite = "coding-core@1.0.0"
+heimdall_task = "t01@1.0.0"
+heimdall_shape = "diff"
+heimdall_grader = "hidden_tests"
+heimdall_lock_status = "admitted"
+heimdall_exporter = "bifrost-bench export harbor test"
+heimdall_instruction_sha256 = "a0380419508c239c658112734605de0d984bb31d9af5cb1dcda091b85dca99cf"
+heimdall_repo_tree_sha256 = "709a0adeac85865f2b1c8e2d16b18f282d5c3380ca06d1ce9f9ee2c1506827cf"
+heimdall_verifier_sha256 = "e1fb107c4a70fe0d6348c542e073fdec5f77a821f0c7c85529216f45e1bb4a13"
+
+[verifier]
+timeout_sec = 360.0
+user = "root"
+
+[agent]
+timeout_sec = 900.0
+
+[environment]
+build_timeout_sec = 600.0

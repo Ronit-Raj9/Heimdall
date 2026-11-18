@@ -1,0 +1,46 @@
+# SYNTHETIC smoke of experiments/matrix-frameworks.yaml (DESIGN.md 19.1):
+# the seven framework arms of that matrix through the real pipeline (plan,
+# workspace, run key, agent, diff export, hidden-test grade, gates, seal) with
+# every model call answered by the fault proxy's scripted model. Its results
+# are never findings. `smoke: true` marks it as such.
+#
+# $0 by construction: every arm is switched to the anthropic provider, which
+# the bench gateway serves only through the fault proxy, and the proxy holds
+# no Anthropic key, so it answers from its scripted model (GET /health on the
+# proxy says `"anthropic": "scripted"`; check it before running). The agents
+# still speak the OpenAI formats to Bifrost's /openai/v1 route; Bifrost
+# translates chat completions and Responses requests to the Anthropic
+# Messages API, so the smoke also proves each framework runs unchanged on a
+# provider it was not written for. Codex, the matrix's arm A, is left out:
+# its config is pinned to the openai provider, whose upstream is real, and it
+# has 249 real runs already (docs/harness-matrix.md).
+#
+# Clean only. The model-outage probe returns 503 from the third model call
+# on, and the scripted model ends every run in two calls, so an outage
+# condition here arms but never fires (a first smoke showed it: armed 7 of
+# 7, fired 0). How each framework handles a failing model needs a real model.
+#
+# Slots: 7 arms x 2 tasks x 1 trial = 14.
+name: matrix-frameworks-smoke
+smoke: true
+suite: coding-core@1.0.0
+base: agents/fw-plain-openai.yaml
+arms:
+  A: {label: "no framework, OpenAI SDK, scripted", agent: agents/fw-plain-openai.yaml, set: &scripted {gateway.provider: anthropic, model: claude-sonnet-4-5, env.AGENT_MODEL: "anthropic/{{model}}"}}
+  B: {label: "LangGraph, scripted", agent: agents/fw-langgraph.yaml, set: *scripted}
+  C: {label: "OpenAI Agents SDK, scripted", agent: agents/fw-openai-agents.yaml, set: *scripted}
+  D: {label: "CrewAI, scripted", agent: agents/fw-crewai.yaml, set: *scripted}
+  E: {label: "Pydantic AI, scripted", agent: agents/fw-pydantic-ai.yaml, set: *scripted}
+  F: {label: "LlamaIndex, scripted", agent: agents/fw-llamaindex.yaml, set: *scripted}
+  G: {label: "Vercel AI SDK, scripted", agent: agents/fw-ai-sdk.yaml, set: *scripted}
+primary: {condition: clean, metric: verified_success}
+guards:
+  - {rule: no_new_integrity_violation}
+conditions:
+  - {id: clean, tasks: [t01, t02], trials: 1}
+budget: {total_usd: 0}
+verdict: {policy: paired_signflip, alpha: 0.05, assumed_sd: 0.30}
+seed: 20261118
+concurrency: 2
+manifest_mode: agent_exposure
+policy: policies/default.yaml

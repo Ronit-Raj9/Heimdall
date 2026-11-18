@@ -1,0 +1,20 @@
+# Keys of bench.ts `CanaryMetricTest`, one per line; a trailing ? marks an optional (Go omitempty) key.
+# W5 drift canary (handlers/canary.go, bench/canary, docs/drift-canary.md). Change with bench.ts.
+key
+arm
+label
+condition
+metric
+higher_is_better
+tasks
+discordant
+worse
+baseline
+current
+delta
+relative
+p
+level
+floor
+status
+reason

@@ -204,11 +204,17 @@
 		"newExperiment": "New experiment",
 		"triage": "Triage",
 		"clusters": "Failure clusters",
+		"inbox": "Failure inbox",
 		"matrix": "Model matrix",
 		"releases": "Releases",
 		"imports": "Imports",
 		"workers": "Workers",
-		"trends": "Trends"
+		"quickstart": "First workflow",
+		"trends": "Trends",
+		"calibration": "Judge calibration",
+		"canaries": "Drift canaries",
+		"live": "Live traffic",
+		"migration": "Model migration"
 	},
 	"mode": {
 		"live": "LIVE",
@@ -1564,6 +1570,338 @@
 		"evidenceMore": "+{{count}} more",
 		"openRun": "Open the matched pair of run {{run}}"
 	},
+	"canaries": {
+		"title": "Drift canaries",
+		"subtitle": "A small pinned suite re-run on a schedule through the gateway and tested against a known-good baseline, so an agent that gets worse with no change by its team (a model updated behind its alias, a degraded route) is caught. A drift alerts only after two consecutive looks flag the same target and metric.",
+		"loadError": "Could not load the drift canaries.",
+		"detailError": "Could not load canary {{name}}.",
+		"empty": "No canaries yet. Write one with `heimdall canary init`, then pin a baseline with `heimdall canary baseline`.",
+		"definitionError": "{{name}}: {{error}}",
+		"smoke": "smoke: synthetic",
+		"unknown": "unknown",
+		"run": "Run a look now",
+		"runStarted": "Started in the background; this page refreshes when it finishes.",
+		"runError": "Could not start the look (write token, a run already going, or the daily cap).",
+		"state": {
+			"no_baseline": "No baseline",
+			"steady": "Steady",
+			"watching": "Watching",
+			"drifted": "Drifted",
+			"invalid": "Invalid",
+			"baseline_stale": "Baseline stale"
+		},
+		"testStatus": {
+			"worse": "Worse",
+			"better": "Better",
+			"below_floor": "Below noise floor",
+			"no_change": "No change",
+			"cannot_tell": "Cannot tell"
+		},
+		"kind": {
+			"baseline": "Baseline",
+			"run": "Look",
+			"confirmation": "Confirmation"
+		},
+		"outcome": {
+			"pinned": "Pinned",
+			"clear": "Clear",
+			"flagged": "Flagged",
+			"invalid": "Invalid",
+			"stale": "Stale",
+			"refused": "Refused",
+			"error": "Error"
+		},
+		"metric": {
+			"verified_success": "Success",
+			"cost_usd": "Cost per run",
+			"tokens": "Tokens per run",
+			"latency_ms": "Model latency",
+			"format_errors": "Format errors"
+		},
+		"list": {
+			"title": "Canaries",
+			"description": "Drifted first, then what needs a look. The spend column is today against the daily cap; a look that would pass it is refused before anything runs.",
+			"label": "Drift canaries",
+			"noBaseline": "none",
+			"notScheduled": "not scheduled",
+			"noCap": "no cap (smoke)",
+			"spendOfCap": "{{spent}} of {{cap}}",
+			"columns": {
+				"name": "Canary",
+				"state": "State",
+				"targets": "Targets",
+				"baseline": "Baseline",
+				"looks": "Looks",
+				"next": "Next look",
+				"spend": "Spent today"
+			}
+		},
+		"detail": {
+			"facts": "Suite {{suite}}, agent {{agent}}, {{tasks}} tasks x {{trials}} trials, sensitivity {{sensitivity}} (family level {{alpha}})",
+			"allTasks": "all",
+			"baseline": "Baseline {{exp}}, pinned {{at}}, {{looks}} looks since.",
+			"noBaseline": "No baseline pinned: run `heimdall canary baseline {{name}}`."
+		},
+		"history": {
+			"title": "History",
+			"description": "Success per look for every target, baseline first. A ring marks a look where the canary was drifted; a diamond marks a frozen config that changed.",
+			"empty": "Fewer than two looks so far."
+		},
+		"changes": {
+			"title": "What changed",
+			"description": "The newest compared look against the baseline: flagged tests, then what moved at the gateway (served model under the same alias, provider, system fingerprint, input tokens at the identical first prompt, latency, errors), new failure clusters and tasks that lost success.",
+			"empty": "No look has been compared with the baseline yet.",
+			"nothing": "Nothing moved.",
+			"label": "What changed per target",
+			"changed": "changed",
+			"to": "to",
+			"fingerprint": "system fingerprint {{before}} to {{now}}",
+			"promptChanged": "{{changed}} of {{tasks}} tasks",
+			"newClusters": "New failure clusters",
+			"clusterRuns_one": "{{count}} run",
+			"clusterRuns_other": "{{count}} runs",
+			"columns": {
+				"target": "Target",
+				"served": "Served model",
+				"provider": "Provider",
+				"success": "Success",
+				"latency": "Median latency",
+				"prompt": "Prompt tokens changed",
+				"errors": "Request errors"
+			}
+		},
+		"tests": {
+			"title": "Tests of the newest look",
+			"description": "Exact paired sign-flip per task against the baseline. Success is one Holm family and cost, tokens and latency another, each at level {{alpha}}; a change smaller than its noise floor never flags.",
+			"label": "Tests",
+			"changed": "{{changed}} of {{tasks}} changed",
+			"columns": {
+				"target": "Target",
+				"metric": "Metric",
+				"baseline": "Baseline",
+				"current": "Now",
+				"tasks": "Tasks",
+				"p": "p",
+				"status": "Result"
+			}
+		},
+		"equivalence": {
+			"title": "Provider equivalence",
+			"description": "The same model through two providers in the same look, paired by task. No difference detected is not proof of sameness: with this many tasks only large differences show.",
+			"empty": "No look of both providers yet.",
+			"vs": "vs",
+			"verdict": {
+				"differs": "Differs",
+				"no_difference_detected": "No difference detected",
+				"cannot_tell": "Cannot tell"
+			}
+		},
+		"looks": {
+			"title": "Looks",
+			"description": "Every baseline and look, newest first. An injected look forced a fault on a smoke canary to test the alarm path.",
+			"label": "Looks",
+			"injected": "injected {{probe}}",
+			"columns": {
+				"started": "Started",
+				"kind": "Kind",
+				"outcome": "Outcome",
+				"state": "State",
+				"experiment": "Experiment",
+				"cost": "Cost",
+				"alerts": "Alerts"
+			}
+		}
+	},
+	"inbox": {
+		"title": "Failure inbox",
+		"subtitle": "Production traces that failed, grouped by signature. Accept one to draft a regression task from it, reject it with a reason, or snooze it. A drafted task is a starting point: a person finishes it before it is admitted.",
+		"loadError": "Could not load the failure inbox.",
+		"regressionTasks_one": "{{count}} regression task drafted from the inbox",
+		"regressionTasks_other": "{{count}} regression tasks drafted from the inbox",
+		"filters": {
+			"label": "Filter by state",
+			"source": "Source",
+			"allSources": "Every source"
+		},
+		"state": {
+			"all": "All",
+			"new": "New",
+			"accepted": "Accepted",
+			"rejected": "Rejected",
+			"duplicate": "Duplicate",
+			"snoozed": "Snoozed"
+		},
+		"kind": {
+			"qa": "Q&A",
+			"tool-use": "Tool use",
+			"mcp": "MCP",
+			"memory": "Memory"
+		},
+		"outcome": {
+			"error": "error",
+			"ok": "ok",
+			"unknown": "unknown"
+		},
+		"table": {
+			"title": "Items",
+			"description": "One row per failure signature. Pick a row to read its redacted trace and decide what to do with it.",
+			"label": "Failure inbox items",
+			"columns": {
+				"title": "Request",
+				"source": "Source",
+				"flagged": "Flagged because",
+				"occurrences": "Seen",
+				"firstSeen": "First seen",
+				"lastSeen": "Last seen",
+				"state": "State",
+				"suggested": "Suggested",
+				"trace": "Trace",
+				"task": "Regression task"
+			},
+			"open": "Open item {{id}}",
+			"openTrace": "Open trace",
+			"openTraceAria": "Open trace {{id}} in {{source}} (new tab)",
+			"noLink": "no link",
+			"moreFlagged_one": "+{{count}} more",
+			"moreFlagged_other": "+{{count}} more",
+			"noSuite": "no suite",
+			"acceptedAs": "accepted as {{suite}}/{{task}}",
+			"noTask": "none",
+			"recurrences_one": "recurred {{count}} time since accepted",
+			"recurrences_other": "recurred {{count}} times since accepted"
+		},
+		"release": {
+			"passes": "passes in {{experiment}} ({{passed}}/{{runs}})",
+			"passesNoExp": "passes ({{passed}}/{{runs}})",
+			"fails": "fails in {{experiment}} ({{passed}}/{{runs}})",
+			"failsNoExp": "fails ({{passed}}/{{runs}})",
+			"notRun": "not run yet",
+			"other": "{{status}}"
+		},
+		"empty": {
+			"title": "Nothing in the inbox yet.",
+			"pull": "Failed traces arrive when this command reads the trace sources:",
+			"sources": "Sources are listed in {{file}}. Each pull reads a source from where the last one stopped.",
+			"docs": "How sources, redaction and accepting work: {{doc}}.",
+			"filtered": "No items in this state.",
+			"filteredSource": "No items from this source in this state."
+		},
+		"sources": {
+			"title": "Trace sources",
+			"description": "Where failures are pulled from, as listed in inbox/sources.yaml, and how the last pull went.",
+			"label": "Trace sources",
+			"columns": {
+				"name": "Source",
+				"kind": "Kind",
+				"lastPull": "Last pull",
+				"since": "Reading from",
+				"pulled": "Traces read",
+				"lastError": "Last error"
+			},
+			"never": "never",
+			"ok": "no error",
+			"none": "No trace source is configured. Add one to inbox/sources.yaml, then run heimdall inbox pull.",
+			"ingestOff": "Push ingest is off on this server: POST /api/bench/inbox/ingest takes no traces, so items arrive only through heimdall inbox pull. docs/failure-inbox.md says how to turn it on."
+		},
+		"detail": {
+			"select": "Pick an item to read its redacted trace, its signature and what to do with it.",
+			"loadError": "Could not load item {{id}}.",
+			"close": "Close",
+			"trace": "Trace {{id}}",
+			"openTrace": "Open in {{source}}",
+			"facts": "Item facts",
+			"source": "Source",
+			"outcome": "Outcome",
+			"model": "Model",
+			"tools": "Tools",
+			"seen": "Seen",
+			"seenValue_one": "{{count}} time, first {{first}}, last {{last}}",
+			"seenValue_other": "{{count}} times, first {{first}}, last {{last}}",
+			"suggested": "Suggested",
+			"suggestedValue": "{{kind}} task in {{suite}}",
+			"suggestedNoSuite": "{{kind}} task, no suite suggested",
+			"flagged": "Flagged because",
+			"redacted": "Redacted before storage: {{list}}. Only the counts are kept, never the values.",
+			"preview": "Redacted trace",
+			"previewHint": "Plain text exactly as stored, at most 16 KiB. Nothing in it is rendered as markup.",
+			"previewEmpty": "No preview was stored for this item.",
+			"signature": "Signature",
+			"signatureHint": "Traces whose normalised request, tool and error match share one signature and one item.",
+			"parts": {
+				"request": "Request",
+				"tool": "Tool",
+				"error": "Error"
+			},
+			"traces": "Matching traces",
+			"tracesHint": "Newest last, at most 20.",
+			"task": "Regression task",
+			"taskValue": "Accepted as {{suite}}/{{task}} on {{at}}.",
+			"taskDir": "Folder: {{dir}}",
+			"admitted": "admitted",
+			"notAdmitted": "not admitted yet",
+			"release": "Newest experiment:",
+			"recurrences_one": "Recurred {{count}} time since it was accepted, last {{at}}.",
+			"recurrences_other": "Recurred {{count}} times since it was accepted, last {{at}}.",
+			"rejected": "Rejected: {{reason}}",
+			"duplicateOf": "Duplicate of {{id}}.",
+			"snoozedUntil": "Snoozed until {{at}}."
+		},
+		"actions": {
+			"title": "Decide",
+			"label": "Action",
+			"accept": "Accept",
+			"reject": "Reject",
+			"snooze": "Snooze",
+			"readOnly": "This server runs in {{mode}} mode, so the inbox is read-only here.",
+			"closed": "This item is {{state}}. Only new and snoozed items can be accepted, rejected or snoozed.",
+			"token": "Write token",
+			"tokenHint": "Kept in this tab only. The server needs it for every change.",
+			"tokenPlaceholder": "Bearer token",
+			"error": "The server refused: {{error}}",
+			"acceptForm": {
+				"suite": "Suite",
+				"suitePlaceholder": "Pick a suite",
+				"suiteOption": "{{suite}} (template {{template}})",
+				"suiteRequired": "Pick the suite the task goes into.",
+				"noSuites": "No suite can take inbox tasks on this server.",
+				"kind": "Task kind",
+				"kindHint": "Suggested: {{kind}}.",
+				"taskId": "Task id (optional)",
+				"taskIdPlaceholder": "generated when empty",
+				"submit": "Accept and draft a task"
+			},
+			"rejectForm": {
+				"reason": "Reason",
+				"reasonPlaceholder": "Why this is not a regression to test, for example expected behaviour",
+				"reasonRequired": "Say why the item is rejected.",
+				"duplicateOf": "Duplicate of (optional)",
+				"duplicatePlaceholder": "inc-...",
+				"duplicateHint": "With an item id here, this item is marked a duplicate of that one.",
+				"duplicateSelf": "An item cannot be a duplicate of itself.",
+				"submit": "Reject"
+			},
+			"snoozeForm": {
+				"days": "Days",
+				"daysHint": "From 1 to 90 days.",
+				"daysInvalid": "Enter a whole number of days from 1 to 90.",
+				"submit": "Snooze"
+			},
+			"done": {
+				"rejected": "Rejected.",
+				"duplicate": "Marked as a duplicate of {{id}}.",
+				"snoozed": "Snoozed until {{at}}."
+			}
+		},
+		"draft": {
+			"title": "Draft task {{task}} written",
+			"needsHuman": "This is a draft, not a finished test. A person still has to fill in the files marked EDIT ME, then validate and admit the task before it counts.",
+			"dir": "Folder",
+			"template": "Template",
+			"editMe": "Files to edit (marked EDIT ME)",
+			"next": "Next steps",
+			"warnings": "Warnings"
+		}
+	},
 	"notFound": {
 		"title": "Page not found",
 		"description": "There is no bench screen at this address.",
@@ -2083,6 +2421,7 @@
 			"browser": "Browser",
 			"computer_use": "Computer use",
 			"artifact": "Artifacts",
+			"support": "Customer support",
 			"codingHint": "Edit a repository; hidden tests decide.",
 			"terminalHint": "Work in a whole container; its state is checked afterwards.",
 			"tool_useHint": "Call tools against a service; the final state is checked.",
@@ -2094,6 +2433,7 @@
 			"browserHint": "A web application operated through a browser; its final state is checked.",
 			"computer_useHint": "A desktop operated through screenshots, mouse and keyboard; its final state is checked.",
 			"artifactHint": "Produce files, such as a report, a chart or a model, graded on their content.",
+			"supportHint": "Talk to a simulated customer; the helpdesk state, the policy and what was said are checked.",
 			"otherHint": "A track this version of the UI does not know."
 		},
 		"grading": {
@@ -2307,7 +2647,8 @@
 			"invalid_evaluator": "Grader undecided",
 			"veto": "Veto gate fired",
 			"false_completion": "False completion",
-			"flagged": "Flagged"
+			"flagged": "Flagged",
+			"contested": "Contested judge verdict"
 		},
 		"decision": {
 			"pass": "Pass",
@@ -2403,5 +2744,506 @@
 			"title": "Human reviews",
 			"description": "Reviews of each arm's run. They apply only under grade source reviewed."
 		}
+	},
+	"routing": {
+		"title": "Gateway policy",
+		"description": "What each arm's Bifrost routing policy was and what it did: the targets that answered, the fallbacks that fired and the cost by target.",
+		"differences": "Arms differ in",
+		"noDifference": "The arms run the same gateway policy.",
+		"policyHash": "policy {{hash}}",
+		"fixed": "fixed key, no routing policy",
+		"condition": "{{condition}}: {{runs}} runs",
+		"fallbacks": "fallback answered in {{fired}} of {{known}} runs",
+		"switches": "{{count}} model switches",
+		"target": "Target",
+		"turns": "Turns",
+		"cost": "Cost",
+		"latency": "Latency",
+		"unknown": "unknown",
+		"noRuns": "No sealed runs yet.",
+		"run": {
+			"title": "Gateway policy of this run",
+			"fallbackUsed": "fallback answered",
+			"fallbackUnused": "no fallback",
+			"rows": "Bifrost rows",
+			"row": "{{provider}}/{{model}} {{status}}",
+			"fallbackRow": "fallback {{index}}",
+			"expected": "model fidelity: {{detail}}",
+			"fired": "model fidelity fired: {{detail}}"
+		}
+	},
+	"quickstart": {
+		"title": "First workflow",
+		"subtitle": "Will this change break my coding agent? Four commands from inside your own git repository, then the tasks whose drafted instructions still need a person to read them.",
+		"loadError": "Could not load the suites.",
+		"stepsTitle": "Four commands",
+		"stepsHint": "Run them from the repository root. Every step is $0 until a real model runs, and compare asks before it spends.",
+		"cost": "Cost",
+		"step": {
+			"init": {
+				"title": "Set up the project",
+				"what": "Detects the test command, the agent CLIs on PATH, Docker and the stack's ports, and writes .heimdall/ (with fresh tokens) inside the repository.",
+				"cost": "$0, no model call"
+			},
+			"mine": {
+				"title": "Mine tasks from history",
+				"what": "Cuts a task from each commit that changed code and tests, drafts its instruction without the fix, and keeps only the tasks admission proves.",
+				"cost": "$0, Docker only"
+			},
+			"compare": {
+				"title": "Compare two versions",
+				"what": "Writes a normal experiment file, shows the forecast, asks, runs both arms with repeated trials and a fault, and prints the verdict card.",
+				"cost": "$0 with scripted agents; a real agent's forecast is shown before anything is spent"
+			},
+			"ci": {
+				"title": "Gate pull requests",
+				"what": "Writes .github/workflows/heimdall.yml: one PR comment updated in place, the evidence as an artifact, and a failed job on regressed, invalid or a policy block.",
+				"cost": "$0 (writes a file)"
+			}
+		},
+		"minedTitle": "Mined tasks",
+		"minedHint": "Tasks heimdall tasks mine cut from your history. A drafted instruction is a draft: read it, fix it, then mark it reviewed. Reports say how many unreviewed tasks an experiment ran.",
+		"noMined": "No mined tasks yet. Run heimdall tasks mine -limit 10 in your repository.",
+		"unreviewedTotal_one": "{{count}} task has an unreviewed instruction.",
+		"unreviewedTotal_other": "{{count}} tasks have unreviewed instructions.",
+		"allReviewed": "all reviewed",
+		"col": {
+			"suite": "Suite",
+			"mined": "Mined / tasks",
+			"admitted": "Mined and admitted",
+			"unreviewed": "Unreviewed instructions"
+		}
+	},
+	"support": {
+		"title": "Support scorecard",
+		"description": "Customer support numbers per arm over the {{condition}} runs. Resolution is verified success: the helpdesk state, the policy and what the customer was told all checked.",
+		"descriptionLLM": "Customer support numbers per arm over the {{condition}} runs, with a model-played customer. Compare these only with runs under the same simulated user: a different simulator model can move resolution on its own (simulator spread).",
+		"synthetic": "smoke test, not findings",
+		"resolution": "Resolution",
+		"resolvedOf": "{{resolved}} of {{decided}} chats resolved",
+		"costPerResolution": "Cost per resolution",
+		"escalationRate": "Escalation rate",
+		"escalationCorrect": "escalated correctly in {{rate}}",
+		"policyViolationRate": "Policy violation rate",
+		"runs_one": "{{count}} run",
+		"runs_other": "{{count}} runs",
+		"extra": "user turns per chat {{turns}}; simulator cost {{cost}} (never part of the agent's cost)"
+	},
+	"research": {
+		"title": "Research scorecard",
+		"description": "Research numbers per arm over the {{condition}} runs. Verified means a right answer with acceptable sources (no invented page, an evidence page cited). Citations grounded is the share of cited pages that the run's own Tavily searches returned, from the tool proxy's ledger.",
+		"replay": "replayed searches",
+		"live": "live search results, not repeatable",
+		"synthetic": "smoke test, not findings",
+		"verified": "Verified",
+		"passedOf": "{{passed}} of {{decided}} answers verified",
+		"grounded": "Citations grounded",
+		"groundedHint": "cited pages this run's searches returned",
+		"precision": "Citation precision",
+		"searches": "Searches per run",
+		"cited": "sources cited per run {{cited}}",
+		"runs_one": "{{count}} run",
+		"runs_other": "{{count}} runs",
+		"unmatched": "{{mean}} searches per run were not in the recording (the agent got an error): widen the cassette"
+	},
+	"calibration": {
+		"title": "Judge calibration",
+		"subtitle": "How often a judged suite's judge agrees with people. A judged verdict is capped at INCONCLUSIVE until the judge has a calibration record, and is INVALID when the judge is shown unreliable.",
+		"pickSuite": "Judged suite",
+		"noJudgedSuites": "No suite is judged. A verified suite's outcomes come from a deterministic check and need no calibration.",
+		"loadError": "Calibration could not be loaded",
+		"cardTitle": "Judge of {{suite}}",
+		"judge": "Judge {{provider}}/{{model}}, prompt {{prompt}}",
+		"agreement": "Agreement with people (exact 95%)",
+		"kappa": "Cohen's kappa",
+		"tnr": "True negative rate (exact 95%)",
+		"fprBound": "False-positive rate, upper bound",
+		"setSize": "Calibration set",
+		"setSizeValue": "{{human}} human-labelled, {{seeds}} seeds, {{disputed}} disputed ({{rows}} rows)",
+		"date": "Calibrated",
+		"never": "never",
+		"thresholds": "Thresholds",
+		"thresholdsValue": "agreement >= {{agreement}}, TNR >= {{tnr}} (lower bounds), {{labels}}+ labels",
+		"runHint": "Measure the judge on the labels with: heimdall judge calibrate {{suite}} (it forecasts the cost and asks first).",
+		"contested_one": "{{count}} contested",
+		"contested_other": "{{count}} contested",
+		"capped": "capped from {{decision}}",
+		"arm": "Arm",
+		"raw": "Raw judged rate",
+		"corrected": "Corrected for judge error",
+		"reportOnly": "The corrected rate uses the judge's measured TPR and TNR (Rogan-Gladen). It is shown for reading only and never replaces the verdict.",
+		"labelTitle": "Label an answer",
+		"readOnly": "Labels are written only on a live server (this one is {{mode}}).",
+		"task": "Task",
+		"pickTask": "Pick a task",
+		"answer": "Answer",
+		"label": "Label",
+		"pickLabel": "Pick correct or incorrect",
+		"labeller": "Your name",
+		"note": "Note",
+		"token": "Write token",
+		"submit": "Add label",
+		"incomplete": "Task, answer, label and your name are required.",
+		"noLabels": "No labels yet.",
+		"source": "Source",
+		"seed": "seed (weak)",
+		"labelsTitle": "Labels",
+		"labels": {
+			"correct": "Correct",
+			"incorrect": "Incorrect"
+		},
+		"sources": {
+			"human_review": "Review",
+			"label": "Label",
+			"import": "Import",
+			"admission_control": "Admission control"
+		},
+		"state": {
+			"calibrated": "Calibrated",
+			"few_labels": "Few labels",
+			"uncalibrated": "Not calibrated",
+			"allowed_uncalibrated": "Not calibrated (allowed)",
+			"unreliable": "Unreliable",
+			"not_judged": "Not judged"
+		}
+	},
+	"adaptive": {
+		"title": "Trials and tier",
+		"tier_one": "tier {{tier}}: {{count}} task",
+		"tier_other": "tier {{tier}}: {{count}} tasks",
+		"tierNote": "Compare this experiment with one of another tier only on their common tasks.",
+		"ruleTask": "adaptive trials: per task",
+		"ruleSequential": "adaptive trials: sequential looks",
+		"extendsCombined": "follow-up of {{exp}}: decided together (pre-declared rule)",
+		"extendsExploratory": "follow-up of {{exp}}: pooled analysis is exploratory",
+		"used": "Trials used",
+		"usedValue": "{{run}} of {{max}} slots",
+		"saved": "Runs saved",
+		"savedHint": "optional slots the frozen rule never released: not required, not missing",
+		"stop": "Stopping reason",
+		"alpha": "Decision alpha",
+		"alphaHint": "the alpha the primary decision used",
+		"atLook": "{{text}} at look {{look}} of {{looks}}",
+		"reason": {
+			"concordant": "every task concordant",
+			"max_reached": "some tasks used every trial",
+			"efficacy": "clear result",
+			"futility": "no later look could decide",
+			"final_look": "last look analysed",
+			"waiting": "waiting for runs"
+		},
+		"look": "Look",
+		"lookTasks": "Tasks",
+		"lookAlpha": "Alpha",
+		"lookP": "p (lower / upper bound)",
+		"lookOutcome": "Outcome",
+		"taskSummary": "{{stopped}} of {{total}} tasks stopped early (both arms agreed every trial); {{full}} used every planned trial.",
+		"excluded_one": "{{count}} run of a slot the rule did not release was left out of the analysis.",
+		"excluded_other": "{{count}} runs of slots the rule did not release were left out of the analysis.",
+		"more": "To detect {{pp}} pp you need about {{tasks}} more tasks, estimated cost {{cost}}.",
+		"costUnknown": "unknown",
+		"sdAssumed": "SD {{sd}} assumed (no A/A arm).",
+		"sdMeasured": "SD {{sd}} measured from the A/A arm.",
+		"combined": "A follow-up is decided together with this experiment by the pre-declared inverse-normal rule at alpha {{alpha}}.",
+		"exploratory": "No combination rule was declared: a follow-up decides on its own; pooling it with this experiment is exploratory."
+	},
+	"export": {
+		"title": "Export",
+		"runs_one": "{{count}} sealed run",
+		"runs_other": "{{count}} sealed runs",
+		"eee": "Every Eval Ever records (JSON lines)",
+		"eeeNote": "One aggregate record per arm, validated against the vendored Every Eval Ever schema 0.3.0, with the manifest and seal hashes.",
+		"eeeSyntheticNote": "Synthetic results (scripted agent, scripted model or smoke run): exported labelled synthetic, not as findings.",
+		"jsonl": "Run table (JSONL)",
+		"csv": "Run table (CSV)",
+		"tableNote": "One row per sealed run: ids, outcome, cost and every metric; an unobserved metric is empty, never zero.",
+		"traces": "Traces to Langfuse, LangSmith, Braintrust, Datadog, Maxim, Phoenix or Jaeger go from the CLI, with the backend's credentials in your environment:",
+		"harbor": "Harbor task folders (tar.gz)",
+		"harborNote": "The suite's admitted public tasks as Harbor tasks. Hidden tests, expected answers and reference solutions are withheld: tests/test.sh exits without a reward.",
+		"harborCli": "A runnable export carries the hidden tests, so only the CLI writes it, on purpose:"
+	},
+	"live": {
+		"title": "Live traffic",
+		"subtitle": "Real sessions read from the Bifrost gateway (read-only), scored without ground truth, two live versions compared with an always-valid sequential test, failures sent to the failure inbox.",
+		"loadError": "Could not load live scoring",
+		"pull": "Pull now",
+		"pulled": "Pulled: {{sessions}} sessions scored",
+		"pullError": "The pull failed",
+		"evidenceLabel": "Live evidence.",
+		"unconfigured": "Live scoring is not configured. Run `bifrost-bench livescore init` and set the versions in livescore/config.yaml (docs/live-scoring.md).",
+		"problem": "Live scoring is off: {{problem}}",
+		"result": {
+			"better": "Better",
+			"worse": "Worse",
+			"not_yet_known": "Not yet known"
+		},
+		"source": {
+			"title": "What is read",
+			"description": "Only GET requests to the gateway's log API leave; no prompt or output is stored here.",
+			"gateway": "Gateway",
+			"readOnly": "read-only",
+			"lastPull": "Last pull",
+			"never": "never",
+			"grouping": "Sessions",
+			"groupingCounts": "{{id}} by session id, {{gap}} by idle gap ({{concurrent}} with overlapping requests)",
+			"privacy": "Kept",
+			"privacyText": "{{rate}}% of sessions scored, kept {{days}} days; numbers and flags only, inbox transcripts redacted",
+			"judge": "Judge"
+		},
+		"compare": {
+			"none": "No comparison: set compare: in livescore/config.yaml with a baseline and a candidate version.",
+			"title": "{{candidate}} against {{baseline}}",
+			"description": "False-alarm rate {{alpha}} over {{signals}} signals and every look; a signal decides when its e-value reaches {{threshold}}, after at least {{pairs}} pairs.",
+			"counts": "{{candidate}} candidate and {{baseline}} baseline sessions.",
+			"restarts": "Restarted {{count}} times; each restart tests only sessions scored after it.",
+			"label": "Live comparison by signal",
+			"needPairs": "pairs still needed: {{count}}",
+			"columns": {
+				"signal": "Signal",
+				"pairs": "Pairs",
+				"baseline": "Baseline",
+				"candidate": "Candidate",
+				"eWorse": "E worse",
+				"eBetter": "E better",
+				"decision": "Decision"
+			}
+		},
+		"series": {
+			"empty": "No session scored yet.",
+			"title": "Signals over time",
+			"description": "Each version's mean per hour (per day past three days), on one scale per signal; the last 24 hours with the sessions counted.",
+			"legend": "{{name}}: {{sessions}} sessions, {{flagged}} flagged ({{selector}})",
+			"label": "Live signals by version",
+			"sparkLabel": "{{signal}} over time",
+			"columns": {
+				"signal": "Signal",
+				"last24h": "{{name}}, last 24 h",
+				"trend": "Over time"
+			}
+		},
+		"worst": {
+			"empty": "No failing session scored.",
+			"title": "Worst sessions",
+			"description": "Failing sessions by severity; the worst failure signatures of each pull are in the failure inbox, where they become regression task drafts.",
+			"label": "Worst live sessions",
+			"notPushed": "not pushed",
+			"columns": {
+				"session": "Session",
+				"version": "Version",
+				"ended": "Ended",
+				"flags": "Flags",
+				"requests": "Requests",
+				"inbox": "Inbox item"
+			}
+		}
+	},
+	"migration": {
+		"title": "Model migration",
+		"subtitle": "One agent moved from one model to others on a model matrix experiment: a verdict per model pair overall and per stratum (exact sign-flip test, Holm across the strata), cost per verified success and why it moved, behaviour differences, flipped tasks and a recommendation that follows the release policy and is never stronger than the tests.",
+		"listError": "Could not load experiments",
+		"noExperiments": "No experiments yet. Run `heimdall migrate -agent <config> -from <model> -to <model> -suite <suite> -yes`, then read its report here.",
+		"experiment": "Experiment {{id}}",
+		"fromLabel": "Old model or arm",
+		"toLabel": "New models or arms",
+		"loadError": "Could not load the migration report",
+		"unknown": "unknown",
+		"synthetic": "Synthetic: scripted agent, scripted model or smoke experiment. The numbers are not findings.",
+		"facts": "Suite {{suite}}. Old model {{from}} (arm {{arm}}). Overall verdicts on {{condition}}, alpha {{alpha}}.",
+		"policy": "Release policy: {{name}}.",
+		"noPolicy": "No release policy evaluated.",
+		"action": {
+			"migrate": "Migrate.",
+			"do_not_migrate": "Do not migrate.",
+			"not_enough_evidence": "Not enough evidence."
+		},
+		"pairName": "{{from}} to {{to}} (arm {{arm}})",
+		"models": {
+			"arm": "Arm",
+			"model": "Model",
+			"success": "Verified success [95%]",
+			"passk": "pass^k",
+			"costPerSuccess": "Cost per verified success",
+			"costPerRun": "Median cost per run",
+			"tokens": "Median tokens",
+			"wall": "Median wall s",
+			"steps": "Median steps",
+			"latency": "Latency per turn",
+			"pareto": "Pareto position"
+		},
+		"overall": "Overall:",
+		"strata": {
+			"caption_one": "Every stratum of this pair is one Holm family of {{family}} test.",
+			"caption_other": "Every stratum of this pair is one Holm family of {{family}} tests.",
+			"stratum": "Stratum",
+			"tasks": "Tasks",
+			"betterWorse": "Better / worse",
+			"meanDiff": "Mean difference",
+			"p": "p",
+			"pAdjusted": "p after Holm",
+			"result": "Result"
+		},
+		"dimension": {
+			"condition": "Condition",
+			"task_kind": "Task kind",
+			"capability": "Capability",
+			"tag": "Tag",
+			"difficulty_declared": "Declared difficulty",
+			"difficulty_observed": "Observed difficulty"
+		},
+		"result": {
+			"better": "better",
+			"worse": "worse",
+			"cannot_tell": "cannot tell"
+		},
+		"tasksNeeded_one": "About {{count}} task would detect a difference of this size with 80% power.",
+		"tasksNeeded_other": "About {{count}} tasks would detect a difference of this size with 80% power.",
+		"behaviour": {
+			"title": "Behaviour (old / new)",
+			"falseCompletion": "False completion",
+			"rejected": "Rejected requests per run (4xx: malformed request or tool call)",
+			"refusals": "Refusals per run",
+			"retries": "Retries per run",
+			"fallbacks": "Fallbacks per run",
+			"gate": "Gate {{gate}} fired in {{from}} / {{to}} runs ({{status}})",
+			"newCluster": "Failure cluster only the new model shows: {{title}} ({{count}} runs)",
+			"fixedCluster": "Failure cluster the new model fixed: {{title}} ({{count}} runs)"
+		},
+		"gateStatus": {
+			"new": "new",
+			"fixed": "fixed",
+			"both": "in both"
+		},
+		"conditions": {
+			"condition": "Condition",
+			"runs": "Runs (old / new)",
+			"success": "Success (old / new)",
+			"falseCompletion": "False completion (old / new)"
+		},
+		"flipped": {
+			"title_one": "{{count}} flipped task",
+			"title_other": "{{count}} flipped tasks",
+			"open": "open run pair"
+		},
+		"flipKind": {
+			"regressed": "regressed",
+			"fixed": "fixed"
+		},
+		"cost": {
+			"title": "Why the cost moved",
+			"loadError": "Could not load the cost explanation",
+			"row": {
+				"model": "Model (served)",
+				"runs": "Graded runs (verified)",
+				"perRun": "Cost per run",
+				"perSuccess": "Cost per verified success",
+				"cacheNeutral": "Cache-neutral cost per success",
+				"cacheRead": "Cache read share",
+				"turns": "Model turns per run",
+				"tokensPerTurn": "Input / output tokens per turn",
+				"attempts": "Retries / fallbacks / rejected per run",
+				"unpriced": "Unpriced / unsplit rows"
+			},
+			"runsValue": "{{runs}} ({{successes}})",
+			"arm": "Arm {{arm}}: {{label}}",
+			"perRun": "Cost per run, B minus A",
+			"perSuccess": "Cost per verified success, B minus A",
+			"apart": "Measuring costs, kept apart from the agent's cost (A / B)",
+			"cache": "Cache",
+			"noCacheBreak": "No silent cache break: the cache read share did not drop by 10 points or more between the arms or over time.",
+			"cacheBreak": "Cache read share of arm {{arm}} dropped to {{after}} from {{before}} ({{baseline}}).",
+			"likelyCause": "Likely cause:",
+			"notApplicable": "Not applicable: {{reason}}.",
+			"fromTo": "A {{from}}, B {{to}}, difference {{total}}.",
+			"total": "Total",
+			"legend": "Parts sum to the total; a hatched bar is an unknown part's range"
+		},
+		"pareto": {
+			"title": "Cost against verified success",
+			"loadError": "Could not load the cost against success plane",
+			"summary_one": "Cost against verified success: {{placed}} of {{count}} config placed; x is {{axis}}.",
+			"summary_other": "Cost against verified success: {{placed}} of {{count}} configs placed; x is {{axis}}.",
+			"frontierList": "On the frontier: {{list}}.",
+			"noFrontier": "No config could be placed.",
+			"legendFrontier": "Filled, joined: on the frontier (nothing is both cheaper and more successful)",
+			"legendDominated": "Hollow, grey: dominated",
+			"legendInterval": "Bar: 95% success interval",
+			"notPlaced": "not placed: {{reason}}",
+			"onFrontier": "on the frontier at {{x}}, {{y}}",
+			"dominated": "at {{x}}, {{y}}, dominated by {{by}}"
+		}
+	},
+	"visual": {
+		"title": "Visual grade",
+		"checksPassed": "{{passed}} of {{total}} checks passed",
+		"kind": {
+			"browser": "browser capture",
+			"desktop": "desktop screenshot",
+			"artifact": "artifact"
+		},
+		"judged": "judged",
+		"judgedHint": "A vision judge model gave part of this grade. Its verdict counts toward an experiment's verdict only under a calibration record (judge_calibration).",
+		"capture": "Capture (taken by the bench)",
+		"reference": "Reference (hidden)",
+		"diff": "Difference (red: differs, blue: masked)",
+		"unsealed": "The images are served once the run is sealed.",
+		"masks": "Masked, ignored by every check: {{list}}",
+		"size": "{{w}}x{{h}}",
+		"service": "service {{id}}",
+		"scale": "scale {{scale}}",
+		"fullPage": "full page",
+		"renderer": "rendered with {{image}}",
+		"fonts": "fonts {{sha}}",
+		"pointerParked": "pointer parked",
+		"noChecks": "No deterministic checks.",
+		"pass": "pass",
+		"fail": "fail",
+		"col": {
+			"check": "Check",
+			"method": "Method",
+			"value": "Value",
+			"threshold": "Threshold",
+			"result": "Result",
+			"detail": "Detail"
+		},
+		"judge": {
+			"title": "Vision judge",
+			"calibrated": "calibrated",
+			"uncalibrated": "uncalibrated: reports, does not decide",
+			"line": "{{model}}, prompt {{prompt}}, {{aggregate}} of votes {{votes}}, score {{score}}",
+			"noScore": "none",
+			"record": "Calibration record {{ref}}.",
+			"agreement": "Agreement with people {{k}} of {{n}} ({{value}}).",
+			"rationale": "Judge's words:"
+		}
+	},
+	"voice": {
+		"title": "Voice call",
+		"witness": "caller timeline",
+		"ended": "ended by {{by}} after {{length}}",
+		"noCall": "No call to show: {{reason}}",
+		"noAudio": "The run kept no call audio (hashes only, or nothing was played).",
+		"summary": "First agent audio after {{first}}; {{turns}} answered turns; dead air {{deadAir}} (gaps over {{bound}}); {{clears}} clear messages from the agent.",
+		"who": {
+			"caller": "caller",
+			"agent": "agent"
+		},
+		"track": {
+			"caller": "Caller audio (what the agent heard)",
+			"agent": "Agent audio (as the caller played it)"
+		},
+		"turn": "Turn",
+		"latency": "Latency (red: dead air)",
+		"gap": "Gap",
+		"noAnswer": "no answer",
+		"kind": {
+			"greeting": "greeting",
+			"opening": "caller opening",
+			"reply": "caller line {{turn}}",
+			"reprompt": "reprompt {{turn}}"
+		},
+		"bargeHandled": "stopped",
+		"bargeMissed": "kept talking",
+		"barge": "the agent's audio stopped {{after}} after the caller talked over it ({{by}}; bound {{bound}})",
+		"inaudible": "(not transcribed)"
 	}
 }

@@ -1,0 +1,11 @@
+# Keys of bench.ts `CanaryBaseline`, one per line; a trailing ? marks an optional (Go omitempty) key.
+# W5 drift canary (handlers/canary.go, bench/canary, docs/drift-canary.md). Change with bench.ts.
+exp_id
+manifest_hash
+fingerprint
+pinned_at
+created_at
+served
+clusters
+smoke?
+note?

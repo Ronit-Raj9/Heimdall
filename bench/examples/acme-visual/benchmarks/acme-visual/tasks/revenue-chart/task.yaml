@@ -1,0 +1,47 @@
+# Finance wants the quarterly revenue as a bar chart for the board deck,
+# drawn exactly to the house chart spec. The agent writes an SVG. Graded on
+# what the chart looks like when the bench renders it, plus a structure
+# check that the file is a well-formed SVG of the right size with four bars.
+id: revenue-chart
+version: 1.0.0
+title: Draw the quarterly revenue bar chart to the house spec
+project: acme-visual
+kind: feature
+instruction: instruction.md
+# The workspace holds the figures and the chart spec; the agent writes
+# chart/revenue.svg.
+repo_dir: repo
+output:
+  kind: artifact
+  artifacts:
+    - {id: chart, path: chart/revenue.svg, required: true, max_bytes: 262144}
+  visual:
+    # The bench renders the SVG in the clean-room renderer at its own size.
+    capture: {kind: artifact, artifact: chart, width: 480, height: 320}
+    # Hidden: the chart drawn to the spec from the right figures.
+    reference: verifier/reference.png
+    # At most 0.01% of pixels (15 of 153,600) may differ by more than 32 in
+    # a channel: a missing label or a bar of the wrong height is hundreds.
+    method: pixel
+    threshold: 0.0001
+    tolerance: 32
+    checks:
+      - {id: size, method: dimensions}
+      - {id: bars-blue, method: colors, colors: ["#2563eb"], min_share: 0.1}
+verifier:
+  tests: verifier/tests
+  required: []
+protected: []
+controls:
+  reference: solution/reference.sh
+  empty: controls/empty.sh
+  mutants: [controls/mutant-missing-label.sh, controls/mutant-wrong-value.sh]
+  exploit: controls/exploit.sh
+timeouts:
+  agent_s: 600
+capabilities: [visual_design, data_to_chart, file_output]
+difficulty: medium
+provenance:
+  source: bench/examples/acme-visual (fictional Acme revenue figures, written for this example)
+  license: MIT
+  created_by: hand-written example

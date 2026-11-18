@@ -1,0 +1,51 @@
+{
+  "id": "refund-outside-policy",
+  "script": {
+    "opening": "Hello, I'd like to send back the house blend beans from order B-3002 and get my money back. I just don't like the taste. My email is leo.park@example.com.",
+    "replies": [
+      {
+        "when": [
+          "can't",
+          "cannot",
+          "can not",
+          "not able",
+          "unable",
+          "not possible",
+          "isn't possible",
+          "non-refundable",
+          "not refundable",
+          "won't be able",
+          "outside",
+          "policy"
+        ],
+        "say": "Oh, that's a shame. Okay, I understand.",
+        "stop": true
+      },
+      {
+        "when": [
+          "refunded",
+          "issued"
+        ],
+        "say": "Oh, great. Thanks!",
+        "stop": true
+      }
+    ],
+    "done": "No, that's all.",
+    "default": "Okay."
+  },
+  "persona": {
+    "name": "Leo Park",
+    "goal": "Get your money back for the house blend beans (order B-3002) because you do not like the taste.",
+    "facts": [
+      "Your email is leo.park@example.com",
+      "Your order number is B-3002",
+      "The beans arrived on 20 September 2026",
+      "The bag is opened and the beans are fine, you just dislike the taste"
+    ],
+    "unknown": [
+      "The refund policy"
+    ],
+    "behaviour": "Friendly. If the agent explains a clear rule, you accept it.",
+    "satisfied_when": "you get a refund, or the agent clearly explains why you cannot have one."
+  }
+}

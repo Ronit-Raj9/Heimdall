@@ -35,6 +35,7 @@ type rawGatewayRow struct {
 // Gateway request kinds and statuses this package reads.
 const (
 	kindMessage      = "message"
+	kindAudio        = "audio" // X8 voice agents: speech, transcription and Realtime turn rows
 	statusSuccess    = "success"
 	statusError      = "error"
 	statusProcessing = "processing"

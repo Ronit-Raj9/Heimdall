@@ -1,0 +1,4 @@
+# Keys of bench.ts `CanaryDefinitionLoad`, one per line; a trailing ? marks an optional (Go omitempty) key.
+# W5 drift canary (handlers/canary.go, bench/canary, docs/drift-canary.md). Change with bench.ts.
+name
+error

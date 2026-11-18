@@ -29,9 +29,9 @@ const (
 	SetTaskSet  = "task_set"       // published (default) or all
 	SetNL       = "nl_assertions"  // skip (default) or unscored
 	SetNoop     = "noop_tasks"     // skip (default) or include
-	SetUser     = "user"           // scripted (default); llm is not built
+	SetUser     = "user"           // scripted (default) or llm (a pinned model plays the user, W3)
 	SetRef      = "ref"            // upstream commit, when -from is not a git clone
-	SetMaxTurns = "max_user_turns" // replies before the scripted user leaves; default 30
+	SetMaxTurns = "max_user_turns" // replies before the user leaves; default 30
 )
 
 // Values of the settings above.
@@ -43,6 +43,7 @@ const (
 	NoopSkip         = "skip"
 	NoopInclude      = "include"
 	UserScripted     = "scripted"
+	UserLLM          = "llm" // W3 customer support: upstream's model-played user through bench/simuser
 )
 
 // supportedDomains are the domains whose tasks need only agent tools and a
@@ -152,8 +153,8 @@ func parseSettings(extra map[string]string) (settings, error) {
 	if s.noop, err = pick(SetNoop, NoopSkip, NoopSkip, NoopInclude); err != nil {
 		return s, err
 	}
-	if v := extra[SetUser]; v != "" && v != UserScripted {
-		return s, fmt.Errorf("%s=%q: only %s is built (a model-played user is not)", SetUser, v, UserScripted)
+	if s.user, err = pick(SetUser, UserScripted, UserScripted, UserLLM); err != nil {
+		return s, err
 	}
 	s.ref = extra[SetRef]
 	if v := extra[SetMaxTurns]; v != "" {

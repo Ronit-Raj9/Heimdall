@@ -1,0 +1,4 @@
+# Sealed run folders stay on the machine that ran them.
+runs/
+# Runs written by `bifrost-bench agent check`.
+checks/

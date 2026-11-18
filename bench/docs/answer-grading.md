@@ -110,6 +110,8 @@ A judge is only as good as its agreement with the task's intent, so every judged
 
 A task whose judge disagrees on any of them is not admitted. The record goes into `suite.lock` like any admission, so a run's verdict rests on tasks where this judge, with this prompt, was seen to tell right from wrong. Change the judge and admit again.
 
+Admission controls are easy cases written by the suite author. Whether the judge agrees with people on agents' real answers is measured apart, with human labels: `heimdall judge calibrate <suite>` writes a calibration record, and a judged verdict without one for the exact judge and prompt is at most INCONCLUSIVE (docs/judge-calibration.md). The controls can seed that set, as weak items reported apart.
+
 ## Metrics
 
 | Metric | What it is |

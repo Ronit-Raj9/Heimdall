@@ -1,0 +1,10 @@
+# Keys of bench.ts `CanaryEquivalence`, one per line; a trailing ? marks an optional (Go omitempty) key.
+# W5 drift canary (handlers/canary.go, bench/canary, docs/drift-canary.md). Change with bench.ts.
+model
+arm_a
+arm_b
+label_a
+label_b
+tests
+verdict
+reason

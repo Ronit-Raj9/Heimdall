@@ -1,0 +1,14 @@
+# Keys of bench.ts `CalibrationStats`, one per line. W8 judge calibration. Change with bench.ts.
+items
+positives
+negatives
+tp
+fp
+fn
+tn
+undecided
+agreement
+tpr
+tnr
+fpr
+kappa

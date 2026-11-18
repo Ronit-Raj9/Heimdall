@@ -339,6 +339,9 @@ func (d *Daemon) acquire(name string) (func() error, error) {
 // cap must fit under max_usd_per_day, because the engine may spend up to the
 // cap (and counts unknown costs at its estimate) before it stops leasing.
 func (d *Daemon) capRefusal(s Schedule, day string) string {
+	if s.Job != "" {
+		return "" // a built-in job spends nothing
+	}
 	exp, err := d.o.Load(Resolve(d.o.Root, s.Experiment))
 	if err != nil {
 		return "experiment file: " + err.Error()

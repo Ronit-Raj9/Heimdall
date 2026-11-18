@@ -31,22 +31,25 @@ func register(name, summary string, run func(args []string) int) {
 }
 
 func main() {
+	progName = programName(os.Args[0])                      // Heimdall binary name (progname.go)
+	flushStderr := renameUsageStderr(progName)              // Heimdall binary name: usage lines print the started name
+	exit := func(code int) { flushStderr(); os.Exit(code) } // Heimdall binary name
 	if len(os.Args) < 2 {
 		usage()
-		os.Exit(exitUsage)
+		exit(exitUsage)
 	}
 	name := os.Args[1]
 	if name == "-h" || name == "--help" || name == "help" {
 		usage()
-		return
+		exit(exitOK)
 	}
 	cmd, ok := commands[name]
 	if !ok {
-		fmt.Fprintf(os.Stderr, "unknown command %q\n\n", name)
+		fmt.Fprintf(os.Stderr, "%s: unknown command %q\n\n", progName, name)
 		usage()
-		os.Exit(exitUsage)
+		exit(exitUsage)
 	}
-	os.Exit(cmd.run(os.Args[2:]))
+	exit(cmd.run(os.Args[2:]))
 }
 
 func usage() {
@@ -56,7 +59,7 @@ func usage() {
 	}
 	sort.Strings(names)
 	var b strings.Builder
-	b.WriteString("usage: bifrost-bench <command> [flags]\n\ncommands:\n")
+	b.WriteString("usage: " + progName + " <command> [flags]\n\ncommands:\n")
 	for _, n := range names {
 		fmt.Fprintf(&b, "  %-10s %s\n", n, commands[n].summary)
 	}

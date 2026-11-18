@@ -1,0 +1,15 @@
+# Keys of bench.ts `AdaptiveReport` (schemas/trials.go, W7). Change with bench.ts.
+rule
+max_slots
+required_slots
+run_slots
+runs_saved
+stop_reason
+stop_look?
+looks?
+decision_alpha
+tasks?
+look_results?
+excluded?
+notes?
+conditions?

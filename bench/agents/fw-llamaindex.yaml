@@ -1,0 +1,44 @@
+# Framework agent: a LlamaIndex coding agent (FunctionAgent with function
+# tools, OpenAILike), code in examples/frameworks/llamaindex/. It runs
+# unchanged: the only bench-specific things are the standard OpenAI variables
+# below (LlamaIndex reads OPENAI_API_BASE), which point it at Bifrost with the
+# run's key.
+#
+# Speaks OpenAI chat completions to Bifrost's /openai/v1 route. AGENT_MODEL
+# is sent as the model id; a bare id goes to the openai provider.
+# To run it on another provider, override gateway.provider, model and
+# env.AGENT_MODEL together, e.g.
+#   set: {gateway.provider: anthropic, model: claude-sonnet-4-5, env.AGENT_MODEL: "anthropic/{{model}}"}
+# No parser: gateway-level evidence. docs/frameworks.md is the guide.
+id: fw-llamaindex
+adapter: command
+image: bench/agent-fw-llamaindex:1
+build:
+  dockerfile: examples/frameworks/llamaindex/Dockerfile
+  tag: bench/agent-fw-llamaindex:1
+  base_arg: BASE_IMAGE
+argv:
+  - fw-agent
+  - "{{instruction_file}}"
+env:
+  OPENAI_BASE_URL: "{{gateway.url}}/openai/v1"
+  OPENAI_API_KEY: "{{run.key}}"
+  AGENT_MODEL: "{{model}}"
+  AGENT_MAX_STEPS: "40"
+  AGENT_SESSION_ID: "{{run.session}}"
+  OPENAI_API_BASE: "{{gateway.url}}/openai/v1"
+  # Telemetry: LlamaIndex sends nothing but the model calls; its tokenizer
+  # and NLTK data ship inside the package.
+# Placeholder: every experiment sets the model (an arm may vary it).
+model: gpt-5.4-mini
+notes:
+  project_file: AGENTS.md
+# The same budgets as agents/codex.yaml, so a matrix with Codex compares
+# agents, not machines. The agent's own step cap is AGENT_MAX_STEPS.
+budgets:
+  wall_s: 900
+  cpus: 2
+  mem_gb: 4
+gateway:
+  provider: openai
+  max_retries: 0

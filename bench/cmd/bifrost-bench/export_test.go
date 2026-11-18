@@ -183,8 +183,8 @@ func TestExportOTLPUsage(t *testing.T) {
 			}
 		})
 	}
-	if runExport(nil) != exitUsage || runExport([]string{"csv"}) != exitUsage {
-		t.Fatal("export without the otlp subcommand must be a usage error")
+	if runExport(nil) != exitUsage || runExport([]string{"xml"}) != exitUsage {
+		t.Fatal("export without a known subcommand must be a usage error")
 	}
 }
 

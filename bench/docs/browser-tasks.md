@@ -286,6 +286,10 @@ internal network.
 - **No visual grading.** Outcomes come from the exported state. A task
   whose result is only visible on screen (a chart, a layout) is not a
   browser task here.
+  X1 vision grading adds that: with `grader: visual` and `output.visual`
+  the bench takes its own screenshot after the session and checks it
+  against a hidden reference, beside the state checks
+  ([`visual-grading.md`](visual-grading.md)).
 - **No desktop applications.** The browser is the only interface.
 - **Image size.** The browser image is about 1.45 GB, pulled once per
   machine.

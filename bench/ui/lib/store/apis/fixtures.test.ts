@@ -268,6 +268,66 @@ function contractFor(file: string): { type: string; nested: Record<string, strin
 		"reviews.create.json": { type: "Review", nested: {} },
 	};
 	if (byFile[file]) return byFile[file];
+	// Failure inbox area: the list, then one item's detail per id.
+	if (file === "inbox.json" || file.startsWith("inbox.")) {
+		const item = file === "inbox.json" ? "items[]" : "item";
+		return {
+			type: file === "inbox.json" ? "InboxList" : "InboxItemDetail",
+			nested: {
+				...(file === "inbox.json"
+					? {
+							"sources[]": "InboxSourceStatus",
+							"suites[]": "InboxSuite",
+							"items[].task": "InboxTaskLink",
+							"items[].release": "InboxReleaseStatus",
+						}
+					: {}),
+				[item]: "InboxItem",
+				[`${item}.signature_parts`]: "InboxSignatureParts",
+				[`${item}.traces[]`]: "InboxTraceRef",
+			},
+		};
+	}
+	// W5 drift canary: the list, then one canary's detail per name.
+	// W3 customer support: one experiment's support scorecard.
+	if (file.startsWith("experiments.support.")) {
+		return { type: "SupportSummary", nested: { "arms[]": "SupportArm" } };
+	}
+	if (file === "canaries.json") {
+		return {
+			type: "CanaryList",
+			nested: {
+				"canaries[]": "CanarySummary",
+				"canaries[].targets[]": "CanaryTarget",
+				"canaries[].baseline": "CanaryBaseline",
+				"canaries[].baseline.served[]": "CanaryServed",
+				"canaries[].last_look": "CanaryRecord",
+				"errors[]": "CanaryDefinitionLoad",
+			},
+		};
+	}
+	if (file.startsWith("canaries.")) {
+		return {
+			type: "CanaryDetail",
+			nested: {
+				summary: "CanarySummary",
+				definition: "CanaryDefinition",
+				"definition.budget": "CanaryBudget",
+				"baselines[]": "CanaryBaseline",
+				"records[]": "CanaryRecord",
+				"records[].comparison": "CanaryComparison",
+				"records[].comparison.tests[]": "CanaryMetricTest",
+				"records[].changes": "CanaryChanges",
+				"records[].changes.arms[]": "CanaryArmChanges",
+				// Only the nightly fixture watches one model through two providers.
+				...(file === "canaries.nightly.json" ? { "records[].equivalence[]": "CanaryEquivalence", "pairs[]": "CanaryEquivalencePair" } : {}),
+				"records[].served[]": "CanaryServed",
+				"records[].points[]": "CanaryArmPoint",
+				"history[]": "TrendLineage",
+				"history[].points[]": "TrendPoint",
+			},
+		};
+	}
 	if (file === "suites.json") {
 		return {
 			type: "SuiteList",

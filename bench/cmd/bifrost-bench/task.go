@@ -19,11 +19,13 @@ func init() {
 const taskUsage = `usage: bifrost-bench task init -suite <suite> -id <task> -repo <git repo> -base <commit> -reference <commit>
            [-tests <glob,...>] [-license <spdx|proprietary>] [-capabilities a,b] [-difficulty easy|medium|hard]
            [-kind bugfix|feature|refactor|performance] [-force] [-config deploy/bench.yaml]
-       bifrost-bench task init -suite <suite> -id <task> [-kind tool-use|mcp|browser|memory|qa|artifact|external-api|computer-use] [-from <task>]
+       bifrost-bench task init -suite <suite> -id <task> [-kind tool-use|mcp|browser|memory|qa|artifact|external-api|computer-use|research] [-from <task>] [-visual]
            [-license <spdx|proprietary>] [-force] [-config deploy/bench.yaml]
        bifrost-bench task validate [-config deploy/bench.yaml] <suite>/<task>
        bifrost-bench task admit [-config deploy/bench.yaml] <suite>/<task>
-       bifrost-bench task from-trace -suite <suite> -id <task> -trace <file> [-kind qa|tool-use|mcp|memory] [-redact=false]`
+       bifrost-bench task from-trace -suite <suite> -id <task> -trace <file> [-kind qa|tool-use|mcp|memory] [-redact=false]
+       bifrost-bench task mine [-limit 10] [-since <ref|date>] [-paths a,b] [-min-tests 1]   (same as tasks mine)
+       bifrost-bench task review <suite>/<task>`
 
 func runTask(args []string) int {
 	if len(args) == 0 {
@@ -39,6 +41,10 @@ func runTask(args []string) int {
 		return runTaskAdmit(args[1:])
 	case "from-trace": // task from-trace: draft a task from a recorded session (taskfromtrace.go)
 		return runTaskFromTrace(args[1:])
+	case "mine": // First workflow: task mine is tasks mine (tasksmine.go)
+		return runTasksMine(args[1:])
+	case "review": // First workflow: mark a mined task's instruction reviewed (tasksmine.go)
+		return runTaskReview(args[1:])
 	default:
 		fmt.Fprintf(os.Stderr, "unknown task subcommand %q\n%s\n", args[0], taskUsage)
 		return exitUsage
@@ -62,6 +68,7 @@ func runTaskInit(args []string) int {
 	kind := fs.String("kind", "bugfix", "bugfix, feature, refactor or performance; or tool-use, mcp, memory, qa or artifact for a scenario suite")
 	from := fs.String("from", "", "scenario suites: task whose shape is copied (default: the suite's first task)")
 	force := fs.Bool("force", false, "replace an existing task folder")
+	visualOut := fs.Bool("visual", false, "browser, computer-use and artifact tasks: add output.visual and move the suite to grader visual (X1, docs/visual-grading.md)")
 	pos, err := parseArgs(fs, args)
 	if err == nil && len(pos) == 0 && *suiteID != "" && *id != "" && (*repo == "" || scaffold.IsScenarioTemplate(*kind)) {
 		if *repo != "" || *base != "" || *ref != "" {
@@ -73,6 +80,7 @@ func runTaskInit(args []string) int {
 		}
 		return runScenarioTaskInit(fs, *config, *suiteID, scaffold.ScenarioTaskOptions{
 			ID: *id, Kind: explicit, From: *from, License: flagValue(fs, "license"), Force: *force,
+			Visual: *visualOut, // X1 vision grading
 		})
 	}
 	if err != nil || len(pos) != 0 || *suiteID == "" || *id == "" || *repo == "" || *base == "" || *ref == "" {

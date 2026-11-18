@@ -13,6 +13,7 @@ const version = "1.0.0"
 // Gateway request kinds and statuses the metrics read (schemas.GatewayRequest).
 const (
 	kindMessage       = "message"
+	kindAudio         = "audio" // X8 voice agents: speech, transcription and Realtime turn rows
 	statusSuccess     = "success"
 	statusProcessing  = "processing"
 	reasonNoLog       = "no gateway request log"

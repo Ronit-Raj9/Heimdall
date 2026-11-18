@@ -47,6 +47,7 @@ type ProviderSpec struct {
 	Message     []string `json:"message" yaml:"message"`
 	CountTokens []string `json:"count_tokens,omitempty" yaml:"count_tokens"`
 	Models      []string `json:"models,omitempty" yaml:"models"`
+	Audio       []string `json:"audio,omitempty" yaml:"audio"`             // X8 voice agents: speech and transcription routes (KindAudio)
 	SlotPrefix  string   `json:"slot_prefix,omitempty" yaml:"slot_prefix"` // default slots are <prefix>-slot-1..4
 }
 
@@ -97,6 +98,7 @@ func DefaultProviders() []ProviderSpec {
 			Message:     []string{"POST /v1/chat/completions", "POST /v1/responses"},
 			CountTokens: []string{"POST /v1/responses/input_tokens"},
 			Models:      []string{"GET /v1/models", "GET /v1/models/*"},
+			Audio:       []string{"POST /v1/audio/transcriptions", "POST /v1/audio/speech", "GET /v1/realtime"}, // X8 voice agents
 		},
 		{
 			Name: ProviderGemini, BaseURL: "https://generativelanguage.googleapis.com/v1beta", KeyEnv: "GEMINI_API_KEY",
@@ -229,6 +231,8 @@ func (p ProviderSpec) classify(r *http.Request) string {
 		return KindCountTokens
 	case matchAny(p.Models, r):
 		return KindModels
+	case matchAny(p.Audio, r): // X8 voice agents
+		return KindAudio
 	default:
 		return KindOther
 	}

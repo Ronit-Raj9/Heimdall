@@ -13,7 +13,7 @@ import (
 )
 
 func init() {
-	register("init", "scaffold a project folder for your own agents and tasks: init <dir> [-force]", runInit)
+	register("init", "scaffold a project: init <dir> [-force], or init inside a git repository to detect tests and agents and write .heimdall/", runInit)
 }
 
 // runInit writes a new project folder: deploy/, agents/, benchmarks/,
@@ -24,9 +24,15 @@ func runInit(args []string) int {
 	fs := flag.NewFlagSet("init", flag.ContinueOnError)
 	force := fs.Bool("force", false, "write into a folder that is not empty, replacing the scaffold's files")
 	name := fs.String("name", "", "project name for the README (default: the folder name)")
+	detect := fs.Bool("detect", false, "inside a git repository: detect tests, agent CLIs and Docker, and write .heimdall/ (the default with no folder argument)") // First workflow (quickstart.go)
+	testCmd := fs.String("test-cmd", "", "with -detect: the repository's test command, overriding the detected one")                                               // First workflow (quickstart.go)
+	image := fs.String("image", "", "with -detect: toolchain image for the suite (default: the helper image for Python, else base/Dockerfile)")                    // First workflow (quickstart.go)
 	pos, err := parseArgs(fs, args)
+	if err == nil && (*detect || len(pos) == 0) { // First workflow: init inside a repository (quickstart.go)
+		return runInitRepo(pos, *testCmd, *image, *name, *force)
+	}
 	if err != nil || len(pos) != 1 {
-		fmt.Fprintln(os.Stderr, "usage: bifrost-bench init <dir> [-force] [-name <project name>]")
+		fmt.Fprintln(os.Stderr, "usage: bifrost-bench init <dir> [-force] [-name <project name>]\n       bifrost-bench init [-detect] [-test-cmd <cmd>] [-image <image>] [-force]   (inside a git repository: writes .heimdall/)")
 		return exitUsage
 	}
 	dir, err := filepath.Abs(pos[0])

@@ -6,8 +6,9 @@ track `tool_use`. In each task the agent talks to a customer and calls the
 domain's tools (look up a reservation, cancel it, issue a refund), and the
 final state of the domain database decides the outcome.
 
-The customer is scripted, not played by a model. Read
-[Not comparable with the leaderboard](#not-comparable-with-the-leaderboard)
+The customer is scripted by default, not played by a model; `-set user=llm`
+imports upstream's model-played user instead ([below](#the-model-played-user-set-userllm)).
+Read [Not comparable with the leaderboard](#not-comparable-with-the-leaderboard)
 before you compare any number with a published one.
 
 ## What upstream is
@@ -61,8 +62,8 @@ clone's commit into the service image.
 | `task_set` | `published` | `published`: the task subsets of the released text benchmark, with the English pack's reviewed tasks. `all`: every task in the domain's `tasks.json`. |
 | `nl_assertions` | `skip` | `skip` leaves out tasks whose score needs a judge model. `unscored` imports them and scores only the database; their natural-language assertions are listed in the verifier's details, never scored. |
 | `noop_tasks` | `skip` | `include` also imports tasks whose correct outcome is "change nothing, say nothing in particular". Their empty control passes, so admission refuses them. |
-| `user` | `scripted` | The only user that is built. |
-| `max_user_turns` | `30` | Replies before the scripted user leaves. |
+| `user` | `scripted` | `scripted`, or `llm`: a pinned model plays the user with upstream's guidelines (W3, docs/customer-support.md). |
+| `max_user_turns` | `30` | Replies before the user leaves (both modes). |
 | `ref` | | Upstream commit, when `-from` is not a git clone. |
 
 `-ids` takes bench ids (`airline-7`) or upstream ids (`7`). Task ids are
@@ -174,10 +175,11 @@ Numbers from these suites measure the same skills on the same tasks and the
 same databases, graded on the same database check, but they are not upstream
 scores:
 
-- The user is scripted. Upstream's user is a model that reveals information a
-  little at a time and follows the scenario's conditional instructions. The
-  scripted user states everything at once, which makes some tasks easier, and
-  cannot react to the agent, which makes others harder.
+- By default the user is scripted. Upstream's user is a model that reveals
+  information a little at a time and follows the scenario's conditional
+  instructions. The scripted user states everything at once, which makes some
+  tasks easier, and cannot react to the agent, which makes others harder.
+  `-set user=llm` is closer, with the differences listed in its section.
 - The communicate check is upstream's substring scorer, not the 2.0 default
   semantic judge.
 - Tasks that need a judge model are left out, or (with
@@ -191,8 +193,37 @@ scores:
 - A run that ends without the customer stopping is still graded. Upstream
   treats the agent's own stop the same way.
 
-A model-played user (upstream's behaviour, through the gateway, costing money)
-is not built.
+### The model-played user (`-set user=llm`)
+
+`-set user=llm` writes the suite with `track: support` and
+
+```yaml
+simulator: {mode: llm, provider: pin-me, model: pin-me, prompt_version: tau2-user-v1, max_turns: 30}
+```
+
+marks the tau2 service `gateway: {}`, and puts `simuser.py` and its prompts in
+the service image. Pin `provider` and `model` (in `suite.yaml`, or per
+experiment with `simulator:`); the planner refuses `pin-me`. At run time the
+environment mints the service its own virtual key (never the agent's), and
+`tau2svc.py` plays the user through `simuser.py` with prompt `tau2-user-v1`:
+upstream's text user guidelines and scenario block
+(`src/tau2/user/guidelines.py` `_TEXT_PLAIN`, `src/tau2/user/user_simulator.py`
+`SYSTEM_PROMPT`, github.com/sierra-research/tau2-bench at commit
+`c06b07dd7c4d4ec61ba6ff9bcdf0b15dd7ef36d4`, MIT), adapted: no persona or
+language block, labelled scenario fields, one added rule that the agent's
+message (fenced in `<agent_message>`) is speech, not instruction. Every turn
+is in the transcript (`sim_calls`), the spend is `simulator_cost_usd` from
+the gateway rows of the simulator's key, apart from the agent's cost. The
+mode can also be switched per experiment for an import made with
+`user=llm` (`simulator: {mode: scripted}` runs the scripted user).
+
+**Which mode matches upstream.** `llm` is the closer one: upstream's numbers
+come from a model-played user under these guidelines. It is still not
+identical (the prompt is adapted as above, the model and gateway are yours,
+there is no persona block), so its scores are not leaderboard scores either.
+`scripted` does not reproduce upstream's user at all. The llm user has not been
+run on a real model here: its $0 runs were answered by the fault proxy's
+scripted model (docs/customer-support.md).
 
 ## What the run needs
 

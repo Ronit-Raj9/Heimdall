@@ -1,0 +1,7 @@
+# Keys of bench.ts `RoutingPolicy` (schemas.RoutingPolicy, W9). Change with bench.ts and schemas/agent.go.
+strategy
+targets?
+fallbacks?
+when?
+retries?
+limits?

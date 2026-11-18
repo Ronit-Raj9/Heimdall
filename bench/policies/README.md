@@ -43,6 +43,7 @@ Top level:
 | `description` | no | Free text |
 | `on_unknown` | no | `block` or `warn`: what an unknown result on a `block`-severity check does. Unset: a small-sample unknown warns, any other unknown blocks (see Decision) |
 | `checks` | yes | One or more checks |
+| `judge_calibration` | no | Thresholds of the `judge_calibration` instrument of judged experiments: `min_agreement` (default 0.75), `min_tnr` (0.60), `min_labels` (30), `max_age_days` (90). See docs/judge-calibration.md |
 
 Each check:
 

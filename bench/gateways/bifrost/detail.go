@@ -20,6 +20,7 @@ const (
 	kindCountTokens = "count_tokens"
 	kindModels      = "models"
 	kindOther       = "other"
+	kindAudio       = "audio" // X8 voice agents: speech, transcription and Realtime turn rows
 
 	statusProcessing = "processing"
 )
@@ -36,6 +37,9 @@ var objectKinds = map[string]string{
 	"text_completion_stream": kindMessage,
 	"count_tokens":           kindCountTokens,
 	"list_models":            kindModels,
+
+	// X8 voice agents: Bifrost v2.5.1's audio and Realtime rows (docs/voice-agents.md).
+	"speech": kindAudio, "speech_stream": kindAudio, "transcription": kindAudio, "transcription_stream": kindAudio, "realtime.turn": kindAudio,
 }
 
 // Fault proxy error messages carry the run's nonce. The bench proxy writes
@@ -88,6 +92,11 @@ type detailRow struct {
 			Arguments string `json:"arguments"`
 		} `json:"function"`
 	} `json:"tool_calls"`
+	// W9 routing policy under test: the rule Bifrost matched and the engines
+	// that routed the row (framework/logstore/tables.go Log).
+	RoutingRuleID   *string  `json:"routing_rule_id"`
+	RoutingRuleName *string  `json:"routing_rule_name"`
+	RoutingEngines  []string `json:"routing_engines_used"`
 }
 
 type tokenUsage struct {
@@ -141,6 +150,10 @@ func parseDetail(raw []byte) (*parsedRow, error) {
 	}
 	if d.ParentRequestID != nil {
 		r.ParentID = *d.ParentRequestID
+	}
+	r.RoutingRuleID, r.RoutingRuleName = derefOr(d.RoutingRuleID, ""), derefOr(d.RoutingRuleName, "") // W9 (routing.go)
+	if len(d.RoutingEngines) > 0 {
+		r.RoutingEngines = append([]string(nil), d.RoutingEngines...)
 	}
 	if d.Latency != nil {
 		r.LatencyMS = *d.Latency

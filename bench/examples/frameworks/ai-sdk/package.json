@@ -1,0 +1,11 @@
+{
+  "name": "heimdall-example-ai-sdk-agent",
+  "private": true,
+  "type": "module",
+  "description": "A small coding agent built with the Vercel AI SDK (bench/examples/frameworks/ai-sdk).",
+  "dependencies": {
+    "@ai-sdk/openai": "4.0.121",
+    "ai": "7.0.176",
+    "zod": "4.6.7"
+  }
+}

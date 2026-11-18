@@ -1,0 +1,35 @@
+{
+  "at": "2026-11-18T08:00:00Z",
+  "window": [
+    "2026-11-18T06:00:00Z",
+    "2026-11-18T08:00:00Z"
+  ],
+  "rows": {
+    "v1": 240,
+    "v2": 270
+  },
+  "sessions": {
+    "v1": 80,
+    "v2": 86
+  },
+  "skipped": 0,
+  "open": 0,
+  "details": 166,
+  "inbox": [
+    "inc-0e16a39d5ba5",
+    "inc-7e18b8b6e1db",
+    "inc-71313dcc3849"
+  ],
+  "alerts": [
+    "live_signal_threshold: v2 abandoned",
+    "live_comparison_worse: v2 vs v1"
+  ],
+  "decided": [
+    "abandoned: worse",
+    "cost_usd: better",
+    "tokens: better",
+    "tool_error_rate: worse"
+  ],
+  "truncated": false,
+  "judged": 20
+}

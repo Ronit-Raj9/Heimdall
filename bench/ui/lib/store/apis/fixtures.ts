@@ -42,6 +42,8 @@ export const FIXTURE_ROUTES: readonly FixtureRoute[] = [
 	{ method: "GET", pattern: "/runs/:id/reviews", file: "runs.{id}.reviews.json" },
 	{ method: "POST", pattern: "/reviews", file: "reviews.create.json" },
 	{ method: "GET", pattern: "/experiments/:id/matrix", file: "experiments.matrix.json" },
+	// W3 customer support: the scorecard of one support experiment; other ids answer 404 and the card stays hidden.
+	{ method: "GET", pattern: "/experiments/:id/support", file: "experiments.support.{id}.json" },
 	{ method: "GET", pattern: "/runs/:id", file: "runs.{id}.json" },
 	{ method: "GET", pattern: "/runs/:id/events", file: "runs.{id}.events.json" },
 	{ method: "GET", pattern: "/runs/:id/diff", file: "runs.{id}.diff.json" },
@@ -66,6 +68,12 @@ export const FIXTURE_ROUTES: readonly FixtureRoute[] = [
 	{ method: "GET", pattern: "/imports", file: "imports.json" },
 	// Workers on: the page shows the table. A server with the worker API off answers 404 instead.
 	{ method: "GET", pattern: "/workers", file: "workers.json" },
+	// Failure inbox area: one list for every state and source; two items have a detail, others answer 404.
+	{ method: "GET", pattern: "/inbox", file: "inbox.json" },
+	{ method: "GET", pattern: "/inbox/:id", file: "inbox.{id}.json" },
+	// W5 drift canary: the list, then one canary's detail per name; other names answer 404.
+	{ method: "GET", pattern: "/canaries", file: "canaries.json" },
+	{ method: "GET", pattern: "/canaries/:id", file: "canaries.{id}.json" },
 ];
 
 /** True when the URL has fixture=1 or the build sets VITE_BENCH_FIXTURE=1. */

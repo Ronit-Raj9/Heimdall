@@ -1,0 +1,11 @@
+# ParetoPoint: costexplain.ParetoPoint (W6, docs/cost-explain.md)
+id
+label
+agent
+model
+x
+y
+placed
+frontier
+dominated_by
+reason

@@ -1,0 +1,2822 @@
+{
+  "summary": {
+    "name": "nightly",
+    "description": "Nightly 8-task check of the support agent on Sonnet through two providers",
+    "state": "drifted",
+    "reason": "drift confirmed by two consecutive looks on A/clean/verified_success, B/clean/verified_success, A/clean/latency_ms, B/clean/latency_ms",
+    "suite": "coding-core@1.0.0",
+    "agent": "agents/toy.yaml",
+    "targets": [
+      {
+        "provider": "anthropic",
+        "model": "claude-sonnet-4-5"
+      },
+      {
+        "provider": "bedrock",
+        "model": "claude-sonnet-4-5"
+      }
+    ],
+    "tasks": 2,
+    "trials": 1,
+    "cron": "0 6 * * *",
+    "next": "2026-11-21T06:00:00Z",
+    "sensitivity": "normal",
+    "alpha": 0.1,
+    "smoke": false,
+    "per_run_usd": 1,
+    "per_day_usd": 4,
+    "spent_today_usd": 0.84,
+    "baseline": {
+      "exp_id": "e_canary_1",
+      "manifest_hash": "h_e_canary_1",
+      "fingerprint": "fp1",
+      "pinned_at": "2026-11-17T06:05:00Z",
+      "created_at": "2026-11-17T06:04:00Z",
+      "served": [
+        {
+          "arm": "A",
+          "label": "anthropic/claude-sonnet-4-5",
+          "requested": [
+            "claude-sonnet-4-5"
+          ],
+          "served": [
+            "claude-sonnet-4-5-20250929"
+          ],
+          "providers": [
+            "anthropic"
+          ],
+          "requests": 24
+        },
+        {
+          "arm": "B",
+          "label": "bedrock/claude-sonnet-4-5",
+          "requested": [
+            "claude-sonnet-4-5"
+          ],
+          "served": [
+            "claude-sonnet-4-5-20250929"
+          ],
+          "providers": [
+            "anthropic"
+          ],
+          "requests": 24
+        }
+      ],
+      "clusters": [],
+      "note": "pinned after the 1.4 release"
+    },
+    "last_look": {
+      "id": "e_canary_5",
+      "canary": "nightly",
+      "kind": "confirmation",
+      "started": "2026-11-20T06:25:00Z",
+      "finished": "2026-11-20T06:28:00Z",
+      "exp_id": "e_canary_5",
+      "manifest_hash": "h_e_canary_5",
+      "fingerprint": "fp1",
+      "baseline": "e_canary_1",
+      "outcome": "flagged",
+      "state": "drifted",
+      "reason": "drift confirmed by two consecutive looks on A/clean/verified_success, B/clean/verified_success, A/clean/latency_ms, B/clean/latency_ms",
+      "cost_usd": 0.42,
+      "runs": 16,
+      "run_errors": 0,
+      "served": [
+        {
+          "arm": "A",
+          "label": "anthropic/claude-sonnet-4-5",
+          "requested": [
+            "claude-sonnet-4-5"
+          ],
+          "served": [
+            "claude-sonnet-4-5-20261101"
+          ],
+          "providers": [
+            "anthropic"
+          ],
+          "requests": 24
+        },
+        {
+          "arm": "B",
+          "label": "bedrock/claude-sonnet-4-5",
+          "requested": [
+            "claude-sonnet-4-5"
+          ],
+          "served": [
+            "claude-sonnet-4-5-20261101"
+          ],
+          "providers": [
+            "anthropic"
+          ],
+          "requests": 24
+        }
+      ],
+      "points": [
+        {
+          "arm": "A",
+          "success": 0,
+          "tasks": 8,
+          "runs": 8
+        },
+        {
+          "arm": "B",
+          "success": 0,
+          "tasks": 8,
+          "runs": 8
+        }
+      ]
+    },
+    "looks": 4
+  },
+  "definition": {
+    "name": "nightly",
+    "description": "Nightly 8-task check of the support agent on Sonnet through two providers",
+    "agent": "agents/toy.yaml",
+    "suite": "coding-core@1.0.0",
+    "tasks": [
+      "t01",
+      "t02"
+    ],
+    "trials": 1,
+    "targets": [
+      {
+        "provider": "anthropic",
+        "model": "claude-sonnet-4-5"
+      },
+      {
+        "provider": "bedrock",
+        "model": "claude-sonnet-4-5"
+      }
+    ],
+    "schedule": {
+      "cron": "0 6 * * *",
+      "timezone": "UTC"
+    },
+    "budget": {
+      "per_run_usd": 1,
+      "per_day_usd": 4
+    },
+    "alerts": [
+      {
+        "url_env": "CANARY_HOOK"
+      }
+    ]
+  },
+  "baselines": [
+    {
+      "exp_id": "e_canary_1",
+      "manifest_hash": "h_e_canary_1",
+      "fingerprint": "fp1",
+      "pinned_at": "2026-11-17T06:05:00Z",
+      "created_at": "2026-11-17T06:04:00Z",
+      "served": [
+        {
+          "arm": "A",
+          "label": "anthropic/claude-sonnet-4-5",
+          "requested": [
+            "claude-sonnet-4-5"
+          ],
+          "served": [
+            "claude-sonnet-4-5-20250929"
+          ],
+          "providers": [
+            "anthropic"
+          ],
+          "requests": 24
+        },
+        {
+          "arm": "B",
+          "label": "bedrock/claude-sonnet-4-5",
+          "requested": [
+            "claude-sonnet-4-5"
+          ],
+          "served": [
+            "claude-sonnet-4-5-20250929"
+          ],
+          "providers": [
+            "anthropic"
+          ],
+          "requests": 24
+        }
+      ],
+      "clusters": [],
+      "note": "pinned after the 1.4 release"
+    }
+  ],
+  "records": [
+    {
+      "id": "e_canary_5",
+      "canary": "nightly",
+      "kind": "confirmation",
+      "started": "2026-11-20T06:25:00Z",
+      "finished": "2026-11-20T06:28:00Z",
+      "exp_id": "e_canary_5",
+      "manifest_hash": "h_e_canary_5",
+      "fingerprint": "fp1",
+      "baseline": "e_canary_1",
+      "outcome": "flagged",
+      "state": "drifted",
+      "reason": "drift confirmed by two consecutive looks on A/clean/verified_success, B/clean/verified_success, A/clean/latency_ms, B/clean/latency_ms",
+      "cost_usd": 0.42,
+      "runs": 16,
+      "run_errors": 0,
+      "comparison": {
+        "alpha": 0.1,
+        "family": 8,
+        "tests": [
+          {
+            "key": "A/clean/verified_success",
+            "arm": "A",
+            "label": "anthropic/claude-sonnet-4-5",
+            "condition": "clean",
+            "metric": "verified_success",
+            "higher_is_better": true,
+            "tasks": 8,
+            "discordant": 8,
+            "worse": 8,
+            "baseline": 1,
+            "current": 0,
+            "delta": -1,
+            "relative": -1,
+            "p": 0.0078125,
+            "level": 0.05,
+            "floor": 0,
+            "status": "worse",
+            "reason": "p 0.00781 \u003c= 0.05 on 8 tasks (8 of 8 changed tasks worse): success -100.0 points (100% to 0%)"
+          },
+          {
+            "key": "B/clean/verified_success",
+            "arm": "B",
+            "label": "bedrock/claude-sonnet-4-5",
+            "condition": "clean",
+            "metric": "verified_success",
+            "higher_is_better": true,
+            "tasks": 8,
+            "discordant": 8,
+            "worse": 8,
+            "baseline": 1,
+            "current": 0,
+            "delta": -1,
+            "relative": -1,
+            "p": 0.0078125,
+            "level": 0.1,
+            "floor": 0,
+            "status": "worse",
+            "reason": "p 0.00781 \u003c= 0.1 on 8 tasks (8 of 8 changed tasks worse): success -100.0 points (100% to 0%)"
+          },
+          {
+            "key": "A/clean/cost_usd",
+            "arm": "A",
+            "label": "anthropic/claude-sonnet-4-5",
+            "condition": "clean",
+            "metric": "cost_usd",
+            "higher_is_better": false,
+            "tasks": 8,
+            "discordant": 0,
+            "worse": 0,
+            "baseline": 0.01,
+            "current": 0.01,
+            "delta": 0,
+            "relative": 0,
+            "p": 1,
+            "level": 0,
+            "floor": 0.2,
+            "status": "no_change",
+            "reason": "no task changed (8 tasks)"
+          },
+          {
+            "key": "B/clean/cost_usd",
+            "arm": "B",
+            "label": "bedrock/claude-sonnet-4-5",
+            "condition": "clean",
+            "metric": "cost_usd",
+            "higher_is_better": false,
+            "tasks": 8,
+            "discordant": 0,
+            "worse": 0,
+            "baseline": 0.01,
+            "current": 0.01,
+            "delta": 0,
+            "relative": 0,
+            "p": 1,
+            "level": 0,
+            "floor": 0.2,
+            "status": "no_change",
+            "reason": "no task changed (8 tasks)"
+          },
+          {
+            "key": "A/clean/tokens",
+            "arm": "A",
+            "label": "anthropic/claude-sonnet-4-5",
+            "condition": "clean",
+            "metric": "tokens",
+            "higher_is_better": false,
+            "tasks": 8,
+            "discordant": 0,
+            "worse": 0,
+            "baseline": 1000,
+            "current": 1000,
+            "delta": 0,
+            "relative": 0,
+            "p": 1,
+            "level": 0,
+            "floor": 0.1,
+            "status": "no_change",
+            "reason": "no task changed (8 tasks)"
+          },
+          {
+            "key": "B/clean/tokens",
+            "arm": "B",
+            "label": "bedrock/claude-sonnet-4-5",
+            "condition": "clean",
+            "metric": "tokens",
+            "higher_is_better": false,
+            "tasks": 8,
+            "discordant": 0,
+            "worse": 0,
+            "baseline": 1000,
+            "current": 1000,
+            "delta": 0,
+            "relative": 0,
+            "p": 1,
+            "level": 0,
+            "floor": 0.1,
+            "status": "no_change",
+            "reason": "no task changed (8 tasks)"
+          },
+          {
+            "key": "A/clean/latency_ms",
+            "arm": "A",
+            "label": "anthropic/claude-sonnet-4-5",
+            "condition": "clean",
+            "metric": "latency_ms",
+            "higher_is_better": false,
+            "tasks": 8,
+            "discordant": 8,
+            "worse": 8,
+            "baseline": 1500,
+            "current": 3200,
+            "delta": 1700,
+            "relative": 1.1333333333333333,
+            "p": 0.0078125,
+            "level": 0.016666666666666666,
+            "floor": 0.25,
+            "status": "worse",
+            "reason": "p 0.00781 \u003c= 0.0167 on 8 tasks (8 of 8 changed tasks worse): latency_ms +113% (1500 to 3200)"
+          },
+          {
+            "key": "B/clean/latency_ms",
+            "arm": "B",
+            "label": "bedrock/claude-sonnet-4-5",
+            "condition": "clean",
+            "metric": "latency_ms",
+            "higher_is_better": false,
+            "tasks": 8,
+            "discordant": 8,
+            "worse": 8,
+            "baseline": 2400,
+            "current": 5120,
+            "delta": 2720,
+            "relative": 1.1333333333333333,
+            "p": 0.0078125,
+            "level": 0.02,
+            "floor": 0.25,
+            "status": "worse",
+            "reason": "p 0.00781 \u003c= 0.02 on 8 tasks (8 of 8 changed tasks worse): latency_ms +113% (2400 to 5120)"
+          }
+        ],
+        "flagged": [
+          "A/clean/verified_success",
+          "B/clean/verified_success",
+          "A/clean/latency_ms",
+          "B/clean/latency_ms"
+        ],
+        "flips": [
+          {
+            "arm": "A",
+            "label": "anthropic/claude-sonnet-4-5",
+            "condition": "clean",
+            "task": "t01",
+            "baseline": 1,
+            "current": 0
+          },
+          {
+            "arm": "A",
+            "label": "anthropic/claude-sonnet-4-5",
+            "condition": "clean",
+            "task": "t02",
+            "baseline": 1,
+            "current": 0
+          },
+          {
+            "arm": "A",
+            "label": "anthropic/claude-sonnet-4-5",
+            "condition": "clean",
+            "task": "t03",
+            "baseline": 1,
+            "current": 0
+          },
+          {
+            "arm": "A",
+            "label": "anthropic/claude-sonnet-4-5",
+            "condition": "clean",
+            "task": "t04",
+            "baseline": 1,
+            "current": 0
+          },
+          {
+            "arm": "A",
+            "label": "anthropic/claude-sonnet-4-5",
+            "condition": "clean",
+            "task": "t05",
+            "baseline": 1,
+            "current": 0
+          },
+          {
+            "arm": "A",
+            "label": "anthropic/claude-sonnet-4-5",
+            "condition": "clean",
+            "task": "t06",
+            "baseline": 1,
+            "current": 0
+          },
+          {
+            "arm": "A",
+            "label": "anthropic/claude-sonnet-4-5",
+            "condition": "clean",
+            "task": "t07",
+            "baseline": 1,
+            "current": 0
+          },
+          {
+            "arm": "A",
+            "label": "anthropic/claude-sonnet-4-5",
+            "condition": "clean",
+            "task": "t08",
+            "baseline": 1,
+            "current": 0
+          },
+          {
+            "arm": "B",
+            "label": "bedrock/claude-sonnet-4-5",
+            "condition": "clean",
+            "task": "t01",
+            "baseline": 1,
+            "current": 0
+          },
+          {
+            "arm": "B",
+            "label": "bedrock/claude-sonnet-4-5",
+            "condition": "clean",
+            "task": "t02",
+            "baseline": 1,
+            "current": 0
+          },
+          {
+            "arm": "B",
+            "label": "bedrock/claude-sonnet-4-5",
+            "condition": "clean",
+            "task": "t03",
+            "baseline": 1,
+            "current": 0
+          },
+          {
+            "arm": "B",
+            "label": "bedrock/claude-sonnet-4-5",
+            "condition": "clean",
+            "task": "t04",
+            "baseline": 1,
+            "current": 0
+          },
+          {
+            "arm": "B",
+            "label": "bedrock/claude-sonnet-4-5",
+            "condition": "clean",
+            "task": "t05",
+            "baseline": 1,
+            "current": 0
+          },
+          {
+            "arm": "B",
+            "label": "bedrock/claude-sonnet-4-5",
+            "condition": "clean",
+            "task": "t06",
+            "baseline": 1,
+            "current": 0
+          },
+          {
+            "arm": "B",
+            "label": "bedrock/claude-sonnet-4-5",
+            "condition": "clean",
+            "task": "t07",
+            "baseline": 1,
+            "current": 0
+          },
+          {
+            "arm": "B",
+            "label": "bedrock/claude-sonnet-4-5",
+            "condition": "clean",
+            "task": "t08",
+            "baseline": 1,
+            "current": 0
+          }
+        ]
+      },
+      "changes": {
+        "moved": [
+          "anthropic/claude-sonnet-4-5 on clean: p 0.00781 \u003c= 0.05 on 8 tasks (8 of 8 changed tasks worse): success -100.0 points (100% to 0%)",
+          "bedrock/claude-sonnet-4-5 on clean: p 0.00781 \u003c= 0.1 on 8 tasks (8 of 8 changed tasks worse): success -100.0 points (100% to 0%)",
+          "anthropic/claude-sonnet-4-5 on clean: p 0.00781 \u003c= 0.0167 on 8 tasks (8 of 8 changed tasks worse): latency_ms +113% (1500 to 3200)",
+          "bedrock/claude-sonnet-4-5 on clean: p 0.00781 \u003c= 0.02 on 8 tasks (8 of 8 changed tasks worse): latency_ms +113% (2400 to 5120)",
+          "anthropic/claude-sonnet-4-5: served model changed under the same alias (claude-sonnet-4-5): claude-sonnet-4-5-20250929 before, claude-sonnet-4-5-20261101 now",
+          "anthropic/claude-sonnet-4-5: input tokens at the identical first prompt changed on 8 of 8 tasks (median +2.5%)",
+          "anthropic/claude-sonnet-4-5: median model latency +113% (1500 ms to 3200 ms)",
+          "anthropic/claude-sonnet-4-5: 8 task(s) lost success: t01 100%-\u003e0%, t02 100%-\u003e0%, t03 100%-\u003e0%, t04 100%-\u003e0%, t05 100%-\u003e0%, t06 100%-\u003e0%, t07 100%-\u003e0%, t08 100%-\u003e0%",
+          "bedrock/claude-sonnet-4-5: served model changed under the same alias (claude-sonnet-4-5): claude-sonnet-4-5-20250929 before, claude-sonnet-4-5-20261101 now",
+          "bedrock/claude-sonnet-4-5: input tokens at the identical first prompt changed on 8 of 8 tasks (median +2.5%)",
+          "bedrock/claude-sonnet-4-5: median model latency +113% (2400 ms to 5120 ms)",
+          "bedrock/claude-sonnet-4-5: 8 task(s) lost success: t01 100%-\u003e0%, t02 100%-\u003e0%, t03 100%-\u003e0%, t04 100%-\u003e0%, t05 100%-\u003e0%, t06 100%-\u003e0%, t07 100%-\u003e0%, t08 100%-\u003e0%",
+          "new failure cluster c_outage \"model unavailable\" (8 runs; tasks t01)"
+        ],
+        "arms": [
+          {
+            "arm": "A",
+            "label": "anthropic/claude-sonnet-4-5",
+            "served_before": [
+              "claude-sonnet-4-5-20250929"
+            ],
+            "served_now": [
+              "claude-sonnet-4-5-20261101"
+            ],
+            "served_changed": true,
+            "providers_before": [
+              "anthropic"
+            ],
+            "providers_now": [
+              "anthropic"
+            ],
+            "provider_changed": false,
+            "fingerprints_before": [],
+            "fingerprints_now": [],
+            "fingerprint_changed": false,
+            "latency_before_ms": 1500,
+            "latency_now_ms": 3200,
+            "latency_shift": 1.1333333333333333,
+            "prompt_tasks": 8,
+            "prompt_changed": 8,
+            "prompt_shift": 0.02499999999999991,
+            "error_rate_before": 0,
+            "error_rate_now": 0,
+            "format_errors_before": 0,
+            "format_errors_now": 0,
+            "flips": [
+              {
+                "arm": "A",
+                "label": "anthropic/claude-sonnet-4-5",
+                "condition": "clean",
+                "task": "t01",
+                "baseline": 1,
+                "current": 0
+              },
+              {
+                "arm": "A",
+                "label": "anthropic/claude-sonnet-4-5",
+                "condition": "clean",
+                "task": "t02",
+                "baseline": 1,
+                "current": 0
+              },
+              {
+                "arm": "A",
+                "label": "anthropic/claude-sonnet-4-5",
+                "condition": "clean",
+                "task": "t03",
+                "baseline": 1,
+                "current": 0
+              },
+              {
+                "arm": "A",
+                "label": "anthropic/claude-sonnet-4-5",
+                "condition": "clean",
+                "task": "t04",
+                "baseline": 1,
+                "current": 0
+              },
+              {
+                "arm": "A",
+                "label": "anthropic/claude-sonnet-4-5",
+                "condition": "clean",
+                "task": "t05",
+                "baseline": 1,
+                "current": 0
+              },
+              {
+                "arm": "A",
+                "label": "anthropic/claude-sonnet-4-5",
+                "condition": "clean",
+                "task": "t06",
+                "baseline": 1,
+                "current": 0
+              },
+              {
+                "arm": "A",
+                "label": "anthropic/claude-sonnet-4-5",
+                "condition": "clean",
+                "task": "t07",
+                "baseline": 1,
+                "current": 0
+              },
+              {
+                "arm": "A",
+                "label": "anthropic/claude-sonnet-4-5",
+                "condition": "clean",
+                "task": "t08",
+                "baseline": 1,
+                "current": 0
+              }
+            ],
+            "success_before": 1,
+            "success_now": 0,
+            "requests_before": 24,
+            "requests_now": 24,
+            "requested_now": [
+              "claude-sonnet-4-5"
+            ]
+          },
+          {
+            "arm": "B",
+            "label": "bedrock/claude-sonnet-4-5",
+            "served_before": [
+              "claude-sonnet-4-5-20250929"
+            ],
+            "served_now": [
+              "claude-sonnet-4-5-20261101"
+            ],
+            "served_changed": true,
+            "providers_before": [
+              "anthropic"
+            ],
+            "providers_now": [
+              "anthropic"
+            ],
+            "provider_changed": false,
+            "fingerprints_before": [],
+            "fingerprints_now": [],
+            "fingerprint_changed": false,
+            "latency_before_ms": 2400,
+            "latency_now_ms": 5120,
+            "latency_shift": 1.1333333333333333,
+            "prompt_tasks": 8,
+            "prompt_changed": 8,
+            "prompt_shift": 0.02499999999999991,
+            "error_rate_before": 0,
+            "error_rate_now": 0,
+            "format_errors_before": 0,
+            "format_errors_now": 0,
+            "flips": [
+              {
+                "arm": "B",
+                "label": "bedrock/claude-sonnet-4-5",
+                "condition": "clean",
+                "task": "t01",
+                "baseline": 1,
+                "current": 0
+              },
+              {
+                "arm": "B",
+                "label": "bedrock/claude-sonnet-4-5",
+                "condition": "clean",
+                "task": "t02",
+                "baseline": 1,
+                "current": 0
+              },
+              {
+                "arm": "B",
+                "label": "bedrock/claude-sonnet-4-5",
+                "condition": "clean",
+                "task": "t03",
+                "baseline": 1,
+                "current": 0
+              },
+              {
+                "arm": "B",
+                "label": "bedrock/claude-sonnet-4-5",
+                "condition": "clean",
+                "task": "t04",
+                "baseline": 1,
+                "current": 0
+              },
+              {
+                "arm": "B",
+                "label": "bedrock/claude-sonnet-4-5",
+                "condition": "clean",
+                "task": "t05",
+                "baseline": 1,
+                "current": 0
+              },
+              {
+                "arm": "B",
+                "label": "bedrock/claude-sonnet-4-5",
+                "condition": "clean",
+                "task": "t06",
+                "baseline": 1,
+                "current": 0
+              },
+              {
+                "arm": "B",
+                "label": "bedrock/claude-sonnet-4-5",
+                "condition": "clean",
+                "task": "t07",
+                "baseline": 1,
+                "current": 0
+              },
+              {
+                "arm": "B",
+                "label": "bedrock/claude-sonnet-4-5",
+                "condition": "clean",
+                "task": "t08",
+                "baseline": 1,
+                "current": 0
+              }
+            ],
+            "success_before": 1,
+            "success_now": 0,
+            "requests_before": 24,
+            "requests_now": 24,
+            "requested_now": [
+              "claude-sonnet-4-5"
+            ]
+          }
+        ],
+        "new_clusters": [
+          {
+            "signature": "c_outage",
+            "title": "model unavailable",
+            "count": 8,
+            "tasks": [
+              "t01"
+            ]
+          }
+        ]
+      },
+      "equivalence": [
+        {
+          "model": "claude-sonnet-4-5",
+          "arm_a": "A",
+          "arm_b": "B",
+          "label_a": "anthropic/claude-sonnet-4-5",
+          "label_b": "bedrock/claude-sonnet-4-5",
+          "tests": [
+            {
+              "key": "pair/clean/verified_success",
+              "arm": "pair",
+              "label": "bedrock/claude-sonnet-4-5 vs anthropic/claude-sonnet-4-5",
+              "condition": "clean",
+              "metric": "verified_success",
+              "higher_is_better": true,
+              "tasks": 8,
+              "discordant": 0,
+              "worse": 0,
+              "baseline": 0,
+              "current": 0,
+              "delta": 0,
+              "relative": null,
+              "p": 1,
+              "level": 0,
+              "floor": 0,
+              "status": "no_change",
+              "reason": "no task changed (8 tasks)"
+            },
+            {
+              "key": "pair/clean/cost_usd",
+              "arm": "pair",
+              "label": "bedrock/claude-sonnet-4-5 vs anthropic/claude-sonnet-4-5",
+              "condition": "clean",
+              "metric": "cost_usd",
+              "higher_is_better": false,
+              "tasks": 8,
+              "discordant": 0,
+              "worse": 0,
+              "baseline": 0.01,
+              "current": 0.01,
+              "delta": 0,
+              "relative": 0,
+              "p": 1,
+              "level": 0,
+              "floor": 0,
+              "status": "no_change",
+              "reason": "no task changed (8 tasks)"
+            },
+            {
+              "key": "pair/clean/latency_ms",
+              "arm": "pair",
+              "label": "bedrock/claude-sonnet-4-5 vs anthropic/claude-sonnet-4-5",
+              "condition": "clean",
+              "metric": "latency_ms",
+              "higher_is_better": false,
+              "tasks": 8,
+              "discordant": 8,
+              "worse": 8,
+              "baseline": 3200,
+              "current": 5120,
+              "delta": 1920,
+              "relative": 0.6,
+              "p": 0.0078125,
+              "level": 0.03333333333333333,
+              "floor": 0,
+              "status": "worse",
+              "reason": "p 0.00781 \u003c= 0.0333 on 8 tasks (8 of 8 changed tasks worse): latency_ms +60% (3200 to 5120)"
+            },
+            {
+              "key": "pair/clean/format_errors",
+              "arm": "pair",
+              "label": "bedrock/claude-sonnet-4-5 vs anthropic/claude-sonnet-4-5",
+              "condition": "clean",
+              "metric": "format_errors",
+              "higher_is_better": false,
+              "tasks": 8,
+              "discordant": 0,
+              "worse": 0,
+              "baseline": 0,
+              "current": 0,
+              "delta": 0,
+              "relative": null,
+              "p": 1,
+              "level": 0,
+              "floor": 0,
+              "status": "no_change",
+              "reason": "no task changed (8 tasks)"
+            }
+          ],
+          "verdict": "differs",
+          "reason": "bedrock/claude-sonnet-4-5 differs from anthropic/claude-sonnet-4-5: latency_ms on clean: latency_ms +60% (3200 to 5120)"
+        }
+      ],
+      "served": [
+        {
+          "arm": "A",
+          "label": "anthropic/claude-sonnet-4-5",
+          "requested": [
+            "claude-sonnet-4-5"
+          ],
+          "served": [
+            "claude-sonnet-4-5-20261101"
+          ],
+          "providers": [
+            "anthropic"
+          ],
+          "requests": 24
+        },
+        {
+          "arm": "B",
+          "label": "bedrock/claude-sonnet-4-5",
+          "requested": [
+            "claude-sonnet-4-5"
+          ],
+          "served": [
+            "claude-sonnet-4-5-20261101"
+          ],
+          "providers": [
+            "anthropic"
+          ],
+          "requests": 24
+        }
+      ],
+      "points": [
+        {
+          "arm": "A",
+          "success": 0,
+          "tasks": 8,
+          "runs": 8
+        },
+        {
+          "arm": "B",
+          "success": 0,
+          "tasks": 8,
+          "runs": 8
+        }
+      ]
+    },
+    {
+      "id": "e_canary_4",
+      "canary": "nightly",
+      "kind": "run",
+      "started": "2026-11-20T06:20:00Z",
+      "finished": "2026-11-20T06:23:00Z",
+      "exp_id": "e_canary_4",
+      "manifest_hash": "h_e_canary_4",
+      "fingerprint": "fp1",
+      "baseline": "e_canary_1",
+      "outcome": "flagged",
+      "state": "watching",
+      "reason": "flagged once on A/clean/verified_success, B/clean/verified_success, A/clean/latency_ms, B/clean/latency_ms; a second consecutive flag on the same target and metric confirms a drift",
+      "cost_usd": 0.42,
+      "runs": 16,
+      "run_errors": 0,
+      "comparison": {
+        "alpha": 0.1,
+        "family": 8,
+        "tests": [
+          {
+            "key": "A/clean/verified_success",
+            "arm": "A",
+            "label": "anthropic/claude-sonnet-4-5",
+            "condition": "clean",
+            "metric": "verified_success",
+            "higher_is_better": true,
+            "tasks": 8,
+            "discordant": 8,
+            "worse": 8,
+            "baseline": 1,
+            "current": 0,
+            "delta": -1,
+            "relative": -1,
+            "p": 0.0078125,
+            "level": 0.05,
+            "floor": 0,
+            "status": "worse",
+            "reason": "p 0.00781 \u003c= 0.05 on 8 tasks (8 of 8 changed tasks worse): success -100.0 points (100% to 0%)"
+          },
+          {
+            "key": "B/clean/verified_success",
+            "arm": "B",
+            "label": "bedrock/claude-sonnet-4-5",
+            "condition": "clean",
+            "metric": "verified_success",
+            "higher_is_better": true,
+            "tasks": 8,
+            "discordant": 8,
+            "worse": 8,
+            "baseline": 1,
+            "current": 0,
+            "delta": -1,
+            "relative": -1,
+            "p": 0.0078125,
+            "level": 0.1,
+            "floor": 0,
+            "status": "worse",
+            "reason": "p 0.00781 \u003c= 0.1 on 8 tasks (8 of 8 changed tasks worse): success -100.0 points (100% to 0%)"
+          },
+          {
+            "key": "A/clean/cost_usd",
+            "arm": "A",
+            "label": "anthropic/claude-sonnet-4-5",
+            "condition": "clean",
+            "metric": "cost_usd",
+            "higher_is_better": false,
+            "tasks": 8,
+            "discordant": 0,
+            "worse": 0,
+            "baseline": 0.01,
+            "current": 0.01,
+            "delta": 0,
+            "relative": 0,
+            "p": 1,
+            "level": 0,
+            "floor": 0.2,
+            "status": "no_change",
+            "reason": "no task changed (8 tasks)"
+          },
+          {
+            "key": "B/clean/cost_usd",
+            "arm": "B",
+            "label": "bedrock/claude-sonnet-4-5",
+            "condition": "clean",
+            "metric": "cost_usd",
+            "higher_is_better": false,
+            "tasks": 8,
+            "discordant": 0,
+            "worse": 0,
+            "baseline": 0.01,
+            "current": 0.01,
+            "delta": 0,
+            "relative": 0,
+            "p": 1,
+            "level": 0,
+            "floor": 0.2,
+            "status": "no_change",
+            "reason": "no task changed (8 tasks)"
+          },
+          {
+            "key": "A/clean/tokens",
+            "arm": "A",
+            "label": "anthropic/claude-sonnet-4-5",
+            "condition": "clean",
+            "metric": "tokens",
+            "higher_is_better": false,
+            "tasks": 8,
+            "discordant": 0,
+            "worse": 0,
+            "baseline": 1000,
+            "current": 1000,
+            "delta": 0,
+            "relative": 0,
+            "p": 1,
+            "level": 0,
+            "floor": 0.1,
+            "status": "no_change",
+            "reason": "no task changed (8 tasks)"
+          },
+          {
+            "key": "B/clean/tokens",
+            "arm": "B",
+            "label": "bedrock/claude-sonnet-4-5",
+            "condition": "clean",
+            "metric": "tokens",
+            "higher_is_better": false,
+            "tasks": 8,
+            "discordant": 0,
+            "worse": 0,
+            "baseline": 1000,
+            "current": 1000,
+            "delta": 0,
+            "relative": 0,
+            "p": 1,
+            "level": 0,
+            "floor": 0.1,
+            "status": "no_change",
+            "reason": "no task changed (8 tasks)"
+          },
+          {
+            "key": "A/clean/latency_ms",
+            "arm": "A",
+            "label": "anthropic/claude-sonnet-4-5",
+            "condition": "clean",
+            "metric": "latency_ms",
+            "higher_is_better": false,
+            "tasks": 8,
+            "discordant": 8,
+            "worse": 8,
+            "baseline": 1500,
+            "current": 3200,
+            "delta": 1700,
+            "relative": 1.1333333333333333,
+            "p": 0.0078125,
+            "level": 0.016666666666666666,
+            "floor": 0.25,
+            "status": "worse",
+            "reason": "p 0.00781 \u003c= 0.0167 on 8 tasks (8 of 8 changed tasks worse): latency_ms +113% (1500 to 3200)"
+          },
+          {
+            "key": "B/clean/latency_ms",
+            "arm": "B",
+            "label": "bedrock/claude-sonnet-4-5",
+            "condition": "clean",
+            "metric": "latency_ms",
+            "higher_is_better": false,
+            "tasks": 8,
+            "discordant": 8,
+            "worse": 8,
+            "baseline": 2400,
+            "current": 5120,
+            "delta": 2720,
+            "relative": 1.1333333333333333,
+            "p": 0.0078125,
+            "level": 0.02,
+            "floor": 0.25,
+            "status": "worse",
+            "reason": "p 0.00781 \u003c= 0.02 on 8 tasks (8 of 8 changed tasks worse): latency_ms +113% (2400 to 5120)"
+          }
+        ],
+        "flagged": [
+          "A/clean/verified_success",
+          "B/clean/verified_success",
+          "A/clean/latency_ms",
+          "B/clean/latency_ms"
+        ],
+        "flips": [
+          {
+            "arm": "A",
+            "label": "anthropic/claude-sonnet-4-5",
+            "condition": "clean",
+            "task": "t01",
+            "baseline": 1,
+            "current": 0
+          },
+          {
+            "arm": "A",
+            "label": "anthropic/claude-sonnet-4-5",
+            "condition": "clean",
+            "task": "t02",
+            "baseline": 1,
+            "current": 0
+          },
+          {
+            "arm": "A",
+            "label": "anthropic/claude-sonnet-4-5",
+            "condition": "clean",
+            "task": "t03",
+            "baseline": 1,
+            "current": 0
+          },
+          {
+            "arm": "A",
+            "label": "anthropic/claude-sonnet-4-5",
+            "condition": "clean",
+            "task": "t04",
+            "baseline": 1,
+            "current": 0
+          },
+          {
+            "arm": "A",
+            "label": "anthropic/claude-sonnet-4-5",
+            "condition": "clean",
+            "task": "t05",
+            "baseline": 1,
+            "current": 0
+          },
+          {
+            "arm": "A",
+            "label": "anthropic/claude-sonnet-4-5",
+            "condition": "clean",
+            "task": "t06",
+            "baseline": 1,
+            "current": 0
+          },
+          {
+            "arm": "A",
+            "label": "anthropic/claude-sonnet-4-5",
+            "condition": "clean",
+            "task": "t07",
+            "baseline": 1,
+            "current": 0
+          },
+          {
+            "arm": "A",
+            "label": "anthropic/claude-sonnet-4-5",
+            "condition": "clean",
+            "task": "t08",
+            "baseline": 1,
+            "current": 0
+          },
+          {
+            "arm": "B",
+            "label": "bedrock/claude-sonnet-4-5",
+            "condition": "clean",
+            "task": "t01",
+            "baseline": 1,
+            "current": 0
+          },
+          {
+            "arm": "B",
+            "label": "bedrock/claude-sonnet-4-5",
+            "condition": "clean",
+            "task": "t02",
+            "baseline": 1,
+            "current": 0
+          },
+          {
+            "arm": "B",
+            "label": "bedrock/claude-sonnet-4-5",
+            "condition": "clean",
+            "task": "t03",
+            "baseline": 1,
+            "current": 0
+          },
+          {
+            "arm": "B",
+            "label": "bedrock/claude-sonnet-4-5",
+            "condition": "clean",
+            "task": "t04",
+            "baseline": 1,
+            "current": 0
+          },
+          {
+            "arm": "B",
+            "label": "bedrock/claude-sonnet-4-5",
+            "condition": "clean",
+            "task": "t05",
+            "baseline": 1,
+            "current": 0
+          },
+          {
+            "arm": "B",
+            "label": "bedrock/claude-sonnet-4-5",
+            "condition": "clean",
+            "task": "t06",
+            "baseline": 1,
+            "current": 0
+          },
+          {
+            "arm": "B",
+            "label": "bedrock/claude-sonnet-4-5",
+            "condition": "clean",
+            "task": "t07",
+            "baseline": 1,
+            "current": 0
+          },
+          {
+            "arm": "B",
+            "label": "bedrock/claude-sonnet-4-5",
+            "condition": "clean",
+            "task": "t08",
+            "baseline": 1,
+            "current": 0
+          }
+        ]
+      },
+      "changes": {
+        "moved": [
+          "anthropic/claude-sonnet-4-5 on clean: p 0.00781 \u003c= 0.05 on 8 tasks (8 of 8 changed tasks worse): success -100.0 points (100% to 0%)",
+          "bedrock/claude-sonnet-4-5 on clean: p 0.00781 \u003c= 0.1 on 8 tasks (8 of 8 changed tasks worse): success -100.0 points (100% to 0%)",
+          "anthropic/claude-sonnet-4-5 on clean: p 0.00781 \u003c= 0.0167 on 8 tasks (8 of 8 changed tasks worse): latency_ms +113% (1500 to 3200)",
+          "bedrock/claude-sonnet-4-5 on clean: p 0.00781 \u003c= 0.02 on 8 tasks (8 of 8 changed tasks worse): latency_ms +113% (2400 to 5120)",
+          "anthropic/claude-sonnet-4-5: served model changed under the same alias (claude-sonnet-4-5): claude-sonnet-4-5-20250929 before, claude-sonnet-4-5-20261101 now",
+          "anthropic/claude-sonnet-4-5: input tokens at the identical first prompt changed on 8 of 8 tasks (median +2.5%)",
+          "anthropic/claude-sonnet-4-5: median model latency +113% (1500 ms to 3200 ms)",
+          "anthropic/claude-sonnet-4-5: 8 task(s) lost success: t01 100%-\u003e0%, t02 100%-\u003e0%, t03 100%-\u003e0%, t04 100%-\u003e0%, t05 100%-\u003e0%, t06 100%-\u003e0%, t07 100%-\u003e0%, t08 100%-\u003e0%",
+          "bedrock/claude-sonnet-4-5: served model changed under the same alias (claude-sonnet-4-5): claude-sonnet-4-5-20250929 before, claude-sonnet-4-5-20261101 now",
+          "bedrock/claude-sonnet-4-5: input tokens at the identical first prompt changed on 8 of 8 tasks (median +2.5%)",
+          "bedrock/claude-sonnet-4-5: median model latency +113% (2400 ms to 5120 ms)",
+          "bedrock/claude-sonnet-4-5: 8 task(s) lost success: t01 100%-\u003e0%, t02 100%-\u003e0%, t03 100%-\u003e0%, t04 100%-\u003e0%, t05 100%-\u003e0%, t06 100%-\u003e0%, t07 100%-\u003e0%, t08 100%-\u003e0%",
+          "new failure cluster c_outage \"model unavailable\" (8 runs; tasks t01)"
+        ],
+        "arms": [
+          {
+            "arm": "A",
+            "label": "anthropic/claude-sonnet-4-5",
+            "served_before": [
+              "claude-sonnet-4-5-20250929"
+            ],
+            "served_now": [
+              "claude-sonnet-4-5-20261101"
+            ],
+            "served_changed": true,
+            "providers_before": [
+              "anthropic"
+            ],
+            "providers_now": [
+              "anthropic"
+            ],
+            "provider_changed": false,
+            "fingerprints_before": [],
+            "fingerprints_now": [],
+            "fingerprint_changed": false,
+            "latency_before_ms": 1500,
+            "latency_now_ms": 3200,
+            "latency_shift": 1.1333333333333333,
+            "prompt_tasks": 8,
+            "prompt_changed": 8,
+            "prompt_shift": 0.02499999999999991,
+            "error_rate_before": 0,
+            "error_rate_now": 0,
+            "format_errors_before": 0,
+            "format_errors_now": 0,
+            "flips": [
+              {
+                "arm": "A",
+                "label": "anthropic/claude-sonnet-4-5",
+                "condition": "clean",
+                "task": "t01",
+                "baseline": 1,
+                "current": 0
+              },
+              {
+                "arm": "A",
+                "label": "anthropic/claude-sonnet-4-5",
+                "condition": "clean",
+                "task": "t02",
+                "baseline": 1,
+                "current": 0
+              },
+              {
+                "arm": "A",
+                "label": "anthropic/claude-sonnet-4-5",
+                "condition": "clean",
+                "task": "t03",
+                "baseline": 1,
+                "current": 0
+              },
+              {
+                "arm": "A",
+                "label": "anthropic/claude-sonnet-4-5",
+                "condition": "clean",
+                "task": "t04",
+                "baseline": 1,
+                "current": 0
+              },
+              {
+                "arm": "A",
+                "label": "anthropic/claude-sonnet-4-5",
+                "condition": "clean",
+                "task": "t05",
+                "baseline": 1,
+                "current": 0
+              },
+              {
+                "arm": "A",
+                "label": "anthropic/claude-sonnet-4-5",
+                "condition": "clean",
+                "task": "t06",
+                "baseline": 1,
+                "current": 0
+              },
+              {
+                "arm": "A",
+                "label": "anthropic/claude-sonnet-4-5",
+                "condition": "clean",
+                "task": "t07",
+                "baseline": 1,
+                "current": 0
+              },
+              {
+                "arm": "A",
+                "label": "anthropic/claude-sonnet-4-5",
+                "condition": "clean",
+                "task": "t08",
+                "baseline": 1,
+                "current": 0
+              }
+            ],
+            "success_before": 1,
+            "success_now": 0,
+            "requests_before": 24,
+            "requests_now": 24,
+            "requested_now": [
+              "claude-sonnet-4-5"
+            ]
+          },
+          {
+            "arm": "B",
+            "label": "bedrock/claude-sonnet-4-5",
+            "served_before": [
+              "claude-sonnet-4-5-20250929"
+            ],
+            "served_now": [
+              "claude-sonnet-4-5-20261101"
+            ],
+            "served_changed": true,
+            "providers_before": [
+              "anthropic"
+            ],
+            "providers_now": [
+              "anthropic"
+            ],
+            "provider_changed": false,
+            "fingerprints_before": [],
+            "fingerprints_now": [],
+            "fingerprint_changed": false,
+            "latency_before_ms": 2400,
+            "latency_now_ms": 5120,
+            "latency_shift": 1.1333333333333333,
+            "prompt_tasks": 8,
+            "prompt_changed": 8,
+            "prompt_shift": 0.02499999999999991,
+            "error_rate_before": 0,
+            "error_rate_now": 0,
+            "format_errors_before": 0,
+            "format_errors_now": 0,
+            "flips": [
+              {
+                "arm": "B",
+                "label": "bedrock/claude-sonnet-4-5",
+                "condition": "clean",
+                "task": "t01",
+                "baseline": 1,
+                "current": 0
+              },
+              {
+                "arm": "B",
+                "label": "bedrock/claude-sonnet-4-5",
+                "condition": "clean",
+                "task": "t02",
+                "baseline": 1,
+                "current": 0
+              },
+              {
+                "arm": "B",
+                "label": "bedrock/claude-sonnet-4-5",
+                "condition": "clean",
+                "task": "t03",
+                "baseline": 1,
+                "current": 0
+              },
+              {
+                "arm": "B",
+                "label": "bedrock/claude-sonnet-4-5",
+                "condition": "clean",
+                "task": "t04",
+                "baseline": 1,
+                "current": 0
+              },
+              {
+                "arm": "B",
+                "label": "bedrock/claude-sonnet-4-5",
+                "condition": "clean",
+                "task": "t05",
+                "baseline": 1,
+                "current": 0
+              },
+              {
+                "arm": "B",
+                "label": "bedrock/claude-sonnet-4-5",
+                "condition": "clean",
+                "task": "t06",
+                "baseline": 1,
+                "current": 0
+              },
+              {
+                "arm": "B",
+                "label": "bedrock/claude-sonnet-4-5",
+                "condition": "clean",
+                "task": "t07",
+                "baseline": 1,
+                "current": 0
+              },
+              {
+                "arm": "B",
+                "label": "bedrock/claude-sonnet-4-5",
+                "condition": "clean",
+                "task": "t08",
+                "baseline": 1,
+                "current": 0
+              }
+            ],
+            "success_before": 1,
+            "success_now": 0,
+            "requests_before": 24,
+            "requests_now": 24,
+            "requested_now": [
+              "claude-sonnet-4-5"
+            ]
+          }
+        ],
+        "new_clusters": [
+          {
+            "signature": "c_outage",
+            "title": "model unavailable",
+            "count": 8,
+            "tasks": [
+              "t01"
+            ]
+          }
+        ]
+      },
+      "equivalence": [
+        {
+          "model": "claude-sonnet-4-5",
+          "arm_a": "A",
+          "arm_b": "B",
+          "label_a": "anthropic/claude-sonnet-4-5",
+          "label_b": "bedrock/claude-sonnet-4-5",
+          "tests": [
+            {
+              "key": "pair/clean/verified_success",
+              "arm": "pair",
+              "label": "bedrock/claude-sonnet-4-5 vs anthropic/claude-sonnet-4-5",
+              "condition": "clean",
+              "metric": "verified_success",
+              "higher_is_better": true,
+              "tasks": 8,
+              "discordant": 0,
+              "worse": 0,
+              "baseline": 0,
+              "current": 0,
+              "delta": 0,
+              "relative": null,
+              "p": 1,
+              "level": 0,
+              "floor": 0,
+              "status": "no_change",
+              "reason": "no task changed (8 tasks)"
+            },
+            {
+              "key": "pair/clean/cost_usd",
+              "arm": "pair",
+              "label": "bedrock/claude-sonnet-4-5 vs anthropic/claude-sonnet-4-5",
+              "condition": "clean",
+              "metric": "cost_usd",
+              "higher_is_better": false,
+              "tasks": 8,
+              "discordant": 0,
+              "worse": 0,
+              "baseline": 0.01,
+              "current": 0.01,
+              "delta": 0,
+              "relative": 0,
+              "p": 1,
+              "level": 0,
+              "floor": 0,
+              "status": "no_change",
+              "reason": "no task changed (8 tasks)"
+            },
+            {
+              "key": "pair/clean/latency_ms",
+              "arm": "pair",
+              "label": "bedrock/claude-sonnet-4-5 vs anthropic/claude-sonnet-4-5",
+              "condition": "clean",
+              "metric": "latency_ms",
+              "higher_is_better": false,
+              "tasks": 8,
+              "discordant": 8,
+              "worse": 8,
+              "baseline": 3200,
+              "current": 5120,
+              "delta": 1920,
+              "relative": 0.6,
+              "p": 0.0078125,
+              "level": 0.03333333333333333,
+              "floor": 0,
+              "status": "worse",
+              "reason": "p 0.00781 \u003c= 0.0333 on 8 tasks (8 of 8 changed tasks worse): latency_ms +60% (3200 to 5120)"
+            },
+            {
+              "key": "pair/clean/format_errors",
+              "arm": "pair",
+              "label": "bedrock/claude-sonnet-4-5 vs anthropic/claude-sonnet-4-5",
+              "condition": "clean",
+              "metric": "format_errors",
+              "higher_is_better": false,
+              "tasks": 8,
+              "discordant": 0,
+              "worse": 0,
+              "baseline": 0,
+              "current": 0,
+              "delta": 0,
+              "relative": null,
+              "p": 1,
+              "level": 0,
+              "floor": 0,
+              "status": "no_change",
+              "reason": "no task changed (8 tasks)"
+            }
+          ],
+          "verdict": "differs",
+          "reason": "bedrock/claude-sonnet-4-5 differs from anthropic/claude-sonnet-4-5: latency_ms on clean: latency_ms +60% (3200 to 5120)"
+        }
+      ],
+      "served": [
+        {
+          "arm": "A",
+          "label": "anthropic/claude-sonnet-4-5",
+          "requested": [
+            "claude-sonnet-4-5"
+          ],
+          "served": [
+            "claude-sonnet-4-5-20261101"
+          ],
+          "providers": [
+            "anthropic"
+          ],
+          "requests": 24
+        },
+        {
+          "arm": "B",
+          "label": "bedrock/claude-sonnet-4-5",
+          "requested": [
+            "claude-sonnet-4-5"
+          ],
+          "served": [
+            "claude-sonnet-4-5-20261101"
+          ],
+          "providers": [
+            "anthropic"
+          ],
+          "requests": 24
+        }
+      ],
+      "points": [
+        {
+          "arm": "A",
+          "success": 0,
+          "tasks": 8,
+          "runs": 8
+        },
+        {
+          "arm": "B",
+          "success": 0,
+          "tasks": 8,
+          "runs": 8
+        }
+      ]
+    },
+    {
+      "id": "e_canary_3",
+      "canary": "nightly",
+      "kind": "run",
+      "started": "2026-11-19T06:14:00Z",
+      "finished": "2026-11-19T06:18:00Z",
+      "exp_id": "e_canary_3",
+      "manifest_hash": "h_e_canary_3",
+      "fingerprint": "fp1",
+      "baseline": "e_canary_1",
+      "outcome": "clear",
+      "state": "steady",
+      "reason": "no drift detected",
+      "cost_usd": 0.42,
+      "runs": 16,
+      "run_errors": 0,
+      "comparison": {
+        "alpha": 0.1,
+        "family": 8,
+        "tests": [
+          {
+            "key": "A/clean/verified_success",
+            "arm": "A",
+            "label": "anthropic/claude-sonnet-4-5",
+            "condition": "clean",
+            "metric": "verified_success",
+            "higher_is_better": true,
+            "tasks": 8,
+            "discordant": 0,
+            "worse": 0,
+            "baseline": 1,
+            "current": 1,
+            "delta": 0,
+            "relative": 0,
+            "p": 1,
+            "level": 0,
+            "floor": 0,
+            "status": "no_change",
+            "reason": "no task changed (8 tasks)"
+          },
+          {
+            "key": "B/clean/verified_success",
+            "arm": "B",
+            "label": "bedrock/claude-sonnet-4-5",
+            "condition": "clean",
+            "metric": "verified_success",
+            "higher_is_better": true,
+            "tasks": 8,
+            "discordant": 0,
+            "worse": 0,
+            "baseline": 1,
+            "current": 1,
+            "delta": 0,
+            "relative": 0,
+            "p": 1,
+            "level": 0,
+            "floor": 0,
+            "status": "no_change",
+            "reason": "no task changed (8 tasks)"
+          },
+          {
+            "key": "A/clean/cost_usd",
+            "arm": "A",
+            "label": "anthropic/claude-sonnet-4-5",
+            "condition": "clean",
+            "metric": "cost_usd",
+            "higher_is_better": false,
+            "tasks": 8,
+            "discordant": 0,
+            "worse": 0,
+            "baseline": 0.01,
+            "current": 0.01,
+            "delta": 0,
+            "relative": 0,
+            "p": 1,
+            "level": 0,
+            "floor": 0.2,
+            "status": "no_change",
+            "reason": "no task changed (8 tasks)"
+          },
+          {
+            "key": "B/clean/cost_usd",
+            "arm": "B",
+            "label": "bedrock/claude-sonnet-4-5",
+            "condition": "clean",
+            "metric": "cost_usd",
+            "higher_is_better": false,
+            "tasks": 8,
+            "discordant": 0,
+            "worse": 0,
+            "baseline": 0.01,
+            "current": 0.01,
+            "delta": 0,
+            "relative": 0,
+            "p": 1,
+            "level": 0,
+            "floor": 0.2,
+            "status": "no_change",
+            "reason": "no task changed (8 tasks)"
+          },
+          {
+            "key": "A/clean/tokens",
+            "arm": "A",
+            "label": "anthropic/claude-sonnet-4-5",
+            "condition": "clean",
+            "metric": "tokens",
+            "higher_is_better": false,
+            "tasks": 8,
+            "discordant": 0,
+            "worse": 0,
+            "baseline": 1000,
+            "current": 1000,
+            "delta": 0,
+            "relative": 0,
+            "p": 1,
+            "level": 0,
+            "floor": 0.1,
+            "status": "no_change",
+            "reason": "no task changed (8 tasks)"
+          },
+          {
+            "key": "B/clean/tokens",
+            "arm": "B",
+            "label": "bedrock/claude-sonnet-4-5",
+            "condition": "clean",
+            "metric": "tokens",
+            "higher_is_better": false,
+            "tasks": 8,
+            "discordant": 0,
+            "worse": 0,
+            "baseline": 1000,
+            "current": 1000,
+            "delta": 0,
+            "relative": 0,
+            "p": 1,
+            "level": 0,
+            "floor": 0.1,
+            "status": "no_change",
+            "reason": "no task changed (8 tasks)"
+          },
+          {
+            "key": "A/clean/latency_ms",
+            "arm": "A",
+            "label": "anthropic/claude-sonnet-4-5",
+            "condition": "clean",
+            "metric": "latency_ms",
+            "higher_is_better": false,
+            "tasks": 8,
+            "discordant": 0,
+            "worse": 0,
+            "baseline": 1500,
+            "current": 1500,
+            "delta": 0,
+            "relative": 0,
+            "p": 1,
+            "level": 0,
+            "floor": 0.25,
+            "status": "no_change",
+            "reason": "no task changed (8 tasks)"
+          },
+          {
+            "key": "B/clean/latency_ms",
+            "arm": "B",
+            "label": "bedrock/claude-sonnet-4-5",
+            "condition": "clean",
+            "metric": "latency_ms",
+            "higher_is_better": false,
+            "tasks": 8,
+            "discordant": 0,
+            "worse": 0,
+            "baseline": 2400,
+            "current": 2400,
+            "delta": 0,
+            "relative": 0,
+            "p": 1,
+            "level": 0,
+            "floor": 0.25,
+            "status": "no_change",
+            "reason": "no task changed (8 tasks)"
+          }
+        ],
+        "flagged": [],
+        "flips": []
+      },
+      "changes": {
+        "moved": [],
+        "arms": [
+          {
+            "arm": "A",
+            "label": "anthropic/claude-sonnet-4-5",
+            "served_before": [
+              "claude-sonnet-4-5-20250929"
+            ],
+            "served_now": [
+              "claude-sonnet-4-5-20250929"
+            ],
+            "served_changed": false,
+            "providers_before": [
+              "anthropic"
+            ],
+            "providers_now": [
+              "anthropic"
+            ],
+            "provider_changed": false,
+            "fingerprints_before": [],
+            "fingerprints_now": [],
+            "fingerprint_changed": false,
+            "latency_before_ms": 1500,
+            "latency_now_ms": 1500,
+            "latency_shift": 0,
+            "prompt_tasks": 8,
+            "prompt_changed": 0,
+            "prompt_shift": 0,
+            "error_rate_before": 0,
+            "error_rate_now": 0,
+            "format_errors_before": 0,
+            "format_errors_now": 0,
+            "flips": [],
+            "success_before": 1,
+            "success_now": 1,
+            "requests_before": 24,
+            "requests_now": 24,
+            "requested_now": [
+              "claude-sonnet-4-5"
+            ]
+          },
+          {
+            "arm": "B",
+            "label": "bedrock/claude-sonnet-4-5",
+            "served_before": [
+              "claude-sonnet-4-5-20250929"
+            ],
+            "served_now": [
+              "claude-sonnet-4-5-20250929"
+            ],
+            "served_changed": false,
+            "providers_before": [
+              "anthropic"
+            ],
+            "providers_now": [
+              "anthropic"
+            ],
+            "provider_changed": false,
+            "fingerprints_before": [],
+            "fingerprints_now": [],
+            "fingerprint_changed": false,
+            "latency_before_ms": 2400,
+            "latency_now_ms": 2400,
+            "latency_shift": 0,
+            "prompt_tasks": 8,
+            "prompt_changed": 0,
+            "prompt_shift": 0,
+            "error_rate_before": 0,
+            "error_rate_now": 0,
+            "format_errors_before": 0,
+            "format_errors_now": 0,
+            "flips": [],
+            "success_before": 1,
+            "success_now": 1,
+            "requests_before": 24,
+            "requests_now": 24,
+            "requested_now": [
+              "claude-sonnet-4-5"
+            ]
+          }
+        ],
+        "new_clusters": []
+      },
+      "equivalence": [
+        {
+          "model": "claude-sonnet-4-5",
+          "arm_a": "A",
+          "arm_b": "B",
+          "label_a": "anthropic/claude-sonnet-4-5",
+          "label_b": "bedrock/claude-sonnet-4-5",
+          "tests": [
+            {
+              "key": "pair/clean/verified_success",
+              "arm": "pair",
+              "label": "bedrock/claude-sonnet-4-5 vs anthropic/claude-sonnet-4-5",
+              "condition": "clean",
+              "metric": "verified_success",
+              "higher_is_better": true,
+              "tasks": 8,
+              "discordant": 0,
+              "worse": 0,
+              "baseline": 1,
+              "current": 1,
+              "delta": 0,
+              "relative": 0,
+              "p": 1,
+              "level": 0,
+              "floor": 0,
+              "status": "no_change",
+              "reason": "no task changed (8 tasks)"
+            },
+            {
+              "key": "pair/clean/cost_usd",
+              "arm": "pair",
+              "label": "bedrock/claude-sonnet-4-5 vs anthropic/claude-sonnet-4-5",
+              "condition": "clean",
+              "metric": "cost_usd",
+              "higher_is_better": false,
+              "tasks": 8,
+              "discordant": 0,
+              "worse": 0,
+              "baseline": 0.01,
+              "current": 0.01,
+              "delta": 0,
+              "relative": 0,
+              "p": 1,
+              "level": 0,
+              "floor": 0,
+              "status": "no_change",
+              "reason": "no task changed (8 tasks)"
+            },
+            {
+              "key": "pair/clean/latency_ms",
+              "arm": "pair",
+              "label": "bedrock/claude-sonnet-4-5 vs anthropic/claude-sonnet-4-5",
+              "condition": "clean",
+              "metric": "latency_ms",
+              "higher_is_better": false,
+              "tasks": 8,
+              "discordant": 8,
+              "worse": 8,
+              "baseline": 1500,
+              "current": 2400,
+              "delta": 900,
+              "relative": 0.6,
+              "p": 0.0078125,
+              "level": 0.03333333333333333,
+              "floor": 0,
+              "status": "worse",
+              "reason": "p 0.00781 \u003c= 0.0333 on 8 tasks (8 of 8 changed tasks worse): latency_ms +60% (1500 to 2400)"
+            },
+            {
+              "key": "pair/clean/format_errors",
+              "arm": "pair",
+              "label": "bedrock/claude-sonnet-4-5 vs anthropic/claude-sonnet-4-5",
+              "condition": "clean",
+              "metric": "format_errors",
+              "higher_is_better": false,
+              "tasks": 8,
+              "discordant": 0,
+              "worse": 0,
+              "baseline": 0,
+              "current": 0,
+              "delta": 0,
+              "relative": null,
+              "p": 1,
+              "level": 0,
+              "floor": 0,
+              "status": "no_change",
+              "reason": "no task changed (8 tasks)"
+            }
+          ],
+          "verdict": "differs",
+          "reason": "bedrock/claude-sonnet-4-5 differs from anthropic/claude-sonnet-4-5: latency_ms on clean: latency_ms +60% (1500 to 2400)"
+        }
+      ],
+      "served": [
+        {
+          "arm": "A",
+          "label": "anthropic/claude-sonnet-4-5",
+          "requested": [
+            "claude-sonnet-4-5"
+          ],
+          "served": [
+            "claude-sonnet-4-5-20250929"
+          ],
+          "providers": [
+            "anthropic"
+          ],
+          "requests": 24
+        },
+        {
+          "arm": "B",
+          "label": "bedrock/claude-sonnet-4-5",
+          "requested": [
+            "claude-sonnet-4-5"
+          ],
+          "served": [
+            "claude-sonnet-4-5-20250929"
+          ],
+          "providers": [
+            "anthropic"
+          ],
+          "requests": 24
+        }
+      ],
+      "points": [
+        {
+          "arm": "A",
+          "success": 1,
+          "tasks": 8,
+          "runs": 8
+        },
+        {
+          "arm": "B",
+          "success": 1,
+          "tasks": 8,
+          "runs": 8
+        }
+      ]
+    },
+    {
+      "id": "e_canary_2",
+      "canary": "nightly",
+      "kind": "run",
+      "started": "2026-11-18T06:08:00Z",
+      "finished": "2026-11-18T06:12:00Z",
+      "exp_id": "e_canary_2",
+      "manifest_hash": "h_e_canary_2",
+      "fingerprint": "fp1",
+      "baseline": "e_canary_1",
+      "outcome": "clear",
+      "state": "steady",
+      "reason": "no drift detected",
+      "cost_usd": 0.42,
+      "runs": 16,
+      "run_errors": 0,
+      "comparison": {
+        "alpha": 0.1,
+        "family": 8,
+        "tests": [
+          {
+            "key": "A/clean/verified_success",
+            "arm": "A",
+            "label": "anthropic/claude-sonnet-4-5",
+            "condition": "clean",
+            "metric": "verified_success",
+            "higher_is_better": true,
+            "tasks": 8,
+            "discordant": 0,
+            "worse": 0,
+            "baseline": 1,
+            "current": 1,
+            "delta": 0,
+            "relative": 0,
+            "p": 1,
+            "level": 0,
+            "floor": 0,
+            "status": "no_change",
+            "reason": "no task changed (8 tasks)"
+          },
+          {
+            "key": "B/clean/verified_success",
+            "arm": "B",
+            "label": "bedrock/claude-sonnet-4-5",
+            "condition": "clean",
+            "metric": "verified_success",
+            "higher_is_better": true,
+            "tasks": 8,
+            "discordant": 0,
+            "worse": 0,
+            "baseline": 1,
+            "current": 1,
+            "delta": 0,
+            "relative": 0,
+            "p": 1,
+            "level": 0,
+            "floor": 0,
+            "status": "no_change",
+            "reason": "no task changed (8 tasks)"
+          },
+          {
+            "key": "A/clean/cost_usd",
+            "arm": "A",
+            "label": "anthropic/claude-sonnet-4-5",
+            "condition": "clean",
+            "metric": "cost_usd",
+            "higher_is_better": false,
+            "tasks": 8,
+            "discordant": 0,
+            "worse": 0,
+            "baseline": 0.01,
+            "current": 0.01,
+            "delta": 0,
+            "relative": 0,
+            "p": 1,
+            "level": 0,
+            "floor": 0.2,
+            "status": "no_change",
+            "reason": "no task changed (8 tasks)"
+          },
+          {
+            "key": "B/clean/cost_usd",
+            "arm": "B",
+            "label": "bedrock/claude-sonnet-4-5",
+            "condition": "clean",
+            "metric": "cost_usd",
+            "higher_is_better": false,
+            "tasks": 8,
+            "discordant": 0,
+            "worse": 0,
+            "baseline": 0.01,
+            "current": 0.01,
+            "delta": 0,
+            "relative": 0,
+            "p": 1,
+            "level": 0,
+            "floor": 0.2,
+            "status": "no_change",
+            "reason": "no task changed (8 tasks)"
+          },
+          {
+            "key": "A/clean/tokens",
+            "arm": "A",
+            "label": "anthropic/claude-sonnet-4-5",
+            "condition": "clean",
+            "metric": "tokens",
+            "higher_is_better": false,
+            "tasks": 8,
+            "discordant": 0,
+            "worse": 0,
+            "baseline": 1000,
+            "current": 1000,
+            "delta": 0,
+            "relative": 0,
+            "p": 1,
+            "level": 0,
+            "floor": 0.1,
+            "status": "no_change",
+            "reason": "no task changed (8 tasks)"
+          },
+          {
+            "key": "B/clean/tokens",
+            "arm": "B",
+            "label": "bedrock/claude-sonnet-4-5",
+            "condition": "clean",
+            "metric": "tokens",
+            "higher_is_better": false,
+            "tasks": 8,
+            "discordant": 0,
+            "worse": 0,
+            "baseline": 1000,
+            "current": 1000,
+            "delta": 0,
+            "relative": 0,
+            "p": 1,
+            "level": 0,
+            "floor": 0.1,
+            "status": "no_change",
+            "reason": "no task changed (8 tasks)"
+          },
+          {
+            "key": "A/clean/latency_ms",
+            "arm": "A",
+            "label": "anthropic/claude-sonnet-4-5",
+            "condition": "clean",
+            "metric": "latency_ms",
+            "higher_is_better": false,
+            "tasks": 8,
+            "discordant": 0,
+            "worse": 0,
+            "baseline": 1500,
+            "current": 1500,
+            "delta": 0,
+            "relative": 0,
+            "p": 1,
+            "level": 0,
+            "floor": 0.25,
+            "status": "no_change",
+            "reason": "no task changed (8 tasks)"
+          },
+          {
+            "key": "B/clean/latency_ms",
+            "arm": "B",
+            "label": "bedrock/claude-sonnet-4-5",
+            "condition": "clean",
+            "metric": "latency_ms",
+            "higher_is_better": false,
+            "tasks": 8,
+            "discordant": 0,
+            "worse": 0,
+            "baseline": 2400,
+            "current": 2400,
+            "delta": 0,
+            "relative": 0,
+            "p": 1,
+            "level": 0,
+            "floor": 0.25,
+            "status": "no_change",
+            "reason": "no task changed (8 tasks)"
+          }
+        ],
+        "flagged": [],
+        "flips": []
+      },
+      "changes": {
+        "moved": [],
+        "arms": [
+          {
+            "arm": "A",
+            "label": "anthropic/claude-sonnet-4-5",
+            "served_before": [
+              "claude-sonnet-4-5-20250929"
+            ],
+            "served_now": [
+              "claude-sonnet-4-5-20250929"
+            ],
+            "served_changed": false,
+            "providers_before": [
+              "anthropic"
+            ],
+            "providers_now": [
+              "anthropic"
+            ],
+            "provider_changed": false,
+            "fingerprints_before": [],
+            "fingerprints_now": [],
+            "fingerprint_changed": false,
+            "latency_before_ms": 1500,
+            "latency_now_ms": 1500,
+            "latency_shift": 0,
+            "prompt_tasks": 8,
+            "prompt_changed": 0,
+            "prompt_shift": 0,
+            "error_rate_before": 0,
+            "error_rate_now": 0,
+            "format_errors_before": 0,
+            "format_errors_now": 0,
+            "flips": [],
+            "success_before": 1,
+            "success_now": 1,
+            "requests_before": 24,
+            "requests_now": 24,
+            "requested_now": [
+              "claude-sonnet-4-5"
+            ]
+          },
+          {
+            "arm": "B",
+            "label": "bedrock/claude-sonnet-4-5",
+            "served_before": [
+              "claude-sonnet-4-5-20250929"
+            ],
+            "served_now": [
+              "claude-sonnet-4-5-20250929"
+            ],
+            "served_changed": false,
+            "providers_before": [
+              "anthropic"
+            ],
+            "providers_now": [
+              "anthropic"
+            ],
+            "provider_changed": false,
+            "fingerprints_before": [],
+            "fingerprints_now": [],
+            "fingerprint_changed": false,
+            "latency_before_ms": 2400,
+            "latency_now_ms": 2400,
+            "latency_shift": 0,
+            "prompt_tasks": 8,
+            "prompt_changed": 0,
+            "prompt_shift": 0,
+            "error_rate_before": 0,
+            "error_rate_now": 0,
+            "format_errors_before": 0,
+            "format_errors_now": 0,
+            "flips": [],
+            "success_before": 1,
+            "success_now": 1,
+            "requests_before": 24,
+            "requests_now": 24,
+            "requested_now": [
+              "claude-sonnet-4-5"
+            ]
+          }
+        ],
+        "new_clusters": []
+      },
+      "equivalence": [
+        {
+          "model": "claude-sonnet-4-5",
+          "arm_a": "A",
+          "arm_b": "B",
+          "label_a": "anthropic/claude-sonnet-4-5",
+          "label_b": "bedrock/claude-sonnet-4-5",
+          "tests": [
+            {
+              "key": "pair/clean/verified_success",
+              "arm": "pair",
+              "label": "bedrock/claude-sonnet-4-5 vs anthropic/claude-sonnet-4-5",
+              "condition": "clean",
+              "metric": "verified_success",
+              "higher_is_better": true,
+              "tasks": 8,
+              "discordant": 0,
+              "worse": 0,
+              "baseline": 1,
+              "current": 1,
+              "delta": 0,
+              "relative": 0,
+              "p": 1,
+              "level": 0,
+              "floor": 0,
+              "status": "no_change",
+              "reason": "no task changed (8 tasks)"
+            },
+            {
+              "key": "pair/clean/cost_usd",
+              "arm": "pair",
+              "label": "bedrock/claude-sonnet-4-5 vs anthropic/claude-sonnet-4-5",
+              "condition": "clean",
+              "metric": "cost_usd",
+              "higher_is_better": false,
+              "tasks": 8,
+              "discordant": 0,
+              "worse": 0,
+              "baseline": 0.01,
+              "current": 0.01,
+              "delta": 0,
+              "relative": 0,
+              "p": 1,
+              "level": 0,
+              "floor": 0,
+              "status": "no_change",
+              "reason": "no task changed (8 tasks)"
+            },
+            {
+              "key": "pair/clean/latency_ms",
+              "arm": "pair",
+              "label": "bedrock/claude-sonnet-4-5 vs anthropic/claude-sonnet-4-5",
+              "condition": "clean",
+              "metric": "latency_ms",
+              "higher_is_better": false,
+              "tasks": 8,
+              "discordant": 8,
+              "worse": 8,
+              "baseline": 1500,
+              "current": 2400,
+              "delta": 900,
+              "relative": 0.6,
+              "p": 0.0078125,
+              "level": 0.03333333333333333,
+              "floor": 0,
+              "status": "worse",
+              "reason": "p 0.00781 \u003c= 0.0333 on 8 tasks (8 of 8 changed tasks worse): latency_ms +60% (1500 to 2400)"
+            },
+            {
+              "key": "pair/clean/format_errors",
+              "arm": "pair",
+              "label": "bedrock/claude-sonnet-4-5 vs anthropic/claude-sonnet-4-5",
+              "condition": "clean",
+              "metric": "format_errors",
+              "higher_is_better": false,
+              "tasks": 8,
+              "discordant": 0,
+              "worse": 0,
+              "baseline": 0,
+              "current": 0,
+              "delta": 0,
+              "relative": null,
+              "p": 1,
+              "level": 0,
+              "floor": 0,
+              "status": "no_change",
+              "reason": "no task changed (8 tasks)"
+            }
+          ],
+          "verdict": "differs",
+          "reason": "bedrock/claude-sonnet-4-5 differs from anthropic/claude-sonnet-4-5: latency_ms on clean: latency_ms +60% (1500 to 2400)"
+        }
+      ],
+      "served": [
+        {
+          "arm": "A",
+          "label": "anthropic/claude-sonnet-4-5",
+          "requested": [
+            "claude-sonnet-4-5"
+          ],
+          "served": [
+            "claude-sonnet-4-5-20250929"
+          ],
+          "providers": [
+            "anthropic"
+          ],
+          "requests": 24
+        },
+        {
+          "arm": "B",
+          "label": "bedrock/claude-sonnet-4-5",
+          "requested": [
+            "claude-sonnet-4-5"
+          ],
+          "served": [
+            "claude-sonnet-4-5-20250929"
+          ],
+          "providers": [
+            "anthropic"
+          ],
+          "requests": 24
+        }
+      ],
+      "points": [
+        {
+          "arm": "A",
+          "success": 1,
+          "tasks": 8,
+          "runs": 8
+        },
+        {
+          "arm": "B",
+          "success": 1,
+          "tasks": 8,
+          "runs": 8
+        }
+      ]
+    },
+    {
+      "id": "e_canary_1",
+      "canary": "nightly",
+      "kind": "baseline",
+      "started": "2026-11-17T06:02:00Z",
+      "finished": "2026-11-17T06:06:00Z",
+      "exp_id": "e_canary_1",
+      "manifest_hash": "h_e_canary_1",
+      "fingerprint": "fp1",
+      "baseline": "e_canary_1",
+      "outcome": "pinned",
+      "state": "steady",
+      "reason": "baseline pinned: e_canary_1 (16 runs, success A 100%, B 100%)",
+      "cost_usd": 0.42,
+      "runs": 16,
+      "run_errors": 0,
+      "served": [
+        {
+          "arm": "A",
+          "label": "anthropic/claude-sonnet-4-5",
+          "requested": [
+            "claude-sonnet-4-5"
+          ],
+          "served": [
+            "claude-sonnet-4-5-20250929"
+          ],
+          "providers": [
+            "anthropic"
+          ],
+          "requests": 24
+        },
+        {
+          "arm": "B",
+          "label": "bedrock/claude-sonnet-4-5",
+          "requested": [
+            "claude-sonnet-4-5"
+          ],
+          "served": [
+            "claude-sonnet-4-5-20250929"
+          ],
+          "providers": [
+            "anthropic"
+          ],
+          "requests": 24
+        }
+      ],
+      "points": [
+        {
+          "arm": "A",
+          "success": 1,
+          "tasks": 8,
+          "runs": 8
+        },
+        {
+          "arm": "B",
+          "success": 1,
+          "tasks": 8,
+          "runs": 8
+        }
+      ]
+    }
+  ],
+  "history": [
+    {
+      "key": "nightly|A",
+      "agent": "nightly",
+      "model": "anthropic/claude-sonnet-4-5",
+      "synthetic": false,
+      "points": [
+        {
+          "experiment": "e_canary_1",
+          "date": "2026-11-17T06:02:00Z",
+          "suite": "coding-core@1.0.0",
+          "arm": "A",
+          "config_hash": "fp1",
+          "config_changed": false,
+          "synthetic": false,
+          "tasks": 8,
+          "runs": 8,
+          "value": 1,
+          "success": 1,
+          "success_low": null,
+          "success_high": null,
+          "cost_per_success": null,
+          "tokens": null,
+          "wall_time_s": null,
+          "false_completion": null,
+          "decision": "steady",
+          "policy": "",
+          "release": "",
+          "regression": {
+            "status": "first",
+            "p": null,
+            "common_tasks": 0,
+            "discordant": 0,
+            "delta": null,
+            "against": "",
+            "reason": "baseline"
+          }
+        },
+        {
+          "experiment": "e_canary_2",
+          "date": "2026-11-18T06:08:00Z",
+          "suite": "coding-core@1.0.0",
+          "arm": "A",
+          "config_hash": "fp1",
+          "config_changed": false,
+          "synthetic": false,
+          "tasks": 8,
+          "runs": 8,
+          "value": 1,
+          "success": 1,
+          "success_low": null,
+          "success_high": null,
+          "cost_per_success": null,
+          "tokens": null,
+          "wall_time_s": null,
+          "false_completion": null,
+          "decision": "steady",
+          "policy": "",
+          "release": "",
+          "regression": {
+            "status": "no_change",
+            "p": 1,
+            "common_tasks": 8,
+            "discordant": 0,
+            "delta": 0,
+            "against": "e_canary_1",
+            "reason": "no task changed (8 tasks)"
+          }
+        },
+        {
+          "experiment": "e_canary_3",
+          "date": "2026-11-19T06:14:00Z",
+          "suite": "coding-core@1.0.0",
+          "arm": "A",
+          "config_hash": "fp1",
+          "config_changed": false,
+          "synthetic": false,
+          "tasks": 8,
+          "runs": 8,
+          "value": 1,
+          "success": 1,
+          "success_low": null,
+          "success_high": null,
+          "cost_per_success": null,
+          "tokens": null,
+          "wall_time_s": null,
+          "false_completion": null,
+          "decision": "steady",
+          "policy": "",
+          "release": "",
+          "regression": {
+            "status": "no_change",
+            "p": 1,
+            "common_tasks": 8,
+            "discordant": 0,
+            "delta": 0,
+            "against": "e_canary_1",
+            "reason": "no task changed (8 tasks)"
+          }
+        },
+        {
+          "experiment": "e_canary_4",
+          "date": "2026-11-20T06:20:00Z",
+          "suite": "coding-core@1.0.0",
+          "arm": "A",
+          "config_hash": "fp1",
+          "config_changed": false,
+          "synthetic": false,
+          "tasks": 8,
+          "runs": 8,
+          "value": 0,
+          "success": 0,
+          "success_low": null,
+          "success_high": null,
+          "cost_per_success": null,
+          "tokens": null,
+          "wall_time_s": null,
+          "false_completion": null,
+          "decision": "watching",
+          "policy": "",
+          "release": "",
+          "regression": {
+            "status": "regressed",
+            "p": 0.0078125,
+            "common_tasks": 8,
+            "discordant": 8,
+            "delta": -1,
+            "against": "e_canary_1",
+            "reason": "p 0.00781 \u003c= 0.05 on 8 tasks (8 of 8 changed tasks worse): success -100.0 points (100% to 0%)"
+          }
+        },
+        {
+          "experiment": "e_canary_5",
+          "date": "2026-11-20T06:25:00Z",
+          "suite": "coding-core@1.0.0",
+          "arm": "A",
+          "config_hash": "fp1",
+          "config_changed": false,
+          "synthetic": false,
+          "tasks": 8,
+          "runs": 8,
+          "value": 0,
+          "success": 0,
+          "success_low": null,
+          "success_high": null,
+          "cost_per_success": null,
+          "tokens": null,
+          "wall_time_s": null,
+          "false_completion": null,
+          "decision": "drifted",
+          "policy": "",
+          "release": "regressed",
+          "regression": {
+            "status": "regressed",
+            "p": 0.0078125,
+            "common_tasks": 8,
+            "discordant": 8,
+            "delta": -1,
+            "against": "e_canary_1",
+            "reason": "p 0.00781 \u003c= 0.05 on 8 tasks (8 of 8 changed tasks worse): success -100.0 points (100% to 0%)"
+          }
+        }
+      ],
+      "regression": {
+        "status": "regressed",
+        "p": 0.0078125,
+        "common_tasks": 8,
+        "discordant": 8,
+        "delta": -1,
+        "against": "e_canary_1",
+        "reason": "p 0.00781 \u003c= 0.05 on 8 tasks (8 of 8 changed tasks worse): success -100.0 points (100% to 0%)"
+      }
+    },
+    {
+      "key": "nightly|B",
+      "agent": "nightly",
+      "model": "bedrock/claude-sonnet-4-5",
+      "synthetic": false,
+      "points": [
+        {
+          "experiment": "e_canary_1",
+          "date": "2026-11-17T06:02:00Z",
+          "suite": "coding-core@1.0.0",
+          "arm": "B",
+          "config_hash": "fp1",
+          "config_changed": false,
+          "synthetic": false,
+          "tasks": 8,
+          "runs": 8,
+          "value": 1,
+          "success": 1,
+          "success_low": null,
+          "success_high": null,
+          "cost_per_success": null,
+          "tokens": null,
+          "wall_time_s": null,
+          "false_completion": null,
+          "decision": "steady",
+          "policy": "",
+          "release": "",
+          "regression": {
+            "status": "first",
+            "p": null,
+            "common_tasks": 0,
+            "discordant": 0,
+            "delta": null,
+            "against": "",
+            "reason": "baseline"
+          }
+        },
+        {
+          "experiment": "e_canary_2",
+          "date": "2026-11-18T06:08:00Z",
+          "suite": "coding-core@1.0.0",
+          "arm": "B",
+          "config_hash": "fp1",
+          "config_changed": false,
+          "synthetic": false,
+          "tasks": 8,
+          "runs": 8,
+          "value": 1,
+          "success": 1,
+          "success_low": null,
+          "success_high": null,
+          "cost_per_success": null,
+          "tokens": null,
+          "wall_time_s": null,
+          "false_completion": null,
+          "decision": "steady",
+          "policy": "",
+          "release": "",
+          "regression": {
+            "status": "no_change",
+            "p": 1,
+            "common_tasks": 8,
+            "discordant": 0,
+            "delta": 0,
+            "against": "e_canary_1",
+            "reason": "no task changed (8 tasks)"
+          }
+        },
+        {
+          "experiment": "e_canary_3",
+          "date": "2026-11-19T06:14:00Z",
+          "suite": "coding-core@1.0.0",
+          "arm": "B",
+          "config_hash": "fp1",
+          "config_changed": false,
+          "synthetic": false,
+          "tasks": 8,
+          "runs": 8,
+          "value": 1,
+          "success": 1,
+          "success_low": null,
+          "success_high": null,
+          "cost_per_success": null,
+          "tokens": null,
+          "wall_time_s": null,
+          "false_completion": null,
+          "decision": "steady",
+          "policy": "",
+          "release": "",
+          "regression": {
+            "status": "no_change",
+            "p": 1,
+            "common_tasks": 8,
+            "discordant": 0,
+            "delta": 0,
+            "against": "e_canary_1",
+            "reason": "no task changed (8 tasks)"
+          }
+        },
+        {
+          "experiment": "e_canary_4",
+          "date": "2026-11-20T06:20:00Z",
+          "suite": "coding-core@1.0.0",
+          "arm": "B",
+          "config_hash": "fp1",
+          "config_changed": false,
+          "synthetic": false,
+          "tasks": 8,
+          "runs": 8,
+          "value": 0,
+          "success": 0,
+          "success_low": null,
+          "success_high": null,
+          "cost_per_success": null,
+          "tokens": null,
+          "wall_time_s": null,
+          "false_completion": null,
+          "decision": "watching",
+          "policy": "",
+          "release": "",
+          "regression": {
+            "status": "regressed",
+            "p": 0.0078125,
+            "common_tasks": 8,
+            "discordant": 8,
+            "delta": -1,
+            "against": "e_canary_1",
+            "reason": "p 0.00781 \u003c= 0.1 on 8 tasks (8 of 8 changed tasks worse): success -100.0 points (100% to 0%)"
+          }
+        },
+        {
+          "experiment": "e_canary_5",
+          "date": "2026-11-20T06:25:00Z",
+          "suite": "coding-core@1.0.0",
+          "arm": "B",
+          "config_hash": "fp1",
+          "config_changed": false,
+          "synthetic": false,
+          "tasks": 8,
+          "runs": 8,
+          "value": 0,
+          "success": 0,
+          "success_low": null,
+          "success_high": null,
+          "cost_per_success": null,
+          "tokens": null,
+          "wall_time_s": null,
+          "false_completion": null,
+          "decision": "drifted",
+          "policy": "",
+          "release": "regressed",
+          "regression": {
+            "status": "regressed",
+            "p": 0.0078125,
+            "common_tasks": 8,
+            "discordant": 8,
+            "delta": -1,
+            "against": "e_canary_1",
+            "reason": "p 0.00781 \u003c= 0.1 on 8 tasks (8 of 8 changed tasks worse): success -100.0 points (100% to 0%)"
+          }
+        }
+      ],
+      "regression": {
+        "status": "regressed",
+        "p": 0.0078125,
+        "common_tasks": 8,
+        "discordant": 8,
+        "delta": -1,
+        "against": "e_canary_1",
+        "reason": "p 0.00781 \u003c= 0.1 on 8 tasks (8 of 8 changed tasks worse): success -100.0 points (100% to 0%)"
+      }
+    }
+  ],
+  "pairs": [
+    {
+      "model": "claude-sonnet-4-5",
+      "arm_a": "A",
+      "arm_b": "B",
+      "label_a": "anthropic/claude-sonnet-4-5",
+      "label_b": "bedrock/claude-sonnet-4-5"
+    }
+  ]
+}

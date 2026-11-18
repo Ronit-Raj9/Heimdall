@@ -1,0 +1,41 @@
+{
+	"_comment": "SYNTHETIC fixture for UI development: the support scorecard of the $0 llm-user smoke of examples/acme-helpdesk (scripted controls, the fault proxy scripted model as the customer), served by GET /api/bench/experiments/{id}/support on 18 Nov 2026. Not a benchmark result.",
+	"mode": "synthetic",
+	"exp_id": "e_hd_w3_helpdesk_llm_smoke_vqj0",
+	"suite": "acme-helpdesk@1.0.0",
+	"condition": "clean",
+	"support": true,
+	"simulator_mode": "llm",
+	"simulator_label": "simulated user (model: anthropic/claude-sonnet-4-5)",
+	"synthetic": true,
+	"arms": [
+		{
+			"arm": "A",
+			"label": "oracle (reference script)",
+			"runs": 2,
+			"resolution": 1,
+			"resolved": 2,
+			"decided": 2,
+			"cost_per_resolution": null,
+			"escalation_rate": 0.5,
+			"escalation_correct": 1,
+			"policy_violation_rate": 0,
+			"user_turns": 2,
+			"simulator_cost_usd": null
+		},
+		{
+			"arm": "B",
+			"label": "noop (no change)",
+			"runs": 2,
+			"resolution": 0,
+			"resolved": 0,
+			"decided": 2,
+			"cost_per_resolution": null,
+			"escalation_rate": 0,
+			"escalation_correct": 0.5,
+			"policy_violation_rate": 0,
+			"user_turns": 0,
+			"simulator_cost_usd": 0
+		}
+	]
+}

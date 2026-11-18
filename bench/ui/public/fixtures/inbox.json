@@ -1,0 +1,187 @@
+{
+	"_comment": "SYNTHETIC fixture for UI development. Not a benchmark result.",
+	"items": [
+		{
+			"id": "inc-3f9a1c2b7d10",
+			"state": "new",
+			"source": "prod-langfuse",
+			"source_kind": "langfuse",
+			"trace_id": "abc123",
+			"link": "https://cloud.langfuse.com/project/p1/traces/abc123",
+			"title": "Please refund order A-<n>, the tent arrived torn.",
+			"flagged": ["score helpfulness = 0 (below 0.5)", "observation \"issue_refund\" level ERROR: timeout"],
+			"signature": "f_3f9a1c2b7d10aa00",
+			"signature_parts": { "request": "q_ab12cd34ef56", "tool": "issue_refund", "error": "timeout after <n>s" },
+			"occurrences": 3,
+			"first_seen": "2026-11-14T09:12:00Z",
+			"last_seen": "2026-11-17T18:40:00Z",
+			"traces": [
+				{
+					"id": "abc101",
+					"source": "prod-langfuse",
+					"at": "2026-11-14T09:12:00Z",
+					"link": "https://cloud.langfuse.com/project/p1/traces/abc101"
+				},
+				{
+					"id": "abc117",
+					"source": "prod-langfuse",
+					"at": "2026-11-16T11:03:00Z",
+					"link": "https://cloud.langfuse.com/project/p1/traces/abc117"
+				},
+				{
+					"id": "abc123",
+					"source": "prod-langfuse",
+					"at": "2026-11-17T18:40:00Z",
+					"link": "https://cloud.langfuse.com/project/p1/traces/abc123"
+				}
+			],
+			"suggested_kind": "mcp",
+			"suggested_suite": "support",
+			"tools": ["lookup_order", "issue_refund"],
+			"model": "gpt-x",
+			"outcome": "error",
+			"redacted": { "email": 1 },
+			"updated": "2026-11-17T18:40:00Z"
+		},
+		{
+			"id": "inc-9c11aa02f3b4",
+			"state": "snoozed",
+			"source": "prod-langfuse",
+			"source_kind": "langfuse",
+			"trace_id": "abc090",
+			"link": "https://cloud.langfuse.com/project/p1/traces/abc090",
+			"title": "Remind me what size I ordered last time.",
+			"flagged": ["user feedback: thumbs down"],
+			"signature": "f_9c11aa02f3b4cc10",
+			"signature_parts": { "request": "q_77aa01bc2d3e" },
+			"occurrences": 1,
+			"first_seen": "2026-11-12T15:20:00Z",
+			"last_seen": "2026-11-12T15:20:00Z",
+			"traces": [{ "id": "abc090", "source": "prod-langfuse", "at": "2026-11-12T15:20:00Z" }],
+			"suggested_kind": "memory",
+			"outcome": "ok",
+			"snoozed_until": "2026-11-21T00:00:00Z",
+			"updated": "2026-11-14T08:00:00Z"
+		},
+		{
+			"id": "inc-7b20c4d9e811",
+			"state": "accepted",
+			"source": "edge-otlp",
+			"source_kind": "otlp",
+			"trace_id": "4bf92f3577b34da6a3ce929d0e0e4736",
+			"title": "What is the warranty period for the Alpine <n> tent?",
+			"flagged": ["answer contradicts the product page: warranty <n> years"],
+			"signature": "f_7b20c4d9e8114410",
+			"signature_parts": { "request": "q_5e6f7a8b9c0d" },
+			"occurrences": 2,
+			"first_seen": "2026-11-08T10:00:00Z",
+			"last_seen": "2026-11-16T07:45:00Z",
+			"traces": [
+				{ "id": "4bf92f3577b34da6a3ce929d0e0e4730", "source": "edge-otlp", "at": "2026-11-08T10:00:00Z" },
+				{ "id": "4bf92f3577b34da6a3ce929d0e0e4736", "source": "edge-otlp", "at": "2026-11-16T07:45:00Z" }
+			],
+			"suggested_kind": "qa",
+			"suggested_suite": "support",
+			"model": "gpt-x",
+			"outcome": "ok",
+			"task": {
+				"suite": "support",
+				"id": "warranty-period",
+				"dir": "benchmarks/support/tasks/warranty-period",
+				"accepted_at": "2026-11-09T09:30:00Z",
+				"admitted": true
+			},
+			"recurrences": 1,
+			"last_recurrence": "2026-11-16T07:45:00Z",
+			"release": { "status": "passes", "experiment": "e_123", "at": "2026-11-15T12:00:00Z", "passed": 3, "runs": 3 },
+			"updated": "2026-11-16T07:45:00Z"
+		},
+		{
+			"id": "inc-2a3b4c5d6e7f",
+			"state": "accepted",
+			"source": "prod-langfuse",
+			"source_kind": "langfuse",
+			"trace_id": "abc055",
+			"link": "https://cloud.langfuse.com/project/p1/traces/abc055",
+			"title": "Change the delivery address on order A-<n> to my office.",
+			"flagged": ["observation \"update_address\" level ERROR: validation failed"],
+			"signature": "f_2a3b4c5d6e7f9910",
+			"signature_parts": { "request": "q_1a2b3c4d5e6f", "tool": "update_address", "error": "validation failed: field <n>" },
+			"occurrences": 4,
+			"first_seen": "2026-11-05T08:00:00Z",
+			"last_seen": "2026-11-10T16:30:00Z",
+			"traces": [{ "id": "abc055", "source": "prod-langfuse", "at": "2026-11-10T16:30:00Z" }],
+			"suggested_kind": "tool-use",
+			"suggested_suite": "support",
+			"tools": ["update_address"],
+			"outcome": "error",
+			"task": {
+				"suite": "support",
+				"id": "address-change",
+				"dir": "benchmarks/support/tasks/address-change",
+				"accepted_at": "2026-11-11T09:00:00Z",
+				"admitted": false
+			},
+			"release": { "status": "not_run", "passed": 0, "runs": 0 },
+			"updated": "2026-11-11T09:00:00Z"
+		},
+		{
+			"id": "inc-5d8e7f6a1b2c",
+			"state": "rejected",
+			"source": "edge-otlp",
+			"source_kind": "otlp",
+			"trace_id": "9a0b1c2d3e4f5a6b7c8d9e0f1a2b3c4d",
+			"title": "Cancel my subscription.",
+			"flagged": ["score resolution = 0 (below 0.5)"],
+			"signature": "f_5d8e7f6a1b2c3310",
+			"signature_parts": { "request": "q_0f1e2d3c4b5a" },
+			"occurrences": 1,
+			"first_seen": "2026-11-09T13:00:00Z",
+			"last_seen": "2026-11-09T13:00:00Z",
+			"traces": [{ "id": "9a0b1c2d3e4f5a6b7c8d9e0f1a2b3c4d", "source": "edge-otlp", "at": "2026-11-09T13:00:00Z" }],
+			"suggested_kind": "qa",
+			"outcome": "unknown",
+			"reason": "expected behaviour: cancellation needs a signed-in user",
+			"updated": "2026-11-10T09:00:00Z"
+		},
+		{
+			"id": "inc-6e7f8a9b0c1d",
+			"state": "duplicate",
+			"source": "prod-langfuse",
+			"source_kind": "langfuse",
+			"trace_id": "abc140",
+			"title": "Refund order A-<n> please, it never arrived.",
+			"flagged": ["observation \"issue_refund\" level ERROR: timeout"],
+			"signature": "f_6e7f8a9b0c1d5510",
+			"signature_parts": { "request": "q_99887766aabb", "tool": "issue_refund", "error": "timeout after <n>s" },
+			"occurrences": 2,
+			"first_seen": "2026-11-15T10:00:00Z",
+			"last_seen": "2026-11-16T10:00:00Z",
+			"traces": [{ "id": "abc140", "source": "prod-langfuse", "at": "2026-11-16T10:00:00Z" }],
+			"suggested_kind": "mcp",
+			"suggested_suite": "support",
+			"tools": ["issue_refund"],
+			"outcome": "error",
+			"reason": "same refund timeout",
+			"duplicate_of": "inc-3f9a1c2b7d10",
+			"updated": "2026-11-16T12:00:00Z"
+		}
+	],
+	"counts": { "new": 1, "accepted": 2, "rejected": 1, "duplicate": 1, "snoozed": 1 },
+	"sources": [
+		{ "name": "prod-langfuse", "kind": "langfuse", "last_pull": "2026-11-17T19:00:00Z", "since": "2026-11-17T18:59:00Z", "pulled": 12 },
+		{
+			"name": "edge-otlp",
+			"kind": "otlp",
+			"last_pull": "2026-11-17T19:00:00Z",
+			"last_error": "read traces/edge.jsonl: no such file or directory"
+		}
+	],
+	"suites": [
+		{ "id": "support", "template": "mcp" },
+		{ "id": "faq", "template": "qa" }
+	],
+	"ingest_enabled": true,
+	"regression_tasks": 2,
+	"mode": "synthetic"
+}

@@ -1,0 +1,6 @@
+# MigrationGateChange: migration.GateChange (W6, docs/model-migration.md)
+gate
+effect
+from
+to
+status

@@ -32,8 +32,9 @@ func CompleteSlots(m *schemas.Manifest, runs []schemas.SealedRun) []schemas.Seal
 		have[r.Slot.SlotID] = true
 	}
 	var missing []schemas.SealedRun
+	notRequired := NotRequiredSlots(m, runs) // W7 adaptive trials: optional slots the frozen rule never released (sequential.go)
 	for _, sl := range m.Slots {
-		if !sl.Counted || have[sl.SlotID] {
+		if !sl.Counted || have[sl.SlotID] || notRequired[sl.SlotID] {
 			continue
 		}
 		have[sl.SlotID] = true

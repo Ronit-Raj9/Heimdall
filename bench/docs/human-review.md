@@ -93,6 +93,7 @@ The queue lists counted, sealed runs that need a person, read with their sealed 
 | `veto` | a veto gate fired (outcome `integrity_violation`) |
 | `false_completion` | the agent claimed success on a failed run (`false_completion` is 1) |
 | `flagged` | the run has a `flag_only` review |
+| `contested` | a judged run whose judge verdict is in dispute: split votes, an auditor that disagreed, or a decision review saying the opposite of the judge (docs/judge-calibration.md) |
 
 A run stays in the queue after it is reviewed, with its current outcome and the decision in effect, so a second reviewer can see what was decided.
 

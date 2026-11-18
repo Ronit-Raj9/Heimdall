@@ -18,6 +18,7 @@ import (
 	"time"
 
 	"github.com/maximhq/bifrost/bench/schemas"
+	"github.com/maximhq/bifrost/bench/simuser"
 	"github.com/maximhq/bifrost/bench/utils"
 )
 
@@ -211,6 +212,11 @@ func (e *dockerWorkspace) ExportState(ctx context.Context, rc *schemas.RunContex
 	}
 	e.copyAgentEvents(ctx, runID, rc.Dir)                    // Agent events area: the collector's ledger (eventcollector.go)
 	if err := e.exportExternal(ctx, rc, runID); err != nil { // External APIs area: record mode cassettes
+		return files, fmt.Errorf("export state for run %s: %w", runID, err)
+	}
+	gw, err := e.finishServiceKeys(ctx, rc, runID) // W3 customer support: services' own gateway rows, keys revoked (servicegateway.go)
+	files = append(files, gw...)
+	if err != nil {
 		return files, fmt.Errorf("export state for run %s: %w", runID, err)
 	}
 	return files, nil
@@ -430,10 +436,19 @@ func (e *dockerWorkspace) createService(ctx context.Context, rc *schemas.RunCont
 	for _, k := range sortedKeys(env) {
 		args = append(args, "-e", k+"="+env[k])
 	}
+	gwArgs, gwDone, err := e.prepareServiceGateway(ctx, rc, runID, spec) // W3 customer support: the service's own key (servicegateway.go)
+	defer gwDone()
+	if err != nil {
+		return err
+	}
+	args = append(args, gwArgs...)
 	args = append(args, image)
 	args = append(args, spec.Argv...)
 	if _, err := e.cfg.Docker.MustRun(ctx, args...); err != nil {
 		return fmt.Errorf("create container: %w", err)
+	}
+	if err := e.connectGatewayNetwork(ctx, rc, spec, name); err != nil { // W3 customer support
+		return err
 	}
 	if hidden && !spec.Hidden {
 		if _, err := e.cfg.Docker.MustRun(ctx, "network", "connect", "--alias", spec.ID, hiddenNetwork(runID), name); err != nil {
@@ -460,6 +475,11 @@ func serviceEnv(rc *schemas.RunContext, spec schemas.ServiceSpec) map[string]str
 	env := map[string]string{}
 	for k, v := range spec.Env {
 		env[k] = v
+	}
+	if simuser.SimulatorBacked(spec) { // W3 customer support: the effective user simulator settings win over the spec's
+		for k, v := range simuser.ServiceEnv(simuser.Effective(rc.Suite, rc.Experiment)) {
+			env[k] = v
+		}
 	}
 	if rc.Probe != nil {
 		for k, v := range rc.Probe.Apply.ServiceEnv[spec.ID] {

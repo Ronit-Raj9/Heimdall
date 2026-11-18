@@ -135,6 +135,8 @@ Events:
 | `experiment_invalid` | the verdict is INVALID |
 | `run_errors` | at least one run ended `infra_error` or `aborted_infra`, or a slot hit a store error or lost its lease |
 | `schedule_failed` | the run could not finish (plan, run or analysis failed), or it was refused (daily cap, unreadable experiment) |
+| `live_signal_threshold` | X6 live scoring: a live signal's mean crossed its threshold ([live-scoring.md](live-scoring.md)) |
+| `live_comparison_worse` | X6 live scoring: the comparison of two live versions decided the candidate worse |
 
 A JSON alert is a POST with this body:
 

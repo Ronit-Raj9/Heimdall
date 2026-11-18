@@ -1,0 +1,4 @@
+# Keys of bench.ts `CanaryBudget`, one per line; a trailing ? marks an optional (Go omitempty) key.
+# W5 drift canary (handlers/canary.go, bench/canary, docs/drift-canary.md). Change with bench.ts.
+per_run_usd
+per_day_usd

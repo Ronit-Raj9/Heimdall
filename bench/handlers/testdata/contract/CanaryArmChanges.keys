@@ -1,0 +1,29 @@
+# Keys of bench.ts `CanaryArmChanges`, one per line; a trailing ? marks an optional (Go omitempty) key.
+# W5 drift canary (handlers/canary.go, bench/canary, docs/drift-canary.md). Change with bench.ts.
+arm
+label
+served_before
+served_now
+served_changed
+providers_before
+providers_now
+provider_changed
+fingerprints_before
+fingerprints_now
+fingerprint_changed
+latency_before_ms
+latency_now_ms
+latency_shift
+prompt_tasks
+prompt_changed
+prompt_shift
+error_rate_before
+error_rate_now
+format_errors_before
+format_errors_now
+flips
+success_before
+success_now
+requests_before
+requests_now
+requested_now

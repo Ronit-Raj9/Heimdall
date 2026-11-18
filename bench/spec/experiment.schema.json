@@ -56,7 +56,8 @@
       "properties": {
         "policy": {"type": "string", "minLength": 1},
         "alpha": {"type": "number", "exclusiveMinimum": 0, "exclusiveMaximum": 1},
-        "assumed_sd": {"type": "number", "exclusiveMinimum": 0}
+        "assumed_sd": {"type": "number", "exclusiveMinimum": 0},
+        "allow_uncalibrated_judge": {"type": "boolean", "description": "W8 judge calibration: a judged suite whose judge has no calibration record is labelled instead of capping the verdict at INCONCLUSIVE (docs/judge-calibration.md)."}
       }
     },
     "metrics": {"type": "array", "items": {"type": "string", "minLength": 1}},
@@ -68,6 +69,47 @@
     "smoke": {"type": "boolean", "description": "A synthetic smoke experiment: suite lock problems (no lock, a task not admitted) only warn, and the flag is frozen in the manifest so its results are never presented as findings. The experiment name has no effect."},
     "requirements": {"$ref": "#/$defs/requirements"},
     "external": {"enum": ["live", "record", "replay"], "description": "Overrides every external API's mode for this experiment's runs. live and record call the real hosts: the results are not repeatable, and reports and the leaderboard label or exclude them (docs/external-apis.md)."},
+    "simulator": {"$ref": "suite.schema.json#/$defs/simulator", "description": "W3 customer support: overrides the suite's user simulator mode, provider and model for every arm (docs/customer-support.md)."},
+    "tier": {"type": "string", "pattern": "^[a-z0-9][a-z0-9_-]*$", "description": "W7 suite tiers: the suite tier whose tasks `tasks: all` means (docs/suite-tiers.md)."},
+    "trials": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "W7 adaptive trials: the pre-registered trials design (docs/adaptive-trials.md). Absent or mode fixed: every slot runs.",
+      "required": ["mode"],
+      "properties": {
+        "mode": {"enum": ["fixed", "adaptive"]},
+        "rule": {"enum": ["task", "sequential"]},
+        "min": {"type": "integer", "minimum": 1},
+        "max": {"type": "integer", "minimum": 2},
+        "conditions": {"type": "array", "items": {"type": "string", "minLength": 1}},
+        "looks": {"type": "integer", "minimum": 2, "maximum": 5},
+        "alpha_split": {"enum": ["equal", "obf"]},
+        "alphas": {"type": "array", "items": {"type": "number", "exclusiveMinimum": 0, "exclusiveMaximum": 1}},
+        "futility": {"enum": ["curtail", "nonbinding", "off"]},
+        "extension": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["rule"],
+          "properties": {
+            "rule": {"enum": ["inverse_normal"]},
+            "alpha_first": {"type": "number", "exclusiveMinimum": 0, "exclusiveMaximum": 1},
+            "weight_first": {"type": "number", "exclusiveMinimum": 0, "exclusiveMaximum": 1}
+          }
+        }
+      }
+    },
+    "extends": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "W7 buy more evidence: the experiment this follow-up extends, written by `extend`.",
+      "required": ["exp_id", "manifest_hash", "kind", "rule"],
+      "properties": {
+        "exp_id": {"type": "string", "minLength": 1},
+        "manifest_hash": {"type": "string", "minLength": 1},
+        "kind": {"enum": ["tasks", "trials"]},
+        "rule": {"enum": ["inverse_normal", "exploratory"]}
+      }
+    },
     "matrix": {
       "type": "object",
       "additionalProperties": false,

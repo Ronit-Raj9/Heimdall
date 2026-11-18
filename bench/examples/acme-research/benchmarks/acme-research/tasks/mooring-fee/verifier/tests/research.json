@@ -1,0 +1,18 @@
+{
+  "question": "What is the current visitor mooring fee per night for a 10 metre yacht at Skerry Harbour, in pounds?",
+  "category": "conflicting_sources",
+  "match": "numeric",
+  "expected": [
+    "24"
+  ],
+  "tolerance": 0,
+  "evidence_urls": [
+    "https://skerry-harbour.example/notices/2026-visitor-mooring-fees"
+  ],
+  "require_grounding": true,
+  "wrong_answers": [
+    "18",
+    "21",
+    "31"
+  ]
+}

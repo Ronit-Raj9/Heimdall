@@ -1,0 +1,9 @@
+# Keys of bench.ts `SupportSummary` (schemas.SupportSummary, W3 customer support). Change with bench.ts and schemas/support.go.
+exp_id
+suite
+condition
+support
+simulator_mode?
+simulator_label
+synthetic
+arms
