@@ -297,41 +297,13 @@
 	"app": {
 		"name": "Heimdall",
 		"tagline": "The release gate for AI agents, built on Bifrost",
-		"groups": {
-			"results": "Results",
-			"runs": "Runs",
-			"setup": "Setup",
-			"more": "More"
-		},
 		"collapseNav": "Collapse navigation",
 		"expandNav": "Expand navigation",
 		"skipToContent": "Skip to content",
 		"copyId": "Copy {{id}}"
 	},
 	"nav": {
-		"label": "Heimdall navigation",
-		"leaderboard": "Leaderboard",
-		"review": "Review",
-		"suites": "Suites",
-		"agents": "Agents",
-		"verdict": "Verdict",
-		"runs": "Run comparison",
-		"receipts": "Receipts",
-		"newExperiment": "New experiment",
-		"triage": "Triage",
-		"clusters": "Failure clusters",
-		"inbox": "Failure inbox",
-		"matrix": "Model matrix",
-		"releases": "Releases",
-		"imports": "Imports",
-		"workers": "Workers",
-		"quickstart": "First workflow",
-		"trends": "Trends",
-		"calibration": "Judge calibration",
-		"canaries": "Drift canaries",
-		"live": "Live traffic",
-		"migration": "Model migration",
-		"monitors": "Monitors"
+		"label": "Heimdall navigation"
 	},
 	"mode": {
 		"live": "LIVE",
@@ -707,11 +679,32 @@
 			},
 			"empty": "No runs in the grid yet.",
 			"loadError": "Could not load the task grid: {{error}}"
+		},
+		"source": {
+			"kind": {
+				"verified": "Verified",
+				"judged": "Judged",
+				"regraded": "Regraded",
+				"reviewed": "Reviewed"
+			},
+			"regradedId": "Regraded {{id}}",
+			"hint": {
+				"verified": "The verifier's grade each run was sealed with.",
+				"judged": "The judge's grade each run was sealed with.",
+				"regraded": "A regrade of the sealed runs; the sealed grades are unchanged.",
+				"reviewed": "Human reviews where they exist, else the sealed grade."
+			},
+			"reading": "Reading grade source {{source}}. The task grid and gates still show sealed outcomes.",
+			"backToOriginal": "Back to sealed grades",
+			"pickLabel": "Grades",
+			"pickVerified": "Sealed, verified",
+			"pickJudged": "Sealed, judged",
+			"pickReviewed": "With human reviews"
 		}
 	},
 	"runs": {
-		"title": "Run comparison",
-		"subtitle": "Two matched runs of one task, condition and trial, aligned step by step.",
+		"title": "Compare runs",
+		"subtitle": "Every arm of one matched task, condition and trial, side by side.",
 		"trace": {
 			"download": "Download trace (OTLP)",
 			"downloadAria": "Download the OpenTelemetry trace of run {{run}} (arm {{arm}}) as OTLP/JSON",
@@ -839,7 +832,8 @@
 			"divergenceHint": "An observation, not a root cause.",
 			"noDivergence": "No divergence observed: the arms took the same steps.",
 			"empty": "No aligned steps for this pair.",
-			"notInLog": "Not in this run's event log."
+			"notInLog": "Not in this run's event log.",
+			"alignedArms": "Steps are aligned between arms {{arms}}; the other arms have their own tabs below."
 		},
 		"gateway": {
 			"title": "Gateway lane",
@@ -1369,6 +1363,125 @@
 				"cost": "Cost",
 				"run": "Replay run"
 			}
+		},
+		"experimentLabel": "Experiment",
+		"lanesCapped": "Showing the first {{shown}} of {{total}} arms.",
+		"output": {
+			"title": "Output",
+			"description": "What each run produced: the patch, the answer, the exported state or the files.",
+			"loadError": "Could not load this run.",
+			"noAnswer": "This run recorded no answer.",
+			"noState": "This run exported no state.",
+			"noArtifacts": "This run produced no artifact files.",
+			"noDiff": "The agent changed no files, so there is no diff.",
+			"noDiffYet": "No diff yet: the run has not been sealed."
+		},
+		"evidence": {
+			"title": "Evidence status",
+			"description": "Required and observed evidence for each run.",
+			"unknown": "unknown",
+			"none": "none",
+			"quality": "Quality",
+			"available": "Available",
+			"missing": "Missing",
+			"taskHash": "Task hash",
+			"runInputHash": "Run input hash",
+			"level": "Evidence level",
+			"unknownReasons": "Unknown reasons",
+			"tools": "Tools requested / executed",
+			"toolsValue": "{{requested}} / {{executed}}",
+			"adapterComplete": "Adapter fault instrumentation: complete",
+			"adapterIncomplete": "Adapter fault instrumentation: incomplete",
+			"adapterDecisions": "Controller decisions: {{count}}",
+			"adapterApplied": "SDK acknowledgements: {{count}}"
+		},
+		"list": {
+			"title": "Runs",
+			"subtitle": "Every run across experiments, newest first.",
+			"filtersLabel": "Filter runs",
+			"clear": "Clear filters",
+			"all": "All",
+			"loadError": "Could not load the runs.",
+			"noMatch": "No run matches these filters.",
+			"empty": "No runs yet. Start an experiment to see them here.",
+			"newExperiment": "New experiment",
+			"tableLabel": "Runs",
+			"filter": {
+				"exp": "Experiment",
+				"arm": "Arm",
+				"task": "Task",
+				"condition": "Condition",
+				"outcome": "Outcome",
+				"track": "Track"
+			},
+			"col": {
+				"run": "Run",
+				"experiment": "Experiment",
+				"task": "Task",
+				"arm": "Arm",
+				"condition": "Condition",
+				"outcome": "Outcome",
+				"score": "Score",
+				"cost": "Cost",
+				"started": "Started",
+				"compare": "Compare"
+			},
+			"notCounted": "not counted",
+			"attempt": "attempt {{n}}",
+			"inFlight": "In flight",
+			"compareAria": "Compare the pair of run {{run}}",
+			"pages": "Pages",
+			"showing": "{{first}} to {{last}} of {{total}} runs",
+			"prev": "Previous",
+			"next": "Next",
+			"page": "Page {{page}} of {{pages}}",
+			"trial": "#{{trial}}",
+			"trialHint": "Trial {{trial}}"
+		},
+		"page": {
+			"notFound": "No run {{id}} on this server.",
+			"backToList": "All runs",
+			"loadError": "Could not load this run.",
+			"crumb": "Run {{id}}",
+			"title": "{{task}}, arm {{arm}}",
+			"experiment": "Experiment",
+			"task": "Task",
+			"slotFacts": "{{condition}}, trial {{trial}}",
+			"compare": "Compare arms",
+			"tabsLabel": "Run views",
+			"tabs": {
+				"overview": "Overview",
+				"timeline": "Timeline",
+				"output": "Output",
+				"agents": "Agents",
+				"visual": "Visual",
+				"voice": "Voice",
+				"gpu": "GPU",
+				"services": "Services",
+				"security": "Security",
+				"evidence": "Evidence"
+			},
+			"grade": {
+				"title": "Grade",
+				"description": "What the agent said beside what the grader found."
+			},
+			"facts": {
+				"title": "Run",
+				"arm": "Arm",
+				"agent": "Agent",
+				"suite": "Suite",
+				"attempt": "Attempt",
+				"started": "Started",
+				"sealed": "Sealed",
+				"seal": "Seal",
+				"notSealed": "Not sealed",
+				"sealMismatch": "Files no longer match the seal"
+			},
+			"metricsDescription": "Each value carries the evidence level it was observed at. Unknown is hatched, never zero.",
+			"gatesDescription": "Checks run on this run's evidence when it was sealed.",
+			"gateFired": "Fired",
+			"gateClear": "Clear",
+			"receiptsDescription": "How far this run's fault got, step by step."
 		}
 	},
 	"receipts": {
@@ -1659,7 +1772,7 @@
 	"experiments": {
 		"new": {
 			"title": "New experiment",
-			"subtitle": "Two arms that differ in one setting. Plan first: nothing runs until you start.",
+			"subtitle": "Two arms that differ in one setting; nothing runs until you plan and start.",
 			"catalogError": "Could not load the catalog.",
 			"catalogEmpty": "The catalog has no suites or agents, so no experiment can be planned.",
 			"sections": {
@@ -1700,7 +1813,7 @@
 				"totalUsd": "Total spend cap (USD)",
 				"token": "Write token",
 				"tokenPlaceholder": "printed by the server at first start",
-				"tokenHint": "Kept in this tab's session storage only. Sent as Authorization: Bearer on plan, create and start."
+				"tokenHint": "Kept in this tab only. Sent as Authorization: Bearer on plan, estimate, create and start."
 			},
 			"validation": {
 				"nameRequired": "Give the experiment a name.",
@@ -1726,7 +1839,7 @@
 				"needsPlan": "Plan the experiment first.",
 				"planStale": "The form changed since the last plan. Plan again before starting.",
 				"blocked": "The plan has errors that block the start.",
-				"needsToken": "Enter the write token to start.",
+				"needsToken": "Enter the write token to plan and start.",
 				"planError": "Planning failed.",
 				"createError": "Could not create the experiment.",
 				"startError": "Created {{id}}, but could not start it."
@@ -1806,6 +1919,53 @@
 				"newExperiment": "Plan another",
 				"loadError": "Could not load the experiment status."
 			}
+		},
+		"list": {
+			"title": "Experiments",
+			"subtitle": "Every experiment on this server, newest first.",
+			"loadError": "Could not load the experiments.",
+			"empty": "No experiments yet. Run the quickstart to create one.",
+			"getStarted": "Get started",
+			"filtersLabel": "Filter experiments",
+			"search": "Search",
+			"searchPlaceholder": "Name or id",
+			"noMatch": "No experiment matches these filters.",
+			"tableLabel": "Experiments",
+			"col": {
+				"experiment": "Experiment",
+				"suite": "Suite",
+				"arms": "Arms",
+				"status": "Status",
+				"verdict": "Verdict",
+				"started": "Started",
+				"cost": "Spent"
+			},
+			"progress": "{{done}} of {{total}} slots",
+			"noVerdict": "None yet",
+			"count": "{{shown}} of {{total}} experiments"
+		},
+		"page": {
+			"notFound": "No experiment {{id}} on this server.",
+			"backToList": "All experiments",
+			"loadError": "Could not load this experiment.",
+			"suite": "Suite",
+			"arms_one": "Arm {{arms}}",
+			"arms_other": "Arms {{arms}}",
+			"compare": "Compare runs",
+			"tabsLabel": "Experiment views",
+			"tabs": {
+				"verdict": "Verdict",
+				"runs": "Runs",
+				"matrix": "Matrix",
+				"cost": "Cost",
+				"migration": "Migration",
+				"adaptive": "Adaptive",
+				"scorecards": "Scorecards",
+				"receipts": "Receipts",
+				"integrity": "Integrity",
+				"export": "Export"
+			},
+			"notStarted": "This experiment has not started, so there is no verdict yet."
 		}
 	},
 	"releases": {
@@ -2242,8 +2402,7 @@
 	},
 	"notFound": {
 		"title": "Page not found",
-		"description": "There is no bench screen at this address.",
-		"back": "Go to the verdict"
+		"description": "There is no bench screen at this address."
 	},
 	"errors": {
 		"noFixture": "No fixture file for {{method}} {{url}}.",
@@ -3111,8 +3270,6 @@
 		}
 	},
 	"quickstart": {
-		"title": "First workflow",
-		"subtitle": "Will this change break my coding agent? Four commands from inside your own git repository, then the tasks whose drafted instructions still need a person to read them.",
 		"loadError": "Could not load the suites.",
 		"stepsTitle": "Four commands",
 		"stepsHint": "Run them from the repository root. Every step is $0 until a real model runs, and compare asks before it spends.",
@@ -3667,5 +3824,148 @@
 		"samples": "{{count}} samples every {{ms}} ms",
 		"noSampler": "No host-side samples: the sampler was off or the agent never started.",
 		"samplerError": "Sampler: {{error}}"
+	},
+	"shell": {
+		"breadcrumbs": "Breadcrumb",
+		"entity": {
+			"experiment": "Open experiment {{id}}",
+			"run": "Open run {{id}}",
+			"suite": "Open suite {{id}}",
+			"task": "Open task {{id}}",
+			"agent": "Open agent {{id}}"
+		},
+		"status": {
+			"noDecision": "No verdict",
+			"state": {
+				"created": "Created",
+				"running": "Running",
+				"analyzing": "Analyzing",
+				"done": "Done",
+				"failed": "Failed",
+				"cancelled": "Cancelled"
+			},
+			"decision": {
+				"improved": "Improved",
+				"regressed": "Regressed",
+				"inconclusive": "Inconclusive",
+				"invalid": "Invalid"
+			}
+		},
+		"newExperiment": "New experiment",
+		"openMenu": "Open navigation",
+		"closeMenu": "Close navigation",
+		"groupToggle": "Show or hide {{group}}",
+		"groups": {
+			"benchmark": "Benchmark",
+			"build": "Build",
+			"production": "Production",
+			"govern": "Govern",
+			"operate": "Operate"
+		},
+		"nav": {
+			"home": "Home",
+			"experiments": "Experiments",
+			"runs": "Runs",
+			"leaderboard": "Leaderboard",
+			"agents": "Agents",
+			"suites": "Suites",
+			"canaries": "Drift canaries",
+			"live": "Live traffic",
+			"inbox": "Failure inbox",
+			"review": "Review queue",
+			"releases": "Releases",
+			"monitors": "Monitors",
+			"workers": "Runners",
+			"settings": "Settings"
+		},
+		"backHome": "Go to Home",
+		"error": {
+			"title": "This page failed to load",
+			"description": "Something in this page broke while it rendered; the rest of the app still works.",
+			"retry": "Try again"
+		}
+	},
+	"home": {
+		"title": "Home",
+		"subtitle": "What is running, what finished and what is ready to benchmark on this server.",
+		"actions": {
+			"title": "Quick actions",
+			"newExperiment": "New experiment",
+			"newExperimentHint": "Compare two agent versions on a suite.",
+			"addSuite": "Add a suite",
+			"addSuiteHint": "Import tasks from a benchmark or your own repository.",
+			"addAgent": "Add an agent",
+			"addAgentHint": "Point a config at an agent CLI and a model.",
+			"getStarted": "Get started",
+			"getStartedHint": "Four commands from your own repository."
+		},
+		"running": {
+			"title": "Running now",
+			"empty": "Nothing is running.",
+			"slots": "{{done}} of {{total}} slots sealed",
+			"slotsDetail": "{{done}} done, {{running}} running, {{failed}} failed, {{total}} total",
+			"spent": "Spent",
+			"last": "Last event",
+			"noEvents": "Waiting for the first event.",
+			"event": {
+				"slot_started": "Slot started",
+				"stage": "Stage {{stage}}",
+				"slot_sealed": "Run sealed",
+				"budget_stop": "Stopped at the spend cap",
+				"experiment_done": "Experiment done",
+				"error": "Error",
+				"end": "Stream ended"
+			},
+			"open": "Open",
+			"loadError": "Could not follow this experiment."
+		},
+		"recent": {
+			"title": "Recent experiments",
+			"viewAll": "All experiments",
+			"empty": "No experiments yet.",
+			"col": {
+				"experiment": "Experiment",
+				"suite": "Suite",
+				"state": "Status",
+				"verdict": "Verdict",
+				"started": "Started",
+				"cost": "Cost"
+			},
+			"notStarted": "Not started",
+			"loadError": "Could not load the experiments.",
+			"verdictError": "Unavailable"
+		},
+		"suites": {
+			"title": "Suites",
+			"viewAll": "All suites",
+			"empty": "No suites under the benchmarks root yet.",
+			"tasks_one": "{{count}} task",
+			"tasks_other": "{{count}} tasks",
+			"admitted": "{{admitted}} of {{total}} admitted",
+			"lock": {
+				"locked": "Locked",
+				"stale": "Lock stale",
+				"unlocked": "Not locked",
+				"unknown": "Lock unknown"
+			},
+			"error": "Failed to load",
+			"loadError": "Could not load the suites."
+		},
+		"getStarted": {
+			"title": "Run your first benchmark",
+			"body": "No experiment has run here yet: set up a project, mine tasks, then compare two versions.",
+			"open": "Get started",
+			"newExperiment": "New experiment"
+		},
+		"stats": {
+			"experiments": "Experiments",
+			"running": "Running",
+			"suites": "Suites",
+			"agents": "Agents"
+		},
+		"quickstart": {
+			"title": "Get started",
+			"subtitle": "Four commands from inside your own git repository tell you whether a change breaks your coding agent."
+		}
 	}
 }

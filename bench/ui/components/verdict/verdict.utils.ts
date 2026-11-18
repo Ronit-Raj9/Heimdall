@@ -133,22 +133,7 @@ export function naiveLeader(naive: Record<string, Ratio>, arms: string[]): { lea
 	return na > nb ? { leader: a, by: na - nb } : { leader: b, by: nb - na };
 }
 
-/** The newest experiment by frozen time; ties keep the server's order. */
-export function newestExperiment(experiments: ExperimentStatus[]): ExperimentStatus | undefined {
-	let newest: ExperimentStatus | undefined;
-	let newestAt = Number.NEGATIVE_INFINITY;
-	for (const experiment of experiments) {
-		const at = Date.parse(experiment.frozen_at);
-		const key = Number.isNaN(at) ? Number.NEGATIVE_INFINITY : at;
-		if (!newest || key > newestAt) {
-			newest = experiment;
-			newestAt = key;
-		}
-	}
-	return newest;
-}
-
-/** Experiments newest first, for the picker. */
+/** Experiments newest first, for the experiment list and the picker. */
 export function sortExperimentsNewestFirst(experiments: ExperimentStatus[]): ExperimentStatus[] {
 	const at = (e: ExperimentStatus) => {
 		const t = Date.parse(e.frozen_at);

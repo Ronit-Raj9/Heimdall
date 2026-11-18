@@ -1,0 +1,22 @@
+# Keys of bench.ts `RunListRow`, one per line; a trailing ? marks an optional (Go omitempty) key.
+# Change with bench.ts and handlers/runlist.go.
+run_id
+exp_id
+pair_id
+suite
+track?
+output?
+grading?
+task
+arm
+condition
+trial
+attempt
+counted
+sealed
+outcome
+y
+cost_usd?
+config_id
+started?
+sealed_at?

@@ -1,3 +1,5 @@
+import { compareHref } from "@/components/experiments/legacyRoutes";
+import { EntityLink } from "@/components/shell/entityLink";
 import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { ValueCell } from "@/components/valueCell";
@@ -202,13 +204,9 @@ function Evidence({
 			{shown.map((run) => {
 				const pair = runPairs?.[run];
 				if (!pair) {
-					return (
-						<code key={run} className="text-muted-foreground font-mono text-[10px]">
-							{run}
-						</code>
-					);
+					return <EntityLink key={run} kind="run" id={run} className="text-[10px]" />;
 				}
-				const href = `/runs?pair=${encodeURIComponent(pair)}&exp=${encodeURIComponent(expId)}`;
+				const href = compareHref(pair, expId);
 				const open = (event: MouseEvent<HTMLAnchorElement>) => {
 					if (!onOpenPair || event.metaKey || event.ctrlKey || event.shiftKey || event.button !== 0) return;
 					event.preventDefault();

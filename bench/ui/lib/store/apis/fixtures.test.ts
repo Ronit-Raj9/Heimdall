@@ -48,7 +48,9 @@ describe("resolveFixture", () => {
 		{ method: "post", url: "/experiments/e_x/start", want: "experiments.start.json" },
 		{ method: "GET", url: "/experiments/e_x", want: "experiments.get.json" },
 		{ method: "GET", url: `${BENCH_API_BASE}/experiments`, want: "experiments.list.json" },
+		{ method: "GET", url: "/experiments/e_synthetic-nightly/events?since=48", want: "experiments.events.e_synthetic-nightly.json" }, // U1 home
 		{ method: "GET", url: "/experiments/e_x/verdict?x=1", want: "experiments.verdict.json" },
+		{ method: "GET", url: "/runs?exp=e_x&arm=C&offset=100", want: "runs.list.json" }, // U2 UI regroup
 		{ method: "GET", url: "/runs/r_abc", want: "runs.r_abc.json" },
 		{ method: "GET", url: "/runs/r_abc/events", want: "runs.r_abc.events.json" },
 		{ method: "GET", url: `${BENCH_API_BASE}/runs/r_abc/agents`, want: "runs.r_abc.agents.json" },
@@ -119,6 +121,14 @@ describe("fixture files", () => {
 			const cell = grid.rows.flatMap((row) => row.cells).find((c) => c.run_id === run.run_id);
 			expect(cell?.slot_id).toBe(slot.slot_id);
 		}
+	});
+
+	// U2 UI regroup: arm C onward used to be dropped by the pair view; this pair keeps three arms on screen.
+	it("give every arm of the three-arm pair its run fixtures", () => {
+		const pair = readFixture<PairResponse>("pairs.p_synth3arms.json");
+		expect(pair.runs.map((run) => run.arm)).toEqual(["A", "B", "C"]);
+		// Arms A and B reuse the two-arm pair's runs; arm C has its own run fixtures.
+		for (const { run, slot } of pair.runs) expect(readFixture<RunResponse>(`runs.${run.run_id}.json`).slot.arm).toBe(slot.arm);
 	});
 
 	it("link every suite task to its detail fixture", () => {
@@ -218,6 +228,12 @@ function contractFor(file: string): { type: string; nested: Record<string, strin
 		"experiments.get.json": { type: "ExperimentStatus", nested: { slots: "SlotProgress" } },
 		"experiments.start.json": { type: "ExperimentStatus", nested: { slots: "SlotProgress" } },
 		"experiments.list.json": { type: "ExperimentList", nested: { "experiments[]": "ExperimentStatus" } },
+		// U1 home: the poll form of the events route for the running fixture experiment.
+		"experiments.events.e_synthetic-nightly.json": {
+			type: "EventsPoll",
+			nested: { status: "ExperimentStatus", "status.slots": "SlotProgress" },
+		},
+		"runs.list.json": { type: "RunList", nested: { "runs[]": "RunListRow", facets: "RunListFacets" } }, // U2 UI regroup
 		"experiments.verdict.json": { type: "VerdictPayload", nested: { verdict: "Verdict" } },
 		"experiments.diagnostics.json": { type: "DiagnosticsPayload", nested: {} },
 		"experiments.grid.json": { type: "Grid", nested: { "rows[]": "GridRow", "rows[].cells[]": "GridCell" } },

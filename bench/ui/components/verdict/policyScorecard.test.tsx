@@ -2,8 +2,11 @@ import "@/lib/i18n";
 
 import type { PolicyDecision, PolicyResult } from "@/lib/types/bench";
 import { renderToStaticMarkup } from "react-dom/server";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { PolicyScorecard } from "./policyScorecard";
+
+// Run ids without a known pair are EntityLinks (router links).
+vi.mock("@tanstack/react-router", async () => (await import("@/lib/testing/routerMock")).routerMock);
 import { verdictFixture } from "./testFixtures";
 
 const fixturePolicy = verdictFixture.policy as PolicyResult;
@@ -52,10 +55,10 @@ describe("PolicyScorecard", () => {
 		const html = renderToStaticMarkup(<PolicyScorecard policy={fixturePolicy} expId="e_x" runPairs={{ r_1w30xridyv: "p_ygsluimr7n" }} />);
 		expect(html).toMatch(/data-testid="policy-check-row-false-completion-ceiling" data-status="fail" data-blocking="true"/);
 		expect(html).toContain('data-testid="policy-check-blocking-false-completion-ceiling"');
-		expect(html).toContain('href="/runs?pair=p_ygsluimr7n&amp;exp=e_x"');
+		expect(html).toContain('href="/compare?pair=p_ygsluimr7n&amp;exp=e_x"');
 		expect(html).toContain('data-testid="policy-evidence-link-r_1w30xridyv"');
-		// No pair known: the id is shown but not linked.
-		expect(html).toContain(">r_efejyyax55</code>");
+		// No pair known: the id links to its run page instead of a pair.
+		expect(html).toContain('href="/runs/r_efejyyax55"');
 		expect(html).toContain("&lt;= 0.05");
 	});
 

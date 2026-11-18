@@ -230,6 +230,11 @@ type ExperimentStatus struct {
 	Slots        SlotProgress    `json:"slots"`
 	SpentUSD     Value           `json:"spent_usd"`
 	AnalysisID   string          `json:"analysis_id,omitempty"`
+	// UI regroup (U2): the suite and arm ids from the manifest, and on the
+	// list only the decision of the newest analysis on disk.
+	Suite    string   `json:"suite,omitempty"`
+	Arms     []string `json:"arms,omitempty"`
+	Decision Decision `json:"decision,omitempty"`
 }
 
 // ExperimentList is GET /experiments.

@@ -1,5 +1,5 @@
 {
-	"_comment": "SYNTHETIC fixture for UI development. Not a benchmark result. GET /experiments (schemas.ExperimentList).",
+	"_comment": "SYNTHETIC fixture for UI development. Not a benchmark result. GET /experiments (schemas.ExperimentList). U1 home: a running, a created and a failed experiment beside the finished one; the running one starts before the finished one so the newest stays e_synthetic-codewins. U2: the arm ids per experiment. The list can also carry suite and decision; they are left out here so Home exercises its verdict fallback.",
 	"mode": "synthetic",
 	"experiments": [
 		{
@@ -21,7 +21,80 @@
 				"v": 16.84,
 				"evidence": "gateway"
 			},
-			"analysis_id": "a_synth00001"
+			"analysis_id": "a_synth00001",
+			"arms": [
+				"A",
+				"B"
+			]
+		},
+		{
+			"exp_id": "e_synthetic-nightly",
+			"name": "SYNTHETIC nightly prompt change",
+			"state": "running",
+			"manifest_hash": "sha256:9f1c2e7a5b3d4c6e8f0a1b2c3d4e5f60718293a4b5c6d7e8f9a0b1c2d3e4f5a6",
+			"frozen_at": "2026-11-14T17:38:12Z",
+			"started_at": "2026-11-14T17:40:00Z",
+			"slots": {
+				"total": 36,
+				"done": 21,
+				"running": 3,
+				"failed": 1
+			},
+			"spent_usd": {
+				"state": "observed",
+				"v": 5.12,
+				"evidence": "gateway"
+			},
+			"arms": [
+				"A",
+				"B"
+			]
+		},
+		{
+			"exp_id": "e_synthetic-draft",
+			"name": "SYNTHETIC model swap draft",
+			"state": "created",
+			"manifest_hash": "sha256:0b1d2f3e4a5c6b7d8e9f0a1b2c3d4e5f6a7b8c9d0e1f2a3b4c5d6e7f8a9b0c1d",
+			"frozen_at": "2026-11-14T16:05:41Z",
+			"slots": {
+				"total": 24,
+				"done": 0,
+				"running": 0,
+				"failed": 0
+			},
+			"spent_usd": {
+				"state": "observed",
+				"v": 0,
+				"evidence": "gateway"
+			},
+			"arms": [
+				"A",
+				"B"
+			]
+		},
+		{
+			"exp_id": "e_synthetic-outage",
+			"name": "SYNTHETIC gateway outage drill",
+			"state": "failed",
+			"manifest_hash": "sha256:5e6f7a8b9c0d1e2f3a4b5c6d7e8f9a0b1c2d3e4f5a6b7c8d9e0f1a2b3c4d5e6f",
+			"frozen_at": "2026-11-13T09:12:00Z",
+			"started_at": "2026-11-13T09:13:30Z",
+			"finished_at": "2026-11-13T09:31:02Z",
+			"slots": {
+				"total": 12,
+				"done": 7,
+				"running": 0,
+				"failed": 5
+			},
+			"spent_usd": {
+				"state": "observed",
+				"v": 1.37,
+				"evidence": "gateway"
+			},
+			"arms": [
+				"A",
+				"B"
+			]
 		}
 	]
 }

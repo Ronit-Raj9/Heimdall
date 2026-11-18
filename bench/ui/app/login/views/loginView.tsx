@@ -39,7 +39,7 @@ export default function LoginView({ returnTo, oauthError }: { returnTo?: string;
 					{t("auth.login.localMode")}
 				</p>
 				<Button asChild className="h-10 w-full">
-					<Link to="/verdict">{t("auth.login.openApp")}</Link>
+					<Link to="/">{t("auth.login.openApp")}</Link>
 				</Button>
 			</div>
 		);

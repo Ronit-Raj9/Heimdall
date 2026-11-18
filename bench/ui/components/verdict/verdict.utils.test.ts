@@ -10,7 +10,6 @@ import {
 	integrityView,
 	meterGroup,
 	naiveLeader,
-	newestExperiment,
 	shortHash,
 	sortExperimentsNewestFirst,
 	sortGridRows,
@@ -95,9 +94,8 @@ describe("armOrder", () => {
 describe("experiments", () => {
 	const exp = (id: string, frozen: string) => ({ exp_id: id, frozen_at: frozen }) as ExperimentStatus;
 	const list = [exp("e_old", "2026-11-01T00:00:00Z"), exp("e_new", "2026-11-14T00:00:00Z"), exp("e_bad", "not a date")];
-	it("picks the newest", () => expect(newestExperiment(list)?.exp_id).toBe("e_new"));
 	it("sorts newest first", () => expect(sortExperimentsNewestFirst(list).map((e) => e.exp_id)).toEqual(["e_new", "e_old", "e_bad"]));
-	it("empty", () => expect(newestExperiment([])).toBeUndefined());
+	it("empty", () => expect(sortExperimentsNewestFirst([])).toEqual([]));
 });
 
 describe("cellTone", () => {

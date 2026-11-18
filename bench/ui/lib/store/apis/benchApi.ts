@@ -37,6 +37,8 @@ import type {
 	RunReceiptsResponse,
 	RunResponse,
 	RunReviewsResponse,
+	RunList,
+	RunListParams,
 	SuiteTaskResponse,
 	SuiteHealthResponse,
 	SuitesResponse,
@@ -211,6 +213,24 @@ export function normalizeSuiteHealth(raw: unknown): SuiteHealthResponse {
 	};
 }
 
+/**
+ * GET /catalog with null lists (a server before the Go fix, or a bench root without an agents/
+ * folder) read as empty, so the new experiment form never reads a null list.
+ */
+export function normalizeCatalog(raw: unknown): CatalogResponse {
+	const body = (raw ?? {}) as CatalogResponse;
+	const list = <T>(value: T[] | null | undefined): T[] => (Array.isArray(value) ? value : []);
+	return {
+		...body,
+		suites: list(body.suites).map((suite) => ({ ...suite, tasks: list(suite.tasks), probes: list(suite.probes) })),
+		probes: list(body.probes),
+		agents: list(body.agents),
+		metrics: list(body.metrics),
+		gates: list(body.gates),
+		parts: body.parts && typeof body.parts === "object" ? body.parts : {},
+	};
+}
+
 /** A clusters request: empty, zero and absent params are left out so the server default applies. */
 export function clusterRequest(url: string, params: ClusterParams): string | FetchArgs {
 	const search = Object.fromEntries(Object.entries(params).filter(([, value]) => Boolean(value)));
@@ -268,6 +288,7 @@ export const benchApi = createApi({
 		}),
 		getCatalog: builder.query<CatalogResponse, void>({
 			query: () => "/catalog",
+			transformResponse: (raw: unknown) => normalizeCatalog(raw),
 			providesTags: ["BenchCatalog"],
 		}),
 
@@ -307,9 +328,14 @@ export const benchApi = createApi({
 			},
 			providesTags: (_result, _error, arg) => [{ type: "BenchVerdict", id: verdictArgs(arg).expId }],
 		}),
-		getDiagnostics: builder.query<DiagnosticsResponse, string>({
-			query: (expId) => `/experiments/${id(expId)}/diagnostics`,
-			providesTags: (_result, _error, expId) => [{ type: "BenchDiagnostics", id: expId }],
+		// U2 UI regroup: like the verdict, an object may name a grade source, so both read the same grades.
+		getDiagnostics: builder.query<DiagnosticsResponse, string | VerdictArgs>({
+			query: (arg) => {
+				const { expId, gradeSource } = verdictArgs(arg);
+				const url = `/experiments/${id(expId)}/diagnostics`;
+				return gradeSource ? { url, params: { grade_source: gradeSource } } : url;
+			},
+			providesTags: (_result, _error, arg) => [{ type: "BenchDiagnostics", id: verdictArgs(arg).expId }],
 		}),
 		// Every arm on one condition with every pair tested. An absent or empty param uses the server default.
 		getModelMatrix: builder.query<ModelMatrixResponse, ModelMatrixParams>({
@@ -326,6 +352,16 @@ export const benchApi = createApi({
 		}),
 
 		// Runs and pairs
+		// U2 UI regroup: every run across experiments, one page, newest first. Empty filters are left out.
+		listRuns: builder.query<RunList, RunListParams | void>({
+			query: (params) => {
+				const search = Object.fromEntries(
+					Object.entries(params ?? {}).filter(([, value]) => value !== undefined && value !== null && value !== ""),
+				);
+				return Object.keys(search).length > 0 ? { url: "/runs", params: search } : "/runs";
+			},
+			providesTags: [{ type: "BenchRun", id: "LIST" }],
+		}),
 		getRun: builder.query<RunResponse, string>({
 			query: (runId) => `/runs/${id(runId)}`,
 			providesTags: (_result, _error, runId) => [{ type: "BenchRun", id: runId }],
@@ -480,6 +516,7 @@ export const {
 	useGetVerdictQuery,
 	useGetDiagnosticsQuery,
 	useGetGridQuery,
+	useListRunsQuery,
 	useGetRunQuery,
 	useGetRunEventsQuery,
 	useGetRunDiffQuery,

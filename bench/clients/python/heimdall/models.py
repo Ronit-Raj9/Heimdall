@@ -1805,8 +1805,11 @@ class _ExperimentStatusRequired(TypedDict):
 
 class ExperimentStatus(_ExperimentStatusRequired, total=False):
     analysis_id: str
+    arms: List[str]
+    decision: str
     finished_at: Optional[str]
     started_at: Optional[str]
+    suite: str
 
 
 class Explanation(TypedDict):
@@ -3867,6 +3870,50 @@ class RunInputIdentity(_RunInputIdentityRequired, total=False):
     probe_hash: str
 
 
+class RunList(TypedDict):
+    facets: RunListFacets
+    limit: int
+    offset: int
+    runs: List[RunListRow]
+    total: int
+
+
+class RunListFacets(TypedDict):
+    arms: List[str]
+    conditions: List[str]
+    experiments: List[str]
+    outcomes: List[str]
+    suites: List[str]
+    tasks: List[str]
+    tracks: List[str]
+
+
+class _RunListRowRequired(TypedDict):
+    arm: str
+    attempt: int
+    condition: str
+    config_id: str
+    counted: bool
+    exp_id: str
+    outcome: str
+    pair_id: str
+    run_id: str
+    sealed: bool
+    suite: str
+    task: str
+    trial: int
+    y: Value
+
+
+class RunListRow(_RunListRowRequired, total=False):
+    cost_usd: Optional[Value]
+    grading: str
+    output: str
+    sealed_at: Optional[str]
+    started: Optional[str]
+    track: str
+
+
 class _RunPairRequired(TypedDict):
     a: RunRef_agentdiff
     b: RunRef_agentdiff
@@ -5619,6 +5666,10 @@ class RunEventsResponse(RunEvents):
     mode: Mode
 
 
+class RunListResponse(RunList):
+    mode: Mode
+
+
 class RunReceiptsResponse(RunReceipts):
     mode: Mode
 
@@ -6069,6 +6120,9 @@ __all__ = [
     'RunEvidenceContract',
     'RunGatewayInfo',
     'RunInputIdentity',
+    'RunList',
+    'RunListFacets',
+    'RunListRow',
     'RunPair',
     'RunReceipts',
     'RunRef',
@@ -6255,6 +6309,7 @@ __all__ = [
     'RunDetailResponse',
     'RunDiffResponse',
     'RunEventsResponse',
+    'RunListResponse',
     'RunReceiptsResponse',
     'RunRemoteResponse',
     'RunReviewsResponse',

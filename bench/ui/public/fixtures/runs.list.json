@@ -1,0 +1,1479 @@
+{
+	"_comment": "SYNTHETIC fixture for UI development. Not a benchmark result. GET /runs (handlers.RunList); the two runs of pairs.p_ltosmymyqy.json come first and have detail fixtures.",
+	"mode": "synthetic",
+	"runs": [
+		{
+			"run_id": "r_pww2l7yame",
+			"exp_id": "e_synthetic-codewins",
+			"pair_id": "p_ltosmymyqy",
+			"suite": "coding-core",
+			"track": "coding",
+			"output": "diff",
+			"grading": "verified",
+			"task": "t02",
+			"arm": "B",
+			"condition": "stale-notes",
+			"trial": 1,
+			"attempt": 1,
+			"counted": true,
+			"sealed": true,
+			"outcome": "pass",
+			"y": {
+				"state": "observed",
+				"v": 1,
+				"evidence": "outcome"
+			},
+			"cost_usd": {
+				"state": "observed",
+				"v": 0.38,
+				"evidence": "gateway"
+			},
+			"config_id": "claude-code",
+			"started": "2026-11-14T18:40:09Z",
+			"sealed_at": "2026-11-14T18:46:30Z"
+		},
+		{
+			"run_id": "r_fmw1z7ouim",
+			"exp_id": "e_synthetic-codewins",
+			"pair_id": "p_ltosmymyqy",
+			"suite": "coding-core",
+			"track": "coding",
+			"output": "diff",
+			"grading": "verified",
+			"task": "t02",
+			"arm": "A",
+			"condition": "stale-notes",
+			"trial": 1,
+			"attempt": 1,
+			"counted": true,
+			"sealed": true,
+			"outcome": "fail",
+			"y": {
+				"state": "observed",
+				"v": 0,
+				"evidence": "outcome"
+			},
+			"cost_usd": {
+				"state": "observed",
+				"v": 0.31,
+				"evidence": "gateway"
+			},
+			"config_id": "claude-code",
+			"started": "2026-11-14T18:40:02Z",
+			"sealed_at": "2026-11-14T18:46:30Z"
+		},
+		{
+			"run_id": "r_efejyyax55",
+			"exp_id": "e_synthetic-codewins",
+			"pair_id": "p_ra4hewomjk",
+			"suite": "coding-core",
+			"track": "coding",
+			"output": "diff",
+			"grading": "verified",
+			"task": "t03",
+			"arm": "B",
+			"condition": "stale-notes",
+			"trial": 3,
+			"attempt": 1,
+			"counted": true,
+			"sealed": true,
+			"outcome": "fail",
+			"y": {
+				"state": "observed",
+				"v": 0,
+				"evidence": "outcome"
+			},
+			"cost_usd": {
+				"state": "observed",
+				"v": 0.38,
+				"evidence": "gateway"
+			},
+			"config_id": "codex-notes",
+			"started": "2026-11-14T19:48:04Z",
+			"sealed_at": "2026-11-14T19:54:04Z"
+		},
+		{
+			"run_id": "r_qln5dp8zmd",
+			"exp_id": "e_synthetic-codewins",
+			"pair_id": "p_ymw1msttgt",
+			"suite": "coding-core",
+			"track": "coding",
+			"output": "diff",
+			"grading": "verified",
+			"task": "t03",
+			"arm": "B",
+			"condition": "stale-notes",
+			"trial": 2,
+			"attempt": 1,
+			"counted": true,
+			"sealed": true,
+			"outcome": "pass",
+			"y": {
+				"state": "observed",
+				"v": 1,
+				"evidence": "outcome"
+			},
+			"cost_usd": {
+				"state": "observed",
+				"v": 0.38,
+				"evidence": "gateway"
+			},
+			"config_id": "codex-notes",
+			"started": "2026-11-14T19:46:04Z",
+			"sealed_at": "2026-11-14T19:52:04Z"
+		},
+		{
+			"run_id": "r_1w30xridyv",
+			"exp_id": "e_synthetic-codewins",
+			"pair_id": "p_ygsluimr7n",
+			"suite": "coding-core",
+			"track": "coding",
+			"output": "diff",
+			"grading": "verified",
+			"task": "t03",
+			"arm": "B",
+			"condition": "stale-notes",
+			"trial": 1,
+			"attempt": 1,
+			"counted": true,
+			"sealed": true,
+			"outcome": "fail",
+			"y": {
+				"state": "observed",
+				"v": 0,
+				"evidence": "outcome"
+			},
+			"cost_usd": {
+				"state": "observed",
+				"v": 0.38,
+				"evidence": "gateway"
+			},
+			"config_id": "codex-notes",
+			"started": "2026-11-14T19:44:04Z",
+			"sealed_at": "2026-11-14T19:50:04Z"
+		},
+		{
+			"run_id": "r_mlv3ndgl7w",
+			"exp_id": "e_synthetic-codewins",
+			"pair_id": "p_ra4hewomjk",
+			"suite": "coding-core",
+			"track": "coding",
+			"output": "diff",
+			"grading": "verified",
+			"task": "t03",
+			"arm": "A",
+			"condition": "stale-notes",
+			"trial": 3,
+			"attempt": 1,
+			"counted": true,
+			"sealed": true,
+			"outcome": "fail",
+			"y": {
+				"state": "observed",
+				"v": 0,
+				"evidence": "outcome"
+			},
+			"cost_usd": {
+				"state": "observed",
+				"v": 0.31,
+				"evidence": "gateway"
+			},
+			"config_id": "codex-baseline",
+			"started": "2026-11-14T19:42:04Z",
+			"sealed_at": "2026-11-14T19:48:04Z"
+		},
+		{
+			"run_id": "r_93zg5gqtl1",
+			"exp_id": "e_synthetic-codewins",
+			"pair_id": "p_ymw1msttgt",
+			"suite": "coding-core",
+			"track": "coding",
+			"output": "diff",
+			"grading": "verified",
+			"task": "t03",
+			"arm": "A",
+			"condition": "stale-notes",
+			"trial": 2,
+			"attempt": 1,
+			"counted": true,
+			"sealed": true,
+			"outcome": "fail",
+			"y": {
+				"state": "observed",
+				"v": 0,
+				"evidence": "outcome"
+			},
+			"cost_usd": {
+				"state": "observed",
+				"v": 0.31,
+				"evidence": "gateway"
+			},
+			"config_id": "codex-baseline",
+			"started": "2026-11-14T19:40:04Z",
+			"sealed_at": "2026-11-14T19:46:04Z"
+		},
+		{
+			"run_id": "r_4udkjt21zr",
+			"exp_id": "e_synthetic-codewins",
+			"pair_id": "p_ygsluimr7n",
+			"suite": "coding-core",
+			"track": "coding",
+			"output": "diff",
+			"grading": "verified",
+			"task": "t03",
+			"arm": "A",
+			"condition": "stale-notes",
+			"trial": 1,
+			"attempt": 1,
+			"counted": true,
+			"sealed": true,
+			"outcome": "pass",
+			"y": {
+				"state": "observed",
+				"v": 1,
+				"evidence": "outcome"
+			},
+			"cost_usd": {
+				"state": "observed",
+				"v": 0.31,
+				"evidence": "gateway"
+			},
+			"config_id": "codex-baseline",
+			"started": "2026-11-14T19:38:04Z",
+			"sealed_at": "2026-11-14T19:44:04Z"
+		},
+		{
+			"run_id": "r_70zlp328h1",
+			"exp_id": "e_synthetic-codewins",
+			"pair_id": "p_6mottci9h0",
+			"suite": "coding-core",
+			"track": "coding",
+			"output": "diff",
+			"grading": "verified",
+			"task": "t04",
+			"arm": "B",
+			"condition": "clean",
+			"trial": 3,
+			"attempt": 1,
+			"counted": true,
+			"sealed": true,
+			"outcome": "pass",
+			"y": {
+				"state": "observed",
+				"v": 1,
+				"evidence": "outcome"
+			},
+			"cost_usd": {
+				"state": "observed",
+				"v": 0.38,
+				"evidence": "gateway"
+			},
+			"config_id": "codex-notes",
+			"started": "2026-11-14T19:36:04Z",
+			"sealed_at": "2026-11-14T19:42:04Z"
+		},
+		{
+			"run_id": "r_sjr9r76hj8",
+			"exp_id": "e_synthetic-codewins",
+			"pair_id": "p_bg9hm0obfb",
+			"suite": "coding-core",
+			"track": "coding",
+			"output": "diff",
+			"grading": "verified",
+			"task": "t04",
+			"arm": "B",
+			"condition": "clean",
+			"trial": 2,
+			"attempt": 1,
+			"counted": true,
+			"sealed": true,
+			"outcome": "pass",
+			"y": {
+				"state": "observed",
+				"v": 1,
+				"evidence": "outcome"
+			},
+			"cost_usd": {
+				"state": "observed",
+				"v": 0.38,
+				"evidence": "gateway"
+			},
+			"config_id": "codex-notes",
+			"started": "2026-11-14T19:34:04Z",
+			"sealed_at": "2026-11-14T19:40:04Z"
+		},
+		{
+			"run_id": "r_c7yopmmu3m",
+			"exp_id": "e_synthetic-codewins",
+			"pair_id": "p_8svc7i16zb",
+			"suite": "coding-core",
+			"track": "coding",
+			"output": "diff",
+			"grading": "verified",
+			"task": "t04",
+			"arm": "B",
+			"condition": "clean",
+			"trial": 1,
+			"attempt": 1,
+			"counted": true,
+			"sealed": true,
+			"outcome": "pass",
+			"y": {
+				"state": "observed",
+				"v": 1,
+				"evidence": "outcome"
+			},
+			"cost_usd": {
+				"state": "observed",
+				"v": 0.38,
+				"evidence": "gateway"
+			},
+			"config_id": "codex-notes",
+			"started": "2026-11-14T19:32:04Z",
+			"sealed_at": "2026-11-14T19:38:04Z"
+		},
+		{
+			"run_id": "r_wkcy6rp3l4",
+			"exp_id": "e_synthetic-codewins",
+			"pair_id": "p_6mottci9h0",
+			"suite": "coding-core",
+			"track": "coding",
+			"output": "diff",
+			"grading": "verified",
+			"task": "t04",
+			"arm": "A",
+			"condition": "clean",
+			"trial": 3,
+			"attempt": 1,
+			"counted": true,
+			"sealed": true,
+			"outcome": "pass",
+			"y": {
+				"state": "observed",
+				"v": 1,
+				"evidence": "outcome"
+			},
+			"cost_usd": {
+				"state": "observed",
+				"v": 0.31,
+				"evidence": "gateway"
+			},
+			"config_id": "codex-baseline",
+			"started": "2026-11-14T19:30:04Z",
+			"sealed_at": "2026-11-14T19:36:04Z"
+		},
+		{
+			"run_id": "r_3eu6wum3b3",
+			"exp_id": "e_synthetic-codewins",
+			"pair_id": "p_bg9hm0obfb",
+			"suite": "coding-core",
+			"track": "coding",
+			"output": "diff",
+			"grading": "verified",
+			"task": "t04",
+			"arm": "A",
+			"condition": "clean",
+			"trial": 2,
+			"attempt": 1,
+			"counted": true,
+			"sealed": true,
+			"outcome": "pass",
+			"y": {
+				"state": "observed",
+				"v": 1,
+				"evidence": "outcome"
+			},
+			"cost_usd": {
+				"state": "observed",
+				"v": 0.31,
+				"evidence": "gateway"
+			},
+			"config_id": "codex-baseline",
+			"started": "2026-11-14T19:28:04Z",
+			"sealed_at": "2026-11-14T19:34:04Z"
+		},
+		{
+			"run_id": "r_dpizowcec0",
+			"exp_id": "e_synthetic-codewins",
+			"pair_id": "p_8svc7i16zb",
+			"suite": "coding-core",
+			"track": "coding",
+			"output": "diff",
+			"grading": "verified",
+			"task": "t04",
+			"arm": "A",
+			"condition": "clean",
+			"trial": 1,
+			"attempt": 1,
+			"counted": true,
+			"sealed": true,
+			"outcome": "pass",
+			"y": {
+				"state": "observed",
+				"v": 1,
+				"evidence": "outcome"
+			},
+			"cost_usd": {
+				"state": "observed",
+				"v": 0.31,
+				"evidence": "gateway"
+			},
+			"config_id": "codex-baseline",
+			"started": "2026-11-14T19:26:04Z",
+			"sealed_at": "2026-11-14T19:32:04Z"
+		},
+		{
+			"run_id": "r_wgswu845vv",
+			"exp_id": "e_synthetic-codewins",
+			"pair_id": "p_gszjh69z4k",
+			"suite": "coding-core",
+			"track": "coding",
+			"output": "diff",
+			"grading": "verified",
+			"task": "t03",
+			"arm": "B",
+			"condition": "clean",
+			"trial": 3,
+			"attempt": 1,
+			"counted": true,
+			"sealed": true,
+			"outcome": "pass",
+			"y": {
+				"state": "observed",
+				"v": 1,
+				"evidence": "outcome"
+			},
+			"cost_usd": {
+				"state": "observed",
+				"v": 0.38,
+				"evidence": "gateway"
+			},
+			"config_id": "codex-notes",
+			"started": "2026-11-14T19:24:04Z",
+			"sealed_at": "2026-11-14T19:30:04Z"
+		},
+		{
+			"run_id": "r_fqxhrj5xwe",
+			"exp_id": "e_synthetic-codewins",
+			"pair_id": "p_z23fp0kzsu",
+			"suite": "coding-core",
+			"track": "coding",
+			"output": "diff",
+			"grading": "verified",
+			"task": "t03",
+			"arm": "B",
+			"condition": "clean",
+			"trial": 2,
+			"attempt": 1,
+			"counted": true,
+			"sealed": true,
+			"outcome": "fail",
+			"y": {
+				"state": "observed",
+				"v": 0,
+				"evidence": "outcome"
+			},
+			"cost_usd": {
+				"state": "observed",
+				"v": 0.38,
+				"evidence": "gateway"
+			},
+			"config_id": "codex-notes",
+			"started": "2026-11-14T19:22:04Z",
+			"sealed_at": "2026-11-14T19:28:04Z"
+		},
+		{
+			"run_id": "r_ohqo8vpd2b",
+			"exp_id": "e_synthetic-codewins",
+			"pair_id": "p_rxdd4pvj8u",
+			"suite": "coding-core",
+			"track": "coding",
+			"output": "diff",
+			"grading": "verified",
+			"task": "t03",
+			"arm": "B",
+			"condition": "clean",
+			"trial": 1,
+			"attempt": 1,
+			"counted": true,
+			"sealed": true,
+			"outcome": "fail",
+			"y": {
+				"state": "observed",
+				"v": 0,
+				"evidence": "outcome"
+			},
+			"cost_usd": {
+				"state": "observed",
+				"v": 0.38,
+				"evidence": "gateway"
+			},
+			"config_id": "codex-notes",
+			"started": "2026-11-14T19:20:04Z",
+			"sealed_at": "2026-11-14T19:26:04Z"
+		},
+		{
+			"run_id": "r_qolshdu5jg",
+			"exp_id": "e_synthetic-codewins",
+			"pair_id": "p_gszjh69z4k",
+			"suite": "coding-core",
+			"track": "coding",
+			"output": "diff",
+			"grading": "verified",
+			"task": "t03",
+			"arm": "A",
+			"condition": "clean",
+			"trial": 3,
+			"attempt": 1,
+			"counted": true,
+			"sealed": true,
+			"outcome": "fail",
+			"y": {
+				"state": "observed",
+				"v": 0,
+				"evidence": "outcome"
+			},
+			"cost_usd": {
+				"state": "observed",
+				"v": 0.31,
+				"evidence": "gateway"
+			},
+			"config_id": "codex-baseline",
+			"started": "2026-11-14T19:18:04Z",
+			"sealed_at": "2026-11-14T19:24:04Z"
+		},
+		{
+			"run_id": "r_hxbpnq2pv6",
+			"exp_id": "e_synthetic-codewins",
+			"pair_id": "p_z23fp0kzsu",
+			"suite": "coding-core",
+			"track": "coding",
+			"output": "diff",
+			"grading": "verified",
+			"task": "t03",
+			"arm": "A",
+			"condition": "clean",
+			"trial": 2,
+			"attempt": 1,
+			"counted": true,
+			"sealed": true,
+			"outcome": "pass",
+			"y": {
+				"state": "observed",
+				"v": 1,
+				"evidence": "outcome"
+			},
+			"cost_usd": {
+				"state": "observed",
+				"v": 0.31,
+				"evidence": "gateway"
+			},
+			"config_id": "codex-baseline",
+			"started": "2026-11-14T19:16:04Z",
+			"sealed_at": "2026-11-14T19:22:04Z"
+		},
+		{
+			"run_id": "r_u3815243j0",
+			"exp_id": "e_synthetic-codewins",
+			"pair_id": "p_rxdd4pvj8u",
+			"suite": "coding-core",
+			"track": "coding",
+			"output": "diff",
+			"grading": "verified",
+			"task": "t03",
+			"arm": "A",
+			"condition": "clean",
+			"trial": 1,
+			"attempt": 1,
+			"counted": true,
+			"sealed": true,
+			"outcome": "fail",
+			"y": {
+				"state": "observed",
+				"v": 0,
+				"evidence": "outcome"
+			},
+			"cost_usd": {
+				"state": "observed",
+				"v": 0.31,
+				"evidence": "gateway"
+			},
+			"config_id": "codex-baseline",
+			"started": "2026-11-14T19:14:04Z",
+			"sealed_at": "2026-11-14T19:20:04Z"
+		},
+		{
+			"run_id": "r_ch4jx6agsd",
+			"exp_id": "e_synthetic-codewins",
+			"pair_id": "p_4qij5a9l1s",
+			"suite": "coding-core",
+			"track": "coding",
+			"output": "diff",
+			"grading": "verified",
+			"task": "t01",
+			"arm": "B",
+			"condition": "clean",
+			"trial": 3,
+			"attempt": 1,
+			"counted": true,
+			"sealed": true,
+			"outcome": "pass",
+			"y": {
+				"state": "observed",
+				"v": 1,
+				"evidence": "outcome"
+			},
+			"cost_usd": {
+				"state": "observed",
+				"v": 0.38,
+				"evidence": "gateway"
+			},
+			"config_id": "codex-notes",
+			"started": "2026-11-14T19:12:04Z",
+			"sealed_at": "2026-11-14T19:18:04Z"
+		},
+		{
+			"run_id": "r_kfywciywzb",
+			"exp_id": "e_synthetic-codewins",
+			"pair_id": "p_8j1ixcwzag",
+			"suite": "coding-core",
+			"track": "coding",
+			"output": "diff",
+			"grading": "verified",
+			"task": "t01",
+			"arm": "B",
+			"condition": "clean",
+			"trial": 2,
+			"attempt": 1,
+			"counted": true,
+			"sealed": true,
+			"outcome": "pass",
+			"y": {
+				"state": "observed",
+				"v": 1,
+				"evidence": "outcome"
+			},
+			"cost_usd": {
+				"state": "observed",
+				"v": 0.38,
+				"evidence": "gateway"
+			},
+			"config_id": "codex-notes",
+			"started": "2026-11-14T19:10:04Z",
+			"sealed_at": "2026-11-14T19:16:04Z"
+		},
+		{
+			"run_id": "r_rybsm1ml4i",
+			"exp_id": "e_synthetic-codewins",
+			"pair_id": "p_6quxt1pbgw",
+			"suite": "coding-core",
+			"track": "coding",
+			"output": "diff",
+			"grading": "verified",
+			"task": "t01",
+			"arm": "B",
+			"condition": "clean",
+			"trial": 1,
+			"attempt": 1,
+			"counted": true,
+			"sealed": true,
+			"outcome": "pass",
+			"y": {
+				"state": "observed",
+				"v": 1,
+				"evidence": "outcome"
+			},
+			"cost_usd": {
+				"state": "observed",
+				"v": 0.38,
+				"evidence": "gateway"
+			},
+			"config_id": "codex-notes",
+			"started": "2026-11-14T19:08:04Z",
+			"sealed_at": "2026-11-14T19:14:04Z"
+		},
+		{
+			"run_id": "r_hksyecc1wm",
+			"exp_id": "e_synthetic-codewins",
+			"pair_id": "p_4qij5a9l1s",
+			"suite": "coding-core",
+			"track": "coding",
+			"output": "diff",
+			"grading": "verified",
+			"task": "t01",
+			"arm": "A",
+			"condition": "clean",
+			"trial": 3,
+			"attempt": 1,
+			"counted": true,
+			"sealed": true,
+			"outcome": "pass",
+			"y": {
+				"state": "observed",
+				"v": 1,
+				"evidence": "outcome"
+			},
+			"cost_usd": {
+				"state": "observed",
+				"v": 0.31,
+				"evidence": "gateway"
+			},
+			"config_id": "codex-baseline",
+			"started": "2026-11-14T19:06:04Z",
+			"sealed_at": "2026-11-14T19:12:04Z"
+		},
+		{
+			"run_id": "r_duzu74vp0x",
+			"exp_id": "e_synthetic-codewins",
+			"pair_id": "p_8j1ixcwzag",
+			"suite": "coding-core",
+			"track": "coding",
+			"output": "diff",
+			"grading": "verified",
+			"task": "t01",
+			"arm": "A",
+			"condition": "clean",
+			"trial": 2,
+			"attempt": 1,
+			"counted": true,
+			"sealed": true,
+			"outcome": "pass",
+			"y": {
+				"state": "observed",
+				"v": 1,
+				"evidence": "outcome"
+			},
+			"cost_usd": {
+				"state": "observed",
+				"v": 0.31,
+				"evidence": "gateway"
+			},
+			"config_id": "codex-baseline",
+			"started": "2026-11-14T19:04:04Z",
+			"sealed_at": "2026-11-14T19:10:04Z"
+		},
+		{
+			"run_id": "r_3nnfsrtmq2",
+			"exp_id": "e_synthetic-codewins",
+			"pair_id": "p_6quxt1pbgw",
+			"suite": "coding-core",
+			"track": "coding",
+			"output": "diff",
+			"grading": "verified",
+			"task": "t01",
+			"arm": "A",
+			"condition": "clean",
+			"trial": 1,
+			"attempt": 1,
+			"counted": true,
+			"sealed": true,
+			"outcome": "pass",
+			"y": {
+				"state": "observed",
+				"v": 1,
+				"evidence": "outcome"
+			},
+			"cost_usd": {
+				"state": "observed",
+				"v": 0.31,
+				"evidence": "gateway"
+			},
+			"config_id": "codex-baseline",
+			"started": "2026-11-14T19:02:04Z",
+			"sealed_at": "2026-11-14T19:08:04Z"
+		},
+		{
+			"run_id": "r_o7lkizp79k",
+			"exp_id": "e_synthetic-codewins",
+			"pair_id": "p_y9zzxst7om",
+			"suite": "coding-core",
+			"track": "coding",
+			"output": "diff",
+			"grading": "verified",
+			"task": "t04",
+			"arm": "B",
+			"condition": "stale-notes",
+			"trial": 3,
+			"attempt": 1,
+			"counted": true,
+			"sealed": true,
+			"outcome": "pass",
+			"y": {
+				"state": "observed",
+				"v": 1,
+				"evidence": "outcome"
+			},
+			"cost_usd": {
+				"state": "observed",
+				"v": 0.38,
+				"evidence": "gateway"
+			},
+			"config_id": "codex-notes",
+			"started": "2026-11-14T19:00:04Z",
+			"sealed_at": "2026-11-14T19:06:04Z"
+		},
+		{
+			"run_id": "r_iqhmvc19ph",
+			"exp_id": "e_synthetic-codewins",
+			"pair_id": "p_rlldt68rjp",
+			"suite": "coding-core",
+			"track": "coding",
+			"output": "diff",
+			"grading": "verified",
+			"task": "t04",
+			"arm": "B",
+			"condition": "stale-notes",
+			"trial": 2,
+			"attempt": 1,
+			"counted": true,
+			"sealed": true,
+			"outcome": "pass",
+			"y": {
+				"state": "observed",
+				"v": 1,
+				"evidence": "outcome"
+			},
+			"cost_usd": {
+				"state": "observed",
+				"v": 0.38,
+				"evidence": "gateway"
+			},
+			"config_id": "codex-notes",
+			"started": "2026-11-14T18:58:04Z",
+			"sealed_at": "2026-11-14T19:04:04Z"
+		},
+		{
+			"run_id": "r_tqm0myvhj6",
+			"exp_id": "e_synthetic-codewins",
+			"pair_id": "p_1rl2algqsk",
+			"suite": "coding-core",
+			"track": "coding",
+			"output": "diff",
+			"grading": "verified",
+			"task": "t04",
+			"arm": "B",
+			"condition": "stale-notes",
+			"trial": 1,
+			"attempt": 1,
+			"counted": true,
+			"sealed": true,
+			"outcome": "pass",
+			"y": {
+				"state": "observed",
+				"v": 1,
+				"evidence": "outcome"
+			},
+			"cost_usd": {
+				"state": "observed",
+				"v": 0.38,
+				"evidence": "gateway"
+			},
+			"config_id": "codex-notes",
+			"started": "2026-11-14T18:56:04Z",
+			"sealed_at": "2026-11-14T19:02:04Z"
+		},
+		{
+			"run_id": "r_m5o3ba0haf",
+			"exp_id": "e_synthetic-codewins",
+			"pair_id": "p_y9zzxst7om",
+			"suite": "coding-core",
+			"track": "coding",
+			"output": "diff",
+			"grading": "verified",
+			"task": "t04",
+			"arm": "A",
+			"condition": "stale-notes",
+			"trial": 3,
+			"attempt": 1,
+			"counted": true,
+			"sealed": true,
+			"outcome": "pass",
+			"y": {
+				"state": "observed",
+				"v": 1,
+				"evidence": "outcome"
+			},
+			"cost_usd": {
+				"state": "observed",
+				"v": 0.31,
+				"evidence": "gateway"
+			},
+			"config_id": "codex-baseline",
+			"started": "2026-11-14T18:54:04Z",
+			"sealed_at": "2026-11-14T19:00:04Z"
+		},
+		{
+			"run_id": "r_b4y7c0s88h",
+			"exp_id": "e_synthetic-codewins",
+			"pair_id": "p_rlldt68rjp",
+			"suite": "coding-core",
+			"track": "coding",
+			"output": "diff",
+			"grading": "verified",
+			"task": "t04",
+			"arm": "A",
+			"condition": "stale-notes",
+			"trial": 2,
+			"attempt": 1,
+			"counted": true,
+			"sealed": true,
+			"outcome": "fail",
+			"y": {
+				"state": "observed",
+				"v": 0,
+				"evidence": "outcome"
+			},
+			"cost_usd": {
+				"state": "observed",
+				"v": 0.31,
+				"evidence": "gateway"
+			},
+			"config_id": "codex-baseline",
+			"started": "2026-11-14T18:52:04Z",
+			"sealed_at": "2026-11-14T18:58:04Z"
+		},
+		{
+			"run_id": "r_i393vlyis6",
+			"exp_id": "e_synthetic-codewins",
+			"pair_id": "p_1rl2algqsk",
+			"suite": "coding-core",
+			"track": "coding",
+			"output": "diff",
+			"grading": "verified",
+			"task": "t04",
+			"arm": "A",
+			"condition": "stale-notes",
+			"trial": 1,
+			"attempt": 1,
+			"counted": true,
+			"sealed": true,
+			"outcome": "pass",
+			"y": {
+				"state": "observed",
+				"v": 1,
+				"evidence": "outcome"
+			},
+			"cost_usd": {
+				"state": "observed",
+				"v": 0.31,
+				"evidence": "gateway"
+			},
+			"config_id": "codex-baseline",
+			"started": "2026-11-14T18:50:04Z",
+			"sealed_at": "2026-11-14T18:56:04Z"
+		},
+		{
+			"run_id": "r_4x5roh2oec",
+			"exp_id": "e_synthetic-codewins",
+			"pair_id": "p_zfvce8sobm",
+			"suite": "coding-core",
+			"track": "coding",
+			"output": "diff",
+			"grading": "verified",
+			"task": "t02",
+			"arm": "B",
+			"condition": "clean",
+			"trial": 3,
+			"attempt": 1,
+			"counted": true,
+			"sealed": true,
+			"outcome": "pass",
+			"y": {
+				"state": "observed",
+				"v": 1,
+				"evidence": "outcome"
+			},
+			"cost_usd": {
+				"state": "observed",
+				"v": 0.38,
+				"evidence": "gateway"
+			},
+			"config_id": "codex-notes",
+			"started": "2026-11-14T18:48:04Z",
+			"sealed_at": "2026-11-14T18:54:04Z"
+		},
+		{
+			"run_id": "r_jrwscaid8v",
+			"exp_id": "e_synthetic-codewins",
+			"pair_id": "p_abn68lw1hm",
+			"suite": "coding-core",
+			"track": "coding",
+			"output": "diff",
+			"grading": "verified",
+			"task": "t02",
+			"arm": "B",
+			"condition": "clean",
+			"trial": 2,
+			"attempt": 1,
+			"counted": true,
+			"sealed": true,
+			"outcome": "pass",
+			"y": {
+				"state": "observed",
+				"v": 1,
+				"evidence": "outcome"
+			},
+			"cost_usd": {
+				"state": "observed",
+				"v": 0.38,
+				"evidence": "gateway"
+			},
+			"config_id": "codex-notes",
+			"started": "2026-11-14T18:46:04Z",
+			"sealed_at": "2026-11-14T18:52:04Z"
+		},
+		{
+			"run_id": "r_936pwmy871",
+			"exp_id": "e_synthetic-codewins",
+			"pair_id": "p_m8pbnkbsw8",
+			"suite": "coding-core",
+			"track": "coding",
+			"output": "diff",
+			"grading": "verified",
+			"task": "t02",
+			"arm": "B",
+			"condition": "clean",
+			"trial": 1,
+			"attempt": 1,
+			"counted": true,
+			"sealed": true,
+			"outcome": "pass",
+			"y": {
+				"state": "observed",
+				"v": 1,
+				"evidence": "outcome"
+			},
+			"cost_usd": {
+				"state": "observed",
+				"v": 0.38,
+				"evidence": "gateway"
+			},
+			"config_id": "codex-notes",
+			"started": "2026-11-14T18:44:04Z",
+			"sealed_at": "2026-11-14T18:50:04Z"
+		},
+		{
+			"run_id": "r_2e0a9n5wdl",
+			"exp_id": "e_synthetic-codewins",
+			"pair_id": "p_zfvce8sobm",
+			"suite": "coding-core",
+			"track": "coding",
+			"output": "diff",
+			"grading": "verified",
+			"task": "t02",
+			"arm": "A",
+			"condition": "clean",
+			"trial": 3,
+			"attempt": 1,
+			"counted": true,
+			"sealed": true,
+			"outcome": "pass",
+			"y": {
+				"state": "observed",
+				"v": 1,
+				"evidence": "outcome"
+			},
+			"cost_usd": {
+				"state": "observed",
+				"v": 0.31,
+				"evidence": "gateway"
+			},
+			"config_id": "codex-baseline",
+			"started": "2026-11-14T18:42:04Z",
+			"sealed_at": "2026-11-14T18:48:04Z"
+		},
+		{
+			"run_id": "r_t0fqfkdo9d",
+			"exp_id": "e_synthetic-codewins",
+			"pair_id": "p_abn68lw1hm",
+			"suite": "coding-core",
+			"track": "coding",
+			"output": "diff",
+			"grading": "verified",
+			"task": "t02",
+			"arm": "A",
+			"condition": "clean",
+			"trial": 2,
+			"attempt": 1,
+			"counted": true,
+			"sealed": true,
+			"outcome": "fail",
+			"y": {
+				"state": "observed",
+				"v": 0,
+				"evidence": "outcome"
+			},
+			"cost_usd": {
+				"state": "observed",
+				"v": 0.31,
+				"evidence": "gateway"
+			},
+			"config_id": "codex-baseline",
+			"started": "2026-11-14T18:40:04Z",
+			"sealed_at": "2026-11-14T18:46:04Z"
+		},
+		{
+			"run_id": "r_of09kz15g0",
+			"exp_id": "e_synthetic-codewins",
+			"pair_id": "p_m8pbnkbsw8",
+			"suite": "coding-core",
+			"track": "coding",
+			"output": "diff",
+			"grading": "verified",
+			"task": "t02",
+			"arm": "A",
+			"condition": "clean",
+			"trial": 1,
+			"attempt": 1,
+			"counted": true,
+			"sealed": true,
+			"outcome": "pass",
+			"y": {
+				"state": "observed",
+				"v": 1,
+				"evidence": "outcome"
+			},
+			"cost_usd": {
+				"state": "observed",
+				"v": 0.31,
+				"evidence": "gateway"
+			},
+			"config_id": "codex-baseline",
+			"started": "2026-11-14T18:38:04Z",
+			"sealed_at": "2026-11-14T18:44:04Z"
+		},
+		{
+			"run_id": "r_jfbzf5gpr8",
+			"exp_id": "e_synthetic-codewins",
+			"pair_id": "p_m5zmrgc2ep",
+			"suite": "coding-core",
+			"track": "coding",
+			"output": "diff",
+			"grading": "verified",
+			"task": "t02",
+			"arm": "B",
+			"condition": "stale-notes",
+			"trial": 3,
+			"attempt": 1,
+			"counted": true,
+			"sealed": true,
+			"outcome": "fail",
+			"y": {
+				"state": "observed",
+				"v": 0,
+				"evidence": "outcome"
+			},
+			"cost_usd": {
+				"state": "observed",
+				"v": 0.38,
+				"evidence": "gateway"
+			},
+			"config_id": "codex-notes",
+			"started": "2026-11-14T18:36:04Z",
+			"sealed_at": "2026-11-14T18:42:04Z"
+		},
+		{
+			"run_id": "r_ieofv74n3y",
+			"exp_id": "e_synthetic-codewins",
+			"pair_id": "p_hq1yzk7usk",
+			"suite": "coding-core",
+			"track": "coding",
+			"output": "diff",
+			"grading": "verified",
+			"task": "t02",
+			"arm": "B",
+			"condition": "stale-notes",
+			"trial": 2,
+			"attempt": 1,
+			"counted": true,
+			"sealed": true,
+			"outcome": "pass",
+			"y": {
+				"state": "observed",
+				"v": 1,
+				"evidence": "outcome"
+			},
+			"cost_usd": {
+				"state": "observed",
+				"v": 0.38,
+				"evidence": "gateway"
+			},
+			"config_id": "codex-notes",
+			"started": "2026-11-14T18:34:04Z",
+			"sealed_at": "2026-11-14T18:40:04Z"
+		},
+		{
+			"run_id": "r_9nje22hmzt",
+			"exp_id": "e_synthetic-codewins",
+			"pair_id": "p_m5zmrgc2ep",
+			"suite": "coding-core",
+			"track": "coding",
+			"output": "diff",
+			"grading": "verified",
+			"task": "t02",
+			"arm": "A",
+			"condition": "stale-notes",
+			"trial": 3,
+			"attempt": 1,
+			"counted": true,
+			"sealed": true,
+			"outcome": "timeout",
+			"y": {
+				"state": "observed",
+				"v": 0,
+				"evidence": "outcome"
+			},
+			"cost_usd": {
+				"state": "observed",
+				"v": 0.31,
+				"evidence": "gateway"
+			},
+			"config_id": "codex-baseline",
+			"started": "2026-11-14T18:30:04Z",
+			"sealed_at": "2026-11-14T18:36:04Z"
+		},
+		{
+			"run_id": "r_lsrv6xcv2u",
+			"exp_id": "e_synthetic-codewins",
+			"pair_id": "p_hq1yzk7usk",
+			"suite": "coding-core",
+			"track": "coding",
+			"output": "diff",
+			"grading": "verified",
+			"task": "t02",
+			"arm": "A",
+			"condition": "stale-notes",
+			"trial": 2,
+			"attempt": 1,
+			"counted": true,
+			"sealed": true,
+			"outcome": "fail",
+			"y": {
+				"state": "observed",
+				"v": 0,
+				"evidence": "outcome"
+			},
+			"cost_usd": {
+				"state": "observed",
+				"v": 0.31,
+				"evidence": "gateway"
+			},
+			"config_id": "codex-baseline",
+			"started": "2026-11-14T18:28:04Z",
+			"sealed_at": "2026-11-14T18:34:04Z"
+		},
+		{
+			"run_id": "r_7gwi714zu9",
+			"exp_id": "e_synthetic-codewins",
+			"pair_id": "p_82yxw5wejc",
+			"suite": "coding-core",
+			"track": "coding",
+			"output": "diff",
+			"grading": "verified",
+			"task": "t01",
+			"arm": "B",
+			"condition": "stale-notes",
+			"trial": 3,
+			"attempt": 1,
+			"counted": true,
+			"sealed": true,
+			"outcome": "pass",
+			"y": {
+				"state": "observed",
+				"v": 1,
+				"evidence": "outcome"
+			},
+			"cost_usd": {
+				"state": "observed",
+				"v": 0.38,
+				"evidence": "gateway"
+			},
+			"config_id": "codex-notes",
+			"started": "2026-11-14T18:24:04Z",
+			"sealed_at": "2026-11-14T18:30:04Z"
+		},
+		{
+			"run_id": "r_vhainn95e6",
+			"exp_id": "e_synthetic-codewins",
+			"pair_id": "p_ph0r4oc7j1",
+			"suite": "coding-core",
+			"track": "coding",
+			"output": "diff",
+			"grading": "verified",
+			"task": "t01",
+			"arm": "B",
+			"condition": "stale-notes",
+			"trial": 2,
+			"attempt": 1,
+			"counted": true,
+			"sealed": true,
+			"outcome": "pass",
+			"y": {
+				"state": "observed",
+				"v": 1,
+				"evidence": "outcome"
+			},
+			"cost_usd": {
+				"state": "observed",
+				"v": 0.38,
+				"evidence": "gateway"
+			},
+			"config_id": "codex-notes",
+			"started": "2026-11-14T18:22:04Z",
+			"sealed_at": "2026-11-14T18:28:04Z"
+		},
+		{
+			"run_id": "r_k85z6ajlhj",
+			"exp_id": "e_synthetic-codewins",
+			"pair_id": "p_oo2rekitzo",
+			"suite": "coding-core",
+			"track": "coding",
+			"output": "diff",
+			"grading": "verified",
+			"task": "t01",
+			"arm": "B",
+			"condition": "stale-notes",
+			"trial": 1,
+			"attempt": 1,
+			"counted": true,
+			"sealed": true,
+			"outcome": "pass",
+			"y": {
+				"state": "observed",
+				"v": 1,
+				"evidence": "outcome"
+			},
+			"cost_usd": {
+				"state": "observed",
+				"v": 0.38,
+				"evidence": "gateway"
+			},
+			"config_id": "codex-notes",
+			"started": "2026-11-14T18:20:04Z",
+			"sealed_at": "2026-11-14T18:26:04Z"
+		},
+		{
+			"run_id": "r_g2f0s9ek5m",
+			"exp_id": "e_synthetic-codewins",
+			"pair_id": "p_82yxw5wejc",
+			"suite": "coding-core",
+			"track": "coding",
+			"output": "diff",
+			"grading": "verified",
+			"task": "t01",
+			"arm": "A",
+			"condition": "stale-notes",
+			"trial": 3,
+			"attempt": 1,
+			"counted": true,
+			"sealed": true,
+			"outcome": "fail",
+			"y": {
+				"state": "observed",
+				"v": 0,
+				"evidence": "outcome"
+			},
+			"cost_usd": {
+				"state": "observed",
+				"v": 0.31,
+				"evidence": "gateway"
+			},
+			"config_id": "codex-baseline",
+			"started": "2026-11-14T18:18:04Z",
+			"sealed_at": "2026-11-14T18:24:04Z"
+		},
+		{
+			"run_id": "r_u26l96gxc4",
+			"exp_id": "e_synthetic-codewins",
+			"pair_id": "p_ph0r4oc7j1",
+			"suite": "coding-core",
+			"track": "coding",
+			"output": "diff",
+			"grading": "verified",
+			"task": "t01",
+			"arm": "A",
+			"condition": "stale-notes",
+			"trial": 2,
+			"attempt": 1,
+			"counted": true,
+			"sealed": true,
+			"outcome": "pass",
+			"y": {
+				"state": "observed",
+				"v": 1,
+				"evidence": "outcome"
+			},
+			"cost_usd": {
+				"state": "observed",
+				"v": 0.31,
+				"evidence": "gateway"
+			},
+			"config_id": "codex-baseline",
+			"started": "2026-11-14T18:16:04Z",
+			"sealed_at": "2026-11-14T18:22:04Z"
+		},
+		{
+			"run_id": "r_jcxc4c30cm",
+			"exp_id": "e_synthetic-codewins",
+			"pair_id": "p_oo2rekitzo",
+			"suite": "coding-core",
+			"track": "coding",
+			"output": "diff",
+			"grading": "verified",
+			"task": "t01",
+			"arm": "A",
+			"condition": "stale-notes",
+			"trial": 1,
+			"attempt": 1,
+			"counted": true,
+			"sealed": true,
+			"outcome": "fail",
+			"y": {
+				"state": "observed",
+				"v": 0,
+				"evidence": "outcome"
+			},
+			"cost_usd": {
+				"state": "observed",
+				"v": 0.31,
+				"evidence": "gateway"
+			},
+			"config_id": "codex-baseline",
+			"started": "2026-11-14T18:14:04Z",
+			"sealed_at": "2026-11-14T18:20:04Z"
+		}
+	],
+	"total": 48,
+	"limit": 100,
+	"offset": 0,
+	"facets": {
+		"experiments": [
+			"e_synthetic-codewins"
+		],
+		"suites": [
+			"coding-core"
+		],
+		"arms": [
+			"A",
+			"B"
+		],
+		"tasks": [
+			"t01",
+			"t02",
+			"t03",
+			"t04"
+		],
+		"conditions": [
+			"clean",
+			"stale-notes"
+		],
+		"outcomes": [
+			"fail",
+			"pass",
+			"timeout"
+		],
+		"tracks": [
+			"coding"
+		]
+	}
+}

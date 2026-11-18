@@ -1,3 +1,4 @@
+import { EntityLink } from "@/components/shell/entityLink";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { getLocale } from "@/lib/i18n";
 import type { Grid, GridCell, GridRow } from "@/lib/types/bench";
@@ -27,11 +28,13 @@ export interface TaskGridProps {
 	grid: Grid;
 	/** Opens the run comparison for one pair (every arm's run of one task, condition and trial). */
 	onOpenPair: (pairId: string) => void;
+	/** The experiment's suite; with it each task id links to the task in its suite. */
+	suite?: string;
 	className?: string;
 }
 
 /** Task x condition rows, discordant first; one cell per arm and trial, coloured by outcome. */
-export function TaskGrid({ grid, onOpenPair, className }: TaskGridProps) {
+export function TaskGrid({ grid, onOpenPair, suite, className }: TaskGridProps) {
 	const { t } = useTranslation("bench");
 	const rows = useMemo(() => sortGridRows(grid.rows), [grid.rows]);
 	const trials = useMemo(() => Array.from({ length: Math.max(grid.trials, 0) }, (_, i) => i + 1), [grid.trials]);
@@ -72,7 +75,14 @@ export function TaskGrid({ grid, onOpenPair, className }: TaskGridProps) {
 				</TableHeader>
 				<TableBody>
 					{rows.map((row) => (
-						<GridRowView key={`${row.task}:${row.condition}`} row={row} arms={grid.arms} trials={trials} onOpenPair={onOpenPair} />
+						<GridRowView
+							key={`${row.task}:${row.condition}`}
+							row={row}
+							arms={grid.arms}
+							trials={trials}
+							onOpenPair={onOpenPair}
+							suite={suite}
+						/>
 					))}
 				</TableBody>
 			</Table>
@@ -98,11 +108,13 @@ function GridRowView({
 	arms,
 	trials,
 	onOpenPair,
+	suite,
 }: {
 	row: GridRow;
 	arms: string[];
 	trials: number[];
 	onOpenPair: (pairId: string) => void;
+	suite?: string;
 }) {
 	const { t } = useTranslation("bench");
 	const locale = getLocale();
@@ -112,7 +124,7 @@ function GridRowView({
 		<TableRow data-testid={`verdict-grid-row-${row.task}-${row.condition}`} data-discordant={row.discordant}>
 			<TableCell className="font-mono text-xs">
 				<span className="inline-flex items-center gap-2">
-					{row.task}
+					{suite ? <EntityLink kind="task" id={row.task} suite={suite} /> : row.task}
 					{row.discordant && (
 						<span className="border-chart-warning/60 text-chart-warning-ink rounded-sm border px-1 text-[10px] uppercase">
 							{t("verdict.grid.discordant")}

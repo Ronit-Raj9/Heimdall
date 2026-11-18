@@ -162,6 +162,7 @@ func registerOrgRoutes(r *router.Router, cfg *lib.Config, deps Deps, write lib.M
 	handlers.NewCatalogHandler(mode, deps.Catalog).RegisterRoutes(r, common...)
 	experiments.RegisterRoutes(r, common...)
 	handlers.NewRunsHandler(mode, deps.Index).RegisterRoutes(r, common...)
+	handlers.NewRunListHandler(mode, deps.Index, deps.Suites).RegisterRoutes(r, common...) // UI regroup (U2): GET /runs (handlers/runlist.go)
 	handlers.NewPairsHandler(mode, deps.Index).RegisterRoutes(r, common...)
 	handlers.NewTriageHandler(mode, deps.Index, deps.Catalog).RegisterRoutes(r, common...)
 	handlers.NewLeaderboardHandler(mode, deps.Index).RegisterRoutes(r, common...)

@@ -9,8 +9,8 @@ export function NotFoundComponent() {
 			<h1 className="text-foreground text-xl font-semibold tracking-tight">{t("notFound.title")}</h1>
 			<p className="text-muted-foreground text-sm">{t("notFound.description")}</p>
 			<Button asChild variant="outline" size="sm">
-				<Link to="/verdict" data-testid="not-found-link-verdict">
-					{t("notFound.back")}
+				<Link to="/" data-testid="not-found-link-home">
+					{t("shell.backHome")}
 				</Link>
 			</Button>
 		</section>
