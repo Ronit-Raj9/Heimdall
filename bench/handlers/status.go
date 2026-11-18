@@ -18,6 +18,8 @@ type StatusFacts struct {
 	Costs      map[string]schemas.Value
 	Active     bool   // the launcher is executing the experiment in this process
 	AnalysisID string // newest analysis, empty when none exists
+	// Cancelled: the experiment's newest run job was cancelled (Jobs area).
+	Cancelled bool
 }
 
 // BuildStatus derives an experiment's progress from its manifest and runs.
@@ -30,8 +32,9 @@ type StatusFacts struct {
 //
 // State: done once every slot has a counted run (analyzing while the
 // launcher still holds it), running while the launcher is active or a run is
-// unsealed, created before any run, and failed when the experiment stopped
-// with slots left: a budget stop, a crash or a restart. It is pure.
+// unsealed, cancelled when its run job was cancelled with slots left, created
+// before any run, and failed when the experiment stopped with slots left: a
+// budget stop, a crash or a restart. It is pure.
 func BuildStatus(m *schemas.Manifest, runs []RunView, f StatusFacts) schemas.ExperimentStatus {
 	st := schemas.ExperimentStatus{
 		ExpID: m.ExpID, Name: m.Experiment.Name, ManifestHash: m.Hash, FrozenAt: m.CreatedAt,
@@ -68,7 +71,11 @@ func BuildStatus(m *schemas.Manifest, runs []RunView, f StatusFacts) schemas.Exp
 		st.State = schemas.ExperimentAnalyzing
 	case complete:
 		st.State, st.FinishedAt = schemas.ExperimentDone, finished
-	case f.Active || len(unsealed) > 0:
+	case f.Active:
+		st.State = schemas.ExperimentRunning
+	case f.Cancelled: // Jobs area: stopped by a cancel, slots left; resume runs them
+		st.State = schemas.ExperimentCancelled
+	case len(unsealed) > 0:
 		st.State = schemas.ExperimentRunning
 	case len(runs) == 0:
 		st.State = schemas.ExperimentCreatedState

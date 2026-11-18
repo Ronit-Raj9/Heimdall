@@ -163,6 +163,12 @@ func writeInstruments(w *bufio.Writer, checks []schemas.InstrumentCheck, m *sche
 		}
 		fmt.Fprintf(w, " %s | %s |\n", cell(orDash(c.Threshold)), cell(orDash(c.Detail)))
 	}
+	if m != nil && m.Gateway.Deferred() {
+		// Tenancy area: the preflight was the runners'; the gateway_hygiene
+		// instrument row above reads their per-run records.
+		w.WriteString("\n")
+		return
+	}
 	status, detail := hygieneText(m)
 	fmt.Fprintf(w, "| %s | %s |%s %s | %s |\n\n", hygieneName, status, strings.Repeat(" - |", len(arms)),
 		"no MCP auto-inject with MCP clients, no semantic cache, no multi-target routing", cell(detail))

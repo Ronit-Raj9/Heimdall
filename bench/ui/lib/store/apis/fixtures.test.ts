@@ -68,6 +68,11 @@ describe("resolveFixture", () => {
 		{ method: "GET", url: "/experiments/e_x/reviews", want: "experiments.reviews.json" },
 		{ method: "GET", url: "/runs/r_abc/reviews", want: "runs.r_abc.reviews.json" },
 		{ method: "POST", url: "/reviews", want: "reviews.create.json" },
+		{ method: "POST", url: "/experiments/e_x/regrade", want: "experiments.regrade.json" },
+		{ method: "GET", url: `${BENCH_API_BASE}/jobs`, want: "jobs.json" },
+		{ method: "GET", url: "/jobs/job_abc", want: "jobs.job_abc.json" },
+		{ method: "GET", url: "/jobs/job_abc/logs?since=4", want: "jobs.job_abc.logs.json" },
+		{ method: "POST", url: "/regrade", want: null },
 		{ method: "GET", url: "/experiments/plan/extra", want: null },
 		{ method: "DELETE", url: "/health", want: null },
 		{ method: "GET", url: "/runs/..%2F..%2Fsecret", want: null },
@@ -182,7 +187,8 @@ function contractFor(file: string): { type: string; nested: Record<string, strin
 		"doctor.json": { type: "Doctor", nested: {} },
 		"catalog.json": { type: "Catalog", nested: {} },
 		"audit.json": { type: "Verdict", nested: {} },
-		"regrade.json": { type: "RegradeResult", nested: {} },
+		"experiments.regrade.json": { type: "Job", nested: {} },
+		"jobs.json": { type: "JobList", nested: { "jobs[]": "Job" } },
 		"experiments.plan.json": { type: "ExperimentPlan", nested: {} },
 		"estimate.json": {
 			type: "Forecast",
@@ -314,6 +320,8 @@ function contractFor(file: string): { type: string; nested: Record<string, strin
 		};
 	}
 	if (file.startsWith("pairs.")) return { type: "Pair", nested: { "runs[]": "PairRun" } };
+	if (file.startsWith("jobs.") && file.endsWith(".logs.json")) return { type: "JobLogs", nested: { "lines[]": "JobLogLine" } };
+	if (file.startsWith("jobs.")) return { type: "Job", nested: {} };
 	if (!file.startsWith("runs.")) return null;
 	if (file.endsWith(".events.json")) return { type: "RunEvents", nested: {} };
 	if (file.endsWith(".diff.json")) return { type: "RunDiff", nested: {} };

@@ -61,6 +61,10 @@ func (h *ExperimentsHandler) RegisterRoutes(r *router.Router, middlewares ...lib
 	r.GET(p+"/{id}/diagnostics", lib.ChainMiddlewares(h.getDiagnostics, middlewares...))
 	r.GET(p+"/{id}/grid", lib.ChainMiddlewares(h.getGrid, middlewares...))
 	r.GET(p+"/{id}/events", lib.ChainMiddlewares(h.getEvents, middlewares...))
+	// Jobs area: cancel, resume and regrade run as jobs (experimentjobs.go).
+	r.POST(p+"/{id}/cancel", lib.ChainMiddlewares(h.cancelExperiment, writeMW...))
+	r.POST(p+"/{id}/resume", lib.ChainMiddlewares(h.resumeExperiment, writeMW...))
+	r.POST(p+"/{id}/regrade", lib.ChainMiddlewares(h.regradeExperiment, writeMW...))
 }
 
 // Close ends every open event stream and subscription. The server calls it
@@ -155,7 +159,7 @@ func (h *ExperimentsHandler) startExperiment(ctx *fasthttp.RequestCtx) {
 	}
 	work, cancel := workContext(ctx, readTimeout)
 	defer cancel()
-	if err := h.launcher.Start(work, id); err != nil {
+	if err := h.launcher.Start(withPrincipal(work, ctx), id); err != nil { // Jobs area: the run job records who started it
 		sendDepError(ctx, h.mode, "start experiment "+id, err)
 		return
 	}
@@ -385,7 +389,8 @@ func (h *ExperimentsHandler) status(m *schemas.Manifest, runs []RunView, started
 	if ar, ok := h.launcher.(ActivityReporter); ok && !active {
 		active = ar.Active(m.ExpID)
 	}
-	return BuildStatus(m, runs, StatusFacts{Costs: runCosts(h.index, runs), Active: active, AnalysisID: h.latestAnalysis(m.ExpID)})
+	return BuildStatus(m, runs, StatusFacts{Costs: runCosts(h.index, runs), Active: active, AnalysisID: h.latestAnalysis(m.ExpID),
+		Cancelled: !active && h.cancelledFact(m.ExpID)}) // Jobs area: cancelled state (experimentjobs.go)
 }
 
 // latestAnalysis returns the newest analysis id of an experiment: from the

@@ -1488,12 +1488,12 @@ export interface AuditRequest {
 	alpha?: number;
 }
 
-export interface RegradeRequest {
+/** POST /experiments/{exp_id}/regrade: the experiment in the path, the optional rest in the body. */
+export interface RegradeRequest extends ExperimentRegradeRequest {
 	exp_id: string;
-	suite_version: string;
 }
 
-/** POST /regrade (stretch) */
+/** schemas.RegradeResult: a regrade as the CLI reports it. The API answers with the regrade job. */
 export interface RegradeResult {
 	regrade_id: string;
 	exp_id: string;
@@ -2694,7 +2694,7 @@ export type RunDiffResponse = WithMode<RunDiff>;
 export type RunReceiptsResponse = WithMode<RunReceipts>;
 export type PairResponse = WithMode<Pair>;
 export type AuditResponse = WithMode<Verdict>;
-export type RegradeResponse = WithMode<RegradeResult>;
+export type RegradeResponse = WithMode<Job>;
 export type TriageResponse = WithMode<Triage>;
 export type ReleaseListResponse = WithMode<ReleaseList>;
 export type ReleaseResponse = WithMode<ReleaseRecord>;
@@ -3269,3 +3269,394 @@ export interface AgentDiffParams {
 
 export type AgentDiffResponse = WithMode<AgentDiffReport>;
 export type AgentDiffVersionsResponse = WithMode<AgentDiffVersionList>;
+
+// =============================================================================================
+// Hosted platform (docs/platform-design.md): auth, organizations, members, API tokens, jobs,
+// runners and the audit log. Platform routes answer with `mode` like every bench route. Times
+// are RFC 3339 strings; formatWhen() also reads unix milliseconds.
+// =============================================================================================
+
+/** auth.mode: local is the single-user mode (write token); hosted has sessions and orgs. */
+export type AuthMode = "local" | "hosted";
+
+/** A membership role, least to most privileged. */
+export type Role = "viewer" | "member" | "admin" | "owner";
+
+/** How a request authenticated (auth.PrincipalKind). */
+export type PrincipalKind = "user" | "token" | "runner" | "anonymous" | "local";
+
+/** auth.signup: who may create an account. */
+export type SignupPolicy = "invite" | "open" | "closed";
+
+/** A time from a platform route: RFC 3339, or unix milliseconds. */
+export type PlatformTime = string | number;
+
+/** A signed-in user (auth.User). */
+export interface PlatformUser {
+	id: string;
+	email: string;
+	name: string;
+	created_at: PlatformTime;
+}
+
+/** One organization of the caller with the caller's role in it (auth.MeOrg). */
+export interface MeOrg {
+	id: string;
+	slug: string;
+	name: string;
+	role: Role;
+}
+
+/** The session's organization as the UI holds it: an org of /auth/me, public_read once known. */
+export interface OrgSummary {
+	id: string;
+	slug: string;
+	name: string;
+	role?: Role;
+	public_read?: boolean;
+}
+
+/** GET /auth/me (auth.Me): who is calling, the organizations, the current one and the CSRF value. */
+export interface AuthMe {
+	auth_mode: AuthMode;
+	kind: PrincipalKind;
+	user?: PlatformUser;
+	token_id?: string;
+	orgs: MeOrg[];
+	/** Id of the organization requests act in. */
+	current_org?: string;
+	/** The caller's role in current_org. */
+	role?: Role;
+	/** Session CSRF value: sent as X-Heimdall-CSRF on every cookie-authenticated write. */
+	csrf?: string;
+}
+
+/** GET /auth/config (auth.AuthInfo): what the sign-in page offers, answered to anyone. */
+export interface AuthConfig {
+	auth_mode: AuthMode;
+	signup?: SignupPolicy;
+	github: boolean;
+	/** An empty install: the first sign-up creates the owner account and its organization. */
+	bootstrap?: boolean;
+}
+
+/** POST /auth/login. */
+export interface LoginRequest {
+	email: string;
+	password: string;
+}
+
+/** POST /auth/signup. invitation is the token from an invitation link. */
+export interface SignupRequest {
+	email: string;
+	password: string;
+	name?: string;
+	/** Name of the first organization (open sign-up); default from the name or email. */
+	org_name?: string;
+	invitation?: string;
+}
+
+/** GET /auth/invitations/{token} (auth.InvitationInfo): what a link grants, before it is accepted. */
+export interface InvitationPreview {
+	org_name: string;
+	org_slug: string;
+	email: string;
+	role: Role;
+	expires_at: PlatformTime;
+	/** The invited email has an account: offer sign-in rather than sign-up. */
+	account_exists: boolean;
+	/** False under signup closed: only an existing account may accept. */
+	signup_allowed: boolean;
+}
+
+/** POST /auth/switch-org: an org id or slug the user belongs to. */
+export interface SwitchOrgRequest {
+	org: string;
+}
+
+/** One membership (handlers/members.go MemberInfo). */
+export interface Member {
+	user_id: string;
+	email: string;
+	name?: string;
+	role: Role;
+	created_at: PlatformTime;
+}
+
+/** GET /orgs/{org}/members. */
+export interface MemberList {
+	members: Member[];
+}
+
+/** One invitation (handlers/members.go InvitationInfo). token is set only in the create answer. */
+export interface Invitation {
+	id: string;
+	email: string;
+	role: Role;
+	created_by?: string;
+	created_at: PlatformTime;
+	expires_at: PlatformTime;
+	accepted_at?: PlatformTime;
+	token?: string;
+	/** The acceptance link, with token: in the create answer only. */
+	url?: string;
+}
+
+/** GET /orgs/{org}/invitations. */
+export interface InvitationList {
+	invitations: Invitation[];
+}
+
+/** POST /orgs/{org}/invitations. */
+export interface InvitationRequest {
+	email: string;
+	role: Role;
+}
+
+/** One organization as the org routes answer (handlers/orgs.go OrgInfo). */
+export interface OrgInfo {
+	id: string;
+	slug: string;
+	name: string;
+	public_read: boolean;
+	created_at: PlatformTime;
+	/** The caller's role in the org, empty for a public reader. */
+	role?: Role;
+	/** Tenancy area: the server's public read-only demo org (demo.org with public_read). */
+	demo?: boolean;
+}
+
+/** GET /orgs. */
+export interface OrgList {
+	orgs: OrgInfo[];
+}
+
+/** An API token, never its secret (auth.APIToken). */
+export interface ApiToken {
+	id: string;
+	org_id: string;
+	/** The user who created it; empty once that user is removed. */
+	user_id?: string;
+	name: string;
+	/** hm_<prefix>: enough to recognise the token, not to use it. */
+	prefix: string;
+	role: Role;
+	created_at: PlatformTime;
+	last_used_at?: PlatformTime;
+	expires_at?: PlatformTime;
+	revoked_at?: PlatformTime;
+}
+
+/** GET /auth/tokens. */
+export interface ApiTokenList {
+	tokens: ApiToken[];
+}
+
+/** POST /auth/tokens (auth.TokenCreateRequest). role empty: the creator's own; 0 days: never expires. */
+export interface ApiTokenRequest {
+	name: string;
+	role?: Role;
+	expires_in_days?: number;
+}
+
+/** POST /auth/tokens (auth.TokenCreated): the secret, shown once, and the token row. */
+export interface ApiTokenCreated {
+	token: string;
+	api_token: ApiToken;
+}
+
+/** Runner state (schemas/runners.go): lost after the stale threshold without a call. */
+export type RunnerState = "idle" | "running" | "lost";
+
+/** One registered runner (schemas.RunnerView). */
+export interface Runner {
+	id: string;
+	org_id: string;
+	/** The runner's -name, its worker id. */
+	name: string;
+	pool: string;
+	labels: string[] | null;
+	/** Bench build the runner runs. */
+	version: string;
+	host: string;
+	state: RunnerState;
+	slots: number;
+	/** Slot ids it holds now. */
+	running: string[] | null;
+	running_slots: number;
+	/** Runs accepted since the server started. */
+	completed: number;
+	token_id: string;
+	token_prefix?: string;
+	last_seen: PlatformTime;
+	registered_at: PlatformTime;
+	/** The coordinator holds a registration for it now. */
+	live: boolean;
+}
+
+/** GET /runners. */
+export interface RunnerList {
+	runners: Runner[];
+}
+
+/** Runner token state. */
+export type RunnerTokenState = "active" | "revoked" | "expired";
+
+/** A runner token without its secret (schemas.RunnerTokenView). */
+export interface RunnerToken {
+	id: string;
+	org_id: string;
+	pool: string;
+	name: string;
+	/** The 8 lookup characters after hmr_. */
+	prefix: string;
+	created_by: string;
+	created_at: PlatformTime;
+	expires_at?: PlatformTime;
+	last_used_at?: PlatformTime;
+	revoked_at?: PlatformTime;
+	state: RunnerTokenState;
+}
+
+/** GET /runners/tokens. */
+export interface RunnerTokenList {
+	tokens: RunnerToken[];
+}
+
+/** POST /runners/tokens. Every field optional: pool defaults to the server's default pool. */
+export interface RunnerTokenRequest {
+	pool?: string;
+	name?: string;
+	expires_in_days?: number;
+}
+
+/** POST /runners/tokens: the only time the token is shown, with the lines that use it. */
+export interface RunnerTokenCreated {
+	token: string;
+	info: RunnerToken;
+	/** The exact `bifrost-bench runner start` line. */
+	command: string;
+	/** The install script line for a fresh box. */
+	install: string;
+}
+
+/** One audit_log row (handlers/orgs.go AuditRow). */
+export interface AuditEntry {
+	id: string;
+	actor_type: "user" | "token" | "runner" | "system";
+	actor_id?: string;
+	action: string;
+	target_type?: string;
+	target_id?: string;
+	ip?: string;
+	at: PlatformTime;
+	details?: Record<string, JsonValue>;
+}
+
+/** GET /orgs/{org}/audit, newest first. */
+export interface AuditList {
+	entries: AuditEntry[];
+}
+
+/** GET /orgs/{org}/audit query: before is unix milliseconds (rows strictly older). */
+export interface AuditLogParams {
+	orgId: string;
+	action?: string;
+	before?: number;
+	limit?: number;
+}
+
+/** POST /orgs/{org}/rename. */
+export interface RenameOrgRequest {
+	name: string;
+}
+
+/** POST /orgs/{org}/public-read. */
+export interface PublicReadRequest {
+	public_read: boolean;
+}
+
+/** jobs.status */
+export type JobStatus = "queued" | "running" | "succeeded" | "failed" | "cancelled";
+
+/** One job (jobs.Job): experiment runs, suite checks, regrades, imports. */
+export interface Job {
+	id: string;
+	org_id: string;
+	kind: string;
+	/** What the job acts on, for example an experiment id. */
+	target?: string;
+	status: JobStatus;
+	params: Record<string, JsonValue> | null;
+	/** Kind-specific: experiment.run reports {exp_id, phase, slots, sealed, skipped, errors, last_event}. */
+	progress?: Record<string, JsonValue>;
+	result?: Record<string, JsonValue>;
+	error?: string;
+	created_by?: string;
+	created_at: PlatformTime;
+	started_at?: PlatformTime;
+	finished_at?: PlatformTime;
+	cancel_requested: boolean;
+	/** Claims so far: 1 on the first run, more after each requeue (a resume). */
+	attempt: number;
+	lease_owner?: string;
+	lease_until?: PlatformTime;
+}
+
+/** GET /jobs (handlers/jobs.go JobList): newest first, and the kinds POST /jobs accepts. */
+export interface JobList {
+	jobs: Job[];
+	/** The before= cursor of the next page, empty on the last. */
+	next?: string;
+	kinds: string[];
+}
+
+/** One line of a job's log (jobs.LogLine). */
+export interface JobLogLine {
+	seq: number;
+	at: PlatformTime;
+	level: string;
+	line: string;
+}
+
+/** GET /jobs/{id}/logs?since=N (jobs.LogPage): lines after seq N, and the job's status. */
+export interface JobLogs {
+	job_id: string;
+	status: JobStatus;
+	lines: JobLogLine[];
+	/** Cursor for the next poll. */
+	next: number;
+	/** Lines left out between the oldest and newest kept lines. */
+	dropped: number;
+}
+
+/** POST /experiments/{id}/regrade (handlers/experimentjobs.go RegradeRequest); every field optional. */
+export interface ExperimentRegradeRequest {
+	/** Regrade id to write; default a new rg_ id. */
+	id?: string;
+	/** Why; every report that uses the regrade shows it. */
+	note?: string;
+	/** The suite.lock the experiment was frozen with, when the suite's lock changed since. */
+	suite_lock?: string;
+}
+
+export type AuthMeResponse = WithMode<AuthMe>;
+export type AuthConfigResponse = WithMode<AuthConfig>;
+export type MeOrgResponse = WithMode<MeOrg>;
+export type InvitationPreviewResponse = WithMode<InvitationPreview>;
+export type MemberResponse = WithMode<Member>;
+export type MemberListResponse = WithMode<MemberList>;
+export type InvitationListResponse = WithMode<InvitationList>;
+export type InvitationResponse = WithMode<Invitation>;
+export type OrgResponse = WithMode<OrgInfo>;
+export type OrgListResponse = WithMode<OrgList>;
+export type ApiTokenListResponse = WithMode<ApiTokenList>;
+export type ApiTokenCreatedResponse = WithMode<ApiTokenCreated>;
+export type RunnerListResponse = WithMode<RunnerList>;
+export type RunnerTokenResponse = WithMode<RunnerToken>;
+export type RunnerTokenListResponse = WithMode<RunnerTokenList>;
+export type RunnerTokenCreatedResponse = WithMode<RunnerTokenCreated>;
+export type AuditListResponse = WithMode<AuditList>;
+export type JobListResponse = WithMode<JobList>;
+export type JobResponse = WithMode<Job>;
+export type JobLogsResponse = WithMode<JobLogs>;

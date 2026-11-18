@@ -37,6 +37,16 @@ const (
 // RemoteOptions configures a Coordinator.
 type RemoteOptions struct {
 	Token string // the shared worker token; only its sha256 is kept
+	// OrgID, when set, makes this a hosted coordinator of one organization
+	// (Runners area, docs/runners.md): there is no shared token, every call
+	// must carry a schemas.RunnerScope of this organization on its context
+	// (the worker routes put it there from the runner token), and a runner
+	// leases only experiments whose runner pool is its token's pool. Token
+	// must then be empty. Unset, the coordinator is the local one, unchanged.
+	OrgID string
+	// Book records hosted runners outside the coordinator's memory (the
+	// runners table); nil records nothing. Never called in local mode.
+	Book RunnerBook
 	// StaleAfter marks a worker with no lease that has not called for this
 	// long as lost in the list. Leases use the attached scheduler's own
 	// stale threshold and heartbeat interval, the same as its local slots.
@@ -49,6 +59,14 @@ type RemoteOptions struct {
 	// loss. Default: <store root>/.remote.
 	StagingDir string
 	Logger     schemas.Logger
+}
+
+// RunnerBook records hosted runners as the coordinator sees them (Runners
+// area): on every registration and, as often as it chooses to write, on
+// lease and heartbeat calls. It is called outside the coordinator's lock and
+// must not block for long; its errors are its own to log.
+type RunnerBook interface {
+	RunnerSeen(ctx context.Context, scope schemas.RunnerScope, info schemas.WorkerInfo, registered bool)
 }
 
 // Coordinator is the server side of remote execution. It lives in the
@@ -76,6 +94,7 @@ type Coordinator struct {
 // remoteWorker is one registered worker.
 type remoteWorker struct {
 	info     schemas.WorkerInfo
+	scope    schemas.RunnerScope // hosted: the token it registered with; zero in local mode
 	parts    map[string]string
 	refused  map[string]string // exp id -> why the worker refused it
 	rejected int
@@ -101,7 +120,10 @@ func NewCoordinator(reg *schemas.Registry, opts RemoteOptions) (*Coordinator, er
 	if reg == nil || reg.Store == nil {
 		return nil, errors.New("coordinator: no store registered")
 	}
-	if strings.TrimSpace(opts.Token) == "" {
+	switch {
+	case opts.OrgID != "" && opts.Token != "":
+		return nil, errors.New("coordinator: a hosted coordinator takes runner tokens, not a shared worker token")
+	case opts.OrgID == "" && strings.TrimSpace(opts.Token) == "":
 		return nil, errors.New("coordinator: empty worker token")
 	}
 	if opts.StaleAfter <= 0 {
@@ -127,17 +149,27 @@ func NewCoordinator(reg *schemas.Registry, opts RemoteOptions) (*Coordinator, er
 	}
 	c := &Coordinator{store: reg.Store, logger: opts.Logger, opts: opts, now: time.Now,
 		workers: map[string]*remoteWorker{}, leases: map[string]*remoteLease{}, ended: map[string]string{}}
-	c.tokenSum = sha256.Sum256([]byte(opts.Token))
+	if opts.OrgID == "" {
+		c.tokenSum = sha256.Sum256([]byte(opts.Token))
+	}
 	c.opts.Token = ""
 	return c, nil
 }
 
 // CheckToken reports whether tok is the worker token. Both sides are hashed
-// first, so the comparison is constant time whatever the lengths.
+// first, so the comparison is constant time whatever the lengths. A hosted
+// coordinator has no shared token and accepts none.
 func (c *Coordinator) CheckToken(tok string) bool {
+	if c.opts.OrgID != "" {
+		return false
+	}
 	sum := sha256.Sum256([]byte(tok))
 	return tok != "" && subtle.ConstantTimeCompare(sum[:], c.tokenSum[:]) == 1
 }
+
+// OrgID is the organization of a hosted coordinator, empty for the local
+// one. The worker routes authenticate by runner token when it is set.
+func (c *Coordinator) OrgID() string { return c.opts.OrgID }
 
 // ChunkBytes is the largest upload chunk the coordinator accepts.
 func (c *Coordinator) ChunkBytes() int { return c.opts.ChunkBytes }
@@ -145,7 +177,7 @@ func (c *Coordinator) ChunkBytes() int { return c.opts.ChunkBytes }
 // Register records a worker, or refreshes it. A worker that registers again
 // while it holds leases restarted, so those leases are lost at once instead
 // of waiting for the stale threshold.
-func (c *Coordinator) Register(_ context.Context, req *schemas.WorkerRegister) (*schemas.WorkerRegistered, error) {
+func (c *Coordinator) Register(ctx context.Context, req *schemas.WorkerRegister) (*schemas.WorkerRegistered, error) {
 	if req == nil || !validWorkerID(req.WorkerID) {
 		return nil, fmt.Errorf("%w: worker_id must be 1 to 64 letters, digits, '-', '_' or '.'", schemas.ErrWorkerRequest)
 	}
@@ -155,8 +187,23 @@ func (c *Coordinator) Register(_ context.Context, req *schemas.WorkerRegister) (
 	if len(req.Host) > 255 || len(req.Version) > 128 {
 		return nil, fmt.Errorf("%w: host or version too long", schemas.ErrWorkerRequest)
 	}
+	if err := validLabels(req.Pool, req.Labels); err != nil {
+		return nil, err
+	}
+	scope, err := c.callScope(ctx)
+	if err != nil {
+		return nil, err
+	}
+	pool := req.Pool
+	if c.hosted() {
+		switch {
+		case pool == "":
+			pool = scope.Pool
+		case pool != scope.Pool:
+			return nil, fmt.Errorf("%w: the runner asks for pool %q, its token is scoped to pool %q", schemas.ErrWorkerScope, pool, scope.Pool)
+		}
+	}
 	c.mu.Lock()
-	defer c.mu.Unlock()
 	w, ok := c.workers[req.WorkerID]
 	if !ok {
 		w = &remoteWorker{refused: map[string]string{}}
@@ -169,9 +216,15 @@ func (c *Coordinator) Register(_ context.Context, req *schemas.WorkerRegister) (
 		}
 	}
 	w.info = schemas.WorkerInfo{ID: req.WorkerID, Host: req.Host, Version: req.Version, State: schemas.WorkerIdle,
-		Slots: req.Slots, Running: []string{}, Completed: w.info.Completed, LastSeen: c.now().UTC()}
+		Slots: req.Slots, Running: []string{}, Completed: w.info.Completed, LastSeen: c.now().UTC(),
+		Pool: pool, Labels: append([]string(nil), req.Labels...), TokenID: scope.TokenID}
 	w.parts = copyStrings(req.Parts)
-	c.logger.Info("remote worker registered", "worker", req.WorkerID, "host", req.Host, "version", req.Version, "slots", req.Slots)
+	w.scope = scope
+	w.scope.Pool = pool
+	info, seen := c.infoLocked(w), w.scope
+	c.mu.Unlock()
+	c.logger.Info("remote worker registered", "worker", req.WorkerID, "host", req.Host, "version", req.Version, "slots", req.Slots, "pool", pool)
+	c.book(ctx, seen, info, true)
 	return &schemas.WorkerRegistered{WorkerID: req.WorkerID, MaxUploadBytes: c.opts.MaxUploadBytes, ChunkBytes: c.opts.ChunkBytes}, nil
 }
 
@@ -179,16 +232,24 @@ func (c *Coordinator) Register(_ context.Context, req *schemas.WorkerRegister) (
 // every slot is done, out, or waiting for the spend cap, or the worker holds
 // as many leases as it offers slots. An experiment the worker refused is
 // never offered to it again.
-func (c *Coordinator) Lease(_ context.Context, workerID string) (*schemas.WorkerLease, error) {
+func (c *Coordinator) Lease(ctx context.Context, workerID string) (*schemas.WorkerLease, error) {
+	scope, err := c.callScope(ctx)
+	if err != nil {
+		return nil, err
+	}
 	c.mu.Lock()
-	w, ok := c.workers[workerID]
-	if !ok {
+	w, err := c.workerLocked(workerID, scope)
+	if err != nil {
 		c.mu.Unlock()
-		return nil, fmt.Errorf("worker %s: %w", workerID, schemas.ErrWorkerUnknown)
+		return nil, err
 	}
 	w.info.LastSeen = c.now().UTC()
 	if w.info.State == schemas.WorkerLost {
 		w.info.State = stateOf(w)
+	}
+	if c.hosted() {
+		seen := w.scope
+		defer func() { c.book(ctx, seen, c.infoOf(w), false) }()
 	}
 	if len(w.info.Running) >= w.info.Slots || w.rejected >= maxRejections {
 		c.mu.Unlock()
@@ -196,7 +257,7 @@ func (c *Coordinator) Lease(_ context.Context, workerID string) (*schemas.Worker
 	}
 	var exps []*schedRun
 	for _, r := range c.exps {
-		if _, refused := w.refused[r.m.ExpID]; !refused {
+		if _, refused := w.refused[r.m.ExpID]; !refused && c.openTo(w, r) {
 			exps = append(exps, r)
 		}
 	}
@@ -236,14 +297,19 @@ func (c *Coordinator) Lease(_ context.Context, workerID string) (*schemas.Worker
 
 // Manifest returns the manifest of an attached experiment to a registered
 // worker, which recomputes its hash and compares it with its own plan.
-func (c *Coordinator) Manifest(_ context.Context, workerID, expID string) (*schemas.Manifest, error) {
+func (c *Coordinator) Manifest(ctx context.Context, workerID, expID string) (*schemas.Manifest, error) {
+	scope, err := c.callScope(ctx)
+	if err != nil {
+		return nil, err
+	}
 	c.mu.Lock()
 	defer c.mu.Unlock()
-	if _, ok := c.workers[workerID]; !ok {
-		return nil, fmt.Errorf("worker %s: %w", workerID, schemas.ErrWorkerUnknown)
+	w, err := c.workerLocked(workerID, scope)
+	if err != nil {
+		return nil, err
 	}
 	for _, r := range c.exps {
-		if r.m.ExpID == expID {
+		if r.m.ExpID == expID && c.openTo(w, r) {
 			return r.m, nil
 		}
 	}
@@ -254,8 +320,12 @@ func (c *Coordinator) Manifest(_ context.Context, workerID, expID string) (*sche
 // says the slot is no longer this lease's (another owner reclaimed it, or it
 // is gone), the lease is lost and the worker must stop.
 func (c *Coordinator) Heartbeat(ctx context.Context, leaseID, workerID string) error {
+	scope, err := c.callScope(ctx)
+	if err != nil {
+		return err
+	}
 	c.mu.Lock()
-	l, err := c.leaseLocked(leaseID, workerID)
+	l, err := c.leaseLocked(leaseID, workerID, scope)
 	c.mu.Unlock()
 	if err != nil {
 		return err
@@ -276,19 +346,31 @@ func (c *Coordinator) Heartbeat(ctx context.Context, leaseID, workerID string) e
 	if c.leases[l.id] == l {
 		l.lastBeat = c.now()
 	}
+	w := c.workers[workerID]
+	var seen schemas.RunnerScope
+	if w != nil {
+		seen = w.scope
+	}
 	c.mu.Unlock()
+	if c.hosted() && w != nil {
+		c.book(ctx, seen, c.infoOf(w), false)
+	}
 	return nil
 }
 
 // Upload appends one chunk of the lease's archive. offset must be the number
 // of bytes already held, so a retried chunk is refused instead of written
 // twice; the archive may not pass MaxUploadBytes.
-func (c *Coordinator) Upload(_ context.Context, leaseID, workerID string, offset int64, data []byte) (int64, error) {
+func (c *Coordinator) Upload(ctx context.Context, leaseID, workerID string, offset int64, data []byte) (int64, error) {
+	scope, err := c.callScope(ctx)
+	if err != nil {
+		return 0, err
+	}
 	if len(data) > c.opts.ChunkBytes {
 		return 0, fmt.Errorf("chunk of %d bytes is larger than %d: %w", len(data), c.opts.ChunkBytes, schemas.ErrUploadTooLarge)
 	}
 	c.mu.Lock()
-	l, err := c.leaseLocked(leaseID, workerID)
+	l, err := c.leaseLocked(leaseID, workerID, scope)
 	switch {
 	case err != nil:
 		c.mu.Unlock()
@@ -330,8 +412,12 @@ func (c *Coordinator) Complete(ctx context.Context, leaseID string, req *schemas
 	if req == nil {
 		return nil, fmt.Errorf("%w: empty body", schemas.ErrWorkerRequest)
 	}
+	scope, err := c.callScope(ctx)
+	if err != nil {
+		return nil, err
+	}
 	c.mu.Lock()
-	l, err := c.leaseLocked(leaseID, req.WorkerID)
+	l, err := c.leaseLocked(leaseID, req.WorkerID, scope)
 	if err == nil && (l.closing || l.uploading) {
 		err = fmt.Errorf("lease %s: a call is already in progress: %w", leaseID, schemas.ErrLeaseGone)
 	}
@@ -384,12 +470,16 @@ func (c *Coordinator) Complete(ctx context.Context, leaseID string, req *schemas
 // experiment from being offered to that worker again; a run abandoned after
 // its agent started is charged its reported cost, or the estimate when that
 // is unknown.
-func (c *Coordinator) Release(_ context.Context, leaseID string, req *schemas.WorkerRelease) error {
+func (c *Coordinator) Release(ctx context.Context, leaseID string, req *schemas.WorkerRelease) error {
 	if req == nil {
 		return fmt.Errorf("%w: empty body", schemas.ErrWorkerRequest)
 	}
+	scope, err := c.callScope(ctx)
+	if err != nil {
+		return err
+	}
 	c.mu.Lock()
-	l, err := c.leaseLocked(leaseID, req.WorkerID)
+	l, err := c.leaseLocked(leaseID, req.WorkerID, scope)
 	if err == nil && l.closing {
 		err = fmt.Errorf("lease %s: a call is already in progress: %w", leaseID, schemas.ErrLeaseGone)
 	}
@@ -423,10 +513,7 @@ func (c *Coordinator) Workers() []schemas.WorkerInfo {
 	defer c.mu.Unlock()
 	out := make([]schemas.WorkerInfo, 0, len(c.order))
 	for _, id := range c.order {
-		info := c.workers[id].info
-		info.Running = append([]string{}, info.Running...)
-		sort.Strings(info.Running)
-		out = append(out, info)
+		out = append(out, c.infoLocked(c.workers[id]))
 	}
 	return out
 }
@@ -628,11 +715,23 @@ type remoteRecord struct {
 	ArchiveSHA   string        `json:"archive_sha256"`
 	ReportedCost schemas.Value `json:"reported_cost_usd"`
 	AcceptedAt   time.Time     `json:"accepted_at"`
+	// Gateway is the worker's own gateway preflight for the run, reported
+	// with the upload when the manifest defers the preflight to runners
+	// (Tenancy area); the gateway_hygiene instrument reads it.
+	Gateway *schemas.GatewayManifest `json:"gateway,omitempty"`
+	// Images are the worker's own image ids for the run, for a deferred
+	// manifest planned without Docker (Deploy area); the runner_images
+	// instrument reads them.
+	Images *schemas.RunnerImages `json:"images,omitempty"`
 }
 
 func (c *Coordinator) writeProvenance(ctx context.Context, l *remoteLease, req *schemas.WorkerComplete, up *sealedUpload) error {
 	rec := remoteRecord{WorkerID: l.worker, LeaseID: l.id, Attempt: l.attempt, WorkerSeal: up.seal.Hash,
 		ArchiveSHA: req.ArchiveSHA256, ReportedCost: req.CostUSD, AcceptedAt: c.now().UTC()}
+	if l.r != nil && l.r.m != nil && l.r.m.Gateway.Deferred() { // Tenancy area: only a deferred manifest takes the runner's record
+		rec.Gateway = req.Gateway
+		rec.Images = req.Images // Deploy area: the runner's image ids (remoteimages.go)
+	}
 	c.mu.Lock()
 	if w := c.workers[l.worker]; w != nil {
 		rec.Host, rec.Version = w.info.Host, w.info.Version
@@ -653,9 +752,9 @@ func (c *Coordinator) writeProvenance(ctx context.Context, l *remoteLease, req *
 
 // leaseLocked returns the worker's live lease, or ErrLeaseGone with the
 // reason the lease ended. The caller holds mu.
-func (c *Coordinator) leaseLocked(leaseID, workerID string) (*remoteLease, error) {
-	if _, ok := c.workers[workerID]; !ok {
-		return nil, fmt.Errorf("worker %s: %w", workerID, schemas.ErrWorkerUnknown)
+func (c *Coordinator) leaseLocked(leaseID, workerID string, scope schemas.RunnerScope) (*remoteLease, error) {
+	if _, err := c.workerLocked(workerID, scope); err != nil {
+		return nil, err
 	}
 	l, ok := c.leases[leaseID]
 	if !ok {

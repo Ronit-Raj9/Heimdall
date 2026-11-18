@@ -5,6 +5,8 @@ Two features let an experiment run beyond one machine's agent containers:
 - **Remote workers.** `bifrost-bench worker` runs on another machine, leases slots from a coordinator over HTTP, runs them with the normal pipeline and uploads each sealed run folder. The coordinator verifies the worker's seal before it accepts the run.
 - **Remote agents.** Adapter `remote_http` runs an agent that is a deployed service: the run posts the instruction to the service's URL and grades the answer it returns.
 
+On the hosted platform remote workers are called **runners**: they authenticate with a runner token scoped to one organization and one pool instead of `BENCH_WORKER_TOKEN`, each organization has its own coordinator, and the hosted server runs no slot itself. Everything below holds for them too; docs/runners.md describes what hosted mode adds. `bifrost-bench worker` is now `bifrost-bench runner start` (the old name stays as an alias with the same flags; `-id` is `-name`).
+
 Code: `engine/remote.go` (coordinator), `engine/remoteworker.go` (worker), `engine/remotearchive.go` (archive and seal checks), `engine/scheduler.go` (shared slot queue), `handlers/workers.go` (HTTP routes), `cmd/bifrost-bench/worker.go` (CLI), `adapters/remotehttp.go`, `adapters/remotehttp.py` and `adapters/remotecoverage.go` (remote agents), `utils/remoteegress.go` (the remote agent's one route out), `utils/remotetools.go`, `environments/remotetools.go` and `toolproxy/remotegate.go` (the published tool gate), `evidence/remotereport.go` and `metrics/remotereported.go` (channel summary and self-report).
 
 ## Remote workers

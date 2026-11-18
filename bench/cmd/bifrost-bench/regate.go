@@ -1,10 +1,7 @@
 package main
 
 import (
-	"bytes"
 	"context"
-	"encoding/json"
-	"errors"
 	"flag"
 	"fmt"
 	"os"
@@ -13,7 +10,7 @@ import (
 	"strings"
 	"syscall"
 
-	"github.com/maximhq/bifrost/bench/engine"
+	"github.com/maximhq/bifrost/bench/ops"
 	"github.com/maximhq/bifrost/bench/schemas"
 	"github.com/maximhq/bifrost/bench/store"
 	"github.com/maximhq/bifrost/bench/utils"
@@ -69,110 +66,13 @@ func runRegate(args []string) int {
 // regated. frozenLock is the experiment's suite.lock when the suite's lock has
 // changed since the freeze (see checkSuiteDrift).
 func (a *app) regate(ctx context.Context, expID, regradeID, note, frozenLock string) (*store.RegradeInfo, []schemas.SealedRun, []schemas.SealedRun, error) {
-	m, err := a.store.LoadManifest(ctx, expID)
-	if err != nil {
-		return nil, nil, nil, err
-	}
-	suite, err := engine.LoadSuite(ctx, a.reg, m.Experiment.Suite)
-	if err != nil {
-		return nil, nil, nil, err
-	}
-	if err := checkSuiteDrift(m, suite, frozenLock); err != nil {
-		return nil, nil, nil, err
-	}
-	runs, err := a.store.SealedRuns(ctx, expID, schemas.GradeSourceOriginal)
-	if err != nil {
-		return nil, nil, nil, fmt.Errorf("load sealed runs: %w", err)
-	}
-	results := make([]*store.GateRegrade, len(runs))
-	for i := range runs {
-		sr := &runs[i]
-		if len(sr.Problems) > 0 {
-			return nil, nil, nil, fmt.Errorf("run %s: %s", sr.Run.RunID, strings.Join(sr.Problems, "; "))
-		}
-		if err := a.store.Verify(ctx, expID, sr.Run.RunID); err != nil {
-			return nil, nil, nil, fmt.Errorf("run %s: seal does not verify: %w", sr.Run.RunID, err)
-		}
-		r, err := engine.Regate(ctx, a.reg, m, suite, sr)
-		if err != nil {
-			return nil, nil, nil, err
-		}
-		results[i] = &store.GateRegrade{Gates: r.Gates, Recomputed: r.Recomputed, SealedOutcome: sr.Run.Outcome,
-			Outcome: r.Outcome, Y: r.Y, Metrics: r.Metrics, Notes: r.Notes}
-		for _, n := range r.Notes {
-			a.logger.Warn("regate note", "run_id", sr.Run.RunID, "note", n)
-		}
-	}
-	info := store.RegradeInfo{SuiteVersion: m.SuiteVersion, GateVersions: engine.RegateVersions(a.reg, m), Note: note}
-	if suite.LockHash != m.SuiteLockHash {
-		info.SuiteLockHash = suite.LockHash
-	}
-	for i := range runs {
-		if err := a.store.WriteGateRegrade(ctx, expID, regradeID, runs[i].Run.RunID, info, results[i]); err != nil {
-			return nil, nil, nil, err
-		}
-	}
-	after, err := a.store.SealedRuns(ctx, expID, regradeID)
-	if err != nil {
-		return nil, nil, nil, fmt.Errorf("load regated runs: %w", err)
-	}
-	return &info, runs, after, nil
+	return ops.Regate(ctx, a.reg, a.store, a.logger, expID, regradeID, note, frozenLock) // Jobs area: shared with the experiment.regate job (bench/ops)
 }
 
 // checkSuiteDrift makes sure the suite the gates read now is the one the
-// experiment froze. With the same lock hash it is. When the lock changed (a
-// probe or task added later), the caller must hand in the frozen suite.lock:
-// its sha256 must be the manifest's suite_lock_hash, and the entry of every
-// task and probe condition the experiment's slots use must be the same in
-// both locks, so the protected paths and the tests the gates compare against
-// did not move.
+// experiment froze (ops.CheckSuiteDrift).
 func checkSuiteDrift(m *schemas.Manifest, suite *schemas.Suite, frozenLock string) error {
-	if lockMatches(suite, m.SuiteLockHash) { // Lock fingerprints: a lock that only gained fingerprints still matches (lockfingerprints.go)
-		return nil
-	}
-	if frozenLock == "" {
-		return fmt.Errorf("suite %s lock hash %s differs from the manifest's %s; pass the frozen lock with -suite-lock to check the tasks it uses",
-			suite.ID, short(suite.LockHash), short(m.SuiteLockHash))
-	}
-	if suite.Lock == nil {
-		return fmt.Errorf("suite %s has no lock to compare", suite.ID)
-	}
-	raw, err := os.ReadFile(frozenLock)
-	if err != nil {
-		return fmt.Errorf("read frozen lock: %w", err)
-	}
-	if sum := utils.SHA256Bytes(raw); sum != m.SuiteLockHash {
-		return fmt.Errorf("frozen lock %s hashes to %s, the manifest froze %s", frozenLock, short(sum), short(m.SuiteLockHash))
-	}
-	var frozen schemas.SuiteLock
-	if err := json.Unmarshal(raw, &frozen); err != nil {
-		return fmt.Errorf("decode frozen lock: %w", err)
-	}
-	for _, sl := range m.Slots {
-		if err := sameEntry("task "+sl.Task, frozen.Tasks[sl.Task], suite.Lock.Tasks[sl.Task]); err != nil {
-			return err
-		}
-		if sl.Condition == schemas.ConditionClean {
-			continue
-		}
-		if err := sameEntry("probe "+sl.Condition, frozen.Probes[sl.Condition], suite.Lock.Probes[sl.Condition]); err != nil {
-			return err
-		}
-	}
-	return nil
-}
-
-// sameEntry compares two lock entries by their JSON form.
-func sameEntry(what string, frozen, now any) error {
-	a, errA := json.Marshal(frozen)
-	b, errB := json.Marshal(now)
-	if errA != nil || errB != nil {
-		return fmt.Errorf("%s: encode lock entry: %w", what, errors.Join(errA, errB))
-	}
-	if !bytes.Equal(a, b) {
-		return fmt.Errorf("%s changed since the experiment was frozen; its gates cannot be recomputed against the current suite", what)
-	}
-	return nil
+	return ops.CheckSuiteDrift(m, suite, frozenLock)
 }
 
 // gateSourceSection is the report section that says the gates were

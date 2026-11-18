@@ -1,0 +1,11 @@
+# Keys of bench.ts `AuditEntry` (handlers/orgs.go AuditRow), one per line; a trailing ? marks an optional (Go omitempty) key.
+# Hosted platform (U1 UI). A top-level response adds "mode". Change with bench.ts and the Go type.
+id
+actor_type
+actor_id?
+action
+target_type?
+target_id?
+ip?
+at
+details?

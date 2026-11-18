@@ -16,6 +16,22 @@ Mode = Literal["live", "recorded", "synthetic"]
 """Where the data came from. Only live is a real measurement."""
 
 
+class _APITokenRequired(TypedDict):
+    created_at: str
+    id: str
+    name: str
+    org_id: str
+    prefix: str
+    role: str
+
+
+class APIToken(_APITokenRequired, total=False):
+    expires_at: Optional[str]
+    last_used_at: Optional[str]
+    revoked_at: Optional[str]
+    user_id: str
+
+
 class AdapterCapabilities(TypedDict, total=False):
     evidence_levels: List[str]
     fault_hooks: List[AdapterFaultHook]
@@ -297,6 +313,16 @@ class AuditRow(TypedDict):
     b_n: int
     b_pass: int
     task: str
+
+
+class _AuthInfoRequired(TypedDict):
+    auth_mode: str
+    github: bool
+
+
+class AuthInfo(_AuthInfoRequired, total=False):
+    bootstrap: bool
+    signup: str
 
 
 class BudgetDiff(TypedDict):
@@ -759,6 +785,7 @@ class Experiment(_ExperimentRequired, total=False):
     metrics: List[str]
     policy: str
     requirements: CapabilityRequirements
+    runner: Optional[RunnerSpec]
     smoke: bool
 
 
@@ -959,8 +986,10 @@ class _GatewayManifestRequired(TypedDict):
 
 
 class GatewayManifest(_GatewayManifestRequired, total=False):
+    deferred_to_runner: bool
     dropped_logs: Optional[int]
     hygiene: Optional[GatewayHygiene]
+    part_version: str
     plugins: List[str]
     price_sha256: str
     problems: List[str]
@@ -1122,6 +1151,56 @@ class InstrumentCheck(_InstrumentCheckRequired, total=False):
     per_arm: Dict[str, Ratio]
 
 
+class InvitationInfo(TypedDict):
+    account_exists: bool
+    email: str
+    expires_at: str
+    org_name: str
+    org_slug: str
+    role: str
+    signup_allowed: bool
+
+
+class _JobRequired(TypedDict):
+    attempt: int
+    cancel_requested: bool
+    created_at: str
+    id: str
+    kind: str
+    org_id: str
+    params: Any
+    status: str
+
+
+class Job(_JobRequired, total=False):
+    created_by: str
+    error: str
+    finished_at: Optional[str]
+    lease_owner: str
+    lease_until: Optional[str]
+    progress: Any
+    result: Any
+    started_at: Optional[str]
+    target: str
+
+
+class _JobCreateRequired(TypedDict):
+    kind: str
+
+
+class JobCreate(_JobCreateRequired, total=False):
+    params: Any
+
+
+class _JobListRequired(TypedDict):
+    jobs: List[Job]
+    kinds: List[str]
+
+
+class JobList(_JobListRequired, total=False):
+    next: str
+
+
 class JudgeForecast(TypedDict):
     basis_text: str
     cost_usd: ForecastRange
@@ -1235,6 +1314,21 @@ class LiveEvent(_LiveEventRequired, total=False):
     stage: str
 
 
+class LogLine(TypedDict):
+    at: str
+    level: str
+    line: str
+    seq: int
+
+
+class LogPage(TypedDict):
+    dropped: int
+    job_id: str
+    lines: List[LogLine]
+    next: int
+    status: str
+
+
 class _LogicalRequestRequired(TypedDict):
     logical_request_id: str
     logical_step: int
@@ -1243,6 +1337,11 @@ class _LogicalRequestRequired(TypedDict):
 class LogicalRequest(_LogicalRequestRequired, total=False):
     request_id: str
     status: str
+
+
+class LoginRequest(TypedDict):
+    email: str
+    password: str
 
 
 class MCPEndpoint(TypedDict, total=False):
@@ -1321,6 +1420,27 @@ class MatrixSpec(TypedDict, total=False):
     agents: List[str]
     allow_unpriced: bool
     models: List[Any]
+
+
+class _MeRequired(TypedDict):
+    auth_mode: str
+    kind: str
+    orgs: List[MeOrg]
+
+
+class Me(_MeRequired, total=False):
+    csrf: str
+    current_org: str
+    role: str
+    token_id: str
+    user: Optional[User]
+
+
+class MeOrg(TypedDict):
+    id: str
+    name: str
+    role: str
+    slug: str
 
 
 class Meter(TypedDict):
@@ -1458,6 +1578,11 @@ class PartFailure(TypedDict):
     stage: str
 
 
+class PasswordChangeRequest(TypedDict):
+    current_password: str
+    new_password: str
+
+
 class PerRunRanges(TypedDict):
     cost_usd: ForecastRange
     tokens: ForecastRange
@@ -1572,6 +1697,12 @@ class _ReceiptEntryRequired(TypedDict):
 class ReceiptEntry(_ReceiptEntryRequired, total=False):
     detail: str
     evidence: List[str]
+
+
+class RegradeRequest(TypedDict, total=False):
+    id: str
+    note: str
+    suite_lock: str
 
 
 class Regression(TypedDict):
@@ -1986,6 +2117,88 @@ class RunTiming(_RunTimingRequired, total=False):
     sealed: Optional[str]
 
 
+class RunnerImages(TypedDict):
+    ids: Dict[str, str]
+
+
+class RunnerSpec(TypedDict, total=False):
+    pool: str
+
+
+class RunnerTokenCreate(TypedDict, total=False):
+    expires_in_days: int
+    name: str
+    pool: str
+
+
+class RunnerTokenCreated(TypedDict):
+    command: str
+    info: RunnerTokenView
+    install: str
+    token: str
+
+
+class _RunnerTokenViewRequired(TypedDict):
+    created_at: str
+    created_by: str
+    id: str
+    name: str
+    org_id: str
+    pool: str
+    prefix: str
+    state: str
+
+
+class RunnerTokenView(_RunnerTokenViewRequired, total=False):
+    expires_at: Optional[str]
+    last_used_at: Optional[str]
+    revoked_at: Optional[str]
+
+
+class RunnerTokensList(TypedDict):
+    tokens: List[RunnerTokenView]
+
+
+class _RunnerViewRequired(TypedDict):
+    completed: int
+    host: str
+    id: str
+    labels: List[str]
+    last_seen: str
+    live: bool
+    name: str
+    org_id: str
+    pool: str
+    registered_at: str
+    running: List[str]
+    running_slots: int
+    slots: int
+    state: str
+    token_id: str
+    version: str
+
+
+class RunnerView(_RunnerViewRequired, total=False):
+    token_prefix: str
+
+
+class _RunnerWhoamiRequired(TypedDict):
+    mode: str
+    now: str
+    open_experiments: int
+    workers: List[WorkerInfo]
+
+
+class RunnerWhoami(_RunnerWhoamiRequired, total=False):
+    org_id: str
+    pool: str
+    token_id: str
+
+
+class RunnersList(TypedDict):
+    runners: List[RunnerView]
+
+
 class ScriptedSpec(TypedDict):
     kind: str
 
@@ -2064,6 +2277,17 @@ class SignTest(TypedDict):
     n_positive: int
     n_tasks: int
     p: Optional[float]
+
+
+class _SignupRequestRequired(TypedDict):
+    email: str
+    password: str
+
+
+class SignupRequest(_SignupRequestRequired, total=False):
+    invitation: str
+    name: str
+    org_name: str
 
 
 class _SlotRequired(TypedDict):
@@ -2292,6 +2516,10 @@ class SuiteTaskDetail(TypedDict):
     verifier_result: str
 
 
+class SwitchOrgRequest(TypedDict):
+    org: str
+
+
 class TaskDiff(TypedDict):
     d: float
     mean_a: float
@@ -2345,6 +2573,24 @@ class _TaskQuarantineRequired(TypedDict):
 class TaskQuarantine(_TaskQuarantineRequired, total=False):
     evidence: List[str]
     task_version: str
+
+
+class _TokenCreateRequestRequired(TypedDict):
+    name: str
+
+
+class TokenCreateRequest(_TokenCreateRequestRequired, total=False):
+    expires_in_days: int
+    role: str
+
+
+class TokenCreated(TypedDict):
+    api_token: APIToken
+    token: str
+
+
+class TokenList(TypedDict):
+    tokens: List[APIToken]
 
 
 class Tokens(TypedDict):
@@ -2432,6 +2678,13 @@ class TriageGroup(TypedDict):
     pattern: str
     per_arm: Dict[str, Ratio]
     runs: Dict[str, List[str]]
+
+
+class User(TypedDict):
+    created_at: str
+    email: str
+    id: str
+    name: str
 
 
 class _ValueRequired(TypedDict):
@@ -2539,7 +2792,7 @@ class VersionList(TypedDict):
     versions: List[VersionInfo]
 
 
-class WorkerComplete(TypedDict):
+class _WorkerCompleteRequired(TypedDict):
     archive_bytes: int
     archive_sha256: str
     cost_usd: Value
@@ -2549,11 +2802,16 @@ class WorkerComplete(TypedDict):
     worker_id: str
 
 
+class WorkerComplete(_WorkerCompleteRequired, total=False):
+    gateway: Optional[GatewayManifest]
+    images: Optional[RunnerImages]
+
+
 class WorkerHeartbeat(TypedDict):
     worker_id: str
 
 
-class WorkerInfo(TypedDict):
+class _WorkerInfoRequired(TypedDict):
     completed: int
     host: str
     id: str
@@ -2562,6 +2820,12 @@ class WorkerInfo(TypedDict):
     slots: int
     state: str
     version: str
+
+
+class WorkerInfo(_WorkerInfoRequired, total=False):
+    labels: List[str]
+    pool: str
+    token_id: str
 
 
 class WorkerLease(TypedDict):
@@ -2582,12 +2846,17 @@ class WorkerLeaseRequest(TypedDict):
     worker_id: str
 
 
-class WorkerRegister(TypedDict):
+class _WorkerRegisterRequired(TypedDict):
     host: str
     parts: Dict[str, str]
     slots: int
     version: str
     worker_id: str
+
+
+class WorkerRegister(_WorkerRegisterRequired, total=False):
+    labels: List[str]
+    pool: str
 
 
 class WorkerRegistered(TypedDict):
@@ -2628,6 +2897,10 @@ class WorkersList(TypedDict):
 
 
 class AgentListResponse(AgentList):
+    mode: Mode
+
+
+class AuthInfoResponse(AuthInfo):
     mode: Mode
 
 
@@ -2682,11 +2955,35 @@ class ImportListResponse(ImportList):
     mode: Mode
 
 
+class InvitationInfoResponse(InvitationInfo):
+    mode: Mode
+
+
+class JobResponse(Job):
+    mode: Mode
+
+
+class JobListResponse(JobList):
+    mode: Mode
+
+
 class LeaderboardResponse(Leaderboard):
     mode: Mode
 
 
+class LogPageResponse(LogPage):
+    mode: Mode
+
+
 class ManifestResponse(Manifest):
+    mode: Mode
+
+
+class MeResponse(Me):
+    mode: Mode
+
+
+class MeOrgResponse(MeOrg):
     mode: Mode
 
 
@@ -2758,6 +3055,29 @@ class RunStepsResponse(RunSteps):
     mode: Mode
 
 
+class RunnerTokenCreatedResponse(RunnerTokenCreated):
+    mode: Mode
+
+
+class RunnerTokenViewResponse(RunnerTokenView):
+    mode: Mode
+
+
+class RunnerTokensListResponse(RunnerTokensList):
+    mode: Mode
+
+
+class RunnerViewResponse(RunnerView):
+    mode: Mode
+
+
+RunnerWhoamiResponse = RunnerWhoami
+
+
+class RunnersListResponse(RunnersList):
+    mode: Mode
+
+
 class SuiteHealthResponse(SuiteHealth):
     mode: Mode
 
@@ -2767,6 +3087,14 @@ class SuiteListResponse(SuiteList):
 
 
 class SuiteTaskDetailResponse(SuiteTaskDetail):
+    mode: Mode
+
+
+class TokenCreatedResponse(TokenCreated):
+    mode: Mode
+
+
+class TokenListResponse(TokenList):
     mode: Mode
 
 
@@ -2808,6 +3136,7 @@ class WorkersListResponse(WorkersList):
 
 __all__ = [
     "Mode",
+    'APIToken',
     'AdapterCapabilities',
     'AdapterFaultEntry',
     'AdapterFaultEvidence',
@@ -2832,6 +3161,7 @@ __all__ = [
     'AttemptRecord',
     'AuditRequest',
     'AuditRow',
+    'AuthInfo',
     'BudgetDiff',
     'BudgetParityResult',
     'BudgetSnapshot',
@@ -2908,6 +3238,10 @@ __all__ = [
     'Info',
     'InfraHealth',
     'InstrumentCheck',
+    'InvitationInfo',
+    'Job',
+    'JobCreate',
+    'JobList',
     'JudgeForecast',
     'JudgeRecord',
     'Layer',
@@ -2917,12 +3251,17 @@ __all__ = [
     'LeaderboardGradeSource',
     'Lineage',
     'LiveEvent',
+    'LogLine',
+    'LogPage',
     'LogicalRequest',
+    'LoginRequest',
     'MCPEndpoint',
     'Manifest',
     'MatrixPair',
     'MatrixRow',
     'MatrixSpec',
+    'Me',
+    'MeOrg',
     'Meter',
     'MetricDelta',
     'MetricDescriptor',
@@ -2936,6 +3275,7 @@ __all__ = [
     'PairRun',
     'ParseDiagnostics',
     'PartFailure',
+    'PasswordChangeRequest',
     'PerRunRanges',
     'PlanCondition',
     'Point',
@@ -2947,6 +3287,7 @@ __all__ = [
     'ReadyCheck',
     'Receipt',
     'ReceiptEntry',
+    'RegradeRequest',
     'Regression',
     'Related',
     'ReleaseList',
@@ -2981,6 +3322,15 @@ __all__ = [
     'RunReviews',
     'RunSteps',
     'RunTiming',
+    'RunnerImages',
+    'RunnerSpec',
+    'RunnerTokenCreate',
+    'RunnerTokenCreated',
+    'RunnerTokenView',
+    'RunnerTokensList',
+    'RunnerView',
+    'RunnerWhoami',
+    'RunnersList',
     'ScriptedSpec',
     'ServiceResult',
     'ServiceSpec',
@@ -2988,6 +3338,7 @@ __all__ = [
     'SessionSpec',
     'ShimSpec',
     'SignTest',
+    'SignupRequest',
     'Slot',
     'SlotProgress',
     'StateExport',
@@ -3003,18 +3354,23 @@ __all__ = [
     'SuiteSummary',
     'SuiteTask',
     'SuiteTaskDetail',
+    'SwitchOrgRequest',
     'TaskDiff',
     'TaskEnvironment',
     'TaskHealth',
     'TaskOutcome',
     'TaskProvenance',
     'TaskQuarantine',
+    'TokenCreateRequest',
+    'TokenCreated',
+    'TokenList',
     'Tokens',
     'ToolCall',
     'ToolCallRecord',
     'ToolFault',
     'Triage',
     'TriageGroup',
+    'User',
     'Value',
     'Verdict',
     'VerdictPayload',
@@ -3036,6 +3392,7 @@ __all__ = [
     'WorkerUploadState',
     'WorkersList',
     'AgentListResponse',
+    'AuthInfoResponse',
     'CatalogResponse',
     'DetailResponse',
     'DiagnosticsPayloadResponse',
@@ -3049,8 +3406,14 @@ __all__ = [
     'GridResponse',
     'HealthResponse',
     'ImportListResponse',
+    'InvitationInfoResponse',
+    'JobResponse',
+    'JobListResponse',
     'LeaderboardResponse',
+    'LogPageResponse',
     'ManifestResponse',
+    'MeResponse',
+    'MeOrgResponse',
     'ModelMatrixResponse',
     'PairResponse',
     'ReleaseListResponse',
@@ -3068,9 +3431,17 @@ __all__ = [
     'RunRemoteResponse',
     'RunReviewsResponse',
     'RunStepsResponse',
+    'RunnerTokenCreatedResponse',
+    'RunnerTokenViewResponse',
+    'RunnerTokensListResponse',
+    'RunnerViewResponse',
+    'RunnerWhoamiResponse',
+    'RunnersListResponse',
     'SuiteHealthResponse',
     'SuiteListResponse',
     'SuiteTaskDetailResponse',
+    'TokenCreatedResponse',
+    'TokenListResponse',
     'TriageResponse',
     'VerdictResponse',
     'VerdictPayloadResponse',

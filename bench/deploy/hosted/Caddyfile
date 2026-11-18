@@ -1,0 +1,72 @@
+# Caddy in front of the hosted Heimdall server (docs/hosting.md). Caddy is
+# the only published service: it obtains and renews the certificate for
+# $HEIMDALL_DOMAIN, redirects HTTP to HTTPS, sets the transport security
+# headers and caps request bodies, then proxies to heimdall:8090 on the
+# compose network. The Heimdall server sets its own CSP, framing and
+# content-type headers on every answer; Caddy keeps them.
+#
+# A *.localhost domain or an IP gets a certificate from Caddy's internal CA
+# instead of ACME (smoke.sh uses heimdall.localhost).
+{
+	email {$HEIMDALL_ACME_EMAIL:admin@example.com}
+	# No admin API: configuration changes go through a container restart.
+	admin off
+	servers {
+		timeouts {
+			read_header 10s
+			idle 2m
+		}
+	}
+}
+
+{$HEIMDALL_DOMAIN} {
+	encode zstd gzip
+
+	# Deferred: applied as the response is written, so these replace (never
+	# duplicate) the same headers coming from the server.
+	header {
+		defer
+		Strict-Transport-Security "max-age=31536000; includeSubDomains"
+		X-Content-Type-Options "nosniff"
+		Referrer-Policy "no-referrer"
+		Permissions-Policy "camera=(), microphone=(), geolocation=(), payment=(), usb=()"
+		Cross-Origin-Opener-Policy "same-origin"
+		-Server
+		-Via
+		-X-Powered-By
+	}
+
+	# Readiness detail (database, migrations, disk) stays on the host:
+	# docker compose ps and the container health check read it. /healthz is
+	# public for uptime monitors.
+	handle /readyz {
+		respond "not found" 404
+	}
+
+	handle {
+		# The API caps bodies at 1 MiB (runner uploads are chunked below
+		# it); anything far above is refused here before it reaches it.
+		request_body {
+			max_size {$HEIMDALL_MAX_BODY:2MiB}
+		}
+		reverse_proxy heimdall:8090 {
+			# Server-sent events (job logs, live runs) stream unbuffered.
+			flush_interval -1
+			header_up X-Real-IP {remote_host}
+			transport http {
+				dial_timeout 5s
+			}
+		}
+	}
+
+	# Errors Caddy answers itself (a refused body, an unreachable server).
+	handle_errors {
+		header -Server
+		respond "{err.status_code} {err.status_text}"
+	}
+
+	log {
+		output stdout
+		format json
+	}
+}

@@ -1,0 +1,678 @@
+package jobs
+
+import (
+	"context"
+	"database/sql"
+	"encoding/json"
+	"errors"
+	"fmt"
+	"os"
+	"runtime/debug"
+	"sort"
+	"strings"
+	"sync"
+	"time"
+
+	"github.com/maximhq/bifrost/bench/db"
+	"github.com/maximhq/bifrost/bench/schemas"
+)
+
+// Handler runs one job. ctx is cancelled with cause ErrCancelled when a
+// cancel is requested, ErrShutdown when the runner stops and ErrLeaseLost
+// when another runner reclaimed the job. progress stores its argument, as
+// JSON, as the job's latest progress. The result is stored as JSON.
+type Handler func(ctx context.Context, j *Job, log Logger, progress func(any)) (result any, err error)
+
+// Validator checks a job's params for an organization before the job is
+// queued. It returns the params to store (nil keeps them as given) and the
+// job's target ("" for none: then any number may run at once).
+type Validator func(ctx context.Context, orgID string, params json.RawMessage) (normalized any, target string, err error)
+
+// KindOption configures a registered kind.
+type KindOption func(*kind)
+
+// WithValidator sets the kind's params validator.
+func WithValidator(v Validator) KindOption { return func(k *kind) { k.validate = v } }
+
+// WithMaxAttempts caps how often the kind's jobs are claimed: a job whose
+// lease expired after its last allowed attempt fails instead of being queued
+// again.
+func WithMaxAttempts(n int) KindOption { return func(k *kind) { k.maxAttempts = n } }
+
+// Internal marks a kind the API may not create (Create refuses it); the
+// server enqueues it itself with Enqueue.
+func Internal() KindOption { return func(k *kind) { k.internal = true } }
+
+type kind struct {
+	name        string
+	handler     Handler
+	validate    Validator
+	maxAttempts int
+	internal    bool
+}
+
+// Options configure a Runner. Zero values take the defaults.
+type Options struct {
+	Workers        int           // jobs run at once by this runner; default 4
+	Owner          string        // lease owner; default host-pid-random
+	LeaseFor       time.Duration // default 30s
+	HeartbeatEvery time.Duration // default LeaseFor/3
+	PollEvery      time.Duration // claim and cancel poll; default 1s
+	MaxAttempts    int           // default 3, per kind with WithMaxAttempts
+	LogHead        int           // first lines kept per job; default 500
+	LogTail        int           // newest lines kept per job; default 1500
+	MaxLineBytes   int           // longer lines are cut; default 8192
+	ProgressEvery  time.Duration // progress writes at most this often; default 500ms
+	ShutdownGrace  time.Duration // Stop waits this long for handlers; default 30s
+	Logger         schemas.Logger
+}
+
+func (o Options) withDefaults() Options {
+	if o.Workers <= 0 {
+		o.Workers = 4
+	}
+	if o.Owner == "" {
+		host, _ := os.Hostname()
+		o.Owner = fmt.Sprintf("%s-%d-%s", host, os.Getpid(), db.NewID("")[20:])
+	}
+	if o.LeaseFor <= 0 {
+		o.LeaseFor = 30 * time.Second
+	}
+	if o.HeartbeatEvery <= 0 {
+		o.HeartbeatEvery = o.LeaseFor / 3
+	}
+	if o.PollEvery <= 0 {
+		o.PollEvery = time.Second
+	}
+	if o.MaxAttempts <= 0 {
+		o.MaxAttempts = 3
+	}
+	if o.LogHead <= 0 {
+		o.LogHead = 500
+	}
+	if o.LogTail <= 0 {
+		o.LogTail = 1500
+	}
+	if o.MaxLineBytes <= 0 {
+		o.MaxLineBytes = 8192
+	}
+	if o.ProgressEvery <= 0 {
+		o.ProgressEvery = 500 * time.Millisecond
+	}
+	if o.ShutdownGrace <= 0 {
+		o.ShutdownGrace = 30 * time.Second
+	}
+	if o.Logger == nil {
+		o.Logger = schemas.NoopLogger{}
+	}
+	return o
+}
+
+// Runner claims queued jobs of its registered kinds and runs them. It is
+// also the API's entry point: Create validates against the registered kinds.
+type Runner struct {
+	*Store
+	opts Options
+
+	mu      sync.Mutex
+	kinds   map[string]*kind
+	running map[string]context.CancelCauseFunc
+	started bool
+	stopped bool
+	wake    chan struct{}
+	quit    chan struct{}
+	wg      sync.WaitGroup // workers and the sweeper
+	jobsWG  sync.WaitGroup // running handlers
+}
+
+// New returns a runner over d. Register kinds, then Start it.
+func New(d *db.DB, opts Options) *Runner {
+	return &Runner{
+		Store: NewStore(d), opts: opts.withDefaults(),
+		kinds: map[string]*kind{}, running: map[string]context.CancelCauseFunc{},
+		wake: make(chan struct{}, 1), quit: make(chan struct{}),
+	}
+}
+
+// Owner returns the lease owner this runner claims as.
+func (r *Runner) Owner() string { return r.opts.Owner }
+
+// Register adds a job kind. Registering a kind twice replaces it.
+func (r *Runner) Register(name string, h Handler, opts ...KindOption) {
+	k := &kind{name: name, handler: h, maxAttempts: r.opts.MaxAttempts}
+	for _, o := range opts {
+		o(k)
+	}
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	r.kinds[name] = k
+}
+
+// Kinds lists the registered kinds the API may create, sorted.
+func (r *Runner) Kinds() []string {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	var out []string
+	for n, k := range r.kinds {
+		if !k.internal {
+			out = append(out, n)
+		}
+	}
+	sort.Strings(out)
+	return out
+}
+
+func (r *Runner) kind(name string) (*kind, bool) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	k, ok := r.kinds[name]
+	return k, ok
+}
+
+// NewJob is a job to queue.
+type NewJob struct {
+	OrgID     string
+	Kind      string
+	Params    json.RawMessage // nil means {}
+	CreatedBy string          // user, token or "system"
+}
+
+// Create validates and queues a job the API asked for: the kind must be
+// registered and not internal.
+func (r *Runner) Create(ctx context.Context, n NewJob) (*Job, error) {
+	k, ok := r.kind(n.Kind)
+	if !ok {
+		return nil, fmt.Errorf("%w: %q", ErrUnknownKind, n.Kind)
+	}
+	if k.internal {
+		return nil, fmt.Errorf("%w: %s", ErrNotCreatable, n.Kind)
+	}
+	return r.enqueue(ctx, k, n)
+}
+
+// Enqueue validates and queues a job of any registered kind, internal ones
+// included. The server uses it for experiment runs and regrades.
+func (r *Runner) Enqueue(ctx context.Context, n NewJob) (*Job, error) {
+	k, ok := r.kind(n.Kind)
+	if !ok {
+		return nil, fmt.Errorf("%w: %q", ErrUnknownKind, n.Kind)
+	}
+	return r.enqueue(ctx, k, n)
+}
+
+func (r *Runner) enqueue(ctx context.Context, k *kind, n NewJob) (*Job, error) {
+	if strings.TrimSpace(n.OrgID) == "" {
+		return nil, errors.New("job has no organization")
+	}
+	params := n.Params
+	if len(strings.TrimSpace(string(params))) == 0 {
+		params = json.RawMessage("{}")
+	}
+	if !json.Valid(params) {
+		return nil, fmt.Errorf("%w: params are not JSON", ErrInvalidParams)
+	}
+	target := ""
+	if k.validate != nil {
+		norm, t, err := k.validate(ctx, n.OrgID, params)
+		if err != nil {
+			if errors.Is(err, ErrInvalidParams) || errors.Is(err, ErrConflict) || errors.Is(err, ErrNotFound) {
+				return nil, err
+			}
+			return nil, fmt.Errorf("%w: %v", ErrInvalidParams, err)
+		}
+		target = t
+		if norm != nil {
+			b, err := json.Marshal(norm)
+			if err != nil {
+				return nil, fmt.Errorf("%w: %v", ErrInvalidParams, err)
+			}
+			params = b
+		}
+	}
+	j := &Job{ID: db.NewID("job"), OrgID: n.OrgID, Kind: k.name, Target: target, Status: StatusQueued,
+		Params: params, CreatedBy: n.CreatedBy, CreatedAt: r.now().UTC()}
+	if err := r.insert(ctx, j); err != nil {
+		return nil, err
+	}
+	r.poke()
+	return r.Get(ctx, n.OrgID, j.ID)
+}
+
+// poke wakes one idle worker so a new job starts without waiting a poll.
+func (r *Runner) poke() {
+	select {
+	case r.wake <- struct{}{}:
+	default:
+	}
+}
+
+// Start launches the workers and the lease sweeper. Recovery of jobs whose
+// runner died happens on the sweeper's first pass, right away.
+func (r *Runner) Start(ctx context.Context) error {
+	r.mu.Lock()
+	if r.started {
+		r.mu.Unlock()
+		return errors.New("job runner already started")
+	}
+	r.started = true
+	r.mu.Unlock()
+	if _, err := r.Recover(ctx); err != nil {
+		r.opts.Logger.Warn("job recovery failed", "error", err.Error())
+	}
+	r.wg.Add(1)
+	go r.sweeper()
+	for range r.opts.Workers {
+		r.wg.Add(1)
+		go r.worker()
+	}
+	return nil
+}
+
+// Stop stops claiming, cancels every running handler with ErrShutdown, waits
+// up to the grace period (or ctx) for them, and queues their jobs again so
+// the next runner resumes them.
+func (r *Runner) Stop(ctx context.Context) {
+	r.mu.Lock()
+	if r.stopped || !r.started {
+		r.stopped = true
+		r.mu.Unlock()
+		return
+	}
+	r.stopped = true
+	close(r.quit)
+	for _, cancel := range r.running {
+		cancel(ErrShutdown)
+	}
+	r.mu.Unlock()
+	done := make(chan struct{})
+	go func() {
+		r.jobsWG.Wait()
+		r.wg.Wait()
+		close(done)
+	}()
+	grace := time.NewTimer(r.opts.ShutdownGrace)
+	defer grace.Stop()
+	select {
+	case <-done:
+	case <-grace.C:
+		r.opts.Logger.Warn("job runner stopped with handlers still running; their leases expire and another runner resumes them")
+	case <-ctx.Done():
+	}
+}
+
+func (r *Runner) isStopped() bool {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	return r.stopped
+}
+
+func (r *Runner) worker() {
+	defer r.wg.Done()
+	t := time.NewTicker(r.opts.PollEvery)
+	defer t.Stop()
+	for {
+		if r.isStopped() {
+			return
+		}
+		j, err := r.claim(context.Background())
+		if err != nil {
+			r.opts.Logger.Warn("claim job failed", "error", err.Error())
+		}
+		if j != nil {
+			r.run(j)
+			continue
+		}
+		select {
+		case <-r.quit:
+			return
+		case <-r.wake:
+		case <-t.C:
+		}
+	}
+}
+
+func (r *Runner) sweeper() {
+	defer r.wg.Done()
+	every := max(r.opts.LeaseFor/3, r.opts.PollEvery)
+	t := time.NewTicker(every)
+	defer t.Stop()
+	for {
+		select {
+		case <-r.quit:
+			return
+		case <-t.C:
+		}
+		if _, err := r.Recover(context.Background()); err != nil {
+			r.opts.Logger.Warn("job recovery failed", "error", err.Error())
+		}
+	}
+}
+
+// claim takes the oldest queued job of a registered kind with db.ClaimOne:
+// one UPDATE ... RETURNING whose candidate SELECT runs under the write lock
+// (SQLite) or FOR UPDATE SKIP LOCKED (Postgres), so of two runners racing for
+// one job exactly one gets it.
+func (r *Runner) claim(ctx context.Context) (*Job, error) {
+	r.mu.Lock()
+	names := make([]string, 0, len(r.kinds))
+	for n := range r.kinds {
+		names = append(names, n)
+	}
+	r.mu.Unlock()
+	if len(names) == 0 {
+		return nil, nil
+	}
+	sort.Strings(names)
+	marks := strings.TrimSuffix(strings.Repeat("?, ", len(names)), ", ")
+	args := []any{string(StatusQueued)}
+	for _, n := range names {
+		args = append(args, n)
+	}
+	now := r.now()
+	row, err := r.db.ClaimOne(ctx, db.ClaimQuery{
+		Table:     "jobs",
+		Where:     "status = ? AND kind IN (" + marks + ")",
+		Args:      args,
+		OrderBy:   "created_at, id",
+		Set:       "status = ?, lease_owner = ?, lease_until = ?, attempt = attempt + 1, started_at = COALESCE(started_at, ?)",
+		SetArgs:   []any{string(StatusRunning), r.opts.Owner, now.Add(r.opts.LeaseFor).UnixMilli(), now.UnixMilli()},
+		Returning: jobColumns,
+	})
+	if err != nil {
+		return nil, err
+	}
+	j, err := scanJob(row)
+	if errors.Is(err, sql.ErrNoRows) {
+		return nil, nil
+	}
+	return j, err
+}
+
+// RecoverResult counts what Recover did.
+type RecoverResult struct {
+	Requeued  int `json:"requeued"`
+	Failed    int `json:"failed"`
+	Cancelled int `json:"cancelled"`
+}
+
+// Recover settles running jobs whose lease expired (their runner died or
+// hung): a job with a cancel request is cancelled, a job out of attempts
+// fails, any other is queued again, and its next claim counts an attempt.
+func (r *Runner) Recover(ctx context.Context) (RecoverResult, error) {
+	var out RecoverResult
+	now := r.now().UnixMilli()
+	rows, err := r.db.SQL().QueryContext(ctx, r.q(`SELECT id, kind, attempt, cancel_requested FROM jobs WHERE status = ? AND lease_until < ?`),
+		string(StatusRunning), now)
+	if err != nil {
+		return out, err
+	}
+	type expired struct {
+		id, kind        string
+		attempt         int
+		cancelRequested bool
+	}
+	var list []expired
+	for rows.Next() {
+		var e expired
+		var c int64
+		if err := rows.Scan(&e.id, &e.kind, &e.attempt, &c); err != nil {
+			rows.Close()
+			return out, err
+		}
+		e.cancelRequested = c != 0
+		list = append(list, e)
+	}
+	rows.Close()
+	if err := rows.Err(); err != nil {
+		return out, err
+	}
+	for _, e := range list {
+		maxAttempts := r.opts.MaxAttempts
+		if k, ok := r.kind(e.kind); ok {
+			maxAttempts = k.maxAttempts
+		}
+		var (
+			status Status
+			msg    string
+		)
+		switch {
+		case e.cancelRequested:
+			status, msg = StatusCancelled, "cancelled; its runner stopped before it ended"
+		case e.attempt >= maxAttempts:
+			status, msg = StatusFailed, fmt.Sprintf("lease expired on attempt %d of %d: its runner stopped or hung", e.attempt, maxAttempts)
+		default:
+			status, msg = StatusQueued, fmt.Sprintf("lease expired on attempt %d: queued again to resume", e.attempt)
+		}
+		var res interface{ RowsAffected() (int64, error) }
+		if status == StatusQueued {
+			res, err = r.db.SQL().ExecContext(ctx, r.q(`UPDATE jobs SET status = ?, lease_owner = NULL, lease_until = NULL
+				WHERE id = ? AND status = ? AND lease_until < ?`), string(StatusQueued), e.id, string(StatusRunning), now)
+		} else {
+			res, err = r.db.SQL().ExecContext(ctx, r.q(`UPDATE jobs SET status = ?, error = ?, finished_at = ?, lease_owner = NULL, lease_until = NULL
+				WHERE id = ? AND status = ? AND lease_until < ?`), string(status), msg, now, e.id, string(StatusRunning), now)
+		}
+		if err != nil {
+			return out, err
+		}
+		if n, _ := res.RowsAffected(); n != 1 {
+			continue // renewed or settled meanwhile
+		}
+		switch status {
+		case StatusQueued:
+			out.Requeued++
+			r.poke()
+		case StatusFailed:
+			out.Failed++
+		case StatusCancelled:
+			out.Cancelled++
+		}
+		r.systemLog(ctx, e.id, "warn", msg)
+		r.opts.Logger.Warn("job lease expired", "job", e.id, "kind", e.kind, "outcome", string(status))
+	}
+	return out, nil
+}
+
+// systemLog appends a line outside a running handler (recovery, requeue).
+func (r *Runner) systemLog(ctx context.Context, jobID, level, line string) {
+	seq, err := r.lastLogSeq(ctx, jobID)
+	if err == nil {
+		err = r.appendLog(ctx, jobID, seq+1, r.now(), level, line, int64(r.opts.LogHead), int64(r.opts.LogTail))
+	}
+	if err != nil {
+		r.opts.Logger.Warn("job log write failed", "job", jobID, "error", err.Error())
+	}
+}
+
+// run executes one claimed job to its end and records the outcome.
+func (r *Runner) run(j *Job) {
+	k, ok := r.kind(j.Kind)
+	if !ok { // claimed only registered kinds; unregistered since
+		r.finish(j, StatusFailed, nil, "kind "+j.Kind+" is not registered on this runner")
+		return
+	}
+	ctx, cancel := context.WithCancelCause(context.Background())
+	r.mu.Lock()
+	if r.stopped { // claimed while stopping: hand it back untouched
+		r.mu.Unlock()
+		cancel(ErrShutdown)
+		r.unclaim(j)
+		return
+	}
+	r.running[j.ID] = cancel
+	r.jobsWG.Add(1)
+	r.mu.Unlock()
+	defer func() {
+		r.mu.Lock()
+		delete(r.running, j.ID)
+		r.mu.Unlock()
+		cancel(nil)
+		r.jobsWG.Done()
+	}()
+
+	log := r.newLogger(j)
+	prog := &progressBox{}
+	if j.Attempt > 1 {
+		log.Warnf("resuming: attempt %d", j.Attempt)
+	}
+	watchDone := make(chan struct{})
+	watchStop := make(chan struct{})
+	go func() {
+		defer close(watchDone)
+		r.watch(ctx, cancel, j, prog, watchStop)
+	}()
+
+	result, err := r.call(ctx, k.handler, j, log, prog.set)
+	log.Flush()
+
+	close(watchStop)
+	<-watchDone
+	r.flushProgress(j, prog)
+	cause := context.Cause(ctx)
+	switch {
+	case errors.Is(cause, ErrLeaseLost):
+		r.opts.Logger.Warn("job lease lost; its result is not recorded", "job", j.ID)
+	case err == nil:
+		r.finishResult(j, StatusSucceeded, result, "")
+	case errors.Is(err, ErrCancelled) || errors.Is(cause, ErrCancelled):
+		log.Warnf("cancelled: %v", err)
+		r.finishResult(j, StatusCancelled, result, err.Error())
+	case errors.Is(cause, ErrShutdown):
+		log.Warnf("runner shutting down: queued again to resume")
+		r.requeue(j)
+	default:
+		log.Errorf("failed: %v", err)
+		r.finishResult(j, StatusFailed, result, err.Error())
+	}
+}
+
+// call runs the handler and turns a panic into an error.
+func (r *Runner) call(ctx context.Context, h Handler, j *Job, log Logger, progress func(any)) (result any, err error) {
+	defer func() {
+		if p := recover(); p != nil {
+			err = fmt.Errorf("handler panicked: %v", p)
+			r.opts.Logger.Error("job handler panicked", "job", j.ID, "panic", fmt.Sprint(p), "stack", string(debug.Stack()))
+		}
+	}()
+	return h(ctx, j, log, progress)
+}
+
+// watch renews the lease, polls for a cancel request and writes progress
+// until stop closes.
+func (r *Runner) watch(ctx context.Context, cancel context.CancelCauseFunc, j *Job, prog *progressBox, stop <-chan struct{}) {
+	poll := time.NewTicker(r.opts.PollEvery)
+	defer poll.Stop()
+	beat := time.NewTicker(r.opts.HeartbeatEvery)
+	defer beat.Stop()
+	progT := time.NewTicker(r.opts.ProgressEvery)
+	defer progT.Stop()
+	bg := context.Background()
+	for {
+		select {
+		case <-stop:
+			return
+		case <-progT.C:
+			r.flushProgress(j, prog)
+		case <-poll.C:
+			if ctx.Err() != nil {
+				continue
+			}
+			var c int64
+			err := r.db.SQL().QueryRowContext(bg, r.q(`SELECT cancel_requested FROM jobs WHERE id = ?`), j.ID).Scan(&c)
+			if err == nil && c != 0 {
+				cancel(ErrCancelled)
+			}
+		case <-beat.C:
+			// Renewed while the handler runs, also after a cancel or a
+			// shutdown request, so the in-flight work can seal in peace.
+			res, err := r.db.SQL().ExecContext(bg, r.q(`UPDATE jobs SET lease_until = ? WHERE id = ? AND lease_owner = ? AND status = ?`),
+				r.now().Add(r.opts.LeaseFor).UnixMilli(), j.ID, r.opts.Owner, string(StatusRunning))
+			if err != nil {
+				r.opts.Logger.Warn("job heartbeat failed; retrying", "job", j.ID, "error", err.Error())
+				continue
+			}
+			if n, _ := res.RowsAffected(); n == 0 {
+				cancel(ErrLeaseLost)
+				return
+			}
+		}
+	}
+}
+
+// progressBox holds the latest progress until it is written.
+type progressBox struct {
+	mu    sync.Mutex
+	data  []byte
+	dirty bool
+}
+
+func (p *progressBox) set(v any) {
+	b, err := json.Marshal(v)
+	if err != nil {
+		b, _ = json.Marshal(map[string]string{"error": "progress is not JSON: " + err.Error()})
+	}
+	p.mu.Lock()
+	p.data, p.dirty = b, true
+	p.mu.Unlock()
+}
+
+func (p *progressBox) take() ([]byte, bool) {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	if !p.dirty {
+		return nil, false
+	}
+	p.dirty = false
+	return p.data, true
+}
+
+func (r *Runner) flushProgress(j *Job, prog *progressBox) {
+	b, ok := prog.take()
+	if !ok {
+		return
+	}
+	if _, err := r.db.SQL().ExecContext(context.Background(), r.q(`UPDATE jobs SET progress = ? WHERE id = ? AND lease_owner = ?`),
+		string(b), j.ID, r.opts.Owner); err != nil {
+		r.opts.Logger.Warn("job progress write failed", "job", j.ID, "error", err.Error())
+	}
+}
+
+func (r *Runner) finishResult(j *Job, status Status, result any, msg string) {
+	var b []byte
+	if result != nil {
+		var err error
+		if b, err = json.Marshal(result); err != nil {
+			b, _ = json.Marshal(map[string]string{"error": "result is not JSON: " + err.Error()})
+		}
+	}
+	r.finish(j, status, b, msg)
+}
+
+func (r *Runner) finish(j *Job, status Status, result []byte, msg string) {
+	var res any
+	if result != nil {
+		res = string(result)
+	}
+	if _, err := r.db.SQL().ExecContext(context.Background(), r.q(`UPDATE jobs SET status = ?, result = ?, error = ?, finished_at = ?,
+		lease_owner = NULL, lease_until = NULL WHERE id = ? AND lease_owner = ? AND status = ?`),
+		string(status), res, msg, r.now().UnixMilli(), j.ID, r.opts.Owner, string(StatusRunning)); err != nil {
+		r.opts.Logger.Error("job finish write failed", "job", j.ID, "error", err.Error())
+	}
+}
+
+// requeue hands a job this runner holds back to the queue (shutdown); the
+// next claim counts an attempt and resumes it.
+func (r *Runner) requeue(j *Job) {
+	if _, err := r.db.SQL().ExecContext(context.Background(), r.q(`UPDATE jobs SET status = ?, lease_owner = NULL, lease_until = NULL
+		WHERE id = ? AND lease_owner = ? AND status = ?`), string(StatusQueued), j.ID, r.opts.Owner, string(StatusRunning)); err != nil {
+		r.opts.Logger.Error("job requeue failed; its lease expires instead", "job", j.ID, "error", err.Error())
+	}
+}
+
+// unclaim hands back a job this runner claimed but never started (it began
+// stopping meanwhile): queued again with the claim's attempt taken back.
+func (r *Runner) unclaim(j *Job) {
+	if _, err := r.db.SQL().ExecContext(context.Background(), r.q(`UPDATE jobs SET status = ?, lease_owner = NULL, lease_until = NULL,
+		attempt = attempt - 1 WHERE id = ? AND lease_owner = ? AND status = ?`), string(StatusQueued), j.ID, r.opts.Owner, string(StatusRunning)); err != nil {
+		r.opts.Logger.Error("job unclaim failed; its lease expires instead", "job", j.ID, "error", err.Error())
+	}
+}

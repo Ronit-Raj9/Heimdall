@@ -41,40 +41,37 @@ func runServe(args []string) int {
 	}
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
-	a, err := newApp(ctx, *config, appOptions{gateway: !*offline, debug: *debug})
+	// Tenancy area (P3): a hosted server runs no agent, so it needs no
+	// gateway: runners hold the gateway and the provider keys (servetenancy.go).
+	a, err := newApp(ctx, *config, appOptions{gateway: !*offline && !hostedConfig(*config), debug: *debug})
 	if err != nil {
 		return fail("%v", err)
 	}
-	ix := store.NewIndex(a.store)
-	if err := ix.Rebuild(ctx); err != nil {
-		return fail("index runs: %v", err)
+	// Tenancy area (P3): auth.mode hosted serves every organization from its
+	// own folders through the tenancy registry (servetenancy.go).
+	if a.cfg.Auth.IsHosted() {
+		return serveHosted(ctx, a, *offline)
 	}
-	deps := server.Deps{
-		Index:    indexAdapter{ix: ix, root: a.store.Root()},
-		Analyzer: analyzerAdapter{a: a, ix: ix},
-		Catalog:  &catalogSource{a: a},
-		Auditor:  auditor{},
-		Doctor:   a.doctor,
-		Releases: serveReleaseLog(a),
-		Suites:   serveSuites{root: a.cfg.Path(a.cfg.BenchmarksRoot), cfg: a.cfg},
-		Agents:   serveAgents{root: a.cfg.Root},
-		UI:       builtUI(),
-		Logger:   a.logger,
-		Version:  benchVersion,
+	// Tenancy area (P3): orgDeps builds the deps over one org root; local
+	// mode calls it once, for org local, hosted mode once per org.
+	deps, ix, err := orgDeps(ctx, a)
+	if err != nil {
+		return fail("%v", err)
 	}
 	if !*offline {
 		deps.Launcher = newLauncher(a, ix)
 	}
 	deps.Launcher, deps.Workers = withWorkers(a, deps.Launcher) // Remote area: worker mode when BENCH_WORKER_TOKEN is set (worker.go)
-	deps.Reviews = reviewSource{st: a.store}                    // Human review (review.go)
-	// Forecast and matrix area: estimate and matrix routes (estimate.go, matrix.go).
-	deps.Forecast = serveForecast{a: a}
 	// Index and trends area: trends source and optional schedule daemon (serveextras.go).
 	if err := extras.apply(ctx, a, &deps, *offline); err != nil {
 		return fail("%v", err)
 	}
-	// Suite health area: GET /suites/{id}/health reads the run store (suitehealth.go).
-	deps.Health = serveHealthSource(a.cfg)
+	// Jobs area (P4): experiments run as experiment.run jobs (cancel,
+	// resume after a restart) and the ops kinds serve /jobs (servejobs.go).
+	stopJobs := startLocalJobs(ctx, a, *config, deps.Launcher, ix, &deps)
+	defer stopJobs()
+	deps.Ready = readyChecks(a) // Deploy area: /readyz checks (serveready.go)
+	startEvidenceMirror(ctx, a) // Evidence storage area (P6): background mirror and sweeper when storage.mirror_dir or storage.s3 is set; seal hook evidenceOnSeal (evidence.go)
 	srv, err := server.New(a.cfg, deps)
 	if err != nil {
 		return fail("server: %v", err)
@@ -90,6 +87,40 @@ func runServe(args []string) int {
 		return fail("serve: %v", err)
 	}
 	return exitOK
+}
+
+// orgDeps builds server.Deps over one org root: a's run store, its project
+// root (a.cfg.Root: suites, agents, policies) and its registry. Tenancy area
+// (P3): local mode calls it once with the app of the configured runs root;
+// hosted mode calls it per org with that org's app (servetenancy.go), so an
+// org's handlers are built over that org's folders and nothing else. The
+// launcher, worker mode and the schedule daemon are wired by the caller.
+func orgDeps(ctx context.Context, a *app) (server.Deps, *store.Index, error) {
+	ix := store.NewIndex(a.store)
+	if err := ix.Rebuild(ctx); err != nil {
+		return server.Deps{}, nil, fmt.Errorf("index runs: %w", err)
+	}
+	deps := server.Deps{
+		Index:    indexAdapter{ix: ix, root: a.store.Root()},
+		Analyzer: analyzerAdapter{a: a, ix: ix},
+		Catalog:  &catalogSource{a: a},
+		Auditor:  auditor{},
+		Doctor:   a.doctor,
+		Releases: a.serveReleases(), // Tenancy area: a hosted org's own release log (servetenancy.go)
+		Suites:   serveSuites{root: a.cfg.Path(a.cfg.BenchmarksRoot), cfg: a.cfg},
+		Agents:   serveAgents{root: a.cfg.Root},
+		UI:       builtUI(),
+		Logger:   a.logger,
+		Version:  benchVersion,
+	}
+	deps.Reviews = reviewSource{st: a.store} // Human review (review.go)
+	// Forecast and matrix area: estimate and matrix routes (estimate.go, matrix.go).
+	deps.Forecast = serveForecast{a: a}
+	// Index and trends area: trends over this root's results index; the database index when a.results is set (servetenancy.go).
+	deps.Trends = trendSource{ix: a.resultsSource(), logger: a.logger}
+	// Suite health area: GET /suites/{id}/health reads the run store (suitehealth.go).
+	deps.Health = serveHealthSource(a.cfg)
+	return deps, ix, nil
 }
 
 // builtUI returns the embedded UI, or nil when it has not been built.
@@ -280,150 +311,5 @@ func (c *catalogSource) build() *schemas.Catalog {
 	return cat
 }
 
-// launcher plans, freezes and runs experiments for the API and fans live
-// events out to subscribers.
-type launcher struct {
-	a  *app
-	ix *store.Index
-
-	mu     sync.Mutex
-	active map[string]*liveRun
-}
-
-// liveRun is one running experiment's event fan-out.
-type liveRun struct {
-	mu   sync.Mutex
-	seq  int
-	subs map[chan schemas.LiveEvent]bool
-	done bool
-}
-
-func newLauncher(a *app, ix *store.Index) *launcher {
-	return &launcher{a: a, ix: ix, active: map[string]*liveRun{}}
-}
-
-func (l *launcher) Plan(ctx context.Context, exp *schemas.Experiment) (*schemas.Manifest, error) {
-	return l.a.newPlanner().Plan(ctx, exp)
-}
-
-func (l *launcher) Create(ctx context.Context, m *schemas.Manifest) error {
-	if err := l.a.store.CreateExperiment(ctx, m); err != nil {
-		return err
-	}
-	return l.ix.Rebuild(ctx)
-}
-
-// Active reports whether an experiment is running in this process.
-func (l *launcher) Active(expID string) bool {
-	l.mu.Lock()
-	defer l.mu.Unlock()
-	r, ok := l.active[expID]
-	return ok && !r.done
-}
-
-func (l *launcher) Start(ctx context.Context, expID string) error {
-	m, err := l.a.store.LoadManifest(ctx, expID)
-	if err != nil {
-		return err
-	}
-	l.mu.Lock()
-	if r, ok := l.active[expID]; ok && !r.done {
-		l.mu.Unlock()
-		return fmt.Errorf("experiment %s is already running", expID)
-	}
-	run := &liveRun{subs: map[chan schemas.LiveEvent]bool{}}
-	l.active[expID] = run
-	l.mu.Unlock()
-
-	go l.execute(m, run)
-	return nil
-}
-
-// execute runs the experiment detached from any request, analyzes it, and
-// closes every subscriber.
-func (l *launcher) execute(m *schemas.Manifest, run *liveRun) {
-	ctx := context.Background()
-	events := make(chan engine.Event, 256)
-	forwarded := make(chan struct{})
-	go func() {
-		defer close(forwarded)
-		for ev := range events {
-			run.publish(schemas.LiveEvent{Kind: ev.Kind, SlotID: ev.SlotID, RunID: ev.RunID, Stage: ev.Stage, Outcome: ev.Outcome, Message: ev.Message, At: ev.At})
-			if ev.Kind == engine.EventRunSealed {
-				_ = l.ix.Rebuild(ctx)
-			}
-		}
-	}()
-	janitor := engine.NewJanitor(l.a.reg.Gateway, l.a.docker, l.a.logger)
-	sched := engine.NewScheduler(l.a.reg, l.a.cfg.Root, l.a.logger, janitor)
-	// Create already froze the experiment, so the scheduler runs in resume mode.
-	_, err := sched.Run(ctx, m, engine.RunOptions{Resume: true, Events: events})
-	close(events)
-	<-forwarded
-	if err != nil {
-		run.publish(schemas.LiveEvent{Kind: "error", Message: err.Error(), At: time.Now()})
-	}
-	if an, _, aerr := l.a.analyze(ctx, m.ExpID, ""); aerr != nil {
-		run.publish(schemas.LiveEvent{Kind: "error", Message: "analyze: " + aerr.Error(), At: time.Now()})
-	} else {
-		run.publish(schemas.LiveEvent{Kind: "experiment_done", Message: string(an.Verdict.Decision), At: time.Now()})
-	}
-	_ = l.ix.Rebuild(ctx)
-	run.finish()
-}
-
-func (l *launcher) Events(expID string) (<-chan schemas.LiveEvent, func()) {
-	l.mu.Lock()
-	run, ok := l.active[expID]
-	l.mu.Unlock()
-	ch := make(chan schemas.LiveEvent, 64)
-	if !ok {
-		close(ch)
-		return ch, func() {}
-	}
-	return run.subscribe(ch)
-}
-
-func (r *liveRun) publish(ev schemas.LiveEvent) {
-	r.mu.Lock()
-	defer r.mu.Unlock()
-	r.seq++
-	ev.Seq = r.seq
-	for ch := range r.subs {
-		select {
-		case ch <- ev:
-		default: // a slow subscriber misses events; the poll endpoint can catch up
-		}
-	}
-}
-
-func (r *liveRun) subscribe(ch chan schemas.LiveEvent) (<-chan schemas.LiveEvent, func()) {
-	r.mu.Lock()
-	defer r.mu.Unlock()
-	if r.done {
-		close(ch)
-		return ch, func() {}
-	}
-	r.subs[ch] = true
-	var once sync.Once
-	return ch, func() {
-		once.Do(func() {
-			r.mu.Lock()
-			defer r.mu.Unlock()
-			if r.subs[ch] {
-				delete(r.subs, ch)
-				close(ch)
-			}
-		})
-	}
-}
-
-func (r *liveRun) finish() {
-	r.mu.Lock()
-	defer r.mu.Unlock()
-	r.done = true
-	for ch := range r.subs {
-		close(ch)
-		delete(r.subs, ch)
-	}
-}
+// Jobs area: the launcher (experiments as experiment.run jobs, live events,
+// cancel and resume) is in servejobs.go.

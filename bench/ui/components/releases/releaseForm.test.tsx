@@ -1,6 +1,8 @@
 import "@/lib/i18n";
 
 import type { Action, ExperimentStatus, ReleasePolicyDecision } from "@/lib/types/bench";
+import { SessionContext, type SessionInfo } from "@/lib/session/sessionContext";
+import { demoSession, hostedSession } from "@/lib/testing/platformFixtures";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 import { ReleaseForm } from "./releaseForm";
@@ -110,5 +112,28 @@ describe("ReleaseForm", () => {
 		);
 		expect(submitButton(html)).toMatch(/ disabled=""/);
 		expect(html).toContain('data-testid="release-verdict-loading"');
+	});
+});
+describe("ReleaseForm in hosted mode", () => {
+	const inSession = (session: SessionInfo) =>
+		renderToStaticMarkup(
+			<SessionContext.Provider value={session}>
+				<ReleaseForm
+					experiments={[experiment]}
+					expId="e_synth_notes"
+					onExpChange={() => {}}
+					verdict={{ analysisId: "a_synth001", decision: "improved", action: "ship" }}
+					policy={undefined}
+					onSubmit={() => {}}
+				/>
+			</SessionContext.Provider>,
+		);
+	it("has no write-token box for a member; local mode keeps it", () => {
+		expect(inSession(hostedSession("member"))).not.toContain("release-token-input");
+		expect(render("ship", undefined, {})).toContain("release-token-input");
+	});
+	it("tells a viewer the role needed and shows a demo visitor no form", () => {
+		expect(inSession(hostedSession("viewer"))).toContain('data-testid="release-form-role"');
+		expect(inSession(demoSession())).toBe("");
 	});
 });

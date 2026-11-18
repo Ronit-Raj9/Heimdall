@@ -17,6 +17,21 @@ const (
 	InstrumentTimeoutParity     = "timeout_parity"
 	InstrumentBudgetParity      = "budget_parity"
 	InstrumentUpstreamErrors    = "upstream_errors"
+	// InstrumentGatewayHygiene checks the runners' own gateway preflight
+	// records when a hosted manifest defers the preflight to runners
+	// (Tenancy area). Other manifests keep the hygiene record of their own
+	// preflight, which refused the plan on any violation.
+	InstrumentGatewayHygiene = "gateway_hygiene"
+	// InstrumentGatewayVersions warns when the counted runs of a deferred
+	// manifest came from different runner gateways (bench part or gateway
+	// version): the manifest freezes no gateway part, so mixed versions are
+	// shown, never silent (Tenancy area).
+	InstrumentGatewayVersions = "gateway_versions"
+	// InstrumentRunnerImages warns when the counted runs of a deferred
+	// manifest, planned without Docker and so with no frozen image ids, ran
+	// on different image ids for the same role; unknown when a run records
+	// none (Deploy area, engine/remoteimages.go).
+	InstrumentRunnerImages = "runner_images"
 )
 
 // GateUpstreamErrors is the name of the report gate that counts a run's model
@@ -34,7 +49,164 @@ const (
 // an unknown one holds an IMPROVED verdict; a warning changes nothing unless
 // the experiment declares the timeout_parity guard.
 func instrumentChecks(m *schemas.Manifest, idx runIndex) []schemas.InstrumentCheck {
-	return []schemas.InstrumentCheck{usageCompleteness(idx), droppedLogs(m, idx), timeoutParityCheck(idx), budgetParity(m), upstreamErrors(idx)}
+	checks := []schemas.InstrumentCheck{usageCompleteness(idx), droppedLogs(m, idx), timeoutParityCheck(idx), budgetParity(m), upstreamErrors(idx)}
+	if m != nil && m.Gateway.Deferred() { // Tenancy area: the runners' records stand in for the server's preflight
+		checks = append(checks, runnerGatewayHygiene(idx), runnerGatewayVersions(idx), runnerImages(idx)) // Deploy area: runner_images
+	}
+	return checks
+}
+
+// runnerGatewayVersions groups the counted runs of a deferred manifest by
+// the gateway their runner used: the bench part version and the gateway's
+// own name and version, from each run's runner record. One version passes;
+// more than one warns, naming each with its run count; a run without a
+// record leaves the check unknown.
+func runnerGatewayVersions(idx runIndex) schemas.InstrumentCheck {
+	c := schemas.InstrumentCheck{Name: InstrumentGatewayVersions, Threshold: "one runner gateway version across the counted runs"}
+	counts := map[string]int{}
+	runs, missing := 0, 0
+	for _, arm := range armsIn(idx, "") {
+		for _, r := range idx.armRuns("", arm) {
+			runs++
+			g := r.RunnerGateway
+			if g == nil || g.PartVersion == "" {
+				missing++
+				continue
+			}
+			counts[fmt.Sprintf("%s (%s %s)", g.PartVersion, g.Name, g.Version)]++
+		}
+	}
+	keys := sortedKeys(counts)
+	parts := make([]string, 0, len(keys))
+	for _, k := range keys {
+		parts = append(parts, fmt.Sprintf("%s: %d runs", k, counts[k]))
+	}
+	switch {
+	case runs == 0 || len(keys) == 0:
+		c.Status = schemas.InstrumentUnknown
+		c.Detail = fmt.Sprintf("gateway preflight deferred to runners: no runner gateway version recorded in %d counted runs", runs)
+	case len(keys) > 1:
+		c.Status = schemas.InstrumentWarn
+		c.Detail = "counted runs came from different runner gateways: " + strings.Join(parts, "; ")
+		if missing > 0 {
+			c.Detail += fmt.Sprintf("; %d runs record none", missing)
+		}
+	case missing > 0:
+		c.Status = schemas.InstrumentUnknown
+		c.Detail = fmt.Sprintf("%d of %d counted runs record no runner gateway version; the others: %s", missing, runs, strings.Join(parts, "; "))
+	default:
+		c.Status = schemas.InstrumentPass
+		c.Detail = "one runner gateway across the counted runs: " + strings.Join(parts, "; ")
+	}
+	return c
+}
+
+// runnerImages groups the image ids the runners recorded for the counted
+// runs of a deferred manifest by role (Deploy area). One id per role passes;
+// a role with more than one id warns, naming each id with its run count; a
+// run without a record leaves the check unknown with the count.
+func runnerImages(idx runIndex) schemas.InstrumentCheck {
+	c := schemas.InstrumentCheck{Name: InstrumentRunnerImages, Threshold: "one image id per role across the counted runs"}
+	byRole := map[string]map[string]int{}
+	runs, missing := 0, 0
+	for _, arm := range armsIn(idx, "") {
+		for _, r := range idx.armRuns("", arm) {
+			runs++
+			if r.RunnerImages == nil {
+				missing++
+				continue
+			}
+			for role, id := range r.RunnerImages.IDs {
+				if byRole[role] == nil {
+					byRole[role] = map[string]int{}
+				}
+				byRole[role][id]++
+			}
+		}
+	}
+	var mixed, roles []string
+	for _, role := range sortedKeys(byRole) {
+		ids := byRole[role]
+		parts := make([]string, 0, len(ids))
+		for _, id := range sortedKeys(ids) {
+			parts = append(parts, fmt.Sprintf("%s: %d runs", shortImageID(id), ids[id]))
+		}
+		if len(ids) > 1 {
+			mixed = append(mixed, role+" -> "+strings.Join(parts, ", "))
+		}
+		roles = append(roles, role+" "+strings.Join(parts, ", "))
+	}
+	switch {
+	case runs == 0 || (missing == runs):
+		c.Status = schemas.InstrumentUnknown
+		c.Detail = fmt.Sprintf("images resolved on runners: no runner image record in %d counted runs (remote/worker.json images)", runs)
+	case len(mixed) > 0:
+		c.Status = schemas.InstrumentWarn
+		c.Detail = "counted runs used different image ids for the same role: " + strings.Join(mixed, "; ")
+		if missing > 0 {
+			c.Detail += fmt.Sprintf("; %d runs record none", missing)
+		}
+	case missing > 0:
+		c.Status = schemas.InstrumentUnknown
+		c.Detail = fmt.Sprintf("%d of %d counted runs record no runner image ids; the others: %s", missing, runs, strings.Join(roles, "; "))
+	default:
+		c.Status = schemas.InstrumentPass
+		c.Detail = fmt.Sprintf("one image id per role in all %d counted runs", runs)
+		if len(roles) > 0 {
+			c.Detail += ": " + strings.Join(roles, "; ")
+		}
+	}
+	return c
+}
+
+// shortImageID trims a sha256:... image id to 12 hex characters for a
+// detail line.
+func shortImageID(id string) string {
+	if s, ok := strings.CutPrefix(id, "sha256:"); ok && len(s) > 12 {
+		return "sha256:" + s[:12]
+	}
+	return id
+}
+
+// runnerGatewayHygiene reads the gateway preflight each runner recorded for
+// each counted run of a manifest that defers the preflight to runners. A
+// violation fails the check (INVALID): the run's model traffic may have been
+// rewritten, cached or rerouted. A run without a record leaves the check
+// unknown with the count, never a pass: nothing shows that its gateway was
+// checked. With no counted run it is unknown too.
+func runnerGatewayHygiene(idx runIndex) schemas.InstrumentCheck {
+	c := schemas.InstrumentCheck{Name: InstrumentGatewayHygiene,
+		Threshold: "every run's runner gateway preflight: no MCP auto-inject with MCP clients, no semantic cache, no multi-target routing"}
+	runs, missing := 0, 0
+	var violations []string
+	for _, arm := range armsIn(idx, "") {
+		for _, r := range idx.armRuns("", arm) {
+			runs++
+			g := r.RunnerGateway
+			if g == nil || g.Hygiene == nil {
+				missing++
+				continue
+			}
+			for _, v := range g.Hygiene.Violations {
+				violations = append(violations, fmt.Sprintf("run %s: %s", r.Run.RunID, v))
+			}
+		}
+	}
+	switch {
+	case len(violations) > 0:
+		c.Status = schemas.InstrumentFail
+		c.Detail = "runner gateway hygiene violated: " + strings.Join(violations, "; ")
+	case runs == 0:
+		c.Status = schemas.InstrumentUnknown
+		c.Detail = "gateway preflight deferred to runners and no counted run carries a runner record"
+	case missing > 0:
+		c.Status = schemas.InstrumentUnknown
+		c.Detail = fmt.Sprintf("gateway preflight deferred to runners: %d of %d counted runs carry no runner gateway record (remote/worker.json gateway)", missing, runs)
+	default:
+		c.Status = schemas.InstrumentPass
+		c.Detail = fmt.Sprintf("runner gateway preflight clean in all %d counted runs", runs)
+	}
+	return c
 }
 
 // instrumentReasons returns the detail of every failed check, as invalid

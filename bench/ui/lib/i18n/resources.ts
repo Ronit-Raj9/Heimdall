@@ -1,8 +1,10 @@
 import benchEn from "@/locales/en/bench.json";
+import platformEn from "@/locales/en/platform.json";
 
-// One namespace for now. When the screens move into ui/, "bench" joins ui/'s NAMESPACES and
-// gets a catalog in every locale directory there.
-export const NAMESPACES = ["bench"] as const;
+// "bench" holds the benchmark screens. "platform" holds the hosted platform: sign-in, settings,
+// jobs and the org switcher. When the screens move into ui/, both join ui/'s NAMESPACES and get a
+// catalog in every locale directory there.
+export const NAMESPACES = ["bench", "platform"] as const;
 
 export type I18nNamespace = (typeof NAMESPACES)[number];
 
@@ -10,5 +12,6 @@ export type I18nNamespace = (typeof NAMESPACES)[number];
 export const resources = {
 	en: {
 		bench: benchEn,
+		platform: platformEn,
 	},
 } as const;

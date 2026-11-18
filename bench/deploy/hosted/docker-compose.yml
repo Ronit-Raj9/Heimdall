@@ -1,0 +1,305 @@
+# Hosted Heimdall: Caddy (HTTPS) -> Heimdall server -> Postgres, plus an
+# optional demo runner with its own Bifrost stack. From a fresh VM to a
+# working instance: docs/hosting.md. Use the scripts beside this file rather
+# than raw compose; they pass the env file and fill in derived values:
+#
+#   deploy/hosted/bootstrap.sh   first run: .env, build, migrate, owner, demo org
+#   deploy/hosted/upgrade.sh     pull, rebuild, migrate, restart
+#   deploy/hosted/backup.sh      database dump and evidence mirror
+#   deploy/hosted/smoke.sh       the whole stack on spare local ports, then down
+#
+# Raw compose, from bench/:
+#
+#   docker compose -f deploy/hosted/docker-compose.yml --env-file deploy/hosted/.env up -d --wait
+#
+# Networks:
+#   edge      Caddy and the server (and the demo runner). Caddy is the only
+#             service with published ports (80, 443 and 443/udp).
+#   backend   internal (no route out): the server and Postgres. Postgres is
+#             never published.
+#   upstream  demo-runner profile only: Bifrost, its Postgres and the fault
+#             proxy, which reaches the real provider.
+#   evalnet   demo-runner profile only, internal, IPv6 off: agent containers
+#             the demo runner starts can reach only Bifrost.
+#
+# Third-party images are pinned by digest (tag kept for reading). The server
+# and runner images are built here from this checkout
+# (deploy/hosted/Dockerfile.server).
+name: heimdall
+
+x-labels: &labels
+  heimdall: "1"
+
+x-hardening: &hardening
+  read_only: true
+  cap_drop: [ALL]
+  security_opt: ["no-new-privileges:true"]
+
+x-logging: &logging
+  logging:
+    driver: json-file
+    options:
+      max-size: "20m"
+      max-file: "5"
+
+networks:
+  edge:
+    labels: *labels
+  backend:
+    internal: true
+    labels: *labels
+  upstream:
+    enable_ipv6: false
+    labels: *labels
+  evalnet:
+    # Fixed name: the demo runner attaches agent containers to it by name.
+    name: ${HEIMDALL_EVAL_NETWORK:-heimdall-evalnet}
+    internal: true
+    enable_ipv6: false
+    labels: *labels
+
+volumes:
+  pgdata:
+    labels: *labels
+  heimdall-data:
+    labels: *labels
+  caddy-data:
+    labels: *labels
+  caddy-config:
+    labels: *labels
+  bifrost-pgdata:
+    labels: *labels
+  bifrost-data:
+    labels: *labels
+  faultproxy-ledger:
+    labels: *labels
+
+services:
+  caddy:
+    image: caddy:2-alpine@sha256:003a97808e781aa9f7e75cc2f43d34d461099031faf5e20faefb9f61126836f0
+    labels: *labels
+    <<: [*hardening, *logging]
+    # Caddy binds 80 and 443 inside the container; it needs that capability
+    # and nothing else.
+    cap_add: [NET_BIND_SERVICE]
+    environment:
+      HEIMDALL_DOMAIN: ${HEIMDALL_DOMAIN:?set HEIMDALL_DOMAIN in deploy/hosted/.env}
+      HEIMDALL_ACME_EMAIL: ${HEIMDALL_ACME_EMAIL:-}
+      HEIMDALL_MAX_BODY: ${HEIMDALL_MAX_BODY:-2MiB}
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy-data:/data
+      - caddy-config:/config
+    tmpfs:
+      - /tmp
+    networks: [edge]
+    ports:
+      # HEIMDALL_*_PUBLISH may carry a bind address, e.g. 127.0.0.1:28443.
+      - "${HEIMDALL_HTTP_PUBLISH:-80}:80"
+      - "${HEIMDALL_HTTPS_PUBLISH:-443}:443"
+      - "${HEIMDALL_HTTPS_PUBLISH:-443}:443/udp"
+    depends_on:
+      heimdall:
+        condition: service_healthy
+    restart: unless-stopped
+
+  postgres:
+    image: postgres:18@sha256:979bccfde35445db618c65107d27d08c6c21339d8dc3ad4c830c6633947be0e4
+    labels: *labels
+    <<: *logging
+    environment:
+      POSTGRES_USER: heimdall
+      POSTGRES_PASSWORD: ${HEIMDALL_PG_PASSWORD:?set HEIMDALL_PG_PASSWORD in deploy/hosted/.env}
+      POSTGRES_DB: heimdall
+      POSTGRES_INITDB_ARGS: "--auth-host=scram-sha-256"
+    volumes:
+      - pgdata:/var/lib/postgresql
+    networks: [backend]
+    shm_size: 256m
+    # Over TCP on purpose: the image's entrypoint runs a temporary init server
+    # on the Unix socket only, so a socket check can pass too early.
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -h 127.0.0.1 -p 5432 -U heimdall -d heimdall"]
+      interval: 2s
+      timeout: 3s
+      retries: 30
+    restart: unless-stopped
+
+  heimdall:
+    build:
+      context: ../..
+      dockerfile: deploy/hosted/Dockerfile.server
+      target: server
+    image: ${HEIMDALL_IMAGE:-heimdall/server:local}
+    labels: *labels
+    <<: [*hardening, *logging]
+    command: ["serve", "-config", "/srv/heimdall/deploy/bench.yaml"]
+    environment:
+      HEIMDALL_DATABASE_URL: postgres://heimdall:${HEIMDALL_PG_PASSWORD:?set HEIMDALL_PG_PASSWORD in deploy/hosted/.env}@postgres:5432/heimdall?sslmode=disable
+      BENCH_AUTH_PUBLIC_URL: ${HEIMDALL_PUBLIC_URL:-https://${HEIMDALL_DOMAIN:?set HEIMDALL_DOMAIN in deploy/hosted/.env}}
+      BENCH_AUTH_SIGNUP: ${HEIMDALL_SIGNUP:-invite}
+      # The public name, and "heimdall" for the demo runner on the edge network.
+      BENCH_SERVER_ALLOWED_HOSTS: ${HEIMDALL_DOMAIN},heimdall
+      # Only compose networks reach the server (its port is not published),
+      # and Caddy overwrites X-Forwarded-For with the real client address, so
+      # the server takes the client IP (rate limits, audit) from that header
+      # when the peer is a private address.
+      BENCH_AUTH_TRUSTED_PROXIES: ${HEIMDALL_TRUSTED_PROXIES:-172.16.0.0/12,10.0.0.0/8,192.168.0.0/16}
+      # GitHub sign-in is on only when a client id is set; the variable
+      # names are cleared when it is empty (older servers refused to start
+      # on named but empty variables).
+      BENCH_AUTH_GITHUB_CLIENT_ID_ENV: ${HEIMDALL_GITHUB_CLIENT_ID:+HEIMDALL_GITHUB_CLIENT_ID}
+      BENCH_AUTH_GITHUB_CLIENT_SECRET_ENV: ${HEIMDALL_GITHUB_CLIENT_ID:+HEIMDALL_GITHUB_CLIENT_SECRET}
+      HEIMDALL_GITHUB_CLIENT_ID: ${HEIMDALL_GITHUB_CLIENT_ID:-}
+      HEIMDALL_GITHUB_CLIENT_SECRET: ${HEIMDALL_GITHUB_CLIENT_SECRET:-}
+      # The evidence mirror is on exactly when a bucket is named.
+      BENCH_STORAGE_S3_BUCKET: ${HEIMDALL_S3_BUCKET:-}
+      BENCH_STORAGE_S3_REGION: ${HEIMDALL_S3_REGION:-}
+      HEIMDALL_S3_ENDPOINT: ${HEIMDALL_S3_ENDPOINT:-}
+      HEIMDALL_S3_ACCESS_KEY: ${HEIMDALL_S3_ACCESS_KEY:-}
+      HEIMDALL_S3_SECRET_KEY: ${HEIMDALL_S3_SECRET_KEY:-}
+    volumes:
+      - ./bench.hosted.yaml:/srv/heimdall/deploy/bench.yaml:ro
+      - heimdall-data:/var/lib/heimdall
+    tmpfs:
+      - /tmp
+    networks: [edge, backend]
+    depends_on:
+      postgres:
+        condition: service_healthy
+    # The image's health check reads /readyz: database reachable, migrations
+    # current, runs root writable.
+    restart: unless-stopped
+
+  # ---------------------------------------------------------------------------
+  # Profile demo-runner: a runner registered to the demo organization (pool
+  # "demo") with its own Bifrost gateway and fault proxy. Start with
+  #   docker compose ... --profile demo-runner up -d
+  # after setting HEIMDALL_DEMO_RUNNER_TOKEN. It is the only place this host
+  # runs agent containers, and only for the demo organization's suites.
+
+  bifrost-postgres:
+    profiles: [demo-runner]
+    image: postgres:18@sha256:979bccfde35445db618c65107d27d08c6c21339d8dc3ad4c830c6633947be0e4
+    labels: *labels
+    <<: *logging
+    environment:
+      POSTGRES_USER: bifrost
+      POSTGRES_PASSWORD: ${BIFROST_PG_PASSWORD:-}
+      POSTGRES_DB: bifrost
+    volumes:
+      - bifrost-pgdata:/var/lib/postgresql
+    networks:
+      upstream:
+        # deploy/bifrost/config.json names its database host "postgres".
+        aliases: [postgres]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -h 127.0.0.1 -p 5432 -U bifrost -d bifrost"]
+      interval: 2s
+      timeout: 3s
+      retries: 30
+    restart: unless-stopped
+
+  faultproxy:
+    profiles: [demo-runner]
+    image: ${HEIMDALL_IMAGE:-heimdall/server:local}
+    labels: *labels
+    <<: [*hardening, *logging]
+    command: ["proxy", "--config", "/etc/bench/bench.yaml"]
+    environment:
+      BENCH_FAULTPROXY_TOKEN: ${BENCH_FAULTPROXY_TOKEN:-}
+      BENCH_FAULTPROXY_LISTEN: ":9100"
+      BENCH_FAULTPROXY_CONTROL_LISTEN: "0.0.0.0:9101"
+      BENCH_FAULTPROXY_LEDGER: /var/lib/heimdall/ledger.jsonl
+      # Provider keys live here only. Empty: the scripted model, no spend.
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+    volumes:
+      - ../bench.yaml:/etc/bench/bench.yaml:ro
+      - faultproxy-ledger:/var/lib/heimdall
+    tmpfs:
+      - /tmp
+    networks: [upstream]
+    healthcheck:
+      disable: true
+    restart: unless-stopped
+
+  bifrost:
+    profiles: [demo-runner]
+    image: maximhq/bifrost:v2.5.1@sha256:5ec9873acaf1687556b6e4dd854b92b539d9debf87a5a683b66338648b84d3c8
+    labels: *labels
+    <<: *logging
+    environment:
+      BIFROST_SETUP_TOKEN: ${BIFROST_SETUP_TOKEN:-}
+      BIFROST_PG_PASSWORD: ${BIFROST_PG_PASSWORD:-}
+      LOG_STYLE: json
+    volumes:
+      - bifrost-data:/app/data
+      - ../bifrost/config.json:/app/data/config.json:ro
+      - ../bifrost/datasheet:/app/datasheet:ro
+    depends_on:
+      bifrost-postgres:
+        condition: service_healthy
+      faultproxy:
+        condition: service_started
+    networks: [evalnet, upstream]
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q -O /dev/null http://127.0.0.1:8080/health"]
+      interval: 2s
+      timeout: 3s
+      retries: 60
+    restart: unless-stopped
+
+  demo-runner:
+    profiles: [demo-runner]
+    build:
+      context: ../..
+      dockerfile: deploy/hosted/Dockerfile.server
+      target: runner
+    image: ${HEIMDALL_RUNNER_IMAGE:-heimdall/runner:local}
+    labels: *labels
+    <<: [*hardening, *logging]
+    # Agent containers are started on the host's Docker through its socket,
+    # so every path the runner hands to `docker run -v` must mean the same on
+    # the host: the checkout and the runner's data folder are mounted at
+    # their host paths.
+    group_add: ["${HEIMDALL_DOCKER_GID:-0}"]
+    working_dir: ${HEIMDALL_BENCH_DIR:?run through deploy/hosted/*.sh or set HEIMDALL_BENCH_DIR}
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - |
+        set -eu
+        umask 077
+        [ -n "$${HEIMDALL_RUNNER_TOKEN:-}" ] || { echo "HEIMDALL_DEMO_RUNNER_TOKEN is empty: create a runner token for the demo org (docs/hosting.md)" >&2; exit 64; }
+        printf '%s' "$$HEIMDALL_RUNNER_TOKEN" > /tmp/runner.token
+        unset HEIMDALL_RUNNER_TOKEN
+        exec bifrost-bench runner start -server http://heimdall:8090 -token-file /tmp/runner.token \
+          -config "$$HEIMDALL_BENCH_DIR/deploy/bench.yaml" -name demo-runner -slots 1 \
+          -spend-cap-usd "$$HEIMDALL_DEMO_SPEND_CAP_USD"
+    environment:
+      HOME: /tmp
+      HEIMDALL_RUNNER_TOKEN: ${HEIMDALL_DEMO_RUNNER_TOKEN:-}
+      HEIMDALL_DEMO_SPEND_CAP_USD: ${HEIMDALL_DEMO_SPEND_CAP_USD:-5}
+      HEIMDALL_BENCH_DIR: ${HEIMDALL_BENCH_DIR:?run through deploy/hosted/*.sh or set HEIMDALL_BENCH_DIR}
+      BENCH_RUNS_ROOT: ${HEIMDALL_RUNNER_DIR:-/var/lib/heimdall-runner}/runs
+      BENCH_RELEASES_ROOT: ${HEIMDALL_RUNNER_DIR:-/var/lib/heimdall-runner}/releases
+      BENCH_GATEWAY_URL: http://bifrost:8080
+      BENCH_GATEWAY_AGENT_URL: http://bifrost:8080
+      BENCH_GATEWAY_FAULT_PROXY_URL: http://faultproxy:9100
+      BENCH_FAULTPROXY_CONTROL_URL: http://faultproxy:9101
+      BENCH_NETWORKS_EVAL: ${HEIMDALL_EVAL_NETWORK:-heimdall-evalnet}
+      BIFROST_SETUP_TOKEN: ${BIFROST_SETUP_TOKEN:-}
+      BENCH_FAULTPROXY_TOKEN: ${BENCH_FAULTPROXY_TOKEN:-}
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - ${HEIMDALL_BENCH_DIR:?run through deploy/hosted/*.sh or set HEIMDALL_BENCH_DIR}:${HEIMDALL_BENCH_DIR:?run through deploy/hosted/*.sh or set HEIMDALL_BENCH_DIR}:ro
+      - ${HEIMDALL_RUNNER_DIR:-/var/lib/heimdall-runner}:${HEIMDALL_RUNNER_DIR:-/var/lib/heimdall-runner}
+    tmpfs:
+      - /tmp
+    networks: [edge, upstream]
+    depends_on:
+      heimdall:
+        condition: service_healthy
+      bifrost:
+        condition: service_healthy
+    restart: unless-stopped

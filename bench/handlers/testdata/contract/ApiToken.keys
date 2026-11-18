@@ -1,0 +1,12 @@
+# Keys of bench.ts `ApiToken` (auth.APIToken), one per line; a trailing ? marks an optional (Go omitempty) key.
+# Hosted platform (U1 UI). A top-level response adds "mode". Change with bench.ts and the Go type.
+id
+org_id
+user_id?
+name
+prefix
+role
+created_at
+last_used_at?
+expires_at?
+revoked_at?

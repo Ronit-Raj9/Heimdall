@@ -1,6 +1,10 @@
 package schemas
 
-import "errors"
+import (
+	"context"
+	"errors"
+	"time"
+)
 
 // This file holds the remote worker API (docs/remote-execution.md). A
 // coordinator (bifrost-bench serve with BENCH_WORKER_TOKEN set) hands out
@@ -24,6 +28,12 @@ type WorkerRegister struct {
 	Version  string            `json:"version"` // bench build the worker runs
 	Parts    map[string]string `json:"parts"`   // "<kind>/<name>" -> version of every part the worker registered
 	Slots    int               `json:"slots"`   // concurrent runs it offers
+	// Runners area (docs/runners.md): the pool the runner asks for and its
+	// free-form labels. In hosted mode the pool must be the runner token's
+	// pool (empty takes the token's); local mode records both and leases
+	// from every attached experiment as before.
+	Pool   string   `json:"pool,omitempty"`
+	Labels []string `json:"labels,omitempty"`
 }
 
 // WorkerRegistered is the answer to a registration: the upload limits the
@@ -80,6 +90,24 @@ type WorkerComplete struct {
 	ArchiveBytes  int64   `json:"archive_bytes"`
 	Outcome       Outcome `json:"outcome"`
 	CostUSD       Value   `json:"cost_usd"`
+	// Gateway is the worker's own gateway preflight for this run, sent when
+	// the manifest defers the preflight to runners (hosted); the
+	// coordinator records it in remote/worker.json (Tenancy area).
+	Gateway *GatewayManifest `json:"gateway,omitempty"`
+	// Images are the worker's own image ids for this run, sent with a
+	// deferred manifest, which a hosted server plans without Docker; the
+	// coordinator records them in remote/worker.json (Deploy area,
+	// engine/remoteimages.go).
+	Images *RunnerImages `json:"images,omitempty"`
+}
+
+// RunnerImages are the local image ids a runner resolved for one run of a
+// deferred (hosted) manifest, by role: base, helper, toolproxy and
+// service/<id> as in Manifest.SuiteImages, plus task/<task id> for a task's
+// own image and agent/<arm> for the arm's agent image. A role whose image
+// could not be inspected is left out (Deploy area).
+type RunnerImages struct {
+	IDs map[string]string `json:"ids"`
 }
 
 // WorkerRelease is the body of POST /api/bench/workers/leases/{id}/release:
@@ -106,6 +134,45 @@ type WorkerResult struct {
 	SealHash string `json:"seal_hash,omitempty"` // the coordinator's seal of the accepted run
 }
 
+// RunnerScope is what a hosted runner's token allows (Runners area,
+// docs/runners.md): one organization and one pool. The worker routes put it
+// on the context of every coordinator call in hosted mode; local mode has
+// none, and the coordinator checks the shared worker token instead.
+type RunnerScope struct {
+	OrgID   string `json:"org_id"`
+	Pool    string `json:"pool"`
+	TokenID string `json:"token_id"` // runner_tokens.id
+}
+
+type runnerScopeKey struct{}
+
+// WithRunnerScope returns ctx carrying a hosted runner's scope.
+func WithRunnerScope(ctx context.Context, s RunnerScope) context.Context {
+	return context.WithValue(ctx, runnerScopeKey{}, s)
+}
+
+// RunnerScopeFrom returns the hosted runner scope on ctx, if any.
+func RunnerScopeFrom(ctx context.Context) (RunnerScope, bool) {
+	if ctx == nil {
+		return RunnerScope{}, false
+	}
+	s, ok := ctx.Value(runnerScopeKey{}).(RunnerScope)
+	return s, ok
+}
+
+// RunnerWhoami is the answer of GET /api/bench/workers/whoami: what the
+// caller's token is scoped to and the runners registered with it, for
+// `bifrost-bench runner status`.
+type RunnerWhoami struct {
+	Mode    string       `json:"mode"` // local | hosted
+	OrgID   string       `json:"org_id,omitempty"`
+	Pool    string       `json:"pool,omitempty"`
+	TokenID string       `json:"token_id,omitempty"`
+	Workers []WorkerInfo `json:"workers"`          // registered with this token (local mode: every worker)
+	Open    int          `json:"open_experiments"` // experiments this token may lease from now
+	Now     time.Time    `json:"now"`
+}
+
 // Sentinel errors of the worker API. The HTTP handler maps them to statuses.
 var (
 	// ErrWorkerAuth is a missing or wrong bearer token.
@@ -124,4 +191,8 @@ var (
 	ErrUploadOffset = errors.New("upload offset mismatch")
 	// ErrWorkerRequest is a malformed worker request.
 	ErrWorkerRequest = errors.New("bad worker request")
+	// ErrWorkerScope is a hosted runner call outside its token's
+	// organization or pool, or for a runner registered with another token
+	// (Runners area). The handler answers 403.
+	ErrWorkerScope = errors.New("outside the runner token's scope")
 )

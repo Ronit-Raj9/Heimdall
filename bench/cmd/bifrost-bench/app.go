@@ -21,6 +21,7 @@ import (
 	"github.com/maximhq/bifrost/bench/policy"
 	"github.com/maximhq/bifrost/bench/probes"
 	"github.com/maximhq/bifrost/bench/reporters"
+	"github.com/maximhq/bifrost/bench/resultsindex"
 	"github.com/maximhq/bifrost/bench/scaffold"
 	"github.com/maximhq/bifrost/bench/schemas"
 	"github.com/maximhq/bifrost/bench/store"
@@ -42,6 +43,13 @@ type app struct {
 	store     *store.FSStore
 	upstreams engine.UpstreamChecker // the fault proxy's upstream check; nil without the gateway
 	prices    *evidence.PriceTable   // the price snapshot new runs are costed with
+
+	// Tenancy area (P3): set only on a hosted org's app (servetenancy.go).
+	orgID        string                          // the org this app serves; empty in local mode
+	releasesRoot string                          // the org's release log; empty uses release.DefaultRoot
+	planGuard    func(*schemas.Experiment) error // confines experiment paths to the org's project
+	deferGateway bool                            // the gateway preflight is the runners' (hosted: deferred_to_runner)
+	results      resultsindex.Source             // the org's database index (db.OrgIndex); nil uses the JSONL index
 }
 
 // appOptions says which live services a command needs.
@@ -159,6 +167,12 @@ func (a *app) newPlanner() *engine.Planner {
 	opts = append(opts, engine.WithModelPrices(a.priced)) // Forecast and matrix area: refuse unpriced matrix models (estimate.go)
 	// Suite health area: -include-quarantined (suitehealth.go).
 	opts = append(opts, engine.WithIncludeQuarantined(includeQuarantined))
+	if a.planGuard != nil {
+		opts = append(opts, engine.WithExperimentGuard(a.planGuard)) // Tenancy area: hosted org paths stay in its project (servetenancy.go)
+	}
+	if a.deferGateway {
+		opts = append(opts, engine.WithGatewayDeferredToRunner()) // Tenancy area: a hosted server has no gateway; runners preflight theirs (servetenancy.go)
+	}
 	return engine.NewPlanner(a.reg, a.cfg.Root, a.logger, opts...)
 }
 

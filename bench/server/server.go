@@ -49,6 +49,8 @@ type Deps struct {
 	Forecast handlers.ForecastSource
 	// Suite health area: sealed runs for GET /suites/{id}/health; nil answers 503 (handlers/suitehealth.go).
 	Health taskhealth.Source
+	Jobs   handlers.JobsAPI      // Jobs area (P4): the job API in local mode; hosted mode serves it as a platform area (handlers/jobs.go)
+	Ready  []handlers.ReadyCheck // Deploy area: /readyz checks (database, migrations, runs root); /healthz needs none (handlers/readiness.go)
 	// UI is the built UI with index.html at its root, for example
 	// fs.Sub(ui.Dist, "dist"). Nil serves the API only.
 	UI      fs.FS
@@ -66,6 +68,7 @@ type Server struct {
 	token          string
 	tokenGenerated bool
 	announceOnce   sync.Once
+	closers        []func() // Tenancy area (P3): hosted mode's org registry and sweeper (hosted.go)
 }
 
 // New builds the server and registers every route. The write token comes
@@ -99,32 +102,13 @@ func New(cfg *lib.Config, deps Deps) (*Server, error) {
 		lib.SendError(ctx, mode, fasthttp.StatusMethodNotAllowed, lib.ErrTypeMethodNotAllowed,
 			"method "+string(ctx.Method())+" not allowed on "+string(ctx.Path()))
 	}
-	s.experiments = handlers.NewExperimentsHandler(mode, deps.Index, deps.Analyzer, deps.Launcher, deps.Catalog, write)
-	handlers.NewHealthHandler(mode, deps.Version, deps.Doctor).RegisterRoutes(r, common...)
-	handlers.NewCatalogHandler(mode, deps.Catalog).RegisterRoutes(r, common...)
-	s.experiments.RegisterRoutes(r, common...)
-	handlers.NewRunsHandler(mode, deps.Index).RegisterRoutes(r, common...)
-	handlers.NewPairsHandler(mode, deps.Index).RegisterRoutes(r, common...)
-	handlers.NewTriageHandler(mode, deps.Index, deps.Catalog).RegisterRoutes(r, common...)
-	handlers.NewLeaderboardHandler(mode, deps.Index).RegisterRoutes(r, common...)
-	handlers.NewClustersHandler(mode, deps.Index).RegisterRoutes(r, common...) // Failure clusters area (handlers/clusters.go)
-	handlers.NewAuditHandler(mode, deps.Auditor, write).RegisterRoutes(r, common...)
-	handlers.NewReleasesHandler(mode, deps.Releases, write).RegisterRoutes(r, common...)
-	handlers.NewSuitesHandler(mode, deps.Suites).WithHeldOutVisible(cfg.HeldOut.Visible).RegisterRoutes(r, common...) // Suite health area: held_out.visible
-	handlers.NewSuiteHealthHandler(mode, deps.Suites, deps.Health).RegisterRoutes(r, common...)                       // Suite health area (handlers/suitehealth.go)
-	handlers.NewAgentsHandler(mode, deps.Agents, deps.Index).RegisterRoutes(r, common...)
-	// Agent diff area: two versions of an agent config compared (handlers/agentdiff.go, docs/agent-diff.md).
-	handlers.NewAgentDiffHandler(mode, deps.Index, cfg.Root).RegisterRoutes(r, common...)
-	handlers.NewImportsHandler(mode).RegisterRoutes(r, common...) // UI area: importer catalog (handlers/imports.go)
-	// Forecast and matrix area: POST /estimate and GET /experiments/{id}/matrix (handlers/forecast.go, docs/forecast.md).
-	handlers.NewForecastHandler(mode, deps.Forecast, write).RegisterRoutes(r, common...)
-	// Remote area: worker API, off unless BENCH_WORKER_TOKEN is set (handlers/workers.go).
-	handlers.NewWorkersHandler(mode, deps.Workers).RegisterRoutes(r, common...)
-	handlers.NewOpenAPIHandler(mode, deps.Version).RegisterRoutes(r, common...) // Clients area: API description (handlers/openapi.go, docs/clients.md)
-	// Index and trends area: GET /trends over the derived results index (handlers/trends.go, docs/trends.md).
-	handlers.NewTrendsHandler(mode, deps.Trends).RegisterRoutes(r, common...)
-	// Human review area: review queue and history, POST /reviews behind the write token (handlers/reviews.go, docs/human-review.md).
-	handlers.NewReviewsHandler(mode, deps.Reviews, write).RegisterRoutes(r, common...)
+	s.experiments = registerOrgRoutes(r, cfg, deps, write, common) // Tenancy area (P3): the same registration builds every hosted org router (hosted.go)
+	// Jobs area (P4): /jobs routes of the local org; nil Jobs answers 503 (handlers/jobs.go).
+	jobsHandler := handlers.NewJobsHandler(mode, deps.Jobs, write)
+	jobsHandler.RegisterRoutes(r, common...)
+	s.closers = append(s.closers, jobsHandler.Close)
+	handlers.NewAuthHandler(mode, nil).RegisterRoutes(r, common...)         // Auth area (P2): local mode answers GET /auth/config and /auth/me (local principal); hosted-only routes 404 (handlers/auth.go)
+	handlers.NewRunnersHandler(mode, nil, nil).RegisterRoutes(r, common...) // Runners area (P5): runner admin is hosted only; local mode answers 503 (handlers/runners.go)
 	if deps.UI != nil {
 		NewUIHandler(mode, deps.UI).RegisterRoutes(r)
 	}
@@ -149,6 +133,42 @@ func New(cfg *lib.Config, deps Deps) (*Server, error) {
 	return s, nil
 }
 
+// registerOrgRoutes registers the bench API over one run store on r: every
+// route of local mode, and of each organization's router in hosted mode
+// (Tenancy area, hosted.go). Register new org-scoped routes here and give
+// them a policy entry in tenancy/policy.go (TestPolicyCoversEveryRoute).
+func registerOrgRoutes(r *router.Router, cfg *lib.Config, deps Deps, write lib.Middleware, common []lib.Middleware) *handlers.ExperimentsHandler {
+	mode := cfg.Server.Mode
+	experiments := handlers.NewExperimentsHandler(mode, deps.Index, deps.Analyzer, deps.Launcher, deps.Catalog, write)
+	handlers.NewHealthHandler(mode, deps.Version, deps.Doctor).RegisterRoutes(r, common...)
+	handlers.NewReadinessHandler(mode, deps.Version, deps.Ready).RegisterRoutes(r, common...) // Deploy area: GET /healthz and /readyz at the site root (handlers/readiness.go)
+	handlers.NewCatalogHandler(mode, deps.Catalog).RegisterRoutes(r, common...)
+	experiments.RegisterRoutes(r, common...)
+	handlers.NewRunsHandler(mode, deps.Index).RegisterRoutes(r, common...)
+	handlers.NewPairsHandler(mode, deps.Index).RegisterRoutes(r, common...)
+	handlers.NewTriageHandler(mode, deps.Index, deps.Catalog).RegisterRoutes(r, common...)
+	handlers.NewLeaderboardHandler(mode, deps.Index).RegisterRoutes(r, common...)
+	handlers.NewClustersHandler(mode, deps.Index).RegisterRoutes(r, common...) // Failure clusters area (handlers/clusters.go)
+	handlers.NewAuditHandler(mode, deps.Auditor, write).RegisterRoutes(r, common...)
+	handlers.NewReleasesHandler(mode, deps.Releases, write).RegisterRoutes(r, common...)
+	handlers.NewSuitesHandler(mode, deps.Suites).WithHeldOutVisible(cfg.HeldOut.Visible).RegisterRoutes(r, common...) // Suite health area: held_out.visible
+	handlers.NewSuiteHealthHandler(mode, deps.Suites, deps.Health).RegisterRoutes(r, common...)                       // Suite health area (handlers/suitehealth.go)
+	handlers.NewAgentsHandler(mode, deps.Agents, deps.Index).RegisterRoutes(r, common...)
+	// Agent diff area: two versions of an agent config compared (handlers/agentdiff.go, docs/agent-diff.md).
+	handlers.NewAgentDiffHandler(mode, deps.Index, cfg.Root).RegisterRoutes(r, common...)
+	handlers.NewImportsHandler(mode).RegisterRoutes(r, common...) // UI area: importer catalog (handlers/imports.go)
+	// Forecast and matrix area: POST /estimate and GET /experiments/{id}/matrix (handlers/forecast.go, docs/forecast.md).
+	handlers.NewForecastHandler(mode, deps.Forecast, write).RegisterRoutes(r, common...)
+	// Remote area: worker API, off unless BENCH_WORKER_TOKEN is set (handlers/workers.go).
+	handlers.NewWorkersHandler(mode, deps.Workers).RegisterRoutes(r, common...)
+	handlers.NewOpenAPIHandler(mode, deps.Version).RegisterRoutes(r, common...) // Clients area: API description (handlers/openapi.go, docs/clients.md)
+	// Index and trends area: GET /trends over the derived results index (handlers/trends.go, docs/trends.md).
+	handlers.NewTrendsHandler(mode, deps.Trends).RegisterRoutes(r, common...)
+	// Human review area: review queue and history, POST /reviews behind the write token (handlers/reviews.go, docs/human-review.md).
+	handlers.NewReviewsHandler(mode, deps.Reviews, write).RegisterRoutes(r, common...)
+	return experiments
+}
+
 // Handler returns the root handler with every middleware applied.
 func (s *Server) Handler() fasthttp.RequestHandler {
 	return s.handler
@@ -163,7 +183,7 @@ func (s *Server) WriteToken() string {
 // shuts down gracefully. A non-loopback address is allowed but warned about:
 // loopback binding is the API's first defence.
 func (s *Server) ListenAndServe(ctx context.Context) error {
-	if !s.cfg.ListenIsLoopback() {
+	if !s.cfg.ListenIsLoopback() && !s.cfg.Auth.IsHosted() { // Tenancy area: hosted mode is meant to listen behind its proxy; sessions and tokens guard it
 		s.logger.Warn(fmt.Sprintf("bench API listens on %s, which is not loopback; only the write token guards it", s.cfg.Server.Listen))
 	}
 	ln, err := net.Listen("tcp", s.cfg.Server.Listen)
@@ -187,14 +207,14 @@ func (s *Server) Serve(ctx context.Context, ln net.Listener) error {
 	go func() { errCh <- s.server.Serve(ln) }()
 	select {
 	case err := <-errCh:
-		s.experiments.Close()
+		s.closeHandlers()
 		if err != nil {
 			return fmt.Errorf("serve bench API: %w", err)
 		}
 		return nil
 	case <-ctx.Done():
 	}
-	s.experiments.Close()
+	s.closeHandlers()
 	shutdownCtx, cancel := context.WithTimeout(context.Background(), shutdownTimeout)
 	defer cancel()
 	if err := s.server.ShutdownWithContext(shutdownCtx); err != nil {
@@ -204,6 +224,17 @@ func (s *Server) Serve(ctx context.Context, ln net.Listener) error {
 		return fmt.Errorf("serve bench API: %w", err)
 	}
 	return nil
+}
+
+// closeHandlers closes the live event streams: local mode's experiments
+// handler, and in hosted mode every org runtime (Tenancy area, hosted.go).
+func (s *Server) closeHandlers() {
+	if s.experiments != nil {
+		s.experiments.Close()
+	}
+	for _, c := range s.closers {
+		c()
+	}
 }
 
 // fasthttpLogger routes fasthttp's connection errors (an oversized body, a

@@ -1,0 +1,19 @@
+# Keys of bench.ts `Job` (jobs.Job (handlers/jobs.go GET /jobs/{id}, POST /jobs/{id}/cancel, POST /experiments/{id}/regrade)), one per line; a trailing ? marks an optional (Go omitempty) key.
+# Hosted platform (U1 UI). A top-level response adds "mode". Change with bench.ts and the Go type.
+id
+org_id
+kind
+target?
+status
+params
+progress?
+result?
+error?
+created_by?
+created_at
+started_at?
+finished_at?
+cancel_requested
+attempt
+lease_owner?
+lease_until?

@@ -1,4 +1,6 @@
 import { ConfigDiff } from "@/components/configDiff";
+import { RoleGate } from "@/components/platform/accessNotes";
+import { ExperimentRunActions, RegradeAction } from "@/components/platform/experimentActions";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -33,21 +35,26 @@ export default function VerdictView() {
 	const experiments = useMemo(() => sortExperimentsNewestFirst(list.data?.experiments ?? []), [list.data]);
 	// Default to the newest experiment without writing it to the URL, so "newest" stays a live default.
 	const selectedId = exp ?? experiments[0]?.exp_id;
+	const selected = experiments.find((experiment) => experiment.exp_id === selectedId);
 
 	return (
 		<section className="flex flex-col gap-6" data-testid="verdict-screen">
 			<div className="flex flex-wrap items-end justify-between gap-4">
 				<h1 className="text-foreground text-xl font-semibold tracking-tight">{t("verdict.title")}</h1>
-				{list.isLoading ? (
-					<Skeleton className="h-9 w-72" data-testid="verdict-experiment-picker-loading" />
-				) : (
-					<ExperimentPicker
-						experiments={experiments}
-						value={selectedId}
-						onChange={(id) => void setExp(id)}
-						disabled={experiments.length === 0}
-					/>
-				)}
+				<div className="flex flex-wrap items-end gap-3">
+					{/* Jobs: cancel a running experiment, resume a cancelled or failed one. */}
+					{selected && <ExperimentRunActions status={selected} />}
+					{list.isLoading ? (
+						<Skeleton className="h-9 w-72" data-testid="verdict-experiment-picker-loading" />
+					) : (
+						<ExperimentPicker
+							experiments={experiments}
+							value={selectedId}
+							onChange={(id) => void setExp(id)}
+							disabled={experiments.length === 0}
+						/>
+					)}
+				</div>
 			</div>
 			{list.isError && (
 				<ErrorState
@@ -109,7 +116,11 @@ function ExperimentVerdict({ expId }: { expId: string }) {
 
 	return (
 		<div className="flex flex-col gap-6" data-testid="verdict-content" data-exp-id={payload.exp_id}>
-			<VerdictHeaderStrip payload={payload} />
+			<div className="flex flex-wrap items-center justify-between gap-3">
+				<VerdictHeaderStrip payload={payload} />
+				{/* Jobs: regrade the sealed runs as a job; the original grades stay. */}
+				<RegradeAction expId={payload.exp_id} />
+			</div>
 
 			{/* The decision opens the page; what changed and the naive count sit beside each other under it. */}
 			<VerdictCard verdict={payload.verdict} metricLabel={metrics[payload.verdict.primary.metric]?.label} />
@@ -194,11 +205,14 @@ function NoExperiments() {
 		<Card className="border-dashed py-10 shadow-none" data-testid="verdict-empty-state">
 			<CardContent className="flex flex-col items-start gap-3">
 				<p className="text-muted-foreground max-w-prose text-sm">{t("verdict.noExperiments")}</p>
-				<Button variant="outline" size="sm" asChild>
-					<Link to="/experiments/new" data-testid="verdict-empty-new-experiment">
-						{t("verdict.newExperiment")}
-					</Link>
-				</Button>
+				{/* Hosted: only members start experiments; demo visitors get no write controls. */}
+				<RoleGate min="member" fallback={null}>
+					<Button variant="outline" size="sm" asChild>
+						<Link to="/experiments/new" data-testid="verdict-empty-new-experiment">
+							{t("verdict.newExperiment")}
+						</Link>
+					</Button>
+				</RoleGate>
 			</CardContent>
 		</Card>
 	);

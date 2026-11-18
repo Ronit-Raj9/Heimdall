@@ -1,5 +1,7 @@
 import "@/lib/i18n";
 
+import { demoSession, hostedSession } from "@/lib/testing/platformFixtures";
+import { render } from "@/lib/testing/render";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 import { ReviewForm, type ReviewFormProps } from "./reviewForm";
@@ -53,5 +55,21 @@ describe("ReviewForm", () => {
 		const html = renderToStaticMarkup(<ReviewForm {...base} submitError="run r_x is not sealed" created={passedRunReviews.reviews[0]} />);
 		expect(html).toContain("run r_x is not sealed");
 		expect(html).toContain("Review rv_synth0002 recorded.");
+	});
+});
+describe("ReviewForm in hosted mode", () => {
+	it("has no write-token box and starts with the signed-in user as reviewer", () => {
+		const html = render(<ReviewForm {...base} />, hostedSession("member"));
+		expect(html).toContain('data-testid="review-form"');
+		expect(html).not.toContain("review-token-input");
+		expect(html).not.toContain("There is no login");
+		expect(tag(html, "review-reviewer-input")).toContain('value="Ada Lovelace"');
+	});
+	it("keeps the token box in local mode", () => {
+		expect(renderToStaticMarkup(<ReviewForm {...base} />)).toContain("review-token-input");
+	});
+	it("tells a viewer the role needed and shows a demo visitor no form", () => {
+		expect(render(<ReviewForm {...base} />, hostedSession("viewer"))).toContain('data-testid="review-form-role"');
+		expect(render(<ReviewForm {...base} />, demoSession())).toBe("");
 	});
 });

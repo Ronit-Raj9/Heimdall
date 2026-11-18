@@ -1,0 +1,57 @@
+import "@/lib/i18n";
+
+import { LOCAL_SESSION, signedOutSession } from "@/lib/testing/platformFixtures";
+import { mutation, render } from "@/lib/testing/render";
+import { beforeEach, describe, expect, it, vi } from "vitest";
+import LoginView from "./loginView";
+
+const api = vi.hoisted(() => ({ login: {} as Record<string, unknown> }));
+vi.mock("@tanstack/react-router", async () => (await import("@/lib/testing/routerMock")).routerMock);
+vi.mock("@/lib/store/apis/platformApi", async (importOriginal) => ({
+	...(await importOriginal<typeof import("@/lib/store/apis/platformApi")>()),
+	useLoginMutation: () => mutation(api.login),
+}));
+
+beforeEach(() => {
+	api.login = {};
+});
+
+describe("LoginView", () => {
+	it("asks for email and password, offers GitHub with the return path, and sign-up when open", () => {
+		const html = render(<LoginView returnTo="/verdict?exp=e_1" />, signedOutSession());
+		expect(html).toContain('data-testid="login-form"');
+		expect(html).toContain('data-testid="login-email"');
+		expect(html).toContain('type="password"');
+		expect(html).toContain('href="/api/bench/auth/github/start?return_to=%2Fverdict%3Fexp%3De_1"');
+		expect(html).toContain('data-testid="login-signup-link"');
+		expect(html).not.toContain("write token");
+	});
+
+	it("leaves out GitHub and sign-up when the server does not offer them, and never returns off-site", () => {
+		const html = render(
+			<LoginView returnTo="https://evil.example" />,
+			signedOutSession({ mode: "live", auth_mode: "hosted", signup: "invite", github: false }),
+		);
+		expect(html).not.toContain("auth-github");
+		expect(html).not.toContain("login-signup-link");
+	});
+
+	it("says wrong credentials and rate limits in plain words", () => {
+		api.login = { error: { status: 401, data: { error: { message: "invalid credentials" } } } };
+		expect(render(<LoginView />, signedOutSession())).toContain("That email and password do not match an account.");
+		api.login = { error: { status: 429, data: { error: { message: "slow down" } } } };
+		expect(render(<LoginView />, signedOutSession())).toContain("Too many attempts.");
+	});
+
+	it("explains a GitHub sign-in that did not complete", () => {
+		expect(render(<LoginView oauthError="github" />, signedOutSession())).toContain("GitHub sign-in did not complete.");
+		expect(render(<LoginView oauthError="signup_not_allowed" />, signedOutSession())).toContain("sign-up is not open here");
+	});
+
+	it("tells a local-mode visitor there is nothing to sign in to", () => {
+		const html = render(<LoginView />, LOCAL_SESSION);
+		expect(html).toContain('data-testid="login-local"');
+		expect(html).toContain("local mode");
+		expect(html).not.toContain("login-form");
+	});
+});

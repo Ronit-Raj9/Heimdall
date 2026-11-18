@@ -1,0 +1,230 @@
+import "@/lib/i18n";
+
+import { AuditTab } from "@/components/settings/auditTab";
+import { ApiTokensTab } from "@/components/settings/apiTokensTab";
+import { MembersTab, invitationLink } from "@/components/settings/membersTab";
+import { OrgTab } from "@/components/settings/orgTab";
+import { RunnersTab, saveTokenCommand, tokenFileOf } from "@/components/settings/runnersTab";
+import { grantableRoles, mayManage } from "@/components/settings/settingsBits";
+import {
+	API_TOKENS,
+	API_TOKEN_CREATED,
+	AUDIT,
+	INVITATIONS,
+	LOCAL_SESSION,
+	MEMBERS,
+	ORG,
+	RUNNERS,
+	RUNNER_TOKENS,
+	demoSession,
+	hostedSession,
+} from "@/lib/testing/platformFixtures";
+import { errorQuery, loadingQuery, mutation, okQuery, render, tagOf } from "@/lib/testing/render";
+import { beforeEach, describe, expect, it, vi } from "vitest";
+import SettingsView, { settingsTab } from "./settingsView";
+
+const api = vi.hoisted(() => ({ q: {} as Record<string, unknown>, m: {} as Record<string, Record<string, unknown>> }));
+vi.mock("@tanstack/react-router", async () => (await import("@/lib/testing/routerMock")).routerMock);
+vi.mock("@/lib/store/apis/platformApi", async (importOriginal) => {
+	const real = await importOriginal<typeof import("@/lib/store/apis/platformApi")>();
+	const { mutation: m } = await import("@/lib/testing/render");
+	const q = (name: string) => () => api.q[name];
+	const w = (name: string) => () => m(api.m[name] ?? {});
+	return {
+		...real,
+		useListMembersQuery: q("members"),
+		useListInvitationsQuery: q("invitations"),
+		useListApiTokensQuery: q("tokens"),
+		useListRunnersQuery: q("runners"),
+		useListRunnerTokensQuery: q("runnerTokens"),
+		useGetAuditLogQuery: q("audit"),
+		useGetOrgQuery: q("org"),
+		useUpdateMemberMutation: w("updateMember"),
+		useRemoveMemberMutation: w("removeMember"),
+		useCreateInvitationMutation: w("createInvitation"),
+		useRevokeInvitationMutation: w("revokeInvitation"),
+		useCreateApiTokenMutation: w("createToken"),
+		useRevokeApiTokenMutation: w("revokeToken"),
+		useCreateRunnerTokenMutation: w("createRunnerToken"),
+		useRevokeRunnerTokenMutation: w("revokeRunnerToken"),
+		useRemoveRunnerMutation: w("removeRunner"),
+		useRenameOrgMutation: w("rename"),
+		useSetPublicReadMutation: w("publicRead"),
+	};
+});
+
+const org = hostedSession().org!;
+
+beforeEach(() => {
+	api.q = {
+		members: okQuery(MEMBERS),
+		invitations: okQuery(INVITATIONS),
+		tokens: okQuery(API_TOKENS),
+		runners: okQuery(RUNNERS),
+		runnerTokens: okQuery(RUNNER_TOKENS),
+		audit: okQuery(AUDIT),
+		org: okQuery(ORG),
+	};
+	api.m = {};
+});
+
+describe("SettingsView", () => {
+	it("explains local mode instead of showing team settings", () => {
+		const html = render(<SettingsView tab="members" onTabChange={() => undefined} />, LOCAL_SESSION);
+		expect(html).toContain('data-testid="settings-local"');
+		expect(html).toContain("local mode");
+		expect(html).not.toContain("settings-tab-members");
+	});
+	it("asks a visitor who is not signed in to sign in", () => {
+		expect(render(<SettingsView tab="members" onTabChange={() => undefined} />, demoSession())).toContain("settings-signed-out");
+	});
+	it("shows the five tabs and the organization in hosted mode", () => {
+		const html = render(<SettingsView tab="members" onTabChange={() => undefined} />, hostedSession());
+		for (const tab of ["members", "tokens", "runners", "audit", "org"]) expect(html).toContain(`data-testid="settings-tab-${tab}"`);
+		expect(html).toContain("Members, access and runners of Acme Agents.");
+		expect(html).toContain('data-testid="settings-members"');
+	});
+	it("reads the tab from the URL, members by default", () => {
+		expect(settingsTab("audit")).toBe("audit");
+		expect(settingsTab("nope")).toBe("members");
+		expect(settingsTab(null)).toBe("members");
+	});
+});
+
+describe("MembersTab", () => {
+	it("lets an owner change roles and remove others, never itself", () => {
+		const html = render(<MembersTab org={org} />, hostedSession("owner"));
+		expect(html).toContain('data-testid="member-role-usr_grace"');
+		expect(html).toContain('data-testid="member-remove-usr_grace"');
+		expect(html).not.toContain("member-role-usr_ada");
+		expect(html).not.toContain("member-remove-usr_ada");
+		expect(html).toContain('data-testid="invite-form"');
+		expect(html).toContain('data-testid="invitation-row-inv_1"');
+	});
+	it("lets an admin manage members and viewers but not owners", () => {
+		const html = render(<MembersTab org={org} />, hostedSession("admin"));
+		expect(html).toContain("member-role-usr_alan");
+		expect(html).toContain("member-role-usr_kat");
+		expect(html).not.toContain("member-role-usr_ada");
+		expect(grantableRoles("admin")).toEqual(["viewer", "member", "admin"]);
+		expect(mayManage("admin", "owner")).toBe(false);
+		expect(mayManage("admin", "member", "owner")).toBe(false);
+		expect(mayManage("owner", "admin", "owner")).toBe(true);
+	});
+	it("shows a member read-only roles and no invite form", () => {
+		const html = render(<MembersTab org={org} />, hostedSession("member"));
+		expect(html).not.toContain("member-role-usr_grace");
+		expect(html).not.toContain("invite-form");
+		expect(html).toContain("Needs admin or above. Your role: member.");
+	});
+	it("shows the role refusal when the server answers 403", () => {
+		api.q.members = errorQuery(403, "members need the admin role");
+		const html = render(<MembersTab org={org} />, hostedSession("viewer"));
+		expect(html).toContain("Your role cannot do this");
+		expect(html).toContain("members need the admin role");
+	});
+	it("builds the invitation link on this site", () => {
+		expect(invitationLink("https://h.dev", "a/b")).toBe("https://h.dev/invite/a%2Fb");
+	});
+});
+
+describe("ApiTokensTab", () => {
+	it("lists tokens by prefix only, never a secret, with revoke on active ones", () => {
+		const html = render(<ApiTokensTab />, hostedSession("admin"));
+		expect(html).toContain("hm_a1b2c3d4…");
+		expect(html).not.toContain(API_TOKEN_CREATED.token);
+		expect(tagOf(html, "token-row-tok_old")).toContain('data-state="revoked"');
+		expect(html).toContain('data-testid="token-revoke-tok_ci"');
+		expect(html).not.toContain("token-revoke-tok_old");
+		expect(html).toContain('data-testid="token-form"');
+	});
+	it("shows the create form, not a secret, on a fresh render: a secret is shown once", () => {
+		const html = render(<ApiTokensTab />, hostedSession("owner"));
+		expect(html).toContain('data-testid="token-form"');
+		expect(html).not.toContain("token-created");
+	});
+	it("hides create and revoke from members", () => {
+		const html = render(<ApiTokensTab />, hostedSession("member"));
+		expect(html).not.toContain("token-form");
+		expect(html).not.toContain("token-revoke-");
+	});
+	it("shows empty and loading states", () => {
+		api.q.tokens = okQuery({ mode: "live", tokens: [] });
+		expect(render(<ApiTokensTab />, hostedSession())).toContain("tokens-empty");
+		api.q.tokens = loadingQuery();
+		expect(render(<ApiTokensTab />, hostedSession())).toContain("tokens-loading");
+	});
+});
+
+describe("RunnersTab", () => {
+	it("lists runners with state, pool, version and last seen, and the runner tokens", () => {
+		const html = render(<RunnersTab org={org} />, hostedSession("admin"));
+		expect(html).toContain('data-testid="runner-row-rnr_1"');
+		expect(html).toContain('data-testid="runner-state-running"');
+		expect(html).toContain('data-testid="runner-state-lost"');
+		expect(html).toContain("2 of 4 busy");
+		expect(html).toContain("0.9.2");
+		expect(html).toContain('data-testid="runner-token-row-rtk_1"');
+		expect(html).toContain("hmr_f00dcafe…");
+		expect(html).toContain('data-testid="runner-token-form"');
+		expect(html).toContain('data-testid="runner-remove-rnr_2"');
+	});
+	it("says how to get a first runner", () => {
+		api.q.runners = okQuery({ mode: "live", runners: [] });
+		expect(render(<RunnersTab org={org} />, hostedSession())).toContain("Create a runner token, then start a runner with it.");
+	});
+	it("shows the role refusal to members (runners are admin)", () => {
+		api.q.runners = errorQuery(403, "runners and runner tokens need the admin role");
+		api.q.runnerTokens = errorQuery(403, "runners and runner tokens need the admin role");
+		expect(render(<RunnersTab org={org} />, hostedSession("member"))).toContain("Your role cannot do this");
+	});
+	it("saves the token where the start command reads it", () => {
+		const command = "bifrost-bench runner start -server https://h.dev -token-file /etc/heimdall/token -pool gpu";
+		expect(tokenFileOf(command)).toBe("/etc/heimdall/token");
+		expect(tokenFileOf("bifrost-bench runner start")).toBe("~/.heimdall/runner-token");
+		expect(saveTokenCommand("hmr_x", "/etc/heimdall/token")).toBe(
+			"mkdir -p /etc/heimdall && (umask 077 && printf '%s\\n' 'hmr_x' > /etc/heimdall/token)",
+		);
+	});
+});
+
+describe("AuditTab", () => {
+	it("shows who did what to which target, when and from where, with paging", () => {
+		const html = render(<AuditTab org={org} />, hostedSession("admin"));
+		expect(html).toContain('data-testid="audit-row-aud_3"');
+		expect(html).toContain("ada@acme.dev"); // actor ids read as member emails
+		expect(html).toContain("member.role");
+		expect(html).toContain("user:usr_grace");
+		expect(html).toContain("10.0.0.7");
+		expect(html).toContain("from=member  to=admin");
+		expect(tagOf(html, "audit-newer")).toContain('disabled=""');
+		expect(tagOf(html, "audit-older")).toContain('disabled=""'); // a short page is the last
+	});
+	it("says when nothing matches", () => {
+		api.q.audit = okQuery({ mode: "live", entries: [] });
+		expect(render(<AuditTab org={org} />, hostedSession())).toContain("audit-empty");
+	});
+});
+
+describe("OrgTab", () => {
+	it("lets an owner rename and change public read, with the danger zone", () => {
+		const html = render(<OrgTab org={org} />, hostedSession("owner"));
+		expect(html).toContain('data-testid="org-rename-form"');
+		expect(html).toContain('data-testid="org-public-toggle"');
+		expect(html).toContain("Make public");
+		expect(html).toContain('data-testid="org-leave"');
+		expect(html).toContain('data-testid="org-delete-note"');
+	});
+	it("lets an admin rename but only an owner publish", () => {
+		const html = render(<OrgTab org={org} />, hostedSession("admin"));
+		expect(html).toContain("org-rename-form");
+		expect(html).not.toContain("org-public-toggle");
+		expect(html).toContain("Needs owner or above. Your role: admin.");
+	});
+	it("shows the public state", () => {
+		api.q.org = okQuery({ ...ORG, public_read: true });
+		const html = render(<OrgTab org={org} />, hostedSession("owner"));
+		expect(tagOf(html, "org-public-state")).toContain('data-public="true"');
+		expect(html).toContain("Make private");
+	});
+});

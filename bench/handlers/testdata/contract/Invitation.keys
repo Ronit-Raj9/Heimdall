@@ -1,0 +1,11 @@
+# Keys of bench.ts `Invitation` (handlers/members.go InvitationInfo; token only in the POST /orgs/{org}/invitations answer), one per line; a trailing ? marks an optional (Go omitempty) key.
+# Hosted platform (U1 UI). A top-level response adds "mode". Change with bench.ts and the Go type.
+id
+email
+role
+created_by?
+created_at
+expires_at
+accepted_at?
+token?
+url?

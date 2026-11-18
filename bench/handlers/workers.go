@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/fasthttp/router"
+	"github.com/maximhq/bifrost/bench/auth"
 	"github.com/maximhq/bifrost/bench/lib"
 	"github.com/maximhq/bifrost/bench/schemas"
 	"github.com/valyala/fasthttp"
@@ -31,7 +32,25 @@ type WorkerAPI interface {
 	Complete(ctx context.Context, leaseID string, req *schemas.WorkerComplete) (*schemas.WorkerResult, error)
 	Release(ctx context.Context, leaseID string, req *schemas.WorkerRelease) error
 	Workers() []schemas.WorkerInfo
+	// Whoami answers GET /workers/whoami (Runners area).
+	Whoami(ctx context.Context) (*schemas.RunnerWhoami, error)
 }
+
+// HostedWorkerAPI is a WorkerAPI that serves one hosted organization
+// (engine.Coordinator with RemoteOptions.OrgID set). Its routes authenticate
+// by runner token instead of the shared worker token (Runners area,
+// docs/runners.md).
+type HostedWorkerAPI interface {
+	OrgID() string
+}
+
+// RunnerVerifier resolves a runner token (hmr_...) to its scope, or fails
+// for an unknown, revoked or expired token. The runners package provides it.
+type RunnerVerifier func(ctx context.Context, token string) (schemas.RunnerScope, error)
+
+// runnerScopeValue is the request user value that carries a hosted runner's
+// scope from auth to the coordinator call.
+const runnerScopeValue = "heimdall.runners.scope"
 
 // WorkersList is the answer of GET /api/bench/workers.
 type WorkersList struct {
@@ -44,20 +63,34 @@ type WorkersList struct {
 // "Authorization: Bearer <token>"; the token is compared in constant time by
 // the coordinator and never logged.
 type WorkersHandler struct {
-	mode schemas.Mode
-	api  WorkerAPI
+	mode   schemas.Mode
+	api    WorkerAPI
+	orgID  string         // hosted: the organization the coordinator serves (Runners area)
+	verify RunnerVerifier // hosted: checks a bearer runner token when the auth middleware set no runner principal
 }
 
 // NewWorkersHandler creates the worker handler. api may be nil: the list is
 // then empty and every worker route answers 503.
 func NewWorkersHandler(mode schemas.Mode, api WorkerAPI) *WorkersHandler {
-	return &WorkersHandler{mode: mode, api: api}
+	h := &WorkersHandler{mode: mode, api: api}
+	if hosted, ok := api.(HostedWorkerAPI); ok && api != nil {
+		h.orgID = hosted.OrgID()
+	}
+	return h
+}
+
+// WithRunnerVerifier makes a hosted handler check bearer runner tokens itself
+// when the request reached it without a runner principal (Runners area).
+func (h *WorkersHandler) WithRunnerVerifier(v RunnerVerifier) *WorkersHandler {
+	h.verify = v
+	return h
 }
 
 // RegisterRoutes registers the worker routes under /api/bench/workers.
 func (h *WorkersHandler) RegisterRoutes(r *router.Router, middlewares ...lib.Middleware) {
 	p := APIPrefix + "/workers"
 	r.GET(p, lib.ChainMiddlewares(h.list, middlewares...))
+	r.GET(p+"/whoami", lib.ChainMiddlewares(h.auth(h.whoami), middlewares...)) // Runners area: runner status
 	r.POST(p+"/register", lib.ChainMiddlewares(h.auth(h.register), middlewares...))
 	r.POST(p+"/lease", lib.ChainMiddlewares(h.auth(h.lease), middlewares...))
 	r.GET(p+"/manifests/{exp_id}", lib.ChainMiddlewares(h.auth(h.manifest), middlewares...))
@@ -79,12 +112,20 @@ func (h *WorkersHandler) list(ctx *fasthttp.RequestCtx) {
 }
 
 // auth answers 503 when worker mode is off and 401 unless the request
-// carries the worker token.
+// carries the worker token. A hosted handler (Runners area) takes a runner
+// token instead: the runner principal the auth middleware set, or a bearer
+// token its own verifier accepts; the token's scope (organization and pool)
+// goes with every coordinator call, and a token of another organization is
+// refused with 403.
 func (h *WorkersHandler) auth(next fasthttp.RequestHandler) fasthttp.RequestHandler {
 	return func(ctx *fasthttp.RequestCtx) {
 		if h.api == nil {
 			lib.SendError(ctx, h.mode, fasthttp.StatusServiceUnavailable, lib.ErrTypeUnavailable,
 				"worker API is off on this server: set BENCH_WORKER_TOKEN before starting serve")
+			return
+		}
+		if h.orgID != "" {
+			h.runnerAuth(ctx, next)
 			return
 		}
 		tok, ok := strings.CutPrefix(string(ctx.Request.Header.Peek("Authorization")), "Bearer ")
@@ -96,12 +137,62 @@ func (h *WorkersHandler) auth(next fasthttp.RequestHandler) fasthttp.RequestHand
 	}
 }
 
+// runnerAuth resolves a hosted request's runner scope (Runners area).
+func (h *WorkersHandler) runnerAuth(ctx *fasthttp.RequestCtx, next fasthttp.RequestHandler) {
+	var scope schemas.RunnerScope
+	if p := auth.PrincipalFrom(ctx); p.Kind == auth.KindRunner {
+		scope = schemas.RunnerScope{OrgID: p.OrgID, Pool: p.Pool, TokenID: p.TokenID}
+	} else if tok, ok := strings.CutPrefix(string(ctx.Request.Header.Peek("Authorization")), "Bearer "); ok && h.verify != nil {
+		work, cancel := workContext(ctx, readTimeout)
+		s, err := h.verify(work, strings.TrimSpace(tok))
+		cancel()
+		if err == nil {
+			scope = s
+		}
+	}
+	if scope.TokenID == "" {
+		lib.SendError(ctx, h.mode, fasthttp.StatusUnauthorized, lib.ErrTypeUnauthorized,
+			"runner token required: Authorization: Bearer hmr_...")
+		return
+	}
+	if scope.OrgID != h.orgID {
+		lib.SendError(ctx, h.mode, fasthttp.StatusForbidden, lib.ErrTypeForbidden,
+			"the runner token belongs to another organization")
+		return
+	}
+	ctx.SetUserValue(runnerScopeValue, scope)
+	next(ctx)
+}
+
+// work is the context of one coordinator call: workContext plus, in hosted
+// mode, the caller's runner scope.
+func (h *WorkersHandler) work(ctx *fasthttp.RequestCtx, d time.Duration) (context.Context, context.CancelFunc) {
+	work, cancel := workContext(ctx, d)
+	if s, ok := ctx.UserValue(runnerScopeValue).(schemas.RunnerScope); ok {
+		work = schemas.WithRunnerScope(work, s)
+	}
+	return work, cancel
+}
+
+// whoami handles GET /api/bench/workers/whoami: the caller's token scope and
+// its registered runners, for `bifrost-bench runner status`.
+func (h *WorkersHandler) whoami(ctx *fasthttp.RequestCtx) {
+	work, cancel := h.work(ctx, readTimeout)
+	defer cancel()
+	out, err := h.api.Whoami(work)
+	if err != nil {
+		h.sendErr(ctx, "whoami", err)
+		return
+	}
+	lib.SendJSON(ctx, h.mode, fasthttp.StatusOK, out)
+}
+
 func (h *WorkersHandler) register(ctx *fasthttp.RequestCtx) {
 	var req schemas.WorkerRegister
 	if !h.decode(ctx, &req) {
 		return
 	}
-	work, cancel := workContext(ctx, readTimeout)
+	work, cancel := h.work(ctx, readTimeout)
 	defer cancel()
 	out, err := h.api.Register(work, &req)
 	if err != nil {
@@ -117,7 +208,7 @@ func (h *WorkersHandler) lease(ctx *fasthttp.RequestCtx) {
 	if !h.decode(ctx, &req) {
 		return
 	}
-	work, cancel := workContext(ctx, workerCallTimeout)
+	work, cancel := h.work(ctx, workerCallTimeout)
 	defer cancel()
 	out, err := h.api.Lease(work, req.WorkerID)
 	if err != nil {
@@ -136,7 +227,7 @@ func (h *WorkersHandler) manifest(ctx *fasthttp.RequestCtx) {
 	if !ok {
 		return
 	}
-	work, cancel := workContext(ctx, readTimeout)
+	work, cancel := h.work(ctx, readTimeout)
 	defer cancel()
 	m, err := h.api.Manifest(work, string(ctx.QueryArgs().Peek("worker_id")), expID)
 	if err != nil {
@@ -155,7 +246,7 @@ func (h *WorkersHandler) heartbeat(ctx *fasthttp.RequestCtx) {
 	if !h.decode(ctx, &req) {
 		return
 	}
-	work, cancel := workContext(ctx, readTimeout)
+	work, cancel := h.work(ctx, readTimeout)
 	defer cancel()
 	if err := h.api.Heartbeat(work, leaseID, req.WorkerID); err != nil {
 		h.sendErr(ctx, "heartbeat", err)
@@ -176,7 +267,7 @@ func (h *WorkersHandler) upload(ctx *fasthttp.RequestCtx) {
 		lib.SendError(ctx, h.mode, fasthttp.StatusBadRequest, lib.ErrTypeBadRequest, "offset must be a non-negative integer")
 		return
 	}
-	work, cancel := workContext(ctx, workerCallTimeout)
+	work, cancel := h.work(ctx, workerCallTimeout)
 	defer cancel()
 	n, err := h.api.Upload(work, leaseID, string(ctx.QueryArgs().Peek("worker_id")), offset, bytes.Clone(ctx.PostBody()))
 	if err != nil {
@@ -195,7 +286,7 @@ func (h *WorkersHandler) complete(ctx *fasthttp.RequestCtx) {
 	if !h.decode(ctx, &req) {
 		return
 	}
-	work, cancel := workContext(ctx, workerCallTimeout)
+	work, cancel := h.work(ctx, workerCallTimeout)
 	defer cancel()
 	out, err := h.api.Complete(work, leaseID, &req)
 	if err != nil {
@@ -214,7 +305,7 @@ func (h *WorkersHandler) release(ctx *fasthttp.RequestCtx) {
 	if !h.decode(ctx, &req) {
 		return
 	}
-	work, cancel := workContext(ctx, readTimeout)
+	work, cancel := h.work(ctx, readTimeout)
 	defer cancel()
 	if err := h.api.Release(work, leaseID, &req); err != nil {
 		h.sendErr(ctx, "release", err)
@@ -251,6 +342,10 @@ func (h *WorkersHandler) sendErr(ctx *fasthttp.RequestCtx, what string, err erro
 		lib.SendError(ctx, h.mode, fasthttp.StatusRequestEntityTooLarge, lib.ErrTypeTooLarge, msg)
 	case errors.Is(err, schemas.ErrWorkerRequest):
 		lib.SendError(ctx, h.mode, fasthttp.StatusBadRequest, lib.ErrTypeBadRequest, msg)
+	case errors.Is(err, schemas.ErrWorkerAuth): // Runners area
+		lib.SendError(ctx, h.mode, fasthttp.StatusUnauthorized, lib.ErrTypeUnauthorized, msg)
+	case errors.Is(err, schemas.ErrWorkerScope): // Runners area: another organization, pool or token
+		lib.SendError(ctx, h.mode, fasthttp.StatusForbidden, lib.ErrTypeForbidden, msg)
 	default:
 		sendDepError(ctx, h.mode, what, err)
 	}

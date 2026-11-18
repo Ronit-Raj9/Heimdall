@@ -1,5 +1,7 @@
+import { ForbiddenNote, isRoleRefusal } from "@/components/platform/forbiddenNote";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
+import { useSession } from "@/lib/session/sessionContext";
 import { getBenchErrorMessage } from "@/lib/store/apis/benchApi";
 import { cn } from "@/lib/utils";
 import { AlertTriangle } from "lucide-react";
@@ -17,6 +19,9 @@ export interface LoadErrorProps {
 /** A failed request: what failed, the server's message, and a retry. Used by the runs, receipts and new-experiment screens. */
 export function LoadError({ title, error, onRetry, testId, className }: LoadErrorProps) {
 	const { t } = useTranslation("bench");
+	const session = useSession();
+	// Hosted mode: a 403 is the caller's role, not a fault; say so instead of offering a retry.
+	if (isRoleRefusal(session, error)) return <ForbiddenNote error={error} testId={testId} className={className} />;
 	return (
 		<div
 			role="alert"

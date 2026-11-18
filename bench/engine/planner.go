@@ -87,6 +87,9 @@ type Planner struct {
 	// a worker's replan ignores quarantine (taskscreen.go).
 	includeQuarantined bool
 	ignoreQuarantine   bool
+
+	guard        func(*schemas.Experiment) error // Tenancy area: hosted orgs confine experiment paths to the org's project (experimentguard.go)
+	deferGateway bool                            // Tenancy area: a hosted server records the gateway preflight as the runners' (experimentguard.go)
 }
 
 // planMode is what differs between planning an experiment and planning an
@@ -160,6 +163,11 @@ func (p *Planner) plan(ctx context.Context, exp *schemas.Experiment, mode planMo
 	}
 	if p.reg == nil {
 		return nil, errors.New("plan: registry is nil")
+	}
+	if p.guard != nil { // Tenancy area: refuse paths outside the org's project before anything is read (experimentguard.go)
+		if err := p.guard(exp); err != nil {
+			return nil, fmt.Errorf("plan %s: %w", exp.Name, err)
+		}
 	}
 	if err := validateExperiment(exp, mode.minArms); err != nil {
 		return nil, fmt.Errorf("plan %s: %w", exp.Name, err)
@@ -270,7 +278,9 @@ func (p *Planner) plan(ctx context.Context, exp *schemas.Experiment, mode planMo
 	if m.Scenario, err = p.scenarioHashes(suite); err != nil {
 		return nil, fmt.Errorf("plan %s: %w", e.ID, err)
 	}
-	if m.Gateway, err = p.preflight(ctx, e.Name); err != nil {
+	if p.deferGateway { // Tenancy area: the runners preflight their own gateway before every slot (experimentguard.go)
+		m.Gateway = deferredGateway()
+	} else if m.Gateway, err = p.preflight(ctx, e.Name); err != nil {
 		return nil, fmt.Errorf("plan %s: %w", e.ID, err)
 	}
 	if !mode.skipUpstreams {
@@ -1170,6 +1180,9 @@ func validateExperiment(e *schemas.Experiment, minArms int) error {
 	}
 	if e.Budget.TotalUSD < 0 {
 		errs = append(errs, fmt.Errorf("budget total_usd %v is negative", e.Budget.TotalUSD))
+	}
+	if e.Runner != nil && e.Runner.Pool != "" && !schemas.ValidPoolName(e.Runner.Pool) { // Runners area: runner.pool (docs/runners.md)
+		errs = append(errs, fmt.Errorf("runner pool %q must be 1 to 64 letters, digits, '.', '_' or '-'", e.Runner.Pool))
 	}
 	if c := e.Compatibility; c != nil && (c.Agent == "" || c.Trials < 1 || len(c.Conditions) == 0) {
 		errs = append(errs, errors.New("compatibility needs an agent, conditions and trials >= 1"))

@@ -1,0 +1,210 @@
+package main
+
+import (
+	"context"
+	"errors"
+	"flag"
+	"fmt"
+	"io"
+	"os"
+	"os/signal"
+	"path/filepath"
+	"strings"
+	"syscall"
+	"time"
+
+	"github.com/maximhq/bifrost/bench/engine"
+	"github.com/maximhq/bifrost/bench/schemas"
+)
+
+// Runners area (docs/runners.md): `runner start` runs this machine as a
+// runner of a coordinator (a hosted organization with a runner token, or a
+// local serve with BENCH_WORKER_TOKEN); `runner status` checks the server
+// and the token. `worker` is the former name of `runner start`.
+
+func init() {
+	register("runner", "run this machine as a runner (runner start) or check its server and token (runner status)", runRunner)
+}
+
+const runnerUsage = `usage:
+  bifrost-bench runner start -server <url> -token-file <path> [-pool name] [-slots n] [-name name] [-labels a,b] [-spend-cap-usd x] [-config deploy/bench.yaml] [-debug]
+  bifrost-bench runner status -server <url> -token-file <path> [-name name]`
+
+func runRunner(args []string) int {
+	if len(args) == 0 {
+		fmt.Fprintln(os.Stderr, runnerUsage)
+		return exitUsage
+	}
+	switch args[0] {
+	case "start":
+		return runRunnerStart("runner start", args[1:])
+	case "status":
+		return runRunnerStatus(args[1:], os.Stdout)
+	case "-h", "--help", "help":
+		fmt.Fprintln(os.Stdout, runnerUsage)
+		return exitOK
+	}
+	fmt.Fprintln(os.Stderr, runnerUsage)
+	return exitUsage
+}
+
+// runnerFlags are the flags of `runner start` and its alias `worker`.
+type runnerFlags struct {
+	server, tokenFile, name, pool, labels, config string
+	slots                                         int
+	spendCap                                      float64
+	debug                                         bool
+}
+
+func parseRunnerFlags(cmd string, args []string) (*runnerFlags, error) {
+	f := &runnerFlags{}
+	fs := flag.NewFlagSet(cmd, flag.ContinueOnError)
+	fs.SetOutput(io.Discard)
+	fs.StringVar(&f.server, "server", "", "coordinator URL: the hosted server (https://...) or a local serve, e.g. http://127.0.0.1:8090 through an SSH tunnel")
+	fs.StringVar(&f.tokenFile, "token-file", "", "file holding the runner token (hmr_..., hosted) or the coordinator's BENCH_WORKER_TOKEN (local); mode 0600")
+	fs.IntVar(&f.slots, "slots", 1, "slots to run at once")
+	fs.StringVar(&f.name, "name", "", "runner name, unique in the organization (default: a random one)")
+	fs.StringVar(&f.name, "id", "", "same as -name")
+	fs.StringVar(&f.pool, "pool", "", "pool to serve (hosted: must be the token's pool; empty takes it)")
+	fs.StringVar(&f.labels, "labels", "", "comma-separated labels shown in the runners list, e.g. gpu,region=eu")
+	fs.Float64Var(&f.spendCap, "spend-cap-usd", 0, "stop leasing once this runner spent this much in a UTC day (0: no cap)")
+	fs.StringVar(&f.config, "config", defaultConfig, "bench config")
+	fs.BoolVar(&f.debug, "debug", false, "debug logging")
+	if err := fs.Parse(args); err != nil {
+		return nil, err
+	}
+	switch {
+	case fs.NArg() != 0:
+		return nil, fmt.Errorf("unexpected argument %q", fs.Arg(0))
+	case f.server == "" || f.tokenFile == "":
+		return nil, errors.New("-server and -token-file are required")
+	case f.slots < 1 || f.slots > 64:
+		return nil, errors.New("-slots must be 1 to 64")
+	case f.spendCap < 0:
+		return nil, errors.New("-spend-cap-usd must not be negative")
+	case f.pool != "" && !schemas.ValidPoolName(f.pool):
+		return nil, fmt.Errorf("-pool %q: 1 to 64 letters, digits, '.', '_' or '-'", f.pool)
+	}
+	return f, nil
+}
+
+func (f *runnerFlags) labelList() []string {
+	var out []string
+	for _, l := range strings.Split(f.labels, ",") {
+		if l = strings.TrimSpace(l); l != "" {
+			out = append(out, l)
+		}
+	}
+	return out
+}
+
+// runRunnerStart runs this machine as a runner. It needs the same project at
+// the same commit as the coordinator and its own local stack (gateway, fault
+// proxy, docker): every leased experiment is planned again here and refused
+// when its manifest does not come out the same.
+func runRunnerStart(cmd string, args []string) int {
+	f, err := parseRunnerFlags(cmd, args)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "%s: %v\n%s\n", cmd, err, runnerUsage)
+		return exitUsage
+	}
+	token, err := readTokenFile(f.tokenFile)
+	if err != nil {
+		return fail("%v", err)
+	}
+	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+	defer stop()
+	a, err := newApp(ctx, f.config, appOptions{gateway: true, debug: f.debug})
+	if err != nil {
+		return fail("%v", err)
+	}
+	host, err := os.Hostname()
+	if err != nil {
+		host = ""
+	}
+	w, err := engine.NewWorker(a.reg, engine.NewPipeline(a.reg, a.cfg.Root, a.logger),
+		engine.NewPlanner(a.reg, a.cfg.Root, a.logger, engine.WithIgnoreQuarantine()).Plan, // Suite health area: a replan reproduces a frozen manifest (engine/taskscreen.go)
+		engine.WorkerOptions{Server: f.server, Token: token, WorkerID: f.name, Host: host, Version: benchVersion,
+			Slots: f.slots, Logger: a.logger, Pool: f.pool, Labels: f.labelList(),
+			SpendCapUSD: f.spendCap, SpendFile: filepath.Join(a.store.Root(), ".runner", "spend.json")})
+	if err != nil {
+		return fail("%v", err)
+	}
+	msg := fmt.Sprintf("runner %s: %d slots, runs sealed under %s, coordinator %s", w.ID(), f.slots, a.store.Root(), f.server)
+	if f.pool != "" {
+		msg += ", pool " + f.pool
+	}
+	if f.spendCap > 0 {
+		msg += fmt.Sprintf(", spend cap %.2f USD per UTC day", f.spendCap)
+	}
+	a.logger.Info(msg)
+	if err := w.Run(ctx); err != nil {
+		return fail("%s: %v", cmd, err)
+	}
+	return exitOK
+}
+
+// runRunnerStatus checks that the server answers and accepts the token, and
+// prints what the token is scoped to and the runners registered with it.
+// Exit 0 when the token is accepted, even before this runner registered.
+func runRunnerStatus(args []string, out io.Writer) int {
+	fs := flag.NewFlagSet("runner status", flag.ContinueOnError)
+	fs.SetOutput(io.Discard)
+	server := fs.String("server", "", "coordinator URL")
+	tokenFile := fs.String("token-file", "", "file holding the runner token")
+	name := fs.String("name", "", "this runner's name, to show its state")
+	if err := fs.Parse(args); err != nil || fs.NArg() != 0 || *server == "" || *tokenFile == "" {
+		fmt.Fprintln(os.Stderr, runnerUsage)
+		return exitUsage
+	}
+	token, err := readTokenFile(*tokenFile)
+	if err != nil {
+		return fail("%v", err)
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+	who, err := engine.FetchWhoami(ctx, *server, token, nil)
+	switch {
+	case errors.Is(err, schemas.ErrWorkerAuth):
+		return fail("server %s refused the token: unknown, revoked or expired (%v)", *server, err)
+	case errors.Is(err, schemas.ErrWorkerScope):
+		return fail("server %s: the token belongs to another organization (%v)", *server, err)
+	case err != nil:
+		return fail("server %s: %v", *server, err)
+	}
+	printRunnerStatus(out, *server, *name, who)
+	return exitOK
+}
+
+func printRunnerStatus(out io.Writer, server, name string, who *schemas.RunnerWhoami) {
+	fmt.Fprintf(out, "server      %s (reachable, token accepted)\n", server)
+	fmt.Fprintf(out, "mode        %s\n", who.Mode)
+	if who.Mode == "hosted" {
+		fmt.Fprintf(out, "org         %s\npool        %s\ntoken       %s\n", who.OrgID, who.Pool, who.TokenID)
+	}
+	fmt.Fprintf(out, "open        %d experiment(s) this token may lease from now\n", who.Open)
+	found := false
+	for _, w := range who.Workers {
+		if name != "" && w.ID != name {
+			continue
+		}
+		found = true
+		ago := who.Now.Sub(w.LastSeen).Round(time.Second)
+		fmt.Fprintf(out, "runner      %s: %s, %d/%d slots, pool %s, version %s, last seen %s ago, %d accepted\n",
+			w.ID, w.State, len(w.Running), w.Slots, orDash(w.Pool), orDash(w.Version), ago, w.Completed)
+	}
+	if !found {
+		if name != "" {
+			fmt.Fprintf(out, "runner      %s: not registered with this token (start it with `bifrost-bench runner start`)\n", name)
+		} else {
+			fmt.Fprintln(out, "runner      none registered with this token yet")
+		}
+	}
+}
+
+func orDash(s string) string {
+	if s == "" {
+		return "-"
+	}
+	return s
+}

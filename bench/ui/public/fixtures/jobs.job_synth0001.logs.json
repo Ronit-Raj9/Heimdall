@@ -1,0 +1,17 @@
+{
+	"_comment": "SYNTHETIC fixture for UI development. Not a benchmark result.",
+	"mode": "synthetic",
+	"job_id": "job_synth0001",
+	"status": "running",
+	"lines": [
+		{ "seq": 1, "at": "2026-11-18T05:31:02Z", "level": "info", "line": "experiment e_synthetic-codewins: 48 slots, concurrency 4, cap $12.00" },
+		{ "seq": 2, "at": "2026-11-18T05:31:03Z", "level": "info", "line": "lease s_t01_A to runner w-gpu-1" },
+		{ "seq": 3, "at": "2026-11-18T05:31:41Z", "level": "info", "line": "sealed r_t01_A passed (verified) in 38.2s, $0.21" },
+		{ "seq": 4, "at": "2026-11-18T05:32:10Z", "level": "warn", "line": "s_t04_B: gateway 429, retrying in 4s (attempt 2 of 3)" },
+		{ "seq": 5, "at": "2026-11-18T05:32:19Z", "level": "info", "line": "sealed r_t04_B failed (tests) in 52.0s, $0.33" },
+		{ "seq": 6, "at": "2026-11-18T05:33:02Z", "level": "error", "line": "s_t09_A: agent container exited 137 (out of memory); sealed as aborted_infra" },
+		{ "seq": 7, "at": "2026-11-18T05:34:40Z", "level": "info", "line": "29 of 48 slots sealed, $6.12 spent" }
+	],
+	"next": 7,
+	"dropped": 0
+}

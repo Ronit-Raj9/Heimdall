@@ -1,0 +1,7 @@
+# Keys of bench.ts `JobLogs` (jobs.LogPage: GET /jobs/{id}/logs (JSON form)), one per line; a trailing ? marks an optional (Go omitempty) key.
+# Hosted platform (U1 UI). A top-level response adds "mode". Change with bench.ts and the Go type.
+job_id
+status
+lines
+next
+dropped

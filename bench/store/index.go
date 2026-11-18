@@ -527,6 +527,18 @@ func (s *FSStore) loadSealedRun(expID string, slot *schemas.Slot, rec *schemas.R
 		return nil, err
 	}
 	sr.Gateway = ev.Requests.Tally()
+	// Tenancy area: a runner's own gateway preflight, recorded by the
+	// coordinator in the sealed remote/worker.json (hosted manifests defer
+	// the preflight to runners).
+	var remote struct {
+		Gateway *schemas.GatewayManifest `json:"gateway"`
+		Images  *schemas.RunnerImages    `json:"images"` // Deploy area: the runner's image ids (engine/remoteimages.go)
+	}
+	if _, err := readOptionalJSON(filepath.Join(rec.Dir, "remote", "worker.json"), &remote); err != nil {
+		return nil, err
+	}
+	sr.RunnerGateway = remote.Gateway
+	sr.RunnerImages = remote.Images // Deploy area
 	return sr, nil
 }
 

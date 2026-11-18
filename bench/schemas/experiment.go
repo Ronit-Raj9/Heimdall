@@ -38,6 +38,45 @@ type Experiment struct {
 	// Forecast and matrix area: the matrix sugar expands into arms at plan
 	// time (matrix.go, engine/matrixplan.go); nil for every other experiment.
 	Matrix *MatrixSpec `json:"matrix,omitempty" yaml:"matrix,omitempty"`
+
+	// Runners area: which runner pool runs this experiment's slots on the
+	// hosted platform (docs/runners.md); nil for every experiment without
+	// one, so it encodes and hashes exactly as before.
+	Runner *RunnerSpec `json:"runner,omitempty" yaml:"runner,omitempty"`
+}
+
+// RunnerSpec picks the runners of a hosted organization that may run an
+// experiment (Runners area). In hosted mode an experiment without a pool runs
+// on pool DefaultRunnerPool; local mode ignores it.
+type RunnerSpec struct {
+	Pool string `json:"pool,omitempty" yaml:"pool,omitempty"`
+}
+
+// DefaultRunnerPool is the pool of a hosted experiment that names none.
+const DefaultRunnerPool = "default"
+
+// RunnerPool is the pool the experiment runs on in hosted mode: its
+// runner.pool, or DefaultRunnerPool.
+func (e *Experiment) RunnerPool() string {
+	if e == nil || e.Runner == nil || e.Runner.Pool == "" {
+		return DefaultRunnerPool
+	}
+	return e.Runner.Pool
+}
+
+// ValidPoolName reports whether s is a usable runner pool or runner name:
+// 1 to 64 letters, digits, '.', '_' or '-', starting with a letter or digit.
+func ValidPoolName(s string) bool {
+	if s == "" || len(s) > 64 {
+		return false
+	}
+	for i, r := range s {
+		ok := r >= 'a' && r <= 'z' || r >= 'A' && r <= 'Z' || r >= '0' && r <= '9' || (i > 0 && (r == '-' || r == '_' || r == '.'))
+		if !ok {
+			return false
+		}
+	}
+	return true
 }
 
 // CapabilityRequirements separates plan-blocking capabilities from optional

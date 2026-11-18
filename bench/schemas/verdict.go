@@ -73,6 +73,14 @@ type SealedRun struct {
 	Gateway     *GatewayTally    `json:"gateway,omitempty"`  // from evidence.json; nil when the run has no gateway log
 	Problems    []string         `json:"problems,omitempty"` // evidence problems found while loading (seal does not verify, slot has more than one counted run); any makes the verdict INVALID
 	Review      *Review          `json:"review,omitempty"`   // the human review whose decision this run's outcome came from, under grade source reviewed only
+	// RunnerGateway is the runner's own gateway preflight for this run, from
+	// the sealed remote/worker.json; set only for runs of a manifest whose
+	// gateway preflight is deferred to the runner (Tenancy area).
+	RunnerGateway *GatewayManifest `json:"runner_gateway,omitempty"`
+	// RunnerImages are the runner's own image ids for this run, from the
+	// sealed remote/worker.json; set only for runs of a deferred manifest
+	// (Deploy area, instrument runner_images).
+	RunnerImages *RunnerImages `json:"runner_images,omitempty"`
 }
 
 // Effect summarizes paired per-task differences for one condition and metric.

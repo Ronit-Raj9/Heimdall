@@ -1,3 +1,4 @@
+import { ExperimentRunActions } from "@/components/platform/experimentActions";
 import { ValueCell } from "@/components/valueCell";
 import { formatValueNumber } from "@/components/valueCell.utils";
 import { Button } from "@/components/ui/button";
@@ -78,6 +79,8 @@ export function ExperimentProgressCard({ status, capUsd, onNew }: ExperimentProg
 						</Link>
 					</Button>
 				)}
+				{/* Jobs: cancel a running experiment, resume a cancelled or failed one. */}
+				<ExperimentRunActions status={status} />
 				{onNew && (
 					<Button variant="outline" size="sm" onClick={onNew} dataTestId="experiment-plan-another">
 						{t("experiments.new.progress.newExperiment")}

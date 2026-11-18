@@ -44,7 +44,23 @@ type GatewayManifest struct {
 	Problems     []string          `json:"problems,omitempty"`     // preflight failures
 	Hygiene      *GatewayHygiene   `json:"hygiene,omitempty"`      // features that could change a run's traffic; any violation refuses the plan
 	DroppedLogs  *int64            `json:"dropped_logs,omitempty"` // Bifrost's global drop counter at preflight, the experiment's baseline
+
+	// DeferredToRunner marks a manifest planned on a hosted server, which
+	// runs no agent and opens no gateway: the gateway preflight (hygiene,
+	// egress probe, drop counter) is the runner's, run before every slot
+	// and uploaded with each run (remote/worker.json "gateway"); the
+	// gateway_hygiene instrument reads those records (Tenancy area,
+	// docs/platform-design.md).
+	DeferredToRunner bool `json:"deferred_to_runner,omitempty"`
+	// PartVersion is the bench gateway part a runner ran with,
+	// "gateway/<name>@<version>", set only on the runner's per-run record of
+	// a deferred manifest (whose part versions name no gateway).
+	PartVersion string `json:"part_version,omitempty"`
 }
+
+// Deferred reports whether the gateway preflight is the runners' (a hosted
+// manifest). Nil is not deferred.
+func (g *GatewayManifest) Deferred() bool { return g != nil && g.DeferredToRunner }
 
 // GatewayHygiene records the live gateway features that could change what a
 // run's model requests carry or where they go, as preflight read them. The

@@ -1,0 +1,5 @@
+# Keys of bench.ts `JobList` (handlers/jobs.go JobList: GET /jobs), one per line; a trailing ? marks an optional (Go omitempty) key.
+# Hosted platform (U1 UI). A top-level response adds "mode". Change with bench.ts and the Go type.
+jobs
+next?
+kinds

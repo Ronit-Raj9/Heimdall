@@ -1,8 +1,9 @@
 import { HeimdallMark } from "@/components/heimdallMark";
 import { BENCH_NAV, type BenchNavItem } from "@/lib/constants/navigation";
+import { canUse, useSession } from "@/lib/session/sessionContext";
 import { cn } from "@/lib/utils";
 import { Link } from "@tanstack/react-router";
-import { GitCompare, PanelLeftClose, PanelLeftOpen, type LucideIcon } from "lucide-react";
+import { GitCompare, PanelLeftClose, PanelLeftOpen, Settings, type LucideIcon } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 
@@ -27,6 +28,7 @@ const GROUP_OF: Record<string, GroupId> = {
 	"/imports": "setup",
 	"/workers": "setup",
 	"/experiments/new": "setup",
+	"/settings": "setup", // U1 platform: hosted settings
 };
 
 // Order inside each section; screens not listed keep their BENCH_NAV order after these.
@@ -47,12 +49,13 @@ const ORDER = [
 	"/imports",
 	"/workers",
 	"/experiments/new",
+	"/settings",
 ];
 
 const GROUPS: readonly GroupId[] = ["results", "runs", "setup", "more"];
 
 interface NavEntry {
-	to: BenchNavItem["to"] | "/agents/diff";
+	to: BenchNavItem["to"] | "/agents/diff" | "/settings";
 	label: string;
 	icon: LucideIcon;
 	testId: string;
@@ -83,6 +86,8 @@ function writeCollapsed(value: boolean) {
  */
 export function BenchSidebar() {
 	const { t } = useTranslation("bench");
+	const { t: tp } = useTranslation("platform");
+	const session = useSession();
 	// null: follow the width (rail below xl). true or false: the user's choice.
 	const [collapsed, setCollapsed] = useState<boolean | null>(null);
 	useEffect(() => setCollapsed(readCollapsed()), []);
@@ -97,12 +102,19 @@ export function BenchSidebar() {
 		return () => query.removeEventListener("change", update);
 	}, []);
 
-	const entries: NavEntry[] = BENCH_NAV.map((item: BenchNavItem) => ({
-		to: item.to,
-		label: t(item.labelKey),
-		icon: item.icon,
-		testId: item.testId,
-	}));
+	// A demo visitor or a viewer cannot start experiments, so the form is not offered.
+	const entries: NavEntry[] = BENCH_NAV.filter((item) => item.to !== "/experiments/new" || canUse(session, "member")).map(
+		(item: BenchNavItem) => ({
+			to: item.to,
+			label: t(item.labelKey),
+			icon: item.icon,
+			testId: item.testId,
+		}),
+	);
+	// Hosted mode: members, tokens, runners and the audit log of the organization.
+	if (session.authMode === "hosted" && session.signedIn) {
+		entries.push({ to: "/settings", label: tp("settings.title"), icon: Settings, testId: "nav-link-settings" });
+	}
 	// Agent diff has its own route but no BENCH_NAV entry; keep it one click away.
 	if (!entries.some((entry) => entry.to === "/agents/diff")) {
 		entries.push({ to: "/agents/diff", label: t("agentDiff.title"), icon: GitCompare, testId: "nav-link-agent-diff" });
@@ -135,7 +147,7 @@ export function BenchSidebar() {
 	return (
 		<aside
 			className={cn(
-				"bg-sidebar flex shrink-0 flex-col gap-3 border-b px-3 py-2.5 md:h-dvh md:border-r md:border-b-0 md:px-2.5 md:py-3",
+				"bg-sidebar flex shrink-0 flex-col gap-3 border-b px-3 py-2.5 md:min-h-0 md:border-r md:border-b-0 md:px-2.5 md:py-3",
 				"transition-[width] duration-200 ease-(--ease-out)",
 				rail && "md:w-[3.75rem]",
 				auto && "md:w-[3.75rem] xl:w-60",

@@ -1,0 +1,14 @@
+{
+	"_comment": "SYNTHETIC fixture for UI development. Not a benchmark result.",
+	"mode": "synthetic",
+	"id": "job_synth0003",
+	"org_id": "local",
+	"kind": "experiment.regate",
+	"target": "e_synthetic-codewins",
+	"status": "queued",
+	"params": { "exp_id": "e_synthetic-codewins", "id": "rg_synth00002" },
+	"created_by": "local",
+	"created_at": "2026-11-18T05:40:00Z",
+	"cancel_requested": false,
+	"attempt": 0
+}

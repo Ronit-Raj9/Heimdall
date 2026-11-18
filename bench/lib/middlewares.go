@@ -148,7 +148,7 @@ func CORS(origins []string) Middleware {
 				h := &ctx.Response.Header
 				h.Set(fasthttp.HeaderAccessControlAllowOrigin, origin)
 				h.Set(fasthttp.HeaderAccessControlAllowMethods, "GET, POST, OPTIONS")
-				h.Set(fasthttp.HeaderAccessControlAllowHeaders, "Authorization, Content-Type")
+				h.Set(fasthttp.HeaderAccessControlAllowHeaders, "Authorization, Content-Type, X-Heimdall-CSRF, X-Heimdall-Org") // Auth area (P2): CSRF and org headers of hosted mode
 				h.Set(fasthttp.HeaderVary, "Origin")
 				if ctx.IsOptions() {
 					ctx.SetStatusCode(fasthttp.StatusNoContent)

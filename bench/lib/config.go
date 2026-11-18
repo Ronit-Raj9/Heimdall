@@ -13,6 +13,8 @@ import (
 	"strings"
 
 	"github.com/maximhq/bifrost/bench/alerts"
+	"github.com/maximhq/bifrost/bench/db/dbconfig"            // Database area (P1)
+	"github.com/maximhq/bifrost/bench/evidencestore/evconfig" // Evidence storage area (P6)
 	"github.com/maximhq/bifrost/bench/schemas"
 	"gopkg.in/yaml.v3"
 )
@@ -50,6 +52,14 @@ type Config struct {
 	// (Remote coverage, docs/remote-execution.md). Used only by runs of a
 	// remote_http agent with remote.tools expose.
 	RemoteTools RemoteToolsConfig `yaml:"remote_tools" json:"remote_tools,omitzero"`
+
+	Auth AuthConfig `yaml:"auth" json:"auth,omitzero"` // Auth area (P2): local | hosted, sessions, signup, GitHub (lib/authconfig.go, docs/auth.md)
+
+	Database dbconfig.Config `yaml:"database" json:"database,omitzero"` // Database area (P1): sqlite | postgres; resolved by Config.DatabaseConfig (lib/database.go)
+
+	Storage evconfig.Config `yaml:"storage" json:"storage,omitzero"` // Evidence storage area (P6): hosted root, mirror (folder or S3), sweeper (docs/evidence-storage.md)
+
+	Demo DemoConfig `yaml:"demo" json:"demo,omitzero"` // Tenancy area (P3): the public read-only demo organization (lib/democonfig.go)
 
 	Root string `yaml:"-" json:"-"` // bench root that relative paths resolve against
 }
@@ -153,6 +163,12 @@ func (c *Config) Validate() error {
 	}
 	if c.RunsRoot == "" {
 		return fmt.Errorf("runs_root is empty")
+	}
+	if err := c.Auth.Validate(); err != nil { // Auth area (P2)
+		return err
+	}
+	if err := c.Database.Validate(); err != nil { // Database area (P1)
+		return err
 	}
 	return nil
 }

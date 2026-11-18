@@ -53,6 +53,13 @@ type WorkerOptions struct {
 	ScratchDir string        // archives are built here; default the system temp folder
 	HTTP       *http.Client
 	Logger     schemas.Logger
+	// Runners area (docs/runners.md): the pool the runner asks for (hosted:
+	// its token's pool when empty), free-form labels, and the runner's own
+	// spend cap per UTC day (0 = none), kept in SpendFile across restarts.
+	Pool        string
+	Labels      []string
+	SpendCapUSD float64
+	SpendFile   string
 }
 
 // Worker is the remote side of remote execution: it registers with a
@@ -69,6 +76,8 @@ type Worker struct {
 	mu         sync.Mutex
 	registered *schemas.WorkerRegistered
 	exps       map[string]*workerExp
+	spend      *runnerSpend // Runners area: nil without a spend cap
+	capLogged  atomic.Bool
 }
 
 // workerExp is an experiment the worker checked: admitted with its manifest
@@ -119,7 +128,17 @@ func NewWorker(reg *schemas.Registry, runner SlotRunner, replan Replanner, opts 
 	if opts.Logger == nil {
 		opts.Logger = schemas.NoopLogger{}
 	}
-	return &Worker{reg: reg, runner: runner, replan: replan, opts: opts, logger: opts.Logger, exps: map[string]*workerExp{}}, nil
+	if err := validLabels(opts.Pool, opts.Labels); err != nil {
+		return nil, fmt.Errorf("worker: %w", err)
+	}
+	if opts.SpendCapUSD < 0 {
+		return nil, errors.New("worker: negative spend cap")
+	}
+	spend, err := newRunnerSpend(opts.SpendCapUSD, opts.SpendFile)
+	if err != nil {
+		return nil, fmt.Errorf("worker: %w", err)
+	}
+	return &Worker{reg: reg, runner: runner, replan: replan, opts: opts, logger: opts.Logger, exps: map[string]*workerExp{}, spend: spend}, nil
 }
 
 // ID is the worker id it registers under.
@@ -146,7 +165,7 @@ func (w *Worker) Run(ctx context.Context) error {
 // register registers, retrying while the coordinator cannot be reached.
 func (w *Worker) register(ctx context.Context) error {
 	req := schemas.WorkerRegister{WorkerID: w.opts.WorkerID, Host: w.opts.Host, Version: w.opts.Version,
-		Parts: PartVersions(w.reg), Slots: w.opts.Slots}
+		Parts: PartVersions(w.reg), Slots: w.opts.Slots, Pool: w.opts.Pool, Labels: w.opts.Labels}
 	for {
 		var out schemas.WorkerRegistered
 		err := w.call(ctx, http.MethodPost, workerAPI+"/register", req, &out)
@@ -157,7 +176,7 @@ func (w *Worker) register(ctx context.Context) error {
 			w.logger.Info("registered with coordinator", "worker", w.opts.WorkerID, "server", w.opts.Server, "slots", w.opts.Slots)
 			return nil
 		}
-		if errors.Is(err, schemas.ErrWorkerAuth) || errors.Is(err, schemas.ErrWorkerRequest) {
+		if errors.Is(err, schemas.ErrWorkerAuth) || errors.Is(err, schemas.ErrWorkerRequest) || errors.Is(err, schemas.ErrWorkerScope) {
 			return fmt.Errorf("register with %s: %w", w.opts.Server, err)
 		}
 		w.logger.Warn("coordinator not reachable; retrying", "server", w.opts.Server, "error", err.Error())
@@ -170,6 +189,15 @@ func (w *Worker) register(ctx context.Context) error {
 // loop leases and works one slot at a time until ctx ends.
 func (w *Worker) loop(ctx context.Context) {
 	for ctx.Err() == nil {
+		if reached, spent := w.spend.reached(); reached { // Runners area: the runner's own spend cap
+			if !w.capLogged.Swap(true) {
+				w.logger.Warn("runner spend cap reached; no further leases until the next UTC day",
+					"cap_usd", w.opts.SpendCapUSD, "spent_usd", spent)
+			}
+			sleepCtx(ctx, w.opts.PollEvery)
+			continue
+		}
+		w.capLogged.Store(false)
 		var lease schemas.WorkerLease
 		err := w.call(ctx, http.MethodPost, workerAPI+"/lease", schemas.WorkerLeaseRequest{WorkerID: w.opts.WorkerID}, &lease)
 		switch {
@@ -212,9 +240,34 @@ func (w *Worker) Work(ctx context.Context, lease *schemas.WorkerLease) *schemas.
 		w.release(ctx, lease, "the leased slot is not the manifest's slot "+lease.Slot.SlotID, true, nil)
 		return nil
 	}
+	// Tenancy area: a hosted manifest defers the gateway preflight to this
+	// runner; it runs before every slot and refuses the lease on a failure
+	// (remotegateway.go).
+	runM, runnerGW, why := w.runnerPreflight(ctx, exp.m)
+	if why != "" {
+		w.logger.Warn("lease refused", "lease", lease.LeaseID, "experiment", lease.ExpID, "reason", why)
+		w.release(ctx, lease, why, false, nil)
+		return nil
+	}
+	// Deploy area: a deferred manifest froze no image ids; the lock's image
+	// pins are checked again here and the ids this slot runs are recorded
+	// (remoteimages.go).
+	if why := w.checkSlotImages(ctx, exp); why != "" {
+		w.logger.Warn("lease refused", "lease", lease.LeaseID, "experiment", lease.ExpID, "reason", why)
+		w.release(ctx, lease, why, true, nil)
+		return nil
+	}
+	runnerImgs := w.runnerImages(ctx, exp, slot)
 	sctx, stop := w.heartbeat(ctx, lease)
-	res, err := w.runner.RunSlot(sctx, SlotInput{Manifest: exp.m, Suite: exp.suite, Slot: slot, Attempt: lease.Attempt})
+	res, err := w.runner.RunSlot(sctx, SlotInput{Manifest: runM, Suite: exp.suite, Slot: slot, Attempt: lease.Attempt})
+	if res != nil {
+		res.RunnerGateway = runnerGW  // Tenancy area: uploaded with the run
+		res.RunnerImages = runnerImgs // Deploy area: uploaded with the run
+	}
 	defer stop()
+	if serr := w.spend.add(res, exp.m); serr != nil { // Runners area: the runner's own spend cap
+		w.logger.Warn("record runner spend", "error", serr.Error())
+	}
 	if cause := context.Cause(sctx); errors.Is(cause, ErrLeaseLost) {
 		w.logger.Error("lease lost while the slot ran; the run stays in the local store and is not uploaded",
 			"lease", lease.LeaseID, "slot", slot.SlotID, "cause", cause.Error())
@@ -303,7 +356,11 @@ func (w *Worker) check(ctx context.Context, lease *schemas.WorkerLease, m *schem
 	case m.BenchVersion != BenchVersion:
 		return nil, fmt.Sprintf("manifest bench version %s is not this worker's %s", m.BenchVersion, BenchVersion)
 	}
-	if d := mapDiff(PartVersions(w.reg), m.Parts); d != "" {
+	parts := PartVersions(w.reg)
+	if m.Gateway.Deferred() { // Tenancy area: deferred manifest: skip only the gateway/* parts (the runner's, recorded per run); every other part must match (remotegateway.go)
+		parts = withoutGatewayParts(parts)
+	}
+	if d := mapDiff(parts, m.Parts); d != "" {
 		return nil, "part versions differ from the manifest's: " + d
 	}
 	suite, err := LoadSuite(ctx, w.reg, m.Experiment.Suite)
@@ -359,6 +416,12 @@ func adoptUnrepeatable(local, remote *schemas.Manifest) {
 		}
 	}
 	local.Gateway = remote.Gateway
+	if remote.Gateway.Deferred() { // Tenancy area: a hosted plan has no gateway part (remotegateway.go)
+		local.Parts = withoutGatewayParts(local.Parts)
+	}
+	if hostedImagesAdopted(remote) { // Deploy area: a hosted plan (no Docker) froze no image ids; the runner records its own per slot (remoteimages.go)
+		local.SuiteImages, local.TaskImages = nil, nil
+	}
 	for id, am := range local.Arms {
 		if ra, ok := remote.Arms[id]; ok {
 			am.ImageID = ra.ImageID
@@ -466,7 +529,9 @@ func (w *Worker) upload(ctx context.Context, lease *schemas.WorkerLease, res *Sl
 		return nil, err
 	}
 	req := schemas.WorkerComplete{WorkerID: w.opts.WorkerID, RunID: res.Run.RunID, SealSHA256: sha256Hex(sealRaw),
-		ArchiveSHA256: sum, ArchiveBytes: size, Outcome: res.Run.Outcome, CostUSD: costValue(res)}
+		ArchiveSHA256: sum, ArchiveBytes: size, Outcome: res.Run.Outcome, CostUSD: costValue(res),
+		Gateway: res.RunnerGateway, // Tenancy area: the runner's own preflight when the manifest defers it
+		Images:  res.RunnerImages}  // Deploy area: the runner's image ids when the manifest defers it
 	var out schemas.WorkerResult
 	if err := w.call(ctx, http.MethodPost, workerAPI+"/leases/"+url.PathEscape(lease.LeaseID)+"/complete", req, &out); err != nil {
 		return nil, fmt.Errorf("complete: %w", err)
@@ -608,6 +673,8 @@ func apiError(status int, raw []byte) error {
 		sentinel = schemas.ErrUploadTooLarge
 	case http.StatusBadRequest:
 		sentinel = schemas.ErrWorkerRequest
+	case http.StatusForbidden: // Runners area: outside the runner token's organization or pool
+		sentinel = schemas.ErrWorkerScope
 	default:
 		return fmt.Errorf("coordinator answered %d: %s", status, msg)
 	}
@@ -682,6 +749,13 @@ func manifestDiff(a, b *schemas.Manifest) string {
 		{"policy_hash", a.PolicyHash == b.PolicyHash},
 		{"budget_diffs", reflect.DeepEqual(a.BudgetDiffs, b.BudgetDiffs)},
 		{"compatibility", reflect.DeepEqual(a.Compatibility, b.Compatibility)},
+		// Deploy area: the fields a host can change name themselves too.
+		{"suite_images", reflect.DeepEqual(a.SuiteImages, b.SuiteImages)},
+		{"task_images", reflect.DeepEqual(a.TaskImages, b.TaskImages)},
+		{"fingerprint_hash", a.FingerprintHash == b.FingerprintHash},
+		{"task_identities", reflect.DeepEqual(a.TaskIdentities, b.TaskIdentities)},
+		{"run_inputs", reflect.DeepEqual(a.RunInputs, b.RunInputs)},
+		{"gateway", reflect.DeepEqual(a.Gateway, b.Gateway)},
 	}
 	for _, c := range checks {
 		if !c.same {

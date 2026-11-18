@@ -5,7 +5,6 @@ import (
 	"errors"
 	"flag"
 
-	"github.com/maximhq/bifrost/bench/resultsindex"
 	"github.com/maximhq/bifrost/bench/server"
 )
 
@@ -30,7 +29,7 @@ func addServeExtras(fs *flag.FlagSet) *serveExtras {
 // trends request builds it. The daemon runs experiments, so it needs the
 // gateway and is refused with -offline.
 func (x *serveExtras) apply(ctx context.Context, a *app, deps *server.Deps, offline bool) error {
-	deps.Trends = trendSource{ix: resultsindex.New(a.store, a.logger), logger: a.logger}
+	deps.Trends = trendSource{ix: a.resultsSource(), logger: a.logger} // Tenancy area: the database index when one is wired (servetenancy.go)
 	if x.schedules == nil || !*x.schedules {
 		return nil
 	}

@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { WRITE_TOKEN_KEY, isWorkersOff, normalizeWorkers, prepareBenchHeaders, readWriteToken, saveWriteToken } from "./benchApi";
+import { CSRF_HEADER, setAuthState } from "./session";
 
 function memoryStorage(): Storage {
 	const items = new Map<string, string>();
@@ -71,5 +72,37 @@ describe("workers", () => {
 		expect(normalizeWorkers(null).workers).toEqual([]);
 		const w = { id: "w1", host: "h", version: "v", state: "idle", slots: 1, running: [], completed: 0, last_seen: "" };
 		expect(normalizeWorkers({ mode: "recorded", enabled: true, workers: [w] })).toEqual({ mode: "recorded", enabled: true, workers: [w] });
+	});
+});
+describe("hosted mode headers", () => {
+	beforeEach(() => {
+		vi.stubGlobal("window", { sessionStorage: memoryStorage(), location: { search: "" } });
+	});
+	afterEach(() => {
+		saveWriteToken("");
+		setAuthState({ mode: "local" });
+		vi.unstubAllGlobals();
+	});
+
+	it("sends the session's CSRF value on every mutation and never a write token", () => {
+		saveWriteToken("left-over-local-token");
+		setAuthState({ mode: "hosted", csrf: "csrf-123" });
+		const mutation = prepareBenchHeaders(new Headers(), "mutation");
+		expect(mutation.get(CSRF_HEADER)).toBe("csrf-123");
+		expect(mutation.has("Authorization")).toBe(false);
+		expect(CSRF_HEADER).toBe("X-Heimdall-CSRF");
+	});
+
+	it("sends no CSRF header on queries", () => {
+		setAuthState({ mode: "hosted", csrf: "csrf-123" });
+		expect(prepareBenchHeaders(new Headers(), "query").has(CSRF_HEADER)).toBe(false);
+	});
+
+	it("keeps local mode exactly as before: the write token, no CSRF header", () => {
+		saveWriteToken("secret");
+		setAuthState({ mode: "local" });
+		const mutation = prepareBenchHeaders(new Headers(), "mutation");
+		expect(mutation.get("Authorization")).toBe("Bearer secret");
+		expect(mutation.has(CSRF_HEADER)).toBe(false);
 	});
 });

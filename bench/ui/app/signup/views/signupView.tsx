@@ -1,0 +1,142 @@
+import { AuthError, AuthField, AuthHeading, GithubButton } from "@/components/platform/authForm";
+import { RoleBadge } from "@/components/platform/badges";
+import { looksLikeEmail } from "@/components/platform/platform.utils";
+import { BlockSkeleton } from "@/components/runs/screenStates";
+import { Button } from "@/components/ui/button";
+import { useSession } from "@/lib/session/sessionContext";
+import { getBenchErrorMessage } from "@/lib/store/apis/benchApi";
+import { useGetInvitationQuery, useSignupMutation } from "@/lib/store/apis/platformApi";
+import { Link, Navigate } from "@tanstack/react-router";
+import { Info } from "lucide-react";
+import { useState, type FormEvent } from "react";
+import { useTranslation } from "react-i18next";
+
+/** Passwords shorter than this are refused here before the server refuses them. */
+export const MIN_PASSWORD = 12;
+
+/**
+ * Create an account. Open sign-up creates a first organization with the new user as its owner; an
+ * invitation token joins the inviting organization instead. Invite-only and closed servers say so.
+ */
+export default function SignupView({ invitation }: { invitation?: string }) {
+	const { t } = useTranslation("platform");
+	const session = useSession();
+	const invite = useGetInvitationQuery(invitation ?? "", { skip: !invitation });
+	const [name, setName] = useState("");
+	const [email, setEmail] = useState("");
+	const [password, setPassword] = useState("");
+	const [touched, setTouched] = useState(false);
+	const [signup, state] = useSignupMutation();
+	// An invitation fixes the email: the account must be the one invited.
+	const invitedEmail = invite.data?.email;
+
+	if (session.signedIn) return <Navigate to="/verdict" replace />;
+	if (session.status === "ready" && session.authMode === "local") return <Navigate to="/verdict" replace />;
+
+	const notice = (text: string, testId: string) => (
+		<div className="flex flex-col gap-6" data-testid={testId}>
+			<AuthHeading title={t("auth.signup.title")} />
+			<p className="border-border bg-muted/40 text-muted-foreground flex items-start gap-2.5 rounded-md border px-3 py-3 text-sm">
+				<Info className="mt-0.5 size-4 shrink-0" aria-hidden="true" />
+				{text}
+			</p>
+			<p className="text-muted-foreground text-sm">
+				{t("auth.signup.haveAccount")}{" "}
+				<Link to="/login" className="text-primary font-medium underline-offset-4 hover:underline">
+					{t("auth.signup.signIn")}
+				</Link>
+			</p>
+		</div>
+	);
+	if (!invitation && session.signup === "closed") return notice(t("auth.signup.closed"), "signup-closed");
+	if (!invitation && session.signup !== "open") return notice(t("auth.signup.inviteOnly"), "signup-invite-only");
+	if (invitation && invite.isLoading) return <BlockSkeleton rows={4} testId="signup-invite-loading" />;
+	if (invitation && (invite.isError || !invite.data)) {
+		return (
+			<div className="flex flex-col gap-6" data-testid="signup-invite-invalid">
+				<AuthHeading title={t("auth.invite.invalid")} subtitle={t("auth.invite.invalidBody")} />
+			</div>
+		);
+	}
+
+	const address = invitedEmail ?? email;
+	const emailError = touched && !looksLikeEmail(address) ? t("settings.invite.invalidEmail") : undefined;
+	const passwordShort = touched && password.length < MIN_PASSWORD;
+	const onSubmit = async (event: FormEvent) => {
+		event.preventDefault();
+		setTouched(true);
+		if (!looksLikeEmail(address) || password.length < MIN_PASSWORD) return;
+		try {
+			await signup({ email: address.trim(), password, name: name.trim() || undefined, invitation }).unwrap();
+			window.location.assign("/");
+		} catch {
+			// state.error renders the failure.
+		}
+	};
+
+	const subtitle = invite.data
+		? t("auth.signup.subtitleInvite", { org: invite.data.org_name, role: t(`roles.${invite.data.role}`).toLowerCase() })
+		: t("auth.signup.subtitle");
+	return (
+		<div className="flex flex-col gap-7" data-testid="signup-screen">
+			<AuthHeading title={t("auth.signup.title")} subtitle={subtitle} />
+			{invite.data && (
+				<div className="bg-muted/40 flex items-center gap-2 rounded-md border px-3 py-2 text-sm" data-testid="signup-invite-org">
+					<span className="text-foreground truncate font-medium">{invite.data.org_name}</span>
+					<RoleBadge role={invite.data.role} className="ml-auto" />
+				</div>
+			)}
+			<form className="flex flex-col gap-4" onSubmit={(event) => void onSubmit(event)} noValidate data-testid="signup-form">
+				<AuthField
+					label={t("auth.name")}
+					name="name"
+					autoComplete="name"
+					placeholder={t("auth.namePlaceholder")}
+					value={name}
+					onChange={(event) => setName(event.target.value)}
+					testId="signup-name"
+				/>
+				<AuthField
+					label={t("auth.email")}
+					type="email"
+					name="email"
+					autoComplete="email"
+					required
+					readOnly={Boolean(invitedEmail)}
+					value={address}
+					onChange={(event) => setEmail(event.target.value)}
+					error={emailError}
+					testId="signup-email"
+				/>
+				<AuthField
+					label={t("auth.password")}
+					type="password"
+					name="new-password"
+					autoComplete="new-password"
+					required
+					minLength={MIN_PASSWORD}
+					value={password}
+					onChange={(event) => setPassword(event.target.value)}
+					hint={t("auth.passwordHint")}
+					error={passwordShort ? t("auth.passwordHint") : undefined}
+					testId="signup-password"
+				/>
+				{state.error && <AuthError title={t("auth.signup.error")} message={getBenchErrorMessage(state.error)} testId="signup-error" />}
+				<Button type="submit" size="lg" className="mt-1 h-10 w-full" isLoading={state.isLoading} dataTestId="signup-submit">
+					{t("auth.signup.submit")}
+				</Button>
+				{session.github && !invitation && <GithubButton returnTo="/" />}
+			</form>
+			<p className="text-muted-foreground text-sm">
+				{t("auth.signup.haveAccount")}{" "}
+				<Link
+					to="/login"
+					search={invitation ? { return_to: `/invite/${encodeURIComponent(invitation)}` } : {}}
+					className="text-primary font-medium underline-offset-4 hover:underline"
+				>
+					{t("auth.signup.signIn")}
+				</Link>
+			</p>
+		</div>
+	);
+}

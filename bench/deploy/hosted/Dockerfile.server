@@ -1,0 +1,81 @@
+# Hosted Heimdall server image: the web UI built with npm, embedded into a
+# static Go binary (CGO_ENABLED=0), on a minimal non-root runtime. Built from
+# bench/ as the context:
+#
+#   docker build -f deploy/hosted/Dockerfile.server -t heimdall/server:local .
+#   docker build -f deploy/hosted/Dockerfile.server --target runner -t heimdall/runner:local .
+#
+# deploy/hosted/docker-compose.yml builds both. The build context is filtered
+# by Dockerfile.server.dockerignore (next to this file), not by bench's
+# .dockerignore, which only admits the prebuilt binary for the fault proxy
+# image (bench/Dockerfile, unchanged).
+#
+# Every base image is pinned by digest (tag kept for reading). To move one:
+# docker pull <tag>, then docker inspect --format '{{index .RepoDigests 0}}' <tag>.
+
+# --- UI: npm ci from the lockfile, then vite build into ui/dist ------------
+FROM node:22-slim@sha256:e9f565d32859f0cbfb52125eafe8be39390f24dac302dc3cdf566e8ba3ab21ee AS ui
+WORKDIR /src/ui
+COPY ui/package.json ui/package-lock.json ./
+RUN npm ci --no-audit --no-fund
+COPY ui/ ./
+RUN npm run build
+
+# --- Go: static binary with the built UI embedded ---------------------------
+FROM golang:1.26-alpine@sha256:ecb67f987aa1a57794c91d19ade7ae0209f2f0f5496aaef9e6ae85ddf92d02ab AS build
+ENV GOWORK=off CGO_ENABLED=0 GOFLAGS=-trimpath
+WORKDIR /src
+COPY go.mod go.sum ./
+RUN go mod download
+COPY . .
+COPY --from=ui /src/ui/dist ./ui/dist
+RUN test -f ui/dist/index.html \
+    && go build -ldflags="-s -w" -o /out/bifrost-bench ./cmd/bifrost-bench \
+    && /out/bifrost-bench version
+
+# --- Runtime: the server ------------------------------------------------------
+# Layout: /srv/heimdall is the bench root (read-only, from the image):
+# deploy/bench.yaml (the hosted template, replaced by a bind mount in
+# compose), benchmarks/, agents/, experiments/ and the price snapshot.
+# /var/lib/heimdall is the data volume: runs/ (sealed evidence, per org) and
+# releases/. Both data folders exist here owned by the runtime user, so a
+# fresh named volume starts with that ownership.
+# postgresql18-client: pg_dump and pg_restore matching the Postgres 18
+# server, for `bifrost-bench evidence backup` (database dump uploaded to the
+# evidence mirror) and `db backup`.
+FROM alpine:3.23@sha256:469c9ea410b9215eaee7976ba6c0639039b444be8e5d638f7abbada189971eb2 AS server
+RUN apk add --no-cache 'postgresql18-client~18' \
+    && addgroup -S -g 10001 heimdall \
+    && adduser -S -D -H -h /var/lib/heimdall -u 10001 -G heimdall heimdall \
+    && mkdir -p /srv/heimdall/deploy /var/lib/heimdall/runs /var/lib/heimdall/releases \
+    && chown -R 10001:10001 /var/lib/heimdall \
+    && chmod 0750 /var/lib/heimdall
+COPY --from=build /out/bifrost-bench /usr/local/bin/bifrost-bench
+COPY benchmarks /srv/heimdall/benchmarks
+COPY agents /srv/heimdall/agents
+COPY experiments /srv/heimdall/experiments
+COPY deploy/pricing-snapshot.json /srv/heimdall/deploy/pricing-snapshot.json
+COPY deploy/hosted/bench.hosted.yaml /srv/heimdall/deploy/bench.yaml
+ENV HOME=/var/lib/heimdall \
+    BENCH_RELEASES_ROOT=/var/lib/heimdall/releases
+WORKDIR /srv/heimdall
+USER 10001:10001
+EXPOSE 8090
+# /readyz: the database answers, migrations are current, the runs root is
+# writable. busybox wget ships with the base image.
+HEALTHCHECK --interval=10s --timeout=5s --start-period=30s --retries=3 \
+    CMD wget -q -O /dev/null http://127.0.0.1:8090/readyz || exit 1
+ENTRYPOINT ["/usr/local/bin/bifrost-bench"]
+CMD ["serve", "-config", "/srv/heimdall/deploy/bench.yaml"]
+
+# --- Runtime: the demo runner (compose profile demo-runner) -----------------
+# The same binary plus the Docker CLI: the runner starts agent containers on
+# the host's Docker through the mounted socket. Runs as the same non-root
+# user; compose adds the socket's group.
+FROM server AS runner
+COPY --from=docker:29-cli@sha256:34507eb5069d8be82c95dd3b6987d4250fd5fee49b82e2509b7d7a7030740d6d /usr/local/bin/docker /usr/local/bin/docker
+HEALTHCHECK NONE
+CMD ["version"]
+
+# The default target is the server.
+FROM server

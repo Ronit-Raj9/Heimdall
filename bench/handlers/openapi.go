@@ -14,8 +14,10 @@ import (
 	"time"
 
 	"github.com/fasthttp/router"
+	"github.com/maximhq/bifrost/bench/auth"
 	"github.com/maximhq/bifrost/bench/clusters"
 	"github.com/maximhq/bifrost/bench/importers"
+	"github.com/maximhq/bifrost/bench/jobs"
 	"github.com/maximhq/bifrost/bench/lib"
 	"github.com/maximhq/bifrost/bench/schemas"
 	"github.com/valyala/fasthttp"
@@ -81,6 +83,13 @@ var APIRoutes = []RouteDoc{
 	{Method: "GET", Path: APIPrefix + "/experiments/{id}/grid", Tag: "experiments", Summary: "Task by trial grid of slots and runs", Response: schemas.Grid{}},
 	{Method: "GET", Path: APIPrefix + "/experiments/{id}/events", Tag: "experiments", Summary: "Live events: server-sent events for Accept text/event-stream, else a poll",
 		Query: []QueryDoc{{Name: "since", Description: "Return events after this sequence number"}}, Response: schemas.EventsPoll{}, AlsoRaw: "text/event-stream"},
+	// Jobs area (P4, handlers/experimentjobs.go): experiments run as experiment.run jobs.
+	{Method: "POST", Path: APIPrefix + "/experiments/{id}/cancel", Tag: "experiments", Summary: "Cancel a running experiment: no new slot is leased, in-flight runs stop and seal as aborted_infra (never counted); the state becomes cancelled; 409 when nothing runs",
+		Auth: AuthWrite, Status: fasthttp.StatusAccepted, Response: schemas.ExperimentStatus{}},
+	{Method: "POST", Path: APIPrefix + "/experiments/{id}/resume", Tag: "experiments", Summary: "Queue a stopped experiment's run again; sealed runs are kept and the rest run; 409 while a run or regrade job is active",
+		Auth: AuthWrite, Status: fasthttp.StatusAccepted, Response: schemas.ExperimentStatus{}},
+	{Method: "POST", Path: APIPrefix + "/experiments/{id}/regrade", Tag: "analysis", Summary: "Queue an experiment.regate job: recompute the gates of the sealed runs as a new regrade (id in the job's params); nothing runs again",
+		Auth: AuthWrite, Request: RegradeRequest{}, Status: fasthttp.StatusAccepted, Response: jobs.Job{}},
 	{Method: "GET", Path: APIPrefix + "/experiments/{id}/triage", Tag: "analysis", Summary: "Runs grouped by failure pattern per arm", Response: schemas.Triage{}},
 	{Method: "POST", Path: APIPrefix + "/estimate", Tag: "experiments", Summary: "Forecast an experiment's cost and time from sealed history; nothing is frozen, a refused plan comes back with fit unknown and 200",
 		Auth: AuthWrite, Request: schemas.Experiment{}, RequestAlso: experimentMediaTypes, Response: schemas.Forecast{}}, // Forecast and matrix area (forecast.go)
@@ -157,6 +166,53 @@ var APIRoutes = []RouteDoc{
 		Auth: AuthWorker, Request: schemas.WorkerComplete{}, Response: schemas.WorkerResult{}},
 	{Method: "POST", Path: APIPrefix + "/workers/leases/{lease_id}/release", Tag: "workers", Summary: "Give a lease back unfinished",
 		Auth: AuthWorker, Request: schemas.WorkerRelease{}, Status: fasthttp.StatusNoContent},
+	// Runners area (P5, handlers/workers.go, handlers/runners.go, docs/runners.md). Hosted mode: the worker routes take a
+	// runner token (hmr_...) scoped to one org and pool; 403 for another org's or pool's work. The runner admin routes need
+	// an admin of the current org and answer 503 in local mode.
+	{Method: "GET", Path: APIPrefix + "/workers/whoami", Tag: "workers", Summary: "What the caller's token is scoped to and the runners registered with it",
+		Auth: AuthWorker, Response: schemas.RunnerWhoami{}},
+	{Method: "GET", Path: APIPrefix + "/runners", Tag: "runners", Summary: "Registered runners of the org: state, pool, version, last seen, running slots",
+		Auth: AuthWrite, Response: schemas.RunnersList{}},
+	{Method: "GET", Path: APIPrefix + "/runners/{id}", Tag: "runners", Summary: "One runner of the org", Auth: AuthWrite, Response: schemas.RunnerView{}},
+	{Method: "POST", Path: APIPrefix + "/runners/{id}/remove", Tag: "runners", Summary: "Remove a runner: its leases are lost now; revoke its token to keep it out",
+		Auth: AuthWrite, Response: schemas.RunnerView{}},
+	{Method: "GET", Path: APIPrefix + "/runners/tokens", Tag: "runners", Summary: "Runner tokens of the org, without secrets", Auth: AuthWrite, Response: schemas.RunnerTokensList{}},
+	{Method: "POST", Path: APIPrefix + "/runners/tokens", Tag: "runners", Summary: "Create a runner token for one pool; the token and the runner start command are shown once",
+		Auth: AuthWrite, Request: schemas.RunnerTokenCreate{}, Status: fasthttp.StatusCreated, Response: schemas.RunnerTokenCreated{}},
+	{Method: "POST", Path: APIPrefix + "/runners/tokens/{id}/revoke", Tag: "runners", Summary: "Revoke a runner token now; its runners lose their leases",
+		Auth: AuthWrite, Response: schemas.RunnerTokenView{}},
+	{Method: "GET", Path: APIPrefix + "/runners/install.sh", Tag: "runners", Summary: "Runner install script for a fresh Ubuntu or Debian box (deploy/runner/install.sh)",
+		Raw: "text/x-shellscript"},
+
+	// Jobs area (P4, handlers/jobs.go, docs/platform-design.md): background jobs of the caller's org.
+	{Method: "GET", Path: APIPrefix + "/jobs", Tag: "jobs", Summary: "Jobs of the org, newest first, and the kinds POST /jobs accepts", Response: JobList{}, Query: []QueryDoc{
+		{Name: "kind", Description: "Only this kind"}, {Name: "status", Description: "queued, running, succeeded, failed or cancelled"},
+		{Name: "target", Description: "Only jobs on this target, e.g. exp:<id> or suite:<id>"}, {Name: "limit", Description: "1..500, default 50"},
+		{Name: "before", Description: "Page: jobs created before this job id (next of the previous page)"}}},
+	{Method: "POST", Path: APIPrefix + "/jobs", Tag: "jobs", Summary: "Queue a job: suite.lint, suite.lock, suite.admit, agent.check, index.rebuild or experiment.regate, params validated per kind, paths inside the org's project folder (member)",
+		Auth: AuthWrite, Request: JobCreate{}, Status: fasthttp.StatusAccepted, Response: jobs.Job{}},
+	{Method: "GET", Path: APIPrefix + "/jobs/{id}", Tag: "jobs", Summary: "One job: status, params, progress, result, error, attempt", Response: jobs.Job{}},
+	{Method: "GET", Path: APIPrefix + "/jobs/{id}/logs", Tag: "jobs", Summary: "Log lines after since: JSON, or server-sent events (log events, then end) for Accept text/event-stream; the first and newest lines are kept, dropped counts the rest",
+		Query:    []QueryDoc{{Name: "since", Description: "Return lines after this sequence number"}, {Name: "limit", Description: "1..2000, default 500"}},
+		Response: jobs.LogPage{}, AlsoRaw: "text/event-stream"},
+	{Method: "POST", Path: APIPrefix + "/jobs/{id}/cancel", Tag: "jobs", Summary: "Cancel a job: a queued one at once, a running one when its handler stops; 409 when it already ended (member)",
+		Auth: AuthWrite, Status: fasthttp.StatusAccepted, Response: jobs.Job{}},
+
+	// Auth area (P2, handlers/auth.go, docs/auth.md). Local mode answers config and me only; the rest are hosted mode.
+	{Method: "GET", Path: AuthPrefix + "/config", Tag: "auth", Summary: "Sign-in options: auth mode, signup policy, GitHub, bootstrap", Response: auth.AuthInfo{}},
+	{Method: "GET", Path: AuthPrefix + "/me", Tag: "auth", Summary: "The caller: user, orgs with roles, current org, CSRF value; 401 when anonymous", Response: auth.Me{}},
+	{Method: "POST", Path: AuthPrefix + "/signup", Tag: "auth", Summary: "Create an account under the signup policy and sign in", Request: auth.SignupRequest{}, Status: fasthttp.StatusCreated, Response: auth.Me{}},
+	{Method: "POST", Path: AuthPrefix + "/login", Tag: "auth", Summary: "Sign in with email and password; sets the session cookie", Request: auth.LoginRequest{}, Response: auth.Me{}},
+	{Method: "POST", Path: AuthPrefix + "/logout", Tag: "auth", Summary: "End the session and clear the cookie", Status: fasthttp.StatusNoContent},
+	{Method: "POST", Path: AuthPrefix + "/switch-org", Tag: "auth", Summary: "Make one of the user's orgs the session's current org", Request: auth.SwitchOrgRequest{}, Response: auth.MeOrg{}},
+	{Method: "POST", Path: AuthPrefix + "/password", Tag: "auth", Summary: "Change the password; ends the user's other sessions", Request: auth.PasswordChangeRequest{}, Status: fasthttp.StatusNoContent},
+	{Method: "GET", Path: AuthPrefix + "/github/start", Tag: "auth", Summary: "Redirect to GitHub sign-in", Query: []QueryDoc{{Name: "return_to", Description: "Same-site path to land on after sign-in"}}, Status: fasthttp.StatusFound},
+	{Method: "GET", Path: AuthPrefix + "/github/callback", Tag: "auth", Summary: "GitHub's redirect back; redirects to the return path or /login?error=", Status: fasthttp.StatusFound},
+	{Method: "GET", Path: AuthPrefix + "/invitations/{token}", Tag: "auth", Summary: "Pending invitation: org, email, role, expiry", Response: auth.InvitationInfo{}},
+	{Method: "POST", Path: AuthPrefix + "/invitations/{token}", Tag: "auth", Summary: "Accept an invitation as the signed-in user", Response: auth.MeOrg{}},
+	{Method: "GET", Path: AuthPrefix + "/tokens", Tag: "auth", Summary: "API tokens of the current org (admin)", Response: TokenList{}},
+	{Method: "POST", Path: AuthPrefix + "/tokens", Tag: "auth", Summary: "Create an API token; the secret is shown once (admin)", Request: auth.TokenCreateRequest{}, Status: fasthttp.StatusCreated, Response: auth.TokenCreated{}},
+	{Method: "POST", Path: AuthPrefix + "/tokens/{id}/revoke", Tag: "auth", Summary: "Revoke an API token (admin)", Status: fasthttp.StatusNoContent},
 }
 
 var (

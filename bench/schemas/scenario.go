@@ -484,6 +484,11 @@ type WorkerInfo struct {
 	Running   []string  `json:"running"` // slot ids it holds
 	Completed int       `json:"completed"`
 	LastSeen  time.Time `json:"last_seen"`
+	// Runners area (docs/runners.md): the runner's pool and labels; in
+	// hosted mode also the runner token it registered with.
+	Pool    string   `json:"pool,omitempty"`
+	Labels  []string `json:"labels,omitempty"`
+	TokenID string   `json:"token_id,omitempty"`
 }
 
 // External API modes (ExternalAPI.Mode, Experiment.External). Live and record

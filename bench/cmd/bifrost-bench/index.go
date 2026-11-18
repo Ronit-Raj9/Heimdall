@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"github.com/maximhq/bifrost/bench/engine"
+	"github.com/maximhq/bifrost/bench/ops"
 	"github.com/maximhq/bifrost/bench/resultsindex"
 	"github.com/maximhq/bifrost/bench/schemas"
 	"github.com/maximhq/bifrost/bench/trends"
@@ -67,11 +68,11 @@ func runIndex(args []string) int {
 	ix := resultsindex.New(a.store, a.logger)
 	switch sub {
 	case "rebuild":
-		st, err := ix.Rebuild(ctx)
+		rix, st, err := ops.IndexRebuild(ctx, a.store, a.logger) // Jobs area: shared with the index.rebuild job (bench/ops)
 		if err != nil {
 			return fail("%v", err)
 		}
-		return printIndexStatus(os.Stdout, ix, st)
+		return printIndexStatus(os.Stdout, rix, st)
 	case "status":
 		snap, err := ix.Snapshot()
 		if err != nil {
@@ -98,7 +99,7 @@ func runIndex(args []string) int {
 // runs sealed. The index is derived data, so a failure is only logged: the
 // sealed folders are intact and `index rebuild` recovers.
 func refreshResultsIndex(ctx context.Context, a *app, expID string) {
-	if err := resultsindex.New(a.store, a.logger).UpdateExperiment(ctx, expID); err != nil {
+	if err := a.resultsSource().UpdateExperiment(ctx, expID); err != nil { // Tenancy area: the app's own org index (servetenancy.go)
 		a.logger.Warn("results index not updated; run `bifrost-bench index rebuild`", "exp_id", expID, "error", err.Error())
 	}
 }
@@ -109,7 +110,14 @@ func refreshResultsIndex(ctx context.Context, a *app, expID string) {
 // index; a burst of seals collapses into one update.
 type sealRefresher struct {
 	once sync.Once
-	kick chan string
+	kick chan refreshReq // Tenancy area: carries the app, so a hosted org's seal updates that org's index
+}
+
+// refreshReq is one queued index update: the app (its store and index) and
+// the experiment.
+type refreshReq struct {
+	a     *app
+	expID string
 }
 
 var indexRefresher sealRefresher
@@ -123,16 +131,16 @@ func indexOnSeal(ctx context.Context, a *app, expID string, ev engine.Event) {
 		return
 	}
 	indexRefresher.once.Do(func() {
-		indexRefresher.kick = make(chan string, 1)
+		indexRefresher.kick = make(chan refreshReq, 1)
 		go func() {
 			bg := context.WithoutCancel(ctx)
-			for id := range indexRefresher.kick {
-				refreshResultsIndex(bg, a, id)
+			for req := range indexRefresher.kick {
+				refreshResultsIndex(bg, req.a, req.expID)
 			}
 		}()
 	})
 	select {
-	case indexRefresher.kick <- expID:
+	case indexRefresher.kick <- refreshReq{a: a, expID: expID}:
 	default: // an update is already queued; it reads the new seal too
 	}
 }
@@ -141,7 +149,7 @@ func indexOnSeal(ctx context.Context, a *app, expID string, ev engine.Event) {
 // date incrementally first. The verdict, leaderboard and release paths never
 // use it.
 type trendSource struct {
-	ix     *resultsindex.Index
+	ix     resultsindex.Source // Database area (P1): the JSONL Index, or db.OrgIndex when a database is configured
 	logger schemas.Logger
 }
 
@@ -151,7 +159,7 @@ func (s trendSource) Trends(ctx context.Context, q trends.Query) (*trends.Respon
 	if _, err := s.ix.Sync(ctx); err != nil {
 		s.logger.Warn("results index sync failed; serving trends from the index as it is", "error", err.Error())
 	}
-	snap, err := s.ix.Snapshot()
+	snap, err := s.ix.Load(ctx) // Database area (P1): Source.Load; the JSONL Index reads its file as before
 	if err != nil {
 		return nil, err
 	}

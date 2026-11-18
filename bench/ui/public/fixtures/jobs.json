@@ -1,0 +1,51 @@
+{
+	"_comment": "SYNTHETIC fixture for UI development. Not a benchmark result.",
+	"mode": "synthetic",
+	"jobs": [
+		{
+			"id": "job_synth0001",
+			"org_id": "local",
+			"kind": "experiment.run",
+			"target": "e_synthetic-codewins",
+			"status": "running",
+			"params": { "exp_id": "e_synthetic-codewins" },
+			"progress": { "exp_id": "e_synthetic-codewins", "phase": "running", "slots": 48, "sealed": 29, "skipped": 0, "errors": 1 },
+			"created_by": "local",
+			"created_at": "2026-11-18T05:31:00Z",
+			"started_at": "2026-11-18T05:31:02Z",
+			"cancel_requested": false,
+			"attempt": 1
+		},
+		{
+			"id": "job_synth0002",
+			"org_id": "local",
+			"kind": "suite.lint",
+			"target": "coding-core",
+			"status": "succeeded",
+			"params": { "suite": "coding-core" },
+			"result": { "suite": "coding-core", "problems": 0 },
+			"created_by": "local",
+			"created_at": "2026-11-18T05:12:00Z",
+			"started_at": "2026-11-18T05:12:01Z",
+			"finished_at": "2026-11-18T05:12:09Z",
+			"cancel_requested": false,
+			"attempt": 1
+		},
+		{
+			"id": "job_synth0004",
+			"org_id": "local",
+			"kind": "agent.check",
+			"target": "codex",
+			"status": "failed",
+			"params": { "agent": "codex" },
+			"error": "agent check: the gateway at :8080 refused the connection",
+			"created_by": "local",
+			"created_at": "2026-11-18T04:50:00Z",
+			"started_at": "2026-11-18T04:50:01Z",
+			"finished_at": "2026-11-18T04:50:31Z",
+			"cancel_requested": false,
+			"attempt": 1
+		}
+	],
+	"kinds": ["experiment.run", "experiment.regate", "suite.lint", "suite.lock", "suite.admit", "agent.check", "index.rebuild", "org.import"]
+}

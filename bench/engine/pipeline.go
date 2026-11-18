@@ -65,6 +65,13 @@ type SlotResult struct {
 	Dir     string
 	Metrics map[string]schemas.Value
 	Seal    *schemas.SealRecord // nil when sealing failed
+	// RunnerGateway is a remote worker's own gateway preflight for the run,
+	// uploaded with it when the manifest defers the preflight to runners
+	// (Tenancy area, remotegateway.go).
+	RunnerGateway *schemas.GatewayManifest
+	// RunnerImages are a remote worker's own image ids for the run, uploaded
+	// with it when the manifest is deferred (Deploy area, remoteimages.go).
+	RunnerImages *schemas.RunnerImages
 }
 
 // runState is everything one run accumulates on its way through the stages.
@@ -139,6 +146,10 @@ func (p *Pipeline) RunSlot(ctx context.Context, in SlotInput) (*SlotResult, erro
 		st.rc.Run.Outcome = schemas.OutcomeAbortedInfra
 		st.rc.Run.Failures = append(st.rc.Run.Failures, schemas.PartFailure{Stage: schemas.StageLeased, Part: "engine",
 			Error: cause.Error() + "; the run was stopped and is not counted, since another owner may run the slot"})
+	} else if errors.Is(cause, ErrRunCancelled) { // Jobs area: a cancelled or stopping experiment's in-flight run never counts (cancel.go)
+		st.rc.Run.Outcome = schemas.OutcomeAbortedInfra
+		st.rc.Run.Failures = append(st.rc.Run.Failures, schemas.PartFailure{Stage: schemas.StageLeased, Part: "engine",
+			Error: cause.Error() + "; the run was stopped and is not counted; a resume runs the slot again"})
 	}
 	st.rc.Run.Y = scoreOf(st.rc.Run.Outcome)
 	if pf, ok := upstreamFailure(up, st.rc.Run.Outcome); ok {

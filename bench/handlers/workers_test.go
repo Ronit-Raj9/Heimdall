@@ -55,6 +55,10 @@ func (f *fakeWorkerAPI) Workers() []schemas.WorkerInfo {
 	return []schemas.WorkerInfo{{ID: "w1", Host: "box", State: schemas.WorkerIdle, Slots: 2, Running: []string{}}}
 }
 
+func (f *fakeWorkerAPI) Whoami(context.Context) (*schemas.RunnerWhoami, error) {
+	return &schemas.RunnerWhoami{Mode: "local", Workers: f.Workers()}, f.err
+}
+
 // workerCall sends one request through the worker routes.
 func workerCall(t *testing.T, api WorkerAPI, method, uri, token, body string) *fasthttp.Response {
 	t.Helper()

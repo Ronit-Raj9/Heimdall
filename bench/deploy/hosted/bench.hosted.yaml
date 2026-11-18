@@ -1,0 +1,90 @@
+# Hosted Heimdall configuration (docs/hosting.md). docker-compose.yml mounts
+# this file read-only at /srv/heimdall/deploy/bench.yaml inside the server
+# container, so relative paths resolve against /srv/heimdall (the bench root
+# baked into the image: benchmarks/, agents/, experiments/).
+#
+# Nothing secret is written here. Secrets are named by environment variable
+# (*_env keys) and come from deploy/hosted/.env through compose. Any key can
+# also be overridden with BENCH_<SECTION>_<KEY>; compose sets the per-site
+# values that way (BENCH_AUTH_PUBLIC_URL, BENCH_SERVER_ALLOWED_HOSTS, ...).
+
+# The data volume. Hosted mode keeps each organization's sealed runs under
+# runs/orgs/<org_id>/.
+runs_root: /var/lib/heimdall/runs
+benchmarks_root: benchmarks
+pricing: deploy/pricing-snapshot.json
+
+server:
+  # Inside the container, on the compose network only. Caddy is the only
+  # published service; nothing else reaches this port.
+  listen: 0.0.0.0:8090
+  mode: live
+  # The public domain; compose sets it from HEIMDALL_DOMAIN
+  # (BENCH_SERVER_ALLOWED_HOSTS). Loopback names stay allowed for health checks.
+  allowed_hosts: []
+  # Same-origin UI: no CORS.
+  cors_origins: []
+
+auth:
+  mode: hosted
+  # Compose sets it to https://$HEIMDALL_DOMAIN (BENCH_AUTH_PUBLIC_URL). The
+  # GitHub OAuth callback is <public_url>/api/bench/auth/github/callback.
+  public_url: https://heimdall.example.com
+  session_ttl_h: 168
+  session_idle_h: 24
+  # invite: accounts only through an invitation (or `bifrost-bench user
+  # create`); open: anyone may sign up; closed: CLI only.
+  signup: invite
+  invite_ttl_h: 168
+  # Reverse proxies whose X-Forwarded-For is believed (per-IP login limits,
+  # audit IPs). Compose sets it to the private ranges
+  # (BENCH_AUTH_TRUSTED_PROXIES, HEIMDALL_TRUSTED_PROXIES): only compose
+  # networks reach the server, and Caddy overwrites X-Forwarded-For with the
+  # client's address.
+  trusted_proxies: []
+  # GitHub OAuth: on when HEIMDALL_GITHUB_CLIENT_ID and
+  # HEIMDALL_GITHUB_CLIENT_SECRET are both set in .env, off otherwise.
+  github:
+    client_id_env: HEIMDALL_GITHUB_CLIENT_ID
+    client_secret_env: HEIMDALL_GITHUB_CLIENT_SECRET
+
+database:
+  driver: postgres
+  dsn_env: HEIMDALL_DATABASE_URL
+
+storage:
+  # Optional S3-compatible mirror of sealed experiments and database backups
+  # (docs/evidence-storage.md). Compose sets the bucket from
+  # HEIMDALL_S3_BUCKET (BENCH_STORAGE_S3_BUCKET), so leave it empty here.
+  # The server keeps the mirror off while the access and secret key
+  # variables are empty; an empty endpoint means AWS S3. The bucket must
+  # exist before the first pass: the mirror never creates buckets.
+  s3:
+    endpoint_env: HEIMDALL_S3_ENDPOINT
+    bucket: ""
+    access_key_env: HEIMDALL_S3_ACCESS_KEY
+    secret_key_env: HEIMDALL_S3_SECRET_KEY
+
+# The public read-only organization the demo runs are imported into. Empty
+# for none.
+demo:
+  org: demo
+
+# The hosted server runs no agent: runners do (docs/hosting.md, "Runners").
+# These sections are kept for commands run inside the server container that
+# read them; the demo runner overrides them by environment.
+gateway:
+  url: http://bifrost:8080
+  agent_url: http://bifrost:8080
+  admin_token_env: BIFROST_SETUP_TOKEN
+  provider: anthropic
+  key_slots: [fp-slot-1, fp-slot-2, fp-slot-3, fp-slot-4]
+
+faultproxy:
+  control_url: http://faultproxy:9101
+
+networks:
+  eval: heimdall-evalnet
+
+images:
+  helper: bench/coding-core-base:1

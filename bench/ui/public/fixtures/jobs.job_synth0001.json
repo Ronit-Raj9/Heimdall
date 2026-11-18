@@ -1,0 +1,16 @@
+{
+	"_comment": "SYNTHETIC fixture for UI development. Not a benchmark result.",
+	"mode": "synthetic",
+	"id": "job_synth0001",
+	"org_id": "local",
+	"kind": "experiment.run",
+	"target": "e_synthetic-codewins",
+	"status": "running",
+	"params": { "exp_id": "e_synthetic-codewins" },
+	"progress": { "exp_id": "e_synthetic-codewins", "phase": "running", "slots": 48, "sealed": 29, "skipped": 0, "errors": 1 },
+	"created_by": "local",
+	"created_at": "2026-11-18T05:31:00Z",
+	"started_at": "2026-11-18T05:31:02Z",
+	"cancel_requested": false,
+	"attempt": 1
+}

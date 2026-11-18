@@ -1,0 +1,9 @@
+# Keys of bench.ts `InvitationPreview` (auth.InvitationInfo: GET /auth/invitations/{token}), one per line; a trailing ? marks an optional (Go omitempty) key.
+# Hosted platform (U1 UI). A top-level response adds "mode". Change with bench.ts and the Go type.
+org_name
+org_slug
+email
+role
+expires_at
+account_exists
+signup_allowed

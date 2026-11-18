@@ -68,6 +68,14 @@
     "smoke": {"type": "boolean", "description": "A synthetic smoke experiment: suite lock problems (no lock, a task not admitted) only warn, and the flag is frozen in the manifest so its results are never presented as findings. The experiment name has no effect."},
     "requirements": {"$ref": "#/$defs/requirements"},
     "external": {"enum": ["live", "record", "replay"], "description": "Overrides every external API's mode for this experiment's runs. live and record call the real hosts: the results are not repeatable, and reports and the leaderboard label or exclude them (docs/external-apis.md)."},
+    "runner": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "Hosted platform: which runner pool of the organization runs this experiment's slots (docs/runners.md). Without it a hosted experiment runs on pool default; local mode ignores it.",
+      "properties": {
+        "pool": {"type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$"}
+      }
+    },
     "matrix": {
       "type": "object",
       "additionalProperties": false,

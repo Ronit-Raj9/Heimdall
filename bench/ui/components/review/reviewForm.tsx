@@ -1,5 +1,7 @@
+import { RoleNote } from "@/components/platform/accessNotes";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { canUse, useSession, usesWriteToken } from "@/lib/session/sessionContext";
 import { readWriteToken, saveWriteToken } from "@/lib/store/apis/benchApi";
 import { REVIEW_DECISIONS, type Mode, type Review, type ReviewRequest } from "@/lib/types/bench";
 import { cn } from "@/lib/utils";
@@ -33,7 +35,14 @@ const TEXT_AREA =
 export function ReviewForm(props: ReviewFormProps) {
 	const { t } = useTranslation("bench");
 	const ids = useId();
-	const [values, setValues] = useState<ReviewFormValues>({ ...EMPTY_REVIEW_FORM, ...props.initialValues });
+	const session = useSession();
+	// Hosted mode: the signed-in user is the reviewer, so the name starts filled in.
+	const signedInName = session.signedIn ? session.user?.name || session.user?.email : undefined;
+	const [values, setValues] = useState<ReviewFormValues>({
+		...EMPTY_REVIEW_FORM,
+		...(signedInName ? { reviewer: signedInName } : {}),
+		...props.initialValues,
+	});
 	const [touched, setTouched] = useState(Boolean(props.showErrors));
 	const [token, setToken] = useState(readWriteToken);
 	const writable = canWriteReviews(props.mode);
@@ -41,6 +50,10 @@ export function ReviewForm(props: ReviewFormProps) {
 	const shown = touched ? errors : [];
 	const set = (patch: Partial<ReviewFormValues>) => setValues((v) => ({ ...v, ...patch }));
 	const disabled = !writable || props.submitting;
+	const tokenBox = usesWriteToken(session);
+
+	// Hosted: reviews need the member role; a viewer sees why, a demo visitor sees no form.
+	if (!canUse(session, "member")) return session.signedIn ? <RoleNote min="member" testId="review-form-role" /> : null;
 
 	return (
 		<form
@@ -110,7 +123,7 @@ export function ReviewForm(props: ReviewFormProps) {
 				{shown.includes("reason") && <FieldError testId="review-error-reason">{t("review.form.reasonRequired")}</FieldError>}
 			</Field>
 
-			<Field label={t("review.form.reviewer")} htmlFor={`${ids}-reviewer`} hint={t("review.form.noAuth")}>
+			<Field label={t("review.form.reviewer")} htmlFor={`${ids}-reviewer`} hint={tokenBox ? t("review.form.noAuth") : undefined}>
 				<Input
 					id={`${ids}-reviewer`}
 					placeholder={t("review.form.reviewerPlaceholder")}
@@ -137,21 +150,24 @@ export function ReviewForm(props: ReviewFormProps) {
 				/>
 			</Field>
 
-			<Field label={t("review.form.token")} htmlFor={`${ids}-token`} hint={t("review.form.tokenHint")}>
-				<Input
-					id={`${ids}-token`}
-					type="password"
-					autoComplete="off"
-					placeholder={t("review.form.tokenPlaceholder")}
-					value={token}
-					onChange={(e) => {
-						setToken(e.target.value);
-						saveWriteToken(e.target.value);
-					}}
-					disabled={!writable}
-					data-testid="review-token-input"
-				/>
-			</Field>
+			{/* Local mode only: hosted writes ride on the session cookie and its CSRF header. */}
+			{tokenBox && (
+				<Field label={t("review.form.token")} htmlFor={`${ids}-token`} hint={t("review.form.tokenHint")}>
+					<Input
+						id={`${ids}-token`}
+						type="password"
+						autoComplete="off"
+						placeholder={t("review.form.tokenPlaceholder")}
+						value={token}
+						onChange={(e) => {
+							setToken(e.target.value);
+							saveWriteToken(e.target.value);
+						}}
+						disabled={!writable}
+						data-testid="review-token-input"
+					/>
+				</Field>
+			)}
 
 			<Button type="submit" disabled={disabled} isLoading={props.submitting} dataTestId="review-submit">
 				{t("review.form.submit")}

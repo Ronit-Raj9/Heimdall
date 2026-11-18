@@ -1,0 +1,9 @@
+# Keys of bench.ts `OrgInfo` (handlers/orgs.go OrgInfo: GET /orgs/{org}, POST /orgs/{org}/rename, POST /orgs/{org}/public-read), one per line; a trailing ? marks an optional (Go omitempty) key.
+# Hosted platform (U1 UI). A top-level response adds "mode". Change with bench.ts and the Go type.
+id
+slug
+name
+public_read
+created_at
+role?
+demo?

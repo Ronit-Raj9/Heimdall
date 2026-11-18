@@ -1,0 +1,19 @@
+# Keys of bench.ts `Runner` (schemas.RunnerView: GET /runners runners[]), one per line; a trailing ? marks an optional (Go omitempty) key.
+# Hosted platform (U1 UI). A top-level response adds "mode". Change with bench.ts and the Go type.
+id
+org_id
+name
+pool
+labels
+version
+host
+state
+slots
+running
+running_slots
+completed
+token_id
+token_prefix?
+last_seen
+registered_at
+live

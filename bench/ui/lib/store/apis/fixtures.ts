@@ -49,7 +49,8 @@ export const FIXTURE_ROUTES: readonly FixtureRoute[] = [
 	{ method: "GET", pattern: "/runs/:id/steps", file: "runs.{id}.steps.json" }, // Agent step timeline (stepTimeline.tsx)
 	{ method: "GET", pattern: "/pairs/:id", file: "pairs.{id}.json" },
 	{ method: "POST", pattern: "/audit", file: "audit.json" },
-	{ method: "POST", pattern: "/regrade", file: "regrade.json" },
+	// A regrade runs as a job: the route answers with the queued experiment.regate job.
+	{ method: "POST", pattern: "/experiments/:id/regrade", file: "experiments.regrade.json" },
 	{ method: "GET", pattern: "/releases", file: "releases.list.json" },
 	// One board for every suite, condition, scope and synthetic filter: the query string is ignored.
 	{ method: "GET", pattern: "/leaderboard", file: "leaderboard.json" },
@@ -66,6 +67,10 @@ export const FIXTURE_ROUTES: readonly FixtureRoute[] = [
 	{ method: "GET", pattern: "/imports", file: "imports.json" },
 	// Workers on: the page shows the table. A server with the worker API off answers 404 instead.
 	{ method: "GET", pattern: "/workers", file: "workers.json" },
+	// Jobs (hosted platform, also local): the drawer's list, one job and its log (poll form).
+	{ method: "GET", pattern: "/jobs", file: "jobs.json" },
+	{ method: "GET", pattern: "/jobs/:id", file: "jobs.{id}.json" },
+	{ method: "GET", pattern: "/jobs/:id/logs", file: "jobs.{id}.logs.json" },
 ];
 
 /** True when the URL has fixture=1 or the build sets VITE_BENCH_FIXTURE=1. */

@@ -46,6 +46,7 @@ import type {
 } from "@/lib/types/bench";
 import { createApi, fetchBaseQuery, type BaseQueryFn, type FetchArgs, type FetchBaseQueryError } from "@reduxjs/toolkit/query/react";
 import { BENCH_API_BASE, detectFixtureMode, resolveFixture } from "./fixtures";
+import { CSRF_HEADER, errorStatus, getAuthState, notifyUnauthorized } from "./session";
 
 /** Polling interval for experiment status when server-sent events are unavailable (DESIGN.md 16.7). */
 export const EXPERIMENT_POLL_MS = 2000;
@@ -109,9 +110,18 @@ export function getBenchErrorMessage(error: unknown): string {
 	return i18n.t("errors.unexpected", { ns: "bench" });
 }
 
-/** JSON by default; every mutation (each a POST behind the write token) carries the token, queries never do. */
+/**
+ * JSON by default. Local mode: every mutation (each a POST behind the write token) carries the
+ * token, queries never do. Hosted mode: the session cookie authenticates, so no token is sent;
+ * every mutation carries the session's CSRF value instead.
+ */
 export function prepareBenchHeaders(headers: Headers, type: "query" | "mutation"): Headers {
 	if (!headers.has("Content-Type")) headers.set("Content-Type", "application/json");
+	const auth = getAuthState();
+	if (auth.mode === "hosted") {
+		if (type === "mutation" && auth.csrf && !headers.has(CSRF_HEADER)) headers.set(CSRF_HEADER, auth.csrf);
+		return headers;
+	}
 	const token = type === "mutation" ? readWriteToken().trim() : "";
 	if (token && !headers.has("Authorization")) headers.set("Authorization", `Bearer ${token}`);
 	return headers;
@@ -119,11 +129,19 @@ export function prepareBenchHeaders(headers: Headers, type: "query" | "mutation"
 
 type BenchBaseQuery = BaseQueryFn<string | FetchArgs, unknown, FetchBaseQueryError>;
 
-const httpBaseQuery: BenchBaseQuery = fetchBaseQuery({
+const fetchBenchQuery: BenchBaseQuery = fetchBaseQuery({
 	baseUrl: BENCH_API_BASE,
 	credentials: "include",
 	prepareHeaders: (headers, { type }) => prepareBenchHeaders(headers, type),
 });
+
+// A hosted 401 outside /auth/* means the session ended: the session provider sends the visitor to
+// the login page. In local mode a 401 is the write-token check and stays on the page.
+const httpBaseQuery: BenchBaseQuery = async (args, api, extraOptions) => {
+	const result = await fetchBenchQuery(args, api, extraOptions);
+	if (result.error && errorStatus(result.error) === 401) notifyUnauthorized(typeof args === "string" ? args : args.url);
+	return result;
+};
 
 const fixtureBaseQuery: BenchBaseQuery = async (args) => {
 	const url = typeof args === "string" ? args : args.url;
@@ -229,6 +247,15 @@ export const benchApi = createApi({
 		"BenchReviews",
 		"BenchMatrix",
 		"BenchClusters",
+		// Hosted platform (platformApi.ts)
+		"AuthMe",
+		"Members",
+		"Invitations",
+		"ApiTokens",
+		"Runners",
+		"RunnerTokens",
+		"AuditLog",
+		"Jobs",
 	],
 	endpoints: (builder) => ({
 		getHealth: builder.query<HealthResponse, void>({
@@ -429,17 +456,12 @@ export const benchApi = createApi({
 		auditTable: builder.mutation<AuditResponse, AuditRequest>({
 			query: (body) => ({ url: "/audit", method: "POST", body }),
 		}),
-		// Stretch: a regrade writes new grades, so that experiment's analysis must be refetched.
+		// A regrade runs as an experiment.regate job (handlers/experimentjobs.go): 202 with the queued
+		// job. The original grades stay; once the job succeeds, ?grade=<regrade id> on the verdict
+		// reads the new ones, so nothing cached is stale yet. The jobs list picks the job up.
 		regrade: builder.mutation<RegradeResponse, RegradeRequest>({
-			query: (body) => ({ url: "/regrade", method: "POST", body }),
-			invalidatesTags: (_result, _error, { exp_id }) => [
-				{ type: "BenchVerdict", id: exp_id },
-				{ type: "BenchDiagnostics", id: exp_id },
-				{ type: "BenchGrid", id: exp_id },
-				{ type: "BenchTriage", id: exp_id },
-				{ type: "BenchMatrix", id: exp_id },
-				"BenchLeaderboard",
-			],
+			query: ({ exp_id, ...body }) => ({ url: `/experiments/${id(exp_id)}/regrade`, method: "POST", body }),
+			invalidatesTags: [{ type: "Jobs", id: "LIST" }],
 		}),
 	}),
 });

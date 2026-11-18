@@ -1,4 +1,5 @@
 import { readWriteToken, saveWriteToken } from "@/components/experiments/experiments.utils";
+import { useSession, usesWriteToken } from "@/lib/session/sessionContext";
 import { PlanResult, planBlocksStart } from "@/components/experiments/planResult";
 import { PlanEstimate } from "@/components/experiments/planEstimate";
 import { LoadError } from "@/components/runs/screenStates";
@@ -43,6 +44,8 @@ export function ExperimentForm({ catalog, defaults, onStarted }: ExperimentFormP
 	const { control, register, handleSubmit, setValue, formState } = form;
 	const values = useWatch({ control });
 	const [token, setToken] = useState(readWriteToken);
+	// Hosted mode has no token box: the session cookie and its CSRF header authorise the writes.
+	const tokenBox = usesWriteToken(useSession());
 	const [planned, setPlanned] = useState<Planned | null>(null);
 	const [actionError, setActionError] = useState<{ title: string; error: unknown } | null>(null);
 	// benchApi attaches the write token saved below to every mutation.
@@ -58,7 +61,7 @@ export function ExperimentForm({ catalog, defaults, onStarted }: ExperimentFormP
 			? t("experiments.new.actions.planStale")
 			: planBlocksStart(planned.plan)
 				? t("experiments.new.actions.blocked")
-				: !token.trim()
+				: tokenBox && !token.trim()
 					? t("experiments.new.actions.needsToken")
 					: null;
 
@@ -364,23 +367,25 @@ export function ExperimentForm({ catalog, defaults, onStarted }: ExperimentFormP
 								/>
 							)}
 						</Field>
-						<Field label={t("experiments.new.fields.token")} hint={t("experiments.new.fields.tokenHint")}>
-							{(id, describedBy) => (
-								<Input
-									id={id}
-									type="password"
-									autoComplete="off"
-									aria-describedby={describedBy}
-									placeholder={t("experiments.new.fields.tokenPlaceholder")}
-									value={token}
-									onChange={(e) => {
-										setToken(e.target.value);
-										saveWriteToken(e.target.value);
-									}}
-									data-testid="experiment-write-token-input"
-								/>
-							)}
-						</Field>
+						{tokenBox && (
+							<Field label={t("experiments.new.fields.token")} hint={t("experiments.new.fields.tokenHint")}>
+								{(id, describedBy) => (
+									<Input
+										id={id}
+										type="password"
+										autoComplete="off"
+										aria-describedby={describedBy}
+										placeholder={t("experiments.new.fields.tokenPlaceholder")}
+										value={token}
+										onChange={(e) => {
+											setToken(e.target.value);
+											saveWriteToken(e.target.value);
+										}}
+										data-testid="experiment-write-token-input"
+									/>
+								)}
+							</Field>
+						)}
 					</div>
 				</FormSection>
 			</div>

@@ -11,7 +11,7 @@ BIN     := bin/bifrost-bench
 COMPOSE := docker compose -f deploy/docker-compose.yml --env-file deploy/.env
 WITHENV := set -a; . deploy/.env; set +a;
 
-.PHONY: help build bin ui test test-integration images env up down admit doctor smoke serve demo clean
+.PHONY: help build bin ui test test-integration images env up down admit doctor smoke serve demo clean hosted-image hosted-smoke
 
 help: ## Show targets
 	@grep -E '^[a-z-]+:.*## ' $(MAKEFILE_LIST) | awk -F':.*## ' '{printf "  %-18s %s\n", $$1, $$2}'
@@ -70,6 +70,12 @@ serve: bin ## Web UI and API
 	@$(WITHENV) ./$(BIN) serve
 
 demo: up smoke serve ## Start everything, run the smoke experiment, then serve the UI
+
+hosted-image: ## Build the hosted server image, UI embedded (deploy/hosted/Dockerfile.server; Deploy area)
+	docker build -f deploy/hosted/Dockerfile.server -t heimdall/server:local .
+
+hosted-smoke: ## Hosted stack on spare loopback ports with Caddy's internal CA, checked, then removed (deploy/hosted/smoke.sh; Deploy area)
+	deploy/hosted/smoke.sh
 
 clean: ## Remove build outputs
 	rm -rf bin ui/dist/assets ui/dist/index.html

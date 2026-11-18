@@ -1,0 +1,37 @@
+# Build context filter for deploy/hosted/Dockerfile.server (BuildKit reads
+# <Dockerfile>.dockerignore beside the Dockerfile in place of the context's
+# .dockerignore). A deny list, not an allow list: many packages embed
+# non-Go files (migrations, Dockerfiles, scripts, templates).
+
+# Secrets and local state: never in an image or a build cache.
+**/.env
+**/.env.*
+!deploy/.env.example
+!deploy/hosted/.env.example
+**/*.token
+**/*.pem
+**/*.key
+.heimdall
+**/.heimdall
+
+# Build outputs and caches; the image builds its own.
+bin
+bifrost-bench
+ui/node_modules
+ui/dist
+ui/tsconfig.tsbuildinfo
+
+# Evidence and large local data; not part of the image.
+runs
+releases
+checks
+datasets
+spike
+examples
+**/testdata
+**/*_test.go
+
+# Docs and VCS.
+docs
+.git
+**/.DS_Store

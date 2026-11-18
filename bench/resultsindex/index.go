@@ -21,6 +21,7 @@ package resultsindex
 import (
 	"bufio"
 	"bytes"
+	"cmp"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -129,6 +130,7 @@ type Snapshot struct {
 	Rejects      []Rejected
 	path         string
 	exists       bool
+	format       string // Database area (P1): "" is jsonl; set by NewSnapshot for the database index
 }
 
 // line is one line of the index file.
@@ -176,7 +178,8 @@ func (s *Snapshot) Rejected() []Rejected { return slices.Clone(s.Rejects) }
 
 // Status implements Reader.
 func (s *Snapshot) Status() Status {
-	return Status{Format: FormatName, Path: s.path, Exists: s.exists, BuiltAt: s.BuiltAt, UpdatedAt: s.UpdatedAt,
+	// Database area (P1): cmp.Or gives a database snapshot its own format.
+	return Status{Format: cmp.Or(s.format, FormatName), Path: s.path, Exists: s.exists, BuiltAt: s.BuiltAt, UpdatedAt: s.UpdatedAt,
 		Experiments: len(s.Experiments), Runs: len(s.RunRows), Analyses: len(s.AnalysisRows), Rejected: len(s.Rejects)}
 }
 

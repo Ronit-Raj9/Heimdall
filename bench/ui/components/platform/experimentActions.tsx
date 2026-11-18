@@ -1,0 +1,116 @@
+import { RoleGate } from "@/components/platform/accessNotes";
+import { ConfirmButton } from "@/components/platform/badges";
+import { ForbiddenNote, isRoleRefusal } from "@/components/platform/forbiddenNote";
+import { Button } from "@/components/ui/button";
+import { useSession } from "@/lib/session/sessionContext";
+import { getBenchErrorMessage, useRegradeMutation } from "@/lib/store/apis/benchApi";
+import { useCancelExperimentMutation, useResumeExperimentMutation } from "@/lib/store/apis/platformApi";
+import type { ExperimentStatus, Role } from "@/lib/types/bench";
+import { Link } from "@tanstack/react-router";
+import { ArrowRight, Play, RotateCcw } from "lucide-react";
+import { useTranslation } from "react-i18next";
+
+/** A failed experiment action: the role refusal in hosted mode, the server's reason otherwise. */
+function ActionError({ error, title, testId, min = "member" }: { error: unknown; title: string; testId: string; min?: Role }) {
+	const session = useSession();
+	if (isRoleRefusal(session, error)) return <ForbiddenNote min={min} error={error} testId={testId} className="w-full" />;
+	return (
+		<p role="alert" className="text-chart-error-ink w-full text-xs" data-testid={testId}>
+			{title}: {getBenchErrorMessage(error)}
+		</p>
+	);
+}
+
+/**
+ * Cancel a running experiment, resume a cancelled or failed one (POST /experiments/{id}/cancel and
+ * /resume, served by the job runner). Members and up; demo visitors see nothing.
+ */
+export function ExperimentRunActions({ status }: { status: ExperimentStatus }) {
+	const { t } = useTranslation("platform");
+	const [cancel, cancelState] = useCancelExperimentMutation();
+	const [resume, resumeState] = useResumeExperimentMutation();
+	const running = status.state === "running";
+	const resumable = status.state === "cancelled" || status.state === "failed";
+	if (!running && !resumable) return null;
+	return (
+		<RoleGate min="member">
+			<div className="flex flex-wrap items-center gap-2" data-testid="experiment-run-actions">
+				{running && (
+					<ConfirmButton
+						label={t("experimentActions.cancel")}
+						question={t("experimentActions.confirmCancel", { id: status.exp_id })}
+						confirmLabel={t("experimentActions.confirm")}
+						cancelLabel={t("experimentActions.keep")}
+						onConfirm={() => void cancel(status.exp_id)}
+						isLoading={cancelState.isLoading}
+						className="h-8 px-3 text-sm"
+						testId="experiment-cancel"
+					/>
+				)}
+				{resumable && (
+					<Button
+						variant="outline"
+						size="sm"
+						className="gap-1.5"
+						isLoading={resumeState.isLoading}
+						onClick={() => void resume(status.exp_id)}
+						dataTestId="experiment-resume"
+					>
+						<Play className="size-3.5" aria-hidden="true" />
+						{t("experimentActions.resume")}
+					</Button>
+				)}
+				{cancelState.error && (
+					<ActionError error={cancelState.error} title={t("experimentActions.cancelError")} testId="experiment-cancel-error" />
+				)}
+				{resumeState.error && (
+					<ActionError error={resumeState.error} title={t("experimentActions.resumeError")} testId="experiment-resume-error" />
+				)}
+			</div>
+		</RoleGate>
+	);
+}
+
+/**
+ * Regrade an experiment's sealed runs as a job (POST /experiments/{id}/regrade). Shows the job it
+ * started with a link to follow it; the original grades stay.
+ */
+export function RegradeAction({ expId }: { expId: string }) {
+	const { t } = useTranslation("platform");
+	const [regrade, state] = useRegradeMutation();
+	const job = state.data && state.originalArgs?.exp_id === expId ? state.data : null;
+	return (
+		<RoleGate min="member" fallback={null}>
+			<div className="flex flex-wrap items-center justify-end gap-2" data-testid="regrade-action">
+				{job ? (
+					<span className="flex items-center gap-2 text-xs" role="status" data-testid="regrade-started">
+						<span className="text-muted-foreground">{t("experimentActions.started", { id: job.id })}</span>
+						<Link
+							to="/jobs/$jobId"
+							params={{ jobId: job.id }}
+							className="text-primary inline-flex items-center gap-1 font-medium underline-offset-4 hover:underline"
+							data-testid="regrade-open-job"
+						>
+							{t("experimentActions.openJob")}
+							<ArrowRight className="size-3" aria-hidden="true" />
+						</Link>
+					</span>
+				) : (
+					<Button
+						variant="outline"
+						size="sm"
+						className="gap-1.5"
+						title={t("experimentActions.regradeHint")}
+						isLoading={state.isLoading}
+						onClick={() => void regrade({ exp_id: expId })}
+						dataTestId="regrade-button"
+					>
+						<RotateCcw className="size-3.5" aria-hidden="true" />
+						{t("experimentActions.regrade")}
+					</Button>
+				)}
+				{state.error && <ActionError error={state.error} title={t("experimentActions.regradeError")} testId="regrade-error" />}
+			</div>
+		</RoleGate>
+	);
+}

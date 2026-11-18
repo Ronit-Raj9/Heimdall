@@ -5,11 +5,10 @@ import (
 	"flag"
 	"fmt"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"strings"
-	"time"
 
+	"github.com/maximhq/bifrost/bench/ops"
 	"github.com/maximhq/bifrost/bench/scaffold"
 	"github.com/maximhq/bifrost/bench/schemas"
 	"github.com/maximhq/bifrost/bench/suite"
@@ -53,46 +52,32 @@ func runSuite(args []string) int {
 	if err != nil {
 		return fail("%v", err)
 	}
-	s, err := loadSuite(context.Background(), benchRoot, pos[0])
-	if err != nil {
-		return fail("load suite %s: %v", pos[0], err)
-	}
+	ctx := context.Background()
+	// Jobs area: lint and lock are bench/ops functions the suite.lint and
+	// suite.lock jobs run too.
 	switch sub {
 	case "lint":
-		problems := suite.Lint(s)
-		for _, p := range problems {
-			fmt.Printf("%-7s %s: %s\n", p.Severity, p.Path, p.Message)
+		rep, err := ops.SuiteLint(ctx, benchRoot, pos[0], os.Stdout)
+		if err != nil {
+			return fail("%v", err)
 		}
-		fmt.Printf("%s@%s: %d tasks, %d probes, %d problems\n", s.ID, s.Version, len(s.Tasks), len(s.Probes), len(problems))
-		for _, p := range problems {
-			if p.Severity == "error" {
-				return 1
-			}
+		if rep.Errors > 0 {
+			return 1
 		}
 		return exitOK
 	case "lock":
-		pin := suite.LockPinsLocal(s.Lock) // Lock fingerprints: pinning is sticky unless the flag says otherwise
+		var pin *bool // Lock fingerprints: pinning is sticky unless the flag says otherwise
 		if flagSet(fs, "pin-local-images") {
-			pin = *pinLocal
+			pin = pinLocal
 		}
-		lock, err := suite.LockWith(s, time.Now().UTC(), lockFingerprintOptions(context.Background(), cfg, utils.Docker{}, pin))
-		if err != nil {
-			return fail("lock: %v", err)
+		if _, err := ops.SuiteLock(ctx, ops.LockOptions{BenchRoot: benchRoot, Ref: pos[0], Config: cfg, Docker: utils.Docker{}, Pin: pin}, os.Stdout); err != nil {
+			return fail("%v", err)
 		}
-		printLockChanges(os.Stdout, s, lock) // Lock fingerprints: drift as a diff (lockfingerprints.go)
-		path := filepath.Join(s.Root, "suite.lock")
-		if _, err := suite.WriteLock(path, lock); err != nil {
-			return fail("write %s: %v", path, err)
-		}
-		admitted := 0
-		for _, tl := range lock.Tasks {
-			if tl.Status == schemas.TaskAdmitted {
-				admitted++
-			}
-		}
-		fmt.Printf("wrote %s (%d tasks, %d admitted, %d probes, fingerprinted)\n", path, len(lock.Tasks), admitted, len(lock.Probes))
 		return exitOK
 	default:
+		if _, err := loadSuite(ctx, benchRoot, pos[0]); err != nil {
+			return fail("load suite %s: %v", pos[0], err)
+		}
 		fmt.Fprintf(os.Stderr, "unknown suite subcommand %q\n%s\n", sub, suiteUsage)
 		return exitUsage
 	}
@@ -145,11 +130,7 @@ func runSuiteInit(args []string) int {
 
 // loadSuite loads a suite with the first registered loader.
 func loadSuite(ctx context.Context, root, ref string) (*schemas.Suite, error) {
-	loaders := suite.Builtin(root)
-	if len(loaders) == 0 {
-		return nil, fmt.Errorf("no suite loader registered")
-	}
-	return loaders[0].Load(ctx, ref)
+	return ops.LoadSuite(ctx, root, ref)
 }
 
 // runAdmit runs the admission controls for every task (or one) with the real
@@ -179,74 +160,30 @@ func admitSuite(ctx context.Context, config, ref, only string) int {
 	if err != nil {
 		return fail("%v", err)
 	}
-	s, err := loadSuite(ctx, a.cfg.Path(a.cfg.BenchmarksRoot), ref)
+	rep, err := ops.SuiteAdmit(ctx, a.admitEnv(config), ref, only, os.Stdout) // Jobs area: shared with the suite.admit job (bench/ops)
 	if err != nil {
-		return fail("load suite %s: %v", ref, err)
-	}
-	if only != "" && s.TaskByID(only) == nil {
-		return fail("suite %s has no task %q in its tasks list", s.ID, only)
-	}
-	if s.Grading == schemas.GradingJudged { // run kernel: the judge grader calls its model through the gateway
-		if a, err = newApp(ctx, config, appOptions{gateway: true}); err != nil {
-			return fail("%v", err)
-		}
-	}
-	deps := suite.AdmitDeps{Logger: a.logger}
-	for _, e := range a.reg.Environments {
-		if e.GetName() == s.Environment {
-			deps.Env = e
-		}
-	}
-	for _, g := range a.reg.Graders {
-		if g.GetName() == s.Grader {
-			deps.Grader = g
-		}
-	}
-	if deps.Env == nil {
-		return fail("suite %s: environment %q is not registered", s.ID, s.Environment)
-	}
-	if deps.Grader == nil {
-		return fail("suite %s: grader %q is not registered", s.ID, s.Grader)
-	}
-	problems := suite.StaticValidation(ctx, s, only)
-	printProblems(problems)
-	if n := suite.Errors(problems); n > 0 {
-		return fail("admit refused: static validation found %s; fix them (bifrost-bench task validate <suite>/<task> shows the same list) and admit again",
-			plural(n, "error"))
-	}
-	if err := a.ensureImages(ctx, s); err != nil {
 		return fail("%v", err)
 	}
-	lock, err := suite.LockWith(s, time.Now().UTC(), lockFingerprintOptions(ctx, a.cfg, a.docker, suite.LockPinsLocal(s.Lock)))
-	if err != nil {
-		return fail("lock: %v", err)
-	}
-	failed := 0
-	for _, t := range s.Tasks {
-		if only != "" && t.ID != only {
-			continue
-		}
-		rec, err := suite.Admit(ctx, deps, s, t)
-		if err != nil {
-			return fail("admit %s: %v", t.ID, err)
-		}
-		if err := suite.RecordAdmission(lock, t.ID, rec); err != nil {
-			return fail("%v", err)
-		}
-		if !rec.Admitted {
-			failed++
-		}
-		printAdmission(t.ID, rec)
-	}
-	path := filepath.Join(s.Root, "suite.lock")
-	if _, err := suite.WriteLock(path, lock); err != nil {
-		return fail("write %s: %v", path, err)
-	}
-	fmt.Printf("wrote %s\n", path)
-	if failed > 0 {
+	if rep.Failed > 0 {
 		return 1
 	}
 	return exitOK
+}
+
+// admitEnv is what ops.SuiteAdmit needs from the app: a judged suite asks
+// for a registry with the live gateway, assembled from config as newApp does.
+func (a *app) admitEnv(config string) ops.AdmitEnv {
+	return ops.AdmitEnv{Config: a.cfg, Docker: a.docker, Logger: a.logger,
+		Registry: func(ctx context.Context, gateway bool) (*schemas.Registry, error) {
+			if !gateway {
+				return a.reg, nil
+			}
+			ga, err := newApp(ctx, config, appOptions{gateway: true})
+			if err != nil {
+				return nil, err
+			}
+			return ga.reg, nil
+		}}
 }
 
 // printProblems prints lint and validation problems, one per line, as
@@ -259,143 +196,27 @@ func printProblems(problems []suite.Problem) {
 
 // printAdmission prints one task's admission checks.
 func printAdmission(id string, rec *schemas.AdmissionRecord) {
-	status := "admitted"
-	if !rec.Admitted {
-		status = "NOT ADMITTED"
-	}
-	fmt.Printf("%-4s %s\n", id, status)
-	for _, c := range rec.Checks {
-		mark := "ok  "
-		if !c.Passed {
-			mark = "FAIL"
-		}
-		fmt.Printf("     %s %-40s want %-6s got %s\n", mark, c.Name, c.Want, c.Got)
-		if !c.Passed && c.Detail != "" {
-			fmt.Printf("          %s\n", c.Detail)
-		}
-	}
+	ops.PrintAdmission(os.Stdout, id, rec)
 }
 
-// ensureImages builds the suite's base image from base_image.dockerfile and
-// the helper image from <project>/deploy/helper/Dockerfile, each only when it
-// is missing, so a fresh project needs nothing but the binary and Docker. An
-// image that exists is never rebuilt.
+// ensureImages builds the suite's missing images (ops.EnsureImages).
 func (a *app) ensureImages(ctx context.Context, s *schemas.Suite) error {
-	suiteDockerfile := ""
-	if s.BaseImage.Dockerfile != "" {
-		// Resolved again right before the build: the build context is the
-		// Dockerfile's folder, and docker follows a symlink to it.
-		real, err := utils.ResolveInside(s.Root, s.BaseImage.Dockerfile)
-		if err != nil {
-			return fmt.Errorf("suite %s base image: base_image.dockerfile: %w", s.ID, err)
-		}
-		suiteDockerfile = real
-	}
-	if err := a.ensureImage(ctx, s.BaseImage.Tag, suiteDockerfile); err != nil {
-		return fmt.Errorf("suite %s base image: %w", s.ID, err)
-	}
-	if err := a.ensureServiceImages(ctx, s); err != nil {
-		return err
-	}
-	if helper := a.cfg.Images.Helper; helper != "" && helper != s.BaseImage.Tag {
-		helperDockerfile := filepath.Join(a.cfg.Root, "deploy", "helper", "Dockerfile")
-		if _, err := os.Stat(helperDockerfile); err != nil {
-			helperDockerfile = ""
-		}
-		if err := a.ensureImage(ctx, helper, helperDockerfile); err != nil {
-			return fmt.Errorf("helper image (images.helper): %w", err)
-		}
-	}
-	return nil
+	return ops.EnsureImages(ctx, a.cfg, a.docker, s, os.Stdout)
 }
 
-// ensureServiceImages builds every missing service image of the suite and
-// its tasks, each once: from build.dockerfile when the service has a build
-// section (relative to the suite root for suite services, the task folder
-// for task services), else, for a service that names only an image, from
-// services/<service id>/Dockerfile in the suite folder when it exists (the
-// layout `suite init -template tool-use|mcp` writes).
-func (a *app) ensureServiceImages(ctx context.Context, s *schemas.Suite) error {
-	done := map[string]bool{}
-	for _, b := range serviceBuilds(s) {
-		if done[b.tag] {
-			continue
-		}
-		done[b.tag] = true
-		dockerfile := ""
-		if b.dockerfile != "" {
-			real, err := utils.ResolveInside(b.root, b.dockerfile)
-			if err != nil {
-				return fmt.Errorf("service %s: build.dockerfile: %w", b.service, err)
-			}
-			dockerfile = real
-		}
-		if err := a.ensureImage(ctx, b.tag, dockerfile); err != nil {
-			return fmt.Errorf("service %s image: %w", b.service, err)
-		}
-	}
-	return nil
-}
-
-// serviceBuild is one service image ensureServiceImages looks after.
+// serviceBuild is one service image ops.EnsureImages looks after.
 type serviceBuild struct {
 	service, tag string
 	root         string // folder the Dockerfile must stay inside
 	dockerfile   string // relative to root; empty when nothing builds it
 }
 
-// serviceBuilds lists the service images of a suite, suite services first.
+// serviceBuilds lists the service images of a suite, suite services first
+// (ops.ServiceBuilds).
 func serviceBuilds(s *schemas.Suite) []serviceBuild {
 	var out []serviceBuild
-	add := func(sv schemas.ServiceSpec, root string) {
-		switch {
-		case sv.Build != nil && sv.Build.Tag != "":
-			out = append(out, serviceBuild{service: sv.ID, tag: sv.Build.Tag, root: root, dockerfile: sv.Build.Dockerfile})
-		case sv.Image != "":
-			b := serviceBuild{service: sv.ID, tag: sv.Image, root: s.Root}
-			conv := filepath.Join("services", sv.ID, "Dockerfile")
-			if _, err := os.Stat(filepath.Join(s.Root, conv)); err == nil {
-				b.dockerfile = conv
-			}
-			out = append(out, b)
-		}
-	}
-	for _, sv := range s.Services {
-		add(sv, s.Root)
-	}
-	for _, t := range s.Tasks {
-		for _, sv := range t.Services {
-			add(sv, t.Dir)
-		}
+	for _, b := range ops.ServiceBuilds(s) {
+		out = append(out, serviceBuild{service: b.Service, tag: b.Tag, root: b.Root, dockerfile: b.Dockerfile})
 	}
 	return out
-}
-
-// ensureImage builds tag from dockerfile (in the Dockerfile's folder) when
-// docker does not have the image.
-func (a *app) ensureImage(ctx context.Context, tag, dockerfile string) error {
-	if tag == "" {
-		return fmt.Errorf("no image tag")
-	}
-	res, err := a.docker.Run(ctx, "image", "inspect", "--format", "{{.Id}}", tag)
-	if err != nil {
-		return err
-	}
-	if res.ExitCode == 0 {
-		return nil
-	}
-	if dockerfile == "" {
-		return fmt.Errorf("image %s is missing and no Dockerfile builds it; build or pull it first", tag)
-	}
-	fmt.Printf("building %s from %s\n", tag, dockerfile)
-	bin := a.docker.Binary
-	if bin == "" {
-		bin = "docker"
-	}
-	cmd := exec.CommandContext(ctx, bin, "build", "-t", tag, "-f", dockerfile, filepath.Dir(dockerfile))
-	cmd.Stdout, cmd.Stderr = os.Stderr, os.Stderr
-	if err := cmd.Run(); err != nil {
-		return fmt.Errorf("docker build %s: %w", tag, err)
-	}
-	return nil
 }

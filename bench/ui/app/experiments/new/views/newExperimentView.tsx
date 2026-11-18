@@ -1,4 +1,5 @@
 import { ExperimentProgressCard } from "@/components/experiments/experimentProgress";
+import { RoleGate } from "@/components/platform/accessNotes";
 import { TERMINAL_STATES } from "@/components/experiments/experiments.utils";
 import { BlockSkeleton, EmptyNote, LoadError } from "@/components/runs/screenStates";
 import { Card, CardContent } from "@/components/ui/card";
@@ -38,14 +39,17 @@ export default function NewExperimentView() {
 			) : catalog.data.suites.length === 0 || catalog.data.agents.length === 0 || !defaults ? (
 				<EmptyNote testId="new-experiment-catalog-empty">{t("experiments.new.catalogEmpty")}</EmptyNote>
 			) : (
-				<ExperimentForm
-					catalog={catalog.data}
-					defaults={defaults}
-					onStarted={(id, cap) => {
-						setCapUsd(cap);
-						void setExpId(id);
-					}}
-				/>
+				// Hosted: starting experiments needs the member role; demo visitors see no form.
+				<RoleGate min="member">
+					<ExperimentForm
+						catalog={catalog.data}
+						defaults={defaults}
+						onStarted={(id, cap) => {
+							setCapUsd(cap);
+							void setExpId(id);
+						}}
+					/>
+				</RoleGate>
 			)}
 		</div>
 	);

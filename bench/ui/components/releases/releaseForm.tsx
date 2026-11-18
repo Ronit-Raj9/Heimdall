@@ -2,6 +2,8 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { RoleNote } from "@/components/platform/accessNotes";
+import { canUse, useSession, usesWriteToken } from "@/lib/session/sessionContext";
 import { readWriteToken, saveWriteToken } from "@/lib/store/apis/benchApi";
 import type { Action, Decision, ExperimentStatus, ReleasePolicyDecision, ReleaseRecord, ReleaseRequest } from "@/lib/types/bench";
 import { cn } from "@/lib/utils";
@@ -47,6 +49,10 @@ export function ReleaseForm(props: ReleaseFormProps) {
 	const set = (patch: Partial<ReleaseFormValues>) => setValues((v) => ({ ...v, ...patch }));
 	const blockers = verdict ? releaseBlockers(verdict.action, policy) : [];
 	const enabled = canRelease(Boolean(verdict), verdict?.action, policy, values) && !props.submitting;
+	const session = useSession();
+
+	// Hosted: releases need the member role; a viewer sees why, a demo visitor sees no form.
+	if (!canUse(session, "member")) return session.signedIn ? <RoleNote min="member" testId="release-form-role" /> : null;
 
 	return (
 		<form
@@ -127,20 +133,23 @@ export function ReleaseForm(props: ReleaseFormProps) {
 					data-testid="release-note-input"
 				/>
 			</Field>
-			<Field label={t("releases.panel.token")} htmlFor="release-token" hint={t("releases.panel.tokenHint")}>
-				<Input
-					id="release-token"
-					type="password"
-					autoComplete="off"
-					placeholder={t("releases.panel.tokenPlaceholder")}
-					value={token}
-					onChange={(e) => {
-						setToken(e.target.value);
-						saveWriteToken(e.target.value);
-					}}
-					data-testid="release-token-input"
-				/>
-			</Field>
+			{/* Local mode only: hosted writes ride on the session cookie and its CSRF header. */}
+			{usesWriteToken(session) && (
+				<Field label={t("releases.panel.token")} htmlFor="release-token" hint={t("releases.panel.tokenHint")}>
+					<Input
+						id="release-token"
+						type="password"
+						autoComplete="off"
+						placeholder={t("releases.panel.tokenPlaceholder")}
+						value={token}
+						onChange={(e) => {
+							setToken(e.target.value);
+							saveWriteToken(e.target.value);
+						}}
+						data-testid="release-token-input"
+					/>
+				</Field>
+			)}
 
 			<Button type="submit" disabled={!enabled} isLoading={props.submitting} dataTestId="release-submit">
 				{t("releases.panel.submit")}

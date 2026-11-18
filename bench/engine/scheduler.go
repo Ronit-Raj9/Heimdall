@@ -57,6 +57,11 @@ type RunOptions struct {
 	// duration of Run (remote.go): they lease slots from the same queue and
 	// reserve against the same spend cap as the local workers.
 	Remote *Coordinator
+	// RemoteOnly runs no local worker: every slot waits for a remote worker,
+	// and Run returns once none is pending or out, or ctx ends. Hosted mode
+	// sets it, since strangers' agents never run on the hosted server. It
+	// needs Remote. (Runners area, docs/runners.md)
+	RemoteOnly bool
 }
 
 // Summary is what one scheduler run did.
@@ -130,6 +135,9 @@ func NewScheduler(reg *schemas.Registry, benchRoot string, logger schemas.Logger
 // reserve against the same cap while Run lasts, and Run returns only when no
 // slot is pending and none is out on a remote lease (or ctx ends).
 func (s *Scheduler) Run(ctx context.Context, m *schemas.Manifest, opts RunOptions) (*Summary, error) {
+	if opts.RemoteOnly && opts.Remote == nil { // Runners area
+		return nil, errors.New("scheduler: remote only needs a coordinator")
+	}
 	r, err := s.start(ctx, m, opts)
 	if err != nil {
 		return nil, err
@@ -147,6 +155,9 @@ func (s *Scheduler) Run(ctx context.Context, m *schemas.Manifest, opts RunOption
 	if workers <= 0 {
 		workers = DefaultConcurrency
 	}
+	if opts.RemoteOnly { // Runners area: no local worker
+		workers = 0
+	}
 	var wg sync.WaitGroup
 	for range workers {
 		wg.Add(1)
@@ -162,6 +173,9 @@ func (s *Scheduler) Run(ctx context.Context, m *schemas.Manifest, opts RunOption
 		}()
 	}
 	wg.Wait()
+	if opts.RemoteOnly { // Runners area: wait for the remote workers
+		r.queue.drained(ctx)
+	}
 	detach()
 	r.mu.Lock()
 	out, stopped := r.sum, r.stopped
@@ -345,7 +359,8 @@ func (r *schedRun) attempts(ctx context.Context, slot *schemas.Slot, est float64
 	if done {
 		return
 	}
-	for attempts < maxAttempts && ctx.Err() == nil {
+	budget := maxAttempts + r.stoppedRuns(ctx, slot) // Jobs area: a run its owner stopped (cancel, shutdown) uses no attempt (cancel.go)
+	for attempts < budget && ctx.Err() == nil {
 		if attempts > 0 {
 			r.count(func(s *Summary) { s.Retried++ })
 		}
@@ -402,7 +417,7 @@ func (r *schedRun) settle(ctx context.Context, slot *schemas.Slot, est float64) 
 			return len(recs), true
 		}
 	}
-	return len(recs), len(recs) >= maxAttempts
+	return len(recs), len(recs)-countOwnerStopped(recs) >= maxAttempts // Jobs area: owner-stopped runs use no attempt (cancel.go)
 }
 
 // skipDone reports, and counts as skipped, a slot that needs no new run: it
@@ -418,7 +433,9 @@ func (r *schedRun) skipDone(slot *schemas.Slot, recs []schemas.RunRecord) bool {
 			r.emit(Event{Kind: EventSlotSkipped, SlotID: slot.SlotID, RunID: rec.Run.RunID, Outcome: rec.Run.Outcome})
 			return true
 		}
-		sealedAborts++
+		if !OwnerStopped(&rec.Run) { // Jobs area: a run its owner stopped uses no attempt (cancel.go)
+			sealedAborts++
+		}
 	}
 	if sealedAborts >= maxAttempts {
 		r.count(func(s *Summary) { s.Skipped++ })
@@ -760,6 +777,26 @@ func (q *slotQueue) next(ctx context.Context) (*schemas.Slot, bool) {
 		select {
 		case <-ctx.Done():
 			return nil, false
+		case <-wait:
+		}
+	}
+}
+
+// drained waits until no slot is pending and none is out, or ctx ends. A
+// remote-only run waits here while remote workers take every slot (Runners
+// area).
+func (q *slotQueue) drained(ctx context.Context) {
+	for {
+		q.mu.Lock()
+		if len(q.pending) == 0 && q.remote == 0 {
+			q.mu.Unlock()
+			return
+		}
+		wait := q.changed
+		q.mu.Unlock()
+		select {
+		case <-ctx.Done():
+			return
 		case <-wait:
 		}
 	}
