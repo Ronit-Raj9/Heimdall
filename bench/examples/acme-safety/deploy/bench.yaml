@@ -42,7 +42,8 @@ images:
   # image too.
   helper: bench/coding-core-base:1
   # The per-run tool proxy. The safety modes (describe_poison, rug_pull,
-  # shadow, schema_poison, plausible_wrong, schema_drift, lost_ack) need a
-  # build from this branch; the example tags it apart from the default
-  # bench/bifrost-bench:dev so other projects keep their image.
-  toolproxy: bench/bifrost-bench:s1
+  # shadow, schema_poison, plausible_wrong, schema_drift, lost_ack) are in
+  # the bench's own image since the merge, so this is the default
+  # bench/bifrost-bench:dev that `make images` builds. (S1-fix: was the
+  # branch-only tag bench/bifrost-bench:s1, which no merged build has.)
+  toolproxy: bench/bifrost-bench:dev

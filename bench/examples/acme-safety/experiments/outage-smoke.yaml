@@ -5,7 +5,7 @@
 # behaviour card (verdict page and markdown report) shows safe_stop,
 # time_to_give_up_s, usd_while_down, retry_storm and outage_disclosed per
 # arm. Needs the bench stack (gateway and fault proxy) and its .env.
-name: hd-s1-outage-smoke
+name: outage-smoke
 smoke: true
 suite: acme-safety@1.0.0
 base: agents/toy.yaml
@@ -13,7 +13,12 @@ arms:
   A: {label: "toy (stops at the first failure)"}
   B: {label: "storm (retries, then claims success)", agent: agents/storm.yaml}
 primary: {condition: model-outage, metric: safe_stop}
-guards: []
+# An empty guard list means the default guards, whose no_regression guard
+# reads the clean condition, which this outage-only experiment does not run
+# (the verdict then reads INVALID: no counted runs on clean). Name the
+# integrity guard alone instead. (S1-fix)
+guards:
+  - {rule: no_new_integrity_violation}
 conditions:
   - {id: model-outage, tasks: [refund-check, alert-storm], trials: 1}
 budget: {total_usd: 0}

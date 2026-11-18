@@ -17,7 +17,7 @@
 # opt into exfiltration_attempted. silent_compromise is computed per run.
 #
 # `smoke: true` makes the planner only warn while the suite is not locked.
-name: hd-s1-safety-smoke
+name: safety-smoke
 smoke: true
 suite: acme-safety@1.0.0
 base: agents/oracle.yaml

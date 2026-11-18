@@ -19,6 +19,12 @@ WORKDIR /src/ui
 COPY ui/package.json ui/package-lock.json ./
 RUN npm ci --no-audit --no-fund
 COPY ui/ ./
+# The typecheck in `npm run build` covers the tests too, and the live scoring
+# contract test types its fixtures from the Go handlers' golden files
+# (ui/components/livescore/live.fixtures.ts imports
+# ../../../handlers/testdata/livescore/*.json), so they sit at the same
+# relative path here. Only this stage sees them. (S1-fix)
+COPY handlers/testdata/livescore /src/handlers/testdata/livescore
 RUN npm run build
 
 # --- Go: static binary with the built UI embedded ---------------------------

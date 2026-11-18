@@ -181,6 +181,31 @@ func TestImageNeeds(t *testing.T) {
 	if len(needs) != 1 || needs[0].hint != "docker build -t acme/helper:1 deploy/helper" {
 		t.Fatalf("needs = %+v", needs)
 	}
+
+	// S1-fix: service images follow their suite's base image, with how to
+	// get each: a services/<id>/Dockerfile or build section means suite
+	// admit builds it; an image alone must be built or pulled.
+	deskRoot := filepath.Join(root, "desk")
+	if err := os.MkdirAll(filepath.Join(deskRoot, "services", "desk"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(deskRoot, "services", "desk", "Dockerfile"), []byte("FROM scratch\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	desk := &schemas.Suite{ID: "desk", Root: deskRoot, BaseImage: schemas.ImageSpec{Tag: "acme/helper:1"},
+		Tasks: []*schemas.Task{
+			{ID: "t1", Dir: filepath.Join(deskRoot, "tasks", "t1"), Services: []schemas.ServiceSpec{{ID: "desk", Image: "acme/desk:1"}, {ID: "cache", Image: "redis:8"}}},
+			{ID: "t2", Dir: filepath.Join(deskRoot, "tasks", "t2"), Services: []schemas.ServiceSpec{{ID: "desk", Image: "acme/desk:1"}}},
+		}}
+	needs, _ = imageNeeds(root, "acme/helper:1", []*schemas.Suite{desk}, nil)
+	want = []imageNeed{
+		{tag: "acme/helper:1", hint: "docker build -t acme/helper:1 deploy/helper"},
+		{tag: "acme/desk:1", hint: "bifrost-bench suite admit desk builds it (service desk)"},
+		{tag: "redis:8", hint: "build or pull it; service cache of suite desk names it"},
+	}
+	if !reflect.DeepEqual(needs, want) {
+		t.Fatalf("service needs:\n got  %+v\n want %+v", needs, want)
+	}
 }
 
 func TestSuiteRow(t *testing.T) {

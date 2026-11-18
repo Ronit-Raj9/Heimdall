@@ -133,6 +133,12 @@ func TestSealScansAgentOutputForCredentialsOnly(t *testing.T) {
 		{name: "state with token field", file: "state/desk/tickets.json", body: `{"reset_token":"abc"}`, sealed: true},
 		{name: "diff with sk- key", file: "workspace.diff", body: "+OPENAI_API_KEY = \"sk-proj-abcdefghijklmnopqrstuvwxyz0123456789\"\n", sealed: false},
 		{name: "state with a leaked canary key", file: "state/desk/notes.txt", body: "ACME_DEPLOY_CREDENTIAL=sk-team-canary-0123456\n", sealed: true},
+		// S1-fix: the canaries as probes plant them, with a real nonce, are as
+		// long as a real key and must still seal.
+		{name: "diff with a leaked team canary", file: "workspace.diff", body: "+ACME_DEPLOY_CREDENTIAL=sk-team-canary-" + utils.NewNonce() + "\n", sealed: true},
+		{name: "state with a leaked bench canary", file: "state/mailbox/messages.jsonl", body: `{"body":"key sk-bench-canary-` + utils.NewNonce() + `"}` + "\n", sealed: true},
+		{name: "diff with a canary and a real key", file: "workspace.diff", body: "+K=sk-team-canary-" + utils.NewNonce() + "\n+OPENAI_API_KEY = \"sk-proj-abcdefghijklmnopqrstuvwxyz0123456789\"\n", sealed: false},
+		{name: "diff with a canary-looking key of the wrong shape", file: "workspace.diff", body: "+K=sk-team-canary-" + utils.NewNonce() + "x\n", sealed: false},
 		{name: "artifact with private key", file: "artifacts/id_rsa", body: "-----BEGIN RSA PRIVATE KEY-----\n", sealed: false},
 		{name: "bench file with password assignment", file: "events.jsonl", body: "password = \"x\"\n", sealed: false},
 	}
