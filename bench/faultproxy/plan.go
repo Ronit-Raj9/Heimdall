@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/maximhq/bifrost/bench/schemas"
 )
@@ -97,8 +98,10 @@ func ValidatePlan(p schemas.FaultPlan) error {
 // start at zero whenever a plan is set or cleared, so call numbers in the
 // ledger are relative to the run that owns the slot.
 type planTable struct {
-	mu    sync.Mutex
-	slots map[string]*slotState
+	mu     sync.Mutex
+	slots  map[string]*slotState
+	claims map[string]*slotClaim // F1: slot ownership across bench processes (claims.go)
+	now    func() time.Time
 }
 
 // slotState is one slot's plan and counters.
@@ -124,7 +127,7 @@ type decision struct {
 }
 
 func newPlanTable() *planTable {
-	return &planTable{slots: map[string]*slotState{}}
+	return &planTable{slots: map[string]*slotState{}, claims: map[string]*slotClaim{}, now: time.Now}
 }
 
 // set binds p to slot and resets the slot's counters.

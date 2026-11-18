@@ -88,7 +88,7 @@ func (g *Gateway) mintMember(ctx context.Context, runID string, p ProviderSetup,
 	} else if m.Config != nil && m.Config.Model != "" {
 		model = m.Config.Model
 	}
-	slot, keyID, err := g.takeReserved(p, runID, name)
+	slot, keyID, err := g.takeReserved(ctx, p, runID, name)
 	if err != nil {
 		return schemas.MemberKey{}, err
 	}

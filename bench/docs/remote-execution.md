@@ -110,6 +110,8 @@ The scheduler's local workers and remote workers draw from one queue in slot ord
 
 Every lease, refusal, rejection, release and loss is a line of `<runs root>/.remote/<exp id>.jsonl`, and the live view gets an event for each. The run summary adds `remote` (accepted remote runs, also counted in `sealed`) and `remote_rejected`.
 
+Several bench processes may share one gateway safely: the server, runners on the same machine, parallel CI jobs or two terminals. Each process claims its key slots at the fault proxy before it mints a key, so no process can take or rebind a slot another process's run holds; when every slot is held elsewhere, a run waits up to two minutes and then fails with the holder named. This needs a fault proxy with slot claims: with an older proxy image, or with direct providers, slots are reserved per process only and `doctor` says so (`docs/DESIGN.md` 13.3, "Key slot ownership across bench processes").
+
 ### What remote execution does not guarantee
 
 - **A worker's honesty.** The seal proves that the folder arrived as the worker sealed it and that it belongs to the leased slot and attempt. It does not prove the worker ran the agent faithfully: a worker with the token can fabricate a folder consistent with its own seal. Admit only machines you control, as you would for local runs.

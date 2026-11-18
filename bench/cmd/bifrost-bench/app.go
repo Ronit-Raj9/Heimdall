@@ -80,9 +80,12 @@ func newApp(ctx context.Context, configPath string, opts appOptions) (*app, erro
 		fp := faultproxy.NewClient(cfg.FaultProxy.ControlURL, faultproxy.WithToken(os.Getenv("BENCH_FAULTPROXY_TOKEN")))
 		fault = fp
 		a.upstreams = proxyUpstreams{fp}
-		gw, err = newGateway(ctx, cfg, a.docker, logger)
+		gw, err = newGateway(ctx, cfg, a.docker, logger, fp) // F1: the plan-writing client holds the slot claims
 		if err != nil {
 			return nil, err
+		}
+		if c, ok := gw.(interface{ Close(context.Context) error }); ok { // F1: release this process's slot claims at exit
+			onExit(func() { _ = c.Close(context.Background()) })
 		}
 	}
 

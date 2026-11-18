@@ -31,6 +31,7 @@ const (
 //
 //	PUT    /plans/{slot}     body schemas.FaultPlan; resets the slot's counters
 //	DELETE /plans/{slot}     clears the plan; resets the slot's counters
+//	                         (both: 409 while another owner's claim holds the slot, claims.go)
 //	GET    /ledger?run_id=   {"run_id":..., "entries":[...]}
 //	GET    /health           {"status":"ok", "plan_modes":[...], "scripted_providers":[...], ...}
 //	GET    /upstreams        UpstreamReport: TCP and TLS reachability of each real upstream
@@ -41,6 +42,11 @@ func (s *Server) ControlHandler() http.Handler {
 	mux.HandleFunc("GET /ledger", s.handleLedger)
 	mux.HandleFunc("GET /health", s.handleHealth)
 	mux.HandleFunc("GET /upstreams", s.handleUpstreams)
+	// F1: key slot ownership across bench processes (claims.go).
+	mux.HandleFunc("POST /claims", s.handleClaim)
+	mux.HandleFunc("POST /claims/renew", s.handleRenew)
+	mux.HandleFunc("POST /claims/release", s.handleRelease)
+	mux.HandleFunc("GET /claims", s.handleClaims)
 	return mux
 }
 
@@ -56,8 +62,13 @@ func (s *Server) handleSetPlan(w http.ResponseWriter, r *http.Request) {
 		s.controlError(w, http.StatusBadRequest, "decode plan: "+err.Error())
 		return
 	}
-	if err := s.plans.set(slot, p); err != nil {
+	held, err := s.plans.setOwned(slot, r.Header.Get(OwnerHeader), p) // F1: a slot another owner claimed keeps its plan
+	if err != nil {
 		s.controlError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+	if held != nil {
+		s.planRefused(w, "set", slot, held)
 		return
 	}
 	s.logger.Info("fault plan set", "slot", slot, "run_id", p.RunID, "mode", p.Mode,
@@ -70,7 +81,10 @@ func (s *Server) handleClearPlan(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
-	s.plans.clear(slot)
+	if held := s.plans.clearOwned(slot, r.Header.Get(OwnerHeader)); held != nil { // F1
+		s.planRefused(w, "clear", slot, held)
+		return
+	}
 	s.logger.Info("fault plan cleared", "slot", slot)
 	w.WriteHeader(http.StatusNoContent)
 }
@@ -99,6 +113,7 @@ func (s *Server) handleHealth(w http.ResponseWriter, _ *http.Request) {
 		Status: "ok", Upstream: s.upstreamLabel(), Slots: len(s.names),
 		PlanModes: PlanModes, ScriptedProviders: s.scriptedProviders(),
 		PlanFields: PlanFields, // W9: model-filtered plans
+		SlotClaims: true,       // F1: the claim API (claims.go)
 	})
 }
 
@@ -166,6 +181,7 @@ type Health struct {
 	PlanModes         []string          `json:"plan_modes,omitempty"`
 	ScriptedProviders []string          `json:"scripted_providers,omitempty"`
 	PlanFields        []string          `json:"plan_fields,omitempty"` // W9: optional plan fields honoured; an older proxy rejects a plan that sets one
+	SlotClaims        bool              `json:"slot_claims,omitempty"` // F1: the proxy enforces key slot claims (claims.go); false from an older proxy
 }
 
 // Supports reports whether the proxy honours plan mode.
@@ -190,6 +206,8 @@ type Client struct {
 	base  string
 	token string
 	http  *http.Client
+	owner string // F1: owner token for key slot claims, sent in X-Slot-Owner (claims.go)
+	label string // F1: who this client is in claims, host and pid
 }
 
 var _ schemas.FaultController = (*Client)(nil)
@@ -208,9 +226,12 @@ func WithHTTPClient(hc *http.Client) ClientOption {
 }
 
 // NewClient returns a control client for the proxy at baseURL, for example
-// http://127.0.0.1:9101.
+// http://127.0.0.1:9101. Each client is its own slot owner, with a random
+// owner token, unless WithOwner sets one: claims and plan writes of one bench
+// process must go through one client.
 func NewClient(baseURL string, opts ...ClientOption) *Client {
-	c := &Client{base: strings.TrimRight(baseURL, "/"), http: &http.Client{Timeout: defaultClientTimeout}}
+	c := &Client{base: strings.TrimRight(baseURL, "/"), http: &http.Client{Timeout: defaultClientTimeout}, label: defaultOwnerLabel()}
+	c.owner, _ = randomHex(16) // F1: an empty owner (no randomness) claims nothing and writes only unclaimed slots
 	for _, o := range opts {
 		o(c)
 	}
@@ -303,6 +324,9 @@ func (c *Client) do(ctx context.Context, method, path string, body []byte, out a
 	if c.token != "" {
 		req.Header.Set("Authorization", "Bearer "+c.token)
 	}
+	if c.owner != "" {
+		req.Header.Set(OwnerHeader, c.owner) // F1: plan writes on a claimed slot need it
+	}
 	resp, err := c.http.Do(req)
 	if err != nil {
 		return fmt.Errorf("%s %s: %w", method, path, err)
@@ -316,7 +340,7 @@ func (c *Client) do(ctx context.Context, method, path string, body []byte, out a
 		var e struct {
 			Error string `json:"error"`
 		}
-		se := &statusError{code: resp.StatusCode}
+		se := &statusError{code: resp.StatusCode, body: data}
 		if json.Unmarshal(data, &e) == nil {
 			se.msg = e.Error
 		}
@@ -336,6 +360,7 @@ func (c *Client) do(ctx context.Context, method, path string, body []byte, out a
 type statusError struct {
 	code int
 	msg  string
+	body []byte // the raw answer, for callers that read more than the error text (claims.go)
 }
 
 func (e *statusError) Error() string {

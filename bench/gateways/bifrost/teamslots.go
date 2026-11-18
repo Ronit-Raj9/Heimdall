@@ -52,29 +52,56 @@ func (g *Gateway) KeySlots(provider string) int {
 // acquireRunSlots takes the run's slot and, for a team, reserves one more
 // per non-lead member, all at once. A single-agent run fails at once when no
 // slot is free, as before, unless a team run holds slots: then, like a team
-// run, it waits until enough are free or ctx ends.
+// run, it waits until enough are free or ctx ends. F1: when another bench
+// process has claimed the free slots at the fault proxy, any run waits up to
+// the claim wait (Config.ClaimWait) and then fails with that reason.
 func (g *Gateway) acquireRunSlots(ctx context.Context, p ProviderSetup, runID string, n int) (Slot, string, error) {
 	if n > len(p.Slots) {
 		return Slot{}, "", fmt.Errorf("a team of %d members needs %d key slots; provider %s has %d (gateway.key_slots)", n, n, p.Name, len(p.Slots))
 	}
+	var heldSince time.Time
 	for {
-		s, id, wait, err := g.tryRunSlots(p, runID, n)
+		s, id, wait, err := g.tryRunSlots(ctx, p, runID, n)
 		if !wait {
 			return s, id, err
+		}
+		poll := slotPoll
+		var he *heldElsewhereError
+		if errors.As(err, &he) { // F1: another bench process holds them (slotclaims.go)
+			poll = claimPoll
+			switch {
+			case heldSince.IsZero():
+				heldSince = time.Now()
+				g.logger.Warn("waiting for a key slot: every free slot is claimed by another bench process on this gateway",
+					"run_id", runID, "provider", p.Name, "needed", n, "held", he.holders(), "max_wait", g.claimWait().String())
+			case time.Since(heldSince) >= g.claimWait():
+				return Slot{}, "", fmt.Errorf("%w; gave up after %s: the other process frees a slot when its run ends, and a crashed process's claims expire after %s",
+					err, g.claimWait(), g.claimTTL())
+			}
 		}
 		select {
 		case <-ctx.Done():
 			return Slot{}, "", fmt.Errorf("wait for %d free key slots of %s: %w (last: %v)", n, p.Name, ctx.Err(), err)
-		case <-time.After(slotPoll):
+		case <-time.After(poll):
 		}
 	}
 }
 
-// tryRunSlots takes n free slots under one lock, or none. wait says whether
-// the caller should try again later rather than fail.
-func (g *Gateway) tryRunSlots(p ProviderSetup, runID string, n int) (Slot, string, bool, error) {
+// tryRunSlots takes n free slots, or none. wait says whether the caller
+// should try again later rather than fail. Without claims it works under one
+// lock; with claims (F1) it holds takeMu while it claims the slots at the
+// fault proxy, all n in one call, and records them only once the proxy
+// granted them.
+func (g *Gateway) tryRunSlots(ctx context.Context, p ProviderSetup, runID string, n int) (Slot, string, bool, error) {
+	claims, err := g.claimsFor(ctx, p)
+	if err != nil {
+		return Slot{}, "", false, err
+	}
+	if claims {
+		g.claims.takeMu.Lock()
+		defer g.claims.takeMu.Unlock()
+	}
 	g.mu.Lock()
-	defer g.mu.Unlock()
 	var free []Slot
 	busy, teams := 0, false
 	for _, s := range p.Slots {
@@ -88,17 +115,43 @@ func (g *Gateway) tryRunSlots(p ProviderSetup, runID string, n int) (Slot, strin
 		}
 	}
 	if busy == 0 && len(free) == 0 {
+		g.mu.Unlock()
 		return Slot{}, "", false, errors.New("gateway not set up: Setup has not run")
 	}
 	if len(free) < n {
+		g.mu.Unlock()
 		err := fmt.Errorf("no free key slot for %s: %d of %d in use, %d needed", p.Name, busy, len(p.Slots), n)
 		return Slot{}, "", n > 1 || teams, err
 	}
-	g.inUse[free[0].Name] = "pending:" + runID
-	for _, s := range free[1:n] {
+	if !claims {
+		defer g.mu.Unlock()
+		g.reserveLocked(runID, free[:n])
+		return free[0], g.keyIDs[free[0].Name], false, nil
+	}
+	g.mu.Unlock()
+	got, err := g.claimSlots(ctx, p, runID, free, n)
+	if err != nil {
+		var he *heldElsewhereError
+		return Slot{}, "", errors.As(err, &he), err
+	}
+	g.mu.Lock()
+	g.reserveLocked(runID, got)
+	for _, s := range got {
+		g.claims.claimed[s.Name] = runID
+	}
+	id := g.keyIDs[got[0].Name]
+	g.mu.Unlock()
+	g.startRenewal()
+	return got[0], id, false, nil
+}
+
+// reserveLocked marks the first slot pending for runID and reserves the
+// rest for its team. Called with g.mu held.
+func (g *Gateway) reserveLocked(runID string, slots []Slot) {
+	g.inUse[slots[0].Name] = "pending:" + runID
+	for _, s := range slots[1:] {
 		g.inUse[s.Name] = reservedPrefix + runID
 	}
-	return free[0], g.keyIDs[free[0].Name], false, nil
 }
 
 // isTeamHolder reports whether a slot holder is a member key of a team run.
@@ -108,9 +161,10 @@ func (g *Gateway) isTeamHolder(holder string) bool {
 	return ok
 }
 
-// takeReserved claims one slot the run reserved for a member key, or, when
-// none is left, any free slot.
-func (g *Gateway) takeReserved(p ProviderSetup, runID, name string) (Slot, string, error) {
+// takeReserved takes one slot the run reserved for a member key, or, when
+// none is left, any free slot (F1: claimed at the fault proxy for the member
+// key's name when claims are on).
+func (g *Gateway) takeReserved(ctx context.Context, p ProviderSetup, runID, name string) (Slot, string, error) {
 	g.mu.Lock()
 	for _, s := range p.Slots {
 		if g.inUse[s.Name] == reservedPrefix+runID {
@@ -121,16 +175,27 @@ func (g *Gateway) takeReserved(p ProviderSetup, runID, name string) (Slot, strin
 		}
 	}
 	g.mu.Unlock()
+	if on, err := g.claimsFor(ctx, p); err != nil || on {
+		if err != nil {
+			return Slot{}, "", err
+		}
+		s, id, _, err := g.tryRunSlots(ctx, p, name, 1)
+		return s, id, err
+	}
 	return g.acquireSlot(p, name)
 }
 
-// releaseReserved frees the slots a run reserved and never used.
+// releaseReserved frees the slots a run reserved and never used, and their
+// claims at the fault proxy (F1).
 func (g *Gateway) releaseReserved(runID string) {
+	drop := map[string]string{}
 	g.mu.Lock()
-	defer g.mu.Unlock()
 	for name, holder := range g.inUse {
 		if holder == reservedPrefix+runID {
 			delete(g.inUse, name)
+			g.unclaimLocked(name, drop)
 		}
 	}
+	g.mu.Unlock()
+	g.releaseClaims(drop)
 }

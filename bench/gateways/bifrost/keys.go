@@ -67,6 +67,7 @@ func (g *Gateway) MintKey(ctx context.Context, rc *schemas.RunContext) (*schemas
 			err = errors.Join(err, fmt.Errorf("delete virtual key %s: %w", key.ID, derr))
 		}
 		g.releaseSlot(slot.Name, runID)
+		g.releaseReserved(runID) // F1: a team's reserved slots (and their claims) go too
 		return nil, fmt.Errorf("mint key for run %s: %w", runID, err)
 	}
 	g.mu.Lock()
@@ -106,8 +107,24 @@ func (g *Gateway) RevokeKey(ctx context.Context, key *schemas.RunKey) error {
 
 // RevokeStale implements schemas.Gateway. It deletes every virtual key whose
 // name looks like a run id and whose run is not in active, and returns how
-// many it deleted.
+// many it deleted. F1: a run that holds a live key slot claim at the fault
+// proxy, by this process or another bench process, is kept as if active;
+// when the claims cannot be read, nothing is revoked.
 func (g *Gateway) RevokeStale(ctx context.Context, active map[string]bool) (int, error) {
+	held, err := g.liveClaimRuns(ctx)
+	if err != nil {
+		return 0, fmt.Errorf("revoke stale keys: nothing revoked, the key slot claims of other bench processes could not be read: %w", err)
+	}
+	if len(held) > 0 {
+		merged := make(map[string]bool, len(active)+len(held))
+		for run := range active {
+			merged[run] = active[run]
+		}
+		for run := range held {
+			merged[run] = true
+		}
+		active = merged
+	}
 	var errs []error
 	if _, err := g.revokeStaleRules(ctx, active); err != nil { // W9: stale run routing rules first (routing.go)
 		errs = append(errs, fmt.Errorf("revoke stale routing rules: %w", err))
@@ -199,27 +216,36 @@ func (g *Gateway) acquireSlot(p ProviderSetup, runID string) (Slot, string, erro
 	return Slot{}, "", fmt.Errorf("no free key slot for %s: %d of %d in use", p.Name, busy, len(p.Slots))
 }
 
-// releaseSlot frees slot if runID's mint still holds it as pending.
+// releaseSlot frees slot if runID's mint still holds it as pending, and its
+// claim at the fault proxy (F1).
 func (g *Gateway) releaseSlot(slot, runID string) {
+	drop := map[string]string{}
 	g.mu.Lock()
-	defer g.mu.Unlock()
 	if g.inUse[slot] == "pending:"+runID {
 		delete(g.inUse, slot)
+		g.unclaimLocked(slot, drop)
 	}
+	g.mu.Unlock()
+	g.releaseClaims(drop)
 }
 
-// forget drops a minted key and frees its slot.
+// forget drops a minted key and frees its slot and the slot's claim at the
+// fault proxy (F1).
 func (g *Gateway) forget(vkID string) {
+	drop := map[string]string{}
 	g.mu.Lock()
-	defer g.mu.Unlock()
 	rec, ok := g.minted[vkID]
 	if !ok {
+		g.mu.Unlock()
 		return
 	}
 	delete(g.minted, vkID)
 	if g.inUse[rec.slot] == vkID {
 		delete(g.inUse, rec.slot)
+		g.unclaimLocked(rec.slot, drop)
 	}
+	g.mu.Unlock()
+	g.releaseClaims(drop)
 }
 
 // createVirtualKey makes sure the slot's provider key serves model, then
