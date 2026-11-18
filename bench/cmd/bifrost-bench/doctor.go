@@ -14,6 +14,7 @@ import (
 	"github.com/maximhq/bifrost/bench/engine"
 	"github.com/maximhq/bifrost/bench/faultproxy"
 	"github.com/maximhq/bifrost/bench/gateways/bifrost"
+	"github.com/maximhq/bifrost/bench/ops"
 	"github.com/maximhq/bifrost/bench/schemas"
 	"github.com/maximhq/bifrost/bench/suite"
 	"github.com/maximhq/bifrost/bench/utils"
@@ -225,6 +226,16 @@ func imageNeeds(root, helper string, suites []*schemas.Suite, agents []doctorAge
 			hint = "bifrost-bench suite admit " + s.ID + " builds it from its base_image.dockerfile"
 		}
 		need(s.BaseImage.Tag, hint)
+		// S1-fix: a missing service image (a task's desk, desktop or browser
+		// server) is built by suite admit only, and a run that needs it
+		// aborts every attempt of every slot, so doctor names it too.
+		for _, b := range ops.ServiceBuilds(s) {
+			hint := "build or pull it; service " + b.Service + " of suite " + s.ID + " names it"
+			if b.Dockerfile != "" {
+				hint = "bifrost-bench suite admit " + s.ID + " builds it (service " + b.Service + ")"
+			}
+			need(b.Tag, hint)
+		}
 	}
 	for _, ag := range agents {
 		if ag.cfg.Build == nil || ag.cfg.Build.BaseArg == "" {

@@ -79,13 +79,13 @@ under the outage probe the fault proxy answers every model call itself.
 
 All from this folder, with `bifrost-bench` built from `bench/` and the
 bench's stack running (gateway and fault proxy; the commands that reach the
-gateway need the stack's `deploy/.env` loaded). The tool proxy image must be
-a build of this branch, tagged `bench/bifrost-bench:s1` (`images.toolproxy`
-in `deploy/bench.yaml`):
+gateway need the stack's `deploy/.env` loaded). The tool proxy image is the
+bench's own `bench/bifrost-bench:dev` (`images.toolproxy` in
+`deploy/bench.yaml`), built by `make images` from the same tree:
 
 ```sh
 cd bench && CGO_ENABLED=0 GOWORK=off go build -o bin/bifrost-bench ./cmd/bifrost-bench
-docker build -t bench/bifrost-bench:s1 .
+make images
 cd examples/acme-safety
 
 bifrost-bench suite lint -config deploy/bench.yaml acme-safety
@@ -108,7 +108,8 @@ and is skipped there; Docker admission covers it.
 ## Status
 
 What was run on 18 Nov 2026 (scripted controls, $0, on the bench's Docker
-stack with the tool proxy image `bench/bifrost-bench:s1`):
+stack with the tool proxy image built from the safety branch, then tagged
+`bench/bifrost-bench:s1`; since the merge it is `bench/bifrost-bench:dev`):
 
 - **Host-side:** every control of every task against the desk server on a
   loopback port, in the clean condition and with `DESK_ALERTS=storm` and

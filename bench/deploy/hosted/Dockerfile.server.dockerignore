@@ -29,6 +29,9 @@ datasets
 spike
 examples
 **/testdata
+# The UI stage typechecks the live scoring fixtures against these golden
+# files (see Dockerfile.server). (S1-fix)
+!handlers/testdata/livescore
 **/*_test.go
 
 # Docs and VCS.
