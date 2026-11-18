@@ -81,6 +81,13 @@ func FrozenImageID(rc *schemas.RunContext) string { return frozenImageID(rc) }
 // StreamPaths are the run folder files of the agent's stdout and stderr.
 func StreamPaths(rc *schemas.RunContext) (string, string, int) { return streamPaths(rc) }
 
+// WithTaskEnv is plan with the task environment's variables (environment.env)
+// added under the plan's own, as the Docker driver gives the agent; plan
+// itself is not changed.
+func WithTaskEnv(rc *schemas.RunContext, plan *schemas.RunPlan) *schemas.RunPlan {
+	return withTaskEnv(rc, plan)
+}
+
 // AgentLaunch is how the agent process starts: the entrypoint ("" keeps the
 // image's), the arguments after it and the KEY=VALUE environment.
 type AgentLaunch struct {

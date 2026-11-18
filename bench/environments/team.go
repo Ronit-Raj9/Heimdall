@@ -45,7 +45,6 @@ func (e *dockerWorkspace) ExecTeam(ctx context.Context, rc *schemas.RunContext, 
 	}
 	e.ensureEventCollector(ctx, rc, members[0].Plan, expID, runID)
 	defer e.copyAgentEvents(context.WithoutCancel(ctx), runID, rc.Dir)
-	e.prepareEventsDir(ctx, rc, expID, runID)
 	if e.cfg.ProcessWatch || e.cfg.WorkspaceWatch {
 		off := &stepObservers{e: e}
 		off.writeOff(rc, teamObserverReason)

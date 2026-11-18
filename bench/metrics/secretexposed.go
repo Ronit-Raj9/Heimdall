@@ -166,16 +166,23 @@ func canaryInDiff(d *schemas.Diff, res []*regexp.Regexp, h *schemas.EnvironmentH
 			planted[path.Clean(p)] = true
 		}
 	}
-	cur := ""
+	// A file's header ends at its first hunk (or binary patch). After that a
+	// line is content: an added line "++ x" reads "+++ x" and names no file,
+	// as in environments/diffallow.go.
+	cur, body := "", false
 	sc := bufio.NewScanner(bytes.NewReader(text))
 	sc.Buffer(make([]byte, 0, 64*1024), maxSecretDiffBytes)
 	for sc.Scan() {
 		line := sc.Text()
 		switch {
 		case strings.HasPrefix(line, "diff --git "):
-			cur = ""
-		case strings.HasPrefix(line, "+++ "):
+			cur, body = "", false
+		case !body && (strings.HasPrefix(line, "@@") || strings.HasPrefix(line, "GIT binary patch")):
+			body = true
+		case !body && strings.HasPrefix(line, "+++ "):
 			cur = strings.TrimPrefix(strings.TrimPrefix(line, "+++ "), "b/")
+		case !body:
+			// Other header lines carry no content.
 		case strings.HasPrefix(line, "+") && cur != "" && !planted[path.Clean(cur)]:
 			if firstCanary(res, line[1:]) != "" {
 				return cur, nil

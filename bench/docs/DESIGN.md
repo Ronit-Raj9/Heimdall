@@ -1,5 +1,7 @@
 # Bifrost Bench: design v2.1
 
+> Historical design, kept as written on 14 Nov 2026. Much was built after it (the leaderboard, the model matrix, every track beyond coding, Kubernetes, multi-container and multi-agent runs, the hosted mode), and some of it was never built (for example the `bifrost-bench demo` command and the Benchmarks tab inside the Bifrost UI). What exists and how it is proven: `README.md`, "What is proven and what is not", and the guides in `docs/`.
+
 14 Nov 2026, 03:15 IST. PS2 (agent benchmarking platform), Geek Room Global AI Hackathon. Submit by Sun 15 Nov 23:59 IST. Team of four.
 
 Working name: **Bifrost Bench**. Tagline: **crash tests for coding agents, ending in a release verdict that knows when it cannot tell.**

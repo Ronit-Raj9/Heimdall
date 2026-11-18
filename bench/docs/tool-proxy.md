@@ -51,7 +51,10 @@ checked, upstreams must be http or https URLs, and a service may appear once.
 
 One `schemas.ToolCall` JSON line per row, appended and fsynced before the
 next row is numbered. `seq` is 1-based and keeps counting after a proxy
-restart. Arguments and the result are kept up to 64 KiB each; the sha256 on
+restart. A row is written once its answer has gone back to the agent (it
+holds the answer's hash and size), so `seq` is the order rows were written,
+not the order requests arrived: a request sent right after another one's
+answer can be numbered first. `started` is the arrival time. Arguments and the result are kept up to 64 KiB each; the sha256 on
 the row always covers the whole value.
 
 **Nothing passes unrecorded.** Every request the proxy relays to a service

@@ -301,7 +301,6 @@ func (e *dockerWorkspace) Exec(ctx context.Context, rc *schemas.RunContext, plan
 		network, joiner = "container:"+w.holder, w.holder
 	}
 	// Agent steps area: trusted process and workspace observers (observers.go); never fail the run.
-	e.prepareEventsDir(ctx, rc, expID, runID) // Agent events area: the events file folder (eventcollector.go)
 	obs := e.startObservers(ctx, rc, plan, expID, runID)
 	defer obs.finish(ctx, rc, nil)
 	args := agentCreateArgsView(name, utils.LabelArgs(expID, runID), agentPlan, rc.Handle, network, envFile, l, mounts, snapshotMode(rc) || root, view) // Eval integrity area (S2): view

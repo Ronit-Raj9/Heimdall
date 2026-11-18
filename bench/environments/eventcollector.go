@@ -7,7 +7,6 @@ import (
 	"strconv"
 	"strings"
 	"sync"
-	"time"
 
 	"github.com/maximhq/bifrost/bench/agentevents"
 	"github.com/maximhq/bifrost/bench/schemas"
@@ -22,7 +21,8 @@ import (
 // this can fail a run: a collector that does not start leaves the agent's
 // reports to the file and stdout channels and is recorded as missing.
 const (
-	// EventsDir is where the agent's events file lives (aux volume).
+	// EventsDir is where the agent's events file lives (aux volume). The
+	// helper that seeds the workspace makes it (populateScript, taskimage.go).
 	EventsDir = auxMount + "/events"
 	// EventsFilePath is BENCH_EVENTS_FILE.
 	EventsFilePath = EventsDir + "/events.jsonl"
@@ -35,7 +35,6 @@ const (
 	CollectorStateFile = "agent_events.collector.json"
 	collectorLedger    = "/ledger/" + agentevents.LedgerName
 	collectorCounts    = "/ledger/" + agentevents.CounterName
-	collectorPrepare   = 30 * time.Second
 )
 
 // collectorRuns marks the runs whose collector is serving, by run id;
@@ -187,24 +186,6 @@ func (e *dockerWorkspace) eventEnvView(rc *schemas.RunContext, runID string, env
 	add("OTEL_SERVICE_NAME", service)
 	add("OTEL_RESOURCE_ATTRIBUTES", v.otelAttr+runID) // Eval integrity area (S2): heimdall.run_id= in a standard run
 	return env
-}
-
-// prepareEventsDir makes the events folder in the aux volume, writable by
-// any agent user (sticky, so one user cannot remove another's file). A
-// failure is logged: the file channel is then unavailable.
-func (e *dockerWorkspace) prepareEventsDir(ctx context.Context, rc *schemas.RunContext, expID, runID string) {
-	if !e.cfg.EventsCollector || rc.Handle == nil || rc.Handle.AuxVolume == "" {
-		return
-	}
-	cctx, cancel := context.WithTimeout(ctx, collectorPrepare)
-	defer cancel()
-	args := append([]string{"run", "--rm"}, utils.LabelArgs(expID, runID)...)
-	args = append(args, "--network", "none", "--user", "0", "--cap-drop", "ALL", "--cap-add", "CHOWN", "--cap-add", "FOWNER",
-		"--security-opt", "no-new-privileges", "-v", rc.Handle.AuxVolume+":/a", "--entrypoint", "sh", e.helperImage(rc),
-		"-c", "mkdir -p /a/events && chmod 1777 /a/events")
-	if _, err := e.cfg.Docker.MustRun(cctx, args...); err != nil {
-		e.cfg.Logger.Warn("agent events folder not prepared; the file channel is unavailable", "run", runID, "error", err.Error())
-	}
 }
 
 // copyAgentEvents copies the collector's ledger and counters into the run

@@ -39,12 +39,18 @@ Export one session to a file. Any of these works:
   instrumentations, `OTEL_INSTRUMENTATION_GENAI_CAPTURE_MESSAGE_CONTENT=true`):
   without it the spans hold no messages and there is nothing to draft from.
   A run exported by `bifrost-bench export otlp` reads back too.
-- **Langfuse.** The trace with its observations, from the public API:
+- **Langfuse.** The trace's observations, from the public Observations API
+  (v2) filtered to the trace:
   `curl -u "$LANGFUSE_PUBLIC_KEY:$LANGFUSE_SECRET_KEY"
-  "$LANGFUSE_HOST/api/public/traces/<trace id>" > failing-session.json`, or
-  the newer Observations API filtered to the trace:
-  `.../api/public/v2/observations?traceId=<trace id>&fields=core,basic,io`
-  (one page holds up to 1,000 observations).
+  "$LANGFUSE_HOST/api/public/v2/observations?traceId=<trace id>&fields=core,basic,io"
+  > failing-session.json`. One page holds up to 1,000 observations; for a
+  longer trace, the failure inbox (`inbox pull`, then `inbox accept`,
+  [failure-inbox.md](failure-inbox.md)) follows the `meta.cursor` paging and
+  drafts the task for you. Langfuse's current OpenAPI reference no longer lists
+  `GET /api/public/traces/{id}` (read on 18 Nov 2026, see
+  [failure-inbox.md](failure-inbox.md#what-is-verified-and-what-is-not));
+  a trace object with `observations` saved earlier from that route, or from
+  a self-hosted version that still serves it, still reads.
 - **A chat transcript.** The messages your application sent and received,
   in the OpenAI chat format: `{"id": "...", "messages": [...]}`, with
   `tool_calls` on assistant messages and `role: tool` results.
@@ -170,7 +176,7 @@ refuse all failed.
 | Format | Read | Verified against |
 |---|---|---|
 | `otlp` | `resourceSpans` (also `resource_spans` and the older `instrumentationLibrarySpans`), one object or one per line, grouped by `traceId`. `execute_tool` spans (or any span with `gen_ai.tool.name`): `gen_ai.tool.call.id`, `gen_ai.tool.call.arguments`, `gen_ai.tool.call.result`, the span status. `gen_ai.input.messages` and `gen_ai.output.messages` (role and parts of type `text`, `tool_call`, `tool_call_response`, reading `response` or `result`). The older indexed `gen_ai.prompt.<i>.*` and `gen_ai.completion.<i>.*` attributes, including `tool_calls.<j>.*`. Span events `gen_ai.<role>.message` and `gen_ai.choice`. `gen_ai.response.model` or `gen_ai.request.model`. Status ERROR, its message or `error.type` | The OpenTelemetry GenAI semantic conventions (message JSON schema with `ToolCallResponsePart.response`; their spans page still shows `result`, so both are read); a round trip of the bench's own exporter types. The event and indexed forms follow common instrumentations and are best effort |
-| `langfuse` | A trace with `observations` (`GET /api/public/traces/{id}`), a list of them or a `{"data": [...]}` page, and observation rows with `traceId`, `type`, `startTime` (Observations API v2), grouped by trace. `GENERATION` input and output, `TOOL` observations (name, input as arguments, output as result, `metadata.tool_call_id`), level `ERROR` with `statusMessage`, trace `input`, `output` and `scores` | Langfuse's public API reference for the trace and observation fields and types. Input and output are free JSON whose shape depends on the integration: message lists, message objects, `choices`, plain strings and objects with one obvious text field are read. The UI's table export has no documented column list and is **unverified**: it is read only when its rows look like the API's traces |
+| `langfuse` | Observation rows with `traceId`, `type`, `startTime` (Observations API v2, `GET /api/public/v2/observations`), as a list or a `{"data": [...]}` page, grouped by trace; also a trace object with `observations` (the shape of the older `GET /api/public/traces/{id}`, which the current OpenAPI reference no longer lists) or a list of them. `GENERATION` input and output, `TOOL` observations (name, input as arguments, output as result, `metadata.tool_call_id`), level `ERROR` with `statusMessage`, trace `input`, `output` and `scores` | Langfuse's public API reference for the trace and observation fields and types. Input and output are free JSON whose shape depends on the integration: message lists, message objects, `choices`, plain strings and objects with one obvious text field are read. The UI's table export has no documented column list and is **unverified**: it is read only when its rows look like the API's traces |
 | `chat` | `{"messages": [...]}` with optional `id`, `model`, `status`, `error`; a bare message array; a list or `data` page of conversations; one conversation or one message per line. OpenAI `tool_calls` and `function_call`, `role: tool` and `role: function` results, content parts, and Anthropic-style `tool_use` and `tool_result` blocks | The OpenAI chat format |
 
 Several LLM spans or generations each carry the history so far; a message is
