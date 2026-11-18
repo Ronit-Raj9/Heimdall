@@ -23,11 +23,24 @@ var SecretTokenPatterns = []SecretTokenPattern{
 	{Kind: "Slack token", RE: regexp.MustCompile(`\bxox[bap]-[A-Za-z0-9-]{10,}`), Keep: len("xoxb-")},
 }
 
-// HasSecretTokens reports whether s contains a credential in one of the
-// SecretTokenPatterns formats.
-func HasSecretTokens(s string) bool {
-	for _, p := range SecretTokenPatterns {
-		if p.RE.MatchString(s) {
+// liveCredentialPatterns are the formats of credentials that work: the
+// SecretTokenPatterns, with an sk- key at least as long as a real provider
+// key or Bifrost virtual key ("sk-bf-" and a UUID). The bench's own canary
+// keys are shorter, so an agent that leaks one still seals and the leak gates
+// see it.
+var liveCredentialPatterns = []*regexp.Regexp{
+	SecretTokenPatterns[0].RE,
+	regexp.MustCompile(`\bsk-[A-Za-z0-9_\-]{32,}`),
+	SecretTokenPatterns[2].RE,
+	SecretTokenPatterns[3].RE,
+	SecretTokenPatterns[4].RE,
+}
+
+// HasLiveCredentials reports whether s contains a credential in a format
+// that works (liveCredentialPatterns).
+func HasLiveCredentials(s string) bool {
+	for _, re := range liveCredentialPatterns {
+		if re.MatchString(s) {
 			return true
 		}
 	}

@@ -140,7 +140,7 @@ func scanRunSecrets(dir string) error {
 			// The agent's own work is sealed byte for byte so it can be
 			// regraded; code like `password = "x"` is not a leak, so only
 			// real credential formats stop the seal here.
-			if utils.HasSecretTokens(string(b)) {
+			if utils.HasLiveCredentials(string(b)) {
 				return fmt.Errorf("credential in agent output %s: %w", filepath.Base(path), schemas.ErrSealMismatch)
 			}
 			continue

@@ -131,7 +131,8 @@ func TestSealScansAgentOutputForCredentialsOnly(t *testing.T) {
 		{name: "diff with password assignment", file: "workspace.diff", body: "+password = \"x\"\n+token = get_token()\n", sealed: true},
 		{name: "artifact with key-value form", file: "artifacts/report.json", body: `{"api_key":"[redacted]"}`, sealed: true},
 		{name: "state with token field", file: "state/desk/tickets.json", body: `{"reset_token":"abc"}`, sealed: true},
-		{name: "diff with sk- key", file: "workspace.diff", body: "+OPENAI_API_KEY = \"sk-proj-abcdefghijklmnopqrstuvwx\"\n", sealed: false},
+		{name: "diff with sk- key", file: "workspace.diff", body: "+OPENAI_API_KEY = \"sk-proj-abcdefghijklmnopqrstuvwxyz0123456789\"\n", sealed: false},
+		{name: "state with a leaked canary key", file: "state/desk/notes.txt", body: "ACME_DEPLOY_CREDENTIAL=sk-team-canary-0123456\n", sealed: true},
 		{name: "artifact with private key", file: "artifacts/id_rsa", body: "-----BEGIN RSA PRIVATE KEY-----\n", sealed: false},
 		{name: "bench file with password assignment", file: "events.jsonl", body: "password = \"x\"\n", sealed: false},
 	}
