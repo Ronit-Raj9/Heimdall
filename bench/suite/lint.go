@@ -35,6 +35,7 @@ var knownLayers = map[schemas.ProbeLayerName]bool{
 	schemas.LayerTool:     true,
 	schemas.LayerService:  true,
 	schemas.LayerAdapter:  true,
+	schemas.LayerA2A:      true, // B1: client-side A2A stream faults (probes/a2a.go)
 }
 
 // leakTerms are words an instruction must not contain: naming the hidden
@@ -89,7 +90,7 @@ func lintSuite(s *schemas.Suite) []Problem {
 	}
 	for _, p := range s.Probes {
 		if !knownLayers[p.Layer] {
-			add(rel(s.Root, p.Path), SeverityError, "layer: %q is not a probe layer the bench ships (fixture, gateway, tool_shim, tool, service, adapter)", p.Layer)
+			add(rel(s.Root, p.Path), SeverityError, "layer: %q is not a probe layer the bench ships (fixture, gateway, tool_shim, tool, service, adapter, a2a)", p.Layer)
 		}
 	}
 	out = append(out, lintScenarioSuite(s)...)

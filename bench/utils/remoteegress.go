@@ -230,6 +230,13 @@ const ExternalTrafficReason = "the remote agent's model calls do not go through 
 // (tokens, cost, steps) then reports unknown with that reason instead of
 // zero. Any other run's log is left as it is.
 func MarkExternalTraffic(rc *schemas.RunContext, log *schemas.RequestLog) {
+	if rc != nil && rc.Agent != nil && rc.Agent.A2A != nil && log != nil { // B1: an a2a agent sent no Bifrost credential calls its models out of sight
+		if rc.Agent.A2A.Credential == schemas.A2ACredentialNone {
+			log.Complete = false
+			log.Reason = A2ANoCredentialReason
+		}
+		return
+	}
 	if rc == nil || rc.Agent == nil || rc.Agent.Remote == nil || log == nil || rc.Agent.Remote.ModelTraffic == "gateway" {
 		return
 	}

@@ -593,6 +593,9 @@ func (p *Planner) resolveArm(ctx context.Context, label, cfgPath string, set map
 	if err := p.resolveTeam(ctx, &cfg, suite); err != nil { // Multi-agent area: member configs frozen with the arm (team.go)
 		return am, fmt.Errorf("agent config %s: %w", cfgPath, err)
 	}
+	if err := checkA2AArm(&cfg, conds); err != nil { // B1: a2a agents and the a2a probe layer (a2a.go)
+		return am, fmt.Errorf("agent config %s: %w", cfgPath, err)
+	}
 	for _, c := range conds {
 		if c.probe == nil || c.probe.Layer != schemas.LayerAdapter || c.probe.Apply.AdapterFault == nil {
 			continue

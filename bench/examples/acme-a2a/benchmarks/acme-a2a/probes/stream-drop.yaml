@@ -1,0 +1,17 @@
+# The bench's launcher closes the A2A stream after the first event, as a
+# client that lost its connection would. Bifrost documents that it never
+# replays a stream and that the disconnect does not cancel the task, so a
+# good agent and gateway let the client recover the finished task with
+# GetTask or SubscribeToTask. Needs an a2a arm with a2a.streaming: true
+# (the planner refuses any other arm).
+id: stream-drop
+version: 1.0.0
+axis: transport
+ps2_family: unavailable_model
+layer: a2a
+goal_preserving: true
+apply:
+  a2a:
+    stream: drop
+    after_events: 1
+safe_behavior: The task keeps running after the client disconnects and is recovered, completed, through the gateway.

@@ -1,0 +1,32 @@
+# $0 proof of the a2a adapter through the real pipeline (B1,
+# docs/a2a-agents.md). Both arms are reference A2A agents (bench/a2a/
+# refagent.py) registered per run in Bifrost's agent gateway: the bench
+# sends each task as one A2A message through the gateway, follows the task
+# and grades the answer. Arm A answers nothing useful (persona noop), arm B
+# answers correctly (persona oracle, which also makes one scripted model
+# call through Bifrost with the forwarded run key and the correlation
+# headers). Expected: A verifies 0 of 3, B 3 of 3, every run's agent gateway
+# witness is complete, and B's linked LLM rows carry its task id. Anything
+# else means the registration, the gateway path or the witness is wired
+# wrong. No model is paid: the fault proxy answers B's model call from its
+# scripted model.
+#
+# Not a smoke run: the planner requires the suite locked and every task
+# admitted. Slots: 3 tasks x 1 trial x 2 arms = 6.
+name: a2a-oracle-vs-noop
+suite: acme-a2a@1.0.0
+base: agents/a2a-noop.yaml
+arms:
+  A: {label: a2a noop (persona noop)}
+  B: {label: a2a oracle (persona oracle), agent: agents/a2a-oracle.yaml}
+primary: {condition: clean, metric: verified_success}
+guards:
+  - {rule: no_new_integrity_violation}
+conditions:
+  - {id: clean, tasks: all, trials: 1}
+budget: {total_usd: 0}
+verdict: {policy: paired_signflip, alpha: 0.05, assumed_sd: 0.30}
+seed: 20261118
+concurrency: 1
+manifest_mode: agent_exposure
+policy: policies/default.yaml

@@ -89,6 +89,12 @@ func TestBuiltin(t *testing.T) {
 		{name: Speedup, kind: schemas.KindCount, higher: true, min: schemas.EvidenceOutcome},
 		{name: HeldoutScore, kind: schemas.KindRate, higher: true, min: schemas.EvidenceOutcome},
 		{name: TimeToTargetS, kind: schemas.KindDuration, min: schemas.EvidenceOutcome},
+
+		// B1: A2A agents through the agent gateway.
+		{name: A2ATasks, kind: schemas.KindCount, min: schemas.EvidenceGateway},
+		{name: A2ALatencyMS, kind: schemas.KindCount, min: schemas.EvidenceGateway},
+		{name: A2AErrors, kind: schemas.KindCount, min: schemas.EvidenceGateway},
+		{name: A2AHops, kind: schemas.KindCount, min: schemas.EvidenceGateway},
 	}
 	got := Builtin()
 	if len(got) != len(tests) {

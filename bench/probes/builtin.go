@@ -58,6 +58,7 @@ func Builtin(deps Deps) []schemas.ProbeLayer {
 		// condition data planted in services (Tool safety)
 		newServiceLayer(deps.Logger),
 		newAdapterLayer(deps.AdapterFault),
+		newA2ALayer(), // B1: client-side A2A stream faults through the agent gateway (a2a.go)
 	}
 }
 

@@ -100,6 +100,7 @@ type AgentConfig struct {
 	Skills *AgentSkills `json:"skills,omitempty" yaml:"skills"` // agent skills and where they are installed
 	Memory *AgentMemory `json:"memory,omitempty" yaml:"memory"` // paths kept between sessions
 	Remote *RemoteAgent `json:"remote,omitempty" yaml:"remote"` // read only by the remote_http adapter
+	A2A    *A2AAgent    `json:"a2a,omitempty" yaml:"a2a"`       // B1: read only by the a2a adapter and the engine (a2a.go)
 
 	// Multi-agent fields (agents.go, docs/multi-agent.md). Team runs one
 	// container per member, each on its own gateway key, under the run-wide

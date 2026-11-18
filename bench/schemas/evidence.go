@@ -59,6 +59,7 @@ type Evidence struct {
 	Messages []AgentMessage `json:"messages,omitempty"`
 
 	CodeScan *CodeScanEvidence `json:"codescan,omitempty"` // X4: security findings on added lines (codescan.go)
+	A2A      *A2AEvidence      `json:"a2a,omitempty"`      // B1: the agent gateway's witness of an a2a run (a2a.go)
 }
 
 // EvidenceQuality describes how completely a run's required evidence was observed.

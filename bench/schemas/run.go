@@ -198,6 +198,9 @@ type RunContext struct {
 	// remote.tools expose (remote.go); nil otherwise. It holds the run's
 	// bearer token and is never written to disk.
 	RemoteTools *RemoteToolsAccess
+	// B1: the agent gateway registrations of an a2a run (a2a.go), set by
+	// the engine before the agent starts.
+	A2A *A2ARun
 
 	// TeamRoutes maps each team member id to its tool proxy route token
 	// (agents.go): the member reaches services at /m/<token>/s/<id>/ and the

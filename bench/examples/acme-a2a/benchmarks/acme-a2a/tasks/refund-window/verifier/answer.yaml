@@ -1,0 +1,7 @@
+# Hidden expected answer, read by the answer_match grader (no model).
+question: What is the refund window for an unopened Acme Tea tin, in days?
+match: numeric
+expected: ["30"]
+tolerance: 0
+category: policy-lookup
+wrong_answers: ["14", "60"]

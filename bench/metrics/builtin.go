@@ -79,5 +79,6 @@ func Builtin() []schemas.Metric {
 		newInsecureFindingsMetric(), newInsecureFindingsHighMetric(), newSecretsAddedMetric(), // X4: code scan of added lines
 		// X7: GPU runs: the host-side sampler and what the verifier measured on the GPU (gpu.go).
 		newGPUSecondsMetric(), newPeakVRAMMetric(), newGPUUtilMetric(), newSpeedupMetric(), newHeldoutScoreMetric(), newTimeToTargetMetric(),
+		newA2AMetric(A2ATasks), newA2AMetric(A2ALatencyMS), newA2AMetric(A2AErrors), newA2AMetric(A2AHops), // B1: A2A agents through the agent gateway (a2a.go)
 	}
 }

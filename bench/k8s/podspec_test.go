@@ -206,6 +206,7 @@ func TestRefusals(t *testing.T) {
 		RefuseSessions:        func(s *environments.DriverSlot) { s.Task = &schemas.Task{Sessions: []schemas.SessionSpec{{ID: "a"}}} },
 		RefuseMemory:          func(s *environments.DriverSlot) { s.Agent = &schemas.AgentConfig{Memory: &schemas.AgentMemory{}} },
 		RefuseRemote:          func(s *environments.DriverSlot) { s.Agent = &schemas.AgentConfig{Adapter: "remote_http"} },
+		RefuseA2A:             func(s *environments.DriverSlot) { s.Agent = &schemas.AgentConfig{Adapter: "a2a"} }, // B1
 		RefuseNeutral:         func(s *environments.DriverSlot) { s.Experiment = &schemas.Experiment{Realism: schemas.RealismNeutral} },
 		RefuseSnapshot: func(s *environments.DriverSlot) {
 			s.Suite = &schemas.Suite{Verifier: schemas.SuiteVerifier{Mode: schemas.VerifierSnapshot}}

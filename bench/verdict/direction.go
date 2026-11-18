@@ -26,6 +26,9 @@ var lowerIsBetter = map[string]bool{
 	// Remote coverage: agent-reported usage of a remote agent.
 	"reported_tokens": true, "reported_cost_usd": true,
 
+	// B1: A2A agents through the agent gateway (metrics/a2a.go).
+	"a2a_tasks": true, "a2a_latency_ms": true, "a2a_errors": true, "a2a_hops": true,
+
 	// External API rows of the tool proxy ledger.
 	"external_calls": true, "external_unmatched": true, "external_error_rate": true,
 	"adapter_faults_issued": true,

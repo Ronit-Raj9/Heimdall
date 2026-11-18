@@ -1,0 +1,29 @@
+# acme-a2a: three support questions for agents that speak A2A (B1,
+# docs/a2a-agents.md). Each task asks one question about the fictional Acme
+# Tea handbook in the workspace; the answer_match grader compares the answer
+# with the task's hidden verifier/answer.yaml, with no model. An a2a agent
+# is not beside the workspace: its launcher sends the instruction and the
+# handbook (a data part) as one A2A message through Bifrost's agent gateway
+# and writes the task's final answer to answer.txt. The same tasks run with
+# the scripted oracle and noop controls, which admission uses.
+#
+# probes: stream-drop and stream-delay perturb the client side of an A2A
+# stream (layer a2a): the task must be recovered through the gateway.
+id: acme-a2a
+version: 1.0.0
+description: Support questions answered by A2A agents through Bifrost's agent gateway, matched against a hidden expected answer with no model.
+track: qa
+environment: docker_workspace
+grader: answer_match
+base_image:
+  tag: bench/coding-core-base:1
+workdir: /workspace
+output:
+  kind: answer
+  answer_path: answer.txt
+# answer_match grades without running a command; the schema still wants one.
+verifier:
+  command: ["true"]
+  timeout_s: 60
+tasks: [refund-window, dispatch-cutoff, team-brief]
+probes: [stream-drop, stream-delay]

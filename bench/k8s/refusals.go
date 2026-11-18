@@ -28,6 +28,7 @@ const (
 	RefuseMemberProbe = "member-targeted probes are not supported (no teams)"
 	RefuseGPU         = "GPU tasks are not supported (no GPU request is passed to the pod)"
 	RefuseCompose     = "compose tasks are not supported (their services run as Docker containers)"
+	RefuseA2A         = "a2a agents are not supported (proven on the Docker driver only, docs/a2a-agents.md)" // B1
 )
 
 // Refusals implements environments.Driver.
@@ -83,6 +84,9 @@ func refusals(s environments.DriverSlot) []string {
 		}
 		if a.Adapter == "remote_http" || a.Remote != nil {
 			add(RefuseRemote)
+		}
+		if a.Adapter == "a2a" || a.A2A != nil { // B1: a2a agents are proven on the Docker driver only (docs/a2a-agents.md)
+			add(RefuseA2A)
 		}
 	}
 	if p := s.Probe; p != nil {

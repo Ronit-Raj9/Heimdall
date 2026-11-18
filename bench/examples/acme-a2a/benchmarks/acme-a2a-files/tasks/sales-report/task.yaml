@@ -1,0 +1,41 @@
+# Sample task written by `bifrost-bench suite init -template artifact`. The
+# agent summarises data/sales.csv into report.csv and draws chart.svg; the
+# hidden verifier reads both files after the run.
+# `bifrost-bench task init -suite <suite> -id <task>` copies this shape into
+# a new task with EDIT ME markers.
+id: sales-report
+version: 1.0.0
+title: Regional sales report and chart
+project: sales-review
+kind: feature
+instruction: instruction.md
+# The workspace: the data the agent works from.
+repo_dir: repo
+output:
+  kind: artifact
+  # Each artifact is a file (or a glob: *, ? and [...]) relative to the
+  # workspace root. The verifier reads it at /grader/artifacts/<id>/<file name>.
+  artifacts:
+    - {id: report, path: report.csv, required: true, max_bytes: 1048576}
+    - {id: chart, path: chart.svg, required: true, max_bytes: 1048576}
+verifier:
+  # Hidden folder, mounted at /grader/tests.
+  tests: verifier/tests
+  required: []
+protected: ["data/**"]
+controls:
+  # Scripts run in the agent's place, in the workspace: the reference must
+  # pass; the empty control, the mutants and the exploit must fail.
+  reference: solution/reference.sh
+  empty: controls/empty.sh
+  mutants: [controls/mutant-refunds-counted.sh]
+  exploit: controls/exploit.sh
+timeouts:
+  agent_s: 600
+capabilities: [data_analysis]
+difficulty: easy
+# split: held_out   # optional; default public. Held-out tasks never run under tasks: all (only when a condition sets split: held_out or names them) and are not served by the UI or API.
+provenance:
+  source: written by bifrost-bench suite init (template artifact)
+  license: proprietary
+  created_by: suite init

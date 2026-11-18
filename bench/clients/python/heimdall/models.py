@@ -16,6 +16,167 @@ Mode = Literal["live", "recorded", "synthetic"]
 """Where the data came from. Only live is a real measurement."""
 
 
+class A2AAgent(TypedDict, total=False):
+    artifacts: str
+    card_url: str
+    credential: str
+    registration: str
+    streaming: bool
+    team: List[A2AMember]
+    timeout_s: int
+    tools: str
+
+
+class A2AAgreement(TypedDict, total=False):
+    answer_matches: Optional[bool]
+    gateway_state: str
+    launcher_state: str
+    note: str
+    task_id: str
+
+
+class _A2AEvidenceRequired(TypedDict):
+    complete: bool
+    entry: str
+    strength: str
+
+
+class A2AEvidence(_A2AEvidenceRequired, total=False):
+    agreement: Optional[A2AAgreement]
+    fault: Optional[A2AFaultEvidence]
+    foreign: int
+    gateway: str
+    hops: List[A2AHop]
+    launcher: Optional[A2ALauncherReport]
+    linked: List[A2ALinkedRow]
+    operations: List[A2AOperation]
+    problems: List[str]
+    reason: str
+    registrations: List[A2ARegistration]
+    stream_events: int
+    task_states: Dict[str, str]
+    team: Dict[str, str]
+    unmatched: List[A2ALaunchOperation]
+
+
+class _A2AFaultRequired(TypedDict):
+    stream: str
+
+
+class A2AFault(_A2AFaultRequired, total=False):
+    after_events: int
+    delay_ms: int
+
+
+class _A2AFaultEvidenceRequired(TypedDict):
+    kind: str
+    observed: bool
+    recovered: bool
+
+
+class A2AFaultEvidence(_A2AFaultEvidenceRequired, total=False):
+    detail: str
+
+
+class _A2AFaultFiredRequired(TypedDict):
+    fired: bool
+    stream: str
+
+
+class A2AFaultFired(_A2AFaultFiredRequired, total=False):
+    after_events: int
+    delay_ms: int
+
+
+A2AHop = TypedDict('A2AHop', {'from': "str", 'operation_id': "str", 'source': "str", 'task_id': "str", 'to': "str"}, total=False)
+
+
+class _A2ALaunchOperationRequired(TypedDict):
+    method: str
+    rpc_id: str
+    status: int
+
+
+class A2ALaunchOperation(_A2ALaunchOperationRequired, total=False):
+    error: str
+    task_id: str
+
+
+class A2ALauncherReport(TypedDict, total=False):
+    answer_sha256: str
+    artifacts: List[str]
+    context_id: str
+    elapsed_ms: int
+    error: str
+    fault: Optional[A2AFaultFired]
+    final_state: str
+    message_id: str
+    notes: List[str]
+    operations: List[A2ALaunchOperation]
+    polls: int
+    recovered: str
+    response_kinds: List[str]
+    stream_ended: str
+    task_id: str
+
+
+class _A2ALinkedRowRequired(TypedDict):
+    id: str
+    kind: str
+    on_run_key: bool
+    task_id: str
+
+
+class A2ALinkedRow(_A2ALinkedRowRequired, total=False):
+    member: str
+    virtual_key_id: str
+
+
+class _A2AMemberRequired(TypedDict):
+    card_url: str
+    id: str
+
+
+class A2AMember(_A2AMemberRequired, total=False):
+    budget_usd: float
+    role: str
+
+
+class _A2AOperationRequired(TypedDict):
+    agent: str
+    id: str
+    operation: str
+    status: str
+    timestamp: str
+
+
+class A2AOperation(_A2AOperationRequired, total=False):
+    answer_sha256: str
+    caller: str
+    context_id: str
+    downstream_transport: str
+    error: str
+    latency_ms: Optional[float]
+    member: str
+    overhead_latency_ms: Optional[float]
+    request_id: str
+    task_id: str
+    task_state: str
+    upstream_latency_ms: Optional[float]
+    upstream_transport: str
+    virtual_key_id: str
+
+
+class _A2ARegistrationRequired(TypedDict):
+    name: str
+    owned: bool
+
+
+class A2ARegistration(_A2ARegistrationRequired, total=False):
+    card_url: str
+    member: str
+
+
 class _APITokenRequired(TypedDict):
     created_at: str
     id: str
@@ -185,6 +346,7 @@ class _AgentConfigRequired(TypedDict):
 
 
 class AgentConfig(_AgentConfigRequired, total=False):
+    a2a: Optional[A2AAgent]
     agent_version: str
     build: Optional[ImageSpec]
     capabilities: Optional[AdapterCapabilities]
@@ -3268,6 +3430,7 @@ class PrivacyView(TypedDict):
 
 
 class ProbeApply(TypedDict, total=False):
+    a2a: Optional[A2AFault]
     adapter_fault: Optional[AdapterFaultRule]
     agent: str
     fault: Optional[FaultPlan]
@@ -3750,6 +3913,12 @@ class Run(_RunRequired, total=False):
     hardware: Optional[HardwareRecord]
     run_input_hash: str
     task_hash: str
+
+
+class RunA2A(TypedDict):
+    a2a: Optional[A2AEvidence]
+    available: bool
+    run_id: str
 
 
 class RunAccepted(TypedDict):
@@ -5599,6 +5768,10 @@ class RoutingSummaryResponse(RoutingSummary):
     mode: Mode
 
 
+class RunA2AResponse(RunA2A):
+    mode: Mode
+
+
 class RunAcceptedResponse(RunAccepted):
     mode: Mode
 
@@ -5740,6 +5913,19 @@ class WorkersListResponse(WorkersList):
 
 __all__ = [
     "Mode",
+    'A2AAgent',
+    'A2AAgreement',
+    'A2AEvidence',
+    'A2AFault',
+    'A2AFaultEvidence',
+    'A2AFaultFired',
+    'A2AHop',
+    'A2ALaunchOperation',
+    'A2ALauncherReport',
+    'A2ALinkedRow',
+    'A2AMember',
+    'A2AOperation',
+    'A2ARegistration',
     'APIToken',
     'AdapterCapabilities',
     'AdapterFaultEntry',
@@ -6060,6 +6246,7 @@ __all__ = [
     'RoutingSummary',
     'RoutingTargetUse',
     'Run',
+    'RunA2A',
     'RunAccepted',
     'RunAgentInfo',
     'RunAgents',
@@ -6250,6 +6437,7 @@ __all__ = [
     'ReviewLogResponse',
     'ReviewQueueResponse',
     'RoutingSummaryResponse',
+    'RunA2AResponse',
     'RunAcceptedResponse',
     'RunAgentsResponse',
     'RunDetailResponse',

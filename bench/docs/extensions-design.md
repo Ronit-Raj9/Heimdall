@@ -133,3 +133,23 @@ Each feature with something to show ships TypeScript types, an RTK Query
 hook, contract key files, and one self-contained page or panel under
 `ui/components/<area>/` with vitest tests, reachable from one navigation
 entry or from the run or verdict page. Do not restructure shared UI.
+
+## B1: A2A agents through Bifrost's agent gateway
+
+Added after the X wave (18 Nov 2026, `docs/a2a-agents.md`). Names:
+
+| Kind | Name |
+|---|---|
+| Adapter | `a2a` (`adapters/a2a.go`, launcher `adapters/a2a.py`) |
+| Agent config | `A2A *A2AAgent` (`a2a`: `card_url`, `registration`, `streaming`, `timeout_s`, `credential`, `tools`, `artifacts`, `team`) |
+| Run context | `A2A *A2ARun` (run time only) |
+| Evidence | `A2A *A2AEvidence` (`a2a` in evidence.json) |
+| Probe layer | `a2a` (`ProbeApply.A2A *A2AFault`: `stream` drop or delay, `after_events`, `delay_ms`) |
+| Gateway extension | `schemas.A2AGateway`, implemented by `gateways/bifrost/a2a.go` |
+| Metrics | `a2a_tasks`, `a2a_latency_ms`, `a2a_errors`, `a2a_hops` (all lower is better) |
+| Agent check row | `a2a_witness` |
+| Route | `GET /api/bench/runs/{id}/a2a` (`RunA2A`, `handlers/runa2a.go`) |
+| Kubernetes | refused (`k8s.RefuseA2A`) |
+| Owned files | `bench/a2a/`, `adapters/a2a*`, `engine/a2a*.go`, `gateways/bifrost/a2a*.go`, `metrics/a2a*.go`, `probes/a2a.go`, `schemas/a2a.go`, `utils/a2a*.go`, `cmd/bifrost-bench/agenta2a*.go`, `handlers/runa2a*.go`, `docs/a2a-agents.md`, `examples/acme-a2a/` |
+
+Shared files carry one marked line or block each (comment `B1`).

@@ -31,6 +31,7 @@ func checkRows(in *checkInput) []checkRow {
 	}
 	rows = append(rows, scenarioRows(in)...)
 	rows = append(rows, remoteRows(in)...) // Remote coverage: channel summary of a remote agent (agentremote.go)
+	rows = append(rows, a2aRows(in)...)    // B1: the agent gateway witness of an a2a agent (agenta2a.go)
 	// Agent events area: agentEventsRow (agentevents.go) comes last.
 	return append(rows, egressRow(in, net), processObserverRow(in), workspaceObserverRow(in), evidenceRow(in), claimRow(in), agentEventsRow(in))
 }

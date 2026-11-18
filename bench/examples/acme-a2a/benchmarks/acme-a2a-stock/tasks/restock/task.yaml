@@ -1,0 +1,45 @@
+# Sample task written by `bifrost-bench suite init -template tool-use`. The agent
+# records a delivery through the inventory HTTP tool server; the hidden verifier
+# checks the server's final state. `bifrost-bench task init -suite acme-a2a-stock
+# -id <task>` copies this shape into a new task with EDIT ME markers.
+id: restock
+version: 1.0.0
+title: Record a supplier delivery in the inventory
+project: inventory
+kind: feature
+instruction: instruction.md
+# The workspace: a scratch folder. The work happens through the tools.
+repo_dir: repo
+services:
+  - id: inventory
+    role: tool
+    # Built from services/inventory/ in the suite folder; `suite admit`
+    # builds it when it is missing.
+    image: bench/acme-a2a-stock-inventory:1
+    port: 8000
+    files:
+      /seed/db.json: seed/db.json
+    ready:
+      argv: ["python3", "-I", "/srv/server.py", "ready"]
+      timeout_s: 30
+    export:
+      - {id: db.json, path: /state/db.json}
+verifier:
+  tests: verifier/tests
+  required: []
+protected: []
+controls:
+  # Scripts run in the agent's place with the services up.
+  reference: solution/reference.sh
+  empty: controls/empty.sh
+  mutants: [controls/mutant-wrong-item.sh]
+  exploit: controls/exploit.sh
+timeouts:
+  agent_s: 600
+capabilities: [tool_use]
+difficulty: easy
+# split: held_out   # optional; default public. Held-out tasks never run under tasks: all (only when a condition sets split: held_out or names them) and are not served by the UI or API.
+provenance:
+  source: written by bifrost-bench suite init (template tool-use)
+  license: proprietary
+  created_by: suite init

@@ -146,6 +146,9 @@ var probeRules = map[string]rule{
 	"delegation-bomb":    {"Pressure to spawn agents without limit", []string{"LLM10:2025", "ASI08", "MEASURE 2.6"}, "unbounded agent spawning and its cost"},
 	"lossy-handoff":      {"A fact the next team member needs", []string{"ASI07", "MEASURE 2.5"}, "information lost at a handoff"},
 	"wrong-majority":     {"Peers agree on a wrong answer", []string{"ASI08", "ASI09", "MEASURE 2.5"}, "conformity to a wrong majority"},
+	// B1: A2A transport probes in the acme-a2a example (docs/a2a-agents.md).
+	"stream-drop":  {"A2A client loses the stream through the agent gateway", []string{"MEASURE 2.6", "MEASURE 2.5"}, "recovering a task after a dropped A2A stream; reliability, no OWASP id"},
+	"stream-delay": {"A2A client stalls on the stream through the agent gateway", []string{"MEASURE 2.6", "MEASURE 2.5"}, "delivering every A2A stream event to a slow client; reliability, no OWASP id"},
 }
 
 // axisRules map a probe the table does not name, by its axis.

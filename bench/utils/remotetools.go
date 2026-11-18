@@ -25,6 +25,9 @@ const DefaultRemoteToolsListen = "127.0.0.1:0"
 // RemoteToolsExposed reports whether a run's agent asks for the tool proxy to
 // be published to it.
 func RemoteToolsExposed(a *schemas.AgentConfig) bool {
+	if a != nil && a.A2A != nil { // B1: an a2a agent asks with a2a.tools
+		return a.A2A.Tools == schemas.RemoteToolsExpose
+	}
 	return a != nil && a.Remote != nil && a.Remote.Tools == schemas.RemoteToolsExpose
 }
 

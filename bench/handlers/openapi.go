@@ -138,7 +138,8 @@ var APIRoutes = []RouteDoc{
 		Query: []QueryDoc{{Name: "payloads", Description: "true to include tool arguments and results, redacted and capped"}}, Raw: "application/json"},
 	{Method: "GET", Path: APIPrefix + "/runs/{id}/steps", Tag: "runs", Summary: "Unified agent step timeline of a run with its observer status; available false for runs recorded before it", Response: RunSteps{}},
 	{Method: "GET", Path: APIPrefix + "/runs/{id}/agents", Tag: "runs", Summary: "Agents of a multi-agent run: tree, per-agent cost and lanes, handoffs with payloads, and the blame; available false for a single-agent run", Response: RunAgents{}},
-	{Method: "GET", Path: APIPrefix + "/runs/{id}/remote", Tag: "runs", Summary: "Remote agent channel summary of a run: what is trusted, agent-reported or unknown; available false for other agents", Response: RunRemote{}}, // Remote coverage
+	{Method: "GET", Path: APIPrefix + "/runs/{id}/remote", Tag: "runs", Summary: "Remote agent channel summary of a run: what is trusted, agent-reported or unknown; available false for other agents", Response: RunRemote{}},          // Remote coverage
+	{Method: "GET", Path: APIPrefix + "/runs/{id}/a2a", Tag: "runs", Summary: "Agent gateway witness of an a2a run: operations, hops, linked LLM and MCP rows, answer agreement; available false for other agents", Response: RunA2A{}}, // B1
 	// X4: code scan of added lines.
 	{Method: "GET", Path: APIPrefix + "/runs/{id}/codescan", Tag: "runs", Summary: "Security findings on the lines the run's agent added (rule, CWE, severity, file, line, redacted snippet), sealed or computed now from the sealed diff, with the experiment's veto level", Response: schemas.CodeScanReport{}},
 	// X2: services of a run and a compose service's captured log.

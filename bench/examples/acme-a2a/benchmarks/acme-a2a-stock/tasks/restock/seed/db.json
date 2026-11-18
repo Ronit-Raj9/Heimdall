@@ -1,0 +1,8 @@
+{
+  "items": [
+    {"sku": "W-100", "name": "Steel water bottle 750 ml", "stock": 30, "location": "A3"},
+    {"sku": "W-101", "name": "Steel water bottle 500 ml", "stock": 12, "location": "A3"},
+    {"sku": "T-200", "name": "Canvas tote bag", "stock": 0, "location": "B1"}
+  ],
+  "adjustments": []
+}

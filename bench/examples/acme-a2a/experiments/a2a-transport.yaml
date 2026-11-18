@@ -1,0 +1,33 @@
+# Transport faults through Bifrost's agent gateway (B1, docs/a2a-agents.md;
+# Bifrost's transports-and-recovery guide). Both arms stream. Arm A is the
+# oracle persona; arm B's card lists a first interface that answers 404.
+# Bifrost never replays a stream, so B's streams fail with a JSON-RPC
+# internal error naming the 404 and B verifies nothing, in every condition
+# (the unary failover that does work is a2a-failover). The two stream probes
+# perturb the client side: stream-drop closes the stream after the first
+# event, and the task must be recovered with GetTask or SubscribeToTask;
+# stream-delay stops reading for 3 s. Expected: A verifies in every
+# condition, with the stream-drop receipt fired, delivered and absorbed_by
+# gateway; B fails every run before the fault can fire. $0.
+#
+# Slots: 1 task x 1 trial x 3 conditions x 2 arms = 6.
+name: a2a-transport
+smoke: true
+suite: acme-a2a@1.0.0
+base: agents/a2a-stream.yaml
+arms:
+  A: {label: streaming oracle}
+  B: {label: first interface gone (404), agent: agents/a2a-failover.yaml}
+primary: {condition: clean, metric: verified_success}
+guards:
+  - {rule: no_new_integrity_violation}
+conditions:
+  - {id: clean, tasks: [refund-window], trials: 1}
+  - {id: stream-drop, tasks: [refund-window], trials: 1}
+  - {id: stream-delay, tasks: [refund-window], trials: 1}
+budget: {total_usd: 0}
+verdict: {policy: paired_signflip, alpha: 0.05, assumed_sd: 0.30}
+seed: 20261118
+concurrency: 1
+manifest_mode: agent_exposure
+policy: policies/default.yaml

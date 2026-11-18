@@ -1,0 +1,25 @@
+# Reference A2A agent for artifact tasks (persona reporter): it completes the
+# sales-report task with two file artifacts, report.csv and chart.svg, as
+# file parts with a filename. With a2a.artifacts inline the launcher writes
+# them into the workspace, where the hidden verifier grades them like any
+# agent's files.
+# adapter a2a (docs/a2a-agents.md): the bench registers the agent card below
+# in Bifrost's agent gateway for each run, grants only the run's key, sends
+# the task as an A2A message through the gateway and deletes the
+# registration at cleanup. The image is the launcher's (python3 only);
+# nothing of the agent runs in it.
+id: a2a-reporter
+adapter: a2a
+image: bench/coding-core-base:1
+model: claude-sonnet-4-5
+a2a:
+  card_url: http://a2a-agents:9000/reporter/.well-known/agent-card.json
+  timeout_s: 120
+  artifacts: inline
+budgets:
+  wall_s: 300
+  cpus: 1
+  mem_gb: 1
+gateway:
+  provider: anthropic
+  max_retries: 0

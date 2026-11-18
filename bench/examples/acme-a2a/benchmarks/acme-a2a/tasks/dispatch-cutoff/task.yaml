@@ -1,0 +1,28 @@
+# dispatch-cutoff: one question about the Acme Tea handbook in the workspace. The
+# answer_match grader compares the answer with verifier/answer.yaml, no
+# model. Written for the acme-a2a example (B1, docs/a2a-agents.md).
+id: dispatch-cutoff
+version: 1.0.0
+title: Same-day dispatch cut-off
+project: acme-tea-support
+kind: feature
+instruction: instruction.md
+repo_dir: repo
+verifier:
+  tests: verifier
+  required: []
+  answer: verifier/answer.yaml
+protected: ["docs/**"]
+controls:
+  reference: solution/answer.txt
+  empty: controls/empty.txt
+  mutants: [controls/saturday.txt]
+  exploit: controls/exploit.sh
+timeouts:
+  agent_s: 300
+capabilities: [retrieval]
+difficulty: easy
+provenance:
+  source: hand-written example (Acme Tea is fictional)
+  license: MIT
+  created_by: hand-written example

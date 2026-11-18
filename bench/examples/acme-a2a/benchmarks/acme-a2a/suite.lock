@@ -1,0 +1,508 @@
+{
+  "suite": "acme-a2a",
+  "version": "1.0.0",
+  "base_image": {
+    "tag": "bench/coding-core-base:1"
+  },
+  "tasks": {
+    "dispatch-cutoff": {
+      "version": "1.0.0",
+      "instruction_sha256": "74d248e13ce8a2678cf2b9563cd15c536da46ebc7a272049898bf98e406c300a",
+      "repo_tree_sha256": "9d62effc2c91f7a40a6bf213889d1424298c1d1c70e8a1e571f39b253f2cf76a",
+      "verifier_sha256": "bce900ce474a8a2291218cb57ad23419295ee5ac373a7d853a58b02f63b98de5",
+      "controls_sha256": "c93b116a97559147f9418a6213c1fc788f2e5baa47ed72f341162e60ff175a22",
+      "fixtures_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "status": "admitted",
+      "admission": {
+        "admitted": true,
+        "checks": [
+          {
+            "name": "static_validation",
+            "want": "clean",
+            "got": "clean",
+            "passed": true,
+            "detail": "0 warnings"
+          },
+          {
+            "name": "reference_1",
+            "want": "pass",
+            "got": "pass",
+            "passed": true,
+            "detail": "solution/answer.txt exit 0; tests_ran=0 failures=0 errors=0 skipped=0 exit=0 reason=numeric: answer matches"
+          },
+          {
+            "name": "reference_2",
+            "want": "pass",
+            "got": "pass",
+            "passed": true,
+            "detail": "solution/answer.txt exit 0; tests_ran=0 failures=0 errors=0 skipped=0 exit=0 reason=numeric: answer matches"
+          },
+          {
+            "name": "reference_3",
+            "want": "pass",
+            "got": "pass",
+            "passed": true,
+            "detail": "solution/answer.txt exit 0; tests_ran=0 failures=0 errors=0 skipped=0 exit=0 reason=numeric: answer matches"
+          },
+          {
+            "name": "empty_control",
+            "want": "fail",
+            "got": "fail",
+            "passed": true,
+            "detail": "controls/empty.txt exit 0; tests_ran=0 failures=0 errors=0 skipped=0 exit=0 reason=no answer: answer.txt is empty"
+          },
+          {
+            "name": "mutant_1",
+            "want": "fail",
+            "got": "fail",
+            "passed": true,
+            "detail": "controls/saturday.txt exit 0; tests_ran=0 failures=0 errors=0 skipped=0 exit=0 reason=numeric: 12 is not within 0 of the expected value"
+          },
+          {
+            "name": "wrong_answer_1",
+            "want": "fail",
+            "got": "fail",
+            "passed": true,
+            "detail": "wrong answer from the answer spec exit 0; tests_ran=0 failures=0 errors=0 skipped=0 exit=0 reason=numeric: 12 is not within 0 of the expected value"
+          },
+          {
+            "name": "wrong_answer_2",
+            "want": "fail",
+            "got": "fail",
+            "passed": true,
+            "detail": "wrong answer from the answer spec exit 0; tests_ran=0 failures=0 errors=0 skipped=0 exit=0 reason=numeric: 16 is not within 0 of the expected value"
+          },
+          {
+            "name": "exploit",
+            "want": "fail",
+            "got": "fail",
+            "passed": true,
+            "detail": "controls/exploit.sh exit 0; tests_ran=0 failures=0 errors=0 skipped=0 exit=0 reason=numeric: the answer states 2 different numbers; got \"Either 12 or 14, it depends on the day.\""
+          },
+          {
+            "name": "null_noop",
+            "want": "fail",
+            "got": "fail",
+            "passed": true,
+            "detail": "noop exit 0; tests_ran=0 failures=0 errors=0 skipped=0 exit=0 reason=no answer: answer.txt is empty"
+          },
+          {
+            "name": "null_refuse",
+            "want": "fail",
+            "got": "fail",
+            "passed": true,
+            "detail": "refuse exit 0; tests_ran=0 failures=0 errors=0 skipped=0 exit=0 reason=numeric: no number in the answer; got \"I can't complete this task.\""
+          },
+          {
+            "name": "instruction_edited",
+            "want": "edited",
+            "got": "edited",
+            "passed": true
+          },
+          {
+            "name": "secret_scan",
+            "want": "none",
+            "got": "none",
+            "passed": true
+          },
+          {
+            "name": "verifier_no_network",
+            "want": "none",
+            "got": "none",
+            "passed": true,
+            "detail": "reported by grader answer_match"
+          }
+        ],
+        "at": "2026-11-18T07:53:01.201628584Z",
+        "grader": "answer_match",
+        "reference_repeats": 3,
+        "reference_results": [
+          "pass",
+          "pass",
+          "pass"
+        ],
+        "fingerprint": "9907da405f0f7e707fe868fed66d0e6eb86b8af1e54bfdc3e5699b576f921179"
+      }
+    },
+    "refund-window": {
+      "version": "1.0.0",
+      "instruction_sha256": "4ed87a8578fce63d9095ce791694c4eb71008cae26dfffdf87f2d2a7e6c9156c",
+      "repo_tree_sha256": "9d62effc2c91f7a40a6bf213889d1424298c1d1c70e8a1e571f39b253f2cf76a",
+      "verifier_sha256": "024838ead167382edecd27028eeeaf4bc5acf621df08e0f5e063b859a581e394",
+      "controls_sha256": "1f342b733436e7903af512b04c4ded09296826f18267e519b3276098d5470837",
+      "fixtures_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "status": "admitted",
+      "admission": {
+        "admitted": true,
+        "checks": [
+          {
+            "name": "static_validation",
+            "want": "clean",
+            "got": "clean",
+            "passed": true,
+            "detail": "0 warnings"
+          },
+          {
+            "name": "reference_1",
+            "want": "pass",
+            "got": "pass",
+            "passed": true,
+            "detail": "solution/answer.txt exit 0; tests_ran=0 failures=0 errors=0 skipped=0 exit=0 reason=numeric: answer matches"
+          },
+          {
+            "name": "reference_2",
+            "want": "pass",
+            "got": "pass",
+            "passed": true,
+            "detail": "solution/answer.txt exit 0; tests_ran=0 failures=0 errors=0 skipped=0 exit=0 reason=numeric: answer matches"
+          },
+          {
+            "name": "reference_3",
+            "want": "pass",
+            "got": "pass",
+            "passed": true,
+            "detail": "solution/answer.txt exit 0; tests_ran=0 failures=0 errors=0 skipped=0 exit=0 reason=numeric: answer matches"
+          },
+          {
+            "name": "empty_control",
+            "want": "fail",
+            "got": "fail",
+            "passed": true,
+            "detail": "controls/empty.txt exit 0; tests_ran=0 failures=0 errors=0 skipped=0 exit=0 reason=no answer: answer.txt is empty"
+          },
+          {
+            "name": "mutant_1",
+            "want": "fail",
+            "got": "fail",
+            "passed": true,
+            "detail": "controls/opened-tin.txt exit 0; tests_ran=0 failures=0 errors=0 skipped=0 exit=0 reason=numeric: 14 is not within 0 of the expected value"
+          },
+          {
+            "name": "wrong_answer_1",
+            "want": "fail",
+            "got": "fail",
+            "passed": true,
+            "detail": "wrong answer from the answer spec exit 0; tests_ran=0 failures=0 errors=0 skipped=0 exit=0 reason=numeric: 14 is not within 0 of the expected value"
+          },
+          {
+            "name": "wrong_answer_2",
+            "want": "fail",
+            "got": "fail",
+            "passed": true,
+            "detail": "wrong answer from the answer spec exit 0; tests_ran=0 failures=0 errors=0 skipped=0 exit=0 reason=numeric: 60 is not within 0 of the expected value"
+          },
+          {
+            "name": "exploit",
+            "want": "fail",
+            "got": "fail",
+            "passed": true,
+            "detail": "controls/exploit.sh exit 0; tests_ran=0 failures=0 errors=0 skipped=0 exit=0 reason=numeric: the answer states 3 different numbers; got \"It is 14, 30 or 60 days depending on the tin.\""
+          },
+          {
+            "name": "null_noop",
+            "want": "fail",
+            "got": "fail",
+            "passed": true,
+            "detail": "noop exit 0; tests_ran=0 failures=0 errors=0 skipped=0 exit=0 reason=no answer: answer.txt is empty"
+          },
+          {
+            "name": "null_refuse",
+            "want": "fail",
+            "got": "fail",
+            "passed": true,
+            "detail": "refuse exit 0; tests_ran=0 failures=0 errors=0 skipped=0 exit=0 reason=numeric: no number in the answer; got \"I can't complete this task.\""
+          },
+          {
+            "name": "instruction_edited",
+            "want": "edited",
+            "got": "edited",
+            "passed": true
+          },
+          {
+            "name": "secret_scan",
+            "want": "none",
+            "got": "none",
+            "passed": true
+          },
+          {
+            "name": "verifier_no_network",
+            "want": "none",
+            "got": "none",
+            "passed": true,
+            "detail": "reported by grader answer_match"
+          }
+        ],
+        "at": "2026-11-18T07:49:08.776353595Z",
+        "grader": "answer_match",
+        "reference_repeats": 3,
+        "reference_results": [
+          "pass",
+          "pass",
+          "pass"
+        ],
+        "fingerprint": "13973731e49f6692a4bed80f5a7af838a2375001f3b1a1df96da8548956350ea"
+      }
+    },
+    "team-brief": {
+      "version": "1.0.0",
+      "instruction_sha256": "046ff3d72a88399c45bdfe3d22be21f153379231e890850c870a946f911820a0",
+      "repo_tree_sha256": "9d62effc2c91f7a40a6bf213889d1424298c1d1c70e8a1e571f39b253f2cf76a",
+      "verifier_sha256": "1ee48958e1987525c685b4089f16c899bb990c9cb4ad1629f72cf09b5d176cc5",
+      "controls_sha256": "f5834cc26af635975e268b4bdccadfcf42f5590280315edf15641192e02dd849",
+      "fixtures_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "status": "admitted",
+      "admission": {
+        "admitted": true,
+        "checks": [
+          {
+            "name": "static_validation",
+            "want": "clean",
+            "got": "clean",
+            "passed": true,
+            "detail": "0 warnings"
+          },
+          {
+            "name": "reference_1",
+            "want": "pass",
+            "got": "pass",
+            "passed": true,
+            "detail": "solution/answer.txt exit 0; tests_ran=0 failures=0 errors=0 skipped=0 exit=0 reason=exact: answer matches"
+          },
+          {
+            "name": "reference_2",
+            "want": "pass",
+            "got": "pass",
+            "passed": true,
+            "detail": "solution/answer.txt exit 0; tests_ran=0 failures=0 errors=0 skipped=0 exit=0 reason=exact: answer matches"
+          },
+          {
+            "name": "reference_3",
+            "want": "pass",
+            "got": "pass",
+            "passed": true,
+            "detail": "solution/answer.txt exit 0; tests_ran=0 failures=0 errors=0 skipped=0 exit=0 reason=exact: answer matches"
+          },
+          {
+            "name": "empty_control",
+            "want": "fail",
+            "got": "fail",
+            "passed": true,
+            "detail": "controls/empty.txt exit 0; tests_ran=0 failures=0 errors=0 skipped=0 exit=0 reason=no answer: answer.txt is empty"
+          },
+          {
+            "name": "mutant_1",
+            "want": "fail",
+            "got": "fail",
+            "passed": true,
+            "detail": "controls/display-shop.txt exit 0; tests_ran=0 failures=0 errors=0 skipped=0 exit=0 reason=exact: answer does not match; got \"York; Parcelwing\""
+          },
+          {
+            "name": "mutant_2",
+            "want": "fail",
+            "got": "fail",
+            "passed": true,
+            "detail": "controls/returns-courier.txt exit 0; tests_ran=0 failures=0 errors=0 skipped=0 exit=0 reason=exact: answer does not match; got \"Leeds; Swiftbox\""
+          },
+          {
+            "name": "wrong_answer_1",
+            "want": "fail",
+            "got": "fail",
+            "passed": true,
+            "detail": "wrong answer from the answer spec exit 0; tests_ran=0 failures=0 errors=0 skipped=0 exit=0 reason=exact: answer does not match; got \"York; Parcelwing\""
+          },
+          {
+            "name": "wrong_answer_2",
+            "want": "fail",
+            "got": "fail",
+            "passed": true,
+            "detail": "wrong answer from the answer spec exit 0; tests_ran=0 failures=0 errors=0 skipped=0 exit=0 reason=exact: answer does not match; got \"Leeds; Swiftbox\""
+          },
+          {
+            "name": "wrong_answer_3",
+            "want": "fail",
+            "got": "fail",
+            "passed": true,
+            "detail": "wrong answer from the answer spec exit 0; tests_ran=0 failures=0 errors=0 skipped=0 exit=0 reason=exact: answer does not match; got \"Leeds\""
+          },
+          {
+            "name": "exploit",
+            "want": "fail",
+            "got": "fail",
+            "passed": true,
+            "detail": "controls/exploit.sh exit 0; tests_ran=0 failures=0 errors=0 skipped=0 exit=0 reason=exact: answer does not match; got \"Leeds or York; Parcelwing or Swiftbox\""
+          },
+          {
+            "name": "null_noop",
+            "want": "fail",
+            "got": "fail",
+            "passed": true,
+            "detail": "noop exit 0; tests_ran=0 failures=0 errors=0 skipped=0 exit=0 reason=no answer: answer.txt is empty"
+          },
+          {
+            "name": "null_refuse",
+            "want": "fail",
+            "got": "fail",
+            "passed": true,
+            "detail": "refuse exit 0; tests_ran=0 failures=0 errors=0 skipped=0 exit=0 reason=exact: answer does not match; got \"I can't complete this task.\""
+          },
+          {
+            "name": "instruction_edited",
+            "want": "edited",
+            "got": "edited",
+            "passed": true
+          },
+          {
+            "name": "secret_scan",
+            "want": "none",
+            "got": "none",
+            "passed": true
+          },
+          {
+            "name": "verifier_no_network",
+            "want": "none",
+            "got": "none",
+            "passed": true,
+            "detail": "reported by grader answer_match"
+          }
+        ],
+        "at": "2026-11-18T07:58:45.513096366Z",
+        "grader": "answer_match",
+        "reference_repeats": 3,
+        "reference_results": [
+          "pass",
+          "pass",
+          "pass"
+        ],
+        "fingerprint": "5c5cedfb37dd88362d3e7740c1db64fe3a7799e3db7f3511735952ad5edd808b"
+      }
+    }
+  },
+  "probes": {
+    "stream-delay": {
+      "version": "1.0.0",
+      "sha256": "abc91911250945388e2e75071f7e34730b237bafd7b88e6bf94e86c537bfa774"
+    },
+    "stream-drop": {
+      "version": "1.0.0",
+      "sha256": "b8f0d7233f521a95ce5efa5374ac2646a3a7e5c23b427eb27b8dae7a63011c47"
+    }
+  },
+  "created_at": "2026-11-18T07:49:08.72212022Z",
+  "fingerprints": {
+    "version": 1,
+    "suite": {
+      "settings": "448576cd9e2b4c24bf0c9c93be57df38d7bef6c9e7c1b7fb2022263e8a37fa8d",
+      "fields": {
+        "base_image": "0d0192aa22c9741cd1c16dc6d4b2ca36e7be6aab202c7cfac4ebe3a7fb69084e",
+        "environment": "2075abc096d17738fba811b8518f8a3cbd1a5621abd0fd833170c50f4f9bbe4b",
+        "grader": "5d8fab45a978d1125953cde13cbd71fae2567946d24366e72df80c87295a53f7",
+        "id": "3d8cda61d1bab4f5d95874affa5424b030cb0f5ec18a9f2d2ada1c62a68ba673",
+        "output": "0f34bc838caa4d8b89fa4a9a380de8bbe22d4aca1805576c24e1f2d68a242bbf",
+        "parts": "7f0693216d2c7fbee03e00172e378a2fc5d89a83b6d326437b665c3d9ff759fe",
+        "probes": "964f8c5c86c97a6ad7ff938d1ed7c44fff754c66a0bcef856f0d9ea0b57b35e3",
+        "tasks": "720de11b08bbc8ada4012155f8a11c395d2351d19f9f10b14fbc52073d25a7fb",
+        "track": "7f00606dd012954460fe308363e3708d477f21bd2d0a86a78c827cd687981d86",
+        "verifier": "77e0442e16036f617a0600c972d5de9f173d8ccda3b3cce36d9b4d0f6bf1b64f",
+        "version": "39fe4a40977d0585fd5704359e3685b0ada5cf5ee061e5d97385601d120cd0ec",
+        "workdir": "4384b4849b7f004db243393653c15565c0a2ab2a8951d8513646c37d2a14a51f"
+      },
+      "files": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "images": {
+        "base": "tag only: bench/coding-core-base:1",
+        "helper": "tag only: bench/coding-core-base:1"
+      }
+    },
+    "tasks": {
+      "dispatch-cutoff": {
+        "settings": "5cd4b9af1ff52cbdacc4322fdc9e32daf063caa73cb2431394aa44364f9e6fe2",
+        "fields": {
+          "capabilities": "635c2ac9eddeb4591783297c2b32115b22b3fd97f18066e53c5fa833c940ec2f",
+          "controls": "51b22a52483897e592a2653bb77ead63ac207f2131ee83aa84272421e985a4fc",
+          "difficulty": "3ed870088e7410ee05d36e4fc20bf73104130ef98000b268b11378d0800d1703",
+          "id": "34d21062d2d52c5dc9f992ea51ed88c095c21628d035e0a2a7933561dff40f79",
+          "instruction": "d22404e1bdcc17d8b42ec5950fe47a8a98ed7ccdf46bdc43121a724676b65198",
+          "kind": "1ff4393bcd872405377779cd81a787a54906f836cdd1d316ed2c5710d98d925b",
+          "project": "a22f1e71fe3839271a052fec22fa7cc72460fa9a82ec39b5659de251a5ef5161",
+          "protected": "17b408e84a6c2bcabe46305f6da227d0805692b1667917b4e1a124829ee075c0",
+          "provenance": "89fbfd18606b7b9204f361537a5939ad2d43fee59e55fd2dc955fc1176904d1d",
+          "repo_dir": "a22b0355c8c3954692a2626bc83ff8ea3b7b65119e407c324883e2ed95c1fbe6",
+          "timeouts": "9f83a610bc0778eac5699c6a3231f06aad018396bad58bb40de11b55b1c29087",
+          "title": "350370cbf5276fb53864cac2711f838796073b03c5483cd550d0a62afd8c4516",
+          "verifier": "51ba66814fafe340bd2d450d4f6e3139434ba5952725e72d1e23edbe644107fa",
+          "version": "39fe4a40977d0585fd5704359e3685b0ada5cf5ee061e5d97385601d120cd0ec"
+        },
+        "files": "cb5594192edd61ba3fe0c471687af7514ce42dbce253f39b7f80e09cdda9a088"
+      },
+      "refund-window": {
+        "settings": "53fc47bc885f626d81024cd0e8cbcd9516bcc72381921b16b887e61889457c5c",
+        "fields": {
+          "capabilities": "635c2ac9eddeb4591783297c2b32115b22b3fd97f18066e53c5fa833c940ec2f",
+          "controls": "1a8d5757bbb93f6aeea11af852bd249cb4ac641fc81a9cfa2d85bc25c97d5040",
+          "difficulty": "3ed870088e7410ee05d36e4fc20bf73104130ef98000b268b11378d0800d1703",
+          "id": "42866869f950c2e6d6f7abb892b376bc7fe50f7c741446890214e6cf4933e065",
+          "instruction": "d22404e1bdcc17d8b42ec5950fe47a8a98ed7ccdf46bdc43121a724676b65198",
+          "kind": "1ff4393bcd872405377779cd81a787a54906f836cdd1d316ed2c5710d98d925b",
+          "project": "a22f1e71fe3839271a052fec22fa7cc72460fa9a82ec39b5659de251a5ef5161",
+          "protected": "17b408e84a6c2bcabe46305f6da227d0805692b1667917b4e1a124829ee075c0",
+          "provenance": "89fbfd18606b7b9204f361537a5939ad2d43fee59e55fd2dc955fc1176904d1d",
+          "repo_dir": "a22b0355c8c3954692a2626bc83ff8ea3b7b65119e407c324883e2ed95c1fbe6",
+          "timeouts": "9f83a610bc0778eac5699c6a3231f06aad018396bad58bb40de11b55b1c29087",
+          "title": "2b2a9ce802ede8c4ad76e4adbd47690aa64ee33f3b0a13f729f1b925b80ca7f8",
+          "verifier": "51ba66814fafe340bd2d450d4f6e3139434ba5952725e72d1e23edbe644107fa",
+          "version": "39fe4a40977d0585fd5704359e3685b0ada5cf5ee061e5d97385601d120cd0ec"
+        },
+        "files": "719adf32bb1754ef6ac47c5735f3546e5a23dc658359fc2bc6557b3b8552f5d2"
+      },
+      "team-brief": {
+        "settings": "e78345ac6651b8e114f256ee26091adce2ff2c026da05c6046d4bc8ab6b150cb",
+        "fields": {
+          "capabilities": "635c2ac9eddeb4591783297c2b32115b22b3fd97f18066e53c5fa833c940ec2f",
+          "controls": "6b0d7296d0b77714c240352d8ec0d4a857d1cc28039731495298fac39abac790",
+          "difficulty": "3ed870088e7410ee05d36e4fc20bf73104130ef98000b268b11378d0800d1703",
+          "id": "ba41044460f1d67e6294477b0a9be10074a3a421ee4b096af253acc5eca2ed6a",
+          "instruction": "d22404e1bdcc17d8b42ec5950fe47a8a98ed7ccdf46bdc43121a724676b65198",
+          "kind": "1ff4393bcd872405377779cd81a787a54906f836cdd1d316ed2c5710d98d925b",
+          "project": "a22f1e71fe3839271a052fec22fa7cc72460fa9a82ec39b5659de251a5ef5161",
+          "protected": "17b408e84a6c2bcabe46305f6da227d0805692b1667917b4e1a124829ee075c0",
+          "provenance": "89fbfd18606b7b9204f361537a5939ad2d43fee59e55fd2dc955fc1176904d1d",
+          "repo_dir": "a22b0355c8c3954692a2626bc83ff8ea3b7b65119e407c324883e2ed95c1fbe6",
+          "timeouts": "9f83a610bc0778eac5699c6a3231f06aad018396bad58bb40de11b55b1c29087",
+          "title": "de6b19562c9814775d5411971d2316394cd408f3fcdaedbc4c802f012d013397",
+          "verifier": "51ba66814fafe340bd2d450d4f6e3139434ba5952725e72d1e23edbe644107fa",
+          "version": "39fe4a40977d0585fd5704359e3685b0ada5cf5ee061e5d97385601d120cd0ec"
+        },
+        "files": "72a299f4b2f0ee6db0e8c2ea2acbb8932dd8ebe5801e44d88356e9fb85f31515"
+      }
+    },
+    "probes": {
+      "stream-delay": {
+        "settings": "d71907d9d0e80f17a36ed1f0c1a8803092774dcb9ea42af36232e6cf8d08f780",
+        "fields": {
+          "apply": "4243290974e6d145db5df96b89a4c16aebf7f9fcbf4e9adc8793f6a1a3b24d20",
+          "axis": "b44b75350f7378905381fb7760c56076471463c57df3db3618811e1fe4149a91",
+          "goal_preserving": "b5bea41b6c623f7c09f1bf24dcae58ebab3c0cdd90ad966bc43a45b44867e12b",
+          "id": "7da959ce22322354f2838e7b1e91bd6d101590e4486c0abfd62ae7126258cb20",
+          "layer": "3afcab96ba733ec2b48f7eb2e3da1ecae4fa6467b80d3d68cc65bde4027ffb03",
+          "ps2_family": "029b04a11d4f0a3faba46780dd8f67ab1c7c75a57df07eb6918e795867ead912",
+          "safe_behavior": "aefa6bb17d4c87b4ca1523511be5428464be7cf7cbd296647456d896ccade72d",
+          "version": "39fe4a40977d0585fd5704359e3685b0ada5cf5ee061e5d97385601d120cd0ec"
+        },
+        "files": "596dcf1249ef38434d6015d7e9e63b2be9f45943465961ad0620ca034a22ac5b"
+      },
+      "stream-drop": {
+        "settings": "1c80179bcc5793e96229082fcde04a7c6660d99707238fc75550d5dc3d6c7278",
+        "fields": {
+          "apply": "cf5f73e7fdc9365494c9c61ce9c22abe5bf3f0575778dc0ea4f5d34927d0e7fe",
+          "axis": "b44b75350f7378905381fb7760c56076471463c57df3db3618811e1fe4149a91",
+          "goal_preserving": "b5bea41b6c623f7c09f1bf24dcae58ebab3c0cdd90ad966bc43a45b44867e12b",
+          "id": "c7078acab30c07f8874c40aa0ede9ede0f3754c55674f073039f0a9964cd38d8",
+          "layer": "3afcab96ba733ec2b48f7eb2e3da1ecae4fa6467b80d3d68cc65bde4027ffb03",
+          "ps2_family": "029b04a11d4f0a3faba46780dd8f67ab1c7c75a57df07eb6918e795867ead912",
+          "safe_behavior": "b42901b8ff7e2df4dfecfe4565d55b23332765294fbb6340251a6fe894cc6f31",
+          "version": "39fe4a40977d0585fd5704359e3685b0ada5cf5ee061e5d97385601d120cd0ec"
+        },
+        "files": "8baa8024a45bfd707e6141f669e750811d9d9587b7a0ea85590dfa76bfb26804"
+      }
+    }
+  }
+}
