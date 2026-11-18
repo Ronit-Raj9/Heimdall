@@ -1,6 +1,8 @@
 package handlers
 
 import (
+	"cmp"
+	"maps"
 	"slices"
 	"time"
 
@@ -39,6 +41,7 @@ func BuildStatus(m *schemas.Manifest, runs []RunView, f StatusFacts) schemas.Exp
 	st := schemas.ExperimentStatus{
 		ExpID: m.ExpID, Name: m.Experiment.Name, ManifestHash: m.Hash, FrozenAt: m.CreatedAt,
 		SpentUSD: spentUSD(runs, f.Costs), AnalysisID: f.AnalysisID,
+		Suite: cmp.Or(m.SuiteID, m.Experiment.Suite), Arms: slices.Sorted(maps.Keys(m.Arms)), // UI regroup (U2)
 	}
 	counted := countedRuns(runs)
 	unsealed := map[string]bool{}

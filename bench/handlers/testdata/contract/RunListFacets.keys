@@ -1,0 +1,9 @@
+# Keys of bench.ts `RunListFacets`, one per line; a trailing ? marks an optional (Go omitempty) key.
+# Change with bench.ts and handlers/runlist.go.
+experiments
+suites
+arms
+tasks
+conditions
+outcomes
+tracks

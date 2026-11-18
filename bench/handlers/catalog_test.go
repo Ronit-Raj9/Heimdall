@@ -26,3 +26,27 @@ func TestCatalogSetsModeWithoutMutating(t *testing.T) {
 		t.Errorf("gates = %v", body["gates"])
 	}
 }
+
+// A bench root with no agents/ folder (or no suites, probes or metrics) answers
+// empty lists, never null: the new experiment form reads them as lists.
+func TestCatalogNilListsAnswerEmpty(t *testing.T) {
+	shared := &schemas.Catalog{Suites: []schemas.CatalogSuite{{ID: "s", Version: "1"}}}
+	d := fullDeps()
+	d.catalog = liveCatalog{shared}
+	body := decodeBody(t, newTestClient(t, d).do(t, "GET", "/api/bench/catalog", nil, nil))
+	for _, key := range []string{"probes", "agents", "metrics", "gates"} {
+		if list, ok := body[key].([]any); !ok || len(list) != 0 {
+			t.Errorf("%s = %#v, want []", key, body[key])
+		}
+	}
+	if parts, ok := body["parts"].(map[string]any); !ok || len(parts) != 0 {
+		t.Errorf("parts = %#v, want {}", body["parts"])
+	}
+	suite := body["suites"].([]any)[0].(map[string]any)
+	if tasks, ok := suite["tasks"].([]any); !ok || len(tasks) != 0 {
+		t.Errorf("suite tasks = %#v, want []", suite["tasks"])
+	}
+	if shared.Agents != nil || shared.Suites[0].Tasks != nil {
+		t.Error("the shared catalog was changed in place")
+	}
+}

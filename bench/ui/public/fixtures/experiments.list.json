@@ -1,5 +1,5 @@
 {
-	"_comment": "SYNTHETIC fixture for UI development. Not a benchmark result. GET /experiments (schemas.ExperimentList). U1 home: a running, a created and a failed experiment beside the finished one; the running one starts before the finished one so the newest stays e_synthetic-codewins.",
+	"_comment": "SYNTHETIC fixture for UI development. Not a benchmark result. GET /experiments (schemas.ExperimentList). U1 home: a running, a created and a failed experiment beside the finished one; the running one starts before the finished one so the newest stays e_synthetic-codewins. U2: the arm ids per experiment. The list can also carry suite and decision; they are left out here so Home exercises its verdict fallback.",
 	"mode": "synthetic",
 	"experiments": [
 		{
@@ -21,7 +21,11 @@
 				"v": 16.84,
 				"evidence": "gateway"
 			},
-			"analysis_id": "a_synth00001"
+			"analysis_id": "a_synth00001",
+			"arms": [
+				"A",
+				"B"
+			]
 		},
 		{
 			"exp_id": "e_synthetic-nightly",
@@ -40,7 +44,11 @@
 				"state": "observed",
 				"v": 5.12,
 				"evidence": "gateway"
-			}
+			},
+			"arms": [
+				"A",
+				"B"
+			]
 		},
 		{
 			"exp_id": "e_synthetic-draft",
@@ -58,7 +66,11 @@
 				"state": "observed",
 				"v": 0,
 				"evidence": "gateway"
-			}
+			},
+			"arms": [
+				"A",
+				"B"
+			]
 		},
 		{
 			"exp_id": "e_synthetic-outage",
@@ -78,7 +90,11 @@
 				"state": "observed",
 				"v": 1.37,
 				"evidence": "gateway"
-			}
+			},
+			"arms": [
+				"A",
+				"B"
+			]
 		}
 	]
 }

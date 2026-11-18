@@ -121,6 +121,12 @@ var APIRoutes = []RouteDoc{
 		gradeSourceQuery, {Name: "split", Description: "public or held_out"}, {Name: "k", Description: "pass^k depth"},
 	}},
 
+	// UI regroup (U2): the run list across experiments (handlers/runlist.go).
+	{Method: "GET", Path: APIPrefix + "/runs", Tag: "runs", Summary: "Every run across experiments, newest first, with filters, paging and the values each filter can take", Response: RunList{}, Query: []QueryDoc{
+		{Name: "exp", Description: "Experiment id"}, {Name: "suite", Description: "Suite id"}, {Name: "arm", Description: "Arm id"},
+		{Name: "task", Description: "Task id"}, {Name: "condition", Description: "clean or a probe id"}, {Name: "outcome", Description: "Run outcome"},
+		{Name: "track", Description: "Suite track"}, {Name: "limit", Description: "Page size; default 100, at most 500"}, {Name: "offset", Description: "Rows to skip"},
+	}},
 	{Method: "GET", Path: APIPrefix + "/runs/{id}", Tag: "runs", Summary: "One run with seal, grade, metrics, gates and receipts", Response: schemas.RunDetail{}},
 	{Method: "GET", Path: APIPrefix + "/runs/{id}/events", Tag: "runs", Summary: "Canonical event log of a run", Response: schemas.RunEvents{}},
 	{Method: "GET", Path: APIPrefix + "/runs/{id}/diff", Tag: "runs", Summary: "Patch the agent produced; ?format=text answers the raw patch",

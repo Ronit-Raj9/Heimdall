@@ -192,6 +192,7 @@ var OrgPolicy = map[string]Rule{
 	key("POST", api+"/experiments/{id}/regrade"):      org(member),
 	key("POST", api+"/estimate"):                      org(member),
 
+	key("GET", api+"/runs"):                                  org(viewer), // UI regroup (U2): run list (handlers/runlist.go)
 	key("GET", api+"/runs/{id}"):                             org(viewer),
 	key("GET", api+"/runs/{id}/events"):                      org(viewer),
 	key("GET", api+"/runs/{id}/diff"):                        org(viewer),

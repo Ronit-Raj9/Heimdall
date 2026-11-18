@@ -271,6 +271,7 @@ func newTestClient(t *testing.T, d testDeps) *testClient {
 	NewCatalogHandler(testMode, d.catalog).RegisterRoutes(r, common...)
 	exp.RegisterRoutes(r, common...)
 	NewRunsHandler(testMode, d.index).RegisterRoutes(r, common...)
+	NewRunListHandler(testMode, d.index, nil).RegisterRoutes(r, common...) // UI regroup (U2)
 	NewPairsHandler(testMode, d.index).RegisterRoutes(r, common...)
 	NewAuditHandler(testMode, d.auditor, write).RegisterRoutes(r, common...)
 	ln := fasthttputil.NewInmemoryListener()

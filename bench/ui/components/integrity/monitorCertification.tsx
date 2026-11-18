@@ -1,3 +1,4 @@
+import { EntityLink } from "@/components/shell/entityLink";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { CopyId } from "@/components/ui/copyId";
@@ -145,9 +146,7 @@ export function MonitorCertDetail({ cert }: { cert: MonitorCertification }) {
 					<Fact label={t("integrity.monitors.experiments")}>
 						<span className="flex flex-wrap gap-1">
 							{cert.exp_ids.map((id) => (
-								<Link key={id} to="/verdict" search={{ exp: id } as never} className="font-mono text-xs underline-offset-2 hover:underline">
-									{id}
-								</Link>
+								<EntityLink key={id} kind="experiment" id={id} className="text-xs" />
 							))}
 						</span>
 					</Fact>

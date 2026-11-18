@@ -1,0 +1,7 @@
+# Keys of bench.ts `RunList`, one per line; a trailing ? marks an optional (Go omitempty) key.
+# The top-level response adds "mode". Change with bench.ts and handlers/runlist.go.
+runs
+total
+limit
+offset
+facets

@@ -157,6 +157,7 @@ func TestResponsesMatchContract(t *testing.T) {
 		{"run diff", "GET", "/runs/r_t01_A/diff", nil, 200, "RunDiff", nil},
 		{"run receipts", "GET", "/runs/r_t01_A/receipts", nil, 200, "RunReceipts", nil},
 		{"pair", "GET", "/pairs/p_t01", nil, 200, "Pair", map[string]string{"runs[]": "PairRun"}},
+		{"run list", "GET", "/runs", nil, 200, "RunList", map[string]string{"runs[]": "RunListRow", "facets": "RunListFacets"}}, // UI regroup (U2)
 		{"audit", "POST", "/audit", []byte(`{"rows":[{"task":"t01","a_pass":1,"a_n":3,"b_pass":2,"b_n":3}]}`), 200, "Verdict", nil},
 	}
 	for _, tt := range tests {

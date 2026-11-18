@@ -34,7 +34,7 @@ describe("MigrationReportView", () => {
 	});
 
 	it("links a flipped task to its run pair and shows the cost and the Pareto plane", () => {
-		expect(html).toMatch(/href="\/runs\?pair=[^"]+"[^>]*data-testid="migration-flipped-link"/);
+		expect(html).toMatch(/href="\/compare\?pair=[^"]+"[^>]*data-testid="migration-flipped-link"/);
 		expect(html).toContain('data-testid="migration-pareto"');
 		expect(html).toContain('data-testid="migration-cost"');
 	});

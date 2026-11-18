@@ -1,3 +1,4 @@
+import { compareSearch } from "@/components/experiments/legacyRoutes";
 import { BlockSkeleton, LoadError } from "@/components/runs/screenStates";
 import { getLocale } from "@/lib/i18n";
 import { useGetExperimentParetoQuery, useGetLeaderboardParetoQuery } from "@/lib/store/apis/migrationApi";
@@ -236,8 +237,8 @@ function PairSection({ pair, expId }: { pair: MigrationPair; expId: string }) {
 								{formatShare(f.from_rate, locale)} / {formatShare(f.to_rate, locale)}{" "}
 								{f.runs[0]?.pair_id && (
 									<Link
-										to="/runs"
-										search={{ pair: f.runs[0].pair_id }}
+										to="/compare"
+										search={compareSearch(f.runs[0].pair_id) as never}
 										className="text-primary underline-offset-4 hover:underline"
 										data-testid="migration-flipped-link"
 									>

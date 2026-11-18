@@ -46,6 +46,7 @@ export const FIXTURE_ROUTES: readonly FixtureRoute[] = [
 	{ method: "GET", pattern: "/experiments/:id/matrix", file: "experiments.matrix.json" },
 	// W3 customer support: the scorecard of one support experiment; other ids answer 404 and the card stays hidden.
 	{ method: "GET", pattern: "/experiments/:id/support", file: "experiments.support.{id}.json" },
+	{ method: "GET", pattern: "/runs", file: "runs.list.json" }, // U2 UI regroup: the run list; one page for every filter
 	{ method: "GET", pattern: "/runs/:id", file: "runs.{id}.json" },
 	{ method: "GET", pattern: "/runs/:id/events", file: "runs.{id}.events.json" },
 	{ method: "GET", pattern: "/runs/:id/diff", file: "runs.{id}.diff.json" },

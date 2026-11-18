@@ -1,0 +1,354 @@
+import { compareSearch } from "@/components/experiments/legacyRoutes";
+import { EmptyState } from "@/components/shell/emptyState";
+import { EntityLink } from "@/components/shell/entityLink";
+import { Button } from "@/components/ui/button";
+import { Card } from "@/components/ui/card";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { ValueCell } from "@/components/valueCell";
+import { GradeSourceTag } from "@/components/verdict/gradeSourceTag";
+import { getLocale } from "@/lib/i18n";
+import { useListRunsQuery } from "@/lib/store/apis/benchApi";
+import type { RunListFacets, RunListParams, RunListRow } from "@/lib/types/bench";
+import { Link } from "@tanstack/react-router";
+import { ChevronLeft, ChevronRight, Gavel, GitCompareArrows, ListX } from "lucide-react";
+import { parseAsInteger, parseAsString, useQueryStates } from "nuqs";
+import { useTranslation } from "react-i18next";
+import { OutcomeBadge } from "./outcomeBadge";
+import { BlockSkeleton, LoadError } from "./screenStates";
+
+/** A start time as month, day and time; the year is left out to keep the column narrow. */
+export function formatShortTime(iso: string | undefined, locale: string): string {
+	if (!iso) return "";
+	const at = new Date(iso);
+	if (Number.isNaN(at.getTime())) return "";
+	return new Intl.DateTimeFormat(locale, { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" }).format(at);
+}
+
+/** Rows per page of the run list. */
+export const RUN_LIST_PAGE = 50;
+
+/** The filters the run list offers, in menu order, each with its facet and its query parameter. */
+export const RUN_FILTERS = [
+	{ param: "exp", facet: "experiments" },
+	{ param: "arm", facet: "arms" },
+	{ param: "task", facet: "tasks" },
+	{ param: "condition", facet: "conditions" },
+	{ param: "outcome", facet: "outcomes" },
+	{ param: "track", facet: "tracks" },
+] as const satisfies readonly { param: keyof RunListParams; facet: keyof RunListFacets }[];
+
+type FilterParam = (typeof RUN_FILTERS)[number]["param"];
+
+const ALL = "__all";
+
+const searchParsers = {
+	exp: parseAsString,
+	arm: parseAsString,
+	task: parseAsString,
+	condition: parseAsString,
+	outcome: parseAsString,
+	track: parseAsString,
+	page: parseAsInteger,
+};
+
+/** The request for one page of the list: empty filters left out, the page turned into an offset. */
+export function runListRequest(filters: Partial<Record<FilterParam, string | null>>, page: number | null): RunListParams {
+	const params: RunListParams = { limit: RUN_LIST_PAGE };
+	for (const { param } of RUN_FILTERS) {
+		const value = filters[param];
+		if (value) params[param] = value;
+	}
+	const p = Math.max(1, page ?? 1);
+	if (p > 1) params.offset = (p - 1) * RUN_LIST_PAGE;
+	return params;
+}
+
+export interface RunListProps {
+	/** An experiment page passes its id: the experiment filter and column are then left out. */
+	expId?: string;
+	testId?: string;
+}
+
+/**
+ * Runs across experiments (GET /runs), newest first. Every filter lives in the URL, so a filtered
+ * list can be shared; the menus offer the values the server has seen. Scores are each run's sealed
+ * grade, and the header says so.
+ */
+export function RunList({ expId, testId = "run-list" }: RunListProps) {
+	const { t } = useTranslation("bench");
+	const [search, setSearch] = useQueryStates(searchParsers, { history: "replace" });
+	const filters = { ...search, exp: expId ?? search.exp };
+	const request = runListRequest(filters, search.page);
+	const list = useListRunsQuery(request);
+	const shownFilters = RUN_FILTERS.filter((f) => !(expId && f.param === "exp"));
+	const active = shownFilters.some((f) => Boolean(search[f.param]));
+	const page = Math.max(1, search.page ?? 1);
+
+	const setFilter = (param: FilterParam, value: string | null) => void setSearch({ [param]: value, page: null });
+	const clear = () => void setSearch({ exp: null, arm: null, task: null, condition: null, outcome: null, track: null, page: null });
+
+	return (
+		<div className="flex min-w-0 flex-col gap-4" data-testid={testId}>
+			<div className="flex flex-wrap items-end gap-2" role="group" aria-label={t("runs.list.filtersLabel")}>
+				{shownFilters.map((filter) => (
+					<FilterSelect
+						key={filter.param}
+						param={filter.param}
+						options={list.data?.facets[filter.facet] ?? []}
+						value={search[filter.param]}
+						onChange={(value) => setFilter(filter.param, value)}
+					/>
+				))}
+				{active && (
+					<Button variant="ghost" size="sm" onClick={clear} dataTestId="run-list-clear">
+						{t("runs.list.clear")}
+					</Button>
+				)}
+			</div>
+
+			{list.isLoading ? (
+				<BlockSkeleton rows={8} testId="run-list-loading" />
+			) : list.error || !list.data ? (
+				<LoadError title={t("runs.list.loadError")} error={list.error} onRetry={() => void list.refetch()} testId="run-list-error" />
+			) : list.data.runs.length === 0 ? (
+				<EmptyState
+					icon={ListX}
+					message={active ? t("runs.list.noMatch") : t("runs.list.empty")}
+					action={
+						active ? { label: t("runs.list.clear"), onClick: clear } : { label: t("runs.list.newExperiment"), to: "/experiments/new" }
+					}
+					testId="run-list-empty"
+				/>
+			) : (
+				<>
+					<Card className="hidden py-0 shadow-none md:flex">
+						<RunTable rows={list.data.runs} showExperiment={!expId} />
+					</Card>
+					<RunCards rows={list.data.runs} showExperiment={!expId} />
+					<Pager page={page} total={list.data.total} onPage={(next) => void setSearch({ page: next === 1 ? null : next })} />
+				</>
+			)}
+		</div>
+	);
+}
+
+function FilterSelect({
+	param,
+	options,
+	value,
+	onChange,
+}: {
+	param: FilterParam;
+	options: readonly string[];
+	value: string | null;
+	onChange: (value: string | null) => void;
+}) {
+	const { t } = useTranslation("bench");
+	const id = `run-filter-${param}`;
+	// A value from the URL the facets do not carry (a typo, an old link) still shows as chosen.
+	const choices = value && !options.includes(value) ? [value, ...options] : options;
+	return (
+		<div className="flex min-w-0 flex-col gap-1">
+			<label htmlFor={id} className="text-muted-foreground text-xs">
+				{t(`runs.list.filter.${param}`)}
+			</label>
+			<Select value={value ?? ALL} onValueChange={(next) => onChange(next === ALL ? null : next)}>
+				<SelectTrigger id={id} size="sm" className="w-40 max-w-full font-mono text-xs" data-testid={id}>
+					<SelectValue />
+				</SelectTrigger>
+				<SelectContent>
+					<SelectItem value={ALL}>
+						<span className="font-sans">{t("runs.list.all")}</span>
+					</SelectItem>
+					{choices.map((option) => (
+						<SelectItem key={option} value={option} className="font-mono text-xs">
+							{param === "outcome" ? t(`runs.outcome.${option}`, { defaultValue: option }) : option}
+						</SelectItem>
+					))}
+				</SelectContent>
+			</Select>
+		</div>
+	);
+}
+
+/** The run table. Every id links to its page; the pair opens the side-by-side comparison. */
+export function RunTable({ rows, showExperiment = true }: { rows: readonly RunListRow[]; showExperiment?: boolean }) {
+	const { t } = useTranslation("bench");
+	const locale = getLocale();
+	return (
+		<Table stickyColumns={1} data-testid="run-table" aria-label={t("runs.list.tableLabel")}>
+			<TableHeader>
+				<TableRow>
+					<TableHead scope="col">{t("runs.list.col.run")}</TableHead>
+					{showExperiment && <TableHead scope="col">{t("runs.list.col.experiment")}</TableHead>}
+					<TableHead scope="col">{t("runs.list.col.task")}</TableHead>
+					<TableHead scope="col">{t("runs.list.col.arm")}</TableHead>
+					<TableHead scope="col">{t("runs.list.col.condition")}</TableHead>
+					<TableHead scope="col">{t("runs.list.col.outcome")}</TableHead>
+					<TableHead scope="col" className="text-right">
+						<span className="inline-flex items-center gap-1.5">
+							{t("runs.list.col.score")}
+							<GradeSourceTag sealedOnly judged={rows.every((row) => row.grading === "judged")} testId="run-table-score-source" />
+						</span>
+					</TableHead>
+					<TableHead scope="col" className="text-right">
+						{t("runs.list.col.cost")}
+					</TableHead>
+					<TableHead scope="col">{t("runs.list.col.started")}</TableHead>
+					<TableHead scope="col">
+						<span className="sr-only">{t("runs.list.col.compare")}</span>
+					</TableHead>
+				</TableRow>
+			</TableHeader>
+			<TableBody>
+				{rows.map((row) => (
+					<TableRow key={row.run_id} data-testid={`run-row-${row.run_id}`} data-arm={row.arm}>
+						<TableCell className="text-xs">
+							<EntityLink kind="run" id={row.run_id} testId={`run-row-${row.run_id}-link`} />
+							{!row.counted && <span className="text-muted-foreground ml-1.5 text-[11px]">{t("runs.list.notCounted")}</span>}
+							{row.attempt > 1 && (
+								<span className="text-muted-foreground ml-1.5 text-[11px]">{t("runs.list.attempt", { n: row.attempt })}</span>
+							)}
+						</TableCell>
+						{showExperiment && (
+							<TableCell className="text-xs">
+								<EntityLink kind="experiment" id={row.exp_id} />
+							</TableCell>
+						)}
+						<TableCell className="text-xs">
+							<EntityLink kind="task" id={row.task} suite={row.suite} />
+						</TableCell>
+						<TableCell className="font-mono text-xs font-semibold">{row.arm}</TableCell>
+						<TableCell className="text-xs">
+							<span className="font-mono">{row.condition}</span>
+							<span className="text-muted-foreground ml-1.5 tabular-nums" title={t("runs.list.trialHint", { trial: row.trial })}>
+								{t("runs.list.trial", { trial: row.trial })}
+							</span>
+						</TableCell>
+						<TableCell>
+							{row.sealed ? (
+								<OutcomeBadge outcome={row.outcome} testId={`run-row-${row.run_id}-outcome`} />
+							) : (
+								<span className="text-chart-info-ink text-xs">{t("runs.list.inFlight")}</span>
+							)}
+						</TableCell>
+						<TableCell className="text-right">
+							<span className="inline-flex items-center gap-1">
+								{row.grading === "judged" && (
+									<Gavel
+										className="text-chart-warning-ink size-3"
+										aria-label={t("verdict.source.kind.judged")}
+										data-testid={`run-row-${row.run_id}-judged`}
+									/>
+								)}
+								<ValueCell value={row.y} kind="count" />
+							</span>
+						</TableCell>
+						<TableCell className="text-right">
+							<ValueCell value={row.cost_usd} kind="usd" />
+						</TableCell>
+						<TableCell className="text-muted-foreground text-xs whitespace-nowrap tabular-nums">
+							{formatShortTime(row.started, locale)}
+						</TableCell>
+						<TableCell className="text-right">
+							{row.pair_id && (
+								<Link
+									to="/compare"
+									search={compareSearch(row.pair_id, row.exp_id) as never}
+									className="text-muted-foreground hover:text-primary focus-visible:ring-ring/60 inline-flex items-center gap-1 rounded-sm text-xs focus-visible:ring-2 focus-visible:outline-none"
+									aria-label={t("runs.list.compareAria", { run: row.run_id })}
+									title={t("runs.list.compareAria", { run: row.run_id })}
+									data-testid={`run-row-${row.run_id}-compare`}
+								>
+									<GitCompareArrows className="size-3.5" aria-hidden="true" />
+								</Link>
+							)}
+						</TableCell>
+					</TableRow>
+				))}
+			</TableBody>
+		</Table>
+	);
+}
+
+/** The run list on a phone: one card per run with the same links, in place of the wide table. */
+function RunCards({ rows, showExperiment }: { rows: readonly RunListRow[]; showExperiment: boolean }) {
+	const { t } = useTranslation("bench");
+	const locale = getLocale();
+	return (
+		<ul className="flex flex-col gap-2 md:hidden" data-testid="run-cards" aria-label={t("runs.list.tableLabel")}>
+			{rows.map((row) => (
+				<li
+					key={row.run_id}
+					className="bg-card flex flex-col gap-1.5 rounded-lg border px-3 py-2.5 text-xs"
+					data-testid={`run-card-${row.run_id}`}
+				>
+					<div className="flex items-center justify-between gap-2">
+						<EntityLink kind="run" id={row.run_id} />
+						{row.sealed ? <OutcomeBadge outcome={row.outcome} /> : <span className="text-chart-info-ink">{t("runs.list.inFlight")}</span>}
+					</div>
+					<div className="text-muted-foreground flex flex-wrap items-center gap-x-3 gap-y-1">
+						<span>
+							{t("runs.list.col.task")} <EntityLink kind="task" id={row.task} suite={row.suite} />
+						</span>
+						<span>
+							{t("runs.list.col.arm")} <span className="text-foreground font-mono font-semibold">{row.arm}</span>
+						</span>
+						<span className="font-mono">
+							{row.condition} {t("runs.list.trial", { trial: row.trial })}
+						</span>
+					</div>
+					<div className="text-muted-foreground flex flex-wrap items-center gap-x-3 gap-y-1">
+						{showExperiment && <EntityLink kind="experiment" id={row.exp_id} />}
+						<span className="tabular-nums">{formatShortTime(row.started, locale)}</span>
+						<span className="ml-auto flex items-center gap-2">
+							<ValueCell value={row.cost_usd} kind="usd" />
+							{row.pair_id && (
+								<Link
+									to="/compare"
+									search={compareSearch(row.pair_id, row.exp_id) as never}
+									className="text-muted-foreground hover:text-primary inline-flex items-center"
+									aria-label={t("runs.list.compareAria", { run: row.run_id })}
+								>
+									<GitCompareArrows className="size-3.5" aria-hidden="true" />
+								</Link>
+							)}
+						</span>
+					</div>
+				</li>
+			))}
+		</ul>
+	);
+}
+
+function Pager({ page, total, onPage }: { page: number; total: number; onPage: (page: number) => void }) {
+	const { t } = useTranslation("bench");
+	const pages = Math.max(1, Math.ceil(total / RUN_LIST_PAGE));
+	const first = (page - 1) * RUN_LIST_PAGE + 1;
+	const last = Math.min(total, page * RUN_LIST_PAGE);
+	return (
+		<nav
+			className="flex flex-wrap items-center justify-between gap-2 text-xs"
+			aria-label={t("runs.list.pages")}
+			data-testid="run-list-pager"
+		>
+			<span className="text-muted-foreground tabular-nums" data-testid="run-list-count">
+				{t("runs.list.showing", { first, last, total })}
+			</span>
+			{pages > 1 && (
+				<span className="flex items-center gap-1">
+					<Button variant="outline" size="sm" disabled={page <= 1} onClick={() => onPage(page - 1)} dataTestId="run-list-prev">
+						<ChevronLeft aria-hidden="true" />
+						{t("runs.list.prev")}
+					</Button>
+					<span className="text-muted-foreground px-2 tabular-nums">{t("runs.list.page", { page, pages })}</span>
+					<Button variant="outline" size="sm" disabled={page >= pages} onClick={() => onPage(page + 1)} dataTestId="run-list-next">
+						{t("runs.list.next")}
+						<ChevronRight aria-hidden="true" />
+					</Button>
+				</span>
+			)}
+		</nav>
+	);
+}

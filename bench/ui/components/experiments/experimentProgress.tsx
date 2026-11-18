@@ -74,7 +74,7 @@ export function ExperimentProgressCard({ status, capUsd, onNew }: ExperimentProg
 			<div className="flex flex-wrap gap-2">
 				{status.state === "done" && (
 					<Button asChild size="sm" dataTestId="experiment-open-verdict">
-						<Link to="/verdict" search={{ exp: status.exp_id }}>
+						<Link to="/experiments/$expId" params={{ expId: status.exp_id }}>
 							{t("experiments.new.progress.openVerdict")}
 						</Link>
 					</Button>

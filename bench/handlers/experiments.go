@@ -92,7 +92,14 @@ func (h *ExperimentsHandler) listExperiments(ctx *fasthttp.RequestCtx) {
 	out := schemas.ExperimentList{Experiments: []schemas.ExperimentStatus{}}
 	for _, id := range h.index.Experiments() {
 		if m, ok := h.index.Manifest(id); ok {
-			out.Experiments = append(out.Experiments, h.status(m, h.index.Runs(id), false))
+			st := h.status(m, h.index.Runs(id), false)
+			// UI regroup (U2): the newest analysis's decision, when the index can read it.
+			if vi, isVerdict := h.index.(VerdictIndex); isVerdict {
+				if d, found := vi.LatestDecision(id); found {
+					st.Decision = d
+				}
+			}
+			out.Experiments = append(out.Experiments, st)
 		}
 	}
 	lib.SendJSON(ctx, h.mode, fasthttp.StatusOK, out)

@@ -1120,6 +1120,7 @@ concurrency: 4
 | `GET /experiments/{id}/verdict` | Primary verdict, guards, gates, action, manifest hash |
 | `GET /experiments/{id}/diagnostics` | Per-condition rows and meters |
 | `GET /experiments/{id}/grid` | Task x trial outcomes, discordant first |
+| `GET /runs?exp=&suite=&arm=&task=&condition=&outcome=&track=&limit=&offset=` | Every run across experiments, newest first: one page (100 by default, at most 500), the number that matched, and the values each filter can take. Each row carries the suite's track, the task's output kind and the grading (verified or judged) |
 | `GET /runs/{id}`, `GET /runs/{id}/events`, `GET /runs/{id}/diff`, `GET /runs/{id}/receipts` | One run |
 | `GET /runs/{id}/artifacts/{artifact}/{name}` | One artifact file of a sealed artifact-task run, only when the evidence lists it and its sha256 matches the evidence and the seal. Always a download (`application/octet-stream`, `nosniff`, attachment, CSP sandbox), never rendered: the agent wrote it |
 | `GET /pairs/{pair_id}` | Matched runs, aligned, with first divergence |

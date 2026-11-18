@@ -1,5 +1,13 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { WRITE_TOKEN_KEY, isWorkersOff, normalizeWorkers, prepareBenchHeaders, readWriteToken, saveWriteToken } from "./benchApi";
+import {
+	WRITE_TOKEN_KEY,
+	isWorkersOff,
+	normalizeCatalog,
+	normalizeWorkers,
+	prepareBenchHeaders,
+	readWriteToken,
+	saveWriteToken,
+} from "./benchApi";
 import { CSRF_HEADER, setAuthState } from "./session";
 
 function memoryStorage(): Storage {
@@ -104,5 +112,24 @@ describe("hosted mode headers", () => {
 		const mutation = prepareBenchHeaders(new Headers(), "mutation");
 		expect(mutation.get("Authorization")).toBe("Bearer secret");
 		expect(mutation.has(CSRF_HEADER)).toBe(false);
+	});
+});
+
+// U2: GET /catalog from a bench root without an agents/ folder sent agents: null.
+describe("normalizeCatalog", () => {
+	it("reads null lists as empty and keeps the rest", () => {
+		const out = normalizeCatalog({
+			mode: "live",
+			suites: [{ id: "s", version: "1", tasks: null, probes: ["p"] }],
+			agents: null,
+			probes: null,
+		});
+		expect(out.agents).toEqual([]);
+		expect(out.probes).toEqual([]);
+		expect(out.metrics).toEqual([]);
+		expect(out.gates).toEqual([]);
+		expect(out.parts).toEqual({});
+		expect(out.suites[0]).toMatchObject({ id: "s", tasks: [], probes: ["p"] });
+		expect(out.mode).toBe("live");
 	});
 });

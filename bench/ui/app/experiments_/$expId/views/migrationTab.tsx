@@ -1,0 +1,109 @@
+import { MigrationReportView } from "@/components/migration/migrationReport";
+import { ModeBadge } from "@/components/modeBadge";
+import { BlockSkeleton, LoadError } from "@/components/runs/screenStates";
+import { GradeSourceTag } from "@/components/verdict/gradeSourceTag";
+import { cn } from "@/lib/utils";
+import { useGetMigrationQuery } from "@/lib/store/apis/migrationApi";
+import { parseAsString, useQueryState } from "nuqs";
+import { useTranslation } from "react-i18next";
+
+/**
+ * The Migration tab (docs/model-migration.md): moving from one arm to the others. ?from= is one arm
+ * (default A), ?to= a comma list (default every other arm); both are picked from the experiment's arms.
+ */
+export function MigrationTab({ expId, arms }: { expId: string; arms: readonly string[] }) {
+	const { t } = useTranslation("bench");
+	const [from, setFrom] = useQueryState("from", parseAsString);
+	const [to, setTo] = useQueryState("to", parseAsString);
+	const [condition] = useQueryState("condition", parseAsString);
+	const report = useGetMigrationQuery({ expId, from: from ?? undefined, to: to ?? undefined, condition: condition ?? undefined });
+	const fromArm = from ?? report.data?.from.arm ?? arms[0];
+	const targets = arms.filter((arm) => arm !== fromArm);
+	const chosen = to ? to.split(",").filter((arm) => targets.includes(arm)) : targets;
+	const toggle = (arm: string) => {
+		const next = chosen.includes(arm) ? chosen.filter((a) => a !== arm) : [...chosen, arm];
+		// Every other arm is the server default, so the full set leaves the URL clean.
+		void setTo(next.length === 0 || next.length === targets.length ? null : targets.filter((a) => next.includes(a)).join(","));
+	};
+
+	return (
+		<div className="flex flex-col gap-4" data-testid="migration-screen">
+			<div className="flex flex-wrap items-end gap-x-6 gap-y-3 text-sm">
+				<div className="flex flex-col gap-1">
+					<span className="text-muted-foreground text-xs" id="migration-from-label">
+						{t("migration.fromLabel")}
+					</span>
+					<div className="flex flex-wrap gap-1" role="radiogroup" aria-labelledby="migration-from-label">
+						{arms.map((arm) => (
+							<ArmChip
+								key={arm}
+								arm={arm}
+								active={arm === fromArm}
+								role="radio"
+								onClick={() => {
+									void setFrom(arm === arms[0] ? null : arm);
+									void setTo(null);
+								}}
+								testId={`migration-from-${arm}`}
+							/>
+						))}
+					</div>
+				</div>
+				<div className="flex flex-col gap-1">
+					<span className="text-muted-foreground text-xs" id="migration-to-label">
+						{t("migration.toLabel")}
+					</span>
+					<div className="flex flex-wrap gap-1" role="group" aria-labelledby="migration-to-label">
+						{targets.map((arm) => (
+							<ArmChip key={arm} arm={arm} active={chosen.includes(arm)} onClick={() => toggle(arm)} testId={`migration-to-${arm}`} />
+						))}
+					</div>
+				</div>
+				{report.data && (
+					<span className="flex items-center gap-2">
+						<ModeBadge mode={report.data.mode} />
+						<GradeSourceTag testId="migration-source" />
+					</span>
+				)}
+			</div>
+			{report.isLoading ? (
+				<BlockSkeleton rows={6} testId="migration-report-loading" />
+			) : report.error || !report.data ? (
+				<LoadError title={t("migration.loadError")} error={report.error} onRetry={() => void report.refetch()} testId="migration-error" />
+			) : (
+				<MigrationReportView report={report.data} />
+			)}
+		</div>
+	);
+}
+
+function ArmChip({
+	arm,
+	active,
+	onClick,
+	role,
+	testId,
+}: {
+	arm: string;
+	active: boolean;
+	onClick: () => void;
+	role?: "radio";
+	testId: string;
+}) {
+	return (
+		<button
+			type="button"
+			role={role}
+			aria-checked={role ? active : undefined}
+			aria-pressed={role ? undefined : active}
+			onClick={onClick}
+			data-testid={testId}
+			className={cn(
+				"focus-visible:ring-ring/50 min-w-8 cursor-pointer rounded-sm border px-2.5 py-1 font-mono text-xs transition-colors focus-visible:ring-[3px] focus-visible:outline-none",
+				active ? "bg-primary text-primary-foreground border-primary" : "hover:bg-accent",
+			)}
+		>
+			{arm}
+		</button>
+	);
+}

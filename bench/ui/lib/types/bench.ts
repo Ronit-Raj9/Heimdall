@@ -1547,11 +1547,76 @@ export interface ExperimentStatus {
 	slots: SlotProgress;
 	spent_usd: Value;
 	analysis_id?: string;
+	// U2 UI regroup: the manifest's suite and arm ids; on GET /experiments only, the newest analysis's decision.
+	suite?: string;
+	arms?: string[];
+	/** A Decision (improved, regressed, inconclusive, invalid); typed as text so a newer server's value still renders. */
+	decision?: string;
 }
 
 /** GET /experiments */
 export interface ExperimentList {
 	experiments: ExperimentStatus[];
+}
+
+// U2 UI regroup: GET /runs, every run across experiments (handlers/runlist.go).
+/** One run of GET /runs. track and output come from the suite and are absent when it could not be loaded. */
+export interface RunListRow {
+	run_id: string;
+	exp_id: string;
+	pair_id: string;
+	suite: string;
+	track?: string;
+	output?: OutputKind;
+	/** verified | judged: who decided y. */
+	grading?: string;
+	task: string;
+	arm: string;
+	condition: string;
+	trial: number;
+	attempt: number;
+	counted: boolean;
+	sealed: boolean;
+	outcome: Outcome;
+	y: Value;
+	/** Read from metrics.json; absent until the run has one. */
+	cost_usd?: Value;
+	config_id: string;
+	started?: string;
+	sealed_at?: string;
+}
+
+/** The distinct values of each run list filter, across every run. */
+export interface RunListFacets {
+	experiments: string[];
+	suites: string[];
+	arms: string[];
+	tasks: string[];
+	conditions: string[];
+	outcomes: string[];
+	tracks: string[];
+}
+
+/** GET /runs: one page, newest first; total counts every run that matched. */
+export interface RunList {
+	runs: RunListRow[];
+	total: number;
+	limit: number;
+	offset: number;
+	facets: RunListFacets;
+}
+
+/** The filters and page of GET /runs. An empty value is left out. */
+export interface RunListParams {
+	exp?: string;
+	suite?: string;
+	arm?: string;
+	task?: string;
+	condition?: string;
+	outcome?: string;
+	track?: string;
+	limit?: number;
+	offset?: number;
 }
 
 /** One server-sent event on GET /experiments/{id}/events. */
