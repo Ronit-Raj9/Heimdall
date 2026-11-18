@@ -28,6 +28,11 @@ const (
 	codexMCPCall      = "mcp_tool_call"
 	codexWebSearch    = "web_search"
 	codexItemError    = "error"
+	// codexCollab is a multi-agent tool item (spawn_agent, send_input, wait,
+	// ...). Its name and fields (tool, sender_thread_id, receiver_thread_ids,
+	// prompt) are read from the strings of the Codex 0.169.1 binary, not from
+	// a recorded stream (docs/multi-agent.md).
+	codexCollab = "collab_tool_call"
 )
 
 var (
@@ -143,6 +148,10 @@ type codexItem struct {
 	Result           json.RawMessage `json:"result"`
 	Error            json.RawMessage `json:"error"`
 	Query            string          `json:"query"`
+	// Multi-agent area: collab_tool_call items.
+	SenderThreadID    string   `json:"sender_thread_id"`
+	ReceiverThreadIDs []string `json:"receiver_thread_ids"`
+	Prompt            string   `json:"prompt"`
 }
 
 type codexChange struct {
@@ -188,12 +197,15 @@ func (st *codexState) item(phase string, it codexItem) {
 		if phase == "item.completed" {
 			st.message(it)
 		}
-	case codexCommand, codexFileChange, codexMCPCall, codexWebSearch:
+	case codexCommand, codexFileChange, codexMCPCall, codexWebSearch, codexCollab:
 		if phase == "item.updated" {
 			return
 		}
 		if _, seen := st.items[it.ID]; !seen {
 			st.toolCall(it)
+		}
+		if it.Type == codexCollab {
+			st.collab(it) // Multi-agent area: spawned threads are subagents
 		}
 		if phase == "item.completed" {
 			st.toolResult(it)
@@ -313,9 +325,26 @@ func codexToolArgs(it codexItem) (name, target string, args any) {
 			target = it.Tool
 		}
 		return it.Server + "." + it.Tool, target, map[string]any{"arguments": a}
+	case codexCollab:
+		return it.Tool, strings.Join(it.ReceiverThreadIDs, ", "), map[string]any{"tool": it.Tool, "prompt": it.Prompt}
 	default: // web_search
 		return "web_search", strings.TrimSpace(it.Query), map[string]any{"query": it.Query}
 	}
+}
+
+// CodexThreadPrefix starts the agent id the parser gives a Codex sub-thread:
+// the prefix plus the thread id spawn_agent answered with.
+const CodexThreadPrefix = "thread:"
+
+// collab marks a spawn_agent call with the sub-thread it started, once the
+// item names it.
+func (st *codexState) collab(it codexItem) {
+	i, ok := st.items[it.ID]
+	if !ok || it.Tool != "spawn_agent" || len(it.ReceiverThreadIDs) == 0 || it.ReceiverThreadIDs[0] == "" {
+		return
+	}
+	st.events[i].AgentTarget = CodexThreadPrefix + clip(it.ReceiverThreadIDs[0], 120)
+	st.events[i].AgentName = clip(oneLine(it.Prompt), 128)
 }
 
 // codexOutcome reads a completed tool item: whether it failed, the hash of

@@ -1,0 +1,21 @@
+# Oracle control: applies the task's reference patch, or runs its reference
+# script in the agent's place (train-classifier trains its model on the GPU
+# there), so the verifier must pass every task.
+# Scripted adapter: argv, env and files come from the adapter, not this file.
+# The image is the suite's CUDA image: a GPU task's agent runs where the
+# verifier will load what it leaves.
+id: oracle
+adapter: scripted
+image: heimdall-example/acme-gpu-cuda:1
+scripted:
+  kind: oracle
+model: claude-sonnet-4-5
+notes:
+  project_file: CLAUDE.md
+budgets:
+  wall_s: 900
+  cpus: 2
+  mem_gb: 6
+gateway:
+  provider: anthropic
+  max_retries: 0

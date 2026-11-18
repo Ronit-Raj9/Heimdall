@@ -1,0 +1,10 @@
+# Keys of bench.ts `CodeScanEvidence` (schemas/codescan.go). X4.
+rules_version
+scanned
+reason?
+diff_sha256?
+files
+added_lines
+skipped?
+findings
+external?

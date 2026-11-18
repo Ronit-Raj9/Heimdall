@@ -1,0 +1,9 @@
+# Keys of bench.ts `BlameCandidate` (attribution/blame.go Candidate), in Blame.candidates.
+agent_id
+gate
+effect
+ref
+role?
+step_seq?
+at?
+agent_source?

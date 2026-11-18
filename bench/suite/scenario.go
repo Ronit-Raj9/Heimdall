@@ -80,6 +80,10 @@ func scenarioParts(s *schemas.Suite, t *schemas.Task) (scenarioHashParts, error)
 	}
 	errs = append(errs, serviceCode(p.fixtures, "services.code", t.Dir, t.Services)...)
 	errs = append(errs, externalParts(p.fixtures, s, t)...) // External APIs area: specs and cassettes (external.go)
+	if t.Compose != "" {                                    // X2: the compose file itself (compose.go)
+		sum, err := fileHash(t.Dir, t.Compose)
+		put(p.fixtures, "compose", sum, err)
+	}
 	if t.Skills != "" {
 		sum, err := treeHashRel(t.Dir, t.Skills)
 		put(p.fixtures, "skills", sum, err)
@@ -361,6 +365,7 @@ func lintScenarioTask(s *schemas.Suite, t *schemas.Task) []Problem {
 	if t.Skills != "" {
 		out = append(out, lintSkills(root, t)...)
 	}
+	out = append(out, lintCompose(s, t, taskYAML)...) // X2: what the compose mapping changed or ignored (compose.go)
 	return out
 }
 

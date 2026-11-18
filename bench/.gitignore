@@ -9,6 +9,10 @@
 /bifrost-bench
 # Release log and evidence packs written by `bifrost-bench release`.
 /releases/
+# Eval integrity area (S2): monitor certificates (`monitor certify`) and
+# skill or MCP admission records (`skill scan`, `mcp scan`) are local records.
+/monitor-certs/
+/admissions/
 # The repo-level .gitignore drops *.test (Go test binaries); this is the py.test shim.
 !/probes/shims/py.test
 /checks/

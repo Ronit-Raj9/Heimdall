@@ -9,6 +9,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/maximhq/bifrost/bench/gpu" // X7
 	"github.com/maximhq/bifrost/bench/schemas"
 	"github.com/maximhq/bifrost/bench/utils"
 )
@@ -57,6 +58,10 @@ type SlotInput struct {
 	Slot     *schemas.Slot
 	Attempt  int         // 1-based
 	Emit     func(Event) // optional progress sink
+	// GPU is the GPUs the scheduler's GPU worker holds for this run (X7,
+	// gpu.go); nil for a task without a GPU request, or when RunSlot should
+	// take them from the registry's pool itself.
+	GPU *schemas.GPUAssignment
 }
 
 // SlotResult is a finished run.
@@ -124,6 +129,8 @@ func NewPipeline(reg *schemas.Registry, benchRoot string, logger schemas.Logger,
 // recorded in the run, not returned; the error is non-nil only when the run
 // folder could not be created or the run could not be sealed.
 func (p *Pipeline) RunSlot(ctx context.Context, in SlotInput) (*SlotResult, error) {
+	in, releaseGPU := p.holdGPU(ctx, in) // X7: a GPU task's run holds its GPUs until it is sealed (gpu.go)
+	defer releaseGPU()
 	st, err := p.begin(ctx, in)
 	if err != nil {
 		return nil, err
@@ -230,6 +237,7 @@ func (p *Pipeline) begin(ctx context.Context, in SlotInput) (*runState, error) {
 			ParserVersion: p.parserVersion(cfg.Parser)},
 		Gateway: schemas.RunGatewayInfo{SessionID: runID},
 	}
+	run.Hardware = gpu.Hardware(in.GPU) // X7: the GPUs this run holds, sealed in run.json; nil for a task without a GPU request
 	dir, err := p.reg.Store.NewRun(ctx, slot, run)
 	if err != nil {
 		return nil, fmt.Errorf("create run folder for slot %s: %w", slot.SlotID, err)
@@ -239,6 +247,7 @@ func (p *Pipeline) begin(ctx context.Context, in SlotInput) (*runState, error) {
 		rc: &schemas.RunContext{
 			Experiment: &in.Manifest.Experiment, Manifest: in.Manifest, Suite: in.Suite,
 			Task: in.Suite.TaskByID(slot.Task), Slot: slot, Run: run, Agent: &cfg, Dir: dir, Logger: p.logger,
+			GPU: in.GPU, // X7: the run's GPUs, for the agent and the verifier only (gpu.go)
 		},
 		ev:          &schemas.Evidence{},
 		taskImageID: taskImageID,

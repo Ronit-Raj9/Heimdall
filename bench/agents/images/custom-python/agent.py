@@ -22,13 +22,25 @@ import sys
 import urllib.error
 import urllib.request
 
-BASE_URL = os.environ["BENCH_BASE_URL"].rstrip("/")
-API_KEY = os.environ["BENCH_API_KEY"]
-MODEL = os.environ["BENCH_MODEL"]
-INSTRUCTION_FILE = os.environ.get("BENCH_INSTRUCTION_FILE", "/tmp/bench/instruction.md")
-SESSION_ID = os.environ.get("BENCH_SESSION_ID", "")
-MAX_TURNS = int(os.environ.get("BENCH_MAX_TURNS", "40"))
-SHELL_TIMEOUT_S = int(os.environ.get("BENCH_SHELL_TIMEOUT_S", "120"))
+def _env(name, default=None):
+    """The bench variable name (its BENCH_ form). A run with realism neutral
+    passes it as AGENT_<rest> (docs/eval-awareness.md), which is read first;
+    otherwise this is exactly os.environ[name] or os.environ.get(name, default)."""
+    neutral = "AGENT_" + name[len("BENCH_"):]
+    if neutral in os.environ:
+        return os.environ[neutral]
+    if default is None:
+        return os.environ[name]
+    return os.environ.get(name, default)
+
+
+BASE_URL = _env("BENCH_BASE_URL").rstrip("/")
+API_KEY = _env("BENCH_API_KEY")
+MODEL = _env("BENCH_MODEL")
+INSTRUCTION_FILE = _env("BENCH_INSTRUCTION_FILE", "/tmp/bench/instruction.md")
+SESSION_ID = _env("BENCH_SESSION_ID", "")
+MAX_TURNS = int(_env("BENCH_MAX_TURNS", "40"))
+SHELL_TIMEOUT_S = int(_env("BENCH_SHELL_TIMEOUT_S", "120"))
 WORKSPACE = "/workspace"
 NOTES_FILE = "AGENTS.md"  # the project notes file this agent reads (notes.project_file)
 OUTPUT_MAX = 8000  # characters of tool output sent back to the model
@@ -72,7 +84,7 @@ def chat(messages):
 def run_shell(command):
     try:
         # The run key stays out of the commands' environment: the model's commands never need it.
-        env = {k: v for k, v in os.environ.items() if k != "BENCH_API_KEY"}
+        env = {k: v for k, v in os.environ.items() if k not in ("AGENT_API_KEY", "BENCH_API_KEY")}
         p = subprocess.run(command, shell=True, cwd=WORKSPACE, capture_output=True, text=True,
                            timeout=SHELL_TIMEOUT_S, env=env)
         out = f"exit {p.returncode}\n{p.stdout}{p.stderr}"

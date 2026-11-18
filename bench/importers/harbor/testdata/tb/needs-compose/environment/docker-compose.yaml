@@ -1,5 +1,20 @@
 services:
   main:
-    build: .
+    build:
+      context: ${CONTEXT_DIR}
+    image: ${MAIN_IMAGE_NAME}
+    command: ["sh", "-c", "sleep infinity"]
+    environment:
+      - TEST_DIR=${TEST_DIR}
+    volumes:
+      - ${HOST_VERIFIER_LOGS_PATH}:${ENV_VERIFIER_LOGS_PATH}
+    depends_on:
+      db: {condition: service_healthy}
   db:
     image: postgres:16
+    environment:
+      POSTGRES_PASSWORD: fixture
+    healthcheck:
+      test: ["CMD", "pg_isready"]
+      interval: 1s
+      retries: 30

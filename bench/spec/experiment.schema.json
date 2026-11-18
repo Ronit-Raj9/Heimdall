@@ -68,6 +68,22 @@
     "policy": {"type": "string", "minLength": 1, "description": "Release policy file, relative to the bench root."},
     "smoke": {"type": "boolean", "description": "A synthetic smoke experiment: suite lock problems (no lock, a task not admitted) only warn, and the flag is frozen in the manifest so its results are never presented as findings. The experiment name has no effect."},
     "requirements": {"$ref": "#/$defs/requirements"},
+    "aa": {"type": "boolean", "description": "Eval integrity area (S2): add arm A2, a copy of arm A with the same config hash, on the clean condition. The verdict measures the noise floor from A2 minus A, uses it for the MDE, and is INVALID (harness noise) when the identical arms differ significantly (docs/noise-floor.md)."},
+    "realism": {"enum": ["standard", "neutral"], "description": "Eval integrity area (S2): neutral gives the agent neutral variable names and hostnames, stamps no canary and names observer processes innocuously (docs/eval-awareness.md). Default standard; overrides the suite's realism."},
+    "codescan": {"type": "object", "additionalProperties": false, "description": "X4: the insecure_code_added gate's setting (docs/code-scan.md). With none it only reports. veto_at makes a run with a counted finding at or above that severity an integrity violation; ignore lists builtin rule ids or <scanner>:<rule> ids whose findings are shown but not counted.", "properties": {"veto_at": {"enum": ["low", "medium", "high", "critical"]}, "ignore": {"type": "array", "items": {"type": "string", "minLength": 1}}}},
+    "safety": {"enum": ["trifecta"], "description": "Safety probes area (S1): trifecta adds the suite's exfiltration probes (axis exfiltration) as conditions on every task whose agent config has private data, untrusted input and an exit (docs/safety-probes.md), and opts into exfiltration_attempted."},
+    "environment": {"type": "object", "additionalProperties": false, "required": ["driver"], "description": "X3: the environment driver this experiment must run on (docs/kubernetes.md). The planner refuses it when bench.yaml configures another driver, and freezes the configured driver into the manifest when it is not docker.", "properties": {"driver": {"enum": ["docker", "kubernetes"]}}},
+    "attribution": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "Opt in to counterfactual replay of the step blamed for a failed run (docs/multi-agent.md).",
+      "properties": {
+        "replay": {"type": "boolean"},
+        "max_replays": {"type": "integer", "minimum": 0},
+        "stub": {"type": "string", "minLength": 1}
+      }
+    },
+    "fairness": {"enum": ["equal_budget"], "description": "equal_budget: every arm must have the same total USD cap (budgets.usd) enforced at the gateway; the planner refuses otherwise and the verdict is INVALID when a run exceeded its cap (docs/multi-agent.md)."},
     "external": {"enum": ["live", "record", "replay"], "description": "Overrides every external API's mode for this experiment's runs. live and record call the real hosts: the results are not repeatable, and reports and the leaderboard label or exclude them (docs/external-apis.md)."},
     "simulator": {"$ref": "suite.schema.json#/$defs/simulator", "description": "W3 customer support: overrides the suite's user simulator mode, provider and model for every arm (docs/customer-support.md)."},
     "tier": {"type": "string", "pattern": "^[a-z0-9][a-z0-9_-]*$", "description": "W7 suite tiers: the suite tier whose tasks `tasks: all` means (docs/suite-tiers.md)."},
@@ -151,7 +167,7 @@
         "set": {
           "type": "object",
           "description": "Dotted agent config paths to any value, e.g. notes.user_file or model.",
-          "patternProperties": {"^(id|adapter|image|build|argv|env|files|model|notes|parser|budgets|gateway|scripted|mcp|skills|memory|remote)(\\..+)?$": true},
+          "patternProperties": {"^(id|adapter|image|build|argv|env|files|model|notes|parser|budgets|gateway|scripted|mcp|skills|memory|remote|topology|limits|team)(\\..+)?$": true},
           "additionalProperties": false
         }
       }

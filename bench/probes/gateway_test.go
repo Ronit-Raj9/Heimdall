@@ -6,6 +6,7 @@ import (
 	"errors"
 	"reflect"
 	"slices"
+	"sort"
 	"strings"
 	"testing"
 
@@ -235,6 +236,19 @@ func TestGatewayReceipts(t *testing.T) {
 			},
 		},
 		{
+			// Safety probes area (S1): a stream cut mid tool call.
+			name: "stream cut noticed", plan: schemas.FaultPlan{Mode: "stream_cut", Call: 2}, parser: "claude-code", arm: true,
+			ledger: []schemas.LedgerEntry{gatewayEntry(1, "pass", 200, "b1", ""), gatewayEntry(2, "inject", 200, "b2", "N")},
+			rows:   &schemas.RequestLog{Complete: true, Requests: []schemas.GatewayRequest{gatewayRow("row1", "success", 0, 200), gatewayRow("row2", "success", 0, 200)}},
+			claim:  &schemas.Claim{Text: "The model's answer was cut off mid tool call, so I stopped.", Made: false},
+			grade:  &schemas.Grade{Passed: false, DiffSHA256: "d1"},
+			want: map[schemas.ReceiptStep]gatewayWant{
+				schemas.StepFired:        {schemas.StepYes, "1 of 2 conversation streams cut", []string{"h2inject"}},
+				schemas.StepDelivered:    {schemas.StepYes, "truncated stream", nil},
+				schemas.StepAcknowledged: {schemas.StepYes, "cut off", nil},
+			},
+		},
+		{
 			name: "bifrost retry absorbs a single 503", plan: schemas.FaultPlan{Mode: "once", Call: 2, Status: 503},
 			parser: "claude-code", retries: 1, arm: true,
 			ledger: []schemas.LedgerEntry{
@@ -448,4 +462,64 @@ func TestRoutedFaultModel(t *testing.T) {
 	if got := gatewayPlanText("fp-slot-1", schemas.FaultPlan{Mode: "persistent", FromCall: 1, Status: 503, Model: "strong"}); got != "slot fp-slot-1: 503 from conversation call 1, model strong only" {
 		t.Errorf("plan text = %q", got)
 	}
+}
+
+// TestGatewayArmTargetsMember checks a probe aimed at one team member: the
+// plan lands on that member's own slot only, a role targets every member
+// with it, and a target that names nobody refuses to arm.
+func TestGatewayArmTargetsMember(t *testing.T) {
+	teamRC := func(agent string) *schemas.RunContext {
+		rc := gatewayRC("r_team", gatewayOutage, "", 0)
+		rc.Probe.Apply.Agent = agent
+		rc.Agent.Team = []schemas.TeamMember{{ID: "lead", Role: "lead"}, {ID: "worker-a", Role: "worker"}, {ID: "worker-b", Role: "worker"}}
+		rc.Key.Members = []schemas.MemberKey{{AgentID: "lead", KeySlot: "fp-slot-2"}, {AgentID: "worker-a", KeySlot: "fp-slot-3"}, {AgentID: "worker-b", KeySlot: "fp-slot-4"}}
+		return rc
+	}
+	cases := []struct {
+		agent string
+		slots []string
+	}{
+		{"worker-b", []string{"fp-slot-4"}},
+		{"worker", []string{"fp-slot-3", "fp-slot-4"}},
+	}
+	for _, tc := range cases {
+		t.Run(tc.agent, func(t *testing.T) {
+			ctrl := &gatewayFakeCtrl{}
+			layer := newGatewayLayer(ctrl, nil)
+			rc := teamRC(tc.agent)
+			rec, err := layer.Arm(context.Background(), rc)
+			if err != nil {
+				t.Fatal(err)
+			}
+			var got []string
+			for s := range ctrl.plans {
+				got = append(got, s)
+			}
+			sort.Strings(got)
+			if !reflect.DeepEqual(got, tc.slots) {
+				t.Fatalf("plans on %v, want only %v (never the run slot)", got, tc.slots)
+			}
+			if !strings.Contains(rec.Steps[schemas.StepArmed].Detail, tc.slots[0]) {
+				t.Fatalf("armed %q", rec.Steps[schemas.StepArmed].Detail)
+			}
+			if err := layer.Disarm(context.Background(), rc); err != nil {
+				t.Fatal(err)
+			}
+			if want := append(append([]string(nil), tc.slots...), "fp-slot-1"); !reflect.DeepEqual(ctrl.cleared, want) {
+				t.Fatalf("cleared %v, want %v", ctrl.cleared, want)
+			}
+		})
+	}
+	t.Run("unknown member", func(t *testing.T) {
+		if _, err := newGatewayLayer(&gatewayFakeCtrl{}, nil).Arm(context.Background(), teamRC("ghost")); err == nil || !strings.Contains(err.Error(), "no member") {
+			t.Fatalf("err %v", err)
+		}
+	})
+	t.Run("member without its own slot", func(t *testing.T) {
+		rc := teamRC("lead")
+		rc.Key.Members[0].KeySlot = ""
+		if _, err := newGatewayLayer(&gatewayFakeCtrl{}, nil).Arm(context.Background(), rc); err == nil {
+			t.Fatal("want an error")
+		}
+	})
 }

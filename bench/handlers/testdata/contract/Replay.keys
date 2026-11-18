@@ -1,0 +1,12 @@
+# Keys of bench.ts `BlameReplay` (attribution/blame.go Replay), in Blame.replay.
+# Status is not_run | flipped | held | error. cost_usd is absent when not recorded.
+status
+suspect
+stub
+outcome_before
+exp_id?
+run_id?
+outcome_after?
+gates_after?
+cost_usd?
+detail?

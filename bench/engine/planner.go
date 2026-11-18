@@ -5,16 +5,19 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"maps"
 	"math/rand/v2"
 	"os"
 	"path"
 	"path/filepath"
 	"regexp"
+	"slices"
 	"sort"
 	"strings"
 	"time"
 
 	"github.com/maximhq/bifrost/bench/adapters"
+	"github.com/maximhq/bifrost/bench/codescan"
 	"github.com/maximhq/bifrost/bench/schemas"
 	suitepkg "github.com/maximhq/bifrost/bench/suite"
 	"github.com/maximhq/bifrost/bench/utils"
@@ -24,6 +27,19 @@ import (
 // armOrderStream is the second PCG word. It is fixed so arm order depends on
 // the experiment seed alone.
 const armOrderStream = 0x62696672 // "bifr"
+
+// AAArm is the arm id of the A/A arm (docs/noise-floor.md): a second copy of
+// arm A, with A's config and config hash, that the planner adds on the clean
+// condition when the experiment sets aa: true. The verdict reads it under the
+// same id (verdict.ArmAA) to measure the noise floor.
+const AAArm = "A2"
+
+// aaSourceArm is the arm the A/A arm copies.
+const aaSourceArm = "A"
+
+// aaOrderStream is the PCG word of the A/A slot placement. It differs from
+// armOrderStream so that adding aa: true never changes the A/B arm order.
+const aaOrderStream = 0x61612d61 // "aa-a"
 
 // Guard rules the planner accepts (DESIGN.md 9.2).
 const (
@@ -91,6 +107,7 @@ type Planner struct {
 
 	guard        func(*schemas.Experiment) error // Tenancy area: hosted orgs confine experiment paths to the org's project (experimentguard.go)
 	deferGateway bool                            // Tenancy area: a hosted server records the gateway preflight as the runners' (experimentguard.go)
+	skipGPU      bool                            // X7: a remote worker's replan skips the GPU check (gpu.go)
 }
 
 // planMode is what differs between planning an experiment and planning an
@@ -146,6 +163,12 @@ func NewPlanner(reg *schemas.Registry, benchRoot string, logger schemas.Logger, 
 // path. Arm order is drawn once per task from the seed and reused for every
 // block of that task, so a task-level sign flip stays exact (DESIGN.md 9.3).
 //
+// With aa: true the plan also holds arm A2, a copy of arm A with the same
+// config hash (the one same-hash pair allowed), on the clean condition only:
+// one more counted slot per clean task and trial (resolveArms, buildSlots).
+// The A/B arm order of every block is the one the same experiment without aa
+// draws.
+//
 // Scenario tasks are checked against what the environment can do
 // (checkScenario), their own images are built and recorded (taskImages), an
 // agent with build.base_arg is built on each of them (taskAgentImages), and
@@ -180,6 +203,13 @@ func (p *Planner) plan(ctx context.Context, exp *schemas.Experiment, mode planMo
 	suite, err := LoadSuite(ctx, p.reg, e.Suite)
 	if err != nil {
 		return nil, fmt.Errorf("plan %s: %w", e.ID, err)
+	}
+	notes, err := applySafetyTrifecta(suite, &e) // Safety probes area (S1): safety: trifecta (trifecta.go)
+	if err != nil {
+		return nil, fmt.Errorf("plan %s: %w", e.ID, err)
+	}
+	for _, n := range notes { // Safety probes area (S1)
+		p.logger.Info("plan safety", "experiment", e.ID, "note", n)
 	}
 	conds, err := resolveConditions(suite, e.Conditions)
 	if err != nil {
@@ -234,6 +264,12 @@ func (p *Planner) plan(ctx context.Context, exp *schemas.Experiment, mode planMo
 	if m.Arms, err = p.resolveArms(ctx, &e, suite, conds); err != nil {
 		return nil, fmt.Errorf("plan %s: %w", e.ID, err)
 	}
+	if err := checkFairness(&e, m.Arms, p.logger); err != nil { // Multi-agent area: equal-budget fairness (fairness.go)
+		return nil, fmt.Errorf("plan %s: %w", e.ID, err)
+	}
+	if err := p.checkTaskTeams(m.Arms, suite, conds); err != nil { // X5b: a task's own team must fit the gateway's key slots (taskteam.go)
+		return nil, fmt.Errorf("plan %s: %w", e.ID, err)
+	}
 	if m.BudgetParity = parityPtr(schemas.BudgetParityOf(&e, m.Arms)); m.BudgetParity.Status == schemas.BudgetParityUnexpectedDifference {
 		return nil, fmt.Errorf("plan %s: unexpected budget difference: %s", e.ID, budgetParityText(*m.BudgetParity))
 	}
@@ -268,6 +304,12 @@ func (p *Planner) plan(ctx context.Context, exp *schemas.Experiment, mode planMo
 		}
 	}
 	if err := p.checkScenario(suite, all, m.Arms, m.Compatibility); err != nil {
+		return nil, fmt.Errorf("plan %s: %w", e.ID, err)
+	}
+	if m.Experiment.Environment, err = p.planDriver(&e, suite, all, m); err != nil { // X3: driver refusals, the frozen driver (driverplan.go)
+		return nil, fmt.Errorf("plan %s: %w", e.ID, err)
+	}
+	if err := p.checkGPU(&e, suite, all); err != nil { // X7: GPU tasks this machine cannot run are refused with the reason (gpu.go)
 		return nil, fmt.Errorf("plan %s: %w", e.ID, err)
 	}
 	if err := p.checkExternal(&e, suite, all); err != nil { // External APIs area: modes and cassettes (externalplan.go)
@@ -309,7 +351,7 @@ func (p *Planner) plan(ctx context.Context, exp *schemas.Experiment, mode planMo
 			return nil, fmt.Errorf("plan %s: %w", e.ID, err)
 		}
 	}
-	m.ArmOrder = drawArmOrder(e.Seed, suite.TaskIDs, conds, sortedKeys(m.Arms))
+	m.ArmOrder = drawArmOrder(e.Seed, suite.TaskIDs, conds, pairArms(m))
 	m.Slots = buildSlots(m, suite, conds, compat)
 	m.Tier = tier
 	if m.Adaptive, err = planAdaptive(&e, m, conds, p.logger); err != nil { // W7 adaptive trials: optional slots of the maximum design (adaptive.go)
@@ -399,6 +441,7 @@ func (p *Planner) checkParts(e *schemas.Experiment, suite *schemas.Suite, conds 
 			errs = append(errs, fmt.Errorf("extra gate %q is not registered", g))
 		}
 	}
+	errs = append(errs, codescan.CheckPolicy(e.CodeScan), codescan.CheckSuite(suite)) // X4: code scan veto level, ignored rules and external scanners
 	known := map[string]bool{}
 	for _, m := range selectMetrics(p.reg, e.Metrics) {
 		known[m.GetName()], known[metricName(m)] = true, true
@@ -452,7 +495,10 @@ func validateAdapterFaultRule(r schemas.AdapterFaultRule) error {
 	return nil
 }
 
-// resolveArms resolves every arm and refuses arms that do not differ.
+// resolveArms resolves every arm and refuses arms that do not differ. With
+// aa: true it then adds the A/A arm (aaArm), which is exempt from that
+// refusal on purpose: two arms that do not differ are its measurement. The
+// refusal still holds for every arm the experiment declares.
 func (p *Planner) resolveArms(ctx context.Context, e *schemas.Experiment, suite *schemas.Suite, conds []condPlan) (map[string]schemas.ArmManifest, error) {
 	out := map[string]schemas.ArmManifest{}
 	byHash := map[string]string{}
@@ -472,7 +518,58 @@ func (p *Planner) resolveArms(ctx context.Context, e *schemas.Experiment, suite 
 		byHash[am.ConfigHash] = id
 		out[id] = am
 	}
+	if e.AA {
+		a, ok := out[aaSourceArm]
+		if !ok {
+			return nil, fmt.Errorf("aa: no arm %s to copy", aaSourceArm)
+		}
+		out[AAArm] = aaArm(a)
+	}
 	return out, nil
+}
+
+// aaArm returns the A/A arm: resolved arm A with the same config, config
+// hash, identity, budgets and image, labelled as the copy. It lays down only
+// A's clean files, since it runs only on clean. Pointers and maps are copied
+// so that no later step that edits one arm edits the other.
+func aaArm(a schemas.ArmManifest) schemas.ArmManifest {
+	c := a
+	c.Label = "A/A copy of arm " + aaSourceArm
+	if a.Label != "" {
+		c.Label += " (" + a.Label + ")"
+	}
+	if a.BudgetSnapshot != nil {
+		b := *a.BudgetSnapshot
+		c.BudgetSnapshot = &b
+	}
+	if a.Identity != nil {
+		id := *a.Identity
+		if a.Identity.BudgetSnapshot != nil {
+			id.BudgetSnapshot = c.BudgetSnapshot
+		}
+		c.Identity = &id
+	}
+	c.CapabilityGaps = slices.Clone(a.CapabilityGaps)
+	c.TaskImages, c.TaskImageIDs = maps.Clone(a.TaskImages), maps.Clone(a.TaskImageIDs)
+	c.Files = map[string]map[string]string{}
+	if f, ok := a.Files[schemas.ConditionClean]; ok {
+		c.Files[schemas.ConditionClean] = maps.Clone(f)
+	}
+	return c
+}
+
+// pairArms returns, sorted, the arms that share each block's pair: every
+// resolved arm but the A/A arm, which sits in a slot of its own beside the
+// pair. Without aa it is every arm, so the arm order draws are unchanged.
+func pairArms(m *schemas.Manifest) []string {
+	out := make([]string, 0, len(m.Arms))
+	for _, id := range sortedKeys(m.Arms) {
+		if m.Experiment.AA && id == AAArm {
+			continue
+		}
+		out = append(out, id)
+	}
+	return out
 }
 
 // resolveArm reads one agent config, applies the overrides, resolves its
@@ -491,6 +588,9 @@ func (p *Planner) resolveArm(ctx context.Context, label, cfgPath string, set map
 		return am, fmt.Errorf("agent config %s: %w", cfgPath, err)
 	}
 	if err := p.checkAgent(&cfg); err != nil {
+		return am, fmt.Errorf("agent config %s: %w", cfgPath, err)
+	}
+	if err := p.resolveTeam(ctx, &cfg, suite); err != nil { // Multi-agent area: member configs frozen with the arm (team.go)
 		return am, fmt.Errorf("agent config %s: %w", cfgPath, err)
 	}
 	for _, c := range conds {
@@ -1212,7 +1312,35 @@ func validateExperiment(e *schemas.Experiment, minArms int) error {
 	if c := e.Compatibility; c != nil && (c.Agent == "" || c.Trials < 1 || len(c.Conditions) == 0) {
 		errs = append(errs, errors.New("compatibility needs an agent, conditions and trials >= 1"))
 	}
+	errs = append(errs, aaErrors(e, conds)...)
+	if r := e.Realism; r != "" && r != schemas.RealismStandard && r != schemas.RealismNeutral { // Eval integrity area (S2): W-A realism check
+		errs = append(errs, fmt.Errorf("realism %q must be standard or neutral", r)) // Eval integrity area (S2)
+	} // Eval integrity area (S2)
 	return errors.Join(errs...)
+}
+
+// aaErrors checks aa: true before any I/O. The A/A arm copies arm A and runs
+// on the clean condition, so both must exist, and its id is reserved. A
+// matrix experiment is refused: the matrix ranks every arm against every
+// other, and a copy of arm A would enter that ranking as one more contender.
+func aaErrors(e *schemas.Experiment, conds map[string]bool) []error {
+	if !e.AA {
+		return nil
+	}
+	var errs []error
+	if e.Matrix != nil {
+		errs = append(errs, errors.New("aa: true is not supported with a matrix; run the A/A arm in a two-arm experiment of the configs you compare"))
+	}
+	if _, ok := e.Arms[AAArm]; ok {
+		errs = append(errs, fmt.Errorf("arm id %s is reserved for the A/A copy of arm %s when aa: true; rename the declared arm %s", AAArm, aaSourceArm, AAArm))
+	}
+	if _, ok := e.Arms[aaSourceArm]; !ok {
+		errs = append(errs, fmt.Errorf("aa: true needs an arm %s to copy", aaSourceArm))
+	}
+	if !conds[schemas.ConditionClean] {
+		errs = append(errs, fmt.Errorf("aa: true needs the %s condition: the A/A arm runs only there", schemas.ConditionClean))
+	}
+	return errs
 }
 
 // resolveConditions checks each condition against the suite and resolves its
@@ -1279,6 +1407,49 @@ func usedTasks(conds []condPlan) []string {
 // experiment seed. Orders are drawn for every suite task in suite order, so a
 // task's order does not depend on which other tasks an experiment selects.
 func drawArmOrder(seed int64, suiteTasks []string, conds []condPlan, arms []string) map[string][]string {
+	tasks, used := drawTasks(suiteTasks, conds)
+	r := rand.New(rand.NewPCG(uint64(seed), armOrderStream))
+	out := map[string][]string{}
+	for _, t := range tasks {
+		order := append([]string(nil), arms...)
+		r.Shuffle(len(order), func(i, j int) { order[i], order[j] = order[j], order[i] })
+		if used[t] {
+			out[t] = order
+		}
+	}
+	return out
+}
+
+// drawAAFirst draws, once per task, whether the A/A arm's slot runs just
+// before (true) or just after the A/B pair of each of the task's clean
+// blocks, from a PCG seeded with the experiment seed on its own stream, so
+// the A/B draws do not move. Drawing per task, as the arm order is, keeps
+// the task-level sign flip of A2 against A exact; drawing for every suite
+// task in suite order keeps a task's draw independent of the other tasks
+// selected. Only tasks that run on clean are returned.
+func drawAAFirst(seed int64, suiteTasks []string, conds []condPlan) map[string]bool {
+	var clean []condPlan
+	for _, c := range conds {
+		if c.id == schemas.ConditionClean {
+			clean = append(clean, c)
+		}
+	}
+	tasks, used := drawTasks(suiteTasks, clean)
+	r := rand.New(rand.NewPCG(uint64(seed), aaOrderStream))
+	out := map[string]bool{}
+	for _, t := range tasks {
+		first := r.IntN(2) == 0
+		if used[t] {
+			out[t] = first
+		}
+	}
+	return out
+}
+
+// drawTasks returns the tasks a per-task draw walks, every suite task in
+// suite order and then any used task the suite does not list, and the set of
+// tasks conds use.
+func drawTasks(suiteTasks []string, conds []condPlan) ([]string, map[string]bool) {
 	used := map[string]bool{}
 	for _, t := range usedTasks(conds) {
 		used[t] = true
@@ -1293,16 +1464,7 @@ func drawArmOrder(seed int64, suiteTasks []string, conds []condPlan, arms []stri
 			tasks = append(tasks, t)
 		}
 	}
-	r := rand.New(rand.NewPCG(uint64(seed), armOrderStream))
-	out := map[string][]string{}
-	for _, t := range tasks {
-		order := append([]string(nil), arms...)
-		r.Shuffle(len(order), func(i, j int) { order[i], order[j] = order[j], order[i] })
-		if used[t] {
-			out[t] = order
-		}
-	}
-	return out
+	return tasks, used
 }
 
 // buildSlots lays out every slot. Pairs are interleaved trial by trial, then
@@ -1310,6 +1472,12 @@ func drawArmOrder(seed int64, suiteTasks []string, conds []condPlan, arms []stri
 // to each other in the task's arm order. A spend-cap stop therefore leaves
 // whole trials missing rather than whole conditions, and the two arms of a
 // pair run close together in time. Compatibility slots come last.
+//
+// With aa: true each clean block also gets an A/A slot (arm A2, counted) with
+// a pair id of its own, so a pair keeps exactly the arms it had and every
+// reader of a pair still sees A against B. It sits right before or right
+// after the A/B pair, as drawAAFirst decided for the task; the A/B slots keep
+// their order.
 func buildSlots(m *schemas.Manifest, suite *schemas.Suite, conds, compat []condPlan) []schemas.Slot {
 	var slots []schemas.Slot
 	add := func(c condPlan, task, arm, pair string, trial int, counted bool) {
@@ -1328,6 +1496,10 @@ func buildSlots(m *schemas.Manifest, suite *schemas.Suite, conds, compat []condP
 			Counted:     counted,
 		})
 	}
+	var aaFirst map[string]bool
+	if m.Experiment.AA {
+		aaFirst = drawAAFirst(m.Experiment.Seed, suite.TaskIDs, conds)
+	}
 	for trial := 1; trial <= maxTrials(conds); trial++ {
 		for _, c := range conds {
 			if trial > c.trials {
@@ -1335,8 +1507,16 @@ func buildSlots(m *schemas.Manifest, suite *schemas.Suite, conds, compat []condP
 			}
 			for _, task := range c.tasks {
 				pair := utils.NewID("p", 10)
+				first, aa := aaFirst[task]
+				aa = aa && c.id == schemas.ConditionClean
+				if aa && first {
+					add(c, task, AAArm, utils.NewID("p", 10), trial, true)
+				}
 				for _, arm := range m.ArmOrder[task] {
 					add(c, task, arm, pair, trial, true)
+				}
+				if aa && !first {
+					add(c, task, AAArm, utils.NewID("p", 10), trial, true)
 				}
 			}
 		}

@@ -1,0 +1,38 @@
+# acme-gpu: ML-engineering tasks on a GPU (X7, docs/gpu-tasks.md). Acme, its
+# ticket router, churn model and ranking service are fictional.
+#
+# Each task asks for a whole GPU (resources.gpu in task.yaml). A run holds
+# it alone, from before the agent starts until its verifier is done; the
+# GPU is passed by UUID to the agent container and to the clean-room
+# verifier only, never in privileged mode, and the plan is refused on a
+# machine without a GPU that fits. The agent, the scripted controls and the
+# verifier all run in one CUDA image (base/Dockerfile: PyTorch 2.15 with CUDA
+# 13.2 and Triton 3.9, which support compute capability 7.5 and newer).
+#
+# The verifiers grade on the GPU, in the clean room, on data the agent never
+# sees: a held-out set from a source only the verifier has, or fresh inputs
+# seeded from os.urandom at grading time. When a verifier times the agent's
+# code, that code runs in a child process and the verifier holds the clock.
+# Every verifier writes a reward with one dimension per property it checks;
+# speedup, heldout_score and time_to_target_s are also GPU metrics.
+#
+# The track is ml_engineering: these tasks get a leaderboard of their own.
+id: acme-gpu
+version: 1.0.0
+description: Acme ML-engineering tasks on a GPU (fictional); graded in the clean room on held-out data or measured speed.
+track: ml_engineering
+environment: docker_workspace
+grader: verifier_command
+base_image:
+  dockerfile: base/Dockerfile
+  tag: heimdall-example/acme-gpu-cuda:1
+workdir: /workspace
+verifier:
+  command: ["python3", "-I", "-B", "/grader/tests/verify.py"]
+  result: reward
+  result_path: /grader/out/reward.json
+  pass_threshold: 1
+  restore: []
+  timeout_s: 900
+tasks: [train-classifier, fix-slow-loop, fused-softmax]
+probes: [model-outage]

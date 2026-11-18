@@ -243,6 +243,7 @@ func (a *admitter) runControl(ctx context.Context, c control, image string) (che
 	}
 	plan := &schemas.RunPlan{Image: image, Argv: c.argv, Env: env, Files: c.files, Workdir: a.s.Workdir,
 		WallS: exploitWallS, CPUs: 1, MemGB: 1, Network: "none", User: exploitUser}
+	a.gpuControlBudget(plan) // X7: a GPU task's controls train on the GPU (gpu.go)
 	res, err := a.deps.Env.Exec(ctx, rc, plan)
 	if err != nil {
 		return failed(check, fmt.Errorf("run %s: %w", c.name, err))

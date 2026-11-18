@@ -41,6 +41,8 @@ func TestAuditMaximTB21(t *testing.T) {
 		{"d_bar -1/77", near(e.DBar, -1.0/77, 1e-12)},
 		{"bounds equal the point estimate", e.LowerBound.DBar == e.DBar && e.UpperBound.DBar == e.DBar},
 		{"observed SD from the table", !v.MDEAssumedSD && math.Abs(v.SD-0.3032) < 0.001 && v.MDE > 0},
+		{"variance card names the table's own SD", v.Variance != nil && v.Variance.Source == VarianceObservedEffect &&
+			v.Variance.SD == v.SD && v.Variance.MDE == v.MDE && v.Variance.MeasuredSD == nil && v.Variance.AAArm == ""},
 		{"needs more than 200 tasks", v.TasksNeeded == 0 && v.TasksNeededOver == auditMaxTasks},
 		{"integrity unknown", v.Integrity == schemas.IntegrityUnknown},
 		{"no invalid reasons", len(v.InvalidReasons) == 0},
@@ -89,6 +91,11 @@ func TestAudit(t *testing.T) {
 			}
 			if v.Decision != tt.decision {
 				t.Fatalf("decision %s, want %s (%v)", v.Decision, tt.decision, v.InvalidReasons)
+			}
+			// Every row of clear has the same difference, so its SD is 0 and
+			// the assumed SD stands in; one row has no SD at all.
+			if c := v.Variance; c == nil || c.Source != schemas.VarianceAssumed || c.SD != 0.30 || c.MDE != v.MDE {
+				t.Fatalf("variance card %+v, want the assumed SD", c)
 			}
 		})
 	}

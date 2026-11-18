@@ -16,6 +16,10 @@ Experiment `e_codewins`, analysis `a_1`, grade source `original`.
 | d_bar with unknowns against B / for B | +25.0 pp / +37.5 pp |
 | Integrity | clean |
 
+## Noise floor
+
+No variance card: this analysis was written before the card existed. The MDE used SD 0.30, assumed.
+
 ## Guards
 
 | Guard | Condition | Status | Effect | Detail |

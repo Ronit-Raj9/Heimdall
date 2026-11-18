@@ -1,0 +1,46 @@
+# Acme Shop's stack, as the team runs it with docker compose: the app (the
+# agent's workspace), Postgres and Redis. Heimdall maps it onto one run:
+# app becomes the task image, db and cache run beside it on the run's
+# internal network, and the verifier may query them by name.
+services:
+  app:
+    build: ./app
+    working_dir: /app
+    environment:
+      DATABASE_URL: postgresql://acme:${DB_PASSWORD:-acme}@db:5432/acme
+      CACHE_URL: redis://cache:6379/0
+    depends_on:
+      db: {condition: service_healthy}
+      cache: {condition: service_healthy}
+    x-heimdall: {workspace: true}
+  db:
+    image: postgres:18
+    environment:
+      POSTGRES_USER: acme
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-acme}
+      POSTGRES_DB: acme
+    healthcheck:
+      # Over TCP: during first start the image's init server listens on its
+      # socket only, so a socket check would pass too early.
+      test: ["CMD", "pg_isready", "-h", "127.0.0.1", "-U", "acme", "-d", "acme"]
+      interval: 1s
+      timeout: 3s
+      retries: 60
+    volumes:
+      - pgdata:/var/lib/postgresql
+      - ./db/initdb:/docker-entrypoint-initdb.d:ro
+    ports: ["5432:5432"]
+  cache:
+    image: redis:7-alpine
+    command: redis-server --save "" --appendonly no
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 1s
+      timeout: 3s
+      retries: 30
+    expose: ["6379"]
+volumes:
+  pgdata: {}
+x-heimdall:
+  verifier_services: true
+  build_network: true

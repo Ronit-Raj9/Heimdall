@@ -100,7 +100,9 @@ func (e *dockerWorkspace) tryStartCollector(ctx context.Context, rc *schemas.Run
 		return err.Error()
 	}
 	args := append([]string{"create", "--name", name}, utils.LabelArgs(expID, runID)...)
-	args = append(args, "--network", serviceNetwork(runID), "--network-alias", ToolProxyHost, "--hostname", ToolProxyHost,
+	args = append(args, "--network", serviceNetwork(runID))
+	args = append(args, proxyAliasArgs(rc)...) // Eval integrity area (S2): toolproxy, plus tools.internal in a neutral run
+	args = append(args,
 		"--cap-drop", "ALL", "--security-opt", "no-new-privileges", "--read-only", "--tmpfs", "/tmp:size=16m",
 		"--pids-limit", "64", "--memory", "128m", "--log-driver", "json-file", "--log-opt", "max-size=1m",
 		"-v", ledger+":/ledger", "--entrypoint", "bifrost-bench", image,
@@ -138,6 +140,14 @@ func (e *dockerWorkspace) ensureEventCollector(ctx context.Context, rc *schemas.
 // collector URL and the standard OpenTelemetry exporter variables when the
 // collector serves.
 func (e *dockerWorkspace) eventEnv(rc *schemas.RunContext, runID string, env []string) []string {
+	return e.eventEnvView(rc, runID, env, standardView)
+}
+
+// eventEnvView is eventEnv with the names, host and events file path of the
+// run's view (realism.go): a neutral run's agent gets AGENT_EVENTS_FILE and
+// AGENT_EVENTS_URL on the neutral tool host, and no heimdall attribute. The
+// standard view gives exactly eventEnv.
+func (e *dockerWorkspace) eventEnvView(rc *schemas.RunContext, runID string, env []string, v agentView) []string { // Eval integrity area (S2)
 	if !e.cfg.EventsCollector {
 		return env
 	}
@@ -152,12 +162,16 @@ func (e *dockerWorkspace) eventEnv(rc *schemas.RunContext, runID string, env []s
 			set[k] = true
 		}
 	}
-	add("BENCH_EVENTS_FILE", EventsFilePath)
+	eventsFile, host := EventsFilePath, ToolProxyHost // Eval integrity area (S2): the view's path and host
+	if v.neutral() {
+		eventsFile, host = v.eventsFile(), NeutralToolProxyHost
+	}
+	add(v.envName("BENCH_EVENTS_FILE"), eventsFile)
 	if !collectorRunning(runID) {
 		return env
 	}
-	base := "http://" + ToolProxyHost + ":" + strconv.Itoa(ToolProxyPort)
-	add("BENCH_EVENTS_URL", base+agentevents.PathEvents)
+	base := "http://" + host + ":" + strconv.Itoa(ToolProxyPort)
+	add(v.envName("BENCH_EVENTS_URL"), base+agentevents.PathEvents)
 	add("OTEL_EXPORTER_OTLP_ENDPOINT", base+"/otlp")
 	add("OTEL_EXPORTER_OTLP_TRACES_ENDPOINT", base+agentevents.PathOTLP)
 	add("OTEL_EXPORTER_OTLP_PROTOCOL", "http/protobuf")
@@ -171,7 +185,7 @@ func (e *dockerWorkspace) eventEnv(rc *schemas.RunContext, runID string, env []s
 		service = rc.Agent.ID
 	}
 	add("OTEL_SERVICE_NAME", service)
-	add("OTEL_RESOURCE_ATTRIBUTES", "heimdall.run_id="+runID)
+	add("OTEL_RESOURCE_ATTRIBUTES", v.otelAttr+runID) // Eval integrity area (S2): heimdall.run_id= in a standard run
 	return env
 }
 

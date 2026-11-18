@@ -65,6 +65,9 @@ func (p *Pipeline) prepare(ctx context.Context, st *runState) error {
 		return wrapPart("environment", st.env, fmt.Errorf("create workspace: %w", err))
 	}
 	st.rc.Handle = h
+	if err := p.prepareTeam(st); err != nil { // Multi-agent area: team route tokens before the tool proxy starts (team.go)
+		return err
+	}
 	if err := p.startServices(ctx, st); err != nil {
 		return err
 	}
@@ -84,7 +87,10 @@ func (p *Pipeline) prepare(ctx context.Context, st *runState) error {
 	st.rc.Key = key
 	st.rc.Run.Gateway.VirtualKeyID = key.ID
 	st.rc.Run.Gateway.KeySlot = key.KeySlot
-	return p.bindFaultPlan(ctx, st)
+	if err := p.bindFaultPlan(ctx, st); err != nil {
+		return err
+	}
+	return p.mintTeam(ctx, st) // Multi-agent area: one key per team member (team.go)
 }
 
 // bindFaultPlan binds an empty fault plan carrying the run id to the run's
@@ -95,7 +101,7 @@ func (p *Pipeline) prepare(ctx context.Context, st *runState) error {
 // plan is what keeps the run off every real provider, so a run that cannot
 // bind it is refused rather than run.
 func (p *Pipeline) bindFaultPlan(ctx context.Context, st *runState) error {
-	gatewayProbe := st.rc.Probe != nil && st.rc.Probe.Layer == schemas.LayerGateway
+	gatewayProbe := st.rc.Probe != nil && st.rc.Probe.Layer == schemas.LayerGateway && st.rc.Probe.Apply.Agent == "" // Multi-agent area: a member-targeted probe binds only its member's slot when it arms
 	if p.faultMode == faultModeScripted {
 		switch {
 		case p.reg.Fault == nil:
@@ -462,6 +468,7 @@ func (p *Pipeline) cleanup(ctx context.Context, st *runState) error {
 			errs = append(errs, wrapPart("environment", st.env, fmt.Errorf("destroy: %w", err)))
 		}
 	}
+	errs = append(errs, p.clearTeamPlans(ctx, st)) // Multi-agent area: team member slots (team.go)
 	if st.rc.Key != nil && p.reg.Fault != nil {
 		if err := p.reg.Fault.ClearPlan(ctx, st.rc.Key.KeySlot); err != nil {
 			errs = append(errs, &partError{part: faultPart, err: fmt.Errorf("clear plan of key slot %s: %w", st.rc.Key.KeySlot, err)})

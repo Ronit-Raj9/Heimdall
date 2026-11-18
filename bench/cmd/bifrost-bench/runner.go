@@ -123,7 +123,7 @@ func runRunnerStart(cmd string, args []string) int {
 		host = ""
 	}
 	w, err := engine.NewWorker(a.reg, engine.NewPipeline(a.reg, a.cfg.Root, a.logger),
-		engine.NewPlanner(a.reg, a.cfg.Root, a.logger, engine.WithIgnoreQuarantine()).Plan, // Suite health area: a replan reproduces a frozen manifest (engine/taskscreen.go)
+		engine.NewPlanner(a.reg, a.cfg.Root, a.logger, engine.WithIgnoreQuarantine(), engine.WithoutGPUCheck()).Plan, // Suite health area: a replan reproduces a frozen manifest (engine/taskscreen.go); X7: no GPU check, the coordinator leases GPU slots by the GPUs a runner registers
 		engine.WorkerOptions{Server: f.server, Token: token, WorkerID: f.name, Host: host, Version: benchVersion,
 			Slots: f.slots, Logger: a.logger, Pool: f.pool, Labels: f.labelList(),
 			SpendCapUSD: f.spendCap, SpendFile: filepath.Join(a.store.Root(), ".runner", "spend.json")})
@@ -200,11 +200,4 @@ func printRunnerStatus(out io.Writer, server, name string, who *schemas.RunnerWh
 			fmt.Fprintln(out, "runner      none registered with this token yet")
 		}
 	}
-}
-
-func orDash(s string) string {
-	if s == "" {
-		return "-"
-	}
-	return s
 }

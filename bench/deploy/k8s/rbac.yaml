@@ -1,0 +1,68 @@
+# What the Kubernetes driver needs when the bench runs inside the cluster
+# with a service account (docs/kubernetes.md, "Running the bench in the
+# cluster"). The driver creates one namespace per run, so these are cluster
+# permissions; `bifrost-bench k8s check` asks the API server for each verb
+# and names any that is denied.
+#
+#   kubectl apply -f deploy/k8s/rbac.yaml
+#
+# The run pods themselves get no permissions at all: their service account
+# token is never mounted (automountServiceAccountToken: false).
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: heimdall-bench
+  namespace: heimdall-system
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: heimdall-bench-driver
+rules:
+  # One namespace per run, removed with everything in it.
+  - apiGroups: [""]
+    resources: [namespaces]
+    verbs: [create, get, list, delete]
+  # The run pod, its env secret, its anchor and observer scripts.
+  - apiGroups: [""]
+    resources: [pods, secrets, configmaps]
+    verbs: [create, get, list, delete, patch]
+  # Seeding, export, observers and the agent's own streams.
+  - apiGroups: [""]
+    resources: [pods/exec, pods/attach]
+    verbs: [create, get]
+  - apiGroups: [""]
+    resources: [pods/log, events]
+    verbs: [get, list]
+  # The gateway Service the agents reach, and the cluster DNS and API server
+  # addresses the egress probe tries.
+  - apiGroups: [""]
+    resources: [services]
+    verbs: [get, list, create, patch, delete]
+  - apiGroups: [""]
+    resources: [nodes]
+    verbs: [get, list]
+  - apiGroups: [networking.k8s.io]
+    resources: [networkpolicies]
+    verbs: [create, get, list, delete]
+  # `k8s gateway up|down` only.
+  - apiGroups: [apps]
+    resources: [deployments]
+    verbs: [create, get, list, patch, delete]
+  # `k8s check`.
+  - apiGroups: [authorization.k8s.io]
+    resources: [selfsubjectaccessreviews]
+    verbs: [create]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: heimdall-bench-driver
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: heimdall-bench-driver
+subjects:
+  - kind: ServiceAccount
+    name: heimdall-bench
+    namespace: heimdall-system

@@ -101,6 +101,7 @@ type Run struct {
 	BudgetSnapshot *BudgetSnapshot       `json:"budget_snapshot,omitempty"`
 	Gateway        RunGatewayInfo        `json:"gateway"`
 	Failures       []PartFailure         `json:"failures,omitempty"`
+	Hardware       *HardwareRecord       `json:"hardware,omitempty"` // X7: the GPUs a GPU task's run held (schemas/gpu.go); nil otherwise
 }
 
 // RunTiming records when the run passed its milestones.
@@ -197,4 +198,15 @@ type RunContext struct {
 	// remote.tools expose (remote.go); nil otherwise. It holds the run's
 	// bearer token and is never written to disk.
 	RemoteTools *RemoteToolsAccess
+
+	// TeamRoutes maps each team member id to its tool proxy route token
+	// (agents.go): the member reaches services at /m/<token>/s/<id>/ and the
+	// proxy stamps ToolCall.AgentID from it. Nil outside team runs; never
+	// written to disk.
+	TeamRoutes map[string]string
+
+	// GPU is the GPUs this run holds from the scheduler's pool (X7,
+	// schemas/gpu.go): only the agent container and the verifier get them.
+	// Nil for a run of a task without a GPU request; never written to disk.
+	GPU *GPUAssignment
 }

@@ -1,0 +1,25 @@
+# acme-team/split-refactor (fictional, written for this example): Split a refactor across two files.
+id: split-refactor
+version: 1.0.0
+title: Split a refactor across two files
+project: acme-team
+kind: refactor
+instruction: instruction.md
+repo_dir: repo
+verifier:
+  tests: verifier/tests
+  required: []
+protected: []
+controls:
+  reference: solution/reference.diff
+  empty: controls/empty.diff
+  mutants: [controls/mutant-half-done.diff]
+  exploit: controls/exploit.sh
+timeouts:
+  agent_s: 300
+capabilities: [planning, delegation]
+difficulty: easy
+provenance:
+  source: bench/examples/acme-team (fictional Acme Tea team tasks, written for this example)
+  license: MIT
+  created_by: hand-written example

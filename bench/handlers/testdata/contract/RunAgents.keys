@@ -1,0 +1,14 @@
+# Keys of bench.ts `RunAgents` (handlers/runagents.go), GET /runs/{id}/agents.
+# The top-level response adds "mode". Change with bench.ts and handlers/runagents.go.
+# A single-agent run answers available false with empty lists and no tree or blame.
+run_id
+available
+members
+spans
+wall_ms
+busy_ms
+critical_ms
+handoffs
+tree?
+blame?
+truncated?

@@ -1,0 +1,17 @@
+diff --git a/train.py b/train.py
+index 950efc4..5fddf71 100644
+--- a/train.py
++++ b/train.py
+@@ -45,10 +45,8 @@ def train(x, y, device):
+             opt.zero_grad()
+             loss.backward()
+             opt.step()
+-            torch.cuda.synchronize()
+-            history.append(loss.item())
+-            acc = (model(xb).argmax(1).cpu().numpy() == yb.cpu().numpy()).mean()
+-        print(f"epoch {epoch + 1} loss {np.mean(history[-len(loader):]):.4f} last batch acc {acc:.3f}", flush=True)
++            history.append(loss.detach())
++        print(f"epoch {epoch + 1} loss {torch.stack(history[-len(loader):]).mean().item():.4f}", flush=True)
+     return model
+ 
+ 

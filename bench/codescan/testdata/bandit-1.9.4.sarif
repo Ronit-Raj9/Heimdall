@@ -1,0 +1,397 @@
+{
+  "runs": [
+    {
+      "tool": {
+        "driver": {
+          "name": "Bandit",
+          "organization": "PyCQA",
+          "rules": [
+            {
+              "id": "B403",
+              "name": "blacklist",
+              "properties": {
+                "tags": [
+                  "security",
+                  "external/cwe/cwe-502"
+                ],
+                "precision": "high"
+              },
+              "helpUri": "https://bandit.readthedocs.io/en/1.9.4/blacklists/blacklist_imports.html#b403-import-pickle"
+            },
+            {
+              "id": "B404",
+              "name": "blacklist",
+              "properties": {
+                "tags": [
+                  "security",
+                  "external/cwe/cwe-78"
+                ],
+                "precision": "high"
+              },
+              "helpUri": "https://bandit.readthedocs.io/en/1.9.4/blacklists/blacklist_imports.html#b404-import-subprocess"
+            },
+            {
+              "id": "B602",
+              "name": "subprocess_popen_with_shell_equals_true",
+              "properties": {
+                "tags": [
+                  "security",
+                  "external/cwe/cwe-78"
+                ],
+                "precision": "high"
+              },
+              "helpUri": "https://bandit.readthedocs.io/en/1.9.4/plugins/b602_subprocess_popen_with_shell_equals_true.html"
+            },
+            {
+              "id": "B301",
+              "name": "blacklist",
+              "properties": {
+                "tags": [
+                  "security",
+                  "external/cwe/cwe-502"
+                ],
+                "precision": "high"
+              },
+              "helpUri": "https://bandit.readthedocs.io/en/1.9.4/blacklists/blacklist_calls.html#b301-pickle"
+            },
+            {
+              "id": "B506",
+              "name": "yaml_load",
+              "properties": {
+                "tags": [
+                  "security",
+                  "external/cwe/cwe-20"
+                ],
+                "precision": "high"
+              },
+              "helpUri": "https://bandit.readthedocs.io/en/1.9.4/plugins/b506_yaml_load.html"
+            },
+            {
+              "id": "B501",
+              "name": "request_with_no_cert_validation",
+              "properties": {
+                "tags": [
+                  "security",
+                  "external/cwe/cwe-295"
+                ],
+                "precision": "high"
+              },
+              "helpUri": "https://bandit.readthedocs.io/en/1.9.4/plugins/b501_request_with_no_cert_validation.html"
+            },
+            {
+              "id": "B324",
+              "name": "hashlib",
+              "properties": {
+                "tags": [
+                  "security",
+                  "external/cwe/cwe-327"
+                ],
+                "precision": "high"
+              },
+              "helpUri": "https://bandit.readthedocs.io/en/1.9.4/plugins/b324_hashlib.html"
+            }
+          ],
+          "version": "1.9.4",
+          "semanticVersion": "1.9.4"
+        }
+      },
+      "invocations": [
+        {
+          "executionSuccessful": true,
+          "endTimeUtc": "2026-11-18T02:36:43Z"
+        }
+      ],
+      "properties": {
+        "metrics": {
+          "_totals": {
+            "loc": 17,
+            "nosec": 0,
+            "skipped_tests": 0,
+            "SEVERITY.UNDEFINED": 0,
+            "CONFIDENCE.UNDEFINED": 0,
+            "SEVERITY.LOW": 2,
+            "CONFIDENCE.LOW": 0,
+            "SEVERITY.MEDIUM": 2,
+            "CONFIDENCE.MEDIUM": 0,
+            "SEVERITY.HIGH": 3,
+            "CONFIDENCE.HIGH": 7
+          },
+          "app/server.py": {
+            "loc": 17,
+            "nosec": 0,
+            "skipped_tests": 0,
+            "SEVERITY.UNDEFINED": 0,
+            "SEVERITY.LOW": 2,
+            "SEVERITY.MEDIUM": 2,
+            "SEVERITY.HIGH": 3,
+            "CONFIDENCE.UNDEFINED": 0,
+            "CONFIDENCE.LOW": 0,
+            "CONFIDENCE.MEDIUM": 0,
+            "CONFIDENCE.HIGH": 7
+          }
+        }
+      },
+      "results": [
+        {
+          "message": {
+            "text": "Consider possible security implications associated with pickle module."
+          },
+          "level": "note",
+          "locations": [
+            {
+              "physicalLocation": {
+                "region": {
+                  "snippet": {
+                    "text": "import pickle\n"
+                  },
+                  "endColumn": 14,
+                  "endLine": 2,
+                  "startColumn": 1,
+                  "startLine": 2
+                },
+                "artifactLocation": {
+                  "uri": "app/server.py"
+                },
+                "contextRegion": {
+                  "snippet": {
+                    "text": "import hashlib\nimport pickle\nimport subprocess\n"
+                  },
+                  "endLine": 3,
+                  "startLine": 1
+                }
+              }
+            }
+          ],
+          "properties": {
+            "issue_confidence": "HIGH",
+            "issue_severity": "LOW"
+          },
+          "ruleId": "B403",
+          "ruleIndex": 0
+        },
+        {
+          "message": {
+            "text": "Consider possible security implications associated with the subprocess module."
+          },
+          "level": "note",
+          "locations": [
+            {
+              "physicalLocation": {
+                "region": {
+                  "snippet": {
+                    "text": "import subprocess\n"
+                  },
+                  "endColumn": 18,
+                  "endLine": 3,
+                  "startColumn": 1,
+                  "startLine": 3
+                },
+                "artifactLocation": {
+                  "uri": "app/server.py"
+                },
+                "contextRegion": {
+                  "snippet": {
+                    "text": "import pickle\nimport subprocess\n\n"
+                  },
+                  "endLine": 4,
+                  "startLine": 2
+                }
+              }
+            }
+          ],
+          "properties": {
+            "issue_confidence": "HIGH",
+            "issue_severity": "LOW"
+          },
+          "ruleId": "B404",
+          "ruleIndex": 1
+        },
+        {
+          "message": {
+            "text": "subprocess call with shell=True identified, security issue."
+          },
+          "level": "error",
+          "locations": [
+            {
+              "physicalLocation": {
+                "region": {
+                  "snippet": {
+                    "text": "    return subprocess.call(cmd, shell=True)\n"
+                  },
+                  "endColumn": 44,
+                  "endLine": 11,
+                  "startColumn": 12,
+                  "startLine": 11
+                },
+                "artifactLocation": {
+                  "uri": "app/server.py"
+                },
+                "contextRegion": {
+                  "snippet": {
+                    "text": "    # already in the repository before the agent ran\n    return subprocess.call(cmd, shell=True)\n\n"
+                  },
+                  "endLine": 12,
+                  "startLine": 10
+                }
+              }
+            }
+          ],
+          "properties": {
+            "issue_confidence": "HIGH",
+            "issue_severity": "HIGH"
+          },
+          "ruleId": "B602",
+          "ruleIndex": 2
+        },
+        {
+          "message": {
+            "text": "Pickle and modules that wrap it can be unsafe when used to deserialize untrusted data, possible security issue."
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "region": {
+                  "snippet": {
+                    "text": "    return pickle.loads(blob)\n"
+                  },
+                  "endColumn": 30,
+                  "endLine": 19,
+                  "startColumn": 12,
+                  "startLine": 19
+                },
+                "artifactLocation": {
+                  "uri": "app/server.py"
+                },
+                "contextRegion": {
+                  "snippet": {
+                    "text": "def load_session(blob):\n    return pickle.loads(blob)\n\n"
+                  },
+                  "endLine": 20,
+                  "startLine": 18
+                }
+              }
+            }
+          ],
+          "properties": {
+            "issue_confidence": "HIGH",
+            "issue_severity": "MEDIUM"
+          },
+          "ruleId": "B301",
+          "ruleIndex": 3
+        },
+        {
+          "message": {
+            "text": "Use of unsafe yaml load. Allows instantiation of arbitrary objects. Consider yaml.safe_load()."
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "region": {
+                  "snippet": {
+                    "text": "    return yaml.load(text)\n"
+                  },
+                  "endColumn": 27,
+                  "endLine": 23,
+                  "startColumn": 12,
+                  "startLine": 23
+                },
+                "artifactLocation": {
+                  "uri": "app/server.py"
+                },
+                "contextRegion": {
+                  "snippet": {
+                    "text": "def load_config(text):\n    return yaml.load(text)\n\n"
+                  },
+                  "endLine": 24,
+                  "startLine": 22
+                }
+              }
+            }
+          ],
+          "properties": {
+            "issue_confidence": "HIGH",
+            "issue_severity": "MEDIUM"
+          },
+          "ruleId": "B506",
+          "ruleIndex": 4
+        },
+        {
+          "message": {
+            "text": "Call to requests with verify=False disabling SSL certificate checks, security issue."
+          },
+          "level": "error",
+          "locations": [
+            {
+              "physicalLocation": {
+                "region": {
+                  "snippet": {
+                    "text": "    return requests.get(url, verify=False, timeout=5)\n"
+                  },
+                  "endColumn": 54,
+                  "endLine": 27,
+                  "startColumn": 12,
+                  "startLine": 27
+                },
+                "artifactLocation": {
+                  "uri": "app/server.py"
+                },
+                "contextRegion": {
+                  "snippet": {
+                    "text": "def fetch(url):\n    return requests.get(url, verify=False, timeout=5)\n\n"
+                  },
+                  "endLine": 28,
+                  "startLine": 26
+                }
+              }
+            }
+          ],
+          "properties": {
+            "issue_confidence": "HIGH",
+            "issue_severity": "HIGH"
+          },
+          "ruleId": "B501",
+          "ruleIndex": 5
+        },
+        {
+          "message": {
+            "text": "Use of weak MD5 hash for security. Consider usedforsecurity=False"
+          },
+          "level": "error",
+          "locations": [
+            {
+              "physicalLocation": {
+                "region": {
+                  "snippet": {
+                    "text": "    return hashlib.md5(password.encode()).hexdigest()\n"
+                  },
+                  "endColumn": 42,
+                  "endLine": 31,
+                  "startColumn": 12,
+                  "startLine": 31
+                },
+                "artifactLocation": {
+                  "uri": "app/server.py"
+                },
+                "contextRegion": {
+                  "snippet": {
+                    "text": "def store_password(password):\n    return hashlib.md5(password.encode()).hexdigest()\n"
+                  },
+                  "endLine": 31,
+                  "startLine": 30
+                }
+              }
+            }
+          ],
+          "properties": {
+            "issue_confidence": "HIGH",
+            "issue_severity": "HIGH"
+          },
+          "ruleId": "B324",
+          "ruleIndex": 6
+        }
+      ]
+    }
+  ],
+  "version": "2.1.0",
+  "$schema": "https://json.schemastore.org/sarif-2.1.0.json"
+}

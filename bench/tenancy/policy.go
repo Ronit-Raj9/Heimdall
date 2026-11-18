@@ -258,6 +258,17 @@ var OrgPolicy = map[string]Rule{
 	key("GET", api+"/livescore/compare"):               org(viewer),
 	key("POST", api+"/livescore/pull"):                 deny("live scoring pulls call a gateway URL; hosted servers make no such calls yet"),
 
+	// Multi-agent, safety and eval integrity reads.
+	key("GET", api+"/experiments/{id}/awareness"):             org(viewer),
+	key("GET", api+"/experiments/{id}/compliance"):            org(viewer),
+	key("GET", api+"/monitors/certifications"):                org(viewer),
+	key("GET", api+"/monitors/certifications/{id}"):           org(viewer),
+	key("GET", api+"/monitors/certifications/{id}/report.md"): org(viewer),
+	key("GET", api+"/runs/{id}/agents"):                       org(viewer),
+	key("GET", api+"/runs/{id}/codescan"):                     org(viewer),
+	key("GET", api+"/runs/{id}/services"):                     org(viewer),
+	key("GET", api+"/runs/{id}/services/{service}/log"):       org(viewer),
+
 	// Remote workers: the list is a status read; everything else is the
 	// runner protocol and admits only runners of the org.
 	key("GET", api+"/workers"):                              org(viewer),

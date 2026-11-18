@@ -34,6 +34,12 @@ type Experiment struct {
 	Requirements  CapabilityRequirements `json:"requirements,omitzero" yaml:"requirements"`
 	Smoke         bool                   `json:"smoke,omitempty" yaml:"smoke"`       // synthetic smoke experiment: lock problems only warn; results are never findings
 	External      string                 `json:"external,omitempty" yaml:"external"` // live | record | replay: overrides every external API's mode for this experiment's runs
+	// Fairness is a comparison rule the planner and the verdict enforce
+	// (agents.go): equal_budget, or empty for none.
+	Fairness string `json:"fairness,omitempty" yaml:"fairness"`
+	// Attribution opts in to counterfactual replay of blamed steps
+	// (agents.go AttributionSpec); nil for none.
+	Attribution *AttributionSpec `json:"attribution,omitempty" yaml:"attribution"`
 
 	// Forecast and matrix area: the matrix sugar expands into arms at plan
 	// time (matrix.go, engine/matrixplan.go); nil for every other experiment.
@@ -54,6 +60,28 @@ type Experiment struct {
 	// hosted platform (docs/runners.md); nil for every experiment without
 	// one, so it encodes and hashes exactly as before.
 	Runner *RunnerSpec `json:"runner,omitempty" yaml:"runner,omitempty"`
+	// Eval integrity area (S2). AA adds arm A2, a copy of arm A with the same
+	// config hash, on the clean condition: the measured noise floor
+	// (docs/noise-floor.md). Realism "neutral" hides the bench's own cues from
+	// the agent (docs/eval-awareness.md); empty means standard and overrides
+	// nothing the suite sets. Both are omitempty, so recorded manifests keep
+	// their hashes.
+	AA      bool   `json:"aa,omitempty" yaml:"aa,omitempty"`           // Eval integrity area (S2)
+	Realism string `json:"realism,omitempty" yaml:"realism,omitempty"` // Eval integrity area (S2): standard | neutral
+
+	// Safety probes area (S1). Safety "trifecta" makes the planner add the
+	// suite's exfiltration probes to every task whose agent config has
+	// private data, untrusted input and an exit (docs/safety-probes.md).
+	// omitempty keeps recorded manifests' hashes.
+	Safety string `json:"safety,omitempty" yaml:"safety,omitempty"` // Safety probes area (S1): trifecta
+
+	CodeScan *CodeScanPolicy `json:"codescan,omitempty" yaml:"codescan,omitempty"` // X4: veto level and ignored rules of insecure_code_added (codescan.go)
+
+	// X3: the environment driver the experiment must run on
+	// (docs/kubernetes.md); the planner refuses another one and freezes the
+	// configured driver here when it is not docker. nil keeps recorded
+	// manifests' hashes.
+	Environment *EnvironmentChoice `json:"environment,omitempty" yaml:"environment,omitempty"` // X3
 }
 
 // RunnerSpec picks the runners of a hosted organization that may run an
@@ -88,6 +116,38 @@ func ValidPoolName(s string) bool {
 		}
 	}
 	return true
+}
+
+// EnvironmentChoice is an experiment's environment driver (X3, Kubernetes
+// area): "docker" or "kubernetes".
+type EnvironmentChoice struct {
+	Driver string `json:"driver" yaml:"driver"`
+}
+
+// SafetyTrifecta is the Experiment.Safety value that auto-attaches the
+// exfiltration probes (Safety probes area, S1).
+const SafetyTrifecta = "trifecta"
+
+// Realism modes (Eval integrity area, S2). RealismStandard is the default and
+// what every recorded run used; RealismNeutral gives the agent neutral
+// variable names and hostnames, stamps no canary and names observer
+// processes innocuously (docs/eval-awareness.md).
+const (
+	RealismStandard = "standard"
+	RealismNeutral  = "neutral"
+)
+
+// EffectiveRealism is the realism a run of the experiment uses: the
+// experiment's own setting when it names one, else the suite's, else
+// standard. Unknown values are refused by the planner, never guessed here.
+func EffectiveRealism(e *Experiment, s *Suite) string { // Eval integrity area (S2)
+	if e != nil && e.Realism != "" {
+		return e.Realism
+	}
+	if s != nil && s.Realism != "" {
+		return s.Realism
+	}
+	return RealismStandard
 }
 
 // CapabilityRequirements separates plan-blocking capabilities from optional

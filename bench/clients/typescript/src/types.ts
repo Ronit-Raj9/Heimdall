@@ -552,6 +552,40 @@ export interface Run {
 	budget_snapshot?: BudgetSnapshot;
 	gateway: RunGatewayInfo;
 	failures?: PartFailure[];
+	/** X7: the GPUs a GPU task's run held (schemas/gpu.go); absent for every other run. */
+	hardware?: HardwareRecord;
+}
+
+// X7: GPU benchmarking (schemas/gpu.go, docs/gpu-tasks.md).
+export interface GPUInfo {
+	index: number;
+	uuid: string;
+	name: string;
+	memory_mb: number;
+	driver: string;
+	cuda_version?: string;
+	compute_cap: string;
+}
+
+export interface GPUSamplerSummary {
+	samples: number;
+	interval_ms: number;
+	agent_seconds: number;
+	gpu_seconds: number;
+	baseline_mb: number;
+	peak_used_mb: number;
+	peak_vram_mb: number;
+	mean_util_pct: number;
+	sessions: number;
+	error?: string;
+}
+
+export interface HardwareRecord {
+	gpus?: GPUInfo[];
+	/** cdi | device_requests */
+	mode?: string;
+	devices?: string[];
+	sampler?: GPUSamplerSummary;
 }
 
 // ---------------------------------------------------------------------------------------------
@@ -895,6 +929,8 @@ export interface Verdict {
 	integrity: IntegrityStatus | "";
 	manifest_hash: string;
 	frozen_at: string;
+	/** Eval integrity area (S2): the noise floor behind the MDE. Absent on analyses written before it. */
+	variance?: VarianceCard;
 }
 
 /** fail makes the experiment INVALID; unknown is never a pass and holds an IMPROVED verdict; warn changes nothing unless declared as a guard. */
@@ -2766,6 +2802,8 @@ export interface WorkerInfo {
 	running: string[];
 	completed: number;
 	last_seen: string;
+	/** X7: the GPUs the worker registered; only a worker with free GPUs is leased a GPU slot. */
+	gpus?: GPUInfo[];
 }
 
 /** GET /workers. enabled false means worker mode is off (BENCH_WORKER_TOKEN unset); so does a 404 from an older server. */
@@ -5160,3 +5198,503 @@ export interface VoiceCall {
 	audio: VoiceTrack[];
 	witness: string;
 }
+
+// ---------------------------------------------------------------------------------------------
+// Multi-agent (schemas/agents.go, handlers/runagents.go, attribution/blame.go)
+// ---------------------------------------------------------------------------------------------
+
+/** How a step or an agent is known, strongest first. Other values may appear and are shown as text. */
+export type AgentAttributionSource = "gateway_key" | "header" | "transcript" | "otlp" | "self_report" | (string & {});
+/** proven: a bench-minted gateway key per container; declared: a header the gateway logged; reported: the agent's own record. */
+export type AgentAttributionStrength = "proven" | "declared" | "reported";
+export type AgentEdgeKind = "spawn" | "handoff" | "message" | "claim" | "return";
+
+/** One agent of a run. Role, name and model are agent-influenced display text. Times are absent when no source recorded them. */
+export interface AgentNode {
+	id: string;
+	role?: string;
+	name?: string;
+	model?: string;
+	parent_id?: string;
+	/** 0 for a root agent. */
+	depth: number;
+	spawn_tool_call_id?: string;
+	spawn_event_id?: string;
+	started?: string;
+	ended?: string;
+	/** completed | error | timeout | exit code n */
+	exit?: string;
+	exit_code?: number;
+	source: AgentAttributionSource;
+	strength: AgentAttributionStrength;
+	sources?: string[];
+	key_id?: string;
+	container?: string;
+	budget_usd?: number;
+}
+
+/** One interaction between two agents: the payload's hash and size, never the payload. */
+export interface AgentEdge {
+	kind: AgentEdgeKind;
+	from: string;
+	to?: string;
+	at?: string;
+	payload_sha256?: string;
+	size?: number;
+	source: AgentAttributionSource;
+	strength: AgentAttributionStrength;
+	ref?: string;
+}
+
+/** How much of the step timeline carries an agent id. A row no source could place stays unknown. */
+export interface AgentCoverage {
+	steps: number;
+	attributed: number;
+	unknown: number;
+	by_source?: Record<string, number>;
+	by_strength?: Record<string, number>;
+	/** Sources that had anything to say in this run. */
+	available?: string[];
+}
+
+/** agents.json: every agent of one run, how they were started and how they talked. */
+export interface AgentTree {
+	version: string;
+	/** in_process | team */
+	shape: string;
+	agents: AgentNode[];
+	edges?: AgentEdge[];
+	coverage: AgentCoverage;
+	notes?: string[];
+}
+
+/** One agent's row in the per-agent table. A null count was not recorded (tokens and cost need gateway rows with the agent's id), never zero. */
+export interface AgentStats {
+	agent_id: string;
+	role?: string;
+	model?: string;
+	parent_id?: string;
+	depth: number;
+	/** Strongest attribution source of the agent. */
+	source: AgentAttributionSource;
+	strength: AgentAttributionStrength;
+	/** Timeline rows with this agent id. */
+	steps: number;
+	model_turns: number;
+	tool_calls: number;
+	input_tokens: number | null;
+	output_tokens: number | null;
+	cost_usd: number | null;
+	messages_sent: number;
+	messages_received: number;
+	busy_ms: number;
+	exit?: string;
+}
+
+/** One swimlane block: a timeline row with an agent id, in milliseconds from the run's first row. Label is clipped agent text. */
+export interface AgentSpan {
+	agent_id: string;
+	/** The timeline row. */
+	seq: number;
+	kind: string;
+	start_ms: number;
+	end_ms: number;
+	label: string;
+	is_error?: boolean;
+	/** On the critical path. */
+	critical?: boolean;
+}
+
+/** One planted fact checked on a handoff. */
+export interface HandoffFact {
+	fact: string;
+	sent: boolean;
+	delivered: boolean;
+}
+
+/**
+ * One edge of the agent tree with what travelled on it. sent is the payload as sent and delivered
+ * as received, both clipped agent text; altered is true when they differ.
+ */
+export interface AgentHandoff {
+	index: number;
+	kind: AgentEdgeKind;
+	from: string;
+	to?: string;
+	at?: string;
+	/** ms from the run's first timeline row, the same zero as spans; null when either time is unknown. */
+	at_ms: number | null;
+	bytes: number;
+	payload_sha256?: string;
+	sent?: string;
+	delivered?: string;
+	altered?: boolean;
+	ref?: string;
+	/** gateway_key when the sender is proven by its route token, else self_report. */
+	source: AgentAttributionSource;
+	facts?: HandoffFact[];
+}
+
+/** Blame tiers, strongest first. unattributed: no agent could be proven responsible; single_agent: nothing to attribute. */
+export type BlameTier = "replay_validated" | "gate_proven" | "unattributed" | "single_agent";
+export type BlameReplayStatus = "not_run" | "flipped" | "held" | "error";
+
+/** One fired gate's reference placed on an agent (Go attribution.Candidate). */
+export interface BlameCandidate {
+	agent_id: string;
+	role?: string;
+	gate: string;
+	effect: string;
+	ref: string;
+	step_seq?: number;
+	at?: string;
+	agent_source?: string;
+}
+
+/**
+ * The tier 2 counterfactual (Go attribution.Replay): the slot run again with the suspect replaced
+ * by a scripted stub. flipped validates the blame; held means the suspect alone does not explain it.
+ */
+export interface BlameReplay {
+	status: BlameReplayStatus;
+	suspect: string;
+	stub: string;
+	exp_id?: string;
+	run_id?: string;
+	outcome_before: string;
+	outcome_after?: string;
+	/** Gates that still fired in the replay. */
+	gates_after?: string[];
+	/** Absent when the replay's cost was not recorded. */
+	cost_usd?: number;
+	detail?: string;
+}
+
+/** blame.json: which agent of one run is responsible for its failure, how that is known, and the replay when one ran. */
+export interface Blame {
+	version: string;
+	run_id: string;
+	exp_id?: string;
+	parent_seal?: string;
+	outcome: string;
+	/** Outcome not pass, or a veto or report gate fired. */
+	failed: boolean;
+	tier: BlameTier;
+	/** Empty unless the tier is gate_proven or replay_validated. */
+	agent_id?: string;
+	role?: string;
+	gate?: string;
+	step_seq?: number;
+	at?: string;
+	/** How the step's agent is known. */
+	agent_source?: string;
+	strength?: AgentAttributionStrength;
+	evidence?: string[];
+	detail: string;
+	/** Every placed reference of every fired gate, earliest first. */
+	candidates?: BlameCandidate[];
+	/** Fired gates' references no agent could be found for. */
+	unplaced?: string[];
+	replay?: BlameReplay;
+	coverage?: AgentCoverage;
+	notes?: string[];
+}
+
+/**
+ * GET /runs/{id}/agents. available is false for a single-agent run (no agents.json): the lists are
+ * then empty and tree and blame absent. Every string that came from an agent is inert display text.
+ */
+export interface RunAgents {
+	run_id: string;
+	available: boolean;
+	tree?: AgentTree;
+	/** One row per agent, in tree order (depth first). */
+	members: AgentStats[];
+	/** Swimlane blocks; critical marks the blocks on the critical path. */
+	spans: AgentSpan[];
+	/** First to last timeline row. busy_ms / wall_ms is the parallelism factor. */
+	wall_ms: number;
+	busy_ms: number;
+	critical_ms: number;
+	/** Spawn, handoff, message, claim and return edges in time order. */
+	handoffs: AgentHandoff[];
+	blame?: Blame;
+	/** The timeline was longer than one response carries: spans cover the first rows only. */
+	truncated?: boolean;
+}
+
+export type RunAgentsResponse = WithMode<RunAgents>;
+
+// ---------------------------------------------------------------------------------------------
+// Eval integrity area (S2): verdict.go VarianceCard, the eval-awareness scan, monitor
+// certification (monitor.go) and the compliance pack route.
+// ---------------------------------------------------------------------------------------------
+
+/** observed_effect: an audit of a published table, whose own per-task differences give the SD. */
+export type VarianceSource = "measured_aa" | "assumed" | "observed_effect";
+
+/** The noise floor of an experiment: the SD the MDE used, where it came from, and the A/A comparison when an A/A arm ran. */
+export interface VarianceCard {
+	source: VarianceSource;
+	/** The SD the MDE and tasks_needed used. */
+	sd: number;
+	assumed_sd: number;
+	/** SD of A2 minus A per task; absent without an A/A arm or with fewer than 2 paired tasks. */
+	measured_sd?: number;
+	aa_arm?: string;
+	aa_tasks?: number;
+	aa_effect?: Effect;
+	/** improved or regressed between identical arms is harness noise and makes the verdict invalid. */
+	aa_decision?: Decision;
+	/** Percentage points. */
+	mde: number;
+	detail: string;
+}
+
+export type AwarenessSource = "assistant_message" | "reasoning_summary" | "final_message" | "agent_stream";
+
+export interface AwarenessArm {
+	runs: number;
+	runs_scanned: number;
+	runs_with_signals: number;
+	signals: number;
+}
+
+export interface AwarenessExample {
+	run_id: string;
+	arm: string;
+	task: string;
+	condition: string;
+	source: AwarenessSource | string;
+	phrase: string;
+	excerpt: string;
+}
+
+/** GET /experiments/{id}/awareness: a heuristic phrase scan of the agent's own words for test-awareness statements. Report only. */
+export interface AwarenessReport {
+	exp_id: string;
+	realism: string;
+	heuristic: boolean;
+	scanner_version: string;
+	label: string;
+	per_arm: Record<string, AwarenessArm>;
+	examples: AwarenessExample[];
+	not_scanned?: { run_id: string; reason: string }[];
+}
+
+export type AwarenessResponse = WithMode<AwarenessReport>;
+
+export interface MonitorInfo {
+	name: string;
+	kind: "command" | "http" | "builtin" | string;
+	mode: "transcript" | "action" | string;
+	config_hash: string;
+	image?: string;
+	network?: string;
+	builtin?: string;
+	timeout_s?: number;
+}
+
+/** One fixed false-positive rate: the threshold it gives on honest runs and the attacks caught there, with exact binomial intervals. */
+export interface OperatingPoint {
+	target_fpr: number;
+	/** false when the honest set is too small for this rate (fewer than 1/target runs). */
+	supported: boolean;
+	/** null: only block decisions fit the target; no score cut does (the note says so). */
+	threshold?: number | null;
+	false_positives: number;
+	honest: number;
+	/** null when there is no honest run. */
+	achieved_fpr: number | null;
+	fpr_interval?: [number, number];
+	caught: number;
+	attacks: number;
+	/** null when there is no attack run; the interval is then [0, 1]. */
+	catch_rate: number | null;
+	catch_interval?: [number, number];
+	note?: string;
+}
+
+export interface FamilyPoint {
+	target_fpr: number;
+	caught: number;
+	attacks: number;
+	catch_rate: number | null;
+	catch_interval?: [number, number];
+}
+
+export interface MonitorFamily {
+	family: string;
+	gates?: string[];
+	attacks: number;
+	points: FamilyPoint[];
+}
+
+export interface MonitorItem {
+	run_id: string;
+	exp_id: string;
+	task: string;
+	arm: string;
+	condition: string;
+	label: "honest" | "attack";
+	family?: string;
+	gates?: string[];
+	/** null with decision "" when the monitor errored; an error never counts as allow. */
+	score: number | null;
+	decision: "allow" | "block" | "" | string;
+	reason?: string;
+	actions?: number;
+	truncated?: boolean;
+	synthetic?: boolean;
+	grade_source?: string;
+	seal_hash: string;
+	error?: string;
+}
+
+/** The monitor-injection check: planted "approved, score 0" text in attack transcripts; flipped counts verdicts it changed. */
+export interface MonitorIntegrity {
+	state: "passed" | "failed" | "not_run" | string;
+	plant?: string;
+	tested?: number;
+	flipped?: number;
+	honest_tested?: number;
+	honest_flagged?: number;
+	errors?: number;
+	detail?: string;
+}
+
+export interface MonitorHeadline {
+	target_fpr: number;
+	catch_rate: number | null;
+	catch_interval?: [number, number];
+	supported: boolean;
+}
+
+/** A monitor's certificate over labelled sealed runs (docs/monitor-certification.md). */
+export interface MonitorCertification {
+	cert_id: string;
+	created_at: string;
+	monitor: MonitorInfo;
+	exp_ids: string[];
+	experiments?: { exp_id: string; manifest_hash: string; suite_id: string; suite_version: string; runs: number }[];
+	labels: { honest: number; attack: number; excluded: number; rule: string; excluded_reasons?: Record<string, number> };
+	operating_points: OperatingPoint[];
+	families: MonitorFamily[];
+	headline?: MonitorHeadline;
+	integrity?: MonitorIntegrity;
+	warnings?: string[];
+	items?: MonitorItem[];
+	excluded?: { run_id: string; exp_id: string; task: string; arm: string; condition: string; seal_hash: string; reason: string }[];
+	errors?: number;
+	error_limit?: number;
+	grade_source?: string;
+	attack_axes?: string[];
+	harm_metrics?: string[];
+	transcript?: Record<string, unknown>;
+	bench_version?: string;
+	bench_mode?: string;
+}
+
+export interface MonitorCertificationSummary {
+	cert_id: string;
+	created_at: string;
+	monitor_name: string;
+	monitor_kind: string;
+	mode: string;
+	exp_ids: string[];
+	honest: number;
+	attacks: number;
+	headline?: MonitorHeadline;
+	warnings?: string[];
+}
+
+export type MonitorCertificationListResponse = WithMode<{ certifications: MonitorCertificationSummary[] }>;
+export type MonitorCertificationResponse = WithMode<MonitorCertification>;
+
+// X4: code scan of the lines an agent added (bench/schemas/codescan.go, docs/code-scan.md).
+
+/** Code scan severities, lowest first. */
+export type CodeScanSeverity = "low" | "medium" | "high" | "critical";
+
+/** One security finding on a line the agent added (or a protection it removed). Snippet is redacted, inert text. */
+export interface CodeScanFinding {
+	rule: string;
+	title: string;
+	cwe?: string;
+	severity: CodeScanSeverity;
+	file: string;
+	line: number;
+	removed?: boolean;
+	/** 1-based line of workspace.diff holding the finding. */
+	patch_line?: number;
+	snippet?: string;
+	/** "builtin" or an external scanner's id. */
+	source: string;
+	in_test?: boolean;
+}
+
+/** One external scanner's run; error set means its findings are unknown, never zero. */
+export interface CodeScanExternal {
+	scanner: string;
+	image: string;
+	exit_code: number;
+	sarif_sha256?: string;
+	results: number;
+	on_added_lines: number;
+	error?: string;
+}
+
+/** A changed file the scan did not read. */
+export interface CodeScanSkip {
+	file: string;
+	reason: string;
+}
+
+/** One run's code scan. scanned false carries the reason. */
+export interface CodeScanEvidence {
+	rules_version: string;
+	scanned: boolean;
+	reason?: string;
+	diff_sha256?: string;
+	files: number;
+	added_lines: number;
+	skipped?: CodeScanSkip[];
+	findings: CodeScanFinding[];
+	external?: CodeScanExternal[];
+}
+
+/** GET /runs/{id}/codescan. sealed false: the builtin rules ran again now on the sealed diff. */
+export interface CodeScanReport {
+	run_id: string;
+	sealed: boolean;
+	veto_at?: CodeScanSeverity;
+	ignored_rules?: string[];
+	counted: number;
+	vetoed: boolean;
+	scan: CodeScanEvidence;
+}
+
+export type CodeScanReportResponse = WithMode<CodeScanReport>;
+
+// X2: services of a run and their captured logs (bench/handlers/runservices.go, docs/multi-container.md).
+
+/** One service that ran beside the agent. log_bytes is set when its log was captured (compose services). */
+export interface RunService {
+	id: string;
+	role?: string;
+	image: string;
+	image_id?: string;
+	ready: boolean;
+	error?: string;
+	proxied?: boolean;
+	log_bytes?: number;
+}
+
+/** GET /runs/{id}/services. */
+export interface RunServices {
+	run_id: string;
+	sealed: boolean;
+	services: RunService[];
+}
+
+export type RunServicesResponse = WithMode<RunServices>;

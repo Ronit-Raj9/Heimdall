@@ -154,6 +154,12 @@ type StepRecord struct {
 	// ModelSwitch (W9) marks a model_turn row answered by another model than
 	// the previous answered turn: "<previous> to <this>", from Bifrost rows.
 	ModelSwitch string `json:"model_switch,omitempty"`
+	// AgentID is the agent of a multi-agent run the row belongs to, and
+	// AgentSource how that is known (agents.go: gateway_key, header,
+	// transcript, otlp, self_report). Both are empty in a single-agent run
+	// and on a row no source could place.
+	AgentID     string `json:"agent_id,omitempty"`
+	AgentSource string `json:"agent_source,omitempty"`
 }
 
 // Proof classes of a requested tool call: the strongest witness of its

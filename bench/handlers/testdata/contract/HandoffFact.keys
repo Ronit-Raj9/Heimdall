@@ -1,0 +1,4 @@
+# Keys of bench.ts `HandoffFact` (handlers/runagents.go), in AgentHandoff.facts.
+fact
+sent
+delivered

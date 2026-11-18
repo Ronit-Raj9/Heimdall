@@ -21,6 +21,7 @@ const taskUsage = `usage: bifrost-bench task init -suite <suite> -id <task> -rep
            [-kind bugfix|feature|refactor|performance] [-force] [-config deploy/bench.yaml]
        bifrost-bench task init -suite <suite> -id <task> [-kind tool-use|mcp|browser|memory|qa|artifact|external-api|computer-use|research] [-from <task>] [-visual]
            [-license <spdx|proprietary>] [-force] [-config deploy/bench.yaml]
+       bifrost-bench task init -suite <suite> -id <task> -from-compose <docker-compose.yaml> [-license <spdx|proprietary>] [-force] [-config deploy/bench.yaml]
        bifrost-bench task validate [-config deploy/bench.yaml] <suite>/<task>
        bifrost-bench task admit [-config deploy/bench.yaml] <suite>/<task>
        bifrost-bench task from-trace -suite <suite> -id <task> -trace <file> [-kind qa|tool-use|mcp|memory] [-redact=false]
@@ -69,7 +70,11 @@ func runTaskInit(args []string) int {
 	from := fs.String("from", "", "scenario suites: task whose shape is copied (default: the suite's first task)")
 	force := fs.Bool("force", false, "replace an existing task folder")
 	visualOut := fs.Bool("visual", false, "browser, computer-use and artifact tasks: add output.visual and move the suite to grader visual (X1, docs/visual-grading.md)")
+	fromCompose := fs.String("from-compose", "", "a team's docker compose file: copy its folder into the task and map it (docs/multi-container.md)") // X2 (taskcompose.go)
 	pos, err := parseArgs(fs, args)
+	if err == nil && *fromCompose != "" { // X2: a task from a compose file (taskcompose.go)
+		return runTaskInitCompose(fs, pos, *config, *suiteID, *id, *fromCompose, *license, *force)
+	}
 	if err == nil && len(pos) == 0 && *suiteID != "" && *id != "" && (*repo == "" || scaffold.IsScenarioTemplate(*kind)) {
 		if *repo != "" || *base != "" || *ref != "" {
 			return fail("-kind %s scaffolds from the suite's sample task; leave out -repo, -base and -reference", *kind)

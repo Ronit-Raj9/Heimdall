@@ -64,6 +64,10 @@ type Deps struct {
 	Health taskhealth.Source
 	Jobs   handlers.JobsAPI      // Jobs area (P4): the job API in local mode; hosted mode serves it as a platform area (handlers/jobs.go)
 	Ready  []handlers.ReadyCheck // Deploy area: /readyz checks (database, migrations, runs root); /healthz needs none (handlers/readiness.go)
+	// Eval integrity area (S2): compliance packs for GET /experiments/{id}/compliance; nil answers 503 (handlers/compliance.go).
+	Compliance handlers.ComplianceSource
+	// Eval integrity area (S2): stored monitor certificates for GET /monitors/certifications; nil answers 503 (handlers/monitorcert.go).
+	MonitorCerts handlers.MonitorCertSource
 	// UI is the built UI with index.html at its root, for example
 	// fs.Sub(ui.Dist, "dist"). Nil serves the API only.
 	UI      fs.FS
@@ -195,6 +199,11 @@ func registerOrgRoutes(r *router.Router, cfg *lib.Config, deps Deps, write lib.M
 	handlers.NewExportHandler(mode, deps.Export).RegisterRoutes(r, common...) // W10 export (handlers/export.go, docs/export.md)
 	// X6 live scoring: GET /livescore, /livescore/sessions, /livescore/compare, POST /livescore/pull (handlers/livescore.go, docs/live-scoring.md).
 	handlers.NewLivescoreHandler(mode, deps.Livescore, write).RegisterRoutes(r, common...)
+	// Eval integrity area (S2): eval awareness scan (handlers/awareness.go).
+	handlers.NewAwarenessHandler(mode, deps.Index).RegisterRoutes(r, common...)
+	handlers.NewComplianceHandler(mode, deps.Compliance).RegisterRoutes(r, common...) // Eval integrity area (S2): compliance pack (handlers/compliance.go)
+	// Eval integrity area (S2): monitor certification (handlers/monitorcert.go).
+	handlers.NewMonitorCertHandler(mode, deps.MonitorCerts).RegisterRoutes(r, common...)
 	return experiments
 }
 

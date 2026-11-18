@@ -1,0 +1,18 @@
+# Noop control: changes nothing and exits 0, so no model or kernel is
+# written and every task must fail. Scripted adapter: argv, env and files
+# come from the adapter, not this file.
+id: noop
+adapter: scripted
+image: heimdall-example/acme-gpu-cuda:1
+scripted:
+  kind: noop
+model: claude-sonnet-4-5
+notes:
+  project_file: CLAUDE.md
+budgets:
+  wall_s: 900
+  cpus: 2
+  mem_gb: 6
+gateway:
+  provider: anthropic
+  max_retries: 0

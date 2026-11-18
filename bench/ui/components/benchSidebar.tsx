@@ -18,6 +18,7 @@ const GROUP_OF: Record<string, GroupId> = {
 	"/matrix": "results",
 	"/agents/diff": "results",
 	"/releases": "results",
+	"/monitors": "results", // Eval integrity area (S2)
 	"/runs": "runs",
 	"/receipts": "runs",
 	"/triage": "runs",
@@ -39,6 +40,7 @@ const ORDER = [
 	"/matrix",
 	"/agents/diff",
 	"/releases",
+	"/monitors",
 	"/runs",
 	"/receipts",
 	"/triage",

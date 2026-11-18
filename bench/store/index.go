@@ -44,6 +44,7 @@ var runFileAllowlist = map[string]bool{
 	"transitions.jsonl":      true,
 	"adapter.fault.json":     true,
 	"adapter.fault.jsonl":    true,
+	"realism.json":           true, // Eval integrity area (S2): a neutral run's realism record (environments/realism.go)
 }
 
 // SealedRuns loads every counted, sealed run of an experiment for analysis,
@@ -295,7 +296,20 @@ func runFileAllowed(name string) bool {
 		n := strings.TrimSuffix(strings.TrimPrefix(name, "agent.stderr."), ".txt")
 		return positiveSessionIndex(n)
 	}
+	if id, ok := strings.CutPrefix(name, "services/"); ok && strings.HasSuffix(id, ".log") { // X2: a compose service's log (environments/compose.go)
+		return serviceLogID(strings.TrimSuffix(id, ".log"))
+	}
 	return false
+}
+
+// serviceLogID reports whether id is one host-name label (lower-case
+// letters, digits and inner '-', at most 63), the service ids of
+// services/<id>.log (X2). It is pure.
+func serviceLogID(id string) bool {
+	if id == "" || len(id) > 63 || id[0] == '-' || id[len(id)-1] == '-' {
+		return false
+	}
+	return strings.Trim(id, "abcdefghijklmnopqrstuvwxyz0123456789-") == ""
 }
 
 func positiveSessionIndex(s string) bool {

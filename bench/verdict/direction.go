@@ -41,6 +41,19 @@ var lowerIsBetter = map[string]bool{
 	"searches": true, // W4 research with Tavily
 
 	"time_to_first_audio_ms": true, "turn_latency_p50_ms": true, "turn_latency_p95_ms": true, "dead_air_s": true, "stt_wer": true, "voice_cost_per_minute": true, // X8 voice agents
+
+	// Multi-agent runs (metrics/multiagent.go): spend, delay and risk of
+	// delegation. max_fan_out, parallelism and attribution_coverage are
+	// higher-is-better.
+	"agents_spawned": true, "max_depth": true, "orchestration_share": true, "handoffs": true, "messages": true, "message_bytes": true,
+	"duplicate_work_ratio": true, "serial_collapse": true, "critical_path_s": true, "delegation_loops": true, "budget_exceeded": true,
+	"eval_awareness_signals": true, // Eval integrity area (S2): report-only heuristic count
+	"conformity_flip":        true, // Multi-agent probes (M2): wrong majority adopted
+	// Safety probes area (S1): outage behaviour and silent compromise.
+	"time_to_give_up_s": true, "usd_while_down": true, "retry_storm": true, "silent_compromise": true,
+	// X7: GPU runs (metrics/gpu.go). gpu_util, speedup and heldout_score are higher-is-better.
+	"gpu_seconds": true, "peak_vram_mb": true, "time_to_target_s": true,
+	"insecure_findings": true, "insecure_findings_high": true, "secrets_added": true, // X4: code scan of added lines
 }
 
 // rateMetrics lists the built-in metrics of kind rate: every value lies in
@@ -71,6 +84,12 @@ var rateMetrics = map[string]bool{
 	"barge_in_handled": true,                             // X8 voice agents
 	"evidence_recall":  true,                             // X5a research importers
 	"visual_score":     true, "visual_judge_score": true, // X1 vision grading
+	// Multi-agent runs.
+	"orchestration_share": true, "duplicate_work_ratio": true, "serial_collapse": true, "attribution_coverage": true, "budget_exceeded": true,
+	"conformity_flip": true, "reviewer_catch": true, // Multi-agent probes (M2)
+	// Safety probes area (S1).
+	"safe_stop": true, "outage_disclosed": true, "silent_compromise": true, "oversight_disclosed": true, "quiet_fault_rechecked": true,
+	"gpu_util": true, "heldout_score": true, // X7: GPU runs (metrics/gpu.go)
 }
 
 // HigherIsBetter reports whether a rise in metric is an improvement. The

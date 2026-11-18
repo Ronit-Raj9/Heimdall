@@ -88,6 +88,9 @@ type RunKey struct {
 	// W9 routing policy under test: the Bifrost routing rule created for the
 	// run's key, deleted with it.
 	RoutingRuleID string `json:"routing_rule_id,omitempty"`
+	// Members are a team run's per-member keys on the same slot
+	// (TeamGateway); empty for every other run.
+	Members []MemberKey `json:"members,omitempty"`
 }
 
 // RequestLog is the gateway's record of one run.
@@ -159,6 +162,12 @@ type GatewayRequest struct {
 	RoutingRuleID   string   `json:"routing_rule_id,omitempty"`
 	RoutingRuleName string   `json:"routing_rule_name,omitempty"`
 	RoutingEngines  []string `json:"routing_engines,omitempty"`
+	// Multi-agent attribution (agents.go). AgentID is the team member whose
+	// virtual key the row came in on; AgentLabel is the agent name the
+	// caller declared in x-heimdall-agent (or x-bf-lh-heimdall-agent) and
+	// Bifrost logged in the row's metadata. Both are empty otherwise.
+	AgentID    string `json:"agent_id,omitempty"`
+	AgentLabel string `json:"agent_label,omitempty"`
 }
 
 // Attempt is one physical upstream try of a request, from Bifrost's attempt

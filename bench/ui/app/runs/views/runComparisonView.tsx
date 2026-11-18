@@ -15,6 +15,10 @@ import { RunScenarioEvidence } from "@/components/runs/runScenario";
 import { TraceQualityDetails } from "@/components/runs/traceQuality";
 import { TraceDownloadLink } from "@/components/runs/runTraceLink";
 import { RunStepTimeline } from "@/components/runs/stepTimeline";
+import { RunAgentsPanel } from "@/components/runs/agents/agentsSection";
+import { RunCodeScanPanel } from "@/components/codescan/codeScanPanel"; // X4
+import { ServiceLogsSection } from "@/components/services/serviceLogs"; // X2
+import { HardwarePanel } from "@/components/gpu/hardwarePanel"; // X7
 import { indexEvents, stripMetricKinds } from "@/components/runs/runs.utils";
 import { BlockSkeleton, EmptyNote, LoadError, Section } from "@/components/runs/screenStates";
 import { hasScenarioEvidence } from "@/components/scenario/scenario.utils";
@@ -205,7 +209,25 @@ function PairComparison({ pairId, onClear }: { pairId: string; onClear: () => vo
 							<RunVisualPanel runId={lane.pairRun.run.run_id} />
 							{/* X8 voice agents */}
 							<RunVoicePanel runId={lane.pairRun.run.run_id} />
+							<HardwarePanel hardware={lane.pairRun.run.hardware} arm={lane.pairRun.arm} /> {/* X7: the GPUs a GPU run held */}
 							<RunStepTimeline runId={lane.pairRun.run.run_id} arm={lane.pairRun.arm} />
+						</TabsContent>
+					))}
+				</Tabs>
+			</Section>
+
+			<Section title={t("runs.agents.title")} description={t("runs.agents.description")} testId="runs-agents-section">
+				<Tabs defaultValue={lanes[0].pairRun.arm}>
+					<TabsList>
+						{lanes.map((lane) => (
+							<TabsTrigger key={lane.pairRun.arm} value={lane.pairRun.arm} data-testid={`runs-agents-tab-${lane.pairRun.arm}`}>
+								{t("runs.arm", { arm: lane.pairRun.arm })}
+							</TabsTrigger>
+						))}
+					</TabsList>
+					{lanes.map((lane) => (
+						<TabsContent key={lane.pairRun.arm} value={lane.pairRun.arm}>
+							<RunAgentsPanel runId={lane.pairRun.run.run_id} arm={lane.pairRun.arm} />
 						</TabsContent>
 					))}
 				</Tabs>
@@ -223,6 +245,24 @@ function PairComparison({ pairId, onClear }: { pairId: string; onClear: () => vo
 					{lanes.map((lane) => (
 						<TabsContent key={lane.pairRun.arm} value={lane.pairRun.arm}>
 							<DiffBlock lane={lane} />
+						</TabsContent>
+					))}
+				</Tabs>
+			</Section>
+
+			{/* X4: security findings on the lines each arm's agent added, annotated in place. */}
+			<Section title={t("codescan.title")} description={t("codescan.description")} testId="runs-codescan-section">
+				<Tabs defaultValue={lanes[0].pairRun.arm}>
+					<TabsList>
+						{lanes.map((lane) => (
+							<TabsTrigger key={lane.pairRun.arm} value={lane.pairRun.arm} data-testid={`runs-codescan-tab-${lane.pairRun.arm}`}>
+								{t("runs.arm", { arm: lane.pairRun.arm })}
+							</TabsTrigger>
+						))}
+					</TabsList>
+					{lanes.map((lane) => (
+						<TabsContent key={lane.pairRun.arm} value={lane.pairRun.arm}>
+							<RunCodeScanPanel runId={lane.pairRun.run.run_id} arm={lane.pairRun.arm} />
 						</TabsContent>
 					))}
 				</Tabs>
@@ -246,6 +286,13 @@ function PairComparison({ pairId, onClear }: { pairId: string; onClear: () => vo
 					</Tabs>
 				</Section>
 			)}
+
+			{/* X2: the services beside each arm's agent and the compose services' captured logs. */}
+			<ServiceLogsSection
+				runs={lanes
+					.filter((lane) => lane.detail.data?.services?.length)
+					.map((lane) => ({ arm: lane.pairRun.arm, runId: lane.pairRun.run.run_id }))}
+			/>
 		</div>
 	);
 }

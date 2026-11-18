@@ -190,12 +190,30 @@ class AgentConfig(_AgentConfigRequired, total=False):
     capabilities: Optional[AdapterCapabilities]
     files: Dict[str, str]
     image_digest: str
+    limits: Optional[AgentLimits]
     mcp: Optional[AgentMCP]
     memory: Optional[AgentMemory]
     parser: str
     remote: Optional[RemoteAgent]
     scripted: Optional[ScriptedSpec]
     skills: Optional[AgentSkills]
+    team: List[TeamMember]
+    topology: str
+
+
+class _AgentCoverageRequired(TypedDict):
+    attributed: int
+    steps: int
+    unknown: int
+
+
+class AgentCoverage(_AgentCoverageRequired, total=False):
+    available: List[str]
+    by_source: Dict[str, int]
+    by_strength: Dict[str, int]
+
+
+AgentEdge = TypedDict('AgentEdge', {'at': "str", 'from': "str", 'kind': "str", 'payload_sha256': "str", 'ref': "str", 'size': "int", 'source': "str", 'strength': "str", 'to': "str"}, total=False)
 
 
 class _AgentEventStatusRequired(TypedDict):
@@ -211,6 +229,15 @@ class AgentEventStatus(_AgentEventStatusRequired, total=False):
     reason: str
 
 
+AgentHandoff = TypedDict('AgentHandoff', {'altered': "bool", 'at': "str", 'at_ms': "Optional[int]", 'bytes': "int", 'delivered': "str", 'facts': "List[HandoffFact]", 'from': "str", 'index': "int", 'kind': "str", 'payload_sha256': "str", 'ref': "str", 'sent': "str", 'source': "str", 'to': "str"}, total=False)
+
+
+class AgentLimits(TypedDict, total=False):
+    max_agents: int
+    max_concurrent: int
+    max_depth: int
+
+
 class AgentList(TypedDict):
     agents: List[AgentSummary]
 
@@ -222,6 +249,30 @@ class AgentMCP(TypedDict, total=False):
 
 class AgentMemory(TypedDict, total=False):
     paths: List[str]
+
+
+class _AgentNodeRequired(TypedDict):
+    depth: int
+    id: str
+    source: str
+    strength: str
+
+
+class AgentNode(_AgentNodeRequired, total=False):
+    budget_usd: float
+    container: str
+    ended: str
+    exit: str
+    exit_code: Optional[int]
+    key_id: str
+    model: str
+    name: str
+    parent_id: str
+    role: str
+    sources: List[str]
+    spawn_event_id: str
+    spawn_tool_call_id: str
+    started: str
 
 
 class _AgentNotesRequired(TypedDict):
@@ -237,6 +288,43 @@ class AgentSkills(TypedDict, total=False):
     dir: str
     enabled: Optional[bool]
     extra: List[str]
+
+
+class _AgentSpanRequired(TypedDict):
+    agent_id: str
+    end_ms: int
+    kind: str
+    label: str
+    seq: int
+    start_ms: int
+
+
+class AgentSpan(_AgentSpanRequired, total=False):
+    critical: bool
+    is_error: bool
+
+
+class _AgentStatsRequired(TypedDict):
+    agent_id: str
+    busy_ms: int
+    cost_usd: Optional[float]
+    depth: int
+    input_tokens: Optional[int]
+    messages_received: int
+    messages_sent: int
+    model_turns: int
+    output_tokens: Optional[int]
+    source: str
+    steps: int
+    strength: str
+    tool_calls: int
+
+
+class AgentStats(_AgentStatsRequired, total=False):
+    exit: str
+    model: str
+    parent_id: str
+    role: str
 
 
 class _AgentSummaryRequired(TypedDict):
@@ -263,6 +351,18 @@ class _AgentSummaryRequired(TypedDict):
 class AgentSummary(_AgentSummaryRequired, total=False):
     error: str
     reports_events: str
+
+
+class _AgentTreeRequired(TypedDict):
+    agents: List[AgentNode]
+    coverage: AgentCoverage
+    shape: str
+    version: str
+
+
+class AgentTree(_AgentTreeRequired, total=False):
+    edges: List[AgentEdge]
+    notes: List[str]
 
 
 class AlignedStep(TypedDict):
@@ -490,6 +590,12 @@ class AttemptRecord(_AttemptRecordRequired, total=False):
     status: str
 
 
+class AttributionSpec(TypedDict, total=False):
+    max_replays: int
+    replay: bool
+    stub: str
+
+
 class _AudioRefRequired(TypedDict):
     sha256: str
 
@@ -524,6 +630,39 @@ class _AuthInfoRequired(TypedDict):
 class AuthInfo(_AuthInfoRequired, total=False):
     bootstrap: bool
     signup: str
+
+
+class AwarenessArm(TypedDict):
+    runs: int
+    runs_scanned: int
+    runs_with_signals: int
+    signals: int
+
+
+class AwarenessExample(TypedDict):
+    arm: str
+    condition: str
+    excerpt: str
+    phrase: str
+    run_id: str
+    source: str
+    task: str
+
+
+class AwarenessNotScanned(TypedDict):
+    reason: str
+    run_id: str
+
+
+class AwarenessReport(TypedDict):
+    examples: List[AwarenessExample]
+    exp_id: str
+    heuristic: bool
+    label: str
+    not_scanned: List[AwarenessNotScanned]
+    per_arm: Dict[str, AwarenessArm]
+    realism: str
+    scanner_version: str
 
 
 class BargeIn(TypedDict):
@@ -572,6 +711,33 @@ class _BiasAdjustedRateRequired(TypedDict):
 
 class BiasAdjustedRate(_BiasAdjustedRateRequired, total=False):
     note: str
+
+
+class _BlameRequired(TypedDict):
+    detail: str
+    failed: bool
+    outcome: str
+    run_id: str
+    tier: str
+    version: str
+
+
+class Blame(_BlameRequired, total=False):
+    agent_id: str
+    agent_source: str
+    at: str
+    candidates: List[Candidate]
+    coverage: Optional[AgentCoverage]
+    evidence: List[str]
+    exp_id: str
+    gate: str
+    notes: List[str]
+    parent_seal: str
+    replay: Optional[Replay]
+    role: str
+    step_seq: int
+    strength: str
+    unplaced: List[str]
 
 
 class Budget(TypedDict):
@@ -783,6 +949,20 @@ class CalibrationStatus(_CalibrationStatusRequired, total=False):
     set_sha256: str
 
 
+class _CandidateRequired(TypedDict):
+    agent_id: str
+    effect: str
+    gate: str
+    ref: str
+
+
+class Candidate(_CandidateRequired, total=False):
+    agent_source: str
+    at: str
+    role: str
+    step_seq: int
+
+
 class _CanonicalArmIdentityRequired(TypedDict):
     agent_config_hash: str
     agent_config_id: str
@@ -956,6 +1136,74 @@ class ClusterRef_migration(TypedDict):
     title: str
 
 
+class _CodeScanEvidenceRequired(TypedDict):
+    added_lines: int
+    files: int
+    findings: List[CodeScanFinding]
+    rules_version: str
+    scanned: bool
+
+
+class CodeScanEvidence(_CodeScanEvidenceRequired, total=False):
+    diff_sha256: str
+    external: List[CodeScanExternal]
+    reason: str
+    skipped: List[CodeScanSkip]
+
+
+class _CodeScanExternalRequired(TypedDict):
+    exit_code: int
+    image: str
+    on_added_lines: int
+    results: int
+    scanner: str
+
+
+class CodeScanExternal(_CodeScanExternalRequired, total=False):
+    error: str
+    sarif_sha256: str
+
+
+class _CodeScanFindingRequired(TypedDict):
+    file: str
+    line: int
+    rule: str
+    severity: str
+    source: str
+    title: str
+
+
+class CodeScanFinding(_CodeScanFindingRequired, total=False):
+    cwe: str
+    in_test: bool
+    patch_line: int
+    removed: bool
+    snippet: str
+
+
+class CodeScanPolicy(TypedDict, total=False):
+    ignore: List[str]
+    veto_at: str
+
+
+class _CodeScanReportRequired(TypedDict):
+    counted: int
+    run_id: str
+    scan: Optional[CodeScanEvidence]
+    sealed: bool
+    vetoed: bool
+
+
+class CodeScanReport(_CodeScanReportRequired, total=False):
+    ignored_rules: List[str]
+    veto_at: str
+
+
+class CodeScanSkip(TypedDict):
+    file: str
+    reason: str
+
+
 class Comparison(TypedDict):
     alpha: float
     family: int
@@ -991,6 +1239,176 @@ class CompatibilitySpec(TypedDict):
     conditions: List[str]
     tasks: Any
     trials: int
+
+
+class ComplianceArtifact(TypedDict):
+    file: str
+    holds: str
+    sealed: bool
+
+
+class _ComplianceEvidenceRequired(TypedDict):
+    arm: str
+    condition: str
+    exp_id: str
+    path: str
+    run_id: str
+    seal_hash: str
+    task: str
+    trial: int
+
+
+class ComplianceEvidence(_ComplianceEvidenceRequired, total=False):
+    fired: bool
+    outcome: str
+
+
+class _ComplianceExperimentRequired(TypedDict):
+    arms: List[str]
+    chain_status: str
+    conditions: List[str]
+    counted_runs: int
+    exp_id: str
+    frozen_at: str
+    manifest_hash: str
+    path: str
+    runs_verified: int
+    suite: str
+
+
+class ComplianceExperiment(_ComplianceExperimentRequired, total=False):
+    action: str
+    analysis_id: str
+    chain_detail: str
+    decision: str
+    grade_source: str
+    mode: str
+    name: str
+    realism: str
+    run_problems: List[str]
+    seals_log_tail: str
+    suite_lock_hash: str
+    suite_version: str
+
+
+class ComplianceFramework(TypedDict):
+    framework: str
+    id: str
+    name: str
+    source: str
+    verified: bool
+
+
+class ComplianceFunction(TypedDict):
+    evidence: str
+    gap: str
+    id: str
+    name: str
+    source: str
+    verified: bool
+
+
+class _ComplianceMappingRequired(TypedDict):
+    framework: str
+    id: str
+    name: str
+    source: str
+    verified: bool
+
+
+class ComplianceMapping(_ComplianceMappingRequired, total=False):
+    note: str
+
+
+class _CompliancePackRequired(TypedDict):
+    experiments: List[ComplianceExperiment]
+    frameworks: List[ComplianceFramework]
+    generated_at: str
+    generator: str
+    nist_functions: List[ComplianceFunction]
+    not_certified: List[str]
+    record_keeping: ComplianceRecordKeeping
+    tests: List[ComplianceTest]
+    version: str
+
+
+class CompliancePack(_CompliancePackRequired, total=False):
+    release: Optional[ComplianceRelease]
+    unmapped: List[str]
+    warnings: List[str]
+
+
+class ComplianceRecordKeeping(TypedDict):
+    articles: List[ComplianceMapping]
+    external_anchor: bool
+    location: str
+    notes: List[str]
+    retained: List[ComplianceArtifact]
+    retention: str
+
+
+class _ComplianceReleaseRequired(TypedDict):
+    action: str
+    analysis_id: str
+    approver: str
+    created_at: str
+    decision: str
+    exp_id: str
+    hash: str
+    release_id: str
+    seals_digest: str
+
+
+class ComplianceRelease(_ComplianceReleaseRequired, total=False):
+    evidence_sha256: str
+    override: str
+
+
+class _ComplianceTestRequired(TypedDict):
+    evidence: List[ComplianceEvidence]
+    exp_ids: List[str]
+    fired: int
+    id: str
+    kind: str
+    mapped_by: str
+    mappings: List[ComplianceMapping]
+    name: str
+    runs: int
+    title: str
+
+
+class ComplianceTest(_ComplianceTestRequired, total=False):
+    axis: str
+    effect: str
+    family: str
+
+
+class _ComposeServiceRequired(TypedDict):
+    name: str
+
+
+class ComposeService(_ComposeServiceRequired, total=False):
+    aliases: List[str]
+    cpus: float
+    entrypoint: List[str]
+    entrypoint_set: bool
+    memory_bytes: int
+    pids: int
+    run_once: bool
+    tmpfs: List[str]
+    user: str
+    verifier: bool
+    volumes: List[ComposeVolume]
+    workdir: str
+
+
+class _ComposeVolumeRequired(TypedDict):
+    name: str
+    target: str
+
+
+class ComposeVolume(_ComposeVolumeRequired, total=False):
+    read_only: bool
 
 
 class ConditionDiff(TypedDict):
@@ -1201,6 +1619,10 @@ class Endpoint(TypedDict):
     metric: str
 
 
+class EnvironmentChoice(TypedDict):
+    driver: str
+
+
 class Equivalence(TypedDict):
     arm_a: str
     arm_b: str
@@ -1244,6 +1666,10 @@ class _EventRequired(TypedDict):
 
 
 class Event(_EventRequired, total=False):
+    agent_id: str
+    agent_name: str
+    agent_role: str
+    agent_target: str
     args_hash: str
     attempt_id: str
     attempt_no: Optional[int]
@@ -1322,15 +1748,22 @@ class _ExperimentRequired(TypedDict):
 
 
 class Experiment(_ExperimentRequired, total=False):
+    aa: bool
+    attribution: Optional[AttributionSpec]
+    codescan: Optional[CodeScanPolicy]
     compatibility: Optional[CompatibilitySpec]
+    environment: Optional[EnvironmentChoice]
     extends: Optional[ExtendsRef]
     external: str
     extra_gates: List[str]
+    fairness: str
     matrix: Optional[MatrixSpec]
     metrics: List[str]
     policy: str
+    realism: str
     requirements: CapabilityRequirements
     runner: Optional[RunnerSpec]
+    safety: str
     simulator: Optional[SimulatorSpec]
     smoke: bool
     tier: str
@@ -1406,6 +1839,20 @@ class _ExtensionRuleRequired(TypedDict):
 class ExtensionRule(_ExtensionRuleRequired, total=False):
     alpha_first: float
     weight_first: float
+
+
+class _FairnessReportRequired(TypedDict):
+    best_of_n_baseline: bool
+    caps_usd: Dict[str, float]
+    claim_allowed: bool
+    rule: str
+    single_agent_baseline: bool
+
+
+class FairnessReport(_FairnessReportRequired, total=False):
+    exceeded: List[str]
+    notes: List[str]
+    topologies: Dict[str, str]
 
 
 class _FallbackRecordRequired(TypedDict):
@@ -1522,6 +1969,35 @@ class _ForecastRangeRequired(TypedDict):
 
 class ForecastRange(_ForecastRangeRequired, total=False):
     reason: str
+
+
+class _GPUInfoRequired(TypedDict):
+    compute_cap: str
+    driver: str
+    index: int
+    memory_mb: int
+    name: str
+    uuid: str
+
+
+class GPUInfo(_GPUInfoRequired, total=False):
+    cuda_version: str
+
+
+class _GPUSamplerSummaryRequired(TypedDict):
+    agent_seconds: float
+    baseline_mb: float
+    gpu_seconds: float
+    interval_ms: int
+    mean_util_pct: float
+    peak_used_mb: float
+    peak_vram_mb: float
+    samples: int
+    sessions: int
+
+
+class GPUSamplerSummary(_GPUSamplerSummaryRequired, total=False):
+    error: str
 
 
 class GateChange(TypedDict):
@@ -1680,6 +2156,19 @@ class _GuardSpecRequired(TypedDict):
 class GuardSpec(_GuardSpecRequired, total=False):
     condition: str
     metric: str
+
+
+class HandoffFact(TypedDict):
+    delivered: bool
+    fact: str
+    sent: bool
+
+
+class HardwareRecord(TypedDict, total=False):
+    devices: List[str]
+    gpus: List[GPUInfo]
+    mode: str
+    sampler: Optional[GPUSamplerSummary]
 
 
 class Health(TypedDict):
@@ -2387,6 +2876,176 @@ class ModelSummary(TypedDict):
     wall_time_s: Value
 
 
+class MonitorCertExperiment(TypedDict):
+    exp_id: str
+    manifest_hash: str
+    runs: int
+    suite_id: str
+    suite_version: str
+
+
+class MonitorCertHeadline(TypedDict):
+    catch_interval: List[float]
+    catch_rate: Optional[float]
+    supported: bool
+    target_fpr: float
+
+
+class MonitorCertList(TypedDict):
+    certifications: List[MonitorCertSummary]
+
+
+class _MonitorCertMonitorRequired(TypedDict):
+    config_hash: str
+    kind: str
+    mode: str
+    name: str
+    network: str
+
+
+class MonitorCertMonitor(_MonitorCertMonitorRequired, total=False):
+    builtin: str
+    image: str
+    timeout_s: int
+
+
+class MonitorCertSummary(TypedDict):
+    attacks: int
+    cert_id: str
+    created_at: str
+    exp_ids: List[str]
+    headline: Optional[MonitorCertHeadline]
+    honest: int
+    mode: str
+    monitor_kind: str
+    monitor_name: str
+    warnings: List[str]
+
+
+class _MonitorCertificateRequired(TypedDict):
+    attack_axes: List[str]
+    cert_id: str
+    created_at: str
+    error_limit: float
+    errors: int
+    excluded: List[MonitorExcludedRun]
+    exp_ids: List[str]
+    experiments: List[MonitorCertExperiment]
+    families: List[MonitorFamily]
+    grade_source: str
+    harm_metrics: List[str]
+    integrity: MonitorInjectionCheck
+    items: List[MonitorItem]
+    labels: MonitorLabelSummary
+    monitor: MonitorCertMonitor
+    operating_points: List[MonitorOperatingPoint]
+    transcript: MonitorTranscriptLimits
+    warnings: List[str]
+
+
+class MonitorCertificate(_MonitorCertificateRequired, total=False):
+    bench_mode: str
+    bench_version: str
+    headline: Optional[MonitorCertHeadline]
+
+
+class _MonitorExcludedRunRequired(TypedDict):
+    arm: str
+    condition: str
+    exp_id: str
+    reason: str
+    run_id: str
+    task: str
+
+
+class MonitorExcludedRun(_MonitorExcludedRunRequired, total=False):
+    seal_hash: str
+
+
+class MonitorFamily(TypedDict):
+    attacks: int
+    family: str
+    gates: List[str]
+    points: List[MonitorFamilyPoint]
+
+
+class MonitorFamilyPoint(TypedDict):
+    attacks: int
+    catch_interval: List[float]
+    catch_rate: Optional[float]
+    caught: int
+    target_fpr: float
+
+
+class _MonitorInjectionCheckRequired(TypedDict):
+    detail: str
+    errors: int
+    flipped: int
+    honest_flagged: int
+    honest_tested: int
+    state: str
+    tested: int
+
+
+class MonitorInjectionCheck(_MonitorInjectionCheckRequired, total=False):
+    plant: str
+
+
+class _MonitorItemRequired(TypedDict):
+    actions: int
+    arm: str
+    condition: str
+    decision: str
+    error: str
+    exp_id: str
+    family: str
+    label: str
+    run_id: str
+    score: Optional[float]
+    seal_hash: str
+    task: str
+
+
+class MonitorItem(_MonitorItemRequired, total=False):
+    gates: List[str]
+    grade_source: str
+    reason: str
+    synthetic: bool
+    truncated: bool
+
+
+class MonitorLabelSummary(TypedDict):
+    attack: int
+    excluded: int
+    excluded_reasons: Dict[str, int]
+    honest: int
+    rule: str
+
+
+class MonitorOperatingPoint(TypedDict):
+    achieved_fpr: Optional[float]
+    attacks: int
+    catch_interval: List[float]
+    catch_rate: Optional[float]
+    caught: int
+    false_positives: int
+    fpr_interval: List[float]
+    honest: int
+    note: str
+    supported: bool
+    target_fpr: float
+    threshold: Optional[float]
+
+
+class MonitorTranscriptLimits(TypedDict):
+    actions_omitted_in: int
+    max_action_bytes: int
+    max_actions: int
+    max_final_message_bytes: int
+    max_instruction_bytes: int
+    truncated_runs: int
+
+
 class _MoreEvidenceRequired(TypedDict):
     combination: str
     cost_basis: str
@@ -2610,6 +3269,7 @@ class PrivacyView(TypedDict):
 
 class ProbeApply(TypedDict, total=False):
     adapter_fault: Optional[AdapterFaultRule]
+    agent: str
     fault: Optional[FaultPlan]
     markers: List[str]
     overlay: Optional[OverlaySpec]
@@ -2823,6 +3483,22 @@ class RemoteEvidence(_RemoteEvidenceRequired, total=False):
 
 
 RemoteReport = TypedDict('RemoteReport', {'artifacts': "List[str]", 'async': "bool", 'build': "str", 'cost_usd': "Optional[float]", 'events': "int", 'events_dropped': "int", 'input_tokens': "Optional[int]", 'model': "str", 'notes': "List[str]", 'output_tokens': "Optional[int]", 'total_tokens': "Optional[int]", 'version': "str"}, total=False)
+
+
+class _ReplayRequired(TypedDict):
+    outcome_before: str
+    status: str
+    stub: str
+    suspect: str
+
+
+class Replay(_ReplayRequired, total=False):
+    cost_usd: Optional[float]
+    detail: str
+    exp_id: str
+    gates_after: List[str]
+    outcome_after: str
+    run_id: str
 
 
 class Report(TypedDict):
@@ -3071,6 +3747,7 @@ class Run(_RunRequired, total=False):
     canonical_hash: str
     claim: Optional[Claim]
     failures: List[PartFailure]
+    hardware: Optional[HardwareRecord]
     run_input_hash: str
     task_hash: str
 
@@ -3101,6 +3778,23 @@ class RunAgentInfo(_RunAgentInfoRequired, total=False):
     trace_source: str
 
 
+class _RunAgentsRequired(TypedDict):
+    available: bool
+    busy_ms: int
+    critical_ms: int
+    handoffs: List[AgentHandoff]
+    members: List[AgentStats]
+    run_id: str
+    spans: List[AgentSpan]
+    wall_ms: int
+
+
+class RunAgents(_RunAgentsRequired, total=False):
+    blame: Optional[Blame]
+    tree: Optional[AgentTree]
+    truncated: bool
+
+
 class _RunDetailRequired(TypedDict):
     gates: List[GateResult]
     grade: Optional[Grade]
@@ -3115,6 +3809,7 @@ class _RunDetailRequired(TypedDict):
 
 class RunDetail(_RunDetailRequired, total=False):
     adapter_fault: Optional[AdapterFaultEvidence]
+    agents: Optional[AgentTree]
     answer: Optional[Answer]
     artifacts: List[ArtifactFile]
     canonical: Optional[CanonicalRun]
@@ -3272,6 +3967,26 @@ class RunRoutingRow(_RunRoutingRowRequired, total=False):
     parent_id: str
     routing_engines: List[str]
     routing_rule_name: str
+
+
+class _RunServiceRequired(TypedDict):
+    id: str
+    image: str
+    ready: bool
+
+
+class RunService(_RunServiceRequired, total=False):
+    error: str
+    image_id: str
+    log_bytes: Optional[int]
+    proxied: bool
+    role: str
+
+
+class RunServices(TypedDict):
+    run_id: str
+    sealed: bool
+    services: List[RunService]
 
 
 class _RunStepsRequired(TypedDict):
@@ -3455,6 +4170,7 @@ class _ServiceSpecRequired(TypedDict):
 class ServiceSpec(_ServiceSpecRequired, total=False):
     argv: List[str]
     build: Optional[ImageSpec]
+    compose: Optional[ComposeService]
     env: Dict[str, str]
     export: List[StateExport]
     files: Dict[str, str]
@@ -3724,6 +4440,8 @@ class _StepRecordRequired(TypedDict):
 
 
 class StepRecord(_StepRecordRequired, total=False):
+    agent_id: str
+    agent_source: str
     attempt: int
     channel: str
     conflict: str
@@ -3974,6 +4692,7 @@ class TaskEnvironment(TypedDict, total=False):
     build_network: bool
     context: str
     dockerfile: str
+    env: Dict[str, str]
     image: str
     user: str
     verifier_image: str
@@ -4037,6 +4756,20 @@ class TaskQuarantine(_TaskQuarantineRequired, total=False):
     task_version: str
 
 
+class _TeamMemberRequired(TypedDict):
+    id: str
+
+
+class TeamMember(_TeamMemberRequired, total=False):
+    agent: str
+    argv: List[str]
+    budget_usd: float
+    config: Optional[AgentConfig]
+    env: Dict[str, str]
+    model: str
+    role: str
+
+
 class TierPlan(TypedDict):
     name: str
     tasks: List[str]
@@ -4080,6 +4813,7 @@ class _ToolCallRequired(TypedDict):
 
 
 class ToolCall(_ToolCallRequired, total=False):
+    agent_id: str
     arguments: str
     blocked: bool
     content_type: str
@@ -4124,10 +4858,13 @@ class _ToolFaultRequired(TypedDict):
 
 
 class ToolFault(_ToolFaultRequired, total=False):
+    agent: str
     calls: int
     from_call: int
     message: str
     nonce: str
+    patch: Dict[str, Any]
+    rename: Dict[str, str]
     server: str
     text: str
     timeout_s: int
@@ -4208,6 +4945,22 @@ class Value(_ValueRequired, total=False):
     source: str
 
 
+class _VarianceCardRequired(TypedDict):
+    assumed_sd: float
+    detail: str
+    mde: float
+    sd: float
+    source: str
+
+
+class VarianceCard(_VarianceCardRequired, total=False):
+    aa_arm: str
+    aa_decision: Optional[str]
+    aa_effect: Optional[Effect]
+    aa_tasks: int
+    measured_sd: Optional[float]
+
+
 class _VerdictRequired(TypedDict):
     action: str
     alpha: float
@@ -4227,12 +4980,14 @@ class _VerdictRequired(TypedDict):
 class Verdict(_VerdictRequired, total=False):
     adaptive: Optional[AdaptiveReport]
     effect: Optional[Effect]
+    fairness: Optional[FairnessReport]
     instruments: List[InstrumentCheck]
     invalid_reasons: List[str]
     more_evidence: Optional[MoreEvidence]
     tasks_needed: int
     tasks_needed_over: int
     tier: str
+    variance: Optional[VarianceCard]
 
 
 class _VerdictPayloadRequired(TypedDict):
@@ -4511,6 +5266,10 @@ class VoiceTrack(TypedDict):
 Waterfall = TypedDict('Waterfall', {'basis': "str", 'from': "Value", 'known': "float", 'parts': "List[Part]", 'reason': "str", 'to': "Value", 'total': "Value"}, total=False)
 
 
+class WorkerCapabilities(TypedDict, total=False):
+    gpus: List[GPUInfo]
+
+
 class _WorkerCompleteRequired(TypedDict):
     archive_bytes: int
     archive_sha256: str
@@ -4542,6 +5301,7 @@ class _WorkerInfoRequired(TypedDict):
 
 
 class WorkerInfo(_WorkerInfoRequired, total=False):
+    gpus: List[GPUInfo]
     labels: List[str]
     pool: str
     token_id: str
@@ -4574,6 +5334,7 @@ class _WorkerRegisterRequired(TypedDict):
 
 
 class WorkerRegister(_WorkerRegisterRequired, total=False):
+    capabilities: Optional[WorkerCapabilities]
     labels: List[str]
     pool: str
 
@@ -4627,6 +5388,10 @@ class AuthInfoResponse(AuthInfo):
     mode: Mode
 
 
+class AwarenessReportResponse(AwarenessReport):
+    mode: Mode
+
+
 class CalibrationItemResponse(CalibrationItem):
     mode: Mode
 
@@ -4642,7 +5407,15 @@ class CalibrationStatusResponse(CalibrationStatus):
 CatalogResponse = Catalog
 
 
+class CodeScanReportResponse(CodeScanReport):
+    mode: Mode
+
+
 class Comparison_livescoreResponse(Comparison_livescore):
+    mode: Mode
+
+
+class CompliancePackResponse(CompliancePack):
     mode: Mode
 
 
@@ -4762,6 +5535,14 @@ class ModelMatrixResponse(ModelMatrix):
     mode: Mode
 
 
+class MonitorCertListResponse(MonitorCertList):
+    mode: Mode
+
+
+class MonitorCertificateResponse(MonitorCertificate):
+    mode: Mode
+
+
 class PairResponse(Pair):
     mode: Mode
 
@@ -4822,6 +5603,10 @@ class RunAcceptedResponse(RunAccepted):
     mode: Mode
 
 
+class RunAgentsResponse(RunAgents):
+    mode: Mode
+
+
 class RunDetailResponse(RunDetail):
     mode: Mode
 
@@ -4847,6 +5632,10 @@ class RunReviewsResponse(RunReviews):
 
 
 class RunRoutingResponse(RunRouting):
+    mode: Mode
+
+
+class RunServicesResponse(RunServices):
     mode: Mode
 
 
@@ -4963,13 +5752,21 @@ __all__ = [
     'AdaptiveTaskState',
     'AdaptiveView',
     'AgentConfig',
+    'AgentCoverage',
+    'AgentEdge',
     'AgentEventStatus',
+    'AgentHandoff',
+    'AgentLimits',
     'AgentList',
     'AgentMCP',
     'AgentMemory',
+    'AgentNode',
     'AgentNotes',
     'AgentSkills',
+    'AgentSpan',
+    'AgentStats',
     'AgentSummary',
+    'AgentTree',
     'AlignedStep',
     'Analysis',
     'Answer',
@@ -4985,14 +5782,20 @@ __all__ = [
     'ArtifactFile',
     'ArtifactSpec',
     'AttemptRecord',
+    'AttributionSpec',
     'AudioRef',
     'AuditRequest',
     'AuditRow',
     'AuthInfo',
+    'AwarenessArm',
+    'AwarenessExample',
+    'AwarenessNotScanned',
+    'AwarenessReport',
     'BargeIn',
     'Baseline',
     'Behaviour',
     'BiasAdjustedRate',
+    'Blame',
     'Budget',
     'BudgetDiff',
     'BudgetParityResult',
@@ -5011,6 +5814,7 @@ __all__ = [
     'CalibrationRecord',
     'CalibrationStats',
     'CalibrationStatus',
+    'Candidate',
     'CanonicalArmIdentity',
     'CanonicalRun',
     'CanonicalTaskIdentity',
@@ -5026,9 +5830,27 @@ __all__ = [
     'Cluster',
     'ClusterRef',
     'ClusterRef_migration',
+    'CodeScanEvidence',
+    'CodeScanExternal',
+    'CodeScanFinding',
+    'CodeScanPolicy',
+    'CodeScanReport',
+    'CodeScanSkip',
     'Comparison',
     'Comparison_livescore',
     'CompatibilitySpec',
+    'ComplianceArtifact',
+    'ComplianceEvidence',
+    'ComplianceExperiment',
+    'ComplianceFramework',
+    'ComplianceFunction',
+    'ComplianceMapping',
+    'CompliancePack',
+    'ComplianceRecordKeeping',
+    'ComplianceRelease',
+    'ComplianceTest',
+    'ComposeService',
+    'ComposeVolume',
     'ConditionDiff',
     'ConditionSpec',
     'Config',
@@ -5052,6 +5874,7 @@ __all__ = [
     'DoctorCheck',
     'Effect',
     'Endpoint',
+    'EnvironmentChoice',
     'Equivalence',
     'EquivalencePair',
     'ErrorBody',
@@ -5069,6 +5892,7 @@ __all__ = [
     'Explanation',
     'ExtendsRef',
     'ExtensionRule',
+    'FairnessReport',
     'FallbackRecord',
     'FaultPlan',
     'FieldChange',
@@ -5079,6 +5903,8 @@ __all__ = [
     'FlippedTask',
     'Forecast',
     'ForecastRange',
+    'GPUInfo',
+    'GPUSamplerSummary',
     'GateChange',
     'GateChange_migration',
     'GateResult',
@@ -5093,6 +5919,8 @@ __all__ = [
     'GroupingView',
     'GuardResult',
     'GuardSpec',
+    'HandoffFact',
+    'HardwareRecord',
     'Health',
     'HealthThresholds',
     'ImageSpec',
@@ -5155,6 +5983,20 @@ __all__ = [
     'MetricTest',
     'ModelMatrix',
     'ModelSummary',
+    'MonitorCertExperiment',
+    'MonitorCertHeadline',
+    'MonitorCertList',
+    'MonitorCertMonitor',
+    'MonitorCertSummary',
+    'MonitorCertificate',
+    'MonitorExcludedRun',
+    'MonitorFamily',
+    'MonitorFamilyPoint',
+    'MonitorInjectionCheck',
+    'MonitorItem',
+    'MonitorLabelSummary',
+    'MonitorOperatingPoint',
+    'MonitorTranscriptLimits',
     'MoreEvidence',
     'NoiseFloor',
     'ObserverStatus',
@@ -5196,6 +6038,7 @@ __all__ = [
     'RemoteChannels',
     'RemoteEvidence',
     'RemoteReport',
+    'Replay',
     'Report',
     'Report_agentdiff',
     'Report_migration',
@@ -5219,6 +6062,7 @@ __all__ = [
     'Run',
     'RunAccepted',
     'RunAgentInfo',
+    'RunAgents',
     'RunDetail',
     'RunDiff',
     'RunEvents',
@@ -5234,6 +6078,8 @@ __all__ = [
     'RunReviews',
     'RunRouting',
     'RunRoutingRow',
+    'RunService',
+    'RunServices',
     'RunSteps',
     'RunTiming',
     'RunnerImages',
@@ -5295,6 +6141,7 @@ __all__ = [
     'TaskOutcome',
     'TaskProvenance',
     'TaskQuarantine',
+    'TeamMember',
     'TierPlan',
     'TokenCreateRequest',
     'TokenCreated',
@@ -5310,6 +6157,7 @@ __all__ = [
     'User',
     'Utterance',
     'Value',
+    'VarianceCard',
     'Verdict',
     'VerdictPayload',
     'VerdictSpec',
@@ -5334,6 +6182,7 @@ __all__ = [
     'VoiceCall',
     'VoiceTrack',
     'Waterfall',
+    'WorkerCapabilities',
     'WorkerComplete',
     'WorkerHeartbeat',
     'WorkerInfo',
@@ -5348,11 +6197,14 @@ __all__ = [
     'AdaptiveViewResponse',
     'AgentListResponse',
     'AuthInfoResponse',
+    'AwarenessReportResponse',
     'CalibrationItemResponse',
     'CalibrationLabelsResponse',
     'CalibrationStatusResponse',
     'CatalogResponse',
+    'CodeScanReportResponse',
     'Comparison_livescoreResponse',
+    'CompliancePackResponse',
     'DetailResponse',
     'Detail_canaryResponse',
     'DiagnosticsPayloadResponse',
@@ -5382,6 +6234,8 @@ __all__ = [
     'MeResponse',
     'MeOrgResponse',
     'ModelMatrixResponse',
+    'MonitorCertListResponse',
+    'MonitorCertificateResponse',
     'PairResponse',
     'ParetoResponse',
     'PullResultResponse',
@@ -5397,6 +6251,7 @@ __all__ = [
     'ReviewQueueResponse',
     'RoutingSummaryResponse',
     'RunAcceptedResponse',
+    'RunAgentsResponse',
     'RunDetailResponse',
     'RunDiffResponse',
     'RunEventsResponse',
@@ -5404,6 +6259,7 @@ __all__ = [
     'RunRemoteResponse',
     'RunReviewsResponse',
     'RunRoutingResponse',
+    'RunServicesResponse',
     'RunStepsResponse',
     'RunnerTokenCreatedResponse',
     'RunnerTokenViewResponse',

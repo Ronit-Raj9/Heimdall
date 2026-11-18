@@ -1,0 +1,7 @@
+# Keys of bench.ts `AgentTree` (schemas/agents.go, agents.json), in RunAgents.tree.
+version
+shape
+agents
+coverage
+edges?
+notes?

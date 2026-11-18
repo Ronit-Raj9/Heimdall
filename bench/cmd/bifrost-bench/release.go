@@ -25,7 +25,7 @@ const exitRefused = 1
 const releaseUsage = `usage: bifrost-bench release create -exp <id> -approver <name> [-note text] [-override reason] [-analysis <id>] [-config deploy/bench.yaml]
        bifrost-bench release list [-config deploy/bench.yaml]
        bifrost-bench release verify [-config deploy/bench.yaml]
-       bifrost-bench release export <release_id> [-o path] [-config deploy/bench.yaml]
+       bifrost-bench release export <release_id> [-o path] [-compliance] [-config deploy/bench.yaml]
 The releases root is $` + release.RootEnv + `, else <bench root>/releases.`
 
 func init() {
@@ -149,6 +149,7 @@ func runReleaseExport(args []string) int {
 	fs := flag.NewFlagSet("release export", flag.ContinueOnError)
 	config := fs.String("config", defaultConfig, "bench config")
 	out := fs.String("o", "", "copy the evidence pack to this path (default: print its path)")
+	withCompliance := fs.Bool("compliance", false, "also write compliance-<release_id>.md and .json beside the export (docs/compliance.md)") // Eval integrity area (S2)
 	var id string
 	if len(args) > 0 && !strings.HasPrefix(args[0], "-") {
 		id, args = args[0], args[1:]
@@ -173,7 +174,7 @@ func runReleaseExport(args []string) int {
 			return fail("%v", err)
 		}
 		fmt.Println(p)
-		return exitOK
+		return exportCompliance(*withCompliance, *config, l, id, "") // Eval integrity area (S2)
 	}
 	b, err := l.Evidence(context.Background(), id)
 	if err != nil {
@@ -183,6 +184,27 @@ func runReleaseExport(args []string) int {
 		return fail("write %s: %v", *out, err)
 	}
 	fmt.Printf("wrote %s (%d bytes, sha256 %s)\n", *out, len(b), utils.SHA256Bytes(b))
+	return exportCompliance(*withCompliance, *config, l, id, *out) // Eval integrity area (S2)
+}
+
+// exportCompliance writes the release's compliance pack when asked
+// (Eval integrity area, S2; compliance.go).
+func exportCompliance(on bool, config string, l *release.Log, id, out string) int {
+	if !on {
+		return exitOK
+	}
+	ctx := context.Background()
+	rec, err := l.Get(ctx, id)
+	if err != nil {
+		return fail("%v", err)
+	}
+	paths, err := releaseCompliance(ctx, config, rec, out)
+	if err != nil {
+		return fail("compliance pack: %v", err)
+	}
+	for _, p := range paths {
+		fmt.Printf("wrote %s\n", p)
+	}
 	return exitOK
 }
 

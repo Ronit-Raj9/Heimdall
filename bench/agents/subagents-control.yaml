@@ -1,0 +1,20 @@
+# Scripted in-process multi-agent control (docs/multi-agent.md): one
+# container that reports a planner, two workers running at the same time, a
+# handoff and a reviewer as native agent events on stdout, and writes their
+# files. Deterministic and makes no model call; for admission and tests.
+id: subagents-control
+adapter: scripted
+image: bench/coding-core-base:1
+scripted:
+  kind: subagents
+model: claude-sonnet-4-5
+notes:
+  project_file: CLAUDE.md
+budgets:
+  wall_s: 120
+  cpus: 1
+  mem_gb: 1
+gateway:
+  provider: anthropic
+  max_retries: 0
+topology: orchestrator_worker

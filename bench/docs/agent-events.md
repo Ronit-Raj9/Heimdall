@@ -101,6 +101,13 @@ How a span becomes a step:
 | A name starting with `handoff`, or containing `memory` | `handoff`, `memory_read` or `memory_write` |
 | Anything else | `span` |
 
+An agent span, a `subagent_start` or any event can name its agent with an
+attribute (`gen_ai.agent.id`, `gen_ai.agent.name`, `agent_id`,
+`agent_role`; for a handoff `from_agent` and `to_agent`, or a
+`transfer_to_<agent>` tool name): the event keeps it as `agent_id`,
+`agent_name`, `agent_role` and `agent_target`, and the run's agent tree and
+step attribution read them ([multi-agent.md](multi-agent.md)).
+
 Span and parent ids become the event's id and parent, so the nesting of a
 multi-agent run survives. A span status of ERROR marks the step failed.
 

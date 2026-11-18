@@ -9,6 +9,9 @@
 The wire format is spec/agent-event.schema.json. Delivery follows the
 environment the bench sets in the agent container: BENCH_EVENTS_URL (POST,
 JSON lines), else BENCH_EVENTS_FILE (one JSON object appended per line). A
+run with realism neutral names them AGENT_EVENTS_URL and AGENT_EVENTS_FILE
+(docs/eval-awareness.md); the neutral name is read first, the BENCH_ one
+second. A
 failed POST falls back to the file when both are set. With neither set every
 call is a no-op that still returns an event id, so instrumented code runs the
 same outside the bench. Nothing here raises into the agent. ``stdout_line``
@@ -32,6 +35,9 @@ from typing import Any, Dict, Iterator, Optional
 
 ENV_URL = "BENCH_EVENTS_URL"
 ENV_FILE = "BENCH_EVENTS_FILE"
+# The names a run with realism neutral sets instead; read before the above.
+NEUTRAL_ENV_URL = "AGENT_EVENTS_URL"
+NEUTRAL_ENV_FILE = "AGENT_EVENTS_FILE"
 STDOUT_PREFIX = "@@heimdall-event "
 
 TYPES = (
@@ -66,7 +72,7 @@ _url_down_until = 0.0
 
 def enabled() -> bool:
     """True when the bench asked for events (either variable is set)."""
-    return bool(os.environ.get(ENV_URL) or os.environ.get(ENV_FILE))
+    return bool(_events_url() or _events_file())
 
 
 def new_id() -> str:
@@ -237,9 +243,17 @@ def step(type: str, name: Optional[str] = None, **kw: Any) -> Iterator[Step]:
          attributes=s.attributes, **kw)
 
 
+def _events_url() -> Optional[str]:
+    return os.environ.get(NEUTRAL_ENV_URL) or os.environ.get(ENV_URL)
+
+
+def _events_file() -> Optional[str]:
+    return os.environ.get(NEUTRAL_ENV_FILE) or os.environ.get(ENV_FILE)
+
+
 def _send(line: str) -> None:
-    url = os.environ.get(ENV_URL)
-    path = os.environ.get(ENV_FILE)
+    url = _events_url()
+    path = _events_file()
     if url and _post(url, line):
         return
     if path:

@@ -1,0 +1,14 @@
+# Always-allow monitor, kind command: a POSIX sh script in a stock alpine
+# image, sandboxed like an agent container with --network none. Mode action
+# exercises the one-request-per-action protocol (one container per run,
+# one request line per action).
+# Usage:
+#   bifrost-bench monitor certify -monitor examples/monitors/always-allow/monitor.yaml -exp <id>
+name: always-allow-command
+kind: command
+mode: action
+image: alpine:3.22
+argv: ["sh", "-c", "{{script}}"]
+script: always_allow.sh
+timeout_s: 30
+network: none

@@ -1,0 +1,9 @@
+# Keys of bench.ts `RunService` (handlers/runservices.go). X2.
+id
+role?
+image
+image_id?
+ready
+error?
+proxied?
+log_bytes?

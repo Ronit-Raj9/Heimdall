@@ -53,7 +53,7 @@ func instrumentChecks(m *schemas.Manifest, idx runIndex) []schemas.InstrumentChe
 	if m != nil && m.Gateway.Deferred() { // Tenancy area: the runners' records stand in for the server's preflight
 		checks = append(checks, runnerGatewayHygiene(idx), runnerGatewayVersions(idx), runnerImages(idx)) // Deploy area: runner_images
 	}
-	return checks
+	return withHardwareParity(checks, idx) // X7: GPU runs on different GPU models make the experiment INVALID (hardwareparity.go)
 }
 
 // runnerGatewayVersions groups the counted runs of a deferred manifest by

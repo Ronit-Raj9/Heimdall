@@ -228,14 +228,16 @@ func SuiteAdmit(ctx context.Context, env AdmitEnv, ref, only string, w io.Writer
 			return nil, err
 		}
 	}
-	deps := suite.AdmitDeps{Logger: env.Logger}
+	deps := suite.AdmitDeps{Logger: env.Logger, GPUs: reg.GPUs} // X7: GPU tasks hold the machine's GPUs (gpu.go)
+	// The first registered part of a name wins, as in the engine's findPart:
+	// the app registers the gateway-wired judge ahead of Builtin's unwired one.
 	for _, e := range reg.Environments {
-		if e.GetName() == s.Environment {
+		if deps.Env == nil && e.GetName() == s.Environment {
 			deps.Env = e
 		}
 	}
 	for _, g := range reg.Graders {
-		if g.GetName() == s.Grader {
+		if deps.Grader == nil && g.GetName() == s.Grader {
 			deps.Grader = g
 		}
 	}

@@ -66,14 +66,14 @@ func TestRegistered(t *testing.T) {
 
 func TestImportTerminalBench(t *testing.T) {
 	root, res := runImport(t, filepath.Join("testdata", "tb"), "tb-sample", importers.Options{})
-	if got := strings.Join(res.Tasks, ","); got != "hello-file,pip-check" {
+	if got := strings.Join(res.Tasks, ","); got != "hello-file,needs-compose,pip-check,solo-compose-yml" { // X2: compose tasks import (compose.go)
 		t.Fatalf("tasks = %s", got)
 	}
 	wantSkips := map[string]string{
 		"downloads-tests":   "fetches from the network at verify time",
 		"fetching-solution": "the reference solution downloads at run time (apt-get install -y jq)",
 		"honeypot":          "hack-verifiable task",
-		"needs-compose":     "multi-container docker compose",
+		"compose-refused":   "multi-container compose environment the bench cannot run as written", // X2
 		"needs-gpu":         "needs 1 GPU(s)",
 		"no-workdir":        "sets no literal WORKDIR",
 	}

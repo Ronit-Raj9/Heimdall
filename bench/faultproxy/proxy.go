@@ -262,6 +262,9 @@ func (s *Server) serveData(w http.ResponseWriter, r *http.Request) {
 		upstreamStart := time.Now()
 		s.answerScripted(sw, r, p, kind, slot.name, body, e)
 		e.UpstreamMS = float64(time.Since(upstreamStart).Microseconds()) / 1000
+	case d.Cut && req.Stream: // Safety probes area (S1): stream_cut
+		s.answerCut(sw, r, p, kind, slot.name, body, e, d)
+		return
 	default:
 		e.Action = ActionPass
 		upstreamStart := time.Now()
@@ -270,6 +273,36 @@ func (s *Server) serveData(w http.ResponseWriter, r *http.Request) {
 	}
 	e.Status = sw.status()
 	s.record(e)
+}
+
+// answerCut answers a streamed conversation request the stream_cut fault
+// takes: the answer (real upstream or scripted model) is relayed through a
+// streamCutter. When the cutter cut the stream, the ledger line is an inject
+// line carrying the plan's nonce, written before the connection is aborted,
+// so the client sees the stream end without its final events. When the
+// stream held no tool call it passed whole and the line is a pass line.
+func (s *Server) answerCut(sw *statusWriter, r *http.Request, p ProviderSpec, kind, slot string, body []byte, e *schemas.LedgerEntry, d decision) {
+	cutter := newStreamCutter(sw, p.Format)
+	e.Action = ActionPass
+	upstreamStart := time.Now()
+	if d.Scripted {
+		e.Upstream = schemas.LedgerUpstreamScripted
+		s.answerScripted(cutter, r, p, kind, slot, body, e)
+	} else {
+		s.answer(cutter, r, p, kind, slot, body, e)
+	}
+	e.UpstreamMS = float64(time.Since(upstreamStart).Microseconds()) / 1000
+	e.Status = sw.status()
+	if !cutter.cut {
+		cutter.finish()
+		s.record(e)
+		return
+	}
+	e.Action, e.Nonce, e.Tokens = ActionInject, d.Nonce, nil
+	s.record(e)
+	// Abort the response: net/http closes the connection without the final
+	// chunk, so the client reads a truncated stream.
+	panic(http.ErrAbortHandler)
 }
 
 // answer passes one request on: to the real upstream, the scripted model, or

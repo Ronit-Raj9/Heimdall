@@ -118,15 +118,17 @@ These tools are visible to the agent: it can see that pytest and a Python under 
 
 | Reason | Terminal-Bench 2.0 (89) | SkillsBench main (87) |
 |---|---|---|
-| imported | 54 | 70 |
-| reference solution downloads at run time (apt, pip, git clone, npm, uv add) | 33 | 11 |
+| imported | 54 | 71 |
+| reference solution downloads at run time (apt, pip, git clone, npm, uv add) | 33 | 12 |
 | `test.sh` downloads in a way that cannot move to the build (git clone of test data, `uv venv`/`uv pip`, a release binary) | 2 | 2 |
-| multi-container compose environment | 0 | 3 |
+| compose file the bench refuses (here: provider keys read from the host) | 0 | 1 |
 | no literal `WORKDIR` | 0 | 1 |
+
+SkillsBench counts as of 18 Nov 2026 (X2): compose tasks now import through `bench/compose` (docs/multi-container.md). Of the 3 tasks in `tasks/` with a compose file, `react-performance-debugging` imports as one container (its file is `docker-compose.yml`, which Harbor does not read), `fix-visual-stability` maps (main plus an `api` service) but is skipped because its solution runs `npm install`, and `drone-planning-control` is refused because `main` reads `ANTHROPIC_API_KEY` from the host. Terminal-Bench 2.0 ships no compose file.
 
 Hack-Verifiable Terminal-Bench 2.1 (89): all skipped by default; with `-set hack_verifiable=keep`, 54 imported and 35 skipped for the same network reasons as Terminal-Bench 2.0.
 
-Also skipped when present: a separate verifier container (DeepSWE), GPUs, MCP servers in `task.toml`, environment values taken from the host (`${VAR}`), a missing `solve.sh` or `test.sh`, a solution folder over 2 MiB packed, and symlinks that leave the task folder. Every upstream Terminal-Bench 2.0 task says `allow_internet = true`; bench runs never give the agent network except model calls, which is why a task whose reference installs packages is left out: the agent could not install them either.
+A task with `environment/docker-compose.yaml` imports with its other services running beside the agent (`compose:` in `task.yaml`, mapped under Harbor's conventions, every change listed in `IMPORT.md`), unless the file holds something the bench refuses (docs/multi-container.md). Also skipped when present: a separate verifier container (DeepSWE), GPUs, MCP servers in `task.toml`, environment values taken from the host (`${VAR}`), a missing `solve.sh` or `test.sh`, a solution folder over 2 MiB packed, and symlinks that leave the task folder. Every upstream Terminal-Bench 2.0 task says `allow_internet = true`; bench runs never give the agent network except model calls, which is why a task whose reference installs packages is left out: the agent could not install them either.
 
 ### Hack-verifiable tasks
 

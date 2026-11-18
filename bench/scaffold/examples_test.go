@@ -108,6 +108,9 @@ func runExampleControls(t *testing.T, s *schemas.Suite, task *schemas.Task) {
 	if s.Track == schemas.TrackSupport {
 		t.Skip("support tasks run two services; TestSupportControls runs their controls")
 	}
+	if len(task.Services) > 1 { // Safety probes area (S1): acme-safety/kb-answer runs two MCP servers; Docker admission covers it
+		t.Skipf("task %s starts %d services; the host harness runs one", task.ID, len(task.Services))
+	}
 	sv := task.Services[0]
 	server := filepath.Join(s.Root, "services", sv.ID, "server.py")
 	if _, err := os.Stat(server); err != nil {

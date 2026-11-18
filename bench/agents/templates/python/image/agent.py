@@ -28,13 +28,24 @@ import urllib.error
 import urllib.request
 import uuid
 
-BASE_URL = os.environ["BENCH_BASE_URL"].rstrip("/")
-API_KEY = os.environ["BENCH_API_KEY"]
-MODEL = os.environ["BENCH_MODEL"]
-INSTRUCTION_FILE = os.environ.get("BENCH_INSTRUCTION_FILE", "/tmp/bench/instruction.md")
-SESSION_ID = os.environ.get("BENCH_SESSION_ID", "")
-MAX_TURNS = int(os.environ.get("BENCH_MAX_TURNS", "40"))
-SHELL_TIMEOUT_S = int(os.environ.get("BENCH_SHELL_TIMEOUT_S", "120"))
+def _env(name, default=None):
+    """A bench variable: AGENT_<name> in a run with realism neutral, else
+    BENCH_<name> (docs/eval-awareness.md). Without a default it must be set."""
+    v = os.environ.get("AGENT_" + name) or os.environ.get("BENCH_" + name)
+    if v:
+        return v
+    if default is None:
+        raise KeyError("BENCH_" + name)
+    return default
+
+
+BASE_URL = _env("BASE_URL").rstrip("/")
+API_KEY = _env("API_KEY")
+MODEL = _env("MODEL")
+INSTRUCTION_FILE = _env("INSTRUCTION_FILE", "/tmp/bench/instruction.md")
+SESSION_ID = _env("SESSION_ID", "")
+MAX_TURNS = int(_env("MAX_TURNS", "40"))
+SHELL_TIMEOUT_S = int(_env("SHELL_TIMEOUT_S", "120"))
 WORKSPACE = "/workspace"
 NOTES_FILE = "AGENTS.md"  # notes.project_file in the agent YAML
 OUTPUT_MAX = 8000
@@ -63,8 +74,8 @@ def emit(obj):
     print(json.dumps(obj, ensure_ascii=False), flush=True)
 
 
-EVENTS_URL = os.environ.get("BENCH_EVENTS_URL", "")
-EVENTS_FILE = os.environ.get("BENCH_EVENTS_FILE", "")
+EVENTS_URL = os.environ.get("AGENT_EVENTS_URL") or os.environ.get("BENCH_EVENTS_URL", "")
+EVENTS_FILE = os.environ.get("AGENT_EVENTS_FILE") or os.environ.get("BENCH_EVENTS_FILE", "")
 
 
 def report_event(type, name=None, **fields):
@@ -115,7 +126,7 @@ def chat(messages):
 
 def run_shell(command):
     # The run key stays out of the commands' environment: the model's commands never need it.
-    env = {k: v for k, v in os.environ.items() if k != "BENCH_API_KEY"}
+    env = {k: v for k, v in os.environ.items() if k not in ("AGENT_API_KEY", "BENCH_API_KEY")}
     try:
         p = subprocess.run(command, shell=True, cwd=WORKSPACE, capture_output=True, text=True,
                            timeout=SHELL_TIMEOUT_S, env=env)

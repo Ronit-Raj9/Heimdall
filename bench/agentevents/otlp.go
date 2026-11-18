@@ -162,6 +162,11 @@ func spanRecord(sp span, agentSpans map[string]bool, lim Limits, now time.Time) 
 			attrs[k] = v
 		}
 	}
+	for _, k := range agentKeys { // Multi-agent area: agent identity attributes (agents.go)
+		if v := sp.attrs[k]; v != "" {
+			attrs[k] = v
+		}
+	}
 	if len(attrs) > 0 {
 		r.Attributes = attrs
 	}

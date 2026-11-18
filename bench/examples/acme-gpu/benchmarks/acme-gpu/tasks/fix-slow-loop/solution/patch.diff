@@ -1,0 +1,61 @@
+diff --git a/train.py b/train.py
+index 950efc4..57b2217 100644
+--- a/train.py
++++ b/train.py
+@@ -10,10 +10,8 @@ segment no longer fits in its window.
+ import argparse
+ import time
+ 
+-import numpy as np
+ import torch
+ import torch.nn.functional as F
+-from torch.utils.data import DataLoader, Dataset
+ 
+ from data import make
+ from model import MLP
+@@ -21,34 +19,23 @@ from model import MLP
+ EPOCHS, BATCH, LR, SEED = 10, 256, 1e-3, 0
+ 
+ 
+-class Points(Dataset):
+-    def __init__(self, x, y):
+-        self.x, self.y = x, y
+-
+-    def __len__(self):
+-        return len(self.x)
+-
+-    def __getitem__(self, i):
+-        return torch.tensor(self.x[i]), torch.tensor(self.y[i])
+-
+-
+ def train(x, y, device):
+     torch.manual_seed(SEED)
+-    loader = DataLoader(Points(x, y), batch_size=BATCH, shuffle=True)
++    # The whole data set fits on the GPU: move it once, shuffle there, and
++    # never wait for the GPU inside the loop.
++    x = torch.from_numpy(x).to(device)
++    y = torch.from_numpy(y).to(device)
++    n = len(x)
+     model = MLP().to(device)
+-    opt = torch.optim.Adam(model.parameters(), lr=LR)
+-    history = []
++    opt = torch.optim.Adam(model.parameters(), lr=LR, fused=True)
+     for epoch in range(EPOCHS):
+-        for xb, yb in loader:
+-            xb, yb = xb.to(device), yb.to(device)
+-            loss = F.cross_entropy(model(xb), yb)
+-            opt.zero_grad()
++        perm = torch.randperm(n, device=device)
++        for i in range(0, n, BATCH):
++            idx = perm[i:i + BATCH]
++            loss = F.cross_entropy(model(x[idx]), y[idx])
++            opt.zero_grad(set_to_none=True)
+             loss.backward()
+             opt.step()
+-            torch.cuda.synchronize()
+-            history.append(loss.item())
+-            acc = (model(xb).argmax(1).cpu().numpy() == yb.cpu().numpy()).mean()
+-        print(f"epoch {epoch + 1} loss {np.mean(history[-len(loader):]):.4f} last batch acc {acc:.3f}", flush=True)
+     return model
+ 
+ 

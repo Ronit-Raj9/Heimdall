@@ -360,6 +360,13 @@ func taskFingerprint(s *schemas.Suite, t *schemas.Task, opts FingerprintOptions)
 	} else if ok && img.Tag != "" {
 		images[ImageTask] = img.Tag
 	}
+	svc, err := composeImages(s, t) // X2: a compose task's service images, bound like the task image (compose.go)
+	if err != nil {
+		return fp, err
+	}
+	for role, tag := range svc {
+		images[role] = tag
+	}
 	fp.Images = identities(images, opts)
 	return fp, nil
 }

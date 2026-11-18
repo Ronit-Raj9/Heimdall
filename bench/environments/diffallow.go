@@ -38,6 +38,7 @@ type diffSection struct {
 	status string
 	modes  []string
 	raw    []byte
+	body   bool // X2: a hunk or binary patch has started; no more header lines
 }
 
 var diffHeader = []byte("diff --git ")
@@ -108,6 +109,12 @@ func splitDiff(raw []byte) ([]diffSection, error) {
 // readExtendedHeader records the mode, status and path a header line carries.
 // Lines that are not header lines change nothing.
 func (s *diffSection) readExtendedHeader(line string) error {
+	// X2: after the first hunk (or binary patch) a line is content: a removed
+	// line "-- note" (an SQL or Lua comment) reads "--- note" and is no marker.
+	if s.body || strings.HasPrefix(line, "@@") || strings.HasPrefix(line, "GIT binary patch") {
+		s.body = true
+		return nil
+	}
 	switch {
 	case strings.HasPrefix(line, "new file mode "):
 		s.status = StatusAdded

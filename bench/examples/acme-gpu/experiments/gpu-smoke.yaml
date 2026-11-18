@@ -1,0 +1,25 @@
+# Free check of the acme-gpu project on a real GPU: no model calls, no
+# spend. Arm A runs each task's reference (oracle), arm B does nothing
+# (noop), clean condition, one trial: A must verify 3 of 3 and B 0 of 3.
+# Every slot is a GPU slot: it waits for the machine's GPU, holds it alone,
+# and its run records the GPU (run.json hardware) and the host-side samples
+# (gpu.samples.jsonl). The plan is refused on a machine without a GPU of at
+# least 2 GiB.
+# Slots: 3 tasks x 1 trial x 2 arms = 6.
+name: gpu-smoke
+suite: acme-gpu@1.0.0
+base: agents/oracle.yaml
+arms:
+  A: {label: oracle (reference)}
+  B: {label: noop (no change), agent: agents/noop.yaml}
+primary: {condition: clean, metric: verified_success}
+guards:
+  - {rule: no_new_integrity_violation}
+conditions:
+  - {id: clean, tasks: all, trials: 1}
+budget: {total_usd: 0}
+verdict: {policy: paired_signflip, alpha: 0.05, assumed_sd: 0.30}
+seed: 20261118
+concurrency: 2
+manifest_mode: agent_exposure
+policy: policies/default.yaml

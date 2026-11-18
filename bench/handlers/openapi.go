@@ -137,7 +137,13 @@ var APIRoutes = []RouteDoc{
 	{Method: "GET", Path: APIPrefix + "/runs/{id}/otlp", Tag: "runs", Summary: "A sealed run as an OpenTelemetry trace (OTLP/JSON download); ?payloads=true adds redacted, capped tool payloads",
 		Query: []QueryDoc{{Name: "payloads", Description: "true to include tool arguments and results, redacted and capped"}}, Raw: "application/json"},
 	{Method: "GET", Path: APIPrefix + "/runs/{id}/steps", Tag: "runs", Summary: "Unified agent step timeline of a run with its observer status; available false for runs recorded before it", Response: RunSteps{}},
+	{Method: "GET", Path: APIPrefix + "/runs/{id}/agents", Tag: "runs", Summary: "Agents of a multi-agent run: tree, per-agent cost and lanes, handoffs with payloads, and the blame; available false for a single-agent run", Response: RunAgents{}},
 	{Method: "GET", Path: APIPrefix + "/runs/{id}/remote", Tag: "runs", Summary: "Remote agent channel summary of a run: what is trusted, agent-reported or unknown; available false for other agents", Response: RunRemote{}}, // Remote coverage
+	// X4: code scan of added lines.
+	{Method: "GET", Path: APIPrefix + "/runs/{id}/codescan", Tag: "runs", Summary: "Security findings on the lines the run's agent added (rule, CWE, severity, file, line, redacted snippet), sealed or computed now from the sealed diff, with the experiment's veto level", Response: schemas.CodeScanReport{}},
+	// X2: services of a run and a compose service's captured log.
+	{Method: "GET", Path: APIPrefix + "/runs/{id}/services", Tag: "runs", Summary: "Services that ran beside the agent: image, readiness, error, and the size of each captured compose service log", Response: RunServices{}},
+	{Method: "GET", Path: APIPrefix + "/runs/{id}/services/{service}/log", Tag: "runs", Summary: "One compose service's captured output (stdout and stderr, timestamped), from a sealed run that verifies against its seal; plain text", Raw: "text/plain"},
 	{Method: "GET", Path: APIPrefix + "/pairs/{id}", Tag: "runs", Summary: "Both arms of a pair with their aligned steps", Response: schemas.Pair{}},
 
 	{Method: "GET", Path: APIPrefix + "/leaderboard", Tag: "leaderboard", Summary: "Leaderboard over sealed runs", Response: schemas.Leaderboard{}, Query: []QueryDoc{
@@ -216,6 +222,10 @@ var APIRoutes = []RouteDoc{
 		Auth: AuthWrite, Request: schemas.CalibrationLabelRequest{}, Status: fasthttp.StatusCreated, Response: schemas.CalibrationItem{}},
 	{Method: "GET", Path: APIPrefix + "/agents", Tag: "agents", Summary: "Agent configs", Response: schemas.AgentList{}},
 	AgentDiffRouteDoc, AgentDiffVersionsRouteDoc, // Agent diff area (agentdiff.go)
+	ComplianceRouteDoc, // Eval integrity area (S2): compliance pack (compliance.go)
+	AwarenessRouteDoc,  // Eval integrity area (S2): eval awareness scan (awareness.go)
+	// Eval integrity area (S2): monitor certification (monitorcert.go).
+	MonitorCertListRouteDoc, MonitorCertGetRouteDoc, MonitorCertReportRouteDoc,
 	{Method: "GET", Path: APIPrefix + "/imports", Tag: "imports", Summary: "Importers the binary links", Response: ImportList{Importers: []importers.Info{}}},
 
 	{Method: "GET", Path: APIPrefix + "/workers", Tag: "workers", Summary: "Remote workers; enabled is false when worker mode is off", Response: WorkersList{}},

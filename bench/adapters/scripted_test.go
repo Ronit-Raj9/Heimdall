@@ -42,6 +42,8 @@ func TestScriptedPlans(t *testing.T) {
 		{kind: ScriptedExploit, argv: []string{"sh", exploitFile}, network: "none", files: map[string]string{exploitFile: testExploit}, noEnvKeys: true},
 		{kind: ScriptedToy, argv: []string{"python3", "-I", toyAgentFile}, network: testNetwork, keyInEnv: true,
 			files: map[string]string{toyAgentFile: toyAgentSource, referencePatchFile: testPatch, InstructionFile: testInstruction}},
+		{kind: ScriptedTeam, argv: []string{"python3", "-I", teamControlFile}, network: "none", files: map[string]string{teamControlFile: teamControlSource}},
+		{kind: ScriptedSubagents, argv: []string{"python3", "-I", subagentsFile}, network: "none", files: map[string]string{subagentsFile: subagentsSource}},
 	}
 	for _, tt := range tests {
 		t.Run(tt.kind, func(t *testing.T) {

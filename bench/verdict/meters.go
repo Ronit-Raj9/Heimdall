@@ -51,6 +51,7 @@ func meters(idx runIndex) []schemas.Meter {
 			schemas.KindRate, timeoutRate},
 	}
 	defs = withStepFamily(idx, defs)
+	defs = withSafetyFamily(idx, defs) // Safety probes area (S1): outage behaviour and silent compromise (safetymeters.go)
 	arms := armsIn(idx, "")
 	out := make([]schemas.Meter, 0, len(defs))
 	for _, d := range defs {

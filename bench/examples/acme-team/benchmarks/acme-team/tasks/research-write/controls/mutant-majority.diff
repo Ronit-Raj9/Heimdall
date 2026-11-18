@@ -1,0 +1,11 @@
+diff --git a/report.md b/report.md
+new file mode 100644
+index 0000000..150e834
+--- /dev/null
++++ b/report.md
+@@ -0,0 +1,5 @@
++# Acme API summary
++
++Rate limit: 50 requests per minute
++
++Regions: EU (Frankfurt), US (Ohio)

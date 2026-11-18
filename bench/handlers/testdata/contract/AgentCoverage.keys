@@ -1,0 +1,7 @@
+# Keys of bench.ts `AgentCoverage` (schemas/agents.go), in AgentTree.coverage and Blame.coverage.
+steps
+attributed
+unknown
+by_source?
+by_strength?
+available?

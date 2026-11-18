@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"github.com/maximhq/bifrost/bench/schemas"
+	"github.com/maximhq/bifrost/bench/utils"
 )
 
 // vkPageSize is the page size for listing virtual keys.
@@ -41,19 +42,24 @@ func (g *Gateway) MintKey(ctx context.Context, rc *schemas.RunContext) (*schemas
 	if err != nil {
 		return nil, fmt.Errorf("mint key for run %s: %w", runID, err)
 	}
-	slot, keyID, err := g.acquireSlot(p, runID)
+	slot, keyID, err := g.acquireRunSlots(ctx, p, runID, teamSlots(rc)) // Multi-agent area: a team takes all its slots at once (teamslots.go)
 	if err != nil {
 		return nil, fmt.Errorf("mint key for run %s: %w", runID, err)
 	}
 	var routing *schemas.RoutingPolicy // W9 routing policy under test (routing.go)
-	var extra []string                 // X8 voice agents: the agent's declared extra models (gateway.models)
+	var models []string                // X8 voice agents: the agent's declared extra models (gateway.models)
 	if rc.Agent != nil {
 		routing = rc.Agent.Gateway.Routing
-		extra = rc.Agent.Gateway.Models
+		models = rc.Agent.Gateway.Models
 	}
-	key, err := g.createVirtualKey(ctx, runID, p, slot, keyID, model, routing, extra)
+	extra := map[string]any{}
+	if usd := runBudget(rc); usd > 0 { // Multi-agent area: the equal_budget fairness rule enforces the run's cap here (team.go)
+		extra["budgets"] = []map[string]any{{"max_limit": usd, "reset_duration": budgetReset}}
+	}
+	key, err := g.createVirtualKey(ctx, runID, p, slot, keyID, model, routing, models, extra)
 	if err != nil {
 		g.releaseSlot(slot.Name, runID)
+		g.releaseReserved(runID)
 		return nil, fmt.Errorf("mint key for run %s: %w", runID, err)
 	}
 	if err := g.applyRouteRule(ctx, key, p.Name, routing); err != nil { // W9: the run's VK-scoped routing rule
@@ -78,6 +84,10 @@ func (g *Gateway) MintKey(ctx context.Context, rc *schemas.RunContext) (*schemas
 func (g *Gateway) RevokeKey(ctx context.Context, key *schemas.RunKey) error {
 	if key == nil || key.ID == "" {
 		return nil
+	}
+	g.releaseReserved(key.Name)
+	if err := g.revokeMembers(ctx, key, g.teamOf(key.ID)); err != nil { // Multi-agent area: a team run's member keys and team (team.go)
+		return fmt.Errorf("revoke members of virtual key %s (%s): %w", key.ID, key.Name, err)
 	}
 	var ruleErr error
 	if key.RoutingRuleID != "" { // W9: the run's routing rule goes first, so no rule outlives its key
@@ -108,7 +118,8 @@ func (g *Gateway) RevokeStale(ctx context.Context, active map[string]bool) (int,
 	}
 	n := 0
 	for _, k := range keys {
-		if !runIDPattern.MatchString(k.Name) || active[k.Name] || active[ownerRun(k.Name)] { // W3: a service or judge key of a live run stays
+		run, ok := staleRun(k.Name)                         // Multi-agent area: member keys carry their run id (team.go)
+		if !ok || active[run] || active[ownerRun(k.Name)] { // W3: a service or judge key of a live run stays
 			continue
 		}
 		if err := g.deleteVirtualKey(ctx, k.ID); err != nil {
@@ -213,11 +224,11 @@ func (g *Gateway) forget(vkID string) {
 
 // createVirtualKey makes sure the slot's provider key serves model, then
 // creates the run's virtual key on that slot.
-func (g *Gateway) createVirtualKey(ctx context.Context, runID string, p ProviderSetup, slot Slot, keyID, model string, routing *schemas.RoutingPolicy, extra []string) (*schemas.RunKey, error) {
+func (g *Gateway) createVirtualKey(ctx context.Context, runID string, p ProviderSetup, slot Slot, keyID, model string, routing *schemas.RoutingPolicy, models []string, extra map[string]any) (*schemas.RunKey, error) {
 	if err := g.ensureSlotModel(ctx, p, slot, keyID, model); err != nil {
 		return nil, err
 	}
-	for _, m := range extra { // X8 voice agents: declared extra models on the slot
+	for _, m := range models { // X8 voice agents: declared extra models on the slot
 		if err := g.ensureSlotModel(ctx, p, slot, keyID, m); err != nil {
 			return nil, err
 		}
@@ -243,7 +254,10 @@ func (g *Gateway) createVirtualKey(ctx context.Context, runID string, p Provider
 			}
 		}
 	}
-	addAllowedModels(body, extra) // X8 voice agents: the declared extra models on the key
+	addAllowedModels(body, models) // X8 voice agents: the declared extra models on the key
+	for k, v := range extra {
+		body[k] = v
+	}
 	var out struct {
 		VirtualKey virtualKey `json:"virtual_key"`
 	}
@@ -353,4 +367,18 @@ func addAllowedModels(body map[string]any, models []string) {
 		}
 	}
 	pcs[0]["allowed_models"] = out
+}
+
+// runBudget is the run key's USD cap: Budgets.USD of the arm when the
+// experiment declares the equal_budget fairness rule, which needs the cap
+// enforced at the gateway (docs/multi-agent.md); 0 otherwise. A team run
+// enforces its cap on the team instead (MintMemberKeys).
+func runBudget(rc *schemas.RunContext) float64 {
+	if rc == nil || rc.Agent == nil || rc.Experiment == nil || rc.Experiment.Fairness != schemas.FairnessEqualBudget {
+		return 0
+	}
+	if len(utils.TeamOf(rc)) > 0 { // X5b: a solo baseline arm on a team task keeps its run cap (utils.TeamOf)
+		return 0
+	}
+	return rc.Agent.Budgets.USD
 }

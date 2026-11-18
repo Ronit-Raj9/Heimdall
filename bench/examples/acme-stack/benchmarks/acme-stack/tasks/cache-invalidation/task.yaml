@@ -1,0 +1,28 @@
+# Invalidate the product cache on a price change. The environment is the docker compose stack in stack/:
+# the app is the agent's workspace, Postgres and Redis run beside it.
+id: cache-invalidation
+version: 1.0.0
+title: Invalidate the product cache on a price change
+project: acme-shop
+kind: bugfix
+instruction: instruction.md
+# The workspace comes from the app image (stack/app/ copied to /app).
+repo_dir: repo
+compose: stack/compose.yaml
+verifier:
+  tests: verifier/tests
+  required: []
+protected: []
+controls:
+  reference: solution/reference.sh
+  empty: controls/empty.sh
+  mutants: [controls/mutant-no-cache.sh, controls/mutant-flush-all.sh, controls/mutant-wrong-key.sh]
+  exploit: controls/exploit.sh
+timeouts:
+  agent_s: 600
+capabilities: [debugging, caching]
+difficulty: easy
+provenance:
+  source: bench/examples/acme-stack (fictional Acme Shop, written for this example)
+  license: MIT
+  created_by: hand-written example

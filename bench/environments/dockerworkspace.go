@@ -172,9 +172,10 @@ func (e *dockerWorkspace) Create(ctx context.Context, rc *schemas.RunContext) (*
 	if err := e.checkFrozenImage(ctx, rc); err != nil {
 		return nil, fmt.Errorf("create workspace for run %s: %w", runID, err)
 	}
+	view := viewFor(rc) // Eval integrity area (S2): neutral runs get neutral volume names (realism.go)
 	h := &schemas.EnvironmentHandle{
-		Volume:     workspaceVolume(runID),
-		AuxVolume:  auxVolume(runID),
+		Volume:     view.workspaceVolume(runID), // Eval integrity area (S2): workspaceVolume(runID) in a standard run
+		AuxVolume:  view.auxVolume(runID),       // Eval integrity area (S2): auxVolume(runID) in a standard run
 		Network:    e.network(""),
 		Workdir:    workdir(rc),
 		Labels:     labelMap(expID, runID),
@@ -249,13 +250,25 @@ func (e *dockerWorkspace) Exec(ctx context.Context, rc *schemas.RunContext, plan
 	if err != nil {
 		return nil, fmt.Errorf("exec run %s: %w", runID, err)
 	}
-	name := agentName(rc, runID)
-	e.removeContainers(ctx, staleAgents(rc, runID)...)
-	mounts, links, err := e.agentMounts(ctx, rc, plan, expID, runID)
+	view := viewFor(rc)                    // Eval integrity area (S2): the names the agent is shown (realism.go)
+	agentPlan, err := view.agentPlan(plan) // Eval integrity area (S2): plan itself stays as planned for plan.json
 	if err != nil {
 		return nil, fmt.Errorf("exec run %s: %w", runID, err)
 	}
-	l, err := buildLaunch(plan, shimDir+":"+basePath, agentHome, links)
+	agentPlan = withTaskEnv(rc, agentPlan) // X2: the workspace service's environment, under the plan's own variables (compose.go)
+	name := agentName(rc, runID)
+	e.removeContainers(ctx, staleAgents(rc, runID)...)
+	mounts, links, err := e.agentMounts(ctx, rc, agentPlan, expID, runID) // Eval integrity area (S2): agentPlan
+	if err != nil {
+		return nil, fmt.Errorf("exec run %s: %w", runID, err)
+	}
+	// X7: the run's GPUs, for the agent container only (gpu.go).
+	gpuArgs, err := agentGPUArgs(rc)
+	if err != nil {
+		return nil, fmt.Errorf("exec run %s: %w", runID, err)
+	}
+	mounts = append(mounts, gpuArgs...)
+	l, err := buildLaunchView(agentPlan, view.shimDir()+":"+basePath, agentHome, links, view) // Eval integrity area (S2): view
 	if err != nil {
 		return nil, fmt.Errorf("exec run %s: %w", runID, err)
 	}
@@ -267,7 +280,10 @@ func (e *dockerWorkspace) Exec(ctx context.Context, rc *schemas.RunContext, plan
 	defer egress.Stop(context.WithoutCancel(ctx))
 	e.ensureEventCollector(ctx, rc, plan, expID, runID) // Agent events area: the collector, started before the first session (eventcollector.go)
 	defer e.copyAgentEvents(context.WithoutCancel(ctx), runID, rc.Dir)
-	l.Env = e.eventEnv(rc, runID, l.Env) // Agent events area: BENCH_EVENTS_* and OTEL_* (eventcollector.go)
+	l.Env = e.eventEnvView(rc, runID, l.Env, view)                 // Agent events area: BENCH_EVENTS_* and OTEL_* (eventcollector.go); Eval integrity area (S2): view
+	if err := view.writeRealism(rc.Dir, plan, l.Env); err != nil { // Eval integrity area (S2): realism.json, neutral runs only
+		return nil, fmt.Errorf("exec run %s: %w", runID, err)
+	}
 	envFile, err := writeEnvFile(l.Env)
 	if err != nil {
 		return nil, fmt.Errorf("exec run %s: %w", runID, err)
@@ -288,7 +304,7 @@ func (e *dockerWorkspace) Exec(ctx context.Context, rc *schemas.RunContext, plan
 	e.prepareEventsDir(ctx, rc, expID, runID) // Agent events area: the events file folder (eventcollector.go)
 	obs := e.startObservers(ctx, rc, plan, expID, runID)
 	defer obs.finish(ctx, rc, nil)
-	args := agentCreateArgs(name, utils.LabelArgs(expID, runID), plan, rc.Handle, network, envFile, l, mounts, snapshotMode(rc) || root)
+	args := agentCreateArgsView(name, utils.LabelArgs(expID, runID), agentPlan, rc.Handle, network, envFile, l, mounts, snapshotMode(rc) || root, view) // Eval integrity area (S2): view
 	_, cerr := e.cfg.Docker.MustRun(ctx, args...)
 	if rerr := os.Remove(envFile); rerr != nil {
 		e.cfg.Logger.Warn("remove env file", "path", envFile, "error", rerr)
@@ -332,7 +348,9 @@ func (e *dockerWorkspace) Exec(ctx context.Context, rc *schemas.RunContext, plan
 	}
 
 	obs.watchAgent(ctx, rc, expID, runID, name)
+	gpuSampler := startGPUSampler(ctx, rc) // X7: host-side nvidia-smi samples of the run's GPUs (gpu.go)
 	res, err := e.attach(ctx, name, stdout, stderr, wall, secret, faultToken)
+	stopGPUSampler(rc, gpuSampler) // X7
 	obs.finish(ctx, rc, res)
 	if err != nil {
 		keep = false
@@ -429,6 +447,7 @@ func (e *dockerWorkspace) Destroy(ctx context.Context, rc *schemas.RunContext) e
 		}
 	}
 	vols := map[string]bool{workspaceVolume(runID): true, auxVolume(runID): true}
+	vols[viewFor(rc).workspaceVolume(runID)], vols[viewFor(rc).auxVolume(runID)] = true, true // Eval integrity area (S2): a neutral run's names
 	if rc.Handle != nil {
 		for _, v := range []string{rc.Handle.Volume, rc.Handle.AuxVolume} {
 			if v != "" {
@@ -444,7 +463,7 @@ func (e *dockerWorkspace) Destroy(ctx context.Context, rc *schemas.RunContext) e
 		if perr != nil {
 			paths = nil
 		}
-		for _, v := range memoryVolumes(runID, len(paths)) {
+		for _, v := range viewFor(rc).memoryVolumes(runID, len(paths)) { // Eval integrity area (S2): the run's view names them
 			vols[v] = true
 		}
 	}
@@ -469,6 +488,7 @@ func (e *dockerWorkspace) Destroy(ctx context.Context, rc *schemas.RunContext) e
 	if err := errors.Join(errs...); err != nil {
 		return fmt.Errorf("destroy run %s: %w", runID, err)
 	}
+	neutralRuns.Delete(runID) // Eval integrity area (S2): everything named after the run is gone
 	return nil
 }
 
@@ -761,6 +781,13 @@ func (e *dockerWorkspace) network(planNetwork string) string {
 // environment.user root) gets back the capabilities a package install needs
 // (utils.RootCaps), never more; no-new-privileges still holds. It is pure.
 func agentCreateArgs(name string, labels []string, plan *schemas.RunPlan, h *schemas.EnvironmentHandle, network, envFile string, l *launch, mounts []string, writableRoot bool) []string {
+	return agentCreateArgsView(name, labels, plan, h, network, envFile, l, mounts, writableRoot, standardView)
+}
+
+// agentCreateArgsView is agentCreateArgs with the aux volume mounted where the
+// run's view puts it (realism.go). The standard view gives exactly
+// agentCreateArgs.
+func agentCreateArgsView(name string, labels []string, plan *schemas.RunPlan, h *schemas.EnvironmentHandle, network, envFile string, l *launch, mounts []string, writableRoot bool, v agentView) []string { // Eval integrity area (S2)
 	user := plan.User
 	if user == "" {
 		user = defaultUser
@@ -802,7 +829,7 @@ func agentCreateArgs(name string, labels []string, plan *schemas.RunPlan, h *sch
 		"--tmpfs", agentHome+":"+homeTmpfsOpts(user),
 		"--network", network,
 		"-v", h.Volume+":/workspace",
-		"-v", h.AuxVolume+":"+auxMount,
+		"-v", h.AuxVolume+":"+v.auxMount, // Eval integrity area (S2): v.auxMount is auxMount in a standard run
 	)
 	args = append(args, mounts...)
 	args = append(args,
@@ -938,6 +965,7 @@ func runIDs(rc *schemas.RunContext) (string, string, error) {
 	if expID == "" && rc.Experiment != nil {
 		expID = rc.Experiment.ID
 	}
+	markRealism(rc, runID) // Eval integrity area (S2): name helpers that take only a run id follow the run's realism (realism.go)
 	return expID, runID, nil
 }
 
@@ -976,7 +1004,12 @@ func workspaceVolume(runID string) string { return "bench-ws-" + runID }
 
 func auxVolume(runID string) string { return "bench-aux-" + runID }
 
-func agentContainer(runID string) string { return "bench-" + runID }
+func agentContainer(runID string) string {
+	if neutralRun(runID) { // Eval integrity area (S2): its name is what reverse DNS answers for the agent's address
+		return neutralAgentPrefix + runID
+	}
+	return "bench-" + runID
+}
 
 func helperName(runID, step string) string {
 	return "bench-" + runID + "-" + step + "-" + strings.TrimPrefix(utils.NewID("h", 6), "h_")

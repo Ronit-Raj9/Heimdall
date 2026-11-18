@@ -213,6 +213,65 @@ func TestMarkdownInstruments(t *testing.T) {
 	}
 }
 
+func TestMarkdownNoiseFloor(t *testing.T) {
+	p, aaP := 0.3, 0.0078125
+	improved, inconclusive := schemas.DecisionImproved, schemas.DecisionInconclusive
+	measured, zero := 0.2041, 0.0
+	aaEffect := &schemas.Effect{DBar: 0.0417, PValue: &p, NTasks: 8, NNonzero: 3}
+	tests := []struct {
+		name    string
+		card    *schemas.VarianceCard
+		assumed bool
+		want    []string
+		notWant []string
+	}{
+		{"no card", nil, true, []string{"## Noise floor\n\nNo variance card: this analysis was written before the card existed. The MDE used SD 0.30, assumed.\n"},
+			[]string{"A/A"}},
+		{"assumed", &schemas.VarianceCard{Source: schemas.VarianceAssumed, SD: 0.3, AssumedSD: 0.3, MDE: 34.6,
+			Detail: "SD 0.30 assumed: the experiment ran no A/A arm (aa: true adds one), so the noise floor is not measured"}, true,
+			[]string{"| SD used | 0.300 (assumed) |", "| Assumed SD | 0.30 |", "| MDE | 34.6 pp |", "the noise floor is not measured |", "| MDE | 34.6 pp (assumed SD 0.30) |"},
+			[]string{"| A/A arm |", "Measured SD", "Arm A2 in the tables"}},
+		{"measured from the A/A arm", &schemas.VarianceCard{Source: schemas.VarianceMeasuredAA, SD: measured, AssumedSD: 0.3, MeasuredSD: &measured,
+			AAArm: "A2", AATasks: 8, AAEffect: aaEffect, AADecision: &inconclusive, MDE: 23.6, Detail: "SD 0.204 measured | from the A/A arm"}, false,
+			[]string{"| SD used | 0.204 (measured from the A/A arm over 8 tasks) |", "| Measured SD, A2 minus A | 0.204 over 8 tasks |",
+				"| A/A arm | A2, a copy of arm A on the clean condition |", "| A/A effect | +4.2 pp, p-value 0.3000, 3 of 8 discordant tasks |",
+				"| A/A decision | INCONCLUSIVE |", "| MDE | 23.6 pp |", `SD 0.204 measured \| from the A/A arm`,
+				"Arm A2 in the tables below is the A/A copy of arm A.", "(SD 0.204 measured from the A/A arm)"},
+			[]string{"harness noise"}},
+		{"harness noise", &schemas.VarianceCard{Source: schemas.VarianceAssumed, SD: 0.3, AssumedSD: 0.3, MeasuredSD: &zero, AAArm: "A2", AATasks: 8,
+			AAEffect: &schemas.Effect{DBar: 1, PValue: &aaP, NTasks: 8, NNonzero: 8}, AADecision: &improved, MDE: 34.6}, true,
+			[]string{"| SD used | 0.300 (assumed) |", "| Measured SD, A2 minus A | 0.000 over 8 tasks |", "| A/A effect | +100.0 pp, p-value 0.0078, 8 of 8 discordant tasks |",
+				"| A/A decision | IMPROVED: harness noise, the verdict is INVALID |", "| Detail | - |"}, nil},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			a := testAnalysis()
+			a.Verdict.Variance, a.Verdict.MDEAssumedSD = tt.card, tt.assumed
+			if tt.card != nil {
+				a.Verdict.SD, a.Verdict.MDE = tt.card.SD, tt.card.MDE
+			}
+			var buf bytes.Buffer
+			if err := newMarkdownReporter().Write(context.Background(), a, nil, &buf); err != nil {
+				t.Fatal(err)
+			}
+			out := buf.String()
+			if strings.Index(out, "## Noise floor") < strings.Index(out, "## Primary endpoint") || strings.Index(out, "## Noise floor") > strings.Index(out, "## Guards") {
+				t.Fatalf("noise floor section is not between the primary endpoint and the guards:\n%s", out)
+			}
+			for _, w := range tt.want {
+				if !strings.Contains(out, w) {
+					t.Errorf("report lacks %q:\n%s", w, out)
+				}
+			}
+			for _, w := range tt.notWant {
+				if strings.Contains(out, w) {
+					t.Errorf("report has %q", w)
+				}
+			}
+		})
+	}
+}
+
 func TestCell(t *testing.T) {
 	if got := cell("a|b\n<script>"); got != `a\|b &lt;script&gt;` {
 		t.Errorf("cell = %q", got)

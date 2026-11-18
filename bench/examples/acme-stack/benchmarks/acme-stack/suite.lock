@@ -1,0 +1,470 @@
+{
+  "suite": "acme-stack",
+  "version": "1.0.0",
+  "base_image": {
+    "tag": "bench/coding-core-base:1"
+  },
+  "tasks": {
+    "cache-invalidation": {
+      "version": "1.0.0",
+      "instruction_sha256": "6a992823e16e538101ba1096c441b5721349affae21800563fb8569781c16f21",
+      "repo_tree_sha256": "0ff79a78b92f7be2bcd7294652ff4f66acadb60ee4daffeacebdef61a3ed1aae",
+      "verifier_sha256": "60ff523efedf08d0191075c499cb71581c1a42bd8b9cfba7ace6054604d1d51b",
+      "controls_sha256": "75fc8929533fc55b592a86f90ed65689cc402160ce896bbbad377d2693dc2c95",
+      "fixtures_sha256": "0b2f62e3983c706dadf8a0259a534e26a675e999d814ec30fdbcfe8c57495522",
+      "status": "admitted",
+      "admission": {
+        "admitted": true,
+        "checks": [
+          {
+            "name": "static_validation",
+            "want": "clean",
+            "got": "clean",
+            "passed": true,
+            "detail": "0 warnings"
+          },
+          {
+            "name": "reference_1",
+            "want": "pass",
+            "got": "pass",
+            "passed": true,
+            "detail": "solution/reference.sh exit 0; tests_ran=0 failures=0 errors=0 skipped=0 exit=0 reason=passed (reward 1)"
+          },
+          {
+            "name": "reference_2",
+            "want": "pass",
+            "got": "pass",
+            "passed": true,
+            "detail": "solution/reference.sh exit 0; tests_ran=0 failures=0 errors=0 skipped=0 exit=0 reason=passed (reward 1)"
+          },
+          {
+            "name": "reference_3",
+            "want": "pass",
+            "got": "pass",
+            "passed": true,
+            "detail": "solution/reference.sh exit 0; tests_ran=0 failures=0 errors=0 skipped=0 exit=0 reason=passed (reward 1)"
+          },
+          {
+            "name": "empty_control",
+            "want": "fail",
+            "got": "fail",
+            "passed": true,
+            "detail": "controls/empty.sh exit 0; tests_ran=0 failures=0 errors=0 skipped=0 exit=0 reason=reward 0 below pass threshold 1"
+          },
+          {
+            "name": "mutant_1",
+            "want": "fail",
+            "got": "fail",
+            "passed": true,
+            "detail": "controls/mutant-no-cache.sh exit 0; tests_ran=0 failures=0 errors=0 skipped=0 exit=0 reason=reward 0 below pass threshold 1"
+          },
+          {
+            "name": "mutant_2",
+            "want": "fail",
+            "got": "fail",
+            "passed": true,
+            "detail": "controls/mutant-flush-all.sh exit 0; tests_ran=0 failures=0 errors=0 skipped=0 exit=0 reason=reward 0 below pass threshold 1"
+          },
+          {
+            "name": "mutant_3",
+            "want": "fail",
+            "got": "fail",
+            "passed": true,
+            "detail": "controls/mutant-wrong-key.sh exit 0; tests_ran=0 failures=0 errors=0 skipped=0 exit=0 reason=reward 0 below pass threshold 1"
+          },
+          {
+            "name": "exploit",
+            "want": "fail",
+            "got": "fail",
+            "passed": true,
+            "detail": "controls/exploit.sh exit 0; tests_ran=0 failures=0 errors=0 skipped=0 exit=0 reason=reward 0 below pass threshold 1"
+          },
+          {
+            "name": "null_noop",
+            "want": "fail",
+            "got": "fail",
+            "passed": true,
+            "detail": "noop exit 0; tests_ran=0 failures=0 errors=0 skipped=0 exit=0 reason=reward 0 below pass threshold 1"
+          },
+          {
+            "name": "null_refuse",
+            "want": "fail",
+            "got": "fail",
+            "passed": true,
+            "detail": "refuse exit 0; tests_ran=0 failures=0 errors=0 skipped=0 exit=0 reason=reward 0 below pass threshold 1"
+          },
+          {
+            "name": "instruction_edited",
+            "want": "edited",
+            "got": "edited",
+            "passed": true
+          },
+          {
+            "name": "secret_scan",
+            "want": "none",
+            "got": "none",
+            "passed": true
+          },
+          {
+            "name": "verifier_network_internal",
+            "want": "internal",
+            "got": "internal",
+            "passed": true,
+            "detail": "the verifier joins only the run's internal service network to query db, cache; the grader checks the network is internal before each grade and has no route out"
+          }
+        ],
+        "at": "2026-11-18T03:21:07.423148854Z",
+        "grader": "verifier_command",
+        "reference_repeats": 3,
+        "reference_results": [
+          "pass",
+          "pass",
+          "pass"
+        ],
+        "fingerprint": "ec1f23d9aee069ed9ff7bbde681cec6a464b7c5d5ecc62eac59e5b78e6efa61b"
+      }
+    },
+    "fix-migration": {
+      "version": "1.0.0",
+      "instruction_sha256": "444860603726f7a27372f157f80ac0e1ae63db6f186e5f6b9bb2cd38d85c04d9",
+      "repo_tree_sha256": "8e64d30949942c9a082a08fae9f06a18d859568008fc7355326fec28f89247e9",
+      "verifier_sha256": "5f9a87c9f87814512a3098c92205fc69ae183181cb7cfe44e5e80165d54e33b8",
+      "controls_sha256": "69fc2d63d83382e927627f0358e136ba7946ebea0252e7cb980e4299a6a1e422",
+      "fixtures_sha256": "e1691f54955b216fb7b5dfef24ed0f8707c4d8125191cc9683cb49495b7dba88",
+      "status": "admitted",
+      "admission": {
+        "admitted": true,
+        "checks": [
+          {
+            "name": "static_validation",
+            "want": "clean",
+            "got": "clean",
+            "passed": true,
+            "detail": "1 warnings"
+          },
+          {
+            "name": "reference_1",
+            "want": "pass",
+            "got": "pass",
+            "passed": true,
+            "detail": "solution/reference.sh exit 0; tests_ran=0 failures=0 errors=0 skipped=0 exit=0 reason=passed (reward 1)"
+          },
+          {
+            "name": "reference_2",
+            "want": "pass",
+            "got": "pass",
+            "passed": true,
+            "detail": "solution/reference.sh exit 0; tests_ran=0 failures=0 errors=0 skipped=0 exit=0 reason=passed (reward 1)"
+          },
+          {
+            "name": "reference_3",
+            "want": "pass",
+            "got": "pass",
+            "passed": true,
+            "detail": "solution/reference.sh exit 0; tests_ran=0 failures=0 errors=0 skipped=0 exit=0 reason=passed (reward 1)"
+          },
+          {
+            "name": "empty_control",
+            "want": "fail",
+            "got": "fail",
+            "passed": true,
+            "detail": "controls/empty.sh exit 0; tests_ran=0 failures=0 errors=0 skipped=0 exit=0 reason=reward 0 below pass threshold 1"
+          },
+          {
+            "name": "mutant_1",
+            "want": "fail",
+            "got": "fail",
+            "passed": true,
+            "detail": "controls/mutant-drop-rows.sh exit 0; tests_ran=0 failures=0 errors=0 skipped=0 exit=0 reason=reward 0 below pass threshold 1"
+          },
+          {
+            "name": "mutant_2",
+            "want": "fail",
+            "got": "fail",
+            "passed": true,
+            "detail": "controls/mutant-not-applied.sh exit 0; tests_ran=0 failures=0 errors=0 skipped=0 exit=0 reason=reward 0 below pass threshold 1"
+          },
+          {
+            "name": "mutant_3",
+            "want": "fail",
+            "got": "fail",
+            "passed": true,
+            "detail": "controls/mutant-nullable.sh exit 0; tests_ran=0 failures=0 errors=0 skipped=0 exit=0 reason=reward 0 below pass threshold 1"
+          },
+          {
+            "name": "exploit",
+            "want": "fail",
+            "got": "fail",
+            "passed": true,
+            "detail": "controls/exploit.sh exit 0; tests_ran=0 failures=0 errors=0 skipped=0 exit=0 reason=reward 0 below pass threshold 1"
+          },
+          {
+            "name": "null_noop",
+            "want": "fail",
+            "got": "fail",
+            "passed": true,
+            "detail": "noop exit 0; tests_ran=0 failures=0 errors=0 skipped=0 exit=0 reason=reward 0 below pass threshold 1"
+          },
+          {
+            "name": "null_refuse",
+            "want": "fail",
+            "got": "fail",
+            "passed": true,
+            "detail": "refuse exit 0; tests_ran=0 failures=0 errors=0 skipped=0 exit=0 reason=reward 0 below pass threshold 1"
+          },
+          {
+            "name": "instruction_edited",
+            "want": "edited",
+            "got": "edited",
+            "passed": true
+          },
+          {
+            "name": "secret_scan",
+            "want": "none",
+            "got": "none",
+            "passed": true
+          },
+          {
+            "name": "verifier_network_internal",
+            "want": "internal",
+            "got": "internal",
+            "passed": true,
+            "detail": "the verifier joins only the run's internal service network to query db, cache; the grader checks the network is internal before each grade and has no route out"
+          }
+        ],
+        "at": "2026-11-18T03:12:53.160024571Z",
+        "grader": "verifier_command",
+        "reference_repeats": 3,
+        "reference_results": [
+          "pass",
+          "pass",
+          "pass"
+        ],
+        "fingerprint": "2255b52189f58cf58a4653a356c7f31c71f962db1ba8672c04dfa3c4b99d7ac6"
+      }
+    },
+    "health-db": {
+      "version": "1.0.0",
+      "instruction_sha256": "d7e790db27c18d75a2de958a292358d4b3434ff63eab255bb9f967ad985981a6",
+      "repo_tree_sha256": "18f284431b0c4b3dbccc757bc4dbab747f1ada893ef98fad046ec913e28f15d9",
+      "verifier_sha256": "076ebdd510f1fe0023499e62bbe18b53761af1bb20183900228a40dc6c060075",
+      "controls_sha256": "40b69ea417eedcde32e248c003372aeaac5697b2300c92a12b2ec24db891a037",
+      "fixtures_sha256": "a94c64a5671a53622d21f355a83cd4e08a5dd70789015b379172fbda3313a863",
+      "status": "admitted",
+      "admission": {
+        "admitted": true,
+        "checks": [
+          {
+            "name": "static_validation",
+            "want": "clean",
+            "got": "clean",
+            "passed": true,
+            "detail": "0 warnings"
+          },
+          {
+            "name": "reference_1",
+            "want": "pass",
+            "got": "pass",
+            "passed": true,
+            "detail": "solution/reference.sh exit 0; tests_ran=0 failures=0 errors=0 skipped=0 exit=0 reason=passed (reward 1)"
+          },
+          {
+            "name": "reference_2",
+            "want": "pass",
+            "got": "pass",
+            "passed": true,
+            "detail": "solution/reference.sh exit 0; tests_ran=0 failures=0 errors=0 skipped=0 exit=0 reason=passed (reward 1)"
+          },
+          {
+            "name": "reference_3",
+            "want": "pass",
+            "got": "pass",
+            "passed": true,
+            "detail": "solution/reference.sh exit 0; tests_ran=0 failures=0 errors=0 skipped=0 exit=0 reason=passed (reward 1)"
+          },
+          {
+            "name": "empty_control",
+            "want": "fail",
+            "got": "fail",
+            "passed": true,
+            "detail": "controls/empty.sh exit 0; tests_ran=0 failures=0 errors=0 skipped=0 exit=0 reason=reward 0 below pass threshold 1"
+          },
+          {
+            "name": "mutant_1",
+            "want": "fail",
+            "got": "fail",
+            "passed": true,
+            "detail": "controls/mutant-always-up.sh exit 0; tests_ran=0 failures=0 errors=0 skipped=0 exit=0 reason=reward 0 below pass threshold 1"
+          },
+          {
+            "name": "mutant_2",
+            "want": "fail",
+            "got": "fail",
+            "passed": true,
+            "detail": "controls/mutant-down-200.sh exit 0; tests_ran=0 failures=0 errors=0 skipped=0 exit=0 reason=reward 0 below pass threshold 1"
+          },
+          {
+            "name": "exploit",
+            "want": "fail",
+            "got": "fail",
+            "passed": true,
+            "detail": "controls/exploit.sh exit 0; tests_ran=0 failures=0 errors=0 skipped=0 exit=0 reason=reward 0 below pass threshold 1"
+          },
+          {
+            "name": "null_noop",
+            "want": "fail",
+            "got": "fail",
+            "passed": true,
+            "detail": "noop exit 0; tests_ran=0 failures=0 errors=0 skipped=0 exit=0 reason=reward 0 below pass threshold 1"
+          },
+          {
+            "name": "null_refuse",
+            "want": "fail",
+            "got": "fail",
+            "passed": true,
+            "detail": "refuse exit 0; tests_ran=0 failures=0 errors=0 skipped=0 exit=0 reason=reward 0 below pass threshold 1"
+          },
+          {
+            "name": "instruction_edited",
+            "want": "edited",
+            "got": "edited",
+            "passed": true
+          },
+          {
+            "name": "secret_scan",
+            "want": "none",
+            "got": "none",
+            "passed": true
+          },
+          {
+            "name": "verifier_network_internal",
+            "want": "internal",
+            "got": "internal",
+            "passed": true,
+            "detail": "the verifier joins only the run's internal service network to query db, cache, seed; the grader checks the network is internal before each grade and has no route out"
+          }
+        ],
+        "at": "2026-11-18T03:26:47.033571678Z",
+        "grader": "verifier_command",
+        "reference_repeats": 3,
+        "reference_results": [
+          "pass",
+          "pass",
+          "pass"
+        ],
+        "fingerprint": "23fb80097774d6dd80ba112a6b1cee1e4ae576e62bf70119d008e134d5f316be"
+      }
+    }
+  },
+  "probes": {},
+  "created_at": "2026-11-18T03:12:51.252469956Z",
+  "fingerprints": {
+    "version": 1,
+    "suite": {
+      "settings": "ba812260c02f5505a52b6d5bdff7d67903bbe2486bb6d0c2703f76d2430ead1c",
+      "fields": {
+        "base_image": "0d0192aa22c9741cd1c16dc6d4b2ca36e7be6aab202c7cfac4ebe3a7fb69084e",
+        "environment": "2075abc096d17738fba811b8518f8a3cbd1a5621abd0fd833170c50f4f9bbe4b",
+        "grader": "47789364c3ef10b8c5e96f4a5397a4297f3b5ffd83bbf1f3a18dad282737362d",
+        "id": "1af3f9afe2c6db1a59707ffb223c4f02dbfe4cd830113d02e1d49e862c88944b",
+        "parts": "68df612014fc627742a5c7276caf6fc051723f0f8362b14ad74b8f18fd752328",
+        "tasks": "5b1bb6ee2b02bfa1d707f807d00b5cd9be82353a95f59e0674dc9097683b70e8",
+        "track": "ac34c4a367830d919e1206c4190bf4d642e7437485048e7130ade630c56b5b1a",
+        "verifier": "5a9a584b58a4190794b5d1567d687db7d5ca56fc56672a4437680813b6371c74",
+        "version": "39fe4a40977d0585fd5704359e3685b0ada5cf5ee061e5d97385601d120cd0ec",
+        "workdir": "8d9fb2af3d3c049c03b650cdb7376907eab883c1e50ec024d21226eece8ff675"
+      },
+      "files": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "images": {
+        "base": "tag only: bench/coding-core-base:1",
+        "helper": "tag only: bench/coding-core-base:1"
+      }
+    },
+    "tasks": {
+      "cache-invalidation": {
+        "settings": "88041c8ae23bfa3fb3cfaa6649e7b0bc708e4f30bd8bab5634c32810554b0ea7",
+        "fields": {
+          "capabilities": "7ca80547ab10743d513fe4ff254be1385c15af129fe2d7a4f709d86324d5edac",
+          "compose": "24d75cc2eca4750f398eb50054e4bb2974ba699ea907ec13a2d53ffc31ad3271",
+          "controls": "b8da222e2547170f6177feeb6cd79fa51352dd507ff5516d0657153049e2d8c2",
+          "difficulty": "3ed870088e7410ee05d36e4fc20bf73104130ef98000b268b11378d0800d1703",
+          "environment": "5981c821817f639d4c155b394e57843b0c4221a905cdb1e7fd4e6b513e1ec388",
+          "id": "289263bdfe3cc1be92f689be74d22bd6c97aa5033584b8de5e7b22cfbb7a402c",
+          "instruction": "d22404e1bdcc17d8b42ec5950fe47a8a98ed7ccdf46bdc43121a724676b65198",
+          "kind": "b0807f5c4317639d17df2c24273926bc79a0be0c53d07935538d70b5ae435c46",
+          "project": "0af35634dd7489c23f614373d31060c5e47babe64bb94c70979783769733b86c",
+          "provenance": "debba5f93c031171aa5e7793c3a15c1f0c14b21794bc64d6449cd2794b6180d0",
+          "repo_dir": "a22b0355c8c3954692a2626bc83ff8ea3b7b65119e407c324883e2ed95c1fbe6",
+          "services": "33591a258acfcd9dd29b468c84d7f0aad805d6ffbd007ad5c6ca0d6a92de34da",
+          "timeouts": "95dd6e9d195c211d04fe42d19603dbbcefc90dfe116e3136ffbc818a564d0d55",
+          "title": "eea025164b2a0bf2cac85bc5a37f41d46af4c7534efa14ad5563044ef12358be",
+          "verifier": "3c0c9efd04d308ebf9f4569298c7d6c6f448e083dacf0c4b9ce1b504ac56bb65",
+          "version": "39fe4a40977d0585fd5704359e3685b0ada5cf5ee061e5d97385601d120cd0ec"
+        },
+        "files": "2268f56ace76e6637db3c5b6d2ef0aa85f90136a882dfb595856c747bfd7dd55",
+        "images": {
+          "service/cache": "tag only: redis:7-alpine",
+          "service/db": "tag only: postgres:18",
+          "task": "tag only: bench/task-acme-stack-cache-invalidation:b81971c264f3"
+        }
+      },
+      "fix-migration": {
+        "settings": "db30acab01f52c9adf678250d731e46b618db33fb13f6056338439250a652af0",
+        "fields": {
+          "capabilities": "19f4eefa27d26717b56fdfad63d936971744f8b02ab511a008b69493dc299891",
+          "compose": "24d75cc2eca4750f398eb50054e4bb2974ba699ea907ec13a2d53ffc31ad3271",
+          "controls": "77ab1498a92a5feff555c6a95bd60e05e8f7ca538027e9702c5bd566a5e0f54c",
+          "difficulty": "3ed870088e7410ee05d36e4fc20bf73104130ef98000b268b11378d0800d1703",
+          "environment": "5981c821817f639d4c155b394e57843b0c4221a905cdb1e7fd4e6b513e1ec388",
+          "id": "2b53aa80962ced853c4a91727f8af3744df61bf74a9e2ea1345fbaedf3dc64e0",
+          "instruction": "d22404e1bdcc17d8b42ec5950fe47a8a98ed7ccdf46bdc43121a724676b65198",
+          "kind": "b0807f5c4317639d17df2c24273926bc79a0be0c53d07935538d70b5ae435c46",
+          "project": "0af35634dd7489c23f614373d31060c5e47babe64bb94c70979783769733b86c",
+          "protected": "b1467f89411b48eb47c574ddd51a28e34febff39ebe243285eb21d7f34961610",
+          "provenance": "debba5f93c031171aa5e7793c3a15c1f0c14b21794bc64d6449cd2794b6180d0",
+          "repo_dir": "a22b0355c8c3954692a2626bc83ff8ea3b7b65119e407c324883e2ed95c1fbe6",
+          "services": "33591a258acfcd9dd29b468c84d7f0aad805d6ffbd007ad5c6ca0d6a92de34da",
+          "timeouts": "95dd6e9d195c211d04fe42d19603dbbcefc90dfe116e3136ffbc818a564d0d55",
+          "title": "930fccb718732469f2354bc82bcde7883eb334455807931c42748d7cd4d2f237",
+          "verifier": "3c0c9efd04d308ebf9f4569298c7d6c6f448e083dacf0c4b9ce1b504ac56bb65",
+          "version": "39fe4a40977d0585fd5704359e3685b0ada5cf5ee061e5d97385601d120cd0ec"
+        },
+        "files": "db70c47c6ac5d80651c53c4ac8faea6ff99a97b94286a5b45fca2c65c46466fe",
+        "images": {
+          "service/cache": "tag only: redis:7-alpine",
+          "service/db": "tag only: postgres:18",
+          "task": "tag only: bench/task-acme-stack-fix-migration:7d182bfe0f5c"
+        }
+      },
+      "health-db": {
+        "settings": "e6509a0ade7e578d848906393b144fb40e5a66aa6245fae9fd037736f015dd37",
+        "fields": {
+          "capabilities": "943a242ace921b4ddc236e6070ee54419e75b93d88918e169b65cadde675e080",
+          "compose": "24d75cc2eca4750f398eb50054e4bb2974ba699ea907ec13a2d53ffc31ad3271",
+          "controls": "f0ddecf3d3674b90b8df8a256e3999760b9b14aa416b987ff89252dcf1580602",
+          "difficulty": "3ed870088e7410ee05d36e4fc20bf73104130ef98000b268b11378d0800d1703",
+          "environment": "5981c821817f639d4c155b394e57843b0c4221a905cdb1e7fd4e6b513e1ec388",
+          "id": "03a77f7ae02a44aa5c964783c800972ece2a00f125e1d1855d6dda6132084ea7",
+          "instruction": "d22404e1bdcc17d8b42ec5950fe47a8a98ed7ccdf46bdc43121a724676b65198",
+          "kind": "b0807f5c4317639d17df2c24273926bc79a0be0c53d07935538d70b5ae435c46",
+          "project": "0af35634dd7489c23f614373d31060c5e47babe64bb94c70979783769733b86c",
+          "provenance": "debba5f93c031171aa5e7793c3a15c1f0c14b21794bc64d6449cd2794b6180d0",
+          "repo_dir": "a22b0355c8c3954692a2626bc83ff8ea3b7b65119e407c324883e2ed95c1fbe6",
+          "services": "c22cd1435444ffeedaeea8b26bca28cb1e9dcd65ae5b5f666eb07f9d3ba1f677",
+          "timeouts": "95dd6e9d195c211d04fe42d19603dbbcefc90dfe116e3136ffbc818a564d0d55",
+          "title": "f4833cd0a62e970cdbd6e1e6c0f77ea24bb631635fd2e9189c560664bed64151",
+          "verifier": "3c0c9efd04d308ebf9f4569298c7d6c6f448e083dacf0c4b9ce1b504ac56bb65",
+          "version": "39fe4a40977d0585fd5704359e3685b0ada5cf5ee061e5d97385601d120cd0ec"
+        },
+        "files": "1c6d73ecc39760f3f3f837495764e0d85e90bbf4171f1600152549fdd302edde",
+        "images": {
+          "service/cache": "tag only: redis:7-alpine",
+          "service/db": "tag only: postgres:18",
+          "service/seed": "tag only: postgres:18",
+          "task": "tag only: bench/task-acme-stack-health-db:39239fc25095"
+        }
+      }
+    },
+    "probes": {}
+  }
+}

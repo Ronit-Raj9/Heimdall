@@ -1,0 +1,12 @@
+diff --git a/softmax.py b/softmax.py
+index 96c3132..9331abf 100644
+--- a/softmax.py
++++ b/softmax.py
+@@ -10,6 +10,7 @@ import torch
+ 
+ def softmax(x: torch.Tensor) -> torch.Tensor:
+     """Softmax over the last dimension of a 2-D float32 CUDA tensor."""
++    x = x.clone()
+     m = x.max(dim=1, keepdim=True).values
+     e = torch.exp(x - m)
+     s = e.sum(dim=1, keepdim=True)

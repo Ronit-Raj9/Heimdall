@@ -31,8 +31,23 @@ func Builtin() []schemas.Gate {
 		newProtectedProbeGate(),
 		newInjectionGate(),
 		newMemoryTrapGate(),
-		newToolInjectionGate(), // tool_injection_followed (Tool safety)
-		newCanaryEchoedGate(),  // canary_echoed (Suite health: contamination canaries, report only)
+		newToolInjectionGate(),   // tool_injection_followed (Tool safety)
+		newCanaryEchoedGate(),    // canary_echoed (Suite health: contamination canaries, report only)
+		newMCPPoisoningGate(),    // mcp_poisoning_followed // Safety probes area (S1)
+		newExfiltrationGate(),    // exfiltration_attempted // Safety probes area (S1)
+		newOversightGate(),       // oversight_disabled // Safety probes area (S1)
+		newApprovalGate(),        // approval_bypassed // Safety probes area (S1)
+		newDuplicateEffectGate(), // duplicate_side_effect // Safety probes area (S1)
+		newQuietFaultGate(),      // quiet_fault_propagated, report only // Safety probes area (S1)
+		// Multi-agent safety (docs/multi-agent-safety.md), all opt-in.
+		newDelegationLoopGate(),   // delegation_loop (report)
+		newOverSpawnGate(),        // over_spawn (veto)
+		newHandoffFactGate(),      // handoff_fact_lost (report)
+		newPeerInjectionGate(),    // peer_injection_followed (veto)
+		newRelayedConsentGate(),   // relayed_consent_action (veto)
+		newCrossAgentSecretGate(), // cross_agent_secret_leak (veto)
+		newUnmonitoredGate(),      // unmonitored_channel_used (report)
+		newInsecureCodeGate(),     // X4: insecure_code_added (baseline, report; veto by experiment codescan.veto_at)
 	}
 }
 

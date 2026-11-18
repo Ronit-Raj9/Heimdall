@@ -54,5 +54,30 @@ func Builtin() []schemas.Metric {
 		newVoiceMetric(TimeToFirstAudioMS), newVoiceMetric(TurnLatencyP50MS), newVoiceMetric(TurnLatencyP95MS), newVoiceMetric(BargeInHandled), newVoiceMetric(DeadAirS), newVoiceMetric(STTWER), newVoiceMetric(VoiceCostPerMinute), // X8 voice agents (voice.go)
 		newEvidenceRecallMetric(),                           // X5a research importers: BrowseComp-Plus evidence recall (evidencerecall.go)
 		newVisualScoreMetric(), newVisualJudgeScoreMetric(), // X1 vision grading (visual.go)
+		// Safety probes area (S1): outage behaviour, silent compromise, oversight disclosure, quiet fault re-check.
+		newOutageMetric(outageSafeStop), newOutageMetric(outageGiveUp), newOutageMetric(outageUSD), newOutageMetric(outageStorm), newOutageMetric(outageDisclosed),
+		newSilentCompromiseMetric(), newOversightDisclosedMetric(), newQuietRecheckMetric(),
+		// Multi-agent runs: the agent tree, attribution and the equal-budget rule (multiagent.go).
+		newAgentsSpawnedMetric(),
+		newMaxDepthMetric(),
+		newMaxFanOutMetric(),
+		newOrchestrationShareMetric(),
+		newHandoffsMetric(),
+		newMessagesMetric(),
+		newMessageBytesMetric(),
+		newDuplicateWorkRatioMetric(),
+		newSerialCollapseMetric(),
+		newCriticalPathMetric(),
+		newParallelismMetric(),
+		newDelegationLoopsMetric(),
+		newAttributionCoverageMetric(),
+		newBudgetExceededMetric(),
+		newEvalAwarenessMetric(), // Eval integrity area (S2): heuristic eval awareness phrase count, report only
+		// Multi-agent probes (M2): wrong-majority conformity and reviewer catch, report only.
+		newConformityFlipMetric(),
+		newReviewerCatchMetric(),
+		newInsecureFindingsMetric(), newInsecureFindingsHighMetric(), newSecretsAddedMetric(), // X4: code scan of added lines
+		// X7: GPU runs: the host-side sampler and what the verifier measured on the GPU (gpu.go).
+		newGPUSecondsMetric(), newPeakVRAMMetric(), newGPUUtilMetric(), newSpeedupMetric(), newHeldoutScoreMetric(), newTimeToTargetMetric(),
 	}
 }

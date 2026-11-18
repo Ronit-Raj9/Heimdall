@@ -17,6 +17,11 @@ import { NaiveScoreboard } from "@/components/verdict/naiveScoreboard";
 import { PolicyScorecard } from "@/components/verdict/policyScorecard";
 import { TaskGrid } from "@/components/verdict/taskGrid";
 import { VerdictCard } from "@/components/verdict/verdictCard";
+// Eval integrity area (S2): noise floor, eval awareness, monitor certifications, compliance pack.
+import { CompliancePackLinks } from "@/components/integrity/compliancePack";
+import { AwarenessSection, ExperimentMonitorsSection } from "@/components/integrity/integritySections";
+import { VarianceCard } from "@/components/integrity/varianceCard";
+import { OutageCard } from "@/components/safety/outageCard"; // Safety probes area (S1)
 import { armOrder, sortExperimentsNewestFirst } from "@/components/verdict/verdict.utils";
 import {
 	getBenchErrorMessage,
@@ -132,6 +137,9 @@ function ExperimentVerdict({ expId }: { expId: string }) {
 			{/* The decision opens the page; what changed and the naive count sit beside each other under it. */}
 			<VerdictCard verdict={payload.verdict} metricLabel={metrics[payload.verdict.primary.metric]?.label} />
 
+			{/* Eval integrity area (S2): the noise floor right under the decision it qualifies. */}
+			<VarianceCard verdict={payload.verdict} />
+
 			<div className="grid grid-cols-1 items-start gap-4 lg:grid-cols-[minmax(0,2fr)_minmax(0,1fr)]">
 				<Section title={t("verdict.configDiff.title")} description={t("verdict.configDiff.description")} testId="verdict-config-diff">
 					<ConfigDiff changes={payload.config_diff} armLabels={arms.length === 2 ? { a: arms[0], b: arms[1] } : undefined} />
@@ -177,6 +185,9 @@ function ExperimentVerdict({ expId }: { expId: string }) {
 				)}
 			</Section>
 
+			{/* Safety probes area (S1): how each arm behaved while the model was down (outage probes only). */}
+			{diagnostics.data && <OutageCard meters={diagnostics.data.meters} arms={arms} />}
+
 			<Section title={t("verdict.grid.title")} description={t("verdict.grid.description")} testId="verdict-grid">
 				{grid.isLoading ? (
 					<TableSkeleton testId="verdict-grid-loading" />
@@ -190,6 +201,19 @@ function ExperimentVerdict({ expId }: { expId: string }) {
 					<TaskGrid grid={grid.data} onOpenPair={openPair} />
 				)}
 			</Section>
+
+			{/* Eval integrity area (S2). */}
+			<Section title={t("integrity.awareness.title")} description={t("integrity.awareness.description")} testId="verdict-awareness">
+				<AwarenessSection expId={payload.exp_id} arms={arms} />
+			</Section>
+			<div className="grid grid-cols-1 items-start gap-4 lg:grid-cols-[minmax(0,2fr)_minmax(0,1fr)]">
+				<Section title={t("integrity.monitors.title")} description={t("integrity.monitors.forExperiment")} testId="verdict-monitors">
+					<ExperimentMonitorsSection expId={payload.exp_id} />
+				</Section>
+				<Section title={t("integrity.compliance.title")} description={t("integrity.compliance.description")} testId="verdict-compliance">
+					<CompliancePackLinks expId={payload.exp_id} />
+				</Section>
+			</div>
 		</div>
 	);
 }

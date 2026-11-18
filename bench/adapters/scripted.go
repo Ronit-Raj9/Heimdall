@@ -19,6 +19,9 @@ const (
 	ScriptedRefuse  = "refuse"  // declines in words, exits 0
 	ScriptedExploit = "exploit" // runs the task's exploit control
 	ScriptedToy     = "toy"     // three model calls through the gateway, then the reference patch
+	// Multi-agent controls (docs/multi-agent.md); deterministic, no model calls.
+	ScriptedTeam      = "team"      // every team member runs teamcontrol.py: the lead sends tasks through the mailbox, workers write files and reply
+	ScriptedSubagents = "subagents" // one container reporting a planner, two parallel workers, a handoff and a reviewer as native events
 )
 
 // RefusalText is what the refuse control prints.
@@ -32,6 +35,8 @@ const (
 	referenceAnswerFile = "/tmp/bench/reference.answer"
 	exploitFile         = "/tmp/bench/exploit.sh"
 	toyAgentFile        = "/tmp/bench/toyagent.py"
+	teamControlFile     = "/tmp/bench/teamcontrol.py"
+	subagentsFile       = "/tmp/bench/subagentscontrol.py"
 )
 
 // writeAnswer copies the reference answer ($2) to the answer path ($1),
@@ -45,6 +50,12 @@ var gitApply = []string{"git", "-c", "safe.directory=*", "apply", "--whitespace=
 
 //go:embed toyagent.py
 var toyAgentSource string
+
+//go:embed teamcontrol.py
+var teamControlSource string
+
+//go:embed subagentscontrol.py
+var subagentsSource string
 
 type scriptedAdapter struct {
 	cfg CommandConfig
@@ -148,6 +159,14 @@ func (a *scriptedAdapter) Plan(ctx context.Context, rc *schemas.RunContext) (*sc
 			return nil, fmt.Errorf("plan run %s: toy: %w", rc.Run.RunID, err)
 		}
 		argv = []string{"python3", "-I", toyAgentFile}
+	case ScriptedTeam: // Multi-agent area: the run kernel adds the team variables (engine/team.go)
+		files[teamControlFile] = teamControlSource
+		env["BENCH_WORKSPACE"] = Workspace
+		argv = []string{"python3", "-I", teamControlFile}
+	case ScriptedSubagents:
+		files[subagentsFile] = subagentsSource
+		env["BENCH_WORKSPACE"] = Workspace
+		argv = []string{"python3", "-I", subagentsFile}
 	default:
 		return nil, fmt.Errorf("plan run %s: unknown scripted kind %q", rc.Run.RunID, kind)
 	}

@@ -148,6 +148,38 @@ type Verdict struct {
 	Adaptive     *AdaptiveReport `json:"adaptive,omitempty"`
 	Tier         string          `json:"tier,omitempty"`
 	MoreEvidence *MoreEvidence   `json:"more_evidence,omitempty"`
+	// Fairness is set when the experiment declared a fairness rule (agents.go).
+	Fairness *FairnessReport `json:"fairness,omitempty"`
+	Variance *VarianceCard   `json:"variance,omitempty"` // Eval integrity area (S2): the noise floor behind the MDE
+}
+
+// Variance sources (Eval integrity area, S2).
+const (
+	VarianceMeasuredAA = "measured_aa" // SD of A2 minus A per task, from the experiment's own A/A arm
+	VarianceAssumed    = "assumed"     // the configured assumed SD (default 0.30); no usable A/A arm
+	// VarianceObservedEffect is an audit of a published table: its own
+	// per-task differences give the SD (verdict.VarianceObservedEffect).
+	VarianceObservedEffect = "observed_effect"
+)
+
+// VarianceCard is the noise floor of an experiment (Eval integrity area,
+// S2): the SD of per-task paired differences the MDE used and where it came
+// from and, when the experiment ran an A/A arm (aa: true, arm A2 with A's
+// config hash on the clean condition), the A/A comparison itself. Two
+// identical arms that differ significantly mean the harness, not the agent,
+// moved the number, so a directional AADecision makes the verdict INVALID
+// with the reason "harness noise".
+type VarianceCard struct {
+	Source     string    `json:"source"`                // measured_aa | assumed
+	SD         float64   `json:"sd"`                    // the SD the MDE and tasks_needed used
+	AssumedSD  float64   `json:"assumed_sd"`            // the configured assumed SD, default 0.30
+	MeasuredSD *float64  `json:"measured_sd,omitempty"` // SD of A2 minus A per task; nil without an A/A arm or with fewer than 2 paired tasks
+	AAArm      string    `json:"aa_arm,omitempty"`      // "A2" when the experiment ran an A/A arm
+	AATasks    int       `json:"aa_tasks,omitempty"`    // tasks with observed runs in both A and A2 on the clean condition
+	AAEffect   *Effect   `json:"aa_effect,omitempty"`   // A2 against A on the clean condition and the primary metric
+	AADecision *Decision `json:"aa_decision,omitempty"` // improved | regressed (harness noise) | inconclusive between identical arms
+	MDE        float64   `json:"mde"`                   // percentage points at the primary effect's paired task count, with SD
+	Detail     string    `json:"detail"`                // one plain sentence for the card
 }
 
 // InstrumentStatus is one instrument check's state.

@@ -49,6 +49,8 @@ export const FIXTURE_ROUTES: readonly FixtureRoute[] = [
 	{ method: "GET", pattern: "/runs/:id/diff", file: "runs.{id}.diff.json" },
 	{ method: "GET", pattern: "/runs/:id/receipts", file: "runs.{id}.receipts.json" },
 	{ method: "GET", pattern: "/runs/:id/steps", file: "runs.{id}.steps.json" }, // Agent step timeline (stepTimeline.tsx)
+	// Agents of a multi-agent run (components/runs/agents); a single-agent run answers available false.
+	{ method: "GET", pattern: "/runs/:id/agents", file: "runs.{id}.agents.json" },
 	{ method: "GET", pattern: "/pairs/:id", file: "pairs.{id}.json" },
 	{ method: "POST", pattern: "/audit", file: "audit.json" },
 	// A regrade runs as a job: the route answers with the queued experiment.regate job.

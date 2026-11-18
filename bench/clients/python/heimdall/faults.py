@@ -13,14 +13,18 @@ import urllib.request
 import uuid
 from typing import Any, Callable, Optional
 
+def _env(suffix: str) -> Optional[str]:
+    return os.getenv("AGENT_HOOK_"+suffix) or os.getenv("BENCH_FAULT_"+suffix)
+
 class FaultControlError(RuntimeError): pass
 class InjectedFaultError(RuntimeError): pass
 class InjectedTimeoutError(TimeoutError): pass
 
 class FaultSession:
     def __init__(self, session: Optional[str] = None):
-        self.url=os.getenv("BENCH_FAULT_URL"); self.token=os.getenv("BENCH_FAULT_TOKEN"); self.run=os.getenv("BENCH_FAULT_RUN_ID"); self.session=session or os.getenv("BENCH_FAULT_SESSION") or "default"; self.closed=False
-        try: self.hooks=json.loads(os.getenv("BENCH_FAULT_HOOKS","[]"))
+        # A run with realism neutral names these AGENT_HOOK_* (docs/eval-awareness.md); read first.
+        self.url=_env("URL"); self.token=_env("TOKEN"); self.run=_env("RUN_ID"); self.session=session or _env("SESSION") or "default"; self.closed=False
+        try: self.hooks=json.loads(_env("HOOKS") or "[]")
         except json.JSONDecodeError as e: raise FaultControlError("invalid BENCH_FAULT_HOOKS") from e
         if bool(self.url) != bool(self.token) or (self.url and not self.run): raise FaultControlError("adapter fault runtime is partially configured")
         if self.url: self._post("register", {"version":"1","run_id":self.run,"session":self.session,"phase":"register","hooks":self.hooks})

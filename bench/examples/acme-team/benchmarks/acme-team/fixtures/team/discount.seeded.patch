@@ -1,0 +1,22 @@
+--- a/acme/pricing.py
++++ b/acme/pricing.py
+@@ -8,9 +8,16 @@
+     return float(Decimal(str(x)).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP))
+ 
+ 
+-def basket_total(items):
+-    """Sum of price * quantity over (price, quantity) pairs."""
++def basket_total(items, discount=0):
++    """Sum of price * quantity over (price, quantity) pairs, less a discount share."""
+     total = 0
+-    for price, qty in items:
++    for i in range(1, len(items)):
++        price, qty = items[i]
+         total += price * qty
++    total = total * (1 - discount)
+     return cents(total)
++
++
++def loyalty_total(items, points):
++    """Basket total less one penny per loyalty point."""
++    return round(basket_total(items) - points / 100, 1)

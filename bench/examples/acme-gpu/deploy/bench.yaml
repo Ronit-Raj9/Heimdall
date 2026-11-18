@@ -1,0 +1,48 @@
+# Heimdall (bifrost-bench) configuration for the acme-gpu example project.
+# Relative paths resolve against the project root, the parent of this deploy/
+# folder, so every command takes `-config examples/acme-gpu/deploy/bench.yaml`
+# (or `-config deploy/bench.yaml` from the project root). Every key can be
+# overridden with an environment variable named BENCH_<SECTION>_<KEY>, for
+# example BENCH_GPU_DEVICES=0.
+#
+# The gateway, fault proxy and networks are the same stack the bench's own
+# deploy/docker-compose.yml starts; this project reuses it.
+runs_root: runs
+benchmarks_root: benchmarks
+pricing: deploy/pricing-snapshot.json
+
+server:
+  # Loopback only. Port 8100 so it can run beside the bench's own server and the other examples.
+  listen: 127.0.0.1:8100
+  mode: live
+  allowed_hosts: []
+  cors_origins: []
+
+gateway:
+  url: http://127.0.0.1:18080        # host side
+  agent_url: http://bifrost:8080     # from inside the evaluation network
+  admin_token_env: BIFROST_SETUP_TOKEN
+  provider: anthropic
+  key_slots: [fp-slot-1, fp-slot-2, fp-slot-3, fp-slot-4]
+
+faultproxy:
+  control_url: http://127.0.0.1:19101
+
+networks:
+  eval: bench-evalnet
+
+images:
+  # Trusted helper for workspace copy, diff export and the GPU container
+  # check (`bifrost-bench gpu check` runs nvidia-smi -L in it; it needs
+  # glibc). Built by `bifrost-bench init` from deploy/helper/Dockerfile.
+  helper: bench/coding-core-base:1
+
+# GPU tasks (docs/gpu-tasks.md). Each GPU is passed to the agent container
+# and the verifier by UUID as a CDI device (`--device nvidia.com/gpu=<uuid>`),
+# never in privileged mode, and a run holds its GPUs alone. `bifrost-bench
+# gpu check -config examples/acme-gpu/deploy/bench.yaml` lists the GPUs and
+# proves a hardened container sees each one.
+gpu:
+  mode: cdi
+  devices: []        # every GPU nvidia-smi lists; or [0], or [GPU-<uuid>]
+  sample_ms: 500     # host-side nvidia-smi sampler while the agent runs

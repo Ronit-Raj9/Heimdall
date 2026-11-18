@@ -17,14 +17,18 @@ type Suite struct {
 	ProbeIDs    []string      `json:"probes" yaml:"probes"`
 
 	// Scenario fields (scenario.go). All optional.
-	Track    string        `json:"track,omitempty" yaml:"track"`       // leaderboard track; empty means coding
-	Grading  string        `json:"grading,omitempty" yaml:"grading"`   // verified (default) | judged
-	Output   *OutputSpec   `json:"output,omitempty" yaml:"output"`     // what the verifier reads; default diff
-	Services []ServiceSpec `json:"services,omitempty" yaml:"services"` // started beside the agent in every run
-	Judge    *JudgeSpec    `json:"judge,omitempty" yaml:"judge"`       // required when Grading is judged
-	Imported *ImportRecord `json:"imported,omitempty" yaml:"imported"` // set by `bifrost-bench import`
-	External []ExternalAPI `json:"external,omitempty" yaml:"external"` // real HTTP APIs every task's agent may call through the tool proxy
-	Canary   string        `json:"canary,omitempty" yaml:"canary"`     // contamination canary GUID, set by `suite canary` (docs/held-out-and-canaries.md)
+	Track    string        `json:"track,omitempty" yaml:"track"`               // leaderboard track; empty means coding
+	Grading  string        `json:"grading,omitempty" yaml:"grading"`           // verified (default) | judged
+	Output   *OutputSpec   `json:"output,omitempty" yaml:"output"`             // what the verifier reads; default diff
+	Services []ServiceSpec `json:"services,omitempty" yaml:"services"`         // started beside the agent in every run
+	Judge    *JudgeSpec    `json:"judge,omitempty" yaml:"judge"`               // required when Grading is judged
+	Imported *ImportRecord `json:"imported,omitempty" yaml:"imported"`         // set by `bifrost-bench import`
+	External []ExternalAPI `json:"external,omitempty" yaml:"external"`         // real HTTP APIs every task's agent may call through the tool proxy
+	Canary   string        `json:"canary,omitempty" yaml:"canary"`             // contamination canary GUID, set by `suite canary` (docs/held-out-and-canaries.md)
+	Realism  string        `json:"realism,omitempty" yaml:"realism,omitempty"` // Eval integrity area (S2): standard (default) | neutral; an experiment's realism overrides it
+
+	// X4: optional external scanners on the post-run tree (codescan.go).
+	CodeScan *SuiteCodeScan `json:"codescan,omitempty" yaml:"codescan,omitempty"`
 
 	Simulator *SimulatorSpec `json:"simulator,omitempty" yaml:"simulator"` // W3 customer support: user simulator settings, pinned like a judge (scenario.go)
 

@@ -166,6 +166,7 @@ func (w *Worker) Run(ctx context.Context) error {
 func (w *Worker) register(ctx context.Context) error {
 	req := schemas.WorkerRegister{WorkerID: w.opts.WorkerID, Host: w.opts.Host, Version: w.opts.Version,
 		Parts: PartVersions(w.reg), Slots: w.opts.Slots, Pool: w.opts.Pool, Labels: w.opts.Labels}
+	req.Capabilities = WorkerCapabilities(w.reg) // X7: the GPUs this worker offers; nil without a GPU pool (gpu.go)
 	for {
 		var out schemas.WorkerRegistered
 		err := w.call(ctx, http.MethodPost, workerAPI+"/register", req, &out)

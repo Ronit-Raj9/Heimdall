@@ -10,6 +10,7 @@ import (
 	"strings"
 
 	"github.com/maximhq/bifrost/bench/adapters"
+	"github.com/maximhq/bifrost/bench/codescan"
 	"github.com/maximhq/bifrost/bench/engine"
 	"github.com/maximhq/bifrost/bench/environments"
 	"github.com/maximhq/bifrost/bench/evidence"
@@ -93,17 +94,18 @@ func newApp(ctx context.Context, configPath string, opts appOptions) (*app, erro
 	parsers := adapters.BuiltinParsers()
 	adapterFaults := environments.NewAdapterFaultController(environments.DockerWorkspaceConfig{Docker: a.docker, Logger: logger, HelperImage: cfg.Images.Helper, ToolProxyImage: cfg.Images.ToolProxy})
 	helper := cfg.Images.Helper
+	dockerCfg := environments.DockerWorkspaceConfig{
+		EvalNetwork: cfg.Networks.Eval, HelperImage: helper, Logger: logger, Docker: a.docker,
+		ToolProxyImage: cfg.Images.ToolProxy,
+		// Agent steps area: trusted step observers, on unless switched off.
+		ProcessWatch: cfg.Observers.ProcessOn(), WorkspaceWatch: cfg.Observers.WorkspaceOn(), WatchIntervalMS: cfg.Observers.IntervalMS,
+		EventsCollector:   cfg.Events.CollectorOn(),                                                // Agent events area
+		RemoteToolsListen: cfg.RemoteTools.Listen, RemoteToolsPublicURL: cfg.RemoteTools.PublicURL, // Remote coverage
+		ServiceGateway: environments.ServiceGatewayConfig{Gateway: gw, AgentURL: cfg.Gateway.AgentURL, Fault: fault, Price: graders.PricesFrom(prices.Lookup), PriceRef: prices.Ref()}, // W3 customer support: a service's own gateway key (servicegateway.go)
+	}
 	a.reg = &schemas.Registry{
-		Loaders: suite.Builtin(cfg.Path(cfg.BenchmarksRoot)),
-		Environments: environments.Builtin(environments.DockerWorkspaceConfig{
-			EvalNetwork: cfg.Networks.Eval, HelperImage: helper, Logger: logger, Docker: a.docker,
-			ToolProxyImage: cfg.Images.ToolProxy,
-			// Agent steps area: trusted step observers, on unless switched off.
-			ProcessWatch: cfg.Observers.ProcessOn(), WorkspaceWatch: cfg.Observers.WorkspaceOn(), WatchIntervalMS: cfg.Observers.IntervalMS,
-			EventsCollector:   cfg.Events.CollectorOn(),                                                // Agent events area
-			RemoteToolsListen: cfg.RemoteTools.Listen, RemoteToolsPublicURL: cfg.RemoteTools.PublicURL, // Remote coverage
-			ServiceGateway: environments.ServiceGatewayConfig{Gateway: gw, AgentURL: cfg.Gateway.AgentURL, Fault: fault, Price: graders.PricesFrom(prices.Lookup), PriceRef: prices.Ref()}, // W3 customer support: services' own keys
-		}),
+		Loaders:      suite.Builtin(cfg.Path(cfg.BenchmarksRoot)),
+		Environments: []schemas.Environment{environments.NewDockerDriver(dockerCfg)}, // X3: the Docker driver, today's docker_workspace behind the driver seam (environments/driver.go)
 		Adapters: adapters.Builtin(adapters.CommandConfig{
 			GatewayAgentURL: cfg.Gateway.AgentURL, EvalNetwork: cfg.Networks.Eval, BenchRoot: cfg.Root,
 			GatewayPublicURL: cfg.Gateway.PublicURL, // Remote coverage: the gateway as a remote agent reaches it
@@ -123,10 +125,16 @@ func newApp(ctx context.Context, configPath string, opts appOptions) (*app, erro
 		AdapterFaults: adapterFaults,
 		Store:         st,
 	}
+	a.reg.Evidence = append(a.reg.Evidence, codescan.NewSource(graders.ScanInCleanRoom(graders.HiddenTestsConfig{Image: helper, Logger: logger, Docker: a.docker}))) // X4: code scan of added lines
+	// X3: environment.driver kubernetes swaps in the Kubernetes driver (k8s.go).
+	if err := a.useKubernetes(dockerCfg); err != nil {
+		return nil, err
+	}
 	if fault == nil {
 		a.reg.Fault = nil // a typed nil would look non-nil to the engine
 	}
 	a.reg.Graders = withGrader(a.reg.Graders, graders.NewVisual(graders.VisualConfig{Inner: graders.HiddenTestsConfig{Image: helper, Logger: logger, Docker: a.docker}, Judge: graders.JudgeConfig{Gateway: gw, URL: cfg.Gateway.URL, Price: graders.PricesFrom(prices.Lookup), PriceRef: prices.Ref(), Logger: logger}, Logger: logger})) // X1 vision grading: the wired visual grader replaces Builtin's unwired one (visual.go)
+	a.reg.GPUs = gpuAllocator(ctx, cfg, logger)                                                                                                                                                                                                                                                                                            // X7: this machine's GPU pool, nil without a usable GPU (gpu.go)
 	return a, nil
 }
 

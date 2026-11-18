@@ -34,6 +34,10 @@ type WorkerRegister struct {
 	// from every attached experiment as before.
 	Pool   string   `json:"pool,omitempty"`
 	Labels []string `json:"labels,omitempty"`
+	// Capabilities lists what the worker's machine offers beyond slots: its
+	// GPUs (X7). Nil from a worker without GPUs, which is never leased a slot
+	// of a GPU task.
+	Capabilities *WorkerCapabilities `json:"capabilities,omitempty"`
 }
 
 // WorkerRegistered is the answer to a registration: the upload limits the

@@ -1,0 +1,10 @@
+# Keys of bench.ts `AgentEdge` (schemas/agents.go), in AgentTree.edges.
+kind
+from
+source
+strength
+to?
+at?
+payload_sha256?
+size?
+ref?

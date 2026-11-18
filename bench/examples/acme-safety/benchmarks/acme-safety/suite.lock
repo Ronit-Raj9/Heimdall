@@ -1,0 +1,882 @@
+{
+  "suite": "acme-safety",
+  "version": "1.0.0",
+  "base_image": {
+    "tag": "bench/coding-core-base:1"
+  },
+  "tasks": {
+    "alert-storm": {
+      "version": "1.0.0",
+      "instruction_sha256": "285ca2b9794551da79338487324bd7cfbc42ff3ae3095f46540d5ea4ba7ea6d9",
+      "repo_tree_sha256": "971bd10240483d91c8e6dbd05bb5082e20a079b8c301d697626ba85898f659cb",
+      "verifier_sha256": "765f1a7c7eb634b19f29a79f580d0dc893f85b9e8ef9438954d20efdc7563e16",
+      "controls_sha256": "32ac7771528b02d39c9964bbb5c07ad1e3f0d6746517841f6e73faef94269226",
+      "fixtures_sha256": "f10b13941e305c8bf753c22d722f832f7f56333b49b9b9edee9c87d99480e9ba",
+      "status": "admitted",
+      "admission": {
+        "admitted": true,
+        "checks": [
+          {
+            "name": "static_validation",
+            "want": "clean",
+            "got": "clean",
+            "passed": true,
+            "detail": "0 warnings"
+          },
+          {
+            "name": "reference_1",
+            "want": "pass",
+            "got": "pass",
+            "passed": true,
+            "detail": "solution/reference.sh exit 0; tests_ran=0 failures=0 errors=0 skipped=0 exit=0 reason=passed (reward 1)"
+          },
+          {
+            "name": "reference_2",
+            "want": "pass",
+            "got": "pass",
+            "passed": true,
+            "detail": "solution/reference.sh exit 0; tests_ran=0 failures=0 errors=0 skipped=0 exit=0 reason=passed (reward 1)"
+          },
+          {
+            "name": "reference_3",
+            "want": "pass",
+            "got": "pass",
+            "passed": true,
+            "detail": "solution/reference.sh exit 0; tests_ran=0 failures=0 errors=0 skipped=0 exit=0 reason=passed (reward 1)"
+          },
+          {
+            "name": "empty_control",
+            "want": "fail",
+            "got": "fail",
+            "passed": true,
+            "detail": "controls/empty.sh exit 0; tests_ran=0 failures=0 errors=0 skipped=0 exit=0 reason=reward 0 below pass threshold 1"
+          },
+          {
+            "name": "mutant_1",
+            "want": "fail",
+            "got": "fail",
+            "passed": true,
+            "detail": "controls/mutant.sh exit 0; tests_ran=0 failures=0 errors=0 skipped=0 exit=0 reason=reward 0 below pass threshold 1"
+          },
+          {
+            "name": "exploit",
+            "want": "fail",
+            "got": "fail",
+            "passed": true,
+            "detail": "controls/exploit.sh exit 0; tests_ran=0 failures=0 errors=0 skipped=0 exit=0 reason=reward 0 below pass threshold 1"
+          },
+          {
+            "name": "null_noop",
+            "want": "fail",
+            "got": "fail",
+            "passed": true,
+            "detail": "noop exit 0; tests_ran=0 failures=0 errors=0 skipped=0 exit=0 reason=reward 0 below pass threshold 1"
+          },
+          {
+            "name": "null_refuse",
+            "want": "fail",
+            "got": "fail",
+            "passed": true,
+            "detail": "refuse exit 0; tests_ran=0 failures=0 errors=0 skipped=0 exit=0 reason=reward 0 below pass threshold 1"
+          },
+          {
+            "name": "instruction_edited",
+            "want": "edited",
+            "got": "edited",
+            "passed": true
+          },
+          {
+            "name": "secret_scan",
+            "want": "none",
+            "got": "none",
+            "passed": true
+          },
+          {
+            "name": "verifier_no_network",
+            "want": "none",
+            "got": "none",
+            "passed": true,
+            "detail": "reported by grader verifier_command"
+          }
+        ],
+        "at": "2026-11-18T01:38:05.630437044Z",
+        "grader": "verifier_command",
+        "reference_repeats": 3,
+        "reference_results": [
+          "pass",
+          "pass",
+          "pass"
+        ],
+        "fingerprint": "0034ebfb2c92ae18c858dfdaad65d18c0b630ab4f40d5d567fcbbb156ec166ef"
+      }
+    },
+    "card-update": {
+      "version": "1.0.0",
+      "instruction_sha256": "ab947467be22f2a0d725ae8949684e394fd727de409c80749132374e3cabe222",
+      "repo_tree_sha256": "971bd10240483d91c8e6dbd05bb5082e20a079b8c301d697626ba85898f659cb",
+      "verifier_sha256": "972d76375d8be37a48465ce98f149015c6cf5bf2d56769a3edc941aee3c698f5",
+      "controls_sha256": "9575da977033e97447b7e4379ccecb597c360844f1153fb50beb4da2eebde44e",
+      "fixtures_sha256": "6ee734d32a7372e7e41e00315423a9c44365f22d327bf05cc90d9d7ae6dc872c",
+      "status": "admitted",
+      "admission": {
+        "admitted": true,
+        "checks": [
+          {
+            "name": "static_validation",
+            "want": "clean",
+            "got": "clean",
+            "passed": true,
+            "detail": "0 warnings"
+          },
+          {
+            "name": "reference_1",
+            "want": "pass",
+            "got": "pass",
+            "passed": true,
+            "detail": "solution/reference.sh exit 0; tests_ran=0 failures=0 errors=0 skipped=0 exit=0 reason=passed (reward 1)"
+          },
+          {
+            "name": "reference_2",
+            "want": "pass",
+            "got": "pass",
+            "passed": true,
+            "detail": "solution/reference.sh exit 0; tests_ran=0 failures=0 errors=0 skipped=0 exit=0 reason=passed (reward 1)"
+          },
+          {
+            "name": "reference_3",
+            "want": "pass",
+            "got": "pass",
+            "passed": true,
+            "detail": "solution/reference.sh exit 0; tests_ran=0 failures=0 errors=0 skipped=0 exit=0 reason=passed (reward 1)"
+          },
+          {
+            "name": "empty_control",
+            "want": "fail",
+            "got": "fail",
+            "passed": true,
+            "detail": "controls/empty.sh exit 0; tests_ran=0 failures=0 errors=0 skipped=0 exit=0 reason=reward 0 below pass threshold 1"
+          },
+          {
+            "name": "mutant_1",
+            "want": "fail",
+            "got": "fail",
+            "passed": true,
+            "detail": "controls/mutant.sh exit 0; tests_ran=0 failures=0 errors=0 skipped=0 exit=0 reason=reward 0 below pass threshold 1"
+          },
+          {
+            "name": "exploit",
+            "want": "fail",
+            "got": "fail",
+            "passed": true,
+            "detail": "controls/exploit.sh exit 0; tests_ran=0 failures=0 errors=0 skipped=0 exit=0 reason=reward 0 below pass threshold 1"
+          },
+          {
+            "name": "null_noop",
+            "want": "fail",
+            "got": "fail",
+            "passed": true,
+            "detail": "noop exit 0; tests_ran=0 failures=0 errors=0 skipped=0 exit=0 reason=reward 0 below pass threshold 1"
+          },
+          {
+            "name": "null_refuse",
+            "want": "fail",
+            "got": "fail",
+            "passed": true,
+            "detail": "refuse exit 0; tests_ran=0 failures=0 errors=0 skipped=0 exit=0 reason=reward 0 below pass threshold 1"
+          },
+          {
+            "name": "instruction_edited",
+            "want": "edited",
+            "got": "edited",
+            "passed": true
+          },
+          {
+            "name": "secret_scan",
+            "want": "none",
+            "got": "none",
+            "passed": true
+          },
+          {
+            "name": "verifier_no_network",
+            "want": "none",
+            "got": "none",
+            "passed": true,
+            "detail": "reported by grader verifier_command"
+          }
+        ],
+        "at": "2026-11-18T01:33:38.801204719Z",
+        "grader": "verifier_command",
+        "reference_repeats": 3,
+        "reference_results": [
+          "pass",
+          "pass",
+          "pass"
+        ],
+        "fingerprint": "643156986ffe0c5d93e8298ffc0e7a1c6bd416249ea603a1d8721dc9b9cde7ec"
+      }
+    },
+    "kb-answer": {
+      "version": "1.0.0",
+      "instruction_sha256": "e82989fbedff2262cc4fcb5689d56aaaca4817bce15d3c2317bdac8ef1dd3225",
+      "repo_tree_sha256": "971bd10240483d91c8e6dbd05bb5082e20a079b8c301d697626ba85898f659cb",
+      "verifier_sha256": "470cdb263122acdc3b6ba1f0e67f77424038c2e94847d6d4b98839e42495fae8",
+      "controls_sha256": "6ea793d71fb3ec088e3ebeac0d2113ae6c4e8513bf6fd80e37e782b964adca60",
+      "fixtures_sha256": "92ee74e12f89f66bb70abb7a60207b0b88fb33737b2920636da5992710eee177",
+      "status": "admitted",
+      "admission": {
+        "admitted": true,
+        "checks": [
+          {
+            "name": "static_validation",
+            "want": "clean",
+            "got": "clean",
+            "passed": true,
+            "detail": "0 warnings"
+          },
+          {
+            "name": "reference_1",
+            "want": "pass",
+            "got": "pass",
+            "passed": true,
+            "detail": "solution/reference.sh exit 0; tests_ran=0 failures=0 errors=0 skipped=0 exit=0 reason=passed (reward 1)"
+          },
+          {
+            "name": "reference_2",
+            "want": "pass",
+            "got": "pass",
+            "passed": true,
+            "detail": "solution/reference.sh exit 0; tests_ran=0 failures=0 errors=0 skipped=0 exit=0 reason=passed (reward 1)"
+          },
+          {
+            "name": "reference_3",
+            "want": "pass",
+            "got": "pass",
+            "passed": true,
+            "detail": "solution/reference.sh exit 0; tests_ran=0 failures=0 errors=0 skipped=0 exit=0 reason=passed (reward 1)"
+          },
+          {
+            "name": "empty_control",
+            "want": "fail",
+            "got": "fail",
+            "passed": true,
+            "detail": "controls/empty.sh exit 0; tests_ran=0 failures=0 errors=0 skipped=0 exit=0 reason=reward 0 below pass threshold 1"
+          },
+          {
+            "name": "mutant_1",
+            "want": "fail",
+            "got": "fail",
+            "passed": true,
+            "detail": "controls/mutant.sh exit 0; tests_ran=0 failures=0 errors=0 skipped=0 exit=0 reason=reward 0 below pass threshold 1"
+          },
+          {
+            "name": "exploit",
+            "want": "fail",
+            "got": "fail",
+            "passed": true,
+            "detail": "controls/exploit.sh exit 0; tests_ran=0 failures=0 errors=0 skipped=0 exit=0 reason=reward 0 below pass threshold 1"
+          },
+          {
+            "name": "null_noop",
+            "want": "fail",
+            "got": "fail",
+            "passed": true,
+            "detail": "noop exit 0; tests_ran=0 failures=0 errors=0 skipped=0 exit=0 reason=reward 0 below pass threshold 1"
+          },
+          {
+            "name": "null_refuse",
+            "want": "fail",
+            "got": "fail",
+            "passed": true,
+            "detail": "refuse exit 0; tests_ran=0 failures=0 errors=0 skipped=0 exit=0 reason=reward 0 below pass threshold 1"
+          },
+          {
+            "name": "instruction_edited",
+            "want": "edited",
+            "got": "edited",
+            "passed": true
+          },
+          {
+            "name": "secret_scan",
+            "want": "none",
+            "got": "none",
+            "passed": true
+          },
+          {
+            "name": "verifier_no_network",
+            "want": "none",
+            "got": "none",
+            "passed": true,
+            "detail": "reported by grader verifier_command"
+          }
+        ],
+        "at": "2026-11-18T01:25:46.085205292Z",
+        "grader": "verifier_command",
+        "reference_repeats": 3,
+        "reference_results": [
+          "pass",
+          "pass",
+          "pass"
+        ],
+        "fingerprint": "8a4572f3425ff42ea45569402ae95038b7bdd57779dd74299e66e0eb9c76eb0b"
+      }
+    },
+    "refund-approval": {
+      "version": "1.0.0",
+      "instruction_sha256": "197ecfd2ddec0502de3f737d3f1a67c2b68221c11ca38c4cb8f30822e5bbfcb4",
+      "repo_tree_sha256": "971bd10240483d91c8e6dbd05bb5082e20a079b8c301d697626ba85898f659cb",
+      "verifier_sha256": "a97fe1bfa75c4ee2f4c61308266243f4e1b3b1832f78637fb5793d9dcf1f8e07",
+      "controls_sha256": "416d09ae7d4ef043d12c440da950ee4e40317b6b0cbf4406f32246c59c1bfdf9",
+      "fixtures_sha256": "f10b13941e305c8bf753c22d722f832f7f56333b49b9b9edee9c87d99480e9ba",
+      "status": "admitted",
+      "admission": {
+        "admitted": true,
+        "checks": [
+          {
+            "name": "static_validation",
+            "want": "clean",
+            "got": "clean",
+            "passed": true,
+            "detail": "0 warnings"
+          },
+          {
+            "name": "reference_1",
+            "want": "pass",
+            "got": "pass",
+            "passed": true,
+            "detail": "solution/reference.sh exit 0; tests_ran=0 failures=0 errors=0 skipped=0 exit=0 reason=passed (reward 1)"
+          },
+          {
+            "name": "reference_2",
+            "want": "pass",
+            "got": "pass",
+            "passed": true,
+            "detail": "solution/reference.sh exit 0; tests_ran=0 failures=0 errors=0 skipped=0 exit=0 reason=passed (reward 1)"
+          },
+          {
+            "name": "reference_3",
+            "want": "pass",
+            "got": "pass",
+            "passed": true,
+            "detail": "solution/reference.sh exit 0; tests_ran=0 failures=0 errors=0 skipped=0 exit=0 reason=passed (reward 1)"
+          },
+          {
+            "name": "empty_control",
+            "want": "fail",
+            "got": "fail",
+            "passed": true,
+            "detail": "controls/empty.sh exit 0; tests_ran=0 failures=0 errors=0 skipped=0 exit=0 reason=reward 0 below pass threshold 1"
+          },
+          {
+            "name": "mutant_1",
+            "want": "fail",
+            "got": "fail",
+            "passed": true,
+            "detail": "controls/mutant.sh exit 0; tests_ran=0 failures=0 errors=0 skipped=0 exit=0 reason=reward 0 below pass threshold 1"
+          },
+          {
+            "name": "exploit",
+            "want": "fail",
+            "got": "fail",
+            "passed": true,
+            "detail": "controls/exploit.sh exit 0; tests_ran=0 failures=0 errors=0 skipped=0 exit=0 reason=reward 0 below pass threshold 1"
+          },
+          {
+            "name": "null_noop",
+            "want": "fail",
+            "got": "fail",
+            "passed": true,
+            "detail": "noop exit 0; tests_ran=0 failures=0 errors=0 skipped=0 exit=0 reason=reward 0 below pass threshold 1"
+          },
+          {
+            "name": "null_refuse",
+            "want": "fail",
+            "got": "fail",
+            "passed": true,
+            "detail": "refuse exit 0; tests_ran=0 failures=0 errors=0 skipped=0 exit=0 reason=reward 0 below pass threshold 1"
+          },
+          {
+            "name": "instruction_edited",
+            "want": "edited",
+            "got": "edited",
+            "passed": true
+          },
+          {
+            "name": "secret_scan",
+            "want": "none",
+            "got": "none",
+            "passed": true
+          },
+          {
+            "name": "verifier_no_network",
+            "want": "none",
+            "got": "none",
+            "passed": true,
+            "detail": "reported by grader verifier_command"
+          }
+        ],
+        "at": "2026-11-18T01:40:31.168357473Z",
+        "grader": "verifier_command",
+        "reference_repeats": 3,
+        "reference_results": [
+          "pass",
+          "pass",
+          "pass"
+        ],
+        "fingerprint": "57a0a87994fd6be6aae5503d5663c9fa6ec63448e57817cf7d4c9d18f0e3bdab"
+      }
+    },
+    "refund-check": {
+      "version": "1.0.0",
+      "instruction_sha256": "2c7be2195dfde722ad2c5cd1a94c827d7f1ae7777c516272e08223ecf906fcf9",
+      "repo_tree_sha256": "971bd10240483d91c8e6dbd05bb5082e20a079b8c301d697626ba85898f659cb",
+      "verifier_sha256": "5bcc9957c3c840bd17055edef28cad45282b05f530d7a1d70591bf4b954c8b05",
+      "controls_sha256": "0284260e4264cabb285ea887c4df1548107996fb98f0abf926136b248e1ee1fc",
+      "fixtures_sha256": "f10b13941e305c8bf753c22d722f832f7f56333b49b9b9edee9c87d99480e9ba",
+      "status": "admitted",
+      "admission": {
+        "admitted": true,
+        "checks": [
+          {
+            "name": "static_validation",
+            "want": "clean",
+            "got": "clean",
+            "passed": true,
+            "detail": "0 warnings"
+          },
+          {
+            "name": "reference_1",
+            "want": "pass",
+            "got": "pass",
+            "passed": true,
+            "detail": "solution/reference.sh exit 0; tests_ran=0 failures=0 errors=0 skipped=0 exit=0 reason=passed (reward 1)"
+          },
+          {
+            "name": "reference_2",
+            "want": "pass",
+            "got": "pass",
+            "passed": true,
+            "detail": "solution/reference.sh exit 0; tests_ran=0 failures=0 errors=0 skipped=0 exit=0 reason=passed (reward 1)"
+          },
+          {
+            "name": "reference_3",
+            "want": "pass",
+            "got": "pass",
+            "passed": true,
+            "detail": "solution/reference.sh exit 0; tests_ran=0 failures=0 errors=0 skipped=0 exit=0 reason=passed (reward 1)"
+          },
+          {
+            "name": "empty_control",
+            "want": "fail",
+            "got": "fail",
+            "passed": true,
+            "detail": "controls/empty.sh exit 0; tests_ran=0 failures=0 errors=0 skipped=0 exit=0 reason=reward 0 below pass threshold 1"
+          },
+          {
+            "name": "mutant_1",
+            "want": "fail",
+            "got": "fail",
+            "passed": true,
+            "detail": "controls/mutant.sh exit 0; tests_ran=0 failures=0 errors=0 skipped=0 exit=0 reason=reward 0 below pass threshold 1"
+          },
+          {
+            "name": "exploit",
+            "want": "fail",
+            "got": "fail",
+            "passed": true,
+            "detail": "controls/exploit.sh exit 0; tests_ran=0 failures=0 errors=0 skipped=0 exit=0 reason=reward 0 below pass threshold 1"
+          },
+          {
+            "name": "null_noop",
+            "want": "fail",
+            "got": "fail",
+            "passed": true,
+            "detail": "noop exit 0; tests_ran=0 failures=0 errors=0 skipped=0 exit=0 reason=reward 0 below pass threshold 1"
+          },
+          {
+            "name": "null_refuse",
+            "want": "fail",
+            "got": "fail",
+            "passed": true,
+            "detail": "refuse exit 0; tests_ran=0 failures=0 errors=0 skipped=0 exit=0 reason=reward 0 below pass threshold 1"
+          },
+          {
+            "name": "instruction_edited",
+            "want": "edited",
+            "got": "edited",
+            "passed": true
+          },
+          {
+            "name": "secret_scan",
+            "want": "none",
+            "got": "none",
+            "passed": true
+          },
+          {
+            "name": "verifier_no_network",
+            "want": "none",
+            "got": "none",
+            "passed": true,
+            "detail": "reported by grader verifier_command"
+          }
+        ],
+        "at": "2026-11-18T01:17:56.394955662Z",
+        "grader": "verifier_command",
+        "reference_repeats": 3,
+        "reference_results": [
+          "pass",
+          "pass",
+          "pass"
+        ],
+        "fingerprint": "b1ec8245917745b352ffdc89fbf293f6c46ba58259a235a69ee6b0d1b9aa39a0"
+      }
+    }
+  },
+  "probes": {
+    "alert-noise": {
+      "version": "1.0.0",
+      "sha256": "f4a06f6adfe9e347e283653e3c7a1a6065b33d85bbc36c63e2270ff9d7d4ebb3"
+    },
+    "approval-denied": {
+      "version": "1.0.0",
+      "sha256": "53d27731035affac4e046df4cd8a2fc48dba3393b19f3910a8a3bbc392924f61"
+    },
+    "describe-poison": {
+      "version": "1.0.0",
+      "sha256": "12a03cbdbc610915d6995562d7752563dacea8e554271229e33d359c5162bd86"
+    },
+    "exfil-ticket": {
+      "version": "1.0.0",
+      "sha256": "c1eec1406aa9fd50817175f8f8d8f4b132b8674173de0aaf62cd63921ea3b290"
+    },
+    "lost-ack": {
+      "version": "1.0.0",
+      "sha256": "200ea233cda8ea97e0a3bdb7945130869123afdf492d48954d6c68ea67956447"
+    },
+    "model-outage": {
+      "version": "1.0.0",
+      "sha256": "1eb12d902d2c909ed815aab45589600d443f96ebfeaa48aaad7e5caffce8534c"
+    },
+    "plausible-wrong": {
+      "version": "1.0.0",
+      "sha256": "a2e26971b0ce3eb01716c4ab6051f82ed3ac7b32b1d55de43eb764147db1cd03"
+    },
+    "rug-pull": {
+      "version": "1.0.0",
+      "sha256": "7c76819cfac026d2e17dd111e2dff6c5d87500a767ebd88ecfed59784a034eaa"
+    },
+    "schema-drift": {
+      "version": "1.0.0",
+      "sha256": "540f2d7414de67a0fffc23abe700990246451f8272eba6e50fe4a78fa9dd5a68"
+    },
+    "schema-poison": {
+      "version": "1.0.0",
+      "sha256": "08a352481a5aa1c409405e331447516c63df6aa3fcfed5d84d898ba069b08bd2"
+    },
+    "shadow-kb": {
+      "version": "1.0.0",
+      "sha256": "65053526ef44c02f4453a71d80420b05f6e139528f44a32ac70c324e94c054f7"
+    },
+    "stream-cut": {
+      "version": "1.0.0",
+      "sha256": "45a939fbbb443e0896b91e99a9e6d0e9b8d45cc556e1a47fd7c5c1a9de150385"
+    }
+  },
+  "created_at": "2026-11-18T01:17:56.108441577Z",
+  "fingerprints": {
+    "version": 1,
+    "suite": {
+      "settings": "ddae3c5a6b510a45bce3f222f332ab77aec486d600862a5e695a378daafb5f36",
+      "fields": {
+        "base_image": "0d0192aa22c9741cd1c16dc6d4b2ca36e7be6aab202c7cfac4ebe3a7fb69084e",
+        "environment": "2075abc096d17738fba811b8518f8a3cbd1a5621abd0fd833170c50f4f9bbe4b",
+        "grader": "47789364c3ef10b8c5e96f4a5397a4297f3b5ffd83bbf1f3a18dad282737362d",
+        "id": "5f5787d38578fc25c74b66ad93b914d4c168bd0eb045edacc7032c78628a9248",
+        "output": "0b1ac582c010782f89773b90008f13b7947093b29e2f74c906fa4629bf2e9d19",
+        "parts": "68df612014fc627742a5c7276caf6fc051723f0f8362b14ad74b8f18fd752328",
+        "probes": "cc49d6d665880118f5ff3b68176172f247329f70ea9c03ce89f84179697b1f5d",
+        "tasks": "10570fa985dc629bf78b80c4389e549db759ccf15f37fc3585bee9fb5fb7ef1f",
+        "track": "7c5c4ba60297f1adc7a83b8b86eeb7c355f6846ca0b2a04f88f94e98a978a21e",
+        "verifier": "386f602bb15950286e29e80fc9c473bb22db23a6cc0433730694cbb7b39abc32",
+        "version": "39fe4a40977d0585fd5704359e3685b0ada5cf5ee061e5d97385601d120cd0ec",
+        "workdir": "4384b4849b7f004db243393653c15565c0a2ab2a8951d8513646c37d2a14a51f"
+      },
+      "files": "de87beebbbe3c2cc8d9b51d208ecadb40275e9ef0e40b057c7ada94d6a05c562",
+      "images": {
+        "base": "tag only: bench/coding-core-base:1",
+        "helper": "tag only: bench/coding-core-base:1"
+      }
+    },
+    "tasks": {
+      "alert-storm": {
+        "settings": "df4f25f25ebc43e75e5eab5fbb1d2cdf934bca515a19ff0d82efb08b9425144f",
+        "fields": {
+          "capabilities": "dae07eae408cd3e0f9b0f0dce36e2c74ae7fc995317f4caf7b86ad5841d488b2",
+          "controls": "40b802188f873c039db135ac05eb685b37d3f45d898d1f19581fcae2c9757ed5",
+          "difficulty": "3ed870088e7410ee05d36e4fc20bf73104130ef98000b268b11378d0800d1703",
+          "id": "b27fb0ed661480ced6eaaf818f91c1af051d4063b583d5b5d2baea358e4a997d",
+          "instruction": "d22404e1bdcc17d8b42ec5950fe47a8a98ed7ccdf46bdc43121a724676b65198",
+          "kind": "1ff4393bcd872405377779cd81a787a54906f836cdd1d316ed2c5710d98d925b",
+          "project": "5f5787d38578fc25c74b66ad93b914d4c168bd0eb045edacc7032c78628a9248",
+          "provenance": "ef96dcd00e3dd5ed5dadff6126f6806c4acdbb94119905799aea4ff39ede9ae9",
+          "repo_dir": "a22b0355c8c3954692a2626bc83ff8ea3b7b65119e407c324883e2ed95c1fbe6",
+          "services": "f1d58afe22b360a421df56ecd65b2073e96ff06d3011fb9904cd58305809ea38",
+          "timeouts": "9f83a610bc0778eac5699c6a3231f06aad018396bad58bb40de11b55b1c29087",
+          "title": "76e3899e82d27e9ca0f0b954d38e2ff7c941dc979025ddc015cb80441c36318b",
+          "verifier": "3c0c9efd04d308ebf9f4569298c7d6c6f448e083dacf0c4b9ce1b504ac56bb65",
+          "version": "39fe4a40977d0585fd5704359e3685b0ada5cf5ee061e5d97385601d120cd0ec"
+        },
+        "files": "25577546a5e46301e2f84ba40c4ac22afc1c89ed31cfdd2422681aafecf3f133"
+      },
+      "card-update": {
+        "settings": "22530c9e372feae6c4e308b25a85778cbc39c400fa66254da17f46b8f72826f5",
+        "fields": {
+          "capabilities": "38aa5aa9e3882e7f98cc0c4a0cbdbb68c15cae775f6ab4816be1838c08dc8faa",
+          "controls": "40b802188f873c039db135ac05eb685b37d3f45d898d1f19581fcae2c9757ed5",
+          "difficulty": "3ed870088e7410ee05d36e4fc20bf73104130ef98000b268b11378d0800d1703",
+          "external": "c9b540173f014db0b25d358901ff14e7bc71c97d43aada76c4ab497351924263",
+          "id": "66d698f1abdf3697a097275fc31edd9ca4390d2a1483009e683aa5907150339a",
+          "instruction": "d22404e1bdcc17d8b42ec5950fe47a8a98ed7ccdf46bdc43121a724676b65198",
+          "kind": "1ff4393bcd872405377779cd81a787a54906f836cdd1d316ed2c5710d98d925b",
+          "project": "5f5787d38578fc25c74b66ad93b914d4c168bd0eb045edacc7032c78628a9248",
+          "provenance": "ef96dcd00e3dd5ed5dadff6126f6806c4acdbb94119905799aea4ff39ede9ae9",
+          "repo_dir": "a22b0355c8c3954692a2626bc83ff8ea3b7b65119e407c324883e2ed95c1fbe6",
+          "services": "f1d58afe22b360a421df56ecd65b2073e96ff06d3011fb9904cd58305809ea38",
+          "timeouts": "9f83a610bc0778eac5699c6a3231f06aad018396bad58bb40de11b55b1c29087",
+          "title": "2d5cd2596f8131e68ca89494793a6b3f05e640bc99b4d3c0698617780f030e21",
+          "verifier": "3c0c9efd04d308ebf9f4569298c7d6c6f448e083dacf0c4b9ce1b504ac56bb65",
+          "version": "39fe4a40977d0585fd5704359e3685b0ada5cf5ee061e5d97385601d120cd0ec"
+        },
+        "files": "dbe439356a7a1b90dbe76ae4d3597d5be4b18072ff2eefe534d684e120c613bc"
+      },
+      "kb-answer": {
+        "settings": "b07deb1b4dd7f9be233545cff33c85f510197688a767d0699a1b1184f5d8c84f",
+        "fields": {
+          "capabilities": "dae07eae408cd3e0f9b0f0dce36e2c74ae7fc995317f4caf7b86ad5841d488b2",
+          "controls": "40b802188f873c039db135ac05eb685b37d3f45d898d1f19581fcae2c9757ed5",
+          "difficulty": "3ed870088e7410ee05d36e4fc20bf73104130ef98000b268b11378d0800d1703",
+          "id": "bb9d085a8545435d952d89bad7a06bff0cef4b20d9ba4f0bc91fcfa3a36fab18",
+          "instruction": "d22404e1bdcc17d8b42ec5950fe47a8a98ed7ccdf46bdc43121a724676b65198",
+          "kind": "1ff4393bcd872405377779cd81a787a54906f836cdd1d316ed2c5710d98d925b",
+          "project": "5f5787d38578fc25c74b66ad93b914d4c168bd0eb045edacc7032c78628a9248",
+          "provenance": "ef96dcd00e3dd5ed5dadff6126f6806c4acdbb94119905799aea4ff39ede9ae9",
+          "repo_dir": "a22b0355c8c3954692a2626bc83ff8ea3b7b65119e407c324883e2ed95c1fbe6",
+          "services": "78bcd01215c6ea1a60a37cac004e4ebff226c4063f10b3176e79402008a465b0",
+          "timeouts": "9f83a610bc0778eac5699c6a3231f06aad018396bad58bb40de11b55b1c29087",
+          "title": "c22ef17bc21857b9e5292efb2b72d67111176901ac06d4318f0795e8cd9228cf",
+          "verifier": "3c0c9efd04d308ebf9f4569298c7d6c6f448e083dacf0c4b9ce1b504ac56bb65",
+          "version": "39fe4a40977d0585fd5704359e3685b0ada5cf5ee061e5d97385601d120cd0ec"
+        },
+        "files": "f5698730a97ea6e14d887f19bd2ca17ec8d4897d806b009bf346a694fc5f35eb"
+      },
+      "refund-approval": {
+        "settings": "c76538c79fd79752881e6b814f5a40e64fa4d34887a3088db4040ad9337823b9",
+        "fields": {
+          "capabilities": "dae07eae408cd3e0f9b0f0dce36e2c74ae7fc995317f4caf7b86ad5841d488b2",
+          "controls": "40b802188f873c039db135ac05eb685b37d3f45d898d1f19581fcae2c9757ed5",
+          "difficulty": "3ed870088e7410ee05d36e4fc20bf73104130ef98000b268b11378d0800d1703",
+          "id": "597507c05f56eca51643dce027184be1cb78f9b6405ae981493d7472d9522f78",
+          "instruction": "d22404e1bdcc17d8b42ec5950fe47a8a98ed7ccdf46bdc43121a724676b65198",
+          "kind": "1ff4393bcd872405377779cd81a787a54906f836cdd1d316ed2c5710d98d925b",
+          "project": "5f5787d38578fc25c74b66ad93b914d4c168bd0eb045edacc7032c78628a9248",
+          "provenance": "ef96dcd00e3dd5ed5dadff6126f6806c4acdbb94119905799aea4ff39ede9ae9",
+          "repo_dir": "a22b0355c8c3954692a2626bc83ff8ea3b7b65119e407c324883e2ed95c1fbe6",
+          "services": "f1d58afe22b360a421df56ecd65b2073e96ff06d3011fb9904cd58305809ea38",
+          "timeouts": "9f83a610bc0778eac5699c6a3231f06aad018396bad58bb40de11b55b1c29087",
+          "title": "e32ad486645b167c131bf67e6d057aa0ed9ef5d4ed5fc19b0c67cf05c11d633b",
+          "verifier": "3c0c9efd04d308ebf9f4569298c7d6c6f448e083dacf0c4b9ce1b504ac56bb65",
+          "version": "39fe4a40977d0585fd5704359e3685b0ada5cf5ee061e5d97385601d120cd0ec"
+        },
+        "files": "5c263dd16d7cbbbb6b7aa7e87190a287c235bf29a1d8415a76e7437720bad235"
+      },
+      "refund-check": {
+        "settings": "cfd494ecaf0b8fe357fc548909c2e9a366e3e9903bb17a580f01b02e5e90dda4",
+        "fields": {
+          "capabilities": "dae07eae408cd3e0f9b0f0dce36e2c74ae7fc995317f4caf7b86ad5841d488b2",
+          "controls": "40b802188f873c039db135ac05eb685b37d3f45d898d1f19581fcae2c9757ed5",
+          "difficulty": "3ed870088e7410ee05d36e4fc20bf73104130ef98000b268b11378d0800d1703",
+          "id": "708ecab631319b491eefb51990c02c6baaf2b2dcab33f5bfe6d8e325595f20fd",
+          "instruction": "d22404e1bdcc17d8b42ec5950fe47a8a98ed7ccdf46bdc43121a724676b65198",
+          "kind": "1ff4393bcd872405377779cd81a787a54906f836cdd1d316ed2c5710d98d925b",
+          "project": "5f5787d38578fc25c74b66ad93b914d4c168bd0eb045edacc7032c78628a9248",
+          "provenance": "ef96dcd00e3dd5ed5dadff6126f6806c4acdbb94119905799aea4ff39ede9ae9",
+          "repo_dir": "a22b0355c8c3954692a2626bc83ff8ea3b7b65119e407c324883e2ed95c1fbe6",
+          "services": "f1d58afe22b360a421df56ecd65b2073e96ff06d3011fb9904cd58305809ea38",
+          "timeouts": "9f83a610bc0778eac5699c6a3231f06aad018396bad58bb40de11b55b1c29087",
+          "title": "cf9ccc8ee2b49fda895190ebf8fa488529c476ec997d22f2ac7a9dd60de300b5",
+          "verifier": "3c0c9efd04d308ebf9f4569298c7d6c6f448e083dacf0c4b9ce1b504ac56bb65",
+          "version": "39fe4a40977d0585fd5704359e3685b0ada5cf5ee061e5d97385601d120cd0ec"
+        },
+        "files": "bcca798e741a987891eec38ebc18a1d6d4aacc0a011439da807928e42cf7e2c2"
+      }
+    },
+    "probes": {
+      "alert-noise": {
+        "settings": "c7ae936d3669666fd12b193628ad569875459eab93e9fab83925ee9fd63b5c6f",
+        "fields": {
+          "apply": "0438d6c48098ad4fc26d55a6e5dafc8c87075d216de59aba36593ea1c1db794f",
+          "axis": "879e12bd526eca73a1129c8a412885130c5799f9513e3a8b0ff54557aba12025",
+          "goal_preserving": "b5bea41b6c623f7c09f1bf24dcae58ebab3c0cdd90ad966bc43a45b44867e12b",
+          "id": "1fe6a52b412615adab2e63c3c4dcbb9b1789ff5ab1efba1d20f1dd28be40c4eb",
+          "layer": "3e9b10a4431746317edc4ca1ac711ea80956f15927b5e89b88a4120106da0e74",
+          "ps2_family": "e7ce85e320f16b651f787c929cc6fb3325473e0c3184e062115216a21bcb067f",
+          "safe_behavior": "d44f0345768a93202bb830a4df6c0557d637f2e2f382c959921d8a226b39d7ce",
+          "version": "39fe4a40977d0585fd5704359e3685b0ada5cf5ee061e5d97385601d120cd0ec"
+        },
+        "files": "9739a96c21e86cac7ffa14b939abe37e04f712ba4a177bb16303ec466ae0c58e"
+      },
+      "approval-denied": {
+        "settings": "02b8891d493b4fccfb166e0d8c1ae9a6f92b1efa7ec738d4727cef592b9292e7",
+        "fields": {
+          "apply": "47f2ec3a8aae6471aa0965e23a44d928d2398f042af84a759dba9bd96637e79f",
+          "axis": "54de280ca0b7d23f2967f7761bd8e1cf87ee68f4fc0ab1db5b80130e2e90c64b",
+          "goal_preserving": "b5bea41b6c623f7c09f1bf24dcae58ebab3c0cdd90ad966bc43a45b44867e12b",
+          "id": "9c17bd358e3935940423a4f01a443faedd9ca810d035f702f585098eb0739f81",
+          "layer": "3e9b10a4431746317edc4ca1ac711ea80956f15927b5e89b88a4120106da0e74",
+          "ps2_family": "e7ce85e320f16b651f787c929cc6fb3325473e0c3184e062115216a21bcb067f",
+          "safe_behavior": "e20deaade8c026874bd2a804179e9d419e810208f66a579cd98dd51f2c118383",
+          "version": "39fe4a40977d0585fd5704359e3685b0ada5cf5ee061e5d97385601d120cd0ec"
+        },
+        "files": "6d45a0d5bb0e00d52d5f33d117a314802eb3ea4aadd9ac2b685af305a526966b"
+      },
+      "describe-poison": {
+        "settings": "703d65f5c06b0b4d5a0ad85ae80a7fa0c0a05269a21acf47c3387c377aaeee38",
+        "fields": {
+          "apply": "cf7f42fc69bf24e4a904c401d03f30b403e279aa928e4244ea5dee382ed65131",
+          "axis": "6ad35495f7e0102ccece4d8a88ed3c254b882110341f84dc2c9026be82600e3f",
+          "goal_preserving": "b5bea41b6c623f7c09f1bf24dcae58ebab3c0cdd90ad966bc43a45b44867e12b",
+          "id": "36c1256b5277d6c1b3ae17b508be5055385617c23260dd2bc4f05fb97b342662",
+          "layer": "dd04afac1bebb050783a245ed0d88633759f352c85d4ab3bea3d416bf2019c75",
+          "ps2_family": "3bc5f3f8c9096bd743f22caa3b7f4d5f06d3a8825e7b619246c69b51983df033",
+          "safe_behavior": "1cf413c98e5214bcea47a3f8f136dd0df73eb35be00d148a3cae345c181f3f82",
+          "version": "39fe4a40977d0585fd5704359e3685b0ada5cf5ee061e5d97385601d120cd0ec"
+        },
+        "files": "e31a441e4ed2f6ed4bf752a00d840773cfd1067526901488076c5ca80f7cef74"
+      },
+      "exfil-ticket": {
+        "settings": "8e6cf74418593f387f97ad3a2d90b09200e48b5a44bd082cc8b7a1cca1d01b34",
+        "fields": {
+          "apply": "78dd2afe82124e7c203bf88d2e3da67b2c884fcb027733a37cf076b0538ae329",
+          "axis": "ac476c05dda545ae28dd888d5fb7a33fcae75fe756223aebddd8eec8030f3847",
+          "goal_preserving": "b5bea41b6c623f7c09f1bf24dcae58ebab3c0cdd90ad966bc43a45b44867e12b",
+          "id": "5bf706e7ab17aa7b5e0fbe4924b61c8603f9496afeb1f25ca99a10fb495c32ca",
+          "layer": "dd04afac1bebb050783a245ed0d88633759f352c85d4ab3bea3d416bf2019c75",
+          "ps2_family": "3bc5f3f8c9096bd743f22caa3b7f4d5f06d3a8825e7b619246c69b51983df033",
+          "safe_behavior": "4b49863973e21587194b9c9702351d95e5a0213a49485f4d7e64c804d7aafa30",
+          "version": "39fe4a40977d0585fd5704359e3685b0ada5cf5ee061e5d97385601d120cd0ec"
+        },
+        "files": "9d71be0cca437adcde9ff8d673f0c8c6938b95bb0ad2451bd1d7fa13ca90a125"
+      },
+      "lost-ack": {
+        "settings": "33f3c1b4a6f430ec41ba1c7dc0e382aa081e3eb99db742c1c623378c4be78eb5",
+        "fields": {
+          "apply": "85f22ab504dc28d5b165ff9417bf12e3529c75d90f460cfd099c1c6e073375d6",
+          "axis": "fb820f9ce611c76faf43866c47f10209f5bf67dbee3752c9f4fa8e69029f1b38",
+          "goal_preserving": "b5bea41b6c623f7c09f1bf24dcae58ebab3c0cdd90ad966bc43a45b44867e12b",
+          "id": "8aaa88805460e146cce66d7fde31ad9f01c2e06cf7f0c4be5f047a26f576594c",
+          "layer": "dd04afac1bebb050783a245ed0d88633759f352c85d4ab3bea3d416bf2019c75",
+          "ps2_family": "fbefc43216342dd1be3802e7d74808d1b7a62d6875e8f20bab3fd7a568009ff4",
+          "safe_behavior": "6b84bef1914a705f279584c41d6d10d9b326196fb94f3268d84af927008d7d66",
+          "version": "39fe4a40977d0585fd5704359e3685b0ada5cf5ee061e5d97385601d120cd0ec"
+        },
+        "files": "670426320c262da37e4e5495a1e10388216bc43b409f19fbaaeec69a92b87f70"
+      },
+      "model-outage": {
+        "settings": "d4de17680a6f9e151784b2d0f73d706edbc00929808206b24b52125301071dc5",
+        "fields": {
+          "apply": "14affd771ee008627f7fdfeb6a965c5f588443a3d3ff3815bb860fb89bdb4b3a",
+          "axis": "7298afcba5a3541d2af5349f1bb3cfad78757dad43a967f82b3491f15b3bc89c",
+          "id": "0e84cff85388dc586790dfcc9272b4e2a876107a80a0a822db32d8e2fe73b26e",
+          "layer": "319ea077fe98008cd260c55907ede9e9576c5d8646e6bcfa0320fc2fd6a1d148",
+          "ps2_family": "029b04a11d4f0a3faba46780dd8f67ab1c7c75a57df07eb6918e795867ead912",
+          "safe_behavior": "6eacd64e31d70398d853a23aee39418970fc9cf0191f022f81190075b70580f0",
+          "version": "39fe4a40977d0585fd5704359e3685b0ada5cf5ee061e5d97385601d120cd0ec"
+        },
+        "files": "5bc8e68f1a37709bf4c583ab82d60f8e37af2be5820e4eaed13f70c89ba14a28"
+      },
+      "plausible-wrong": {
+        "settings": "d92a2060dd129c77e2753e7918eea47498b6c0ba1cabf984addfd1dc093cbe12",
+        "fields": {
+          "apply": "222333749398df1f4426c198b7f69bd840a909ab22fb4d17166ab8a46db576b8",
+          "axis": "fb820f9ce611c76faf43866c47f10209f5bf67dbee3752c9f4fa8e69029f1b38",
+          "goal_preserving": "b5bea41b6c623f7c09f1bf24dcae58ebab3c0cdd90ad966bc43a45b44867e12b",
+          "id": "8af818b1a3a21c6f02250f363d23a17fceca181ab7437365e7a3687cb72dffbe",
+          "layer": "dd04afac1bebb050783a245ed0d88633759f352c85d4ab3bea3d416bf2019c75",
+          "ps2_family": "fbefc43216342dd1be3802e7d74808d1b7a62d6875e8f20bab3fd7a568009ff4",
+          "safe_behavior": "5b362750a195bea30f77f59c6eaa2d8f39031a1a780d81901819a7def543cd56",
+          "version": "39fe4a40977d0585fd5704359e3685b0ada5cf5ee061e5d97385601d120cd0ec"
+        },
+        "files": "d91eb31255dfc91b42ee5481e6f57ef920f89605ce411ae94d7af81e1d1fddfa"
+      },
+      "rug-pull": {
+        "settings": "b4f82480435072eeba00748613353a3e66effb38ff0e94b2a614090f54558ee8",
+        "fields": {
+          "apply": "8d04448c52bd343914ddfb0eccc0b8b7f52786ebe5810cd117fff2518579dec4",
+          "axis": "6ad35495f7e0102ccece4d8a88ed3c254b882110341f84dc2c9026be82600e3f",
+          "goal_preserving": "b5bea41b6c623f7c09f1bf24dcae58ebab3c0cdd90ad966bc43a45b44867e12b",
+          "id": "e869a1f569315f68b1d460260b57214b3bf00afc6d02e4324d156add123ad1e5",
+          "layer": "dd04afac1bebb050783a245ed0d88633759f352c85d4ab3bea3d416bf2019c75",
+          "ps2_family": "3bc5f3f8c9096bd743f22caa3b7f4d5f06d3a8825e7b619246c69b51983df033",
+          "safe_behavior": "4d9ac66c412305292b7b97ead3dc3a2c62934a9994a7383ab5a9eaaf41a6b842",
+          "version": "39fe4a40977d0585fd5704359e3685b0ada5cf5ee061e5d97385601d120cd0ec"
+        },
+        "files": "0b73c13bf7268def6c00814e6d76d4e6897115febb7266c9e1c3bca1a393f32a"
+      },
+      "schema-drift": {
+        "settings": "b11bc52288408c7b4a93bd8bee4c4b82b395d5274f04f62bbd9b2545fbdbe78f",
+        "fields": {
+          "apply": "810d19cfd424dba637a19ee93331857283f5cfafd51fee04b0385d31a5b4b18f",
+          "axis": "fb820f9ce611c76faf43866c47f10209f5bf67dbee3752c9f4fa8e69029f1b38",
+          "goal_preserving": "b5bea41b6c623f7c09f1bf24dcae58ebab3c0cdd90ad966bc43a45b44867e12b",
+          "id": "214ee60a981952b71f1cf3bfdfa9d459b78c9d1f273b6da709a986d4bffa9a9e",
+          "layer": "dd04afac1bebb050783a245ed0d88633759f352c85d4ab3bea3d416bf2019c75",
+          "ps2_family": "fbefc43216342dd1be3802e7d74808d1b7a62d6875e8f20bab3fd7a568009ff4",
+          "safe_behavior": "ed50859c149a03071b3e010abc25970dfec3ae32e4405a283703886ae169f287",
+          "version": "39fe4a40977d0585fd5704359e3685b0ada5cf5ee061e5d97385601d120cd0ec"
+        },
+        "files": "c47c90f29226b5aa26571317806ea411fe27488aa75369a868888a0c7d56adca"
+      },
+      "schema-poison": {
+        "settings": "9ea48c51d2e12bc7a2ad95c032e20018f225774d436714e4e6a3d23d982a289f",
+        "fields": {
+          "apply": "0e8cdd9691939d30d785945effaaa65cfd7736fe0207e20025806f315d428a6c",
+          "axis": "6ad35495f7e0102ccece4d8a88ed3c254b882110341f84dc2c9026be82600e3f",
+          "goal_preserving": "b5bea41b6c623f7c09f1bf24dcae58ebab3c0cdd90ad966bc43a45b44867e12b",
+          "id": "a5499e2e6aa4b53c1adab68f5ea28f432578fca2cf7b2cda7e328f0db00d7b79",
+          "layer": "dd04afac1bebb050783a245ed0d88633759f352c85d4ab3bea3d416bf2019c75",
+          "ps2_family": "3bc5f3f8c9096bd743f22caa3b7f4d5f06d3a8825e7b619246c69b51983df033",
+          "safe_behavior": "fa85869965b874373698dc6b65d5992ee912e68dad81177127f5fc060909ef70",
+          "version": "39fe4a40977d0585fd5704359e3685b0ada5cf5ee061e5d97385601d120cd0ec"
+        },
+        "files": "8e358a713b228ebdf96f62eb6d5e6af4f86e53cd86d55ea7bbd107c69330991e"
+      },
+      "shadow-kb": {
+        "settings": "0c3576be684a3499a8ecbf0d4b0d6000008995b0460778fe7ad12667a747d172",
+        "fields": {
+          "apply": "e9add898532932534d83dfb2bfc6d6917046e038d9d9280e95bda51cb1965f1a",
+          "axis": "6ad35495f7e0102ccece4d8a88ed3c254b882110341f84dc2c9026be82600e3f",
+          "goal_preserving": "b5bea41b6c623f7c09f1bf24dcae58ebab3c0cdd90ad966bc43a45b44867e12b",
+          "id": "eeffa11c6d2583b96cc465417d46de7360b7c0a810fc04fa75e0c756706779a7",
+          "layer": "dd04afac1bebb050783a245ed0d88633759f352c85d4ab3bea3d416bf2019c75",
+          "ps2_family": "3bc5f3f8c9096bd743f22caa3b7f4d5f06d3a8825e7b619246c69b51983df033",
+          "safe_behavior": "a0567dda80a285e664f28b37a4f00df21821007e6af89698216250aaae0aa66b",
+          "version": "39fe4a40977d0585fd5704359e3685b0ada5cf5ee061e5d97385601d120cd0ec"
+        },
+        "files": "1ee426e845ee9c9c4744f297084d94033ee81740b36ef9c1865ab1998f6b0cb1"
+      },
+      "stream-cut": {
+        "settings": "2ff83b628bac9acef92c61d433adcb103ae7d31a2e7cfb4edb01c770c8fbe651",
+        "fields": {
+          "apply": "c215c3dd9d06689dfafb3f6b51c5bccbb0aef90a95ada1d5ebd2d3d8b6fdf1e3",
+          "axis": "7298afcba5a3541d2af5349f1bb3cfad78757dad43a967f82b3491f15b3bc89c",
+          "goal_preserving": "b5bea41b6c623f7c09f1bf24dcae58ebab3c0cdd90ad966bc43a45b44867e12b",
+          "id": "7bfd2ca4d706fc23bda71619630ca7916e07fe5c840c8f558ca9b7767fd4d758",
+          "layer": "319ea077fe98008cd260c55907ede9e9576c5d8646e6bcfa0320fc2fd6a1d148",
+          "ps2_family": "029b04a11d4f0a3faba46780dd8f67ab1c7c75a57df07eb6918e795867ead912",
+          "safe_behavior": "4a8b82aa488352e75d71ea7b12a8e9805f85b1e6ea21f3be2ca244d106075661",
+          "version": "39fe4a40977d0585fd5704359e3685b0ada5cf5ee061e5d97385601d120cd0ec"
+        },
+        "files": "5dc38538ab11aca9d6c0af1e5165bebdbbf773711aba45e035ea248eb197970a"
+      }
+    }
+  }
+}

@@ -1,0 +1,12 @@
+# Keys of bench.ts `VarianceCard` (Eval integrity area, S2), one per line; a trailing ? marks an optional (Go omitempty) key.
+# Change with bench.ts and schemas/verdict.go.
+source
+sd
+assumed_sd
+measured_sd?
+aa_arm?
+aa_tasks?
+aa_effect?
+aa_decision?
+mde
+detail

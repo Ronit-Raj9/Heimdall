@@ -61,6 +61,16 @@ type Config struct {
 
 	Demo DemoConfig `yaml:"demo" json:"demo,omitzero"` // Tenancy area (P3): the public read-only demo organization (lib/democonfig.go)
 
+	// X3: where runs execute (docs/kubernetes.md). Environment.Driver is
+	// docker (the default) or kubernetes; Kubernetes configures the latter.
+	Environment EnvironmentConfig `yaml:"environment" json:"environment,omitzero"` // X3
+	Kubernetes  KubernetesConfig  `yaml:"kubernetes" json:"kubernetes,omitzero"`   // X3
+
+	// GPU configures GPU tasks (X7, docs/gpu-tasks.md, gpuconfig.go): how
+	// whole GPUs are passed to the agent and verifier containers, which GPUs
+	// the pool holds, and the host-side sampler.
+	GPU GPUConfig `yaml:"gpu" json:"gpu,omitzero"`
+
 	Root string `yaml:"-" json:"-"` // bench root that relative paths resolve against
 }
 
@@ -169,6 +179,14 @@ func (c *Config) Validate() error {
 	}
 	if err := c.Database.Validate(); err != nil { // Database area (P1)
 		return err
+	}
+	if err := c.GPU.Validate(); err != nil { // X7
+		return err
+	}
+	switch c.Environment.Driver { // X3
+	case "", "docker", "kubernetes":
+	default:
+		return fmt.Errorf("environment.driver must be docker or kubernetes, got %q", c.Environment.Driver)
 	}
 	return nil
 }
@@ -286,3 +304,42 @@ type EventsConfig struct {
 
 // CollectorOn reports whether the agent event collector runs.
 func (o EventsConfig) CollectorOn() bool { return o.Collector == nil || *o.Collector }
+
+// EnvironmentConfig picks the environment driver (X3, docs/kubernetes.md).
+type EnvironmentConfig struct {
+	Driver string `yaml:"driver,omitempty" json:"driver,omitempty"` // docker (default) | kubernetes
+}
+
+// DriverName is the configured driver, docker when unset.
+func (e EnvironmentConfig) DriverName() string {
+	if e.Driver == "" {
+		return "docker"
+	}
+	return e.Driver
+}
+
+// KubernetesConfig configures the Kubernetes driver (X3,
+// docs/kubernetes.md). Kubeconfig empty means $KUBECONFIG, then
+// ~/.kube/config, then the pod's service account; Context empty means the
+// kubeconfig's current context. GatewayURL is the in-cluster URL of the
+// gateway Service (http://<service>.<namespace>.svc:<port>).
+type KubernetesConfig struct {
+	Kubeconfig      string                 `yaml:"kubeconfig,omitempty" json:"kubeconfig,omitempty"`
+	Context         string                 `yaml:"context,omitempty" json:"context,omitempty"`
+	NamespacePrefix string                 `yaml:"namespace_prefix,omitempty" json:"namespace_prefix,omitempty"`
+	GatewayURL      string                 `yaml:"gateway_url,omitempty" json:"gateway_url,omitempty"`
+	ImagePullPolicy string                 `yaml:"image_pull_policy,omitempty" json:"image_pull_policy,omitempty"`
+	ServiceAccount  string                 `yaml:"service_account,omitempty" json:"service_account,omitempty"`
+	NodeSelector    map[string]string      `yaml:"node_selector,omitempty" json:"node_selector,omitempty"`
+	Tolerations     []KubernetesToleration `yaml:"tolerations,omitempty" json:"tolerations,omitempty"`
+	KindCluster     string                 `yaml:"kind_cluster,omitempty" json:"kind_cluster,omitempty"` // `k8s images load` target
+}
+
+// KubernetesToleration is one pod toleration.
+type KubernetesToleration struct {
+	Key               string `yaml:"key,omitempty" json:"key,omitempty"`
+	Operator          string `yaml:"operator,omitempty" json:"operator,omitempty"`
+	Value             string `yaml:"value,omitempty" json:"value,omitempty"`
+	Effect            string `yaml:"effect,omitempty" json:"effect,omitempty"`
+	TolerationSeconds *int64 `yaml:"toleration_seconds,omitempty" json:"toleration_seconds,omitempty"`
+}

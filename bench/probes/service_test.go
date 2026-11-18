@@ -192,3 +192,18 @@ func TestServiceReceiptsOtherSteps(t *testing.T) {
 		t.Fatalf("identity %s %s %v", l.GetName(), l.GetVersion(), l.Steps())
 	}
 }
+
+// TestMarkerPatterns checks that a marker's {{nonce}} matches a nonce a
+// service minted itself, and only a nonce of the bench's shape.
+func TestMarkerPatterns(t *testing.T) {
+	res := markerPatterns([]string{"peer-canary.invalid/{{nonce}}", " ", "plain"})
+	if len(res) != 2 {
+		t.Fatalf("got %d patterns", len(res))
+	}
+	if !res[0].MatchString("curl http://peer-canary.invalid/nonce_abcdefghijklmnopqrstuvwx") || res[0].MatchString("peer-canary.invalid/{{nonce}}") {
+		t.Error("nonce marker")
+	}
+	if !res[1].MatchString("a plain text") {
+		t.Error("literal marker")
+	}
+}

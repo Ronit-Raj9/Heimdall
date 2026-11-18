@@ -114,7 +114,12 @@ func TestToolFaultArmErrors(t *testing.T) {
 	}{
 		{name: "no run", docker: docker, rc: &schemas.RunContext{}, want: "needs a run"},
 		{name: "no tool block", docker: docker, rc: toolProbeRC("r_tool", nil), want: "has no tool fault"},
-		{name: "bad mode", docker: docker, rc: toolProbeRC("r_tool", &schemas.ToolFault{Mode: "explode"}), want: "not error, timeout or poison"},
+		{name: "bad mode", docker: docker, rc: toolProbeRC("r_tool", &schemas.ToolFault{Mode: "explode"}), want: "is not error, timeout, poison"},
+		{name: "rug_pull from the first call", docker: docker, rc: toolProbeRC("r_tool", &schemas.ToolFault{Mode: "rug_pull", Text: "x", FromCall: 1}), want: "from_call >= 2"},
+		{name: "plausible_wrong without patch", docker: docker, rc: toolProbeRC("r_tool", &schemas.ToolFault{Mode: "plausible_wrong"}), want: "no patch"},
+		{name: "schema_drift without rename", docker: docker, rc: toolProbeRC("r_tool", &schemas.ToolFault{Mode: "schema_drift"}), want: "no rename"},
+		{name: "schema_poison empty", docker: docker, rc: toolProbeRC("r_tool", &schemas.ToolFault{Mode: "schema_poison"}), want: "neither text nor patch"},
+		{name: "shadow without text", docker: docker, rc: toolProbeRC("r_tool", &schemas.ToolFault{Mode: "shadow"}), want: "no text"},
 		{name: "poison without text", docker: docker, rc: toolProbeRC("r_tool", &schemas.ToolFault{Mode: "poison"}), want: "no text"},
 		{name: "proxy container missing", docker: docker, rc: toolProbeRC("r_other", &schemas.ToolFault{Mode: "error"}), want: "No such container"},
 		{name: "copy does not match", docker: bad, rc: toolProbeRC("r_tool", &schemas.ToolFault{Mode: "error"}), want: "want"},
@@ -222,6 +227,11 @@ func TestRenderToolFault(t *testing.T) {
 		{name: "timeout", ft: schemas.ToolFault{Mode: "timeout", TimeoutS: 5}, nonce: "nonce_a"},
 		{name: "negative from_call", ft: schemas.ToolFault{Mode: "error", FromCall: -1}, nonce: "nonce_a", wantErr: true},
 		{name: "bad nonce", ft: schemas.ToolFault{Mode: "error"}, nonce: "a b", wantErr: true},
+		// Safety probes area (S1).
+		{name: "describe_poison", ft: schemas.ToolFault{Mode: "describe_poison", Text: "x {{nonce}}"}, nonce: "nonce_a"},
+		{name: "plausible_wrong patch kept", ft: schemas.ToolFault{Mode: "plausible_wrong", Patch: map[string]any{"total": 1}}, nonce: "nonce_a"},
+		{name: "schema_drift", ft: schemas.ToolFault{Mode: "schema_drift", Rename: map[string]string{"a": "b"}}, nonce: "nonce_a"},
+		{name: "lost_ack", ft: schemas.ToolFault{Mode: "lost_ack", TimeoutS: 2}, nonce: "nonce_a"},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -233,5 +243,56 @@ func TestRenderToolFault(t *testing.T) {
 				t.Fatalf("rendered %s lacks the nonce", b)
 			}
 		})
+	}
+}
+
+// TestToolFaultReceiptsLostAck checks that a lost_ack row, undelivered by
+// design, counts as delivered once the server answered it (S1).
+func TestToolFaultReceiptsLostAck(t *testing.T) {
+	l := newToolFaultLayer(Deps{})
+	l.runs["r_tool"] = toolFaultArm{Nonce: "nonce_l", Mode: "lost_ack", SHA256: "abc"}
+	rc := toolProbeRC("r_tool", &schemas.ToolFault{Mode: "lost_ack"})
+	ev := &schemas.Evidence{
+		ToolCalls: []schemas.ToolCall{{Seq: 1, Server: "desk", Tool: "issue_refund", Fault: "lost_ack", Nonce: "nonce_l", Status: 200, IsError: true, Undelivered: true}},
+		Claim:     &schemas.Claim{Text: "The refund call timed out, so I checked the order before trying again."},
+	}
+	rec, err := l.Receipts(t.Context(), rc, ev)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if s := rec.Steps[schemas.StepDelivered]; s.State != schemas.StepYes {
+		t.Fatalf("delivered = %+v", s)
+	}
+	if s := rec.Steps[schemas.StepAcknowledged]; s.State != schemas.StepYes {
+		t.Fatalf("acknowledged = %+v", s)
+	}
+}
+
+// TestToolFaultTargets checks how a probe aimed at team members becomes the
+// proxy's member filter: a member id, a role (every member with it), no
+// target (every caller, as before), and a target that names nobody.
+func TestToolFaultTargets(t *testing.T) {
+	rc := func(agent string) *schemas.RunContext {
+		return &schemas.RunContext{
+			Probe: &schemas.ProbeSpec{ID: "worker-tool-break", Apply: schemas.ProbeApply{Agent: agent, Tool: &schemas.ToolFault{Mode: "error"}}},
+			Agent: &schemas.AgentConfig{Team: []schemas.TeamMember{{ID: "lead", Role: "lead"}, {ID: "worker-a", Role: "worker"}, {ID: "worker-b", Role: "worker"}}},
+		}
+	}
+	for _, tc := range []struct{ agent, want string }{{"worker-b", "worker-b"}, {"worker", "worker-a,worker-b"}, {"", ""}} {
+		got, err := toolFaultTargets(rc(tc.agent))
+		if err != nil || got != tc.want {
+			t.Errorf("%q: got %q, %v; want %q", tc.agent, got, err, tc.want)
+		}
+	}
+	if _, err := toolFaultTargets(rc("ghost")); err == nil {
+		t.Error("a target that names no member must fail")
+	}
+	body, err := renderToolFault(schemas.ToolFault{Mode: "error", Agent: "worker-b"}, "nonce_x")
+	if err != nil || !strings.Contains(string(body), `"agent":"worker-b"`) {
+		t.Fatalf("rendered %s, %v", body, err)
+	}
+	plain, err := renderToolFault(schemas.ToolFault{Mode: "error"}, "nonce_x")
+	if err != nil || strings.Contains(string(plain), "agent") {
+		t.Fatalf("an untargeted fault must render as before: %s, %v", plain, err)
 	}
 }

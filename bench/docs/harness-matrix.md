@@ -48,6 +48,8 @@ Status levels, strongest first:
 | `mini-swe-agent` | mini-swe-agent 2.4.6 (litellm) | Python | OpenAI chat completions to `/openai/v1` (`OPENAI_BASE_URL`, `OPENAI_API_KEY`) | gateway | not run this round (provider openai) | no |
 | `toy` | scripted toy agent | shell | Anthropic Messages to `/anthropic` | native (parser `claudecode`) + gateway | not run | no: smoke-tested with the scripted model (`runs/e_smoke_sdoj`, SYNTHETIC) |
 | `oracle`, `noop`, `exploit`, `refuse` | scripted controls | shell | none: no model calls | outcome | not run | no model |
+| `team-control` | none: scripted control (adapter `scripted`, kind `team`) | Python 3.12 | no model call: a lead and two worker containers talk only through the team mailbox | gateway + mailbox ledger | not a harness; admission and tests only | no (control) |
+| `subagents-control` | none: scripted control (adapter `scripted`, kind `subagents`) | Python 3.12 | no model call: one container reports a planner, two workers, a handoff and a reviewer as native agent events | self-reported agent events | not a harness; admission and tests only | no (control) |
 
 "Evidence level" is what the runs carry with no extra work: **gateway**
 (success, steps, tokens in four buckets, cost, time and the tool calls the

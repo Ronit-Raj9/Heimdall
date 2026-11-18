@@ -112,7 +112,8 @@
         "workspace_path": {"type": "string", "pattern": "^/"},
         "verifier_image": {"type": "string", "minLength": 1},
         "build_network": {"type": "boolean"},
-        "user": {"enum": ["root"], "description": "root runs the agent as root in the task's own image (docs/runner-safety.md)."}
+        "user": {"enum": ["root"], "description": "root runs the agent as root in the task's own image (docs/runner-safety.md)."},
+        "env": {"type": "object", "additionalProperties": {"type": "string"}, "description": "Variables set in the agent's, a control's and the verifier's container, under the plan's own (docs/multi-container.md)."}
       }
     },
     "services": {"type": "array", "items": {"$ref": "#/$defs/service"}, "description": "Started beside the agent, after the suite's services."},
@@ -135,6 +136,25 @@
     "skills": {"$ref": "#/$defs/rel_path", "description": "Folder of agent skills (each holding SKILL.md)."},
     "impossible": {"type": "boolean", "description": "The task has no honest solution; a pass is an integrity violation."},
     "external": {"type": "array", "items": {"$ref": "#/$defs/external_api"}, "description": "Real HTTP APIs the agent may call through the tool proxy, after the suite's (docs/external-apis.md); cassette paths relative to the task folder."},
+    "team": {"type": "array", "minItems": 2, "items": {"$ref": "#/$defs/team_member"}, "description": "Multi-container team used when the agent config declares none (docs/multi-agent.md)."},
+    "compose": {"$ref": "#/$defs/rel_path", "description": "A docker compose file, relative to the task folder: one service is the agent's workspace image, the rest run beside it (docs/multi-container.md)."},
+    "resources": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "What the task needs beyond the agent's budgets (X7, docs/gpu-tasks.md).",
+      "properties": {
+        "gpu": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["count"],
+          "description": "Whole GPUs the run holds alone, passed to the agent container and the verifier only. A machine without a GPU that fits refuses the plan.",
+          "properties": {
+            "count": {"type": "integer", "minimum": 1, "maximum": 8, "description": "How many GPUs."},
+            "min_vram_mb": {"type": "integer", "minimum": 0, "description": "Memory each GPU must have, in MiB as nvidia-smi reports it; 0 means any."}
+          }
+        }
+      }
+    },
     "split": {"enum": ["public", "held_out"], "description": "public (default) or held_out: tasks: all selects public tasks only, and the API never serves a held-out task's instruction or files (docs/held-out-and-canaries.md)."},
     "voice": {
       "type": "object",
@@ -150,6 +170,21 @@
     }
   },
   "$defs": {
+    "team_member": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id"],
+      "description": "One member of a multi-container team (docs/multi-agent.md). Mirrors schemas.TeamMember; same as agent.schema.json.",
+      "properties": {
+        "id": {"type": "string", "pattern": "^[a-z0-9][a-z0-9_-]*$"},
+        "role": {"type": "string", "minLength": 1},
+        "agent": {"type": "string", "minLength": 1},
+        "model": {"type": "string", "minLength": 1},
+        "budget_usd": {"type": "number", "minimum": 0},
+        "env": {"type": "object", "additionalProperties": {"type": "string"}},
+        "argv": {"type": "array", "items": {"type": "string"}}
+      }
+    },
     "rel_path": {"type": "string", "minLength": 1, "pattern": "^[^/]"},
     "external_api": {
       "type": "object",

@@ -106,4 +106,15 @@ type Event struct {
 	ReportedID     string `json:"reported_id,omitempty"`
 	ReportedParent string `json:"reported_parent,omitempty"`
 	Channel        string `json:"channel,omitempty"`
+	// Multi-agent attribution (agents.go). AgentID is the agent the event
+	// belongs to or, for an agent span or subagent_start, the agent it
+	// names; AgentName and AgentRole describe that agent; AgentTarget is the
+	// receiving agent of a handoff. Set from a reported event's attributes
+	// (gen_ai.agent.id, gen_ai.agent.name, agent_id, from_agent, to_agent,
+	// ...) or from a transcript (a Claude Code subagent line). Empty
+	// otherwise.
+	AgentID     string `json:"agent_id,omitempty"`
+	AgentName   string `json:"agent_name,omitempty"`
+	AgentRole   string `json:"agent_role,omitempty"`
+	AgentTarget string `json:"agent_target,omitempty"`
 }

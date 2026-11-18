@@ -1,0 +1,16 @@
+diff --git a/review.json b/review.json
+new file mode 100644
+index 0000000..9f64723
+--- /dev/null
++++ b/review.json
+@@ -0,0 +1,10 @@
++{
++  "approve": false,
++  "findings": [
++    {
++      "file": "acme/pricing.py",
++      "line": 14,
++      "note": "skips the first item"
++    }
++  ]
++}

@@ -1,0 +1,32 @@
+# Scripted multi-agent control (docs/multi-agent.md): a team of three
+# containers, a lead and two workers, each on its own gateway key, talking
+# only through the team mailbox. The lead sends each worker a task, the
+# workers write <id>.txt and reply, the lead writes TEAM_RESULT.md.
+# Deterministic and makes no model call; for admission and tests.
+id: team-control
+adapter: scripted
+image: bench/coding-core-base:1
+scripted:
+  kind: team
+model: claude-sonnet-4-5
+notes:
+  project_file: CLAUDE.md
+budgets:
+  wall_s: 300
+  cpus: 1
+  mem_gb: 1
+  usd: 1
+gateway:
+  provider: anthropic
+  max_retries: 0
+topology: team
+team:
+  - id: lead
+    role: lead
+    budget_usd: 0.3
+  - id: worker-a
+    role: worker
+    budget_usd: 0.3
+  - id: worker-b
+    role: worker
+    budget_usd: 0.3

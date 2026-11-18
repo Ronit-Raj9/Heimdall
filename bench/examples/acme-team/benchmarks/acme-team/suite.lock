@@ -1,0 +1,594 @@
+{
+  "suite": "acme-team",
+  "version": "1.0.0",
+  "base_image": {
+    "tag": "bench/coding-core-base:1"
+  },
+  "tasks": {
+    "research-write": {
+      "version": "1.0.0",
+      "instruction_sha256": "2acdd8c7f981c6a5dc4e5f9dfc875c289d1d5be42b07356ba8334f9926a22aee",
+      "repo_tree_sha256": "600d6505af0c7008e7856a221e53e219f08b7d94b99baba8c7756fa9723b5f11",
+      "verifier_sha256": "4abcfb304c086911c803d257196fe2c5363abe9cec62ea60c80281432a59738a",
+      "controls_sha256": "0cbb619da22a810d3cf95588d0a11cef60e455c969dcf6595dc98f2f347a3e6d",
+      "fixtures_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "status": "admitted",
+      "admission": {
+        "admitted": true,
+        "checks": [
+          {
+            "name": "static_validation",
+            "want": "clean",
+            "got": "clean",
+            "passed": true,
+            "detail": "1 warnings"
+          },
+          {
+            "name": "reference_1",
+            "want": "pass",
+            "got": "pass",
+            "passed": true,
+            "detail": "solution/reference.diff; tests_ran=0 failures=0 errors=0 skipped=0 exit=0 reason=passed (reward 1)"
+          },
+          {
+            "name": "reference_2",
+            "want": "pass",
+            "got": "pass",
+            "passed": true,
+            "detail": "solution/reference.diff; tests_ran=0 failures=0 errors=0 skipped=0 exit=0 reason=passed (reward 1)"
+          },
+          {
+            "name": "reference_3",
+            "want": "pass",
+            "got": "pass",
+            "passed": true,
+            "detail": "solution/reference.diff; tests_ran=0 failures=0 errors=0 skipped=0 exit=0 reason=passed (reward 1)"
+          },
+          {
+            "name": "empty_patch",
+            "want": "fail",
+            "got": "fail",
+            "passed": true,
+            "detail": "controls/empty.diff; tests_ran=0 failures=0 errors=0 skipped=0 exit=0 reason=reward 0 below pass threshold 1"
+          },
+          {
+            "name": "mutant_1",
+            "want": "fail",
+            "got": "fail",
+            "passed": true,
+            "detail": "controls/mutant-majority.diff; tests_ran=0 failures=0 errors=0 skipped=0 exit=0 reason=reward 0 below pass threshold 1"
+          },
+          {
+            "name": "exploit",
+            "want": "fail",
+            "got": "fail",
+            "passed": true,
+            "detail": "exploit exit 0; tests_ran=0 failures=0 errors=0 skipped=0 exit=0 reason=reward 0 below pass threshold 1"
+          },
+          {
+            "name": "null_noop",
+            "want": "fail",
+            "got": "fail",
+            "passed": true,
+            "detail": "noop exit 0; tests_ran=0 failures=0 errors=0 skipped=0 exit=0 reason=reward 0 below pass threshold 1"
+          },
+          {
+            "name": "null_refuse",
+            "want": "fail",
+            "got": "fail",
+            "passed": true,
+            "detail": "refuse exit 0; tests_ran=0 failures=0 errors=0 skipped=0 exit=0 reason=reward 0 below pass threshold 1"
+          },
+          {
+            "name": "instruction_edited",
+            "want": "edited",
+            "got": "edited",
+            "passed": true
+          },
+          {
+            "name": "secret_scan",
+            "want": "none",
+            "got": "none",
+            "passed": true
+          },
+          {
+            "name": "verifier_no_network",
+            "want": "none",
+            "got": "none",
+            "passed": true,
+            "detail": "reported by grader verifier_command"
+          }
+        ],
+        "at": "2026-11-18T02:26:02.067091186Z",
+        "grader": "verifier_command",
+        "reference_repeats": 3,
+        "reference_results": [
+          "pass",
+          "pass",
+          "pass"
+        ],
+        "fingerprint": "09ae1b6026f6ec1ae5de8a864949b32e1a32465bc645aea84cd63f55bff16043"
+      }
+    },
+    "review-patch": {
+      "version": "1.0.0",
+      "instruction_sha256": "407f1d7d85578909d410e86bf3ee8816291886787412b1d5c6c3c6aa769ed295",
+      "repo_tree_sha256": "b1880a8d19b27d4a6cc6a35a154e8ae010872ceaa04331b85d413ebbda3795cf",
+      "verifier_sha256": "2f880a0ba9d706299d95f032430f2e579bc8d14c88ccc9a37fd22d8153f0abf8",
+      "controls_sha256": "b4ecb8238be1b936ead0c387ab0eb3a41023bdeb1c578dad726dd12e70dcbd35",
+      "fixtures_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "status": "admitted",
+      "admission": {
+        "admitted": true,
+        "checks": [
+          {
+            "name": "static_validation",
+            "want": "clean",
+            "got": "clean",
+            "passed": true,
+            "detail": "1 warnings"
+          },
+          {
+            "name": "reference_1",
+            "want": "pass",
+            "got": "pass",
+            "passed": true,
+            "detail": "solution/reference.diff; tests_ran=0 failures=0 errors=0 skipped=0 exit=0 reason=passed (reward 1)"
+          },
+          {
+            "name": "reference_2",
+            "want": "pass",
+            "got": "pass",
+            "passed": true,
+            "detail": "solution/reference.diff; tests_ran=0 failures=0 errors=0 skipped=0 exit=0 reason=passed (reward 1)"
+          },
+          {
+            "name": "reference_3",
+            "want": "pass",
+            "got": "pass",
+            "passed": true,
+            "detail": "solution/reference.diff; tests_ran=0 failures=0 errors=0 skipped=0 exit=0 reason=passed (reward 1)"
+          },
+          {
+            "name": "empty_patch",
+            "want": "fail",
+            "got": "fail",
+            "passed": true,
+            "detail": "controls/empty.diff; tests_ran=0 failures=0 errors=0 skipped=0 exit=0 reason=reward 0 below pass threshold 1"
+          },
+          {
+            "name": "mutant_1",
+            "want": "fail",
+            "got": "fail",
+            "passed": true,
+            "detail": "controls/mutant-rubber-stamp.diff; tests_ran=0 failures=0 errors=0 skipped=0 exit=0 reason=reward 0 below pass threshold 1"
+          },
+          {
+            "name": "exploit",
+            "want": "fail",
+            "got": "fail",
+            "passed": true,
+            "detail": "exploit exit 0; tests_ran=0 failures=0 errors=0 skipped=0 exit=0 reason=reward 0 below pass threshold 1"
+          },
+          {
+            "name": "null_noop",
+            "want": "fail",
+            "got": "fail",
+            "passed": true,
+            "detail": "noop exit 0; tests_ran=0 failures=0 errors=0 skipped=0 exit=0 reason=reward 0 below pass threshold 1"
+          },
+          {
+            "name": "null_refuse",
+            "want": "fail",
+            "got": "fail",
+            "passed": true,
+            "detail": "refuse exit 0; tests_ran=0 failures=0 errors=0 skipped=0 exit=0 reason=reward 0 below pass threshold 1"
+          },
+          {
+            "name": "instruction_edited",
+            "want": "edited",
+            "got": "edited",
+            "passed": true
+          },
+          {
+            "name": "secret_scan",
+            "want": "none",
+            "got": "none",
+            "passed": true
+          },
+          {
+            "name": "verifier_no_network",
+            "want": "none",
+            "got": "none",
+            "passed": true,
+            "detail": "reported by grader verifier_command"
+          }
+        ],
+        "at": "2026-11-18T02:29:06.273656074Z",
+        "grader": "verifier_command",
+        "reference_repeats": 3,
+        "reference_results": [
+          "pass",
+          "pass",
+          "pass"
+        ],
+        "fingerprint": "2360067a81fb119a1dfd903b08c8db8f2e0b02529ab9c18f8f7c1846012ce0e2"
+      }
+    },
+    "split-refactor": {
+      "version": "1.0.0",
+      "instruction_sha256": "971b6ac858c6dce64c635f1a6f97fcdb8e1120ff3e8c85d16e610efd2d6af2f2",
+      "repo_tree_sha256": "dc984bb115cc13eb59ac55ccd25797f88c55487f485fab045d4a08bb39fa6fed",
+      "verifier_sha256": "2f074916c29968fa2af0e88e31f12a46a1cb72897d8d03838cffeee2030eb522",
+      "controls_sha256": "e8b42a6dd40884cd49ac526a6f5a90c2624c3d72a3679c94a3162a8eaa53add3",
+      "fixtures_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "status": "admitted",
+      "admission": {
+        "admitted": true,
+        "checks": [
+          {
+            "name": "static_validation",
+            "want": "clean",
+            "got": "clean",
+            "passed": true,
+            "detail": "1 warnings"
+          },
+          {
+            "name": "reference_1",
+            "want": "pass",
+            "got": "pass",
+            "passed": true,
+            "detail": "solution/reference.diff; tests_ran=0 failures=0 errors=0 skipped=0 exit=0 reason=passed (reward 1)"
+          },
+          {
+            "name": "reference_2",
+            "want": "pass",
+            "got": "pass",
+            "passed": true,
+            "detail": "solution/reference.diff; tests_ran=0 failures=0 errors=0 skipped=0 exit=0 reason=passed (reward 1)"
+          },
+          {
+            "name": "reference_3",
+            "want": "pass",
+            "got": "pass",
+            "passed": true,
+            "detail": "solution/reference.diff; tests_ran=0 failures=0 errors=0 skipped=0 exit=0 reason=passed (reward 1)"
+          },
+          {
+            "name": "empty_patch",
+            "want": "fail",
+            "got": "fail",
+            "passed": true,
+            "detail": "controls/empty.diff; tests_ran=0 failures=0 errors=0 skipped=0 exit=0 reason=reward 0 below pass threshold 1"
+          },
+          {
+            "name": "mutant_1",
+            "want": "fail",
+            "got": "fail",
+            "passed": true,
+            "detail": "controls/mutant-half-done.diff; tests_ran=0 failures=0 errors=0 skipped=0 exit=0 reason=reward 0 below pass threshold 1"
+          },
+          {
+            "name": "exploit",
+            "want": "fail",
+            "got": "fail",
+            "passed": true,
+            "detail": "exploit exit 0; tests_ran=0 failures=0 errors=0 skipped=0 exit=0 reason=reward 0 below pass threshold 1"
+          },
+          {
+            "name": "null_noop",
+            "want": "fail",
+            "got": "fail",
+            "passed": true,
+            "detail": "noop exit 0; tests_ran=0 failures=0 errors=0 skipped=0 exit=0 reason=reward 0 below pass threshold 1"
+          },
+          {
+            "name": "null_refuse",
+            "want": "fail",
+            "got": "fail",
+            "passed": true,
+            "detail": "refuse exit 0; tests_ran=0 failures=0 errors=0 skipped=0 exit=0 reason=reward 0 below pass threshold 1"
+          },
+          {
+            "name": "instruction_edited",
+            "want": "edited",
+            "got": "edited",
+            "passed": true
+          },
+          {
+            "name": "secret_scan",
+            "want": "none",
+            "got": "none",
+            "passed": true
+          },
+          {
+            "name": "verifier_no_network",
+            "want": "none",
+            "got": "none",
+            "passed": true,
+            "detail": "reported by grader verifier_command"
+          }
+        ],
+        "at": "2026-11-18T02:22:21.033105101Z",
+        "grader": "verifier_command",
+        "reference_repeats": 3,
+        "reference_results": [
+          "pass",
+          "pass",
+          "pass"
+        ],
+        "fingerprint": "b2008e27e039b2dbf8ffcc02b016d2a3d6ad364cbf2bcfceb56494a853f4102a"
+      }
+    }
+  },
+  "probes": {
+    "covert-channel": {
+      "version": "1.0.0",
+      "sha256": "0b034b2fc1f13a20269989b08dba71e06b9d20655ded44269564c87e778815ac"
+    },
+    "cross-agent-canary": {
+      "version": "1.0.0",
+      "sha256": "03d7723301da8ad48f7d67181dd44c25ccada26529ebe9faf8f6efcbbf280371"
+    },
+    "delegation-bomb": {
+      "version": "1.0.0",
+      "sha256": "e04ab14801f3da2f7e1db5d6ae76bf6fabd798710033ea739e3256e12bc601ef"
+    },
+    "lossy-handoff": {
+      "version": "1.0.0",
+      "sha256": "1674834114aae446feba24ac61f395bf8a890868f4163d45f17d356e05939efc"
+    },
+    "poisoned-peer": {
+      "version": "1.0.0",
+      "sha256": "580c83026e5a768aebf9042b48c6e9ccaf4f3e468afd6d45fe64db86e90f586a"
+    },
+    "relayed-consent": {
+      "version": "1.0.0",
+      "sha256": "141a3faefa1c770cb1cd4e9ba1280160fe15ea3a22eb30afc893bc0b54d84b7c"
+    },
+    "seeded-bug": {
+      "version": "1.0.0",
+      "sha256": "841bd495f3eb1c6f98c0083384cb6df4e091a6b4ca84249cd21da78752c9310a"
+    },
+    "worker-outage": {
+      "version": "1.0.0",
+      "sha256": "c492e2bce60cd5d312507386493eb1ce89174e3c7aa0776311c09d0158b5ffdd"
+    },
+    "worker-tool-break": {
+      "version": "1.0.0",
+      "sha256": "40c4e2e41bb61045a4a19be28669578cc299a8abe9a25fee79b808bb724cd54b"
+    },
+    "wrong-majority": {
+      "version": "1.0.0",
+      "sha256": "cfece07753efd06cb52a24db23d64f0a52bd02a80d8b8758d3c0e3f772c6ea92"
+    }
+  },
+  "created_at": "2026-11-18T02:22:12.05214795Z",
+  "fingerprints": {
+    "version": 1,
+    "suite": {
+      "settings": "29c9617fbc1c06f94b151a3572262b3f00bb9e81e473a6d61c388e74bf35588e",
+      "fields": {
+        "base_image": "0d0192aa22c9741cd1c16dc6d4b2ca36e7be6aab202c7cfac4ebe3a7fb69084e",
+        "environment": "2075abc096d17738fba811b8518f8a3cbd1a5621abd0fd833170c50f4f9bbe4b",
+        "grader": "47789364c3ef10b8c5e96f4a5397a4297f3b5ffd83bbf1f3a18dad282737362d",
+        "id": "066d899cdd3ac487f7636d37dc5e2085831c8d80d658b7793dd1d7abb37f1a11",
+        "parts": "68df612014fc627742a5c7276caf6fc051723f0f8362b14ad74b8f18fd752328",
+        "probes": "14856e5324dff37f6ab2b2c813d993f9997536a1da2f3ab05d47444c19ada25c",
+        "tasks": "58610ae0bce91cc32edcfee00e8577f777ef6ebc449446ded3022469547516d4",
+        "verifier": "9cc3284f7cea017b19845be1f8180bf152f11220711cad872f0b0863e3c43731",
+        "version": "39fe4a40977d0585fd5704359e3685b0ada5cf5ee061e5d97385601d120cd0ec",
+        "workdir": "4384b4849b7f004db243393653c15565c0a2ab2a8951d8513646c37d2a14a51f"
+      },
+      "files": "657eee503615e4162eb32010f7db12c51476ef82baa67f2f3ff9838d84a4054e",
+      "images": {
+        "base": "tag only: bench/coding-core-base:1",
+        "helper": "tag only: bench/coding-core-base:1"
+      }
+    },
+    "tasks": {
+      "research-write": {
+        "settings": "d9dc7bfab8885c838f6f5729830f9df4ae08af23705528c70774777b27116eda",
+        "fields": {
+          "capabilities": "663fe317b6def4d1c763c0e9a5b3de09d39b0b6cc46e3cdf4157a81e65e28a0c",
+          "controls": "7687ad9ea104d3c2f68cd988da894824777b848e0ffda4ddd12008b8d897d624",
+          "difficulty": "3ed870088e7410ee05d36e4fc20bf73104130ef98000b268b11378d0800d1703",
+          "id": "97400533d1c12731b6625e10c0596dd8528891f9de32dded95e66824a5c4798f",
+          "instruction": "d22404e1bdcc17d8b42ec5950fe47a8a98ed7ccdf46bdc43121a724676b65198",
+          "kind": "1ff4393bcd872405377779cd81a787a54906f836cdd1d316ed2c5710d98d925b",
+          "project": "066d899cdd3ac487f7636d37dc5e2085831c8d80d658b7793dd1d7abb37f1a11",
+          "provenance": "4cc711d3ff56615ef57142531e1ecb8095c45c4c62f5aed017ad541b320cb50d",
+          "repo_dir": "a22b0355c8c3954692a2626bc83ff8ea3b7b65119e407c324883e2ed95c1fbe6",
+          "timeouts": "9f83a610bc0778eac5699c6a3231f06aad018396bad58bb40de11b55b1c29087",
+          "title": "b95c69646d0293ce1367be9c1da995ca67cfef9c4528e00a6d264331c69a66cd",
+          "verifier": "3c0c9efd04d308ebf9f4569298c7d6c6f448e083dacf0c4b9ce1b504ac56bb65",
+          "version": "39fe4a40977d0585fd5704359e3685b0ada5cf5ee061e5d97385601d120cd0ec"
+        },
+        "files": "908d801169fe39cbffabe67fa47c90557d7661dde6c0243b04c6a5d926aaa11b"
+      },
+      "review-patch": {
+        "settings": "6d3bfd7a9af4adad816824b746a94a08eb385b307a7d5e312bea9341141b4366",
+        "fields": {
+          "capabilities": "92a8b1d7589f7f0e70f5bb041173f266d9a3cd8b2a738c1cfed49c15c1b96158",
+          "controls": "ff70f32a47398b09ecc7c0a2ee348fa1cc926d5cda25546ffdae35f41a45c98c",
+          "difficulty": "3ed870088e7410ee05d36e4fc20bf73104130ef98000b268b11378d0800d1703",
+          "id": "3422874d50d1b092e62212d89094a64f5a1ee59252794668e4e5071945040c13",
+          "instruction": "d22404e1bdcc17d8b42ec5950fe47a8a98ed7ccdf46bdc43121a724676b65198",
+          "kind": "1ff4393bcd872405377779cd81a787a54906f836cdd1d316ed2c5710d98d925b",
+          "project": "066d899cdd3ac487f7636d37dc5e2085831c8d80d658b7793dd1d7abb37f1a11",
+          "provenance": "4cc711d3ff56615ef57142531e1ecb8095c45c4c62f5aed017ad541b320cb50d",
+          "repo_dir": "a22b0355c8c3954692a2626bc83ff8ea3b7b65119e407c324883e2ed95c1fbe6",
+          "timeouts": "9f83a610bc0778eac5699c6a3231f06aad018396bad58bb40de11b55b1c29087",
+          "title": "e9591795279956928bb6e82e71714c1492d6a76273ab51c4d7374281c7f04e90",
+          "verifier": "3c0c9efd04d308ebf9f4569298c7d6c6f448e083dacf0c4b9ce1b504ac56bb65",
+          "version": "39fe4a40977d0585fd5704359e3685b0ada5cf5ee061e5d97385601d120cd0ec"
+        },
+        "files": "852ef4220a97243bf546e37b3d9858bb6b3aca1a2fd123a9be51d78d4a4f087d"
+      },
+      "split-refactor": {
+        "settings": "0f1c5748a040cb14ed9197974b934794361ad664c66cf51e5b32501bbb45ed64",
+        "fields": {
+          "capabilities": "9970b7339d79ad516913b6ea889af8db6ee4c09e423bb3d1f46c8fc358f5ad51",
+          "controls": "06e9e3d0fc86caf2d8acaa02d80d12a4cb06a1a338f6a607bbb324ac5cad09a2",
+          "difficulty": "3ed870088e7410ee05d36e4fc20bf73104130ef98000b268b11378d0800d1703",
+          "id": "5b14c3a442fe14dd74dc5810be48636c250143eb94ac69daed1702ef2af4260c",
+          "instruction": "d22404e1bdcc17d8b42ec5950fe47a8a98ed7ccdf46bdc43121a724676b65198",
+          "kind": "b5cd6f3690daa0017f3a8c2c99ed807812b3bdf228d2df0de1ea8bd1007112b4",
+          "project": "066d899cdd3ac487f7636d37dc5e2085831c8d80d658b7793dd1d7abb37f1a11",
+          "provenance": "4cc711d3ff56615ef57142531e1ecb8095c45c4c62f5aed017ad541b320cb50d",
+          "repo_dir": "a22b0355c8c3954692a2626bc83ff8ea3b7b65119e407c324883e2ed95c1fbe6",
+          "timeouts": "9f83a610bc0778eac5699c6a3231f06aad018396bad58bb40de11b55b1c29087",
+          "title": "a8414390b39c3062420ad083d282fd6288f098a834baeccb57d91093285b4da1",
+          "verifier": "3c0c9efd04d308ebf9f4569298c7d6c6f448e083dacf0c4b9ce1b504ac56bb65",
+          "version": "39fe4a40977d0585fd5704359e3685b0ada5cf5ee061e5d97385601d120cd0ec"
+        },
+        "files": "e9baa001885f9a3be1b2b5d89e1f5ee1d6d93ae88555653b9ba120fc99afbfa4"
+      }
+    },
+    "probes": {
+      "covert-channel": {
+        "settings": "fb09b2d887845425c7ccd2563ac414ad2a30ad7e70842a4f337a6e27f3ca6879",
+        "fields": {
+          "apply": "4937eb880a5525a4242002eff9f6ac700931079025ced5750d39c138bfdd411d",
+          "axis": "ee8294f87e101963be0221546eb9ac4c719405d77134a8acaa831ca2fba31aba",
+          "goal_preserving": "b5bea41b6c623f7c09f1bf24dcae58ebab3c0cdd90ad966bc43a45b44867e12b",
+          "id": "9faa4aefcfb12c89ab795168815b7bc64afcb434ec1c99bfb2c89a4b99f2b007",
+          "layer": "b086de7b32510701e873f3d4ae742917ca1cc1141ffe4a8387d604ef474ef9e4",
+          "ps2_family": "e7ce85e320f16b651f787c929cc6fb3325473e0c3184e062115216a21bcb067f",
+          "safe_behavior": "d971d02f77e0fc34e5a1dcf68e97182c7dcec60fff98b1020930bccfbc43cd27",
+          "version": "39fe4a40977d0585fd5704359e3685b0ada5cf5ee061e5d97385601d120cd0ec"
+        },
+        "files": "86f13d69cab2e86997b2b83cbfe25e0f495ea0e55a7a69ab5703e1954548e3cc"
+      },
+      "cross-agent-canary": {
+        "settings": "9fc37376dd0c3248a77245af29d67d61b1397ed63269f9e9f1c95ccca0489577",
+        "fields": {
+          "apply": "7fde6339dcd4c9f742b12a9dd4e84e3a87fc3ea163abf00f4fef6d9f09279e51",
+          "axis": "6ad35495f7e0102ccece4d8a88ed3c254b882110341f84dc2c9026be82600e3f",
+          "goal_preserving": "b5bea41b6c623f7c09f1bf24dcae58ebab3c0cdd90ad966bc43a45b44867e12b",
+          "id": "f61f9738c4f10d2a8084c66ee3bfe48b53616856b77dda72ede7b62679cc7243",
+          "layer": "b086de7b32510701e873f3d4ae742917ca1cc1141ffe4a8387d604ef474ef9e4",
+          "metrics": "927b6cd455f4d1fd4ac84d1bdbfa0ce3796bddce10549741c1a2681717ad53ae",
+          "ps2_family": "e7ce85e320f16b651f787c929cc6fb3325473e0c3184e062115216a21bcb067f",
+          "safe_behavior": "ba4415e836f0b1e264a1190563dcf83495d941f5610e1ed5061716c17c8c35be",
+          "version": "39fe4a40977d0585fd5704359e3685b0ada5cf5ee061e5d97385601d120cd0ec"
+        },
+        "files": "144eb0a85a9da9740f931849f9f88d54d0cfae4433461da3dc9f9918b6b500b4"
+      },
+      "delegation-bomb": {
+        "settings": "1ac0b6691975d0f118d17caaa1b5d6632648f06776231fab14048b8d32a538c8",
+        "fields": {
+          "apply": "1bc40aafb3096b5a1f68adde1304e411e757b4f08ba0daae5317be2270734807",
+          "axis": "ee8294f87e101963be0221546eb9ac4c719405d77134a8acaa831ca2fba31aba",
+          "goal_preserving": "b5bea41b6c623f7c09f1bf24dcae58ebab3c0cdd90ad966bc43a45b44867e12b",
+          "id": "57309d1fa35ef6819f1806a51ba8c6f44d8de0085dd3650c250f90969f84510e",
+          "layer": "b086de7b32510701e873f3d4ae742917ca1cc1141ffe4a8387d604ef474ef9e4",
+          "ps2_family": "e7ce85e320f16b651f787c929cc6fb3325473e0c3184e062115216a21bcb067f",
+          "safe_behavior": "e25d38325d568eb17d4095e3b81376622d56f0b53fd607fffecadb463d126abc",
+          "version": "39fe4a40977d0585fd5704359e3685b0ada5cf5ee061e5d97385601d120cd0ec"
+        },
+        "files": "3054a23460eb3feb68cf137f1e5eea41067b6473e706765f7c220e1922e8b7ad"
+      },
+      "lossy-handoff": {
+        "settings": "173db15f97522d2fe62fd857294729334be771fd2cb04a9e46920b1ebb487670",
+        "fields": {
+          "apply": "75a79080b92a4fb591498e40c7ac31fe62ba224d31cf5e1a456ca1a889041db0",
+          "axis": "ee8294f87e101963be0221546eb9ac4c719405d77134a8acaa831ca2fba31aba",
+          "goal_preserving": "b5bea41b6c623f7c09f1bf24dcae58ebab3c0cdd90ad966bc43a45b44867e12b",
+          "id": "0924f0f558cbba613b40bf7db0ea7c9b2adcdef9e7e4c355349362e09eac39c6",
+          "layer": "b086de7b32510701e873f3d4ae742917ca1cc1141ffe4a8387d604ef474ef9e4",
+          "ps2_family": "e7ce85e320f16b651f787c929cc6fb3325473e0c3184e062115216a21bcb067f",
+          "safe_behavior": "bd778d0d7231d268fa4fb5516356ba950d34e2d0e589a425607686b5eb050121",
+          "version": "39fe4a40977d0585fd5704359e3685b0ada5cf5ee061e5d97385601d120cd0ec"
+        },
+        "files": "1bccdd63b9372269435945f50858d3e92cae5c4b4b07c3f2223c80a7a13ba529"
+      },
+      "poisoned-peer": {
+        "settings": "d09f6e6979a02f3899e468bfc2dfecbcebd1c598681121bda83a03b44bec2a05",
+        "fields": {
+          "apply": "c20a135564dace553f333f02c2e1de85423d33c5aef4bfb501eef22b13a21f21",
+          "axis": "6ad35495f7e0102ccece4d8a88ed3c254b882110341f84dc2c9026be82600e3f",
+          "goal_preserving": "b5bea41b6c623f7c09f1bf24dcae58ebab3c0cdd90ad966bc43a45b44867e12b",
+          "id": "400d882fa3fc812bd0a6c6ec634d762d1c7751e3a43d93b72b6885feb38bc300",
+          "layer": "3e9b10a4431746317edc4ca1ac711ea80956f15927b5e89b88a4120106da0e74",
+          "ps2_family": "e7ce85e320f16b651f787c929cc6fb3325473e0c3184e062115216a21bcb067f",
+          "safe_behavior": "2116e87641ad11b7ebc256d2d02b1d7a39f9544215d03ff6e1f30951a24369b0",
+          "version": "39fe4a40977d0585fd5704359e3685b0ada5cf5ee061e5d97385601d120cd0ec"
+        },
+        "files": "74543a8bd1d2cf6b7b9452ac717d0b3ae76accca15e6fddfcb0d2636afc16d63"
+      },
+      "relayed-consent": {
+        "settings": "46229e4a8a9da2882afc11f8cd18e68b7cc755e46a89ba71f8be78a1a8885daf",
+        "fields": {
+          "apply": "21d947076679da5fa683f30a9deb7f7e0d2da12db795d62959757597a872a88b",
+          "axis": "6ad35495f7e0102ccece4d8a88ed3c254b882110341f84dc2c9026be82600e3f",
+          "goal_preserving": "b5bea41b6c623f7c09f1bf24dcae58ebab3c0cdd90ad966bc43a45b44867e12b",
+          "id": "793eb435ad14f4e75d9c5fadb729c83e5269a96e11304b976c99c0508416dba7",
+          "layer": "3e9b10a4431746317edc4ca1ac711ea80956f15927b5e89b88a4120106da0e74",
+          "ps2_family": "e7ce85e320f16b651f787c929cc6fb3325473e0c3184e062115216a21bcb067f",
+          "safe_behavior": "671b31d0cbcf694153354f20fbb5d3bd8e59520cdb8d10ec6708d13bab4e0959",
+          "version": "39fe4a40977d0585fd5704359e3685b0ada5cf5ee061e5d97385601d120cd0ec"
+        },
+        "files": "9ea088b6ed477578ceae32c64541a9e5d95bf96dc091c91631a83dde67f40d59"
+      },
+      "seeded-bug": {
+        "settings": "4b39f237f399dce91062094964af69c6c7c114fba0b78a5118eab07a92e80a07",
+        "fields": {
+          "apply": "2c8aca626285316028e6d170a891ef5838d90011ff450e6c1c76c3bf25013609",
+          "axis": "ee8294f87e101963be0221546eb9ac4c719405d77134a8acaa831ca2fba31aba",
+          "goal_preserving": "b5bea41b6c623f7c09f1bf24dcae58ebab3c0cdd90ad966bc43a45b44867e12b",
+          "id": "05e165c9c9f55876be6f4c7f5e76b8a34df9a0ccc780682e3827cc35568fcc28",
+          "layer": "b086de7b32510701e873f3d4ae742917ca1cc1141ffe4a8387d604ef474ef9e4",
+          "metrics": "a49ba081f6940dc4e4c91ecf7801c5bdb6228b3bcfd1e8884c4f6df0babafbdb",
+          "ps2_family": "e7ce85e320f16b651f787c929cc6fb3325473e0c3184e062115216a21bcb067f",
+          "safe_behavior": "1bbe11734ad4588999e86370c29bf6ba8df8fb35497d9f26c2e097b440a310ab",
+          "version": "39fe4a40977d0585fd5704359e3685b0ada5cf5ee061e5d97385601d120cd0ec"
+        },
+        "files": "2b37e55c1225c0cd1590021f6a7f3246f05752bc20675b4f4a2f4e7c53c71f3b"
+      },
+      "worker-outage": {
+        "settings": "885642155b95842cf60616cd99e9d8f82b85bbd357b3b1b924df0de02e131390",
+        "fields": {
+          "apply": "a6ced084f1ef174aafc4a847675d21d419779521ea0af9da41bab7cdf2a16b46",
+          "axis": "7298afcba5a3541d2af5349f1bb3cfad78757dad43a967f82b3491f15b3bc89c",
+          "goal_preserving": "b5bea41b6c623f7c09f1bf24dcae58ebab3c0cdd90ad966bc43a45b44867e12b",
+          "id": "373877a9480109ac1ae9792ac96c852bf89e2e0448d8c07207939bba0f10503f",
+          "layer": "319ea077fe98008cd260c55907ede9e9576c5d8646e6bcfa0320fc2fd6a1d148",
+          "ps2_family": "029b04a11d4f0a3faba46780dd8f67ab1c7c75a57df07eb6918e795867ead912",
+          "safe_behavior": "8a4e2f347e466385949d8db75bd702020a8e5c9fc8f57a8dde6dea5775b61f37",
+          "version": "39fe4a40977d0585fd5704359e3685b0ada5cf5ee061e5d97385601d120cd0ec"
+        },
+        "files": "d1b9c73ff295fb426ca33b4c05d7cf20133e0cb3b64d4c541c47b420e6a181fd"
+      },
+      "worker-tool-break": {
+        "settings": "37b0d2e27495e0a1a2eaf66d96b391e7cf12cf8ee0439ce4453467cca5158baa",
+        "fields": {
+          "apply": "224e49f3935367d81033801811136a45e0d043c0f99cc18d06a7d9f735a9c6a6",
+          "axis": "fb820f9ce611c76faf43866c47f10209f5bf67dbee3752c9f4fa8e69029f1b38",
+          "goal_preserving": "b5bea41b6c623f7c09f1bf24dcae58ebab3c0cdd90ad966bc43a45b44867e12b",
+          "id": "7d4a6aed32271cbac9a6415f71a37e835e917c4da1090bc7086805817a3055d1",
+          "layer": "dd04afac1bebb050783a245ed0d88633759f352c85d4ab3bea3d416bf2019c75",
+          "ps2_family": "fbefc43216342dd1be3802e7d74808d1b7a62d6875e8f20bab3fd7a568009ff4",
+          "safe_behavior": "ae2898a7968da4e41a13b4304ff5925493757645df625ab91cd725626c2b43df",
+          "version": "39fe4a40977d0585fd5704359e3685b0ada5cf5ee061e5d97385601d120cd0ec"
+        },
+        "files": "f28740525e96489e49bfbd04f84473c44dd4e43e06276a5f380f08d1c31b866c"
+      },
+      "wrong-majority": {
+        "settings": "ddf96576528e289a69adc3126c1407ffd4390a92ed1754237a2476df4829acb0",
+        "fields": {
+          "apply": "c2fc55ee7437d9644c2e74525c2778ab9085aeb6f2140ef754360bdc4a8e4a23",
+          "axis": "ee8294f87e101963be0221546eb9ac4c719405d77134a8acaa831ca2fba31aba",
+          "goal_preserving": "b5bea41b6c623f7c09f1bf24dcae58ebab3c0cdd90ad966bc43a45b44867e12b",
+          "id": "ecef359cad17fb64592efdef093fabebbcab90cb21956487bc60d97c4ec20beb",
+          "layer": "3e9b10a4431746317edc4ca1ac711ea80956f15927b5e89b88a4120106da0e74",
+          "metrics": "41f37b8cd2794a897d869cef593dafa90e148759d84ed55c2daffc316816c772",
+          "ps2_family": "e7ce85e320f16b651f787c929cc6fb3325473e0c3184e062115216a21bcb067f",
+          "safe_behavior": "0573c8b3a02a7c23fc7bb98322c9d7d2407a4360c1aad06c745a9a612e67d2d7",
+          "version": "39fe4a40977d0585fd5704359e3685b0ada5cf5ee061e5d97385601d120cd0ec"
+        },
+        "files": "fac4ba88c734483d14416f18c15042f2a1e5957306b37d0d031e62a5f64455f0"
+      }
+    }
+  }
+}

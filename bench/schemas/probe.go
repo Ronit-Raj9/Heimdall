@@ -69,6 +69,11 @@ type ProbeApply struct {
 	// condition (service id -> variable -> value). It is how a condition
 	// plants hostile or broken data inside a tool's own data.
 	ServiceEnv map[string]map[string]string `json:"service_env,omitempty" yaml:"service_env"`
+	// Agent targets the probe at one agent of a team run: a team member id
+	// or a role (every member with it). Empty targets the whole run. A
+	// gateway-layer probe binds its plan to the member's own key slot
+	// (MemberKey.KeySlot); a tool-layer probe matches ToolCall.AgentID.
+	Agent string `json:"agent,omitempty" yaml:"agent"`
 }
 
 // OverlaySpec copies From (relative to the task folder) to To (relative to the
@@ -94,7 +99,7 @@ type ShimSpec struct {
 // requests (POST /v1/messages) are counted; token counting and model listing
 // pass through uncounted.
 type FaultPlan struct {
-	Mode        string `json:"mode" yaml:"mode"`                     // none | persistent | once
+	Mode        string `json:"mode" yaml:"mode"`                     // none | persistent | once | stream_cut (Safety probes area, S1)
 	FromCall    int    `json:"from_call,omitempty" yaml:"from_call"` // persistent: first failing call, 1-based
 	Call        int    `json:"call,omitempty" yaml:"call"`           // once: the failing call, 1-based
 	Status      int    `json:"status,omitempty" yaml:"status"`       // e.g. 503

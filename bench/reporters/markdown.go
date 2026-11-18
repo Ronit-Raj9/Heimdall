@@ -53,13 +53,16 @@ func (r *markdownReporter) Write(ctx context.Context, a *schemas.Analysis, m *sc
 	writeSplit(bw, m)    // Suite health area: held-out experiments state their split (split.go)
 	writeSupport(bw, m)  // W3 customer support: the simulated user's label (support.go)
 	writePrimary(bw, &a.Verdict)
+	writeNoiseFloor(bw, &a.Verdict) // Eval integrity area (S2): the variance card behind the MDE
 	writeGuards(bw, a.Verdict.Guards)
 	writeInvalid(bw, a.Verdict.InvalidReasons)
 	writeInstruments(bw, a.Verdict.Instruments, m, arms)
-	writeRouting(bw, m) // W9 routing policy under test: arms by policy difference (routing.go)
+	writeRouting(bw, m)                   // W9 routing policy under test: arms by policy difference (routing.go)
+	writeFairness(bw, a.Verdict.Fairness) // Multi-agent area: equal-budget fairness (fairness.go)
 	writePolicy(bw, a.Policy)
 	writeNaive(bw, a.Naive, arms)
 	writeDiagnostics(bw, a.Diagnostics, arms)
+	writeOutage(bw, a.Meters, arms) // Safety probes area (S1): Outage behaviour card (outage.go)
 	writeMeters(bw, a.Meters, arms)
 	writeProvenance(bw, a)
 	if err := bw.Flush(); err != nil {
@@ -96,6 +99,8 @@ func writePrimary(w *bufio.Writer, v *schemas.Verdict) {
 	mde := ppText(v.MDE, false)
 	if mde != unknownText && v.MDEAssumedSD {
 		mde += fmt.Sprintf(" (assumed SD %.2f)", v.SD)
+	} else if mde != unknownText && v.Variance != nil && v.Variance.Source == schemas.VarianceMeasuredAA {
+		mde += fmt.Sprintf(" (SD %.3f measured from the A/A arm)", v.SD)
 	}
 	row(w, "MDE", mde)
 	row(w, "Alpha", fixed(v.Alpha, 3))
@@ -109,6 +114,66 @@ func writePrimary(w *bufio.Writer, v *schemas.Verdict) {
 	}
 	row(w, "Integrity", orUnknown(string(v.Integrity)))
 	w.WriteString("\n")
+}
+
+// writeNoiseFloor writes the variance card (docs/noise-floor.md): the SD the
+// MDE used and where it came from, and, when the experiment ran an A/A arm,
+// the A/A comparison and what it did to the verdict. An analysis written
+// before the card existed gets one line from the verdict's own SD.
+func writeNoiseFloor(w *bufio.Writer, v *schemas.Verdict) {
+	w.WriteString("## Noise floor\n\n")
+	c := v.Variance
+	if c == nil {
+		label := "assumed"
+		if !v.MDEAssumedSD {
+			label = "not assumed"
+		}
+		fmt.Fprintf(w, "No variance card: this analysis was written before the card existed. The MDE used SD %s, %s.\n\n", fixed(v.SD, 2), label)
+		return
+	}
+	w.WriteString("| Field | Value |\n|---|---|\n")
+	row(w, "SD used", fmt.Sprintf("%s (%s)", fixed(c.SD, 3), varianceSourceText(c)))
+	row(w, "Assumed SD", fixed(c.AssumedSD, 2))
+	if c.MeasuredSD != nil {
+		row(w, "Measured SD, A2 minus A", fmt.Sprintf("%s over %d tasks", fixed(*c.MeasuredSD, 3), c.AATasks))
+	}
+	if c.AAArm != "" {
+		row(w, "A/A arm", cell(c.AAArm)+", a copy of arm A on the clean condition")
+		row(w, "A/A effect", fmt.Sprintf("%s, p-value %s, %s discordant tasks", effectPP(c.AAEffect), pValue(c.AAEffect), discordant(c.AAEffect)))
+		row(w, "A/A decision", aaDecisionText(c.AADecision))
+	}
+	row(w, "MDE", ppText(c.MDE, false))
+	row(w, "Detail", cell(orDash(c.Detail)))
+	if c.AAArm != "" {
+		fmt.Fprintf(w, "\nArm %s in the tables below is the A/A copy of arm A. It never enters the A-against-B effect, the guards or integrity.\n", cell(c.AAArm))
+	}
+	w.WriteString("\n")
+}
+
+// varianceSourceText says where the card's SD came from.
+func varianceSourceText(c *schemas.VarianceCard) string {
+	switch c.Source {
+	case schemas.VarianceMeasuredAA:
+		return fmt.Sprintf("measured from the A/A arm over %d tasks", c.AATasks)
+	case schemas.VarianceAssumed:
+		return "assumed"
+	case schemas.VarianceObservedEffect:
+		return "the published table's own per-task differences, not an A/A measurement"
+	default:
+		return cell(orUnknown(c.Source))
+	}
+}
+
+// aaDecisionText is the A/A decision, with what a directional one means.
+func aaDecisionText(d *schemas.Decision) string {
+	if d == nil {
+		return unknownText
+	}
+	text := strings.ToUpper(orUnknown(string(*d)))
+	if *d == schemas.DecisionImproved || *d == schemas.DecisionRegressed {
+		text += ": harness noise, the verdict is INVALID"
+	}
+	return text
 }
 
 // writeGuards writes one row per release guard.

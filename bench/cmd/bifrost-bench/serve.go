@@ -15,6 +15,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/maximhq/bifrost/bench/attribution"
 	"github.com/maximhq/bifrost/bench/engine"
 	"github.com/maximhq/bifrost/bench/gates"
 	"github.com/maximhq/bifrost/bench/handlers"
@@ -74,6 +75,9 @@ func runServe(args []string) int {
 	deps.Export = serveExport{a: a} // W10 export downloads (export.go)
 	// X6 live scoring: Live page and API (livescore.go).
 	deps.Livescore = serveLivescore(a)
+	deps.Compliance = serveCompliance{a: a} // Eval integrity area (S2): compliance pack (compliance.go)
+	// Eval integrity area (S2): monitor certification (monitor.go).
+	deps.MonitorCerts = serveMonitorCerts(a)
 	// Jobs area (P4): experiments run as experiment.run jobs (cancel,
 	// resume after a restart) and the ops kinds serve /jobs (servejobs.go).
 	stopJobs := startLocalJobs(ctx, a, *config, deps.Launcher, ix, &deps)
@@ -224,6 +228,12 @@ func (x indexAdapter) RunVisual(runID, name string) ([]byte, error) {
 // RunVoiceFile implements handlers.VoiceReader (X8 voice agents, store/runvoice.go).
 func (x indexAdapter) RunVoiceFile(runID, service, name string) ([]byte, error) {
 	return x.ix.RunVoiceFile(runID, service, name)
+}
+
+// RunBlame implements handlers.BlameReader: the run's blame.json child
+// artifact (attribution/artifact.go), or nil when none was written.
+func (x indexAdapter) RunBlame(expID, runID, sealHash string) (*attribution.Blame, error) {
+	return attribution.Read(x.root, expID, runID, sealHash)
 }
 
 // VerifySeal implements handlers.SealVerifier with the index's cached seal

@@ -109,6 +109,7 @@ type remoteLease struct {
 	est               float64 // the slot's spend reservation
 	lastBeat          time.Time
 	archive           string // staged upload
+	gpus              int    // X7: GPUs the slot's task holds on the worker (gpu.go)
 	received          int64
 	uploading         bool // a chunk is being written
 	closing           bool // complete or release in progress; the sweep leaves it alone
@@ -221,6 +222,9 @@ func (c *Coordinator) Register(ctx context.Context, req *schemas.WorkerRegister)
 	w.parts = copyStrings(req.Parts)
 	w.scope = scope
 	w.scope.Pool = pool
+	if req.Capabilities != nil { // X7: the GPUs the worker offers (gpu.go)
+		w.info.GPUs = append([]schemas.GPUInfo(nil), req.Capabilities.GPUs...)
+	}
 	info, seen := c.infoLocked(w), w.scope
 	c.mu.Unlock()
 	c.logger.Info("remote worker registered", "worker", req.WorkerID, "host", req.Host, "version", req.Version, "slots", req.Slots, "pool", pool)
@@ -261,21 +265,28 @@ func (c *Coordinator) Lease(ctx context.Context, workerID string) (*schemas.Work
 			exps = append(exps, r)
 		}
 	}
+	accept := remoteGPUAccept(w.info.GPUs, c.gpusHeldLocked(workerID)) // X7: GPU slots only to a worker with free GPUs (gpu.go)
 	c.mu.Unlock()
 	for _, r := range exps {
 		id := utils.NewID("l", 12)
 		owner := "worker:" + workerID + ":" + id
-		slot, attempt, est, ok := r.leaseRemote(owner)
+		slot, attempt, est, ok := r.leaseRemoteWhere(owner, accept) // X7
 		if !ok {
 			continue
 		}
 		l := &remoteLease{id: id, worker: workerID, owner: owner, r: r, slot: slot, attempt: attempt, est: est,
 			lastBeat: c.now(), archive: filepath.Join(c.opts.StagingDir, id+".tar.gz")}
+		l.gpus = r.suite.TaskByID(slot.Task).GPUCount() // X7
 		c.mu.Lock()
 		if !c.attachedLocked(r) {
 			c.mu.Unlock()
 			r.endRemote(l, false)
 			continue
+		}
+		if l.gpus > 0 && c.gpusHeldLocked(workerID)+l.gpus > len(w.info.GPUs) { // X7: a concurrent lease call took the worker's GPUs
+			c.mu.Unlock()
+			r.endRemote(l, true)
+			return nil, nil
 		}
 		if len(w.info.Running) >= w.info.Slots {
 			// A concurrent lease call of the same worker took its last slot.
@@ -872,9 +883,19 @@ func (c *Coordinator) journalLocked(r *schedRun, event string, l *remoteLease, d
 // settled. ok is false when there is nothing to hand out now: the queue is
 // empty, the cap is waiting on in-flight slots, or Run's context ended.
 func (r *schedRun) leaseRemote(owner string) (*schemas.Slot, int, float64, bool) {
+	return r.leaseRemoteWhere(owner, nil)
+}
+
+// leaseRemoteWhere is leaseRemote for the slots whose task accept takes (nil
+// takes every slot; X7: the worker's GPUs decide, gpu.go).
+func (r *schedRun) leaseRemoteWhere(owner string, accept func(*schemas.Task) bool) (*schemas.Slot, int, float64, bool) {
 	store := r.s.reg.Store
+	var match func(*schemas.Slot) bool
+	if accept != nil {
+		match = func(s *schemas.Slot) bool { return accept(r.suite.TaskByID(s.Task)) }
+	}
 	for r.ctx.Err() == nil {
-		slot, ok := r.queue.take()
+		slot, ok := r.queue.takeWhere(match)
 		if !ok {
 			return nil, 0, 0, false
 		}

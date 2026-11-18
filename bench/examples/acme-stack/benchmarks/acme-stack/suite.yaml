@@ -1,0 +1,31 @@
+# acme-stack: Acme Shop's app with Postgres and Redis beside it, each task a
+# docker compose stack (docs/multi-container.md). Acme Shop is fictional.
+#
+# Each task's stack/compose.yaml is the team's own compose file: the app
+# service (x-heimdall workspace) becomes the task image the agent works in,
+# db (postgres:18) and cache (redis:7-alpine) run beside it on the run's
+# private internal network, ready by their healthchecks. After the agent
+# exits, the hidden verifier runs in the app image on the clean-room
+# workspace and joins that network (x-heimdall verifier_services) to query
+# db and cache by name: the state the agent left, and fresh databases of its
+# own for the code checks.
+id: acme-stack
+version: 1.0.0
+description: Acme Shop (fictional) app, Postgres and Redis as one compose stack per task; graded on the code and the database.
+track: coding
+environment: docker_workspace
+grader: verifier_command
+# The helper image: the base image is only used for the trusted copy steps;
+# each task's own app image runs the agent, the controls and the verifier.
+base_image:
+  tag: bench/coding-core-base:1
+workdir: /app
+verifier:
+  command: ["python3", "/grader/tests/verify.py"]
+  result: reward
+  result_path: /grader/out/reward.json
+  pass_threshold: 1
+  restore: []
+  timeout_s: 180
+tasks: [fix-migration, cache-invalidation, health-db]
+probes: []

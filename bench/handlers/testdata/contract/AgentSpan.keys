@@ -1,0 +1,10 @@
+# Keys of bench.ts `AgentSpan` (handlers/runagents.go), in RunAgents.spans.
+# label is clipped agent text: rendered as inert text only.
+agent_id
+seq
+kind
+start_ms
+end_ms
+label
+is_error?
+critical?

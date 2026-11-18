@@ -23,15 +23,18 @@ import { existsSync, mkdirSync, readFileSync, realpathSync, writeFileSync } from
 import { dirname, join, relative, resolve, sep } from 'node:path';
 
 const env = process.env;
-const BASE_URL = (env.BENCH_BASE_URL ?? '').replace(/\/+$/, '');
-const API_KEY = env.BENCH_API_KEY ?? '';
-const MODEL = env.BENCH_MODEL ?? '';
-const INSTRUCTION_FILE = env.BENCH_INSTRUCTION_FILE || '/tmp/bench/instruction.md';
-const SESSION_ID = env.BENCH_SESSION_ID ?? '';
-const MAX_TURNS = positiveInt(env.BENCH_MAX_TURNS, 40);
-const SHELL_TIMEOUT_S = positiveInt(env.BENCH_SHELL_TIMEOUT_S, 120);
+// A run with realism neutral names the bench's variables AGENT_* instead of
+// BENCH_* (docs/eval-awareness.md); the neutral name is read first.
+const benchEnv = (name) => env[`AGENT_${name}`] || env[`BENCH_${name}`];
+const BASE_URL = (benchEnv('BASE_URL') ?? '').replace(/\/+$/, '');
+const API_KEY = benchEnv('API_KEY') ?? '';
+const MODEL = benchEnv('MODEL') ?? '';
+const INSTRUCTION_FILE = benchEnv('INSTRUCTION_FILE') || '/tmp/bench/instruction.md';
+const SESSION_ID = benchEnv('SESSION_ID') ?? '';
+const MAX_TURNS = positiveInt(benchEnv('MAX_TURNS'), 40);
+const SHELL_TIMEOUT_S = positiveInt(benchEnv('SHELL_TIMEOUT_S'), 120);
 // The bench always uses /workspace; the override exists for the offline tests.
-const WORKSPACE = resolve(env.BENCH_WORKSPACE || '/workspace');
+const WORKSPACE = resolve(benchEnv('WORKSPACE') || '/workspace');
 const NOTES_FILE = 'AGENTS.md'; // the project notes file this agent reads (notes.project_file)
 const OUTPUT_MAX = 8000; // characters of shell output sent back to the model
 const READ_MAX = 20000; // characters of a file sent back to the model
@@ -76,7 +79,7 @@ const SYSTEM =
 process.exitCode = await main();
 
 async function main() {
-  const missing = ['BENCH_BASE_URL', 'BENCH_API_KEY', 'BENCH_MODEL'].filter((name) => !env[name]);
+  const missing = ['BASE_URL', 'API_KEY', 'MODEL'].filter((name) => !benchEnv(name)).map((name) => `BENCH_${name}`);
   if (missing.length > 0) {
     console.log(`Stopped: missing environment: ${missing.join(', ')}`);
     return 2;
@@ -165,7 +168,7 @@ function callTool(name, rawArgs) {
 
 function runShell(command) {
   // The run key stays out of the commands' environment: the model's commands never need it.
-  const { BENCH_API_KEY: _key, ...childEnv } = env;
+  const { BENCH_API_KEY: _key, AGENT_API_KEY: _neutralKey, ...childEnv } = env;
   const r = spawnSync('/bin/sh', ['-c', command], {
     cwd: WORKSPACE,
     env: childEnv,

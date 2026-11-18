@@ -13,6 +13,7 @@ import {
 	ReceiptText,
 	ScanSearch,
 	Server,
+	ShieldCheck,
 	TrendingUp,
 	type LucideIcon,
 } from "lucide-react";
@@ -45,7 +46,8 @@ export interface BenchNavItem {
 		| "/calibration" // W8 judge calibration
 		| "/canaries" // W5 drift canary
 		| "/live" // X6 live scoring
-		| "/releases";
+		| "/releases"
+		| "/monitors"; // Eval integrity area (S2)
 	labelKey:
 		| "nav.leaderboard"
 		| "nav.trends"
@@ -67,7 +69,8 @@ export interface BenchNavItem {
 		| "nav.calibration" // W8 judge calibration
 		| "nav.canaries" // W5 drift canary
 		| "nav.live" // X6 live scoring
-		| "nav.releases";
+		| "nav.releases"
+		| "nav.monitors"; // Eval integrity area (S2)
 	icon: LucideIcon;
 	testId: string;
 }
@@ -94,5 +97,6 @@ export const BENCH_NAV: readonly BenchNavItem[] = [
 	{ to: "/canaries", labelKey: "nav.canaries", icon: Activity, testId: "nav-link-canaries" }, // W5 drift canary
 	{ to: "/live", labelKey: "nav.live", icon: Radio, testId: "nav-link-live" }, // X6 live scoring
 	{ to: "/releases", labelKey: "nav.releases", icon: PackageCheck, testId: "nav-link-releases" },
+	{ to: "/monitors", labelKey: "nav.monitors", icon: ShieldCheck, testId: "nav-link-monitors" }, // Eval integrity area (S2)
 	{ to: "/experiments/new", labelKey: "nav.newExperiment", icon: FlaskConical, testId: "nav-link-new-experiment" },
 ];

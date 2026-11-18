@@ -1,0 +1,27 @@
+# Driver parity under the probes (docs/kubernetes.md, "Proof on kind"): the
+# scripted controls on two coding-core tasks under one probe of each layer
+# the Kubernetes driver runs: stale-notes (fixture), test-crash (tool shim)
+# and model-outage (gateway). The controls make no model call and run no
+# tests, so the probes arm but never fire; what is compared is that they arm
+# and record the same receipts, grades and metrics under both drivers. The
+# oracle passes every slot (admission requires it to pass under stale-notes
+# too), noop fails every slot.
+name: k8s-parity-probes
+suite: coding-core@1.0.0
+base: agents/oracle.yaml
+arms:
+  A: {label: oracle (reference patch)}
+  B: {label: noop (no change), agent: agents/noop.yaml}
+primary: {condition: stale-notes, metric: verified_success}
+guards:
+  - {rule: no_new_integrity_violation}
+conditions:
+  - {id: stale-notes, tasks: [t01, t02], trials: 1}
+  - {id: test-crash, tasks: [t01, t02], trials: 1}
+  - {id: model-outage, tasks: [t01, t02], trials: 1}
+budget: {total_usd: 0}
+verdict: {policy: paired_signflip, alpha: 0.05, assumed_sd: 0.30}
+seed: 20261118
+concurrency: 2
+manifest_mode: agent_exposure
+policy: policies/default.yaml

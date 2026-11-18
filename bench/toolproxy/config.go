@@ -29,6 +29,10 @@ const DefaultMCPPath = "/mcp"
 type Routes struct {
 	RunID  string  `json:"run_id"`
 	Routes []Route `json:"routes"`
+	// Members maps a team member's route token to its member id (team runs,
+	// docs/multi-agent.md): /m/<token>/s/<id>/ reaches the same services and
+	// stamps the member on every row (members.go).
+	Members map[string]string `json:"members,omitempty"`
 }
 
 // Route is one proxied service. The agent reaches it at
@@ -41,6 +45,9 @@ type Route struct {
 	// External holds the allowlist, credential, mode and caps of an
 	// external route (Protocol external); nil for every other route.
 	External *ExternalRoute `json:"external,omitempty"`
+	// Agent is the team member a request came in for (members.go); set per
+	// request on a copy of the route, never read from routes.json.
+	Agent string `json:"-"`
 }
 
 // ExternalRoute is how the proxy fronts one external API

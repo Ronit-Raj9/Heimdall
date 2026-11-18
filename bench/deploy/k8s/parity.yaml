@@ -1,0 +1,24 @@
+# Driver parity check (docs/kubernetes.md, "Proof on kind"): the scripted
+# controls on four coding-core tasks, clean, one trial, no model call. Arm A
+# applies each task's reference patch (oracle), arm B changes nothing
+# (noop), so A must verify 4 of 4 and B 0 of 4 under either driver, with the
+# same grades, metrics and sealed evidence. Run it once with the Docker
+# driver and once with environment.driver kubernetes, then compare the two
+# experiments' runs task by task.
+name: k8s-parity
+suite: coding-core@1.0.0
+base: agents/oracle.yaml
+arms:
+  A: {label: oracle (reference patch)}
+  B: {label: noop (no change), agent: agents/noop.yaml}
+primary: {condition: clean, metric: verified_success}
+guards:
+  - {rule: no_new_integrity_violation}
+conditions:
+  - {id: clean, tasks: [t01, t02, t03, t04], trials: 1}
+budget: {total_usd: 0}
+verdict: {policy: paired_signflip, alpha: 0.05, assumed_sd: 0.30}
+seed: 20261118
+concurrency: 2
+manifest_mode: agent_exposure
+policy: policies/default.yaml

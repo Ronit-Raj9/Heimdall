@@ -107,6 +107,7 @@ func Normalize(recs []Record, o Options) ([]schemas.Event, int) {
 			e.DurationMS = &d
 		}
 		e.Summary = red(summary(r))
+		setAgentFields(&e, r, red) // Multi-agent area: agent identity for attribution (agents.go)
 		out = append(out, e)
 	}
 	return out, dropped

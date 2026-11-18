@@ -100,6 +100,13 @@ type AgentConfig struct {
 	Skills *AgentSkills `json:"skills,omitempty" yaml:"skills"` // agent skills and where they are installed
 	Memory *AgentMemory `json:"memory,omitempty" yaml:"memory"` // paths kept between sessions
 	Remote *RemoteAgent `json:"remote,omitempty" yaml:"remote"` // read only by the remote_http adapter
+
+	// Multi-agent fields (agents.go, docs/multi-agent.md). Team runs one
+	// container per member, each on its own gateway key, under the run-wide
+	// cap Budgets.USD; Topology labels the arm for topology comparisons.
+	Team     []TeamMember `json:"team,omitempty" yaml:"team"`
+	Topology string       `json:"topology,omitempty" yaml:"topology"` // single | best_of_n | orchestrator_worker | team | swarm
+	Limits   *AgentLimits `json:"limits,omitempty" yaml:"limits"`     // spawn caps, frozen in the manifest; the over_spawn gate compares the tree with them
 }
 
 // AgentNotes says which notes files the agent reads (DESIGN.md 8.6).
