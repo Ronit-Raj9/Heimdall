@@ -253,6 +253,7 @@ func (st *streamState) assistant(obj map[string]json.RawMessage) {
 		st.turnIndex[id] = idx
 		if subagent {
 			st.events[idx].Summary = "subagent"
+			st.events[idx].AgentID = subagentAgentID(obj) // Multi-agent area: transcript attribution (docs/multi-agent.md)
 		}
 	}
 	ev := &st.events[idx]
@@ -287,6 +288,9 @@ func (st *streamState) assistant(obj map[string]json.RawMessage) {
 			}
 		case "tool_use":
 			st.toolCall(b, turn, parentID)
+			if subagent {
+				st.events[len(st.events)-1].AgentID = subagentAgentID(obj)
+			}
 		}
 	}
 }
@@ -302,6 +306,10 @@ func (st *streamState) toolCall(b contentBlock, turn int, parentID string) {
 	ev.Summary = clip(oneLine(strings.TrimSpace(b.Name+" "+ev.Target)), summaryMax)
 	if b.ID != "" {
 		st.calls[b.ID] = i
+	}
+	if spawnTools[b.Name] && b.ID != "" { // Multi-agent area: a Task/Agent call starts the subagent whose lines carry its id
+		ev.AgentTarget = SubagentPrefix + b.ID
+		ev.AgentName = spawnName(b.Input)
 	}
 }
 
@@ -331,6 +339,7 @@ func (st *streamState) user(obj map[string]json.RawMessage) {
 		ev.IsError = b.IsError
 		ev.ResultHash = hashRaw(b.Content)
 		ev.Summary = clip(oneLine(resultText(b.Content)), summaryMax)
+		ev.AgentID = subagentAgentID(obj) // Multi-agent area: empty for the main agent
 	}
 }
 
@@ -571,4 +580,40 @@ func clipTail(s string, n int) string {
 	}
 	r := []rune(s)
 	return "..." + string(r[len(r)-(n-3):])
+}
+
+// SubagentPrefix starts the agent id the parser gives a Claude Code
+// subagent: the prefix plus the id of the Task (or Agent) tool call that
+// started it, which every line of the subagent carries as
+// parent_tool_use_id (docs/multi-agent.md).
+const SubagentPrefix = "task:"
+
+// spawnTools are the Claude Code tools that start a subagent: Task, renamed
+// Agent in later versions (both seen in real transcripts).
+var spawnTools = map[string]bool{"Task": true, "Agent": true}
+
+// subagentAgentID is the agent id of a subagent line, or "" for the main
+// agent's lines.
+func subagentAgentID(obj map[string]json.RawMessage) string {
+	s, ok := rawString(obj["parent_tool_use_id"])
+	if !ok || s == "" {
+		return ""
+	}
+	return SubagentPrefix + clip(s, 120)
+}
+
+// spawnName is the subagent's name from the spawning call's input: its type,
+// else its description.
+func spawnName(input json.RawMessage) string {
+	var in struct {
+		SubagentType string `json:"subagent_type"`
+		Description  string `json:"description"`
+	}
+	if json.Unmarshal(input, &in) != nil {
+		return ""
+	}
+	if in.SubagentType != "" {
+		return clip(oneLine(in.SubagentType), 128)
+	}
+	return clip(oneLine(in.Description), 128)
 }

@@ -1,0 +1,31 @@
+# Write a fused GPU softmax at least twice as fast as the five-kernel one.
+# Graded on the diff: the hidden verifier checks the agent's kernel against
+# a float64 reference on cases seeded at grading time, then times it against
+# the original in child processes, checking a random output of every timed
+# round, and reports the speedup with its interval.
+id: fused-softmax
+version: 1.0.0
+title: Write a fused softmax kernel for the ranking service
+project: ranking-kernels
+kind: performance
+instruction: instruction.md
+repo_dir: repo
+resources:
+  gpu: {count: 1, min_vram_mb: 2048}
+verifier:
+  tests: verifier/tests
+  required: []
+protected: [tests/test_softmax.py]
+controls:
+  reference: solution/patch.diff
+  empty: controls/empty.diff
+  mutants: [controls/mutant-no-max.diff, controls/mutant-slow.diff]
+  exploit: controls/exploit.sh
+timeouts:
+  agent_s: 900
+capabilities: [gpu_kernels, performance, gpu]
+difficulty: medium
+provenance:
+  source: bench/examples/acme-gpu (fictional Acme ranking service)
+  license: MIT
+  created_by: hand-written example

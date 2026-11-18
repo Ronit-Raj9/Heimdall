@@ -59,3 +59,29 @@ func TestBuildGrid(t *testing.T) {
 		}
 	})
 }
+
+// TestArmIDsAAArmLast checks that the A/A arm sorts after B only in an
+// experiment with aa: true (Eval integrity area, S2).
+func TestArmIDsAAArmLast(t *testing.T) { // Eval integrity area (S2)
+	arms := map[string]schemas.ArmManifest{"A": {}, "A2": {}, "B": {}} // Eval integrity area (S2)
+	tests := []struct {                                                // Eval integrity area (S2)
+		name string // Eval integrity area (S2)
+		aa   bool   // Eval integrity area (S2)
+		want string // Eval integrity area (S2)
+	}{ // Eval integrity area (S2)
+		{"aa: A2 last", true, "A,B,A2,"},               // Eval integrity area (S2)
+		{"declared A2 stays sorted", false, "A,A2,B,"}, // Eval integrity area (S2)
+	} // Eval integrity area (S2)
+	for _, tt := range tests { // Eval integrity area (S2)
+		t.Run(tt.name, func(t *testing.T) { // Eval integrity area (S2)
+			m := &schemas.Manifest{Arms: arms, Experiment: schemas.Experiment{AA: tt.aa}} // Eval integrity area (S2)
+			got := ""                                                                     // Eval integrity area (S2)
+			for _, a := range armIDs(m) {                                                 // Eval integrity area (S2)
+				got += a + "," // Eval integrity area (S2)
+			} // Eval integrity area (S2)
+			if got != tt.want { // Eval integrity area (S2)
+				t.Fatalf("armIDs = %s, want %s", got, tt.want) // Eval integrity area (S2)
+			} // Eval integrity area (S2)
+		}) // Eval integrity area (S2)
+	} // Eval integrity area (S2)
+} // Eval integrity area (S2)

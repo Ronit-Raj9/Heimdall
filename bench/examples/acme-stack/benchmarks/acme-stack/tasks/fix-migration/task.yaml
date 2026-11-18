@@ -1,0 +1,28 @@
+# Fix a migration that fails on a database with data. The environment is the docker compose stack in stack/:
+# the app is the agent's workspace, Postgres and Redis run beside it.
+id: fix-migration
+version: 1.0.0
+title: Fix a migration that fails on a database with data
+project: acme-shop
+kind: bugfix
+instruction: instruction.md
+# The workspace comes from the app image (stack/app/ copied to /app).
+repo_dir: repo
+compose: stack/compose.yaml
+verifier:
+  tests: verifier/tests
+  required: []
+protected: [migrations/001_products.sql]
+controls:
+  reference: solution/reference.sh
+  empty: controls/empty.sh
+  mutants: [controls/mutant-drop-rows.sh, controls/mutant-not-applied.sh, controls/mutant-nullable.sh]
+  exploit: controls/exploit.sh
+timeouts:
+  agent_s: 600
+capabilities: [debugging, databases]
+difficulty: easy
+provenance:
+  source: bench/examples/acme-stack (fictional Acme Shop, written for this example)
+  license: MIT
+  created_by: hand-written example

@@ -151,7 +151,7 @@ func (e *dockerWorkspace) createMemory(ctx context.Context, rc *schemas.RunConte
 	if err != nil {
 		return err
 	}
-	for _, v := range memoryVolumes(runID, len(paths)) {
+	for _, v := range viewFor(rc).memoryVolumes(runID, len(paths)) { // Eval integrity area (S2): neutral volume names in a neutral run
 		if err := e.freshVolume(ctx, v, expID, runID); err != nil {
 			return err
 		}
@@ -171,6 +171,7 @@ func (e *dockerWorkspace) createMemory(ctx context.Context, rc *schemas.RunConte
 func (e *dockerWorkspace) agentMounts(ctx context.Context, rc *schemas.RunContext, plan *schemas.RunPlan, expID, runID string) ([]string, []link, error) {
 	var mounts []string
 	var links []link
+	view := viewFor(rc) // Eval integrity area (S2): where linked volumes are mounted (realism.go)
 	if wp := workspacePath(rc); wp != "" && wp != defaultWorkdir {
 		mounts = append(mounts, "-v", rc.Handle.Volume+":"+wp)
 	}
@@ -180,12 +181,12 @@ func (e *dockerWorkspace) agentMounts(ctx context.Context, rc *schemas.RunContex
 		if err != nil {
 			return nil, nil, err
 		}
-		vols := memoryVolumes(runID, len(paths))
+		vols := view.memoryVolumes(runID, len(paths)) // Eval integrity area (S2): view
 		mounts = append(mounts, "-v", vols[0]+":"+utils.DefaultMemoryDir)
 		for i, p := range paths {
 			at := p
 			if linked(p) {
-				at = benchMount + "/memory/" + strconv.Itoa(i)
+				at = view.linkTarget("memory", i) // Eval integrity area (S2): benchMount/memory/i in a standard run
 				links = append(links, link{dst: p, src: at})
 			}
 			mounts = append(mounts, "-v", vols[i+1]+":"+at)
@@ -197,13 +198,13 @@ func (e *dockerWorkspace) agentMounts(ctx context.Context, rc *schemas.RunContex
 		return nil, nil, err
 	}
 	for i, d := range dirs {
-		v := dirVolume(runID, i)
+		v := view.dirVolume(runID, i) // Eval integrity area (S2): view
 		if err := e.freshVolume(ctx, v, expID, runID); err != nil {
 			return nil, nil, err
 		}
 		at := d.dst
 		if linked(d.dst) {
-			at = benchMount + "/dirs/" + strconv.Itoa(i)
+			at = view.linkTarget("dirs", i) // Eval integrity area (S2): benchMount/dirs/i in a standard run
 			links = append(links, link{dst: d.dst, src: at})
 		}
 		mounts = append(mounts, "-v", v+":"+at+":ro")
@@ -288,7 +289,7 @@ func (e *dockerWorkspace) fillAgentVolumes(ctx context.Context, rc *schemas.RunC
 	}
 	for i, d := range dirs {
 		n := strconv.Itoa(i)
-		args = append(args, "-v", dirVolume(runID, i)+":/bench-dir/"+n, "-v", d.src+":/bench-src/"+n+":ro")
+		args = append(args, "-v", viewFor(rc).dirVolume(runID, i)+":/bench-dir/"+n, "-v", d.src+":/bench-src/"+n+":ro") // Eval integrity area (S2): view
 	}
 	args = append(args, "-e", "BENCH_UID="+uid, "-e", "BENCH_GID="+gid, e.helperImage(rc), "-c", fillScript)
 	if _, err := e.cfg.Docker.MustRun(ctx, args...); err != nil {

@@ -100,6 +100,10 @@ type schedRun struct {
 	maxCost  float64       // highest observed cost of one run
 	observed bool          // some run's cost was observed
 	freed    chan struct{} // closed and replaced whenever a reservation is released
+
+	// X7: the GPUs each GPU worker holds, by slot id (gpu.go).
+	gpuMu sync.Mutex
+	gpus  map[string]*schemas.GPUAssignment
 }
 
 // NewScheduler returns a scheduler. janitor may be nil (tests, or a host
@@ -147,17 +151,45 @@ func (s *Scheduler) Run(ctx context.Context, m *schemas.Manifest, opts RunOption
 	if workers <= 0 {
 		workers = DefaultConcurrency
 	}
+	// X7: GPU slots go to GPU workers only, one per GPU of the pool, and
+	// never to a CPU worker (gpu.go). With remote workers attached, a CPU
+	// worker also waits while GPU slots are pending, since a remote GPU
+	// worker may still take them.
+	nGPU := gpuSlots(m, r.suite)
+	gpuWorkerCount := gpuWorkers(r.s.reg, nGPU)
+	if nGPU > 0 && gpuWorkerCount == 0 && opts.Remote == nil {
+		detach()
+		return nil, fmt.Errorf("run %s: %d slots are of GPU tasks and this machine has no GPU pool (bifrost-bench gpu check); nothing was run", m.ExpID, nGPU)
+	}
+	if nGPU > 0 && gpuWorkerCount == 0 {
+		r.emit(Event{Kind: EventError, Message: fmt.Sprintf("%d slots are of GPU tasks and this machine has no GPU pool: they wait for a remote worker that registered a GPU", nGPU)})
+	}
+	isGPU := func(s *schemas.Slot) bool { return slotNeedsGPU(r.suite, s) }
+	isCPU := func(s *schemas.Slot) bool { return !slotNeedsGPU(r.suite, s) }
 	var wg sync.WaitGroup
 	for range workers {
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
 			for {
-				slot, ok := r.queue.next(ctx)
+				slot, ok := r.queue.nextWhere(ctx, isCPU, opts.Remote != nil && nGPU > 0) // X7: CPU slots only
 				if !ok {
 					return
 				}
 				r.process(ctx, slot)
+			}
+		}()
+	}
+	for range gpuWorkerCount { // X7: one GPU worker per GPU (gpu.go)
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			for {
+				slot, ok := r.queue.nextWhere(ctx, isGPU, false)
+				if !ok {
+					return
+				}
+				r.runGPUSlot(ctx, slot)
 			}
 		}()
 	}
@@ -430,7 +462,7 @@ func (r *schedRun) skipDone(slot *schemas.Slot, recs []schemas.RunRecord) bool {
 }
 
 func (r *schedRun) input(slot *schemas.Slot, attempt int) SlotInput {
-	return SlotInput{Manifest: r.m, Suite: r.suite, Slot: slot, Attempt: attempt, Emit: r.emit}
+	return SlotInput{Manifest: r.m, Suite: r.suite, Slot: slot, Attempt: attempt, Emit: r.emit, GPU: r.gpuFor(slot.SlotID)} // X7: GPU
 }
 
 // record adds a finished run's cost and counts its seal. A run whose agent
@@ -743,15 +775,26 @@ func newSlotQueue(slots []schemas.Slot) *slotQueue {
 // work out; it reports false when nothing is pending and nothing is out, or
 // when ctx ends while it waits.
 func (q *slotQueue) next(ctx context.Context) (*schemas.Slot, bool) {
+	return q.nextWhere(ctx, nil, false)
+}
+
+// nextWhere is next for the slots match accepts (nil accepts every slot;
+// X7: CPU and GPU workers each take their own kind). Besides waiting while
+// remote workers hold slots, it waits while other slots are pending when
+// waitOthers is set, so a local worker stays until a remote worker has taken
+// the slots it cannot run.
+func (q *slotQueue) nextWhere(ctx context.Context, match func(*schemas.Slot) bool, waitOthers bool) (*schemas.Slot, bool) {
 	for {
 		q.mu.Lock()
-		if len(q.pending) > 0 {
-			slot := q.pending[0]
-			q.pending = q.pending[1:]
-			q.mu.Unlock()
-			return slot, true
+		for i, slot := range q.pending {
+			if match == nil || match(slot) {
+				q.pending = append(q.pending[:i:i], q.pending[i+1:]...)
+				q.notifyLocked() // X7: a worker waiting on other slots re-checks
+				q.mu.Unlock()
+				return slot, true
+			}
 		}
-		if q.remote == 0 {
+		if q.remote == 0 && (!waitOthers || len(q.pending) == 0) {
 			q.mu.Unlock()
 			return nil, false
 		}
@@ -768,15 +811,23 @@ func (q *slotQueue) next(ctx context.Context) (*schemas.Slot, bool) {
 // take pops the next slot for a remote worker without waiting. The slot is
 // out until giveBack or finish.
 func (q *slotQueue) take() (*schemas.Slot, bool) {
+	return q.takeWhere(nil)
+}
+
+// takeWhere is take for the first pending slot match accepts (nil accepts
+// every slot; X7: a remote worker without free GPUs takes no GPU slot).
+func (q *slotQueue) takeWhere(match func(*schemas.Slot) bool) (*schemas.Slot, bool) {
 	q.mu.Lock()
 	defer q.mu.Unlock()
-	if len(q.pending) == 0 {
-		return nil, false
+	for i, slot := range q.pending {
+		if match == nil || match(slot) {
+			q.pending = append(q.pending[:i:i], q.pending[i+1:]...)
+			q.remote++
+			q.notifyLocked()
+			return slot, true
+		}
 	}
-	slot := q.pending[0]
-	q.pending = q.pending[1:]
-	q.remote++
-	return slot, true
+	return nil, false
 }
 
 // giveBack queues a slot that was out again, in OrderIndex order.

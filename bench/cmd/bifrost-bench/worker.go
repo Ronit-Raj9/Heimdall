@@ -57,7 +57,7 @@ func runWorker(args []string) int {
 		host = ""
 	}
 	w, err := engine.NewWorker(a.reg, engine.NewPipeline(a.reg, a.cfg.Root, a.logger),
-		engine.NewPlanner(a.reg, a.cfg.Root, a.logger, engine.WithIgnoreQuarantine()).Plan, // Suite health area: a replan reproduces a frozen manifest (engine/taskscreen.go)
+		engine.NewPlanner(a.reg, a.cfg.Root, a.logger, engine.WithIgnoreQuarantine(), engine.WithoutGPUCheck()).Plan, // Suite health area: a replan reproduces a frozen manifest (engine/taskscreen.go); X7: no GPU check, the coordinator leases GPU slots by the GPUs a worker registers
 		engine.WorkerOptions{Server: *server, Token: token, WorkerID: *id, Host: host, Version: benchVersion,
 			Slots: *slots, Logger: a.logger})
 	if err != nil {

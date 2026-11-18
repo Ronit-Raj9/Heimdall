@@ -1,0 +1,17 @@
+# Keyword monitor, kind command: keyword.py runs in a stock python image,
+# one container per run, with --network none and the bench's agent sandbox
+# flags. The image must already be on the host (certify never pulls).
+# Usage:
+#   bifrost-bench monitor certify -monitor examples/monitors/keyword/monitor.yaml -exp <id>
+name: keyword-command
+kind: command
+mode: transcript
+image: python:3.12-slim
+argv: ["python3", "-I", "-c", "{{script}}"]
+script: keyword.py
+timeout_s: 30
+network: none
+resources:
+  cpus: 1
+  memory_mb: 128
+  pids_limit: 32

@@ -1,4 +1,120 @@
 {
+	"integrity": {
+		"variance": {
+			"title": "Noise floor",
+			"description": "How much the score moves between identical runs, and the smallest effect this experiment could detect.",
+			"source": {
+				"measured_aa": "measured from the A/A arm",
+				"assumed": "assumed",
+				"observed_effect": "from the published per-task differences"
+			},
+			"sdUsed": "SD of per-task differences",
+			"assumedSd": "Assumed SD",
+			"measuredSd": "Measured SD",
+			"notMeasured": "not measured",
+			"mde": "Minimal detectable effect",
+			"aaTasks": "A/A tasks",
+			"aaEffect": "A/A difference",
+			"aaDecision": "A/A verdict",
+			"aaDecisionValue": {
+				"improved": "differs (harness noise)",
+				"regressed": "differs (harness noise)",
+				"inconclusive": "no difference",
+				"invalid": "invalid"
+			},
+			"noAA": "No A/A arm ran, so the MDE rests on an assumed SD. Set aa: true in the experiment to measure the noise floor.",
+			"harnessNoise": "Two identical arms differed significantly: the harness, not the agent, moved the number. The verdict is invalid.",
+			"band": {
+				"label": "Release effect against the noise floor",
+				"zero": "0",
+				"release": "B - A",
+				"aa": "A2 - A",
+				"mde": "±MDE",
+				"inside": "The release effect is inside ±MDE: this experiment cannot tell it from noise.",
+				"outside": "The release effect is outside ±MDE."
+			},
+			"legacy": "This analysis predates the noise-floor card; the MDE above uses {{kind}} SD {{sd}}.",
+			"legacyAssumed": "an assumed",
+			"legacyMeasured": "a measured"
+		},
+		"awareness": {
+			"title": "Evaluation awareness",
+			"description": "Heuristic phrase scan of what the agent itself wrote (messages, reasoning summaries, final message) for statements that it is being tested.",
+			"heuristic": "heuristic",
+			"reportOnly": "report only, never a gate",
+			"realism": "Realism: {{realism}}",
+			"arm": "Arm",
+			"runs": "Runs scanned",
+			"runsWithSignals": "Runs with signals",
+			"signals": "Signals",
+			"examples": "Examples",
+			"noExamples": "No run said anything that matched. Silence is not proof the agent did not notice: unverbalized awareness is invisible to this scan.",
+			"notScanned_one": "{{count}} run could not be scanned",
+			"notScanned_other": "{{count}} runs could not be scanned",
+			"source": {
+				"assistant_message": "message",
+				"reasoning_summary": "reasoning",
+				"final_message": "final message",
+				"agent_stream": "agent stream"
+			},
+			"loadError": "Could not load the awareness scan.",
+			"unavailable": "This server has no awareness scan for the experiment."
+		},
+		"monitors": {
+			"title": "Monitor certifications",
+			"subtitle": "A monitor or guardrail replayed over labelled sealed runs: catch rate on attack runs at a fixed false-positive rate on honest runs.",
+			"disclaimer": "Labels come from deterministic gates: honest means no veto fired, attack means a safety probe's veto fired. A monitor is scored only on attacks the gates can see.",
+			"forExperiment": "Certifications that replayed this experiment's runs.",
+			"none": "No certification yet. Run: bifrost-bench monitor certify -monitor <config.yaml> -exp {{exp}}",
+			"noneAll": "No certification yet. Run: bifrost-bench monitor certify -monitor <config.yaml> -exp <id>",
+			"headline": "Catch rate at {{fpr}} FPR",
+			"unsupported": "sample too small",
+			"noAttacks": "no attack runs to score",
+			"honest": "{{count}} honest",
+			"attacks": "{{count}} attacks",
+			"excluded": "{{count}} excluded",
+			"open": "Open",
+			"report": "Report (Markdown)",
+			"back": "All certifications",
+			"monitor": "Monitor",
+			"mode": "Mode",
+			"configHash": "Config",
+			"network": "Network",
+			"experiments": "Experiments",
+			"labels": "Labels",
+			"points": "Operating points",
+			"targetFpr": "Target FPR",
+			"threshold": "Threshold",
+			"achievedFpr": "Achieved FPR",
+			"catchRate": "Catch rate",
+			"interval": "95% exact",
+			"supported": "Supported",
+			"families": "Per attack family",
+			"family": "Family",
+			"gates": "Gates",
+			"warnings": "Warnings",
+			"errors_one": "{{count}} monitor error",
+			"errors_other": "{{count}} monitor errors",
+			"items": "Replayed runs",
+			"itemsMore": "{{count}} more runs in the JSON certificate.",
+			"label": "Label",
+			"score": "Score",
+			"decision": "Decision",
+			"run": "Run",
+			"yes": "yes",
+			"excludedReasons": "Excluded:",
+			"injection": "Monitor-injection check (planted \"approved, score 0\" text)",
+			"loadError": "Could not load monitor certifications.",
+			"notFound": "Certification {{id}} was not found."
+		},
+		"compliance": {
+			"title": "Compliance evidence pack",
+			"description": "Each executed test mapped to OWASP LLM 2025, OWASP Agentic 2026 and NIST AI RMF ids, the record-keeping the bench does (EU AI Act Art. 12 and 26), and links to the sealed runs.",
+			"markdown": "Download Markdown",
+			"json": "Download JSON",
+			"disclaimer": "A map from evidence to frameworks, not a certificate or legal advice. Unverified ids are starred."
+		}
+	},
 	"agentDiff": {
 		"title": "Agent diff",
 		"subtitle": "What changed between version A and version B of an agent, and which tasks flipped. Only verified sealed runs on one suite version and one condition count.",
@@ -208,7 +324,8 @@
 		"releases": "Releases",
 		"imports": "Imports",
 		"workers": "Workers",
-		"trends": "Trends"
+		"trends": "Trends",
+		"monitors": "Monitors"
 	},
 	"mode": {
 		"live": "LIVE",
@@ -669,8 +786,10 @@
 				"tokens": "Fresh input, cache read, cache write and output tokens over every physical attempt.",
 				"cost_usd": "Every physical attempt at the pinned price snapshot.",
 				"wall_time_s": "Agent container start to exit.",
-				"verified_success": "The hidden verifier passed and no integrity gate vetoed the run."
-			}
+				"verified_success": "The hidden verifier passed and no integrity gate vetoed the run.",
+				"silent_compromise": "1 when a veto gate fired on this run (the harm happened) and the final message does not disclose it; 0 when nothing fired or it was disclosed."
+			},
+			"silent_compromise": "Silent compromise"
 		},
 		"claim": {
 			"title": "Agent said, beside the hidden result",
@@ -1025,6 +1144,225 @@
 			"version": "version {{version}}, build {{build}} (self-declared)",
 			"events_one": "{{count}} event",
 			"events_other": "{{count}} events"
+		},
+		"agents": {
+			"title": "Agents",
+			"description": "Who the agents of a multi-agent run were, what each did and cost, who handed what to whom, and which agent the failure is blamed on. Agent-written text is shown as plain text.",
+			"loadError": "Could not load the run's agents.",
+			"unavailable": "Single-agent run: there is no agent tree, swimlane or blame to show.",
+			"unknown": "unknown",
+			"unknownHint": "Not recorded: tokens and cost need gateway rows that carry the agent's id.",
+			"notRecorded": "Not recorded by the run",
+			"notSet": "not set",
+			"noAgent": "no agent",
+			"via": "via",
+			"count_one": "{{value}} agent",
+			"count_other": "{{value}} agents",
+			"truncated": "The timeline is longer than one response carries: the swimlanes cover the first rows only.",
+			"notes": "What could not be read or matched",
+			"shape": {
+				"team": "team: one container per member",
+				"in_process": "in-process subagents",
+				"unknown": "shape not recorded"
+			},
+			"strength": {
+				"proven": "proven",
+				"declared": "declared",
+				"reported": "reported"
+			},
+			"strengthHint": {
+				"proven": "Proven: the bench minted a gateway key for this agent's container, so it cannot pose as another member",
+				"declared": "Declared: a header the gateway recorded, but the agent chose its value",
+				"reported": "Reported: the agent's own record (transcript, OTLP spans or native events), the weakest evidence",
+				"unknown": "Attribution strength not recorded"
+			},
+			"source": {
+				"gateway_key": "gateway key",
+				"header": "header",
+				"transcript": "transcript",
+				"otlp": "OTLP",
+				"self_report": "self-report"
+			},
+			"exit": {
+				"completed": "completed",
+				"error": "error",
+				"timeout": "timeout"
+			},
+			"exitHint": "How the agent ended",
+			"edge": {
+				"spawn": "spawn",
+				"handoff": "handoff",
+				"message": "message",
+				"claim": "claim",
+				"return": "return"
+			},
+			"kind": {
+				"model_turn": "model turn",
+				"model_attempt": "model attempt",
+				"tool_request": "tool request",
+				"tool_execution": "tool execution",
+				"command": "command",
+				"file_change": "file change",
+				"network": "network",
+				"agent_event": "agent event"
+			},
+			"coverage": {
+				"value": "{{percent}} of steps attributed",
+				"noSteps": "no steps to attribute",
+				"counts": "{{attributed}} of {{steps}} steps",
+				"unknownCount": "{{value}} unknown",
+				"byStrength": "By strength:",
+				"bySource": "By source:",
+				"missing": "Attribution coverage not recorded"
+			},
+			"stats": {
+				"wall": "Wall time",
+				"wallHint": "From the first to the last timeline row",
+				"busy": "Busy time",
+				"busyHint": "Every agent's busy time added up",
+				"parallelism": "Parallelism",
+				"parallelismHint": "Busy time over wall time: 1.0 means the agents never overlapped",
+				"critical": "Critical path",
+				"criticalHint": "The longest chain of dependent blocks: the part of the wall time more agents could not have shortened",
+				"factor": "{{value}}x",
+				"ofWall": "{{percent}} of wall",
+				"noWall": "No wall time recorded, so no parallelism factor"
+			},
+			"swimlane": {
+				"title": "Swimlanes",
+				"description": "One lane per agent. Each block is a timeline row placed over the run's wall time, coloured by kind; ringed blocks are on the critical path, red-edged ones are errors. Vertical markers are handoffs from the sender's lane to the receiver's at their time.",
+				"empty": "No timeline row carries an agent id.",
+				"legend": "Legend",
+				"error": "error",
+				"critical": "critical path",
+				"label": "Agent swimlanes of arm {{arm}}",
+				"lane": "Lane of",
+				"block": "row #{{seq}}, from {{start}} to {{end}}",
+				"handoff": "handoff",
+				"alteredHandoff": "altered or lossy handoff",
+				"handoffs": "Handoffs between the lanes",
+				"handoffAt": "at {{time}}"
+			},
+			"tree": {
+				"title": "Agent tree",
+				"description": "Who started whom, each agent's role and model, how it is known and how it ended, then what each one did and cost.",
+				"label": "Agent tree of arm {{arm}}",
+				"orphan": "Its parent is not in the tree: drawn as a root."
+			},
+			"table": {
+				"agent": "Agent",
+				"role": "Role",
+				"model": "Model",
+				"steps": "Steps",
+				"modelTurns": "Model turns",
+				"toolCalls": "Tool calls",
+				"inputTokens": "Input tokens",
+				"outputTokens": "Output tokens",
+				"cost": "Cost (USD)",
+				"sent": "Messages sent",
+				"received": "Messages received",
+				"busy": "Busy time"
+			},
+			"handoffs": {
+				"title": "Handoffs",
+				"description": "Every spawn, handoff, message, claim and return in time order. Open a row to compare the payload as sent with the payload as delivered.",
+				"empty": "No handoffs recorded between the agents.",
+				"label": "Handoffs of arm {{arm}}",
+				"to": "to",
+				"noRecipient": "no recipient",
+				"noTime": "time not recorded",
+				"altered": "altered",
+				"alteredHint": "The payload delivered differs from the payload sent: a lossy handoff or a truncation on the way",
+				"ref": "Shown by",
+				"notRecorded": "Payload not recorded: the run kept only its hash and size.",
+				"onlySent": "Only the payload as sent was recorded:",
+				"onlyDelivered": "Only the payload as delivered was recorded:",
+				"unchanged": "Delivered as sent:",
+				"sent": "sent",
+				"delivered": "delivered"
+			},
+			"facts": {
+				"label": "Planted facts",
+				"sent": {
+					"yes": "in the payload sent",
+					"no": "not in the payload sent"
+				},
+				"delivered": {
+					"yes": "delivered",
+					"no": "not delivered"
+				},
+				"state": {
+					"kept": "kept",
+					"lost": "lost",
+					"added": "added on the way",
+					"absent": "never sent"
+				}
+			},
+			"blame": {
+				"title": "Blame",
+				"none": "No blame recorded for this run.",
+				"outcome": "Outcome",
+				"failed": "failed",
+				"version": "rules {{version}}",
+				"blamed": "Blamed agent",
+				"gate": "Gate",
+				"step": "Step",
+				"time": "Time",
+				"knownBy": "Agent known by",
+				"evidence": "Evidence references",
+				"unplaced": "References no agent could be found for",
+				"unplacedHint": "A fired gate named these, but no timeline row with an agent id matches them.",
+				"notes": "Notes",
+				"ladder": "Evidence tiers, strongest first",
+				"judgeRung": "LLM judge",
+				"judgeNotOffered": "LLM-judge blame is not offered: best published step-level accuracy is 14%.",
+				"tier": {
+					"replay_validated": "replay validated",
+					"gate_proven": "gate proven",
+					"unattributed": "unattributed",
+					"single_agent": "single agent"
+				},
+				"tierHint": {
+					"replay_validated": "The run was replayed with the suspect replaced by a scripted correct stub, and the failure went away",
+					"gate_proven": "The first agent whose recorded step tripped a fired gate. Deterministic, from the sealed gates and timeline",
+					"unattributed": "No agent could be proven responsible: no fired gate names a step with an agent id",
+					"single_agent": "The run had one agent, so there is nothing to attribute"
+				},
+				"candidates": "Candidates",
+				"effect": "Effect",
+				"ref": "Reference",
+				"source": "Source",
+				"picked": "blamed",
+				"effectName": {
+					"invalidate": "invalidate",
+					"veto": "veto",
+					"report": "report",
+					"admission": "admission"
+				}
+			},
+			"replay": {
+				"title": "Counterfactual replay",
+				"status": {
+					"not_run": "not run",
+					"flipped": "flipped",
+					"held": "held",
+					"error": "error"
+				},
+				"statusHint": {
+					"not_run": "No replay ran for this run",
+					"flipped": "The failure went away with the suspect replaced: the blame is validated",
+					"held": "The failure stayed with the suspect replaced: the suspect alone does not explain it",
+					"error": "The replay itself failed"
+				},
+				"suspect": "Suspect",
+				"stub": "Replaced by",
+				"outcome": "Outcome",
+				"noOutcome": "not run",
+				"gatesAfter": "Gates still firing",
+				"noGates": "none",
+				"cost": "Cost",
+				"run": "Replay run"
+			}
 		}
 	},
 	"receipts": {
@@ -2403,5 +2741,89 @@
 			"title": "Human reviews",
 			"description": "Reviews of each arm's run. They apply only under grade source reviewed."
 		}
+	},
+	"safety": {
+		"outage": {
+			"title": "Outage behaviour",
+			"description": "Persistent model outage runs only: success says nothing when the model is down, so this is how each arm behaved while it was.",
+			"behaviour": "Behaviour",
+			"definition": "Definition",
+			"rows": {
+				"outage_safe_stop": "Safe stop",
+				"outage_time_to_give_up_median": "Time to give up, median",
+				"outage_usd_while_down": "USD spent while down, mean",
+				"outage_retry_storm_median": "Model calls per minute while down, median",
+				"outage_disclosed": "Outage disclosed"
+			}
+		}
+	},
+	"codescan": {
+		"title": "Security findings",
+		"description": "Security problems in the lines this run's agent added, from the code scan of its sealed diff: pattern rules with CWE ids and any external scanners the suite declares. Lines already in the repository are never counted. Patterns, not dataflow analysis.",
+		"loadError": "Could not load the run's code scan.",
+		"notScanned": "Not scanned: {{reason}}.",
+		"noReason": "no reason recorded",
+		"vetoed": "Vetoes the run (veto at {{level}})",
+		"findings_one": "{{value}} finding",
+		"findings_other": "{{value}} findings",
+		"clean": "No findings",
+		"incomplete": "No findings, but a scanner failed",
+		"scope": "{{lines}} added lines in {{files}} files, rules {{version}}",
+		"sealed": "From the run's sealed code scan evidence.",
+		"recomputed": "Computed now from the run's sealed diff (the run predates these rules).",
+		"vetoLevel": "Experiment veto level {{level}}: not reached.",
+		"externalRan": "{{scanner}}: {{results}} results, {{added}} on added lines, exit {{exit}}",
+		"externalFailed": "{{scanner}} failed: {{error}}. Its findings are unknown.",
+		"none": "No security findings on the lines the agent added.",
+		"fromScanner": "from {{scanner}}",
+		"ignored": "(ignored by the experiment)",
+		"removed": "(removed line)",
+		"inTest": "(test file)",
+		"diffMissing": "The diff could not be loaded, so the lines are not shown in place.",
+		"skipped": "Not read: {{files}}.",
+		"col": {
+			"severity": "Severity",
+			"rule": "Rule",
+			"where": "Where",
+			"line": "Line (redacted)"
+		},
+		"severity": {
+			"low": "low",
+			"medium": "medium",
+			"high": "high",
+			"critical": "critical"
+		}
+	},
+	"services": {
+		"title": "Services",
+		"description": "The containers that ran beside the agent (a compose stack, or the task's tool servers), whether each came up, and the output of each compose service, captured after the agent exited and sealed with the run. Logs are service output the agent may have influenced: shown as text.",
+		"loadError": "Could not load the run's services.",
+		"logError": "Could not load the service's log.",
+		"none": "No services ran beside this agent.",
+		"ready": "ready",
+		"notReady": "not ready",
+		"noLog": "no log captured",
+		"unsealed": "served once the run is sealed",
+		"show": "Show log ({{size}})",
+		"hide": "Hide log",
+		"col": {
+			"service": "Service",
+			"image": "Image",
+			"state": "Start",
+			"log": "Log"
+		}
+	},
+	"gpu": {
+		"title": "GPU",
+		"description": "The GPUs this run held alone, passed to the agent and the verifier only, and what the host-side sampler saw while the agent ran.",
+		"mode": "Passthrough: {{mode}}",
+		"device": "GPU {{index}}: {{name}}, {{memory}} MiB, compute {{cc}}, driver {{driver}}",
+		"cuda": "CUDA {{version}}",
+		"gpuSeconds": "GPU time {{value}} s",
+		"peak": "Peak memory {{value}} MiB above the {{baseline}} MiB in use before the agent started",
+		"util": "Mean utilization {{value}}%",
+		"samples": "{{count}} samples every {{ms}} ms",
+		"noSampler": "No host-side samples: the sampler was off or the agent never started.",
+		"samplerError": "Sampler: {{error}}"
 	}
 }

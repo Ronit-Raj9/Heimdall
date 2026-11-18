@@ -67,3 +67,22 @@ func TestRunDetailArtifacts(t *testing.T) {
 		t.Errorf("plain run has artifacts: %v", plain["artifacts"])
 	}
 }
+
+// TestRunDetailAgents: a multi-agent run's tree comes from evidence.json, or
+// from agents.json before the run is sealed; a single-agent run has none.
+func TestRunDetailAgents(t *testing.T) {
+	idx := testIndex()
+	idx.files["r_t01_A"][FileEvidence] = []byte(`{"requests":{"complete":true},"agents":{"version":"1.0.0","shape":"team","agents":[{"id":"lead","depth":0,"source":"gateway_key","strength":"proven"},{"id":"w","depth":0,"source":"gateway_key","strength":"proven"}],"coverage":{"steps":2,"attributed":2,"unknown":0}}}`)
+	idx.files["r_t02_A"]["agents.json"] = []byte(`{"version":"1.0.0","shape":"in_process","agents":[{"id":"main","depth":0,"source":"self_report","strength":"reported"},{"id":"sub","parent_id":"main","depth":1,"source":"self_report","strength":"reported"}],"coverage":{"steps":0,"attributed":0,"unknown":0}}`)
+	d := fullDeps()
+	d.index = idx
+	c := newTestClient(t, d)
+	team := decodeBody(t, c.do(t, "GET", "/api/bench/runs/r_t01_A", nil, nil))
+	if a, _ := team["agents"].(map[string]any); a["shape"] != "team" || len(a["agents"].([]any)) != 2 {
+		t.Errorf("team agents = %v", team["agents"])
+	}
+	unsealed := decodeBody(t, c.do(t, "GET", "/api/bench/runs/r_t02_A", nil, nil))
+	if a, _ := unsealed["agents"].(map[string]any); a["shape"] != "in_process" {
+		t.Errorf("agents.json agents = %v", unsealed["agents"])
+	}
+}

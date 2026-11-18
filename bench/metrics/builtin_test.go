@@ -5,6 +5,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/maximhq/bifrost/bench/codescan"
 	"github.com/maximhq/bifrost/bench/schemas"
 )
 
@@ -48,6 +49,40 @@ func TestBuiltin(t *testing.T) {
 		{name: ToolProofRate, kind: schemas.KindRate, higher: true, min: schemas.EvidenceBoundary}, {name: ToolProofProxy, kind: schemas.KindRate, higher: true, min: schemas.EvidenceBoundary}, {name: ToolProofProcess, kind: schemas.KindRate, higher: true, min: schemas.EvidenceBoundary}, {name: ToolProofFileEffect, kind: schemas.KindRate, higher: true, min: schemas.EvidenceBoundary}, {name: ToolProofShim, kind: schemas.KindRate, higher: true, min: schemas.EvidenceBoundary}, {name: ToolProofResultReturned, kind: schemas.KindRate, min: schemas.EvidenceBoundary}, {name: ToolProofNone, kind: schemas.KindRate, min: schemas.EvidenceBoundary}, // proof classes of requested tool calls
 		{name: ReportedTokens, kind: schemas.KindCount, min: schemas.EvidenceNative}, {name: ReportedCostUSD, kind: schemas.KindUSD, min: schemas.EvidenceNative}, // Remote coverage: agent-reported usage
 		{name: ReportedSteps, kind: schemas.KindCount, min: schemas.EvidenceNative}, {name: ReportedToolCalls, kind: schemas.KindCount, min: schemas.EvidenceNative}, {name: SubagentsSpawned, kind: schemas.KindCount, min: schemas.EvidenceNative}, {name: EventsDropped, kind: schemas.KindCount, min: schemas.EvidenceNative}, // Agent events area
+		// Safety probes area (S1).
+		{name: SafeStop, kind: schemas.KindRate, higher: true, min: schemas.EvidenceGateway}, {name: TimeToGiveUpS, kind: schemas.KindDuration, min: schemas.EvidenceGateway}, {name: USDWhileDown, kind: schemas.KindUSD, min: schemas.EvidenceGateway}, {name: RetryStorm, kind: schemas.KindCount, min: schemas.EvidenceGateway}, {name: OutageDisclosed, kind: schemas.KindRate, higher: true, min: schemas.EvidenceGateway},
+		{name: SilentCompromise, kind: schemas.KindRate, min: schemas.EvidenceOutcome}, {name: OversightDisclosed, kind: schemas.KindRate, higher: true, min: schemas.EvidenceOutcome}, {name: QuietFaultRechecked, kind: schemas.KindRate, higher: true, min: schemas.EvidenceBoundary},
+		// Multi-agent runs.
+		{name: AgentsSpawned, kind: schemas.KindCount, min: schemas.EvidenceNative},
+		{name: MaxAgentDepth, kind: schemas.KindCount, min: schemas.EvidenceNative},
+		{name: MaxFanOut, kind: schemas.KindCount, higher: true, min: schemas.EvidenceNative},
+		{name: OrchestrationShare, kind: schemas.KindRate, min: schemas.EvidenceGateway},
+		{name: Handoffs, kind: schemas.KindCount, min: schemas.EvidenceNative},
+		{name: AgentMessages, kind: schemas.KindCount, min: schemas.EvidenceNative},
+		{name: AgentMessageBytes, kind: schemas.KindCount, min: schemas.EvidenceNative},
+		{name: DuplicateWorkRatio, kind: schemas.KindRate, min: schemas.EvidenceNative},
+		{name: SerialCollapse, kind: schemas.KindRate, min: schemas.EvidenceNative},
+		{name: CriticalPathS, kind: schemas.KindDuration, min: schemas.EvidenceNative},
+		{name: Parallelism, kind: schemas.KindCount, higher: true, min: schemas.EvidenceNative},
+		{name: DelegationLoops, kind: schemas.KindCount, min: schemas.EvidenceNative},
+		{name: AttributionCoverage, kind: schemas.KindRate, higher: true, min: schemas.EvidenceNative},
+		{name: BudgetExceeded, kind: schemas.KindRate, min: schemas.EvidenceGateway},
+		{name: EvalAwarenessSignals, kind: schemas.KindCount, min: schemas.EvidenceNative},        // Eval integrity area (S2)
+		{name: ConformityFlip, kind: schemas.KindRate, min: schemas.EvidenceOutcome},              // Multi-agent probes (M2)
+		{name: ReviewerCatch, kind: schemas.KindRate, higher: true, min: schemas.EvidenceGateway}, // Multi-agent probes (M2)
+
+		// X4: code scan of added lines.
+		{name: InsecureFindings, kind: schemas.KindCount, min: schemas.EvidenceOutcome},
+		{name: InsecureFindingsHigh, kind: schemas.KindCount, min: schemas.EvidenceOutcome},
+		{name: SecretsAdded, kind: schemas.KindCount, min: schemas.EvidenceOutcome},
+
+		// X7: GPU runs.
+		{name: GPUSeconds, kind: schemas.KindDuration, min: schemas.EvidenceOutcome},
+		{name: PeakVRAMMB, kind: schemas.KindCount, min: schemas.EvidenceOutcome},
+		{name: GPUUtil, kind: schemas.KindRate, higher: true, min: schemas.EvidenceOutcome},
+		{name: Speedup, kind: schemas.KindCount, higher: true, min: schemas.EvidenceOutcome},
+		{name: HeldoutScore, kind: schemas.KindRate, higher: true, min: schemas.EvidenceOutcome},
+		{name: TimeToTargetS, kind: schemas.KindDuration, min: schemas.EvidenceOutcome},
 	}
 	got := Builtin()
 	if len(got) != len(tests) {
@@ -63,6 +98,9 @@ func TestBuiltin(t *testing.T) {
 			want := "1.0.0"
 			if tt.name == ToolCallsExecuted {
 				want = toolCallsExecutedVersion // ledger and observer witnesses count since 1.1.0
+			}
+			if tt.name == InsecureFindings || tt.name == InsecureFindingsHigh || tt.name == SecretsAdded {
+				want = codescan.RulesVersion // X4: code scan metrics follow the rules
 			}
 			if m.GetVersion() != want || d.Version != want {
 				t.Errorf("version %q, descriptor %q, want %s", m.GetVersion(), d.Version, want)

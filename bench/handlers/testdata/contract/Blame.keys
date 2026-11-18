@@ -1,0 +1,23 @@
+# Keys of bench.ts `Blame` (attribution/blame.go Blame, blame.json), in RunAgents.blame.
+# Tier is replay_validated | gate_proven | unattributed | single_agent.
+version
+run_id
+outcome
+failed
+tier
+detail
+exp_id?
+parent_seal?
+agent_id?
+role?
+gate?
+step_seq?
+at?
+agent_source?
+strength?
+evidence?
+candidates?
+unplaced?
+replay?
+coverage?
+notes?

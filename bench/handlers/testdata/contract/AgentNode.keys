@@ -1,0 +1,20 @@
+# Keys of bench.ts `AgentNode` (schemas/agents.go), in AgentTree.agents.
+# role, name and model are agent-influenced display text.
+id
+depth
+source
+strength
+role?
+name?
+model?
+parent_id?
+spawn_tool_call_id?
+spawn_event_id?
+started?
+ended?
+exit?
+exit_code?
+sources?
+key_id?
+container?
+budget_usd?

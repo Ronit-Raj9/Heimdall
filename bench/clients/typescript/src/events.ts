@@ -9,7 +9,8 @@
  * The wire format is spec/agent-event.schema.json. Delivery follows the
  * environment the bench sets in the agent container: BENCH_EVENTS_URL (POST,
  * JSON lines), else BENCH_EVENTS_FILE (one JSON object appended per line). A
- * failed POST falls back to the file when both are set. With neither set every
+ * run with realism neutral names them AGENT_EVENTS_URL and AGENT_EVENTS_FILE
+ * (docs/eval-awareness.md); the neutral name is read first. A failed POST falls back to the file when both are set. With neither set every
  * call is a no-op that still returns an event id. Nothing here throws into the
  * agent. stdoutLine builds the "@@heimdall-event " line for an agent that can
  * only print.
@@ -21,6 +22,9 @@
 
 export const EVENTS_URL_ENV = "BENCH_EVENTS_URL";
 export const EVENTS_FILE_ENV = "BENCH_EVENTS_FILE";
+/** The names a run with realism neutral sets instead; read before the above. */
+export const NEUTRAL_EVENTS_URL_ENV = "AGENT_EVENTS_URL";
+export const NEUTRAL_EVENTS_FILE_ENV = "AGENT_EVENTS_FILE";
 export const EVENTS_STDOUT_PREFIX = "@@heimdall-event ";
 
 /** Input and output are sent as JSON while their text fits this many bytes, and as text cut to it otherwise. */
@@ -106,9 +110,17 @@ function env(name: string): string {
 	return proc()?.env?.[name] ?? "";
 }
 
+function eventsURL(): string {
+	return env(NEUTRAL_EVENTS_URL_ENV) || env(EVENTS_URL_ENV);
+}
+
+function eventsFile(): string {
+	return env(NEUTRAL_EVENTS_FILE_ENV) || env(EVENTS_FILE_ENV);
+}
+
 /** True when the bench asked for events (either variable is set). */
 export function eventsEnabled(): boolean {
-	return env(EVENTS_URL_ENV) !== "" || env(EVENTS_FILE_ENV) !== "";
+	return eventsURL() !== "" || eventsFile() !== "";
 }
 
 /** A fresh event id: 32 hex characters. */
@@ -257,8 +269,8 @@ export async function flushEvents(): Promise<void> {
 }
 
 async function send(line: string): Promise<void> {
-	const url = env(EVENTS_URL_ENV);
-	const path = env(EVENTS_FILE_ENV);
+	const url = eventsURL();
+	const path = eventsFile();
 	if (url && (await post(url, line))) return;
 	if (path) await appendLine(path, line);
 }

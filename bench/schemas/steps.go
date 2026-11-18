@@ -151,6 +151,12 @@ type StepRecord struct {
 	// ProofClass is the strongest witness of a tool_request row's execution
 	// (ProofProxy and the other proof classes below).
 	ProofClass string `json:"proof_class,omitempty"`
+	// AgentID is the agent of a multi-agent run the row belongs to, and
+	// AgentSource how that is known (agents.go: gateway_key, header,
+	// transcript, otlp, self_report). Both are empty in a single-agent run
+	// and on a row no source could place.
+	AgentID     string `json:"agent_id,omitempty"`
+	AgentSource string `json:"agent_source,omitempty"`
 }
 
 // Proof classes of a requested tool call: the strongest witness of its

@@ -60,6 +60,14 @@ type wrapEnv struct {
 // default HOME. links are made first, as the agent user, so a plan file
 // under a link's parent lands in a folder the agent owns. It is pure.
 func buildLaunch(plan *schemas.RunPlan, pathValue, home string, links []link) (*launch, error) {
+	return buildLaunchView(plan, pathValue, home, links, standardView)
+}
+
+// buildLaunchView is buildLaunch with the wrapper's variable prefix and $0
+// taken from the run's view (realism.go): a neutral run's wrapper names
+// nothing after the bench. The standard view gives exactly buildLaunch.
+func buildLaunchView(plan *schemas.RunPlan, pathValue, home string, links []link, v agentView) (*launch, error) { // Eval integrity area (S2)
+	wrapPrefix, wrapName := v.wrapPrefix, v.wrapName
 	l := &launch{}
 	var budget int
 	for i, k := range links {
@@ -68,7 +76,7 @@ func buildLaunch(plan *schemas.RunPlan, pathValue, home string, links []link) (*
 		}
 		l.Env = append(l.Env, fmt.Sprintf("%sL%d_DST=%s", wrapPrefix, i, k.dst), fmt.Sprintf("%sL%d_SRC=%s", wrapPrefix, i, k.src))
 	}
-	fileChunks, err := encodeFiles(plan.Files, &l.Env, &budget)
+	fileChunks, err := encodeFiles(plan.Files, &l.Env, &budget, wrapPrefix)
 	if err != nil {
 		return nil, err
 	}
@@ -115,13 +123,13 @@ func buildLaunch(plan *schemas.RunPlan, pathValue, home string, links []link) (*
 		return nil, fmt.Errorf("plan has files, folders, memory paths or multi-line env but no argv to exec")
 	}
 	l.Entrypoint = wrapShell
-	l.Args = append([]string{"-c", wrapScript(len(links), fileChunks, wrapped), wrapName}, plan.Argv...)
+	l.Args = append([]string{"-c", wrapScriptPrefix(len(links), fileChunks, wrapped, wrapPrefix), wrapName}, plan.Argv...)
 	return l, nil
 }
 
 // encodeFiles appends the path and content chunks of every plan file, in path
 // order, and returns the chunk count of each.
-func encodeFiles(files map[string]string, env *[]string, budget *int) ([]int, error) {
+func encodeFiles(files map[string]string, env *[]string, budget *int, wrapPrefix string) ([]int, error) {
 	paths := make([]string, 0, len(files))
 	for p := range files {
 		if !path.IsAbs(p) || path.Clean(p) != p || p == "/" || strings.ContainsAny(p, "\x00\n") {
@@ -160,6 +168,11 @@ func appendChunks(env *[]string, prefix string, data []byte) int {
 // files, exports the wrapped variables, removes every BENCH_WRAP_* variable
 // and execs "$@".
 func wrapScript(links int, fileChunks []int, envs []wrapEnv) string {
+	return wrapScriptPrefix(links, fileChunks, envs, wrapPrefix)
+}
+
+// wrapScriptPrefix is wrapScript for the variables named with wrapPrefix.
+func wrapScriptPrefix(links int, fileChunks []int, envs []wrapEnv, wrapPrefix string) string { // Eval integrity area (S2)
 	var b strings.Builder
 	var unset []string
 	b.WriteString("set -e\n")

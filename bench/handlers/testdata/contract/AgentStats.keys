@@ -1,0 +1,19 @@
+# Keys of bench.ts `AgentStats` (handlers/runagents.go), in RunAgents.members.
+# input_tokens, output_tokens and cost_usd are always present: null means not recorded, never zero.
+agent_id
+depth
+source
+strength
+steps
+model_turns
+tool_calls
+input_tokens
+output_tokens
+cost_usd
+messages_sent
+messages_received
+busy_ms
+role?
+model?
+parent_id?
+exit?

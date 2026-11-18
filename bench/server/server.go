@@ -49,6 +49,10 @@ type Deps struct {
 	Forecast handlers.ForecastSource
 	// Suite health area: sealed runs for GET /suites/{id}/health; nil answers 503 (handlers/suitehealth.go).
 	Health taskhealth.Source
+	// Eval integrity area (S2): compliance packs for GET /experiments/{id}/compliance; nil answers 503 (handlers/compliance.go).
+	Compliance handlers.ComplianceSource
+	// Eval integrity area (S2): stored monitor certificates for GET /monitors/certifications; nil answers 503 (handlers/monitorcert.go).
+	MonitorCerts handlers.MonitorCertSource
 	// UI is the built UI with index.html at its root, for example
 	// fs.Sub(ui.Dist, "dist"). Nil serves the API only.
 	UI      fs.FS
@@ -108,6 +112,8 @@ func New(cfg *lib.Config, deps Deps) (*Server, error) {
 	handlers.NewTriageHandler(mode, deps.Index, deps.Catalog).RegisterRoutes(r, common...)
 	handlers.NewLeaderboardHandler(mode, deps.Index).RegisterRoutes(r, common...)
 	handlers.NewClustersHandler(mode, deps.Index).RegisterRoutes(r, common...) // Failure clusters area (handlers/clusters.go)
+	// Eval integrity area (S2): eval awareness scan (handlers/awareness.go).
+	handlers.NewAwarenessHandler(mode, deps.Index).RegisterRoutes(r, common...)
 	handlers.NewAuditHandler(mode, deps.Auditor, write).RegisterRoutes(r, common...)
 	handlers.NewReleasesHandler(mode, deps.Releases, write).RegisterRoutes(r, common...)
 	handlers.NewSuitesHandler(mode, deps.Suites).WithHeldOutVisible(cfg.HeldOut.Visible).RegisterRoutes(r, common...) // Suite health area: held_out.visible
@@ -125,6 +131,9 @@ func New(cfg *lib.Config, deps Deps) (*Server, error) {
 	handlers.NewTrendsHandler(mode, deps.Trends).RegisterRoutes(r, common...)
 	// Human review area: review queue and history, POST /reviews behind the write token (handlers/reviews.go, docs/human-review.md).
 	handlers.NewReviewsHandler(mode, deps.Reviews, write).RegisterRoutes(r, common...)
+	handlers.NewComplianceHandler(mode, deps.Compliance).RegisterRoutes(r, common...) // Eval integrity area (S2): compliance pack (handlers/compliance.go)
+	// Eval integrity area (S2): monitor certification (handlers/monitorcert.go).
+	handlers.NewMonitorCertHandler(mode, deps.MonitorCerts).RegisterRoutes(r, common...)
 	if deps.UI != nil {
 		NewUIHandler(mode, deps.UI).RegisterRoutes(r)
 	}

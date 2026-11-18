@@ -22,6 +22,19 @@ func TestParseFault(t *testing.T) {
 		{name: "unknown mode", in: `{"mode":"explode"}`, wantErr: true},
 		{name: "negative calls", in: `{"mode":"error","calls":-1}`, wantErr: true},
 		{name: "not json", in: `mode: error`, wantErr: true},
+		// Safety probes area (S1).
+		{name: "describe_poison", in: `{"mode":"describe_poison","text":"x"}`},
+		{name: "describe_poison without text", in: `{"mode":"describe_poison"}`, wantErr: true},
+		{name: "shadow without text", in: `{"mode":"shadow"}`, wantErr: true},
+		{name: "rug_pull", in: `{"mode":"rug_pull","text":"x","from_call":2}`},
+		{name: "rug_pull from the first call", in: `{"mode":"rug_pull","text":"x","from_call":1}`, wantErr: true},
+		{name: "schema_poison patch only", in: `{"mode":"schema_poison","patch":{"cc":{"type":"string"}}}`},
+		{name: "schema_poison empty", in: `{"mode":"schema_poison"}`, wantErr: true},
+		{name: "plausible_wrong", in: `{"mode":"plausible_wrong","patch":{"total":1}}`},
+		{name: "plausible_wrong without patch", in: `{"mode":"plausible_wrong"}`, wantErr: true},
+		{name: "schema_drift", in: `{"mode":"schema_drift","rename":{"a":"b"}}`},
+		{name: "schema_drift no-op rename", in: `{"mode":"schema_drift","rename":{"a":"a"}}`, wantErr: true},
+		{name: "lost_ack", in: `{"mode":"lost_ack","timeout_s":2}`},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -78,7 +91,7 @@ func TestFaultFileDecide(t *testing.T) {
 			}
 			f := newFaultFile(p, schemas.NoopLogger{})
 			for i, c := range tt.calls {
-				if _, got := f.decide(c.server, c.tool); got != c.want {
+				if _, got := f.decide(c.server, c.tool, ""); got != c.want {
 					t.Fatalf("call %d (%s %s): affected %v, want %v", i+1, c.server, c.tool, got, c.want)
 				}
 			}
@@ -114,7 +127,7 @@ func TestFaultFileFollowsChanges(t *testing.T) {
 					t.Fatal(err)
 				}
 			}
-			ft, got := f.decide("fs", "read")
+			ft, got := f.decide("fs", "read", "")
 			if got != s.want || ft.Nonce != s.nonce {
 				t.Fatalf("affected %v nonce %q, want %v %q", got, ft.Nonce, s.want, s.nonce)
 			}
@@ -164,5 +177,62 @@ func TestPoisonTextAndHold(t *testing.T) {
 				t.Fatalf("holdSeconds = %d, want %d", got, tt.want)
 			}
 		})
+	}
+}
+
+// TestFaultFileListing checks that a listing fault takes no call and that a
+// rug pull applies only after from_call-1 calls to its server (S1).
+func TestFaultFileListing(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "fault.json")
+	if err := os.WriteFile(path, []byte(`{"mode":"rug_pull","server":"fs","from_call":3,"text":"x"}`), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	f := newFaultFile(path, schemas.NoopLogger{})
+	if _, ok := f.listing("fs"); ok {
+		t.Fatal("rug pull before any call")
+	}
+	for i := 0; i < 2; i++ {
+		if _, hit := f.decide("fs", "echo", ""); hit {
+			t.Fatal("a listing fault must never take a call")
+		}
+		f.decide("kb", "echo", "") // another server's calls do not count
+	}
+	if _, ok := f.listing("kb"); ok {
+		t.Fatal("rug pull on another server")
+	}
+	if ft, ok := f.listing("fs"); !ok || ft.Mode != FaultRugPull {
+		t.Fatalf("rug pull after 2 calls: %v %+v", ok, ft)
+	}
+}
+
+// TestFaultFileAgentTarget checks a fault aimed at team members: other
+// callers' calls are neither faulted nor counted, so from_call and calls
+// count the targets' calls only, and a call on no member route is never a
+// target.
+func TestFaultFileAgentTarget(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "fault.json")
+	if err := os.WriteFile(path, []byte(`{"mode":"error","server":"mailbox","tool":"POST /recv","from_call":2,"calls":2,"agent":"worker-b,reviewer"}`), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	f := newFaultFile(path, schemas.NoopLogger{})
+	steps := []struct {
+		agent string
+		want  bool
+	}{
+		{"worker-a", false}, // not a target: not counted
+		{"", false},         // no member route
+		{"worker-b", false}, // target call 1, before from_call
+		{"lead", false},
+		{"reviewer", true},  // target call 2
+		{"worker-b", true},  // target call 3
+		{"worker-b", false}, // past calls
+	}
+	for i, s := range steps {
+		if _, hit := f.decide("mailbox", "POST /recv", s.agent); hit != s.want {
+			t.Fatalf("step %d (%s): hit %v, want %v", i, s.agent, hit, s.want)
+		}
+	}
+	if !targetsAgent("a, b", "b") || targetsAgent("a,b", "") || targetsAgent("ab", "a") {
+		t.Fatal("targetsAgent")
 	}
 }

@@ -287,8 +287,8 @@ func (s *stepObservers) watchAgent(ctx context.Context, rc *schemas.RunContext, 
 	args := append([]string{"create", "-i", "--name", name}, utils.LabelArgs(expID, runID)...)
 	args = append(args, "--network", "none", "--user", "0", "--cap-drop", "ALL",
 		"--pid", "container:"+agent, "--cap-add", "SYS_PTRACE", "--security-opt", "no-new-privileges",
-		"--read-only", "--pids-limit", "8", "--memory", "128m", "--log-driver", "none",
-		"--entrypoint", "python3", e.helperImage(rc), "-u", "-", strconv.Itoa(s.interval))
+		"--read-only", "--pids-limit", "8", "--memory", "128m", "--log-driver", "none")
+	args = append(args, procWatchCommand(viewFor(rc), e.helperImage(rc), s.interval)...) // Eval integrity area (S2): the argv the agent sees in ps
 	if _, err := e.cfg.Docker.MustRun(ctx, args...); err != nil {
 		s.setProc(nil, fmt.Errorf("create process observer: %w", err))
 		close(s.procDone)

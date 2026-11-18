@@ -72,7 +72,8 @@ class EventsTest(unittest.TestCase):
         events._reset()
         self.tmp = tempfile.TemporaryDirectory()
         self.file = os.path.join(self.tmp.name, "events", "events.jsonl")
-        env = {k: v for k, v in os.environ.items() if k not in (events.ENV_URL, events.ENV_FILE)}
+        names = (events.ENV_URL, events.ENV_FILE, events.NEUTRAL_ENV_URL, events.NEUTRAL_ENV_FILE)
+        env = {k: v for k, v in os.environ.items() if k not in names}
         self.env = mock.patch.dict(os.environ, env, clear=True)
         self.env.start()
 
@@ -93,6 +94,19 @@ class EventsTest(unittest.TestCase):
         self.assertRegex(s.id, r"^[0-9a-f]{32}$")
         self.assertNotEqual(eid, s.id)
         self.assertEqual(events.emit("plan", id="mine"), "mine")
+
+    def test_neutral_names_first(self) -> None:
+        # A run with realism neutral sets AGENT_EVENTS_FILE (docs/eval-awareness.md).
+        other = os.path.join(self.tmp.name, "bench.jsonl")
+        os.environ[events.NEUTRAL_ENV_FILE] = self.file
+        os.environ[events.ENV_FILE] = other
+        self.assertTrue(events.enabled())
+        events.emit("plan", "p")
+        self.assertEqual(len(read_lines(self.file)), 1)
+        self.assertEqual(read_lines(other), [])
+        del os.environ[events.NEUTRAL_ENV_FILE]
+        events.emit("plan", "q")
+        self.assertEqual(len(read_lines(other)), 1)
 
     def test_file(self) -> None:
         os.environ[events.ENV_FILE] = self.file

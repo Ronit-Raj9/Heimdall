@@ -191,7 +191,7 @@ func admitSuite(ctx context.Context, config, ref, only string) int {
 			return fail("%v", err)
 		}
 	}
-	deps := suite.AdmitDeps{Logger: a.logger}
+	deps := suite.AdmitDeps{Logger: a.logger, GPUs: a.reg.GPUs} // X7: GPU tasks hold the machine's GPUs (gpu.go)
 	for _, e := range a.reg.Environments {
 		if e.GetName() == s.Environment {
 			deps.Env = e

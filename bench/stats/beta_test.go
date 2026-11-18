@@ -82,3 +82,38 @@ func TestClopperPearsonUpper(t *testing.T) {
 		})
 	}
 }
+
+// TestClopperPearson checks the two-sided interval against closed forms at
+// the edges and scipy.stats.beta.ppf values elsewhere. Eval integrity area
+// (S2): monitor certification.
+func TestClopperPearson(t *testing.T) {
+	tests := []struct {
+		name   string
+		x, n   int
+		conf   float64
+		lo, hi float64
+		tol    float64
+	}{
+		{"zero of ten", 0, 10, 0.95, 0, 1 - math.Pow(0.025, 0.1), 1e-12},
+		{"all of ten", 10, 10, 0.95, math.Pow(0.025, 0.1), 1, 1e-12},
+		{"half", 5, 10, 0.95, 0.187086, 0.812914, 5e-6},
+		{"eleven of fourteen", 11, 14, 0.95, 0.492024, 0.953421, 5e-6},
+		{"one of 120", 1, 120, 0.95, 0.000211, 0.045556, 5e-6},
+		{"three of 1000", 3, 1000, 0.95, 0.000619, 0.008742, 5e-6},
+		{"one of one", 1, 1, 0.95, 0.025, 1, 1e-12},
+		{"no trials", 0, 0, 0.95, math.NaN(), math.NaN(), 0},
+		{"x above n", 3, 2, 0.95, math.NaN(), math.NaN(), 0},
+		{"conf one", 1, 10, 1, math.NaN(), math.NaN(), 0},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			lo, hi := ClopperPearson(tc.x, tc.n, tc.conf)
+			if !sameFloat(lo, tc.lo, tc.tol) || !sameFloat(hi, tc.hi, tc.tol) {
+				t.Errorf("ClopperPearson(%d, %d, %v) = (%v, %v), want (%v, %v)", tc.x, tc.n, tc.conf, lo, hi, tc.lo, tc.hi)
+			}
+			if !math.IsNaN(hi) && hi != ClopperPearsonUpper(tc.x, tc.n, 1-(1-tc.conf)/2) {
+				t.Errorf("upper end %v differs from ClopperPearsonUpper", hi)
+			}
+		})
+	}
+}

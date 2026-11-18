@@ -1,0 +1,17 @@
+id: split
+version: 1.0.0
+title: Split the work across a team
+project: e2e
+kind: feature
+instruction: instruction.md
+repo_dir: repo
+verifier:
+  tests: verifier/tests
+  required: []
+controls:
+  reference: controls/reference.sh
+  empty: controls/empty.sh
+  mutants: []
+  exploit: controls/exploit.sh
+timeouts:
+  agent_s: 120

@@ -50,6 +50,15 @@ type Evidence struct {
 
 	// Remote is a remote agent's channel summary and self-report (remote.go).
 	Remote *RemoteEvidence `json:"remote,omitempty"`
+
+	// Agents is the run's agent tree (agents.go, docs/multi-agent.md); nil
+	// for a single-agent run.
+	Agents *AgentTree `json:"agents,omitempty"`
+	// Messages are a team run's mailbox messages (agents.go), also
+	// messages.jsonl; empty otherwise.
+	Messages []AgentMessage `json:"messages,omitempty"`
+
+	CodeScan *CodeScanEvidence `json:"codescan,omitempty"` // X4: security findings on added lines (codescan.go)
 }
 
 // EvidenceQuality describes how completely a run's required evidence was observed.

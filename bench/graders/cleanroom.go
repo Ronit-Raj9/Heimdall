@@ -75,6 +75,14 @@ type gradeInputs struct {
 	// /grader/artifacts.
 	artifactsDir string
 	root         bool // the task runs as root (environment.user root): so does its verifier
+	// gpuArgs pass the run's GPUs to the verifier container (X7, gpu.go):
+	// the preparation step never gets them.
+	gpuArgs []string
+
+	// X2: a compose task's verifier (compose.go): the workspace service's
+	// variables, and the internal run networks of the services it queries.
+	env      map[string]string
+	networks []string
 }
 
 // gradeJob names the docker objects of one grade.
@@ -132,6 +140,11 @@ func gatherInputs(rc *schemas.RunContext, diff *schemas.Diff, image string) (*gr
 		in.image = rc.Suite.BaseImage.Tag
 	}
 	in.prepImage = in.image
+	gpuArgs, gerr := verifierGPUArgs(rc) // X7: the verifier of a GPU task gets the run's GPUs (gpu.go)
+	if gerr != nil {
+		return nil, gerr
+	}
+	in.gpuArgs = gpuArgs
 	if in.timeout <= 0 {
 		in.timeout = defaultVerifierS * time.Second
 	}
@@ -315,16 +328,21 @@ func (c *cleanRoom) verify(ctx context.Context, j *gradeJob) (int, bool, error) 
 		// live anywhere in that file system.
 		args = append(args, "--read-only", "--tmpfs", "/tmp:exec,size=512m")
 	}
-	args = append(args, "--network", verifierNetwork)
+	if err := c.checkInternal(ctx, j.in.networks); err != nil { // X2: only internal run networks (compose.go)
+		return 0, false, err
+	}
+	args = append(args, verifierNetworkArgs(j.in)...) // X2: none, unless a compose task's verifier queries services (compose.go)
+	args = append(args, verifierEnvArgs(j.in)...)     // X2
 	args = append(args, verifierIdentity(j.in.root)...)
 	args = append(args,
 		"--security-opt", "no-new-privileges",
-		"--pids-limit", "512", "--memory", "2g", "--memory-swap", "2g", "--cpus", strconv.Itoa(min(2, runtime.NumCPU())),
+		"--pids-limit", "512", "--memory", verifierMemory(j.in), "--memory-swap", verifierMemory(j.in), "--cpus", strconv.Itoa(min(2, runtime.NumCPU())), // X7: a GPU verifier gets more host memory (gpu.go)
 		"-v", j.workspace+":"+mount+access,
 		"-v", j.in.testsDir+":/grader/tests:ro",
 		"-v", j.out+":/grader/out",
 		"--log-driver", "none")
 	args = append(args, scenarioMounts(j.in)...)
+	args = append(args, j.in.gpuArgs...) // X7: GPU devices, verifier only (gpu.go)
 	if j.in.workdir != "" {
 		args = append(args, "--workdir", j.in.workdir)
 	}
@@ -332,6 +350,9 @@ func (c *cleanRoom) verify(ctx context.Context, j *gradeJob) (int, bool, error) 
 	args = append(args, j.in.command[1:]...)
 	if _, err := c.docker.MustRun(ctx, args...); err != nil {
 		return 0, false, fmt.Errorf("create verifier container: %w", err)
+	}
+	if err := c.connectExtra(ctx, j.container, j.in.networks); err != nil { // X2 (compose.go)
+		return 0, false, err
 	}
 	output := &cappedBuffer{limit: maxVerifierOutput}
 	cmd := exec.Command(dockerBinary(c.docker), "start", "-a", j.container)
@@ -524,6 +545,9 @@ func applyScenario(rc *schemas.RunContext, in *gradeInputs) error {
 			return errors.New("snapshot grading needs the run's workspace volume")
 		}
 		in.snapshot, in.workspace = ref, rc.Handle.Volume
+	}
+	if err := composeVerifier(rc, in); err != nil { // X2: environment and service networks of a compose task's verifier (compose.go)
+		return err
 	}
 	if rc.Dir == "" {
 		return nil

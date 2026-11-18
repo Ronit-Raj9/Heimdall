@@ -111,7 +111,7 @@ func (s snapshot) final() bool {
 // (and again while processing or when the status changed), and joins them to
 // the ledger.
 func (g *Gateway) snapshot(ctx context.Context, key *schemas.RunKey, since time.Time, cache map[string]*parsedRow, ledger []schemas.LedgerEntry, direct bool) (*snapshot, error) {
-	rows, err := g.listRows(ctx, key.ID, since)
+	rows, err := g.listRows(ctx, keyIDs(key), since) // Multi-agent area: a team run's member keys too (team.go)
 	if err != nil {
 		return nil, err
 	}
@@ -137,11 +137,18 @@ func (g *Gateway) snapshot(ctx context.Context, key *schemas.RunKey, since time.
 	sort.Strings(sig)
 	var join joinResult
 	if !direct {
-		join = joinLedger(parsed, ledger, key.KeySlot)
+		slot := key.KeySlot
+		if len(key.Members) > 0 {
+			slot = "" // Multi-agent area: members are on slots of their own; the ledger is the run's alone
+		}
+		join = joinLedger(parsed, ledger, slot)
 	}
 	log := &schemas.RequestLog{Requests: make([]schemas.GatewayRequest, 0, len(parsed)), RowIDs: ids}
+	members := memberAgents(key)
 	for _, p := range parsed {
-		log.Requests = append(log.Requests, p.Req)
+		req := p.Req
+		req.AgentID = members[p.KeyID]
+		log.Requests = append(log.Requests, req)
 	}
 	log.Complete = join.complete() && processing == 0
 	switch {

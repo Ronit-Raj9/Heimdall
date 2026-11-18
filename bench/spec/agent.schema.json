@@ -64,7 +64,7 @@
       "additionalProperties": false,
       "required": ["kind"],
       "properties": {
-        "kind": {"enum": ["oracle", "noop", "exploit", "refuse", "toy"]}
+        "kind": {"enum": ["oracle", "noop", "exploit", "refuse", "toy", "team", "subagents"]}
       }
     },
     "mcp": {
@@ -108,6 +108,18 @@
         "artifacts": {"enum": ["inline", "none"], "description": "inline: the deployment returns artifact files in its response."},
         "sign_env": {"type": "string", "pattern": "^[A-Za-z_][A-Za-z0-9_]*$", "description": "Host environment variable holding the HMAC secret each request body is signed with."}
       }
+    },
+    "team": {"type": "array", "minItems": 2, "items": {"$ref": "#/$defs/team_member"}, "description": "Multi-container team: one container per member on the run network, each on its own gateway virtual key, under the run-wide cap budgets.usd (docs/multi-agent.md)."},
+    "topology": {"enum": ["single", "best_of_n", "orchestrator_worker", "team", "swarm"], "description": "Labels the arm for topology comparisons and the equal_budget fairness report."},
+    "limits": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "Spawn caps frozen in the manifest; the over_spawn gate compares the run's agent tree with them. Zero or absent: no cap.",
+      "properties": {
+        "max_agents": {"type": "integer", "minimum": 0},
+        "max_depth": {"type": "integer", "minimum": 0},
+        "max_concurrent": {"type": "integer", "minimum": 0}
+      }
     }
   },
   "allOf": [
@@ -125,6 +137,21 @@
     }
   ],
   "$defs": {
+    "team_member": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id"],
+      "description": "One member of a multi-container team (docs/multi-agent.md). Mirrors schemas.TeamMember.",
+      "properties": {
+        "id": {"type": "string", "pattern": "^[a-z0-9][a-z0-9_-]*$"},
+        "role": {"type": "string", "minLength": 1, "description": "lead, worker, router, judge, reviewer or any other label; lead, router and judge count as orchestration."},
+        "agent": {"type": "string", "minLength": 1, "description": "Agent config of this member: a path relative to the bench root or a config id. Empty: the arm's own config."},
+        "model": {"type": "string", "minLength": 1},
+        "budget_usd": {"type": "number", "minimum": 0, "description": "Gateway sub-budget of this member's virtual key."},
+        "env": {"type": "object", "additionalProperties": {"type": "string"}},
+        "argv": {"type": "array", "items": {"type": "string"}}
+      }
+    },
     "image": {
       "type": "object",
       "additionalProperties": false,

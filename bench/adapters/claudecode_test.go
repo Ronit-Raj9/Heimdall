@@ -348,3 +348,47 @@ func TestClaudeCodeParseRealOutput(t *testing.T) {
 		}
 	})
 }
+
+// TestClaudeCodeSubagentAttribution: an Agent (or Task) call names the
+// subagent it starts, and every line that subagent wrote, model turn, tool
+// call and tool result, carries its id from parent_tool_use_id. The main
+// agent's lines carry none.
+func TestClaudeCodeSubagentAttribution(t *testing.T) {
+	stream := strings.Join([]string{
+		`{"type":"assistant","message":{"id":"m1","model":"claude-x","content":[{"type":"tool_use","id":"toolu_spawn","name":"Agent","input":{"description":"Find the bug","subagent_type":"general-purpose","prompt":"..."}}]},"parent_tool_use_id":null}`,
+		`{"type":"assistant","message":{"id":"m2","model":"claude-x","content":[{"type":"tool_use","id":"toolu_ls","name":"Bash","input":{"command":"ls"}}]},"parent_tool_use_id":"toolu_spawn"}`,
+		`{"type":"user","message":{"content":[{"type":"tool_result","tool_use_id":"toolu_ls","content":"a b"}]},"parent_tool_use_id":"toolu_spawn"}`,
+		`{"type":"user","message":{"content":[{"type":"tool_result","tool_use_id":"toolu_spawn","content":"found it"}]},"parent_tool_use_id":null}`,
+		`{"type":"assistant","message":{"id":"m3","model":"claude-x","content":[{"type":"tool_use","id":"toolu_old","name":"Task","input":{"description":"Old style"}}]},"parent_tool_use_id":null}`,
+	}, "\n")
+	res, err := newClaudeCodeParser().Parse(context.Background(), &schemas.RunContext{Run: &schemas.Run{RunID: "r_x"}}, []byte(stream))
+	if err != nil {
+		t.Fatal(err)
+	}
+	sub := SubagentPrefix + "toolu_spawn"
+	byCall := map[string][]schemas.Event{}
+	var subTurns int
+	for _, e := range res.Events {
+		if e.ToolCallID != "" {
+			byCall[e.ToolCallID] = append(byCall[e.ToolCallID], e)
+		}
+		if e.Type == schemas.EventModelResponse && e.AgentID == sub {
+			subTurns++
+		}
+	}
+	spawn := byCall["toolu_spawn"]
+	if len(spawn) != 2 || spawn[0].AgentTarget != sub || spawn[0].AgentName != "general-purpose" || spawn[0].AgentID != "" || spawn[1].AgentID != "" {
+		t.Errorf("spawn call and result = %+v", spawn)
+	}
+	for _, e := range byCall["toolu_ls"] {
+		if e.AgentID != sub {
+			t.Errorf("subagent event %s has agent %q", e.Type, e.AgentID)
+		}
+	}
+	if subTurns != 1 {
+		t.Errorf("subagent model turns = %d, want 1", subTurns)
+	}
+	if old := byCall["toolu_old"]; len(old) != 1 || old[0].AgentTarget != SubagentPrefix+"toolu_old" || old[0].AgentName != "Old style" {
+		t.Errorf("Task call = %+v", old)
+	}
+}

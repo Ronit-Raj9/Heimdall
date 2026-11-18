@@ -105,6 +105,9 @@ func (l *localLoader) Load(ctx context.Context, ref string) (*schemas.Suite, err
 			return nil, fmt.Errorf("load suite %s: %w", s.ID, err)
 		}
 		t, err := loadTask(root, id, d)
+		if err == nil {
+			err = expandCompose(&s, t, d) // X2: a compose file becomes the task's environment and services (compose.go)
+		}
 		if err != nil {
 			errs = append(errs, err)
 			continue
@@ -153,6 +156,9 @@ func LoadTask(benchmarksRoot, ref, taskID string) (*schemas.Suite, *schemas.Task
 		return nil, nil, fmt.Errorf("%s: id: got %q, want %q (the folder name)", d.name(suitePath), s.ID, wantID)
 	}
 	t, err := loadTask(root, taskID, d)
+	if err == nil {
+		err = expandCompose(&s, t, d) // X2: a compose file becomes the task's environment and services (compose.go)
+	}
 	if err != nil {
 		return nil, nil, err
 	}

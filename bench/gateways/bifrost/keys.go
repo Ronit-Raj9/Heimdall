@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"github.com/maximhq/bifrost/bench/schemas"
+	"github.com/maximhq/bifrost/bench/utils"
 )
 
 // vkPageSize is the page size for listing virtual keys.
@@ -41,13 +42,18 @@ func (g *Gateway) MintKey(ctx context.Context, rc *schemas.RunContext) (*schemas
 	if err != nil {
 		return nil, fmt.Errorf("mint key for run %s: %w", runID, err)
 	}
-	slot, keyID, err := g.acquireSlot(p, runID)
+	slot, keyID, err := g.acquireRunSlots(ctx, p, runID, teamSlots(rc)) // Multi-agent area: a team takes all its slots at once (teamslots.go)
 	if err != nil {
 		return nil, fmt.Errorf("mint key for run %s: %w", runID, err)
 	}
-	key, err := g.createVirtualKey(ctx, runID, p, slot, keyID, model)
+	extra := map[string]any{}
+	if usd := runBudget(rc); usd > 0 { // Multi-agent area: the equal_budget fairness rule enforces the run's cap here (team.go)
+		extra["budgets"] = []map[string]any{{"max_limit": usd, "reset_duration": budgetReset}}
+	}
+	key, err := g.createVirtualKey(ctx, runID, p, slot, keyID, model, extra)
 	if err != nil {
 		g.releaseSlot(slot.Name, runID)
+		g.releaseReserved(runID)
 		return nil, fmt.Errorf("mint key for run %s: %w", runID, err)
 	}
 	g.mu.Lock()
@@ -65,6 +71,10 @@ func (g *Gateway) MintKey(ctx context.Context, rc *schemas.RunContext) (*schemas
 func (g *Gateway) RevokeKey(ctx context.Context, key *schemas.RunKey) error {
 	if key == nil || key.ID == "" {
 		return nil
+	}
+	g.releaseReserved(key.Name)
+	if err := g.revokeMembers(ctx, key, g.teamOf(key.ID)); err != nil { // Multi-agent area: a team run's member keys and team (team.go)
+		return fmt.Errorf("revoke members of virtual key %s (%s): %w", key.ID, key.Name, err)
 	}
 	if err := g.deleteVirtualKey(ctx, key.ID); err != nil {
 		return fmt.Errorf("revoke virtual key %s (%s): %w", key.ID, key.Name, err)
@@ -85,7 +95,7 @@ func (g *Gateway) RevokeStale(ctx context.Context, active map[string]bool) (int,
 	n := 0
 	var errs []error
 	for _, k := range keys {
-		if !runIDPattern.MatchString(k.Name) || active[k.Name] {
+		if run, ok := staleRun(k.Name); !ok || active[run] { // Multi-agent area: member keys carry their run id (team.go)
 			continue
 		}
 		if err := g.deleteVirtualKey(ctx, k.ID); err != nil {
@@ -190,7 +200,7 @@ func (g *Gateway) forget(vkID string) {
 
 // createVirtualKey makes sure the slot's provider key serves model, then
 // creates the run's virtual key on that slot.
-func (g *Gateway) createVirtualKey(ctx context.Context, runID string, p ProviderSetup, slot Slot, keyID, model string) (*schemas.RunKey, error) {
+func (g *Gateway) createVirtualKey(ctx context.Context, runID string, p ProviderSetup, slot Slot, keyID, model string, extra map[string]any) (*schemas.RunKey, error) {
 	if err := g.ensureSlotModel(ctx, p, slot, keyID, model); err != nil {
 		return nil, err
 	}
@@ -203,6 +213,9 @@ func (g *Gateway) createVirtualKey(ctx context.Context, runID string, p Provider
 			"key_ids":        []string{keyID},
 		}},
 		"is_active": true,
+	}
+	for k, v := range extra {
+		body[k] = v
 	}
 	var out struct {
 		VirtualKey virtualKey `json:"virtual_key"`
@@ -276,4 +289,18 @@ func (g *Gateway) listVirtualKeys(ctx context.Context) ([]virtualKey, error) {
 			return all, nil
 		}
 	}
+}
+
+// runBudget is the run key's USD cap: Budgets.USD of the arm when the
+// experiment declares the equal_budget fairness rule, which needs the cap
+// enforced at the gateway (docs/multi-agent.md); 0 otherwise. A team run
+// enforces its cap on the team instead (MintMemberKeys).
+func runBudget(rc *schemas.RunContext) float64 {
+	if rc == nil || rc.Agent == nil || rc.Experiment == nil || rc.Experiment.Fairness != schemas.FairnessEqualBudget {
+		return 0
+	}
+	if len(utils.TeamOf(rc)) > 0 { // X5b: a solo baseline arm on a team task keeps its run cap (utils.TeamOf)
+		return 0
+	}
+	return rc.Agent.Budgets.USD
 }

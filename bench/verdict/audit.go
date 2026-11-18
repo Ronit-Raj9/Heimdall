@@ -77,15 +77,17 @@ func Audit(rows []AuditRow, alpha float64) (*schemas.Verdict, error) {
 	if needed == 0 && eff.DBar != 0 {
 		over = auditMaxTasks
 	}
+	mde := mdePP(eff.NTasks, sd, alpha)
 	return &schemas.Verdict{
 		Primary:           schemas.Endpoint{Condition: AuditCondition, Metric: AuditMetric},
 		Decision:          decision,
 		Action:            actionFor(decision, nil, "", nil),
 		Effect:            eff,
 		Alpha:             alpha,
-		MDE:               mdePP(eff.NTasks, sd, alpha),
+		MDE:               mde,
 		MDEAssumedSD:      assumed,
 		SD:                sd,
+		Variance:          auditVariance(sd, assumed, eff.NTasks, mde),
 		TasksNeeded:       needed,
 		TasksNeededOver:   over,
 		RandomizationUnit: randomizationUnit,
@@ -99,6 +101,21 @@ func Audit(rows []AuditRow, alpha float64) (*schemas.Verdict, error) {
 // auditMaxTasks is the largest suite TasksNeeded searches; beyond it the
 // verdict reports "more than auditMaxTasks".
 const auditMaxTasks = 200
+
+// auditVariance is an audit's variance card. A published table has no A/A
+// arm, so its SD is the SD of its own per-task B-minus-A differences
+// (VarianceObservedEffect) or, when those cannot give one, the assumed SD.
+// The first includes whatever real effect the table holds, so it is an upper
+// estimate of the noise, not a measured noise floor.
+func auditVariance(sd float64, assumed bool, n int, mde float64) *schemas.VarianceCard {
+	c := &schemas.VarianceCard{Source: VarianceObservedEffect, SD: sd, AssumedSD: defaultAssumedSD, MDE: mde,
+		Detail: fmt.Sprintf("SD %.3f of the table's own per-task differences over %d tasks; a published table has no A/A arm, and this SD includes any real effect, so it is not a measured noise floor", sd, n)}
+	if assumed {
+		c.Source = schemas.VarianceAssumed
+		c.Detail = fmt.Sprintf("SD %.2f assumed: a published table has no A/A arm, and its per-task differences over %d task(s) give no SD above 0", sd, n)
+	}
+	return c
+}
 
 // taskDiffs returns the per-task differences of an effect.
 func taskDiffs(e *schemas.Effect) []float64 {

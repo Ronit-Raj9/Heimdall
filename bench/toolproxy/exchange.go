@@ -14,6 +14,9 @@ type pending struct {
 	key         string
 	row         schemas.ToolCall
 	poison      *schemas.ToolFault // a poison fault that takes this call's result
+	quiet       *schemas.ToolFault // a plausible_wrong or schema_drift fault that rewrites this call's result (S1)
+	listing     *schemas.ToolFault // a listing fault that rewrites this tools/list answer (S1)
+	lostAck     *schemas.ToolFault // a lost_ack fault: forwarded, answer withheld (S1)
 	answered    bool
 	committed   bool
 	undelivered bool
@@ -48,6 +51,7 @@ func (x *exchange) trackAs(kind, key, tool string, args []byte) *pending {
 		Protocol: ProtocolMCP,
 		Started:  x.started,
 		Kind:     kind,
+		AgentID:  x.route.Agent, // Multi-agent area: the team member whose route the call came in on
 	}}
 	p.row.Arguments, p.row.ArgsSHA256 = Capture(args)
 	if key == "" {
@@ -98,8 +102,38 @@ func (x *exchange) answerMessage(it rpcItem, status int) (json.RawMessage, *pend
 			}
 		}
 	}
+	if np, ok := x.safetyRewrite(p, result); ok {
+		if nr, ok := replaceResult(raw, np); ok {
+			raw, result, rewritten = nr, np, true
+		}
+	}
 	p.answer(result, resultIsError(result), status, now)
 	return raw, p, rewritten
+}
+
+// safetyRewrite applies a quiet or listing fault to one call's result and
+// stamps the row with the fault and its nonce (Safety probes area, S1). ok
+// is false when no such fault took the call or nothing could be rewritten.
+func (x *exchange) safetyRewrite(p *pending, result json.RawMessage) (json.RawMessage, bool) {
+	if len(result) == 0 {
+		return result, false
+	}
+	var ft *schemas.ToolFault
+	var out json.RawMessage
+	ok := false
+	switch {
+	case p.quiet != nil:
+		ft = p.quiet
+		out, ok = quietResult(result, *ft)
+	case p.listing != nil:
+		ft = p.listing
+		out, ok = rewriteListing(result, *ft)
+	}
+	if !ok {
+		return result, false
+	}
+	p.row.Fault, p.row.Nonce = ft.Mode, ft.Nonce
+	return out, true
 }
 
 // answerEvent records every response in one server-sent event and rewrites

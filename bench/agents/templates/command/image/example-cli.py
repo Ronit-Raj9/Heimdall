@@ -29,7 +29,8 @@ def report_event(type, name=None, **fields):
     Printed only when the bench collects events for the run (it then sets
     BENCH_EVENTS_FILE or BENCH_EVENTS_URL), so stdout is unchanged otherwise.
     """
-    if not (os.environ.get("BENCH_EVENTS_FILE") or os.environ.get("BENCH_EVENTS_URL")):
+    # A run with realism neutral sets AGENT_* instead of BENCH_* (docs/eval-awareness.md).
+    if not any(os.environ.get(p + "EVENTS_" + k) for p in ("AGENT_", "BENCH_") for k in ("FILE", "URL")):
         return
     event = dict({"type": type}, **fields)
     if name is not None:
@@ -42,8 +43,9 @@ def report_event(type, name=None, **fields):
 
 def chat(messages):
     headers = {"Authorization": "Bearer " + os.environ["OPENAI_API_KEY"], "Content-Type": "application/json"}
-    if os.environ.get("BENCH_SESSION_ID"):
-        headers["x-bf-session-id"] = os.environ["BENCH_SESSION_ID"]
+    session = os.environ.get("AGENT_SESSION_ID") or os.environ.get("BENCH_SESSION_ID")
+    if session:
+        headers["x-bf-session-id"] = session
     body = json.dumps({"model": ARGS.model, "messages": messages, "tools": [WRITE_FILE]}).encode()
     url = os.environ["OPENAI_BASE_URL"].rstrip("/") + "/chat/completions"
     with urllib.request.urlopen(urllib.request.Request(url, data=body, headers=headers), timeout=600) as r:

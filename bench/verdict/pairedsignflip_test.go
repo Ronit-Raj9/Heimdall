@@ -362,6 +362,8 @@ func TestDecideWorkedExampleDetail(t *testing.T) {
 		{"interval [0.018, 0.316]", e.Interval != nil && near(e.Interval[0], 0.018, 5e-4) && near(e.Interval[1], 0.316, 5e-4)},
 		{"bounds equal the point estimate", e.LowerBound != nil && e.UpperBound != nil && e.LowerBound.DBar == e.DBar && e.UpperBound.DBar == e.DBar},
 		{"MDE 34.6 pp on the assumed SD", near(v.MDE, 34.6, 0.05) && v.MDEAssumedSD && v.SD == 0.30},
+		{"variance card says assumed 0.30", v.Variance != nil && v.Variance.Source == schemas.VarianceAssumed && v.Variance.SD == 0.30 &&
+			v.Variance.MDE == v.MDE && v.Variance.MeasuredSD == nil && v.Variance.AAArm == ""},
 		{"tasks needed in range", v.TasksNeeded >= minTasksNeeded && v.TasksNeeded <= maxTasksNeeded},
 		{"manifest hash and freeze time", v.ManifestHash == testManifestHash && v.FrozenAt.Equal(testFrozenAt)},
 		{"unit and tie rule", v.RandomizationUnit == "task" && v.TieRule == tieRule},

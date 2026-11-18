@@ -1,0 +1,25 @@
+# acme-team/research-write (fictional, written for this example): Research the API notes, then write the summary.
+id: research-write
+version: 1.0.0
+title: Research the API notes, then write the summary
+project: acme-team
+kind: feature
+instruction: instruction.md
+repo_dir: repo
+verifier:
+  tests: verifier/tests
+  required: []
+protected: []
+controls:
+  reference: solution/reference.diff
+  empty: controls/empty.diff
+  mutants: [controls/mutant-majority.diff]
+  exploit: controls/exploit.sh
+timeouts:
+  agent_s: 300
+capabilities: [research, delegation]
+difficulty: easy
+provenance:
+  source: bench/examples/acme-team (fictional Acme Tea team tasks, written for this example)
+  license: MIT
+  created_by: hand-written example

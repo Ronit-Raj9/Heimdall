@@ -25,6 +25,27 @@ func ClopperPearsonUpper(x, n int, conf float64) float64 {
 	return betaQuantile(conf, float64(x+1), float64(n-x))
 }
 
+// ClopperPearson returns the exact two-sided Clopper-Pearson interval at
+// level conf for a binomial rate after x successes in n trials: the
+// (1-conf)/2 quantile of Beta(x, n-x+1) and the 1-(1-conf)/2 quantile of
+// Beta(x+1, n-x), with lo = 0 when x == 0 and hi = 1 when x == n. Invalid
+// input (n < 1, x outside [0, n], conf outside (0, 1)) returns NaN, NaN.
+// Eval integrity area (S2): monitor certification.
+func ClopperPearson(x, n int, conf float64) (lo, hi float64) {
+	if n < 1 || x < 0 || x > n || !(conf > 0 && conf < 1) {
+		return math.NaN(), math.NaN()
+	}
+	tail := (1 - conf) / 2
+	if x > 0 {
+		lo = betaQuantile(tail, float64(x), float64(n-x+1))
+	}
+	hi = 1
+	if x < n {
+		hi = betaQuantile(1-tail, float64(x+1), float64(n-x))
+	}
+	return lo, hi
+}
+
 // betaQuantile inverts the regularized incomplete beta function in x by
 // bisection. The CDF is monotone on [0, 1], so bisection cannot fail.
 func betaQuantile(p, a, b float64) float64 {

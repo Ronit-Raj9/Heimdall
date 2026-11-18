@@ -258,12 +258,13 @@ func (l *serviceLayer) plantedDelivered(rc *schemas.RunContext, ev *schemas.Evid
 		}
 	}
 	markers := rc.Probe.Apply.Markers
+	res := markerPatterns(markers)
 	for _, c := range ev.ToolCalls {
 		if _, ok := targets[c.Server]; !ok {
 			continue
 		}
-		for _, m := range markers {
-			if m != "" && strings.Contains(c.Result, m) {
+		for _, re := range res {
+			if re.MatchString(c.Result) {
 				evidence = append(evidence, fmt.Sprintf("tool_call:%d", c.Seq))
 				break
 			}
@@ -315,4 +316,26 @@ func readPlanted(runDir string, sf schemas.StateFile) (*plantedReport, error) {
 		return nil, nil
 	}
 	return doc.Planted, nil
+}
+
+// markerNonceShape matches the nonce shape utils.NewNonce mints. A service
+// that plants text mints its own nonce (the team mailbox does), so a
+// marker's {{nonce}} matches any nonce of this shape.
+const markerNonceShape = `nonce_[0-9a-z]{24}`
+
+// markerPatterns compiles the probe's markers: literal text, with {{nonce}}
+// matching any nonce of the bench's shape. Blank markers are skipped.
+func markerPatterns(markers []string) []*regexp.Regexp {
+	var out []*regexp.Regexp
+	for _, m := range markers {
+		if strings.TrimSpace(m) == "" {
+			continue
+		}
+		parts := strings.Split(m, "{{nonce}}")
+		for i := range parts {
+			parts[i] = regexp.QuoteMeta(parts[i])
+		}
+		out = append(out, regexp.MustCompile(strings.Join(parts, markerNonceShape)))
+	}
+	return out
 }

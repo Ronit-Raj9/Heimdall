@@ -1,0 +1,35 @@
+{
+ "jsonrpc": "2.0",
+ "id": 2,
+ "result": {
+  "tools": [
+   {
+    "name": "get_weather",
+    "description": "Returns the forecast for a city.",
+    "inputSchema": {
+     "type": "object",
+     "properties": {
+      "city": {
+       "type": "string",
+       "description": "City name"
+      }
+     },
+     "required": [
+      "city"
+     ]
+    }
+   },
+   {
+    "name": "list_notes",
+    "description": "Lists the user's notes.",
+    "inputSchema": {
+     "type": "object",
+     "properties": {}
+    },
+    "_meta": {
+     "generated_at": "2026-11-18T06:00:00Z"
+    }
+   }
+  ]
+ }
+}

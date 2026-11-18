@@ -111,11 +111,13 @@ type Gateway struct {
 	pageSize int
 	settle   time.Duration
 
-	mu     sync.Mutex
-	keyIDs map[string]string          // slot name -> Bifrost provider key id, set by Setup
-	models map[string]map[string]bool // slot name -> models the provider key serves
-	inUse  map[string]string          // slot name -> virtual key id holding it
-	minted map[string]mintRecord      // virtual key id -> its slot and creation time
+	mu       sync.Mutex
+	keyIDs   map[string]string          // slot name -> Bifrost provider key id, set by Setup
+	models   map[string]map[string]bool // slot name -> models the provider key serves
+	inUse    map[string]string          // slot name -> virtual key id holding it
+	minted   map[string]mintRecord      // virtual key id -> its slot and creation time
+	teams    map[string]string          // run key id -> Bifrost team id of a team run (team.go)
+	memberOf map[string]string          // member key id -> its run id (teamslots.go)
 }
 
 // mintRecord remembers what this process minted, so RevokeKey releases the
@@ -147,7 +149,7 @@ func New(cfg Config) (*Gateway, error) {
 	return &Gateway{
 		cfg: cfg, providers: providers, http: client, logger: logger, pageSize: logPageSize, settle: emptyLedgerSettle,
 		keyIDs: map[string]string{}, models: map[string]map[string]bool{},
-		inUse: map[string]string{}, minted: map[string]mintRecord{},
+		inUse: map[string]string{}, minted: map[string]mintRecord{}, teams: map[string]string{}, memberOf: map[string]string{},
 	}, nil
 }
 

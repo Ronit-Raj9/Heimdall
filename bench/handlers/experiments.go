@@ -302,6 +302,9 @@ func BuildPlan(m *schemas.Manifest) schemas.ExperimentPlan {
 	p.Slots, p.Conditions = len(m.Slots), planConditions(m)
 	pairs := map[string]bool{}
 	for _, s := range m.Slots {
+		if m.Experiment.AA && s.Arm == "A2" { // Eval integrity area (S2): an A/A slot is a pair id of its own, not an A/B pair (docs/noise-floor.md)
+			continue // Eval integrity area (S2)
+		} // Eval integrity area (S2)
 		if s.Counted {
 			pairs[s.PairID] = true
 		}

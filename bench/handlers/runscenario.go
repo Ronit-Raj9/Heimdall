@@ -30,6 +30,7 @@ func fillScenario(index ReadIndex, runID string, out *schemas.RunDetail) error {
 		State        []schemas.StateFile           `json:"state"`
 		Services     []schemas.ServiceResult       `json:"services"`
 		Artifacts    []schemas.ArtifactFile        `json:"artifacts"`
+		Agents       *schemas.AgentTree            `json:"agents"` // Multi-agent area (docs/multi-agent.md)
 	}
 	data, found, err := readInternal(index, runID, FileEvidence)
 	if err != nil {
@@ -48,6 +49,15 @@ func fillScenario(index ReadIndex, runID string, out *schemas.RunDetail) error {
 	out.ToolCalls, out.Sessions, out.Answer, out.State, out.Services = ev.ToolCalls, ev.Sessions, ev.Answer, ev.State, ev.Services
 	out.AdapterFault = ev.AdapterFault
 	out.Artifacts = ev.Artifacts
+	out.Agents = ev.Agents
+	if out.Agents == nil {
+		var tree schemas.AgentTree
+		if data, found, err := readInternal(index, runID, schemas.AgentsFile); err != nil {
+			return err
+		} else if found && json.Unmarshal(data, &tree) == nil {
+			out.Agents = &tree // an unsealed run: agents.json is written at collect
+		}
+	}
 	return nil
 }
 

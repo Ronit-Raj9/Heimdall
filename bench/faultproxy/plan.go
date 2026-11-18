@@ -18,12 +18,15 @@ const (
 	ModePersistent = "persistent"
 	ModeOnce       = "once"
 	ModeScripted   = "scripted"
+	// ModeStreamCut cuts a streamed answer after its first tool-call delta
+	// (streamcut.go; Safety probes area, S1).
+	ModeStreamCut = "stream_cut"
 )
 
 // PlanModes lists every plan mode this proxy honours, in the order /health
 // reports them. A caller that needs a mode checks for it there first: an
 // older proxy rejects a mode it does not know with 400.
-var PlanModes = []string{ModeNone, ModePersistent, ModeOnce, ModeScripted}
+var PlanModes = []string{ModeNone, ModePersistent, ModeOnce, ModeScripted, ModeStreamCut}
 
 // Request kinds recorded in the ledger. Only KindMessage is counted.
 const (
@@ -62,8 +65,16 @@ func ValidatePlan(p schemas.FaultPlan) error {
 		if p.Call < 1 {
 			return errors.New("once plan needs call >= 1")
 		}
+	case ModeStreamCut:
+		if p.Call < 1 && p.FromCall < 1 {
+			return errors.New("stream_cut plan needs call >= 1 or from_call >= 1")
+		}
+		if p.Status != 0 || p.RetryAfterS != 0 {
+			return errors.New("stream_cut plan injects no status; status and retry_after_s must be unset")
+		}
+		return nil
 	default:
-		return fmt.Errorf("mode must be none, persistent, once or scripted, got %q", p.Mode)
+		return fmt.Errorf("mode must be none, persistent, once, scripted or stream_cut, got %q", p.Mode)
 	}
 	if p.Status < 400 || p.Status > 599 {
 		return fmt.Errorf("status must be 4xx or 5xx, got %d", p.Status)
@@ -96,6 +107,7 @@ type decision struct {
 	Status      int
 	RetryAfterS int
 	Scripted    bool // the run is bound to ModeScripted: answer from the scripted model, never upstream
+	Cut         bool // ModeStreamCut takes this call: a streamed answer is cut after its first tool-call delta
 }
 
 func newPlanTable() *planTable {
@@ -147,6 +159,10 @@ func (t *planTable) begin(slot, kind string) decision {
 	}
 	st.calls++
 	d.Call = st.calls
+	if st.plan.Mode == ModeStreamCut {
+		d.Cut = cuts(st.plan, d.Call)
+		return d
+	}
 	if fires(st.plan, d.Call) {
 		d.Inject = true
 		d.Status = st.plan.Status
@@ -186,4 +202,10 @@ func fires(p schemas.FaultPlan, call int) bool {
 	default:
 		return false
 	}
+}
+
+// cuts reports whether a stream_cut plan takes conversation call number
+// call: exactly Call, or every call from FromCall.
+func cuts(p schemas.FaultPlan, call int) bool {
+	return (p.Call > 0 && call == p.Call) || (p.FromCall > 0 && call >= p.FromCall)
 }

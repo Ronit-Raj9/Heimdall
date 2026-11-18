@@ -42,7 +42,7 @@ func sessionStreamFile(n int) string {
 // the run is aborted_infra with the service named; the agent never starts.
 func (p *Pipeline) startServices(ctx context.Context, st *runState) error {
 	rc := st.rc
-	if len(utils.TaskServices(rc.Suite, rc.Task)) == 0 && len(utils.ExternalAPIs(rc.Suite, rc.Task)) == 0 { // External APIs area: external APIs run through the tool proxy
+	if len(utils.TaskServices(rc.Suite, rc.Task)) == 0 && len(utils.ExternalAPIs(rc.Suite, rc.Task)) == 0 && len(utils.TeamOf(rc)) == 0 { // External APIs area: external APIs run through the tool proxy; Multi-agent area: a team's mailbox
 		return nil
 	}
 	se, ok := st.env.(schemas.ServiceEnvironment)
@@ -84,9 +84,12 @@ func notReady(results []schemas.ServiceResult) string {
 // snapshot then freezes the agent's container file system.
 func (p *Pipeline) runAgent(ctx context.Context, st *runState) error {
 	var err error
-	if len(st.rc.Task.Sessions) == 0 {
+	switch {
+	case len(utils.TeamOf(st.rc)) > 0: // Multi-agent area: one container per team member (team.go)
+		err = p.runTeam(ctx, st)
+	case len(st.rc.Task.Sessions) == 0:
 		_, err = p.execOnce(ctx, st, nil)
-	} else {
+	default:
 		err = p.runSessions(ctx, st)
 	}
 	if err != nil {
@@ -349,7 +352,7 @@ func (p *Pipeline) snapshot(ctx context.Context, st *runState) error {
 func (p *Pipeline) exportScenario(ctx context.Context, st *runState) error {
 	rc := st.rc
 	var errs []error
-	if len(utils.TaskServices(rc.Suite, rc.Task)) > 0 || len(utils.ExternalAPIs(rc.Suite, rc.Task)) > 0 { // External APIs area: copies the ledger and recorded cassettes
+	if len(utils.TaskServices(rc.Suite, rc.Task)) > 0 || len(utils.ExternalAPIs(rc.Suite, rc.Task)) > 0 || len(utils.TeamOf(rc)) > 0 { // External APIs area: copies the ledger and recorded cassettes; Multi-agent area: the mailbox
 		if se, ok := st.env.(schemas.ServiceEnvironment); !ok {
 			errs = append(errs, wrapPart("environment", st.env, errors.New("export state: environment cannot run services")))
 		} else if files, err := se.ExportState(ctx, rc); err != nil {

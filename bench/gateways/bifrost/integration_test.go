@@ -703,3 +703,111 @@ func (c benchControl) ledger(ctx context.Context, t *testing.T, runID string) []
 	}
 	return out.Entries
 }
+
+// TestIntegrationTeamKeys runs the team key path against a real Bifrost
+// named by HEIMDALL_TEST_BIFROST_URL and HEIMDALL_TEST_BIFROST_TOKEN (its
+// setup token); it skips without them. A throwaway Bifrost is enough:
+//
+//	docker run -d -e BIFROST_SETUP_TOKEN=tok -p 127.0.0.1:38080:8080 maximhq/bifrost:v2.5.1
+//
+// It mints a three-member team (the lead on the run key), checks that every
+// key is in the run's Bifrost team with its sub-budget, sends one model call
+// per member with x-bf-lh-heimdall-agent, and checks that the run's fetch
+// returns every member's rows with the member's id and declared label. The
+// provider points at a closed port, so every call is an error row and no
+// money is spent. RevokeKey then removes every key and the team.
+func TestIntegrationTeamKeys(t *testing.T) {
+	url, token := os.Getenv("HEIMDALL_TEST_BIFROST_URL"), os.Getenv("HEIMDALL_TEST_BIFROST_TOKEN")
+	if url == "" || token == "" {
+		t.Skip("HEIMDALL_TEST_BIFROST_URL and HEIMDALL_TEST_BIFROST_TOKEN are not set")
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Minute)
+	defer cancel()
+	g, err := New(Config{URL: url, SetupToken: token, FaultProxyURL: "http://127.0.0.1:9", Model: testModel, MaxRetries: 0,
+		Slots:  []Slot{{Name: "hdma1-slot-1", Value: "hdma1-slot-1"}, {Name: "hdma1-slot-2", Value: "hdma1-slot-2"}, {Name: "hdma1-slot-3", Value: "hdma1-slot-3"}},
+		Logger: testLogger{t}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := g.Setup(ctx); err != nil {
+		t.Fatalf("Setup: %v", err)
+	}
+	g.settle = 8 * time.Second // Bifrost writes log rows in batches
+	rc := runContext(utils.NewID("r", 10), testModel)
+	rc.Agent.Budgets.USD = 1
+	rc.Agent.Team = []schemas.TeamMember{{ID: "lead", Role: "lead", BudgetUSD: 0.4}, {ID: "worker-a", BudgetUSD: 0.3}, {ID: "worker-b", BudgetUSD: 0.3}}
+	run, err := g.MintKey(ctx, rc)
+	if err != nil {
+		t.Fatalf("MintKey: %v", err)
+	}
+	keys, err := g.MintMemberKeys(ctx, rc, run, rc.Agent.Team)
+	if err != nil {
+		_ = g.RevokeKey(ctx, run)
+		t.Fatalf("MintMemberKeys: %v", err)
+	}
+	run.Members = keys
+	revoked := false
+	defer func() {
+		if !revoked {
+			_ = g.RevokeKey(context.WithoutCancel(ctx), run)
+		}
+	}()
+	teamID := g.teams[run.ID]
+	for _, k := range keys {
+		var out struct {
+			VirtualKey struct {
+				TeamID  *string `json:"team_id"`
+				Budgets []struct {
+					MaxLimit float64 `json:"max_limit"`
+				} `json:"budgets"`
+			} `json:"virtual_key"`
+		}
+		if err := g.call(ctx, http.MethodGet, "/api/governance/virtual-keys/"+k.ID, nil, &out); err != nil {
+			t.Fatalf("get key %s: %v", k.ID, err)
+		}
+		if out.VirtualKey.TeamID == nil || *out.VirtualKey.TeamID != teamID || len(out.VirtualKey.Budgets) != 1 || out.VirtualKey.Budgets[0].MaxLimit != k.BudgetUSD {
+			t.Errorf("member %s key: team %v budgets %+v (run team %s)", k.AgentID, out.VirtualKey.TeamID, out.VirtualKey.Budgets, teamID)
+		}
+		body := strings.NewReader(`{"model":"anthropic/` + testModel + `","messages":[{"role":"user","content":"hi"}]}`)
+		req, _ := http.NewRequestWithContext(ctx, http.MethodPost, url+"/v1/chat/completions", body)
+		req.Header.Set("Content-Type", "application/json")
+		req.Header.Set("x-bf-vk", k.Value)
+		req.Header.Set("x-bf-lh-heimdall-agent", k.AgentID)
+		resp, err := http.DefaultClient.Do(req)
+		if err != nil {
+			t.Fatalf("call as %s: %v", k.AgentID, err)
+		}
+		msg, _ := io.ReadAll(io.LimitReader(resp.Body, 300))
+		resp.Body.Close()
+		t.Logf("call as %s: %d %s", k.AgentID, resp.StatusCode, msg)
+	}
+	log, err := g.FetchRequests(ctx, run, schemas.FetchExpectation{Timeout: 20 * time.Second, PollEvery: time.Second})
+	if err != nil {
+		t.Fatalf("FetchRequests: %v", err)
+	}
+	seen := map[string]string{}
+	for _, r := range log.Requests {
+		seen[r.AgentID] = r.AgentLabel
+	}
+	for _, m := range rc.Agent.Team {
+		if seen[m.ID] != m.ID {
+			t.Errorf("member %s: no row with its key and label in %+v", m.ID, seen)
+		}
+	}
+	if err := g.RevokeKey(ctx, run); err != nil {
+		t.Fatalf("RevokeKey: %v", err)
+	}
+	revoked = true
+	vks, err := g.listVirtualKeys(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, k := range vks {
+		if strings.HasPrefix(k.Name, rc.Run.RunID) {
+			t.Errorf("key %s left after revoke", k.Name)
+		}
+	}
+	if err := g.call(ctx, http.MethodGet, "/api/governance/teams/"+teamID, nil, nil); err == nil {
+		t.Errorf("team %s left after revoke", teamID)
+	}
+}

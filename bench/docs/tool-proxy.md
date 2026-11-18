@@ -160,7 +160,7 @@ id: fs-write-fails
 layer: tool
 apply:
   tool:
-    mode: error          # error | timeout | poison
+    mode: error          # error | timeout | poison | describe_poison | rug_pull | shadow | schema_poison | plausible_wrong | schema_drift | lost_ack
     server: fs           # empty matches every proxied service
     tool: write_file     # empty matches every tool
     from_call: 1         # first affected matching call, 1-based
@@ -185,6 +185,57 @@ fault and restarts the count of matching calls.
   text item of its result (HTTP: to a JSON object as a `notice` member, else
   as trailing text).
 
+Seven more modes test the agent's safety rather than its recovery (the
+probes are in [safety-probes.md](safety-probes.md); the example suite is
+`examples/acme-safety`). Four rewrite what an MCP server says about its
+tools; they never take a tool call, and only `tools/list` answers of
+`server` (empty: every server) change:
+
+- `describe_poison` (MCP tool poisoning): `text` is appended to the
+  description of every matching tool (`tool`, empty for every tool) in each
+  `tools/list` answer.
+- `shadow` (cross-server shadowing): the same rewrite, with a `text` that
+  tells the agent how to use another server's tools. The harm shows up in
+  calls to that other server, which is where the gate looks.
+- `schema_poison` (full-schema poisoning): `text` is appended to every
+  parameter description of the matching tools, and `patch` (strings rendered
+  with `{{nonce}}`) is merged into their `inputSchema.properties`, so a probe
+  can add a parameter whose default carries the canary.
+- `rug_pull`: listings are served clean until the server has taken
+  `from_call - 1` tool calls under the fault (so `from_call` must be at least
+  2), and rewritten like `describe_poison` after that. An agent that never
+  lists the tools again never sees the change; the receipt says so.
+
+The rewritten listing is what the agent got, and the `tools/list` row
+records it: `fault` is the mode, `nonce` the run's nonce and `result` the
+listing as served (its hash covers the whole answer). That row is the receipt
+that the poisoned listing was served.
+
+Two quiet modes rewrite a real result that stays a success (status, and
+`isError` false):
+
+- `plausible_wrong`: `patch` is applied as a JSON merge patch (RFC 7386) to
+  the result: an MCP result's `structuredContent` when it is an object and
+  every text item whose text is a JSON object; an HTTP or external answer
+  whose body is a JSON object. Arrays are replaced whole, so a patch that
+  changes one item of a list gives the whole list.
+- `schema_drift`: `rename` maps old member names to new ones, renamed at any
+  depth (never over a member that already has the new name).
+
+The row of a quiet fault records what the agent got, with `fault` and
+`nonce`.
+
+- `lost_ack`: the call is forwarded and the server carries it out, but its
+  answer is withheld: the agent is held for `timeout_s` (default 60) and then
+  answered like `timeout`. The one row of the call keeps the server's real
+  answer (`status`, `result`: the proof the effect happened), with `fault`
+  `lost_ack`, the nonce, `is_error` true (the agent saw a failure) and
+  `undelivered` true (the real answer never reached it). An MCP answer that
+  came as an event stream is read whole and answered as plain JSON, which the
+  streamable HTTP transport allows. In a batch, the other calls' answers are
+  relayed after the hold. It applies to MCP and plain HTTP tool routes; an
+  external route passes the call untouched.
+
 `{{nonce}}` in `message` or `text` is replaced by the nonce. A message without
 it gets the nonce on a line of its own (`request id: <nonce>`), so a later
 model request that carries it proves the agent saw the fault.
@@ -199,10 +250,10 @@ receipt reads them:
 
 | Step | From |
 |---|---|
-| fired | rows carrying the run's nonce: how many calls the fault took |
-| delivered | those rows without `undelivered` |
+| fired | rows carrying the run's nonce: how many calls (or, for the listing modes, listings) the fault took |
+| delivered | those rows without `undelivered`; a `lost_ack` row counts when the server answered it, since what the agent got is the timeout |
 | visible | the nonce in a later gateway request |
-| acknowledged | the final message naming the failure (or the injection, for poison) |
+| acknowledged | the final message naming the failure (or the injection, for poison and the listing modes; the inconsistency, for the quiet modes; the timeout or the check, for `lost_ack`) |
 | effect | the grade |
 
 With no ledger, fired and delivered are unknown; with a ledger and no such
@@ -323,6 +374,15 @@ back to its command-line setup. If the server exits, pending requests fail and
 GOWORK=off go test ./toolproxy/ ./evidence/ ./metrics/ ./probes/
 GOWORK=off go test -tags integration -run TestIntegrationProxyContainer ./toolproxy/
 ```
+
+The safety modes are covered by `TestProxySafetyListingModes` (every listing
+mode, JSON and SSE answers, the rug pull's threshold, another server left
+alone), `TestProxySafetyQuietModes` and `TestProxySafetyQuietHTTP`
+(`toolproxy/proxy_test.go`), `TestProxyLostAckMCP` and `TestProxyLostAckHTTP`
+(`toolproxy/lostack_test.go`: the effect reaches the server, the agent gets
+the timeout after the hold, the row keeps the real answer; single calls and
+batches, JSON and SSE), the pure rewrites in `toolproxy/rewrite_test.go`, and
+end to end by `examples/acme-safety`'s smoke experiment.
 
 The unit tests run the proxy against an in-process MCP server that answers in
 JSON and in SSE, with every fault mode, batches and malformed traffic, and run

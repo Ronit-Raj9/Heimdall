@@ -71,6 +71,11 @@ func (p *pairedSignFlipPolicy) GetVersion() string { return pairedSignFlipVersio
 // decision must hold at both missingness bounds; the paired-t interval is
 // descriptive and never decides. Mode is left for the caller, which knows
 // whether the runs are live, recorded or synthetic.
+//
+// An A/A arm (A2, docs/noise-floor.md) enters only the variance card and the
+// aa_noise_floor check; the naive scoreboard, diagnostics, meters, arm
+// metrics and the instrument checks that span every arm show it under its own
+// id. It never enters the A-against-B effect, the guards or integrity.
 func (p *pairedSignFlipPolicy) Decide(ctx context.Context, m *schemas.Manifest, runs []schemas.SealedRun) (*schemas.Analysis, error) {
 	if err := ctx.Err(); err != nil {
 		return nil, fmt.Errorf("decide: %w", err)
@@ -85,7 +90,7 @@ func (p *pairedSignFlipPolicy) Decide(ctx context.Context, m *schemas.Manifest, 
 	cfg := settingsFor(m)
 	runs = CompleteSlots(m, runs)
 	idx := newRunIndex(runs)
-	v := verdictFor(m, cfg, idx, runs, arms[ArmAA])
+	v := verdictFor(m, cfg, idx, runs, hasAAArm(m))
 	return &schemas.Analysis{
 		AnalysisID:  utils.NewID("a", 10),
 		ExpID:       m.ExpID,
@@ -100,31 +105,33 @@ func (p *pairedSignFlipPolicy) Decide(ctx context.Context, m *schemas.Manifest, 
 }
 
 // verdictFor assembles the verdict: primary effect, guards, instrument gates
-// and checks, integrity, decision, action and the minimal detectable effect.
+// and checks, integrity, decision, action, the minimal detectable effect and
+// the variance card behind it (noiseFloor). A directional A/A result fails
+// the aa_noise_floor check, whose detail becomes an invalid reason.
 func verdictFor(m *schemas.Manifest, cfg settings, idx runIndex, runs []schemas.SealedRun, hasAA bool) schemas.Verdict {
 	pc, pm := cfg.primary.Condition, cfg.primary.Metric
 	primary := pairedEffect(pc, pm, ArmBaseline, ArmCandidate, idx.cells(pc, ArmBaseline, pm), idx.cells(pc, ArmCandidate, pm), true)
 	guards := evaluateGuards(cfg, idx)
-	checks := append(instrumentChecks(m, idx), slotCoverage(m, runs))
+	variance, aaCheck := noiseFloor(cfg, idx, hasAA)
+	checks := append(instrumentChecks(m, idx), slotCoverage(m, runs), aaCheck)
+	fair, fairChecks := fairnessFor(m, idx) // Multi-agent area: equal-budget fairness (fairness.go)
+	checks = append(checks, fairChecks...)
 	invalid := append(instrumentGates(m, cfg, idx, runs), instrumentReasons(checks)...)
 	integrity := integrityStatus(idx)
 	decision := decide(invalid, primary, guards, cfg.alpha)
 
-	sd, assumed := cfg.assumedSD, true
-	if hasAA {
-		if measured, ok := aaSD(idx, pm); ok {
-			sd, assumed = measured, false
-		}
-	}
+	sd := variance.SD
+	variance.MDE = mdePP(pairedTasks(primary), sd, cfg.alpha)
 	return schemas.Verdict{
 		Primary:           cfg.primary,
 		Decision:          decision,
 		Action:            actionFor(decision, guards, integrity, checks),
 		Effect:            primary,
 		Alpha:             cfg.alpha,
-		MDE:               mdePP(pairedTasks(primary), sd, cfg.alpha),
-		MDEAssumedSD:      assumed,
+		MDE:               variance.MDE,
+		MDEAssumedSD:      variance.Source != schemas.VarianceMeasuredAA,
 		SD:                sd,
+		Variance:          variance,
 		TasksNeeded:       tasksNeeded(primary.DBar, sd, cfg.alpha),
 		RandomizationUnit: randomizationUnit,
 		TieRule:           tieRule,
@@ -134,6 +141,7 @@ func verdictFor(m *schemas.Manifest, cfg settings, idx runIndex, runs []schemas.
 		Integrity:         integrity,
 		ManifestHash:      m.Hash,
 		FrozenAt:          m.CreatedAt,
+		Fairness:          fair,
 	}
 }
 

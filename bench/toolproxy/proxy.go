@@ -74,6 +74,8 @@ type Server struct {
 	// external holds the external routes (external.go); they are never in
 	// routes, so /s/<id> cannot reach them.
 	external map[string]*externalRoute
+	// members maps team member route tokens to member ids (members.go).
+	members map[string]string
 }
 
 // New loads the routes, opens the ledger and returns a server ready to
@@ -118,6 +120,7 @@ func newServer(cfg Config, rs *Routes) (*Server, error) {
 		parseCap: defaultParseCap,
 	}
 	s.external = map[string]*externalRoute{}
+	s.members = rs.Members // Multi-agent area: team member route tokens (members.go)
 	for _, r := range rs.Routes {
 		if r.Protocol == ProtocolExternal {
 			x, err := newExternalRoute(cfg, r)
@@ -186,6 +189,10 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	if s.serveCollectorPath(w, r) { // Agent events area: POST /events and /otlp/v1/traces (collector.go)
 		return
 	}
+	agent, ok := s.memberRoute(w, r) // Multi-agent area: /m/<token>/ names the team member (members.go)
+	if !ok {
+		return
+	}
 	if rest, ok := strings.CutPrefix(r.URL.Path, "/x/"); ok {
 		s.serveExternal(w, r, rest) // External APIs area: real HTTP APIs behind the allowlist (external.go)
 		return
@@ -202,6 +209,7 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, fmt.Sprintf("unknown service %q", service), http.StatusNotFound)
 		return
 	}
+	rt.Agent = agent
 	switch {
 	case rt.Protocol == ProtocolMCP && r.Method == http.MethodPost && path == rt.MCPPath:
 		s.serveMCP(w, r, rt, path)
@@ -275,14 +283,25 @@ func (s *Server) serveMCP(w http.ResponseWriter, r *http.Request, rt Route, path
 			// and answers to server requests are visible; none is a tool call.
 			p := s.clientMessage(x, it, key)
 			p.row.RequestBytes = int64(len(it.raw))
+			if m.Method == methodToolsList && key != "" {
+				if ft, ok := s.faults.listing(rt.Service); ok { // Safety probes area (S1): MCP tool poisoning
+					p.listing = &ft
+				}
+			}
 		default:
 			name, args := readToolParams(it.msg.Params)
 			p := x.track(key, name, args)
 			p.row.RequestBytes = int64(len(it.raw))
-			ft, hit := s.faults.decide(rt.Service, name)
+			ft, hit := s.faults.decide(rt.Service, name, rt.Agent)
 			switch {
 			case hit && ft.Mode == FaultPoison:
 				p.poison = &ft
+			case hit && IsQuietMode(ft.Mode): // Safety probes area (S1)
+				p.quiet = &ft
+			case hit && ft.Mode == FaultLostAck && key != "": // Safety probes area (S1)
+				p.lostAck = &ft
+			case hit && ft.Mode == FaultLostAck:
+				// A notification gets no answer to withhold: forwarded as is.
 			case hit && key != "":
 				p.row.Fault, p.row.Nonce = ft.Mode, ft.Nonce
 				faulted = append(faulted, p)
@@ -336,6 +355,10 @@ func (s *Server) serveMCP(w http.ResponseWriter, r *http.Request, rt Route, path
 		return
 	}
 	defer resp.Body.Close()
+	if x.lostAckHold() > 0 { // Safety probes area (S1): lost_ack
+		s.relayLostAck(w, r, resp, x, synthetic, batch)
+		return
+	}
 	if isEventStream(resp.Header) {
 		s.relaySSE(w, r, resp, x, synthetic)
 		return
@@ -580,7 +603,7 @@ func (s *Server) serverMessage(rt Route, it rpcItem, status int) {
 // its result.
 func (s *Server) serveHTTPTool(w http.ResponseWriter, r *http.Request, rt Route, path string) {
 	started := s.now()
-	row := schemas.ToolCall{Server: rt.Service, Tool: r.Method + " " + path, Protocol: ProtocolHTTP, Started: started}
+	row := schemas.ToolCall{Server: rt.Service, Tool: r.Method + " " + path, Protocol: ProtocolHTTP, Started: started, AgentID: rt.Agent}
 	req := newMeter()
 	in := io.TeeReader(r.Body, req)
 	body, err := readUpTo(in, maxBody)
@@ -617,8 +640,8 @@ func (s *Server) serveHTTPTool(w http.ResponseWriter, r *http.Request, rt Route,
 	}
 	row.Arguments, row.ArgsSHA256 = Capture(args)
 	row.RequestBytes = int64(len(body))
-	ft, hit := s.faults.decide(rt.Service, row.Tool)
-	if hit && ft.Mode != FaultPoison {
+	ft, hit := s.faults.decide(rt.Service, row.Tool, rt.Agent)
+	if hit && (ft.Mode == FaultError || ft.Mode == FaultTimeout) {
 		row.Fault, row.Nonce, row.IsError = ft.Mode, ft.Nonce, true
 		status := http.StatusInternalServerError
 		if ft.Mode == FaultTimeout {
@@ -650,6 +673,10 @@ func (s *Server) serveHTTPTool(w http.ResponseWriter, r *http.Request, rt Route,
 		return
 	}
 	defer resp.Body.Close()
+	if hit && ft.Mode == FaultLostAck { // Safety probes area (S1)
+		s.lostAckHTTP(w, r, resp, &row, ft)
+		return
+	}
 	var poison *schemas.ToolFault
 	if hit {
 		poison = &ft
@@ -702,8 +729,10 @@ func (s *Server) relayHTTPTool(w http.ResponseWriter, resp *http.Response, row *
 	}
 	changed := false
 	if poison != nil {
-		raw = poisonHTTPBody(raw, resp.Header.Get("Content-Type"), poisonText(*poison))
-		row.Fault, row.Nonce, changed = FaultPoison, poison.Nonce, true
+		raw, changed = rewriteHTTPAnswer(raw, resp.Header.Get("Content-Type"), *poison)
+		if changed {
+			row.Fault, row.Nonce = poison.Mode, poison.Nonce
+		}
 	}
 	row.Result, row.ResultSHA256 = Capture(raw)
 	row.ResponseBytes = int64(len(raw))
@@ -901,6 +930,18 @@ func (f flushWriter) Write(p []byte) (int, error) {
 		fl.Flush()
 	}
 	return n, err
+}
+
+// rewriteHTTPAnswer applies a poison or quiet fault to a plain HTTP or
+// external answer. ok is false when the fault changed nothing.
+func rewriteHTTPAnswer(body []byte, contentType string, ft schemas.ToolFault) ([]byte, bool) {
+	switch {
+	case ft.Mode == FaultPoison:
+		return poisonHTTPBody(body, contentType, poisonText(ft)), true
+	case IsQuietMode(ft.Mode): // Safety probes area (S1)
+		return quietHTTPBody(body, ft)
+	}
+	return body, false
 }
 
 // poisonHTTPBody appends text to a plain HTTP tool answer: as a "notice"

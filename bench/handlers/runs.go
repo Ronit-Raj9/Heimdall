@@ -75,6 +75,10 @@ func (h *RunsHandler) RegisterRoutes(r *router.Router, middlewares ...lib.Middle
 	r.GET(p+"/otlp", lib.ChainMiddlewares(h.getRunOTLP, middlewares...))                            // OpenTelemetry trace download (handlers/runotlp.go)
 	r.GET(p+"/steps", lib.ChainMiddlewares(h.getRunSteps, middlewares...))                          // unified step timeline (handlers/runsteps.go)
 	r.GET(p+"/remote", lib.ChainMiddlewares(h.getRunRemote, middlewares...))                        // Remote coverage: channel summary of a remote agent's run (handlers/runremote.go)
+	r.GET(p+"/agents", lib.ChainMiddlewares(h.getRunAgents, middlewares...))                        // Multi-agent: tree, lanes, handoffs and blame (handlers/runagents.go)
+	r.GET(p+"/codescan", lib.ChainMiddlewares(h.getRunCodeScan, middlewares...))                    // X4: code scan of added lines (handlers/runcodescan.go)
+	r.GET(p+"/services", lib.ChainMiddlewares(h.getRunServices, middlewares...))                    // X2: services of the run and their logs (handlers/runservices.go)
+	r.GET(p+"/services/{service}/log", lib.ChainMiddlewares(h.getRunServiceLog, middlewares...))    // X2
 }
 
 // getRun handles GET /api/bench/runs/{id}: the run record with its grade,

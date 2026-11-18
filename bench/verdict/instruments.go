@@ -34,7 +34,8 @@ const (
 // an unknown one holds an IMPROVED verdict; a warning changes nothing unless
 // the experiment declares the timeout_parity guard.
 func instrumentChecks(m *schemas.Manifest, idx runIndex) []schemas.InstrumentCheck {
-	return []schemas.InstrumentCheck{usageCompleteness(idx), droppedLogs(m, idx), timeoutParityCheck(idx), budgetParity(m), upstreamErrors(idx)}
+	checks := []schemas.InstrumentCheck{usageCompleteness(idx), droppedLogs(m, idx), timeoutParityCheck(idx), budgetParity(m), upstreamErrors(idx)}
+	return withHardwareParity(checks, idx) // X7: GPU runs on different GPU models make the experiment INVALID (hardwareparity.go)
 }
 
 // instrumentReasons returns the detail of every failed check, as invalid

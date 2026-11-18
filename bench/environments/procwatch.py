@@ -9,14 +9,16 @@
 # last-PID counter (/proc/sys/kernel/ns_last_pid) says how many PIDs were
 # handed out, so the miss count is bounded and reported, never hidden.
 #
-# argv[1] is the poll interval in milliseconds.
+# argv[1] is the poll interval in milliseconds; without it, the POLL_MS
+# environment variable is (a neutral run keeps its command line bare, because
+# the agent sees this process in ps: docs/eval-awareness.md).
 import json
 import os
 import signal
 import sys
 import time
 
-INTERVAL = max(int(sys.argv[1]) if len(sys.argv) > 1 else 20, 1) / 1000.0
+INTERVAL = max(int(sys.argv[1]) if len(sys.argv) > 1 else int(os.environ.get("POLL_MS") or 20), 1) / 1000.0
 ARG_CAP = 2048
 ARGS_MAX = 64
 SELF = os.getpid()

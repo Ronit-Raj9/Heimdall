@@ -13,6 +13,7 @@ import {
 	ReceiptText,
 	ScanSearch,
 	Server,
+	ShieldCheck,
 	TrendingUp,
 	type LucideIcon,
 } from "lucide-react";
@@ -33,7 +34,8 @@ export interface BenchNavItem {
 		| "/triage"
 		| "/matrix"
 		| "/clusters"
-		| "/releases";
+		| "/releases"
+		| "/monitors"; // Eval integrity area (S2)
 	labelKey:
 		| "nav.leaderboard"
 		| "nav.trends"
@@ -49,7 +51,8 @@ export interface BenchNavItem {
 		| "nav.triage"
 		| "nav.matrix"
 		| "nav.clusters"
-		| "nav.releases";
+		| "nav.releases"
+		| "nav.monitors"; // Eval integrity area (S2)
 	icon: LucideIcon;
 	testId: string;
 }
@@ -70,5 +73,6 @@ export const BENCH_NAV: readonly BenchNavItem[] = [
 	{ to: "/matrix", labelKey: "nav.matrix", icon: Grid3x3, testId: "nav-link-matrix" }, // Model matrix area
 	{ to: "/clusters", labelKey: "nav.clusters", icon: Layers, testId: "nav-link-clusters" },
 	{ to: "/releases", labelKey: "nav.releases", icon: PackageCheck, testId: "nav-link-releases" },
+	{ to: "/monitors", labelKey: "nav.monitors", icon: ShieldCheck, testId: "nav-link-monitors" }, // Eval integrity area (S2)
 	{ to: "/experiments/new", labelKey: "nav.newExperiment", icon: FlaskConical, testId: "nav-link-new-experiment" },
 ];

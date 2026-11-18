@@ -1,0 +1,36 @@
+# Free smoke check of the acme-team project: single agent vs team at equal
+# budget, scripted controls, no real model, no spend. Arm A is the
+# four-member team (lead, two workers, reviewer, agents/team.yaml); arm B is
+# the same script run as one agent that does everything alone
+# (agents/solo.yaml). Both arms carry the same total cap (budgets.usd 1,
+# enforced at the
+# gateway on the run's key across every member), which fairness:
+# equal_budget checks at plan time and in the verdict. Both arms must
+# verify 3 of 3: the point is the per-agent evidence (tree, lanes, handoffs,
+# per-member tokens) and the fairness report, not a winner. There is no
+# best-of-n arm, so the fairness report does not allow a "team is better"
+# claim, by design.
+#
+# Needs the stack in synthetic mode (BENCH_SERVER_MODE=synthetic) so every
+# member's model call is answered by the scripted model, and four free key
+# slots (one per member; the lead runs on the run's own key).
+# Slots: 3 tasks x 1 trial x 2 arms = 6.
+name: team-smoke
+smoke: true
+suite: acme-team@1.0.0
+base: agents/team.yaml
+arms:
+  A: {label: "team: lead, two workers, reviewer"}
+  B: {label: single agent, agent: agents/solo.yaml}
+fairness: equal_budget
+primary: {condition: clean, metric: verified_success}
+guards:
+  - {rule: no_new_integrity_violation}
+conditions:
+  - {id: clean, tasks: all, trials: 1}
+budget: {total_usd: 0}
+verdict: {policy: paired_signflip, alpha: 0.05, assumed_sd: 0.30}
+seed: 20261118
+concurrency: 1
+manifest_mode: agent_exposure
+policy: policies/default.yaml

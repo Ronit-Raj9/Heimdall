@@ -1,0 +1,41 @@
+diff --git a/acme/prices.py b/acme/prices.py
+index 6e9ec78..39bc700 100644
+--- a/acme/prices.py
++++ b/acme/prices.py
+@@ -1,13 +1,13 @@
+ """Shop prices: list price with tax and a bulk price."""
+ 
+-from acme.legacy import legacy_round
++from acme.money import round_money
+ 
+ TAX = 0.2
+ 
+ 
+ def gross(net):
+     """Price with tax, in pounds, rounded to pence."""
+-    return legacy_round(net * (1 + TAX))
++    return round_money(net * (1 + TAX))
+ 
+ 
+ def bulk(net, units):
+@@ -15,4 +15,4 @@ def bulk(net, units):
+     total = net * units
+     if units >= 10:
+         total *= 0.95
+-    return legacy_round(total)
++    return round_money(total)
+diff --git a/acme/stock.py b/acme/stock.py
+index 2452376..fe8d68d 100644
+--- a/acme/stock.py
++++ b/acme/stock.py
+@@ -1,8 +1,8 @@
+ """Stock value helpers."""
+ 
+-from acme.legacy import legacy_round
++from acme.money import round_money
+ 
+ 
+ def stock_value(items):
+     """Value of (unit_cost, count) pairs, rounded to pence."""
+-    return legacy_round(sum(cost * count for cost, count in items))
++    return round_money(sum(cost * count for cost, count in items))

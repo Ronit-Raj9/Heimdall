@@ -10,8 +10,10 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"slices"
 
 	"github.com/maximhq/bifrost/bench/schemas"
+	"github.com/maximhq/bifrost/bench/utils"
 )
 
 // ToolLedger is the name of the tool proxy ledger source.
@@ -128,6 +130,9 @@ func ProxiedServices(rc *schemas.RunContext) []string {
 		if proxied && !s.Hidden {
 			ids = append(ids, s.ID)
 		}
+	}
+	if len(utils.TeamOf(rc)) > 0 && !slices.Contains(ids, schemas.MailboxServer) { // Multi-agent area: a team run's mailbox is proxied (docs/multi-agent.md)
+		ids = append(ids, schemas.MailboxServer)
 	}
 	return ids
 }

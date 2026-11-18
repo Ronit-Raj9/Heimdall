@@ -1,0 +1,458 @@
+{
+  "suite": "acme-gpu",
+  "version": "1.0.0",
+  "base_image": {
+    "dockerfile": "base/Dockerfile",
+    "tag": "heimdall-example/acme-gpu-cuda:1"
+  },
+  "tasks": {
+    "fix-slow-loop": {
+      "version": "1.0.0",
+      "instruction_sha256": "00e0d210f5740ee3f216a035acad8ec95d882228ccb384a1d4962a20c3fa3c3b",
+      "repo_tree_sha256": "e9e6aeccd5cf5c334abb65d82797414f260ff78fbced7c041a8a65dbdbb18070",
+      "verifier_sha256": "1d797c2f4ed46535510e10b618edbaa115c6b3caca3d7b8f1efed96eb960d22d",
+      "controls_sha256": "f94edfc898bf98d33871d44a203afd0fb06d8aabf9ac79f3cad9164015e9ea53",
+      "fixtures_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "status": "admitted",
+      "admission": {
+        "admitted": true,
+        "checks": [
+          {
+            "name": "static_validation",
+            "want": "clean",
+            "got": "clean",
+            "passed": true,
+            "detail": "0 warnings"
+          },
+          {
+            "name": "reference_1",
+            "want": "pass",
+            "got": "pass",
+            "passed": true,
+            "detail": "solution/patch.diff; tests_ran=0 failures=0 errors=0 skipped=0 exit=0 reason=passed (reward 1)"
+          },
+          {
+            "name": "reference_2",
+            "want": "pass",
+            "got": "pass",
+            "passed": true,
+            "detail": "solution/patch.diff; tests_ran=0 failures=0 errors=0 skipped=0 exit=0 reason=passed (reward 1)"
+          },
+          {
+            "name": "reference_3",
+            "want": "pass",
+            "got": "pass",
+            "passed": true,
+            "detail": "solution/patch.diff; tests_ran=0 failures=0 errors=0 skipped=0 exit=0 reason=passed (reward 1)"
+          },
+          {
+            "name": "empty_patch",
+            "want": "fail",
+            "got": "fail",
+            "passed": true,
+            "detail": "controls/empty.diff; tests_ran=0 failures=0 errors=0 skipped=0 exit=0 reason=reward 0 below pass threshold 1"
+          },
+          {
+            "name": "mutant_1",
+            "want": "fail",
+            "got": "fail",
+            "passed": true,
+            "detail": "controls/mutant-sync-only.diff; tests_ran=0 failures=0 errors=0 skipped=0 exit=0 reason=reward 0 below pass threshold 1"
+          },
+          {
+            "name": "mutant_2",
+            "want": "fail",
+            "got": "fail",
+            "passed": true,
+            "detail": "controls/mutant-two-epochs.diff; tests_ran=0 failures=0 errors=0 skipped=0 exit=0 reason=reward 0 below pass threshold 1"
+          },
+          {
+            "name": "exploit",
+            "want": "fail",
+            "got": "fail",
+            "passed": true,
+            "detail": "exploit exit 0; tests_ran=0 failures=0 errors=0 skipped=0 exit=0 reason=reward 0 below pass threshold 1"
+          },
+          {
+            "name": "null_noop",
+            "want": "fail",
+            "got": "fail",
+            "passed": true,
+            "detail": "noop exit 0; tests_ran=0 failures=0 errors=0 skipped=0 exit=0 reason=reward 0 below pass threshold 1"
+          },
+          {
+            "name": "null_refuse",
+            "want": "fail",
+            "got": "fail",
+            "passed": true,
+            "detail": "refuse exit 0; tests_ran=0 failures=0 errors=0 skipped=0 exit=0 reason=reward 0 below pass threshold 1"
+          },
+          {
+            "name": "instruction_edited",
+            "want": "edited",
+            "got": "edited",
+            "passed": true
+          },
+          {
+            "name": "secret_scan",
+            "want": "none",
+            "got": "none",
+            "passed": true
+          },
+          {
+            "name": "verifier_no_network",
+            "want": "none",
+            "got": "none",
+            "passed": true,
+            "detail": "reported by grader verifier_command"
+          }
+        ],
+        "at": "2026-11-18T03:30:12.074011423Z",
+        "grader": "verifier_command",
+        "reference_repeats": 3,
+        "reference_results": [
+          "pass",
+          "pass",
+          "pass"
+        ],
+        "fingerprint": "b61d760940e116e96ac6baa8efba8584d384eda406e421388860a2191cd657ae"
+      }
+    },
+    "fused-softmax": {
+      "version": "1.0.0",
+      "instruction_sha256": "bcc7751c965974ad1259eb4e16d22da2ce75466dda1585ec326f5585accf50a9",
+      "repo_tree_sha256": "976810e2a42728ac4af573dff3adcc125c640db257cad219e7ec39cbae7599e9",
+      "verifier_sha256": "88aefbee403b948a053fe0dab1554dc9f1d19ffe3d96250d9beeecd47b478e4b",
+      "controls_sha256": "6a6fe0cdf820dd429f7d0c0b934c419c128815a8aadb0393b8e5333f16a94949",
+      "fixtures_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "status": "admitted",
+      "admission": {
+        "admitted": true,
+        "checks": [
+          {
+            "name": "static_validation",
+            "want": "clean",
+            "got": "clean",
+            "passed": true,
+            "detail": "0 warnings"
+          },
+          {
+            "name": "reference_1",
+            "want": "pass",
+            "got": "pass",
+            "passed": true,
+            "detail": "solution/patch.diff; tests_ran=0 failures=0 errors=0 skipped=0 exit=0 reason=passed (reward 1)"
+          },
+          {
+            "name": "reference_2",
+            "want": "pass",
+            "got": "pass",
+            "passed": true,
+            "detail": "solution/patch.diff; tests_ran=0 failures=0 errors=0 skipped=0 exit=0 reason=passed (reward 1)"
+          },
+          {
+            "name": "reference_3",
+            "want": "pass",
+            "got": "pass",
+            "passed": true,
+            "detail": "solution/patch.diff; tests_ran=0 failures=0 errors=0 skipped=0 exit=0 reason=passed (reward 1)"
+          },
+          {
+            "name": "empty_patch",
+            "want": "fail",
+            "got": "fail",
+            "passed": true,
+            "detail": "controls/empty.diff; tests_ran=0 failures=0 errors=0 skipped=0 exit=0 reason=reward 0 below pass threshold 1"
+          },
+          {
+            "name": "mutant_1",
+            "want": "fail",
+            "got": "fail",
+            "passed": true,
+            "detail": "controls/mutant-no-max.diff; tests_ran=0 failures=0 errors=0 skipped=0 exit=0 reason=reward 0 below pass threshold 1"
+          },
+          {
+            "name": "mutant_2",
+            "want": "fail",
+            "got": "fail",
+            "passed": true,
+            "detail": "controls/mutant-slow.diff; tests_ran=0 failures=0 errors=0 skipped=0 exit=0 reason=reward 0 below pass threshold 1"
+          },
+          {
+            "name": "exploit",
+            "want": "fail",
+            "got": "fail",
+            "passed": true,
+            "detail": "exploit exit 0; tests_ran=0 failures=0 errors=0 skipped=0 exit=0 reason=reward 0 below pass threshold 1"
+          },
+          {
+            "name": "null_noop",
+            "want": "fail",
+            "got": "fail",
+            "passed": true,
+            "detail": "noop exit 0; tests_ran=0 failures=0 errors=0 skipped=0 exit=0 reason=reward 0 below pass threshold 1"
+          },
+          {
+            "name": "null_refuse",
+            "want": "fail",
+            "got": "fail",
+            "passed": true,
+            "detail": "refuse exit 0; tests_ran=0 failures=0 errors=0 skipped=0 exit=0 reason=reward 0 below pass threshold 1"
+          },
+          {
+            "name": "instruction_edited",
+            "want": "edited",
+            "got": "edited",
+            "passed": true
+          },
+          {
+            "name": "secret_scan",
+            "want": "none",
+            "got": "none",
+            "passed": true
+          },
+          {
+            "name": "verifier_no_network",
+            "want": "none",
+            "got": "none",
+            "passed": true,
+            "detail": "reported by grader verifier_command"
+          }
+        ],
+        "at": "2026-11-18T03:55:54.398267105Z",
+        "grader": "verifier_command",
+        "reference_repeats": 3,
+        "reference_results": [
+          "pass",
+          "pass",
+          "pass"
+        ],
+        "fingerprint": "18128dac9c2e1b8c7fc1995eb4cba41d9999a2c83850350215472dce4d26c23a"
+      }
+    },
+    "train-classifier": {
+      "version": "1.0.0",
+      "instruction_sha256": "e9c1e2e029fccb93f1216beca4340a386dca524d067f5637489e4819006b1967",
+      "repo_tree_sha256": "feb233016ceb5b6ee2ebf41277538eb4ef3513f45d29d2bbe10d5b4bbbd095a0",
+      "verifier_sha256": "ac206350360566c598c90db542a70dceaa4f55ebc2328dfabab79ceb8380e515",
+      "controls_sha256": "510e3f6d6f8b6c1043aeca7e11038b70ff6432fbe15eafee61fd2be015000f25",
+      "fixtures_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "status": "admitted",
+      "admission": {
+        "admitted": true,
+        "checks": [
+          {
+            "name": "static_validation",
+            "want": "clean",
+            "got": "clean",
+            "passed": true,
+            "detail": "0 warnings"
+          },
+          {
+            "name": "reference_1",
+            "want": "pass",
+            "got": "pass",
+            "passed": true,
+            "detail": "solution/reference.sh exit 0; tests_ran=0 failures=0 errors=0 skipped=0 exit=0 reason=passed (reward 1)"
+          },
+          {
+            "name": "reference_2",
+            "want": "pass",
+            "got": "pass",
+            "passed": true,
+            "detail": "solution/reference.sh exit 0; tests_ran=0 failures=0 errors=0 skipped=0 exit=0 reason=passed (reward 1)"
+          },
+          {
+            "name": "reference_3",
+            "want": "pass",
+            "got": "pass",
+            "passed": true,
+            "detail": "solution/reference.sh exit 0; tests_ran=0 failures=0 errors=0 skipped=0 exit=0 reason=passed (reward 1)"
+          },
+          {
+            "name": "empty_control",
+            "want": "fail",
+            "got": "fail",
+            "passed": true,
+            "detail": "controls/empty.sh exit 0; artifact output: required artifact missing: model (model.pt: missing: no file matches model.pt), config (model.json: missing: no file matches model.json)"
+          },
+          {
+            "name": "mutant_1",
+            "want": "fail",
+            "got": "fail",
+            "passed": true,
+            "detail": "controls/mutant-starter.sh exit 1; artifact output: required artifact missing: model (model.pt: missing: no file matches model.pt), config (model.json: missing: no file matches model.json)"
+          },
+          {
+            "name": "mutant_2",
+            "want": "fail",
+            "got": "fail",
+            "passed": true,
+            "detail": "controls/mutant-wrong-config.sh exit 0; tests_ran=0 failures=0 errors=0 skipped=0 exit=0 reason=reward 0 below pass threshold 1"
+          },
+          {
+            "name": "exploit",
+            "want": "fail",
+            "got": "fail",
+            "passed": true,
+            "detail": "controls/exploit.sh exit 0; tests_ran=0 failures=0 errors=0 skipped=0 exit=0 reason=reward 0 below pass threshold 1"
+          },
+          {
+            "name": "null_noop",
+            "want": "fail",
+            "got": "fail",
+            "passed": true,
+            "detail": "noop exit 0; artifact output: required artifact missing: model (model.pt: missing: no file matches model.pt), config (model.json: missing: no file matches model.json)"
+          },
+          {
+            "name": "null_refuse",
+            "want": "fail",
+            "got": "fail",
+            "passed": true,
+            "detail": "refuse exit 0; artifact output: required artifact missing: model (model.pt: missing: no file matches model.pt), config (model.json: missing: no file matches model.json)"
+          },
+          {
+            "name": "instruction_edited",
+            "want": "edited",
+            "got": "edited",
+            "passed": true
+          },
+          {
+            "name": "secret_scan",
+            "want": "none",
+            "got": "none",
+            "passed": true
+          },
+          {
+            "name": "verifier_no_network",
+            "want": "none",
+            "got": "none",
+            "passed": true,
+            "detail": "reported by grader verifier_command"
+          }
+        ],
+        "at": "2026-11-18T03:23:35.194904112Z",
+        "grader": "verifier_command",
+        "reference_repeats": 3,
+        "reference_results": [
+          "pass",
+          "pass",
+          "pass"
+        ],
+        "fingerprint": "ffc82cd363d33e5f8a16dc2562b3cd7f190dea4867cea4ec2163648b39321e35"
+      }
+    }
+  },
+  "probes": {
+    "model-outage": {
+      "version": "1.0.0",
+      "sha256": "6a434aba4ee1ecdb69c3b68f64bc83c4707d54c73f6a1518b953ef56c172182d"
+    }
+  },
+  "created_at": "2026-11-18T03:55:48.983247583Z",
+  "fingerprints": {
+    "version": 1,
+    "suite": {
+      "settings": "72f5c7f79af7bdc78463c6d74c10e91c956cf5b0d5668ced0776fce23a63ffaf",
+      "fields": {
+        "base_image": "7c1498d5fdbb7bf7139465530093cc745e8f70422e717f6eae701e1a1cf04604",
+        "environment": "2075abc096d17738fba811b8518f8a3cbd1a5621abd0fd833170c50f4f9bbe4b",
+        "grader": "47789364c3ef10b8c5e96f4a5397a4297f3b5ffd83bbf1f3a18dad282737362d",
+        "id": "c778f746c78b78806a266d144310215bb9e0d297db09bd252c3e60b77a2144a6",
+        "parts": "68df612014fc627742a5c7276caf6fc051723f0f8362b14ad74b8f18fd752328",
+        "probes": "3ce7fcef3bd51a3d5702a375e1c86df815ddcd66985457af7108e97c83be0263",
+        "tasks": "e2231d32a078a5937f6d3dac5cff0fcd0c8da55f7f03b8e010b5568b03886844",
+        "track": "4773c8847376899ca6f3a33c1630f5d5d2e8885fe5b3c1bc94f1a729be74f96e",
+        "verifier": "bab35aa5923cbd9cab1697d019906437eaab989ba0dc8055406325229e705f0f",
+        "version": "39fe4a40977d0585fd5704359e3685b0ada5cf5ee061e5d97385601d120cd0ec",
+        "workdir": "4384b4849b7f004db243393653c15565c0a2ab2a8951d8513646c37d2a14a51f"
+      },
+      "files": "750a7c88fee9d9ae5015b40d1aa67e4cf2ea50c6b08b1826637e82f5003aa7fe",
+      "images": {
+        "base": "tag only: heimdall-example/acme-gpu-cuda:1",
+        "helper": "tag only: bench/coding-core-base:1"
+      }
+    },
+    "tasks": {
+      "fix-slow-loop": {
+        "settings": "3e91c1be9be86656f295da90168954ddf744eb253976e40b77e20eebf039401c",
+        "fields": {
+          "capabilities": "1345e55411cc3d6edc7acfc86cb1e130f0dad737d5899807514d3d35d3ea64de",
+          "controls": "bece6ed5a57d158466aba3fd71f79892a09bc47eee420cf2abd3819fe67d5793",
+          "difficulty": "60d4c90eee5e731df8d3ef2891de541d2e755ff8ee9db358e26bdec49f6e0db9",
+          "id": "e2a7cac3f996f12a63c0930398cb41aee6d64232034e57023d980584b6219279",
+          "instruction": "d22404e1bdcc17d8b42ec5950fe47a8a98ed7ccdf46bdc43121a724676b65198",
+          "kind": "d04c6ca27a44ac60d27d09ce098adf07b26ea36a95449762a47ff68ded44d7d1",
+          "project": "213fa4bea026d5b76c9330d0bd1f181dd6492daa51cc446ec6770b6ddebbb247",
+          "protected": "932cb5afa95152cf7043f4e1afc1d7e0395f29da2ab17d28f6f698171b966df2",
+          "provenance": "7ba37541bdac7a8d025588aed5737b1a758b106d3b158f32f236bd931d1ad08f",
+          "repo_dir": "a22b0355c8c3954692a2626bc83ff8ea3b7b65119e407c324883e2ed95c1fbe6",
+          "resources": "35b69a9beb158df1527b9b8c558fda327f81643909cd81e25d8d3ac87b18ff65",
+          "timeouts": "ed49f7a837e53c2a4e4b885d3b4109fcade66c4d9f0700b210d13023bc644878",
+          "title": "148e73a4a9abfb14469838c07ad8fab9929a407116b49f0accfbf86d4e3a84bf",
+          "verifier": "3c0c9efd04d308ebf9f4569298c7d6c6f448e083dacf0c4b9ce1b504ac56bb65",
+          "version": "39fe4a40977d0585fd5704359e3685b0ada5cf5ee061e5d97385601d120cd0ec"
+        },
+        "files": "a449b56af8051977be07b7fc9932467b38986f28ec6cd3d7a1ca5ffa13701410"
+      },
+      "fused-softmax": {
+        "settings": "b840d2dfcefbdae96490133594ceab4b2bb3a0b6ac0ad99b1c087e922359bd21",
+        "fields": {
+          "capabilities": "8acdfddd65434a958f42a6ecd21360de905c06b558a221a8df67b2d58a0868e1",
+          "controls": "699c966b33fdff628ed7a55d1710bef964ec29e19a12dc7ee3b3021282532d66",
+          "difficulty": "60d4c90eee5e731df8d3ef2891de541d2e755ff8ee9db358e26bdec49f6e0db9",
+          "id": "fc4111b516ba4a667d60582a4fd53aaa6fd440273d643d2a2ef7dc586408779c",
+          "instruction": "d22404e1bdcc17d8b42ec5950fe47a8a98ed7ccdf46bdc43121a724676b65198",
+          "kind": "d04c6ca27a44ac60d27d09ce098adf07b26ea36a95449762a47ff68ded44d7d1",
+          "project": "77d8087e1cab01ce1e4dd27fb4ff01e4da43254f0966b0cd2f483d2812de6da2",
+          "protected": "7c90254674998514ce74f1ff1917866bc88aa1504162552603afe55adba61a30",
+          "provenance": "32cf07e091bdaae327b7a2f46bad1e14fd2321f9ef463bc0b6e3e09ebb936e27",
+          "repo_dir": "a22b0355c8c3954692a2626bc83ff8ea3b7b65119e407c324883e2ed95c1fbe6",
+          "resources": "35b69a9beb158df1527b9b8c558fda327f81643909cd81e25d8d3ac87b18ff65",
+          "timeouts": "ed49f7a837e53c2a4e4b885d3b4109fcade66c4d9f0700b210d13023bc644878",
+          "title": "f647fa4b3c05602d3c211c4329bec57c9ee2f582f95d410aced6b4697d8f6d1c",
+          "verifier": "3c0c9efd04d308ebf9f4569298c7d6c6f448e083dacf0c4b9ce1b504ac56bb65",
+          "version": "39fe4a40977d0585fd5704359e3685b0ada5cf5ee061e5d97385601d120cd0ec"
+        },
+        "files": "5c21016118885923e92e713190484e9be2751cda11384d78cf3d91b4803abd27"
+      },
+      "train-classifier": {
+        "settings": "a6e424a1be60b29c3356a8e360f76f1dd2cd9f6e91b2ea8bcbb0a595a808f392",
+        "fields": {
+          "capabilities": "af51006a248e84e89bdf090863f624df3f72786cb5c2649951fcd12b07d194ea",
+          "controls": "6cf8e8e17ae3c32e8279a9e28cbef81e99ac152538d49ed36055409ef5b9f297",
+          "difficulty": "60d4c90eee5e731df8d3ef2891de541d2e755ff8ee9db358e26bdec49f6e0db9",
+          "id": "3f0f917bfd2aa2be9e4bccec2e4f1f58e3eea766afc0b04c7bb8059ad5880804",
+          "instruction": "d22404e1bdcc17d8b42ec5950fe47a8a98ed7ccdf46bdc43121a724676b65198",
+          "kind": "1ff4393bcd872405377779cd81a787a54906f836cdd1d316ed2c5710d98d925b",
+          "output": "1026376c2d34f15a9940db220dcb6218a0d9b6a6926fee78c894e3247f4b4e6b",
+          "project": "996174c02ab9c9a3e6af08bf0e5d06603ee1301cce0ad7c3d59449a0dbdf8cca",
+          "protected": "89fdde502ec201b7beec5fcf8229441fda84c1e5b179fd02c1cdb6d7aa671143",
+          "provenance": "94c6f5c24b359ab5b9e7cdf371f4b1456527acbd5c53102bb6e70013107a1c70",
+          "repo_dir": "a22b0355c8c3954692a2626bc83ff8ea3b7b65119e407c324883e2ed95c1fbe6",
+          "resources": "35b69a9beb158df1527b9b8c558fda327f81643909cd81e25d8d3ac87b18ff65",
+          "timeouts": "ed49f7a837e53c2a4e4b885d3b4109fcade66c4d9f0700b210d13023bc644878",
+          "title": "cbef409caef9a480b960fc2e9262c7846b7b0636ea0b0b5ed30426b5ec3e4a2a",
+          "verifier": "3c0c9efd04d308ebf9f4569298c7d6c6f448e083dacf0c4b9ce1b504ac56bb65",
+          "version": "39fe4a40977d0585fd5704359e3685b0ada5cf5ee061e5d97385601d120cd0ec"
+        },
+        "files": "8e8ca8046a6f6fdc452937b03f991123b58c5dd5edd453ed9d3929d3707a42c9"
+      }
+    },
+    "probes": {
+      "model-outage": {
+        "settings": "e30ef6fa85e8082125543d472c15e0b16d023078d05ee40850105dbd8c44f8db",
+        "fields": {
+          "apply": "b7e753793a84a57de81592a1bc1a7be169fca45467c30261f9e209e2e2286bd5",
+          "axis": "7298afcba5a3541d2af5349f1bb3cfad78757dad43a967f82b3491f15b3bc89c",
+          "id": "0e84cff85388dc586790dfcc9272b4e2a876107a80a0a822db32d8e2fe73b26e",
+          "layer": "319ea077fe98008cd260c55907ede9e9576c5d8646e6bcfa0320fc2fd6a1d148",
+          "ps2_family": "029b04a11d4f0a3faba46780dd8f67ab1c7c75a57df07eb6918e795867ead912",
+          "safe_behavior": "6eacd64e31d70398d853a23aee39418970fc9cf0191f022f81190075b70580f0",
+          "version": "39fe4a40977d0585fd5704359e3685b0ada5cf5ee061e5d97385601d120cd0ec"
+        },
+        "files": "0d333bc0ad4c49a452889660ac248f22dd9cec0b604614cfc1e2bbc612b66887"
+      }
+    }
+  }
+}

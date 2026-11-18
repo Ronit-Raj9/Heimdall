@@ -72,8 +72,21 @@ func armIDs(m *schemas.Manifest) []string {
 		arms = append(arms, id)
 	}
 	slices.Sort(arms)
+	arms = aaArmLast(m, arms) // Eval integrity area (S2): the A/A arm never takes B's place as the second arm
 	return arms
 }
+
+// aaArmLast moves the A/A arm (A2, docs/noise-floor.md) of an experiment
+// with aa: true to the end, so readers that compare the first two arms (the
+// grid's row diff, the config diff) compare A with B, never A with its copy.
+func aaArmLast(m *schemas.Manifest, arms []string) []string { // Eval integrity area (S2)
+	const aaArm = "A2"             // Eval integrity area (S2): engine.AAArm
+	i := slices.Index(arms, aaArm) // Eval integrity area (S2)
+	if !m.Experiment.AA || i < 0 { // Eval integrity area (S2)
+		return arms // Eval integrity area (S2)
+	} // Eval integrity area (S2)
+	return append(slices.Delete(slices.Clone(arms), i, i+1), aaArm) // Eval integrity area (S2)
+} // Eval integrity area (S2)
 
 // gridCell builds one cell from a slot and its counted run. Run id and
 // outcome stay null until the slot has a counted run; until then y is

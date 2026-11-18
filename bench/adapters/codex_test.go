@@ -289,3 +289,33 @@ func TestCodexCommandTarget(t *testing.T) {
 		}
 	}
 }
+
+// TestCodexCollabSpawn: a collab_tool_call spawn_agent item is a tool call
+// that names the sub-thread it started. The item shape follows the field
+// names in the Codex 0.169.1 binary, not a recorded stream.
+func TestCodexCollabSpawn(t *testing.T) {
+	stream := strings.Join([]string{
+		`{"type":"thread.started","thread_id":"t0"}`,
+		`{"type":"turn.started"}`,
+		`{"type":"item.started","item":{"id":"item_1","type":"collab_tool_call","tool":"spawn_agent","sender_thread_id":"t0","receiver_thread_ids":[],"prompt":"check the tests","status":"in_progress"}}`,
+		`{"type":"item.completed","item":{"id":"item_1","type":"collab_tool_call","tool":"spawn_agent","sender_thread_id":"t0","receiver_thread_ids":["t1"],"prompt":"check the tests","status":"completed"}}`,
+		`{"type":"item.completed","item":{"id":"item_2","type":"agent_message","text":"done"}}`,
+		`{"type":"turn.completed","usage":{"input_tokens":1,"output_tokens":1}}`,
+	}, "\n")
+	res, err := newCodexParser().Parse(context.Background(), &schemas.RunContext{Run: &schemas.Run{RunID: "r_x"}}, []byte(stream))
+	if err != nil {
+		t.Fatal(err)
+	}
+	found := false
+	for _, e := range res.Events {
+		if e.Type == schemas.EventToolCall && e.ToolCallID == "item_1" {
+			found = true
+			if e.ToolName != "spawn_agent" || e.AgentTarget != CodexThreadPrefix+"t1" || e.AgentName != "check the tests" {
+				t.Errorf("spawn call = %+v", e)
+			}
+		}
+	}
+	if !found {
+		t.Fatalf("no spawn call in %+v", res.Events)
+	}
+}

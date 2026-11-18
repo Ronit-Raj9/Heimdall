@@ -3,7 +3,8 @@
 //   BENCH_EVENTS_FILE=/tmp/events.jsonl node --experimental-strip-types agent-events.ts && cat /tmp/events.jsonl
 //
 // Inside a bench run the bench sets BENCH_EVENTS_URL or BENCH_EVENTS_FILE in
-// the agent container; with neither set every call below is a no-op, so the
+// the agent container (AGENT_EVENTS_URL or AGENT_EVENTS_FILE in a run with
+// realism neutral, docs/eval-awareness.md; the helper reads both); with neither set every call below is a no-op, so the
 // same code runs anywhere. The bench shows these events as agent-reported
 // evidence, next to what it observed itself. spec/agent-event.schema.json is
 // the format.

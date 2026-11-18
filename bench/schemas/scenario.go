@@ -27,6 +27,11 @@ const (
 	TrackArtifact    = "artifact"     // produce files (a report, a chart, a model) graded on their content
 )
 
+// TrackMLEngineering is the GPU track (X7, schemas/gpu.go, docs/gpu-tasks.md):
+// train a model, speed up a training loop or write a kernel on a GPU, graded
+// on held-out data or measured speed in the verifier.
+const TrackMLEngineering = "ml_engineering"
+
 // Grading levels (Suite.Grading). A judged suite's outcomes come from a
 // pinned judge model, not a deterministic check; reports and the leaderboard
 // label it and never place judged and verified results in one comparison.
@@ -92,6 +97,11 @@ type TaskEnvironment struct {
 	// change files under /etc. Empty keeps the unprivileged user. It is
 	// honoured only when the task has its own image.
 	User string `json:"user,omitempty" yaml:"user"`
+
+	// X2: Env is set in the agent's container (and a scripted control's, and
+	// the verifier's) under the plan's own variables, which win. A compose
+	// task fills it from the workspace service's environment.
+	Env map[string]string `json:"env,omitempty" yaml:"env"`
 }
 
 // ServiceSpec is one container started beside the agent for a run and removed
@@ -123,6 +133,8 @@ type ServiceSpec struct {
 	// Hidden keeps the service off the agent's network: only the verifier and
 	// other services reach it.
 	Hidden bool `json:"hidden,omitempty" yaml:"hidden"`
+
+	Compose *ComposeService `json:"compose,omitempty" yaml:"-"` // X2: settings only a compose file sets (compose.go)
 }
 
 // ReadyCheck says when a service is ready. Exactly one of Argv (run inside
@@ -341,14 +353,24 @@ type ToolCall struct {
 	ResponseBytes       int64  `json:"response_bytes,omitempty"`        // every byte of the answer body, counted while streamed
 	Unparsed            bool   `json:"unparsed,omitempty"`              // the proxy relayed this traffic without parsing all of it
 	UnparsedReason      string `json:"unparsed_reason,omitempty"`
+
+	// AgentID is the team member whose call this was (agents.go), from the
+	// per-member route the call came in on; empty outside team runs.
+	AgentID string `json:"agent_id,omitempty"`
 }
 
 // ToolFault is a fault the tool proxy injects for one run (ProbeApply.Tool,
 // probe layer LayerTool). Mode error answers the matching calls with a tool
 // error, timeout delays them past TimeoutS and then errors, poison lets the
 // real call through and appends Text to its result (an injected instruction).
+//
+// Safety probes area (S1) modes: describe_poison, rug_pull, shadow and
+// schema_poison rewrite the tools/list answers of Server (MCP tool
+// poisoning, docs/tool-proxy.md); plausible_wrong (Patch) and schema_drift
+// (Rename) rewrite a real result while it stays a success; lost_ack forwards
+// the call to the server and answers the agent with a timeout instead.
 type ToolFault struct {
-	Mode     string `json:"mode" yaml:"mode"`                     // error | timeout | poison
+	Mode     string `json:"mode" yaml:"mode"`                     // error | timeout | poison | describe_poison | rug_pull | shadow | schema_poison | plausible_wrong | schema_drift | lost_ack
 	Server   string `json:"server,omitempty" yaml:"server"`       // service id; empty matches every server
 	Tool     string `json:"tool,omitempty" yaml:"tool"`           // tool name; empty matches every tool
 	FromCall int    `json:"from_call,omitempty" yaml:"from_call"` // first affected matching call, 1-based (default 1)
@@ -357,6 +379,13 @@ type ToolFault struct {
 	TimeoutS int    `json:"timeout_s,omitempty" yaml:"timeout_s"`
 	Text     string `json:"text,omitempty" yaml:"text"` // poison: appended to the result; {{nonce}} is replaced per run
 	Nonce    string `json:"nonce,omitempty" yaml:"-"`
+	// Agent limits the fault to calls on these team members' own proxy
+	// routes (comma-separated member ids), set by the tool layer from
+	// ProbeApply.Agent; empty faults every caller, as before.
+	Agent string `json:"agent,omitempty" yaml:"-"`
+
+	Patch  map[string]any    `json:"patch,omitempty" yaml:"patch"`   // Safety probes area (S1): plausible_wrong merge patch; schema_poison parameters
+	Rename map[string]string `json:"rename,omitempty" yaml:"rename"` // Safety probes area (S1): schema_drift field renames, old to new
 }
 
 // LayerTool is the probe layer of tool faults: it acts in the tool proxy.
@@ -433,6 +462,7 @@ type ServiceHandle struct {
 	// for a proxied service, the service's own otherwise.
 	URL      string `json:"url,omitempty"`
 	Upstream string `json:"upstream,omitempty"` // the service's own address, behind the proxy
+	Network  string `json:"network,omitempty"`  // X2: the run network the service is on (its first, for a hidden one the hidden network)
 }
 
 // ServiceEnvironment is implemented by environments that can run services
@@ -484,6 +514,7 @@ type WorkerInfo struct {
 	Running   []string  `json:"running"` // slot ids it holds
 	Completed int       `json:"completed"`
 	LastSeen  time.Time `json:"last_seen"`
+	GPUs      []GPUInfo `json:"gpus,omitempty"` // X7: the GPUs the worker registered
 }
 
 // External API modes (ExternalAPI.Mode, Experiment.External). Live and record

@@ -15,6 +15,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/maximhq/bifrost/bench/attribution"
 	"github.com/maximhq/bifrost/bench/engine"
 	"github.com/maximhq/bifrost/bench/gates"
 	"github.com/maximhq/bifrost/bench/handlers"
@@ -75,6 +76,9 @@ func runServe(args []string) int {
 	}
 	// Suite health area: GET /suites/{id}/health reads the run store (suitehealth.go).
 	deps.Health = serveHealthSource(a.cfg)
+	deps.Compliance = serveCompliance{a: a} // Eval integrity area (S2): compliance pack (compliance.go)
+	// Eval integrity area (S2): monitor certification (monitor.go).
+	deps.MonitorCerts = serveMonitorCerts(a)
 	srv, err := server.New(a.cfg, deps)
 	if err != nil {
 		return fail("server: %v", err)
@@ -174,6 +178,12 @@ func (x indexAdapter) RunFile(runID, name string) ([]byte, error) { return x.ix.
 // RunArtifact implements handlers.ArtifactReader (store/runartifact.go).
 func (x indexAdapter) RunArtifact(runID, id, name string) ([]byte, error) {
 	return x.ix.RunArtifact(runID, id, name)
+}
+
+// RunBlame implements handlers.BlameReader: the run's blame.json child
+// artifact (attribution/artifact.go), or nil when none was written.
+func (x indexAdapter) RunBlame(expID, runID, sealHash string) (*attribution.Blame, error) {
+	return attribution.Read(x.root, expID, runID, sealHash)
 }
 
 // VerifySeal implements handlers.SealVerifier with the index's cached seal

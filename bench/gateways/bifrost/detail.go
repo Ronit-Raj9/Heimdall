@@ -56,6 +56,7 @@ type parsedRow struct {
 	Nonce     string // fault nonce found in the error or raw response
 	NonceCall int    // the call number after the nonce; 0 when absent
 	Upstream  bool   // the row has at least one attempt, so it reached the proxy
+	KeyID     string // the virtual key id the row came in on
 }
 
 // detailRow is the subset of GET /api/logs/{id} the bench reads.
@@ -88,6 +89,8 @@ type detailRow struct {
 			Arguments string `json:"arguments"`
 		} `json:"function"`
 	} `json:"tool_calls"`
+	VirtualKeyID string         `json:"virtual_key_id"` // which key the call came in on (team runs, team.go)
+	Metadata     map[string]any `json:"metadata"`       // logging headers, x-bf-lh-* labels
 }
 
 type tokenUsage struct {
@@ -163,7 +166,8 @@ func parseDetail(raw []byte) (*parsedRow, error) {
 	}
 	r.ToolCalls = d.toolCalls()
 	r.ToolResultIDs = toolResultIDs(d.RawRequest)
-	p := &parsedRow{Req: r, Upstream: len(d.AttemptTrail) > 0}
+	r.AgentLabel = agentLabel(d.Metadata) // Multi-agent area: a declared agent header (team.go)
+	p := &parsedRow{Req: r, Upstream: len(d.AttemptTrail) > 0, KeyID: d.VirtualKeyID}
 	if d.RawRequest != "" && !d.LargeRequest {
 		p.ReqSHA256 = utils.SHA256Bytes([]byte(d.RawRequest))
 	}

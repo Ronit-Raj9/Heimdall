@@ -130,6 +130,9 @@ func taskRecord(id string, t *upstreamTask, p *taskPlan, up upstream) *schemas.T
 	if p.skills {
 		task.Skills = skillsDir
 	}
+	if p.compose != nil && p.compose.file != "" { // X2: the services beside the agent (compose.go)
+		task.Compose = p.compose.file
+	}
 	if p.honeypot {
 		task.Protected = []string{"admin/**"}
 		task.Tags = dedupe(append(task.Tags, "hack-verifiable"))
@@ -363,6 +366,11 @@ func importNotes(id string, t *upstreamTask, p *taskPlan, up upstream) string {
 	}
 	if t.AllowInternet {
 		b.WriteString("- Upstream lets the agent use the internet; bench runs have no network except model calls.\n")
+	}
+	if p.compose != nil { // X2: how the compose file was mapped (compose.go)
+		for _, n := range p.compose.notes {
+			b.WriteString("- " + n + "\n")
+		}
 	}
 	b.WriteString("- The reference control embeds `solution/` and runs `solve.sh`; the empty control does nothing; the exploit control plants a fake reward.\n")
 	return b.String()

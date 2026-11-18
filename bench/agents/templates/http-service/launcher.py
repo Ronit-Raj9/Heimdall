@@ -48,8 +48,19 @@ def log(msg):
     print("launcher: " + msg, file=sys.stderr, flush=True)
 
 
-EVENTS_URL = os.environ.get("BENCH_EVENTS_URL", "")
-EVENTS_FILE = os.environ.get("BENCH_EVENTS_FILE", "")
+def _env(name, default=None):
+    """A bench variable: AGENT_<name> in a run with realism neutral, else
+    BENCH_<name> (docs/eval-awareness.md). Without a default it must be set."""
+    v = os.environ.get("AGENT_" + name) or os.environ.get("BENCH_" + name)
+    if v:
+        return v
+    if default is None:
+        raise KeyError("BENCH_" + name)
+    return default
+
+
+EVENTS_URL = os.environ.get("AGENT_EVENTS_URL") or os.environ.get("BENCH_EVENTS_URL", "")
+EVENTS_FILE = os.environ.get("AGENT_EVENTS_FILE") or os.environ.get("BENCH_EVENTS_FILE", "")
 
 
 def now_rfc3339():
@@ -91,9 +102,9 @@ def report_event(type, name=None, **fields):
 
 def start_server():
     # The server gets the key with each task, not in its environment.
-    env = {k: v for k, v in os.environ.items() if k != "BENCH_API_KEY"}
+    env = {k: v for k, v in os.environ.items() if k not in ("AGENT_API_KEY", "BENCH_API_KEY")}
     return subprocess.Popen(shlex.split(SERVER_CMD), env=env, stdout=sys.stderr, stderr=sys.stderr,
-                            cwd=os.environ.get("BENCH_WORKSPACE", "/workspace"))
+                            cwd=_env("WORKSPACE", "/workspace"))
 
 
 def stop_server(proc):
@@ -130,15 +141,15 @@ def wait_healthy(proc, deadline):
 
 
 def task():
-    with open(os.environ.get("BENCH_INSTRUCTION_FILE", "/tmp/bench/instruction.md")) as f:
+    with open(_env("INSTRUCTION_FILE", "/tmp/bench/instruction.md")) as f:
         instruction = f.read()
     return {
         "instruction": instruction,
-        "workspace": os.environ.get("BENCH_WORKSPACE", "/workspace"),
-        "base_url": os.environ["BENCH_BASE_URL"],
-        "api_key": os.environ["BENCH_API_KEY"],
-        "model": os.environ["BENCH_MODEL"],
-        "session_id": os.environ.get("BENCH_SESSION_ID", ""),
+        "workspace": _env("WORKSPACE", "/workspace"),
+        "base_url": _env("BASE_URL"),
+        "api_key": _env("API_KEY"),
+        "model": _env("MODEL"),
+        "session_id": _env("SESSION_ID", ""),
     }
 
 

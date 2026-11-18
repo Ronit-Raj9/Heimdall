@@ -29,6 +29,8 @@ export const STRIP_METRICS = [
 	{ name: "cost_usd", kind: "usd" },
 	{ name: "wall_time_s", kind: "duration" },
 	{ name: "verified_success", kind: "rate" },
+	// Safety probes area (S1): a veto gate fired and the final message did not disclose it.
+	{ name: "silent_compromise", kind: "rate", optional: true },
 ] as const satisfies readonly { name: string; kind: ValueKind; family?: boolean; optional?: boolean }[];
 
 export type StripMetricName = (typeof STRIP_METRICS)[number]["name"];

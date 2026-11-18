@@ -12,6 +12,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/maximhq/bifrost/bench/compose"
 	"github.com/maximhq/bifrost/bench/schemas"
 	"github.com/maximhq/bifrost/bench/utils"
 )
@@ -69,6 +70,7 @@ type AdmitDeps struct {
 	Env    schemas.Environment
 	Grader schemas.Grader
 	Logger schemas.Logger
+	GPUs   schemas.GPUAllocator // X7: GPUs for a GPU task's controls and verifier (gpu.go); nil refuses such a task
 }
 
 // Admit runs the admission controls of one task version, the checks of
@@ -119,6 +121,11 @@ func Admit(ctx context.Context, deps AdmitDeps, s *schemas.Suite, t *schemas.Tas
 	}
 	defer os.RemoveAll(tmp)
 	a := &admitter{deps: deps, s: s, t: t, tmp: tmp, expID: utils.NewID("e", 10)}
+	releaseGPU, err := a.holdGPU(ctx) // X7: a GPU task holds its GPUs for the whole admission (gpu.go)
+	if err != nil {
+		return nil, err
+	}
+	defer releaseGPU()
 	if utils.ControlKind(s, t) != utils.ControlPatch {
 		rec := &schemas.AdmissionRecord{Admitted: true, At: time.Now().UTC(), Grader: deps.Grader.GetName(), ReferenceRepeats: referenceRuns}
 		return a.admitScenario(ctx, rec, []schemas.AdmissionCheck{static})
@@ -211,6 +218,9 @@ type admitter struct {
 	t     *schemas.Task
 	tmp   string // removed when Admit returns
 	expID string // synthetic experiment id grouping this admission's runs
+
+	// X7: the GPUs a GPU task's controls and verifier get (gpu.go).
+	gpu *schemas.GPUAssignment
 }
 
 type controlPaths struct {
@@ -412,6 +422,9 @@ func (a *admitter) secretScan() schemas.AdmissionCheck {
 // verifierNetwork checks that the verifier container has no network: as the
 // grader reports it, or by construction for the shipped graders.
 func (a *admitter) verifierNetwork() schemas.AdmissionCheck {
+	if names := compose.VerifierServices(a.t); len(names) > 0 { // X2: a compose task's verifier joins only internal run networks (compose.go)
+		return composeVerifierNetwork(names)
+	}
 	c := schemas.AdmissionCheck{Name: "verifier_no_network", Want: wantNoNetwork}
 	name := a.deps.Grader.GetName()
 	switch r, ok := a.deps.Grader.(VerifierNetworkReporter); {
@@ -511,7 +524,7 @@ func (a *admitter) runContext(name string) (*schemas.RunContext, error) {
 		Stage:   schemas.StagePlanned,
 		Timing:  schemas.RunTiming{Started: time.Now().UTC()},
 	}
-	return &schemas.RunContext{Suite: a.s, Task: a.t, Slot: slot, Run: run, Dir: dir, Logger: a.deps.Logger}, nil
+	return &schemas.RunContext{Suite: a.s, Task: a.t, Slot: slot, Run: run, Dir: dir, Logger: a.deps.Logger, GPU: a.gpu}, nil // X7: GPU
 }
 
 // patchDiff describes a patch file on disk as an exported diff.

@@ -55,6 +55,21 @@ type Task struct {
 	// its instruction or files unless the server config allows it.
 	Split string `json:"split,omitempty" yaml:"split"`
 
+	// Team runs the task with a multi-container team (agents.go) when the
+	// agent config declares none: one container per member, each on its own
+	// gateway key. Empty for every other task.
+	Team []TeamMember `json:"team,omitempty" yaml:"team"`
+
+	// Resources is what the task needs beyond the agent's budgets: whole
+	// GPUs (X7, schemas/gpu.go). Nil for every task without a GPU.
+	Resources *Resources `json:"resources,omitempty" yaml:"resources"`
+
+	// X2: Compose is a docker compose file relative to the task folder
+	// (docs/multi-container.md). The suite loader maps it onto Environment
+	// (the workspace service) and Services (the rest) before anything else
+	// reads the task.
+	Compose string `json:"compose,omitempty" yaml:"compose"`
+
 	Dir string `json:"-" yaml:"-"` // absolute task folder
 }
 

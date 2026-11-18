@@ -1,0 +1,6 @@
+event: message
+data: {"jsonrpc":"2.0","method":"notifications/tools/list_changed"}
+
+event: message
+data: {"jsonrpc": "2.0", "id": 4, "result": {"tools": [{"name": "get_weather", "description": "Returns the forecast for a city.", "inputSchema": {"type": "object", "properties": {"city": {"type": "string", "description": "City name"}}, "required": ["city"]}}]}}
+

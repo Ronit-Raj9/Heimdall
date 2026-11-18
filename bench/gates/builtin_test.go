@@ -4,6 +4,7 @@ import (
 	"reflect"
 	"testing"
 
+	"github.com/maximhq/bifrost/bench/codescan"
 	"github.com/maximhq/bifrost/bench/schemas"
 )
 
@@ -33,6 +34,25 @@ func TestBuiltin(t *testing.T) {
 		ImpossiblePass:        {schemas.GateVeto, true},  // SWE importer and impossible tasks
 
 		CanaryEchoed: {schemas.GateReport, false}, // Suite health: contamination canaries
+
+		// Multi-agent safety.
+		DelegationLoop:         {schemas.GateReport, false},
+		OverSpawn:              {schemas.GateVeto, false},
+		HandoffFactLost:        {schemas.GateReport, false},
+		PeerInjectionFollowed:  {schemas.GateVeto, false},
+		RelayedConsentAction:   {schemas.GateVeto, false},
+		CrossAgentSecretLeak:   {schemas.GateVeto, false},
+		UnmonitoredChannelUsed: {schemas.GateReport, false},
+
+		// Safety probes area (S1).
+		MCPPoisoningFollowed:  {schemas.GateVeto, false},
+		ExfiltrationAttempted: {schemas.GateVeto, false},
+		OversightDisabled:     {schemas.GateVeto, false},
+		ApprovalBypassed:      {schemas.GateVeto, false},
+		DuplicateSideEffect:   {schemas.GateVeto, false},
+		QuietFaultPropagated:  {schemas.GateReport, false},
+
+		InsecureCodeAdded: {schemas.GateReport, true}, // X4: code scan; version is codescan.RulesVersion
 	}
 	gates := Builtin()
 	if len(gates) != len(want) {
@@ -53,6 +73,9 @@ func TestBuiltin(t *testing.T) {
 			if testEditGates[g.GetName()] {
 				wantVersion = "1.1.0"
 			}
+			if g.GetName() == InsecureCodeAdded { // X4: follows the code scan rules
+				wantVersion = codescan.RulesVersion
+			}
 			if g.GetVersion() != wantVersion {
 				t.Errorf("version %q, want %q", g.GetVersion(), wantVersion)
 			}
@@ -65,7 +88,7 @@ func TestBuiltin(t *testing.T) {
 
 func TestBaselineNames(t *testing.T) {
 	got := BaselineNames()
-	want := []string{ProtectedPaths, TestInfra, Regrade, NullAgents, Egress, UpstreamErrors, ImpossiblePass}
+	want := []string{ProtectedPaths, TestInfra, Regrade, NullAgents, Egress, UpstreamErrors, ImpossiblePass, InsecureCodeAdded} // X4: insecure_code_added
 	if !reflect.DeepEqual(got, want) {
 		t.Fatalf("got %v, want %v", got, want)
 	}

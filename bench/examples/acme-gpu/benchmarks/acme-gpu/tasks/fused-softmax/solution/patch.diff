@@ -1,0 +1,44 @@
+diff --git a/softmax.py b/softmax.py
+index 96c3132..05185b6 100644
+--- a/softmax.py
++++ b/softmax.py
+@@ -1,16 +1,31 @@
+ """Row-wise softmax for the attention scores of Acme's ranking model.
+ 
+-The ranking service calls softmax() on every batch of scores, and the
+-profiler puts it at the top of the GPU time. It runs one kernel per
+-operation (max, subtract, exp, sum, divide), so every element is read and
+-written to GPU memory five times.
++softmax() is one fused Triton kernel: each program loads one row once,
++subtracts its maximum, exponentiates, sums and divides in registers, and
++writes the row once, instead of five kernels that each read and write the
++whole tensor.
+ """
+ import torch
++import triton
++import triton.language as tl
++
++
++@triton.jit
++def _softmax_rows(x_ptr, y_ptr, stride_x, stride_y, n_cols, BLOCK: tl.constexpr):
++    row = tl.program_id(0)
++    cols = tl.arange(0, BLOCK)
++    mask = cols < n_cols
++    x = tl.load(x_ptr + row * stride_x + cols, mask=mask, other=-float("inf"))
++    x = x - tl.max(x, axis=0)
++    e = tl.exp(x)
++    tl.store(y_ptr + row * stride_y + cols, e / tl.sum(e, axis=0), mask=mask)
+ 
+ 
+ def softmax(x: torch.Tensor) -> torch.Tensor:
+     """Softmax over the last dimension of a 2-D float32 CUDA tensor."""
+-    m = x.max(dim=1, keepdim=True).values
+-    e = torch.exp(x - m)
+-    s = e.sum(dim=1, keepdim=True)
+-    return e / s
++    rows, cols = x.shape
++    y = torch.empty_like(x)
++    block = triton.next_power_of_2(cols)
++    warps = 4 if block <= 1024 else (8 if block <= 4096 else 16)
++    _softmax_rows[(rows,)](x, y, x.stride(0), y.stride(0), cols, BLOCK=block, num_warps=warps)
++    return y

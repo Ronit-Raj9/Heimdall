@@ -4,6 +4,7 @@ import {
 	type PairResponse,
 	type PlanResponse,
 	type RunEventsResponse,
+	type RunAgents,
 	type RunReceiptsResponse,
 	type RunResponse,
 	type SuiteTaskResponse,
@@ -50,6 +51,7 @@ describe("resolveFixture", () => {
 		{ method: "GET", url: "/experiments/e_x/verdict?x=1", want: "experiments.verdict.json" },
 		{ method: "GET", url: "/runs/r_abc", want: "runs.r_abc.json" },
 		{ method: "GET", url: "/runs/r_abc/events", want: "runs.r_abc.events.json" },
+		{ method: "GET", url: `${BENCH_API_BASE}/runs/r_abc/agents`, want: "runs.r_abc.agents.json" },
 		{ method: "GET", url: "/pairs/p_abc", want: "pairs.p_abc.json" },
 		{ method: "POST", url: "/audit", want: "audit.json" },
 		{ method: "GET", url: "/leaderboard?suite=coding-core%401.0.0&scope=common", want: "leaderboard.json" },
@@ -319,9 +321,27 @@ function contractFor(file: string): { type: string; nested: Record<string, strin
 	if (file.endsWith(".diff.json")) return { type: "RunDiff", nested: {} };
 	if (file.endsWith(".receipts.json")) return { type: "RunReceipts", nested: {} };
 	if (file.endsWith(".steps.json")) return { type: "RunSteps", nested: { "steps[]": "StepRecord", "observers[]": "ObserverStatus" } };
+	// A single-agent run (available false) has empty lists and no tree or blame, so nothing nested to check.
+	if (file.endsWith(".agents.json")) return { type: "RunAgents", nested: readFixture<RunAgents>(file).available ? RUN_AGENTS_NESTED : {} };
 	if (file.endsWith(".reviews.json")) return { type: "RunReviews", nested: { "reviews[]": "Review" } };
 	return { type: "RunDetail", nested: {} };
 }
+
+/** Nested objects of a multi-agent RunAgents fixture: path -> contract type. */
+const RUN_AGENTS_NESTED: Record<string, string> = {
+	tree: "AgentTree",
+	"tree.agents[]": "AgentNode",
+	"tree.edges[]": "AgentEdge",
+	"tree.coverage": "AgentCoverage",
+	"members[]": "AgentStats",
+	"spans[]": "AgentSpan",
+	"handoffs[]": "AgentHandoff",
+	"handoffs[].facts[]": "HandoffFact",
+	blame: "Blame",
+	"blame.candidates[]": "Candidate",
+	"blame.replay": "Replay",
+	"blame.coverage": "AgentCoverage",
+};
 
 /** Problems with one object's keys against a contract key list. "_comment" labels a fixture and is allowed. */
 function keyProblems(where: string, obj: JsonObject, type: string, topLevel: boolean): string[] {

@@ -1,0 +1,12 @@
+# Keys of bench.ts `CodeScanFinding` (schemas/codescan.go). X4.
+rule
+title
+cwe?
+severity
+file
+line
+removed?
+patch_line?
+snippet?
+source
+in_test?

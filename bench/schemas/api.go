@@ -147,6 +147,10 @@ type RunDetail struct {
 	State     []StateFile     `json:"state,omitempty"`
 	Services  []ServiceResult `json:"services,omitempty"`
 	Artifacts []ArtifactFile  `json:"artifacts,omitempty"`
+
+	// Agents is the agent tree of a multi-agent run (agents.json); nil for a
+	// single-agent run.
+	Agents *AgentTree `json:"agents,omitempty"`
 }
 
 // RunDiff is GET /runs/{id}/diff. Patch is inert text.

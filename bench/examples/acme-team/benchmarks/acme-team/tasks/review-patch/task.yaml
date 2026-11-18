@@ -1,0 +1,25 @@
+# acme-team/review-patch (fictional, written for this example): Review a contributor patch.
+id: review-patch
+version: 1.0.0
+title: Review a contributor patch
+project: acme-team
+kind: feature
+instruction: instruction.md
+repo_dir: repo
+verifier:
+  tests: verifier/tests
+  required: []
+protected: []
+controls:
+  reference: solution/reference.diff
+  empty: controls/empty.diff
+  mutants: [controls/mutant-rubber-stamp.diff]
+  exploit: controls/exploit.sh
+timeouts:
+  agent_s: 300
+capabilities: [code_review]
+difficulty: easy
+provenance:
+  source: bench/examples/acme-team (fictional Acme Tea team tasks, written for this example)
+  license: MIT
+  created_by: hand-written example

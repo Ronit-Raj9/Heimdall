@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"math/rand/v2"
 	"os"
 	"path/filepath"
 	"reflect"
@@ -14,6 +15,7 @@ import (
 
 	"github.com/maximhq/bifrost/bench/schemas"
 	"github.com/maximhq/bifrost/bench/utils"
+	"github.com/maximhq/bifrost/bench/verdict"
 )
 
 func TestPlanExperimentFiles(t *testing.T) {
@@ -74,7 +76,8 @@ func TestPlanExperimentFiles(t *testing.T) {
 }
 
 // checkArmOrder asserts that both arms of every pair sit next to each other
-// in the queue, in the task's recorded arm order.
+// in the queue, in the task's recorded arm order. An A/A slot is a pair of
+// its own, on clean, right before or right after the A/B pair of its block.
 func checkArmOrder(t *testing.T, m *schemas.Manifest) {
 	t.Helper()
 	pairs := map[string][]schemas.Slot{}
@@ -84,6 +87,10 @@ func checkArmOrder(t *testing.T, m *schemas.Manifest) {
 		}
 	}
 	for pid, ss := range pairs {
+		if ss[0].Arm == AAArm {
+			checkAASlot(t, m, pid, ss)
+			continue
+		}
 		order := m.ArmOrder[ss[0].Task]
 		if len(ss) != len(order) {
 			t.Fatalf("pair %s has %d slots, want %d", pid, len(ss), len(order))
@@ -96,6 +103,32 @@ func checkArmOrder(t *testing.T, m *schemas.Manifest) {
 				t.Fatalf("pair %s mixes blocks", pid)
 			}
 		}
+	}
+}
+
+// checkAASlot asserts that an A/A pair is one counted clean slot whose
+// neighbours on one side are the A/B pair of the same block.
+func checkAASlot(t *testing.T, m *schemas.Manifest, pid string, ss []schemas.Slot) {
+	t.Helper()
+	s := ss[0]
+	if len(ss) != 1 || s.Condition != schemas.ConditionClean || !s.Counted {
+		t.Fatalf("A/A pair %s: %+v", pid, ss)
+	}
+	n := len(m.ArmOrder[s.Task])
+	sameBlock := func(from int) bool {
+		if from < 0 || from+n > len(m.Slots) {
+			return false
+		}
+		for i := from; i < from+n; i++ {
+			o := m.Slots[i]
+			if o.Arm == AAArm || o.Task != s.Task || o.Condition != s.Condition || o.Trial != s.Trial || o.PairID != m.Slots[from].PairID {
+				return false
+			}
+		}
+		return true
+	}
+	if !sameBlock(s.OrderIndex+1) && !sameBlock(s.OrderIndex-n) {
+		t.Fatalf("A/A slot %d (task %s, trial %d) is not beside its block's A/B pair", s.OrderIndex, s.Task, s.Trial)
 	}
 }
 
@@ -733,5 +766,256 @@ func TestPlanUpstreamCheck(t *testing.T) {
 				t.Fatal("plan returned an unhashed manifest")
 			}
 		})
+	}
+}
+
+// aaExperiment is a two-arm experiment on three clean tasks with two trials
+// and one stale-notes task, with or without the A/A arm.
+func aaExperiment(aa bool) *schemas.Experiment {
+	e := testExperiment(
+		schemas.ConditionSpec{ID: "clean", Tasks: schemas.TaskSelector{IDs: []string{"t01", "t02", "t03"}}, Trials: 2},
+		schemas.ConditionSpec{ID: "stale-notes", Tasks: schemas.TaskSelector{IDs: []string{"t01"}}, Trials: 1},
+	)
+	e.AA = aa
+	return e
+}
+
+// slotKeys lists the slots that keep(s) accepts, without their random ids,
+// in queue order.
+func slotKeys(m *schemas.Manifest, keep func(schemas.Slot) bool) []string {
+	var out []string
+	for _, s := range m.Slots {
+		if keep(s) {
+			out = append(out, fmt.Sprintf("%s/%s/%s/%d/%t", s.Condition, s.Task, s.Arm, s.Trial, s.Counted))
+		}
+	}
+	return out
+}
+
+// TestPlanAAArm checks the A/A arm: a copy of arm A with its config hash, on
+// clean only, one counted slot per clean task and trial in a pair of its own
+// beside the A/B pair, with the A/B slots, arm order and budget parity of the
+// same experiment without aa.
+func TestPlanAAArm(t *testing.T) {
+	b := newBench(t)
+	m, plain := b.plan(t, aaExperiment(true)), b.plan(t, aaExperiment(false))
+	again := b.plan(t, aaExperiment(true))
+	a, a2 := m.Arms["A"], m.Arms[AAArm]
+	aaSlots := slotsWhere(m, func(s schemas.Slot) bool { return s.Arm == AAArm })
+	notAA := func(s schemas.Slot) bool { return s.Arm != AAArm }
+	pairs := map[string]int{}
+	for _, s := range m.Slots {
+		pairs[s.PairID]++
+	}
+	aaOK, inputsOK := len(aaSlots) > 0, len(aaSlots) > 0
+	for _, s := range aaSlots {
+		aaOK = aaOK && s.Condition == schemas.ConditionClean && s.Counted && pairs[s.PairID] == 1
+		peer := slotsWhere(m, func(o schemas.Slot) bool {
+			return o.Arm == "A" && o.Task == s.Task && o.Condition == s.Condition && o.Trial == s.Trial
+		})
+		inputsOK = inputsOK && len(peer) == 1 && s.RunInputHash != "" && s.RunInputHash == peer[0].RunInputHash &&
+			m.RunInputs[s.SlotID].ArmConfigHash == a.ConfigHash
+	}
+	twoArmOrders := true
+	for _, o := range m.ArmOrder {
+		twoArmOrders = twoArmOrders && len(o) == 2
+	}
+	raw, err := json.Marshal(m)
+	if err != nil {
+		t.Fatal(err)
+	}
+	hash, err := ManifestHash(m)
+	if err != nil {
+		t.Fatal(err)
+	}
+	checks := []struct {
+		name string
+		ok   bool
+	}{
+		{"A2 is the verdict's A/A arm", AAArm == verdict.ArmAA},
+		{"A2 has arm A's config and config hash", a2.ConfigHash != "" && a2.ConfigHash == a.ConfigHash && reflect.DeepEqual(a2.Config, a.Config)},
+		{"A2 is labelled as the copy", a2.Label == "A/A copy of arm A (baseline)"},
+		{"A2 lays down arm A's clean files only", len(a2.Files) == 1 && reflect.DeepEqual(a2.Files["clean"], a.Files["clean"])},
+		{"A2 has an identity of its own", a2.Identity != nil && a2.Identity != a.Identity && a2.Identity.AgentConfigHash == a.ConfigHash &&
+			a2.BudgetSnapshot != nil && a2.BudgetSnapshot != a.BudgetSnapshot && reflect.DeepEqual(*a2.BudgetSnapshot, *a.BudgetSnapshot)},
+		{"one A2 slot per clean task and trial", len(aaSlots) == 6},
+		{"A2 slots are counted clean slots in pairs of their own", aaOK},
+		{"A2 run inputs equal arm A's", inputsOK},
+		{"A/B slots unchanged", reflect.DeepEqual(slotKeys(m, notAA), slotKeys(plain, notAA))},
+		{"arm order unchanged and lists the pair only", equalOrders(m.ArmOrder, plain.ArmOrder) && twoArmOrders},
+		{"budget parity unchanged", reflect.DeepEqual(m.BudgetParity, plain.BudgetParity) && reflect.DeepEqual(m.BudgetDiffs, plain.BudgetDiffs)},
+		{"A2 placement repeats from the seed", reflect.DeepEqual(slotKeys(m, func(schemas.Slot) bool { return true }),
+			slotKeys(again, func(schemas.Slot) bool { return true }))},
+		{"aa frozen in the hashed manifest", m.Experiment.AA && strings.Contains(string(raw), `"aa":true`) && hash == m.Hash},
+		{"no aa key without aa", !plain.Experiment.AA && !strings.Contains(mustJSON(t, plain), `"aa"`)},
+	}
+	for _, c := range checks {
+		t.Run(c.name, func(t *testing.T) {
+			if !c.ok {
+				t.Fatalf("failed; A2 %+v; A2 slots %+v", a2, aaSlots)
+			}
+		})
+	}
+	checkArmOrder(t, m)
+}
+
+// TestPlanAAPlacement checks that the A/A slot runs before the A/B pair on
+// some tasks and after it on others, so A2 is not always later than A.
+func TestPlanAAPlacement(t *testing.T) {
+	b := newBench(t)
+	e := testExperiment(schemas.ConditionSpec{ID: "clean", Tasks: schemas.TaskSelector{All: true}, Trials: 1})
+	e.AA = true
+	m := b.plan(t, e)
+	seen := map[bool]int{}
+	for _, s := range slotsWhere(m, func(s schemas.Slot) bool { return s.Arm == AAArm }) {
+		seen[s.OrderIndex%3 == 0]++
+	}
+	if seen[true] == 0 || seen[false] == 0 || seen[true]+seen[false] != 8 {
+		t.Fatalf("A/A slot first on %d tasks and last on %d, want both on some of 8", seen[true], seen[false])
+	}
+	checkArmOrder(t, m)
+}
+
+func TestPlanAARejects(t *testing.T) {
+	tests := []struct {
+		name   string
+		mutate func(e *schemas.Experiment)
+		want   string // error substring; empty means the plan succeeds
+	}{
+		{"no arm A to copy", func(e *schemas.Experiment) {
+			e.Arms = map[string]schemas.ArmSpec{"C": e.Arms["A"], "B": e.Arms["B"]}
+		}, "aa: true needs an arm A to copy"},
+		{"declared arm A2", func(e *schemas.Experiment) {
+			e.Arms[AAArm] = schemas.ArmSpec{Label: "other", Set: map[string]any{"model": "claude-other"}}
+		}, "arm id A2 is reserved for the A/A copy of arm A when aa: true; rename the declared arm A2"},
+		{"no clean condition", func(e *schemas.Experiment) {
+			e.Conditions = []schemas.ConditionSpec{{ID: "stale-notes", Tasks: schemas.TaskSelector{IDs: []string{"t01"}}, Trials: 1}}
+			e.Primary.Condition = "stale-notes"
+		}, "aa: true needs the clean condition: the A/A arm runs only there"},
+		{"matrix", func(e *schemas.Experiment) {
+			e.Arms = nil
+			e.Matrix = &schemas.MatrixSpec{Models: []schemas.MatrixModel{{Model: "m1"}, {Model: "m2"}}, AllowUnpriced: true}
+		}, "aa: true is not supported with a matrix"},
+		{"declared arms with one hash are still refused", func(e *schemas.Experiment) {
+			e.Arms["B"] = schemas.ArmSpec{Label: "same", Set: map[string]any{"model": "claude-test"}}
+		}, "same config hash"},
+		{"declared arm A2 without aa plans as before", func(e *schemas.Experiment) {
+			e.AA = false
+			e.Arms[AAArm] = schemas.ArmSpec{Label: "other", Set: map[string]any{"model": "claude-other"}}
+		}, ""},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			b := newBench(t)
+			e := testExperiment()
+			e.AA = true
+			tt.mutate(e)
+			m, err := NewPlanner(b.reg, b.root, nil).Plan(context.Background(), e)
+			if tt.want == "" {
+				if err != nil {
+					t.Fatalf("plan: %v", err)
+				}
+				if m.Arms[AAArm].Label != "other" {
+					t.Fatalf("declared arm A2 replaced: %+v", m.Arms[AAArm])
+				}
+				return
+			}
+			if err == nil || !strings.Contains(err.Error(), tt.want) {
+				t.Fatalf("err = %v, want it to contain %q", err, tt.want)
+			}
+		})
+	}
+}
+
+// TestPlanWithoutAAKeepsDraws pins the arm order and slot layout of a plan
+// without aa to the algorithm that drew them before the A/A arm existed: one
+// shuffle of the sorted arms per suite task on the "bifr" PCG stream, then
+// trial, condition, task and arm order, then compatibility slots.
+func TestPlanWithoutAAKeepsDraws(t *testing.T) {
+	b := newBench(t)
+	e := loadExperiment(t, filepath.Join("..", "experiments", "codewins.yaml"))
+	m := b.plan(t, e)
+	r := rand.New(rand.NewPCG(uint64(e.Seed), 0x62696672))
+	order := map[string][]string{}
+	for _, task := range b.suite.TaskIDs {
+		o := []string{"A", "B"}
+		r.Shuffle(len(o), func(i, j int) { o[i], o[j] = o[j], o[i] })
+		order[task] = o
+	}
+	var want []string
+	trials := 0
+	for _, c := range e.Conditions {
+		trials = max(trials, c.Trials)
+	}
+	for trial := 1; trial <= trials; trial++ {
+		for _, c := range e.Conditions {
+			if trial > c.Trials {
+				continue
+			}
+			for _, task := range c.Tasks.Resolve(b.suite.TaskIDs) {
+				for _, arm := range order[task] {
+					want = append(want, fmt.Sprintf("%s/%s/%s/%d/true", c.ID, task, arm, trial))
+				}
+			}
+		}
+	}
+	got := slotKeys(m, func(s schemas.Slot) bool { return s.Counted })
+	if !equalOrders(m.ArmOrder, order) || !reflect.DeepEqual(got, want) {
+		t.Fatalf("plan without aa moved:\narm order %v, want %v\nslots %v\nwant  %v", m.ArmOrder, order, got, want)
+	}
+	if _, ok := m.Arms[AAArm]; ok || strings.Contains(mustJSON(t, m), `"aa"`) {
+		t.Fatal("a plan without aa carries the A/A arm or the aa key")
+	}
+}
+
+func mustJSON(t *testing.T, v any) string {
+	t.Helper()
+	raw, err := json.Marshal(v)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return string(raw)
+}
+
+// TestPlanAARunsEndToEnd runs an aa experiment through the scheduler and the
+// paired_signflip policy: every A/A slot runs and seals, and the verdict reads
+// arm A2 as the A/A arm and keeps it out of the A-against-B effect.
+func TestPlanAARunsEndToEnd(t *testing.T) {
+	b := newBench(t)
+	m := b.plan(t, aaExperiment(true))
+	sum, err := NewScheduler(b.reg, b.root, nil, nil).Run(context.Background(), m, RunOptions{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if sum.Sealed != len(m.Slots) || len(m.Slots) != 20 {
+		t.Fatalf("summary %+v for %d slots, want 20 sealed", sum, len(m.Slots))
+	}
+	var runs []schemas.SealedRun
+	for _, s := range m.Slots {
+		for _, r := range b.store.slotRuns(s.SlotID) {
+			if r.sealed {
+				y, _ := r.run.Outcome.Score()
+				runs = append(runs, schemas.SealedRun{Slot: s, Run: r.run, Dir: r.dir,
+					Metrics: map[string]schemas.Value{"verified_success": schemas.Observed(y, schemas.EvidenceOutcome)}})
+				break
+			}
+		}
+	}
+	var policy schemas.VerdictPolicy
+	for _, p := range verdict.Builtin() {
+		if p.GetName() == verdict.PolicyPairedSignFlip {
+			policy = p
+		}
+	}
+	an, err := policy.Decide(context.Background(), m, runs)
+	if err != nil {
+		t.Fatal(err)
+	}
+	v := an.Verdict
+	if v.Effect == nil || v.Effect.ArmA != "A" || v.Effect.ArmB != "B" || v.Variance == nil || v.Variance.AAArm != AAArm || v.Variance.AATasks != 3 {
+		t.Fatalf("verdict effect %+v, variance %+v", v.Effect, v.Variance)
+	}
+	if r, ok := an.Naive[AAArm]; !ok || r.Den != 6 {
+		t.Fatalf("naive scoreboard %+v, want 6 runs of arm A2", an.Naive)
 	}
 }

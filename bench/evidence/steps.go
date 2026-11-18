@@ -77,6 +77,7 @@ func (s *stepTimelineSource) Collect(_ context.Context, rc *schemas.RunContext, 
 		}
 	}
 	steps, tools := BuildTimeline(ev)
+	errs = append(errs, collectAgents(rc, ev, steps)) // Multi-agent area: mailbox messages and the agent tree (agentscollect.go)
 	if len(steps) == 0 {
 		return errors.Join(errs...)
 	}

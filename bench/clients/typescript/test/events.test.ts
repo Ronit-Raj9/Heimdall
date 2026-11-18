@@ -12,6 +12,8 @@ import {
 	EVENTS_MAX_TEXT,
 	EVENTS_STDOUT_PREFIX,
 	EVENTS_URL_ENV,
+	NEUTRAL_EVENTS_FILE_ENV,
+	NEUTRAL_EVENTS_URL_ENV,
 	emit,
 	eventsEnabled,
 	flushEvents,
@@ -65,6 +67,8 @@ let n = 0;
 beforeEach(() => {
 	delete process.env[EVENTS_URL_ENV];
 	delete process.env[EVENTS_FILE_ENV];
+	delete process.env[NEUTRAL_EVENTS_URL_ENV];
+	delete process.env[NEUTRAL_EVENTS_FILE_ENV];
 	resetEventsForTest();
 	file = join(dir, `run${++n}`, "events.jsonl");
 });
@@ -73,6 +77,8 @@ afterEach(async () => {
 	await flushEvents();
 	delete process.env[EVENTS_URL_ENV];
 	delete process.env[EVENTS_FILE_ENV];
+	delete process.env[NEUTRAL_EVENTS_URL_ENV];
+	delete process.env[NEUTRAL_EVENTS_FILE_ENV];
 });
 
 after(() => rmSync(dir, { recursive: true, force: true }));
@@ -94,6 +100,17 @@ describe("agent events", () => {
 		assert.equal(emit("plan", undefined, { id: "mine" }), "mine");
 		await flushEvents();
 		assert.equal(existsSync(file), false);
+	});
+
+	it("reads the neutral AGENT_EVENTS_FILE before BENCH_EVENTS_FILE", async () => {
+		const other = join(dir, `run${n}-bench.jsonl`);
+		process.env[NEUTRAL_EVENTS_FILE_ENV] = file;
+		process.env[EVENTS_FILE_ENV] = other;
+		assert.equal(eventsEnabled(), true);
+		emit("plan", "p");
+		await flushEvents();
+		assert.equal(lines(file).length, 1);
+		assert.equal(existsSync(other), false);
 	});
 
 	it("appends one JSON object per line to BENCH_EVENTS_FILE", async () => {

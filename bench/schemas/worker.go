@@ -24,6 +24,10 @@ type WorkerRegister struct {
 	Version  string            `json:"version"` // bench build the worker runs
 	Parts    map[string]string `json:"parts"`   // "<kind>/<name>" -> version of every part the worker registered
 	Slots    int               `json:"slots"`   // concurrent runs it offers
+	// Capabilities lists what the worker's machine offers beyond slots: its
+	// GPUs (X7). Nil from a worker without GPUs, which is never leased a slot
+	// of a GPU task.
+	Capabilities *WorkerCapabilities `json:"capabilities,omitempty"`
 }
 
 // WorkerRegistered is the answer to a registration: the upload limits the

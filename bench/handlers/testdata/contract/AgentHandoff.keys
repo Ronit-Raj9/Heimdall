@@ -1,0 +1,16 @@
+# Keys of bench.ts `AgentHandoff` (handlers/runagents.go), in RunAgents.handoffs.
+# sent and delivered are clipped agent payloads: rendered as inert text only.
+index
+kind
+from
+at_ms
+bytes
+source
+to?
+at?
+payload_sha256?
+sent?
+delivered?
+altered?
+ref?
+facts?

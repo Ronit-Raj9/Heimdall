@@ -112,6 +112,7 @@ func (e *dockerWorkspace) StartServices(ctx context.Context, rc *schemas.RunCont
 	if err != nil {
 		return nil, nil, err
 	}
+	svcs = e.withMailbox(rc, svcs) // Multi-agent area: a team run's mailbox (mailbox.go)
 	// External APIs area: the run's external APIs (external.go); nil for a run without them.
 	ext, err := externalAPIs(rc, svcs)
 	if err != nil {
@@ -126,6 +127,9 @@ func (e *dockerWorkspace) StartServices(ctx context.Context, rc *schemas.RunCont
 	}
 	if err := e.createNetworks(ctx, expID, runID, hidden); err != nil {
 		return nil, nil, &ServiceError{Service: "network", Err: err}
+	}
+	if err := e.createComposeVolumes(ctx, expID, runID, svcs); err != nil { // X2: the run's compose named volumes (compose.go)
+		return nil, nil, &ServiceError{Service: "volumes", Err: err}
 	}
 	probe, err := e.startProbe(ctx, rc, expID, runID, hidden)
 	if err != nil {
@@ -191,6 +195,7 @@ func (e *dockerWorkspace) ExportState(ctx context.Context, rc *schemas.RunContex
 	if err != nil {
 		return nil, fmt.Errorf("export state for run %s: %w", runID, err)
 	}
+	svcs = e.withMailbox(rc, svcs) // Multi-agent area: a team run's mailbox (mailbox.go)
 	var files []schemas.StateFile
 	anyProxied := false
 	for _, s := range svcs {
@@ -209,6 +214,7 @@ func (e *dockerWorkspace) ExportState(ctx context.Context, rc *schemas.RunContex
 			e.cfg.Logger.Warn("tool proxy ledger not copied; tool evidence is unknown", "run", runID, "error", err.Error())
 		}
 	}
+	e.captureServiceLogs(ctx, runID, rc.Dir, svcs)           // X2: compose services' output as services/<id>.log (compose.go)
 	e.copyAgentEvents(ctx, runID, rc.Dir)                    // Agent events area: the collector's ledger (eventcollector.go)
 	if err := e.exportExternal(ctx, rc, runID); err != nil { // External APIs area: record mode cassettes
 		return files, fmt.Errorf("export state for run %s: %w", runID, err)
@@ -380,6 +386,18 @@ func (e *dockerWorkspace) startService(ctx context.Context, rc *schemas.RunConte
 		res.Error = err.Error()
 		return h, res, fmt.Errorf("start: %w", err)
 	}
+	h.Network = serviceNetwork(runID) // X2: where the verifier finds it (compose.go)
+	if spec.Hidden {
+		h.Network = hiddenNetwork(runID)
+	}
+	if runOnce(spec) { // X2: a one-shot compose service must exit 0 before the next one starts (compose.go)
+		if err := e.waitDone(ctx, h.Container); err != nil {
+			res.Error = err.Error()
+			return h, res, err
+		}
+		res.Ready = true
+		return h, res, nil
+	}
 	if err := e.waitReady(ctx, h.Container, spec, probe); err != nil {
 		res.Error = err.Error()
 		return h, res, err
@@ -423,20 +441,23 @@ func (e *dockerWorkspace) createService(ctx context.Context, rc *schemas.RunCont
 		primary = hiddenNetwork(runID)
 	}
 	args := append([]string{"create", "--name", name}, utils.LabelArgs(expID, runID)...)
+	pids, mem := serviceLimits(spec) // X2: a compose file may lower the caps (compose.go)
 	args = append(args, "--network", primary, "--network-alias", spec.ID, "--hostname", spec.ID,
-		"--security-opt", "no-new-privileges", "--pids-limit", "1024", "--memory", "4g",
+		"--security-opt", "no-new-privileges", "--pids-limit", pids, "--memory", mem,
 		"--log-driver", "json-file", "--log-opt", "max-size=1m", "--log-opt", "max-file=1")
+	args = append(args, composeCreateArgs(runID, spec)...) // X2: aliases, user, workdir, tmpfs, volumes, cpus, entrypoint (compose.go)
 	env := serviceEnv(rc, spec)
 	for _, k := range sortedKeys(env) {
 		args = append(args, "-e", k+"="+env[k])
 	}
 	args = append(args, image)
-	args = append(args, spec.Argv...)
+	args = append(args, serviceArgv(spec)...) // X2: the rest of a compose entrypoint, then the command (compose.go)
 	if _, err := e.cfg.Docker.MustRun(ctx, args...); err != nil {
 		return fmt.Errorf("create container: %w", err)
 	}
 	if hidden && !spec.Hidden {
-		if _, err := e.cfg.Docker.MustRun(ctx, "network", "connect", "--alias", spec.ID, hiddenNetwork(runID), name); err != nil {
+		connect := append([]string{"network", "connect", "--alias", spec.ID}, hiddenAliasArgs(spec)...) // X2: compose aliases (compose.go)
+		if _, err := e.cfg.Docker.MustRun(ctx, append(connect, hiddenNetwork(runID), name)...); err != nil {
 			return fmt.Errorf("connect hidden network: %w", err)
 		}
 	}
@@ -580,7 +601,9 @@ func (e *dockerWorkspace) startToolProxy(ctx context.Context, rc *schemas.RunCon
 		return err
 	}
 	args := append([]string{"create", "--name", name}, utils.LabelArgs(expID, runID)...)
-	args = append(args, "--network", serviceNetwork(runID), "--network-alias", ToolProxyHost, "--hostname", ToolProxyHost,
+	args = append(args, "--network", serviceNetwork(runID))
+	args = append(args, proxyAliasArgs(rc)...) // Eval integrity area (S2): toolproxy, plus tools.internal in a neutral run (realism.go)
+	args = append(args,
 		"--cap-drop", "ALL", "--security-opt", "no-new-privileges", "--read-only", "--tmpfs", "/tmp:size=64m",
 		"--pids-limit", "256", "--memory", "512m", "--log-driver", "json-file", "--log-opt", "max-size=1m",
 		"-v", ledger+":/ledger", "-v", cfgVol+":"+toolProxyCfg)
@@ -592,9 +615,10 @@ func (e *dockerWorkspace) startToolProxy(ctx context.Context, rc *schemas.RunCon
 		return fmt.Errorf("create tool proxy: %w", err)
 	}
 	raw, err := json.Marshal(struct {
-		RunID  string      `json:"run_id"`
-		Routes []toolRoute `json:"routes"`
-	}{runID, routes})
+		RunID   string            `json:"run_id"`
+		Routes  []toolRoute       `json:"routes"`
+		Members map[string]string `json:"members,omitempty"` // Multi-agent area: team member route tokens (toolproxy/members.go)
+	}{runID, routes, utils.MemberRoutes(rc.TeamRoutes)})
 	if err != nil {
 		return fmt.Errorf("encode routes: %w", err)
 	}
@@ -923,7 +947,12 @@ func toolProxyURL(id string) string {
 	return "http://" + ToolProxyHost + ":" + strconv.Itoa(ToolProxyPort) + "/s/" + id
 }
 
-func serviceNetwork(runID string) string { return "bench-net-" + runID }
+func serviceNetwork(runID string) string {
+	if neutralRun(runID) { // Eval integrity area (S2): its name is the domain reverse DNS answers on it
+		return neutralNetworkPrefix + runID
+	}
+	return "bench-net-" + runID
+}
 
 func hiddenNetwork(runID string) string { return "bench-hnet-" + runID }
 

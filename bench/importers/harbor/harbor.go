@@ -319,9 +319,10 @@ type taskPlan struct {
 	honeypot   bool // a planted admin/ folder watched by inotifywait (Hack-Verifiable Terminal-Bench)
 	agentS     int
 	verifierS  int
-	solution   []byte   // tar.gz of the solution folder
-	skillsTar  []byte   // tar.gz of the skills folder, for the reference control
-	skillRoots []string // folders the reference control installs the skills in
+	solution   []byte       // tar.gz of the solution folder
+	skillsTar  []byte       // tar.gz of the skills folder, for the reference control
+	skillRoots []string     // folders the reference control installs the skills in
+	compose    *composePlan // X2: the task's compose file, mapped (compose.go); nil without one
 }
 
 // plan checks t against what the bench can run and prepares the rewritten
@@ -331,8 +332,6 @@ func plan(t *upstreamTask, cfg settings) (*taskPlan, string) {
 	dockerfile := filepath.Join(t.EnvDir, "Dockerfile")
 	hasDockerfile := isFile(dockerfile)
 	switch {
-	case t.Compose:
-		return nil, "needs a multi-container docker compose environment; the importer does not map compose files to services"
 	case t.GPUs > 0:
 		return nil, fmt.Sprintf("needs %d GPU(s); the bench schedules none", t.GPUs)
 	case t.SeparateVerifier:
@@ -391,6 +390,13 @@ func plan(t *upstreamTask, cfg settings) (*taskPlan, string) {
 	}
 	if p.workdir == "" || p.workdir == "/" {
 		return nil, "the Dockerfile's final stage sets no literal WORKDIR, so the workspace path is unknown (Harbor's test scripts refuse to run from /)"
+	}
+	if t.Compose { // X2: a compose file is mapped to services (compose.go)
+		cp, reason := planCompose(t, p.workdir)
+		if reason != "" {
+			return nil, reason
+		}
+		p.compose = cp
 	}
 	if cfg.image == "prebuilt" {
 		src = fmt.Sprintf("# Upstream's prebuilt image, as task.toml names it (bifrost-bench import harbor -set image=prebuilt).\nFROM %s\nWORKDIR %s\n", t.DockerImage, p.workdir)

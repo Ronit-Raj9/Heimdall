@@ -180,13 +180,13 @@ func (s *Server) serveExternal(w http.ResponseWriter, r *http.Request, rest stri
 		}
 	}
 	row.Arguments, row.ArgsSHA256 = Capture(x.redactBytes(args))
-	ft, hit := s.faults.decide(id, row.Tool)
-	if hit && ft.Mode != FaultPoison {
+	ft, hit := s.faults.decide(id, row.Tool, "") // external APIs come in on no member route
+	if hit && (ft.Mode == FaultError || ft.Mode == FaultTimeout) {
 		s.externalFault(w, r, &row, ft)
 		return
 	}
 	var poison *schemas.ToolFault
-	if hit {
+	if hit && (ft.Mode == FaultPoison || IsQuietMode(ft.Mode)) { // lost_ack is not applied to external routes (S1)
 		poison = &ft
 	}
 	if x.tape != nil {
@@ -265,8 +265,10 @@ func (s *Server) externalReplay(w http.ResponseWriter, r *http.Request, x *exter
 // fault took the call, and records it.
 func (s *Server) externalAnswer(w http.ResponseWriter, x *externalRoute, row *schemas.ToolCall, status int, h http.Header, raw []byte, poison *schemas.ToolFault) {
 	if poison != nil {
-		raw = poisonHTTPBody(raw, h.Get("Content-Type"), poisonText(*poison))
-		row.Fault, row.Nonce = FaultPoison, poison.Nonce
+		var changed bool
+		if raw, changed = rewriteHTTPAnswer(raw, h.Get("Content-Type"), *poison); changed {
+			row.Fault, row.Nonce = poison.Mode, poison.Nonce
+		}
 	}
 	out := w.Header()
 	copyHeaders(out, h, true)
