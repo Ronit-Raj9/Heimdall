@@ -121,6 +121,9 @@ func (g *Gateway) checkPlugins(ctx context.Context, f *hygieneFindings, loaded [
 		Plugins []struct {
 			Name    string `json:"name"`
 			Enabled bool   `json:"enabled"`
+			Config  struct {
+				DefaultCacheKey string `json:"default_cache_key"` // B2: a default key caches requests that send none
+			} `json:"config"`
 		} `json:"plugins"`
 	}
 	if err := g.call(ctx, http.MethodGet, pathPlugins, nil, &rows); err != nil {
@@ -131,6 +134,9 @@ func (g *Gateway) checkPlugins(ctx context.Context, f *hygieneFindings, loaded [
 		if p.Name == pluginSemanticCache && p.Enabled && !f.h.SemanticCache {
 			f.h.SemanticCache = true
 			f.violate("semantic cache plugin %s is enabled in the plugin config", pluginSemanticCache)
+		}
+		if p.Name == pluginSemanticCache && p.Config.DefaultCacheKey != "" { // B2 Bifrost features
+			f.h.SemanticCacheDefaultKey = true
 		}
 	}
 }

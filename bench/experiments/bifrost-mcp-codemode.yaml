@@ -1,0 +1,54 @@
+# B2 Bifrost features under test (docs/bifrost-features.md): MCP through
+# Bifrost, classic and Code Mode, on the Acme Tea support desk (four MCP
+# tasks, one server with nine tools). Bifrost's docs say Code Mode "reduces
+# input token usage by up to 92.8% when using multiple MCP servers"
+# (docs/mcp/code-mode.mdx, measured with 16 servers and 508 tools). Does it
+# on one small server, and does success or behaviour move?
+#
+#   A  MCP direct: the agent reaches the desk through the run's tool proxy.
+#   B  MCP through Bifrost, classic: one Bifrost MCP client per run in front of
+#      the same tool proxy, served at /mcp/<slug> behind the run's own MCP key;
+#      the agent sees the desk's tools with the client prefix.
+#   C  as B with a Code Mode client: the agent sees listToolFiles,
+#      readToolFile, getToolDocs and executeToolCode and writes programs.
+# The tool proxy stays the trusted witness in every arm; in B and C Bifrost's
+# mcp_tool_logs are a second witness (bifrost_mcp_witness_mismatch must be 0).
+# Claude Code streams, so Bifrost's agent mode (which executes Code Mode's
+# read-only tools itself on non-streaming requests) stays out of the loop.
+#
+# Run from bench/ against the example's suite (the planner resolves
+# agents/claude-code.yaml against bench/):
+#   BENCH_BENCHMARKS_ROOT=examples/acme-support/benchmarks \
+#     bifrost-bench plan experiments/bifrost-mcp-codemode.yaml
+#
+# Forecast (not run; assumptions, no history): 4 tasks x 3 trials x 3 arms =
+# 36 runs. Claude Code on claude-sonnet-4-5 at about 6 to 10 model turns and
+# 20k to 40k input tokens per support task, about $0.08 to $0.15 per run, so
+# $3 to $5.5 in all. Expected from the $0 proof (e_b2_mcp_proof_re2o, a
+# scripted model): with one server of nine short tools the four Code Mode
+# meta-tools (about 7 KB of definitions) are larger than the server's own
+# tools (about 3 KB), so input tokens per run rise in C by 12% to 100% even
+# though C needs fewer model turns; any saving needs more servers or larger
+# tool sets than this suite has. Success is not expected to move between A
+# and B (same tools, same results); C may lose success if the model writes
+# programs that misuse the stubs. Three tasks per arm pair cannot detect less
+# than a very large effect: treat input tokens and turns as the measurement
+# and the verdict as a guard.
+name: bifrost-mcp-codemode
+suite: acme-support@1.0.0
+base: agents/claude-code.yaml
+arms:
+  A: {label: MCP direct}
+  B: {label: MCP through Bifrost (classic), set: {gateway.bifrost: {mcp: {code_mode: false}}}}
+  C: {label: MCP through Bifrost (Code Mode), set: {gateway.bifrost: {mcp: {code_mode: true}}}}
+primary: {condition: clean, metric: verified_success}
+guards:
+  - {rule: no_new_integrity_violation}
+conditions:
+  - {id: clean, tasks: all, trials: 3}
+budget: {total_usd: 6}
+verdict: {policy: paired_signflip, alpha: 0.05, assumed_sd: 0.30}
+seed: 20261118
+concurrency: 2
+manifest_mode: agent_exposure
+policy: policies/default.yaml

@@ -359,6 +359,10 @@ type Manifest struct {
 	// gateway.routing, for arms that declare one; empty for other plans.
 	Routing map[string]string `json:"routing,omitempty"`
 
+	// B2 Bifrost features under test: arm id -> sha256 of the arm's
+	// canonical gateway.bifrost, for arms that declare one; empty otherwise.
+	BifrostFeatures map[string]string `json:"bifrost_features,omitempty"`
+
 	// W7 adaptive trials and suite tiers (trials.go): the frozen adaptive
 	// design and the tier the tasks were drawn from; nil for other plans.
 	Adaptive *AdaptivePlan `json:"adaptive,omitempty"`

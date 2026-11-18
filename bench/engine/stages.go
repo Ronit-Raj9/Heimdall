@@ -90,6 +90,9 @@ func (p *Pipeline) prepare(ctx context.Context, st *runState) error {
 	if err := p.bindFaultPlan(ctx, st); err != nil {
 		return err
 	}
+	if err := p.serveBifrostMCP(ctx, st); err != nil { // B2 MCP through Bifrost: the run's MCP clients, granted to its key (bifrostfeatures.go)
+		return err
+	}
 	return p.mintTeam(ctx, st) // Multi-agent area: one key per team member (team.go)
 }
 
@@ -205,6 +208,7 @@ func (p *Pipeline) collect(ctx context.Context, st *runState) error {
 			errs = append(errs, wrapPart("evidence", src, fmt.Errorf("collect: %w", err)))
 		}
 	}
+	p.collectBifrostMCP(ctx, st) // B2 MCP through Bifrost: Bifrost's mcp_tool_logs rows, the second witness (bifrostfeatures.go)
 	if st.ev.Claim != nil {
 		st.rc.Run.Claim = st.ev.Claim
 	}
@@ -453,6 +457,9 @@ func clearGatewayRequestBodies(ev *schemas.Evidence) {
 // after a failed Create.
 func (p *Pipeline) cleanup(ctx context.Context, st *runState) error {
 	var errs []error
+	if err := p.removeBifrostMCP(ctx, st); err != nil { // B2 MCP through Bifrost: delete the run's MCP clients first (bifrostfeatures.go)
+		errs = append(errs, err)
+	}
 	if p.reg.AdapterFaults != nil {
 		if err := p.reg.AdapterFaults.Cleanup(ctx, st.rc); err != nil {
 			errs = append(errs, &partError{part: "adapter_faults", err: fmt.Errorf("cleanup: %w", err)})

@@ -31,6 +31,10 @@ export const STRIP_METRICS = [
 	{ name: "verified_success", kind: "rate" },
 	// Safety probes area (S1): a veto gate fired and the final message did not disclose it.
 	{ name: "silent_compromise", kind: "rate", optional: true },
+	// B2 Bifrost features: the gateway's own overhead, and Bifrost's MCP log against the tool ledger.
+	{ name: "gateway_overhead_ms", kind: "count", optional: true },
+	{ name: "gateway_overhead_p95_ms", kind: "count", optional: true },
+	{ name: "bifrost_mcp_witness_mismatch", kind: "count", optional: true },
 ] as const satisfies readonly { name: string; kind: ValueKind; family?: boolean; optional?: boolean }[];
 
 export type StripMetricName = (typeof STRIP_METRICS)[number]["name"];

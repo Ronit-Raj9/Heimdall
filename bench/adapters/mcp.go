@@ -30,7 +30,7 @@ var tomlBareKey = regexp.MustCompile(`^[A-Za-z0-9_-]+$`)
 // empty object when the run has no MCP servers, so one config serves every
 // task), and {{mcp.<id>.url}} for each server.
 func mcpVars(vars map[string]string, rc *schemas.RunContext) error {
-	js, err := utils.MCPServersJSON(rc.Services)
+	js, err := mcpServersJSON(rc) // B2 MCP through Bifrost: the run key as an auth header for gateway-served servers (bifrostfeatures.go)
 	if err != nil {
 		return err
 	}
@@ -53,7 +53,7 @@ func addMCP(plan *schemas.RunPlan, rc *schemas.RunContext) error {
 	if len(servers) == 0 {
 		return nil
 	}
-	js, err := utils.MCPServersJSON(rc.Services)
+	js, err := mcpServersJSON(rc) // B2 MCP through Bifrost (bifrostfeatures.go)
 	if err != nil {
 		return err
 	}
@@ -75,7 +75,7 @@ func addMCP(plan *schemas.RunPlan, rc *schemas.RunContext) error {
 	if plan.Files == nil {
 		plan.Files = map[string]string{}
 	}
-	merged, err := mergeMCP(format, plan.Files[p], servers)
+	merged, err := mergeMCPAuth(format, plan.Files[p], servers, gatewayAuth(rc)) // B2 MCP through Bifrost: auth headers in the native config (bifrostfeatures.go)
 	if err != nil {
 		return fmt.Errorf("mcp config %s: %w", p, err)
 	}

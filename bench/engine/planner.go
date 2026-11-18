@@ -108,6 +108,8 @@ type Planner struct {
 	guard        func(*schemas.Experiment) error // Tenancy area: hosted orgs confine experiment paths to the org's project (experimentguard.go)
 	deferGateway bool                            // Tenancy area: a hosted server records the gateway preflight as the runners' (experimentguard.go)
 	skipGPU      bool                            // X7: a remote worker's replan skips the GPU check (gpu.go)
+
+	semanticCacheArm bool // B2: some arm of the experiment being planned sets gateway.bifrost.semantic_cache (bifrostfeatures.go)
 }
 
 // planMode is what differs between planning an experiment and planning an
@@ -338,12 +340,17 @@ func (p *Planner) plan(ctx context.Context, exp *schemas.Experiment, mode planMo
 			return nil, fmt.Errorf("plan %s: arm %s: %w", e.ID, arm, err)
 		}
 	}
+	// B2: preflight accepts the semantic cache only for an experiment that tests it (bifrostfeatures.go).
+	p.semanticCacheArm = declaresSemanticCache(m)
 	if p.deferGateway { // Tenancy area: the runners preflight their own gateway before every slot (experimentguard.go)
 		m.Gateway = deferredGateway()
 	} else if m.Gateway, err = p.preflight(ctx, e.Name); err != nil {
 		return nil, fmt.Errorf("plan %s: %w", e.ID, err)
 	}
 	if m.Routing, err = checkRouting(m); err != nil { // W9 routing policy under test (routingplan.go)
+		return nil, fmt.Errorf("plan %s: %w", e.ID, err)
+	}
+	if m.BifrostFeatures, err = p.checkBifrostFeatures(ctx, m, suite); err != nil { // B2 Bifrost features under test (bifrostfeatures.go)
 		return nil, fmt.Errorf("plan %s: %w", e.ID, err)
 	}
 	if !mode.skipUpstreams {
@@ -978,6 +985,9 @@ func (p *Planner) preflight(ctx context.Context, name string) (*schemas.GatewayM
 	for _, pr := range gm.Problems {
 		p.logger.Warn("gateway preflight problem", "experiment", name, "problem", pr)
 	}
+	if p.semanticCacheArm { // B2 Bifrost features: an arm opts in to the semantic cache with its own key header (bifrostfeatures.go)
+		acceptSemanticCache(gm.Hygiene)
+	}
 	if h := gm.Hygiene; h != nil && len(h.Violations) > 0 {
 		return nil, fmt.Errorf("gateway hygiene check failed, fix the gateway config before planning: %s", strings.Join(h.Violations, "; "))
 	}
@@ -1038,7 +1048,7 @@ func (p *Planner) checkUpstreams(ctx context.Context, m *schemas.Manifest) error
 func armProviders(m *schemas.Manifest) map[string][]string {
 	out := map[string][]string{}
 	add := func(arm string, cfg *schemas.AgentConfig) {
-		if cfg.Adapter == adapterScripted && (cfg.Scripted == nil || cfg.Scripted.Kind != scriptedToy) {
+		if cfg.Adapter == adapterScripted && (cfg.Scripted == nil || (cfg.Scripted.Kind != scriptedToy && cfg.Scripted.Kind != adapters.ScriptedMCPLoop)) { // B2: the MCP loop agent calls the gateway too
 			return
 		}
 		prov := cfg.Gateway.Provider

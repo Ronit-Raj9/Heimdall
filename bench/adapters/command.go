@@ -164,6 +164,7 @@ func (a *commandAdapter) Plan(ctx context.Context, rc *schemas.RunContext) (*sch
 	if err := externalVars(vars, rc); err != nil { // External APIs area: {{external.<id>.url}}, {{external.apis_json}}
 		return nil, fmt.Errorf("plan run %s: %w", rc.Run.RunID, err)
 	}
+	bifrostVars(vars, rc) // B2 Bifrost features: {{gateway.headers_json}} (bifrostfeatures.go)
 
 	argv, err := renderList(rc.Agent.Argv, vars)
 	if err != nil {
@@ -209,6 +210,7 @@ func (a *commandAdapter) Plan(ctx context.Context, rc *schemas.RunContext) (*sch
 	if err := addMCP(plan, rc); err != nil {
 		return nil, fmt.Errorf("plan run %s: %w", rc.Run.RunID, err)
 	}
+	addBifrostEnv(plan, rc) // B2 Bifrost features: BENCH_GATEWAY_HEADERS (bifrostfeatures.go)
 	return plan, nil
 }
 

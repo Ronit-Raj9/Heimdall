@@ -1,0 +1,52 @@
+# B2 Bifrost features under test (docs/bifrost-features.md): the semantic
+# cache. The plugin is gateway-wide (a vector store and the semantic_cache
+# plugin, no default_cache_key), but it engages only on requests that carry a
+# cache key header, so one arm can opt in: gateway.bifrost.semantic_cache
+# makes the agent send x-bf-cache-key (here one key per arm and task) and
+# x-bf-cache-type. A cached answer is not a model call: no fresh output, no
+# cost, and a later trial can be answered with an earlier trial's reply, so
+# trials stop being independent samples of the model. This experiment
+# measures the saving and the risk: semantic_cache_hits,
+# semantic_cache_foreign_hits (replies another run stored), and
+# `bifrost-bench bifrost cache-replays -exp <id>`, which names every hit's
+# storing run and counts cross-task replays (0 by construction with
+# scope: task; switch to scope: arm or experiment with mode: semantic to see
+# them).
+#
+#   A  no cache key: the plugin skips every request.
+#   B  direct hash cache, key per arm and task, 1h TTL.
+#
+# Run from bench/ on a gateway with the plugin loaded (the planner accepts the
+# loaded plugin only for an experiment with a semantic_cache arm, and never
+# with a default_cache_key):
+#   BENCH_BENCHMARKS_ROOT=examples/acme-support/benchmarks \
+#     bifrost-bench plan experiments/bifrost-semantic-cache.yaml
+#
+# Forecast (not run on a real model; assumptions): 4 tasks x 3 trials x 2
+# arms = 24 runs on claude-haiku-4-5, under $0.30. Expected: no saving at all.
+# On v2.5.1 with the plugin's defaults, a streamed tool-call answer is never
+# served from the cache and a conversation longer than three messages is not
+# cached, and this agent's first answers are tool calls, so B should show
+# semantic_cache_hits 0 and the same cost as A (the $0 proofs
+# e_b2_semantic_cache_proof_p249 and e_b2_semantic_cache_replay_proof_ohnk:
+# 0 hits in 16 runs). That null result is the finding for tool-using agents;
+# to measure savings and cross-task replays, run an answer suite whose first
+# reply is the answer, with scope: arm or experiment and mode: semantic
+# (e_b2_semantic_cache_crosstask_proof shows what such a run reports).
+name: bifrost-semantic-cache
+suite: acme-support@1.0.0
+base: agents/mcploop.yaml
+arms:
+  A: {label: no cache key, set: {model: claude-haiku-4-5}}
+  B: {label: "semantic cache (direct, per task)", set: {model: claude-haiku-4-5, gateway.bifrost: {semantic_cache: {mode: direct, scope: task, ttl: 1h}}}}
+primary: {condition: clean, metric: verified_success}
+guards:
+  - {rule: no_new_integrity_violation}
+conditions:
+  - {id: clean, tasks: all, trials: 3}
+budget: {total_usd: 1}
+verdict: {policy: paired_signflip, alpha: 0.05, assumed_sd: 0.30}
+seed: 20261118
+concurrency: 1
+manifest_mode: agent_exposure
+policy: policies/default.yaml

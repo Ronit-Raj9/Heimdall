@@ -538,6 +538,12 @@ type ServiceHandle struct {
 	URL      string `json:"url,omitempty"`
 	Upstream string `json:"upstream,omitempty"` // the service's own address, behind the proxy
 	Network  string `json:"network,omitempty"`  // X2: the run network the service is on (its first, for a hidden one the hidden network)
+	// B2 MCP through Bifrost: URL is the gateway's per-server MCP endpoint
+	// and the agent authenticates there with the run's MCP key
+	// (Authorization: Bearer); the adapter adds the header. The key's value
+	// is never written to disk with the handle.
+	GatewayAuth bool   `json:"gateway_auth,omitempty"`
+	GatewayKey  string `json:"-"`
 }
 
 // ServiceEnvironment is implemented by environments that can run services

@@ -1,0 +1,7 @@
+{
+  "default_text": "Done.",
+  "tasks": [
+    {"id": "refund-ok", "match": "ticket T-1001", "classic": [{"text": "Ticket T-1001: the dented kettle qualifies for a GBP 42.00 refund under the policy."}]},
+    {"id": "address-change", "match": "ticket T-3001", "classic": [{"text": "Ticket T-3001: order A-1003 has not shipped, so the address can change."}]}
+  ]
+}

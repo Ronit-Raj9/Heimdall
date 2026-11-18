@@ -284,7 +284,11 @@ func (p *Pipeline) execOnce(ctx context.Context, st *runState, sess *schemas.Ses
 func scenarioEnv(rc *schemas.RunContext) (map[string]string, error) {
 	env := map[string]string{}
 	if len(rc.Services) > 0 {
-		servers, err := utils.MCPServersJSON(rc.Services)
+		key := ""
+		if rc.Key != nil {
+			key = rc.Key.Value
+		}
+		servers, err := utils.MCPServersJSONFor(rc.Services, key) // B2 MCP through Bifrost: the run key as an auth header for gateway-served servers
 		if err != nil {
 			return nil, err
 		}

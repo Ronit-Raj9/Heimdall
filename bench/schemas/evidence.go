@@ -59,6 +59,8 @@ type Evidence struct {
 	Messages []AgentMessage `json:"messages,omitempty"`
 
 	CodeScan *CodeScanEvidence `json:"codescan,omitempty"` // X4: security findings on added lines (codescan.go)
+
+	BifrostMCP *BifrostMCPEvidence `json:"bifrost_mcp,omitempty"` // B2: MCP through Bifrost, its clients and mcp_tool_logs rows (bifrostfeatures.go)
 }
 
 // EvidenceQuality describes how completely a run's required evidence was observed.

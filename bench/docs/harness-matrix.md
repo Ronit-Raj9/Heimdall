@@ -48,6 +48,7 @@ Status levels, strongest first:
 | `mini-swe-agent` | mini-swe-agent 2.4.6 (litellm) | Python | OpenAI chat completions to `/openai/v1` (`OPENAI_BASE_URL`, `OPENAI_API_KEY`) | gateway | not run this round (provider openai) | no |
 | `toy` | scripted toy agent | shell | Anthropic Messages to `/anthropic` | native (parser `claudecode`) + gateway | not run | no: smoke-tested with the scripted model (`runs/e_smoke_sdoj`, SYNTHETIC) |
 | `oracle`, `noop`, `exploit`, `refuse` | scripted controls | shell | none: no model calls | outcome | not run | no model |
+| `mcploop` | scripted MCP tool loop (adapter `scripted`, kind `mcploop`; B2) | Python 3.12 (standard library) | Anthropic Messages, streamed, to `/anthropic`; MCP tools from `BENCH_MCP_SERVERS`, direct or through Bifrost's MCP gateway; extra request headers from `BENCH_GATEWAY_HEADERS` | native (parser `claudecode`) + gateway | not run | no: proven against the scripted upstream `toolscript` only (`docs/bifrost-features.md`) |
 | `team-control` | none: scripted control (adapter `scripted`, kind `team`) | Python 3.12 | no model call: a lead and two worker containers talk only through the team mailbox | gateway + mailbox ledger | not a harness; admission and tests only | no (control) |
 | `subagents-control` | none: scripted control (adapter `scripted`, kind `subagents`) | Python 3.12 | no model call: one container reports a planner, two workers, a handoff and a reviewer as native agent events | self-reported agent events | not a harness; admission and tests only | no (control) |
 
@@ -152,6 +153,7 @@ instance per proxy, as in a normal install, the join is complete (the
 | `fw-*` (seven) | OpenAI chat completions, or Responses for `fw-openai-agents` and `fw-ai-sdk` | `/openai/v1` | openai (bare id in `AGENT_MODEL`); any configured provider by overriding `gateway.provider`, `model` and `env.AGENT_MODEL: "<provider>/{{model}}"` together | none | `AGENTS.md` | `bench/agent-fw-<name>:1`, built per suite (`build.base_arg`), so `bench/agent-fw-<name>:1-coding-core` |
 | `toy` | Anthropic Messages | `/anthropic` | anthropic | `claudecode` | `CLAUDE.md` | `bench/coding-core-base:1` |
 | `oracle`, `noop`, `exploit`, `refuse` | none (no model calls) | none | none | none | `CLAUDE.md` | `bench/coding-core-base:1` |
+| `mcploop` | Anthropic Messages, streamed | `/anthropic` | anthropic | `claudecode` | `CLAUDE.md` | `bench/coding-core-base:1` |
 
 "Providers through Bifrost" is what Bifrost's route can translate to. A run
 can only use a provider the bench gateway configures. The bench sets up two,

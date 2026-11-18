@@ -100,7 +100,7 @@ func ValidateRouting(cfg *schemas.AgentConfig, gm *schemas.GatewayManifest) erro
 			bad("%s/%s is not on the gateway provider %s: a run key holds one key slot", t.Provider, t.Model, provider)
 		}
 	}
-	if p, ok := pol.Primary(); ok && !sameRouteModel(cfg.Model, p.Model) {
+	if p, ok := pol.Primary(); ok && !sameRouteModel(cfg.Model, p.Model) && !complexityRule(pol) { // B2: a complexity_tier rule routes matched requests to another model by design (bifrostfeatures.go)
 		bad("the first target %s must be the model the agent asks for (model: %s)", p.Model, orDash(cfg.Model))
 	}
 	if pol.Retries != nil {

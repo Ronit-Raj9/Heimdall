@@ -79,5 +79,9 @@ func Builtin() []schemas.Metric {
 		newInsecureFindingsMetric(), newInsecureFindingsHighMetric(), newSecretsAddedMetric(), // X4: code scan of added lines
 		// X7: GPU runs: the host-side sampler and what the verifier measured on the GPU (gpu.go).
 		newGPUSecondsMetric(), newPeakVRAMMetric(), newGPUUtilMetric(), newSpeedupMetric(), newHeldoutScoreMetric(), newTimeToTargetMetric(),
+		// B2 Bifrost features: gateway overhead (gatewayoverhead.go), MCP through Bifrost and caching arms (bifrostfeatures.go).
+		newGatewayOverheadMetric(GatewayOverheadMS), newGatewayOverheadMetric(GatewayOverheadP95MS),
+		newInputTokensMetric(), newCacheReadShareMetric(), newSemanticCacheMetric(SemanticCacheHits), newSemanticCacheMetric(SemanticCacheForeignHits),
+		newBifrostMCPMetric(BifrostMCPCalls), newBifrostMCPMetric(BifrostMCPWitnessMismatch),
 	}
 }

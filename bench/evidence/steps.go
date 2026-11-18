@@ -625,12 +625,14 @@ func matchLedgerRow(rows []row, ledger []int, req *row, lo, hi time.Time, inWind
 
 // toolNameFits reports whether a model-side tool name names the proxied
 // server's tool: frameworks prefix MCP tools ("mcp__docs__search",
-// "docs.search", "docs_search").
+// "docs.search", "docs_search"), and Bifrost's MCP gateway prefixes them with
+// its client name and a hyphen ("docs_r_1a2b3c-search", B2 MCP through
+// Bifrost, whose client names carry the service id).
 func toolNameFits(requested, server, tool string) bool {
 	if requested == tool {
 		return true
 	}
-	for _, sep := range []string{"__", ".", "/", "_", ":"} {
+	for _, sep := range []string{"__", ".", "/", "_", ":", "-"} {
 		if strings.HasSuffix(requested, sep+tool) && (server == "" || strings.Contains(requested, server)) {
 			return true
 		}
