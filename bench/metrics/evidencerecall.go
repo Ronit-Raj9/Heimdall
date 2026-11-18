@@ -20,7 +20,7 @@ const EvidenceRecall = "evidence_recall"
 
 // CorpusService is the id of a fixed-corpus search service of an imported
 // research suite (importers/browsecompplus writes it).
-const CorpusService = "corpus"
+const CorpusService = research.CorpusService
 
 var _ schemas.Metric = (*evidenceRecallMetric)(nil)
 
@@ -80,7 +80,7 @@ func searchedURLs(calls []schemas.ToolCall, apis map[string]bool) map[string]boo
 	var rows []schemas.ToolCall
 	for _, c := range calls {
 		corpus := c.Protocol == "http" && c.Server == CorpusService && c.Tool == research.SearchTool
-		if research.IsSearch(c, apis) || corpus {
+		if research.IsSearch(c, apis) || corpus { // the corpus check also covers ledgers read without the suite's services
 			rows = append(rows, c)
 		}
 	}

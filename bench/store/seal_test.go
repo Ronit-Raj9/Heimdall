@@ -120,6 +120,38 @@ func TestSealRejectsUnredactedSecret(t *testing.T) {
 	}
 }
 
+// The agent's own output is sealed byte for byte: code that only names a
+// password or token seals, a real credential format in it does not, and the
+// bench's own files keep the strict key-value check.
+func TestSealScansAgentOutputForCredentialsOnly(t *testing.T) {
+	tests := []struct {
+		name, file, body string
+		sealed           bool
+	}{
+		{name: "diff with password assignment", file: "workspace.diff", body: "+password = \"x\"\n+token = get_token()\n", sealed: true},
+		{name: "artifact with key-value form", file: "artifacts/report.json", body: `{"api_key":"[redacted]"}`, sealed: true},
+		{name: "state with token field", file: "state/desk/tickets.json", body: `{"reset_token":"abc"}`, sealed: true},
+		{name: "diff with sk- key", file: "workspace.diff", body: "+OPENAI_API_KEY = \"sk-proj-abcdefghijklmnopqrstuvwx\"\n", sealed: false},
+		{name: "artifact with private key", file: "artifacts/id_rsa", body: "-----BEGIN RSA PRIVATE KEY-----\n", sealed: false},
+		{name: "bench file with password assignment", file: "events.jsonl", body: "password = \"x\"\n", sealed: false},
+	}
+	for i, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			s := newTestStore(t, nil)
+			m := mustCreateExp(t, s, "e_agentout")
+			r := mustNewRun(t, s, m, "s_a1", fmt.Sprintf("r_agentout%d", i), 1, schemas.OutcomePass)
+			mustWrite(t, s, r, tt.file, tt.body)
+			_, err := s.Seal(context.Background(), r)
+			if tt.sealed && err != nil {
+				t.Fatalf("seal err = %v, want sealed", err)
+			}
+			if !tt.sealed && !errors.Is(err, schemas.ErrSealMismatch) {
+				t.Fatalf("seal err = %v, want ErrSealMismatch", err)
+			}
+		})
+	}
+}
+
 func TestVerifyDetectsTampering(t *testing.T) {
 	ctx := context.Background()
 	tests := []struct {

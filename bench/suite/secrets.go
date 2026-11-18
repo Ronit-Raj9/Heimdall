@@ -10,6 +10,8 @@ import (
 	"path/filepath"
 	"regexp"
 	"strings"
+
+	"github.com/maximhq/bifrost/bench/utils"
 )
 
 // Secret scan limits.
@@ -34,24 +36,10 @@ func (f SecretFinding) String() string {
 	return fmt.Sprintf("%s:%d: possible %s (%s)", f.Path, f.Line, f.Kind, f.Masked)
 }
 
-// secretPattern is one kind of secret. keep is how many leading bytes of the
-// match are shown; the rest is masked.
-type secretPattern struct {
-	kind string
-	re   *regexp.Regexp
-	keep int
-}
-
-// secretPatterns are the patterns of docs/bring-your-own-design.md: private
-// keys, sk- API keys, AWS access key ids, GitHub and Slack tokens.
-// High-entropy *_TOKEN= and *_KEY= assignments are matched separately.
-var secretPatterns = []secretPattern{
-	{kind: "private key", re: regexp.MustCompile(`-----BEGIN [A-Z0-9 ]*PRIVATE KEY-----`), keep: len("-----BEGIN ")},
-	{kind: "sk- API key", re: regexp.MustCompile(`\bsk-[A-Za-z0-9_\-]{16,}`), keep: len("sk-")},
-	{kind: "AWS access key id", re: regexp.MustCompile(`\bAKIA[0-9A-Z]{16}\b`), keep: len("AKIA")},
-	{kind: "GitHub token", re: regexp.MustCompile(`\bghp_[A-Za-z0-9]{20,}`), keep: len("ghp_")},
-	{kind: "Slack token", re: regexp.MustCompile(`\bxox[bap]-[A-Za-z0-9-]{10,}`), keep: len("xoxb-")},
-}
+// secretPatterns are the patterns of docs/bring-your-own-design.md, shared
+// with the run seal (utils.SecretTokenPatterns). High-entropy *_TOKEN= and
+// *_KEY= assignments are matched separately.
+var secretPatterns = utils.SecretTokenPatterns
 
 var (
 	assignRE      = regexp.MustCompile(`(?i)\b([a-z0-9_]*(?:_token|_key))["']?\s*[=:]\s*["']?([^\s"'#,;]+)`)
@@ -108,8 +96,8 @@ func ScanSecretsIn(name string, data []byte) []SecretFinding {
 	for n := 1; sc.Scan(); n++ {
 		line := sc.Text()
 		for _, p := range secretPatterns {
-			for _, m := range p.re.FindAllString(line, -1) {
-				out = append(out, SecretFinding{Path: name, Line: n, Kind: p.kind, Masked: mask(m, p.keep)})
+			for _, m := range p.RE.FindAllString(line, -1) {
+				out = append(out, SecretFinding{Path: name, Line: n, Kind: p.Kind, Masked: mask(m, p.Keep)})
 			}
 		}
 		for _, m := range assignRE.FindAllStringSubmatch(line, -1) {

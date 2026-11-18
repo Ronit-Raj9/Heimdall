@@ -205,3 +205,26 @@ func TestLoadSpecExample(t *testing.T) {
 		t.Error("unknown key: want an error")
 	}
 }
+
+// A suite that starts the fixed-corpus search service as a tool server
+// counts its POST /search and /extract http rows as research calls; the same
+// rows of another service, or without the service, do not.
+func TestCorpusServiceRowsCount(t *testing.T) {
+	suite := &schemas.Suite{Services: []schemas.ServiceSpec{{ID: CorpusService, Role: schemas.ServiceRoleTool}}}
+	apis := TavilyAPIs(suite, nil)
+	if !apis[CorpusService] {
+		t.Fatalf("TavilyAPIs = %v, want the corpus service", apis)
+	}
+	search := schemas.ToolCall{Protocol: "http", Server: CorpusService, Tool: SearchTool}
+	fetch := schemas.ToolCall{Protocol: "http", Server: CorpusService, Tool: ExtractTool}
+	other := schemas.ToolCall{Protocol: "http", Server: "desk", Tool: SearchTool}
+	if !IsSearch(search, apis) || !IsFetch(fetch, apis) || IsSearch(fetch, apis) {
+		t.Error("corpus rows not classified as search and fetch")
+	}
+	if IsSearch(other, apis) {
+		t.Error("another service's POST /search counted as a search")
+	}
+	if IsSearch(search, TavilyAPIs(&schemas.Suite{}, nil)) {
+		t.Error("corpus row counted without the corpus service")
+	}
+}

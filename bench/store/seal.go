@@ -136,11 +136,31 @@ func scanRunSecrets(dir string) error {
 		if !utf8.Valid(b) {
 			continue
 		}
+		if agentOutput(dir, path) {
+			// The agent's own work is sealed byte for byte so it can be
+			// regraded; code like `password = "x"` is not a leak, so only
+			// real credential formats stop the seal here.
+			if utils.HasSecretTokens(string(b)) {
+				return fmt.Errorf("credential in agent output %s: %w", filepath.Base(path), schemas.ErrSealMismatch)
+			}
+			continue
+		}
 		if utils.HasUnredactedSecrets(string(b)) {
 			return fmt.Errorf("unredacted secret in %s: %w", filepath.Base(path), schemas.ErrSealMismatch)
 		}
 	}
 	return nil
+}
+
+// agentOutput reports whether path holds the agent's own output in run
+// folder dir: the workspace diff, exported artifacts and exported state.
+func agentOutput(dir, path string) bool {
+	rel, err := filepath.Rel(dir, path)
+	if err != nil {
+		return false
+	}
+	rel = filepath.ToSlash(rel)
+	return rel == "workspace.diff" || strings.HasPrefix(rel, "artifacts/") || strings.HasPrefix(rel, "state/")
 }
 
 // Verify recomputes a run's seal: every file hash, no file added or removed,

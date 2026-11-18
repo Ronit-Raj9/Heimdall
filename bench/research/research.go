@@ -39,6 +39,10 @@ const (
 	// allowed calls (method and path, as the tool proxy records them).
 	SearchTool  = "POST /search"
 	ExtractTool = "POST /extract"
+	// CorpusService is the id of a fixed-corpus search service that answers
+	// in Tavily's shape (importers/browsecompplus writes it); its calls reach
+	// the ledger as http rows of that service.
+	CorpusService = "corpus"
 	// SearchResults is how many results the websearch tool always asks
 	// Tavily for; it cuts the list to what the agent asked for itself, so
 	// one recorded call answers every max_results.
@@ -260,7 +264,37 @@ func TavilyAPIs(s *schemas.Suite, t *schemas.Task) map[string]bool {
 			out[ref.API.ID] = true
 		}
 	}
+	if hasCorpusService(s, t) {
+		out[CorpusService] = true
+	}
 	return out
+}
+
+// hasCorpusService reports whether the suite or the task starts the
+// fixed-corpus search service as a tool server.
+func hasCorpusService(s *schemas.Suite, t *schemas.Task) bool {
+	var specs []schemas.ServiceSpec
+	if s != nil {
+		specs = append(specs, s.Services...)
+	}
+	if t != nil {
+		specs = append(specs, t.Services...)
+	}
+	for _, sp := range specs {
+		if sp.ID == CorpusService && sp.Role == schemas.ServiceRoleTool {
+			return true
+		}
+	}
+	return false
+}
+
+// searchRow reports whether c is a call to one of the research APIs: an
+// external Tavily row, or an http row of the corpus service.
+func searchRow(c schemas.ToolCall, apis map[string]bool) bool {
+	if !apis[c.Server] {
+		return false
+	}
+	return c.Protocol == "external" || (c.Protocol == "http" && c.Server == CorpusService)
 }
 
 // IsResearchRun reports whether a run belongs to the research track: its
@@ -278,13 +312,13 @@ func IsResearchRun(rc *schemas.RunContext) bool {
 // IsSearch reports whether a ledger row is a call to a Tavily API's search
 // endpoint (whatever its outcome).
 func IsSearch(c schemas.ToolCall, apis map[string]bool) bool {
-	return c.Protocol == "external" && apis[c.Server] && c.Tool == SearchTool
+	return searchRow(c, apis) && c.Tool == SearchTool
 }
 
 // IsFetch reports whether a ledger row is a call to a Tavily API's extract
 // endpoint.
 func IsFetch(c schemas.ToolCall, apis map[string]bool) bool {
-	return c.Protocol == "external" && apis[c.Server] && c.Tool == ExtractTool
+	return searchRow(c, apis) && c.Tool == ExtractTool
 }
 
 // resultURLRE finds "url" keys in a result the ledger clipped.
