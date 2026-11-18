@@ -1,5 +1,5 @@
 import { formatValueNumber } from "@/components/valueCell.utils";
-import type { TrendLineage, TrendMetric, TrendPoint, TrendStatus, TrendSynthetic, Trends, ValueKind } from "@/lib/types/bench";
+import type { TrendLineage, TrendMetric, TrendPoint, TrendSynthetic, Trends, ValueKind } from "@/lib/types/bench";
 
 /** Chartable metrics in display order (trends.Metrics). */
 export const TREND_METRICS = [
@@ -12,9 +12,6 @@ export const TREND_METRICS = [
 
 /** Synthetic filter values. */
 export const TREND_SYNTHETIC = ["exclude", "include", "only"] as const satisfies readonly TrendSynthetic[];
-
-/** Regression statuses, in the order the legend lists them. */
-export const TREND_STATUSES = ["regressed", "improved", "no_change", "cannot_tell", "first"] as const satisfies readonly TrendStatus[];
 
 /** Fewer points than this and the page shows the empty state instead of a chart. */
 export const MIN_TREND_POINTS = 2;

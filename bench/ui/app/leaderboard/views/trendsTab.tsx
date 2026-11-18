@@ -12,12 +12,13 @@ import { useMemo } from "react";
 import { useTranslation } from "react-i18next";
 
 /**
- * Trends: /trends?suite=&agent=&metric=&condition=&synthetic=. Every filter goes to the server;
+ * The Trends tab of /leaderboard: ?tab=trends&suite=&agent=&metric=&condition=&synthetic= (the old
+ * /trends redirects here with its filters). Every filter goes to the server;
  * an absent one takes the server default (every suite, every agent, verified_success, clean,
  * exclude). The numbers come from the derived results index: a monitoring signal that never
  * gates a release.
  */
-export default function TrendsView() {
+export default function TrendsTab() {
 	const { t } = useTranslation("bench");
 	const [suite, setSuite] = useQueryState("suite", parseAsString);
 	const [agent, setAgent] = useQueryState("agent", parseAsString);
@@ -48,15 +49,12 @@ export default function TrendsView() {
 
 	return (
 		<section className="flex min-w-0 flex-col gap-6" data-testid="trends-screen">
-			<header className="flex flex-col gap-1">
-				<div className="flex flex-wrap items-center gap-3">
-					<h1 className="text-foreground text-xl font-semibold tracking-tight">{t("trends.title")}</h1>
-					<ModeBadge mode={data?.mode} isLoading={trends.isLoading} isError={trends.isError && !data} />
-				</div>
+			<div className="flex flex-wrap items-center gap-3">
 				<p className="text-muted-foreground max-w-3xl text-sm" data-testid="trends-explainer">
 					{t("trends.subtitle")}
 				</p>
-			</header>
+				<ModeBadge mode={data?.mode} isLoading={trends.isLoading} isError={trends.isError && !data} />
+			</div>
 
 			<TrendsFilters
 				suite={data?.suite ?? suite ?? ""}

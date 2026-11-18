@@ -444,6 +444,17 @@
 					"id": "p02",
 					"part": "files"
 				}
+			],
+			"tiers": [
+				{
+					"name": "nightly",
+					"tasks": [
+						"p01",
+						"p02",
+						"p03"
+					],
+					"defined": false
+				}
 			]
 		},
 		{
@@ -882,7 +893,34 @@
 			"track": "coding",
 			"grading": "verified",
 			"output": "diff",
-			"lock_kind": "fingerprinted"
+			"lock_kind": "fingerprinted",
+			"tiers": [
+				{
+					"name": "pr",
+					"tasks": [
+						"t01",
+						"t03"
+					],
+					"defined": true
+				},
+				{
+					"name": "nightly",
+					"tasks": [
+						"t01",
+						"t02",
+						"t03",
+						"t04"
+					],
+					"defined": false
+				},
+				{
+					"name": "headroom",
+					"tasks": [
+						"t04"
+					],
+					"defined": true
+				}
+			]
 		},
 		{
 			"id": "harbor-shell",
@@ -988,7 +1026,17 @@
 			],
 			"track": "terminal",
 			"grading": "verified",
-			"output": "diff"
+			"output": "diff",
+			"tiers": [
+				{
+					"name": "nightly",
+					"tasks": [
+						"h01",
+						"h02"
+					],
+					"defined": false
+				}
+			]
 		},
 		{
 			"id": "memory-recall",
@@ -1071,7 +1119,16 @@
 				"revision": "4b1d9e2",
 				"license": "CC-BY-4.0",
 				"at": "2026-11-15T08:00:00Z"
-			}
+			},
+			"tiers": [
+				{
+					"name": "nightly",
+					"tasks": [
+						"m01"
+					],
+					"defined": false
+				}
+			]
 		},
 		{
 			"id": "support-desk",
@@ -1220,6 +1277,16 @@
 			"output": "state",
 			"services": [
 				"crm"
+			],
+			"tiers": [
+				{
+					"name": "nightly",
+					"tasks": [
+						"d01",
+						"d02"
+					],
+					"defined": false
+				}
 			]
 		}
 	]

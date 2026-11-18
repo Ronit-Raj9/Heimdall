@@ -1,4 +1,5 @@
 import { ToneBadge } from "@/components/suites/suiteBadges";
+import { EntityLink } from "@/components/shell";
 import { TONE_TEXT, formatPValue, shortHash } from "@/components/verdict/verdict.utils";
 import { getLocale } from "@/lib/i18n";
 import { AGENT_DIFF_CLASSES, type AgentDiffReport, type AgentDiffVersion } from "@/lib/types/bench";
@@ -113,7 +114,9 @@ function VersionCard({ side, version }: { side: "a" | "b"; version: AgentDiffVer
 			</header>
 			<dl className="grid min-w-0 grid-cols-[max-content_minmax(0,1fr)] gap-x-3 gap-y-1 text-xs">
 				<dt className="text-muted-foreground">{t("agentDiff.version.agent")}</dt>
-				<dd className="text-foreground font-mono">{version.agent_id}</dd>
+				<dd className="text-foreground">
+					<EntityLink kind="agent" id={version.agent_id} />
+				</dd>
 				{version.exp_id && (
 					<>
 						<dt className="text-muted-foreground">{t("agentDiff.version.arm")}</dt>
@@ -125,8 +128,10 @@ function VersionCard({ side, version }: { side: "a" | "b"; version: AgentDiffVer
 				<dt className="text-muted-foreground">{t("agentDiff.version.runs")}</dt>
 				<dd className="text-foreground tabular-nums">{version.runs}</dd>
 				<dt className="text-muted-foreground">{t("agentDiff.version.experiments")}</dt>
-				<dd className="text-foreground min-w-0 font-mono break-all">
-					{experiments.length > 0 ? experiments.join(", ") : t("agentDiff.version.noExperiments")}
+				<dd className="text-foreground flex min-w-0 flex-wrap gap-x-2 break-all">
+					{experiments.length > 0
+						? experiments.map((expId) => <EntityLink key={expId} kind="experiment" id={expId} />)
+						: t("agentDiff.version.noExperiments")}
 				</dd>
 				<dt className="text-muted-foreground">{t("agentDiff.version.excluded")}</dt>
 				<dd className="text-foreground min-w-0" data-testid={`agentdiff-version-${side}-excluded`}>

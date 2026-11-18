@@ -1,4 +1,6 @@
 import { EmptyNote, Section } from "@/components/runs/screenStates";
+import { Link } from "@tanstack/react-router";
+import { EntityLink } from "@/components/shell";
 import { TrendsChart } from "@/components/trends/trendsChart";
 import { seriesSlots } from "@/components/trends/trends.utils";
 import { Badge } from "@/components/ui/badge";
@@ -159,9 +161,14 @@ function WhatChanged({ look }: { look: CanaryRecord }) {
 					<ul className="text-xs">
 						{ch.new_clusters.map((c) => (
 							<li key={c.signature}>
-								<a className="font-mono underline-offset-2 hover:underline" href={`/clusters?signature=${encodeURIComponent(c.signature)}`}>
+								<Link
+									to="/inbox"
+									search={{ tab: "clusters", sig: c.signature } as never}
+									className="font-mono underline-offset-2 hover:underline"
+									data-testid={`canary-cluster-${c.signature}`}
+								>
 									{c.signature}
-								</a>{" "}
+								</Link>{" "}
 								{c.title} ({t("canaries.changes.clusterRuns", { count: c.count })})
 							</li>
 						))}
@@ -327,15 +334,7 @@ function LooksTable({ records, locale }: { records: readonly CanaryRecord[]; loc
 						<TableCell>
 							<CanaryStateBadge state={r.state} />
 						</TableCell>
-						<TableCell className="font-mono text-xs">
-							{r.exp_id ? (
-								<a className="underline-offset-2 hover:underline" href={`/triage?exp=${encodeURIComponent(r.exp_id)}`}>
-									{r.exp_id}
-								</a>
-							) : (
-								"-"
-							)}
-						</TableCell>
+						<TableCell className="font-mono text-xs">{r.exp_id ? <EntityLink kind="experiment" id={r.exp_id} /> : "-"}</TableCell>
 						<TableCell className="text-right text-xs tabular-nums">{formatUSD(r.cost_usd, locale)}</TableCell>
 						<TableCell className="text-xs">{(r.alerts ?? []).join(", ")}</TableCell>
 					</TableRow>

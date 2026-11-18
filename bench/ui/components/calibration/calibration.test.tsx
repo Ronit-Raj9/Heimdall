@@ -10,16 +10,7 @@ import {
 	CALIBRATION_UNCALIBRATED_FIXTURE,
 	VERDICT_CALIBRATION_FIXTURE,
 } from "./calibration.fixtures";
-import {
-	EMPTY_LABEL_FORM,
-	canLabel,
-	formatRate,
-	fprBound,
-	judgedSuites,
-	labelFormErrors,
-	labelRequestFrom,
-	stateTone,
-} from "./calibration.utils";
+import { EMPTY_LABEL_FORM, canLabel, formatRate, fprBound, labelFormErrors, labelRequestFrom, stateTone } from "./calibration.utils";
 import { CalibrationCard, ContestedBadge, LabelForm, LabelsTable, VerdictCalibration } from "./calibrationPanel";
 
 const noop = () => {};
@@ -47,14 +38,6 @@ describe("calibration utils", () => {
 		expect(stateTone("uncalibrated")).toBe("bad");
 		expect(stateTone("unreliable")).toBe("bad");
 		expect(stateTone("not_judged")).toBe("neutral");
-	});
-
-	it("lists judged suites only, sorted", () => {
-		const s = (id: string, grading?: "judged" | "verified") => ({ id, grading }) as never;
-		expect(judgedSuites([s("b", "judged"), s("c"), s("a", "judged"), s("d", "verified")]).map((x: { id: string }) => x.id)).toEqual([
-			"a",
-			"b",
-		]);
 	});
 
 	it("needs task, answer, label and labeller, and sends a trimmed body", () => {

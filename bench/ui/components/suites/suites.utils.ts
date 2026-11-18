@@ -256,11 +256,6 @@ export function controlRows(checks: readonly SuiteAdmissionCheck[]): ControlRow[
 	});
 }
 
-/** The suite shown when the URL names none: the first one that loaded, else the first. */
-export function defaultSuiteId(suites: readonly SuiteSummary[]): string | null {
-	return (suites.find((suite) => !suite.error) ?? suites[0])?.id ?? null;
-}
-
 /** The leaderboard's suite parameter for a suite: id@version. */
 export function leaderboardSuite(suite: Pick<SuiteSummary, "id" | "version">): string {
 	return `${suite.id}@${suite.version}`;

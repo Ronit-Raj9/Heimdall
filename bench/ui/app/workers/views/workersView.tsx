@@ -1,4 +1,5 @@
 import { ModeBadge } from "@/components/modeBadge";
+import { PageHeader } from "@/components/shell";
 import { BlockSkeleton, EmptyNote, LoadError } from "@/components/runs/screenStates";
 import { WorkersOff, WorkersTable } from "@/components/workers/workersTable";
 import { isWorkersOff, useGetWorkersQuery } from "@/lib/store/apis/benchApi";
@@ -18,13 +19,11 @@ export default function WorkersView() {
 	const off = !query.isLoading && isWorkersOff(query.isError ? query.error : undefined, data);
 	return (
 		<section className="flex min-w-0 flex-col gap-6" data-testid="workers-screen">
-			<header className="flex flex-col gap-1">
-				<div className="flex flex-wrap items-center gap-3">
-					<h1 className="text-foreground text-xl font-semibold tracking-tight">{t("workers.title")}</h1>
-					{(data || !off) && <ModeBadge mode={data?.mode} isLoading={query.isLoading} isError={query.isError && !data} />}
-				</div>
-				<p className="text-muted-foreground max-w-3xl text-sm">{t("workers.subtitle")}</p>
-			</header>
+			<PageHeader
+				title={t("workers.title")}
+				subtitle={t("workers.subtitle")}
+				meta={(data || !off) && <ModeBadge mode={data?.mode} isLoading={query.isLoading} isError={query.isError && !data} />}
+			/>
 			{data?.mode === "synthetic" && (
 				<p
 					role="note"

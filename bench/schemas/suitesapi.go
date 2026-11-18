@@ -89,6 +89,21 @@ type SuiteSummary struct {
 	// refuses while it is not empty.
 	LockKind         string             `json:"lock_kind,omitempty"`
 	FingerprintDrift []FingerprintDrift `json:"fingerprint_drift,omitempty"`
+
+	// U3: the suite's tiers (docs/suite-tiers.md), pr, nightly and headroom
+	// first, then the others by name. nightly is listed even when suite.yaml
+	// does not define it, as every task.
+	Tiers []SuiteTier `json:"tiers,omitempty"`
+}
+
+// SuiteTier is one tier of a suite: a named task subset an experiment can
+// pick with `tier:`. Tasks are ids in suite order; a held-out task is listed
+// by id like everywhere else in the suites API.
+type SuiteTier struct {
+	Name    string   `json:"name"`
+	Tasks   []string `json:"tasks"`
+	Defined bool     `json:"defined"`         // false for nightly when suite.yaml leaves it out
+	Error   string   `json:"error,omitempty"` // why planning would refuse the tier, e.g. an unknown task
 }
 
 // Lock kinds (SuiteSummary.LockKind).

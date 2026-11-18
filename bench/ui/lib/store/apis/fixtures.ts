@@ -66,6 +66,9 @@ export const FIXTURE_ROUTES: readonly FixtureRoute[] = [
 	{ method: "GET", pattern: "/suites/*/tasks/:id", file: "suites.task.{id}.json" },
 	// Suite health per suite id; a suite with no file answers 404, which the page shows as health unavailable.
 	{ method: "GET", pattern: "/suites/:id/health", file: "suites.health.{id}.json" },
+	// U3: judge calibration of a judged suite (the Calibration tab); other suites answer 404.
+	{ method: "GET", pattern: "/suites/:id/calibration", file: "suites.calibration.{id}.json" },
+	{ method: "GET", pattern: "/suites/:id/calibration/labels", file: "suites.calibration.labels.{id}.json" },
 	{ method: "GET", pattern: "/agents", file: "agents.json" },
 	// Agent diff: one report for every a, b, suite and condition (the query string is ignored).
 	{ method: "GET", pattern: "/agents/diff", file: "agents.diff.json" },
@@ -83,6 +86,10 @@ export const FIXTURE_ROUTES: readonly FixtureRoute[] = [
 	// W5 drift canary: the list, then one canary's detail per name; other names answer 404.
 	{ method: "GET", pattern: "/canaries", file: "canaries.json" },
 	{ method: "GET", pattern: "/canaries/:id", file: "canaries.{id}.json" },
+	// U3: live scoring (the Live traffic page): status, the two-version comparison and sessions.
+	{ method: "GET", pattern: "/livescore", file: "livescore.json" },
+	{ method: "GET", pattern: "/livescore/compare", file: "livescore.compare.json" },
+	{ method: "GET", pattern: "/livescore/sessions", file: "livescore.sessions.json" },
 ];
 
 /** True when the URL has fixture=1 or the build sets VITE_BENCH_FIXTURE=1. */

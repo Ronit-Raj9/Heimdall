@@ -4560,6 +4560,7 @@ class SuiteSummary(_SuiteSummaryRequired, total=False):
     output: str
     quarantined_count: int
     services: List[str]
+    tiers: List[SuiteTier]
     track: str
 
 
@@ -4608,6 +4609,16 @@ class SuiteTaskDetail(TypedDict):
     suite_version: str
     task: SuiteTask
     verifier_result: str
+
+
+class _SuiteTierRequired(TypedDict):
+    defined: bool
+    name: str
+    tasks: List[str]
+
+
+class SuiteTier(_SuiteTierRequired, total=False):
+    error: str
 
 
 class Summary(TypedDict):
@@ -6128,6 +6139,7 @@ __all__ = [
     'SuiteSummary',
     'SuiteTask',
     'SuiteTaskDetail',
+    'SuiteTier',
     'Summary',
     'SupportArm',
     'SupportSummary',

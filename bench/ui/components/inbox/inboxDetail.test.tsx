@@ -8,13 +8,7 @@ import { InboxDraftResult } from "./inboxDraft";
 import { InboxEmpty, InboxIngestOffNote, InboxSourcesTable } from "./inboxSources";
 
 // A plain anchor stands in for the router's Link, so the target URL is visible in the markup.
-vi.mock("@tanstack/react-router", () => ({
-	Link: ({ to, search, children, ...rest }: { to: string; search: { exp: string }; children: React.ReactNode }) => (
-		<a href={`${to}?exp=${search.exp}`} {...rest}>
-			{children}
-		</a>
-	),
-}));
+vi.mock("@tanstack/react-router", async () => (await import("@/lib/testing/routerMock")).routerMock);
 
 describe("InboxPreview", () => {
 	it("shows a planted script tag as text, never as markup", () => {
@@ -53,7 +47,7 @@ describe("InboxItemDetailView", () => {
 		expect(html).toContain('data-testid="inbox-detail-task"');
 		expect(html).toContain("Accepted as support/warranty-period");
 		expect(html).toContain("passes in e_123 (3/3)");
-		expect(html).toContain('href="/verdict?exp=e_123"');
+		expect(html).toContain('href="/experiments/e_123"');
 		expect(html).toContain('data-testid="inbox-detail-recurrences"');
 		expect(html).toContain(">admitted<");
 		// No link on the item or its traces: nothing to open.

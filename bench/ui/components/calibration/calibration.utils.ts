@@ -1,4 +1,4 @@
-import type { CalibrationLabel, CalibrationLabelRequest, CalibrationRate, CalibrationState, Mode, SuiteSummary } from "@/lib/types/bench";
+import type { CalibrationLabel, CalibrationLabelRequest, CalibrationRate, CalibrationState, Mode } from "@/lib/types/bench";
 
 // W8 judge calibration (docs/judge-calibration.md): pure helpers of the calibration page.
 
@@ -29,11 +29,6 @@ export function stateTone(state: CalibrationState): "good" | "warn" | "bad" | "n
 		default:
 			return "neutral";
 	}
-}
-
-/** The suites whose outcomes a judge decides, sorted by id. */
-export function judgedSuites(suites: readonly SuiteSummary[]): SuiteSummary[] {
-	return suites.filter((s) => s.grading === "judged").sort((a, b) => a.id.localeCompare(b.id));
 }
 
 /** Labels can be written only on a live server, like reviews. */

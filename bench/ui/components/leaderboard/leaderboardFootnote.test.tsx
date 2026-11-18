@@ -9,13 +9,7 @@ import { CopyMarkdownButton } from "./copyMarkdownButton";
 import { LeaderboardSyntheticBanner } from "./leaderboardBanner";
 import { LeaderboardFootnote } from "./leaderboardFootnote";
 
-vi.mock("@tanstack/react-router", () => ({
-	Link: ({ to, search, children, ...rest }: { to: string; search: { exp: string }; children: React.ReactNode }) => (
-		<a href={`${to}?exp=${search.exp}`} {...rest}>
-			{children}
-		</a>
-	),
-}));
+vi.mock("@tanstack/react-router", async () => (await import("@/lib/testing/routerMock")).routerMock);
 
 const board = JSON.parse(fs.readFileSync(path.resolve(__dirname, "../../public/fixtures/leaderboard.json"), "utf8")) as LeaderboardResponse;
 
@@ -27,7 +21,7 @@ describe("LeaderboardFootnote", () => {
 		expect(html).toContain('data-testid="leaderboard-excluded-infra_error"');
 		expect(html).toContain(">24 runs<");
 		expect(html).toContain(">1 run<");
-		expect(html).toContain('href="/verdict?exp=e_synthetic-flaky"');
+		expect(html).toContain('href="/experiments/e_synthetic-flaky"');
 		expect(html).toContain("Scope all: each entry is measured over its own tasks");
 		expect(html).toContain("Rank alone is never a claim that one agent beats another.");
 		expect(html).toContain("Resilience columns appear on the clean board only");

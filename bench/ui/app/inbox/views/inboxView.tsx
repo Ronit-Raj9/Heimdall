@@ -3,24 +3,49 @@ import { InboxEmpty, InboxIngestOffNote, InboxSourcesTable } from "@/components/
 import { InboxStateFilter } from "@/components/inbox/inboxStateFilter";
 import { InboxTable } from "@/components/inbox/inboxTable";
 import { ModeBadge } from "@/components/modeBadge";
+import { PageHeader, RouteTabs, type RouteTab } from "@/components/shell";
 import { BlockSkeleton, EmptyNote, LoadError, Section } from "@/components/runs/screenStates";
 import { useGetInboxQuery } from "@/lib/store/apis/inboxApi";
 import type { InboxListResponse } from "@/lib/types/bench";
 import { parseAsString, parseAsStringLiteral, useQueryState } from "nuqs";
 import { useId, useMemo, type ReactNode } from "react";
 import { useTranslation } from "react-i18next";
+import ClustersTab from "./clustersTab";
 import { InboxItemPanel } from "./inboxItemPanel";
+import TriageTab from "./triageTab";
 
 /** The state the screen opens on: what still needs a decision. */
 const DEFAULT_FILTER: InboxFilter = "new";
 
 /**
- * The failure inbox: /inbox?state=&source=&item=. Production failures pulled from trace sources,
+ * Failure inbox: /inbox?tab=. Inbox (default), Clusters (the old /clusters) and Triage (the old
+ * /triage): production failures, failed benchmark runs grouped by signature, and failure patterns
+ * per arm of one experiment.
+ */
+export default function InboxView() {
+	const { t } = useTranslation("bench");
+	const tabs: RouteTab[] = [
+		{ id: "inbox", label: t("inbox.tabs.inbox") },
+		{ id: "clusters", label: t("inbox.tabs.clusters") },
+		{ id: "triage", label: t("inbox.tabs.triage") },
+	];
+	return (
+		<section className="flex min-w-0 flex-col gap-6" data-testid="inbox-page">
+			<PageHeader title={t("inbox.title")} subtitle={t("inbox.pageSubtitle")} />
+			<RouteTabs tabs={tabs} defaultTab="inbox" label={t("inbox.tabs.label")} testId="inbox-tabs">
+				{(active) => (active === "clusters" ? <ClustersTab /> : active === "triage" ? <TriageTab /> : <InboxTab />)}
+			</RouteTabs>
+		</section>
+	);
+}
+
+/**
+ * The Inbox tab: ?state=&source=&item=. Production failures pulled from trace sources,
  * one row per signature. state and source go to the server; item opens one item beside the table,
  * where it can be accepted into a suite as a draft regression task, rejected or snoozed
  * (docs/failure-inbox.md).
  */
-export default function InboxView() {
+export function InboxTab() {
 	const { t } = useTranslation("bench");
 	const [filter, setFilter] = useQueryState("state", parseAsStringLiteral(INBOX_FILTERS).withDefault(DEFAULT_FILTER));
 	const [source, setSource] = useQueryState("source", parseAsString);
@@ -30,13 +55,10 @@ export default function InboxView() {
 
 	return (
 		<section className="flex min-w-0 flex-col gap-6" data-testid="inbox-screen">
-			<header className="flex flex-col gap-1">
-				<div className="flex flex-wrap items-center gap-3">
-					<h1 className="text-foreground text-xl font-semibold tracking-tight">{t("inbox.title")}</h1>
-					<ModeBadge mode={data?.mode} isLoading={list.isLoading} isError={list.isError && !data} />
-				</div>
+			<div className="flex flex-wrap items-center gap-3">
 				<p className="text-muted-foreground max-w-3xl text-sm">{t("inbox.subtitle")}</p>
-			</header>
+				<ModeBadge mode={data?.mode} isLoading={list.isLoading} isError={list.isError && !data} />
+			</div>
 			{list.isLoading ? (
 				<BlockSkeleton rows={6} testId="inbox-loading" />
 			) : list.error || !data ? (

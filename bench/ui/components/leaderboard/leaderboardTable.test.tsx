@@ -9,13 +9,7 @@ import { DEFAULT_SORT, sortEntries, type LeaderboardSort } from "./leaderboard.u
 import { LeaderboardTable } from "./leaderboardTable";
 
 // A plain anchor stands in for the router's Link, so the target URL is visible in the markup.
-vi.mock("@tanstack/react-router", () => ({
-	Link: ({ to, search, children, ...rest }: { to: string; search: { exp: string }; children: React.ReactNode }) => (
-		<a href={`${to}?exp=${search.exp}`} {...rest}>
-			{children}
-		</a>
-	),
-}));
+vi.mock("@tanstack/react-router", async () => (await import("@/lib/testing/routerMock")).routerMock);
 
 const board = JSON.parse(fs.readFileSync(path.resolve(__dirname, "../../public/fixtures/leaderboard.json"), "utf8")) as LeaderboardResponse;
 const FAULTS = ["model-outage", "stale-notes", "test-crash"];
@@ -40,7 +34,7 @@ describe("LeaderboardTable", () => {
 		expect(leader).toContain(">codex<");
 		expect(leader).toContain(">gpt-5.4-mini<");
 		expect(leader).toContain(">B: code-wins note<");
-		expect(leader).toContain('href="/verdict?exp=e_synthetic-codewins"');
+		expect(leader).toContain('href="/experiments/e_synthetic-codewins"');
 		expect(row(html, 4)).toContain(">Tier 2<");
 		expect(row(html, 4)).toContain(">behind<");
 	});

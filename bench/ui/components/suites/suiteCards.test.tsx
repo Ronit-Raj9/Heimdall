@@ -9,23 +9,38 @@ import { SuiteCards } from "./suiteCards";
 import { BrokenSuite, SuiteDriftNotice, SuiteFacts } from "./suiteFacts";
 
 vi.mock("@tanstack/react-router", () => ({
-	Link: ({ to, search, children, ...rest }: { to: string; search: { suite: string }; children: React.ReactNode }) => (
-		<a href={`${to}?suite=${search.suite}`} {...rest}>
-			{children}
-		</a>
-	),
+	Link: ({
+		to,
+		params,
+		search,
+		children,
+		...rest
+	}: {
+		to: string;
+		params?: Record<string, string>;
+		search?: Record<string, string>;
+		children: React.ReactNode;
+	}) => {
+		let href = to;
+		for (const [key, value] of Object.entries(params ?? {})) href = href.replace(`$${key}`, value);
+		const qs = new URLSearchParams(search ?? {}).toString();
+		return (
+			<a href={qs ? `${href}?${qs}` : href} {...rest}>
+				{children}
+			</a>
+		);
+	},
 }));
 
 const list = JSON.parse(fs.readFileSync(path.resolve(__dirname, "../../public/fixtures/suites.json"), "utf8")) as SuiteList;
 const suite = (id: string) => list.suites.find((s) => s.id === id)!;
-const card = (html: string, id: string) => html.match(new RegExp(`data-testid="suites-card-${id}"[\\s\\S]*?</button>`))?.[0] ?? "";
+const card = (html: string, id: string) => html.match(new RegExp(`data-testid="suites-card-${id}"[\\s\\S]*?</a>`))?.[0] ?? "";
 
 describe("SuiteCards", () => {
-	const html = renderToStaticMarkup(<SuiteCards suites={list.suites} selected="coding-core" onSelect={() => undefined} />);
+	const html = renderToStaticMarkup(<SuiteCards suites={list.suites} />);
 
-	it("presses the selected suite only", () => {
-		expect(html.match(/aria-pressed="true"/g)).toHaveLength(1);
-		expect(html).toMatch(/aria-pressed="true"[^>]*data-testid="suites-card-coding-core"/);
+	it("links every card to its suite's page", () => {
+		expect(html).toMatch(/href="\/suites\/coding-core"[^>]*data-testid="suites-card-coding-core"/);
 	});
 
 	it("shows lock state, admitted count, drift and verifier format", () => {
@@ -52,7 +67,7 @@ describe("SuiteCards", () => {
 describe("suite facts", () => {
 	it("links to the suite's leaderboard and shows the threshold of a reward suite", () => {
 		const html = renderToStaticMarkup(<SuiteFacts suite={suite("harbor-shell")} />);
-		expect(html).toContain('href="/leaderboard?suite=harbor-shell@0.1.0"');
+		expect(html).toContain('href="/leaderboard?suite=harbor-shell%400.1.0"');
 		expect(html).toMatch(/data-testid="suites-fact-threshold".*?>1</);
 		expect(renderToStaticMarkup(<SuiteFacts suite={suite("coding-core")} />)).not.toContain("suites-fact-threshold");
 	});
@@ -95,7 +110,7 @@ describe("scenario facts", () => {
 	});
 
 	it("puts the track on every card and marks judged suites", () => {
-		const html = renderToStaticMarkup(<SuiteCards suites={list.suites} selected="coding-core" onSelect={() => undefined} />);
+		const html = renderToStaticMarkup(<SuiteCards suites={list.suites} />);
 		expect(card(html, "coding-core")).toMatch(/data-testid="suites-card-coding-core-track"[^>]*>Coding/);
 		expect(card(html, "harbor-shell")).toMatch(/data-testid="suites-card-harbor-shell-track"[^>]*>Terminal/);
 		expect(card(html, "memory-recall")).toContain('data-testid="suites-card-memory-recall-judged"');

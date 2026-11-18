@@ -4,8 +4,10 @@ import type { ReleaseListResponse, ReleaseRecord } from "@/lib/types/bench";
 import fs from "node:fs";
 import path from "node:path";
 import { renderToStaticMarkup } from "react-dom/server";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { ReleaseTimeline } from "./releaseTimeline";
+
+vi.mock("@tanstack/react-router", async () => (await import("@/lib/testing/routerMock")).routerMock);
 
 const fixture = JSON.parse(
 	fs.readFileSync(path.resolve(__dirname, "../../public/fixtures/releases.list.json"), "utf8"),

@@ -1,10 +1,12 @@
 import "@/lib/i18n";
 
 import { renderToStaticMarkup } from "react-dom/server";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { CLUSTER_LIST_FIXTURE } from "./clusters.fixtures";
 import { ClustersSummary } from "./clustersSummary";
 import { ClusterScopeBadge, ClustersTable } from "./clustersTable";
+
+vi.mock("@tanstack/react-router", async () => (await import("@/lib/testing/routerMock")).routerMock);
 
 const clusters = CLUSTER_LIST_FIXTURE.clusters;
 const [limiter, loop, toolError] = clusters;
@@ -88,5 +90,12 @@ describe("ClustersSummary", () => {
 		expect(html).toContain("No runs left out.");
 		expect(html).not.toContain("clusters-summary-hidden");
 		expect(html).not.toContain("clusters-summary-experiments");
+	});
+
+	it("links each task to its suite's task row and each agent to its config", () => {
+		const html = renderToStaticMarkup(<ClustersTable clusters={clusters} selected={null} onSelect={() => undefined} />);
+		const [suite, id] = (limiter.tasks ?? [])[0].split("/");
+		expect(html).toContain(`href="/suites/${suite}?tab=tasks&amp;task=${id}"`);
+		expect(html).toContain(`href="/agents?agent=${(limiter.agents ?? [])[0]}"`);
 	});
 });

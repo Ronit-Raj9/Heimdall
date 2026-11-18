@@ -33,3 +33,5 @@ has_canary?
 # Lock fingerprint keys (docs/lock-fingerprints.md).
 lock_kind?
 fingerprint_drift?
+# U3: suite tiers (handlers/suitetiers.go).
+tiers?

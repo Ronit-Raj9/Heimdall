@@ -2,6 +2,7 @@ import { CanaryDetailBody } from "@/components/canaries/canaryDetail";
 import { CanaryList } from "@/components/canaries/canaryList";
 import { sortCanaries } from "@/components/canaries/canary.utils";
 import { ModeBadge } from "@/components/modeBadge";
+import { PageHeader } from "@/components/shell";
 import { BlockSkeleton, EmptyNote, LoadError, Section } from "@/components/runs/screenStates";
 import { Button } from "@/components/ui/button";
 import { useGetCanariesQuery, useGetCanaryQuery, useRunCanaryMutation } from "@/lib/store/apis/canaryApi";
@@ -24,13 +25,11 @@ export default function CanariesView() {
 
 	return (
 		<section className="flex min-w-0 flex-col gap-6" data-testid="canaries-screen">
-			<header className="flex flex-col gap-1">
-				<div className="flex flex-wrap items-center gap-3">
-					<h1 className="text-foreground text-xl font-semibold tracking-tight">{t("canaries.title")}</h1>
-					<ModeBadge mode={data?.mode} isLoading={list.isLoading} isError={list.isError && !data} />
-				</div>
-				<p className="text-muted-foreground max-w-3xl text-sm">{t("canaries.subtitle")}</p>
-			</header>
+			<PageHeader
+				title={t("canaries.title")}
+				subtitle={t("canaries.subtitle")}
+				meta={<ModeBadge mode={data?.mode} isLoading={list.isLoading} isError={list.isError && !data} />}
+			/>
 			{list.isLoading ? (
 				<BlockSkeleton rows={4} testId="canaries-loading" />
 			) : list.error || !data ? (

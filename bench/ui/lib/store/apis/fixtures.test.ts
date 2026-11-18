@@ -62,6 +62,11 @@ describe("resolveFixture", () => {
 		{ method: "GET", url: "/suites/..%2F/tasks/t01", want: null },
 		{ method: "GET", url: "/suites/../tasks/t01", want: null },
 		{ method: "GET", url: `${BENCH_API_BASE}/suites/acme-payments/health`, want: "suites.health.acme-payments.json" },
+		// U3: a judged suite's calibration and labels; live scoring.
+		{ method: "GET", url: "/suites/memory-recall/calibration", want: "suites.calibration.memory-recall.json" },
+		{ method: "GET", url: "/suites/memory-recall/calibration/labels", want: "suites.calibration.labels.memory-recall.json" },
+		{ method: "GET", url: "/livescore", want: "livescore.json" },
+		{ method: "GET", url: "/livescore/sessions?limit=50", want: "livescore.sessions.json" },
 		{ method: "GET", url: "/agents", want: "agents.json" },
 		{ method: "GET", url: `${BENCH_API_BASE}/agents/diff?a=sha256:abc&b=e_x:B`, want: "agents.diff.json" },
 		{ method: "GET", url: "/agents/diff/versions", want: "agents.diff.versions.json" },
@@ -350,6 +355,7 @@ function contractFor(file: string): { type: string; nested: Record<string, strin
 				"suites[].base_image": "SuiteImage",
 				"suites[].drift[]": "SuiteDrift",
 				"suites[].fingerprint_drift[]": "FingerprintDrift",
+				"suites[].tiers[]": "SuiteTier", // U3
 				"suites[].probes[]": "SuiteProbe",
 				"suites[].tasks[]": "SuiteTask",
 				"suites[].tasks[].checks[]": "SuiteAdmissionCheck",
@@ -358,6 +364,12 @@ function contractFor(file: string): { type: string; nested: Record<string, strin
 			},
 		};
 	}
+	// U3: judge calibration and live scoring in fixture mode.
+	if (file.startsWith("suites.calibration.labels.")) return { type: "CalibrationLabels", nested: { "items[]": "CalibrationItem" } };
+	if (file.startsWith("suites.calibration.")) return { type: "CalibrationStatus", nested: {} };
+	if (file === "livescore.json") return { type: "LiveStatus", nested: {} };
+	if (file === "livescore.compare.json") return { type: "LiveComparison", nested: {} };
+	if (file === "livescore.sessions.json") return { type: "LiveSessionList", nested: { "sessions[]": "LiveSessionRecord" } };
 	if (file.startsWith("suites.task.")) return { type: "SuiteTaskDetail", nested: { task: "SuiteTask", "files[]": "SuiteRepoFile" } };
 	if (file.startsWith("suites.health.")) {
 		return {

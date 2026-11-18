@@ -1,9 +1,11 @@
 import "@/lib/i18n";
 
 import { renderToStaticMarkup } from "react-dom/server";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { CANARY_DRIFTED_FIXTURE, CANARY_STEADY_FIXTURE } from "./canary.fixtures";
 import { CanaryDetailBody } from "./canaryDetail";
+
+vi.mock("@tanstack/react-router", async () => (await import("@/lib/testing/routerMock")).routerMock);
 
 describe("CanaryDetailBody", () => {
 	const html = renderToStaticMarkup(<CanaryDetailBody detail={CANARY_DRIFTED_FIXTURE} />);

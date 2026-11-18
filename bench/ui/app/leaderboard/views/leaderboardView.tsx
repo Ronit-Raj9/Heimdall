@@ -10,12 +10,19 @@ import {
 	sortEntries,
 	type SortKey,
 } from "@/components/leaderboard/leaderboard.utils";
-import { HeldOutBoardToggle, LeaderboardHeldOutBanner } from "@/components/leaderboard/heldOutBoard";
+import {
+	HeldOutBoardOff,
+	HeldOutBoardToggle,
+	LeaderboardHeldOutBanner,
+	heldOutBoardOffered,
+	isNotFoundError,
+} from "@/components/leaderboard/heldOutBoard";
 import { LeaderboardSyntheticBanner } from "@/components/leaderboard/leaderboardBanner";
 import { LeaderboardFilters } from "@/components/leaderboard/leaderboardFilters";
 import { LeaderboardFootnote } from "@/components/leaderboard/leaderboardFootnote";
 import { LeaderboardTable } from "@/components/leaderboard/leaderboardTable";
 import { ModeBadge } from "@/components/modeBadge";
+import { PageHeader, RouteTabs, type RouteTab } from "@/components/shell";
 import { GRADE_SOURCE_MODES, GradeSourcePicker } from "@/components/review/gradeSourcePicker";
 import { ReviewedBadge } from "@/components/review/reviewedBadge";
 import { GradingBadge, JudgedNotice } from "@/components/scenario/scenarioBadges";
@@ -30,14 +37,35 @@ import { parseAsString, parseAsStringLiteral, useQueryState } from "nuqs";
 import { useMemo } from "react";
 import { useTranslation } from "react-i18next";
 import { LeaderboardParetoPanel } from "@/components/migration/migrationReport"; // W6 cost against verified success
+import TrendsTab from "./trendsTab";
 
 /**
- * The leaderboard: /leaderboard?track=&suite=&condition=&scope=&synthetic=&sort=&dir=. suite,
+ * Leaderboard: /leaderboard?tab=. The board (default) and the Trends tab (the old /trends), which
+ * share the suite, condition and synthetic filters in the URL.
+ */
+export default function LeaderboardView() {
+	const { t } = useTranslation("bench");
+	const tabs: RouteTab[] = [
+		{ id: "leaderboard", label: t("leaderboard.tabs.board") },
+		{ id: "trends", label: t("leaderboard.tabs.trends") },
+	];
+	return (
+		<section className="flex min-w-0 flex-col gap-6" data-testid="leaderboard-page">
+			<PageHeader title={t("leaderboard.title")} subtitle={t("leaderboard.pageSubtitle")} />
+			<RouteTabs tabs={tabs} defaultTab="leaderboard" label={t("leaderboard.tabs.label")} testId="leaderboard-tabs">
+				{(active) => (active === "trends" ? <TrendsTab /> : <LeaderboardTab />)}
+			</RouteTabs>
+		</section>
+	);
+}
+
+/**
+ * The board tab: ?track=&suite=&condition=&scope=&synthetic=&sort=&dir=. suite,
  * condition, scope and synthetic go to the server; an absent one takes the server default, so
  * "newest suite" stays a live default. track narrows the suite picker to one track, from the
  * suites on disk; sort and dir order the rows on the client; the rank is always the board's.
  */
-export default function LeaderboardView() {
+export function LeaderboardTab() {
 	const { t } = useTranslation("bench");
 	const [suite, setSuite] = useQueryState("suite", parseAsString);
 	const [condition, setCondition] = useQueryState("condition", parseAsString);
@@ -50,6 +78,8 @@ export default function LeaderboardView() {
 	// Track and grading come from the suites on disk; the board itself carries neither.
 	const suitesQuery = useGetSuitesQuery();
 	const facts = useMemo(() => suiteFactsById(suitesQuery.data?.suites ?? []), [suitesQuery.data]);
+	// U3: the held-out board is served only with held_out.visible; offer it only when some suite has held-out tasks the server shows.
+	const heldOutBoard = useMemo(() => heldOutBoardOffered(suitesQuery.data?.suites ?? []), [suitesQuery.data]);
 
 	const params = useMemo<LeaderboardParams>(
 		() => ({
@@ -90,29 +120,24 @@ export default function LeaderboardView() {
 
 	return (
 		<section className="flex min-w-0 flex-col gap-6" data-testid="leaderboard-screen">
-			<header className="flex flex-col gap-1">
-				<div className="flex flex-wrap items-center gap-3">
-					<h1 className="text-foreground text-xl font-semibold tracking-tight">{t("leaderboard.title")}</h1>
-					<ModeBadge mode={data?.mode} isLoading={board.isLoading} isError={board.isError && !data} />
-					{judged && <GradingBadge grading="judged" testId="leaderboard-judged-badge" />}
-					<ReviewedBadge
-						reviewed={data?.reviewed_runs}
-						changed={data?.review_changed_runs}
-						gradeSource={data?.grade_source}
-						testId="leaderboard-reviewed-badge"
-					/>
-				</div>
+			<div className="flex flex-wrap items-center gap-x-3 gap-y-2">
 				<p className="text-muted-foreground max-w-3xl text-sm" data-testid="leaderboard-explainer">
 					{t("leaderboard.subtitle")}
 				</p>
-			</header>
-
+				<ModeBadge mode={data?.mode} isLoading={board.isLoading} isError={board.isError && !data} />
+				{judged && <GradingBadge grading="judged" testId="leaderboard-judged-badge" />}
+				<ReviewedBadge
+					reviewed={data?.reviewed_runs}
+					changed={data?.review_changed_runs}
+					gradeSource={data?.grade_source}
+					testId="leaderboard-reviewed-badge"
+				/>
+			</div>
 			{showBanner && <LeaderboardSyntheticBanner />}
 			{data?.split === "held_out" && <LeaderboardHeldOutBanner />}
 			{judged && (
 				<JudgedNotice title={t("leaderboard.judged.title")} body={t("leaderboard.judged.body")} testId="leaderboard-judged-note" />
 			)}
-
 			<LeaderboardFilters
 				suite={data?.suite ?? suite ?? ""}
 				suites={data?.suites ?? []}
@@ -139,10 +164,17 @@ export default function LeaderboardView() {
 				disabled={board.isLoading}
 				testId="leaderboard-grade-source"
 			/>
-			<HeldOutBoardToggle heldOut={split === "held_out"} onChange={(next) => void setSplit(next ? "held_out" : null)} disabled={board.isLoading} />
-
+			{(heldOutBoard || split === "held_out") && (
+				<HeldOutBoardToggle
+					heldOut={split === "held_out"}
+					onChange={(next) => void setSplit(next ? "held_out" : null)}
+					disabled={board.isLoading}
+				/>
+			)}
 			{board.isLoading ? (
 				<BlockSkeleton rows={6} testId="leaderboard-loading" />
+			) : split === "held_out" && isNotFoundError(board.error) ? (
+				<HeldOutBoardOff onBack={() => void setSplit(null)} />
 			) : board.isError || !data ? (
 				<div className="flex flex-col gap-2">
 					<LoadError

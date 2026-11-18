@@ -69,7 +69,11 @@ by split or by id.
   curl 'http://127.0.0.1:8090/api/bench/leaderboard?split=held_out'
   ```
 
-  It carries `"split": "held_out"` and a HELD-OUT BOARD banner. The split of
+  It carries `"split": "held_out"` and a HELD-OUT BOARD banner. The API
+  serves it, and its Pareto plane (`/leaderboard/pareto?split=held_out`),
+  only when the server config sets `held_out.visible: true`; otherwise both
+  answer 404 and say why. The CLI reads the run folder and always prints it.
+  The split of
   a run is read from its frozen manifest (`held_out_tasks`), not from today's
   task files, so moving a task between splits later never moves old runs
   between boards. A public task run inside a held-out experiment stays on the
@@ -98,6 +102,9 @@ held_out:
   saying it is held out.
 - `GET /api/bench/suites/{id}/health` lists held-out tasks by id with their
   numbers only.
+- `GET /api/bench/leaderboard?split=held_out` and
+  `GET /api/bench/leaderboard/pareto?split=held_out` answer 404. The public
+  board never counts a held-out run, whatever the setting.
 
 Run pages are not filtered. The agent stream, diff and artifacts of a run of
 a held-out task are served like any other run, and the agent stream contains

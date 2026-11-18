@@ -1,0 +1,1610 @@
+{
+	"_comment": "SYNTHETIC fixture for UI development. Not a measurement. Shapes follow handlers/testdata/contract.",
+	"mode": "synthetic",
+	"evidence": "live",
+	"note": "Live evidence, kept apart from experiment verdicts: production traffic has no ground truth (nobody checked whether an answer was right) and no control of inputs (each version saw different users asking different things), so a live score says how a version behaved on the traffic it got, never that it passes or fails tasks.",
+	"configured": true,
+	"source": {
+		"url": "http://127.0.0.1:18080",
+		"token_env": "LIVE_TOKEN",
+		"read_only": true,
+		"last_pull": "2026-11-18T08:00:00Z",
+		"since": "2026-11-18T07:55:00Z",
+		"last_scored": 166,
+		"schedule": "*/15 * * * *"
+	},
+	"versions": [
+		{
+			"name": "v1",
+			"selector": "virtual key vk-a",
+			"sessions": 80,
+			"flagged": 0,
+			"last_24h": [
+				{
+					"signal": "request_error_rate",
+					"mean": 0,
+					"n": 80
+				},
+				{
+					"signal": "tool_error_rate",
+					"mean": 0,
+					"n": 80
+				},
+				{
+					"signal": "loop",
+					"mean": 0,
+					"n": 80
+				},
+				{
+					"signal": "repeated_calls",
+					"mean": 0,
+					"n": 80
+				},
+				{
+					"signal": "retried",
+					"mean": 0,
+					"n": 80
+				},
+				{
+					"signal": "fallback",
+					"mean": 0,
+					"n": 80
+				},
+				{
+					"signal": "refusal",
+					"mean": 0,
+					"n": 80
+				},
+				{
+					"signal": "budget_hit",
+					"mean": 0,
+					"n": 80
+				},
+				{
+					"signal": "rate_limited",
+					"mean": 0,
+					"n": 80
+				},
+				{
+					"signal": "injection_marker",
+					"mean": 0,
+					"n": 80
+				},
+				{
+					"signal": "abandoned",
+					"mean": 0,
+					"n": 80
+				},
+				{
+					"signal": "turn_latency_ms",
+					"mean": 800,
+					"n": 80
+				},
+				{
+					"signal": "session_ms",
+					"mean": 3000,
+					"n": 80
+				},
+				{
+					"signal": "cost_usd",
+					"mean": 0.003000000000000002,
+					"n": 80
+				},
+				{
+					"signal": "tokens",
+					"mean": 660,
+					"n": 80
+				},
+				{
+					"signal": "judge_score",
+					"mean": 0.5,
+					"n": 15
+				}
+			],
+			"series": [
+				{
+					"start": "2026-11-18T06:00:00Z",
+					"sessions": 80,
+					"means": [
+						{
+							"signal": "request_error_rate",
+							"mean": 0,
+							"n": 80
+						},
+						{
+							"signal": "tool_error_rate",
+							"mean": 0,
+							"n": 80
+						},
+						{
+							"signal": "loop",
+							"mean": 0,
+							"n": 80
+						},
+						{
+							"signal": "repeated_calls",
+							"mean": 0,
+							"n": 80
+						},
+						{
+							"signal": "retried",
+							"mean": 0,
+							"n": 80
+						},
+						{
+							"signal": "fallback",
+							"mean": 0,
+							"n": 80
+						},
+						{
+							"signal": "refusal",
+							"mean": 0,
+							"n": 80
+						},
+						{
+							"signal": "budget_hit",
+							"mean": 0,
+							"n": 80
+						},
+						{
+							"signal": "rate_limited",
+							"mean": 0,
+							"n": 80
+						},
+						{
+							"signal": "injection_marker",
+							"mean": 0,
+							"n": 80
+						},
+						{
+							"signal": "abandoned",
+							"mean": 0,
+							"n": 80
+						},
+						{
+							"signal": "turn_latency_ms",
+							"mean": 800,
+							"n": 80
+						},
+						{
+							"signal": "session_ms",
+							"mean": 3000,
+							"n": 80
+						},
+						{
+							"signal": "cost_usd",
+							"mean": 0.003000000000000002,
+							"n": 80
+						},
+						{
+							"signal": "tokens",
+							"mean": 660,
+							"n": 80
+						},
+						{
+							"signal": "judge_score",
+							"mean": 0.5,
+							"n": 15
+						}
+					]
+				}
+			]
+		},
+		{
+			"name": "v2",
+			"selector": "virtual key vk-b",
+			"sessions": 86,
+			"flagged": 46,
+			"last_24h": [
+				{
+					"signal": "request_error_rate",
+					"mean": 0.15503875968992256,
+					"n": 86
+				},
+				{
+					"signal": "tool_error_rate",
+					"mean": 0.23255813953488372,
+					"n": 86
+				},
+				{
+					"signal": "loop",
+					"mean": 0.06976744186046512,
+					"n": 86
+				},
+				{
+					"signal": "repeated_calls",
+					"mean": 0.20930232558139536,
+					"n": 86
+				},
+				{
+					"signal": "retried",
+					"mean": 0,
+					"n": 86
+				},
+				{
+					"signal": "fallback",
+					"mean": 0,
+					"n": 86
+				},
+				{
+					"signal": "refusal",
+					"mean": 0,
+					"n": 86
+				},
+				{
+					"signal": "budget_hit",
+					"mean": 0,
+					"n": 86
+				},
+				{
+					"signal": "rate_limited",
+					"mean": 0,
+					"n": 86
+				},
+				{
+					"signal": "injection_marker",
+					"mean": 0.03488372093023256,
+					"n": 86
+				},
+				{
+					"signal": "abandoned",
+					"mean": 0.46511627906976744,
+					"n": 86
+				},
+				{
+					"signal": "turn_latency_ms",
+					"mean": 800,
+					"n": 86
+				},
+				{
+					"signal": "session_ms",
+					"mean": 3153.4883720930234,
+					"n": 86
+				},
+				{
+					"signal": "cost_usd",
+					"mean": 0.0026744186046511647,
+					"n": 86
+				},
+				{
+					"signal": "tokens",
+					"mean": 576.7441860465116,
+					"n": 86
+				},
+				{
+					"signal": "judge_score",
+					"mean": 0.5,
+					"n": 5
+				}
+			],
+			"series": [
+				{
+					"start": "2026-11-18T06:00:00Z",
+					"sessions": 86,
+					"means": [
+						{
+							"signal": "request_error_rate",
+							"mean": 0.15503875968992256,
+							"n": 86
+						},
+						{
+							"signal": "tool_error_rate",
+							"mean": 0.23255813953488372,
+							"n": 86
+						},
+						{
+							"signal": "loop",
+							"mean": 0.06976744186046512,
+							"n": 86
+						},
+						{
+							"signal": "repeated_calls",
+							"mean": 0.20930232558139536,
+							"n": 86
+						},
+						{
+							"signal": "retried",
+							"mean": 0,
+							"n": 86
+						},
+						{
+							"signal": "fallback",
+							"mean": 0,
+							"n": 86
+						},
+						{
+							"signal": "refusal",
+							"mean": 0,
+							"n": 86
+						},
+						{
+							"signal": "budget_hit",
+							"mean": 0,
+							"n": 86
+						},
+						{
+							"signal": "rate_limited",
+							"mean": 0,
+							"n": 86
+						},
+						{
+							"signal": "injection_marker",
+							"mean": 0.03488372093023256,
+							"n": 86
+						},
+						{
+							"signal": "abandoned",
+							"mean": 0.46511627906976744,
+							"n": 86
+						},
+						{
+							"signal": "turn_latency_ms",
+							"mean": 800,
+							"n": 86
+						},
+						{
+							"signal": "session_ms",
+							"mean": 3153.4883720930234,
+							"n": 86
+						},
+						{
+							"signal": "cost_usd",
+							"mean": 0.0026744186046511647,
+							"n": 86
+						},
+						{
+							"signal": "tokens",
+							"mean": 576.7441860465116,
+							"n": 86
+						},
+						{
+							"signal": "judge_score",
+							"mean": 0.5,
+							"n": 5
+						}
+					]
+				}
+			]
+		}
+	],
+	"signals": [
+		{
+			"name": "request_error_rate",
+			"label": "Request errors",
+			"kind": "rate",
+			"lower_is_better": true,
+			"method": "share of the session's gateway requests whose Bifrost row has status error (provider errors after retries, governance refusals)"
+		},
+		{
+			"name": "tool_error_rate",
+			"label": "Tool errors",
+			"kind": "rate",
+			"lower_is_better": true,
+			"method": "share of tool results in the transcript that say they failed (an MCP isError result, an object with an error field, or text starting with Error:); unknown when the session made no tool call or Bifrost served no transcript. A tool that fails silently is not seen"
+		},
+		{
+			"name": "loop",
+			"label": "Loops",
+			"kind": "rate",
+			"lower_is_better": true,
+			"method": "the same tool call (name and arguments) 3 or more times in a row, the triage pattern_loop rule; unknown without a transcript"
+		},
+		{
+			"name": "repeated_calls",
+			"label": "Repeated identical calls",
+			"kind": "ordinal",
+			"lower_is_better": true,
+			"unit": "calls",
+			"method": "tool calls identical in name and arguments to an earlier call of the session; unknown without a transcript"
+		},
+		{
+			"name": "retried",
+			"label": "Retried",
+			"kind": "rate",
+			"lower_is_better": true,
+			"method": "the session had a request Bifrost retried (number_of_retries above 0)"
+		},
+		{
+			"name": "fallback",
+			"label": "Fallbacks",
+			"kind": "rate",
+			"lower_is_better": true,
+			"method": "the session had a request served by a fallback (fallback_index above 0)"
+		},
+		{
+			"name": "refusal",
+			"label": "Refusals",
+			"kind": "rate",
+			"lower_is_better": true,
+			"method": "a row with stop_reason content_filter, a refusal field on the model's message, or a final answer that opens with a refusal phrase (a heuristic: a polite refusal in other words is missed, and a correct refusal of a bad request counts the same)"
+		},
+		{
+			"name": "budget_hit",
+			"label": "Budget hits",
+			"kind": "rate",
+			"lower_is_better": true,
+			"method": "a request refused by a governance budget (error type budget_exceeded or status 402)"
+		},
+		{
+			"name": "rate_limited",
+			"label": "Rate limited",
+			"kind": "rate",
+			"lower_is_better": true,
+			"method": "a request answered 429 (a governance rate limit or the provider's)"
+		},
+		{
+			"name": "injection_marker",
+			"label": "Injection markers",
+			"kind": "rate",
+			"lower_is_better": true,
+			"method": "a tool result holding a prompt-injection phrase (ignore previous instructions, new system instructions, chat-template tags, requests to send credentials); a heuristic list, so a novel injection is missed. It says the agent was exposed, not that it obeyed"
+		},
+		{
+			"name": "abandoned",
+			"label": "Abandoned",
+			"kind": "rate",
+			"lower_is_better": true,
+			"method": "the session's last request failed and nothing came after it within the session gap"
+		},
+		{
+			"name": "turn_latency_ms",
+			"label": "Latency per turn",
+			"kind": "ordinal",
+			"lower_is_better": true,
+			"unit": "ms",
+			"method": "mean of Bifrost's latency over the session's requests"
+		},
+		{
+			"name": "session_ms",
+			"label": "Latency per session",
+			"kind": "ordinal",
+			"lower_is_better": true,
+			"unit": "ms",
+			"method": "first request's timestamp to the last request's timestamp plus its latency; includes the agent's own time between requests"
+		},
+		{
+			"name": "cost_usd",
+			"label": "Cost per session",
+			"kind": "ordinal",
+			"lower_is_better": true,
+			"unit": "USD",
+			"method": "Bifrost's own cost field summed over the session's rows (its pricing, not the bench's pinned snapshot); unknown when an answered row has no cost"
+		},
+		{
+			"name": "tokens",
+			"label": "Tokens per session",
+			"kind": "ordinal",
+			"lower_is_better": true,
+			"unit": "tokens",
+			"method": "prompt plus completion tokens from Bifrost's token_usage, summed; unknown when an answered row has none"
+		},
+		{
+			"name": "judge_score",
+			"label": "Judge score",
+			"kind": "rate",
+			"lower_is_better": false,
+			"method": "a model judge's 0 to 1 score of the redacted transcript, on a sample; reported only, and compared only when a judge calibration record covers the exact model and prompt"
+		}
+	],
+	"grouping": {
+		"by_session_id": 160,
+		"by_gap": 6,
+		"concurrent": 0,
+		"gap_seconds": 300,
+		"reliability": "some sessions were grouped by the idle-gap heuristic (same key and user, no gap longer than sessions.gap); conversations running at once on one key would be merged; send x-bf-session-id from the agent for exact sessions"
+	},
+	"compare": {
+		"evidence": "live",
+		"baseline": "v1",
+		"candidate": "v2",
+		"result": "worse",
+		"alpha": 0.05,
+		"per_test_level": 0.0019230769230769232,
+		"threshold": 520,
+		"min_pairs": 20,
+		"started_at": "2026-11-18T08:00:00Z",
+		"decided_at": "2026-11-18T08:00:00Z",
+		"sessions_baseline": 80,
+		"sessions_candidate": 86,
+		"restarts": 0,
+		"signals": [
+			{
+				"name": "request_error_rate",
+				"label": "Request errors",
+				"kind": "rate",
+				"lower_is_better": true,
+				"pairs": 80,
+				"need_pairs": 0,
+				"sessions_baseline": 80,
+				"sessions_candidate": 86,
+				"mean_baseline": 0,
+				"mean_candidate": 0.15503875968992256,
+				"e_worse": 72.40304527658418,
+				"e_better": 0.2769868380733941,
+				"decision": "not_yet_known"
+			},
+			{
+				"name": "tool_error_rate",
+				"label": "Tool errors",
+				"kind": "rate",
+				"lower_is_better": true,
+				"pairs": 80,
+				"need_pairs": 0,
+				"sessions_baseline": 80,
+				"sessions_candidate": 86,
+				"mean_baseline": 0,
+				"mean_candidate": 0.23255813953488372,
+				"e_worse": 886.8725075392847,
+				"e_better": 0.2043305838806668,
+				"decision": "worse",
+				"decided_at": "2026-11-18T08:00:00Z"
+			},
+			{
+				"name": "loop",
+				"label": "Loops",
+				"kind": "rate",
+				"lower_is_better": true,
+				"pairs": 80,
+				"need_pairs": 0,
+				"sessions_baseline": 80,
+				"sessions_candidate": 86,
+				"mean_baseline": 0,
+				"mean_candidate": 0.06976744186046512,
+				"e_worse": 2.3699407766666662,
+				"e_better": 0.5072634433333333,
+				"decision": "not_yet_known"
+			},
+			{
+				"name": "retried",
+				"label": "Retried",
+				"kind": "rate",
+				"lower_is_better": true,
+				"pairs": 80,
+				"need_pairs": 0,
+				"sessions_baseline": 80,
+				"sessions_candidate": 86,
+				"mean_baseline": 0,
+				"mean_candidate": 0,
+				"e_worse": 1,
+				"e_better": 1,
+				"decision": "not_yet_known"
+			},
+			{
+				"name": "fallback",
+				"label": "Fallbacks",
+				"kind": "rate",
+				"lower_is_better": true,
+				"pairs": 80,
+				"need_pairs": 0,
+				"sessions_baseline": 80,
+				"sessions_candidate": 86,
+				"mean_baseline": 0,
+				"mean_candidate": 0,
+				"e_worse": 1,
+				"e_better": 1,
+				"decision": "not_yet_known"
+			},
+			{
+				"name": "refusal",
+				"label": "Refusals",
+				"kind": "rate",
+				"lower_is_better": true,
+				"pairs": 80,
+				"need_pairs": 0,
+				"sessions_baseline": 80,
+				"sessions_candidate": 86,
+				"mean_baseline": 0,
+				"mean_candidate": 0,
+				"e_worse": 1,
+				"e_better": 1,
+				"decision": "not_yet_known"
+			},
+			{
+				"name": "budget_hit",
+				"label": "Budget hits",
+				"kind": "rate",
+				"lower_is_better": true,
+				"pairs": 80,
+				"need_pairs": 0,
+				"sessions_baseline": 80,
+				"sessions_candidate": 86,
+				"mean_baseline": 0,
+				"mean_candidate": 0,
+				"e_worse": 1,
+				"e_better": 1,
+				"decision": "not_yet_known"
+			},
+			{
+				"name": "injection_marker",
+				"label": "Injection markers",
+				"kind": "rate",
+				"lower_is_better": true,
+				"pairs": 80,
+				"need_pairs": 0,
+				"sessions_baseline": 80,
+				"sessions_candidate": 86,
+				"mean_baseline": 0,
+				"mean_candidate": 0.03488372093023256,
+				"e_worse": 1.4775666666666667,
+				"e_better": 0.6642333333333333,
+				"decision": "not_yet_known"
+			},
+			{
+				"name": "abandoned",
+				"label": "Abandoned",
+				"kind": "rate",
+				"lower_is_better": true,
+				"pairs": 80,
+				"need_pairs": 0,
+				"sessions_baseline": 80,
+				"sessions_candidate": 86,
+				"mean_baseline": 0,
+				"mean_candidate": 0.46511627906976744,
+				"e_worse": 834185.6578985124,
+				"e_better": 0.10415490048930097,
+				"decision": "worse",
+				"decided_at": "2026-11-18T08:00:00Z"
+			},
+			{
+				"name": "turn_latency_ms",
+				"label": "Latency per turn",
+				"kind": "ordinal",
+				"lower_is_better": true,
+				"unit": "ms",
+				"pairs": 80,
+				"need_pairs": 0,
+				"sessions_baseline": 80,
+				"sessions_candidate": 86,
+				"mean_baseline": 800,
+				"mean_candidate": 800,
+				"e_worse": 1,
+				"e_better": 1,
+				"decision": "not_yet_known"
+			},
+			{
+				"name": "session_ms",
+				"label": "Latency per session",
+				"kind": "ordinal",
+				"lower_is_better": true,
+				"unit": "ms",
+				"pairs": 80,
+				"need_pairs": 0,
+				"sessions_baseline": 80,
+				"sessions_candidate": 86,
+				"mean_baseline": 3000,
+				"mean_candidate": 3153.4883720930234,
+				"e_worse": 2.3699407766666662,
+				"e_better": 0.5072634433333333,
+				"decision": "not_yet_known"
+			},
+			{
+				"name": "cost_usd",
+				"label": "Cost per session",
+				"kind": "ordinal",
+				"lower_is_better": true,
+				"unit": "USD",
+				"pairs": 80,
+				"need_pairs": 0,
+				"sessions_baseline": 80,
+				"sessions_candidate": 86,
+				"mean_baseline": 0.003000000000000002,
+				"mean_candidate": 0.0026744186046511647,
+				"e_worse": 0.11709392915150038,
+				"e_better": 53934.31191273479,
+				"decision": "better",
+				"decided_at": "2026-11-18T08:00:00Z"
+			},
+			{
+				"name": "tokens",
+				"label": "Tokens per session",
+				"kind": "ordinal",
+				"lower_is_better": true,
+				"unit": "tokens",
+				"pairs": 80,
+				"need_pairs": 0,
+				"sessions_baseline": 80,
+				"sessions_candidate": 86,
+				"mean_baseline": 660,
+				"mean_candidate": 576.7441860465116,
+				"e_worse": 0.11709392915150038,
+				"e_better": 53934.31191273479,
+				"decision": "better",
+				"decided_at": "2026-11-18T08:00:00Z"
+			}
+		],
+		"method": "Always-valid sequential test per signal: sessions of the two versions are paired in order of scoring; a rate signal bets on the difference of the pair, an ordinal one on which is larger; two one-sided betting e-processes per signal (a mixture over a fixed grid of bets) are each tested at alpha / (2 x signals), so by Ville's inequality the chance that any signal ever decides when the versions do not differ is at most alpha, over every look. A signal decides only after the minimum pairs. Live evidence: no ground truth and no control of inputs, never part of an experiment verdict."
+	},
+	"worst": [
+		{
+			"seq": 163,
+			"id": "ls_2eea7ddd72c3f261",
+			"version": "v2",
+			"evidence": "live",
+			"grouping": "session_id",
+			"started": "2026-11-18T06:26:05Z",
+			"ended": "2026-11-18T06:26:08Z",
+			"scored_at": "2026-11-18T08:00:00Z",
+			"requests": 3,
+			"model": "anthropic/claude-x",
+			"last_row": "b78-2",
+			"signals": {
+				"request_errors": 1,
+				"request_error_rate": 0.3333333333333333,
+				"tool_calls": 2,
+				"tool_errors": 1,
+				"tool_error_rate": 0.5,
+				"repeated_calls": 0,
+				"loop": false,
+				"retries": 0,
+				"fallbacks": 0,
+				"refusal": false,
+				"turn_latency_ms": 800,
+				"max_turn_latency_ms": 800,
+				"session_ms": 3000,
+				"cost_usd": 0.002,
+				"tokens": 340,
+				"budget_hits": 0,
+				"rate_limited": 0,
+				"injection_markers": 0,
+				"abandoned": true
+			},
+			"flags": [
+				"abandoned",
+				"request_error",
+				"tool_error"
+			],
+			"severity": 9,
+			"signature": "f_0e16a39d5ba5c395",
+			"inbox_item": "inc-0e16a39d5ba5"
+		},
+		{
+			"seq": 161,
+			"id": "ls_9a4fb94d3603e9e8",
+			"version": "v2",
+			"evidence": "live",
+			"grouping": "session_id",
+			"started": "2026-11-18T06:25:25Z",
+			"ended": "2026-11-18T06:25:28Z",
+			"scored_at": "2026-11-18T08:00:00Z",
+			"requests": 3,
+			"model": "anthropic/claude-x",
+			"last_row": "b76-2",
+			"signals": {
+				"request_errors": 1,
+				"request_error_rate": 0.3333333333333333,
+				"tool_calls": 2,
+				"tool_errors": 1,
+				"tool_error_rate": 0.5,
+				"repeated_calls": 0,
+				"loop": false,
+				"retries": 0,
+				"fallbacks": 0,
+				"refusal": false,
+				"turn_latency_ms": 800,
+				"max_turn_latency_ms": 800,
+				"session_ms": 3000,
+				"cost_usd": 0.002,
+				"tokens": 340,
+				"budget_hits": 0,
+				"rate_limited": 0,
+				"injection_markers": 0,
+				"abandoned": true
+			},
+			"flags": [
+				"abandoned",
+				"request_error",
+				"tool_error"
+			],
+			"severity": 9,
+			"signature": "f_0e16a39d5ba5c395",
+			"inbox_item": "inc-0e16a39d5ba5"
+		},
+		{
+			"seq": 159,
+			"id": "ls_dc5553de8fa7a47e",
+			"version": "v2",
+			"evidence": "live",
+			"grouping": "session_id",
+			"started": "2026-11-18T06:24:45Z",
+			"ended": "2026-11-18T06:24:48Z",
+			"scored_at": "2026-11-18T08:00:00Z",
+			"requests": 3,
+			"model": "anthropic/claude-x",
+			"last_row": "b74-2",
+			"signals": {
+				"request_errors": 1,
+				"request_error_rate": 0.3333333333333333,
+				"tool_calls": 2,
+				"tool_errors": 1,
+				"tool_error_rate": 0.5,
+				"repeated_calls": 0,
+				"loop": false,
+				"retries": 0,
+				"fallbacks": 0,
+				"refusal": false,
+				"turn_latency_ms": 800,
+				"max_turn_latency_ms": 800,
+				"session_ms": 3000,
+				"cost_usd": 0.002,
+				"tokens": 340,
+				"budget_hits": 0,
+				"rate_limited": 0,
+				"injection_markers": 0,
+				"abandoned": true
+			},
+			"flags": [
+				"abandoned",
+				"request_error",
+				"tool_error"
+			],
+			"severity": 9,
+			"signature": "f_0e16a39d5ba5c395",
+			"inbox_item": "inc-0e16a39d5ba5"
+		},
+		{
+			"seq": 157,
+			"id": "ls_ea332d486f38e9ff",
+			"version": "v2",
+			"evidence": "live",
+			"grouping": "session_id",
+			"started": "2026-11-18T06:24:05Z",
+			"ended": "2026-11-18T06:24:08Z",
+			"scored_at": "2026-11-18T08:00:00Z",
+			"requests": 3,
+			"model": "anthropic/claude-x",
+			"last_row": "b72-2",
+			"signals": {
+				"request_errors": 1,
+				"request_error_rate": 0.3333333333333333,
+				"tool_calls": 2,
+				"tool_errors": 1,
+				"tool_error_rate": 0.5,
+				"repeated_calls": 0,
+				"loop": false,
+				"retries": 0,
+				"fallbacks": 0,
+				"refusal": false,
+				"turn_latency_ms": 800,
+				"max_turn_latency_ms": 800,
+				"session_ms": 3000,
+				"cost_usd": 0.002,
+				"tokens": 340,
+				"budget_hits": 0,
+				"rate_limited": 0,
+				"injection_markers": 0,
+				"abandoned": true
+			},
+			"flags": [
+				"abandoned",
+				"request_error",
+				"tool_error"
+			],
+			"severity": 9,
+			"signature": "f_0e16a39d5ba5c395",
+			"inbox_item": "inc-0e16a39d5ba5"
+		},
+		{
+			"seq": 155,
+			"id": "ls_59464b88f5a61557",
+			"version": "v2",
+			"evidence": "live",
+			"grouping": "session_id",
+			"started": "2026-11-18T06:23:25Z",
+			"ended": "2026-11-18T06:23:28Z",
+			"scored_at": "2026-11-18T08:00:00Z",
+			"requests": 3,
+			"model": "anthropic/claude-x",
+			"last_row": "b70-2",
+			"signals": {
+				"request_errors": 1,
+				"request_error_rate": 0.3333333333333333,
+				"tool_calls": 2,
+				"tool_errors": 1,
+				"tool_error_rate": 0.5,
+				"repeated_calls": 0,
+				"loop": false,
+				"retries": 0,
+				"fallbacks": 0,
+				"refusal": false,
+				"turn_latency_ms": 800,
+				"max_turn_latency_ms": 800,
+				"session_ms": 3000,
+				"cost_usd": 0.002,
+				"tokens": 340,
+				"budget_hits": 0,
+				"rate_limited": 0,
+				"injection_markers": 0,
+				"abandoned": true
+			},
+			"flags": [
+				"abandoned",
+				"request_error",
+				"tool_error"
+			],
+			"severity": 9,
+			"signature": "f_0e16a39d5ba5c395",
+			"inbox_item": "inc-0e16a39d5ba5"
+		},
+		{
+			"seq": 153,
+			"id": "ls_cdeb0436a4587e81",
+			"version": "v2",
+			"evidence": "live",
+			"grouping": "session_id",
+			"started": "2026-11-18T06:22:45Z",
+			"ended": "2026-11-18T06:22:48Z",
+			"scored_at": "2026-11-18T08:00:00Z",
+			"requests": 3,
+			"model": "anthropic/claude-x",
+			"last_row": "b68-2",
+			"signals": {
+				"request_errors": 1,
+				"request_error_rate": 0.3333333333333333,
+				"tool_calls": 2,
+				"tool_errors": 1,
+				"tool_error_rate": 0.5,
+				"repeated_calls": 0,
+				"loop": false,
+				"retries": 0,
+				"fallbacks": 0,
+				"refusal": false,
+				"turn_latency_ms": 800,
+				"max_turn_latency_ms": 800,
+				"session_ms": 3000,
+				"cost_usd": 0.002,
+				"tokens": 340,
+				"budget_hits": 0,
+				"rate_limited": 0,
+				"injection_markers": 0,
+				"abandoned": true
+			},
+			"flags": [
+				"abandoned",
+				"request_error",
+				"tool_error"
+			],
+			"severity": 9,
+			"signature": "f_0e16a39d5ba5c395",
+			"inbox_item": "inc-0e16a39d5ba5"
+		},
+		{
+			"seq": 151,
+			"id": "ls_12fe9b6b0fea7e68",
+			"version": "v2",
+			"evidence": "live",
+			"grouping": "session_id",
+			"started": "2026-11-18T06:22:05Z",
+			"ended": "2026-11-18T06:22:08Z",
+			"scored_at": "2026-11-18T08:00:00Z",
+			"requests": 3,
+			"model": "anthropic/claude-x",
+			"last_row": "b66-2",
+			"signals": {
+				"request_errors": 1,
+				"request_error_rate": 0.3333333333333333,
+				"tool_calls": 2,
+				"tool_errors": 1,
+				"tool_error_rate": 0.5,
+				"repeated_calls": 0,
+				"loop": false,
+				"retries": 0,
+				"fallbacks": 0,
+				"refusal": false,
+				"turn_latency_ms": 800,
+				"max_turn_latency_ms": 800,
+				"session_ms": 3000,
+				"cost_usd": 0.002,
+				"tokens": 340,
+				"budget_hits": 0,
+				"rate_limited": 0,
+				"injection_markers": 0,
+				"abandoned": true
+			},
+			"flags": [
+				"abandoned",
+				"request_error",
+				"tool_error"
+			],
+			"severity": 9,
+			"signature": "f_0e16a39d5ba5c395",
+			"inbox_item": "inc-0e16a39d5ba5"
+		},
+		{
+			"seq": 148,
+			"id": "ls_6c10ba8d90c3570b",
+			"version": "v2",
+			"evidence": "live",
+			"grouping": "session_id",
+			"started": "2026-11-18T06:21:25Z",
+			"ended": "2026-11-18T06:21:28Z",
+			"scored_at": "2026-11-18T08:00:00Z",
+			"requests": 3,
+			"model": "anthropic/claude-x",
+			"last_row": "b64-2",
+			"signals": {
+				"request_errors": 1,
+				"request_error_rate": 0.3333333333333333,
+				"tool_calls": 2,
+				"tool_errors": 1,
+				"tool_error_rate": 0.5,
+				"repeated_calls": 0,
+				"loop": false,
+				"retries": 0,
+				"fallbacks": 0,
+				"refusal": false,
+				"turn_latency_ms": 800,
+				"max_turn_latency_ms": 800,
+				"session_ms": 3000,
+				"cost_usd": 0.002,
+				"tokens": 340,
+				"budget_hits": 0,
+				"rate_limited": 0,
+				"injection_markers": 0,
+				"abandoned": true
+			},
+			"flags": [
+				"abandoned",
+				"request_error",
+				"tool_error"
+			],
+			"severity": 9,
+			"signature": "f_0e16a39d5ba5c395",
+			"inbox_item": "inc-0e16a39d5ba5"
+		},
+		{
+			"seq": 146,
+			"id": "ls_e59388ff6cde936f",
+			"version": "v2",
+			"evidence": "live",
+			"grouping": "session_id",
+			"started": "2026-11-18T06:20:45Z",
+			"ended": "2026-11-18T06:20:48Z",
+			"scored_at": "2026-11-18T08:00:00Z",
+			"requests": 3,
+			"model": "anthropic/claude-x",
+			"last_row": "b62-2",
+			"signals": {
+				"request_errors": 1,
+				"request_error_rate": 0.3333333333333333,
+				"tool_calls": 2,
+				"tool_errors": 1,
+				"tool_error_rate": 0.5,
+				"repeated_calls": 0,
+				"loop": false,
+				"retries": 0,
+				"fallbacks": 0,
+				"refusal": false,
+				"turn_latency_ms": 800,
+				"max_turn_latency_ms": 800,
+				"session_ms": 3000,
+				"cost_usd": 0.002,
+				"tokens": 340,
+				"budget_hits": 0,
+				"rate_limited": 0,
+				"injection_markers": 0,
+				"abandoned": true
+			},
+			"flags": [
+				"abandoned",
+				"request_error",
+				"tool_error"
+			],
+			"severity": 9,
+			"signature": "f_0e16a39d5ba5c395",
+			"inbox_item": "inc-0e16a39d5ba5"
+		},
+		{
+			"seq": 144,
+			"id": "ls_d5392bbf79c8c997",
+			"version": "v2",
+			"evidence": "live",
+			"grouping": "session_id",
+			"started": "2026-11-18T06:20:05Z",
+			"ended": "2026-11-18T06:20:08Z",
+			"scored_at": "2026-11-18T08:00:00Z",
+			"requests": 3,
+			"model": "anthropic/claude-x",
+			"last_row": "b60-2",
+			"signals": {
+				"request_errors": 1,
+				"request_error_rate": 0.3333333333333333,
+				"tool_calls": 2,
+				"tool_errors": 1,
+				"tool_error_rate": 0.5,
+				"repeated_calls": 0,
+				"loop": false,
+				"retries": 0,
+				"fallbacks": 0,
+				"refusal": false,
+				"turn_latency_ms": 800,
+				"max_turn_latency_ms": 800,
+				"session_ms": 3000,
+				"cost_usd": 0.002,
+				"tokens": 340,
+				"budget_hits": 0,
+				"rate_limited": 0,
+				"injection_markers": 0,
+				"abandoned": true
+			},
+			"flags": [
+				"abandoned",
+				"request_error",
+				"tool_error"
+			],
+			"severity": 9,
+			"signature": "f_0e16a39d5ba5c395",
+			"inbox_item": "inc-0e16a39d5ba5"
+		},
+		{
+			"seq": 142,
+			"id": "ls_2558546819534107",
+			"version": "v2",
+			"evidence": "live",
+			"grouping": "session_id",
+			"started": "2026-11-18T06:19:25Z",
+			"ended": "2026-11-18T06:19:28Z",
+			"scored_at": "2026-11-18T08:00:00Z",
+			"requests": 3,
+			"model": "anthropic/claude-x",
+			"last_row": "b58-2",
+			"signals": {
+				"request_errors": 1,
+				"request_error_rate": 0.3333333333333333,
+				"tool_calls": 2,
+				"tool_errors": 1,
+				"tool_error_rate": 0.5,
+				"repeated_calls": 0,
+				"loop": false,
+				"retries": 0,
+				"fallbacks": 0,
+				"refusal": false,
+				"turn_latency_ms": 800,
+				"max_turn_latency_ms": 800,
+				"session_ms": 3000,
+				"cost_usd": 0.002,
+				"tokens": 340,
+				"budget_hits": 0,
+				"rate_limited": 0,
+				"injection_markers": 0,
+				"abandoned": true
+			},
+			"flags": [
+				"abandoned",
+				"request_error",
+				"tool_error"
+			],
+			"severity": 9,
+			"signature": "f_0e16a39d5ba5c395",
+			"inbox_item": "inc-0e16a39d5ba5"
+		},
+		{
+			"seq": 140,
+			"id": "ls_a66a556af65ceca8",
+			"version": "v2",
+			"evidence": "live",
+			"grouping": "session_id",
+			"started": "2026-11-18T06:18:45Z",
+			"ended": "2026-11-18T06:18:48Z",
+			"scored_at": "2026-11-18T08:00:00Z",
+			"requests": 3,
+			"model": "anthropic/claude-x",
+			"last_row": "b56-2",
+			"signals": {
+				"request_errors": 1,
+				"request_error_rate": 0.3333333333333333,
+				"tool_calls": 2,
+				"tool_errors": 1,
+				"tool_error_rate": 0.5,
+				"repeated_calls": 0,
+				"loop": false,
+				"retries": 0,
+				"fallbacks": 0,
+				"refusal": false,
+				"turn_latency_ms": 800,
+				"max_turn_latency_ms": 800,
+				"session_ms": 3000,
+				"cost_usd": 0.002,
+				"tokens": 340,
+				"budget_hits": 0,
+				"rate_limited": 0,
+				"injection_markers": 0,
+				"abandoned": true
+			},
+			"flags": [
+				"abandoned",
+				"request_error",
+				"tool_error"
+			],
+			"severity": 9,
+			"signature": "f_0e16a39d5ba5c395",
+			"inbox_item": "inc-0e16a39d5ba5"
+		},
+		{
+			"seq": 138,
+			"id": "ls_5f4a7703583f989a",
+			"version": "v2",
+			"evidence": "live",
+			"grouping": "session_id",
+			"started": "2026-11-18T06:18:05Z",
+			"ended": "2026-11-18T06:18:08Z",
+			"scored_at": "2026-11-18T08:00:00Z",
+			"requests": 3,
+			"model": "anthropic/claude-x",
+			"last_row": "b54-2",
+			"signals": {
+				"request_errors": 1,
+				"request_error_rate": 0.3333333333333333,
+				"tool_calls": 2,
+				"tool_errors": 1,
+				"tool_error_rate": 0.5,
+				"repeated_calls": 0,
+				"loop": false,
+				"retries": 0,
+				"fallbacks": 0,
+				"refusal": false,
+				"turn_latency_ms": 800,
+				"max_turn_latency_ms": 800,
+				"session_ms": 3000,
+				"cost_usd": 0.002,
+				"tokens": 340,
+				"budget_hits": 0,
+				"rate_limited": 0,
+				"injection_markers": 0,
+				"abandoned": true
+			},
+			"flags": [
+				"abandoned",
+				"request_error",
+				"tool_error"
+			],
+			"severity": 9,
+			"signature": "f_0e16a39d5ba5c395",
+			"inbox_item": "inc-0e16a39d5ba5"
+		},
+		{
+			"seq": 136,
+			"id": "ls_5876d6c0182d8244",
+			"version": "v2",
+			"evidence": "live",
+			"grouping": "session_id",
+			"started": "2026-11-18T06:17:25Z",
+			"ended": "2026-11-18T06:17:28Z",
+			"scored_at": "2026-11-18T08:00:00Z",
+			"requests": 3,
+			"model": "anthropic/claude-x",
+			"last_row": "b52-2",
+			"signals": {
+				"request_errors": 1,
+				"request_error_rate": 0.3333333333333333,
+				"tool_calls": 2,
+				"tool_errors": 1,
+				"tool_error_rate": 0.5,
+				"repeated_calls": 0,
+				"loop": false,
+				"retries": 0,
+				"fallbacks": 0,
+				"refusal": false,
+				"turn_latency_ms": 800,
+				"max_turn_latency_ms": 800,
+				"session_ms": 3000,
+				"cost_usd": 0.002,
+				"tokens": 340,
+				"budget_hits": 0,
+				"rate_limited": 0,
+				"injection_markers": 0,
+				"abandoned": true
+			},
+			"flags": [
+				"abandoned",
+				"request_error",
+				"tool_error"
+			],
+			"severity": 9,
+			"signature": "f_0e16a39d5ba5c395",
+			"inbox_item": "inc-0e16a39d5ba5"
+		},
+		{
+			"seq": 134,
+			"id": "ls_226c10e07d0d9f5e",
+			"version": "v2",
+			"evidence": "live",
+			"grouping": "session_id",
+			"started": "2026-11-18T06:16:45Z",
+			"ended": "2026-11-18T06:16:48Z",
+			"scored_at": "2026-11-18T08:00:00Z",
+			"requests": 3,
+			"model": "anthropic/claude-x",
+			"last_row": "b50-2",
+			"signals": {
+				"request_errors": 1,
+				"request_error_rate": 0.3333333333333333,
+				"tool_calls": 2,
+				"tool_errors": 1,
+				"tool_error_rate": 0.5,
+				"repeated_calls": 0,
+				"loop": false,
+				"retries": 0,
+				"fallbacks": 0,
+				"refusal": false,
+				"turn_latency_ms": 800,
+				"max_turn_latency_ms": 800,
+				"session_ms": 3000,
+				"cost_usd": 0.002,
+				"tokens": 340,
+				"budget_hits": 0,
+				"rate_limited": 0,
+				"injection_markers": 0,
+				"abandoned": true
+			},
+			"flags": [
+				"abandoned",
+				"request_error",
+				"tool_error"
+			],
+			"severity": 9,
+			"signature": "f_0e16a39d5ba5c395",
+			"inbox_item": "inc-0e16a39d5ba5"
+		},
+		{
+			"seq": 132,
+			"id": "ls_7b3bf7ab550a2294",
+			"version": "v2",
+			"evidence": "live",
+			"grouping": "session_id",
+			"started": "2026-11-18T06:16:05Z",
+			"ended": "2026-11-18T06:16:08Z",
+			"scored_at": "2026-11-18T08:00:00Z",
+			"requests": 3,
+			"model": "anthropic/claude-x",
+			"last_row": "b48-2",
+			"signals": {
+				"request_errors": 1,
+				"request_error_rate": 0.3333333333333333,
+				"tool_calls": 2,
+				"tool_errors": 1,
+				"tool_error_rate": 0.5,
+				"repeated_calls": 0,
+				"loop": false,
+				"retries": 0,
+				"fallbacks": 0,
+				"refusal": false,
+				"turn_latency_ms": 800,
+				"max_turn_latency_ms": 800,
+				"session_ms": 3000,
+				"cost_usd": 0.002,
+				"tokens": 340,
+				"budget_hits": 0,
+				"rate_limited": 0,
+				"injection_markers": 0,
+				"abandoned": true
+			},
+			"flags": [
+				"abandoned",
+				"request_error",
+				"tool_error"
+			],
+			"severity": 9,
+			"signature": "f_0e16a39d5ba5c395",
+			"inbox_item": "inc-0e16a39d5ba5"
+		},
+		{
+			"seq": 130,
+			"id": "ls_a5f73b1250b409ef",
+			"version": "v2",
+			"evidence": "live",
+			"grouping": "session_id",
+			"started": "2026-11-18T06:15:25Z",
+			"ended": "2026-11-18T06:15:28Z",
+			"scored_at": "2026-11-18T08:00:00Z",
+			"requests": 3,
+			"model": "anthropic/claude-x",
+			"last_row": "b46-2",
+			"signals": {
+				"request_errors": 1,
+				"request_error_rate": 0.3333333333333333,
+				"tool_calls": 2,
+				"tool_errors": 1,
+				"tool_error_rate": 0.5,
+				"repeated_calls": 0,
+				"loop": false,
+				"retries": 0,
+				"fallbacks": 0,
+				"refusal": false,
+				"turn_latency_ms": 800,
+				"max_turn_latency_ms": 800,
+				"session_ms": 3000,
+				"cost_usd": 0.002,
+				"tokens": 340,
+				"budget_hits": 0,
+				"rate_limited": 0,
+				"injection_markers": 0,
+				"abandoned": true
+			},
+			"flags": [
+				"abandoned",
+				"request_error",
+				"tool_error"
+			],
+			"severity": 9,
+			"signature": "f_0e16a39d5ba5c395",
+			"inbox_item": "inc-0e16a39d5ba5"
+		},
+		{
+			"seq": 128,
+			"id": "ls_0c9651d0755dfd30",
+			"version": "v2",
+			"evidence": "live",
+			"grouping": "session_id",
+			"started": "2026-11-18T06:14:45Z",
+			"ended": "2026-11-18T06:14:48Z",
+			"scored_at": "2026-11-18T08:00:00Z",
+			"requests": 3,
+			"model": "anthropic/claude-x",
+			"last_row": "b44-2",
+			"signals": {
+				"request_errors": 1,
+				"request_error_rate": 0.3333333333333333,
+				"tool_calls": 2,
+				"tool_errors": 1,
+				"tool_error_rate": 0.5,
+				"repeated_calls": 0,
+				"loop": false,
+				"retries": 0,
+				"fallbacks": 0,
+				"refusal": false,
+				"turn_latency_ms": 800,
+				"max_turn_latency_ms": 800,
+				"session_ms": 3000,
+				"cost_usd": 0.002,
+				"tokens": 340,
+				"budget_hits": 0,
+				"rate_limited": 0,
+				"injection_markers": 0,
+				"abandoned": true
+			},
+			"flags": [
+				"abandoned",
+				"request_error",
+				"tool_error"
+			],
+			"severity": 9,
+			"signature": "f_0e16a39d5ba5c395",
+			"inbox_item": "inc-0e16a39d5ba5"
+		},
+		{
+			"seq": 125,
+			"id": "ls_267d0aed3220b717",
+			"version": "v2",
+			"evidence": "live",
+			"grouping": "session_id",
+			"started": "2026-11-18T06:14:05Z",
+			"ended": "2026-11-18T06:14:08Z",
+			"scored_at": "2026-11-18T08:00:00Z",
+			"requests": 3,
+			"model": "anthropic/claude-x",
+			"last_row": "b42-2",
+			"signals": {
+				"request_errors": 1,
+				"request_error_rate": 0.3333333333333333,
+				"tool_calls": 2,
+				"tool_errors": 1,
+				"tool_error_rate": 0.5,
+				"repeated_calls": 0,
+				"loop": false,
+				"retries": 0,
+				"fallbacks": 0,
+				"refusal": false,
+				"turn_latency_ms": 800,
+				"max_turn_latency_ms": 800,
+				"session_ms": 3000,
+				"cost_usd": 0.002,
+				"tokens": 340,
+				"budget_hits": 0,
+				"rate_limited": 0,
+				"injection_markers": 0,
+				"abandoned": true
+			},
+			"flags": [
+				"abandoned",
+				"request_error",
+				"tool_error"
+			],
+			"severity": 9,
+			"signature": "f_0e16a39d5ba5c395",
+			"inbox_item": "inc-0e16a39d5ba5"
+		},
+		{
+			"seq": 123,
+			"id": "ls_fdfbf28813ec52a3",
+			"version": "v2",
+			"evidence": "live",
+			"grouping": "session_id",
+			"started": "2026-11-18T06:13:25Z",
+			"ended": "2026-11-18T06:13:28Z",
+			"scored_at": "2026-11-18T08:00:00Z",
+			"requests": 3,
+			"model": "anthropic/claude-x",
+			"last_row": "b40-2",
+			"signals": {
+				"request_errors": 1,
+				"request_error_rate": 0.3333333333333333,
+				"tool_calls": 2,
+				"tool_errors": 1,
+				"tool_error_rate": 0.5,
+				"repeated_calls": 0,
+				"loop": false,
+				"retries": 0,
+				"fallbacks": 0,
+				"refusal": false,
+				"turn_latency_ms": 800,
+				"max_turn_latency_ms": 800,
+				"session_ms": 3000,
+				"cost_usd": 0.002,
+				"tokens": 340,
+				"budget_hits": 0,
+				"rate_limited": 0,
+				"injection_markers": 0,
+				"abandoned": true
+			},
+			"flags": [
+				"abandoned",
+				"request_error",
+				"tool_error"
+			],
+			"severity": 9,
+			"signature": "f_0e16a39d5ba5c395",
+			"inbox_item": "inc-0e16a39d5ba5"
+		}
+	],
+	"events": [
+		{
+			"at": "2026-11-18T08:00:00Z",
+			"event": "alert",
+			"detail": "live_signal_threshold: live abandoned of version v2 is 46.5% over the last 24h0m0s (86 sessions), above the threshold 25.0% (live evidence: no ground truth)"
+		},
+		{
+			"at": "2026-11-18T08:00:00Z",
+			"event": "alert",
+			"detail": "live_comparison_worse: live comparison: v2 vs v1: worse (86 and 80 sessions; tool_error_rate worse at 80 pairs; abandoned worse at 80 pairs; cost_usd better at 80 pairs; tokens better at 80 pairs) (live evidence: no ground truth, no control of inputs)"
+		},
+		{
+			"at": "2026-11-18T08:00:00Z",
+			"event": "pull",
+			"detail": "scored 166 sessions, skipped 0 by sampling, 0 open, 166 detail rows, inbox 3 items"
+		},
+		{
+			"at": "2026-11-18T08:00:00Z",
+			"event": "decision",
+			"detail": "abandoned: worse"
+		},
+		{
+			"at": "2026-11-18T08:00:00Z",
+			"event": "decision",
+			"detail": "cost_usd: better"
+		},
+		{
+			"at": "2026-11-18T08:00:00Z",
+			"event": "decision",
+			"detail": "tokens: better"
+		},
+		{
+			"at": "2026-11-18T08:00:00Z",
+			"event": "decision",
+			"detail": "tool_error_rate: worse"
+		}
+	],
+	"privacy": {
+		"sample_rate": 1,
+		"retention_days": 30,
+		"stores_text": false,
+		"inbox_redacted": true,
+		"inbox_push": true,
+		"inbox_max_per_pull": 3
+	},
+	"judge": {
+		"model": "openai/judge",
+		"sample_rate": 0.2,
+		"calibrated": false,
+		"note": "no calibration record covers this judge and prompt; its scores are reported and never decide"
+	}
+}

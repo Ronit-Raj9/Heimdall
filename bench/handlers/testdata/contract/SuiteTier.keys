@@ -1,0 +1,6 @@
+# Keys of bench.ts `SuiteTier`, one per line; a trailing ? marks an optional (Go omitempty) key.
+# Change with bench.ts and schemas/suitesapi.go (U3: handlers/suitetiers.go).
+name
+tasks
+defined
+error?

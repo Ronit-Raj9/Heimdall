@@ -6,7 +6,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { renderToStaticMarkup } from "react-dom/server";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import AgentDiffView from "./agentDiffView";
+import AgentDiffTab from "./agentDiffTab";
 
 const query = vi.hoisted(() => ({
 	diff: {} as Record<string, unknown>,
@@ -33,7 +33,7 @@ vi.mock("@tanstack/react-router", () => ({
 	},
 }));
 
-const fixtureDir = path.resolve(__dirname, "../../../../public/fixtures");
+const fixtureDir = path.resolve(__dirname, "../../../public/fixtures");
 const readFixture = <T,>(file: string): T => JSON.parse(fs.readFileSync(path.join(fixtureDir, file), "utf8")) as T;
 const report = readFixture<AgentDiffResponse>("agents.diff.json");
 const versionList = readFixture<AgentDiffVersionsResponse>("agents.diff.versions.json");
@@ -54,7 +54,7 @@ const loaded = (data: unknown) => ({ ...idle, isSuccess: true, data });
 function render(search: string): string {
 	return renderToStaticMarkup(
 		<NuqsTestingAdapter searchParams={search}>
-			<AgentDiffView />
+			<AgentDiffTab />
 		</NuqsTestingAdapter>,
 	);
 }
@@ -62,7 +62,7 @@ function render(search: string): string {
 /** Text with tags removed, to assert reading order. */
 const text = (html: string) => html.replace(/<[^>]+>/g, " ");
 
-describe("AgentDiffView", () => {
+describe("AgentDiffTab", () => {
 	beforeEach(() => {
 		query.diff = { ...idle };
 		query.versions = loaded(versionList);

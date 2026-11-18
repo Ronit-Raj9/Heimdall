@@ -4,7 +4,8 @@ import { ReviewQueueTable } from "@/components/review/reviewQueueTable";
 import { BlockSkeleton, EmptyNote, LoadError, Section } from "@/components/runs/screenStates";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { sortExperimentsNewestFirst } from "@/components/verdict/verdict.utils";
+import { PageHeader } from "@/components/shell";
+import { ExperimentSelect, experimentsNewestFirst } from "@/components/triage/experimentSelect";
 import { useGetReviewQueueQuery, useListExperimentsQuery } from "@/lib/store/apis/benchApi";
 import { REVIEW_REASONS, type ReviewQueueResponse } from "@/lib/types/bench";
 import { Link } from "@tanstack/react-router";
@@ -12,7 +13,6 @@ import { AlertTriangle } from "lucide-react";
 import { parseAsString, useQueryState } from "nuqs";
 import { useId, useMemo } from "react";
 import { useTranslation } from "react-i18next";
-import { ExperimentPicker } from "../../verdict/views/experimentPicker";
 import { ReviewRunPanel } from "./reviewRunPanel";
 
 /** The reason filter's value for "every reason". Not snake_case, so never a real reason. */
@@ -29,19 +29,14 @@ export default function ReviewView() {
 	const [reason, setReason] = useQueryState("reason", parseAsString);
 	const [runId, setRunId] = useQueryState("run", parseAsString);
 	const list = useListExperimentsQuery();
-	const experiments = useMemo(() => sortExperimentsNewestFirst(list.data?.experiments ?? []), [list.data]);
+	const experiments = useMemo(() => experimentsNewestFirst(list.data?.experiments ?? []), [list.data]);
 	const selectedExp = exp ?? experiments[0]?.exp_id;
 
 	return (
 		<section className="flex min-w-0 flex-col gap-6" data-testid="review-screen">
-			<header className="flex flex-col gap-1">
-				<h1 className="text-foreground text-xl font-semibold tracking-tight">{t("review.title")}</h1>
-				<p className="text-muted-foreground max-w-3xl text-sm" data-testid="review-explainer">
-					{t("review.subtitle")}
-				</p>
-			</header>
-			<div className="flex flex-wrap items-end gap-4">
-				<ExperimentPicker
+			<PageHeader title={t("review.title")} subtitle={<span data-testid="review-explainer">{t("review.subtitle")}</span>} />
+			<div className="flex flex-wrap items-end gap-3">
+				<ExperimentSelect
 					experiments={experiments}
 					value={selectedExp}
 					onChange={(id) => {
@@ -49,10 +44,17 @@ export default function ReviewView() {
 						void setRunId(null);
 					}}
 					disabled={list.isLoading || experiments.length === 0}
+					testId="review-experiment-picker"
 				/>
 				{selectedExp && (
 					<Button variant="outline" size="sm" asChild>
-						<Link to="/verdict" search={{ exp: selectedExp, grade: "reviewed" }} data-testid="review-verdict-link">
+						{/* U2 owns /experiments/$expId; grade=reviewed asks its verdict for grade source reviewed. */}
+						<Link
+							to={"/experiments/$expId" as never}
+							params={{ expId: selectedExp } as never}
+							search={{ grade: "reviewed" } as never}
+							data-testid="review-verdict-link"
+						>
 							{t("review.verdictLink")}
 						</Link>
 					</Button>

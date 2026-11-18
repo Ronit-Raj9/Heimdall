@@ -152,7 +152,7 @@ var APIRoutes = []RouteDoc{
 		{Name: "scope", Description: "Which runs count; default all"},
 		{Name: "synthetic", Description: "exclude (default) or include synthetic runs"},
 		{Name: "grade_source", Description: "original (default) or latest"},
-		{Name: "split", Description: "public (default) or held_out: the separate held-out board"},
+		{Name: "split", Description: "public (default) or held_out: the separate held-out board, served only with held_out.visible (U3)"},
 		{Name: "k", Description: "pass@k and pass^k depth, 2 or more"},
 	}},
 	// Failure clusters area (handlers/clusters.go).

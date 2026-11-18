@@ -33,11 +33,12 @@ import { useMemo } from "react";
 import { useTranslation } from "react-i18next";
 
 /**
- * Failure clusters: /clusters?suite=&agent=&exp=&since=&min=&synthetic=&sig=. Every filter goes to
+ * The Clusters tab of /inbox: ?tab=clusters&suite=&agent=&exp=&since=&min=&synthetic=&sig= (the
+ * old /clusters redirects here with its filters). Every filter goes to
  * the server; an absent one takes the server default. sig opens one cluster below the table.
  * Clusters are observed groupings of failed runs, never root causes (docs/failure-clusters.md).
  */
-export default function ClustersView() {
+export default function ClustersTab() {
 	const { t } = useTranslation("bench");
 	const [suite, setSuite] = useQueryState("suite", parseAsString);
 	const [agent, setAgent] = useQueryState("agent", parseAsString);
@@ -71,13 +72,10 @@ export default function ClustersView() {
 
 	return (
 		<section className="flex min-w-0 flex-col gap-6" data-testid="clusters-screen">
-			<header className="flex flex-col gap-1">
-				<div className="flex flex-wrap items-center gap-3">
-					<h1 className="text-foreground text-xl font-semibold tracking-tight">{t("clusters.title")}</h1>
-					<ModeBadge mode={data?.mode} isLoading={list.isLoading} isError={list.isError && !data} />
-				</div>
+			<div className="flex flex-wrap items-center gap-3">
 				<p className="text-muted-foreground max-w-3xl text-sm">{t("clusters.subtitle")}</p>
-			</header>
+				<ModeBadge mode={data?.mode} isLoading={list.isLoading} isError={list.isError && !data} />
+			</div>
 			<ClustersBanner />
 
 			<ClustersFilters

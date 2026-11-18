@@ -1,6 +1,7 @@
 import { ReleasePanel } from "@/components/releases/releasePanel";
 import { ReleaseTimeline } from "@/components/releases/releaseTimeline";
 import { LoadError } from "@/components/runs/screenStates";
+import { PageHeader } from "@/components/shell";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useListReleasesQuery } from "@/lib/store";
 import { useTranslation } from "react-i18next";
@@ -12,16 +13,13 @@ export default function ReleasesView() {
 
 	return (
 		<section className="flex flex-col gap-6" data-testid="releases-screen">
-			<div className="flex flex-col gap-1">
-				<h1 className="text-foreground text-xl font-semibold tracking-tight">{t("releases.title")}</h1>
-				<p className="text-muted-foreground text-sm">{t("releases.subtitle")}</p>
-				<p className="text-muted-foreground text-xs" data-testid="releases-disclaimer">
-					{t("releases.disclaimer")}
-				</p>
-			</div>
+			<PageHeader title={t("releases.title")} subtitle={t("releases.subtitle")} />
 			<div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_22rem] xl:items-start">
 				<div className="flex flex-col gap-3">
 					<h2 className="text-sm font-medium">{t("releases.timeline.title")}</h2>
+					<p className="text-muted-foreground text-xs" data-testid="releases-disclaimer">
+						{t("releases.disclaimer")}
+					</p>
 					{releases.isLoading ? (
 						<Skeleton className="h-40 w-full" data-testid="release-timeline-loading" />
 					) : releases.isError ? (

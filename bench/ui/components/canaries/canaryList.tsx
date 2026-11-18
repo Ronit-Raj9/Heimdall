@@ -1,4 +1,5 @@
 import { Badge } from "@/components/ui/badge";
+import { EntityLink } from "@/components/shell";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { formatDateTime } from "@/components/verdict/verdict.utils";
 import { getLocale } from "@/lib/i18n";
@@ -83,7 +84,9 @@ export function CanaryList({ canaries, selected, onSelect }: CanaryListProps) {
 									<div key={targetLabel(tg)}>{targetLabel(tg)}</div>
 								))}
 							</TableCell>
-							<TableCell className="font-mono text-xs">{c.baseline ? c.baseline.exp_id : t("canaries.list.noBaseline")}</TableCell>
+							<TableCell className="text-xs">
+								{c.baseline ? <EntityLink kind="experiment" id={c.baseline.exp_id} /> : t("canaries.list.noBaseline")}
+							</TableCell>
 							<TableCell className="text-right tabular-nums">{c.looks}</TableCell>
 							<TableCell className="text-xs">
 								{c.next ? (formatDateTime(c.next, locale) ?? c.next) : t("canaries.list.notScheduled")}

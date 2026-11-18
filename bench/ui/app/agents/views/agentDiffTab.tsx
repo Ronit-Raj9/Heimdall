@@ -12,7 +12,6 @@ import { DiffSummary, VersionCards } from "@/components/agentdiff/diffSummary";
 import { GateChanges, MetricDeltasTable } from "@/components/agentdiff/metricDeltas";
 import { TaskFlipsTable } from "@/components/agentdiff/taskFlipsTable";
 import { VersionPicker } from "@/components/agentdiff/versionPicker";
-import { ModeBadge } from "@/components/modeBadge";
 import { BlockSkeleton, EmptyNote, LoadError, Section } from "@/components/runs/screenStates";
 import { useGetAgentDiffQuery, useGetAgentDiffVersionsQuery } from "@/lib/store/apis/agentDiffApi";
 import type { AgentDiffResponse } from "@/lib/types/bench";
@@ -33,12 +32,13 @@ const searchParsers = {
 };
 
 /**
- * Agent diff: /agents/diff?a=&b=&suite=&condition=&agent=&synthetic=1. What changed between
+ * The Diff tab of /agents: ?tab=diff&a=&b=&suite=&condition=&agent=&synthetic=1 (the old
+ * /agents/diff redirects here with its query). What changed between
  * version A and version B of an agent (config half) and which tasks flipped (outcome half), over
  * verified sealed runs. With only b (a link from the leaderboard), A is that agent's previous
  * version; with only agent (a link from the agents page), the server compares its two newest.
  */
-export default function AgentDiffView() {
+export default function AgentDiffTab() {
 	const { t } = useTranslation("bench");
 	const [search, setSearch] = useQueryStates(searchParsers);
 	const versionsQuery = useGetAgentDiffVersionsQuery();
@@ -58,13 +58,7 @@ export default function AgentDiffView() {
 
 	return (
 		<section className="flex min-w-0 flex-col gap-6" data-testid="agentdiff-screen">
-			<header className="flex flex-col gap-1">
-				<div className="flex flex-wrap items-center gap-3">
-					<h1 className="text-foreground text-xl font-semibold tracking-tight">{t("agentDiff.title")}</h1>
-					<ModeBadge mode={mode} isLoading={versionsQuery.isLoading && !mode} isError={versionsQuery.isError && diff.isError && !mode} />
-				</div>
-				<p className="text-muted-foreground max-w-3xl text-sm">{t("agentDiff.subtitle")}</p>
-			</header>
+			<p className="text-muted-foreground max-w-3xl text-sm">{t("agentDiff.subtitle")}</p>
 			{synthetic && (
 				<p
 					role="note"

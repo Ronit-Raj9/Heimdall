@@ -2248,6 +2248,19 @@ export interface SuiteSummary {
 	lock_kind?: LockKind;
 	/** What no longer matches the recorded fingerprints; absent when nothing drifted or the lock is legacy. */
 	fingerprint_drift?: FingerprintDrift[];
+	/** U3: the suite's tiers (docs/suite-tiers.md): pr, nightly, headroom first; nightly always listed. */
+	tiers?: SuiteTier[];
+}
+
+/** U3: one tier of a suite, a named task subset an experiment picks with `tier:` (handlers/suitetiers.go). */
+export interface SuiteTier {
+	name: string;
+	/** Task ids in suite order. */
+	tasks: string[];
+	/** False for nightly when suite.yaml leaves it out: every task. */
+	defined: boolean;
+	/** Why planning would refuse the tier, for example an unknown task. */
+	error?: string;
 }
 
 /** GET /suites: every pack under the benchmarks root, sorted by id. */

@@ -7,7 +7,7 @@ import type { ClusterRun, Grid } from "@/lib/types/bench";
 import { skipToken } from "@reduxjs/toolkit/query/react";
 import fs from "node:fs";
 import path from "node:path";
-import ClustersView, { EmptyClusters, RunPairLink } from "./clustersView";
+import ClustersTab, { EmptyClusters, RunPairLink } from "./clustersTab";
 
 const state = vi.hoisted(() => ({
 	url: {} as Record<string, string | number | null>,
@@ -54,7 +54,7 @@ vi.mock("@/lib/store/apis/benchApi", async (importOriginal) => ({
 
 const idle = { isLoading: false, isFetching: false, isError: false, data: undefined, error: undefined, refetch: () => undefined };
 
-describe("ClustersView", () => {
+describe("ClustersTab", () => {
 	beforeEach(() => {
 		state.url = {};
 		state.list = { ...idle };
@@ -67,7 +67,7 @@ describe("ClustersView", () => {
 
 	it("shows a skeleton while loading", () => {
 		state.list = { ...idle, isLoading: true };
-		const html = renderToStaticMarkup(<ClustersView />);
+		const html = renderToStaticMarkup(<ClustersTab />);
 		expect(html).toContain('data-testid="clusters-loading"');
 		expect(html).toContain('data-testid="clusters-banner"');
 	});
@@ -75,7 +75,7 @@ describe("ClustersView", () => {
 	it("shows the server's message on failure, with a reset when filters are set", () => {
 		state.url = { suite: "nope" };
 		state.list = { ...idle, isError: true, error: { status: 400, data: { error: { message: "unknown suite nope" } } } };
-		const html = renderToStaticMarkup(<ClustersView />);
+		const html = renderToStaticMarkup(<ClustersTab />);
 		expect(html).toContain('data-testid="clusters-error"');
 		expect(html).toContain("unknown suite nope");
 		expect(html).toContain('data-testid="clusters-reset-filters"');
@@ -84,7 +84,7 @@ describe("ClustersView", () => {
 	it("sends URL filters to the server and lists clusters with the scope line", () => {
 		state.url = { agent: "codex-default", exp: "e_1, e_2", min: 2, synthetic: "include" };
 		state.list = { ...idle, data: CLUSTER_LIST_FIXTURE };
-		const html = renderToStaticMarkup(<ClustersView />);
+		const html = renderToStaticMarkup(<ClustersTab />);
 		expect(state.listArgs[0]).toEqual({ agent: "codex-default", exp: "e_1,e_2", min: 2, synthetic: "include" });
 		expect(html).toContain('data-testid="clusters-table"');
 		expect(html).toContain("12 failures in 30 verified runs");
@@ -96,7 +96,7 @@ describe("ClustersView", () => {
 		state.url = { sig: "c_99aabbccddeeff00", suite: "support-desk" };
 		state.list = { ...idle, data: CLUSTER_LIST_FIXTURE };
 		state.detail = { ...idle, data: CLUSTER_DETAIL_FIXTURE };
-		const html = renderToStaticMarkup(<ClustersView />);
+		const html = renderToStaticMarkup(<ClustersTab />);
 		expect(state.detailArgs[0]).toEqual({ signature: "c_99aabbccddeeff00", suite: "support-desk" });
 		expect(html).toContain('data-testid="cluster-detail-c_99aabbccddeeff00"');
 		expect(html).toMatch(/data-testid="clusters-row-c_99aabbccddeeff00"[^>]*data-state="selected"/);
@@ -106,14 +106,14 @@ describe("ClustersView", () => {
 		state.url = { sig: "c_0000000000000000" };
 		state.list = { ...idle, data: CLUSTER_LIST_FIXTURE };
 		state.detail = { ...idle, isError: true, error: { status: 404, data: { error: { message: "no such cluster" } } } };
-		const html = renderToStaticMarkup(<ClustersView />);
+		const html = renderToStaticMarkup(<ClustersTab />);
 		expect(html).toContain('data-testid="cluster-detail-not-found"');
 		expect(html).not.toContain('data-testid="cluster-detail-error"');
 	});
 
 	it("shows an empty state when there are no clusters", () => {
 		state.list = { ...idle, data: { ...CLUSTER_LIST_FIXTURE, clusters: [], hidden: 0 } };
-		const html = renderToStaticMarkup(<ClustersView />);
+		const html = renderToStaticMarkup(<ClustersTab />);
 		expect(html).toContain('data-testid="clusters-empty"');
 		expect(html).not.toContain('data-testid="clusters-table"');
 	});

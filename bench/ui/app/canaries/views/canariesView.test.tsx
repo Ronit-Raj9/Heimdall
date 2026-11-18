@@ -2,8 +2,10 @@ import "@/lib/i18n";
 
 import { CANARY_LIST_FIXTURE } from "@/components/canaries/canary.fixtures";
 import { renderToStaticMarkup } from "react-dom/server";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { CanariesBody } from "./canariesView";
+
+vi.mock("@tanstack/react-router", async () => (await import("@/lib/testing/routerMock")).routerMock);
 
 describe("CanariesBody", () => {
 	it("lists the canaries, names a broken definition and shows the open panel", () => {

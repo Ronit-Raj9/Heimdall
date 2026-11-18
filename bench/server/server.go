@@ -164,7 +164,8 @@ func registerOrgRoutes(r *router.Router, cfg *lib.Config, deps Deps, write lib.M
 	handlers.NewRunsHandler(mode, deps.Index).RegisterRoutes(r, common...)
 	handlers.NewPairsHandler(mode, deps.Index).RegisterRoutes(r, common...)
 	handlers.NewTriageHandler(mode, deps.Index, deps.Catalog).RegisterRoutes(r, common...)
-	handlers.NewLeaderboardHandler(mode, deps.Index).RegisterRoutes(r, common...)
+	// U3: the held-out board needs held_out.visible, as held-out task detail does.
+	handlers.NewLeaderboardHandler(mode, deps.Index).WithHeldOutVisible(cfg.HeldOut.Visible).RegisterRoutes(r, common...)
 	handlers.NewClustersHandler(mode, deps.Index).RegisterRoutes(r, common...) // Failure clusters area (handlers/clusters.go)
 	handlers.NewAuditHandler(mode, deps.Auditor, write).RegisterRoutes(r, common...)
 	handlers.NewReleasesHandler(mode, deps.Releases, write).RegisterRoutes(r, common...)
@@ -195,7 +196,8 @@ func registerOrgRoutes(r *router.Router, cfg *lib.Config, deps Deps, write lib.M
 	handlers.NewCanaryHandler(mode, deps.Canaries, write).RegisterRoutes(r, common...)
 	// W6 migration report, cost explanation and Pareto planes (handlers/migration.go, handlers/costexplain.go, docs/model-migration.md, docs/cost-explain.md).
 	handlers.NewMigrationHandler(mode, deps.Migration).RegisterRoutes(r, common...)
-	handlers.NewCostExplainHandler(mode, deps.CostExplain, deps.Index).RegisterRoutes(r, common...)
+	// U3: the held-out board's plane needs held_out.visible too.
+	handlers.NewCostExplainHandler(mode, deps.CostExplain, deps.Index).WithHeldOutVisible(cfg.HeldOut.Visible).RegisterRoutes(r, common...)
 	handlers.NewExportHandler(mode, deps.Export).RegisterRoutes(r, common...) // W10 export (handlers/export.go, docs/export.md)
 	// X6 live scoring: GET /livescore, /livescore/sessions, /livescore/compare, POST /livescore/pull (handlers/livescore.go, docs/live-scoring.md).
 	handlers.NewLivescoreHandler(mode, deps.Livescore, write).RegisterRoutes(r, common...)
