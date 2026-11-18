@@ -100,7 +100,13 @@ func (a *app) doctor(ctx context.Context) []schemas.DoctorCheck {
 	} else {
 		add("gateway", schemas.DoctorPass, fmt.Sprintf("%s %s, egress %s", gm.Name, gm.Version, gm.Settings["egress_probe"]))
 	}
-	return append(out, faultProxyChecks(ctx, a.cfg.FaultProxy.ControlURL, os.Getenv("BENCH_FAULTPROXY_TOKEN"))...)
+	out = append(out, faultProxyChecks(ctx, a.cfg.FaultProxy.ControlURL, os.Getenv("BENCH_FAULTPROXY_TOKEN"))...)
+	if so, ok := a.reg.Gateway.(interface { // F1: can several bench processes share this gateway (gateways/bifrost/slotclaims.go)
+		SlotOwnership(context.Context) schemas.DoctorCheck
+	}); ok {
+		out = append(out, so.SlotOwnership(ctx))
+	}
+	return out
 }
 
 // doctorSuites loads every suite of the project (benchmarks/*/suite.yaml, by

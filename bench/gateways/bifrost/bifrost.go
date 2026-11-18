@@ -79,6 +79,14 @@ type Config struct {
 	Docker        utils.Docker
 	Logger        schemas.Logger
 	HTTP          *http.Client
+	// F1: key slot ownership across bench processes (slotclaims.go). Claims
+	// is the fault proxy's claim API, the same client that writes plans; nil
+	// keeps slots process-local. ClaimTTL defaults to faultproxy.DefaultClaimTTL
+	// and ClaimWait, how long a mint waits while every free slot is claimed
+	// by another process, to DefaultClaimWait.
+	Claims    SlotClaimer
+	ClaimTTL  time.Duration
+	ClaimWait time.Duration
 }
 
 // ProviderSetup is one Bifrost provider and its key slots. In proxied mode
@@ -118,6 +126,7 @@ type Gateway struct {
 	minted   map[string]mintRecord      // virtual key id -> its slot and creation time
 	teams    map[string]string          // run key id -> Bifrost team id of a team run (team.go)
 	memberOf map[string]string          // member key id -> its run id (teamslots.go)
+	claims   *claimState                // F1: this process's key slot claims at the fault proxy (slotclaims.go)
 }
 
 // mintRecord remembers what this process minted, so RevokeKey releases the
@@ -150,6 +159,7 @@ func New(cfg Config) (*Gateway, error) {
 		cfg: cfg, providers: providers, http: client, logger: logger, pageSize: logPageSize, settle: emptyLedgerSettle,
 		keyIDs: map[string]string{}, models: map[string]map[string]bool{},
 		inUse: map[string]string{}, minted: map[string]mintRecord{}, teams: map[string]string{}, memberOf: map[string]string{},
+		claims: newClaimState(),
 	}, nil
 }
 

@@ -749,6 +749,35 @@ A separate bench process talks to a stock Bifrost over HTTP. It makes no SQL aga
 - **Retries are set explicitly** on the provider: `max_retries: 0` for agent-exposure runs, so a fault reaches the agent. The provider also needs `allow_private_network: true` to reach the proxy.
 - **The fault counter counts conversation requests only.** Token-counting and model-listing calls pass through and are not counted.
 - **Not used:** the Mocker plugin. Stock Bifrost cannot load it (#5674) and its errors skip the retry loop [L13-016, L13-001].
+- **Slots are owned at the proxy** when several bench processes share one gateway (next section).
+
+#### Key slot ownership across bench processes
+
+A key slot is one Bifrost provider key plus one fault proxy plan. Each bench process keeps its own record of which slots its runs hold (`gateways/bifrost/keys.go`, `teamslots.go`). Two processes on one gateway (two terminals, parallel CI jobs, `serve` beside runners, several working copies) cannot see each other's records, so before this they could pick the same slot, and one process's fault plan replaced the other's while that run was live: ledger lines and gateway rows stopped agreeing, `usage_completeness` failed, verdicts came out INVALID, injected faults never fired, and a run bound to the scripted model could be rebound to a forwarding plan and reach a paid provider.
+
+The fault proxy now decides who owns a slot (`faultproxy/claims.go`, `gateways/bifrost/slotclaims.go`):
+
+- **Claim before mint.** Each bench process has one fault proxy client with a random owner token. Before it creates a run's virtual key, the gateway claims the slot at the proxy (`POST /claims` with the owner token, a TTL, the run id and a label naming host and pid). The proxy takes the first free slot of the offered list, so a slot held by another process is skipped and the next one is used.
+- **Plan writes need the owner.** The client sends its owner token in `X-Slot-Owner` on every control call. While a claim is live, `PUT` and `DELETE /plans/{slot}` from any other owner, or from a client with no owner, get 409 and change nothing. A slot with no live claim still accepts any write, so a bench older than claims keeps working on slots nobody claimed.
+- **Fail closed.** A refused plan write is an error at bind time, so the run fails as `aborted_infra` before its agent starts. A scripted (smoke) plan is never replaced silently: the proxy refuses the other writer, and the refused run never starts.
+- **Teams take all or none.** A team run claims all its slots in one call; the proxy grants all of them or none, so two processes can never each hold part of a pool and wait for the rest (the same rule as within one process, `docs/multi-agent.md`).
+- **Waiting is bounded.** When every slot that is free in this process is claimed elsewhere, the mint logs `waiting for a key slot: every free slot is claimed by another bench process on this gateway`, polls once a second, and after two minutes (`bifrost.Config.ClaimWait`; not a `bench.yaml` key yet) fails the slot with the holders named: owner id, host and pid, run id and expiry.
+- **TTL, renewal and release.** Claims last 60 seconds and are renewed every 20 seconds while the process holds them. `RevokeKey` releases a run's claims, and the process releases all of its claims when the command exits. A crashed process stops renewing, and its slots are free again one TTL later. A release names the run it was made for, so a late release never frees a slot another run of the same process has claimed since.
+- **Lost claims are reported.** If renewal fails for a whole TTL (the proxy was unreachable) and another process claims the slot in that window, the next renewal logs `key slot claim lost to another bench process` as an error, and the run's teardown is refused at the proxy rather than clearing the other run's plan.
+- **The janitor respects live claims.** `RevokeStale` reads `GET /claims` first and keeps the virtual keys and routing rules of every run that holds a live claim, whichever process holds it. When the claims cannot be read, it revokes nothing.
+
+Control API additions (all writes need the control token; `GET /claims` does not, like `/health`):
+
+| Call | Body | Answer |
+|---|---|---|
+| `POST /claims` | `{"owner", "slots": [...], "count", "ttl_s", "run_id", "label"}` | 200 `{"claimed": [...], "expires_at"}`, or 409 `{"error", "held": [claims]}` |
+| `POST /claims/renew` | `{"owner", "slots": [{"slot", "run_id"}], "ttl_s", "label"}` | 200 `{"renewed": [...], "lost": [claims], "expires_at"}` |
+| `POST /claims/release` | `{"owner", "slots": [...], "run_id"}` | 200 `{"released": [...]}` |
+| `GET /claims` | none | 200 `{"claims": [{"slot", "owner_id", "run_id", "label", "expires_at"}]}` |
+
+The owner token is never logged or listed; `owner_id` is the first 12 hex characters of its sha256. TTLs run from 1 to 600 seconds. `/health` reports `slot_claims: true`.
+
+**Compatibility.** A fault proxy older than claims answers `/health` without `slot_claims`. The bench then warns once (`key slot ownership: process-local only (fault proxy too old)`) and keeps the in-process reservation only, and `doctor` prints `slot ownership` as a warning with `process-local only (fault proxy too old)`. With a current proxy the row passes and says how many slots are claimed, and how many of them by other processes. A direct provider has no fault proxy and no plan, so its slots stay process-local; `doctor` says so, and a gateway with only direct providers reports `process-local only (direct mode, no fault proxy)`. In those cases, run one bench process per gateway.
 
 ### 13.4 Log completeness
 

@@ -21,8 +21,10 @@ const (
 // newGateway builds the Bifrost client and makes sure the provider and its key
 // slots exist. The management token comes only from the environment variable
 // named in bench.yaml. Each slot's placeholder key value is its name; the
-// fault proxy swaps in the real provider key.
-func newGateway(ctx context.Context, cfg *lib.Config, docker utils.Docker, logger schemas.Logger) (schemas.Gateway, error) {
+// fault proxy swaps in the real provider key. claims is the fault proxy
+// client that also writes the plans (F1: key slot ownership across bench
+// processes); nil keeps slots process-local.
+func newGateway(ctx context.Context, cfg *lib.Config, docker utils.Docker, logger schemas.Logger, claims bifrost.SlotClaimer) (schemas.Gateway, error) {
 	token := os.Getenv(cfg.Gateway.AdminTokenEnv)
 	if token == "" {
 		return nil, fmt.Errorf("gateway: %s is not set (see deploy/.env.example)", cfg.Gateway.AdminTokenEnv)
@@ -37,6 +39,7 @@ func newGateway(ctx context.Context, cfg *lib.Config, docker utils.Docker, logge
 		HelperImage:   cfg.Images.Helper,
 		Docker:        docker,
 		Logger:        logger,
+		Claims:        claims, // F1: claimed at the fault proxy before a key is minted (gateways/bifrost/slotclaims.go)
 	})
 	if err != nil {
 		return nil, fmt.Errorf("gateway: %w", err)

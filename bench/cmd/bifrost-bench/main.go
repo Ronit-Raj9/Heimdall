@@ -8,6 +8,7 @@ import (
 	"os"
 	"sort"
 	"strings"
+	"sync"
 )
 
 // command is one subcommand.
@@ -30,10 +31,42 @@ func register(name, summary string, run func(args []string) int) {
 	commands[name] = command{summary: summary, run: run}
 }
 
+// F1: exitHooks run once before the process exits, newest first. The
+// gateway registers one that releases its key slot claims at the fault
+// proxy, so another bench process need not wait for them to expire.
+var (
+	exitMu    sync.Mutex
+	exitHooks []func()
+)
+
+func onExit(f func()) {
+	exitMu.Lock()
+	defer exitMu.Unlock()
+	exitHooks = append(exitHooks, f)
+}
+
+func withExitHooks(exit func(int)) func(int) {
+	return func(code int) {
+		runExitHooks()
+		exit(code)
+	}
+}
+
+func runExitHooks() {
+	exitMu.Lock()
+	hooks := exitHooks
+	exitHooks = nil
+	exitMu.Unlock()
+	for i := len(hooks) - 1; i >= 0; i-- {
+		hooks[i]()
+	}
+}
+
 func main() {
 	progName = programName(os.Args[0])                      // Heimdall binary name (progname.go)
 	flushStderr := renameUsageStderr(progName)              // Heimdall binary name: usage lines print the started name
 	exit := func(code int) { flushStderr(); os.Exit(code) } // Heimdall binary name
+	exit = withExitHooks(exit)                              // F1: release key slot claims before exiting
 	if len(os.Args) < 2 {
 		usage()
 		exit(exitUsage)
