@@ -333,7 +333,8 @@
 		"armA": "A",
 		"armB": "B",
 		"unset": "unset",
-		"empty": "The arms have no config differences."
+		"empty": "The arms have no config differences.",
+		"showAll": "Show all {{count}} lines"
 	},
 	"leaderboard": {
 		"title": "Leaderboard",

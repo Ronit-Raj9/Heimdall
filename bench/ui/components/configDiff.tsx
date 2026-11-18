@@ -38,10 +38,10 @@ export function ConfigDiff({ changes, armLabels, className }: ConfigDiffProps) {
 				{changes.map((change) => (
 					<TableRow key={change.path} data-testid={`config-diff-row-${change.path}`}>
 						<TableCell className="font-mono text-xs">{change.path}</TableCell>
-						<TableCell className="bg-destructive/5 font-mono text-xs whitespace-pre-wrap">
+						<TableCell className="bg-destructive/5 font-mono text-xs break-all whitespace-pre-wrap">
 							<ConfigValue value={change.a} unsetLabel={t("configDiff.unset")} />
 						</TableCell>
-						<TableCell className="bg-primary/5 font-mono text-xs whitespace-pre-wrap">
+						<TableCell className="bg-primary/5 font-mono text-xs break-all whitespace-pre-wrap">
 							<ConfigValue value={change.b} unsetLabel={t("configDiff.unset")} />
 						</TableCell>
 					</TableRow>
@@ -51,7 +51,26 @@ export function ConfigDiff({ changes, armLabels, className }: ConfigDiffProps) {
 	);
 }
 
+/** Values longer than this many lines start folded to their first PREVIEW_LINES lines. */
+const FOLD_LINES = 6;
+const PREVIEW_LINES = 3;
+
 function ConfigValue({ value, unsetLabel }: { value: JsonValue; unsetLabel: string }) {
+	const { t } = useTranslation("bench");
 	if (value === null) return <span className="text-muted-foreground italic">{unsetLabel}</span>;
-	return <span>{typeof value === "string" ? value : JSON.stringify(value)}</span>;
+	const text = typeof value === "string" ? value : JSON.stringify(value);
+	const lines = text.split("\n");
+	if (lines.length <= FOLD_LINES) return <span>{text}</span>;
+	// A whole config file (for example an agent's config.toml) would fill the page; a native
+	// details element keeps the full text one click away without any state.
+	return (
+		<details data-testid="config-diff-folded">
+			<summary className="text-muted-foreground cursor-pointer font-sans">
+				<span className="text-foreground font-mono whitespace-pre-wrap">{lines.slice(0, PREVIEW_LINES).join("\n")}</span>
+				{"\n"}
+				{t("configDiff.showAll", { count: lines.length })}
+			</summary>
+			<span>{lines.slice(PREVIEW_LINES).join("\n")}</span>
+		</details>
+	);
 }
