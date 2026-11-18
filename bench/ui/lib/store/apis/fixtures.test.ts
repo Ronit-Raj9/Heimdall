@@ -48,6 +48,7 @@ describe("resolveFixture", () => {
 		{ method: "post", url: "/experiments/e_x/start", want: "experiments.start.json" },
 		{ method: "GET", url: "/experiments/e_x", want: "experiments.get.json" },
 		{ method: "GET", url: `${BENCH_API_BASE}/experiments`, want: "experiments.list.json" },
+		{ method: "GET", url: "/experiments/e_synthetic-nightly/events?since=48", want: "experiments.events.e_synthetic-nightly.json" }, // U1 home
 		{ method: "GET", url: "/experiments/e_x/verdict?x=1", want: "experiments.verdict.json" },
 		{ method: "GET", url: "/runs/r_abc", want: "runs.r_abc.json" },
 		{ method: "GET", url: "/runs/r_abc/events", want: "runs.r_abc.events.json" },
@@ -218,6 +219,11 @@ function contractFor(file: string): { type: string; nested: Record<string, strin
 		"experiments.get.json": { type: "ExperimentStatus", nested: { slots: "SlotProgress" } },
 		"experiments.start.json": { type: "ExperimentStatus", nested: { slots: "SlotProgress" } },
 		"experiments.list.json": { type: "ExperimentList", nested: { "experiments[]": "ExperimentStatus" } },
+		// U1 home: the poll form of the events route for the running fixture experiment.
+		"experiments.events.e_synthetic-nightly.json": {
+			type: "EventsPoll",
+			nested: { status: "ExperimentStatus", "status.slots": "SlotProgress" },
+		},
 		"experiments.verdict.json": { type: "VerdictPayload", nested: { verdict: "Verdict" } },
 		"experiments.diagnostics.json": { type: "DiagnosticsPayload", nested: {} },
 		"experiments.grid.json": { type: "Grid", nested: { "rows[]": "GridRow", "rows[].cells[]": "GridCell" } },

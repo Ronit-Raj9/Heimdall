@@ -1,102 +1,155 @@
 import {
-	Boxes,
-	ClipboardCheck,
+	Activity,
 	Bot,
-	Download,
+	Boxes,
+	CirclePlay,
+	ClipboardCheck,
 	FlaskConical,
-	GitCompareArrows,
-	Gavel,
-	Grid3x3,
-	Layers,
+	House,
+	Inbox,
 	ListOrdered,
 	PackageCheck,
-	ReceiptText,
-	ScanSearch,
+	Radio,
 	Server,
+	Settings,
 	ShieldCheck,
-	TrendingUp,
 	type LucideIcon,
 } from "lucide-react";
-import { Inbox } from "lucide-react"; // Failure inbox area
-import { ArrowRightLeft } from "lucide-react"; // W6 model migration
-import { Rocket } from "lucide-react"; // First workflow area
-import { Scale } from "lucide-react"; // W8 judge calibration
-import { Activity } from "lucide-react"; // W5 drift canary
-import { Radio } from "lucide-react"; // X6 live scoring
+
+export type BenchNavGroupId = "benchmark" | "build" | "production" | "govern" | "operate";
 
 export interface BenchNavItem {
+	/** The entry's route. Object routes below it (an experiment, a run, a suite) keep it highlighted. */
 	to:
-		| "/leaderboard"
-		| "/trends"
-		| "/suites"
-		| "/imports"
-		| "/agents"
-		| "/workers"
-		| "/verdict"
+		| "/"
+		| "/experiments"
 		| "/runs"
-		| "/receipts"
+		| "/leaderboard"
+		| "/agents"
+		| "/suites"
+		| "/canaries"
+		| "/live"
+		| "/inbox"
 		| "/review"
-		| "/experiments/new"
-		| "/triage"
-		| "/matrix"
-		| "/migration" // W6 model migration
-		| "/clusters"
-		| "/inbox" // Failure inbox area
-		| "/quickstart" // First workflow area
-		| "/calibration" // W8 judge calibration
-		| "/canaries" // W5 drift canary
-		| "/live" // X6 live scoring
 		| "/releases"
-		| "/monitors"; // Eval integrity area (S2)
+		| "/monitors"
+		| "/workers"
+		| "/settings";
 	labelKey:
-		| "nav.leaderboard"
-		| "nav.trends"
-		| "nav.suites"
-		| "nav.imports"
-		| "nav.agents"
-		| "nav.workers"
-		| "nav.verdict"
-		| "nav.runs"
-		| "nav.receipts"
-		| "nav.review"
-		| "nav.newExperiment"
-		| "nav.triage"
-		| "nav.matrix"
-		| "nav.migration" // W6 model migration
-		| "nav.clusters"
-		| "nav.inbox" // Failure inbox area
-		| "nav.quickstart" // First workflow area
-		| "nav.calibration" // W8 judge calibration
-		| "nav.canaries" // W5 drift canary
-		| "nav.live" // X6 live scoring
-		| "nav.releases"
-		| "nav.monitors"; // Eval integrity area (S2)
+		| "shell.nav.home"
+		| "shell.nav.experiments"
+		| "shell.nav.runs"
+		| "shell.nav.leaderboard"
+		| "shell.nav.agents"
+		| "shell.nav.suites"
+		| "shell.nav.canaries"
+		| "shell.nav.live"
+		| "shell.nav.inbox"
+		| "shell.nav.review"
+		| "shell.nav.releases"
+		| "shell.nav.monitors"
+		| "shell.nav.workers"
+		| "shell.nav.settings";
 	icon: LucideIcon;
 	testId: string;
+	/**
+	 * Other paths that belong to this entry: pages that became one of its tabs and still answer
+	 * until their redirect lands, or pages reached from it (the quickstart from Home).
+	 */
+	also?: readonly string[];
+	/** Hosted mode with a signed-in user only (the organization's settings). */
+	hostedOnly?: boolean;
 }
 
-/** Left navigation. One entry per P0 screen (DESIGN.md 18). Add a screen here and in app/. */
-export const BENCH_NAV: readonly BenchNavItem[] = [
-	{ to: "/leaderboard", labelKey: "nav.leaderboard", icon: ListOrdered, testId: "nav-link-leaderboard" },
-	{ to: "/trends", labelKey: "nav.trends", icon: TrendingUp, testId: "nav-link-trends" }, // Index and trends area
-	{ to: "/suites", labelKey: "nav.suites", icon: Boxes, testId: "nav-link-suites" },
-	{ to: "/imports", labelKey: "nav.imports", icon: Download, testId: "nav-link-imports" },
-	{ to: "/agents", labelKey: "nav.agents", icon: Bot, testId: "nav-link-agents" },
-	{ to: "/workers", labelKey: "nav.workers", icon: Server, testId: "nav-link-workers" },
-	{ to: "/verdict", labelKey: "nav.verdict", icon: Gavel, testId: "nav-link-verdict" },
-	{ to: "/runs", labelKey: "nav.runs", icon: GitCompareArrows, testId: "nav-link-runs" },
-	{ to: "/receipts", labelKey: "nav.receipts", icon: ReceiptText, testId: "nav-link-receipts" },
-	{ to: "/review", labelKey: "nav.review", icon: ClipboardCheck, testId: "nav-link-review" },
-	{ to: "/triage", labelKey: "nav.triage", icon: ScanSearch, testId: "nav-link-triage" },
-	{ to: "/matrix", labelKey: "nav.matrix", icon: Grid3x3, testId: "nav-link-matrix" }, // Model matrix area
-	{ to: "/migration", labelKey: "nav.migration", icon: ArrowRightLeft, testId: "nav-link-migration" }, // W6 model migration
-	{ to: "/clusters", labelKey: "nav.clusters", icon: Layers, testId: "nav-link-clusters" },
-	{ to: "/inbox", labelKey: "nav.inbox", icon: Inbox, testId: "nav-link-inbox" }, // Failure inbox area
-	{ to: "/quickstart", labelKey: "nav.quickstart", icon: Rocket, testId: "nav-link-quickstart" }, // First workflow area
-	{ to: "/calibration", labelKey: "nav.calibration", icon: Scale, testId: "nav-link-calibration" }, // W8 judge calibration
-	{ to: "/canaries", labelKey: "nav.canaries", icon: Activity, testId: "nav-link-canaries" }, // W5 drift canary
-	{ to: "/live", labelKey: "nav.live", icon: Radio, testId: "nav-link-live" }, // X6 live scoring
-	{ to: "/releases", labelKey: "nav.releases", icon: PackageCheck, testId: "nav-link-releases" },
-	{ to: "/monitors", labelKey: "nav.monitors", icon: ShieldCheck, testId: "nav-link-monitors" }, // Eval integrity area (S2)
-	{ to: "/experiments/new", labelKey: "nav.newExperiment", icon: FlaskConical, testId: "nav-link-new-experiment" },
+export interface BenchNavGroup {
+	id: BenchNavGroupId;
+	labelKey: "shell.groups.benchmark" | "shell.groups.build" | "shell.groups.production" | "shell.groups.govern" | "shell.groups.operate";
+	items: readonly BenchNavItem[];
+}
+
+/**
+ * Left navigation, grouped around the objects a user thinks in (UI regroup contract). A feature
+ * page is a tab of its object or an entry of its group, never a nav entry of its own. "New
+ * experiment" is the header's primary action, not an entry.
+ */
+export const BENCH_NAV_GROUPS: readonly BenchNavGroup[] = [
+	{
+		id: "benchmark",
+		labelKey: "shell.groups.benchmark",
+		items: [
+			{ to: "/", labelKey: "shell.nav.home", icon: House, testId: "nav-link-home", also: ["/quickstart"] },
+			{
+				to: "/experiments",
+				labelKey: "shell.nav.experiments",
+				icon: FlaskConical,
+				testId: "nav-link-experiments",
+				also: ["/verdict", "/matrix", "/migration", "/receipts"],
+			},
+			{ to: "/runs", labelKey: "shell.nav.runs", icon: CirclePlay, testId: "nav-link-runs", also: ["/compare"] },
+			{ to: "/leaderboard", labelKey: "shell.nav.leaderboard", icon: ListOrdered, testId: "nav-link-leaderboard", also: ["/trends"] },
+		],
+	},
+	{
+		id: "build",
+		labelKey: "shell.groups.build",
+		items: [
+			{ to: "/agents", labelKey: "shell.nav.agents", icon: Bot, testId: "nav-link-agents", also: ["/agents_"] },
+			{ to: "/suites", labelKey: "shell.nav.suites", icon: Boxes, testId: "nav-link-suites", also: ["/imports", "/calibration"] },
+		],
+	},
+	{
+		id: "production",
+		labelKey: "shell.groups.production",
+		items: [
+			{ to: "/canaries", labelKey: "shell.nav.canaries", icon: Activity, testId: "nav-link-canaries" },
+			{ to: "/live", labelKey: "shell.nav.live", icon: Radio, testId: "nav-link-live" },
+			{ to: "/inbox", labelKey: "shell.nav.inbox", icon: Inbox, testId: "nav-link-inbox", also: ["/clusters", "/triage"] },
+		],
+	},
+	{
+		id: "govern",
+		labelKey: "shell.groups.govern",
+		items: [
+			{ to: "/review", labelKey: "shell.nav.review", icon: ClipboardCheck, testId: "nav-link-review" },
+			{ to: "/releases", labelKey: "shell.nav.releases", icon: PackageCheck, testId: "nav-link-releases" },
+			{ to: "/monitors", labelKey: "shell.nav.monitors", icon: ShieldCheck, testId: "nav-link-monitors" },
+		],
+	},
+	{
+		id: "operate",
+		labelKey: "shell.groups.operate",
+		items: [
+			{ to: "/workers", labelKey: "shell.nav.workers", icon: Server, testId: "nav-link-workers" },
+			{ to: "/settings", labelKey: "shell.nav.settings", icon: Settings, testId: "nav-link-settings", hostedOnly: true },
+		],
+	},
 ];
+
+/** Every entry in order, for lookups. */
+export const BENCH_NAV: readonly BenchNavItem[] = BENCH_NAV_GROUPS.flatMap((group) => group.items);
+
+function underPath(pathname: string, base: string): boolean {
+	return pathname === base || pathname.startsWith(`${base}/`);
+}
+
+/**
+ * Whether an entry is the current one for a path: its route or any route below it (an object
+ * page, a tab route), or one of its `also` paths. Home matches "/" and its `also` paths only.
+ */
+export function isNavActive(item: BenchNavItem, pathname: string): boolean {
+	const path = pathname.length > 1 ? pathname.replace(/\/+$/, "") : pathname;
+	if (item.to === "/") return path === "/" || path === "" || (item.also ?? []).some((base) => underPath(path, base));
+	return underPath(path, item.to) || (item.also ?? []).some((base) => underPath(path, base));
+}
+
+/** The entry to highlight for a path, or null when none owns it (the jobs page, an auth page). */
+export function activeNavItem(pathname: string): BenchNavItem | null {
+	return BENCH_NAV.find((item) => isNavActive(item, pathname)) ?? null;
+}
+
+/** The group that holds the entry for a path, or null. */
+export function activeNavGroup(pathname: string): BenchNavGroupId | null {
+	const item = activeNavItem(pathname);
+	if (!item) return null;
+	return BENCH_NAV_GROUPS.find((group) => group.items.includes(item))?.id ?? null;
+}

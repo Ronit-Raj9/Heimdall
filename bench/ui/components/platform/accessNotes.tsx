@@ -26,8 +26,11 @@ export function DemoBanner() {
 				<Eye className="size-4 shrink-0" aria-hidden="true" />
 				{t("demo.banner")}
 			</span>
-			<span className="text-muted-foreground min-w-0 flex-1 text-[13px]">{t("demo.detail")}</span>
-			<Button asChild variant="outline" size="sm" className="h-7">
+			{/* U1 shell: on a narrow screen the detail takes its own line under the title and the button. */}
+			<span className="text-muted-foreground order-last min-w-0 basis-full text-[13px] sm:order-none sm:flex-1 sm:basis-0">
+				{t("demo.detail")}
+			</span>
+			<Button asChild variant="outline" size="sm" className="ml-auto h-7 sm:ml-0">
 				<Link to="/login" search={{ return_to: href }} data-testid="demo-banner-sign-in">
 					{t("demo.signIn")}
 				</Link>

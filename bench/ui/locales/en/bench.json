@@ -297,41 +297,13 @@
 	"app": {
 		"name": "Heimdall",
 		"tagline": "The release gate for AI agents, built on Bifrost",
-		"groups": {
-			"results": "Results",
-			"runs": "Runs",
-			"setup": "Setup",
-			"more": "More"
-		},
 		"collapseNav": "Collapse navigation",
 		"expandNav": "Expand navigation",
 		"skipToContent": "Skip to content",
 		"copyId": "Copy {{id}}"
 	},
 	"nav": {
-		"label": "Heimdall navigation",
-		"leaderboard": "Leaderboard",
-		"review": "Review",
-		"suites": "Suites",
-		"agents": "Agents",
-		"verdict": "Verdict",
-		"runs": "Run comparison",
-		"receipts": "Receipts",
-		"newExperiment": "New experiment",
-		"triage": "Triage",
-		"clusters": "Failure clusters",
-		"inbox": "Failure inbox",
-		"matrix": "Model matrix",
-		"releases": "Releases",
-		"imports": "Imports",
-		"workers": "Workers",
-		"quickstart": "First workflow",
-		"trends": "Trends",
-		"calibration": "Judge calibration",
-		"canaries": "Drift canaries",
-		"live": "Live traffic",
-		"migration": "Model migration",
-		"monitors": "Monitors"
+		"label": "Heimdall navigation"
 	},
 	"mode": {
 		"live": "LIVE",
@@ -2242,8 +2214,7 @@
 	},
 	"notFound": {
 		"title": "Page not found",
-		"description": "There is no bench screen at this address.",
-		"back": "Go to the verdict"
+		"description": "There is no bench screen at this address."
 	},
 	"errors": {
 		"noFixture": "No fixture file for {{method}} {{url}}.",
@@ -3111,8 +3082,6 @@
 		}
 	},
 	"quickstart": {
-		"title": "First workflow",
-		"subtitle": "Will this change break my coding agent? Four commands from inside your own git repository, then the tasks whose drafted instructions still need a person to read them.",
 		"loadError": "Could not load the suites.",
 		"stepsTitle": "Four commands",
 		"stepsHint": "Run them from the repository root. Every step is $0 until a real model runs, and compare asks before it spends.",
@@ -3667,5 +3636,148 @@
 		"samples": "{{count}} samples every {{ms}} ms",
 		"noSampler": "No host-side samples: the sampler was off or the agent never started.",
 		"samplerError": "Sampler: {{error}}"
+	},
+	"shell": {
+		"breadcrumbs": "Breadcrumb",
+		"entity": {
+			"experiment": "Open experiment {{id}}",
+			"run": "Open run {{id}}",
+			"suite": "Open suite {{id}}",
+			"task": "Open task {{id}}",
+			"agent": "Open agent {{id}}"
+		},
+		"status": {
+			"noDecision": "No verdict",
+			"state": {
+				"created": "Created",
+				"running": "Running",
+				"analyzing": "Analyzing",
+				"done": "Done",
+				"failed": "Failed",
+				"cancelled": "Cancelled"
+			},
+			"decision": {
+				"improved": "Improved",
+				"regressed": "Regressed",
+				"inconclusive": "Inconclusive",
+				"invalid": "Invalid"
+			}
+		},
+		"newExperiment": "New experiment",
+		"openMenu": "Open navigation",
+		"closeMenu": "Close navigation",
+		"groupToggle": "Show or hide {{group}}",
+		"groups": {
+			"benchmark": "Benchmark",
+			"build": "Build",
+			"production": "Production",
+			"govern": "Govern",
+			"operate": "Operate"
+		},
+		"nav": {
+			"home": "Home",
+			"experiments": "Experiments",
+			"runs": "Runs",
+			"leaderboard": "Leaderboard",
+			"agents": "Agents",
+			"suites": "Suites",
+			"canaries": "Drift canaries",
+			"live": "Live traffic",
+			"inbox": "Failure inbox",
+			"review": "Review queue",
+			"releases": "Releases",
+			"monitors": "Monitors",
+			"workers": "Runners",
+			"settings": "Settings"
+		},
+		"backHome": "Go to Home",
+		"error": {
+			"title": "This page failed to load",
+			"description": "Something in this page broke while it rendered; the rest of the app still works.",
+			"retry": "Try again"
+		}
+	},
+	"home": {
+		"title": "Home",
+		"subtitle": "What is running, what finished and what is ready to benchmark on this server.",
+		"actions": {
+			"title": "Quick actions",
+			"newExperiment": "New experiment",
+			"newExperimentHint": "Compare two agent versions on a suite.",
+			"addSuite": "Add a suite",
+			"addSuiteHint": "Import tasks from a benchmark or your own repository.",
+			"addAgent": "Add an agent",
+			"addAgentHint": "Point a config at an agent CLI and a model.",
+			"getStarted": "Get started",
+			"getStartedHint": "Four commands from your own repository."
+		},
+		"running": {
+			"title": "Running now",
+			"empty": "Nothing is running.",
+			"slots": "{{done}} of {{total}} slots sealed",
+			"slotsDetail": "{{done}} done, {{running}} running, {{failed}} failed, {{total}} total",
+			"spent": "Spent",
+			"last": "Last event",
+			"noEvents": "Waiting for the first event.",
+			"event": {
+				"slot_started": "Slot started",
+				"stage": "Stage {{stage}}",
+				"slot_sealed": "Run sealed",
+				"budget_stop": "Stopped at the spend cap",
+				"experiment_done": "Experiment done",
+				"error": "Error",
+				"end": "Stream ended"
+			},
+			"open": "Open",
+			"loadError": "Could not follow this experiment."
+		},
+		"recent": {
+			"title": "Recent experiments",
+			"viewAll": "All experiments",
+			"empty": "No experiments yet.",
+			"col": {
+				"experiment": "Experiment",
+				"suite": "Suite",
+				"state": "Status",
+				"verdict": "Verdict",
+				"started": "Started",
+				"cost": "Cost"
+			},
+			"notStarted": "Not started",
+			"loadError": "Could not load the experiments.",
+			"verdictError": "Unavailable"
+		},
+		"suites": {
+			"title": "Suites",
+			"viewAll": "All suites",
+			"empty": "No suites under the benchmarks root yet.",
+			"tasks_one": "{{count}} task",
+			"tasks_other": "{{count}} tasks",
+			"admitted": "{{admitted}} of {{total}} admitted",
+			"lock": {
+				"locked": "Locked",
+				"stale": "Lock stale",
+				"unlocked": "Not locked",
+				"unknown": "Lock unknown"
+			},
+			"error": "Failed to load",
+			"loadError": "Could not load the suites."
+		},
+		"getStarted": {
+			"title": "Run your first benchmark",
+			"body": "No experiment has run here yet: set up a project, mine tasks, then compare two versions.",
+			"open": "Get started",
+			"newExperiment": "New experiment"
+		},
+		"stats": {
+			"experiments": "Experiments",
+			"running": "Running",
+			"suites": "Suites",
+			"agents": "Agents"
+		},
+		"quickstart": {
+			"title": "Get started",
+			"subtitle": "Four commands from inside your own git repository tell you whether a change breaks your coding agent."
+		}
 	}
 }
