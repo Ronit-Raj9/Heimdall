@@ -29,7 +29,7 @@ func addServeExtras(fs *flag.FlagSet) *serveExtras {
 // trends request builds it. The daemon runs experiments, so it needs the
 // gateway and is refused with -offline.
 func (x *serveExtras) apply(ctx context.Context, a *app, deps *server.Deps, offline bool) error {
-	deps.Trends = trendSource{ix: a.resultsSource(), logger: a.logger} // Tenancy area: the database index when one is wired (servetenancy.go)
+	deps.Trends = trendSource{ix: a.resultsSource(), logger: a.logger, manifests: a.store.LoadManifest} // Tenancy area: the database index when one is wired (servetenancy.go)
 	if x.schedules == nil || !*x.schedules {
 		return nil
 	}

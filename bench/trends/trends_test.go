@@ -219,3 +219,28 @@ func TestBuildLeavesOutNotRepeatable(t *testing.T) {
 		t.Fatalf("points %d, first %s: want e_1 (external live) left out", r.Points, r.Lineages[0].Points[0].Experiment)
 	}
 }
+
+// A held-out task's runs never enter a trend: with every task of e_1 held
+// out its point disappears, as the public leaderboard never counts them.
+func TestBuildLeavesOutHeldOut(t *testing.T) {
+	q := Query{HeldOut: func(expID, task string) bool { return expID == "e_1" }}
+	r, err := Build(fixtureIndex(), q, time.Now())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if r.Points != 2 || r.Lineages[0].Points[0].Experiment != "e_2" {
+		t.Fatalf("points %d, first %s: want e_1 (held out) left out", r.Points, r.Lineages[0].Points[0].Experiment)
+	}
+	one := Query{HeldOut: func(expID, task string) bool { return task == "t02" }}
+	r, err = Build(fixtureIndex(), one, time.Now())
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, l := range r.Lineages {
+		for _, p := range l.Points {
+			if p.Tasks > 7 {
+				t.Fatalf("point %s counts %d tasks, want t02 left out", p.Experiment, p.Tasks)
+			}
+		}
+	}
+}

@@ -151,6 +151,9 @@ func indexOnSeal(ctx context.Context, a *app, expID string, ev engine.Event) {
 type trendSource struct {
 	ix     resultsindex.Source // Database area (P1): the JSONL Index, or db.OrgIndex when a database is configured
 	logger schemas.Logger
+	// manifests loads an experiment's manifest so held-out tasks stay out of
+	// the trends; nil keeps every run (tests over a bare index).
+	manifests func(ctx context.Context, expID string) (*schemas.Manifest, error)
 }
 
 // Trends implements handlers.TrendSource. A failed sync is logged and the
@@ -163,7 +166,36 @@ func (s trendSource) Trends(ctx context.Context, q trends.Query) (*trends.Respon
 	if err != nil {
 		return nil, err
 	}
+	q.HeldOut = s.heldOut(ctx)
 	return trends.Build(snap, q, time.Now())
+}
+
+// heldOut answers from each experiment's manifest whether a task is held
+// out, loading each manifest once. A manifest that cannot be read keeps its
+// runs out of the trends: a held-out result must never leak into a public
+// view because of a read error.
+func (s trendSource) heldOut(ctx context.Context) func(expID, task string) bool {
+	if s.manifests == nil {
+		return nil
+	}
+	cache := map[string]map[string]bool{}
+	return func(expID, task string) bool {
+		tasks, ok := cache[expID]
+		if !ok {
+			m, err := s.manifests(ctx, expID)
+			if err != nil {
+				s.logger.Warn("trends: manifest unreadable, its runs are left out", "experiment", expID, "error", err.Error())
+				cache[expID] = nil
+				return true
+			}
+			tasks = map[string]bool{}
+			for _, id := range m.HeldOutTasks {
+				tasks[id] = true
+			}
+			cache[expID] = tasks
+		}
+		return tasks == nil || tasks[task]
+	}
 }
 
 // printIndexStatus prints the index status and every rejected entry.

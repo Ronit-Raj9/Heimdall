@@ -33,6 +33,10 @@ type Query struct {
 	Metric    string
 	Condition string
 	Synthetic string
+	// HeldOut reports whether a task of an experiment is held out (its
+	// manifest's held_out_tasks); such runs never enter a trend, as the
+	// public leaderboard never counts them. Nil keeps every run.
+	HeldOut func(expID, task string) bool `json:"-"`
 }
 
 // Normalize fills the defaults and checks the values.
@@ -71,6 +75,9 @@ func Build(r resultsindex.Reader, q Query, now time.Time) (*Response, error) {
 	var kept []resultsindex.RunRow
 	for _, row := range all {
 		if a, ok := newest[row.Experiment]; ok && a.Decision == string(schemas.DecisionInvalid) {
+			continue
+		}
+		if q.HeldOut != nil && q.HeldOut(row.Experiment, row.Task) {
 			continue
 		}
 		resp.Suites = appendUnique(resp.Suites, row.Suite)

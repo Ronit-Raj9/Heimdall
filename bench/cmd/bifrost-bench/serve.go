@@ -130,7 +130,7 @@ func orgDeps(ctx context.Context, a *app) (server.Deps, *store.Index, error) {
 	deps.Forecast = serveForecast{a: a}
 	deps.Migration, deps.CostExplain = serveW6{a: a}, serveW6{a: a} // W6 migration report and cost explanation (migrate.go, costexplain.go)
 	// Index and trends area: trends over this root's results index; the database index when a.results is set (servetenancy.go).
-	deps.Trends = trendSource{ix: a.resultsSource(), logger: a.logger}
+	deps.Trends = trendSource{ix: a.resultsSource(), logger: a.logger, manifests: a.store.LoadManifest}
 	// Suite health area: GET /suites/{id}/health reads the run store (suitehealth.go).
 	deps.Health = serveHealthSource(a.cfg)
 	return deps, ix, nil
