@@ -11,13 +11,16 @@ BIN     := bin/bifrost-bench
 COMPOSE := docker compose -f deploy/docker-compose.yml --env-file deploy/.env
 WITHENV := set -a; . deploy/.env; set +a;
 
-.PHONY: help build bin ui test test-integration images env up down admit doctor smoke serve demo clean hosted-image hosted-smoke
+.PHONY: help build bin heimdall ui test test-integration images env up down admit doctor smoke serve demo clean hosted-image hosted-smoke
 
 help: ## Show targets
 	@grep -E '^[a-z-]+:.*## ' $(MAKEFILE_LIST) | awk -F':.*## ' '{printf "  %-18s %s\n", $$1, $$2}'
 
 bin: ## Build the bench binary (static, for the host and the bench image)
 	$(GOENV) CGO_ENABLED=0 $(GO) build -o $(BIN) ./cmd/bifrost-bench
+
+heimdall: ## Build the same binary under the name heimdall (bin/heimdall)
+	$(GOENV) CGO_ENABLED=0 $(GO) build -o bin/heimdall ./cmd/bifrost-bench
 
 ui: ## Build the web UI into ui/dist (embedded by the binary)
 	cd ui && npm ci --no-audit --no-fund && npm run build

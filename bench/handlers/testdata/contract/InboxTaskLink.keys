@@ -1,0 +1,7 @@
+# Keys of bench.ts `InboxTaskLink`, one per line; a trailing ? marks an optional (Go omitempty) key.
+# Failure inbox (handlers/inbox.go, traceinbox, docs/failure-inbox.md). Change with bench.ts.
+suite
+id
+dir
+accepted_at
+admitted

@@ -1,0 +1,75 @@
+# template: research
+# Written by `bifrost-bench suite init`. A research suite tests an agent that
+# answers questions by searching the web through Tavily and cites its
+# sources. Search reaches Tavily's API only through the per-run tool proxy
+# (external API `tavily`: POST /search and POST /extract only; the proxy
+# injects TAVILY_API_KEY as "Authorization: Bearer <key>" in live and record
+# mode, and the agent never sees it). The agent uses the websearch MCP
+# server (web_search, fetch_page; services/websearch/), which calls that
+# route, or calls the route itself (BENCH_EXTERNAL_APIS). Every search and
+# every result lands in tools.jsonl.
+#
+# Runs replay cassettes/tavily.cassette.jsonl with no network. The sample
+# cassette was recorded through the tool proxy in record mode FROM THE
+# TAVILY STAND-IN (a fixed corpus about a fictional coast), not from the live
+# web. Record your own from Tavily with a key: docs/research-tasks.md.
+#
+# Each task writes answer.txt and sources.json; the hidden verifier
+# (verifier/tests/verify.py with research.json) checks the answer and the
+# cited sources deterministically, with no judge. Add tasks with
+# `bifrost-bench task init -suite [[.ID]] -id <task>`, which copies the shape
+# of the first task below and adds the id to the tasks list.
+id: [[.ID]]
+version: 0.1.0
+description: Research questions answered through Tavily web search (replayed from a cassette) with cited sources.
+track: research
+environment: docker_workspace
+grader: verifier_command
+base_image:
+[[- if .Dockerfile]]
+  dockerfile: base/Dockerfile
+[[- end]]
+  tag: [[.Image]]
+workdir: /workspace
+output:
+  kind: artifact
+verifier:
+  command: ["python3", "/grader/tests/verify.py"]
+  result: reward
+  result_path: /grader/out/reward.json
+  pass_threshold: 1
+  restore: []
+  timeout_s: 120
+services:
+  - id: websearch
+    role: mcp
+    # Built from services/websearch/ in this folder; `suite admit` builds it
+    # when it is missing.
+    image: bench/[[.ID]]-websearch:1
+    port: 8000
+    mcp: {path: /mcp}
+    env:
+      TAVILY_URL: http://toolproxy:9200/x/tavily
+    ready:
+      argv: ["python3", "-I", "/srv/server.py", "ready"]
+      timeout_s: 30
+external:
+  - id: tavily
+    base_url: https://api.tavily.com
+    allow:
+      - {methods: [POST], path_prefix: /search}
+      - {methods: [POST], path_prefix: /extract}
+    headers: {Content-Type: application/json}
+    # Live and record mode only: the bench passes TAVILY_API_KEY by name to
+    # the proxy, which sends "Authorization: Bearer <key>". Replay never
+    # reads it.
+    auth_env: TAVILY_API_KEY
+    auth_header: Authorization
+    auth_scheme: Bearer
+    mode: replay
+    cassette: cassettes/tavily.cassette.jsonl
+    max_calls: 60
+    max_bytes: 262144
+    timeout_s: 30
+tasks: [ferry-start]
+probes: [model-outage, search-outage, stale-results, hostile-page]

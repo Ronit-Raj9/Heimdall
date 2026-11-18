@@ -110,7 +110,7 @@ func TestAddReviewChain(t *testing.T) {
 		rr.SealedOutcome != schemas.OutcomeFail || len(rr.Problems) != 0 {
 		t.Fatalf("run reviews = %+v", rr)
 	}
-	if got := strings.Join(rr.Reasons, ","); got != "split_votes,false_completion" {
+	if got := strings.Join(rr.Reasons, ","); got != "split_votes,false_completion,contested" { // W8 judge calibration: split votes are contested
 		t.Fatalf("reasons = %q", got)
 	}
 }

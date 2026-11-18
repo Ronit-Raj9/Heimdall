@@ -1,0 +1,102 @@
+# Throwaway stack for judgescript runs (docs/judge-calibration.md, "A full
+# run at $0"): Bifrost + fault proxy + Postgres + judgescript. No real
+# provider key; the proxy's anthropic upstream is judgescript and the proxy
+# sits only on an internal network, so nothing can reach a provider. Copy this
+# file to a scratch folder with deploy/bifrost/ (as ./bifrost), deploy/bench.yaml
+# and ./js/{judgescript,script.json}; never run it beside the live stack's names.
+name: hd-w8
+
+x-labels: &labels
+  hd-w8: "1"
+
+networks:
+  internal:
+    name: hd-w8-internal
+    internal: true
+    enable_ipv6: false
+    labels: *labels
+  edge:
+    name: hd-w8-edge
+    enable_ipv6: false
+    labels: *labels
+
+volumes:
+  pgdata:
+    labels: *labels
+  bifrost-data:
+    labels: *labels
+  ledger:
+    labels: *labels
+
+services:
+  postgres:
+    image: postgres:18@sha256:979bccfde35445db618c65107d27d08c6c21339d8dc3ad4c830c6633947be0e4
+    labels: *labels
+    environment:
+      POSTGRES_USER: bifrost
+      POSTGRES_PASSWORD: hd-w8-pg-dummy
+      POSTGRES_DB: bifrost
+    volumes:
+      - pgdata:/var/lib/postgresql
+    networks: [internal]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -h 127.0.0.1 -p 5432 -U bifrost -d bifrost"]
+      interval: 2s
+      timeout: 3s
+      retries: 30
+
+  judgescript:
+    image: bench/coding-core-base:1
+    labels: *labels
+    command: ["/js/judgescript", "-listen", "0.0.0.0:9200", "-script", "/js/script.json"]
+    user: "1000"
+    volumes:
+      - ./js:/js:ro
+    networks: [internal]
+
+  faultproxy:
+    image: bench/bifrost-bench:dev
+    labels: *labels
+    command: ["proxy", "--config", "/etc/bench/bench.yaml"]
+    environment:
+      BENCH_FAULTPROXY_TOKEN: hd-w8-fp-dummy
+      BENCH_FAULTPROXY_LISTEN: ":9100"
+      BENCH_FAULTPROXY_CONTROL_LISTEN: "0.0.0.0:9101"
+      BENCH_FAULTPROXY_LEDGER: /var/lib/bench/ledger/ledger.jsonl
+      BENCH_FAULTPROXY_UPSTREAM: http://judgescript:9200
+      ANTHROPIC_API_KEY: hd-w8-dummy-not-a-key
+    volumes:
+      - ./bench.yaml:/etc/bench/bench.yaml:ro
+      - ledger:/var/lib/bench/ledger
+    read_only: true
+    tmpfs:
+      - /tmp
+    cap_drop: [ALL]
+    security_opt: ["no-new-privileges:true"]
+    networks: [internal]
+    depends_on: [judgescript]
+
+  bifrost:
+    image: maximhq/bifrost:v2.5.1@sha256:5ec9873acaf1687556b6e4dd854b92b539d9debf87a5a683b66338648b84d3c8
+    labels: *labels
+    environment:
+      BIFROST_SETUP_TOKEN: hd-w8-setup-dummy
+      BIFROST_PG_PASSWORD: hd-w8-pg-dummy
+      LOG_STYLE: json
+    volumes:
+      - bifrost-data:/app/data
+      - ./bifrost/config.json:/app/data/config.json:ro
+      - ./bifrost/datasheet:/app/datasheet:ro
+    depends_on:
+      postgres:
+        condition: service_healthy
+      faultproxy:
+        condition: service_started
+    networks: [internal, edge]
+    ports:
+      - "127.0.0.1:28080:8080"
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q -O /dev/null http://127.0.0.1:8080/health"]
+      interval: 2s
+      timeout: 3s
+      retries: 60

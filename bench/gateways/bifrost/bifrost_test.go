@@ -100,6 +100,9 @@ func newFakeBifrost(t *testing.T) *fakeBifrost {
 			writeJSONT(w, 200, map[string]any{"dropped_requests": 0})
 		},
 		"GET /api/logs/{id}": f.getLog,
+		// W9 routing policy under test (routing_test.go).
+		"POST /api/routing/rules":        f.postRule,
+		"DELETE /api/routing/rules/{id}": f.deleteRule,
 	}
 	for pattern, h := range routes {
 		mux.HandleFunc(pattern, f.guard(pattern, h))

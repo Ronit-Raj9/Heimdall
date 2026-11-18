@@ -1,0 +1,41 @@
+{
+	"_comment": "SYNTHETIC fixture for UI development: the support scorecard of the $0 scripted-user smoke of examples/acme-helpdesk (oracle against noop, scripted controls), served by GET /api/bench/experiments/{id}/support on 18 Nov 2026. Not a benchmark result.",
+	"mode": "synthetic",
+	"exp_id": "e_hd_w3_helpdesk_smoke_xjlz",
+	"suite": "acme-helpdesk@1.0.0",
+	"condition": "clean",
+	"support": true,
+	"simulator_mode": "scripted",
+	"simulator_label": "scripted user",
+	"synthetic": true,
+	"arms": [
+		{
+			"arm": "A",
+			"label": "oracle (reference script)",
+			"runs": 6,
+			"resolution": 1,
+			"resolved": 6,
+			"decided": 6,
+			"cost_per_resolution": null,
+			"escalation_rate": 0.16666666666666666,
+			"escalation_correct": 1,
+			"policy_violation_rate": 0,
+			"user_turns": 2.6666666666666665,
+			"simulator_cost_usd": null
+		},
+		{
+			"arm": "B",
+			"label": "noop (no change)",
+			"runs": 6,
+			"resolution": 0,
+			"resolved": 0,
+			"decided": 6,
+			"cost_per_resolution": null,
+			"escalation_rate": 0,
+			"escalation_correct": 0.8333333333333334,
+			"policy_violation_rate": 0,
+			"user_turns": 0,
+			"simulator_cost_usd": null
+		}
+	]
+}

@@ -164,3 +164,53 @@ Policy `enterprise-default`, hash `277b2be0eaa7`: **BLOCK**. A policy only adds 
 With `policy: none` the same job passes: `bench gate: verdict=inconclusive action=no_decision policy=n/a exit=0 (pass)`.
 
 The job log ends with one line, e.g. `bench gate: verdict=inconclusive action=no_decision policy=block exit=5 (fail: policy decision block)`, and a failing gate adds an error annotation such as `fail: regressed (verdict regressed, action hold, exit 1)`.
+
+## In your own repository: `heimdall ci install github`
+
+`heimdall ci install github` (step 4 of `docs/quickstart.md`) writes
+`.github/workflows/heimdall.yml` into the repository holding your
+`.heimdall` project. `-dry-run` prints it and writes nothing.
+
+| Mode | Runner | What the job does |
+|---|---|---|
+| `-mode recorded` (default) | GitHub-hosted | re-checks the sealed experiment you commit under `.heimdall/recorded/` (copy one from `.heimdall/runs/<exp_id>`): no Docker, no gateway, no key, no secret |
+| `-mode live` | self-hosted, label `heimdall` | writes a baseline-vs-candidate experiment (`heimdall compare --baseline origin/<base branch> --candidate <PR head> --write-only`) and runs it with `check` against the stack on that runner |
+
+Both modes:
+
+1. check out the repository (full history) and Heimdall (`-source`,
+   `-source-ref`; pin a commit), set up Go and build the binary once;
+2. run the gate through this folder's composite action (`uses:
+   ./.heimdall-src/bench/ci`) with the prebuilt binary (`bin` input) and the
+   project folder (`BENCH_CI_BENCH_DIR=.heimdall`), so `check.sh`, the seal
+   guard, the exit codes and the job summary are the ones above;
+3. render the verdict card (`heimdall ci card -report <report.json>`):
+   decision and action, a data-strength banner, "N of M tasks have
+   unreviewed instructions", verified success and cost per verified success
+   for both arms, the effect with its interval, the policy, integrity, and the
+   three tasks that differ most;
+4. post it as one pull-request comment and update that comment on every
+   later run (it starts with `<!-- heimdall-verdict -->`; `gh api` with the
+   job's `GITHUB_TOKEN`, `pull-requests: write`);
+5. upload the evidence (`.heimdall/runs/` in live mode, `.heimdall/recorded/`
+   in recorded mode, plus the card) as the `heimdall-evidence` artifact;
+6. fail the job on `regressed`, `invalid` or a release-policy block (the
+   action's last step).
+
+The workflow names no secret. In live mode the stack's tokens stay on the
+self-hosted runner in an env file whose path is the repository variable
+`HEIMDALL_ENV_FILE`; `check.sh` sources it without printing it, and provider
+keys live only in the stack's fault proxy. Pull requests from forks never
+run the live job. The workflow triggers on the files that change a coding
+agent: `AGENTS.md`, `CLAUDE.md`, `GEMINI.md`, `.claude/**`, `skills/**`,
+`prompts/**`, `.heimdall/**` and the workflow itself.
+
+Not verified here: the workflow has not run on GitHub. The card renderer and
+the workflow text are golden-tested (`go test ./ci/`, which also parses the
+YAML), the action's new `bin` input is a shell `if`, and the PR comment step
+uses documented `gh api` endpoints (`repos/{repo}/issues/{pr}/comments`,
+`issues/comments/{id}`). What the job runs was checked locally on the
+walk-through's sealed run (docs/quickstart.md, step 4b): the seal guard with
+`BENCH_CI_BUNDLE` pointing into `.heimdall/recorded`, `check.sh recorded`
+with `BENCH_CI_BENCH_DIR=.heimdall` and a prebuilt binary (exit 5, policy
+block), and `heimdall ci card` on its `report.json`.

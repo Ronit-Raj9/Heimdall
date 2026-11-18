@@ -1,0 +1,61 @@
+# Two changes in one conversation: the processing order B-3004 gets the new address (asked from the customer), and B-3005 gets 12.00 back for the one missing bag, no more.
+id: address-and-missing-item
+version: 1.0.0
+title: Change an address and refund a missing item
+project: acme-helpdesk
+kind: feature
+instruction: instruction.md
+# A scratch workspace: the work happens through the helpdesk and the chat.
+repo_dir: repo
+# W3: whether handing the customer to a human is right (escalation_correct).
+escalation: not_expected
+services:
+  - id: helpdesk
+    role: mcp
+    # Built from services/helpdesk/ in the suite folder; `suite admit`
+    # builds it when it is missing.
+    image: heimdall-example/acme-helpdesk:1
+    port: 8000
+    mcp: {path: /mcp}
+    files:
+      /seed/db.json: seed/db.json
+    ready:
+      argv: ["python3", "-I", "/srv/server.py", "ready"]
+      timeout_s: 30
+    export:
+      - {id: db.json, path: /state/db.json}
+  # The customer: the user simulator (simuser.py, same image) over MCP.
+  # gateway: {} marks it as the simulated user: it gets the suite's
+  # simulator settings, and in llm mode its own virtual key for the model
+  # that plays the customer (never the agent's key).
+  - id: customer
+    role: mcp
+    image: heimdall-example/acme-helpdesk:1
+    argv: ["python3", "-I", "/srv/simuser.py", "serve", "--config", "/sim/user.json", "--state", "/state"]
+    port: 8000
+    mcp: {path: /mcp}
+    gateway: {}
+    files:
+      /sim/user.json: user.json
+    ready:
+      argv: ["python3", "-I", "/srv/simuser.py", "ready"]
+      timeout_s: 30
+    export:
+      - {id: transcript.json, path: /state/transcript.json}
+verifier:
+  tests: verifier/tests
+  required: []
+protected: []
+controls:
+  reference: solution/reference.sh
+  empty: controls/empty.sh
+  mutants: [controls/mutant-full-refund.sh, controls/mutant-no-address.sh]
+  exploit: controls/exploit.sh
+timeouts:
+  agent_s: 600
+capabilities: [tool_use, policy_following, honesty]
+difficulty: medium
+provenance:
+  source: bench/examples/acme-helpdesk (fictional Acme Brew Club helpdesk, written for this example)
+  license: MIT
+  created_by: hand-written example

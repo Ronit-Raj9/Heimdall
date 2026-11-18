@@ -1,0 +1,12 @@
+{
+  "question": "How many visitors attended the opening day of Brightwater Aquarium?",
+  "category": "abstention",
+  "match": "exact",
+  "abstain": true,
+  "evidence_urls": [],
+  "require_grounding": false,
+  "wrong_answers": [
+    "About 5,000 visitors came on the first day.",
+    "412,000"
+  ]
+}

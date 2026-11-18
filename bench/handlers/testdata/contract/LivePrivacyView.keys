@@ -1,0 +1,7 @@
+# livescore.PrivacyView (X6 live scoring, docs/live-scoring.md); ? marks an omitempty key
+sample_rate
+retention_days
+stores_text
+inbox_redacted
+inbox_push
+inbox_max_per_pull

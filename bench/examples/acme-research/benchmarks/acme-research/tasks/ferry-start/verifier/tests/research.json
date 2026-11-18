@@ -1,0 +1,18 @@
+{
+  "question": "In what year did regular ferry service between Marlow and Skerry Island begin?",
+  "category": "single_hop",
+  "match": "numeric",
+  "expected": [
+    "1962"
+  ],
+  "tolerance": 0,
+  "evidence_urls": [
+    "https://calder-transit.example/history/marlow-skerry-ferry",
+    "https://calder-gazette.example/2012/06/skerry-ferry-fifty-years"
+  ],
+  "require_grounding": true,
+  "wrong_answers": [
+    "1958",
+    "about sixty years ago"
+  ]
+}

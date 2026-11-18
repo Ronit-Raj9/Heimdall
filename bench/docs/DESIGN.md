@@ -514,6 +514,7 @@ For the demo experiment (a sentence telling the agent that code beats stale note
 - **Why a task-level flip is exact.** With no real effect, swapping the two arm labels inside any one block leaves the outcome distribution unchanged. So does swapping them in every block of one task at once, which turns d_i into minus d_i. The test uses exactly those task-level swaps, and a test over a subset of the valid swaps is still exact. This subset is the conservative choice: it stays valid when the trials of one task are correlated, and it does not let three trials of one task count as three independent wins.
 - Trials per arm are equal within a condition. Unequal trials fire a gate.
 - "Add N tasks" means a new experiment with a new manifest. A re-analysis that pools old and new runs is labelled exploratory.
+- Amendment (W7, [adaptive-trials.md](adaptive-trials.md)): an experiment may pre-register an adaptive design (`trials: {mode: adaptive}`): the maximum design is frozen and hashed, optional slots run only when the frozen rule releases them, and a never-released slot is "not required", not missing. The rule is replayed from the sealed runs at analysis. It may also pre-declare a combination rule for one follow-up (`trials.extension`), the only case in which a follow-up is decided together with it.
 
 ### 9.4 One release rule
 

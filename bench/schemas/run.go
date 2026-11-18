@@ -16,7 +16,8 @@ type Slot struct {
 	Condition    string `json:"condition"` // clean or a probe id
 	Trial        int    `json:"trial"`     // 1-based
 	OrderIndex   int    `json:"order_index"`
-	Counted      bool   `json:"counted"` // false for compatibility runs; they never enter the verdict
+	Counted      bool   `json:"counted"`            // false for compatibility runs; they never enter the verdict
+	Optional     bool   `json:"optional,omitempty"` // W7 adaptive trials: runs only when the frozen rule releases it (trials.go)
 }
 
 // Stage is one step of the slot pipeline (DESIGN.md 8.2). This list is the

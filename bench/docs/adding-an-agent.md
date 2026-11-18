@@ -12,7 +12,7 @@ bifrost-bench agent check agents/mybot.yaml -suite coding-core
 
 `agent check` runs one real task through the normal pipeline with the fault proxy answering every model call from its scripted model, so it costs nothing, and prints a PASS, WARN or FAIL row for each thing an agent must get right, with a one-line fix. When every row passes, put the agent in an experiment (`experiments/<name>.yaml`, arm `agent: agents/mybot.yaml`) and run it on a real model.
 
-`docs/harness-matrix.md` lists the agent configs that ship (Claude Code, Codex, OpenCode, Gemini CLI, mini-swe-agent, `custom-python`) and how far each has been tested. `docs/bring-your-own-design.md` is the contract these commands implement.
+`docs/harness-matrix.md` lists the agent configs that ship (Claude Code, Codex, OpenCode, Gemini CLI, mini-swe-agent, `custom-python`, and seven framework agents in `agents/fw-*.yaml`) and how far each has been tested; only Codex and `custom-python` have run on a real model. `docs/bring-your-own-design.md` is the contract these commands implement.
 
 ## The three templates
 
@@ -137,7 +137,7 @@ Bifrost exposes provider-compatible routes and translates any of them to any con
 
 ## Framework agents
 
-A framework agent needs only the base URL and the key, from env. What each framework documents, checked on 2026-11-15:
+A framework agent needs only the base URL and the key, from env. Seven working examples (LangGraph, OpenAI Agents SDK, CrewAI, Pydantic AI, LlamaIndex, Vercel AI SDK, plain OpenAI SDK), each passing `agent check`, are in `examples/frameworks/`; [frameworks.md](frameworks.md) is the ten-minute guide and lists each framework's telemetry switches as found in its installed source. What each framework documents, checked on 2026-11-15:
 
 | Framework | Base URL | Key | Also set |
 |---|---|---|---|

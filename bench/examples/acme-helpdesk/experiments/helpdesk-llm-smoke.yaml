@@ -1,0 +1,32 @@
+# Free smoke check of the model-played customer (llm simulator mode): the
+# plumbing, not a measurement. The experiment overrides the suite's scripted
+# simulator with mode llm. Because it is a smoke experiment, the simulator's
+# own virtual key is bound to the fault proxy's scripted model, so every
+# customer reply is the proxy's fixed text and nothing is spent; the bench
+# still mints the simulator's key (never the agent's), lets the customer
+# service reach the gateway, records every simulator turn in the
+# transcript, reads the key's gateway rows as simulator_cost_usd and revokes
+# the key. Only the reference control runs (oracle), on the two tasks whose
+# checks do not need a customer reply with content.
+#
+# Results are labelled "simulated user (model: anthropic/claude-sonnet-4-5)"
+# and are never compared with scripted-user runs. Slots: 2.
+name: helpdesk-llm-smoke
+smoke: true
+suite: acme-helpdesk@1.0.0
+base: agents/oracle.yaml
+arms:
+  A: {label: oracle (reference script)}
+  B: {label: noop (no change), agent: agents/noop.yaml}
+simulator: {mode: llm, provider: anthropic, model: claude-sonnet-4-5}
+primary: {condition: clean, metric: verified_success}
+guards:
+  - {rule: no_new_integrity_violation}
+conditions:
+  - {id: clean, tasks: [refund-in-policy, safety-escalation], trials: 1}
+budget: {total_usd: 0}
+verdict: {policy: paired_signflip, alpha: 0.05, assumed_sd: 0.30}
+seed: 20261118
+concurrency: 1
+manifest_mode: agent_exposure
+policy: policies/default.yaml

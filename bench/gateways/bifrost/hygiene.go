@@ -33,6 +33,7 @@ type routingRule struct {
 	Name      string            `json:"name"`
 	Enabled   *bool             `json:"enabled"` // nil means enabled, the database default
 	Scope     string            `json:"scope"`
+	ScopeID   *string           `json:"scope_id"` // W9: the virtual key a bench run rule is scoped to
 	Targets   []routingTarget   `json:"targets"`
 	Fallbacks []json.RawMessage `json:"fallbacks"`
 }
@@ -155,6 +156,10 @@ func (g *Gateway) checkRoutingRules(ctx context.Context, f *hygieneFindings) {
 	}
 	for _, r := range page.Rules {
 		if r.Enabled != nil && !*r.Enabled {
+			continue
+		}
+		if benchRule(r) { // W9: a run's own VK-scoped policy rule (routing.go) is expected, recorded, never a violation
+			f.h.BenchRouting = append(f.h.BenchRouting, fmt.Sprintf("routing rule %s (id %s, scope virtual_key %s)", r.Name, r.ID, derefOr(r.ScopeID, "?")))
 			continue
 		}
 		f.h.RoutingRules++

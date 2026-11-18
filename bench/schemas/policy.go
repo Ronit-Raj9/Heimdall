@@ -11,6 +11,8 @@ type Policy struct {
 	Description   string        `json:"description,omitempty" yaml:"description"`
 	OnUnknown     string        `json:"on_unknown" yaml:"on_unknown"` // block | warn; unset: a small-sample unknown warns, any other unknown blocks
 	Checks        []PolicyCheck `json:"checks" yaml:"checks"`
+
+	JudgeCalibration *JudgeCalibrationPolicy `json:"judge_calibration,omitempty" yaml:"judge_calibration"` // W8 judge calibration: thresholds of the judge_calibration instrument (judgecalibration.go)
 }
 
 // PolicyCheck is one rule. Exactly one of Rule, Max, Min or Equals applies.

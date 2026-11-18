@@ -109,6 +109,8 @@ func excludeReason(r *record) string {
 		return ReasonVerdictInvalid
 	case externalReason(r) != "": // External APIs area: live or record runs are not repeatable (external.go)
 		return ReasonExternalLive
+	case simulatedUserReason(r) != "": // W3 customer support: a model-played user is another instrument (simuser.go)
+		return ReasonSimulatedUser
 	case !r.sealed:
 		return ReasonNotSealed
 	case r.counted > 1:

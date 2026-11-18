@@ -66,6 +66,14 @@ func runServe(args []string) int {
 	if err := extras.apply(ctx, a, &deps, *offline); err != nil {
 		return fail("%v", err)
 	}
+	deps.Inbox = serveInbox(a) // Failure inbox area: inbox page, actions and webhook (inbox.go)
+	// W5 drift canary: canary list, detail and run (canary.go).
+	deps.Canaries = serveCanaries(a, *offline)
+	// W8 judge calibration: calibration card and labels (judge.go).
+	deps.Calibration = judgeSvc{a: a}
+	deps.Export = serveExport{a: a} // W10 export downloads (export.go)
+	// X6 live scoring: Live page and API (livescore.go).
+	deps.Livescore = serveLivescore(a)
 	// Jobs area (P4): experiments run as experiment.run jobs (cancel,
 	// resume after a restart) and the ops kinds serve /jobs (servejobs.go).
 	stopJobs := startLocalJobs(ctx, a, *config, deps.Launcher, ix, &deps)
@@ -116,6 +124,7 @@ func orgDeps(ctx context.Context, a *app) (server.Deps, *store.Index, error) {
 	deps.Reviews = reviewSource{st: a.store} // Human review (review.go)
 	// Forecast and matrix area: estimate and matrix routes (estimate.go, matrix.go).
 	deps.Forecast = serveForecast{a: a}
+	deps.Migration, deps.CostExplain = serveW6{a: a}, serveW6{a: a} // W6 migration report and cost explanation (migrate.go, costexplain.go)
 	// Index and trends area: trends over this root's results index; the database index when a.results is set (servetenancy.go).
 	deps.Trends = trendSource{ix: a.resultsSource(), logger: a.logger}
 	// Suite health area: GET /suites/{id}/health reads the run store (suitehealth.go).
@@ -205,6 +214,16 @@ func (x indexAdapter) RunFile(runID, name string) ([]byte, error) { return x.ix.
 // RunArtifact implements handlers.ArtifactReader (store/runartifact.go).
 func (x indexAdapter) RunArtifact(runID, id, name string) ([]byte, error) {
 	return x.ix.RunArtifact(runID, id, name)
+}
+
+// RunVisual implements handlers.VisualReader (X1 vision grading, store/runvisual.go).
+func (x indexAdapter) RunVisual(runID, name string) ([]byte, error) {
+	return x.ix.RunVisual(runID, name)
+}
+
+// RunVoiceFile implements handlers.VoiceReader (X8 voice agents, store/runvoice.go).
+func (x indexAdapter) RunVoiceFile(runID, service, name string) ([]byte, error) {
+	return x.ix.RunVoiceFile(runID, service, name)
 }
 
 // VerifySeal implements handlers.SealVerifier with the index's cached seal

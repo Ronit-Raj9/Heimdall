@@ -1,0 +1,48 @@
+# W9 routing policy under test (docs/routing-experiments.md), experiment (c):
+# cheap model first, strong model only when the cheap one errors. Does the
+# escalation-on-error policy keep strong-model success at cheap-model cost?
+#
+#   A  fixed claude-sonnet-4-5 (the agent asks for sonnet).
+#   B  fallback_chain: target anthropic/claude-haiku-4-5, fallback
+#      anthropic/claude-sonnet-4-5 (the agent asks for haiku: the planner
+#      requires the first target to be the model the agent asks for, so the
+#      arm also sets model).
+# Bifrost falls back on errors only (5xx, 429, provider errors), never on a
+# wrong answer, so on clean this is mostly "haiku alone". The model-outage
+# condition takes the primary target down (haiku in B, sonnet in A), which is
+# where the escalation fires; the arms are then asymmetric by design: A has
+# nothing to fall back to.
+#
+# Forecast (not run; assumptions as in routing-fallback-outage.yaml): 8 tasks
+# x 2 trials x 2 conditions x 2 arms = 64 runs, about $3.5. Expected: clean
+# success B below A (haiku), cost B about a third of A; under outage B keeps
+# working on sonnet while A stops; fallback_used near 0 on clean in B (a
+# fallback there means haiku itself failed).
+name: routing-cheap-first
+suite: coding-core@1.0.0
+base: agents/custom-python.yaml
+arms:
+  A:
+    label: fixed sonnet
+    set:
+      gateway.routing: {strategy: fixed, targets: [{model: claude-sonnet-4-5}]}
+  B:
+    label: haiku first, sonnet on error
+    set:
+      model: claude-haiku-4-5
+      gateway.routing: {strategy: fallback_chain, targets: [{model: claude-haiku-4-5}], fallbacks: [{model: claude-sonnet-4-5}]}
+primary: {condition: clean, metric: verified_success}
+# model_fidelity is not a baseline gate: routing experiments switch it on, so a
+# served model outside the arm\'s policy fires and policy switches are counted.
+extra_gates: [model_fidelity]
+guards:
+  - {rule: no_new_integrity_violation}
+conditions:
+  - {id: clean, tasks: all, trials: 2}
+  - {id: model-outage, tasks: all, trials: 2}
+budget: {total_usd: 5}
+verdict: {policy: paired_signflip, alpha: 0.05, assumed_sd: 0.30}
+seed: 20261118
+concurrency: 2
+manifest_mode: agent_exposure
+policy: policies/default.yaml

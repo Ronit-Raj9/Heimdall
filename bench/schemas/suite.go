@@ -26,6 +26,10 @@ type Suite struct {
 	External []ExternalAPI `json:"external,omitempty" yaml:"external"` // real HTTP APIs every task's agent may call through the tool proxy
 	Canary   string        `json:"canary,omitempty" yaml:"canary"`     // contamination canary GUID, set by `suite canary` (docs/held-out-and-canaries.md)
 
+	Simulator *SimulatorSpec `json:"simulator,omitempty" yaml:"simulator"` // W3 customer support: user simulator settings, pinned like a judge (scenario.go)
+
+	Tiers map[string]TaskSelector `json:"tiers,omitempty" yaml:"tiers,omitempty"` // W7 suite tiers: pr, nightly, headroom (docs/suite-tiers.md)
+
 	Root     string       `json:"-" yaml:"-"` // absolute folder of the pack
 	Tasks    []*Task      `json:"-" yaml:"-"` // loaded tasks, in TaskIDs order
 	Probes   []*ProbeSpec `json:"-" yaml:"-"` // loaded probes, in ProbeIDs order
@@ -122,6 +126,8 @@ type LockFingerprints struct {
 	Suite   Fingerprint            `json:"suite"`
 	Tasks   map[string]Fingerprint `json:"tasks"`
 	Probes  map[string]Fingerprint `json:"probes"`
+
+	Calibration string `json:"calibration,omitempty"` // W8 judge calibration: sha256 of calibration/labels.jsonl, set only when the suite has one
 }
 
 // Fingerprint pins one suite, task or probe. Settings is the sha256 of the

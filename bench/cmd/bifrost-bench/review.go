@@ -21,7 +21,7 @@ func init() {
 }
 
 const reviewUsage = `usage: bifrost-bench review <list|show|add|log> ...
-  review list -exp <exp_id> [-reason split_votes|unparsable_votes|invalid_evaluator|veto|false_completion|flagged] [-json]
+  review list -exp <exp_id> [-reason split_votes|unparsable_votes|invalid_evaluator|veto|false_completion|flagged|contested] [-json]
   review show <run_id> [-exp <exp_id>] [-json]
   review add -run <run_id> -decision pass|fail|invalid|flag_only -reason "why" -reviewer <name> [-evidence item ...] [-exp <exp_id>]
   review log -exp <exp_id> [-json]

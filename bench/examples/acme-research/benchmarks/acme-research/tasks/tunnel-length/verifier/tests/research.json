@@ -1,0 +1,19 @@
+{
+  "question": "How long is the Ferrow Tunnel, in metres?",
+  "category": "numeric",
+  "match": "numeric",
+  "expected": [
+    "2340"
+  ],
+  "tolerance": 0,
+  "evidence_urls": [
+    "https://ferrow-tunnel.example/facts",
+    "https://calder-gazette.example/2003/03/ferrow-tunnel-opens"
+  ],
+  "require_grounding": true,
+  "wrong_answers": [
+    "340",
+    "2.34",
+    "about 2500"
+  ]
+}

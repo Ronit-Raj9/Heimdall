@@ -466,12 +466,14 @@ func gatewayRows(ev *schemas.Evidence, add func(row) int) ([]turnSpan, []int) {
 	var turns []turnSpan
 	var requests []int
 	seenTool := map[string]bool{}
+	prevServed := "" // W9: the model that answered the previous turn, for ModelSwitch
 	for _, root := range order {
 		l := byRoot[root]
 		last := l.rows[len(l.rows)-1]
 		r := row{order: 1}
 		r.TS, r.Kind, r.Source, r.Proof = l.start, schemas.StepModelTurn, schemas.StepSourceGateway, schemas.EvidenceStrong
 		r.Turn, r.RequestID, r.Counted, r.IsError = l.step, root, l.ok, !l.ok
+		r.ModelSwitch, prevServed = modelSwitch(prevServed, l.rows) // W9 (stepsrouting.go)
 		if l.ok {
 			d := l.end.Sub(l.start).Milliseconds()
 			r.DurationMS = &d

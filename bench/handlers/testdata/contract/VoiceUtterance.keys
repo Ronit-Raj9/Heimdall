@@ -1,0 +1,7 @@
+# Keys of bench.ts `VoiceUtterance` (X8 voice agents, voice.Utterance). Change with bench.ts and the Go type.
+utt
+start_ms
+end_ms
+text?
+stt?
+interrupted?

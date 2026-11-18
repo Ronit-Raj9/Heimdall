@@ -1,0 +1,13 @@
+# Keys of bench.ts `MoreEvidence` (schemas/trials.go, W7). Change with bench.ts.
+target_pp
+tasks
+tasks_total
+over?
+sd
+sd_assumed
+runs
+cost_usd?
+cost_basis
+command?
+combination
+alpha_kept?

@@ -1,0 +1,44 @@
+# template: voice
+# acme-voice-desk: Acme Brew Club's phone support line (fictional), the six
+# conversations of examples/acme-helpdesk spoken over a call. Acme Brew Club,
+# its customers, orders and subscriptions are fictional.
+# A voice suite tests a voice agent on a support call (docs/voice-agents.md).
+# Each task starts two services from the image built from services/helpdesk/:
+# the helpdesk MCP server, seeded with the task's seed/db.json and reached
+# through the per-run tool proxy, and the customer, the voice caller
+# (voicecaller.py from bench/voice), which the agent dials at
+# ws://customer:8000/call and talks to in audio (heimdall-voice/1,
+# docs/voice-protocol.md). The caller speaks the simulated customer's lines
+# with Piper, transcribes the agent's audio and writes the call timeline the
+# voice metrics read. After the agent exits the helpdesk database and the
+# call are exported and the hidden verifier (verifier/tests/verify.py with
+# the task's checks.py) scores three dimensions: db, policy and communicate
+# (the agent's words as the caller transcribed them).
+#
+# simulator: what the customer says. mode scripted (the default) replays
+# each task's script deterministically and calls no model; mode llm has a
+# pinned model play the persona through the gateway on the caller's own key.
+id: acme-voice-desk
+version: 1.0.0
+description: Spoken customer support calls graded on the helpdesk's final state, the policy and what the customer heard.
+track: voice
+environment: docker_workspace
+grader: verifier_command
+base_image:
+  tag: bench/coding-core-base:1
+workdir: /workspace
+output:
+  kind: state
+simulator:
+  mode: scripted
+  prompt_version: user-v1
+  max_turns: 12
+verifier:
+  command: ["python3", "/grader/tests/verify.py"]
+  result: reward
+  result_path: /grader/out/reward.json
+  pass_threshold: 1
+  restore: []
+  timeout_s: 120
+tasks: [refund-in-policy, refund-outside-policy, safety-escalation, clarify-subscription, pushback-hold-policy, address-and-missing-item]
+probes: [caller-noise, caller-speed, caller-interrupts, caller-silent, stt-outage]

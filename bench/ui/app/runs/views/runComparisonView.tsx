@@ -8,6 +8,9 @@ import { IncompleteNotice } from "@/components/runs/incompleteNotice";
 import { MetricStrip } from "@/components/runs/metricStrip";
 import { PairPicker } from "@/components/runs/pairPicker";
 import { RunRemoteCoverage } from "@/components/runs/remoteCoverage";
+import { RunGatewayPolicy } from "@/components/routing/gatewayPolicyCard"; // W9 routing policy under test
+import { RunVisualPanel } from "@/components/visual/runVisualPanel"; // X1 vision grading
+import { RunVoicePanel } from "@/components/voice/runVoicePanel"; // X8 voice agents
 import { RunScenarioEvidence } from "@/components/runs/runScenario";
 import { TraceQualityDetails } from "@/components/runs/traceQuality";
 import { TraceDownloadLink } from "@/components/runs/runTraceLink";
@@ -196,6 +199,12 @@ function PairComparison({ pairId, onClear }: { pairId: string; onClear: () => vo
 					{lanes.map((lane) => (
 						<TabsContent key={lane.pairRun.arm} value={lane.pairRun.arm}>
 							<RunRemoteCoverage runId={lane.pairRun.run.run_id} arm={lane.pairRun.arm} />
+							{/* W9 routing policy under test */}
+							<RunGatewayPolicy runId={lane.pairRun.run.run_id} />
+							{/* X1 vision grading */}
+							<RunVisualPanel runId={lane.pairRun.run.run_id} />
+							{/* X8 voice agents */}
+							<RunVoicePanel runId={lane.pairRun.run.run_id} />
 							<RunStepTimeline runId={lane.pairRun.run.run_id} arm={lane.pairRun.arm} />
 						</TabsContent>
 					))}

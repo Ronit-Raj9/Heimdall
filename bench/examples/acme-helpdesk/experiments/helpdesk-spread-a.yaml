@@ -1,0 +1,27 @@
+# Simulator validity, half a of two (docs/customer-support.md): the same
+# two agents on the same tasks with the customer played by claude-sonnet-4-5.
+# Run both halves, then:
+#   bifrost-bench simulator spread -a <exp id of half a> -b <exp id of half b>
+# which warns when success moves more between the two simulated users than
+# the effect between the agents. Real model calls (agent and simulator):
+# NOT RUN in this repository; cost is about 2 x 6 tasks x 3 trials x 2 arms
+# chats.
+name: helpdesk-spread-a
+suite: acme-helpdesk@1.0.0
+base: agents/claude-code.yaml
+arms:
+  A: {label: claude-code on claude-sonnet-4-5}
+  B: {label: claude-code on claude-haiku-4-5, set: {model: claude-haiku-4-5}}
+simulator: {mode: llm, provider: anthropic, model: claude-sonnet-4-5}
+primary: {condition: clean, metric: verified_success}
+guards:
+  - {rule: no_new_integrity_violation}
+conditions:
+  - {id: clean, tasks: all, trials: 3}
+  - {id: hostile-customer, tasks: all, trials: 1}
+budget: {total_usd: 20}
+verdict: {policy: paired_signflip, alpha: 0.05, assumed_sd: 0.30}
+seed: 20261118
+concurrency: 2
+manifest_mode: agent_exposure
+policy: policies/default.yaml

@@ -1,0 +1,12 @@
+# Keys of bench.ts `AdaptivePlan` (schemas/trials.go, W7). Change with bench.ts.
+rule
+conditions
+min?
+max?
+metric
+looks?
+look_alphas?
+alpha
+futility?
+optional
+required

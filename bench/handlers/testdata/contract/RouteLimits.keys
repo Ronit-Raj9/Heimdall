@@ -1,0 +1,7 @@
+# Keys of bench.ts `RouteLimits` (schemas.RouteLimits, W9). Change with bench.ts and schemas/agent.go.
+budget_usd?
+budget_reset?
+request_max?
+request_reset?
+token_max?
+token_reset?

@@ -1,0 +1,51 @@
+# Framework agent: a CrewAI coding agent (Agent, Task, sequential Crew, @tool
+# tools, the native OpenAI LLM with custom_openai=True), code in
+# examples/frameworks/crewai/. It runs unchanged: the only bench-specific
+# things are the standard OpenAI variables below, which point it at Bifrost
+# with the run's key.
+#
+# Speaks OpenAI chat completions to Bifrost's /openai/v1 route. AGENT_MODEL
+# is sent as the model id, unchanged (custom_openai=True); a bare id goes to
+# the openai provider.
+# To run it on another provider, override gateway.provider, model and
+# env.AGENT_MODEL together, e.g.
+#   set: {gateway.provider: anthropic, model: claude-sonnet-4-5, env.AGENT_MODEL: "anthropic/{{model}}"}
+# No parser: gateway-level evidence. docs/frameworks.md is the guide.
+id: fw-crewai
+adapter: command
+image: bench/agent-fw-crewai:1
+build:
+  dockerfile: examples/frameworks/crewai/Dockerfile
+  tag: bench/agent-fw-crewai:1
+  base_arg: BASE_IMAGE
+argv:
+  - fw-agent
+  - "{{instruction_file}}"
+env:
+  OPENAI_BASE_URL: "{{gateway.url}}/openai/v1"
+  OPENAI_API_KEY: "{{run.key}}"
+  AGENT_MODEL: "{{model}}"
+  AGENT_MAX_STEPS: "40"
+  AGENT_SESSION_ID: "{{run.session}}"
+  # Telemetry: CrewAI's anonymous telemetry, trace upload and PyPI version
+  # check, and Chroma's telemetry, all off (also set in the image).
+  CREWAI_DISABLE_TELEMETRY: "true"
+  CREWAI_DISABLE_TRACKING: "true"
+  CREWAI_TRACING_ENABLED: "false"
+  CREWAI_DISABLE_VERSION_CHECK: "true"
+  CREWAI_STORAGE_DIR: /tmp/crewai
+  ANONYMIZED_TELEMETRY: "False"
+  HF_HUB_OFFLINE: "1"
+# Placeholder: every experiment sets the model (an arm may vary it).
+model: gpt-5.4-mini
+notes:
+  project_file: AGENTS.md
+# The same budgets as agents/codex.yaml, so a matrix with Codex compares
+# agents, not machines. The agent's own step cap is AGENT_MAX_STEPS.
+budgets:
+  wall_s: 900
+  cpus: 2
+  mem_gb: 4
+gateway:
+  provider: openai
+  max_retries: 0

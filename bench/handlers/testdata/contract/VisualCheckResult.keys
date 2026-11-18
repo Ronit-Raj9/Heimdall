@@ -1,0 +1,9 @@
+# Keys of bench.ts `VisualCheckResult` (schemas/visual.go): one deterministic visual check.
+id
+method
+value
+threshold
+passed
+detail?
+area?
+found?

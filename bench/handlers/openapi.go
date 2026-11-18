@@ -15,11 +15,16 @@ import (
 
 	"github.com/fasthttp/router"
 	"github.com/maximhq/bifrost/bench/auth"
+	"github.com/maximhq/bifrost/bench/canary" // W5 drift canary
 	"github.com/maximhq/bifrost/bench/clusters"
+	"github.com/maximhq/bifrost/bench/costexplain" // W6 cost explanation
 	"github.com/maximhq/bifrost/bench/importers"
 	"github.com/maximhq/bifrost/bench/jobs"
 	"github.com/maximhq/bifrost/bench/lib"
+	"github.com/maximhq/bifrost/bench/livescore" // X6 live scoring
+	"github.com/maximhq/bifrost/bench/migration" // W6 migration report
 	"github.com/maximhq/bifrost/bench/schemas"
+	"github.com/maximhq/bifrost/bench/traceinbox"
 	"github.com/valyala/fasthttp"
 )
 
@@ -31,6 +36,7 @@ const (
 	AuthNone   = ""       // anyone the host guard lets in
 	AuthWrite  = "write"  // Authorization: Bearer <BENCH_WRITE_TOKEN>
 	AuthWorker = "worker" // Authorization: Bearer <BENCH_WORKER_TOKEN>
+	AuthInbox  = "inbox"  // Failure inbox area: Authorization: Bearer <the webhook source's token_env>
 )
 
 // RouteDoc describes one route of the bench API for the OpenAPI description.
@@ -97,6 +103,23 @@ var APIRoutes = []RouteDoc{
 		{Name: "condition", Description: "Condition; default the experiment's primary condition"}, gradeSourceQuery,
 		{Name: "k", Description: "pass^k depth, 2 or more"}, {Name: "alpha", Description: "Significance level; default 0.05"},
 	}}, // Forecast and matrix area (forecast.go)
+	// W6 migration report and cost explanation (migration.go, costexplain.go, docs/model-migration.md, docs/cost-explain.md).
+	{Method: "GET", Path: APIPrefix + "/experiments/{id}/migration", Tag: "analysis", Summary: "Model migration report: verdict per model pair overall and per stratum (exact sign-flip, Holm), cost per verified success and why it moved, behaviour differences, flipped tasks, a recommendation that follows the release policy", Response: migration.Report{}, Query: []QueryDoc{
+		{Name: "from", Description: "Old model or arm id; default arm A"}, {Name: "to", Description: "New models or arm ids, comma-separated; default every other arm of the same agent"},
+		{Name: "condition", Description: "Condition of the overall verdict; default the experiment's primary condition"}, {Name: "alpha", Description: "Significance level; default 0.05"}, gradeSourceQuery,
+	}},
+	{Method: "GET", Path: APIPrefix + "/experiments/{id}/cost-explain", Tag: "analysis", Summary: "Why arm B cost more than arm A: additive parts of the difference in cost per run and per verified success, measuring costs apart, silent cache breaks with their likely cause", Response: costexplain.Explanation{}, Query: []QueryDoc{
+		{Name: "a", Description: "Baseline arm; default the first arm"}, {Name: "b", Description: "Arm to explain; default the second arm"},
+		{Name: "condition", Description: "Condition; default the experiment's primary condition"}, gradeSourceQuery,
+	}},
+	{Method: "GET", Path: APIPrefix + "/experiments/{id}/pareto", Tag: "analysis", Summary: "Every arm on the cost against verified success plane, the frontier marked", Response: costexplain.Pareto{}, Query: []QueryDoc{
+		{Name: "x", Description: "cost_per_success (default) or cost_per_run"}, {Name: "condition", Description: "Condition; default the experiment's primary condition"},
+	}},
+	{Method: "GET", Path: APIPrefix + "/leaderboard/pareto", Tag: "leaderboard", Summary: "The leaderboard's configs on the cost against verified success plane, the frontier marked", Response: costexplain.Pareto{}, Query: []QueryDoc{
+		{Name: "x", Description: "cost_per_success (default) or cost_per_run (median)"}, {Name: "suite", Description: "Suite id or id@version, as for GET /leaderboard"},
+		{Name: "condition", Description: "Condition, as for GET /leaderboard"}, {Name: "scope", Description: "all or common"}, {Name: "synthetic", Description: "exclude or only"},
+		gradeSourceQuery, {Name: "split", Description: "public or held_out"}, {Name: "k", Description: "pass^k depth"},
+	}},
 
 	{Method: "GET", Path: APIPrefix + "/runs/{id}", Tag: "runs", Summary: "One run with seal, grade, metrics, gates and receipts", Response: schemas.RunDetail{}},
 	{Method: "GET", Path: APIPrefix + "/runs/{id}/events", Tag: "runs", Summary: "Canonical event log of a run", Response: schemas.RunEvents{}},
@@ -106,6 +129,11 @@ var APIRoutes = []RouteDoc{
 	{Method: "GET", Path: APIPrefix + "/runs/{id}/files/{name}", Tag: "runs", Summary: "One allowlisted run file, raw; mode in X-Bench-Mode", Raw: "application/octet-stream"},
 	{Method: "GET", Path: APIPrefix + "/runs/{id}/evidence/{name}", Tag: "runs", Summary: "Raw audit evidence from a sealed, verified run", Raw: "application/octet-stream"},
 	{Method: "GET", Path: APIPrefix + "/runs/{id}/artifacts/{artifact}/{name}", Tag: "runs", Summary: "One file of a run's output artifact, raw and sandboxed", Raw: "application/octet-stream"},
+	{Method: "GET", Path: APIPrefix + "/runs/{id}/visual/{name}", Tag: "runs", Summary: "One image of a run's visual grade (capture.png, reference.png or diff.png), checked against the grade and the seal", Raw: "image/png"}, // X1 vision grading
+
+	{Method: "GET", Path: APIPrefix + "/runs/{id}/voice", Tag: "runs", Summary: "The run's voice call: the caller's timeline read as the voice metrics read it, and the kept audio tracks", Response: VoiceCall{}},                       // X8 voice agents
+	{Method: "GET", Path: APIPrefix + "/runs/{id}/voice/audio/{track}", Tag: "runs", Summary: "One audio track of a run's voice call (caller or agent), from a sealed run, checked against the evidence and the seal", Raw: "audio/wav"}, // X8 voice agents
+
 	{Method: "GET", Path: APIPrefix + "/runs/{id}/otlp", Tag: "runs", Summary: "A sealed run as an OpenTelemetry trace (OTLP/JSON download); ?payloads=true adds redacted, capped tool payloads",
 		Query: []QueryDoc{{Name: "payloads", Description: "true to include tool arguments and results, redacted and capped"}}, Raw: "application/json"},
 	{Method: "GET", Path: APIPrefix + "/runs/{id}/steps", Tag: "runs", Summary: "Unified agent step timeline of a run with its observer status; available false for runs recorded before it", Response: RunSteps{}},
@@ -143,9 +171,49 @@ var APIRoutes = []RouteDoc{
 	{Method: "POST", Path: APIPrefix + "/reviews", Tag: "reviews", Summary: "Record a human review of a sealed run; refused (403) outside live mode; the reviewer name is self-declared",
 		Auth: AuthWrite, Request: schemas.ReviewRequest{}, Status: fasthttp.StatusCreated, Response: schemas.Review{}},
 
+	// W9 routing policy under test (routing.go, docs/routing-experiments.md).
+	{Method: "GET", Path: APIPrefix + "/experiments/{id}/routing", Tag: "analysis", Summary: "Gateway policy card: every arm's routing policy, how the arms' policies differ, and per condition fallbacks fired, model switches and turns, cost and latency by target", Response: schemas.RoutingSummary{}},
+	{Method: "GET", Path: APIPrefix + "/experiments/{id}/support", Tag: "analysis", Summary: "Support scorecard (W3): per arm resolution (verified success), cost per resolution, escalation and policy violation rates, user turns and simulator cost, with the simulated user's label; ?condition= picks the condition (default clean)", Response: schemas.SupportSummary{}},
+	{Method: "GET", Path: APIPrefix + "/experiments/{id}/research", Tag: "analysis", Summary: "Research scorecard (W4): per arm verified share, mean searches, sources cited, citations grounded in the run's own Tavily results and citation precision, and replayed searches the cassette did not hold; replay false for a live or record experiment; ?condition= picks the condition (default clean)", Response: schemas.ResearchSummary{}}, // W4 research with Tavily
+	// W7 adaptive trials and suite tiers (adaptive.go, docs/adaptive-trials.md).
+	{Method: "GET", Path: APIPrefix + "/experiments/{id}/adaptive", Tag: "analysis", Summary: "Trials and tier panel (W7): the suite tier, the declared trials policy, the frozen adaptive design, trials used against the maximum, runs saved, the stopping reason, and what more evidence would cost", Response: AdaptiveView{}},
+	{Method: "GET", Path: APIPrefix + "/runs/{id}/routing", Tag: "runs", Summary: "One run's gateway policy, the Bifrost rows that show which target served each request, and the model fidelity result", Response: schemas.RunRouting{}},
+
+	// W10 export (export.go, docs/export.md).
+	{Method: "GET", Path: APIPrefix + "/experiments/{id}/export", Tag: "analysis", Summary: "Download the experiment's sealed results: format=eee (Every Eval Ever aggregate records, one JSON object per line, one per arm; synthetic results refused (409) unless allow_synthetic=true, then labelled), jsonl or csv (one row per sealed run)",
+		Query: []QueryDoc{{Name: "format", Description: "eee, jsonl or csv"}, {Name: "allow_synthetic", Description: "true exports synthetic arms, labelled (eee)"}}, Raw: "application/x-ndjson", AlsoRaw: "text/csv"},
+	{Method: "GET", Path: APIPrefix + "/suites/{id}/export", Tag: "suites", Summary: "Download the suite's admitted public tasks as Harbor task folders (gzip tar); every verifier and reference solution is withheld, never served",
+		Query: []QueryDoc{{Name: "format", Description: "harbor"}}, Raw: "application/gzip"},
+
+	// X6 live scoring (livescore.go, docs/live-scoring.md). Live evidence: no ground truth, never part of a verdict.
+	{Method: "GET", Path: APIPrefix + "/livescore", Tag: "livescore", Summary: "Live scoring: the gateway read (read-only), every version's signals over time, session grouping reliability, the comparison and the worst sessions with their inbox items", Response: livescore.Status{}},
+	{Method: "GET", Path: APIPrefix + "/livescore/sessions", Tag: "livescore", Summary: "Scored live sessions, newest first: numbers and flags only, never a prompt or an output",
+		Query: []QueryDoc{{Name: "version", Description: "a configured version"}, {Name: "flag", Description: "abandoned, tool_error, loop, injection_marker, budget_hit, refusal, ..."}, {Name: "limit", Description: "1 to 1000, default 200"}}, Response: livescore.SessionList{}},
+	{Method: "GET", Path: APIPrefix + "/livescore/compare", Tag: "livescore", Summary: "The running comparison of two live versions: better, worse or not yet known per signal, with pairs, means and e-values; 404 until one has started", Response: livescore.Comparison{}},
+	{Method: "POST", Path: APIPrefix + "/livescore/pull", Tag: "livescore", Summary: "Pull the gateway's logs once now (GET requests only towards the gateway); live mode only",
+		Auth: AuthWrite, Response: livescore.PullResult{}},
+
+	// Failure inbox area (inbox.go, docs/failure-inbox.md).
+	{Method: "GET", Path: APIPrefix + "/inbox", Tag: "inbox", Summary: "Failure inbox: production failures pulled from observability tools, with counts by state, sources and suites",
+		Query: []QueryDoc{{Name: "state", Description: "new, accepted, rejected, duplicate or snoozed"}, {Name: "source", Description: "Keep only items from this source"}}, Response: schemas.InboxList{}},
+	{Method: "GET", Path: APIPrefix + "/inbox/{id}", Tag: "inbox", Summary: "One inbox item with its redacted transcript preview", Response: schemas.InboxItemDetail{}},
+	{Method: "POST", Path: APIPrefix + "/inbox/{id}/accept", Tag: "inbox", Summary: "Turn an item into a task draft (EDIT ME markers; still needs task validate and task admit)",
+		Auth: AuthWrite, Request: schemas.InboxAcceptRequest{}, Response: schemas.InboxAcceptResult{}},
+	{Method: "POST", Path: APIPrefix + "/inbox/{id}/reject", Tag: "inbox", Summary: "Reject an item with a reason, or mark it a duplicate of another",
+		Auth: AuthWrite, Request: schemas.InboxRejectRequest{}, Response: schemas.InboxActionResult{}},
+	{Method: "POST", Path: APIPrefix + "/inbox/{id}/snooze", Tag: "inbox", Summary: "Hide an item for some days",
+		Auth: AuthWrite, Request: schemas.InboxSnoozeRequest{}, Response: schemas.InboxActionResult{}},
+	{Method: "POST", Path: APIPrefix + "/inbox/ingest", Tag: "inbox", Summary: "Push one flagged trace (OTLP, Langfuse or chat JSON); the webhook's own token, a size cap and a rate limit guard it; 503 while off",
+		Auth: AuthInbox, Request: traceinbox.IngestRequest{}, Status: fasthttp.StatusCreated, Response: schemas.InboxIngestResult{}},
+
 	{Method: "GET", Path: APIPrefix + "/suites", Tag: "suites", Summary: "Suites with their tasks", Response: schemas.SuiteList{}},
 	{Method: "GET", Path: APIPrefix + "/suites/{id}/tasks/{task}", Tag: "suites", Summary: "One task of a suite", Response: schemas.SuiteTaskDetail{}},
 	{Method: "GET", Path: APIPrefix + "/suites/{id}/health", Tag: "suites", Summary: "Task health of a suite: verifier flakiness, agent variance, infra, observed difficulty", Response: schemas.SuiteHealth{}}, // Suite health area (suitehealth.go)
+	// W8 judge calibration (calibration.go, docs/judge-calibration.md).
+	{Method: "GET", Path: APIPrefix + "/suites/{id}/calibration", Tag: "suites", Summary: "Judge calibration card of a suite: state, agreement, kappa, false-positive bound, label counts, newest record, drift reminders", Response: schemas.CalibrationStatus{}},
+	{Method: "GET", Path: APIPrefix + "/suites/{id}/calibration/labels", Tag: "suites", Summary: "Every row of the suite's calibration labels, oldest first", Response: schemas.CalibrationLabels{}},
+	{Method: "POST", Path: APIPrefix + "/suites/{id}/calibration/labels", Tag: "suites", Summary: "Append a human label (correct or incorrect) for an answer to a task; refused (403) outside live mode; the labeller name is self-declared",
+		Auth: AuthWrite, Request: schemas.CalibrationLabelRequest{}, Status: fasthttp.StatusCreated, Response: schemas.CalibrationItem{}},
 	{Method: "GET", Path: APIPrefix + "/agents", Tag: "agents", Summary: "Agent configs", Response: schemas.AgentList{}},
 	AgentDiffRouteDoc, AgentDiffVersionsRouteDoc, // Agent diff area (agentdiff.go)
 	{Method: "GET", Path: APIPrefix + "/imports", Tag: "imports", Summary: "Importers the binary links", Response: ImportList{Importers: []importers.Info{}}},
@@ -213,6 +281,11 @@ var APIRoutes = []RouteDoc{
 	{Method: "GET", Path: AuthPrefix + "/tokens", Tag: "auth", Summary: "API tokens of the current org (admin)", Response: TokenList{}},
 	{Method: "POST", Path: AuthPrefix + "/tokens", Tag: "auth", Summary: "Create an API token; the secret is shown once (admin)", Request: auth.TokenCreateRequest{}, Status: fasthttp.StatusCreated, Response: auth.TokenCreated{}},
 	{Method: "POST", Path: AuthPrefix + "/tokens/{id}/revoke", Tag: "auth", Summary: "Revoke an API token (admin)", Status: fasthttp.StatusNoContent},
+	// W5 drift canary (canary.go, docs/drift-canary.md).
+	{Method: "GET", Path: APIPrefix + "/canaries", Tag: "canaries", Summary: "Drift canaries with their state (steady, watching, drifted, invalid, baseline_stale), baseline, last look, schedule and spend today", Response: canary.List{}},
+	{Method: "GET", Path: APIPrefix + "/canaries/{name}", Tag: "canaries", Summary: "One canary: definition, baselines, looks newest first with tests and what changed, provider equivalence, and history as trends lineages", Response: canary.Detail{}},
+	{Method: "POST", Path: APIPrefix + "/canaries/{name}/run", Tag: "canaries", Summary: "Start one look (and its confirmation after a flag) in the background; 409 while the canary runs; refused under the daily cap",
+		Auth: AuthWrite, Status: fasthttp.StatusAccepted, Response: canary.RunAccepted{}},
 }
 
 var (
@@ -318,6 +391,7 @@ func BuildOpenAPI(registered map[string][]string, version string, mode schemas.M
 			"securitySchemes": map[string]any{
 				"writeToken":  map[string]any{"type": "http", "scheme": "bearer", "description": "BENCH_WRITE_TOKEN; required on every write route"},
 				"workerToken": map[string]any{"type": "http", "scheme": "bearer", "description": "BENCH_WORKER_TOKEN; required on the worker routes"},
+				"inboxToken":  map[string]any{"type": "http", "scheme": "bearer", "description": "the inbox webhook token (token_env of the webhook source in inbox/sources.yaml); Failure inbox area"},
 			},
 		},
 		"x-bench-mode":         string(mode),
@@ -367,6 +441,8 @@ func (g *schemaGen) operation(rd RouteDoc) map[string]any {
 		op["security"] = []any{map[string]any{"writeToken": []string{}}}
 	case AuthWorker:
 		op["security"] = []any{map[string]any{"workerToken": []string{}}}
+	case AuthInbox: // Failure inbox area (inbox.go)
+		op["security"] = []any{map[string]any{"inboxToken": []string{}}}
 	}
 	if body := g.requestBody(rd); body != nil {
 		op["requestBody"] = body

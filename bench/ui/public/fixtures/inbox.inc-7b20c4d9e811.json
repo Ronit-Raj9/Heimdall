@@ -1,0 +1,38 @@
+{
+	"_comment": "SYNTHETIC fixture for UI development. Not a benchmark result.",
+	"item": {
+		"id": "inc-7b20c4d9e811",
+		"state": "accepted",
+		"source": "edge-otlp",
+		"source_kind": "otlp",
+		"trace_id": "4bf92f3577b34da6a3ce929d0e0e4736",
+		"title": "What is the warranty period for the Alpine <n> tent?",
+		"flagged": ["answer contradicts the product page: warranty <n> years"],
+		"signature": "f_7b20c4d9e8114410",
+		"signature_parts": { "request": "q_5e6f7a8b9c0d" },
+		"occurrences": 2,
+		"first_seen": "2026-11-08T10:00:00Z",
+		"last_seen": "2026-11-16T07:45:00Z",
+		"traces": [
+			{ "id": "4bf92f3577b34da6a3ce929d0e0e4730", "source": "edge-otlp", "at": "2026-11-08T10:00:00Z" },
+			{ "id": "4bf92f3577b34da6a3ce929d0e0e4736", "source": "edge-otlp", "at": "2026-11-16T07:45:00Z" }
+		],
+		"suggested_kind": "qa",
+		"suggested_suite": "support",
+		"model": "gpt-x",
+		"outcome": "ok",
+		"task": {
+			"suite": "support",
+			"id": "warranty-period",
+			"dir": "benchmarks/support/tasks/warranty-period",
+			"accepted_at": "2026-11-09T09:30:00Z",
+			"admitted": true
+		},
+		"recurrences": 1,
+		"last_recurrence": "2026-11-16T07:45:00Z",
+		"release": { "status": "passes", "experiment": "e_123", "at": "2026-11-15T12:00:00Z", "passed": 3, "runs": 3 },
+		"updated": "2026-11-16T07:45:00Z"
+	},
+	"preview": "# Trace 4bf92f3577b34da6a3ce929d0e0e4736 (edge-otlp)\n\nFlagged: answer contradicts the product page: warranty 2 years\n\n## user\n\nWhat is the warranty period for the Alpine 2 tent?\n\n## assistant\n\nThe Alpine 2 tent comes with a 5 year warranty.\n",
+	"mode": "synthetic"
+}

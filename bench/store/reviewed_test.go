@@ -192,9 +192,10 @@ func TestReviewQueue(t *testing.T) {
 		want    []string // run id: reasons
 		wantErr error
 	}{
-		{reason: "", want: []string{"r_a:split_votes,false_completion,flagged", "r_b:veto"}},
+		{reason: "", want: []string{"r_a:split_votes,false_completion,flagged,contested", "r_b:veto"}}, // W8 judge calibration: split votes are contested
 		{reason: "veto", want: []string{"r_b:veto"}},
-		{reason: "flagged", want: []string{"r_a:split_votes,false_completion,flagged"}},
+		{reason: "flagged", want: []string{"r_a:split_votes,false_completion,flagged,contested"}},
+		{reason: "contested", want: []string{"r_a:split_votes,false_completion,flagged,contested"}}, // W8 judge calibration
 		{reason: "invalid_evaluator", want: nil},
 		{reason: "nonsense", wantErr: schemas.ErrReviewInput},
 	}
@@ -237,7 +238,10 @@ func TestQueueReasons(t *testing.T) {
 		want string
 	}{
 		{"unanimous judge", schemas.SealedRun{Grade: judged("correct", "correct", "correct")}, ""},
-		{"split judge", schemas.SealedRun{Grade: judged("correct", "incorrect", "correct")}, "split_votes"},
+		// W8 judge calibration: split votes and an auditor disagreement are contested.
+		{"split judge", schemas.SealedRun{Grade: judged("correct", "incorrect", "correct")}, "split_votes,contested"},
+		{"auditor disagrees", schemas.SealedRun{Grade: &schemas.Grade{Judged: true,
+			Judge: &schemas.JudgeRecord{Votes: []string{"correct"}, Audit: &schemas.JudgeAudit{Verdict: "incorrect"}}}}, "contested"},
 		{"unparsable vote", schemas.SealedRun{Grade: judged("incorrect", "unparsable", "incorrect")}, "unparsable_votes"},
 		{"invalid evaluator", schemas.SealedRun{Run: schemas.Run{Outcome: schemas.OutcomeInvalidEvaluator}}, "invalid_evaluator"},
 		{"undecided grade", schemas.SealedRun{Grade: &schemas.Grade{InvalidEvaluator: true}}, "invalid_evaluator"},

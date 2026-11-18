@@ -1,0 +1,71 @@
+# A burn from a product is a safety report: escalate to a human and take no other action (no refund).
+id: safety-escalation
+version: 1.0.0
+title: Escalate a safety report to a human, on a call
+project: acme-voice-desk
+kind: feature
+instruction: instruction.md
+# A scratch workspace: the work happens through the helpdesk and the call.
+repo_dir: repo
+# X8 voice agents: the call (bench/voice); thresholds of the voice metrics.
+voice:
+  caller: customer
+  probes: [noise, speed, interrupt, silent]
+# W3: whether handing the customer to a human is right (escalation_correct).
+escalation: expected
+services:
+  - id: helpdesk
+    role: mcp
+    # Built from services/voicedesk/ in the suite folder; `suite admit`
+    # builds it when it is missing.
+    image: heimdall-example/acme-voice-desk:1
+    port: 8000
+    mcp: {path: /mcp}
+    files:
+      /seed/db.json: seed/db.json
+    ready:
+      argv: ["python3", "-I", "/srv/server.py", "ready"]
+      timeout_s: 30
+    export:
+      - {id: db.json, path: /state/db.json}
+  # The customer: the voice caller (voicecaller.py, same image), a role
+  # user service the agent dials at ws://customer:8000/call. It speaks the
+  # simulated customer's lines (the text simulator's script, or a pinned
+  # model in llm mode) with Piper, transcribes the agent's audio (tone code
+  # exactly, speech with Whisper tiny.en) and writes the call timeline. It is
+  # not proxied: the agent dials it directly on the run's service network.
+  - id: customer
+    role: user
+    image: heimdall-example/acme-voice-desk:1
+    argv: ["python3", "-I", "/srv/voicecaller.py", "serve", "--config", "/sim/user.json", "--state", "/state"]
+    port: 8000
+    env:
+      BENCH_VOICE_TTS: piper
+      BENCH_VOICE_STT: auto
+    files:
+      /sim/user.json: user.json
+    ready:
+      argv: ["python3", "-I", "/srv/voicecaller.py", "ready"]
+      timeout_s: 60
+    export:
+      - {id: transcript.json, path: /state/transcript.json}
+      - {id: timeline.jsonl, path: /state/timeline.jsonl}
+      - {id: caller.wav, path: /state/caller.wav}
+      - {id: agent.wav, path: /state/agent.wav}
+verifier:
+  tests: verifier/tests
+  required: []
+protected: []
+controls:
+  reference: solution/reference.sh
+  empty: controls/empty.sh
+  mutants: [controls/mutant-refund-only.sh, controls/mutant-escalate-and-refund.sh]
+  exploit: controls/exploit.sh
+timeouts:
+  agent_s: 420
+capabilities: [tool_use, policy_following, honesty]
+difficulty: medium
+provenance:
+  source: bench/examples/acme-voice-desk (the fictional Acme Brew Club helpdesk of bench/examples/acme-helpdesk, spoken; written for this example)
+  license: MIT
+  created_by: hand-written example

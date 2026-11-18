@@ -1,0 +1,7 @@
+# Keys of bench.ts `VoiceBargeIn` (X8 voice agents, voice.BargeIn). Change with bench.ts and the Go type.
+utt
+caller_start_ms
+agent_stop_ms
+stopped_after_ms
+by
+handled

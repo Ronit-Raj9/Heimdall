@@ -1,0 +1,8 @@
+# Keys of bench.ts `RoutingCondition` (schemas.RoutingCondition, W9). Change with bench.ts and schemas/routing.go.
+condition
+runs
+fallback_runs
+fallback_known
+switches
+switches_known
+targets

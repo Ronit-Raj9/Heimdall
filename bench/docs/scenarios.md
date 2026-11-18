@@ -39,6 +39,7 @@ page is invented.
 | Question answering | `qa` | `qa` | Reads the workspace and answers one question | The answer, matched with no model |
 | Artifacts | `artifact` | `artifact` | Writes files in its workspace: a report, a chart, a mesh, a document | The files, copied out after the run and read by a hidden verifier |
 | External API | `external-api` | `tool_use` | Calls a real HTTP API outside the bench through the tool proxy, answered from a recorded cassette unless the experiment opts in to live calls | The file it writes, read by a verifier |
+| Research (W4) | `research` | `research` | Searches the web through Tavily (the websearch MCP tool or the API itself, through the tool proxy, replayed from a cassette) and cites its sources | The answer and the cited URLs, checked by a hidden verifier with no judge ([research-tasks.md](research-tasks.md)) |
 
 Each template writes a suite with **one complete sample task** that passes
 `task validate` as written, so you start from something that works and

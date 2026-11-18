@@ -1,0 +1,56 @@
+# The settings page's primary button is grey and pushed to the left; design
+# wants it blue and centred. The agent edits the page's stylesheet. Graded on
+# what the page looks like when the bench renders it, plus a structure check
+# that the page still holds its form.
+id: primary-button
+version: 1.0.0
+title: Make the primary button blue and centred
+project: acme-visual
+kind: feature
+instruction: instruction.md
+# The workspace holds the page; the agent edits site/style.css.
+repo_dir: repo
+output:
+  kind: artifact
+  artifacts:
+    # Both files of the page are exported, so the renderer sees the
+    # stylesheet the agent left; the verifier reads them read-only at
+    # /grader/artifacts/site/.
+    - {id: site, path: "site/*", required: true, max_bytes: 262144}
+  visual:
+    # After the agent exits the bench renders index.html in the clean-room
+    # renderer: an 800 x 480 viewport, device scale 1, no network.
+    capture: {kind: artifact, artifact: site, file: index.html, width: 800, height: 480}
+    # Hidden: what the page looks like after a correct change.
+    reference: verifier/reference.png
+    # The whole page must match the reference closely (mean SSIM).
+    method: ssim
+    threshold: 0.995
+    # The "Last saved" time is written by the page's script when it loads,
+    # so it differs on every render: every check ignores it.
+    masks:
+      - {x: 176, y: 246, w: 164, h: 24}
+    checks:
+      # The button is blue: #1d4ed8 covers at least 30% of the button area.
+      - {id: button-blue, method: colors, colors: ["#1d4ed8"], min_share: 0.3, area: {x: 330, y: 283, w: 140, h: 42}}
+      # The button, cut from the reference, is found where the reference
+      # has it (centred), within 2 pixels.
+      - {id: button-centred, method: region, crop: {x: 326, y: 279, w: 148, h: 50}, at: {x: 326, y: 279}, max_offset: 2}
+verifier:
+  # Hidden folder, mounted at /grader/tests: the structure check.
+  tests: verifier/tests
+  required: []
+protected: []
+controls:
+  reference: solution/reference.sh
+  empty: controls/empty.sh
+  mutants: [controls/mutant-red.sh, controls/mutant-left.sh]
+  exploit: controls/exploit.sh
+timeouts:
+  agent_s: 600
+capabilities: [visual_design, file_output]
+difficulty: easy
+provenance:
+  source: bench/examples/acme-visual (fictional Acme settings page, written for this example)
+  license: MIT
+  created_by: hand-written example

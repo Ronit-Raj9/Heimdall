@@ -1,0 +1,11 @@
+# MigrationBehaviour: migration.Behaviour (W6, docs/model-migration.md)
+new_clusters
+fixed_clusters
+gates
+false_completion
+rejected_per_run
+refusals_per_run
+retries_per_run
+fallbacks_per_run
+latency_ms_per_turn
+conditions

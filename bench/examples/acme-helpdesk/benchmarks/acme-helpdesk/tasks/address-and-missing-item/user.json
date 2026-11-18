@@ -1,0 +1,43 @@
+{
+  "id": "address-and-missing-item",
+  "script": {
+    "opening": "Hi, two things. My order B-3004 hasn't shipped yet and I've moved, so please send it to my new address. And order B-3005 arrived with only two of the three bags of single origin. My email is tom.reed@example.com.",
+    "replies": [
+      {
+        "when": [
+          "address",
+          "where should",
+          "where would",
+          "where do"
+        ],
+        "say": "The new address is 14 Harbour Lane, Flat 2, Bristol, BS1 4QA, United Kingdom."
+      },
+      {
+        "when": [
+          "refunded",
+          "refund of",
+          "issued"
+        ],
+        "say": "Thanks, that's everything.",
+        "stop": true
+      }
+    ],
+    "done": "No, that's all.",
+    "default": "Okay."
+  },
+  "persona": {
+    "name": "Tom Reed",
+    "goal": "Have order B-3004 (not shipped yet) sent to your new address, and get money back for the bag missing from order B-3005.",
+    "facts": [
+      "Your email is tom.reed@example.com",
+      "Your new address is 14 Harbour Lane, Flat 2, Bristol, BS1 4QA, United Kingdom",
+      "Order B-3005 arrived on 3 November 2026 with two of the three bags of single origin",
+      "Order B-3004 has not shipped yet"
+    ],
+    "unknown": [
+      "Prices of the bags"
+    ],
+    "behaviour": "Practical and brief. Give the new address only when the agent asks for it.",
+    "satisfied_when": "the agent confirms the address change and the refund for the missing bag."
+  }
+}

@@ -1,0 +1,454 @@
+{
+  "suite": "acme-visual",
+  "version": "1.0.0",
+  "base_image": {
+    "tag": "bench/coding-core-base:1"
+  },
+  "tasks": {
+    "primary-button": {
+      "version": "1.0.0",
+      "instruction_sha256": "21cde2ce8d7b49924cdb18b8871de39c13c056a5f3c6731667bebc6df8c60931",
+      "repo_tree_sha256": "554b8744db96ca642d65507aa4d0ffd0ca9d9c72659cc7687abd60f8a797a038",
+      "verifier_sha256": "360c394bc2193ba509a819f7bd4298eb1a2c05da125f3ac531e1aefb2821f4a8",
+      "controls_sha256": "1bb55051b4c55ee262cf991c4c39a7b59f9b4c056e7e1b1465c4a5daf58477d0",
+      "fixtures_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "status": "admitted",
+      "admission": {
+        "admitted": true,
+        "checks": [
+          {
+            "name": "static_validation",
+            "want": "clean",
+            "got": "clean",
+            "passed": true,
+            "detail": "0 warnings"
+          },
+          {
+            "name": "reference_1",
+            "want": "pass",
+            "got": "pass",
+            "passed": true,
+            "detail": "solution/reference.sh exit 0; tests_ran=0 failures=0 errors=0 skipped=0 exit=0 reason=verifier command: passed (reward 1); visual: 3 of 3 checks passed"
+          },
+          {
+            "name": "reference_2",
+            "want": "pass",
+            "got": "pass",
+            "passed": true,
+            "detail": "solution/reference.sh exit 0; tests_ran=0 failures=0 errors=0 skipped=0 exit=0 reason=verifier command: passed (reward 1); visual: 3 of 3 checks passed"
+          },
+          {
+            "name": "reference_3",
+            "want": "pass",
+            "got": "pass",
+            "passed": true,
+            "detail": "solution/reference.sh exit 0; tests_ran=0 failures=0 errors=0 skipped=0 exit=0 reason=verifier command: passed (reward 1); visual: 3 of 3 checks passed"
+          },
+          {
+            "name": "empty_control",
+            "want": "fail",
+            "got": "fail",
+            "passed": true,
+            "detail": "controls/empty.sh exit 0; tests_ran=0 failures=0 errors=0 skipped=0 exit=0 reason=verifier command: passed (reward 1); visual: 0 of 3 checks passed; failed: ssim (mean SSIM over 23345 windows); button-blue (#1d4ed8: nearest #ffffff (share 1.000) at distance 289.7; dominant: #ffffff 1.000); button-centred (crop 148x50 not found: best difference 0.3609 at (114,279), threshold 0.0200)"
+          },
+          {
+            "name": "mutant_1",
+            "want": "fail",
+            "got": "fail",
+            "passed": true,
+            "detail": "controls/mutant-red.sh exit 0; tests_ran=0 failures=0 errors=0 skipped=0 exit=0 reason=verifier command: passed (reward 1); visual: 1 of 3 checks passed; failed: button-blue (#1d4ed8: nearest #dc2626 (share 0.886) at distance 264.1; dominant: #dc2626 0.886, #fffefe 0.021, #e76a6a 0.007, #fadcdc 0.007, #fbe4e4 0.006, #f4bcbc 0.006, #e24b4b 0.005, #f2acac 0.005); button-centred (crop 148x50 not found: best difference 0.3720 at (153,59), threshold 0.0200)"
+          },
+          {
+            "name": "mutant_2",
+            "want": "fail",
+            "got": "fail",
+            "passed": true,
+            "detail": "controls/mutant-left.sh exit 0; tests_ran=0 failures=0 errors=0 skipped=0 exit=0 reason=verifier command: passed (reward 1); visual: 0 of 3 checks passed; failed: ssim (mean SSIM over 23345 windows); button-blue (#1d4ed8: nearest #ffffff (share 1.000) at distance 289.7; dominant: #ffffff 1.000); button-centred (crop 148x50 found at (116,279), not at (326,279) within 2 px)"
+          },
+          {
+            "name": "exploit",
+            "want": "fail",
+            "got": "fail",
+            "passed": true,
+            "detail": "controls/exploit.sh exit 0; tests_ran=0 failures=0 errors=0 skipped=0 exit=0 reason=verifier command: reward 0 below pass threshold 1; visual: 0 of 3 checks passed; failed: ssim (mean SSIM over 23345 windows); button-blue (#1d4ed8: nearest #ffffff (share 1.000) at distance 289.7; dominant: #ffffff 1.000); button-centred (crop 148x50 not found: best difference 0.3997 at (54,5), threshold 0.0200)"
+          },
+          {
+            "name": "null_noop",
+            "want": "fail",
+            "got": "fail",
+            "passed": true,
+            "detail": "noop exit 0; tests_ran=0 failures=0 errors=0 skipped=0 exit=0 reason=verifier command: passed (reward 1); visual: 0 of 3 checks passed; failed: ssim (mean SSIM over 23345 windows); button-blue (#1d4ed8: nearest #ffffff (share 1.000) at distance 289.7; dominant: #ffffff 1.000); button-centred (crop 148x50 not found: best difference 0.3609 at (114,279), threshold 0.0200)"
+          },
+          {
+            "name": "null_refuse",
+            "want": "fail",
+            "got": "fail",
+            "passed": true,
+            "detail": "refuse exit 0; tests_ran=0 failures=0 errors=0 skipped=0 exit=0 reason=verifier command: passed (reward 1); visual: 0 of 3 checks passed; failed: ssim (mean SSIM over 23345 windows); button-blue (#1d4ed8: nearest #ffffff (share 1.000) at distance 289.7; dominant: #ffffff 1.000); button-centred (crop 148x50 not found: best difference 0.3609 at (114,279), threshold 0.0200)"
+          },
+          {
+            "name": "instruction_edited",
+            "want": "edited",
+            "got": "edited",
+            "passed": true
+          },
+          {
+            "name": "secret_scan",
+            "want": "none",
+            "got": "none",
+            "passed": true
+          },
+          {
+            "name": "verifier_no_network",
+            "want": "none",
+            "got": "none",
+            "passed": true,
+            "detail": "reported by grader visual"
+          }
+        ],
+        "at": "2026-11-18T03:43:54.37654064Z",
+        "grader": "visual",
+        "reference_repeats": 3,
+        "reference_results": [
+          "pass",
+          "pass",
+          "pass"
+        ],
+        "fingerprint": "5d66c713a5620b1b42d5a35970eaed865f718fcce25e6f5def68aed3dd6c464a"
+      }
+    },
+    "revenue-chart": {
+      "version": "1.0.0",
+      "instruction_sha256": "a7696efbe44ef985d8755e6c12410bd659ea380d06d1c35f2a5604c7e8433eef",
+      "repo_tree_sha256": "be1b37f431c8c2071c8f2d1d3f639fa42d811026dc219d145fac9308e6fe41e5",
+      "verifier_sha256": "946915177eb0506de4c5a193556224501624e5f3c6d996c9f1fab1c571de24a7",
+      "controls_sha256": "03cbf61eef330c023f2a69ea287cb565cbe231f2b5f08ac9cb349877d3a6826b",
+      "fixtures_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "status": "admitted",
+      "admission": {
+        "admitted": true,
+        "checks": [
+          {
+            "name": "static_validation",
+            "want": "clean",
+            "got": "clean",
+            "passed": true,
+            "detail": "0 warnings"
+          },
+          {
+            "name": "reference_1",
+            "want": "pass",
+            "got": "pass",
+            "passed": true,
+            "detail": "solution/reference.sh exit 0; tests_ran=0 failures=0 errors=0 skipped=0 exit=0 reason=verifier command: passed (reward 1); visual: 3 of 3 checks passed"
+          },
+          {
+            "name": "reference_2",
+            "want": "pass",
+            "got": "pass",
+            "passed": true,
+            "detail": "solution/reference.sh exit 0; tests_ran=0 failures=0 errors=0 skipped=0 exit=0 reason=verifier command: passed (reward 1); visual: 3 of 3 checks passed"
+          },
+          {
+            "name": "reference_3",
+            "want": "pass",
+            "got": "pass",
+            "passed": true,
+            "detail": "solution/reference.sh exit 0; tests_ran=0 failures=0 errors=0 skipped=0 exit=0 reason=verifier command: passed (reward 1); visual: 3 of 3 checks passed"
+          },
+          {
+            "name": "empty_control",
+            "want": "fail",
+            "got": "fail",
+            "passed": true,
+            "detail": "controls/empty.sh exit 0; artifact output: required artifact missing: chart (chart/revenue.svg: missing: no file matches chart/revenue.svg)"
+          },
+          {
+            "name": "mutant_1",
+            "want": "fail",
+            "got": "fail",
+            "passed": true,
+            "detail": "controls/mutant-missing-label.sh exit 0; tests_ran=0 failures=0 errors=0 skipped=0 exit=0 reason=verifier command: passed (reward 1); visual: 2 of 3 checks passed; failed: pixel (101 of 153600 pixels differ by more than 32 in a channel)"
+          },
+          {
+            "name": "mutant_2",
+            "want": "fail",
+            "got": "fail",
+            "passed": true,
+            "detail": "controls/mutant-wrong-value.sh exit 0; tests_ran=0 failures=0 errors=0 skipped=0 exit=0 reason=verifier command: passed (reward 1); visual: 2 of 3 checks passed; failed: pixel (1299 of 153600 pixels differ by more than 32 in a channel)"
+          },
+          {
+            "name": "exploit",
+            "want": "fail",
+            "got": "fail",
+            "passed": true,
+            "detail": "controls/exploit.sh exit 0; tests_ran=0 failures=0 errors=0 skipped=0 exit=0 reason=verifier command: reward 0 below pass threshold 1; visual: 1 of 3 checks passed; failed: pixel (87252 of 153600 pixels differ by more than 32 in a channel); bars-blue (#2563eb: nearest #ffdddd (share 0.340) at distance 250.2; dominant: #ffffff 0.606, #ffdddd 0.340, #cc7777 0.015, #000000 0.012, #eccccc 0.001, #5d5151 0.001, #b29a9a 0.001, #433a3a 0.001)"
+          },
+          {
+            "name": "null_noop",
+            "want": "fail",
+            "got": "fail",
+            "passed": true,
+            "detail": "noop exit 0; artifact output: required artifact missing: chart (chart/revenue.svg: missing: no file matches chart/revenue.svg)"
+          },
+          {
+            "name": "null_refuse",
+            "want": "fail",
+            "got": "fail",
+            "passed": true,
+            "detail": "refuse exit 0; artifact output: required artifact missing: chart (chart/revenue.svg: missing: no file matches chart/revenue.svg)"
+          },
+          {
+            "name": "instruction_edited",
+            "want": "edited",
+            "got": "edited",
+            "passed": true
+          },
+          {
+            "name": "secret_scan",
+            "want": "none",
+            "got": "none",
+            "passed": true
+          },
+          {
+            "name": "verifier_no_network",
+            "want": "none",
+            "got": "none",
+            "passed": true,
+            "detail": "reported by grader visual"
+          }
+        ],
+        "at": "2026-11-18T03:49:17.387723981Z",
+        "grader": "visual",
+        "reference_repeats": 3,
+        "reference_results": [
+          "pass",
+          "pass",
+          "pass"
+        ],
+        "fingerprint": "88d05c5a0790dd34a50dd2be09b61710f61865db5beed3dfe3629844e6af90d4"
+      }
+    },
+    "review-layout": {
+      "version": "1.0.0",
+      "instruction_sha256": "2292bb712e09ed2fdf25847fb81581b058294a1636086f150b8134f3e6425c18",
+      "repo_tree_sha256": "17fed9e92cd1818af7b1ad4b4c39a43ed254383eaba8a2fd426867ad7afec509",
+      "verifier_sha256": "38a9eabbf88f7bc10e73e7373a0044eca23a06ddb20d396919632595ef61503a",
+      "controls_sha256": "0950b32e143d9598af51c796b7aec0d30af520e0b7392de54eb4304db51446b5",
+      "fixtures_sha256": "f0fe405f7dccefe5413ef4f56b042b943fac7f63dbb1a38bed4caa17cf156567",
+      "status": "admitted",
+      "admission": {
+        "admitted": true,
+        "checks": [
+          {
+            "name": "static_validation",
+            "want": "clean",
+            "got": "clean",
+            "passed": true,
+            "detail": "0 warnings"
+          },
+          {
+            "name": "reference_1",
+            "want": "pass",
+            "got": "pass",
+            "passed": true,
+            "detail": "solution/reference.sh exit 0; tests_ran=0 failures=0 errors=0 skipped=0 exit=0 reason=verifier command: passed (reward 1); visual: 3 of 3 checks passed"
+          },
+          {
+            "name": "reference_2",
+            "want": "pass",
+            "got": "pass",
+            "passed": true,
+            "detail": "solution/reference.sh exit 0; tests_ran=0 failures=0 errors=0 skipped=0 exit=0 reason=verifier command: passed (reward 1); visual: 3 of 3 checks passed"
+          },
+          {
+            "name": "reference_3",
+            "want": "pass",
+            "got": "pass",
+            "passed": true,
+            "detail": "solution/reference.sh exit 0; tests_ran=0 failures=0 errors=0 skipped=0 exit=0 reason=verifier command: passed (reward 1); visual: 3 of 3 checks passed"
+          },
+          {
+            "name": "empty_control",
+            "want": "fail",
+            "got": "fail",
+            "passed": true,
+            "detail": "controls/empty.sh exit 0; tests_ran=0 failures=0 errors=0 skipped=0 exit=0 reason=verifier command: passed (reward 1); visual: 0 of 3 checks passed; failed: ssim (mean SSIM over 63277 windows); line-numbers (crop 26x90 not found: best difference 0.1096 at (182,26), threshold 0.0200); status-bar (crop 166x26 not found: best difference 0.0721 at (210,23), threshold 0.0200)"
+          },
+          {
+            "name": "mutant_1",
+            "want": "fail",
+            "got": "fail",
+            "passed": true,
+            "detail": "controls/mutant-no-statusbar.sh exit 0; tests_ran=0 failures=0 errors=0 skipped=0 exit=0 reason=verifier command: passed (reward 1); visual: 1 of 3 checks passed; failed: ssim (mean SSIM over 63277 windows); status-bar (crop 166x26 not found: best difference 0.0721 at (210,23), threshold 0.0200)"
+          },
+          {
+            "name": "mutant_2",
+            "want": "fail",
+            "got": "fail",
+            "passed": true,
+            "detail": "controls/mutant-toolbar.sh exit 0; tests_ran=0 failures=0 errors=0 skipped=0 exit=0 reason=verifier command: passed (reward 1); visual: 0 of 3 checks passed; failed: ssim (mean SSIM over 63277 windows); line-numbers (crop 26x90 found at (0,92), not at (0,50) within 1 px); status-bar (crop 166x26 not found: best difference 0.0713 at (155,54), threshold 0.0200)"
+          },
+          {
+            "name": "exploit",
+            "want": "fail",
+            "got": "fail",
+            "passed": true,
+            "detail": "controls/exploit.sh exit 0; tests_ran=0 failures=0 errors=0 skipped=0 exit=0 reason=verifier command: passed (reward 1); visual: 0 of 3 checks passed; failed: ssim (mean SSIM over 63277 windows); line-numbers (crop 26x90 not found: best difference 0.1096 at (182,26), threshold 0.0200); status-bar (crop 166x26 not found: best difference 0.0721 at (210,23), threshold 0.0200)"
+          },
+          {
+            "name": "null_noop",
+            "want": "fail",
+            "got": "fail",
+            "passed": true,
+            "detail": "noop exit 0; tests_ran=0 failures=0 errors=0 skipped=0 exit=0 reason=verifier command: passed (reward 1); visual: 0 of 3 checks passed; failed: ssim (mean SSIM over 63277 windows); line-numbers (crop 26x90 not found: best difference 0.1096 at (182,26), threshold 0.0200); status-bar (crop 166x26 not found: best difference 0.0721 at (210,23), threshold 0.0200)"
+          },
+          {
+            "name": "null_refuse",
+            "want": "fail",
+            "got": "fail",
+            "passed": true,
+            "detail": "refuse exit 0; tests_ran=0 failures=0 errors=0 skipped=0 exit=0 reason=verifier command: passed (reward 1); visual: 0 of 3 checks passed; failed: ssim (mean SSIM over 63277 windows); line-numbers (crop 26x90 not found: best difference 0.1096 at (182,26), threshold 0.0200); status-bar (crop 166x26 not found: best difference 0.0721 at (210,23), threshold 0.0200)"
+          },
+          {
+            "name": "instruction_edited",
+            "want": "edited",
+            "got": "edited",
+            "passed": true
+          },
+          {
+            "name": "secret_scan",
+            "want": "none",
+            "got": "none",
+            "passed": true
+          },
+          {
+            "name": "verifier_no_network",
+            "want": "none",
+            "got": "none",
+            "passed": true,
+            "detail": "reported by grader visual"
+          }
+        ],
+        "at": "2026-11-18T03:52:10.446317527Z",
+        "grader": "visual",
+        "reference_repeats": 3,
+        "reference_results": [
+          "pass",
+          "pass",
+          "pass"
+        ],
+        "fingerprint": "28b26e93f1c95a795435ee828e6dce164d6cc1d12fd4984afdbcdcb33fb177bf"
+      }
+    }
+  },
+  "probes": {
+    "model-outage": {
+      "version": "1.0.0",
+      "sha256": "6a434aba4ee1ecdb69c3b68f64bc83c4707d54c73f6a1518b953ef56c172182d"
+    }
+  },
+  "created_at": "2026-11-18T03:43:47.983765094Z",
+  "fingerprints": {
+    "version": 1,
+    "suite": {
+      "settings": "009c918604308c446c28d72ee80f925a261f46cbdcaac45127c90263649aecd1",
+      "fields": {
+        "base_image": "0d0192aa22c9741cd1c16dc6d4b2ca36e7be6aab202c7cfac4ebe3a7fb69084e",
+        "environment": "2075abc096d17738fba811b8518f8a3cbd1a5621abd0fd833170c50f4f9bbe4b",
+        "grader": "e51a68338e05c1e9a9a60985cd23a1552ad51f0308d288674430a75a8282cba1",
+        "id": "69f0e07be0b54feaa74d457bd030f775f9a2efc6c313dbfd7351dbe898f079b5",
+        "parts": "d32d2974795cdde5afd6bbfafba26b3a46b15c486efeee771ea4ce235a39bf27",
+        "probes": "3ce7fcef3bd51a3d5702a375e1c86df815ddcd66985457af7108e97c83be0263",
+        "tasks": "10ed031b7e31902879b9a3b0a7f8cc333f36d05bbcbead0e4bf20424eefd28cf",
+        "track": "0c47fcc7df96778c6d8a9a6b979a21c0fbbe0ed0b6d097f2fa27cfec9142b974",
+        "verifier": "386f602bb15950286e29e80fc9c473bb22db23a6cc0433730694cbb7b39abc32",
+        "version": "39fe4a40977d0585fd5704359e3685b0ada5cf5ee061e5d97385601d120cd0ec",
+        "workdir": "4384b4849b7f004db243393653c15565c0a2ab2a8951d8513646c37d2a14a51f"
+      },
+      "files": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "images": {
+        "base": "tag only: bench/coding-core-base:1",
+        "helper": "tag only: bench/coding-core-base:1"
+      }
+    },
+    "tasks": {
+      "primary-button": {
+        "settings": "26d5ba883eed23283167de652bcebba1d7a00d46731ccc2c04e55057aecac850",
+        "fields": {
+          "capabilities": "4cd55b8b881474bc444d3472bf1e93de8b70d83d4cb85d06b6eacce9379af10a",
+          "controls": "194dd67ce81a0a2fbcb5b33ba6f775bda4fa332f93c0df69bafc87a5226b97eb",
+          "difficulty": "3ed870088e7410ee05d36e4fc20bf73104130ef98000b268b11378d0800d1703",
+          "id": "d9876cf42427e4f4a2efc8d9f379ac28e8f32818bc7c9225c08d8475f5b7f0d5",
+          "instruction": "d22404e1bdcc17d8b42ec5950fe47a8a98ed7ccdf46bdc43121a724676b65198",
+          "kind": "1ff4393bcd872405377779cd81a787a54906f836cdd1d316ed2c5710d98d925b",
+          "output": "0cb07cbd059057dfa9f44494c690b7ce20e26affbef5060a78970dd2057346d4",
+          "project": "69f0e07be0b54feaa74d457bd030f775f9a2efc6c313dbfd7351dbe898f079b5",
+          "provenance": "4408ceede0e87b0e5c4f688cb3cb6b23820a063fa110e24abf3a58ac27cff487",
+          "repo_dir": "a22b0355c8c3954692a2626bc83ff8ea3b7b65119e407c324883e2ed95c1fbe6",
+          "timeouts": "95dd6e9d195c211d04fe42d19603dbbcefc90dfe116e3136ffbc818a564d0d55",
+          "title": "ca4b71f1880020ddef83fd8163b33732aae10070f58e957915857c0e08ba74c3",
+          "verifier": "3c0c9efd04d308ebf9f4569298c7d6c6f448e083dacf0c4b9ce1b504ac56bb65",
+          "version": "39fe4a40977d0585fd5704359e3685b0ada5cf5ee061e5d97385601d120cd0ec"
+        },
+        "files": "83e631d69ca849c73a8b1f86d3085e13aa65be2f88a77b7996ff861256c9df58"
+      },
+      "revenue-chart": {
+        "settings": "d2473c0e7842f33705a758b8c4e2ef5815e6d2ede3bd0e94a956e02e3c5338cd",
+        "fields": {
+          "capabilities": "5390e13e31d157a4cf66b694c6fe1cbff9666dd0664c826b86a12f497acb9bf3",
+          "controls": "de8a134b8c3044840b9f409248da21f8732583125e26d36597480758ba5d2ece",
+          "difficulty": "60d4c90eee5e731df8d3ef2891de541d2e755ff8ee9db358e26bdec49f6e0db9",
+          "id": "9cd1c9d010454154e6a76037b8e67a32d19e2334582ceae6537251ec9338ab63",
+          "instruction": "d22404e1bdcc17d8b42ec5950fe47a8a98ed7ccdf46bdc43121a724676b65198",
+          "kind": "1ff4393bcd872405377779cd81a787a54906f836cdd1d316ed2c5710d98d925b",
+          "output": "70ca2cc66d05ad884d51e2f3a2fc2360ffe3258bc234268db1d7eb419460125a",
+          "project": "69f0e07be0b54feaa74d457bd030f775f9a2efc6c313dbfd7351dbe898f079b5",
+          "provenance": "1089dd05b52ee5f81f5b4e8ec0f20c9f70f5e8f273f5c41aec97a232636ab66f",
+          "repo_dir": "a22b0355c8c3954692a2626bc83ff8ea3b7b65119e407c324883e2ed95c1fbe6",
+          "timeouts": "95dd6e9d195c211d04fe42d19603dbbcefc90dfe116e3136ffbc818a564d0d55",
+          "title": "69aeb91f2f936e77205a92c5dfc8fc9a173f2e71968dd39bfd92fabda63e6152",
+          "verifier": "3c0c9efd04d308ebf9f4569298c7d6c6f448e083dacf0c4b9ce1b504ac56bb65",
+          "version": "39fe4a40977d0585fd5704359e3685b0ada5cf5ee061e5d97385601d120cd0ec"
+        },
+        "files": "d5ebb8067adf22f6debe33e9645391a899f54c7420f089c7d3f9b1001d767451"
+      },
+      "review-layout": {
+        "settings": "4e237d44d25b94cceb83b6f14a5a4cff994bb643fa33344bfb9b3433f4a67075",
+        "fields": {
+          "capabilities": "07e6af4832900c65c1ed1e19dc8a2b90b4267faa13705eb262928acc87e747a9",
+          "controls": "8fe59377e04f0a42dcf3f56a8e3231f6028dc2a3cdc2878ab8a87d9dc5a972a7",
+          "difficulty": "3ed870088e7410ee05d36e4fc20bf73104130ef98000b268b11378d0800d1703",
+          "id": "b2b157f6b1f98acb1e821cd33fea0fa35547bf5180818f4ac4908ca486bad5fe",
+          "instruction": "d22404e1bdcc17d8b42ec5950fe47a8a98ed7ccdf46bdc43121a724676b65198",
+          "kind": "1ff4393bcd872405377779cd81a787a54906f836cdd1d316ed2c5710d98d925b",
+          "output": "4585e9e24eb703acdd443c91687bb5e816a20ea4151e63a1d20c679b561cda11",
+          "project": "69f0e07be0b54feaa74d457bd030f775f9a2efc6c313dbfd7351dbe898f079b5",
+          "provenance": "df09705adb54a4a62657039414020d6a40c993508af8d504d5e84e2f6e06f80f",
+          "repo_dir": "a22b0355c8c3954692a2626bc83ff8ea3b7b65119e407c324883e2ed95c1fbe6",
+          "services": "f9d365cd82d97fef68c9e763a1a13b04fde88952893afea33541880d3834c712",
+          "timeouts": "ed49f7a837e53c2a4e4b885d3b4109fcade66c4d9f0700b210d13023bc644878",
+          "title": "5db3ac8f5e1b8b3e081003a5e6c2910cf1ff2e8317e59163d0eb208732d609e0",
+          "verifier": "3c0c9efd04d308ebf9f4569298c7d6c6f448e083dacf0c4b9ce1b504ac56bb65",
+          "version": "39fe4a40977d0585fd5704359e3685b0ada5cf5ee061e5d97385601d120cd0ec"
+        },
+        "files": "58ba11322e2f74f53a42bb194ce73fe193b16e9dc7511f9ad44dc719e8c17680"
+      }
+    },
+    "probes": {
+      "model-outage": {
+        "settings": "e30ef6fa85e8082125543d472c15e0b16d023078d05ee40850105dbd8c44f8db",
+        "fields": {
+          "apply": "b7e753793a84a57de81592a1bc1a7be169fca45467c30261f9e209e2e2286bd5",
+          "axis": "7298afcba5a3541d2af5349f1bb3cfad78757dad43a967f82b3491f15b3bc89c",
+          "id": "0e84cff85388dc586790dfcc9272b4e2a876107a80a0a822db32d8e2fe73b26e",
+          "layer": "319ea077fe98008cd260c55907ede9e9576c5d8646e6bcfa0320fc2fd6a1d148",
+          "ps2_family": "029b04a11d4f0a3faba46780dd8f67ab1c7c75a57df07eb6918e795867ead912",
+          "safe_behavior": "6eacd64e31d70398d853a23aee39418970fc9cf0191f022f81190075b70580f0",
+          "version": "39fe4a40977d0585fd5704359e3685b0ada5cf5ee061e5d97385601d120cd0ec"
+        },
+        "files": "0d333bc0ad4c49a452889660ac248f22dd9cec0b604614cfc1e2bbc612b66887"
+      }
+    }
+  }
+}

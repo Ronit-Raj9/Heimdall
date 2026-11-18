@@ -1,0 +1,23 @@
+{
+  "question": "Who is the current mayor of the town where the Kestrel Footbridge stands?",
+  "category": "multi_hop",
+  "match": "contains_all",
+  "expected": [
+    "idris fenwick"
+  ],
+  "normalize": [
+    "lower",
+    "strip_punct",
+    "collapse_space"
+  ],
+  "evidence_urls": [
+    "https://coastwiki.example/wiki/Kestrel_Footbridge",
+    "https://caldercoast-council.example/penhallow/mayor",
+    "https://calder-gazette.example/2025/05/penhallow-new-mayor"
+  ],
+  "require_grounding": true,
+  "wrong_answers": [
+    "Agnes Polgrain",
+    "Rosalind Achebe"
+  ]
+}

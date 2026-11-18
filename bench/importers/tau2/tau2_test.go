@@ -253,7 +253,7 @@ func TestParseSettingsErrors(t *testing.T) {
 	}{
 		{name: "unknown key", extra: map[string]string{"bogus": "1"}, want: "unknown setting"},
 		{name: "telecom", extra: map[string]string{SetDomains: "telecom"}, want: "not supported"},
-		{name: "llm user", extra: map[string]string{SetUser: "llm"}, want: "only scripted is built"},
+		{name: "unknown user", extra: map[string]string{SetUser: "human"}, want: "want one of"},
 		{name: "bad task set", extra: map[string]string{SetTaskSet: "some"}, want: "want one of"},
 		{name: "bad turns", extra: map[string]string{SetMaxTurns: "1"}, want: "from 2 to 200"},
 	}

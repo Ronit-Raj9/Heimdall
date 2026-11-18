@@ -1,0 +1,47 @@
+# W9 routing policy under test (docs/routing-experiments.md), experiment (b):
+# what does a weighted split across two models do to success, cost and
+# behaviour, against the fixed strong model?
+#
+#   A  fixed claude-sonnet-4-5.
+#   B  weighted: one VK-scoped routing rule with targets
+#      anthropic/claude-sonnet-4-5 weight 0.5 and anthropic/claude-haiku-4-5
+#      weight 0.5. Bifrost draws the target per request (unseeded
+#      math/rand, plugins/routing/rules/engine.go), so one trajectory mixes
+#      models turn by turn; served_model_switches counts the changes and
+#      routed_target_<target> gives the realised share. The realised share is
+#      not exactly 0.5 and cannot be replayed: report it, do not assume it.
+#
+# Forecast (not run; assumptions as in routing-fallback-outage.yaml): clean
+# only, 8 tasks x 3 trials x 2 arms = 48 runs; arm A about $2.4, arm B about
+# $1.6 (half the turns on haiku). Expected: cost per verified success lower
+# in B; success lower or inconclusive; served_model_switches around half the
+# turn count in B and 0 in A; prompt-cache reads lower in B because each
+# switch starts a cold prefix on the other model.
+name: routing-weighted-split
+suite: coding-core@1.0.0
+base: agents/custom-python.yaml
+arms:
+  A:
+    label: fixed sonnet
+    set:
+      gateway.routing: {strategy: fixed, targets: [{model: claude-sonnet-4-5}]}
+  B:
+    label: sonnet and haiku 50/50 per request
+    set:
+      gateway.routing:
+        strategy: weighted
+        targets: [{model: claude-sonnet-4-5, weight: 0.5}, {model: claude-haiku-4-5, weight: 0.5}]
+primary: {condition: clean, metric: verified_success}
+# model_fidelity is not a baseline gate: routing experiments switch it on, so a
+# served model outside the arm\'s policy fires and policy switches are counted.
+extra_gates: [model_fidelity]
+guards:
+  - {rule: no_new_integrity_violation}
+conditions:
+  - {id: clean, tasks: all, trials: 3}
+budget: {total_usd: 5}
+verdict: {policy: paired_signflip, alpha: 0.05, assumed_sd: 0.30}
+seed: 20261118
+concurrency: 2
+manifest_mode: agent_exposure
+policy: policies/default.yaml

@@ -1,0 +1,17 @@
+# livescore.Comparison (X6 live scoring, docs/live-scoring.md); ? marks an omitempty key
+evidence
+baseline
+candidate
+result
+alpha
+per_test_level
+threshold
+min_pairs
+started_at
+decided_at?
+sessions_baseline
+sessions_candidate
+restarts
+signals
+method
+stale?

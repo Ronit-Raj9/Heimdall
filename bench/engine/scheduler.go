@@ -85,6 +85,10 @@ type Summary struct {
 	// they are in Sealed too. RemoteRejected counts uploads it refused.
 	Remote         int `json:"remote,omitempty"`
 	RemoteRejected int `json:"remote_rejected,omitempty"`
+	// W7 adaptive trials (adaptive_sched.go): optional slots the frozen rule
+	// did not release (not required, not missing) and why it stopped.
+	NotRequired int    `json:"not_required,omitempty"`
+	StopReason  string `json:"stop_reason,omitempty"`
 }
 
 // schedRun is the shared state of one Run call. The spend fields are read
@@ -105,6 +109,8 @@ type schedRun struct {
 	maxCost  float64       // highest observed cost of one run
 	observed bool          // some run's cost was observed
 	freed    chan struct{} // closed and replaced whenever a reservation is released
+
+	w7 *adaptiveState // W7 adaptive trials: slots queued and the last replay (adaptive_sched.go)
 }
 
 // NewScheduler returns a scheduler. janitor may be nil (tests, or a host
@@ -143,7 +149,7 @@ func (s *Scheduler) Run(ctx context.Context, m *schemas.Manifest, opts RunOption
 		return nil, err
 	}
 	r.ctx = ctx
-	r.queue = newSlotQueue(m.Slots)
+	r.queue = newSlotQueue(initialSlots(m)) // W7 adaptive trials: optional slots wait for the rule (adaptive_sched.go)
 	detach := func() {}
 	if opts.Remote != nil {
 		detach = opts.Remote.attach(r)
@@ -158,28 +164,31 @@ func (s *Scheduler) Run(ctx context.Context, m *schemas.Manifest, opts RunOption
 	if opts.RemoteOnly { // Runners area: no local worker
 		workers = 0
 	}
-	var wg sync.WaitGroup
-	for range workers {
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
-			for {
-				slot, ok := r.queue.next(ctx)
-				if !ok {
-					return
+	for more := true; more; more = r.releaseOptional(ctx) { // W7 adaptive trials: one stage per release of the rule (adaptive_sched.go)
+		var wg sync.WaitGroup
+		for range workers {
+			wg.Add(1)
+			go func() {
+				defer wg.Done()
+				for {
+					slot, ok := r.queue.next(ctx)
+					if !ok {
+						return
+					}
+					r.process(ctx, slot)
 				}
-				r.process(ctx, slot)
-			}
-		}()
-	}
-	wg.Wait()
-	if opts.RemoteOnly { // Runners area: wait for the remote workers
-		r.queue.drained(ctx)
+			}()
+		}
+		wg.Wait()
+		if opts.RemoteOnly { // Runners area: wait for the remote workers before the rule looks at the stage
+			r.queue.drained(ctx)
+		}
 	}
 	detach()
 	r.mu.Lock()
 	out, stopped := r.sum, r.stopped
 	r.mu.Unlock()
+	r.adaptiveSummary(&out) // W7
 	if stopped {
 		r.s.logger.Warn("spend cap stopped leasing", "experiment", m.ExpID, "cap_usd", m.Experiment.Budget.TotalUSD,
 			"spent_usd", out.SpentUSD, "pending", out.Pending, "unknown_cost_runs", out.UnknownCostRuns)

@@ -1,0 +1,9 @@
+# Keys of bench.ts `CanaryServed`, one per line; a trailing ? marks an optional (Go omitempty) key.
+# W5 drift canary (handlers/canary.go, bench/canary, docs/drift-canary.md). Change with bench.ts.
+arm
+label
+requested
+served
+providers
+system_fingerprints?
+requests

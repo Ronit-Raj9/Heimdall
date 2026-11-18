@@ -42,7 +42,25 @@ type Schedule struct {
 	MaxUSDPerDay float64         `json:"max_usd_per_day,omitempty" yaml:"max_usd_per_day,omitempty"` // daily spend cap; required unless the experiment is a smoke experiment
 	FailOn       []string        `json:"fail_on,omitempty" yaml:"fail_on,omitempty"`                 // verdict decisions recorded as a failed check; empty is regressed and invalid
 	Alerts       []alerts.Config `json:"alerts,omitempty" yaml:"alerts,omitempty"`
+	// Job is a built-in job the daemon runs in place of an experiment (one of
+	// Jobs); such a schedule names no experiment and spends nothing. Failure
+	// inbox area: inbox-pull (docs/failure-inbox.md).
+	Job string `json:"job,omitempty" yaml:"job,omitempty"`
 }
+
+// Built-in jobs (Schedule.Job). The CLI's runner implements each.
+const (
+	JobInboxPull = "inbox-pull" // Failure inbox area: pull flagged production sessions
+)
+
+// Jobs lists the built-in jobs a schedule may name.
+var Jobs = []string{JobInboxPull}
+
+// X6 live scoring: livescore-pull reads the gateway's logs once and scores
+// the closed sessions (docs/live-scoring.md); it spends nothing.
+const JobLivescorePull = "livescore-pull"
+
+func init() { Jobs = append(Jobs, JobLivescorePull) } // X6 live scoring
 
 // DefaultFailOn is the verdicts a scheduled check fails on when FailOn is
 // empty, the same default as `check -fail-on`.
@@ -197,6 +215,15 @@ func (s Schedule) Validate(root string, load ExperimentLoader) error {
 		if err := a.Validate(); err != nil {
 			return wrap("%w", err)
 		}
+	}
+	if s.Job != "" { // a built-in job runs no experiment and spends nothing
+		if !slices.Contains(Jobs, s.Job) {
+			return wrap("job %q: want one of %s", s.Job, strings.Join(Jobs, ", "))
+		}
+		if s.Experiment != "" || s.Policy != "" || s.MaxUSDPerDay != 0 {
+			return wrap("a job schedule takes no experiment, policy or max_usd_per_day")
+		}
+		return nil
 	}
 	if s.Policy != "" {
 		if _, err := os.Stat(Resolve(root, s.Policy)); err != nil {

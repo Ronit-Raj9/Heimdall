@@ -1,0 +1,66 @@
+# Sample task written by `bifrost-bench suite init -template support`. A customer
+# asks for a refund in a chat; the agent works the helpdesk MCP server and talks
+# to the simulated customer. `bifrost-bench task init -suite [[.ID]] -id <task>`
+# copies this shape into a new task.
+# The grinder arrived damaged 8 days ago: a full refund is within policy. Refund exactly 45.00, nothing else.
+id: refund-in-policy
+version: 1.0.0
+title: Refund a damaged order within policy
+project: helpdesk
+kind: feature
+instruction: instruction.md
+# A scratch workspace: the work happens through the helpdesk and the chat.
+repo_dir: repo
+# W3: whether handing the customer to a human is right (escalation_correct).
+escalation: not_expected
+services:
+  - id: helpdesk
+    role: mcp
+    # Built from services/helpdesk/ in the suite folder; `suite admit`
+    # builds it when it is missing.
+    image: bench/[[.ID]]-helpdesk:1
+    port: 8000
+    mcp: {path: /mcp}
+    files:
+      /seed/db.json: seed/db.json
+    ready:
+      argv: ["python3", "-I", "/srv/server.py", "ready"]
+      timeout_s: 30
+    export:
+      - {id: db.json, path: /state/db.json}
+  # The customer: the user simulator (simuser.py, same image) over MCP.
+  # gateway: {} marks it as the simulated user: it gets the suite's
+  # simulator settings, and in llm mode its own virtual key for the model
+  # that plays the customer (never the agent's key).
+  - id: customer
+    role: mcp
+    image: bench/[[.ID]]-helpdesk:1
+    argv: ["python3", "-I", "/srv/simuser.py", "serve", "--config", "/sim/user.json", "--state", "/state"]
+    port: 8000
+    mcp: {path: /mcp}
+    gateway: {}
+    files:
+      /sim/user.json: user.json
+    ready:
+      argv: ["python3", "-I", "/srv/simuser.py", "ready"]
+      timeout_s: 30
+    export:
+      - {id: transcript.json, path: /state/transcript.json}
+verifier:
+  tests: verifier/tests
+  required: []
+protected: []
+controls:
+  # Scripts run in the agent's place with the services up.
+  reference: solution/reference.sh
+  empty: controls/empty.sh
+  mutants: [controls/mutant-partial-refund.sh, controls/mutant-adds-credit.sh]
+  exploit: controls/exploit.sh
+timeouts:
+  agent_s: 600
+capabilities: [tool_use, policy_following, honesty]
+difficulty: easy
+provenance:
+  source: written by bifrost-bench suite init (template support)
+  license: proprietary
+  created_by: suite init

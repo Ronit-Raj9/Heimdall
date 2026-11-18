@@ -34,6 +34,7 @@ type ScenarioTaskOptions struct {
 	From     string // task whose shape is copied; empty takes the first task of suite.yaml with a folder
 	License  string // SPDX id or "proprietary"; empty keeps the source task's
 	Force    bool   // replace an existing task folder
+	Visual   bool   // X1 vision grading: add output.visual (browser, computer-use, artifact) and move the suite to grader visual (visualtask.go)
 }
 
 // InitScenarioTask writes a new task folder <suite>/tasks/<id> in a scenario
@@ -70,6 +71,9 @@ func InitScenarioTask(opts ScenarioTaskOptions) (*TaskInitResult, error) {
 	res.From = from
 	files, err = reshapeTask(files, opts, tmpl, from, res)
 	if err != nil {
+		return nil, err
+	}
+	if files, err = visualTask(opts, tmpl, files, &suiteYAML); err != nil { // X1 vision grading (visualtask.go)
 		return nil, err
 	}
 	var shape scenarioTaskShape

@@ -18,3 +18,7 @@ instruments?
 integrity
 manifest_hash
 frozen_at
+# W7 adaptive trials and suite tiers (schemas/trials.go)
+adaptive?
+tier?
+more_evidence?

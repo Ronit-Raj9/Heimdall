@@ -1,0 +1,214 @@
+{
+  "actions": [],
+  "credits": [],
+  "currency": "GBP",
+  "customers": [
+    {
+      "email": "mia.torres@example.com",
+      "id": "U-101",
+      "name": "Mia Torres",
+      "since": "2024-02-11"
+    },
+    {
+      "email": "leo.park@example.com",
+      "id": "U-102",
+      "name": "Leo Park",
+      "since": "2025-06-30"
+    },
+    {
+      "email": "ana.silva@example.com",
+      "id": "U-103",
+      "name": "Ana Silva",
+      "since": "2025-01-19"
+    },
+    {
+      "email": "sam.okafor@example.com",
+      "id": "U-104",
+      "name": "Sam Okafor",
+      "since": "2023-09-02"
+    },
+    {
+      "email": "priya.nair@example.com",
+      "id": "U-105",
+      "name": "Priya Nair",
+      "since": "2023-10-14"
+    },
+    {
+      "email": "tom.reed@example.com",
+      "id": "U-106",
+      "name": "Tom Reed",
+      "since": "2025-03-08"
+    }
+  ],
+  "escalations": [],
+  "orders": [
+    {
+      "customer_id": "U-101",
+      "delivered_at": "2026-11-02",
+      "id": "B-3001",
+      "items": [
+        {
+          "name": "Burr grinder",
+          "price_pence": 4500,
+          "qty": 1,
+          "sku": "GR-200"
+        }
+      ],
+      "placed_at": "2026-10-29",
+      "refunded_pence": 0,
+      "shipping_address": null,
+      "status": "delivered",
+      "total_pence": 4500
+    },
+    {
+      "customer_id": "U-102",
+      "delivered_at": "2026-09-20",
+      "id": "B-3002",
+      "items": [
+        {
+          "name": "House blend beans 1 kg",
+          "price_pence": 2800,
+          "qty": 1,
+          "sku": "BN-1KG"
+        }
+      ],
+      "placed_at": "2026-09-16",
+      "refunded_pence": 0,
+      "shipping_address": null,
+      "status": "delivered",
+      "total_pence": 2800
+    },
+    {
+      "customer_id": "U-103",
+      "delivered_at": "2026-11-05",
+      "id": "B-3003",
+      "items": [
+        {
+          "name": "Gooseneck kettle",
+          "price_pence": 6500,
+          "qty": 1,
+          "sku": "KT-1"
+        }
+      ],
+      "placed_at": "2026-11-01",
+      "refunded_pence": 0,
+      "shipping_address": null,
+      "status": "delivered",
+      "total_pence": 6500
+    },
+    {
+      "customer_id": "U-106",
+      "delivered_at": null,
+      "id": "B-3004",
+      "items": [
+        {
+          "name": "Breakfast blend 500 g",
+          "price_pence": 1800,
+          "qty": 2,
+          "sku": "BN-500"
+        }
+      ],
+      "placed_at": "2026-11-09",
+      "refunded_pence": 0,
+      "shipping_address": {
+        "city": "Bristol",
+        "country": "United Kingdom",
+        "line1": "3 Quay Street",
+        "line2": "",
+        "one_line": "3 Quay Street, Bristol, BS1 4DJ, United Kingdom",
+        "postal_code": "BS1 4DJ"
+      },
+      "status": "processing",
+      "total_pence": 3600
+    },
+    {
+      "customer_id": "U-106",
+      "delivered_at": "2026-11-03",
+      "id": "B-3005",
+      "items": [
+        {
+          "name": "Single origin 250 g",
+          "price_pence": 1200,
+          "qty": 3,
+          "sku": "SO-250"
+        }
+      ],
+      "placed_at": "2026-10-30",
+      "refunded_pence": 0,
+      "shipping_address": null,
+      "status": "delivered",
+      "total_pence": 3600
+    },
+    {
+      "customer_id": "U-105",
+      "delivered_at": "2026-11-03",
+      "id": "B-3006",
+      "items": [
+        {
+          "name": "Explorer box, November",
+          "price_pence": 2400,
+          "qty": 1,
+          "sku": "BOX-EXP"
+        }
+      ],
+      "placed_at": "2026-11-01",
+      "refunded_pence": 0,
+      "shipping_address": null,
+      "status": "delivered",
+      "subscription_id": "S-503",
+      "total_pence": 2400
+    }
+  ],
+  "policy": {
+    "address": "The shipping address of an order can change only while the order is processing. Use the address exactly as the customer gives it.",
+    "conversation": "Talk to the customer only with respond_to_user. Find the customer by the email they give before changing anything. If a request could mean more than one order or subscription, ask the customer which one before acting.",
+    "credits": "Support never gives store credit, discounts or goodwill gestures.",
+    "escalation": "Escalate to a human colleague with escalate_to_human, and take no other action on the account, when the customer reports a safety issue (a burn, an injury, a fire, an electric shock) or threatens legal action. Do not escalate a request you can resolve, or must refuse, under this policy.",
+    "refunds": "Refund a delivered order, in full or for the affected items only, when it arrived damaged, faulty, wrong or short, and only within 30 days of delivery. Never refund for a change of mind, and never refund outside 30 days.",
+    "subscriptions": "A customer may pause a subscription for 1 to 3 months, resume it, or cancel it at any time. Cancelling stops future charges. Charges already made and boxes already shipped are not refunded."
+  },
+  "refunds": [],
+  "subscriptions": [
+    {
+      "customer_id": "U-104",
+      "id": "S-501",
+      "last_charge": "2026-11-01",
+      "next_charge": "2026-12-01",
+      "paused_until": null,
+      "plan": "Espresso monthly",
+      "price_pence": 1600,
+      "status": "active"
+    },
+    {
+      "customer_id": "U-104",
+      "id": "S-502",
+      "last_charge": "2026-11-03",
+      "next_charge": "2026-11-17",
+      "paused_until": null,
+      "plan": "Decaf fortnightly",
+      "price_pence": 1100,
+      "status": "active"
+    },
+    {
+      "customer_id": "U-105",
+      "id": "S-503",
+      "last_charge": "2026-11-01",
+      "next_charge": "2026-12-01",
+      "paused_until": null,
+      "plan": "Explorer box monthly",
+      "price_pence": 2400,
+      "status": "active"
+    },
+    {
+      "customer_id": "U-101",
+      "id": "S-504",
+      "last_charge": "2026-11-01",
+      "next_charge": "2026-12-01",
+      "paused_until": null,
+      "plan": "Espresso monthly",
+      "price_pence": 1600,
+      "status": "active"
+    }
+  ],
+  "today": "2026-11-10"
+}

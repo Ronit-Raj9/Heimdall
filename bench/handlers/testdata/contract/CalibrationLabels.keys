@@ -1,0 +1,4 @@
+# Keys of bench.ts `CalibrationLabels`, one per line. W8 judge calibration. Change with bench.ts.
+suite
+set_sha256
+items

@@ -1,0 +1,5 @@
+# Keys of bench.ts `ExtendsRef` (schemas/trials.go, W7). Change with bench.ts.
+exp_id
+manifest_hash
+kind
+rule

@@ -1,0 +1,17 @@
+# livescore.SignalResult (X6 live scoring, docs/live-scoring.md); ? marks an omitempty key
+name
+label
+kind
+lower_is_better
+unit?
+pairs
+need_pairs
+sessions_baseline
+sessions_candidate
+mean_baseline?
+mean_candidate?
+e_worse
+e_better
+decision
+decided_at?
+dropped?

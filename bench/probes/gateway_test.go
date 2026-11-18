@@ -416,3 +416,36 @@ func gatewayNoNonce(t *testing.T, rec *schemas.Receipt, nonce string) {
 		t.Fatalf("receipt leaks the nonce: %s", data)
 	}
 }
+
+// TestRoutedFaultModel (W9): a routed run's fault that names no model fails
+// the primary target only; an explicit model, "*" and unrouted runs keep the
+// plan as written.
+func TestRoutedFaultModel(t *testing.T) {
+	routed := &schemas.RunContext{Agent: &schemas.AgentConfig{Model: "strong", Gateway: schemas.GatewayPolicy{Routing: &schemas.RoutingPolicy{
+		Strategy: schemas.RoutingFallbackChain, Targets: []schemas.RouteTarget{{Model: "strong"}}, Fallbacks: []schemas.RouteTarget{{Model: "cheap"}}}}}}
+	plain := &schemas.RunContext{Agent: &schemas.AgentConfig{Model: "strong"}}
+	outage := schemas.FaultPlan{Mode: "persistent", FromCall: 1, Status: 503}
+	cases := []struct {
+		name string
+		plan schemas.FaultPlan
+		rc   *schemas.RunContext
+		want string
+	}{
+		{"routed run: primary only", outage, routed, "strong"},
+		{"unrouted run: unchanged", outage, plain, ""},
+		{"explicit model kept", schemas.FaultPlan{Mode: "once", Call: 1, Status: 503, Model: "cheap"}, routed, "cheap"},
+		{"star kept", schemas.FaultPlan{Mode: "persistent", FromCall: 1, Status: 503, Model: "*"}, routed, "*"},
+		{"none plan untouched", schemas.FaultPlan{Mode: "none"}, routed, ""},
+		{"no agent", outage, &schemas.RunContext{}, ""},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			if got := routedFaultModel(c.plan, c.rc); got != c.want {
+				t.Fatalf("model = %q, want %q", got, c.want)
+			}
+		})
+	}
+	if got := gatewayPlanText("fp-slot-1", schemas.FaultPlan{Mode: "persistent", FromCall: 1, Status: 503, Model: "strong"}); got != "slot fp-slot-1: 503 from conversation call 1, model strong only" {
+		t.Errorf("plan text = %q", got)
+	}
+}

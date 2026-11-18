@@ -1,0 +1,6 @@
+# MigrationRunRef: migration.RunRef (W6, docs/model-migration.md)
+run_id
+pair_id
+arm
+trial
+outcome

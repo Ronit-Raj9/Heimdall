@@ -30,7 +30,7 @@ func (m *tokensMetric) Descriptor() schemas.MetricDescriptor {
 		Kind:           schemas.KindTokens,
 		HigherIsBetter: false,
 		MinEvidence:    schemas.EvidenceGateway,
-		Description:    "Tokens per run as fresh input plus cache read plus cache write plus output over every message request, averaged over runs whose every message request recorded usage.",
+		Description:    "Tokens per run as fresh input plus cache read plus cache write plus output over every message request and every audio row that records tokens (Realtime turns), averaged over runs whose every message request recorded usage.",
 		PS2:            true,
 	}
 }
@@ -49,6 +49,11 @@ func (m *tokensMetric) Compute(_ context.Context, _ *schemas.RunContext, ev *sch
 			return schemas.Unknown(fmt.Sprintf("message request %s has no usage", r.ID), schemas.EvidenceGateway), nil
 		}
 		sum += r.Tokens.Fresh + r.Tokens.CacheRead + r.Tokens.CacheWrite + r.Tokens.Out
+	}
+	for _, r := range ev.Requests.Requests { // X8 voice agents: Realtime turns carry tokens; speech and transcription rows are priced by audio and carry none
+		if r.Kind == kindAudio && r.Tokens != nil {
+			sum += r.Tokens.Fresh + r.Tokens.CacheRead + r.Tokens.CacheWrite + r.Tokens.Out
+		}
 	}
 	return schemas.Observed(float64(sum), schemas.EvidenceGateway), nil
 }

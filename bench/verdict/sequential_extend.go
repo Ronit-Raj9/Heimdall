@@ -1,0 +1,189 @@
+package verdict
+
+import (
+	"errors"
+	"fmt"
+	"math"
+	"sort"
+
+	"github.com/maximhq/bifrost/bench/schemas"
+	"github.com/maximhq/bifrost/bench/stats"
+)
+
+// W7 buy more evidence (docs/adaptive-trials.md): a follow-up planned by
+// `extend` is analysed together with the experiment it extends only under
+// the combination rule the first experiment pre-declared before its first
+// run. The rule is the weighted inverse-normal combination of one-sided
+// stage p-values, each stage's own exact sign-flip test on its own runs:
+//
+//	Z = w1 * Phi^-1(1 - p1) + w2 * Phi^-1(1 - p2),  w1^2 + w2^2 = 1
+//
+// tested at alpha - alpha_first (the first stage decided at alpha_first),
+// each direction at half of it. The second stage's p-value is exact given
+// everything the first stage showed, however its size was chosen, so the
+// combination keeps its level when the follow-up size depends on the first
+// result; Bonferroni over the two analyses keeps the whole at alpha. With
+// no pre-declared rule the pooled analysis is exploratory and decides
+// nothing.
+
+// CombineExtension analyses child (planned by `extend`) together with
+// parent. Each decision is the stage's own verdict; an INVALID stage makes
+// the combination INVALID.
+func CombineExtension(parent *schemas.Manifest, parentRuns []schemas.SealedRun, parentDecision schemas.Decision,
+	child *schemas.Manifest, childRuns []schemas.SealedRun, childDecision schemas.Decision) (*schemas.ExtensionResult, error) {
+	if parent == nil || child == nil {
+		return nil, errors.New("combine: nil manifest")
+	}
+	ref := child.Experiment.Extends
+	if ref == nil {
+		return nil, fmt.Errorf("combine: experiment %s extends nothing", child.ExpID)
+	}
+	if ref.ExpID != parent.ExpID || ref.ManifestHash != parent.Hash {
+		return nil, fmt.Errorf("combine: %s extends %s at manifest %s, not %s at %s", child.ExpID, ref.ExpID, ref.ManifestHash, parent.ExpID, parent.Hash)
+	}
+	pc, cc := settingsFor(parent), settingsFor(child)
+	if pc.primary != cc.primary {
+		return nil, fmt.Errorf("combine: primary endpoints differ: %s/%s and %s/%s", pc.primary.Condition, pc.primary.Metric, cc.primary.Condition, cc.primary.Metric)
+	}
+	res := &schemas.ExtensionResult{Parent: parent.ExpID, Child: child.ExpID, Kind: ref.Kind, Rule: schemas.ExtensionExploratory}
+	pe := stageEffect(parent, parentRuns, pc.primary)
+	ce := stageEffect(child, childRuns, cc.primary)
+	res.Stages = []schemas.ExtensionStage{stageOf(parent.ExpID, parentDecision, pe), stageOf(child.ExpID, childDecision, ce)}
+	res.PooledDBar, res.PooledTasks = pooled(pe, ce)
+
+	a1, declared := ExtensionAlphaFirst(parent, pc.alpha)
+	if !declared || ref.Rule != schemas.ExtensionInverseNormal {
+		res.Exploratory = true
+		res.Decision = schemas.DecisionInconclusive
+		res.Reasons = append(res.Reasons, fmt.Sprintf("experiment %s pre-declared no combination rule: the pooled analysis is exploratory and decides nothing; run a new experiment with enough tasks instead", parent.ExpID))
+		return res, nil
+	}
+	res.Rule = schemas.ExtensionInverseNormal
+	res.Alpha = pc.alpha - a1
+	w1sq := parent.Experiment.Trials.Extension.WeightFirst
+	if w1sq <= 0 || w1sq >= 1 {
+		w1sq = 0.5
+	}
+	res.WeightFirst = w1sq
+	w1, w2 := math.Sqrt(w1sq), math.Sqrt(1-w1sq)
+	res.ZCritical = normalQuantile(1 - res.Alpha/2)
+	p, c := res.Stages[0], res.Stages[1]
+	res.ZImproveLow = combineZ(w1, w2, p.PImproveLow, c.PImproveLow)
+	res.ZImproveHi = combineZ(w1, w2, p.PImproveHi, c.PImproveHi)
+	res.ZRegressLow = combineZ(w1, w2, p.PRegressLow, c.PRegressLow)
+	res.ZRegressHi = combineZ(w1, w2, p.PRegressHi, c.PRegressHi)
+	improved := res.ZImproveLow >= res.ZCritical && res.ZImproveHi >= res.ZCritical
+	regressed := res.ZRegressLow >= res.ZCritical && res.ZRegressHi >= res.ZCritical
+	switch {
+	case parentDecision == schemas.DecisionInvalid || childDecision == schemas.DecisionInvalid:
+		res.Decision = schemas.DecisionInvalid
+		res.Reasons = append(res.Reasons, "a stage's own verdict is INVALID: fix the harness; no combined decision")
+	case regressed:
+		res.Decision = schemas.DecisionRegressed
+	case improved && childDecision == schemas.DecisionRegressed:
+		res.Decision = schemas.DecisionInconclusive
+		res.Reasons = append(res.Reasons, "the follow-up's own verdict is REGRESSED (a guard or the primary): the combination cannot ship it")
+	case improved:
+		res.Decision = schemas.DecisionImproved
+	default:
+		res.Decision = schemas.DecisionInconclusive
+	}
+	return res, nil
+}
+
+// stageEffect is the primary effect of one stage, with its missingness
+// bounds, over the slots its own design required.
+func stageEffect(m *schemas.Manifest, runs []schemas.SealedRun, primary schemas.Endpoint) *schemas.Effect {
+	runs = CompleteSlots(m, AdaptiveRuns(m, runs))
+	idx := newRunIndex(runs)
+	return pairedEffect(primary.Condition, primary.Metric, ArmBaseline, ArmCandidate,
+		idx.cells(primary.Condition, ArmBaseline, primary.Metric), idx.cells(primary.Condition, ArmCandidate, primary.Metric), true)
+}
+
+// stageOf reads the one-sided p-values of a stage at both bounds. Without
+// bounds (an unbounded unknown) every p is 1, so the stage can never help
+// a combined decision.
+func stageOf(id string, d schemas.Decision, e *schemas.Effect) schemas.ExtensionStage {
+	st := schemas.ExtensionStage{ExpID: id, Decision: d, PImproveLow: 1, PImproveHi: 1, PRegressLow: 1, PRegressHi: 1}
+	if e == nil {
+		return st
+	}
+	st.Tasks, st.DBar = e.NTasks, e.DBar
+	if e.LowerBound == nil || e.UpperBound == nil {
+		return st
+	}
+	up := better(e.Metric)
+	st.PImproveLow, st.PImproveHi = oneSidedP(diffs(e.LowerBound), up), oneSidedP(diffs(e.UpperBound), up)
+	st.PRegressLow, st.PRegressHi = oneSidedP(diffs(e.UpperBound), -up), oneSidedP(diffs(e.LowerBound), -up)
+	return st
+}
+
+// oneSidedP is the exact one-sided sign-flip p-value P(T >= t) for the sum
+// of the differences oriented by dir: half the two-sided p when the observed
+// sum points that way (the null distribution is symmetric), else 1, which
+// is larger than the exact value and so still valid.
+func oneSidedP(d []float64, dir float64) float64 {
+	sum, scale := 0.0, 0.0
+	for _, x := range d {
+		sum += dir * x
+		scale += math.Abs(x)
+	}
+	if sum <= 1e-9*scale || sum <= 0 {
+		return 1
+	}
+	p := stats.SignFlip(d).P
+	if !finite(p) {
+		return 1
+	}
+	return math.Min(1, p/2)
+}
+
+// combineZ is w1*z(p1) + w2*z(p2) with z(p) = Phi^-1(1-p); a p of 1 gives
+// minus infinity, so a stage pointing the other way blocks the direction.
+func combineZ(w1, w2, p1, p2 float64) float64 {
+	z := func(p float64) float64 {
+		if p >= 1 {
+			return math.Inf(-1)
+		}
+		return normalQuantile(1 - p)
+	}
+	return w1*z(p1) + w2*z(p2)
+}
+
+// pooled is the descriptive pooled d_bar: per task the mean of the stage
+// differences it has, then the mean over tasks.
+func pooled(a, b *schemas.Effect) (float64, int) {
+	per := map[string][]float64{}
+	for _, e := range []*schemas.Effect{a, b} {
+		if e == nil {
+			continue
+		}
+		for _, td := range e.PerTask {
+			per[td.Task] = append(per[td.Task], td.D)
+		}
+	}
+	tasks := make([]string, 0, len(per))
+	for t := range per {
+		tasks = append(tasks, t)
+	}
+	sort.Strings(tasks)
+	sum := 0.0
+	for _, t := range tasks {
+		sum += meanFloats(per[t])
+	}
+	if len(tasks) == 0 {
+		return 0, 0
+	}
+	return sum / float64(len(tasks)), len(tasks)
+}
+
+func meanFloats(x []float64) float64 {
+	if len(x) == 0 {
+		return 0
+	}
+	s := 0.0
+	for _, v := range x {
+		s += v
+	}
+	return s / float64(len(x))
+}

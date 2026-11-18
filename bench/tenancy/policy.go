@@ -224,6 +224,40 @@ var OrgPolicy = map[string]Rule{
 	key("GET", api+"/agents/diff/versions"):     org(viewer),
 	key("GET", api+"/imports"):                  org(viewer),
 
+	// Adoption wave and extensions: read routes are viewer reads. Routes that
+	// would make the server run an agent or call out to a URL from the org's
+	// settings are refused in hosted mode until they run on runners.
+	key("GET", api+"/experiments/{id}/adaptive"):       org(viewer),
+	key("GET", api+"/experiments/{id}/cost-explain"):   org(viewer),
+	key("GET", api+"/experiments/{id}/export"):         org(viewer),
+	key("GET", api+"/experiments/{id}/migration"):      org(viewer),
+	key("GET", api+"/experiments/{id}/pareto"):         org(viewer),
+	key("GET", api+"/experiments/{id}/research"):       org(viewer),
+	key("GET", api+"/experiments/{id}/routing"):        org(viewer),
+	key("GET", api+"/experiments/{id}/support"):        org(viewer),
+	key("GET", api+"/leaderboard/pareto"):              org(viewer),
+	key("GET", api+"/runs/{id}/routing"):               org(viewer),
+	key("GET", api+"/runs/{id}/visual/{name}"):         org(viewer),
+	key("GET", api+"/runs/{id}/voice"):                 org(viewer),
+	key("GET", api+"/runs/{id}/voice/audio/{track}"):   org(viewer),
+	key("GET", api+"/suites/{id}/export"):              org(viewer),
+	key("GET", api+"/suites/{id}/calibration"):         org(viewer),
+	key("GET", api+"/suites/{id}/calibration/labels"):  org(viewer),
+	key("POST", api+"/suites/{id}/calibration/labels"): org(member),
+	key("GET", api+"/canaries"):                        org(viewer),
+	key("GET", api+"/canaries/{name}"):                 org(viewer),
+	key("POST", api+"/canaries/{name}/run"):            deny("a canary look runs agents; hosted servers run none (use a runner)"),
+	key("GET", api+"/inbox"):                           org(viewer),
+	key("GET", api+"/inbox/{id}"):                      org(viewer),
+	key("POST", api+"/inbox/{id}/accept"):              org(member),
+	key("POST", api+"/inbox/{id}/reject"):              org(member),
+	key("POST", api+"/inbox/{id}/snooze"):              org(member),
+	key("POST", api+"/inbox/ingest"):                   deny("the inbox webhook is local mode only for now"),
+	key("GET", api+"/livescore"):                       org(viewer),
+	key("GET", api+"/livescore/sessions"):              org(viewer),
+	key("GET", api+"/livescore/compare"):               org(viewer),
+	key("POST", api+"/livescore/pull"):                 deny("live scoring pulls call a gateway URL; hosted servers make no such calls yet"),
+
 	// Remote workers: the list is a status read; everything else is the
 	// runner protocol and admits only runners of the org.
 	key("GET", api+"/workers"):                              org(viewer),

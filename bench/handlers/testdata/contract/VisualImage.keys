@@ -1,0 +1,6 @@
+# Keys of bench.ts `VisualImage` (schemas/visual.go): capture, reference and diff of a visual grade.
+path
+sha256
+bytes
+width
+height

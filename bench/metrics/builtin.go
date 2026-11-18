@@ -48,5 +48,11 @@ func Builtin() []schemas.Metric {
 		// Remote coverage: agent-reported usage of a remote agent, apart from tokens and cost_usd.
 		newReportedTokensMetric(), newReportedCostMetric(),
 		newReportedStepsMetric(), newReportedToolCallsMetric(), newSubagentsSpawnedMetric(), newEventsDroppedMetric(), // Agent events area: agent-reported (reported.go)
+		newFallbackUsedMetric(), newServedModelSwitchesMetric(), newRoutedTargetMetric(), // W9 routing policy under test (routing.go)
+		newEscalatedMetric(), newEscalationCorrectMetric(), newPolicyViolationMetric(), newUserTurnsMetric(), newSimulatorCostMetric(), // W3 customer support (support.go)
+		newSearchesMetric(), newSourcesCitedMetric(), newCitationsGroundedMetric(), newCitationPrecisionMetric(), // W4 research with Tavily (research.go)
+		newVoiceMetric(TimeToFirstAudioMS), newVoiceMetric(TurnLatencyP50MS), newVoiceMetric(TurnLatencyP95MS), newVoiceMetric(BargeInHandled), newVoiceMetric(DeadAirS), newVoiceMetric(STTWER), newVoiceMetric(VoiceCostPerMinute), // X8 voice agents (voice.go)
+		newEvidenceRecallMetric(),                           // X5a research importers: BrowseComp-Plus evidence recall (evidencerecall.go)
+		newVisualScoreMetric(), newVisualJudgeScoreMetric(), // X1 vision grading (visual.go)
 	}
 }

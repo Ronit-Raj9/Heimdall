@@ -1,0 +1,8 @@
+# Keys of bench.ts `VoiceLine` (X8 voice agents, voice.Line). Change with bench.ts and the Go type.
+turn
+kind
+text
+start_ms
+end_ms
+tts
+final?

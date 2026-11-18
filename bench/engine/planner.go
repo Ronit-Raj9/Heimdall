@@ -18,6 +18,7 @@ import (
 	"github.com/maximhq/bifrost/bench/schemas"
 	suitepkg "github.com/maximhq/bifrost/bench/suite"
 	"github.com/maximhq/bifrost/bench/utils"
+	"github.com/maximhq/bifrost/bench/voice" // X8 voice agents
 )
 
 // armOrderStream is the second PCG word. It is fixed so arm order depends on
@@ -184,6 +185,10 @@ func (p *Planner) plan(ctx context.Context, exp *schemas.Experiment, mode planMo
 	if err != nil {
 		return nil, fmt.Errorf("plan %s: %w", e.ID, err)
 	}
+	var tier *schemas.TierPlan
+	if conds, tier, err = w7Conditions(suite, &e, conds); err != nil { // W7 suite tier and trials policy (adaptive.go)
+		return nil, fmt.Errorf("plan %s: %w", e.ID, err)
+	}
 	var compat []condPlan
 	if e.Compatibility != nil {
 		if compat, err = resolveConditions(suite, compatSpecs(e.Compatibility)); err != nil {
@@ -278,9 +283,25 @@ func (p *Planner) plan(ctx context.Context, exp *schemas.Experiment, mode planMo
 	if m.Scenario, err = p.scenarioHashes(suite); err != nil {
 		return nil, fmt.Errorf("plan %s: %w", e.ID, err)
 	}
+	if err := planSimulator(&e, suite, all, m, p.logger); err != nil { // W3 customer support: user simulator checks and hash (simulatorplan.go)
+		return nil, fmt.Errorf("plan %s: %w", e.ID, err)
+	}
+	for _, c := range all { // X8 voice agents: voice tasks, voice probes and gateway.models are refused at plan time with the reason (bench/voice)
+		if err := voice.CheckCondition(suite, c.probe, c.tasks); err != nil {
+			return nil, fmt.Errorf("plan %s: condition %s: %w", e.ID, c.id, err)
+		}
+	}
+	for _, arm := range sortedKeys(m.Arms) { // X8 voice agents
+		if err := voice.CheckGatewayModels(m.Arms[arm].Config); err != nil {
+			return nil, fmt.Errorf("plan %s: arm %s: %w", e.ID, arm, err)
+		}
+	}
 	if p.deferGateway { // Tenancy area: the runners preflight their own gateway before every slot (experimentguard.go)
 		m.Gateway = deferredGateway()
 	} else if m.Gateway, err = p.preflight(ctx, e.Name); err != nil {
+		return nil, fmt.Errorf("plan %s: %w", e.ID, err)
+	}
+	if m.Routing, err = checkRouting(m); err != nil { // W9 routing policy under test (routingplan.go)
 		return nil, fmt.Errorf("plan %s: %w", e.ID, err)
 	}
 	if !mode.skipUpstreams {
@@ -290,6 +311,10 @@ func (p *Planner) plan(ctx context.Context, exp *schemas.Experiment, mode planMo
 	}
 	m.ArmOrder = drawArmOrder(e.Seed, suite.TaskIDs, conds, sortedKeys(m.Arms))
 	m.Slots = buildSlots(m, suite, conds, compat)
+	m.Tier = tier
+	if m.Adaptive, err = planAdaptive(&e, m, conds, p.logger); err != nil { // W7 adaptive trials: optional slots of the maximum design (adaptive.go)
+		return nil, fmt.Errorf("plan %s: %w", e.ID, err)
+	}
 	if m.RunInputs, err = p.runInputs(m, suite, all); err != nil {
 		return nil, fmt.Errorf("plan %s: run inputs: %w", e.ID, err)
 	}

@@ -29,6 +29,7 @@ import { cn } from "@/lib/utils";
 import { parseAsString, parseAsStringLiteral, useQueryState } from "nuqs";
 import { useMemo } from "react";
 import { useTranslation } from "react-i18next";
+import { LeaderboardParetoPanel } from "@/components/migration/migrationReport"; // W6 cost against verified success
 
 /**
  * The leaderboard: /leaderboard?track=&suite=&condition=&scope=&synthetic=&sort=&dir=. suite,
@@ -159,6 +160,7 @@ export default function LeaderboardView() {
 			) : (
 				<Board data={data} isFetching={board.isFetching} onShowSynthetic={() => void setSynthetic("only")} />
 			)}
+			{data && data.entries.length > 0 && <LeaderboardParetoPanel params={params} />} {/* W6 cost against verified success */}
 		</section>
 	);
 }

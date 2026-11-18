@@ -1,0 +1,332 @@
+[
+ {
+  "model_answer": "17",
+  "ground_truth": "17",
+  "correct": true
+ },
+ {
+  "model_answer": "17.0",
+  "ground_truth": "17",
+  "correct": true
+ },
+ {
+  "model_answer": "$17",
+  "ground_truth": "17",
+  "correct": true
+ },
+ {
+  "model_answer": "17%",
+  "ground_truth": "17",
+  "correct": true
+ },
+ {
+  "model_answer": "1,700",
+  "ground_truth": "1700",
+  "correct": true
+ },
+ {
+  "model_answer": "1 700",
+  "ground_truth": "1700",
+  "correct": false
+ },
+ {
+  "model_answer": "seventeen",
+  "ground_truth": "17",
+  "correct": false
+ },
+ {
+  "model_answer": " 17 ",
+  "ground_truth": "17",
+  "correct": true
+ },
+ {
+  "model_answer": "17 km",
+  "ground_truth": "17",
+  "correct": false
+ },
+ {
+  "model_answer": "1_7",
+  "ground_truth": "17",
+  "correct": true
+ },
+ {
+  "model_answer": "１７",
+  "ground_truth": "17",
+  "correct": true
+ },
+ {
+  "model_answer": "٤٢",
+  "ground_truth": "42",
+  "correct": true
+ },
+ {
+  "model_answer": "4.2e1",
+  "ground_truth": "42",
+  "correct": true
+ },
+ {
+  "model_answer": "0x11",
+  "ground_truth": "17",
+  "correct": false
+ },
+ {
+  "model_answer": "inf",
+  "ground_truth": "17",
+  "correct": false
+ },
+ {
+  "model_answer": "17",
+  "ground_truth": "17.000",
+  "correct": true
+ },
+ {
+  "model_answer": "-3",
+  "ground_truth": "-3",
+  "correct": true
+ },
+ {
+  "model_answer": "+3",
+  "ground_truth": "3",
+  "correct": true
+ },
+ {
+  "model_answer": "3.",
+  "ground_truth": "3",
+  "correct": true
+ },
+ {
+  "model_answer": ".5",
+  "ground_truth": "0.5",
+  "correct": true
+ },
+ {
+  "model_answer": "0.50",
+  "ground_truth": "0.5",
+  "correct": true
+ },
+ {
+  "model_answer": "1e3",
+  "ground_truth": "1000",
+  "correct": true
+ },
+ {
+  "model_answer": "1000",
+  "ground_truth": "1e3",
+  "correct": true
+ },
+ {
+  "model_answer": "nan",
+  "ground_truth": "nan",
+  "correct": false
+ },
+ {
+  "model_answer": "anything",
+  "ground_truth": "inf",
+  "correct": true
+ },
+ {
+  "model_answer": "",
+  "ground_truth": "17",
+  "correct": false
+ },
+ {
+  "model_answer": "None",
+  "ground_truth": "17",
+  "correct": false
+ },
+ {
+  "model_answer": "Paris",
+  "ground_truth": "Paris",
+  "correct": true
+ },
+ {
+  "model_answer": "paris",
+  "ground_truth": "Paris",
+  "correct": true
+ },
+ {
+  "model_answer": "  Paris. ",
+  "ground_truth": "Paris",
+  "correct": true
+ },
+ {
+  "model_answer": "sea gull",
+  "ground_truth": "seagull",
+  "correct": true
+ },
+ {
+  "model_answer": "Saint-Petersburg",
+  "ground_truth": "Saint Petersburg",
+  "correct": true
+ },
+ {
+  "model_answer": "St. Petersburg",
+  "ground_truth": "Saint Petersburg",
+  "correct": false
+ },
+ {
+  "model_answer": "The Paris",
+  "ground_truth": "Paris",
+  "correct": false
+ },
+ {
+  "model_answer": "Café",
+  "ground_truth": "café",
+  "correct": true
+ },
+ {
+  "model_answer": "Café",
+  "ground_truth": "Cafe",
+  "correct": false
+ },
+ {
+  "model_answer": "a+b",
+  "ground_truth": "ab",
+  "correct": true
+ },
+ {
+  "model_answer": "a\u2013b",
+  "ground_truth": "ab",
+  "correct": false
+ },
+ {
+  "model_answer": "x y",
+  "ground_truth": "xy",
+  "correct": true
+ },
+ {
+  "model_answer": "x\u001cy",
+  "ground_truth": "xy",
+  "correct": true
+ },
+ {
+  "model_answer": "ПАРИЖ",
+  "ground_truth": "париж",
+  "correct": true
+ },
+ {
+  "model_answer": "apple, banana",
+  "ground_truth": "apple, banana",
+  "correct": true
+ },
+ {
+  "model_answer": "apple,banana",
+  "ground_truth": "apple, banana",
+  "correct": true
+ },
+ {
+  "model_answer": "Apple; Banana",
+  "ground_truth": "apple, banana",
+  "correct": true
+ },
+ {
+  "model_answer": "banana, apple",
+  "ground_truth": "apple, banana",
+  "correct": false
+ },
+ {
+  "model_answer": "apple, banana, cherry",
+  "ground_truth": "apple, banana",
+  "correct": false
+ },
+ {
+  "model_answer": "apple",
+  "ground_truth": "apple, banana",
+  "correct": false
+ },
+ {
+  "model_answer": "1, 2, 3",
+  "ground_truth": "1, 2, 3",
+  "correct": true
+ },
+ {
+  "model_answer": "1, 2.0, $3",
+  "ground_truth": "1, 2, 3",
+  "correct": true
+ },
+ {
+  "model_answer": "1, two, 3",
+  "ground_truth": "1, 2, 3",
+  "correct": false
+ },
+ {
+  "model_answer": "a., b",
+  "ground_truth": "a, b",
+  "correct": false
+ },
+ {
+  "model_answer": "a, b.",
+  "ground_truth": "a, b",
+  "correct": false
+ },
+ {
+  "model_answer": "Mr. X, Y",
+  "ground_truth": "Mr. X, Y",
+  "correct": true
+ },
+ {
+  "model_answer": "Mr X, Y",
+  "ground_truth": "Mr. X, Y",
+  "correct": false
+ },
+ {
+  "model_answer": "1,000",
+  "ground_truth": "1,000",
+  "correct": true
+ },
+ {
+  "model_answer": "1000",
+  "ground_truth": "1,000",
+  "correct": false
+ },
+ {
+  "model_answer": "1, 000",
+  "ground_truth": "1,000",
+  "correct": true
+ },
+ {
+  "model_answer": "b, 3",
+  "ground_truth": "b, 3",
+  "correct": true
+ },
+ {
+  "model_answer": "b, 3%",
+  "ground_truth": "b, 3",
+  "correct": true
+ },
+ {
+  "model_answer": "b,",
+  "ground_truth": "b,",
+  "correct": true
+ },
+ {
+  "model_answer": "b",
+  "ground_truth": "b,",
+  "correct": false
+ },
+ {
+  "model_answer": ",",
+  "ground_truth": ",",
+  "correct": true
+ },
+ {
+  "model_answer": "",
+  "ground_truth": ",",
+  "correct": false
+ },
+ {
+  "model_answer": "5876",
+  "ground_truth": "White; 5876",
+  "correct": false
+ },
+ {
+  "model_answer": "White; 5876",
+  "ground_truth": "White; 5876",
+  "correct": true
+ },
+ {
+  "model_answer": "white, 5876",
+  "ground_truth": "White; 5876",
+  "correct": true
+ }
+]

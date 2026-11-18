@@ -1,0 +1,743 @@
+{
+  "eval_library": {
+    "additional_details": {
+      "exported_by": "test",
+      "exporter": "bifrost-bench export eee"
+    },
+    "name": "heimdall",
+    "version": "test"
+  },
+  "evaluation_id": "heimdall.coding-core/e_fx/A",
+  "evaluation_results": [
+    {
+      "evaluation_name": "heimdall.coding-core.clean",
+      "evaluation_result_id": "heimdall.coding-core.clean.heimdall.verified_success",
+      "generation_config": {
+        "additional_details": {
+          "heimdall_arm_label": "label A",
+          "heimdall_budget_usd": "2",
+          "heimdall_condition": "clean",
+          "heimdall_config_hash": "cfgA",
+          "heimdall_provider": "openai"
+        },
+        "generation_args": {
+          "agentic_eval_config": {
+            "additional_details": {
+              "adapter": "command",
+              "agent_config": "codex"
+            }
+          },
+          "eval_limits": {
+            "message_limit": 40,
+            "time_limit": 900
+          },
+          "sandbox": {
+            "config": "bench/codex:1",
+            "type": "docker"
+          }
+        }
+      },
+      "metric_config": {
+        "evaluation_description": "mean over tasks of the per-task share of runs the hidden verifier passed (intention to treat)",
+        "lower_is_better": false,
+        "max_score": 1,
+        "metric_id": "heimdall.verified_success",
+        "metric_kind": "pass_rate",
+        "metric_name": "verified success",
+        "metric_unit": "proportion",
+        "min_score": 0,
+        "score_type": "continuous"
+      },
+      "score_details": {
+        "details": {
+          "passes": "6/8",
+          "rank": "1",
+          "tasks": "4",
+          "tier": "1",
+          "tier_reason": "leader",
+          "unknown_runs": "0"
+        },
+        "score": 0.75,
+        "uncertainty": {
+          "confidence_interval": {
+            "confidence_level": 0.95,
+            "lower": 0,
+            "method": "t interval over per-task success rates (descriptive)",
+            "upper": 1
+          },
+          "num_samples": 8
+        }
+      },
+      "source_data": {
+        "additional_details": {
+          "condition": "clean",
+          "note": "a Heimdall suite: tasks with hidden verifiers, run in containers; the suite lock hash pins every task file",
+          "suite_lock_hash": "lockhash",
+          "tasks": "4"
+        },
+        "dataset_name": "coding-core@1.0.0",
+        "source_type": "other"
+      }
+    },
+    {
+      "evaluation_name": "heimdall.coding-core.clean",
+      "evaluation_result_id": "heimdall.coding-core.clean.heimdall.pass_hat_k",
+      "generation_config": {
+        "additional_details": {
+          "heimdall_arm_label": "label A",
+          "heimdall_budget_usd": "2",
+          "heimdall_condition": "clean",
+          "heimdall_config_hash": "cfgA",
+          "heimdall_provider": "openai"
+        },
+        "generation_args": {
+          "agentic_eval_config": {
+            "additional_details": {
+              "adapter": "command",
+              "agent_config": "codex"
+            }
+          },
+          "eval_limits": {
+            "message_limit": 40,
+            "time_limit": 900
+          },
+          "sandbox": {
+            "config": "bench/codex:1",
+            "type": "docker"
+          }
+        }
+      },
+      "metric_config": {
+        "evaluation_description": "mean over tasks of the chance that all k tries pass",
+        "lower_is_better": false,
+        "max_score": 1,
+        "metric_id": "heimdall.pass_hat_k",
+        "metric_kind": "pass_rate",
+        "metric_name": "pass^2",
+        "metric_parameters": {
+          "k": 2
+        },
+        "metric_unit": "proportion",
+        "min_score": 0,
+        "score_type": "continuous"
+      },
+      "score_details": {
+        "score": 0.75,
+        "uncertainty": {
+          "num_samples": 8
+        }
+      },
+      "source_data": {
+        "additional_details": {
+          "condition": "clean",
+          "note": "a Heimdall suite: tasks with hidden verifiers, run in containers; the suite lock hash pins every task file",
+          "suite_lock_hash": "lockhash",
+          "tasks": "4"
+        },
+        "dataset_name": "coding-core@1.0.0",
+        "source_type": "other"
+      }
+    },
+    {
+      "evaluation_name": "heimdall.coding-core.clean",
+      "evaluation_result_id": "heimdall.coding-core.clean.heimdall.cost_per_verified_success_usd",
+      "generation_config": {
+        "additional_details": {
+          "heimdall_arm_label": "label A",
+          "heimdall_budget_usd": "2",
+          "heimdall_condition": "clean",
+          "heimdall_config_hash": "cfgA",
+          "heimdall_provider": "openai"
+        },
+        "generation_args": {
+          "agentic_eval_config": {
+            "additional_details": {
+              "adapter": "command",
+              "agent_config": "codex"
+            }
+          },
+          "eval_limits": {
+            "message_limit": 40,
+            "time_limit": 900
+          },
+          "sandbox": {
+            "config": "bench/codex:1",
+            "type": "docker"
+          }
+        }
+      },
+      "metric_config": {
+        "evaluation_description": "total observed gateway cost over verified successes",
+        "lower_is_better": true,
+        "max_score": "Infinity",
+        "metric_id": "heimdall.cost_per_verified_success_usd",
+        "metric_kind": "cost",
+        "metric_name": "cost per verified success",
+        "metric_unit": "usd",
+        "min_score": 0,
+        "score_type": "continuous"
+      },
+      "score_details": {
+        "score": 0.06666666666666667
+      },
+      "source_data": {
+        "additional_details": {
+          "condition": "clean",
+          "note": "a Heimdall suite: tasks with hidden verifiers, run in containers; the suite lock hash pins every task file",
+          "suite_lock_hash": "lockhash",
+          "tasks": "4"
+        },
+        "dataset_name": "coding-core@1.0.0",
+        "source_type": "other"
+      }
+    },
+    {
+      "evaluation_name": "heimdall.coding-core.clean",
+      "evaluation_result_id": "heimdall.coding-core.clean.heimdall.cost_usd_median",
+      "generation_config": {
+        "additional_details": {
+          "heimdall_arm_label": "label A",
+          "heimdall_budget_usd": "2",
+          "heimdall_condition": "clean",
+          "heimdall_config_hash": "cfgA",
+          "heimdall_provider": "openai"
+        },
+        "generation_args": {
+          "agentic_eval_config": {
+            "additional_details": {
+              "adapter": "command",
+              "agent_config": "codex"
+            }
+          },
+          "eval_limits": {
+            "message_limit": 40,
+            "time_limit": 900
+          },
+          "sandbox": {
+            "config": "bench/codex:1",
+            "type": "docker"
+          }
+        }
+      },
+      "metric_config": {
+        "evaluation_description": "median gateway cost of one run",
+        "lower_is_better": true,
+        "max_score": "Infinity",
+        "metric_id": "heimdall.cost_usd_median",
+        "metric_kind": "count",
+        "metric_name": "cost per run (median)",
+        "metric_unit": "usd",
+        "min_score": 0,
+        "score_type": "continuous"
+      },
+      "score_details": {
+        "score": 0.05,
+        "uncertainty": {
+          "num_samples": 8
+        }
+      },
+      "source_data": {
+        "additional_details": {
+          "condition": "clean",
+          "note": "a Heimdall suite: tasks with hidden verifiers, run in containers; the suite lock hash pins every task file",
+          "suite_lock_hash": "lockhash",
+          "tasks": "4"
+        },
+        "dataset_name": "coding-core@1.0.0",
+        "source_type": "other"
+      }
+    },
+    {
+      "evaluation_name": "heimdall.coding-core.clean",
+      "evaluation_result_id": "heimdall.coding-core.clean.heimdall.tokens_median",
+      "generation_config": {
+        "additional_details": {
+          "heimdall_arm_label": "label A",
+          "heimdall_budget_usd": "2",
+          "heimdall_condition": "clean",
+          "heimdall_config_hash": "cfgA",
+          "heimdall_provider": "openai"
+        },
+        "generation_args": {
+          "agentic_eval_config": {
+            "additional_details": {
+              "adapter": "command",
+              "agent_config": "codex"
+            }
+          },
+          "eval_limits": {
+            "message_limit": 40,
+            "time_limit": 900
+          },
+          "sandbox": {
+            "config": "bench/codex:1",
+            "type": "docker"
+          }
+        }
+      },
+      "metric_config": {
+        "evaluation_description": "median tokens of one run: fresh, cache read, cache write and output",
+        "lower_is_better": true,
+        "max_score": "Infinity",
+        "metric_id": "heimdall.tokens_median",
+        "metric_kind": "count",
+        "metric_name": "tokens per run (median)",
+        "metric_unit": "tokens",
+        "min_score": 0,
+        "score_type": "continuous"
+      },
+      "score_details": {
+        "score": 1000,
+        "uncertainty": {
+          "num_samples": 8
+        }
+      },
+      "source_data": {
+        "additional_details": {
+          "condition": "clean",
+          "note": "a Heimdall suite: tasks with hidden verifiers, run in containers; the suite lock hash pins every task file",
+          "suite_lock_hash": "lockhash",
+          "tasks": "4"
+        },
+        "dataset_name": "coding-core@1.0.0",
+        "source_type": "other"
+      }
+    },
+    {
+      "evaluation_name": "heimdall.coding-core.clean",
+      "evaluation_result_id": "heimdall.coding-core.clean.heimdall.wall_time_s_median",
+      "generation_config": {
+        "additional_details": {
+          "heimdall_arm_label": "label A",
+          "heimdall_budget_usd": "2",
+          "heimdall_condition": "clean",
+          "heimdall_config_hash": "cfgA",
+          "heimdall_provider": "openai"
+        },
+        "generation_args": {
+          "agentic_eval_config": {
+            "additional_details": {
+              "adapter": "command",
+              "agent_config": "codex"
+            }
+          },
+          "eval_limits": {
+            "message_limit": 40,
+            "time_limit": 900
+          },
+          "sandbox": {
+            "config": "bench/codex:1",
+            "type": "docker"
+          }
+        }
+      },
+      "metric_config": {
+        "evaluation_description": "median agent wall time of one run",
+        "lower_is_better": true,
+        "max_score": "Infinity",
+        "metric_id": "heimdall.wall_time_s_median",
+        "metric_kind": "count",
+        "metric_name": "wall time per run (median)",
+        "metric_unit": "seconds",
+        "min_score": 0,
+        "score_type": "continuous"
+      },
+      "score_details": {
+        "score": 30,
+        "uncertainty": {
+          "num_samples": 8
+        }
+      },
+      "source_data": {
+        "additional_details": {
+          "condition": "clean",
+          "note": "a Heimdall suite: tasks with hidden verifiers, run in containers; the suite lock hash pins every task file",
+          "suite_lock_hash": "lockhash",
+          "tasks": "4"
+        },
+        "dataset_name": "coding-core@1.0.0",
+        "source_type": "other"
+      }
+    },
+    {
+      "evaluation_name": "heimdall.coding-core.model-outage",
+      "evaluation_result_id": "heimdall.coding-core.model-outage.heimdall.verified_success",
+      "generation_config": {
+        "additional_details": {
+          "heimdall_arm_label": "label A",
+          "heimdall_budget_usd": "2",
+          "heimdall_condition": "model-outage",
+          "heimdall_config_hash": "cfgA",
+          "heimdall_provider": "openai"
+        },
+        "generation_args": {
+          "agentic_eval_config": {
+            "additional_details": {
+              "adapter": "command",
+              "agent_config": "codex"
+            }
+          },
+          "eval_limits": {
+            "message_limit": 40,
+            "time_limit": 900
+          },
+          "sandbox": {
+            "config": "bench/codex:1",
+            "type": "docker"
+          }
+        }
+      },
+      "metric_config": {
+        "evaluation_description": "mean over tasks of the per-task share of runs the hidden verifier passed (intention to treat)",
+        "lower_is_better": false,
+        "max_score": 1,
+        "metric_id": "heimdall.verified_success",
+        "metric_kind": "pass_rate",
+        "metric_name": "verified success",
+        "metric_unit": "proportion",
+        "min_score": 0,
+        "score_type": "continuous"
+      },
+      "score_details": {
+        "details": {
+          "passes": "4/8",
+          "rank": "1",
+          "tasks": "4",
+          "tier": "1",
+          "tier_reason": "leader",
+          "unknown_runs": "0"
+        },
+        "score": 0.5,
+        "uncertainty": {
+          "confidence_interval": {
+            "confidence_level": 0.95,
+            "lower": 0,
+            "method": "t interval over per-task success rates (descriptive)",
+            "upper": 1
+          },
+          "num_samples": 8
+        }
+      },
+      "source_data": {
+        "additional_details": {
+          "condition": "model-outage",
+          "note": "a Heimdall suite: tasks with hidden verifiers, run in containers; the suite lock hash pins every task file",
+          "suite_lock_hash": "lockhash",
+          "tasks": "4"
+        },
+        "dataset_name": "coding-core@1.0.0",
+        "source_type": "other"
+      }
+    },
+    {
+      "evaluation_name": "heimdall.coding-core.model-outage",
+      "evaluation_result_id": "heimdall.coding-core.model-outage.heimdall.pass_hat_k",
+      "generation_config": {
+        "additional_details": {
+          "heimdall_arm_label": "label A",
+          "heimdall_budget_usd": "2",
+          "heimdall_condition": "model-outage",
+          "heimdall_config_hash": "cfgA",
+          "heimdall_provider": "openai"
+        },
+        "generation_args": {
+          "agentic_eval_config": {
+            "additional_details": {
+              "adapter": "command",
+              "agent_config": "codex"
+            }
+          },
+          "eval_limits": {
+            "message_limit": 40,
+            "time_limit": 900
+          },
+          "sandbox": {
+            "config": "bench/codex:1",
+            "type": "docker"
+          }
+        }
+      },
+      "metric_config": {
+        "evaluation_description": "mean over tasks of the chance that all k tries pass",
+        "lower_is_better": false,
+        "max_score": 1,
+        "metric_id": "heimdall.pass_hat_k",
+        "metric_kind": "pass_rate",
+        "metric_name": "pass^2",
+        "metric_parameters": {
+          "k": 2
+        },
+        "metric_unit": "proportion",
+        "min_score": 0,
+        "score_type": "continuous"
+      },
+      "score_details": {
+        "score": 0.5,
+        "uncertainty": {
+          "num_samples": 8
+        }
+      },
+      "source_data": {
+        "additional_details": {
+          "condition": "model-outage",
+          "note": "a Heimdall suite: tasks with hidden verifiers, run in containers; the suite lock hash pins every task file",
+          "suite_lock_hash": "lockhash",
+          "tasks": "4"
+        },
+        "dataset_name": "coding-core@1.0.0",
+        "source_type": "other"
+      }
+    },
+    {
+      "evaluation_name": "heimdall.coding-core.model-outage",
+      "evaluation_result_id": "heimdall.coding-core.model-outage.heimdall.cost_per_verified_success_usd",
+      "generation_config": {
+        "additional_details": {
+          "heimdall_arm_label": "label A",
+          "heimdall_budget_usd": "2",
+          "heimdall_condition": "model-outage",
+          "heimdall_config_hash": "cfgA",
+          "heimdall_provider": "openai"
+        },
+        "generation_args": {
+          "agentic_eval_config": {
+            "additional_details": {
+              "adapter": "command",
+              "agent_config": "codex"
+            }
+          },
+          "eval_limits": {
+            "message_limit": 40,
+            "time_limit": 900
+          },
+          "sandbox": {
+            "config": "bench/codex:1",
+            "type": "docker"
+          }
+        }
+      },
+      "metric_config": {
+        "evaluation_description": "total observed gateway cost over verified successes",
+        "lower_is_better": true,
+        "max_score": "Infinity",
+        "metric_id": "heimdall.cost_per_verified_success_usd",
+        "metric_kind": "cost",
+        "metric_name": "cost per verified success",
+        "metric_unit": "usd",
+        "min_score": 0,
+        "score_type": "continuous"
+      },
+      "score_details": {
+        "score": 0.1
+      },
+      "source_data": {
+        "additional_details": {
+          "condition": "model-outage",
+          "note": "a Heimdall suite: tasks with hidden verifiers, run in containers; the suite lock hash pins every task file",
+          "suite_lock_hash": "lockhash",
+          "tasks": "4"
+        },
+        "dataset_name": "coding-core@1.0.0",
+        "source_type": "other"
+      }
+    },
+    {
+      "evaluation_name": "heimdall.coding-core.model-outage",
+      "evaluation_result_id": "heimdall.coding-core.model-outage.heimdall.cost_usd_median",
+      "generation_config": {
+        "additional_details": {
+          "heimdall_arm_label": "label A",
+          "heimdall_budget_usd": "2",
+          "heimdall_condition": "model-outage",
+          "heimdall_config_hash": "cfgA",
+          "heimdall_provider": "openai"
+        },
+        "generation_args": {
+          "agentic_eval_config": {
+            "additional_details": {
+              "adapter": "command",
+              "agent_config": "codex"
+            }
+          },
+          "eval_limits": {
+            "message_limit": 40,
+            "time_limit": 900
+          },
+          "sandbox": {
+            "config": "bench/codex:1",
+            "type": "docker"
+          }
+        }
+      },
+      "metric_config": {
+        "evaluation_description": "median gateway cost of one run",
+        "lower_is_better": true,
+        "max_score": "Infinity",
+        "metric_id": "heimdall.cost_usd_median",
+        "metric_kind": "count",
+        "metric_name": "cost per run (median)",
+        "metric_unit": "usd",
+        "min_score": 0,
+        "score_type": "continuous"
+      },
+      "score_details": {
+        "score": 0.05,
+        "uncertainty": {
+          "num_samples": 8
+        }
+      },
+      "source_data": {
+        "additional_details": {
+          "condition": "model-outage",
+          "note": "a Heimdall suite: tasks with hidden verifiers, run in containers; the suite lock hash pins every task file",
+          "suite_lock_hash": "lockhash",
+          "tasks": "4"
+        },
+        "dataset_name": "coding-core@1.0.0",
+        "source_type": "other"
+      }
+    },
+    {
+      "evaluation_name": "heimdall.coding-core.model-outage",
+      "evaluation_result_id": "heimdall.coding-core.model-outage.heimdall.tokens_median",
+      "generation_config": {
+        "additional_details": {
+          "heimdall_arm_label": "label A",
+          "heimdall_budget_usd": "2",
+          "heimdall_condition": "model-outage",
+          "heimdall_config_hash": "cfgA",
+          "heimdall_provider": "openai"
+        },
+        "generation_args": {
+          "agentic_eval_config": {
+            "additional_details": {
+              "adapter": "command",
+              "agent_config": "codex"
+            }
+          },
+          "eval_limits": {
+            "message_limit": 40,
+            "time_limit": 900
+          },
+          "sandbox": {
+            "config": "bench/codex:1",
+            "type": "docker"
+          }
+        }
+      },
+      "metric_config": {
+        "evaluation_description": "median tokens of one run: fresh, cache read, cache write and output",
+        "lower_is_better": true,
+        "max_score": "Infinity",
+        "metric_id": "heimdall.tokens_median",
+        "metric_kind": "count",
+        "metric_name": "tokens per run (median)",
+        "metric_unit": "tokens",
+        "min_score": 0,
+        "score_type": "continuous"
+      },
+      "score_details": {
+        "score": 1000,
+        "uncertainty": {
+          "num_samples": 8
+        }
+      },
+      "source_data": {
+        "additional_details": {
+          "condition": "model-outage",
+          "note": "a Heimdall suite: tasks with hidden verifiers, run in containers; the suite lock hash pins every task file",
+          "suite_lock_hash": "lockhash",
+          "tasks": "4"
+        },
+        "dataset_name": "coding-core@1.0.0",
+        "source_type": "other"
+      }
+    },
+    {
+      "evaluation_name": "heimdall.coding-core.model-outage",
+      "evaluation_result_id": "heimdall.coding-core.model-outage.heimdall.wall_time_s_median",
+      "generation_config": {
+        "additional_details": {
+          "heimdall_arm_label": "label A",
+          "heimdall_budget_usd": "2",
+          "heimdall_condition": "model-outage",
+          "heimdall_config_hash": "cfgA",
+          "heimdall_provider": "openai"
+        },
+        "generation_args": {
+          "agentic_eval_config": {
+            "additional_details": {
+              "adapter": "command",
+              "agent_config": "codex"
+            }
+          },
+          "eval_limits": {
+            "message_limit": 40,
+            "time_limit": 900
+          },
+          "sandbox": {
+            "config": "bench/codex:1",
+            "type": "docker"
+          }
+        }
+      },
+      "metric_config": {
+        "evaluation_description": "median agent wall time of one run",
+        "lower_is_better": true,
+        "max_score": "Infinity",
+        "metric_id": "heimdall.wall_time_s_median",
+        "metric_kind": "count",
+        "metric_name": "wall time per run (median)",
+        "metric_unit": "seconds",
+        "min_score": 0,
+        "score_type": "continuous"
+      },
+      "score_details": {
+        "score": 30,
+        "uncertainty": {
+          "num_samples": 8
+        }
+      },
+      "source_data": {
+        "additional_details": {
+          "condition": "model-outage",
+          "note": "a Heimdall suite: tasks with hidden verifiers, run in containers; the suite lock hash pins every task file",
+          "suite_lock_hash": "lockhash",
+          "tasks": "4"
+        },
+        "dataset_name": "coding-core@1.0.0",
+        "source_type": "other"
+      }
+    }
+  ],
+  "evaluation_timestamp": "1794909600",
+  "model_info": {
+    "additional_details": {
+      "deployment_type": "externally_managed",
+      "heimdall_provider": "openai",
+      "model_availability": "unknown"
+    },
+    "id": "openai/gpt-x-a",
+    "inference_platform": "openai",
+    "name": "gpt-x-a"
+  },
+  "retrieved_timestamp": "1763460000",
+  "schema_version": "0.3.0",
+  "source_metadata": {
+    "additional_details": {
+      "heimdall_arm": "A",
+      "heimdall_experiment": "e_fx",
+      "heimdall_grade_source": "original",
+      "heimdall_manifest_hash": "manifesthash",
+      "heimdall_runs_sealed": "16",
+      "heimdall_seal_hashes": "[\"seal-s_clean_A_1_1\",\"seal-s_clean_A_1_2\",\"seal-s_clean_A_2_1\",\"seal-s_clean_A_2_2\",\"seal-s_clean_A_3_1\",\"seal-s_clean_A_3_2\",\"seal-s_clean_A_4_1\",\"seal-s_clean_A_4_2\",\"seal-s_model-outage_A_1_1\",\"seal-s_model-outage_A_1_2\",\"seal-s_model-outage_A_2_1\",\"seal-s_model-outage_A_2_2\",\"seal-s_model-outage_A_3_1\",\"seal-s_model-outage_A_3_2\",\"seal-s_model-outage_A_4_1\",\"seal-s_model-outage_A_4_2\"]",
+      "heimdall_seal_set_sha256": "fdc29f60eed564962230d6b01426c34494dccff257a211eb0b5ba6d6454e6e0e",
+      "heimdall_suite_lock_hash": "lockhash",
+      "heimdall_synthetic": "false"
+    },
+    "evaluator_relationship": "third_party",
+    "source_name": "Heimdall",
+    "source_organization_name": "Acme",
+    "source_type": "evaluation_run"
+  }
+}

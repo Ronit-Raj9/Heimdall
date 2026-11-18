@@ -1,0 +1,8 @@
+# MigrationConditionDiff: migration.ConditionDiff (W6, docs/model-migration.md)
+condition
+from_success
+to_success
+from_runs
+to_runs
+false_completion
+retry_amplification

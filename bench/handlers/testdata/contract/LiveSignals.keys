@@ -1,0 +1,23 @@
+# livescore.Signals (X6 live scoring, docs/live-scoring.md); ? marks an omitempty key
+request_errors
+request_error_rate?
+tool_calls?
+tool_errors?
+tool_error_rate?
+repeated_calls?
+loop?
+retries
+fallbacks
+refusal?
+turn_latency_ms?
+max_turn_latency_ms?
+session_ms?
+cost_usd?
+tokens?
+budget_hits
+rate_limited
+injection_markers?
+abandoned
+judge_score?
+judge_calibrated?
+content_hidden?

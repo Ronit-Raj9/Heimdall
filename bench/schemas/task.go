@@ -34,6 +34,10 @@ type Task struct {
 	Capabilities []string        `json:"capabilities,omitempty" yaml:"capabilities"`
 	Difficulty   string          `json:"difficulty,omitempty" yaml:"difficulty"`
 	Provenance   *TaskProvenance `json:"provenance,omitempty" yaml:"provenance"`
+	// W3 customer support: whether handing the customer to a human is the
+	// right outcome (expected | not_expected); empty leaves the
+	// escalation_correct metric not applicable.
+	Escalation string `json:"escalation,omitempty" yaml:"escalation"`
 
 	// Scenario fields (scenario.go, docs/scenarios-design.md). All optional;
 	// a task without them is a repository task graded on its diff.
@@ -54,6 +58,8 @@ type Task struct {
 	// a condition sets split: held_out or names it, and the API never serves
 	// its instruction or files unless the server config allows it.
 	Split string `json:"split,omitempty" yaml:"split"`
+
+	Voice *VoiceSpec `json:"voice,omitempty" yaml:"voice"` // X8 voice agents: the task is a phone call with a voice caller (voice.go)
 
 	Dir string `json:"-" yaml:"-"` // absolute task folder
 }
@@ -111,4 +117,22 @@ type TaskProvenance struct {
 	License         string `json:"license,omitempty" yaml:"license"`                   // SPDX id, or "proprietary"
 	ImportedFrom    string `json:"imported_from,omitempty" yaml:"imported_from"`       // benchmark and version, for imported tasks
 	CreatedBy       string `json:"created_by,omitempty" yaml:"created_by"`             // tool that scaffolded it, e.g. "task init"
+	// First workflow: false when a tool drafted the instruction and no human
+	// has reviewed it yet (`tasks mine`); `task review` sets it true. Absent
+	// on every hand-written or older task.
+	InstructionReviewed *bool `json:"instruction_reviewed,omitempty" yaml:"instruction_reviewed,omitempty"`
+	// Failure inbox: the production incident the task was drafted from
+	// (`inbox accept`, docs/failure-inbox.md). Absent on every other task.
+	Incident *TaskIncident `json:"incident,omitempty" yaml:"incident,omitempty"`
+}
+
+// TaskIncident links a task to the failure inbox item it came from, so a
+// report can name the incident when the task fails (Failure inbox area).
+type TaskIncident struct {
+	ID        string `json:"id" yaml:"id"`                                     // inbox item id, inc-<hex>
+	Source    string `json:"source,omitempty" yaml:"source,omitempty"`         // inbox source name
+	TraceID   string `json:"trace_id,omitempty" yaml:"trace_id,omitempty"`     // first occurrence's trace id, redacted
+	Link      string `json:"link,omitempty" yaml:"link,omitempty"`             // back to the trace in the source tool
+	FirstSeen string `json:"first_seen,omitempty" yaml:"first_seen,omitempty"` // RFC 3339
+	Signature string `json:"signature,omitempty" yaml:"signature,omitempty"`   // failure signature, f_<hex>
 }

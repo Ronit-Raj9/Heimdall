@@ -40,8 +40,9 @@ func TestRunInit(t *testing.T) {
 	if b, err := os.ReadFile(filepath.Join(dir, "keep.txt")); err != nil || string(b) != "keep" {
 		t.Errorf("-force touched a file that is not the scaffold's: %v", err)
 	}
+	t.Chdir(t.TempDir()) // First workflow: with no folder, init detects the repository it runs in; outside one it is a usage error
 	if code := runInit(nil); code != exitUsage {
-		t.Fatalf("init without a folder: exit %d", code)
+		t.Fatalf("init without a folder outside a repository: exit %d", code)
 	}
 }
 

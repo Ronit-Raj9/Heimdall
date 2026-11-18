@@ -1,0 +1,41 @@
+# acme-visual: Acme's product team checks what its agent's work looks like.
+# Acme, its settings page, its revenue figures and its editor are fictional.
+#
+# Every task is graded twice, both from evidence the bench took itself:
+#
+# - The task's hidden verifier (verifier/tests/verify.py, Python standard
+#   library only) checks the structure: the page still holds its form, the
+#   chart is a well-formed SVG of the right size, the note was not edited.
+# - The visual grader then captures the result after the agent exited and
+#   compares it with the task's hidden reference image (output.visual in
+#   task.yaml): a web page or an SVG rendered in a clean-room Chromium with a
+#   fixed viewport, scale and font set and no network, or the desktop's
+#   screen taken through its own screenshot tool. The checks are
+#   deterministic (SSIM, pixel difference, dominant colours, a reference
+#   crop found at its place) and every number is in the grade.
+#
+# A run passes only when the verifier and every visual check pass. No judge
+# model is used, so the suite is verified, not judged.
+#
+# The base image is the bench's helper image (python3 and git, uid 1000):
+# the verifiers need nothing else. The renderer is the pinned Playwright
+# image of the browser tasks; the desktop task reuses the acme-desktop
+# image (examples/acme-desktop, about 860 MB, built by `suite admit`).
+id: acme-visual
+version: 1.0.0
+description: Acme product tasks (fictional) graded on what the result looks like, from captures the bench takes itself.
+track: artifact
+environment: docker_workspace
+grader: visual
+base_image:
+  tag: bench/coding-core-base:1
+workdir: /workspace
+verifier:
+  command: ["python3", "/grader/tests/verify.py"]
+  result: reward
+  result_path: /grader/out/reward.json
+  pass_threshold: 1
+  restore: []
+  timeout_s: 120
+tasks: [primary-button, revenue-chart, review-layout]
+probes: [model-outage]

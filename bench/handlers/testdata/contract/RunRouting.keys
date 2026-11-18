@@ -1,0 +1,12 @@
+# Keys of bench.ts `RunRouting` (schemas.RunRouting, W9). Change with bench.ts and schemas/routing.go.
+run_id
+arm
+condition
+model
+policy?
+summary
+fallback_used?
+switches?
+targets
+rows
+fidelity?

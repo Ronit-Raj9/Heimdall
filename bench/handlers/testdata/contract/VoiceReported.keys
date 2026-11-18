@@ -1,0 +1,4 @@
+# Keys of bench.ts `VoiceReported` (X8 voice agents, voice.Reported). Change with bench.ts and the Go type.
+t_ms
+role
+text

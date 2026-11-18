@@ -280,6 +280,8 @@ func (s *Server) serveScriptedOpenAI(w http.ResponseWriter, r *http.Request, kin
 			data = append(data, scriptedOpenAIModelEntry(id))
 		}
 		s.writeJSON(w, http.StatusOK, map[string]any{"object": "list", "data": data})
+	case KindAudio: // X8 voice agents: tone-coded speech and its transcription (audio.go)
+		s.serveScriptedAudio(w, r, body, e)
 	default:
 		s.writeError(w, FormatOpenAI, http.StatusNotFound, errNotFound, "no scripted route for "+r.Method+" "+r.URL.Path)
 	}

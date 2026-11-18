@@ -1,0 +1,19 @@
+# SYNTHETIC smoke canary (docs/drift-canary.md): the scripted toy agent
+# against the fault proxy's scripted model on all eight coding-core tasks,
+# at zero cost. Its looks are never findings. It proves the canary path end
+# to end: `canary baseline smoke-toy`, `canary run smoke-toy` (steady), then
+# `canary run smoke-toy -inject-fault model-outage` forces a drift that the
+# confirmation look turns into drifted. No schedule, so the daemon never
+# runs it by itself; add one to watch it on a timetable.
+name: smoke-toy
+description: Scripted toy agent on the scripted model; zero cost, never a finding
+agent: agents/toy.yaml
+suite: coding-core@1.0.0
+tasks: [t01, t02, t03, t04, t05, t06, t07, t08]
+trials: 1
+targets:
+  - {provider: anthropic, model: claude-sonnet-4-5}
+budget: {per_run_usd: 0, per_day_usd: 0}
+smoke: true
+seed: 20261118
+concurrency: 2

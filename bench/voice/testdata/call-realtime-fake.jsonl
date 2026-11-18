@@ -1,0 +1,408 @@
+{"ev": "call_start", "mode": "scripted", "probe": null, "protocol": "heimdall-voice/1", "settings": {"end_silence_ms": 800, "first_wait_ms": 3000, "hangup_grace_ms": 600, "keep_audio": true, "max_audio_s": 240, "max_call_s": 240, "max_reprompts": 2, "reply_delay_ms": 300, "reprompt_ms": 7000, "stt": "tone", "tts": "tone"}, "stt_note": null, "t_ms": 0.1, "task": "refund-in-policy", "wall_ms": 1794972732283}
+{"dir": "agent", "ev": "frame", "ms": 100.0, "play_ms": 186.8, "recv_ms": 186.8, "seq": 1, "t_ms": 188.3, "voiced": true}
+{"ev": "agent_speech_start", "t_ms": 188.4, "utt": 1}
+{"ev": "first_agent_audio", "t_ms": 188.4, "utt": 1}
+{"dir": "agent", "ev": "frame", "ms": 100.0, "play_ms": 286.8, "recv_ms": 207.6, "seq": 2, "t_ms": 295.4, "voiced": true}
+{"dir": "agent", "ev": "frame", "ms": 100.0, "play_ms": 386.8, "recv_ms": 230.5, "seq": 3, "t_ms": 395.4, "voiced": true}
+{"dir": "agent", "ev": "frame", "ms": 100.0, "play_ms": 486.8, "recv_ms": 251.5, "seq": 4, "t_ms": 487.3, "voiced": true}
+{"dir": "agent", "ev": "frame", "ms": 100.0, "play_ms": 586.8, "recv_ms": 274.0, "seq": 5, "t_ms": 594.7, "voiced": true}
+{"dir": "agent", "ev": "frame", "ms": 100.0, "play_ms": 686.8, "recv_ms": 295.2, "seq": 6, "t_ms": 695.0, "voiced": true}
+{"dir": "agent", "ev": "frame", "ms": 100.0, "play_ms": 786.8, "recv_ms": 325.8, "seq": 7, "t_ms": 790.2, "voiced": true}
+{"dir": "agent", "ev": "frame", "ms": 100.0, "play_ms": 886.8, "recv_ms": 339.8, "seq": 8, "t_ms": 893.6, "voiced": true}
+{"dir": "agent", "ev": "frame", "ms": 100.0, "play_ms": 986.8, "recv_ms": 365.8, "seq": 9, "t_ms": 1002.9, "voiced": true}
+{"dir": "agent", "ev": "frame", "ms": 100.0, "play_ms": 1086.8, "recv_ms": 379.5, "seq": 10, "t_ms": 1087.7, "voiced": true}
+{"dir": "agent", "ev": "frame", "ms": 100.0, "play_ms": 1186.8, "recv_ms": 400.9, "seq": 11, "t_ms": 1192.6, "voiced": true}
+{"dir": "agent", "ev": "frame", "ms": 100.0, "play_ms": 1286.8, "recv_ms": 421.6, "seq": 12, "t_ms": 1292.0, "voiced": true}
+{"dir": "agent", "ev": "frame", "ms": 100.0, "play_ms": 1386.8, "recv_ms": 442.0, "seq": 13, "t_ms": 1390.7, "voiced": true}
+{"dir": "agent", "ev": "frame", "ms": 100.0, "play_ms": 1486.8, "recv_ms": 465.6, "seq": 14, "t_ms": 1494.1, "voiced": true}
+{"dir": "agent", "ev": "frame", "ms": 100.0, "play_ms": 1586.8, "recv_ms": 483.8, "seq": 15, "t_ms": 1593.5, "voiced": true}
+{"dir": "agent", "ev": "frame", "ms": 100.0, "play_ms": 1686.8, "recv_ms": 515.1, "seq": 16, "t_ms": 1690.7, "voiced": true}
+{"dir": "agent", "ev": "frame", "ms": 100.0, "play_ms": 1786.8, "recv_ms": 533.7, "seq": 17, "t_ms": 1794.5, "voiced": true}
+{"dir": "agent", "ev": "frame", "ms": 100.0, "play_ms": 1886.8, "recv_ms": 549.1, "seq": 18, "t_ms": 1895.8, "voiced": true}
+{"dir": "agent", "ev": "frame", "ms": 100.0, "play_ms": 1986.8, "recv_ms": 576.3, "seq": 19, "t_ms": 1995.2, "voiced": true}
+{"dir": "agent", "ev": "frame", "ms": 100.0, "play_ms": 2086.8, "recv_ms": 615.1, "seq": 20, "t_ms": 2098.1, "voiced": true}
+{"dir": "agent", "ev": "frame", "ms": 60.0, "play_ms": 2186.8, "recv_ms": 628.3, "seq": 21, "t_ms": 2202.2, "voiced": false}
+{"end_ms": 2186.8, "ev": "agent_speech_end", "start_ms": 186.8, "t_ms": 2990.7, "utt": 1}
+{"audio_ms": 2060.0, "ev": "agent_transcript", "interrupted": false, "stt": "tone_code", "t_ms": 3112.3, "text": "Sorry, could you tell me your order number?", "utt": 1}
+{"audio_ms": 5480.0, "ev": "caller_speech_start", "final": false, "kind": "reply", "probe": null, "t_ms": 3414.6, "text": "Hi, my burr grinder from order B-3001 arrived with a cracked hopper. I'd like a refund please. My email is mia.torres@example.com.", "tts": "tone_code", "turn": 1}
+{"dir": "caller", "ev": "frame", "ms": 20, "play_ms": 3414.8, "seq": 1, "t_ms": 3414.8, "voiced": false}
+{"dir": "caller", "ev": "frame", "ms": 20, "play_ms": 3435.2, "seq": 2, "t_ms": 3435.3, "voiced": false}
+{"dir": "caller", "ev": "frame", "ms": 20, "play_ms": 3455.3, "seq": 3, "t_ms": 3455.4, "voiced": true}
+{"dir": "caller", "ev": "frame", "ms": 20, "play_ms": 3475.8, "seq": 4, "t_ms": 3475.9, "voiced": true}
+{"dir": "caller", "ev": "frame", "ms": 20, "play_ms": 3496.4, "seq": 5, "t_ms": 3496.5, "voiced": true}
+{"dir": "caller", "ev": "frame", "ms": 20, "play_ms": 3517.0, "seq": 6, "t_ms": 3517.1, "voiced": true}
+{"dir": "caller", "ev": "frame", "ms": 20, "play_ms": 3535.0, "seq": 7, "t_ms": 3535.1, "voiced": true}
+{"dir": "caller", "ev": "frame", "ms": 20, "play_ms": 3556.4, "seq": 8, "t_ms": 3556.5, "voiced": true}
+{"dir": "caller", "ev": "frame", "ms": 20, "play_ms": 3576.0, "seq": 9, "t_ms": 3576.1, "voiced": true}
+{"dir": "caller", "ev": "frame", "ms": 20, "play_ms": 3595.1, "seq": 10, "t_ms": 3595.2, "voiced": true}
+{"dir": "caller", "ev": "frame", "ms": 20, "play_ms": 3614.9, "seq": 11, "t_ms": 3615.0, "voiced": true}
+{"dir": "caller", "ev": "frame", "ms": 20, "play_ms": 3636.9, "seq": 12, "t_ms": 3637.0, "voiced": true}
+{"dir": "caller", "ev": "frame", "ms": 20, "play_ms": 3657.1, "seq": 13, "t_ms": 3657.1, "voiced": true}
+{"dir": "caller", "ev": "frame", "ms": 20, "play_ms": 3674.9, "seq": 14, "t_ms": 3675.0, "voiced": true}
+{"dir": "caller", "ev": "frame", "ms": 20, "play_ms": 3695.8, "seq": 15, "t_ms": 3695.8, "voiced": true}
+{"dir": "caller", "ev": "frame", "ms": 20, "play_ms": 3715.7, "seq": 16, "t_ms": 3715.7, "voiced": true}
+{"dir": "caller", "ev": "frame", "ms": 20, "play_ms": 3736.5, "seq": 17, "t_ms": 3736.6, "voiced": true}
+{"dir": "caller", "ev": "frame", "ms": 20, "play_ms": 3756.2, "seq": 18, "t_ms": 3756.3, "voiced": true}
+{"dir": "caller", "ev": "frame", "ms": 20, "play_ms": 3775.1, "seq": 19, "t_ms": 3775.2, "voiced": true}
+{"dir": "caller", "ev": "frame", "ms": 20, "play_ms": 3795.2, "seq": 20, "t_ms": 3795.2, "voiced": true}
+{"dir": "caller", "ev": "frame", "ms": 20, "play_ms": 3821.2, "seq": 21, "t_ms": 3822.5, "voiced": true}
+{"dir": "caller", "ev": "frame", "ms": 20, "play_ms": 3836.9, "seq": 22, "t_ms": 3837.0, "voiced": true}
+{"dir": "caller", "ev": "frame", "ms": 20, "play_ms": 3855.6, "seq": 23, "t_ms": 3855.7, "voiced": true}
+{"dir": "caller", "ev": "frame", "ms": 20, "play_ms": 3875.5, "seq": 24, "t_ms": 3875.6, "voiced": true}
+{"dir": "caller", "ev": "frame", "ms": 20, "play_ms": 3895.4, "seq": 25, "t_ms": 3895.5, "voiced": true}
+{"dir": "caller", "ev": "frame", "ms": 20, "play_ms": 3915.3, "seq": 26, "t_ms": 3915.4, "voiced": true}
+{"dir": "caller", "ev": "frame", "ms": 20, "play_ms": 3935.2, "seq": 27, "t_ms": 3935.3, "voiced": true}
+{"dir": "caller", "ev": "frame", "ms": 20, "play_ms": 3955.1, "seq": 28, "t_ms": 3955.2, "voiced": true}
+{"dir": "caller", "ev": "frame", "ms": 20, "play_ms": 3978.0, "seq": 29, "t_ms": 3978.0, "voiced": true}
+{"dir": "caller", "ev": "frame", "ms": 20, "play_ms": 3994.9, "seq": 30, "t_ms": 3995.0, "voiced": true}
+{"dir": "caller", "ev": "frame", "ms": 20, "play_ms": 4015.0, "seq": 31, "t_ms": 4015.1, "voiced": true}
+{"dir": "caller", "ev": "frame", "ms": 20, "play_ms": 4036.3, "seq": 32, "t_ms": 4036.4, "voiced": true}
+{"dir": "caller", "ev": "frame", "ms": 20, "play_ms": 4055.5, "seq": 33, "t_ms": 4055.6, "voiced": true}
+{"dir": "caller", "ev": "frame", "ms": 20, "play_ms": 4075.8, "seq": 34, "t_ms": 4075.9, "voiced": true}
+{"dir": "caller", "ev": "frame", "ms": 20, "play_ms": 4096.0, "seq": 35, "t_ms": 4096.1, "voiced": true}
+{"dir": "caller", "ev": "frame", "ms": 20, "play_ms": 4116.8, "seq": 36, "t_ms": 4116.9, "voiced": true}
+{"dir": "caller", "ev": "frame", "ms": 20, "play_ms": 4135.5, "seq": 37, "t_ms": 4135.6, "voiced": true}
+{"dir": "caller", "ev": "frame", "ms": 20, "play_ms": 4155.4, "seq": 38, "t_ms": 4155.5, "voiced": true}
+{"dir": "caller", "ev": "frame", "ms": 20, "play_ms": 4177.1, "seq": 39, "t_ms": 4177.2, "voiced": true}
+{"dir": "caller", "ev": "frame", "ms": 20, "play_ms": 4195.4, "seq": 40, "t_ms": 4195.5, "voiced": true}
+{"dir": "caller", "ev": "frame", "ms": 20, "play_ms": 4216.3, "seq": 41, "t_ms": 4216.4, "voiced": true}
+{"dir": "caller", "ev": "frame", "ms": 20, "play_ms": 4235.2, "seq": 42, "t_ms": 4235.2, "voiced": true}
+{"dir": "caller", "ev": "frame", "ms": 20, "play_ms": 4260.0, "seq": 43, "t_ms": 4260.1, "voiced": true}
+{"dir": "caller", "ev": "frame", "ms": 20, "play_ms": 4275.1, "seq": 44, "t_ms": 4275.2, "voiced": true}
+{"dir": "caller", "ev": "frame", "ms": 20, "play_ms": 4295.7, "seq": 45, "t_ms": 4295.8, "voiced": true}
+{"dir": "caller", "ev": "frame", "ms": 20, "play_ms": 4318.2, "seq": 46, "t_ms": 4318.2, "voiced": true}
+{"dir": "caller", "ev": "frame", "ms": 20, "play_ms": 4335.5, "seq": 47, "t_ms": 4335.6, "voiced": true}
+{"dir": "caller", "ev": "frame", "ms": 20, "play_ms": 4356.3, "seq": 48, "t_ms": 4356.3, "voiced": true}
+{"dir": "caller", "ev": "frame", "ms": 20, "play_ms": 4376.7, "seq": 49, "t_ms": 4376.8, "voiced": true}
+{"dir": "caller", "ev": "frame", "ms": 20, "play_ms": 4395.7, "seq": 50, "t_ms": 4395.8, "voiced": true}
+{"dir": "caller", "ev": "frame", "ms": 20, "play_ms": 4425.8, "seq": 51, "t_ms": 4428.6, "voiced": true}
+{"dir": "caller", "ev": "frame", "ms": 20, "play_ms": 4444.3, "seq": 52, "t_ms": 4444.4, "voiced": true}
+{"dir": "caller", "ev": "frame", "ms": 20, "play_ms": 4457.2, "seq": 53, "t_ms": 4457.2, "voiced": true}
+{"dir": "caller", "ev": "frame", "ms": 20, "play_ms": 4475.2, "seq": 54, "t_ms": 4475.2, "voiced": true}
+{"dir": "caller", "ev": "frame", "ms": 20, "play_ms": 4498.9, "seq": 55, "t_ms": 4499.0, "voiced": true}
+{"dir": "caller", "ev": "frame", "ms": 20, "play_ms": 4516.6, "seq": 56, "t_ms": 4516.7, "voiced": true}
+{"dir": "caller", "ev": "frame", "ms": 20, "play_ms": 4544.6, "seq": 57, "t_ms": 4544.7, "voiced": true}
+{"dir": "caller", "ev": "frame", "ms": 20, "play_ms": 4555.2, "seq": 58, "t_ms": 4555.3, "voiced": true}
+{"dir": "caller", "ev": "frame", "ms": 20, "play_ms": 4576.0, "seq": 59, "t_ms": 4576.1, "voiced": true}
+{"dir": "caller", "ev": "frame", "ms": 20, "play_ms": 4597.5, "seq": 60, "t_ms": 4597.6, "voiced": true}
+{"dir": "caller", "ev": "frame", "ms": 20, "play_ms": 4616.8, "seq": 61, "t_ms": 4616.9, "voiced": true}
+{"dir": "caller", "ev": "frame", "ms": 20, "play_ms": 4635.7, "seq": 62, "t_ms": 4635.8, "voiced": true}
+{"dir": "caller", "ev": "frame", "ms": 20, "play_ms": 4655.6, "seq": 63, "t_ms": 4655.7, "voiced": true}
+{"dir": "caller", "ev": "frame", "ms": 20, "play_ms": 4676.0, "seq": 64, "t_ms": 4676.0, "voiced": true}
+{"dir": "caller", "ev": "frame", "ms": 20, "play_ms": 4695.0, "seq": 65, "t_ms": 4695.1, "voiced": true}
+{"dir": "caller", "ev": "frame", "ms": 20, "play_ms": 4718.7, "seq": 66, "t_ms": 4718.7, "voiced": true}
+{"dir": "caller", "ev": "frame", "ms": 20, "play_ms": 4746.2, "seq": 67, "t_ms": 4746.3, "voiced": true}
+{"dir": "caller", "ev": "frame", "ms": 20, "play_ms": 4758.6, "seq": 68, "t_ms": 4758.7, "voiced": true}
+{"dir": "caller", "ev": "frame", "ms": 20, "play_ms": 4776.4, "seq": 69, "t_ms": 4776.5, "voiced": true}
+{"dir": "caller", "ev": "frame", "ms": 20, "play_ms": 4795.8, "seq": 70, "t_ms": 4795.9, "voiced": true}
+{"dir": "caller", "ev": "frame", "ms": 20, "play_ms": 4818.0, "seq": 71, "t_ms": 4818.1, "voiced": true}
+{"dir": "caller", "ev": "frame", "ms": 20, "play_ms": 4836.6, "seq": 72, "t_ms": 4836.6, "voiced": true}
+{"dir": "caller", "ev": "frame", "ms": 20, "play_ms": 4858.0, "seq": 73, "t_ms": 4858.1, "voiced": true}
+{"dir": "caller", "ev": "frame", "ms": 20, "play_ms": 4875.0, "seq": 74, "t_ms": 4875.1, "voiced": true}
+{"dir": "caller", "ev": "frame", "ms": 20, "play_ms": 4896.3, "seq": 75, "t_ms": 4896.4, "voiced": true}
+{"dir": "caller", "ev": "frame", "ms": 20, "play_ms": 4915.5, "seq": 76, "t_ms": 4915.5, "voiced": true}
+{"dir": "caller", "ev": "frame", "ms": 20, "play_ms": 4935.5, "seq": 77, "t_ms": 4935.5, "voiced": true}
+{"dir": "caller", "ev": "frame", "ms": 20, "play_ms": 4958.9, "seq": 78, "t_ms": 4959.0, "voiced": true}
+{"dir": "caller", "ev": "frame", "ms": 20, "play_ms": 4975.6, "seq": 79, "t_ms": 4975.7, "voiced": true}
+{"dir": "caller", "ev": "frame", "ms": 20, "play_ms": 4995.6, "seq": 80, "t_ms": 4995.7, "voiced": true}
+{"dir": "caller", "ev": "frame", "ms": 20, "play_ms": 5015.4, "seq": 81, "t_ms": 5015.4, "voiced": true}
+{"dir": "caller", "ev": "frame", "ms": 20, "play_ms": 5035.2, "seq": 82, "t_ms": 5035.3, "voiced": true}
+{"dir": "caller", "ev": "frame", "ms": 20, "play_ms": 5055.1, "seq": 83, "t_ms": 5055.1, "voiced": true}
+{"dir": "caller", "ev": "frame", "ms": 20, "play_ms": 5075.8, "seq": 84, "t_ms": 5075.9, "voiced": true}
+{"dir": "caller", "ev": "frame", "ms": 20, "play_ms": 5096.5, "seq": 85, "t_ms": 5096.6, "voiced": true}
+{"dir": "caller", "ev": "frame", "ms": 20, "play_ms": 5116.2, "seq": 86, "t_ms": 5116.3, "voiced": true}
+{"dir": "caller", "ev": "frame", "ms": 20, "play_ms": 5135.1, "seq": 87, "t_ms": 5135.2, "voiced": true}
+{"dir": "caller", "ev": "frame", "ms": 20, "play_ms": 5158.4, "seq": 88, "t_ms": 5158.4, "voiced": true}
+{"dir": "caller", "ev": "frame", "ms": 20, "play_ms": 5175.2, "seq": 89, "t_ms": 5175.3, "voiced": true}
+{"dir": "caller", "ev": "frame", "ms": 20, "play_ms": 5195.4, "seq": 90, "t_ms": 5195.4, "voiced": true}
+{"dir": "caller", "ev": "frame", "ms": 20, "play_ms": 5215.1, "seq": 91, "t_ms": 5215.2, "voiced": true}
+{"dir": "caller", "ev": "frame", "ms": 20, "play_ms": 5236.0, "seq": 92, "t_ms": 5236.0, "voiced": true}
+{"dir": "caller", "ev": "frame", "ms": 20, "play_ms": 5256.8, "seq": 93, "t_ms": 5256.9, "voiced": true}
+{"dir": "caller", "ev": "frame", "ms": 20, "play_ms": 5275.9, "seq": 94, "t_ms": 5276.0, "voiced": true}
+{"dir": "caller", "ev": "frame", "ms": 20, "play_ms": 5296.9, "seq": 95, "t_ms": 5297.0, "voiced": true}
+{"dir": "caller", "ev": "frame", "ms": 20, "play_ms": 5315.6, "seq": 96, "t_ms": 5315.7, "voiced": true}
+{"dir": "caller", "ev": "frame", "ms": 20, "play_ms": 5335.6, "seq": 97, "t_ms": 5335.6, "voiced": true}
+{"dir": "caller", "ev": "frame", "ms": 20, "play_ms": 5355.8, "seq": 98, "t_ms": 5355.8, "voiced": true}
+{"dir": "caller", "ev": "frame", "ms": 20, "play_ms": 5375.5, "seq": 99, "t_ms": 5375.6, "voiced": true}
+{"dir": "caller", "ev": "frame", "ms": 20, "play_ms": 5395.4, "seq": 100, "t_ms": 5395.5, "voiced": true}
+{"dir": "caller", "ev": "frame", "ms": 20, "play_ms": 5418.0, "seq": 101, "t_ms": 5418.1, "voiced": true}
+{"dir": "caller", "ev": "frame", "ms": 20, "play_ms": 5435.1, "seq": 102, "t_ms": 5435.2, "voiced": true}
+{"dir": "caller", "ev": "frame", "ms": 20, "play_ms": 5455.0, "seq": 103, "t_ms": 5455.0, "voiced": true}
+{"dir": "caller", "ev": "frame", "ms": 20, "play_ms": 5476.2, "seq": 104, "t_ms": 5476.3, "voiced": true}
+{"dir": "caller", "ev": "frame", "ms": 20, "play_ms": 5499.0, "seq": 105, "t_ms": 5499.1, "voiced": true}
+{"dir": "caller", "ev": "frame", "ms": 20, "play_ms": 5518.0, "seq": 106, "t_ms": 5518.0, "voiced": true}
+{"dir": "caller", "ev": "frame", "ms": 20, "play_ms": 5537.5, "seq": 107, "t_ms": 5537.5, "voiced": true}
+{"dir": "caller", "ev": "frame", "ms": 20, "play_ms": 5558.1, "seq": 108, "t_ms": 5558.2, "voiced": true}
+{"dir": "caller", "ev": "frame", "ms": 20, "play_ms": 5575.0, "seq": 109, "t_ms": 5575.1, "voiced": true}
+{"dir": "caller", "ev": "frame", "ms": 20, "play_ms": 5595.3, "seq": 110, "t_ms": 5595.3, "voiced": true}
+{"dir": "caller", "ev": "frame", "ms": 20, "play_ms": 5615.1, "seq": 111, "t_ms": 5615.2, "voiced": true}
+{"dir": "caller", "ev": "frame", "ms": 20, "play_ms": 5634.9, "seq": 112, "t_ms": 5635.0, "voiced": true}
+{"dir": "caller", "ev": "frame", "ms": 20, "play_ms": 5655.1, "seq": 113, "t_ms": 5655.1, "voiced": true}
+{"dir": "caller", "ev": "frame", "ms": 20, "play_ms": 5675.5, "seq": 114, "t_ms": 5675.6, "voiced": true}
+{"dir": "caller", "ev": "frame", "ms": 20, "play_ms": 5695.3, "seq": 115, "t_ms": 5695.4, "voiced": true}
+{"dir": "caller", "ev": "frame", "ms": 20, "play_ms": 5715.6, "seq": 116, "t_ms": 5715.7, "voiced": true}
+{"dir": "caller", "ev": "frame", "ms": 20, "play_ms": 5735.5, "seq": 117, "t_ms": 5735.5, "voiced": true}
+{"dir": "caller", "ev": "frame", "ms": 20, "play_ms": 5756.1, "seq": 118, "t_ms": 5756.2, "voiced": true}
+{"dir": "caller", "ev": "frame", "ms": 20, "play_ms": 5776.8, "seq": 119, "t_ms": 5776.9, "voiced": true}
+{"dir": "caller", "ev": "frame", "ms": 20, "play_ms": 5795.4, "seq": 120, "t_ms": 5795.5, "voiced": true}
+{"dir": "caller", "ev": "frame", "ms": 20, "play_ms": 5815.2, "seq": 121, "t_ms": 5815.3, "voiced": true}
+{"dir": "caller", "ev": "frame", "ms": 20, "play_ms": 5835.0, "seq": 122, "t_ms": 5835.1, "voiced": true}
+{"dir": "caller", "ev": "frame", "ms": 20, "play_ms": 5855.7, "seq": 123, "t_ms": 5855.8, "voiced": true}
+{"dir": "caller", "ev": "frame", "ms": 20, "play_ms": 5875.5, "seq": 124, "t_ms": 5875.6, "voiced": true}
+{"dir": "caller", "ev": "frame", "ms": 20, "play_ms": 5895.4, "seq": 125, "t_ms": 5895.5, "voiced": true}
+{"dir": "caller", "ev": "frame", "ms": 20, "play_ms": 5915.8, "seq": 126, "t_ms": 5916.0, "voiced": true}
+{"dir": "caller", "ev": "frame", "ms": 20, "play_ms": 5936.2, "seq": 127, "t_ms": 5936.2, "voiced": true}
+{"dir": "caller", "ev": "frame", "ms": 20, "play_ms": 5955.2, "seq": 128, "t_ms": 5955.3, "voiced": true}
+{"dir": "caller", "ev": "frame", "ms": 20, "play_ms": 5974.9, "seq": 129, "t_ms": 5975.0, "voiced": true}
+{"dir": "caller", "ev": "frame", "ms": 20, "play_ms": 5995.6, "seq": 130, "t_ms": 5995.7, "voiced": true}
+{"dir": "caller", "ev": "frame", "ms": 20, "play_ms": 6015.2, "seq": 131, "t_ms": 6015.2, "voiced": true}
+{"dir": "caller", "ev": "frame", "ms": 20, "play_ms": 6035.1, "seq": 132, "t_ms": 6035.2, "voiced": true}
+{"dir": "caller", "ev": "frame", "ms": 20, "play_ms": 6055.2, "seq": 133, "t_ms": 6055.3, "voiced": true}
+{"dir": "caller", "ev": "frame", "ms": 20, "play_ms": 6075.0, "seq": 134, "t_ms": 6075.0, "voiced": true}
+{"dir": "caller", "ev": "frame", "ms": 20, "play_ms": 6095.2, "seq": 135, "t_ms": 6095.3, "voiced": true}
+{"dir": "caller", "ev": "frame", "ms": 20, "play_ms": 6115.6, "seq": 136, "t_ms": 6115.7, "voiced": true}
+{"dir": "caller", "ev": "frame", "ms": 20, "play_ms": 6136.3, "seq": 137, "t_ms": 6136.4, "voiced": true}
+{"dir": "caller", "ev": "frame", "ms": 20, "play_ms": 6156.4, "seq": 138, "t_ms": 6156.5, "voiced": true}
+{"dir": "caller", "ev": "frame", "ms": 20, "play_ms": 6175.3, "seq": 139, "t_ms": 6175.4, "voiced": true}
+{"dir": "caller", "ev": "frame", "ms": 20, "play_ms": 6200.1, "seq": 140, "t_ms": 6200.2, "voiced": true}
+{"dir": "caller", "ev": "frame", "ms": 20, "play_ms": 6216.1, "seq": 141, "t_ms": 6216.2, "voiced": true}
+{"dir": "caller", "ev": "frame", "ms": 20, "play_ms": 6235.8, "seq": 142, "t_ms": 6235.9, "voiced": true}
+{"dir": "caller", "ev": "frame", "ms": 20, "play_ms": 6255.4, "seq": 143, "t_ms": 6255.5, "voiced": true}
+{"dir": "caller", "ev": "frame", "ms": 20, "play_ms": 6276.3, "seq": 144, "t_ms": 6276.3, "voiced": true}
+{"dir": "caller", "ev": "frame", "ms": 20, "play_ms": 6299.0, "seq": 145, "t_ms": 6299.1, "voiced": true}
+{"dir": "caller", "ev": "frame", "ms": 20, "play_ms": 6316.7, "seq": 146, "t_ms": 6316.8, "voiced": true}
+{"dir": "caller", "ev": "frame", "ms": 20, "play_ms": 6340.0, "seq": 147, "t_ms": 6340.1, "voiced": true}
+{"dir": "caller", "ev": "frame", "ms": 20, "play_ms": 6355.7, "seq": 148, "t_ms": 6355.7, "voiced": true}
+{"dir": "caller", "ev": "frame", "ms": 20, "play_ms": 6375.0, "seq": 149, "t_ms": 6375.1, "voiced": true}
+{"dir": "caller", "ev": "frame", "ms": 20, "play_ms": 6395.4, "seq": 150, "t_ms": 6395.5, "voiced": true}
+{"dir": "caller", "ev": "frame", "ms": 20, "play_ms": 6415.2, "seq": 151, "t_ms": 6415.3, "voiced": true}
+{"dir": "caller", "ev": "frame", "ms": 20, "play_ms": 6435.7, "seq": 152, "t_ms": 6435.8, "voiced": true}
+{"dir": "caller", "ev": "frame", "ms": 20, "play_ms": 6457.2, "seq": 153, "t_ms": 6457.3, "voiced": true}
+{"dir": "caller", "ev": "frame", "ms": 20, "play_ms": 6476.0, "seq": 154, "t_ms": 6476.1, "voiced": true}
+{"dir": "caller", "ev": "frame", "ms": 20, "play_ms": 6496.9, "seq": 155, "t_ms": 6497.0, "voiced": true}
+{"dir": "caller", "ev": "frame", "ms": 20, "play_ms": 6515.7, "seq": 156, "t_ms": 6515.7, "voiced": true}
+{"dir": "caller", "ev": "frame", "ms": 20, "play_ms": 6535.9, "seq": 157, "t_ms": 6536.0, "voiced": true}
+{"dir": "caller", "ev": "frame", "ms": 20, "play_ms": 6555.2, "seq": 158, "t_ms": 6555.3, "voiced": true}
+{"dir": "caller", "ev": "frame", "ms": 20, "play_ms": 6575.6, "seq": 159, "t_ms": 6575.7, "voiced": true}
+{"dir": "caller", "ev": "frame", "ms": 20, "play_ms": 6595.1, "seq": 160, "t_ms": 6595.2, "voiced": true}
+{"dir": "caller", "ev": "frame", "ms": 20, "play_ms": 6615.9, "seq": 161, "t_ms": 6616.0, "voiced": true}
+{"dir": "caller", "ev": "frame", "ms": 20, "play_ms": 6638.0, "seq": 162, "t_ms": 6638.0, "voiced": true}
+{"dir": "caller", "ev": "frame", "ms": 20, "play_ms": 6660.1, "seq": 163, "t_ms": 6660.2, "voiced": true}
+{"dir": "caller", "ev": "frame", "ms": 20, "play_ms": 6678.0, "seq": 164, "t_ms": 6678.1, "voiced": true}
+{"dir": "caller", "ev": "frame", "ms": 20, "play_ms": 6696.1, "seq": 165, "t_ms": 6696.2, "voiced": true}
+{"dir": "caller", "ev": "frame", "ms": 20, "play_ms": 6717.4, "seq": 166, "t_ms": 6717.5, "voiced": true}
+{"dir": "caller", "ev": "frame", "ms": 20, "play_ms": 6736.8, "seq": 167, "t_ms": 6736.9, "voiced": true}
+{"dir": "caller", "ev": "frame", "ms": 20, "play_ms": 6761.2, "seq": 168, "t_ms": 6761.3, "voiced": true}
+{"dir": "caller", "ev": "frame", "ms": 20, "play_ms": 6776.9, "seq": 169, "t_ms": 6776.9, "voiced": true}
+{"dir": "caller", "ev": "frame", "ms": 20, "play_ms": 6798.0, "seq": 170, "t_ms": 6798.1, "voiced": true}
+{"dir": "caller", "ev": "frame", "ms": 20, "play_ms": 6815.8, "seq": 171, "t_ms": 6816.2, "voiced": true}
+{"dir": "caller", "ev": "frame", "ms": 20, "play_ms": 6842.5, "seq": 172, "t_ms": 6842.6, "voiced": true}
+{"dir": "caller", "ev": "frame", "ms": 20, "play_ms": 6858.0, "seq": 173, "t_ms": 6858.1, "voiced": true}
+{"dir": "caller", "ev": "frame", "ms": 20, "play_ms": 6876.3, "seq": 174, "t_ms": 6876.4, "voiced": true}
+{"dir": "caller", "ev": "frame", "ms": 20, "play_ms": 6896.4, "seq": 175, "t_ms": 6896.4, "voiced": true}
+{"dir": "caller", "ev": "frame", "ms": 20, "play_ms": 6917.1, "seq": 176, "t_ms": 6917.2, "voiced": true}
+{"dir": "caller", "ev": "frame", "ms": 20, "play_ms": 6936.6, "seq": 177, "t_ms": 6936.7, "voiced": true}
+{"dir": "caller", "ev": "frame", "ms": 20, "play_ms": 6956.9, "seq": 178, "t_ms": 6957.0, "voiced": true}
+{"dir": "caller", "ev": "frame", "ms": 20, "play_ms": 6975.2, "seq": 179, "t_ms": 6975.3, "voiced": true}
+{"dir": "caller", "ev": "frame", "ms": 20, "play_ms": 6997.5, "seq": 180, "t_ms": 6997.5, "voiced": true}
+{"dir": "caller", "ev": "frame", "ms": 20, "play_ms": 7015.6, "seq": 181, "t_ms": 7015.7, "voiced": true}
+{"dir": "caller", "ev": "frame", "ms": 20, "play_ms": 7035.0, "seq": 182, "t_ms": 7035.1, "voiced": true}
+{"dir": "caller", "ev": "frame", "ms": 20, "play_ms": 7059.4, "seq": 183, "t_ms": 7059.5, "voiced": true}
+{"dir": "caller", "ev": "frame", "ms": 20, "play_ms": 7075.6, "seq": 184, "t_ms": 7075.7, "voiced": true}
+{"dir": "caller", "ev": "frame", "ms": 20, "play_ms": 7096.2, "seq": 185, "t_ms": 7096.2, "voiced": true}
+{"dir": "caller", "ev": "frame", "ms": 20, "play_ms": 7115.6, "seq": 186, "t_ms": 7115.7, "voiced": true}
+{"dir": "caller", "ev": "frame", "ms": 20, "play_ms": 7137.8, "seq": 187, "t_ms": 7137.8, "voiced": true}
+{"dir": "caller", "ev": "frame", "ms": 20, "play_ms": 7157.5, "seq": 188, "t_ms": 7157.6, "voiced": true}
+{"dir": "caller", "ev": "frame", "ms": 20, "play_ms": 7176.2, "seq": 189, "t_ms": 7176.2, "voiced": true}
+{"dir": "caller", "ev": "frame", "ms": 20, "play_ms": 7197.1, "seq": 190, "t_ms": 7197.2, "voiced": true}
+{"dir": "caller", "ev": "frame", "ms": 20, "play_ms": 7215.6, "seq": 191, "t_ms": 7216.0, "voiced": true}
+{"dir": "caller", "ev": "frame", "ms": 20, "play_ms": 7235.1, "seq": 192, "t_ms": 7235.2, "voiced": true}
+{"dir": "caller", "ev": "frame", "ms": 20, "play_ms": 7255.8, "seq": 193, "t_ms": 7255.8, "voiced": true}
+{"dir": "caller", "ev": "frame", "ms": 20, "play_ms": 7275.6, "seq": 194, "t_ms": 7275.7, "voiced": true}
+{"dir": "caller", "ev": "frame", "ms": 20, "play_ms": 7295.9, "seq": 195, "t_ms": 7296.0, "voiced": true}
+{"dir": "caller", "ev": "frame", "ms": 20, "play_ms": 7315.8, "seq": 196, "t_ms": 7315.9, "voiced": true}
+{"dir": "caller", "ev": "frame", "ms": 20, "play_ms": 7335.5, "seq": 197, "t_ms": 7335.5, "voiced": true}
+{"dir": "caller", "ev": "frame", "ms": 20, "play_ms": 7355.9, "seq": 198, "t_ms": 7356.0, "voiced": true}
+{"dir": "caller", "ev": "frame", "ms": 20, "play_ms": 7375.4, "seq": 199, "t_ms": 7375.4, "voiced": true}
+{"dir": "caller", "ev": "frame", "ms": 20, "play_ms": 7397.0, "seq": 200, "t_ms": 7397.0, "voiced": true}
+{"dir": "caller", "ev": "frame", "ms": 20, "play_ms": 7415.0, "seq": 201, "t_ms": 7415.1, "voiced": true}
+{"dir": "caller", "ev": "frame", "ms": 20, "play_ms": 7435.9, "seq": 202, "t_ms": 7436.0, "voiced": true}
+{"dir": "caller", "ev": "frame", "ms": 20, "play_ms": 7455.7, "seq": 203, "t_ms": 7455.8, "voiced": true}
+{"dir": "caller", "ev": "frame", "ms": 20, "play_ms": 7475.6, "seq": 204, "t_ms": 7475.7, "voiced": true}
+{"dir": "caller", "ev": "frame", "ms": 20, "play_ms": 7495.2, "seq": 205, "t_ms": 7495.3, "voiced": true}
+{"dir": "caller", "ev": "frame", "ms": 20, "play_ms": 7515.3, "seq": 206, "t_ms": 7515.4, "voiced": true}
+{"dir": "caller", "ev": "frame", "ms": 20, "play_ms": 7539.2, "seq": 207, "t_ms": 7539.3, "voiced": true}
+{"dir": "caller", "ev": "frame", "ms": 20, "play_ms": 7558.9, "seq": 208, "t_ms": 7559.0, "voiced": true}
+{"dir": "caller", "ev": "frame", "ms": 20, "play_ms": 7576.9, "seq": 209, "t_ms": 7577.0, "voiced": true}
+{"dir": "caller", "ev": "frame", "ms": 20, "play_ms": 7595.9, "seq": 210, "t_ms": 7596.0, "voiced": true}
+{"dir": "caller", "ev": "frame", "ms": 20, "play_ms": 7615.7, "seq": 211, "t_ms": 7615.8, "voiced": true}
+{"dir": "caller", "ev": "frame", "ms": 20, "play_ms": 7636.5, "seq": 212, "t_ms": 7637.3, "voiced": true}
+{"dir": "caller", "ev": "frame", "ms": 20, "play_ms": 7656.6, "seq": 213, "t_ms": 7656.7, "voiced": true}
+{"dir": "caller", "ev": "frame", "ms": 20, "play_ms": 7676.0, "seq": 214, "t_ms": 7676.1, "voiced": true}
+{"dir": "caller", "ev": "frame", "ms": 20, "play_ms": 7695.7, "seq": 215, "t_ms": 7695.8, "voiced": true}
+{"dir": "caller", "ev": "frame", "ms": 20, "play_ms": 7716.8, "seq": 216, "t_ms": 7716.9, "voiced": true}
+{"dir": "caller", "ev": "frame", "ms": 20, "play_ms": 7735.4, "seq": 217, "t_ms": 7735.5, "voiced": true}
+{"dir": "caller", "ev": "frame", "ms": 20, "play_ms": 7755.1, "seq": 218, "t_ms": 7755.2, "voiced": true}
+{"dir": "caller", "ev": "frame", "ms": 20, "play_ms": 7775.3, "seq": 219, "t_ms": 7775.3, "voiced": true}
+{"dir": "caller", "ev": "frame", "ms": 20, "play_ms": 7797.0, "seq": 220, "t_ms": 7797.0, "voiced": true}
+{"dir": "caller", "ev": "frame", "ms": 20, "play_ms": 7816.9, "seq": 221, "t_ms": 7817.0, "voiced": true}
+{"dir": "caller", "ev": "frame", "ms": 20, "play_ms": 7836.0, "seq": 222, "t_ms": 7836.0, "voiced": true}
+{"dir": "caller", "ev": "frame", "ms": 20, "play_ms": 7855.8, "seq": 223, "t_ms": 7855.9, "voiced": true}
+{"dir": "caller", "ev": "frame", "ms": 20, "play_ms": 7876.5, "seq": 224, "t_ms": 7876.6, "voiced": true}
+{"dir": "caller", "ev": "frame", "ms": 20, "play_ms": 7896.6, "seq": 225, "t_ms": 7896.7, "voiced": true}
+{"dir": "caller", "ev": "frame", "ms": 20, "play_ms": 7915.3, "seq": 226, "t_ms": 7915.4, "voiced": true}
+{"dir": "caller", "ev": "frame", "ms": 20, "play_ms": 7934.9, "seq": 227, "t_ms": 7935.1, "voiced": true}
+{"dir": "caller", "ev": "frame", "ms": 20, "play_ms": 7956.0, "seq": 228, "t_ms": 7956.0, "voiced": true}
+{"dir": "caller", "ev": "frame", "ms": 20, "play_ms": 7976.6, "seq": 229, "t_ms": 7976.7, "voiced": true}
+{"dir": "caller", "ev": "frame", "ms": 20, "play_ms": 7995.5, "seq": 230, "t_ms": 7995.6, "voiced": true}
+{"dir": "caller", "ev": "frame", "ms": 20, "play_ms": 8015.2, "seq": 231, "t_ms": 8015.2, "voiced": true}
+{"dir": "caller", "ev": "frame", "ms": 20, "play_ms": 8035.1, "seq": 232, "t_ms": 8035.2, "voiced": true}
+{"dir": "caller", "ev": "frame", "ms": 20, "play_ms": 8057.4, "seq": 233, "t_ms": 8057.5, "voiced": true}
+{"dir": "caller", "ev": "frame", "ms": 20, "play_ms": 8077.9, "seq": 234, "t_ms": 8078.0, "voiced": true}
+{"dir": "caller", "ev": "frame", "ms": 20, "play_ms": 8095.9, "seq": 235, "t_ms": 8095.9, "voiced": true}
+{"dir": "caller", "ev": "frame", "ms": 20, "play_ms": 8115.6, "seq": 236, "t_ms": 8115.7, "voiced": true}
+{"dir": "caller", "ev": "frame", "ms": 20, "play_ms": 8134.9, "seq": 237, "t_ms": 8135.0, "voiced": true}
+{"dir": "caller", "ev": "frame", "ms": 20, "play_ms": 8159.4, "seq": 238, "t_ms": 8159.5, "voiced": true}
+{"dir": "caller", "ev": "frame", "ms": 20, "play_ms": 8176.0, "seq": 239, "t_ms": 8176.1, "voiced": true}
+{"dir": "caller", "ev": "frame", "ms": 20, "play_ms": 8195.9, "seq": 240, "t_ms": 8195.9, "voiced": true}
+{"dir": "caller", "ev": "frame", "ms": 20, "play_ms": 8216.7, "seq": 241, "t_ms": 8216.8, "voiced": true}
+{"dir": "caller", "ev": "frame", "ms": 20, "play_ms": 8235.6, "seq": 242, "t_ms": 8235.7, "voiced": true}
+{"dir": "caller", "ev": "frame", "ms": 20, "play_ms": 8255.4, "seq": 243, "t_ms": 8255.4, "voiced": true}
+{"dir": "caller", "ev": "frame", "ms": 20, "play_ms": 8276.0, "seq": 244, "t_ms": 8276.0, "voiced": true}
+{"dir": "caller", "ev": "frame", "ms": 20, "play_ms": 8300.9, "seq": 245, "t_ms": 8301.0, "voiced": true}
+{"dir": "caller", "ev": "frame", "ms": 20, "play_ms": 8317.4, "seq": 246, "t_ms": 8317.5, "voiced": true}
+{"dir": "caller", "ev": "frame", "ms": 20, "play_ms": 8335.6, "seq": 247, "t_ms": 8335.7, "voiced": true}
+{"dir": "caller", "ev": "frame", "ms": 20, "play_ms": 8355.6, "seq": 248, "t_ms": 8355.6, "voiced": true}
+{"dir": "caller", "ev": "frame", "ms": 20, "play_ms": 8388.8, "seq": 249, "t_ms": 8388.9, "voiced": true}
+{"dir": "caller", "ev": "frame", "ms": 20, "play_ms": 8395.4, "seq": 250, "t_ms": 8395.5, "voiced": true}
+{"dir": "caller", "ev": "frame", "ms": 20, "play_ms": 8418.0, "seq": 251, "t_ms": 8418.1, "voiced": true}
+{"dir": "caller", "ev": "frame", "ms": 20, "play_ms": 8436.9, "seq": 252, "t_ms": 8437.0, "voiced": true}
+{"dir": "caller", "ev": "frame", "ms": 20, "play_ms": 8455.8, "seq": 253, "t_ms": 8455.9, "voiced": true}
+{"dir": "caller", "ev": "frame", "ms": 20, "play_ms": 8476.2, "seq": 254, "t_ms": 8476.3, "voiced": true}
+{"dir": "caller", "ev": "frame", "ms": 20, "play_ms": 8495.0, "seq": 255, "t_ms": 8495.1, "voiced": true}
+{"dir": "caller", "ev": "frame", "ms": 20, "play_ms": 8519.0, "seq": 256, "t_ms": 8519.1, "voiced": true}
+{"dir": "caller", "ev": "frame", "ms": 20, "play_ms": 8539.4, "seq": 257, "t_ms": 8539.4, "voiced": true}
+{"dir": "caller", "ev": "frame", "ms": 20, "play_ms": 8555.5, "seq": 258, "t_ms": 8555.6, "voiced": true}
+{"dir": "caller", "ev": "frame", "ms": 20, "play_ms": 8575.3, "seq": 259, "t_ms": 8575.4, "voiced": true}
+{"dir": "caller", "ev": "frame", "ms": 20, "play_ms": 8595.5, "seq": 260, "t_ms": 8595.6, "voiced": true}
+{"dir": "caller", "ev": "frame", "ms": 20, "play_ms": 8615.9, "seq": 261, "t_ms": 8616.9, "voiced": true}
+{"dir": "caller", "ev": "frame", "ms": 20, "play_ms": 8638.8, "seq": 262, "t_ms": 8638.8, "voiced": true}
+{"dir": "caller", "ev": "frame", "ms": 20, "play_ms": 8657.8, "seq": 263, "t_ms": 8657.9, "voiced": true}
+{"dir": "caller", "ev": "frame", "ms": 20, "play_ms": 8679.0, "seq": 264, "t_ms": 8679.1, "voiced": true}
+{"dir": "caller", "ev": "frame", "ms": 20, "play_ms": 8700.7, "seq": 265, "t_ms": 8700.7, "voiced": true}
+{"dir": "caller", "ev": "frame", "ms": 20, "play_ms": 8715.3, "seq": 266, "t_ms": 8715.4, "voiced": true}
+{"dir": "caller", "ev": "frame", "ms": 20, "play_ms": 8735.9, "seq": 267, "t_ms": 8736.0, "voiced": true}
+{"dir": "caller", "ev": "frame", "ms": 20, "play_ms": 8756.1, "seq": 268, "t_ms": 8756.2, "voiced": true}
+{"dir": "caller", "ev": "frame", "ms": 20, "play_ms": 8779.6, "seq": 269, "t_ms": 8779.7, "voiced": true}
+{"dir": "caller", "ev": "frame", "ms": 20, "play_ms": 8795.2, "seq": 270, "t_ms": 8795.3, "voiced": true}
+{"dir": "caller", "ev": "frame", "ms": 20, "play_ms": 8815.2, "seq": 271, "t_ms": 8815.2, "voiced": true}
+{"dir": "caller", "ev": "frame", "ms": 20, "play_ms": 8835.1, "seq": 272, "t_ms": 8835.2, "voiced": false}
+{"dir": "caller", "ev": "frame", "ms": 20, "play_ms": 8857.6, "seq": 273, "t_ms": 8857.7, "voiced": false}
+{"dir": "caller", "ev": "frame", "ms": 20, "play_ms": 8875.5, "seq": 274, "t_ms": 8875.5, "voiced": false}
+{"end_ms": 8876.4, "ev": "caller_speech_end", "kind": "reply", "start_ms": 3414.6, "t_ms": 8876.4, "turn": 1}
+{"ev": "agent_reported", "kind": "transcript", "role": "caller", "t_ms": 9661.2, "text": "Hi, my burr grinder from order B-3001 arrived with a cracked hopper. I'd like a refund please. My email is mia.torres@example.com.", "turn": 1}
+{"dir": "agent", "ev": "frame", "ms": 100.0, "play_ms": 10207.1, "recv_ms": 10207.1, "seq": 22, "t_ms": 10214.5, "voiced": true}
+{"ev": "agent_speech_start", "t_ms": 10215.0, "utt": 2}
+{"dir": "agent", "ev": "frame", "ms": 100.0, "play_ms": 10307.1, "recv_ms": 10227.2, "seq": 23, "t_ms": 10321.9, "voiced": true}
+{"dir": "agent", "ev": "frame", "ms": 100.0, "play_ms": 10407.1, "recv_ms": 10248.7, "seq": 24, "t_ms": 10413.2, "voiced": true}
+{"dir": "agent", "ev": "frame", "ms": 100.0, "play_ms": 10507.1, "recv_ms": 10273.2, "seq": 25, "t_ms": 10517.2, "voiced": true}
+{"dir": "agent", "ev": "frame", "ms": 100.0, "play_ms": 10607.1, "recv_ms": 10290.1, "seq": 26, "t_ms": 10612.0, "voiced": true}
+{"dir": "agent", "ev": "frame", "ms": 100.0, "play_ms": 10707.1, "recv_ms": 10313.4, "seq": 27, "t_ms": 10714.0, "voiced": true}
+{"dir": "agent", "ev": "frame", "ms": 100.0, "play_ms": 10807.1, "recv_ms": 10335.1, "seq": 28, "t_ms": 10812.8, "voiced": true}
+{"dir": "agent", "ev": "frame", "ms": 100.0, "play_ms": 10907.1, "recv_ms": 10351.2, "seq": 29, "t_ms": 10924.4, "voiced": true}
+{"dir": "agent", "ev": "frame", "ms": 100.0, "play_ms": 11007.1, "recv_ms": 10376.3, "seq": 30, "t_ms": 11017.5, "voiced": true}
+{"dir": "agent", "ev": "frame", "ms": 100.0, "play_ms": 11107.1, "recv_ms": 10401.1, "seq": 31, "t_ms": 11110.1, "voiced": true}
+{"dir": "agent", "ev": "frame", "ms": 100.0, "play_ms": 11207.1, "recv_ms": 10420.3, "seq": 32, "t_ms": 11212.0, "voiced": true}
+{"dir": "agent", "ev": "frame", "ms": 100.0, "play_ms": 11307.1, "recv_ms": 10435.6, "seq": 33, "t_ms": 11312.3, "voiced": true}
+{"dir": "agent", "ev": "frame", "ms": 100.0, "play_ms": 11407.1, "recv_ms": 10460.6, "seq": 34, "t_ms": 11408.9, "voiced": true}
+{"dir": "agent", "ev": "frame", "ms": 100.0, "play_ms": 11507.1, "recv_ms": 10481.5, "seq": 35, "t_ms": 11513.8, "voiced": true}
+{"dir": "agent", "ev": "frame", "ms": 100.0, "play_ms": 11607.1, "recv_ms": 10501.5, "seq": 36, "t_ms": 11611.3, "voiced": true}
+{"dir": "agent", "ev": "frame", "ms": 100.0, "play_ms": 11707.1, "recv_ms": 10524.0, "seq": 37, "t_ms": 11710.4, "voiced": true}
+{"dir": "agent", "ev": "frame", "ms": 100.0, "play_ms": 11807.1, "recv_ms": 10544.9, "seq": 38, "t_ms": 11814.8, "voiced": true}
+{"dir": "agent", "ev": "frame", "ms": 100.0, "play_ms": 11907.1, "recv_ms": 10564.9, "seq": 39, "t_ms": 11909.1, "voiced": true}
+{"dir": "agent", "ev": "frame", "ms": 100.0, "play_ms": 12007.1, "recv_ms": 10585.0, "seq": 40, "t_ms": 12007.7, "voiced": true}
+{"dir": "agent", "ev": "frame", "ms": 100.0, "play_ms": 12107.1, "recv_ms": 10609.0, "seq": 41, "t_ms": 12118.0, "voiced": true}
+{"dir": "agent", "ev": "frame", "ms": 100.0, "play_ms": 12207.1, "recv_ms": 10625.0, "seq": 42, "t_ms": 12214.2, "voiced": true}
+{"dir": "agent", "ev": "frame", "ms": 100.0, "play_ms": 12307.1, "recv_ms": 10648.7, "seq": 43, "t_ms": 12310.0, "voiced": true}
+{"dir": "agent", "ev": "frame", "ms": 100.0, "play_ms": 12407.1, "recv_ms": 10670.1, "seq": 44, "t_ms": 12414.8, "voiced": true}
+{"dir": "agent", "ev": "frame", "ms": 100.0, "play_ms": 12507.1, "recv_ms": 10695.7, "seq": 45, "t_ms": 12512.9, "voiced": true}
+{"dir": "agent", "ev": "frame", "ms": 100.0, "play_ms": 12607.1, "recv_ms": 10713.8, "seq": 46, "t_ms": 12608.9, "voiced": true}
+{"dir": "agent", "ev": "frame", "ms": 100.0, "play_ms": 12707.1, "recv_ms": 10731.1, "seq": 47, "t_ms": 12715.7, "voiced": true}
+{"dir": "agent", "ev": "frame", "ms": 100.0, "play_ms": 12807.1, "recv_ms": 10753.7, "seq": 48, "t_ms": 12811.5, "voiced": true}
+{"dir": "agent", "ev": "frame", "ms": 100.0, "play_ms": 12907.1, "recv_ms": 10776.9, "seq": 49, "t_ms": 12907.9, "voiced": true}
+{"dir": "agent", "ev": "frame", "ms": 100.0, "play_ms": 13007.1, "recv_ms": 10798.5, "seq": 50, "t_ms": 13016.8, "voiced": true}
+{"dir": "agent", "ev": "frame", "ms": 100.0, "play_ms": 13107.1, "recv_ms": 10817.4, "seq": 51, "t_ms": 13116.2, "voiced": true}
+{"dir": "agent", "ev": "frame", "ms": 100.0, "play_ms": 13207.1, "recv_ms": 10838.4, "seq": 52, "t_ms": 13216.2, "voiced": true}
+{"dir": "agent", "ev": "frame", "ms": 100.0, "play_ms": 13307.1, "recv_ms": 10895.5, "seq": 53, "t_ms": 13313.2, "voiced": true}
+{"dir": "agent", "ev": "frame", "ms": 100.0, "play_ms": 13407.1, "recv_ms": 10899.4, "seq": 54, "t_ms": 13412.2, "voiced": true}
+{"dir": "agent", "ev": "frame", "ms": 100.0, "play_ms": 13507.1, "recv_ms": 10908.4, "seq": 55, "t_ms": 13515.2, "voiced": true}
+{"dir": "agent", "ev": "frame", "ms": 100.0, "play_ms": 13607.1, "recv_ms": 10924.1, "seq": 56, "t_ms": 13617.1, "voiced": true}
+{"dir": "agent", "ev": "frame", "ms": 100.0, "play_ms": 13707.1, "recv_ms": 10949.7, "seq": 57, "t_ms": 13718.2, "voiced": true}
+{"dir": "agent", "ev": "frame", "ms": 100.0, "play_ms": 13807.1, "recv_ms": 10970.8, "seq": 58, "t_ms": 13816.7, "voiced": true}
+{"dir": "agent", "ev": "frame", "ms": 100.0, "play_ms": 13907.1, "recv_ms": 10985.9, "seq": 59, "t_ms": 13907.6, "voiced": true}
+{"dir": "agent", "ev": "frame", "ms": 100.0, "play_ms": 14007.1, "recv_ms": 11011.0, "seq": 60, "t_ms": 14018.9, "voiced": true}
+{"dir": "agent", "ev": "frame", "ms": 100.0, "play_ms": 14107.1, "recv_ms": 11036.5, "seq": 61, "t_ms": 14114.2, "voiced": true}
+{"dir": "agent", "ev": "frame", "ms": 100.0, "play_ms": 14207.1, "recv_ms": 11053.5, "seq": 62, "t_ms": 14208.7, "voiced": true}
+{"dir": "agent", "ev": "frame", "ms": 100.0, "play_ms": 14307.1, "recv_ms": 11074.7, "seq": 63, "t_ms": 14307.9, "voiced": true}
+{"dir": "agent", "ev": "frame", "ms": 100.0, "play_ms": 14407.1, "recv_ms": 11095.1, "seq": 64, "t_ms": 14408.3, "voiced": true}
+{"dir": "agent", "ev": "frame", "ms": 100.0, "play_ms": 14507.1, "recv_ms": 11116.8, "seq": 65, "t_ms": 14514.2, "voiced": true}
+{"dir": "agent", "ev": "frame", "ms": 100.0, "play_ms": 14607.1, "recv_ms": 11144.8, "seq": 66, "t_ms": 14613.2, "voiced": true}
+{"dir": "agent", "ev": "frame", "ms": 100.0, "play_ms": 14707.1, "recv_ms": 11159.6, "seq": 67, "t_ms": 14711.2, "voiced": true}
+{"dir": "agent", "ev": "frame", "ms": 100.0, "play_ms": 14807.1, "recv_ms": 11187.1, "seq": 68, "t_ms": 14812.7, "voiced": true}
+{"dir": "agent", "ev": "frame", "ms": 100.0, "play_ms": 14907.1, "recv_ms": 11206.7, "seq": 69, "t_ms": 14918.7, "voiced": true}
+{"dir": "agent", "ev": "frame", "ms": 100.0, "play_ms": 15007.1, "recv_ms": 11233.1, "seq": 70, "t_ms": 15007.7, "voiced": true}
+{"dir": "agent", "ev": "frame", "ms": 80.0, "play_ms": 15107.1, "recv_ms": 11249.5, "seq": 71, "t_ms": 15116.4, "voiced": false}
+{"end_ms": 15107.1, "ev": "agent_speech_end", "start_ms": 10207.1, "t_ms": 15909.8, "utt": 2}
+{"audio_ms": 4980.0, "ev": "agent_transcript", "interrupted": false, "stt": "tone_code", "t_ms": 16445.6, "text": "I'm sorry about the cracked hopper. I have refunded the full 45.00 for order B-3001 to your original payment method.", "utt": 2}
+{"audio_ms": 960.0, "ev": "caller_speech_start", "final": true, "kind": "reply", "probe": null, "t_ms": 16751.8, "text": "Great, thank you!", "tts": "tone_code", "turn": 2}
+{"dir": "caller", "ev": "frame", "ms": 20, "play_ms": 16751.9, "seq": 275, "t_ms": 16751.9, "voiced": false}
+{"dir": "caller", "ev": "frame", "ms": 20, "play_ms": 16772.5, "seq": 276, "t_ms": 16772.6, "voiced": false}
+{"dir": "caller", "ev": "frame", "ms": 20, "play_ms": 16794.0, "seq": 277, "t_ms": 16794.1, "voiced": true}
+{"dir": "caller", "ev": "frame", "ms": 20, "play_ms": 16813.0, "seq": 278, "t_ms": 16813.1, "voiced": true}
+{"dir": "caller", "ev": "frame", "ms": 20, "play_ms": 16833.7, "seq": 279, "t_ms": 16833.7, "voiced": true}
+{"dir": "caller", "ev": "frame", "ms": 20, "play_ms": 16852.9, "seq": 280, "t_ms": 16853.0, "voiced": true}
+{"dir": "caller", "ev": "frame", "ms": 20, "play_ms": 16872.1, "seq": 281, "t_ms": 16872.2, "voiced": true}
+{"dir": "caller", "ev": "frame", "ms": 20, "play_ms": 16892.2, "seq": 282, "t_ms": 16892.3, "voiced": true}
+{"dir": "caller", "ev": "frame", "ms": 20, "play_ms": 16914.6, "seq": 283, "t_ms": 16914.7, "voiced": true}
+{"dir": "caller", "ev": "frame", "ms": 20, "play_ms": 16932.8, "seq": 284, "t_ms": 16932.9, "voiced": true}
+{"dir": "caller", "ev": "frame", "ms": 20, "play_ms": 16956.6, "seq": 285, "t_ms": 16956.7, "voiced": true}
+{"dir": "caller", "ev": "frame", "ms": 20, "play_ms": 16972.1, "seq": 286, "t_ms": 16972.2, "voiced": true}
+{"dir": "caller", "ev": "frame", "ms": 20, "play_ms": 16995.0, "seq": 287, "t_ms": 16995.0, "voiced": true}
+{"dir": "caller", "ev": "frame", "ms": 20, "play_ms": 17015.9, "seq": 288, "t_ms": 17016.0, "voiced": true}
+{"dir": "caller", "ev": "frame", "ms": 20, "play_ms": 17033.8, "seq": 289, "t_ms": 17033.9, "voiced": true}
+{"dir": "caller", "ev": "frame", "ms": 20, "play_ms": 17055.6, "seq": 290, "t_ms": 17055.7, "voiced": true}
+{"dir": "caller", "ev": "frame", "ms": 20, "play_ms": 17073.1, "seq": 291, "t_ms": 17073.2, "voiced": true}
+{"dir": "caller", "ev": "frame", "ms": 20, "play_ms": 17096.1, "seq": 292, "t_ms": 17096.2, "voiced": true}
+{"dir": "caller", "ev": "frame", "ms": 20, "play_ms": 17115.2, "seq": 293, "t_ms": 17115.3, "voiced": true}
+{"dir": "caller", "ev": "frame", "ms": 20, "play_ms": 17137.5, "seq": 294, "t_ms": 17137.6, "voiced": true}
+{"dir": "caller", "ev": "frame", "ms": 20, "play_ms": 17157.9, "seq": 295, "t_ms": 17158.0, "voiced": true}
+{"dir": "caller", "ev": "frame", "ms": 20, "play_ms": 17172.9, "seq": 296, "t_ms": 17175.9, "voiced": true}
+{"dir": "caller", "ev": "frame", "ms": 20, "play_ms": 17194.1, "seq": 297, "t_ms": 17194.2, "voiced": true}
+{"dir": "caller", "ev": "frame", "ms": 20, "play_ms": 17215.7, "seq": 298, "t_ms": 17215.7, "voiced": true}
+{"dir": "caller", "ev": "frame", "ms": 20, "play_ms": 17232.1, "seq": 299, "t_ms": 17232.2, "voiced": true}
+{"dir": "caller", "ev": "frame", "ms": 20, "play_ms": 17255.6, "seq": 300, "t_ms": 17255.6, "voiced": true}
+{"dir": "caller", "ev": "frame", "ms": 20, "play_ms": 17274.3, "seq": 301, "t_ms": 17274.3, "voiced": true}
+{"dir": "caller", "ev": "frame", "ms": 20, "play_ms": 17293.1, "seq": 302, "t_ms": 17293.2, "voiced": true}
+{"dir": "caller", "ev": "frame", "ms": 20, "play_ms": 17314.8, "seq": 303, "t_ms": 17314.9, "voiced": true}
+{"dir": "caller", "ev": "frame", "ms": 20, "play_ms": 17334.0, "seq": 304, "t_ms": 17334.0, "voiced": true}
+{"dir": "caller", "ev": "frame", "ms": 20, "play_ms": 17357.8, "seq": 305, "t_ms": 17357.9, "voiced": true}
+{"dir": "caller", "ev": "frame", "ms": 20, "play_ms": 17376.2, "seq": 306, "t_ms": 17376.2, "voiced": true}
+{"dir": "caller", "ev": "frame", "ms": 20, "play_ms": 17394.9, "seq": 307, "t_ms": 17395.0, "voiced": true}
+{"dir": "caller", "ev": "frame", "ms": 20, "play_ms": 17414.6, "seq": 308, "t_ms": 17414.7, "voiced": true}
+{"dir": "caller", "ev": "frame", "ms": 20, "play_ms": 17433.0, "seq": 309, "t_ms": 17433.1, "voiced": true}
+{"dir": "caller", "ev": "frame", "ms": 20, "play_ms": 17452.5, "seq": 310, "t_ms": 17452.6, "voiced": true}
+{"dir": "caller", "ev": "frame", "ms": 20, "play_ms": 17473.8, "seq": 311, "t_ms": 17473.8, "voiced": true}
+{"dir": "caller", "ev": "frame", "ms": 20, "play_ms": 17493.6, "seq": 312, "t_ms": 17493.7, "voiced": true}
+{"dir": "caller", "ev": "frame", "ms": 20, "play_ms": 17515.0, "seq": 313, "t_ms": 17515.1, "voiced": true}
+{"dir": "caller", "ev": "frame", "ms": 20, "play_ms": 17534.8, "seq": 314, "t_ms": 17534.8, "voiced": true}
+{"dir": "caller", "ev": "frame", "ms": 20, "play_ms": 17557.5, "seq": 315, "t_ms": 17557.5, "voiced": true}
+{"dir": "caller", "ev": "frame", "ms": 20, "play_ms": 17572.5, "seq": 316, "t_ms": 17572.5, "voiced": true}
+{"dir": "caller", "ev": "frame", "ms": 20, "play_ms": 17596.5, "seq": 317, "t_ms": 17596.6, "voiced": true}
+{"dir": "caller", "ev": "frame", "ms": 20, "play_ms": 17612.1, "seq": 318, "t_ms": 17612.2, "voiced": true}
+{"dir": "caller", "ev": "frame", "ms": 20, "play_ms": 17636.5, "seq": 319, "t_ms": 17636.6, "voiced": true}
+{"dir": "caller", "ev": "frame", "ms": 20, "play_ms": 17652.1, "seq": 320, "t_ms": 17652.1, "voiced": false}
+{"dir": "caller", "ev": "frame", "ms": 20, "play_ms": 17672.9, "seq": 321, "t_ms": 17673.0, "voiced": false}
+{"dir": "caller", "ev": "frame", "ms": 20, "play_ms": 17694.4, "seq": 322, "t_ms": 17694.4, "voiced": false}
+{"end_ms": 17694.7, "ev": "caller_speech_end", "kind": "reply", "start_ms": 16751.8, "t_ms": 17694.7, "turn": 2}
+{"by": "caller", "ev": "hangup", "reason": "caller_done", "t_ms": 18302.1}
+{"agent_audio": {"bytes": 486028, "file": "agent.wav", "sha256": "c06ad1b562cf62fe9e416be532680f15cbcf10d455b92a460a4dbe69bdb0aeac", "truncated": false}, "agent_utterances": 2, "caller_audio": {"bytes": 566892, "file": "caller.wav", "sha256": "bae17408d43b12b114f585c6f13e665c7b1cf829d15ae1285d1b1ea77f5e7f3e", "truncated": false}, "caller_turns": 2, "duration_ms": 18304.1, "ended_by": "caller_done", "ev": "call_end", "frames_dropped": 0, "t_ms": 18312.0}

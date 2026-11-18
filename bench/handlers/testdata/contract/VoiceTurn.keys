@@ -1,0 +1,8 @@
+# Keys of bench.ts `VoiceTurn` (X8 voice agents, voice.Turn). Change with bench.ts and the Go type.
+kind
+caller_turn?
+floor_ms
+agent_start_ms?
+gap_ms
+latency_ms?
+dead_air

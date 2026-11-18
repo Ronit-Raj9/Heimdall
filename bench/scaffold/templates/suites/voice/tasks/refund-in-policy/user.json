@@ -1,0 +1,44 @@
+{
+  "id": "refund-in-policy",
+  "script": {
+    "opening": "Hi, my burr grinder from order B-3001 arrived with a cracked hopper. I'd like a refund please. My email is mia.torres@example.com.",
+    "replies": [
+      {
+        "when": [
+          "photo",
+          "picture",
+          "image"
+        ],
+        "say": "I can't send photos in this chat, but the hopper is clearly cracked."
+      },
+      {
+        "when": [
+          "refunded",
+          "refund has been",
+          "issued",
+          "processed"
+        ],
+        "say": "Great, thank you!",
+        "stop": true
+      }
+    ],
+    "done": "No, that's all. Thanks!",
+    "default": "Okay."
+  },
+  "persona": {
+    "name": "Mia Torres",
+    "goal": "Get a refund for your burr grinder (order B-3001), which arrived with a cracked hopper.",
+    "facts": [
+      "Your email is mia.torres@example.com",
+      "Your order number is B-3001",
+      "The grinder arrived on 2 November 2026 with a cracked hopper",
+      "You paid 45.00 pounds"
+    ],
+    "unknown": [
+      "Your card number",
+      "The refund policy"
+    ],
+    "behaviour": "Polite and brief.",
+    "satisfied_when": "the agent confirms the grinder has been refunded."
+  }
+}

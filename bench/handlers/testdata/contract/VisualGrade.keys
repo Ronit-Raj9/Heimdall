@@ -1,0 +1,10 @@
+# Keys of bench.ts `VisualGrade` (schemas/visual.go), in RunDetail.grade.visual. X1 vision grading.
+capture
+source
+reference?
+diff?
+masks?
+checks?
+passed
+score?
+judge?

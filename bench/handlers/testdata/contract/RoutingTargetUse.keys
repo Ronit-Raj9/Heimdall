@@ -1,0 +1,5 @@
+# Keys of bench.ts `RoutingTargetUse` (schemas.RoutingTargetUse, W9). Change with bench.ts and schemas/routing.go.
+target
+turn_share
+cost_usd?
+latency_ms?

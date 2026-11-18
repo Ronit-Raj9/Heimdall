@@ -271,3 +271,83 @@ It does **not** prove:
 - anything about a different version of the task. An admission holds for the
   exact hashes in the lock: change the instruction, the repo, the verifier or
   the controls and the task goes back to draft until it is admitted again.
+
+## Mining tasks from history: `tasks mine`
+
+Cutting tasks one commit at a time is the precise path. `heimdall tasks mine`
+(also `task mine`; `bifrost-bench` works the same) is the fast one: it walks
+your git history, picks the commits that changed both code and tests, cuts
+each with the same `task init` machinery, and keeps only the tasks admission
+proves. It is step 2 of `docs/quickstart.md`.
+
+```sh
+heimdall tasks mine -limit 10                 # newest first, until 10 are proven
+heimdall tasks mine -since v1.4.0 -paths src/billing,src/tax -min-tests 1
+heimdall tasks mine -dry-run                  # ranked candidates and skip reasons only
+```
+
+Run it from inside the repository after `heimdall init`; it finds
+`.heimdall/deploy/bench.yaml` and the suite init wrote. Outside a
+`.heimdall` project pass `-config` and `-suite`.
+
+What it does for each commit, newest first (at most `-scan`, default 300):
+
+| Step | Rule |
+|---|---|
+| Candidate | one parent; base = the parent, reference = the commit; hidden tests = the test files the commit added or changed (the suite template's test globs) |
+| Skipped, with the reason printed | merge commit; root commit; no test file changed; only test files changed; fewer than `-min-tests` test files; nothing under `-paths`; a test file deleted; a binary file changed; more than `-max-files` (12) files or `-max-lines` (400) lines changed; a test that needs the network (an HTTP client or socket call in the test, or a remote URL in the test while the commit's code makes a network call); a test that reads a credential from the environment (`*_API_KEY`, `*TOKEN*`, `*SECRET*`, `*PASSWORD*`) |
+| Ranked | small diffs, few files and few test functions first (fast to prove and to run), interleaved across top-level folders so the first picks cover different areas |
+| Cut | `task init` from the parent to the commit into `benchmarks/<suite>/tasks/m-<commit>`; the `.heimdall` folder is left out of the snapshot |
+| Drafted | `instruction.md` from the commit subject and body and the names of the hidden tests, never from the diff; body sentences that say how the fix was made ("use", "instead", "replace", "the fix", ...) are dropped, and test names become plain phrases ("test_no_edge_hyphens" becomes "no edge hyphens") |
+| Marked | `provenance.created_by: tasks mine` and `provenance.instruction_reviewed: false` (an additive field); no EDIT ME marker, so the task can be proved and run at once |
+| Secret scan | the same scan as `task init`; a finding drops the task |
+| Proved | the existing admission, run in the suite's verifier container: the reference passes 3 times, the empty patch fails (the hidden tests fail at the parent), the exploit and the null agents fail, the verifier has no network. An admitted task is recorded in `suite.lock` |
+| Dropped | a task that is not admitted is removed again and `suite.yaml` restored, with the failed checks printed |
+
+It stops after `-limit` proven tasks. A task already in the suite (the same
+commit mined before) counts as proven and is left alone. The repository is
+only read, with the same plumbing as `task init` (`ls-tree`, `cat-file`,
+`diff`, `log`): no checkout, no worktree, no lock files, no hooks.
+
+### Unreviewed instructions
+
+A drafted instruction is a draft. Every report (`report.md` of `run`, `check`
+and `compare`) and the verdict card say "N of M tasks have unreviewed
+instructions" while any task of the experiment still has
+`instruction_reviewed: false`. Read each `instruction.md`, rewrite what a
+teammate would not say, then:
+
+```sh
+heimdall task review minitext/m-56d8921cd6     # or just the task id inside a .heimdall project
+```
+
+`task review` sets `instruction_reviewed: true` in task.yaml. The whole task
+folder, task.yaml included, is part of the task's lock fingerprint, so the
+mark (and any edit to `instruction.md`) clears the task's admission; `task
+review` therefore proves the task again with the same admission ($0, Docker
+only) and records it. `-no-admit` only marks it, and you run `task admit`
+before the next experiment.
+
+`tasks mine` writes `suite.lock` once, at the end. Adding task ids to
+suite.yaml changes the suite fingerprint, which alone would clear every
+earlier admission, so the miner carries a record (this run's proofs and the
+previous lock's admissions) only when the task's own fingerprint and the
+suite's image identities are the ones it was admitted against and suite.yaml
+differs from before only in its tasks list; any other record is dropped with
+a warning naming the task to admit again.
+
+### Limits of mining
+
+- The draft can still say too much: a commit body that names the exact line
+  to change survives the filter when it does not use a "how" word. Review
+  before you trust a verdict.
+- The skip rules for network and secrets read the test files and the changed
+  code; a test that reaches the network through a helper in another file is
+  not caught statically. Admission catches it anyway (the verifier has no
+  network, so the reference fails), at the cost of one proof.
+- The default test globs are the suite template's. A repository that keeps
+  tests elsewhere needs its globs in the suite (`task init -tests` takes
+  them; `tasks mine` uses the template's).
+- Proof time is the admission's: about 3 minutes per task on an 8-core
+  machine under heavy load (load average above 40), mostly the 3 reference
+  gradings and the 2 null-agent workspaces.

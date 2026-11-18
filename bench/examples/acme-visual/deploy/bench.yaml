@@ -1,0 +1,40 @@
+# Heimdall (bifrost-bench) configuration for the acme-visual example project.
+# Relative paths resolve against the project root, the parent of this deploy/
+# folder, so every command takes `-config examples/acme-visual/deploy/bench.yaml`
+# (or `-config deploy/bench.yaml` from the project root). Every key can be
+# overridden with an environment variable named BENCH_<SECTION>_<KEY>
+# (top-level keys: BENCH_<KEY>), for example BENCH_SERVER_MODE=recorded.
+#
+# The gateway, fault proxy and networks are the same stack the bench's own
+# deploy/docker-compose.yml starts; this project reuses it rather than
+# starting a second one.
+runs_root: runs
+benchmarks_root: benchmarks
+pricing: deploy/pricing-snapshot.json
+
+server:
+  # Loopback only. Port 8095 so it can run beside the bench's own server and the other examples.
+  listen: 127.0.0.1:8095
+  # live | recorded | synthetic. Every API response carries it.
+  mode: live
+  allowed_hosts: []
+  cors_origins: []
+
+gateway:
+  url: http://127.0.0.1:18080        # host side
+  agent_url: http://bifrost:8080     # from inside the evaluation network
+  admin_token_env: BIFROST_SETUP_TOKEN
+  provider: anthropic
+  key_slots: [fp-slot-1, fp-slot-2, fp-slot-3, fp-slot-4]
+
+faultproxy:
+  control_url: http://127.0.0.1:19101
+
+networks:
+  eval: bench-evalnet
+
+images:
+  # Trusted helper for workspace copy, diff export and the egress probe. It
+  # needs sh, git and python3, so it is the bench's own helper image. The
+  # acme-visual suite uses it as its base image too.
+  helper: bench/coding-core-base:1

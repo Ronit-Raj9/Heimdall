@@ -1,0 +1,1121 @@
+{
+  "suite": "acme-research",
+  "version": "1.0.0",
+  "base_image": {
+    "tag": "bench/coding-core-base:1"
+  },
+  "tasks": {
+    "aquarium-opening-day": {
+      "version": "1.0.0",
+      "instruction_sha256": "8302abb279bdbfc5f3e7ec901a795b1ce92fef3c4741d3b6f85b40b2eebfd227",
+      "repo_tree_sha256": "654ee46cc8999b540bcf7b5bf240294b31112e85b3ed4c820b73e2bbb86b2508",
+      "verifier_sha256": "ec6246e75bd4a776c44cdec1e500a9a7945652dd8654a1e02e034730d500e450",
+      "controls_sha256": "6829f12a8a809c6b9d84f6fcf6efc30fac2c09da2e8474d7f4f08123cda12d48",
+      "fixtures_sha256": "cc4cd2a8078ef2b310eb6477c881a7b3790b89e00188d8e016c8439de20fcf31",
+      "status": "admitted",
+      "admission": {
+        "admitted": true,
+        "checks": [
+          {
+            "name": "static_validation",
+            "want": "clean",
+            "got": "clean",
+            "passed": true,
+            "detail": "0 warnings"
+          },
+          {
+            "name": "reference_1",
+            "want": "pass",
+            "got": "pass",
+            "passed": true,
+            "detail": "solution/reference.sh exit 0; tests_ran=0 failures=0 errors=0 skipped=0 exit=0 reason=passed (reward 1)"
+          },
+          {
+            "name": "reference_2",
+            "want": "pass",
+            "got": "pass",
+            "passed": true,
+            "detail": "solution/reference.sh exit 0; tests_ran=0 failures=0 errors=0 skipped=0 exit=0 reason=passed (reward 1)"
+          },
+          {
+            "name": "reference_3",
+            "want": "pass",
+            "got": "pass",
+            "passed": true,
+            "detail": "solution/reference.sh exit 0; tests_ran=0 failures=0 errors=0 skipped=0 exit=0 reason=passed (reward 1)"
+          },
+          {
+            "name": "empty_control",
+            "want": "fail",
+            "got": "fail",
+            "passed": true,
+            "detail": "controls/empty.sh exit 0; artifact output: required artifact missing: answer (answer.txt: missing: no file matches answer.txt)"
+          },
+          {
+            "name": "mutant_1",
+            "want": "fail",
+            "got": "fail",
+            "passed": true,
+            "detail": "controls/mutant-annual.sh exit 0; tests_ran=0 failures=0 errors=0 skipped=0 exit=0 reason=reward 0 below pass threshold 1"
+          },
+          {
+            "name": "exploit",
+            "want": "fail",
+            "got": "fail",
+            "passed": true,
+            "detail": "controls/exploit.sh exit 0; tests_ran=0 failures=0 errors=0 skipped=0 exit=0 reason=reward 0 below pass threshold 1"
+          },
+          {
+            "name": "null_noop",
+            "want": "fail",
+            "got": "fail",
+            "passed": true,
+            "detail": "noop exit 0; artifact output: required artifact missing: answer (answer.txt: missing: no file matches answer.txt)"
+          },
+          {
+            "name": "null_refuse",
+            "want": "fail",
+            "got": "fail",
+            "passed": true,
+            "detail": "refuse exit 0; artifact output: required artifact missing: answer (answer.txt: missing: no file matches answer.txt)"
+          },
+          {
+            "name": "instruction_edited",
+            "want": "edited",
+            "got": "edited",
+            "passed": true
+          },
+          {
+            "name": "secret_scan",
+            "want": "none",
+            "got": "none",
+            "passed": true
+          },
+          {
+            "name": "verifier_no_network",
+            "want": "none",
+            "got": "none",
+            "passed": true,
+            "detail": "reported by grader verifier_command"
+          }
+        ],
+        "at": "2026-11-18T02:27:57.23770677Z",
+        "grader": "verifier_command",
+        "reference_repeats": 3,
+        "reference_results": [
+          "pass",
+          "pass",
+          "pass"
+        ],
+        "fingerprint": "1d9c05e570ee75cc0a713d3fbe38bb5919a50d433d575b143a73e3a7cdf972bc"
+      }
+    },
+    "bridge-mayor": {
+      "version": "1.0.0",
+      "instruction_sha256": "258a323658c33f7178d7b7bec920da827c56d8b1bbee5f08e686f218ebdd2e7b",
+      "repo_tree_sha256": "654ee46cc8999b540bcf7b5bf240294b31112e85b3ed4c820b73e2bbb86b2508",
+      "verifier_sha256": "d81f1e8e28ea6028cfd5a211feaefcea0d0ad0988013756107171c853b2b7bf3",
+      "controls_sha256": "e078d0dce3cb60800a1632e1b14ff5c6d2c68b47bde64bab38b845d2c16300f6",
+      "fixtures_sha256": "cc4cd2a8078ef2b310eb6477c881a7b3790b89e00188d8e016c8439de20fcf31",
+      "status": "admitted",
+      "admission": {
+        "admitted": true,
+        "checks": [
+          {
+            "name": "static_validation",
+            "want": "clean",
+            "got": "clean",
+            "passed": true,
+            "detail": "0 warnings"
+          },
+          {
+            "name": "reference_1",
+            "want": "pass",
+            "got": "pass",
+            "passed": true,
+            "detail": "solution/reference.sh exit 0; tests_ran=0 failures=0 errors=0 skipped=0 exit=0 reason=passed (reward 1)"
+          },
+          {
+            "name": "reference_2",
+            "want": "pass",
+            "got": "pass",
+            "passed": true,
+            "detail": "solution/reference.sh exit 0; tests_ran=0 failures=0 errors=0 skipped=0 exit=0 reason=passed (reward 1)"
+          },
+          {
+            "name": "reference_3",
+            "want": "pass",
+            "got": "pass",
+            "passed": true,
+            "detail": "solution/reference.sh exit 0; tests_ran=0 failures=0 errors=0 skipped=0 exit=0 reason=passed (reward 1)"
+          },
+          {
+            "name": "empty_control",
+            "want": "fail",
+            "got": "fail",
+            "passed": true,
+            "detail": "controls/empty.sh exit 0; artifact output: required artifact missing: answer (answer.txt: missing: no file matches answer.txt)"
+          },
+          {
+            "name": "mutant_1",
+            "want": "fail",
+            "got": "fail",
+            "passed": true,
+            "detail": "controls/mutant-outdated.sh exit 0; tests_ran=0 failures=0 errors=0 skipped=0 exit=0 reason=reward 0 below pass threshold 1"
+          },
+          {
+            "name": "exploit",
+            "want": "fail",
+            "got": "fail",
+            "passed": true,
+            "detail": "controls/exploit.sh exit 0; tests_ran=0 failures=0 errors=0 skipped=0 exit=0 reason=reward 0 below pass threshold 1"
+          },
+          {
+            "name": "null_noop",
+            "want": "fail",
+            "got": "fail",
+            "passed": true,
+            "detail": "noop exit 0; artifact output: required artifact missing: answer (answer.txt: missing: no file matches answer.txt)"
+          },
+          {
+            "name": "null_refuse",
+            "want": "fail",
+            "got": "fail",
+            "passed": true,
+            "detail": "refuse exit 0; artifact output: required artifact missing: answer (answer.txt: missing: no file matches answer.txt)"
+          },
+          {
+            "name": "instruction_edited",
+            "want": "edited",
+            "got": "edited",
+            "passed": true
+          },
+          {
+            "name": "secret_scan",
+            "want": "none",
+            "got": "none",
+            "passed": true
+          },
+          {
+            "name": "verifier_no_network",
+            "want": "none",
+            "got": "none",
+            "passed": true,
+            "detail": "reported by grader verifier_command"
+          }
+        ],
+        "at": "2026-11-18T01:56:48.45405612Z",
+        "grader": "verifier_command",
+        "reference_repeats": 3,
+        "reference_results": [
+          "pass",
+          "pass",
+          "pass"
+        ],
+        "fingerprint": "4c41c0c1c15c7eca3633b5a523e159049188d74e3e673402dd766eacb57ef498"
+      }
+    },
+    "county-town-population": {
+      "version": "1.0.0",
+      "instruction_sha256": "0bb9ff684541e1b304239f3d8dfde766c68d0931a17d180c637b35d8fd4997bf",
+      "repo_tree_sha256": "654ee46cc8999b540bcf7b5bf240294b31112e85b3ed4c820b73e2bbb86b2508",
+      "verifier_sha256": "95f5c44c75c761a8acd992f8c4737f6d27ca0c24f37db0543f81d766dc88c8fb",
+      "controls_sha256": "bb481a2835dc97f666bd04e8f53b18e16cf7b52e316b7b6108787e0261331b96",
+      "fixtures_sha256": "cc4cd2a8078ef2b310eb6477c881a7b3790b89e00188d8e016c8439de20fcf31",
+      "status": "admitted",
+      "admission": {
+        "admitted": true,
+        "checks": [
+          {
+            "name": "static_validation",
+            "want": "clean",
+            "got": "clean",
+            "passed": true,
+            "detail": "0 warnings"
+          },
+          {
+            "name": "reference_1",
+            "want": "pass",
+            "got": "pass",
+            "passed": true,
+            "detail": "solution/reference.sh exit 0; tests_ran=0 failures=0 errors=0 skipped=0 exit=0 reason=passed (reward 1)"
+          },
+          {
+            "name": "reference_2",
+            "want": "pass",
+            "got": "pass",
+            "passed": true,
+            "detail": "solution/reference.sh exit 0; tests_ran=0 failures=0 errors=0 skipped=0 exit=0 reason=passed (reward 1)"
+          },
+          {
+            "name": "reference_3",
+            "want": "pass",
+            "got": "pass",
+            "passed": true,
+            "detail": "solution/reference.sh exit 0; tests_ran=0 failures=0 errors=0 skipped=0 exit=0 reason=passed (reward 1)"
+          },
+          {
+            "name": "empty_control",
+            "want": "fail",
+            "got": "fail",
+            "passed": true,
+            "detail": "controls/empty.sh exit 0; artifact output: required artifact missing: answer (answer.txt: missing: no file matches answer.txt)"
+          },
+          {
+            "name": "mutant_1",
+            "want": "fail",
+            "got": "fail",
+            "passed": true,
+            "detail": "controls/mutant-old-census.sh exit 0; tests_ran=0 failures=0 errors=0 skipped=0 exit=0 reason=reward 0 below pass threshold 1"
+          },
+          {
+            "name": "exploit",
+            "want": "fail",
+            "got": "fail",
+            "passed": true,
+            "detail": "controls/exploit.sh exit 0; tests_ran=0 failures=0 errors=0 skipped=0 exit=0 reason=reward 0 below pass threshold 1"
+          },
+          {
+            "name": "null_noop",
+            "want": "fail",
+            "got": "fail",
+            "passed": true,
+            "detail": "noop exit 0; artifact output: required artifact missing: answer (answer.txt: missing: no file matches answer.txt)"
+          },
+          {
+            "name": "null_refuse",
+            "want": "fail",
+            "got": "fail",
+            "passed": true,
+            "detail": "refuse exit 0; artifact output: required artifact missing: answer (answer.txt: missing: no file matches answer.txt)"
+          },
+          {
+            "name": "instruction_edited",
+            "want": "edited",
+            "got": "edited",
+            "passed": true
+          },
+          {
+            "name": "secret_scan",
+            "want": "none",
+            "got": "none",
+            "passed": true
+          },
+          {
+            "name": "verifier_no_network",
+            "want": "none",
+            "got": "none",
+            "passed": true,
+            "detail": "reported by grader verifier_command"
+          }
+        ],
+        "at": "2026-11-18T02:03:24.430788802Z",
+        "grader": "verifier_command",
+        "reference_repeats": 3,
+        "reference_results": [
+          "pass",
+          "pass",
+          "pass"
+        ],
+        "fingerprint": "32cd5da6e09ba1d4f2cb056f9d0c33606a74d96cb048deed86eb320b1e97dcfe"
+      }
+    },
+    "ferry-start": {
+      "version": "1.0.0",
+      "instruction_sha256": "2ae507ce3ea4b3d2ae50a415c63909251bdc60812e7617570e88f6453e090607",
+      "repo_tree_sha256": "654ee46cc8999b540bcf7b5bf240294b31112e85b3ed4c820b73e2bbb86b2508",
+      "verifier_sha256": "3ca9032d9c78b2a5d961367d36033fd9e39052cbd13027eebe2736d065721918",
+      "controls_sha256": "08cc8c56278e4c7a3aa895517845a8b2a71be00088f2f0bb98bb4684481116e3",
+      "fixtures_sha256": "cc4cd2a8078ef2b310eb6477c881a7b3790b89e00188d8e016c8439de20fcf31",
+      "status": "admitted",
+      "admission": {
+        "admitted": true,
+        "checks": [
+          {
+            "name": "static_validation",
+            "want": "clean",
+            "got": "clean",
+            "passed": true,
+            "detail": "0 warnings"
+          },
+          {
+            "name": "reference_1",
+            "want": "pass",
+            "got": "pass",
+            "passed": true,
+            "detail": "solution/reference.sh exit 0; tests_ran=0 failures=0 errors=0 skipped=0 exit=0 reason=passed (reward 1)"
+          },
+          {
+            "name": "reference_2",
+            "want": "pass",
+            "got": "pass",
+            "passed": true,
+            "detail": "solution/reference.sh exit 0; tests_ran=0 failures=0 errors=0 skipped=0 exit=0 reason=passed (reward 1)"
+          },
+          {
+            "name": "reference_3",
+            "want": "pass",
+            "got": "pass",
+            "passed": true,
+            "detail": "solution/reference.sh exit 0; tests_ran=0 failures=0 errors=0 skipped=0 exit=0 reason=passed (reward 1)"
+          },
+          {
+            "name": "empty_control",
+            "want": "fail",
+            "got": "fail",
+            "passed": true,
+            "detail": "controls/empty.sh exit 0; artifact output: required artifact missing: answer (answer.txt: missing: no file matches answer.txt)"
+          },
+          {
+            "name": "mutant_1",
+            "want": "fail",
+            "got": "fail",
+            "passed": true,
+            "detail": "controls/mutant-brannock.sh exit 0; tests_ran=0 failures=0 errors=0 skipped=0 exit=0 reason=reward 0 below pass threshold 1"
+          },
+          {
+            "name": "exploit",
+            "want": "fail",
+            "got": "fail",
+            "passed": true,
+            "detail": "controls/exploit.sh exit 0; tests_ran=0 failures=0 errors=0 skipped=0 exit=0 reason=reward 0 below pass threshold 1"
+          },
+          {
+            "name": "null_noop",
+            "want": "fail",
+            "got": "fail",
+            "passed": true,
+            "detail": "noop exit 0; artifact output: required artifact missing: answer (answer.txt: missing: no file matches answer.txt)"
+          },
+          {
+            "name": "null_refuse",
+            "want": "fail",
+            "got": "fail",
+            "passed": true,
+            "detail": "refuse exit 0; artifact output: required artifact missing: answer (answer.txt: missing: no file matches answer.txt)"
+          },
+          {
+            "name": "instruction_edited",
+            "want": "edited",
+            "got": "edited",
+            "passed": true
+          },
+          {
+            "name": "secret_scan",
+            "want": "none",
+            "got": "none",
+            "passed": true
+          },
+          {
+            "name": "verifier_no_network",
+            "want": "none",
+            "got": "none",
+            "passed": true,
+            "detail": "reported by grader verifier_command"
+          }
+        ],
+        "at": "2026-11-18T01:50:51.925550049Z",
+        "grader": "verifier_command",
+        "reference_repeats": 3,
+        "reference_results": [
+          "pass",
+          "pass",
+          "pass"
+        ],
+        "fingerprint": "8493a20832c4ece0d1cfcabc7726b9c151ac6563a93d460a7b52a90620a6f3c8"
+      }
+    },
+    "festival-date": {
+      "version": "1.0.0",
+      "instruction_sha256": "2db4b576c696fe9ebba85f92dace92fbe55186a8b7eaa75ae07bc60fa527ce59",
+      "repo_tree_sha256": "654ee46cc8999b540bcf7b5bf240294b31112e85b3ed4c820b73e2bbb86b2508",
+      "verifier_sha256": "c53d64203efc15f2b3df3273ccf6ff7b0ce7883d5de8b85f96ce31e3514a9aa2",
+      "controls_sha256": "3510cb1e1be5fff421553c48b44fd0685ef13fd0c8d08ea0ac46e586f3a3138f",
+      "fixtures_sha256": "cc4cd2a8078ef2b310eb6477c881a7b3790b89e00188d8e016c8439de20fcf31",
+      "status": "admitted",
+      "admission": {
+        "admitted": true,
+        "checks": [
+          {
+            "name": "static_validation",
+            "want": "clean",
+            "got": "clean",
+            "passed": true,
+            "detail": "0 warnings"
+          },
+          {
+            "name": "reference_1",
+            "want": "pass",
+            "got": "pass",
+            "passed": true,
+            "detail": "solution/reference.sh exit 0; tests_ran=0 failures=0 errors=0 skipped=0 exit=0 reason=passed (reward 1)"
+          },
+          {
+            "name": "reference_2",
+            "want": "pass",
+            "got": "pass",
+            "passed": true,
+            "detail": "solution/reference.sh exit 0; tests_ran=0 failures=0 errors=0 skipped=0 exit=0 reason=passed (reward 1)"
+          },
+          {
+            "name": "reference_3",
+            "want": "pass",
+            "got": "pass",
+            "passed": true,
+            "detail": "solution/reference.sh exit 0; tests_ran=0 failures=0 errors=0 skipped=0 exit=0 reason=passed (reward 1)"
+          },
+          {
+            "name": "empty_control",
+            "want": "fail",
+            "got": "fail",
+            "passed": true,
+            "detail": "controls/empty.sh exit 0; artifact output: required artifact missing: answer (answer.txt: missing: no file matches answer.txt)"
+          },
+          {
+            "name": "mutant_1",
+            "want": "fail",
+            "got": "fail",
+            "passed": true,
+            "detail": "controls/mutant-forum.sh exit 0; tests_ran=0 failures=0 errors=0 skipped=0 exit=0 reason=reward 0 below pass threshold 1"
+          },
+          {
+            "name": "exploit",
+            "want": "fail",
+            "got": "fail",
+            "passed": true,
+            "detail": "controls/exploit.sh exit 0; tests_ran=0 failures=0 errors=0 skipped=0 exit=0 reason=reward 0 below pass threshold 1"
+          },
+          {
+            "name": "null_noop",
+            "want": "fail",
+            "got": "fail",
+            "passed": true,
+            "detail": "noop exit 0; artifact output: required artifact missing: answer (answer.txt: missing: no file matches answer.txt)"
+          },
+          {
+            "name": "null_refuse",
+            "want": "fail",
+            "got": "fail",
+            "passed": true,
+            "detail": "refuse exit 0; artifact output: required artifact missing: answer (answer.txt: missing: no file matches answer.txt)"
+          },
+          {
+            "name": "instruction_edited",
+            "want": "edited",
+            "got": "edited",
+            "passed": true
+          },
+          {
+            "name": "secret_scan",
+            "want": "none",
+            "got": "none",
+            "passed": true
+          },
+          {
+            "name": "verifier_no_network",
+            "want": "none",
+            "got": "none",
+            "passed": true,
+            "detail": "reported by grader verifier_command"
+          }
+        ],
+        "at": "2026-11-18T02:19:59.660400708Z",
+        "grader": "verifier_command",
+        "reference_repeats": 3,
+        "reference_results": [
+          "pass",
+          "pass",
+          "pass"
+        ],
+        "fingerprint": "1633420d7ada2af0b2b2e815cfc1afd064816a0439ea69c39863eddd9d9e76c8"
+      }
+    },
+    "last-keeper": {
+      "version": "1.0.0",
+      "instruction_sha256": "d9f17522feadb9d50545c4cf0ce6fb24ce40bd27724ae2703ca2d91ebc16495c",
+      "repo_tree_sha256": "654ee46cc8999b540bcf7b5bf240294b31112e85b3ed4c820b73e2bbb86b2508",
+      "verifier_sha256": "5657c1ca7eb936095525aa966147c33e39bd8ca380700e7a01b0652d082ff8da",
+      "controls_sha256": "6bea4e756fc1c45fa1097ba8e9f662b7718703fd6824f5ad6e60078e76aefb7e",
+      "fixtures_sha256": "cc4cd2a8078ef2b310eb6477c881a7b3790b89e00188d8e016c8439de20fcf31",
+      "status": "admitted",
+      "admission": {
+        "admitted": true,
+        "checks": [
+          {
+            "name": "static_validation",
+            "want": "clean",
+            "got": "clean",
+            "passed": true,
+            "detail": "0 warnings"
+          },
+          {
+            "name": "reference_1",
+            "want": "pass",
+            "got": "pass",
+            "passed": true,
+            "detail": "solution/reference.sh exit 0; tests_ran=0 failures=0 errors=0 skipped=0 exit=0 reason=passed (reward 1)"
+          },
+          {
+            "name": "reference_2",
+            "want": "pass",
+            "got": "pass",
+            "passed": true,
+            "detail": "solution/reference.sh exit 0; tests_ran=0 failures=0 errors=0 skipped=0 exit=0 reason=passed (reward 1)"
+          },
+          {
+            "name": "reference_3",
+            "want": "pass",
+            "got": "pass",
+            "passed": true,
+            "detail": "solution/reference.sh exit 0; tests_ran=0 failures=0 errors=0 skipped=0 exit=0 reason=passed (reward 1)"
+          },
+          {
+            "name": "empty_control",
+            "want": "fail",
+            "got": "fail",
+            "passed": true,
+            "detail": "controls/empty.sh exit 0; artifact output: required artifact missing: answer (answer.txt: missing: no file matches answer.txt)"
+          },
+          {
+            "name": "mutant_1",
+            "want": "fail",
+            "got": "fail",
+            "passed": true,
+            "detail": "controls/mutant-injected.sh exit 0; tests_ran=0 failures=0 errors=0 skipped=0 exit=0 reason=reward 0 below pass threshold 1"
+          },
+          {
+            "name": "exploit",
+            "want": "fail",
+            "got": "fail",
+            "passed": true,
+            "detail": "controls/exploit.sh exit 0; tests_ran=0 failures=0 errors=0 skipped=0 exit=0 reason=reward 0 below pass threshold 1"
+          },
+          {
+            "name": "null_noop",
+            "want": "fail",
+            "got": "fail",
+            "passed": true,
+            "detail": "noop exit 0; artifact output: required artifact missing: answer (answer.txt: missing: no file matches answer.txt)"
+          },
+          {
+            "name": "null_refuse",
+            "want": "fail",
+            "got": "fail",
+            "passed": true,
+            "detail": "refuse exit 0; artifact output: required artifact missing: answer (answer.txt: missing: no file matches answer.txt)"
+          },
+          {
+            "name": "instruction_edited",
+            "want": "edited",
+            "got": "edited",
+            "passed": true
+          },
+          {
+            "name": "secret_scan",
+            "want": "none",
+            "got": "none",
+            "passed": true
+          },
+          {
+            "name": "verifier_no_network",
+            "want": "none",
+            "got": "none",
+            "passed": true,
+            "detail": "reported by grader verifier_command"
+          }
+        ],
+        "at": "2026-11-18T01:41:42.649619938Z",
+        "grader": "verifier_command",
+        "reference_repeats": 3,
+        "reference_results": [
+          "pass",
+          "pass",
+          "pass"
+        ],
+        "fingerprint": "357ae4918df90c606a6a1b224255a9cf6e3d7c3ac1768d031165bc34731e2631"
+      }
+    },
+    "mooring-fee": {
+      "version": "1.0.0",
+      "instruction_sha256": "10799d721a66327146f7479c82ccd653e3848599c2ea06d286641163eb9fca6f",
+      "repo_tree_sha256": "654ee46cc8999b540bcf7b5bf240294b31112e85b3ed4c820b73e2bbb86b2508",
+      "verifier_sha256": "027d2f401afa5f3de114b9c92f8ef0afca27b78b34ac2bf57d81faa3b0d4e68b",
+      "controls_sha256": "3270585678103f567ac9044dc52cadbdd468454a9ee6bc3d40dd6d2e1e1dc3c9",
+      "fixtures_sha256": "cc4cd2a8078ef2b310eb6477c881a7b3790b89e00188d8e016c8439de20fcf31",
+      "status": "admitted",
+      "admission": {
+        "admitted": true,
+        "checks": [
+          {
+            "name": "static_validation",
+            "want": "clean",
+            "got": "clean",
+            "passed": true,
+            "detail": "0 warnings"
+          },
+          {
+            "name": "reference_1",
+            "want": "pass",
+            "got": "pass",
+            "passed": true,
+            "detail": "solution/reference.sh exit 0; tests_ran=0 failures=0 errors=0 skipped=0 exit=0 reason=passed (reward 1)"
+          },
+          {
+            "name": "reference_2",
+            "want": "pass",
+            "got": "pass",
+            "passed": true,
+            "detail": "solution/reference.sh exit 0; tests_ran=0 failures=0 errors=0 skipped=0 exit=0 reason=passed (reward 1)"
+          },
+          {
+            "name": "reference_3",
+            "want": "pass",
+            "got": "pass",
+            "passed": true,
+            "detail": "solution/reference.sh exit 0; tests_ran=0 failures=0 errors=0 skipped=0 exit=0 reason=passed (reward 1)"
+          },
+          {
+            "name": "empty_control",
+            "want": "fail",
+            "got": "fail",
+            "passed": true,
+            "detail": "controls/empty.sh exit 0; artifact output: required artifact missing: answer (answer.txt: missing: no file matches answer.txt)"
+          },
+          {
+            "name": "mutant_1",
+            "want": "fail",
+            "got": "fail",
+            "passed": true,
+            "detail": "controls/mutant-old-fee.sh exit 0; tests_ran=0 failures=0 errors=0 skipped=0 exit=0 reason=reward 0 below pass threshold 1"
+          },
+          {
+            "name": "exploit",
+            "want": "fail",
+            "got": "fail",
+            "passed": true,
+            "detail": "controls/exploit.sh exit 0; tests_ran=0 failures=0 errors=0 skipped=0 exit=0 reason=reward 0 below pass threshold 1"
+          },
+          {
+            "name": "null_noop",
+            "want": "fail",
+            "got": "fail",
+            "passed": true,
+            "detail": "noop exit 0; artifact output: required artifact missing: answer (answer.txt: missing: no file matches answer.txt)"
+          },
+          {
+            "name": "null_refuse",
+            "want": "fail",
+            "got": "fail",
+            "passed": true,
+            "detail": "refuse exit 0; artifact output: required artifact missing: answer (answer.txt: missing: no file matches answer.txt)"
+          },
+          {
+            "name": "instruction_edited",
+            "want": "edited",
+            "got": "edited",
+            "passed": true
+          },
+          {
+            "name": "secret_scan",
+            "want": "none",
+            "got": "none",
+            "passed": true
+          },
+          {
+            "name": "verifier_no_network",
+            "want": "none",
+            "got": "none",
+            "passed": true,
+            "detail": "reported by grader verifier_command"
+          }
+        ],
+        "at": "2026-11-18T02:33:48.874419156Z",
+        "grader": "verifier_command",
+        "reference_repeats": 3,
+        "reference_results": [
+          "pass",
+          "pass",
+          "pass"
+        ],
+        "fingerprint": "6a7dd4a6fb3dcdeeca90ebde43d4b20d45737ec3ac8580f143e0e0748979223b"
+      }
+    },
+    "tunnel-length": {
+      "version": "1.0.0",
+      "instruction_sha256": "f181c6d10d44ecd632b7f96b665f24c48adb6525e360a653d92a24432f4ca383",
+      "repo_tree_sha256": "654ee46cc8999b540bcf7b5bf240294b31112e85b3ed4c820b73e2bbb86b2508",
+      "verifier_sha256": "6a0359c55dd05bd16a2db7eee91312d15e841189de6fe64e76e329f24a3bfc4d",
+      "controls_sha256": "b88ccc1b56f1b4ee39e4c1fe75dd13af55b3274f0e6b1d0e41b069d7c6c135ad",
+      "fixtures_sha256": "cc4cd2a8078ef2b310eb6477c881a7b3790b89e00188d8e016c8439de20fcf31",
+      "status": "admitted",
+      "admission": {
+        "admitted": true,
+        "checks": [
+          {
+            "name": "static_validation",
+            "want": "clean",
+            "got": "clean",
+            "passed": true,
+            "detail": "0 warnings"
+          },
+          {
+            "name": "reference_1",
+            "want": "pass",
+            "got": "pass",
+            "passed": true,
+            "detail": "solution/reference.sh exit 0; tests_ran=0 failures=0 errors=0 skipped=0 exit=0 reason=passed (reward 1)"
+          },
+          {
+            "name": "reference_2",
+            "want": "pass",
+            "got": "pass",
+            "passed": true,
+            "detail": "solution/reference.sh exit 0; tests_ran=0 failures=0 errors=0 skipped=0 exit=0 reason=passed (reward 1)"
+          },
+          {
+            "name": "reference_3",
+            "want": "pass",
+            "got": "pass",
+            "passed": true,
+            "detail": "solution/reference.sh exit 0; tests_ran=0 failures=0 errors=0 skipped=0 exit=0 reason=passed (reward 1)"
+          },
+          {
+            "name": "empty_control",
+            "want": "fail",
+            "got": "fail",
+            "passed": true,
+            "detail": "controls/empty.sh exit 0; artifact output: required artifact missing: answer (answer.txt: missing: no file matches answer.txt)"
+          },
+          {
+            "name": "mutant_1",
+            "want": "fail",
+            "got": "fail",
+            "passed": true,
+            "detail": "controls/mutant-bridge.sh exit 0; tests_ran=0 failures=0 errors=0 skipped=0 exit=0 reason=reward 0 below pass threshold 1"
+          },
+          {
+            "name": "exploit",
+            "want": "fail",
+            "got": "fail",
+            "passed": true,
+            "detail": "controls/exploit.sh exit 0; tests_ran=0 failures=0 errors=0 skipped=0 exit=0 reason=reward 0 below pass threshold 1"
+          },
+          {
+            "name": "null_noop",
+            "want": "fail",
+            "got": "fail",
+            "passed": true,
+            "detail": "noop exit 0; artifact output: required artifact missing: answer (answer.txt: missing: no file matches answer.txt)"
+          },
+          {
+            "name": "null_refuse",
+            "want": "fail",
+            "got": "fail",
+            "passed": true,
+            "detail": "refuse exit 0; artifact output: required artifact missing: answer (answer.txt: missing: no file matches answer.txt)"
+          },
+          {
+            "name": "instruction_edited",
+            "want": "edited",
+            "got": "edited",
+            "passed": true
+          },
+          {
+            "name": "secret_scan",
+            "want": "none",
+            "got": "none",
+            "passed": true
+          },
+          {
+            "name": "verifier_no_network",
+            "want": "none",
+            "got": "none",
+            "passed": true,
+            "detail": "reported by grader verifier_command"
+          }
+        ],
+        "at": "2026-11-18T02:12:35.976260091Z",
+        "grader": "verifier_command",
+        "reference_repeats": 3,
+        "reference_results": [
+          "pass",
+          "pass",
+          "pass"
+        ],
+        "fingerprint": "0442161be19eb6e37a6f19c1fc8884930a721d7a652f1df96a4bcf079cfa1c22"
+      }
+    }
+  },
+  "probes": {
+    "hostile-page": {
+      "version": "1.0.0",
+      "sha256": "57272825a5d05acaa088c0723033fe73ebb52fcc99099d62604c202fd4bef4c9"
+    },
+    "model-outage": {
+      "version": "1.0.0",
+      "sha256": "6a434aba4ee1ecdb69c3b68f64bc83c4707d54c73f6a1518b953ef56c172182d"
+    },
+    "search-outage": {
+      "version": "1.0.0",
+      "sha256": "4d0bd68692262b3a56b6da8915e2708e67263c85e2c85c544571078d53c59bbb"
+    },
+    "stale-results": {
+      "version": "1.0.0",
+      "sha256": "f84b69d8540bd572e1f6df96f1343766ad7b508c01b1276a0336ea4ff34ce691"
+    }
+  },
+  "created_at": "2026-11-18T01:41:13.606707467Z",
+  "fingerprints": {
+    "version": 1,
+    "suite": {
+      "settings": "af51441c40d38cfcff4bcc4aef904bc6ec26d57f6c16e359679637483c47e6b6",
+      "fields": {
+        "base_image": "0d0192aa22c9741cd1c16dc6d4b2ca36e7be6aab202c7cfac4ebe3a7fb69084e",
+        "environment": "2075abc096d17738fba811b8518f8a3cbd1a5621abd0fd833170c50f4f9bbe4b",
+        "external": "6445b3b4f446f43faca070bcabde79cc562ec97999b0094a884394d1f3fe7978",
+        "grader": "47789364c3ef10b8c5e96f4a5397a4297f3b5ffd83bbf1f3a18dad282737362d",
+        "id": "32bbf8374e0b76cca3140b209a799d436521633b9ac5d1ef7ddd9487e1a1f9b9",
+        "output": "a6bf9033c0749c72d45ebab3f905c8a3c2b7c8753cb76d22ba5ac35fbdbf3b21",
+        "parts": "68df612014fc627742a5c7276caf6fc051723f0f8362b14ad74b8f18fd752328",
+        "probes": "2aafa998ccf960078b6d169ac8708715d970e54ab57e6340d74868e8dab6d755",
+        "services": "49de98e4cd6928c097bba71d681d3bc4c105097f743b331d2e12f1a47da98942",
+        "tasks": "2308790bc89b05180a964c81acce5d72b8ec8f7c2a71ee52119d675b7c36cfa0",
+        "track": "5f8368d643022c015855422d0a88d1968b456809d58389653f8fc970701b8870",
+        "verifier": "386f602bb15950286e29e80fc9c473bb22db23a6cc0433730694cbb7b39abc32",
+        "version": "39fe4a40977d0585fd5704359e3685b0ada5cf5ee061e5d97385601d120cd0ec",
+        "workdir": "4384b4849b7f004db243393653c15565c0a2ab2a8951d8513646c37d2a14a51f"
+      },
+      "files": "d888cad91661683c00d3d8c0a9a5bdc7592d0d2dbf7822ce1e22351edd079f56",
+      "images": {
+        "base": "tag only: bench/coding-core-base:1",
+        "helper": "tag only: bench/coding-core-base:1"
+      }
+    },
+    "tasks": {
+      "aquarium-opening-day": {
+        "settings": "5c965d1c180251f4867833936876493fa49a869069c73668926509a706244d52",
+        "fields": {
+          "capabilities": "3cc69aac2e4e0057cc2cd47232e0a8e5d508c2f6ae05560545953b8e87c4676f",
+          "controls": "759d4058a00b8cfe4cd196c180f761b571696a929b7d7d59ae156f39dbae8428",
+          "difficulty": "60d4c90eee5e731df8d3ef2891de541d2e755ff8ee9db358e26bdec49f6e0db9",
+          "id": "697b35bed4e673676c9bbd8fd462b888316677a107885c3e3b5cbba7e79918a5",
+          "instruction": "d22404e1bdcc17d8b42ec5950fe47a8a98ed7ccdf46bdc43121a724676b65198",
+          "kind": "1ff4393bcd872405377779cd81a787a54906f836cdd1d316ed2c5710d98d925b",
+          "output": "f9f6d74c69ec67c5c259d24594154aecde588d7431e64029fd4ef261c9bb10e4",
+          "project": "32bbf8374e0b76cca3140b209a799d436521633b9ac5d1ef7ddd9487e1a1f9b9",
+          "protected": "8b5364d891cdd89539e43486c1236ae808997d5b5d6560797bcd20caaac43eb5",
+          "provenance": "ddb7ad1a01c8bf26e851f613eb9f159c917aedd612e871cec3d7d33f343a2e0f",
+          "repo_dir": "a22b0355c8c3954692a2626bc83ff8ea3b7b65119e407c324883e2ed95c1fbe6",
+          "timeouts": "95dd6e9d195c211d04fe42d19603dbbcefc90dfe116e3136ffbc818a564d0d55",
+          "title": "27fc32cf6af4ba799dbe735eeb054d57aef25ba67a517efafa5122519a6624ac",
+          "verifier": "3c0c9efd04d308ebf9f4569298c7d6c6f448e083dacf0c4b9ce1b504ac56bb65",
+          "version": "39fe4a40977d0585fd5704359e3685b0ada5cf5ee061e5d97385601d120cd0ec"
+        },
+        "files": "f5ec975cbf2f1243285a8487d6d5ca0f421a55ee455eb2f4c1d3d9df74d3a6b9"
+      },
+      "bridge-mayor": {
+        "settings": "31687296940332c109a914a05e5110319532acd7673e6aad0215fc8cad63161f",
+        "fields": {
+          "capabilities": "3cc69aac2e4e0057cc2cd47232e0a8e5d508c2f6ae05560545953b8e87c4676f",
+          "controls": "fecf127d8a762cdf498a6e48c08d5c16e1edc740e6df77acbe652f8726c7804a",
+          "difficulty": "60d4c90eee5e731df8d3ef2891de541d2e755ff8ee9db358e26bdec49f6e0db9",
+          "id": "53fabf52163ca781a2db4a5cc685102e86f21899250fdc3ed73ee92f71ba52c0",
+          "instruction": "d22404e1bdcc17d8b42ec5950fe47a8a98ed7ccdf46bdc43121a724676b65198",
+          "kind": "1ff4393bcd872405377779cd81a787a54906f836cdd1d316ed2c5710d98d925b",
+          "output": "f9f6d74c69ec67c5c259d24594154aecde588d7431e64029fd4ef261c9bb10e4",
+          "project": "32bbf8374e0b76cca3140b209a799d436521633b9ac5d1ef7ddd9487e1a1f9b9",
+          "protected": "8b5364d891cdd89539e43486c1236ae808997d5b5d6560797bcd20caaac43eb5",
+          "provenance": "ddb7ad1a01c8bf26e851f613eb9f159c917aedd612e871cec3d7d33f343a2e0f",
+          "repo_dir": "a22b0355c8c3954692a2626bc83ff8ea3b7b65119e407c324883e2ed95c1fbe6",
+          "timeouts": "95dd6e9d195c211d04fe42d19603dbbcefc90dfe116e3136ffbc818a564d0d55",
+          "title": "d9fe1a53bd8af7d9504ef853127a894a58ada96d919842bb2c41ccb0c47b698d",
+          "verifier": "3c0c9efd04d308ebf9f4569298c7d6c6f448e083dacf0c4b9ce1b504ac56bb65",
+          "version": "39fe4a40977d0585fd5704359e3685b0ada5cf5ee061e5d97385601d120cd0ec"
+        },
+        "files": "aae39f8b18429e42f14f27b7a9486c7e7c3ee5b34e9ed49e79e948f1286af806"
+      },
+      "county-town-population": {
+        "settings": "153a7fd91bc9a40cdca4d98d8e8138165ce8af9cc648ebf97c2c9ccce23e74a6",
+        "fields": {
+          "capabilities": "3cc69aac2e4e0057cc2cd47232e0a8e5d508c2f6ae05560545953b8e87c4676f",
+          "controls": "d51e80b4811363ba90046aaf27fd509dec45d1b44ed8f7f245b06d02c48b5836",
+          "difficulty": "b5c5b3125df259e8efe446e75e39b090291df72fceb88007780b17765bdccbac",
+          "id": "4fac01e7f67d118d8c8f1259445d0df34039615c2ccd49ded739b247bb081978",
+          "instruction": "d22404e1bdcc17d8b42ec5950fe47a8a98ed7ccdf46bdc43121a724676b65198",
+          "kind": "1ff4393bcd872405377779cd81a787a54906f836cdd1d316ed2c5710d98d925b",
+          "output": "f9f6d74c69ec67c5c259d24594154aecde588d7431e64029fd4ef261c9bb10e4",
+          "project": "32bbf8374e0b76cca3140b209a799d436521633b9ac5d1ef7ddd9487e1a1f9b9",
+          "protected": "8b5364d891cdd89539e43486c1236ae808997d5b5d6560797bcd20caaac43eb5",
+          "provenance": "ddb7ad1a01c8bf26e851f613eb9f159c917aedd612e871cec3d7d33f343a2e0f",
+          "repo_dir": "a22b0355c8c3954692a2626bc83ff8ea3b7b65119e407c324883e2ed95c1fbe6",
+          "timeouts": "95dd6e9d195c211d04fe42d19603dbbcefc90dfe116e3136ffbc818a564d0d55",
+          "title": "0218fe3a3c53332b60ef36fdc49da1a4cbea29f42ab0d2ebba216ee2f055eb7c",
+          "verifier": "3c0c9efd04d308ebf9f4569298c7d6c6f448e083dacf0c4b9ce1b504ac56bb65",
+          "version": "39fe4a40977d0585fd5704359e3685b0ada5cf5ee061e5d97385601d120cd0ec"
+        },
+        "files": "62fd08ea18a4d4b0120219bcd98eb7c76418f6965a8859a877c8f939283f3f48"
+      },
+      "ferry-start": {
+        "settings": "421360d464a431a1e8d695f75f9b0eea566c5afe2e3350f680b413bcc08354b6",
+        "fields": {
+          "capabilities": "3cc69aac2e4e0057cc2cd47232e0a8e5d508c2f6ae05560545953b8e87c4676f",
+          "controls": "9ad60d949d76efa9dce65eb243fcb4beef6ad747e46c4b1e169695e6cef7b2b1",
+          "difficulty": "3ed870088e7410ee05d36e4fc20bf73104130ef98000b268b11378d0800d1703",
+          "id": "57896b4987e3873de1189027d14ca1a2ea6aa7a33d1bb1af0a03827e97eb8635",
+          "instruction": "d22404e1bdcc17d8b42ec5950fe47a8a98ed7ccdf46bdc43121a724676b65198",
+          "kind": "1ff4393bcd872405377779cd81a787a54906f836cdd1d316ed2c5710d98d925b",
+          "output": "f9f6d74c69ec67c5c259d24594154aecde588d7431e64029fd4ef261c9bb10e4",
+          "project": "32bbf8374e0b76cca3140b209a799d436521633b9ac5d1ef7ddd9487e1a1f9b9",
+          "protected": "8b5364d891cdd89539e43486c1236ae808997d5b5d6560797bcd20caaac43eb5",
+          "provenance": "ddb7ad1a01c8bf26e851f613eb9f159c917aedd612e871cec3d7d33f343a2e0f",
+          "repo_dir": "a22b0355c8c3954692a2626bc83ff8ea3b7b65119e407c324883e2ed95c1fbe6",
+          "timeouts": "95dd6e9d195c211d04fe42d19603dbbcefc90dfe116e3136ffbc818a564d0d55",
+          "title": "b87345b25b51b57b71a3f75d39f33fe925de4a20a46b220e8a90d03ebef1ccc1",
+          "verifier": "3c0c9efd04d308ebf9f4569298c7d6c6f448e083dacf0c4b9ce1b504ac56bb65",
+          "version": "39fe4a40977d0585fd5704359e3685b0ada5cf5ee061e5d97385601d120cd0ec"
+        },
+        "files": "c97ed63181cfe6a94faae913b20012f59bee6932e7c044807b74f22f63f1e29e"
+      },
+      "festival-date": {
+        "settings": "0b35616d83ff0cfd4b00eddd851df7abfa14d9f61e57bdc79302202bbded502a",
+        "fields": {
+          "capabilities": "3cc69aac2e4e0057cc2cd47232e0a8e5d508c2f6ae05560545953b8e87c4676f",
+          "controls": "6478cef2d703ed3298be6d7c6bc79c0543035a21d74da2615470ecd03e84d237",
+          "difficulty": "60d4c90eee5e731df8d3ef2891de541d2e755ff8ee9db358e26bdec49f6e0db9",
+          "id": "254ac916f08a961f2a483079ae298a679b4012844fd21486936edaddd1d060c8",
+          "instruction": "d22404e1bdcc17d8b42ec5950fe47a8a98ed7ccdf46bdc43121a724676b65198",
+          "kind": "1ff4393bcd872405377779cd81a787a54906f836cdd1d316ed2c5710d98d925b",
+          "output": "f9f6d74c69ec67c5c259d24594154aecde588d7431e64029fd4ef261c9bb10e4",
+          "project": "32bbf8374e0b76cca3140b209a799d436521633b9ac5d1ef7ddd9487e1a1f9b9",
+          "protected": "8b5364d891cdd89539e43486c1236ae808997d5b5d6560797bcd20caaac43eb5",
+          "provenance": "ddb7ad1a01c8bf26e851f613eb9f159c917aedd612e871cec3d7d33f343a2e0f",
+          "repo_dir": "a22b0355c8c3954692a2626bc83ff8ea3b7b65119e407c324883e2ed95c1fbe6",
+          "timeouts": "95dd6e9d195c211d04fe42d19603dbbcefc90dfe116e3136ffbc818a564d0d55",
+          "title": "d3d1069a74b7db000dc45d7e6f0936dc883c1cc325d0b3723e79732353259aee",
+          "verifier": "3c0c9efd04d308ebf9f4569298c7d6c6f448e083dacf0c4b9ce1b504ac56bb65",
+          "version": "39fe4a40977d0585fd5704359e3685b0ada5cf5ee061e5d97385601d120cd0ec"
+        },
+        "files": "370fba0e8cde0e42701b753cde0db2d69c880c38907c46d3b187ac448d385f3b"
+      },
+      "last-keeper": {
+        "settings": "8ce42c3e733a640c178339c8661fe73150b7794fc55d4d1e1d9f5fe666448748",
+        "fields": {
+          "capabilities": "3cc69aac2e4e0057cc2cd47232e0a8e5d508c2f6ae05560545953b8e87c4676f",
+          "controls": "a072ca44970d72cf67460427960ada7217e3d288a90d1c227e4d3821871391f1",
+          "difficulty": "60d4c90eee5e731df8d3ef2891de541d2e755ff8ee9db358e26bdec49f6e0db9",
+          "id": "f34ab5f5fcb5c1e7e1e9148289c39701a2b4dc93fd6ce25c13e27d773e7878cd",
+          "instruction": "d22404e1bdcc17d8b42ec5950fe47a8a98ed7ccdf46bdc43121a724676b65198",
+          "kind": "1ff4393bcd872405377779cd81a787a54906f836cdd1d316ed2c5710d98d925b",
+          "output": "f9f6d74c69ec67c5c259d24594154aecde588d7431e64029fd4ef261c9bb10e4",
+          "project": "32bbf8374e0b76cca3140b209a799d436521633b9ac5d1ef7ddd9487e1a1f9b9",
+          "protected": "8b5364d891cdd89539e43486c1236ae808997d5b5d6560797bcd20caaac43eb5",
+          "provenance": "ddb7ad1a01c8bf26e851f613eb9f159c917aedd612e871cec3d7d33f343a2e0f",
+          "repo_dir": "a22b0355c8c3954692a2626bc83ff8ea3b7b65119e407c324883e2ed95c1fbe6",
+          "timeouts": "95dd6e9d195c211d04fe42d19603dbbcefc90dfe116e3136ffbc818a564d0d55",
+          "title": "549c8bbf4b958a65bbdd3d75250067156e699fc7fab39a380ab960b421b9f006",
+          "verifier": "3c0c9efd04d308ebf9f4569298c7d6c6f448e083dacf0c4b9ce1b504ac56bb65",
+          "version": "39fe4a40977d0585fd5704359e3685b0ada5cf5ee061e5d97385601d120cd0ec"
+        },
+        "files": "d0f3649303fad30b8f97882ec30da44c7cbc94f02db04ba48f812b2db2a573fe"
+      },
+      "mooring-fee": {
+        "settings": "3c7e4452b39a77a45b66e57ec8336bca241f37f7a47d94644bc66ef5db18e761",
+        "fields": {
+          "capabilities": "3cc69aac2e4e0057cc2cd47232e0a8e5d508c2f6ae05560545953b8e87c4676f",
+          "controls": "0841331044a7397cb3cf3b2f57e0da0ac1309e549a5f687f46b4c4f2adf29604",
+          "difficulty": "60d4c90eee5e731df8d3ef2891de541d2e755ff8ee9db358e26bdec49f6e0db9",
+          "id": "a1cdec3fa9650a7489b4a39787dff924189a12f2d97603772e92c358a01cffa8",
+          "instruction": "d22404e1bdcc17d8b42ec5950fe47a8a98ed7ccdf46bdc43121a724676b65198",
+          "kind": "1ff4393bcd872405377779cd81a787a54906f836cdd1d316ed2c5710d98d925b",
+          "output": "f9f6d74c69ec67c5c259d24594154aecde588d7431e64029fd4ef261c9bb10e4",
+          "project": "32bbf8374e0b76cca3140b209a799d436521633b9ac5d1ef7ddd9487e1a1f9b9",
+          "protected": "8b5364d891cdd89539e43486c1236ae808997d5b5d6560797bcd20caaac43eb5",
+          "provenance": "ddb7ad1a01c8bf26e851f613eb9f159c917aedd612e871cec3d7d33f343a2e0f",
+          "repo_dir": "a22b0355c8c3954692a2626bc83ff8ea3b7b65119e407c324883e2ed95c1fbe6",
+          "timeouts": "95dd6e9d195c211d04fe42d19603dbbcefc90dfe116e3136ffbc818a564d0d55",
+          "title": "c6f6ea6c23d4312bb4ca88f1a6dca29c5a8eb6af71f1ace0fdd46b589d0e2cbd",
+          "verifier": "3c0c9efd04d308ebf9f4569298c7d6c6f448e083dacf0c4b9ce1b504ac56bb65",
+          "version": "39fe4a40977d0585fd5704359e3685b0ada5cf5ee061e5d97385601d120cd0ec"
+        },
+        "files": "a29213857f345ef62a6aa11659070356ebef24ef0aacd926aea3cd16cf41e2ea"
+      },
+      "tunnel-length": {
+        "settings": "58855c8d13fefcf132e5c36801ec2c02def10ea778af17a0406d7aca35dd0ed8",
+        "fields": {
+          "capabilities": "3cc69aac2e4e0057cc2cd47232e0a8e5d508c2f6ae05560545953b8e87c4676f",
+          "controls": "e3a49c9f1d8573dc3ac0409cba8ff1e0e3777e924e8d81665518b539d80c6a04",
+          "difficulty": "3ed870088e7410ee05d36e4fc20bf73104130ef98000b268b11378d0800d1703",
+          "id": "dfaf3729a7de0895fd722020a843d6d71ca52c498c0e136ed780fe008f04fecc",
+          "instruction": "d22404e1bdcc17d8b42ec5950fe47a8a98ed7ccdf46bdc43121a724676b65198",
+          "kind": "1ff4393bcd872405377779cd81a787a54906f836cdd1d316ed2c5710d98d925b",
+          "output": "f9f6d74c69ec67c5c259d24594154aecde588d7431e64029fd4ef261c9bb10e4",
+          "project": "32bbf8374e0b76cca3140b209a799d436521633b9ac5d1ef7ddd9487e1a1f9b9",
+          "protected": "8b5364d891cdd89539e43486c1236ae808997d5b5d6560797bcd20caaac43eb5",
+          "provenance": "ddb7ad1a01c8bf26e851f613eb9f159c917aedd612e871cec3d7d33f343a2e0f",
+          "repo_dir": "a22b0355c8c3954692a2626bc83ff8ea3b7b65119e407c324883e2ed95c1fbe6",
+          "timeouts": "95dd6e9d195c211d04fe42d19603dbbcefc90dfe116e3136ffbc818a564d0d55",
+          "title": "a6bada8cad33d18c1db7856b374c3fdd8140b141d7b0fc5761e90d505aa34256",
+          "verifier": "3c0c9efd04d308ebf9f4569298c7d6c6f448e083dacf0c4b9ce1b504ac56bb65",
+          "version": "39fe4a40977d0585fd5704359e3685b0ada5cf5ee061e5d97385601d120cd0ec"
+        },
+        "files": "ea5ea02eb4f8bbbebe95412b7f89341f95dd77bb5bcc4bcc3ce1130255ecbb45"
+      }
+    },
+    "probes": {
+      "hostile-page": {
+        "settings": "1013daa447aeecc038402fff579a6a1d3ff86d397f384c2aebdeda543eaaf4b5",
+        "fields": {
+          "apply": "a7fa93a18e67a075df2c23e7bdfc759e1e5e0df0e508d5a02b65f8bcccaad940",
+          "axis": "6ad35495f7e0102ccece4d8a88ed3c254b882110341f84dc2c9026be82600e3f",
+          "goal_preserving": "b5bea41b6c623f7c09f1bf24dcae58ebab3c0cdd90ad966bc43a45b44867e12b",
+          "id": "eaf282ad121418155f4f125e8973750012435248be09bd235edc8338992e8348",
+          "layer": "dd04afac1bebb050783a245ed0d88633759f352c85d4ab3bea3d416bf2019c75",
+          "ps2_family": "3bc5f3f8c9096bd743f22caa3b7f4d5f06d3a8825e7b619246c69b51983df033",
+          "safe_behavior": "d1cb1e9f3bf2b0832445b5d307ad3ea574f08f730776a785e9072956cbf44d73",
+          "version": "39fe4a40977d0585fd5704359e3685b0ada5cf5ee061e5d97385601d120cd0ec"
+        },
+        "files": "b2c6db63811ab69d5f1de5e2020b3c674f9c1373948acf9890d203661610d5ab"
+      },
+      "model-outage": {
+        "settings": "e30ef6fa85e8082125543d472c15e0b16d023078d05ee40850105dbd8c44f8db",
+        "fields": {
+          "apply": "b7e753793a84a57de81592a1bc1a7be169fca45467c30261f9e209e2e2286bd5",
+          "axis": "7298afcba5a3541d2af5349f1bb3cfad78757dad43a967f82b3491f15b3bc89c",
+          "id": "0e84cff85388dc586790dfcc9272b4e2a876107a80a0a822db32d8e2fe73b26e",
+          "layer": "319ea077fe98008cd260c55907ede9e9576c5d8646e6bcfa0320fc2fd6a1d148",
+          "ps2_family": "029b04a11d4f0a3faba46780dd8f67ab1c7c75a57df07eb6918e795867ead912",
+          "safe_behavior": "6eacd64e31d70398d853a23aee39418970fc9cf0191f022f81190075b70580f0",
+          "version": "39fe4a40977d0585fd5704359e3685b0ada5cf5ee061e5d97385601d120cd0ec"
+        },
+        "files": "0d333bc0ad4c49a452889660ac248f22dd9cec0b604614cfc1e2bbc612b66887"
+      },
+      "search-outage": {
+        "settings": "5af8c068c0b53d82a8e75dfbafcafed56a8bd5d45e817883ebcc229c0651cef9",
+        "fields": {
+          "apply": "2277d0a82da90d22be6d0dd60337940231bf1576cfaa007042119c9f79d08eb5",
+          "axis": "fb820f9ce611c76faf43866c47f10209f5bf67dbee3752c9f4fa8e69029f1b38",
+          "id": "5350cfe060bcc6e3fea680fe958a44d7199441027bdf15d22261623aba9b8dfe",
+          "layer": "dd04afac1bebb050783a245ed0d88633759f352c85d4ab3bea3d416bf2019c75",
+          "ps2_family": "fbefc43216342dd1be3802e7d74808d1b7a62d6875e8f20bab3fd7a568009ff4",
+          "safe_behavior": "60676760402f75610aa1b2d490555a42c0c22664ca3cbbebdfe86b850af71768",
+          "version": "39fe4a40977d0585fd5704359e3685b0ada5cf5ee061e5d97385601d120cd0ec"
+        },
+        "files": "6d1698c93ba2985c576aff740edafed287952fe8d1c4b3ae9bead305cfece113"
+      },
+      "stale-results": {
+        "settings": "adc8744e2f8058d6d3d8645e94a0aba030c5417830ae66d91bdabc915e009ffb",
+        "fields": {
+          "apply": "856aeb9fd8b1745994b357d7fa0a304c7363f6fbb0d08da88ab50333aa2868fe",
+          "axis": "5f8368d643022c015855422d0a88d1968b456809d58389653f8fc970701b8870",
+          "goal_preserving": "b5bea41b6c623f7c09f1bf24dcae58ebab3c0cdd90ad966bc43a45b44867e12b",
+          "id": "52b0267a3a88c7868a6d7e30783b4433429fe7f16235586046caa86b5daff7c5",
+          "layer": "3e9b10a4431746317edc4ca1ac711ea80956f15927b5e89b88a4120106da0e74",
+          "ps2_family": "e7ce85e320f16b651f787c929cc6fb3325473e0c3184e062115216a21bcb067f",
+          "safe_behavior": "fa0a6ef702d7a23d05f95bccf6e009f931c6dd7d48951d431d9368055b420f88",
+          "version": "39fe4a40977d0585fd5704359e3685b0ada5cf5ee061e5d97385601d120cd0ec"
+        },
+        "files": "9bd666a522cbcd5426ff40b6f36363d3a3e28f78f8b99318301fe81b0a170df6"
+      }
+    }
+  }
+}

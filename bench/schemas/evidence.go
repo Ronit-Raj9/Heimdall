@@ -137,6 +137,8 @@ type Grade struct {
 	Judged   bool         `json:"judged,omitempty"`
 	Judge    *JudgeRecord `json:"judge,omitempty"`
 	Category string       `json:"category,omitempty"`
+
+	Visual *VisualGrade `json:"visual,omitempty"` // X1 vision grading: captures, per-check numbers, judge report (visual.go)
 }
 
 // Grader decides the outcome from the exported diff, never from the agent's

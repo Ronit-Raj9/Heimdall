@@ -126,7 +126,20 @@ func Fingerprints(s *schemas.Suite, opts FingerprintOptions) (*schemas.LockFinge
 		}
 		f.Probes[p.ID] = fp
 	}
+	f.Calibration = calibrationSetHash(s.Root) // W8 judge calibration: only when the suite has labels (docs/judge-calibration.md)
 	return f, nil
+}
+
+// calibrationSetHash is the sha256 of the suite's calibration labels
+// (calibration/labels.jsonl), "" when it has none, so a suite without a
+// calibration set fingerprints as before. Records and snapshots beside the
+// labels are left out: writing a record never makes a lock drift.
+func calibrationSetHash(root string) string {
+	sum, err := utils.SHA256File(filepath.Join(root, "calibration", "labels.jsonl"))
+	if err != nil {
+		return ""
+	}
+	return sum
 }
 
 // CheckFingerprints recomputes the fingerprints of s and compares them with
@@ -175,6 +188,9 @@ func CheckFingerprints(s *schemas.Suite, opts FingerprintOptions) ([]schemas.Fin
 	for _, p := range s.Probes {
 		w, ok := want.Probes[p.ID]
 		cmp(ScopeProbe, p.ID, w, got.Probes[p.ID], ok)
+	}
+	if want.Calibration != got.Calibration { // W8 judge calibration: labels changed since the lock; a warning, never drift
+		warns = append(warns, "calibration labels changed since the lock: run `suite lock` to bind the current set")
 	}
 	return drift, warns, nil
 }
@@ -406,7 +422,8 @@ func expandSuiteRoot(root string, rels []string) ([]string, error) {
 			name := e.Name()
 			switch {
 			case name == LockFile, name == schemas.SuiteHealthFileName, name == tasksDir, name == probesDir,
-				name == "runs", name == "checks", strings.HasPrefix(name, ".suite."):
+				name == "runs", name == "checks", strings.HasPrefix(name, ".suite."),
+				name == "calibration": // W8 judge calibration: hashed apart (calibrationSetHash)
 				continue
 			}
 			out = append(out, name)

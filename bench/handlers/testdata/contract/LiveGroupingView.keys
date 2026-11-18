@@ -1,0 +1,6 @@
+# livescore.GroupingView (X6 live scoring, docs/live-scoring.md); ? marks an omitempty key
+by_session_id
+by_gap
+concurrent
+gap_seconds
+reliability

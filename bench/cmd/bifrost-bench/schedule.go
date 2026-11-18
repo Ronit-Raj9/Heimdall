@@ -183,7 +183,11 @@ func scheduleList(args []string, out io.Writer) int {
 		if r.MaxUSDPerDay > 0 {
 			capText = fmt.Sprintf("%.2f / %.2f", r.SpentTodayUSD, r.MaxUSDPerDay)
 		}
-		fmt.Fprintf(tw, "%s\t%s\t%s\t%s\t%s\t%s\n", r.Name, r.Cron, r.Next, r.Experiment, capText, r.Last)
+		exp := r.Experiment
+		if r.Job != "" {
+			exp, capText = "job "+r.Job, "none (job)" // built-in jobs spend nothing
+		}
+		fmt.Fprintf(tw, "%s\t%s\t%s\t%s\t%s\t%s\n", r.Name, r.Cron, r.Next, exp, capText, r.Last)
 	}
 	if err := tw.Flush(); err != nil {
 		return fail("%v", err)
@@ -351,7 +355,12 @@ func newScheduleDaemon(a *app, path string) (*schedule.Daemon, error) {
 	if err != nil {
 		return nil, err
 	}
-	if err := file.Validate(a.cfg.Root, loadExperiment); err != nil {
+	addInboxSchedule(a, file) // Failure inbox area: inbox/sources.yaml schedule: becomes an inbox-pull job (inbox.go)
+	// W5 drift canary: canaries/*.yaml with a schedule run as canary-<name>;
+	// loadScheduled reads canary files too (canary.go).
+	addCanarySchedules(a, file)
+	addLivescoreSchedule(a, file) // X6 live scoring: livescore/config.yaml schedule: becomes a livescore-pull job (livescore.go)
+	if err := file.Validate(a.cfg.Root, loadScheduled); err != nil {
 		return nil, fmt.Errorf("schedules %s: %w", path, err)
 	}
 	for _, c := range a.cfg.Alerts {
@@ -365,7 +374,7 @@ func newScheduleDaemon(a *app, path string) (*schedule.Daemon, error) {
 		StateDir:    state,
 		Runner:      scheduleRunner{a: a},
 		Notifier:    alerts.NewSender(filepath.Join(state, schedule.DeliveriesFile)),
-		Load:        loadExperiment,
+		Load:        loadScheduled, // W5 drift canary: a canary file's caps (canary.go)
 		Logger:      a.logger,
 		ExtraAlerts: a.cfg.Alerts,
 	})
@@ -407,6 +416,15 @@ type scheduleRunner struct {
 // Run implements schedule.Runner. After the freeze a failure still returns
 // the Result with the spend so far, so the daily cap counts it.
 func (r scheduleRunner) Run(ctx context.Context, s schedule.Schedule) (*schedule.Result, error) {
+	if s.Job == schedule.JobLivescorePull {
+		return runLivescoreSchedule(ctx, r.a, s) // X6 live scoring (livescore.go)
+	}
+	if s.Job != "" {
+		return runScheduleJob(ctx, r.a, s) // built-in jobs, e.g. the failure inbox's inbox-pull (inbox.go)
+	}
+	if isCanarySchedule(r.a, s) {
+		return runCanarySchedule(ctx, r.a, s) // W5 drift canary: a canary look and its confirmation (canary.go)
+	}
 	a := r.a
 	exp, err := loadExperiment(schedule.Resolve(a.cfg.Root, s.Experiment))
 	if err != nil {

@@ -329,6 +329,93 @@ export interface Grade {
 	judge?: JudgeRecord;
 	/** The task's answer category, for breakdowns. */
 	category?: string;
+	/** X1 vision grading: captures, per-check numbers and the vision judge's report (schemas/visual.go). */
+	visual?: VisualGrade;
+}
+
+// X1 vision grading (schemas/visual.go, docs/visual-grading.md). Key lists:
+// handlers/testdata/contract/Visual*.keys. X1 block ends after VisualJudgeResult.
+
+/** A rectangle in image pixels; x and y are its top-left corner. */
+export interface VisualRect {
+	x: number;
+	y: number;
+	w: number;
+	h: number;
+}
+
+/** One image of a visual grade in the run folder (visual/capture.png, reference.png, diff.png). */
+export interface VisualImage {
+	path: string;
+	sha256: string;
+	bytes: number;
+	width: number;
+	height: number;
+}
+
+/** How the bench took the capture. */
+export interface VisualSource {
+	kind: "browser" | "desktop" | "artifact" | string;
+	service?: string;
+	url?: string;
+	artifact?: string;
+	renderer?: string;
+	width?: number;
+	height?: number;
+	scale?: number;
+	full_page?: boolean;
+	fonts_sha256?: string;
+	format: string;
+	pointer_parked?: boolean;
+}
+
+/** One deterministic check's number; what value means follows the method. */
+export interface VisualCheckResult {
+	id: string;
+	method: string;
+	value: number;
+	threshold: number;
+	passed: boolean;
+	detail?: string;
+	area?: VisualRect;
+	found?: { x: number; y: number };
+}
+
+/** The vision judge's report. It decides only with a calibration record for its model and prompt. */
+export interface VisualJudgeResult {
+	model: string;
+	served_model?: string;
+	prompt_version: string;
+	prompt_sha256: string;
+	rubric_sha256: string;
+	aggregate: string;
+	/** pass, fail or unparsable per sample. */
+	votes: string[];
+	scores: number[] | null;
+	score?: number;
+	/** pass, fail or undecided. */
+	verdict: string;
+	/** The judge model's own words: untrusted text, shown clipped. */
+	rationale?: string;
+	usd: Value;
+	price_ref?: string;
+	calibration?: string;
+	decides: boolean;
+	reason?: string;
+	agreement?: CalibrationStats;
+}
+
+/** What a visual grade rested on (Grade.visual). */
+export interface VisualGrade {
+	capture: VisualImage;
+	source: VisualSource;
+	reference?: VisualImage;
+	diff?: VisualImage;
+	masks?: VisualRect[];
+	checks?: VisualCheckResult[];
+	passed: number;
+	score?: number;
+	judge?: VisualJudgeResult;
 }
 
 /** What one judged grade rested on (schemas.JudgeRecord). The judge's cost is never the agent's. */
@@ -985,6 +1072,8 @@ export interface VerdictPayload {
 	reviewed_runs?: number;
 	/** Of reviewed_runs, those whose outcome differs from the sealed one. */
 	review_changed_runs?: number;
+	/** W8 judge calibration: the judge_calibration instrument of a judged experiment; absent otherwise. */
+	judge_calibration?: JudgeCalibrationVerdict;
 }
 
 // ---------------------------------------------------------------------------------------------
@@ -1717,7 +1806,7 @@ export type ReviewDecision = "pass" | "fail" | "invalid" | "flag_only";
 export const REVIEW_DECISIONS: readonly ReviewDecision[] = ["pass", "fail", "invalid", "flag_only"];
 
 /** Why a run is in the review queue. */
-export type ReviewReason = "split_votes" | "unparsable_votes" | "invalid_evaluator" | "veto" | "false_completion" | "flagged";
+export type ReviewReason = "split_votes" | "unparsable_votes" | "invalid_evaluator" | "veto" | "false_completion" | "flagged" | "contested"; // W8 judge calibration: contested
 
 /** Every queue reason, in display order (schemas.ReviewReasons). */
 export const REVIEW_REASONS: readonly ReviewReason[] = [
@@ -1727,6 +1816,7 @@ export const REVIEW_REASONS: readonly ReviewReason[] = [
 	"veto",
 	"false_completion",
 	"flagged",
+	"contested", // W8 judge calibration
 ];
 
 /** One review record (schemas.Review): <exp>/reviews/<review_id>/review.json. */
@@ -1974,6 +2064,8 @@ export interface TaskProvenance {
 	imported_from?: string;
 	/** Tool that scaffolded it, for example "task init". */
 	created_by?: string;
+	/** First workflow: false while a tool-drafted instruction (tasks mine) awaits human review; `task review` sets true. */
+	instruction_reviewed?: boolean;
 }
 
 /** A suite's base image: the toolchain every task and verifier runs on. */
@@ -2327,6 +2419,10 @@ export interface AgentGateway {
 	provider: string;
 	max_retries: number;
 	fallbacks?: string[];
+	/** W9 routing policy under test; absent for the fixed single-model key. */
+	routing?: RoutingPolicy;
+	/** X8 voice agents: more models of the same provider the run's key may call (speech to text, text to speech). */
+	models?: string[];
 }
 
 /** One agents/*.yaml config. Env values and delivered file contents are never served. */
@@ -2383,7 +2479,8 @@ export type Track =
 	| "qa"
 	| "browser"
 	| "computer_use"
-	| "artifact";
+	| "artifact"
+	| "support"; // W3 customer support
 
 /** The tracks in display order. */
 export const TRACKS: readonly Track[] = [
@@ -2398,6 +2495,7 @@ export const TRACKS: readonly Track[] = [
 	"browser",
 	"computer_use",
 	"artifact",
+	"support", // W3 customer support
 ];
 
 /** verified: a deterministic check. judged: a pinned judge model decides; never compared with verified. */
@@ -3663,3 +3761,1402 @@ export type AuditListResponse = WithMode<AuditList>;
 export type JobListResponse = WithMode<JobList>;
 export type JobResponse = WithMode<Job>;
 export type JobLogsResponse = WithMode<JobLogs>;
+
+// ---------------------------------------------------------------------------------------------
+// Failure inbox area (handlers/inbox.go, traceinbox, docs/failure-inbox.md): production failures
+// pulled from trace sources, grouped by signature, and turned into draft regression tasks.
+// GET /inbox, GET /inbox/{id}, POST /inbox/{id}/accept|reject|snooze, POST /inbox/ingest.
+// Key lists: handlers/testdata/contract/Inbox*.keys. Failure inbox area ends at the end of this block.
+// ---------------------------------------------------------------------------------------------
+
+/** Where an inbox item stands. */
+export type InboxState = "new" | "accepted" | "rejected" | "duplicate" | "snoozed";
+export const INBOX_STATES = ["new", "accepted", "rejected", "duplicate", "snoozed"] as const satisfies readonly InboxState[];
+
+/** The task template an accepted item is drafted from. */
+export type InboxTaskKind = "qa" | "tool-use" | "mcp" | "memory";
+export const INBOX_TASK_KINDS = ["qa", "tool-use", "mcp", "memory"] as const satisfies readonly InboxTaskKind[];
+
+/** How the traced request ended. */
+export type InboxOutcome = "error" | "ok" | "unknown";
+
+/** Whether the regression task drafted from an item passes in its newest experiment. */
+export type InboxReleaseState = "passes" | "fails" | "not_run";
+
+/** The parts the item signature is hashed from. Text is normalised: numbers read <n>. */
+export interface InboxSignatureParts {
+	request: string;
+	tool?: string;
+	error?: string;
+}
+
+/** One trace that matched the item's signature. */
+export interface InboxTraceRef {
+	id: string;
+	source: string;
+	at: string;
+	/** The trace in its source's own UI. */
+	link?: string;
+}
+
+/** The draft task an accepted item became. */
+export interface InboxTaskLink {
+	suite: string;
+	id: string;
+	/** Task folder, relative to the bench root. */
+	dir: string;
+	accepted_at: string;
+	/** True once the drafted task passed admission. */
+	admitted: boolean;
+}
+
+/** The drafted task's result in the newest experiment that ran it. */
+export interface InboxReleaseStatus {
+	status: InboxReleaseState;
+	experiment?: string;
+	at?: string;
+	passed: number;
+	runs: number;
+}
+
+/** One failure signature seen in production, with every trace that matched it. */
+export interface InboxItem {
+	id: string;
+	state: InboxState;
+	/** Source name from inbox/sources.yaml. */
+	source: string;
+	source_kind: string;
+	trace_id: string;
+	/** The first trace in its source's own UI. */
+	link?: string;
+	/** The request, redacted and cut short. */
+	title: string;
+	/** Why the trace was flagged. */
+	flagged: string[];
+	signature: string;
+	signature_parts: InboxSignatureParts;
+	occurrences: number;
+	first_seen: string;
+	last_seen: string;
+	/** Newest last, at most 20. */
+	traces: InboxTraceRef[];
+	suggested_kind: InboxTaskKind;
+	suggested_suite?: string;
+	tools?: string[];
+	model?: string;
+	outcome: InboxOutcome;
+	/** Values removed before storage, counted by kind. Never the values. */
+	redacted?: Record<string, number>;
+	/** Set once accepted. */
+	task?: InboxTaskLink;
+	/** Occurrences seen after the item was accepted. */
+	recurrences?: number;
+	last_recurrence?: string;
+	release?: InboxReleaseStatus;
+	/** Reject reason. */
+	reason?: string;
+	duplicate_of?: string;
+	snoozed_until?: string;
+	updated: string;
+}
+
+/** One trace source and its last pull. */
+export interface InboxSourceStatus {
+	name: string;
+	kind: string;
+	last_pull?: string;
+	/** Traces newer than this are pulled next. */
+	since?: string;
+	last_error?: string;
+	/** Traces read by the last pull. */
+	pulled?: number;
+}
+
+/** A suite an item can be accepted into, with the template its tasks use. */
+export interface InboxSuite {
+	id: string;
+	template: string;
+}
+
+/** GET /inbox: items in the filter, with counts by state over every item. */
+export interface InboxList {
+	items: InboxItem[];
+	counts: Partial<Record<InboxState, number>>;
+	sources: InboxSourceStatus[];
+	suites: InboxSuite[];
+	/** False when POST /inbox/ingest is off on this server. */
+	ingest_enabled: boolean;
+	/** Tasks drafted from accepted items. */
+	regression_tasks: number;
+}
+
+/** GET /inbox/{id}: one item and its redacted preview (markdown text, at most 16 KiB). */
+export interface InboxItemDetail {
+	item: InboxItem;
+	/** Plain text to show as is. Never rendered as HTML. */
+	preview: string;
+}
+
+/** The draft task an accept wrote. It still needs a person to finish, validate and admit it. */
+export interface InboxDraft {
+	/** suite/task. */
+	task: string;
+	dir: string;
+	template: string;
+	/** Files with EDIT ME markers, relative to dir. */
+	edit_me: string[];
+	/** Next steps, in order. */
+	next: string[];
+	warnings?: string[];
+}
+
+/** POST /inbox/{id}/accept. */
+export interface InboxAcceptResult {
+	item: InboxItem;
+	draft: InboxDraft;
+}
+
+/** POST /inbox/{id}/reject and POST /inbox/{id}/snooze. */
+export interface InboxActionResult {
+	item: InboxItem;
+}
+
+/** POST /inbox/ingest. */
+export interface InboxIngestResult {
+	item_id: string;
+	created: boolean;
+	occurrences: number;
+}
+
+/** GET /inbox query. An absent or empty param is left out. */
+export interface InboxListParams {
+	state?: InboxState;
+	source?: string;
+}
+
+/** POST /inbox/{id}/accept body. kind defaults to the suggested kind, task_id to a generated id. */
+export interface InboxAcceptRequest {
+	suite: string;
+	kind?: InboxTaskKind;
+	task_id?: string;
+}
+
+/** POST /inbox/{id}/reject body. With duplicate_of the item becomes a duplicate. */
+export interface InboxRejectRequest {
+	reason: string;
+	duplicate_of?: string;
+}
+
+/** POST /inbox/{id}/snooze body: 1 to 90 days. */
+export interface InboxSnoozeRequest {
+	days: number;
+}
+
+/** POST /inbox/ingest body. Sent by services with the ingest token, never by this UI. */
+export interface InboxIngestRequest {
+	/** OTLP, Langfuse or chat JSON. */
+	trace: unknown;
+	/** Empty to detect. */
+	format?: string;
+	reason?: string;
+	link?: string;
+	source?: string;
+}
+
+export type InboxListResponse = WithMode<InboxList>;
+export type InboxItemDetailResponse = WithMode<InboxItemDetail>;
+export type InboxAcceptResponse = WithMode<InboxAcceptResult>;
+export type InboxActionResponse = WithMode<InboxActionResult>;
+export type InboxIngestResponse = WithMode<InboxIngestResult>;
+// Failure inbox area ends.
+
+// W9 routing policy under test (handlers/routing.go, docs/routing-experiments.md).
+
+/** Routing strategy of an arm (schemas.RoutingPolicy.Strategy). */
+export type RoutingStrategy = "fixed" | "weighted" | "fallback_chain" | "rule";
+
+/** One provider and model of a routing policy; an empty provider is the run's gateway provider. */
+export interface RouteTarget {
+	provider?: string;
+	model: string;
+	weight?: number;
+}
+
+/** Governance limits on the run's virtual key (402/429 tests). */
+export interface RouteLimits {
+	budget_usd?: number;
+	budget_reset?: string;
+	request_max?: number;
+	request_reset?: string;
+	token_max?: number;
+	token_reset?: string;
+}
+
+/** An arm's gateway policy (agent config gateway.routing). */
+export interface RoutingPolicy {
+	strategy: RoutingStrategy;
+	targets?: RouteTarget[];
+	fallbacks?: RouteTarget[];
+	when?: string;
+	retries?: number;
+	limits?: RouteLimits;
+}
+
+/** One target's share of answered turns and its spend; cost absent when some run's spend on it was unknown. */
+export interface RoutingTargetUse {
+	target: string;
+	turn_share: number;
+	cost_usd?: number;
+	latency_ms?: number;
+}
+
+/** What an arm's policy did under one condition, over the sealed counted runs. */
+export interface RoutingCondition {
+	condition: string;
+	runs: number;
+	fallback_runs: number;
+	fallback_known: number;
+	switches: number;
+	switches_known: number;
+	targets: RoutingTargetUse[];
+}
+
+/** One arm's policy, frozen hash and effect per condition. */
+export interface RoutingArm {
+	arm: string;
+	label: string;
+	model: string;
+	policy?: RoutingPolicy;
+	policy_hash?: string;
+	summary: string;
+	conditions: RoutingCondition[];
+}
+
+/** GET /experiments/{id}/routing. */
+export interface RoutingSummary {
+	exp_id: string;
+	routed: boolean;
+	arms: RoutingArm[];
+	differences: string[];
+}
+
+/** One Bifrost message row of a run: which target served it and how it was routed. */
+export interface RunRoutingRow {
+	id: string;
+	parent_id?: string;
+	provider: string;
+	model_served: string;
+	fallback_index: number;
+	status: string;
+	error_status?: number;
+	latency_ms: number;
+	routing_rule_name?: string;
+	routing_engines?: string[];
+}
+
+/** GET /runs/{id}/routing. */
+export interface RunRouting {
+	run_id: string;
+	arm: string;
+	condition: string;
+	model: string;
+	policy?: RoutingPolicy;
+	summary: string;
+	fallback_used?: boolean;
+	switches?: number;
+	targets: RoutingTargetUse[];
+	rows: RunRoutingRow[];
+	fidelity?: GateResult;
+}
+
+export type RoutingSummaryResponse = WithMode<RoutingSummary>;
+export type RunRoutingResponse = WithMode<RunRouting>;
+// W9 routing policy under test ends.
+
+// W3 customer support (docs/customer-support.md): the support scorecard, schemas/support.go.
+
+/** One arm's support numbers. A null number is unknown. On a support suite verified success is resolution. */
+export interface SupportArm {
+	arm: string;
+	label?: string;
+	runs: number;
+	resolution: number | null;
+	resolved: number;
+	decided: number;
+	cost_per_resolution: number | null;
+	escalation_rate: number | null;
+	escalation_correct: number | null;
+	policy_violation_rate: number | null;
+	user_turns: number | null;
+	simulator_cost_usd: number | null;
+}
+
+/** GET /experiments/{id}/support. `support` false: the scorecard does not apply. */
+export interface SupportSummary {
+	exp_id: string;
+	suite: string;
+	condition: string;
+	support: boolean;
+	simulator_mode?: "scripted" | "llm";
+	simulator_label: string;
+	synthetic: boolean;
+	arms: SupportArm[];
+}
+
+export type SupportSummaryResponse = WithMode<SupportSummary>;
+// W3 customer support ends.
+
+// W5 drift canary (handlers/canary.go, bench/canary, docs/drift-canary.md). Key lists under
+// handlers/testdata/contract/Canary*.keys.
+
+export type CanaryState = "no_baseline" | "steady" | "watching" | "drifted" | "invalid" | "baseline_stale";
+export type CanaryRecordKind = "baseline" | "run" | "confirmation";
+export type CanaryOutcome = "pinned" | "clear" | "flagged" | "invalid" | "stale" | "refused" | "error";
+export type CanaryTestStatus = "worse" | "better" | "below_floor" | "no_change" | "cannot_tell";
+export type CanaryEquivalenceVerdict = "differs" | "no_difference_detected" | "cannot_tell";
+
+/** One watched route: a provider (empty keeps the agent's) and a model alias. */
+export interface CanaryTarget {
+	provider?: string;
+	model: string;
+}
+
+export interface CanaryScheduleSpec {
+	cron: string;
+	timezone?: string;
+}
+
+export interface CanaryBudget {
+	per_run_usd: number;
+	per_day_usd: number;
+}
+
+export interface CanaryNoiseFloor {
+	success?: number;
+	cost_usd?: number;
+	tokens?: number;
+	latency_ms?: number;
+}
+
+/** canaries/<name>.yaml as the server read it. */
+export interface CanaryDefinition {
+	name: string;
+	description?: string;
+	agent: string;
+	suite: string;
+	tasks: "all" | string[];
+	tier?: string;
+	trials: number;
+	conditions?: string[];
+	targets: CanaryTarget[];
+	schedule?: CanaryScheduleSpec;
+	budget: CanaryBudget;
+	alerts?: { url_env: string; secret_env?: string; events?: string[]; format?: string; timeout_s?: number }[];
+	sensitivity?: string;
+	noise_floor?: CanaryNoiseFloor;
+	max_baseline_age_days?: number;
+	smoke?: boolean;
+	seed?: number;
+	concurrency?: number;
+}
+
+/** Which models and providers answered one target. */
+export interface CanaryServed {
+	arm: string;
+	label: string;
+	requested: string[];
+	served: string[];
+	providers: string[];
+	system_fingerprints?: string[];
+	requests: number;
+}
+
+/** A pinned known-good experiment. */
+export interface CanaryBaseline {
+	exp_id: string;
+	manifest_hash: string;
+	fingerprint: string;
+	pinned_at: string;
+	created_at: string;
+	served: CanaryServed[];
+	clusters: string[];
+	smoke?: boolean;
+	note?: string;
+}
+
+/** The exact paired sign-flip test of one metric of one target on one condition. */
+export interface CanaryMetricTest {
+	key: string;
+	arm: string;
+	label: string;
+	condition: string;
+	metric: string;
+	higher_is_better: boolean;
+	tasks: number;
+	discordant: number;
+	worse: number;
+	baseline: number | null;
+	current: number | null;
+	delta: number | null;
+	relative: number | null;
+	p: number | null;
+	level: number;
+	floor: number;
+	status: CanaryTestStatus;
+	reason: string;
+}
+
+export interface CanaryTaskFlip {
+	arm: string;
+	label: string;
+	condition: string;
+	task: string;
+	baseline: number;
+	current: number;
+}
+
+export interface CanaryComparison {
+	alpha: number;
+	family: number;
+	tests: CanaryMetricTest[];
+	flagged: string[];
+	flips: CanaryTaskFlip[];
+}
+
+export interface CanaryClusterRef {
+	signature: string;
+	title: string;
+	count: number;
+	tasks: string[];
+}
+
+/** "What changed" for one target. Numbers are null when not observed. */
+export interface CanaryArmChanges {
+	arm: string;
+	label: string;
+	served_before: string[];
+	served_now: string[];
+	served_changed: boolean;
+	providers_before: string[];
+	providers_now: string[];
+	provider_changed: boolean;
+	fingerprints_before: string[];
+	fingerprints_now: string[];
+	fingerprint_changed: boolean;
+	latency_before_ms: number | null;
+	latency_now_ms: number | null;
+	latency_shift: number | null;
+	prompt_tasks: number;
+	prompt_changed: number;
+	prompt_shift: number | null;
+	error_rate_before: number;
+	error_rate_now: number;
+	format_errors_before: number;
+	format_errors_now: number;
+	flips: CanaryTaskFlip[];
+	success_before: number | null;
+	success_now: number | null;
+	requests_before: number;
+	requests_now: number;
+	requested_now: string[];
+}
+
+export interface CanaryChanges {
+	moved: string[];
+	arms: CanaryArmChanges[];
+	new_clusters: CanaryClusterRef[];
+}
+
+/** Same model through two providers in one look. */
+export interface CanaryEquivalence {
+	model: string;
+	arm_a: string;
+	arm_b: string;
+	label_a: string;
+	label_b: string;
+	tests: CanaryMetricTest[];
+	verdict: CanaryEquivalenceVerdict;
+	reason: string;
+}
+
+export interface CanaryArmPoint {
+	arm: string;
+	success: number | null;
+	tasks: number;
+	runs: number;
+}
+
+/** One look (or baseline). */
+export interface CanaryRecord {
+	id: string;
+	canary: string;
+	kind: CanaryRecordKind;
+	started: string;
+	finished: string;
+	exp_id?: string;
+	manifest_hash?: string;
+	fingerprint?: string;
+	baseline?: string;
+	injected?: string;
+	smoke?: boolean;
+	outcome: CanaryOutcome;
+	state: CanaryState;
+	reason?: string;
+	cost_usd: number;
+	forecast_usd?: number;
+	runs: number;
+	run_errors: number;
+	comparison?: CanaryComparison;
+	changes?: CanaryChanges;
+	equivalence?: CanaryEquivalence[];
+	served?: CanaryServed[];
+	invalid?: string[];
+	alerts?: string[];
+	points?: CanaryArmPoint[];
+}
+
+export interface CanarySummary {
+	name: string;
+	description: string;
+	state: CanaryState;
+	reason: string;
+	suite: string;
+	agent: string;
+	targets: CanaryTarget[];
+	tasks: number;
+	trials: number;
+	cron: string;
+	next: string;
+	sensitivity: string;
+	alpha: number;
+	smoke: boolean;
+	per_run_usd: number;
+	per_day_usd: number;
+	spent_today_usd: number;
+	baseline: CanaryBaseline | null;
+	last_look: CanaryRecord | null;
+	looks: number;
+}
+
+export interface CanaryDefinitionLoad {
+	name: string;
+	error: string;
+}
+
+/** GET /canaries */
+export interface CanaryList {
+	canaries: CanarySummary[];
+	errors: CanaryDefinitionLoad[];
+	states: CanaryState[];
+}
+
+export interface CanaryEquivalencePair {
+	model: string;
+	arm_a: string;
+	arm_b: string;
+	label_a: string;
+	label_b: string;
+}
+
+/** GET /canaries/{name}. history is one trends lineage per target, drawn with the trends chart. */
+export interface CanaryDetail {
+	summary: CanarySummary;
+	definition: CanaryDefinition;
+	baselines: CanaryBaseline[];
+	records: CanaryRecord[];
+	history: TrendLineage[];
+	pairs: CanaryEquivalencePair[];
+}
+
+/** POST /canaries/{name}/run (202). */
+export interface CanaryRunAccepted {
+	canary: string;
+	started: string;
+	message: string;
+}
+
+export type CanaryListResponse = WithMode<CanaryList>;
+export type CanaryDetailResponse = WithMode<CanaryDetail>;
+export type CanaryRunAcceptedResponse = WithMode<CanaryRunAccepted>;
+// W5 drift canary ends.
+
+// W8 judge calibration (docs/judge-calibration.md, handlers/calibration.go).
+
+/** Calibration instrument and suite states. */
+export type CalibrationState = "calibrated" | "few_labels" | "uncalibrated" | "allowed_uncalibrated" | "unreliable" | "not_judged";
+
+/** k of n with its exact two-sided 95% interval; value, lo and hi are null when n is 0. */
+export interface CalibrationRate {
+	k: number;
+	n: number;
+	value: number | null;
+	lo: number | null;
+	hi: number | null;
+}
+
+/** Judge against human labels. Positive is "correct"; a false positive is the judge passing an answer a person failed. */
+export interface CalibrationStats {
+	items: number;
+	positives: number;
+	negatives: number;
+	tp: number;
+	fp: number;
+	fn: number;
+	tn: number;
+	undecided: number;
+	agreement: CalibrationRate;
+	tpr: CalibrationRate;
+	tnr: CalibrationRate;
+	fpr: CalibrationRate;
+	/** Cohen's kappa; null when it is not defined. */
+	kappa: number | null;
+}
+
+export interface CalibrationCategory {
+	category: string;
+	stats: CalibrationStats;
+}
+
+export interface CalibrationConsistency {
+	votes: number;
+	unanimous_items: CalibrationRate;
+	repeat_agreement: CalibrationRate;
+}
+
+export interface CalibrationPerturbation {
+	name: string;
+	flips: CalibrationRate;
+}
+
+export interface CalibrationItemResult {
+	item_id: string;
+	task: string;
+	category?: string;
+	template: string;
+	label: string;
+	source: string;
+	votes: string[];
+	verdict: string;
+	repeat: string;
+	perturbed?: Record<string, string>;
+}
+
+/** One `judge calibrate` result, hash-chained beside the suite's labels. items is null in listings. */
+export interface CalibrationRecord {
+	record_id: string;
+	suite: string;
+	suite_version: string;
+	provider: string;
+	model: string;
+	prompt_version: string;
+	prompt_sha256: string;
+	templates: Record<string, string>;
+	votes: number;
+	served_models?: string[];
+	set_sha256: string;
+	set_rows: number;
+	human_labels: number;
+	seed_items: number;
+	disputed: number;
+	labellers?: string[];
+	human: CalibrationStats;
+	seed?: CalibrationStats;
+	categories?: CalibrationCategory[];
+	consistency: CalibrationConsistency;
+	perturbations?: CalibrationPerturbation[];
+	items: CalibrationItemResult[] | null;
+	calls: number;
+	usd: Value;
+	price_ref?: string;
+	created_at: string;
+	prev_hash: string;
+	hash: string;
+}
+
+export interface JudgeCalibrationThresholds {
+	min_agreement: number;
+	min_tnr: number;
+	min_labels: number;
+	max_age_days: number;
+	/** "defaults" or the release policy file. */
+	source: string;
+}
+
+/** GET /suites/{id}/calibration: the calibration card. */
+export interface CalibrationStatus {
+	suite: string;
+	judged: boolean;
+	provider?: string;
+	model?: string;
+	prompt_version?: string;
+	prompt_sha256?: string;
+	state: CalibrationState;
+	detail: string;
+	set_sha256?: string;
+	labels: number;
+	human_labels: number;
+	seed_items: number;
+	disputed: number;
+	latest?: CalibrationRecord;
+	records: number;
+	thresholds: JudgeCalibrationThresholds;
+	reminders: string[];
+	problems: string[];
+}
+
+export type CalibrationLabel = "correct" | "incorrect";
+
+/** One row of labels.jsonl. */
+export interface CalibrationItem {
+	id: string;
+	task: string;
+	answer: string;
+	label: CalibrationLabel;
+	labeller: string;
+	note?: string;
+	source: "human_review" | "label" | "import" | "admission_control";
+	ref?: string;
+	at: string;
+	/** X1 vision grading: sha256 of the labelled image (calibration/images/<sha256>.png); answer may then be empty. */
+	image?: string;
+}
+
+/** GET /suites/{id}/calibration/labels. */
+export interface CalibrationLabels {
+	suite: string;
+	set_sha256: string;
+	items: CalibrationItem[];
+}
+
+/** POST /suites/{id}/calibration/labels. */
+export interface CalibrationLabelRequest {
+	task: string;
+	answer: string;
+	label: CalibrationLabel;
+	labeller: string;
+	note?: string;
+	ref?: string;
+}
+
+/** Raw judged rate of an arm beside its Rogan-Gladen correction (report only). */
+export interface BiasAdjustedRate {
+	raw: CalibrationRate;
+	estimate: number | null;
+	lo: number | null;
+	hi: number | null;
+	note?: string;
+}
+
+/** The judge_calibration instrument of a judged experiment's verdict. */
+export interface JudgeCalibrationVerdict {
+	state: CalibrationState;
+	detail: string;
+	model: string;
+	templates: string[];
+	record_id?: string;
+	record_hash?: string;
+	record_at?: string;
+	human_labels: number;
+	agreement?: CalibrationRate;
+	tnr?: CalibrationRate;
+	fpr?: CalibrationRate;
+	kappa?: number | null;
+	thresholds: JudgeCalibrationThresholds;
+	reminders?: string[];
+	judged_runs: number;
+	contested_runs: number;
+	error_over_effect?: string;
+	capped_from?: Decision;
+	bias_adjusted?: Record<string, BiasAdjustedRate>;
+}
+
+export type CalibrationStatusResponse = WithMode<CalibrationStatus>;
+export type CalibrationLabelsResponse = WithMode<CalibrationLabels>;
+export type CalibrationItemResponse = WithMode<CalibrationItem>;
+// W8 judge calibration ends.
+
+// W4 research with Tavily (docs/research-tasks.md): the research scorecard, schemas/research.go.
+
+/** One arm's research numbers. A null number is unknown or not applicable in every run. */
+export interface ResearchArm {
+	arm: string;
+	label?: string;
+	runs: number;
+	verified: number | null;
+	passed: number;
+	decided: number;
+	searches: number | null;
+	sources_cited: number | null;
+	citations_grounded: number | null;
+	citation_precision: number | null;
+	external_unmatched: number | null;
+}
+
+/** GET /experiments/{id}/research. `research` false: the scorecard does not apply. */
+export interface ResearchSummary {
+	exp_id: string;
+	suite: string;
+	condition: string;
+	research: boolean;
+	replay: boolean;
+	synthetic: boolean;
+	arms: ResearchArm[];
+}
+
+export type ResearchSummaryResponse = WithMode<ResearchSummary>;
+// W4 research with Tavily ends.
+
+// W7 adaptive trials and suite tiers (handlers/adaptive.go, schemas/trials.go,
+// docs/adaptive-trials.md, docs/suite-tiers.md). Key lists under
+// handlers/testdata/contract/{AdaptiveView,TrialsPolicy,AdaptivePlan,AdaptiveReport,AdaptiveTaskState,AdaptiveLook,MoreEvidence,ExtendsRef}.keys.
+export interface TrialsPolicy {
+	mode: "fixed" | "adaptive";
+	rule?: "task" | "sequential";
+	min?: number;
+	max?: number;
+	conditions?: string[];
+	looks?: number;
+	alpha_split?: "equal" | "obf";
+	alphas?: number[];
+	futility?: "curtail" | "nonbinding" | "off";
+	extension?: { rule: "inverse_normal"; alpha_first?: number; weight_first?: number };
+}
+
+export interface AdaptivePlan {
+	rule: "task" | "sequential";
+	conditions: string[];
+	min?: number;
+	max?: number;
+	metric: string;
+	looks?: string[][];
+	look_alphas?: number[];
+	alpha: number;
+	futility?: "curtail" | "nonbinding" | "off";
+	optional: number;
+	required: number;
+}
+
+export interface AdaptiveTaskState {
+	condition: string;
+	task: string;
+	trials: number;
+	max: number;
+	reason: "concordant" | "max_reached" | "waiting";
+}
+
+export interface AdaptiveLook {
+	look: number;
+	tasks: number;
+	alpha: number;
+	p_low?: number;
+	p_high?: number;
+	d_bar: number;
+	outcome: "continue" | "efficacy" | "futility" | "final_look" | "not_reached" | "waiting";
+	best_case_p?: number;
+}
+
+export interface AdaptiveReport {
+	rule: "task" | "sequential" | string;
+	max_slots: number;
+	required_slots: number;
+	run_slots: number;
+	runs_saved: number;
+	stop_reason: string;
+	stop_look?: number;
+	looks?: number;
+	decision_alpha: number;
+	tasks?: AdaptiveTaskState[];
+	look_results?: AdaptiveLook[];
+	excluded?: string[];
+	notes?: string[];
+	conditions?: string[];
+}
+
+export interface MoreEvidence {
+	target_pp: number;
+	tasks: number;
+	tasks_total: number;
+	over?: boolean;
+	sd: number;
+	sd_assumed: boolean;
+	runs: number;
+	cost_usd?: number;
+	cost_basis: string;
+	command?: string;
+	combination: "inverse_normal" | "exploratory";
+	alpha_kept?: number;
+}
+
+export interface ExtendsRef {
+	exp_id: string;
+	manifest_hash: string;
+	kind: "tasks" | "trials";
+	rule: "inverse_normal" | "exploratory";
+}
+
+/** GET /experiments/{id}/adaptive: the trials and tier panel. */
+export interface AdaptiveView {
+	exp_id: string;
+	tier: string;
+	tier_tasks: string[];
+	trials: TrialsPolicy | null;
+	plan: AdaptivePlan | null;
+	report: AdaptiveReport | null;
+	more_evidence: MoreEvidence | null;
+	extends: ExtendsRef | null;
+	decision: string;
+	max_slots: number;
+}
+
+export type AdaptiveViewResponse = WithMode<AdaptiveView>;
+// W7 adaptive trials and suite tiers ends.
+
+// W6 migration report and cost explanation (docs/model-migration.md, docs/cost-explain.md): bench/costexplain, bench/migration.
+
+/** GET /experiments/{id}/cost-explain query. */
+export interface CostExplainParams {
+	expId: string;
+	a?: string;
+	b?: string;
+	condition?: string;
+	grade_source?: string;
+}
+
+/** One arm's cost picture over its graded runs on the condition (costexplain.ArmCost). */
+export interface CostArm {
+	arm: string;
+	label: string;
+	model: string;
+	served_models: string[];
+	runs: number;
+	successes: number;
+	cost_per_run: Value;
+	cost_per_success: Value;
+	cache_neutral_per_run: Value;
+	cache_neutral_per_success: Value;
+	failed_run_cost_per_run: Value;
+	cache_read_share: Value;
+	cache_write_share: Value;
+	turns_per_run: number;
+	input_tokens_per_turn: number;
+	output_tokens_per_turn: number;
+	tokens: Tokens;
+	/** Effective USD per million tokens of each bucket; absent when the arm has none of it. */
+	price_input?: number;
+	price_cache_read?: number;
+	price_cache_write?: number;
+	price_output?: number;
+	attempts_per_run: number;
+	wasted_attempts_per_run: number;
+	retries_per_run: number;
+	fallbacks_per_run: number;
+	rejected_per_run: number;
+	refusals_per_run: number;
+	latency_ms_per_turn: Value;
+	unpriced_rows: number;
+	unattributed_rows: number;
+	runs_without_rows: number;
+	prompt_hashes: string[];
+	tool_hashes: string[];
+	keys: string[];
+}
+
+export type CostPartId =
+	| "price"
+	| "input_tokens"
+	| "output_tokens"
+	| "cache_read_share"
+	| "cache_write_share"
+	| "turns"
+	| "wasted_attempts"
+	| "unattributed"
+	| "unpriced"
+	| "success_rate";
+
+/** One additive part of a waterfall; unknown with bounds when the rows do not know it. */
+export interface CostPart {
+	id: CostPartId;
+	label: string;
+	usd: Value;
+	detail: string;
+}
+
+/** B minus A split into parts that sum to the total. */
+export interface CostWaterfall {
+	basis: "per_run" | "per_success";
+	from: Value;
+	to: Value;
+	total: Value;
+	parts: CostPart[];
+	known: number;
+	/** Why the waterfall does not apply, or "". */
+	reason: string;
+}
+
+/** A measuring cost (judge, user simulator), reported apart from the agent's cost. */
+export interface CostApart {
+	id: string;
+	label: string;
+	a: Value;
+	b: Value;
+	diff: Value;
+}
+
+/** A silent cache break: the cache read share of arm dropped, with the likely cause. */
+export interface CostCacheFinding {
+	kind: "between_arms" | "over_time";
+	arm: string;
+	baseline: string;
+	share_before: number;
+	share_after: number;
+	cause: string;
+	evidence: string[];
+}
+
+export interface CostExplanation {
+	exp_id: string;
+	suite: string;
+	condition: string;
+	conditions: string[];
+	price_ref: string;
+	synthetic: boolean;
+	a: CostArm;
+	b: CostArm;
+	per_run: CostWaterfall;
+	per_success: CostWaterfall;
+	apart: CostApart[];
+	cache: CostCacheFinding[];
+	notes: string[];
+}
+
+export type CostExplainResponse = WithMode<CostExplanation>;
+
+export type ParetoAxis = "cost_per_success" | "cost_per_run";
+
+/** One config on the cost against success plane. y carries the success interval as bounds. */
+export interface ParetoPoint {
+	id: string;
+	label: string;
+	agent: string;
+	model: string;
+	x: Value;
+	y: Value;
+	placed: boolean;
+	frontier: boolean;
+	dominated_by: string[];
+	reason: string;
+}
+
+/** GET /experiments/{id}/pareto and GET /leaderboard/pareto. */
+export interface Pareto {
+	x: ParetoAxis;
+	x_label: string;
+	y: string;
+	points: ParetoPoint[];
+	frontier: string[];
+	note: string;
+}
+
+export type ParetoResponse = WithMode<Pareto>;
+
+export interface ExperimentParetoParams {
+	expId: string;
+	x?: ParetoAxis;
+	condition?: string;
+}
+
+export type LeaderboardParetoParams = LeaderboardParams & { x?: ParetoAxis };
+
+/** GET /experiments/{id}/migration query. */
+export interface MigrationParams {
+	expId: string;
+	from?: string;
+	/** Comma-separated models or arm ids. */
+	to?: string;
+	condition?: string;
+	alpha?: string;
+	grade_source?: string;
+}
+
+export interface MigrationArmRef {
+	arm: string;
+	label: string;
+	agent: string;
+	model: string;
+	provider: string;
+}
+
+export type MigrationResult = "better" | "worse" | "cannot_tell";
+
+/** One paired comparison: new minus old per-task success rate, exact sign-flip, Holm across family. */
+export interface MigrationVerdict {
+	/** "" for the overall verdict; else condition, task_kind, capability, tag, difficulty_declared, difficulty_observed. */
+	dimension: string;
+	value: string;
+	condition: string;
+	tasks: number;
+	better: number;
+	worse: number;
+	mean_diff: number;
+	p: number | null;
+	p_adjusted: number | null;
+	family: number;
+	result: MigrationResult;
+	reason: string;
+	min_tasks: number;
+	tasks_needed: number;
+}
+
+export type MigrationAction = "migrate" | "do_not_migrate" | "not_enough_evidence";
+
+export interface MigrationRecommendation {
+	action: MigrationAction;
+	reason: string;
+	policy?: PolicyResult;
+	caveats: string[];
+}
+
+export interface MigrationChange {
+	from: Value;
+	to: Value;
+}
+
+export interface MigrationClusterRef {
+	signature: string;
+	title: string;
+	count: number;
+	tasks: string[];
+	examples: string[];
+}
+
+export interface MigrationGateChange {
+	gate: string;
+	effect: string;
+	from: number;
+	to: number;
+	status: "new" | "fixed" | "both";
+}
+
+export interface MigrationConditionDiff {
+	condition: string;
+	from_success: Value;
+	to_success: Value;
+	from_runs: number;
+	to_runs: number;
+	false_completion: MigrationChange;
+	retry_amplification: MigrationChange;
+}
+
+export interface MigrationBehaviour {
+	new_clusters: MigrationClusterRef[];
+	fixed_clusters: MigrationClusterRef[];
+	gates: MigrationGateChange[];
+	false_completion: MigrationChange;
+	rejected_per_run: MigrationChange;
+	refusals_per_run: MigrationChange;
+	retries_per_run: MigrationChange;
+	fallbacks_per_run: MigrationChange;
+	latency_ms_per_turn: MigrationChange;
+	conditions: MigrationConditionDiff[];
+}
+
+export interface MigrationRunRef {
+	run_id: string;
+	pair_id: string;
+	arm: string;
+	trial: number;
+	outcome: string;
+}
+
+export interface MigrationFlippedTask {
+	task: string;
+	condition: string;
+	kind: "regressed" | "fixed";
+	from_rate: number;
+	to_rate: number;
+	runs: MigrationRunRef[];
+}
+
+export interface MigrationPair {
+	from: MigrationArmRef;
+	to: MigrationArmRef;
+	overall: MigrationVerdict;
+	strata: MigrationVerdict[];
+	recommendation: MigrationRecommendation;
+	behaviour: MigrationBehaviour;
+	flipped: MigrationFlippedTask[];
+	cost: CostExplanation | null;
+}
+
+export interface MigrationModelSummary extends MigrationArmRef {
+	success: Value;
+	reliability: Value;
+	k: number;
+	cost_per_success: Value;
+	cost_per_run: Value;
+	tokens: Value;
+	wall_time_s: Value;
+	steps: Value;
+	latency_ms_per_turn: Value;
+	pareto: string;
+}
+
+export interface MigrationReport {
+	exp_id: string;
+	suite: string;
+	condition: string;
+	conditions: string[];
+	alpha: number;
+	synthetic: boolean;
+	policy: string;
+	from: MigrationArmRef;
+	pairs: MigrationPair[];
+	models: MigrationModelSummary[];
+	pareto: Pareto | null;
+	notes: string[];
+}
+
+export type MigrationResponse = WithMode<MigrationReport>;
+// W6 migration report and cost explanation ends.
+
+// W10 export (docs/export.md): GET /experiments/{id}/export?format=eee|jsonl|csv and
+// GET /suites/{id}/export?format=harbor are file downloads. ExportRunRow is one line of the jsonl run
+// table; key list: handlers/testdata/contract/ExportRunRow.keys. W10 export ends at the end of this block.
+export type ExperimentExportFormat = "eee" | "jsonl" | "csv";
+
+export interface ExportRunRow {
+	exp_id: string;
+	run_id: string;
+	slot_id: string;
+	pair_id: string;
+	suite: string;
+	task: string;
+	task_version: string;
+	arm: string;
+	arm_label: string;
+	agent_config: string;
+	model: string;
+	provider: string;
+	condition: string;
+	trial: number;
+	attempt: number;
+	outcome: string;
+	/** 1 or 0 when the outcome scores; null when it does not (infra error, invalid evaluator). */
+	verified_success: number | null;
+	grade_passed: boolean | null;
+	grade_source: string;
+	cost_usd: number | null;
+	synthetic: boolean;
+	started?: string;
+	sealed?: string;
+	manifest_hash: string;
+	seal_hash: string;
+	problems?: string[];
+	/** Every metric the run recorded; null when it did not observe it, never zero. */
+	metrics: Record<string, number | null>;
+}
+// W10 export ends.
+
+// X8 voice agents (docs/voice-agents.md): GET /runs/{id}/voice, the voice
+// caller's timeline read the way the voice metrics read it.
+
+/** One moment the floor passed to the agent and how long it took to speak (voice.Turn). */
+export interface VoiceTurn {
+	kind: string;
+	caller_turn?: number;
+	floor_ms: number;
+	agent_start_ms?: number;
+	gap_ms: number;
+	latency_ms?: number;
+	dead_air: boolean;
+}
+
+/** One time the caller talked over the agent (voice.BargeIn). */
+export interface VoiceBargeIn {
+	utt: number;
+	caller_start_ms: number;
+	agent_stop_ms: number;
+	stopped_after_ms: number;
+	by: string;
+	handled: boolean;
+}
+
+/** One caller line with its known text (voice.Line). */
+export interface VoiceLine {
+	turn: number;
+	kind: string;
+	text: string;
+	start_ms: number;
+	end_ms: number;
+	tts: string;
+	final?: boolean;
+}
+
+/** One agent utterance as the caller heard and transcribed it (voice.Utterance). */
+export interface VoiceUtterance {
+	utt: number;
+	start_ms: number;
+	end_ms: number;
+	text?: string | null;
+	stt?: string;
+	interrupted?: boolean;
+}
+
+/** A transcript line the agent reported about itself (voice.Reported). */
+export interface VoiceReported {
+	t_ms: number;
+	role: string;
+	text: string;
+}
+
+/** A call track the caller kept or only hashed (voice.AudioRef). */
+export interface VoiceAudioRef {
+	file?: string | null;
+	sha256: string;
+	bytes?: number;
+	truncated?: boolean;
+}
+
+/** The analysed call (voice.Analysis). */
+export interface VoiceAnalysis {
+	protocol: string;
+	wall_start_ms: number;
+	call_ms: number;
+	ended_by: string;
+	first_audio_ms?: number;
+	turns: VoiceTurn[];
+	barge_ins: VoiceBargeIn[];
+	dead_air_ms: number;
+	lines: VoiceLine[];
+	utterances: VoiceUtterance[];
+	reported?: VoiceReported[];
+	caller_frames: number;
+	agent_frames: number;
+	clears: number;
+	protocol_errors: number;
+	caller_audio?: VoiceAudioRef;
+	agent_audio?: VoiceAudioRef;
+	barge_in_bound_ms: number;
+	dead_air_bound_ms: number;
+	complete: boolean;
+}
+
+/** One kept audio track, served from a sealed run (handlers.VoiceTrack). */
+export interface VoiceTrack {
+	track: "caller" | "agent";
+	sha256: string;
+	bytes: number;
+	url: string;
+}
+
+/** GET /runs/{id}/voice (handlers.VoiceCall). */
+export interface VoiceCall {
+	mode?: Mode;
+	run_id: string;
+	caller: string;
+	called: boolean;
+	reason?: string;
+	analysis?: VoiceAnalysis;
+	audio: VoiceTrack[];
+	witness: string;
+}

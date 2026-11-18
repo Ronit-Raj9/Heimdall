@@ -1,0 +1,13 @@
+# Keys of bench.ts `SupportArm` (schemas.SupportArm, W3 customer support). Change with bench.ts and schemas/support.go.
+arm
+label?
+runs
+resolution
+resolved
+decided
+cost_per_resolution
+escalation_rate
+escalation_correct
+policy_violation_rate
+user_turns
+simulator_cost_usd

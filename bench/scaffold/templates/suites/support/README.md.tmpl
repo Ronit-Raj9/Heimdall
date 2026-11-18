@@ -1,0 +1,72 @@
+# [[.ID]]
+
+A Heimdall customer support suite written by `bifrost-bench suite init
+-template support`, with one complete sample task (`tasks/[[.Sample]]`). The
+user guide is `docs/customer-support.md` in the bench repository.
+
+[[.About]]
+
+## What to edit
+
+1. `services/helpdesk/server.py`: replace the helpdesk tools with your own
+   (`TOOLS` and their functions); the rest needs no change. Keep a tool whose
+   name starts with `escalate_` (or `transfer_to_human`, `handoff`) if your
+   agent can hand a customer to a human: the `escalated` metric looks for it.
+2. `tasks/<task>/seed/db.json`: the data the helpdesk starts with, the
+   support policy included.
+3. `tasks/<task>/user.json`: the customer. `script` drives the scripted user
+   (an opening, ordered reply rules matched on words in the agent's message,
+   a closing rule, a default); `persona` drives a model-played user (name,
+   goal, known facts, unknown facts, behaviour, when satisfied). Keep both,
+   so the suite can switch modes.
+4. `tasks/<task>/verifier/tests/checks.py`: `DB` (the changes the task
+   needs), `POLICY` (what must not happen) and `COMMUNICATE` (what the agent
+   must say, or what the customer must have been asked); `verify.py` beside
+   it documents every check and needs no change.
+5. `escalation:` in task.yaml: `expected` or `not_expected`.
+6. `tasks/<task>/solution/reference.sh`: the conversation and calls a
+   correct agent makes. Admission runs it in the agent's place, with the
+   scripted customer, and the verifier must pass it.
+
+Leave `services/helpdesk/simuser.py` and `prompts/` as Heimdall wrote them:
+the planner pins the prompt's sha256, and the simulator refuses to start in
+llm mode when its prompt differs.
+
+`controls/` holds what admission requires to fail: the empty control, an
+exploit and plausible wrong ways to handle the chat (mutant scripts).
+
+## Layout
+
+```
+suite.yaml                       the suite: image, grader, output, simulator, tasks, probes
+base/Dockerfile                  the toolchain image the workspace and verifier run on
+services/helpdesk/               one image: the helpdesk (server.py) and the customer (simuser.py, prompts/)
+probes/tool-error-first.yaml     a tool fault: the first helpdesk call fails
+probes/hostile-customer.yaml     a hostile user message: a fake management note asking for credit
+probes/model-outage.yaml         a gateway fault: the model answers 503 from call 3
+tasks/<task>/task.yaml           one task: the two services, escalation, hidden verifier, controls
+tasks/<task>/instruction.md      what the agent is asked to do
+tasks/<task>/user.json           the customer: script and persona
+tasks/<task>/seed/db.json        the data the helpdesk starts with
+tasks/<task>/verifier/tests/     hidden: verify.py and checks.py, at /grader/tests
+tasks/<task>/solution/           the reference script that must pass
+tasks/<task>/controls/           empty, exploit and mutant scripts that must fail
+```
+
+## Commands
+
+Run from the project root.
+
+    [[.Build]]
+    docker build -t bench/[[.ID]]-helpdesk:1 benchmarks/[[.ID]]/services/helpdesk
+    bifrost-bench task validate [[.ID]]/[[.Sample]]
+    bifrost-bench task admit [[.ID]]/[[.Sample]]
+    bifrost-bench task init -suite [[.ID]] -id t02
+    bifrost-bench suite lint [[.ID]]
+
+`task admit` builds the base image and the service image when missing and
+records the result in `suite.lock`. Admission uses the scripted customer
+(no model, no key). For a model-played customer set `simulator: {mode: llm,
+provider: ..., model: ...}` in suite.yaml or in an experiment; its calls go
+through the gateway on the customer's own key and are reported as
+`simulator_cost_usd`, apart from the agent's cost.

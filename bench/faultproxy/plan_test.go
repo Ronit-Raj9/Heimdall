@@ -1,6 +1,8 @@
 package faultproxy
 
 import (
+	"net/http/httptest"
+	"strings"
 	"sync"
 	"testing"
 
@@ -26,6 +28,9 @@ func TestValidatePlan(t *testing.T) {
 		{"scripted", schemas.FaultPlan{Mode: ModeScripted, RunID: "r"}, true},
 		{"scripted with a status", schemas.FaultPlan{Mode: ModeScripted, Status: 503}, false},
 		{"scripted with a call", schemas.FaultPlan{Mode: ModeScripted, Call: 1}, false},
+		{"persistent for one model", schemas.FaultPlan{Mode: ModePersistent, FromCall: 1, Status: 503, Model: "claude-sonnet-4-6"}, true}, // W9
+		{"model on a none plan", schemas.FaultPlan{Mode: ModeNone, Model: "claude-sonnet-4-6"}, false},
+		{"model on a scripted plan", schemas.FaultPlan{Mode: ModeScripted, Model: "claude-sonnet-4-6"}, false},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
@@ -102,4 +107,72 @@ func TestPlanTableConcurrentCallsAreDistinct(t *testing.T) {
 		}()
 	}
 	wg.Wait()
+}
+
+// TestPlanModelFilter (W9): a model-filtered plan fails only that model's
+// requests, numbered among themselves, while the ledger call number counts
+// every message call of the slot; "*" fails every model.
+func TestPlanModelFilter(t *testing.T) {
+	pt := newPlanTable()
+	if err := pt.set("s", schemas.FaultPlan{Mode: ModePersistent, FromCall: 2, Status: 503, Model: "anthropic/strong", RunID: "r"}); err != nil {
+		t.Fatal(err)
+	}
+	steps := []struct {
+		model  string
+		call   int
+		inject bool
+	}{
+		{"cheap", 1, false}, {"strong", 2, false}, {"cheap", 3, false}, {"strong", 4, true}, {"strong", 5, true}, {"", 6, false},
+	}
+	for i, st := range steps {
+		if d := pt.beginModel("s", KindMessage, st.model); d.Call != st.call || d.Inject != st.inject {
+			t.Fatalf("step %d (%s): call %d inject %v, want %d %v", i, st.model, d.Call, d.Inject, st.call, st.inject)
+		}
+	}
+	if err := pt.set("s", schemas.FaultPlan{Mode: ModeOnce, Call: 1, Status: 529, Model: ModelAll}); err != nil {
+		t.Fatal(err)
+	}
+	if d := pt.beginModel("s", KindMessage, "cheap"); !d.Inject {
+		t.Fatal("model * must fail every model")
+	}
+}
+
+func TestRequestModel(t *testing.T) {
+	anth := ProviderSpec{Name: "anthropic", Format: FormatAnthropic}
+	gem := ProviderSpec{Name: "gemini", Format: FormatGemini}
+	cases := []struct {
+		name string
+		p    ProviderSpec
+		path string
+		kind string
+		body string
+		want string
+	}{
+		{"anthropic body", anth, "/v1/messages", KindMessage, `{"model":"claude-sonnet-4-6","max_tokens":1}`, "claude-sonnet-4-6"},
+		{"gemini path", gem, "/v1beta/models/gemini-2.5-pro:streamGenerateContent", KindMessage, `{}`, "gemini-2.5-pro"},
+		{"not a message", anth, "/v1/messages/count_tokens", KindCountTokens, `{"model":"x"}`, ""},
+		{"bad body", anth, "/v1/messages", KindMessage, `{`, ""},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			r := httptest.NewRequest("POST", tc.path, strings.NewReader(tc.body))
+			if got := requestModel(tc.p, r, tc.kind, []byte(tc.body)); got != tc.want {
+				t.Fatalf("model = %q, want %q", got, tc.want)
+			}
+		})
+	}
+}
+
+func TestSameModel(t *testing.T) {
+	cases := []struct {
+		a, b string
+		want bool
+	}{
+		{"claude-x", "claude-x", true}, {"anthropic/claude-x", "claude-x", true}, {"claude-x", "claude-y", false}, {"", "", false},
+	}
+	for _, tc := range cases {
+		if got := SameModel(tc.a, tc.b); got != tc.want {
+			t.Errorf("SameModel(%q, %q) = %v", tc.a, tc.b, got)
+		}
+	}
 }

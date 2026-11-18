@@ -1,0 +1,8 @@
+# Keys of bench.ts `InboxSourceStatus`, one per line; a trailing ? marks an optional (Go omitempty) key.
+# Failure inbox (handlers/inbox.go, traceinbox, docs/failure-inbox.md). Change with bench.ts.
+name
+kind
+last_pull?
+since?
+last_error?
+pulled?

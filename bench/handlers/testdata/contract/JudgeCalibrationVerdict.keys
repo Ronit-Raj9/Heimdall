@@ -1,0 +1,21 @@
+# Keys of bench.ts `JudgeCalibrationVerdict`, one per line; a trailing ? marks an optional (Go omitempty) key.
+# W8 judge calibration (calibration/instrument.go). Change with bench.ts.
+state
+detail
+model
+templates
+record_id?
+record_hash?
+record_at?
+human_labels
+agreement?
+tnr?
+fpr?
+kappa?
+thresholds
+reminders?
+judged_runs
+contested_runs
+error_over_effect?
+capped_from?
+bias_adjusted?

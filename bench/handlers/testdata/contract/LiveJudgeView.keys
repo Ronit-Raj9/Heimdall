@@ -1,0 +1,5 @@
+# livescore.JudgeView (X6 live scoring, docs/live-scoring.md); ? marks an omitempty key
+model
+sample_rate
+calibrated
+note

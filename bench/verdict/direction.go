@@ -36,6 +36,11 @@ var lowerIsBetter = map[string]bool{
 	"model_turns_failed": true, "model_turns_total": true, "model_retries": true, "model_fallbacks": true, // model turn family beside steps
 	"reported_steps": true, "reported_tool_calls": true, "subagents_spawned": true, "events_dropped": true, // Agent events area: agent-reported
 	"tool_proof_result_returned": true, "tool_proof_none": true, // proof classes of requested tool calls
+	"fallback_used": true, "served_model_switches": true, "routed_target": true, // W9 routing policy under test
+	"escalated": true, "policy_violation": true, "user_turns": true, "simulator_cost_usd": true, // W3 customer support
+	"searches": true, // W4 research with Tavily
+
+	"time_to_first_audio_ms": true, "turn_latency_p50_ms": true, "turn_latency_p95_ms": true, "dead_air_s": true, "stt_wer": true, "voice_cost_per_minute": true, // X8 voice agents
 }
 
 // rateMetrics lists the built-in metrics of kind rate: every value lies in
@@ -60,6 +65,12 @@ var rateMetrics = map[string]bool{
 	"adapter_fault_recovery_rate": true,
 	// Proof classes of requested tool calls.
 	"tool_proof_rate": true, "tool_proof_proxy": true, "tool_proof_process": true, "tool_proof_file_effect": true, "tool_proof_shim": true, "tool_proof_result_returned": true, "tool_proof_none": true,
+	"fallback_used": true,                                                       // W9 routing policy under test
+	"escalated":     true, "escalation_correct": true, "policy_violation": true, // W3 customer support
+	"citations_grounded": true, "citation_precision": true, // W4 research with Tavily
+	"barge_in_handled": true,                             // X8 voice agents
+	"evidence_recall":  true,                             // X5a research importers
+	"visual_score":     true, "visual_judge_score": true, // X1 vision grading
 }
 
 // HigherIsBetter reports whether a rise in metric is an improvement. The

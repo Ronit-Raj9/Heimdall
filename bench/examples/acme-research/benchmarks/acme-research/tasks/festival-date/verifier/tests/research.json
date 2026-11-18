@@ -1,0 +1,23 @@
+{
+  "question": "On what date was the first Lantern Tide festival held in Skerry Harbour?",
+  "category": "date",
+  "match": "regex",
+  "expected": [
+    "\\b1987-08-14\\b",
+    "\\b14(st|nd|rd|th)? august,? 1987\\b",
+    "\\baugust 14(st|nd|rd|th)?,? 1987\\b"
+  ],
+  "normalize": [
+    "lower",
+    "collapse_space"
+  ],
+  "evidence_urls": [
+    "https://calder-gazette.example/2017/08/lantern-tide-at-thirty"
+  ],
+  "require_grounding": true,
+  "wrong_answers": [
+    "1986-08-14",
+    "2026-08-22",
+    "August 1987"
+  ]
+}

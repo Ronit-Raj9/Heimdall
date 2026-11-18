@@ -1,0 +1,6 @@
+# Keys of bench.ts `CalibrationRate`, one per line; value, lo and hi are null when n is 0. W8 judge calibration.
+k
+n
+value
+lo
+hi

@@ -176,6 +176,10 @@ func TestExampleArtifactControls(t *testing.T) {
 				continue
 			}
 			ran++
+			if s.Grader == "visual" { // X1 vision grading: the verifier's side only (visualtask_test.go)
+				t.Run(s.ID+"/"+task.ID, func(t *testing.T) { checkVisualArtifactControls(t, s, task) })
+				continue
+			}
 			t.Run(s.ID+"/"+task.ID, func(t *testing.T) { checkArtifactControls(t, s, task) })
 		}
 	}

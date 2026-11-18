@@ -1,0 +1,127 @@
+# Written by `heimdall ci install github -mode live`: the Heimdall agent gate.
+# On every pull request that can change the coding agent (notes, skills,
+# prompts, the .heimdall project) it runs `heimdall check` through Heimdall's
+# composite action (bench/ci/action.yml), posts the verdict card as one PR
+# comment that later runs update in place, uploads the evidence and fails on
+# regressed,invalid or a release-policy block.
+#
+# LIVE mode runs real agents, so it needs a SELF-HOSTED runner labelled
+# `heimdall` with Docker, Go and the Heimdall stack up (`heimdall init` and
+# `docker compose ... up -d --wait` on that machine). The stack's tokens stay
+# on the runner in an env file; set the repository variable HEIMDALL_ENV_FILE
+# to its path. Provider keys live only in the stack's fault proxy and never
+# appear in this workflow or its logs. Pull requests from forks are skipped:
+# their code would run next to the stack.
+name: Heimdall agent gate
+
+on:
+  pull_request:
+    paths:
+      - "AGENTS.md"
+      - "CLAUDE.md"
+      - "GEMINI.md"
+      - ".claude/**"
+      - "skills/**"
+      - "prompts/**"
+      - ".heimdall/**"
+      - ".github/workflows/heimdall.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pull-requests: write # the verdict comment
+
+concurrency:
+  group: heimdall-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  gate:
+    name: Heimdall agent gate (live)
+    if: github.event_name == 'workflow_dispatch' || github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: [self-hosted, heimdall]
+    timeout-minutes: 180
+    env:
+      HEIMDALL_DIR: ${{ github.workspace }}/.heimdall
+    steps:
+      - name: Check out the repository
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          fetch-depth: 0 # tasks and the baseline ref come from history
+          persist-credentials: false
+
+      - name: Check out Heimdall
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          repository: Ronit-Raj9/Heimdall
+          ref: 0123abc # pin a commit for a reproducible gate
+          path: .heimdall-src
+          persist-credentials: false
+
+      - name: Set up Go
+        uses: actions/setup-go@4b73464bb391d4059bd26b0524d20df3927bd417 # v6.3.0
+        with:
+          go-version-file: .heimdall-src/bench/go.mod
+          cache-dependency-path: .heimdall-src/bench/go.sum
+
+      - name: Build heimdall
+        working-directory: .heimdall-src/bench
+        env:
+          GOWORK: "off"
+          CGO_ENABLED: "0"
+        run: go build -o "$RUNNER_TEMP/heimdall" ./cmd/bifrost-bench
+
+      - name: Write the baseline-vs-candidate experiment
+        working-directory: .heimdall
+        run: |
+          rm -rf experiments/pr-gate.yaml experiments/fixtures/pr-gate
+          "$RUNNER_TEMP/heimdall" compare --baseline "origin/${{ github.base_ref || 'main' }}" --candidate "${{ github.sha }}" --base agents/claude-code.yaml --trials 3 --fault model-outage --budget-usd 5 --name pr-gate --write-only
+
+      - name: Heimdall gate
+        id: gate
+        uses: ./.heimdall-src/bench/ci
+        env:
+          BENCH_CI_BENCH_DIR: ${{ github.workspace }}/.heimdall
+          BENCH_CI_ENV_FILE: ${{ vars.HEIMDALL_ENV_FILE }} # an env file on the runner; never echoed
+          BENCH_RUNS_ROOT: ${{ github.workspace }}/.heimdall/runs
+        with:
+          mode: live
+          bin: ${{ runner.temp }}/heimdall
+          experiment: experiments/pr-gate.yaml
+          policy: "" # .heimdall/policies/default.yaml
+          fail-on: regressed,invalid
+          artifact-name: heimdall-report
+
+      - name: Render the verdict card
+        if: always() && steps.gate.outputs.report != ''
+        run: |
+          "$RUNNER_TEMP/heimdall" ci card -config "$HEIMDALL_DIR/deploy/bench.yaml" \
+            -report "${{ steps.gate.outputs.report }}" -out "$RUNNER_TEMP/heimdall-card.md" \
+            -evidence "artifact heimdall-evidence of run ${{ github.run_id }}"
+
+      - name: Post or update the PR comment
+        if: always() && github.event_name == 'pull_request'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR: ${{ github.event.pull_request.number }}
+          REPO: ${{ github.repository }}
+        run: |
+          card="$RUNNER_TEMP/heimdall-card.md"
+          [ -s "$card" ] || { echo "no verdict card (check stopped before a report)"; exit 0; }
+          id=$(gh api "repos/$REPO/issues/$PR/comments" --paginate --jq '.[] | select(.body | startswith("<!-- heimdall-verdict -->")) | .id' | head -n 1)
+          if [ -n "$id" ]; then
+            gh api -X PATCH "repos/$REPO/issues/comments/$id" -F body=@"$card" >/dev/null
+          else
+            gh api -X POST "repos/$REPO/issues/$PR/comments" -F body=@"$card" >/dev/null
+          fi
+
+      - name: Upload the evidence bundle
+        if: always()
+        uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f # v7.0.0
+        with:
+          name: heimdall-evidence
+          path: |
+            .heimdall/runs/
+            .heimdall/experiments/pr-gate.yaml
+            ${{ runner.temp }}/heimdall-card.md
+          if-no-files-found: warn

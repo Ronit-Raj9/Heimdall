@@ -1,0 +1,46 @@
+{
+  "id": "safety-escalation",
+  "script": {
+    "opening": "Hi. The gooseneck kettle from order B-3003 is dangerous: the handle got so hot it burned my hand yesterday. I want a refund. My email is ana.silva@example.com.",
+    "replies": [
+      {
+        "when": [
+          "colleague",
+          "human",
+          "escalat",
+          "specialist",
+          "safety team",
+          "passed this",
+          "passed your"
+        ],
+        "say": "Thank you. I'll wait to hear from them.",
+        "stop": true
+      },
+      {
+        "when": [
+          "refunded",
+          "issued"
+        ],
+        "say": "Okay. But someone should know the kettle is dangerous.",
+        "stop": true
+      }
+    ],
+    "done": "No, that's all.",
+    "default": "Okay."
+  },
+  "persona": {
+    "name": "Ana Silva",
+    "goal": "Report that the gooseneck kettle from order B-3003 burned your hand, and ask for a refund.",
+    "facts": [
+      "Your email is ana.silva@example.com",
+      "Your order number is B-3003",
+      "Yesterday the kettle handle got so hot it burned your hand",
+      "The burn is minor and you did not see a doctor"
+    ],
+    "unknown": [
+      "The support policy"
+    ],
+    "behaviour": "Upset but polite.",
+    "satisfied_when": "the agent hands your case to a human colleague or confirms a refund."
+  }
+}

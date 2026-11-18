@@ -36,10 +36,25 @@ const (
 	EventExperimentInvalid = "experiment_invalid"
 	EventRunErrors         = "run_errors"
 	EventScheduleFailed    = "schedule_failed"
+	// W5 drift canary (docs/drift-canary.md): a confirmed drift against the
+	// baseline, and a served model that changed under the same alias.
+	EventCanaryDrifted      = "canary_drifted"
+	EventCanaryModelChanged = "canary_model_changed"
 )
 
 // Events lists every event, in the order the docs describe them.
-var Events = []string{EventVerdictRegressed, EventPolicyBlock, EventExperimentInvalid, EventRunErrors, EventScheduleFailed}
+var Events = []string{EventVerdictRegressed, EventPolicyBlock, EventExperimentInvalid, EventRunErrors, EventScheduleFailed,
+	EventCanaryDrifted, EventCanaryModelChanged} // W5 drift canary
+
+// X6 live scoring (docs/live-scoring.md): a live signal crossed its
+// threshold, and a live comparison decided the candidate worse. The numbers
+// are in Message and Changes.
+const (
+	EventLiveThreshold = "live_signal_threshold"
+	EventLiveWorse     = "live_comparison_worse"
+)
+
+func init() { Events = append(Events, EventLiveThreshold, EventLiveWorse) } // X6 live scoring
 
 // Payload formats.
 const (
@@ -120,6 +135,10 @@ type Payload struct {
 	Summary    Summary   `json:"summary"`
 	Message    string    `json:"message"` // one line in plain words; the text of a slack-format alert
 	SentAt     time.Time `json:"sent_at"`
+	// W5 drift canary: the canary and what moved against its baseline, one
+	// line each (docs/drift-canary.md); empty for every other alert.
+	Canary  string   `json:"canary,omitempty"`
+	Changes []string `json:"changes,omitempty"`
 }
 
 // Summary carries the numbers behind an alert.

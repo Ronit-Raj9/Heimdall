@@ -1,0 +1,10 @@
+{
+  "search": [
+    "Skerry Harbour visitor mooring fee",
+    "Skerry Harbour mooring fee 2026",
+    "visitor mooring fee per night 10 metre yacht Skerry Harbour"
+  ],
+  "extract": [
+    "https://skerry-harbour.example/notices/2026-visitor-mooring-fees"
+  ]
+}

@@ -62,6 +62,27 @@ func TestHygiene(t *testing.T) {
 				t.Errorf("enabled rules = %d, want 1", m.Hygiene.RoutingRules)
 			}
 		}},
+		// W9: a run's own VK-scoped policy rule is expected and recorded; a
+		// foreign rule, or a bench-named rule that is not VK-scoped, still fails.
+		{name: "bench run rule is recorded, not a violation", mutate: func(f *fakeBifrost) {
+			r := rule(RouteRuleName("r_route0001"), nil, []map[string]any{{"provider": "anthropic", "model": testModel, "weight": 1}}, []any{"anthropic/claude-haiku-4-5"})
+			r["scope"], r["scope_id"] = "virtual_key", "vk-9"
+			f.rules = []map[string]any{r}
+		}, check: func(t *testing.T, f *fakeBifrost, g *Gateway) {
+			m, _ := g.Preflight(context.Background())
+			if len(m.Hygiene.Violations) != 0 || m.Hygiene.RoutingRules != 0 || len(m.Hygiene.BenchRouting) != 1 ||
+				!strings.Contains(m.Hygiene.BenchRouting[0], "heimdall-route-r_route0001") || !strings.Contains(m.Hygiene.BenchRouting[0], "vk-9") {
+				t.Errorf("hygiene = %+v", m.Hygiene)
+			}
+		}},
+		{name: "foreign VK-scoped rule still fails", mutate: func(f *fakeBifrost) {
+			r := rule("team-router", nil, []map[string]any{half("openai"), half("anthropic")}, nil)
+			r["scope"], r["scope_id"] = "virtual_key", "vk-9"
+			f.rules = []map[string]any{r}
+		}, violations: []string{"routing rule team-router (id id-team-router, scope virtual_key"}},
+		{name: "bench-named global rule still fails", mutate: func(f *fakeBifrost) {
+			f.rules = []map[string]any{rule(RouteRuleName("r_route0001"), nil, []map[string]any{half("openai"), half("anthropic")}, nil)}
+		}, violations: []string{"routing rule heimdall-route-r_route0001 (id id-heimdall-route-r_route0001, scope global"}},
 		{name: "enabled model router", mutate: func(f *fakeBifrost) {
 			f.routers = []map[string]any{{"id": "mr1", "name": "smart", "routing": map[string]any{"enabled": true}},
 				{"id": "mr2", "name": "idle", "routing": map[string]any{"enabled": false}}}

@@ -41,7 +41,8 @@
 		"invalid_evaluator",
 		"veto",
 		"false_completion",
-		"flagged"
+		"flagged",
+		"contested"
 	],
 	"problems": []
 }

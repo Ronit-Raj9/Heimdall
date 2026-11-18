@@ -1,0 +1,6 @@
+# Keys of bench.ts `AdaptiveTaskState` (schemas/trials.go, W7). Change with bench.ts.
+condition
+task
+trials
+max
+reason

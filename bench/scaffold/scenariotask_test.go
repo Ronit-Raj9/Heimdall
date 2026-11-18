@@ -53,6 +53,12 @@ func checkScenarioShape(t *testing.T, tmpl string, s *schemas.Suite, task *schem
 		checkExternalShape(t, s, task)
 	case tmpl == TemplateComputerUse:
 		checkComputerUseShape(t, s, task)
+	case tmpl == TemplateSupport: // W3 customer support
+		checkSupportShape(t, s, task)
+	case tmpl == TemplateResearch: // W4 research with Tavily
+		checkResearchShape(t, s, task)
+	case tmpl == TemplateVoice: // X8 voice agents (voicetemplate_test.go)
+		checkVoiceShape(t, s, task)
 	case stateTemplate(tmpl):
 		if s.Output == nil || s.Output.Kind != schemas.OutputState || s.Grader != "verifier_command" || s.Verifier.Result != schemas.VerifierResultReward {
 			t.Errorf("suite output %+v grader %s result %s", s.Output, s.Grader, s.Verifier.Result)
@@ -555,4 +561,29 @@ func browserVerify(t *testing.T, tests, state string) map[string]float64 {
 	}
 	r.Dimensions["reward"] = r.Reward
 	return r.Dimensions
+}
+
+// checkSupportShape checks the support template (W3): a support track with
+// a scripted simulator, the helpdesk MCP server, and the simulated customer
+// as an MCP server marked gateway: {} with a user file and its transcript
+// exported.
+func checkSupportShape(t *testing.T, s *schemas.Suite, task *schemas.Task) {
+	t.Helper()
+	if s.Track != schemas.TrackSupport || s.Output == nil || s.Output.Kind != schemas.OutputState || s.Simulator == nil || s.Simulator.Mode != schemas.SimulatorScripted {
+		t.Errorf("suite track %s output %+v simulator %+v", s.Track, s.Output, s.Simulator)
+	}
+	if len(task.Services) != 2 {
+		t.Fatalf("services = %+v", task.Services)
+	}
+	desk, customer := task.Services[0], task.Services[1]
+	if desk.ID != "helpdesk" || desk.Role != schemas.ServiceRoleMCP || desk.Image != "bench/demo-helpdesk:1" || desk.Gateway != nil || len(desk.Export) != 1 {
+		t.Errorf("helpdesk = %+v", desk)
+	}
+	if customer.ID != "customer" || customer.Role != schemas.ServiceRoleMCP || customer.Gateway == nil || *customer.Gateway != (schemas.ServiceGateway{}) ||
+		customer.Files["/sim/user.json"] != "user.json" || len(customer.Export) != 1 || customer.Export[0].ID != "transcript.json" {
+		t.Errorf("customer = %+v", customer)
+	}
+	if task.Escalation == "" || !strings.HasSuffix(task.Controls.Reference, ".sh") {
+		t.Errorf("escalation %q controls %+v", task.Escalation, task.Controls)
+	}
 }

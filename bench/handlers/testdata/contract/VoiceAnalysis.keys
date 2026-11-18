@@ -1,0 +1,21 @@
+# Keys of bench.ts `VoiceAnalysis` (X8 voice agents, voice.Analysis). Change with bench.ts and the Go type.
+protocol
+wall_start_ms
+call_ms
+ended_by
+first_audio_ms?
+turns
+barge_ins
+dead_air_ms
+lines
+utterances
+reported?
+caller_frames
+agent_frames
+clears
+protocol_errors
+caller_audio?
+agent_audio?
+barge_in_bound_ms
+dead_air_bound_ms
+complete

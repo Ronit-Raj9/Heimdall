@@ -1,0 +1,12 @@
+# Keys of bench.ts `ResearchArm` (schemas.ResearchArm, W4 research with Tavily). Change with bench.ts and schemas/research.go.
+arm
+label?
+runs
+verified
+passed
+decided
+searches
+sources_cited
+citations_grounded
+citation_precision
+external_unmatched

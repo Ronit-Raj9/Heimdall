@@ -142,6 +142,12 @@ type Verdict struct {
 	Integrity         IntegrityStatus   `json:"integrity"`
 	ManifestHash      string            `json:"manifest_hash"`
 	FrozenAt          time.Time         `json:"frozen_at"`
+
+	// W7 adaptive trials and suite tiers (trials.go): the adaptive design's
+	// trials used and stopping reason, the tier, and what more evidence costs.
+	Adaptive     *AdaptiveReport `json:"adaptive,omitempty"`
+	Tier         string          `json:"tier,omitempty"`
+	MoreEvidence *MoreEvidence   `json:"more_evidence,omitempty"`
 }
 
 // InstrumentStatus is one instrument check's state.
@@ -220,6 +226,8 @@ type Analysis struct {
 	// any other grade source.
 	ReviewedRuns      int `json:"reviewed_runs,omitempty"`
 	ReviewChangedRuns int `json:"review_changed_runs,omitempty"`
+
+	JudgeCalibration *JudgeCalibrationVerdict `json:"judge_calibration,omitempty"` // W8 judge calibration: set only for a judged experiment (judgecalibration.go)
 }
 
 // Reporter writes an analysis in one format.

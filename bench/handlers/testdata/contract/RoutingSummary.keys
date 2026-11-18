@@ -1,0 +1,5 @@
+# Keys of bench.ts `RoutingSummary` (schemas.RoutingSummary, W9). Change with bench.ts and schemas/routing.go.
+exp_id
+routed
+arms
+differences

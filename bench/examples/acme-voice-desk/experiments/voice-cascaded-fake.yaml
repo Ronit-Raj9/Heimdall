@@ -1,0 +1,34 @@
+# The reference cascaded voice agent against the deliberately broken one,
+# through the real pipeline: every speech-to-text, chat and text-to-speech
+# call goes through Bifrost on the run's key and the fault proxy. Run it only
+# on a stack whose openai provider is the scripted audio and chat fake
+# (bench/voice/fakeopenai.py with voice/testdata/chat-script.json; the
+# throwaway stack in docs/voice-agents.md), where nothing is paid: on a stack
+# with a real OpenAI key every call is a paid call. Cost numbers are what
+# the calls would cost at pinned prices.
+#
+# Three tasks the chat script covers, clean; refund-in-policy also under
+# every voice probe (the caller barging in, background noise, a fast
+# talker, a quiet caller) and with speech to text down (stt-outage, the
+# fault proxy failing every whisper-1 call). Slots: (3 + 5) x 2 arms = 16.
+name: voice-cascaded-fake
+suite: acme-voice-desk@1.0.0
+base: agents/voice-cascaded.yaml
+arms:
+  A: {label: cascaded (reference)}
+  B: {label: "broken (talks over, dead air, half refunds)", agent: agents/voice-broken.yaml}
+primary: {condition: clean, metric: verified_success}
+guards:
+  - {rule: no_new_integrity_violation}
+conditions:
+  - {id: clean, tasks: [refund-in-policy, safety-escalation, refund-outside-policy], trials: 1}
+  - {id: caller-interrupts, tasks: [refund-in-policy], trials: 1}
+  - {id: caller-noise, tasks: [refund-in-policy], trials: 1}
+  - {id: caller-speed, tasks: [refund-in-policy], trials: 1}
+  - {id: caller-silent, tasks: [refund-in-policy], trials: 1}
+  - {id: stt-outage, tasks: [refund-in-policy], trials: 1}
+budget: {total_usd: 0.5}
+verdict: {policy: paired_signflip, alpha: 0.05, assumed_sd: 0.30}
+seed: 20261118
+concurrency: 1
+manifest_mode: agent_exposure

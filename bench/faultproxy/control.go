@@ -98,6 +98,7 @@ func (s *Server) handleHealth(w http.ResponseWriter, _ *http.Request) {
 	s.writeJSON(w, http.StatusOK, Health{
 		Status: "ok", Upstream: s.upstreamLabel(), Slots: len(s.names),
 		PlanModes: PlanModes, ScriptedProviders: s.scriptedProviders(),
+		PlanFields: PlanFields, // W9: model-filtered plans
 	})
 }
 
@@ -164,6 +165,7 @@ type Health struct {
 	Slots             int               `json:"slots"`
 	PlanModes         []string          `json:"plan_modes,omitempty"`
 	ScriptedProviders []string          `json:"scripted_providers,omitempty"`
+	PlanFields        []string          `json:"plan_fields,omitempty"` // W9: optional plan fields honoured; an older proxy rejects a plan that sets one
 }
 
 // Supports reports whether the proxy honours plan mode.

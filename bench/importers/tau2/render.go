@@ -10,6 +10,7 @@ import (
 	"strings"
 
 	"github.com/maximhq/bifrost/bench/schemas"
+	"github.com/maximhq/bifrost/bench/simuser"
 	"github.com/maximhq/bifrost/bench/utils"
 )
 
@@ -30,6 +31,10 @@ type writer struct {
 // in the service Dockerfile and fixes the base image tag.
 func (w *writer) prepare(domains []string) error {
 	w.dockerfile = strings.ReplaceAll(serviceDockerfile, "__TAU2_REF__", w.up.revision)
+	if w.set.user == UserLLM { // W3 customer support: the model-played user (bench/simuser) beside tau2svc.py
+		w.dockerfile = strings.Replace(w.dockerfile, "COPY tau2svc.py /opt/tau2svc/tau2svc.py\n",
+			"COPY tau2svc.py /opt/tau2svc/tau2svc.py\nCOPY simuser.py /opt/tau2svc/simuser.py\nCOPY prompts/ /opt/tau2svc/prompts/\n", 1)
+	}
 	w.baseTag = "bench/tau2-base:" + shortHash(baseDockerfile)
 	w.writes = map[string]map[string]bool{}
 	for _, d := range domains {
@@ -77,6 +82,11 @@ func (w *writer) writeTask(dir string, c candidate) error {
 		"verifier/tests/grading.json": string(grading) + "\n",
 		"verifier/requirements.md":    requirements(c),
 		"controls/empty.sh":           "#!/bin/sh\n# Empty control: no tool call and no message to the customer.\nexit 0\n",
+	}
+	if w.set.user == UserLLM { // W3 customer support: the user simulator in the service image
+		for rel, b := range simuser.Files() {
+			files["service/"+rel] = string(b)
+		}
 	}
 	for name, plan := range controlPlans(c, acts, w.writes[c.domain]) {
 		s, err := controlShell(name, c, plan)
@@ -170,6 +180,12 @@ func (w *writer) taskYAML(c candidate, acts []upAction, serviceImage string) str
 	p("    argv: [python, /opt/tau2svc/tau2svc.py, serve, --scenario, /task/scenario.json, --state, /state, --port, %s]\n", q(strconv.Itoa(servicePort)))
 	p("    files:\n      /task/scenario.json: scenario/scenario.json\n")
 	p("    port: %d\n", servicePort)
+	if w.set.user == UserLLM {
+		// W3 customer support: gateway: {} marks the service as the simulated
+		// user; in llm mode it gets its own virtual key for the suite's
+		// simulator model, never the agent's.
+		p("    gateway: {}\n")
+	}
 	p("    ready:\n      http: /healthz\n      timeout_s: 120\n")
 	p("    mcp:\n      transport: http\n      path: /mcp\n")
 	p("    export:\n")
@@ -216,7 +232,15 @@ func (w *writer) writeSuite(id string, tasks []string, rec schemas.ImportRecord)
 	p("  restore: []\n  timeout_s: %d\n  result: reward\n  result_path: /grader/out/reward.json\n", verifierTimeout)
 	p("tasks: [%s]\n", strings.Join(quoted, ", "))
 	p("probes: []\n")
-	p("track: %s\ngrading: %s\n", schemas.TrackToolUse, schemas.GradingVerified)
+	if w.set.user == UserLLM {
+		// W3 customer support: upstream's model-played user, pinned like a
+		// judge; plan refuses to run until provider and model are pinned.
+		p("track: %s\ngrading: %s\n", schemas.TrackSupport, schemas.GradingVerified)
+		p("simulator:\n  mode: %s\n  provider: %s\n  model: %s\n  prompt_version: %s\n  max_turns: %d\n",
+			schemas.SimulatorLLM, simuser.Placeholder, simuser.Placeholder, simuser.PromptTau2UserV1, w.set.maxTurns)
+	} else {
+		p("track: %s\ngrading: %s\n", schemas.TrackToolUse, schemas.GradingVerified)
+	}
 	p("output:\n  kind: state\n")
 	p("imported:\n  importer: %s\n  benchmark: %s\n  source: %s\n  revision: %s\n  license: %s\n  at: %s\n",
 		rec.Importer, q(rec.Benchmark), q(rec.Source), rec.Revision, rec.License, rec.At.Format("2006-01-02T15:04:05Z"))

@@ -1,0 +1,29 @@
+# Keys of bench.ts `ExportRunRow` (export.RunRow, W10): one line of GET /experiments/{id}/export?format=jsonl.
+# Change with bench.ts and export/runtable.go; export/eee_test.go checks the Go side.
+exp_id
+run_id
+slot_id
+pair_id
+suite
+task
+task_version
+arm
+arm_label
+agent_config
+model
+provider
+condition
+trial
+attempt
+outcome
+verified_success
+grade_passed
+grade_source
+cost_usd
+synthetic
+started?
+sealed?
+manifest_hash
+seal_hash
+problems?
+metrics

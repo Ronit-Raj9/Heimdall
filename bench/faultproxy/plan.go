@@ -1,8 +1,11 @@
 package faultproxy
 
 import (
+	"encoding/json"
 	"errors"
 	"fmt"
+	"net/http"
+	"strings"
 	"sync"
 
 	"github.com/maximhq/bifrost/bench/schemas"
@@ -31,6 +34,11 @@ const (
 	KindCountTokens = "count_tokens"
 	KindModels      = "models"
 	KindOther       = "other"
+	// KindAudio is a speech or transcription request (X8 voice agents,
+	// ProviderSpec.Audio). It is never counted for a plan without a model;
+	// a plan with a model (an STT-outage probe on whisper-1, say) counts and
+	// fails audio requests for that model among themselves.
+	KindAudio = "audio"
 )
 
 // Ledger actions.
@@ -45,6 +53,9 @@ const (
 func ValidatePlan(p schemas.FaultPlan) error {
 	if p.RetryAfterS < 0 {
 		return fmt.Errorf("retry_after_s must be >= 0, got %d", p.RetryAfterS)
+	}
+	if p.Model != "" && p.Mode != ModePersistent && p.Mode != ModeOnce { // W9: a model filter only narrows a fault
+		return fmt.Errorf("model %q needs mode persistent or once, got %q", p.Model, p.Mode)
 	}
 	switch p.Mode {
 	case "", ModeNone:
@@ -85,6 +96,8 @@ type slotState struct {
 	hasPlan    bool
 	calls      int
 	toolServed bool // the scripted model already answered this run with a tool_use
+	modelCalls int  // W9: message calls for the plan's model, which number a model-filtered fault
+	audioCalls int  // X8 voice agents: audio requests of the slot (ledger call numbers of KindAudio lines)
 }
 
 // decision is what the proxy does with one request.
@@ -136,18 +149,44 @@ func (t *planTable) get(slot string) (schemas.FaultPlan, bool) {
 
 // begin counts a request of kind on slot and decides whether to inject.
 // Counting and deciding happen under one lock so concurrent requests on a
-// slot get distinct call numbers.
-func (t *planTable) begin(slot, kind string) decision {
+// slot get distinct call numbers. A plan with a model (W9) fires only on
+// requests for that model, numbered among themselves: from_call 1 fails the
+// first call for the model whatever other models were called before; the
+// ledger call number still counts every message call of the slot.
+func (t *planTable) begin(slot, kind string) decision { return t.beginModel(slot, kind, "") }
+
+// beginModel is begin for a request whose model is known (W9).
+func (t *planTable) beginModel(slot, kind, model string) decision {
 	t.mu.Lock()
 	defer t.mu.Unlock()
 	st := t.state(slot)
 	d := decision{RunID: st.plan.RunID, Nonce: st.plan.Nonce, Scripted: st.plan.Mode == ModeScripted}
+	if kind == KindAudio { // X8 voice agents: audio counts only for a plan aimed at its model
+		st.audioCalls++
+		d.Call = st.audioCalls
+		if !filtered(st.plan) || !SameModel(model, st.plan.Model) {
+			return d
+		}
+		st.modelCalls++
+		if fires(st.plan, st.modelCalls) {
+			d.Inject, d.Status, d.RetryAfterS = true, st.plan.Status, st.plan.RetryAfterS
+		}
+		return d
+	}
 	if kind != KindMessage {
 		return d
 	}
 	st.calls++
 	d.Call = st.calls
-	if fires(st.plan, d.Call) {
+	n := d.Call
+	if filtered(st.plan) {
+		if !SameModel(model, st.plan.Model) {
+			return d
+		}
+		st.modelCalls++
+		n = st.modelCalls
+	}
+	if fires(st.plan, n) {
 		d.Inject = true
 		d.Status = st.plan.Status
 		d.RetryAfterS = st.plan.RetryAfterS
@@ -186,4 +225,59 @@ func fires(p schemas.FaultPlan, call int) bool {
 	default:
 		return false
 	}
+}
+
+// filtered reports whether the plan fails only one model's requests.
+func filtered(p schemas.FaultPlan) bool {
+	return p.Model != "" && p.Model != ModelAll
+}
+
+// PlanFields lists the optional plan fields this proxy honours, as /health
+// reports them (W9). The control API decodes plans strictly, so an older
+// proxy refuses a plan with a model instead of failing every model.
+var PlanFields = []string{"model"}
+
+// ModelAll is the plan model that fails every model, as an empty one does;
+// it lets a probe say so explicitly for a routed run, whose gateway probe
+// would otherwise narrow the fault to the run's primary target (W9).
+const ModelAll = "*"
+
+// SameModel compares a request's model with a plan's, ignoring one leading
+// provider segment on either side ("anthropic/claude-x" equals "claude-x"),
+// as the model fidelity gate does. Bifrost sends the bare model upstream.
+func SameModel(a, b string) bool {
+	if a == b {
+		return a != ""
+	}
+	_, ar, aok := strings.Cut(a, "/")
+	_, br, bok := strings.Cut(b, "/")
+	return (aok && ar == b) || (bok && a == br) || (aok && bok && ar == br)
+}
+
+// requestModel is the model a conversation request asks the provider for:
+// the body's "model" (Anthropic and OpenAI formats), or the Gemini path
+// segment between "models/" and ":". Empty when it cannot be read; such a
+// request never matches a model-filtered plan. It is pure.
+func requestModel(p ProviderSpec, r *http.Request, kind string, body []byte) string {
+	if kind == KindAudio { // X8 voice agents: a JSON speech body or a multipart transcription form
+		return audioModel(r, body)
+	}
+	if kind != KindMessage {
+		return ""
+	}
+	if p.Format == FormatGemini {
+		_, rest, ok := strings.Cut(r.URL.Path, "/models/")
+		if !ok {
+			return ""
+		}
+		model, _, _ := strings.Cut(rest, ":")
+		return model
+	}
+	var req struct {
+		Model string `json:"model"`
+	}
+	if json.Unmarshal(body, &req) != nil {
+		return ""
+	}
+	return req.Model
 }

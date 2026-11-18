@@ -1,0 +1,9 @@
+# Keys of bench.ts `AdaptiveLook` (schemas/trials.go, W7). Change with bench.ts.
+look
+tasks
+alpha
+p_low?
+p_high?
+d_bar
+outcome
+best_case_p?

@@ -1,0 +1,11 @@
+# Keys of bench.ts `AdaptiveView` (handlers/adaptive.go, W7). Change with bench.ts.
+exp_id
+tier
+tier_tasks
+trials
+plan
+report
+more_evidence
+extends
+decision
+max_slots

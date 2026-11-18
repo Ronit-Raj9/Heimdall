@@ -1,0 +1,5 @@
+# Keys of bench.ts `VoiceTrack` (X8 voice agents, handlers.VoiceTrack). Change with bench.ts and the Go type.
+track
+sha256
+bytes
+url
