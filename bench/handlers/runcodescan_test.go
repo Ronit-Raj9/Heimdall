@@ -7,6 +7,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/maximhq/bifrost/bench/codescan"
 	"github.com/maximhq/bifrost/bench/schemas"
 	"github.com/maximhq/bifrost/bench/utils"
 )
@@ -67,7 +68,7 @@ func TestRunCodeScan(t *testing.T) {
 	}
 
 	// Sealed code scan evidence at the current rules is served as it is.
-	write("r_t01_A", FileEvidence, `{"diff":{"path":"workspace.diff","sha256":"`+sum+`","files":[]},"codescan":{"rules_version":"1.0.0","scanned":true,"files":1,"added_lines":3,"findings":[]}}`)
+	write("r_t01_A", FileEvidence, `{"diff":{"path":"workspace.diff","sha256":"`+sum+`","files":[]},"codescan":{"rules_version":"`+codescan.RulesVersion+`","scanned":true,"files":1,"added_lines":3,"findings":[]}}`)
 	resp = c.do(t, "GET", APIPrefix+"/runs/r_t01_A/codescan", nil, nil)
 	rep = schemas.CodeScanReport{}
 	if err := json.Unmarshal(resp.Body(), &rep); err != nil || !rep.Sealed || rep.Counted != 0 || rep.Vetoed {

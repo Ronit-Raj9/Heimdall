@@ -26,7 +26,7 @@ import (
 // rule's firing logic: the insecure_code_added gate carries it as its
 // version, so results from different rules are never mixed and a regate
 // checks old runs again.
-const RulesVersion = "1.0.0"
+const RulesVersion = "1.1.0" // 1.1.0: files the bench planted are skipped, never blamed on the agent (source.go)
 
 // SourceBuiltin is CodeScanFinding.Source for the builtin rules.
 const SourceBuiltin = "builtin"
