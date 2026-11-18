@@ -75,6 +75,7 @@ func (h *RunsHandler) RegisterRoutes(r *router.Router, middlewares ...lib.Middle
 	r.GET(p+"/otlp", lib.ChainMiddlewares(h.getRunOTLP, middlewares...))                            // OpenTelemetry trace download (handlers/runotlp.go)
 	r.GET(p+"/steps", lib.ChainMiddlewares(h.getRunSteps, middlewares...))                          // unified step timeline (handlers/runsteps.go)
 	r.GET(p+"/remote", lib.ChainMiddlewares(h.getRunRemote, middlewares...))                        // Remote coverage: channel summary of a remote agent's run (handlers/runremote.go)
+	r.GET(p+"/a2a", lib.ChainMiddlewares(h.getRunA2A, middlewares...))                              // B1: the agent gateway witness of an a2a run (handlers/runa2a.go)
 	r.GET(p+"/visual/{name}", lib.ChainMiddlewares(h.getRunVisual, middlewares...))                 // X1 vision grading: capture, reference and diff images (handlers/runvisual.go)
 	r.GET(p+"/voice", lib.ChainMiddlewares(h.getRunVoice, middlewares...))                          // X8 voice agents: the call timeline (handlers/runvoice.go)
 	r.GET(p+"/voice/audio/{track}", lib.ChainMiddlewares(h.getRunVoiceAudio, middlewares...))       // X8 voice agents: call audio, caller or agent

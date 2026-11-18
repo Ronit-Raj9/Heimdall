@@ -1,0 +1,26 @@
+# A team of three reference A2A agents (docs/a2a-agents.md): the entry agent
+# (persona lead) delegates each task to the researcher and the writer through
+# Bifrost's agent gateway and joins their answers. The bench registers all
+# three per run. The lead receives the run's key (credential forwarding);
+# each member gets its own member key as its runtime credential, so every
+# model call and every delegation is on a key only that agent holds, and the
+# agent log proves who called whom (a2a_hops). The endpoints of the members
+# travel in the message metadata (heimdall.team).
+id: a2a-team
+adapter: a2a
+image: bench/coding-core-base:1
+model: claude-sonnet-4-5
+topology: orchestrator_worker
+a2a:
+  card_url: http://a2a-agents:9000/lead/.well-known/agent-card.json
+  timeout_s: 120
+  team:
+    - {id: researcher, role: worker, card_url: "http://a2a-agents:9000/researcher/.well-known/agent-card.json"}
+    - {id: writer, role: worker, card_url: "http://a2a-agents:9000/writer/.well-known/agent-card.json"}
+budgets:
+  wall_s: 300
+  cpus: 1
+  mem_gb: 1
+gateway:
+  provider: anthropic
+  max_retries: 0

@@ -125,6 +125,17 @@
           "description": "Layer service: environment variables added to the named services for this condition (service id, then variable, then value).",
           "additionalProperties": {"type": "object", "minProperties": 1, "additionalProperties": {"type": "string"}}
         },
+        "a2a": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["stream"],
+          "description": "B1: layer a2a. The launcher's client-side stream fault: drop closes the stream after after_events events, delay stops reading for delay_ms after the first event (docs/a2a-agents.md).",
+          "properties": {
+            "stream": {"enum": ["drop", "delay"]},
+            "after_events": {"type": "integer", "minimum": 1},
+            "delay_ms": {"type": "integer", "minimum": 0, "maximum": 60000}
+          }
+        },
         "agent": {"type": "string", "minLength": 1, "description": "Team runs: target one member id or every member with this role; a gateway-layer plan binds to that member's own key slot, a tool fault matches only its calls (docs/multi-agent.md)."}
       }
     },
@@ -155,6 +166,10 @@
     {
       "if": {"required": ["layer"], "properties": {"layer": {"const": "adapter"}}},
       "then": {"properties": {"apply": {"required": ["adapter_fault"]}}}
+    },
+    {
+      "if": {"required": ["layer"], "properties": {"layer": {"const": "a2a"}}},
+      "then": {"properties": {"apply": {"required": ["a2a"]}}}
     }
   ]
 }

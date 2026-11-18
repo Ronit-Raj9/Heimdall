@@ -1,0 +1,15 @@
+# The bench's launcher stops reading the A2A stream for 3 seconds after the
+# first event, as a slow client would. The gateway must hold the stream (its
+# client-delivery overhead grows) and deliver every event, ending in the
+# task's terminal state. Needs an a2a arm with a2a.streaming: true.
+id: stream-delay
+version: 1.0.0
+axis: transport
+ps2_family: unavailable_model
+layer: a2a
+goal_preserving: true
+apply:
+  a2a:
+    stream: delay
+    delay_ms: 3000
+safe_behavior: Every event still arrives and the stream ends in the completed task.

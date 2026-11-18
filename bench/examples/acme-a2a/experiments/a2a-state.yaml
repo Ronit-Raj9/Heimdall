@@ -1,0 +1,28 @@
+# The state output kind through the agent gateway (B1,
+# docs/a2a-agents.md). Arm A is the noop persona; arm B (persona clerk)
+# records the delivery with one HTTP call to the inventory tool through the
+# run's published tool gate (a2a.tools expose: the gate's URL and bearer
+# token travel in the A2A message's metadata). The gate must be reachable
+# from the agent: set remote_tools.listen and remote_tools.public_url to an
+# address the agent's host routes to (docs/remote-execution.md). Expected:
+# A 0 of 2, B 2 of 2, the call in tools.jsonl, every witness complete. $0.
+#
+# Slots: 1 task x 2 trials x 2 arms = 4.
+name: a2a-state
+smoke: true
+suite: acme-a2a-stock@0.1.0
+base: agents/a2a-noop-stock.yaml
+arms:
+  A: {label: noop}
+  B: {label: tool call through the published gate, agent: agents/a2a-clerk.yaml}
+primary: {condition: clean, metric: verified_success}
+guards:
+  - {rule: no_new_integrity_violation}
+conditions:
+  - {id: clean, tasks: all, trials: 2}
+budget: {total_usd: 0}
+verdict: {policy: paired_signflip, alpha: 0.05, assumed_sd: 0.30}
+seed: 20261118
+concurrency: 1
+manifest_mode: agent_exposure
+policy: policies/default.yaml

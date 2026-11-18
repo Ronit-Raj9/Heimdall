@@ -1,0 +1,27 @@
+# acme-a2a-files: one artifact task for A2A agents (B1,
+# docs/a2a-agents.md), written by `bifrost-bench suite init -template
+# artifact` and used unchanged. The agent writes report.csv and chart.svg
+# from data/sales.csv; the hidden verifier grades the files. An a2a agent
+# returns them as file parts of its task's artifacts, and with
+# a2a.artifacts inline the launcher writes them into the workspace, where
+# the artifact export picks them up like a local agent's files.
+id: acme-a2a-files
+version: 0.1.0
+description: Tasks graded on the files the agent writes, read by a hidden verifier.
+track: artifact
+environment: docker_workspace
+grader: verifier_command
+base_image:
+  tag: bench/coding-core-base:1
+workdir: /workspace
+output:
+  kind: artifact
+verifier:
+  command: ["python3", "/grader/tests/verify.py"]
+  result: reward
+  result_path: /grader/out/reward.json
+  pass_threshold: 1
+  restore: []
+  timeout_s: 120
+tasks: [sales-report]
+probes: [model-outage]

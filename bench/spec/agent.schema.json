@@ -8,7 +8,7 @@
   "required": ["id", "adapter"],
   "properties": {
     "id": {"type": "string", "pattern": "^[a-z0-9][a-z0-9._-]*$"},
-    "adapter": {"enum": ["command", "scripted", "remote_http"]},
+    "adapter": {"enum": ["command", "scripted", "remote_http", "a2a"]},
     "image": {"type": "string", "minLength": 1},
     "build": {"$ref": "#/$defs/image"},
     "argv": {"type": "array", "items": {"type": "string"}},
@@ -112,6 +112,34 @@
         "sign_env": {"type": "string", "pattern": "^[A-Za-z_][A-Za-z0-9_]*$", "description": "Host environment variable holding the HMAC secret each request body is signed with."}
       }
     },
+    "a2a": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "B1: an A2A agent reached through Bifrost's agent gateway, read by the a2a adapter. Mirrors schemas.A2AAgent (docs/a2a-agents.md).",
+      "properties": {
+        "card_url": {"type": "string", "pattern": "^https?://", "description": "The agent's own agent card URL as Bifrost reaches it; the bench registers it per run."},
+        "registration": {"type": "string", "pattern": "^[a-z0-9]+(-[a-z0-9]+)*$", "description": "An existing registration that allows any virtual key; the bench never edits it."},
+        "streaming": {"type": "boolean"},
+        "timeout_s": {"type": "integer", "minimum": 1},
+        "credential": {"enum": ["forward", "none"]},
+        "tools": {"enum": ["expose", "off"]},
+        "artifacts": {"enum": ["inline", "none"]},
+        "team": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["id", "card_url"],
+            "properties": {
+              "id": {"type": "string", "pattern": "^[a-z0-9]+(-[a-z0-9]+)*$"},
+              "card_url": {"type": "string", "pattern": "^https?://"},
+              "role": {"type": "string"},
+              "budget_usd": {"type": "number", "minimum": 0}
+            }
+          }
+        }
+      }
+    },
     "team": {"type": "array", "minItems": 2, "items": {"$ref": "#/$defs/team_member"}, "description": "Multi-container team: one container per member on the run network, each on its own gateway virtual key, under the run-wide cap budgets.usd (docs/multi-agent.md)."},
     "topology": {"enum": ["single", "best_of_n", "orchestrator_worker", "team", "swarm"], "description": "Labels the arm for topology comparisons and the equal_budget fairness report."},
     "limits": {
@@ -137,6 +165,10 @@
     {
       "if": {"required": ["adapter"], "properties": {"adapter": {"const": "remote_http"}}},
       "then": {"required": ["remote"]}
+    },
+    {
+      "if": {"required": ["adapter"], "properties": {"adapter": {"const": "a2a"}}},
+      "then": {"required": ["a2a"]}
     }
   ],
   "$defs": {

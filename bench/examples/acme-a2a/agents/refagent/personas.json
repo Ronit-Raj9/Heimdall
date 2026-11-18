@@ -1,0 +1,162 @@
+{
+  "model": "claude-sonnet-4-5",
+  "provider": "anthropic",
+  "personas": {
+    "oracle": {
+      "mode": "scripted",
+      "model_call": true,
+      "answers": [
+        {
+          "match": "refund window",
+          "answer": "30 days"
+        },
+        {
+          "match": "cut-off",
+          "answer": "14"
+        },
+        {
+          "match": "courier",
+          "answer": "Leeds; Parcelwing"
+        }
+      ]
+    },
+    "slow": {
+      "mode": "scripted",
+      "delay_s": 4,
+      "answers": [
+        {
+          "match": "refund window",
+          "answer": "30 days"
+        },
+        {
+          "match": "cut-off",
+          "answer": "14"
+        },
+        {
+          "match": "courier",
+          "answer": "Leeds; Parcelwing"
+        }
+      ]
+    },
+    "noop": {
+      "mode": "noop"
+    },
+    "broken": {
+      "mode": "broken",
+      "broken": "failed_task"
+    },
+    "broken-rpc": {
+      "mode": "broken",
+      "broken": "jsonrpc_error"
+    },
+    "failover": {
+      "mode": "scripted",
+      "dead_first": true,
+      "answers": [
+        {
+          "match": "refund window",
+          "answer": "30 days"
+        },
+        {
+          "match": "cut-off",
+          "answer": "14"
+        },
+        {
+          "match": "courier",
+          "answer": "Leeds; Parcelwing"
+        }
+      ]
+    },
+    "dropper": {
+      "mode": "scripted",
+      "drop_stream": true,
+      "delay_s": 1,
+      "answers": [
+        {
+          "match": "refund window",
+          "answer": "30 days"
+        },
+        {
+          "match": "cut-off",
+          "answer": "14"
+        },
+        {
+          "match": "courier",
+          "answer": "Leeds; Parcelwing"
+        }
+      ]
+    },
+    "lead": {
+      "mode": "delegate",
+      "model_call": true,
+      "workers": [
+        "researcher",
+        "writer"
+      ]
+    },
+    "researcher": {
+      "mode": "scripted",
+      "model_call": true,
+      "answers": [
+        {
+          "match": "",
+          "answer": "Leeds"
+        }
+      ]
+    },
+    "writer": {
+      "mode": "scripted",
+      "model_call": true,
+      "answers": [
+        {
+          "match": "",
+          "answer": "Parcelwing"
+        }
+      ]
+    },
+    "reporter": {
+      "mode": "scripted",
+      "model_call": true,
+      "answers": [
+        {
+          "match": "regional review",
+          "answer": "report.csv and chart.svg are attached.",
+          "artifacts": [
+            {
+              "name": "report.csv",
+              "text": "region,orders,units,revenue\r\nEast,2,8,267.00\r\nNorth,3,13,335.97\r\nSouth,3,10,352.46\r\nWest,3,19,402.43\r\n",
+              "media_type": "text/csv"
+            },
+            {
+              "name": "chart.svg",
+              "text": "<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"280\" height=\"240\" viewBox=\"0 0 280 240\">\n  <rect x=\"20\" y=\"87.31\" width=\"40\" height=\"132.69\" fill=\"#4a7bd0\"><title>East</title></rect>\n  <rect x=\"80\" y=\"53.03\" width=\"40\" height=\"166.97\" fill=\"#4a7bd0\"><title>North</title></rect>\n  <rect x=\"140\" y=\"44.83000000000001\" width=\"40\" height=\"175.17\" fill=\"#4a7bd0\"><title>South</title></rect>\n  <rect x=\"200\" y=\"20.0\" width=\"40\" height=\"200.0\" fill=\"#4a7bd0\"><title>West</title></rect>\n</svg>\n",
+              "media_type": "image/svg+xml"
+            }
+          ]
+        }
+      ]
+    },
+    "clerk": {
+      "mode": "scripted",
+      "model_call": true,
+      "answers": [
+        {
+          "match": "D-5531",
+          "answer": "Recorded 12 units of W-100 for delivery D-5531.",
+          "tool_calls": [
+            {
+              "tool": "inventory",
+              "method": "POST",
+              "path": "/items/W-100/adjust",
+              "body": {
+                "delta": 12,
+                "reason": "Delivery D-5531 from supplier"
+              }
+            }
+          ]
+        }
+      ]
+    }
+  },
+  "_comment": "Personas of the reference A2A agents (bench/a2a/refagent.py) for the acme-a2a example. Nothing here is a model: each persona answers what its script says."
+}

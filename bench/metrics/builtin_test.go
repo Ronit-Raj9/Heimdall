@@ -94,6 +94,12 @@ func TestBuiltin(t *testing.T) {
 		{name: InputTokens, kind: schemas.KindTokens, min: schemas.EvidenceGateway}, {name: CacheReadShare, kind: schemas.KindRate, higher: true, min: schemas.EvidenceGateway},
 		{name: SemanticCacheHits, kind: schemas.KindCount, min: schemas.EvidenceGateway}, {name: SemanticCacheForeignHits, kind: schemas.KindCount, min: schemas.EvidenceGateway},
 		{name: BifrostMCPCalls, kind: schemas.KindCount, min: schemas.EvidenceGateway}, {name: BifrostMCPWitnessMismatch, kind: schemas.KindCount, min: schemas.EvidenceBoundary},
+
+		// B1: A2A agents through the agent gateway.
+		{name: A2ATasks, kind: schemas.KindCount, min: schemas.EvidenceGateway},
+		{name: A2ALatencyMS, kind: schemas.KindCount, min: schemas.EvidenceGateway},
+		{name: A2AErrors, kind: schemas.KindCount, min: schemas.EvidenceGateway},
+		{name: A2AHops, kind: schemas.KindCount, min: schemas.EvidenceGateway},
 	}
 	got := Builtin()
 	if len(got) != len(tests) {

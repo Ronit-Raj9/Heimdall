@@ -60,6 +60,7 @@ func (p *Planner) checkScenario(suite *schemas.Suite, conds []condPlan, arms map
 			}
 		}
 		errs = append(errs, remoteTaskErrs(suite, t, remote, remoteCfg)...) // Remote coverage (scenarioremote.go)
+		errs = append(errs, a2aTaskErrs(suite, t, arms, compat)...)         // B1: a2a arms (a2a.go)
 	}
 	return errors.Join(errs...)
 }

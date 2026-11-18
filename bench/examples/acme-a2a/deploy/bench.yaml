@@ -1,0 +1,42 @@
+# Heimdall (bifrost-bench) configuration for the acme-a2a example project.
+# Relative paths resolve against the project root, the parent of this deploy/
+# folder, so every command takes `-config examples/acme-a2a/deploy/bench.yaml`
+# (or `-config deploy/bench.yaml` from the project root). Every key can be
+# overridden with an environment variable named BENCH_<SECTION>_<KEY>
+# (top-level keys: BENCH_<KEY>), for example BENCH_GATEWAY_URL.
+#
+# The A2A agents are reached through Bifrost's agent gateway, which needs
+# client.a2a_external_client_url set and the agents' private addresses in
+# client.a2a_private_allowlist (deploy/bifrost-a2a.json shows both). The
+# reference agents (bench/a2a/refagent.py) run as one container beside
+# Bifrost; deploy/README in this folder's README.md says how. The values
+# below are the bench's own stack; the $0 proofs in docs/a2a-agents.md ran on
+# a throwaway copy of it with its own ports and networks, set through the
+# BENCH_* overrides.
+runs_root: runs
+benchmarks_root: benchmarks
+pricing: deploy/pricing-snapshot.json
+
+server:
+  # Loopback only. Port 8099 so it can run beside the bench's own server and the other examples.
+  listen: 127.0.0.1:8099
+  mode: live
+  allowed_hosts: []
+  cors_origins: []
+
+gateway:
+  url: http://127.0.0.1:18080        # host side
+  agent_url: http://bifrost:8080     # from inside the evaluation network
+  admin_token_env: BIFROST_SETUP_TOKEN
+  provider: anthropic
+  key_slots: [fp-slot-1, fp-slot-2, fp-slot-3, fp-slot-4]
+
+faultproxy:
+  control_url: http://127.0.0.1:19101
+
+networks:
+  eval: bench-evalnet
+
+images:
+  # The launcher of an a2a run and the helper both need only python3 and sh.
+  helper: bench/coding-core-base:1

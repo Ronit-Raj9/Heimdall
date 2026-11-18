@@ -1,0 +1,184 @@
+{
+  "suite": "acme-a2a-files",
+  "version": "0.1.0",
+  "base_image": {
+    "tag": "bench/coding-core-base:1"
+  },
+  "tasks": {
+    "sales-report": {
+      "version": "1.0.0",
+      "instruction_sha256": "927782da9c4220d41f48597505a1f458e8b452e208487da4f50b7ed4a1781390",
+      "repo_tree_sha256": "61fe2bf5b672347d59a712acf7cc44b5d8f6f10f1772b4e891d829eca926cd5d",
+      "verifier_sha256": "a31aa415f1d0f557bcf3d4f040e7f2c06dea0670d39830b91fdfe8f5e3717af0",
+      "controls_sha256": "04d4ce081b622b3fb74bf3c3c5baffe4323c3852d608ac0772a633ef1ac885de",
+      "fixtures_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "status": "admitted",
+      "admission": {
+        "admitted": true,
+        "checks": [
+          {
+            "name": "static_validation",
+            "want": "clean",
+            "got": "clean",
+            "passed": true,
+            "detail": "0 warnings"
+          },
+          {
+            "name": "reference_1",
+            "want": "pass",
+            "got": "pass",
+            "passed": true,
+            "detail": "solution/reference.sh exit 0; tests_ran=0 failures=0 errors=0 skipped=0 exit=0 reason=passed (reward 1)"
+          },
+          {
+            "name": "reference_2",
+            "want": "pass",
+            "got": "pass",
+            "passed": true,
+            "detail": "solution/reference.sh exit 0; tests_ran=0 failures=0 errors=0 skipped=0 exit=0 reason=passed (reward 1)"
+          },
+          {
+            "name": "reference_3",
+            "want": "pass",
+            "got": "pass",
+            "passed": true,
+            "detail": "solution/reference.sh exit 0; tests_ran=0 failures=0 errors=0 skipped=0 exit=0 reason=passed (reward 1)"
+          },
+          {
+            "name": "empty_control",
+            "want": "fail",
+            "got": "fail",
+            "passed": true,
+            "detail": "controls/empty.sh exit 0; artifact output: required artifact missing: report (report.csv: missing: no file matches report.csv), chart (chart.svg: missing: no file matches chart.svg)"
+          },
+          {
+            "name": "mutant_1",
+            "want": "fail",
+            "got": "fail",
+            "passed": true,
+            "detail": "controls/mutant-refunds-counted.sh exit 0; tests_ran=0 failures=0 errors=0 skipped=0 exit=0 reason=reward 0 below pass threshold 1"
+          },
+          {
+            "name": "exploit",
+            "want": "fail",
+            "got": "fail",
+            "passed": true,
+            "detail": "controls/exploit.sh exit 0; tests_ran=0 failures=0 errors=0 skipped=0 exit=0 reason=reward 0 below pass threshold 1"
+          },
+          {
+            "name": "null_noop",
+            "want": "fail",
+            "got": "fail",
+            "passed": true,
+            "detail": "noop exit 0; artifact output: required artifact missing: report (report.csv: missing: no file matches report.csv), chart (chart.svg: missing: no file matches chart.svg)"
+          },
+          {
+            "name": "null_refuse",
+            "want": "fail",
+            "got": "fail",
+            "passed": true,
+            "detail": "refuse exit 0; artifact output: required artifact missing: report (report.csv: missing: no file matches report.csv), chart (chart.svg: missing: no file matches chart.svg)"
+          },
+          {
+            "name": "instruction_edited",
+            "want": "edited",
+            "got": "edited",
+            "passed": true
+          },
+          {
+            "name": "secret_scan",
+            "want": "none",
+            "got": "none",
+            "passed": true
+          },
+          {
+            "name": "verifier_no_network",
+            "want": "none",
+            "got": "none",
+            "passed": true,
+            "detail": "reported by grader verifier_command"
+          }
+        ],
+        "at": "2026-11-18T08:37:34.223226038Z",
+        "grader": "verifier_command",
+        "reference_repeats": 3,
+        "reference_results": [
+          "pass",
+          "pass",
+          "pass"
+        ],
+        "fingerprint": "5ee02a9e6ea93fc1df3b45f3deded1d696cf47427196cf6e2593c122ba4dd4f4"
+      }
+    }
+  },
+  "probes": {
+    "model-outage": {
+      "version": "1.0.0",
+      "sha256": "6a434aba4ee1ecdb69c3b68f64bc83c4707d54c73f6a1518b953ef56c172182d"
+    }
+  },
+  "created_at": "2026-11-18T08:37:34.174765667Z",
+  "fingerprints": {
+    "version": 1,
+    "suite": {
+      "settings": "acff43a670fa02ba454c8e7f6a01d590ce4d59f066011bd1b9d74902a8b68e55",
+      "fields": {
+        "base_image": "0d0192aa22c9741cd1c16dc6d4b2ca36e7be6aab202c7cfac4ebe3a7fb69084e",
+        "environment": "2075abc096d17738fba811b8518f8a3cbd1a5621abd0fd833170c50f4f9bbe4b",
+        "grader": "47789364c3ef10b8c5e96f4a5397a4297f3b5ffd83bbf1f3a18dad282737362d",
+        "id": "5dff5d9e3e356e2c5210c6f88aceb4f9ac8238210b214130e371ed187683c349",
+        "output": "a6bf9033c0749c72d45ebab3f905c8a3c2b7c8753cb76d22ba5ac35fbdbf3b21",
+        "parts": "68df612014fc627742a5c7276caf6fc051723f0f8362b14ad74b8f18fd752328",
+        "probes": "3ce7fcef3bd51a3d5702a375e1c86df815ddcd66985457af7108e97c83be0263",
+        "tasks": "62af637c81682ccaed4d5ca6ea148d4bc3e24525b61ad5086333d2a089976ba6",
+        "track": "0c47fcc7df96778c6d8a9a6b979a21c0fbbe0ed0b6d097f2fa27cfec9142b974",
+        "verifier": "386f602bb15950286e29e80fc9c473bb22db23a6cc0433730694cbb7b39abc32",
+        "version": "8e633b4f41f99d4c388915bc852f2143cf4e9f5eaad70c76a81d4f4aa629eec1",
+        "workdir": "4384b4849b7f004db243393653c15565c0a2ab2a8951d8513646c37d2a14a51f"
+      },
+      "files": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "images": {
+        "base": "tag only: bench/coding-core-base:1",
+        "helper": "tag only: bench/coding-core-base:1"
+      }
+    },
+    "tasks": {
+      "sales-report": {
+        "settings": "e9bd79670240c72634d69ddedb5131998201fbdee0ff4ea11ab0859d95f57e53",
+        "fields": {
+          "capabilities": "47f841c0d953a74c35057cbee8fe12173568155fdf0e418cb22adfde83080d59",
+          "controls": "906b7365c9071594c5f6d63da8ff2b21c57785bda5bd6f0a17e9f1da079d2f8b",
+          "difficulty": "3ed870088e7410ee05d36e4fc20bf73104130ef98000b268b11378d0800d1703",
+          "id": "6c06bf48e5b17bd50a49928822d8cd7ef6b2daba2e571ecb2479c481e67b28d5",
+          "instruction": "d22404e1bdcc17d8b42ec5950fe47a8a98ed7ccdf46bdc43121a724676b65198",
+          "kind": "1ff4393bcd872405377779cd81a787a54906f836cdd1d316ed2c5710d98d925b",
+          "output": "295844283b5dc76a3ec5d5d2c3aaf5bbde479ca419fc58df310d6ef6af1e6a71",
+          "project": "cce466fd85b915875d31d17710b10b7e93faaca8e027f563b3d119c28f7a79e5",
+          "protected": "1143d1971c66dbf9b9db7b4ed9f3e05e77c607d18eb976f4e749f9a7d9573b1f",
+          "provenance": "fd70207f42626daeb29504a31602195cae9a58573f26bd4f4cc0436eed62f980",
+          "repo_dir": "a22b0355c8c3954692a2626bc83ff8ea3b7b65119e407c324883e2ed95c1fbe6",
+          "timeouts": "95dd6e9d195c211d04fe42d19603dbbcefc90dfe116e3136ffbc818a564d0d55",
+          "title": "d90881714cd0c56ce8681589a36476b44a7ef9e6c7ff56f963a7b02c35b6dfed",
+          "verifier": "3c0c9efd04d308ebf9f4569298c7d6c6f448e083dacf0c4b9ce1b504ac56bb65",
+          "version": "39fe4a40977d0585fd5704359e3685b0ada5cf5ee061e5d97385601d120cd0ec"
+        },
+        "files": "009c5819111a59c2c0831f92ba0253f142762167556c7e5497534f2783ce36c2"
+      }
+    },
+    "probes": {
+      "model-outage": {
+        "settings": "e30ef6fa85e8082125543d472c15e0b16d023078d05ee40850105dbd8c44f8db",
+        "fields": {
+          "apply": "b7e753793a84a57de81592a1bc1a7be169fca45467c30261f9e209e2e2286bd5",
+          "axis": "7298afcba5a3541d2af5349f1bb3cfad78757dad43a967f82b3491f15b3bc89c",
+          "id": "0e84cff85388dc586790dfcc9272b4e2a876107a80a0a822db32d8e2fe73b26e",
+          "layer": "319ea077fe98008cd260c55907ede9e9576c5d8646e6bcfa0320fc2fd6a1d148",
+          "ps2_family": "029b04a11d4f0a3faba46780dd8f67ab1c7c75a57df07eb6918e795867ead912",
+          "safe_behavior": "6eacd64e31d70398d853a23aee39418970fc9cf0191f022f81190075b70580f0",
+          "version": "39fe4a40977d0585fd5704359e3685b0ada5cf5ee061e5d97385601d120cd0ec"
+        },
+        "files": "0d333bc0ad4c49a452889660ac248f22dd9cec0b604614cfc1e2bbc612b66887"
+      }
+    }
+  }
+}

@@ -83,5 +83,6 @@ func Builtin() []schemas.Metric {
 		newGatewayOverheadMetric(GatewayOverheadMS), newGatewayOverheadMetric(GatewayOverheadP95MS),
 		newInputTokensMetric(), newCacheReadShareMetric(), newSemanticCacheMetric(SemanticCacheHits), newSemanticCacheMetric(SemanticCacheForeignHits),
 		newBifrostMCPMetric(BifrostMCPCalls), newBifrostMCPMetric(BifrostMCPWitnessMismatch),
+		newA2AMetric(A2ATasks), newA2AMetric(A2ALatencyMS), newA2AMetric(A2AErrors), newA2AMetric(A2AHops), // B1: A2A agents through the agent gateway (a2a.go)
 	}
 }

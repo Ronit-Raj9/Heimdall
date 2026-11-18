@@ -1,0 +1,6 @@
+{
+  "client": {
+    "a2a_external_client_url": "http://bifrost:8080",
+    "a2a_private_allowlist": ["a2a-agents"]
+  }
+}

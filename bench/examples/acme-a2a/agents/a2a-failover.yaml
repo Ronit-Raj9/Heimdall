@@ -1,0 +1,27 @@
+# The oracle persona whose card lists a first interface that answers 404
+# (persona failover), over SendStreamingMessage. Bifrost never replays a
+# stream, so it does not fail over a streaming operation: on v2.5.1 every
+# stream of a fresh registration fails with a JSON-RPC internal error naming
+# the 404 (docs/a2a-agents.md). agents/a2a-failover-unary.yaml is the same
+# agent over SendMessage, which Bifrost failed over in 3 of 4 tries.
+# adapter a2a (docs/a2a-agents.md): the bench registers the agent card below
+# in Bifrost's agent gateway for each run, grants only the run's key, sends
+# the task as an A2A message through the gateway and deletes the
+# registration at cleanup. The image is the launcher's (python3 only);
+# nothing of the agent runs in it. The card host is the reference agents'
+# container (agents/refagent/), as Bifrost reaches it.
+id: a2a-failover
+adapter: a2a
+image: bench/coding-core-base:1
+model: claude-sonnet-4-5
+a2a:
+  card_url: http://a2a-agents:9000/failover/.well-known/agent-card.json
+  streaming: true
+  timeout_s: 120
+budgets:
+  wall_s: 300
+  cpus: 1
+  mem_gb: 1
+gateway:
+  provider: anthropic
+  max_retries: 0

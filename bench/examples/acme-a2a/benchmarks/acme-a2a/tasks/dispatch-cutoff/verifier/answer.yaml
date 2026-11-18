@@ -1,0 +1,7 @@
+# Hidden expected answer, read by the answer_match grader (no model).
+question: Until what hour (24-hour clock) can a working-day order leave the same day?
+match: numeric
+expected: ["14"]
+tolerance: 0
+category: policy-lookup
+wrong_answers: ["12", "16"]

@@ -1,0 +1,26 @@
+# The reference A2A agents of the acme-a2a example (bench/a2a/refagent.py,
+# standard library only, on the bench's helper image), as an override of the
+# bench's own stack. From bench/:
+#
+#   docker compose -f deploy/docker-compose.yml \
+#     -f examples/acme-a2a/deploy/a2a-agents.compose.yml up -d
+#
+# Bifrost reaches them on the upstream network as http://a2a-agents:9000;
+# the agent configs' card URLs use that name. Bifrost also needs the two
+# client settings in bifrost-a2a.json beside this file merged into its
+# config.json (the external client URL turns the protocol routes on; the
+# allowlist lets it connect to a private address). Compose resolves the
+# paths below against the first file's folder, bench/deploy.
+services:
+  a2a-agents:
+    image: bench/coding-core-base:1
+    command: ["python3", "-B", "/a2a/refagent.py", "--port", "9000", "--script", "/script/personas.json", "--public-url", "http://a2a-agents:9000"]
+    environment:
+      REF_GATEWAY_URL: http://bifrost:8080
+    volumes:
+      - ../a2a:/a2a:ro
+      - ../examples/acme-a2a/agents/refagent/personas.json:/script/personas.json:ro
+    networks: [upstream]
+    read_only: true
+    cap_drop: [ALL]
+    security_opt: ["no-new-privileges:true"]

@@ -93,7 +93,10 @@ func (p *Pipeline) prepare(ctx context.Context, st *runState) error {
 	if err := p.serveBifrostMCP(ctx, st); err != nil { // B2 MCP through Bifrost: the run's MCP clients, granted to its key (bifrostfeatures.go)
 		return err
 	}
-	return p.mintTeam(ctx, st) // Multi-agent area: one key per team member (team.go)
+	if err := p.mintTeam(ctx, st); err != nil { // Multi-agent area: one key per team member (team.go)
+		return err
+	}
+	return p.prepareA2A(ctx, st) // B1: register the run's A2A agents in the agent gateway (a2a.go)
 }
 
 // bindFaultPlan binds an empty fault plan carrying the run id to the run's
@@ -208,7 +211,10 @@ func (p *Pipeline) collect(ctx context.Context, st *runState) error {
 			errs = append(errs, wrapPart("evidence", src, fmt.Errorf("collect: %w", err)))
 		}
 	}
-	p.collectBifrostMCP(ctx, st) // B2 MCP through Bifrost: Bifrost's mcp_tool_logs rows, the second witness (bifrostfeatures.go)
+	p.collectBifrostMCP(ctx, st)                  // B2 MCP through Bifrost: Bifrost's mcp_tool_logs rows, the second witness (bifrostfeatures.go)
+	if err := p.collectA2A(ctx, st); err != nil { // B1: the agent gateway's witness (a2a.go)
+		errs = append(errs, err)
+	}
 	if st.ev.Claim != nil {
 		st.rc.Run.Claim = st.ev.Claim
 	}
@@ -476,6 +482,7 @@ func (p *Pipeline) cleanup(ctx context.Context, st *runState) error {
 		}
 	}
 	errs = append(errs, p.clearTeamPlans(ctx, st)) // Multi-agent area: team member slots (team.go)
+	errs = append(errs, p.cleanupA2A(ctx, st))     // B1: the run's agent gateway registrations (a2a.go)
 	if st.rc.Key != nil && p.reg.Fault != nil {
 		if err := p.reg.Fault.ClearPlan(ctx, st.rc.Key.KeySlot); err != nil {
 			errs = append(errs, &partError{part: faultPart, err: fmt.Errorf("clear plan of key slot %s: %w", st.rc.Key.KeySlot, err)})

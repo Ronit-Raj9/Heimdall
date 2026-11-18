@@ -1,0 +1,30 @@
+# acme-a2a-stock: one state task for A2A agents (B1, docs/a2a-agents.md),
+# written by `bifrost-bench suite init -template tool-use`; only the
+# instruction was edited to say where an A2A agent finds the tool. The agent
+# records a delivery through the inventory HTTP tool server; the hidden
+# verifier grades the server's exported state. An A2A agent is not on the
+# run's network: with a2a.tools expose the bench publishes the run's tool
+# proxy through a per-run gate behind a bearer token (the remote_http
+# channel 2, docs/remote-execution.md), and the gate's URL and token travel
+# in the A2A message's metadata (heimdall.tools). Every call lands in
+# tools.jsonl like a local agent's.
+id: acme-a2a-stock
+version: 0.1.0
+description: Tool-use tasks over an HTTP tool server, graded on its final state.
+track: tool_use
+environment: docker_workspace
+grader: verifier_command
+base_image:
+  tag: bench/coding-core-base:1
+workdir: /workspace
+output:
+  kind: state
+verifier:
+  command: ["python3", "/grader/tests/verify.py"]
+  result: reward
+  result_path: /grader/out/reward.json
+  pass_threshold: 1
+  restore: []
+  timeout_s: 120
+tasks: [restock]
+probes: [model-outage, tool-error]

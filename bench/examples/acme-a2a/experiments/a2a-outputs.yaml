@@ -1,0 +1,26 @@
+# The artifact output kind through the agent gateway (B1,
+# docs/a2a-agents.md). Arm A is the noop persona; arm B (persona reporter)
+# completes the sales-report task with report.csv and chart.svg as file
+# parts, which the launcher writes into the workspace (a2a.artifacts
+# inline) for the hidden verifier. Expected: A 0 of 2, B 2 of 2, every
+# witness complete. $0.
+#
+# Slots: 1 task x 2 trials x 2 arms = 4.
+name: a2a-outputs
+smoke: true
+suite: acme-a2a-files@0.1.0
+base: agents/a2a-noop-files.yaml
+arms:
+  A: {label: noop}
+  B: {label: files as A2A artifacts, agent: agents/a2a-reporter.yaml}
+primary: {condition: clean, metric: verified_success}
+guards:
+  - {rule: no_new_integrity_violation}
+conditions:
+  - {id: clean, tasks: all, trials: 2}
+budget: {total_usd: 0}
+verdict: {policy: paired_signflip, alpha: 0.05, assumed_sd: 0.30}
+seed: 20261118
+concurrency: 1
+manifest_mode: agent_exposure
+policy: policies/default.yaml

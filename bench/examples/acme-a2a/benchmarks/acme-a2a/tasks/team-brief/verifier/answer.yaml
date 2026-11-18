@@ -1,0 +1,7 @@
+# Hidden expected answer, read by the answer_match grader (no model).
+question: Which warehouse city packs Acme Tea orders, and which courier carries them?
+match: exact
+expected: ["leeds parcelwing"]
+normalize: [lower, strip_punct, collapse_space, trim]
+category: policy-lookup
+wrong_answers: ["York; Parcelwing", "Leeds; Swiftbox", "Leeds"]

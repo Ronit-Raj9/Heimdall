@@ -1,0 +1,28 @@
+# Unary interface failover in Bifrost's agent gateway (B1,
+# docs/a2a-agents.md). Arm A is the oracle persona; arm B is the same agent
+# whose card lists a first interface that answers 404 (persona failover).
+# Bifrost's transports-and-recovery guide says a 404 moves a unary operation
+# to the next interface within the same operation and refreshes the card in
+# the background, so B should verify every task like A; the agent log shows
+# the higher upstream latency of the extra attempt. Both arms use
+# SendMessage: a stream is never failed over (a2a-transport shows that). $0.
+#
+# Slots: 3 tasks x 1 trial x 2 arms = 6.
+name: a2a-failover
+smoke: true
+suite: acme-a2a@1.0.0
+base: agents/a2a-oracle.yaml
+arms:
+  A: {label: oracle}
+  B: {label: first interface gone (404), agent: agents/a2a-failover-unary.yaml}
+primary: {condition: clean, metric: verified_success}
+guards:
+  - {rule: no_new_integrity_violation}
+conditions:
+  - {id: clean, tasks: all, trials: 1}
+budget: {total_usd: 0}
+verdict: {policy: paired_signflip, alpha: 0.05, assumed_sd: 0.30}
+seed: 20261118
+concurrency: 1
+manifest_mode: agent_exposure
+policy: policies/default.yaml

@@ -1,0 +1,29 @@
+# A single A2A agent against a team of three A2A agents on the task that
+# needs two facts (B1, docs/a2a-agents.md). Arm A is the oracle persona
+# alone; arm B's entry agent (persona lead) delegates to a researcher and a
+# writer through Bifrost's agent gateway and joins their answers. Every team
+# member is registered per run and holds its own member key, so the agent
+# log proves each delegation (a2a_hops, Evidence.Messages with source
+# agent_gateway) and each member's model call is on its own key. Expected:
+# both arms verify 2 of 2; B shows 2 hops and 3 A2A tasks per run, A 0 and
+# 1. $0: every model call is answered by the fault proxy's scripted model.
+#
+# Slots: 1 task x 2 trials x 2 arms = 4.
+name: a2a-team
+smoke: true
+suite: acme-a2a@1.0.0
+base: agents/a2a-oracle.yaml
+arms:
+  A: {label: single A2A agent}
+  B: {label: A2A team through the gateway, agent: agents/a2a-team.yaml}
+primary: {condition: clean, metric: verified_success}
+guards:
+  - {rule: no_new_integrity_violation}
+conditions:
+  - {id: clean, tasks: [team-brief], trials: 2}
+budget: {total_usd: 0}
+verdict: {policy: paired_signflip, alpha: 0.05, assumed_sd: 0.30}
+seed: 20261118
+concurrency: 1
+manifest_mode: agent_exposure
+policy: policies/default.yaml

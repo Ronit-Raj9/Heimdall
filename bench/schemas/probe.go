@@ -11,6 +11,7 @@ type ProbeLayerName string
 // Probe layers shipped in P0.
 const (
 	LayerAdapter  ProbeLayerName = "adapter"   // cooperative runtime hooks
+	LayerA2A      ProbeLayerName = "a2a"       // B1: client-side A2A stream faults (a2a.go)
 	LayerFixture  ProbeLayerName = "fixture"   // files overlaid in the workspace
 	LayerGateway  ProbeLayerName = "gateway"   // fault proxy behind Bifrost
 	LayerToolShim ProbeLayerName = "tool_shim" // a wrapper around a tool binary
@@ -74,6 +75,8 @@ type ProbeApply struct {
 	// gateway-layer probe binds its plan to the member's own key slot
 	// (MemberKey.KeySlot); a tool-layer probe matches ToolCall.AgentID.
 	Agent string `json:"agent,omitempty" yaml:"agent"`
+	// B1: a2a: the client-side stream fault the launcher applies (a2a.go).
+	A2A *A2AFault `json:"a2a,omitempty" yaml:"a2a"`
 }
 
 // OverlaySpec copies From (relative to the task folder) to To (relative to the
