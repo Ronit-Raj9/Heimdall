@@ -16,8 +16,8 @@ export interface FixtureRoute {
 /**
  * Every route in DESIGN.md 16.7 that returns JSON. Experiment-level routes share one fixture
  * because fixtures hold one experiment; run and pair routes are keyed by id because a pair has
- * two runs. GET /experiments/{id}/events is server-sent events and has no fixture: in fixture
- * mode screens poll GET /experiments/{id}, which is the designed fallback.
+ * two runs. GET /experiments/{id}/events streams server-sent events; its JSON poll form (no
+ * text/event-stream Accept header) has a fixture per running experiment (U1 home).
  */
 export const FIXTURE_ROUTES: readonly FixtureRoute[] = [
 	{ method: "GET", pattern: "/health", file: "health.json" },
@@ -29,6 +29,8 @@ export const FIXTURE_ROUTES: readonly FixtureRoute[] = [
 	{ method: "POST", pattern: "/experiments/:id/start", file: "experiments.start.json" },
 	{ method: "GET", pattern: "/experiments", file: "experiments.list.json" },
 	{ method: "GET", pattern: "/experiments/:id", file: "experiments.get.json" },
+	// U1 home: the JSON (poll) form of the events route for a running experiment; other ids answer 404.
+	{ method: "GET", pattern: "/experiments/:id/events", file: "experiments.events.{id}.json" },
 	{ method: "GET", pattern: "/experiments/:id/verdict", file: "experiments.verdict.json" },
 	{ method: "GET", pattern: "/experiments/:id/diagnostics", file: "experiments.diagnostics.json" },
 	{ method: "GET", pattern: "/experiments/:id/grid", file: "experiments.grid.json" },

@@ -8,6 +8,7 @@ import { RouterProvider, createRouter, parseSearchWith, stringifySearchWith } fr
 import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
 
+import { RouteErrorComponent } from "./__error";
 import { NotFoundComponent } from "./__notFound";
 import { routeTree } from "./routeTree.gen";
 
@@ -40,6 +41,8 @@ const router = createRouter({
 	scrollRestoration: true,
 	notFoundMode: "root",
 	defaultNotFoundComponent: NotFoundComponent,
+	// A page that throws shows its error inside the shell, with a retry and the way home.
+	defaultErrorComponent: RouteErrorComponent,
 	parseSearch: parseSearchWith(safeJsonParse),
 	stringifySearch: stringifySearchWith(stringifySearchValue),
 });

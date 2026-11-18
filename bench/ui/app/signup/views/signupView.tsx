@@ -30,8 +30,8 @@ export default function SignupView({ invitation }: { invitation?: string }) {
 	// An invitation fixes the email: the account must be the one invited.
 	const invitedEmail = invite.data?.email;
 
-	if (session.signedIn) return <Navigate to="/verdict" replace />;
-	if (session.status === "ready" && session.authMode === "local") return <Navigate to="/verdict" replace />;
+	if (session.signedIn) return <Navigate to="/" replace />;
+	if (session.status === "ready" && session.authMode === "local") return <Navigate to="/" replace />;
 
 	const notice = (text: string, testId: string) => (
 		<div className="flex flex-col gap-6" data-testid={testId}>
