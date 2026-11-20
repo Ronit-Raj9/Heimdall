@@ -189,12 +189,15 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	if s.serveCollectorPath(w, r) { // Agent events area: POST /events and /otlp/v1/traces (collector.go)
 		return
 	}
+	// The call is in flight until its row is written: the answer reaches
+	// the agent first, so the ledger status says when a copy would miss it.
+	defer s.ledger.Begin()()
 	agent, ok := s.memberRoute(w, r) // Multi-agent area: /m/<token>/ names the team member (members.go)
 	if !ok {
 		return
 	}
 	if rest, ok := strings.CutPrefix(r.URL.Path, "/x/"); ok {
-		s.serveExternal(w, r, rest) // External APIs area: real HTTP APIs behind the allowlist (external.go)
+		s.serveExternal(w, r, rest, agent) // External APIs area: real HTTP APIs behind the allowlist (external.go)
 		return
 	}
 	rest, ok := strings.CutPrefix(r.URL.Path, "/s/")
@@ -376,14 +379,16 @@ func (s *Server) relayJSON(w http.ResponseWriter, resp *http.Response, x *exchan
 		copyHeaders(w.Header(), resp.Header, false)
 		w.WriteHeader(resp.StatusCode)
 		_, werr := w.Write(raw)
+		x.commitFaulted(len(synthetic) > 0) // the synthetic answers were not sent
 		x.commitAll(werr != nil)
 		return
 	}
 	if errors.Is(err, errTooLarge) {
 		// Relayed whole and streamed; the hash and count cover every byte.
 		// Synthetic answers to faulted calls of the batch cannot be merged
-		// into an answer the proxy does not parse; those calls were already
-		// recorded as answered by the fault.
+		// into an answer the proxy does not parse, so the agent never sees
+		// them: those calls are recorded as undelivered, not as faults the
+		// agent witnessed.
 		copyHeaders(w.Header(), resp.Header, true)
 		w.WriteHeader(resp.StatusCode)
 		m := newMeter()
@@ -394,6 +399,7 @@ func (s *Server) relayJSON(w http.ResponseWriter, resp *http.Response, x *exchan
 		}
 		sha, n := m.sum()
 		x.unparsedAnswer(resp.StatusCode, fmt.Sprintf("answer over the %d MiB parse cap; relayed whole, not parsed", s.parseCap>>20), sha, n)
+		x.commitFaulted(len(synthetic) > 0)
 		x.commitAll(werr != nil)
 		return
 	}
@@ -405,6 +411,7 @@ func (s *Server) relayJSON(w http.ResponseWriter, resp *http.Response, x *exchan
 			copyHeaders(w.Header(), resp.Header, false)
 			w.WriteHeader(resp.StatusCode)
 			_, werr := w.Write(raw)
+			x.commitFaulted(len(synthetic) > 0) // the synthetic answers were not sent
 			x.commitAll(werr != nil)
 			return
 		}
@@ -801,8 +808,9 @@ func (s *Server) pass(w http.ResponseWriter, r *http.Request, rt Route, path str
 	s.finishRow(&row, req, res)
 }
 
-// append writes a row to the ledger. A write failure is logged and shows on
-// /healthz; the call itself was already answered.
+// append writes a row to the ledger. A write failure is logged, shows on
+// /healthz for the rest of the run and marks the ledger status incomplete;
+// the call itself was already answered.
 func (s *Server) append(row *schemas.ToolCall) {
 	if err := s.ledger.Append(row); err != nil {
 		s.logger.Error("tool ledger write failed", "error", err.Error())

@@ -69,12 +69,16 @@ func resolveQuery(m *schemas.Manifest, q Query) (Query, error) {
 		arms = append(arms, id)
 	}
 	slices.Sort(arms)
+	// Defaults prefer the canonical baseline and candidate, then the other
+	// arms, and A/A replicas (A2) last: comparing the baseline with its
+	// own copy reports noise, so it is chosen only when asked for.
+	order := defaultArmOrder(arms)
 	q.A, q.B = strings.TrimSpace(q.A), strings.TrimSpace(q.B)
-	if q.A == "" && len(arms) > 0 {
-		q.A = arms[0]
+	if q.A == "" && len(order) > 0 {
+		q.A = order[0]
 	}
 	if q.B == "" {
-		for _, id := range arms {
+		for _, id := range order {
 			if id != q.A {
 				q.B = id
 				break
@@ -94,6 +98,25 @@ func resolveQuery(m *schemas.Manifest, q Query) (Query, error) {
 		}
 	}
 	return q, nil
+}
+
+// defaultArmOrder ranks sorted arm IDs for default selection: the canonical
+// baseline A, the canonical candidate B, other arms, then A/A replicas.
+func defaultArmOrder(arms []string) []string {
+	rank := func(id string) int {
+		switch {
+		case id == "A":
+			return 0
+		case id == "B":
+			return 1
+		case id == "A2":
+			return 3
+		}
+		return 2
+	}
+	out := slices.Clone(arms)
+	slices.SortStableFunc(out, func(x, y string) int { return cmp.Compare(rank(x), rank(y)) })
+	return out
 }
 
 // LoadArms reads the graded runs of the listed arms on one condition (all
@@ -224,8 +247,6 @@ func aggregate(runs []*RunEvidence, prices *evidence.PriceTable) *agg {
 			g.keys[k] += v
 		}
 		g.refusals += ev.Refusals
-		g.cacheKeyRows += ev.CacheKeyRows
-		g.rawRows += ev.RawRows
 		g.cacheKeyRows += ev.CacheKeyRows
 		g.rawRows += ev.RawRows
 		g.judge = append(g.judge, ev.Run.Metrics[metricJudgeCost])

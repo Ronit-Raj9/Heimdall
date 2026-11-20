@@ -833,10 +833,14 @@ func unpackExport(spool, out string, limit int64) (int64, string, error) {
 
 // copyLedger copies the tool proxy's ledger into the run folder as
 // tools.jsonl. A missing ledger leaves no file, so tool evidence is unknown.
+// The ledger's status file is copied first, waiting a short while for calls
+// still in flight to write their rows; evidence collection reads it to
+// refuse a ledger that misses rows (3-D-08).
 func (e *dockerWorkspace) copyLedger(ctx context.Context, runID, dir string) error {
 	out := filepath.Join(dir, ToolsFile)
 	cctx, cancel := context.WithTimeout(ctx, exportTimeout)
 	defer cancel()
+	e.copyLedgerStatus(cctx, runID, dir)
 	n, problem, err := e.exportPath(cctx, toolProxyContainer(runID), toolProxyLedger, out, maxLedgerBytes)
 	if err != nil {
 		return err
@@ -849,6 +853,36 @@ func (e *dockerWorkspace) copyLedger(ctx context.Context, runID, dir string) err
 	}
 	e.cfg.Logger.Debug("tool ledger copied", "run", runID, "bytes", n)
 	return nil
+}
+
+// ledgerDrainWait bounds how long copyLedgerStatus waits for in-flight calls.
+var ledgerDrainWait = 5 * time.Second
+
+// copyLedgerStatus copies the proxy's ledger status into the run folder,
+// retrying while it reports calls in flight. A proxy too old to write one
+// leaves no file and the ledger is read as before.
+func (e *dockerWorkspace) copyLedgerStatus(ctx context.Context, runID, dir string) {
+	out := filepath.Join(dir, schemas.ToolLedgerStatusFile)
+	src := path.Join(path.Dir(toolProxyLedger), schemas.ToolLedgerStatusFile)
+	deadline := time.Now().Add(ledgerDrainWait)
+	for {
+		_, problem, err := e.exportPath(ctx, toolProxyContainer(runID), src, out, 1<<20)
+		if err != nil || problem != "" {
+			_ = os.Remove(out)
+			e.cfg.Logger.Warn("tool ledger status not copied", "run", runID, "problem", problem, "error", err)
+			return
+		}
+		var st schemas.ToolLedgerStatus
+		raw, rerr := os.ReadFile(out)
+		if rerr != nil || json.Unmarshal(raw, &st) != nil || st.InFlight == 0 || !time.Now().Before(deadline) {
+			return
+		}
+		select {
+		case <-ctx.Done():
+			return
+		case <-time.After(200 * time.Millisecond):
+		}
+	}
 }
 
 // copyFiles copies host files or folders (relative to base, resolved inside

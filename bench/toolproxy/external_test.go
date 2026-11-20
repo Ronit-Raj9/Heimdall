@@ -1,6 +1,8 @@
 package toolproxy
 
 import (
+	"bytes"
+	"compress/zlib"
 	"context"
 	"crypto/x509"
 	"fmt"
@@ -497,5 +499,140 @@ func assertNoSecret(t *testing.T, path string) {
 	}
 	if strings.Contains(string(b), testSecret) {
 		t.Fatalf("credential written to %s", path)
+	}
+}
+
+// TestExternalRecordRedactsHeaders proves a credential the upstream echoes in
+// a header the cassette keeps (Location, ETag) is redacted in the cassette
+// and in the reply, and so never replayed (finding 3-D-02).
+func TestExternalRecordRedactsHeaders(t *testing.T) {
+	up := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		auth := r.Header.Get("Authorization")
+		w.Header().Set("Content-Type", "application/json")
+		w.Header().Set("Location", "https://api.example/next?token="+auth)
+		w.Header().Set("Etag", `"`+auth+`"`)
+		_, _ = io.WriteString(w, `{"ok":true}`)
+	}))
+	defer up.Close()
+	tape := filepath.Join(t.TempDir(), "acme.cassette.jsonl")
+	rec := liveRoute()
+	rec.Mode, rec.RecordTo = schemas.ExternalRecord, tape
+	tp := newExtProxy(t, up.URL, rec, nil, nil)
+	s, h, _ := call(t, tp.front.URL, "GET", "/x/acme/rates", "", nil)
+	if s != 200 || strings.Contains(h.Get("Location"), testSecret) || strings.Contains(h.Get("Etag"), testSecret) {
+		t.Fatalf("reply %d headers %v", s, h)
+	}
+	assertNoSecret(t, tape)
+	raw, err := os.ReadFile(tape)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(raw), redacted) {
+		t.Fatalf("cassette lost the redacted headers: %s", raw)
+	}
+}
+
+// TestExternalContentEncoding proves an answer with an explicit content
+// coding is decoded before it is recorded and relayed, and one the proxy
+// cannot decode is refused, not relayed without its coding (finding 3-D-05).
+func TestExternalContentEncoding(t *testing.T) {
+	const plain = `{"rate":1.25}`
+	var zb bytes.Buffer
+	zw := zlib.NewWriter(&zb)
+	_, _ = zw.Write([]byte(plain))
+	_ = zw.Close()
+	up := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		if strings.HasSuffix(r.URL.Path, "/br") {
+			w.Header().Set("Content-Encoding", "br")
+			_, _ = w.Write([]byte{0x8b, 0x01, 0x80})
+			return
+		}
+		w.Header().Set("Content-Encoding", "deflate")
+		_, _ = w.Write(zb.Bytes())
+	}))
+	defer up.Close()
+	tape := filepath.Join(t.TempDir(), "acme.cassette.jsonl")
+	rec := liveRoute()
+	rec.Mode, rec.RecordTo = schemas.ExternalRecord, tape
+	tp := newExtProxy(t, up.URL, rec, nil, nil)
+	s, h, body := call(t, tp.front.URL, "GET", "/x/acme/rates", "", nil)
+	if s != 200 || body != plain || h.Get("Content-Encoding") != "" {
+		t.Fatalf("deflate reply %d %q %v", s, body, h)
+	}
+	if s, _, _ := call(t, tp.front.URL, "GET", "/x/acme/rates/br", "", nil); s != http.StatusBadGateway {
+		t.Fatalf("undecodable coding status = %d, want 502", s)
+	}
+	entries, err := readCassetteFile(t, tape)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(entries) != 1 || entries[0].Body != plain || entries[0].Base64 {
+		t.Fatalf("cassette = %+v", entries)
+	}
+	rep := liveRoute()
+	rep.Mode, rep.Cassette = schemas.ExternalReplay, tape
+	tpRep := newExtProxy(t, up.URL, rep, nil, nil)
+	if s, _, body := call(t, tpRep.front.URL, "GET", "/x/acme/rates", "", nil); s != 200 || body != plain {
+		t.Fatalf("replay %d %q", s, body)
+	}
+}
+
+// readCassetteFile reads a cassette file for a test.
+func readCassetteFile(t *testing.T, path string) ([]CassetteEntry, error) {
+	t.Helper()
+	f, err := os.Open(path)
+	if err != nil {
+		return nil, err
+	}
+	defer f.Close()
+	return ReadCassette(f)
+}
+
+// TestExternalReplayCap proves replay holds the route's answer cap like live
+// mode does (finding 3-D-09).
+func TestExternalReplayCap(t *testing.T) {
+	tape := filepath.Join(t.TempDir(), "acme.cassette.jsonl")
+	line := `{"method":"GET","path":"/rates","query":"","body_sha256":"` + sha256Hex(nil) + `","status":200,"body":"` + strings.Repeat("y", 32) + `"}`
+	if err := os.WriteFile(tape, []byte(line+"\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	rep := liveRoute()
+	rep.Mode, rep.Cassette, rep.MaxBytes = schemas.ExternalReplay, tape, 16
+	tp := newExtProxy(t, "https://example.com", rep, nil, nil)
+	s, _, body := call(t, tp.front.URL, "GET", "/x/acme/rates", "", nil)
+	if s != http.StatusBadGateway || strings.Contains(body, "yyyy") {
+		t.Fatalf("over-cap replay = %d %s", s, body)
+	}
+	if r := tp.rows(t)[0]; !r.Blocked || !r.Replayed {
+		t.Fatalf("row %+v", r)
+	}
+}
+
+// TestExternalMemberRoute proves a call on a member's route is attributed to
+// the member, a fault that targets the member takes it, and the member id is
+// not sent upstream (finding 3-D-06).
+func TestExternalMemberRoute(t *testing.T) {
+	api := &fakeAPI{}
+	up := httptest.NewServer(api)
+	defer up.Close()
+	tp := newExtProxy(t, up.URL, liveRoute(), nil, nil)
+	tp.srv.members = map[string]string{"tok1": "worker-a"}
+	if s, _, _ := call(t, tp.front.URL, "GET", "/m/tok1/x/acme/rates", "", nil); s != 200 {
+		t.Fatalf("member call status %d", s)
+	}
+	if got := api.seen(); len(got) != 1 || got[0].header.Get(MemberHeader) != "" {
+		t.Fatalf("upstream saw %+v", got)
+	}
+	tp.setFault(t, `{"mode":"error","server":"acme","agent":"worker-a","nonce":"n9"}`)
+	if s, _, _ := call(t, tp.front.URL, "GET", "/x/acme/rates", "", nil); s != 200 {
+		t.Fatalf("lead call took the member's fault: %d", s)
+	}
+	if s, _, body := call(t, tp.front.URL, "GET", "/m/tok1/x/acme/rates", "", nil); s != 500 || !strings.Contains(body, "n9") {
+		t.Fatalf("member fault not fired: %d %s", s, body)
+	}
+	rows := tp.rows(t)
+	if len(rows) != 3 || rows[0].AgentID != "worker-a" || rows[1].AgentID != "" || rows[2].AgentID != "worker-a" || rows[2].Fault != "error" {
+		t.Fatalf("rows %+v", rows)
 	}
 }

@@ -1,5 +1,7 @@
 package schemas
 
+import "fmt"
+
 // Kinds of tool proxy ledger rows (ToolCall.Kind). The proxy writes a row
 // for every request it relays, so nothing an agent and a tool server
 // exchange through it is invisible; only rows with an empty Kind are tool
@@ -41,4 +43,28 @@ const ToolRowUnparsedTool = "unparsed"
 // and the tools/list rows written before kinds existed, are not.
 func (c ToolCall) IsToolCall() bool {
 	return c.Kind == "" && !(c.Protocol == "mcp" && c.Tool == "tools/list")
+}
+
+// ToolLedgerStatusFile is the tool proxy's ledger status, kept next to its
+// ledger and copied into the run folder beside tools.jsonl (3-D-08).
+const ToolLedgerStatusFile = "tools.status.json"
+
+// ToolLedgerStatus is the content of ToolLedgerStatusFile.
+type ToolLedgerStatus struct {
+	Rows     int    `json:"rows"`             // the highest Seq numbered, written or not
+	InFlight int    `json:"inflight"`         // calls answered or in progress whose row is not yet written
+	Failed   int    `json:"failed,omitempty"` // rows that could not be written
+	Error    string `json:"error,omitempty"`  // the first write error
+}
+
+// Incomplete says why a ledger with this status is not the whole record of
+// the run's calls, or "" when it is.
+func (st ToolLedgerStatus) Incomplete() string {
+	switch {
+	case st.Failed > 0 || st.Error != "":
+		return fmt.Sprintf("%d rows failed to write: %s", st.Failed, st.Error)
+	case st.InFlight > 0:
+		return fmt.Sprintf("%d calls were still in flight when the ledger was copied", st.InFlight)
+	}
+	return ""
 }

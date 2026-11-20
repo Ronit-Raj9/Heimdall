@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"os"
 	"os/exec"
 	"sync"
 	"time"
@@ -39,6 +40,7 @@ type Bridge struct {
 	waiters map[string]chan json.RawMessage
 	exited  chan struct{}
 	exitErr error
+	readErr error // why the only stdout reader stopped, if it failed
 }
 
 // StartBridge starts the stdio server argv and returns a bridge serving its
@@ -89,6 +91,9 @@ func (b *Bridge) Exited() <-chan struct{} { return b.exited }
 func (b *Bridge) ExitErr() error {
 	b.mu.Lock()
 	defer b.mu.Unlock()
+	if b.readErr != nil {
+		return b.readErr
+	}
 	return b.exitErr
 }
 
@@ -250,8 +255,23 @@ func (b *Bridge) readLoop(stdout io.Reader) {
 			}
 		}
 	}
-	if err := sc.Err(); err != nil {
-		b.logger.Warn("stdio server output unreadable", "error", err.Error())
+	err := sc.Err()
+	if err == nil || errors.Is(err, os.ErrClosed) {
+		return // stdout closed: the server is exiting and Wait reports it
+	}
+	// Nothing else reads stdout, so no response can arrive any more. Stop
+	// the server: the exit path then fails pending and future requests and
+	// health turns unhealthy, instead of calls hanging on a live child.
+	b.logger.Warn("stdio server output unreadable; stopping it", "error", err.Error())
+	b.mu.Lock()
+	select {
+	case <-b.exited:
+	default:
+		b.readErr = fmt.Errorf("stdio server output unreadable: %w", err)
+	}
+	b.mu.Unlock()
+	if b.cmd.Process != nil {
+		_ = b.cmd.Process.Kill()
 	}
 }
 

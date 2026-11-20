@@ -57,6 +57,14 @@ func TestResearchMetrics(t *testing.T) {
 		{Seq: 3, Server: "tavily", Tool: "POST /search", Protocol: "external", Status: 599, IsError: true, Unmatched: true},
 		{Seq: 4, Server: "tavily", Tool: "POST /extract", Protocol: "external", Status: 200, Result: `{"results":[{"url":"https://f.example/fetched","raw_content":"x"}]}`},
 	}
+	// direct is a run that called Tavily itself, with no websearch MCP tool.
+	direct := []schemas.ToolCall{ledger[0], ledger[2], ledger[3]}
+	// mediated is a run that searched through the websearch MCP tool, which
+	// showed the agent one hit of the two its upstream call got (3-D-10).
+	mediated := []schemas.ToolCall{
+		{Seq: 1, Server: "websearch", Tool: "web_search", Protocol: "mcp", Status: 200, Result: `{"content":[{"type":"text","text":"{\"results\":[{\"url\":\"https://e.example/ev\"}]}"}],"isError":false}`},
+		searchRow(2, "https://e.example/ev", "https://d.example/distractor"),
+	}
 	tests := []struct {
 		name   string
 		rc     func(t *testing.T) *schemas.RunContext
@@ -76,12 +84,15 @@ func TestResearchMetrics(t *testing.T) {
 		{name: "sources cited zero when sources.json is broken", rc: func(t *testing.T) *schemas.RunContext { return researchRun(t, `[oops`, true) }, metric: newSourcesCitedMetric(), want: 0, status: "observed"},
 		{name: "grounded: searched and fetched pages count", rc: func(t *testing.T) *schemas.RunContext {
 			return researchRun(t, `["https://e.example/ev", "https://f.example/fetched"]`, true)
-		}, calls: ledger, metric: newCitationsGroundedMetric(), want: 1, status: "observed"},
+		}, calls: direct, metric: newCitationsGroundedMetric(), want: 1, status: "observed"},
 		{name: "grounded catches an invented citation", rc: func(t *testing.T) *schemas.RunContext {
 			return researchRun(t, `["https://e.example/ev", "https://invented.example/page"]`, true)
-		}, calls: ledger, metric: newCitationsGroundedMetric(), want: 0.5, status: "observed"},
+		}, calls: direct, metric: newCitationsGroundedMetric(), want: 0.5, status: "observed"},
 		{name: "grounded catches a real page never retrieved in this run", rc: func(t *testing.T) *schemas.RunContext { return researchRun(t, `["https://e.example/ev"]`, true) }, calls: []schemas.ToolCall{searchRow(1, "https://d.example/distractor")}, metric: newCitationsGroundedMetric(), want: 0, status: "observed"},
-		{name: "grounded ignores the MCP row text", rc: func(t *testing.T) *schemas.RunContext { return researchRun(t, `["https://mcp-only.example/x"]`, true) }, calls: ledger, metric: newCitationsGroundedMetric(), want: 0, status: "observed"},
+		{name: "grounded counts what the MCP tool delivered", rc: func(t *testing.T) *schemas.RunContext { return researchRun(t, `["https://e.example/ev"]`, true) }, calls: mediated, metric: newCitationsGroundedMetric(), want: 1, status: "observed"},
+		{name: "grounded ignores an upstream hit the agent never saw", rc: func(t *testing.T) *schemas.RunContext {
+			return researchRun(t, `["https://d.example/distractor"]`, true)
+		}, calls: mediated, metric: newCitationsGroundedMetric(), want: 0, status: "observed"},
 		{name: "grounded not applicable without citations", rc: func(t *testing.T) *schemas.RunContext { return researchRun(t, `[]`, true) }, calls: ledger, metric: newCitationsGroundedMetric(), status: "na"},
 		{name: "grounded unknown without ledger", rc: func(t *testing.T) *schemas.RunContext { return researchRun(t, `["https://e.example/ev"]`, true) }, metric: newCitationsGroundedMetric(), status: "unknown"},
 		{name: "precision", rc: func(t *testing.T) *schemas.RunContext {

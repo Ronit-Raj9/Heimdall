@@ -2,6 +2,7 @@ package toolproxy
 
 import (
 	"bytes"
+	"compress/flate"
 	"compress/gzip"
 	"compress/zlib"
 	"crypto/sha256"
@@ -474,6 +475,36 @@ func TestRecordCompressedBodies(t *testing.T) {
 			t.Fatalf("rows = %+v", rows)
 		}
 	})
+	// HTTP deflate on an event stream is zlib-framed (RFC 9110); raw
+	// deflate is the tolerated fallback. Both must decode end to end.
+	for _, framing := range []string{"zlib", "raw"} {
+		t.Run("deflate event stream "+framing, func(t *testing.T) {
+			ev := "event: message\ndata: {\"jsonrpc\":\"2.0\",\"id\":7,\"result\":{\"content\":[{\"type\":\"text\",\"text\":\"streamed\"}]}}\n\n"
+			var b bytes.Buffer
+			if framing == "zlib" {
+				b.Write(deflated(ev))
+			} else {
+				fw, _ := flate.NewWriter(&b, flate.DefaultCompression)
+				_, _ = fw.Write([]byte(ev))
+				_ = fw.Close()
+			}
+			upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				w.Header().Set("Content-Type", "text/event-stream")
+				w.Header().Set("Content-Encoding", "deflate")
+				_, _ = w.Write(b.Bytes())
+			}))
+			defer upstream.Close()
+			tp := newTestProxy(t, upstream.URL, ProtocolMCP)
+			status, _, got := rawPost(t, tp.front.URL+"/s/fs/mcp", strings.NewReader(callBody(7, "echo", "x")), -1, map[string]string{"Content-Type": "application/json"})
+			if status != 200 || string(got) != ev {
+				t.Fatalf("status %d, stream %q", status, got)
+			}
+			rows := tp.waitRows(t, 1)
+			if len(rows) != 1 || !strings.Contains(rows[0].Result, "streamed") || rows[0].Unparsed || rows[0].IsError {
+				t.Fatalf("rows = %+v", rows)
+			}
+		})
+	}
 	t.Run("fault on a gzip batch", func(t *testing.T) {
 		up := &scriptedMCP{t: t}
 		upstream := httptest.NewServer(up)

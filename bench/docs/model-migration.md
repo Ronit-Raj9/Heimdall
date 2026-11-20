@@ -26,7 +26,11 @@ GET /api/bench/experiments/{id}/migration?from=&to=&condition=&alpha=&grade_sour
    a `matrix:` of the old model first, then each new one (with `-provider`
    when it differs from the agent config's), the same tasks, trials and
    conditions for every model, `budget.total_usd` from `-budget-usd`, and the
-   release policy. It is an ordinary experiment file: `heimdall run` runs it
+   release policy. The primary condition is `clean` when it is run, else the
+   first of `-conditions`. The report afterwards names the frozen arms (A for
+   the old model, then B, C...), so one model through two providers compares
+   one direction only. In `migrate report`, `provider/model` names one of
+   those arms. It is an ordinary experiment file: `heimdall run` runs it
    too.
 2. Plans it with the planner (`docs/model-matrix.md`: an unpriced model is
    refused unless `-allow-unpriced`) and prints the slots and the forecast
@@ -114,7 +118,11 @@ each to `/runs?pair=`).
 The policy is evaluated with `policy.Evaluate` exactly as `check` would on a
 two-arm experiment of the pair's runs (old arm as baseline A, new arm as
 candidate B): the experiment's own policy file, else `policies/default.yaml`,
-or `-policy`. A policy check that is unknown blocks only as "not enough
+or `-policy`. A policy that was asked for (by `-policy` or by the experiment)
+and cannot be read fails the report; only an absent implicit
+`policies/default.yaml` gives a statistics-only report, and `-policy none`
+asks for one. The experiment's own policy is checked against the hash frozen
+in its manifest. A policy check that is unknown blocks only as "not enough
 evidence", never as "do not migrate". Every report notes that the same
 prompt and config were used for every model: a prompt tuned for the old
 model is not a tuned prompt for the new one, so the report measures the move

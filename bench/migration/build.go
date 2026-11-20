@@ -43,6 +43,10 @@ type Input struct {
 	// alone.
 	Policy     *schemas.Policy
 	PolicyHash string
+	// PolicyFrozen says Policy is the one the experiment froze, so its
+	// hash is checked against Manifest.PolicyHash; a policy chosen for
+	// this report only is evaluated without that check.
+	PolicyFrozen bool
 	// Synthetic marks synthetic arms (leaderboard.SyntheticArms).
 	Synthetic map[string]bool
 	// Invalid are the experiment's release verdict invalid reasons
@@ -129,7 +133,7 @@ func Build(ctx context.Context, in Input, q Query) (*Report, error) {
 		pair.Flipped = flipped(g, p[0], p[1])
 		var pr *schemas.PolicyResult
 		if in.Policy != nil {
-			pr = evaluatePolicy(in.Policy, in.PolicyHash, m, in.Runs, p[0], p[1])
+			pr = evaluatePolicy(in.Policy, in.PolicyHash, in.PolicyFrozen, m, in.Runs, p[0], p[1])
 		}
 		pair.Recommendation = recommend(pair, pr, synthetic, in.Invalid)
 		rep.Pairs = append(rep.Pairs, pair)
@@ -167,6 +171,13 @@ func resolvePairs(m *schemas.Manifest, q Query) ([][2]string, error) {
 	}
 	slices.Sort(to)
 	to = slices.Compact(to)
+	// An arm named by both sides is the old one: a model served through two
+	// providers resolves to both arms on both sides, and comparing them in
+	// both directions would report the reverse migration too.
+	to = slices.DeleteFunc(to, func(id string) bool { return slices.Contains(from, id) })
+	if len(to) == 0 && len(from) > 1 {
+		return nil, fmt.Errorf("%w: %s names arms %s on both sides; name the arms (-from A -to B) or provider/model", ErrBadQuery, q.From, strings.Join(from, ", "))
+	}
 	var pairs [][2]string
 	for _, f := range from {
 		for _, t := range to {
@@ -201,10 +212,12 @@ func resolveArms(m *schemas.Manifest, v string) ([]string, error) {
 	if _, ok := m.Arms[v]; ok {
 		return []string{v}, nil
 	}
+	// A value of the form provider/model names the model through one
+	// gateway provider, for experiments that run one model through two.
 	var out, models []string
 	for id, a := range m.Arms {
 		models = append(models, a.Config.Model)
-		if a.Config.Model == v {
+		if a.Config.Model == v || a.Config.Gateway.Provider+"/"+a.Config.Model == v {
 			out = append(out, id)
 		}
 	}
@@ -662,8 +675,9 @@ func flipped(g *graded, from, to string) []FlippedTask {
 
 // evaluatePolicy runs the release policy on the pair with the old model as
 // baseline arm A and the new one as candidate B, exactly as `check` would on
-// a two-arm experiment of those runs.
-func evaluatePolicy(p *schemas.Policy, hash string, m *schemas.Manifest, runs []schemas.SealedRun, from, to string) *schemas.PolicyResult {
+// a two-arm experiment of those runs. A frozen policy keeps the manifest's
+// hash, so an edited policy file fails the policy_hash check.
+func evaluatePolicy(p *schemas.Policy, hash string, frozen bool, m *schemas.Manifest, runs []schemas.SealedRun, from, to string) *schemas.PolicyResult {
 	var pairRuns []schemas.SealedRun
 	for _, r := range runs {
 		switch r.Slot.Arm {
@@ -677,7 +691,9 @@ func evaluatePolicy(p *schemas.Policy, hash string, m *schemas.Manifest, runs []
 		pairRuns = append(pairRuns, r)
 	}
 	mc := *m
-	mc.PolicyHash = ""
+	if !frozen {
+		mc.PolicyHash = ""
+	}
 	return policy.Evaluate(p, hash, &mc, nil, pairRuns)
 }
 

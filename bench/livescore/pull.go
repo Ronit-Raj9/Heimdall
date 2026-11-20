@@ -120,6 +120,19 @@ func (s *Scorer) Pull(ctx context.Context) (*PullResult, error) {
 	if err != nil {
 		return nil, err
 	}
+	// A pull that stopped after appending its sessions but before saving
+	// the state left records the cursor does not know about. Skip those
+	// session ids and continue the sequence after the highest recorded one,
+	// so a retry never appends a session twice or reuses a sequence number.
+	prior, err := s.Store.Sessions()
+	if err != nil {
+		return nil, err
+	}
+	recorded := make(map[string]bool, len(prior))
+	for _, r := range prior {
+		recorded[r.ID] = true
+		state.Seq = max(state.Seq, r.Seq)
+	}
 	now := s.now()
 	cl := newClient(base, token, s.HTTP)
 	cfg := s.Config
@@ -144,7 +157,10 @@ func (s *Scorer) Pull(ctx context.Context) (*PullResult, error) {
 	failed := 0
 	for vi := range cfg.Versions {
 		v := &cfg.Versions[vi]
-		rows, trunc, err := cl.listRows(ctx, v, from, now)
+		rows, trunc, err := cl.listRows(ctx, v, from, now, func(id string) bool {
+			_, done := scored[id]
+			return done
+		})
 		if err != nil {
 			if ctx.Err() != nil {
 				return nil, ctx.Err()
@@ -195,6 +211,12 @@ func (s *Scorer) Pull(ctx context.Context) (*PullResult, error) {
 			if !stale && !sess.closed(now, gap) {
 				res.Open++
 				next = minTime(next, sess.rows[0].Timestamp)
+				continue
+			}
+			if recorded[sessionID(v.Name, sess.key, sess.rows[0].ID)] {
+				for _, r := range sess.rows {
+					scored[r.ID] = r.Timestamp
+				}
 				continue
 			}
 			if !sampled(v.Name, sess.key, cfg.sampleRate()) {

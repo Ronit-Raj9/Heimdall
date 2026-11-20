@@ -113,13 +113,17 @@ so a changed cassette is a changed task.
 
 1. Set the credential in the shell that runs the bench:
    `export FX_API_KEY=...`.
-2. Copy a smoke experiment, add `external: record`, keep only the oracle arm
-   if you want the reference's calls (or use a real agent to capture what
-   agents ask), then plan and run it.
+2. Copy a smoke experiment and add `external: record`, then plan and run it.
+   An experiment needs at least two arms: keep the oracle arm for the
+   reference's calls next to a noop arm (which makes no calls), or use a real
+   agent as an arm to capture what agents ask. Every arm that calls the API
+   records its own cassette.
 3. Each run folder holds `external/<id>.cassette.jsonl`, written by the proxy
-   with the credential redacted, and sealed with the run.
-4. Promote it by copying it over the task's cassette:
-   `cp runs/<exp>/<run>/external/fx.cassette.jsonl benchmarks/<suite>/tasks/<task>/cassettes/fx.cassette.jsonl`,
+   with the credential redacted, and sealed with the run. Run folders sit at
+   `runs/<exp>/slots/<slot>/runs/<run>/`; `report` or the run's `plan.json`
+   names the slot of each arm.
+4. Promote it by copying the oracle run's cassette over the task's:
+   `cp runs/<exp>/slots/<slot>/runs/<run>/external/fx.cassette.jsonl benchmarks/<suite>/tasks/<task>/cassettes/fx.cassette.jsonl`,
    review it (it is the API's real answers), then `suite lock` and
    `suite admit` again.
 

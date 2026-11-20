@@ -441,3 +441,52 @@ func TestServiceIngestOff(t *testing.T) {
 		t.Errorf("list = %+v, %v", l, err)
 	}
 }
+
+// TestReadNewLinesDetectsReplacement is audit 5-C-04: a file replaced at the
+// same name by one at least as long as the saved offset is read from the
+// start, for rename-and-create and for copy-truncate that regrew between
+// pulls; an append is still read from the offset.
+func TestReadNewLinesDetectsReplacement(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "traces.jsonl")
+	first := `{"a":1}` + "\n" + `{"a":2}` + "\n"
+	if err := os.WriteFile(path, []byte(first), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	chunk, off, head, err := readNewLines(path, 0, "", 1<<20)
+	if err != nil || string(chunk) != first || off != int64(len(first)) || head == "" {
+		t.Fatalf("first read = %q %d %q %v", chunk, off, head, err)
+	}
+
+	// Append: only the new line.
+	f, _ := os.OpenFile(path, os.O_APPEND|os.O_WRONLY, 0o644)
+	_, _ = f.WriteString(`{"a":3}` + "\n")
+	f.Close()
+	chunk, off, head, err = readNewLines(path, off, head, 1<<20)
+	if err != nil || string(chunk) != `{"a":3}`+"\n" {
+		t.Fatalf("append read = %q %v", chunk, err)
+	}
+
+	// Rename and create a longer file at the same name.
+	if err := os.Rename(path, path+".1"); err != nil {
+		t.Fatal(err)
+	}
+	second := `{"b":1}` + "\n" + `{"b":2}` + "\n" + `{"b":3}` + "\n" + `{"b":4}` + "\n"
+	if err := os.WriteFile(path, []byte(second), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	chunk, off, head, err = readNewLines(path, off, head, 1<<20)
+	if err != nil || string(chunk) != second {
+		t.Fatalf("replaced read = %q %v, want the whole new file", chunk, err)
+	}
+
+	// Copy-truncate in place, regrown past the old offset before the pull.
+	third := strings.Repeat(`{"c":1}`+"\n", 6)
+	if err := os.WriteFile(path, []byte(third), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	chunk, _, _, err = readNewLines(path, off, head, 1<<20)
+	if err != nil || string(chunk) != third {
+		t.Fatalf("copy-truncate read = %q %v, want the whole regrown file", chunk, err)
+	}
+}

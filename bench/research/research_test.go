@@ -1,6 +1,7 @@
 package research
 
 import (
+	"encoding/json"
 	"os"
 	"path/filepath"
 	"strings"
@@ -16,6 +17,12 @@ func TestNormalizeQuery(t *testing.T) {
 		{in: "?!.,;:", want: ""},
 		{in: "Ferrow (A39) tunnel: length.", want: "ferrow (a39) tunnel: length"},
 		{in: strings.Repeat("a", MaxQueryRunes+20), want: strings.Repeat("a", MaxQueryRunes)},
+		// Python's str.lower, not Go's simple mapping (finding 3-D-07).
+		{in: "İstanbul ΟΣ", want: "i\u0307stanbul ος"},
+		{in: "ΣΑΣ ΣΑΣ.", want: "σας σας"},
+		{in: "Σ", want: "σ"},
+		{in: "AΣ'Σ x", want: "aσ'ς x"},
+		{in: "ΌΣΟΣ\u2003BAR", want: "όσος bar"},
 	}
 	for _, tt := range tests {
 		t.Run(tt.want, func(t *testing.T) {
@@ -156,6 +163,46 @@ func TestReturnedURLs(t *testing.T) {
 			}
 			if strings.Join(keys, " ") != tt.want || len(got) != len(keys) {
 				t.Errorf("ReturnedURLs = %v, want %q", got, tt.want)
+			}
+		})
+	}
+}
+
+// TestReturnedURLsMCPBoundary checks 3-D-10: through the websearch MCP
+// tools, only what the tool handed the agent counts, not the extra hits of
+// its upstream Tavily call, and an undelivered answer never counts.
+func TestReturnedURLsMCPBoundary(t *testing.T) {
+	apis := map[string]bool{"tavily": true}
+	upstream := schemas.ToolCall{Server: "tavily", Tool: SearchTool, Protocol: "external", Status: 200, Result: `{"results":[{"url":"https://a.example/x"},{"url":"https://b.example/y"}]}`}
+	mcp := func(tool, text string) schemas.ToolCall {
+		b, _ := json.Marshal(map[string]any{"content": []any{map[string]any{"type": "text", "text": text}}, "isError": false})
+		return schemas.ToolCall{Server: "websearch", Tool: tool, Protocol: "mcp", Status: 200, Result: string(b)}
+	}
+	search := mcp(MCPSearchTool, `{"query":"q","results":[{"url":"https://a.example/x"}]}`)
+	fetch := mcp(MCPFetchTool, `{"url":"https://c.example/z","content":"..."}`)
+	lost := search
+	lost.Undelivered = true
+	tests := []struct {
+		name string
+		rows []schemas.ToolCall
+		want []string
+	}{
+		{name: "hidden upstream hit not counted", rows: []schemas.ToolCall{search, upstream}, want: []string{"https://a.example/x"}},
+		{name: "fetched page", rows: []schemas.ToolCall{fetch}, want: []string{"https://c.example/z"}},
+		{name: "undelivered mcp answer", rows: []schemas.ToolCall{lost, upstream}},
+		{name: "direct call counts without mcp", rows: []schemas.ToolCall{upstream}, want: []string{"https://a.example/x", "https://b.example/y"}},
+		{name: "undelivered direct call", rows: []schemas.ToolCall{func() schemas.ToolCall { u := upstream; u.Undelivered = true; return u }()}},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := ReturnedURLs(tt.rows, apis)
+			if len(got) != len(tt.want) {
+				t.Fatalf("ReturnedURLs = %v, want %v", got, tt.want)
+			}
+			for _, u := range tt.want {
+				if !got[u] {
+					t.Fatalf("ReturnedURLs = %v, want %v", got, tt.want)
+				}
 			}
 		})
 	}

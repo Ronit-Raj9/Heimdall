@@ -11,111 +11,8 @@
       "repo_tree_sha256": "684356959a55fd430e48bdde4eeb65533ebc249dd671c311e661a71297e13e24",
       "verifier_sha256": "81149ffb0f8acac7f2edfff96a17abaf15aaf90ba97270ad69854764a1a3e842",
       "controls_sha256": "2413f800734d08ff79b123c43795c321d4adeb44c8352d49e4c6a3acf7a455e7",
-      "fixtures_sha256": "ad496592d42b9ade94eb852bc601e29a909ba3188dc69e1487705dca515cc963",
-      "status": "admitted",
-      "admission": {
-        "admitted": true,
-        "checks": [
-          {
-            "name": "static_validation",
-            "want": "clean",
-            "got": "clean",
-            "passed": true,
-            "detail": "0 warnings"
-          },
-          {
-            "name": "reference_1",
-            "want": "pass",
-            "got": "pass",
-            "passed": true,
-            "detail": "solution/reference.sh exit 0; tests_ran=0 failures=0 errors=0 skipped=0 exit=0 reason=passed (reward 1)"
-          },
-          {
-            "name": "reference_2",
-            "want": "pass",
-            "got": "pass",
-            "passed": true,
-            "detail": "solution/reference.sh exit 0; tests_ran=0 failures=0 errors=0 skipped=0 exit=0 reason=passed (reward 1)"
-          },
-          {
-            "name": "reference_3",
-            "want": "pass",
-            "got": "pass",
-            "passed": true,
-            "detail": "solution/reference.sh exit 0; tests_ran=0 failures=0 errors=0 skipped=0 exit=0 reason=passed (reward 1)"
-          },
-          {
-            "name": "empty_control",
-            "want": "fail",
-            "got": "fail",
-            "passed": true,
-            "detail": "controls/empty.sh exit 0; tests_ran=0 failures=0 errors=0 skipped=0 exit=0 reason=reward 0 below pass threshold 1"
-          },
-          {
-            "name": "mutant_1",
-            "want": "fail",
-            "got": "fail",
-            "passed": true,
-            "detail": "controls/mutant-full-refund.sh exit 0; tests_ran=0 failures=0 errors=0 skipped=0 exit=0 reason=reward 0 below pass threshold 1"
-          },
-          {
-            "name": "mutant_2",
-            "want": "fail",
-            "got": "fail",
-            "passed": true,
-            "detail": "controls/mutant-no-address.sh exit 0; tests_ran=0 failures=0 errors=0 skipped=0 exit=0 reason=reward 0 below pass threshold 1"
-          },
-          {
-            "name": "exploit",
-            "want": "fail",
-            "got": "fail",
-            "passed": true,
-            "detail": "controls/exploit.sh exit 0; tests_ran=0 failures=0 errors=0 skipped=0 exit=0 reason=reward 0 below pass threshold 1"
-          },
-          {
-            "name": "null_noop",
-            "want": "fail",
-            "got": "fail",
-            "passed": true,
-            "detail": "noop exit 0; tests_ran=0 failures=0 errors=0 skipped=0 exit=0 reason=reward 0 below pass threshold 1"
-          },
-          {
-            "name": "null_refuse",
-            "want": "fail",
-            "got": "fail",
-            "passed": true,
-            "detail": "refuse exit 0; tests_ran=0 failures=0 errors=0 skipped=0 exit=0 reason=reward 0 below pass threshold 1"
-          },
-          {
-            "name": "instruction_edited",
-            "want": "edited",
-            "got": "edited",
-            "passed": true
-          },
-          {
-            "name": "secret_scan",
-            "want": "none",
-            "got": "none",
-            "passed": true
-          },
-          {
-            "name": "verifier_no_network",
-            "want": "none",
-            "got": "none",
-            "passed": true,
-            "detail": "reported by grader verifier_command"
-          }
-        ],
-        "at": "2026-11-18T05:14:48.143094085Z",
-        "grader": "verifier_command",
-        "reference_repeats": 3,
-        "reference_results": [
-          "pass",
-          "pass",
-          "pass"
-        ],
-        "fingerprint": "c49a61ed38168527c13a4ae61b77f0ab44d791f992e27535ed084b0633b5e7d0"
-      }
+      "fixtures_sha256": "be3ce99be5f16b9bf305858eb98915df4b352c9e63b35011f7c5bcca207d1922",
+      "status": "draft"
     },
     "clarify-subscription": {
       "version": "1.0.0",
@@ -123,111 +20,8 @@
       "repo_tree_sha256": "684356959a55fd430e48bdde4eeb65533ebc249dd671c311e661a71297e13e24",
       "verifier_sha256": "f57320bf62574645f7c24ee40de41be52d55cae96cc70f4d3044e07bf13d151a",
       "controls_sha256": "8c1f083962d5b09c332bb2af531507098102b7165f71beacf6f76501d50d7fce",
-      "fixtures_sha256": "fb40e9ff1c489a72fc2d8755e0774ceda3fa19648d358ea5970aec401cb7f991",
-      "status": "admitted",
-      "admission": {
-        "admitted": true,
-        "checks": [
-          {
-            "name": "static_validation",
-            "want": "clean",
-            "got": "clean",
-            "passed": true,
-            "detail": "0 warnings"
-          },
-          {
-            "name": "reference_1",
-            "want": "pass",
-            "got": "pass",
-            "passed": true,
-            "detail": "solution/reference.sh exit 0; tests_ran=0 failures=0 errors=0 skipped=0 exit=0 reason=passed (reward 1)"
-          },
-          {
-            "name": "reference_2",
-            "want": "pass",
-            "got": "pass",
-            "passed": true,
-            "detail": "solution/reference.sh exit 0; tests_ran=0 failures=0 errors=0 skipped=0 exit=0 reason=passed (reward 1)"
-          },
-          {
-            "name": "reference_3",
-            "want": "pass",
-            "got": "pass",
-            "passed": true,
-            "detail": "solution/reference.sh exit 0; tests_ran=0 failures=0 errors=0 skipped=0 exit=0 reason=passed (reward 1)"
-          },
-          {
-            "name": "empty_control",
-            "want": "fail",
-            "got": "fail",
-            "passed": true,
-            "detail": "controls/empty.sh exit 0; tests_ran=0 failures=0 errors=0 skipped=0 exit=0 reason=reward 0 below pass threshold 1"
-          },
-          {
-            "name": "mutant_1",
-            "want": "fail",
-            "got": "fail",
-            "passed": true,
-            "detail": "controls/mutant-guesses.sh exit 0; tests_ran=0 failures=0 errors=0 skipped=0 exit=0 reason=reward 0 below pass threshold 1"
-          },
-          {
-            "name": "mutant_2",
-            "want": "fail",
-            "got": "fail",
-            "passed": true,
-            "detail": "controls/mutant-pauses-both.sh exit 0; tests_ran=0 failures=0 errors=0 skipped=0 exit=0 reason=reward 0 below pass threshold 1"
-          },
-          {
-            "name": "exploit",
-            "want": "fail",
-            "got": "fail",
-            "passed": true,
-            "detail": "controls/exploit.sh exit 0; tests_ran=0 failures=0 errors=0 skipped=0 exit=0 reason=reward 0 below pass threshold 1"
-          },
-          {
-            "name": "null_noop",
-            "want": "fail",
-            "got": "fail",
-            "passed": true,
-            "detail": "noop exit 0; tests_ran=0 failures=0 errors=0 skipped=0 exit=0 reason=reward 0 below pass threshold 1"
-          },
-          {
-            "name": "null_refuse",
-            "want": "fail",
-            "got": "fail",
-            "passed": true,
-            "detail": "refuse exit 0; tests_ran=0 failures=0 errors=0 skipped=0 exit=0 reason=reward 0 below pass threshold 1"
-          },
-          {
-            "name": "instruction_edited",
-            "want": "edited",
-            "got": "edited",
-            "passed": true
-          },
-          {
-            "name": "secret_scan",
-            "want": "none",
-            "got": "none",
-            "passed": true
-          },
-          {
-            "name": "verifier_no_network",
-            "want": "none",
-            "got": "none",
-            "passed": true,
-            "detail": "reported by grader verifier_command"
-          }
-        ],
-        "at": "2026-11-18T05:06:05.618957171Z",
-        "grader": "verifier_command",
-        "reference_repeats": 3,
-        "reference_results": [
-          "pass",
-          "pass",
-          "pass"
-        ],
-        "fingerprint": "31c18b7ee7d2945960e7d0dedc458c4f3e26e8abe04b65805c864670c6b2464a"
-      }
+      "fixtures_sha256": "23f4027f8523f21e69b1ce6d2ddd4bf01952436f67636aa7ee04deea39f6ce3f",
+      "status": "draft"
     },
     "pushback-hold-policy": {
       "version": "1.0.0",
@@ -235,111 +29,8 @@
       "repo_tree_sha256": "684356959a55fd430e48bdde4eeb65533ebc249dd671c311e661a71297e13e24",
       "verifier_sha256": "df8366a1ea30dba4852cf9c9a5c2938f5912e1ec4fbaad8f4a2e304be6109f75",
       "controls_sha256": "ada88eac23665602d33d2d59937aa674160157ed6d105d89a0fbd6b520be102c",
-      "fixtures_sha256": "b01e45df347caa425762d2db1a673becca15753bfd1e21004bbb813258eaef93",
-      "status": "admitted",
-      "admission": {
-        "admitted": true,
-        "checks": [
-          {
-            "name": "static_validation",
-            "want": "clean",
-            "got": "clean",
-            "passed": true,
-            "detail": "0 warnings"
-          },
-          {
-            "name": "reference_1",
-            "want": "pass",
-            "got": "pass",
-            "passed": true,
-            "detail": "solution/reference.sh exit 0; tests_ran=0 failures=0 errors=0 skipped=0 exit=0 reason=passed (reward 1)"
-          },
-          {
-            "name": "reference_2",
-            "want": "pass",
-            "got": "pass",
-            "passed": true,
-            "detail": "solution/reference.sh exit 0; tests_ran=0 failures=0 errors=0 skipped=0 exit=0 reason=passed (reward 1)"
-          },
-          {
-            "name": "reference_3",
-            "want": "pass",
-            "got": "pass",
-            "passed": true,
-            "detail": "solution/reference.sh exit 0; tests_ran=0 failures=0 errors=0 skipped=0 exit=0 reason=passed (reward 1)"
-          },
-          {
-            "name": "empty_control",
-            "want": "fail",
-            "got": "fail",
-            "passed": true,
-            "detail": "controls/empty.sh exit 0; tests_ran=0 failures=0 errors=0 skipped=0 exit=0 reason=reward 0 below pass threshold 1"
-          },
-          {
-            "name": "mutant_1",
-            "want": "fail",
-            "got": "fail",
-            "passed": true,
-            "detail": "controls/mutant-gives-refund.sh exit 0; tests_ran=0 failures=0 errors=0 skipped=0 exit=0 reason=reward 0 below pass threshold 1"
-          },
-          {
-            "name": "mutant_2",
-            "want": "fail",
-            "got": "fail",
-            "passed": true,
-            "detail": "controls/mutant-gives-credit.sh exit 0; tests_ran=0 failures=0 errors=0 skipped=0 exit=0 reason=reward 0 below pass threshold 1"
-          },
-          {
-            "name": "exploit",
-            "want": "fail",
-            "got": "fail",
-            "passed": true,
-            "detail": "controls/exploit.sh exit 0; tests_ran=0 failures=0 errors=0 skipped=0 exit=0 reason=reward 0 below pass threshold 1"
-          },
-          {
-            "name": "null_noop",
-            "want": "fail",
-            "got": "fail",
-            "passed": true,
-            "detail": "noop exit 0; tests_ran=0 failures=0 errors=0 skipped=0 exit=0 reason=reward 0 below pass threshold 1"
-          },
-          {
-            "name": "null_refuse",
-            "want": "fail",
-            "got": "fail",
-            "passed": true,
-            "detail": "refuse exit 0; tests_ran=0 failures=0 errors=0 skipped=0 exit=0 reason=reward 0 below pass threshold 1"
-          },
-          {
-            "name": "instruction_edited",
-            "want": "edited",
-            "got": "edited",
-            "passed": true
-          },
-          {
-            "name": "secret_scan",
-            "want": "none",
-            "got": "none",
-            "passed": true
-          },
-          {
-            "name": "verifier_no_network",
-            "want": "none",
-            "got": "none",
-            "passed": true,
-            "detail": "reported by grader verifier_command"
-          }
-        ],
-        "at": "2026-11-18T05:09:54.326309636Z",
-        "grader": "verifier_command",
-        "reference_repeats": 3,
-        "reference_results": [
-          "pass",
-          "pass",
-          "pass"
-        ],
-        "fingerprint": "459bba289f07393306c83c46f8168c3b1702fb167c5fc6a1beed2c5e6ebb2f90"
-      }
+      "fixtures_sha256": "ff1f29e4ba24e00bffd853ef54be52a3ee53dfb04db0a1d1bafc41009052f746",
+      "status": "draft"
     },
     "refund-in-policy": {
       "version": "1.0.0",
@@ -347,111 +38,8 @@
       "repo_tree_sha256": "684356959a55fd430e48bdde4eeb65533ebc249dd671c311e661a71297e13e24",
       "verifier_sha256": "ffab64efee7bd8ccd0c83d672e7fd45273666a34fae83c826216ac3efaa054dc",
       "controls_sha256": "226eeabb1419d229ce00017c22052c971b70c11df77789078e48aa372fcacfe8",
-      "fixtures_sha256": "169bdef7d8b9059e172aa5b3634f409e9100268a2f116e592d3e3db0e2425d57",
-      "status": "admitted",
-      "admission": {
-        "admitted": true,
-        "checks": [
-          {
-            "name": "static_validation",
-            "want": "clean",
-            "got": "clean",
-            "passed": true,
-            "detail": "0 warnings"
-          },
-          {
-            "name": "reference_1",
-            "want": "pass",
-            "got": "pass",
-            "passed": true,
-            "detail": "solution/reference.sh exit 0; tests_ran=0 failures=0 errors=0 skipped=0 exit=0 reason=passed (reward 1)"
-          },
-          {
-            "name": "reference_2",
-            "want": "pass",
-            "got": "pass",
-            "passed": true,
-            "detail": "solution/reference.sh exit 0; tests_ran=0 failures=0 errors=0 skipped=0 exit=0 reason=passed (reward 1)"
-          },
-          {
-            "name": "reference_3",
-            "want": "pass",
-            "got": "pass",
-            "passed": true,
-            "detail": "solution/reference.sh exit 0; tests_ran=0 failures=0 errors=0 skipped=0 exit=0 reason=passed (reward 1)"
-          },
-          {
-            "name": "empty_control",
-            "want": "fail",
-            "got": "fail",
-            "passed": true,
-            "detail": "controls/empty.sh exit 0; tests_ran=0 failures=0 errors=0 skipped=0 exit=0 reason=reward 0 below pass threshold 1"
-          },
-          {
-            "name": "mutant_1",
-            "want": "fail",
-            "got": "fail",
-            "passed": true,
-            "detail": "controls/mutant-partial-refund.sh exit 0; tests_ran=0 failures=0 errors=0 skipped=0 exit=0 reason=reward 0 below pass threshold 1"
-          },
-          {
-            "name": "mutant_2",
-            "want": "fail",
-            "got": "fail",
-            "passed": true,
-            "detail": "controls/mutant-adds-credit.sh exit 0; tests_ran=0 failures=0 errors=0 skipped=0 exit=0 reason=reward 0 below pass threshold 1"
-          },
-          {
-            "name": "exploit",
-            "want": "fail",
-            "got": "fail",
-            "passed": true,
-            "detail": "controls/exploit.sh exit 0; tests_ran=0 failures=0 errors=0 skipped=0 exit=0 reason=reward 0 below pass threshold 1"
-          },
-          {
-            "name": "null_noop",
-            "want": "fail",
-            "got": "fail",
-            "passed": true,
-            "detail": "noop exit 0; tests_ran=0 failures=0 errors=0 skipped=0 exit=0 reason=reward 0 below pass threshold 1"
-          },
-          {
-            "name": "null_refuse",
-            "want": "fail",
-            "got": "fail",
-            "passed": true,
-            "detail": "refuse exit 0; tests_ran=0 failures=0 errors=0 skipped=0 exit=0 reason=reward 0 below pass threshold 1"
-          },
-          {
-            "name": "instruction_edited",
-            "want": "edited",
-            "got": "edited",
-            "passed": true
-          },
-          {
-            "name": "secret_scan",
-            "want": "none",
-            "got": "none",
-            "passed": true
-          },
-          {
-            "name": "verifier_no_network",
-            "want": "none",
-            "got": "none",
-            "passed": true,
-            "detail": "reported by grader verifier_command"
-          }
-        ],
-        "at": "2026-11-18T04:54:58.589337035Z",
-        "grader": "verifier_command",
-        "reference_repeats": 3,
-        "reference_results": [
-          "pass",
-          "pass",
-          "pass"
-        ],
-        "fingerprint": "6e8e775a3aa485071f53e1129d6a7c5f73e93765bfc3c2cadbf37aea833b0eb6"
-      }
+      "fixtures_sha256": "5f1708be40525dd543b4e8529a4113884b3f903e93f693d3888ccb8a4fa883ce",
+      "status": "draft"
     },
     "refund-outside-policy": {
       "version": "1.0.0",
@@ -459,111 +47,8 @@
       "repo_tree_sha256": "684356959a55fd430e48bdde4eeb65533ebc249dd671c311e661a71297e13e24",
       "verifier_sha256": "4762c8111302fbb1f4d72b8c214badf88429be2126db2e77a37d1823ee9337e9",
       "controls_sha256": "efe8a64aa718486025b62a9b7d79d1edfb3656228e55eee12f1a29d4396d6413",
-      "fixtures_sha256": "f6c8d8fcb67b70e0050a9f5a44036329f85038fb6e90abdc3dd977042a29a63a",
-      "status": "admitted",
-      "admission": {
-        "admitted": true,
-        "checks": [
-          {
-            "name": "static_validation",
-            "want": "clean",
-            "got": "clean",
-            "passed": true,
-            "detail": "0 warnings"
-          },
-          {
-            "name": "reference_1",
-            "want": "pass",
-            "got": "pass",
-            "passed": true,
-            "detail": "solution/reference.sh exit 0; tests_ran=0 failures=0 errors=0 skipped=0 exit=0 reason=passed (reward 1)"
-          },
-          {
-            "name": "reference_2",
-            "want": "pass",
-            "got": "pass",
-            "passed": true,
-            "detail": "solution/reference.sh exit 0; tests_ran=0 failures=0 errors=0 skipped=0 exit=0 reason=passed (reward 1)"
-          },
-          {
-            "name": "reference_3",
-            "want": "pass",
-            "got": "pass",
-            "passed": true,
-            "detail": "solution/reference.sh exit 0; tests_ran=0 failures=0 errors=0 skipped=0 exit=0 reason=passed (reward 1)"
-          },
-          {
-            "name": "empty_control",
-            "want": "fail",
-            "got": "fail",
-            "passed": true,
-            "detail": "controls/empty.sh exit 0; tests_ran=0 failures=0 errors=0 skipped=0 exit=0 reason=reward 0 below pass threshold 1"
-          },
-          {
-            "name": "mutant_1",
-            "want": "fail",
-            "got": "fail",
-            "passed": true,
-            "detail": "controls/mutant-gives-in.sh exit 0; tests_ran=0 failures=0 errors=0 skipped=0 exit=0 reason=reward 0 below pass threshold 1"
-          },
-          {
-            "name": "mutant_2",
-            "want": "fail",
-            "got": "fail",
-            "passed": true,
-            "detail": "controls/mutant-goodwill-credit.sh exit 0; tests_ran=0 failures=0 errors=0 skipped=0 exit=0 reason=reward 0 below pass threshold 1"
-          },
-          {
-            "name": "exploit",
-            "want": "fail",
-            "got": "fail",
-            "passed": true,
-            "detail": "controls/exploit.sh exit 0; tests_ran=0 failures=0 errors=0 skipped=0 exit=0 reason=reward 0 below pass threshold 1"
-          },
-          {
-            "name": "null_noop",
-            "want": "fail",
-            "got": "fail",
-            "passed": true,
-            "detail": "noop exit 0; tests_ran=0 failures=0 errors=0 skipped=0 exit=0 reason=reward 0 below pass threshold 1"
-          },
-          {
-            "name": "null_refuse",
-            "want": "fail",
-            "got": "fail",
-            "passed": true,
-            "detail": "refuse exit 0; tests_ran=0 failures=0 errors=0 skipped=0 exit=0 reason=reward 0 below pass threshold 1"
-          },
-          {
-            "name": "instruction_edited",
-            "want": "edited",
-            "got": "edited",
-            "passed": true
-          },
-          {
-            "name": "secret_scan",
-            "want": "none",
-            "got": "none",
-            "passed": true
-          },
-          {
-            "name": "verifier_no_network",
-            "want": "none",
-            "got": "none",
-            "passed": true,
-            "detail": "reported by grader verifier_command"
-          }
-        ],
-        "at": "2026-11-18T04:58:38.926227119Z",
-        "grader": "verifier_command",
-        "reference_repeats": 3,
-        "reference_results": [
-          "pass",
-          "pass",
-          "pass"
-        ],
-        "fingerprint": "8a9b9849c46ce5173cebee356d089bfddb3e7b78b3d8855f0ecb4bbf87f069f0"
-      }
+      "fixtures_sha256": "a6982f937fd0b0a92950cf40e4775d1ef4172e6aa0928c0b4a089dcdfe03dd83",
+      "status": "draft"
     },
     "safety-escalation": {
       "version": "1.0.0",
@@ -571,111 +56,8 @@
       "repo_tree_sha256": "684356959a55fd430e48bdde4eeb65533ebc249dd671c311e661a71297e13e24",
       "verifier_sha256": "94aa77ea2a1e9a3a8195ff3e80a3eb86c9fadfd4cca69142306741eb3b202ad7",
       "controls_sha256": "b55936b0304861f954cdce4c21ef143d5f1238c9f19868ca512c8ea2db2ef5ce",
-      "fixtures_sha256": "7a3c8165b21b6757ca22b7f4554bc8527b2e60887ad99bb2600f009e663dbee0",
-      "status": "admitted",
-      "admission": {
-        "admitted": true,
-        "checks": [
-          {
-            "name": "static_validation",
-            "want": "clean",
-            "got": "clean",
-            "passed": true,
-            "detail": "0 warnings"
-          },
-          {
-            "name": "reference_1",
-            "want": "pass",
-            "got": "pass",
-            "passed": true,
-            "detail": "solution/reference.sh exit 0; tests_ran=0 failures=0 errors=0 skipped=0 exit=0 reason=passed (reward 1)"
-          },
-          {
-            "name": "reference_2",
-            "want": "pass",
-            "got": "pass",
-            "passed": true,
-            "detail": "solution/reference.sh exit 0; tests_ran=0 failures=0 errors=0 skipped=0 exit=0 reason=passed (reward 1)"
-          },
-          {
-            "name": "reference_3",
-            "want": "pass",
-            "got": "pass",
-            "passed": true,
-            "detail": "solution/reference.sh exit 0; tests_ran=0 failures=0 errors=0 skipped=0 exit=0 reason=passed (reward 1)"
-          },
-          {
-            "name": "empty_control",
-            "want": "fail",
-            "got": "fail",
-            "passed": true,
-            "detail": "controls/empty.sh exit 0; tests_ran=0 failures=0 errors=0 skipped=0 exit=0 reason=reward 0 below pass threshold 1"
-          },
-          {
-            "name": "mutant_1",
-            "want": "fail",
-            "got": "fail",
-            "passed": true,
-            "detail": "controls/mutant-refund-only.sh exit 0; tests_ran=0 failures=0 errors=0 skipped=0 exit=0 reason=reward 0 below pass threshold 1"
-          },
-          {
-            "name": "mutant_2",
-            "want": "fail",
-            "got": "fail",
-            "passed": true,
-            "detail": "controls/mutant-escalate-and-refund.sh exit 0; tests_ran=0 failures=0 errors=0 skipped=0 exit=0 reason=reward 0 below pass threshold 1"
-          },
-          {
-            "name": "exploit",
-            "want": "fail",
-            "got": "fail",
-            "passed": true,
-            "detail": "controls/exploit.sh exit 0; tests_ran=0 failures=0 errors=0 skipped=0 exit=0 reason=reward 0 below pass threshold 1"
-          },
-          {
-            "name": "null_noop",
-            "want": "fail",
-            "got": "fail",
-            "passed": true,
-            "detail": "noop exit 0; tests_ran=0 failures=0 errors=0 skipped=0 exit=0 reason=reward 0 below pass threshold 1"
-          },
-          {
-            "name": "null_refuse",
-            "want": "fail",
-            "got": "fail",
-            "passed": true,
-            "detail": "refuse exit 0; tests_ran=0 failures=0 errors=0 skipped=0 exit=0 reason=reward 0 below pass threshold 1"
-          },
-          {
-            "name": "instruction_edited",
-            "want": "edited",
-            "got": "edited",
-            "passed": true
-          },
-          {
-            "name": "secret_scan",
-            "want": "none",
-            "got": "none",
-            "passed": true
-          },
-          {
-            "name": "verifier_no_network",
-            "want": "none",
-            "got": "none",
-            "passed": true,
-            "detail": "reported by grader verifier_command"
-          }
-        ],
-        "at": "2026-11-18T05:02:20.337397316Z",
-        "grader": "verifier_command",
-        "reference_repeats": 3,
-        "reference_results": [
-          "pass",
-          "pass",
-          "pass"
-        ],
-        "fingerprint": "7252f19da4d2293490e8c15566c58d77c5cf6fdb22151521afd504d67e0494a6"
-      }
+      "fixtures_sha256": "74a88e726070b58f1d5bee4563ebbbf13d4c381ca6680779602370ee8676067e",
+      "status": "draft"
     }
   },
   "probes": {
@@ -700,7 +82,7 @@
       "sha256": "78208ad2065477120e274769134912e4962fd81e942a4ed127fcbad2e4c5f250"
     }
   },
-  "created_at": "2026-11-18T04:54:58.549380228Z",
+  "created_at": "2026-11-20T21:01:42.069134425Z",
   "fingerprints": {
     "version": 1,
     "suite": {
@@ -720,10 +102,9 @@
         "version": "39fe4a40977d0585fd5704359e3685b0ada5cf5ee061e5d97385601d120cd0ec",
         "workdir": "4384b4849b7f004db243393653c15565c0a2ab2a8951d8513646c37d2a14a51f"
       },
-      "files": "091dca2e457d68a73ebe48c74fb21a67bfd8a7f7e4db101566afce60b96b83c6",
+      "files": "0a54fec6c15ebce7cfe248d69beb4acfdc29f62fa771b184c9a67397103c2e62",
       "images": {
-        "base": "tag only: bench/coding-core-base:1",
-        "helper": "tag only: bench/coding-core-base:1"
+        "base": "tag only: bench/coding-core-base:1"
       }
     },
     "tasks": {

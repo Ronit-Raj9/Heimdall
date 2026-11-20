@@ -216,7 +216,7 @@ actually retrieved in this run is a metric, not part of the grade:
 |---|---|---|
 | `searches` | Tavily search calls the proxy recorded (tool or direct, answered or not) | lower is better (a diagnostic, like `external_calls`) |
 | `sources_cited` | distinct cited URLs | reported only |
-| `citations_grounded` | share of cited URLs that one of this run's own successful search or extract calls returned (`results[].url` in the ledger; poison text never counts). Catches invented citations and real pages cited from memory | higher is better, rate |
+| `citations_grounded` | share of cited URLs that one of this run's own successful search or extract calls returned to the agent (`results[].url` in the ledger; poison text and undelivered answers never count). Through the websearch MCP tools only their answers count, not the Tavily calls behind them, which hold hits the agent did not ask for; Tavily rows count when the agent called Tavily directly. Catches invented citations and real pages cited from memory | higher is better, rate |
 | `citation_precision` | share of cited URLs listed in the task's `evidence_urls` | higher is better, rate |
 
 They apply to research runs (track `research`, or any task with a Tavily

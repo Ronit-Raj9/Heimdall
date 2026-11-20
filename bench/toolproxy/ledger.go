@@ -27,13 +27,25 @@ const maxLedgerLine = 4 << 20
 // Ledger appends one schemas.ToolCall JSON line per call to tools.jsonl. One
 // mutex covers numbering, writing and fsync, so Seq order is file order and a
 // row is on disk before the next one is numbered.
+//
+// Next to the ledger it keeps a status file (LedgerStatusFile) saying how
+// many rows were numbered, how many calls are still in flight and whether
+// any write failed. The proxy answers a call before its row is written, so
+// the ledger alone cannot tell a quiet run from one copied mid-call or one
+// whose writes failed; the exporter copies the status with the ledger and
+// evidence collection refuses a ledger the status marks incomplete (3-D-08).
 type Ledger struct {
-	mu   sync.Mutex
-	path string
-	f    *os.File
-	seq  int
-	err  error // the last write error, reported by Healthy
+	mu       sync.Mutex
+	path     string
+	f        *os.File
+	seq      int
+	err      error // the first write error; it stays for the life of the ledger
+	failed   int   // rows that could not be written
+	inflight int   // calls begun and not yet ended
 }
+
+// LedgerStatusFile is the status file kept next to the ledger.
+const LedgerStatusFile = schemas.ToolLedgerStatusFile
 
 // OpenLedger opens or creates the ledger at path. An existing ledger is read
 // first and numbering continues after its highest Seq, so a restarted proxy
@@ -67,32 +79,91 @@ func OpenLedger(path string) (*Ledger, error) {
 		_ = f.Close()
 		return nil, err
 	}
-	return &Ledger{path: path, f: f, seq: seq}, nil
+	l := &Ledger{path: path, f: f, seq: seq}
+	l.mu.Lock()
+	l.writeStatus()
+	l.mu.Unlock()
+	return l, nil
+}
+
+// Begin marks a call in flight until the returned end is called, after its
+// row was appended (or the call made no row).
+func (l *Ledger) Begin() (end func()) {
+	l.mu.Lock()
+	l.inflight++
+	l.writeStatus()
+	l.mu.Unlock()
+	var once sync.Once
+	return func() {
+		once.Do(func() {
+			l.mu.Lock()
+			l.inflight--
+			l.writeStatus()
+			l.mu.Unlock()
+		})
+	}
+}
+
+// writeStatus replaces the status file; l.mu is held. A failure to write it
+// is itself a ledger fault: the status file would then claim too little.
+func (l *Ledger) writeStatus() {
+	st := schemas.ToolLedgerStatus{Rows: l.seq, InFlight: l.inflight, Failed: l.failed}
+	if l.err != nil {
+		st.Error = l.err.Error()
+	}
+	b, _ := json.Marshal(st)
+	dst := filepath.Join(filepath.Dir(l.path), LedgerStatusFile)
+	tmp := dst + ".tmp"
+	if err := os.WriteFile(tmp, b, 0o644); err != nil {
+		l.fail(fmt.Errorf("write ledger status: %w", err))
+		return
+	}
+	if err := os.Rename(tmp, dst); err != nil {
+		l.fail(fmt.Errorf("write ledger status: %w", err))
+	}
+}
+
+// fail records the first write error; l.mu is held.
+func (l *Ledger) fail(err error) {
+	if l.err == nil {
+		l.err = err
+	}
 }
 
 // Append numbers c, writes it as one line and fsyncs. It sets c.Seq.
 func (l *Ledger) Append(c *schemas.ToolCall) error {
 	l.mu.Lock()
 	defer l.mu.Unlock()
-	c.Seq = l.seq + 1
+	// The number is used even when the write fails, so a lost row leaves a
+	// gap in Seq, and the error stays: one lost row makes the whole ledger
+	// an incomplete record.
+	l.seq++
+	c.Seq = l.seq
+	err := l.write(c)
+	if err != nil {
+		l.failed++
+		l.fail(err)
+	}
+	l.writeStatus()
+	return err
+}
+
+// write writes and fsyncs one row; l.mu is held.
+func (l *Ledger) write(c *schemas.ToolCall) error {
 	line, err := json.Marshal(c)
 	if err != nil {
 		return fmt.Errorf("encode ledger row %d: %w", c.Seq, err)
 	}
 	if _, err := l.f.Write(append(line, '\n')); err != nil {
-		l.err = err
 		return fmt.Errorf("write ledger %s: %w", l.path, err)
 	}
 	if err := l.f.Sync(); err != nil {
-		l.err = err
 		return fmt.Errorf("sync ledger %s: %w", l.path, err)
 	}
-	l.seq = c.Seq
-	l.err = nil
 	return nil
 }
 
-// Healthy returns the last write error, nil when the last write worked.
+// Healthy returns the first write error, nil while every write worked.
 func (l *Ledger) Healthy() error {
 	l.mu.Lock()
 	defer l.mu.Unlock()

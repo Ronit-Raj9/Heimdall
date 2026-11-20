@@ -3,6 +3,7 @@ package ops
 import (
 	"bytes"
 	"context"
+	"encoding/json"
 	"os"
 	"path/filepath"
 	"strings"
@@ -147,5 +148,36 @@ func TestCheckEvaluatorRefusesEditedTask(t *testing.T) {
 	s.Lock.Fingerprints = nil
 	if err := CheckEvaluator(ctx, reg, m, s); err == nil || !strings.Contains(err.Error(), "no fingerprints") {
 		t.Fatalf("legacy lock accepted: %v", err)
+	}
+}
+
+// TestCheckSuiteDriftIgnoresAdmission is the regression test for audit
+// finding 8-D-02: a frozen lock whose used task differs only in admission
+// and lifecycle metadata still regrades; a changed content hash does not.
+func TestCheckSuiteDriftIgnoresAdmission(t *testing.T) {
+	task := schemas.TaskLock{Version: "1", InstructionSHA256: "i", RepoTreeSHA256: "r", VerifierSHA256: "v",
+		ControlsSHA256: "c", FixturesSHA256: "f", Status: schemas.TaskAdmitted}
+	frozen := schemas.SuiteLock{Tasks: map[string]schemas.TaskLock{"t01": task}}
+	raw, err := json.Marshal(frozen)
+	if err != nil {
+		t.Fatal(err)
+	}
+	p := filepath.Join(t.TempDir(), "suite.lock")
+	if err := os.WriteFile(p, raw, 0o644); err != nil {
+		t.Fatal(err)
+	}
+	now := task
+	now.Status = schemas.TaskQuarantined
+	now.Admission = &schemas.AdmissionRecord{Admitted: true, Fingerprint: "sha256:x"}
+	s := &schemas.Suite{ID: "s", LockHash: "sha256:new", Lock: &schemas.SuiteLock{Tasks: map[string]schemas.TaskLock{"t01": now}}}
+	m := &schemas.Manifest{SuiteLockHash: utils.SHA256Bytes(raw),
+		Slots: []schemas.Slot{{SlotID: "s_1", Task: "t01", Condition: schemas.ConditionClean}}}
+	if err := CheckSuiteDrift(m, s, p); err != nil {
+		t.Fatalf("admission-only change refused: %v", err)
+	}
+	now.VerifierSHA256 = "v2"
+	s.Lock.Tasks["t01"] = now
+	if err := CheckSuiteDrift(m, s, p); err == nil || !strings.Contains(err.Error(), "task t01 changed") {
+		t.Fatalf("changed verifier accepted: %v", err)
 	}
 }

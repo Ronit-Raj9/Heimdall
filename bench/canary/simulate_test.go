@@ -1,6 +1,7 @@
 package canary
 
 import (
+	"math"
 	"os"
 	"testing"
 )
@@ -59,5 +60,21 @@ func TestSimulateTable(t *testing.T) {
 				t.Logf("drop %.2f %s trials %d: first %.3f by3 %.3f", drop, s, trials, r.DetectFirst, r.DetectBy3)
 			}
 		}
+	}
+}
+
+// TestHorizonIsMeasuredWhenRepsReachIt pins that a horizon the replications
+// cover is the observed share of replications with an alarm, and that a
+// shorter run says its value is an extrapolation.
+func TestHorizonIsMeasuredWhenRepsReachIt(t *testing.T) {
+	r := Simulate(SimConfig{Tasks: 8, Trials: 1, Triggers: 40, Reps: 60, Sensitivity: SensitivityHigh, Spread: true, Seed: 3})
+	if !r.Measured30 || r.Measured365 {
+		t.Fatalf("measured 30/365 = %v/%v, want true/false for 40 triggers", r.Measured30, r.Measured365)
+	}
+	if got := r.AnyAlarm30 * float64(r.Config.Reps); math.Abs(got-math.Round(got)) > 1e-9 {
+		t.Errorf("any_alarm_30 %.6f is not a share of %d replications", r.AnyAlarm30, r.Config.Reps)
+	}
+	if want := 1 - math.Pow(1-r.AlarmPerTrigger, 365); r.AnyAlarm365 != want {
+		t.Errorf("any_alarm_365 = %v, want the labelled extrapolation %v", r.AnyAlarm365, want)
 	}
 }

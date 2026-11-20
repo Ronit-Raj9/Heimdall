@@ -525,7 +525,12 @@ class Call:
                 self.log("limit", what="max_call_s", value=self.s["max_call_s"])
                 self.finish("max_call")
                 break
-            busy = self.caller_speaking or self.agent_speaking or (self.pending_reply and not self.pending_reply.done())
+            # A started caller line counts as speaking before say() sets
+            # caller_speaking: the text and the audio are made in an executor,
+            # and a slow one (a loaded machine) must not let the next tick
+            # start a second opening whose frames interleave with the first.
+            starting = self.speak_task is not None and not self.speak_task.done()
+            busy = starting or self.caller_speaking or self.agent_speaking or (self.pending_reply and not self.pending_reply.done())
             if not busy and not self.stop_after_speaking:
                 if self.caller_turn == 0 and not self.agent_ever and now >= self.s["first_wait_ms"]:
                     self.speak_task = asyncio.get_running_loop().create_task(self.opening())
@@ -540,7 +545,7 @@ class Call:
                         self.floor_since = now
                         self.speak_task = asyncio.get_running_loop().create_task(self.say(REPROMPT, "reprompt"))
             pid = self.probe.get("id")
-            if (pid == "interrupt" and self.agent_speaking and not self.caller_speaking and self.barges == 0
+            if (pid == "interrupt" and self.agent_speaking and not self.caller_speaking and not starting and self.barges == 0
                     and self.agent_utt >= self.probe["turn"] and now - self.utt_start >= self.probe["after_ms"]):
                 self.speak_task = asyncio.get_running_loop().create_task(self.interrupt())
             if self.agent_hung_up and not self.queue and not self.agent_speaking:

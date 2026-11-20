@@ -127,3 +127,29 @@ func TestCanarySourceReadsStateFiles(t *testing.T) {
 		t.Errorf("offline start = %v", err)
 	}
 }
+
+// TestCanarySimulateRejectsBadFlagsAndPrintsTheRun pins that dimensions the
+// simulator would replace and unknown formats are usage errors, and that
+// the table header reports the configuration that ran.
+func TestCanarySimulateRejectsBadFlagsAndPrintsTheRun(t *testing.T) {
+	for _, args := range [][]string{
+		{"-tasks", "0"}, {"-reps", "-1"}, {"-triggers", "0"}, {"-trials", "0"},
+		{"-tasks", "2", "-reps", "2", "-triggers", "2", "-format", "nonsense"},
+		{"-sensitivity", "extreme"},
+	} {
+		var out bytes.Buffer
+		if code := canarySimulate(args, &out); code != exitUsage {
+			t.Errorf("simulate %v: exit %d, want %d", args, code, exitUsage)
+		}
+	}
+	var out bytes.Buffer
+	if code := canarySimulate([]string{"-tasks", "3", "-reps", "4", "-triggers", "5"}, &out); code != exitOK {
+		t.Fatalf("simulate exit %d", code)
+	}
+	if !strings.Contains(out.String(), "3 tasks x 1 trials") || !strings.Contains(out.String(), "4 replications x 5 triggers") {
+		t.Errorf("table header does not report the run:\n%s", out.String())
+	}
+	if !strings.Contains(out.String(), "extrapolated, assumes independent triggers") {
+		t.Errorf("a 5-trigger run must label its horizon chances as extrapolated:\n%s", out.String())
+	}
+}

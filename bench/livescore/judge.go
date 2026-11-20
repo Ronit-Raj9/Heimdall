@@ -73,7 +73,30 @@ func NewChatJudge(j *JudgeConfig, key, prompt, calibrationDir string, hc *http.C
 	return cj
 }
 
-var scorePattern = regexp.MustCompile(`(?i)score\s*[:=]\s*([01](?:\.\d+)?|\.\d+)`)
+// scorePattern captures the whole token after "SCORE:" so a prefix of an
+// invalid number (for example "10" or "1e-2") is never accepted as a score.
+var scorePattern = regexp.MustCompile(`(?i)score\s*[:=]\s*([^\s,;)]+)`)
+
+// scoreToken is the only accepted number shape: a plain decimal in [0, 1]
+// without sign or exponent.
+var scoreToken = regexp.MustCompile(`^(?:0(?:\.\d+)?|1(?:\.0+)?|\.\d+)$`)
+
+// parseScore reads the judge's score from its answer text.
+func parseScore(content string) (float64, error) {
+	m := scorePattern.FindStringSubmatch(content)
+	if m == nil {
+		return 0, errors.New("judge answer holds no SCORE line")
+	}
+	tok := strings.TrimSuffix(m[1], ".")
+	if !scoreToken.MatchString(tok) {
+		return 0, errors.New("judge score is not between 0 and 1")
+	}
+	v, err := strconv.ParseFloat(tok, 64)
+	if err != nil || v < 0 || v > 1 {
+		return 0, errors.New("judge score is not between 0 and 1")
+	}
+	return v, nil
+}
 
 // Score implements Judge. The transcript sent is the redacted one.
 func (j *ChatJudge) Score(ctx context.Context, s *traceimport.Session) (float64, bool, error) {
@@ -105,13 +128,9 @@ func (j *ChatJudge) Score(ctx context.Context, s *traceimport.Session) (float64,
 	if err := json.Unmarshal(raw, &out); err != nil || len(out.Choices) == 0 {
 		return 0, false, errors.New("judge answer did not parse")
 	}
-	m := scorePattern.FindStringSubmatch(out.Choices[0].Message.Content)
-	if m == nil {
-		return 0, false, errors.New("judge answer holds no SCORE line")
-	}
-	v, err := strconv.ParseFloat(m[1], 64)
-	if err != nil || v < 0 || v > 1 {
-		return 0, false, errors.New("judge score is not between 0 and 1")
+	v, err := parseScore(out.Choices[0].Message.Content)
+	if err != nil {
+		return 0, false, err
 	}
 	return v, j.Calibrated, nil
 }

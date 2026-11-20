@@ -14,6 +14,7 @@ import (
 	"os"
 	"os/signal"
 	"path/filepath"
+	"slices"
 	"strings"
 	"sync"
 	"syscall"
@@ -329,19 +330,55 @@ func canarySimulate(args []string, out io.Writer) int {
 		fmt.Fprintln(os.Stderr, canaryUsage)
 		return exitUsage
 	}
+	if err := checkSimulate(c, *format); err != nil {
+		fmt.Fprintln(os.Stderr, "canary simulate:", err)
+		return exitUsage
+	}
 	c.Seed = 1
 	r := canary.Simulate(c)
 	if *format == "json" {
 		return printJSON(r, "canary simulate")
 	}
+	// Print the configuration the simulator ran, not the raw flags.
+	c = r.Config
 	fmt.Fprintf(out, "%d tasks x %d trials, sensitivity %s (family level %.2f), %d replications x %d triggers\n", c.Tasks, c.Trials, c.Sensitivity, r.Alpha, c.Reps, c.Triggers)
 	fmt.Fprintf(out, "single-look flag rate      %.4f\nconfirmation looks/trigger %.4f\nalarms per trigger         %.5f\n", r.FlagPerLook, r.ConfirmPerTrigger, r.AlarmPerTrigger)
 	if c.DropPoints > 0 || c.ShiftRel > 0 {
 		fmt.Fprintf(out, "alarmed on first trigger   %.3f\nalarmed within 3 triggers  %.3f\n", r.DetectFirst, r.DetectBy3)
 	} else {
-		fmt.Fprintf(out, "P(any false alarm, 30 daily triggers)  %.3f\nP(any false alarm, 365 daily triggers) %.3f\n", r.AnyAlarm30, r.AnyAlarm365)
+		fmt.Fprintf(out, "P(any false alarm, 30 daily triggers)  %.3f%s\nP(any false alarm, 365 daily triggers) %.3f%s\n",
+			r.AnyAlarm30, horizonNote(r.Measured30), r.AnyAlarm365, horizonNote(r.Measured365))
 	}
 	return exitOK
+}
+
+// horizonNote labels a horizon chance extrapolated from the per-trigger
+// rate because the replications were shorter than the horizon.
+func horizonNote(measured bool) string {
+	if measured {
+		return ""
+	}
+	return " (extrapolated, assumes independent triggers; raise -triggers to measure)"
+}
+
+// checkSimulate rejects dimensions the simulator would silently replace and
+// formats it cannot print.
+func checkSimulate(c canary.SimConfig, format string) error {
+	for _, d := range []struct {
+		name string
+		v    int
+	}{{"tasks", c.Tasks}, {"trials", c.Trials}, {"triggers", c.Triggers}, {"reps", c.Reps}} {
+		if d.v <= 0 {
+			return fmt.Errorf("-%s must be positive, got %d", d.name, d.v)
+		}
+	}
+	if c.Sensitivity != "" && !slices.Contains(canary.Sensitivities, c.Sensitivity) {
+		return fmt.Errorf("-sensitivity %q is not one of %s", c.Sensitivity, strings.Join(canary.Sensitivities, ", "))
+	}
+	if format != "table" && format != "json" {
+		return fmt.Errorf("-format %q is not table or json", format)
+	}
+	return nil
 }
 
 // printCanaryRecord prints one look.

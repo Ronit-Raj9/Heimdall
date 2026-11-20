@@ -140,8 +140,9 @@ func (x *externalRoute) close() error {
 	return x.rec.Close()
 }
 
-// serveExternal handles one call to /x/<id>/<path>.
-func (s *Server) serveExternal(w http.ResponseWriter, r *http.Request, rest string) {
+// serveExternal handles one call to /x/<id>/<path>. agent is the team
+// member whose route (/m/<token>/x/...) the call came in on, or "".
+func (s *Server) serveExternal(w http.ResponseWriter, r *http.Request, rest, agent string) {
 	id, _, _ := strings.Cut(rest, "/")
 	x, ok := s.external[id]
 	if !ok {
@@ -150,7 +151,7 @@ func (s *Server) serveExternal(w http.ResponseWriter, r *http.Request, rest stri
 	}
 	started := s.now()
 	path, bad := externalPath(r, id)
-	row := schemas.ToolCall{Server: id, Tool: x.redact(r.Method + " " + path), Protocol: ProtocolExternal, Started: started}
+	row := schemas.ToolCall{Server: id, Tool: x.redact(r.Method + " " + path), Protocol: ProtocolExternal, Started: started, AgentID: agent}
 	if bad != "" {
 		s.externalRefuse(w, x, &row, http.StatusBadRequest, bad)
 		return
@@ -180,7 +181,7 @@ func (s *Server) serveExternal(w http.ResponseWriter, r *http.Request, rest stri
 		}
 	}
 	row.Arguments, row.ArgsSHA256 = Capture(x.redactBytes(args))
-	ft, hit := s.faults.decide(id, row.Tool, "") // external APIs come in on no member route
+	ft, hit := s.faults.decide(id, row.Tool, agent) // Multi-agent area: a member's route names the member
 	if hit && (ft.Mode == FaultError || ft.Mode == FaultTimeout) {
 		s.externalFault(w, r, &row, ft)
 		return
@@ -224,13 +225,49 @@ func (s *Server) externalLive(w http.ResponseWriter, r *http.Request, x *externa
 		s.externalError(w, x, row, http.StatusBadGateway, x.redact("read external api answer: "+err.Error()))
 		return
 	}
+	if enc := contentEncoding(resp.Header); enc != "" {
+		// The answer is decoded so it can be redacted, recorded and relayed
+		// as plain bytes; a coding the proxy cannot read is refused rather
+		// than relayed (or recorded) without its Content-Encoding.
+		d, derr := decodeBody(raw, enc, x.maxBytes)
+		switch {
+		case errors.Is(derr, errDecodedTooLarge):
+			row.Blocked = true
+			s.externalError(w, x, row, http.StatusBadGateway, fmt.Sprintf("decoded answer of external api %s is over its %d byte cap", row.Server, x.maxBytes))
+			return
+		case derr != nil:
+			s.externalError(w, x, row, http.StatusBadGateway, x.redact(fmt.Sprintf("answer of external api %s has content encoding %q the proxy cannot decode: %s", row.Server, enc, derr.Error())))
+			return
+		}
+		raw = d
+	}
 	raw = x.redactBytes(raw)
+	h := x.redactHeader(resp.Header)
 	if x.rec != nil {
-		if err := x.rec.Append(NewCassetteEntry(r.Method, path, r.URL.RawQuery, body, resp.StatusCode, resp.Header, raw)); err != nil {
+		if err := x.rec.Append(NewCassetteEntry(r.Method, path, r.URL.RawQuery, body, resp.StatusCode, h, raw)); err != nil {
 			s.logger.Error("external cassette write failed", "service", row.Server, "error", err.Error())
 		}
 	}
-	s.externalAnswer(w, x, row, resp.StatusCode, resp.Header, raw, poison)
+	s.externalAnswer(w, x, row, resp.StatusCode, h, raw, poison)
+}
+
+// redactHeader returns a copy of an upstream answer's headers fit to relay
+// and to record: the credential replaced in every value, and the content
+// coding and length dropped because the body is relayed decoded. Both the
+// cassette and the agent's reply are built from it, so neither can keep a
+// credential the upstream echoed in a header.
+func (x *externalRoute) redactHeader(src http.Header) http.Header {
+	h := make(http.Header, len(src))
+	for k, vs := range src {
+		out := make([]string, len(vs))
+		for i, v := range vs {
+			out[i] = x.redact(v)
+		}
+		h[k] = out
+	}
+	h.Del("Content-Encoding")
+	h.Del("Content-Length")
+	return h
 }
 
 // externalReplay answers one call from the cassette, with no network. A call
@@ -251,6 +288,14 @@ func (s *Server) externalReplay(w http.ResponseWriter, r *http.Request, x *exter
 	if err != nil {
 		row.Unmatched = true
 		s.externalError(w, x, row, StatusUnmatched, err.Error())
+		return
+	}
+	if int64(len(raw)) > x.maxBytes {
+		// The route's answer cap holds in replay as in live mode: a
+		// hand-written answer, or one recorded under a larger cap, is
+		// refused the same way.
+		row.Blocked, row.Replayed = true, true
+		s.externalError(w, x, row, http.StatusBadGateway, fmt.Sprintf("answer of external api %s is over its %d byte cap", row.Server, x.maxBytes))
 		return
 	}
 	h := http.Header{}
@@ -365,6 +410,7 @@ func (x *externalRoute) request(ctx context.Context, r *http.Request, path strin
 		req.Header.Del(h)
 	}
 	req.Header.Del(x.authHead)
+	req.Header.Del(MemberHeader) // the member id stays inside the bench
 	for k, v := range x.cfg.Headers {
 		req.Header.Set(k, v)
 	}

@@ -116,7 +116,7 @@ func CheckSuiteDrift(m *schemas.Manifest, s *schemas.Suite, frozenLock string) e
 		return fmt.Errorf("decode frozen lock: %w", err)
 	}
 	for _, sl := range m.Slots {
-		if err := sameEntry("task "+sl.Task, frozen.Tasks[sl.Task], s.Lock.Tasks[sl.Task]); err != nil {
+		if err := sameEntry("task "+sl.Task, gateContent(frozen.Tasks[sl.Task]), gateContent(s.Lock.Tasks[sl.Task])); err != nil {
 			return err
 		}
 		if sl.Condition == schemas.ConditionClean {
@@ -163,6 +163,16 @@ func CheckEvaluator(ctx context.Context, reg *schemas.Registry, m *schemas.Manif
 		return fmt.Errorf("the evaluator changed since suite %s was locked (%s); its gates cannot be recomputed against the current suite", s.ID, suite.DriftText(hit))
 	}
 	return nil
+}
+
+// gateContent is the part of a task lock entry the gates read: the version
+// and the content hashes. Admission and lifecycle status are provenance; a
+// later `suite admit` or quarantine does not change what a sealed run is
+// graded against, so they stay out of the comparison (audit 8-D-02).
+func gateContent(t schemas.TaskLock) schemas.TaskLock {
+	t.Admission = nil
+	t.Status = ""
+	return t
 }
 
 // sameEntry compares two lock entries by their JSON form.

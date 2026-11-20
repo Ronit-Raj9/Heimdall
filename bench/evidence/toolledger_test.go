@@ -22,6 +22,7 @@ func TestToolLedgerCollect(t *testing.T) {
 		name      string
 		rc        *schemas.RunContext
 		file      *string
+		status    string
 		wantErr   error
 		wantNil   bool
 		wantCalls int
@@ -29,7 +30,15 @@ func TestToolLedgerCollect(t *testing.T) {
 		{name: "no proxied service: nothing to do", rc: toolTask(schemas.ServiceSpec{ID: "db", Role: schemas.ServiceRoleData}), wantNil: true},
 		{name: "missing ledger is a failure, calls unknown", rc: toolTask(mcp), wantErr: errNoToolLedger, wantNil: true},
 		{name: "empty ledger is zero calls", rc: toolTask(mcp), file: toolLedgerText(""), wantCalls: 0},
-		{name: "rows read, torn line skipped", rc: toolTask(mcp), file: toolLedgerText(row + "\n" + `{"seq":2,"ser`), wantCalls: 1},
+		{name: "external-only run: ledger read", rc: externalOnly(), file: toolLedgerText(strings.Replace(row, `"protocol":"mcp"`, `"protocol":"external"`, 1)), wantCalls: 1},
+		{name: "external-only run: missing ledger is a failure", rc: externalOnly(), wantErr: errNoToolLedger, wantNil: true},
+		// 3-D-08: a ledger that misses rows is not the observed call set.
+		{name: "torn line: incomplete, calls unknown", rc: toolTask(mcp), file: toolLedgerText(row + "\n" + `{"seq":2,"ser`), wantErr: errToolLedgerIncomplete, wantNil: true},
+		{name: "seq gap: incomplete", rc: toolTask(mcp), file: toolLedgerText(strings.Replace(row, `"seq":1`, `"seq":2`, 1)), wantErr: errToolLedgerIncomplete, wantNil: true},
+		{name: "status complete", rc: toolTask(mcp), file: toolLedgerText(row), status: `{"rows":1,"inflight":0}`, wantCalls: 1},
+		{name: "status in flight", rc: toolTask(mcp), file: toolLedgerText(row), status: `{"rows":1,"inflight":1}`, wantErr: errToolLedgerIncomplete, wantNil: true},
+		{name: "status write failed", rc: toolTask(mcp), file: toolLedgerText(row), status: `{"rows":2,"inflight":0,"failed":1,"error":"no space left on device"}`, wantErr: errToolLedgerIncomplete, wantNil: true},
+		{name: "status counts more rows", rc: toolTask(mcp), file: toolLedgerText(row), status: `{"rows":2,"inflight":0}`, wantErr: errToolLedgerIncomplete, wantNil: true},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -37,6 +46,11 @@ func TestToolLedgerCollect(t *testing.T) {
 			tt.rc.Dir = dir
 			if tt.file != nil {
 				if err := os.WriteFile(filepath.Join(dir, toolsFile), []byte(*tt.file), 0o644); err != nil {
+					t.Fatal(err)
+				}
+			}
+			if tt.status != "" {
+				if err := os.WriteFile(filepath.Join(dir, schemas.ToolLedgerStatusFile), []byte(tt.status), 0o644); err != nil {
 					t.Fatal(err)
 				}
 			}
@@ -57,6 +71,14 @@ func TestToolLedgerCollect(t *testing.T) {
 			}
 		})
 	}
+}
+
+// externalOnly is a run whose task declares an external API and no proxied
+// service (finding 3-D-01).
+func externalOnly() *schemas.RunContext {
+	rc := toolTask()
+	rc.Task.External = []schemas.ExternalAPI{{ID: "weather", BaseURL: "https://weather.example"}}
+	return rc
 }
 
 func TestToolLedgerNoRunFolder(t *testing.T) {

@@ -3,6 +3,8 @@ package traceinbox
 import (
 	"bytes"
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -18,8 +20,8 @@ import (
 // The OTLP folder source reads the files an OpenTelemetry collector's file
 // exporter writes (one ExportTraceServiceRequest as JSON per line, the
 // format traceimport reads). It remembers a byte offset per file, so each
-// pull reads only lines added since the last one; a file that shrank was
-// rotated and is read from the start; at most 64 MiB are read per pull, and
+// pull reads only lines added since the last one; a file that shrank, or
+// whose first bytes changed, was rotated and is read from the start; at most 64 MiB are read per pull, and
 // the rest waits for the next. A session is flagged when a span has
 // status ERROR or a tool call failed. Spans of one trace that land in two
 // pulls are read as two partial sessions; the collector's batch settings
@@ -52,6 +54,9 @@ func (f *otlpDirFetcher) Fetch(ctx context.Context, src *Source, cur Cursor, now
 	if b.Cursor.Files == nil {
 		b.Cursor.Files = map[string]int64{}
 	}
+	if b.Cursor.FileHeads == nil {
+		b.Cursor.FileHeads = map[string]string{}
+	}
 	var names []string
 	for _, e := range entries {
 		if ok, _ := matchPattern(pattern, e.Name()); ok && e.Type().IsRegular() {
@@ -70,13 +75,14 @@ func (f *otlpDirFetcher) Fetch(ctx context.Context, src *Source, cur Cursor, now
 			b.Truncated = true
 			break
 		}
-		chunk, next, err := readNewLines(filepath.Join(src.Path, name), b.Cursor.Files[name], budget)
+		chunk, next, head, err := readNewLines(filepath.Join(src.Path, name), b.Cursor.Files[name], b.Cursor.FileHeads[name], budget)
 		if err != nil {
 			b.Warnings = append(b.Warnings, fmt.Sprintf("%s: %v", name, err))
 			continue
 		}
 		budget -= int64(len(chunk))
 		b.Cursor.Files[name] = next
+		b.Cursor.FileHeads[name] = head
 		for _, line := range bytes.Split(chunk, []byte("\n")) {
 			line = bytes.TrimSpace(line)
 			if len(line) == 0 {
@@ -92,6 +98,7 @@ func (f *otlpDirFetcher) Fetch(ctx context.Context, src *Source, cur Cursor, now
 	for name := range b.Cursor.Files {
 		if _, err := os.Stat(filepath.Join(src.Path, name)); errors.Is(err, os.ErrNotExist) {
 			delete(b.Cursor.Files, name)
+			delete(b.Cursor.FileHeads, name)
 		}
 	}
 	if bad > 0 {
@@ -118,37 +125,69 @@ func (f *otlpDirFetcher) Fetch(ctx context.Context, src *Source, cur Cursor, now
 	return b, nil
 }
 
+// otlpHeadBytes bounds the prefix whose hash identifies an OTLP file.
+const otlpHeadBytes = 4096
+
 // readNewLines reads the complete lines of a file after offset, at most
-// limit bytes, and returns them with the offset after the last full line.
-func readNewLines(path string, offset, limit int64) ([]byte, int64, error) {
+// limit bytes, and returns them with the offset after the last full line
+// and the hash of the file's head up to that offset. head is the hash
+// saved with offset: a file that shrank or whose head changed is a
+// replacement and is read from the start (audit 5-C-04). A cursor saved
+// before heads were kept has none and is trusted as it was.
+func readNewLines(path string, offset int64, head string, limit int64) ([]byte, int64, string, error) {
 	f, err := os.Open(path)
 	if err != nil {
-		return nil, offset, err
+		return nil, offset, head, err
 	}
 	defer f.Close()
 	info, err := f.Stat()
 	if err != nil {
-		return nil, offset, err
+		return nil, offset, head, err
 	}
 	if info.Size() < offset {
-		offset = 0 // rotated or truncated: read from the start
+		offset, head = 0, "" // rotated or truncated: read from the start
+	}
+	if offset > 0 && head != "" {
+		got, err := headHash(f, offset)
+		if err != nil {
+			return nil, offset, head, err
+		}
+		if got != head {
+			offset, head = 0, "" // replaced by a file at least as long
+		}
 	}
 	if info.Size() == offset {
-		return nil, offset, nil
+		return nil, offset, head, nil
 	}
 	if _, err := f.Seek(offset, io.SeekStart); err != nil {
-		return nil, offset, err
+		return nil, offset, head, err
 	}
 	data, err := io.ReadAll(io.LimitReader(f, limit))
 	if err != nil {
-		return nil, offset, err
+		return nil, offset, head, err
 	}
 	end := bytes.LastIndexByte(data, '\n')
 	if end < 0 {
 		if int64(len(data)) >= limit {
-			return nil, offset, fmt.Errorf("a line longer than %d bytes", limit)
+			return nil, offset, head, fmt.Errorf("a line longer than %d bytes", limit)
 		}
-		return nil, offset, nil // a line still being written
+		return nil, offset, head, nil // a line still being written
 	}
-	return data[:end+1], offset + int64(end+1), nil
+	next := offset + int64(end+1)
+	if head == "" || offset < otlpHeadBytes {
+		if head, err = headHash(f, next); err != nil {
+			return nil, offset, "", err
+		}
+	}
+	return data[:end+1], next, head, nil
+}
+
+// headHash is the sha256 of the first min(n, otlpHeadBytes) bytes of f.
+func headHash(f *os.File, n int64) (string, error) {
+	buf := make([]byte, min(n, otlpHeadBytes))
+	if _, err := f.ReadAt(buf, 0); err != nil {
+		return "", err
+	}
+	sum := sha256.Sum256(buf)
+	return hex.EncodeToString(sum[:]), nil
 }

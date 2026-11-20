@@ -833,3 +833,26 @@ func TestProxyHTTPMemberFault(t *testing.T) {
 		t.Errorf("rows not stamped with their members: %q %q %q", rows[0].AgentID, rows[1].AgentID, rows[2].AgentID)
 	}
 }
+
+// TestProxyBatchFaultOverParseCap proves that when the forwarded part of a
+// batch gets an answer over the parse cap, the synthetic fault answer that
+// could not be merged into it is recorded as undelivered (finding 3-D-04).
+func TestProxyBatchFaultOverParseCap(t *testing.T) {
+	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = io.WriteString(w, `[{"jsonrpc":"2.0","id":1,"result":{"content":[{"type":"text","text":"`+strings.Repeat("z", 4096)+`"}]}}]`)
+	}))
+	defer upstream.Close()
+	tp := newTestProxy(t, upstream.URL, ProtocolMCP)
+	tp.srv.parseCap = 1024
+	tp.setFault(t, `{"mode":"error","tool":"fail","nonce":"n_cap"}`)
+	_, _, body := post(t, tp.front.URL, "/s/fs/mcp", "["+callBody(1, "echo", "x")+","+callBody(2, "fail", "")+"]", nil)
+	if strings.Contains(body, "n_cap") {
+		t.Fatalf("synthetic answer unexpectedly merged: %q", body)
+	}
+	for _, r := range tp.waitRows(t, 2) {
+		if r.Tool == "fail" && (r.Fault != "error" || !r.Undelivered) {
+			t.Fatalf("faulted row %+v, want fault error and undelivered", r)
+		}
+	}
+}
