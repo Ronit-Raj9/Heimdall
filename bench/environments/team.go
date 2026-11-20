@@ -86,6 +86,9 @@ func (e *dockerWorkspace) createMember(ctx context.Context, rc *schemas.RunConte
 	if err := e.checkPlan(plan, false); err != nil {
 		return err
 	}
+	if err := e.checkFrozenMemberImage(ctx, rc, m.Member.ID, plan.Image); err != nil {
+		return err
+	}
 	basePath, err := e.imagePath(ctx, plan)
 	if err != nil {
 		return err
@@ -184,4 +187,39 @@ func concatMemberStreams(dir string, members []schemas.MemberRun) error {
 		}
 	}
 	return nil
+}
+
+// checkFrozenMemberImage refuses a member whose own image tag no longer
+// names the image id the manifest froze for it (ArmManifest.Members), as
+// checkFrozenImage does for the arm. A member without a frozen id is not
+// checked here: it runs the arm's image, which Create checked.
+func (e *dockerWorkspace) checkFrozenMemberImage(ctx context.Context, rc *schemas.RunContext, id, image string) error {
+	want := frozenMemberImageID(rc, id)
+	if want == "" || image == "" {
+		return nil
+	}
+	got, err := e.ImageID(ctx, image)
+	if err != nil {
+		return fmt.Errorf("member image: %w", err)
+	}
+	if got != want {
+		return fmt.Errorf("member image %s is now %s but experiment %s was planned with %s; restore that image or plan a new experiment",
+			image, short(got), rc.Manifest.ExpID, short(want))
+	}
+	return nil
+}
+
+// frozenMemberImageID is the image id the manifest recorded for a member's
+// own config in the run's arm.
+func frozenMemberImageID(rc *schemas.RunContext, id string) string {
+	if rc == nil || rc.Manifest == nil || rc.Slot == nil {
+		return ""
+	}
+	if rc.Slot.Arm == compatArm {
+		if rc.Manifest.Compatibility == nil {
+			return ""
+		}
+		return rc.Manifest.Compatibility.Members[id].ImageID
+	}
+	return rc.Manifest.Arms[rc.Slot.Arm].Members[id].ImageID
 }

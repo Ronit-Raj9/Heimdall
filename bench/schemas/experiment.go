@@ -573,4 +573,16 @@ type ArmManifest struct {
 	// refused when it names another image. Empty for an arm without them.
 	TaskImages   map[string]string `json:"task_images,omitempty"`
 	TaskImageIDs map[string]string `json:"task_image_ids,omitempty"`
+
+	// Members freezes, per team member that runs a config of its own (keyed
+	// by member id), that config's image id and laid file hashes, as ImageID
+	// and Files do for the arm. The environment refuses to start a member on
+	// any other image. Empty for an arm without such members.
+	Members map[string]MemberManifest `json:"members,omitempty"`
+}
+
+// MemberManifest is the frozen identity of one team member's own config.
+type MemberManifest struct {
+	ImageID string                       `json:"image_id,omitempty"`
+	Files   map[string]map[string]string `json:"files,omitempty"` // condition -> path -> sha256
 }

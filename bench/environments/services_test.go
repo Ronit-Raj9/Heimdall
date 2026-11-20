@@ -46,6 +46,7 @@ case "$1" in
   inspect)
     case "$*" in
       *Running*) echo "true 0" ;;
+      *StartedAt*) echo "${FAKE_AGENT_STATE:-0 exited 2026-01-01T00:00:00Z}" ;;
       *Config.Env*) printf '["PATH=/opt/bench/shim:/usr/bin","SECRET=x","LANG=C"]\nsha256:img\n' ;;
       *) echo 0 ;;
     esac ;;
@@ -152,6 +153,34 @@ func TestStartServicesWithFakeDocker(t *testing.T) {
 	}
 	if c := callWith(all, "create --name bench-r_1-svc-audit"); strings.Contains(c, "bench-net-r_1") {
 		t.Errorf("hidden service on the agent's network: %s", c)
+	}
+}
+
+// TestProxiedServiceOffAgentNetwork reproduces audit 2-B-01: a proxied
+// service (here an MCP server, as the team mailbox is) must not sit on the
+// network the agent joins, only on the upstream network the tool proxy also
+// joins, so the agent cannot bypass the proxy and its ledger.
+func TestProxiedServiceOffAgentNetwork(t *testing.T) {
+	docker, logPath := fakeDocker(t)
+	e := newDockerWorkspace(DockerWorkspaceConfig{Docker: docker, HelperImage: "helper:1"})
+	rc := serviceRC(t, schemas.ServiceSpec{ID: "mcp1", Role: schemas.ServiceRoleMCP, Image: "mcp:1", Port: 9000, MCP: &schemas.MCPEndpoint{Path: "/rpc"}})
+	handles, _, err := e.StartServices(t.Context(), rc)
+	if err != nil {
+		t.Fatalf("start services: %v", err)
+	}
+	if handles[0].URL != "http://toolproxy:9200/s/mcp1" || handles[0].Network != "bench-hnet-r_1" {
+		t.Fatalf("handle %+v", handles[0])
+	}
+	all := calls(t, logPath)
+	c := callWith(all, "create --name bench-r_1-svc-mcp1")
+	if !strings.Contains(c, "--network bench-hnet-r_1") || strings.Contains(c, "bench-net-r_1") {
+		t.Errorf("proxied service on the agent's network: %s", c)
+	}
+	if callWith(all, "network connect", "bench-net-r_1 bench-r_1-svc-mcp1") != "" {
+		t.Error("proxied service joined the agent's network")
+	}
+	if callWith(all, "network connect bench-hnet-r_1 bench-tp-r_1") == "" {
+		t.Errorf("tool proxy not on the upstream network:\n%s", strings.Join(all, "\n"))
 	}
 }
 
