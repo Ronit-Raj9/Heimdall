@@ -11,9 +11,11 @@ import (
 	"github.com/maximhq/bifrost/bench/costexplain"
 	"github.com/maximhq/bifrost/bench/evidence"
 	"github.com/maximhq/bifrost/bench/lib"
+	"github.com/maximhq/bifrost/bench/metrics"
 	"github.com/maximhq/bifrost/bench/migration"
 	"github.com/maximhq/bifrost/bench/schemas"
 	"github.com/maximhq/bifrost/bench/store"
+	"github.com/maximhq/bifrost/bench/verdict"
 )
 
 // recordedApp is an app over the committed recorded bundle, read only,
@@ -32,7 +34,7 @@ func recordedApp(t *testing.T) *app {
 	if err != nil {
 		t.Fatalf("prices: %v", err)
 	}
-	return &app{cfg: cfg, logger: schemas.NoopLogger{}, store: st, prices: prices}
+	return &app{cfg: cfg, logger: schemas.NoopLogger{}, store: st, prices: prices, reg: &schemas.Registry{Policies: verdict.Builtin(), Metrics: metrics.Builtin()}}
 }
 
 func TestCostExplainRecorded(t *testing.T) {
