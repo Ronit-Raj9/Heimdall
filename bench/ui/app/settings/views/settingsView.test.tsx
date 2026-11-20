@@ -4,6 +4,7 @@ import { AuditTab } from "@/components/settings/auditTab";
 import { ApiTokensTab } from "@/components/settings/apiTokensTab";
 import { MembersTab, invitationLink } from "@/components/settings/membersTab";
 import { OrgTab } from "@/components/settings/orgTab";
+import { PasswordTab } from "@/components/settings/passwordTab";
 import { RunnersTab, saveTokenCommand, tokenFileOf } from "@/components/settings/runnersTab";
 import { grantableRoles, mayManage } from "@/components/settings/settingsBits";
 import {
@@ -50,6 +51,7 @@ vi.mock("@/lib/store/apis/platformApi", async (importOriginal) => {
 		useRemoveRunnerMutation: w("removeRunner"),
 		useRenameOrgMutation: w("rename"),
 		useSetPublicReadMutation: w("publicRead"),
+		useChangePasswordMutation: w("changePassword"),
 	};
 });
 
@@ -78,14 +80,15 @@ describe("SettingsView", () => {
 	it("asks a visitor who is not signed in to sign in", () => {
 		expect(render(<SettingsView tab="members" onTabChange={() => undefined} />, demoSession())).toContain("settings-signed-out");
 	});
-	it("shows the five tabs and the organization in hosted mode", () => {
+	it("shows the six tabs and the organization in hosted mode", () => {
 		const html = render(<SettingsView tab="members" onTabChange={() => undefined} />, hostedSession());
-		for (const tab of ["members", "tokens", "runners", "audit", "org"]) expect(html).toContain(`data-testid="settings-tab-${tab}"`);
+		for (const tab of ["members", "tokens", "runners", "audit", "org", "account"]) expect(html).toContain(`data-testid="settings-tab-${tab}"`);
 		expect(html).toContain("Members, access and runners of Acme Agents.");
 		expect(html).toContain('data-testid="settings-members"');
 	});
 	it("reads the tab from the URL, members by default", () => {
 		expect(settingsTab("audit")).toBe("audit");
+		expect(settingsTab("account")).toBe("account");
 		expect(settingsTab("nope")).toBe("members");
 		expect(settingsTab(null)).toBe("members");
 	});
@@ -226,5 +229,22 @@ describe("OrgTab", () => {
 		const html = render(<OrgTab org={org} />, hostedSession("owner"));
 		expect(tagOf(html, "org-public-state")).toContain('data-public="true"');
 		expect(html).toContain("Make private");
+	});
+});
+// 4-A-05: the hosted bootstrap password can be rotated from the browser.
+describe("PasswordTab", () => {
+	it("asks for the current and new password and says which sessions end", () => {
+		const html = render(<PasswordTab />, hostedSession("member"));
+		expect(html).toContain('data-testid="password-form"');
+		expect(tagOf(html, "password-current")).toContain('autoComplete="current-password"');
+		expect(tagOf(html, "password-new")).toContain('autoComplete="new-password"');
+		expect(html).toContain('data-testid="password-repeat"');
+		expect(html).toContain("Your other signed-in sessions end; this one stays signed in.");
+	});
+	it("shows the server's reason when the change fails", () => {
+		api.m.changePassword = { error: { status: 403, data: { error: { message: "current password is wrong" } } } };
+		const html = render(<PasswordTab />, hostedSession("member"));
+		expect(html).toContain('data-testid="password-error"');
+		expect(html).toContain("current password is wrong");
 	});
 });

@@ -48,7 +48,7 @@ import type {
 } from "@/lib/types/bench";
 import { createApi, fetchBaseQuery, type BaseQueryFn, type FetchArgs, type FetchBaseQueryError } from "@reduxjs/toolkit/query/react";
 import { BENCH_API_BASE, detectFixtureMode, resolveFixture } from "./fixtures";
-import { CSRF_HEADER, errorStatus, getAuthState, notifyUnauthorized } from "./session";
+import { CSRF_HEADER, errorStatus, getAuthState, notifyUnauthorized, ORG_HEADER } from "./session";
 
 /** Polling interval for experiment status when server-sent events are unavailable (DESIGN.md 16.7). */
 export const EXPERIMENT_POLL_MS = 2000;
@@ -115,13 +115,15 @@ export function getBenchErrorMessage(error: unknown): string {
 /**
  * JSON by default. Local mode: every mutation (each a POST behind the write token) carries the
  * token, queries never do. Hosted mode: the session cookie authenticates, so no token is sent;
- * every mutation carries the session's CSRF value instead.
+ * every mutation carries the session's CSRF value instead, and every request names the org this
+ * tab displays (X-Heimdall-Org) so a switch in another tab cannot redirect it.
  */
 export function prepareBenchHeaders(headers: Headers, type: "query" | "mutation"): Headers {
 	if (!headers.has("Content-Type")) headers.set("Content-Type", "application/json");
 	const auth = getAuthState();
 	if (auth.mode === "hosted") {
 		if (type === "mutation" && auth.csrf && !headers.has(CSRF_HEADER)) headers.set(CSRF_HEADER, auth.csrf);
+		if (auth.org && !headers.has(ORG_HEADER)) headers.set(ORG_HEADER, auth.org);
 		return headers;
 	}
 	const token = type === "mutation" ? readWriteToken().trim() : "";

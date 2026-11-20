@@ -23,6 +23,8 @@ export interface SessionInfo {
 	demo: boolean;
 	signup: AuthConfig["signup"];
 	github: boolean;
+	/** An empty install: the first sign-up creates the owner, whatever the signup policy. */
+	bootstrap: boolean;
 }
 
 export const LOCAL_SESSION: SessionInfo = {
@@ -35,6 +37,7 @@ export const LOCAL_SESSION: SessionInfo = {
 	demo: false,
 	signup: undefined,
 	github: false,
+	bootstrap: false,
 };
 
 export interface SessionSources {
@@ -54,7 +57,7 @@ export interface SessionSources {
  * anonymous read succeeds.
  */
 export function sessionFromMe({ me, meError, meLoading, config, demoReadable = false }: SessionSources): SessionInfo {
-	const offers = { signup: config?.signup, github: Boolean(config?.github) };
+	const offers = { signup: config?.signup, github: Boolean(config?.github), bootstrap: Boolean(config?.bootstrap) };
 	// A 401 wins over earlier data: the session ended since the last answer.
 	if (isUnauthorized(meError)) {
 		// Still loading while the sign-in options and the demo read are on their way.
@@ -98,6 +101,11 @@ export function canUse(session: SessionInfo, min: Role = "member"): boolean {
 	if (session.authMode === "local") return true;
 	if (!session.signedIn) return false;
 	return roleAtLeast(session.role, min);
+}
+
+/** Whether a visitor without an invitation may use the signup form: open signup or an empty install. */
+export function signupOffered(session: SessionInfo): boolean {
+	return session.signup === "open" || session.bootstrap;
 }
 
 /** True when this tab should show the write-token box: local mode only. */

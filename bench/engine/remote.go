@@ -207,6 +207,13 @@ func (c *Coordinator) Register(ctx context.Context, req *schemas.WorkerRegister)
 	}
 	c.mu.Lock()
 	w, ok := c.workers[req.WorkerID]
+	if ok && c.hosted() && w.scope.TokenID != scope.TokenID {
+		// Same name, another token: not a restart of this runner. Taking the
+		// name over would lose the other runner's leases and rebind its
+		// scope, so the operator must remove that registration first.
+		c.mu.Unlock()
+		return nil, fmt.Errorf("worker %s: %w: the name is registered with another runner token; remove that runner first", req.WorkerID, schemas.ErrWorkerScope)
+	}
 	if !ok {
 		w = &remoteWorker{refused: map[string]string{}}
 		c.workers[req.WorkerID] = w

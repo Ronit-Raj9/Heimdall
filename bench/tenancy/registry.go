@@ -15,6 +15,8 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"os"
+	"path/filepath"
 	"sort"
 	"sync"
 	"time"
@@ -89,6 +91,46 @@ type entry struct {
 	lastUsed time.Time
 	evicted  bool // out of the map; closed when refs drops to 0
 	closed   bool
+	gen      string // the store generation the runtime was built at
+}
+
+// GenerationFile, in an org's store root, changes whenever another process
+// changes the store under a running server (org import). A cached runtime
+// built at another generation is rebuilt on its next idle acquire.
+const GenerationFile = ".heimdall-generation"
+
+// BumpGeneration writes a new generation into the store root storeRoot.
+func BumpGeneration(storeRoot string) error {
+	tmp, err := os.CreateTemp(storeRoot, GenerationFile+".tmp*")
+	if err != nil {
+		return fmt.Errorf("store generation: %w", err)
+	}
+	_, werr := fmt.Fprintf(tmp, "%d\n", time.Now().UnixNano())
+	cerr := tmp.Close()
+	if werr == nil {
+		werr = cerr
+	}
+	if werr == nil {
+		werr = os.Rename(tmp.Name(), filepath.Join(storeRoot, GenerationFile))
+	}
+	if werr != nil {
+		_ = os.Remove(tmp.Name())
+		return fmt.Errorf("store generation: %w", werr)
+	}
+	return nil
+}
+
+// readGeneration returns the store generation of p ("" when none was
+// written).
+func readGeneration(p OrgPaths) string {
+	if p.StoreRoot == "" {
+		return ""
+	}
+	b, err := os.ReadFile(filepath.Join(p.StoreRoot, GenerationFile))
+	if err != nil {
+		return ""
+	}
+	return string(b)
 }
 
 // ErrRegistryClosed is returned after Close.
@@ -116,20 +158,38 @@ func (r *Registry) Layout() Layout { return r.layout }
 // release func the caller must call when its request is done. The runtime
 // is never closed while acquired.
 func (r *Registry) Acquire(ctx context.Context, org Org) (*OrgRuntime, func(), error) {
+	rt, release, stale, err := r.acquire(ctx, org)
+	if err != nil || !stale {
+		return rt, release, err
+	}
+	// Built before another process changed the org's store: rebuild it
+	// once, unless work in flight holds it.
+	if rt.Busy != nil && rt.Busy() {
+		return rt, release, nil
+	}
+	release()
+	r.Evict(org.ID)
+	rt, release, _, err = r.acquire(ctx, org)
+	return rt, release, err
+}
+
+func (r *Registry) acquire(ctx context.Context, org Org) (*OrgRuntime, func(), bool, error) {
 	paths, err := r.layout.Paths(org.ID)
 	if err != nil {
-		return nil, nil, err
+		return nil, nil, false, err
 	}
+	gen := readGeneration(paths)
 	r.mu.Lock()
 	if r.closed {
 		r.mu.Unlock()
-		return nil, nil, ErrRegistryClosed
+		return nil, nil, false, ErrRegistryClosed
 	}
 	e, ok := r.entries[org.ID]
 	if !ok {
 		e = &entry{ready: make(chan struct{})}
 		r.entries[org.ID] = e
 		e.refs++ // the builder's hold, handed to this caller on success
+		e.gen = gen
 		r.mu.Unlock()
 		r.runBuild(ctx, e, org, paths)
 		r.mu.Lock()
@@ -140,7 +200,7 @@ func (r *Registry) Acquire(ctx context.Context, org Org) (*OrgRuntime, func(), e
 		case <-e.ready:
 		case <-ctx.Done():
 			r.release(org.ID, e)
-			return nil, nil, ctx.Err()
+			return nil, nil, false, ctx.Err()
 		}
 		r.mu.Lock()
 	}
@@ -148,13 +208,13 @@ func (r *Registry) Acquire(ctx context.Context, org Org) (*OrgRuntime, func(), e
 		err := e.err
 		e.refs--
 		r.mu.Unlock()
-		return nil, nil, err
+		return nil, nil, false, err
 	}
 	e.lastUsed = r.opts.Now()
 	r.mu.Unlock()
 	r.evictOverflow()
 	var once sync.Once
-	return e.rt, func() { once.Do(func() { r.release(org.ID, e) }) }, nil
+	return e.rt, func() { once.Do(func() { r.release(org.ID, e) }) }, e.gen != gen, nil
 }
 
 // runBuild runs the builder outside the lock. A failed build is dropped from

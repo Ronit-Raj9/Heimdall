@@ -8,7 +8,6 @@ package handlers
 // leaves one audit row.
 
 import (
-	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
@@ -76,12 +75,17 @@ type AuditRow struct {
 // AuditList is GET /orgs/{org}/audit, newest first.
 type AuditList struct {
 	Entries []AuditRow `json:"entries"`
+	// Next is the opaque cursor of the following page (pass it back as
+	// ?cursor=); empty on the last page. Unlike a timestamp it never skips
+	// entries that share a millisecond.
+	Next string `json:"next,omitempty"`
 }
 
 // AuditQuery filters the audit log.
 type AuditQuery struct {
 	Limit  int       // 1..500, default 100
 	Before time.Time // rows strictly older than this; zero: newest
+	Cursor string    // AuditList.Next of the previous page, optional
 	Action string    // exact action, optional
 }
 
@@ -99,7 +103,9 @@ type OrgService interface {
 	RenameOrg(ctx context.Context, orgID, name string) (OrgInfo, error)
 	SetPublicRead(ctx context.Context, orgID string, on bool) (OrgInfo, error)
 	MemberService
-	Audit(ctx context.Context, orgID string, q AuditQuery) ([]AuditRow, error)
+	// Audit returns one page of the log and the cursor of the next page
+	// ("" when it is the last).
+	Audit(ctx context.Context, orgID string, q AuditQuery) ([]AuditRow, string, error)
 }
 
 // Org and member input errors.
@@ -338,15 +344,17 @@ func (h *OrgsHandler) leaveOrg(ctx *fasthttp.RequestCtx) {
 	}
 	wctx, cancel := workContext(ctx, readTimeout)
 	defer cancel()
-	if err := h.orgs.RemoveMember(wctx, o.ID, p.UserID); err != nil {
+	g := h.auditIn(ctx, MemberGuard{}, o.ID, "member.leave", p.UserID, func(from auth.Role) map[string]any {
+		return map[string]any{"role": string(from)}
+	})
+	if _, err := h.orgs.RemoveMember(wctx, o.ID, p.UserID, g); err != nil {
 		h.sendErr(ctx, "leave organization", err)
 		return
 	}
-	h.write(ctx, o.ID, "member.leave", "user", p.UserID, map[string]any{"role": string(p.Role)})
 	ctx.SetStatusCode(fasthttp.StatusNoContent)
 }
 
-// getAudit handles GET /orgs/{org}/audit?limit=&before=<unix ms>&action=.
+// getAudit handles GET /orgs/{org}/audit?limit=&cursor=&before=<unix ms>&action=.
 func (h *OrgsHandler) getAudit(ctx *fasthttp.RequestCtx) {
 	o, ok := h.target(ctx)
 	if !ok {
@@ -369,9 +377,10 @@ func (h *OrgsHandler) getAudit(ctx *fasthttp.RequestCtx) {
 		}
 		q.Before = time.UnixMilli(ms).UTC()
 	}
+	q.Cursor = string(ctx.QueryArgs().Peek("cursor"))
 	wctx, cancel := workContext(ctx, readTimeout)
 	defer cancel()
-	rows, err := h.orgs.Audit(wctx, o.ID, q)
+	rows, next, err := h.orgs.Audit(wctx, o.ID, q)
 	if err != nil {
 		h.sendErr(ctx, "audit log", err)
 		return
@@ -379,7 +388,7 @@ func (h *OrgsHandler) getAudit(ctx *fasthttp.RequestCtx) {
 	if rows == nil {
 		rows = []AuditRow{}
 	}
-	lib.SendJSON(ctx, h.mode, fasthttp.StatusOK, AuditList{Entries: rows})
+	lib.SendJSON(ctx, h.mode, fasthttp.StatusOK, AuditList{Entries: rows, Next: next})
 }
 
 // target is the org the dispatcher resolved for this request. A request
@@ -417,6 +426,8 @@ func (h *OrgsHandler) sendErr(ctx *fasthttp.RequestCtx, what string, err error) 
 	switch {
 	case errors.Is(err, ErrOrgInput):
 		lib.SendError(ctx, h.mode, fasthttp.StatusBadRequest, lib.ErrTypeBadRequest, what+": "+err.Error())
+	case errors.Is(err, ErrMemberForbidden):
+		lib.SendError(ctx, h.mode, fasthttp.StatusForbidden, lib.ErrTypeForbidden, what+": "+err.Error())
 	case errors.Is(err, ErrLastOwner):
 		lib.SendError(ctx, h.mode, fasthttp.StatusConflict, lib.ErrTypeConflict, what+": "+err.Error())
 	default:
@@ -427,9 +438,7 @@ func (h *OrgsHandler) sendErr(ctx *fasthttp.RequestCtx, what string, err error) 
 // decodeStrict decodes a JSON body with unknown fields refused, answering
 // 400 itself on failure.
 func decodeStrict(ctx *fasthttp.RequestCtx, mode schemas.Mode, v any, what string) bool {
-	dec := json.NewDecoder(bytes.NewReader(ctx.PostBody()))
-	dec.DisallowUnknownFields()
-	if err := dec.Decode(v); err != nil {
+	if err := decodeJSONStrict(ctx.PostBody(), v); err != nil {
 		lib.SendError(ctx, mode, fasthttp.StatusBadRequest, lib.ErrTypeBadRequest, what+": "+err.Error())
 		return false
 	}

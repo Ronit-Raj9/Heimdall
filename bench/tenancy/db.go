@@ -66,13 +66,19 @@ var _ AuditSink = DBAudit{}
 
 // Audit implements AuditSink.
 func (a DBAudit) Audit(ctx context.Context, e AuditEntry) error {
+	_, err := a.DB.AppendAudit(ctx, DBEntry(e))
+	return err
+}
+
+// DBEntry is e as an audit_log row, for writers that append it inside
+// their own transaction (db.AppendAuditTx).
+func DBEntry(e AuditEntry) db.AuditEntry {
 	var details json.RawMessage
 	if len(e.Details) > 0 {
 		details = db.AuditDetails(e.Details)
 	}
-	_, err := a.DB.AppendAudit(ctx, db.AuditEntry{
+	return db.AuditEntry{
 		OrgID: e.OrgID, ActorType: e.ActorType, ActorID: e.ActorID, Action: e.Action,
 		TargetType: e.TargetType, TargetID: e.TargetID, IP: e.IP, At: e.At, Details: details,
-	})
-	return err
+	}
 }

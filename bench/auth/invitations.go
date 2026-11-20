@@ -79,6 +79,15 @@ func (s *Service) CreateInvitationFor(ctx context.Context, orgID, email string, 
 	in := Invitation{ID: db.NewID("inv"), OrgID: orgID, Email: email, Role: role, CreatedBy: createdBy,
 		CreatedAt: now, ExpiresAt: now.Add(s.cfg.InviteTTL)}
 	err = s.st.d.Tx(ctx, func(tx *sql.Tx) error {
+		// One pending invitation per org and address: lock the org row so
+		// concurrent re-invites on Postgres (READ COMMITTED) see each
+		// other's INSERT before their DELETE, instead of both inserting.
+		if err := s.st.lockOrgRow(ctx, tx, orgID); err != nil {
+			if errors.Is(err, db.ErrNotFound) {
+				return errNotFound("organization not found")
+			}
+			return err
+		}
 		if err := s.st.deletePendingInvites(ctx, tx, orgID, email); err != nil {
 			return err
 		}

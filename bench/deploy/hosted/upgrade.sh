@@ -6,7 +6,9 @@
 #   1. database backup (backup.sh --db-only, into $HEIMDALL_BACKUP_DIR or
 #      /var/backups/heimdall), unless --no-backup
 #   2. git pull --ff-only (or check out --ref), unless --no-pull
-#   3. the running images are tagged :previous, then rebuilt from the checkout
+#   3. the images of the running containers are tagged :previous (an
+#      existing :previous is kept when the service is not running), then
+#      rebuilt from the checkout
 #   4. Postgres up, migrations applied (bifrost-bench db migrate)
 #   5. containers whose image or configuration changed are recreated; wait
 #      for health
@@ -67,12 +69,32 @@ server_image=${HEIMDALL_IMAGE:-$(env_get HEIMDALL_IMAGE)}
 server_image=${server_image:-heimdall/server:local}
 runner_image=${HEIMDALL_RUNNER_IMAGE:-$(env_get HEIMDALL_RUNNER_IMAGE)}
 runner_image=${runner_image:-heimdall/runner:local}
-for img in "$server_image" "$runner_image"; do
-	if docker image inspect "$img" >/dev/null 2>&1; then
-		docker tag "$img" "${img%:*}:previous"
-		log "kept $img as ${img%:*}:previous for rollback"
+
+# running_image_id SERVICE prints the image ID of the service's running
+# container, or nothing when none runs. The configured tag can already point
+# at an image built by an earlier attempt that failed before recreating the
+# service, so the rollback tag follows what actually runs, never the tag.
+running_image_id() {
+	local cid
+	cid=$(hc ps -q "$1" 2>/dev/null | head -n 1) || true
+	[ -n "$cid" ] || return 0
+	docker inspect --format '{{.Image}}' "$cid" 2>/dev/null || true
+}
+
+keep_previous() { # keep_previous SERVICE IMAGE
+	local id
+	id=$(running_image_id "$1")
+	if [ -n "$id" ]; then
+		docker tag "$id" "${2%:*}:previous"
+		log "kept running $1 image $id as ${2%:*}:previous for rollback"
+	elif docker image inspect "${2%:*}:previous" >/dev/null 2>&1; then
+		log "no running $1 container; keeping the existing ${2%:*}:previous"
+	else
+		log "no running $1 container and no ${2%:*}:previous; no rollback image for $1"
 	fi
-done
+}
+keep_previous heimdall "$server_image"
+keep_previous demo-runner "$runner_image"
 
 log "building images"
 hc build --pull

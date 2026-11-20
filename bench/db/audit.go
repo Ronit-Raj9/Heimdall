@@ -212,5 +212,8 @@ func decodeCursor(c string) (int64, string, error) {
 			}
 		}
 	}
-	return 0, "", errors.New("db: bad page cursor")
+	return 0, "", ErrBadCursor
 }
+
+// ErrBadCursor is an audit page cursor ListAudit did not issue.
+var ErrBadCursor = errors.New("db: bad page cursor")

@@ -21,6 +21,18 @@ func TestConfigDiff(t *testing.T) {
 			t.Fatalf("diff = %+v", got)
 		}
 	})
+	t.Run("literal credentials redacted", func(t *testing.T) {
+		m := testManifest()
+		m.Arms["A"] = schemas.ArmManifest{Config: schemas.AgentConfig{Model: "m1", Env: map[string]string{"OPENAI_API_KEY": "sk-aaaaaaaaaaaaaaaaaaaaaaaa"}}}
+		m.Arms["B"] = schemas.ArmManifest{Config: schemas.AgentConfig{Model: "m1", Env: map[string]string{"OPENAI_API_KEY": "sk-bbbbbbbbbbbbbbbbbbbbbbbb"}}}
+		got, err := ConfigDiff(m)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if len(got) != 1 || got[0].Path != "env.OPENAI_API_KEY" || got[0].A != "[redacted]" || got[0].B != "[redacted]" {
+			t.Fatalf("diff = %+v", got)
+		}
+	})
 	t.Run("falls back to set overrides", func(t *testing.T) {
 		got, err := ConfigDiff(testManifest())
 		if err != nil {

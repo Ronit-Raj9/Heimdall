@@ -24,8 +24,10 @@ tokens. The auth middleware (`auth.Middleware`) resolves every request to a
 | `heimdall_session` cookie | `user`, the session's current org and the user's role there | every write |
 | nothing | `anonymous` | foreign `Origin` refused on writes |
 
-A bearer token that is malformed, unknown, revoked or expired is a 401; it
-never falls back to the cookie. A cookie that names no live session is
+A bearer token that is malformed (including `Bearer` with an empty or blank
+token), unknown, revoked or expired is a 401; it never falls back to the
+cookie. A runner token that can not be checked because the database is
+unavailable is a 503, so a runner retries instead of giving up. A cookie that names no live session is
 cleared and the request continues as anonymous.
 
 ## Configuration
@@ -77,7 +79,9 @@ a breach corpus.
 `HttpOnly`, `SameSite=Lax`, `Path=/`, `Secure` when `public_url` is https,
 `Max-Age` the absolute lifetime. A session ends at `session_ttl_h` after
 login whatever happens, or `session_idle_h` after its last request
-(`last_seen` is written at most once a minute). Login, signup and GitHub
+(`last_seen` is written at most once a minute, so the idle check allows
+that minute on top: a session lives at least `session_idle_h` after its
+last request and at most one minute longer). Login, signup and GitHub
 sign-in delete the caller's previous session (the id rotates); logout
 deletes the row and clears the cookie; a password change ends every other
 session of the user; disabling a user ends all of theirs. The session's
@@ -142,9 +146,14 @@ The account is the one linked to that GitHub id, else the one with that
 verified email (which gets linked; an account already linked to another
 GitHub id is refused), else a new one when the signup policy allows (below,
 where a pending invitation for the verified email counts as an invitation).
+Linking by email retires the account's earlier credentials, since password
+signup never verified that email: its password is cleared and every session
+ends (audit `auth.github_link`). The owner can then set a new password from
+the GitHub session with no current password.
 `return_to` must be a same-site path; anything else becomes `/`. Failures
 redirect to `/login?error=github` (or `signup_not_allowed`) with details in
-the server and audit logs.
+the server and audit logs; a rate-limited callback is `429` with
+`Retry-After` instead.
 
 ## Signup policy and the first account
 
@@ -203,14 +212,18 @@ audit API: `auth.login`, `auth.login_failed`, `auth.login_rate_limited`,
 `auth.logout`, `auth.signup`, `auth.signup_failed`, `auth.switch_org`,
 `auth.password_change`, `auth.password_change_failed`, `auth.token_create`,
 `auth.token_revoke`, `auth.invite_create`, `auth.invite_revoke`,
-`auth.invite_accept`, and from the CLI `auth.user_create` and
-`auth.password_set` (actor `system`). Failed logins are recorded with actor
-`anonymous` and the attempted email (or the user id when it exists). An
-audit write that fails is logged, not shown to the caller.
+`auth.invite_accept`, `auth.github_link`, and from the CLI
+`auth.user_create` and `auth.password_set` (actor `system`). Failed logins
+(including rate-limited ones and GitHub callbacks refused before the code
+exchange), refused signups (validation, rate limit, closed policy) and failed
+password changes are recorded with actor `anonymous` or the user and the
+reason. An audit write that fails is logged, not shown to the caller; the
+CLI commands exit non-zero when their audit row could not be written.
 
 ## Routes
 
-All under `/api/bench/auth/`; bodies are JSON with unknown fields refused.
+All under `/api/bench/auth/`; bodies are a single JSON value with unknown
+fields refused (trailing data after it is a 400).
 
 | Route | Who | Answer |
 |---|---|---|

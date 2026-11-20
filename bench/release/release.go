@@ -416,7 +416,11 @@ func (ev *evidence) loadPolicy() error {
 }
 
 // newestAnalysis returns the analysis id with the latest created_at, ties to
-// the larger id. Folders without a readable verdict.json are skipped.
+// the larger id, among the analyses of the original grades. Folders without
+// a readable verdict.json are skipped. An analysis of another grade source
+// (a regrade or judge) is used only when the request names it: reading such
+// a verdict writes an analysis, and that must not change which evidence a
+// later release takes by default (audit 4-B-07).
 func (l *Log) newestAnalysis(base string) (string, error) {
 	entries, err := os.ReadDir(base)
 	if err != nil && !errors.Is(err, fs.ErrNotExist) {
@@ -431,6 +435,9 @@ func (l *Log) newestAnalysis(base string) (string, error) {
 		var a schemas.Analysis
 		if err := readJSON(filepath.Join(base, e.Name(), verdictFile), &a); err != nil {
 			l.d.Logger.Warn("analysis skipped", "analysis_id", e.Name(), "error", err.Error())
+			continue
+		}
+		if a.GradeSource != "" && a.GradeSource != schemas.GradeSourceOriginal {
 			continue
 		}
 		if best == "" || a.CreatedAt.After(bestAt) || (a.CreatedAt.Equal(bestAt) && e.Name() > best) {

@@ -8,7 +8,8 @@
 #   database   pg_dump in custom format (restore with pg_restore), from the
 #              running Postgres container: heimdall-db-<UTC time>.dump
 #   evidence   the sealed run folders. With the S3 mirror configured
-#              (HEIMDALL_S3_BUCKET and its keys; the bucket must exist) this
+#              (HEIMDALL_S3_BUCKET from the shell, else the env file, as
+#              compose reads it; and its keys; the bucket must exist) this
 #              runs `bifrost-bench evidence backup` in the server container:
 #              a second database dump uploaded to the bucket under
 #              _backups/db/, then a mirror pass over every sealed experiment
@@ -18,7 +19,9 @@
 #              experiment definitions, policies, release logs) and releases/
 #              are archived to heimdall-projects-<UTC time>.tar.gz as well.
 #              Without a mirror, the data volume (runs, releases) is archived
-#              to heimdall-evidence-<UTC time>.tar.gz
+#              to heimdall-evidence-<UTC time>.tar.gz. A configured mirror
+#              whose backup command is missing fails the backup instead of
+#              switching to the local archive.
 #   archives   are written with the server container paused (docker compose
 #              pause), so no run, seal or release is half-written into them;
 #              requests wait for the length of the tar and then continue.
@@ -77,7 +80,13 @@ mv "$db_file.part" "$db_file"
 cp "$ENV_FILE" "$dir/heimdall-env-$ts"
 
 if [ -z "$db_only" ]; then
-	if [ -n "$(env_get HEIMDALL_S3_BUCKET)" ] && bench_has evidence; then
+	# Same precedence as compose: the shell's value, then the env file's.
+	s3_bucket=${HEIMDALL_S3_BUCKET:-$(env_get HEIMDALL_S3_BUCKET)}
+	if [ -n "$s3_bucket" ] && ! bench_has evidence; then
+		# A configured mirror never falls back to a silent local-only backup.
+		die "HEIMDALL_S3_BUCKET is set but this server build has no 'evidence' command; upgrade the server image or unset the bucket to archive the volume locally"
+	fi
+	if [ -n "$s3_bucket" ]; then
 		log "evidence backup to the S3 mirror: database dump upload, then a mirror pass"
 		# The dump is written to the container's tmpfs and removed once
 		# uploaded; exit 4 means the database part or an experiment failed.

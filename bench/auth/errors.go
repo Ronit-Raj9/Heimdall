@@ -69,6 +69,16 @@ func errNotFound(format string, args ...any) *Error {
 	return &Error{Status: http.StatusNotFound, Type: "not_found", Msg: fmt.Sprintf(format, args...)}
 }
 
+func errConflict(format string, args ...any) *Error {
+	return &Error{Status: http.StatusConflict, Type: "conflict", Msg: fmt.Sprintf(format, args...)}
+}
+
+// errUnavailable is a backend failure (database outage) that callers may
+// retry; it is never a verdict on the credential.
+func errUnavailable(format string, args ...any) *Error {
+	return &Error{Status: http.StatusServiceUnavailable, Type: "unavailable", Msg: fmt.Sprintf(format, args...)}
+}
+
 func errRateLimited(wait time.Duration) *Error {
 	if wait < time.Second {
 		wait = time.Second

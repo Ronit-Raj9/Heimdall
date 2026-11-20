@@ -365,3 +365,67 @@ func TestUserHelpersAndDeleteOrg(t *testing.T) {
 		}
 	})
 }
+
+// TestMemberCheckUnderLock: the checked membership changes authorize on the
+// roles current under the org lock, not a snapshot taken earlier (4-B-03).
+func TestMemberCheckUnderLock(t *testing.T) {
+	dbtest.Each(t, func(t *testing.T, d *db.DB) {
+		ctx := context.Background()
+		own, _ := d.CreateUser(ctx, db.User{Email: "own@x.io"})
+		adm, _ := d.CreateUser(ctx, db.User{Email: "adm@x.io"})
+		tgt, _ := d.CreateUser(ctx, db.User{Email: "tgt@x.io"})
+		o, err := d.CreateOrg(ctx, db.NewOrg{Slug: "chk", OwnerID: own.ID})
+		if err != nil {
+			t.Fatal(err)
+		}
+		_ = d.AddMember(ctx, o.ID, adm.ID, db.RoleAdmin)
+		_ = d.AddMember(ctx, o.ID, tgt.ID, db.RoleMember)
+		// An admin may manage only up to admin, judged on current roles.
+		check := func(actor, target string) error {
+			if db.RoleRank(actor) < db.RoleRank(target) || db.RoleRank(actor) < db.RoleRank(db.RoleAdmin) {
+				return errDenied
+			}
+			return nil
+		}
+		// The admin saw tgt as a member; meanwhile tgt became an owner.
+		if err := d.SetRole(ctx, o.ID, tgt.ID, db.RoleOwner); err != nil {
+			t.Fatal(err)
+		}
+		if _, err := d.RemoveMemberChecked(ctx, o.ID, tgt.ID, db.MemberChange{ActorID: adm.ID, Check: check}); !errors.Is(err, errDenied) {
+			t.Fatalf("remove a now-owner: %v", err)
+		}
+		if _, err := d.SetRoleChecked(ctx, o.ID, tgt.ID, db.RoleViewer, db.MemberChange{ActorID: adm.ID, Check: check}); !errors.Is(err, errDenied) {
+			t.Fatalf("demote a now-owner: %v", err)
+		}
+		// The actor's own demotion counts too.
+		_ = d.SetRole(ctx, o.ID, tgt.ID, db.RoleMember)
+		_ = d.SetRole(ctx, o.ID, adm.ID, db.RoleViewer)
+		if _, err := d.RemoveMemberChecked(ctx, o.ID, tgt.ID, db.MemberChange{ActorID: adm.ID, Check: check}); !errors.Is(err, errDenied) {
+			t.Fatalf("remove by a demoted admin: %v", err)
+		}
+		_ = d.SetRole(ctx, o.ID, adm.ID, db.RoleAdmin)
+		from, err := d.SetRoleChecked(ctx, o.ID, tgt.ID, db.RoleViewer, db.MemberChange{ActorID: adm.ID, Check: check})
+		if err != nil || from != db.RoleMember {
+			t.Fatalf("allowed change: from %q %v", from, err)
+		}
+		// The audit row commits with the change (4-B-06): a row that can not
+		// be written rolls the change back.
+		bad := db.MemberChange{Audit: func(string) *db.AuditEntry { return &db.AuditEntry{ActorType: "alien", Action: "member.remove"} }}
+		if _, err := d.RemoveMemberChecked(ctx, o.ID, tgt.ID, bad); err == nil {
+			t.Fatal("remove with an unwritable audit row succeeded")
+		}
+		good := db.MemberChange{ActorID: adm.ID, Check: check, Audit: func(from string) *db.AuditEntry {
+			return &db.AuditEntry{OrgID: o.ID, ActorType: db.ActorUser, ActorID: adm.ID, Action: "member.remove", TargetID: tgt.ID,
+				Details: db.AuditDetails(map[string]string{"role": from})}
+		}}
+		if from, err := d.RemoveMemberChecked(ctx, o.ID, tgt.ID, good); err != nil || from != db.RoleViewer {
+			t.Fatalf("allowed remove: from %q %v", from, err)
+		}
+		p, err := d.ListAudit(ctx, db.AuditFilter{OrgID: o.ID, Action: "member.remove"})
+		if err != nil || len(p.Entries) != 1 || string(p.Entries[0].Details) != `{"role":"viewer"}` {
+			t.Fatalf("audit %+v %v", p.Entries, err)
+		}
+	})
+}
+
+var errDenied = errors.New("denied")

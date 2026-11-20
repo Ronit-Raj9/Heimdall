@@ -31,6 +31,14 @@ describe("SignupView", () => {
 		expect(render(<SignupView />, signedOutSession({ ...AUTH_CONFIG, signup: "closed" }))).toContain('data-testid="signup-closed"');
 	});
 
+	it("shows the form under invite-only when the install is empty (bootstrap), and refuses without it", () => {
+		const boot = render(<SignupView />, signedOutSession({ ...AUTH_CONFIG, signup: "invite", bootstrap: true }));
+		expect(boot).toContain('data-testid="signup-form"');
+		expect(boot).not.toContain("signup-invite-only");
+		const after = render(<SignupView />, signedOutSession({ ...AUTH_CONFIG, signup: "invite", bootstrap: false }));
+		expect(after).toContain('data-testid="signup-invite-only"');
+	});
+
 	it("joins the inviting organization with the invited email filled in", () => {
 		api.invite = okQuery(INVITATION_PREVIEW);
 		const html = render(<SignupView invitation="tok" />, signedOutSession({ ...AUTH_CONFIG, signup: "invite" }));

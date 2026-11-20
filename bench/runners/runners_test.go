@@ -284,3 +284,34 @@ func TestRunnerRows(t *testing.T) {
 		}
 	})
 }
+
+// TestRunnerRowKeepsItsToken is the 4-B-01 regression after a restart: the
+// coordinator's memory is empty, so the row is the only record of which
+// token registered the name. A runner of another token under the same name
+// never takes the row (its token and pool) over.
+func TestRunnerRowKeepsItsToken(t *testing.T) {
+	dbtest.Each(t, func(t *testing.T, d *db.DB) {
+		s, c, live := newService(t, d)
+		ctx := context.Background()
+		gpu, err := s.CreateToken(ctx, "org_a", "usr_1", schemas.RunnerTokenCreate{Pool: "gpu"})
+		if err != nil {
+			t.Fatal(err)
+		}
+		def, err := s.CreateToken(ctx, "org_a", "usr_1", schemas.RunnerTokenCreate{Pool: "default"})
+		if err != nil {
+			t.Fatal(err)
+		}
+		info := schemas.WorkerInfo{ID: "box-01", State: schemas.WorkerIdle, Slots: 1, Running: []string{}}
+		s.RunnerSeen(ctx, schemas.RunnerScope{OrgID: "org_a", Pool: "gpu", TokenID: gpu.Info.ID}, info, true)
+		// A fresh service: the restart that empties the in-memory runner list.
+		s2 := New(d, Options{Now: c.now, Live: live, PublicURL: "https://heimdall.example.com/"})
+		s2.RunnerSeen(ctx, schemas.RunnerScope{OrgID: "org_a", Pool: "default", TokenID: def.Info.ID}, info, true)
+		list, err := s2.ListRunners(ctx, "org_a")
+		if err != nil || len(list) != 1 {
+			t.Fatalf("runners %+v %v", list, err)
+		}
+		if list[0].Pool != "gpu" || list[0].TokenPrefix != gpu.Info.Prefix {
+			t.Fatalf("another token took the row over: %+v", list[0])
+		}
+	})
+}

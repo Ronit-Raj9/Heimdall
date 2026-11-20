@@ -410,19 +410,33 @@ runner: {pool: demo}'
 		sleep 5
 	done
 	printf '%s' "$st" | jq -c '{state, slots, spent_usd}' >&2 || true
-	done_slots=$(printf '%s' "$st" | jq -r '.slots.done // 0' 2>/dev/null || echo 0)
-	[ "$(printf '%s' "$st" | jq -r '.state // empty' 2>/dev/null)" = "done" ] || fail "experiment $exp_id did not finish: $st"
-	[ "${done_slots:-0}" -ge 1 ] || fail "no slot of $exp_id finished: $st"
+	slots=$(printf '%s' "$st" | jq -c '.slots // {}' 2>/dev/null || echo '{}')
+	[ "$(printf '%s' "$st" | jq -r '.state // empty' 2>/dev/null)" = "done" ] || fail "experiment $exp_id did not finish: ${st:0:300}"
+	# Both slots (arms A and B, one trial each) must succeed: a done state
+	# also covers slots that failed on the runner.
+	done_slots=$(printf '%s' "$slots" | jq -r '.done // 0')
+	printf '%s' "$slots" | jq -e '(.total // 0) == 2 and (.done // 0) == (.total // 0) and (.failed // 0) == 0' >/dev/null ||
+		fail "experiment $exp_id slots are not all done: $slots"
 	ok "runner leased, ran and uploaded $done_slots slot(s); the server sealed them and analyzed $exp_id"
 
 	verdict=$(c -H "Origin: $origin" -w '\n%{http_code}' "$origin/api/bench/experiments/$exp_id/verdict")
 	code=${verdict##*$'\n'}
 	verdict=${verdict%$'\n'*}
 	[ "$code" = 200 ] || fail "GET /api/bench/experiments/$exp_id/verdict answered $code: ${verdict:0:300}"
+	decision=$(printf '%s' "$verdict" | jq -r '.verdict.decision // empty' 2>/dev/null || true)
+	case $decision in
+	improved | regressed | inconclusive) ;;
+	*) fail "verdict decision is '${decision:-missing}', want improved, regressed or inconclusive: $(printf '%s' "$verdict" | jq -c '{decision: .verdict.decision, action: .verdict.action, reasons: .verdict.invalid_reasons}' 2>/dev/null || printf '%s' "${verdict:0:300}")" ;;
+	esac
 	ok "verdict over HTTPS: $(printf '%s' "$verdict" | jq -c '{decision: .verdict.decision, action: .verdict.action, analysis: .analysis_id}')"
 	for inst in gateway_hygiene gateway_versions runner_images; do
 		row=$(printf '%s' "$verdict" | jq -c --arg n "$inst" '.verdict.instruments[]? | select(.name == $n)')
 		[ -n "$row" ] || fail "verdict has no $inst instrument"
+		# fail and unknown are not healthy; warn changes nothing by default.
+		case $(printf '%s' "$row" | jq -r '.status // empty') in
+		pass | warn | not_applicable) ;;
+		*) fail "instrument $inst is not healthy: $row" ;;
+		esac
 		ok "instrument $row"
 	done
 
@@ -439,9 +453,15 @@ runner: {pool: demo}'
 		sleep 2
 	done
 	[ "$js" = succeeded ] || fail "regrade job $job ended $js: $(c -H "Origin: $origin" "$origin/api/bench/jobs/$job")"
-	rg=$(c -H "Origin: $origin" "$origin/api/bench/jobs/$job" | jq -r '.params.id // .result.id // empty')
-	code=$(c -o /dev/null -w '%{http_code}' -H "Origin: $origin" "$origin/api/bench/experiments/$exp_id/verdict?grade_source=$rg")
-	[ "$code" = 200 ] || fail "regraded verdict (grade_source=$rg) answered $code"
+	jr=$(c -H "Origin: $origin" "$origin/api/bench/jobs/$job")
+	rg=$(printf '%s' "$jr" | jq -r '.params.id // .result.id // empty' 2>/dev/null || true)
+	[ -n "$rg" ] || fail "regrade job $job names no regrade id: ${jr:0:300}"
+	rv=$(c -H "Origin: $origin" -w '\n%{http_code}' "$origin/api/bench/experiments/$exp_id/verdict?grade_source=$rg")
+	code=${rv##*$'\n'}
+	rv=${rv%$'\n'*}
+	[ "$code" = 200 ] || fail "regraded verdict (grade_source=$rg) answered $code: ${rv:0:300}"
+	[ "$(printf '%s' "$rv" | jq -r '.grade_source // empty' 2>/dev/null)" = "$rg" ] ||
+		fail "regraded verdict does not record grade_source $rg: $(printf '%s' "$rv" | jq -c '{grade_source, analysis_id}' 2>/dev/null || printf '%s' "${rv:0:300}")"
 	ok "regrade job $job succeeded in the signup organization; verdict with grade_source=$rg over HTTPS"
 fi
 

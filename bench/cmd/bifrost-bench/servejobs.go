@@ -56,6 +56,7 @@ type launcher struct {
 
 	org        string              // organization of this launcher's experiments
 	jobs       *jobs.Runner        // nil: run in-process, no cancel or resume
+	hub        *jobsHub            // the hub that holds it (hosted), for Detach
 	coord      *engine.Coordinator // Remote area: opens runs to remote workers (worker.go)
 	remoteOnly bool                // Runners area: run no slot locally (hosted mode)
 
@@ -536,9 +537,27 @@ func newJobsHub(d *db.DB, logger schemas.Logger, hosted, launches bool, configPa
 
 // add registers an organization's launcher and wires it to the runner.
 func (h *jobsHub) add(l *launcher) {
-	l.jobs = h.runner
+	l.jobs, l.hub = h.runner, h
 	h.mu.Lock()
 	h.orgs[l.org] = l
+	h.mu.Unlock()
+}
+
+// Detach takes the launcher out of its hub when its org runtime closes.
+func (l *launcher) Detach() {
+	if l.hub != nil {
+		l.hub.remove(l)
+	}
+}
+
+// remove drops l when it is still the organization's launcher: the org's
+// runtime was evicted, and the hub must not keep its index and app alive
+// (4-B-12). A newer runtime's launcher stays.
+func (h *jobsHub) remove(l *launcher) {
+	h.mu.Lock()
+	if h.orgs[l.org] == l {
+		delete(h.orgs, l.org)
+	}
 	h.mu.Unlock()
 }
 
@@ -965,7 +984,10 @@ func hostedHub(env *hostedEnv) *jobsHub {
 	if h, ok := hostedHubs.Load(env); ok {
 		return h.(*jobsHub)
 	}
-	h := newJobsHub(env.db, env.base.logger, true, !env.offline, "")
+	// launches is true whatever -offline says: the hosted server runs no
+	// slot itself (runners do), so -offline changes nothing here, as the
+	// startup warning says, and experiment start keeps working (4-B-11).
+	h := newJobsHub(env.db, env.base.logger, true, true, "")
 	h.build = func(ctx context.Context, orgID string) (func(), error) {
 		org, err := env.dir.OrgByID(ctx, orgID)
 		if err != nil {

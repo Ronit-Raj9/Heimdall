@@ -253,7 +253,7 @@ type analyzerAdapter struct {
 }
 
 func (x analyzerAdapter) Analyze(ctx context.Context, expID, gradeSource string) (*schemas.Analysis, error) {
-	an, _, err := x.a.analyze(ctx, expID, gradeSource)
+	an, _, err := x.a.analyzeView(ctx, expID, gradeSource)
 	if err != nil {
 		return nil, err
 	}

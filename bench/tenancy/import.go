@@ -94,6 +94,13 @@ func ImportRuns(ctx context.Context, src, dstRoot string, logger schemas.Logger)
 			rep.Refused++
 		}
 	}
+	if rep.Imported > 0 {
+		// A server process other than this one may cache the org's index:
+		// the new generation makes its registry rebuild the runtime.
+		if err := BumpGeneration(dstAbs); err != nil {
+			return rep, fmt.Errorf("import: %w", err)
+		}
+	}
 	return rep, nil
 }
 

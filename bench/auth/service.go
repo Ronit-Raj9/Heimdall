@@ -241,7 +241,11 @@ func (s *Service) sessionPrincipal(ctx context.Context, cookie string) (*Princip
 	}
 	now := s.now()
 	nowMS := now.UnixMilli()
-	if nowMS >= row.ExpiresAt || nowMS >= row.LastSeen+s.cfg.SessionIdle.Milliseconds() {
+	// last_seen is written at most once per sessionTouchEvery, so activity
+	// inside that window is not recorded. Allow that window on top of the
+	// idle interval: a session expires only after at least SessionIdle of
+	// real inactivity (and at most SessionIdle plus one touch interval).
+	if nowMS >= row.ExpiresAt || nowMS >= row.LastSeen+s.cfg.SessionIdle.Milliseconds()+sessionTouchEvery.Milliseconds() {
 		_ = s.st.deleteSession(ctx, s.st.d.SQL(), id)
 		return nil, nil
 	}
@@ -288,6 +292,11 @@ func (s *Service) Logout(ctx context.Context, p *Principal, ip string) error {
 	return nil
 }
 
+// afterCredentialCheck, when set (tests only), runs after a password was
+// verified against a snapshot and before the result is committed, to
+// interleave a concurrent credential change deterministically.
+var afterCredentialCheck func(userID string)
+
 // ---- login ----
 
 // LoginRequest is the body of POST /auth/login.
@@ -303,6 +312,7 @@ type LoginRequest struct {
 func (s *Service) Login(ctx context.Context, req LoginRequest, ip, ua, replace string) (*User, *NewSession, error) {
 	email := NormalizeEmail(req.Email)
 	if ok, wait := s.loginIP.Allow(ip); !ok {
+		s.record(AuditEvent{ActorType: "anonymous", Action: "auth.login_rate_limited", TargetType: "ip", TargetID: clip(ip, 64), IP: ip})
 		return nil, nil, errRateLimited(wait)
 	}
 	if ok, wait := s.loginEmail.Allow(email); !ok {
@@ -337,24 +347,57 @@ func (s *Service) Login(ctx context.Context, req LoginRequest, ip, ua, replace s
 		}
 		return fail(u)
 	}
+	if afterCredentialCheck != nil {
+		afterCredentialCheck(u.ID)
+	}
+	newHash := ""
 	if rehash {
 		if h, err := s.hasher.Hash(req.Password); err == nil {
-			if err := s.st.setPasswordHash(ctx, s.st.d.SQL(), u.ID, h); err != nil {
-				s.logger.Warn(fmt.Sprintf("auth: rehash password of %s: %v", u.ID, err))
-			}
+			newHash = h
 		}
 	}
-	orgs, err := s.st.memberships(ctx, s.st.d.SQL(), u.ID)
+	// The password was verified against a snapshot read outside any
+	// transaction. Issue the session only if that snapshot is still the
+	// committed credential: a reset or change committed in between (and
+	// the session revocation it made) must not be undone by this login.
+	var (
+		orgID string
+		sess  *NewSession
+		stale bool
+	)
+	err = s.st.d.Tx(ctx, func(tx *sql.Tx) error {
+		cur, err := s.st.lockUser(ctx, tx, u.ID)
+		if errors.Is(err, db.ErrNotFound) {
+			stale = true
+			return nil
+		}
+		if err != nil {
+			return err
+		}
+		if cur.Disabled || cur.PasswordHash != u.PasswordHash {
+			stale = true
+			return nil
+		}
+		if newHash != "" {
+			if _, err := s.st.swapPasswordHash(ctx, tx, u.ID, u.PasswordHash, newHash); err != nil {
+				return err
+			}
+		}
+		orgs, err := s.st.memberships(ctx, tx, u.ID)
+		if err != nil {
+			return err
+		}
+		if len(orgs) > 0 {
+			orgID = orgs[0].ID
+		}
+		sess, err = s.createSession(ctx, tx, u.ID, orgID, replace, ip, ua)
+		return err
+	})
 	if err != nil {
 		return nil, nil, err
 	}
-	orgID := ""
-	if len(orgs) > 0 {
-		orgID = orgs[0].ID
-	}
-	sess, err := s.createSession(ctx, s.st.d.SQL(), u.ID, orgID, replace, ip, ua)
-	if err != nil {
-		return nil, nil, err
+	if stale {
+		return fail(u)
 	}
 	s.loginEmail.Reset(email)
 	s.record(userEvent(u, orgID, "auth.login", ip, map[string]any{"method": "password"}))
@@ -384,26 +427,33 @@ type SignupRequest struct {
 //   - otherwise signup is refused.
 func (s *Service) Signup(ctx context.Context, req SignupRequest, ip, ua, replace string) (*User, *NewSession, error) {
 	email := NormalizeEmail(req.Email)
+	// deny audits a refusal before any account work (every signup outcome
+	// leaves an audit row) and returns it.
+	deny := func(e *Error) (*User, *NewSession, error) {
+		s.record(AuditEvent{ActorType: "anonymous", Action: "auth.signup_failed", TargetType: "email", TargetID: clip(email, 254), IP: ip,
+			Details: map[string]any{"reason": e.Msg}})
+		return nil, nil, e
+	}
 	if ok, wait := s.signupIP.Allow(ip); !ok {
-		return nil, nil, errRateLimited(wait)
+		return deny(errRateLimited(wait))
 	}
 	if !validEmail(email) {
-		return nil, nil, errBadRequest("a valid email address is required")
+		return deny(errBadRequest("a valid email address is required"))
 	}
 	if ok, wait := s.signupEmail.Allow(email); !ok {
-		return nil, nil, errRateLimited(wait)
+		return deny(errRateLimited(wait))
 	}
 	if err := CheckPasswordPolicy(req.Password, email); err != nil {
-		return nil, nil, errBadRequest("%s", err.Error())
+		return deny(errBadRequest("%s", err.Error()))
 	}
 	name := strings.TrimSpace(req.Name)
 	if len(name) > 200 {
-		return nil, nil, errBadRequest("name is longer than 200 characters")
+		return deny(errBadRequest("name is longer than 200 characters"))
 	}
 	if s.cfg.Signup == SignupClosed {
 		// Closed: nothing on the web creates accounts, not even the first
 		// one; `bifrost-bench user create` does.
-		return nil, nil, ErrSignupNotAllowed
+		return deny(ErrSignupNotAllowed)
 	}
 	hash, err := s.hasher.Hash(req.Password)
 	if err != nil {
@@ -417,6 +467,9 @@ func (s *Service) Signup(ctx context.Context, req SignupRequest, ip, ua, replace
 		sess    *NewSession
 	)
 	err = s.st.d.Tx(ctx, func(tx *sql.Tx) error {
+		if err := s.st.lockAccounts(ctx, tx); err != nil {
+			return err
+		}
 		if req.Invitation != "" {
 			in, err := s.pendingInvite(ctx, tx, req.Invitation)
 			if err != nil {
@@ -611,8 +664,16 @@ func (s *Service) ChangePassword(ctx context.Context, p *Principal, req Password
 	if p.Kind != KindUser || p.sessionID == "" {
 		return ErrSessionRequired
 	}
+	failed := func(u *User, e *Error) error {
+		ev := principalEvent(p, "auth.password_change_failed", "user", p.UserID, ip, map[string]any{"reason": e.Msg})
+		if u != nil {
+			ev = userEvent(u, p.OrgID, "auth.password_change_failed", ip, map[string]any{"reason": e.Msg})
+		}
+		s.record(ev)
+		return e
+	}
 	if ok, wait := s.loginEmail.Allow(NormalizeEmail(p.Email)); !ok {
-		return errRateLimited(wait)
+		return failed(nil, errRateLimited(wait))
 	}
 	u, err := s.st.userByID(ctx, s.st.d.SQL(), p.UserID)
 	if err != nil {
@@ -620,25 +681,35 @@ func (s *Service) ChangePassword(ctx context.Context, p *Principal, req Password
 	}
 	if u.PasswordHash != "" {
 		if _, err := s.hasher.Verify(u.PasswordHash, req.Current); err != nil {
-			s.record(userEvent(u, p.OrgID, "auth.password_change_failed", ip, nil))
-			return errForbidden("current password is wrong")
+			return failed(u, errForbidden("current password is wrong"))
 		}
 	}
 	if err := CheckPasswordPolicy(req.New, u.Email); err != nil {
-		return errBadRequest("%s", err.Error())
+		return failed(u, errBadRequest("%s", err.Error()))
 	}
 	hash, err := s.hasher.Hash(req.New)
 	if err != nil {
 		return err
 	}
+	if afterCredentialCheck != nil {
+		afterCredentialCheck(u.ID)
+	}
+	// Write only over the hash that was verified above: a reset or another
+	// change committed since must not be overwritten by this request.
+	changed := false
 	err = s.st.d.Tx(ctx, func(tx *sql.Tx) error {
-		if err := s.st.setPasswordHash(ctx, tx, u.ID, hash); err != nil {
+		ok, err := s.st.swapPasswordHash(ctx, tx, u.ID, u.PasswordHash, hash)
+		if err != nil || !ok {
 			return err
 		}
+		changed = true
 		return s.st.deleteUserSessions(ctx, tx, u.ID, p.sessionID)
 	})
 	if err != nil {
 		return err
+	}
+	if !changed {
+		return failed(u, errConflict("the password was changed by another request; sign in again"))
 	}
 	s.record(userEvent(u, p.OrgID, "auth.password_change", ip, nil))
 	return nil

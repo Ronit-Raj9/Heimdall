@@ -36,6 +36,12 @@ describe("LoginView", () => {
 		expect(html).not.toContain("login-signup-link");
 	});
 
+	it("links to sign-up under invite-only when the install is empty (bootstrap)", () => {
+		const cfg = { mode: "live", auth_mode: "hosted", signup: "invite", github: false } as const;
+		expect(render(<LoginView />, signedOutSession({ ...cfg, bootstrap: true }))).toContain('data-testid="login-signup-link"');
+		expect(render(<LoginView />, signedOutSession({ ...cfg, bootstrap: false }))).not.toContain("login-signup-link");
+	});
+
 	it("says wrong credentials and rate limits in plain words", () => {
 		api.login = { error: { status: 401, data: { error: { message: "invalid credentials" } } } };
 		expect(render(<LoginView />, signedOutSession())).toContain("That email and password do not match an account.");

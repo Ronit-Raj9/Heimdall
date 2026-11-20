@@ -105,6 +105,7 @@ type Planner struct {
 	includeQuarantined bool
 	ignoreQuarantine   bool
 
+	confine      string                          // Tenancy area: agent config files must resolve inside it (experimentguard.go)
 	guard        func(*schemas.Experiment) error // Tenancy area: hosted orgs confine experiment paths to the org's project (experimentguard.go)
 	deferGateway bool                            // Tenancy area: a hosted server records the gateway preflight as the runners' (experimentguard.go)
 	skipGPU      bool                            // X7: a remote worker's replan skips the GPU check (gpu.go)
@@ -980,7 +981,11 @@ func (p *Planner) checkAgent(cfg *schemas.AgentConfig) error {
 func (p *Planner) layFiles(cfg *schemas.AgentConfig, suite *schemas.Suite, conds []condPlan) (map[string]map[string]string, error) {
 	armFiles := map[string]string{}
 	if cfg.Notes.UserFile != "" {
-		sum, err := utils.SHA256File(p.abs(cfg.Notes.UserFile))
+		src, err := p.configFile(cfg.Notes.UserFile)
+		if err != nil {
+			return nil, fmt.Errorf("notes.user_file: %w", err)
+		}
+		sum, err := utils.SHA256File(src)
 		if err != nil {
 			return nil, fmt.Errorf("notes.user_file: %w", err)
 		}
@@ -1135,6 +1140,19 @@ func (p *Planner) policyHash(rel string) (string, error) {
 		return "", fmt.Errorf("release policy %s: %w", rel, err)
 	}
 	return sum, nil
+}
+
+// configFile is the host path of a file an agent config names. With a
+// confinement root it must be a relative path that resolves inside it,
+// symlinks included; nothing outside is opened.
+func (p *Planner) configFile(name string) (string, error) {
+	if p.confine == "" {
+		return p.abs(name), nil
+	}
+	if filepath.IsAbs(name) || strings.HasPrefix(name, "/") || strings.Contains(name, `\`) {
+		return "", fmt.Errorf("%q: want a path relative to the organization's project", name)
+	}
+	return utils.ResolveInside(p.confine, name)
 }
 
 func (p *Planner) abs(rel string) string {

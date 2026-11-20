@@ -81,7 +81,12 @@ func (s *Service) Authenticate(ctx *fasthttp.RequestCtx) (*Principal, error) {
 	dctx, cancel := dbCtx()
 	defer cancel()
 	write := !isSafeMethod(ctx)
-	if raw, ok := bearer(ctx); ok {
+	if raw, present := bearer(ctx); present {
+		if raw == "" {
+			// "Bearer" with no token is a malformed credential, not an
+			// absent one: no fallback to the ambient session cookie.
+			return nil, ErrInvalidToken
+		}
 		var (
 			p   *Principal
 			err error
@@ -181,14 +186,18 @@ func isSafeMethod(ctx *fasthttp.RequestCtx) bool {
 	return ctx.IsGet() || ctx.IsHead() || ctx.IsOptions()
 }
 
-// bearer returns the token of "Authorization: Bearer <token>".
+// bearer returns the token of "Authorization: Bearer <token>" and whether
+// the header presents the Bearer scheme at all. A present scheme with an
+// empty or blank token returns ("", true): the caller rejects it.
 func bearer(ctx *fasthttp.RequestCtx) (string, bool) {
-	h := ctx.Request.Header.Peek(fasthttp.HeaderAuthorization)
-	if len(h) < 7 || !bytes.EqualFold(h[:7], []byte("Bearer ")) {
+	h := bytes.TrimSpace(ctx.Request.Header.Peek(fasthttp.HeaderAuthorization))
+	if len(h) < 6 || !bytes.EqualFold(h[:6], []byte("Bearer")) {
 		return "", false
 	}
-	tok := strings.TrimSpace(string(h[7:]))
-	return tok, tok != ""
+	if len(h) > 6 && h[6] != ' ' && h[6] != '\t' {
+		return "", false // another scheme that starts with "Bearer"
+	}
+	return strings.TrimSpace(string(h[6:])), true
 }
 
 // sendAuthError answers err with its status; internal errors stay vague.
@@ -219,9 +228,27 @@ func SendError(ctx *fasthttp.RequestCtx, mode schemas.Mode, err error) { sendAut
 // only sees "internal error".
 func (s *Service) Fail(ctx *fasthttp.RequestCtx, err error) {
 	if e, ok := AsError(err); !ok || e.Status >= 500 {
-		s.logger.Error(fmt.Sprintf("auth: %s %s: %v", ctx.Method(), ctx.Path(), err))
+		s.logger.Error(fmt.Sprintf("auth: %s %s: %v", ctx.Method(), LogPath(ctx.Path()), err))
 	}
 	sendAuthError(ctx, s.cfg.ServerMode, err)
+}
+
+// credentialSegments are path segments followed by a raw credential (an
+// invitation token) in a request path.
+var credentialSegments = map[string]bool{"invite": true, "invitations": true}
+
+// LogPath is a request path safe for logs: the segment after "invite" or
+// "invitations" (a raw one-time invitation token) is replaced by
+// "{token}". The query string is not part of the path.
+func LogPath(path []byte) string {
+	parts := strings.Split(string(path), "/")
+	for i := 0; i+1 < len(parts); i++ {
+		if credentialSegments[parts[i]] && parts[i+1] != "" {
+			parts[i+1] = "{token}"
+			i++
+		}
+	}
+	return strings.Join(parts, "/")
 }
 
 // ---- cookies ----

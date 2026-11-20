@@ -15,7 +15,10 @@
 #   4. first owner account and its organization (bifrost-bench user
 #      create); the generated password is printed once
 #   5. demo organization, public read-only, with recorded runs imported
-#      (bifrost-bench org import); default source bench/testdata/recorded
+#      (bifrost-bench org import); default source bench/testdata/recorded.
+#      With --owner-email, a demo that already exists gets that owner as a
+#      member (bifrost-bench org member add), so a rerun repairs a demo
+#      created without one
 #   6. start everything and wait for health; print the URL
 set -euo pipefail
 # shellcheck source=lib.sh
@@ -126,6 +129,21 @@ if [ -z "$no_demo" ]; then
 			log "demo organization created"
 		elif printf '%s' "$out" | grep -qi 'exist'; then
 			log "demo organization exists"
+			# org create adds the owner only to an org it creates. A demo made
+			# by an earlier run without --owner-email has no admin, so grant the
+			# owner membership here (idempotent: an existing member is kept).
+			if [ -n "$owner_email" ]; then
+				if out=$(bench -- org member add -org demo -email "$owner_email" -role owner 2>&1); then
+					log "$owner_email is an owner of the demo organization"
+				elif printf '%s' "$out" | grep -qi 'already'; then
+					log "$owner_email is already a member of the demo organization"
+				elif printf '%s' "$out" | grep -qi 'unknown org command'; then
+					log "warning: this build has no 'org member add'; $owner_email may not administer the demo organization (docs/hosting.md, Bootstrap)"
+				else
+					printf '%s\n' "$out" >&2
+					die "adding $owner_email to the demo organization failed"
+				fi
+			fi
 		else
 			printf '%s\n' "$out" >&2
 			die "creating the demo organization failed"

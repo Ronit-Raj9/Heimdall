@@ -3,7 +3,7 @@ import { RoleBadge } from "@/components/platform/badges";
 import { looksLikeEmail } from "@/components/platform/platform.utils";
 import { BlockSkeleton } from "@/components/runs/screenStates";
 import { Button } from "@/components/ui/button";
-import { useSession } from "@/lib/session/sessionContext";
+import { signupOffered, useSession } from "@/lib/session/sessionContext";
 import { getBenchErrorMessage } from "@/lib/store/apis/benchApi";
 import { useGetInvitationQuery, useSignupMutation } from "@/lib/store/apis/platformApi";
 import { Link, Navigate } from "@tanstack/react-router";
@@ -48,8 +48,8 @@ export default function SignupView({ invitation }: { invitation?: string }) {
 			</p>
 		</div>
 	);
-	if (!invitation && session.signup === "closed") return notice(t("auth.signup.closed"), "signup-closed");
-	if (!invitation && session.signup !== "open") return notice(t("auth.signup.inviteOnly"), "signup-invite-only");
+	if (!invitation && session.signup === "closed" && !session.bootstrap) return notice(t("auth.signup.closed"), "signup-closed");
+	if (!invitation && !signupOffered(session)) return notice(t("auth.signup.inviteOnly"), "signup-invite-only");
 	if (invitation && invite.isLoading) return <BlockSkeleton rows={4} testId="signup-invite-loading" />;
 	if (invitation && (invite.isError || !invite.data)) {
 		return (

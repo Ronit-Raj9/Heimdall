@@ -3,9 +3,7 @@
 package handlers
 
 import (
-	"bytes"
 	"context"
-	"encoding/json"
 	"errors"
 	"net/url"
 	"time"
@@ -81,9 +79,7 @@ func (h *AuthHandler) work() (context.Context, context.CancelFunc) {
 
 // decodeAuthBody parses a JSON body strictly, answering 400 on failure.
 func (h *AuthHandler) decodeAuthBody(ctx *fasthttp.RequestCtx, dst any) bool {
-	dec := json.NewDecoder(bytes.NewReader(ctx.PostBody()))
-	dec.DisallowUnknownFields()
-	if err := dec.Decode(dst); err != nil {
+	if err := decodeJSONStrict(ctx.PostBody(), dst); err != nil {
 		lib.SendError(ctx, h.mode, fasthttp.StatusBadRequest, lib.ErrTypeBadRequest, "parse request body: "+err.Error())
 		return false
 	}
@@ -227,11 +223,18 @@ func (h *AuthHandler) getGitHubStart(ctx *fasthttp.RequestCtx) {
 
 // getGitHubCallback handles GitHub's redirect back. It always answers with
 // a redirect: to the return path on success, to /login?error=github
-// otherwise (details go to the server log and the audit log).
+// otherwise (details go to the server log and the audit log), except a
+// rate-limited callback, which is 429 with Retry-After.
 func (h *AuthHandler) getGitHubCallback(ctx *fasthttp.RequestCtx) {
 	sess, returnTo, err := h.svc.GitHubCallback(ctx, auth.PrincipalFrom(ctx).SessionID())
 	ctx.Response.Header.Set("Cache-Control", "no-store")
 	if err != nil {
+		if e, ok := auth.AsError(err); ok && e.Status == fasthttp.StatusTooManyRequests {
+			// The documented rate-limit contract: 429 with Retry-After,
+			// distinguishable from a failed sign-in.
+			h.fail(ctx, err)
+			return
+		}
 		reason := "github"
 		if errors.Is(err, auth.ErrSignupNotAllowed) {
 			reason = "signup_not_allowed"

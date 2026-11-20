@@ -55,7 +55,9 @@ func (s *Service) CreateToken(ctx context.Context, p *Principal, req TokenCreate
 	if !p.Role.AtLeast(role) {
 		return nil, errForbidden("a token's role can not exceed yours (%s)", p.Role)
 	}
-	if req.ExpiresInDays < 0 || time.Duration(req.ExpiresInDays)*24*time.Hour > MaxTokenLifetime {
+	// Bound the day count itself: converting first could overflow the
+	// int64 nanosecond Duration and wrap back into the allowed range.
+	if req.ExpiresInDays < 0 || req.ExpiresInDays > int(MaxTokenLifetime/(24*time.Hour)) {
 		return nil, errBadRequest("expires_in_days must be between 0 (never) and 3650")
 	}
 	raw, prefix, err := NewAPIToken()
@@ -186,10 +188,20 @@ func verifyRunner(ctx context.Context, raw string) (*Principal, error) {
 		return nil, ErrInvalidToken
 	}
 	p, err := (*v)(ctx, raw)
-	if err != nil || p == nil {
-		if e, ok := AsError(err); ok && e.Status >= 500 {
-			return nil, err
+	if err != nil {
+		// A typed auth error is the verifier's verdict on the token (or a
+		// typed service failure). Anything else is a backend failure, such
+		// as a database outage: answering 401 would make a valid runner
+		// treat it as a permanent auth failure and stop registering.
+		if e, ok := AsError(err); ok {
+			if e.Status >= 500 {
+				return nil, err
+			}
+			return nil, ErrInvalidToken
 		}
+		return nil, fmt.Errorf("%w: %v", errUnavailable("runner token verification is unavailable; retry"), err)
+	}
+	if p == nil {
 		return nil, ErrInvalidToken
 	}
 	if p.Kind != KindRunner || p.OrgID == "" {

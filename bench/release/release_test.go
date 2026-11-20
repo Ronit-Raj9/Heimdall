@@ -251,6 +251,14 @@ func TestCreatePicksAnalysis(t *testing.T) {
 	f := newFixture(t, schemas.ActionHold, "")
 	f.writeAnalysis("a_two", time.Date(2026, 11, 14, 11, 0, 0, 0, time.UTC), schemas.ActionShip, "")
 	f.writeAnalysis("a_old", time.Date(2026, 11, 13, 11, 0, 0, 0, time.UTC), schemas.ActionShip, "")
+	// A newer analysis of another grade source (written by viewing its
+	// verdict) is not the default (4-B-07).
+	judge := &schemas.Analysis{AnalysisID: "a_judge", ExpID: testExp, CreatedAt: time.Date(2026, 11, 15, 11, 0, 0, 0, time.UTC),
+		GradeSource: "judge_x", Verdict: schemas.Verdict{Decision: schemas.DecisionImproved, Action: schemas.ActionShip,
+			ManifestHash: f.m.Hash, Effect: &schemas.Effect{ArmA: "A", ArmB: "B"}}}
+	if err := f.st.WriteAnalysis(context.Background(), judge, nil); err != nil {
+		t.Fatal(err)
+	}
 	tests := []struct {
 		name, analysisID, want, refused string
 	}{

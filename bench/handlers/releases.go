@@ -11,6 +11,7 @@ import (
 	"github.com/fasthttp/router"
 	"github.com/maximhq/bifrost/bench/lib"
 	"github.com/maximhq/bifrost/bench/schemas"
+	"github.com/maximhq/bifrost/bench/tenancy"
 	"github.com/valyala/fasthttp"
 )
 
@@ -93,6 +94,7 @@ func (h *ReleasesHandler) createRelease(ctx *fasthttp.RequestCtx) {
 		sendDepError(ctx, h.mode, "release "+req.ExpID, err)
 		return
 	}
+	tenancy.SetCreated(ctx, rec.ReleaseID)
 	lib.SendJSON(ctx, h.mode, fasthttp.StatusCreated, rec)
 }
 

@@ -91,6 +91,6 @@ describe("notifyUnauthorized", () => {
 		expect(listener).not.toHaveBeenCalled();
 		notifyUnauthorized("/experiments");
 		expect(listener).toHaveBeenCalledTimes(1);
-		expect(getAuthState()).toEqual({ mode: "hosted", csrf: "c" });
+		expect(getAuthState()).toEqual({ mode: "hosted", csrf: "c", org: "" });
 	});
 });

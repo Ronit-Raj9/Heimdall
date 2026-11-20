@@ -18,6 +18,7 @@ import (
 	"github.com/maximhq/bifrost/bench/lib"
 	"github.com/maximhq/bifrost/bench/schemas"
 	"github.com/maximhq/bifrost/bench/stats"
+	"github.com/maximhq/bifrost/bench/tenancy"
 	"github.com/valyala/fasthttp"
 	"gopkg.in/yaml.v3"
 )
@@ -147,6 +148,7 @@ func (h *ExperimentsHandler) createExperiment(ctx *fasthttp.RequestCtx) {
 		sendDepError(ctx, h.mode, "create experiment "+m.ExpID, err)
 		return
 	}
+	tenancy.SetCreated(ctx, m.ExpID)
 	lib.SendJSON(ctx, h.mode, fasthttp.StatusCreated, schemas.ExperimentCreated{
 		ExpID: m.ExpID, ManifestHash: m.Hash, CreatedAt: m.CreatedAt,
 	})

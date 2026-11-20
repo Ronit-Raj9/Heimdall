@@ -122,7 +122,8 @@
 			"tokens": "API tokens",
 			"runners": "Runners",
 			"audit": "Audit log",
-			"org": "Organization"
+			"org": "Organization",
+			"account": "Account"
 		},
 		"members": {
 			"title": "Members",
@@ -316,7 +317,21 @@
 			"adminOnly": "Only admins rename the organization.",
 			"loadError": "Could not load the organization"
 		},
-		"notSignedIn": "Sign in to manage an organization."
+		"notSignedIn": "Sign in to manage an organization.",
+		"password": {
+			"title": "Password",
+			"description": "Change the password you sign in with. Your other signed-in sessions end; this one stays signed in. API tokens keep working.",
+			"current": "Current password",
+			"currentHint": "Leave empty only if the account has no password yet (signed up with GitHub).",
+			"new": "New password",
+			"newHint": "At least {{min}} characters.",
+			"tooShort": "Use at least {{min}} characters.",
+			"confirm": "Repeat new password",
+			"mismatch": "The passwords differ.",
+			"submit": "Change password",
+			"error": "Could not change the password",
+			"done": "Password changed. Your other sessions were signed out."
+		}
 	},
 	"jobs": {
 		"indicator": "Jobs",

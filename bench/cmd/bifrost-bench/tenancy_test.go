@@ -613,6 +613,24 @@ func TestHostedPlanGuard(t *testing.T) {
 		if !strings.Contains(r.body, "organization") && !strings.Contains(r.body, "leaves the folder") && !strings.Contains(r.body, "relative") {
 			t.Errorf("plan %v: %d %s", exp, r.status, trim(r.body))
 		}
+	} // Transitive files of the resolved arm configs are confined too
+	// (4-B-14): an absolute or symlinked notes file outside the project.
+	if err := os.Symlink("/etc/hostname", filepath.Join(p.ProjectRoot, "agents", "out.md")); err != nil {
+		t.Fatal(err)
+	}
+	for _, src := range []string{"/etc/hostname", "agents/out.md", "../" + f.beta.ID + "/agents/noop.yaml"} {
+		exp := map[string]any{"name": "x", "suite": "coding-core", "base": "agents/noop.yaml", "arms": map[string]any{
+			"A": map[string]any{"label": "a"},
+			"B": map[string]any{"label": "b", "set": map[string]any{"notes.user_file": src, "notes.user_path": "/home/agent/NOTES.md"}},
+		},
+			"primary":    map[string]any{"condition": "clean", "metric": "verified_success"},
+			"conditions": []any{map[string]any{"id": "clean", "tasks": []string{"t01"}, "trials": 1}},
+		}
+		r := f.do("POST", "/api/bench/experiments/plan", "alice", nil, exp)
+		confined := strings.Contains(r.body, "want a path relative") || strings.Contains(r.body, "leaves the folder") || strings.Contains(r.body, "outside the folder")
+		if !strings.Contains(r.body, "notes.user_file") || !confined {
+			t.Errorf("plan with notes %s: %d %s", src, r.status, trim(r.body))
+		}
 	}
 }
 
@@ -1026,4 +1044,140 @@ func trim(s string) string {
 		return s[:300] + "..."
 	}
 	return s
+}
+
+// TestCreateOrgFolderFailure: a folder failure leaves no committed org, no
+// taken slug and no staged folders, so a retry succeeds (4-B-04).
+func TestCreateOrgFolderFailure(t *testing.T) {
+	ctx := context.Background()
+	d := dbtest.Open(t)
+	root := t.TempDir()
+	layout := tenancy.Layout{Hosted: true, StorageRoot: root}
+	cfg := &lib.Config{Root: root}
+	block := filepath.Join(root, tenancy.ProjectsDir)
+	if err := os.WriteFile(block, []byte("x"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := createOrg(ctx, d, layout, cfg, "staged", "Staged", "", false); err == nil {
+		t.Fatal("create with unwritable folders succeeded")
+	}
+	if _, err := d.OrgBySlug(ctx, "staged"); !errors.Is(err, db.ErrNotFound) {
+		t.Fatalf("org committed after a folder failure: %v", err)
+	}
+	if ents, _ := os.ReadDir(filepath.Join(root, tenancy.OrgsDir)); len(ents) != 0 {
+		t.Fatalf("staged folders left behind: %v", ents)
+	}
+	if err := os.Remove(block); err != nil {
+		t.Fatal(err)
+	}
+	o, err := createOrg(ctx, d, layout, cfg, "staged", "Staged", "", false)
+	if err != nil {
+		t.Fatalf("retry: %v", err)
+	}
+	if _, err := os.Stat(filepath.Join(root, tenancy.ProjectsDir, o.ID)); err != nil {
+		t.Fatalf("project folder: %v", err)
+	}
+}
+
+// TestHostedAuditPaging: the audit route hands out the database's opaque
+// cursor, so rows sharing a millisecond are never skipped (4-B-05).
+func TestHostedAuditPaging(t *testing.T) {
+	f := newHostedFixture(t)
+	ctx := context.Background()
+	at := time.Date(2026, 11, 18, 6, 0, 0, 0, time.UTC)
+	want := map[string]bool{}
+	for i := 0; i < 3; i++ {
+		e, err := f.d.AppendAudit(ctx, db.AuditEntry{OrgID: f.acme.ID, ActorType: db.ActorSystem, Action: "page.test", At: at})
+		if err != nil {
+			t.Fatal(err)
+		}
+		want[e.ID] = true
+	}
+	seen := map[string]bool{}
+	cursor := ""
+	for pages := 0; pages < 5; pages++ {
+		path := "/api/bench/orgs/acme/audit?action=page.test&limit=1"
+		if cursor != "" {
+			path += "&cursor=" + cursor
+		}
+		r := f.do("GET", path, "alice", nil, nil)
+		var out handlers.AuditList
+		if err := json.Unmarshal([]byte(r.body), &out); r.status != 200 || err != nil {
+			t.Fatalf("%d %v: %s", r.status, err, trim(r.body))
+		}
+		for _, e := range out.Entries {
+			seen[e.ID] = true
+		}
+		if cursor = out.Next; cursor == "" {
+			break
+		}
+	}
+	if len(seen) != len(want) {
+		t.Fatalf("paged %d of %d same-millisecond rows", len(seen), len(want))
+	}
+	if r := f.do("GET", "/api/bench/orgs/acme/audit?cursor=!!", "alice", nil, nil); r.status != 400 {
+		t.Fatalf("bad cursor: %d %s", r.status, trim(r.body))
+	}
+}
+
+// TestHostedVerdictReadReusesAnalysis: viewing a verdict again writes no
+// new analysis while the evidence is unchanged (4-B-07).
+func TestHostedVerdictReadReusesAnalysis(t *testing.T) {
+	f := newHostedFixture(t)
+	p, err := f.env.layout.Paths(f.acme.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	dir := filepath.Join(p.StoreRoot, f.aExp, "analysis")
+	count := func() int { ents, _ := os.ReadDir(dir); return len(ents) }
+	before := count()
+	var ids []string
+	for i := 0; i < 3; i++ {
+		r := f.do("GET", "/api/bench/experiments/"+f.aExp+"/verdict", "vera", nil, nil)
+		var out struct {
+			AnalysisID string `json:"analysis_id"`
+		}
+		if err := json.Unmarshal([]byte(r.body), &out); r.status != 200 || err != nil {
+			t.Fatalf("verdict: %d %v %s", r.status, err, trim(r.body))
+		}
+		ids = append(ids, out.AnalysisID)
+	}
+	if n := count(); n > before+1 {
+		t.Fatalf("three reads wrote %d analyses", n-before)
+	}
+	if ids[1] != ids[0] || ids[2] != ids[0] {
+		t.Fatalf("analysis ids %v", ids)
+	}
+}
+
+// TestHostedOfflineLaunchesAndDetach: -offline leaves hosted experiment
+// launch on (4-B-11), and an evicted runtime's launcher leaves the jobs hub
+// while a newer one of the org stays (4-B-12).
+func TestHostedOfflineLaunchesAndDetach(t *testing.T) {
+	f := newHostedFixture(t)
+	ctx, cancel := context.WithCancel(context.Background())
+	t.Cleanup(cancel)
+	env := newEnv(ctx, f.env.base, f.d, true)
+	h := hostedHub(env)
+	if !h.launches {
+		t.Fatal("hosted -offline unregistered experiment.run")
+	}
+	old := &launcher{org: "org_x"}
+	h.add(old)
+	cur := &launcher{org: "org_x"}
+	h.add(cur)
+	old.Detach() // an older runtime closing must not drop the current launcher
+	h.mu.Lock()
+	kept := h.orgs["org_x"] == cur
+	h.mu.Unlock()
+	if !kept {
+		t.Fatal("detaching an old launcher dropped the current one")
+	}
+	cur.Detach()
+	h.mu.Lock()
+	_, left := h.orgs["org_x"]
+	h.mu.Unlock()
+	if left {
+		t.Fatal("evicted runtime's launcher still held by the hub")
+	}
 }

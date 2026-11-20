@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	"github.com/fasthttp/router"
+	"github.com/maximhq/bifrost/bench/auth"
 	"github.com/maximhq/bifrost/bench/schemas"
 	"github.com/valyala/fasthttp"
 )
@@ -169,5 +170,51 @@ func TestWorkersUploadAndLease(t *testing.T) {
 	}
 	if resp := workerCall(t, api, "POST", "/api/bench/workers/leases/l_1/complete", testWorkerToken, `{"worker_id":"w1","nope":1}`); resp.StatusCode() != 400 {
 		t.Fatalf("unknown field: status %d", resp.StatusCode())
+	}
+}
+
+// hostedFakeWorkerAPI is fakeWorkerAPI on a hosted coordinator of one org.
+type hostedFakeWorkerAPI struct{ fakeWorkerAPI }
+
+func (hostedFakeWorkerAPI) OrgID() string { return "org_a" }
+
+func (hostedFakeWorkerAPI) Workers() []schemas.WorkerInfo {
+	return []schemas.WorkerInfo{{ID: "w1", Host: "box", Version: "v9", State: schemas.WorkerRunning, Slots: 2,
+		Running: []string{"s1"}, Pool: "gpu", Labels: []string{"a100"}, TokenID: "rtk_1", GPUs: []schemas.GPUInfo{{}}}}
+}
+
+// TestWorkersListHostedInventory: only an org admin sees runner
+// infrastructure on a hosted server (4-B-02).
+func TestWorkersListHostedInventory(t *testing.T) {
+	for _, tc := range []struct {
+		name string
+		p    *auth.Principal
+		full bool
+	}{
+		{"anonymous", nil, false},
+		{"viewer", &auth.Principal{Kind: auth.KindUser, OrgID: "org_a", Role: auth.RoleViewer}, false},
+		{"admin of another org", &auth.Principal{Kind: auth.KindUser, OrgID: "org_b", Role: auth.RoleOwner}, false},
+		{"admin", &auth.Principal{Kind: auth.KindUser, OrgID: "org_a", Role: auth.RoleAdmin}, true},
+	} {
+		r := router.New()
+		NewWorkersHandler(schemas.ModeLive, &hostedFakeWorkerAPI{}).RegisterRoutes(r)
+		var ctx fasthttp.RequestCtx
+		ctx.Request.SetRequestURI("/api/bench/workers")
+		if tc.p != nil {
+			auth.SetPrincipal(&ctx, tc.p)
+		}
+		r.Handler(&ctx)
+		var out WorkersList
+		if err := json.Unmarshal(ctx.Response.Body(), &out); err != nil || len(out.Workers) != 1 {
+			t.Fatalf("%s: %v %s", tc.name, err, ctx.Response.Body())
+		}
+		w := out.Workers[0]
+		if w.ID != "w1" || w.Slots != 2 || w.Pool != "gpu" || len(w.Running) != 1 {
+			t.Fatalf("%s: summary lost: %+v", tc.name, w)
+		}
+		leaked := w.Host != "" || w.Version != "" || w.TokenID != "" || len(w.Labels) > 0 || len(w.GPUs) > 0
+		if leaked != tc.full {
+			t.Fatalf("%s: full=%v, got %+v", tc.name, tc.full, w)
+		}
 	}
 }
