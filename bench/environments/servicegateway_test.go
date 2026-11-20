@@ -55,6 +55,7 @@ type fakeSvcFault struct {
 	mu      sync.Mutex
 	plans   []schemas.FaultPlan
 	cleared []string
+	ledger  []schemas.LedgerEntry // what Ledger returns
 }
 
 func (f *fakeSvcFault) SetPlan(_ context.Context, slot string, p schemas.FaultPlan) error {
@@ -70,7 +71,7 @@ func (f *fakeSvcFault) ClearPlan(_ context.Context, slot string) error {
 	return nil
 }
 func (f *fakeSvcFault) Ledger(context.Context, string) ([]schemas.LedgerEntry, error) {
-	return nil, nil
+	return f.ledger, nil
 }
 
 func userRC(t *testing.T, runID string, sim *schemas.SimulatorSpec) *schemas.RunContext {
@@ -196,7 +197,7 @@ func TestServiceGatewayKeyLifecycle(t *testing.T) {
 func TestServiceGatewaySmokeIsScripted(t *testing.T) {
 	docker, _ := fakeDocker(t)
 	gw := &fakeSvcGateway{rows: []schemas.GatewayRequest{{ID: "a", Status: "success", Kind: "message", Tokens: &schemas.Tokens{Fresh: 50, Out: 32}}}}
-	fault := &fakeSvcFault{}
+	fault := &fakeSvcFault{ledger: []schemas.LedgerEntry{{Call: 1, Kind: "message", Action: "pass", Upstream: schemas.LedgerUpstreamScripted}}}
 	e := newDockerWorkspace(DockerWorkspaceConfig{Docker: docker, HelperImage: "helper:1", EvalNetwork: "bench-evalnet",
 		ServiceGateway: ServiceGatewayConfig{Gateway: gw, AgentURL: "http://bifrost:8080", Fault: fault, Price: price}})
 	rc := userRC(t, "r_gw2", llmSim())
@@ -306,5 +307,28 @@ func TestPriceServiceRows(t *testing.T) {
 	}
 	if u := priceServiceRows(schemas.ServiceGatewayUsage{Model: "claude-sim", Complete: true}, rows, nil); u.USD.State != schemas.ValueUnknown {
 		t.Fatalf("no snapshot: %+v", u)
+	}
+}
+
+// TestPriceScriptedServiceNeedsWitness guards 3-C-07: a scripted service is
+// zero cost only when the ledger proves the scripted upstream answered.
+func TestPriceScriptedServiceNeedsWitness(t *testing.T) {
+	rows := []schemas.GatewayRequest{{Status: "success", Kind: "message", Tokens: &schemas.Tokens{Fresh: 1_000_000}}}
+	base := schemas.ServiceGatewayUsage{Model: "claude-sim", Complete: true, BudgetUSD: 0.5, FaultMode: faultModeScripted}
+	scripted := []schemas.LedgerEntry{{Call: 1, Kind: "message", Action: "pass", Upstream: schemas.LedgerUpstreamScripted}}
+	if u := priceScriptedService(base, rows, scripted, "", price); u.USD.State != schemas.ValueObserved || *u.USD.V != 0 || u.OverBudget {
+		t.Fatalf("witnessed scripted: %+v", u)
+	}
+	real := []schemas.LedgerEntry{{Call: 1, Kind: "message", Action: "pass", Upstream: schemas.LedgerUpstreamReal}}
+	missing := []schemas.LedgerEntry{{Call: 1, Kind: "message", Action: "pass"}}
+	mixed := append(append([]schemas.LedgerEntry(nil), scripted...), schemas.LedgerEntry{Call: 2, Kind: "message", Action: "pass", Upstream: schemas.LedgerUpstreamReal})
+	for name, c := range map[string]struct {
+		l   []schemas.LedgerEntry
+		err string
+	}{"real": {real, ""}, "missing": {missing, ""}, "mixed": {mixed, ""}, "none": {nil, ""}, "unread": {nil, "ledger not read: boom"}} {
+		u := priceScriptedService(base, rows, c.l, c.err, price)
+		if u.USD.State != schemas.ValueObserved || *u.USD.V != 1 || !u.OverBudget || !strings.Contains(u.Reason, "integrity") || u.FaultMode != faultModeScripted {
+			t.Fatalf("%s: real cost must be kept and flagged: %+v", name, u)
+		}
 	}
 }

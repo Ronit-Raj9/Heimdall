@@ -264,3 +264,67 @@ func canonicalLine(e schemas.LedgerEntry) (string, error) {
 	line, err := utils.CanonicalJSON(e)
 	return string(line), err
 }
+
+// TestLedgerRepairsUnterminatedTail covers a crash between the final object
+// and its newline: reopen repairs the delimiter so the next append stays JSONL.
+func TestLedgerRepairsUnterminatedTail(t *testing.T) {
+	path := writeLedger(t, 2)
+	raw, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(path, bytes.TrimRight(raw, "\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	l, err := openLedger(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := l.append(&schemas.LedgerEntry{Slot: "slot-a", RunID: "r", Kind: KindModels, Action: ActionPass}); err != nil {
+		t.Fatal(err)
+	}
+	if err := l.close(); err != nil {
+		t.Fatal(err)
+	}
+	if err := VerifyFile(path); err != nil {
+		t.Fatalf("append after unterminated tail: %v", err)
+	}
+}
+
+// TestLedgerRefusesSecondWriter covers two proxies on one ledger path.
+func TestLedgerRefusesSecondWriter(t *testing.T) {
+	path := writeLedger(t, 1)
+	l, err := openLedger(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := openLedger(path); err == nil || !strings.Contains(err.Error(), path) {
+		t.Fatalf("second opener: %v, want refusal naming the path", err)
+	}
+	if err := l.close(); err != nil {
+		t.Fatal(err)
+	}
+	l2, err := openLedger(path)
+	if err != nil {
+		t.Fatalf("reopen after close: %v", err)
+	}
+	l2.close()
+}
+
+// TestLedgerStopsAfterWriteFailure: once a write fails the tail is unknown,
+// so later appends refuse instead of chaining onto a possibly lost entry.
+func TestLedgerStopsAfterWriteFailure(t *testing.T) {
+	path := writeLedger(t, 1)
+	l, err := openLedger(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	l.f.Close() // force the next write to fail
+	if err := l.append(&schemas.LedgerEntry{Slot: "slot-a", Kind: KindModels, Action: ActionPass}); err == nil {
+		t.Fatal("write to closed file succeeded")
+	}
+	err = l.append(&schemas.LedgerEntry{Slot: "slot-a", Kind: KindModels, Action: ActionPass})
+	if err == nil || !strings.Contains(err.Error(), "refuses appends") {
+		t.Fatalf("append after failure: %v", err)
+	}
+}

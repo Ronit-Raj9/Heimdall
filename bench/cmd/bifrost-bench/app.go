@@ -42,8 +42,9 @@ type app struct {
 	docker    utils.Docker
 	reg       *schemas.Registry
 	store     *store.FSStore
-	upstreams engine.UpstreamChecker // the fault proxy's upstream check; nil without the gateway
-	prices    *evidence.PriceTable   // the price snapshot new runs are costed with
+	upstreams engine.UpstreamChecker             // the fault proxy's upstream check; nil without the gateway
+	prices    *evidence.PriceTable               // the price snapshot new runs are costed with
+	dockerCfg environments.DockerWorkspaceConfig // the run environment's wiring (service gateway included); agent check reuses it
 
 	// Tenancy area (P3): set only on a hosted org's app (servetenancy.go).
 	orgID        string                          // the org this app serves; empty in local mode
@@ -107,6 +108,7 @@ func newApp(ctx context.Context, configPath string, opts appOptions) (*app, erro
 		RemoteToolsListen: cfg.RemoteTools.Listen, RemoteToolsPublicURL: cfg.RemoteTools.PublicURL, // Remote coverage
 		ServiceGateway: environments.ServiceGatewayConfig{Gateway: gw, AgentURL: cfg.Gateway.AgentURL, Fault: fault, Price: graders.PricesFrom(prices.Lookup), PriceRef: prices.Ref()}, // W3 customer support: a service's own gateway key (servicegateway.go)
 	}
+	a.dockerCfg = dockerCfg
 	a.reg = &schemas.Registry{
 		Loaders:      suite.Builtin(cfg.Path(cfg.BenchmarksRoot)),
 		Environments: []schemas.Environment{environments.NewDockerDriver(dockerCfg)}, // X3: the Docker driver, today's docker_workspace behind the driver seam (environments/driver.go)

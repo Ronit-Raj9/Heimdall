@@ -215,3 +215,16 @@ func TestDecideFairness(t *testing.T) {
 		})
 	}
 }
+
+// TestFairnessA2ATeamIsNotSingle covers 3-A-11: an A2A arm with a2a.team
+// and no topology is a team, so no claim is allowed without a real
+// single-agent baseline.
+func TestFairnessA2ATeamIsNotSingle(t *testing.T) {
+	m := fairManifest(true, 1, 1, 1)
+	m.Arms[ArmBaseline] = schemas.ArmManifest{Label: "a2a", Config: schemas.AgentConfig{Adapter: "a2a", Budgets: schemas.Budgets{USD: 1},
+		A2A: &schemas.A2AAgent{CardURL: "http://e/card", Team: []schemas.A2AMember{{ID: "w"}}}}}
+	single, bestOfN := fairnessBaselines(m.Arms)
+	if single || !bestOfN {
+		t.Fatalf("single=%v bestOfN=%v, want false true", single, bestOfN)
+	}
+}

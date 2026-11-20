@@ -116,6 +116,14 @@ func (g *Gateway) ServeMCP(ctx context.Context, rc *schemas.RunContext, ups []sc
 		}
 		return nil, nil, err
 	}
+	names := map[string]string{}
+	for _, u := range ups { // 3-A-10: two services that fold to one client name would share one Bifrost identity
+		name := MCPClientName(u.Service, runID)
+		if other, dup := names[name]; dup && other != u.Service {
+			return nil, nil, fmt.Errorf("serve mcp: services %s and %s both map to MCP client name %s; rename one", other, u.Service, name)
+		}
+		names[name] = u.Service
+	}
 	for _, u := range ups {
 		name := MCPClientName(u.Service, runID)
 		body := map[string]any{
@@ -220,6 +228,14 @@ func (g *Gateway) RemoveStaleMCP(ctx context.Context, active map[string]bool) (i
 	if err != nil {
 		errs = append(errs, fmt.Errorf("list keys: %w", err))
 	}
+	rows, rowsErr := g.listMCPClients(ctx)
+	// 3-A-08: the same liveness as RevokeStale, read after listing: a run
+	// holding a live key slot claim keeps its MCP key and clients, and
+	// nothing goes when the claims cannot be read.
+	active, err = g.withClaimHolders(ctx, active)
+	if err != nil {
+		return 0, fmt.Errorf("remove stale mcp: nothing removed, the key slot claims of other bench processes could not be read: %w", err)
+	}
 	for _, k := range keys {
 		run, ok := strings.CutPrefix(k.Name, "hm-mcp-")
 		if !ok || !runIDPattern.MatchString(run) || active[run] {
@@ -232,9 +248,8 @@ func (g *Gateway) RemoveStaleMCP(ctx context.Context, active map[string]bool) (i
 		g.logger.Info("stale mcp key deleted", "virtual_key_id", k.ID, "name", k.Name)
 		n++
 	}
-	rows, err := g.listMCPClients(ctx)
-	if err != nil {
-		return n, errors.Join(append(errs, fmt.Errorf("list mcp clients: %w", err))...)
+	if rowsErr != nil {
+		return n, errors.Join(append(errs, fmt.Errorf("list mcp clients: %w", rowsErr))...)
 	}
 	for _, r := range rows {
 		m := mcpClientRunRe.FindStringSubmatch(r.Config.Name)

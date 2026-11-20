@@ -8,7 +8,8 @@ import (
 
 // X8 voice agents: speech, transcription and Realtime rows are priced at
 // Bifrost's own row cost; a row without one is unknown, an injected outage
-// costs nothing.
+// costs nothing. A 503 with no proxy inject witness is a genuine outage:
+// still free, never labelled injected.
 func TestCostRowsAudio(t *testing.T) {
 	usd := func(v float64) *float64 { return &v }
 	speech := schemas.GatewayRequest{ID: "s1", Timestamp: t0, Status: "success", Kind: kindAudio, ModelRequested: "gpt-4o-mini-tts", BifrostUSD: usd(0.000018)}
@@ -18,7 +19,7 @@ func TestCostRowsAudio(t *testing.T) {
 	noPrice := schemas.GatewayRequest{ID: "s4", Timestamp: t0.Add(3), Status: "success", Kind: kindAudio, ModelRequested: "whisper-1"}
 	outage := schemas.GatewayRequest{ID: "s5", Timestamp: t0.Add(4), Status: "error", ErrorStatus: 503, Kind: kindAudio, ModelRequested: "whisper-1"}
 	rows := CostRows(&schemas.RequestLog{Requests: []schemas.GatewayRequest{speech, stt, rt, noPrice, outage}}, nil, nil)
-	want := []string{"s1#1 0.000018", "s2#1 0.000100", "s3#1 0.000136", "s4#1 unknown", "s5#1 0.000000 inject"}
+	want := []string{"s1#1 0.000018", "s2#1 0.000100", "s3#1 0.000136", "s4#1 unknown", "s5#1 0.000000"}
 	if len(rows) != len(want) {
 		t.Fatalf("rows %d", len(rows))
 	}

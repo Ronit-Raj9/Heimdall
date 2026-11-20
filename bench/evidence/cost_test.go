@@ -71,6 +71,18 @@ func TestCostRows(t *testing.T) {
 		return schemas.LedgerEntry{Kind: "message", Call: call, Action: "pass", Status: 200, ResponseID: resp, Tokens: tk}
 	}
 
+	teamReq := func(id string, at time.Duration, resp string) schemas.GatewayRequest {
+		r := msgReq(id, at, "success")
+		r.ResponseID = resp
+		return r
+	}
+	teamA, teamB, teamC := teamReq("ta", 0, "msg_a"), teamReq("tb", time.Second, "msg_b"), teamReq("tc", 2*time.Second, "msg_c")
+	slotPass := func(slot string, call int, resp string, outM int64) schemas.LedgerEntry {
+		e := pass(call, resp, &schemas.Tokens{Out: outM * 1_000_000})
+		e.Slot = slot
+		return e
+	}
+
 	tests := []struct {
 		name   string
 		reqs   []schemas.GatewayRequest
@@ -78,7 +90,16 @@ func TestCostRows(t *testing.T) {
 		prices *PriceTable
 		want   []string
 	}{
-		{name: "retry after a 5xx", reqs: []schemas.GatewayRequest{retried}, want: []string{"r1#1 0.000000 inject", "r1#2 0.011475"}},
+		{name: "retry after an upstream 5xx is not injected", reqs: []schemas.GatewayRequest{retried}, want: []string{"r1#1 0.000000", "r1#2 0.011475"}},
+		{name: "passed-through upstream 503 is not injected", reqs: []schemas.GatewayRequest{retried},
+			ledger: []schemas.LedgerEntry{{Kind: "message", Call: 1, Action: "pass", Status: 503}, pass(2, "", nil)},
+			want:   []string{"r1#1 0.000000", "r1#2 0.011475"}},
+		{name: "team slots match by response id, not call order", reqs: []schemas.GatewayRequest{teamA, teamB, teamC},
+			ledger: []schemas.LedgerEntry{slotPass("lead", 1, "msg_a", 1), slotPass("lead", 2, "msg_b", 2), slotPass("member", 1, "msg_c", 3)},
+			want:   []string{"ta#1 15.000000", "tb#1 30.000000", "tc#1 45.000000"}},
+		{name: "duplicate response id borrows nothing", reqs: []schemas.GatewayRequest{teamA},
+			ledger: []schemas.LedgerEntry{slotPass("lead", 1, "msg_a", 1), slotPass("member", 1, "msg_a", 2)},
+			want:   []string{"ta#1 unknown"}},
 		{name: "proxy-injected 429", reqs: []schemas.GatewayRequest{rejected}, ledger: []schemas.LedgerEntry{inject(1, 429)}, want: []string{"r2#1 0.000000 inject"}},
 		{name: "provider 429 is rejected, not injected", reqs: []schemas.GatewayRequest{rejected}, want: []string{"r2#1 0.000000"}},
 		{name: "unknown model bounded by table maximum", reqs: []schemas.GatewayRequest{unknownModel}, want: []string{"r3#1 unknown[0.000000,0.090000]"}},

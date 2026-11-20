@@ -74,3 +74,17 @@ func TestA2AOutputAllowed(t *testing.T) {
 		t.Fatal("a2a.tools expose publishes the tool proxy")
 	}
 }
+
+// TestA2ARegistrationNameLongMembers covers 3-A-15: two long member ids with
+// one prefix stay distinct and within 63 characters.
+func TestA2ARegistrationNameLongMembers(t *testing.T) {
+	a := strings.Repeat("x", 62) + "-aaa"
+	b := strings.Repeat("x", 62) + "-bbb"
+	na, nb := A2ARegistrationName("r_0123456789abcdef", a), A2ARegistrationName("r_0123456789abcdef", b)
+	if na == nb || len(na) > 63 || len(nb) > 63 {
+		t.Fatalf("names %q (%d) and %q (%d)", na, len(na), nb, len(nb))
+	}
+	if short := A2ARegistrationName("r_abc", "worker"); short != "hb-r-abc-worker" {
+		t.Fatalf("short name changed: %q", short)
+	}
+}

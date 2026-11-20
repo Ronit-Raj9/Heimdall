@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"net/http"
 	"net/url"
+	"regexp"
 	"slices"
 	"strconv"
 	"strings"
@@ -160,4 +161,53 @@ func (g *Gateway) A2ACorrelated(ctx context.Context, taskIDs []string, since tim
 		}
 	}
 	return out, errors.Join(errs...)
+}
+
+// a2aRunName reads the run id of a bench a2a registration name
+// (utils.A2ARegistrationName): "hb-r-<id>-<member>". A name whose run id
+// was cut is not matched, so it is never taken for another run's.
+var a2aRunName = regexp.MustCompile(`^hb-r-([a-z0-9]+)-[a-z0-9][a-z0-9-]*$`)
+
+// listA2ANames lists every a2a registration name; none on a gateway
+// without the agent endpoints.
+func (g *Gateway) listA2ANames(ctx context.Context) ([]string, error) {
+	var page struct {
+		Agents []struct {
+			Name string `json:"name"`
+		} `json:"agents"`
+	}
+	err := g.call(ctx, http.MethodGet, "/api/agents", nil, &page)
+	if isStatus(err, http.StatusNotFound) {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, fmt.Errorf("list agents: %w", err)
+	}
+	names := make([]string, 0, len(page.Agents))
+	for _, a := range page.Agents {
+		names = append(names, a.Name)
+	}
+	return names, nil
+}
+
+// removeStaleA2A deletes bench a2a registrations of runs that are not
+// active, for the janitor (3-A-04): a crashed run, a failed DELETE or a
+// POST whose answer was lost leaves one behind.
+func (g *Gateway) removeStaleA2A(ctx context.Context, names []string, listErr error, active map[string]bool) []error {
+	if listErr != nil {
+		return []error{fmt.Errorf("remove stale a2a registrations: %w", listErr)}
+	}
+	var errs []error
+	for _, name := range names {
+		m := a2aRunName.FindStringSubmatch(name)
+		if m == nil || active["r_"+m[1]] {
+			continue
+		}
+		if err := g.DeleteA2A(ctx, name); err != nil {
+			errs = append(errs, fmt.Errorf("remove stale a2a registration: %w", err))
+			continue
+		}
+		g.logger.Info("stale a2a registration deleted", "name", name)
+	}
+	return errs
 }

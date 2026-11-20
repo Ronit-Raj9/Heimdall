@@ -59,7 +59,9 @@ func (g *Gateway) FetchRequests(ctx context.Context, key *schemas.RunKey, expect
 	if !direct {
 		expected = len(joinLedger(nil, expect.LedgerEntries, key.KeySlot).Entries)
 	}
+	var prevAt time.Time // when the snapshot behind prev was taken
 	for {
+		polledAt := time.Now()
 		snap, err := g.snapshot(ctx, key, since, cache, expect.LedgerEntries, direct)
 		switch {
 		case err != nil && ctx.Err() != nil:
@@ -69,11 +71,15 @@ func (g *Gateway) FetchRequests(ctx context.Context, key *schemas.RunKey, expect
 			g.logger.Warn("bifrost log poll failed", "virtual_key_id", key.ID, "error", lastErr)
 		default:
 			lastErr, last = "", snap.log
-			settled := expected > 0 || time.Since(start) >= g.settle
+			// 3-B-12: with nothing to expect, a repeat counts only when the
+			// earlier snapshot was itself taken after the settle time, so
+			// two empty polls from before Bifrost's batched writer flushed
+			// never end the wait.
+			settled := expected > 0 || prevAt.Sub(start) >= g.settle
 			if snap.sig == prev && settled && snap.final() {
 				return g.finish(ctx, snap.log), nil
 			}
-			prev = snap.sig
+			prev, prevAt = snap.sig, polledAt
 		}
 		if time.Since(start)+every > timeout {
 			return g.finish(ctx, timedOut(last, timeout, lastErr)), nil

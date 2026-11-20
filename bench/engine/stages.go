@@ -440,7 +440,7 @@ func (p *Pipeline) measure(ctx context.Context, st *runState) error {
 	var errs []error
 	st.metrics = map[string]schemas.Value{}
 	selected := selectMetrics(p.reg, st.rc.Experiment.Metrics)
-	for _, m := range selected {
+	for _, m := range append(selected, accountingMetrics(p.reg, st.rc.Experiment, selected)...) {
 		v, err := m.Compute(ctx, st.rc, st.ev)
 		if err != nil {
 			errs = append(errs, wrapPart("metric", m, fmt.Errorf("compute: %w", err)))
@@ -453,6 +453,30 @@ func (p *Pipeline) measure(ctx context.Context, st *runState) error {
 		errs = append(errs, err)
 	}
 	return errors.Join(errs...)
+}
+
+// accountingMetrics returns the registered cost metrics the scheduler's
+// spend cap reads that the experiment's display selection left out. A
+// positive budget.total_usd always needs the measured cost, so choosing a
+// metric subset never turns a measurable run into an unknown one charged at
+// the per-run estimate. The values land in metrics.json, so resume sees them.
+func accountingMetrics(reg *schemas.Registry, e *schemas.Experiment, selected []schemas.Metric) []schemas.Metric {
+	if reg == nil || e == nil || e.Budget.TotalUSD <= 0 {
+		return nil
+	}
+	have := map[string]bool{}
+	for _, m := range selected {
+		have[metricName(m)] = true
+	}
+	var out []schemas.Metric
+	for _, m := range reg.Metrics {
+		n := metricName(m)
+		if (n == costMetric || n == simulatorCostMetric) && !have[n] {
+			have[n] = true
+			out = append(out, m)
+		}
+	}
+	return out
 }
 
 // measureDerived adds the values of every selected DerivedMetric to

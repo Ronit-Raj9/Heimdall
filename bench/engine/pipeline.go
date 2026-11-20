@@ -415,7 +415,7 @@ func (p *Pipeline) writeArtifacts(ctx context.Context, st *runState) error {
 		{"evidence.json", trimEvidence(st.ev)},
 		{"gates.json", gates},
 		{"grade.json", st.ev.Grade},
-		{"plan.json", redactPlan(st.plan)},
+		{"plan.json", redactPlan(st.plan, utils.RunSecrets(st.rc)...)}, // 3-A-12: the run's issued credentials, wherever the adapter rendered them
 		{"run.json", st.rc.Run},
 	}
 	if len(st.ev.Sessions) > 0 {
@@ -652,10 +652,20 @@ func trimEvidence(ev *schemas.Evidence) schemas.Evidence {
 }
 
 // redactPlan copies the plan with env values blanked for every key that
-// names a credential.
-func redactPlan(plan *schemas.RunPlan) *schemas.RunPlan {
+// names a credential, and every known secret value (the run's issued keys
+// and tokens, utils.RunSecrets) blanked wherever it was rendered: env
+// values of any name, files and argv. The execution plan is not changed.
+func redactPlan(plan *schemas.RunPlan, secrets ...string) *schemas.RunPlan {
 	if plan == nil {
 		return nil
+	}
+	scrub := func(v string) string {
+		for _, s := range secrets {
+			if s != "" {
+				v = strings.ReplaceAll(v, s, "[redacted]")
+			}
+		}
+		return v
 	}
 	out := *plan
 	out.Env = make(map[string]string, len(plan.Env))
@@ -663,7 +673,19 @@ func redactPlan(plan *schemas.RunPlan) *schemas.RunPlan {
 		if isSecretKey(k) {
 			v = "[redacted]"
 		}
-		out.Env[k] = v
+		out.Env[k] = scrub(v)
+	}
+	if plan.Files != nil {
+		out.Files = make(map[string]string, len(plan.Files))
+		for k, v := range plan.Files {
+			out.Files[scrub(k)] = scrub(v)
+		}
+	}
+	if plan.Argv != nil {
+		out.Argv = make([]string, len(plan.Argv))
+		for i, a := range plan.Argv {
+			out.Argv[i] = scrub(a)
+		}
 	}
 	redactBearer(&out) // B2 MCP through Bifrost: the run key in MCP auth headers (bifrostfeatures.go)
 	return &out

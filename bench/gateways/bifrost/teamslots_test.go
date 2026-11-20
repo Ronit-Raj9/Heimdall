@@ -143,3 +143,66 @@ func TestKeySlots(t *testing.T) {
 		t.Errorf("KeySlots unknown = %d", n)
 	}
 }
+
+// TestA2ATeamSlotsUpFront covers 3-A-01: an A2A team reserves its entry and
+// every worker slot at once.
+func TestA2ATeamSlotsUpFront(t *testing.T) {
+	rc := runContext("r_a2a", testModel)
+	rc.Agent.Adapter = "a2a"
+	rc.Agent.A2A = &schemas.A2AAgent{CardURL: "http://e/card", Team: []schemas.A2AMember{{ID: "wa"}, {ID: "wb"}}}
+	if n := teamSlots(rc); n != 3 {
+		t.Fatalf("teamSlots = %d, want 3", n)
+	}
+	g, p := slotGateway(t, 2)
+	if _, _, err := g.acquireRunSlots(context.Background(), p, "r_a2a", teamSlots(rc)); err == nil || !strings.Contains(err.Error(), "needs 3 key slots") {
+		t.Fatalf("A2A team over the pool: %v", err)
+	}
+}
+
+// TestOwnServiceSlotsFailFast covers 3-A-14: a run whose own service key
+// holds the slots it needs fails at once instead of waiting forever.
+func TestOwnServiceSlotsFailFast(t *testing.T) {
+	g, p := slotGateway(t, 2)
+	g.mu.Lock()
+	g.inUse["fp-slot-1"] = "vk-svc"
+	g.minted["vk-svc"] = mintRecord{slot: "fp-slot-1", at: time.Now(), run: "r_own" + "s0abc"}
+	g.mu.Unlock()
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	defer cancel()
+	_, _, err := g.acquireRunSlots(ctx, p, "r_own", 2)
+	if err == nil || !strings.Contains(err.Error(), "its own services hold 1 of the 2") {
+		t.Fatalf("want an immediate own-service refusal, got %v", err)
+	}
+	if ctx.Err() != nil {
+		t.Fatal("waited for its own slot")
+	}
+}
+
+// TestMintKeyRefusesRoutingBudgetUnderFairness covers 3-A-09: the fairness
+// cap never silently replaces the routing treatment's budget.
+func TestMintKeyRefusesRoutingBudgetUnderFairness(t *testing.T) {
+	g, _ := slotGateway(t, 1)
+	rc := runContext("r_rb", testModel)
+	rc.Experiment = &schemas.Experiment{Fairness: schemas.FairnessEqualBudget}
+	rc.Agent.Budgets.USD = 1
+	rc.Agent.Gateway.Routing = &schemas.RoutingPolicy{Targets: []schemas.RouteTarget{{Model: testModel}}, Limits: &schemas.RouteLimits{BudgetUSD: 0.02}}
+	if _, err := g.MintKey(context.Background(), rc); err == nil || !strings.Contains(err.Error(), "both limit the run key") {
+		t.Fatalf("want a refusal, got %v", err)
+	}
+	g.mu.Lock()
+	defer g.mu.Unlock()
+	if len(g.inUse) != 0 {
+		t.Fatalf("slot not released: %v", g.inUse)
+	}
+}
+
+// TestServeMCPRefusesFoldedNameCollision covers 3-A-10.
+func TestServeMCPRefusesFoldedNameCollision(t *testing.T) {
+	g, _ := slotGateway(t, 1)
+	rc := runContext("r_mcp", testModel)
+	rc.Key = &schemas.RunKey{ID: "vk-1"}
+	ups := []schemas.MCPUpstream{{Service: "lookup-cache", URL: "http://a"}, {Service: "lookup--cache", URL: "http://b"}}
+	if _, _, err := g.ServeMCP(context.Background(), rc, ups, false); err == nil || !strings.Contains(err.Error(), "both map to MCP client name") {
+		t.Fatalf("want a collision refusal, got %v", err)
+	}
+}

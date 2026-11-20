@@ -116,3 +116,24 @@ func TestPlanFairness(t *testing.T) {
 		})
 	}
 }
+
+// TestFairnessA2AAndRoutingBudget covers 3-A-09 and 3-A-11: a routing
+// budget beside the fairness cap is refused, and an A2A team is not a
+// single-agent baseline and its worker budgets count.
+func TestFairnessA2AAndRoutingBudget(t *testing.T) {
+	e := &schemas.Experiment{ID: "e_x", Fairness: schemas.FairnessEqualBudget}
+	routed := schemas.AgentConfig{Budgets: schemas.Budgets{USD: 1}, Gateway: schemas.GatewayPolicy{Routing: &schemas.RoutingPolicy{Limits: &schemas.RouteLimits{BudgetUSD: 0.02}}}}
+	err := checkFairness(e, map[string]schemas.ArmManifest{"r": {Config: routed}}, nil)
+	if err == nil || !strings.Contains(err.Error(), "gateway.routing.limits.budget_usd") {
+		t.Fatalf("routing budget beside the fairness cap: %v", err)
+	}
+	a2a := schemas.AgentConfig{Adapter: "a2a", Budgets: schemas.Budgets{USD: 1}, A2A: &schemas.A2AAgent{CardURL: "http://e/card", Team: []schemas.A2AMember{{ID: "w", BudgetUSD: 2}}}}
+	err = checkFairness(e, map[string]schemas.ArmManifest{"a": {Config: a2a}}, nil)
+	if err == nil || !strings.Contains(err.Error(), "member sub-budgets sum to 2.00") {
+		t.Fatalf("A2A worker budgets over the cap: %v", err)
+	}
+	a2a.A2A.Team[0].BudgetUSD = 0
+	if single, _ := fairnessBaselines(map[string]schemas.ArmManifest{"a": {Config: a2a}}); single {
+		t.Fatal("an A2A team arm is not a single-agent baseline")
+	}
+}

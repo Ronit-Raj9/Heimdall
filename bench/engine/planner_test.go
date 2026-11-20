@@ -730,7 +730,7 @@ func TestPlanUpstreamCheck(t *testing.T) {
 		{name: "reachable", checker: &fakeChecker{statuses: openaiDown[:1]}, wantCalls: 1},
 		{name: "used provider unreachable refuses", checker: &fakeChecker{statuses: anthDown}, wantCalls: 1,
 			want: "upstream check failed, every model call would fail; fix the network or the provider key before planning: " +
-				"provider anthropic (api.anthropic.com:443, arms A, B): " + dnsErr},
+				"provider anthropic (api.anthropic.com:443, used by A, B): " + dnsErr},
 		{name: "old proxy proceeds", checker: &fakeChecker{err: fmt.Errorf("fault proxy upstream check: %w", ErrUpstreamCheckUnsupported)},
 			wantCalls: 1},
 		{name: "checker error refuses", checker: &fakeChecker{err: errors.New("fault proxy upstream check: status 401: control token required")},
@@ -741,13 +741,13 @@ func TestPlanUpstreamCheck(t *testing.T) {
 		{name: "one arm on the unreachable provider refuses", checker: &fakeChecker{statuses: openaiDown}, wantCalls: 1,
 			mutate: func(e *schemas.Experiment) {
 				e.Arms["B"] = schemas.ArmSpec{Label: "gpt", Set: map[string]any{"gateway.provider": "openai"}}
-			}, want: "provider openai (api.openai.com:443, arms B): dial tcp: lookup api.openai.com"},
+			}, want: "provider openai (api.openai.com:443, used by B): dial tcp: lookup api.openai.com"},
 		{name: "compatibility agent counts", checker: &fakeChecker{statuses: openaiDown}, wantCalls: 1,
 			mutate: func(e *schemas.Experiment) {
 				e.Arms["B"] = schemas.ArmSpec{Label: "other model", Set: map[string]any{"model": "claude-other"}}
 				e.Compatibility = &schemas.CompatibilitySpec{Agent: "agents/compat-openai.yaml",
 					Conditions: []string{"clean"}, Tasks: schemas.TaskSelector{IDs: []string{"t01"}}, Trials: 1}
-			}, want: "provider openai (api.openai.com:443, arms " + CompatArm + ")"},
+			}, want: "provider openai (api.openai.com:443, used by " + CompatArm + ")"},
 		{name: "offline scripted controls skip the check", checker: &fakeChecker{statuses: anthDown},
 			mutate: func(e *schemas.Experiment) {
 				e.Base = "agents/oracle.yaml"
@@ -756,7 +756,7 @@ func TestPlanUpstreamCheck(t *testing.T) {
 		{name: "toy control calls its provider", checker: &fakeChecker{statuses: anthDown}, wantCalls: 1,
 			mutate: func(e *schemas.Experiment) {
 				e.Arms["B"] = schemas.ArmSpec{Label: "toy", Agent: "agents/toy-model.yaml"}
-			}, want: "provider anthropic (api.anthropic.com:443, arms A, B)"},
+			}, want: "provider anthropic (api.anthropic.com:443, used by A, B)"},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

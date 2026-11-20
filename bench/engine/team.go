@@ -108,7 +108,45 @@ func (p *Planner) resolveTeam(ctx context.Context, cfg *schemas.AgentConfig, sui
 		}
 		team[i] = m
 	}
+	if err := checkTeamMembers(cfg, team); err != nil {
+		return err
+	}
 	cfg.Team = team
+	return nil
+}
+
+// checkTeamMembers refuses at plan time a team its runtime cannot honor:
+// every member runs through the arm's adapter on the arm's provider (member
+// keys take slots of the run's provider), and the lead runs on the run key,
+// which allows the arm's model only, so the lead's effective model must be
+// the arm's. It is pure.
+func checkTeamMembers(arm *schemas.AgentConfig, team []schemas.TeamMember) error {
+	if arm == nil || len(team) == 0 {
+		return nil
+	}
+	var errs []error
+	lead := 0
+	for i, m := range team {
+		if m.Role == schemas.AgentRoleLead {
+			lead = i
+			break
+		}
+	}
+	for i, m := range team {
+		cfg := memberConfig(arm, m)
+		if cfg.Adapter != arm.Adapter { // 3-A-17
+			errs = append(errs, fmt.Errorf("team member %s: adapter %q differs from the arm's %q; every member runs through the arm's adapter", m.ID, cfg.Adapter, arm.Adapter))
+		}
+		if cfg.Gateway.Provider != "" && arm.Gateway.Provider != "" && cfg.Gateway.Provider != arm.Gateway.Provider {
+			errs = append(errs, fmt.Errorf("team member %s: gateway provider %q differs from the arm's %q; member keys take slots of the run's provider", m.ID, cfg.Gateway.Provider, arm.Gateway.Provider))
+		}
+		if i == lead && cfg.Model != arm.Model { // 3-A-06
+			errs = append(errs, fmt.Errorf("team member %s: the lead runs on the run key, which allows the arm's model %q only, but its model is %q; give the arm that model or let another member use it", m.ID, arm.Model, cfg.Model))
+		}
+	}
+	if len(errs) > 0 {
+		return fmt.Errorf("team: %w", errors.Join(errs...))
+	}
 	return nil
 }
 

@@ -79,9 +79,10 @@ func (s *costSource) Collect(_ context.Context, rc *schemas.RunContext, ev *sche
 // the table does not list is unknown, bounded above by the table's highest
 // price per bucket when the tokens are known.
 //
-// Ledger entries are matched to message attempts in order when both have the
-// same count and agree on every status; otherwise only by provider response
-// id. A matched ledger entry supplies usage the gateway did not record.
+// Ledger entries are matched to message attempts in order only when the
+// ledger comes from one slot (its call counter is then a total order), both
+// sides have the same count, and the pairing contradicts no recorded status or
+// provider response id; otherwise only by unique provider response id. A matched ledger entry supplies usage the gateway did not record.
 func CostRows(log *schemas.RequestLog, ledger []schemas.LedgerEntry, prices *PriceTable) []schemas.CostRow {
 	if log == nil {
 		return nil
@@ -162,17 +163,26 @@ func matchLedger(attempts []physAttempt, ledger []schemas.LedgerEntry) []*schema
 			idx = append(idx, i)
 		}
 	}
-	if len(idx) == len(msgs) && statusesAgree(attempts, idx, msgs) {
+	if len(idx) == len(msgs) && singleSlot(msgs) && statusesAgree(attempts, idx, msgs) && responseIDsAgree(attempts, idx, msgs) {
 		for j, i := range idx {
 			out[i] = &msgs[j]
 		}
 		return out
 	}
 	byResp := map[string]*schemas.LedgerEntry{}
+	dup := map[string]bool{}
 	for j := range msgs {
-		if msgs[j].ResponseID != "" {
-			byResp[msgs[j].ResponseID] = &msgs[j]
+		id := msgs[j].ResponseID
+		if id == "" {
+			continue
 		}
+		if _, seen := byResp[id]; seen {
+			dup[id] = true // ambiguous: never borrow tokens from either
+		}
+		byResp[id] = &msgs[j]
+	}
+	for id := range dup {
+		delete(byResp, id)
 	}
 	for _, i := range idx {
 		if a := attempts[i]; a.final && a.req.ResponseID != "" {
@@ -180,6 +190,30 @@ func matchLedger(attempts []physAttempt, ledger []schemas.LedgerEntry) []*schema
 		}
 	}
 	return out
+}
+
+// singleSlot reports whether every entry comes from one slot. Call counters
+// restart at one per slot, so ordering by Call across slots is not the order
+// the requests happened in.
+func singleSlot(msgs []schemas.LedgerEntry) bool {
+	for _, e := range msgs {
+		if e.Slot != msgs[0].Slot {
+			return false
+		}
+	}
+	return true
+}
+
+// responseIDsAgree reports whether pairing attempts and ledger entries in
+// order never contradicts a recorded provider response id.
+func responseIDsAgree(attempts []physAttempt, idx []int, msgs []schemas.LedgerEntry) bool {
+	for j, i := range idx {
+		a, e := attempts[i].req.ResponseID, msgs[j].ResponseID
+		if attempts[i].final && a != "" && e != "" && a != e {
+			return false
+		}
+	}
+	return true
 }
 
 // statusesAgree reports whether pairing attempts and ledger entries in order
@@ -206,7 +240,9 @@ func priceAttempt(a physAttempt, led *schemas.LedgerEntry, prices *PriceTable) s
 		v := *r.BifrostUSD
 		row.BifrostUSD = &v
 	}
-	injected := (led != nil && led.Action == actionInject) || a.status >= 500
+	// Fault provenance comes only from the proxy witness: a genuine upstream
+	// 5xx is recorded with action pass and is an ordinary failed attempt.
+	injected := led != nil && led.Action == actionInject
 	switch {
 	case r.Kind == kindAudio && injected: // X8 voice agents: an injected audio fault (an STT outage) is not billed
 		row.USD = schemas.Observed(0, schemas.EvidenceGateway)

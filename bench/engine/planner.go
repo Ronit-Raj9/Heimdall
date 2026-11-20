@@ -20,6 +20,7 @@ import (
 	"github.com/maximhq/bifrost/bench/adapters"
 	"github.com/maximhq/bifrost/bench/codescan"
 	"github.com/maximhq/bifrost/bench/schemas"
+	"github.com/maximhq/bifrost/bench/simuser"
 	suitepkg "github.com/maximhq/bifrost/bench/suite"
 	"github.com/maximhq/bifrost/bench/utils"
 	"github.com/maximhq/bifrost/bench/verdict"
@@ -363,7 +364,7 @@ func (p *Planner) plan(ctx context.Context, exp *schemas.Experiment, mode planMo
 		return nil, fmt.Errorf("plan %s: %w", e.ID, err)
 	}
 	if !mode.skipUpstreams {
-		if err := p.checkUpstreams(ctx, m); err != nil {
+		if err := p.checkUpstreams(ctx, m, evaluatorProviders(&e, suite, all)); err != nil {
 			return nil, fmt.Errorf("plan %s: %w", e.ID, err)
 		}
 	}
@@ -1086,11 +1087,19 @@ func (p *Planner) preflight(ctx context.Context, name string, acceptCache bool) 
 // checked; a checker that cannot run the check (an older fault proxy) only
 // warns. Any other checker error refuses the plan: every run binds a plan
 // through the same control API, so it would fail too.
-func (p *Planner) checkUpstreams(ctx context.Context, m *schemas.Manifest) error {
+//
+// extra adds the providers a run needs besides its arms (judges, the
+// auditor, vision judges and model-backed services, from evaluatorProviders),
+// keyed by provider with a label per user, so an all-scripted arm set with a
+// live evaluator is still checked.
+func (p *Planner) checkUpstreams(ctx context.Context, m *schemas.Manifest, extra map[string][]string) error {
 	if p.upstreams == nil {
 		return nil
 	}
 	used := armProviders(m)
+	for _, prov := range sortedKeys(extra) {
+		used[prov] = append(used[prov], extra[prov]...)
+	}
 	if len(used) == 0 {
 		return nil
 	}
@@ -1109,11 +1118,11 @@ func (p *Planner) checkUpstreams(ctx context.Context, m *schemas.Manifest) error
 		}
 		arms, ok := used[st.Provider]
 		if !ok {
-			p.logger.Warn("upstream unreachable for a provider no arm uses", "experiment", m.ExpID,
+			p.logger.Warn("upstream unreachable for a provider no run uses", "experiment", m.ExpID,
 				"provider", st.Provider, "host", st.Host, "error", st.Error)
 			continue
 		}
-		problems = append(problems, fmt.Sprintf("provider %s (%s, arms %s): %s", st.Provider, st.Host, strings.Join(arms, ", "), st.Error))
+		problems = append(problems, fmt.Sprintf("provider %s (%s, used by %s): %s", st.Provider, st.Host, strings.Join(arms, ", "), st.Error))
 	}
 	if len(problems) > 0 {
 		return fmt.Errorf("upstream check failed, every model call would fail; fix the network or the provider key before planning: %s",
@@ -1144,6 +1153,60 @@ func armProviders(m *schemas.Manifest) map[string][]string {
 	}
 	if m.Compatibility != nil {
 		add(CompatArm, &m.Compatibility.Config)
+	}
+	return out
+}
+
+// evaluatorProviders maps each provider a run calls besides its arms to its
+// users: the suite's text judge and auditor, each selected task's vision
+// judge, and each selected task's model-backed service (simulator included).
+// A no-paid-traffic experiment (smoke, scripted_upstream) calls none of them
+// on a real provider: judges are skipped and services are scripted.
+func evaluatorProviders(e *schemas.Experiment, suite *schemas.Suite, all []condPlan) map[string][]string {
+	out := map[string][]string{}
+	if e == nil || suite == nil || e.NoPaidTraffic() {
+		return out
+	}
+	seen := map[string]bool{}
+	add := func(prov, who string) {
+		if prov == "" || seen[prov+"\x00"+who] {
+			return
+		}
+		seen[prov+"\x00"+who] = true
+		out[prov] = append(out[prov], who)
+	}
+	if j := suite.Judge; j != nil && suite.Grading == schemas.GradingJudged {
+		add(j.Provider, "judge")
+		if j.Auditor != nil {
+			add(j.Auditor.Provider, "judge auditor")
+		}
+	}
+	sim := simuser.Effective(suite, e)
+	visual := func(o *schemas.OutputSpec, who string) {
+		if o != nil && o.Visual != nil && o.Visual.Judge != nil && o.Visual.Rubric != "" {
+			add(o.Visual.Judge.Provider, who)
+		}
+	}
+	for _, s := range suite.Services {
+		if g := simuser.GatewayFor(s, sim); g != nil {
+			add(g.Provider, "service "+s.ID)
+		}
+	}
+	for _, id := range selectedTasks(all) {
+		t := suite.TaskByID(id)
+		if t == nil {
+			continue
+		}
+		out := t.Output
+		if out == nil {
+			out = suite.Output
+		}
+		visual(out, "vision judge (task "+id+")")
+		for _, s := range t.Services {
+			if g := simuser.GatewayFor(s, sim); g != nil {
+				add(g.Provider, "service "+s.ID+" (task "+id+")")
+			}
+		}
 	}
 	return out
 }

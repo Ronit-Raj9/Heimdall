@@ -65,7 +65,16 @@ func (g *Gateway) MintMemberKeys(ctx context.Context, rc *schemas.RunContext, ru
 		}
 		if err != nil {
 			partial := &schemas.RunKey{Members: keys}
-			g.revokeMembers(context.WithoutCancel(ctx), partial, teamID)
+			// 3-A-03: a failed rollback is reported, and the team id stays
+			// recorded on the run key so RevokeKey retries it.
+			if rbErr := g.revokeMembers(context.WithoutCancel(ctx), partial, teamID); rbErr != nil {
+				if teamID != "" {
+					g.mu.Lock()
+					g.teams[run.ID] = teamID
+					g.mu.Unlock()
+				}
+				return nil, fmt.Errorf("mint member keys for run %s: member %s: %w", runID, m.ID, errors.Join(err, fmt.Errorf("rollback: %w", rbErr)))
+			}
 			return nil, fmt.Errorf("mint member keys for run %s: member %s: %w", runID, m.ID, err)
 		}
 		keys = append(keys, k)
@@ -131,8 +140,21 @@ func (g *Gateway) createTeam(ctx context.Context, name string, usd float64) (str
 }
 
 // revokeMembers deletes the member keys of a run key and its team. Keys that
-// are already gone count as revoked.
+// are already gone count as revoked. The team is deleted only once every
+// member key is gone.
 func (g *Gateway) revokeMembers(ctx context.Context, key *schemas.RunKey, teamID string) error {
+	if err := g.revokeMemberKeys(ctx, key); err != nil {
+		return err
+	}
+	if teamID != "" {
+		return g.deleteTeam(ctx, teamID)
+	}
+	return nil
+}
+
+// revokeMemberKeys deletes every member key of a run key except the lead's,
+// attempting each one and joining the errors.
+func (g *Gateway) revokeMemberKeys(ctx context.Context, key *schemas.RunKey) error {
 	var errs []error
 	for _, m := range key.Members {
 		if m.ID == "" || m.ID == key.ID {
@@ -147,21 +169,22 @@ func (g *Gateway) revokeMembers(ctx context.Context, key *schemas.RunKey, teamID
 		delete(g.memberOf, m.ID)
 		g.mu.Unlock()
 	}
-	if teamID != "" {
-		if err := g.deleteTeam(ctx, teamID); err != nil {
-			errs = append(errs, err)
-		}
-	}
 	return errors.Join(errs...)
 }
 
-// teamOf returns and forgets the Bifrost team of a run key.
-func (g *Gateway) teamOf(keyID string) string {
+// teamFor returns the Bifrost team of a run key. It stays recorded until
+// dropTeam, so a failed cleanup can be retried (3-A-02).
+func (g *Gateway) teamFor(keyID string) string {
 	g.mu.Lock()
 	defer g.mu.Unlock()
-	id := g.teams[keyID]
+	return g.teams[keyID]
+}
+
+// dropTeam forgets the Bifrost team of a run key once its DELETE succeeded.
+func (g *Gateway) dropTeam(keyID string) {
+	g.mu.Lock()
+	defer g.mu.Unlock()
 	delete(g.teams, keyID)
-	return id
 }
 
 func (g *Gateway) deleteTeam(ctx context.Context, id string) error {
@@ -282,4 +305,50 @@ func (g *Gateway) leadKey(ctx context.Context, run *schemas.RunKey, teamID strin
 	}
 	return schemas.MemberKey{AgentID: m.ID, ID: run.ID, Name: run.Name, Value: run.Value, KeySlot: run.KeySlot,
 		SlotAuth: run.SlotAuth, BudgetUSD: m.BudgetUSD}, nil
+}
+
+// benchTeam is a Bifrost governance team as GET /api/governance/teams
+// returns it.
+type benchTeam struct {
+	ID   string `json:"id"`
+	Name string `json:"name"`
+}
+
+// listTeams lists every governance team; none on a gateway without the
+// endpoint.
+func (g *Gateway) listTeams(ctx context.Context) ([]benchTeam, error) {
+	var page struct {
+		Teams []benchTeam `json:"teams"`
+	}
+	err := g.call(ctx, http.MethodGet, "/api/governance/teams", nil, &page)
+	if isStatus(err, http.StatusNotFound) {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, fmt.Errorf("list teams: %w", err)
+	}
+	return page.Teams, nil
+}
+
+// removeStaleTeams deletes bench run teams (named <run id>--team) of runs
+// that are not active, for the janitor (3-A-03). A run whose keys could not
+// all be deleted keeps its team, so no key is left pointing at a deleted
+// team; the next sweep retries.
+func (g *Gateway) removeStaleTeams(ctx context.Context, teams []benchTeam, listErr error, active, keyLeft map[string]bool) []error {
+	if listErr != nil {
+		return []error{fmt.Errorf("revoke stale teams: %w", listErr)}
+	}
+	var errs []error
+	for _, t := range teams {
+		run, ok := staleRun(t.Name)
+		if !ok || t.Name != run+memberKeySep+"team" || active[run] || keyLeft[run] || t.ID == "" {
+			continue
+		}
+		if err := g.deleteTeam(ctx, t.ID); err != nil {
+			errs = append(errs, fmt.Errorf("revoke stale team %s (%s): %w", t.ID, t.Name, err))
+			continue
+		}
+		g.logger.Info("stale team deleted", "team_id", t.ID, "name", t.Name)
+	}
+	return errs
 }

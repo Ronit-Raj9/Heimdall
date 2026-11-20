@@ -342,20 +342,12 @@ func (e *dockerWorkspace) Exec(ctx context.Context, rc *schemas.RunContext, plan
 	if plan.WallS <= 0 {
 		wall = defaultWallS * time.Second
 	}
-	secret := ""
-	if rc.Key != nil {
-		secret = rc.Key.Value
-	}
 	stdout, stderr, session := streamPaths(rc)
-	faultToken := ""
-	if rc.FaultRuntime != nil {
-		faultToken = rc.FaultRuntime.Token
-	}
 
 	obs.watchAgent(ctx, rc, expID, runID, name)
-	gpuSampler := startGPUSampler(ctx, rc) // X7: host-side nvidia-smi samples of the run's GPUs (gpu.go)
-	res, err := e.attach(ctx, name, stdout, stderr, wall, secret, faultToken)
-	stopGPUSampler(rc, gpuSampler) // X7
+	gpuSampler := startGPUSampler(ctx, rc)                                         // X7: host-side nvidia-smi samples of the run's GPUs (gpu.go)
+	res, err := e.attach(ctx, name, stdout, stderr, wall, utils.RunSecrets(rc)...) // 3-A-13: every runtime credential, the MCP key too
+	stopGPUSampler(rc, gpuSampler)                                                 // X7
 	obs.finish(ctx, rc, res)
 	if err != nil {
 		keep = false

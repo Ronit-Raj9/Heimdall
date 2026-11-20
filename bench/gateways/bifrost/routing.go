@@ -216,19 +216,35 @@ func (g *Gateway) deleteRouteRule(ctx context.Context, id string) error {
 // active, and returns how many it deleted. A gateway without the routing
 // rules API has none.
 func (g *Gateway) revokeStaleRules(ctx context.Context, active map[string]bool) (int, error) {
+	rules, err := g.listRouteRules(ctx)
+	if err != nil {
+		return 0, err
+	}
+	return g.deleteStaleRules(ctx, rules, active)
+}
+
+// listRouteRules lists every routing rule; none on a gateway without the
+// endpoint.
+func (g *Gateway) listRouteRules(ctx context.Context) ([]routingRule, error) {
 	var page struct {
 		Rules []routingRule `json:"rules"`
 	}
 	err := g.call(ctx, http.MethodGet, pathRoutingRules, nil, &page)
 	if isStatus(err, http.StatusNotFound) {
-		return 0, nil
+		return nil, nil
 	}
 	if err != nil {
-		return 0, fmt.Errorf("list routing rules: %w", err)
+		return nil, fmt.Errorf("list routing rules: %w", err)
 	}
+	return page.Rules, nil
+}
+
+// deleteStaleRules deletes the listed bench run rules whose run is not
+// active.
+func (g *Gateway) deleteStaleRules(ctx context.Context, rules []routingRule, active map[string]bool) (int, error) {
 	n := 0
 	var errs []error
-	for _, r := range page.Rules {
+	for _, r := range rules {
 		m := routeRulePattern.FindStringSubmatch(r.Name)
 		if m == nil || r.Scope != routeRuleScope || active[m[1]] {
 			continue

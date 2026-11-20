@@ -66,6 +66,9 @@ var claimPoll = time.Second
 type claimState struct {
 	modeMu sync.Mutex
 	mode   string // "" until detected
+	// modeAt is when a process-local mode was detected. 3-B-04: that
+	// result expires after legacyModeTTL, so an upgraded proxy is adopted.
+	modeAt time.Time
 
 	// takeMu serializes everything this process changes at the proxy:
 	// claims, renewals and releases. A slot taker holds it from reading the
@@ -154,13 +157,25 @@ func (g *Gateway) claimsFor(ctx context.Context, p ProviderSetup) (bool, error) 
 	return mode == OwnershipFaultProxy, err
 }
 
-// ownershipMode detects once whether the fault proxy enforces claims. A
-// failed check is not cached: the proxy may simply be starting.
+// legacyModeTTL is how long a "fault proxy too old" result is trusted
+// before the proxy's capabilities are read again (3-B-04).
+var legacyModeTTL = time.Minute
+
+// ownershipMode detects whether the fault proxy enforces claims. A failed
+// check is not cached: the proxy may simply be starting. Claim enforcement
+// is cached for the process; a process-local result only for legacyModeTTL,
+// since the proxy may be upgraded under a long-running process.
 func (g *Gateway) ownershipMode(ctx context.Context) (string, error) {
+	return g.detectOwnership(ctx, false)
+}
+
+// detectOwnership is ownershipMode; fresh rereads a cached process-local
+// result, as the janitor does before acting on it.
+func (g *Gateway) detectOwnership(ctx context.Context, fresh bool) (string, error) {
 	c := g.claims
 	c.modeMu.Lock()
 	defer c.modeMu.Unlock()
-	if c.mode != "" {
+	if c.mode == OwnershipFaultProxy || (c.mode == OwnershipProcessLocal && !fresh && time.Since(c.modeAt) < legacyModeTTL) {
 		return c.mode, nil
 	}
 	cctx, cancel := context.WithTimeout(ctx, claimCallTimeout)
@@ -170,7 +185,11 @@ func (g *Gateway) ownershipMode(ctx context.Context) (string, error) {
 		return "", fmt.Errorf("check key slot ownership at the fault proxy: %w", err)
 	}
 	if !h.SlotClaims {
-		c.mode = OwnershipProcessLocal
+		again := c.mode == OwnershipProcessLocal
+		c.mode, c.modeAt = OwnershipProcessLocal, time.Now()
+		if again {
+			return c.mode, nil
+		}
 		g.logger.Warn("key slot ownership: process-local only (fault proxy too old): another bench process on this gateway " +
 			"can take the same key slot and replace this process's fault plans; run one bench process per gateway or update the fault proxy image")
 		return c.mode, nil
@@ -409,7 +428,7 @@ func (g *Gateway) liveClaimRuns(ctx context.Context) (map[string]bool, error) {
 	if g.cfg.Claims == nil || !g.anyProxied() {
 		return nil, nil
 	}
-	mode, err := g.ownershipMode(ctx)
+	mode, err := g.detectOwnership(ctx, true) // 3-B-04: the janitor never acts on a stale legacy result
 	if err != nil || mode != OwnershipFaultProxy {
 		return nil, err
 	}

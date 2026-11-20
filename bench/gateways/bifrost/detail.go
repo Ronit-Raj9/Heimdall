@@ -61,6 +61,7 @@ type parsedRow struct {
 	NonceCall int    // the call number after the nonce; 0 when absent
 	Upstream  bool   // the row has at least one attempt, so it reached the proxy
 	KeyID     string // the virtual key id the row came in on
+	Object    string // Bifrost's request type (objectKinds), for the audio witness check
 }
 
 // detailRow is the subset of GET /api/logs/{id} the bench reads.
@@ -186,7 +187,7 @@ func parseDetail(raw []byte) (*parsedRow, error) {
 	r.ToolResultIDs = toolResultIDs(d.RawRequest)
 	r.AgentLabel = agentLabel(d.Metadata) // Multi-agent area: a declared agent header (team.go)
 	featureFields(&r, d, raw)             // B2 Bifrost features: overhead split, complexity tier, cache hit type (bifrostfeatures.go)
-	p := &parsedRow{Req: r, Upstream: len(d.AttemptTrail) > 0, KeyID: d.VirtualKeyID}
+	p := &parsedRow{Req: r, Upstream: len(d.AttemptTrail) > 0, KeyID: d.VirtualKeyID, Object: d.Object}
 	if d.RawRequest != "" && !d.LargeRequest {
 		p.ReqSHA256 = utils.SHA256Bytes([]byte(d.RawRequest))
 	}

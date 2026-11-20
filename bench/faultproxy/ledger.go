@@ -96,6 +96,10 @@ type ledger struct {
 	path string
 	f    *os.File
 	last map[string]string // slot -> hash of its latest entry
+	// broken is set when a write or fsync fails. The durable tail is then
+	// unknown (a partial line, or a line whose hash last does not hold), so
+	// every later append refuses until a restart re-verifies the file.
+	broken error
 }
 
 // openLedger opens or creates the ledger at path. An existing ledger is
@@ -108,32 +112,60 @@ func openLedger(path string) (*ledger, error) {
 	if err := os.MkdirAll(filepath.Dir(path), 0o700); err != nil {
 		return nil, fmt.Errorf("create ledger dir for %s: %w", path, err)
 	}
-	last := map[string]string{}
-	existing, err := os.Open(path)
-	switch {
-	case err == nil:
-		entries, rerr := ReadLedger(existing)
-		cerr := existing.Close()
-		if rerr != nil {
-			return nil, fmt.Errorf("ledger %s: %w", path, rerr)
-		}
-		if cerr != nil {
-			return nil, fmt.Errorf("close ledger %s: %w", path, cerr)
-		}
-		if verr := VerifyChain(entries); verr != nil {
-			return nil, fmt.Errorf("ledger %s: %w", path, verr)
-		}
-		for _, e := range entries {
-			last[e.Slot] = e.Hash
-		}
-	case !errors.Is(err, os.ErrNotExist):
-		return nil, fmt.Errorf("open ledger %s: %w", path, err)
-	}
-	f, err := os.OpenFile(path, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0o600)
+	// The append handle is opened and locked first, so the verified content
+	// below cannot change under a second proxy writing the same file. The
+	// lock lives as long as the handle (until close).
+	f, err := os.OpenFile(path, os.O_CREATE|os.O_RDWR|os.O_APPEND, 0o600)
 	if err != nil {
 		return nil, fmt.Errorf("open ledger %s for append: %w", path, err)
 	}
+	if err := lockLedger(path, f); err != nil {
+		f.Close()
+		return nil, err
+	}
+	last, err := loadLedgerTail(path, f)
+	if err != nil {
+		f.Close()
+		return nil, err
+	}
 	return &ledger{path: path, f: f, last: last}, nil
+}
+
+// loadLedgerTail verifies the locked ledger and returns each slot's latest
+// hash. A final record without its newline (a crash between the object and
+// the delimiter) is repaired by writing the newline, but only after the whole
+// file, that record included, decoded and verified.
+func loadLedgerTail(path string, f *os.File) (map[string]string, error) {
+	last := map[string]string{}
+	entries, err := ReadLedger(io.NewSectionReader(f, 0, 1<<62))
+	if err != nil {
+		return nil, fmt.Errorf("ledger %s: %w", path, err)
+	}
+	if err := VerifyChain(entries); err != nil {
+		return nil, fmt.Errorf("ledger %s: %w", path, err)
+	}
+	for _, e := range entries {
+		last[e.Slot] = e.Hash
+	}
+	st, err := f.Stat()
+	if err != nil {
+		return nil, fmt.Errorf("stat ledger %s: %w", path, err)
+	}
+	if st.Size() > 0 {
+		b := make([]byte, 1)
+		if _, err := f.ReadAt(b, st.Size()-1); err != nil {
+			return nil, fmt.Errorf("read ledger %s tail: %w", path, err)
+		}
+		if b[0] != '\n' {
+			if _, err := f.Write([]byte{'\n'}); err != nil {
+				return nil, fmt.Errorf("repair ledger %s tail: %w", path, err)
+			}
+			if err := f.Sync(); err != nil {
+				return nil, fmt.Errorf("sync ledger %s tail repair: %w", path, err)
+			}
+		}
+	}
+	return last, nil
 }
 
 // append chains e to its slot, writes it as one line and fsyncs. It fills
@@ -141,6 +173,9 @@ func openLedger(path string) (*ledger, error) {
 func (l *ledger) append(e *schemas.LedgerEntry) error {
 	l.mu.Lock()
 	defer l.mu.Unlock()
+	if l.broken != nil {
+		return fmt.Errorf("ledger %s refuses appends after an earlier failure: %w", l.path, l.broken)
+	}
 	e.PrevHash = l.last[e.Slot]
 	h, err := HashEntry(*e)
 	if err != nil {
@@ -152,10 +187,12 @@ func (l *ledger) append(e *schemas.LedgerEntry) error {
 		return fmt.Errorf("encode ledger entry: %w", err)
 	}
 	if _, err := l.f.Write(append(line, '\n')); err != nil {
-		return fmt.Errorf("write ledger %s: %w", l.path, err)
+		l.broken = fmt.Errorf("write ledger %s: %w", l.path, err)
+		return l.broken
 	}
 	if err := l.f.Sync(); err != nil {
-		return fmt.Errorf("sync ledger %s: %w", l.path, err)
+		l.broken = fmt.Errorf("sync ledger %s: %w", l.path, err)
+		return l.broken
 	}
 	l.last[e.Slot] = h
 	return nil

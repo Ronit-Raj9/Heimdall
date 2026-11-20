@@ -132,10 +132,13 @@ func (p *Pipeline) prepareA2A(ctx context.Context, st *runState) error {
 			callers = append(callers, k.ID)
 		}
 	}
+	// 3-A-04: a name is owned before its POST, so a registration created
+	// behind a lost or failed answer is still deleted at cleanup (DELETE of
+	// a missing registration is not an error). Names are run-scoped.
+	run.Owned = append(run.Owned, entry)
 	if err := gw.RegisterA2A(ctx, schemas.A2ARegistrationSpec{Name: entry, CardURL: spec.CardURL, VirtualKeyIDs: []string{rc.Key.ID}, Forward: forward}); err != nil {
 		return wrapPart("gateway", p.reg.Gateway, fmt.Errorf("a2a: %w", err))
 	}
-	run.Owned = append(run.Owned, entry)
 	run.Entry, run.Members[entry], run.CardURLs[entry] = entry, a2a.Lead, spec.CardURL
 	for _, m := range spec.Team {
 		name := utils.A2ARegistrationName(rc.Run.RunID, m.ID)
@@ -156,10 +159,10 @@ func (p *Pipeline) prepareA2A(ctx context.Context, st *runState) error {
 				allowed = append(allowed, id)
 			}
 		}
+		run.Owned = append(run.Owned, name) // 3-A-04: owned before the POST
 		if err := gw.RegisterA2A(ctx, schemas.A2ARegistrationSpec{Name: name, CardURL: m.CardURL, VirtualKeyIDs: allowed, RuntimeKey: key.Value}); err != nil {
 			return wrapPart("gateway", p.reg.Gateway, fmt.Errorf("a2a: team member %s: %w", m.ID, err))
 		}
-		run.Owned = append(run.Owned, name)
 		run.Members[name] = m.ID
 		run.KeyMember[key.ID] = m.ID
 		run.CardURLs[name] = m.CardURL
