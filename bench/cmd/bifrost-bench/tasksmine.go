@@ -6,6 +6,7 @@ import (
 	"errors"
 	"flag"
 	"fmt"
+	"maps"
 	"os"
 	"path/filepath"
 	"sort"
@@ -279,15 +280,15 @@ func proveTask(ctx context.Context, a *app, suiteID, id string) (*schemas.Admiss
 	if err != nil {
 		return nil, none, err
 	}
-	return rec, proof{rec: rec, fp: fps.Tasks[id], suiteImages: fps.Suite.Images}, nil
+	return rec, proof{rec: rec, fp: fps.Tasks[id], suite: fps.Suite}, nil
 }
 
 // proof is one admission this run proved, with the task fingerprint it ran
 // against.
 type proof struct {
-	rec         *schemas.AdmissionRecord
-	fp          schemas.Fingerprint
-	suiteImages map[string]string // the suite's image identities (base, helper) at proof time
+	rec   *schemas.AdmissionRecord
+	fp    schemas.Fingerprint
+	suite schemas.Fingerprint // the suite's fingerprint (settings fields, files, images) at proof time
 }
 
 // recordProofs writes suite.lock once: a fresh lock of the suite with every
@@ -295,8 +296,11 @@ type proof struct {
 // re-recorded. Adding task ids to suite.yaml changes the suite fingerprint,
 // which on its own would clear every earlier admission, so a record is
 // carried only when the task's own fingerprint (settings, files, images) and
-// the suite's image identities are the ones it was admitted against and
-// suite.yaml differs from before only in its tasks list. A record that fails either test is dropped and reported:
+// the suite's own evaluator settings, files and image identities are the
+// ones it was admitted against (only the tasks list may differ; audit 5-B-03:
+// comparing suite.yaml at command start and end alone misses a suite change
+// made before this command), and suite.yaml differs from before only in its
+// tasks list. A record that fails either test is dropped and reported:
 // that task needs `task admit` again.
 func recordProofs(ctx context.Context, a *app, suiteID string, before []byte, proofs map[string]proof) ([]string, error) {
 	s, err := loadSuite(ctx, a.cfg.Path(a.cfg.BenchmarksRoot), suiteID)
@@ -315,7 +319,7 @@ func recordProofs(ctx context.Context, a *app, suiteID string, before []byte, pr
 	if prev := s.Lock; prev != nil && prev.Fingerprints != nil {
 		for id, tl := range prev.Tasks {
 			if tl.Status == schemas.TaskAdmitted && tl.Admission != nil && tl.Admission.Admitted {
-				all[id] = proof{rec: tl.Admission, fp: prev.Fingerprints.Tasks[id], suiteImages: prev.Fingerprints.Suite.Images}
+				all[id] = proof{rec: tl.Admission, fp: prev.Fingerprints.Tasks[id], suite: prev.Fingerprints.Suite}
 			}
 		}
 	}
@@ -338,7 +342,7 @@ func recordProofs(ctx context.Context, a *app, suiteID string, before []byte, pr
 			continue
 		}
 		if !sameSuite || lock.Fingerprints == nil || !sameFingerprint(lock.Fingerprints.Tasks[id], p.fp) ||
-			!sameFingerprint(schemas.Fingerprint{Images: lock.Fingerprints.Suite.Images}, schemas.Fingerprint{Images: p.suiteImages}) {
+			!sameSuiteExceptTasks(lock.Fingerprints.Suite, p.suite) {
 			dropped = append(dropped, id)
 			continue
 		}
@@ -350,6 +354,29 @@ func recordProofs(ctx context.Context, a *app, suiteID string, before []byte, pr
 		return nil, fmt.Errorf("write suite.lock: %w", err)
 	}
 	return dropped, nil
+}
+
+// sameSuiteExceptTasks compares two suite fingerprints on every settings
+// field but the tasks list, the suite's files and its image identities. A
+// fingerprint without per-field hashes cannot show which setting changed,
+// so it never matches.
+func sameSuiteExceptTasks(a, b schemas.Fingerprint) bool {
+	if a.Fields == nil || b.Fields == nil || a.Files != b.Files {
+		return false
+	}
+	if !sameFingerprint(schemas.Fingerprint{Images: a.Images}, schemas.Fingerprint{Images: b.Images}) {
+		return false
+	}
+	strip := func(m map[string]string) map[string]string {
+		out := make(map[string]string, len(m))
+		for k, v := range m {
+			if k != "tasks" {
+				out[k] = v
+			}
+		}
+		return out
+	}
+	return maps.Equal(strip(a.Fields), strip(b.Fields))
 }
 
 // sameFingerprint compares two task fingerprints: settings, files and images.

@@ -187,6 +187,10 @@ go run ./research/cmd/tavily-record -suite <any folder> -upstream https://api.ta
   -queries <folder>/<task_id>/queries.json -out <folder>/<task_id>/tavily.cassette.jsonl
 ```
 
+If any call does not answer 200 the recorder exits 1 and leaves the `-out`
+cassette as it was; what it did record is written to `<out>.partial` for
+inspection. Fix the cause and record again.
+
 At import every listed search and fetch is replayed through the real tool
 proxy code in replay mode, with the websearch tool's exact bodies; one that
 is not answered 200 refuses the question. A covered question gets the

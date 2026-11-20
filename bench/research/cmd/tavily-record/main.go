@@ -69,6 +69,7 @@ func main() {
 		fmt.Printf("wrote the corpus URL list into %d task verifier folders\n", len(files))
 	}
 	if len(res.Failed) > 0 {
+		fmt.Fprintf(os.Stderr, "tavily-record: incomplete recording; %s left unchanged, partial cassette in %s\n", *out, res.Cassette)
 		os.Exit(1)
 	}
 }

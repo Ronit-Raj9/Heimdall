@@ -78,6 +78,10 @@ func TestRecordInjectsKey(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			out := filepath.Join(t.TempDir(), "c.jsonl")
+			const prior = "{\"prior\":true}\n"
+			if err := os.WriteFile(out, []byte(prior), 0o644); err != nil {
+				t.Fatal(err)
+			}
 			res, err := Record(context.Background(), &Queries{Search: []string{"Lantern Tide"}}, Options{Upstream: srv.URL, Out: out, Getenv: tt.getenv})
 			if err != nil {
 				t.Fatal(err)
@@ -85,7 +89,15 @@ func TestRecordInjectsKey(t *testing.T) {
 			if (len(res.Failed) > 0) != tt.failed {
 				t.Fatalf("failed = %v", res.Failed)
 			}
-			b, _ := os.ReadFile(out)
+			// A failed recording never replaces the existing cassette
+			// (audit 3-D-14); it lands next to it as a partial.
+			if got, _ := os.ReadFile(out); (string(got) == prior) != tt.failed {
+				t.Fatalf("cassette replaced = %v with failures %v", string(got) != prior, res.Failed)
+			}
+			if tt.failed && res.Cassette != PartialPath(out) {
+				t.Fatalf("partial written to %q", res.Cassette)
+			}
+			b, _ := os.ReadFile(res.Cassette)
 			if bytes.Contains(b, []byte(key)) || strings.Contains(strings.Join(res.Failed, " "), key) {
 				t.Fatal("key leaked")
 			}

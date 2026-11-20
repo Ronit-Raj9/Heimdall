@@ -221,6 +221,10 @@ func (ib *Inbox) pullOne(ctx context.Context, s *Source, cur Cursor, since time.
 			if next.Seen == nil {
 				next.Seen = map[string]time.Time{}
 			}
+			// A session that could not be taken in keeps the source
+			// position where it was, so the next pull fetches it again;
+			// the ones taken in are remembered as seen either way.
+			takeFailed := false
 			for _, fl := range b.Sessions {
 				key := ib.redactID(fl.TraceID)
 				if _, seen := cur.Seen[key]; seen && key != "" {
@@ -230,9 +234,11 @@ func (ib *Inbox) pullOne(ctx context.Context, s *Source, cur Cursor, since time.
 				out, ierr := ib.take(s, fl)
 				if ierr != nil {
 					res.Warnings = append(res.Warnings, fmt.Sprintf("trace %s: %v", ib.redactID(key), ierr))
+					takeFailed = true
 					continue
 				}
 				next.Seen[key] = firstTime(fl.At, now)
+				cur.Seen[key] = next.Seen[key]
 				switch {
 				case out.Created:
 					res.New++
@@ -245,8 +251,10 @@ func (ib *Inbox) pullOne(ctx context.Context, s *Source, cur Cursor, since time.
 					res.Recurred = append(res.Recurred, out.ItemID)
 				}
 			}
-			next.prune(s.overlap() + time.Hour)
-			cur = next
+			if !takeFailed {
+				next.prune(s.overlap() + time.Hour)
+				cur = next
+			}
 		}
 	}
 	cur.LastPull, cur.Pulled, cur.LastError = now, res.New+res.Repeats, ""
@@ -347,6 +355,11 @@ func (ib *Inbox) take(s *Source, fl Flagged) (takeResult, error) {
 		if len(items) >= MaxItems {
 			return nil, fmt.Errorf("the inbox holds %d items, the cap; reject or accept old items first", len(items))
 		}
+		// The session and preview are written before the item that lists
+		// them, so a failed write leaves no item that cannot become a task.
+		if err := ib.Store.SaveSession(id, sess, Preview(sess, reasons, s.Name)); err != nil {
+			return nil, fmt.Errorf("item %s: %w", id, err)
+		}
 		out.Created = true
 		it := Item{
 			ID: id, State: StateNew, Source: s.Name, SourceKind: s.Kind, TraceID: traceID, Link: link,
@@ -363,11 +376,6 @@ func (ib *Inbox) take(s *Source, fl Flagged) (takeResult, error) {
 	})
 	if err != nil {
 		return takeResult{}, err
-	}
-	if out.Created {
-		if err := ib.Store.SaveSession(id, sess, Preview(sess, reasons, s.Name)); err != nil {
-			return out, fmt.Errorf("item %s: %w", id, err)
-		}
 	}
 	if out.Recurred {
 		_ = ib.Store.Log(LogEvent{At: now, Event: "recur", Item: id, Source: s.Name, Detail: "trace " + traceID})

@@ -78,12 +78,18 @@ type Result struct {
 	Upstream string // "stand-in" or the upstream's host
 	Searches int
 	Extracts int
-	Cassette string
-	Failed   []string // calls that did not answer 200 (the cassette still records them)
+	Cassette string   // the file written: opts.Out, or PartialPath(opts.Out) when Failed is not empty
+	Failed   []string // calls that did not answer 200; the cassette is then written as a partial
 }
 
+// PartialPath is where an incomplete recording of out is written: a
+// recording with a failed call never replaces an existing cassette.
+func PartialPath(out string) string { return out + ".partial" }
+
 // Record sends every query and URL of q through a record-mode tool proxy
-// and writes the cassette to opts.Out (replacing it).
+// and writes the cassette to opts.Out (replacing it) when every call
+// answered 200. Otherwise opts.Out is left untouched and what was recorded
+// goes to PartialPath(opts.Out), named in Result.Cassette.
 func Record(ctx context.Context, q *Queries, opts Options) (*Result, error) {
 	if opts.Out == "" {
 		return nil, errors.New("no output cassette")
@@ -205,11 +211,16 @@ func Record(ctx context.Context, q *Queries, opts Options) (*Result, error) {
 	if err := os.MkdirAll(filepath.Dir(opts.Out), 0o755); err != nil {
 		return nil, fmt.Errorf("create %s: %w", filepath.Dir(opts.Out), err)
 	}
-	tmpOut := opts.Out + ".tmp"
+	dest := opts.Out
+	if len(res.Failed) > 0 {
+		dest = PartialPath(opts.Out)
+		res.Cassette = dest
+	}
+	tmpOut := dest + ".tmp"
 	if err := os.WriteFile(tmpOut, b, 0o644); err != nil {
 		return nil, fmt.Errorf("write cassette: %w", err)
 	}
-	if err := os.Rename(tmpOut, opts.Out); err != nil {
+	if err := os.Rename(tmpOut, dest); err != nil {
 		return nil, fmt.Errorf("write cassette: %w", err)
 	}
 	return res, nil

@@ -2,6 +2,7 @@ package main
 
 import (
 	"bufio"
+	"bytes"
 	"context"
 	"encoding/json"
 	"flag"
@@ -181,6 +182,8 @@ func refArms(ctx context.Context, f compareFlags, root, name, base string) (quic
 	paths := splitList(f.paths)
 	var arms [2]quickstart.ArmInput
 	var exported [2]*scaffold.ExportedRef
+	var dsts [2]string
+	used := map[string]bool{} // repository paths some arm feeds to its runs
 	for i, ref := range []string{f.baseline, f.candidate} {
 		id := []string{"A", "B"}[i]
 		rel := path.Join("experiments", "fixtures", name, id)
@@ -189,15 +192,21 @@ func refArms(ctx context.Context, f compareFlags, root, name, base string) (quic
 		if err != nil {
 			return arms[0], arms[1], "", fmt.Errorf("read agent files at %s: %w", ref, err)
 		}
-		exported[i] = ex
+		exported[i], dsts[i] = ex, dst
 		arm := quickstart.ArmInput{Label: fmt.Sprintf("%s (%s)", ref, ex.Commit[:12]), Set: map[string]any{}}
 		if notes := pickNotes(ex.Files, root, base); notes != "" {
 			arm.Set["notes.user_file"] = path.Join(rel, notes)
+			used[notes] = true
 		}
 		if skills := skillFolders(ex.Files); len(skills) > 0 {
 			var extra []any
 			for _, s := range skills {
 				extra = append(extra, path.Join(rel, s))
+				for _, f := range ex.Files {
+					if strings.HasPrefix(f, s+"/") {
+						used[f] = true
+					}
+				}
 			}
 			arm.Set["skills.extra"] = extra
 		}
@@ -205,6 +214,7 @@ func refArms(ctx context.Context, f compareFlags, root, name, base string) (quic
 		for _, p := range ex.Files {
 			if p == committed {
 				arm.Agent = path.Join(rel, committed)
+				used[p] = true
 			}
 		}
 		if len(arm.Set) == 0 {
@@ -218,9 +228,40 @@ func refArms(ctx context.Context, f compareFlags, root, name, base string) (quic
 	if len(exported[0].Files) == 0 && len(exported[1].Files) == 0 {
 		return arms[0], arms[1], "", fmt.Errorf("no agent files under %s at either ref", strings.Join(paths, ","))
 	}
+	// Only the notes file, skill folders and the committed agent config reach
+	// the runs. A changed file outside them (a prompt file, another agent's
+	// config) would leave both arms running the same inputs while the report
+	// credits the change, so it is refused (audit 5-B-01).
+	if ignored := unusedChanges(exported, dsts, used); len(ignored) > 0 {
+		return arms[0], arms[1], "", fmt.Errorf("%s and %s differ in %s, which neither arm feeds to its runs (only the notes file, skill folders and .heimdall/%s are used); narrow --paths or reference the file from the agent config", f.baseline, f.candidate, strings.Join(ignored, ", "), base)
+	}
 	subject := fmt.Sprintf("agent files at `%s` (%s, %d files) vs `%s` (%s, %d files)", f.baseline, exported[0].Commit[:12], len(exported[0].Files),
 		f.candidate, exported[1].Commit[:12], len(exported[1].Files))
 	return arms[0], arms[1], subject, nil
+}
+
+// unusedChanges lists the exported files that differ between the two refs
+// (added, removed or changed) and that no arm uses, sorted.
+func unusedChanges(ex [2]*scaffold.ExportedRef, dsts [2]string, used map[string]bool) []string {
+	all := map[string]bool{}
+	for _, e := range ex {
+		for _, f := range e.Files {
+			all[f] = true
+		}
+	}
+	var out []string
+	for f := range all {
+		if used[f] {
+			continue
+		}
+		a, errA := os.ReadFile(filepath.Join(dsts[0], filepath.FromSlash(f)))
+		b, errB := os.ReadFile(filepath.Join(dsts[1], filepath.FromSlash(f)))
+		if (errA == nil) != (errB == nil) || !bytes.Equal(a, b) {
+			out = append(out, f)
+		}
+	}
+	sort.Strings(out)
+	return out
 }
 
 // pickNotes chooses the notes file for the base agent: its own project file
