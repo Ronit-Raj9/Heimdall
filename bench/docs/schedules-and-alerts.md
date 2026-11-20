@@ -120,8 +120,10 @@ So that a forgotten schedule cannot spend without limit, a non-smoke
 experiment must have both `max_usd_per_day` and `budget.total_usd`, and its
 spend cap must not be above the daily cap (else no run could ever start).
 `add` and the daemon refuse a schedule that breaks this. A smoke experiment
-(`smoke: true`) runs scripted parts and needs neither; a daily cap set on one
-still holds. A spend ledger that cannot be read refuses every run until it is
+(`smoke: true`) with no `max_usd_per_day` needs neither. A smoke experiment
+with a daily cap must also have `budget.total_usd`, so the daily cap holds:
+the smoke flag alone does not prove that every part (a model-played user, a
+judge) is scripted. A spend ledger that cannot be read refuses every run until it is
 fixed, rather than letting runs through uncounted.
 
 ## Alerts

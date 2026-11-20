@@ -389,6 +389,23 @@ func TestDaemonRefusesUncappedLiveExperiment(t *testing.T) {
 	}
 }
 
+// TestDaemonSmokeKeepsDailyCap (audit 7-B-02): a smoke experiment with no
+// spend cap under a schedule with a daily cap is refused, since the smoke
+// flag alone does not prove that nothing calls a model.
+func TestDaemonSmokeKeepsDailyCap(t *testing.T) {
+	clock := newFakeClock(start)
+	r := &fakeRunner{clock: clock}
+	d, _ := newTestDaemon(t, Schedule{Name: "s", Cron: "0 * * * *", Timezone: "UTC", MaxUSDPerDay: 10}, 0, r, nil)
+	d.o.Load = func(string) (*schemas.Experiment, error) { return &schemas.Experiment{Smoke: true}, nil }
+	rec, err := d.Trigger(context.Background(), "s")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if rec.Status != StatusRefused || !strings.Contains(rec.Reason, "no spend cap") || len(r.callTimes()) != 0 {
+		t.Fatalf("uncapped smoke under a daily cap = %+v", rec)
+	}
+}
+
 func TestDaemonAlertsOnOutcome(t *testing.T) {
 	tests := []struct {
 		name       string

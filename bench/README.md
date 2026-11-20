@@ -302,7 +302,7 @@ The fault proxy is registered as the base URL of Bifrost's provider, so faults g
 ```bash
 heimdall init                                   # detect the test command, agent CLIs, Docker, ports; write .heimdall/ ($0)
 heimdall tasks mine -limit 10                   # cut tasks from fix commits, keep the ones admission proves ($0, Docker only)
-heimdall compare --baseline main --candidate HEAD --base agents/claude-code.yaml --trials 3 --fault model-outage
+heimdall compare --baseline main --candidate HEAD --base agents/claude-code.yaml --trials 3 --fault model-outage --budget-usd 5
                                                 # forecast, ask, run, verdict card; exits like check (scripted agents: $0)
 heimdall ci install github                      # .github/workflows/heimdall.yml: PR comment, evidence artifact, fails on regressed/invalid/policy block
 ```

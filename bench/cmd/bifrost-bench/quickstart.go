@@ -140,7 +140,7 @@ func printRepoNextSteps(pf *quickstart.ProjectFile, d quickstart.Detection) {
 	}
 	say("$0 (no model; runs your tests in containers to prove each task)", p+" tasks mine -limit 10")
 	say("$0 with the scripted agents shown; a real agent shows its forecast and asks before spending",
-		p+" compare --a agents/oracle.yaml --b agents/noop.yaml --trials 1   # then: --baseline main --candidate HEAD --base agents/<your agent>.yaml")
+		p+" compare --a agents/oracle.yaml --b agents/noop.yaml --trials 1   # then: --baseline main --candidate HEAD --base agents/<your agent>.yaml --budget-usd 5")
 	say("$0 (writes a file)", p+" ci install github -dry-run")
 	fmt.Printf("\nevery command finds %s by itself; pass -config %s to be explicit.\n", cfg, cfg)
 }

@@ -38,7 +38,7 @@ func init() {
 const compareUsage = `usage: bifrost-bench compare --baseline <ref> --candidate <ref> [--base agents/<agent>.yaml] [--paths AGENTS.md,CLAUDE.md,...]
        bifrost-bench compare --a agents/x.yaml --b agents/y.yaml
        bifrost-bench compare --a model=<m1> --b model=<m2> [--base agents/<agent>.yaml]   (any key=value override, comma-separated)
-   common: [--suite <suite>] [--trials 3] [--fault model-outage]... [--tier <tier>] [--budget-usd 0] [--yes]
+   common: [--suite <suite>] [--trials 3] [--fault model-outage]... [--tier <tier>] [--budget-usd <usd, required unless every arm is scripted>] [--yes]
            [--name <experiment name>] [--concurrency 2] [--policy policies/default.yaml|none] [--fail-on regressed,invalid] [--write-only] [--config ...]
 exit: 0 ok, 1 regressed, 2 inconclusive, 3 invalid (each only when listed in --fail-on), 4 infrastructure error, 5 blocked by the release policy, 64 usage`
 
@@ -78,7 +78,7 @@ func runCompare(args []string) int {
 	fs.StringVar(&f.repo, "repo", ".", "--baseline/--candidate: the git repository")
 	fs.IntVar(&f.trials, "trials", quickstart.DefaultTrials, "trials per task, arm and condition")
 	fs.IntVar(&f.concurrency, "concurrency", 2, "runs at once")
-	fs.Float64Var(&f.budget, "budget-usd", 0, "total spend cap in USD; the scheduler stops leasing runs past it (0 = no real-model spend)")
+	fs.Float64Var(&f.budget, "budget-usd", 0, "total spend cap in USD; the scheduler stops leasing runs past it. Required (> 0) unless every arm is a scripted agent: 0 would leave the run uncapped")
 	fs.Var(&f.faults, "fault", "a fault condition (probe id) to add, e.g. model-outage; repeatable")
 	fs.BoolVar(&f.yes, "yes", false, "run without asking, even when the forecast says it costs money")
 	fs.BoolVar(&f.writeOnly, "write-only", false, "write the experiment file (and its fixtures) and stop; nothing is planned or run")
@@ -152,6 +152,11 @@ func buildCompare(ctx context.Context, f compareFlags, cfg *lib.Config) (*compar
 		setup.subject = fmt.Sprintf("A = %s, B = %s", o.A.Describe(), o.B.Describe())
 	}
 	o.Smoke = allScripted(cfg.Root, o)
+	if !o.Smoke && !(o.BudgetUSD > 0) {
+		// The scheduler treats a zero budget as no cap, so a comparison that
+		// can call a real model must state a positive one.
+		return nil, fmt.Errorf("an arm can call a real model: pass --budget-usd with a positive spend cap (0 means uncapped, not free)")
+	}
 	raw, err := quickstart.ExperimentYAML(o)
 	if err != nil {
 		return nil, err

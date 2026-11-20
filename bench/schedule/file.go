@@ -243,7 +243,7 @@ func (s Schedule) Validate(root string, load ExperimentLoader) error {
 	if err != nil {
 		return wrap("%w", err)
 	}
-	if exp.Smoke {
+	if exp.Smoke && s.MaxUSDPerDay <= 0 {
 		return nil
 	}
 	if s.MaxUSDPerDay <= 0 {

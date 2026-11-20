@@ -53,6 +53,7 @@ func TestScheduleValidate(t *testing.T) {
 	}{
 		{"valid", func(*Schedule) {}, ""},
 		{"smoke needs no cap", func(s *Schedule) { s.Experiment, s.MaxUSDPerDay = "experiments/smoke.yaml", 0 }, ""},
+		{"smoke with daily cap needs spend cap", func(s *Schedule) { s.Experiment = "experiments/smoke.yaml" }, "no spend cap"},
 		{"with policy and tz", func(s *Schedule) { s.Policy, s.Timezone = "policy.yaml", "Asia/Kolkata" }, ""},
 		{"bad name", func(s *Schedule) { s.Name = "Bad Name" }, "name must be"},
 		{"bad cron", func(s *Schedule) { s.Cron = "0 2 * *" }, "want 5 fields"},
