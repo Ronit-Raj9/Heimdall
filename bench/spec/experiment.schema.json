@@ -67,6 +67,7 @@
     "manifest_mode": {"enum": ["agent_exposure", "stack_resilience"]},
     "policy": {"type": "string", "minLength": 1, "description": "Release policy file, relative to the bench root."},
     "smoke": {"type": "boolean", "description": "A synthetic smoke experiment: suite lock problems (no lock, a task not admitted) only warn, and the flag is frozen in the manifest so its results are never presented as findings. The experiment name has no effect."},
+    "scripted_upstream": {"type": "boolean", "description": "Every model call of the experiment's runs is answered by the fault proxy's scripted model, never a real provider, as under smoke but without relaxing the lock checks. A run that cannot be held to it (no fault proxy, a proxy too old for scripted plans) is refused, and model judges refuse to grade."},
     "requirements": {"$ref": "#/$defs/requirements"},
     "aa": {"type": "boolean", "description": "Eval integrity area (S2): add arm A2, a copy of arm A with the same config hash, on the clean condition. The verdict measures the noise floor from A2 minus A, uses it for the MDE, and is INVALID (harness noise) when the identical arms differ significantly (docs/noise-floor.md)."},
     "realism": {"enum": ["standard", "neutral"], "description": "Eval integrity area (S2): neutral gives the agent neutral variable names and hostnames, stamps no canary and names observer processes innocuously (docs/eval-awareness.md). Default standard; overrides the suite's realism."},

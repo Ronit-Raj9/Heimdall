@@ -3,6 +3,7 @@ package schemas
 import (
 	"context"
 	"io"
+	"strings"
 	"time"
 )
 
@@ -223,6 +224,30 @@ func (p *RoutingPolicy) Models() []string {
 		}
 	}
 	return out
+}
+
+// EffectiveModels is every model a run under the policy may be served by:
+// Models, plus agentModel for the rule strategy, whose unmatched requests
+// keep the agent's own model (a complexity router's first target is the
+// routed model, not the agent's). The key allowlist and the model fidelity
+// gate both use it, so default-model traffic is neither refused nor fired on.
+func (p *RoutingPolicy) EffectiveModels(agentModel string) []string {
+	out := p.Models()
+	if p == nil || p.Strategy != RoutingRule || agentModel == "" {
+		return out
+	}
+	bare := func(m string) string {
+		if _, rest, ok := strings.Cut(m, "/"); ok {
+			return rest
+		}
+		return m
+	}
+	for _, m := range out {
+		if m == agentModel || bare(m) == bare(agentModel) {
+			return out
+		}
+	}
+	return append(out, agentModel)
 }
 
 // ScriptedSpec selects a scripted control agent.

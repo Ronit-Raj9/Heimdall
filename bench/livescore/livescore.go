@@ -91,6 +91,10 @@ const (
 )
 
 // ErrNotConfigured marks a project without livescore/config.yaml.
+// ErrOffline is a pull refused by a server started with -offline: a pull
+// reads the gateway and may call the judge, both outbound.
+var ErrOffline = errors.New("live pull is off: this server runs -offline (no gateway, no outbound calls); stored live scores stay readable")
+
 var ErrNotConfigured = errors.New("live scoring is not configured: run `bifrost-bench livescore init` (docs/live-scoring.md)")
 
 // SessionRecord is one scored session: who (version, grouping), when, how

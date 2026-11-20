@@ -208,7 +208,9 @@ tag and the local image id, and an unchanged rebuild keeps the same id.
 
 `agent check` is the free conformance test: one real task through the
 normal pipeline, with every model call answered by the fault proxy's
-scripted model, sealed under `checks/` (never `runs/`):
+scripted model, sealed under `checks/` (never `runs/`). A model-judged task
+is not judged in a check (the judge's own key would reach a real provider):
+its grade is `invalid_evaluator` with the reason saying so.
 
 ```
 agent check pybot on pyapp/t01 (scripted model, nothing spent)

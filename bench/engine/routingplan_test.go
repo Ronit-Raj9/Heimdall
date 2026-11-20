@@ -100,3 +100,24 @@ func TestRoutingOverride(t *testing.T) {
 		t.Fatalf("routing = %+v", p)
 	}
 }
+
+// TestValidateRoutingRefusesTeams is 8-B-02: a routing policy reaches only
+// the lead's key while the fidelity gate scores every member against it, so
+// a team arm (team: or a2a.team) with gateway.routing is refused at plan time.
+func TestValidateRoutingRefusesTeams(t *testing.T) {
+	pol := &schemas.RoutingPolicy{Strategy: "fixed", Targets: []schemas.RouteTarget{{Model: "claude-sonnet-4-6"}}}
+	gm := &schemas.GatewayManifest{Settings: map[string]string{"anthropic.max_retries": "0"}}
+	team := routedAgent(pol)
+	team.Team = []schemas.TeamMember{{ID: "lead"}, {ID: "worker", Model: "model-b"}}
+	a2a := routedAgent(pol)
+	a2a.A2A = &schemas.A2AAgent{Team: []schemas.A2AMember{{ID: "lead"}, {ID: "writer"}}}
+	for name, cfg := range map[string]schemas.AgentConfig{"team": team, "a2a team": a2a} {
+		if err := ValidateRouting(&cfg, gm); err == nil || !strings.Contains(err.Error(), "cannot be combined with a team") {
+			t.Errorf("%s: err = %v", name, err)
+		}
+	}
+	solo := routedAgent(pol)
+	if err := ValidateRouting(&solo, gm); err != nil {
+		t.Fatalf("solo routed arm refused: %v", err)
+	}
+}

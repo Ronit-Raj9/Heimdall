@@ -207,7 +207,9 @@ func TestBindFaultPlanModes(t *testing.T) {
 		mode     string
 		noFault  bool
 		probe    *schemas.ProbeSpec
-		wantMode string // mode of the one plan bound; empty: none bound
+		exp      *schemas.Experiment // 3-C-01: a smoke or scripted_upstream experiment
+		direct   bool                // the run key is on a direct slot (no SlotAuth)
+		wantMode string              // mode of the one plan bound; empty: none bound
 		wantErr  string
 	}{
 		{name: "default binds none", wantMode: faultModeNone},
@@ -216,6 +218,13 @@ func TestBindFaultPlanModes(t *testing.T) {
 		{name: "scripted refuses a gateway probe", mode: faultModeScripted, probe: gatewayProbe, wantErr: "cannot run gateway-layer probe"},
 		{name: "no fault proxy binds nothing", noFault: true},
 		{name: "scripted refuses to run without the fault proxy", mode: faultModeScripted, noFault: true, wantErr: "needs the fault proxy"},
+
+		// 3-C-01, 7-C-04: a smoke or scripted_upstream run on the default pipeline is scripted.
+		{name: "smoke binds scripted", exp: &schemas.Experiment{Smoke: true}, wantMode: faultModeScripted},
+		{name: "scripted_upstream binds scripted", exp: &schemas.Experiment{ScriptedUpstream: true}, wantMode: faultModeScripted},
+		{name: "smoke refuses to run without the fault proxy", exp: &schemas.Experiment{Smoke: true}, noFault: true, wantErr: "needs the fault proxy"},
+		{name: "smoke refuses a direct slot", exp: &schemas.Experiment{Smoke: true}, direct: true, wantErr: "is direct, not proxied"},
+		{name: "smoke lets a gateway probe bind its scripted plan", exp: &schemas.Experiment{Smoke: true}, probe: gatewayProbe},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -224,8 +233,11 @@ func TestBindFaultPlanModes(t *testing.T) {
 			if tt.noFault {
 				reg.Fault = nil
 			}
-			st := &runState{rc: &schemas.RunContext{Run: &schemas.Run{RunID: "r_1"}, Probe: tt.probe,
-				Key: &schemas.RunKey{KeySlot: "fp-slot-1"}}}
+			key := &schemas.RunKey{KeySlot: "fp-slot-1", SlotAuth: "slot-auth-1"}
+			if tt.direct {
+				key.SlotAuth = ""
+			}
+			st := &runState{rc: &schemas.RunContext{Run: &schemas.Run{RunID: "r_1"}, Probe: tt.probe, Experiment: tt.exp, Key: key}}
 			err := NewPipeline(&reg, b.root, nil, WithFaultMode(tt.mode)).bindFaultPlan(context.Background(), st)
 			if (err != nil) != (tt.wantErr != "") || (err != nil && !strings.Contains(err.Error(), tt.wantErr)) {
 				t.Fatalf("err = %v, want %q", err, tt.wantErr)

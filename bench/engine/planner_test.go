@@ -582,6 +582,26 @@ func TestShippedSmokeExperimentsDeclareSmoke(t *testing.T) {
 	}
 }
 
+// TestA2AExampleExperimentsAreScripted is 7-C-04: the acme-a2a walkthrough
+// promises every model call is scripted, so each of its experiments sets
+// scripted_upstream and its runs bind the scripted plan.
+func TestA2AExampleExperimentsAreScripted(t *testing.T) {
+	files, err := filepath.Glob(filepath.Join("..", "examples", "acme-a2a", "experiments", "*.yaml"))
+	if err != nil || len(files) == 0 {
+		t.Fatalf("no acme-a2a experiments: %v", err)
+	}
+	p := NewPipeline(nil, "", nil)
+	for _, f := range files {
+		e := loadExperiment(t, f)
+		if !e.ScriptedUpstream || !e.NoPaidTraffic() {
+			t.Errorf("%s does not set scripted_upstream: true", f)
+		}
+		if got := p.runFaultMode(&schemas.RunContext{Experiment: e}); got != faultModeScripted {
+			t.Errorf("%s: run fault mode %q, want scripted", f, got)
+		}
+	}
+}
+
 func TestPlanArmOrderFromSeed(t *testing.T) {
 	b := newBench(t)
 	e := loadExperiment(t, filepath.Join("..", "experiments", "codewins.yaml"))

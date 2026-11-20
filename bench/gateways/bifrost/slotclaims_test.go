@@ -2,6 +2,7 @@ package bifrost
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"net/http"
 	"net/http/httptest"
@@ -580,5 +581,84 @@ func TestTeamMintClaimsAcrossProcesses(t *testing.T) {
 		if c.OwnerID == cb.OwnerID() {
 			t.Fatalf("revoked team kept a claim: %+v", c)
 		}
+	}
+}
+
+// hasVK reports whether the fake Bifrost still holds virtual key id.
+func hasVK(f *fakeBifrost, id string) bool {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	for _, vk := range f.vks {
+		if vk["id"] == id {
+			return true
+		}
+	}
+	return false
+}
+
+// TestLostClaimFencesOldRun is 3-B-02: when this process's claim lapsed and
+// another process took the slot, the next renewal revokes the old run's
+// virtual key, so its agent cannot keep calling on a slot whose plan and
+// ledger label are now another run's.
+func TestLostClaimFencesOldRun(t *testing.T) {
+	f := newFakeBifrost(t)
+	proxy := newClaimProxy(t, 1)
+	ca, cb := proxy.client("host-a"), proxy.client("host-b")
+	a, log := claimGateway(t, f, 1, ca, func(c *Config) { c.ClaimTTL = time.Second })
+	ctx := context.Background()
+	ka, err := a.MintKey(ctx, runContext("r_old", testModel))
+	if err != nil {
+		t.Fatal(err)
+	}
+	a.claims.stopOnce.Do(func() { close(a.claims.stop) }) // renewals stop, as in a control-plane outage
+	time.Sleep(1200 * time.Millisecond)
+	if _, err := cb.ClaimSlots(ctx, faultproxy.ClaimRequest{Slots: []string{ka.KeySlot}, RunID: "r_new"}); err != nil {
+		t.Fatalf("B could not take the lapsed slot: %v", err)
+	}
+	if !hasVK(f, ka.ID) {
+		t.Fatal("key gone before the renewal")
+	}
+	a.renewOnce()
+	if hasVK(f, ka.ID) {
+		t.Fatal("the old run's virtual key survived the loss of its slot")
+	}
+	if log.count("fencing") == 0 {
+		t.Fatalf("no fencing logged: %v", log.msgs)
+	}
+	if c := liveClaims(t, cb)[ka.KeySlot]; c.OwnerID != cb.OwnerID() {
+		t.Fatalf("B's claim after the fence: %+v", c)
+	}
+}
+
+// failingRenew is a claimer whose renewals fail, as when the proxy's control
+// plane is unreachable.
+type failingRenew struct{ *faultproxy.Client }
+
+func (failingRenew) RenewSlots(context.Context, faultproxy.RenewRequest) (*faultproxy.RenewResult, error) {
+	return nil, errors.New("control plane down")
+}
+
+// TestLapsedClaimFencesOldRun is 3-B-02 before another process acts: once
+// renewals have failed past the claim's TTL the slot can be taken at any
+// moment, so the run's key is revoked then.
+func TestLapsedClaimFencesOldRun(t *testing.T) {
+	f := newFakeBifrost(t)
+	proxy := newClaimProxy(t, 1)
+	a, _ := claimGateway(t, f, 1, failingRenew{proxy.client("host-a")}, func(c *Config) { c.ClaimTTL = 5 * time.Minute })
+	ctx := context.Background()
+	ka, err := a.MintKey(ctx, runContext("r_old", testModel))
+	if err != nil {
+		t.Fatal(err)
+	}
+	a.renewOnce() // fails, but the claim is still inside its TTL
+	if !hasVK(f, ka.ID) {
+		t.Fatal("key revoked while its claim was still live")
+	}
+	a.mu.Lock()
+	a.claims.until[ka.KeySlot] = time.Now().Add(-time.Second)
+	a.mu.Unlock()
+	a.renewOnce()
+	if hasVK(f, ka.ID) {
+		t.Fatal("the run's key survived a lapsed claim")
 	}
 }

@@ -200,9 +200,14 @@ func (p *Pipeline) mintTeam(ctx context.Context, st *runState) error {
 		if k.KeySlot == st.rc.Key.KeySlot {
 			continue
 		}
-		plan := schemas.FaultPlan{Mode: p.faultMode, RunID: st.rc.Run.RunID}
+		plan := schemas.FaultPlan{Mode: p.runFaultMode(st.rc), RunID: st.rc.Run.RunID}
+		if plan.Mode == faultModeScripted {
+			if err := directSlot(&schemas.RunKey{KeySlot: k.KeySlot, SlotAuth: k.SlotAuth}); err != nil {
+				return &partError{part: faultPart, err: err}
+			}
+		}
 		if err := p.reg.Fault.SetPlan(ctx, k.KeySlot, plan); err != nil {
-			return &partError{part: faultPart, err: fmt.Errorf("bind %s plan to member %s slot %s: %w", p.faultMode, k.AgentID, k.KeySlot, err)}
+			return &partError{part: faultPart, err: fmt.Errorf("bind %s plan to member %s slot %s: %w", plan.Mode, k.AgentID, k.KeySlot, err)}
 		}
 	}
 	return nil

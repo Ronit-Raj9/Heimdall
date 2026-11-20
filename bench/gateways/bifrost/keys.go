@@ -274,7 +274,8 @@ func (g *Gateway) createVirtualKey(ctx context.Context, runID string, p Provider
 		if body, err = routedKeyBody(runID, p.Name, keyID, routing); err != nil {
 			return nil, err
 		}
-		for _, m := range routing.Models() {
+		addAllowedModels(body, routing.EffectiveModels(model)) // a rule's unmatched requests keep the agent's model
+		for _, m := range routing.EffectiveModels(model) {
 			if err := g.ensureSlotModel(ctx, p, slot, keyID, m); err != nil {
 				return nil, err
 			}

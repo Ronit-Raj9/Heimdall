@@ -130,3 +130,25 @@ func TestWriteFixtures(t *testing.T) {
 	write("sessions.json", list)
 	write("pull.json", res)
 }
+
+// TestJudgeCapCountsUnusableAnswers is 8-F-01: max_per_pull caps the judge
+// requests sent, not the scores kept, so a judge whose answers never parse
+// is asked at most max_per_pull times in a pull.
+func TestJudgeCapCountsUnusableAnswers(t *testing.T) {
+	g, srv := newFakeGateway(t, testToken)
+	start := time.Date(2026, 11, 18, 6, 0, 0, 0, time.UTC)
+	fill(g, start, 30, func(i int) bool { return i%3 == 0 })
+	jsrv, calls := fakeJudgeServer(t, "not a number")
+	cfg := testConfig(srv.URL)
+	cfg.Judge = &JudgeConfig{URL: jsrv.URL + "/v1", KeyEnv: "J", Model: "openai/judge", SampleRate: 1, MaxPerPull: 2}
+	now := start.Add(2 * time.Hour)
+	s, _, _ := newTestScorer(t, cfg, &now)
+	s.Judge = NewChatJudge(cfg.Judge, "judge-key", "", "", nil)
+	res, err := s.Pull(context.Background())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if *calls != 2 || res.JudgeAttempts != 2 || res.Judged != 0 {
+		t.Fatalf("%d judge calls, attempts %d, judged %d; want 2 calls and attempts (max_per_pull), 0 judged", *calls, res.JudgeAttempts, res.Judged)
+	}
+}

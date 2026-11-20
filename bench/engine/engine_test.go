@@ -246,7 +246,7 @@ func (g *fakeGateway) MintKey(_ context.Context, rc *schemas.RunContext) (*schem
 	if err := g.w.hit("mint"); err != nil {
 		return nil, err
 	}
-	return &schemas.RunKey{ID: "vk-" + rc.Run.RunID, Value: "sk-virtual", KeySlot: "fp-slot-1"}, nil
+	return &schemas.RunKey{ID: "vk-" + rc.Run.RunID, Value: "sk-virtual", KeySlot: "fp-slot-1", SlotAuth: "slot-auth-1"}, nil
 }
 
 func (g *fakeGateway) RevokeKey(context.Context, *schemas.RunKey) error { return g.w.hit("revoke") }

@@ -462,3 +462,30 @@ func TestPricesFrom(t *testing.T) {
 		t.Fatal("priced a model the snapshot lacks")
 	}
 }
+
+// TestJudgeRefusesNoPaidRun is 3-C-02: on a no-paid-traffic run (agent
+// check, smoke, scripted_upstream) the judge and its auditor mint no key and
+// make no call; the grade is invalid_evaluator with the reason saying so.
+func TestJudgeRefusesNoPaidRun(t *testing.T) {
+	fj := &fakeJudge{replies: []string{"correct"}, model: "judge-model"}
+	srv := httptest.NewServer(fj)
+	defer srv.Close()
+	gw := &fakeGateway{keyValue: "sk-bf-judge-key"}
+	spec := &schemas.JudgeSpec{Provider: "openai", Model: "judge-model", PromptVersion: PromptQAv1, Votes: 1}
+	rc := judgedRC(t, qaSpec, strp("Your dog is Max."), spec)
+	rc.NoPaidTraffic = true
+	j := newTestJudge(gw, srv.URL+"/")
+	got, err := j.Grade(context.Background(), rc, &schemas.Diff{SHA256: "d"})
+	if err != nil {
+		t.Fatalf("Grade: %v", err)
+	}
+	if got.Passed || !got.InvalidEvaluator || got.Judged || got.Reason != NoPaidJudgeReason {
+		t.Fatalf("grade %+v", got)
+	}
+	if _, err := j.vote(context.Background(), rc, *spec, "p"); err == nil { // the auditor's path
+		t.Fatal("vote on a no-paid run did not refuse")
+	}
+	if len(fj.requests) != 0 || len(gw.minted) != 0 {
+		t.Fatalf("judge reached the gateway on a no-paid run: %d calls, %d keys", len(fj.requests), len(gw.minted))
+	}
+}

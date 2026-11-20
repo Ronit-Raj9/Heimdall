@@ -66,7 +66,7 @@ func TestClaimTableClaimRenewExpiryRelease(t *testing.T) {
 	if held, err := pt.setOwned("s3", "", schemas.FaultPlan{RunID: "r_old"}); err != nil || held != nil {
 		t.Fatalf("legacy write on an unclaimed slot: %+v %v", held, err)
 	}
-	if held := pt.clearOwned("s1", ownerB); held == nil {
+	if held, _ := pt.clearOwned("s1", ownerB); held == nil {
 		t.Fatal("B cleared A's plan")
 	}
 	if p, ok := pt.get("s1"); !ok || p.RunID != "r_a2" || p.Mode != ModeScripted {

@@ -5,6 +5,8 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"os"
+	"path/filepath"
 	"strings"
 	"sync"
 	"time"
@@ -102,6 +104,10 @@ type planTable struct {
 	slots  map[string]*slotState
 	claims map[string]*slotClaim // F1: slot ownership across bench processes (claims.go)
 	now    func() time.Time
+	// path is the file that keeps every bound plan across a proxy restart
+	// (3-B-01): a scripted plan forgotten on restart would let its run's
+	// next call reach the real upstream. Empty keeps plans in memory only.
+	path string
 }
 
 // slotState is one slot's plan and counters.
@@ -140,15 +146,93 @@ func (t *planTable) set(slot string, p schemas.FaultPlan) error {
 	}
 	t.mu.Lock()
 	defer t.mu.Unlock()
-	t.slots[slot] = &slotState{plan: p, hasPlan: true}
-	return nil
+	return t.commitLocked(slot, &slotState{plan: p, hasPlan: true})
 }
 
 // clear removes slot's plan and resets its counters.
-func (t *planTable) clear(slot string) {
+func (t *planTable) clear(slot string) error {
 	t.mu.Lock()
 	defer t.mu.Unlock()
-	t.slots[slot] = &slotState{}
+	return t.commitLocked(slot, &slotState{})
+}
+
+// commitLocked puts st on slot and writes the bound plans to t.path first,
+// so a plan the proxy acknowledged survives a restart. When the write fails
+// nothing changes. Called with t.mu held.
+func (t *planTable) commitLocked(slot string, st *slotState) error {
+	if t.path != "" {
+		plans := map[string]schemas.FaultPlan{}
+		for name, cur := range t.slots {
+			if cur.hasPlan && name != slot {
+				plans[name] = cur.plan
+			}
+		}
+		if st.hasPlan {
+			plans[slot] = st.plan
+		}
+		if err := writePlans(t.path, plans); err != nil {
+			return fmt.Errorf("persist fault plans: %w", err)
+		}
+	}
+	t.slots[slot] = st
+	return nil
+}
+
+// writePlans replaces the plan file atomically.
+func writePlans(path string, plans map[string]schemas.FaultPlan) error {
+	b, err := json.Marshal(plans)
+	if err != nil {
+		return err
+	}
+	if err := os.MkdirAll(filepath.Dir(path), 0o700); err != nil {
+		return err
+	}
+	tmp, err := os.CreateTemp(filepath.Dir(path), filepath.Base(path)+".*")
+	if err != nil {
+		return err
+	}
+	_, werr := tmp.Write(b)
+	if serr := tmp.Sync(); werr == nil {
+		werr = serr
+	}
+	if cerr := tmp.Close(); werr == nil {
+		werr = cerr
+	}
+	if werr != nil {
+		os.Remove(tmp.Name())
+		return werr
+	}
+	return os.Rename(tmp.Name(), path)
+}
+
+// loadPlanTable returns a plan table that persists to path, holding the
+// plans a previous proxy process bound (3-B-01). Call counters start again
+// at zero. A plan file that cannot be read or holds an invalid plan is an
+// error: starting without it could forward a scripted run's calls.
+func loadPlanTable(path string) (*planTable, error) {
+	t := newPlanTable()
+	t.path = path
+	if path == "" {
+		return t, nil
+	}
+	b, err := os.ReadFile(path)
+	if errors.Is(err, os.ErrNotExist) {
+		return t, nil
+	}
+	if err != nil {
+		return nil, fmt.Errorf("read fault plans %s: %w", path, err)
+	}
+	var plans map[string]schemas.FaultPlan
+	if err := json.Unmarshal(b, &plans); err != nil {
+		return nil, fmt.Errorf("fault plans %s: %w", path, err)
+	}
+	for slot, p := range plans {
+		if err := ValidatePlan(p); err != nil {
+			return nil, fmt.Errorf("fault plans %s: slot %s: %w", path, slot, err)
+		}
+		t.slots[slot] = &slotState{plan: p, hasPlan: true}
+	}
+	return t, nil
 }
 
 // get returns slot's plan, if one is bound.
@@ -175,7 +259,7 @@ func (t *planTable) beginModel(slot, kind, model string) decision {
 	t.mu.Lock()
 	defer t.mu.Unlock()
 	st := t.state(slot)
-	d := decision{RunID: st.plan.RunID, Nonce: st.plan.Nonce, Scripted: st.plan.Mode == ModeScripted}
+	d := decision{RunID: st.plan.RunID, Nonce: st.plan.Nonce, Scripted: st.plan.Mode == ModeScripted || st.plan.Scripted}
 	if kind == KindAudio { // X8 voice agents: audio counts only for a plan aimed at its model
 		st.audioCalls++
 		d.Call = st.audioCalls
@@ -254,7 +338,11 @@ func filtered(p schemas.FaultPlan) bool {
 // PlanFields lists the optional plan fields this proxy honours, as /health
 // reports them (W9). The control API decodes plans strictly, so an older
 // proxy refuses a plan with a model instead of failing every model.
-var PlanFields = []string{"model"}
+//
+// "scripted" answers every call a fault plan does not fault from the
+// scripted model (a probe on a no-paid run); a proxy without it refuses the
+// plan, so such a run fails closed.
+var PlanFields = []string{"model", "scripted"}
 
 // ModelAll is the plan model that fails every model, as an empty one does;
 // it lets a probe say so explicitly for a routed run, whose gateway probe

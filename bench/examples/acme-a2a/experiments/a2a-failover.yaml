@@ -21,6 +21,7 @@ guards:
 conditions:
   - {id: clean, tasks: all, trials: 1}
 budget: {total_usd: 0}
+scripted_upstream: true # every model call answered by the fault proxy's scripted model; a run that cannot be held to it is refused
 verdict: {policy: paired_signflip, alpha: 0.05, assumed_sd: 0.30}
 seed: 20261118
 concurrency: 1

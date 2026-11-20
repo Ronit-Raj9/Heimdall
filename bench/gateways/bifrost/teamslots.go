@@ -129,6 +129,7 @@ func (g *Gateway) tryRunSlots(ctx context.Context, p ProviderSetup, runID string
 		return free[0], g.keyIDs[free[0].Name], false, nil
 	}
 	g.mu.Unlock()
+	claimStart := time.Now()
 	got, err := g.claimSlots(ctx, p, runID, free, n)
 	if err != nil {
 		var he *heldElsewhereError
@@ -138,6 +139,7 @@ func (g *Gateway) tryRunSlots(ctx context.Context, p ProviderSetup, runID string
 	g.reserveLocked(runID, got)
 	for _, s := range got {
 		g.claims.claimed[s.Name] = runID
+		g.claims.until[s.Name] = claimStart.Add(g.claimTTL())
 	}
 	id := g.keyIDs[got[0].Name]
 	g.mu.Unlock()

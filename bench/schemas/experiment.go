@@ -32,8 +32,12 @@ type Experiment struct {
 	ManifestMode  string                 `json:"manifest_mode" yaml:"manifest_mode"` // agent_exposure | stack_resilience
 	Policy        string                 `json:"policy,omitempty" yaml:"policy"`     // release policy file, relative to the bench root
 	Requirements  CapabilityRequirements `json:"requirements,omitzero" yaml:"requirements"`
-	Smoke         bool                   `json:"smoke,omitempty" yaml:"smoke"`       // synthetic smoke experiment: lock problems only warn; results are never findings
-	External      string                 `json:"external,omitempty" yaml:"external"` // live | record | replay: overrides every external API's mode for this experiment's runs
+	Smoke         bool                   `json:"smoke,omitempty" yaml:"smoke"` // synthetic smoke experiment: lock problems only warn; results are never findings
+	// ScriptedUpstream makes the fault proxy answer every model call of the
+	// experiment's runs from its scripted model, as Smoke does, without
+	// relaxing the lock checks. A run that cannot be held to it is refused.
+	ScriptedUpstream bool   `json:"scripted_upstream,omitempty" yaml:"scripted_upstream"`
+	External         string `json:"external,omitempty" yaml:"external"` // live | record | replay: overrides every external API's mode for this experiment's runs
 	// Fairness is a comparison rule the planner and the verdict enforce
 	// (agents.go): equal_budget, or empty for none.
 	Fairness string `json:"fairness,omitempty" yaml:"fairness"`
@@ -573,4 +577,11 @@ type ArmManifest struct {
 	// refused when it names another image. Empty for an arm without them.
 	TaskImages   map[string]string `json:"task_images,omitempty"`
 	TaskImageIDs map[string]string `json:"task_image_ids,omitempty"`
+}
+
+// NoPaidTraffic reports whether every model call of the experiment's runs
+// must be answered by the fault proxy's scripted model: a smoke experiment,
+// or one that sets scripted_upstream.
+func (e *Experiment) NoPaidTraffic() bool {
+	return e != nil && (e.Smoke || e.ScriptedUpstream)
 }

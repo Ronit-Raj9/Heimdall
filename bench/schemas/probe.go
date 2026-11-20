@@ -110,6 +110,10 @@ type FaultPlan struct {
 	Model       string `json:"model,omitempty" yaml:"model,omitempty"` // W9: fail only requests for this model ("*" = all); a routed run's gateway probe sets its primary target when empty
 	Nonce       string `json:"nonce,omitempty" yaml:"-"`               // secret per run, set when armed, never from YAML
 	RunID       string `json:"run_id,omitempty" yaml:"-"`
+	// Scripted answers every call the plan does not fault from the proxy's
+	// scripted model, never the real upstream: a fault probe on a no-paid
+	// (smoke or scripted_upstream) run. Set by the bench, never from YAML.
+	Scripted bool `json:"scripted,omitempty" yaml:"-"`
 }
 
 // FaultController is the bench's handle on the fault proxy's control API. The

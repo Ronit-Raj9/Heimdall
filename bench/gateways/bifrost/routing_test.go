@@ -345,3 +345,31 @@ func TestRevokeKeyRuleFailure(t *testing.T) {
 		t.Fatalf("second slot: %v", err)
 	}
 }
+
+// TestMintComplexityRoutedKeyAllowsAgentModel is 8-B-01: a complexity
+// router's key allows its routed target and the agent's own model, which
+// serves every request the rule does not match.
+func TestMintComplexityRoutedKeyAllowsAgentModel(t *testing.T) {
+	f := newFakeBifrost(t)
+	g := newTestGateway(t, f)
+	ctx := context.Background()
+	if err := g.Setup(ctx); err != nil {
+		t.Fatal(err)
+	}
+	rc := runContext("r_route0009", testCheap)
+	rc.Agent.Gateway.Routing = &schemas.RoutingPolicy{Strategy: schemas.RoutingRule, When: `complexity_tier == "COMPLEX"`,
+		Targets: []schemas.RouteTarget{{Model: testModel}}}
+	key, err := g.MintKey(ctx, rc)
+	if err != nil {
+		t.Fatalf("MintKey: %v", err)
+	}
+	vk := f.lastBody("POST /api/governance/virtual-keys")
+	pc := vk["provider_configs"].([]any)[0].(map[string]any)
+	if got := fmt.Sprint(pc["allowed_models"]); got != fmt.Sprint([]string{testModel, testCheap}) {
+		t.Fatalf("allowed_models = %s, want the routed target and the agent's model", got)
+	}
+	if got := fmt.Sprint(g.models["fp-slot-1"][testCheap], g.models["fp-slot-1"][testModel]); got != "true true" {
+		t.Errorf("slot models = %v", g.models["fp-slot-1"])
+	}
+	_ = g.RevokeKey(ctx, key)
+}

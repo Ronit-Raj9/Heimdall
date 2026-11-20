@@ -139,6 +139,8 @@ func (h *LivescoreHandler) postPull(ctx *fasthttp.RequestCtx) {
 	switch {
 	case errors.Is(err, livescore.ErrNotConfigured):
 		lib.SendError(ctx, h.mode, fasthttp.StatusNotFound, lib.ErrTypeNotFound, err.Error())
+	case errors.Is(err, livescore.ErrOffline):
+		lib.SendError(ctx, h.mode, fasthttp.StatusConflict, lib.ErrTypeConflict, err.Error())
 	case err != nil && res == nil:
 		sendDepError(ctx, h.mode, "live pull", err)
 	case err != nil:
