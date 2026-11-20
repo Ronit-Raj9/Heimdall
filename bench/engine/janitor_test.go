@@ -157,7 +157,7 @@ func TestJanitorSweep(t *testing.T) {
 		{
 			name:     "leases decide, age decides only without a lease",
 			failList: "none",
-			wantRm:   []string{"rm -f c_stale c_done c_old", "volume rm -f v_old", "network rm n_stale n_old"},
+			wantRm:   []string{"rm -f -v c_stale c_done c_old", "volume rm -f v_old", "network rm n_stale n_old"},
 			wantKeep: []string{"r_check", "r_live", "r_new", "r_odd"},
 			want:     SweepReport{Containers: 3, Volumes: 1, Networks: 2, Keys: 2, KeptYoung: 2},
 		},
@@ -297,7 +297,7 @@ func TestSchedulerSweepKeepsForeignLiveRun(t *testing.T) {
 	if _, err := NewScheduler(b.reg, b.root, nil, NewJanitor(b.gw, docker, nil)).Run(context.Background(), m, RunOptions{}); err != nil {
 		t.Fatal(err)
 	}
-	if got := removals(t, logPath); strings.Join(got, "|") != "rm -f c_crashed" {
+	if got := removals(t, logPath); strings.Join(got, "|") != "rm -f -v c_crashed" {
 		t.Fatalf("removed %v, want only the crashed run's container", got)
 	}
 	if !b.gw.active["r_foreign"] || !b.gw.active["r_check"] || b.gw.active["r_crashed"] {
@@ -340,5 +340,28 @@ func TestJanitorSweepsSnapshotImages(t *testing.T) {
 	}
 	if !strings.Contains(string(raw), "image inspect --format") || strings.Count(string(raw), "sha256:aaa") != 2 {
 		t.Fatalf("calls:\n%s", raw)
+	}
+}
+
+// TestScanRunLivenessUnreadableSlots is the 2-B-12 regression: a slots
+// folder that cannot be read fails the scan instead of hiding its leases,
+// so the janitor sweeps nothing. A missing root is still nothing to scan.
+func TestScanRunLivenessUnreadableSlots(t *testing.T) {
+	if os.Geteuid() == 0 {
+		t.Skip("root reads any folder")
+	}
+	now := time.Now()
+	runs, _ := leaseWorld(t, now)
+	if _, err := ScanRunLiveness([]string{filepath.Join(t.TempDir(), "absent")}, DefaultStaleAfter, now); err != nil {
+		t.Fatalf("missing root: %v", err)
+	}
+	hidden := filepath.Join(runs, "e_hidden", slotsFolder)
+	writeRun(t, filepath.Join(hidden, "s_h"), "r_hidden", false)
+	if err := os.Chmod(hidden, 0); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = os.Chmod(hidden, 0o755) })
+	if _, err := ScanRunLiveness([]string{runs}, DefaultStaleAfter, now); err == nil {
+		t.Fatal("unreadable slots folder scanned as no lease information")
 	}
 }

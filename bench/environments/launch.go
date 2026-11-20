@@ -2,13 +2,18 @@ package environments
 
 import (
 	"encoding/base64"
+	"errors"
 	"fmt"
 	"io"
 	"os"
 	"path"
+	"path/filepath"
 	"regexp"
 	"sort"
+	"strconv"
 	"strings"
+	"sync"
+	"syscall"
 
 	"github.com/maximhq/bifrost/bench/schemas"
 )
@@ -218,11 +223,83 @@ func chunkRefs(prefix string, n int) string {
 	return b.String()
 }
 
-// writeEnvFile writes lines to a private temp file outside the run folder, so
+// envFileHook, when set (tests only), sees every env file's lines.
+var envFileHook func(lines []string)
+
+// envStageOnce sweeps the env file staging folder once per process.
+var envStageOnce sync.Once
+
+// envStageDir is the private folder env files are staged in: one per user
+// under the temp folder, mode 0700. Each file is named after the process
+// that wrote it, so a later process can find and remove the files of one
+// that died before it could (sweepEnvFiles).
+func envStageDir() (string, error) {
+	dir := filepath.Join(os.TempDir(), "bench-env-"+strconv.Itoa(os.Getuid()))
+	if err := os.MkdirAll(dir, 0o700); err != nil {
+		return "", fmt.Errorf("env file folder: %w", err)
+	}
+	st, err := os.Lstat(dir)
+	if err != nil {
+		return "", fmt.Errorf("env file folder: %w", err)
+	}
+	if !st.IsDir() || st.Mode().Perm()&0o077 != 0 {
+		return "", fmt.Errorf("env file folder %s is not a private folder", dir)
+	}
+	return dir, nil
+}
+
+// sweepEnvFiles removes staged env files whose writing process is gone: a
+// hard crash between writing an env file and removing it would otherwise
+// leave gateway keys and route tokens on disk.
+func sweepEnvFiles(dir string) {
+	ents, err := os.ReadDir(dir)
+	if err != nil {
+		return
+	}
+	for _, ent := range ents {
+		pid, ok := envFilePID(ent.Name())
+		if !ok || pid == os.Getpid() || processAlive(pid) {
+			continue
+		}
+		_ = os.Remove(filepath.Join(dir, ent.Name()))
+	}
+}
+
+// envFilePID is the pid in an env file name "env-<pid>-<random>". It is pure.
+func envFilePID(name string) (int, bool) {
+	rest, ok := strings.CutPrefix(name, "env-")
+	if !ok {
+		return 0, false
+	}
+	n, _, ok := strings.Cut(rest, "-")
+	if !ok {
+		return 0, false
+	}
+	pid, err := strconv.Atoi(n)
+	return pid, err == nil && pid > 0
+}
+
+// processAlive reports whether pid names a live process (signal 0). A
+// process owned by another user (EPERM) counts as alive.
+func processAlive(pid int) bool {
+	err := syscall.Kill(pid, 0)
+	return err == nil || errors.Is(err, syscall.EPERM)
+}
+
+// writeEnvFile writes lines to a private file outside the run folder, so
 // secrets never appear in the docker CLI's argv or in the sealed run. The
-// caller removes it once the container is created.
+// caller removes it once the container is created; a file left by a process
+// that died first is removed by the next process that writes one.
 func writeEnvFile(lines []string) (string, error) {
-	f, err := os.CreateTemp("", "bench-env-*")
+	if envFileHook != nil {
+		envFileHook(lines)
+	}
+	dir, err := envStageDir()
+	if err != nil {
+		return "", err
+	}
+	envStageOnce.Do(func() { sweepEnvFiles(dir) })
+	f, err := os.CreateTemp(dir, "env-"+strconv.Itoa(os.Getpid())+"-*")
 	if err != nil {
 		return "", fmt.Errorf("create env file: %w", err)
 	}

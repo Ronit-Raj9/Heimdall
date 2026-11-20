@@ -220,3 +220,24 @@ func TestMemberManifests(t *testing.T) {
 		t.Fatalf("member notes not frozen: %+v", got["coder"])
 	}
 }
+
+// TestResolveTeamRefusesOtherAdapter is the 2-B-08 regression: a member
+// config naming another adapter than the arm's is refused at plan time,
+// since every member is planned with the arm's adapter.
+func TestResolveTeamRefusesOtherAdapter(t *testing.T) {
+	root := t.TempDir()
+	if err := os.MkdirAll(filepath.Join(root, "agents"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	member := "id: coder\nadapter: command\nimage: img:1\nargv: [run]\nbudgets: {wall_s: 60, cpus: 1, mem_gb: 1}\ngateway: {provider: anthropic, max_retries: 0}\n"
+	if err := os.WriteFile(filepath.Join(root, "agents", "coder.yaml"), []byte(member), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	reg := &schemas.Registry{Adapters: []schemas.AgentAdapter{fakeAdapter{part: part{name: "scripted"}}, fakeAdapter{part: part{name: "command"}}}, Gateway: slotGateway{n: 2}}
+	p := NewPlanner(reg, root, nil)
+	cfg := &schemas.AgentConfig{ID: "arm", Adapter: "scripted", Team: []schemas.TeamMember{{ID: "lead", Role: "lead"}, {ID: "coder", Agent: "agents/coder.yaml"}}}
+	err := p.resolveTeam(context.Background(), cfg, &schemas.Suite{})
+	if err == nil || !strings.Contains(err.Error(), `uses adapter "command", the arm uses "scripted"`) {
+		t.Fatalf("other adapter: %v", err)
+	}
+}

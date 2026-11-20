@@ -500,8 +500,9 @@ How a run with sessions goes:
 - The agent also gets `BENCH_SESSION_ID`, `BENCH_SESSION_INDEX` (1-based)
   and `BENCH_SESSION_COUNT`.
 - `wall_s` on a session caps that session; the default is the agent's
-  budget. A session that times out or crashes ends the run with that
-  outcome.
+  budget. A session before the last that times out or crashes ends the run
+  with that outcome. The last session is graded like a single-session run:
+  a passing grade is a pass even when it exited non-zero or timed out.
 - The gateway session id stays the run's, so tokens and cost cover every
   session.
 - Only the last session's answer is graded.

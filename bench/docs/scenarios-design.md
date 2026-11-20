@@ -135,8 +135,12 @@ is that session's. What persists: the `/memory` volume (path in
 `BENCH_MEMORY_DIR`) and the agent's `memory.paths`. The agent also gets
 `BENCH_SESSION_ID`, `BENCH_SESSION_INDEX` and `BENCH_SESSION_COUNT`. The
 gateway session id stays the run's, so cost and tokens cover every session.
-Any session that times out or crashes ends the run with that outcome. Only
-the last session's output is graded.
+A session before the last that times out or crashes ends the run with that
+outcome, and later sessions do not run. The last session is graded like a
+single-session run: its output is graded whatever its exit, so a passing
+grade is a pass even when that session exited non-zero or timed out, and a
+failing grade after a timeout is a timeout. Only the last session's output
+is graded.
 
 ### 6. Outputs and graders
 

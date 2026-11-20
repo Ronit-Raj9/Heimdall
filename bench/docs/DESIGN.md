@@ -854,7 +854,7 @@ The bench runs untrusted agents. These are P0.
 - `--pids-limit`, `--memory`, `--cpus`, capped log size, capped captured output.
 - Read-only root filesystem with tmpfs for `/tmp` and the home directory.
 - The workspace is a Docker volume. No host bind mounts, no Docker socket.
-- Attached only to an internal network whose single reachable host is the gateway. IPv6 is off on that network.
+- Attached only to an internal network with no route out; the gateway is the only bench host on it. IPv6 is off on that network. Known gap: the stock local and hosted Compose stacks put every concurrent run's agent on that one shared bridge, so agents of concurrent runs can reach one another (and any optional service placed there, such as a remote forwarder). Run untrusted agents with `concurrency: 1` on a shared stack until per-run gateway ingress networks land.
 - Docker's default seccomp and AppArmor profiles stay on.
 
 **Host safety.**
@@ -916,7 +916,7 @@ planned -> leased -> prepare -> arm -> run -> disarm -> export -> collect -> gra
         -> measure -> receipt -> cleanup -> seal
 ```
 
-- A run that fails **before its agent starts** is recorded as `aborted_infra` and cleaned up, and the slot gets a new run (at most 2 retries, all kept), and so is a run whose agent got no model response at all because the provider was unreachable (docs/upstream-failures.md). A run that ends on an unreachable provider after some answered calls is `infra_error`, never an agent failure.
+- A run that fails **before its agent starts** is recorded as `aborted_infra` and cleaned up, and the slot gets a new run (at most 2 retries, all kept). This includes a launch the environment reports failed before the agent process could start (a container create or network join error, `schemas.ErrNotLaunched`), and so is a run whose agent got no model response at all because the provider was unreachable (docs/upstream-failures.md). A run that ends on an unreachable provider after some answered calls is `infra_error`, never an agent failure.
 - A run **whose agent started** is never rerun. The later stages still run, `cleanup` always runs, and the run is sealed with whatever outcome it has, or `unknown`. This is what keeps the intention-to-treat ledger honest.
 - `--resume` re-leases only slots with no counted run. A lease carries an owner and a heartbeat, and a stale lease is reclaimed.
 

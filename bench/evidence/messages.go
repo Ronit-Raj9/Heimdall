@@ -29,7 +29,9 @@ type mailboxRecord struct {
 	Delivered *string         `json:"delivered"`
 	ReadBy    []string        `json:"read_by"`
 	ReadAt    json.RawMessage `json:"read_at"`
-	Nonce     string          `json:"nonce"`
+	// ReceivedBy is the text each reader got (newer mailbox records).
+	ReceivedBy map[string]string `json:"received_by"`
+	Nonce      string            `json:"nonce"`
 }
 
 // mailboxMessage is a message as a send body or a receive answer carries it.
@@ -62,7 +64,9 @@ func BuildMessages(calls []schemas.ToolCall, records []mailboxRecord) []schemas.
 		for _, r := range records {
 			m := schemas.AgentMessage{ID: idString(r.ID), From: r.From, To: r.To, Body: r.Body, Fields: stringFields(r.Fields),
 				SenderAgentID: r.Sender, At: r.At, Fault: r.Fault, Nonce: r.Nonce, DeliveredTo: r.ReadBy}
-			if r.Delivered != nil && *r.Delivered != r.Body {
+			if len(r.ReceivedBy) > 0 {
+				recordReceived(&m, r)
+			} else if r.Delivered != nil && *r.Delivered != r.Body {
 				m.Received, m.Altered = *r.Delivered, true
 			}
 			m.DeliveredAt = firstReadAt(r.ReadAt)
@@ -152,8 +156,18 @@ func joinReceives(msgs []schemas.AgentMessage, recvs []schemas.ToolCall) {
 			if m.DeliveredAt.IsZero() || c.Started.Before(m.DeliveredAt) {
 				m.DeliveredAt = c.Started
 			}
-			if got.Body != m.Body && m.Received == "" {
-				m.Received, m.Altered = got.Body, true
+			if got.Body != m.Body {
+				if m.Received == "" {
+					m.Received, m.Altered = got.Body, true
+				}
+				if reader != "" {
+					if m.ReceivedBy == nil {
+						m.ReceivedBy = map[string]string{}
+					}
+					if _, seen := m.ReceivedBy[reader]; !seen {
+						m.ReceivedBy[reader] = got.Body
+					}
+				}
 			}
 			if c.Fault != "" && m.Fault == "" {
 				m.Fault, m.Nonce = c.Fault, c.Nonce
@@ -224,6 +238,37 @@ func extraFields(args string) map[string]string {
 
 // firstReadAt reads read_at: one time, or a map of reader to time (the
 // earliest wins).
+// recordReceived sets a message's per-reader altered text from a record that
+// names what each reader got: ReceivedBy holds only the readers whose text
+// differs from the body, and Received is the text of the earliest of them
+// by read time (reader id breaks ties and orders readers without a time).
+func recordReceived(m *schemas.AgentMessage, r mailboxRecord) {
+	var at map[string]time.Time
+	_ = json.Unmarshal(r.ReadAt, &at) // an old single time names no reader
+	var readers []string
+	for reader, body := range r.ReceivedBy {
+		if body == r.Body {
+			continue
+		}
+		if m.ReceivedBy == nil {
+			m.ReceivedBy = map[string]string{}
+		}
+		m.ReceivedBy[reader] = body
+		readers = append(readers, reader)
+	}
+	if len(readers) == 0 {
+		return
+	}
+	sort.Slice(readers, func(i, j int) bool {
+		ti, tj := at[readers[i]], at[readers[j]]
+		if !ti.Equal(tj) {
+			return tj.IsZero() || (!ti.IsZero() && ti.Before(tj))
+		}
+		return readers[i] < readers[j]
+	})
+	m.Received, m.Altered = m.ReceivedBy[readers[0]], true
+}
+
 func firstReadAt(raw json.RawMessage) time.Time {
 	var t time.Time
 	if json.Unmarshal(raw, &t) == nil {

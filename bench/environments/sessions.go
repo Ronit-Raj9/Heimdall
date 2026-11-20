@@ -169,6 +169,14 @@ func (e *dockerWorkspace) createMemory(ctx context.Context, rc *schemas.RunConte
 // mounted under /bench instead and returned as a link the launch wrapper
 // makes, as the agent user, before the agent starts.
 func (e *dockerWorkspace) agentMounts(ctx context.Context, rc *schemas.RunContext, plan *schemas.RunPlan, expID, runID string) ([]string, []link, error) {
+	return e.agentMountsFor(ctx, rc, plan, expID, runID, runID)
+}
+
+// agentMountsFor is agentMounts with the plan folder volumes named after
+// volKey instead of the run id: a team member passes its own key, so two
+// members never recreate one another's mounted folder volumes. The volumes
+// still carry the run's labels, so Destroy and the janitor remove them.
+func (e *dockerWorkspace) agentMountsFor(ctx context.Context, rc *schemas.RunContext, plan *schemas.RunPlan, expID, runID, volKey string) ([]string, []link, error) {
 	var mounts []string
 	var links []link
 	view := viewFor(rc) // Eval integrity area (S2): where linked volumes are mounted (realism.go)
@@ -197,8 +205,10 @@ func (e *dockerWorkspace) agentMounts(ctx context.Context, rc *schemas.RunContex
 	if err != nil {
 		return nil, nil, err
 	}
+	dirVols := make([]string, len(dirs))
 	for i, d := range dirs {
-		v := view.dirVolume(runID, i) // Eval integrity area (S2): view
+		v := view.dirVolume(volKey, i) // Eval integrity area (S2): view
+		dirVols[i] = v
 		if err := e.freshVolume(ctx, v, expID, runID); err != nil {
 			return nil, nil, err
 		}
@@ -209,7 +219,7 @@ func (e *dockerWorkspace) agentMounts(ctx context.Context, rc *schemas.RunContex
 		}
 		mounts = append(mounts, "-v", v+":"+at+":ro")
 	}
-	if err := e.fillAgentVolumes(ctx, rc, plan, expID, runID, own, dirs); err != nil {
+	if err := e.fillAgentVolumes(ctx, rc, plan, expID, runID, own, dirs, dirVols); err != nil {
 		return nil, nil, err
 	}
 	return mounts, links, nil
@@ -274,7 +284,7 @@ done
 
 // fillAgentVolumes runs fillScript once for every memory volume and plan
 // folder of one Exec. It is skipped when there are none.
-func (e *dockerWorkspace) fillAgentVolumes(ctx context.Context, rc *schemas.RunContext, plan *schemas.RunPlan, expID, runID string, mem []string, dirs []planDir) error {
+func (e *dockerWorkspace) fillAgentVolumes(ctx context.Context, rc *schemas.RunContext, plan *schemas.RunPlan, expID, runID string, mem []string, dirs []planDir, dirVols []string) error {
 	if len(mem) == 0 && len(dirs) == 0 {
 		return nil
 	}
@@ -289,7 +299,7 @@ func (e *dockerWorkspace) fillAgentVolumes(ctx context.Context, rc *schemas.RunC
 	}
 	for i, d := range dirs {
 		n := strconv.Itoa(i)
-		args = append(args, "-v", viewFor(rc).dirVolume(runID, i)+":/bench-dir/"+n, "-v", d.src+":/bench-src/"+n+":ro") // Eval integrity area (S2): view
+		args = append(args, "-v", dirVols[i]+":/bench-dir/"+n, "-v", d.src+":/bench-src/"+n+":ro") // Eval integrity area (S2): view
 	}
 	args = append(args, "-e", "BENCH_UID="+uid, "-e", "BENCH_GID="+gid, e.helperImage(rc), "-c", fillScript)
 	if _, err := e.cfg.Docker.MustRun(ctx, args...); err != nil {

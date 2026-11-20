@@ -1,6 +1,7 @@
 package engine
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -28,6 +29,26 @@ func WithIgnoreQuarantine() PlannerOption {
 	return func(p *Planner) { p.ignoreQuarantine = true }
 }
 
+type frozenTasksKey struct{}
+
+// WithFrozenTasks marks ctx as a replan of the frozen manifest m (a remote
+// worker's admission check): with the quarantine screen off
+// (WithIgnoreQuarantine), a quarantined task that m does not use is still
+// dropped from `tasks: all`, since the coordinator dropped it before the
+// freeze, while one quarantined after the freeze stays (2-C-11).
+func WithFrozenTasks(ctx context.Context, m *schemas.Manifest) context.Context {
+	used := map[string]bool{}
+	for _, s := range m.Slots {
+		used[s.Task] = true
+	}
+	return context.WithValue(ctx, frozenTasksKey{}, used)
+}
+
+func frozenTasks(ctx context.Context) map[string]bool {
+	used, _ := ctx.Value(frozenTasksKey{}).(map[string]bool)
+	return used
+}
+
 // screenTasks applies the task split and the quarantine sidecar
 // (docs/suite-health.md, docs/held-out-and-canaries.md) to resolved
 // conditions, for a new plan only; a manifest already written is never
@@ -39,14 +60,22 @@ func WithIgnoreQuarantine() PlannerOption {
 // whatever each task's split, but naming a quarantined task is refused
 // unless WithIncludeQuarantined is set; under warnOnly (an agent check) it
 // only warns. A condition left with no task is refused.
-func (p *Planner) screenTasks(suite *schemas.Suite, specs []schemas.ConditionSpec, conds []condPlan, warnOnly bool) ([]condPlan, error) {
+func (p *Planner) screenTasks(ctx context.Context, suite *schemas.Suite, specs []schemas.ConditionSpec, conds []condPlan, warnOnly bool) ([]condPlan, error) {
 	var quarantined map[string]schemas.TaskQuarantine
-	if !p.ignoreQuarantine {
+	frozen := frozenTasks(ctx)
+	if !p.ignoreQuarantine || frozen != nil {
 		q, err := readQuarantine(suite.Root)
 		if err != nil {
 			return nil, err
 		}
 		quarantined = q
+	}
+	if p.ignoreQuarantine && frozen != nil { // a frozen replan: only tasks the freeze itself dropped stay out
+		for id := range quarantined {
+			if frozen[id] {
+				delete(quarantined, id)
+			}
+		}
 	}
 	out := make([]condPlan, len(conds))
 	for i, cp := range conds {
@@ -146,13 +175,13 @@ func taskSplit(t *schemas.Task) string {
 
 // screenAll screens the experiment's conditions and its compatibility
 // conditions (screenTasks).
-func (p *Planner) screenAll(suite *schemas.Suite, e *schemas.Experiment, conds, compat []condPlan, warnOnly bool) ([]condPlan, []condPlan, error) {
-	conds, err := p.screenTasks(suite, e.Conditions, conds, warnOnly)
+func (p *Planner) screenAll(ctx context.Context, suite *schemas.Suite, e *schemas.Experiment, conds, compat []condPlan, warnOnly bool) ([]condPlan, []condPlan, error) {
+	conds, err := p.screenTasks(ctx, suite, e.Conditions, conds, warnOnly)
 	if err != nil {
 		return nil, nil, err
 	}
 	if e.Compatibility != nil {
-		if compat, err = p.screenTasks(suite, compatSpecs(e.Compatibility), compat, warnOnly); err != nil {
+		if compat, err = p.screenTasks(ctx, suite, compatSpecs(e.Compatibility), compat, warnOnly); err != nil {
 			return nil, nil, fmt.Errorf("compatibility: %w", err)
 		}
 	}

@@ -194,3 +194,42 @@ func TestReplanIgnoresQuarantine(t *testing.T) {
 		t.Fatal("a new plan did not skip the task quarantined after the freeze")
 	}
 }
+
+// TestFrozenReplanKeepsPreFreezeQuarantine is 2-C-11: a task already
+// quarantined when the coordinator froze `tasks: all` must stay out of a
+// worker's replan of that manifest, while a task quarantined after the freeze
+// stays in, so an identical checkout reproduces the frozen hash.
+func TestFrozenReplanKeepsPreFreezeQuarantine(t *testing.T) {
+	b := screenBench(t)
+	write := func(ids ...string) {
+		q := map[string]schemas.TaskQuarantine{}
+		for _, id := range ids {
+			q[id] = schemas.TaskQuarantine{Reason: "flaky"}
+		}
+		data, err := json.Marshal(schemas.SuiteHealthFile{Quarantined: q})
+		if err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(filepath.Join(b.suite.Root, schemas.SuiteHealthFileName), data, 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+	write("t02")
+	cond := schemas.ConditionSpec{ID: "clean", Tasks: schemas.TaskSelector{All: true}, Trials: 1}
+	frozen := b.plan(t, testExperiment(cond))
+	write("t02", "t03") // t03 quarantined after the freeze
+	e := frozen.Experiment
+	worker := NewPlanner(b.reg, b.root, nil, WithIgnoreQuarantine())
+	replan, err := worker.Plan(WithFrozenTasks(context.Background(), frozen), &e)
+	if err != nil {
+		t.Fatal(err)
+	}
+	adoptUnrepeatable(replan, frozen)
+	h, err := ManifestHash(replan)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if h != frozen.Hash {
+		t.Fatalf("frozen replan hash %s, frozen %s; differs in %s", h, frozen.Hash, manifestDiff(replan, frozen))
+	}
+}

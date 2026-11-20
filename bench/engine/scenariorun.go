@@ -269,6 +269,9 @@ func (p *Pipeline) execOnce(ctx context.Context, st *runState, sess *schemas.Ses
 		}
 	}
 	if err != nil {
+		if first && errors.Is(err, schemas.ErrNotLaunched) { // the environment is certain no agent ran: a pre-start abort, retried (2-A-12)
+			p.unstart(ctx, st)
+		}
 		return res, wrapPart("environment", st.env, fmt.Errorf("exec agent: %w", err))
 	}
 	if res == nil {
@@ -515,4 +518,18 @@ func (p *Pipeline) writeFile(ctx context.Context, st *runState, name string, b [
 		return wrapPart("store", p.reg.Store, fmt.Errorf("write %s: %w", name, err))
 	}
 	return nil
+}
+
+// unstart undoes the agent-start checkpoint of a run whose environment
+// reported that the agent was never launched (schemas.ErrNotLaunched), so
+// the stage failure seals it aborted_infra and the scheduler retries it. A
+// failed rewrite of run.json is logged: the in-memory run is still sealed
+// with no start, and run.json is rewritten at seal.
+func (p *Pipeline) unstart(ctx context.Context, st *runState) {
+	run := st.rc.Run
+	run.Timing.AgentStarted, run.Timing.AgentExited = nil, nil
+	st.agentStarted = false
+	if err := p.writeJSON(ctx, st, "run.json", run); err != nil {
+		p.logger.Warn("rewrite run.json after a launch that never happened", "run", run.RunID, "error", err.Error())
+	}
 }

@@ -382,7 +382,7 @@ func (w *Worker) check(ctx context.Context, lease *schemas.WorkerLease, m *schem
 		return nil, fmt.Sprintf("local suite lock hash %s is not the manifest's %s", suite.LockHash, m.SuiteLockHash)
 	}
 	exp := m.Experiment
-	local, err := w.replan(ctx, &exp)
+	local, err := w.replan(WithFrozenTasks(ctx, m), &exp) // tasks the coordinator's quarantine dropped before the freeze stay out (2-C-11)
 	if err != nil {
 		return nil, "plan the experiment locally: " + err.Error()
 	}

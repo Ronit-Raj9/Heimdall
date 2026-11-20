@@ -230,13 +230,19 @@ func (e *dockerWorkspace) Create(ctx context.Context, rc *schemas.RunContext) (*
 // earlier sessions' containers are removed first, and the output goes to
 // agent.stream.<n>.jsonl and agent.stderr.<n>.txt (ExecResult paths), then is
 // appended to agent.stream.jsonl and agent.stderr.txt.
+// notLaunched marks an Exec error raised before the agent container started:
+// the pipeline may then retry the attempt (schemas.ErrNotLaunched, 2-A-12).
+func notLaunched(err error) error {
+	return fmt.Errorf("%w (%w)", err, schemas.ErrNotLaunched)
+}
+
 func (e *dockerWorkspace) Exec(ctx context.Context, rc *schemas.RunContext, plan *schemas.RunPlan) (*schemas.ExecResult, error) {
 	expID, runID, err := runIDs(rc)
 	if err != nil {
-		return nil, err
+		return nil, notLaunched(err)
 	}
 	if rc.Handle == nil || rc.Dir == "" || plan == nil {
-		return nil, fmt.Errorf("exec run %s: needs a workspace handle, a run folder and a plan", runID)
+		return nil, notLaunched(fmt.Errorf("exec run %s: needs a workspace handle, a run folder and a plan", runID))
 	}
 	root := utils.TaskRunsAsRoot(rc.Task)
 	if root {
@@ -244,49 +250,49 @@ func (e *dockerWorkspace) Exec(ctx context.Context, rc *schemas.RunContext, plan
 		plan.User = rootUser
 	}
 	if err := e.checkPlan(plan, root); err != nil {
-		return nil, fmt.Errorf("exec run %s: %w", runID, err)
+		return nil, notLaunched(fmt.Errorf("exec run %s: %w", runID, err))
 	}
 	basePath, err := e.imagePath(ctx, plan)
 	if err != nil {
-		return nil, fmt.Errorf("exec run %s: %w", runID, err)
+		return nil, notLaunched(fmt.Errorf("exec run %s: %w", runID, err))
 	}
 	view := viewFor(rc)                    // Eval integrity area (S2): the names the agent is shown (realism.go)
 	agentPlan, err := view.agentPlan(plan) // Eval integrity area (S2): plan itself stays as planned for plan.json
 	if err != nil {
-		return nil, fmt.Errorf("exec run %s: %w", runID, err)
+		return nil, notLaunched(fmt.Errorf("exec run %s: %w", runID, err))
 	}
 	agentPlan = withTaskEnv(rc, agentPlan) // X2: the workspace service's environment, under the plan's own variables (compose.go)
 	name := agentName(rc, runID)
 	e.removeContainers(ctx, staleAgents(rc, runID)...)
 	mounts, links, err := e.agentMounts(ctx, rc, agentPlan, expID, runID) // Eval integrity area (S2): agentPlan
 	if err != nil {
-		return nil, fmt.Errorf("exec run %s: %w", runID, err)
+		return nil, notLaunched(fmt.Errorf("exec run %s: %w", runID, err))
 	}
 	// X7: the run's GPUs, for the agent container only (gpu.go).
 	gpuArgs, err := agentGPUArgs(rc)
 	if err != nil {
-		return nil, fmt.Errorf("exec run %s: %w", runID, err)
+		return nil, notLaunched(fmt.Errorf("exec run %s: %w", runID, err))
 	}
 	mounts = append(mounts, gpuArgs...)
 	l, err := buildLaunchView(agentPlan, view.shimDir()+":"+basePath, agentHome, links, view) // Eval integrity area (S2): view
 	if err != nil {
-		return nil, fmt.Errorf("exec run %s: %w", runID, err)
+		return nil, notLaunched(fmt.Errorf("exec run %s: %w", runID, err))
 	}
 	// Remote area: the one route out a remote_http plan asks for (RunPlan.Egress, utils/remoteegress.go); nil for every other plan.
 	egress, err := utils.StartRemoteEgress(ctx, e.cfg.Docker, rc, plan, e.network(plan.Network))
 	if err != nil {
-		return nil, fmt.Errorf("exec run %s: %w", runID, err)
+		return nil, notLaunched(fmt.Errorf("exec run %s: %w", runID, err))
 	}
 	defer egress.Stop(context.WithoutCancel(ctx))
 	e.ensureEventCollector(ctx, rc, plan, expID, runID) // Agent events area: the collector, started before the first session (eventcollector.go)
 	defer e.copyAgentEvents(context.WithoutCancel(ctx), runID, rc.Dir)
 	l.Env = e.eventEnvView(rc, runID, l.Env, view)                 // Agent events area: BENCH_EVENTS_* and OTEL_* (eventcollector.go); Eval integrity area (S2): view
 	if err := view.writeRealism(rc.Dir, plan, l.Env); err != nil { // Eval integrity area (S2): realism.json, neutral runs only
-		return nil, fmt.Errorf("exec run %s: %w", runID, err)
+		return nil, notLaunched(fmt.Errorf("exec run %s: %w", runID, err))
 	}
 	envFile, err := writeEnvFile(l.Env)
 	if err != nil {
-		return nil, fmt.Errorf("exec run %s: %w", runID, err)
+		return nil, notLaunched(fmt.Errorf("exec run %s: %w", runID, err))
 	}
 	network, svcNet := e.network(plan.Network), ""
 	if len(rc.Services) > 0 || collectorRunning(runID) { // Agent events area: the collector is on the service network
@@ -318,18 +324,18 @@ func (e *dockerWorkspace) Exec(ctx context.Context, rc *schemas.RunContext, plan
 	}()
 	if cerr != nil {
 		keep = false
-		return nil, fmt.Errorf("exec run %s: create agent container: %w", runID, cerr)
+		return nil, notLaunched(fmt.Errorf("exec run %s: create agent container: %w", runID, cerr))
 	}
 	if svcNet != "" {
 		if _, err := e.cfg.Docker.MustRun(ctx, "network", "connect", svcNet, joiner); err != nil {
 			keep = false
-			return nil, fmt.Errorf("exec run %s: join service network: %w", runID, err)
+			return nil, notLaunched(fmt.Errorf("exec run %s: join service network: %w", runID, err))
 		}
 	}
 	if rc.FaultRuntime != nil {
 		if _, err := e.cfg.Docker.MustRun(ctx, "network", "connect", rc.FaultRuntime.Network, joiner); err != nil {
 			keep = false
-			return nil, fmt.Errorf("join adapter fault network: %w", err)
+			return nil, notLaunched(fmt.Errorf("join adapter fault network: %w", err))
 		}
 	}
 	wall := time.Duration(plan.WallS) * time.Second
@@ -435,6 +441,7 @@ func (e *dockerWorkspace) Destroy(ctx context.Context, rc *schemas.RunContext) e
 		return err
 	}
 	e.revokeServiceKeys(ctx, runID) // W3 customer support: any service key still live (servicegateway.go)
+	defer forgetCollector(runID)    // Agent events area: the run's collector bookkeeping ends with the run (eventcollector.go)
 	filter := "label=" + utils.LabelRun + "=" + runID
 	var errs []error
 	ps, err := e.cfg.Docker.MustRun(ctx, "ps", "-aq", "--filter", filter)

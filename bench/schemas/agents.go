@@ -299,10 +299,14 @@ type AgentMessage struct {
 	DeliveredAt   time.Time         `json:"delivered_at,omitzero"`
 	Received      string            `json:"received,omitempty"`
 	Altered       bool              `json:"altered,omitempty"`
-	Fault         string            `json:"fault,omitempty"` // a tool fault that answered or changed the send or its delivery
-	Nonce         string            `json:"nonce,omitempty"`
-	SendSeq       int               `json:"send_seq,omitempty"` // ToolCall.Seq of the send row
-	RecvSeqs      []int             `json:"recv_seqs,omitempty"`
+	// ReceivedBy is what each reader got, for the readers whose text
+	// differs from Body only: a fault can alter one recipient's copy of a
+	// broadcast. Received is the earliest such reader's text.
+	ReceivedBy map[string]string `json:"received_by,omitempty"`
+	Fault      string            `json:"fault,omitempty"` // a tool fault that answered or changed the send or its delivery
+	Nonce      string            `json:"nonce,omitempty"`
+	SendSeq    int               `json:"send_seq,omitempty"` // ToolCall.Seq of the send row
+	RecvSeqs   []int             `json:"recv_seqs,omitempty"`
 }
 
 // TeamEnvironment is the optional environment extension that runs a team:

@@ -93,7 +93,10 @@ func (e *dockerWorkspace) createMember(ctx context.Context, rc *schemas.RunConte
 	if err != nil {
 		return err
 	}
-	mounts, links, err := e.agentMounts(ctx, rc, plan, expID, runID)
+	plan = withTaskEnv(rc, plan) // X2: the compose workspace service's environment, as a single agent gets it (compose.go)
+	// Plan folder volumes are the member's own: a shared run-scoped name
+	// would make the next member recreate a volume this one already mounts.
+	mounts, links, err := e.agentMountsFor(ctx, rc, plan, expID, runID, memberVolumeKey(runID, m.Member.ID))
 	if err != nil {
 		return err
 	}
@@ -158,6 +161,9 @@ func MemberStreamFile(id string) string { return "agent." + id + ".stream.jsonl"
 func memberStreamPaths(dir, id string) (string, string) {
 	return filepath.Join(dir, MemberStreamFile(id)), filepath.Join(dir, "agent."+id+".stderr.txt")
 }
+
+// memberVolumeKey names a member's own plan folder volumes.
+func memberVolumeKey(runID, id string) string { return runID + "-m-" + id }
 
 func memberContainer(runID, id string) string { return agentContainer(runID) + "-m-" + id }
 

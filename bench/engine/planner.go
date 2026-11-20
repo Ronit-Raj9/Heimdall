@@ -227,7 +227,7 @@ func (p *Planner) plan(ctx context.Context, exp *schemas.Experiment, mode planMo
 			return nil, fmt.Errorf("plan %s: compatibility: %w", e.ID, err)
 		}
 	}
-	if conds, compat, err = p.screenAll(suite, &e, conds, compat, mode.lockWarnOnly); err != nil { // Suite health area: split and quarantine (taskscreen.go)
+	if conds, compat, err = p.screenAll(ctx, suite, &e, conds, compat, mode.lockWarnOnly); err != nil { // Suite health area: split and quarantine (taskscreen.go)
 		return nil, fmt.Errorf("plan %s: %w", e.ID, err)
 	}
 	all := append(append([]condPlan(nil), conds...), compat...)
@@ -306,6 +306,9 @@ func (p *Planner) plan(ctx context.Context, exp *schemas.Experiment, mode planMo
 		}
 	}
 	if err := p.checkScenario(suite, all, m.Arms, m.Compatibility); err != nil {
+		return nil, fmt.Errorf("plan %s: %w", e.ID, err)
+	}
+	if err := checkTeamCombos(&e, suite, m.Arms, conds, m.Compatibility, compat); err != nil { // Multi-agent area: unsupported team combinations refused before freezing (taskteam.go)
 		return nil, fmt.Errorf("plan %s: %w", e.ID, err)
 	}
 	if m.Experiment.Environment, err = p.planDriver(&e, suite, all, m); err != nil { // X3: driver refusals, the frozen driver (driverplan.go)
@@ -963,6 +966,9 @@ func (p *Planner) checkAgent(cfg *schemas.AgentConfig) error {
 		if _, ok := findPart(p.reg.Parsers, cfg.Parser); !ok {
 			return fmt.Errorf("parser %q is not registered", cfg.Parser)
 		}
+	}
+	if err := checkResourceBudgets(cfg); err != nil {
+		return err
 	}
 	if cfg.Notes.UserFile != "" && !path.IsAbs(cfg.Notes.UserPath) {
 		return fmt.Errorf("notes.user_file is set but notes.user_path %q is not an absolute container path", cfg.Notes.UserPath)

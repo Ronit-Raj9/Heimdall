@@ -43,7 +43,7 @@ def save():
 def store(frm, sender, to, body, fields, planted=False, nonce=""):
     m = {"seq": len(messages) + 1, "id": str(len(messages) + 1), "from": frm, "sender": sender, "to": to,
          "body": body, "fields": fields or {}, "at": now(), "planted": planted, "fault": "", "delivered": None,
-         "read_by": [], "read_at": {}, "nonce": nonce}
+         "read_by": [], "read_at": {}, "received_by": {}, "nonce": nonce}
     messages.append(m)
     return m
 
@@ -71,6 +71,8 @@ def deliver(m, reader):
         m["delivered"] = body
     m["read_by"].append(reader)
     m["read_at"][reader] = now()
+    # what this reader got: a broadcast can be altered for one reader only
+    m.setdefault("received_by", {})[reader] = body
     return {"id": m["id"], "from": m["from"], "to": m["to"], "body": body, "fields": m["fields"], "at": m["at"]}
 
 
