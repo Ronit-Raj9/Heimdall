@@ -7,7 +7,7 @@ skills, its prompt, its model) measured on tasks cut from your own history:
 ```sh
 heimdall init                       # detect tests, agent CLIs, Docker, ports; write .heimdall/
 heimdall tasks mine -limit 10       # cut tasks from fix commits; keep only the proven ones
-heimdall compare --baseline main --candidate HEAD --base agents/claude-code.yaml --trials 3 --fault model-outage
+heimdall compare --baseline main --candidate HEAD --base agents/claude-code.yaml --trials 3 --fault model-outage --budget-usd 5
 heimdall ci install github          # the same gate on every pull request
 ```
 
@@ -38,7 +38,7 @@ proxy's scripted model would have answered any model call. Total spend $0.
 | 2 | `heimdall tasks mine -limit 10` | 28 min 9 s | 0 |
 | 2b | `heimdall task review <task>` (marks it, proves it again) | 74.8 s | 0 |
 | 3 | `heimdall compare --a agents/oracle.yaml --b agents/noop.yaml --trials 1 --fault model-outage` | 21 min 39 s | 5 |
-| 3b | `heimdall compare --baseline HEAD~1 --candidate HEAD --base agents/claude-code.yaml --write-only` | 0.1 s | 0 |
+| 3b | `heimdall compare --baseline HEAD~1 --candidate HEAD --base agents/claude-code.yaml --budget-usd 5 --write-only` | 0.1 s | 0 |
 | 4 | `heimdall ci install github -dry-run` | 0.0 s | 0 |
 | 4b | the workflow's gate locally: `ci/check.sh recorded` on the sealed run, then `heimdall ci card` | 0.9 s | 5 |
 
@@ -91,7 +91,7 @@ next (from the repository root; every step is $0 until a real model runs):
      cost: $0; a port is in use, so a stack may already be running: reuse it (copy its tokens into .heimdall/deploy/.env) or change the ports first
   6. heimdall tasks mine -limit 10
      cost: $0 (no model; runs your tests in containers to prove each task)
-  7. heimdall compare --a agents/oracle.yaml --b agents/noop.yaml --trials 1   # then: --baseline main --candidate HEAD --base agents/<your agent>.yaml
+  7. heimdall compare --a agents/oracle.yaml --b agents/noop.yaml --trials 1   # then: --baseline main --candidate HEAD --base agents/<your agent>.yaml --budget-usd 5
      cost: $0 with the scripted agents shown; a real agent shows its forecast and asks before spending
   8. heimdall ci install github -dry-run
      cost: $0 (writes a file)
@@ -307,7 +307,7 @@ The refs form writes the experiment for a change to the agent's own files
 (here the AGENTS.md commit) and, with `--write-only`, stops before planning:
 
 ```console
-$ heimdall compare --baseline HEAD~1 --candidate HEAD --base agents/claude-code.yaml --trials 3 --fault model-outage --name walk-notes --write-only
+$ heimdall compare --baseline HEAD~1 --candidate HEAD --base agents/claude-code.yaml --trials 3 --fault model-outage --budget-usd 5 --name walk-notes --write-only
 wrote ~/minitext/.heimdall/experiments/walk-notes.yaml
   agent files at `HEAD~1` (4d0e36a2d04d, 1 files) vs `HEAD` (254f9cd3f438, 1 files)
 --write-only: nothing planned or run; run it with
@@ -318,7 +318,7 @@ wrote ~/minitext/.heimdall/experiments/walk-notes.yaml
 # Written by `heimdall compare`; a normal experiment file. Rerun it from the
 # project folder (.heimdall/) with
 #   heimdall check experiments/walk-notes.yaml
-# from: heimdall compare --baseline HEAD~1 --candidate HEAD --base agents/claude-code.yaml --trials 3 --fault model-outage --name walk-notes --write-only
+# from: heimdall compare --baseline HEAD~1 --candidate HEAD --base agents/claude-code.yaml --trials 3 --fault model-outage --budget-usd 5 --name walk-notes --write-only
 name: walk-notes
 suite: minitext
 base: agents/claude-code.yaml
@@ -337,7 +337,7 @@ guards:
 conditions:
   - {id: clean, tasks: all, trials: 3}
   - {id: model-outage, tasks: all, trials: 3}
-budget: {total_usd: 0}
+budget: {total_usd: 5}
 verdict: {policy: paired_signflip, alpha: 0.05, assumed_sd: 0.30}
 seed: 20261118
 concurrency: 2

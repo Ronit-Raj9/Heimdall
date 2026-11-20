@@ -151,7 +151,15 @@ func TestCompareExperimentForms(t *testing.T) {
 		t.Fatalf("models form: %+v %v", exp, err)
 	}
 
-	f = compareFlags{baseline: base, candidate: ref, trials: 3, repo: dir, paths: strings.Join(scaffold.DefaultAgentPaths, ","), name: "refs"}
+	f = compareFlags{a: "model=claude-sonnet-4-5", b: "model=claude-haiku-4-5", trials: 1, repo: dir, name: "zero-budget"}
+	if _, err := buildCompare(ctx, f, cfg); err == nil || !strings.Contains(err.Error(), "--budget-usd") {
+		t.Errorf("a real-model compare with --budget-usd 0 was written uncapped: %v", err) // audit 5-B-02
+	}
+	if _, err := os.Stat(filepath.Join(dir, ".heimdall", "experiments", "zero-budget.yaml")); err == nil {
+		t.Error("the refused zero-budget experiment file was written")
+	}
+
+	f = compareFlags{baseline: base, candidate: ref, trials: 3, budget: 2, repo: dir, paths: strings.Join(scaffold.DefaultAgentPaths, ","), name: "refs"}
 	s, err = buildCompare(ctx, f, cfg)
 	if err != nil {
 		t.Fatal(err)

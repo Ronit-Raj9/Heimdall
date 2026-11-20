@@ -86,7 +86,7 @@ func (s *runnerSpend) add(res *SlotResult, m *schemas.Manifest) error {
 	if s == nil || res == nil || res.Run == nil {
 		return nil
 	}
-	c, ok := runCost(res.Metrics, res.Run)
+	c, ok := spendCost(res.Dir, res.Metrics, res.Run)
 	unknown := !ok
 	if unknown {
 		c = DefaultUnknownRunUSD

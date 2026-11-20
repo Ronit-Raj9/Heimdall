@@ -24,6 +24,10 @@ const (
 	DefaultStaleAfter     = 2 * time.Minute
 	DefaultHeartbeatEvery = 15 * time.Second
 	costMetric            = "cost_usd"
+	// simulatorCostMetric is the model-played user's own spend
+	// (metrics.SimulatorCostUSD). It is never part of cost_usd, but it is
+	// spend, so the budget counts it (runCost).
+	simulatorCostMetric = "simulator_cost_usd"
 )
 
 // ErrLeaseLost is the cause of a slot context the scheduler cancelled because
@@ -323,7 +327,7 @@ func (r *schedRun) spentSoFar(ctx context.Context) error {
 			if !rec.Sealed {
 				continue
 			}
-			c, known, err := readCost(rec.Dir, &rec.Run)
+			c, known, err := readSpend(rec.Dir, &rec.Run)
 			if err != nil {
 				r.s.logger.Warn("unreadable metrics.json", "run", rec.Run.RunID, "error", err.Error())
 			}
@@ -333,6 +337,18 @@ func (r *schedRun) spentSoFar(ctx context.Context) error {
 			}
 			r.observeLocked(c)
 		}
+	}
+	charges, err := r.remoteCharges()
+	if err != nil {
+		return err
+	}
+	for _, ch := range charges {
+		if ch.CostKnown {
+			r.observeLocked(*ch.ChargedUSD)
+			continue
+		}
+		r.sum.SpentUSD += *ch.ChargedUSD
+		r.sum.UnknownCostRuns++
 	}
 	for range unknown {
 		r.sum.SpentUSD += r.estimateLocked()
@@ -401,6 +417,10 @@ func (r *schedRun) attempts(ctx context.Context, slot *schemas.Slot, est float64
 	}
 	budget := maxAttempts + r.stoppedRuns(ctx, slot) // Jobs area: a run its owner stopped (cancel, shutdown) uses no attempt (cancel.go)
 	for attempts < budget && ctx.Err() == nil {
+		if r.capReached() { // every charge so far is recorded: a retry or a run after recovery never starts past the cap
+			r.count(func(s *Summary) { s.Pending++ })
+			return
+		}
 		if attempts > 0 {
 			r.count(func(s *Summary) { s.Retried++ })
 		}
@@ -497,7 +517,7 @@ func (r *schedRun) record(res *SlotResult, est float64) {
 	if res == nil {
 		return
 	}
-	c, known := runCost(res.Metrics, res.Run)
+	c, known := spendCost(res.Dir, res.Metrics, res.Run)
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	if known {
@@ -575,17 +595,37 @@ func (r *schedRun) reserveLocked() (est float64, ok, wait bool) {
 	return 0, false, true
 }
 
+// capReached reports, under mu, whether the spend recorded so far is at or
+// past the cap, and then stops leasing for good. With no cap it is false. It
+// is checked before every new attempt on a slot that already holds a
+// reservation, since that reservation was sized for one run, not a retry.
+func (r *schedRun) capReached() bool {
+	limit := r.m.Experiment.Budget.TotalUSD
+	if limit <= 0 {
+		return false
+	}
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	if r.sum.SpentUSD >= limit {
+		r.stopped, r.sum.BudgetStopped = true, true
+	}
+	return r.stopped
+}
+
 // charge adds the cost of a run that ran on a remote worker but was never
 // sealed here (a rejected upload, a lost or abandoned lease): the cost the
 // worker reported when it was observed, else the slot's reservation or the
-// per-run estimate when that is higher, never zero.
-func (r *schedRun) charge(cost *schemas.Value, est float64, why string) {
+// per-run estimate when that is higher, never zero. It returns what it
+// counted and whether that was an observed cost, so the coordinator can
+// journal the charge and a resumed scheduler can count it again
+// (remoteCharges).
+func (r *schedRun) charge(cost *schemas.Value, est float64, why string) (float64, bool) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	if cost != nil {
 		if c, ok := cost.Float(); ok && c >= 0 {
 			r.observeLocked(c)
-			return
+			return c, true
 		}
 	}
 	counted := max(est, r.estimateLocked())
@@ -593,6 +633,7 @@ func (r *schedRun) charge(cost *schemas.Value, est float64, why string) {
 	r.sum.UnknownCostRuns++
 	r.s.logger.Warn("remote run cost unknown; counted at the per-run estimate", "experiment", r.m.ExpID,
 		"why", why, "counted_usd", counted)
+	return counted, false
 }
 
 // release returns a reservation once the slot's last attempt is recorded and
@@ -613,12 +654,15 @@ func (r *schedRun) release(est float64) {
 }
 
 // estimateLocked is one run's expected cost: the highest cost observed so
-// far, or budget.reserve_usd when that is higher. Before any cost is observed
-// and with no reserve_usd it is the whole remaining budget, so the first run
-// runs alone until its cost is known. The caller holds mu.
+// far, or budget.reserve_usd when that is higher. Before any positive cost is
+// observed and with no reserve_usd it is the whole remaining budget, so runs
+// go one at a time until a positive cost is known. An observed zero (a run
+// whose agent never started, or a free run) never makes the estimate zero,
+// since an unknown cost charged at zero would leave the cap untouched. The
+// caller holds mu.
 func (r *schedRun) estimateLocked() float64 {
 	reserve := r.m.Experiment.Budget.ReserveUSD
-	if r.observed || reserve > 0 {
+	if (r.observed && r.maxCost > 0) || reserve > 0 {
 		return max(r.maxCost, reserve)
 	}
 	return max(r.m.Experiment.Budget.TotalUSD-r.sum.SpentUSD, 0)
@@ -761,17 +805,86 @@ func readCost(dir string, run *schemas.Run) (float64, bool, error) {
 	return c, known, err
 }
 
-// runCost is a run's observed cost_usd. A run whose agent never started made
-// no model call, so its cost is a known 0 even with no metrics. Any other
-// run without an observed cost has an unknown cost. It is pure.
+// runCost is a run's observed spend for the budget: cost_usd plus the
+// model-played user's simulator_cost_usd when that applies. A run whose
+// agent never started made no model call, so its cost is a known 0 even with
+// no metrics. Any other run without an observed cost_usd, or whose simulator
+// spend applies but was not observed, has an unknown cost. It is pure.
 func runCost(metrics map[string]schemas.Value, run *schemas.Run) (float64, bool) {
-	if c, ok := metrics[costMetric].Float(); ok {
-		return c, true
+	c, ok := metrics[costMetric].Float()
+	if !ok {
+		if run == nil || run.Timing.AgentStarted == nil {
+			return 0, true
+		}
+		return 0, false
 	}
-	if run == nil || run.Timing.AgentStarted == nil {
+	if v, present := metrics[simulatorCostMetric]; present && v.State != "" && v.State != schemas.ValueNotApplicable {
+		sim, ok := v.Float()
+		if !ok {
+			return 0, false
+		}
+		c += sim
+	}
+	return c, true
+}
+
+// judgeCost is what the run's judge model calls cost, from grade.json in the
+// run folder: 0 when the run has no grade or was not judged, unknown when a
+// judge voted but its cost was not observed. The judge's cost is never part
+// of cost_usd, but it is spend, so the budget counts it.
+func judgeCost(dir string) (float64, bool) {
+	if dir == "" {
 		return 0, true
 	}
-	return 0, false
+	b, err := os.ReadFile(filepath.Join(dir, "grade.json"))
+	if err != nil {
+		return 0, errors.Is(err, fs.ErrNotExist)
+	}
+	var g struct {
+		Judge *struct {
+			USD schemas.Value `json:"usd"`
+		} `json:"judge"`
+	}
+	if json.Unmarshal(b, &g) != nil {
+		return 0, false
+	}
+	if g.Judge == nil || g.Judge.USD.State == "" || g.Judge.USD.State == schemas.ValueNotApplicable {
+		return 0, true
+	}
+	return g.Judge.USD.Float()
+}
+
+// spendCost is a finished run's whole spend for the budget: runCost plus
+// judgeCost. Either part unknown makes the whole unknown.
+func spendCost(dir string, metrics map[string]schemas.Value, run *schemas.Run) (float64, bool) {
+	c, ok := runCost(metrics, run)
+	if !ok {
+		return 0, false
+	}
+	if run == nil || run.Timing.AgentStarted == nil {
+		return c, true // no agent, no grade: nothing was judged
+	}
+	j, ok := judgeCost(dir)
+	if !ok {
+		return 0, false
+	}
+	return c + j, true
+}
+
+// readSpend is readCost plus the run's judge cost (spendCost).
+func readSpend(dir string, run *schemas.Run) (float64, bool, error) {
+	c, known, err := readCost(dir, run)
+	if !known {
+		return 0, false, err
+	}
+	if run == nil || run.Timing.AgentStarted == nil {
+		return c, true, err
+	}
+	j, ok := judgeCost(dir)
+	if !ok {
+		return 0, false, err
+	}
+	return c + j, true, err
 }
 
 // slotQueue hands the experiment's slots out in OrderIndex order, to the

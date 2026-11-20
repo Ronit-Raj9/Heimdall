@@ -698,7 +698,7 @@ func costValue(res *SlotResult) schemas.Value {
 	if res == nil {
 		return schemas.Unknown("no run result on the worker", schemas.EvidenceGateway)
 	}
-	if c, ok := runCost(res.Metrics, res.Run); ok {
+	if c, ok := spendCost(res.Dir, res.Metrics, res.Run); ok {
 		return schemas.Observed(c, schemas.EvidenceGateway)
 	}
 	return schemas.Unknown("cost_usd was not observed on the worker", schemas.EvidenceGateway)

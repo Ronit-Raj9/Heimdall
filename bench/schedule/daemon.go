@@ -353,9 +353,8 @@ func (d *Daemon) capRefusal(s Schedule, day string) string {
 		return "max_usd_per_day is required for a non-smoke experiment"
 	}
 	if exp.Budget.TotalUSD <= 0 {
-		if exp.Smoke {
-			return ""
-		}
+		// A stated daily cap holds for smoke experiments too: smoke does not
+		// prove every part (model-played users, judges) is scripted.
 		return "the experiment has no spend cap (budget.total_usd), so max_usd_per_day cannot hold"
 	}
 	spent := d.spent(s.Name, day)

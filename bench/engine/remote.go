@@ -1,6 +1,7 @@
 package engine
 
 import (
+	"bytes"
 	"context"
 	"crypto/sha256"
 	"crypto/subtle"
@@ -458,9 +459,9 @@ func (c *Coordinator) Complete(ctx context.Context, leaseID string, req *schemas
 	if reason != "" {
 		c.logger.Error("remote upload rejected; the slot is released for another run", "experiment", l.r.m.ExpID,
 			"slot", l.slot.SlotID, "worker", l.worker, "lease", l.id, "reason", reason)
-		c.journal(l.r, "rejected", l, reason)
 		l.r.count(func(s *Summary) { s.RemoteRejected++ })
-		l.r.charge(&req.CostUSD, l.est, "rejected upload of lease "+l.id)
+		usd, known := l.r.charge(&req.CostUSD, l.est, "rejected upload of lease "+l.id)
+		c.journalCharge(l.r, "rejected", l, reason, usd, known) // before the answer: a resumed scheduler counts it again
 		l.r.emit(Event{Kind: EventError, SlotID: l.slot.SlotID, RunID: req.RunID, Message: "remote upload rejected: " + reason})
 		l.r.endRemote(l, true)
 		return out, nil
@@ -510,9 +511,12 @@ func (c *Coordinator) Release(ctx context.Context, leaseID string, req *schemas.
 	c.remove(l.archive)
 	c.logger.Warn("remote lease given back", "experiment", l.r.m.ExpID, "slot", l.slot.SlotID, "worker", l.worker,
 		"refused", req.Refuse, "reason", req.Reason)
-	c.journal(l.r, map[bool]string{true: "refused", false: "released"}[req.Refuse], l, req.Reason)
+	event := map[bool]string{true: "refused", false: "released"}[req.Refuse]
 	if req.CostUSD != nil {
-		l.r.charge(req.CostUSD, l.est, "abandoned lease "+l.id)
+		usd, known := l.r.charge(req.CostUSD, l.est, "abandoned lease "+l.id)
+		c.journalCharge(l.r, event, l, req.Reason, usd, known) // before the answer: a resumed scheduler counts it again
+	} else {
+		c.journal(l.r, event, l, req.Reason)
 	}
 	l.r.endRemote(l, true)
 	return nil
@@ -797,9 +801,9 @@ func (c *Coordinator) loseLocked(l *remoteLease, why string) {
 	c.remove(l.archive)
 	r := l.r
 	r.count(func(s *Summary) { s.LeaseLost++ })
-	r.charge(nil, l.est, "lost lease "+l.id)
+	usd, known := r.charge(nil, l.est, "lost lease "+l.id)
 	r.emit(Event{Kind: EventError, SlotID: l.slot.SlotID, Message: "remote lease lost: " + why})
-	c.journalLocked(r, "lost", l, why)
+	c.journalLocked(r, journalEntry{Event: "lost", Detail: why, ChargedUSD: &usd, CostKnown: known}, l)
 	r.release(l.est)
 	r.queue.giveBack(l.slot)
 }
@@ -857,18 +861,33 @@ type journalEntry struct {
 	Slot    string    `json:"slot"`
 	Attempt int       `json:"attempt"`
 	Detail  string    `json:"detail,omitempty"`
+	// ChargedUSD is what the scheduler counted against the spend cap for a
+	// run that was never sealed here (rejected, released after its agent
+	// started, lost); CostKnown says it was the observed cost rather than the
+	// estimate. A resumed scheduler adds these back (remoteCharges), once per
+	// lease.
+	ChargedUSD *float64 `json:"charged_usd,omitempty"`
+	CostKnown  bool     `json:"cost_known,omitempty"`
 }
 
 func (c *Coordinator) journal(r *schedRun, event string, l *remoteLease, detail string) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
-	c.journalLocked(r, event, l, detail)
+	c.journalLocked(r, journalEntry{Event: event, Detail: detail}, l)
 }
 
-// journalLocked appends one journal line; a failure is logged, never fatal.
-func (c *Coordinator) journalLocked(r *schedRun, event string, l *remoteLease, detail string) {
-	b, err := json.Marshal(journalEntry{At: c.now().UTC(), Event: event, Lease: l.id, Worker: l.worker, Slot: l.slot.SlotID,
-		Attempt: l.attempt, Detail: detail})
+// journalCharge journals an event that charged an unsealed run's spend.
+func (c *Coordinator) journalCharge(r *schedRun, event string, l *remoteLease, detail string, usd float64, known bool) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	c.journalLocked(r, journalEntry{Event: event, Detail: detail, ChargedUSD: &usd, CostKnown: known}, l)
+}
+
+// journalLocked appends one journal line (e's event, detail and charge, the
+// rest from l); a failure is logged, never fatal.
+func (c *Coordinator) journalLocked(r *schedRun, e journalEntry, l *remoteLease) {
+	e.At, e.Lease, e.Worker, e.Slot, e.Attempt = c.now().UTC(), l.id, l.worker, l.slot.SlotID, l.attempt
+	b, err := json.Marshal(e)
 	if err == nil {
 		err = appendFile(filepath.Join(c.opts.StagingDir, r.m.ExpID+".jsonl"), append(b, '\n'))
 	}
@@ -932,6 +951,10 @@ func (r *schedRun) leaseRemoteWhere(owner string, accept func(*schemas.Task) boo
 			continue
 		}
 		attempts, done := r.settle(r.ctx, slot, est)
+		if !done && r.capReached() { // recovery charges are in: no new attempt past the cap
+			r.count(func(s *Summary) { s.Pending++ })
+			done = true
+		}
 		if done {
 			r.releaseStoreLease(slot, owner)
 			r.release(est)
@@ -1014,4 +1037,42 @@ func (c *Coordinator) remove(p string) {
 	if err := os.Remove(p); err != nil && !errors.Is(err, fs.ErrNotExist) {
 		c.logger.Warn("remove staged upload", "path", p, "error", err.Error())
 	}
+}
+
+// remoteCharges reads the remote journal of r's experiment for the spend
+// charged to runs that were never sealed here, one entry per lease, so a
+// resumed scheduler counts that spend again: sealed runs alone would reset
+// it. The journal is under the attached coordinator's staging folder, else
+// the default one under the store root. No journal means no charges; a line
+// that does not parse is skipped with a warning.
+func (r *schedRun) remoteCharges() ([]journalEntry, error) {
+	dir := filepath.Join(r.s.reg.Store.Root(), stagingFolder)
+	if r.opts.Remote != nil && r.opts.Remote.opts.StagingDir != "" {
+		dir = r.opts.Remote.opts.StagingDir
+	}
+	b, err := os.ReadFile(filepath.Join(dir, r.m.ExpID+".jsonl"))
+	if errors.Is(err, fs.ErrNotExist) {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, fmt.Errorf("read remote journal: %w", err)
+	}
+	var out []journalEntry
+	seen := map[string]bool{}
+	for _, line := range bytes.Split(b, []byte("\n")) {
+		if len(bytes.TrimSpace(line)) == 0 {
+			continue
+		}
+		var e journalEntry
+		if err := json.Unmarshal(line, &e); err != nil {
+			r.s.logger.Warn("unreadable remote journal line", "experiment", r.m.ExpID, "error", err.Error())
+			continue
+		}
+		if e.ChargedUSD == nil || *e.ChargedUSD < 0 || seen[e.Lease] {
+			continue
+		}
+		seen[e.Lease] = true
+		out = append(out, e)
+	}
+	return out, nil
 }

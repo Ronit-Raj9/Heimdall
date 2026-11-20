@@ -30,9 +30,12 @@ With `budget.total_usd` set, a worker reserves one run's estimated cost before i
 
 - At or past the cap the scheduler stops leasing for good (`budget_stopped`).
 - Below it, a slot starts when nothing is in flight, or when the spend so far plus every in-flight reservation is still below the cap. Otherwise the worker waits for an in-flight slot to finish.
-- The estimate is the highest cost observed so far in the experiment, or `budget.reserve_usd` when that is higher. Before any cost is observed and with no `reserve_usd`, the estimate is the whole remaining budget, so the first run runs alone until its cost is known.
+- The estimate is the highest cost observed so far in the experiment, or `budget.reserve_usd` when that is higher. Before any positive cost is observed and with no `reserve_usd`, the estimate is the whole remaining budget, so runs go one at a time until a positive cost is known. An observed zero (a run whose agent never started) never makes the estimate zero.
 - A run whose agent started but whose `cost_usd` is unknown is counted at the estimate, never as zero, on resume too. The summary reports `unknown_cost_runs`. Without `reserve_usd`, one unknown-cost run before any observed cost uses up the cap; set `reserve_usd` to a realistic per-run cost when costs may be unknown (a model missing from the price snapshot).
 - A run whose agent never started made no model call, so its cost is a known zero.
+- A run's budgeted cost is its `cost_usd` plus the model-played user's `simulator_cost_usd` and its judge's cost (`grade.json`); either part unknown makes the run's cost unknown. `cost_usd` itself stays agent-only for arm comparison.
+- A retry (and the first new attempt after an interrupted run is recovered) starts only while the spend so far is under the cap.
+- Spend charged to a remote run that was never sealed (a rejected upload, an abandoned or lost lease) is written to the remote journal with the charge and counted again on resume, once per lease.
 
 Eight workers against a cap that allows three runs start exactly three (`TestSchedulerSpendCapConcurrent`). The cap can still be passed by at most the last admitted run's estimate plus whatever in-flight runs cost beyond their estimates.
 
