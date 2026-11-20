@@ -2,6 +2,7 @@ package store
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"os"
 	"path/filepath"
@@ -142,8 +143,8 @@ func TestSealedRunsRegate(t *testing.T) {
 		Y:             schemas.Observed(0, schemas.EvidenceOutcome),
 		Metrics:       map[string]schemas.Value{"verified_success": schemas.Observed(0, schemas.EvidenceOutcome)},
 	}
-	if err := s.WriteGateRegrade(ctx, "e_test", "rg_g", "r_a1_2", info, regate); err != nil {
-		t.Fatalf("WriteGateRegrade: %v", err)
+	if err := s.WriteGateRegrades(ctx, "e_test", "rg_g", info, map[string]*GateRegrade{"r_a1_2": regate}); err != nil {
+		t.Fatalf("WriteGateRegrades: %v", err)
 	}
 	got, err := s.SealedRuns(ctx, "e_test", "rg_g")
 	if err != nil {
@@ -463,5 +464,73 @@ func TestIndexVerifyRun(t *testing.T) {
 	err := ix.VerifyRun(ctx, "r_a1_2")
 	if !errors.Is(err, schemas.ErrSealMismatch) || !strings.Contains(err.Error(), "file gates.json changed") {
 		t.Fatalf("tampered run: err = %v, want ErrSealMismatch naming gates.json", err)
+	}
+}
+
+// TestSealedRunsUseManifestSlots is the regression test for audit finding
+// 1-A-01: a slot.json edited after the run sealed (another arm, counted
+// turned off) neither moves the run into another verdict cell nor drops it.
+// The run keeps the manifest's slot and carries a problem, so the verdict is
+// INVALID.
+func TestSealedRunsUseManifestSlots(t *testing.T) {
+	ctx := context.Background()
+	s := newTestStore(t, nil)
+	m := mustCreateExp(t, s, "e_test")
+	mustSeal(t, s, mustNewRun(t, s, m, "s_a1", "r_a1", 1, schemas.OutcomePass))
+	mustSeal(t, s, mustNewRun(t, s, m, "s_b1", "r_b1", 1, schemas.OutcomeFail))
+	want := *slotOf(m, "s_a1")
+	stale := want
+	stale.Arm = "B"
+	stale.Task = "t99"
+	stale.Counted = false
+	b, err := json.Marshal(stale)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(s.expDir("e_test"), slotsDir, "s_a1", slotFile), b, 0o644); err != nil {
+		t.Fatal(err)
+	}
+	got, err := s.SealedRuns(ctx, "e_test", "original")
+	if err != nil {
+		t.Fatalf("SealedRuns: %v", err)
+	}
+	var a1 *schemas.SealedRun
+	for i := range got {
+		if got[i].Run.RunID == "r_a1" {
+			a1 = &got[i]
+		}
+	}
+	if a1 == nil {
+		t.Fatalf("r_a1 dropped by a stale counted flag: %+v", got)
+	}
+	if a1.Slot != want {
+		t.Fatalf("slot %+v, want the manifest's %+v", a1.Slot, want)
+	}
+	if len(a1.Problems) != 1 || !strings.Contains(a1.Problems[0], "disagrees with the manifest") || !strings.Contains(a1.Problems[0], "arm B, manifest "+want.Arm) {
+		t.Fatalf("problems %v, want the slot.json disagreement", a1.Problems)
+	}
+	for _, r := range got {
+		if r.Run.RunID != "r_a1" && len(r.Problems) != 0 {
+			t.Fatalf("untouched run %s has problems %v", r.Run.RunID, r.Problems)
+		}
+	}
+}
+
+// TestSealedRunsLedgerBreakIsProblem is the store half of audit finding
+// 3-B-07: a run sealed with a broken fault proxy ledger chain comes back
+// with an evidence problem, so the verdict is INVALID.
+func TestSealedRunsLedgerBreakIsProblem(t *testing.T) {
+	ctx := context.Background()
+	s := newTestStore(t, nil)
+	m := mustCreateExp(t, s, "e_test")
+	r := mustNewRun(t, s, m, "s_a1", "r_a1", 1, schemas.OutcomePass)
+	mustWrite(t, s, r, "evidence.json", `{"requests":{"complete":false,"reason":"proxy ledger hash chain broken (1 break(s))","row_ids":[],"requests":[]},"ledger_breaks":["entry 2 (slot \"a\", call 0): hash does not match content"]}`)
+	mustSeal(t, s, r)
+	got, err := s.SealedRuns(ctx, "e_test", "original")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(got) != 1 || len(got[0].Problems) != 1 || !strings.Contains(got[0].Problems[0], "proxy ledger hash chain broken") {
+		t.Fatalf("got %+v, want one run with the ledger break as a problem", got)
 	}
 }

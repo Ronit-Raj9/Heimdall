@@ -19,4 +19,4 @@ tasks/ferry-start/task.yaml 644 ca7ee6c1aa3e9e29c76367d3223b25a79c0ce7bfce64e49d
 tasks/ferry-start/verifier/requirements.md 644 f7c342aab536b9143924e93c6596cf2c6e1f596552d9963bcff5e25ad386d3ed
 tasks/ferry-start/verifier/tests/corpus_urls.json 644 a1ac617559db87b9b64c02445d709f7c69163553c94a378276150a1ff18a5722
 tasks/ferry-start/verifier/tests/research.json 644 0454f292074acbf32bebd11430cd6cd980928a415fefef7961be8a76e812de3c
-tasks/ferry-start/verifier/tests/verify.py 644 5a9b877bdb978bdc24f9f76c8525dbffce22aec29decf6086f6b08393006aa18
+tasks/ferry-start/verifier/tests/verify.py 644 a468c30fb471b25acd8d8fb984e7f05ae5cac0d103eee8cf721fe09b42d487a8

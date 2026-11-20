@@ -77,6 +77,15 @@ func (s *gatewaySource) Collect(ctx context.Context, rc *schemas.RunContext, ev 
 	if log == nil {
 		return fmt.Errorf("fetch gateway requests for run %s: %w", id, errNoLog)
 	}
+	if len(ev.LedgerBreaks) > 0 {
+		// The ledger this log was matched against does not verify, so its
+		// completeness cannot be claimed (audit 3-B-07).
+		reason := fmt.Sprintf("proxy ledger hash chain broken (%d break(s))", len(ev.LedgerBreaks))
+		if !log.Complete && log.Reason != "" {
+			reason = log.Reason + "; " + reason
+		}
+		log.Complete, log.Reason = false, reason
+	}
 	ev.Requests = log
 	ev.LogicalSteps, ev.Attempts, ev.Retries, ev.Fallbacks, ev.RequestedTools = NormalizeRequestRecords(log)
 	utils.MarkExternalTraffic(rc, log) // Remote area: a remote_http agent's external model calls leave tokens, cost and steps unknown

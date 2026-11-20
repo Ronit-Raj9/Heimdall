@@ -8,6 +8,8 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/maximhq/bifrost/bench/environments"
+	"github.com/maximhq/bifrost/bench/graders"
 	"github.com/maximhq/bifrost/bench/schemas"
 	"github.com/maximhq/bifrost/bench/utils"
 )
@@ -93,5 +95,57 @@ func TestCheckSuiteDriftNeedsFrozenLock(t *testing.T) {
 	}
 	if err := CheckSuiteDrift(&schemas.Manifest{SuiteLockHash: "sha256:new"}, s, ""); err != nil {
 		t.Fatalf("same lock: %v", err)
+	}
+}
+
+// TestCheckEvaluatorRefusesEditedTask is the regression test for audit
+// finding 8-D-01: with suite.lock unchanged, a task edited after locking
+// (here a new protected path) changes what G1 reads, so a regate refuses
+// instead of applying the edited rule to the sealed diffs. A lock without
+// fingerprints is refused too: it binds nothing to compare.
+func TestCheckEvaluatorRefusesEditedTask(t *testing.T) {
+	root := codingCore(t)
+	ctx := context.Background()
+	if _, err := SuiteLock(ctx, LockOptions{BenchRoot: root, Ref: "coding-core"}, nil); err != nil {
+		t.Fatal(err)
+	}
+	s, err := LoadSuite(ctx, root, "coding-core")
+	if err != nil {
+		t.Fatal(err)
+	}
+	// The registry the lock binds part versions from (LockFingerprintOptions).
+	reg := &schemas.Registry{
+		Environments: environments.Builtin(environments.DockerWorkspaceConfig{}),
+		Graders:      append([]schemas.Grader{graders.NewJudge(graders.JudgeConfig{})}, graders.Builtin(graders.HiddenTestsConfig{})...),
+	}
+	m := &schemas.Manifest{SuiteLockHash: s.LockHash, Experiment: schemas.Experiment{Suite: "coding-core"},
+		Slots: []schemas.Slot{{SlotID: "s_1", Task: "t01", Condition: schemas.ConditionClean}}}
+	if err := CheckSuiteDrift(m, s, ""); err != nil {
+		t.Fatalf("lock drift: %v", err)
+	}
+	if err := CheckEvaluator(ctx, reg, m, s); err != nil {
+		t.Fatalf("unchanged suite refused: %v", err)
+	}
+	p := filepath.Join(root, "coding-core", "tasks", "t01", "task.yaml")
+	b, err := os.ReadFile(p)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(p, append(b, []byte("\n# edited after locking\n")...), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	s, err = LoadSuite(ctx, root, "coding-core")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := CheckSuiteDrift(m, s, ""); err != nil {
+		t.Fatalf("the lock file did not change, yet: %v", err)
+	}
+	if err := CheckEvaluator(ctx, reg, m, s); err == nil || !strings.Contains(err.Error(), "task t01") {
+		t.Fatalf("edited task t01 accepted: %v", err)
+	}
+	s.Lock.Fingerprints = nil
+	if err := CheckEvaluator(ctx, reg, m, s); err == nil || !strings.Contains(err.Error(), "no fingerprints") {
+		t.Fatalf("legacy lock accepted: %v", err)
 	}
 }

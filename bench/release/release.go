@@ -449,11 +449,28 @@ func (l *Log) newestAnalysis(base string) (string, error) {
 // overridable.
 func checkRelease(m *schemas.Manifest, ev *evidence, override string) error {
 	a := ev.analysis
+	if err := utils.VerifyManifestHash(m); err != nil {
+		return &RefusedError{Reason: err.Error(), Err: schemas.ErrSealMismatch}
+	}
 	if a.Verdict.ManifestHash != "" && a.Verdict.ManifestHash != m.Hash {
 		return &RefusedError{Reason: fmt.Sprintf("analysis %s was computed on manifest %s, the experiment's is %s", a.AnalysisID, a.Verdict.ManifestHash, m.Hash)}
 	}
 	if len(ev.runs) == 0 {
 		return &RefusedError{Reason: "the experiment has no counted sealed runs"}
+	}
+	// The saved verdict is only released with the evidence it was computed
+	// from: a review, regrade or run added since makes the inputs differ, and
+	// the release needs a fresh analysis (audit 1-A-03). An analysis written
+	// before inputs_digest existed has no snapshot to compare and is
+	// released on its manifest and seal checks alone.
+	if a.InputsDigest != "" {
+		d, err := utils.AnalysisInputsDigest(ev.runs)
+		if err != nil {
+			return fmt.Errorf("create release: digest inputs: %w", err)
+		}
+		if d != a.InputsDigest {
+			return &RefusedError{Reason: fmt.Sprintf("the sealed runs, grades or reviews of %s changed after analysis %s (inputs %s, now %s); run a fresh analysis and release that", m.ExpID, a.AnalysisID, a.InputsDigest, d)}
+		}
 	}
 	var blocked []string
 	if a.Verdict.Action != schemas.ActionShip {

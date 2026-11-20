@@ -287,6 +287,9 @@ func newGatewayFacts(rc *schemas.RunContext, ev *schemas.Evidence, plan schemas.
 	}
 	slices.SortStableFunc(g.entries, func(a, b schemas.LedgerEntry) int { return a.Call - b.Call })
 	g.ledgerOK = len(g.entries) > 0 || !gatewayPartFailed(rc, gatewayLedgerPart)
+	if len(ev.LedgerBreaks) > 0 {
+		g.ledgerOK = false // a ledger whose chain does not verify is no receipt (audit 3-B-07)
+	}
 	switch {
 	case ev.Requests == nil:
 		g.rowsReason = "no gateway rows collected"

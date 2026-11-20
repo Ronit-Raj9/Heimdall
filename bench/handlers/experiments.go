@@ -219,7 +219,10 @@ func (h *ExperimentsHandler) getVerdict(ctx *fasthttp.RequestCtx) {
 		sendDepError(ctx, h.mode, "config diff of "+m.ExpID, err)
 		return
 	}
-	lib.SendJSON(ctx, h.mode, fasthttp.StatusOK, schemas.VerdictPayload{
+	// The verdict carries the analysis's own mode (a smoke experiment is
+	// synthetic on a live server), never a stronger label than its evidence
+	// (audit 7-B-03).
+	lib.SendJSON(ctx, analysisMode(h.mode, a), fasthttp.StatusOK, schemas.VerdictPayload{
 		ExpID: m.ExpID, AnalysisID: a.AnalysisID, GradeSource: a.GradeSource, Suite: m.Experiment.Suite,
 		Verdict: a.Verdict, Naive: a.Naive, Gates: gates, ConfigDiff: diff, Policy: a.Policy,
 		ReviewedRuns: a.ReviewedRuns, ReviewChangedRuns: a.ReviewChangedRuns, // human review counts (docs/human-review.md)
@@ -531,4 +534,14 @@ func (h *ExperimentsHandler) analyze(ctx *fasthttp.RequestCtx, expID string) (*s
 		h.analyses.Store(expID, a.AnalysisID)
 	}
 	return a, true
+}
+
+// analysisMode is the mode a response about analysis a is labeled with: the
+// analysis's mode when it records one and the server is live, else the
+// server's. It is never live unless both the server and the analysis are.
+func analysisMode(server schemas.Mode, a *schemas.Analysis) schemas.Mode {
+	if server == schemas.ModeLive && a != nil && a.Mode != "" {
+		return a.Mode
+	}
+	return server
 }

@@ -54,7 +54,8 @@ ABSTAIN = [
 ]
 WORDS = {w: i for i, w in enumerate("zero one two three four five six seven eight nine ten eleven twelve thirteen "
                                     "fourteen fifteen sixteen seventeen eighteen nineteen twenty".split())}
-NUMBER = re.compile(r"\d{1,3}(?:,\d{3})+(?:\.\d+)?|\d+(?:\.\d+)?")
+# Same grammar as numberRe in graders/answermatch.go: the sign is part of the number.
+NUMBER = re.compile(r"[-+]?(?:\d{1,3}(?:,\d{3})+|\d+)(?:\.\d+)?")
 SECTION = re.compile(r"(?im)^[ \t]*(?:#+[ \t]*)?(?:\*\*)?sources?(?:\*\*)?[ \t]*(?::|$)")
 URL = re.compile(r"https?://[^\s<>\"'`\]\)]+")
 

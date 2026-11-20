@@ -5,6 +5,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"io"
 	"os"
 	"path/filepath"
@@ -175,8 +176,8 @@ func TestEvidencePackRegate(t *testing.T) {
 	info := store.RegradeInfo{GateVersions: map[string]string{"g1_protected_paths": "1.1.0"}}
 	regate := &store.GateRegrade{Outcome: schemas.OutcomePass, SealedOutcome: schemas.OutcomeIntegrityViolation,
 		Y: schemas.Observed(1, schemas.EvidenceOutcome), Gates: []schemas.GateResult{}}
-	if err := f.st.WriteGateRegrade(ctx, testExp, "rg_x", "r_t01_a", info, regate); err != nil {
-		t.Fatalf("WriteGateRegrade: %v", err)
+	if err := f.st.WriteGateRegrades(ctx, testExp, "rg_x", info, map[string]*store.GateRegrade{"r_t01_a": regate}); err != nil {
+		t.Fatalf("WriteGateRegrades: %v", err)
 	}
 	a := &schemas.Analysis{AnalysisID: "a_rg", ExpID: testExp, GradeSource: "rg_x", CreatedAt: time.Date(2026, 11, 14, 11, 0, 0, 0, time.UTC),
 		Verdict: schemas.Verdict{Decision: schemas.DecisionImproved, Action: schemas.ActionShip, ManifestHash: f.m.Hash,
@@ -298,5 +299,50 @@ func TestEvidencePackDeterministic(t *testing.T) {
 	rec.Approver = "bob"
 	if third := build(); bytes.Equal(first, third) {
 		t.Fatal("a different record gave the same zip bytes")
+	}
+}
+
+// TestCreateRefusesChangedReviewSnapshot is the regression test for audit
+// finding 1-A-03: a reviewed analysis records the digest of its inputs, and
+// a superseding review written after it makes release creation refuse that
+// analysis instead of packaging its ship action with the newer review.
+func TestCreateRefusesChangedReviewSnapshot(t *testing.T) {
+	ctx := context.Background()
+	f := newFixture(t, schemas.ActionShip, "")
+	if _, err := f.st.AddReview(ctx, testExp, &schemas.ReviewRequest{RunID: "r_t01_b", Decision: schemas.ReviewPass, Reason: "looks right", Reviewer: "ana"}); err != nil {
+		t.Fatalf("AddReview: %v", err)
+	}
+	runs, err := f.st.SealedRuns(ctx, testExp, schemas.GradeSourceReviewed)
+	if err != nil {
+		t.Fatal(err)
+	}
+	digest, err := utils.AnalysisInputsDigest(runs)
+	if err != nil {
+		t.Fatal(err)
+	}
+	a := &schemas.Analysis{AnalysisID: "a_rv", ExpID: testExp, GradeSource: schemas.GradeSourceReviewed, CreatedAt: time.Date(2026, 11, 14, 11, 0, 0, 0, time.UTC),
+		Verdict: schemas.Verdict{Decision: schemas.DecisionImproved, Action: schemas.ActionShip, ManifestHash: f.m.Hash,
+			Effect: &schemas.Effect{ArmA: "A", ArmB: "B"}}, InputsDigest: digest}
+	if err := f.st.WriteAnalysis(ctx, a, nil); err != nil {
+		t.Fatalf("WriteAnalysis: %v", err)
+	}
+	m, err := f.st.LoadManifest(ctx, testExp)
+	if err != nil {
+		t.Fatal(err)
+	}
+	ev, err := f.log.loadEvidence(ctx, m, "a_rv")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := checkRelease(m, ev, ""); err != nil {
+		t.Fatalf("unchanged inputs refused: %v", err)
+	}
+	if _, err := f.st.AddReview(ctx, testExp, &schemas.ReviewRequest{RunID: "r_t01_b", Decision: schemas.ReviewFail, Reason: "on second look the diff is empty", Reviewer: "bo"}); err != nil {
+		t.Fatalf("superseding AddReview: %v", err)
+	}
+	_, err = f.log.Create(ctx, &schemas.ReleaseRequest{ExpID: testExp, AnalysisID: "a_rv", Approver: "ana"})
+	var refused *RefusedError
+	if !errors.As(err, &refused) || !strings.Contains(refused.Reason, "changed after analysis a_rv") {
+		t.Fatalf("err = %v, want a refusal naming the changed inputs", err)
 	}
 }

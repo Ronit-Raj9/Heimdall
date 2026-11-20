@@ -33,8 +33,10 @@ func (s *proxyLedgerSource) GetVersion() string { return version }
 
 // Collect implements schemas.EvidenceSource. Without a fault controller there
 // is no proxy and nothing is recorded. A broken hash chain is recorded as an
-// error event and a warning, never as a collect failure: the ledger is still
-// the best record there is, and gates decide what a break means.
+// error event, a warning and Evidence.LedgerBreaks, never as a collect
+// failure: the entries are kept as the record, but nothing derived from them
+// is trusted (audit 3-B-07): the gateway log is marked incomplete, cost and
+// probe receipts read unknown, and the sealed run is an evidence problem.
 func (s *proxyLedgerSource) Collect(ctx context.Context, rc *schemas.RunContext, ev *schemas.Evidence) error {
 	if s.fault == nil {
 		return nil
@@ -49,6 +51,7 @@ func (s *proxyLedgerSource) Collect(ctx context.Context, rc *schemas.RunContext,
 		return fmt.Errorf("write proxy ledger for run %s: %w", id, err)
 	}
 	breaks := LedgerChainBreaks(entries)
+	ev.LedgerBreaks = breaks
 	for _, b := range breaks {
 		pickLogger(s.logger, rc).Warn("proxy ledger chain broken", "run_id", id, "detail", b)
 	}

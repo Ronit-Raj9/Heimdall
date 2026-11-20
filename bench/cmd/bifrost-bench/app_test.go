@@ -3,6 +3,7 @@ package main
 import (
 	"bytes"
 	"context"
+	"encoding/json"
 	"errors"
 	"io/fs"
 	"net/http"
@@ -137,13 +138,16 @@ func analysisFixture(t *testing.T) (*app, *schemas.Manifest) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	m := &schemas.Manifest{ExpID: "e_an", Hash: "sha256:m", Arms: map[string]schemas.ArmManifest{"A": {Label: "a"}, "B": {Label: "b"}},
+	m := &schemas.Manifest{ExpID: "e_an", Arms: map[string]schemas.ArmManifest{"A": {Label: "a"}, "B": {Label: "b"}},
 		Experiment: schemas.Experiment{Primary: schemas.Endpoint{Condition: schemas.ConditionClean, Metric: verdict.MetricVerifiedSuccess}}}
 	for _, task := range []string{"t01", "t02"} {
 		for _, arm := range []string{"A", "B"} {
 			m.Slots = append(m.Slots, schemas.Slot{SlotID: "s_" + task + "_" + strings.ToLower(arm), PairID: "p_" + task, Task: task,
 				TaskVersion: "1.0.0", Arm: arm, Condition: schemas.ConditionClean, Trial: 1, Counted: true})
 		}
+	}
+	if m.Hash, err = utils.ManifestHash(m); err != nil {
+		t.Fatal(err)
 	}
 	ctx := context.Background()
 	if err := st.CreateExperiment(ctx, m); err != nil {
@@ -201,6 +205,28 @@ func TestAnalyzeVerifiesSeals(t *testing.T) {
 			dir := runDir(a, "s_t02_b", "r_t02_b")
 			writable(t, dir)
 			if err := os.WriteFile(filepath.Join(dir, "metrics.json"), []byte(`{"verified_success":{"state":"observed","v":0,"evidence":"outcome"}}`), 0o644); err != nil {
+				t.Fatal(err)
+			}
+		}},
+		// Audit 1-A-02: a manifest.json edited after freezing (here its
+		// alpha) no longer matches its hash, so the analysis is INVALID
+		// instead of re-deciding the sealed runs under the new settings.
+		{name: "manifest.json edited", invalid: []string{"manifest e_an does not match its hash"}, tamper: func(t *testing.T, a *app) {
+			p := filepath.Join(a.store.Root(), "e_an", "manifest.json")
+			writable(t, filepath.Dir(p))
+			b, err := os.ReadFile(p)
+			if err != nil {
+				t.Fatal(err)
+			}
+			var raw map[string]any
+			if err := json.Unmarshal(b, &raw); err != nil {
+				t.Fatal(err)
+			}
+			raw["experiment"].(map[string]any)["verdict"] = map[string]any{"alpha": 0.5}
+			if b, err = json.Marshal(raw); err != nil {
+				t.Fatal(err)
+			}
+			if err := os.WriteFile(p, b, 0o644); err != nil {
 				t.Fatal(err)
 			}
 		}},

@@ -40,6 +40,9 @@ func Regate(ctx context.Context, reg *schemas.Registry, st *store.FSStore, logge
 	if err := CheckSuiteDrift(m, s, frozenLock); err != nil {
 		return nil, nil, nil, err
 	}
+	if err := CheckEvaluator(ctx, reg, m, s); err != nil {
+		return nil, nil, nil, err
+	}
 	runs, err := st.SealedRuns(ctx, expID, schemas.GradeSourceOriginal)
 	if err != nil {
 		return nil, nil, nil, fmt.Errorf("load sealed runs: %w", err)
@@ -67,10 +70,14 @@ func Regate(ctx context.Context, reg *schemas.Registry, st *store.FSStore, logge
 	if s.LockHash != m.SuiteLockHash {
 		info.SuiteLockHash = s.LockHash
 	}
+	batch := make(map[string]*store.GateRegrade, len(runs))
 	for i := range runs {
-		if err := st.WriteGateRegrade(ctx, expID, regradeID, runs[i].Run.RunID, info, results[i]); err != nil {
-			return nil, nil, nil, err
-		}
+		batch[runs[i].Run.RunID] = results[i]
+	}
+	// One atomic publish: a failure or interruption leaves no regrade
+	// (audit 8-D-03).
+	if err := st.WriteGateRegrades(ctx, expID, regradeID, info, batch); err != nil {
+		return nil, nil, nil, err
 	}
 	after, err := st.SealedRuns(ctx, expID, regradeID)
 	if err != nil {
@@ -118,6 +125,42 @@ func CheckSuiteDrift(m *schemas.Manifest, s *schemas.Suite, frozenLock string) e
 		if err := sameEntry("probe "+sl.Condition, frozen.Probes[sl.Condition], s.Lock.Probes[sl.Condition]); err != nil {
 			return err
 		}
+	}
+	return nil
+}
+
+// CheckEvaluator makes sure the evaluator the gates read now (the suite's
+// settings, and the settings and files of every task and probe the
+// experiment's slots use, such as protected paths) is the one the lock
+// fingerprinted. A matching lock file alone does not prove it: suite.yaml or
+// a task folder can be edited after locking, and a regate would then apply
+// the edited rules to the sealed diffs (audit 8-D-01). Image drift is not
+// checked: gates read the sealed run folder, never an image. A lock without
+// fingerprints (legacy) binds nothing the regate could check, so it is
+// refused; re-lock the unchanged suite first.
+func CheckEvaluator(ctx context.Context, reg *schemas.Registry, m *schemas.Manifest, s *schemas.Suite) error {
+	if s == nil || s.Lock == nil || s.Lock.Fingerprints == nil {
+		return fmt.Errorf("suite %s lock records no fingerprints, so the evaluator the gates would read cannot be checked against the frozen one; run `bifrost-bench suite lock %s` on the unchanged suite first", m.Experiment.Suite, m.Experiment.Suite)
+	}
+	drift, _, err := suite.CheckFingerprints(s, engine.FingerprintOptions(ctx, reg, s))
+	if err != nil {
+		return fmt.Errorf("check suite %s fingerprints: %w", s.ID, err)
+	}
+	used := map[string]bool{"suite/" + s.ID: true}
+	for _, sl := range m.Slots {
+		used["task/"+sl.Task] = true
+		if sl.Condition != schemas.ConditionClean {
+			used["probe/"+sl.Condition] = true
+		}
+	}
+	var hit []schemas.FingerprintDrift
+	for _, d := range drift {
+		if d.Part != suite.PartImage && used[d.Scope+"/"+d.ID] {
+			hit = append(hit, d)
+		}
+	}
+	if len(hit) > 0 {
+		return fmt.Errorf("the evaluator changed since suite %s was locked (%s); its gates cannot be recomputed against the current suite", s.ID, suite.DriftText(hit))
 	}
 	return nil
 }

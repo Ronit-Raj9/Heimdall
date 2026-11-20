@@ -41,7 +41,7 @@ func newFixture(t *testing.T, action schemas.Action, policy schemas.PolicyDecisi
 	}
 	f.st = st
 	f.m = &schemas.Manifest{
-		ExpID: testExp, Hash: "sha256:manifest",
+		ExpID: testExp,
 		Arms: map[string]schemas.ArmManifest{
 			"A": {Label: "baseline", Config: schemas.AgentConfig{ID: "agent_a"}, ConfigHash: "sha256:cfg_a"},
 			"B": {Label: "candidate", Config: schemas.AgentConfig{ID: "agent_b"}, ConfigHash: "sha256:cfg_b"},
@@ -54,6 +54,10 @@ func newFixture(t *testing.T, action schemas.Action, policy schemas.PolicyDecisi
 		}
 	}
 	f.m.Slots = append(f.m.Slots, schemas.Slot{SlotID: "s_compat", PairID: "p_c", Task: "t01", Arm: "C", Condition: "clean", Trial: 1})
+	// The real hash: release creation recomputes it (audit 1-A-02).
+	if f.m.Hash, err = utils.ManifestHash(f.m); err != nil {
+		t.Fatal(err)
+	}
 	ctx := context.Background()
 	if err := st.CreateExperiment(ctx, f.m); err != nil {
 		t.Fatalf("CreateExperiment: %v", err)
@@ -210,7 +214,7 @@ func checkRecord(t *testing.T, f *fixture, rec *schemas.ReleaseRecord, req *sche
 	}
 	want := map[string]string{
 		"exp_id": testExp, "analysis_id": "a_one", "arm": "B", "agent_config_id": "agent_b", "config_hash": "sha256:cfg_b",
-		"manifest_hash": "sha256:manifest", "seals_digest": SealsDigest(seals), "approver": "ana", "note": "weekly",
+		"manifest_hash": f.m.Hash, "seals_digest": SealsDigest(seals), "approver": "ana", "note": "weekly",
 		"override": strings.TrimSpace(req.Override), "policy_decision": string(policy), "prev_hash": "",
 	}
 	got := map[string]string{
