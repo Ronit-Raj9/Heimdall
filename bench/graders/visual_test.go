@@ -326,3 +326,20 @@ func TestCheckVisualJudge(t *testing.T) {
 		}
 	}
 }
+
+// TestVisualJudgeRefusesNoPaidRun is 3-C-02 for the vision judge: a
+// no-paid-traffic run mints no judge key and the grade is invalid_evaluator.
+func TestVisualJudgeRefusesNoPaidRun(t *testing.T) {
+	g, sv, gw, rc := judgedVisual(t, []string{`{"verdict":"pass","score":1}`}, "", 1)
+	rc.NoPaidTraffic = true
+	gr, err := g.Grade(t.Context(), rc, &schemas.Diff{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if gr.Passed || !gr.InvalidEvaluator || gr.Judged || gr.Reason != NoPaidJudgeReason {
+		t.Fatalf("grade %+v", gr)
+	}
+	if len(sv.bodies) != 0 || len(gw.minted) != 0 {
+		t.Fatalf("vision judge reached the gateway on a no-paid run: %d calls, %d keys", len(sv.bodies), len(gw.minted))
+	}
+}

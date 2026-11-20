@@ -124,6 +124,16 @@ func TestJobKindsValidateParamsAndConfinePaths(t *testing.T) {
 	if _, err := offline.runner.Enqueue(ctx, jobs.NewJob{OrgID: "local", Kind: kindExperimentRun}); !errors.Is(err, jobs.ErrUnknownKind) {
 		t.Fatalf("offline experiment.run: %v", err)
 	}
+	// 8-C-02: offline launches nothing, so no kind that starts containers or
+	// reaches the gateway; the read-only ops kinds stay.
+	if k := offline.runner.Kinds(); slices.Contains(k, kindAgentCheck) || slices.Contains(k, kindSuiteAdmit) || !slices.Contains(k, kindSuiteLint) {
+		t.Fatalf("offline kinds %v", k)
+	}
+	for _, kind := range []string{kindAgentCheck, kindSuiteAdmit} {
+		if _, err := offline.runner.Enqueue(ctx, jobs.NewJob{OrgID: "local", Kind: kind}); !errors.Is(err, jobs.ErrUnknownKind) {
+			t.Fatalf("offline %s: %v", kind, err)
+		}
+	}
 }
 
 func TestLauncherStartCancelResumeAsJobs(t *testing.T) {

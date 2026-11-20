@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -121,7 +122,7 @@ func TestLivescoreScheduleJobAndServe(t *testing.T) {
 	if len(file.Schedules) != 0 {
 		t.Fatalf("schedules %+v without a config", file.Schedules)
 	}
-	st, err := serveLivescore(a).Status(ctx)
+	st, err := serveLivescore(a, false).Status(ctx)
 	if err != nil || st.Problem == "" || !strings.Contains(st.Problem, "livescore init") {
 		t.Fatalf("unconfigured status %+v %v", st, err)
 	}
@@ -149,7 +150,16 @@ func TestLivescoreScheduleJobAndServe(t *testing.T) {
 	if err != nil || !strings.HasPrefix(r.Summary, "live pull: 0 sessions scored") {
 		t.Fatalf("run = %+v %v", r, err)
 	}
-	if c, err := serveLivescore(a).Compare(ctx); err != nil || c == nil || c.Result != livescore.ResultUnknown {
+	if c, err := serveLivescore(a, false).Compare(ctx); err != nil || c == nil || c.Result != livescore.ResultUnknown {
 		t.Fatalf("compare %+v %v", c, err)
+	}
+	// 8-C-02: serve -offline keeps the stored views but refuses a pull, which
+	// would read the gateway and could call a paid judge.
+	off := serveLivescore(a, true)
+	if res, err := off.Pull(ctx); !errors.Is(err, livescore.ErrOffline) || res != nil {
+		t.Fatalf("offline pull = %+v %v, want ErrOffline", res, err)
+	}
+	if st, err := off.Status(ctx); err != nil || st == nil {
+		t.Fatalf("offline status %+v %v", st, err)
 	}
 }

@@ -108,22 +108,48 @@ func (p *Pipeline) prepare(ctx context.Context, st *runState) error {
 // bind it is refused rather than run.
 func (p *Pipeline) bindFaultPlan(ctx context.Context, st *runState) error {
 	gatewayProbe := st.rc.Probe != nil && st.rc.Probe.Layer == schemas.LayerGateway && st.rc.Probe.Apply.Agent == "" // Multi-agent area: a member-targeted probe binds only its member's slot when it arms
-	if p.faultMode == faultModeScripted {
+	mode := p.runFaultMode(st.rc)
+	if mode == faultModeScripted {
 		switch {
 		case p.reg.Fault == nil:
 			return &partError{part: faultPart, err: errors.New("scripted fault mode needs the fault proxy; refusing to run against a real provider")}
-		case gatewayProbe:
+		case gatewayProbe && p.faultMode == faultModeScripted:
 			return &partError{part: faultPart, err: fmt.Errorf("scripted fault mode cannot run gateway-layer probe %s", st.rc.Probe.ID)}
+		}
+		if err := directSlot(st.rc.Key); err != nil {
+			return &partError{part: faultPart, err: err}
 		}
 	}
 	if p.reg.Fault == nil || gatewayProbe {
+		// A gateway-layer probe on a no-paid run binds its own plan, with
+		// Scripted set, when it arms (probes/gateway.go).
 		return nil
 	}
-	plan := schemas.FaultPlan{Mode: p.faultMode, RunID: st.rc.Run.RunID}
+	plan := schemas.FaultPlan{Mode: mode, RunID: st.rc.Run.RunID}
 	if err := p.reg.Fault.SetPlan(ctx, st.rc.Key.KeySlot, plan); err != nil {
-		return &partError{part: faultPart, err: fmt.Errorf("bind %s plan to key slot %s: %w", p.faultMode, st.rc.Key.KeySlot, err)}
+		return &partError{part: faultPart, err: fmt.Errorf("bind %s plan to key slot %s: %w", mode, st.rc.Key.KeySlot, err)}
 	}
 	return nil
+}
+
+// directSlot refuses a key on a direct slot under scripted mode: a direct
+// slot holds the real provider key in the gateway and never passes the fault
+// proxy, so no plan could keep its calls off the provider.
+func directSlot(k *schemas.RunKey) error {
+	if k != nil && k.KeySlot != "" && k.SlotAuth == "" {
+		return fmt.Errorf("key slot %s is direct, not proxied: a scripted (no-paid-traffic) run cannot be answered from the scripted model; refusing to run", k.KeySlot)
+	}
+	return nil
+}
+
+// runFaultMode is the plan mode bound to rc's key slots: the pipeline's
+// mode, or scripted for a run of a smoke or scripted_upstream experiment, so
+// a run promised to cost nothing never forwards a call to a real provider.
+func (p *Pipeline) runFaultMode(rc *schemas.RunContext) string {
+	if p.faultMode == faultModeNone && rc != nil && (rc.Experiment.NoPaidTraffic() || (rc.Manifest != nil && rc.Manifest.Experiment.NoPaidTraffic())) {
+		return faultModeScripted
+	}
+	return p.faultMode
 }
 
 func (p *Pipeline) resolveParts(st *runState) error {

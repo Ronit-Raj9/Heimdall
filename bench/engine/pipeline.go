@@ -277,6 +277,7 @@ func (p *Pipeline) begin(ctx context.Context, in SlotInput) (*runState, error) {
 	if slot.Condition != schemas.ConditionClean {
 		st.rc.Probe = in.Suite.ProbeByID(slot.Condition)
 	}
+	st.rc.NoPaidTraffic = p.runFaultMode(st.rc) == faultModeScripted // model judges refuse rather than mint an unscripted key
 	p.emit(st, Event{Kind: EventRunStarted, Message: fmt.Sprintf("attempt %d", run.Attempt)})
 	if err := p.writeJSON(ctx, st, "run.json", run); err != nil {
 		p.fail(ctx, st, schemas.StageLeased, err)

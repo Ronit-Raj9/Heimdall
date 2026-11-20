@@ -74,7 +74,7 @@ func runServe(args []string) int {
 	deps.Calibration = judgeSvc{a: a}
 	deps.Export = serveExport{a: a} // W10 export downloads (export.go)
 	// X6 live scoring: Live page and API (livescore.go).
-	deps.Livescore = serveLivescore(a)
+	deps.Livescore = serveLivescore(a, *offline)
 	deps.Compliance = serveCompliance{a: a} // Eval integrity area (S2): compliance pack (compliance.go)
 	// Eval integrity area (S2): monitor certification (monitor.go).
 	deps.MonitorCerts = serveMonitorCerts(a)

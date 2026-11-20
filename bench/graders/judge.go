@@ -171,6 +171,12 @@ func (g *judge) Grade(ctx context.Context, rc *schemas.RunContext, diff *schemas
 		grade.Reason = problem
 		return grade, nil
 	}
+	if rc.NoPaidTraffic {
+		// The judge's own key is not bound to the scripted model, so on a
+		// run promised to cost nothing the model judge refuses to call.
+		grade.InvalidEvaluator, grade.Reason = true, NoPaidJudgeReason
+		return grade, nil
+	}
 	rec, err := g.vote(ctx, rc, spec, renderJudgePrompt(tmpl, ans, answer))
 	if err != nil {
 		return nil, fmt.Errorf("%s: %w", JudgeType, err)
@@ -226,9 +232,18 @@ func (g *judge) check(rc *schemas.RunContext) (schemas.JudgeSpec, error) {
 	return spec, nil
 }
 
+// NoPaidJudgeReason is the grade reason of a model-judged run that must not
+// reach a paid provider (agent check, smoke, scripted_upstream): its judge
+// would mint a key the scripted plan does not cover, so it is not called and
+// the grade is invalid_evaluator.
+const NoPaidJudgeReason = "model judge skipped: no-paid-traffic run (scripted check, smoke or scripted_upstream); a judge key would reach a real provider"
+
 // vote mints the judge's key, casts every vote and revokes the key, also
 // when a call fails or ctx is cancelled.
 func (g *judge) vote(ctx context.Context, rc *schemas.RunContext, spec schemas.JudgeSpec, prompt string) (*schemas.JudgeRecord, error) {
+	if rc.NoPaidTraffic { // also the auditor (judgecalibration.go)
+		return nil, errors.New(NoPaidJudgeReason)
+	}
 	name := rc.Run.RunID + "j" + strings.TrimPrefix(utils.NewID("j", judgeKeySuffixLen), "j_")
 	keyRC := &schemas.RunContext{
 		Run:   &schemas.Run{RunID: name, ExpID: rc.Run.ExpID},

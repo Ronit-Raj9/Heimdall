@@ -3,7 +3,11 @@
 This folder is a complete Heimdall (bifrost-bench) project for a team that
 deploys its agents as A2A servers behind Bifrost and wants to gate releases
 on them. It runs at no cost: the agents are scripted reference servers and
-every model call is answered by the fault proxy's scripted model. The design,
+every model call is answered by the fault proxy's scripted model: each
+experiment sets `scripted_upstream: true`, so the bench binds a scripted plan
+to every key of the run and refuses a run it cannot hold to it (no fault
+proxy, a direct key slot, a proxy too old), even on a stack whose proxy
+holds real provider keys. Model judges refuse to grade such a run. The design,
 the witness and the Bifrost facts behind it are in
 [docs/a2a-agents.md](../../docs/a2a-agents.md).
 

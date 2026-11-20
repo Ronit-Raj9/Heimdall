@@ -110,6 +110,13 @@ func ValidateRouting(cfg *schemas.AgentConfig, gm *schemas.GatewayManifest) erro
 	if len(pol.Fallbacks) > 0 && len(cfg.Gateway.Fallbacks) > 0 {
 		bad("gateway.fallbacks and gateway.routing.fallbacks cannot both be set")
 	}
+	if len(cfg.Team) > 0 || (cfg.A2A != nil && len(cfg.A2A.Team) > 0) {
+		// Only the lead's key carries the policy while the fidelity gate
+		// scores every member's rows against it, so a member on its own
+		// model would invalidate the arm. Refused until policies are
+		// modelled per member.
+		bad("gateway.routing cannot be combined with a team: the policy applies to the lead's key only, not per member")
+	}
 	return errors.Join(errs...)
 }
 

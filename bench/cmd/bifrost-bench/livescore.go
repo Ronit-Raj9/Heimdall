@@ -344,9 +344,16 @@ func livescoreCompare(ctx context.Context, args []string, w io.Writer) int {
 // liveSource serves the Live page and API. The config is read on every
 // request, so an edited config applies without a restart; a config that
 // does not load answers as not configured with the reason.
-type liveSource struct{ a *app }
+// With offline set (serve -offline), Pull is refused: it would read the
+// gateway and could call a paid judge.
+type liveSource struct {
+	a       *app
+	offline bool
+}
 
-func serveLivescore(a *app) handlers.LivescoreSource { return liveSource{a: a} }
+func serveLivescore(a *app, offline bool) handlers.LivescoreSource {
+	return liveSource{a: a, offline: offline}
+}
 
 func (l liveSource) scorer() (*livescore.Scorer, error) { return scorerFor(l.a) }
 
@@ -384,6 +391,9 @@ func (l liveSource) Compare(_ context.Context) (*livescore.Comparison, error) {
 
 // Pull implements handlers.LivescoreSource.
 func (l liveSource) Pull(ctx context.Context) (*livescore.PullResult, error) {
+	if l.offline {
+		return nil, livescore.ErrOffline
+	}
 	s, err := l.scorer()
 	if err != nil {
 		return nil, err

@@ -293,19 +293,17 @@ func (t *planTable) setOwned(slot, owner string, p schemas.FaultPlan) (*SlotClai
 	if held := t.heldAgainst(slot, owner); held != nil {
 		return held, nil
 	}
-	t.slots[slot] = &slotState{plan: p, hasPlan: true}
-	return nil, nil
+	return nil, t.commitLocked(slot, &slotState{plan: p, hasPlan: true})
 }
 
 // clearOwned clears slot's plan for owner, or returns the claim that stops it.
-func (t *planTable) clearOwned(slot, owner string) *SlotClaim {
+func (t *planTable) clearOwned(slot, owner string) (*SlotClaim, error) {
 	t.mu.Lock()
 	defer t.mu.Unlock()
 	if held := t.heldAgainst(slot, owner); held != nil {
-		return held
+		return held, nil
 	}
-	t.slots[slot] = &slotState{}
-	return nil
+	return nil, t.commitLocked(slot, &slotState{})
 }
 
 // planRefused answers a plan write on a slot another owner holds: 409, and

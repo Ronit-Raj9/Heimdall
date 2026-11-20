@@ -748,7 +748,10 @@ func (h *jobsHub) registerOps() {
 			}
 			return p, "index", nil
 		})))
-	if h.hosted {
+	if h.hosted || !h.launches {
+		// An -offline server launches nothing: suite.admit and agent.check
+		// start containers and reach the gateway, so they are not
+		// registered and a queued one waits for a launching server.
 		return
 	}
 	r.Register(kindSuiteAdmit, h.withLauncher(suiteAdmitJob), jobs.WithValidator(suiteValidator(true)))

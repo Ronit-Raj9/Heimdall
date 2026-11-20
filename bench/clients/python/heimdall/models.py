@@ -1947,6 +1947,7 @@ class Experiment(_ExperimentRequired, total=False):
     requirements: CapabilityRequirements
     runner: Optional[RunnerSpec]
     safety: str
+    scripted_upstream: bool
     simulator: Optional[SimulatorSpec]
     smoke: bool
     tier: str
@@ -2065,6 +2066,7 @@ class FaultPlan(_FaultPlanRequired, total=False):
     nonce: str
     retry_after_s: int
     run_id: str
+    scripted: bool
     status: int
 
 
@@ -3507,6 +3509,7 @@ class _PullResultRequired(TypedDict):
 
 class PullResult(_PullResultRequired, total=False):
     errors: Dict[str, str]
+    judge_attempts: int
     judged: int
     overlap: int
     pruned: int

@@ -81,7 +81,12 @@ func (s *Server) handleClearPlan(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
-	if held := s.plans.clearOwned(slot, r.Header.Get(OwnerHeader)); held != nil { // F1
+	held, err := s.plans.clearOwned(slot, r.Header.Get(OwnerHeader))
+	if err != nil {
+		s.controlError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+	if held != nil { // F1
 		s.planRefused(w, "clear", slot, held)
 		return
 	}

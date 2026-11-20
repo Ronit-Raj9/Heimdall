@@ -15,7 +15,7 @@ import (
 // does not name, a fallback row when the policy declares no fallback, and a
 // cache hit. Runs without a policy keep the unrouted rule unchanged.
 func (g *modelFidelityGate) checkRouted(requested string, pol *schemas.RoutingPolicy, ev *schemas.Evidence) *schemas.GateResult {
-	allowed := pol.Models()
+	allowed := pol.EffectiveModels(requested) // a rule's unmatched requests keep the agent's model
 	var swapped, undeclared, cached, expected int
 	var evidence []string
 	for _, r := range ev.Requests.Requests {

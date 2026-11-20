@@ -188,6 +188,11 @@ type RunContext struct {
 	Exec          *ExecResult
 	Dir           string // the run folder
 	Logger        Logger
+	// NoPaidTraffic is set by the engine on a run whose model calls must
+	// never reach a paid provider (scripted fault mode, smoke or
+	// scripted_upstream). Parts that would mint their own gateway keys (model
+	// judges) refuse instead of calling.
+	NoPaidTraffic bool
 
 	// Scenario state (scenario.go), set by the engine as the run proceeds.
 	Services     []ServiceHandle // started services, including the tool proxy's view of them

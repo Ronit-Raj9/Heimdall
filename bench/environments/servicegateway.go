@@ -100,9 +100,11 @@ func serviceGateway(rc *schemas.RunContext, spec schemas.ServiceSpec) *schemas.S
 	return simuser.GatewayFor(spec, simuser.Effective(rc.Suite, rc.Experiment))
 }
 
-// smokeRun reports whether rc is a run of a smoke experiment.
+// smokeRun reports whether rc is a run whose model calls must never reach a
+// paid provider: a smoke or scripted_upstream experiment, or a run the engine
+// marked (agent check's scripted mode).
 func smokeRun(rc *schemas.RunContext) bool {
-	return (rc.Experiment != nil && rc.Experiment.Smoke) || (rc.Manifest != nil && rc.Manifest.Experiment.Smoke)
+	return rc.NoPaidTraffic || rc.Experiment.NoPaidTraffic() || (rc.Manifest != nil && rc.Manifest.Experiment.NoPaidTraffic())
 }
 
 // mintServiceKey mints the service's own key, refuses the run's key, binds

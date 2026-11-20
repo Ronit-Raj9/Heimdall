@@ -523,3 +523,21 @@ func TestGatewayArmTargetsMember(t *testing.T) {
 		}
 	})
 }
+
+// TestGatewayArmScriptedOnNoPaidRun is 3-C-01: a fault probe on a smoke or
+// scripted_upstream run arms a plan with Scripted set, so the calls it does
+// not fault are answered by the scripted model, not forwarded; on a normal
+// run the plan forwards as before.
+func TestGatewayArmScriptedOnNoPaidRun(t *testing.T) {
+	for _, noPaid := range []bool{true, false} {
+		ctrl := &gatewayFakeCtrl{}
+		rc := gatewayRC("r_1", gatewayOutage, "", 0)
+		rc.NoPaidTraffic = noPaid
+		if _, err := newGatewayLayer(ctrl, nil).Arm(context.Background(), rc); err != nil {
+			t.Fatal(err)
+		}
+		if got := ctrl.plans["fp-slot-1"]; got.Scripted != noPaid || got.Mode != "persistent" {
+			t.Fatalf("no-paid %v: plan %+v", noPaid, got)
+		}
+	}
+}

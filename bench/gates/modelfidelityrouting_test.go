@@ -58,3 +58,31 @@ func TestModelFidelityRouted(t *testing.T) {
 		})
 	}
 }
+
+// TestModelFidelityComplexityRouterDefaultModel is 8-B-01: a complexity
+// router's first target is the routed model, so a request the rule does not
+// match is served by the agent's own model. That row is neither a fire nor
+// an expected switch; a model outside both still fires.
+func TestModelFidelityComplexityRouterDefaultModel(t *testing.T) {
+	pol := &schemas.RoutingPolicy{Strategy: schemas.RoutingRule, When: `complexity_tier == "COMPLEX"`,
+		Targets: []schemas.RouteTarget{{Model: "claude-sonnet-4-5"}}}
+	rc := &schemas.RunContext{Agent: &schemas.AgentConfig{Model: "claude-haiku-4-5", Gateway: schemas.GatewayPolicy{Routing: pol}}}
+	row := func(id, served string) schemas.GatewayRequest {
+		return schemas.GatewayRequest{ID: id, Kind: "message", ModelRequested: served, ModelServed: served, Status: "success"}
+	}
+	g := newModelFidelityGate()
+	check := func(reqs ...schemas.GatewayRequest) *schemas.GateResult {
+		t.Helper()
+		res, err := g.Check(context.Background(), rc, &schemas.Evidence{Requests: &schemas.RequestLog{Requests: reqs, Complete: true}})
+		if err != nil {
+			t.Fatal(err)
+		}
+		return res
+	}
+	if res := check(row("u1", "claude-haiku-4-5"), row("m1", "claude-sonnet-4-5")); res.Fired || !strings.Contains(res.Detail, "1 request(s) served by another policy model") {
+		t.Fatalf("unmatched default-model row: fired=%v detail=%q", res.Fired, res.Detail)
+	}
+	if res := check(row("x1", "claude-opus-4-1")); !res.Fired {
+		t.Fatal("a model outside the policy and the agent's model did not fire")
+	}
+}

@@ -490,3 +490,20 @@ func TestRunSlotUpstreamUnreachable(t *testing.T) {
 		})
 	}
 }
+
+// TestSmokeRunIsScriptedEndToEnd is 3-C-01 through RunSlot on the default
+// pipeline (what the scheduler, canaries, compare and remote workers use): a
+// smoke run's slot binds the scripted plan, so no call of the run can reach
+// a keyed upstream. (A gateway probe's plan carries Scripted instead:
+// TestGatewayArmScriptedOnNoPaidRun in probes.)
+func TestSmokeRunIsScriptedEndToEnd(t *testing.T) {
+	b, m, slot := pipelineFixture(t, "clean")
+	m.Experiment.Smoke = true
+	res, err := NewPipeline(b.reg, b.root, nil).RunSlot(context.Background(), SlotInput{Manifest: m, Suite: b.suite, Slot: slot, Attempt: 1})
+	if err != nil || res == nil {
+		t.Fatalf("RunSlot: %v", err)
+	}
+	if len(b.w.plans) != 1 || b.w.plans[0].Mode != faultModeScripted || b.w.plans[0].RunID != res.Run.RunID {
+		t.Fatalf("plans %+v, want one scripted plan for %s", b.w.plans, res.Run.RunID)
+	}
+}

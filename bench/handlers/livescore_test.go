@@ -7,6 +7,7 @@ import (
 	"net"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/fasthttp/router"
@@ -26,6 +27,7 @@ type fakeLive struct {
 	list    *livescore.SessionList
 	pull    *livescore.PullResult
 	pulls   int
+	pullErr error
 	filters []livescore.SessionFilter
 }
 
@@ -63,6 +65,9 @@ func (f *fakeLive) Compare(context.Context) (*livescore.Comparison, error) { ret
 
 func (f *fakeLive) Pull(context.Context) (*livescore.PullResult, error) {
 	f.pulls++
+	if f.pullErr != nil {
+		return nil, f.pullErr
+	}
 	return f.pull, nil
 }
 
@@ -159,6 +164,12 @@ func TestLivescoreRouteErrors(t *testing.T) {
 	if resp := rc.do(t, "POST", APIPrefix+"/livescore/pull", nil, authed("")); resp.StatusCode() != 409 {
 		t.Errorf("pull on a recorded server = %d, want 409", resp.StatusCode())
 	}
+	// 8-C-02: a pull refused by serve -offline is a 409, not a dependency error.
+	src.pullErr = livescore.ErrOffline
+	if resp := c.do(t, "POST", APIPrefix+"/livescore/pull", nil, authed("")); resp.StatusCode() != 409 || !strings.Contains(string(resp.Body()), "-offline") {
+		t.Errorf("offline pull = %d %s, want 409", resp.StatusCode(), resp.Body())
+	}
+	src.pullErr = nil
 	nc := newLiveClient(t, nil, schemas.ModeLive)
 	if resp := nc.do(t, "GET", APIPrefix+"/livescore", nil, nil); resp.StatusCode() != 503 {
 		t.Errorf("no source = %d, want 503", resp.StatusCode())

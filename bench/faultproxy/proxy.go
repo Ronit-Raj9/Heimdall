@@ -149,11 +149,25 @@ func NewServer(cfg Config) (*Server, error) {
 	if err != nil {
 		return nil, err
 	}
+	plans, err := loadPlanTable(PlansPath(cfg.LedgerPath)) // 3-B-01: bound plans survive a restart
+	if err != nil {
+		lg.close()
+		return nil, err
+	}
 	return &Server{
 		cfg: cfg, providers: table, upstreams: ups, slots: slots, names: names,
-		plans: newPlanTable(), ledger: lg, client: newUpstreamClient(),
+		plans: plans, ledger: lg, client: newUpstreamClient(),
 		logger: logger, token: token,
 	}, nil
+}
+
+// PlansPath is the file beside the ledger that keeps the bound fault plans
+// across a restart.
+func PlansPath(ledgerPath string) string {
+	if ledgerPath == "" {
+		return ""
+	}
+	return ledgerPath + ".plans.json"
 }
 
 // ControlToken returns the bearer token control writes need. Hand it to the

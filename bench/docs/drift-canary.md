@@ -261,7 +261,10 @@ format errors (Holm over the four): `differs`, `no_difference_detected`, or
   entry with `max_usd_per_day` set to the daily cap.
 
 Smoke canaries (`smoke: true`, scripted agent and scripted model) run at zero
-cost and may leave the caps at 0. `canaries/smoke-toy.yaml` is one; the
+cost and may leave the caps at 0. The bench enforces it: every key slot of a
+smoke run is bound to the fault proxy's scripted model (a fault probe's plan
+carries `scripted`, so calls it does not fault are scripted too), a run that
+cannot be held to that is refused, and model judges do not grade it. `canaries/smoke-toy.yaml` is one; the
 `-inject-fault <probe>` flag of `canary run`, refused on any canary that is
 not smoke, replaces the watched condition with a fault probe so the alarm
 path can be tested for free:

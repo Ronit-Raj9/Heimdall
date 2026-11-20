@@ -71,23 +71,26 @@ func (s *Scorer) tokenEnv() string { return firstNonEmpty(s.Config.Source.TokenE
 
 // PullResult is what one pull did.
 type PullResult struct {
-	At        time.Time         `json:"at"`
-	Window    [2]time.Time      `json:"window"`
-	Rows      map[string]int    `json:"rows"`     // list rows read, per version
-	Sessions  map[string]int    `json:"sessions"` // sessions scored, per version
-	Skipped   int               `json:"skipped"`  // closed sessions outside the sample
-	Open      int               `json:"open"`     // sessions still running, left for the next pull
-	Details   int               `json:"details"`  // detail rows fetched
-	Unchecked int               `json:"unchecked,omitempty"`
-	Overlap   int               `json:"overlap,omitempty"` // rows that matched more than one version, kept in the first
-	Inbox     []string          `json:"inbox"`             // inbox items touched
-	Alerts    []string          `json:"alerts"`            // alerts sent (event: subject)
-	Decided   []string          `json:"decided"`           // comparison signals that decided in this pull
-	Pruned    int               `json:"pruned,omitempty"`
-	Truncated bool              `json:"truncated"`
-	Warnings  []string          `json:"warnings,omitempty"`
-	Judged    int               `json:"judged,omitempty"`
-	Errors    map[string]string `json:"errors,omitempty"` // per version, when a version's read failed
+	At        time.Time      `json:"at"`
+	Window    [2]time.Time   `json:"window"`
+	Rows      map[string]int `json:"rows"`     // list rows read, per version
+	Sessions  map[string]int `json:"sessions"` // sessions scored, per version
+	Skipped   int            `json:"skipped"`  // closed sessions outside the sample
+	Open      int            `json:"open"`     // sessions still running, left for the next pull
+	Details   int            `json:"details"`  // detail rows fetched
+	Unchecked int            `json:"unchecked,omitempty"`
+	Overlap   int            `json:"overlap,omitempty"` // rows that matched more than one version, kept in the first
+	Inbox     []string       `json:"inbox"`             // inbox items touched
+	Alerts    []string       `json:"alerts"`            // alerts sent (event: subject)
+	Decided   []string       `json:"decided"`           // comparison signals that decided in this pull
+	Pruned    int            `json:"pruned,omitempty"`
+	Truncated bool           `json:"truncated"`
+	Warnings  []string       `json:"warnings,omitempty"`
+	Judged    int            `json:"judged,omitempty"`
+	// JudgeAttempts counts judge requests sent this pull, scored or not;
+	// max_per_pull caps it, so unusable answers cannot exceed the limit.
+	JudgeAttempts int               `json:"judge_attempts,omitempty"`
+	Errors        map[string]string `json:"errors,omitempty"` // per version, when a version's read failed
 }
 
 // Pull reads the gateway once: every version's rows since the cursor, the
@@ -244,7 +247,8 @@ func (s *Scorer) Pull(ctx context.Context) (*PullResult, error) {
 			rec, cand := s.score(v.Name, sess, full, hidden, now)
 			state.Seq++
 			rec.Seq = state.Seq
-			if s.Judge != nil && cfg.Judge != nil && res.Judged < judgeMax(cfg.Judge) && sampled("judge:"+v.Name, sess.key, cfg.Judge.SampleRate) && cand != nil {
+			if s.Judge != nil && cfg.Judge != nil && res.JudgeAttempts < judgeMax(cfg.Judge) && sampled("judge:"+v.Name, sess.key, cfg.Judge.SampleRate) && cand != nil {
+				res.JudgeAttempts++ // debited before the call: a sent request that fails or is unusable still counts against max_per_pull
 				if score, calibrated, err := s.Judge.Score(ctx, cand.session); err == nil {
 					rec.Signals.JudgeScore, rec.Signals.JudgeCalibrated = &score, calibrated
 					res.Judged++

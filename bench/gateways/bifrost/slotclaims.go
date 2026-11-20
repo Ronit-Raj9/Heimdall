@@ -74,7 +74,11 @@ type claimState struct {
 	takeMu sync.Mutex
 
 	// Guarded by g.mu.
-	claimed  map[string]string // slot -> the run label it is claimed for at the proxy
+	claimed map[string]string // slot -> the run label it is claimed for at the proxy
+	// until is when this process last knew each claimed slot's claim to
+	// lapse, by its own clock: the claim or renewal start plus the TTL.
+	// Renewals failing past it mean the slot may be another run's now.
+	until    map[string]time.Time
 	renewing bool
 	closed   bool
 	direct   map[string]bool // direct providers already noted in the log
@@ -84,7 +88,7 @@ type claimState struct {
 }
 
 func newClaimState() *claimState {
-	return &claimState{claimed: map[string]string{}, direct: map[string]bool{}, stop: make(chan struct{})}
+	return &claimState{claimed: map[string]string{}, until: map[string]time.Time{}, direct: map[string]bool{}, stop: make(chan struct{})}
 }
 
 // heldElsewhereError is a slot claim refused because another bench process
@@ -226,6 +230,7 @@ func (g *Gateway) unclaimLocked(slot string, drop map[string]string) {
 	if run, ok := g.claims.claimed[slot]; ok {
 		drop[slot] = run
 		delete(g.claims.claimed, slot)
+		delete(g.claims.until, slot)
 	}
 }
 
@@ -293,8 +298,11 @@ func (g *Gateway) renewLoop() {
 // renewOnce renews every claim this process holds. It returns false, and
 // marks the loop stopped, when there is none. A slot another process
 // claimed after this one's claim lapsed (renewals failed for a whole TTL) is
-// logged as an error: its run may have lost its plan, and its teardown will
-// be refused at the proxy.
+// logged as an error and fenced: the virtual key on it is revoked in
+// Bifrost, so the run that held it can make no more calls on a slot whose
+// plan and ledger label now belong to another run. A slot whose renewals
+// have failed past its claim's TTL is fenced the same way, before another
+// process can take it.
 func (g *Gateway) renewOnce() bool {
 	c := g.claims
 	c.takeMu.Lock()
@@ -311,21 +319,62 @@ func (g *Gateway) renewOnce() bool {
 	}
 	g.mu.Unlock()
 	sort.Slice(slots, func(i, j int) bool { return slots[i].Slot < slots[j].Slot })
+	start := time.Now()
 	ctx, cancel := context.WithTimeout(context.Background(), claimCallTimeout)
 	defer cancel()
 	res, err := g.cfg.Claims.RenewSlots(ctx, faultproxy.RenewRequest{Slots: slots, TTLS: g.ttlSeconds()})
 	if err != nil {
 		g.logger.Warn("renew key slot claims failed; they lapse if renewal keeps failing for a whole TTL", "slots", len(slots), "ttl_s", g.ttlSeconds(), "error", err.Error())
+		var lapsed []string
+		now := time.Now()
+		g.mu.Lock()
+		for _, s := range slots {
+			if u, ok := c.until[s.Slot]; ok && !now.Before(u) {
+				lapsed = append(lapsed, s.Slot)
+			}
+		}
+		g.mu.Unlock()
+		for _, s := range lapsed {
+			g.logger.Error("key slot claim lapsed: renewals failed for a whole TTL; fencing the run on it", "slot", s)
+			g.fenceSlot(s)
+		}
 		return true
 	}
+	g.mu.Lock()
+	for _, s := range res.Renewed {
+		if _, ok := c.claimed[s]; ok {
+			c.until[s] = start.Add(g.claimTTL())
+		}
+	}
+	g.mu.Unlock()
 	for _, l := range res.Lost {
-		g.logger.Error("key slot claim lost to another bench process: this process's claim lapsed and the run on the slot may have lost its fault plan",
+		g.logger.Error("key slot claim lost to another bench process: this process's claim lapsed and the run on the slot may have lost its fault plan; fencing it",
 			"slot", l.Slot, "holder", l.String())
-		g.mu.Lock()
-		delete(c.claimed, l.Slot)
-		g.mu.Unlock()
+		g.fenceSlot(l.Slot)
 	}
 	return true
+}
+
+// fenceSlot drops this process's claim on slot without releasing it at the
+// proxy (it may be another owner's) and revokes the virtual key that holds
+// the slot here, so its run's agent fails closed instead of sending calls
+// that the slot's new plan would answer or forward. Called with takeMu held.
+func (g *Gateway) fenceSlot(slot string) {
+	g.mu.Lock()
+	delete(g.claims.claimed, slot)
+	delete(g.claims.until, slot)
+	vk := g.inUse[slot]
+	g.mu.Unlock()
+	if vk == "" || strings.HasPrefix(vk, "pending:") {
+		return
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), claimCallTimeout)
+	defer cancel()
+	if err := g.deleteVirtualKey(ctx, vk); err != nil {
+		g.logger.Error("revoke virtual key on a lost key slot failed", "slot", slot, "virtual_key_id", vk, "error", err.Error())
+		return
+	}
+	g.logger.Warn("virtual key revoked: its key slot claim was lost", "slot", slot, "virtual_key_id", vk)
 }
 
 // Close stops claim renewal and releases every claim this process holds.

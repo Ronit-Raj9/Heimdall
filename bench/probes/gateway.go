@@ -148,7 +148,11 @@ func (l *gatewayLayer) Arm(ctx context.Context, rc *schemas.RunContext) (*schema
 	plan.RunID = rc.Run.RunID
 	plan.Nonce = utils.NewNonce()
 	plan.Model = routedFaultModel(plan, rc) // W9: a routed run's outage takes down its primary target only (docs/routing-experiments.md)
-	slots, err := targetSlots(rc, slot)     // Multi-agent probes (M2): a member-targeted probe arms that member's slots
+	// A no-paid run (smoke, scripted_upstream): calls the plan does not fault
+	// are answered by the scripted model, never forwarded. A proxy too old
+	// for the field rejects the plan, so the run is refused, not paid for.
+	plan.Scripted = rc.NoPaidTraffic
+	slots, err := targetSlots(rc, slot) // Multi-agent probes (M2): a member-targeted probe arms that member's slots
 	if err != nil {
 		return nil, err
 	}
