@@ -1,5 +1,10 @@
 package k8s
 
+import (
+	"encoding/json"
+	"strconv"
+)
+
 // The Kubernetes object fields this package writes or reads, nothing more.
 // JSON names follow the Kubernetes API (camelCase), not the bench's own
 // snake_case: these structs are wire types of a foreign API.
@@ -24,6 +29,14 @@ type OwnerReference struct {
 	Name               string `json:"name"`
 	UID                string `json:"uid"`
 	BlockOwnerDeletion *bool  `json:"blockOwnerDeletion,omitempty"`
+}
+
+// ServiceAccount is corev1.ServiceAccount, trimmed.
+type ServiceAccount struct {
+	APIVersion                   string     `json:"apiVersion"`
+	Kind                         string     `json:"kind"`
+	Metadata                     ObjectMeta `json:"metadata"`
+	AutomountServiceAccountToken *bool      `json:"automountServiceAccountToken,omitempty"`
 }
 
 // Namespace is corev1.Namespace.
@@ -337,8 +350,8 @@ type NetworkPolicyPeer struct {
 
 // NetworkPolicyPort is a protocol and port.
 type NetworkPolicyPort struct {
-	Protocol string `json:"protocol,omitempty"`
-	Port     int    `json:"port,omitempty"`
+	Protocol string  `json:"protocol,omitempty"`
+	Port     PortRef `json:"port,omitzero"`
 }
 
 // LabelSelector matches labels exactly. An empty selector selects all.
@@ -364,11 +377,11 @@ type ServiceSpec struct {
 
 // ServicePort maps a service port to a pod port.
 type ServicePort struct {
-	Name       string `json:"name,omitempty"`
-	Port       int    `json:"port"`
-	TargetPort int    `json:"targetPort,omitempty"`
-	NodePort   int    `json:"nodePort,omitempty"`
-	Protocol   string `json:"protocol,omitempty"`
+	Name       string  `json:"name,omitempty"`
+	Port       int     `json:"port"`
+	TargetPort PortRef `json:"targetPort,omitzero"`
+	NodePort   int     `json:"nodePort,omitempty"`
+	Protocol   string  `json:"protocol,omitempty"`
 }
 
 // Deployment is appsv1.Deployment.
@@ -427,3 +440,53 @@ type Node struct {
 func boolPtr(b bool) *bool    { return &b }
 func int64Ptr(n int64) *int64 { return &n }
 func int32Ptr(n int32) *int32 { return &n }
+
+// PortRef is intstr.IntOrString for ports: a number, or the name of a
+// container port (a Service targetPort or NetworkPolicy port may be either).
+type PortRef struct {
+	Num  int
+	Name string
+}
+
+// Port returns a numeric PortRef.
+func Port(n int) PortRef { return PortRef{Num: n} }
+
+// IsZero reports an unset port, for omitempty.
+func (p PortRef) IsZero() bool { return p.Num == 0 && p.Name == "" }
+
+// String prints the number or the name.
+func (p PortRef) String() string {
+	if p.Name != "" {
+		return p.Name
+	}
+	return strconv.Itoa(p.Num)
+}
+
+// MarshalJSON writes a number or a string, as the API does.
+func (p PortRef) MarshalJSON() ([]byte, error) {
+	if p.Name != "" {
+		return json.Marshal(p.Name)
+	}
+	return json.Marshal(p.Num)
+}
+
+// UnmarshalJSON reads a number or a string. A numeric string is a number.
+func (p *PortRef) UnmarshalJSON(b []byte) error {
+	*p = PortRef{}
+	if len(b) > 0 && b[0] == '"' {
+		var s string
+		if err := json.Unmarshal(b, &s); err != nil {
+			return err
+		}
+		if n, err := strconv.Atoi(s); err == nil {
+			p.Num = n
+		} else {
+			p.Name = s
+		}
+		return nil
+	}
+	if string(b) == "null" {
+		return nil
+	}
+	return json.Unmarshal(b, &p.Num)
+}

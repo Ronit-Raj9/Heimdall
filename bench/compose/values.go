@@ -185,6 +185,13 @@ func envName(s string) bool {
 // A line with a key and no "=" is refused: compose would read it from the
 // host. It is pure.
 func parseDotenv(data string) (map[string]string, []string, error) {
+	return parseDotenvMode(data, false)
+}
+
+// parseDotenvMode is parseDotenv with compose's env_file format: raw. A raw
+// value is everything after the first "=", taken literally: no quote
+// stripping, no escapes and no inline comments.
+func parseDotenvMode(data string, raw bool) (map[string]string, []string, error) {
 	out := map[string]string{}
 	var order []string
 	for n, line := range strings.Split(strings.ReplaceAll(data, "\r\n", "\n"), "\n") {
@@ -200,6 +207,13 @@ func parseDotenv(data string) (map[string]string, []string, error) {
 		}
 		if !envName(k) {
 			return nil, nil, fmt.Errorf("line %d: %q is not a variable name", n+1, k)
+		}
+		if raw {
+			if _, seen := out[k]; !seen {
+				order = append(order, k)
+			}
+			out[k] = v
+			continue
 		}
 		v = strings.TrimSpace(v)
 		switch {

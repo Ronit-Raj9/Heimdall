@@ -66,7 +66,7 @@ func TestPlanScenarioChecks(t *testing.T) {
 				if err != nil {
 					t.Fatal(err)
 				}
-				out := strings.Replace(string(raw), "adapter: command", "adapter: remote_http", 1)
+				out := strings.Replace(string(raw), "adapter: command", "adapter: remote_http\nremote: {url: \"http://127.0.0.1:9/agent\"}", 1)
 				if out == string(raw) {
 					t.Fatalf("agent yaml has no adapter line: %s", raw)
 				}
@@ -104,6 +104,24 @@ func TestPlanTaskImagesAndScenarioHashes(t *testing.T) {
 	b.reg.Environments = []schemas.Environment{imageEnv{fakeScenarioEnv: fakeScenarioEnv{fakeEnv{part{"docker_workspace"}, b.w}, &scenarioWorld{}}, fail: true}}
 	if _, err := NewPlanner(b.reg, b.root, nil).Plan(context.Background(), testExperiment()); err == nil || !strings.Contains(err.Error(), "task t01 image") {
 		t.Fatalf("failed image build: got %v", err)
+	}
+}
+
+// TestDeferredPlanSkipsTaskImageBuild: a hosted plan (gateway deferred to
+// runners) must not need Docker for a task with its own image; the
+// coordinator freezes no task image ids and each runner records its own
+// (audit 8-B-06).
+func TestDeferredPlanSkipsTaskImageBuild(t *testing.T) {
+	b := newBench(t)
+	b.reg.Environments = []schemas.Environment{imageEnv{fakeScenarioEnv: fakeScenarioEnv{fakeEnv{part{"docker_workspace"}, b.w}, &scenarioWorld{}}, fail: true}}
+	b.suite.TaskByID("t01").Environment = &schemas.TaskEnvironment{Dockerfile: "env/Dockerfile"}
+	b.reg.Gateway = nil
+	m, err := NewPlanner(b.reg, b.root, nil, WithGatewayDeferredToRunner()).Plan(context.Background(), testExperiment())
+	if err != nil {
+		t.Fatalf("deferred plan needs Docker: %v", err)
+	}
+	if len(m.TaskImages) != 0 {
+		t.Fatalf("deferred plan froze task images %v", m.TaskImages)
 	}
 }
 

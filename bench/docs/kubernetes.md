@@ -48,7 +48,7 @@ bifrost-bench k8s images load -gateway          # kind load docker-image: helper
 bifrost-bench k8s gateway up -node-port-gateway 30080 -node-port-control 30091
 bifrost-bench k8s check -image bench/coding-core-base:1
 bifrost-bench run deploy/k8s/parity.yaml        # oracle 4 of 4, noop 0 of 4
-bifrost-bench k8s cleanup                        # lists leftover run namespaces; -delete removes them
+bifrost-bench k8s cleanup                        # lists this install's run namespaces; -delete removes the stale ones
 bifrost-bench k8s gateway down
 ```
 
@@ -63,7 +63,7 @@ kubernetes:
   namespace_prefix: heimdall-run
   gateway_url: http://bifrost.heimdall-gw.svc:8080   # the gateway Service, in-cluster
   image_pull_policy: IfNotPresent                    # IfNotPresent | Never | Always
-  service_account: ""           # the run pods' account; its token is never mounted
+  service_account: ""           # created, tokenless, in each run namespace; empty uses the namespace default
   node_selector: {}             # e.g. {heimdall.dev/pool: agents}
   tolerations: []               # [{key, operator, value, effect, toleration_seconds}]
   kind_cluster: ""              # target of `k8s images load`
@@ -130,7 +130,7 @@ Gateway probes act in the fault proxy behind Bifrost and need nothing from the d
 ## Security model
 
 - **Network.** Every run namespace gets a deny-all NetworkPolicy (ingress and egress) when it is created, before any pod exists. A plan with the evaluation network also gets one egress rule: to the gateway Service's pods (its selector, in its namespace) on its target port, and nothing else. A plan with network `none` (every scripted control except toy) keeps deny-all. The pod has no DNS server (`dnsPolicy: None`, nameserver 127.0.0.1); the agent URL's host (`bifrost` in `gateway.agent_url`) is an `/etc/hosts` entry for the gateway Service's cluster IP, so the agent is given the same URL as under Docker and cluster DNS cannot be used as a side channel.
-- **Egress is shown, not assumed.** The gateway preflight runs a probe pod with the run policies, which must fail to reach the internet (1.1.1.1:443), the cloud metadata address, DNS, the cluster DNS Service (UDP and TCP) and the API server, and must reach the gateway (the positive control). Its result replaces the Docker probe's `egress_probe` and `eval_network` settings in the manifest, and the egress gate holds every run to it as under Docker: `eval_network` is `kubernetes:<namespace_prefix>@<api server>` in both the manifest and each run's handle. `k8s check` also runs a control pod without policies: enforcement is shown when a target the control reached is blocked under the policies.
+- **Egress is shown, not assumed.** The gateway preflight runs a control pod without policies and then a probe pod with the run policies. The policed pod must fail to reach the internet (1.1.1.1:443), the cloud metadata address, DNS and the cluster DNS Service (UDP and TCP), and must reach the gateway (the positive control). `egress_probe` is `blocked` only when at least one of those targets was reachable from the control pod and is blocked under the policies; when the control reached none of them, enforcement is not shown and the preflight fails with `not_run`. The API server is probed for information only (it is often reachable on the pod's own node and run pods mount no token), never counted in the verdict. The result replaces the Docker probe's `egress_probe` and `eval_network` settings in the manifest, and the egress gate holds every run to it as under Docker: `eval_network` is `kubernetes:<namespace_prefix>@<api server>` in both the manifest and each run's handle. `k8s check` runs the same contrast.
 - **Credentials.** The run's virtual key is in the agent's env secret only; it is redacted from the captured streams and the observer records as under Docker. The bench's own credential (kubeconfig or service account) never enters a run pod.
 - **Images.** The image the node ran is checked against the one the experiment froze: the container's image id must be the frozen local id (an image loaded with `kind load`) or carry one of the image's registry digests (a pulled one); anything else fails the run before the agent is released. Locks are unchanged: locally built images are bound by tag as before, pulled ones by registry digest; no machine-local id is committed.
 - **Pod Security.** The agent container meets the `restricted` Pod Security Standard. The pod does not: the observers and the bench helper run as root, and the process observer needs SYS_PTRACE, which `baseline` forbids too. With `observers.process: false` the pod meets `baseline`. A cluster that enforces `baseline` or `restricted` everywhere must exempt the run namespaces (prefix `heimdall-run`) or switch the process observer off.
@@ -165,7 +165,7 @@ The fault proxy's ledger lives on an emptyDir: a restarted proxy pod loses the l
 
 ## Cleanup
 
-Every object of a run is owned by its anchor config map (owner references), and everything lives in the run's namespace. `Destroy` deletes the anchor, which garbage-collects its dependents, then the namespace; both are idempotent and work after a failed `Create`. Namespaces carry `heimdall.dev/bench`, `heimdall.dev/run`, `heimdall.dev/exp` and `heimdall.dev/role` labels; `k8s cleanup` lists every driver namespace except the gateway's (`-delete` removes them), the equivalent of the Docker janitor for runs the bench lost track of.
+Every object of a run is owned by its anchor config map (owner references), and everything lives in the run's namespace. `Destroy` deletes the anchor, which garbage-collects its dependents, then the namespace; both are idempotent and work after a failed `Create`. Namespaces carry `heimdall.dev/bench`, `heimdall.dev/run`, `heimdall.dev/exp` and `heimdall.dev/role` labels; `k8s cleanup` lists the namespaces named `<namespace_prefix>-...` except the gateway's, so another install on the same cluster is never touched, and classifies each as the Docker janitor does: a run whose slot lease is fresh is kept, a dead or sealed run is stale, and a namespace with no lease information is stale only when older than `-grace` (6h). `-delete` removes the stale ones only. A run namespace whose name already exists with another run's labels is never replaced; the run fails instead. Long prefixes (at most 40 characters) keep run namespaces unique by ending a cut name in a hash of the run ID.
 
 ## Exec and attach protocol
 
@@ -177,7 +177,7 @@ Nothing here was run on EKS, GKE or AKS, and the provider facts below are unveri
 
 - **Authentication.** Managed clusters' kubeconfigs usually authenticate with an exec plugin (`aws eks get-token`, `gke-gcloud-auth-plugin`, `kubelogin`), which the driver refuses with that reason. Use a service account token (`tokenFile` in a kubeconfig, or run the bench in the cluster with `deploy/k8s/rbac.yaml`), or a client certificate where the cluster issues them.
 - **NetworkPolicy.** EKS enforces policies only with the VPC CNI's network policy agent (or Calico) switched on; GKE with Dataplane V2 or network policy enabled; AKS with Azure, Calico or Cilium network policy chosen at cluster creation. `k8s check` shows whether policies are enforced; a cluster that does not enforce them fails it.
-- **Images.** Push the agent, helper and bench images to the cluster's registry and reference them by digest; `k8s images load` is kind-only. Set `image_pull_policy` and, for a private registry, attach pull secrets to `kubernetes.service_account`.
+- **Images.** Push the agent, helper and bench images to the cluster's registry and reference them by digest; `k8s images load` is kind-only. Set `image_pull_policy`. `kubernetes.service_account` is created fresh, with no token, in every run and probe namespace (the driver role needs `create` on `serviceaccounts`), so for a private registry attach pull secrets through an admission policy or a node credential, not to an account in another namespace.
 - **Metadata address.** The probe treats 169.254.169.254 as forbidden; on clouds it is the instance metadata service, so the deny-all policy also protects node credentials, as long as the CNI enforces egress to link-local addresses (verify with `k8s check`).
 - **Node pools.** `node_selector` and `tolerations` place run pods on a dedicated pool.
 

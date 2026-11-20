@@ -16,6 +16,7 @@ import (
 	"syscall"
 
 	"github.com/maximhq/bifrost/bench/costexplain"
+	"github.com/maximhq/bifrost/bench/engine"
 	"github.com/maximhq/bifrost/bench/handlers"
 	"github.com/maximhq/bifrost/bench/leaderboard"
 	"github.com/maximhq/bifrost/bench/migration"
@@ -208,18 +209,9 @@ func (a *app) migrationReport(ctx context.Context, expID, gradeSource, policyFil
 // saving an analysis. Audit 5-C-01: a migration recommendation never
 // outranks an INVALID release verdict.
 func (a *app) releaseInvalid(ctx context.Context, m *schemas.Manifest, runs []schemas.SealedRun) ([]string, error) {
-	name := m.Experiment.Verdict.Policy
-	if name == "" {
-		name = "paired_signflip"
-	}
-	var vp schemas.VerdictPolicy
-	for _, p := range a.reg.Policies {
-		if p.GetName() == name {
-			vp = p
-		}
-	}
-	if vp == nil {
-		return nil, fmt.Errorf("verdict policy %q is not registered", name)
+	vp, err := engine.FindVerdictPolicy(a.reg, m.Experiment.Verdict.Policy)
+	if err != nil {
+		return nil, err
 	}
 	an, err := vp.Decide(ctx, m, runs)
 	if err != nil {

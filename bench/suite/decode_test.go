@@ -107,6 +107,34 @@ concurrency: 4
 			t.Errorf("arm set: %+v", e.Arms["B"].Set)
 		}
 	})
+	t.Run("experiment arm forms", func(t *testing.T) {
+		armsAB := "arms:\n  A: {label: baseline}\n  B: {label: card, set: {a2a.card_url: \"http://127.0.0.1:23000/card\"}}\n"
+		perArm := "arms:\n  A: {label: first, agent: agents/first.yaml}\n  B: {label: second, agent: agents/second.yaml}\n"
+		tests := []struct {
+			name, from, to, wantErr string
+		}{
+			{"a2a override", "arms:\n  A: {label: baseline}\n  B: {label: code-wins sentence, set: {notes.user_file: fixtures/notes/codewins.md}}\n", armsAB, ""},
+			{"identity overrides", "notes.user_file: fixtures/notes/codewins.md", "agent_version: 2.0.0, image_digest: x, capabilities.streaming: true", ""},
+			{"every arm has its agent, no base", "base: agents/claude-code.yaml\narms:\n  A: {label: baseline}\n  B: {label: code-wins sentence, set: {notes.user_file: fixtures/notes/codewins.md}}\n", perArm, ""},
+			{"an arm without agent needs base", "base: agents/claude-code.yaml\n", "", "base"},
+			{"alpha out of range", "alpha: 0.05", "alpha: 1.5", "verdict.alpha"},
+		}
+		for _, tt := range tests {
+			t.Run(tt.name, func(t *testing.T) {
+				doc := strings.Replace(experiment, tt.from, tt.to, 1)
+				if doc == experiment {
+					t.Fatal("fixture did not change")
+				}
+				err := DecodeYAML([]byte(doc), "exp.yaml", SchemaExperiment, &schemas.Experiment{})
+				if tt.wantErr == "" && err != nil {
+					t.Fatal(err)
+				}
+				if tt.wantErr != "" && (err == nil || !strings.Contains(err.Error(), tt.wantErr)) {
+					t.Fatalf("err = %v, want %q", err, tt.wantErr)
+				}
+			})
+		}
+	})
 	t.Run("task from task init", func(t *testing.T) {
 		task := `
 id: t01

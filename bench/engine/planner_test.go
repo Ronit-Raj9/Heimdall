@@ -303,6 +303,15 @@ func TestPlanRejects(t *testing.T) {
 		{"missing user file", func(_ *bench, e *schemas.Experiment) {
 			e.Arms["B"] = schemas.ArmSpec{Set: map[string]any{"notes.user_file": "experiments/fixtures/missing.md"}}
 		}, "notes.user_file"},
+		{"unregistered verdict policy", func(b *bench, e *schemas.Experiment) {
+			b.reg.Policies = []schemas.VerdictPolicy{testPolicy{part{"paired_signflip"}}}
+			e.Verdict.Policy = "paired_typo"
+		}, `verdict policy "paired_typo" is not registered`},
+		{"verdict alpha above 1", func(_ *bench, e *schemas.Experiment) { e.Verdict.Alpha = 1.5 }, "verdict alpha 1.5 must be between 0 and 1"},
+		{"negative assumed sd", func(_ *bench, e *schemas.Experiment) { e.Verdict.AssumedSD = -0.3 }, "assumed_sd -0.3 must be positive"},
+		{"override value the agent schema refuses", func(_ *bench, e *schemas.Experiment) {
+			e.Arms["B"] = schemas.ArmSpec{Set: map[string]any{"scripted.kind": "nooop"}}
+		}, "scripted.kind"},
 		{"timeout parity on a condition that does not run", func(_ *bench, e *schemas.Experiment) {
 			e.Guards = []schemas.GuardSpec{{Rule: GuardTimeoutParity, Condition: "stale-notes"}}
 		}, `guard timeout_parity: condition "stale-notes" is not one of the conditions`},
@@ -1037,5 +1046,23 @@ func TestPlanAARunsEndToEnd(t *testing.T) {
 	}
 	if r, ok := an.Naive[AAArm]; !ok || r.Den != 6 {
 		t.Fatalf("naive scoreboard %+v, want 6 runs of arm A2", an.Naive)
+	}
+}
+
+// testPolicy is a registered verdict policy for planner checks; planning never
+// calls Decide.
+type testPolicy struct{ part }
+
+func (testPolicy) Decide(context.Context, *schemas.Manifest, []schemas.SealedRun) (*schemas.Analysis, error) {
+	return nil, errors.New("not used")
+}
+
+func TestPlanKnownVerdictPolicy(t *testing.T) {
+	b := newBench(t)
+	b.reg.Policies = []schemas.VerdictPolicy{testPolicy{part{DefaultVerdictPolicy}}}
+	e := testExperiment()
+	e.Verdict.Policy = ""
+	if _, err := NewPlanner(b.reg, b.root, nil).Plan(context.Background(), e); err != nil {
+		t.Fatalf("empty policy falls back to %s: %v", DefaultVerdictPolicy, err)
 	}
 }

@@ -55,11 +55,17 @@ func composeCreateArgs(runID string, spec schemas.ServiceSpec) []string {
 		args = append(args, "--tmpfs", t)
 	}
 	for _, v := range x.Volumes {
+		if v.Name == "" && v.ReadOnly {
+			// "-v" cannot say read-only for an anonymous volume: "/t:ro"
+			// would read as a bind of /t. --mount expresses both.
+			args = append(args, "--mount", "type=volume,target="+v.Target+",readonly")
+			continue
+		}
 		m := v.Target
 		if v.Name != "" {
 			m = composeVolume(runID, v.Name) + ":" + v.Target
 		}
-		if v.ReadOnly && v.Name != "" {
+		if v.ReadOnly {
 			m += ":ro"
 		}
 		args = append(args, "-v", m)

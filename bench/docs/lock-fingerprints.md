@@ -154,7 +154,9 @@ A plan records, additively and only when present:
   fingerprints section, so a run traces to the exact evaluator settings it
   ran under. Empty for a legacy lock.
 - `suite_images`: role to local image id for `base`, `helper`, `toolproxy`
-  (when used) and `service/<id>`, beside the existing `arms.*.image_id`,
+  (when used), `service/<id>` for a suite service and
+  `task/<task id>/service/<id>` for a task's own service (compose services
+  included; checked only by that task's runs), beside the existing `arms.*.image_id`,
   `arms.*.task_images` and `task_images`. A tag that cannot be inspected is
   left out with a warning.
 

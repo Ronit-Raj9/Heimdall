@@ -80,7 +80,8 @@ policy block), and 4 when it was refused, skipped or could not finish.
 runs the same daemon in the background inside the server, off by default;
 `-schedules-file <path>` points it at another file than `schedules.yaml` in
 the project root. It needs the gateway, so `serve -offline -schedules` is
-refused. `run-now` and `daemon` need the live gateway,
+refused. A hosted server (`auth.mode: hosted`) runs no schedule daemon, so
+it refuses `-schedules` and `-schedules-file` at startup. `run-now` and `daemon` need the live gateway,
 like `check`.
 
 ## How the daemon runs

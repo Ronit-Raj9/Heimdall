@@ -96,7 +96,7 @@ func (p *Pipeline) prepareA2A(ctx context.Context, st *runState) error {
 	if !utils.IsA2A(st.rc.Agent) || st.rc.Agent.A2A == nil {
 		return nil
 	}
-	gw, ok := p.reg.Gateway.(schemas.A2AGateway)
+	gw, ok := schemas.GatewayAs[schemas.A2AGateway](p.reg.Gateway)
 	if !ok {
 		return wrapPart("gateway", p.reg.Gateway, errors.New("the gateway has no agent gateway (a2a runs need Bifrost's agent gateway)"))
 	}
@@ -172,17 +172,13 @@ func (p *Pipeline) prepareA2A(ctx context.Context, st *runState) error {
 // and binds the run's fault plan to each member slot so the fault proxy
 // tags their calls with the run.
 func (p *Pipeline) mintA2ATeam(ctx context.Context, st *runState) error {
-	tg, ok := p.reg.Gateway.(schemas.TeamGateway)
+	tg, ok := schemas.GatewayAs[schemas.TeamGateway](p.reg.Gateway)
 	if !ok {
 		return wrapPart("gateway", p.reg.Gateway, errNoTeamGateway)
 	}
-	members := []schemas.TeamMember{{ID: a2a.Lead, Role: "lead"}}
-	for _, m := range st.rc.Agent.A2A.Team {
-		role := m.Role
-		if role == "" || role == "lead" {
-			role = "worker"
-		}
-		members = append(members, schemas.TeamMember{ID: m.ID, Role: role, BudgetUSD: m.BudgetUSD})
+	members := utils.A2ATeam(st.rc.Agent) // shared with the gateway probe layer's role targets (audit 8-B-12)
+	if len(members) == 0 {
+		members = []schemas.TeamMember{{ID: a2a.Lead, Role: "lead"}}
 	}
 	keys, err := tg.MintMemberKeys(ctx, st.rc, st.rc.Key, members)
 	if err != nil {
@@ -218,7 +214,7 @@ func (p *Pipeline) collectA2A(ctx context.Context, st *runState) error {
 	if rc.A2A == nil || !utils.IsA2A(rc.Agent) {
 		return nil
 	}
-	gw, ok := p.reg.Gateway.(schemas.A2AGateway)
+	gw, ok := schemas.GatewayAs[schemas.A2AGateway](p.reg.Gateway)
 	if !ok {
 		return nil
 	}
@@ -289,7 +285,7 @@ func (p *Pipeline) cleanupA2A(ctx context.Context, st *runState) error {
 	if st.rc == nil || st.rc.A2A == nil {
 		return nil
 	}
-	gw, ok := p.reg.Gateway.(schemas.A2AGateway)
+	gw, ok := schemas.GatewayAs[schemas.A2AGateway](p.reg.Gateway)
 	if !ok {
 		return nil
 	}

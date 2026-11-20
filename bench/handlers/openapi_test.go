@@ -224,3 +224,18 @@ func asStrings(v any) []string {
 	}
 	return out
 }
+
+// TestOpenAPIRegradeBodyOptional: an empty regrade POST uses defaults, so
+// the contract must not force a body, while plan still requires one.
+func TestOpenAPIRegradeBodyOptional(t *testing.T) {
+	regrade := handlers.APIPrefix + "/experiments/{id}/regrade"
+	plan := handlers.APIPrefix + "/experiments/plan"
+	doc, _ := handlers.BuildOpenAPI(map[string][]string{"POST": {regrade, plan}}, "", schemas.ModeSynthetic)
+	paths := doc["paths"].(map[string]map[string]any)
+	for path, want := range map[string]bool{regrade: false, plan: true} {
+		body := paths[path]["post"].(map[string]any)["requestBody"].(map[string]any)
+		if body["required"] != want {
+			t.Errorf("%s requestBody.required = %v, want %v", path, body["required"], want)
+		}
+	}
+}

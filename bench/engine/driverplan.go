@@ -11,16 +11,25 @@ import (
 // and the driver that will run the experiment is frozen into the manifest
 // (nil for Docker when the experiment names none, so Docker manifests hash
 // as before).
-func (p *Planner) planDriver(e *schemas.Experiment, suite *schemas.Suite, conds []condPlan, m *schemas.Manifest) (*schemas.EnvironmentChoice, error) {
+func (p *Planner) planDriver(e *schemas.Experiment, suite *schemas.Suite, conds, compatConds []condPlan, m *schemas.Manifest) (*schemas.EnvironmentChoice, error) {
 	var agents []*schemas.AgentConfig
 	for _, id := range sortedKeys(m.Arms) {
 		cfg := m.Arms[id].Config
 		agents = append(agents, &cfg)
 	}
+	// Only the combinations the scheduler builds are put to the driver: the
+	// main arms on the main conditions, the compatibility agent on its own
+	// (audit 8-B-10).
+	slots := driverSlots(suite, conds, agents)
 	if m.Compatibility != nil {
 		cfg := m.Compatibility.Config
-		agents = append(agents, &cfg)
+		slots = append(slots, driverSlots(suite, compatConds, []*schemas.AgentConfig{&cfg})...)
 	}
+	return environments.PlanDriver(p.reg.Environments, suite, e, slots)
+}
+
+// driverSlots crosses conds' tasks with agents.
+func driverSlots(suite *schemas.Suite, conds []condPlan, agents []*schemas.AgentConfig) []environments.DriverSlot {
 	var slots []environments.DriverSlot
 	for _, c := range conds {
 		for _, id := range c.tasks {
@@ -33,5 +42,5 @@ func (p *Planner) planDriver(e *schemas.Experiment, suite *schemas.Suite, conds 
 			}
 		}
 	}
-	return environments.PlanDriver(p.reg.Environments, suite, e, slots)
+	return slots
 }

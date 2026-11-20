@@ -30,7 +30,11 @@ type TaskImageEnsurer interface {
 // so it runs answer tasks, state tasks only with remote.tools expose (and a
 // proxied service or external API to change), artifact tasks only with
 // remote.artifacts inline, and never diff tasks (utils.RemoteOutputAllowed).
-func (p *Planner) checkScenario(suite *schemas.Suite, conds []condPlan, arms map[string]schemas.ArmManifest, compat *schemas.ArmManifest) error {
+//
+// The main arms are checked only against the main conditions' tasks and the
+// compatibility agent only against its own conditions' tasks: those are the
+// only combinations the scheduler builds (audit 8-B-10).
+func (p *Planner) checkScenario(suite *schemas.Suite, conds, compatConds []condPlan, arms map[string]schemas.ArmManifest, compat *schemas.ArmManifest) error {
 	var errs []error
 	if utils.Grading(suite) == schemas.GradingJudged && suite.Judge == nil && !utils.VisualJudged(suite) { // X1 vision grading: a rubric's pinned vision judge stands in
 		errs = append(errs, fmt.Errorf("suite %s is judged but names no judge", suite.ID))
@@ -45,22 +49,33 @@ func (p *Planner) checkScenario(suite *schemas.Suite, conds []condPlan, arms map
 			remoteCfg[id] = am.Config.Remote
 		}
 	}
+	var compatRemote []string
 	if compat != nil && isRemote(&compat.Config) {
-		remote = append(remote, CompatArm)
+		compatRemote = []string{CompatArm}
 		remoteCfg[CompatArm] = compat.Config.Remote
 	}
-	for _, id := range usedTasks(conds) {
+	for _, id := range usedTasks(append(append([]condPlan(nil), conds...), compatConds...)) {
 		t := suite.TaskByID(id)
-		if t == nil {
+		if t == nil || env == nil {
 			continue
 		}
-		if env != nil {
-			if missing := envMissing(env, suite, t); len(missing) > 0 {
-				errs = append(errs, fmt.Errorf("task %s needs %s, which environment %s cannot provide", id, strings.Join(missing, ", "), env.GetName()))
+		if missing := envMissing(env, suite, t); len(missing) > 0 {
+			errs = append(errs, fmt.Errorf("task %s needs %s, which environment %s cannot provide", id, strings.Join(missing, ", "), env.GetName()))
+		}
+	}
+	for _, id := range usedTasks(conds) {
+		if t := suite.TaskByID(id); t != nil {
+			errs = append(errs, remoteTaskErrs(suite, t, remote, remoteCfg)...) // Remote coverage (scenarioremote.go)
+			errs = append(errs, a2aTaskErrs(suite, t, arms, nil)...)            // B1: a2a arms (a2a.go)
+		}
+	}
+	if compat != nil {
+		for _, id := range usedTasks(compatConds) {
+			if t := suite.TaskByID(id); t != nil {
+				errs = append(errs, remoteTaskErrs(suite, t, compatRemote, remoteCfg)...)
+				errs = append(errs, a2aTaskErrs(suite, t, nil, compat)...)
 			}
 		}
-		errs = append(errs, remoteTaskErrs(suite, t, remote, remoteCfg)...) // Remote coverage (scenarioremote.go)
-		errs = append(errs, a2aTaskErrs(suite, t, arms, compat)...)         // B1: a2a arms (a2a.go)
 	}
 	return errors.Join(errs...)
 }
@@ -113,7 +128,11 @@ func (p *Planner) taskImages(ctx context.Context, suite *schemas.Suite, conds []
 			need = append(need, t)
 		}
 	}
-	if len(need) == 0 {
+	if len(need) == 0 || p.deferGateway {
+		// A hosted plan (gateway deferred to runners) runs on a coordinator
+		// without Docker: the tags are deterministic (utils.TaskImage) and
+		// each runner builds or pulls them and records the ids it ran
+		// (remoteimages.go), so nothing is inspected here (audit 8-B-06).
 		return nil, nil
 	}
 	env, _ := findPart(p.reg.Environments, suite.Environment)

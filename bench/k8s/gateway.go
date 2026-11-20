@@ -173,10 +173,10 @@ func GatewayUp(ctx context.Context, c *Client, o GatewayOptions) error {
 		{deployPath(ns), gwFaultProxy, faultProxyDeployment(o, labels)},
 		{deployPath(ns), gwBifrost, bifrostDeployment(image, o.PullPolicy, labels)},
 		{corePath(ns, "services"), gwFaultProxy, service(gwFaultProxy, labels, []ServicePort{
-			{Name: "upstream", Port: proxyPort, TargetPort: proxyPort, Protocol: "TCP"},
-			{Name: "control", Port: controlPort, TargetPort: controlPort, NodePort: o.ControlNodePort, Protocol: "TCP"}}, o.ControlNodePort > 0)},
+			{Name: "upstream", Port: proxyPort, TargetPort: Port(proxyPort), Protocol: "TCP"},
+			{Name: "control", Port: controlPort, TargetPort: Port(controlPort), NodePort: o.ControlNodePort, Protocol: "TCP"}}, o.ControlNodePort > 0)},
 		{corePath(ns, "services"), gwBifrost, service(gwBifrost, labels, []ServicePort{
-			{Name: "http", Port: bifrostPort, TargetPort: bifrostPort, NodePort: o.BifrostNodePort, Protocol: "TCP"}}, o.BifrostNodePort > 0)},
+			{Name: "http", Port: bifrostPort, TargetPort: Port(bifrostPort), NodePort: o.BifrostNodePort, Protocol: "TCP"}}, o.BifrostNodePort > 0)},
 	}
 	for _, x := range objs {
 		if err := c.Apply(ctx, x.coll, x.name, x.obj); err != nil {

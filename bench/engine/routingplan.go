@@ -185,6 +185,9 @@ func routeRetries(retries int, provider string, gm *schemas.GatewayManifest) []e
 	if gm == nil {
 		return []error{errors.New("retries cannot be checked without a gateway preflight")}
 	}
+	if gm.Deferred() { // hosted plan: the runner's replan checks its own gateway's max_retries (audit 8-B-04)
+		return nil
+	}
 	got, ok := gm.Settings[provider+".max_retries"]
 	if !ok {
 		got, ok = gm.Settings["max_retries"]

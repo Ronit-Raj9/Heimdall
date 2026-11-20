@@ -9,6 +9,7 @@ import (
 	"strings"
 
 	"github.com/maximhq/bifrost/bench/schemas"
+	"github.com/maximhq/bifrost/bench/suite"
 	"gopkg.in/yaml.v3"
 )
 
@@ -45,6 +46,14 @@ func ResolveAgentConfig(doc []byte, set map[string]any) (schemas.AgentConfig, er
 	out, err := yaml.Marshal(tree)
 	if err != nil {
 		return cfg, fmt.Errorf("encode agent config: %w", err)
+	}
+	if len(set) > 0 {
+		// The overrides can produce a value the agent schema refuses (an enum
+		// typo such as scripted.kind: nooop) that the Go types accept, so the
+		// overridden values are checked against the agent schema before freezing.
+		if err := suite.ValidateYAMLUnder(out, "effective agent config", suite.SchemaAgent, keys); err != nil {
+			return cfg, err
+		}
 	}
 	dec := yaml.NewDecoder(bytes.NewReader(out))
 	dec.KnownFields(true)

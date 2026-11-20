@@ -187,7 +187,9 @@ team:
   output (`agent.<id>.stream.jsonl`).
 - `agent`: another agent config (path relative to the bench root). The
   planner resolves it, builds its image and freezes it into the arm config,
-  so it is hashed with the arm. Empty: the arm's own config. `model`,
+  so it is hashed with the arm. Empty: the arm's own config. A task's own
+  team cannot set `agent` (its members always run the arm's config), so
+  planning refuses it. `model`,
   `argv`, `env` override the member's config.
 - `role`: `lead`, `worker`, `router`, `judge`, `reviewer` or any label.
   `lead`, `router` and `judge` count as orchestration in

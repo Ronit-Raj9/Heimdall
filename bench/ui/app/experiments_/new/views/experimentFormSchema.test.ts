@@ -6,6 +6,7 @@ import {
 	defaultFormValues,
 	experimentFormSchema,
 	parseOverrideValue,
+	planIsStale,
 	toExperiment,
 	type ExperimentFormValues,
 } from "./experimentFormSchema";
@@ -204,5 +205,18 @@ describe("defaultFormValues with null lists", () => {
 		expect(values.primaryCondition).toBe("clean");
 		expect(values.conditions.map((c) => c.condition)).toEqual(["clean"]);
 		expect(defaultFormValues({ suites: null, agents: null, metrics: null } as unknown as Catalog, 7).suite).toBe("");
+	});
+});
+describe("planIsStale", () => {
+	it("keeps a plan made from padded input fresh: the schema trims, the comparison does too", () => {
+		const raw = { ...valid(), name: "Audit name ", armBLabel: " candidate " };
+		const parsed = experimentFormSchema.parse(raw);
+		expect(planIsStale(toExperiment(parsed), raw)).toBe(false);
+	});
+
+	it("marks a plan stale after an edit or when the form no longer validates", () => {
+		const planned = toExperiment(experimentFormSchema.parse(valid()));
+		expect(planIsStale(planned, { ...valid(), name: "Other" })).toBe(true);
+		expect(planIsStale(planned, { ...valid(), name: "" })).toBe(true);
 	});
 });

@@ -324,6 +324,12 @@ func (m *mapper) service(s *Service, runOnce bool) (schemas.ServiceSpec, bool) {
 	}
 	if s.HasCommand {
 		spec.Argv = s.Command
+		if len(s.Command) == 0 && !s.HasEntrypoint {
+			// docker create cannot clear an image's command while keeping
+			// its entrypoint; launching with no arguments would run the
+			// image command this file meant to remove.
+			m.refuse(at+".command", "an empty command clears the image command, which a launch cannot do without also setting entrypoint")
+		}
 	}
 	if s.HasEntrypoint {
 		x.Entrypoint, x.EntrypointSet = s.Entrypoint, true

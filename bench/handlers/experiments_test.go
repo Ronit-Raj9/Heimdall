@@ -24,6 +24,11 @@ func TestDecodeExperiment(t *testing.T) {
 		{"json unknown field", "application/json", `{"name":"x","nope":1}`, 400, false, 0},
 		{"empty", "application/json", "  ", 400, false, 0},
 		{"unsupported", "application/xml", "<x/>", 415, false, 0},
+		{"yaml second document", "application/yaml", "name: x\n---\nname: y\n", 400, false, 0},
+		{"json second object", "application/json", `{"name":"x"} {"name":"y"}`, 400, false, 0},
+		{"json trailing space", "application/json", "{\"name\":\"x\",\"conditions\":[{\"id\":\"clean\",\"tasks\":{\"all\":true},\"trials\":1}]}\n\n", 200, true, 0},
+		{"yaml matrix provider typo", "application/yaml", "name: x\nmatrix:\n  models: [{model: first, provdier: fake}, second]\n", 400, false, 0},
+		{"json matrix provider typo", "application/json", `{"name":"x","matrix":{"models":[{"model":"first","provdier":"fake"},"second"]}}`, 400, false, 0},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

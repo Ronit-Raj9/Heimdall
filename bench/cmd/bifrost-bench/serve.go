@@ -55,6 +55,9 @@ func runServe(args []string) int {
 	// Tenancy area (P3): auth.mode hosted serves every organization from its
 	// own folders through the tenancy registry (servetenancy.go).
 	if a.cfg.Auth.IsHosted() {
+		if err := extras.checkHosted(); err != nil {
+			return fail("%v", err)
+		}
 		return serveHosted(ctx, a, *offline)
 	}
 	// Tenancy area (P3): orgDeps builds the deps over one org root; local
@@ -313,12 +316,14 @@ func (c *catalogSource) build() *schemas.Catalog {
 		if err != nil {
 			continue
 		}
-		cat.Suites = append(cat.Suites, schemas.CatalogSuite{
-			ID: s.ID, Version: s.Version, Tasks: s.TaskIDs, Probes: s.ProbeIDs, LockHash: s.LockHash,
-		})
+		layers := make(map[string]schemas.ProbeLayerName, len(s.Probes))
 		for _, p := range s.Probes {
 			cat.Probes = append(cat.Probes, *p)
+			layers[p.ID] = p.Layer
 		}
+		cat.Suites = append(cat.Suites, schemas.CatalogSuite{
+			ID: s.ID, Version: s.Version, Tasks: s.TaskIDs, Probes: s.ProbeIDs, LockHash: s.LockHash, ProbeLayers: layers,
+		})
 	}
 	files, _ := filepath.Glob(filepath.Join(a.cfg.Root, "agents", "*.yaml"))
 	sort.Strings(files)

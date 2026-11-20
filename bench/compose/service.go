@@ -369,21 +369,23 @@ func (p *Project) parseEnvironment(s *Service, n *yaml.Node, at string) {
 
 // parseEnvFile reads env_file entries (a path, a list of paths, or entries
 // with path and required), each inside the task folder. Values in the file
-// are taken as written; the environment key wins over them.
+// are taken as written; files apply in listed order with later files
+// overriding earlier ones, and the environment key wins over them all.
 func (p *Project) parseEnvFile(s *Service, n *yaml.Node, at string) {
 	type entry struct {
 		path     string
 		required bool
+		raw      bool
 		at       string
 	}
 	var entries []entry
 	if n.Kind == yaml.ScalarNode {
-		entries = append(entries, entry{p.str(n, at), true, at})
+		entries = append(entries, entry{path: p.str(n, at), required: true, at: at})
 	} else if n.Kind == yaml.SequenceNode {
 		for i, c := range n.Content {
 			kat := fmt.Sprintf("%s[%d]", at, i)
 			if c.Kind == yaml.ScalarNode {
-				entries = append(entries, entry{p.str(c, kat), true, kat})
+				entries = append(entries, entry{path: p.str(c, kat), required: true, at: kat})
 				continue
 			}
 			e := entry{required: true, at: kat}
@@ -394,7 +396,11 @@ func (p *Project) parseEnvFile(s *Service, n *yaml.Node, at string) {
 				case "required":
 					e.required = p.boolean(v, kkat)
 				case "format":
-					if f := p.str(v, kkat); f != "" && f != "raw" {
+					switch f := p.str(v, kkat); f {
+					case "":
+					case "raw":
+						e.raw = true
+					default:
 						p.refuse(kkat, "env_file format %q is not supported", f)
 					}
 				default:
@@ -405,6 +411,10 @@ func (p *Project) parseEnvFile(s *Service, n *yaml.Node, at string) {
 		}
 	} else {
 		p.refuse(at, "want a path or a list of paths")
+	}
+	explicit := map[string]bool{}
+	for k := range s.Env {
+		explicit[k] = true
 	}
 	for _, e := range entries {
 		r, ok := p.rel(e.at, e.path)
@@ -420,13 +430,13 @@ func (p *Project) parseEnvFile(s *Service, n *yaml.Node, at string) {
 			p.refuse(e.at, "env_file %s: %v", r, err)
 			continue
 		}
-		vals, order, err := parseDotenv(string(b))
+		vals, order, err := parseDotenvMode(string(b), e.raw)
 		if err != nil {
 			p.refuse(e.at, "env_file %s: %v", r, err)
 			continue
 		}
 		for _, k := range order {
-			if _, set := s.Env[k]; !set {
+			if !explicit[k] {
 				s.Env[k] = vals[k]
 			}
 		}

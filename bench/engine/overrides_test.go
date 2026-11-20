@@ -1,12 +1,16 @@
 package engine
 
 import (
+	"encoding/json"
 	"os"
 	"path/filepath"
+	"reflect"
+	"regexp"
 	"strings"
 	"testing"
 
 	"github.com/maximhq/bifrost/bench/schemas"
+	"github.com/maximhq/bifrost/bench/spec"
 )
 
 const baseAgent = `id: claude-code
@@ -57,7 +61,10 @@ func TestResolveAgentConfig(t *testing.T) {
 		{name: "unknown top-level field", doc: baseAgent, set: map[string]any{"modle": "x"}, wantErr: `no field "modle"`},
 		{name: "below a scalar", doc: baseAgent, set: map[string]any{"budgets.wall_s.max": 1}, wantErr: "has no field"},
 		{name: "slice index", doc: baseAgent, set: map[string]any{"argv.0": "x"}, wantErr: "has no field"},
-		{name: "wrong value type", doc: baseAgent, set: map[string]any{"budgets.wall_s": "soon"}, wantErr: "decode agent config"},
+		{name: "wrong value type", doc: baseAgent, set: map[string]any{"budgets.wall_s": "soon"}, wantErr: "budgets.wall_s"},
+		{name: "override value the agent schema refuses", doc: baseAgent, set: map[string]any{"scripted.kind": "nooop"}, wantErr: "scripted.kind"},
+		{name: "a2a override", doc: baseAgent, set: map[string]any{"a2a.card_url": "http://127.0.0.1:23000/card"},
+			check: func(t *testing.T, _, _ string, _ int, _ map[string]string, _ string) {}},
 		{name: "unknown field in base file", doc: baseAgent + "extra: 1\n", wantErr: "field extra not found"},
 	}
 	for _, tt := range tests {
@@ -172,5 +179,58 @@ func TestPlanSkillsArmSet(t *testing.T) {
 	}
 	if _, err := ResolveAgentConfig([]byte("id: x\n"), map[string]any{"skills.enable": false}); err == nil {
 		t.Error("a misspelled skills key was accepted")
+	}
+}
+
+// TestExperimentSchemaOverridePrefixes keeps the override prefixes that
+// spec/experiment.schema.json accepts in arms.<id>.set equal to the top-level
+// fields of schemas.AgentConfig that CheckOverridePath accepts, so a field
+// added to the agent config is never rejected by the CLI alone.
+func TestExperimentSchemaOverridePrefixes(t *testing.T) {
+	raw, err := spec.FS.ReadFile("experiment.schema.json")
+	if err != nil {
+		t.Fatal(err)
+	}
+	var doc struct {
+		Defs struct {
+			Arm struct {
+				Properties struct {
+					Set struct {
+						PatternProperties map[string]any `json:"patternProperties"`
+					} `json:"set"`
+				} `json:"properties"`
+			} `json:"arm"`
+		} `json:"$defs"`
+	}
+	if err := json.Unmarshal(raw, &doc); err != nil {
+		t.Fatal(err)
+	}
+	var got []string
+	for pat := range doc.Defs.Arm.Properties.Set.PatternProperties {
+		m := regexp.MustCompile(`^\^\(([a-z0-9_|]+)\)`).FindStringSubmatch(pat)
+		if m == nil {
+			t.Fatalf("unexpected set pattern %q", pat)
+		}
+		got = append(got, strings.Split(m[1], "|")...)
+	}
+	want := map[string]bool{}
+	ty := reflect.TypeOf(schemas.AgentConfig{})
+	for i := 0; i < ty.NumField(); i++ {
+		name, _, _ := strings.Cut(ty.Field(i).Tag.Get("yaml"), ",")
+		if name != "" && name != "-" {
+			want[name] = true
+		}
+	}
+	gotSet := map[string]bool{}
+	for _, g := range got {
+		gotSet[g] = true
+		if !want[g] {
+			t.Errorf("schema prefix %q is not an agent config field", g)
+		}
+	}
+	for w := range want {
+		if !gotSet[w] {
+			t.Errorf("agent config field %q is missing from the experiment schema's set prefixes", w)
+		}
 	}
 }

@@ -73,7 +73,11 @@ func (w *Worker) runnerImages(ctx context.Context, exp *workerExp, slot *schemas
 			}
 		}
 		if arm, ok := exp.m.Arms[slot.Arm]; ok && arm.Config.Image != "" {
-			if id, err := ins.ImageID(ctx, arm.Config.Image); err == nil && id != "" {
+			image := arm.Config.Image
+			if tag, _ := taskAgentImage(&arm, slot.Task); tag != "" { // the per-task agent image the slot starts (audit 8-B-06)
+				image = tag
+			}
+			if id, err := ins.ImageID(ctx, image); err == nil && id != "" {
 				ids[runnerImageAgent+slot.Arm] = id
 			}
 		}

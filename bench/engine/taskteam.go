@@ -22,7 +22,7 @@ func (p *Planner) checkTaskTeams(arms map[string]schemas.ArmManifest, suite *sch
 	if suite == nil {
 		return nil
 	}
-	sc, counts := p.reg.Gateway.(keySlotCounter)
+	sc, counts := schemas.GatewayAs[keySlotCounter](p.reg.Gateway)
 	var errs []error
 	for _, armID := range sortedKeys(arms) {
 		cfg := arms[armID].Config
@@ -45,6 +45,10 @@ func (p *Planner) checkTaskTeams(arms map[string]schemas.ArmManifest, suite *sch
 					errs = append(errs, fmt.Errorf("arm %s, task %s: %w", armID, id, err))
 					continue
 				}
+				if err := refuseTaskMemberAgents(task); err != nil {
+					errs = append(errs, fmt.Errorf("arm %s, task %s: %w", armID, id, err))
+					continue
+				}
 				if !counts {
 					continue
 				}
@@ -53,6 +57,20 @@ func (p *Planner) checkTaskTeams(arms map[string]schemas.ArmManifest, suite *sch
 						armID, id, len(team), len(team), n, cfg.Gateway.Provider))
 				}
 			}
+		}
+	}
+	return errors.Join(errs...)
+}
+
+// refuseTaskMemberAgents refuses a task team member that names its own agent
+// config. Only an arm config's team has its member configs resolved and
+// frozen with the arm (resolveTeam); a task team member always runs the
+// arm's config, so a reference there would be silently ignored.
+func refuseTaskMemberAgents(task *schemas.Task) error {
+	var errs []error
+	for _, m := range task.Team {
+		if m.Agent != "" {
+			errs = append(errs, fmt.Errorf("team member %s sets agent %q, which a task's own team does not support; every member runs the arm's config, so declare the team on the agent config instead (docs/multi-agent.md)", m.ID, m.Agent))
 		}
 	}
 	return errors.Join(errs...)

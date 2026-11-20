@@ -1,6 +1,8 @@
 package k8s
 
 import (
+	"crypto/sha256"
+	"encoding/hex"
 	"fmt"
 	"regexp"
 	"strconv"
@@ -280,7 +282,7 @@ func denyAllPolicy(labels map[string]string, owner []OwnerReference) NetworkPoli
 // gatewayPolicy allows egress from the run's pods to the gateway's pods on
 // one port, and nothing else: no DNS (the gateway name is an /etc/hosts
 // entry), no other namespace, no internet.
-func gatewayPolicy(labels map[string]string, owner []OwnerReference, gwNamespace string, gwPods map[string]string, port int) NetworkPolicy {
+func gatewayPolicy(labels map[string]string, owner []OwnerReference, gwNamespace string, gwPods map[string]string, port PortRef) NetworkPolicy {
 	return NetworkPolicy{APIVersion: "networking.k8s.io/v1", Kind: "NetworkPolicy",
 		Metadata: ObjectMeta{Name: egressPolicy, Labels: labels, OwnerReferences: owner},
 		Spec: NetworkPolicySpec{PodSelector: LabelSelector{}, PolicyTypes: []string{"Egress"},
@@ -292,14 +294,25 @@ func gatewayPolicy(labels map[string]string, owner []OwnerReference, gwNamespace
 
 var nsBad = regexp.MustCompile(`[^a-z0-9-]+`)
 
+// DefaultNamespacePrefix is the run namespace prefix when the config sets none.
+const DefaultNamespacePrefix = "heimdall-run"
+
+// MaxNamespacePrefix is the longest namespace prefix the config accepts, so
+// a run ID keeps most of its characters in the name.
+const MaxNamespacePrefix = 40
+
 // NamespaceFor is a run's namespace: prefix-<run id>, lowercased, with every
 // character a namespace name cannot hold replaced by a hyphen, at most 63
-// characters. It is pure.
+// characters. A name that would be longer is cut and ends in a hash of the
+// whole name, so two runs never share a namespace however long the prefix.
+// It is pure.
 func NamespaceFor(prefix, runID string) string {
 	name := nsBad.ReplaceAllString(strings.ToLower(prefix+"-"+runID), "-")
 	name = strings.Trim(name, "-")
 	if len(name) > 63 {
-		name = strings.TrimRight(name[:63], "-")
+		sum := sha256.Sum256([]byte(prefix + "\x00" + runID))
+		suffix := hex.EncodeToString(sum[:])[:10]
+		name = strings.TrimRight(name[:63-len(suffix)-1], "-") + "-" + suffix
 	}
 	return name
 }

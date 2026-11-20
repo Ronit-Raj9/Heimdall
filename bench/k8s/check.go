@@ -54,7 +54,7 @@ func (d *Driver) Check(ctx context.Context, images []string) []schemas.DoctorChe
 		add("gateway", schemas.DoctorFail, "%v", err)
 	} else {
 		gwOK = true
-		add("gateway", schemas.DoctorPass, "%s -> %s (agents reach %s through /etc/hosts; egress allowed to pods %v port %d)",
+		add("gateway", schemas.DoctorPass, "%s -> %s (agents reach %s through /etc/hosts; egress allowed to pods %v port %s)",
 			d.cfg.GatewayURL, gw.ip, d.cfg.AgentGatewayURL, gw.selector, gw.targetPort)
 	}
 	out = append(out, d.imageRows(ctx, images)...)
@@ -111,9 +111,13 @@ func (d *Driver) permissionRows(ctx context.Context) []schemas.DoctorCheck {
 	type need struct{ verb, group, resource, sub string }
 	needs := []need{
 		{"create", "", "namespaces", ""}, {"delete", "", "namespaces", ""},
-		{"create", "", "pods", ""}, {"get", "", "pods", ""}, {"create", "", "pods", "exec"}, {"create", "", "pods", "attach"}, {"get", "", "pods", "log"},
+		{"create", "", "pods", ""}, {"get", "", "pods", ""}, {"create", "", "pods", "exec"}, {"create", "", "pods", "attach"},
+		{"get", "", "pods", "exec"}, {"get", "", "pods", "attach"}, // 2-D-17: the WebSocket exec and attach upgrade an HTTP GET {"get", "", "pods", "log"},
 		{"create", "", "secrets", ""}, {"create", "", "configmaps", ""}, {"delete", "", "configmaps", ""},
 		{"create", "networking.k8s.io", "networkpolicies", ""}, {"list", "", "events", ""}, {"list", "", "nodes", ""},
+	}
+	if d.cfg.ServiceAccount != "" { // 2-D-05: created in every run namespace
+		needs = append(needs, need{"create", "", "serviceaccounts", ""})
 	}
 	ns := NamespaceFor(d.cfg.NamespacePrefix, "check")
 	var denied []string

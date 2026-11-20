@@ -38,3 +38,13 @@ func (x *serveExtras) apply(ctx context.Context, a *app, deps *server.Deps, offl
 	}
 	return startScheduleDaemon(ctx, a, *x.schedulesFile)
 }
+
+// checkHosted refuses the schedule flags on a hosted server: hosted serve
+// starts no schedule daemon, so accepting them would silently run nothing
+// (audit 8-C-04).
+func (x *serveExtras) checkHosted() error {
+	if (x.schedules != nil && *x.schedules) || (x.schedulesFile != nil && *x.schedulesFile != "") {
+		return errors.New("-schedules and -schedules-file are not supported in hosted mode: the hosted server runs no schedule daemon")
+	}
+	return nil
+}

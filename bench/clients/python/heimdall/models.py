@@ -1249,6 +1249,7 @@ class _CatalogSuiteRequired(TypedDict):
 
 class CatalogSuite(_CatalogSuiteRequired, total=False):
     lock_hash: str
+    probe_layers: Dict[str, str]
 
 
 Change = TypedDict('Change', {'from': "Value", 'to': "Value"}, total=False)
@@ -2686,6 +2687,7 @@ class JudgeCalibrationVerdict(_JudgeCalibrationVerdictRequired, total=False):
     agreement: Optional[CalibrationRate]
     bias_adjusted: Dict[str, BiasAdjustedRate]
     capped_from: str
+    caps: bool
     error_over_effect: str
     fpr: Optional[CalibrationRate]
     kappa: Optional[float]
@@ -3007,7 +3009,7 @@ class MetricDelta(TypedDict):
     unknown_b: int
 
 
-class MetricDescriptor(TypedDict):
+class _MetricDescriptorRequired(TypedDict):
     description: str
     higher_is_better: bool
     kind: str
@@ -3016,6 +3018,10 @@ class MetricDescriptor(TypedDict):
     name: str
     ps2: bool
     version: str
+
+
+class MetricDescriptor(_MetricDescriptorRequired, total=False):
+    report_only: bool
 
 
 class MetricTest(TypedDict):

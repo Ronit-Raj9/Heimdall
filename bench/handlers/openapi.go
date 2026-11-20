@@ -43,20 +43,21 @@ const (
 // Request and Response hold a zero value of the JSON body type; the schema is
 // derived from it by reflection, so it cannot drift from the Go type.
 type RouteDoc struct {
-	Method      string
-	Path        string // router pattern, e.g. /api/bench/runs/{id}
-	Tag         string
-	Summary     string
-	Auth        string
-	Query       []QueryDoc
-	Request     any      // JSON request body, nil when there is none
-	RequestAlso []string // other request media types the route accepts, e.g. application/yaml
-	RawRequest  string   // media type of a non-JSON request body
-	Status      int      // success status; 0 means 200
-	Response    any      // JSON success body; the server adds "mode"
-	Raw         string   // media type of a non-JSON success body
-	AlsoRaw     string   // a second media type the route can answer with, e.g. text/event-stream
-	NoContent   bool     // the route may also answer 204 with no body
+	Method       string
+	Path         string // router pattern, e.g. /api/bench/runs/{id}
+	Tag          string
+	Summary      string
+	Auth         string
+	Query        []QueryDoc
+	Request      any      // JSON request body, nil when there is none
+	RequestAlso  []string // other request media types the route accepts, e.g. application/yaml
+	RawRequest   string   // media type of a non-JSON request body
+	Status       int      // success status; 0 means 200
+	Response     any      // JSON success body; the server adds "mode"
+	Raw          string   // media type of a non-JSON success body
+	AlsoRaw      string   // a second media type the route can answer with, e.g. text/event-stream
+	NoContent    bool     // the route may also answer 204 with no body
+	OptionalBody bool     // the request body may be omitted; the route then uses defaults
 }
 
 // QueryDoc is one query parameter.
@@ -95,7 +96,7 @@ var APIRoutes = []RouteDoc{
 	{Method: "POST", Path: APIPrefix + "/experiments/{id}/resume", Tag: "experiments", Summary: "Queue a stopped experiment's run again; sealed runs are kept and the rest run; 409 while a run or regrade job is active",
 		Auth: AuthWrite, Status: fasthttp.StatusAccepted, Response: schemas.ExperimentStatus{}},
 	{Method: "POST", Path: APIPrefix + "/experiments/{id}/regrade", Tag: "analysis", Summary: "Queue an experiment.regate job: recompute the gates of the sealed runs as a new regrade (id in the job's params); nothing runs again",
-		Auth: AuthWrite, Request: RegradeRequest{}, Status: fasthttp.StatusAccepted, Response: jobs.Job{}},
+		Auth: AuthWrite, Request: RegradeRequest{}, OptionalBody: true, Status: fasthttp.StatusAccepted, Response: jobs.Job{}},
 	{Method: "GET", Path: APIPrefix + "/experiments/{id}/triage", Tag: "analysis", Summary: "Runs grouped by failure pattern per arm", Response: schemas.Triage{}},
 	{Method: "POST", Path: APIPrefix + "/estimate", Tag: "experiments", Summary: "Forecast an experiment's cost and time from sealed history; nothing is frozen, a refused plan comes back with fit unknown and 200",
 		Auth: AuthWrite, Request: schemas.Experiment{}, RequestAlso: experimentMediaTypes, Response: schemas.Forecast{}}, // Forecast and matrix area (forecast.go)
@@ -318,6 +319,8 @@ type OpenAPIHandler struct {
 	mode    schemas.Mode
 	version string
 	routes  func() map[string][]string
+	extra   map[string][]string // Tenancy area: the hosted platform routes served beside the org router
+	hosted  bool                // Tenancy area: describe hosted session, API-token and runner auth
 	once    sync.Once
 	doc     []byte
 	err     error
@@ -326,6 +329,16 @@ type OpenAPIHandler struct {
 // NewOpenAPIHandler creates the description handler.
 func NewOpenAPIHandler(mode schemas.Mode, version string) *OpenAPIHandler {
 	return &OpenAPIHandler{mode: mode, version: version}
+}
+
+// ForHosted makes the document describe a hosted server (audit 8-C-05):
+// platform lists the platform router's routes (accounts, orgs, jobs,
+// runners), served beside the org router this handler is registered on, and
+// the security schemes are the hosted session, API-token and runner ones
+// instead of the local write and worker tokens.
+func (h *OpenAPIHandler) ForHosted(platform map[string][]string) *OpenAPIHandler {
+	h.hosted, h.extra = true, platform
+	return h
 }
 
 // RegisterRoutes registers GET /openapi.json and keeps the router to list
@@ -340,7 +353,12 @@ func (h *OpenAPIHandler) RegisterRoutes(r *router.Router, middlewares ...lib.Mid
 // top-level "mode" key that would make the document invalid.
 func (h *OpenAPIHandler) getOpenAPI(ctx *fasthttp.RequestCtx) {
 	h.once.Do(func() {
-		doc, _ := BuildOpenAPI(h.routes(), h.version, h.mode)
+		var doc map[string]any
+		if h.hosted {
+			doc, _ = BuildHostedOpenAPI(mergeRoutes(h.routes(), h.extra), h.version, h.mode)
+		} else {
+			doc, _ = BuildOpenAPI(h.routes(), h.version, h.mode)
+		}
 		h.doc, h.err = json.MarshalIndent(doc, "", "  ")
 	})
 	if h.err != nil {
@@ -361,11 +379,43 @@ func (h *OpenAPIHandler) getOpenAPI(ctx *fasthttp.RequestCtx) {
 // "METHOD /path"; the document lists them under x-bench-undocumented too.
 // It is pure.
 func BuildOpenAPI(registered map[string][]string, version string, mode schemas.Mode) (doc map[string]any, undocumented []string) {
+	return buildOpenAPI(registered, version, mode, false)
+}
+
+// BuildHostedOpenAPI is BuildOpenAPI for a hosted server: registered is the
+// org router's routes merged with the platform router's, OrgRouteDocs
+// describe the org routes, and the security schemes are the hosted ones
+// (audit 8-C-05).
+func BuildHostedOpenAPI(registered map[string][]string, version string, mode schemas.Mode) (doc map[string]any, undocumented []string) {
+	return buildOpenAPI(registered, version, mode, true)
+}
+
+// mergeRoutes unions two method -> patterns maps.
+func mergeRoutes(a, b map[string][]string) map[string][]string {
+	out := map[string][]string{}
+	for _, m := range []map[string][]string{a, b} {
+		for method, list := range m {
+			for _, p := range list {
+				if !slices.Contains(out[method], p) {
+					out[method] = append(out[method], p)
+				}
+			}
+		}
+	}
+	return out
+}
+
+func buildOpenAPI(registered map[string][]string, version string, mode schemas.Mode, hosted bool) (doc map[string]any, undocumented []string) {
 	table := map[string]RouteDoc{}
-	for _, rd := range APIRoutes {
+	docs := APIRoutes
+	if hosted {
+		docs = append(append([]RouteDoc(nil), APIRoutes...), OrgRouteDocs...)
+	}
+	for _, rd := range docs {
 		table[rd.Method+" "+rd.Path] = rd
 	}
 	g := newSchemaGen()
+	g.hosted = hosted
 	paths := map[string]map[string]any{}
 	for method, list := range registered {
 		for _, p := range list {
@@ -404,17 +454,31 @@ func BuildOpenAPI(registered map[string][]string, version string, mode schemas.M
 		},
 		"paths": paths,
 		"components": map[string]any{
-			"schemas": g.components,
-			"securitySchemes": map[string]any{
-				"writeToken":  map[string]any{"type": "http", "scheme": "bearer", "description": "BENCH_WRITE_TOKEN; required on every write route"},
-				"workerToken": map[string]any{"type": "http", "scheme": "bearer", "description": "BENCH_WORKER_TOKEN; required on the worker routes"},
-				"inboxToken":  map[string]any{"type": "http", "scheme": "bearer", "description": "the inbox webhook token (token_env of the webhook source in inbox/sources.yaml); Failure inbox area"},
-			},
+			"schemas":         g.components,
+			"securitySchemes": securitySchemes(hosted),
 		},
 		"x-bench-mode":         string(mode),
 		"x-bench-undocumented": listed,
 	}
 	return doc, undocumented
+}
+
+// securitySchemes are the local tokens, or the hosted account, API-token
+// and runner credentials (Tenancy area, tenancy/policy.go decides roles).
+func securitySchemes(hosted bool) map[string]any {
+	if hosted {
+		return map[string]any{
+			"session":     map[string]any{"type": "apiKey", "in": "cookie", "name": "heimdall_session", "description": "Signed-in account session; a write also sends the session's CSRF value in X-Heimdall-CSRF"},
+			"csrf":        map[string]any{"type": "apiKey", "in": "header", "name": "X-Heimdall-CSRF", "description": "CSRF value of the session; required with the session cookie on writes"},
+			"apiToken":    map[string]any{"type": "http", "scheme": "bearer", "description": "An organization API token; the org role decides what it may do"},
+			"runnerToken": map[string]any{"type": "http", "scheme": "bearer", "description": "A runner token of the organization; required on the worker routes"},
+		}
+	}
+	return map[string]any{
+		"writeToken":  map[string]any{"type": "http", "scheme": "bearer", "description": "BENCH_WRITE_TOKEN; required on every write route"},
+		"workerToken": map[string]any{"type": "http", "scheme": "bearer", "description": "BENCH_WORKER_TOKEN; required on the worker routes"},
+		"inboxToken":  map[string]any{"type": "http", "scheme": "bearer", "description": "the inbox webhook token (token_env of the webhook source in inbox/sources.yaml); Failure inbox area"},
+	}
 }
 
 // routeParam matches a router path parameter, with an optional regexp or
@@ -428,6 +492,7 @@ func openAPIPath(p string) string {
 
 // schemaGen derives JSON Schemas from Go types into a shared components map.
 type schemaGen struct {
+	hosted     bool // Tenancy area: hosted security requirements
 	components map[string]any
 	names      map[reflect.Type]string
 }
@@ -453,12 +518,18 @@ func (g *schemaGen) operation(rd RouteDoc) map[string]any {
 	if len(params) > 0 {
 		op["parameters"] = params
 	}
-	switch rd.Auth {
-	case AuthWrite:
+	switch {
+	case g.hosted && rd.Auth == AuthWrite:
+		op["security"] = []any{map[string]any{"session": []string{}, "csrf": []string{}}, map[string]any{"apiToken": []string{}}}
+	case g.hosted && rd.Auth == AuthWorker:
+		op["security"] = []any{map[string]any{"runnerToken": []string{}}}
+	case g.hosted && rd.Auth == AuthInbox:
+		// The inbox webhook is local mode only (tenancy/policy.go denies it).
+	case rd.Auth == AuthWrite:
 		op["security"] = []any{map[string]any{"writeToken": []string{}}}
-	case AuthWorker:
+	case rd.Auth == AuthWorker:
 		op["security"] = []any{map[string]any{"workerToken": []string{}}}
-	case AuthInbox: // Failure inbox area (inbox.go)
+	case rd.Auth == AuthInbox: // Failure inbox area (inbox.go)
 		op["security"] = []any{map[string]any{"inboxToken": []string{}}}
 	}
 	if body := g.requestBody(rd); body != nil {
@@ -483,7 +554,7 @@ func (g *schemaGen) requestBody(rd RouteDoc) map[string]any {
 	if len(content) == 0 {
 		return nil
 	}
-	return map[string]any{"required": true, "content": content}
+	return map[string]any{"required": !rd.OptionalBody, "content": content}
 }
 
 // responses describes the success answer and the one error shape.

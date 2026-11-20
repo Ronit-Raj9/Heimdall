@@ -150,3 +150,12 @@ export function toExperiment(v: ExperimentFormValues): Experiment {
 export function dateSeed(now: Date): number {
 	return now.getFullYear() * 10_000 + (now.getMonth() + 1) * 100 + now.getDate();
 }
+/**
+ * Whether a plan no longer describes the form. Both sides are compared as the experiment the
+ * form submits, so the schema's own normalisation (trimmed name and labels) never marks a fresh
+ * plan stale; values that no longer validate always do.
+ */
+export function planIsStale(planned: Experiment, values: unknown): boolean {
+	const parsed = experimentFormSchema.safeParse(values);
+	return !parsed.success || JSON.stringify(toExperiment(parsed.data)) !== JSON.stringify(planned);
+}

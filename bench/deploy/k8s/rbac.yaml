@@ -23,9 +23,10 @@ rules:
   - apiGroups: [""]
     resources: [namespaces]
     verbs: [create, get, list, delete]
-  # The run pod, its env secret, its anchor and observer scripts.
+  # The run pod, its env secret, its anchor and observer scripts, and the
+  # tokenless kubernetes.service_account created in each run namespace.
   - apiGroups: [""]
-    resources: [pods, secrets, configmaps]
+    resources: [pods, secrets, configmaps, serviceaccounts]
     verbs: [create, get, list, delete, patch]
   # Seeding, export, observers and the agent's own streams.
   - apiGroups: [""]

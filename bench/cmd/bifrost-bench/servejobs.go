@@ -965,7 +965,10 @@ func hostedHub(env *hostedEnv) *jobsHub {
 	if h, ok := hostedHubs.Load(env); ok {
 		return h.(*jobsHub)
 	}
-	h := newJobsHub(env.db, env.base.logger, true, !env.offline, "")
+	// Hosted -offline keeps experiment.run: the hosted coordinator queues
+	// leases for runners and launches nothing itself, so offline changes
+	// nothing here (audit 8-C-03).
+	h := newJobsHub(env.db, env.base.logger, true, true, "")
 	h.build = func(ctx context.Context, orgID string) (func(), error) {
 		org, err := env.dir.OrgByID(ctx, orgID)
 		if err != nil {
