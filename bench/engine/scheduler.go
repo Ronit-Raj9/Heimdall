@@ -114,6 +114,16 @@ type schedRun struct {
 	observed bool          // some run's cost was observed
 	freed    chan struct{} // closed and replaced whenever a reservation is released
 
+	// remoteOps counts coordinator calls working on this run outside the
+	// coordinator's lock (a lease being handed out, a completion or release
+	// being settled). Add happens under the coordinator's mu while the run is
+	// attached; detach waits for it, so no call finalizes a lease after Run
+	// returns.
+	remoteOps sync.WaitGroup
+
+	returned  map[string]int  // slot id -> times a remote worker gave it back without a run; under mu (remote.go)
+	unsettled map[string]bool // slots left without a disposition (held elsewhere, store error); under mu (adaptive_sched.go)
+
 	w7 *adaptiveState // W7 adaptive trials: slots queued and the last replay (adaptive_sched.go)
 	// X7: the GPUs each GPU worker holds, by slot id (gpu.go).
 	gpuMu sync.Mutex
@@ -327,6 +337,7 @@ func (r *schedRun) spentSoFar(ctx context.Context) error {
 			if !rec.Sealed {
 				continue
 			}
+			r.finishSeal(ctx, &slot, rec)
 			c, known, err := readSpend(rec.Dir, &rec.Run)
 			if err != nil {
 				r.s.logger.Warn("unreadable metrics.json", "run", rec.Run.RunID, "error", err.Error())
@@ -357,6 +368,27 @@ func (r *schedRun) spentSoFar(ctx context.Context) error {
 	return nil
 }
 
+// finishSeal completes a seal a crash interrupted after seal.json was written
+// (rec.SealPending): Store.Seal appends its missing seals.log entry, so the
+// run verifies before resume counts or skips it, and before any newer seal
+// moves the chain tail past it. A seal that cannot be finished is an
+// integrity failure and is reported as a slot error, never skipped silently.
+func (r *schedRun) finishSeal(ctx context.Context, slot *schemas.Slot, rec schemas.RunRecord) {
+	if !rec.Sealed || !rec.SealPending {
+		return
+	}
+	run := rec.Run
+	_, err := r.s.reg.Store.Seal(ctx, &run)
+	switch {
+	case err == nil:
+		r.s.logger.Warn("finished an interrupted seal", "experiment", r.m.ExpID, "run", run.RunID)
+		r.count(func(s *Summary) { s.Recovered++ })
+	case errors.Is(err, schemas.ErrSealed):
+	default:
+		r.slotError(slot, fmt.Errorf("run %s: interrupted seal cannot be finished: %w", run.RunID, err))
+	}
+}
+
 // process runs one slot to a counted run, or decides it needs none.
 //
 // A slot that already has a counted sealed run is skipped before the budget
@@ -383,12 +415,17 @@ func (r *schedRun) process(ctx context.Context, slot *schemas.Slot) {
 	defer r.release(est)
 	store := r.s.reg.Store
 	ok, err = store.Lease(ctx, slot.SlotID, r.opts.Owner, r.opts.StaleAfter)
+	if errors.Is(err, schemas.ErrLeaseBusy) { // another party holds the slot's lock: left to it, like a held lease
+		r.s.logger.Warn("slot lease lock busy", "slot", slot.SlotID, "error", err.Error())
+		ok, err = false, nil
+	}
 	if err != nil {
 		r.slotError(slot, fmt.Errorf("lease: %w", err))
 		return
 	}
 	if !ok {
 		r.count(func(s *Summary) { s.LeaseHeld++ })
+		r.markUnsettled(slot.SlotID)
 		r.emit(Event{Kind: EventLeaseHeld, SlotID: slot.SlotID})
 		return
 	}
@@ -457,6 +494,9 @@ func (r *schedRun) settle(ctx context.Context, slot *schemas.Slot, est float64) 
 	if err != nil {
 		r.slotError(slot, err)
 		return 0, true
+	}
+	for _, rec := range recs {
+		r.finishSeal(ctx, slot, rec)
 	}
 	if r.skipDone(slot, recs) {
 		return len(recs), true
@@ -581,7 +621,7 @@ func (r *schedRun) tryReserve() (est float64, ok, wait bool) {
 func (r *schedRun) reserveLocked() (est float64, ok, wait bool) {
 	limit := r.m.Experiment.Budget.TotalUSD
 	if !r.stopped && r.sum.SpentUSD >= limit {
-		r.stopped, r.sum.BudgetStopped = true, true
+		r.stopLocked()
 	}
 	if r.stopped {
 		return 0, false, false
@@ -606,10 +646,22 @@ func (r *schedRun) capReached() bool {
 	}
 	r.mu.Lock()
 	defer r.mu.Unlock()
-	if r.sum.SpentUSD >= limit {
-		r.stopped, r.sum.BudgetStopped = true, true
+	if !r.stopped && r.sum.SpentUSD >= limit {
+		r.stopLocked()
 	}
 	return r.stopped
+}
+
+// stopLocked stops leasing for good once the cap is reached. Every slot
+// still queued is counted pending right away, whatever worker it would need:
+// a slot that waits for a worker that is not there (a GPU slot on a
+// coordinator without GPU workers) must not keep Run from returning
+// (2-A-09). The caller holds mu.
+func (r *schedRun) stopLocked() {
+	r.stopped, r.sum.BudgetStopped = true, true
+	if r.queue != nil {
+		r.sum.Pending += r.queue.drop()
+	}
 }
 
 // charge adds the cost of a run that ran on a remote worker but was never
@@ -678,6 +730,7 @@ func (r *schedRun) observeLocked(c float64) {
 
 func (r *schedRun) slotError(slot *schemas.Slot, err error) {
 	r.count(func(s *Summary) { s.Errors++ })
+	r.markUnsettled(slot.SlotID)
 	r.s.logger.Error("slot failed", "experiment", r.m.ExpID, "slot", slot.SlotID, "error", err.Error())
 	r.emit(Event{Kind: EventError, SlotID: slot.SlotID, Message: err.Error()})
 }
@@ -748,8 +801,8 @@ func (r *schedRun) heartbeat(ctx context.Context, slotID string) (context.Contex
 	}()
 	return sctx, func() bool {
 		close(quit)
+		cancel(nil) // a heartbeat blocked on the slot lock sees this and returns, so done is never waited on forever
 		<-done
-		cancel(nil)
 		return lost.Load()
 	}
 }
@@ -998,6 +1051,18 @@ func (q *slotQueue) giveBack(slot *schemas.Slot) {
 	q.pending[i] = slot
 	q.remote--
 	q.notifyLocked()
+}
+
+// drop removes every pending slot and returns how many there were.
+func (q *slotQueue) drop() int {
+	q.mu.Lock()
+	defer q.mu.Unlock()
+	n := len(q.pending)
+	if n > 0 {
+		q.pending = nil
+		q.notifyLocked()
+	}
+	return n
 }
 
 // finish ends a slot that was out and needs nothing more from this queue.

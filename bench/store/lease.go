@@ -20,6 +20,11 @@ import (
 // plenty under the slot lock.
 const leaseAttempts = 3
 
+// leaseLockWait bounds how long one lease change waits for the slot's lock
+// before it reports schemas.ErrLeaseBusy. A process suspended while it holds
+// the flock then delays others by this much, not forever. A variable for tests.
+var leaseLockWait = 10 * time.Second
+
 // Lease takes the slot for owner with an O_EXCL-created lease.json in the
 // slot folder. It returns true when owner now holds the lease (also when it
 // already did; the heartbeat is refreshed) and false when another owner holds
@@ -42,7 +47,7 @@ func (s *FSStore) Lease(ctx context.Context, slotID, owner string, staleAfter ti
 	if err != nil {
 		return false, fmt.Errorf("lease: %w", err)
 	}
-	unlock, err := s.lockSlot(slotID, dir)
+	unlock, err := s.lockSlot(ctx, slotID, dir)
 	if err != nil {
 		return false, fmt.Errorf("lease slot %s: %w", slotID, err)
 	}
@@ -103,7 +108,7 @@ func (s *FSStore) Heartbeat(ctx context.Context, slotID, owner string) error {
 	if err != nil {
 		return fmt.Errorf("heartbeat: %w", err)
 	}
-	unlock, err := s.lockSlot(slotID, dir)
+	unlock, err := s.lockSlot(ctx, slotID, dir)
 	if err != nil {
 		return fmt.Errorf("heartbeat slot %s: %w", slotID, err)
 	}
@@ -136,7 +141,7 @@ func (s *FSStore) Release(ctx context.Context, slotID, owner string) error {
 	if err != nil {
 		return fmt.Errorf("release: %w", err)
 	}
-	unlock, err := s.lockSlot(slotID, dir)
+	unlock, err := s.lockSlot(ctx, slotID, dir)
 	if err != nil {
 		return fmt.Errorf("release slot %s: %w", slotID, err)
 	}
@@ -159,15 +164,23 @@ func (s *FSStore) Release(ctx context.Context, slotID, owner string) error {
 }
 
 // lockSlot serializes lease changes for one slot: a mutex for goroutines of
-// this store, then flock on lease.lock for other stores and processes.
-func (s *FSStore) lockSlot(slotID, dir string) (func(), error) {
-	unlockMu := s.slotLock.lock(slotID)
+// this store, then flock on lease.lock for other stores and processes. Both
+// waits end with ctx, and give up after leaseLockWait with
+// schemas.ErrLeaseBusy, which is contention, not a judgement of the lease.
+func (s *FSStore) lockSlot(ctx context.Context, slotID, dir string) (func(), error) {
+	wctx, cancel := context.WithTimeoutCause(ctx, leaseLockWait,
+		fmt.Errorf("waited %s for the slot lock: %w", leaseLockWait, schemas.ErrLeaseBusy))
+	defer cancel()
+	unlockMu, err := s.slotLock.lockCtx(wctx, slotID)
+	if err != nil {
+		return nil, err
+	}
 	f, err := os.OpenFile(filepath.Join(dir, leaseLockFile), os.O_RDWR|os.O_CREATE, filePerm)
 	if err != nil {
 		unlockMu()
 		return nil, fmt.Errorf("open lease lock: %w", err)
 	}
-	unlockFile, err := lockFile(f)
+	unlockFile, err := lockFileCtx(wctx, f)
 	if err != nil {
 		unlockMu()
 		return nil, errors.Join(err, f.Close())

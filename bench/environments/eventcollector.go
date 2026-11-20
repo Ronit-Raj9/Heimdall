@@ -46,6 +46,13 @@ func collectorRunning(runID string) bool {
 	return ok
 }
 
+// forgetCollector drops the run's collector bookkeeping once the run is
+// destroyed, so a long-lived process does not keep an entry per run.
+func forgetCollector(runID string) {
+	collectorRuns.Delete(runID)
+	collectorTried.Delete(runID)
+}
+
 // markCollector records that the run's tool proxy (and so its collector)
 // is serving.
 func (e *dockerWorkspace) markCollector(runID string) {

@@ -279,3 +279,34 @@ func TestRecordedManifestsKeepTheirHash(t *testing.T) {
 		}
 	}
 }
+
+// TestSchedulerHeldMinimumNotSettled is 2-C-04: a minimum slot another live
+// owner holds has no result yet, so the rule must not treat it as settled and
+// release that task's optional trials ahead of it.
+func TestSchedulerHeldMinimumNotSettled(t *testing.T) {
+	b := newBench(t)
+	b.reg.Graders = []schemas.Grader{armGrader{part{"hidden_tests"}, func(sl *schemas.Slot) bool { return sl.Arm == "B" }}}
+	e := testExperiment(fourTasks(3)...)
+	e.Trials = &schemas.TrialsPolicy{Mode: schemas.TrialsAdaptive, Rule: schemas.AdaptiveTask, Min: 1, Max: 3}
+	m := b.plan(t, e)
+	var held *schemas.Slot
+	for i := range m.Slots {
+		if !m.Slots[i].Optional {
+			held = &m.Slots[i]
+			break
+		}
+	}
+	b.store.leases[held.SlotID] = "another-live-owner"
+	sum, err := NewScheduler(b.reg, b.root, nil, nil).Run(context.Background(), m, RunOptions{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if sum.LeaseHeld != 1 {
+		t.Fatalf("summary %+v", sum)
+	}
+	for _, sl := range m.Slots {
+		if sl.Optional && sl.Task == held.Task && b.w.execs[sl.SlotID] > 0 {
+			t.Fatalf("optional trial %d of task %s ran while its minimum slot %s is held elsewhere", sl.Trial, sl.Task, held.SlotID)
+		}
+	}
+}

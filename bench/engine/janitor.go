@@ -99,7 +99,7 @@ type dockerKind struct {
 }
 
 var dockerKinds = []dockerKind{
-	{"containers", []string{"ps", "-a"}, "{{.ID}}", true, []string{"rm", "-f"}, false},
+	{"containers", []string{"ps", "-a"}, "{{.ID}}", true, []string{"rm", "-f", "-v"}, false},
 	{"volumes", []string{"volume", "ls"}, "{{.Name}}", false, []string{"volume", "rm", "-f"}, false},
 	{"networks", []string{"network", "ls"}, "{{.ID}}", true, []string{"network", "rm"}, false},
 	{"images", []string{"image", "ls", "-q", "--no-trunc"}, "", false, []string{"image", "rm", "-f"}, true},
@@ -133,7 +133,7 @@ func NewJanitor(gateway schemas.Gateway, docker utils.Docker, logger schemas.Log
 func ScanRunLiveness(roots []string, staleAfter time.Duration, now time.Time) (RunLiveness, error) {
 	lv := RunLiveness{Live: map[string]bool{}, Dead: map[string]bool{}}
 	for _, root := range roots {
-		slots, err := filepath.Glob(filepath.Join(root, "*", slotsFolder, "*"))
+		slots, err := leaseSlotDirs(root)
 		if err != nil {
 			return lv, fmt.Errorf("scan leases under %s: %w", root, err)
 		}
@@ -144,6 +144,39 @@ func ScanRunLiveness(roots []string, staleAfter time.Duration, now time.Time) (R
 		}
 	}
 	return lv, nil
+}
+
+// leaseSlotDirs lists root/<exp>/<slotsFolder>/<slot> with errors kept:
+// filepath.Glob drops directory read errors, which would make a slot whose
+// folder cannot be read look like a run with no lease. A missing root, or an
+// experiment without a slots folder, is nothing to scan; any other read
+// error fails the scan, so the janitor sweeps nothing.
+func leaseSlotDirs(root string) ([]string, error) {
+	exps, err := os.ReadDir(root)
+	if errors.Is(err, fs.ErrNotExist) {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	var out []string
+	for _, exp := range exps {
+		if !exp.IsDir() {
+			continue
+		}
+		dir := filepath.Join(root, exp.Name(), slotsFolder)
+		slots, err := os.ReadDir(dir)
+		if errors.Is(err, fs.ErrNotExist) {
+			continue
+		}
+		if err != nil {
+			return nil, err
+		}
+		for _, slot := range slots {
+			out = append(out, filepath.Join(dir, slot.Name()))
+		}
+	}
+	return out, nil
 }
 
 // Sweep removes docker containers, volumes and networks labelled

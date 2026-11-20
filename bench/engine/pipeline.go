@@ -626,12 +626,11 @@ func scoreOf(o schemas.Outcome) schemas.Value {
 	return schemas.Unknown(string(o), schemas.EvidenceOutcome)
 }
 
-// afterContext returns ctx while it is live, or a fresh bounded context when
-// it was cancelled, so cleanup and seal still run after an interrupt.
+// afterContext returns a fresh bounded context for cleanup and seal, detached
+// from ctx whether or not it was cancelled yet: a cancel that arrives while
+// cleanup runs must not abort container and key cleanup or the abort seal.
+// The run's own cancellation cause is still read from ctx after cleanup.
 func afterContext(ctx context.Context) (context.Context, context.CancelFunc) {
-	if ctx.Err() == nil {
-		return context.WithCancel(ctx)
-	}
 	return context.WithTimeout(context.WithoutCancel(ctx), cleanupTimeout)
 }
 

@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/maximhq/bifrost/bench/gpu"
 	"github.com/maximhq/bifrost/bench/schemas"
 	"github.com/maximhq/bifrost/bench/utils"
 )
@@ -165,33 +164,50 @@ func (p *Pipeline) holdGPU(ctx context.Context, in SlotInput) (SlotInput, func()
 }
 
 // remoteGPUAccept is the lease filter for one remote worker: a slot of a
-// task without a GPU request always fits; a GPU slot fits only when the
-// worker registered enough GPUs with enough memory that none of its running
-// leases holds. busy is how many of its GPUs its running leases hold.
-func remoteGPUAccept(gpus []schemas.GPUInfo, busy int) func(*schemas.Task) bool {
-	free := len(gpus) - busy
+// task without a GPU request always fits; a GPU slot fits only when enough
+// of the worker's registered GPUs that no running lease holds (held, by
+// UUID) each have the memory it asks for. Memory is matched against those
+// free devices, not the whole inventory (2-C-06).
+func remoteGPUAccept(gpus []schemas.GPUInfo, held map[string]bool) func(*schemas.Task) bool {
 	return func(t *schemas.Task) bool {
-		need := t.GPUCount()
-		if need == 0 {
+		if t.GPUCount() == 0 {
 			return true
 		}
-		if need > free {
-			return false
-		}
-		return gpu.Fits(gpus, t.Resources.GPU) == nil
+		return pickRemoteGPUs(gpus, held, t.Resources.GPU) != nil
 	}
 }
 
-// gpusHeldLocked is how many GPUs the worker's running leases hold. The
-// caller holds c.mu.
-func (c *Coordinator) gpusHeldLocked(workerID string) int {
-	n := 0
-	for _, l := range c.leases {
-		if l.worker == workerID {
-			n += l.gpus
+// pickRemoteGPUs picks the lowest-index free devices that meet req, the way
+// the worker's pool does (gpu.Pool.Acquire), or nil when they are not free.
+func pickRemoteGPUs(gpus []schemas.GPUInfo, held map[string]bool, req *schemas.GPURequest) []string {
+	if req == nil {
+		return nil
+	}
+	count := max(req.Count, 1)
+	var picked []string
+	for _, g := range gpus {
+		if !held[g.UUID] && g.MemoryMB >= req.MinVRAMMB {
+			picked = append(picked, g.UUID)
+			if len(picked) == count {
+				return picked
+			}
 		}
 	}
-	return n
+	return nil
+}
+
+// gpusHeldLocked is the set of GPUs (by UUID) the worker's running leases
+// hold. The caller holds c.mu.
+func (c *Coordinator) gpusHeldLocked(workerID string) map[string]bool {
+	held := map[string]bool{}
+	for _, l := range c.leases {
+		if l.worker == workerID {
+			for _, id := range l.gpuIDs {
+				held[id] = true
+			}
+		}
+	}
+	return held
 }
 
 // WorkerCapabilities is what a remote worker registers beyond its slots: the

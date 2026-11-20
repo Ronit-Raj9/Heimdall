@@ -129,9 +129,9 @@ func TestSlotQueueKinds(t *testing.T) {
 func TestRemoteGPUAccept(t *testing.T) {
 	s := gpuTestSuite()
 	gtx := []schemas.GPUInfo{{UUID: "GPU-a", MemoryMB: 4096}}
-	free := remoteGPUAccept(gtx, 0)
-	busy := remoteGPUAccept(gtx, 1)
-	none := remoteGPUAccept(nil, 0)
+	free := remoteGPUAccept(gtx, nil)
+	busy := remoteGPUAccept(gtx, map[string]bool{"GPU-a": true})
+	none := remoteGPUAccept(nil, nil)
 	for _, c := range []struct {
 		accept func(*schemas.Task) bool
 		task   string
@@ -313,5 +313,28 @@ func TestRemoteLeasesGPUSlotsOnlyToFreeGPUs(t *testing.T) {
 	}
 	if !listed {
 		t.Error("GET /workers lists the GPUs a worker registered")
+	}
+}
+
+// TestRemoteGPUAcceptMatchesFreeDevices is 2-C-06: with a 16 GiB and a 4 GiB
+// device and the 16 GiB one held, a second 16 GiB slot must not be leased,
+// while a 4 GiB slot still fits the spare device.
+func TestRemoteGPUAcceptMatchesFreeDevices(t *testing.T) {
+	gpus := []schemas.GPUInfo{{UUID: "gpu-large", MemoryMB: 16384}, {UUID: "gpu-small", MemoryMB: 4096}}
+	large := &schemas.Task{ID: "large", Resources: &schemas.Resources{GPU: &schemas.GPURequest{Count: 1, MinVRAMMB: 16000}}}
+	small := &schemas.Task{ID: "small", Resources: &schemas.Resources{GPU: &schemas.GPURequest{Count: 1, MinVRAMMB: 2000}}}
+	held := map[string]bool{"gpu-large": true}
+	accept := remoteGPUAccept(gpus, held)
+	if accept(large) {
+		t.Fatal("second 16 GiB slot accepted while the only 16 GiB device is held")
+	}
+	if !accept(small) {
+		t.Fatal("4 GiB slot refused while the 4 GiB device is free")
+	}
+	if got := pickRemoteGPUs(gpus, held, small.Resources.GPU); len(got) != 1 || got[0] != "gpu-small" {
+		t.Fatalf("picked %v", got)
+	}
+	if !remoteGPUAccept(gpus, nil)(large) {
+		t.Fatal("16 GiB slot refused with every device free")
 	}
 }

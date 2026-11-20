@@ -47,6 +47,10 @@ type RunRecord struct {
 	Dir         string       `json:"dir"`
 	Transitions []Transition `json:"transitions"`
 	Sealed      bool         `json:"sealed"`
+	// SealPending marks a sealed run whose seal was never finalized: seal.json
+	// was written but the folder was not yet made read-only, so its seals.log
+	// entry may be missing. Store.Seal on it finishes the seal.
+	SealPending bool `json:"seal_pending,omitempty"`
 }
 
 // SealRecord is the content of seal.json. The run's seal hash is the sha256 of
@@ -72,4 +76,13 @@ var (
 	ErrSealed       = errors.New("run is sealed")
 	ErrSealMismatch = errors.New("seal verification failed")
 	ErrLeaseHeld    = errors.New("lease held by another owner")
+	// ErrLeaseBusy is a lease change that gave up waiting for the slot's lock:
+	// another party (perhaps a suspended process) holds it. It says nothing
+	// about whether the lease itself is live or stale.
+	ErrLeaseBusy = errors.New("slot lease lock busy")
+	// ErrNotLaunched marks an environment Exec error that is certain the
+	// agent process never started (a create or network join failed before
+	// launch). The pipeline then treats the attempt as aborted before agent
+	// start, which the scheduler retries, instead of a counted infra_error.
+	ErrNotLaunched = errors.New("agent never launched")
 )

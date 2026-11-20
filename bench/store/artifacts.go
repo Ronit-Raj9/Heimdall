@@ -73,7 +73,7 @@ type FSStore struct {
 	now      func() time.Time
 	runLocks keyedMutex // run id -> serializes writes, transitions and seal of one run
 	expLocks keyedMutex // exp id -> serializes seals.log
-	slotLock keyedMutex // slot id -> serializes lease changes in this process
+	slotLock keyedSem   // slot id -> serializes lease changes in this process
 	slotDirs sync.Map   // slot id -> slot folder, filled on lookup
 	verified *verifyCache
 }
@@ -409,6 +409,17 @@ func isSealed(runDir string) (bool, error) {
 	return false, fmt.Errorf("stat seal: %w", err)
 }
 
+// sealUnfinished reports whether a folder with seal.json was never made
+// read-only, the last step of Seal after its seals.log append: an interrupted
+// seal whose chain entry may be missing.
+func sealUnfinished(runDir string) (bool, error) {
+	info, err := os.Stat(runDir)
+	if err != nil {
+		return false, fmt.Errorf("stat run folder: %w", err)
+	}
+	return info.Mode().Perm()&0o222 != 0, nil
+}
+
 // writeJSONAtomic writes v as indented JSON, readable by people and by the
 // UI; hashes that matter are computed over canonical JSON or file bytes.
 func writeJSONAtomic(target string, v any) error {
@@ -529,4 +540,21 @@ func (k *keyedMutex) lock(key string) func() {
 	mu := v.(*sync.Mutex)
 	mu.Lock()
 	return mu.Unlock
+}
+
+// keyedSem is keyedMutex whose lock gives up when ctx ends, so a lease change
+// waiting behind a stuck one can still be cancelled.
+type keyedSem struct {
+	m sync.Map
+}
+
+func (k *keyedSem) lockCtx(ctx context.Context, key string) (func(), error) {
+	v, _ := k.m.LoadOrStore(key, make(chan struct{}, 1))
+	ch := v.(chan struct{})
+	select {
+	case ch <- struct{}{}:
+		return func() { <-ch }, nil
+	case <-ctx.Done():
+		return nil, context.Cause(ctx)
+	}
 }

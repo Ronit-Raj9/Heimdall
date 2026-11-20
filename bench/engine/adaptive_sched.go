@@ -28,6 +28,18 @@ type adaptiveState struct {
 	last   *schemas.AdaptiveReport
 }
 
+// markUnsettled records a slot this Run call handed out but left without a
+// terminal disposition: another live owner holds its lease, or it failed with
+// a store error. The rule must not read such a slot as settled (2-C-04).
+func (r *schedRun) markUnsettled(slotID string) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	if r.unsettled == nil {
+		r.unsettled = map[string]bool{}
+	}
+	r.unsettled[slotID] = true
+}
+
 // initialSlots are the slots the queue starts with: every slot of a fixed
 // design, and only the non-optional ones of an adaptive design.
 func initialSlots(m *schemas.Manifest) []schemas.Slot {
@@ -72,7 +84,15 @@ func (r *schedRun) releaseOptional(ctx context.Context) bool {
 	for _, run := range runs {
 		done[run.Slot.SlotID] = true
 	}
-	rep := verdict.ReplayAdaptiveSettled(r.m, runs, func(id string) bool { return r.w7.queued[id] || done[id] })
+	r.mu.Lock()
+	unsettled := make(map[string]bool, len(r.unsettled))
+	for id := range r.unsettled {
+		unsettled[id] = true
+	}
+	r.mu.Unlock()
+	// A queued slot is settled only when this call reached a disposition for
+	// it; one left to a live lease elsewhere is still open (2-C-04).
+	rep := verdict.ReplayAdaptiveSettled(r.m, runs, func(id string) bool { return done[id] || (r.w7.queued[id] && !unsettled[id]) })
 	r.w7.last = rep
 	var fresh []*schemas.Slot
 	for i := range r.m.Slots {

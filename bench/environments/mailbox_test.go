@@ -131,6 +131,9 @@ func TestMailboxServer(t *testing.T) {
 	if recs[1]["sender"] != "lead" || recs[1]["fields"].(map[string]any)["task"] != "t1" || recs[1]["fault"] != "truncate" || recs[1]["delivered"] != "writ" {
 		t.Errorf("send = %v", recs[1])
 	}
+	if rb, _ := recs[1]["received_by"].(map[string]any); rb["w1"] != "writ" { // 2-B-11: what each reader got
+		t.Errorf("received_by = %v", recs[1]["received_by"])
+	}
 	if recs[2]["from"] != "lead" || recs[2]["sender"] != "w2" || !strings.Contains(recs[2]["fault"].(string), "poison") ||
 		!nonceRe.MatchString(recs[2]["nonce"].(string)) {
 		t.Errorf("spoofed, poisoned = %v", recs[2])

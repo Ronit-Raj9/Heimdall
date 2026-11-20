@@ -109,8 +109,9 @@ type remoteLease struct {
 	attempt           int
 	est               float64 // the slot's spend reservation
 	lastBeat          time.Time
-	archive           string // staged upload
-	gpus              int    // X7: GPUs the slot's task holds on the worker (gpu.go)
+	archive           string   // staged upload
+	gpus              int      // X7: GPUs the slot's task holds on the worker (gpu.go)
+	gpuIDs            []string // the worker's devices (UUIDs) set aside for it (2-C-06)
 	received          int64
 	uploading         bool // a chunk is being written
 	closing           bool // complete or release in progress; the sweep leaves it alone
@@ -214,7 +215,20 @@ func (c *Coordinator) Register(ctx context.Context, req *schemas.WorkerRegister)
 	}
 	for _, l := range c.leases {
 		if l.worker == req.WorkerID && !l.closing {
+			// The old process is gone, so its store lease is closed under its
+			// own owner before the slot is queued again; left fresh, the next
+			// lease of the slot would find it held and drop it (2-C-01).
+			l.r.releaseStoreLease(l.slot, l.owner)
 			c.loseLocked(l, "the worker registered again, so the process that held the lease is gone")
+		}
+	}
+	// A restarted worker may have been corrected: its refusals are asked
+	// again (a refusal costs nothing), and its rejection count starts over
+	// when it comes back as a different build (2-C-05).
+	if ok {
+		w.refused = map[string]string{}
+		if w.info.Version != req.Version || !sameStrings(w.parts, req.Parts) {
+			w.rejected = 0
 		}
 	}
 	w.info = schemas.WorkerInfo{ID: req.WorkerID, Host: req.Host, Version: req.Version, State: schemas.WorkerIdle,
@@ -264,10 +278,16 @@ func (c *Coordinator) Lease(ctx context.Context, workerID string) (*schemas.Work
 	for _, r := range c.exps {
 		if _, refused := w.refused[r.m.ExpID]; !refused && c.openTo(w, r) {
 			exps = append(exps, r)
+			r.remoteOps.Add(1) // detach waits for this call (2-A-07)
 		}
 	}
 	accept := remoteGPUAccept(w.info.GPUs, c.gpusHeldLocked(workerID)) // X7: GPU slots only to a worker with free GPUs (gpu.go)
 	c.mu.Unlock()
+	defer func() {
+		for _, r := range exps {
+			r.remoteOps.Done()
+		}
+	}()
 	for _, r := range exps {
 		id := utils.NewID("l", 12)
 		owner := "worker:" + workerID + ":" + id
@@ -284,10 +304,13 @@ func (c *Coordinator) Lease(ctx context.Context, workerID string) (*schemas.Work
 			r.endRemote(l, false)
 			continue
 		}
-		if l.gpus > 0 && c.gpusHeldLocked(workerID)+l.gpus > len(w.info.GPUs) { // X7: a concurrent lease call took the worker's GPUs
-			c.mu.Unlock()
-			r.endRemote(l, true)
-			return nil, nil
+		if l.gpus > 0 { // X7: set the devices aside; a concurrent lease call may have taken them
+			l.gpuIDs = pickRemoteGPUs(w.info.GPUs, c.gpusHeldLocked(workerID), r.suite.TaskByID(slot.Task).Resources.GPU)
+			if l.gpuIDs == nil {
+				c.mu.Unlock()
+				r.endRemote(l, true)
+				return nil, nil
+			}
 		}
 		if len(w.info.Running) >= w.info.Slots {
 			// A concurrent lease call of the same worker took its last slot.
@@ -439,7 +462,9 @@ func (c *Coordinator) Complete(ctx context.Context, leaseID string, req *schemas
 		return nil, err
 	}
 	l.closing = true
+	l.r.remoteOps.Add(1) // this call owns the lease's end; detach waits for it (2-A-07)
 	c.mu.Unlock()
+	defer l.r.remoteOps.Done()
 	res, reason := c.accept(ctx, l, req)
 	out := &schemas.WorkerResult{LeaseID: leaseID, RunID: req.RunID, Accepted: reason == ""}
 	c.mu.Lock()
@@ -472,7 +497,7 @@ func (c *Coordinator) Complete(ctx context.Context, leaseID string, req *schemas
 	c.journal(l.r, "accepted", l, string(res.Run.Outcome))
 	l.r.emit(Event{Kind: EventRunSealed, SlotID: l.slot.SlotID, RunID: res.Run.RunID, Stage: schemas.StageSeal, Outcome: res.Run.Outcome,
 		Message: "sealed on remote worker " + l.worker})
-	again := res.Run.Outcome == schemas.OutcomeAbortedInfra && l.attempt < maxAttempts
+	again := res.Run.Outcome == schemas.OutcomeAbortedInfra && l.r.attemptsLeft(ctx, l.slot)
 	l.r.endRemote(l, again)
 	return out, nil
 }
@@ -507,7 +532,9 @@ func (c *Coordinator) Release(ctx context.Context, leaseID string, req *schemas.
 		}
 	}
 	c.endLocked(l, why)
+	l.r.remoteOps.Add(1) // detach waits for the bookkeeping below (2-A-07)
 	c.mu.Unlock()
+	defer l.r.remoteOps.Done()
 	c.remove(l.archive)
 	c.logger.Warn("remote lease given back", "experiment", l.r.m.ExpID, "slot", l.slot.SlotID, "worker", l.worker,
 		"refused", req.Refuse, "reason", req.Reason)
@@ -518,7 +545,15 @@ func (c *Coordinator) Release(ctx context.Context, leaseID string, req *schemas.
 	} else {
 		c.journal(l.r, event, l, req.Reason)
 	}
-	l.r.endRemote(l, true)
+	again := true
+	if !req.Refuse && l.r.noteReturned(l.slot.SlotID) >= maxAttempts {
+		// The same slot came back without a run maxAttempts times (an archive
+		// over the upload cap, a run the worker cannot seal): stop handing it
+		// out, so a deterministic failure cannot loop for free (2-C-08).
+		again = false
+		l.r.slotError(l.slot, fmt.Errorf("remote workers gave the slot back %d times without a run; last: %s", maxAttempts, req.Reason))
+	}
+	l.r.endRemote(l, again)
 	return nil
 }
 
@@ -587,12 +622,13 @@ func (c *Coordinator) attach(r *schedRun) func() {
 		}
 		var left []*remoteLease
 		for _, l := range c.leases {
-			if l.r == r {
+			if l.r == r && !l.closing { // a closing lease belongs to its Complete call, which ends it once (2-A-07)
 				left = append(left, l)
 				c.endLocked(l, "the experiment's scheduler stopped")
 			}
 		}
 		c.mu.Unlock()
+		r.remoteOps.Wait() // every in-flight lease, completion or release call has settled
 		for _, l := range left {
 			c.remove(l.archive)
 			c.journal(r, "stopped", l, "the experiment's scheduler stopped")
@@ -805,7 +841,7 @@ func (c *Coordinator) loseLocked(l *remoteLease, why string) {
 	r.emit(Event{Kind: EventError, SlotID: l.slot.SlotID, Message: "remote lease lost: " + why})
 	c.journalLocked(r, journalEntry{Event: "lost", Detail: why, ChargedUSD: &usd, CostKnown: known}, l)
 	r.release(l.est)
-	r.queue.giveBack(l.slot)
+	r.requeue(l.slot)
 }
 
 // endLocked removes a lease from the table and the worker's running list.
@@ -939,6 +975,9 @@ func (r *schedRun) leaseRemoteWhere(owner string, accept func(*schemas.Task) boo
 			continue
 		}
 		held, err := store.Lease(r.ctx, slot.SlotID, owner, r.opts.StaleAfter)
+		if errors.Is(err, schemas.ErrLeaseBusy) { // the slot's lock is held elsewhere: left to that party
+			held, err = false, nil
+		}
 		if err != nil || !held {
 			r.release(est)
 			r.queue.finish()
@@ -946,6 +985,7 @@ func (r *schedRun) leaseRemoteWhere(owner string, accept func(*schemas.Task) boo
 				r.slotError(slot, fmt.Errorf("lease: %w", err))
 			} else {
 				r.count(func(s *Summary) { s.LeaseHeld++ })
+				r.markUnsettled(slot.SlotID)
 				r.emit(Event{Kind: EventLeaseHeld, SlotID: slot.SlotID})
 			}
 			continue
@@ -976,10 +1016,49 @@ func (r *schedRun) endRemote(l *remoteLease, again bool) {
 	r.releaseStoreLease(l.slot, l.owner)
 	r.release(l.est)
 	if again {
-		r.queue.giveBack(l.slot)
+		r.requeue(l.slot)
 		return
 	}
 	r.queue.finish()
+}
+
+// noteReturned counts one more return of the slot without a run and returns
+// the count for this Run call.
+func (r *schedRun) noteReturned(slotID string) int {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	if r.returned == nil {
+		r.returned = map[string]int{}
+	}
+	r.returned[slotID]++
+	return r.returned[slotID]
+}
+
+// requeue gives a remote slot back to the queue, unless the spend cap has
+// stopped leasing: then it is counted pending at once, since no worker may
+// lease it again (2-A-09).
+func (r *schedRun) requeue(slot *schemas.Slot) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	if r.stopped {
+		r.sum.Pending++
+		r.queue.finish()
+		return
+	}
+	r.queue.giveBack(slot)
+}
+
+// attemptsLeft reports whether the slot may get another attempt after an
+// aborted one, by the same rule as settle: sealed runs, less those their
+// owner stopped, below maxAttempts. The persisted attempt ordinal is not the
+// limit (2-A-08). When the runs cannot be read the slot is queued again and
+// the next lease settles it.
+func (r *schedRun) attemptsLeft(ctx context.Context, slot *schemas.Slot) bool {
+	recs, err := slotRuns(ctx, r.s.reg.Store, r.m.ExpID, slot.SlotID)
+	if err != nil {
+		return true
+	}
+	return len(recs)-countOwnerStopped(recs) < maxAttempts
 }
 
 func (r *schedRun) releaseStoreLease(slot *schemas.Slot, owner string) {
@@ -1006,6 +1085,18 @@ func validWorkerID(id string) bool {
 	for _, r := range id {
 		ok := r >= 'a' && r <= 'z' || r >= 'A' && r <= 'Z' || r >= '0' && r <= '9' || r == '-' || r == '_' || r == '.'
 		if !ok {
+			return false
+		}
+	}
+	return true
+}
+
+func sameStrings(a, b map[string]string) bool {
+	if len(a) != len(b) {
+		return false
+	}
+	for k, v := range a {
+		if bv, ok := b[k]; !ok || bv != v {
 			return false
 		}
 	}

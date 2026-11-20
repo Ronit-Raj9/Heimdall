@@ -95,6 +95,10 @@ func (p *Planner) resolveTeam(ctx context.Context, cfg *schemas.AgentConfig, sui
 			if err := p.checkAgent(&mc); err != nil {
 				return fmt.Errorf("team member %s: agent config %s: %w", m.ID, m.Agent, err)
 			}
+			if mc.Adapter != cfg.Adapter { // every member is planned with the arm's adapter (planMember)
+				return fmt.Errorf("team member %s: agent config %s uses adapter %q, the arm uses %q; every member of a team runs the arm's adapter (docs/multi-agent.md)",
+					m.ID, m.Agent, mc.Adapter, cfg.Adapter)
+			}
 			img, err := ResolveAgentImage(&mc, suite, p.benchRoot)
 			if err != nil {
 				return fmt.Errorf("team member %s: agent config %s: %w", m.ID, m.Agent, err)

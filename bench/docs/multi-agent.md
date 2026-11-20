@@ -69,10 +69,13 @@ Status 18 Nov, M1. Everything below is in `schemas/` now (additive,
      purpose and is measurable).
    - Service record (`state/mailbox/messages.jsonl`, one JSON per message):
      `seq`, `id`, `from`, `sender`, `to`, `body`, `fields`, `at`,
-     `planted`, `fault`, `delivered` (the text a reader got, only when it
-     differs from `body`), `read_by` (member ids), `read_at` (member id to
-     time), `nonce` (item 7). `Evidence.Messages` merges this record with
-     the ledger rows.
+     `planted`, `fault`, `delivered` (the last altered text a reader got,
+     only when it differs from `body`), `read_by` (member ids), `read_at`
+     (member id to time), `received_by` (member id to the text that member
+     got, so a broadcast altered for one reader names that reader), `nonce`
+     (item 7). `Evidence.Messages` merges this record with the ledger rows;
+     a message's `received_by` lists only the readers whose text differs
+     from `body`, and `received` is the earliest of them.
 6. **Is `from` proven?** Yes, when the member uses its own URL, by its
    route token, a bench-minted per-member credential like its gateway key
    (the mailbox never sees the gateway key). Every
@@ -187,16 +190,23 @@ team:
   output (`agent.<id>.stream.jsonl`).
 - `agent`: another agent config (path relative to the bench root). The
   planner resolves it, builds its image and freezes it into the arm config,
-  so it is hashed with the arm. Empty: the arm's own config. `model`,
-  `argv`, `env` override the member's config.
+  so it is hashed with the arm. It must use the arm's adapter (every member
+  is planned with the arm's adapter; a different one is refused at plan
+  time). Empty: the arm's own config. `model`, `argv`, `env` override the
+  member's config.
 - `role`: `lead`, `worker`, `router`, `judge`, `reviewer` or any label.
   `lead`, `router` and `judge` count as orchestration in
   `orchestration_share`.
 - `budget_usd`: the member key's own gateway budget; `budgets.usd` of the
   config is the run-wide cap (a Bifrost team budget over every member key).
-- Not supported yet: teams on multi-session tasks, on root tasks
-  (`environment.user: root`) and on snapshot-graded suites (refused at
-  prepare); per-member step observers (see [Limits](#limits)).
+- Not supported yet, and refused at plan time for every arm, including the
+  compatibility arm, whose effective team (its own or the task's) is
+  non-empty: multi-session tasks, root tasks (`environment.user: root`),
+  snapshot-graded suites, `remote_http` arms, `realism: neutral` and
+  adapter fault probes. The environment also refuses the first three as a
+  resume defense. Per-member step observers are not supported either (see
+  [Limits](#limits)). A compose task's environment variables reach every
+  member, as they reach a single agent.
 
 ### What every member gets
 
@@ -211,7 +221,10 @@ team:
 The lead runs on the run's own key and slot; every other member gets a key
 of its own on a slot of its own (see [Key slots](#key-slots)). Member key
 values and route tokens are redacted from every stream and never written to
-disk; `team.json` holds key ids and slots only.
+the run folder; `team.json` holds key ids and slots only. They do reach the
+container's env file, a 0600 file in a private 0700 staging folder under the
+temp folder, removed once the container is created; a file a crashed process
+left there is removed by the next bench process that launches an agent.
 
 ### The mailbox
 
@@ -404,8 +417,9 @@ of slots, or runs wait for slots.
   split by member; each member's own output is in `agent.<id>.stream.jsonl`.
   Gateway rows and tool calls, which carry the evidence, are split by key and
   route.
-- **Skills and dirs** of a team are copied once per member into the same
-  run volumes; members with different skill folders are not supported yet.
+- **Skills and dirs** of a team are copied once per member into volumes of
+  that member's own (`bench-dir-<run>-m-<member>-<n>`), so members may share
+  or differ in skill folders.
 - **Bifrost budgets** depend on Bifrost pricing the model; an unpriced model
   never reaches its gateway budget, and the verdict's `budget_exceeded`,
   priced from the bench's own snapshot, is what decides INVALID.

@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"slices"
+	"strings"
 
 	"github.com/maximhq/bifrost/bench/schemas"
 	"github.com/maximhq/bifrost/bench/utils"
@@ -56,4 +57,91 @@ func (p *Planner) checkTaskTeams(arms map[string]schemas.ArmManifest, suite *sch
 		}
 	}
 	return errors.Join(errs...)
+}
+
+// checkTeamCombos refuses, at plan time, every slot whose effective team
+// (utils.TeamOf: the arm's own team, else the task's) would meet a feature
+// team runs do not support, so no such plan freezes and fails late. The
+// environment keeps its own refusals as a resume defense. Refused:
+// multi-session tasks, tasks that run as root, snapshot grading
+// (environments.ExecTeam), remote_http arms (no per-member remote egress
+// forwarder), neutral realism (members launch with the standard framing)
+// and adapter fault probes (members have no fault controller). Every
+// problem is reported, once per arm and task or condition.
+func checkTeamCombos(e *schemas.Experiment, suite *schemas.Suite, arms map[string]schemas.ArmManifest, conds []condPlan, compat *schemas.ArmManifest, compatConds []condPlan) error {
+	if suite == nil {
+		return nil
+	}
+	type armCase struct {
+		id    string
+		cfg   schemas.AgentConfig
+		conds []condPlan
+	}
+	cases := make([]armCase, 0, len(arms)+1)
+	for _, id := range sortedKeys(arms) {
+		cases = append(cases, armCase{id, arms[id].Config, conds})
+	}
+	if compat != nil {
+		cases = append(cases, armCase{CompatArm, compat.Config, compatConds})
+	}
+	neutral := schemas.EffectiveRealism(e, suite) == schemas.RealismNeutral
+	snapshot := utils.VerifierMode(suite) == schemas.VerifierSnapshot
+	var errs []error
+	for _, ac := range cases {
+		cfg := ac.cfg
+		seen := map[string]bool{}
+		for _, c := range ac.conds {
+			fault := c.probe != nil && c.probe.Layer == schemas.LayerAdapter && c.probe.Apply.AdapterFault != nil
+			faultSeen := false
+			for _, id := range c.tasks {
+				task := suite.TaskByID(id)
+				if task == nil || len(utils.TeamOf(&schemas.RunContext{Agent: &cfg, Task: task})) == 0 {
+					continue
+				}
+				if fault && !faultSeen {
+					faultSeen = true
+					errs = append(errs, fmt.Errorf("arm %s, condition %s: team runs do not support adapter fault probes (docs/multi-agent.md)", ac.id, c.id))
+				}
+				if seen[id] {
+					continue
+				}
+				seen[id] = true
+				var why []string
+				if len(task.Sessions) > 0 {
+					why = append(why, "multi-session tasks")
+				}
+				if utils.TaskRunsAsRoot(task) {
+					why = append(why, "tasks that run as root")
+				}
+				if snapshot {
+					why = append(why, "snapshot grading")
+				}
+				if cfg.Adapter == "remote_http" {
+					why = append(why, "remote_http agents")
+				}
+				if neutral {
+					why = append(why, "realism: neutral")
+				}
+				if len(why) > 0 {
+					errs = append(errs, fmt.Errorf("arm %s, task %s: team runs do not support %s (docs/multi-agent.md)", ac.id, id, strings.Join(why, ", ")))
+				}
+			}
+		}
+	}
+	return errors.Join(errs...)
+}
+
+// checkResourceBudgets refuses an effective agent config (after overrides)
+// without positive CPU and memory budgets, as spec/agent.schema.json
+// requires: the planner decodes configs without the schema, and Docker
+// skips --cpus and --memory for a zero, so such a plan would run its
+// agents with no CPU or memory limit. It is pure.
+func checkResourceBudgets(cfg *schemas.AgentConfig) error {
+	if !(cfg.Budgets.CPUs > 0) {
+		return fmt.Errorf("budgets.cpus must be positive, got %v: an agent without it runs with no CPU limit", cfg.Budgets.CPUs)
+	}
+	if !(cfg.Budgets.MemGB > 0) {
+		return fmt.Errorf("budgets.mem_gb must be positive, got %v: an agent without it runs with no memory limit", cfg.Budgets.MemGB)
+	}
+	return nil
 }

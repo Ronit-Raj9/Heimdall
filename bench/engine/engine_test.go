@@ -34,6 +34,8 @@ type world struct {
 	seq         []string // every op in call order
 	plans       []schemas.FaultPlan
 	ledgers     [][]schemas.LedgerEntry // proxy ledgers handed to collects in order; none after
+	onHit       map[string]func()       // op -> called (outside mu) each time the op is hit
+	notLaunched bool                    // an injected exec failure says the agent never launched
 }
 
 func newWorld() *world {
@@ -41,6 +43,12 @@ func newWorld() *world {
 }
 
 func (w *world) hit(op string) error {
+	w.mu.Lock()
+	hook := w.onHit[op]
+	w.mu.Unlock()
+	if hook != nil {
+		hook()
+	}
 	w.mu.Lock()
 	defer w.mu.Unlock()
 	w.calls[op]++
@@ -82,6 +90,12 @@ func (e fakeEnv) Exec(ctx context.Context, rc *schemas.RunContext, _ *schemas.Ru
 	e.w.execs[rc.Slot.SlotID]++
 	e.w.mu.Unlock()
 	if err := e.w.hit("exec"); err != nil {
+		e.w.mu.Lock()
+		nl := e.w.notLaunched
+		e.w.mu.Unlock()
+		if nl {
+			err = fmt.Errorf("%w: %w", err, schemas.ErrNotLaunched)
+		}
 		return nil, err
 	}
 	e.w.mu.Lock()

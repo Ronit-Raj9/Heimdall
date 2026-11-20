@@ -63,3 +63,36 @@ func TestBuildMessagesFromRecord(t *testing.T) {
 		t.Errorf("spoofed = %+v", m)
 	}
 }
+
+// TestBuildMessagesPerReaderDelivery is the 2-B-11 regression: a broadcast
+// truncated for one reader only keeps which reader got the altered text,
+// whether the unaffected or the affected reader read first.
+func TestBuildMessagesPerReaderDelivery(t *testing.T) {
+	for _, tt := range []struct{ name, readAt string }{
+		{"unaffected first", `{"w2":"2026-11-18T06:00:05Z","w1":"2026-11-18T06:00:09Z"}`},
+		{"affected first", `{"w1":"2026-11-18T06:00:05Z","w2":"2026-11-18T06:00:09Z"}`},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			line := `{"seq":1,"id":"1","from":"lead","sender":"lead","to":"*","body":"write the file","fault":"truncate","delivered":"writ",` +
+				`"read_by":["w2","w1"],"read_at":` + tt.readAt + `,"received_by":{"w2":"write the file","w1":"writ"},"at":"2026-11-18T06:00:02Z"}`
+			var r mailboxRecord
+			if err := json.Unmarshal([]byte(line), &r); err != nil {
+				t.Fatal(err)
+			}
+			m := BuildMessages(nil, []mailboxRecord{r})[0]
+			if !m.Altered || m.Received != "writ" || len(m.ReceivedBy) != 1 || m.ReceivedBy["w1"] != "writ" {
+				t.Fatalf("message = %+v", m)
+			}
+		})
+	}
+	// From the ledger alone: the receive rows name the reader of each text.
+	calls := []schemas.ToolCall{
+		sendRow(1, "lead", `{"to":"*","body":"write the file"}`, `{"id":"1"}`),
+		recvRow(2, "w2", `{}`, `{"messages":[{"id":"1","body":"write the file"}]}`),
+		recvRow(3, "w1", `{}`, `{"messages":[{"id":"1","body":"writ"}]}`),
+	}
+	m := BuildMessages(calls, nil)[0]
+	if !m.Altered || len(m.ReceivedBy) != 1 || m.ReceivedBy["w1"] != "writ" {
+		t.Fatalf("ledger message = %+v", m)
+	}
+}

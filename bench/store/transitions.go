@@ -96,6 +96,11 @@ func (s *FSStore) loadSlotRuns(slot *schemas.Slot, withTransitions bool) ([]sche
 		if rec.Sealed, err = isSealed(dir); err != nil {
 			return nil, fmt.Errorf("run %s: %w", e.Name(), err)
 		}
+		if rec.Sealed {
+			if rec.SealPending, err = sealUnfinished(dir); err != nil {
+				return nil, fmt.Errorf("run %s: %w", e.Name(), err)
+			}
+		}
 		if withTransitions {
 			if rec.Transitions, err = s.readTransitions(filepath.Join(dir, transitionsFile), e.Name()); err != nil {
 				return nil, fmt.Errorf("run %s: %w", e.Name(), err)
