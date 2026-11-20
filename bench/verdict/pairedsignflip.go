@@ -501,11 +501,13 @@ func gradeSource(runs []schemas.SealedRun) string {
 }
 
 // naiveScoreboard is raw passes over counted runs of the primary condition per
-// arm, shown beside the verdict on purpose.
+// arm, shown beside the verdict on purpose. A pass is always read from
+// verified_success: a primary metric in seconds, counts or USD has no pass
+// threshold (audit 1-C-07).
 func naiveScoreboard(idx runIndex, primary schemas.Endpoint) map[string]schemas.Ratio {
 	out := map[string]schemas.Ratio{}
 	for _, arm := range armsIn(idx, primary.Condition) {
-		out[arm] = successRatio(idx.armRuns(primary.Condition, arm), primary.Metric)
+		out[arm] = successRatio(idx.armRuns(primary.Condition, arm), MetricVerifiedSuccess)
 	}
 	return out
 }

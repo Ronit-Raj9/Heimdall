@@ -108,6 +108,11 @@ func TestBifrostMCPWitness(t *testing.T) {
 	if v := b2compute(t, newBifrostMCPMetric(BifrostMCPWitnessMismatch), &schemas.Evidence{}); v.State != schemas.ValueNotApplicable {
 		t.Fatalf("direct run: %+v, want not applicable", v)
 	}
+	// A missing ledger is no witness, not an empty one (audit 1-C-10).
+	noLedger := &schemas.Evidence{BifrostMCP: ev.BifrostMCP}
+	if v := b2compute(t, newBifrostMCPMetric(BifrostMCPWitnessMismatch), noLedger); v.State != schemas.ValueUnknown {
+		t.Fatalf("missing ledger: %+v, want unknown", v)
+	}
 	ev.BifrostMCP.Complete, ev.BifrostMCP.Reason = false, "page 2 failed"
 	if v := b2compute(t, newBifrostMCPMetric(BifrostMCPCalls), ev); v.State != schemas.ValueUnknown {
 		t.Fatalf("incomplete log: %+v, want unknown", v)

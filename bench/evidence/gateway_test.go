@@ -307,3 +307,25 @@ func TestGatewayCollect(t *testing.T) {
 		}
 	})
 }
+
+// A fallback row's attempts get their own ids and a successful fallback
+// makes the logical request succeed (audit 1-C-13); a cache hit has no
+// upstream attempt (audit 1-C-11).
+func TestNormalizeRequestRecordsFallbackAndCache(t *testing.T) {
+	t0 := time.Date(2026, 11, 1, 10, 0, 0, 0, time.UTC)
+	log := &schemas.RequestLog{Complete: true, Requests: []schemas.GatewayRequest{
+		{ID: "r", Kind: "message", Status: "error", Timestamp: t0},
+		{ID: "f", ParentID: "r", Kind: "message", Status: "success", FallbackIndex: 1, Timestamp: t0.Add(time.Second)},
+		{ID: "c", Kind: "message", Status: "success", CacheHit: true, Timestamp: t0.Add(2 * time.Second)},
+	}}
+	logical, attempts, _, _, _ := NormalizeRequestRecords(log)
+	if len(logical) != 2 || logical[0].Status != "success" {
+		t.Fatalf("logical = %+v, want 2 with the first succeeded", logical)
+	}
+	if len(attempts) != 2 || attempts[0].AttemptID == attempts[1].AttemptID {
+		t.Fatalf("attempts = %+v, want 2 distinct (no cache hit attempt)", attempts)
+	}
+	if attempts[0].AttemptID != "r:attempt:1" || attempts[1].AttemptID != "r:f:attempt:1" {
+		t.Fatalf("attempt ids = %s, %s", attempts[0].AttemptID, attempts[1].AttemptID)
+	}
+}

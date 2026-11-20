@@ -695,3 +695,13 @@ func slotsWhere(m *schemas.Manifest, f func(schemas.Slot) bool) []schemas.Slot {
 	sort.Slice(out, func(i, j int) bool { return out[i].OrderIndex < out[j].OrderIndex })
 	return out
 }
+
+// A metric subset never drops an integrity metric a verdict instrument reads
+// (audit 1-C-10).
+func TestSelectMetricsKeepsIntegrityMetrics(t *testing.T) {
+	reg := &schemas.Registry{Metrics: []schemas.Metric{fakeMetric{part: part{name: "cost_usd"}}, fakeMetric{part: part{name: "bifrost_mcp_witness_mismatch"}}}}
+	got := selectMetrics(reg, []string{"cost_usd"})
+	if len(got) != 2 {
+		t.Fatalf("subset kept %d metrics, want cost_usd and the MCP witness", len(got))
+	}
+}

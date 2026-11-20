@@ -224,5 +224,8 @@ func computeVoiceCost(_ *schemas.RunContext, ev *schemas.Evidence, a *voice.Anal
 			return schemas.Unknown(fmt.Sprintf("cost row %s (%s) is unpriced", row.RequestID, row.Model), schemas.EvidenceGateway)
 		}
 	}
+	if v, cut := incompleteCost(ev.Requests, total); cut {
+		return v
+	}
 	return schemas.Observed(total/(a.CallMS/60000), schemas.EvidenceGateway)
 }

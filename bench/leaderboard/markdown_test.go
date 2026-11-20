@@ -1,6 +1,7 @@
 package leaderboard
 
 import (
+	"context"
 	"strings"
 	"testing"
 
@@ -114,5 +115,32 @@ func TestShort(t *testing.T) {
 		if got := short(in); got != want {
 			t.Errorf("short(%q) = %q, want %q", in, got, want)
 		}
+	}
+}
+
+// A judged board says so in JSON and Markdown from the sealed grade
+// evidence, not today's suite catalog (finding 1-D-09).
+func TestBoardGradingProvenance(t *testing.T) {
+	f := newFake()
+	f.exp("e", "s@1", 0, map[string]schemas.ArmManifest{"A": arm("a", "h", "command")})
+	judged := f.pass("e", "t1", "A", "clean", 1, 0.1)
+	f.files[judged][fileGrade] = []byte(`{"passed":true,"judged":true,"judge":{"model":"judge-m"}}`)
+	lb, err := Build(context.Background(), f, Query{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if lb.Grading != GradingJudged || len(lb.Judges) != 1 || lb.Judges[0] != "judge-m" {
+		t.Fatalf("grading %q judges %v", lb.Grading, lb.Judges)
+	}
+	if md := Markdown(lb); !strings.Contains(md, "**JUDGED.**") || !strings.Contains(md, "judge-m") {
+		t.Fatalf("markdown has no judged label:\n%s", md)
+	}
+	f.files[judged][fileGrade] = []byte(`{"passed":true}`)
+	if lb, _ = Build(context.Background(), f, Query{}); lb.Grading != GradingVerified || strings.Contains(Markdown(lb), "JUDGED") {
+		t.Fatalf("verified board graded %q", lb.Grading)
+	}
+	delete(f.files[judged], fileGrade)
+	if lb, _ = Build(context.Background(), f, Query{}); lb.Grading != GradingUnknown || !strings.Contains(Markdown(lb), "GRADING UNKNOWN") {
+		t.Fatalf("board without grade evidence graded %q", lb.Grading)
 	}
 }

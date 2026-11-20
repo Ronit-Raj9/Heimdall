@@ -84,12 +84,17 @@ func (s *FSStore) Seal(ctx context.Context, run *schemas.Run) (*schemas.SealReco
 			return nil, fmt.Errorf("seal run %s: %s is not a regular file", run.RunID, name)
 		}
 	}
+	format, err := requireArtifacts(run, files)
+	if err != nil {
+		return nil, fmt.Errorf("seal run %s: %w", run.RunID, err)
+	}
 	rec := &schemas.SealRecord{
 		RunID:        run.RunID,
 		ManifestHash: run.ManifestHash,
 		Files:        files,
 		PrevSeal:     lastHash(entries),
 		SealedAt:     s.now().UTC(),
+		Format:       format,
 	}
 	b, err := marshalIndent(rec)
 	if err != nil {
@@ -109,6 +114,50 @@ func (s *FSStore) Seal(ctx context.Context, run *schemas.Run) (*schemas.SealReco
 	return rec, nil
 }
 
+// SealFormatV1 is the seal format of a current-format run: one with a
+// canonical record, sealed only once every file of mandatoryV1 is present.
+const SealFormatV1 = "run/1"
+
+// mandatoryV1 is the artifact set the engine writes for every terminal
+// outcome, aborted_infra included, once the run has a canonical record
+// (engine Pipeline.writeArtifacts). Missing one means the run directory is
+// incomplete evidence, not a run that merely produced little.
+var mandatoryV1 = []string{runFile, canonicalFile, evidenceFile, gatesFile, gradeFile, "plan.json"}
+
+// requireArtifacts returns the seal format for run and refuses a
+// current-format run whose mandatory artifacts are missing. A run without a
+// canonical hash predates the canonical record and seals as legacy (empty
+// format), as before.
+func requireArtifacts(run *schemas.Run, files map[string]string) (string, error) {
+	if run.CanonicalHash == "" {
+		return "", nil
+	}
+	if missing := missingArtifacts(SealFormatV1, files); len(missing) > 0 {
+		return "", fmt.Errorf("mandatory artifacts missing for %s: %s: %w", SealFormatV1, strings.Join(missing, ", "), schemas.ErrSealMismatch)
+	}
+	return SealFormatV1, nil
+}
+
+// missingArtifacts lists the mandatory files of format absent from files.
+// An unknown non-empty format is reported as such so a newer seal is never
+// silently accepted by an older reader.
+func missingArtifacts(format string, files map[string]string) []string {
+	switch format {
+	case "":
+		return nil
+	case SealFormatV1:
+	default:
+		return []string{"(unknown seal format " + format + ")"}
+	}
+	var out []string
+	for _, name := range mandatoryV1 {
+		if _, ok := files[name]; !ok {
+			out = append(out, name)
+		}
+	}
+	return out
+}
+
 // scanRunSecrets checks text artifacts before the first seal. Existing sealed
 // runs are never rescanned during reads. Binary files are ignored because
 // their bytes are evidence, not text that can be safely redacted here.
@@ -120,6 +169,12 @@ func scanRunSecrets(dir string) error {
 		}
 		if d.IsDir() || filepath.Base(path) == sealFile {
 			return nil
+		}
+		// Classify before any open: a symlink could read outside the run
+		// folder and a pipe could block while the chain lock is held.
+		if !d.Type().IsRegular() {
+			rel, _ := filepath.Rel(dir, path)
+			return fmt.Errorf("%s is not a regular file (%s)", filepath.ToSlash(rel), d.Type())
 		}
 		paths = append(paths, path)
 		return nil
@@ -186,6 +241,9 @@ func (s *FSStore) Verify(ctx context.Context, expID, runID string) error {
 	}
 	if err := s.verifyRunFiles(dir, rec); err != nil {
 		return fmt.Errorf("verify run %s: %w", runID, err)
+	}
+	if missing := missingArtifacts(rec.Format, rec.Files); len(missing) > 0 {
+		return fmt.Errorf("verify run %s: seal format %s lacks %s: %w", runID, rec.Format, strings.Join(missing, ", "), schemas.ErrSealMismatch)
 	}
 	var run schemas.Run
 	if err := readJSON(filepath.Join(dir, runFile), &run); err != nil {

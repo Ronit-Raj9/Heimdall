@@ -496,13 +496,28 @@ func noTrend(e *schemas.Effect) bool {
 // |T| >= S+2δ, so the vector was already counted. A completion with a
 // positive total is therefore dominated by all +1, one with a negative total
 // by all -1, and one with total zero has p = 1.
+//
+// Above stats.ExactMaxNonzero differing tasks SignFlip samples its p, and a
+// sampled value is no proof that alpha is out of reach (audit 1-B-07), so
+// such a p is lowered by six Monte Carlo standard errors first: futility
+// then stops only when even that lower bound is not below alpha.
 func BestCaseP(d []float64, more int) float64 {
 	if more <= 0 {
-		return stats.SignFlip(d).P
+		return provableP(stats.SignFlip(d))
 	}
 	up := append(append(make([]float64, 0, len(d)+more), d...), fill1(more, 1)...)
 	down := append(append(make([]float64, 0, len(d)+more), d...), fill1(more, -1)...)
-	return math.Min(stats.SignFlip(up).P, stats.SignFlip(down).P)
+	return math.Min(provableP(stats.SignFlip(up)), provableP(stats.SignFlip(down)))
+}
+
+// provableP is r's p when it is exact, else a lower bound six Monte Carlo
+// standard errors below the sampled value, never below zero.
+func provableP(r stats.SignFlipResult) float64 {
+	if r.Exact || r.Draws <= 0 {
+		return r.P
+	}
+	se := math.Sqrt(math.Max(r.P*(1-r.P), 1/float64(r.Draws)) / float64(r.Draws))
+	return math.Max(0, r.P-6*se)
 }
 
 func fill1(n int, v float64) []float64 {

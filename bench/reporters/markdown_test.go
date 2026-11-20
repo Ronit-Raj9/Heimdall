@@ -277,3 +277,22 @@ func TestCell(t *testing.T) {
 		t.Errorf("cell = %q", got)
 	}
 }
+
+// A non-rate endpoint is shown in its own unit, never as percentage points
+// (audit 1-C-07).
+func TestEffectPPUnits(t *testing.T) {
+	cases := []struct {
+		e    *schemas.Effect
+		want string
+	}{
+		{&schemas.Effect{Metric: "verified_success", DBar: 0.25}, "+25.0 pp"},
+		{&schemas.Effect{DBar: 0.25}, "+25.0 pp"},
+		{&schemas.Effect{Metric: "wall_time_s", DBar: -9}, "-9 s"},
+		{&schemas.Effect{Metric: "cost_usd", DBar: 0.125}, "+0.125 USD"},
+	}
+	for _, c := range cases {
+		if got := effectPP(c.e); got != c.want {
+			t.Errorf("effectPP(%s %v) = %q, want %q", c.e.Metric, c.e.DBar, got, c.want)
+		}
+	}
+}

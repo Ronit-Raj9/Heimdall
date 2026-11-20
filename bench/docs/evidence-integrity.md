@@ -9,6 +9,8 @@ When a run ends, the store writes `seal.json` into the run folder: the sha256 of
 Two checks follow from that:
 
 - **Run check** (`store.Verify`, and the same check inside `SealedRuns` and `Index.VerifyRun`): `seal.json` names the run; every file listed is present with the same hash; no file was added (a symlink or any other non-regular entry counts as added); and the seal hash is the one `seals.log` recorded for the run. The error names the first file that differs, in path order.
+- **Superseded attempts**: `SealedRuns` verifies every sealed attempt of a slot before it picks the counted one, since the pick reads each attempt's `run.json`. A superseded attempt (for example an `aborted_infra` attempt before its retry) that does not verify is reported on the counted run's problems with its run id.
+- **Format check**: a run with a canonical record seals only when `run.json`, `canonical.json`, `evidence.json`, `gates.json`, `grade.json` and `plan.json` are all present, and its `seal.json` carries `"format": "run/1"`; Verify checks that set again. A seal without `format` is a legacy seal or a run sealed before its canonical record existed: it certifies the files it lists, not a complete current-format run. The pre-seal secret scan refuses any entry that is not a regular file before opening it.
 - **Chain check** (`store.VerifyChain`): every `seals.log` line is well formed and names a run once; each line's hash is the sha256 of that run's `seal.json`; each seal's `prev_seal` is the hash on the line before; and no sealed run folder is missing from the log.
 
 ## What is verified when

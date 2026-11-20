@@ -119,6 +119,13 @@ func (s *FSStore) SealedRuns(ctx context.Context, expID, gradeSource string) ([]
 		if err != nil {
 			return nil, fmt.Errorf("sealed runs %s: slot %s: %w", expID, slot.SlotID, err)
 		}
+		// Every sealed attempt's run.json drives the selection below, so
+		// each one is verified first: a damaged superseded attempt is still a
+		// link of the seal chain and must surface (audit 1-A-04).
+		supersededProblems, err := s.verifySupersededAttempts(recs, logged)
+		if err != nil {
+			return nil, fmt.Errorf("sealed runs %s: slot %s: %w", expID, slot.SlotID, err)
+		}
 		rec, counted := countedRun(recs)
 		if rec == nil {
 			continue
@@ -131,6 +138,11 @@ func (s *FSStore) SealedRuns(ctx context.Context, expID, gradeSource string) ([]
 			// The regate covered this run but its result is missing: the
 			// regrade folder lost a file after publishing.
 			sr.Problems = append(sr.Problems, fmt.Sprintf("regrade %s covers run %s but holds no result for it", regradeID, rec.Run.RunID))
+		}
+		for j := range recs {
+			if id := recs[j].Run.RunID; id != rec.Run.RunID && supersededProblems[id] != "" {
+				sr.Problems = append(sr.Problems, supersededProblems[id])
+			}
 		}
 		sr.Problems = append(sr.Problems, slotProblems[slot.SlotID]...)
 		sr.Problems = append(sr.Problems, runIdentityProblems(expID, slot, &rec.Run)...)
@@ -588,6 +600,32 @@ func countedRun(recs []schemas.RunRecord) (*schemas.RunRecord, []string) {
 		return last, []string{last.Run.RunID}
 	}
 	return nil, nil
+}
+
+// verifySupersededAttempts verifies every sealed attempt of one slot and
+// returns run id -> problem for each that does not verify. The picked
+// attempt is verified again by loadSealedRun (a cache hit), which reports its
+// own mismatch, so the caller drops its entry and never counts it twice.
+func (s *FSStore) verifySupersededAttempts(recs []schemas.RunRecord, logged map[string]string) (map[string]string, error) {
+	var out map[string]string
+	for i := range recs {
+		r := &recs[i]
+		if !r.Sealed {
+			continue
+		}
+		_, err := s.verifySealedRun(r.Dir, r.Run.RunID, logged)
+		if err == nil {
+			continue
+		}
+		if !errors.Is(err, schemas.ErrSealMismatch) {
+			return nil, fmt.Errorf("verify attempt %s: %w", r.Run.RunID, err)
+		}
+		if out == nil {
+			out = map[string]string{}
+		}
+		out[r.Run.RunID] = fmt.Sprintf("sealed attempt %s (attempt %d) does not verify: %s", r.Run.RunID, r.Run.Attempt, err)
+	}
+	return out, nil
 }
 
 // loadSealedRun verifies one sealed run against its seal and seals.log

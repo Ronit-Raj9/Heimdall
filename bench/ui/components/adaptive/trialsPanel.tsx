@@ -86,11 +86,13 @@ export function TrialsPanel({ view }: { view: AdaptiveView }) {
 			{me ? (
 				<div className="rounded border p-2" data-testid="trials-more-evidence">
 					<p className="font-medium">
-						{t("adaptive.more", {
-							pp: me.target_pp.toFixed(1),
-							tasks: me.tasks,
-							cost: me.cost_usd === undefined ? t("adaptive.costUnknown") : formatUSD(me.cost_usd),
-						})}
+						{me.over
+							? t("adaptive.moreOver", { pp: me.target_pp.toFixed(1), total: me.tasks_total })
+							: t("adaptive.more", {
+									pp: me.target_pp.toFixed(1),
+									tasks: me.tasks,
+									cost: me.cost_usd === undefined ? t("adaptive.costUnknown") : formatUSD(me.cost_usd),
+								})}
 					</p>
 					<p className="text-muted-foreground">
 						{t(me.sd_assumed ? "adaptive.sdAssumed" : "adaptive.sdMeasured", { sd: me.sd.toFixed(2) })} {me.cost_basis}

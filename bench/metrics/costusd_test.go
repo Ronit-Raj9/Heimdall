@@ -1,6 +1,8 @@
 package metrics
 
 import (
+	"context"
+	"strings"
 	"testing"
 
 	"github.com/maximhq/bifrost/bench/schemas"
@@ -84,5 +86,26 @@ func TestNoCostReason(t *testing.T) {
 				t.Errorf("noCostReason = %q, want %q", got, tt.want)
 			}
 		})
+	}
+}
+
+// A priced prefix of an incomplete gateway log is not the run's spend
+// (audit 1-C-05).
+func TestCostUSDIncompleteLog(t *testing.T) {
+	usd := schemas.Observed(0.03, schemas.EvidenceGateway)
+	ev := &schemas.Evidence{
+		Requests: &schemas.RequestLog{Complete: false, Reason: "rows still missing"},
+		Cost:     []schemas.CostRow{{RequestID: "r1", USD: usd}},
+	}
+	got, err := newCostUSDMetric().Compute(context.Background(), nil, ev)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got.State != schemas.ValueUnknown || !strings.Contains(got.Reason, "lower bound") {
+		t.Fatalf("cost_usd = %+v, want unknown with a lower bound reason", got)
+	}
+	ev.Requests.Complete = true
+	if got, _ := newCostUSDMetric().Compute(context.Background(), nil, ev); got.State != schemas.ValueObserved {
+		t.Fatalf("complete log: cost_usd = %+v, want observed", got)
 	}
 }

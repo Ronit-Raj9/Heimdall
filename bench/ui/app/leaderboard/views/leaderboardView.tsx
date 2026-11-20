@@ -107,7 +107,8 @@ export function LeaderboardTab() {
 	const data = board.data;
 	const showBanner = synthetic === "only" || data?.synthetic === "only" || data?.mode === "synthetic";
 	const trackGroups = useMemo(() => groupSuitesByTrack(data?.suites ?? [], facts), [data?.suites, facts]);
-	const judged = isJudgedSuite(data?.suite, facts);
+	// The board's own grading provenance wins; today's suite catalog is only a fallback for older servers.
+	const judged = data?.grading ? data.grading === "judged" || data.grading === "mixed" : isJudgedSuite(data?.suite, facts);
 	const onTrack = (next: string | null) => {
 		void setTrack(next);
 		// A board outside the chosen track moves to that track's newest suite.

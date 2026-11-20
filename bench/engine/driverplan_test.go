@@ -40,10 +40,12 @@ func TestPlanDriverKubernetes(t *testing.T) {
 		t.Fatalf("the kubernetes driver is not frozen: %+v", m.Experiment.Environment)
 	}
 	gw := testExperiment(schemas.ConditionSpec{ID: "model-outage", Tasks: schemas.TaskSelector{IDs: []string{"t01"}}, Trials: 1})
+	gw.Guards = []schemas.GuardSpec{{Rule: GuardNoNewIntegrityViolation}} // no clean condition, so no default clean guard (audit 1-B-08)
 	if _, err := NewPlanner(b.reg, b.root, nil).Plan(context.Background(), gw); err != nil {
 		t.Fatalf("a gateway probe must plan: %v", err)
 	}
 	stale := testExperiment(schemas.ConditionSpec{ID: "stale-notes", Tasks: schemas.TaskSelector{IDs: []string{"t01"}}, Trials: 1})
+	stale.Guards = gw.Guards
 	_, err := NewPlanner(b.reg, b.root, nil).Plan(context.Background(), stale)
 	if err == nil || !strings.Contains(err.Error(), "the kubernetes driver cannot run this experiment: probe layer fixture") {
 		t.Fatalf("a fixture probe must be refused at plan time: %v", err)

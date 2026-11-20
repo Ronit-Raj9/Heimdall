@@ -55,9 +55,10 @@ const InstrumentBifrostMCPWitness = "bifrost_mcp_witness"
 
 // withBifrostMCPWitness appends the MCP witness instrument when some counted
 // run served MCP through Bifrost (bifrost_mcp_witness_mismatch applies to
-// it), so other experiments' analyses are unchanged.
-func withBifrostMCPWitness(checks []schemas.InstrumentCheck, idx runIndex) []schemas.InstrumentCheck {
-	if c, ok := bifrostMCPWitness(idx); ok {
+// it) or the frozen manifest declares an arm that does, so other
+// experiments' analyses are unchanged.
+func withBifrostMCPWitness(checks []schemas.InstrumentCheck, m *schemas.Manifest, idx runIndex) []schemas.InstrumentCheck {
+	if c, ok := bifrostMCPWitness(m, idx); ok {
 		return append(checks, c)
 	}
 	return checks
@@ -70,15 +71,23 @@ func withBifrostMCPWitness(checks []schemas.InstrumentCheck, idx runIndex) []sch
 // whose MCP log could not be read completely leaves the check unknown.
 // PerArm counts runs with a mismatch over runs that served MCP through
 // Bifrost. ok is false when no counted run did.
-func bifrostMCPWitness(idx runIndex) (schemas.InstrumentCheck, bool) {
+//
+// An arm the frozen manifest declares with MCP through Bifrost needs the
+// witness on every counted run: a run that lacks the metric (not selected,
+// or never computed) is unknown, not skipped, so whether the check exists
+// never depends on an optional display metric (audit 1-C-10).
+func bifrostMCPWitness(m *schemas.Manifest, idx runIndex) (schemas.InstrumentCheck, bool) {
 	c := schemas.InstrumentCheck{Name: InstrumentBifrostMCPWitness, Threshold: "Bifrost's MCP log agrees with the tool proxy ledger on every call", PerArm: map[string]schemas.Ratio{}}
 	var served, bad, unknown int
 	var parts []string
 	for _, arm := range armsIn(idx, "") {
 		var r schemas.Ratio
+		declared := armServesBifrostMCP(m, arm)
 		for _, run := range idx.armRuns("", arm) {
 			v, ok := run.Metrics["bifrost_mcp_witness_mismatch"]
-			if !ok || v.State == schemas.ValueNotApplicable {
+			if !ok && declared {
+				v = schemas.Unknown("bifrost_mcp_witness_mismatch was not computed", schemas.EvidenceBoundary)
+			} else if !ok || v.State == schemas.ValueNotApplicable {
 				continue
 			}
 			r.Den++
@@ -109,10 +118,23 @@ func bifrostMCPWitness(idx runIndex) (schemas.InstrumentCheck, bool) {
 		c.Detail = "runs where Bifrost's MCP log and the tool proxy ledger disagree: " + strings.Join(parts, ", ")
 	case unknown > 0:
 		c.Status = schemas.InstrumentUnknown
-		c.Detail = fmt.Sprintf("Bifrost's MCP log was not read completely in %d of %d runs that served MCP through Bifrost", unknown, served)
+		c.Detail = fmt.Sprintf("the MCP witnesses could not be compared in %d of %d runs that served MCP through Bifrost", unknown, served)
 	default:
 		c.Status = schemas.InstrumentPass
 		c.Detail = fmt.Sprintf("the two witnesses agree on every call in %d runs that served MCP through Bifrost", served)
 	}
 	return c, true
+}
+
+// armServesBifrostMCP reports whether the frozen manifest declares the arm
+// with MCP served through Bifrost.
+func armServesBifrostMCP(m *schemas.Manifest, arm string) bool {
+	if m == nil {
+		return false
+	}
+	a, ok := m.Arms[arm]
+	if !ok || a.Config.Gateway.Bifrost == nil {
+		return false
+	}
+	return a.Config.Gateway.Bifrost.MCP != nil
 }

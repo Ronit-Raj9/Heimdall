@@ -74,6 +74,11 @@ type Options struct {
 	Payloads       bool
 	PayloadCap     int    // bytes per payload; 0 means DefaultPayloadCap
 	ServiceVersion string // bench version, written as service.version when set
+	// IncludeHeldOut exports runs of tasks the experiment's frozen plan
+	// holds out (manifest held_out_tasks). Off by default: a held-out
+	// task's id, transcript and payloads never leave in a trace unless
+	// the operator asks for a private export.
+	IncludeHeldOut bool
 }
 
 // Build returns the trace of one run: one resource, one scope, the root run

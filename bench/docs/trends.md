@@ -19,7 +19,7 @@ Absent parameters take the defaults: every suite, every agent, `verified_success
 
 A **lineage** is one agent config id and model, across experiments: `codex` with `claude-sonnet-4-5` is one lineage however its prompt, budgets or image change. A **point** is one config hash of that lineage in one experiment, dated by the experiment's creation time. Points are ordered by date, then experiment, then arm. Where a point's config hash differs from the previous point's, `config_changed` is true: the chart marks it, so a change in the line can be read against a change in the config. An experiment that ran two arms of the same lineage (A and B with different prompts) gives two points on the same date.
 
-Which runs count follows the leaderboard: counted, sealed, verified runs whose outcome scores (intention to treat: a timeout or a crash is a failure), under the chosen condition. Runs of an experiment whose newest verdict is INVALID are left out, as are runs that called real external hosts (`external: live` or `record`) and, by default, synthetic runs.
+Which runs count follows the leaderboard: counted, sealed, verified runs whose outcome scores (intention to treat: a timeout or a crash is a failure), under the chosen condition. Runs of an experiment whose newest verdict is INVALID are left out, as is any run the index keeps with an evidence problem (for example a slot with two counted runs, which the verdict would call INVALID): those are counted in `invalid`, never charted, as are runs that called real external hosts (`external: live` or `record`) and, by default, synthetic runs.
 
 Per point:
 
@@ -38,7 +38,7 @@ A number nobody observed is null, never zero.
 
 ## The regression flag
 
-Each point after the first is compared with the previous point of its lineage on the tasks both ran, with the exact sign-flip test (`stats.SignFlip`, the test behind the verdict): the per-task differences are the newer task success rate minus the older one. `lineages[].regression` is the newest point's result.
+Each point after the first is compared with the newest earlier point of its lineage on the same suite (`id@version`) and suite lock, on the tasks both ran. Task ids are paired only inside one locked suite: two suites, or two versions of one, can reuse an id such as `t01` for unrelated tasks, so a point with no earlier point of its suite is `cannot_tell`. The comparison is with the exact sign-flip test (`stats.SignFlip`, the test behind the verdict): the per-task differences are the newer task success rate minus the older one. `lineages[].regression` is the newest point's result.
 
 | Status | When |
 |---|---|

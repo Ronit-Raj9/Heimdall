@@ -884,8 +884,10 @@ export interface Effect {
 	n_positive: number;
 	n_negative: number;
 	d_bar: number;
-	/** Exact sign-flip, two-sided; absent when descriptive. */
+	/** Sign-flip, two-sided; absent when descriptive. */
 	p_value?: number;
+	/** Monte Carlo sign vectors behind p_value; absent when it is exact. */
+	p_draws?: number;
 	/** Paired t, descriptive only, always labelled approximate. */
 	interval?: [number, number];
 	per_task: TaskDiff[];
@@ -1880,6 +1882,10 @@ export interface Leaderboard {
 	review_changed_runs?: number;
 	/** held_out on the held-out board (runs of held-out tasks only); absent on the public board, which never counts a held-out task. */
 	split?: TaskSplit;
+	/** How the board's runs were graded, from the frozen plan and sealed grade.json: verified, judged, mixed or unknown. */
+	grading: "verified" | "judged" | "mixed" | "unknown";
+	/** Judge models of judged runs. */
+	judges?: string[];
 }
 
 /** Query of GET /leaderboard. An absent field takes the server default: newest suite, clean, all, exclude, original, each entry's k. */
@@ -2112,6 +2118,8 @@ export interface Trends {
 	points: number;
 	/** Runs the index lists as rejected (seal failed); never charted. */
 	rejected: number;
+	/** Indexed runs with evidence problems (e.g. a slot with two counted runs); never charted. */
+	invalid: number;
 	/** When the index was last written. */
 	indexed_at: string;
 	generated_at: string;
@@ -3041,8 +3049,10 @@ export interface MatrixPair {
 	/** Common tasks where the rates differ. */
 	n_nonzero: number;
 	mean_diff: number;
-	/** Raw exact two-sided sign-flip p; null without common tasks. */
+	/** Raw two-sided sign-flip p; null without common tasks. */
 	p: number | null;
+	/** Monte Carlo sign vectors behind p; absent when p is exact. */
+	p_draws?: number;
 	/** Holm-adjusted across all pairs; null without common tasks. */
 	p_adjusted: number | null;
 	significant: boolean;
@@ -3073,6 +3083,10 @@ export interface ModelMatrix {
 	/** Every pair of rows, in rank order of the first then the second. */
 	pairs: MatrixPair[];
 	excluded: LeaderboardExclusion[];
+	/** held_out when the matrix reads only held-out tasks; absent: public tasks only. */
+	split?: TaskSplit;
+	/** The experiment's newest verdict is INVALID: no run is ranked, excluded says why. */
+	invalid?: boolean;
 }
 
 /** GET /experiments/{id}/matrix query. An absent or empty param is left out so the server default applies. */
@@ -5157,8 +5171,12 @@ export interface ExportRunRow {
 	trial: number;
 	attempt: number;
 	outcome: string;
-	/** 1 or 0 when the outcome scores; null when it does not (infra error, invalid evaluator). */
+	/** public or held_out: the frozen plan's split of the task. */
+	split: string;
+	/** 1 or 0 as the leaderboard reads it: the observed verified_success metric, else the outcome's score; null when the outcome does not score (infra error, invalid evaluator). */
 	verified_success: number | null;
+	/** The outcome's own score (Y), 1 or 0; null when it does not score. */
+	outcome_score: number | null;
 	grade_passed: boolean | null;
 	grade_source: string;
 	cost_usd: number | null;

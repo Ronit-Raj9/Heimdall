@@ -5,6 +5,7 @@ import {
 	boundsDiffer,
 	cellTone,
 	formatPValue,
+	formatSignedEffect,
 	formatSignedPp,
 	integrityTone,
 	integrityView,
@@ -25,6 +26,18 @@ describe("formatSignedPp", () => {
 		{ v: 0.3333, want: "+33.3" },
 	];
 	for (const c of cases) it(String(c.v), () => expect(formatSignedPp(c.v, "en")).toBe(c.want));
+});
+
+describe("formatSignedEffect", () => {
+	// Regression (audit 1-C-07): a seconds endpoint must not print -900 pp.
+	const cases = [
+		{ m: "verified_success", v: 0.25, want: "+25 pp" },
+		{ m: "wall_time_s", v: -9, want: "-9 s" },
+		{ m: "latency_ms", v: 12.5, want: "+12.5 ms" },
+		{ m: "cost_usd", v: 0.03, want: "+0.03 USD" },
+		{ m: undefined, v: 0.1, want: "+10 pp" },
+	];
+	for (const c of cases) it(`${c.m}:${c.v}`, () => expect(formatSignedEffect(c.m, c.v, "en")).toBe(c.want));
 });
 
 describe("formatPValue", () => {

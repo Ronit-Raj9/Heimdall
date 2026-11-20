@@ -61,12 +61,13 @@ func adaptiveMarkdown(an *schemas.Analysis) string {
 		if me.CostUSD != nil {
 			cost = fmt.Sprintf("estimated cost %.2f USD", *me.CostUSD)
 		}
-		over := ""
 		if me.Over {
-			over = " (at least; the sizing caps at its maximum)"
+			fmt.Fprintf(&b, "- Buy more evidence: to detect %.1f pp you need more than %d tasks in all (SD %.2f %s); runs and cost not estimated (%s).",
+				me.TargetPP, me.TasksTotal, me.SD, sd, me.CostBasis)
+		} else {
+			fmt.Fprintf(&b, "- Buy more evidence: to detect %.1f pp you need about %d more tasks (%d in all, SD %.2f %s), %d runs, %s (%s).",
+				me.TargetPP, me.Tasks, me.TasksTotal, me.SD, sd, me.Runs, cost, me.CostBasis)
 		}
-		fmt.Fprintf(&b, "- Buy more evidence: to detect %.1f pp you need about %d more tasks%s (%d in all, SD %.2f %s), %d runs, %s (%s).",
-			me.TargetPP, me.Tasks, over, me.TasksTotal, me.SD, sd, me.Runs, cost, me.CostBasis)
 		if me.Combination == schemas.ExtensionInverseNormal {
 			fmt.Fprintf(&b, " A follow-up is decided together with this experiment by the pre-declared inverse-normal rule at alpha %.4f.", me.AlphaKept)
 		} else {

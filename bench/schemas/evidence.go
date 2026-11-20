@@ -23,23 +23,30 @@ type Evidence struct {
 	ShimLog      []ShimCall        `json:"shim_log,omitempty"`
 	Grade        *Grade            `json:"grade,omitempty"`
 	Gates        []GateResult      `json:"gates,omitempty"`
-	LogicalSteps []LogicalRequest  `json:"logical_steps,omitempty"`
-	Attempts     []AttemptRecord   `json:"attempts,omitempty"`
-	Retries      []RetryRecord     `json:"retries,omitempty"`
-	Fallbacks    []FallbackRecord  `json:"fallbacks,omitempty"`
+	// GateErrors are the gates whose check failed to run, so Gates holds no
+	// result for them: their verdict is unknown, not clean.
+	GateErrors   []GateError      `json:"gate_errors,omitempty"`
+	LogicalSteps []LogicalRequest `json:"logical_steps,omitempty"`
+	Attempts     []AttemptRecord  `json:"attempts,omitempty"`
+	Retries      []RetryRecord    `json:"retries,omitempty"`
+	Fallbacks    []FallbackRecord `json:"fallbacks,omitempty"`
 	// RequestedTools are the tool calls the model asked for, read from the
 	// gateway rows. Evidence.ToolCalls is the tool proxy ledger: what ran.
 	RequestedTools []ToolCallRecord  `json:"requested_tool_calls,omitempty"`
 	Protect        map[string]string `json:"protected_after,omitempty"` // sha256 of protected files after the run
 
 	// Scenario evidence (scenario.go).
-	ToolCalls []ToolCall      `json:"tool_calls,omitempty"` // tool proxy ledger
-	Sessions  []SessionResult `json:"sessions,omitempty"`   // one per session of a multi-session run
-	Answer    *Answer         `json:"answer,omitempty"`     // the exported answer
-	State     []StateFile     `json:"state,omitempty"`      // exported service state
-	Services  []ServiceResult `json:"services,omitempty"`   // services that ran beside the agent
-	Snapshot  string          `json:"snapshot,omitempty"`   // image reference of the frozen agent container, for snapshot grading
-	Artifacts []ArtifactFile  `json:"artifacts,omitempty"`  // exported artifact files of an artifact task
+	ToolCalls []ToolCall `json:"tool_calls,omitempty"` // tool proxy ledger
+	// ToolLedgerProblem says why ToolCalls is only a prefix of the ledger:
+	// malformed lines or a read cap. Empty when the ledger read is complete.
+	// Exact tool metrics read unknown while it is set.
+	ToolLedgerProblem string          `json:"tool_ledger_problem,omitempty"`
+	Sessions          []SessionResult `json:"sessions,omitempty"`  // one per session of a multi-session run
+	Answer            *Answer         `json:"answer,omitempty"`    // the exported answer
+	State             []StateFile     `json:"state,omitempty"`     // exported service state
+	Services          []ServiceResult `json:"services,omitempty"`  // services that ran beside the agent
+	Snapshot          string          `json:"snapshot,omitempty"`  // image reference of the frozen agent container, for snapshot grading
+	Artifacts         []ArtifactFile  `json:"artifacts,omitempty"` // exported artifact files of an artifact task
 
 	// Agent steps evidence (steps.go, docs/steps-and-evidence.md): the
 	// trusted observers' records and the unified step timeline.
@@ -238,4 +245,11 @@ type Metric interface {
 type DerivedMetric interface {
 	Metric
 	ComputeDerived(ctx context.Context, rc *RunContext, ev *Evidence) (map[string]Value, error)
+}
+
+// GateError is a gate whose check failed to run.
+type GateError struct {
+	Gate   string     `json:"gate"`
+	Effect GateEffect `json:"effect"`
+	Error  string     `json:"error"`
 }

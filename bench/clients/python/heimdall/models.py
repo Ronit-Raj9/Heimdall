@@ -1793,6 +1793,7 @@ class _EffectRequired(TypedDict):
 class Effect(_EffectRequired, total=False):
     interval: Optional[List[float]]
     lower_bound: Optional[Effect]
+    p_draws: int
     p_value: Optional[float]
     upper_bound: Optional[Effect]
 
@@ -2686,6 +2687,7 @@ class JudgeCalibrationVerdict(_JudgeCalibrationVerdictRequired, total=False):
     agreement: Optional[CalibrationRate]
     bias_adjusted: Dict[str, BiasAdjustedRate]
     capped_from: str
+    caps: bool
     error_over_effect: str
     fpr: Optional[CalibrationRate]
     kappa: Optional[float]
@@ -2745,6 +2747,7 @@ class _LeaderboardRequired(TypedDict):
     generated_at: str
     grade_source: str
     grade_sources: List[LeaderboardGradeSource]
+    grading: str
     scope: str
     sort_metric: str
     suite: str
@@ -2753,6 +2756,7 @@ class _LeaderboardRequired(TypedDict):
 
 
 class Leaderboard(_LeaderboardRequired, total=False):
+    judges: List[str]
     review_changed_runs: int
     reviewed_runs: int
     split: str
@@ -2919,7 +2923,7 @@ class Manifest(_ManifestRequired, total=False):
     tier: Optional[TierPlan]
 
 
-class MatrixPair(TypedDict):
+class _MatrixPairRequired(TypedDict):
     arm_x: str
     arm_y: str
     mean_diff: float
@@ -2929,6 +2933,10 @@ class MatrixPair(TypedDict):
     reason: str
     significant: bool
     tasks: int
+
+
+class MatrixPair(_MatrixPairRequired, total=False):
+    p_draws: int
 
 
 class MatrixRow(TypedDict):
@@ -3007,7 +3015,7 @@ class MetricDelta(TypedDict):
     unknown_b: int
 
 
-class MetricDescriptor(TypedDict):
+class _MetricDescriptorRequired(TypedDict):
     description: str
     higher_is_better: bool
     kind: str
@@ -3016,6 +3024,10 @@ class MetricDescriptor(TypedDict):
     name: str
     ps2: bool
     version: str
+
+
+class MetricDescriptor(_MetricDescriptorRequired, total=False):
+    report_only: bool
 
 
 class MetricTest(TypedDict):
@@ -3039,7 +3051,7 @@ class MetricTest(TypedDict):
     worse: int
 
 
-class ModelMatrix(TypedDict):
+class _ModelMatrixRequired(TypedDict):
     alpha: float
     condition: str
     conditions: List[str]
@@ -3053,6 +3065,11 @@ class ModelMatrix(TypedDict):
     suite: str
     synthetic: bool
     tasks: int
+
+
+class ModelMatrix(_ModelMatrixRequired, total=False):
+    invalid: bool
+    split: str
 
 
 class ModelSummary(TypedDict):
@@ -3766,6 +3783,7 @@ class Response(TypedDict):
     conditions: List[str]
     generated_at: str
     indexed_at: str
+    invalid: int
     lineages: List[Lineage]
     metric: str
     metrics: List[str]

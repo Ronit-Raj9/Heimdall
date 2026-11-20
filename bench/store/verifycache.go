@@ -6,6 +6,7 @@ import (
 	"io/fs"
 	"maps"
 	"path/filepath"
+	"strings"
 	"sync"
 
 	"github.com/maximhq/bifrost/bench/schemas"
@@ -101,6 +102,9 @@ func (s *FSStore) verifySealedRun(dir, runID string, logged map[string]string) (
 	}
 	if err := s.verifyRunFiles(dir, rec); err != nil {
 		return rec, err
+	}
+	if missing := missingArtifacts(rec.Format, rec.Files); len(missing) > 0 {
+		return rec, fmt.Errorf("seal format %s lacks %s: %w", rec.Format, strings.Join(missing, ", "), schemas.ErrSealMismatch)
 	}
 	if logged[runID] != rec.Hash {
 		return rec, fmt.Errorf("seal hash %s not in seals.log: %w", rec.Hash, schemas.ErrSealMismatch)

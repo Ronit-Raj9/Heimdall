@@ -76,6 +76,17 @@ func packFiles(runsRoot string, rec *schemas.ReleaseRecord, ev *evidence) ([]pac
 	if err := add("seals.log", filepath.Join(expDir, sealsLogFile), true); err != nil {
 		return nil, err
 	}
+	chain, err := chainSeals(expDir, runs)
+	if err != nil {
+		return nil, err
+	}
+	for _, f := range chain {
+		if usedNames[f.name] {
+			return nil, fmt.Errorf("duplicate pack file %s", f.name)
+		}
+		usedNames[f.name] = true
+		files = append(files, f)
+	}
 	for _, run := range runs {
 		id := run.Run.RunID
 		sealPath := filepath.Join(run.Dir, "seal.json")
@@ -143,6 +154,52 @@ func packFiles(runsRoot string, rec *schemas.ReleaseRecord, ev *evidence) ([]pac
 		}
 	}
 	return files, nil
+}
+
+// chainSeals returns chain/<run_id>.seal.json for every seals.log link that
+// is not a counted run of the pack, such as an aborted_infra attempt followed
+// by a counted retry. Without these seal documents an auditor holding only
+// the pack cannot check the prev_seal links through a superseded attempt
+// (audit 1-E-01). Only seal.json is copied: a superseded attempt's files are
+// not release evidence. Each copy must hash to its logged value.
+func chainSeals(expDir string, counted []schemas.SealedRun) ([]packFile, error) {
+	b, err := os.ReadFile(filepath.Join(expDir, sealsLogFile))
+	if err != nil {
+		return nil, fmt.Errorf("read seals.log: %w", err)
+	}
+	isCounted := make(map[string]bool, len(counted))
+	for _, r := range counted {
+		isCounted[r.Run.RunID] = true
+	}
+	var out []packFile
+	for i, line := range strings.Split(strings.TrimRight(string(b), "\n"), "\n") {
+		if line == "" {
+			continue
+		}
+		id, hash, ok := strings.Cut(line, " ")
+		if !ok || id == "" || strings.ContainsAny(id, "/\\.") || strings.ContainsRune(id, '\x00') {
+			return nil, fmt.Errorf("seals.log line %d malformed: %w", i+1, schemas.ErrSealMismatch)
+		}
+		if isCounted[id] {
+			continue
+		}
+		matches, err := filepath.Glob(filepath.Join(expDir, "slots", "*", "runs", id, "seal.json"))
+		if err != nil {
+			return nil, fmt.Errorf("find seal of run %s: %w", id, err)
+		}
+		if len(matches) != 1 {
+			return nil, fmt.Errorf("seals.log line %d: run %s has %d sealed folders: %w", i+1, id, len(matches), schemas.ErrSealMismatch)
+		}
+		data, err := os.ReadFile(matches[0])
+		if err != nil {
+			return nil, fmt.Errorf("read seal of run %s: %w", id, err)
+		}
+		if got := utils.SHA256Bytes(data); got != strings.TrimPrefix(hash, "sha256:") {
+			return nil, fmt.Errorf("seal of run %s hashes to %s, seals.log lists %s: %w", id, got, hash, schemas.ErrSealMismatch)
+		}
+		out = append(out, packFile{"chain/" + id + ".seal.json", data})
+	}
+	return out, nil
 }
 
 // validateSealedRunPath accepts only a relative path inside a run folder. A
@@ -219,6 +276,9 @@ func readme(rec *schemas.ReleaseRecord, nRuns int, hasPolicy bool) string {
 	line("  analysis/report.md       that analysis's markdown report, when written")
 	line("  analysis/policy.json     the policy result, when a policy was evaluated")
 	line("  seals.log                the experiment's seal chain: \"<run_id> <seal hash>\"")
+	line("  chain/<run_id>.seal.json the seal of every other seals.log link, such as an")
+	line("                           aborted attempt that a counted retry replaced; only")
+	line("                           its seal.json, so the chain can be checked offline")
 	line("  runs/<run_id>/seal.json  each counted run's seal: every file of the sealed")
 	line("                           run folder with its sha256")
 	line("  runs/<run_id>/<every file named by seal.json>")
@@ -238,7 +298,9 @@ func readme(rec *schemas.ReleaseRecord, nRuns int, hasPolicy bool) string {
 	line("     on that run's line in seals.log, and every copied run file must hash to")
 	line("     its value under \"files\" in that seal.json.")
 	line("  2. Seal chain. In seals.log, each run's seal.json has prev_seal equal to the")
-	line("     hash on the line before; the first line's prev_seal is empty.")
+	line("     hash on the line before; the first line's prev_seal is empty. A run not")
+	line("     counted here has its seal at chain/<run_id>.seal.json, which must hash to")
+	line("     its seals.log line.")
 	line("  3. Seals digest. Sort the seal hashes of runs/*/seal.json, write each")
 	line("     followed by a newline, and sha256 the result. It must equal seals_digest")
 	line("     in release.json.")

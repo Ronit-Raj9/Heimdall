@@ -195,7 +195,7 @@ func (m *modelAttemptsMetric) Descriptor() schemas.MetricDescriptor {
 	return schemas.MetricDescriptor{
 		Name: ModelAttempts, Version: version, Label: "Model attempts (incl. retries, fallbacks)", Kind: schemas.KindCount,
 		HigherIsBetter: false, MinEvidence: schemas.EvidenceGateway,
-		Description: "Physical upstream model attempts per run: every attempt in Bifrost's retry trail plus every fallback row (a row without a trail is one attempt), averaged over runs with a complete gateway log.",
+		Description: "Physical upstream model attempts per run: every attempt in Bifrost's retry trail plus every fallback row (a row without a trail is one attempt, a cache hit none), averaged over runs with a complete gateway log.",
 	}
 }
 
@@ -207,7 +207,7 @@ func (m *modelAttemptsMetric) Compute(_ context.Context, _ *schemas.RunContext, 
 	}
 	n := 0
 	for _, r := range messageRows(ev.Requests.Requests) {
-		n += max(len(r.Attempts), 1)
+		n += upstreamAttempts(r)
 	}
 	return schemas.Observed(float64(n), schemas.EvidenceGateway), nil
 }

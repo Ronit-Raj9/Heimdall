@@ -322,3 +322,25 @@ func runDir(t *testing.T, root, runID string) string {
 	}
 	return matches[0]
 }
+
+// A dot folder under analysis/ is an analysis still being staged by
+// store.WriteAnalysis: the index never reads it, even with a verdict.json.
+func TestStagedAnalysisSkipped(t *testing.T) {
+	ctx := context.Background()
+	f := newFixture(t, "e_one", false)
+	f.seal("s_t1_a", schemas.OutcomePass, 0.1)
+	stage := filepath.Join(f.st.Root(), f.m.ExpID, "analysis", ".stage-x")
+	if err := os.MkdirAll(stage, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(stage, "verdict.json"), []byte(`{"analysis_id":"x","verdict":{"decision":"invalid"}}`), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	st, err := New(f.st, nil).Rebuild(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if st.Analyses != 0 {
+		t.Fatalf("analyses %d, want the staged one skipped", st.Analyses)
+	}
+}

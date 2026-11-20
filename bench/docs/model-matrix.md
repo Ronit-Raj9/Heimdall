@@ -59,7 +59,7 @@ A sign-flip test on n differing tasks cannot give a p below 2 / 2^n, and Holm mu
 
 > Cannot separate any two arms on this suite: with at most 4 common tasks the smallest possible p is 0.12, and Holm across 3 pairs makes it 0.38, not below alpha 0.05 whatever the results. More tasks are needed; more trials per task do not help, since the test is over tasks.
 
-With 3 arms, 8 tasks can separate a pair only if the arms differ on at least 8 of them in the same direction (2/256 times 3 = 0.023). Every pair also carries its own reason ("too few differing tasks (2 of 8 common)", "p 0.31 after Holm across 3 pairs").
+With 3 arms, a pair can be separated once the two arms differ on at least 7 tasks, all in the same direction: 2/2^7 = 0.0156, and Holm across 3 pairs makes it 0.047, below 0.05. Tied tasks add no sign, so on 8 common tasks one tie still leaves a separable pair; 6 differing tasks cannot (2/64 times 3 = 0.094). The threshold always follows the actual Holm family and the smallest possible p (`stats.MinPossibleP`). Every pair also carries its own reason ("too few differing tasks (2 of 8 common)", "p 0.31 after Holm across 3 pairs").
 
 ## What it does not do
 

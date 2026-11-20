@@ -75,13 +75,15 @@ type ModelMatrix struct {
 	Conditions  []string               `json:"conditions"` // conditions of the experiment with a graded run
 	GradeSource string                 `json:"grade_source"`
 	Alpha       float64                `json:"alpha"`
-	Tasks       int                    `json:"tasks"`     // tasks every arm has a graded run on
-	Separable   bool                   `json:"separable"` // false when no pair could reach alpha after Holm, whatever the results
-	Note        string                 `json:"note"`      // plain words: why nothing can be separated, or what the tiers mean
-	Synthetic   bool                   `json:"synthetic"` // scripted agent, scripted model or smoke experiment: numbers are not findings
-	Rows        []MatrixRow            `json:"rows"`      // in rank order
-	Pairs       []MatrixPair           `json:"pairs"`     // every pair of rows, in rank order of the first then the second
-	Excluded    []LeaderboardExclusion `json:"excluded"`  // runs left out, by reason
+	Tasks       int                    `json:"tasks"`             // tasks every arm has a graded run on
+	Separable   bool                   `json:"separable"`         // false when no pair could reach alpha after Holm, whatever the results
+	Note        string                 `json:"note"`              // plain words: why nothing can be separated, or what the tiers mean
+	Synthetic   bool                   `json:"synthetic"`         // scripted agent, scripted model or smoke experiment: numbers are not findings
+	Rows        []MatrixRow            `json:"rows"`              // in rank order
+	Pairs       []MatrixPair           `json:"pairs"`             // every pair of rows, in rank order of the first then the second
+	Excluded    []LeaderboardExclusion `json:"excluded"`          // runs left out, by reason
+	Split       string                 `json:"split,omitempty"`   // held_out when the matrix reads only held-out tasks; empty: public tasks only
+	Invalid     bool                   `json:"invalid,omitempty"` // the newest analysis decided INVALID: no run is ranked, Excluded says why
 }
 
 // MatrixRow is one arm of a matrix: the arm id and the gateway provider its
@@ -100,7 +102,8 @@ type MatrixPair struct {
 	Tasks       int      `json:"tasks"`     // common tasks
 	NNonzero    int      `json:"n_nonzero"` // common tasks where the rates differ
 	MeanDiff    float64  `json:"mean_diff"`
-	P           *float64 `json:"p"`          // raw exact two-sided sign-flip p; nil without common tasks
+	P           *float64 `json:"p"`          // raw two-sided sign-flip p; nil without common tasks
+	PDraws      int      `json:"p_draws,omitempty"` // Monte Carlo sign vectors behind P; 0 when P is exact (audit 1-B-07)
 	PAdjusted   *float64 `json:"p_adjusted"` // Holm-adjusted across all pairs; nil without common tasks
 	Significant bool     `json:"significant"`
 	Reason      string   `json:"reason"` // plain words, e.g. "cannot separate: too few differing tasks (2 of 6)"

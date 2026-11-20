@@ -52,7 +52,7 @@ func TestReadSnapshotTolerance(t *testing.T) {
 	}{
 		{"missing file is empty", "", false, false, false},
 		{"other format version is empty", `{"kind":"meta","version":99}` + "\n" + `{"kind":"run","run":{"run_id":"r"}}` + "\n", true, false, false},
-		{"broken line is an error", `{"kind":"meta","version":1}` + "\n{not json\n", true, false, true},
+		{"broken line is an error", `{"kind":"meta","version":2}` + "\n{not json\n", true, false, true},
 	}
 	for i, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

@@ -6,6 +6,7 @@ tasks
 n_nonzero
 mean_diff
 p
+p_draws?
 p_adjusted
 significant
 reason

@@ -14,7 +14,7 @@ import (
 	"github.com/maximhq/bifrost/bench/schemas"
 )
 
-const matrixUsage = `usage: bifrost-bench matrix [-config deploy/bench.yaml] -exp <id> [-condition <id>] [-grade-source original|<regrade id>] [-k n] [-alpha 0.05] [-json]
+const matrixUsage = `usage: bifrost-bench matrix [-config deploy/bench.yaml] -exp <id> [-condition <id>] [-grade-source original|<regrade id>] [-k n] [-alpha 0.05] [-split public|held_out] [-json]
 Compares every arm of one experiment from its sealed runs: verified success with its interval, pass^k, cost per success, tokens, wall time and false completion per arm, and every pair by the exact sign-flip test, Holm-adjusted across all pairs. Reads the run folder only; no gateway is needed.`
 
 func init() {
@@ -29,6 +29,7 @@ func runMatrix(args []string) int {
 	gradeSource := fs.String("grade-source", schemas.GradeSourceOriginal, "original, or a regrade id of the experiment")
 	k := fs.Int("k", 0, "k of pass^k for every arm, 2 or more (default: min(3, trials per task))")
 	alpha := fs.Float64("alpha", leaderboard.DefaultAlpha, "significance level for the pairwise tests")
+	split := fs.String("split", "", "public (default) or held_out: the frozen split of tasks the matrix reads")
 	asJSON := fs.Bool("json", false, "print the matrix as JSON")
 	if err := fs.Parse(args); err != nil || fs.NArg() != 0 || *expID == "" {
 		fmt.Fprintln(os.Stderr, matrixUsage)
@@ -39,7 +40,7 @@ func runMatrix(args []string) int {
 	if err != nil {
 		return fail("%v", err)
 	}
-	mx, err := a.matrix(ctx, *expID, leaderboard.MatrixQuery{Condition: *condition, GradeSource: *gradeSource, K: *k, Alpha: *alpha})
+	mx, err := a.matrix(ctx, *expID, leaderboard.MatrixQuery{Condition: *condition, GradeSource: *gradeSource, K: *k, Alpha: *alpha, Split: *split})
 	if errors.Is(err, leaderboard.ErrBadQuery) {
 		fmt.Fprintf(os.Stderr, "%v\n%s\n", err, matrixUsage)
 		return exitUsage
@@ -78,6 +79,11 @@ func (a *app) matrix(ctx context.Context, expID string, q leaderboard.MatrixQuer
 	for _, s := range synthetic {
 		synth = synth || s
 	}
+	// The matrix takes the board's experiment eligibility: an experiment
+	// whose newest verdict is INVALID ranks nothing.
+	if d, ok := (indexAdapter{root: a.store.Root()}).LatestDecision(expID); ok && d == schemas.DecisionInvalid {
+		q.Invalid = true
+	}
 	return leaderboard.Matrix(m, runs, synth, q)
 }
 
@@ -87,6 +93,12 @@ func printMatrix(w io.Writer, mx *schemas.ModelMatrix) {
 		mx.ExpID, mx.Suite, mx.Condition, mx.GradeSource, strings.Join(mx.Conditions, ", "))
 	if mx.Synthetic {
 		fmt.Fprintln(w, "synthetic: scripted agent, scripted model or smoke experiment; the numbers are not findings")
+	}
+	if mx.Invalid {
+		fmt.Fprintln(w, "INVALID: the experiment's newest verdict is invalid; nothing is ranked")
+	}
+	if mx.Split != "" {
+		fmt.Fprintf(w, "split: %s tasks only\n", mx.Split)
 	}
 	fmt.Fprintf(w, "%-4s %-4s %-4s %-28s %-22s %-20s %-10s %-12s %-10s %-9s %s\n",
 		"rank", "tier", "arm", "label", "model", "success [95%]", "pass^k", "cost/succ", "tokens", "wall s", "false compl.")

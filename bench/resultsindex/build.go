@@ -248,6 +248,9 @@ func (ix *Index) fingerprint(expID string) (string, error) {
 		return "", fmt.Errorf("fingerprint %s: %w", expID, err)
 	}
 	for _, e := range entries {
+		if strings.HasPrefix(e.Name(), ".") {
+			continue // an analysis still being staged (store.WriteAnalysis) is not published yet
+		}
 		fmt.Fprintf(h, "analysis %s\n", e.Name())
 	}
 	return hex.EncodeToString(h.Sum(nil))[:16], nil
@@ -266,8 +269,8 @@ func (ix *Index) analyses(expID string) ([]AnalysisRow, error) {
 	}
 	var out []AnalysisRow
 	for _, e := range entries {
-		if !e.IsDir() {
-			continue
+		if !e.IsDir() || strings.HasPrefix(e.Name(), ".") {
+			continue // a dot folder is an analysis still being staged (store.WriteAnalysis)
 		}
 		var a struct {
 			AnalysisID  string    `json:"analysis_id"`
@@ -313,7 +316,7 @@ func sealProblem(sr *schemas.SealedRun) string {
 func runRow(m *schemas.Manifest, sr *schemas.SealedRun, synthetic bool) RunRow {
 	r := RunRow{
 		Experiment: m.ExpID, ExperimentCreated: m.CreatedAt.UTC(), RunID: sr.Run.RunID,
-		Suite: suiteRef(m), Task: sr.Slot.Task, Arm: sr.Slot.Arm, Condition: sr.Slot.Condition, Trial: sr.Slot.Trial,
+		Suite: suiteRef(m), SuiteLockHash: m.SuiteLockHash, Task: sr.Slot.Task, Arm: sr.Slot.Arm, Condition: sr.Slot.Condition, Trial: sr.Slot.Trial,
 		Outcome: string(sr.Run.Outcome), Started: sr.Run.Timing.Started.UTC(), SealHash: sr.SealHash,
 		Synthetic: synthetic, GradeSource: sr.GradeSource, Metrics: map[string]float64{},
 		NotRepeatable: utils.ExternalUnrepeatable(m),

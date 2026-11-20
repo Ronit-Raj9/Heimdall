@@ -9,6 +9,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/maximhq/bifrost/bench/leaderboard"
 	"github.com/maximhq/bifrost/bench/schemas"
 )
 
@@ -32,7 +33,9 @@ type RunRow struct {
 	Trial        int                 `json:"trial"`
 	Attempt      int                 `json:"attempt"`
 	Outcome      string              `json:"outcome"`
-	Success      *float64            `json:"verified_success"` // 1 or 0 when the outcome scores; null when it does not
+	Split        string              `json:"split"`            // public or held_out: the frozen plan's split of the task
+	Success      *float64            `json:"verified_success"` // 1 or 0 as the board reads it (leaderboard.VerifiedSuccess); null when the outcome does not score
+	OutcomeScore *float64            `json:"outcome_score"`    // the outcome's own score (Y), 1 or 0; null when it does not score
 	Passed       *bool               `json:"grade_passed"`     // the grade, when the run has one
 	GradeSource  string              `json:"grade_source"`
 	CostUSD      *float64            `json:"cost_usd"`
@@ -45,12 +48,17 @@ type RunRow struct {
 	Metrics      map[string]*float64 `json:"metrics"`
 }
 
-// RunTable turns an experiment's sealed runs into rows in slot order.
+// RunTable turns an experiment's sealed runs of in.Split into rows in slot
+// order. The default split is public: a run of a task the frozen plan holds
+// out is never in a public table.
 func RunTable(in EEEInput) []RunRow {
 	m := in.Manifest
 	rows := make([]RunRow, 0, len(in.Runs))
 	for i := range in.Runs {
 		sr := &in.Runs[i]
+		if !inSplit(m, sr.Slot.Task, in.Split) {
+			continue
+		}
 		r := RunRow{
 			ExpID: sr.Slot.ExpID, RunID: sr.Run.RunID, SlotID: sr.Slot.SlotID, PairID: sr.Slot.PairID,
 			Suite: sr.Slot.Suite, Task: sr.Slot.Task, TaskVersion: sr.Slot.TaskVersion, Arm: sr.Slot.Arm,
@@ -64,7 +72,14 @@ func RunTable(in EEEInput) []RunRow {
 				r.AgentConfig = firstNonEmpty(a.Config.ID, r.AgentConfig)
 			}
 		}
+		r.Split = schemas.SplitPublic
+		if heldOut(m, sr.Slot.Task) {
+			r.Split = schemas.SplitHeldOut
+		}
 		if y, ok := sr.Run.Outcome.Score(); ok {
+			r.OutcomeScore = &y
+		}
+		if y, ok := leaderboard.VerifiedSuccess(sr.Run.Outcome, sr.Metrics); ok {
 			r.Success = &y
 		}
 		if sr.Grade != nil {
@@ -112,7 +127,7 @@ func WriteJSONL(w io.Writer, rows []RunRow) error {
 
 // csvFixed is the fixed column list; metric columns follow as metric.<id>.
 var csvFixed = []string{"exp_id", "run_id", "slot_id", "pair_id", "suite", "task", "task_version", "arm", "arm_label",
-	"agent_config", "model", "provider", "condition", "trial", "attempt", "outcome", "verified_success", "grade_passed",
+	"agent_config", "model", "provider", "condition", "trial", "attempt", "outcome", "split", "verified_success", "outcome_score", "grade_passed",
 	"grade_source", "cost_usd", "synthetic", "started", "sealed", "manifest_hash", "seal_hash", "problems"}
 
 // WriteCSV writes a header and one line per row. Metric columns are the
@@ -150,7 +165,7 @@ func WriteCSV(w io.Writer, rows []RunRow) error {
 		}
 		rec := []string{r.ExpID, r.RunID, r.SlotID, r.PairID, r.Suite, r.Task, r.TaskVersion, r.Arm, csvSafe(r.ArmLabel),
 			r.AgentConfig, r.Model, r.Provider, r.Condition, strconv.Itoa(r.Trial), strconv.Itoa(r.Attempt), r.Outcome,
-			num(r.Success), passed, r.GradeSource, num(r.CostUSD), strconv.FormatBool(r.Synthetic), r.Started, r.Sealed,
+			r.Split, num(r.Success), num(r.OutcomeScore), passed, r.GradeSource, num(r.CostUSD), strconv.FormatBool(r.Synthetic), r.Started, r.Sealed,
 			r.ManifestHash, r.SealHash, csvSafe(strings.Join(r.Problems, "; "))}
 		for _, id := range metricIDs {
 			rec = append(rec, num(r.Metrics[id]))

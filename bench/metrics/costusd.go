@@ -41,7 +41,9 @@ func (m *costUSDMetric) Descriptor() schemas.MetricDescriptor {
 // the total unknown. When every unpriced row carries bounds, the total keeps
 // bounds from the observed sum to the observed sum plus their upper bounds,
 // so the missingness analysis can still use it. A not_applicable row adds
-// nothing.
+// nothing. Rows priced from a gateway log that is not complete are only a
+// prefix of the run's spend: the total is unknown and the reason carries the
+// priced subtotal as a lower bound (audit 1-C-05).
 func (m *costUSDMetric) Compute(_ context.Context, _ *schemas.RunContext, ev *schemas.Evidence) (schemas.Value, error) {
 	ev = orEmpty(ev)
 	if len(ev.Cost) == 0 {
@@ -65,6 +67,9 @@ func (m *costUSDMetric) Compute(_ context.Context, _ *schemas.RunContext, ev *sc
 		}
 		upper += row.USD.Bounds[1]
 	}
+	if v, cut := incompleteCost(ev.Requests, observed); cut {
+		return v, nil
+	}
 	if unknown == 0 {
 		return schemas.Observed(observed, schemas.EvidenceGateway), nil
 	}
@@ -73,6 +78,21 @@ func (m *costUSDMetric) Compute(_ context.Context, _ *schemas.RunContext, ev *sc
 		return schemas.Unknown(reason, schemas.EvidenceGateway), nil
 	}
 	return schemas.UnknownWithin(reason, schemas.EvidenceGateway, observed, observed+upper), nil
+}
+
+// incompleteCost returns the unknown value for cost priced from an incomplete
+// gateway log, and true; false when the log is complete. The priced subtotal
+// is a lower bound only: rows still missing may carry any spend.
+func incompleteCost(log *schemas.RequestLog, priced float64) (schemas.Value, bool) {
+	if log == nil {
+		return schemas.Value{}, false // rows come only from a log; none to judge
+	}
+	v, bad := requestLogProblem(log)
+	if !bad {
+		return schemas.Value{}, false
+	}
+	v.Reason = fmt.Sprintf("%s; priced subtotal %.6f USD is a lower bound", v.Reason, priced)
+	return v, true
 }
 
 // noCostReason explains a missing cost ledger. Zero rows never mean zero

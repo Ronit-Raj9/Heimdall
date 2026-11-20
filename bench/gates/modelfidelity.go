@@ -29,8 +29,11 @@ func (g *modelFidelityGate) GetVersion() string { return version }
 // Effect implements schemas.Gate.
 func (g *modelFidelityGate) Effect() schemas.GateEffect { return schemas.GateInvalidate }
 
-// Baseline implements schemas.Gate.
-func (g *modelFidelityGate) Baseline() bool { return false }
+// Baseline implements schemas.Gate. Every experiment is checked: the design
+// promises INVALID above a 5% fidelity failure rate for any experiment
+// whose model service is witnessed by the gateway log, not only those that
+// opt in (audit 1-C-14). A run with no gateway log does not fire.
+func (g *modelFidelityGate) Baseline() bool { return true }
 
 // Check implements schemas.Gate. Per message row it flags a served model that
 // differs from the requested one (after trimming a provider prefix such as
@@ -38,7 +41,9 @@ func (g *modelFidelityGate) Baseline() bool { return false }
 // fallback taken without a declared fallback, and a cache hit. A different
 // served model is accepted only when the row is a fallback attempt and the
 // served model is one the agent's gateway policy declared. Rows without a
-// served model (errors, injected faults) are skipped for the model check.
+// served model (errors, injected faults) are skipped for the model check. A
+// cache hit is intended, and not flagged, for an arm that turns on Bifrost's
+// semantic cache.
 func (g *modelFidelityGate) Check(_ context.Context, rc *schemas.RunContext, ev *schemas.Evidence) (*schemas.GateResult, error) {
 	if ev == nil || ev.Requests == nil {
 		return newResult(g, false, "no gateway log", nil), nil
@@ -53,8 +58,10 @@ func (g *modelFidelityGate) Check(_ context.Context, rc *schemas.RunContext, ev 
 	var swapped, undeclared, cached int
 	var evidence []string
 	var declared []string // X8 voice agents: gateway.models
+	cacheOK := false
 	if rc != nil && rc.Agent != nil {
 		declared = rc.Agent.Gateway.Models
+		cacheOK = rc.Agent.Gateway.Bifrost != nil && rc.Agent.Gateway.Bifrost.SemanticCache != nil
 	}
 	for _, r := range ev.Requests.Requests {
 		if r.Kind == "audio" { // X8 voice agents: an audio row is a swap only when the served model is neither the requested nor a declared one
@@ -76,7 +83,7 @@ func (g *modelFidelityGate) Check(_ context.Context, rc *schemas.RunContext, ev 
 			undeclared++
 			bad = true
 		}
-		if r.CacheHit {
+		if r.CacheHit && !cacheOK {
 			cached++
 			bad = true
 		}

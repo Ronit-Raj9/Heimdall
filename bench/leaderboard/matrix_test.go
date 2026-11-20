@@ -202,3 +202,87 @@ func ones(n int) []float64 {
 	}
 	return d
 }
+
+// The matrix applies the board's experiment eligibility: an INVALID verdict
+// or a live external experiment ranks nothing and says why (finding 1-D-05).
+func TestMatrixExperimentEligibility(t *testing.T) {
+	pass := func(arm string, task, trial int) bool { return arm == "A" }
+	m, runs := matrixFixture([]string{"A", "B"}, 8, 1, pass)
+	mx, err := Matrix(m, runs, false, MatrixQuery{Invalid: true})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(mx.Rows) != 0 || !mx.Invalid || len(mx.Excluded) != 1 || mx.Excluded[0].Reason != ReasonVerdictInvalid || mx.Excluded[0].Runs != 16 {
+		t.Fatalf("invalid experiment: rows %d invalid %v excluded %+v", len(mx.Rows), mx.Invalid, mx.Excluded)
+	}
+	m.Experiment.External = schemas.ExternalLive
+	mx, err = Matrix(m, runs, false, MatrixQuery{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(mx.Rows) != 0 || len(mx.Excluded) != 1 || mx.Excluded[0].Reason != ReasonExternalLive {
+		t.Fatalf("external live: rows %d excluded %+v", len(mx.Rows), mx.Excluded)
+	}
+}
+
+// The matrix reads one frozen split: held-out tasks stay out of the default
+// public matrix and only they enter the held-out one (finding 1-D-02).
+func TestMatrixHeldOutSplit(t *testing.T) {
+	m, runs := matrixFixture([]string{"A", "B"}, 8, 1, func(arm string, task, trial int) bool { return arm == "A" })
+	m.HeldOutTasks = []string{"t07", "t08"}
+	pub, err := Matrix(m, runs, false, MatrixQuery{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	held, err := Matrix(m, runs, false, MatrixQuery{Split: schemas.SplitHeldOut})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if pub.Tasks != 6 || pub.Split != "" || held.Tasks != 2 || held.Split != schemas.SplitHeldOut {
+		t.Fatalf("public tasks %d split %q, held-out tasks %d split %q", pub.Tasks, pub.Split, held.Tasks, held.Split)
+	}
+	if _, err := Matrix(m, runs, false, MatrixQuery{Split: "both"}); err == nil {
+		t.Fatal("unknown split accepted")
+	}
+}
+
+// Three arms on eight tasks with one tie: seven same-direction differences
+// separate a pair after Holm across 3 pairs (2/128 times 3 = 0.046875), as
+// docs/model-matrix.md now says (finding 1-D-10).
+func TestMatrixSevenDifferingTasksSeparate(t *testing.T) {
+	m, runs := matrixFixture([]string{"A", "B", "C"}, 8, 1, func(arm string, task, trial int) bool { return arm != "B" || task == 1 })
+	mx, err := Matrix(m, runs, false, MatrixQuery{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !mx.Separable {
+		t.Fatalf("not separable: %s", mx.Note)
+	}
+	sig := 0
+	for _, p := range mx.Pairs {
+		if p.PAdjusted != nil && math.Abs(*p.PAdjusted-0.046875) < 1e-9 && *p.PAdjusted < mx.Alpha {
+			sig++
+		}
+	}
+	if sig != 2 {
+		t.Fatalf("pairs %+v, want A-B and C-B at adjusted p 0.046875", mx.Pairs)
+	}
+}
+
+// A matrix pair with more than stats.ExactMaxNonzero differing tasks carries
+// its draw count and the note does not call the test exact (audit 1-B-07).
+func TestMatrixPairsMarkSampledP(t *testing.T) {
+	x, y := &entryCalc{rates: map[string]float64{}}, &entryCalc{rates: map[string]float64{}}
+	for i := range 23 {
+		task := fmt.Sprintf("t%02d", i)
+		x.rates[task], y.rates[task] = 1, 0
+	}
+	calcs := []*entryCalc{x, y}
+	pairs := matrixPairs(calcs, map[*entryCalc]string{x: "A", y: "B"}, DefaultAlpha)
+	if len(pairs) != 1 || pairs[0].PDraws != stats.MonteCarloDraws {
+		t.Fatalf("pairs %+v", pairs)
+	}
+	if _, note := separability(calcs, pairs, DefaultAlpha); !strings.Contains(note, "sampled") || strings.Contains(note, "Exact sign-flip") {
+		t.Fatalf("note %q", note)
+	}
+}

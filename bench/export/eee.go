@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"slices"
 	"sort"
 	"strconv"
 	"strings"
@@ -29,6 +30,9 @@ const EEESchemaCommit = "0791adc3c2488cc8c91d109b3c541da492238e49"
 
 //go:embed schemas/eee/eval.schema.json
 var eeeSchemaJSON []byte
+
+// ErrInvalid refuses to export an experiment whose verdict is INVALID.
+var ErrInvalid = errors.New("the experiment's newest verdict is INVALID: its instrument failed, so its results are not findings and are not exported")
 
 // ErrSynthetic refuses to export synthetic results (scripted agent, scripted
 // model or smoke experiment) as if they were findings.
@@ -60,6 +64,40 @@ type EEEInput struct {
 	Manifest  *schemas.Manifest
 	Runs      []schemas.SealedRun
 	Synthetic map[string]bool // arm id -> synthetic (leaderboard.SyntheticArms)
+	// Invalid is true when the experiment's newest analysis decided
+	// INVALID. EEE refuses such an experiment (ErrInvalid); the flat run
+	// table still lists its runs, labelled.
+	Invalid bool
+	// Split selects the frozen held-out split of the flat run table
+	// (RunTable): "" or public drops every run of a held-out task,
+	// held_out keeps only those, all keeps both. EEE always publishes the
+	// public split.
+	Split string
+}
+
+// SplitAll is the private run-table split that keeps public and held-out
+// task runs, each row labelled with its split.
+const SplitAll = "all"
+
+// ValidSplit reports whether s is a run-table split.
+func ValidSplit(s string) bool {
+	return s == "" || s == schemas.SplitPublic || s == schemas.SplitHeldOut || s == SplitAll
+}
+
+// heldOut reports whether the manifest's frozen plan holds task out.
+func heldOut(m *schemas.Manifest, task string) bool {
+	return m != nil && slices.Contains(m.HeldOutTasks, task)
+}
+
+// inSplit reports whether a run of task belongs to split.
+func inSplit(m *schemas.Manifest, task, split string) bool {
+	switch split {
+	case SplitAll:
+		return true
+	case schemas.SplitHeldOut:
+		return heldOut(m, task)
+	}
+	return !heldOut(m, task)
 }
 
 // EEERecord is one Every Eval Ever aggregate record (EvaluationLog), kept as
@@ -87,6 +125,9 @@ func EEE(ctx context.Context, in EEEInput, opts EEEOptions) ([]EEERecord, error)
 	anySynthetic := false
 	for _, s := range in.Synthetic {
 		anySynthetic = anySynthetic || s
+	}
+	if in.Invalid {
+		return nil, ErrInvalid
 	}
 	if anySynthetic && !opts.AllowSynthetic {
 		return nil, ErrSynthetic
@@ -118,7 +159,7 @@ func EEE(ctx context.Context, in EEEInput, opts EEEOptions) ([]EEERecord, error)
 	if now.IsZero() {
 		now = time.Now()
 	}
-	seals := sealsByArm(in.Runs)
+	seals, excludedSeals := sealsByArm(m, in.Runs, byCond)
 	arms := make([]string, 0, len(m.Arms))
 	for id := range m.Arms {
 		arms = append(arms, id)
@@ -137,7 +178,7 @@ func EEE(ctx context.Context, in EEEInput, opts EEEOptions) ([]EEERecord, error)
 		if len(results) == 0 {
 			continue
 		}
-		rec := armRecord(m, arm, in.Synthetic[arm], results, seals[arm], opts, rel, now)
+		rec := armRecord(m, arm, in.Synthetic[arm], results, seals[arm], excludedSeals[arm], opts, rel, now)
 		if err := ValidateEEE(rec); err != nil {
 			return nil, fmt.Errorf("export eee: arm %s: the record does not validate against the vendored schema: %w", arm, err)
 		}
@@ -168,18 +209,30 @@ func rowOf(mx *schemas.ModelMatrix, arm string) *schemas.MatrixRow {
 	return nil
 }
 
-// sealsByArm lists each arm's run seal hashes, sorted.
-func sealsByArm(runs []schemas.SealedRun) map[string][]string {
-	out := map[string][]string{}
+// sealsByArm lists, per arm and sorted, the seal hashes of the runs the
+// results were computed from: counted public-split runs with no evidence
+// problem whose outcome scores, on a condition with a result. A run of the
+// sample that was left out (a seal that did not verify, a duplicate counted
+// run, an outcome that does not score) is listed separately, so the
+// provenance never names a seal that failed verification (finding 1-D-11).
+func sealsByArm(m *schemas.Manifest, runs []schemas.SealedRun, byCond map[string]*schemas.ModelMatrix) (used, excluded map[string][]string) {
+	used, excluded = map[string][]string{}, map[string][]string{}
 	for _, r := range runs {
-		if r.SealHash != "" {
-			out[r.Slot.Arm] = append(out[r.Slot.Arm], r.SealHash)
+		if r.SealHash == "" || !r.Slot.Counted || !inSplit(m, r.Slot.Task, schemas.SplitPublic) || byCond[r.Slot.Condition] == nil {
+			continue
+		}
+		if _, scores := r.Run.Outcome.Score(); scores && len(r.Problems) == 0 {
+			used[r.Slot.Arm] = append(used[r.Slot.Arm], r.SealHash)
+		} else {
+			excluded[r.Slot.Arm] = append(excluded[r.Slot.Arm], r.SealHash)
 		}
 	}
-	for k := range out {
-		sort.Strings(out[k])
+	for _, m := range []map[string][]string{used, excluded} {
+		for k := range m {
+			sort.Strings(m[k])
+		}
 	}
-	return out
+	return used, excluded
 }
 
 // modelID is model_info.id: provider/model, the form the schema's examples
@@ -195,7 +248,7 @@ func modelID(provider, model string) string {
 }
 
 // armRecord builds the EvaluationLog of one arm.
-func armRecord(m *schemas.Manifest, arm string, synthetic bool, results []any, seals []string, opts EEEOptions, rel string, now time.Time) EEERecord {
+func armRecord(m *schemas.Manifest, arm string, synthetic bool, results []any, seals, excludedSeals []string, opts EEEOptions, rel string, now time.Time) EEERecord {
 	a := m.Arms[arm]
 	cfg := a.Config
 	provider := cfg.Gateway.Provider
@@ -209,12 +262,20 @@ func armRecord(m *schemas.Manifest, arm string, synthetic bool, results []any, s
 		"heimdall_manifest_hash":   m.Hash,
 		"heimdall_suite_lock_hash": m.SuiteLockHash,
 		"heimdall_runs_sealed":     strconv.Itoa(len(seals)),
+		"heimdall_split":           schemas.SplitPublic, // held-out task runs are never published
 		"heimdall_seal_set_sha256": utils.SHA256Bytes([]byte(strings.Join(seals, "\n"))),
 		"heimdall_synthetic":       strconv.FormatBool(synthetic),
 		"heimdall_grade_source":    firstNonEmpty(opts.GradeSource, schemas.GradeSourceOriginal),
 	}
 	if b, err := json.Marshal(seals); err == nil {
 		src["heimdall_seal_hashes"] = string(b)
+	}
+	if len(excludedSeals) > 0 {
+		// Runs of the sample left out of the results; not provenance.
+		src["heimdall_runs_excluded"] = strconv.Itoa(len(excludedSeals))
+		if b, err := json.Marshal(excludedSeals); err == nil {
+			src["heimdall_excluded_seal_hashes"] = string(b)
+		}
 	}
 	if m.FingerprintHash != "" {
 		src["heimdall_fingerprint_hash"] = m.FingerprintHash

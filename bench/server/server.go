@@ -161,7 +161,8 @@ func registerOrgRoutes(r *router.Router, cfg *lib.Config, deps Deps, write lib.M
 	handlers.NewReadinessHandler(mode, deps.Version, deps.Ready).RegisterRoutes(r, common...) // Deploy area: GET /healthz and /readyz at the site root (handlers/readiness.go)
 	handlers.NewCatalogHandler(mode, deps.Catalog).RegisterRoutes(r, common...)
 	experiments.RegisterRoutes(r, common...)
-	handlers.NewRunsHandler(mode, deps.Index).WithSuites(deps.Suites).RegisterRoutes(r, common...)
+	// Held-out tasks: a held-out task's run content needs held_out.visible too.
+	handlers.NewRunsHandler(mode, deps.Index).WithSuites(deps.Suites).WithHeldOutVisible(cfg.HeldOut.Visible).RegisterRoutes(r, common...)
 	handlers.NewRunListHandler(mode, deps.Index, deps.Suites).RegisterRoutes(r, common...) // UI regroup (U2): GET /runs (handlers/runlist.go)
 	handlers.NewPairsHandler(mode, deps.Index).RegisterRoutes(r, common...)
 	handlers.NewTriageHandler(mode, deps.Index, deps.Catalog).RegisterRoutes(r, common...)
@@ -185,10 +186,10 @@ func registerOrgRoutes(r *router.Router, cfg *lib.Config, deps Deps, write lib.M
 	handlers.NewTrendsHandler(mode, deps.Trends).RegisterRoutes(r, common...)
 	// Human review area: review queue and history, POST /reviews behind the write token (handlers/reviews.go, docs/human-review.md).
 	handlers.NewReviewsHandler(mode, deps.Reviews, write).RegisterRoutes(r, common...)
-	handlers.NewInboxHandler(mode, deps.Inbox, write).RegisterRoutes(r, common...) // Failure inbox area (handlers/inbox.go, docs/failure-inbox.md)
-	handlers.NewRoutingHandler(mode, deps.Index).RegisterRoutes(r, common...)      // W9 routing policy under test (handlers/routing.go)
-	handlers.NewSupportHandler(mode, deps.Index).RegisterRoutes(r, common...)      // W3 customer support scorecard (handlers/support.go)
-	handlers.NewResearchHandler(mode, deps.Index).RegisterRoutes(r, common...)     // W4 research with Tavily scorecard (handlers/research.go)
+	handlers.NewInboxHandler(mode, deps.Inbox, write).RegisterRoutes(r, common...)                                    // Failure inbox area (handlers/inbox.go, docs/failure-inbox.md)
+	handlers.NewRoutingHandler(mode, deps.Index).WithHeldOutVisible(cfg.HeldOut.Visible).RegisterRoutes(r, common...) // W9 routing policy under test (handlers/routing.go)
+	handlers.NewSupportHandler(mode, deps.Index).RegisterRoutes(r, common...)                                         // W3 customer support scorecard (handlers/support.go)
+	handlers.NewResearchHandler(mode, deps.Index).RegisterRoutes(r, common...)                                        // W4 research with Tavily scorecard (handlers/research.go)
 	// W7 adaptive trials and suite tiers: the trials and tier panel (handlers/adaptive.go, docs/adaptive-trials.md).
 	handlers.NewAdaptiveHandler(mode, deps.Index, deps.Analyzer).RegisterRoutes(r, common...)
 	// W8 judge calibration: calibration card and labels (handlers/calibration.go, docs/judge-calibration.md).

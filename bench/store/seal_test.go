@@ -2,6 +2,7 @@ package store
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"os"
@@ -363,5 +364,59 @@ func TestSealRefusesSymlink(t *testing.T) {
 	}
 	if sealed, err := isSealed(s.runDir(r)); err != nil || sealed {
 		t.Fatalf("sealed = %v, %v after refusal", sealed, err)
+	}
+}
+
+// Audit 1-A-05: a run with a canonical record is current-format evidence and
+// seals only with every mandatory artifact present. The seal records its
+// format so Verify can tell it from a legacy seal, which keeps verifying.
+func TestSealRequiresMandatoryArtifacts(t *testing.T) {
+	ctx := context.Background()
+	s := newTestStore(t, nil)
+	m := mustCreateExp(t, s, "e_test")
+	canonical := `{"canonical_version":"1.0"}`
+	r := mustNewRun(t, s, m, "s_a1", "r_1", 1, schemas.OutcomePass)
+	r.CanonicalHash = "sha256:" + utils.SHA256Bytes([]byte(canonical))
+	mustWrite(t, s, r, "canonical.json", canonical)
+	mustWrite(t, s, r, "evidence.json", `{}`)
+	_, err := s.Seal(ctx, r)
+	if !errors.Is(err, schemas.ErrSealMismatch) || !strings.Contains(err.Error(), "gates.json, grade.json, plan.json") {
+		t.Fatalf("incomplete run err = %v, want missing gates.json, grade.json, plan.json", err)
+	}
+	if sealed, err := isSealed(s.runDir(r)); err != nil || sealed {
+		t.Fatalf("sealed = %v, %v after refusal", sealed, err)
+	}
+	mustWrite(t, s, r, "gates.json", `[]`)
+	mustWrite(t, s, r, "grade.json", `null`)
+	mustWrite(t, s, r, "plan.json", `{}`)
+	b, err := json.Marshal(r)
+	if err != nil {
+		t.Fatal(err)
+	}
+	mustWrite(t, s, r, "run.json", string(b))
+	rec, err := s.Seal(ctx, r)
+	if err != nil {
+		t.Fatalf("complete run: %v", err)
+	}
+	if rec.Format != SealFormatV1 {
+		t.Fatalf("format = %q, want %q", rec.Format, SealFormatV1)
+	}
+	if err := s.Verify(ctx, "e_test", r.RunID); err != nil {
+		t.Fatalf("verify: %v", err)
+	}
+
+	legacy := mustNewRun(t, s, m, "s_b1", "r_2", 1, schemas.OutcomePass)
+	lrec := mustSeal(t, s, legacy)
+	if lrec.Format != "" {
+		t.Fatalf("legacy format = %q, want empty", lrec.Format)
+	}
+	if err := s.Verify(ctx, "e_test", legacy.RunID); err != nil {
+		t.Fatalf("legacy verify: %v", err)
+	}
+	if got := missingArtifacts(SealFormatV1, map[string]string{"run.json": "x"}); len(got) != 5 {
+		t.Fatalf("missing = %v", got)
+	}
+	if got := missingArtifacts("run/9", nil); len(got) != 1 {
+		t.Fatalf("unknown format missing = %v", got)
 	}
 }

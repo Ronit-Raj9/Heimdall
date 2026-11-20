@@ -144,3 +144,44 @@ func TestGradeSealMismatch(t *testing.T) {
 		})
 	}
 }
+
+// One run's damaged or unparsable proxy ledger never fails the board: a run
+// whose seal does not verify is checked before its ledger is read, and a
+// verified run with an unparsable ledger is excluded on its own (finding
+// 1-D-06).
+func TestBuildDamagedLedgerExcludesOnlyThatRun(t *testing.T) {
+	f := newFake()
+	f.exp("e_ok", "s@1", 0, map[string]schemas.ArmManifest{"A": arm("a", "h", "command")})
+	f.exp("e_bad", "s@1", 1, map[string]schemas.ArmManifest{"A": arm("b", "g", "command")})
+	good := f.pass("e_ok", "t1", "A", "clean", 1, 0.1)
+	tampered := f.pass("e_bad", "t1", "A", "clean", 1, 0.1)
+	torn := f.pass("e_bad", "t2", "A", "clean", 1, 0.1)
+	f.files[tampered][fileLedger] = []byte(`{not json`)
+	f.files[torn][fileLedger] = []byte(`{"seq":`)
+	src := sealedSource{f, map[string]error{tampered: fmt.Errorf("ledger changed: %w", schemas.ErrSealMismatch)}}
+	lb, err := Build(context.Background(), src, Query{})
+	if err != nil {
+		t.Fatalf("Build failed on one damaged ledger: %v", err)
+	}
+	reasons := map[string]int{}
+	for _, x := range lb.Excluded {
+		reasons[x.Reason] += x.Runs
+	}
+	if reasons[ReasonSealMismatch] != 1 || reasons[ReasonEvidenceUnreadable] != 1 {
+		t.Fatalf("excluded %+v, want one seal mismatch and one unreadable ledger", lb.Excluded)
+	}
+	found := false
+	for _, e := range lb.Entries {
+		found = found || e.ConfigHash == "h"
+	}
+	if !found || good == "" {
+		t.Fatalf("entries %+v, want the healthy experiment ranked", lb.Entries)
+	}
+	// A ledger that cannot be read at all excludes its runs the same way.
+	broken := boardSource()
+	broken.fileErr = errors.New("disk on fire")
+	lb, err = Build(context.Background(), broken, Query{})
+	if err != nil || len(lb.Entries) != 0 {
+		t.Fatalf("unreadable files: entries %d err %v, want every run excluded", len(lb.Entries), err)
+	}
+}

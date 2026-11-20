@@ -36,7 +36,7 @@ func (m *retryAmplificationMetric) Descriptor() schemas.MetricDescriptor {
 }
 
 // Compute implements schemas.Metric. A row without an attempt trail still went
-// upstream once. Unlike steps, the denominator keeps logical requests that
+// upstream once, unless it was a cache hit. Unlike steps, the denominator keeps logical requests that
 // only ever failed: those are where the amplification happens.
 func (m *retryAmplificationMetric) Compute(_ context.Context, _ *schemas.RunContext, ev *schemas.Evidence) (schemas.Value, error) {
 	ev = orEmpty(ev)
@@ -49,7 +49,7 @@ func (m *retryAmplificationMetric) Compute(_ context.Context, _ *schemas.RunCont
 	}
 	physical := 0
 	for _, r := range messageRows(ev.Requests.Requests) {
-		physical += max(1, len(r.Attempts))
+		physical += upstreamAttempts(r)
 	}
 	return schemas.Observed(float64(physical)/float64(len(logical)), schemas.EvidenceGateway), nil
 }

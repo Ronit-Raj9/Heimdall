@@ -94,7 +94,8 @@ type Effect struct {
 	NPositive   int         `json:"n_positive"`
 	NNegative   int         `json:"n_negative"`
 	DBar        float64     `json:"d_bar"`
-	PValue      *float64    `json:"p_value,omitempty"`  // exact sign-flip, two-sided; nil when descriptive
+	PValue      *float64    `json:"p_value,omitempty"`  // sign-flip, two-sided; nil when descriptive
+	PDraws      int         `json:"p_draws,omitempty"`  // Monte Carlo sign vectors behind PValue; 0 when PValue is exact (audit 1-B-07)
 	Interval    *[2]float64 `json:"interval,omitempty"` // paired t, descriptive only
 	PerTask     []TaskDiff  `json:"per_task"`
 	LowerBound  *Effect     `json:"lower_bound,omitempty"` // unknowns set against B
