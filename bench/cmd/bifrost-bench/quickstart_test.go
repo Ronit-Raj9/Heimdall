@@ -1,18 +1,22 @@
 package main
 
 import (
+	"bytes"
 	"context"
 	"errors"
 	"os"
 	"os/exec"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/maximhq/bifrost/bench/lib"
 	"github.com/maximhq/bifrost/bench/quickstart"
 	"github.com/maximhq/bifrost/bench/scaffold"
 	"github.com/maximhq/bifrost/bench/schemas"
+	"github.com/maximhq/bifrost/bench/suite"
 )
 
 // First workflow tests: init inside a repository, compare's experiment
@@ -53,6 +57,36 @@ func quickRepo(t *testing.T) (string, string, string) {
 	gitFixture(t, dir, "-c", "user.name=T", "-c", "user.email=t@example.com", "commit", "-q", "-m", "add keeps the sign")
 	ref := gitFixture(t, dir, "rev-parse", "HEAD")
 	return dir, base, ref
+}
+
+// TestCompareRefsRefusesUnusedPromptChange is audit 5-B-01: a change only
+// under prompts/ never reaches either arm, so the comparison is refused
+// instead of reporting a verdict for a treatment that did not run.
+func TestCompareRefsRefusesUnusedPromptChange(t *testing.T) {
+	dir, _, _ := initQuickRepo(t)
+	cfg, err := lib.LoadConfig(filepath.Join(dir, ".heimdall", "deploy", "bench.yaml"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	commit := func(content string) string {
+		if err := os.MkdirAll(filepath.Join(dir, "prompts"), 0o755); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(filepath.Join(dir, "prompts", "style.txt"), []byte(content), 0o644); err != nil {
+			t.Fatal(err)
+		}
+		gitFixture(t, dir, "add", "prompts")
+		gitFixture(t, dir, "commit", "-q", "-m", "prompt "+content)
+		return gitFixture(t, dir, "rev-parse", "HEAD")
+	}
+	a, b := commit("terse\n"), commit("verbose\n")
+	for name, paths := range map[string]string{"prompt-only-explicit": "prompts", "prompt-only-default": strings.Join(scaffold.DefaultAgentPaths, ",")} {
+		f := compareFlags{baseline: a, candidate: b, trials: 1, repo: dir, paths: paths, name: name}
+		_, err := buildCompare(context.Background(), f, cfg)
+		if err == nil || !strings.Contains(err.Error(), "prompts/style.txt") {
+			t.Errorf("paths %s: prompt-only change accepted: %v", paths, err)
+		}
+	}
 }
 
 // fakeMachine is a probe with no agent CLI, Docker up and every port free.
@@ -270,6 +304,84 @@ func TestMineLockCarryRules(t *testing.T) {
 	for _, other := range []schemas.Fingerprint{{Settings: "x", Files: "f"}, {Settings: "s", Files: "x", Images: fp.Images}, {Settings: "s", Files: "f", Images: map[string]string{"task": "sha256:2"}}} {
 		if sameFingerprint(fp, other) {
 			t.Errorf("%+v counted as equal", other)
+		}
+	}
+}
+
+// TestMineCarryDropsAfterSuiteDrift is audit 5-B-03: a prior admission is
+// not carried into the new lock when a suite-only evaluator setting changed
+// after it was admitted, even though suite.yaml is the same at the start
+// and end of the mining or review command.
+func TestMineCarryDropsAfterSuiteDrift(t *testing.T) {
+	dir, base, ref := initQuickRepo(t)
+	ctx := t.Context()
+	root := filepath.Join(dir, ".heimdall")
+	suiteRoot := filepath.Join(root, "benchmarks", "lib")
+	const id = "m-1"
+	if _, err := scaffold.InitTask(ctx, scaffold.TaskInitOptions{
+		SuiteDir: suiteRoot, ID: id, Repo: dir, Base: base, Reference: ref, ExcludeDir: root,
+	}); err != nil {
+		t.Fatal(err)
+	}
+	a, err := newApp(ctx, filepath.Join(root, "deploy", "bench.yaml"), appOptions{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	s, err := loadSuite(ctx, filepath.Join(root, "benchmarks"), "lib")
+	if err != nil {
+		t.Fatal(err)
+	}
+	opts := lockFingerprintOptions(ctx, a.cfg, a.docker, false)
+	l, err := suite.LockWith(s, time.Now().UTC(), opts)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := suite.RecordAdmission(l, id, &schemas.AdmissionRecord{Admitted: true, ReferenceRepeats: 3}); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := suite.WriteLock(filepath.Join(suiteRoot, "suite.lock"), l); err != nil {
+		t.Fatal(err)
+	}
+	suitePath := filepath.Join(suiteRoot, "suite.yaml")
+	spec, err := os.ReadFile(suitePath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	edited := bytes.Replace(spec, []byte("timeout_s: 300"), []byte("timeout_s: 301"), 1)
+	if bytes.Equal(edited, spec) {
+		t.Fatal("fixture suite.yaml has no timeout_s: 300")
+	}
+	if err := os.WriteFile(suitePath, edited, 0o644); err != nil {
+		t.Fatal(err)
+	}
+	// The command starts after the edit: before and after are equal.
+	dropped, err := recordProofs(ctx, a, "lib", edited, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	s, err = loadSuite(ctx, filepath.Join(root, "benchmarks"), "lib")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := s.Lock.Tasks[id]; got.Status != schemas.TaskDraft || !slices.Contains(dropped, id) {
+		t.Fatalf("stale admission carried across a suite verifier change: status %s, dropped %v", got.Status, dropped)
+	}
+}
+
+func TestSameSuiteExceptTasks(t *testing.T) {
+	fp := schemas.Fingerprint{Settings: "s1", Fields: map[string]string{"tasks": "t1", "verifier": "v"}, Files: "f", Images: map[string]string{"base": "i"}}
+	tasksOnly := schemas.Fingerprint{Settings: "s2", Fields: map[string]string{"tasks": "t2", "verifier": "v"}, Files: "f", Images: map[string]string{"base": "i"}}
+	if !sameSuiteExceptTasks(fp, tasksOnly) {
+		t.Error("a tasks-list change counted as suite drift")
+	}
+	for _, other := range []schemas.Fingerprint{
+		{Fields: map[string]string{"tasks": "t1", "verifier": "v2"}, Files: "f", Images: fp.Images},
+		{Fields: fp.Fields, Files: "f2", Images: fp.Images},
+		{Fields: fp.Fields, Files: "f", Images: map[string]string{"base": "j"}},
+		{Settings: "s1", Files: "f", Images: fp.Images},
+	} {
+		if sameSuiteExceptTasks(fp, other) {
+			t.Errorf("%+v counted as the same suite", other)
 		}
 	}
 }

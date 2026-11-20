@@ -307,6 +307,59 @@ func TestOTLPDirPull(t *testing.T) {
 	checkNoLeak(t, ib.Store.(*FileStore).Dir())
 }
 
+// TestPullFailedSessionWriteRetries is audit 5-C-05: when the session of a
+// new item cannot be written, no item is listed and the source position is
+// not advanced, so the next pull takes the trace in with its session.
+func TestPullFailedSessionWriteRetries(t *testing.T) {
+	dir := t.TempDir()
+	cfg := &Config{Sources: []Source{{Name: "collector", Kind: KindOTLPDir, Path: dir}}}
+	ib, _ := newTestInbox(t, cfg, nil)
+	s := map[string]any{"traceId": "dddddddddddddddd4444444444444444", "spanId": "dddddddd0001", "name": "execute_tool book",
+		"startTimeUnixNano": fmt.Sprint(testNow.Add(-time.Hour).UnixNano()), "endTimeUnixNano": fmt.Sprint(testNow.Add(-time.Hour + time.Second).UnixNano()),
+		"attributes": []any{map[string]any{"key": "gen_ai.operation.name", "value": map[string]any{"stringValue": "execute_tool"}},
+			map[string]any{"key": "gen_ai.tool.name", "value": map[string]any{"stringValue": "book_table"}}},
+		"status": map[string]any{"code": 2, "message": "boom"}}
+	b, _ := json.Marshal(map[string]any{"resourceSpans": []any{map[string]any{"scopeSpans": []any{map[string]any{"spans": []any{s}}}}}})
+	if err := os.WriteFile(filepath.Join(dir, "traces.jsonl"), append(b, '\n'), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	store := ib.Store.(*FileStore).Dir()
+	if err := os.MkdirAll(store, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	blocker := filepath.Join(store, ItemsDir)
+	if err := os.WriteFile(blocker, []byte("not a folder"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	res, err := ib.Pull(context.Background(), PullOptions{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if res[0].Fetched != 1 || res[0].New != 0 || len(res[0].Warnings) == 0 {
+		t.Fatalf("blocked pull = %+v", res[0])
+	}
+	if items, _ := ib.Store.Items(); len(items) != 0 {
+		t.Fatalf("an item without its session was listed: %+v", items)
+	}
+	if err := os.Remove(blocker); err != nil {
+		t.Fatal(err)
+	}
+	res, err = ib.Pull(context.Background(), PullOptions{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if res[0].Fetched != 1 || res[0].New != 1 {
+		t.Fatalf("retry pull = %+v, want the trace taken in", res[0])
+	}
+	items, _ := ib.Store.Items()
+	if len(items) != 1 {
+		t.Fatalf("items = %d", len(items))
+	}
+	if _, err := ib.Store.Session(items[0].ID); err != nil {
+		t.Fatalf("session of %s: %v", items[0].ID, err)
+	}
+}
+
 func TestGate(t *testing.T) {
 	g := NewGate("tok-123", 2, 100)
 	if !g.Enabled() || !g.Check("Bearer tok-123") || !g.Check("tok-123") || g.Check("Bearer tok-1234") || g.Check("") || g.Check("Bearer ") {

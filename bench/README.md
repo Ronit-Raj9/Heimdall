@@ -318,8 +318,10 @@ make up        # builds the binary, UI and images, creates deploy/.env with rand
 make doctor    # preflight: docker, images, internal network, egress blocked, suite lock, gateway, fault proxy, provider reachability
 make smoke     # no API key needed: toy agent + scripted model through real Bifrost, clean and model-outage
 make serve     # web UI and API on http://127.0.0.1:8090
-make down      # stop the stack
+make down      # stop the stack; keeps the Postgres, Bifrost data and fault-proxy ledger volumes
 ```
+
+`make clean-volumes` is the explicit reset: it stops the stack and deletes those volumes, so gateway-side state and any fault-proxy ledger entries not yet collected into a run are lost. Sealed run folders under `runs/` are on the host and are not touched by either target.
 
 With a provider key in `deploy/.env` (only the fault proxy ever sees it):
 

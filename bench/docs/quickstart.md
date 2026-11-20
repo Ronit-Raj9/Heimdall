@@ -414,6 +414,11 @@ still yours:
    default) and reads the agent's own files at both refs: `AGENTS.md`,
    `CLAUDE.md`, `GEMINI.md`, `.claude/skills`, `skills`, `prompts` and a
    committed `.heimdall/agents/<agent>.yaml` (`--paths` changes the list).
+   Only the notes file, skill folders and that committed config reach the
+   runs. A difference anywhere else (a file under `prompts/`, another
+   agent's config) is refused with the file named, since both arms would
+   run the same inputs; reference a prompt from the committed config so it
+   is part of the config change.
    A model swap is `--a model=<m1> --b model=<m2>`.
 7. **Wire CI.** Commit `.heimdall/` (its `.gitignore` keeps `runs/` and
    `deploy/.env` out) and the workflow. Recorded mode needs one sealed

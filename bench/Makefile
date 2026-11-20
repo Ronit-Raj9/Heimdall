@@ -3,7 +3,8 @@
 #   make up        build everything, create deploy/.env if missing, start Bifrost, Postgres and the fault proxy
 #   make smoke     a no-key end-to-end run: toy agent, scripted model, clean and model-outage
 #   make serve     the web UI and API on http://127.0.0.1:8090
-#   make down      stop the stack and remove its volumes
+#   make down      stop the stack; named volumes (Postgres, Bifrost data, fault-proxy ledger) are kept
+#   make clean-volumes  stop the stack and delete those volumes (gateway state and uncollected ledger evidence)
 
 GO      ?= go
 GOENV   := GOWORK=off
@@ -11,7 +12,7 @@ BIN     := bin/bifrost-bench
 COMPOSE := docker compose -f deploy/docker-compose.yml --env-file deploy/.env
 WITHENV := set -a; . deploy/.env; set +a;
 
-.PHONY: help build bin heimdall ui test test-integration images env up down admit doctor smoke serve demo clean hosted-image hosted-smoke
+.PHONY: help build bin heimdall ui test test-integration images env up down clean-volumes admit doctor smoke serve demo clean hosted-image hosted-smoke
 
 help: ## Show targets
 	@grep -E '^[a-z-]+:.*## ' $(MAKEFILE_LIST) | awk -F':.*## ' '{printf "  %-18s %s\n", $$1, $$2}'
@@ -57,7 +58,10 @@ env: ## Create deploy/.env with random tokens if it does not exist
 up: env images ## Start the gateway stack
 	$(COMPOSE) up -d --wait
 
-down: ## Stop the stack and remove its volumes
+down: ## Stop the stack (named volumes are kept)
+	$(COMPOSE) down
+
+clean-volumes: ## Stop the stack AND delete its volumes: Bifrost data, its Postgres, the fault-proxy ledger
 	$(COMPOSE) down -v
 
 admit: bin ## Run admission for every task and write suite.lock

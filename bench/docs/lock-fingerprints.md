@@ -122,6 +122,14 @@ fingerprints, so it is no longer admitted; run suite admit`). Records written
 before fingerprints existed carry none and are taken as they are, so adding
 fingerprints to an admitted pack keeps it admitted.
 
+`tasks mine` and `task review` re-record the admissions of the previous lock
+when they write a new one. A record is carried only when its task
+fingerprint and the previous lock's suite fingerprint (every settings field
+except `tasks`, the suite files and the image identities) equal the new
+lock's; adding task ids is the one suite change allowed. Any other suite
+change, even one made before the command started, drops the record and the
+task needs `task admit` again.
+
 Images: a tag-only identity needs the same tag and nothing else, so a lock
 in this repository plans on any machine that built the same Dockerfiles. A
 recorded registry digest that the image no longer has, or a pinned local id

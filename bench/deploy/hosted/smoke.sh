@@ -28,12 +28,15 @@
 #   - with --s3: a local S3 endpoint (SeaweedFS, pinned) as the evidence
 #     mirror; backup.sh then uploads a database dump and mirrors the demo
 #     experiments, and `evidence list` must show both
-#   - tears everything down (volumes included), also on failure
+#   - tears everything down (volumes included), also on failure; only a
+#     project this invocation created is ever torn down
 #
 #   deploy/hosted/smoke.sh [--keep] [--no-build] [--demo-runner] [--s3]
 #
 # Environment: SMOKE_HTTPS_PORT (default 47443), SMOKE_HTTP_PORT (47080),
-# SMOKE_PROJECT (heimdall-smoke), SMOKE_IMAGE (heimdall/server:smoke),
+# SMOKE_PROJECT (default heimdall-smoke-<UTC time>-<pid>, unique per
+# invocation; a name that already has containers, volumes or networks is
+# refused), SMOKE_IMAGE (heimdall/server:smoke),
 # SMOKE_RUNNER_IMAGE (heimdall/runner:smoke): separate from the production
 # tags, so a smoke run on a live host never replaces its images. Needs
 # docker, curl, jq and openssl.
@@ -56,7 +59,7 @@ need docker curl jq openssl
 
 https_port=${SMOKE_HTTPS_PORT:-47443}
 http_port=${SMOKE_HTTP_PORT:-47080}
-export HEIMDALL_PROJECT=${SMOKE_PROJECT:-heimdall-smoke}
+export HEIMDALL_PROJECT=${SMOKE_PROJECT:-heimdall-smoke-$(date -u +%Y%m%d%H%M%S)-$$}
 domain=heimdall.localhost
 origin=https://$domain:$https_port
 
@@ -66,6 +69,16 @@ for p in "$https_port" "$http_port"; do
 	case $p in 80 | 443 | 5432 | 8090 | 809[2-7] | 18080 | 19101) die "port $p is reserved; pick another SMOKE_*_PORT" ;; esac
 	if (exec 3<>"/dev/tcp/127.0.0.1/$p") 2>/dev/null; then die "port $p is already in use on 127.0.0.1"; fi
 done
+# Teardown deletes the project's volumes, so it is armed only for a project
+# that has nothing yet: a retained smoke project or any other stack under
+# this name is never touched.
+label=com.docker.compose.project=$HEIMDALL_PROJECT
+if [ -n "$(docker ps -aq --filter "label=$label")" ] ||
+	[ -n "$(docker volume ls -q --filter "label=$label")" ] ||
+	[ -n "$(docker network ls -q --filter "label=$label")" ] ||
+	docker network inspect "$HEIMDALL_PROJECT-evalnet" >/dev/null 2>&1; then
+	die "compose project $HEIMDALL_PROJECT already has containers, volumes or networks; pick another SMOKE_PROJECT (a --keep project is removed with the command it printed)"
+fi
 
 work=$(mktemp -d)
 # No provider key ever reaches this stack's fault proxy, whatever the

@@ -161,8 +161,14 @@ Writes `heimdall-db-<time>.dump` (`pg_dump`, custom format) and a copy of
 mirror never creates one, and keep it private) it runs
 `bifrost-bench evidence backup` in the server container, which uploads a
 second database dump to the bucket (`_backups/db/`) and mirrors every sealed
-experiment, checking each seal (`docs/evidence-storage.md`); without a
-mirror it archives the data volume to `heimdall-evidence-<time>.tar.gz`. The
+experiment, checking each seal (`docs/evidence-storage.md`), and archives the
+organization project folders (`runs/projects`: agent configs, suites,
+experiment definitions, policies, release logs) and `releases/` to
+`heimdall-projects-<time>.tar.gz`, since the mirror holds sealed experiments
+only; without a mirror it archives the data volume to
+`heimdall-evidence-<time>.tar.gz`. Archives are taken with the server
+container paused (`docker compose pause`), so a seals.log and its run folders
+always come from the same moment; requests wait while the tar runs. The
 server also mirrors each experiment after it is sealed. Schedule it and
 copy the folder off the machine:
 
@@ -183,6 +189,8 @@ $C up -d --wait postgres
 $C exec -T postgres pg_restore -U heimdall -d heimdall --clean --if-exists --no-owner < heimdall-db-<time>.dump
 gunzip -c heimdall-evidence-<time>.tar.gz | $C run --rm --no-deps -T --entrypoint tar heimdall -C /var/lib/heimdall -xf -
 #   or, with the S3 mirror, into the empty runs folder: $C run --rm --no-deps heimdall evidence restore -all
+#   and then the project folders and release logs, which the mirror does not hold:
+#   gunzip -c heimdall-projects-<time>.tar.gz | $C run --rm --no-deps -T --entrypoint tar heimdall -C /var/lib/heimdall -xf -
 #   (database from the bucket instead of a local dump: evidence list, then evidence fetch-backup -name <file> -out <dir>)
 $C up -d --wait
 ```
@@ -253,7 +261,9 @@ read over HTTPS (with the runner-side `gateway_hygiene` and
 as the evidence mirror and checks that `backup.sh` uploads a database dump
 and mirrors the demo experiments; it is also the way to try a mirror
 configuration before pointing it at a real bucket. It uses its own compose
-project and image tags
+project (a new name per run, `heimdall-smoke-<time>-<pid>`; a `SMOKE_PROJECT`
+that already has containers, volumes or networks is refused before anything
+starts, so teardown only ever removes what that run created) and image tags
 (`heimdall/server:smoke`), so it is safe beside production. Run it before
 upgrading production.
 
