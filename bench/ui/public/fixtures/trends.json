@@ -219,6 +219,7 @@
 	],
 	"points": 5,
 	"rejected": 1,
+	"invalid": 0,
 	"indexed_at": "2026-11-15T10:00:00Z",
 	"generated_at": "2026-11-15T10:00:05Z"
 }

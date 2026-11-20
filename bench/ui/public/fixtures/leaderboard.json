@@ -547,5 +547,6 @@
 			"runs": 6,
 			"regraded_runs": 0
 		}
-	]
+	],
+	"grading": "verified"
 }
