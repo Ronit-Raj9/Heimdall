@@ -25,11 +25,13 @@ func TestToolLedgerCollect(t *testing.T) {
 		wantErr   error
 		wantNil   bool
 		wantCalls int
+		wantCut   bool
 	}{
 		{name: "no proxied service: nothing to do", rc: toolTask(schemas.ServiceSpec{ID: "db", Role: schemas.ServiceRoleData}), wantNil: true},
 		{name: "missing ledger is a failure, calls unknown", rc: toolTask(mcp), wantErr: errNoToolLedger, wantNil: true},
 		{name: "empty ledger is zero calls", rc: toolTask(mcp), file: toolLedgerText(""), wantCalls: 0},
-		{name: "rows read, torn line skipped", rc: toolTask(mcp), file: toolLedgerText(row + "\n" + `{"seq":2,"ser`), wantCalls: 1},
+		{name: "rows read, torn line skipped", rc: toolTask(mcp), file: toolLedgerText(row + "\n" + `{"seq":2,"ser`), wantCalls: 1, wantCut: true},
+		{name: "torn first line marks the ledger incomplete", rc: toolTask(mcp), file: toolLedgerText(`{"seq":`), wantCalls: 0, wantCut: true},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -54,6 +56,9 @@ func TestToolLedgerCollect(t *testing.T) {
 			}
 			if !tt.wantNil && len(ev.ToolCalls) != tt.wantCalls {
 				t.Fatalf("got %d calls, want %d", len(ev.ToolCalls), tt.wantCalls)
+			}
+			if (ev.ToolLedgerProblem != "") != tt.wantCut {
+				t.Fatalf("ToolLedgerProblem = %q, want set %v", ev.ToolLedgerProblem, tt.wantCut)
 			}
 		})
 	}

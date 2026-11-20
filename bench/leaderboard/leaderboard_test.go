@@ -357,8 +357,6 @@ func TestBuildIsDeterministic(t *testing.T) {
 func TestBuildErrors(t *testing.T) {
 	cancelled, cancel := context.WithCancel(context.Background())
 	cancel()
-	broken := boardSource()
-	broken.fileErr = errors.New("disk on fire")
 	corrupt := boardSource()
 	corrupt.files["r_e_one_t1_A_clean_1_1"][fileMetrics] = []byte(`{not json`)
 	tests := []struct {
@@ -370,7 +368,6 @@ func TestBuildErrors(t *testing.T) {
 	}{
 		{name: "bad query", ctx: context.Background(), src: boardSource(), q: Query{Scope: "x"}, bad: true},
 		{name: "cancelled", ctx: cancelled, src: boardSource()},
-		{name: "unreadable file", ctx: context.Background(), src: broken},
 		{name: "corrupt metrics", ctx: context.Background(), src: corrupt},
 	}
 	for _, tt := range tests {

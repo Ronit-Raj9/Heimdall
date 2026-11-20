@@ -21,6 +21,7 @@ import (
 	"github.com/maximhq/bifrost/bench/schemas"
 	suitepkg "github.com/maximhq/bifrost/bench/suite"
 	"github.com/maximhq/bifrost/bench/utils"
+	"github.com/maximhq/bifrost/bench/verdict"
 	"github.com/maximhq/bifrost/bench/voice" // X8 voice agents
 )
 
@@ -1339,6 +1340,21 @@ func validateExperiment(e *schemas.Experiment, minArms int) error {
 	}
 	if e.Primary.Metric == "" {
 		errs = append(errs, errors.New("primary metric is empty"))
+	}
+	if minArms >= 2 && e.Matrix == nil && (e.Verdict.Policy == "" || e.Verdict.Policy == verdict.PolicyPairedSignFlip) {
+		// The paired sign-flip verdict compares arm A against arm B by id;
+		// other ids would run every slot and then fail to decide (audit 1-B-05).
+		for _, id := range []string{verdict.ArmBaseline, verdict.ArmCandidate} {
+			if _, ok := e.Arms[id]; !ok {
+				errs = append(errs, fmt.Errorf("the %s verdict needs arms %s (baseline) and %s (candidate); arm %s is missing", verdict.PolicyPairedSignFlip, verdict.ArmBaseline, verdict.ArmCandidate, id))
+			}
+		}
+	}
+	if minArms >= 2 && len(e.Guards) == 0 && !conds[schemas.ConditionClean] {
+		// With no guards the verdict adds the default no_regression guard on
+		// clean; without a clean condition it could only read INVALID
+		// (audit 1-B-08).
+		errs = append(errs, fmt.Errorf("no guards declared: the default guard checks the %s condition, which is not planned; add %s or declare guards", schemas.ConditionClean, schemas.ConditionClean))
 	}
 	for _, g := range e.Guards {
 		switch g.Rule {

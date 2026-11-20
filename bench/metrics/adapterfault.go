@@ -48,18 +48,34 @@ func (m *adapterFaultRecoveryMetric) Compute(_ context.Context, _ *schemas.RunCo
 	if !ev.AdapterFault.Complete {
 		return schemas.Unknown(ev.AdapterFault.Reason, schemas.EvidenceNative), nil
 	}
+	// A completion is joined to its own decision by operation ID. Only an
+	// unmodified (pass) operation of the same session, kind and name whose
+	// decision came after the fault recovers it: an operation already in
+	// flight when the fault fired is not a retry (audit 1-C-08).
+	entries := ev.AdapterFault.Entries
+	decisionAt := map[string]int{} // session + operation ID -> index of its decision
+	for i, e := range entries {
+		if e.Phase == "decision" && e.OperationID != "" {
+			decisionAt[e.Session+"\x00"+e.OperationID] = i
+		}
+	}
 	episodes := 0
 	recovered := 0
-	for i, e := range ev.AdapterFault.Entries {
+	for i, e := range entries {
 		if e.Phase != "decision" || e.Mode == "pass" {
 			continue
 		}
 		episodes++
-		for _, later := range ev.AdapterFault.Entries[i+1:] {
-			if later.Phase == "completed" && later.Kind == e.Kind && later.Name == e.Name && later.Success {
-				recovered++
-				break
+		for _, later := range entries[i+1:] {
+			if later.Phase != "completed" || !later.Success || later.Session != e.Session || later.Kind != e.Kind || later.Name != e.Name {
+				continue
 			}
+			j, ok := decisionAt[later.Session+"\x00"+later.OperationID]
+			if later.OperationID == "" || !ok || j <= i || entries[j].Mode != "pass" {
+				continue
+			}
+			recovered++
+			break
 		}
 	}
 	if episodes == 0 {

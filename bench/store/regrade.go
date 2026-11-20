@@ -9,6 +9,7 @@ import (
 	"os"
 	"path/filepath"
 	"slices"
+	"strings"
 	"syscall"
 	"time"
 
@@ -246,8 +247,10 @@ func (s *FSStore) RegradeInfo(ctx context.Context, expID, regradeID string) (*Re
 }
 
 // WriteAnalysis writes analysis/<analysis_id>/verdict.json (the Analysis) and
-// the extra files, e.g. report.md. The analysis folder is created with mkdir,
-// so an existing analysis is never overwritten (schemas.ErrExists).
+// the extra files, e.g. report.md. The whole analysis is staged in a hidden
+// folder and published with one rename, so an interrupted write never leaves
+// a final folder without a complete verdict.json (audit 1-D-07). An existing
+// analysis is never overwritten (schemas.ErrExists).
 func (s *FSStore) WriteAnalysis(ctx context.Context, a *schemas.Analysis, files map[string][]byte) error {
 	if err := ctx.Err(); err != nil {
 		return err
@@ -277,25 +280,96 @@ func (s *FSStore) WriteAnalysis(ctx context.Context, a *schemas.Analysis, files 
 		return fmt.Errorf("write analysis %s: %w", a.AnalysisID, err)
 	}
 	dir := filepath.Join(parent, a.AnalysisID)
-	if err := os.Mkdir(dir, dirPerm); err != nil {
-		if errors.Is(err, fs.ErrExist) {
-			return fmt.Errorf("write analysis %s: %w", a.AnalysisID, schemas.ErrExists)
+	if _, err := os.Lstat(dir); err == nil {
+		return fmt.Errorf("write analysis %s: %w", a.AnalysisID, schemas.ErrExists)
+	}
+	stage, err := os.MkdirTemp(parent, ".stage-"+a.AnalysisID+"-")
+	if err != nil {
+		return fmt.Errorf("write analysis %s: %w", a.AnalysisID, err)
+	}
+	published := false
+	defer func() {
+		if !published {
+			_ = os.RemoveAll(stage)
 		}
+	}()
+	if err := os.Chmod(stage, dirPerm); err != nil {
 		return fmt.Errorf("write analysis %s: %w", a.AnalysisID, err)
 	}
-	if err := writeJSONAtomic(filepath.Join(dir, verdictFile), a); err != nil {
+	if err := writeJSONAtomic(filepath.Join(stage, verdictFile), a); err != nil {
 		return fmt.Errorf("write analysis %s: %w", a.AnalysisID, err)
 	}
-	for name, data := range files {
-		target := filepath.Join(dir, filepath.FromSlash(name))
+	for _, name := range slices.Sorted(maps.Keys(files)) {
+		target := filepath.Join(stage, filepath.FromSlash(name))
 		if err := os.MkdirAll(filepath.Dir(target), dirPerm); err != nil {
 			return fmt.Errorf("write analysis %s: %w", a.AnalysisID, err)
 		}
-		if err := writeFileExclusive(target, data); err != nil {
+		if err := writeFileExclusive(target, files[name]); err != nil {
 			return fmt.Errorf("write analysis %s file %s: %w", a.AnalysisID, name, err)
 		}
 	}
+	if err := ctx.Err(); err != nil {
+		return err
+	}
+	// os.Rename replaces an empty folder, so check again right before it; a
+	// non-empty one makes the rename fail.
+	if _, err := os.Lstat(dir); err == nil {
+		return fmt.Errorf("write analysis %s: %w", a.AnalysisID, schemas.ErrExists)
+	}
+	if err := os.Rename(stage, dir); err != nil {
+		if errors.Is(err, fs.ErrExist) || errors.Is(err, syscall.ENOTEMPTY) {
+			return fmt.Errorf("write analysis %s: %w", a.AnalysisID, schemas.ErrExists)
+		}
+		return fmt.Errorf("write analysis %s: publish: %w", a.AnalysisID, err)
+	}
+	published = true
 	return nil
+}
+
+// LatestAnalysis returns the newest complete analysis of an experiment,
+// ordered by its own created_at and then analysis id, never by folder
+// modification time, which copying an archive changes. A folder without
+// verdict.json is an incomplete write from before analyses were staged and is
+// skipped, as is a hidden staging folder. A verdict.json that exists but
+// cannot be read or decoded is an error: the caller cannot tell whether that
+// newest record said INVALID, so it must fail closed. No analysis returns
+// (nil, nil).
+func (s *FSStore) LatestAnalysis(ctx context.Context, expID string) (*schemas.Analysis, error) {
+	if err := ctx.Err(); err != nil {
+		return nil, err
+	}
+	if err := validateID("exp_id", expID); err != nil {
+		return nil, fmt.Errorf("latest analysis: %w", err)
+	}
+	base := filepath.Join(s.expDir(expID), analysisDir)
+	entries, err := os.ReadDir(base)
+	if errors.Is(err, fs.ErrNotExist) {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, fmt.Errorf("latest analysis %s: %w", expID, err)
+	}
+	var best *schemas.Analysis
+	for _, e := range entries {
+		if !e.IsDir() || strings.HasPrefix(e.Name(), ".") {
+			continue
+		}
+		var a schemas.Analysis
+		found, err := readOptionalJSON(filepath.Join(base, e.Name(), verdictFile), &a)
+		if err != nil {
+			return nil, fmt.Errorf("latest analysis %s: analysis %s: %w", expID, e.Name(), err)
+		}
+		if !found {
+			continue
+		}
+		if a.AnalysisID == "" {
+			a.AnalysisID = e.Name()
+		}
+		if best == nil || a.CreatedAt.After(best.CreatedAt) || (a.CreatedAt.Equal(best.CreatedAt) && a.AnalysisID > best.AnalysisID) {
+			best = &a
+		}
+	}
+	return best, nil
 }
 
 // ensureRegradeInfo writes regrade.json on the first grade of a regrade and

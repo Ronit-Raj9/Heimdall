@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"github.com/maximhq/bifrost/bench/schemas"
+	"github.com/maximhq/bifrost/bench/verdict"
 )
 
 // ReporterMarkdown names the Markdown reporter.
@@ -97,6 +98,9 @@ func writePrimary(w *bufio.Writer, v *schemas.Verdict) {
 	row(w, "p-value", pValue(v.Effect))
 	row(w, "Discordant tasks", discordant(v.Effect))
 	mde := ppText(v.MDE, false)
+	if !rateEndpoint(v.Primary.Metric) {
+		mde = unitText(v.Primary.Metric, v.MDE/100, false) // mdePP scales by 100 for every metric
+	}
 	if mde != unknownText && v.MDEAssumedSD {
 		mde += fmt.Sprintf(" (assumed SD %.2f)", v.SD)
 	} else if mde != unknownText && v.Variance != nil && v.Variance.Source == schemas.VarianceMeasuredAA {
@@ -469,12 +473,45 @@ func reportArms(a *schemas.Analysis, m *schemas.Manifest) []string {
 	return arms
 }
 
-// effectPP formats an effect's d_bar in signed percentage points.
+// effectPP formats an effect's d_bar in signed percentage points for a rate
+// metric, and in the metric's own unit for any other (seconds, counts, USD):
+// a difference of 9 seconds is not 900 pp (audit 1-C-07).
 func effectPP(e *schemas.Effect) string {
 	if e == nil {
 		return unknownText
 	}
+	if !rateEndpoint(e.Metric) {
+		return unitText(e.Metric, e.DBar, true)
+	}
 	return ppText(e.DBar*100, true)
+}
+
+// rateEndpoint reports whether metric is read in percentage points: a
+// built-in rate, or no metric named (older verdicts).
+func rateEndpoint(metric string) bool {
+	return metric == "" || verdict.RateMetric(metric)
+}
+
+// unitText formats a value of a non-rate metric with the unit its name
+// carries (_s, _ms, _usd), or none. NaN, infinities and, unless signed
+// values are expected, non-positive values are unknown.
+func unitText(metric string, x float64, signed bool) string {
+	if math.IsNaN(x) || math.IsInf(x, 0) || (!signed && x <= 0) {
+		return unknownText
+	}
+	unit := ""
+	switch {
+	case strings.HasSuffix(metric, "_usd"):
+		unit = " USD"
+	case strings.HasSuffix(metric, "_ms"):
+		unit = " ms"
+	case strings.HasSuffix(metric, "_s"):
+		unit = " s"
+	}
+	if signed {
+		return fmt.Sprintf("%+.4g%s", x, unit)
+	}
+	return fmt.Sprintf("%.4g%s", x, unit)
 }
 
 // ppText formats percentage points with one decimal. NaN, infinities and,
@@ -490,10 +527,14 @@ func ppText(pp float64, signed bool) string {
 	return fmt.Sprintf("%.1f pp", pp)
 }
 
-// pValue formats the exact sign-flip p-value, unknown when there is none.
+// pValue formats the sign-flip p-value, unknown when there is none. A
+// Monte Carlo p says so with its draw count (audit 1-B-07).
 func pValue(e *schemas.Effect) string {
 	if e == nil || e.PValue == nil {
 		return unknownText
+	}
+	if e.PDraws > 0 {
+		return fmt.Sprintf("%s (sampled, %d sign vectors)", fixed(*e.PValue, 4), e.PDraws)
 	}
 	return fixed(*e.PValue, 4)
 }

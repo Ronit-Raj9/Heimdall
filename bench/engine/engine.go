@@ -170,12 +170,21 @@ func selectGates(reg *schemas.Registry, extra []string) []schemas.Gate {
 	return out
 }
 
-// selectMetrics returns every metric, or the named subset, in registry order.
+// integrityMetrics are computed even when an experiment names a metric
+// subset: verdict instruments read them, so a display selection must never
+// decide whether an integrity check has evidence (audit 1-C-10).
+var integrityMetrics = []string{"bifrost_mcp_witness_mismatch"} // metrics.BifrostMCPWitnessMismatch
+
+// selectMetrics returns every metric, or the named subset plus the
+// integrity metrics, in registry order.
 func selectMetrics(reg *schemas.Registry, names []string) []schemas.Metric {
 	if len(names) == 0 {
 		return append([]schemas.Metric(nil), reg.Metrics...)
 	}
 	want := map[string]bool{}
+	for _, n := range integrityMetrics {
+		want[n] = true
+	}
 	for _, n := range names {
 		want[n] = true
 	}

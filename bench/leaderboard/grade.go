@@ -14,12 +14,15 @@ import (
 
 // Exclusion reasons that are not an outcome.
 const (
-	ReasonNotSealed       = "not sealed"
-	ReasonVerdictInvalid  = "experiment verdict invalid"
-	ReasonSealMismatch    = "seal mismatch"
-	ReasonDuplicateSlot   = "slot has more than one counted run"
-	reasonNoOutcome       = "no outcome"
-	metricVerifiedSuccess = "verified_success"
+	ReasonNotSealed      = "not sealed"
+	ReasonVerdictInvalid = "experiment verdict invalid"
+	ReasonSealMismatch   = "seal mismatch"
+	ReasonDuplicateSlot  = "slot has more than one counted run"
+	// ReasonEvidenceUnreadable: the run's seal verifies but a sealed file the
+	// board reads (the proxy ledger) does not parse.
+	ReasonEvidenceUnreadable = "run evidence unreadable"
+	reasonNoOutcome          = "no outcome"
+	metricVerifiedSuccess    = "verified_success"
 )
 
 // SealSource is optionally implemented by a Source that can check a sealed
@@ -83,13 +86,7 @@ func grade(ctx context.Context, src Source, recs []*record) (pool, []excludedRun
 				return nil, nil, err
 			}
 		}
-		y, _ := r.run.Outcome.Score()
-		if v, ok := metrics[metricVerifiedSuccess].Float(); ok {
-			y = 0
-			if v >= 0.5 {
-				y = 1
-			}
-		}
+		y, _ := VerifiedSuccess(r.run.Outcome, metrics)
 		byCond, ok := p[r.hash]
 		if !ok {
 			byCond = map[string][]gradedRun{}
@@ -98,6 +95,80 @@ func grade(ctx context.Context, src Source, recs []*record) (pool, []excludedRun
 		byCond[r.slot.Condition] = append(byCond[r.slot.Condition], gradedRun{rec: r, success: y, metrics: metrics})
 	}
 	return p, excluded, nil
+}
+
+// VerifiedSuccess is a run's verified success, 1 or 0, as every result
+// surface reads it (board, matrix, trends, flat export): the observed
+// verified_success metric when the run has one, else the outcome's score.
+// ok is false when the outcome does not score; such a run has no success.
+func VerifiedSuccess(o schemas.Outcome, metrics map[string]schemas.Value) (y float64, ok bool) {
+	if y, ok = o.Score(); !ok {
+		return 0, false
+	}
+	if v, has := metrics[metricVerifiedSuccess].Float(); has {
+		y = 0
+		if v >= 0.5 {
+			y = 1
+		}
+	}
+	return y, true
+}
+
+// Grading labels of a board (schemas.Leaderboard.Grading).
+const (
+	GradingVerified = schemas.GradingVerified
+	GradingJudged   = schemas.GradingJudged
+	GradingMixed    = "mixed"
+	GradingUnknown  = "unknown"
+)
+
+// boardGrading reads how the board's graded runs on condition were graded:
+// judged when the experiment's frozen plan pinned a judge or a run's sealed
+// grade.json says a judge decided it, verified when a run's grade.json shows
+// a deterministic grade, mixed for both, and unknown when no run carries
+// grade evidence. The label travels with the board, so an archived result
+// never depends on today's suite metadata. A grade.json that cannot be read
+// adds nothing.
+func boardGrading(ctx context.Context, src Source, p pool, condition string) (string, []string) {
+	judged, verified := false, false
+	judges := []string{}
+	for _, byCond := range p {
+		for _, g := range byCond[condition] {
+			if ctx.Err() != nil {
+				return GradingUnknown, nil
+			}
+			planJudged := g.rec.exp != nil && g.rec.exp.m != nil && g.rec.exp.m.Scenario["suite.judge"] != ""
+			data, found, err := readRunFile(src, g.rec.run.RunID, fileGrade)
+			var gr struct {
+				Judged bool `json:"judged"`
+				Judge  *struct {
+					Model string `json:"model"`
+				} `json:"judge"`
+			}
+			if err == nil && found && json.Unmarshal(data, &gr) == nil {
+				if gr.Judged || planJudged {
+					judged = true
+					if gr.Judge != nil && gr.Judge.Model != "" && !slices.Contains(judges, gr.Judge.Model) {
+						judges = append(judges, gr.Judge.Model)
+					}
+				} else {
+					verified = true
+				}
+			} else if planJudged {
+				judged = true
+			}
+		}
+	}
+	slices.Sort(judges)
+	switch {
+	case judged && verified:
+		return GradingMixed, judges
+	case judged:
+		return GradingJudged, judges
+	case verified:
+		return GradingVerified, nil
+	}
+	return GradingUnknown, nil
 }
 
 // excludeReason returns why a record stays off the board, or "" when it is
@@ -115,6 +186,10 @@ func excludeReason(r *record) string {
 		return ReasonNotSealed
 	case r.counted > 1:
 		return ReasonDuplicateSlot
+	case r.sealMismatch:
+		return ReasonSealMismatch
+	case r.evidenceProblem != "":
+		return ReasonEvidenceUnreadable
 	}
 	if _, ok := r.run.Outcome.Score(); ok {
 		return ""
@@ -129,14 +204,19 @@ func excludeReason(r *record) string {
 // record's sealed run does not verify, "" otherwise.
 func sealReason(ctx context.Context, src Source, r *record) (string, error) {
 	ss, ok := src.(SealSource)
-	if !ok || !r.sealed {
+	if !ok || !r.sealed || r.sealVerified {
 		return "", nil
+	}
+	if r.sealMismatch {
+		return ReasonSealMismatch, nil
 	}
 	err := ss.VerifySeal(ctx, r.run.RunID)
 	switch {
 	case err == nil:
+		r.sealVerified = true
 		return "", nil
 	case errors.Is(err, schemas.ErrSealMismatch):
+		r.sealMismatch = true
 		return ReasonSealMismatch, nil
 	default:
 		return "", fmt.Errorf("leaderboard: verify seal of run %s: %w", r.run.RunID, err)

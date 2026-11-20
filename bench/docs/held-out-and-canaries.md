@@ -106,10 +106,25 @@ held_out:
   `GET /api/bench/leaderboard/pareto?split=held_out` answer 404. The public
   board never counts a held-out run, whatever the setting.
 
-Run pages are not filtered. The agent stream, diff and artifacts of a run of
-a held-out task are served like any other run, and the agent stream contains
-the instruction the agent was given. Run held-out experiments against a run
-folder that a public or shared bench server does not serve.
+- `GET /api/bench/runs/{id}` and every route under it (events, diff,
+  receipts, files, raw evidence, artifacts, OTLP trace, steps, voice,
+  services, routing) answer 404 for a run whose experiment's frozen plan
+  holds its task out (`held_out_tasks` in the manifest). The agent stream
+  holds the instruction the agent was given, so none of it is served. Run
+  and pair listings still show the run's ids, outcome and task id.
+- Result surfaces read the same frozen split: the model matrix
+  (`bifrost-bench matrix`, `GET /experiments/{id}/matrix`) counts public
+  tasks unless `split=held_out` is asked for, and then says so in `split`;
+  EEE records are public only and say `heimdall_split: public`; the flat
+  run table (`export jsonl|csv`) leaves out held-out rows unless
+  `-split held_out` or `-split all` asks for a private export, and every
+  row names its `split`; `export otlp` skips held-out runs unless
+  `-include-held-out` is passed.
+
+Even so, run held-out experiments against a run folder that a public or
+shared bench server does not serve where you can: the held-out decision is
+the frozen plan's, and a plan that did not list a task as held out serves
+it like any other.
 
 This guards against accidental leaks: a screenshot of the dashboard, a copied
 API response, a scraped public instance. It does **not** guard against anyone

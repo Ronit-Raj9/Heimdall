@@ -380,6 +380,9 @@ func (p *Pipeline) gate(ctx context.Context, st *runState) error {
 		res, err := g.Check(ctx, st.rc, st.ev)
 		if err != nil {
 			errs = append(errs, wrapPart("gate", g, fmt.Errorf("check: %w", err)))
+			// Recorded so a metric over gate results can tell a gate that
+			// never ran from one that ran clean (audit 1-C-09).
+			st.ev.GateErrors = append(st.ev.GateErrors, schemas.GateError{Gate: g.GetName(), Effect: g.Effect(), Error: err.Error()})
 			continue
 		}
 		if res == nil {

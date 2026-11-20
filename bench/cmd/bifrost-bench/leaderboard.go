@@ -127,29 +127,15 @@ func leaderboardHints(suiteFlag string, lb, synth *schemas.Leaderboard) []string
 }
 
 // LatestDecision returns the verdict decision of the experiment's newest
-// analysis (by LatestAnalysis) from its verdict.json, so the leaderboard can
-// leave out experiments whose verdict is invalid. An unreadable verdict reads
-// as no decision: the experiment's runs then stay on the board.
+// complete analysis, so the leaderboard can leave out experiments whose
+// verdict is invalid. Unreadable analysis state fails closed and reads as
+// INVALID: it might be the newest record that said so (audit 1-D-07).
 func (x indexAdapter) LatestDecision(expID string) (schemas.Decision, bool) {
-	id, ok := x.LatestAnalysis(expID)
-	if !ok {
-		return "", false
-	}
-	return readDecision(filepath.Join(x.root, expID, "analysis", id, "verdict.json"))
-}
-
-// readDecision reads the verdict decision from an analysis verdict.json.
-func readDecision(path string) (schemas.Decision, bool) {
-	data, err := os.ReadFile(path)
+	a, err := x.latestAnalysis(expID)
 	if err != nil {
-		return "", false
+		return schemas.DecisionInvalid, true
 	}
-	var a struct {
-		Verdict struct {
-			Decision schemas.Decision `json:"decision"`
-		} `json:"verdict"`
-	}
-	if err := json.Unmarshal(data, &a); err != nil || a.Verdict.Decision == "" {
+	if a == nil || a.Verdict.Decision == "" {
 		return "", false
 	}
 	return a.Verdict.Decision, true

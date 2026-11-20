@@ -21,6 +21,14 @@ type MatrixQuery struct {
 	GradeSource string // the source the sealed runs were read with; reported only
 	K           int
 	Alpha       float64
+	// Split is the frozen held-out split the matrix reads (split.go): ""
+	// or public leaves out every run of a held-out task, held_out keeps
+	// only those. A matrix never mixes the two.
+	Split string
+	// Invalid is true when the experiment's newest analysis decided
+	// INVALID: its instrument failed, so every run is excluded with
+	// ReasonVerdictInvalid and nothing is ranked, as on the board.
+	Invalid bool
 }
 
 // RunFileReader reads one file of a sealed run's folder. A missing file
@@ -61,12 +69,15 @@ func Matrix(m *schemas.Manifest, runs []schemas.SealedRun, synthetic bool, q Mat
 		return nil, fmt.Errorf("%w: k %d is not 0 (each row's default) or 2 or more", ErrBadQuery, q.K)
 	case !(q.Alpha > 0 && q.Alpha < 1):
 		return nil, fmt.Errorf("%w: alpha %v is not in (0, 1)", ErrBadQuery, q.Alpha)
+	case !validSplit(q.Split):
+		return nil, fmt.Errorf("%w: split %q is not public or held_out", ErrBadQuery, q.Split)
 	}
-	exp := &expInfo{id: m.ExpID, m: m, suite: m.SuiteID + "@" + m.SuiteVersion, trials: slotTrials(m.Slots)}
-	byArm, excluded, conditions := matrixRuns(exp, runs, q.Condition)
+	exp := &expInfo{id: m.ExpID, m: m, suite: m.SuiteID + "@" + m.SuiteVersion, trials: slotTrials(m.Slots), invalid: q.Invalid}
+	byArm, excluded, conditions := matrixRuns(exp, runs, q.Condition, q.Split)
 	out := &schemas.ModelMatrix{
 		ExpID: m.ExpID, Suite: exp.suite, Condition: q.Condition, Conditions: conditions, GradeSource: q.GradeSource,
 		Alpha: q.Alpha, Synthetic: synthetic, Rows: []schemas.MatrixRow{}, Pairs: []schemas.MatrixPair{}, Excluded: excluded,
+		Split: boardSplit(q.Split), Invalid: q.Invalid,
 	}
 	arms := make([]string, 0, len(byArm))
 	for arm := range byArm {
@@ -91,6 +102,9 @@ func Matrix(m *schemas.Manifest, runs []schemas.SealedRun, synthetic bool, q Mat
 		out.Rows = append(out.Rows, schemas.MatrixRow{Arm: arm, Provider: m.Arms[arm].Config.Gateway.Provider, LeaderboardEntry: c.e})
 	}
 	out.Separable, out.Note = separability(calcs, out.Pairs, q.Alpha)
+	if q.Invalid {
+		out.Note = "Experiment verdict INVALID: its instrument failed, so no run is evidence and nothing is ranked. Excluded lists the runs."
+	}
 	return out, nil
 }
 
@@ -140,7 +154,11 @@ func SyntheticArms(ctx context.Context, m *schemas.Manifest, runs []schemas.Seal
 // matrixRuns turns sealed runs into graded runs by arm for one condition,
 // the runs left out by reason, and the conditions with a graded run, clean
 // first. Success is read exactly as grade does.
-func matrixRuns(exp *expInfo, runs []schemas.SealedRun, condition string) (map[string][]gradedRun, []schemas.LeaderboardExclusion, []string) {
+//
+// Runs outside split are skipped silently, as on the board. The rest are
+// excluded for the board's experiment-level reasons first (excludeReason):
+// an invalid verdict, external APIs live or record, a model-played user.
+func matrixRuns(exp *expInfo, runs []schemas.SealedRun, condition, split string) (map[string][]gradedRun, []schemas.LeaderboardExclusion, []string) {
 	byArm := map[string][]gradedRun{}
 	reasons := map[string]int{}
 	seen := map[string]bool{}
@@ -156,6 +174,14 @@ func matrixRuns(exp *expInfo, runs []schemas.SealedRun, condition string) (map[s
 		switch {
 		case !sr.Slot.Counted || rec.arm == nil:
 			continue // compatibility runs never enter a comparison
+		case !inSplit(rec, split):
+			continue // the other split's runs never enter this matrix
+		case exp.invalid:
+			reason = ReasonVerdictInvalid
+		case externalReason(rec) != "":
+			reason = ReasonExternalLive
+		case simulatedUserReason(rec) != "":
+			reason = ReasonSimulatedUser
 		case len(sr.Problems) > 0 && strings.Contains(strings.Join(sr.Problems, " "), "counted runs"):
 			reason = ReasonDuplicateSlot
 		case len(sr.Problems) > 0:
@@ -182,13 +208,7 @@ func matrixRuns(exp *expInfo, runs []schemas.SealedRun, condition string) (map[s
 		if metrics == nil {
 			metrics = map[string]schemas.Value{}
 		}
-		y, _ := sr.Run.Outcome.Score()
-		if v, ok := metrics[metricVerifiedSuccess].Float(); ok {
-			y = 0
-			if v >= 0.5 {
-				y = 1
-			}
-		}
+		y, _ := VerifiedSuccess(sr.Run.Outcome, metrics)
 		byArm[sr.Slot.Arm] = append(byArm[sr.Slot.Arm], gradedRun{rec: rec, success: y, metrics: metrics})
 	}
 	slices.SortFunc(conditions, func(x, y string) int {
@@ -230,6 +250,7 @@ func matrixPairs(calcs []*entryCalc, armOf map[*entryCalc]string, alpha float64)
 			p.NNonzero, p.MeanDiff = res.NNonzero, stats.Mean(d)
 			raw := res.P
 			p.P = &raw
+			p.PDraws = res.Draws
 			tests = append(tests, test{i: len(pairs), res: res})
 			pairs = append(pairs, p)
 		}
@@ -318,8 +339,15 @@ func separability(calcs []*entryCalc, pairs []schemas.MatrixPair, alpha float64)
 			"and Holm across %d pairs makes it %s, not below alpha %s whatever the results. More tasks are needed; more trials per task do not help, "+
 			"since the test is over tasks.", maxTasks, formatP(stats.MinPossibleP(maxTasks)), tested, formatP(best), strconv.FormatFloat(alpha, 'g', -1, 64))
 	}
-	return true, fmt.Sprintf("Tier 1: cannot be told apart from the leader; tier 2: significantly behind it. Exact sign-flip test on the tasks each pair ran, "+
-		"Holm-adjusted across all %d pairs at alpha %s. Rank alone is not a claim that one arm beats another.", tested, strconv.FormatFloat(alpha, 'g', -1, 64))
+	method := "Exact sign-flip test"
+	for _, p := range pairs {
+		if p.PDraws > 0 {
+			method = fmt.Sprintf("Sign-flip test (sampled with %d random sign vectors where more than %d tasks differ, exact below)", p.PDraws, stats.ExactMaxNonzero)
+			break
+		}
+	}
+	return true, fmt.Sprintf("Tier 1: cannot be told apart from the leader; tier 2: significantly behind it. %s on the tasks each pair ran, "+
+		"Holm-adjusted across all %d pairs at alpha %s. Rank alone is not a claim that one arm beats another.", method, tested, strconv.FormatFloat(alpha, 'g', -1, 64))
 }
 
 // commonTasks returns the tasks every row has a graded run on.

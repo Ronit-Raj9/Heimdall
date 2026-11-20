@@ -407,7 +407,9 @@ func TestSealedRunsVerifiesSeals(t *testing.T) {
 				}
 				return
 			}
-			if len(a.Problems) != 1 || !strings.Contains(a.Problems[0], tc.problem) || !strings.Contains(a.Problems[0], "seal does not verify") {
+			// An emptied seals.log also unseats the superseded aborted
+			// attempt, reported after the counted run's own problem.
+			if len(a.Problems) < 1 || !strings.Contains(a.Problems[0], tc.problem) || !strings.Contains(a.Problems[0], "seal does not verify") {
 				t.Fatalf("problems %v, want one naming %q", a.Problems, tc.problem)
 			}
 			if len(a.Metrics) != 0 || a.Grade != nil || a.Gates != nil || a.Gateway != nil {
@@ -532,5 +534,33 @@ func TestSealedRunsLedgerBreakIsProblem(t *testing.T) {
 	}
 	if len(got) != 1 || len(got[0].Problems) != 1 || !strings.Contains(got[0].Problems[0], "proxy ledger hash chain broken") {
 		t.Fatalf("got %+v, want one run with the ledger break as a problem", got)
+	}
+}
+
+// Audit 1-A-04: a damaged superseded attempt still sits in the seal chain, so
+// SealedRuns reports it on the counted run of its slot instead of letting the
+// selector skip it on its unverified run.json.
+func TestSealedRunsReportsDamagedSupersededAttempt(t *testing.T) {
+	ctx := context.Background()
+	s, _ := indexFixture(t)
+	dir := filepath.Join(s.Root(), "e_test", "slots", "s_a1", "runs", "r_a1_1")
+	makeWritable(t, dir)
+	writeTampered(t, filepath.Join(dir, "notes.txt"), []byte("x"))
+	got, err := s.SealedRuns(ctx, "e_test", "original")
+	if err != nil {
+		t.Fatalf("SealedRuns: %v", err)
+	}
+	if len(got) != 2 || got[0].Run.RunID != "r_a1_2" {
+		t.Fatalf("got %+v, want r_a1_2 and r_b1", got)
+	}
+	p := got[0].Problems
+	if len(p) != 1 || !strings.Contains(p[0], "r_a1_1") || !strings.Contains(p[0], "file notes.txt added") {
+		t.Fatalf("problems %v, want one naming damaged attempt r_a1_1", p)
+	}
+	if len(got[0].Metrics) == 0 {
+		t.Fatal("the intact counted run should still be parsed")
+	}
+	if len(got[1].Problems) != 0 {
+		t.Fatalf("other slot problems %v", got[1].Problems)
 	}
 }

@@ -346,3 +346,58 @@ func TestCreateRefusesChangedReviewSnapshot(t *testing.T) {
 		t.Fatalf("err = %v, want a refusal naming the changed inputs", err)
 	}
 }
+
+// Audit 1-E-01: a sealed aborted_infra attempt stays in seals.log while only
+// counted runs are packed. The pack carries that attempt's seal under chain/
+// so the whole prev_seal chain verifies from the zip alone.
+func TestEvidencePackCarriesSupersededSeals(t *testing.T) {
+	f := newFixture(t, schemas.ActionShip, schemas.PolicyAllow)
+	ctx := context.Background()
+	sl := f.m.Slots[0]
+	sl.ExpID = testExp
+	aborted := &schemas.Run{RunID: "r_t01_a_retry", ExpID: testExp, SlotID: sl.SlotID, PairID: sl.PairID,
+		Attempt: 2, Stage: schemas.StageSeal, ManifestHash: f.m.Hash, Outcome: schemas.OutcomeAbortedInfra}
+	if _, err := f.st.NewRun(ctx, &sl, aborted); err != nil {
+		t.Fatalf("NewRun: %v", err)
+	}
+	if _, err := f.st.Seal(ctx, aborted); err != nil {
+		t.Fatalf("Seal: %v", err)
+	}
+	rec, err := f.log.Create(ctx, request("ana", ""))
+	if err != nil {
+		t.Fatalf("Create: %v", err)
+	}
+	b, err := f.log.Evidence(ctx, rec.ReleaseID)
+	if err != nil {
+		t.Fatalf("Evidence: %v", err)
+	}
+	_, files := readZip(t, b)
+	if _, ok := files["runs/r_t01_a_retry/seal.json"]; ok {
+		t.Fatal("superseded attempt packed as a counted run")
+	}
+	prev := ""
+	for _, line := range strings.Split(strings.TrimSpace(string(files["seals.log"])), "\n") {
+		id, hash, _ := strings.Cut(line, " ")
+		seal, ok := files["runs/"+id+"/seal.json"]
+		if !ok {
+			seal, ok = files["chain/"+id+".seal.json"]
+		}
+		if !ok {
+			t.Fatalf("pack has no seal for chain link %s", id)
+		}
+		if got := utils.SHA256Bytes(seal); got != hash {
+			t.Fatalf("seal of %s hashes to %s, log %s", id, got, hash)
+		}
+		var sr schemas.SealRecord
+		if err := json.Unmarshal(seal, &sr); err != nil {
+			t.Fatal(err)
+		}
+		if sr.PrevSeal != prev {
+			t.Fatalf("run %s prev_seal %q, want %q", id, sr.PrevSeal, prev)
+		}
+		prev = hash
+	}
+	if !strings.Contains(string(files["README.txt"]), "chain/<run_id>.seal.json") {
+		t.Fatal("README does not describe chain seals")
+	}
+}

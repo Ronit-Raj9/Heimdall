@@ -33,13 +33,29 @@ func TestLatestDecision(t *testing.T) {
 	write("e_invalid", "a_1", `{"analysis_id":"a_1","verdict":{"decision":"invalid"}}`)
 	write("e_corrupt", "a_1", `{not json`)
 	write("e_empty", "a_1", `{"verdict":{}}`)
+	// Audit 1-D-07: an interrupted write left a newer folder with no
+	// verdict.json, and a copied archive gave an older analysis the newest
+	// folder time. The newest complete record by created_at still decides.
+	write("e_interrupted", "a_1", `{"analysis_id":"a_1","created_at":"2026-11-14T10:00:00Z","verdict":{"decision":"invalid"}}`)
+	if err := os.MkdirAll(filepath.Join(root, "e_interrupted", "analysis", "a_2"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	write("e_copied", "a_new", `{"analysis_id":"a_new","created_at":"2026-11-14T10:00:00Z","verdict":{"decision":"invalid"}}`)
+	write("e_copied", "a_old", `{"analysis_id":"a_old","created_at":"2026-11-13T10:00:00Z","verdict":{"decision":"improved"}}`)
+	past := time.Date(2020, 1, 1, 0, 0, 0, 0, time.UTC)
+	if err := os.Chtimes(filepath.Join(root, "e_copied", "analysis", "a_new"), past, past); err != nil {
+		t.Fatal(err)
+	}
 	tests := []struct {
 		exp    string
 		want   schemas.Decision
 		wantOK bool
 	}{
 		{exp: "e_invalid", want: schemas.DecisionInvalid, wantOK: true},
-		{exp: "e_corrupt", wantOK: false},
+		// Unreadable analysis state fails closed (audit 1-D-07).
+		{exp: "e_corrupt", want: schemas.DecisionInvalid, wantOK: true},
+		{exp: "e_interrupted", want: schemas.DecisionInvalid, wantOK: true},
+		{exp: "e_copied", want: schemas.DecisionInvalid, wantOK: true},
 		{exp: "e_empty", wantOK: false},
 		{exp: "e_none", wantOK: false},
 	}

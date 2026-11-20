@@ -16,8 +16,9 @@ const (
 
 // Reasons a tool ledger metric has no number.
 const (
-	reasonNoToolLedger = "tool ledger missing"
-	reasonNoToolCalls  = "no proxied tool calls"
+	reasonNoToolLedger  = "tool ledger missing"
+	reasonNoToolCalls   = "no proxied tool calls"
+	reasonToolLedgerCut = "tool ledger incomplete"
 )
 
 // toolsListTool is the tool name the proxy records for an MCP tools/list
@@ -222,6 +223,9 @@ func proxiedCalls(rc *schemas.RunContext, ev *schemas.Evidence) ([]schemas.ToolC
 	ev = orEmpty(ev)
 	if ev.ToolCalls == nil {
 		return nil, schemas.Unknown(reasonNoToolLedger, schemas.EvidenceBoundary), false
+	}
+	if ev.ToolLedgerProblem != "" {
+		return nil, schemas.Unknown(reasonToolLedgerCut+": "+ev.ToolLedgerProblem, schemas.EvidenceBoundary), false
 	}
 	calls := make([]schemas.ToolCall, 0, len(ev.ToolCalls))
 	for _, c := range ev.ToolCalls {

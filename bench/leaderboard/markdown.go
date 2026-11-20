@@ -27,6 +27,15 @@ func Markdown(lb *schemas.Leaderboard) string {
 	if lb.Split == schemas.SplitHeldOut { // Suite health area (split.go)
 		b.WriteString("> **HELD-OUT BOARD.** Runs of held-out tasks only. Kept apart from the public board; never compare the two directly.\n\n")
 	}
+	switch lb.Grading {
+	case GradingJudged, GradingMixed:
+		fmt.Fprintf(&b, "> **JUDGED.** A judge model decided whether answers are correct (%s); these results are a model's opinion, not a deterministic check (docs/answer-grading.md).\n\n",
+			orNone(strings.Join(lb.Judges, ", ")))
+	case GradingUnknown:
+		if len(lb.Entries) > 0 {
+			b.WriteString("> **GRADING UNKNOWN.** No graded run carries grade evidence; whether a judge model decided these results is not recorded.\n\n")
+		}
+	}
 	scope := "each entry over its own tasks"
 	if lb.Scope == ScopeCommon {
 		scope = "every entry over the common tasks only"

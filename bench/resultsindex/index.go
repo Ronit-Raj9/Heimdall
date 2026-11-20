@@ -44,7 +44,7 @@ const (
 // FormatVersion is written in the meta line. A file with another version is
 // ignored on load (treated as empty) so an old binary never misreads a newer
 // layout; the next rebuild rewrites it.
-const FormatVersion = 1
+const FormatVersion = 2 // 2: RunRow.SuiteLockHash
 
 // FormatName says which index implementation is in use, for `index status`.
 const FormatName = "jsonl"
@@ -55,7 +55,8 @@ type RunRow struct {
 	Experiment        string             `json:"experiment"`
 	ExperimentCreated time.Time          `json:"experiment_created"`
 	RunID             string             `json:"run_id"`
-	Suite             string             `json:"suite"` // id@version
+	Suite             string             `json:"suite"`                     // id@version
+	SuiteLockHash     string             `json:"suite_lock_hash,omitempty"` // the frozen suite lock: task identity beyond the bare id
 	Task              string             `json:"task"`
 	Arm               string             `json:"arm"`
 	Agent             string             `json:"agent"` // agent config id

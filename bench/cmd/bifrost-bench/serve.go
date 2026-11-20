@@ -13,7 +13,6 @@ import (
 	"strings"
 	"sync"
 	"syscall"
-	"time"
 
 	"github.com/maximhq/bifrost/bench/attribution"
 	"github.com/maximhq/bifrost/bench/engine"
@@ -158,28 +157,30 @@ type indexAdapter struct {
 	root string // run store root, for the analysis folders
 }
 
-// LatestAnalysis returns the newest analysis id of an experiment from its
-// analysis/ folder, so the verdict page survives a server restart.
+// LatestAnalysis returns the newest complete analysis id of an experiment
+// from its analysis/ folder, so the verdict page survives a server restart.
+// The store orders analyses by their own created_at (audit 1-D-07).
 func (x indexAdapter) LatestAnalysis(expID string) (string, bool) {
-	entries, err := os.ReadDir(filepath.Join(x.root, expID, "analysis"))
-	if err != nil {
+	a, err := x.latestAnalysis(expID)
+	if err != nil || a == nil {
 		return "", false
 	}
-	var best string
-	var bestAt time.Time
-	for _, e := range entries {
-		if !e.IsDir() {
-			continue
-		}
-		info, err := e.Info()
-		if err != nil {
-			continue
-		}
-		if best == "" || info.ModTime().After(bestAt) {
-			best, bestAt = e.Name(), info.ModTime()
+	return a.AnalysisID, true
+}
+
+// latestAnalysis reads the newest complete analysis through the store's
+// shared reader.
+func (x indexAdapter) latestAnalysis(expID string) (*schemas.Analysis, error) {
+	var st *store.FSStore
+	if x.ix != nil {
+		st = x.ix.Store()
+	} else {
+		var err error
+		if st, err = store.NewFSStore(x.root, schemas.NoopLogger{}); err != nil {
+			return nil, err
 		}
 	}
-	return best, best != ""
+	return st.LatestAnalysis(context.Background(), expID)
 }
 
 func view(e store.RunEntry) handlers.RunView {

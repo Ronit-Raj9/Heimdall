@@ -49,6 +49,7 @@ const (
 const (
 	fileMetrics = "metrics.json"
 	fileLedger  = "proxy.ledger.jsonl"
+	fileGrade   = "grade.json"
 )
 
 // ErrBadQuery marks a query the board cannot answer as asked. The HTTP
@@ -189,6 +190,7 @@ func Build(ctx context.Context, src Source, q Query) (*schemas.Leaderboard, erro
 		return nil, err
 	}
 	lb.Excluded = exclusions(excluded, q.Condition)
+	lb.Grading, lb.Judges = boardGrading(ctx, src, graded, q.Condition)
 	calcs, common := buildEntries(graded, q)
 	rank(calcs, q.Alpha)
 	lb.Entries, lb.CommonTasks = toEntries(calcs), common
@@ -222,6 +224,10 @@ type record struct {
 	source  string                   // regrade id the run was read from; "" for its original grade
 	counted int                      // sealed runs of the slot that are not aborted_infra; more than one is excluded
 	review  *schemas.Review          // the human review the outcome came from under grade source reviewed (review.go)
+
+	sealVerified    bool   // the seal verified (sealReason); checked once, before any file is read
+	sealMismatch    bool   // the seal did not verify; no file of the run is read
+	evidenceProblem string // a sealed file the board reads did not parse; the run is excluded
 }
 
 // key is the (experiment, config) pair synthetic classification works on.

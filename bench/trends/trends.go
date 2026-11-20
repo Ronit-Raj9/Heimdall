@@ -83,6 +83,12 @@ func Build(r resultsindex.Reader, q Query, now time.Time) (*Response, error) {
 		resp.Suites = appendUnique(resp.Suites, row.Suite)
 		resp.Agents = appendUnique(resp.Agents, row.Agent)
 		resp.Conditions = appendUnique(resp.Conditions, row.Condition)
+		if len(row.Problems) > 0 {
+			// Kept in the index for diagnosis, but evidence the verdict would
+			// call INVALID (e.g. a slot with two counted runs) is never charted.
+			resp.Invalid++
+			continue
+		}
 		if row.Success == nil || row.NotRepeatable || row.Condition != q.Condition || (q.Suite != "" && row.Suite != q.Suite) ||
 			(q.Agent != "" && row.Agent != q.Agent) {
 			continue
@@ -102,6 +108,7 @@ func Build(r resultsindex.Reader, q Query, now time.Time) (*Response, error) {
 // pointRuns is one point under construction.
 type pointRuns struct {
 	p     Point
+	lock  string // suite lock hash: tasks pair only within one lock
 	rows  []resultsindex.RunRow
 	rates map[string]float64
 }
@@ -124,7 +131,7 @@ func lineages(rows []resultsindex.RunRow, newest map[string]resultsindex.Analysi
 		pr, ok := lr.points[pk]
 		if !ok {
 			pr = &pointRuns{p: Point{Experiment: row.Experiment, Date: row.ExperimentCreated, Suite: row.Suite,
-				Arm: row.Arm, ConfigHash: row.ConfigHash}}
+				Arm: row.Arm, ConfigHash: row.ConfigHash}, lock: row.SuiteLockHash}
 			lr.points[pk] = pr
 		}
 		if !slices.Contains(strings.Split(pr.p.Arm, ","), row.Arm) {
@@ -148,8 +155,7 @@ func lineages(rows []resultsindex.RunRow, newest map[string]resultsindex.Analysi
 				pr.p.Regression = Regression{Status: StatusFirst, Reason: "first point of this lineage"}
 			} else {
 				pr.p.ConfigChanged = pr.p.ConfigHash != prs[i-1].p.ConfigHash
-				pr.p.Regression = Compare(prs[i-1].rates, pr.rates)
-				pr.p.Regression.Against = prs[i-1].p.Experiment
+				pr.p.Regression = compareSameSuite(prs[:i], pr)
 			}
 			lr.l.Synthetic = lr.l.Synthetic || pr.p.Synthetic
 			lr.l.Points = append(lr.l.Points, pr.p)
@@ -159,6 +165,22 @@ func lineages(rows []resultsindex.RunRow, newest map[string]resultsindex.Analysi
 	}
 	slices.SortFunc(out, func(a, b Lineage) int { return cmp.Or(cmp.Compare(a.Agent, b.Agent), cmp.Compare(a.Model, b.Model)) })
 	return out
+}
+
+// compareSameSuite compares a point with the newest earlier point of the
+// same suite (id@version) and suite lock. Task IDs are only paired within
+// one locked suite: two suites, two versions of one suite, or a relocked
+// suite can reuse an ID such as t01 for different tasks.
+func compareSameSuite(earlier []*pointRuns, pr *pointRuns) Regression {
+	for j := len(earlier) - 1; j >= 0; j-- {
+		if earlier[j].p.Suite == pr.p.Suite && earlier[j].lock == pr.lock {
+			reg := Compare(earlier[j].rates, pr.rates)
+			reg.Against = earlier[j].p.Experiment
+			return reg
+		}
+	}
+	return Regression{Status: StatusCannotTell,
+		Reason: fmt.Sprintf("no earlier point of suite %s with the same suite lock in this lineage; tasks of other suites are not paired", pr.p.Suite)}
 }
 
 // computePoint fills a point's numbers from its runs and its experiment's

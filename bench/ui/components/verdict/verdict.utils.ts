@@ -82,6 +82,23 @@ export function formatSignedPp(fraction: number, locale: string): string {
 	return new Intl.NumberFormat(locale, { maximumFractionDigits: 1, signDisplay: "exceptZero" }).format(fraction * 100);
 }
 
+/** Unit suffix a non-rate metric name carries (_usd, _ms, _s), or null for a rate read in pp. Mirrors unitText in reporters/markdown.go. */
+export function metricUnit(metric: string | undefined): "USD" | "ms" | "s" | null {
+	if (!metric) return null;
+	if (metric.endsWith("_usd")) return "USD";
+	if (metric.endsWith("_ms")) return "ms";
+	if (metric.endsWith("_s")) return "s";
+	return null;
+}
+
+/** An effect difference in its metric's own unit: signed pp for rates, "-9 s" for seconds, "+0.03 USD" for spend. */
+export function formatSignedEffect(metric: string | undefined, value: number, locale: string): string {
+	const unit = metricUnit(metric);
+	if (unit === null) return `${formatSignedPp(value, locale)} pp`;
+	const n = new Intl.NumberFormat(locale, { maximumFractionDigits: unit === "USD" ? 4 : 3, signDisplay: "exceptZero" }).format(value);
+	return `${n} ${unit}`;
+}
+
 /** A number already in percentage points (the MDE), unsigned. */
 export function formatPp(pp: number, locale: string): string {
 	return new Intl.NumberFormat(locale, { maximumFractionDigits: 1 }).format(pp);

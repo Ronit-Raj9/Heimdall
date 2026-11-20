@@ -51,7 +51,9 @@ func (s *toolLedgerSource) GetVersion() string { return version }
 // empty (not nil) slice when no call was made. A missing ledger is a collect
 // failure and leaves ev.ToolCalls nil, so the tool metrics read unknown, not
 // zero. Malformed lines are skipped with a warning: a proxy killed mid-write
-// leaves a torn last line and the rest is still good evidence.
+// leaves a torn last line and the rest is still good evidence, but only a
+// prefix, so ev.ToolLedgerProblem records it and exact counts read unknown.
+// A ledger over the read cap is marked the same way.
 func (s *toolLedgerSource) Collect(_ context.Context, rc *schemas.RunContext, ev *schemas.Evidence) error {
 	if len(ProxiedServices(rc)) == 0 {
 		return nil
@@ -72,10 +74,14 @@ func (s *toolLedgerSource) Collect(_ context.Context, rc *schemas.RunContext, ev
 	if err != nil {
 		return fmt.Errorf("read tool ledger for run %s: %w", id, err)
 	}
+	ev.ToolCalls = calls
 	if bad > 0 {
 		pickLogger(s.logger, rc).Warn("tool ledger has malformed lines", "run_id", id, "lines", bad)
+		ev.ToolLedgerProblem = fmt.Sprintf("tool ledger has %d malformed lines", bad)
 	}
-	ev.ToolCalls = calls
+	if n, _ := io.Copy(io.Discard, io.LimitReader(f, 1)); n > 0 {
+		ev.ToolLedgerProblem = fmt.Sprintf("tool ledger exceeds the %d byte read cap", toolLedgerMax)
+	}
 	return nil
 }
 

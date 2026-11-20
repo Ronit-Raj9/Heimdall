@@ -44,6 +44,13 @@ type Leaderboard struct {
 	// from experiments that selected them); empty on the public board, which
 	// never counts a held-out task (docs/held-out-and-canaries.md).
 	Split string `json:"split,omitempty"`
+	// Grading is how the board's runs were graded, from each experiment's
+	// frozen plan and the runs' sealed grade.json: verified (a deterministic
+	// check), judged (a judge model decided, docs/answer-grading.md),
+	// mixed, or unknown when no graded run carries grade evidence. Judges
+	// lists the judge models of judged runs.
+	Grading string   `json:"grading"`
+	Judges  []string `json:"judges,omitempty"`
 }
 
 // LeaderboardEntry is one agent configuration on the board.

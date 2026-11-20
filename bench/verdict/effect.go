@@ -280,6 +280,7 @@ func fillEffectStats(e *schemas.Effect, d []float64, inferential bool) {
 			if finite(r.P) {
 				p = r.P
 			}
+			e.PDraws = r.Draws // above stats.ExactMaxNonzero the p is sampled
 			e.NPositive, e.NNegative = r.NPositive, r.NNegative
 		}
 		e.PValue = &p

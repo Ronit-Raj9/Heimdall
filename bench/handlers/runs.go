@@ -8,6 +8,7 @@ import (
 	"errors"
 	"fmt"
 	"io/fs"
+	"slices"
 	"strconv"
 	"strings"
 
@@ -53,8 +54,42 @@ var runFileTypes = map[string]string{
 
 // RunsHandler serves one run: its record, events, diff, receipts and files.
 type RunsHandler struct {
-	mode  schemas.Mode
-	index ReadIndex
+	mode           schemas.Mode
+	index          ReadIndex
+	heldOutVisible bool // server config held_out.visible (WithHeldOutVisible)
+}
+
+// WithHeldOutVisible sets whether runs of held-out tasks are served (server
+// config held_out.visible). The default, false, answers 404 for every route
+// of a run whose experiment's frozen plan holds its task out: its record,
+// events, diff, files, raw evidence, artifacts and trace all carry the
+// instruction or the agent's work on it. Listings keep the run's ids.
+func (h *RunsHandler) WithHeldOutVisible(visible bool) *RunsHandler {
+	h.heldOutVisible = visible
+	return h
+}
+
+// heldOutRun reports whether the run's task is held out in its experiment's
+// frozen plan (manifest held_out_tasks), the split every result surface
+// reads. A run the index lists without a manifest has no frozen plan to
+// hold it out.
+func heldOutRun(index ReadIndex, rv *RunView) bool {
+	m, ok := index.Manifest(rv.Slot.ExpID)
+	if !ok || m == nil {
+		return false
+	}
+	return slices.Contains(m.HeldOutTasks, rv.Slot.Task)
+}
+
+// refuseHeldOutRun answers 404 for a held-out task's run unless held-out
+// content is visible, and reports whether it did.
+func refuseHeldOutRun(ctx *fasthttp.RequestCtx, mode schemas.Mode, index ReadIndex, visible bool, rv *RunView) bool {
+	if visible || !heldOutRun(index, rv) {
+		return false
+	}
+	lib.SendError(ctx, mode, fasthttp.StatusNotFound, lib.ErrTypeNotFound,
+		"run "+rv.Run.RunID+" is of a held-out task; its content is not served (server config held_out.visible is false)")
+	return true
 }
 
 // NewRunsHandler creates the runs handler. index may be nil.
@@ -400,6 +435,9 @@ func (h *RunsHandler) lookup(ctx *fasthttp.RequestCtx) (*RunView, bool) {
 	rv, ok := h.index.Run(id)
 	if !ok || rv == nil {
 		sendNotFound(ctx, h.mode, "run", id)
+		return nil, false
+	}
+	if refuseHeldOutRun(ctx, h.mode, h.index, h.heldOutVisible, rv) {
 		return nil, false
 	}
 	return rv, true

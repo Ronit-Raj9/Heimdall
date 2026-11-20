@@ -306,3 +306,58 @@ func TestPartialRegateIsNotAGradeSource(t *testing.T) {
 		}
 	}
 }
+
+// Audit 1-D-07: WriteAnalysis publishes a complete folder or nothing, and
+// LatestAnalysis picks by created_at, skips incomplete folders and fails on
+// an unreadable verdict.json.
+func TestWriteAnalysisStagedAndLatest(t *testing.T) {
+	ctx := context.Background()
+	s := newTestStore(t, nil)
+	mustCreateExp(t, s, "e_test")
+	if a, err := s.LatestAnalysis(ctx, "e_test"); err != nil || a != nil {
+		t.Fatalf("no analyses: %+v, %v", a, err)
+	}
+	at := time.Date(2026, 11, 14, 12, 0, 0, 0, time.UTC)
+	invalid := &schemas.Analysis{AnalysisID: "an_b", ExpID: "e_test", CreatedAt: at, Verdict: schemas.Verdict{Decision: schemas.DecisionInvalid}}
+	older := &schemas.Analysis{AnalysisID: "an_c", ExpID: "e_test", CreatedAt: at.Add(-time.Hour)}
+	for _, a := range []*schemas.Analysis{invalid, older} {
+		if err := s.WriteAnalysis(ctx, a, nil); err != nil {
+			t.Fatal(err)
+		}
+	}
+	// A failing extra file must not leave a published folder.
+	cancelled, cancel := context.WithCancel(ctx)
+	cancel()
+	_ = s.WriteAnalysis(cancelled, &schemas.Analysis{AnalysisID: "an_x", ExpID: "e_test", CreatedAt: at.Add(time.Hour)}, nil)
+	err := s.WriteAnalysis(ctx, &schemas.Analysis{AnalysisID: "an_y", ExpID: "e_test", CreatedAt: at.Add(time.Hour)},
+		map[string][]byte{"a/b": nil, "a": nil})
+	if err == nil {
+		t.Fatal("conflicting extra files: want error")
+	}
+	base := filepath.Join(s.Root(), "e_test", "analysis")
+	entries, err := os.ReadDir(base)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var names []string
+	for _, e := range entries {
+		names = append(names, e.Name())
+	}
+	if strings.Join(names, ",") != "an_b,an_c" {
+		t.Fatalf("analysis folders %v, want only an_b,an_c", names)
+	}
+	// A legacy interrupted folder without verdict.json is skipped.
+	if err := os.Mkdir(filepath.Join(base, "an_z"), dirPerm); err != nil {
+		t.Fatal(err)
+	}
+	got, err := s.LatestAnalysis(ctx, "e_test")
+	if err != nil || got == nil || got.AnalysisID != "an_b" || got.Verdict.Decision != schemas.DecisionInvalid {
+		t.Fatalf("latest = %+v, %v, want an_b invalid", got, err)
+	}
+	if err := os.WriteFile(filepath.Join(base, "an_z", "verdict.json"), []byte("{"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := s.LatestAnalysis(ctx, "e_test"); err == nil {
+		t.Fatal("unreadable verdict.json: want error")
+	}
+}

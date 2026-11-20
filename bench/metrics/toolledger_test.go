@@ -160,3 +160,18 @@ func TestHasProxiedService(t *testing.T) {
 		})
 	}
 }
+
+// A torn or capped ledger is a prefix: exact counts must not read a measured
+// zero (audit 1-C-04).
+func TestToolLedgerMetricsIncompleteLedger(t *testing.T) {
+	ev := &schemas.Evidence{ToolCalls: []schemas.ToolCall{}, ToolLedgerProblem: "tool ledger has 1 malformed lines"}
+	for _, m := range []schemas.Metric{newToolCallsProxiedMetric(), newToolErrorRateMetric(), newDistinctToolsMetric()} {
+		got, err := m.Compute(context.Background(), toolRun(), ev)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if got.State != schemas.ValueUnknown {
+			t.Fatalf("%s on a torn ledger gave %+v, want unknown", m.GetName(), got)
+		}
+	}
+}

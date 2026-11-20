@@ -93,8 +93,19 @@ func moreEvidence(m *schemas.Manifest, cfg settings, idx runIndex, v *schemas.Ve
 		Combination: schemas.ExtensionExploratory,
 		CostBasis:   "no observed cost in this experiment",
 	}
-	if total >= maxTasksNeeded {
+	if total == 0 {
+		// No size in [minTasksNeeded, maxTasksNeeded] detects the target:
+		// more than the cap is needed. Tasks, runs and cost stay unknown
+		// rather than read as zero (audit 1-B-06); TasksTotal names the cap
+		// the need exceeds.
 		out.Over = true
+		out.TasksTotal = maxTasksNeeded
+		out.CostBasis = fmt.Sprintf("not estimated: more than %d tasks in all would be needed", maxTasksNeeded)
+		if a1, ok := ExtensionAlphaFirst(m, cfg.alpha); ok {
+			out.Combination = schemas.ExtensionInverseNormal
+			out.AlphaKept = cfg.alpha - a1
+		}
+		return out
 	}
 	out.Tasks = max(total-n, 0)
 	perTask := runsPerTask(m)

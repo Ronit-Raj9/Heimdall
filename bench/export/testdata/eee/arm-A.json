@@ -732,6 +732,7 @@
       "heimdall_runs_sealed": "16",
       "heimdall_seal_hashes": "[\"seal-s_clean_A_1_1\",\"seal-s_clean_A_1_2\",\"seal-s_clean_A_2_1\",\"seal-s_clean_A_2_2\",\"seal-s_clean_A_3_1\",\"seal-s_clean_A_3_2\",\"seal-s_clean_A_4_1\",\"seal-s_clean_A_4_2\",\"seal-s_model-outage_A_1_1\",\"seal-s_model-outage_A_1_2\",\"seal-s_model-outage_A_2_1\",\"seal-s_model-outage_A_2_2\",\"seal-s_model-outage_A_3_1\",\"seal-s_model-outage_A_3_2\",\"seal-s_model-outage_A_4_1\",\"seal-s_model-outage_A_4_2\"]",
       "heimdall_seal_set_sha256": "fdc29f60eed564962230d6b01426c34494dccff257a211eb0b5ba6d6454e6e0e",
+      "heimdall_split": "public",
       "heimdall_suite_lock_hash": "lockhash",
       "heimdall_synthetic": "false"
     },

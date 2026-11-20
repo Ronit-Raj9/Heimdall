@@ -275,7 +275,7 @@ answers 404 on the v2.5.1 image. The stack was removed afterwards.
   per-target shares show it.
 - **Governance 429 has no Retry-After** on v2.5.1, and budgets can overshoot
   under concurrency.
-- **The fidelity gate must be switched on** (`extra_gates: [model_fidelity]`),
-  as for unrouted experiments.
+- **The fidelity gate is a baseline gate**: every experiment runs
+  `model_fidelity`; listing it in `extra_gates` is harmless.
 - No routing experiment has run on a real model. The forecasts are
   assumptions, labelled as such in each file.

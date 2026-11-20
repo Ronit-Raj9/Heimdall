@@ -228,6 +228,14 @@ func (m *bifrostMCPMetric) Compute(_ context.Context, _ *schemas.RunContext, ev 
 	if !m.mismatch {
 		return schemas.Observed(float64(len(b.Calls)), schemas.EvidenceGateway), nil
 	}
+	// A missing or partial ledger is no witness: comparing against it would
+	// claim agreement from absent evidence (audit 1-C-10).
+	if ev.ToolCalls == nil {
+		return schemas.Unknown("tool proxy ledger missing: no second witness", schemas.EvidenceBoundary), nil
+	}
+	if ev.ToolLedgerProblem != "" {
+		return schemas.Unknown("tool proxy ledger incomplete: "+ev.ToolLedgerProblem, schemas.EvidenceBoundary), nil
+	}
 	only, _ := MCPWitnessDiff(ev.ToolCalls, b.Calls)
 	return schemas.Observed(float64(len(only)), schemas.EvidenceBoundary), nil
 }

@@ -534,8 +534,9 @@
 			"discordant": "Discordant tasks",
 			"discordantValue": "{{count}} of {{n}}",
 			"discordantSplit": "{{positive}} positive, {{negative}} negative",
-			"pValue": "Exact p-value",
+			"pValue": "Sign-flip p-value",
 			"pValueBelow": "< {{p}}",
+			"pValueSampled": "(sampled, {{draws}} sign vectors)",
 			"pValueUnit": "randomization unit: {{unit}}",
 			"mde": "Minimal detectable effect",
 			"assumedSd": "assumed SD {{sd}}",
@@ -590,7 +591,7 @@
 			"label": "Method: {{name}}",
 			"pValue": {
 				"name": "exact p-value",
-				"definition": "Exact two-sided sign-flip test: the share of all 2^n sign patterns of the per-task differences whose mean is at least as far from zero as the observed one.",
+				"definition": "Exact two-sided sign-flip test: the share of all 2^n sign patterns of the per-task differences whose mean is at least as far from zero as the observed one. Above 22 differing tasks it is estimated from 1,000,000 random sign patterns and marked sampled.",
 				"denominator": "Denominator: all 2^n sign vectors over the n tasks of the primary condition; the task is the unit, so trials of one task never count as separate wins."
 			},
 			"mde": {
@@ -1574,7 +1575,7 @@
 	},
 	"matrix": {
 		"title": "Model matrix",
-		"subtitle": "Every arm of one experiment on one condition, ranked by verified success. Every pair is tested on the tasks both ran with the exact sign-flip test, Holm-adjusted across all pairs.",
+		"subtitle": "Every arm of one experiment on one condition, ranked by verified success. Every pair is tested on the tasks both ran with the sign-flip test (exact up to 22 differing tasks, sampled above), Holm-adjusted across all pairs.",
 		"experiment": "Experiment {{id}}",
 		"noExperiments": "No experiments yet. Plan and run one, then compare its arms here.",
 		"listError": "Could not load experiments",
@@ -3534,6 +3535,7 @@
 		"excluded_other": "{{count}} runs of slots the rule did not release were left out of the analysis.",
 		"more": "To detect {{pp}} pp you need about {{tasks}} more tasks, estimated cost {{cost}}.",
 		"costUnknown": "unknown",
+		"moreOver": "To detect {{pp}} pp you need more than {{total}} tasks in all; runs and cost are not estimated.",
 		"sdAssumed": "SD {{sd}} assumed (no A/A arm).",
 		"sdMeasured": "SD {{sd}} measured from the A/A arm.",
 		"combined": "A follow-up is decided together with this experiment by the pre-declared inverse-normal rule at alpha {{alpha}}.",

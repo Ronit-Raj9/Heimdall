@@ -114,7 +114,7 @@ func (h *ForecastHandler) getMatrix(ctx *fasthttp.RequestCtx) {
 			return
 		}
 	}
-	q := leaderboard.MatrixQuery{Condition: string(args.Peek("condition")), GradeSource: string(args.Peek("grade_source")), K: k, Alpha: alpha}
+	q := leaderboard.MatrixQuery{Condition: string(args.Peek("condition")), GradeSource: string(args.Peek("grade_source")), K: k, Alpha: alpha, Split: string(args.Peek("split"))}
 	work, cancel := workContext(ctx, readTimeout)
 	defer cancel()
 	mx, err := h.source.Matrix(work, id, q)

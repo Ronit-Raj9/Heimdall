@@ -17,3 +17,5 @@ grade_sources
 reviewed_runs?
 review_changed_runs?
 split?
+grading
+judges?

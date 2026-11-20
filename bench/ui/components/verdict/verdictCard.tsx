@@ -17,7 +17,9 @@ import {
 	formatPValue,
 	formatPp,
 	formatSd,
+	formatSignedEffect,
 	formatSignedPp,
+	metricUnit,
 	integrityTone,
 	integrityView,
 	tasksNeededView,
@@ -96,7 +98,7 @@ export function VerdictCard({ verdict, metricLabel, className }: VerdictCardProp
 						</span>
 						<span className="flex flex-col gap-0.5" data-testid="verdict-effect">
 							<span className="text-foreground text-2xl leading-none font-semibold tabular-nums">
-								{effect ? t("verdict.card.pp", { value: formatSignedPp(effect.d_bar, locale) }) : t("verdict.card.noEffect")}
+								{effect ? formatSignedEffect(effect.metric, effect.d_bar, locale) : t("verdict.card.noEffect")}
 							</span>
 							<span className="text-muted-foreground text-xs">{t("verdict.card.releaseEffect")}</span>
 						</span>
@@ -112,10 +114,12 @@ export function VerdictCard({ verdict, metricLabel, className }: VerdictCardProp
 						testId="verdict-stat-interval"
 					>
 						{effect?.interval
-							? t("verdict.card.intervalValue", {
-									lo: formatSignedPp(effect.interval[0], locale),
-									hi: formatSignedPp(effect.interval[1], locale),
-								})
+							? metricUnit(effect.metric) === null
+								? t("verdict.card.intervalValue", {
+										lo: formatSignedPp(effect.interval[0], locale),
+										hi: formatSignedPp(effect.interval[1], locale),
+									})
+								: `${formatSignedEffect(effect.metric, effect.interval[0], locale)} .. ${formatSignedEffect(effect.metric, effect.interval[1], locale)}`
 							: t("verdict.card.noEffect")}
 					</Stat>
 					<Stat label={t("verdict.card.discordant")} testId="verdict-stat-discordant">
@@ -219,8 +223,9 @@ function PValue({ effect }: { effect: Effect | undefined }) {
 	const { t } = useTranslation("bench");
 	const locale = getLocale();
 	if (!effect || typeof effect.p_value !== "number") return <>{t("verdict.card.noEffect")}</>;
-	if (effect.p_value < P_VALUE_FLOOR) return <>{t("verdict.card.pValueBelow", { p: formatPValue(P_VALUE_FLOOR, locale) })}</>;
-	return <>{formatPValue(effect.p_value, locale)}</>;
+	const sampled = effect.p_draws ? <> {t("verdict.card.pValueSampled", { draws: effect.p_draws })}</> : null;
+	if (effect.p_value < P_VALUE_FLOOR) return <>{t("verdict.card.pValueBelow", { p: formatPValue(P_VALUE_FLOOR, locale) })}{sampled}</>;
+	return <>{formatPValue(effect.p_value, locale)}{sampled}</>;
 }
 
 function GuardList({ guards }: { guards: GuardResult[] }) {

@@ -25,8 +25,11 @@ const (
 //
 // Tiers: each entry after the leader is compared with it on the tasks both
 // have in scope. d_t is the leader's success rate minus the entry's on task
-// t; stats.SignFlip gives the exact two-sided p, and the p-values of all
-// compared entries are Holm-adjusted together. An entry is tier 2 only when
+// t; stats.SignFlip gives the two-sided p. The leader is picked from the same
+// scores, so its comparisons are not a predetermined family: the Holm
+// adjustment runs over every pair of entries with a task in common, and each
+// entry keeps the adjusted p of its pair with the leader (audit 1-B-11). An
+// entry is tier 2 only when
 // its adjusted p is below alpha and the leader is ahead on those tasks.
 // Everything else is tier 1, with the reason in plain words: too few
 // differing tasks for any split to reach alpha (stats.MinPossibleP), no
@@ -62,9 +65,22 @@ func rank(calcs []*entryCalc, alpha float64) {
 		}
 		tests = append(tests, test{c: c, d: d, res: stats.SignFlip(d), mean: stats.Mean(d)})
 	}
-	raw := make([]float64, len(tests))
+	raw := make([]float64, len(tests), len(calcs)*(len(calcs)-1)/2)
 	for i, t := range tests {
 		raw[i] = t.res.P
+	}
+	for i, x := range calcs[1:] { // the pairs not involving the leader join the family
+		for _, y := range calcs[i+2:] {
+			var d []float64
+			for _, task := range sortedKeys(x.rates) {
+				if r, ok := y.rates[task]; ok {
+					d = append(d, x.rates[task]-r)
+				}
+			}
+			if len(d) > 0 {
+				raw = append(raw, stats.SignFlip(d).P)
+			}
+		}
 	}
 	adjusted := holm(raw)
 	for i, t := range tests {

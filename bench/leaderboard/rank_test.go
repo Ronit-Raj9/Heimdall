@@ -120,7 +120,10 @@ func TestRankTiers(t *testing.T) {
 		}
 		byHash[c.e.ConfigHash] = c
 	}
-	// Three tested entries: behind has raw p 2/256, Holm multiplies by 3.
+	// Holm runs over every pair with a common task (audit 1-B-11): leader,
+	// same, few and behind give six pairs. behind has raw p 2/256 against
+	// the leader and against same, so Holm multiplies it by 6; few has raw
+	// 0.25 and lands at 3 * 0.25.
 	tests := []struct {
 		hash, reason string
 		tier         int
@@ -128,8 +131,8 @@ func TestRankTiers(t *testing.T) {
 	}{
 		{hash: "h_leader", reason: "leader", tier: 1, p: -1},
 		{hash: "h_same", reason: "same success as the leader on all 8 common tasks", tier: 1, p: 1},
-		{hash: "h_few", reason: "too few differing tasks (3 of 8 common) to separate", tier: 1, p: 0.5},
-		{hash: "h_behind", reason: "p 0.023 on 8 common tasks: behind the leader", tier: 2, p: 3 * 2.0 / 256},
+		{hash: "h_few", reason: "too few differing tasks (3 of 8 common) to separate", tier: 1, p: 0.75},
+		{hash: "h_behind", reason: "p 0.047 on 8 common tasks: behind the leader", tier: 2, p: 6 * 2.0 / 256},
 		{hash: "h_apart", reason: "no tasks in common with the leader", tier: 1, p: -1},
 	}
 	for _, tt := range tests {
@@ -176,5 +179,31 @@ func TestFormatP(t *testing.T) {
 		if got := formatP(p); got != want {
 			t.Errorf("formatP(%v) = %q, want %q", p, got, want)
 		}
+	}
+}
+
+// The audit's 13-task table: picking the leader on the same scores and
+// adjusting only its two comparisons gave the last arm 2 * 0.0224609375 and
+// tier 2. Over all three pairs, as the matrix does, it is 3 * 0.0224609375
+// and not separable (audit 1-B-11).
+func TestRankHolmCoversAllPairsAfterLeaderSelection(t *testing.T) {
+	first, middle, last := map[string]float64{}, map[string]float64{}, map[string]float64{}
+	for i := range 13 {
+		task := fmt.Sprintf("t%02d", i)
+		first[task], middle[task], last[task] = 0, 0, 0
+		switch {
+		case i < 6:
+			first[task], middle[task] = 1, 1
+		case i < 11:
+			first[task] = 1
+		default:
+			last[task] = 1
+		}
+	}
+	calcs := []*entryCalc{calc("h_last", 13, obs(0.1), last), calc("h_middle", 13, obs(0.1), middle), calc("h_first", 13, obs(0.1), first)}
+	rank(calcs, DefaultAlpha)
+	e := calcs[2].e
+	if e.ConfigHash != "h_last" || e.PVsLeader == nil || math.Abs(*e.PVsLeader-3*0.0224609375) > 1e-12 || e.Tier != TierLeader {
+		t.Fatalf("last arm: %s p %v tier %d %q", e.ConfigHash, e.PVsLeader, e.Tier, e.TierReason)
 	}
 }

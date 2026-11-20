@@ -62,16 +62,29 @@ func classify(ctx context.Context, src Source, recs []*record) (map[string]bool,
 			if !r.sealed {
 				continue
 			}
-			data, found, err := readRunFile(src, r.run.RunID, fileLedger)
+			// The seal is checked before any file of the run is read: a run
+			// whose files changed is excluded later as a seal mismatch and
+			// its ledger never decides anything (finding 1-D-06).
+			reason, err := sealReason(ctx, src, r)
 			if err != nil {
 				return nil, err
+			}
+			if reason != "" {
+				continue
+			}
+			data, found, err := readRunFile(src, r.run.RunID, fileLedger)
+			if err != nil {
+				r.evidenceProblem = fmt.Sprintf("%s: %s", fileLedger, err)
+				continue
 			}
 			if !found {
 				continue
 			}
 			scripted, err := scriptedLedger(data)
 			if err != nil {
-				return nil, fmt.Errorf("run %s: %w", r.run.RunID, err)
+				// One run's unreadable ledger excludes that run, not the board.
+				r.evidenceProblem = err.Error()
+				continue
 			}
 			if scripted {
 				out[k] = true

@@ -178,3 +178,16 @@ func levelRank(l schemas.EvidenceLevel) int {
 		return -1
 	}
 }
+
+// upstreamAttempts is the number of physical upstream attempts behind one
+// message row: its retry trail, or one when it has none. A cache hit without
+// a trail never called the provider and counts none (audit 1-C-11).
+func upstreamAttempts(r schemas.GatewayRequest) int {
+	if len(r.Attempts) > 0 {
+		return len(r.Attempts)
+	}
+	if r.CacheHit {
+		return 0
+	}
+	return 1
+}

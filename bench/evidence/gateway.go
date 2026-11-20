@@ -219,17 +219,30 @@ func NormalizeRequestRecords(log *schemas.RequestLog) ([]schemas.LogicalRequest,
 			step = len(logical) + 1
 			steps[root] = step
 			logical = append(logical, schemas.LogicalRequest{LogicalRequestID: root, LogicalStep: step, RequestID: root, Status: row.Status})
+		} else if logical[step-1].Status != "success" {
+			// A later row of the request (a fallback) decides its terminal
+			// status; once one row succeeded the request succeeded
+			// (audit 1-C-13).
+			logical[step-1].Status = row.Status
 		}
 		trail := row.Attempts
-		if len(trail) == 0 {
+		if len(trail) == 0 && !row.CacheHit {
+			// A row without a trail went upstream once; a cache hit never
+			// called the provider and has no attempt (audit 1-C-11).
 			trail = []schemas.Attempt{{N: 1, StatusCode: rowStatusCode(row)}}
+		}
+		// Attempt numbers restart on every row, so a fallback row's
+		// attempts carry the row id to stay distinct from the root's.
+		prefix := root
+		if row.ID != "" && row.ID != root {
+			prefix = root + ":" + row.ID
 		}
 		for attemptIndex, attempt := range trail {
 			n := attempt.N
 			if n == 0 {
 				n = attemptIndex + 1
 			}
-			attemptID := fmt.Sprintf("%s:attempt:%d", root, n)
+			attemptID := fmt.Sprintf("%s:attempt:%d", prefix, n)
 			status := fmt.Sprintf("%d", attempt.StatusCode)
 			if attempt.StatusCode == 0 {
 				status = row.Status

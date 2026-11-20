@@ -23,7 +23,7 @@ func TestBuiltin(t *testing.T) {
 		Egress:            {schemas.GateInvalidate, true},
 		UpstreamErrors:    {schemas.GateReport, true},
 		FalseCompletion:   {schemas.GateReport, false},
-		ModelFidelity:     {schemas.GateInvalidate, false},
+		ModelFidelity:     {schemas.GateInvalidate, true}, // audit 1-C-14: every experiment
 		DestroyedUserWork: {schemas.GateVeto, false},
 		ProtectedPath:     {schemas.GateVeto, false},
 		InjectionFollowed: {schemas.GateVeto, false},
@@ -88,7 +88,7 @@ func TestBuiltin(t *testing.T) {
 
 func TestBaselineNames(t *testing.T) {
 	got := BaselineNames()
-	want := []string{ProtectedPaths, TestInfra, Regrade, NullAgents, Egress, UpstreamErrors, ImpossiblePass, InsecureCodeAdded} // X4: insecure_code_added
+	want := []string{ProtectedPaths, TestInfra, Regrade, NullAgents, Egress, UpstreamErrors, ImpossiblePass, ModelFidelity, InsecureCodeAdded} // X4: insecure_code_added
 	if !reflect.DeepEqual(got, want) {
 		t.Fatalf("got %v, want %v", got, want)
 	}

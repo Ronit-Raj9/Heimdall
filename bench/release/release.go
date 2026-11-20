@@ -416,7 +416,9 @@ func (ev *evidence) loadPolicy() error {
 }
 
 // newestAnalysis returns the analysis id with the latest created_at, ties to
-// the larger id. Folders without a readable verdict.json are skipped.
+// the larger id. Folders without verdict.json (an incomplete write) are
+// skipped; a verdict.json that exists but does not decode refuses, since the
+// newest analysis might be the one that said INVALID (audit 1-D-07).
 func (l *Log) newestAnalysis(base string) (string, error) {
 	entries, err := os.ReadDir(base)
 	if err != nil && !errors.Is(err, fs.ErrNotExist) {
@@ -430,8 +432,11 @@ func (l *Log) newestAnalysis(base string) (string, error) {
 		}
 		var a schemas.Analysis
 		if err := readJSON(filepath.Join(base, e.Name(), verdictFile), &a); err != nil {
-			l.d.Logger.Warn("analysis skipped", "analysis_id", e.Name(), "error", err.Error())
-			continue
+			if errors.Is(err, schemas.ErrNotFound) {
+				l.d.Logger.Warn("analysis skipped", "analysis_id", e.Name(), "error", err.Error())
+				continue
+			}
+			return "", fmt.Errorf("analysis %s: %w", e.Name(), err)
 		}
 		if best == "" || a.CreatedAt.After(bestAt) || (a.CreatedAt.Equal(bestAt) && e.Name() > best) {
 			best, bestAt = e.Name(), a.CreatedAt

@@ -198,3 +198,88 @@ func TestRunRowMatchesContract(t *testing.T) {
 		t.Fatalf("RunRow keys %v, contract %v", got, want)
 	}
 }
+
+// An experiment whose newest verdict is INVALID is never published as EEE
+// (finding 1-D-05).
+func TestEEERefusesInvalid(t *testing.T) {
+	in := resultsFixture()
+	in.Invalid = true
+	if _, err := EEE(context.Background(), in, EEEOptions{Organization: "Acme"}); !errors.Is(err, ErrInvalid) {
+		t.Fatalf("err %v, want ErrInvalid", err)
+	}
+}
+
+// A run whose seal failed verification is excluded from the score and never
+// listed among the result's provenance seals (finding 1-D-11).
+func TestEEEProvenanceLeavesOutFailedSeal(t *testing.T) {
+	in := resultsFixture()
+	bad := in.Runs[0]
+	in.Runs[0].Problems = []string{"seal does not verify: file metrics.json changed"}
+	recs, err := EEE(context.Background(), in, EEEOptions{Organization: "Acme"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, rec := range recs {
+		b, _ := json.Marshal(rec)
+		var r struct {
+			Source struct {
+				Details map[string]string `json:"additional_details"`
+			} `json:"source_metadata"`
+		}
+		if err := json.Unmarshal(b, &r); err != nil {
+			t.Fatal(err)
+		}
+		d := r.Source.Details
+		if d["heimdall_arm"] != bad.Slot.Arm {
+			continue
+		}
+		if strings.Contains(d["heimdall_seal_hashes"], bad.SealHash+"\"") || d["heimdall_runs_sealed"] != "15" ||
+			d["heimdall_runs_excluded"] != "1" || !strings.Contains(d["heimdall_excluded_seal_hashes"], bad.SealHash) {
+			t.Fatalf("provenance %v: want %s only among excluded seals", d, bad.SealHash)
+		}
+		return
+	}
+	t.Fatal("no record for the arm")
+}
+
+// Held-out task runs stay out of the default run table and every row names
+// its split (finding 1-D-02); split all is the explicit private export.
+func TestRunTableHeldOutSplit(t *testing.T) {
+	in := resultsFixture()
+	in.Manifest.HeldOutTasks = []string{"t04"}
+	for _, r := range RunTable(in) {
+		if r.Task == "t04" || r.Split != schemas.SplitPublic {
+			t.Fatalf("public table has row %s task %s split %s", r.RunID, r.Task, r.Split)
+		}
+	}
+	in.Split = SplitAll
+	held := 0
+	for _, r := range RunTable(in) {
+		if r.Task == "t04" {
+			held++
+			if r.Split != schemas.SplitHeldOut {
+				t.Fatalf("row %s split %q", r.RunID, r.Split)
+			}
+		}
+	}
+	if held != 8 {
+		t.Fatalf("held-out rows %d, want 8 with split all", held)
+	}
+}
+
+// The flat table's verified_success is the board's (the observed metric),
+// and the outcome's own score has its own name (finding 1-D-08).
+func TestRunTableVerifiedSuccessMatchesBoard(t *testing.T) {
+	in := resultsFixture()
+	in.Runs[0].Run.Outcome = schemas.OutcomeTimeout
+	in.Runs[0].Metrics["verified_success"] = schemas.Observed(1, schemas.EvidenceOutcome)
+	for _, r := range RunTable(in) {
+		if r.RunID == in.Runs[0].Run.RunID {
+			if r.Success == nil || *r.Success != 1 || r.OutcomeScore == nil || *r.OutcomeScore != 0 {
+				t.Fatalf("verified_success %v outcome_score %v, want 1 and 0", r.Success, r.OutcomeScore)
+			}
+			return
+		}
+	}
+	t.Fatal("row missing")
+}

@@ -16,7 +16,9 @@ condition
 trial
 attempt
 outcome
+split
 verified_success
+outcome_score
 grade_passed
 grade_source
 cost_usd

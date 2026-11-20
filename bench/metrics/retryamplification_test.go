@@ -54,3 +54,20 @@ func TestRetryAmplification(t *testing.T) {
 		})
 	}
 }
+
+// A cache hit answered a logical request without any upstream attempt
+// (audit 1-C-11).
+func TestCacheHitHasNoUpstreamAttempt(t *testing.T) {
+	r := okMsg("c")
+	r.CacheHit, r.Attempts = true, nil
+	ev := &schemas.Evidence{Requests: &schemas.RequestLog{Complete: true, Requests: []schemas.GatewayRequest{r}}}
+	for _, m := range []schemas.Metric{newModelAttemptsMetric(), newRetryAmplificationMetric()} {
+		got, err := m.Compute(t.Context(), nil, ev)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if x, ok := got.Float(); !ok || x != 0 {
+			t.Fatalf("%s on one cache hit = %+v, want observed 0", m.GetName(), got)
+		}
+	}
+}

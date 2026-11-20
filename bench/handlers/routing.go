@@ -35,8 +35,16 @@ var routingSlugRe = regexp.MustCompile(`[^a-z0-9]+`)
 
 // RoutingHandler serves the gateway policy views.
 type RoutingHandler struct {
-	mode  schemas.Mode
-	index ReadIndex
+	mode           schemas.Mode
+	index          ReadIndex
+	heldOutVisible bool // server config held_out.visible, as on the runs handler
+}
+
+// WithHeldOutVisible sets whether a held-out task's run is served
+// (RunsHandler.WithHeldOutVisible).
+func (h *RoutingHandler) WithHeldOutVisible(visible bool) *RoutingHandler {
+	h.heldOutVisible = visible
+	return h
 }
 
 // NewRoutingHandler creates the routing handler. index may be nil.
@@ -89,6 +97,9 @@ func (h *RoutingHandler) getRunRouting(ctx *fasthttp.RequestCtx) {
 	rv, found := h.index.Run(runID)
 	if !found {
 		sendNotFound(ctx, h.mode, "run", runID)
+		return
+	}
+	if refuseHeldOutRun(ctx, h.mode, h.index, h.heldOutVisible, rv) {
 		return
 	}
 	out, err := runRouting(h.index, rv)

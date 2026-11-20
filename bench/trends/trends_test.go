@@ -244,3 +244,49 @@ func TestBuildLeavesOutHeldOut(t *testing.T) {
 		}
 	}
 }
+
+// Two suites that reuse task IDs t01..t06 are not paired: a newer point of
+// another suite cannot be a regression of an older one (finding 1-D-03).
+func TestBuildDoesNotPairOtherSuites(t *testing.T) {
+	f := func(v float64) *float64 { return &v }
+	var runs []resultsindex.RunRow
+	for task := 1; task <= 6; task++ {
+		for _, s := range []struct {
+			exp, suite string
+			day        int
+			y          float64
+		}{{"e_easy", "easy@1", 1, 1}, {"e_hard", "hard@1", 2, 0}} {
+			runs = append(runs, resultsindex.RunRow{Experiment: s.exp, ExperimentCreated: time.Date(2026, 11, s.day, 0, 0, 0, 0, time.UTC),
+				RunID: fmt.Sprintf("r_%s_%d", s.exp, task), Suite: s.suite, Task: fmt.Sprintf("t%02d", task), Arm: "A", Agent: "codex",
+				Model: "m1", ConfigHash: "sha256:a", Condition: "clean", Success: f(s.y), Metrics: map[string]float64{}})
+		}
+	}
+	r, err := Build(&resultsindex.Snapshot{RunRows: runs}, Query{}, time.Now())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(r.Lineages) != 1 || r.Points != 2 {
+		t.Fatalf("lineages %+v", r.Lineages)
+	}
+	if reg := r.Lineages[0].Points[1].Regression; reg.Status != StatusCannotTell || reg.CommonTasks != 0 || reg.P != nil {
+		t.Fatalf("regression across suites = %+v, want cannot_tell with no pairs", reg)
+	}
+}
+
+// A run whose evidence has a problem (a slot with two counted runs) stays in
+// the index but is never charted (finding 1-D-04).
+func TestBuildLeavesOutProblemRuns(t *testing.T) {
+	snap := fixtureIndex()
+	for i := range snap.RunRows {
+		if snap.RunRows[i].Experiment == "e_1" {
+			snap.RunRows[i].Problems = []string{"slot s has 2 counted runs (a, b); exactly one may count"}
+		}
+	}
+	r, err := Build(snap, Query{}, time.Now())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if r.Points != 2 || r.Lineages[0].Points[0].Experiment != "e_2" || r.Invalid != 9 {
+		t.Fatalf("points %d invalid %d: want e_1 left out and counted invalid", r.Points, r.Invalid)
+	}
+}

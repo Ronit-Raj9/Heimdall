@@ -84,6 +84,16 @@ const seqView: AdaptiveView = {
 };
 
 describe("TrialsPanel", () => {
+	it("says more than the cap, not zero tasks, when the sizing is over (audit 1-B-06)", () => {
+		const over = {
+			...seqView,
+			more_evidence: { ...seqView.more_evidence!, over: true, tasks: 0, tasks_total: 200, runs: 0, cost_usd: undefined, command: undefined },
+		};
+		const html = renderToStaticMarkup(<TrialsPanel view={over} />);
+		expect(html).toContain("more than 200 tasks in all");
+		expect(html).not.toContain("about 0 more tasks");
+	});
+
 	it("shows the tier, trials used, runs saved and the stopping reason of a task rule", () => {
 		const html = renderToStaticMarkup(<TrialsPanel view={taskView} />);
 		expect(html).toContain('data-testid="trials-panel"');

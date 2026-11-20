@@ -57,7 +57,12 @@ type SealRecord struct {
 	Files        map[string]string `json:"files"` // relative path -> sha256
 	PrevSeal     string            `json:"prev_seal"`
 	SealedAt     time.Time         `json:"sealed_at"`
-	Hash         string            `json:"-"` // sha256 of seal.json bytes, filled when read
+	// Format names the mandatory artifact set Seal checked before writing
+	// this record (store.SealFormatV1). Empty marks a legacy seal or a run
+	// without a canonical record: its files are certified as present, not
+	// as a complete current-format run (audit 1-A-05).
+	Format string `json:"format,omitempty"`
+	Hash   string `json:"-"` // sha256 of seal.json bytes, filled when read
 }
 
 // Sentinel errors shared across packages.

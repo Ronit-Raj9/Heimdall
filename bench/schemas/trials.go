@@ -1,5 +1,10 @@
 package schemas
 
+import (
+	"encoding/json"
+	"math"
+)
+
 // W7 adaptive trials and suite tiers (docs/adaptive-trials.md,
 // docs/suite-tiers.md). Every type here is optional on the experiment, the
 // suite, the manifest and the verdict, so a manifest without them hashes as
@@ -169,7 +174,7 @@ type MoreEvidence struct {
 	TargetPP    float64  `json:"target_pp"`
 	Tasks       int      `json:"tasks"`       // more tasks, on top of those already run
 	TasksTotal  int      `json:"tasks_total"` // tasks the new experiment needs in all
-	Over        bool     `json:"over,omitempty"`
+	Over        bool     `json:"over,omitempty"` // more than TasksTotal (the sizing cap) tasks needed; Tasks, Runs and CostUSD are then not estimated
 	SD          float64  `json:"sd"`
 	SDAssumed   bool     `json:"sd_assumed"`
 	Runs        int      `json:"runs"` // tasks x trials x arms
@@ -202,6 +207,83 @@ type ExtensionResult struct {
 	PooledDBar  float64          `json:"pooled_d_bar"` // descriptive only
 	PooledTasks int              `json:"pooled_tasks"`
 	Reasons     []string         `json:"reasons,omitempty"`
+}
+
+// extensionResultJSON is ExtensionResult on the wire: a combined z that is
+// -Inf (a stage whose p in that direction is 1 blocks the direction) has no
+// JSON number, so it travels as null and its field name is listed in
+// z_blocked (audit 1-B-04).
+type extensionResultJSON struct {
+	Parent      string           `json:"parent"`
+	Child       string           `json:"child"`
+	Kind        string           `json:"kind"`
+	Rule        string           `json:"rule"`
+	Decision    Decision         `json:"decision"`
+	Exploratory bool             `json:"exploratory"`
+	Alpha       float64          `json:"alpha"`
+	WeightFirst float64          `json:"weight_first"`
+	Stages      []ExtensionStage `json:"stages"`
+	ZImproveLow *float64         `json:"z_improve_low"`
+	ZImproveHi  *float64         `json:"z_improve_high"`
+	ZRegressLow *float64         `json:"z_regress_low"`
+	ZRegressHi  *float64         `json:"z_regress_high"`
+	ZBlocked    []string         `json:"z_blocked,omitempty"`
+	ZCritical   float64          `json:"z_critical"`
+	PooledDBar  float64          `json:"pooled_d_bar"`
+	PooledTasks int              `json:"pooled_tasks"`
+	Reasons     []string         `json:"reasons,omitempty"`
+}
+
+// MarshalJSON encodes a blocked (non-finite) combined z as null and names it
+// in z_blocked instead of failing the whole encoding.
+func (r ExtensionResult) MarshalJSON() ([]byte, error) {
+	w := extensionResultJSON{
+		Parent: r.Parent, Child: r.Child, Kind: r.Kind, Rule: r.Rule,
+		Decision: r.Decision, Exploratory: r.Exploratory, Alpha: r.Alpha,
+		WeightFirst: r.WeightFirst, Stages: r.Stages, ZCritical: r.ZCritical,
+		PooledDBar: r.PooledDBar, PooledTasks: r.PooledTasks, Reasons: r.Reasons,
+	}
+	for _, f := range []struct {
+		name string
+		v    float64
+		dst  **float64
+	}{
+		{"z_improve_low", r.ZImproveLow, &w.ZImproveLow},
+		{"z_improve_high", r.ZImproveHi, &w.ZImproveHi},
+		{"z_regress_low", r.ZRegressLow, &w.ZRegressLow},
+		{"z_regress_high", r.ZRegressHi, &w.ZRegressHi},
+	} {
+		if math.IsInf(f.v, 0) || math.IsNaN(f.v) {
+			w.ZBlocked = append(w.ZBlocked, f.name)
+			continue
+		}
+		v := f.v
+		*f.dst = &v
+	}
+	return json.Marshal(w)
+}
+
+// UnmarshalJSON reads a null combined z back as -Inf (a blocked direction).
+func (r *ExtensionResult) UnmarshalJSON(b []byte) error {
+	var w extensionResultJSON
+	if err := json.Unmarshal(b, &w); err != nil {
+		return err
+	}
+	z := func(p *float64) float64 {
+		if p == nil {
+			return math.Inf(-1)
+		}
+		return *p
+	}
+	*r = ExtensionResult{
+		Parent: w.Parent, Child: w.Child, Kind: w.Kind, Rule: w.Rule,
+		Decision: w.Decision, Exploratory: w.Exploratory, Alpha: w.Alpha,
+		WeightFirst: w.WeightFirst, Stages: w.Stages, ZCritical: w.ZCritical,
+		ZImproveLow: z(w.ZImproveLow), ZImproveHi: z(w.ZImproveHi),
+		ZRegressLow: z(w.ZRegressLow), ZRegressHi: z(w.ZRegressHi),
+		PooledDBar: w.PooledDBar, PooledTasks: w.PooledTasks, Reasons: w.Reasons,
+	}
+	return nil
 }
 
 // ExtensionStage is one stage of a combined analysis.

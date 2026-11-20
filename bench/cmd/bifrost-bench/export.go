@@ -14,6 +14,7 @@ import (
 	"os"
 	"os/signal"
 	"path/filepath"
+	"slices"
 	"strings"
 	"syscall"
 
@@ -34,6 +35,7 @@ func init() {
 const exportUsage = `usage: bifrost-bench export otlp -exp <exp_id> [-run <run_id>] [-out file|dir/] [-payloads]
                                 [-to <preset>] [-endpoint <url> [-header-env NAME]] [-runs <runs root> | -config deploy/bench.yaml]
 Writes each sealed run as an OpenTelemetry trace in OTLP/JSON (docs/trace-export.md): to stdout,
+skipping held-out task runs unless -include-held-out asks for a private export;
 to one file, or to one <run_id>.otlp.json per run in a folder (an existing folder or a path ending
 in /). -endpoint also posts each run to an OTLP/HTTP collector; -header-env names an environment
 variable holding its headers in OTEL_EXPORTER_OTLP_HEADERS format (k=v,k2=v2).
@@ -51,8 +53,10 @@ exported; tasks the format cannot hold honestly are skipped with the reason.
 Writes one Every Eval Ever aggregate record per arm (agent config, model, suite), validated against
 the vendored schema: one JSON object per line to stdout, one file, or one <exp>-<arm>.json per arm.
 
-       bifrost-bench export jsonl|csv -exp <exp_id> [-out file] [-grade-source ...] [-runs <root> | -config ...]
+       bifrost-bench export jsonl|csv -exp <exp_id> [-out file] [-grade-source ...] [-split public|held_out|all] [-runs <root> | -config ...]
 Writes the flat run table: one row per sealed counted run with ids, outcome, cost and metrics.
+Rows of held-out tasks are left out unless -split held_out or all asks for a private export; each
+row names its split. An experiment whose newest verdict is INVALID is never exported as eee.
 
        bifrost-bench export inspect
 Not written; prints why (docs/export.md).`
@@ -90,6 +94,7 @@ func runExportOTLP(args []string, stdout, stderr io.Writer) int {
 	endpoint := fs.String("endpoint", "", "OTLP/HTTP collector to post each run to (a base URL gets /v1/traces)")
 	headerEnv := fs.String("header-env", "", "environment variable holding the collector headers, OTEL_EXPORTER_OTLP_HEADERS format")
 	to := fs.String("to", "", "backend preset: "+strings.Join(export.PresetNames(), ", "))
+	includeHeldOut := fs.Bool("include-held-out", false, "also export runs of held-out tasks (a private export; default: skipped)")
 	if err := fs.Parse(args); err != nil || *exp == "" || fs.NArg() != 0 || (*headerEnv != "" && *endpoint == "" && *to == "") {
 		fmt.Fprintln(stderr, exportUsage)
 		return exitUsage
@@ -118,7 +123,7 @@ func runExportOTLP(args []string, stdout, stderr io.Writer) int {
 	}
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
-	opts := traceexport.Options{Payloads: *payloads, ServiceVersion: benchVersion}
+	opts := traceexport.Options{Payloads: *payloads, ServiceVersion: benchVersion, IncludeHeldOut: *includeHeldOut}
 	traces, err := exportOTLP(ctx, root, *exp, *run, opts, stderr)
 	if err != nil {
 		return failTo(stderr, "export otlp: %v", err)
@@ -154,10 +159,19 @@ func exportOTLP(ctx context.Context, root, expID, runID string, opts traceexport
 	if !ok {
 		return nil, fmt.Errorf("experiment %s: %w", expID, schemas.ErrNotFound)
 	}
+	m, err := st.LoadManifest(ctx, expID)
+	if err != nil {
+		return nil, err
+	}
 	var picked []store.RunEntry
 	for _, e := range entries {
+		held := !opts.IncludeHeldOut && slices.Contains(m.HeldOutTasks, e.Slot.Task)
 		switch {
 		case runID != "" && e.Run.RunID != runID:
+		case held && runID != "":
+			return nil, fmt.Errorf("run %s: task %s is held out; pass -include-held-out for a private export", runID, e.Slot.Task)
+		case held:
+			fmt.Fprintf(stderr, "skipped run %s: task %s is held out\n", e.Run.RunID, e.Slot.Task)
 		case !e.Sealed && runID != "":
 			return nil, fmt.Errorf("run %s: %w: only sealed runs are exported", runID, traceexport.ErrUnsealed)
 		case !e.Sealed:
@@ -396,6 +410,7 @@ func runExportFormat(format string, args []string, stdout, stderr io.Writer) int
 	org := fs.String("org", "", "source organization name written in each record (eee)")
 	relationship := fs.String("relationship", "third_party", "evaluator relationship to the model developer (eee)")
 	allowSynthetic := fs.Bool("allow-synthetic", false, "export synthetic arms, labelled (eee)")
+	split := fs.String("split", schemas.SplitPublic, "jsonl|csv: public, held_out or all (a private export of held-out task rows); eee is always public")
 	if err := fs.Parse(args); err != nil || fs.NArg() != 0 {
 		fmt.Fprintln(stderr, exportUsage)
 		return exitUsage
@@ -417,14 +432,19 @@ func runExportFormat(format string, args []string, stdout, stderr io.Writer) int
 	if err != nil {
 		return failTo(stderr, "%v", err)
 	}
+	if !export.ValidSplit(*split) || (format == "eee" && *split != schemas.SplitPublic) {
+		fmt.Fprintf(stderr, "export %s: split %q: want public, held_out or all (eee: public only)\n", format, *split)
+		return exitUsage
+	}
 	in, err := loadResults(ctx, root, *exp, *gradeSource, stderr)
 	if err != nil {
 		return failTo(stderr, "export %s: %v", format, err)
 	}
+	in.Split = *split
 	if format == "eee" {
 		recs, err := export.EEE(ctx, in, export.EEEOptions{Organization: *org, Relationship: *relationship, AllowSynthetic: *allowSynthetic,
 			GradeSource: *gradeSource, BenchVersion: benchVersion})
-		if errors.Is(err, export.ErrSynthetic) {
+		if errors.Is(err, export.ErrSynthetic) || errors.Is(err, export.ErrInvalid) {
 			fmt.Fprintf(stderr, "export eee: %v\n", err)
 			return exitUsage
 		}
@@ -482,7 +502,8 @@ func loadResultsFrom(ctx context.Context, st *store.FSStore, expID, gradeSource 
 	if err != nil {
 		return export.EEEInput{}, err
 	}
-	return export.EEEInput{Manifest: m, Runs: runs, Synthetic: synthetic}, nil
+	d, _ := (indexAdapter{root: st.Root()}).LatestDecision(expID)
+	return export.EEEInput{Manifest: m, Runs: runs, Synthetic: synthetic, Invalid: d == schemas.DecisionInvalid}, nil
 }
 
 // writeEEE writes the records: JSON lines to stdout, one file (one record),
@@ -584,7 +605,7 @@ func (s serveExport) ExperimentExport(ctx context.Context, expID, format string,
 	switch format {
 	case handlers.ExportFormatEEE:
 		recs, err := export.EEE(ctx, in, export.EEEOptions{AllowSynthetic: allowSynthetic, GradeSource: schemas.GradeSourceOriginal, BenchVersion: benchVersion})
-		if errors.Is(err, export.ErrSynthetic) {
+		if errors.Is(err, export.ErrSynthetic) || errors.Is(err, export.ErrInvalid) {
 			return nil, "", fmt.Errorf("%w: %v", handlers.ErrExportRefused, err)
 		}
 		if err != nil {

@@ -14,6 +14,7 @@ func TestModelFidelity(t *testing.T) {
 	}
 	noFallback := &schemas.RunContext{Agent: &schemas.AgentConfig{}}
 	withFallback := &schemas.RunContext{Agent: &schemas.AgentConfig{Gateway: schemas.GatewayPolicy{Fallbacks: []string{"anthropic/claude-haiku-4-5"}}}}
+	semCache := &schemas.RunContext{Agent: &schemas.AgentConfig{Gateway: schemas.GatewayPolicy{Bifrost: &schemas.BifrostFeatures{SemanticCache: &schemas.BifrostSemanticCache{}}}}}
 	fallbackRow := req("r2", "claude-sonnet-4-5", "claude-haiku-4-5")
 	fallbackRow.FallbackIndex = 1
 	cached := req("r3", "claude-sonnet-4-5", "claude-sonnet-4-5")
@@ -37,6 +38,7 @@ func TestModelFidelity(t *testing.T) {
 		{"undeclared fallback", noFallback, []schemas.GatewayRequest{fallbackRow}, true, []string{"r2"}},
 		{"declared fallback", withFallback, []schemas.GatewayRequest{fallbackRow}, false, nil},
 		{"cache hit", noFallback, []schemas.GatewayRequest{cached}, true, []string{"r3"}},
+		{"cache hit on a semantic cache arm is intended", semCache, []schemas.GatewayRequest{cached}, false, nil},
 		{"count_tokens ignored", noFallback, []schemas.GatewayRequest{countTokens}, false, nil},
 	}
 	g := newModelFidelityGate()
