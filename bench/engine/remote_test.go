@@ -10,6 +10,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"strings"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -344,7 +345,11 @@ func TestRemoteRejectsTamperedUpload(t *testing.T) {
 func TestRemoteLostWorkerReleasedAndLateUploadRefused(t *testing.T) {
 	stale := 300 * time.Millisecond
 	rw := newRemoteWorld(t, testExperiment(), RemoteOptions{StaleAfter: stale})
-	rw.run.StaleAfter, rw.run.HeartbeatEvery = stale, time.Hour
+	// w1 runs its slot outside Work, so it never heartbeats and goes silent on
+	// its own. w2 runs through Work and heartbeats, which also exercises a
+	// heartbeat racing the complete call.
+	rw.run.StaleAfter, rw.run.HeartbeatEvery = stale, stale/6
+	freeze := freezableClock(rw.c)
 	done := rw.attach(t)
 	ctx := context.Background()
 	w1 := rw.worker(t, "w1", newRemoteSide(t))
@@ -363,6 +368,7 @@ func TestRemoteLostWorkerReleasedAndLateUploadRefused(t *testing.T) {
 	if info := rw.c.Workers(); info[0].State != schemas.WorkerLost {
 		t.Fatalf("silent worker state %q", info[0].State)
 	}
+	freeze()
 	l2 := lease(t, w2)
 	if l2 == nil || l2.Slot.SlotID != l1.Slot.SlotID {
 		t.Fatalf("lost slot not re-leased first: %+v", l2)
@@ -666,4 +672,23 @@ func readLog(dir, name string) string {
 		return err.Error()
 	}
 	return string(b)
+}
+
+// freezableClock gives c a clock that follows time.Now until freeze is
+// called and stands still from then on. A test that needs one lease to go
+// stale freezes the clock once it has, so the background sweep cannot also
+// lose the next lease when a store heartbeat (a synced file write) is slow
+// on a loaded machine. It must be called before c serves any call.
+func freezableClock(c *Coordinator) (freeze func()) {
+	var at atomic.Pointer[time.Time]
+	c.now = func() time.Time {
+		if t := at.Load(); t != nil {
+			return *t
+		}
+		return time.Now()
+	}
+	return func() {
+		t := time.Now()
+		at.Store(&t)
+	}
 }

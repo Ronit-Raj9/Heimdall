@@ -230,14 +230,22 @@ func (w *Worker) loop(ctx context.Context) {
 // while the slot runs stops the run (sealed aborted_infra locally) and
 // nothing is uploaded.
 func (w *Worker) Work(ctx context.Context, lease *schemas.WorkerLease) *schemas.WorkerResult {
+	// The lease is kept fresh from the moment it is granted: admission,
+	// preflight and image checks can take longer than the stale threshold on
+	// a loaded worker, and a lease that only starts beating at RunSlot is
+	// lost to the coordinator's sweep before the slot even runs.
+	sctx, stop := w.heartbeat(ctx, lease)
+	defer stop()
 	exp, reason, permanent := w.admit(ctx, lease)
 	if reason != "" {
 		w.logger.Warn("lease refused", "lease", lease.LeaseID, "experiment", lease.ExpID, "reason", reason)
+		stop()
 		w.release(ctx, lease, reason, permanent, nil)
 		return nil
 	}
 	slot := exp.slot(lease.Slot.SlotID)
 	if slot == nil || !reflect.DeepEqual(*slot, lease.Slot) {
+		stop()
 		w.release(ctx, lease, "the leased slot is not the manifest's slot "+lease.Slot.SlotID, true, nil)
 		return nil
 	}
@@ -247,6 +255,7 @@ func (w *Worker) Work(ctx context.Context, lease *schemas.WorkerLease) *schemas.
 	runM, runnerGW, why := w.runnerPreflight(ctx, exp.m)
 	if why != "" {
 		w.logger.Warn("lease refused", "lease", lease.LeaseID, "experiment", lease.ExpID, "reason", why)
+		stop()
 		w.release(ctx, lease, why, false, nil)
 		return nil
 	}
@@ -255,17 +264,16 @@ func (w *Worker) Work(ctx context.Context, lease *schemas.WorkerLease) *schemas.
 	// (remoteimages.go).
 	if why := w.checkSlotImages(ctx, exp); why != "" {
 		w.logger.Warn("lease refused", "lease", lease.LeaseID, "experiment", lease.ExpID, "reason", why)
+		stop()
 		w.release(ctx, lease, why, true, nil)
 		return nil
 	}
 	runnerImgs := w.runnerImages(ctx, exp, slot)
-	sctx, stop := w.heartbeat(ctx, lease)
 	res, err := w.runner.RunSlot(sctx, SlotInput{Manifest: runM, Suite: exp.suite, Slot: slot, Attempt: lease.Attempt})
 	if res != nil {
 		res.RunnerGateway = runnerGW  // Tenancy area: uploaded with the run
 		res.RunnerImages = runnerImgs // Deploy area: uploaded with the run
 	}
-	defer stop()
 	if serr := w.spend.add(res, exp.m); serr != nil { // Runners area: the runner's own spend cap
 		w.logger.Warn("record runner spend", "error", serr.Error())
 	}
@@ -284,13 +292,15 @@ func (w *Worker) Work(ctx context.Context, lease *schemas.WorkerLease) *schemas.
 			v := costValue(res)
 			cost = &v
 		}
+		stop()
 		w.release(ctx, lease, why, false, cost)
 		return nil
 	}
-	out, err := w.upload(sctx, lease, res)
+	out, err := w.uploadTo(sctx, ctx, lease, res)
 	if err != nil {
 		w.logger.Error("upload failed", "lease", lease.LeaseID, "run", res.Run.RunID, "error", err.Error())
 		if !errors.Is(err, schemas.ErrLeaseGone) {
+			stop()
 			v := costValue(res)
 			w.release(ctx, lease, "upload failed: "+err.Error(), false, &v)
 		}
@@ -508,6 +518,16 @@ func (w *Worker) heartbeat(ctx context.Context, lease *schemas.WorkerLease) (con
 // upload packs the sealed run folder, sends it in chunks and completes the
 // lease.
 func (w *Worker) upload(ctx context.Context, lease *schemas.WorkerLease, res *SlotResult) (*schemas.WorkerResult, error) {
+	return w.uploadTo(ctx, ctx, lease, res)
+}
+
+// uploadTo is upload with the complete call on its own context. Work sends
+// the chunks on the heartbeat context, so a lost lease stops them, but sends
+// complete on its parent: the coordinator itself refuses a lease that is
+// gone, and once it has completed the lease a heartbeat racing the call is
+// answered "lease gone: completed", which would otherwise cancel the call
+// and drop the coordinator's answer for a run it already accepted.
+func (w *Worker) uploadTo(ctx, completeCtx context.Context, lease *schemas.WorkerLease, res *SlotResult) (*schemas.WorkerResult, error) {
 	sealRaw, err := os.ReadFile(filepath.Join(res.Dir, sealJSONFile))
 	if err != nil {
 		return nil, fmt.Errorf("read seal.json: %w", err)
@@ -540,7 +560,7 @@ func (w *Worker) upload(ctx context.Context, lease *schemas.WorkerLease, res *Sl
 		Gateway: res.RunnerGateway, // Tenancy area: the runner's own preflight when the manifest defers it
 		Images:  res.RunnerImages}  // Deploy area: the runner's image ids when the manifest defers it
 	var out schemas.WorkerResult
-	if err := w.call(ctx, http.MethodPost, workerAPI+"/leases/"+url.PathEscape(lease.LeaseID)+"/complete", req, &out); err != nil {
+	if err := w.call(completeCtx, http.MethodPost, workerAPI+"/leases/"+url.PathEscape(lease.LeaseID)+"/complete", req, &out); err != nil {
 		return nil, fmt.Errorf("complete: %w", err)
 	}
 	return &out, nil
