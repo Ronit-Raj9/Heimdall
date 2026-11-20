@@ -42,6 +42,13 @@ func (s *costSource) Collect(_ context.Context, rc *schemas.RunContext, ev *sche
 		pickLogger(s.logger, rc).Warn("no price table; cost rows are unknown", "run_id", runID(rc))
 	}
 	rows := CostRows(ev.Requests, ev.Ledger, s.prices)
+	if len(ev.LedgerBreaks) > 0 {
+		// Rows were matched against a ledger whose chain does not verify:
+		// no price derived from it is known (audit 3-B-07).
+		for i := range rows {
+			rows[i].USD = schemas.Unknown("proxy ledger hash chain broken", schemas.EvidenceGateway)
+		}
+	}
 	ev.Cost = rows
 	if err := writeJSON(rc.Dir, costFile, rows); err != nil {
 		return fmt.Errorf("write cost rows for run %s: %w", runID(rc), err)

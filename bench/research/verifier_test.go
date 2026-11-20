@@ -139,3 +139,44 @@ func TestExampleVerifiers(t *testing.T) {
 		})
 	}
 }
+
+// TestVerifierSignedNumbers is the regression test for audit finding 3-D-03:
+// the numeric grammar of verify.py keeps the sign, as numberRe in
+// graders/answermatch.go does, so a negative answer is not read as positive.
+func TestVerifierSignedNumbers(t *testing.T) {
+	py := python(t)
+	script := `import json, runpy, sys
+m = runpy.run_path(sys.argv[1])["matches"]
+cases = json.loads(sys.argv[2])
+print(json.dumps([m({"match": "numeric", "expected": [e]}, a) for e, a in cases]))`
+	cases := []struct {
+		expected, answer string
+		want             bool
+	}{
+		{"-5", "-5", true},
+		{"5", "-5", false},
+		{"-5", "5", false},
+		{"5", "+5", true},
+		{"-1,234.50", "It fell by -1,234.50 units", true},
+		{"1234.5", "-1,234.50", false},
+		{"12", "about 12 degrees", true},
+	}
+	in := make([][2]string, len(cases))
+	for i, c := range cases {
+		in[i] = [2]string{c.expected, c.answer}
+	}
+	b, _ := json.Marshal(in)
+	out, err := exec.Command(py, "-I", "-B", "-c", script, "verifier/verify.py", string(b)).CombinedOutput()
+	if err != nil {
+		t.Fatalf("verify.py: %v: %s", err, out)
+	}
+	var got []bool
+	if err := json.Unmarshal(out, &got); err != nil {
+		t.Fatalf("%v: %s", err, out)
+	}
+	for i, c := range cases {
+		if got[i] != c.want {
+			t.Errorf("expected %q answer %q: matched %v, want %v", c.expected, c.answer, got[i], c.want)
+		}
+	}
+}

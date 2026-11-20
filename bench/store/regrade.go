@@ -8,6 +8,8 @@ import (
 	"maps"
 	"os"
 	"path/filepath"
+	"slices"
+	"syscall"
 	"time"
 
 	"github.com/maximhq/bifrost/bench/schemas"
@@ -26,7 +28,13 @@ type RegradeInfo struct {
 	GateVersions  map[string]string `json:"gate_versions,omitempty"`   // gate name -> version the gates were recomputed at
 	SuiteLockHash string            `json:"suite_lock_hash,omitempty"` // the suite lock a regate read, when it differs from the manifest's
 	Note          string            `json:"note,omitempty"`            // why the gates were recomputed, shown in the report
-	CreatedAt     time.Time         `json:"created_at"`
+	// Runs is a regate's coverage record: the id of every run it recomputed,
+	// written in the same atomic publish as the results. A regate without it
+	// was not committed and is never a grade source (audit 8-D-03); a
+	// counted run outside it was sealed after the regate and keeps its
+	// sealed gates.
+	Runs      []string  `json:"runs,omitempty"`
+	CreatedAt time.Time `json:"created_at"`
 }
 
 // GateRegrade is regrades/<regrade_id>/runs/<run_id>/regate.json: one sealed
@@ -96,19 +104,18 @@ func (s *FSStore) WriteRegrade(ctx context.Context, expID, regradeID, runID stri
 	return nil
 }
 
-// WriteGateRegrade writes regrades/<regrade_id>/runs/<run_id>/regate.json
-// for a sealed run, with parent_seal set to the run's seal hash and hash set
-// over the content. info gives the regrade's suite version, gate versions and
-// note; regrade.json is written by the first call and later calls must carry
-// the same gate versions. A regrade id created by WriteRegrade (grades only)
-// is refused, and a run's regate is written once (schemas.ErrExists after).
-// r itself is not modified.
-func (s *FSStore) WriteGateRegrade(ctx context.Context, expID, regradeID, runID string, info RegradeInfo, r *GateRegrade) error {
+// WriteGateRegrades writes a whole regate batch as regrade regradeID:
+// regrades/<regrade_id>/regrade.json with the coverage record Runs (every
+// run id of results, sorted) and runs/<run_id>/regate.json for each run, with
+// parent_seal set to the run's seal hash and hash set over the content.
+// Everything is staged in a folder beside regrades/ and published with one
+// rename, so an interrupted or failed batch never leaves a regrade a reader
+// can select (audit 8-D-03); the staged folder is removed on failure. An
+// existing regrade id is refused (schemas.ErrExists). results is not
+// modified.
+func (s *FSStore) WriteGateRegrades(ctx context.Context, expID, regradeID string, info RegradeInfo, results map[string]*GateRegrade) error {
 	if err := ctx.Err(); err != nil {
 		return err
-	}
-	if r == nil {
-		return fmt.Errorf("write regate: nil result")
 	}
 	if len(info.GateVersions) == 0 {
 		return fmt.Errorf("write regate %s: no gate versions", regradeID)
@@ -116,38 +123,98 @@ func (s *FSStore) WriteGateRegrade(ctx context.Context, expID, regradeID, runID 
 	if err := validateID("regrade_id", regradeID); err != nil {
 		return fmt.Errorf("write regate: %w", err)
 	}
-	runDir, err := s.findRunDir(expID, runID)
+	if len(results) == 0 {
+		return fmt.Errorf("write regate %s: no runs", regradeID)
+	}
+	parent := filepath.Join(s.expDir(expID), regradesDir)
+	final := filepath.Join(parent, regradeID)
+	if _, err := os.Lstat(final); err == nil {
+		return fmt.Errorf("write regate %s: %w", regradeID, schemas.ErrExists)
+	}
+	files := map[string][]byte{}
+	runIDs := slices.Sorted(maps.Keys(results))
+	for _, runID := range runIDs {
+		r := results[runID]
+		if r == nil {
+			return fmt.Errorf("write regate %s for run %s: nil result", regradeID, runID)
+		}
+		if err := validateID("run_id", runID); err != nil {
+			return fmt.Errorf("write regate %s: %w", regradeID, err)
+		}
+		runDir, err := s.findRunDir(expID, runID)
+		if err != nil {
+			return fmt.Errorf("write regate %s: %w", regradeID, err)
+		}
+		seal, err := readSeal(runDir)
+		if err != nil {
+			return fmt.Errorf("write regate %s for run %s: %w", regradeID, runID, err)
+		}
+		if r.ParentSeal != "" && r.ParentSeal != seal.Hash {
+			return fmt.Errorf("write regate %s for run %s: parent_seal %s is not the run seal %s: %w",
+				regradeID, runID, r.ParentSeal, seal.Hash, schemas.ErrSealMismatch)
+		}
+		c := *r
+		c.ParentSeal, c.Hash = seal.Hash, ""
+		if c.Hash, err = utils.HashJSON(&c); err != nil {
+			return fmt.Errorf("write regate %s for run %s: %w", regradeID, runID, err)
+		}
+		b, err := marshalIndent(&c)
+		if err != nil {
+			return fmt.Errorf("write regate %s for run %s: %w", regradeID, runID, err)
+		}
+		files[filepath.Join(runsDir, runID, regateFile)] = b
+	}
+	info.RegradeID, info.ExpID, info.GraderVersion = regradeID, expID, ""
+	info.CreatedAt = s.now().UTC()
+	info.Runs = runIDs
+	b, err := marshalIndent(&info)
 	if err != nil {
 		return fmt.Errorf("write regate %s: %w", regradeID, err)
 	}
-	seal, err := readSeal(runDir)
-	if err != nil {
-		return fmt.Errorf("write regate %s for run %s: %w", regradeID, runID, err)
-	}
-	if r.ParentSeal != "" && r.ParentSeal != seal.Hash {
-		return fmt.Errorf("write regate %s for run %s: parent_seal %s is not the run seal %s: %w",
-			regradeID, runID, r.ParentSeal, seal.Hash, schemas.ErrSealMismatch)
-	}
-	c := *r
-	c.ParentSeal, c.Hash = seal.Hash, ""
-	if c.Hash, err = utils.HashJSON(&c); err != nil {
-		return fmt.Errorf("write regate %s for run %s: %w", regradeID, runID, err)
-	}
-	base := filepath.Join(s.expDir(expID), regradesDir, regradeID)
-	if err := s.ensureGateRegradeInfo(base, expID, regradeID, info); err != nil {
+	files[regradeFile] = b
+	if err := os.MkdirAll(parent, dirPerm); err != nil {
 		return fmt.Errorf("write regate %s: %w", regradeID, err)
 	}
-	dir := filepath.Join(base, runsDir, runID)
-	if err := os.MkdirAll(dir, dirPerm); err != nil {
-		return fmt.Errorf("write regate %s for run %s: %w", regradeID, runID, err)
-	}
-	b, err := marshalIndent(&c)
+	// The staging folder sits in the experiment folder, not in regrades/, so
+	// no regrade listing ever sees it, and on the same file system, so the
+	// publishing rename is atomic.
+	stage, err := os.MkdirTemp(s.expDir(expID), ".regate-"+regradeID+"-")
 	if err != nil {
-		return fmt.Errorf("write regate %s for run %s: %w", regradeID, runID, err)
+		return fmt.Errorf("write regate %s: %w", regradeID, err)
 	}
-	if err := writeFileExclusive(filepath.Join(dir, regateFile), b); err != nil {
-		return fmt.Errorf("write regate %s for run %s: %w", regradeID, runID, err)
+	published := false
+	defer func() {
+		if !published {
+			_ = os.RemoveAll(stage)
+		}
+	}()
+	if err := os.Chmod(stage, dirPerm); err != nil {
+		return fmt.Errorf("write regate %s: %w", regradeID, err)
 	}
+	for _, name := range slices.Sorted(maps.Keys(files)) {
+		target := filepath.Join(stage, name)
+		if err := os.MkdirAll(filepath.Dir(target), dirPerm); err != nil {
+			return fmt.Errorf("write regate %s: %w", regradeID, err)
+		}
+		if err := writeFileExclusive(target, files[name]); err != nil {
+			return fmt.Errorf("write regate %s file %s: %w", regradeID, name, err)
+		}
+	}
+	if err := ctx.Err(); err != nil {
+		return err
+	}
+	// os.Rename replaces an empty folder, so check again right before it; a
+	// non-empty one makes the rename fail.
+	if _, err := os.Lstat(final); err == nil {
+		return fmt.Errorf("write regate %s: %w", regradeID, schemas.ErrExists)
+	}
+	if err := os.Rename(stage, final); err != nil {
+		if errors.Is(err, fs.ErrExist) || errors.Is(err, syscall.ENOTEMPTY) {
+			return fmt.Errorf("write regate %s: %w", regradeID, schemas.ErrExists)
+		}
+		return fmt.Errorf("write regate %s: publish: %w", regradeID, err)
+	}
+	published = true
 	return nil
 }
 
@@ -169,6 +236,11 @@ func (s *FSStore) RegradeInfo(ctx context.Context, expID, regradeID string) (*Re
 	}
 	if !found {
 		return nil, fmt.Errorf("regrade %s: %w", regradeID, schemas.ErrNotFound)
+	}
+	if len(info.GateVersions) > 0 && len(info.Runs) == 0 {
+		// A regate without its coverage record was never committed: listings
+		// skip it like a regrade without regrade.json (audit 8-D-03).
+		return nil, fmt.Errorf("regrade %s is not committed: %w", regradeID, schemas.ErrNotFound)
 	}
 	return &info, nil
 }
@@ -258,36 +330,6 @@ func (s *FSStore) ensureRegradeInfo(base, expID, regradeID string, g *schemas.Gr
 	if have.SuiteVersion != g.SuiteVersion || have.GraderVersion != g.GraderVersion {
 		return fmt.Errorf("grade is suite %s grader %s, regrade is suite %s grader %s",
 			g.SuiteVersion, g.GraderVersion, have.SuiteVersion, have.GraderVersion)
-	}
-	return nil
-}
-
-// ensureGateRegradeInfo writes regrade.json on the first regate of a regrade
-// and checks later ones against it.
-func (s *FSStore) ensureGateRegradeInfo(base, expID, regradeID string, info RegradeInfo) error {
-	if err := os.MkdirAll(base, dirPerm); err != nil {
-		return err
-	}
-	info.RegradeID, info.ExpID, info.GraderVersion = regradeID, expID, ""
-	info.CreatedAt = s.now().UTC()
-	b, err := marshalIndent(&info)
-	if err != nil {
-		return err
-	}
-	p := filepath.Join(base, regradeFile)
-	err = writeFileExclusive(p, b)
-	if err == nil || !errors.Is(err, schemas.ErrExists) {
-		return err
-	}
-	var have RegradeInfo
-	if err := readJSON(p, &have); err != nil {
-		return err
-	}
-	if len(have.GateVersions) == 0 {
-		return fmt.Errorf("regrade %s holds regraded grades, not gates; use a new regrade id", regradeID)
-	}
-	if !maps.Equal(have.GateVersions, info.GateVersions) {
-		return fmt.Errorf("regate gate versions %v differ from the regrade's %v", info.GateVersions, have.GateVersions)
 	}
 	return nil
 }

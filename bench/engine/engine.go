@@ -90,16 +90,7 @@ func PartVersions(reg *schemas.Registry) map[string]string {
 // empty. The scheduler recomputes it before the first run, so an edited
 // manifest file never runs.
 func ManifestHash(m *schemas.Manifest) (string, error) {
-	if m == nil {
-		return "", errors.New("manifest is nil")
-	}
-	c := *m
-	c.Hash = ""
-	h, err := utils.HashJSON(&c)
-	if err != nil {
-		return "", fmt.Errorf("hash manifest %s: %w", m.ExpID, err)
-	}
-	return h, nil
+	return utils.ManifestHash(m)
 }
 
 // LoadSuite resolves ref with the registered loaders, in registry order, and

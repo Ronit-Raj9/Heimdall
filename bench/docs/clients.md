@@ -29,7 +29,7 @@ A registered route missing from the table still appears, as a bare operation tag
 
 ## Mode, auth, errors
 
-- **Mode.** Both clients return the server's object with its `mode`; raw downloads expose the header's mode. `require_live=True` (Python) or `{ requireLive: true }` (TypeScript) turns every non-live answer into a `ModeError`, so a CI job cannot pass on a recorded demo.
+- **Mode.** Both clients return the server's object with its `mode`; raw downloads expose the header's mode. `require_live=True` (Python) or `{ requireLive: true }` (TypeScript) turns every non-live answer into a `ModeError`, so a CI job cannot pass on a recorded demo. `serve -offline` never answers live (a live bench.yaml is served as recorded), and the verdict route carries the analysis's own mode, so a smoke experiment on a live server answers synthetic.
 - **Auth.** The prompt for this work assumed the server has no auth. It does: every POST route requires the write token, `Authorization: Bearer <BENCH_WRITE_TOKEN>` (`lib.RequireWriteToken`; the server prints a generated token once when the variable is unset), and the worker routes require `BENCH_WORKER_TOKEN`. Read routes need nothing beyond the loopback host check. The clients take one optional bearer token and send it on every request; the worker routes are not wrapped.
 - **Errors.** The server's one error shape `{"mode", "error": {"message", "type"}}` becomes `HeimdallError` with `status`, `type`, the server message and `mode`. A recorded server answers plan, create and start with `503 unavailable` (no launcher).
 - **Timeouts and retries.** Every request has a timeout (30 s default). Reads retry on connection errors, 502 and 504; writes are never retried.

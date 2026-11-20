@@ -172,3 +172,44 @@ func TestProxyLedgerCollect(t *testing.T) {
 		}
 	})
 }
+
+// TestLedgerChainBreakTaintsGatewayAndCost is the regression test for audit
+// finding 3-B-07: a broken proxy ledger chain is recorded on the evidence,
+// and the gateway log collected after it is incomplete and every cost row
+// unknown, even when the gateway itself reported a complete log.
+func TestLedgerChainBreakTaintsGatewayAndCost(t *testing.T) {
+	rc := testRC(t)
+	rc.Key = &schemas.RunKey{ID: "vk_1"}
+	entries := ledgerFixture(t)
+	entries[1].Status = 500
+	ev := &schemas.Evidence{}
+	ctx := context.Background()
+	if err := newProxyLedgerSource(Deps{Fault: &fakeFault{entries: entries}}).Collect(ctx, rc, ev); err != nil {
+		t.Fatal(err)
+	}
+	if len(ev.LedgerBreaks) == 0 {
+		t.Fatal("chain break not recorded on the evidence")
+	}
+	log := requestLogFixture()
+	log.Complete = true
+	if err := newGatewaySource(Deps{Gateway: &fakeGateway{log: log}}).Collect(ctx, rc, ev); err != nil {
+		t.Fatal(err)
+	}
+	if ev.Requests.Complete || !strings.Contains(ev.Requests.Reason, "proxy ledger hash chain broken") {
+		t.Fatalf("gateway log complete=%v reason %q after a ledger chain break", ev.Requests.Complete, ev.Requests.Reason)
+	}
+	if ev.Requests.Tally().Complete {
+		t.Fatal("tally reads complete")
+	}
+	if err := newCostSource(Deps{Prices: testPrices(t)}).Collect(ctx, rc, ev); err != nil {
+		t.Fatal(err)
+	}
+	if len(ev.Cost) == 0 {
+		t.Fatal("no cost rows")
+	}
+	for _, r := range ev.Cost {
+		if _, ok := r.USD.Float(); ok {
+			t.Fatalf("cost row %s priced from a broken ledger: %+v", r.RequestID, r.USD)
+		}
+	}
+}

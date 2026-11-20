@@ -48,6 +48,10 @@ func runServe(args []string) int {
 	if err != nil {
 		return fail("%v", err)
 	}
+	// An offline server runs nothing and reaches no gateway: everything it
+	// serves is replayed from disk, so it is never a live answer, whatever
+	// bench.yaml says (audit 7-B-03). Synthetic stays synthetic.
+	a.cfg.Server.Mode = offlineMode(a.cfg.Server.Mode, *offline)
 	// Tenancy area (P3): auth.mode hosted serves every organization from its
 	// own folders through the tenancy registry (servetenancy.go).
 	if a.cfg.Auth.IsHosted() {
@@ -89,8 +93,8 @@ func runServe(args []string) int {
 		return fail("server: %v", err)
 	}
 	if *offline {
-		// -offline is not a mode: the mode label (live, recorded, synthetic)
-		// still comes from bench.yaml, so say what offline changes.
+		// -offline is not a mode of its own: a live label from bench.yaml is
+		// served as recorded (offlineMode), so say what offline changes.
 		a.logger.Info("bench UI and API on http://%s (mode %s, offline: no gateway, no launching)", a.cfg.Server.Listen, a.cfg.Server.Mode)
 	} else {
 		a.logger.Info("bench UI and API on http://%s (mode %s)", a.cfg.Server.Listen, a.cfg.Server.Mode)
@@ -342,3 +346,12 @@ func (c *catalogSource) build() *schemas.Catalog {
 
 // Jobs area: the launcher (experiments as experiment.run jobs, live events,
 // cancel and resume) is in servejobs.go.
+
+// offlineMode is the mode label a server serves: an offline server replays
+// recorded runs, so a configured live mode becomes recorded.
+func offlineMode(configured schemas.Mode, offline bool) schemas.Mode {
+	if offline && configured == schemas.ModeLive {
+		return schemas.ModeRecorded
+	}
+	return configured
+}

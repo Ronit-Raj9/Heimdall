@@ -274,6 +274,12 @@ func (a *app) analyzeWith(ctx context.Context, expID, gradeSource, policyOverrid
 		}
 		verdict.Invalidate(an, "evidence: seals.log chain does not verify: "+err.Error())
 	}
+	// The manifest read here is the frozen one only when it still matches its
+	// hash; an edited manifest.json would otherwise re-decide unchanged sealed
+	// runs under new settings (audit 1-A-02).
+	if err := utils.VerifyManifestHash(m); err != nil {
+		verdict.Invalidate(an, "evidence: "+err.Error())
+	}
 	a.judgeCalibration(ctx, m, an, runs, policyOverride) // W8 judge calibration: judge_calibration instrument of judged experiments (judge.go)
 	an.AnalysisID = utils.NewID("a", 8)
 	an.Mode = a.cfg.Server.Mode
@@ -282,6 +288,9 @@ func (a *app) analyzeWith(ctx context.Context, expID, gradeSource, policyOverrid
 		an.Mode = schemas.ModeSynthetic
 	}
 	an.GradeSource = gradeSource
+	if an.InputsDigest, err = utils.AnalysisInputsDigest(runs); err != nil {
+		return nil, nil, fmt.Errorf("digest analysis inputs: %w", err)
+	}
 	if an.Policy, err = a.releasePolicy(m, an, verdict.CompleteSlots(m, runs), policyOverride); err != nil {
 		return nil, nil, err
 	}

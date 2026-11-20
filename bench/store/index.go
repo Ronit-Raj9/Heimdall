@@ -91,6 +91,17 @@ func (s *FSStore) SealedRuns(ctx context.Context, expID, gradeSource string) ([]
 	if err != nil {
 		return nil, fmt.Errorf("sealed runs %s: %w", expID, err)
 	}
+	m, err := s.LoadManifest(ctx, expID)
+	if err != nil {
+		return nil, fmt.Errorf("sealed runs %s: %w", expID, err)
+	}
+	slotProblems := canonicalSlots(m, slots)
+	var cover map[string]bool
+	if regradeID != "" {
+		if cover, err = s.committedRegate(expID, regradeID); err != nil {
+			return nil, fmt.Errorf("sealed runs %s: %w", expID, err)
+		}
+	}
 	logged, err := s.loggedSeals(expID)
 	if err != nil {
 		return nil, fmt.Errorf("sealed runs %s: %w", expID, err)
@@ -116,6 +127,13 @@ func (s *FSStore) SealedRuns(ctx context.Context, expID, gradeSource string) ([]
 		if err != nil {
 			return nil, fmt.Errorf("sealed runs %s: run %s: %w", expID, rec.Run.RunID, err)
 		}
+		if cover[rec.Run.RunID] && sr.GradeSource != regradeID && len(sr.Problems) == 0 {
+			// The regate covered this run but its result is missing: the
+			// regrade folder lost a file after publishing.
+			sr.Problems = append(sr.Problems, fmt.Sprintf("regrade %s covers run %s but holds no result for it", regradeID, rec.Run.RunID))
+		}
+		sr.Problems = append(sr.Problems, slotProblems[slot.SlotID]...)
+		sr.Problems = append(sr.Problems, runIdentityProblems(expID, slot, &rec.Run)...)
 		if len(counted) > 1 {
 			s.logger.Warn("slot has more than one counted run", "slot_id", slot.SlotID, "runs", strings.Join(counted, ","))
 			sr.Problems = append(sr.Problems, fmt.Sprintf("slot %s has %d counted runs (%s); exactly one may count",
@@ -389,6 +407,82 @@ func (s *FSStore) indexExperiment(ctx context.Context, expID string) (*schemas.M
 	return m, runs, nil
 }
 
+// canonicalSlots resolves each slot read from slot.json (slots, changed in
+// place) to its slot in the frozen manifest m, which is what the verdict
+// cells use: task, condition, arm, trial and counted come from the manifest,
+// never from the per-slot file beside the runs (audit 1-A-01). A slot.json
+// that disagrees with the manifest, or a slot the manifest does not list,
+// is returned as a problem keyed by slot id, so the run in it makes the
+// verdict INVALID. A manifest without slots (an old experiment) keeps the
+// slot.json values.
+func canonicalSlots(m *schemas.Manifest, slots []schemas.Slot) map[string][]string {
+	if m == nil || len(m.Slots) == 0 {
+		return nil
+	}
+	frozen := make(map[string]schemas.Slot, len(m.Slots))
+	for _, sl := range m.Slots {
+		if sl.ExpID == "" {
+			sl.ExpID = m.ExpID
+		}
+		frozen[sl.SlotID] = sl
+	}
+	problems := map[string][]string{}
+	for i := range slots {
+		disk := slots[i]
+		want, ok := frozen[disk.SlotID]
+		if !ok {
+			problems[disk.SlotID] = append(problems[disk.SlotID], fmt.Sprintf("slot %s is not in the manifest", disk.SlotID))
+			continue
+		}
+		if disk != want {
+			problems[disk.SlotID] = append(problems[disk.SlotID], fmt.Sprintf("slot.json of %s disagrees with the manifest (%s)", disk.SlotID, slotDiff(disk, want)))
+		}
+		slots[i] = want
+	}
+	return problems
+}
+
+// slotDiff names the fields where slot.json (got) differs from the manifest.
+func slotDiff(got, want schemas.Slot) string {
+	var d []string
+	add := func(name string, g, w any) {
+		if g != w {
+			d = append(d, fmt.Sprintf("%s %v, manifest %v", name, g, w))
+		}
+	}
+	add("pair_id", got.PairID, want.PairID)
+	add("exp_id", got.ExpID, want.ExpID)
+	add("suite", got.Suite, want.Suite)
+	add("task", got.Task, want.Task)
+	add("task_version", got.TaskVersion, want.TaskVersion)
+	add("task_hash", got.TaskHash, want.TaskHash)
+	add("run_input_hash", got.RunInputHash, want.RunInputHash)
+	add("arm", got.Arm, want.Arm)
+	add("condition", got.Condition, want.Condition)
+	add("trial", got.Trial, want.Trial)
+	add("order_index", got.OrderIndex, want.OrderIndex)
+	add("counted", got.Counted, want.Counted)
+	add("optional", got.Optional, want.Optional)
+	return strings.Join(d, "; ")
+}
+
+// runIdentityProblems checks that the sealed run.json names the slot, pair
+// and experiment it was found under, so a run copied into another slot
+// folder cannot take that slot's place in the verdict.
+func runIdentityProblems(expID string, slot *schemas.Slot, r *schemas.Run) []string {
+	var p []string
+	if r.SlotID != slot.SlotID {
+		p = append(p, fmt.Sprintf("run %s names slot %s, found under slot %s", r.RunID, r.SlotID, slot.SlotID))
+	}
+	if r.PairID != "" && r.PairID != slot.PairID {
+		p = append(p, fmt.Sprintf("run %s names pair %s, slot %s is in pair %s", r.RunID, r.PairID, slot.SlotID, slot.PairID))
+	}
+	if r.ExpID != "" && r.ExpID != expID {
+		p = append(p, fmt.Sprintf("run %s names experiment %s, found under %s", r.RunID, r.ExpID, expID))
+	}
+	return p
+}
+
 // listSlots reads every slot.json of an experiment, sorted by order index.
 func (s *FSStore) listSlots(expID string) ([]schemas.Slot, error) {
 	if _, err := os.Stat(filepath.Join(s.expDir(expID), manifestFile)); err != nil {
@@ -438,7 +532,33 @@ func (s *FSStore) resolveGradeSource(expID, gradeSource string) (string, error) 
 	if _, err := os.Stat(filepath.Join(s.expDir(expID), regradesDir, gradeSource)); err != nil {
 		return "", fmt.Errorf("regrade %s: %w", gradeSource, schemas.ErrNotFound)
 	}
+	if _, err := s.committedRegate(expID, gradeSource); err != nil {
+		return "", err
+	}
 	return gradeSource, nil
+}
+
+// committedRegate reads the regrade.json of regradeID and, for a regate
+// (gate versions set), returns its coverage record as a set. A regate
+// without one was not published by WriteGateRegrades and is refused as a
+// grade source (audit 8-D-03). A grade regrade returns nil.
+func (s *FSStore) committedRegate(expID, regradeID string) (map[string]bool, error) {
+	var info RegradeInfo
+	found, err := readOptionalJSON(filepath.Join(s.expDir(expID), regradesDir, regradeID, regradeFile), &info)
+	if err != nil {
+		return nil, fmt.Errorf("regrade %s: %w", regradeID, err)
+	}
+	if !found || len(info.GateVersions) == 0 {
+		return nil, nil
+	}
+	if len(info.Runs) == 0 {
+		return nil, fmt.Errorf("regrade %s has no coverage record: it was interrupted or not written in one batch, so it is not a grade source; regate again under a new id: %w", regradeID, schemas.ErrNotFound)
+	}
+	cover := make(map[string]bool, len(info.Runs))
+	for _, id := range info.Runs {
+		cover[id] = true
+	}
+	return cover, nil
 }
 
 // countedRun picks the slot's counted run from recs (sorted by attempt), or
@@ -535,12 +655,19 @@ func (s *FSStore) loadSealedRun(expID string, slot *schemas.Slot, rec *schemas.R
 		return nil, err
 	}
 	var ev struct {
-		Requests *schemas.RequestLog `json:"requests"`
+		Requests     *schemas.RequestLog `json:"requests"`
+		LedgerBreaks []string            `json:"ledger_breaks"`
 	}
 	if _, err := readOptionalJSON(filepath.Join(rec.Dir, evidenceFile), &ev); err != nil {
 		return nil, err
 	}
 	sr.Gateway = ev.Requests.Tally()
+	if len(ev.LedgerBreaks) > 0 {
+		// A fault proxy ledger whose hash chain broke at collect time: the
+		// gateway matching, cost and receipts derived from it cannot be
+		// verified, so no verdict rests on the run (audit 3-B-07).
+		sr.Problems = append(sr.Problems, fmt.Sprintf("proxy ledger hash chain broken: %s", strings.Join(ev.LedgerBreaks, "; ")))
+	}
 	// Tenancy area: a runner's own gateway preflight, recorded by the
 	// coordinator in the sealed remote/worker.json (hosted manifests defer
 	// the preflight to runners).

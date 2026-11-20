@@ -260,6 +260,12 @@ type Analysis struct {
 	ReviewChangedRuns int `json:"review_changed_runs,omitempty"`
 
 	JudgeCalibration *JudgeCalibrationVerdict `json:"judge_calibration,omitempty"` // W8 judge calibration: set only for a judged experiment (judgecalibration.go)
+
+	// InputsDigest is utils.AnalysisInputsDigest of the sealed runs this
+	// analysis read (seals, grade source, grades, gates, effective reviews).
+	// Release creation refuses an analysis whose inputs have changed since.
+	// Empty on analyses written before it existed.
+	InputsDigest string `json:"inputs_digest,omitempty"`
 }
 
 // Reporter writes an analysis in one format.

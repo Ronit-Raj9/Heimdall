@@ -122,24 +122,22 @@ func regradeStore(t *testing.T) (*store.FSStore, map[string]time.Time) {
 	outcomes := map[string]schemas.Outcome{"rg_a": schemas.OutcomeTimeout, "rg_b": schemas.OutcomeFail, "rg_c": schemas.OutcomePass}
 	versions := map[string]string{"g1_protected_paths": "1.1.0"}
 	for id, at := range created {
-		dir := filepath.Join(root, "e_rg", "regrades", id)
-		if err := os.MkdirAll(dir, 0o755); err != nil {
-			t.Fatal(err)
-		}
-		info, err := json.Marshal(store.RegradeInfo{RegradeID: id, ExpID: "e_rg", SuiteVersion: "1", GateVersions: versions, CreatedAt: at})
-		if err != nil {
-			t.Fatal(err)
-		}
-		if err := os.WriteFile(filepath.Join(dir, "regrade.json"), info, 0o644); err != nil {
-			t.Fatal(err)
-		}
 		y := 0.0
 		if outcomes[id] == schemas.OutcomePass {
 			y = 1
 		}
 		r := &store.GateRegrade{SealedOutcome: schemas.OutcomeIntegrityViolation, Outcome: outcomes[id], Y: schemas.Observed(y, schemas.EvidenceOutcome),
 			Metrics: map[string]schemas.Value{"verified_success": schemas.Observed(y, schemas.EvidenceOutcome)}}
-		if err := st.WriteGateRegrade(ctx, "e_rg", id, "r_t1", store.RegradeInfo{SuiteVersion: "1", GateVersions: versions}, r); err != nil {
+		if err := st.WriteGateRegrades(ctx, "e_rg", id, store.RegradeInfo{SuiteVersion: "1", GateVersions: versions}, map[string]*store.GateRegrade{"r_t1": r}); err != nil {
+			t.Fatal(err)
+		}
+		// Pin created_at: rewrite the committed regrade.json.
+		dir := filepath.Join(root, "e_rg", "regrades", id)
+		info, err := json.Marshal(store.RegradeInfo{RegradeID: id, ExpID: "e_rg", SuiteVersion: "1", GateVersions: versions, CreatedAt: at, Runs: []string{"r_t1"}})
+		if err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(filepath.Join(dir, "regrade.json"), info, 0o644); err != nil {
 			t.Fatal(err)
 		}
 	}
