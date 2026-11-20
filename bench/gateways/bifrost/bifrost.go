@@ -134,6 +134,7 @@ type Gateway struct {
 type mintRecord struct {
 	slot string
 	at   time.Time
+	run  string // the key's name (run id, or a derived service or member name)
 }
 
 // New validates cfg and returns a Gateway. It makes no network call; Setup

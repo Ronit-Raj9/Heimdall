@@ -1,6 +1,7 @@
 package utils
 
 import (
+	"strings"
 	"testing"
 
 	"github.com/maximhq/bifrost/bench/schemas"
@@ -54,5 +55,40 @@ func TestTeamHelpers(t *testing.T) {
 	}
 	if ids := TeamIDs(cfgTeam); len(ids) != 2 || ids[1] != "b" {
 		t.Errorf("TeamIDs = %v", ids)
+	}
+}
+
+// TestA2ATopologyAndSlots covers 3-A-01, 3-A-11 and 3-A-16.
+func TestA2ATopologyAndSlots(t *testing.T) {
+	a2a := &schemas.AgentConfig{Adapter: "a2a", A2A: &schemas.A2AAgent{CardURL: "http://e/card", Team: []schemas.A2AMember{{ID: "w", BudgetUSD: 0.5}}}}
+	task := &schemas.Task{Team: []schemas.TeamMember{{ID: "a"}, {ID: "b"}}}
+	rc := &schemas.RunContext{Agent: a2a, Task: task}
+	if TeamOf(rc) != nil {
+		t.Fatal("an A2A arm never takes the task's native team")
+	}
+	if n := RunKeySlots(rc); n != 2 {
+		t.Fatalf("RunKeySlots = %d, want 2", n)
+	}
+	if got := ArmTopology(a2a); got != schemas.TopologyTeam {
+		t.Fatalf("ArmTopology = %q", got)
+	}
+	if got := ArmMemberBudgets(a2a); got != 0.5 {
+		t.Fatalf("ArmMemberBudgets = %v", got)
+	}
+	if n := RunKeySlots(&schemas.RunContext{Agent: &schemas.AgentConfig{}, Task: task}); n != 2 {
+		t.Fatalf("native task team RunKeySlots = %d", n)
+	}
+}
+
+// TestRunSecrets covers 3-A-13: the MCP key is in the sanitizer's set.
+func TestRunSecrets(t *testing.T) {
+	rc := &schemas.RunContext{
+		Key:          &schemas.RunKey{Value: "k-run", Members: []schemas.MemberKey{{Value: "k-m"}, {Value: "k-run"}}},
+		Services:     []schemas.ServiceHandle{{GatewayKey: "k-mcp"}, {}},
+		FaultRuntime: &schemas.AdapterFaultRuntime{Token: "t-fault"},
+	}
+	got := strings.Join(RunSecrets(rc), ",")
+	if got != "k-run,k-m,k-mcp,t-fault" {
+		t.Fatalf("RunSecrets = %s", got)
 	}
 }

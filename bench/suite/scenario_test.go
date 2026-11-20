@@ -636,3 +636,22 @@ func TestLintScenarioCleanArtifactTask(t *testing.T) {
 		}
 	}
 }
+
+// TestLintServicesFoldedIDs covers 3-A-10: two valid ids that fold to one
+// gateway MCP client name are refused.
+func TestLintServicesFoldedIDs(t *testing.T) {
+	svc := func(id string) schemas.ServiceSpec { return schemas.ServiceSpec{ID: id, Image: "img"} }
+	probs := lintServices("suite.yaml", "services", t.TempDir(), []schemas.ServiceSpec{svc("lookup-cache"), svc("lookup--cache"), svc("other")}, map[string]string{})
+	n := 0
+	for _, p := range probs {
+		if strings.Contains(p.Message, "only in its hyphens") {
+			n++
+			if !strings.Contains(p.Message, `"lookup--cache"`) {
+				t.Errorf("wrong id named: %s", p.Message)
+			}
+		}
+	}
+	if n != 1 {
+		t.Fatalf("want one folded-id problem, got %d: %+v", n, probs)
+	}
+}

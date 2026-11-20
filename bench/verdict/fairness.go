@@ -5,6 +5,7 @@ import (
 	"strings"
 
 	"github.com/maximhq/bifrost/bench/schemas"
+	"github.com/maximhq/bifrost/bench/utils"
 )
 
 // InstrumentFairnessEqualBudget is the instrument check of an experiment that
@@ -104,7 +105,7 @@ func fairnessCaps(m *schemas.Manifest, rep *schemas.FairnessReport) []string {
 		cfg := m.Arms[arm].Config
 		limit := cfg.Budgets.USD
 		rep.CapsUSD[arm] = limit
-		rep.Topologies[arm] = topologyOf(cfg)
+		rep.Topologies[arm] = utils.ArmTopology(&cfg)
 		caps = append(caps, fmt.Sprintf("%s=%.2f", arm, limit))
 		distinct[limit] = true
 		if limit <= 0 {
@@ -117,25 +118,13 @@ func fairnessCaps(m *schemas.Manifest, rep *schemas.FairnessReport) []string {
 	return problems
 }
 
-// topologyOf is an arm's declared topology, else team or single by whether
-// it has a team.
-func topologyOf(cfg schemas.AgentConfig) string {
-	switch {
-	case cfg.Topology != "":
-		return cfg.Topology
-	case len(cfg.Team) > 0:
-		return schemas.TopologyTeam
-	default:
-		return schemas.TopologySingle
-	}
-}
-
 // fairnessBaselines reports whether some arm is a single-agent baseline
 // (topology single, or no topology and no team) and whether some arm is a
 // best-of-N baseline.
 func fairnessBaselines(arms map[string]schemas.ArmManifest) (single, bestOfN bool) {
 	for _, a := range arms {
-		switch topologyOf(a.Config) {
+		cfg := a.Config
+		switch utils.ArmTopology(&cfg) { // an A2A team (a2a.team) is a team, not a single-agent baseline
 		case schemas.TopologySingle:
 			single = true
 		case schemas.TopologyBestOfN:

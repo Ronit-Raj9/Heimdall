@@ -47,6 +47,7 @@ var _ schemas.EvidenceSource = (*gatewaySource)(nil)
 // record for model calls (DESIGN.md 11), and normalizes them into events.
 type gatewaySource struct {
 	gateway schemas.Gateway
+	fault   schemas.FaultController // re-reads the ledger for an incomplete log (3-B-09); nil without a proxy
 	logger  schemas.Logger
 }
 
@@ -77,6 +78,9 @@ func (s *gatewaySource) Collect(ctx context.Context, rc *schemas.RunContext, ev 
 	if log == nil {
 		return fmt.Errorf("fetch gateway requests for run %s: %w", id, errNoLog)
 	}
+	if log, err = s.reconcileLate(ctx, rc, ev, log); err != nil {
+		return fmt.Errorf("fetch gateway requests for run %s: %w", id, err)
+	}
 	if len(ev.LedgerBreaks) > 0 {
 		// The ledger this log was matched against does not verify, so its
 		// completeness cannot be claimed (audit 3-B-07).
@@ -104,6 +108,37 @@ func (s *gatewaySource) Collect(ctx context.Context, rc *schemas.RunContext, ev 
 	}
 	ev.Events = append(ev.Events, events...)
 	return writeEvents(rc, ev)
+}
+
+// reconcileLate handles a ledger read that came before the proxy persisted
+// a late entry (a stream finishing or a cancellation), while the gateway
+// poll saw its row (3-B-09). When the log is incomplete, the ledger is read
+// once more; if it only grew, still verifies and extends the first read,
+// the grown ledger becomes the evidence ledger and the gateway rows are
+// matched against it again. Otherwise the first result stands, incomplete.
+func (s *gatewaySource) reconcileLate(ctx context.Context, rc *schemas.RunContext, ev *schemas.Evidence, log *schemas.RequestLog) (*schemas.RequestLog, error) {
+	if log.Complete || s.fault == nil || len(ev.LedgerBreaks) > 0 {
+		return log, nil
+	}
+	id := runID(rc)
+	fresh, err := s.fault.Ledger(ctx, id)
+	if err != nil || len(fresh) <= len(ev.Ledger) || len(LedgerChainBreaks(fresh)) > 0 {
+		return log, nil
+	}
+	for i, e := range ev.Ledger {
+		if fresh[i].Hash != e.Hash {
+			return log, nil
+		}
+	}
+	again, err := s.gateway.FetchRequests(ctx, rc.Key, schemas.FetchExpectation{LedgerEntries: fresh})
+	if err != nil || again == nil {
+		return log, nil
+	}
+	if err := writeJSONL(rc.Dir, ledgerFile, fresh); err != nil {
+		return nil, fmt.Errorf("write proxy ledger for run %s: %w", id, err)
+	}
+	ev.Ledger = fresh
+	return again, nil
 }
 
 func rawGatewayRows(log *schemas.RequestLog) []rawGatewayRow {
@@ -462,5 +497,5 @@ func incompleteEvent(rc *schemas.RunContext, log *schemas.RequestLog, seq int) s
 
 // newGatewaySource returns the gateway source.
 func newGatewaySource(deps Deps) *gatewaySource {
-	return &gatewaySource{gateway: deps.Gateway, logger: deps.Logger}
+	return &gatewaySource{gateway: deps.Gateway, fault: deps.Fault, logger: deps.Logger}
 }

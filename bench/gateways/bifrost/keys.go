@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"net/url"
 	"regexp"
+	"slices"
 	"sort"
 	"strconv"
 	"strings"
@@ -54,6 +55,11 @@ func (g *Gateway) MintKey(ctx context.Context, rc *schemas.RunContext) (*schemas
 	}
 	extra := map[string]any{}
 	if usd := runBudget(rc); usd > 0 { // Multi-agent area: the equal_budget fairness rule enforces the run's cap here (team.go)
+		if routing != nil && routing.Limits != nil && routing.Limits.BudgetUSD > 0 { // 3-A-09: never enforce a different budget than the routing treatment recorded
+			g.releaseSlot(slot.Name, runID)
+			g.releaseReserved(runID)
+			return nil, fmt.Errorf("mint key for run %s: the routing policy's budget_usd %.2f and the fairness cap %.2f both limit the run key; the planner refuses this", runID, routing.Limits.BudgetUSD, usd)
+		}
 		extra["budgets"] = []map[string]any{{"max_limit": usd, "reset_duration": budgetReset}}
 	}
 	key, err := g.createVirtualKey(ctx, runID, p, slot, keyID, model, routing, models, extra)
@@ -72,7 +78,7 @@ func (g *Gateway) MintKey(ctx context.Context, rc *schemas.RunContext) (*schemas
 	}
 	g.mu.Lock()
 	g.inUse[slot.Name] = key.ID
-	g.minted[key.ID] = mintRecord{slot: slot.Name, at: time.Now()}
+	g.minted[key.ID] = mintRecord{slot: slot.Name, at: time.Now(), run: runID}
 	g.mu.Unlock()
 	g.logger.Info("virtual key minted", "run_id", runID, "virtual_key_id", key.ID, "provider", p.Name,
 		"mode", p.Mode, "key_slot", slot.Name, "model", model)
@@ -87,22 +93,36 @@ func (g *Gateway) RevokeKey(ctx context.Context, key *schemas.RunKey) error {
 		return nil
 	}
 	g.releaseReserved(key.Name)
-	if err := g.revokeMembers(ctx, key, g.teamOf(key.ID)); err != nil { // Multi-agent area: a team run's member keys and team (team.go)
-		return fmt.Errorf("revoke members of virtual key %s (%s): %w", key.ID, key.Name, err)
+	// 3-A-02: every independent cleanup step runs and the errors are joined,
+	// so one failed member or team DELETE never leaves the lead key, its
+	// routing rule or its slot behind. The team id stays recorded until its
+	// DELETE is confirmed, so a retry still knows what to delete.
+	var errs []error
+	teamID := g.teamFor(key.ID)
+	membersErr := g.revokeMemberKeys(ctx, key)
+	if membersErr != nil {
+		errs = append(errs, fmt.Errorf("revoke members of virtual key %s (%s): %w", key.ID, key.Name, membersErr))
 	}
-	var ruleErr error
 	if key.RoutingRuleID != "" { // W9: the run's routing rule goes first, so no rule outlives its key
-		ruleErr = g.deleteRouteRule(ctx, key.RoutingRuleID) // on failure the key still goes; the janitor deletes the orphan rule
+		if err := g.deleteRouteRule(ctx, key.RoutingRuleID); err != nil { // on failure the key still goes; the janitor deletes the orphan rule
+			errs = append(errs, fmt.Errorf("revoke virtual key %s (%s): %w", key.ID, key.Name, err))
+		}
 	}
-	if err := g.deleteVirtualKey(ctx, key.ID); err != nil {
-		return fmt.Errorf("revoke virtual key %s (%s): %w", key.ID, key.Name, errors.Join(err, ruleErr))
+	keyErr := g.deleteVirtualKey(ctx, key.ID)
+	if keyErr != nil {
+		errs = append(errs, fmt.Errorf("revoke virtual key %s (%s): %w", key.ID, key.Name, keyErr))
+	} else {
+		g.forget(key.ID)
+		g.logger.Info("virtual key revoked", "virtual_key_id", key.ID, "name", key.Name, "key_slot", key.KeySlot)
 	}
-	g.forget(key.ID)
-	g.logger.Info("virtual key revoked", "virtual_key_id", key.ID, "name", key.Name, "key_slot", key.KeySlot)
-	if ruleErr != nil {
-		return fmt.Errorf("revoke virtual key %s (%s): %w", key.ID, key.Name, ruleErr)
+	if teamID != "" && membersErr == nil && keyErr == nil { // a team goes once the keys in it are gone
+		if err := g.deleteTeam(ctx, teamID); err != nil {
+			errs = append(errs, fmt.Errorf("revoke team of virtual key %s (%s): %w", key.ID, key.Name, err))
+		} else {
+			g.dropTeam(key.ID)
+		}
 	}
-	return nil
+	return errors.Join(errs...)
 }
 
 // RevokeStale implements schemas.Gateway. It deletes every virtual key whose
@@ -111,29 +131,31 @@ func (g *Gateway) RevokeKey(ctx context.Context, key *schemas.RunKey) error {
 // proxy, by this process or another bench process, is kept as if active;
 // when the claims cannot be read, nothing is revoked.
 func (g *Gateway) RevokeStale(ctx context.Context, active map[string]bool) (int, error) {
-	held, err := g.liveClaimRuns(ctx)
+	// 3-B-03: candidates are listed before the claims are read. A key minted
+	// by another process is created after that process claimed its slot, so
+	// every listed key whose run is live is covered by the later claim read.
+	var errs []error
+	rules, rulesErr := g.listRouteRules(ctx)
+	if rulesErr != nil {
+		errs = append(errs, fmt.Errorf("revoke stale routing rules: %w", rulesErr))
+	}
+	keys, keysErr := g.listVirtualKeys(ctx)
+	teams, teamsErr := g.listTeams(ctx)      // 3-A-03
+	agents, agentsErr := g.listA2ANames(ctx) // 3-A-04
+	active, err := g.withClaimHolders(ctx, active)
 	if err != nil {
 		return 0, fmt.Errorf("revoke stale keys: nothing revoked, the key slot claims of other bench processes could not be read: %w", err)
 	}
-	if len(held) > 0 {
-		merged := make(map[string]bool, len(active)+len(held))
-		for run := range active {
-			merged[run] = active[run]
+	if rulesErr == nil {
+		if _, err := g.deleteStaleRules(ctx, rules, active); err != nil { // W9: stale run routing rules first (routing.go)
+			errs = append(errs, fmt.Errorf("revoke stale routing rules: %w", err))
 		}
-		for run := range held {
-			merged[run] = true
-		}
-		active = merged
 	}
-	var errs []error
-	if _, err := g.revokeStaleRules(ctx, active); err != nil { // W9: stale run routing rules first (routing.go)
-		errs = append(errs, fmt.Errorf("revoke stale routing rules: %w", err))
-	}
-	keys, err := g.listVirtualKeys(ctx)
-	if err != nil {
-		return 0, errors.Join(append(errs, fmt.Errorf("revoke stale keys: %w", err))...)
+	if keysErr != nil {
+		return 0, errors.Join(append(errs, fmt.Errorf("revoke stale keys: %w", keysErr))...)
 	}
 	n := 0
+	keyLeft := map[string]bool{} // runs with a key that could not be deleted keep their team
 	for _, k := range keys {
 		run, ok := staleRun(k.Name)                         // Multi-agent area: member keys carry their run id (team.go)
 		if !ok || active[run] || active[ownerRun(k.Name)] { // W3: a service or judge key of a live run stays
@@ -141,13 +163,34 @@ func (g *Gateway) RevokeStale(ctx context.Context, active map[string]bool) (int,
 		}
 		if err := g.deleteVirtualKey(ctx, k.ID); err != nil {
 			errs = append(errs, fmt.Errorf("revoke stale key %s (%s): %w", k.ID, k.Name, err))
+			keyLeft[run] = true
 			continue
 		}
 		g.forget(k.ID)
 		n++
 		g.logger.Info("stale virtual key revoked", "virtual_key_id", k.ID, "name", k.Name)
 	}
+	errs = append(errs, g.removeStaleTeams(ctx, teams, teamsErr, active, keyLeft)...)
+	errs = append(errs, g.removeStaleA2A(ctx, agents, agentsErr, active)...)
 	return n, errors.Join(errs...)
+}
+
+// withClaimHolders returns active plus every run that holds a live key slot
+// claim at the fault proxy (F1). Read it after listing the cleanup
+// candidates (3-B-03). An error means liveness is unknown: nothing may go.
+func (g *Gateway) withClaimHolders(ctx context.Context, active map[string]bool) (map[string]bool, error) {
+	held, err := g.liveClaimRuns(ctx)
+	if err != nil {
+		return nil, err
+	}
+	merged := make(map[string]bool, len(active)+len(held))
+	for run, live := range active {
+		merged[run] = live
+	}
+	for run := range held {
+		merged[run] = true
+	}
+	return merged, nil
 }
 
 // virtualKey is a virtual key as Bifrost returns it.
@@ -314,6 +357,23 @@ func (g *Gateway) ensureSlotModel(ctx context.Context, p ProviderSetup, slot Slo
 		current = append(current, m)
 	}
 	g.mu.Unlock()
+	// 3-A-07: when key slots are shared with other bench processes through
+	// claims, this process's copy of the slot's models is not authoritative:
+	// another owner may have rewritten the list since. Under the slot's
+	// claim, the provider key is read again and updated only when the model
+	// is really missing, keeping every model other owners added.
+	if shared, err := g.claimsFor(ctx, p); err != nil {
+		return err
+	} else if shared {
+		remote, err := g.slotModels(ctx, p, slot)
+		if err != nil {
+			return err
+		}
+		current, have = remote, slices.Contains(remote, model)
+		g.mu.Lock()
+		g.models[slot.Name] = toSet(remote)
+		g.mu.Unlock()
+	}
 	if have {
 		return nil
 	}
@@ -331,6 +391,22 @@ func (g *Gateway) ensureSlotModel(ctx context.Context, p ProviderSetup, slot Slo
 	g.models[slot.Name] = toSet(models)
 	g.mu.Unlock()
 	return nil
+}
+
+// slotModels reads the models the slot's provider key serves now.
+func (g *Gateway) slotModels(ctx context.Context, p ProviderSetup, slot Slot) ([]string, error) {
+	var existing struct {
+		Keys []providerKey `json:"keys"`
+	}
+	if err := g.call(ctx, http.MethodGet, providerPath(p.Name)+"/keys", nil, &existing); err != nil {
+		return nil, fmt.Errorf("list %s keys: %w", p.Name, err)
+	}
+	for _, k := range existing.Keys {
+		if k.Name == slot.Name {
+			return append([]string(nil), k.Models...), nil
+		}
+	}
+	return nil, fmt.Errorf("key slot %s: not found at provider %s", slot.Name, p.Name)
 }
 
 func (g *Gateway) deleteVirtualKey(ctx context.Context, id string) error {

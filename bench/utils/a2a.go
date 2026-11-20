@@ -1,6 +1,8 @@
 package utils
 
 import (
+	"crypto/sha256"
+	"encoding/hex"
 	"fmt"
 	"regexp"
 	"strings"
@@ -141,7 +143,11 @@ func A2ARegistrationName(runID, member string) string {
 		}
 		name = "hb-" + id + "-" + member
 		if len(name) > 63 {
-			name = strings.Trim(name[:63], "-")
+			// 3-A-15: a cut member id keeps a digest of the whole id, so two
+			// long member ids with one prefix stay distinct.
+			sum := sha256.Sum256([]byte(member))
+			tag := "-" + hex.EncodeToString(sum[:])[:10]
+			name = strings.Trim(name[:63-len(tag)], "-") + tag
 		}
 	}
 	return name

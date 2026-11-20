@@ -231,6 +231,15 @@ func agentCheck(ctx context.Context, opts checkOptions, log io.Writer) *checkRep
 	return rep.finish()
 }
 
+// checkEnvConfig is the normal run environment's wiring with the network
+// observer on. It keeps the service gateway, so a model-backed service or an
+// LLM simulator gets its key; the check's scripted fault mode marks the run
+// no-paid-traffic, so that key is bound to the scripted model.
+func checkEnvConfig(cfg environments.DockerWorkspaceConfig) environments.DockerWorkspaceConfig {
+	cfg.NetWatch = true
+	return cfg
+}
+
 // runCheckSlot plans the one-slot check, runs it through the normal pipeline
 // with fault plan mode scripted and the network observer on, seals it under
 // the checks root and reads back what the rows need.
@@ -239,13 +248,7 @@ func runCheckSlot(ctx context.Context, opts checkOptions, rep *checkReport) (*ch
 	if err != nil {
 		return nil, err
 	}
-	a.reg.Environments = environments.Builtin(environments.DockerWorkspaceConfig{
-		EvalNetwork: a.cfg.Networks.Eval, HelperImage: a.cfg.Images.Helper, Logger: a.logger, Docker: a.docker, NetWatch: true,
-		ToolProxyImage: a.cfg.Images.ToolProxy, // lead: tool proxy image for runs with proxied services
-		// Agent steps area: trusted step observers, on unless switched off.
-		ProcessWatch: a.cfg.Observers.ProcessOn(), WorkspaceWatch: a.cfg.Observers.WorkspaceOn(), WatchIntervalMS: a.cfg.Observers.IntervalMS,
-		EventsCollector: a.cfg.Events.CollectorOn(), // Agent events area
-	})
+	a.reg.Environments = environments.Builtin(checkEnvConfig(a.dockerCfg))
 	st, err := store.NewFSStore(a.cfg.Path(opts.runs), a.logger)
 	if err != nil {
 		return nil, fmt.Errorf("open checks folder: %w", err)

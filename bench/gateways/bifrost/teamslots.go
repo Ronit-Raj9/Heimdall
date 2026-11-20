@@ -24,12 +24,23 @@ const reservedPrefix = "reserved:"
 // slotPoll is how often a waiting mint looks for free slots again.
 var slotPoll = 200 * time.Millisecond
 
-// teamSlots is how many key slots a run needs: one per team member, else one.
+// teamSlots is how many key slots a run needs at once: one per native team
+// member or per A2A team agent (entry included), else one
+// (utils.RunKeySlots), so an A2A team reserves its whole set up front.
 func teamSlots(rc *schemas.RunContext) int {
-	if n := len(utils.TeamOf(rc)); n > 1 {
-		return n
+	return utils.RunKeySlots(rc)
+}
+
+// ownDerivedHolderLocked reports whether a slot holder is a key the run
+// itself minted under a derived name (a service or judge key: the run ID
+// followed by more characters), so the run would wait on its own slots.
+// Called with g.mu held.
+func (g *Gateway) ownDerivedHolderLocked(holder, runID string) bool {
+	holder = strings.TrimPrefix(strings.TrimPrefix(holder, "pending:"), reservedPrefix)
+	if rec, ok := g.minted[holder]; ok && rec.run != "" {
+		holder = rec.run
 	}
-	return 1
+	return holder != runID && strings.HasPrefix(holder, runID)
 }
 
 // KeySlots is how many key slots the gateway has for a provider (the
@@ -119,7 +130,16 @@ func (g *Gateway) tryRunSlots(ctx context.Context, p ProviderSetup, runID string
 		return Slot{}, "", false, errors.New("gateway not set up: Setup has not run")
 	}
 	if len(free) < n {
+		own := 0
+		for _, s := range p.Slots {
+			if holder, used := g.inUse[s.Name]; used && g.ownDerivedHolderLocked(holder, runID) {
+				own++
+			}
+		}
 		g.mu.Unlock()
+		if own > 0 && len(p.Slots)-own < n { // 3-A-14: the run's own service keys hold the slots it waits for; they free only after the run
+			return Slot{}, "", false, fmt.Errorf("run %s needs %d key slots of %s at once, but its own services hold %d of the %d; raise gateway.key_slots or move the service to another provider", runID, n, p.Name, own, len(p.Slots))
+		}
 		err := fmt.Errorf("no free key slot for %s: %d of %d in use, %d needed", p.Name, busy, len(p.Slots), n)
 		return Slot{}, "", n > 1 || teams, err
 	}

@@ -100,7 +100,57 @@ func joinLedger(rows []*parsedRow, ledger []schemas.LedgerEntry, slot string) jo
 			j.Unmatched = append(j.Unmatched, i)
 		}
 	}
+	j.Problems = append(j.Problems, audioWitness(rows, ledger, slot)...)
 	return j
+}
+
+// audioWitness is the two-sided completeness check of audio traffic
+// (3-B-08), which the per-request join above does not cover: Bifrost's
+// speech and transcription rows carry no anchor the ledger shares. Each
+// cascaded attempt that reached the proxy must have one audio ledger entry
+// and each entry one attempt. A Realtime session is one ledger entry for
+// many gateway turn rows, so it is reconciled per session: turn rows need
+// at least one session entry and a session entry needs at least one turn
+// row.
+func audioWitness(rows []*parsedRow, ledger []schemas.LedgerEntry, slot string) []string {
+	ledgerCascaded, ledgerSessions := 0, 0
+	for _, e := range ledger {
+		if e.Kind != kindAudio || e.Action == "reject" || (slot != "" && e.Slot != "" && e.Slot != slot) {
+			continue
+		}
+		if isRealtimePath(e.Path) {
+			ledgerSessions++
+		} else {
+			ledgerCascaded++
+		}
+	}
+	rowCascaded, rowTurns := 0, 0
+	for _, r := range rows {
+		if r == nil || r.Req.Kind != kindAudio {
+			continue
+		}
+		if strings.HasPrefix(r.Object, "realtime") {
+			rowTurns++
+		} else if r.Upstream {
+			rowCascaded += attempts(r)
+		}
+	}
+	var out []string
+	if ledgerCascaded != rowCascaded {
+		out = append(out, fmt.Sprintf("audio: %d proxy ledger entries for %d gateway attempts", ledgerCascaded, rowCascaded))
+	}
+	switch {
+	case ledgerSessions > 0 && rowTurns == 0:
+		out = append(out, fmt.Sprintf("realtime: %d proxy sessions and no gateway turn rows", ledgerSessions))
+	case ledgerSessions == 0 && rowTurns > 0:
+		out = append(out, fmt.Sprintf("realtime: %d gateway turn rows and no proxy session", rowTurns))
+	}
+	return out
+}
+
+// isRealtimePath reports whether a ledger path is a Realtime session.
+func isRealtimePath(p string) bool {
+	return strings.HasSuffix(strings.TrimSuffix(p, "/"), "/realtime")
 }
 
 // joinable returns the rows that must appear in the ledger, oldest first:

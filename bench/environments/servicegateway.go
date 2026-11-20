@@ -290,10 +290,14 @@ func (e *dockerWorkspace) serviceUsage(ctx context.Context, sk *serviceKey) (sch
 	cctx, cancel := context.WithTimeout(context.WithoutCancel(ctx), serviceFetchTimeout+5*time.Second)
 	defer cancel()
 	var ledger []schemas.LedgerEntry
+	ledgerErr := "no fault proxy wired"
 	if cfg.Fault != nil {
 		l, err := cfg.Fault.Ledger(cctx, sk.key.Name)
 		if err != nil {
 			e.cfg.Logger.Warn("service key ledger not read", "service", sk.service, "error", err.Error())
+			ledgerErr = "ledger not read: " + err.Error()
+		} else {
+			ledgerErr = ""
 		}
 		ledger = l
 	}
@@ -308,7 +312,72 @@ func (e *dockerWorkspace) serviceUsage(ctx context.Context, sk *serviceKey) (sch
 		return u, nil
 	}
 	u.Complete, u.Reason = log.Complete, log.Reason
-	return priceServiceRows(u, log.Requests, cfg.Price), log.Requests
+	if u.FaultMode != faultModeScripted {
+		return priceServiceRows(u, log.Requests, cfg.Price), log.Requests
+	}
+	return priceScriptedService(u, log.Requests, ledger, ledgerErr, cfg.Price), log.Requests
+}
+
+// priceScriptedService prices a key whose requested fault mode is scripted.
+// The requested mode alone never proves zero spend: the cost is zeroed only
+// when the proxy ledger witnesses every successful message on the scripted
+// upstream. A real, missing or mixed upstream identity is an integrity
+// failure that keeps the priced (possibly unknown) cost, with the reason.
+func priceScriptedService(u schemas.ServiceGatewayUsage, rows []schemas.GatewayRequest, ledger []schemas.LedgerEntry, ledgerErr string, price func(string, schemas.Tokens) (float64, bool)) schemas.ServiceGatewayUsage {
+	problem := scriptedWitnessProblem(rows, ledger, ledgerErr)
+	if problem == "" {
+		return priceServiceRows(u, rows, price)
+	}
+	u.FaultMode = ""
+	u = priceServiceRows(u, rows, price)
+	u.FaultMode = faultModeScripted
+	msg := "scripted service integrity failure: " + problem
+	if u.Reason != "" {
+		msg = u.Reason + "; " + msg
+	}
+	u.Reason = msg
+	if u.USD.State == schemas.ValueUnknown {
+		u.USD = schemas.Unknown(msg, schemas.EvidenceGateway)
+	}
+	return u
+}
+
+// scriptedWitnessProblem returns why the ledger does not prove that every
+// successful message row of a scripted key was answered by the scripted
+// upstream, or "" when it does.
+func scriptedWitnessProblem(rows []schemas.GatewayRequest, ledger []schemas.LedgerEntry, ledgerErr string) string {
+	served := 0
+	for _, r := range rows {
+		if (r.Kind == "" || r.Kind == "message") && r.Status != "error" {
+			served++
+		}
+	}
+	scripted := 0
+	for _, l := range ledger {
+		if l.Kind != "" && l.Kind != "message" {
+			continue
+		}
+		switch l.Upstream {
+		case schemas.LedgerUpstreamScripted:
+			scripted++
+		case "":
+			if l.Action == "pass" {
+				return fmt.Sprintf("ledger call %d has no upstream identity", l.Call)
+			}
+		default:
+			return fmt.Sprintf("ledger call %d went to the %s upstream", l.Call, l.Upstream)
+		}
+	}
+	if served == 0 {
+		return ""
+	}
+	if ledgerErr != "" {
+		return ledgerErr
+	}
+	if scripted < served {
+		return fmt.Sprintf("%d successful gateway rows but only %d scripted ledger witnesses", served, scripted)
+	}
+	return ""
 }
 
 // priceServiceRows counts, sums and prices the message rows of one key. It

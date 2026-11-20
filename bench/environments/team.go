@@ -139,10 +139,7 @@ func (e *dockerWorkspace) attachMember(ctx context.Context, rc *schemas.RunConte
 	if m.Plan.WallS <= 0 {
 		wall = defaultWallS * time.Second
 	}
-	secrets := []string{m.Key.Value, m.RouteToken}
-	if rc.Key != nil {
-		secrets = append(secrets, rc.Key.Value)
-	}
+	secrets := append([]string{m.Key.Value, m.RouteToken}, utils.RunSecrets(rc)...)
 	stdout, stderr := memberStreamPaths(rc.Dir, m.Member.ID)
 	x, err := e.attach(ctx, name, stdout, stderr, wall, secrets...)
 	res.Exec = x

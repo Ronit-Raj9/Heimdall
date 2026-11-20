@@ -22,6 +22,16 @@ var reservedServiceIDs = map[string]bool{"toolproxy": true}
 // containers of the run reach it by.
 var hostNameRE = regexp.MustCompile(`^[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?$`)
 
+// foldedKey is the seen-map key of a service id folded the way the gateway
+// folds it into an MCP client name (every run of hyphens to one
+// underscore), so two ids that fold alike are refused (3-A-10). The NUL
+// prefix keeps it apart from real ids.
+func foldedKey(id string) string {
+	return "\x00fold:" + strings.Trim(hyphenRunRE.ReplaceAllString(id, "_"), "_")
+}
+
+var hyphenRunRE = regexp.MustCompile(`-+`)
+
 // answerGraders are the graders that can grade an answer task.
 var answerGraders = map[string]bool{"answer_match": true, "judge": true, "verifier_command": true}
 
@@ -349,6 +359,9 @@ func lintScenarioTask(s *schemas.Suite, t *schemas.Task) []Problem {
 	seen := map[string]string{}
 	for _, sv := range s.Services {
 		seen[sv.ID] = SuiteFile
+		if seen[foldedKey(sv.ID)] == "" {
+			seen[foldedKey(sv.ID)] = sv.ID
+		}
 	}
 	out = append(out, lintServices(taskYAML, "services", t.Dir, t.Services, seen)...)
 	out = append(out, lintExternalTask(s, t, taskYAML)...) // External APIs area (external.go)
@@ -388,9 +401,14 @@ func lintServices(file, field, base string, services []schemas.ServiceSpec, seen
 			add(SeverityError, "%s.id: %q is reserved for the bench's tool proxy", at, sv.ID)
 		case seen[sv.ID] != "":
 			add(SeverityError, "%s.id: %q is already a service in %s", at, sv.ID, seen[sv.ID])
+		case seen[foldedKey(sv.ID)] != "":
+			add(SeverityError, "%s.id: %q differs from service %s only in its hyphens, so both get one gateway MCP client name", at, sv.ID, seen[foldedKey(sv.ID)])
 		}
 		if sv.ID != "" && seen[sv.ID] == "" {
 			seen[sv.ID] = file
+			if seen[foldedKey(sv.ID)] == "" {
+				seen[foldedKey(sv.ID)] = sv.ID
+			}
 		}
 		if sv.Image == "" && sv.Build == nil {
 			add(SeverityError, "%s: needs image or build", at)

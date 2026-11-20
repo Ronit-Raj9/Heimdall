@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	"github.com/maximhq/bifrost/bench/schemas"
+	"github.com/maximhq/bifrost/bench/utils"
 )
 
 // checkFairness enforces the experiment's fairness rule on the resolved arms
@@ -38,7 +39,10 @@ func checkFairness(e *schemas.Experiment, arms map[string]schemas.ArmManifest, l
 			errs = append(errs, fmt.Errorf("fairness %s: arm %s has no total USD cap (budgets.usd)", e.Fairness, id))
 			continue
 		}
-		if sum := memberBudgets(cfg.Team); sum > limit+fairnessTolerance {
+		if r := cfg.Gateway.Routing; r != nil && r.Limits != nil && r.Limits.BudgetUSD > 0 { // 3-A-09: one USD limit per run key; the fairness cap would replace the routing treatment's
+			errs = append(errs, fmt.Errorf("fairness %s: arm %s sets gateway.routing.limits.budget_usd %.2f, but the run key's USD limit is the fairness cap budgets.usd %.2f; drop one of them", e.Fairness, id, r.Limits.BudgetUSD, limit))
+		}
+		if sum := utils.ArmMemberBudgets(&cfg); sum > limit+fairnessTolerance {
 			errs = append(errs, fmt.Errorf("fairness %s: arm %s member sub-budgets sum to %.2f USD, above its total cap %.2f", e.Fairness, id, sum, limit))
 		}
 	}
@@ -64,29 +68,18 @@ func checkFairness(e *schemas.Experiment, arms map[string]schemas.ArmManifest, l
 const fairnessTolerance = 1e-9
 
 // fairnessBaselines reports whether some arm is a single-agent baseline
-// (topology single, or no topology and no team) and whether some arm is a
-// best-of-N baseline (topology best_of_n).
+// (topology single, or no topology and no native or A2A team,
+// utils.ArmTopology) and whether some arm is a best-of-N baseline (topology
+// best_of_n).
 func fairnessBaselines(arms map[string]schemas.ArmManifest) (single, bestOfN bool) {
 	for _, a := range arms {
-		switch a.Config.Topology {
+		cfg := a.Config
+		switch utils.ArmTopology(&cfg) {
 		case schemas.TopologySingle:
 			single = true
 		case schemas.TopologyBestOfN:
 			bestOfN = true
-		case "":
-			if len(a.Config.Team) == 0 {
-				single = true
-			}
 		}
 	}
 	return single, bestOfN
-}
-
-// memberBudgets sums a team's member sub-budgets.
-func memberBudgets(team []schemas.TeamMember) float64 {
-	var sum float64
-	for _, m := range team {
-		sum += m.BudgetUSD
-	}
-	return sum
 }
