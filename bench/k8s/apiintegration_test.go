@@ -58,14 +58,14 @@ func TestAPIServerAcceptsRunObjects(t *testing.T) {
 	if err := c.Apply(ctx, deployPath(gwNS), gwBifrost, bifrostDeployment("maximhq/bifrost:v2.5.1", "IfNotPresent", labels)); err != nil {
 		t.Fatalf("patch deployment: %v", err)
 	}
-	if err := c.Apply(ctx, corePath(gwNS, "services"), gwBifrost, service(gwBifrost, labels, []ServicePort{{Name: "http", Port: bifrostPort, TargetPort: bifrostPort, Protocol: "TCP"}}, false)); err != nil {
+	if err := c.Apply(ctx, corePath(gwNS, "services"), gwBifrost, service(gwBifrost, labels, []ServicePort{{Name: "http", Port: bifrostPort, TargetPort: Port(bifrostPort), Protocol: "TCP"}}, false)); err != nil {
 		t.Fatalf("patch service: %v", err)
 	}
 	gw, err := d.ResolveGateway(ctx)
 	if err != nil {
 		t.Fatalf("resolve the gateway the API server holds: %v", err)
 	}
-	if gw.ip == "" || gw.targetPort != 8080 || gw.selector[appNameLabel] != "bifrost" {
+	if gw.ip == "" || gw.targetPort != Port(8080) || gw.selector[appNameLabel] != "bifrost" {
 		t.Fatalf("gateway: %+v", gw)
 	}
 	// A run: Create's objects, then Exec's, then the pod (Pending).

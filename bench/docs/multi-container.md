@@ -199,9 +199,9 @@ Per service:
 |---|---|
 | `image` | the image; ignored when `build` is set |
 | `build` | a string (context) or `context` and `dockerfile`, both inside the task folder |
-| `command`, `entrypoint` | a list as is, or a string split like a shell (quotes, backslashes, no expansion); an empty `entrypoint` clears the image's |
+| `command`, `entrypoint` | a list as is, or a string split like a shell (quotes, backslashes, no expansion); an empty `entrypoint` clears the image's; an empty `command` is refused unless `entrypoint` is also set, since a launch cannot clear only the image command |
 | `environment` | a list of `KEY=VALUE` or a mapping |
-| `env_file` | a path, a list, or entries with `path` and `required`, inside the task folder; `environment` wins over it |
+| `env_file` | a path, a list, or entries with `path`, `required` and `format: raw` (values taken literally), inside the task folder; later files override earlier ones and `environment` wins over all of them |
 | `depends_on` | a list, or a mapping with `condition` (`service_started`, `service_healthy`, `service_completed_successfully`); `required: false` is still started, with a note |
 | `healthcheck` | `test`, `interval`, `timeout`, `retries`, `start_period`, `disable` |
 | `volumes` | short (`src:dst[:ro]`) or long syntax: named volumes, anonymous volumes, binds inside the task folder (copied in), `tmpfs` |
@@ -406,10 +406,9 @@ workers or in a team run; Kubernetes (see Limits).
 - Team runs (docs/multi-agent.md) have not been run with a compose file.
   The workspace service's environment is set for a single agent, a scripted
   control and the verifier; a team member's container does not get it.
-- The Kubernetes driver refuses tasks with services, so a compose task with
-  services is refused there; a compose file with only a workspace service
-  would reach Kubernetes without its environment variables, which that
-  driver does not apply yet.
+- The Kubernetes driver refuses every compose task, even one whose only
+  service is the workspace (docs/kubernetes.md lists what that driver
+  supports).
 - Only `x-heimdall` marks the verifier's access; a verifier that joins the
   run network can talk to every non-hidden service on it, not only the
   marked ones.

@@ -185,6 +185,9 @@ func (p *Planner) buildTaskAgents(ctx context.Context, suite *schemas.Suite, con
 			am.TaskImages = map[string]string{}
 		}
 		am.TaskImages[id] = img.Tag
+		if p.deferGateway { // hosted plan: the runner builds the tag and records its id (audit 8-B-06)
+			continue
+		}
 		if b == nil {
 			p.logger.Warn("no agent image builder; the per-task agent image is not built", "agent", cfg.ID, "task", id, "image", img.Tag)
 			continue

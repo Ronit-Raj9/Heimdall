@@ -31,6 +31,9 @@ func (w *Worker) runnerPreflight(ctx context.Context, m *schemas.Manifest) (*sch
 	if gm == nil {
 		return nil, nil, "gateway preflight returned no record"
 	}
+	if declaresSemanticCache(m) { // same opt-in as a local plan (audit 8-B-03)
+		acceptSemanticCache(gm.Hygiene)
+	}
 	if h := gm.Hygiene; h != nil && len(h.Violations) > 0 {
 		return nil, nil, "gateway hygiene check failed on this runner: " + strings.Join(h.Violations, "; ")
 	}

@@ -1249,6 +1249,7 @@ class _CatalogSuiteRequired(TypedDict):
 
 class CatalogSuite(_CatalogSuiteRequired, total=False):
     lock_hash: str
+    probe_layers: Dict[str, str]
 
 
 Change = TypedDict('Change', {'from': "Value", 'to': "Value"}, total=False)

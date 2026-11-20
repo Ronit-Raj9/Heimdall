@@ -209,6 +209,9 @@ func TestCheckFrozenSuiteImages(t *testing.T) {
 			"base image bench/base:1 is now base00000000 but experiment e_1 was planned with old000000000; restore that image or plan a new experiment", ""},
 		{"rebuilt helper refused", map[string]string{"helper": "sha256:old0000000000000"}, "helper image bench/helper:1 is now", ""},
 		{"rebuilt task service refused", map[string]string{"service/mcp": "sha256:old0000000000000"}, "service/mcp image bench/mcp:1 is now", ""},
+		{"task-scoped service matches", map[string]string{"task/t01/service/mcp": "sha256:mcp0000000000000"}, "", ""},
+		{"rebuilt task-scoped service refused", map[string]string{"task/t01/service/mcp": "sha256:old0000000000000"}, "task/t01/service/mcp image bench/mcp:1 is now", ""},
+		{"another task's service is skipped silently", map[string]string{"task/t02/service/mcp": "sha256:old0000000000000"}, "", ""},
 		{"role this run does not name warns", map[string]string{"service/gone": "sha256:x"}, "", "frozen image not checked: this run does not name it"},
 	}
 	for _, tt := range tests {

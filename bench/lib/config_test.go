@@ -4,6 +4,7 @@ import (
 	"os"
 	"path/filepath"
 	"reflect"
+	"strings"
 	"testing"
 
 	"github.com/maximhq/bifrost/bench/schemas"
@@ -111,5 +112,17 @@ func TestHeldOutConfig(t *testing.T) {
 	}
 	if !cfg.HeldOut.Visible {
 		t.Fatal("BENCH_HELD_OUT_VISIBLE=true not applied")
+	}
+}
+
+// 2-D-15: a namespace prefix that leaves no room for the run ID is refused.
+func TestValidateRejectsLongNamespacePrefix(t *testing.T) {
+	c, err := LoadConfig("../deploy/bench.yaml")
+	if err != nil {
+		t.Fatal(err)
+	}
+	c.Kubernetes.NamespacePrefix = strings.Repeat("p", maxNamespacePrefix+1)
+	if err := c.Validate(); err == nil || !strings.Contains(err.Error(), "namespace_prefix") {
+		t.Fatalf("err = %v", err)
 	}
 }

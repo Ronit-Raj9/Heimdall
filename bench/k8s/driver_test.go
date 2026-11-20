@@ -37,8 +37,9 @@ type fakeAPI struct {
 	deleted   []string
 	key       string
 	noEnforce bool
-	workspace string   // the artifact script's workspace root
-	laid      []string // staged tars extracted in prep: destination and member names
+	stall     chan struct{} // non-nil: attach marks the agent done, then never answers until closed
+	workspace string        // the artifact script's workspace root
+	laid      []string      // staged tars extracted in prep: destination and member names
 }
 
 const fakeRef = "0123456789abcdef0123456789abcdef01234567"
@@ -214,6 +215,13 @@ func (f *fakeAPI) attach(w http.ResponseWriter, r *http.Request) {
 	in := s.readStdin(f.t)
 	if string(in) != "\n" {
 		f.t.Errorf("attach stdin %q, want one newline", in)
+	}
+	if f.stall != nil {
+		f.mu.Lock()
+		f.attached = true
+		f.mu.Unlock()
+		<-f.stall
+		return
 	}
 	s.send(streamStdout, []byte(`{"type":"result","text":"done with `+f.key+`"}`+"\n"))
 	s.send(streamStderr, []byte("agent stderr\n"))

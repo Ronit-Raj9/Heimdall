@@ -49,6 +49,9 @@ type hostedEnv struct {
 	dir      tenancy.Directory
 	audit    tenancy.AuditSink
 	offline  bool
+	// platformRoutes are the platform router's routes, set when the server
+	// is built (newHostedServer), before any org runtime is.
+	platformRoutes map[string][]string
 }
 
 // hostedAreas build the platform route areas of hosted mode. Each area
@@ -146,6 +149,7 @@ func newHostedServer(env *hostedEnv) (*server.Server, error) {
 			areas = append(areas, r)
 		}
 	}
+	env.platformRoutes = server.PlatformRoutes(env.base.cfg, areas) // listed in each org's OpenAPI document (audit 8-C-05)
 	mw := env.authMW
 	if mw == nil {
 		mw = auth.Middleware(env.authCfg, env.auth)
@@ -178,6 +182,8 @@ func orgBuilder(env *hostedEnv) tenancy.Builder {
 			return nil, err
 		}
 		deps.UI, deps.Doctor = nil, nil // the UI is served once; preflight checks describe the server, not an org
+		hostedOrgFeatures(oa, &deps)
+		deps.PlatformRoutes = env.platformRoutes
 		// Always wired, -offline or not: the hosted launcher runs no slot
 		// itself and needs no gateway; without it runners get a 503.
 		if orgLauncher != nil {
@@ -190,6 +196,23 @@ func orgBuilder(env *hostedEnv) tenancy.Builder {
 		}
 		return rt, nil
 	}
+}
+
+// hostedOrgFeatures wires the extension feature sources that work over an
+// org's stored data alone, each built over the org's own app (audit 8-C-01):
+// inbox, judge calibration, export, compliance pack and monitor
+// certificates in full; canaries and live scoring as offline sources, so
+// their stored status reads work while a canary run or a live pull (which
+// would run agents or call a gateway from the coordinator) is refused here
+// and denied by tenancy/policy.go before it reaches the handler.
+func hostedOrgFeatures(oa *app, deps *server.Deps) {
+	deps.Inbox = serveInbox(oa)
+	deps.Canaries = serveCanaries(oa, true)
+	deps.Calibration = judgeSvc{a: oa}
+	deps.Export = serveExport{a: oa}
+	deps.Livescore = serveLivescore(oa, true)
+	deps.Compliance = serveCompliance{a: oa}
+	deps.MonitorCerts = serveMonitorCerts(oa)
 }
 
 // forOrg returns the app of one hosted org: a's instance config and

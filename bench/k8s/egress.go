@@ -137,6 +137,9 @@ func (d *Driver) RunEgressProbe(ctx context.Context, policy bool, targets []prob
 			d.cfg.Logger.Warn("remove egress probe namespace", "namespace", ns, "error", err.Error())
 		}
 	}()
+	if err := d.createServiceAccount(ctx, ns, labels, nil); err != nil {
+		return nil, fmt.Errorf("probe %w", err)
+	}
 	var hosts []HostAlias
 	if policy {
 		if err := d.cfg.Client.Create(ctx, netpolPath(ns), denyAllPolicy(labels, nil), nil); err != nil {
@@ -252,6 +255,27 @@ func EgressVerdict(rep *EgressReport, forbidden []probeTarget, gateway bool) (st
 	return EgressBlocked, ""
 }
 
+// ControlledEgressVerdict is EgressVerdict for the policed probe, held
+// against a control probe without policies: blocked stands only when the
+// control reached at least one forbidden target that the policies then
+// blocked. Otherwise enforcement is not shown and the verdict is not_run,
+// which fails the preflight. It is pure.
+func ControlledEgressVerdict(control, policed *EgressReport, forbidden []probeTarget, gateway bool) (string, string) {
+	state, why := EgressVerdict(policed, forbidden, gateway)
+	if state != EgressBlocked {
+		return state, why
+	}
+	if control == nil {
+		return EgressNotRun, "no control probe result, so enforcement is not shown"
+	}
+	for _, t := range forbidden {
+		if !t.Inform && control.Results[t.Name] == "open" && policed.Results[t.Name] == "blocked" {
+			return EgressBlocked, ""
+		}
+	}
+	return EgressNotRun, "every forbidden target is blocked, but the control pod without policies reached none of them either, so enforcement is not shown"
+}
+
 // Gateway wraps the Bifrost gateway so its preflight records the
 // Kubernetes egress probe instead of the Docker one: under this driver the
 // agents' network is the run namespaces' policies, not a Docker network.
@@ -263,6 +287,11 @@ type Gateway struct {
 
 // WrapGateway returns gw with the driver's egress probe.
 func WrapGateway(gw schemas.Gateway, d *Driver) *Gateway { return &Gateway{Gateway: gw, driver: d} }
+
+// UnwrapGateway implements schemas.GatewayWrapper, so the planner still
+// finds the inner gateway's optional capabilities (prompt-cache and
+// complexity probes, team and A2A support) through schemas.GatewayAs.
+func (g *Gateway) UnwrapGateway() schemas.Gateway { return g.Gateway }
 
 // Preflight implements schemas.Gateway: the inner preflight runs as
 // before, then its Docker egress settings and problems are replaced by the
@@ -287,12 +316,19 @@ func (g *Gateway) Preflight(ctx context.Context) (*schemas.GatewayManifest, erro
 	pctx, cancel := context.WithTimeout(ctx, 3*time.Minute)
 	defer cancel()
 	forbidden := g.driver.forbiddenTargets(pctx)
-	rep, perr := g.driver.RunEgressProbe(pctx, true, forbidden)
+	// 2-D-16: a blocked result counts only against a control pod without
+	// the policies that reached a forbidden target, as in `k8s check`.
+	control, cerr := g.driver.RunEgressProbe(pctx, false, forbidden)
+	var rep *EgressReport
+	perr := cerr
+	if cerr == nil {
+		rep, perr = g.driver.RunEgressProbe(pctx, true, forbidden)
+	}
 	state, why := EgressNotRun, ""
 	if perr != nil {
 		why = "egress probe not run in the cluster: " + perr.Error()
 	} else {
-		state, why = EgressVerdict(rep, forbidden, g.driver.cfg.GatewayURL != "")
+		state, why = ControlledEgressVerdict(control, rep, forbidden, g.driver.cfg.GatewayURL != "")
 	}
 	m.Settings[bifrost.SettingEgressProbe] = state
 	m.Settings["egress_probe_targets"] = strconv.Itoa(len(forbidden))

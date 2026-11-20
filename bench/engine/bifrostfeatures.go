@@ -47,10 +47,12 @@ type bifrostComplexityProbe interface {
 // only the rule is the arm's (scoped to the run's key).
 func (p *Planner) checkComplexityRouting(ctx context.Context, cfg *schemas.AgentConfig) error {
 	pol := cfg.Gateway.Routing
-	if pol == nil || !strings.Contains(pol.When, "complexity_tier") {
+	if pol == nil || !strings.Contains(pol.When, "complexity_tier") || p.deferGateway {
+		// A hosted plan has no gateway: the runner's replan, which has one,
+		// checks the analyzer before any slot runs (audit 8-B-04).
 		return nil
 	}
-	probe, ok := p.reg.Gateway.(bifrostComplexityProbe)
+	probe, ok := schemas.GatewayAs[bifrostComplexityProbe](p.reg.Gateway)
 	if !ok {
 		return errors.New("routing.when reads complexity_tier, but the gateway cannot report its complexity analyzer")
 	}
@@ -206,7 +208,10 @@ func headerlessAgent(cfg *schemas.AgentConfig) string {
 // prompt_cache block: Bifrost ignores the header there ("it cannot
 // manufacture opt-in"), so the arm would silently test nothing.
 func (p *Planner) checkPromptCacheProvider(ctx context.Context, provider string) error {
-	probe, ok := p.reg.Gateway.(bifrostPromptCacheProbe)
+	if p.deferGateway { // hosted plan: the runner's replan checks its own gateway (audit 8-B-04)
+		return nil
+	}
+	probe, ok := schemas.GatewayAs[bifrostPromptCacheProbe](p.reg.Gateway)
 	if !ok {
 		return errors.New("prompt_cache: the gateway cannot report its providers' prompt_cache config")
 	}

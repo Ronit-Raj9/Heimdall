@@ -72,7 +72,7 @@ func (p *Planner) resolveTeam(ctx context.Context, cfg *schemas.AgentConfig, sui
 	if err := ValidateTeam(cfg.Team, nil); err != nil {
 		return err
 	}
-	if sc, ok := p.reg.Gateway.(keySlotCounter); ok {
+	if sc, ok := schemas.GatewayAs[keySlotCounter](p.reg.Gateway); ok {
 		if n := sc.KeySlots(cfg.Gateway.Provider); len(cfg.Team) > n {
 			return fmt.Errorf("team: %d members need %d gateway key slots, the gateway has %d for provider %q (raise gateway.key_slots, docs/multi-agent.md)",
 				len(cfg.Team), len(cfg.Team), n, cfg.Gateway.Provider)
@@ -184,7 +184,7 @@ func (p *Pipeline) mintTeam(ctx context.Context, st *runState) error {
 	if len(team) == 0 {
 		return nil
 	}
-	tg, ok := p.reg.Gateway.(schemas.TeamGateway)
+	tg, ok := schemas.GatewayAs[schemas.TeamGateway](p.reg.Gateway)
 	if !ok {
 		return wrapPart("gateway", p.reg.Gateway, errNoTeamGateway)
 	}

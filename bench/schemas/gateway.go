@@ -211,3 +211,28 @@ type ToolCallRef struct {
 	Command string `json:"command,omitempty"`
 	Paths   string `json:"paths,omitempty"`
 }
+
+// GatewayWrapper is implemented by gateways that decorate another one (the
+// Kubernetes driver's egress wrapper, for example). Optional capabilities
+// such as the prompt-cache probe live on the inner gateway, so callers look
+// them up with GatewayAs instead of a plain type assertion.
+type GatewayWrapper interface {
+	UnwrapGateway() Gateway
+}
+
+// GatewayAs reports whether gw, or any gateway it wraps, implements T, and
+// returns the outermost one that does.
+func GatewayAs[T any](gw Gateway) (T, bool) {
+	for gw != nil {
+		if t, ok := gw.(T); ok {
+			return t, true
+		}
+		w, ok := gw.(GatewayWrapper)
+		if !ok {
+			break
+		}
+		gw = w.UnwrapGateway()
+	}
+	var zero T
+	return zero, false
+}

@@ -230,3 +230,34 @@ func jsonEqual(a, b any) bool {
 	y, _ := json.Marshal(b)
 	return string(x) == string(y)
 }
+
+// TestRunnerPreflightSemanticCacheOptIn: the per-slot runner preflight
+// accepts the semantic cache plugin for an experiment whose arm opts in, as a
+// local plan does, and still refuses a default cache key or an experiment
+// without the opt-in (audit 8-B-03).
+func TestRunnerPreflightSemanticCacheOptIn(t *testing.T) {
+	cacheViolation := "semantic cache plugin semantic_cache is loaded"
+	optIn := schemas.AgentConfig{}
+	optIn.Gateway.Bifrost = &schemas.BifrostFeatures{SemanticCache: &schemas.BifrostSemanticCache{}}
+	tests := []struct {
+		name       string
+		arm        schemas.AgentConfig
+		defaultKey bool
+		refused    bool
+	}{
+		{"opt-in accepted", optIn, false, false},
+		{"default key refused", optIn, true, true},
+		{"no opt-in refused", schemas.AgentConfig{}, false, true},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			side := runnerSide(t, &schemas.GatewayHygiene{SemanticCache: true, SemanticCacheDefaultKey: tc.defaultKey, Violations: []string{cacheViolation}})
+			w := &Worker{reg: side.b.reg}
+			m := &schemas.Manifest{Gateway: deferredGateway(), Arms: map[string]schemas.ArmManifest{"a": {Config: tc.arm}}}
+			_, _, why := w.runnerPreflight(context.Background(), m)
+			if (why != "") != tc.refused {
+				t.Fatalf("refusal = %q, want refused=%v", why, tc.refused)
+			}
+		})
+	}
+}

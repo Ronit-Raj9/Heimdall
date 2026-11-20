@@ -223,7 +223,7 @@ func (j *Janitor) Sweep(ctx context.Context, lv RunLiveness) (*SweepReport, erro
 		if err != nil {
 			errs = append(errs, fmt.Errorf("revoke stale keys: %w", err))
 		}
-		if m, ok := j.gateway.(staleMCPRemover); ok { // B2 MCP through Bifrost: leftover run MCP keys and clients (bifrostfeatures.go)
+		if m, ok := schemas.GatewayAs[staleMCPRemover](j.gateway); ok { // B2 MCP through Bifrost: leftover run MCP keys and clients (bifrostfeatures.go)
 			n, err := m.RemoveStaleMCP(ctx, keep)
 			rep.Keys += n
 			if err != nil {

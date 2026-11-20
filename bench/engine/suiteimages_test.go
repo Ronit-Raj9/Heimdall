@@ -19,7 +19,7 @@ func (e imageRoleEnv) ImageRoles() map[string]string { return e.roles }
 func TestSuiteImages(t *testing.T) {
 	ids := map[string]string{
 		"bench/base:1": "sha256:base", "bench/helper:1": "sha256:helper", "bench/tp:dev": "sha256:tp",
-		"bench/db:1": "sha256:db", "bench/built:1": "sha256:built",
+		"bench/db:1": "sha256:db", "bench/built:1": "sha256:built", "bench/mcp:1": "sha256:mcp",
 	}
 	roles := map[string]string{"helper": "bench/helper:1", "toolproxy": "bench/tp:dev"}
 	withServices := &schemas.Suite{ID: "s", Environment: "docker_workspace", BaseImage: schemas.ImageSpec{Tag: "bench/base:1"},
@@ -42,7 +42,7 @@ func TestSuiteImages(t *testing.T) {
 		{"no tool proxy without services", imageRoleEnv{inspectingEnv{fakeEnv{part{"docker_workspace"}, nil}, ids}, roles}, coding,
 			map[string]string{"base": "sha256:base", "helper": "sha256:helper"}, ""},
 		{"task service needs the tool proxy", imageRoleEnv{inspectingEnv{fakeEnv{part{"docker_workspace"}, nil}, ids}, roles}, taskService,
-			map[string]string{"base": "sha256:base", "helper": "sha256:helper", "toolproxy": "sha256:tp"}, ""},
+			map[string]string{"base": "sha256:base", "helper": "sha256:helper", "toolproxy": "sha256:tp", "task/t01/service/mcp": "sha256:mcp"}, ""},
 		{"inspector without roles", inspectingEnv{fakeEnv{part{"docker_workspace"}, nil}, ids}, coding,
 			map[string]string{"base": "sha256:base"}, ""},
 		{"missing image warns and is left out", inspectingEnv{fakeEnv{part{"docker_workspace"}, nil}, ids}, missingBase,

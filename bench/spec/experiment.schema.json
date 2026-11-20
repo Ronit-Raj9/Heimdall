@@ -6,7 +6,7 @@
   "type": "object",
   "additionalProperties": false,
   "required": ["name", "suite", "primary", "conditions"],
-  "anyOf": [{"required": ["base", "arms"]}, {"required": ["matrix"]}],
+  "anyOf": [{"required": ["base", "arms"]}, {"required": ["arms"], "properties": {"arms": {"additionalProperties": {"required": ["agent"]}}}}, {"required": ["matrix"]}],
   "properties": {
     "id": {"type": "string", "pattern": "^e_[a-z0-9][a-z0-9_]*$", "description": "Set by the planner when absent."},
     "name": {"type": "string", "minLength": 1},
@@ -168,7 +168,7 @@
         "set": {
           "type": "object",
           "description": "Dotted agent config paths to any value, e.g. notes.user_file or model.",
-          "patternProperties": {"^(id|adapter|image|build|argv|env|files|model|notes|parser|budgets|gateway|scripted|mcp|skills|memory|remote|topology|limits|team)(\\..+)?$": true},
+          "patternProperties": {"^(id|adapter|image|build|argv|env|files|model|notes|parser|agent_version|image_digest|capabilities|budgets|gateway|scripted|mcp|skills|memory|remote|a2a|team|topology|limits)(\\..+)?$": true},
           "additionalProperties": false
         }
       }

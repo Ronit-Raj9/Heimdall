@@ -146,3 +146,23 @@ func A2ARegistrationName(runID, member string) string {
 	}
 	return name
 }
+
+// A2ATeam is the effective member topology of an a2a run: the entry agent
+// as lead (id lead) and each a2a.team member, whose empty or "lead" role is
+// a worker. The engine mints member keys from it and the gateway probe
+// layer resolves apply.agent roles against it, so planning, minting and
+// arming agree on who is a worker. Nil for an agent without an a2a team.
+func A2ATeam(cfg *schemas.AgentConfig) []schemas.TeamMember {
+	if cfg == nil || cfg.A2A == nil || len(cfg.A2A.Team) == 0 {
+		return nil
+	}
+	members := []schemas.TeamMember{{ID: "lead", Role: "lead"}}
+	for _, m := range cfg.A2A.Team {
+		role := m.Role
+		if role == "" || role == "lead" {
+			role = "worker"
+		}
+		members = append(members, schemas.TeamMember{ID: m.ID, Role: role, BudgetUSD: m.BudgetUSD})
+	}
+	return members
+}

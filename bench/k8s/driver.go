@@ -83,6 +83,9 @@ type Driver struct {
 	// policySettle is how long the egress probe waits after creating its
 	// policies, for the network plugin to program them.
 	policySettle time.Duration
+	// attachDrain bounds the agent's attach stream after a wall expiry or
+	// an interrupt (2-D-06).
+	attachDrain time.Duration
 }
 
 var _ environments.Driver = (*Driver)(nil)
@@ -96,7 +99,7 @@ func New(cfg Config) (*Driver, error) {
 		return nil, errors.New("kubernetes driver: no local driver for image metadata")
 	}
 	if cfg.NamespacePrefix == "" {
-		cfg.NamespacePrefix = "heimdall-run"
+		cfg.NamespacePrefix = DefaultNamespacePrefix
 	}
 	if cfg.ImagePullPolicy == "" {
 		cfg.ImagePullPolicy = "IfNotPresent"
@@ -112,7 +115,7 @@ func New(cfg Config) (*Driver, error) {
 	default:
 		return nil, fmt.Errorf("kubernetes.image_pull_policy %q must be IfNotPresent, Never or Always", cfg.ImagePullPolicy)
 	}
-	return &Driver{cfg: cfg, policySettle: 2 * time.Second}, nil
+	return &Driver{cfg: cfg, policySettle: 2 * time.Second, attachDrain: killGrace + streamGrace}, nil
 }
 
 // GetName implements schemas.Part: the environment type the suite names.
@@ -249,6 +252,9 @@ func (d *Driver) Create(ctx context.Context, rc *schemas.RunContext) (*schemas.E
 	if err != nil {
 		return nil, fmt.Errorf("create workspace for run %s: %w", r.runID, err)
 	}
+	if err := d.createServiceAccount(ctx, r.ns, runLabels(r.runID, r.expID), owner); err != nil {
+		return nil, fmt.Errorf("create workspace for run %s: %w", r.runID, err)
+	}
 	if err := d.cfg.Client.Create(ctx, netpolPath(r.ns), denyAllPolicy(runLabels(r.runID, r.expID), owner), nil); err != nil {
 		return nil, fmt.Errorf("create workspace for run %s: deny-all network policy: %w", r.runID, err)
 	}
@@ -272,6 +278,15 @@ func (d *Driver) freshNamespace(ctx context.Context, r runRef) error {
 		}
 		return nil
 	}
+	// 2-D-15: replace only a namespace that is provably an earlier attempt
+	// of this very run; anything else is someone else's and is left alone.
+	var cur Namespace
+	if err := d.cfg.Client.Get(ctx, nsPath(r.ns), &cur); err != nil {
+		return fmt.Errorf("namespace %s exists and cannot be read: %w", r.ns, err)
+	}
+	if l := cur.Metadata.Labels; l[LabelBench] != "1" || l[LabelRole] != RoleRun || l[LabelRun] != r.runID {
+		return fmt.Errorf("namespace %s already exists and does not belong to run %s; refusing to replace it", r.ns, r.runID)
+	}
 	d.cfg.Logger.Warn("leftover run namespace; replacing it", "namespace", r.ns)
 	if err := d.cfg.Client.Delete(ctx, nsPath(r.ns)); err != nil {
 		return fmt.Errorf("remove leftover namespace %s: %w", r.ns, err)
@@ -281,6 +296,24 @@ func (d *Driver) freshNamespace(ctx context.Context, r runRef) error {
 	}
 	if err := d.cfg.Client.Create(ctx, "/api/v1/namespaces", ns, nil); err != nil {
 		return fmt.Errorf("namespace %s: %w", r.ns, err)
+	}
+	return nil
+}
+
+// createServiceAccount creates kubernetes.service_account in a fresh run or
+// probe namespace (2-D-05): a pod may only name an account of its own
+// namespace, and every bench namespace is new. The account mounts no token
+// and gets no role binding, so it only carries the name (and any image pull
+// secrets a cluster admission policy attaches to it). With no configured
+// account, the pods use the namespace's default account.
+func (d *Driver) createServiceAccount(ctx context.Context, ns string, labels map[string]string, owner []OwnerReference) error {
+	if d.cfg.ServiceAccount == "" {
+		return nil
+	}
+	sa := ServiceAccount{APIVersion: "v1", Kind: "ServiceAccount", AutomountServiceAccountToken: boolPtr(false),
+		Metadata: ObjectMeta{Name: d.cfg.ServiceAccount, Labels: labels, OwnerReferences: owner}}
+	if err := d.cfg.Client.Create(ctx, corePath(ns, "serviceaccounts"), sa, nil); err != nil {
+		return fmt.Errorf("service account %s: %w", d.cfg.ServiceAccount, err)
 	}
 	return nil
 }
@@ -407,7 +440,7 @@ type gatewayTarget struct {
 	namespace  string
 	ip         string
 	host       string
-	targetPort int
+	targetPort PortRef // a number or a gateway container port name
 	selector   map[string]string
 }
 
@@ -489,16 +522,16 @@ func (d *Driver) ResolveGateway(ctx context.Context) (*gatewayTarget, error) {
 	if len(s.Spec.Selector) == 0 {
 		return nil, fmt.Errorf("gateway service %s/%s selects no pods, so no egress policy can name them", ns, svc)
 	}
-	target := 0
+	var target PortRef
 	for _, p := range s.Spec.Ports {
 		if p.Port == port {
-			target = p.TargetPort
-			if target == 0 {
-				target = p.Port
+			target = p.TargetPort // a named port resolves on the gateway pods, as in a NetworkPolicy
+			if target.IsZero() {
+				target = Port(p.Port)
 			}
 		}
 	}
-	if target == 0 {
+	if target.IsZero() {
 		return nil, fmt.Errorf("gateway service %s/%s has no port %d", ns, svc, port)
 	}
 	return &gatewayTarget{namespace: ns, ip: s.Spec.ClusterIP, host: au.Hostname(), targetPort: target, selector: s.Spec.Selector}, nil
@@ -1014,24 +1047,44 @@ func (d *Driver) attach(ctx context.Context, rc *schemas.RunContext, r runRef, p
 	}
 	actx, cancel := context.WithCancel(context.WithoutCancel(ctx))
 	defer cancel()
+	// 2-D-06: the attach stream has its own context. After a wall expiry or
+	// an interrupt it gets attachDrain to deliver the killed agent's last
+	// output, then it is closed even when the kill request failed or the API
+	// proxy stalls the stream, so the run always reaches waitExit and
+	// cleanup.
+	attCtx, attCancel := context.WithCancel(actx)
+	defer attCancel()
+	var drain *time.Timer
+	stopStream := func() { // called with mu held
+		if drain == nil {
+			drain = time.AfterFunc(d.attachDrain, attCancel)
+		}
+	}
 	var timedOut, interrupted bool
 	var mu sync.Mutex
 	timer := time.AfterFunc(wall, func() {
 		mu.Lock()
 		timedOut = true
+		stopStream()
 		mu.Unlock()
 		d.killAgent(actx, r, uid)
 	})
 	stopCtx := context.AfterFunc(ctx, func() {
 		mu.Lock()
 		interrupted = true
+		stopStream()
 		mu.Unlock()
 		d.killAgent(actx, r, uid)
 	})
 	res.Started = time.Now().UTC()
-	aerr := d.cfg.Client.Attach(actx, r.ns, podName, ctrAgent, StreamOptions{Stdin: strings.NewReader("\n"), Stdout: stdout, Stderr: stderr})
+	aerr := d.cfg.Client.Attach(attCtx, r.ns, podName, ctrAgent, StreamOptions{Stdin: strings.NewReader("\n"), Stdout: stdout, Stderr: stderr})
 	timer.Stop()
 	stopCtx()
+	mu.Lock()
+	if drain != nil {
+		drain.Stop()
+	}
+	mu.Unlock()
 	res.Ended = time.Now().UTC()
 	code, early, werr := d.waitExit(actx, r, uid)
 	if early {

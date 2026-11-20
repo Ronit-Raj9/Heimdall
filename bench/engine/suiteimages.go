@@ -10,8 +10,9 @@ import (
 // suiteImages records the local image id of every image a run of suite
 // starts beside the agent and the task (docs/lock-fingerprints.md): the
 // suite's base image, the environment's helper image, its tool proxy image
-// when a service or an external API needs the proxy, and each suite service
-// image. The environment checks them again before each run, so a rebuilt tag
+// when a service or an external API needs the proxy, each suite service
+// image, and each task's own service image (compose services included), as
+// task/<task id>/service/<service id>. The environment checks them again before each run, so a rebuilt tag
 // never changes what a frozen experiment measures. A tag that cannot be
 // inspected (no docker, image not built yet) gets no entry and one warning,
 // never an error. Without any id the result is nil, so the manifest of a
@@ -52,7 +53,8 @@ func (p *Planner) suiteImages(ctx context.Context, s *schemas.Suite) map[string]
 // suiteImageTags maps each image role of s to its tag: base, the helper and
 // tool proxy roles the environment reports (ImageRoler; the tool proxy only
 // when the suite uses it) and service/<id> for each suite service. Roles
-// without a tag are left out.
+// without a tag are left out. A task's own services use
+// task/<task id>/service/<id>, so two tasks may reuse a service id.
 func suiteImageTags(s *schemas.Suite, env schemas.Environment) map[string]string {
 	tags := map[string]string{}
 	if s.BaseImage.Tag != "" {
@@ -75,6 +77,20 @@ func suiteImageTags(s *schemas.Suite, env schemas.Environment) map[string]string
 			tags["service/"+sv.ID] = tag
 		}
 	}
+	for _, t := range s.Tasks {
+		if t == nil {
+			continue
+		}
+		for _, sv := range t.Services {
+			tag := sv.Image
+			if sv.Build != nil && sv.Build.Tag != "" {
+				tag = sv.Build.Tag
+			}
+			if t.ID != "" && sv.ID != "" && tag != "" {
+				tags[TaskServiceRole(t.ID, sv.ID)] = tag
+			}
+		}
+	}
 	return tags
 }
 
@@ -90,4 +106,10 @@ func suiteUsesToolProxy(s *schemas.Suite) bool {
 		}
 	}
 	return false
+}
+
+// TaskServiceRole is the Manifest.SuiteImages role of a task's own service
+// image. environments/image.go reads the same shape.
+func TaskServiceRole(taskID, serviceID string) string {
+	return "task/" + taskID + "/service/" + serviceID
 }

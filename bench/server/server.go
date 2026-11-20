@@ -73,6 +73,10 @@ type Deps struct {
 	UI      fs.FS
 	Logger  schemas.Logger
 	Version string
+	// PlatformRoutes are a hosted server's platform routes (accounts, orgs,
+	// jobs, runners), described in each org router's OpenAPI document beside
+	// the org routes (audit 8-C-05). Nil in local mode.
+	PlatformRoutes map[string][]string
 }
 
 // Server is the bench HTTP server.
@@ -181,7 +185,11 @@ func registerOrgRoutes(r *router.Router, cfg *lib.Config, deps Deps, write lib.M
 	handlers.NewForecastHandler(mode, deps.Forecast, write).RegisterRoutes(r, common...)
 	// Remote area: worker API, off unless BENCH_WORKER_TOKEN is set (handlers/workers.go).
 	handlers.NewWorkersHandler(mode, deps.Workers).RegisterRoutes(r, common...)
-	handlers.NewOpenAPIHandler(mode, deps.Version).RegisterRoutes(r, common...) // Clients area: API description (handlers/openapi.go, docs/clients.md)
+	openapi := handlers.NewOpenAPIHandler(mode, deps.Version)
+	if cfg.Auth.IsHosted() { // Tenancy area: the hosted document lists the platform routes and hosted auth (audit 8-C-05)
+		openapi.ForHosted(deps.PlatformRoutes)
+	}
+	openapi.RegisterRoutes(r, common...) // Clients area: API description (handlers/openapi.go, docs/clients.md)
 	// Index and trends area: GET /trends over the derived results index (handlers/trends.go, docs/trends.md).
 	handlers.NewTrendsHandler(mode, deps.Trends).RegisterRoutes(r, common...)
 	// Human review area: review queue and history, POST /reviews behind the write token (handlers/reviews.go, docs/human-review.md).

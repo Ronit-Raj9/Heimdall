@@ -194,6 +194,7 @@ const (
 	roleHelper    = "helper"
 	roleToolProxy = "toolproxy"
 	roleService   = "service/"
+	roleTask      = "task/" // task/<task id>/service/<service id>: a task's own service
 )
 
 // checkFrozenSuiteImages refuses a run when a tag the manifest froze by id
@@ -215,6 +216,9 @@ func (e *dockerWorkspace) checkFrozenSuiteImages(ctx context.Context, rc *schema
 	sort.Strings(roles)
 	for _, role := range roles {
 		want := rc.Manifest.SuiteImages[role]
+		if otherTaskRole(rc, role) {
+			continue // another task's service; its own runs check it
+		}
 		tag := e.suiteImageTag(rc, role)
 		if tag == "" || want == "" {
 			e.cfg.Logger.Warn("frozen image not checked: this run does not name it", "experiment", rc.Manifest.ExpID, "role", role)
@@ -252,6 +256,22 @@ func (e *dockerWorkspace) suiteImageTag(rc *schemas.RunContext, role string) str
 	case roleToolProxy:
 		return e.cfg.ToolProxyImage
 	}
+	if rest, ok := strings.CutPrefix(role, roleTask); ok {
+		taskID, id, ok := strings.Cut(rest, "/"+roleService)
+		if !ok || rc.Task == nil || rc.Task.ID != taskID {
+			return ""
+		}
+		for _, sv := range rc.Task.Services {
+			if sv.ID != id {
+				continue
+			}
+			if sv.Build != nil && sv.Build.Tag != "" {
+				return sv.Build.Tag
+			}
+			return sv.Image
+		}
+		return ""
+	}
 	id, ok := strings.CutPrefix(role, roleService)
 	if !ok || id == "" {
 		return ""
@@ -273,6 +293,17 @@ func (e *dockerWorkspace) suiteImageTag(rc *schemas.RunContext, role string) str
 		return sv.Image
 	}
 	return ""
+}
+
+// otherTaskRole reports whether role is a task service role of a task other
+// than the run's: each run checks only its own task's services.
+func otherTaskRole(rc *schemas.RunContext, role string) bool {
+	rest, ok := strings.CutPrefix(role, roleTask)
+	if !ok {
+		return false
+	}
+	taskID, _, _ := strings.Cut(rest, "/")
+	return rc.Task == nil || rc.Task.ID != taskID
 }
 
 // perTaskAgent reports whether the run's agent image is chosen per task: the

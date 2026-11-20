@@ -251,18 +251,9 @@ func (a *app) analyzeWith(ctx context.Context, expID, gradeSource, policyOverrid
 	if err != nil {
 		return nil, nil, fmt.Errorf("load sealed runs: %w", err)
 	}
-	policyName := m.Experiment.Verdict.Policy
-	if policyName == "" {
-		policyName = "paired_signflip"
-	}
-	var policy schemas.VerdictPolicy
-	for _, p := range a.reg.Policies {
-		if p.GetName() == policyName {
-			policy = p
-		}
-	}
-	if policy == nil {
-		return nil, nil, fmt.Errorf("verdict policy %q is not registered", policyName)
+	policy, err := engine.FindVerdictPolicy(a.reg, m.Experiment.Verdict.Policy)
+	if err != nil {
+		return nil, nil, err
 	}
 	an, err := policy.Decide(ctx, m, runs)
 	if err != nil {

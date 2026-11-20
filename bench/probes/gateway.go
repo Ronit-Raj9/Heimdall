@@ -216,6 +216,9 @@ func targetSlots(rc *schemas.RunContext, runSlot string) ([]string, error) {
 	for _, m := range utils.TeamOf(rc) {
 		roles[m.ID] = m.Role
 	}
+	for _, m := range utils.A2ATeam(rc.Agent) { // a2a delegation members are minted keys too (audit 8-B-12)
+		roles[m.ID] = m.Role
+	}
 	var out []string
 	for _, k := range rc.Key.Members {
 		if k.AgentID != want && roles[k.AgentID] != want {

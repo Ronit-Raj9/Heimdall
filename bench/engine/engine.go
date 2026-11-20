@@ -211,3 +211,20 @@ func armConfig(m *schemas.Manifest, slot *schemas.Slot) (*schemas.ArmManifest, e
 	}
 	return &a, nil
 }
+
+// DefaultVerdictPolicy is the policy an experiment uses when verdict.policy is
+// empty.
+const DefaultVerdictPolicy = "paired_signflip"
+
+// FindVerdictPolicy resolves an experiment's verdict.policy against the
+// registry. Planning and analysis share it, so a policy name that analysis
+// cannot find is refused before any run is scheduled.
+func FindVerdictPolicy(reg *schemas.Registry, name string) (schemas.VerdictPolicy, error) {
+	if name == "" {
+		name = DefaultVerdictPolicy
+	}
+	if p, ok := findPart(reg.Policies, name); ok {
+		return p, nil
+	}
+	return nil, fmt.Errorf("verdict policy %q is not registered", name)
+}

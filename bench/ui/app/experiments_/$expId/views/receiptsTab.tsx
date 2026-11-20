@@ -1,5 +1,6 @@
 import { ModeBadge } from "@/components/modeBadge";
 import { ReceiptFunnel } from "@/components/receipts/receiptFunnel";
+import { catalogProbeFor } from "@/components/receipts/receipts.utils";
 import { RunReceiptPanel } from "@/components/receipts/runReceiptPanel";
 import { OutcomeBadge } from "@/components/runs/outcomeBadge";
 import { BlockSkeleton, EmptyNote, LoadError, Section } from "@/components/runs/screenStates";
@@ -55,7 +56,7 @@ function ExperimentReceipts({ expId, suite }: { expId: string; suite?: string })
 	const probeRows = diagnostics.data.diagnostics.filter((row) => row.condition !== "clean");
 	if (probeRows.length === 0) return <EmptyNote testId="receipts-empty">{t("receipts.empty")}</EmptyNote>;
 	const row = probeRows.find((r) => r.condition === conditionParam) ?? probeRows[0];
-	const probe = catalog.data?.probes.find((p) => p.id === row.condition);
+	const probe = catalogProbeFor(catalog.data, suite, row.condition);
 
 	return (
 		<div className="flex flex-col gap-6">

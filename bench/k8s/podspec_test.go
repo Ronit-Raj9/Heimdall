@@ -153,8 +153,8 @@ func TestPolicies(t *testing.T) {
 	if len(deny.Spec.PolicyTypes) != 2 || len(deny.Spec.Ingress) != 0 || len(deny.Spec.Egress) != 0 || len(deny.Spec.PodSelector.MatchLabels) != 0 {
 		t.Fatalf("deny-all: %+v", deny.Spec)
 	}
-	gw := gatewayPolicy(nil, nil, "heimdall-gw", map[string]string{"app.kubernetes.io/name": "bifrost"}, 8080)
-	if len(gw.Spec.Egress) != 1 || len(gw.Spec.Egress[0].To) != 1 || gw.Spec.Egress[0].Ports[0].Port != 8080 ||
+	gw := gatewayPolicy(nil, nil, "heimdall-gw", map[string]string{"app.kubernetes.io/name": "bifrost"}, Port(8080))
+	if len(gw.Spec.Egress) != 1 || len(gw.Spec.Egress[0].To) != 1 || gw.Spec.Egress[0].Ports[0].Port != Port(8080) ||
 		gw.Spec.Egress[0].To[0].NamespaceSelector.MatchLabels[nsNameKey] != "heimdall-gw" || len(gw.Spec.Ingress) != 0 || gw.Spec.PolicyTypes[0] != "Egress" {
 		t.Fatalf("gateway policy: %+v", gw.Spec)
 	}
@@ -406,5 +406,32 @@ func TestPodViewMainFirstSeenAsRoot(t *testing.T) {
 	got := podView(recs, 1000, 131)
 	if len(got) != 2 || got[0].PID != 1 || got[1].PID != 163 || got[1].PPID != 1 {
 		t.Fatalf("pod view: %+v", got)
+	}
+}
+
+// 2-D-15: distinct runs keep distinct namespaces under a long prefix.
+func TestNamespaceForLongPrefixStaysUnique(t *testing.T) {
+	prefix := strings.Repeat("p", 60)
+	a, b := NamespaceFor(prefix, "r_aaaaaaaaaaaa"), NamespaceFor(prefix, "r_bbbbbbbbbbbb")
+	if a == b || len(a) > 63 || len(b) > 63 {
+		t.Fatalf("%q %q", a, b)
+	}
+}
+
+// 2-D-16: a policed probe that blocks everything certifies egress only
+// against a control that reached a forbidden target.
+func TestControlledEgressVerdict(t *testing.T) {
+	forbidden := []probeTarget{{Name: "dns"}, {Name: "tcp:1.1.1.1:443"}, {Name: "api", Inform: true}}
+	policed := &EgressReport{Results: map[string]string{"dns": "blocked", "tcp:1.1.1.1:443": "blocked", "gateway": "open"}}
+	reached := &EgressReport{Results: map[string]string{"dns": "open", "tcp:1.1.1.1:443": "blocked"}}
+	dark := &EgressReport{Results: map[string]string{"dns": "blocked", "tcp:1.1.1.1:443": "blocked", "api": "open"}}
+	if s, why := ControlledEgressVerdict(reached, policed, forbidden, true); s != EgressBlocked {
+		t.Fatalf("contrast shown: %s %s", s, why)
+	}
+	if s, why := ControlledEgressVerdict(dark, policed, forbidden, true); s != EgressNotRun || !strings.Contains(why, "not shown") {
+		t.Fatalf("no contrast must not certify: %s %s", s, why)
+	}
+	if s, _ := ControlledEgressVerdict(nil, policed, forbidden, true); s != EgressNotRun {
+		t.Fatalf("missing control: %s", s)
 	}
 }

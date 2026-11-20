@@ -305,13 +305,41 @@ func gatewayIntegrityEvents(rc *schemas.RunContext, log *schemas.RequestLog) []s
 		if req.FallbackIndex > 0 {
 			e := schemas.Event{EventVersion: schemas.EventSchemaVersion, EventID: fmt.Sprintf("%s:%s:%d", rc.Run.RunID, schemas.SourceGateway, seq), RunID: rc.Run.RunID, SlotID: rc.Run.SlotID, PairID: rc.Run.PairID, Seq: seq, Sequence: seq, TS: req.Timestamp, Timestamp: req.Timestamp, Type: schemas.EventIntegrity, Source: schemas.SourceGateway, Evidence: schemas.EvidenceGateway, EvidenceLevel: schemas.EvidenceGateway}
 			seq++
-			e.Status = schemas.EventStatusError
-			e.RequestID = req.ID
-			e.Summary = "unplanned gateway fallback"
+			e.RequestID, e.Provider, e.ModelReq, e.ModelServed = req.ID, req.Provider, req.ModelRequested, req.ModelServed
+			if declaredFallback(rc.Agent, req) {
+				// A declared routing fallback chain served this row with one of
+				// its models: an expected fallback, as model_fidelity treats it
+				// (audit 8-B-08), not an integrity error.
+				e.Type, e.Status = schemas.EventFallback, schemas.EventStatusSuccess
+				e.Summary = fmt.Sprintf("declared gateway fallback %d: served %s", req.FallbackIndex, req.ModelServed)
+			} else {
+				e.Status = schemas.EventStatusError
+				e.Summary = "unplanned gateway fallback"
+			}
 			events = append(events, e)
 		}
 	}
 	return events
+}
+
+// declaredFallback reports whether a fallback row is one the agent's routing
+// policy declares: the policy has a fallback chain and the row was served by
+// a model of the policy (or the served model is unknown). It is the same
+// rule the routed model_fidelity gate applies (gates/modelfidelityrouting.go).
+func declaredFallback(agent *schemas.AgentConfig, req schemas.GatewayRequest) bool {
+	pol := agent.Gateway.Routing
+	if pol == nil || len(pol.Fallbacks) == 0 {
+		return false
+	}
+	if req.ModelServed == "" {
+		return true
+	}
+	for _, m := range pol.EffectiveModels(agent.Model) {
+		if m == req.ModelServed || strings.HasSuffix(req.ModelServed, "/"+m) || strings.HasSuffix(m, "/"+req.ModelServed) {
+			return true
+		}
+	}
+	return false
 }
 
 func availableEvidence(ev *schemas.Evidence) []string {

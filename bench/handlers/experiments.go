@@ -8,6 +8,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"math"
 	"slices"
 	"strconv"
@@ -473,11 +474,18 @@ func DecodeExperiment(mediaType string, body []byte) (*schemas.Experiment, int, 
 		if err := dec.Decode(&exp); err != nil {
 			return nil, fasthttp.StatusBadRequest, fmt.Errorf("parse experiment JSON: %w", err)
 		}
+		if err := dec.Decode(&json.RawMessage{}); !errors.Is(err, io.EOF) {
+			return nil, fasthttp.StatusBadRequest, errors.New("parse experiment JSON: more than one JSON value in the body")
+		}
 	case "", "application/yaml", "application/x-yaml", "text/yaml", "text/x-yaml", "text/plain":
 		dec := yaml.NewDecoder(bytes.NewReader(body))
 		dec.KnownFields(true)
 		if err := dec.Decode(&exp); err != nil {
 			return nil, fasthttp.StatusBadRequest, fmt.Errorf("parse experiment YAML: %w", err)
+		}
+		var extra yaml.Node
+		if err := dec.Decode(&extra); !errors.Is(err, io.EOF) {
+			return nil, fasthttp.StatusBadRequest, errors.New("parse experiment YAML: more than one YAML document in the body")
 		}
 	default:
 		return nil, fasthttp.StatusUnsupportedMediaType,

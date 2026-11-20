@@ -10,12 +10,12 @@ import (
 func TestComposeCreateArgs(t *testing.T) {
 	spec := schemas.ServiceSpec{ID: "db", Argv: []string{"-c", "fsync=off"}, Compose: &schemas.ComposeService{
 		Name: "db_main", Aliases: []string{"db_main", "database"}, User: "999", Workdir: "/srv",
-		Tmpfs: []string{"/run:size=8m"}, Volumes: []schemas.ComposeVolume{{Name: "pgdata", Target: "/var/lib/postgresql"}, {Target: "/scratch"}, {Name: "conf", Target: "/etc/x", ReadOnly: true}},
+		Tmpfs: []string{"/run:size=8m"}, Volumes: []schemas.ComposeVolume{{Name: "pgdata", Target: "/var/lib/postgresql"}, {Target: "/scratch"}, {Name: "conf", Target: "/etc/x", ReadOnly: true}, {Target: "/cache", ReadOnly: true}},
 		CPUs: 0.5, Entrypoint: []string{"docker-entrypoint.sh", "postgres"}, EntrypointSet: true,
 	}}
 	got := composeCreateArgs("r_1", spec)
 	want := []string{"--network-alias", "db_main", "--network-alias", "database", "--user", "999", "--workdir", "/srv",
-		"--tmpfs", "/run:size=8m", "-v", "bench-cv-r_1-pgdata:/var/lib/postgresql", "-v", "/scratch", "-v", "bench-cv-r_1-conf:/etc/x:ro",
+		"--tmpfs", "/run:size=8m", "-v", "bench-cv-r_1-pgdata:/var/lib/postgresql", "-v", "/scratch", "-v", "bench-cv-r_1-conf:/etc/x:ro", "--mount", "type=volume,target=/cache,readonly",
 		"--cpus", "0.5", "--entrypoint", "docker-entrypoint.sh"}
 	if !reflect.DeepEqual(got, want) {
 		t.Fatalf("args\n got %q\nwant %q", got, want)

@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"maps"
+	"math"
 	"math/rand/v2"
 	"os"
 	"path"
@@ -110,7 +111,6 @@ type Planner struct {
 	deferGateway bool                            // Tenancy area: a hosted server records the gateway preflight as the runners' (experimentguard.go)
 	skipGPU      bool                            // X7: a remote worker's replan skips the GPU check (gpu.go)
 
-	semanticCacheArm bool // B2: some arm of the experiment being planned sets gateway.bifrost.semantic_cache (bifrostfeatures.go)
 }
 
 // planMode is what differs between planning an experiment and planning an
@@ -306,13 +306,13 @@ func (p *Planner) plan(ctx context.Context, exp *schemas.Experiment, mode planMo
 			m.Compatibility.CapabilityGaps = append([]string(nil), gaps[CompatArm]...)
 		}
 	}
-	if err := p.checkScenario(suite, all, m.Arms, m.Compatibility); err != nil {
+	if err := p.checkScenario(suite, conds, compat, m.Arms, m.Compatibility); err != nil {
 		return nil, fmt.Errorf("plan %s: %w", e.ID, err)
 	}
 	if err := checkTeamCombos(&e, suite, m.Arms, conds, m.Compatibility, compat); err != nil { // Multi-agent area: unsupported team combinations refused before freezing (taskteam.go)
 		return nil, fmt.Errorf("plan %s: %w", e.ID, err)
 	}
-	if m.Experiment.Environment, err = p.planDriver(&e, suite, all, m); err != nil { // X3: driver refusals, the frozen driver (driverplan.go)
+	if m.Experiment.Environment, err = p.planDriver(&e, suite, conds, compat, m); err != nil { // X3: driver refusals, the frozen driver (driverplan.go)
 		return nil, fmt.Errorf("plan %s: %w", e.ID, err)
 	}
 	gpuArms := make([]schemas.ArmManifest, 0, len(m.Arms)+1)
@@ -351,11 +351,9 @@ func (p *Planner) plan(ctx context.Context, exp *schemas.Experiment, mode planMo
 			return nil, fmt.Errorf("plan %s: arm %s: %w", e.ID, arm, err)
 		}
 	}
-	// B2: preflight accepts the semantic cache only for an experiment that tests it (bifrostfeatures.go).
-	p.semanticCacheArm = declaresSemanticCache(m)
 	if p.deferGateway { // Tenancy area: the runners preflight their own gateway before every slot (experimentguard.go)
 		m.Gateway = deferredGateway()
-	} else if m.Gateway, err = p.preflight(ctx, e.Name); err != nil {
+	} else if m.Gateway, err = p.preflight(ctx, e.Name, declaresSemanticCache(m)); err != nil {
 		return nil, fmt.Errorf("plan %s: %w", e.ID, err)
 	}
 	if m.Routing, err = checkRouting(m); err != nil { // W9 routing policy under test (routingplan.go)
@@ -452,6 +450,11 @@ func (p *Planner) checkParts(e *schemas.Experiment, suite *schemas.Suite, conds 
 			} else if err := validateAdapterFaultSupport(p.reg, c.probe.Apply.AdapterFault, e); err != nil {
 				errs = append(errs, fmt.Errorf("probe %s: %w", c.id, err))
 			}
+		}
+	}
+	if len(p.reg.Policies) > 0 { // a registry without policies (plan-only callers) cannot analyze anyway
+		if _, err := FindVerdictPolicy(p.reg, e.Verdict.Policy); err != nil {
+			errs = append(errs, err)
 		}
 	}
 	for _, g := range e.ExtraGates {
@@ -599,6 +602,25 @@ func pairArms(m *schemas.Manifest) []string {
 	return out
 }
 
+// adapterFaultTeamErr refuses an adapter fault probe on an arm that would
+// run as a team on one of the condition's tasks: only the single-agent
+// launch binds the fault controller's runtime and network, so no team member
+// could execute the armed hook (audit 8-B-11).
+func adapterFaultTeamErr(cfg *schemas.AgentConfig, suite *schemas.Suite, c condPlan) error {
+	if len(cfg.Team) > 0 {
+		return fmt.Errorf("probe %s: adapter fault hooks are not supported for team runs (the arm declares a team)", c.probe.ID)
+	}
+	if cfg.Topology == schemas.TopologySingle || cfg.Topology == schemas.TopologyBestOfN || suite == nil {
+		return nil
+	}
+	for _, id := range c.tasks {
+		if t := suite.TaskByID(id); t != nil && len(t.Team) > 0 {
+			return fmt.Errorf("probe %s: adapter fault hooks are not supported for team runs (task %s declares a team)", c.probe.ID, id)
+		}
+	}
+	return nil
+}
+
 // resolveArm reads one agent config, applies the overrides, resolves its
 // image for the suite, hashes it and hashes every file laid down for it per
 // condition. The image is resolved before hashing, so an agent with
@@ -633,6 +655,9 @@ func (p *Planner) resolveArm(ctx context.Context, label, cfgPath string, set map
 		}
 		if cfg.Adapter == "remote_http" {
 			return am, fmt.Errorf("agent config %s: remote_http agents are not supported by adapter fault hooks", cfgPath)
+		}
+		if err := adapterFaultTeamErr(&cfg, suite, c); err != nil { // audit 8-B-11
+			return am, fmt.Errorf("agent config %s: %w", cfgPath, err)
 		}
 		injector, ok := findPart(p.reg.Adapters, cfg.Adapter)
 		if !ok {
@@ -1026,7 +1051,11 @@ func (p *Planner) layFiles(cfg *schemas.AgentConfig, suite *schemas.Suite, conds
 // violation refuses the plan: a gateway feature that rewrites, caches or
 // reroutes a run's model requests would make the arms measure the gateway
 // instead of the agent, and no analysis can undo that after the runs.
-func (p *Planner) preflight(ctx context.Context, name string) (*schemas.GatewayManifest, error) {
+//
+// acceptCache is the experiment's semantic-cache opt-in (B2). It is an
+// argument, not planner state, so concurrent plans on one planner (a
+// runner's slot goroutines) cannot see each other's opt-in (audit 8-B-13).
+func (p *Planner) preflight(ctx context.Context, name string, acceptCache bool) (*schemas.GatewayManifest, error) {
 	if p.reg.Gateway == nil {
 		return nil, errors.New("no gateway registered")
 	}
@@ -1037,7 +1066,7 @@ func (p *Planner) preflight(ctx context.Context, name string) (*schemas.GatewayM
 	for _, pr := range gm.Problems {
 		p.logger.Warn("gateway preflight problem", "experiment", name, "problem", pr)
 	}
-	if p.semanticCacheArm { // B2 Bifrost features: an arm opts in to the semantic cache with its own key header (bifrostfeatures.go)
+	if acceptCache { // B2 Bifrost features: an arm opts in to the semantic cache with its own key header (bifrostfeatures.go)
 		acceptSemanticCache(gm.Hygiene)
 	}
 	if h := gm.Hygiene; h != nil && len(h.Violations) > 0 {
@@ -1376,6 +1405,15 @@ func validateExperiment(e *schemas.Experiment, minArms int) error {
 		default:
 			errs = append(errs, fmt.Errorf("unknown guard rule %q", g.Rule))
 		}
+	}
+	// verdict.alpha and verdict.assumed_sd: zero means the policy default. The
+	// same bounds as spec/experiment.schema.json, so an API request cannot
+	// freeze a value the CLI refuses and the verdict would silently replace.
+	if a := e.Verdict.Alpha; a != 0 && !(a > 0 && a < 1) {
+		errs = append(errs, fmt.Errorf("verdict alpha %v must be between 0 and 1 (exclusive)", a))
+	}
+	if sd := e.Verdict.AssumedSD; sd != 0 && !(sd > 0 && !math.IsInf(sd, 1)) {
+		errs = append(errs, fmt.Errorf("verdict assumed_sd %v must be positive", sd))
 	}
 	if e.Concurrency < 0 {
 		errs = append(errs, fmt.Errorf("concurrency %d is negative", e.Concurrency))

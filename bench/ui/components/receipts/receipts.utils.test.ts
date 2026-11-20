@@ -1,6 +1,6 @@
-import { RECEIPT_STEPS } from "@/lib/types/bench";
+import { RECEIPT_STEPS, type Catalog, type ProbeSpec } from "@/lib/types/bench";
 import { describe, expect, it } from "vitest";
-import { LAYER_STEPS, ratioShares, stepApplies } from "./receipts.utils";
+import { LAYER_STEPS, catalogProbeFor, ratioShares, stepApplies } from "./receipts.utils";
 
 describe("stepApplies", () => {
 	it("follows each layer's declared steps (DESIGN.md 10.3)", () => {
@@ -40,5 +40,28 @@ describe("probeLayerLabel", () => {
 		expect(probeLayerLabel("a2a", t)).toBe("A2A stream");
 		for (const layer of ["adapter", "tool", "service", "tool_shim"]) expect(probeLayerLabel(layer, t)).not.toContain("receipts.");
 		expect(probeLayerLabel("future_layer", t)).toBe("future layer");
+	});
+});
+
+describe("catalogProbeFor", () => {
+	const probe = (layer: ProbeSpec["layer"]) => ({ id: "shared-probe", layer }) as ProbeSpec;
+	const catalog = {
+		suites: [
+			{ id: "first", version: "1.0.0", tasks: [], probes: ["shared-probe"], probe_layers: { "shared-probe": "fixture" } },
+			{ id: "second", version: "2.0.0", tasks: [], probes: ["shared-probe"], probe_layers: { "shared-probe": "gateway" } },
+		],
+		probes: [probe("fixture"), probe("gateway")],
+	} as unknown as Catalog;
+
+	it("uses the experiment's own suite when two suites share a probe id", () => {
+		expect(catalogProbeFor(catalog, "second@2.0.0", "shared-probe")?.layer).toBe("gateway");
+		expect(catalogProbeFor(catalog, "first", "shared-probe")?.layer).toBe("fixture");
+		const fired = { A: { fired: { num: 1, den: 1, unknown: 0 } } };
+		expect(stepApplies("fired", catalogProbeFor(catalog, "second@2.0.0", "shared-probe")?.layer, fired)).toBe(true);
+	});
+
+	it("does not guess between suites when the suite is unknown", () => {
+		expect(catalogProbeFor(catalog, undefined, "shared-probe")).toBeUndefined();
+		expect(catalogProbeFor(catalog, "other", "missing")).toBeUndefined();
 	});
 });

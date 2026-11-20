@@ -32,6 +32,15 @@ func (m *MatrixModel) UnmarshalYAML(node *yaml.Node) error {
 		*m = MatrixModel{Model: node.Value}
 		return nil
 	}
+	// node.Decode does not inherit the outer decoder's KnownFields, so a
+	// misspelled key (provdier) is refused here instead of silently dropped.
+	if node.Kind == yaml.MappingNode {
+		for i := 0; i+1 < len(node.Content); i += 2 {
+			if k := node.Content[i].Value; k != "model" && k != "provider" {
+				return fmt.Errorf("matrix model: line %d: unknown field %q", node.Content[i].Line, k)
+			}
+		}
+	}
 	var obj struct {
 		Model    string `yaml:"model"`
 		Provider string `yaml:"provider"`
@@ -56,7 +65,9 @@ func (m *MatrixModel) UnmarshalJSON(b []byte) error {
 	}
 	type plain MatrixModel
 	var p plain
-	if err := json.Unmarshal(b, &p); err != nil {
+	dec := json.NewDecoder(bytes.NewReader(b))
+	dec.DisallowUnknownFields() // json.Unmarshal here would drop a misspelled provider
+	if err := dec.Decode(&p); err != nil {
 		return fmt.Errorf("matrix model: %w", err)
 	}
 	*m = MatrixModel(p)

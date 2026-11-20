@@ -15,6 +15,7 @@ func TestCheckTaskTeams(t *testing.T) {
 		{ID: "coding-1", Team: three},
 		{ID: "plain"},
 		{ID: "bad-team", Team: []schemas.TeamMember{{ID: "Agent1"}, {ID: "agent2"}}},
+		{ID: "member-agent", Team: []schemas.TeamMember{{ID: "agent1", Role: "lead"}, {ID: "agent2", Agent: "agents/missing.yaml"}}},
 	}}
 	arm := func(topology string, team []schemas.TeamMember) schemas.ArmManifest {
 		return schemas.ArmManifest{Config: schemas.AgentConfig{Topology: topology, Team: team, Gateway: schemas.GatewayPolicy{Provider: "anthropic"}}}
@@ -35,6 +36,8 @@ func TestCheckTaskTeams(t *testing.T) {
 		{"unset topology runs the team", map[string]schemas.ArmManifest{"a": arm("", nil)}, []string{"database-1"}, []string{"task database-1", "team of 5"}},
 		{"solo and best-of-N baselines run alone", map[string]schemas.ArmManifest{"single": arm(schemas.TopologySingle, nil), "bon": arm(schemas.TopologyBestOfN, nil)}, []string{"database-1"}, nil},
 		{"config team is resolveTeam's", map[string]schemas.ArmManifest{"own": arm(schemas.TopologyTeam, three)}, []string{"database-1"}, nil},
+		{"task member agent refused", map[string]schemas.ArmManifest{"team": arm(schemas.TopologyTeam, nil)}, []string{"member-agent"},
+			[]string{"arm team, task member-agent: team member agent2 sets agent \"agents/missing.yaml\""}},
 		{"invalid task team", map[string]schemas.ArmManifest{"team": arm(schemas.TopologyTeam, nil)}, []string{"bad-team"}, []string{"arm team, task bad-team: team: member id \"Agent1\""}},
 	} {
 		t.Run(tc.name, func(t *testing.T) {

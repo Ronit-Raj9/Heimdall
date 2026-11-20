@@ -192,8 +192,9 @@ team:
   planner resolves it, builds its image and freezes it into the arm config,
   so it is hashed with the arm. It must use the arm's adapter (every member
   is planned with the arm's adapter; a different one is refused at plan
-  time). Empty: the arm's own config. `model`, `argv`, `env` override the
-  member's config.
+  time). Empty: the arm's own config. A task's own team cannot set `agent`
+  (its members always run the arm's config), so planning refuses it.
+  `model`, `argv`, `env` override the member's config.
 - `role`: `lead`, `worker`, `router`, `judge`, `reviewer` or any label.
   `lead`, `router` and `judge` count as orchestration in
   `orchestration_share`.

@@ -188,6 +188,9 @@ func (c *Config) Validate() error {
 	default:
 		return fmt.Errorf("environment.driver must be docker or kubernetes, got %q", c.Environment.Driver)
 	}
+	if n := len(c.Kubernetes.NamespacePrefix); n > maxNamespacePrefix { // keeps room for the run ID in a 63-character namespace name
+		return fmt.Errorf("kubernetes.namespace_prefix is %d characters; at most %d", n, maxNamespacePrefix)
+	}
 	return nil
 }
 
@@ -317,6 +320,9 @@ func (e EnvironmentConfig) DriverName() string {
 	}
 	return e.Driver
 }
+
+// maxNamespacePrefix matches k8s.MaxNamespacePrefix (lib cannot import k8s).
+const maxNamespacePrefix = 40
 
 // KubernetesConfig configures the Kubernetes driver (X3,
 // docs/kubernetes.md). Kubeconfig empty means $KUBECONFIG, then

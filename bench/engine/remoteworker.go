@@ -436,6 +436,9 @@ func adoptUnrepeatable(local, remote *schemas.Manifest) {
 	for id, am := range local.Arms {
 		if ra, ok := remote.Arms[id]; ok {
 			am.ImageID = ra.ImageID
+			if hostedImagesAdopted(remote) { // per-task image ids follow the hosted plan too (audit 8-B-06)
+				am.TaskImageIDs = ra.TaskImageIDs
+			}
 			for mid, rm := range ra.Members {
 				if lm, ok := am.Members[mid]; ok {
 					lm.ImageID = rm.ImageID
@@ -447,6 +450,9 @@ func adoptUnrepeatable(local, remote *schemas.Manifest) {
 	}
 	if local.Compatibility != nil && remote.Compatibility != nil {
 		local.Compatibility.ImageID = remote.Compatibility.ImageID
+		if hostedImagesAdopted(remote) {
+			local.Compatibility.TaskImageIDs = remote.Compatibility.TaskImageIDs
+		}
 	}
 	local.Hash = ""
 }

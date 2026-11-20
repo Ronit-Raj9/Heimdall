@@ -73,6 +73,70 @@ func DecodeYAML(data []byte, file, schema string, out any) error {
 	return nil
 }
 
+// ValidateYAMLUnder validates one YAML document against
+// spec/<schema>.schema.json and reports only the failures at, below or above
+// one of the dotted paths (never at the document root). The planner uses it
+// for an agent config built from a base file and an arm's overrides: the
+// overridden values never exist as a file the CLI could check, while the base
+// file's own problems are reported where that file is loaded. file is used
+// only in error messages.
+func ValidateYAMLUnder(data []byte, file, schema string, paths []string) error {
+	sch, err := compiledSchema(schema)
+	if err != nil {
+		return err
+	}
+	doc, err := yamlToJSONValue(data)
+	if err != nil {
+		return fmt.Errorf("%s: %w", file, err)
+	}
+	verr := sch.Validate(doc)
+	var ve *jsonschema.ValidationError
+	if verr == nil || !errors.As(verr, &ve) {
+		if verr != nil {
+			return fmt.Errorf("%s: validate: %w", file, verr)
+		}
+		return nil
+	}
+	related := func(loc []string) bool {
+		if len(loc) == 0 {
+			return false
+		}
+		l := strings.Join(loc, ".")
+		for _, p := range paths {
+			if l == p || strings.HasPrefix(l, p+".") || strings.HasPrefix(p, l+".") {
+				return true
+			}
+		}
+		return false
+	}
+	pr := message.NewPrinter(language.English)
+	var msgs []string
+	seen := map[string]bool{}
+	var walk func(e *jsonschema.ValidationError)
+	walk = func(e *jsonschema.ValidationError) {
+		if len(e.Causes) > 0 {
+			for _, c := range e.Causes {
+				walk(c)
+			}
+			return
+		}
+		if !related(e.InstanceLocation) {
+			return
+		}
+		for _, m := range leafMessages(e, pr) {
+			if !seen[m] {
+				seen[m] = true
+				msgs = append(msgs, m)
+			}
+		}
+	}
+	walk(ve)
+	if len(msgs) == 0 {
+		return nil
+	}
+	return fmt.Errorf("%s: schema: %s", file, strings.Join(msgs, "; "))
+}
+
 // ValidateSchemas compiles every embedded schema. A failure is a bug in
 // bench/spec, so tests and `doctor` call it to fail fast.
 func ValidateSchemas() error {

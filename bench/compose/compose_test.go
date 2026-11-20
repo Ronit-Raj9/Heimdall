@@ -178,6 +178,8 @@ func TestRefusals(t *testing.T) {
 		{"bad name", "  Bad!Name:\n    image: x\n", "services.Bad!Name", "host name"},
 		{"no image", "  db:\n    environment: {A: b}\n", "services.db", "needs an image or a build"},
 		{"udp port", "  db:\n    image: x\n    expose: [\"53/udp\"]\n", "services.db.expose[0]", "only tcp"},
+		{"empty command", "  db:\n    image: x\n    command: []\n", "services.db.command", "empty command"},
+		{"empty command string", "  db:\n    image: x\n    command: \"\"\n", "services.db.command", "empty command"},
 	}
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
@@ -343,6 +345,26 @@ func TestDotenvAndEnvFile(t *testing.T) {
 	db := res.Services[0]
 	if len(res.Refused()) != 0 || db.Image != "postgres:18" || !reflect.DeepEqual(db.Env, map[string]string{"A": "1", "B": "from-compose", "C": "q z"}) {
 		t.Fatalf("db %+v findings %v", db, res.Findings)
+	}
+}
+
+// TestEnvFileOrderAndRaw pins compose semantics: later env files override
+// earlier ones, the environment key beats every file whichever comes first in
+// the service, and format: raw keeps a value literally.
+func TestEnvFileOrderAndRaw(t *testing.T) {
+	dir := writeTask(t, map[string]string{
+		"compose.yaml": "services:\n  app:\n    image: x\n    working_dir: /a\n    x-heimdall: {workspace: true}\n  db:\n    image: x\n    environment: {E: explicit}\n    env_file: [a.env, b.env, {path: r.env, format: raw}]\n",
+		"a.env":        "A=first\nE=from-a\nK=keep\n",
+		"b.env":        "A=second\n",
+		"r.env":        "R=\"q\\n\" # x\n",
+	})
+	res, err := Expand(dir, "compose.yaml", nil, Options{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := map[string]string{"A": "second", "E": "explicit", "K": "keep", "R": `"q\n" # x`}
+	if db := res.Services[0]; len(res.Refused()) != 0 || !reflect.DeepEqual(db.Env, want) {
+		t.Fatalf("db env %q findings %v", db.Env, res.Findings)
 	}
 }
 

@@ -8,10 +8,12 @@ import (
 	"net/url"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"sort"
 	"strings"
 	"time"
 
+	"github.com/maximhq/bifrost/bench/engine"
 	"github.com/maximhq/bifrost/bench/environments"
 	"github.com/maximhq/bifrost/bench/k8s"
 	"github.com/maximhq/bifrost/bench/lib"
@@ -253,7 +255,8 @@ func runK8sImages(args []string) int {
 func runK8sCleanup(args []string) int {
 	fs := flag.NewFlagSet("k8s cleanup", flag.ContinueOnError)
 	config := fs.String("config", defaultConfig, "bench config")
-	del := fs.Bool("delete", false, "delete them (default: list only)")
+	del := fs.Bool("delete", false, "delete the stale ones (default: list only)")
+	grace := fs.Duration("grace", engine.DefaultSweepGrace, "a namespace with no lease information is stale only when older than this")
 	if err := fs.Parse(args); err != nil {
 		return exitUsage
 	}
@@ -273,9 +276,26 @@ func runK8sCleanup(args []string) int {
 	if err := client.Do(ctx, "GET", "/api/v1/namespaces", q, nil, &list); err != nil {
 		return fail("list namespaces: %v", err)
 	}
-	for _, n := range list.Items {
-		fmt.Printf("%s run=%s role=%s phase=%s\n", n.Metadata.Name, n.Metadata.Labels[k8s.LabelRun], n.Metadata.Labels[k8s.LabelRole], n.Status.Phase)
-		if *del {
+	// 2-D-14: only this install's namespaces, and only runs that are not live.
+	lv, err := engine.ScanRunLiveness([]string{a.store.Root(), filepath.Join(a.cfg.Root, engine.ChecksRoot)}, engine.DefaultStaleAfter, time.Now())
+	if err != nil {
+		return fail("read run leases (nothing deleted): %v", err)
+	}
+	prefix := a.cfg.Kubernetes.NamespacePrefix
+	if prefix == "" {
+		prefix = k8s.DefaultNamespacePrefix
+	}
+	verdicts := k8s.ClassifyCleanup(list.Items, k8s.CleanupInput{Prefix: prefix, Live: lv.Live, Dead: lv.Dead, Grace: *grace, Now: time.Now()})
+	removable := 0
+	for _, v := range verdicts {
+		n := v.Namespace
+		action := "keep"
+		if v.Remove {
+			action = "stale"
+			removable++
+		}
+		fmt.Printf("%s run=%s role=%s phase=%s %s (%s)\n", n.Metadata.Name, n.Metadata.Labels[k8s.LabelRun], n.Metadata.Labels[k8s.LabelRole], n.Status.Phase, action, v.Reason)
+		if *del && v.Remove {
 			cctx, cancel := context.WithTimeout(ctx, 30*time.Second)
 			err := client.Delete(cctx, "/api/v1/namespaces/"+n.Metadata.Name)
 			cancel()
@@ -284,7 +304,7 @@ func runK8sCleanup(args []string) int {
 			}
 		}
 	}
-	fmt.Printf("%d namespaces\n", len(list.Items))
+	fmt.Printf("%d namespaces of prefix %s, %d stale\n", len(verdicts), prefix, removable)
 	return exitOK
 }
 

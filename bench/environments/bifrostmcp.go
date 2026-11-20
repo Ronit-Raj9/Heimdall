@@ -34,7 +34,7 @@ func toolProxyGatewayAlias(runID string) string { return "tp-" + runID }
 
 // ServeMCP implements schemas.BifrostMCPEnvironment.
 func (e *dockerWorkspace) ServeMCP(ctx context.Context, rc *schemas.RunContext, codeMode bool) (*schemas.BifrostMCPEvidence, error) {
-	gw, ok := e.cfg.ServiceGateway.Gateway.(schemas.BifrostMCPGateway)
+	gw, ok := schemas.GatewayAs[schemas.BifrostMCPGateway](e.cfg.ServiceGateway.Gateway)
 	switch {
 	case !ok:
 		return nil, errors.New("the gateway cannot serve MCP servers (needs Bifrost's MCP gateway)")
@@ -102,7 +102,7 @@ func gatewayUpstream(agentURL, alias string) (string, error) {
 
 // RemoveMCP implements schemas.BifrostMCPEnvironment.
 func (e *dockerWorkspace) RemoveMCP(ctx context.Context, rc *schemas.RunContext) error {
-	gw, ok := e.cfg.ServiceGateway.Gateway.(schemas.BifrostMCPGateway)
+	gw, ok := schemas.GatewayAs[schemas.BifrostMCPGateway](e.cfg.ServiceGateway.Gateway)
 	if !ok || rc.Run == nil {
 		return nil
 	}
@@ -114,7 +114,7 @@ func (e *dockerWorkspace) RemoveMCP(ctx context.Context, rc *schemas.RunContext)
 // holds at least as many rows as the tool proxy recorded tool calls, then
 // reads once more after the batch interval so a late row is not missed.
 func (e *dockerWorkspace) CollectMCP(ctx context.Context, rc *schemas.RunContext, ev *schemas.BifrostMCPEvidence, ledger []schemas.ToolCall) {
-	gw, ok := e.cfg.ServiceGateway.Gateway.(schemas.BifrostMCPGateway)
+	gw, ok := schemas.GatewayAs[schemas.BifrostMCPGateway](e.cfg.ServiceGateway.Gateway)
 	if !ok || ev == nil || len(ev.Clients) == 0 {
 		return
 	}

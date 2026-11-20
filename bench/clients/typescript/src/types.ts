@@ -1039,6 +1039,8 @@ export interface CatalogSuite {
 	tasks: string[];
 	probes: string[];
 	lock_hash?: string;
+	/** Probe id to layer for this suite; catalog.probes is flattened across suites and ids can repeat. */
+	probe_layers?: Record<string, ProbeLayerName>;
 }
 
 export interface CatalogAgent {

@@ -6,6 +6,7 @@ import {
 	defaultFormValues,
 	experimentFormSchema,
 	parseOverrideValue,
+	planIsStale,
 	toExperiment,
 	type ExperimentFormValues,
 } from "./experimentFormSchema";
@@ -228,5 +229,19 @@ describe("Experiment request contract", () => {
 		const base = { ...defaultFormValues(catalog, 1), overridePath: "a.b", overrideValue: "1" };
 		expect(toExperiment(base).runner).toBeUndefined();
 		expect(toExperiment({ ...base, runnerPool: " gpu " }).runner).toEqual({ pool: "gpu" });
+	});
+});
+
+describe("planIsStale", () => {
+	it("keeps a plan made from padded input fresh: the schema trims, the comparison does too", () => {
+		const raw = { ...valid(), name: "Audit name ", armBLabel: " candidate " };
+		const parsed = experimentFormSchema.parse(raw);
+		expect(planIsStale(toExperiment(parsed), raw)).toBe(false);
+	});
+
+	it("marks a plan stale after an edit or when the form no longer validates", () => {
+		const planned = toExperiment(experimentFormSchema.parse(valid()));
+		expect(planIsStale(planned, { ...valid(), name: "Other" })).toBe(true);
+		expect(planIsStale(planned, { ...valid(), name: "" })).toBe(true);
 	});
 });

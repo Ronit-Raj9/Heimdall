@@ -18,6 +18,7 @@ import { useTranslation } from "react-i18next";
 import {
 	conditionsFor,
 	experimentFormSchema,
+	planIsStale,
 	suiteRef,
 	toExperiment,
 	type ExperimentFormValues,
@@ -32,8 +33,6 @@ export interface ExperimentFormProps {
 }
 
 interface Planned {
-	/** The form values the plan was made from, to tell when the plan went stale. */
-	snapshot: string;
 	experiment: Experiment;
 	plan: ExperimentPlan;
 }
@@ -54,7 +53,7 @@ export function ExperimentForm({ catalog, defaults, onStarted }: ExperimentFormP
 	const [create, createState] = useCreateExperimentMutation();
 	const [start, startState] = useStartExperimentMutation();
 
-	const stale = planned !== null && planned.snapshot !== JSON.stringify(values);
+	const stale = planned !== null && planIsStale(planned.experiment, values);
 	const busy = createState.isLoading || startState.isLoading;
 	// Local mode: plan, estimate, create and start are all writes behind the token, so it is asked first.
 	const needsToken = tokenBox && !token.trim();
@@ -75,7 +74,7 @@ export function ExperimentForm({ catalog, defaults, onStarted }: ExperimentFormP
 		setPlanned(null);
 		try {
 			const result = await plan(experiment).unwrap();
-			setPlanned({ snapshot: JSON.stringify(formValues), experiment, plan: result });
+			setPlanned({ experiment, plan: result });
 		} catch {
 			// planState.error renders the failure.
 		}

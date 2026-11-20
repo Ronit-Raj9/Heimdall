@@ -29,6 +29,11 @@ type CatalogSuite struct {
 	Tasks    []string `json:"tasks"`
 	Probes   []string `json:"probes"`
 	LockHash string   `json:"lock_hash,omitempty"`
+	// ProbeLayers maps each probe id of this suite to its layer. Catalog.Probes
+	// is flattened across suites, so two suites can share a probe id on
+	// different layers; the receipts view reads the layer of the experiment's
+	// own suite from here.
+	ProbeLayers map[string]ProbeLayerName `json:"probe_layers,omitempty"`
 }
 
 // CatalogAgent summarizes an agent config file.

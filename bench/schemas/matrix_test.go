@@ -18,6 +18,7 @@ func TestMatrixModelDecode(t *testing.T) {
 		{name: "with provider", yamlDoc: "{model: claude-sonnet-5, provider: anthropic}", jsonDoc: `{"model":"claude-sonnet-5","provider":"anthropic"}`,
 			want: MatrixModel{Model: "claude-sonnet-5", Provider: "anthropic"}},
 		{name: "list is not a model", yamlDoc: "[a, b]", jsonDoc: `["a"]`, wantErr: true},
+		{name: "misspelled provider", yamlDoc: "{model: first, provdier: fake}", jsonDoc: `{"model":"first","provdier":"fake"}`, wantErr: true},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
