@@ -75,7 +75,7 @@ func (r *VerifyReport) Summary() string {
 // object's stored size and recorded sha256 are compared with the listing. A
 // mirror with no listing for the experiment returns ErrNotFound.
 func (m *Mirror) Verify(ctx context.Context, org Org, expID string, deep bool) (*VerifyReport, error) {
-	unlock, err := m.lockExp(org, expID)
+	unlock, err := m.lockExp(ctx, org, expID)
 	if err != nil {
 		return nil, err
 	}

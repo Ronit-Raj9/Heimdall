@@ -84,7 +84,7 @@ func runEvidence(args []string) int {
 		return exitUsage
 	}
 	ctx := context.Background()
-	cfg, err := lib.LoadConfig(f.config)
+	cfg, err := loadConfig(f.config)
 	if err != nil {
 		return fail("%v", err)
 	}
@@ -451,6 +451,10 @@ type backupReport struct {
 	Mirror     string                    `json:"mirror"`
 	Experiment []evidencestore.SweepItem `json:"experiments,omitempty"`
 	Failed     int                       `json:"failed"`
+	// SweepError is set when the sweep stopped before it reached every
+	// experiment (cancelled, or the listing failed): the backup is
+	// incomplete even if every item it did reach succeeded.
+	SweepError string `json:"sweep_error,omitempty"`
 }
 
 func (e *evidenceEnv) backupCmd(ctx context.Context) int {
@@ -488,7 +492,11 @@ func (e *evidenceEnv) backupCmd(ctx context.Context) int {
 		if err != nil {
 			return fail("%v", err)
 		}
-		rep.Experiment, _ = m.SweepWith(ctx, orgs, evidencestore.MirrorOptions{Repair: e.f.repair})
+		var sweepErr error
+		rep.Experiment, sweepErr = m.SweepWith(ctx, orgs, evidencestore.MirrorOptions{Repair: e.f.repair})
+		if sweepErr != nil {
+			rep.SweepError = sweepErr.Error()
+		}
 		for _, it := range rep.Experiment {
 			if it.Error != "" {
 				rep.Failed++
@@ -509,8 +517,11 @@ func (e *evidenceEnv) backupCmd(ctx context.Context) int {
 		if !e.f.noMirror {
 			printSweep(e.out, rep.Mirror, rep.Experiment)
 		}
+		if rep.SweepError != "" {
+			fmt.Fprintf(e.out, "evidence sweep INCOMPLETE: %s\n", rep.SweepError)
+		}
 	}
-	if rep.Failed > 0 || rep.DBError != "" {
+	if rep.Failed > 0 || rep.DBError != "" || rep.SweepError != "" {
 		return exitInfra
 	}
 	return exitOK

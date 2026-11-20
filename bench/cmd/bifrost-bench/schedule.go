@@ -96,7 +96,7 @@ func (f scheduleFlags) parse(args []string) error {
 
 // open loads the config and the schedules file.
 func (f scheduleFlags) open() (*lib.Config, string, *schedule.File, error) {
-	cfg, err := lib.LoadConfig(*f.config)
+	cfg, err := loadConfig(*f.config)
 	if err != nil {
 		return nil, "", nil, err
 	}
@@ -133,7 +133,11 @@ func scheduleAdd(args []string, out io.Writer) int {
 	if s.Policy != "" {
 		s.Policy = projectRelative(cfg.Root, s.Policy)
 	}
-	for _, d := range parseDecisions(*failOn) {
+	decisions, err := parseDecisions(*failOn)
+	if err != nil {
+		return fail("%v", err)
+	}
+	for _, d := range decisions {
 		s.FailOn = append(s.FailOn, string(d))
 	}
 	if err := file.Add(s); err != nil {

@@ -365,3 +365,53 @@ func TestScanRunLivenessUnreadableSlots(t *testing.T) {
 		t.Fatal("unreadable slots folder scanned as no lease information")
 	}
 }
+
+// A run of another project on the same docker host is never collected,
+// however old its objects are: its liveness lives in that project's store
+// (audit 5-A-04). Unlabelled (older) objects keep the grace rule.
+func TestJanitorKeepsOtherProjectsRuns(t *testing.T) {
+	now := time.Date(2026, 11, 15, 12, 0, 0, 0, time.UTC)
+	old := now.Add(-48 * time.Hour)
+	j := NewJanitor(nil, utils.Docker{}, nil)
+	j.project, j.now = "p_me", func() time.Time { return now }
+	objs := parseObjects([]byte("c1\tr_other\t" + listTime(old) + "\tp_other\n" +
+		"c2\tr_mine\t" + listTime(old) + "\tp_me\n" +
+		"c3\tr_legacy\t" + listTime(old) + "\t<no value>\n"))
+	if len(objs) != 3 || objs[0].project != "p_other" || objs[2].project != "" {
+		t.Fatalf("parsed %+v", objs)
+	}
+	keep, remove := j.decide(RunLiveness{Live: map[string]bool{}, Dead: map[string]bool{}}, [][]dockerObject{objs}, true, &SweepReport{})
+	if !keep["r_other"] || remove["r_other"] {
+		t.Fatalf("other project's run: keep %v remove %v", keep, remove)
+	}
+	if !remove["r_mine"] || !remove["r_legacy"] {
+		t.Fatalf("own old runs not removed: %v", remove)
+	}
+}
+
+func TestLabelArgsCarryProject(t *testing.T) {
+	prev := utils.Project()
+	t.Cleanup(func() { utils.SetProject(prev) })
+	utils.SetProject("p_me")
+	got := strings.Join(utils.LabelArgs("e_1", "r_1"), " ")
+	if !strings.Contains(got, utils.LabelProject+"=p_me") {
+		t.Fatalf("labels %s", got)
+	}
+	if got := strings.Join(utils.LabelArgs("", ""), " "); strings.Contains(got, utils.LabelProject) {
+		t.Fatalf("shared object labelled with a project: %s", got)
+	}
+	if utils.ProjectID("/a/runs") == utils.ProjectID("/b/runs") || utils.ProjectID("/a/runs") != utils.ProjectID("/a/./runs") {
+		t.Fatal("project ids")
+	}
+}
+
+func TestSpendBasis(t *testing.T) {
+	m := &schemas.Manifest{}
+	if spendBasis(m) != SpendModeled {
+		t.Fatal("live experiment not modeled")
+	}
+	m.Experiment.ScriptedUpstream = true
+	if spendBasis(m) != SpendSimulated {
+		t.Fatal("scripted experiment not simulated")
+	}
+}

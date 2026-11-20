@@ -3,13 +3,13 @@ package main
 import (
 	"context"
 	"fmt"
+	"github.com/maximhq/bifrost/bench/lib"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"strings"
 
 	"github.com/maximhq/bifrost/bench/quickstart"
-	"github.com/maximhq/bifrost/bench/scaffold"
 )
 
 // First workflow (docs/quickstart.md): `init` inside a git repository.
@@ -53,6 +53,9 @@ func runInitRepo(pos []string, testCmd, image, name string, force bool) int {
 		return fail("init: update .gitignore: %v", err)
 	}
 	printDetection(det)
+	if note := quickstart.TestCommandScope(det.Tests); note != "" {
+		fmt.Println(note)
+	}
 	fmt.Printf("\nwrote %d files to %s", len(written), projectDir)
 	if len(kept) > 0 {
 		fmt.Printf(" (kept %d existing; -force replaces the project's own files, never deploy/.env)", len(kept))
@@ -61,7 +64,7 @@ func runInitRepo(pos []string, testCmd, image, name string, force bool) int {
 	if ignored {
 		fmt.Printf("added %s to %s\n", quickstart.RunsIgnore, filepath.Join(top, ".gitignore"))
 	}
-	printRepoNextSteps(pf, det)
+	printRepoNextSteps(pf, det, projectDir, image)
 	return exitOK
 }
 
@@ -112,7 +115,7 @@ func printDetection(d quickstart.Detection) {
 }
 
 // printRepoNextSteps prints the commands after init and what each costs.
-func printRepoNextSteps(pf *quickstart.ProjectFile, d quickstart.Detection) {
+func printRepoNextSteps(pf *quickstart.ProjectFile, d quickstart.Detection, projectDir, image string) {
 	p := progName
 	cfg := quickstart.Dir + "/deploy/bench.yaml"
 	fmt.Println("\nnext (from the repository root; every step is $0 until a real model runs):")
@@ -123,9 +126,8 @@ func printRepoNextSteps(pf *quickstart.ProjectFile, d quickstart.Detection) {
 	}
 	say("$0 (local Docker builds)", fmt.Sprintf("cp \"$(command -v %s)\" %s/deploy/bifrost-bench && docker build -t bench/bifrost-bench:dev %s/deploy && docker build -t %s %s/deploy/helper",
 		p, quickstart.Dir, quickstart.Dir, quickstart.HelperImage, quickstart.Dir))
-	if pf.Tests.Template != scaffold.TemplatePythonPytest {
-		say("$0 (local Docker build); add your toolchain and dependencies to the Dockerfile first",
-			fmt.Sprintf("docker build -t bench/%s-base:1 %s/benchmarks/%s/base", pf.Suite, quickstart.Dir, pf.Suite))
+	if cost, cmd, ok := baseImageStep(projectDir, pf.Suite, image); ok {
+		say(cost, cmd)
 	}
 	for _, a := range d.Agents {
 		id := strings.TrimSuffix(filepath.Base(a.Config), ".yaml")
@@ -145,6 +147,21 @@ func printRepoNextSteps(pf *quickstart.ProjectFile, d quickstart.Detection) {
 	fmt.Printf("\nevery command finds %s by itself; pass -config %s to be explicit.\n", cfg, cfg)
 }
 
+// baseImageStep is the next step for the suite's toolchain image, derived
+// from what init wrote (audit 5-B-13): a build of the base/ folder when the
+// scaffold made one, a check that the -image given exists otherwise.
+func baseImageStep(projectDir, suiteID, image string) (cost, cmd string, ok bool) {
+	if _, err := os.Stat(filepath.Join(projectDir, "benchmarks", suiteID, "base", "Dockerfile")); err == nil {
+		return "$0 (local Docker build); add your toolchain and dependencies to the Dockerfile first",
+			fmt.Sprintf("docker build -t bench/%s-base:1 %s/benchmarks/%s/base", suiteID, quickstart.Dir, suiteID), true
+	}
+	if image != "" {
+		return "$0 (checks the image you chose is on this machine; pull or build it if not)",
+			fmt.Sprintf("docker image inspect --format '{{.Id}}' %s", image), true
+	}
+	return "", "", false
+}
+
 func allPortsFree(d quickstart.Detection) bool {
 	for _, p := range d.Ports {
 		if !p.Free {
@@ -152,6 +169,22 @@ func allPortsFree(d quickstart.Detection) bool {
 		}
 	}
 	return true
+}
+
+// loadConfig loads the bench config at path. The default path
+// (deploy/bench.yaml) that does not exist in the working directory falls
+// back to the .heimdall project of the repository the working directory is
+// in, so every command finds the project init wrote, as init promises.
+func loadConfig(path string) (*lib.Config, error) {
+	return lib.LoadConfig(resolveConfigPath(path))
+}
+
+// resolveConfigPath is the config path loadConfig reads.
+func resolveConfigPath(path string) string {
+	if path != defaultConfig {
+		return path
+	}
+	return projectConfig(path, false)
 }
 
 // projectConfig returns the bench config a first-workflow command uses: the

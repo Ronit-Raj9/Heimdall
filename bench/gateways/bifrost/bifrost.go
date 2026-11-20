@@ -351,10 +351,22 @@ func (g *Gateway) ensureProvider(ctx context.Context, p ProviderSetup) error {
 	case isStatus(err, http.StatusNotFound):
 		body := g.providerBody(p)
 		body["provider"] = p.Name
-		if err := g.call(ctx, http.MethodPost, "/api/providers", body, nil); err != nil {
-			return fmt.Errorf("create provider %s: %w", p.Name, err)
+		err := g.call(ctx, http.MethodPost, "/api/providers", body, nil)
+		if !isStatus(err, http.StatusConflict) {
+			if err != nil {
+				return fmt.Errorf("create provider %s: %w", p.Name, err)
+			}
+			return nil
 		}
-		return nil
+		// Another bench process created it between our GET and POST: read
+		// what it wrote and converge on it like an existing provider.
+		cur = providerConfig{}
+		if err := g.call(ctx, http.MethodGet, providerPath(p.Name), nil, &cur); err != nil {
+			return fmt.Errorf("get provider %s after a create conflict: %w", p.Name, err)
+		}
+		if g.providerMatches(p, cur) {
+			return nil
+		}
 	case err != nil:
 		return fmt.Errorf("get provider %s: %w", p.Name, err)
 	case g.providerMatches(p, cur):
@@ -413,11 +425,31 @@ func (g *Gateway) upsertKey(ctx context.Context, provider string, s Slot, id str
 	body := map[string]any{"name": s.Name, "value": s.Value, "models": models, "weight": 1, "enabled": true}
 	var out providerKey
 	if id == "" {
-		if err := g.call(ctx, http.MethodPost, providerPath(provider)+"/keys", body, &out); err != nil {
+		err := g.call(ctx, http.MethodPost, providerPath(provider)+"/keys", body, &out)
+		switch {
+		case isStatus(err, http.StatusConflict):
+			// Key names are unique across providers: a concurrent setup
+			// (another run or doctor) created this slot after our listing.
+			// Adopt it when it is under this provider and update it below,
+			// keeping the models it already serves.
+			k, ferr := g.findKey(ctx, provider, s.Name)
+			if ferr != nil {
+				return "", fmt.Errorf("create key slot %s: %w (after %v)", s.Name, ferr, err)
+			}
+			id, out = k.ID, providerKey{}
+			merged := k.Models
+			for _, m := range models {
+				merged = mergeModels(merged, m)
+			}
+			body["models"] = merged
+		case err != nil:
 			return "", fmt.Errorf("create key slot %s: %w", s.Name, err)
 		}
-	} else if err := g.call(ctx, http.MethodPut, providerPath(provider)+"/keys/"+id, body, &out); err != nil {
-		return "", fmt.Errorf("update key slot %s: %w", s.Name, err)
+	}
+	if out.ID == "" && id != "" {
+		if err := g.call(ctx, http.MethodPut, providerPath(provider)+"/keys/"+id, body, &out); err != nil {
+			return "", fmt.Errorf("update key slot %s: %w", s.Name, err)
+		}
 	}
 	if out.ID == "" {
 		out.ID = id
@@ -426,6 +458,23 @@ func (g *Gateway) upsertKey(ctx context.Context, provider string, s Slot, id str
 		return "", fmt.Errorf("key slot %s: bifrost returned no key id", s.Name)
 	}
 	return out.ID, nil
+}
+
+// findKey reads the provider's keys again and returns the one named name.
+// A name taken under another provider is an error: that slot is not ours.
+func (g *Gateway) findKey(ctx context.Context, provider, name string) (providerKey, error) {
+	var existing struct {
+		Keys []providerKey `json:"keys"`
+	}
+	if err := g.call(ctx, http.MethodGet, providerPath(provider)+"/keys", nil, &existing); err != nil {
+		return providerKey{}, fmt.Errorf("list %s keys: %w", provider, err)
+	}
+	for _, k := range existing.Keys {
+		if k.Name == name && k.ID != "" {
+			return k, nil
+		}
+	}
+	return providerKey{}, fmt.Errorf("key name %s is taken, but not under provider %s", name, provider)
 }
 
 // provider returns the named provider's setup.

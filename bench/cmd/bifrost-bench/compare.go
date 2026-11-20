@@ -5,6 +5,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"flag"
 	"fmt"
 	"io"
@@ -89,6 +90,10 @@ func runCompare(args []string) int {
 		fmt.Fprintln(os.Stderr, compareUsage)
 		return exitUsage
 	}
+	if _, err := parseDecisions(f.failOn); err != nil {
+		fmt.Fprintln(os.Stderr, "error:", err)
+		return exitUsage
+	}
 	f.config = projectConfig(f.config, flagSet(fs, "config"))
 	if !f.writeOnly {
 		loadProjectEnv(f.config) // the stack's tokens; --write-only needs no stack
@@ -109,7 +114,7 @@ type compareSetup struct {
 
 // buildCompare writes the experiment file for the flags. It needs only the
 // config (no gateway), so tests call it directly.
-func buildCompare(ctx context.Context, f compareFlags, cfg *lib.Config) (*compareSetup, error) {
+func buildCompare(ctx context.Context, f compareFlags, cfg *lib.Config) (_ *compareSetup, retErr error) {
 	pf, _ := quickstart.LoadProjectFile(cfg.Root)
 	suiteID := f.suite
 	if suiteID == "" && pf != nil {
@@ -132,10 +137,28 @@ func buildCompare(ctx context.Context, f compareFlags, cfg *lib.Config) (*compar
 		o.Base = pf.Agents[0].Config
 	}
 	setup := &compareSetup{}
+	setup.rel = path.Join("experiments", name+".yaml")
+	setup.path = filepath.Join(cfg.Root, filepath.FromSlash(setup.rel))
+	// Reserve the name before anything is written, so a refused comparison
+	// can be retried under the same --name (audit 5-B-11).
+	if _, err := os.Stat(setup.path); err == nil {
+		return nil, fmt.Errorf("%s exists; pass another --name", setup.path)
+	}
 	if f.baseline != "" {
 		if o.Base == "" {
 			return nil, fmt.Errorf("--baseline/--candidate need --base agents/<agent>.yaml: the agent whose files differ between the refs")
 		}
+		fixtures := filepath.Join(cfg.Root, "experiments", "fixtures", name)
+		if _, err := os.Stat(fixtures); err == nil {
+			return nil, fmt.Errorf("%s exists; pass another --name", fixtures)
+		}
+		defer func() {
+			if retErr != nil { // the fixture tree belongs to the experiment this call did not write
+				if err := os.RemoveAll(fixtures); err != nil {
+					fmt.Fprintf(os.Stderr, "warning: remove %s: %v\n", fixtures, err)
+				}
+			}
+		}()
 		a, b, subject, err := refArms(ctx, f, cfg.Root, name, o.Base)
 		if err != nil {
 			return nil, err
@@ -161,11 +184,6 @@ func buildCompare(ctx context.Context, f compareFlags, cfg *lib.Config) (*compar
 	if err != nil {
 		return nil, err
 	}
-	setup.rel = path.Join("experiments", name+".yaml")
-	setup.path = filepath.Join(cfg.Root, filepath.FromSlash(setup.rel))
-	if _, err := os.Stat(setup.path); err == nil {
-		return nil, fmt.Errorf("%s exists; pass another --name", setup.path)
-	}
 	if err := os.MkdirAll(filepath.Dir(setup.path), 0o755); err != nil {
 		return nil, err
 	}
@@ -173,11 +191,19 @@ func buildCompare(ctx context.Context, f compareFlags, cfg *lib.Config) (*compar
 		return nil, err
 	}
 	if _, err := loadExperiment(setup.path); err != nil {
+		_ = os.Remove(setup.path)
 		return nil, fmt.Errorf("the written experiment does not load (%s): %w", setup.path, err)
 	}
 	setup.opts = o
 	return setup, nil
 }
+
+// errNoAgentChange is a refs comparison whose two refs have the same agent
+// files: a verified "nothing to gate", not a failure. compare exits
+// ci.ExitNoAgentChange for it, so the generated CI job can skip the gate
+// for a pull request that changes only suite data or the workflow (audit
+// 5-B-14).
+var errNoAgentChange = errors.New("no agent change between the refs")
 
 // refArms copies the agent's files at both refs under
 // experiments/fixtures/<name>/ and turns them into arm overrides: the notes
@@ -228,7 +254,7 @@ func refArms(ctx context.Context, f compareFlags, root, name, base string) (quic
 		arms[i] = arm
 	}
 	if exported[0].Hash == exported[1].Hash {
-		return arms[0], arms[1], "", fmt.Errorf("%s and %s have the same agent files under %s; nothing to compare", f.baseline, f.candidate, strings.Join(paths, ","))
+		return arms[0], arms[1], "", fmt.Errorf("%s and %s have the same agent files under %s; nothing to compare: %w", f.baseline, f.candidate, strings.Join(paths, ","), errNoAgentChange)
 	}
 	if len(exported[0].Files) == 0 && len(exported[1].Files) == 0 {
 		return arms[0], arms[1], "", fmt.Errorf("no agent files under %s at either ref", strings.Join(paths, ","))
@@ -340,11 +366,15 @@ func allScripted(root string, o quickstart.CompareOptions) bool {
 
 func compare(ctx context.Context, f compareFlags, in io.Reader, out io.Writer) int {
 	start := time.Now()
-	cfg, err := lib.LoadConfig(f.config)
+	cfg, err := loadConfig(f.config)
 	if err != nil {
 		return fail("%v", err)
 	}
 	setup, err := buildCompare(ctx, f, cfg)
+	if errors.Is(err, errNoAgentChange) {
+		fmt.Fprintf(os.Stderr, "compare: %v\n", err)
+		return ci.ExitNoAgentChange
+	}
 	if err != nil {
 		return fail("compare: %v", err)
 	}
@@ -410,7 +440,8 @@ func compare(ctx context.Context, f compareFlags, in io.Reader, out io.Writer) i
 	fmt.Fprintf(out, "\n%s\nreport: %s (took %s)\n", card, filepath.Join(dir, "report.md"), time.Since(start).Round(time.Second))
 	fmt.Fprintf(out, "verdict: %s, action: %s\n", an.Verdict.Decision, an.Verdict.Action)
 	printPolicy(an.Policy)
-	return checkExitCode(an, parseDecisions(f.failOn))
+	failOn, _ := parseDecisions(f.failOn) // checked when the flags were parsed
+	return checkExitCode(an, failOn)
 }
 
 // interactive reports whether in is a terminal a person can answer on.

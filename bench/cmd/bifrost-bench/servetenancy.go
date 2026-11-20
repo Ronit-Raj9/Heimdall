@@ -124,7 +124,12 @@ func newHostedEnv(ctx context.Context, a *app, offline bool) (*hostedEnv, func()
 	}
 	env := newEnv(ctx, a, d, offline)
 	env.authCfg, env.auth = authCfg, svc
-	return env, func() { _ = env.registry.Close(); d.Close() }, nil
+	return env, func() {
+		stopHostedHub(env) // the runner hands its jobs back through d first
+		hostedHubs.Delete(env)
+		_ = env.registry.Close()
+		d.Close()
+	}, nil
 }
 
 // newEnv is the database-backed part of hostedEnv (tests reuse it with a
@@ -258,7 +263,7 @@ func (a *app) resultsSource() resultsindex.Source {
 // hostedConfig reports whether the config at path says auth.mode hosted. An
 // unreadable config is not hosted; newApp reports the error.
 func hostedConfig(path string) bool {
-	cfg, err := lib.LoadConfig(path)
+	cfg, err := loadConfig(path)
 	return err == nil && cfg.Auth.IsHosted()
 }
 

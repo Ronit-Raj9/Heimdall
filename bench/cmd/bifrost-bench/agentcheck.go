@@ -18,7 +18,6 @@ import (
 	"github.com/maximhq/bifrost/bench/engine"
 	"github.com/maximhq/bifrost/bench/environments"
 	"github.com/maximhq/bifrost/bench/faultproxy"
-	"github.com/maximhq/bifrost/bench/lib"
 	"github.com/maximhq/bifrost/bench/schemas"
 	"github.com/maximhq/bifrost/bench/store"
 	"github.com/maximhq/bifrost/bench/utils"
@@ -191,7 +190,7 @@ func runAgentCheck(args []string, out io.Writer) int {
 // model. It never sweeps or touches other runs.
 func agentCheck(ctx context.Context, opts checkOptions, log io.Writer) *checkReport {
 	rep := &checkReport{Suite: opts.suite, Task: opts.task}
-	cfg, err := lib.LoadConfig(opts.config)
+	cfg, err := loadConfig(opts.config)
 	if err != nil {
 		return rep.fail(err)
 	}

@@ -40,6 +40,11 @@ type WorkflowOptions struct {
 	FailOn    string   // verdicts that fail the job
 }
 
+// ExitNoAgentChange is the exit code of `compare --baseline --candidate`
+// when both refs have the same agent files: nothing to gate. The live
+// workflow skips the gate on it instead of failing the job.
+const ExitNoAgentChange = 6
+
 // DefaultTriggerPaths are the files that can change a coding agent's
 // behaviour: notes, skills, prompts and the Heimdall project itself.
 var DefaultTriggerPaths = []string{"AGENTS.md", "CLAUDE.md", "GEMINI.md", ".claude/**", "skills/**", "prompts/**", ".heimdall/**", ".github/workflows/heimdall.yml"}
@@ -164,14 +169,28 @@ func GitHubWorkflow(o WorkflowOptions) (string, error) {
 		}
 		args = append(args, "--budget-usd", fmt.Sprint(o.BudgetUSD), "--name", "pr-gate", "--write-only")
 		w("      - name: Write the baseline-vs-candidate experiment")
+		w("        id: write")
 		w("        working-directory: .heimdall")
 		w("        run: |")
 		w("          rm -rf experiments/pr-gate.yaml experiments/fixtures/pr-gate")
-		w("          \"$RUNNER_TEMP/heimdall\" compare %s", strings.Join(args, " "))
+		w("          # Exit %d: both refs have the same agent files (a suite-only or", ExitNoAgentChange)
+		w("          # workflow-only change); there is no treatment to gate, so the gate is skipped.")
+		w("          code=0")
+		w("          \"$RUNNER_TEMP/heimdall\" compare %s || code=$?", strings.Join(args, " "))
+		w("          if [ \"$code\" -eq %d ]; then", ExitNoAgentChange)
+		w("            echo \"changed=false\" >> \"$GITHUB_OUTPUT\"")
+		w("            echo \"no agent change between the refs: gate skipped\"")
+		w("            exit 0")
+		w("          fi")
+		w("          [ \"$code\" -eq 0 ] || exit \"$code\"")
+		w("          echo \"changed=true\" >> \"$GITHUB_OUTPUT\"")
 		w("")
 	}
 	w("      - name: Heimdall gate")
 	w("        id: gate")
+	if o.Mode == ModeLive {
+		w("        if: steps.write.outputs.changed == 'true'")
+	}
 	w("        uses: ./.heimdall-src/bench/ci")
 	w("        env:")
 	w("          BENCH_CI_BENCH_DIR: ${{ github.workspace }}/.heimdall")

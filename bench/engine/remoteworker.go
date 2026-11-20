@@ -269,6 +269,13 @@ func (w *Worker) Work(ctx context.Context, lease *schemas.WorkerLease) *schemas.
 		return nil
 	}
 	runnerImgs := w.runnerImages(ctx, exp, slot)
+	// Admission and the checks above can be slow; confirm the coordinator
+	// still holds this lease for us before any billable agent work starts,
+	// instead of finding out at the first timed heartbeat.
+	if why := w.confirmLease(sctx, lease); why != "" {
+		w.logger.Error("lease gone before the slot started; not running it", "lease", lease.LeaseID, "slot", slot.SlotID, "why", why)
+		return nil
+	}
 	res, err := w.runner.RunSlot(sctx, SlotInput{Manifest: runM, Suite: exp.suite, Slot: slot, Attempt: lease.Attempt})
 	if res != nil {
 		res.RunnerGateway = runnerGW  // Tenancy area: uploaded with the run
@@ -461,6 +468,28 @@ func adoptUnrepeatable(local, remote *schemas.Manifest) {
 // returned context with an ErrLeaseLost cause on loss under the scheduler's
 // rules (leaseLoss): the coordinator says the lease is gone, or no heartbeat
 // succeeded for longer than the stale threshold.
+// confirmLease sends one synchronous heartbeat. It returns why the lease is
+// gone (the coordinator refused it, or the heartbeat loop already lost it),
+// or "" when the lease is ours or the coordinator could not be reached (the
+// heartbeat loop then decides).
+func (w *Worker) confirmLease(sctx context.Context, lease *schemas.WorkerLease) string {
+	if cause := context.Cause(sctx); cause != nil {
+		return cause.Error()
+	}
+	err := w.call(sctx, http.MethodPost, workerAPI+"/leases/"+url.PathEscape(lease.LeaseID)+"/heartbeat",
+		schemas.WorkerHeartbeat{WorkerID: w.opts.WorkerID}, nil)
+	switch {
+	case err == nil:
+		return ""
+	case errors.Is(err, schemas.ErrLeaseGone), errors.Is(err, schemas.ErrWorkerUnknown):
+		return err.Error()
+	case context.Cause(sctx) != nil:
+		return context.Cause(sctx).Error()
+	}
+	w.logger.Warn("lease check before the slot failed; the heartbeat loop retries", "lease", lease.LeaseID, "error", err.Error())
+	return ""
+}
+
 func (w *Worker) heartbeat(ctx context.Context, lease *schemas.WorkerLease) (context.Context, func()) {
 	sctx, cancel := context.WithCancelCause(ctx)
 	every := time.Duration(lease.HeartbeatEveryMS) * time.Millisecond

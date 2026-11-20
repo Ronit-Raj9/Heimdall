@@ -294,7 +294,7 @@ func loadBenchConfig(path string) *lib.Config {
 	if _, err := os.Stat(path); err != nil {
 		return nil
 	}
-	cfg, err := lib.LoadConfig(path)
+	cfg, err := loadConfig(path)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "warning: bench config %s: %v\n", path, err)
 		return nil

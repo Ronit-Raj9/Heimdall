@@ -128,6 +128,13 @@ func NewHosted(cfg *lib.Config, h Hosted) (*Server, error) {
 			}
 		}
 	}()
+	// Platform areas with live streams (the jobs handler's log SSE) end them
+	// before the HTTP shutdown waits for requests to drain, as local mode does.
+	for _, a := range h.Platform {
+		if c, ok := a.(interface{ Close() }); ok {
+			s.closers = append(s.closers, c.Close)
+		}
+	}
 	var once sync.Once
 	s.closers = append(s.closers, func() {
 		once.Do(func() {

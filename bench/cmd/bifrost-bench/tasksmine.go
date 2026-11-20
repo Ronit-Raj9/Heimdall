@@ -82,11 +82,13 @@ type minedTask struct {
 
 func mineTasks(ctx context.Context, f mineFlags) int {
 	start := time.Now()
-	a, err := newApp(ctx, f.config, appOptions{})
+	// The config alone until -dry-run has returned: building the app opens
+	// the run store, which creates its folder (audit 5-B-12).
+	cfg, err := loadConfig(f.config)
 	if err != nil {
 		return fail("%v", err)
 	}
-	pf, _ := quickstart.LoadProjectFile(a.cfg.Root)
+	pf, _ := quickstart.LoadProjectFile(cfg.Root)
 	suiteID, testCmd := f.suite, ""
 	if pf != nil {
 		testCmd = pf.Tests.Command
@@ -97,7 +99,7 @@ func mineTasks(ctx context.Context, f mineFlags) int {
 	if suiteID == "" {
 		return fail("no suite: pass -suite (or run %s init in the repository first)", progName)
 	}
-	root := a.cfg.Path(a.cfg.BenchmarksRoot)
+	root := cfg.Path(cfg.BenchmarksRoot)
 	suiteDir := filepath.Join(root, suiteID)
 	suiteYAML, err := os.ReadFile(filepath.Join(suiteDir, "suite.yaml"))
 	if err != nil {
@@ -113,12 +115,13 @@ func mineTasks(ctx context.Context, f mineFlags) int {
 		return fail("-repo %s: %v", f.repo, err)
 	}
 	exclude := ""
-	if rel, err := filepath.Rel(repoTop, a.cfg.Root); err == nil && !strings.HasPrefix(rel, "..") && rel != "." {
+	if rel, err := filepath.Rel(repoTop, cfg.Root); err == nil && !strings.HasPrefix(rel, "..") && rel != "." {
 		exclude = filepath.ToSlash(rel)
 	}
 	cands, skipped, err := scaffold.MineCandidates(ctx, scaffold.MineOptions{
 		Repo: f.repo, Since: f.since, Paths: splitList(f.paths), MinTests: f.minTests, TestGlobs: globs,
 		Scan: f.scan, MaxFiles: f.maxFiles, MaxLines: f.maxLines, Exclude: exclude,
+		NeedBaseTests: suiteGrader(suiteYAML) == "hidden_tests", // 5-B-16: its static validation needs a visible base test
 	})
 	if err != nil {
 		return fail("tasks mine: %v", err)
@@ -133,8 +136,12 @@ func mineTasks(ctx context.Context, f mineFlags) int {
 		}
 		return exitOK
 	}
+	a, err := newApp(ctx, f.config, appOptions{})
+	if err != nil {
+		return fail("%v", err)
+	}
 	var results []minedTask
-	proved := 0
+	proved, drafts := 0, 0
 	proofs := map[string]proof{}
 	for _, c := range cands {
 		if proved >= f.limit {
@@ -142,8 +149,21 @@ func mineTasks(ctx context.Context, f mineFlags) int {
 		}
 		id := c.TaskID()
 		if _, err := os.Stat(filepath.Join(suiteDir, "tasks", id)); err == nil {
-			fmt.Printf("%s %s already in suite %s; kept as it is\n", id, c.ShortCommit(), suiteID)
-			proved++
+			// A folder alone proves nothing: a draft from task init or an
+			// interrupted cut is reported and skipped without using the
+			// limit; only a current admission counts (audit 5-B-06).
+			current, err := admissionCurrent(ctx, a, suiteID, id)
+			if err != nil {
+				return fail("tasks mine %s: %v", id, err)
+			}
+			if current {
+				fmt.Printf("%s %s already admitted in suite %s; kept as it is\n", id, c.ShortCommit(), suiteID)
+				proved++
+			} else {
+				fmt.Printf("%s %s is in suite %s but not admitted (a draft?); skipped: finish it and run `%s task admit %s/%s`\n",
+					id, c.ShortCommit(), suiteID, progName, suiteID, id)
+				drafts++
+			}
 			continue
 		}
 		fmt.Printf("proving %s (%s) %s ...\n", id, c.ShortCommit(), c.Subject)
@@ -171,6 +191,9 @@ func mineTasks(ctx context.Context, f mineFlags) int {
 	printMined(results, time.Since(start))
 	if s, err := loadSuite(ctx, root, suiteID); err == nil {
 		fmt.Println(unreviewedLine(s, nil))
+	}
+	if drafts > 0 {
+		fmt.Printf("%d existing task folders are not admitted and were skipped\n", drafts)
 	}
 	if proved == 0 {
 		return 1
@@ -569,28 +592,25 @@ func runTaskReview(args []string) int {
 		fmt.Printf("%s/%s: already reviewed\n", suiteID, taskID)
 	}
 	ctx := context.Background()
-	if changed && !*noAdmit {
+	code := exitOK
+	if !*noAdmit {
 		a, err := newApp(ctx, cfgPath, appOptions{})
 		if err != nil {
 			return fail("%v", err)
 		}
-		suitePath := filepath.Join(root, suiteID, "suite.yaml")
-		before, err := os.ReadFile(suitePath)
-		if err != nil {
-			return fail("%v", err)
-		}
-		t0 := time.Now()
-		rec, pr, err := proveTask(ctx, a, suiteID, taskID)
-		if err != nil {
-			return fail("prove %s/%s: %v", suiteID, taskID, err)
-		}
-		if !rec.Admitted {
-			fmt.Printf("%s/%s: NOT admitted after the review: %s\n", suiteID, taskID, failedChecks(rec))
-		} else {
-			if _, err := recordProofs(ctx, a, suiteID, before, map[string]proof{taskID: pr}); err != nil {
+		// Prove whenever the mark changed or the task has no current
+		// admission: a retry after a rejected or interrupted proof must
+		// prove again, not stop at "already reviewed" (audit 5-B-05).
+		current := false
+		if !changed {
+			if current, err = admissionCurrent(ctx, a, suiteID, taskID); err != nil {
 				return fail("%v", err)
 			}
-			fmt.Printf("%s/%s: proved again and admitted (%.1fs)\n", suiteID, taskID, time.Since(t0).Seconds())
+		}
+		if current {
+			fmt.Printf("%s/%s: admission is current\n", suiteID, taskID)
+		} else if code = reproveReviewed(ctx, a, root, suiteID, taskID); code != exitOK && code != 1 {
+			return code
 		}
 	} else if changed {
 		fmt.Printf("task.yaml changed, so the admission no longer holds: run `%s task admit %s/%s` before the next experiment\n", progName, suiteID, taskID)
@@ -600,5 +620,68 @@ func runTaskReview(args []string) int {
 		return fail("load suite %s: %v", suiteID, err)
 	}
 	fmt.Println(unreviewedLine(s, nil))
+	return code
+}
+
+// reproveReviewed proves a reviewed task again and records its admission.
+// It returns exitOK when admitted, 1 when the proof rejected it, and the
+// fail code on an error.
+func reproveReviewed(ctx context.Context, a *app, root, suiteID, taskID string) int {
+	suitePath := filepath.Join(root, suiteID, "suite.yaml")
+	before, err := os.ReadFile(suitePath)
+	if err != nil {
+		return fail("%v", err)
+	}
+	t0 := time.Now()
+	rec, pr, err := proveTask(ctx, a, suiteID, taskID)
+	if err != nil {
+		return fail("prove %s/%s: %v", suiteID, taskID, err)
+	}
+	if !rec.Admitted {
+		fmt.Printf("%s/%s: NOT admitted after the review: %s\n", suiteID, taskID, failedChecks(rec))
+		return 1
+	}
+	if _, err := recordProofs(ctx, a, suiteID, before, map[string]proof{taskID: pr}); err != nil {
+		return fail("%v", err)
+	}
+	fmt.Printf("%s/%s: proved again and admitted (%.1fs)\n", suiteID, taskID, time.Since(t0).Seconds())
 	return exitOK
+}
+
+// admissionCurrent reports whether suite.lock holds an admission of the
+// task that still holds for the files as they are now. A task the lock does
+// not record as admitted is not current, and no fingerprint is computed.
+func admissionCurrent(ctx context.Context, a *app, suiteID, taskID string) (bool, error) {
+	s, err := loadSuite(ctx, a.cfg.Path(a.cfg.BenchmarksRoot), suiteID)
+	if err != nil {
+		return false, fmt.Errorf("load suite %s: %w", suiteID, err)
+	}
+	if !admittedIn(s.Lock, taskID) {
+		return false, nil
+	}
+	fresh, err := suite.LockWith(s, time.Now().UTC(), lockFingerprintOptions(ctx, a.cfg, a.docker, suite.LockPinsLocal(s.Lock)))
+	if err != nil {
+		return false, fmt.Errorf("lock %s: %w", suiteID, err)
+	}
+	return admittedIn(fresh, taskID), nil
+}
+
+// admittedIn reports whether l records taskID as admitted.
+func admittedIn(l *schemas.SuiteLock, taskID string) bool {
+	if l == nil {
+		return false
+	}
+	tl, ok := l.Tasks[taskID]
+	return ok && tl.Status == schemas.TaskAdmitted && tl.Admission != nil && tl.Admission.Admitted
+}
+
+// suiteGrader reads the grader a suite.yaml names, "" when it does not parse.
+func suiteGrader(suiteYAML []byte) string {
+	var v struct {
+		Grader string `yaml:"grader"`
+	}
+	if err := yaml.Unmarshal(suiteYAML, &v); err != nil {
+		return ""
+	}
+	return strings.TrimSpace(v.Grader)
 }

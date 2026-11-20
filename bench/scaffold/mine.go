@@ -46,6 +46,10 @@ const (
 	SkipSecrets   = "tests need secrets"
 	SkipOutside   = "changes paths outside the mined folder"
 	SkipDeleted   = "deletes a test file"
+	// SkipNoBaseTests: the hidden_tests grader needs at least one visible
+	// test in the repository the agent starts from, and the parent commit
+	// has none (the fix adds the repository's first test).
+	SkipNoBaseTests = "the parent commit has no visible test (the hidden_tests grader needs one)"
 )
 
 // MineOptions configures MineCandidates.
@@ -61,6 +65,10 @@ type MineOptions struct {
 	// Exclude is a prefix-relative folder left out of the change (the
 	// .heimdall project inside the repository).
 	Exclude string
+	// NeedBaseTests skips a commit whose parent has no test file matching
+	// TestGlobs: a hidden_tests suite refuses such a task at static
+	// validation, so mining it would only fail admission (audit 5-B-16).
+	NeedBaseTests bool
 }
 
 // Candidate is one commit looked at, with a skip reason or a rank score.
@@ -275,6 +283,16 @@ func (r *gitRepo) classifyCommit(ctx context.Context, hc historyCommit, opts Min
 	if files := len(c.Source) + len(c.Tests); files > opts.MaxFiles || lines > opts.MaxLines {
 		c.Skip, c.SkipDetail = SkipHuge, fmt.Sprintf("%d files, %d lines (limits %d files, %d lines)", files, lines, opts.MaxFiles, opts.MaxLines)
 		return c, nil
+	}
+	if opts.NeedBaseTests {
+		base, err := r.tree(ctx, c.Parent)
+		if err != nil {
+			return c, err
+		}
+		if !hasTestFile(base, opts) {
+			c.Skip = SkipNoBaseTests
+			return c, nil
+		}
 	}
 	tree, err := r.tree(ctx, c.Commit)
 	if err != nil {
@@ -656,4 +674,18 @@ func SetInstructionReviewed(taskYAML []byte) ([]byte, bool, error) {
 	}
 	at := idx + len("\nprovenance:\n")
 	return splice(taskYAML, at, at, "  instruction_reviewed: true\n"), true, nil
+}
+
+// hasTestFile reports whether a tree holds a test file outside the excluded
+// folder.
+func hasTestFile(tree []treeEntry, opts MineOptions) bool {
+	for _, e := range tree {
+		if e.Type != "blob" || (opts.Exclude != "" && (e.Path == opts.Exclude || strings.HasPrefix(e.Path, opts.Exclude+"/"))) {
+			continue
+		}
+		if MatchAny(opts.TestGlobs, e.Path) {
+			return true
+		}
+	}
+	return false
 }

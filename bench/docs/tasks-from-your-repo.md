@@ -176,6 +176,12 @@ BENCH_SERVER_MODE=synthetic bifrost-bench run experiments/smoke.yaml
 - **The tests fail before and pass after.** At least one hidden test must
   fail at the base commit, or the empty diff passes and admission refuses the
   task. Tests that pass either way still run, as regression checks.
+- **The base already has a test (hidden_tests suites).** The `hidden_tests`
+  grader (the Python template) needs at least one visible test in the
+  repository at the base commit, so a fix that adds the repository's first
+  test fails static validation. `tasks mine` skips such commits with
+  "the parent commit has no visible test"; add an unrelated test to the
+  repository first, or use a `verifier_command` suite.
 - **The tests check behaviour, not shape.** Prefer asserting on return
   values, outputs and files over asserting on private names, call counts or
   exact messages.

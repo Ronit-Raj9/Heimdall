@@ -49,6 +49,7 @@ type Janitor struct {
 	docker  utils.Docker
 	logger  schemas.Logger
 	grace   time.Duration
+	project string // utils.Project() when made: objects of another project are never removed
 	now     func() time.Time
 }
 
@@ -110,6 +111,7 @@ var dockerKinds = []dockerKind{
 type dockerObject struct {
 	id      string
 	run     string
+	project string // utils.LabelProject; "" on objects made before the label existed
 	created time.Time
 }
 
@@ -118,7 +120,7 @@ func NewJanitor(gateway schemas.Gateway, docker utils.Docker, logger schemas.Log
 	if logger == nil {
 		logger = schemas.NoopLogger{}
 	}
-	j := &Janitor{gateway: gateway, docker: docker, logger: logger, grace: DefaultSweepGrace, now: time.Now}
+	j := &Janitor{gateway: gateway, docker: docker, logger: logger, grace: DefaultSweepGrace, project: utils.Project(), now: time.Now}
 	for _, o := range opts {
 		o(j)
 	}
@@ -253,10 +255,16 @@ func (j *Janitor) decide(lv RunLiveness, objects [][]dockerObject, listed bool, 
 	}
 	youngest := map[string]time.Time{}
 	unaged := map[string]bool{}
+	foreign := map[string]bool{}
 	for _, objs := range objects {
 		for _, o := range objs {
 			switch {
 			case lv.Live[o.run] || lv.Dead[o.run]:
+			case o.project != "" && j.project != "" && o.project != j.project:
+				// Another project's run: its liveness is in that project's
+				// store, which this sweep can not read, so its own janitor
+				// decides, however old it is (a long agent wall budget).
+				foreign[o.run] = true
 			case o.created.IsZero() || !listed:
 				unaged[o.run] = true
 			case o.created.After(youngest[o.run]):
@@ -267,6 +275,10 @@ func (j *Janitor) decide(lv RunLiveness, objects [][]dockerObject, listed bool, 
 	now := j.now()
 	for run := range unaged {
 		keep[run] = true
+	}
+	for run := range foreign {
+		keep[run] = true
+		delete(youngest, run)
 	}
 	for run, at := range youngest {
 		switch {
@@ -289,10 +301,11 @@ func (j *Janitor) list(ctx context.Context, k dockerKind) ([]dockerObject, error
 	if k.inspect {
 		return j.listImages(ctx, k)
 	}
-	format := k.idField + "\t{{.Label \"" + utils.LabelRun + "\"}}"
+	format := k.idField + "\t{{.Label \"" + utils.LabelRun + "\"}}\t"
 	if k.created {
-		format += "\t{{.CreatedAt}}"
+		format += "{{.CreatedAt}}"
 	}
+	format += "\t{{.Label \"" + utils.LabelProject + "\"}}"
 	args := append(append([]string(nil), k.list...), "--filter", "label="+utils.LabelBench+"=1", "--format", format)
 	res, err := j.docker.MustRun(ctx, args...)
 	if err != nil {
@@ -317,7 +330,7 @@ func (j *Janitor) listImages(ctx context.Context, k dockerKind) ([]dockerObject,
 		return nil, fmt.Errorf("list %s: %w", k.name, err)
 	}
 	seen := map[string]bool{}
-	inspect := []string{"image", "inspect", "--format", "{{.Id}}\t{{index .Config.Labels \"" + utils.LabelRun + "\"}}\t{{.Created}}"}
+	inspect := []string{"image", "inspect", "--format", "{{.Id}}\t{{index .Config.Labels \"" + utils.LabelRun + "\"}}\t{{.Created}}\t{{index .Config.Labels \"" + utils.LabelProject + "\"}}"}
 	for _, id := range strings.Fields(string(res.Stdout)) {
 		if !seen[id] {
 			seen[id] = true
@@ -438,8 +451,8 @@ func readLeaseFile(p string, staleAfter time.Duration, now time.Time) (held, fre
 	return true, now.Sub(at) <= staleAfter, nil
 }
 
-// parseObjects reads "<id>\t<run>[\t<created>]" lines and keeps the objects
-// with a run label. It is pure.
+// parseObjects reads "<id>\t<run>[\t<created>[\t<project>]]" lines (created
+// may be empty) and keeps the objects with a run label. It is pure.
 func parseObjects(out []byte) []dockerObject {
 	var objs []dockerObject
 	sc := bufio.NewScanner(bytes.NewReader(out))
@@ -455,6 +468,11 @@ func parseObjects(out []byte) []dockerObject {
 		o := dockerObject{id: id, run: run}
 		if len(f) > 2 {
 			o.created, _ = parseDockerTime(f[2])
+		}
+		if len(f) > 3 {
+			if p := strings.TrimSpace(f[3]); p != "<no value>" {
+				o.project = p
+			}
 		}
 		objs = append(objs, o)
 	}

@@ -61,7 +61,7 @@ type appOptions struct {
 
 // newApp loads the config and assembles the registry.
 func newApp(ctx context.Context, configPath string, opts appOptions) (*app, error) {
-	cfg, err := lib.LoadConfig(configPath)
+	cfg, err := loadConfig(configPath)
 	if err != nil {
 		return nil, err
 	}
@@ -73,6 +73,7 @@ func newApp(ctx context.Context, configPath string, opts appOptions) (*app, erro
 		return nil, fmt.Errorf("open run store: %w", err)
 	}
 	a.store = st
+	utils.SetProject(utils.ProjectID(cfg.Path(cfg.RunsRoot))) // 5-A-04: label per-run docker objects with their project, for the janitor
 
 	var fault schemas.FaultController
 	var gw schemas.Gateway

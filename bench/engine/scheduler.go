@@ -68,19 +68,31 @@ type RunOptions struct {
 	RemoteOnly bool
 }
 
+// Spend bases of Summary.SpendBasis.
+const (
+	SpendModeled   = "modeled"   // pinned prices over recorded usage; real provider traffic
+	SpendSimulated = "simulated" // pinned prices over scripted model answers; nothing was charged
+)
+
 // Summary is what one scheduler run did.
 type Summary struct {
-	ExpID         string  `json:"exp_id"`
-	Sealed        int     `json:"sealed"`         // runs sealed by this call, retries and recoveries included
-	Skipped       int     `json:"skipped"`        // slots that already had a counted sealed run
-	Retried       int     `json:"retried"`        // new runs started after aborted_infra
-	Recovered     int     `json:"recovered"`      // interrupted runs sealed on resume
-	LeaseHeld     int     `json:"lease_held"`     // slots another live owner holds
-	LeaseLost     int     `json:"lease_lost"`     // slots whose lease was lost mid-run; that run is sealed aborted_infra
-	Pending       int     `json:"pending"`        // slots not leased because of the spend cap or cancellation
-	Errors        int     `json:"errors"`         // slots that hit a store or seal error
-	BudgetStopped bool    `json:"budget_stopped"` // the spend cap stopped leasing
-	SpentUSD      float64 `json:"spent_usd"`
+	ExpID         string `json:"exp_id"`
+	Sealed        int    `json:"sealed"`         // runs sealed by this call, retries and recoveries included
+	Skipped       int    `json:"skipped"`        // slots that already had a counted sealed run
+	Retried       int    `json:"retried"`        // new runs started after aborted_infra
+	Recovered     int    `json:"recovered"`      // interrupted runs sealed on resume
+	LeaseHeld     int    `json:"lease_held"`     // slots another live owner holds
+	LeaseLost     int    `json:"lease_lost"`     // slots whose lease was lost mid-run; that run is sealed aborted_infra
+	Pending       int    `json:"pending"`        // slots not leased because of the spend cap or cancellation
+	Errors        int    `json:"errors"`         // slots that hit a store or seal error
+	BudgetStopped bool   `json:"budget_stopped"` // the spend cap stopped leasing
+	// SpentUSD is the bench's modeled spend: token usage priced at the
+	// pinned price table, plus the per-run estimate for unknown costs. It is
+	// never the provider's bill; SpendBasis says what it was priced from.
+	SpentUSD float64 `json:"spent_usd"`
+	// SpendBasis is SpendModeled, or SpendSimulated when every model answer
+	// was scripted by the fault proxy and no provider was charged.
+	SpendBasis string `json:"spend_basis"`
 	// UnknownCostRuns counts runs whose agent started but whose cost could not
 	// be observed; each is counted in SpentUSD at the per-run estimate.
 	UnknownCostRuns int `json:"unknown_cost_runs"`
@@ -296,7 +308,7 @@ func (s *Scheduler) start(ctx context.Context, m *schemas.Manifest, opts RunOpti
 	if s.janitor != nil {
 		s.sweep(ctx, m.ExpID, opts.StaleAfter)
 	}
-	r := &schedRun{s: s, m: m, suite: suite, opts: opts, sum: Summary{ExpID: m.ExpID}, freed: make(chan struct{})}
+	r := &schedRun{s: s, m: m, suite: suite, opts: opts, sum: Summary{ExpID: m.ExpID, SpendBasis: spendBasis(m)}, freed: make(chan struct{})}
 	if err := r.spentSoFar(ctx); err != nil {
 		return nil, err
 	}
@@ -1076,4 +1088,13 @@ func (q *slotQueue) finish() {
 func (q *slotQueue) notifyLocked() {
 	close(q.changed)
 	q.changed = make(chan struct{})
+}
+
+// spendBasis is SpendSimulated for an experiment whose model calls all go to
+// the scripted model, else SpendModeled.
+func spendBasis(m *schemas.Manifest) string {
+	if m != nil && m.Experiment.NoPaidTraffic() {
+		return SpendSimulated
+	}
+	return SpendModeled
 }

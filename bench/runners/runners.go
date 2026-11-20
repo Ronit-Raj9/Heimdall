@@ -475,7 +475,9 @@ func (s *Service) scanRunner(r interface{ Scan(...any) error }) (*schemas.Runner
 }
 
 // merge applies the live state: a runner the coordinator holds is shown as
-// it sees it; any other runner silent past the stale threshold is lost.
+// it sees it; any other runner silent past the stale threshold is lost. The
+// coordinator only sweeps its runners while an experiment is attached, so an
+// idle runner it holds that has gone silent that long is lost here too.
 func (s *Service) merge(v *schemas.RunnerView, live map[string]schemas.WorkerInfo) {
 	if w, ok := live[v.Name]; ok && w.TokenID == v.TokenID {
 		v.Live = true
@@ -485,6 +487,9 @@ func (s *Service) merge(v *schemas.RunnerView, live map[string]schemas.WorkerInf
 		v.Completed = w.Completed
 		if w.LastSeen.After(v.LastSeen) {
 			v.LastSeen = w.LastSeen
+		}
+		if len(w.Running) == 0 && s.now().Sub(v.LastSeen) > s.opts.StaleAfter {
+			v.State = schemas.RunnerLost
 		}
 		return
 	}

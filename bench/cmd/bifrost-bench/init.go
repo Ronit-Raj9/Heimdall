@@ -24,9 +24,9 @@ func runInit(args []string) int {
 	fs := flag.NewFlagSet("init", flag.ContinueOnError)
 	force := fs.Bool("force", false, "write into a folder that is not empty, replacing the scaffold's files")
 	name := fs.String("name", "", "project name for the README (default: the folder name)")
-	detect := fs.Bool("detect", false, "inside a git repository: detect tests, agent CLIs and Docker, and write .heimdall/ (the default with no folder argument)") // First workflow (quickstart.go)
-	testCmd := fs.String("test-cmd", "", "with -detect: the repository's test command, overriding the detected one")                                               // First workflow (quickstart.go)
-	image := fs.String("image", "", "with -detect: toolchain image for the suite (default: the helper image for Python, else base/Dockerfile)")                    // First workflow (quickstart.go)
+	detect := fs.Bool("detect", false, "inside a git repository: detect tests, agent CLIs and Docker, and write .heimdall/ (the default with no folder argument)")                                                                                   // First workflow (quickstart.go)
+	testCmd := fs.String("test-cmd", "", "with -detect: the repository's test command, overriding the detected one; recorded in heimdall.yaml, and it grades only generic-reward tasks (other templates grade with verifier.command in suite.yaml)") // First workflow (quickstart.go)
+	image := fs.String("image", "", "with -detect: toolchain image for the suite (default: the helper image for Python, else base/Dockerfile)")                                                                                                      // First workflow (quickstart.go)
 	pos, err := parseArgs(fs, args)
 	if err == nil && (*detect || len(pos) == 0) { // First workflow: init inside a repository (quickstart.go)
 		return runInitRepo(pos, *testCmd, *image, *name, *force)
@@ -115,7 +115,7 @@ func benchmarksRoot(fs *flag.FlagSet, root, config string) (string, *lib.Config,
 	if root != "" {
 		return root, nil, nil
 	}
-	cfg, err := lib.LoadConfig(config)
+	cfg, err := loadConfig(config)
 	if err != nil {
 		if flagSet(fs, "config") {
 			return "", nil, err

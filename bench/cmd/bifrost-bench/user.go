@@ -12,7 +12,6 @@ import (
 
 	"github.com/maximhq/bifrost/bench/auth"
 	"github.com/maximhq/bifrost/bench/db"
-	"github.com/maximhq/bifrost/bench/lib"
 )
 
 // Auth area (P2, docs/auth.md): accounts from the operator's shell, for the
@@ -62,7 +61,7 @@ func userMain(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 		fmt.Fprintf(stderr, "%v\n%s\n", err, userUsage)
 		return exitUsage
 	}
-	cfg, err := lib.LoadConfig(*config)
+	cfg, err := loadConfig(*config)
 	if err != nil {
 		return fail("%v", err)
 	}

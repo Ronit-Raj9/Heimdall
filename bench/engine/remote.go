@@ -152,6 +152,7 @@ func NewCoordinator(reg *schemas.Registry, opts RemoteOptions) (*Coordinator, er
 	}
 	c := &Coordinator{store: reg.Store, logger: opts.Logger, opts: opts, now: time.Now,
 		workers: map[string]*remoteWorker{}, leases: map[string]*remoteLease{}, ended: map[string]string{}}
+	c.reapStaging(c.now())
 	if opts.OrgID == "" {
 		c.tokenSum = sha256.Sum256([]byte(opts.Token))
 	}
@@ -394,8 +395,10 @@ func (c *Coordinator) Heartbeat(ctx context.Context, leaseID, workerID string) e
 }
 
 // Upload appends one chunk of the lease's archive. offset must be the number
-// of bytes already held, so a retried chunk is refused instead of written
-// twice; the archive may not pass MaxUploadBytes.
+// of bytes already held, so a retried chunk is never written twice; the
+// archive may not pass MaxUploadBytes. A replay of the last chunk written
+// (its answer was lost on the way back) whose bytes match the staged ones is
+// acknowledged with the current cursor, so the worker's retry recovers.
 func (c *Coordinator) Upload(ctx context.Context, leaseID, workerID string, offset int64, data []byte) (int64, error) {
 	scope, err := c.callScope(ctx)
 	if err != nil {
@@ -416,7 +419,17 @@ func (c *Coordinator) Upload(ctx context.Context, leaseID, workerID string, offs
 		return have, fmt.Errorf("lease %s: another upload call is in progress: %w", leaseID, schemas.ErrUploadOffset)
 	case offset != l.received:
 		have := l.received
+		l.uploading = offset+int64(len(data)) == have && len(data) > 0 // a possible replay: hold the file still while comparing
 		c.mu.Unlock()
+		if l.uploading {
+			same := sameBytesAt(l.archive, offset, data)
+			c.mu.Lock()
+			l.uploading = false
+			c.mu.Unlock()
+			if same {
+				return have, nil
+			}
+		}
 		return have, fmt.Errorf("lease %s: offset %d, coordinator holds %d bytes: %w", leaseID, offset, have, schemas.ErrUploadOffset)
 	case l.received+int64(len(data)) > c.opts.MaxUploadBytes:
 		c.mu.Unlock()
@@ -465,7 +478,7 @@ func (c *Coordinator) Complete(ctx context.Context, leaseID string, req *schemas
 	l.r.remoteOps.Add(1) // this call owns the lease's end; detach waits for it (2-A-07)
 	c.mu.Unlock()
 	defer l.r.remoteOps.Done()
-	res, reason := c.accept(ctx, l, req)
+	res, reason, unverified := c.accept(ctx, l, req)
 	out := &schemas.WorkerResult{LeaseID: leaseID, RunID: req.RunID, Accepted: reason == ""}
 	c.mu.Lock()
 	w := c.workers[l.worker]
@@ -488,7 +501,10 @@ func (c *Coordinator) Complete(ctx context.Context, leaseID string, req *schemas
 		usd, known := l.r.charge(&req.CostUSD, l.est, "rejected upload of lease "+l.id)
 		c.journalCharge(l.r, "rejected", l, reason, usd, known) // before the answer: a resumed scheduler counts it again
 		l.r.emit(Event{Kind: EventError, SlotID: l.slot.SlotID, RunID: req.RunID, Message: "remote upload rejected: " + reason})
-		l.r.endRemote(l, true)
+		// A run sealed here that then failed verification stays in the
+		// store for an operator (verify/recover); queueing the slot again
+		// would only see it and reject every later upload.
+		l.r.endRemote(l, !unverified)
 		return out, nil
 	}
 	out.SealHash = res.Seal.Hash
@@ -639,8 +655,21 @@ func (c *Coordinator) attach(r *schedRun) func() {
 }
 
 // accept verifies and stores an uploaded run. It returns the sealed result,
-// or the reason the upload is rejected.
-func (c *Coordinator) accept(ctx context.Context, l *remoteLease, req *schemas.WorkerComplete) (*SlotResult, string) {
+// or the reason the upload is rejected; unverified says the run was sealed
+// into the store but failed the server-side verification.
+func (c *Coordinator) accept(ctx context.Context, l *remoteLease, req *schemas.WorkerComplete) (_ *SlotResult, reason string, unverified bool) {
+	res, reason := c.acceptUpload(ctx, l, req)
+	if reason != "" && strings.HasPrefix(reason, unverifiedPrefix) {
+		return nil, reason, true
+	}
+	return res, reason, false
+}
+
+// unverifiedPrefix starts the rejection reason of a run that was sealed
+// here and then failed verification.
+const unverifiedPrefix = "sealed run does not verify on the coordinator: "
+
+func (c *Coordinator) acceptUpload(ctx context.Context, l *remoteLease, req *schemas.WorkerComplete) (*SlotResult, string) {
 	if req.ArchiveBytes != l.received {
 		return nil, fmt.Sprintf("archive is %d bytes, the coordinator received %d", req.ArchiveBytes, l.received)
 	}
@@ -706,17 +735,52 @@ func (c *Coordinator) checkSlot(ctx context.Context, l *remoteLease) string {
 	return ""
 }
 
+// storeAttempts is how often storeRun copies a verified upload before it
+// gives up: a transient write error removes the half-written run folder and
+// copies again from the extracted upload, without rerunning the agent.
+const storeAttempts = 3
+
 // storeRun writes a verified upload into the store as a new run of the slot,
 // adds remote/worker.json and the worker's seal byte for byte as
 // remote/seal.json, seals the folder into this store's chain and verifies
 // the seal. run.json goes last, so a crash halfway leaves an interrupted run
-// that the next attempt settles like any other.
+// that the next attempt settles like any other. A copy that fails before
+// the seal removes its unsealed folder (this lease holds the slot), so it
+// never turns into an infra_error run that settles the slot; a seal that
+// does not verify is an error whose message starts with unverifiedPrefix.
 func (c *Coordinator) storeRun(ctx context.Context, l *remoteLease, req *schemas.WorkerComplete, up *sealedUpload) (*SlotResult, error) {
+	for attempt := 1; ; attempt++ {
+		res, dir, sealed, err := c.storeRunOnce(ctx, l, req, up)
+		if err == nil || sealed {
+			return res, err
+		}
+		if dir != "" {
+			if rerr := removeUnsealedRun(dir); rerr != nil {
+				c.logger.Error("remove half-copied remote run", "run", up.run.RunID, "path", dir, "error", rerr.Error())
+				return nil, err
+			}
+		}
+		if attempt >= storeAttempts || ctx.Err() != nil {
+			return nil, err
+		}
+		c.logger.Warn("copy of an accepted remote run failed; copying again", "run", up.run.RunID, "attempt", attempt, "error", err.Error())
+	}
+}
+
+// removeUnsealedRun deletes a run folder that has no seal.json yet.
+func removeUnsealedRun(dir string) error {
+	if _, err := os.Stat(filepath.Join(dir, "seal.json")); err == nil {
+		return fmt.Errorf("run folder %s is sealed", dir)
+	}
+	return os.RemoveAll(dir)
+}
+
+func (c *Coordinator) storeRunOnce(ctx context.Context, l *remoteLease, req *schemas.WorkerComplete, up *sealedUpload) (_ *SlotResult, dir string, sealed bool, _ error) {
 	run := up.run
 	first := *run
 	dir, err := c.store.NewRun(ctx, l.slot, &first)
 	if err != nil {
-		return nil, fmt.Errorf("create run folder: %w", err)
+		return nil, "", false, fmt.Errorf("create run folder: %w", err)
 	}
 	names := make([]string, 0, len(up.files))
 	for name := range up.files {
@@ -728,31 +792,32 @@ func (c *Coordinator) storeRun(ctx context.Context, l *remoteLease, req *schemas
 	for _, name := range names {
 		b, err := os.ReadFile(filepath.Join(up.dir, filepath.FromSlash(name)))
 		if err != nil {
-			return nil, fmt.Errorf("read %s: %w", name, err)
+			return nil, dir, false, fmt.Errorf("read %s: %w", name, err)
 		}
 		if err := c.store.WriteRunFile(ctx, run, name, b); err != nil {
-			return nil, fmt.Errorf("write %s: %w", name, err)
+			return nil, dir, false, fmt.Errorf("write %s: %w", name, err)
 		}
 	}
 	if err := c.writeProvenance(ctx, l, req, up); err != nil {
-		return nil, err
+		return nil, dir, false, err
 	}
 	for _, t := range up.transitions {
 		if err := c.store.AppendTransition(ctx, run, t); err != nil {
-			return nil, fmt.Errorf("append transition: %w", err)
+			return nil, dir, false, fmt.Errorf("append transition: %w", err)
 		}
 	}
 	if err := c.store.WriteRunFile(ctx, run, runJSONFile, up.runRaw); err != nil {
-		return nil, fmt.Errorf("write run.json: %w", err)
+		return nil, dir, false, fmt.Errorf("write run.json: %w", err)
 	}
 	rec, err := c.store.Seal(ctx, run)
 	if err != nil {
-		return nil, fmt.Errorf("seal: %w", err)
+		return nil, dir, false, fmt.Errorf("seal: %w", err)
 	}
 	if err := c.store.Verify(ctx, run.ExpID, run.RunID); err != nil {
-		c.logger.Error("accepted remote run does not verify after sealing", "run", run.RunID, "error", err.Error())
+		c.logger.Error("remote run does not verify after sealing; not accepted", "run", run.RunID, "error", err.Error())
+		return nil, dir, true, errors.New(unverifiedPrefix + err.Error())
 	}
-	return &SlotResult{Run: run, Dir: dir, Metrics: up.metrics, Seal: rec}, nil
+	return &SlotResult{Run: run, Dir: dir, Metrics: up.metrics, Seal: rec}, dir, true, nil
 }
 
 // remoteRecord is remote/worker.json in an accepted run.
@@ -1109,6 +1174,55 @@ func copyStrings(m map[string]string) map[string]string {
 		out[k] = v
 	}
 	return out
+}
+
+// stagingReapAfter is how old a staged upload or extraction folder must be
+// before a starting coordinator deletes it. Leases go stale within minutes,
+// so anything this old belongs to a lease a previous process lost when it
+// stopped; the age keeps a second live coordinator's files safe.
+const stagingReapAfter = time.Hour
+
+// reapStaging removes upload archives (<lease>.tar.gz) and extraction
+// folders (<lease>) left in the staging folder by a coordinator that stopped
+// uncleanly: their in-memory leases are gone, so nothing else ever cleans
+// them up. Journals (<exp>.jsonl) are kept.
+func (c *Coordinator) reapStaging(now time.Time) {
+	entries, err := os.ReadDir(c.opts.StagingDir)
+	if err != nil {
+		c.logger.Warn("read staging folder", "path", c.opts.StagingDir, "error", err.Error())
+		return
+	}
+	for _, e := range entries {
+		name := e.Name()
+		lease := strings.TrimSuffix(name, ".tar.gz")
+		if !strings.HasPrefix(lease, "l_") || (e.IsDir() == (lease != name)) {
+			continue // not an archive file or an extraction folder of a lease
+		}
+		info, err := e.Info()
+		if err != nil || now.Sub(info.ModTime()) < stagingReapAfter {
+			continue
+		}
+		p := filepath.Join(c.opts.StagingDir, name)
+		if err := os.RemoveAll(p); err != nil {
+			c.logger.Warn("remove stale staged upload", "path", p, "error", err.Error())
+			continue
+		}
+		c.logger.Info("removed a staged upload left by an earlier coordinator", "path", p)
+	}
+}
+
+// sameBytesAt reports whether the file at p holds exactly data at offset.
+func sameBytesAt(p string, offset int64, data []byte) bool {
+	f, err := os.Open(p)
+	if err != nil {
+		return false
+	}
+	defer f.Close()
+	got := make([]byte, len(data))
+	if _, err := f.ReadAt(got, offset); err != nil {
+		return false
+	}
+	return bytes.Equal(got, data)
 }
 
 func appendFile(p string, data []byte) error {

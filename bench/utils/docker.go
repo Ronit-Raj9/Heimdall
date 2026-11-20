@@ -3,18 +3,26 @@ package utils
 import (
 	"bytes"
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"errors"
 	"fmt"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"strings"
+	"sync/atomic"
 )
 
 // Label keys every bench-created docker object carries.
 const (
 	LabelBench = "bifrost-bench"
 	LabelRun   = "bifrost-bench.run"
-	LabelExp   = "bifrost-bench.exp"
+	// LabelProject names the project (run store) whose run created a
+	// per-run object, so a janitor of another project on the same docker
+	// host never removes it (SetProject).
+	LabelProject = "bifrost-bench.project"
+	LabelExp     = "bifrost-bench.exp"
 )
 
 // DockerResult is the outcome of one docker CLI call.
@@ -105,7 +113,8 @@ func (d Docker) bin() string {
 	return d.Binary
 }
 
-// LabelArgs returns --label flags for the bench label set.
+// LabelArgs returns --label flags for the bench label set. A per-run object
+// also carries the process's project label when SetProject set one.
 func LabelArgs(expID, runID string) []string {
 	args := []string{"--label", LabelBench + "=1"}
 	if expID != "" {
@@ -113,8 +122,34 @@ func LabelArgs(expID, runID string) []string {
 	}
 	if runID != "" {
 		args = append(args, "--label", LabelRun+"="+runID)
+		if p := Project(); p != "" {
+			args = append(args, "--label", LabelProject+"="+p)
+		}
 	}
 	return args
+}
+
+var project atomic.Value // string
+
+// SetProject sets the project id this process labels its per-run docker
+// objects with: one id per run store, so two projects sharing a docker
+// host tell their runs apart (ProjectID).
+func SetProject(id string) { project.Store(id) }
+
+// Project returns the id SetProject set, or "".
+func Project() string {
+	s, _ := project.Load().(string)
+	return s
+}
+
+// ProjectID is the project id of a run store folder: a short hash of its
+// absolute path.
+func ProjectID(runsRoot string) string {
+	if abs, err := filepath.Abs(runsRoot); err == nil {
+		runsRoot = abs
+	}
+	sum := sha256.Sum256([]byte(filepath.Clean(runsRoot)))
+	return hex.EncodeToString(sum[:8])
 }
 
 // HelperTools are the commands the bench runs inside the trusted helper image

@@ -145,3 +145,23 @@ func TestDetectMachine(t *testing.T) {
 		t.Errorf("empty machine: %+v %+v", d.Docker, d.Agents)
 	}
 }
+
+// A -test-cmd override on a standard template says it does not grade
+// (audit 5-B-15).
+func TestTestCommandScope(t *testing.T) {
+	given := TestSetup{Command: "python -m pytest -m audit_selected", Confidence: ConfidenceGiven, Template: scaffold.TemplatePythonPytest}
+	if note := TestCommandScope(given); !strings.Contains(note, "verifier.command") {
+		t.Fatalf("note %q", note)
+	}
+	if !strings.Contains(suiteHeader(given), "verifier.command") {
+		t.Fatal("suite header lacks the scope note")
+	}
+	given.Template = scaffold.TemplateGenericReward
+	if TestCommandScope(given) != "" {
+		t.Fatal("generic-reward runs the command")
+	}
+	detected := TestSetup{Command: "python -m pytest", Template: scaffold.TemplatePythonPytest}
+	if TestCommandScope(detected) != "" {
+		t.Fatal("note without an override")
+	}
+}

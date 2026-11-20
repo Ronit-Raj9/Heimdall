@@ -122,7 +122,23 @@ func suiteHeader(t TestSetup) string {
 	if cmd == "" {
 		cmd = "(none found; set tests.command in .heimdall/heimdall.yaml)"
 	}
-	return fmt.Sprintf("# Repository test command (heimdall init, %s confidence): %s\n# `heimdall tasks mine` cuts tasks from fix commits into this suite.\n", t.Confidence, cmd)
+	h := fmt.Sprintf("# Repository test command (heimdall init, %s confidence): %s\n# `heimdall tasks mine` cuts tasks from fix commits into this suite.\n", t.Confidence, cmd)
+	if note := TestCommandScope(t); note != "" {
+		h += "# " + note + "\n"
+	}
+	return h
+}
+
+// TestCommandScope says, for a -test-cmd override on a standard template,
+// that the command is recorded but does not grade: the template's
+// verifier.command (with its isolation flags) does. Only generic-reward
+// tasks run the repository command. Empty when no override was given or
+// the template uses it (audit 5-B-15).
+func TestCommandScope(t TestSetup) string {
+	if t.Confidence != ConfidenceGiven || t.Template == scaffold.TemplateGenericReward || t.Template == "" {
+		return ""
+	}
+	return fmt.Sprintf("Note: the %s template grades with verifier.command below, not with the test command above; edit verifier.command to change how tasks are graded.", t.Template)
 }
 
 var nonID = regexp.MustCompile(`[^a-z0-9._-]+`)
