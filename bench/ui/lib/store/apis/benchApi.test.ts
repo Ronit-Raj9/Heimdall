@@ -8,7 +8,7 @@ import {
 	readWriteToken,
 	saveWriteToken,
 } from "./benchApi";
-import { CSRF_HEADER, setAuthState } from "./session";
+import { CSRF_HEADER, ORG_HEADER, setAuthState } from "./session";
 
 function memoryStorage(): Storage {
 	const items = new Map<string, string>();
@@ -104,6 +104,18 @@ describe("hosted mode headers", () => {
 	it("sends no CSRF header on queries", () => {
 		setAuthState({ mode: "hosted", csrf: "csrf-123" });
 		expect(prepareBenchHeaders(new Headers(), "query").has(CSRF_HEADER)).toBe(false);
+	});
+
+	// 4-A-06: a stale tab names the org it displays, so the server never resolves another tab's switch.
+	it("names the tab's displayed org on every hosted request", () => {
+		setAuthState({ mode: "hosted", csrf: "csrf-123", org: "org_a" });
+		expect(prepareBenchHeaders(new Headers(), "mutation").get(ORG_HEADER)).toBe("org_a");
+		expect(prepareBenchHeaders(new Headers(), "query").get(ORG_HEADER)).toBe("org_a");
+		expect(ORG_HEADER).toBe("X-Heimdall-Org");
+		setAuthState({ mode: "hosted", csrf: "csrf-123" });
+		expect(prepareBenchHeaders(new Headers(), "mutation").has(ORG_HEADER)).toBe(false);
+		setAuthState({ mode: "local", org: "org_a" });
+		expect(prepareBenchHeaders(new Headers(), "mutation").has(ORG_HEADER)).toBe(false);
 	});
 
 	it("keeps local mode exactly as before: the write token, no CSRF header", () => {

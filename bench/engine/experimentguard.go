@@ -27,3 +27,12 @@ func WithGatewayDeferredToRunner() PlannerOption {
 func deferredGateway() *schemas.GatewayManifest {
 	return &schemas.GatewayManifest{Name: "deferred", DeferredToRunner: true}
 }
+
+// WithFilesConfinedTo makes the planner open the files an agent config
+// names (notes.user_file) only when they resolve, symlinks included, inside
+// root (Tenancy area: the experiment guard sees only top-level refs; an
+// arm's resolved config and its overrides name more files, audit 4-B-14).
+// Empty confines nothing.
+func WithFilesConfinedTo(root string) PlannerOption {
+	return func(p *Planner) { p.confine = root }
+}

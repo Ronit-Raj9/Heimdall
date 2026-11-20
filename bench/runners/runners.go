@@ -352,7 +352,8 @@ func (s *Service) RevokeToken(ctx context.Context, orgID, id string) (*schemas.R
 	return s.token(ctx, orgID, id)
 }
 
-// Verify resolves a runner token to its scope. Any failure is ErrBadToken.
+// Verify resolves a runner token to its scope. A bad, revoked or expired
+// token is ErrBadToken; a database failure is returned as such.
 func (s *Service) Verify(ctx context.Context, token string) (schemas.RunnerScope, error) {
 	if _, ok := ParseToken(token); !ok {
 		return schemas.RunnerScope{}, ErrBadToken
@@ -378,8 +379,11 @@ func (s *Service) Verify(ctx context.Context, token string) (schemas.RunnerScope
 // VerifyPrincipal is Verify as the auth middleware's runner principal.
 func (s *Service) VerifyPrincipal(ctx context.Context, token string) (*auth.Principal, error) {
 	sc, err := s.Verify(ctx, token)
+	if errors.Is(err, ErrBadToken) {
+		return nil, auth.ErrInvalidToken
+	}
 	if err != nil {
-		return nil, err
+		return nil, err // a backend failure: auth answers 503, the runner retries
 	}
 	return &auth.Principal{Kind: auth.KindRunner, OrgID: sc.OrgID, TokenID: sc.TokenID, Pool: sc.Pool}, nil
 }
@@ -450,6 +454,10 @@ func (s *Service) upsert(ctx context.Context, scope schemas.RunnerScope, info sc
 	if registered {
 		q += `, registered_at = excluded.registered_at`
 	}
+	// A row another token registered keeps its token and pool: a runner
+	// of a different token under the same name never takes it over, also
+	// after a restart emptied the coordinator's memory (4-B-01).
+	q += ` WHERE runners.token_id = excluded.token_id OR runners.token_id IS NULL OR runners.token_id = ''`
 	_, err = s.db.Exec(ctx, q, db.NewID("rnr"), scope.OrgID, info.ID, pool, string(lb), info.Version, info.Host, info.Slots,
 		len(info.Running), scope.TokenID, state, ms, ms)
 	return err

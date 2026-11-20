@@ -147,7 +147,12 @@ func CORS(origins []string) Middleware {
 			if origin != "" && slices.Contains(origins, origin) {
 				h := &ctx.Response.Header
 				h.Set(fasthttp.HeaderAccessControlAllowOrigin, origin)
-				h.Set(fasthttp.HeaderAccessControlAllowMethods, "GET, POST, OPTIONS")
+				// The hosted browser client always sends its session cookie
+				// (credentials: "include"); without this header browsers
+				// drop the response for an explicitly allowed origin. Only
+				// listed origins get it, never a wildcard.
+				h.Set(fasthttp.HeaderAccessControlAllowCredentials, "true")
+				h.Set(fasthttp.HeaderAccessControlAllowMethods, "GET, POST, PUT, PATCH, DELETE, OPTIONS")
 				h.Set(fasthttp.HeaderAccessControlAllowHeaders, "Authorization, Content-Type, X-Heimdall-CSRF, X-Heimdall-Org") // Auth area (P2): CSRF and org headers of hosted mode
 				h.Set(fasthttp.HeaderVary, "Origin")
 				if ctx.IsOptions() {

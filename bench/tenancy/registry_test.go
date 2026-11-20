@@ -3,6 +3,7 @@ package tenancy
 import (
 	"context"
 	"errors"
+	"os"
 	"sync"
 	"sync/atomic"
 	"testing"
@@ -190,5 +191,48 @@ func TestLocalLayoutServesOnlyLocal(t *testing.T) {
 	}
 	if _, err := l.Paths("org_a"); !errors.Is(err, ErrLocalOnly) {
 		t.Fatalf("local mode served org_a: %v", err)
+	}
+}
+
+// TestRegistryRebuildsOnNewGeneration: a runtime built before another
+// process imported into the org's store is rebuilt on its next idle
+// acquire, and kept while busy (4-B-10).
+func TestRegistryRebuildsOnNewGeneration(t *testing.T) {
+	b := &countingBuilder{}
+	r := newTestRegistry(t, b, Options{})
+	org := Org{ID: "org_gen"}
+	acq := func() {
+		t.Helper()
+		_, rel, err := r.Acquire(context.Background(), org)
+		if err != nil {
+			t.Fatal(err)
+		}
+		rel()
+	}
+	acq()
+	acq()
+	if b.builds.Load() != 1 {
+		t.Fatalf("builds %d", b.builds.Load())
+	}
+	p, _ := r.Layout().Paths(org.ID)
+	if err := os.MkdirAll(p.StoreRoot, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := BumpGeneration(p.StoreRoot); err != nil {
+		t.Fatal(err)
+	}
+	acq()
+	if b.builds.Load() != 2 || b.closes.Load() != 1 {
+		t.Fatalf("after import: builds %d closes %d", b.builds.Load(), b.closes.Load())
+	}
+	acq()
+	if b.builds.Load() != 2 {
+		t.Fatalf("rebuilt again without a new generation: %d", b.builds.Load())
+	}
+	b.busy.Store(true)
+	_ = BumpGeneration(p.StoreRoot)
+	acq()
+	if b.builds.Load() != 2 {
+		t.Fatalf("busy runtime rebuilt: %d", b.builds.Load())
 	}
 }

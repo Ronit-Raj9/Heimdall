@@ -6,21 +6,42 @@ import type { AuthMode, Role } from "@/lib/types/bench";
 /** Header carrying the session's CSRF value on every cookie-authenticated write. */
 export const CSRF_HEADER = "X-Heimdall-CSRF";
 
+/**
+ * Header naming the organization a hosted request acts in. Every request of a tab carries the org
+ * that tab displays, so a switch made in another tab (which moves the shared session) never sends
+ * this tab's writes to an org it is not showing. The server checks membership.
+ */
+export const ORG_HEADER = "X-Heimdall-Org";
+
+/** localStorage key written on an org switch: other tabs hear the storage event and re-ask /auth/me. */
+export const ORG_SWITCH_KEY = "heimdall.org-switch";
+
 interface AuthState {
 	mode: AuthMode;
 	csrf: string;
+	/** Id of the organization this tab displays (current_org of its last /auth/me). */
+	org: string;
 }
 
-let authState: AuthState = { mode: "local", csrf: "" };
+let authState: AuthState = { mode: "local", csrf: "", org: "" };
 
 /** The auth mode and CSRF value the request layer uses. Local until /auth/me says otherwise. */
 export function getAuthState(): Readonly<AuthState> {
 	return authState;
 }
 
-/** Records the mode and CSRF value from /auth/me. */
-export function setAuthState(next: { mode: AuthMode; csrf?: string }): void {
-	authState = { mode: next.mode, csrf: next.csrf ?? "" };
+/** Records the mode, CSRF value and displayed organization from /auth/me. */
+export function setAuthState(next: { mode: AuthMode; csrf?: string; org?: string }): void {
+	authState = { mode: next.mode, csrf: next.csrf ?? "", org: next.org ?? "" };
+}
+
+/** Tells other open tabs that this tab switched organization. Best effort: no storage, no signal. */
+export function announceOrgSwitch(orgId: string): void {
+	try {
+		window.localStorage.setItem(ORG_SWITCH_KEY, `${orgId}:${Date.now()}`);
+	} catch {
+		// Storage blocked: other tabs keep their org (their requests still carry it).
+	}
 }
 
 type UnauthorizedListener = () => void;

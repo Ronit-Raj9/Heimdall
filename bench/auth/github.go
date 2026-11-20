@@ -108,8 +108,13 @@ func (s *Service) GitHubCallback(ctx *fasthttp.RequestCtx, replace string) (*New
 		return nil, "", ErrGitHubDisabled
 	}
 	ip := s.ClientIP(ctx)
+	// deny audits a callback refused before the GitHub exchange.
+	deny := func(e *Error) (*NewSession, string, error) {
+		s.record(AuditEvent{ActorType: "anonymous", Action: "auth.login_failed", IP: ip, Details: map[string]any{"method": "github", "reason": e.Msg}})
+		return nil, "", e
+	}
 	if ok, wait := s.probeIP.Allow(ip); !ok {
-		return nil, "", errRateLimited(wait)
+		return deny(errRateLimited(wait))
 	}
 	args := ctx.QueryArgs()
 	state, code := string(args.Peek("state")), string(args.Peek("code"))
@@ -117,19 +122,19 @@ func (s *Service) GitHubCallback(ctx *fasthttp.RequestCtx, replace string) (*New
 	s.clearCookie(ctx, OAuthStateCookie, githubCookiePath)
 	if state == "" || code == "" || len(state) > 128 || len(code) > 512 || cookie == "" ||
 		subtle.ConstantTimeCompare([]byte(state), []byte(cookie)) != 1 {
-		return nil, "", errBadRequest("GitHub sign-in: state does not match this browser; start again")
+		return deny(errBadRequest("GitHub sign-in: state does not match this browser; start again"))
 	}
 	dctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 	created, returnTo, err := s.st.takeOAuthState(dctx, s.st.d.SQL(), HashSecret(state))
 	if errors.Is(err, db.ErrNotFound) {
-		return nil, "", errBadRequest("GitHub sign-in: state unknown or already used; start again")
+		return deny(errBadRequest("GitHub sign-in: state unknown or already used; start again"))
 	}
 	if err != nil {
 		return nil, "", err
 	}
 	if s.now().Sub(time.UnixMilli(created)) > oauthStateTTL {
-		return nil, "", errBadRequest("GitHub sign-in: took longer than 10 minutes; start again")
+		return deny(errBadRequest("GitHub sign-in: took longer than 10 minutes; start again"))
 	}
 	id, err := s.githubIdentity(dctx, g, code)
 	if err != nil {
@@ -152,8 +157,9 @@ func (s *Service) GitHubCallback(ctx *fasthttp.RequestCtx, replace string) (*New
 // githubSignIn maps a GitHub identity to a user and opens a session.
 func (s *Service) githubSignIn(ctx context.Context, id *GitHubIdentity, ip, ua, replace string) (*User, *NewSession, error) {
 	var (
-		u    *User
-		sess *NewSession
+		u                      *User
+		sess                   *NewSession
+		linked, linkedPassword bool
 	)
 	err := s.st.d.Tx(ctx, func(tx *sql.Tx) error {
 		var err error
@@ -167,6 +173,23 @@ func (s *Service) githubSignIn(ctx context.Context, id *GitHubIdentity, ip, ua, 
 				if err := s.st.linkGitHub(ctx, tx, u.ID, id.ID); err != nil {
 					return err
 				}
+				// The email match is the only evidence that the existing
+				// account and this GitHub user are one person, and password
+				// signup never verified that email. Retire the account's
+				// prior credentials: its password and every open session.
+				// The owner of the verified GitHub email can set a new
+				// password from a GitHub session (no current one needed).
+				if u.PasswordHash != "" {
+					if err := s.st.setPasswordHash(ctx, tx, u.ID, ""); err != nil {
+						return err
+					}
+					u.PasswordHash = ""
+					linkedPassword = true
+				}
+				if err := s.st.deleteUserSessions(ctx, tx, u.ID, ""); err != nil {
+					return err
+				}
+				linked = true
 			}
 		}
 		if errors.Is(err, db.ErrNotFound) {
@@ -189,6 +212,9 @@ func (s *Service) githubSignIn(ctx context.Context, id *GitHubIdentity, ip, ua, 
 		sess, err = s.createSession(ctx, tx, u.ID, orgID, replace, ip, ua)
 		return err
 	})
+	if err == nil && linked {
+		s.record(userEvent(u, sess.OrgID, "auth.github_link", ip, map[string]any{"password_retired": linkedPassword, "sessions_ended": true}))
+	}
 	return u, sess, err
 }
 
@@ -198,6 +224,9 @@ func (s *Service) githubSignIn(ctx context.Context, id *GitHubIdentity, ip, ua, 
 func (s *Service) githubCreate(ctx context.Context, tx *sql.Tx, id *GitHubIdentity) (*User, error) {
 	if s.cfg.Signup == SignupClosed {
 		return nil, ErrSignupNotAllowed
+	}
+	if err := s.st.lockAccounts(ctx, tx); err != nil {
+		return nil, err
 	}
 	n, err := s.st.countUsers(ctx, tx)
 	if err != nil {

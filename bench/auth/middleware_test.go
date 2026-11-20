@@ -2,7 +2,6 @@ package auth
 
 import (
 	"context"
-	"errors"
 	"net"
 	"strings"
 	"testing"
@@ -144,7 +143,7 @@ func TestRunnerVerifierHandOff(t *testing.T) {
 		case "hmr_liar":
 			return &Principal{Kind: KindUser, OrgID: "org_1", Role: RoleOwner}, nil
 		}
-		return nil, errors.New("unknown runner token")
+		return nil, ErrInvalidToken
 	})
 	p, ctx := run(mw, func(r *fasthttp.Request) { post(r); r.Header.Set("Authorization", "Bearer hmr_good") })
 	if ctx.Response.StatusCode() != 200 || p.Kind != KindRunner || p.Pool != "gpu" || p.ActorType() != "runner" {

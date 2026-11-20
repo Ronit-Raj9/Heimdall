@@ -1,6 +1,6 @@
 import { AuthError, AuthField, AuthHeading, GithubButton, loginErrorMessage } from "@/components/platform/authForm";
 import { Button } from "@/components/ui/button";
-import { useSession } from "@/lib/session/sessionContext";
+import { signupOffered, useSession } from "@/lib/session/sessionContext";
 import { useLoginMutation } from "@/lib/store/apis/platformApi";
 import { safeReturnTo } from "@/lib/store/apis/session";
 import { Link } from "@tanstack/react-router";
@@ -100,7 +100,7 @@ export default function LoginView({ returnTo, oauthError }: { returnTo?: string;
 				</Button>
 				{session.github && <GithubButton returnTo={target} />}
 			</form>
-			{session.signup === "open" && (
+			{signupOffered(session) && (
 				<p className="text-muted-foreground text-sm">
 					{t("auth.login.noAccount")}{" "}
 					<Link to="/signup" className="text-primary font-medium underline-offset-4 hover:underline" data-testid="login-signup-link">

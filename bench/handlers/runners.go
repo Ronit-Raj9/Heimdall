@@ -3,7 +3,6 @@ package handlers
 import (
 	"bytes"
 	"context"
-	"encoding/json"
 	"errors"
 
 	"github.com/fasthttp/router"
@@ -155,9 +154,7 @@ func (h *RunnersHandler) listTokens(ctx *fasthttp.RequestCtx) {
 func (h *RunnersHandler) createToken(ctx *fasthttp.RequestCtx) {
 	var req schemas.RunnerTokenCreate
 	if body := bytes.TrimSpace(ctx.PostBody()); len(body) > 0 {
-		dec := json.NewDecoder(bytes.NewReader(body))
-		dec.DisallowUnknownFields()
-		if err := dec.Decode(&req); err != nil {
+		if err := decodeJSONStrict(body, &req); err != nil {
 			lib.SendError(ctx, h.mode, fasthttp.StatusBadRequest, lib.ErrTypeBadRequest, "parse request: "+err.Error())
 			return
 		}

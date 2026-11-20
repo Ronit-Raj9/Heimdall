@@ -29,11 +29,12 @@ import type {
 	RunnerTokenRequest,
 	RunnerTokenResponse,
 	SignupRequest,
+	PasswordChangeRequest,
 	SwitchOrgRequest,
 } from "@/lib/types/bench";
 import { benchApi } from "./benchApi";
 import { BENCH_API_BASE } from "./fixtures";
-import { errorStatus, setAuthState } from "./session";
+import { announceOrgSwitch, errorStatus, getAuthState, setAuthState } from "./session";
 
 const id = (value: string) => encodeURIComponent(value);
 
@@ -57,37 +58,6 @@ export const RUNNER_INSTALL_SCRIPT = `${BENCH_API_BASE}/runners/install.sh`;
 /** The runner guide in the repository. */
 export const RUNNER_INSTALL_DOC = "https://github.com/maximhq/bifrost/blob/main/bench/docs/runners.md";
 
-// Every tag of data that belongs to one organization: switching organization refetches all of it.
-const ORG_TAGS = [
-	"BenchHealth",
-	"BenchExperiment",
-	"BenchVerdict",
-	"BenchDiagnostics",
-	"BenchGrid",
-	"BenchRun",
-	"BenchRunEvents",
-	"BenchRunDiff",
-	"BenchRunReceipts",
-	"BenchPair",
-	"BenchRelease",
-	"BenchTriage",
-	"BenchLeaderboard",
-	"BenchSuites",
-	"BenchAgents",
-	"BenchImports",
-	"BenchWorkers",
-	"BenchReviews",
-	"BenchMatrix",
-	"BenchClusters",
-	"AuthMe",
-	"Members",
-	"Invitations",
-	"ApiTokens",
-	"Runners",
-	"RunnerTokens",
-	"AuditLog",
-	"Jobs",
-] as const;
 
 /** GET /orgs/{org}/audit request: empty filters left out so the server defaults apply. */
 export function auditLogRequest({ orgId, ...params }: AuditLogParams): string | { url: string; params: Record<string, string | number> } {
@@ -96,16 +66,33 @@ export function auditLogRequest({ orgId, ...params }: AuditLogParams): string | 
 	return Object.keys(search).length > 0 ? { url, params: search as Record<string, string | number> } : url;
 }
 
+/**
+ * After this tab moves the session to orgId (switch or accepted invitation): later requests name
+ * the new org, and the whole cache is dropped rather than a list of tags, so no org-scoped answer
+ * (trends, calibration, canary, live, migration, any later extension) survives from the old org.
+ * Other open tabs hear about it and re-ask /auth/me.
+ */
+function switchedOrg(dispatch: (action: ReturnType<typeof benchApi.util.resetApiState>) => unknown, orgId: string) {
+	setAuthState({ ...getAuthState(), org: orgId });
+	dispatch(benchApi.util.resetApiState());
+	announceOrgSwitch(orgId);
+}
+
 export const platformApi = benchApi.injectEndpoints({
 	endpoints: (builder) => ({
 		// Who is calling. 404 (a server before the platform) and auth_mode local both mean local mode.
 		getMe: builder.query<AuthMeResponse, void>({
 			query: () => "/auth/me",
 			providesTags: ["AuthMe"],
-			async onQueryStarted(_arg, { queryFulfilled }) {
+			async onQueryStarted(_arg, { dispatch, queryFulfilled }) {
 				try {
 					const { data } = await queryFulfilled;
-					setAuthState({ mode: data.auth_mode === "hosted" ? "hosted" : "local", csrf: data.csrf });
+					const before = getAuthState().org;
+					const org = data.current_org ?? "";
+					setAuthState({ mode: data.auth_mode === "hosted" ? "hosted" : "local", csrf: data.csrf, org });
+					// The session moved to another org (a switch in another tab): every cached answer
+					// belongs to the old one, so drop the whole cache and let screens fetch again.
+					if (before && org && before !== org) dispatch(benchApi.util.resetApiState());
 				} catch (failure) {
 					const status = errorStatus((failure as { error?: unknown })?.error);
 					// Only a hosted server answers /auth/me with 401; anything else leaves local mode on.
@@ -134,16 +121,26 @@ export const platformApi = benchApi.injectEndpoints({
 		logout: builder.mutation<void, void>({
 			query: () => ({ url: "/auth/logout", method: "POST" }),
 		}),
+		// Sets a new password for the signed-in user. Every other session of the user ends; this one stays.
+		changePassword: builder.mutation<void, PasswordChangeRequest>({
+			query: (body) => ({ url: "/auth/password", method: "POST", body }),
+		}),
 		switchOrg: builder.mutation<MeOrgResponse, SwitchOrgRequest>({
 			query: (body) => ({ url: "/auth/switch-org", method: "POST", body }),
-			invalidatesTags: [...ORG_TAGS],
+			async onQueryStarted(_arg, { dispatch, queryFulfilled }) {
+				const { data } = await queryFulfilled.catch(() => ({ data: undefined }));
+				if (data) switchedOrg(dispatch, data.id);
+			},
 		}),
 		getInvitation: builder.query<InvitationPreviewResponse, string>({
 			query: (token) => `/auth/invitations/${id(token)}`,
 		}),
 		acceptInvitation: builder.mutation<MeOrgResponse, string>({
 			query: (token) => ({ url: `/auth/invitations/${id(token)}`, method: "POST" }),
-			invalidatesTags: [...ORG_TAGS],
+			async onQueryStarted(_arg, { dispatch, queryFulfilled }) {
+				const { data } = await queryFulfilled.catch(() => ({ data: undefined }));
+				if (data) switchedOrg(dispatch, data.id);
+			},
 		}),
 
 		// Members and invitations of an organization (admin). orgId is the session's org.
@@ -214,7 +211,7 @@ export const platformApi = benchApi.injectEndpoints({
 			invalidatesTags: ["RunnerTokens", "Runners", "AuditLog"],
 		}),
 
-		// Audit log (admin), newest first, one page at a time (before = unix ms of the last row).
+		// Audit log (admin), newest first, one page at a time (cursor = the previous page's opaque next).
 		getAuditLog: builder.query<AuditListResponse, AuditLogParams>({
 			query: (params) => auditLogRequest(params),
 			providesTags: ["AuditLog"],
@@ -281,6 +278,7 @@ export const {
 	useLoginMutation,
 	useSignupMutation,
 	useLogoutMutation,
+	useChangePasswordMutation,
 	useSwitchOrgMutation,
 	useGetInvitationQuery,
 	useAcceptInvitationMutation,

@@ -136,6 +136,11 @@ func TestCORS(t *testing.T) {
 	if string(on.Response.Header.Peek(fasthttp.HeaderAccessControlAllowOrigin)) != "http://ui.local" {
 		t.Error("listed origin not allowed")
 	}
+	// The hosted client sends credentials: "include"; a listed origin must
+	// be told credentials are allowed or the browser drops the response.
+	if string(on.Response.Header.Peek(fasthttp.HeaderAccessControlAllowCredentials)) != "true" {
+		t.Error("listed origin lacks Access-Control-Allow-Credentials")
+	}
 	other := run(h, func(r *fasthttp.Request) { r.Header.Set("Origin", "http://evil") })
 	if len(other.Response.Header.Peek(fasthttp.HeaderAccessControlAllowOrigin)) != 0 {
 		t.Error("unlisted origin allowed")
@@ -146,6 +151,12 @@ func TestCORS(t *testing.T) {
 	})
 	if pre.Response.StatusCode() != fasthttp.StatusNoContent {
 		t.Errorf("preflight = %d", pre.Response.StatusCode())
+	}
+	if string(pre.Response.Header.Peek(fasthttp.HeaderAccessControlAllowCredentials)) != "true" {
+		t.Error("preflight lacks Access-Control-Allow-Credentials")
+	}
+	if len(other.Response.Header.Peek(fasthttp.HeaderAccessControlAllowCredentials)) != 0 {
+		t.Error("unlisted origin got Access-Control-Allow-Credentials")
 	}
 }
 

@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"github.com/fasthttp/router"
+	"github.com/maximhq/bifrost/bench/auth"
 	"github.com/maximhq/bifrost/bench/handlers"
 	"github.com/maximhq/bifrost/bench/lib"
 	"github.com/maximhq/bifrost/bench/schemas"
@@ -140,6 +141,7 @@ func New(cfg *lib.Config, deps Deps) (*Server, error) {
 		lib.SecurityHeaders(),
 		lib.HostGuard(mode, cfg.Server.AllowedHosts),
 		lib.CORS(cfg.Server.CORSOrigins),
+		auth.Middleware(auth.Config{ServerMode: mode}, nil), // Auth area (P2): every local request carries the local-org owner principal (docs/auth.md)
 	)
 	s.server = &fasthttp.Server{
 		Handler:               s.handler,

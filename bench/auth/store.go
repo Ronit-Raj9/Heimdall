@@ -160,6 +160,49 @@ func (s *store) setPasswordHash(ctx context.Context, q querier, userID, hash str
 	return err
 }
 
+// swapPasswordHash replaces the user's password hash only while it still is
+// prev, the hash the caller verified; false when another write got there
+// first (a reset, a change, another login's rehash).
+func (s *store) swapPasswordHash(ctx context.Context, q querier, userID, prev, hash string) (bool, error) {
+	res, err := s.exec(ctx, q, `UPDATE users SET password_hash = ? WHERE id = ? AND password_hash = ?`, hash, userID, prev)
+	if err != nil {
+		return false, err
+	}
+	n, _ := res.RowsAffected()
+	return n == 1, nil
+}
+
+// lockUser re-reads a user inside tx, holding its row lock on Postgres
+// (SQLite transactions are IMMEDIATE and already hold the write lock), so
+// a credential checked before the transaction can be compared with the
+// committed state before a session is issued on it.
+func (s *store) lockUser(ctx context.Context, tx querier, id string) (*User, error) {
+	return scanUser(s.row(ctx, tx, `SELECT `+userCols+` FROM users WHERE id = ?`+s.d.ForUpdate(), id))
+}
+
+// accountsLockKey is the Postgres advisory lock that serializes account
+// creation, so the bootstrap rule (only the first account of an empty
+// install may sign up without an invitation) holds under READ COMMITTED.
+const accountsLockKey int64 = 0x48444d4c41434354 // "HDMLACCT"
+
+// lockAccounts serializes account creation inside tx. SQLite transactions
+// are IMMEDIATE and serialize already.
+func (s *store) lockAccounts(ctx context.Context, tx querier) error {
+	if s.d.Driver() != db.Postgres {
+		return nil
+	}
+	_, err := s.exec(ctx, tx, `SELECT pg_advisory_xact_lock(?)`, accountsLockKey)
+	return err
+}
+
+// lockOrgRow holds orgID's row lock inside tx on Postgres, serializing
+// writes that must see each other (invitation replacement). A missing org
+// is db.ErrNotFound.
+func (s *store) lockOrgRow(ctx context.Context, tx querier, orgID string) error {
+	var id string
+	return notFound(s.row(ctx, tx, `SELECT id FROM orgs WHERE id = ?`+s.d.ForUpdate(), orgID).Scan(&id))
+}
+
 func (s *store) linkGitHub(ctx context.Context, q querier, userID, ghID string) error {
 	_, err := s.exec(ctx, q, `UPDATE users SET github_id = ? WHERE id = ? AND github_id IS NULL`, ghID, userID)
 	if db.IsUnique(err) {
@@ -203,12 +246,16 @@ func (s *store) insertOrg(ctx context.Context, q querier, name string) (*Org, er
 			slug = base + "-" + suffix
 		}
 		o := &Org{ID: db.NewID("org"), Slug: slug, Name: name}
-		_, err := s.exec(ctx, q, `INSERT INTO orgs (id, slug, name, public_read, created_at) VALUES (?, ?, ?, 0, ?)`, o.ID, o.Slug, o.Name, s.ms())
-		if err == nil {
-			return o, nil
-		}
-		if !db.IsUnique(err) {
+		// ON CONFLICT DO NOTHING: a taken slug must not abort the caller's
+		// Postgres transaction (a failed INSERT poisons it, SQLSTATE 25P02),
+		// so the next candidate can still be tried in the same transaction.
+		res, err := s.exec(ctx, q, `INSERT INTO orgs (id, slug, name, public_read, created_at) VALUES (?, ?, ?, 0, ?) ON CONFLICT (slug) DO NOTHING`,
+			o.ID, o.Slug, o.Name, s.ms())
+		if err != nil {
 			return nil, fmt.Errorf("insert org: %w", err)
+		}
+		if n, _ := res.RowsAffected(); n == 1 {
+			return o, nil
 		}
 	}
 	return nil, fmt.Errorf("insert org: no free slug for %q", name)

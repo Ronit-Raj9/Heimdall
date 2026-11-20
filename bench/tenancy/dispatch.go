@@ -47,8 +47,22 @@ func EntryFor(ctx *fasthttp.RequestCtx, orgID, action, targetType, targetID stri
 	}
 	return AuditEntry{
 		OrgID: orgID, ActorType: actorType, ActorID: p.ActorID(), Action: action,
-		TargetType: targetType, TargetID: targetID, IP: ctx.RemoteIP().String(), At: time.Now().UTC(), Details: details,
+		TargetType: targetType, TargetID: targetID, IP: ClientIP(ctx), At: time.Now().UTC(), Details: details,
 	}
+}
+
+// clientIPKey is the request user value holding the client address the
+// dispatcher resolved through the trusted proxies.
+const clientIPKey = "heimdall.client_ip"
+
+// ClientIP is the request's client address for audit rows: the one the
+// dispatcher resolved with DispatcherConfig.ClientIP (the trusted-proxy
+// resolver auth routes use), else the transport peer.
+func ClientIP(ctx *fasthttp.RequestCtx) string {
+	if ip, ok := ctx.UserValue(clientIPKey).(string); ok && ip != "" {
+		return ip
+	}
+	return ctx.RemoteIP().String()
 }
 
 // DispatcherConfig is what the hosted server hands the dispatcher.
@@ -72,6 +86,10 @@ type DispatcherConfig struct {
 	Fallback fasthttp.RequestHandler
 	Audit    AuditSink
 	Logger   schemas.Logger
+	// ClientIP resolves the caller's address through the trusted proxies
+	// (auth.Service.ClientIP). Nil uses the transport peer, which behind a
+	// reverse proxy is the proxy.
+	ClientIP func(*fasthttp.RequestCtx) string
 }
 
 // Dispatcher is the hosted root handler behind the auth middleware: it
@@ -110,6 +128,9 @@ func (d *Dispatcher) Handle(ctx *fasthttp.RequestCtx) {
 	method := string(ctx.Method())
 	path := string(ctx.Request.URI().PathOriginal())
 	p := auth.PrincipalFrom(ctx)
+	if d.c.ClientIP != nil {
+		ctx.SetUserValue(clientIPKey, d.c.ClientIP(ctx))
+	}
 
 	if pat, ok := d.platform.match(ctx, method, path); ok {
 		rule, _ := d.c.Policy.PlatformRule(method, pat)
@@ -200,6 +221,15 @@ func (d *Dispatcher) authorize(ctx *fasthttp.RequestCtx, rule Rule, method strin
 	return nil, nil, false
 }
 
+// createdKey is the request user value naming the record a create route
+// committed (SetCreated).
+const createdKey = "heimdall.created_id"
+
+// SetCreated records the ID of the resource a create handler committed, so
+// the generic audit row of the write names it. Collection-create routes have
+// no path parameter to take it from.
+func SetCreated(ctx *fasthttp.RequestCtx, id string) { ctx.SetUserValue(createdKey, id) }
+
 // audit writes the generic row of an org-router write. Platform handlers
 // write their own, more specific rows.
 func (d *Dispatcher) audit(ctx *fasthttp.RequestCtx, orgID, method, pattern string) {
@@ -207,9 +237,15 @@ func (d *Dispatcher) audit(ctx *fasthttp.RequestCtx, orgID, method, pattern stri
 		return
 	}
 	action, targetType, targetID := ActionOf(ctx, method, pattern)
-	e := EntryFor(ctx, orgID, action, targetType, targetID, map[string]any{
-		"route": method + " " + pattern, "status": ctx.Response.StatusCode(),
-	})
+	details := map[string]any{"route": method + " " + pattern, "status": ctx.Response.StatusCode()}
+	if id, _ := ctx.UserValue(createdKey).(string); id != "" {
+		if targetID == "" {
+			targetID = id
+		} else {
+			details["created_id"] = id
+		}
+	}
+	e := EntryFor(ctx, orgID, action, targetType, targetID, details)
 	actx, cancel := workContext()
 	defer cancel()
 	if err := d.c.Audit.Audit(actx, e); err != nil {

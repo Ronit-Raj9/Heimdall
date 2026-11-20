@@ -6,6 +6,7 @@ import (
 	"reflect"
 	"slices"
 
+	"github.com/maximhq/bifrost/bench/agentdiff"
 	"github.com/maximhq/bifrost/bench/schemas"
 )
 
@@ -52,7 +53,9 @@ func diffFlat(a, b map[string]any) []schemas.ConfigChange {
 	out := []schemas.ConfigChange{}
 	for _, p := range paths {
 		if !reflect.DeepEqual(a[p], b[p]) {
-			out = append(out, schemas.ConfigChange{Path: p, A: a[p], B: b[p]})
+			// Compared on the real values, shown redacted: the verdict
+			// is readable by viewers and public orgs (4-B-13).
+			out = append(out, schemas.ConfigChange{Path: p, A: agentdiff.PublicLeaf(p, a[p]), B: agentdiff.PublicLeaf(p, b[p])})
 		}
 	}
 	return out

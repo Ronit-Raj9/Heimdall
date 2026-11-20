@@ -3,17 +3,18 @@ import { ApiTokensTab } from "@/components/settings/apiTokensTab";
 import { AuditTab } from "@/components/settings/auditTab";
 import { MembersTab } from "@/components/settings/membersTab";
 import { OrgTab } from "@/components/settings/orgTab";
+import { PasswordTab } from "@/components/settings/passwordTab";
 import { RunnersTab } from "@/components/settings/runnersTab";
 import { EmptyNote } from "@/components/runs/screenStates";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useSession } from "@/lib/session/sessionContext";
-import { Building2, KeyRound, ScrollText, Server, Users } from "lucide-react";
+import { Building2, KeyRound, ScrollText, Server, UserRound, Users } from "lucide-react";
 import { useTranslation } from "react-i18next";
 
-export const SETTINGS_TABS = ["members", "tokens", "runners", "audit", "org"] as const;
+export const SETTINGS_TABS = ["members", "tokens", "runners", "audit", "org", "account"] as const;
 export type SettingsTab = (typeof SETTINGS_TABS)[number];
 
-const TAB_ICON = { members: Users, tokens: KeyRound, runners: Server, audit: ScrollText, org: Building2 } as const;
+const TAB_ICON = { members: Users, tokens: KeyRound, runners: Server, audit: ScrollText, org: Building2, account: UserRound } as const;
 
 /** A tab name from the URL, or members for anything else. */
 export function settingsTab(raw: string | null | undefined): SettingsTab {
@@ -27,7 +28,7 @@ export interface SettingsViewProps {
 
 /**
  * Settings of the current organization: members and invitations, API tokens, runners and runner
- * tokens, the audit log, and the organization itself. Hosted mode only; local mode says why there
+ * tokens, the audit log, the organization itself, and the signed-in user's password (account). Hosted mode only; local mode says why there
  * is nothing to set.
  */
 export default function SettingsView({ tab, onTabChange }: SettingsViewProps) {
@@ -89,6 +90,9 @@ export default function SettingsView({ tab, onTabChange }: SettingsViewProps) {
 				</TabsContent>
 				<TabsContent value="org">
 					<OrgTab org={org} />
+				</TabsContent>
+				<TabsContent value="account">
+					<PasswordTab />
 				</TabsContent>
 			</Tabs>
 		</section>

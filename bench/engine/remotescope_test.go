@@ -244,6 +244,11 @@ func TestHostedTokenScope(t *testing.T) {
 			t.Fatalf("%s: manifest: %v", name, err)
 		}
 	}
+	// Another token of the same organization can not take the name over
+	// (4-B-01): its registration is refused and the lease stays.
+	if _, err := a.c.Register(scoped(tokAGPU), &schemas.WorkerRegister{WorkerID: "r1", Slots: 1, Version: BenchVersion}); !errors.Is(err, schemas.ErrWorkerScope) {
+		t.Fatalf("register a taken name with another token: %v", err)
+	}
 	// The lease survived every refused call.
 	if err := a.c.Heartbeat(scoped(tokADefault), l.LeaseID, "r1"); err != nil {
 		t.Fatalf("heartbeat after refused calls: %v", err)

@@ -458,3 +458,16 @@ func textDiff(f *FileChange, a, b content) {
 		f.Diff, f.Truncated = d, truncated
 	}
 }
+
+// PublicLeaf is the value a public view of an agent config shows for the
+// leaf at the dotted path: "[redacted]" when the env name holding it marks a
+// credential, else v with utils.RedactSecrets applied to its strings. The
+// verdict config diff and any other config display use it, so a literal
+// credential in an arm's config is never served (audit 4-B-13).
+func PublicLeaf(path string, v any) any {
+	if name, ok := strings.CutPrefix(path, "env."); ok && secretName(name) && v != nil {
+		return redacted
+	}
+	out, _ := redactLeaf(v)
+	return out
+}

@@ -6,6 +6,8 @@ package handlers
 
 import (
 	"context"
+	"errors"
+	"fmt"
 	"net/mail"
 	"strings"
 	"time"
@@ -13,6 +15,7 @@ import (
 	"github.com/fasthttp/router"
 	"github.com/maximhq/bifrost/bench/auth"
 	"github.com/maximhq/bifrost/bench/lib"
+	"github.com/maximhq/bifrost/bench/tenancy"
 	"github.com/valyala/fasthttp"
 )
 
@@ -65,9 +68,11 @@ type MemberService interface {
 	Members(ctx context.Context, orgID string) ([]MemberInfo, error)
 	Member(ctx context.Context, orgID, userID string) (MemberInfo, error)
 	// SetMemberRole and RemoveMember refuse to leave the org without an
-	// owner (ErrLastOwner).
-	SetMemberRole(ctx context.Context, orgID, userID string, role auth.Role) (MemberInfo, error)
-	RemoveMember(ctx context.Context, orgID, userID string) error
+	// owner (ErrLastOwner). They run g's check inside the same transaction
+	// as the change, on the roles current there, and return the role the
+	// member held before it.
+	SetMemberRole(ctx context.Context, orgID, userID string, role auth.Role, g MemberGuard) (MemberInfo, auth.Role, error)
+	RemoveMember(ctx context.Context, orgID, userID string, g MemberGuard) (auth.Role, error)
 	Invitations(ctx context.Context, orgID string) ([]InvitationInfo, error)
 	// CreateInvitation and RevokeInvitation act as inviter (the request's
 	// effective principal) and write their own audit rows (auth area).
@@ -101,6 +106,54 @@ func (h *OrgsHandler) listMembers(ctx *fasthttp.RequestCtx) {
 		ms = []MemberInfo{}
 	}
 	lib.SendJSON(ctx, h.mode, fasthttp.StatusOK, MemberList{Members: ms})
+}
+
+// MemberGuard authorizes a membership change against the roles committed
+// when it applies, not a snapshot read before it. ActorID is the acting
+// user (empty for none); Check gets that user's current role (empty when
+// there is no actor or it is no longer a member) and the target's current
+// role. A nil Check allows the change. Audit, when set, is the change's
+// audit row given the member's previous role; the store appends it in the
+// same transaction, so the change never commits without its record.
+type MemberGuard struct {
+	ActorID string
+	Check   func(actor, target auth.Role) error
+	Audit   func(from auth.Role) tenancy.AuditEntry
+}
+
+// auditIn makes g write the audit row of action in the change's
+// transaction when the handler has an audit sink.
+func (h *OrgsHandler) auditIn(ctx *fasthttp.RequestCtx, g MemberGuard, orgID, action, userID string, details func(from auth.Role) map[string]any) MemberGuard {
+	if h.audit != nil {
+		g.Audit = func(from auth.Role) tenancy.AuditEntry {
+			return tenancy.EntryFor(ctx, orgID, action, "user", userID, details(from))
+		}
+	}
+	return g
+}
+
+// ErrMemberForbidden is a membership change the caller's role does not
+// allow once checked against the committed roles (403).
+var ErrMemberForbidden = errors.New("role may not make this membership change")
+
+// manageGuard checks mayManage under the membership lock. The caller's role
+// is the lower of its principal role and, for a user, its current
+// membership role, so a demotion committed meanwhile counts.
+func manageGuard(p *auth.Principal, to string) MemberGuard {
+	g := MemberGuard{Check: func(actor, target auth.Role) error {
+		caller := p.Role
+		if p.UserID != "" && (actor.Rank() == 0 || actor.Rank() < caller.Rank()) {
+			caller = actor
+		}
+		if !mayManage(caller, string(target), to) {
+			return fmt.Errorf("%w: role %q may not change a %s", ErrMemberForbidden, string(caller), string(target))
+		}
+		return nil
+	}}
+	if p.UserID != "" {
+		g.ActorID = p.UserID
+	}
+	return g
 }
 
 // mayManage reports whether the caller may change a member holding role
@@ -144,12 +197,14 @@ func (h *OrgsHandler) setRole(ctx *fasthttp.RequestCtx) {
 			"role "+string(caller)+" may not change a "+cur.Role+" to "+string(role))
 		return
 	}
-	m, err := h.orgs.SetMemberRole(wctx, o.ID, userID, role)
+	g := h.auditIn(ctx, manageGuard(auth.PrincipalFrom(ctx), string(role)), o.ID, "member.role", userID, func(from auth.Role) map[string]any {
+		return map[string]any{"from": string(from), "to": string(role)}
+	})
+	m, _, err := h.orgs.SetMemberRole(wctx, o.ID, userID, role, g)
 	if err != nil {
 		h.sendErr(ctx, "change role", err)
 		return
 	}
-	h.write(ctx, o.ID, "member.role", "user", userID, map[string]any{"from": cur.Role, "to": string(role)})
 	lib.SendJSON(ctx, h.mode, fasthttp.StatusOK, m)
 }
 
@@ -175,11 +230,13 @@ func (h *OrgsHandler) removeMember(ctx *fasthttp.RequestCtx) {
 		lib.SendError(ctx, h.mode, fasthttp.StatusForbidden, lib.ErrTypeForbidden, "role "+string(caller)+" may not remove a "+cur.Role)
 		return
 	}
-	if err := h.orgs.RemoveMember(wctx, o.ID, userID); err != nil {
+	g := h.auditIn(ctx, manageGuard(auth.PrincipalFrom(ctx), ""), o.ID, "member.remove", userID, func(from auth.Role) map[string]any {
+		return map[string]any{"role": string(from)}
+	})
+	if _, err := h.orgs.RemoveMember(wctx, o.ID, userID, g); err != nil {
 		h.sendErr(ctx, "remove member", err)
 		return
 	}
-	h.write(ctx, o.ID, "member.remove", "user", userID, map[string]any{"role": cur.Role})
 	ctx.SetStatusCode(fasthttp.StatusNoContent)
 }
 
@@ -233,7 +290,7 @@ func (h *OrgsHandler) createInvitation(ctx *fasthttp.RequestCtx) {
 	}
 	wctx, cancel := workContext(ctx, readTimeout)
 	defer cancel()
-	inv, err := h.orgs.CreateInvitation(wctx, p, o.ID, email, role, ctx.RemoteIP().String())
+	inv, err := h.orgs.CreateInvitation(wctx, p, o.ID, email, role, tenancy.ClientIP(ctx))
 	if err != nil {
 		h.sendErr(ctx, "create invitation", err)
 		return
@@ -253,7 +310,7 @@ func (h *OrgsHandler) revokeInvitation(ctx *fasthttp.RequestCtx) {
 	}
 	wctx, cancel := workContext(ctx, readTimeout)
 	defer cancel()
-	if err := h.orgs.RevokeInvitation(wctx, auth.PrincipalFrom(ctx), o.ID, id, ctx.RemoteIP().String()); err != nil {
+	if err := h.orgs.RevokeInvitation(wctx, auth.PrincipalFrom(ctx), o.ID, id, tenancy.ClientIP(ctx)); err != nil {
 		h.sendErr(ctx, "revoke invitation", err)
 		return
 	}

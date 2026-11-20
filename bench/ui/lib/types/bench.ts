@@ -3632,6 +3632,12 @@ export interface InvitationPreview {
 	signup_allowed: boolean;
 }
 
+/** POST /auth/password (auth.PasswordChangeRequest). current_password may be empty when the account has none yet. */
+export interface PasswordChangeRequest {
+	current_password: string;
+	new_password: string;
+}
+
 /** POST /auth/switch-org: an org id or slug the user belongs to. */
 export interface SwitchOrgRequest {
 	org: string;
@@ -3819,12 +3825,15 @@ export interface AuditEntry {
 /** GET /orgs/{org}/audit, newest first. */
 export interface AuditList {
 	entries: AuditEntry[];
+	/** Opaque cursor of the next page (pass back as cursor); absent on the last page. */
+	next?: string;
 }
 
-/** GET /orgs/{org}/audit query: before is unix milliseconds (rows strictly older). */
+/** GET /orgs/{org}/audit query: cursor is AuditList.next of the previous page; before is unix milliseconds (rows strictly older). */
 export interface AuditLogParams {
 	orgId: string;
 	action?: string;
+	cursor?: string;
 	before?: number;
 	limit?: number;
 }

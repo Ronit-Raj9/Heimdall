@@ -65,8 +65,20 @@
 		respond "{err.status_code} {err.status_text}"
 	}
 
+	# Access log, JSON. Request URIs can carry credentials: the one-time
+	# invitation token in /invite/<token> and /api/bench/auth/invitations/<token>,
+	# and the OAuth callback's code and state query parameters. The filter
+	# replaces each of those values with REDACTED before the line is written.
+	# The Referer header can repeat such a URL, so it is dropped. (Cookie and
+	# Authorization headers are already redacted by Caddy by default.)
 	log {
 		output stdout
-		format json
+		format filter {
+			wrap json
+			fields {
+				request>uri regexp "((?:/invite/|/api/bench/auth/invitations/)|[?&](?:code|state)=)[^/?&#]+" "${1}REDACTED"
+				request>headers>Referer delete
+			}
+		}
 	}
 }

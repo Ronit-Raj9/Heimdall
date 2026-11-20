@@ -16,6 +16,10 @@ import (
 // shell access to the server and its database, so they need no principal
 // and are audited as actor "system".
 
+// ErrAuditFailed marks a CLI operation that committed but whose audit row
+// could not be written; the result is still returned alongside it.
+var ErrAuditFailed = errors.New("audit write failed")
+
 // CreatedUser is what CreateUser did.
 type CreatedUser struct {
 	User       *User
@@ -53,6 +57,9 @@ func CreateUser(ctx context.Context, d *db.DB, hasher *Hasher, email, name, pass
 	st := &store{d: d, now: time.Now}
 	out := &CreatedUser{Role: role}
 	err = d.Tx(ctx, func(tx *sql.Tx) error {
+		if err := st.lockAccounts(ctx, tx); err != nil {
+			return err
+		}
 		u, err := st.insertUser(ctx, tx, email, name, hash, "")
 		if errors.Is(err, db.ErrConflict) {
 			return fmt.Errorf("a user with email %s already exists", email)
@@ -79,8 +86,11 @@ func CreateUser(ctx context.Context, d *db.DB, hasher *Hasher, email, name, pass
 		return nil, err
 	}
 	details, _ := json.Marshal(map[string]any{"via": "cli", "role": string(role), "org_created": out.OrgCreated})
-	_, _ = d.AppendAudit(ctx, db.AuditEntry{OrgID: out.Org.ID, ActorType: db.ActorSystem, ActorID: "cli", Action: "auth.user_create",
-		TargetType: "user", TargetID: out.User.ID, Details: details})
+	if _, err := d.AppendAudit(ctx, db.AuditEntry{OrgID: out.Org.ID, ActorType: db.ActorSystem, ActorID: "cli", Action: "auth.user_create",
+		TargetType: "user", TargetID: out.User.ID, Details: details}); err != nil {
+		// The account exists; the operator must know its audit row does not.
+		return out, fmt.Errorf("%w: user %s created but its audit row was not written: %v", ErrAuditFailed, out.User.ID, err)
+	}
 	return out, nil
 }
 
@@ -117,7 +127,9 @@ func SetPassword(ctx context.Context, d *db.DB, hasher *Hasher, email, password 
 		return nil, err
 	}
 	details, _ := json.Marshal(map[string]any{"via": "cli"})
-	_, _ = d.AppendAudit(ctx, db.AuditEntry{ActorType: db.ActorSystem, ActorID: "cli", Action: "auth.password_set",
-		TargetType: "user", TargetID: u.ID, Details: details})
+	if _, err := d.AppendAudit(ctx, db.AuditEntry{ActorType: db.ActorSystem, ActorID: "cli", Action: "auth.password_set",
+		TargetType: "user", TargetID: u.ID, Details: details}); err != nil {
+		return u, fmt.Errorf("%w: password of %s set but its audit row was not written: %v", ErrAuditFailed, u.ID, err)
+	}
 	return u, nil
 }

@@ -101,14 +101,36 @@ func (h *WorkersHandler) RegisterRoutes(r *router.Router, middlewares ...lib.Mid
 }
 
 // list handles GET /api/bench/workers: every registered worker, for the UI.
-// It is a read route like the rest of the API and carries no secret.
+// It is a read route like the rest of the API and carries no secret. On a
+// hosted server only an admin of the organization sees runner
+// infrastructure (host, build, labels, token record, GPUs); viewers and
+// anonymous readers of a public organization get the availability summary.
 func (h *WorkersHandler) list(ctx *fasthttp.RequestCtx) {
 	out := WorkersList{Workers: []schemas.WorkerInfo{}}
 	if h.api != nil {
 		out.Enabled = true
 		out.Workers = h.api.Workers()
+		if h.orgID != "" && !h.seesInventory(ctx) {
+			for i := range out.Workers {
+				out.Workers[i] = publicWorker(out.Workers[i])
+			}
+		}
 	}
 	lib.SendJSON(ctx, h.mode, fasthttp.StatusOK, out)
+}
+
+// seesInventory reports whether the caller may see the hosted runner
+// inventory, which GET /runners already limits to admins.
+func (h *WorkersHandler) seesInventory(ctx *fasthttp.RequestCtx) bool {
+	p, ok := auth.Lookup(ctx)
+	return ok && p.OrgID == h.orgID && p.Can(auth.RoleAdmin)
+}
+
+// publicWorker is the availability view of a worker: its name, state,
+// capacity and pool, without infrastructure details.
+func publicWorker(w schemas.WorkerInfo) schemas.WorkerInfo {
+	return schemas.WorkerInfo{ID: w.ID, State: w.State, Slots: w.Slots, Running: w.Running,
+		Completed: w.Completed, LastSeen: w.LastSeen, Pool: w.Pool}
 }
 
 // auth answers 503 when worker mode is off and 401 unless the request

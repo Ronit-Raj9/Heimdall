@@ -298,3 +298,40 @@ func TestAuthInvitationAcceptAndSwitchOrg(t *testing.T) {
 		t.Fatalf("password = %d %s", pw.Response.StatusCode(), pw.Response.Body())
 	}
 }
+
+// 4-A-14: a throttled GitHub callback answers 429 with Retry-After, not
+// the generic sign-in redirect. 4-A-13: trailing data after the JSON body
+// is refused.
+func TestAuthCallbackThrottleAndStrictBody(t *testing.T) {
+	cfg := auth.Config{Hosted: true, ServerMode: schemas.ModeLive, PublicURL: publicURL, Signup: auth.SignupOpen,
+		SessionTTL: 24 * time.Hour, SessionIdle: 24 * time.Hour, InviteTTL: 24 * time.Hour, AllowedOrigins: []string{publicURL},
+		GitHub: &auth.GitHubConfig{ClientID: "cid", ClientSecret: "test-only", TokenURL: "http://127.0.0.1:1/token", APIURL: "http://127.0.0.1:1"}}
+	svc, err := auth.New(cfg, auth.Deps{DB: dbtest.Open(t),
+		Hasher: auth.NewHasher(auth.Argon2Params{Memory: 1024, Time: 1, Threads: 1, SaltLen: 16, KeyLen: 32})})
+	if err != nil {
+		t.Fatal(err)
+	}
+	r := router.New()
+	handlers.NewAuthHandler(schemas.ModeLive, svc).RegisterRoutes(r, lib.BodyLimit(schemas.ModeLive, lib.MaxBodyBytes))
+	s := &authServer{h: lib.ChainMiddlewares(r.Handler, auth.Middleware(cfg, svc)), svc: svc}
+	var last *fasthttp.RequestCtx
+	for i := 0; i < 40; i++ {
+		last = s.do(t, req{method: "GET", path: handlers.AuthPrefix + "/github/callback?state=x&code=y", ip: "198.51.100.77"})
+		if last.Response.StatusCode() == 429 {
+			break
+		}
+		if last.Response.StatusCode() != 302 {
+			t.Fatalf("callback %d = %d", i, last.Response.StatusCode())
+		}
+	}
+	if last.Response.StatusCode() != 429 || len(last.Response.Header.Peek("Retry-After")) == 0 {
+		t.Fatalf("throttled callback = %d, Retry-After %q", last.Response.StatusCode(), last.Response.Header.Peek("Retry-After"))
+	}
+	su := s.do(t, req{method: "POST", path: handlers.AuthPrefix + "/signup", body: `{"email":"a@example.com","password":"violet-tractor-umbrella"}`})
+	me := decode[auth.Me](t, su)
+	sw := s.do(t, req{method: "POST", path: handlers.AuthPrefix + "/switch-org", cookie: sessionCookie(t, su), csrf: me.CSRF, origin: publicURL,
+		body: `{"org":"` + me.CurrentOrg + `"} {"org":"other"}`})
+	if sw.Response.StatusCode() != 400 {
+		t.Fatalf("switch with trailing data = %d %s", sw.Response.StatusCode(), sw.Response.Body())
+	}
+}

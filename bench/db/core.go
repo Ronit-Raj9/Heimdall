@@ -405,11 +405,74 @@ func (d *DB) ownerGuard(ctx context.Context, tx *sql.Tx, orgID, userID string) (
 // SetRole changes a member's role. Demoting the only owner is ErrLastOwner;
 // a non-member is ErrNotFound.
 func (d *DB) SetRole(ctx context.Context, orgID, userID, role string) error {
-	if !ValidRole(role) {
-		return fmt.Errorf("db: role %q is not owner, admin, member or viewer", role)
+	_, err := d.SetRoleChecked(ctx, orgID, userID, role, MemberChange{})
+	return err
+}
+
+// MemberCheck authorizes a membership change under the org lock, from the
+// roles current at that moment: actor is the acting user's role ("" when no
+// actor ID was given or the actor is no longer a member), target the
+// changed member's role. A non-nil error aborts the change and is returned
+// as is.
+type MemberCheck func(actor, target string) error
+
+// MemberChange carries the checks and the audit row of a membership change
+// that run inside its transaction. ActorID names the acting user for
+// Check (empty for none). Audit, when set, builds the row from the role the
+// member held before; it commits with the change or not at all.
+type MemberChange struct {
+	ActorID string
+	Check   MemberCheck
+	Audit   func(from string) *AuditEntry
+}
+
+// memberAudit appends c's audit row inside tx.
+func (d *DB) memberAudit(ctx context.Context, tx *sql.Tx, c MemberChange, from string) error {
+	if c.Audit == nil {
+		return nil
 	}
-	return d.Tx(ctx, func(tx *sql.Tx) error {
+	e := c.Audit(from)
+	if e == nil {
+		return nil
+	}
+	_, err := d.AppendAuditTx(ctx, tx, *e)
+	return err
+}
+
+// memberRoles reads the target's role and, when actorID is set, the actor's
+// role inside tx and runs check on them.
+func (d *DB) memberRoles(ctx context.Context, tx *sql.Tx, orgID, userID, actorID string, check MemberCheck) (string, error) {
+	var target string
+	err := tx.QueryRowContext(ctx, d.Rebind(`SELECT role FROM memberships WHERE org_id = ? AND user_id = ?`), orgID, userID).Scan(&target)
+	if errors.Is(err, sql.ErrNoRows) {
+		return "", ErrNotFound
+	}
+	if err != nil || check == nil {
+		return target, err
+	}
+	var actor string
+	if actorID != "" {
+		err = tx.QueryRowContext(ctx, d.Rebind(`SELECT role FROM memberships WHERE org_id = ? AND user_id = ?`), orgID, actorID).Scan(&actor)
+		if err != nil && !errors.Is(err, sql.ErrNoRows) {
+			return target, err
+		}
+	}
+	return target, check(actor, target)
+}
+
+// SetRoleChecked is SetRole with c's check and audit row run under the org
+// lock, so the authorization, the change and its record see the same roles. It returns the role the
+// member held before the change.
+func (d *DB) SetRoleChecked(ctx context.Context, orgID, userID, role string, c MemberChange) (from string, err error) {
+	if !ValidRole(role) {
+		return "", fmt.Errorf("db: role %q is not owner, admin, member or viewer", role)
+	}
+	err = d.Tx(ctx, func(tx *sql.Tx) error {
 		if err := d.lockOrg(ctx, tx, orgID); err != nil {
+			return err
+		}
+		var err error
+		if from, err = d.memberRoles(ctx, tx, orgID, userID, c.ActorID, c.Check); err != nil {
 			return err
 		}
 		if role != RoleOwner {
@@ -418,23 +481,43 @@ func (d *DB) SetRole(ctx context.Context, orgID, userID, role string) error {
 			}
 		}
 		res, err := tx.ExecContext(ctx, d.Rebind(`UPDATE memberships SET role = ? WHERE org_id = ? AND user_id = ?`), role, orgID, userID)
-		return expectOne(res, err)
+		if err := expectOne(res, err); err != nil {
+			return err
+		}
+		return d.memberAudit(ctx, tx, c, from)
 	})
+	return from, err
 }
 
 // RemoveMember removes a membership. Removing the only owner is
 // ErrLastOwner; a non-member is ErrNotFound.
 func (d *DB) RemoveMember(ctx context.Context, orgID, userID string) error {
-	return d.Tx(ctx, func(tx *sql.Tx) error {
+	_, err := d.RemoveMemberChecked(ctx, orgID, userID, MemberChange{})
+	return err
+}
+
+// RemoveMemberChecked is RemoveMember with c's check and audit row run
+// under the org lock. It
+// returns the role the member held.
+func (d *DB) RemoveMemberChecked(ctx context.Context, orgID, userID string, c MemberChange) (from string, err error) {
+	err = d.Tx(ctx, func(tx *sql.Tx) error {
 		if err := d.lockOrg(ctx, tx, orgID); err != nil {
+			return err
+		}
+		var err error
+		if from, err = d.memberRoles(ctx, tx, orgID, userID, c.ActorID, c.Check); err != nil {
 			return err
 		}
 		if _, err := d.ownerGuard(ctx, tx, orgID, userID); err != nil {
 			return err
 		}
 		res, err := tx.ExecContext(ctx, d.Rebind(`DELETE FROM memberships WHERE org_id = ? AND user_id = ?`), orgID, userID)
-		return expectOne(res, err)
+		if err := expectOne(res, err); err != nil {
+			return err
+		}
+		return d.memberAudit(ctx, tx, c, from)
 	})
+	return from, err
 }
 
 // Members lists an organization's members by email.

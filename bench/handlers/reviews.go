@@ -11,6 +11,7 @@ import (
 	"github.com/fasthttp/router"
 	"github.com/maximhq/bifrost/bench/lib"
 	"github.com/maximhq/bifrost/bench/schemas"
+	"github.com/maximhq/bifrost/bench/tenancy"
 	"github.com/valyala/fasthttp"
 )
 
@@ -139,6 +140,7 @@ func (h *ReviewsHandler) postReview(ctx *fasthttp.RequestCtx) {
 		h.sendReviewError(ctx, "review of run "+req.RunID, err)
 		return
 	}
+	tenancy.SetCreated(ctx, rv.ReviewID)
 	lib.SendJSON(ctx, h.mode, fasthttp.StatusCreated, rv)
 }
 

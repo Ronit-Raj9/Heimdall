@@ -18,6 +18,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"os"
 	"strings"
 
 	"github.com/maximhq/bifrost/bench/adapters"
@@ -32,6 +33,7 @@ import (
 	"github.com/maximhq/bifrost/bench/store"
 	"github.com/maximhq/bifrost/bench/suite"
 	"github.com/maximhq/bifrost/bench/tenancy"
+	"github.com/valyala/fasthttp"
 )
 
 // hostedEnv is what hosted-mode wiring shares: the base app (instance
@@ -163,6 +165,7 @@ func newHostedServer(env *hostedEnv) (*server.Server, error) {
 		Auth: mw, Directory: env.dir, Registry: env.registry, Audit: env.audit,
 		DemoSlug: strings.TrimSpace(env.base.cfg.Demo.Org), Platform: areas,
 		Ready: readyChecks(env.base), UI: builtUI(), Logger: env.base.logger, Version: benchVersion,
+		ClientIP: clientIPOf(env.auth),
 	})
 }
 
@@ -195,7 +198,15 @@ func orgBuilder(env *hostedEnv) tenancy.Builder {
 			deps.Launcher, deps.Workers = orgLauncher(env, oa, ix)
 		}
 		r := server.NewOrgRouter(oa.cfg, org.ID, deps)
-		rt := &tenancy.OrgRuntime{Handler: r.Handler, Routes: r.Routes, Close: func() error { r.Close(); return nil }}
+		rt := &tenancy.OrgRuntime{Handler: r.Handler, Routes: r.Routes, Close: func() error {
+			r.Close()
+			// The jobs hub keeps the launcher (and its index) of this
+			// runtime only while the runtime lives (4-B-12).
+			if d, ok := deps.Launcher.(interface{ Detach() }); ok {
+				d.Detach()
+			}
+			return nil
+		}}
 		if ar, ok := deps.Launcher.(interface{ Busy() bool }); ok {
 			rt.Busy = ar.Busy
 		}
@@ -247,6 +258,7 @@ func (a *app) forOrg(org tenancy.Org, p tenancy.OrgPaths) (*app, error) {
 		orgID: org.ID, releasesRoot: p.ReleasesRoot}
 	project := p.ProjectRoot
 	oa.planGuard = func(e *schemas.Experiment) error { return tenancy.CheckExperimentPaths(project, e) }
+	oa.planConfine = project
 	oa.deferGateway = true // the hosted server opens no gateway: manifests record gateway.deferred_to_runner
 	return oa, nil
 }
@@ -330,21 +342,34 @@ func (s *orgService) CreateOrg(ctx context.Context, slug, name, owner string) (h
 	return orgInfo(o, string(auth.RoleOwner)), nil
 }
 
-// createOrg is CreateOrg for the API and the CLI.
+// createOrg is CreateOrg for the API and the CLI. The folders come first,
+// under a fresh org ID, and the org row only after they exist: a filesystem
+// failure then leaves no committed org (and no taken slug) behind, and a
+// database failure removes the folders it staged.
 func createOrg(ctx context.Context, d *db.DB, layout tenancy.Layout, cfg *lib.Config, slug, name, owner string, public bool) (*db.Org, error) {
 	if !db.ValidSlug(slug) {
 		return nil, fmt.Errorf("%w: slug %q", handlers.ErrOrgInput, slug)
 	}
-	o, err := d.CreateOrg(ctx, db.NewOrg{Slug: slug, Name: name, OwnerID: owner, PublicRead: public})
-	if err != nil {
-		return nil, dbErr(err)
-	}
-	p, err := layout.Paths(o.ID)
+	id := db.NewID("org")
+	p, err := layout.Paths(id)
 	if err != nil {
 		return nil, err
 	}
+	unstage := func() {
+		for _, dir := range []string{p.StoreRoot, p.ProjectRoot} {
+			if dir != "" {
+				_ = os.RemoveAll(dir)
+			}
+		}
+	}
 	if err := tenancy.EnsureProject(p, seedBenchmarks(cfg)); err != nil {
-		return nil, fmt.Errorf("create the folders of org %s: %w", o.Slug, err)
+		unstage()
+		return nil, fmt.Errorf("create the folders of org %s: %w", slug, err)
+	}
+	o, err := d.CreateOrg(ctx, db.NewOrg{ID: id, Slug: slug, Name: name, OwnerID: owner, PublicRead: public})
+	if err != nil {
+		unstage()
+		return nil, dbErr(err)
 	}
 	return o, nil
 }
@@ -412,15 +437,34 @@ func (s *orgService) Member(ctx context.Context, orgID, userID string) (handlers
 	return handlers.MemberInfo{}, fmt.Errorf("%w: member %s", schemas.ErrNotFound, userID)
 }
 
-func (s *orgService) SetMemberRole(ctx context.Context, orgID, userID string, role auth.Role) (handlers.MemberInfo, error) {
-	if err := s.env.db.SetRole(ctx, orgID, userID, string(role)); err != nil {
-		return handlers.MemberInfo{}, dbErr(err)
+func (s *orgService) SetMemberRole(ctx context.Context, orgID, userID string, role auth.Role, g handlers.MemberGuard) (handlers.MemberInfo, auth.Role, error) {
+	from, err := s.env.db.SetRoleChecked(ctx, orgID, userID, string(role), memberChange(g))
+	if err != nil {
+		return handlers.MemberInfo{}, "", dbErr(err)
 	}
-	return s.Member(ctx, orgID, userID)
+	m, err := s.Member(ctx, orgID, userID)
+	return m, auth.Role(from), err
 }
 
-func (s *orgService) RemoveMember(ctx context.Context, orgID, userID string) error {
-	return dbErr(s.env.db.RemoveMember(ctx, orgID, userID))
+func (s *orgService) RemoveMember(ctx context.Context, orgID, userID string, g handlers.MemberGuard) (auth.Role, error) {
+	from, err := s.env.db.RemoveMemberChecked(ctx, orgID, userID, memberChange(g))
+	return auth.Role(from), dbErr(err)
+}
+
+// memberChange runs a handler's member guard, and appends its audit row, in
+// the database transaction of the change.
+func memberChange(g handlers.MemberGuard) db.MemberChange {
+	c := db.MemberChange{ActorID: g.ActorID}
+	if g.Check != nil {
+		c.Check = func(actor, target string) error { return g.Check(auth.Role(actor), auth.Role(target)) }
+	}
+	if g.Audit != nil {
+		c.Audit = func(from string) *db.AuditEntry {
+			e := tenancy.DBEntry(g.Audit(auth.Role(from)))
+			return &e
+		}
+	}
+	return c
 }
 
 func invitationInfo(in auth.Invitation) handlers.InvitationInfo {
@@ -463,16 +507,28 @@ func (s *orgService) RevokeInvitation(ctx context.Context, p *auth.Principal, or
 	return s.env.auth.RevokeInvitation(ctx, p, orgID, id, ip)
 }
 
-func (s *orgService) Audit(ctx context.Context, orgID string, q handlers.AuditQuery) ([]handlers.AuditRow, error) {
-	f := db.AuditFilter{OrgID: orgID, Action: q.Action, Until: q.Before, Limit: q.Limit}
+func (s *orgService) Audit(ctx context.Context, orgID string, q handlers.AuditQuery) ([]handlers.AuditRow, string, error) {
+	f := db.AuditFilter{OrgID: orgID, Action: q.Action, Until: q.Before, Cursor: q.Cursor, Limit: q.Limit}
 	page, err := s.env.db.ListAudit(ctx, f)
 	if err != nil {
-		return nil, dbErr(err)
+		if errors.Is(err, db.ErrBadCursor) {
+			return nil, "", fmt.Errorf("%w: cursor: %v", handlers.ErrOrgInput, err)
+		}
+		return nil, "", dbErr(err)
 	}
 	out := make([]handlers.AuditRow, 0, len(page.Entries))
 	for _, e := range page.Entries {
 		out = append(out, handlers.AuditRow{ID: e.ID, ActorType: e.ActorType, ActorID: e.ActorID, Action: e.Action,
 			TargetType: e.TargetType, TargetID: e.TargetID, IP: e.IP, At: e.At, Details: e.Details})
 	}
-	return out, nil
+	return out, page.Next, nil
+}
+
+// clientIPOf is the auth service's trusted-proxy client address for audit
+// rows (4-B-08), or nil without a service.
+func clientIPOf(svc *auth.Service) func(*fasthttp.RequestCtx) string {
+	if svc == nil {
+		return nil
+	}
+	return svc.ClientIP
 }

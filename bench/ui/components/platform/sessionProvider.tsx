@@ -2,7 +2,7 @@ import { SessionContext, sessionFromMe } from "@/lib/session/sessionContext";
 import { useAppDispatch } from "@/lib/store/hooks";
 import { benchApi } from "@/lib/store/apis/benchApi";
 import { useGetAuthConfigQuery, useGetMeQuery, useProbeDemoQuery } from "@/lib/store/apis/platformApi";
-import { isUnauthorized, onUnauthorized } from "@/lib/store/apis/session";
+import { isUnauthorized, onUnauthorized, ORG_SWITCH_KEY } from "@/lib/store/apis/session";
 import { useEffect, useMemo, useRef, type ReactNode } from "react";
 
 /**
@@ -10,7 +10,8 @@ import { useEffect, useMemo, useRef, type ReactNode } from "react";
  * in gets the sign-in options (GET /auth/config) and one anonymous read (probeDemo): when it
  * answers, the server serves a public demo and the visitor reads it instead of the login page.
  * A hosted 401 on any other route while signed in re-asks /auth/me, so an ended session turns
- * anonymous and the shell sends the visitor to the login page.
+ * anonymous and the shell sends the visitor to the login page. An org switch in another tab (the
+ * storage event of ORG_SWITCH_KEY) re-asks /auth/me too; a changed org then drops the whole cache.
  */
 export function SessionProvider({ children }: { children: ReactNode }) {
 	const me = useGetMeQuery();
@@ -37,6 +38,14 @@ export function SessionProvider({ children }: { children: ReactNode }) {
 			if (signedIn.current) dispatch(benchApi.util.invalidateTags(["AuthMe"]));
 		});
 		return () => onUnauthorized(null);
+	}, [dispatch]);
+
+	useEffect(() => {
+		const onStorage = (event: StorageEvent) => {
+			if (event.key === ORG_SWITCH_KEY) dispatch(benchApi.util.invalidateTags(["AuthMe"]));
+		};
+		window.addEventListener("storage", onStorage);
+		return () => window.removeEventListener("storage", onStorage);
 	}, [dispatch]);
 
 	return <SessionContext.Provider value={session}>{children}</SessionContext.Provider>;

@@ -1,4 +1,3 @@
-import { toDate } from "@/components/platform/platform.utils";
 import { BlockSkeleton, EmptyNote, LoadError } from "@/components/runs/screenStates";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -6,7 +5,7 @@ import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { useGetAuditLogQuery, useListMembersQuery } from "@/lib/store/apis/platformApi";
-import type { AuditEntry, OrgSummary } from "@/lib/types/bench";
+import type { AuditEntry, AuditList, OrgSummary } from "@/lib/types/bench";
 import { cn } from "@/lib/utils";
 import { ChevronLeft, ChevronRight, Search } from "lucide-react";
 import { useId, useMemo, useState, type FormEvent } from "react";
@@ -19,11 +18,12 @@ export const AUDIT_PAGE_SIZE = 50;
 const ACTOR_TYPES = ["user", "token", "runner", "system"] as const;
 type ActorFilter = "all" | AuditEntry["actor_type"];
 
-/** The before= cursor for the page after rows: the oldest row's time in unix ms, or null on a short page. */
-export function nextAuditCursor(rows: readonly AuditEntry[], pageSize: number): number | null {
-	if (rows.length < pageSize) return null;
-	const last = toDate(rows[rows.length - 1]?.at);
-	return last ? last.getTime() : null;
+/**
+ * The cursor= of the page after this one: the server's opaque next cursor, or null on the last page.
+ * A row timestamp would skip rows that share the last row's millisecond.
+ */
+export function nextAuditCursor(page: AuditList | undefined): string | null {
+	return page?.next ? page.next : null;
 }
 
 /** Rows of one page that match the actor type and the free text (id, target, details). */
@@ -51,7 +51,7 @@ export function detailsLine(details: AuditEntry["details"]): string {
 /**
  * The organization's audit log, newest first: who did what to which target, when and from where.
  * The action filter runs on the server; actor type and free text filter the page in view. Pages go
- * back in time with the before= cursor.
+ * back in time with the server's opaque cursor.
  */
 export function AuditTab({ org }: { org: OrgSummary }) {
 	const { t } = useTranslation("platform");
@@ -61,9 +61,9 @@ export function AuditTab({ org }: { org: OrgSummary }) {
 	const [actor, setActor] = useState<ActorFilter>("all");
 	const [text, setText] = useState("");
 	// Cursors of the pages seen so far: [undefined] is the newest page.
-	const [cursors, setCursors] = useState<(number | undefined)[]>([undefined]);
-	const before = cursors[cursors.length - 1];
-	const audit = useGetAuditLogQuery({ orgId: org.id, action: action || undefined, before, limit: AUDIT_PAGE_SIZE });
+	const [cursors, setCursors] = useState<(string | undefined)[]>([undefined]);
+	const cursor = cursors[cursors.length - 1];
+	const audit = useGetAuditLogQuery({ orgId: org.id, action: action || undefined, cursor, limit: AUDIT_PAGE_SIZE });
 	// Users read as their email: the member list maps ids (both are admin routes, like this tab).
 	const members = useListMembersQuery(org.id);
 	const people = useMemo(() => {
@@ -73,7 +73,7 @@ export function AuditTab({ org }: { org: OrgSummary }) {
 	}, [members.data]);
 	const rows = audit.data?.entries ?? [];
 	const shown = useMemo(() => filterAuditRows(rows, actor, text), [rows, actor, text]);
-	const next = nextAuditCursor(rows, AUDIT_PAGE_SIZE);
+	const next = nextAuditCursor(audit.data);
 
 	const apply = (event: FormEvent) => {
 		event.preventDefault();

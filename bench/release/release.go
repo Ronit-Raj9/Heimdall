@@ -416,9 +416,13 @@ func (ev *evidence) loadPolicy() error {
 }
 
 // newestAnalysis returns the analysis id with the latest created_at, ties to
-// the larger id. Folders without verdict.json (an incomplete write) are
-// skipped; a verdict.json that exists but does not decode refuses, since the
-// newest analysis might be the one that said INVALID (audit 1-D-07).
+// the larger id, among the analyses of the original grades. Folders without
+// verdict.json (an incomplete write) are skipped; a verdict.json that exists
+// but does not decode refuses, since the newest analysis might be the one
+// that said INVALID (audit 1-D-07). An analysis of another grade source (a
+// regrade or judge) is used only when the request names it: reading such a
+// verdict writes an analysis, and that must not change which evidence a
+// later release takes by default (audit 4-B-07).
 func (l *Log) newestAnalysis(base string) (string, error) {
 	entries, err := os.ReadDir(base)
 	if err != nil && !errors.Is(err, fs.ErrNotExist) {
@@ -437,6 +441,9 @@ func (l *Log) newestAnalysis(base string) (string, error) {
 				continue
 			}
 			return "", fmt.Errorf("analysis %s: %w", e.Name(), err)
+		}
+		if a.GradeSource != "" && a.GradeSource != schemas.GradeSourceOriginal {
+			continue
 		}
 		if best == "" || a.CreatedAt.After(bestAt) || (a.CreatedAt.Equal(bestAt) && e.Name() > best) {
 			best, bestAt = e.Name(), a.CreatedAt

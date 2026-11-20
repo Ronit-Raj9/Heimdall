@@ -2,12 +2,15 @@ package main
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io/fs"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
+	"time"
 
 	"github.com/maximhq/bifrost/bench/adapters"
 	"github.com/maximhq/bifrost/bench/codescan"
@@ -50,6 +53,7 @@ type app struct {
 	orgID        string                          // the org this app serves; empty in local mode
 	releasesRoot string                          // the org's release log; empty uses release.DefaultRoot
 	planGuard    func(*schemas.Experiment) error // confines experiment paths to the org's project
+	planConfine  string                          // agent config files (notes) must resolve inside it (hosted)
 	deferGateway bool                            // the gateway preflight is the runners' (hosted: deferred_to_runner)
 	results      resultsindex.Source             // the org's database index (db.OrgIndex); nil uses the JSONL index
 }
@@ -186,6 +190,9 @@ func (a *app) newPlanner() *engine.Planner {
 	if a.planGuard != nil {
 		opts = append(opts, engine.WithExperimentGuard(a.planGuard)) // Tenancy area: hosted org paths stay in its project (servetenancy.go)
 	}
+	if a.planConfine != "" {
+		opts = append(opts, engine.WithFilesConfinedTo(a.planConfine)) // and so do the files the resolved agent configs name (4-B-14)
+	}
 	if a.deferGateway {
 		opts = append(opts, engine.WithGatewayDeferredToRunner()) // Tenancy area: a hosted server has no gateway; runners preflight theirs (servetenancy.go)
 	}
@@ -243,6 +250,18 @@ func (a *app) analyze(ctx context.Context, expID, gradeSource string) (*schemas.
 // handed the runs with every missing slot added as an unknown, as the verdict
 // sees them.
 func (a *app) analyzeWith(ctx context.Context, expID, gradeSource, policyOverride string) (*schemas.Analysis, []byte, error) {
+	return a.analyzeOpt(ctx, expID, gradeSource, policyOverride, false)
+}
+
+// analyzeView is analyze for a read route (the verdict, diagnostics and
+// adaptive pages): when an identical analysis is already saved it is
+// returned instead of writing another, so browsing a page never piles up
+// analysis folders (audit 4-B-07).
+func (a *app) analyzeView(ctx context.Context, expID, gradeSource string) (*schemas.Analysis, []byte, error) {
+	return a.analyzeOpt(ctx, expID, gradeSource, "", true)
+}
+
+func (a *app) analyzeOpt(ctx context.Context, expID, gradeSource, policyOverride string, reuse bool) (*schemas.Analysis, []byte, error) {
 	m, err := a.store.LoadManifest(ctx, expID)
 	if err != nil {
 		return nil, nil, err
@@ -307,6 +326,11 @@ func (a *app) analyzeWith(ctx context.Context, expID, gradeSource, policyOverrid
 	report = adaptiveSection(an, report)            // W7 adaptive trials and tiers: trials used, runs saved, stop reason, more evidence (adaptivereport.go)
 	// W8 judge calibration: report section (judge.go).
 	report = a.judgeCalibrationSection(an, report)
+	if reuse {
+		if same := a.sameAnalysis(an, report); same != nil {
+			return same, []byte(report), nil
+		}
+	}
 	if err := a.store.WriteAnalysis(ctx, an, map[string][]byte{"report.md": []byte(report)}); err != nil {
 		return nil, nil, fmt.Errorf("save analysis: %w", err)
 	}
@@ -374,4 +398,99 @@ func (a *app) benchRelative(p string) string {
 		return rel
 	}
 	return abs
+}
+
+// sameAnalysis returns a saved analysis of an's experiment equal to an apart
+// from its ID and creation time, with the same report, or nil.
+func (a *app) sameAnalysis(an *schemas.Analysis, report string) *schemas.Analysis {
+	want, err := analysisKey(an)
+	if err != nil {
+		return nil
+	}
+	base := filepath.Join(a.store.Root(), an.ExpID, "analysis")
+	entries, err := os.ReadDir(base)
+	if err != nil {
+		return nil
+	}
+	for _, e := range entries {
+		if !e.IsDir() {
+			continue
+		}
+		dir := filepath.Join(base, e.Name())
+		raw, err := os.ReadFile(filepath.Join(dir, "verdict.json"))
+		if err != nil {
+			continue
+		}
+		var old schemas.Analysis
+		if json.Unmarshal(raw, &old) != nil || old.AnalysisID != e.Name() {
+			continue
+		}
+		if k, err := analysisKey(&old); err != nil || k != want {
+			continue
+		}
+		md, err := os.ReadFile(filepath.Join(dir, "report.md"))
+		if err != nil || reportKey(string(md), &old) != reportKey(report, an) {
+			continue
+		}
+		return &old
+	}
+	return nil
+}
+
+// analysisKey is an analysis as JSON without its ID and creation time.
+func analysisKey(an *schemas.Analysis) (string, error) {
+	c := *an
+	c.AnalysisID, c.CreatedAt = "", time.Time{}
+	if c.Policy != nil {
+		pol := *c.Policy
+		pol.EvaluatedAt = time.Time{}
+		c.Policy = &pol
+	}
+	b, err := json.Marshal(&c)
+	if err != nil {
+		return "", err
+	}
+	// Sums over maps come out in any order, so a float can differ in its
+	// last bits between two analyses of the same evidence: compare floats
+	// at 12 significant digits.
+	var tree any
+	if err := json.Unmarshal(b, &tree); err != nil {
+		return "", err
+	}
+	b, err = json.Marshal(roundFloats(tree))
+	return string(b), err
+}
+
+// roundFloats rounds every number in a decoded JSON tree to 12 significant
+// digits.
+func roundFloats(v any) any {
+	switch x := v.(type) {
+	case float64:
+		r, _ := strconv.ParseFloat(strconv.FormatFloat(x, 'g', 12, 64), 64)
+		return r
+	case []any:
+		for i := range x {
+			x[i] = roundFloats(x[i])
+		}
+	case map[string]any:
+		for k := range x {
+			x[k] = roundFloats(x[k])
+		}
+	}
+	return v
+}
+
+// reportKey is a report without the analysis ID and the creation and
+// policy evaluation times it names.
+func reportKey(report string, an *schemas.Analysis) string {
+	if an.AnalysisID != "" {
+		report = strings.ReplaceAll(report, an.AnalysisID, "")
+	}
+	if !an.CreatedAt.IsZero() {
+		report = strings.ReplaceAll(report, an.CreatedAt.UTC().Format(time.RFC3339), "")
+	}
+	if an.Policy != nil && !an.Policy.EvaluatedAt.IsZero() {
+		report = strings.ReplaceAll(report, an.Policy.EvaluatedAt.UTC().Format(time.RFC3339), "")
+	}
+	return report
 }
