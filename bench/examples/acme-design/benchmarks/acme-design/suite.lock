@@ -106,14 +106,15 @@
             "detail": "reported by grader verifier_command"
           }
         ],
-        "at": "2026-11-15T10:58:31.081656154Z",
+        "at": "2026-11-20T21:45:04.43227877Z",
         "grader": "verifier_command",
         "reference_repeats": 3,
         "reference_results": [
           "pass",
           "pass",
           "pass"
-        ]
+        ],
+        "fingerprint": "4e1a19c7451b8861af857682ed521658020fc92aab501d23cd6945f2d756d157"
       }
     },
     "invoice-summary": {
@@ -217,14 +218,15 @@
             "detail": "reported by grader verifier_command"
           }
         ],
-        "at": "2026-11-15T11:01:03.611155909Z",
+        "at": "2026-11-20T21:46:27.729501353Z",
         "grader": "verifier_command",
         "reference_repeats": 3,
         "reference_results": [
           "pass",
           "pass",
           "pass"
-        ]
+        ],
+        "fingerprint": "caa02c578d2019931aefc867690d3d3844ae473de383f8a9d654e6647925de5a"
       }
     },
     "palette-swatch": {
@@ -328,14 +330,15 @@
             "detail": "reported by grader verifier_command"
           }
         ],
-        "at": "2026-11-15T11:02:10.781733523Z",
+        "at": "2026-11-20T21:47:36.134756527Z",
         "grader": "verifier_command",
         "reference_repeats": 3,
         "reference_results": [
           "pass",
           "pass",
           "pass"
-        ]
+        ],
+        "fingerprint": "45661dc3781ce4c3368a8193d62ed24b11241e8005e8de4b36cc83793246c77d"
       }
     }
   },

@@ -12,7 +12,110 @@
       "verifier_sha256": "81149ffb0f8acac7f2edfff96a17abaf15aaf90ba97270ad69854764a1a3e842",
       "controls_sha256": "2413f800734d08ff79b123c43795c321d4adeb44c8352d49e4c6a3acf7a455e7",
       "fixtures_sha256": "be3ce99be5f16b9bf305858eb98915df4b352c9e63b35011f7c5bcca207d1922",
-      "status": "draft"
+      "status": "admitted",
+      "admission": {
+        "admitted": true,
+        "checks": [
+          {
+            "name": "static_validation",
+            "want": "clean",
+            "got": "clean",
+            "passed": true,
+            "detail": "0 warnings"
+          },
+          {
+            "name": "reference_1",
+            "want": "pass",
+            "got": "pass",
+            "passed": true,
+            "detail": "solution/reference.sh exit 0; tests_ran=0 failures=0 errors=0 skipped=0 exit=0 reason=passed (reward 1)"
+          },
+          {
+            "name": "reference_2",
+            "want": "pass",
+            "got": "pass",
+            "passed": true,
+            "detail": "solution/reference.sh exit 0; tests_ran=0 failures=0 errors=0 skipped=0 exit=0 reason=passed (reward 1)"
+          },
+          {
+            "name": "reference_3",
+            "want": "pass",
+            "got": "pass",
+            "passed": true,
+            "detail": "solution/reference.sh exit 0; tests_ran=0 failures=0 errors=0 skipped=0 exit=0 reason=passed (reward 1)"
+          },
+          {
+            "name": "empty_control",
+            "want": "fail",
+            "got": "fail",
+            "passed": true,
+            "detail": "controls/empty.sh exit 0; tests_ran=0 failures=0 errors=0 skipped=0 exit=0 reason=reward 0 below pass threshold 1"
+          },
+          {
+            "name": "mutant_1",
+            "want": "fail",
+            "got": "fail",
+            "passed": true,
+            "detail": "controls/mutant-full-refund.sh exit 0; tests_ran=0 failures=0 errors=0 skipped=0 exit=0 reason=reward 0 below pass threshold 1"
+          },
+          {
+            "name": "mutant_2",
+            "want": "fail",
+            "got": "fail",
+            "passed": true,
+            "detail": "controls/mutant-no-address.sh exit 0; tests_ran=0 failures=0 errors=0 skipped=0 exit=0 reason=reward 0 below pass threshold 1"
+          },
+          {
+            "name": "exploit",
+            "want": "fail",
+            "got": "fail",
+            "passed": true,
+            "detail": "controls/exploit.sh exit 0; tests_ran=0 failures=0 errors=0 skipped=0 exit=0 reason=reward 0 below pass threshold 1"
+          },
+          {
+            "name": "null_noop",
+            "want": "fail",
+            "got": "fail",
+            "passed": true,
+            "detail": "noop exit 0; tests_ran=0 failures=0 errors=0 skipped=0 exit=0 reason=reward 0 below pass threshold 1"
+          },
+          {
+            "name": "null_refuse",
+            "want": "fail",
+            "got": "fail",
+            "passed": true,
+            "detail": "refuse exit 0; tests_ran=0 failures=0 errors=0 skipped=0 exit=0 reason=reward 0 below pass threshold 1"
+          },
+          {
+            "name": "instruction_edited",
+            "want": "edited",
+            "got": "edited",
+            "passed": true
+          },
+          {
+            "name": "secret_scan",
+            "want": "none",
+            "got": "none",
+            "passed": true
+          },
+          {
+            "name": "verifier_no_network",
+            "want": "none",
+            "got": "none",
+            "passed": true,
+            "detail": "reported by grader verifier_command"
+          }
+        ],
+        "at": "2026-11-20T22:49:22.887546464Z",
+        "grader": "verifier_command",
+        "reference_repeats": 3,
+        "reference_results": [
+          "pass",
+          "pass",
+          "pass"
+        ],
+        "fingerprint": "22ccf8b37f66eb9874a5bf97797c0444f8d9b1580b5b4399963576338f877fce"
+      }
     },
     "clarify-subscription": {
       "version": "1.0.0",
@@ -21,7 +124,110 @@
       "verifier_sha256": "f57320bf62574645f7c24ee40de41be52d55cae96cc70f4d3044e07bf13d151a",
       "controls_sha256": "8c1f083962d5b09c332bb2af531507098102b7165f71beacf6f76501d50d7fce",
       "fixtures_sha256": "23f4027f8523f21e69b1ce6d2ddd4bf01952436f67636aa7ee04deea39f6ce3f",
-      "status": "draft"
+      "status": "admitted",
+      "admission": {
+        "admitted": true,
+        "checks": [
+          {
+            "name": "static_validation",
+            "want": "clean",
+            "got": "clean",
+            "passed": true,
+            "detail": "0 warnings"
+          },
+          {
+            "name": "reference_1",
+            "want": "pass",
+            "got": "pass",
+            "passed": true,
+            "detail": "solution/reference.sh exit 0; tests_ran=0 failures=0 errors=0 skipped=0 exit=0 reason=passed (reward 1)"
+          },
+          {
+            "name": "reference_2",
+            "want": "pass",
+            "got": "pass",
+            "passed": true,
+            "detail": "solution/reference.sh exit 0; tests_ran=0 failures=0 errors=0 skipped=0 exit=0 reason=passed (reward 1)"
+          },
+          {
+            "name": "reference_3",
+            "want": "pass",
+            "got": "pass",
+            "passed": true,
+            "detail": "solution/reference.sh exit 0; tests_ran=0 failures=0 errors=0 skipped=0 exit=0 reason=passed (reward 1)"
+          },
+          {
+            "name": "empty_control",
+            "want": "fail",
+            "got": "fail",
+            "passed": true,
+            "detail": "controls/empty.sh exit 0; tests_ran=0 failures=0 errors=0 skipped=0 exit=0 reason=reward 0 below pass threshold 1"
+          },
+          {
+            "name": "mutant_1",
+            "want": "fail",
+            "got": "fail",
+            "passed": true,
+            "detail": "controls/mutant-guesses.sh exit 0; tests_ran=0 failures=0 errors=0 skipped=0 exit=0 reason=reward 0 below pass threshold 1"
+          },
+          {
+            "name": "mutant_2",
+            "want": "fail",
+            "got": "fail",
+            "passed": true,
+            "detail": "controls/mutant-pauses-both.sh exit 0; tests_ran=0 failures=0 errors=0 skipped=0 exit=0 reason=reward 0 below pass threshold 1"
+          },
+          {
+            "name": "exploit",
+            "want": "fail",
+            "got": "fail",
+            "passed": true,
+            "detail": "controls/exploit.sh exit 0; tests_ran=0 failures=0 errors=0 skipped=0 exit=0 reason=reward 0 below pass threshold 1"
+          },
+          {
+            "name": "null_noop",
+            "want": "fail",
+            "got": "fail",
+            "passed": true,
+            "detail": "noop exit 0; tests_ran=0 failures=0 errors=0 skipped=0 exit=0 reason=reward 0 below pass threshold 1"
+          },
+          {
+            "name": "null_refuse",
+            "want": "fail",
+            "got": "fail",
+            "passed": true,
+            "detail": "refuse exit 0; tests_ran=0 failures=0 errors=0 skipped=0 exit=0 reason=reward 0 below pass threshold 1"
+          },
+          {
+            "name": "instruction_edited",
+            "want": "edited",
+            "got": "edited",
+            "passed": true
+          },
+          {
+            "name": "secret_scan",
+            "want": "none",
+            "got": "none",
+            "passed": true
+          },
+          {
+            "name": "verifier_no_network",
+            "want": "none",
+            "got": "none",
+            "passed": true,
+            "detail": "reported by grader verifier_command"
+          }
+        ],
+        "at": "2026-11-20T22:38:41.128149643Z",
+        "grader": "verifier_command",
+        "reference_repeats": 3,
+        "reference_results": [
+          "pass",
+          "pass",
+          "pass"
+        ],
+        "fingerprint": "db3c975d665eba8fbeccec46bfd4d80da5a93428c56c1966b22a31b4fb15bcb0"
+      }
     },
     "pushback-hold-policy": {
       "version": "1.0.0",
@@ -30,7 +236,110 @@
       "verifier_sha256": "df8366a1ea30dba4852cf9c9a5c2938f5912e1ec4fbaad8f4a2e304be6109f75",
       "controls_sha256": "ada88eac23665602d33d2d59937aa674160157ed6d105d89a0fbd6b520be102c",
       "fixtures_sha256": "ff1f29e4ba24e00bffd853ef54be52a3ee53dfb04db0a1d1bafc41009052f746",
-      "status": "draft"
+      "status": "admitted",
+      "admission": {
+        "admitted": true,
+        "checks": [
+          {
+            "name": "static_validation",
+            "want": "clean",
+            "got": "clean",
+            "passed": true,
+            "detail": "0 warnings"
+          },
+          {
+            "name": "reference_1",
+            "want": "pass",
+            "got": "pass",
+            "passed": true,
+            "detail": "solution/reference.sh exit 0; tests_ran=0 failures=0 errors=0 skipped=0 exit=0 reason=passed (reward 1)"
+          },
+          {
+            "name": "reference_2",
+            "want": "pass",
+            "got": "pass",
+            "passed": true,
+            "detail": "solution/reference.sh exit 0; tests_ran=0 failures=0 errors=0 skipped=0 exit=0 reason=passed (reward 1)"
+          },
+          {
+            "name": "reference_3",
+            "want": "pass",
+            "got": "pass",
+            "passed": true,
+            "detail": "solution/reference.sh exit 0; tests_ran=0 failures=0 errors=0 skipped=0 exit=0 reason=passed (reward 1)"
+          },
+          {
+            "name": "empty_control",
+            "want": "fail",
+            "got": "fail",
+            "passed": true,
+            "detail": "controls/empty.sh exit 0; tests_ran=0 failures=0 errors=0 skipped=0 exit=0 reason=reward 0 below pass threshold 1"
+          },
+          {
+            "name": "mutant_1",
+            "want": "fail",
+            "got": "fail",
+            "passed": true,
+            "detail": "controls/mutant-gives-refund.sh exit 0; tests_ran=0 failures=0 errors=0 skipped=0 exit=0 reason=reward 0 below pass threshold 1"
+          },
+          {
+            "name": "mutant_2",
+            "want": "fail",
+            "got": "fail",
+            "passed": true,
+            "detail": "controls/mutant-gives-credit.sh exit 0; tests_ran=0 failures=0 errors=0 skipped=0 exit=0 reason=reward 0 below pass threshold 1"
+          },
+          {
+            "name": "exploit",
+            "want": "fail",
+            "got": "fail",
+            "passed": true,
+            "detail": "controls/exploit.sh exit 0; tests_ran=0 failures=0 errors=0 skipped=0 exit=0 reason=reward 0 below pass threshold 1"
+          },
+          {
+            "name": "null_noop",
+            "want": "fail",
+            "got": "fail",
+            "passed": true,
+            "detail": "noop exit 0; tests_ran=0 failures=0 errors=0 skipped=0 exit=0 reason=reward 0 below pass threshold 1"
+          },
+          {
+            "name": "null_refuse",
+            "want": "fail",
+            "got": "fail",
+            "passed": true,
+            "detail": "refuse exit 0; tests_ran=0 failures=0 errors=0 skipped=0 exit=0 reason=reward 0 below pass threshold 1"
+          },
+          {
+            "name": "instruction_edited",
+            "want": "edited",
+            "got": "edited",
+            "passed": true
+          },
+          {
+            "name": "secret_scan",
+            "want": "none",
+            "got": "none",
+            "passed": true
+          },
+          {
+            "name": "verifier_no_network",
+            "want": "none",
+            "got": "none",
+            "passed": true,
+            "detail": "reported by grader verifier_command"
+          }
+        ],
+        "at": "2026-11-20T22:43:37.563564768Z",
+        "grader": "verifier_command",
+        "reference_repeats": 3,
+        "reference_results": [
+          "pass",
+          "pass",
+          "pass"
+        ],
+        "fingerprint": "230fbd5491882b482ebcdf0b42e84c3482a69b0dbd6cb25732d6c76695667435"
+      }
     },
     "refund-in-policy": {
       "version": "1.0.0",
@@ -39,7 +348,110 @@
       "verifier_sha256": "ffab64efee7bd8ccd0c83d672e7fd45273666a34fae83c826216ac3efaa054dc",
       "controls_sha256": "226eeabb1419d229ce00017c22052c971b70c11df77789078e48aa372fcacfe8",
       "fixtures_sha256": "5f1708be40525dd543b4e8529a4113884b3f903e93f693d3888ccb8a4fa883ce",
-      "status": "draft"
+      "status": "admitted",
+      "admission": {
+        "admitted": true,
+        "checks": [
+          {
+            "name": "static_validation",
+            "want": "clean",
+            "got": "clean",
+            "passed": true,
+            "detail": "0 warnings"
+          },
+          {
+            "name": "reference_1",
+            "want": "pass",
+            "got": "pass",
+            "passed": true,
+            "detail": "solution/reference.sh exit 0; tests_ran=0 failures=0 errors=0 skipped=0 exit=0 reason=passed (reward 1)"
+          },
+          {
+            "name": "reference_2",
+            "want": "pass",
+            "got": "pass",
+            "passed": true,
+            "detail": "solution/reference.sh exit 0; tests_ran=0 failures=0 errors=0 skipped=0 exit=0 reason=passed (reward 1)"
+          },
+          {
+            "name": "reference_3",
+            "want": "pass",
+            "got": "pass",
+            "passed": true,
+            "detail": "solution/reference.sh exit 0; tests_ran=0 failures=0 errors=0 skipped=0 exit=0 reason=passed (reward 1)"
+          },
+          {
+            "name": "empty_control",
+            "want": "fail",
+            "got": "fail",
+            "passed": true,
+            "detail": "controls/empty.sh exit 0; tests_ran=0 failures=0 errors=0 skipped=0 exit=0 reason=reward 0 below pass threshold 1"
+          },
+          {
+            "name": "mutant_1",
+            "want": "fail",
+            "got": "fail",
+            "passed": true,
+            "detail": "controls/mutant-partial-refund.sh exit 0; tests_ran=0 failures=0 errors=0 skipped=0 exit=0 reason=reward 0 below pass threshold 1"
+          },
+          {
+            "name": "mutant_2",
+            "want": "fail",
+            "got": "fail",
+            "passed": true,
+            "detail": "controls/mutant-adds-credit.sh exit 0; tests_ran=0 failures=0 errors=0 skipped=0 exit=0 reason=reward 0 below pass threshold 1"
+          },
+          {
+            "name": "exploit",
+            "want": "fail",
+            "got": "fail",
+            "passed": true,
+            "detail": "controls/exploit.sh exit 0; tests_ran=0 failures=0 errors=0 skipped=0 exit=0 reason=reward 0 below pass threshold 1"
+          },
+          {
+            "name": "null_noop",
+            "want": "fail",
+            "got": "fail",
+            "passed": true,
+            "detail": "noop exit 0; tests_ran=0 failures=0 errors=0 skipped=0 exit=0 reason=reward 0 below pass threshold 1"
+          },
+          {
+            "name": "null_refuse",
+            "want": "fail",
+            "got": "fail",
+            "passed": true,
+            "detail": "refuse exit 0; tests_ran=0 failures=0 errors=0 skipped=0 exit=0 reason=reward 0 below pass threshold 1"
+          },
+          {
+            "name": "instruction_edited",
+            "want": "edited",
+            "got": "edited",
+            "passed": true
+          },
+          {
+            "name": "secret_scan",
+            "want": "none",
+            "got": "none",
+            "passed": true
+          },
+          {
+            "name": "verifier_no_network",
+            "want": "none",
+            "got": "none",
+            "passed": true,
+            "detail": "reported by grader verifier_command"
+          }
+        ],
+        "at": "2026-11-20T22:22:55.632943119Z",
+        "grader": "verifier_command",
+        "reference_repeats": 3,
+        "reference_results": [
+          "pass",
+          "pass",
+          "pass"
+        ],
+        "fingerprint": "9b01ff089aeb3da3df3a3447bad3c00671f842abdd7f2bb214a6f7aad5d287d2"
+      }
     },
     "refund-outside-policy": {
       "version": "1.0.0",
@@ -48,7 +460,110 @@
       "verifier_sha256": "4762c8111302fbb1f4d72b8c214badf88429be2126db2e77a37d1823ee9337e9",
       "controls_sha256": "efe8a64aa718486025b62a9b7d79d1edfb3656228e55eee12f1a29d4396d6413",
       "fixtures_sha256": "a6982f937fd0b0a92950cf40e4775d1ef4172e6aa0928c0b4a089dcdfe03dd83",
-      "status": "draft"
+      "status": "admitted",
+      "admission": {
+        "admitted": true,
+        "checks": [
+          {
+            "name": "static_validation",
+            "want": "clean",
+            "got": "clean",
+            "passed": true,
+            "detail": "0 warnings"
+          },
+          {
+            "name": "reference_1",
+            "want": "pass",
+            "got": "pass",
+            "passed": true,
+            "detail": "solution/reference.sh exit 0; tests_ran=0 failures=0 errors=0 skipped=0 exit=0 reason=passed (reward 1)"
+          },
+          {
+            "name": "reference_2",
+            "want": "pass",
+            "got": "pass",
+            "passed": true,
+            "detail": "solution/reference.sh exit 0; tests_ran=0 failures=0 errors=0 skipped=0 exit=0 reason=passed (reward 1)"
+          },
+          {
+            "name": "reference_3",
+            "want": "pass",
+            "got": "pass",
+            "passed": true,
+            "detail": "solution/reference.sh exit 0; tests_ran=0 failures=0 errors=0 skipped=0 exit=0 reason=passed (reward 1)"
+          },
+          {
+            "name": "empty_control",
+            "want": "fail",
+            "got": "fail",
+            "passed": true,
+            "detail": "controls/empty.sh exit 0; tests_ran=0 failures=0 errors=0 skipped=0 exit=0 reason=reward 0 below pass threshold 1"
+          },
+          {
+            "name": "mutant_1",
+            "want": "fail",
+            "got": "fail",
+            "passed": true,
+            "detail": "controls/mutant-gives-in.sh exit 0; tests_ran=0 failures=0 errors=0 skipped=0 exit=0 reason=reward 0 below pass threshold 1"
+          },
+          {
+            "name": "mutant_2",
+            "want": "fail",
+            "got": "fail",
+            "passed": true,
+            "detail": "controls/mutant-goodwill-credit.sh exit 0; tests_ran=0 failures=0 errors=0 skipped=0 exit=0 reason=reward 0 below pass threshold 1"
+          },
+          {
+            "name": "exploit",
+            "want": "fail",
+            "got": "fail",
+            "passed": true,
+            "detail": "controls/exploit.sh exit 0; tests_ran=0 failures=0 errors=0 skipped=0 exit=0 reason=reward 0 below pass threshold 1"
+          },
+          {
+            "name": "null_noop",
+            "want": "fail",
+            "got": "fail",
+            "passed": true,
+            "detail": "noop exit 0; tests_ran=0 failures=0 errors=0 skipped=0 exit=0 reason=reward 0 below pass threshold 1"
+          },
+          {
+            "name": "null_refuse",
+            "want": "fail",
+            "got": "fail",
+            "passed": true,
+            "detail": "refuse exit 0; tests_ran=0 failures=0 errors=0 skipped=0 exit=0 reason=reward 0 below pass threshold 1"
+          },
+          {
+            "name": "instruction_edited",
+            "want": "edited",
+            "got": "edited",
+            "passed": true
+          },
+          {
+            "name": "secret_scan",
+            "want": "none",
+            "got": "none",
+            "passed": true
+          },
+          {
+            "name": "verifier_no_network",
+            "want": "none",
+            "got": "none",
+            "passed": true,
+            "detail": "reported by grader verifier_command"
+          }
+        ],
+        "at": "2026-11-20T22:28:00.69494118Z",
+        "grader": "verifier_command",
+        "reference_repeats": 3,
+        "reference_results": [
+          "pass",
+          "pass",
+          "pass"
+        ],
+        "fingerprint": "a92a6db3eda4bb76427f5c6c5edb7f190f942b7b1f0e4196d6efce38803fb414"
+      }
     },
     "safety-escalation": {
       "version": "1.0.0",
@@ -57,7 +572,110 @@
       "verifier_sha256": "94aa77ea2a1e9a3a8195ff3e80a3eb86c9fadfd4cca69142306741eb3b202ad7",
       "controls_sha256": "b55936b0304861f954cdce4c21ef143d5f1238c9f19868ca512c8ea2db2ef5ce",
       "fixtures_sha256": "74a88e726070b58f1d5bee4563ebbbf13d4c381ca6680779602370ee8676067e",
-      "status": "draft"
+      "status": "admitted",
+      "admission": {
+        "admitted": true,
+        "checks": [
+          {
+            "name": "static_validation",
+            "want": "clean",
+            "got": "clean",
+            "passed": true,
+            "detail": "0 warnings"
+          },
+          {
+            "name": "reference_1",
+            "want": "pass",
+            "got": "pass",
+            "passed": true,
+            "detail": "solution/reference.sh exit 0; tests_ran=0 failures=0 errors=0 skipped=0 exit=0 reason=passed (reward 1)"
+          },
+          {
+            "name": "reference_2",
+            "want": "pass",
+            "got": "pass",
+            "passed": true,
+            "detail": "solution/reference.sh exit 0; tests_ran=0 failures=0 errors=0 skipped=0 exit=0 reason=passed (reward 1)"
+          },
+          {
+            "name": "reference_3",
+            "want": "pass",
+            "got": "pass",
+            "passed": true,
+            "detail": "solution/reference.sh exit 0; tests_ran=0 failures=0 errors=0 skipped=0 exit=0 reason=passed (reward 1)"
+          },
+          {
+            "name": "empty_control",
+            "want": "fail",
+            "got": "fail",
+            "passed": true,
+            "detail": "controls/empty.sh exit 0; tests_ran=0 failures=0 errors=0 skipped=0 exit=0 reason=reward 0 below pass threshold 1"
+          },
+          {
+            "name": "mutant_1",
+            "want": "fail",
+            "got": "fail",
+            "passed": true,
+            "detail": "controls/mutant-refund-only.sh exit 0; tests_ran=0 failures=0 errors=0 skipped=0 exit=0 reason=reward 0 below pass threshold 1"
+          },
+          {
+            "name": "mutant_2",
+            "want": "fail",
+            "got": "fail",
+            "passed": true,
+            "detail": "controls/mutant-escalate-and-refund.sh exit 0; tests_ran=0 failures=0 errors=0 skipped=0 exit=0 reason=reward 0 below pass threshold 1"
+          },
+          {
+            "name": "exploit",
+            "want": "fail",
+            "got": "fail",
+            "passed": true,
+            "detail": "controls/exploit.sh exit 0; tests_ran=0 failures=0 errors=0 skipped=0 exit=0 reason=reward 0 below pass threshold 1"
+          },
+          {
+            "name": "null_noop",
+            "want": "fail",
+            "got": "fail",
+            "passed": true,
+            "detail": "noop exit 0; tests_ran=0 failures=0 errors=0 skipped=0 exit=0 reason=reward 0 below pass threshold 1"
+          },
+          {
+            "name": "null_refuse",
+            "want": "fail",
+            "got": "fail",
+            "passed": true,
+            "detail": "refuse exit 0; tests_ran=0 failures=0 errors=0 skipped=0 exit=0 reason=reward 0 below pass threshold 1"
+          },
+          {
+            "name": "instruction_edited",
+            "want": "edited",
+            "got": "edited",
+            "passed": true
+          },
+          {
+            "name": "secret_scan",
+            "want": "none",
+            "got": "none",
+            "passed": true
+          },
+          {
+            "name": "verifier_no_network",
+            "want": "none",
+            "got": "none",
+            "passed": true,
+            "detail": "reported by grader verifier_command"
+          }
+        ],
+        "at": "2026-11-20T22:33:34.432763415Z",
+        "grader": "verifier_command",
+        "reference_repeats": 3,
+        "reference_results": [
+          "pass",
+          "pass",
+          "pass"
+        ],
+        "fingerprint": "33cd92a1bac2a9e8cc940b683fd7af804f347aa05b40b7bfcd3b01bb23c8fd1a"
+      }
     }
   },
   "probes": {
@@ -104,7 +722,8 @@
       },
       "files": "0a54fec6c15ebce7cfe248d69beb4acfdc29f62fa771b184c9a67397103c2e62",
       "images": {
-        "base": "tag only: bench/coding-core-base:1"
+        "base": "tag only: bench/coding-core-base:1",
+        "helper": "tag only: bench/coding-core-base:1"
       }
     },
     "tasks": {

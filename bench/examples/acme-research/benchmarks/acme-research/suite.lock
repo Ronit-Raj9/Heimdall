@@ -12,7 +12,103 @@
       "verifier_sha256": "04381d10a5fdc2df45de2689d4672b025e376064a9e1ce2a7ef8946495b3bdbb",
       "controls_sha256": "6829f12a8a809c6b9d84f6fcf6efc30fac2c09da2e8474d7f4f08123cda12d48",
       "fixtures_sha256": "cc4cd2a8078ef2b310eb6477c881a7b3790b89e00188d8e016c8439de20fcf31",
-      "status": "draft"
+      "status": "admitted",
+      "admission": {
+        "admitted": true,
+        "checks": [
+          {
+            "name": "static_validation",
+            "want": "clean",
+            "got": "clean",
+            "passed": true,
+            "detail": "0 warnings"
+          },
+          {
+            "name": "reference_1",
+            "want": "pass",
+            "got": "pass",
+            "passed": true,
+            "detail": "solution/reference.sh exit 0; tests_ran=0 failures=0 errors=0 skipped=0 exit=0 reason=passed (reward 1)"
+          },
+          {
+            "name": "reference_2",
+            "want": "pass",
+            "got": "pass",
+            "passed": true,
+            "detail": "solution/reference.sh exit 0; tests_ran=0 failures=0 errors=0 skipped=0 exit=0 reason=passed (reward 1)"
+          },
+          {
+            "name": "reference_3",
+            "want": "pass",
+            "got": "pass",
+            "passed": true,
+            "detail": "solution/reference.sh exit 0; tests_ran=0 failures=0 errors=0 skipped=0 exit=0 reason=passed (reward 1)"
+          },
+          {
+            "name": "empty_control",
+            "want": "fail",
+            "got": "fail",
+            "passed": true,
+            "detail": "controls/empty.sh exit 0; artifact output: required artifact missing: answer (answer.txt: missing: no file matches answer.txt)"
+          },
+          {
+            "name": "mutant_1",
+            "want": "fail",
+            "got": "fail",
+            "passed": true,
+            "detail": "controls/mutant-annual.sh exit 0; tests_ran=0 failures=0 errors=0 skipped=0 exit=0 reason=reward 0 below pass threshold 1"
+          },
+          {
+            "name": "exploit",
+            "want": "fail",
+            "got": "fail",
+            "passed": true,
+            "detail": "controls/exploit.sh exit 0; tests_ran=0 failures=0 errors=0 skipped=0 exit=0 reason=reward 0 below pass threshold 1"
+          },
+          {
+            "name": "null_noop",
+            "want": "fail",
+            "got": "fail",
+            "passed": true,
+            "detail": "noop exit 0; artifact output: required artifact missing: answer (answer.txt: missing: no file matches answer.txt)"
+          },
+          {
+            "name": "null_refuse",
+            "want": "fail",
+            "got": "fail",
+            "passed": true,
+            "detail": "refuse exit 0; artifact output: required artifact missing: answer (answer.txt: missing: no file matches answer.txt)"
+          },
+          {
+            "name": "instruction_edited",
+            "want": "edited",
+            "got": "edited",
+            "passed": true
+          },
+          {
+            "name": "secret_scan",
+            "want": "none",
+            "got": "none",
+            "passed": true
+          },
+          {
+            "name": "verifier_no_network",
+            "want": "none",
+            "got": "none",
+            "passed": true,
+            "detail": "reported by grader verifier_command"
+          }
+        ],
+        "at": "2026-11-20T22:12:16.275556073Z",
+        "grader": "verifier_command",
+        "reference_repeats": 3,
+        "reference_results": [
+          "pass",
+          "pass",
+          "pass"
+        ],
+        "fingerprint": "5ca08346962316c63ef1f7302d268ecb0160b76bff883bc35ebcd7d2c6082684"
+      }
     },
     "bridge-mayor": {
       "version": "1.0.0",
@@ -21,7 +117,103 @@
       "verifier_sha256": "c9f5606df8b36389b4731267ed0221ad6bed30f1650c65427d664c62fda9d252",
       "controls_sha256": "e078d0dce3cb60800a1632e1b14ff5c6d2c68b47bde64bab38b845d2c16300f6",
       "fixtures_sha256": "cc4cd2a8078ef2b310eb6477c881a7b3790b89e00188d8e016c8439de20fcf31",
-      "status": "draft"
+      "status": "admitted",
+      "admission": {
+        "admitted": true,
+        "checks": [
+          {
+            "name": "static_validation",
+            "want": "clean",
+            "got": "clean",
+            "passed": true,
+            "detail": "0 warnings"
+          },
+          {
+            "name": "reference_1",
+            "want": "pass",
+            "got": "pass",
+            "passed": true,
+            "detail": "solution/reference.sh exit 0; tests_ran=0 failures=0 errors=0 skipped=0 exit=0 reason=passed (reward 1)"
+          },
+          {
+            "name": "reference_2",
+            "want": "pass",
+            "got": "pass",
+            "passed": true,
+            "detail": "solution/reference.sh exit 0; tests_ran=0 failures=0 errors=0 skipped=0 exit=0 reason=passed (reward 1)"
+          },
+          {
+            "name": "reference_3",
+            "want": "pass",
+            "got": "pass",
+            "passed": true,
+            "detail": "solution/reference.sh exit 0; tests_ran=0 failures=0 errors=0 skipped=0 exit=0 reason=passed (reward 1)"
+          },
+          {
+            "name": "empty_control",
+            "want": "fail",
+            "got": "fail",
+            "passed": true,
+            "detail": "controls/empty.sh exit 0; artifact output: required artifact missing: answer (answer.txt: missing: no file matches answer.txt)"
+          },
+          {
+            "name": "mutant_1",
+            "want": "fail",
+            "got": "fail",
+            "passed": true,
+            "detail": "controls/mutant-outdated.sh exit 0; tests_ran=0 failures=0 errors=0 skipped=0 exit=0 reason=reward 0 below pass threshold 1"
+          },
+          {
+            "name": "exploit",
+            "want": "fail",
+            "got": "fail",
+            "passed": true,
+            "detail": "controls/exploit.sh exit 0; tests_ran=0 failures=0 errors=0 skipped=0 exit=0 reason=reward 0 below pass threshold 1"
+          },
+          {
+            "name": "null_noop",
+            "want": "fail",
+            "got": "fail",
+            "passed": true,
+            "detail": "noop exit 0; artifact output: required artifact missing: answer (answer.txt: missing: no file matches answer.txt)"
+          },
+          {
+            "name": "null_refuse",
+            "want": "fail",
+            "got": "fail",
+            "passed": true,
+            "detail": "refuse exit 0; artifact output: required artifact missing: answer (answer.txt: missing: no file matches answer.txt)"
+          },
+          {
+            "name": "instruction_edited",
+            "want": "edited",
+            "got": "edited",
+            "passed": true
+          },
+          {
+            "name": "secret_scan",
+            "want": "none",
+            "got": "none",
+            "passed": true
+          },
+          {
+            "name": "verifier_no_network",
+            "want": "none",
+            "got": "none",
+            "passed": true,
+            "detail": "reported by grader verifier_command"
+          }
+        ],
+        "at": "2026-11-20T22:06:09.903710251Z",
+        "grader": "verifier_command",
+        "reference_repeats": 3,
+        "reference_results": [
+          "pass",
+          "pass",
+          "pass"
+        ],
+        "fingerprint": "081dd6804c075665034924e39e47c01681d5be3eb3f3996a7d8cd1cc5034e53d"
+      }
     },
     "county-town-population": {
       "version": "1.0.0",
@@ -30,7 +222,103 @@
       "verifier_sha256": "09efab82cc7b1a6ee7d174d5adcffd1ddeaf027f4157cbed3200eebb56c1f68c",
       "controls_sha256": "bb481a2835dc97f666bd04e8f53b18e16cf7b52e316b7b6108787e0261331b96",
       "fixtures_sha256": "cc4cd2a8078ef2b310eb6477c881a7b3790b89e00188d8e016c8439de20fcf31",
-      "status": "draft"
+      "status": "admitted",
+      "admission": {
+        "admitted": true,
+        "checks": [
+          {
+            "name": "static_validation",
+            "want": "clean",
+            "got": "clean",
+            "passed": true,
+            "detail": "0 warnings"
+          },
+          {
+            "name": "reference_1",
+            "want": "pass",
+            "got": "pass",
+            "passed": true,
+            "detail": "solution/reference.sh exit 0; tests_ran=0 failures=0 errors=0 skipped=0 exit=0 reason=passed (reward 1)"
+          },
+          {
+            "name": "reference_2",
+            "want": "pass",
+            "got": "pass",
+            "passed": true,
+            "detail": "solution/reference.sh exit 0; tests_ran=0 failures=0 errors=0 skipped=0 exit=0 reason=passed (reward 1)"
+          },
+          {
+            "name": "reference_3",
+            "want": "pass",
+            "got": "pass",
+            "passed": true,
+            "detail": "solution/reference.sh exit 0; tests_ran=0 failures=0 errors=0 skipped=0 exit=0 reason=passed (reward 1)"
+          },
+          {
+            "name": "empty_control",
+            "want": "fail",
+            "got": "fail",
+            "passed": true,
+            "detail": "controls/empty.sh exit 0; artifact output: required artifact missing: answer (answer.txt: missing: no file matches answer.txt)"
+          },
+          {
+            "name": "mutant_1",
+            "want": "fail",
+            "got": "fail",
+            "passed": true,
+            "detail": "controls/mutant-old-census.sh exit 0; tests_ran=0 failures=0 errors=0 skipped=0 exit=0 reason=reward 0 below pass threshold 1"
+          },
+          {
+            "name": "exploit",
+            "want": "fail",
+            "got": "fail",
+            "passed": true,
+            "detail": "controls/exploit.sh exit 0; tests_ran=0 failures=0 errors=0 skipped=0 exit=0 reason=reward 0 below pass threshold 1"
+          },
+          {
+            "name": "null_noop",
+            "want": "fail",
+            "got": "fail",
+            "passed": true,
+            "detail": "noop exit 0; artifact output: required artifact missing: answer (answer.txt: missing: no file matches answer.txt)"
+          },
+          {
+            "name": "null_refuse",
+            "want": "fail",
+            "got": "fail",
+            "passed": true,
+            "detail": "refuse exit 0; artifact output: required artifact missing: answer (answer.txt: missing: no file matches answer.txt)"
+          },
+          {
+            "name": "instruction_edited",
+            "want": "edited",
+            "got": "edited",
+            "passed": true
+          },
+          {
+            "name": "secret_scan",
+            "want": "none",
+            "got": "none",
+            "passed": true
+          },
+          {
+            "name": "verifier_no_network",
+            "want": "none",
+            "got": "none",
+            "passed": true,
+            "detail": "reported by grader verifier_command"
+          }
+        ],
+        "at": "2026-11-20T22:07:32.511055224Z",
+        "grader": "verifier_command",
+        "reference_repeats": 3,
+        "reference_results": [
+          "pass",
+          "pass",
+          "pass"
+        ],
+        "fingerprint": "0ea9eee55f12b193fe4fd622083860d6231d5653a360695270a22cd0f1dcb3b3"
+      }
     },
     "ferry-start": {
       "version": "1.0.0",
@@ -39,7 +327,103 @@
       "verifier_sha256": "c061cd2c485c4eff1bf29199e3d444a1b75563fdb469544b92d20a885d561761",
       "controls_sha256": "08cc8c56278e4c7a3aa895517845a8b2a71be00088f2f0bb98bb4684481116e3",
       "fixtures_sha256": "cc4cd2a8078ef2b310eb6477c881a7b3790b89e00188d8e016c8439de20fcf31",
-      "status": "draft"
+      "status": "admitted",
+      "admission": {
+        "admitted": true,
+        "checks": [
+          {
+            "name": "static_validation",
+            "want": "clean",
+            "got": "clean",
+            "passed": true,
+            "detail": "0 warnings"
+          },
+          {
+            "name": "reference_1",
+            "want": "pass",
+            "got": "pass",
+            "passed": true,
+            "detail": "solution/reference.sh exit 0; tests_ran=0 failures=0 errors=0 skipped=0 exit=0 reason=passed (reward 1)"
+          },
+          {
+            "name": "reference_2",
+            "want": "pass",
+            "got": "pass",
+            "passed": true,
+            "detail": "solution/reference.sh exit 0; tests_ran=0 failures=0 errors=0 skipped=0 exit=0 reason=passed (reward 1)"
+          },
+          {
+            "name": "reference_3",
+            "want": "pass",
+            "got": "pass",
+            "passed": true,
+            "detail": "solution/reference.sh exit 0; tests_ran=0 failures=0 errors=0 skipped=0 exit=0 reason=passed (reward 1)"
+          },
+          {
+            "name": "empty_control",
+            "want": "fail",
+            "got": "fail",
+            "passed": true,
+            "detail": "controls/empty.sh exit 0; artifact output: required artifact missing: answer (answer.txt: missing: no file matches answer.txt)"
+          },
+          {
+            "name": "mutant_1",
+            "want": "fail",
+            "got": "fail",
+            "passed": true,
+            "detail": "controls/mutant-brannock.sh exit 0; tests_ran=0 failures=0 errors=0 skipped=0 exit=0 reason=reward 0 below pass threshold 1"
+          },
+          {
+            "name": "exploit",
+            "want": "fail",
+            "got": "fail",
+            "passed": true,
+            "detail": "controls/exploit.sh exit 0; tests_ran=0 failures=0 errors=0 skipped=0 exit=0 reason=reward 0 below pass threshold 1"
+          },
+          {
+            "name": "null_noop",
+            "want": "fail",
+            "got": "fail",
+            "passed": true,
+            "detail": "noop exit 0; artifact output: required artifact missing: answer (answer.txt: missing: no file matches answer.txt)"
+          },
+          {
+            "name": "null_refuse",
+            "want": "fail",
+            "got": "fail",
+            "passed": true,
+            "detail": "refuse exit 0; artifact output: required artifact missing: answer (answer.txt: missing: no file matches answer.txt)"
+          },
+          {
+            "name": "instruction_edited",
+            "want": "edited",
+            "got": "edited",
+            "passed": true
+          },
+          {
+            "name": "secret_scan",
+            "want": "none",
+            "got": "none",
+            "passed": true
+          },
+          {
+            "name": "verifier_no_network",
+            "want": "none",
+            "got": "none",
+            "passed": true,
+            "detail": "reported by grader verifier_command"
+          }
+        ],
+        "at": "2026-11-20T22:04:39.984447115Z",
+        "grader": "verifier_command",
+        "reference_repeats": 3,
+        "reference_results": [
+          "pass",
+          "pass",
+          "pass"
+        ],
+        "fingerprint": "fcd3c9f9323efd1434ab9e34143a5b708b101d81390a6e8235bb6a648b6f34f9"
+      }
     },
     "festival-date": {
       "version": "1.0.0",
@@ -48,7 +432,103 @@
       "verifier_sha256": "3409149725efa58705d1be825cc0c7f57bf574656e880932eafd26c4b01ccae1",
       "controls_sha256": "3510cb1e1be5fff421553c48b44fd0685ef13fd0c8d08ea0ac46e586f3a3138f",
       "fixtures_sha256": "cc4cd2a8078ef2b310eb6477c881a7b3790b89e00188d8e016c8439de20fcf31",
-      "status": "draft"
+      "status": "admitted",
+      "admission": {
+        "admitted": true,
+        "checks": [
+          {
+            "name": "static_validation",
+            "want": "clean",
+            "got": "clean",
+            "passed": true,
+            "detail": "0 warnings"
+          },
+          {
+            "name": "reference_1",
+            "want": "pass",
+            "got": "pass",
+            "passed": true,
+            "detail": "solution/reference.sh exit 0; tests_ran=0 failures=0 errors=0 skipped=0 exit=0 reason=passed (reward 1)"
+          },
+          {
+            "name": "reference_2",
+            "want": "pass",
+            "got": "pass",
+            "passed": true,
+            "detail": "solution/reference.sh exit 0; tests_ran=0 failures=0 errors=0 skipped=0 exit=0 reason=passed (reward 1)"
+          },
+          {
+            "name": "reference_3",
+            "want": "pass",
+            "got": "pass",
+            "passed": true,
+            "detail": "solution/reference.sh exit 0; tests_ran=0 failures=0 errors=0 skipped=0 exit=0 reason=passed (reward 1)"
+          },
+          {
+            "name": "empty_control",
+            "want": "fail",
+            "got": "fail",
+            "passed": true,
+            "detail": "controls/empty.sh exit 0; artifact output: required artifact missing: answer (answer.txt: missing: no file matches answer.txt)"
+          },
+          {
+            "name": "mutant_1",
+            "want": "fail",
+            "got": "fail",
+            "passed": true,
+            "detail": "controls/mutant-forum.sh exit 0; tests_ran=0 failures=0 errors=0 skipped=0 exit=0 reason=reward 0 below pass threshold 1"
+          },
+          {
+            "name": "exploit",
+            "want": "fail",
+            "got": "fail",
+            "passed": true,
+            "detail": "controls/exploit.sh exit 0; tests_ran=0 failures=0 errors=0 skipped=0 exit=0 reason=reward 0 below pass threshold 1"
+          },
+          {
+            "name": "null_noop",
+            "want": "fail",
+            "got": "fail",
+            "passed": true,
+            "detail": "noop exit 0; artifact output: required artifact missing: answer (answer.txt: missing: no file matches answer.txt)"
+          },
+          {
+            "name": "null_refuse",
+            "want": "fail",
+            "got": "fail",
+            "passed": true,
+            "detail": "refuse exit 0; artifact output: required artifact missing: answer (answer.txt: missing: no file matches answer.txt)"
+          },
+          {
+            "name": "instruction_edited",
+            "want": "edited",
+            "got": "edited",
+            "passed": true
+          },
+          {
+            "name": "secret_scan",
+            "want": "none",
+            "got": "none",
+            "passed": true
+          },
+          {
+            "name": "verifier_no_network",
+            "want": "none",
+            "got": "none",
+            "passed": true,
+            "detail": "reported by grader verifier_command"
+          }
+        ],
+        "at": "2026-11-20T22:10:42.451768635Z",
+        "grader": "verifier_command",
+        "reference_repeats": 3,
+        "reference_results": [
+          "pass",
+          "pass",
+          "pass"
+        ],
+        "fingerprint": "2834b7a478d28477178910f6ddd958447ee52988cba3349663aced0e6a73155d"
+      }
     },
     "last-keeper": {
       "version": "1.0.0",
@@ -57,7 +537,103 @@
       "verifier_sha256": "d26b780277ac0239c049cf875f1273f00857b41e6c93f09ec53e51068c11ef7d",
       "controls_sha256": "6bea4e756fc1c45fa1097ba8e9f662b7718703fd6824f5ad6e60078e76aefb7e",
       "fixtures_sha256": "cc4cd2a8078ef2b310eb6477c881a7b3790b89e00188d8e016c8439de20fcf31",
-      "status": "draft"
+      "status": "admitted",
+      "admission": {
+        "admitted": true,
+        "checks": [
+          {
+            "name": "static_validation",
+            "want": "clean",
+            "got": "clean",
+            "passed": true,
+            "detail": "0 warnings"
+          },
+          {
+            "name": "reference_1",
+            "want": "pass",
+            "got": "pass",
+            "passed": true,
+            "detail": "solution/reference.sh exit 0; tests_ran=0 failures=0 errors=0 skipped=0 exit=0 reason=passed (reward 1)"
+          },
+          {
+            "name": "reference_2",
+            "want": "pass",
+            "got": "pass",
+            "passed": true,
+            "detail": "solution/reference.sh exit 0; tests_ran=0 failures=0 errors=0 skipped=0 exit=0 reason=passed (reward 1)"
+          },
+          {
+            "name": "reference_3",
+            "want": "pass",
+            "got": "pass",
+            "passed": true,
+            "detail": "solution/reference.sh exit 0; tests_ran=0 failures=0 errors=0 skipped=0 exit=0 reason=passed (reward 1)"
+          },
+          {
+            "name": "empty_control",
+            "want": "fail",
+            "got": "fail",
+            "passed": true,
+            "detail": "controls/empty.sh exit 0; artifact output: required artifact missing: answer (answer.txt: missing: no file matches answer.txt)"
+          },
+          {
+            "name": "mutant_1",
+            "want": "fail",
+            "got": "fail",
+            "passed": true,
+            "detail": "controls/mutant-injected.sh exit 0; tests_ran=0 failures=0 errors=0 skipped=0 exit=0 reason=reward 0 below pass threshold 1"
+          },
+          {
+            "name": "exploit",
+            "want": "fail",
+            "got": "fail",
+            "passed": true,
+            "detail": "controls/exploit.sh exit 0; tests_ran=0 failures=0 errors=0 skipped=0 exit=0 reason=reward 0 below pass threshold 1"
+          },
+          {
+            "name": "null_noop",
+            "want": "fail",
+            "got": "fail",
+            "passed": true,
+            "detail": "noop exit 0; artifact output: required artifact missing: answer (answer.txt: missing: no file matches answer.txt)"
+          },
+          {
+            "name": "null_refuse",
+            "want": "fail",
+            "got": "fail",
+            "passed": true,
+            "detail": "refuse exit 0; artifact output: required artifact missing: answer (answer.txt: missing: no file matches answer.txt)"
+          },
+          {
+            "name": "instruction_edited",
+            "want": "edited",
+            "got": "edited",
+            "passed": true
+          },
+          {
+            "name": "secret_scan",
+            "want": "none",
+            "got": "none",
+            "passed": true
+          },
+          {
+            "name": "verifier_no_network",
+            "want": "none",
+            "got": "none",
+            "passed": true,
+            "detail": "reported by grader verifier_command"
+          }
+        ],
+        "at": "2026-11-20T22:15:18.460231616Z",
+        "grader": "verifier_command",
+        "reference_repeats": 3,
+        "reference_results": [
+          "pass",
+          "pass",
+          "pass"
+        ],
+        "fingerprint": "cfb501d25fd94030f9da856bbf746ee339a856c53e9466d366d8306c6ffaacf5"
+      }
     },
     "mooring-fee": {
       "version": "1.0.0",
@@ -66,7 +642,103 @@
       "verifier_sha256": "479e9706b66c476874f839c9cadf65be82dfe4285500bac2d1fa9b69e4ad3aa5",
       "controls_sha256": "3270585678103f567ac9044dc52cadbdd468454a9ee6bc3d40dd6d2e1e1dc3c9",
       "fixtures_sha256": "cc4cd2a8078ef2b310eb6477c881a7b3790b89e00188d8e016c8439de20fcf31",
-      "status": "draft"
+      "status": "admitted",
+      "admission": {
+        "admitted": true,
+        "checks": [
+          {
+            "name": "static_validation",
+            "want": "clean",
+            "got": "clean",
+            "passed": true,
+            "detail": "0 warnings"
+          },
+          {
+            "name": "reference_1",
+            "want": "pass",
+            "got": "pass",
+            "passed": true,
+            "detail": "solution/reference.sh exit 0; tests_ran=0 failures=0 errors=0 skipped=0 exit=0 reason=passed (reward 1)"
+          },
+          {
+            "name": "reference_2",
+            "want": "pass",
+            "got": "pass",
+            "passed": true,
+            "detail": "solution/reference.sh exit 0; tests_ran=0 failures=0 errors=0 skipped=0 exit=0 reason=passed (reward 1)"
+          },
+          {
+            "name": "reference_3",
+            "want": "pass",
+            "got": "pass",
+            "passed": true,
+            "detail": "solution/reference.sh exit 0; tests_ran=0 failures=0 errors=0 skipped=0 exit=0 reason=passed (reward 1)"
+          },
+          {
+            "name": "empty_control",
+            "want": "fail",
+            "got": "fail",
+            "passed": true,
+            "detail": "controls/empty.sh exit 0; artifact output: required artifact missing: answer (answer.txt: missing: no file matches answer.txt)"
+          },
+          {
+            "name": "mutant_1",
+            "want": "fail",
+            "got": "fail",
+            "passed": true,
+            "detail": "controls/mutant-old-fee.sh exit 0; tests_ran=0 failures=0 errors=0 skipped=0 exit=0 reason=reward 0 below pass threshold 1"
+          },
+          {
+            "name": "exploit",
+            "want": "fail",
+            "got": "fail",
+            "passed": true,
+            "detail": "controls/exploit.sh exit 0; tests_ran=0 failures=0 errors=0 skipped=0 exit=0 reason=reward 0 below pass threshold 1"
+          },
+          {
+            "name": "null_noop",
+            "want": "fail",
+            "got": "fail",
+            "passed": true,
+            "detail": "noop exit 0; artifact output: required artifact missing: answer (answer.txt: missing: no file matches answer.txt)"
+          },
+          {
+            "name": "null_refuse",
+            "want": "fail",
+            "got": "fail",
+            "passed": true,
+            "detail": "refuse exit 0; artifact output: required artifact missing: answer (answer.txt: missing: no file matches answer.txt)"
+          },
+          {
+            "name": "instruction_edited",
+            "want": "edited",
+            "got": "edited",
+            "passed": true
+          },
+          {
+            "name": "secret_scan",
+            "want": "none",
+            "got": "none",
+            "passed": true
+          },
+          {
+            "name": "verifier_no_network",
+            "want": "none",
+            "got": "none",
+            "passed": true,
+            "detail": "reported by grader verifier_command"
+          }
+        ],
+        "at": "2026-11-20T22:13:57.750484632Z",
+        "grader": "verifier_command",
+        "reference_repeats": 3,
+        "reference_results": [
+          "pass",
+          "pass",
+          "pass"
+        ],
+        "fingerprint": "c0172e2df6f93d75133a97fe9fe69b79c39e05f91c76d632f9a4d838d00462c0"
+      }
     },
     "tunnel-length": {
       "version": "1.0.0",
@@ -75,7 +747,103 @@
       "verifier_sha256": "bb653b2ca01891a3a67676729e508d62b00758685cddfbc79d3ec0dfefdef6d0",
       "controls_sha256": "b88ccc1b56f1b4ee39e4c1fe75dd13af55b3274f0e6b1d0e41b069d7c6c135ad",
       "fixtures_sha256": "cc4cd2a8078ef2b310eb6477c881a7b3790b89e00188d8e016c8439de20fcf31",
-      "status": "draft"
+      "status": "admitted",
+      "admission": {
+        "admitted": true,
+        "checks": [
+          {
+            "name": "static_validation",
+            "want": "clean",
+            "got": "clean",
+            "passed": true,
+            "detail": "0 warnings"
+          },
+          {
+            "name": "reference_1",
+            "want": "pass",
+            "got": "pass",
+            "passed": true,
+            "detail": "solution/reference.sh exit 0; tests_ran=0 failures=0 errors=0 skipped=0 exit=0 reason=passed (reward 1)"
+          },
+          {
+            "name": "reference_2",
+            "want": "pass",
+            "got": "pass",
+            "passed": true,
+            "detail": "solution/reference.sh exit 0; tests_ran=0 failures=0 errors=0 skipped=0 exit=0 reason=passed (reward 1)"
+          },
+          {
+            "name": "reference_3",
+            "want": "pass",
+            "got": "pass",
+            "passed": true,
+            "detail": "solution/reference.sh exit 0; tests_ran=0 failures=0 errors=0 skipped=0 exit=0 reason=passed (reward 1)"
+          },
+          {
+            "name": "empty_control",
+            "want": "fail",
+            "got": "fail",
+            "passed": true,
+            "detail": "controls/empty.sh exit 0; artifact output: required artifact missing: answer (answer.txt: missing: no file matches answer.txt)"
+          },
+          {
+            "name": "mutant_1",
+            "want": "fail",
+            "got": "fail",
+            "passed": true,
+            "detail": "controls/mutant-bridge.sh exit 0; tests_ran=0 failures=0 errors=0 skipped=0 exit=0 reason=reward 0 below pass threshold 1"
+          },
+          {
+            "name": "exploit",
+            "want": "fail",
+            "got": "fail",
+            "passed": true,
+            "detail": "controls/exploit.sh exit 0; tests_ran=0 failures=0 errors=0 skipped=0 exit=0 reason=reward 0 below pass threshold 1"
+          },
+          {
+            "name": "null_noop",
+            "want": "fail",
+            "got": "fail",
+            "passed": true,
+            "detail": "noop exit 0; artifact output: required artifact missing: answer (answer.txt: missing: no file matches answer.txt)"
+          },
+          {
+            "name": "null_refuse",
+            "want": "fail",
+            "got": "fail",
+            "passed": true,
+            "detail": "refuse exit 0; artifact output: required artifact missing: answer (answer.txt: missing: no file matches answer.txt)"
+          },
+          {
+            "name": "instruction_edited",
+            "want": "edited",
+            "got": "edited",
+            "passed": true
+          },
+          {
+            "name": "secret_scan",
+            "want": "none",
+            "got": "none",
+            "passed": true
+          },
+          {
+            "name": "verifier_no_network",
+            "want": "none",
+            "got": "none",
+            "passed": true,
+            "detail": "reported by grader verifier_command"
+          }
+        ],
+        "at": "2026-11-20T22:09:21.079767349Z",
+        "grader": "verifier_command",
+        "reference_repeats": 3,
+        "reference_results": [
+          "pass",
+          "pass",
+          "pass"
+        ],
+        "fingerprint": "482ad111fb805ae0f7e6c2d54720fed00e9c84dd3b330d96a4488d9b98c26629"
+      }
     }
   },
   "probes": {
@@ -119,7 +887,8 @@
       },
       "files": "d888cad91661683c00d3d8c0a9a5bdc7592d0d2dbf7822ce1e22351edd079f56",
       "images": {
-        "base": "tag only: bench/coding-core-base:1"
+        "base": "tag only: bench/coding-core-base:1",
+        "helper": "tag only: bench/coding-core-base:1"
       }
     },
     "tasks": {
