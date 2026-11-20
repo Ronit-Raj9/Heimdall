@@ -2364,9 +2364,13 @@ class HardwareRecord(TypedDict, total=False):
     sampler: Optional[GPUSamplerSummary]
 
 
-class Health(TypedDict):
+class _HealthRequired(TypedDict):
     status: str
     version: str
+
+
+class Health(_HealthRequired, total=False):
+    launch: Optional[bool]
 
 
 class HealthThresholds(TypedDict):
@@ -3334,7 +3338,7 @@ class OutputSpec(TypedDict, total=False):
 OverlaySpec = TypedDict('OverlaySpec', {'from': "str", 'to': "str"}, total=False)
 
 
-class Pair(TypedDict):
+class _PairRequired(TypedDict):
     alignment: List[AlignedStep]
     condition: str
     exp_id: str
@@ -3345,11 +3349,16 @@ class Pair(TypedDict):
     trial: int
 
 
+class Pair(_PairRequired, total=False):
+    suite: str
+
+
 class PairRun(TypedDict):
     arm: str
     metrics: Dict[str, Value]
     run: Run
     slot: Slot
+    synthetic: bool
 
 
 Pair_migration = TypedDict('Pair_migration', {'behaviour': "Behaviour", 'cost': "Optional[Explanation]", 'flipped': "List[FlippedTask]", 'from': "ArmRef_migration", 'overall': "Verdict_migration", 'recommendation': "Recommendation", 'strata': "List[Verdict_migration]", 'to': "ArmRef_migration"}, total=False)
@@ -5525,6 +5534,7 @@ class VisualSource(_VisualSourceRequired, total=False):
 
 class _VoiceCallRequired(TypedDict):
     audio: List[VoiceTrack]
+    bounds_source: str
     called: bool
     caller: str
     run_id: str

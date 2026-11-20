@@ -653,7 +653,8 @@ export interface BenchEvent {
 // probe.go: probes and receipts (DESIGN.md 10)
 // ---------------------------------------------------------------------------------------------
 
-export type ProbeLayerName = "fixture" | "gateway" | "tool_shim";
+/** Probe layers of the Go catalog (schemas/probe.go, schemas/scenario.go). A newer server may send others. */
+export type ProbeLayerName = "fixture" | "gateway" | "tool_shim" | "adapter" | "a2a" | "tool" | "service";
 
 export type PS2Family = "unavailable_model" | "broken_tool" | "misleading_instruction";
 
@@ -844,7 +845,28 @@ export interface Experiment {
 	concurrency: number;
 	/** agent_exposure | stack_resilience */
 	manifest_mode: string;
+	/** Release policy file, relative to the bench root. */
+	policy?: string;
 	requirements?: CapabilityRequirements;
+	smoke?: boolean;
+	scripted_upstream?: boolean;
+	/** live | record | replay: overrides every external API's mode for this experiment's runs. */
+	external?: string;
+	fairness?: string;
+	attribution?: Record<string, unknown>;
+	matrix?: Record<string, unknown>;
+	simulator?: Record<string, unknown>;
+	tier?: string;
+	trials?: Record<string, unknown>;
+	extends?: Record<string, unknown>;
+	/** Hosted mode: the runner pool of the slots; absent runs on the default pool. */
+	runner?: { pool?: string };
+	aa?: boolean;
+	/** standard | neutral */
+	realism?: string;
+	safety?: string;
+	codescan?: Record<string, unknown>;
+	environment?: Record<string, unknown>;
 }
 
 // ---------------------------------------------------------------------------------------------
@@ -1222,6 +1244,8 @@ export interface PairRun {
 	slot: Slot;
 	run: Run;
 	metrics: Record<string, Value>;
+	/** The arm's own provenance (scripted control, smoke or scripted ledger), independent of the server mode. */
+	synthetic: boolean;
 }
 
 /** Events of each arm matched on (event type, target). Null where a lane has no event. */
@@ -1244,6 +1268,8 @@ export interface Pair {
 	pair_id: string;
 	exp_id: string;
 	task: string;
+	/** The experiment's suite id, so the task links to its evidence. */
+	suite?: string;
 	condition: string;
 	trial: number;
 	runs: PairRun[];
@@ -1654,6 +1680,13 @@ export interface EventsPoll {
 export interface Health {
 	status: "ok";
 	version: string;
+	/** False on an offline (replay-only) server: planning and starting are unavailable. */
+	launch?: boolean;
+}
+
+/** Whether the server launches experiments; unknown (older servers, hosted root) counts as yes. */
+export function launchAvailable(health: Health | undefined): boolean {
+	return health?.launch !== false;
 }
 
 export type DoctorStatus = "pass" | "fail" | "warn" | "skip";
@@ -3602,6 +3635,12 @@ export interface InvitationPreview {
 	signup_allowed: boolean;
 }
 
+/** POST /auth/password (auth.PasswordChangeRequest). current_password may be empty when the account has none yet. */
+export interface PasswordChangeRequest {
+	current_password: string;
+	new_password: string;
+}
+
 /** POST /auth/switch-org: an org id or slug the user belongs to. */
 export interface SwitchOrgRequest {
 	org: string;
@@ -3789,12 +3828,15 @@ export interface AuditEntry {
 /** GET /orgs/{org}/audit, newest first. */
 export interface AuditList {
 	entries: AuditEntry[];
+	/** Opaque cursor of the next page (pass back as cursor); absent on the last page. */
+	next?: string;
 }
 
-/** GET /orgs/{org}/audit query: before is unix milliseconds (rows strictly older). */
+/** GET /orgs/{org}/audit query: cursor is AuditList.next of the previous page; before is unix milliseconds (rows strictly older). */
 export interface AuditLogParams {
 	orgId: string;
 	action?: string;
+	cursor?: string;
 	before?: number;
 	limit?: number;
 }
@@ -5295,6 +5337,8 @@ export interface VoiceCall {
 	analysis?: VoiceAnalysis;
 	audio: VoiceTrack[];
 	witness: string;
+	/** Which bounds classified the call: the task's own (as the sealed metrics) or the defaults. */
+	bounds_source: "task" | "default";
 }
 
 // ---------------------------------------------------------------------------------------------
