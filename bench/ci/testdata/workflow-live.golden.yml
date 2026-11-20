@@ -72,13 +72,25 @@ jobs:
         run: go build -o "$RUNNER_TEMP/heimdall" ./cmd/bifrost-bench
 
       - name: Write the baseline-vs-candidate experiment
+        id: write
         working-directory: .heimdall
         run: |
           rm -rf experiments/pr-gate.yaml experiments/fixtures/pr-gate
-          "$RUNNER_TEMP/heimdall" compare --baseline "origin/${{ github.base_ref || 'main' }}" --candidate "${{ github.sha }}" --base agents/claude-code.yaml --trials 3 --fault model-outage --budget-usd 5 --name pr-gate --write-only
+          # Exit 6: both refs have the same agent files (a suite-only or
+          # workflow-only change); there is no treatment to gate, so the gate is skipped.
+          code=0
+          "$RUNNER_TEMP/heimdall" compare --baseline "origin/${{ github.base_ref || 'main' }}" --candidate "${{ github.sha }}" --base agents/claude-code.yaml --trials 3 --fault model-outage --budget-usd 5 --name pr-gate --write-only || code=$?
+          if [ "$code" -eq 6 ]; then
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+            echo "no agent change between the refs: gate skipped"
+            exit 0
+          fi
+          [ "$code" -eq 0 ] || exit "$code"
+          echo "changed=true" >> "$GITHUB_OUTPUT"
 
       - name: Heimdall gate
         id: gate
+        if: steps.write.outputs.changed == 'true'
         uses: ./.heimdall-src/bench/ci
         env:
           BENCH_CI_BENCH_DIR: ${{ github.workspace }}/.heimdall

@@ -3,6 +3,8 @@
 package evidencestore
 
 import (
+	"context"
+	"errors"
 	"testing"
 	"time"
 )
@@ -13,13 +15,13 @@ func TestLockExpAcrossMirrors(t *testing.T) {
 	org := newOrg(t, "local")
 	a, _ := newDirMirror(t)
 	b, _ := newDirMirror(t)
-	unlockA, err := a.lockExp(org, "e_1")
+	unlockA, err := a.lockExp(context.Background(), org, "e_1")
 	if err != nil {
 		t.Fatal(err)
 	}
 	got := make(chan struct{})
 	go func() {
-		unlockB, err := b.lockExp(org, "e_1")
+		unlockB, err := b.lockExp(context.Background(), org, "e_1")
 		if err != nil {
 			t.Error(err)
 			close(got)
@@ -39,7 +41,35 @@ func TestLockExpAcrossMirrors(t *testing.T) {
 	case <-time.After(5 * time.Second):
 		t.Fatal("lock not released")
 	}
-	if _, err := a.lockExp(org, "../x"); err == nil {
+	if _, err := a.lockExp(context.Background(), org, "../x"); err == nil {
 		t.Fatal("bad experiment id accepted")
+	}
+}
+
+// A pass deadline also ends the wait for a lock file another process holds
+// (audit 4-C-12).
+func TestLockExpHonoursContext(t *testing.T) {
+	org := newOrg(t, "local")
+	a, _ := newDirMirror(t)
+	b, _ := newDirMirror(t)
+	unlockA, err := a.lockExp(context.Background(), org, "e_1")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer unlockA()
+	ctx, cancel := context.WithTimeout(context.Background(), 150*time.Millisecond)
+	defer cancel()
+	start := time.Now()
+	if _, err := b.lockExp(ctx, org, "e_1"); !errors.Is(err, context.DeadlineExceeded) {
+		t.Fatalf("held lock file: %v", err)
+	}
+	if time.Since(start) > 3*time.Second {
+		t.Fatal("lock wait ignored the deadline")
+	}
+	// The same mirror's in-process lock is cancellable too.
+	ctx2, cancel2 := context.WithTimeout(context.Background(), 100*time.Millisecond)
+	defer cancel2()
+	if _, err := a.lockExp(ctx2, org, "e_1"); !errors.Is(err, context.DeadlineExceeded) {
+		t.Fatalf("held in-process lock: %v", err)
 	}
 }

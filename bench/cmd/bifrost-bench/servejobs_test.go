@@ -188,3 +188,57 @@ func TestLauncherStartCancelResumeAsJobs(t *testing.T) {
 	default:
 	}
 }
+
+// Cancelling a queued experiment run through the generic jobs API closes
+// its live fan-out and leaves the runtime evictable (audit 4-C-09).
+func TestGenericCancelClosesQueuedExperimentStream(t *testing.T) {
+	a, _ := jobsProject(t)
+	hub := newJobsHub(dbtest.Open(t), a.logger, false, true, "")
+	l := newLauncher(a, nil)
+	hub.add(l) // not started: the job stays queued
+	ctx := context.Background()
+	if err := l.Start(ctx, "e_demo"); err != nil {
+		t.Fatal(err)
+	}
+	ch, stop := l.Events("e_demo")
+	defer stop()
+	if !l.Busy() {
+		t.Fatal("queued experiment not busy")
+	}
+	j, err := hub.runner.Latest(ctx, "local", kindExperimentRun, expTarget("e_demo"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := hub.runner.Cancel(ctx, "local", j.ID); err != nil { // what POST /jobs/{id}/cancel calls
+		t.Fatal(err)
+	}
+	if _, ok := <-ch; ok {
+		t.Fatal("live stream still open after the generic cancel")
+	}
+	if l.Busy() {
+		t.Fatal("cancelled experiment keeps the runtime busy")
+	}
+}
+
+// Busy closes a fan-out left open for a job that ended without a handler.
+func TestBusyIgnoresStaleFanOut(t *testing.T) {
+	a, _ := jobsProject(t)
+	hub := newJobsHub(dbtest.Open(t), a.logger, false, true, "")
+	l := newLauncher(a, nil)
+	hub.add(l)
+	r := l.liveRunFor("e_demo") // a fan-out with no job behind it
+	if l.Busy() {
+		t.Fatal("fan-out without an active job counted as busy")
+	}
+	if !r.isDone() {
+		t.Fatal("stale fan-out left open")
+	}
+}
+
+// Experiment runs on the hosted runner are capped so waiting experiments
+// leave workers to the other kinds (audit 4-C-08).
+func TestHostedHubLimitsExperimentWorkers(t *testing.T) {
+	if hostedExpLimit >= hostedWorkers || hostedExpPerOrg > hostedExpLimit || hostedExpPerOrg < 1 {
+		t.Fatalf("hosted sizing %d workers, %d experiments, %d per org", hostedWorkers, hostedExpLimit, hostedExpPerOrg)
+	}
+}

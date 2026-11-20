@@ -136,7 +136,7 @@ const liveLeaseWindow = time.Hour
 // A crash at any point is finished or undone by the next archive, restore
 // or sweep (recoverExp).
 func (m *Mirror) Archive(ctx context.Context, org Org, expID string) (*Stub, error) {
-	unlock, err := m.lockExp(org, expID)
+	unlock, err := m.lockExp(ctx, org, expID)
 	if err != nil {
 		return nil, err
 	}

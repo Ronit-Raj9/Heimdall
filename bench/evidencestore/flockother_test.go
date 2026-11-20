@@ -14,8 +14,8 @@ func TestFlockNoop(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer f.Close()
-	if err := flock(f); err != nil {
-		t.Fatal(err)
+	if held, err := tryFlock(f); err != nil || held {
+		t.Fatal(held, err)
 	}
 	if err := funlock(f); err != nil {
 		t.Fatal(err)

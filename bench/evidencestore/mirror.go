@@ -95,7 +95,7 @@ type MirrorOptions struct {
 
 // ExperimentWith is Experiment with options.
 func (m *Mirror) ExperimentWith(ctx context.Context, org Org, expID string, opts MirrorOptions) (*MirrorResult, error) {
-	unlock, err := m.lockExp(org, expID)
+	unlock, err := m.lockExp(ctx, org, expID)
 	if err != nil {
 		return nil, err
 	}
@@ -387,34 +387,48 @@ func (m *Mirror) SweepWith(ctx context.Context, orgs []Org, opts MirrorOptions) 
 
 // keyedMutex serializes passes over one experiment inside this process; the
 // lock file serializes them across processes (a server and a cron job).
+// Each key is a one-slot channel, so waiting for it can be cancelled.
 type keyedMutex struct {
 	mu    sync.Mutex
-	locks map[string]*sync.Mutex
+	locks map[string]chan struct{}
 }
 
-func (k *keyedMutex) lock(key string) func() {
+func (k *keyedMutex) lock(ctx context.Context, key string) (func(), error) {
 	k.mu.Lock()
 	if k.locks == nil {
-		k.locks = map[string]*sync.Mutex{}
+		k.locks = map[string]chan struct{}{}
 	}
 	l, ok := k.locks[key]
 	if !ok {
-		l = &sync.Mutex{}
+		l = make(chan struct{}, 1)
 		k.locks[key] = l
 	}
 	k.mu.Unlock()
-	l.Lock()
-	return l.Unlock
+	select {
+	case l <- struct{}{}:
+		return func() { <-l }, nil
+	case <-ctx.Done():
+		return nil, ctx.Err()
+	}
 }
 
-func (m *Mirror) lockExp(org Org, expID string) (func(), error) {
+// lockRetry is how often a held lock file is tried again.
+const lockRetry = 50 * time.Millisecond
+
+// lockExp takes the experiment's in-process and cross-process locks. Both
+// waits end with ctx, so a pass deadline also covers a lock another process
+// (an archive or restore) holds for long.
+func (m *Mirror) lockExp(ctx context.Context, org Org, expID string) (func(), error) {
 	if err := validID("org_id", org.ID); err != nil {
 		return nil, err
 	}
 	if err := validID("exp_id", expID); err != nil {
 		return nil, err
 	}
-	unlockMu := m.locks.lock(org.root() + "\x00" + expID)
+	unlockMu, err := m.locks.lock(ctx, org.root()+"\x00"+expID)
+	if err != nil {
+		return nil, fmt.Errorf("lock %s: %w", expID, err)
+	}
 	dir := filepath.Join(org.root(), stateDir, "locks")
 	if err := os.MkdirAll(dir, 0o755); err != nil {
 		unlockMu()
@@ -425,10 +439,23 @@ func (m *Mirror) lockExp(org Org, expID string) (func(), error) {
 		unlockMu()
 		return nil, fmt.Errorf("lock %s: %w", expID, err)
 	}
-	if err := flock(f); err != nil {
-		_ = f.Close()
-		unlockMu()
-		return nil, fmt.Errorf("lock %s: %w", expID, err)
+	for {
+		held, err := tryFlock(f)
+		if err != nil {
+			_ = f.Close()
+			unlockMu()
+			return nil, fmt.Errorf("lock %s: %w", expID, err)
+		}
+		if !held {
+			break
+		}
+		select {
+		case <-ctx.Done():
+			_ = f.Close()
+			unlockMu()
+			return nil, fmt.Errorf("lock %s: held by another process: %w", expID, ctx.Err())
+		case <-time.After(lockRetry):
+		}
 	}
 	return func() {
 		_ = funlock(f)

@@ -12,7 +12,6 @@ import (
 
 	"github.com/maximhq/bifrost/bench/agentdiff"
 	"github.com/maximhq/bifrost/bench/handlers"
-	"github.com/maximhq/bifrost/bench/lib"
 	"github.com/maximhq/bifrost/bench/store"
 )
 
@@ -46,7 +45,7 @@ func runAgentDiff(args []string, out io.Writer) int {
 	ctx := context.Background()
 	root, runsRoot := "", *runs
 	if runsRoot == "" {
-		cfg, err := lib.LoadConfig(*config)
+		cfg, err := loadConfig(*config)
 		if err != nil {
 			return fail("%v", err)
 		}

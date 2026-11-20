@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/maximhq/bifrost/bench/lib"
+	"github.com/maximhq/bifrost/bench/schemas"
 	"github.com/maximhq/bifrost/bench/utils"
 )
 
@@ -260,5 +261,26 @@ func TestEvidenceVerifyMirrorOnlyExitsOne(t *testing.T) {
 	}
 	if code := runEvidence([]string{"mirror", "-config", config, "-repair"}); code != exitOK {
 		t.Fatalf("mirror -repair with nothing local: exit %d", code)
+	}
+}
+
+// A sweep that stops before it reaches every experiment fails the backup
+// even when nothing it reached failed (audit 4-C-07).
+func TestEvidenceBackupIncompleteSweepFails(t *testing.T) {
+	root, config := evidenceSandbox(t, "storage:\n  mirror_dir: mirror\n")
+	cfg, err := lib.LoadConfig(config)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var out strings.Builder
+	env := &evidenceEnv{cfg: cfg, logger: schemas.NoopLogger{}, out: &out,
+		f: evidenceFlags{noDB: true, mirror: filepath.Join(root, "mirror")}}
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+	if code := env.backupCmd(ctx); code != exitInfra {
+		t.Fatalf("interrupted sweep: exit %d, output %s", code, out.String())
+	}
+	if !strings.Contains(out.String(), "INCOMPLETE") {
+		t.Fatalf("output %s", out.String())
 	}
 }

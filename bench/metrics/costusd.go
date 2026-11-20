@@ -37,7 +37,8 @@ func (m *costUSDMetric) Descriptor() schemas.MetricDescriptor {
 	}
 }
 
-// Compute implements schemas.Metric. A row that could not be priced makes
+// Compute implements schemas.Metric. A complete gateway log with no request
+// is an observed zero. A row that could not be priced makes
 // the total unknown. When every unpriced row carries bounds, the total keeps
 // bounds from the observed sum to the observed sum plus their upper bounds,
 // so the missingness analysis can still use it. A not_applicable row adds
@@ -45,6 +46,12 @@ func (m *costUSDMetric) Descriptor() schemas.MetricDescriptor {
 func (m *costUSDMetric) Compute(_ context.Context, _ *schemas.RunContext, ev *schemas.Evidence) (schemas.Value, error) {
 	ev = orEmpty(ev)
 	if len(ev.Cost) == 0 {
+		if log := ev.Requests; log != nil && log.Complete && len(log.Requests) == 0 {
+			// The gateway log is witnessed complete and holds no request:
+			// the run made no model call, so it spent nothing (an oracle or
+			// a noop control). Missing or incomplete evidence stays unknown.
+			return schemas.Observed(0, schemas.EvidenceGateway), nil
+		}
 		return schemas.Unknown(noCostReason(ev.Requests), schemas.EvidenceGateway), nil
 	}
 	var observed, upper float64

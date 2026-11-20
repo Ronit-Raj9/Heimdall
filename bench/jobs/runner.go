@@ -43,11 +43,29 @@ func WithMaxAttempts(n int) KindOption { return func(k *kind) { k.maxAttempts = 
 // server enqueues it itself with Enqueue.
 func Internal() KindOption { return func(k *kind) { k.internal = true } }
 
+// WithLimit caps how many of the kind's jobs this runner runs at once
+// (total) and how many of them belong to one organization (perOrg); 0 means
+// no cap. A kind whose handlers can wait a long time (an experiment waiting
+// for a runner) uses it so it can not take every worker: the other kinds
+// and other organizations keep progressing.
+func WithLimit(total, perOrg int) KindOption {
+	return func(k *kind) { k.limit, k.orgLimit = total, perOrg }
+}
+
+// WithCancelHook sets a function called after a queued job of the kind was
+// cancelled before any runner started it, whichever path cancelled it (the
+// generic job API or the kind's own API): no handler runs to clean up after
+// such a job, so state kept for it outside the database is released here.
+func WithCancelHook(f func(j *Job)) KindOption { return func(k *kind) { k.onCancel = f } }
+
 type kind struct {
+	onCancel    func(j *Job)
 	name        string
 	handler     Handler
 	validate    Validator
 	maxAttempts int
+	limit       int // running jobs of the kind at once; 0: no cap
+	orgLimit    int // running jobs of the kind per organization; 0: no cap
 	internal    bool
 }
 
@@ -121,8 +139,12 @@ type Runner struct {
 	stopped bool
 	wake    chan struct{}
 	quit    chan struct{}
-	wg      sync.WaitGroup // workers and the sweeper
-	jobsWG  sync.WaitGroup // running handlers
+	halted  chan struct{}     // closed when the first Stop has finished waiting
+	active  map[string]int    // running jobs per kind
+	orgAct  map[[2]string]int // running jobs per kind and organization
+	claimMu sync.Mutex        // one claim at a time, so the kind limits hold
+	wg      sync.WaitGroup    // workers and the sweeper
+	jobsWG  sync.WaitGroup    // running handlers
 }
 
 // New returns a runner over d. Register kinds, then Start it.
@@ -130,7 +152,8 @@ func New(d *db.DB, opts Options) *Runner {
 	return &Runner{
 		Store: NewStore(d), opts: opts.withDefaults(),
 		kinds: map[string]*kind{}, running: map[string]context.CancelCauseFunc{},
-		wake: make(chan struct{}, 1), quit: make(chan struct{}),
+		wake: make(chan struct{}, 1), quit: make(chan struct{}), halted: make(chan struct{}),
+		active: map[string]int{}, orgAct: map[[2]string]int{},
 	}
 }
 
@@ -167,6 +190,19 @@ func (r *Runner) kind(name string) (*kind, bool) {
 	defer r.mu.Unlock()
 	k, ok := r.kinds[name]
 	return k, ok
+}
+
+// Cancel requests cancellation (Store.Cancel) and runs the kind's cancel
+// hook when the job was cancelled before it started.
+func (r *Runner) Cancel(ctx context.Context, orgID, id string) (*Job, error) {
+	j, err := r.Store.Cancel(ctx, orgID, id)
+	if err != nil || j.Status != StatusCancelled {
+		return j, err
+	}
+	if k, ok := r.kind(j.Kind); ok && k.onCancel != nil {
+		k.onCancel(j)
+	}
+	return j, nil
 }
 
 // NewJob is a job to queue.
@@ -270,12 +306,25 @@ func (r *Runner) Start(ctx context.Context) error {
 
 // Stop stops claiming, cancels every running handler with ErrShutdown, waits
 // up to the grace period (or ctx) for them, and queues their jobs again so
-// the next runner resumes them.
+// the next runner resumes them. A second call waits (up to its ctx) for the
+// first one to finish, so a caller that closes the database after Stop
+// returns never races the hand-back of another caller's stop.
 func (r *Runner) Stop(ctx context.Context) {
 	r.mu.Lock()
-	if r.stopped || !r.started {
-		r.stopped = true
+	if !r.started {
+		if !r.stopped {
+			r.stopped = true
+			close(r.halted)
+		}
 		r.mu.Unlock()
+		return
+	}
+	if r.stopped {
+		r.mu.Unlock()
+		select {
+		case <-r.halted:
+		case <-ctx.Done():
+		}
 		return
 	}
 	r.stopped = true
@@ -292,6 +341,7 @@ func (r *Runner) Stop(ctx context.Context) {
 	}()
 	grace := time.NewTimer(r.opts.ShutdownGrace)
 	defer grace.Stop()
+	defer close(r.halted)
 	select {
 	case <-done:
 	case <-grace.C:
@@ -320,6 +370,7 @@ func (r *Runner) worker() {
 		}
 		if j != nil {
 			r.run(j)
+			r.release(j)
 			continue
 		}
 		select {
@@ -353,10 +404,23 @@ func (r *Runner) sweeper() {
 // (SQLite) or FOR UPDATE SKIP LOCKED (Postgres), so of two runners racing for
 // one job exactly one gets it.
 func (r *Runner) claim(ctx context.Context) (*Job, error) {
+	r.claimMu.Lock()
+	defer r.claimMu.Unlock()
 	r.mu.Lock()
 	names := make([]string, 0, len(r.kinds))
-	for n := range r.kinds {
+	full := map[string][]string{} // kind -> organizations at the kind's per-org cap
+	for n, k := range r.kinds {
+		if k.limit > 0 && r.active[n] >= k.limit {
+			continue
+		}
 		names = append(names, n)
+		if k.orgLimit > 0 {
+			for key, c := range r.orgAct {
+				if key[0] == n && c >= k.orgLimit {
+					full[n] = append(full[n], key[1])
+				}
+			}
+		}
 	}
 	r.mu.Unlock()
 	if len(names) == 0 {
@@ -364,14 +428,27 @@ func (r *Runner) claim(ctx context.Context) (*Job, error) {
 	}
 	sort.Strings(names)
 	marks := strings.TrimSuffix(strings.Repeat("?, ", len(names)), ", ")
+	where := "status = ? AND kind IN (" + marks + ")"
 	args := []any{string(StatusQueued)}
 	for _, n := range names {
 		args = append(args, n)
 	}
+	for _, n := range names {
+		orgs := full[n]
+		if len(orgs) == 0 {
+			continue
+		}
+		sort.Strings(orgs)
+		where += " AND NOT (kind = ? AND org_id IN (" + strings.TrimSuffix(strings.Repeat("?, ", len(orgs)), ", ") + "))"
+		args = append(args, n)
+		for _, o := range orgs {
+			args = append(args, o)
+		}
+	}
 	now := r.now()
 	row, err := r.db.ClaimOne(ctx, db.ClaimQuery{
 		Table:     "jobs",
-		Where:     "status = ? AND kind IN (" + marks + ")",
+		Where:     where,
 		Args:      args,
 		OrderBy:   "created_at, id",
 		Set:       "status = ?, lease_owner = ?, lease_until = ?, attempt = attempt + 1, started_at = COALESCE(started_at, ?)",
@@ -385,7 +462,27 @@ func (r *Runner) claim(ctx context.Context) (*Job, error) {
 	if errors.Is(err, sql.ErrNoRows) {
 		return nil, nil
 	}
+	if err == nil {
+		r.mu.Lock()
+		r.active[j.Kind]++
+		r.orgAct[[2]string{j.Kind, j.OrgID}]++
+		r.mu.Unlock()
+	}
 	return j, err
+}
+
+// release returns the claim's place under the kind limits once the job
+// ended (or was handed back) on this runner.
+func (r *Runner) release(j *Job) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	if r.active[j.Kind]--; r.active[j.Kind] <= 0 {
+		delete(r.active, j.Kind)
+	}
+	key := [2]string{j.Kind, j.OrgID}
+	if r.orgAct[key]--; r.orgAct[key] <= 0 {
+		delete(r.orgAct, key)
+	}
 }
 
 // RecoverResult counts what Recover did.
@@ -398,11 +495,28 @@ type RecoverResult struct {
 // Recover settles running jobs whose lease expired (their runner died or
 // hung): a job with a cancel request is cancelled, a job out of attempts
 // fails, any other is queued again, and its next claim counts an attempt.
+// Only kinds registered on this runner are settled: their attempt limit is
+// per kind, and a runner without the kind (an -offline server) can not know
+// it, so it leaves those jobs to a runner that has it.
 func (r *Runner) Recover(ctx context.Context) (RecoverResult, error) {
 	var out RecoverResult
 	now := r.now().UnixMilli()
-	rows, err := r.db.SQL().QueryContext(ctx, r.q(`SELECT id, kind, attempt, cancel_requested FROM jobs WHERE status = ? AND lease_until < ?`),
-		string(StatusRunning), now)
+	r.mu.Lock()
+	names := make([]string, 0, len(r.kinds))
+	for n := range r.kinds {
+		names = append(names, n)
+	}
+	r.mu.Unlock()
+	if len(names) == 0 {
+		return out, nil
+	}
+	sort.Strings(names)
+	args := []any{string(StatusRunning), now}
+	for _, n := range names {
+		args = append(args, n)
+	}
+	rows, err := r.db.SQL().QueryContext(ctx, r.q(`SELECT id, kind, attempt, cancel_requested FROM jobs WHERE status = ? AND lease_until < ?
+		AND kind IN (`+strings.TrimSuffix(strings.Repeat("?, ", len(names)), ", ")+`)`), args...)
 	if err != nil {
 		return out, err
 	}
@@ -427,10 +541,11 @@ func (r *Runner) Recover(ctx context.Context) (RecoverResult, error) {
 		return out, err
 	}
 	for _, e := range list {
-		maxAttempts := r.opts.MaxAttempts
-		if k, ok := r.kind(e.kind); ok {
-			maxAttempts = k.maxAttempts
+		k, ok := r.kind(e.kind)
+		if !ok {
+			continue // unregistered since the SELECT
 		}
+		maxAttempts := k.maxAttempts
 		var (
 			status Status
 			msg    string

@@ -37,12 +37,15 @@ func runPlan(args []string) int {
 		return exitUsage
 	}
 	ctx := context.Background()
-	// The planner runs the gateway preflight, so plan needs the live gateway.
-	a, err := newApp(ctx, *config, appOptions{gateway: true})
+	// Read the experiment first: building the app sets the gateway's
+	// providers and key slots up, which a missing or broken experiment
+	// file must not trigger (audit 5-B-08).
+	exp, err := loadExperiment(fs.Arg(0))
 	if err != nil {
 		return fail("%v", err)
 	}
-	exp, err := loadExperiment(fs.Arg(0))
+	// The planner runs the gateway preflight, so plan needs the live gateway.
+	a, err := newApp(ctx, *config, appOptions{gateway: true})
 	if err != nil {
 		return fail("%v", err)
 	}
@@ -133,6 +136,11 @@ func runRun(args []string) int {
 	if err := fs.Parse(args); err != nil || (fs.NArg() != 1 && *resume == "") {
 		fmt.Fprintln(os.Stderr, "usage: bifrost-bench run [-config deploy/bench.yaml] [-concurrency n] experiments/<file>.yaml | -resume <exp_id> [-allow-version-drift]")
 		return exitUsage
+	}
+	if *resume == "" { // 5-B-08: a bad experiment file fails before the gateway is set up
+		if _, err := loadExperiment(fs.Arg(0)); err != nil {
+			return fail("%v", err)
+		}
 	}
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
@@ -227,8 +235,12 @@ func (a *app) execute(ctx context.Context, m *schemas.Manifest, concurrency int)
 	close(events)
 	<-done
 	if sum != nil {
+		if a.cfg.Server.Mode == schemas.ModeSynthetic {
+			sum.SpendBasis = engine.SpendSimulated // scripted model answers (BENCH_SERVER_MODE=synthetic)
+		}
 		b, _ := json.Marshal(sum)
 		fmt.Fprintf(os.Stderr, "summary: %s\n", b)
+		fmt.Fprintln(os.Stderr, spendNote(sum))
 	}
 	if err != nil {
 		return fail("run %s: %v", m.ExpID, err)
@@ -249,9 +261,19 @@ func runCheck(args []string) int {
 		fmt.Fprintln(os.Stderr, "exit: 0 ok, 1 regressed, 2 inconclusive, 3 invalid (each only when listed in -fail-on), 4 infrastructure error, 5 blocked by the release policy")
 		return exitUsage
 	}
+	failDecisions, err := parseDecisions(*failOn)
+	if err != nil {
+		fmt.Fprintln(os.Stderr, "error:", err)
+		return exitUsage
+	}
 	if *policyFile != "" {
 		// Fail before a long run, not after it.
 		if _, _, err := policy.Load(*policyFile); err != nil {
+			return fail("%v", err)
+		}
+	}
+	if *exp == "" { // 5-B-08: a bad experiment file fails before the gateway is set up
+		if _, err := loadExperiment(fs.Arg(0)); err != nil {
 			return fail("%v", err)
 		}
 	}
@@ -279,12 +301,18 @@ func runCheck(args []string) int {
 	if err := os.WriteFile(*out, report, 0o644); err != nil {
 		return fail("write %s: %v", *out, err)
 	}
-	if b, err := json.MarshalIndent(an, "", "  "); err == nil {
-		_ = os.WriteFile(trimExt(*out)+".json", b, 0o644)
+	// The JSON beside the markdown is part of the check's output (ci card
+	// reads it): a failed write fails the check (audit 5-B-09).
+	b, err := json.MarshalIndent(an, "", "  ")
+	if err != nil {
+		return fail("encode %s: %v", trimExt(*out)+".json", err)
+	}
+	if err := os.WriteFile(trimExt(*out)+".json", b, 0o644); err != nil {
+		return fail("write %s: %v", trimExt(*out)+".json", err)
 	}
 	fmt.Printf("verdict: %s, action: %s\n", an.Verdict.Decision, an.Verdict.Action)
 	printPolicy(an.Policy)
-	return checkExitCode(an, parseDecisions(*failOn))
+	return checkExitCode(an, failDecisions)
 }
 
 // checkExitCode is the exit code of `check`. A release policy that blocks is
@@ -455,4 +483,13 @@ func (a *app) recordDrift(expID string, d versionDrift) error {
 		return errors.Join(err, f.Close())
 	}
 	return f.Close()
+}
+
+// spendNote says what the summary's spent_usd is, so it is not read as a
+// provider bill.
+func spendNote(sum *engine.Summary) string {
+	if sum.SpendBasis == engine.SpendSimulated {
+		return fmt.Sprintf("spend: %.4f USD simulated (scripted model answers priced at the pinned table; no provider was charged)", sum.SpentUSD)
+	}
+	return fmt.Sprintf("spend: %.4f USD modeled (recorded usage priced at the pinned table, unknown costs at the per-run estimate; not a provider bill)", sum.SpentUSD)
 }

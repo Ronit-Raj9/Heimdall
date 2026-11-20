@@ -20,7 +20,6 @@ import (
 	"github.com/maximhq/bifrost/bench/export"
 	"github.com/maximhq/bifrost/bench/handlers"
 	"github.com/maximhq/bifrost/bench/leaderboard"
-	"github.com/maximhq/bifrost/bench/lib"
 	"github.com/maximhq/bifrost/bench/schemas"
 	"github.com/maximhq/bifrost/bench/store"
 	"github.com/maximhq/bifrost/bench/traceexport"
@@ -110,7 +109,7 @@ func runExportOTLP(args []string, stdout, stderr io.Writer) int {
 	}
 	root := *runsRoot
 	if root == "" {
-		cfg, err := lib.LoadConfig(*config)
+		cfg, err := loadConfig(*config)
 		if err != nil {
 			return failTo(stderr, "%v", err)
 		}
@@ -368,7 +367,7 @@ func runsRootOf(config, runsRoot string) (string, error) {
 	if runsRoot != "" {
 		return runsRoot, nil
 	}
-	cfg, err := lib.LoadConfig(config)
+	cfg, err := loadConfig(config)
 	if err != nil {
 		return "", err
 	}
@@ -527,7 +526,7 @@ func writeEEE(out, expID string, recs []export.EEERecord, stdout, stderr io.Writ
 
 // exportHarborCmd writes the suite's tasks as Harbor task folders.
 func exportHarborCmd(ctx context.Context, config, ref, tasks, out string, includeHidden, admittedOnly, force bool, stderr io.Writer) int {
-	cfg, err := lib.LoadConfig(config)
+	cfg, err := loadConfig(config)
 	if err != nil {
 		return failTo(stderr, "%v", err)
 	}

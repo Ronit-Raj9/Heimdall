@@ -10,6 +10,7 @@ import (
 	"sync/atomic"
 	"testing"
 	"time"
+	"unicode/utf8"
 
 	"github.com/maximhq/bifrost/bench/db"
 	"github.com/maximhq/bifrost/bench/db/dbtest"
@@ -437,5 +438,140 @@ func TestHandlerPanicAndErrorFail(t *testing.T) {
 	}
 	if e := status(t, r, "o", b.ID).Error; e != "no luck" {
 		t.Fatalf("error %q", e)
+	}
+}
+
+func TestClipLineKeepsUTF8(t *testing.T) {
+	long := strings.Repeat("a", 8191) + "é" + "tail"
+	got := clipLine(long, 8192)
+	if !utf8.ValidString(got) || got != strings.Repeat("a", 8191)+" [line cut]" {
+		t.Fatalf("clip at a rune boundary: valid=%v len=%d", utf8.ValidString(got), len(got))
+	}
+	if got := clipLine("ok\xffbad", 100); !utf8.ValidString(got) || got != "ok�bad" {
+		t.Fatalf("invalid bytes: %q", got)
+	}
+	if got := clipLine("short", 10); got != "short" {
+		t.Fatalf("short: %q", got)
+	}
+}
+
+func TestCancelTransitionsByState(t *testing.T) {
+	d := dbtest.Open(t)
+	ctx := context.Background()
+	r := New(d, fastOptions("a"))
+	r.Register("echo", func(context.Context, *Job, Logger, func(any)) (any, error) { return nil, nil })
+	queued, _ := r.Create(ctx, NewJob{OrgID: "org_a", Kind: "echo"})
+	running, _ := r.Create(ctx, NewJob{OrgID: "org_a", Kind: "echo"})
+	done, _ := r.Create(ctx, NewJob{OrgID: "org_a", Kind: "echo"})
+	// Simulate a concurrent claim and a finished job without starting the runner.
+	if _, err := d.SQL().ExecContext(ctx, d.Rebind(`UPDATE jobs SET status = ?, lease_owner = 'other', lease_until = ? WHERE id = ?`),
+		string(StatusRunning), time.Now().Add(time.Hour).UnixMilli(), running.ID); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := d.SQL().ExecContext(ctx, d.Rebind(`UPDATE jobs SET status = ? WHERE id = ?`), string(StatusSucceeded), done.ID); err != nil {
+		t.Fatal(err)
+	}
+	if j, err := r.Cancel(ctx, "org_a", queued.ID); err != nil || j.Status != StatusCancelled || !j.CancelRequested {
+		t.Fatalf("queued: %+v %v", j, err)
+	}
+	if j, err := r.Cancel(ctx, "org_a", running.ID); err != nil || j.Status != StatusRunning || !j.CancelRequested {
+		t.Fatalf("running: %+v %v", j, err)
+	}
+	if _, err := r.Cancel(ctx, "org_a", done.ID); !errors.Is(err, ErrFinished) {
+		t.Fatalf("finished: %v", err)
+	}
+	if _, err := r.Cancel(ctx, "org_b", queued.ID); !errors.Is(err, ErrNotFound) {
+		t.Fatalf("other org: %v", err)
+	}
+}
+
+func TestRecoverLeavesUnregisteredKinds(t *testing.T) {
+	d := dbtest.Open(t)
+	ctx := context.Background()
+	online := New(d, fastOptions("a"))
+	online.Register("long", func(context.Context, *Job, Logger, func(any)) (any, error) { return nil, nil }, WithMaxAttempts(20))
+	j, err := online.Enqueue(ctx, NewJob{OrgID: "org_a", Kind: "long"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := d.SQL().ExecContext(ctx, d.Rebind(`UPDATE jobs SET status = ?, attempt = 3, lease_owner = 'gone', lease_until = 1 WHERE id = ?`),
+		string(StatusRunning), j.ID); err != nil {
+		t.Fatal(err)
+	}
+	offline := New(d, fastOptions("b")) // has no "long" kind, like an -offline server
+	offline.Register("other", func(context.Context, *Job, Logger, func(any)) (any, error) { return nil, nil })
+	if res, err := offline.Recover(ctx); err != nil || res != (RecoverResult{}) {
+		t.Fatalf("offline recover: %+v %v", res, err)
+	}
+	if got := status(t, online, "org_a", j.ID); got.Status != StatusRunning {
+		t.Fatalf("offline runner settled a kind it does not run: %+v", got)
+	}
+	if res, err := online.Recover(ctx); err != nil || res.Requeued != 1 {
+		t.Fatalf("online recover: %+v %v", res, err)
+	}
+}
+
+func TestKindLimitLeavesWorkersForOtherWork(t *testing.T) {
+	d := dbtest.Open(t)
+	ctx := context.Background()
+	opts := fastOptions("a")
+	opts.Workers = 3
+	r := New(d, opts)
+	block := make(chan struct{})
+	var started atomic.Int32
+	r.Register("wait", func(ctx context.Context, j *Job, log Logger, progress func(any)) (any, error) {
+		started.Add(1)
+		select {
+		case <-block:
+		case <-ctx.Done():
+		}
+		return nil, nil
+	}, WithLimit(2, 1))
+	r.Register("quick", func(context.Context, *Job, Logger, func(any)) (any, error) { return nil, nil })
+	var waits []*Job
+	for _, org := range []string{"org_a", "org_a", "org_b", "org_c"} {
+		j, err := r.Create(ctx, NewJob{OrgID: org, Kind: "wait"})
+		if err != nil {
+			t.Fatal(err)
+		}
+		waits = append(waits, j)
+	}
+	if err := r.Start(ctx); err != nil {
+		t.Fatal(err)
+	}
+	defer func() { close(block); r.Stop(ctx) }()
+	waitFor(t, "two waits", func() bool { return started.Load() == 2 })
+	if st := status(t, r, "org_a", waits[1].ID).Status; st != StatusQueued {
+		t.Fatalf("second org_a job past the per-org cap: %s", st)
+	}
+	q, _ := r.Create(ctx, NewJob{OrgID: "org_d", Kind: "quick"})
+	waitFor(t, "quick job", func() bool { return status(t, r, "org_d", q.ID).Status == StatusSucceeded })
+	time.Sleep(100 * time.Millisecond)
+	if n := started.Load(); n != 2 {
+		t.Fatalf("kind cap exceeded: %d running", n)
+	}
+}
+
+func TestSecondStopWaitsForHandBack(t *testing.T) {
+	d := dbtest.Open(t)
+	ctx := context.Background()
+	r := New(d, fastOptions("a"))
+	var started atomic.Bool
+	r.Register("slow", func(ctx context.Context, j *Job, log Logger, progress func(any)) (any, error) {
+		started.Store(true)
+		<-ctx.Done()
+		time.Sleep(200 * time.Millisecond) // graceful hand-back takes a while
+		return nil, context.Cause(ctx)
+	})
+	j, _ := r.Create(ctx, NewJob{OrgID: "org_a", Kind: "slow"})
+	if err := r.Start(ctx); err != nil {
+		t.Fatal(err)
+	}
+	waitFor(t, "start", started.Load)
+	go r.Stop(ctx) // e.g. a context.AfterFunc
+	time.Sleep(20 * time.Millisecond)
+	r.Stop(ctx) // the owner's synchronous stop before closing the database
+	if st := status(t, r, "org_a", j.ID).Status; st != StatusQueued {
+		t.Fatalf("second Stop returned before the hand-back: %s", st)
 	}
 }

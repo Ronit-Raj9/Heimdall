@@ -39,6 +39,7 @@ type fakeBifrost struct {
 	vks       []map[string]any
 	rows      []json.RawMessage // detail rows of every key
 	hideLists int               // list calls answered with no rows, like an unflushed writer
+	hideKeys  int               // key list calls answered with no keys, like a listing taken before another process created them
 	config    map[string]any
 	calls     map[string]int // "METHOD /pattern" -> count
 	bodies    map[string][]map[string]any
@@ -225,6 +226,11 @@ func (f *fakeBifrost) listKeys(w http.ResponseWriter, r *http.Request) {
 	cfg, keys := f.state(r.PathValue("p"))
 	if *cfg == nil {
 		writeJSONT(w, 404, map[string]any{})
+		return
+	}
+	if f.hideKeys > 0 {
+		f.hideKeys--
+		writeJSONT(w, 200, map[string]any{"keys": []any{}, "total": 0})
 		return
 	}
 	writeJSONT(w, 200, map[string]any{"keys": *keys, "total": len(*keys)})
@@ -572,5 +578,33 @@ func TestNewProviders(t *testing.T) {
 				t.Fatalf("err = %v, want %q", err, tt.wantErr)
 			}
 		})
+	}
+}
+
+// Two setups racing on a cold gateway: the slot another process created
+// after this one listed the keys answers 409 on create; Setup adopts it and
+// keeps its models instead of failing (audit 5-A-01).
+func TestSetupAdoptsConcurrentlyCreatedKey(t *testing.T) {
+	f := newFakeBifrost(t)
+	f.keys = []map[string]any{{"id": "key-77", "name": "fp-slot-1", "models": []any{"claude-run-model"}, "weight": float64(1), "enabled": true}}
+	f.hideKeys = 1
+	g := newTestGateway(t, f)
+	if err := g.Setup(context.Background()); err != nil {
+		t.Fatalf("Setup after a concurrent create: %v", err)
+	}
+	if g.keyIDs["fp-slot-1"] != "key-77" || g.keyIDs["fp-slot-2"] == "" {
+		t.Fatalf("key ids = %v", g.keyIDs)
+	}
+	if got := f.count("PUT /api/providers/{p}/keys/{id}"); got != 1 {
+		t.Fatalf("adopted key updates = %d, want 1", got)
+	}
+	for _, k := range f.keys {
+		if k["name"] != "fp-slot-1" {
+			continue
+		}
+		ms := fmt.Sprint(k["models"])
+		if !strings.Contains(ms, "claude-run-model") || !strings.Contains(ms, testModel) {
+			t.Fatalf("adopted key models %v", k["models"])
+		}
 	}
 }

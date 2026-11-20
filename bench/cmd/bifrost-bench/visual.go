@@ -20,7 +20,6 @@ import (
 
 	"github.com/maximhq/bifrost/bench/calibration"
 	"github.com/maximhq/bifrost/bench/graders"
-	"github.com/maximhq/bifrost/bench/lib"
 	"github.com/maximhq/bifrost/bench/schemas"
 	"github.com/maximhq/bifrost/bench/utils"
 	"github.com/maximhq/bifrost/bench/visual"
@@ -173,7 +172,7 @@ func runVisualCompare(args []string) int {
 		return exitUsage
 	}
 	ref, taskID, _ := strings.Cut(pos[0], "/")
-	cfg, err := lib.LoadConfig(*config)
+	cfg, err := loadConfig(*config)
 	if err != nil {
 		return fail("visual compare: %v", err)
 	}
@@ -245,7 +244,7 @@ func runVisualLabel(args []string) int {
 		fmt.Fprintln(os.Stderr, visualUsage)
 		return exitUsage
 	}
-	cfg, err := lib.LoadConfig(*config)
+	cfg, err := loadConfig(*config)
 	if err != nil {
 		return fail("visual label: %v", err)
 	}

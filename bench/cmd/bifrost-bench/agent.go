@@ -109,7 +109,7 @@ func runAgentBuild(args []string, out io.Writer) int {
 		return exitUsage
 	}
 	ctx := context.Background()
-	cfg, err := lib.LoadConfig(*config)
+	cfg, err := loadConfig(*config)
 	if err != nil {
 		return fail("%v", err)
 	}

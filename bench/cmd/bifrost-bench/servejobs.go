@@ -108,7 +108,7 @@ func (l *launcher) Active(expID string) bool {
 		l.mu.Lock()
 		defer l.mu.Unlock()
 		r, ok := l.active[expID]
-		return ok && !r.done
+		return ok && !r.isDone()
 	}
 	st, ok := l.jobState(expID)
 	return ok && (st == jobs.StatusQueued || st == jobs.StatusRunning)
@@ -203,14 +203,20 @@ func (l *launcher) Cancel(ctx context.Context, expID string) error {
 	}
 	l.invalidateStates()
 	if c.Status == jobs.StatusCancelled { // cancelled before it started: no handler closes the fan-out
-		l.mu.Lock()
-		r, ok := l.active[expID]
-		l.mu.Unlock()
-		if ok {
-			r.finish()
-		}
+		l.finishLive(expID)
 	}
 	return nil
+}
+
+// finishLive closes the experiment's fan-out, if it has one: its job ended
+// without a handler that would (cancelled while queued).
+func (l *launcher) finishLive(expID string) {
+	l.mu.Lock()
+	r, ok := l.active[expID]
+	l.mu.Unlock()
+	if ok {
+		r.finish()
+	}
 }
 
 // startInProcess runs the experiment detached from any request in this
@@ -222,7 +228,7 @@ func (l *launcher) startInProcess(ctx context.Context, expID string) error {
 		return err
 	}
 	l.mu.Lock()
-	if r, ok := l.active[expID]; ok && !r.done {
+	if r, ok := l.active[expID]; ok && !r.isDone() {
 		l.mu.Unlock()
 		return fmt.Errorf("experiment %s is already running", expID)
 	}
@@ -241,7 +247,7 @@ func (l *launcher) startInProcess(ctx context.Context, expID string) error {
 func (l *launcher) liveRunFor(expID string) *liveRun {
 	l.mu.Lock()
 	defer l.mu.Unlock()
-	if r, ok := l.active[expID]; ok && !r.done {
+	if r, ok := l.active[expID]; ok && !r.isDone() {
 		return r
 	}
 	r := &liveRun{subs: map[chan schemas.LiveEvent]bool{}}
@@ -393,7 +399,7 @@ func (l *launcher) Events(expID string) (<-chan schemas.LiveEvent, func()) {
 	l.mu.Lock()
 	run, ok := l.active[expID]
 	l.mu.Unlock()
-	if (!ok || run.done) && l.Active(expID) {
+	if (!ok || run.isDone()) && l.Active(expID) {
 		// A queued or resumed job: open the fan-out its handler will use.
 		run, ok = l.liveRunFor(expID), true
 	}
@@ -439,6 +445,14 @@ func (r *liveRun) subscribe(ch chan schemas.LiveEvent) (<-chan schemas.LiveEvent
 	}
 }
 
+// isDone reports whether finish ran, under the run's own mutex (finish
+// writes done under it, not under the launcher's).
+func (r *liveRun) isDone() bool {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	return r.done
+}
+
 func (r *liveRun) finish() {
 	r.mu.Lock()
 	defer r.mu.Unlock()
@@ -469,16 +483,27 @@ func actorOf(ctx context.Context) string {
 }
 
 // Busy reports an experiment running in this process, so a hosted org's
-// runtime is not evicted under it (tenancy.OrgRuntime.Busy).
+// runtime is not evicted under it (tenancy.OrgRuntime.Busy). With a job
+// runner the job's status decides, not the optional live fan-out: a fan-out
+// left open for a job that already ended is closed here instead.
 func (l *launcher) Busy() bool {
 	l.mu.Lock()
-	defer l.mu.Unlock()
-	for _, r := range l.active {
-		if !r.done {
-			return true
+	var open []string
+	for id, r := range l.active {
+		if !r.isDone() {
+			open = append(open, id)
 		}
 	}
-	return false
+	l.mu.Unlock()
+	busy := false
+	for _, id := range open {
+		if l.jobs == nil || l.Active(id) {
+			busy = true
+			continue
+		}
+		l.finishLive(id)
+	}
+	return busy
 }
 
 // Regrade queues an experiment.regate job: the gates of the experiment's
@@ -512,6 +537,16 @@ const (
 // scheduler is idempotent, so it gets more claims than the default.
 const expRunMaxAttempts = 20
 
+// Hosted job runner sizing. A hosted experiment.run waits in its scheduler
+// until a matching runner takes its slots, possibly for ever, so experiments
+// get at most hostedExpLimit workers (hostedExpPerOrg per organization) and
+// the rest are left to the ops kinds and to other organizations.
+const (
+	hostedWorkers   = 6
+	hostedExpLimit  = 4
+	hostedExpPerOrg = 2
+)
+
 // jobsHub is serve's job runner and the way a job finds its organization's
 // launcher: the one local launcher, or in hosted mode the launcher the
 // org's runtime registered when the tenancy registry built it.
@@ -528,7 +563,11 @@ type jobsHub struct {
 }
 
 func newJobsHub(d *db.DB, logger schemas.Logger, hosted, launches bool, configPath string) *jobsHub {
-	h := &jobsHub{runner: jobs.New(d, jobs.Options{Logger: logger}), db: d, hosted: hosted, launches: launches, configPath: configPath,
+	opts := jobs.Options{Logger: logger}
+	if hosted {
+		opts.Workers = hostedWorkers
+	}
+	h := &jobsHub{runner: jobs.New(d, opts), db: d, hosted: hosted, launches: launches, configPath: configPath,
 		orgs: map[string]*launcher{}}
 	h.registerKinds()
 	return h
@@ -655,9 +694,13 @@ func (h *jobsHub) registerKinds() {
 
 // registerExperimentRun registers experiment.run.
 func (h *jobsHub) registerExperimentRun() {
+	limit := jobs.WithLimit(0, 0)
+	if h.hosted {
+		limit = jobs.WithLimit(hostedExpLimit, hostedExpPerOrg)
+	}
 	h.runner.Register(kindExperimentRun, h.withLauncher(func(ctx context.Context, l *launcher, j *jobs.Job, log jobs.Logger, progress func(any)) (any, error) {
 		return l.runJob(ctx, j, log, progress)
-	}), jobs.Internal(), jobs.WithMaxAttempts(expRunMaxAttempts), jobs.WithValidator(h.validator(
+	}), jobs.Internal(), jobs.WithMaxAttempts(expRunMaxAttempts), limit, jobs.WithCancelHook(h.expRunCancelled), jobs.WithValidator(h.validator(
 		func(ctx context.Context, l *launcher, raw json.RawMessage) (any, string, error) {
 			var p expRunParams
 			if err := strictParams(raw, &p); err != nil {
@@ -671,6 +714,22 @@ func (h *jobsHub) registerExperimentRun() {
 			}
 			return p, expTarget(p.ExpID), nil
 		})))
+}
+
+// expRunCancelled closes the live fan-out of an experiment whose run job
+// was cancelled while queued, through any API.
+func (h *jobsHub) expRunCancelled(j *jobs.Job) {
+	var p expRunParams
+	if err := j.DecodeParams(&p); err != nil || p.ExpID == "" {
+		return
+	}
+	h.mu.Lock()
+	l, ok := h.orgs[j.OrgID]
+	h.mu.Unlock()
+	if ok {
+		l.invalidateStates()
+		l.finishLive(p.ExpID)
+	}
 }
 
 // registerOps registers experiment.regate and the ops kinds.
@@ -981,12 +1040,21 @@ func hostedHub(env *hostedEnv) *jobsHub {
 	if err := h.runner.Start(context.WithoutCancel(env.ctx)); err != nil {
 		env.base.logger.Warn("job runner: " + err.Error())
 	}
-	context.AfterFunc(env.ctx, func() {
-		sctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
-		defer cancel()
-		h.runner.Stop(sctx)
-	})
+	context.AfterFunc(env.ctx, func() { stopHostedHub(env) })
 	return h
+}
+
+// stopHostedHub stops env's job runner and waits for its running jobs to
+// hand back. serveHosted calls it before closing the org runtimes and the
+// database the hand-back writes to; a repeat call waits for the first.
+func stopHostedHub(env *hostedEnv) {
+	h, ok := hostedHubs.Load(env)
+	if !ok {
+		return
+	}
+	sctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+	h.(*jobsHub).runner.Stop(sctx)
 }
 
 // jobsAudit writes the job routes' audit rows (rule 6): platform handlers

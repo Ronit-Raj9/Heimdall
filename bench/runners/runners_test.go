@@ -251,6 +251,14 @@ func TestRunnerRows(t *testing.T) {
 		if !got.Live || got.RunningSlots != 2 || got.Completed != 7 || len(got.Running) != 2 {
 			t.Fatalf("live runner %+v", got)
 		}
+		// Held idle by a coordinator with no experiment attached (no
+		// sweep runs) and silent past the stale threshold: lost too.
+		live.workers["org_a"] = []schemas.WorkerInfo{{ID: "box-01", State: schemas.WorkerIdle, Running: []string{},
+			TokenID: tok.Info.ID, LastSeen: c.now()}}
+		c.add(3 * time.Minute)
+		if got, _ = s.GetRunner(ctx, "org_a", r.ID); !got.Live || got.State != schemas.RunnerLost {
+			t.Fatalf("silent idle live runner %+v", got)
+		}
 		// Silent past the stale threshold and not live: lost.
 		live.workers["org_a"] = nil
 		c.add(3 * time.Minute)

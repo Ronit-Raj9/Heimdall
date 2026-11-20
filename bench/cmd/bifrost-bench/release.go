@@ -11,7 +11,6 @@ import (
 	"time"
 
 	"github.com/maximhq/bifrost/bench/handlers"
-	"github.com/maximhq/bifrost/bench/lib"
 	"github.com/maximhq/bifrost/bench/release"
 	"github.com/maximhq/bifrost/bench/schemas"
 	"github.com/maximhq/bifrost/bench/store"
@@ -210,7 +209,7 @@ func exportCompliance(on bool, config string, l *release.Log, id, out string) in
 
 // openReleaseLog opens the release log over the configured run store.
 func openReleaseLog(configPath string) (*release.Log, error) {
-	cfg, err := lib.LoadConfig(configPath)
+	cfg, err := loadConfig(configPath)
 	if err != nil {
 		return nil, err
 	}

@@ -317,3 +317,28 @@ func TestExportAgentFiles(t *testing.T) {
 		t.Errorf("same tree, other hash: %v", err)
 	}
 }
+
+// A fix that adds the repository's first test is skipped for a hidden_tests
+// suite, whose static validation needs a visible test in the starting repo
+// (audit 5-B-16); without the option it stays a candidate.
+func TestMineSkipsFirstTestForHiddenTests(t *testing.T) {
+	r := newTestRepo(t)
+	r.write("calc/__init__.py", "")
+	r.write("calc/core.py", "def add(a, b):\n    return abs(a) + abs(b)\n")
+	r.commit("Initial")
+	r.write("calc/core.py", "def add(a, b):\n    return a + b\n")
+	r.write("tests/test_core.py", "from calc.core import add\n\n\ndef test_keeps_sign():\n    assert add(-2, 3) == 1\n")
+	first := r.commit("fix: add keeps the sign")
+	opts := MineOptions{Repo: r.dir, TestGlobs: DefaultTestGlobs(TemplatePythonPytest), NeedBaseTests: true}
+	good, skipped, err := MineCandidates(context.Background(), opts)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(good) != 0 || len(skipped) != 2 || skipped[0].Commit != first || skipped[0].Skip != SkipNoBaseTests {
+		t.Fatalf("good %v skipped %+v", good, skipped)
+	}
+	opts.NeedBaseTests = false
+	if good, _, err := MineCandidates(context.Background(), opts); err != nil || len(good) != 1 {
+		t.Fatalf("without the option: %v %v", good, err)
+	}
+}

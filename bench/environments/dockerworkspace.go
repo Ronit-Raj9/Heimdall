@@ -991,6 +991,9 @@ func labelMap(expID, runID string) map[string]string {
 	if expID != "" {
 		m[utils.LabelExp] = expID
 	}
+	if p := utils.Project(); p != "" && runID != "" {
+		m[utils.LabelProject] = p
+	}
 	return m
 }
 

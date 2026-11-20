@@ -51,6 +51,9 @@ func (e *dockerWorkspace) Snapshot(ctx context.Context, rc *schemas.RunContext) 
 	if expID != "" {
 		args = append(args, "--change", "LABEL "+utils.LabelExp+"="+expID)
 	}
+	if p := utils.Project(); p != "" {
+		args = append(args, "--change", "LABEL "+utils.LabelProject+"="+p)
+	}
 	res, err := e.cfg.Docker.MustRun(ctx, append(args, name, snapshotTag(runID))...)
 	if err != nil {
 		return "", fmt.Errorf("snapshot run %s: %w", runID, err)

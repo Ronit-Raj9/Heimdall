@@ -12,7 +12,6 @@ import (
 	"time"
 
 	"github.com/maximhq/bifrost/bench/db"
-	"github.com/maximhq/bifrost/bench/lib"
 )
 
 // Database area (P1, docs/platform-design.md): the operational database's
@@ -50,7 +49,7 @@ func runDB(args []string) int {
 		fmt.Fprintln(os.Stderr, "db backup needs -out <file>\n"+dbUsage)
 		return exitUsage
 	}
-	cfg, err := lib.LoadConfig(*config)
+	cfg, err := loadConfig(*config)
 	if err != nil {
 		return fail("%v", err)
 	}

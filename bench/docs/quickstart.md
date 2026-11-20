@@ -363,7 +363,7 @@ name: Heimdall agent gate
 
 ...
 -dry-run: would write ~/minitext/.github/workflows/heimdall.yml (115 lines)
-recorded mode: copy one sealed experiment into ~/minitext/.heimdall/recorded (cp -R ~/minitext/.heimdall/runs/<exp_id> ~/minitext/.heimdall/recorded/) and commit it
+recorded mode: copy one sealed experiment into ~/minitext/.heimdall/recorded (mkdir -p ~/minitext/.heimdall/recorded && cp -R ~/minitext/.heimdall/runs/<exp_id> ~/minitext/.heimdall/recorded/) and commit it
 ```
 
 The workflow's gate was then run locally the way the job runs it: the sealed
@@ -385,7 +385,10 @@ still yours:
 1. **Build the images once.** `init` prints the exact `docker build` lines:
    the bench image (from a static build of the binary), the helper image,
    one image per agent CLI it found (`agents/images/<agent>/Dockerfile`),
-   and a toolchain image for every suite that is not Python. Not measured
+   and a toolchain image for every suite that is not Python. With
+   `init -image <tag>` no `base/` folder is written, so instead of a build
+   it prints `docker image inspect <tag>` to check that image is on the
+   machine. Not measured
    here; the agent images download their CLI, so they need the network.
 2. **Start the stack.** `docker compose -f .heimdall/deploy/docker-compose.yml
    --env-file .heimdall/deploy/.env up -d --wait`. `init` writes `.env` with

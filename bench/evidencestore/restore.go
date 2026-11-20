@@ -53,7 +53,7 @@ type RestoreResult struct {
 // mirror, so a mirror rewritten after archiving is refused. A live
 // experiment folder is never replaced: compare it with `evidence verify`.
 func (m *Mirror) Restore(ctx context.Context, org Org, expID string, opts RestoreOptions) (*RestoreResult, error) {
-	unlock, err := m.lockExp(org, expID)
+	unlock, err := m.lockExp(ctx, org, expID)
 	if err != nil {
 		return nil, err
 	}
@@ -406,7 +406,7 @@ func (m *Mirror) recover(org Org) error {
 	}
 	var errs []error
 	for expID := range ids {
-		unlock, err := m.lockExp(org, expID)
+		unlock, err := m.lockExp(context.Background(), org, expID)
 		if err != nil {
 			errs = append(errs, err)
 			continue

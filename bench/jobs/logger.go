@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"strings"
 	"sync"
+	"unicode/utf8"
 )
 
 // Log levels stored in job_logs.level.
@@ -88,10 +89,7 @@ func (l *jobLogger) Flush() {
 }
 
 func (l *jobLogger) line(level, s string) {
-	s = strings.TrimRight(s, "\r\n")
-	if max := l.r.opts.MaxLineBytes; len(s) > max {
-		s = s[:max] + " [line cut]"
-	}
+	s = clipLine(strings.TrimRight(s, "\r\n"), l.r.opts.MaxLineBytes)
 	l.mu.Lock()
 	defer l.mu.Unlock()
 	l.seq++
@@ -99,4 +97,22 @@ func (l *jobLogger) line(level, s string) {
 		int64(l.r.opts.LogHead), int64(l.r.opts.LogTail)); err != nil {
 		l.r.opts.Logger.Warn("job log write failed", "job", l.job, "error", err.Error())
 	}
+}
+
+// lineCut marks a line clipLine shortened.
+const lineCut = " [line cut]"
+
+// clipLine makes s valid UTF-8 (a TEXT column in a UTF-8 PostgreSQL
+// database refuses anything else) and keeps at most max bytes of it, cut at
+// a rune boundary, before the marker.
+func clipLine(s string, max int) string {
+	s = strings.ToValidUTF8(s, "\uFFFD")
+	if len(s) <= max {
+		return s
+	}
+	keep := max
+	for keep > 0 && !utf8.RuneStart(s[keep]) {
+		keep--
+	}
+	return s[:keep] + lineCut
 }

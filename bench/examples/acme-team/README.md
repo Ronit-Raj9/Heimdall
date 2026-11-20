@@ -102,6 +102,11 @@ and the team cannot talk. Rebuild it (`bench/Dockerfile`) or point
 
 Key slots: each member is on a gateway key slot of its own, so a probe can
 fail one member's model; the lead runs on the run's own key. The
-four-member team needs four slots free at once, which is every slot the
-shared development stack has per provider: run it when nothing else holds
-one.
+four-member team needs four slots free at once. The shared development
+stack has eight slots per provider (`fp-slot-1` to `fp-slot-8`, see
+`deploy/bench.yaml`), but this example's `deploy/bench.yaml` lists only
+`fp-slot-1` to `fp-slot-4` under `gateway.key_slots`, so the team needs
+every slot it is allowed. Run it when nothing else holds one of those four,
+or give each project that shares the stack a disjoint subset of the eight
+names in its own `key_slots` (for example slots 1 to 4 here and 5 to 8 for
+another example).

@@ -114,9 +114,17 @@ func printCINotes(mode, top string) {
 	}
 	rec := filepath.Join(top, quickstart.Dir, "recorded")
 	if _, err := os.Stat(rec); err != nil {
-		fmt.Fprintf(os.Stderr, "recorded mode: copy one sealed experiment into %s (cp -R %s/runs/<exp_id> %s/) and commit it\n",
-			rec, filepath.Join(top, quickstart.Dir), rec)
+		fmt.Fprintln(os.Stderr, recordedCopyNote(rec, filepath.Join(top, quickstart.Dir)))
 	}
+}
+
+// recordedCopyNote is the recorded-mode setup step. The folder is created
+// first: `cp -R <exp> <dest>/` into a missing dest makes dest itself the
+// experiment, and CI expects one folder per experiment beneath it (audit
+// 5-B-07).
+func recordedCopyNote(rec, project string) string {
+	return fmt.Sprintf("recorded mode: copy one sealed experiment into %s (mkdir -p %s && cp -R %s/runs/<exp_id> %s/) and commit it",
+		rec, rec, project, rec)
 }
 
 func countLines(s string) int {

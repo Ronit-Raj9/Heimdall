@@ -150,7 +150,7 @@ Archiving one experiment, in order:
 
 **Nothing is deleted unless the mirror copy has been restored and verified.** A crash is finished or undone by the next archive, restore or sweep, from what stands at `<root>/<exp_id>`: nothing there, and the trashed folder is moved back; a valid stub, and the trash is deleted (the stub goes in only after every check); a restored live folder while the trash holds only a stub, and the trash is deleted; anything else (an empty or half-written folder), and both are kept and an error is logged for a manual check.
 
-**The stub** (`heimdall-archive-stub/1`) is the only file left in the folder. Because the folder has no `manifest.json`, the store does not list the experiment and no verdict, leaderboard or release reads it; because the folder exists, the id can not be reused. It holds the experiment's name, suite, arms, creation, last activity and archive times, manifest hash, run, file and byte counts, the mirror location and the listing's key, sha256, generation and last seal. `evidencestore.ListArchived(root)` returns the stubs of a store root, for the UI to list beside live experiments with a restore action; `evidence restore` brings one back.
+**The stub** (`heimdall-archive-stub/1`) is the only file left in the folder. Because the folder has no `manifest.json`, the store does not list the experiment and no verdict, leaderboard or release reads it; because the folder exists, the id can not be reused. It holds the experiment's name, suite, arms, creation, last activity and archive times, manifest hash, run, file and byte counts, the mirror location and the listing's key, sha256, generation and last seal. `evidencestore.ListArchived(root)` returns the stubs of a store root. The server and the UI do not list archived experiments yet and offer no restore action: an archived experiment disappears from the UI until an operator runs `evidence list` to see the stubs and `evidence restore` to bring one back.
 
 ## Database backup
 
@@ -200,7 +200,7 @@ It does not prove anything against someone who can write both the local folders 
 | Jobs (P4) | call `evidenceOnSeal(orgID, m.ExpID)` where the job runner sees `engine.EventRunSealed` (`servejobs.go`); without it the sweeper still mirrors within `sweep_interval_m` |
 | Tenancy (P3) | call `startEvidenceMirror(ctx, a)` in the hosted serve path as `serve` does in local mode; a registry-backed `evidencestore.OrgSource` can replace `RunsRootOrgs` to share the stores' verification caches |
 | Database (P1) | `retention.archive_after_days` in `settings`; the index rebuild can list archived experiments with `evidencestore.ListArchived(root)` |
-| UI (U1) | list archived experiments from the stubs and offer restore (a job or `evidence restore`) |
+| UI (U1) | not wired yet: archived experiments are hidden from the UI, and listing and restoring them is CLI only (`evidence list`, `evidence restore`) |
 
 ## Tests
 

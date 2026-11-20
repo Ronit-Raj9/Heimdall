@@ -51,7 +51,7 @@ func runOrg(args []string) int {
 
 // openOrgDB loads the config and opens the migrated database.
 func openOrgDB(ctx context.Context, config string) (*lib.Config, *db.DB, error) {
-	cfg, err := lib.LoadConfig(config)
+	cfg, err := loadConfig(config)
 	if err != nil {
 		return nil, nil, err
 	}

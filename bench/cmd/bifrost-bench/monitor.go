@@ -17,7 +17,6 @@ import (
 	"time"
 
 	"github.com/maximhq/bifrost/bench/handlers"
-	"github.com/maximhq/bifrost/bench/lib"
 	"github.com/maximhq/bifrost/bench/monitorcert"
 	"github.com/maximhq/bifrost/bench/schemas"
 	"github.com/maximhq/bifrost/bench/store"
@@ -75,7 +74,7 @@ func runMonitorCertify(args []string) int {
 	if err != nil {
 		return fail("%v", err)
 	}
-	cfg, err := lib.LoadConfig(*config)
+	cfg, err := loadConfig(*config)
 	if err != nil {
 		return fail("%v", err)
 	}
@@ -187,7 +186,7 @@ func runMonitorShow(args []string) int {
 
 // openCertStore opens the certificates root of the configured bench.
 func openCertStore(configPath string) (*monitorcert.CertStore, error) {
-	cfg, err := lib.LoadConfig(configPath)
+	cfg, err := loadConfig(configPath)
 	if err != nil {
 		return nil, err
 	}

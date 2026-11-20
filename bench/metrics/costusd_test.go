@@ -55,7 +55,10 @@ func TestCostUSD(t *testing.T) {
 			want: schemas.Unknown("2 of 3 cost rows unpriced", gw),
 		},
 		{name: "no rows and no requests", ev: &schemas.Evidence{}, want: schemas.Unknown("no cost evidence", gw)},
-		{name: "no rows and empty log", ev: &schemas.Evidence{Requests: completeLog()}, want: schemas.Unknown("no cost evidence", gw)},
+		// 5-A-08: a complete, empty gateway witness is an observed zero (a
+		// noop or oracle control); an incomplete one stays unknown.
+		{name: "no rows and complete empty log", ev: &schemas.Evidence{Requests: completeLog()}, want: schemas.Observed(0, gw)},
+		{name: "no rows and incomplete empty log", ev: &schemas.Evidence{Requests: &schemas.RequestLog{}}, want: schemas.Unknown("no cost evidence", gw)},
 		{name: "no rows but requests", ev: &schemas.Evidence{Requests: completeLog(okMsg("a"), okMsg("b"))}, want: schemas.Unknown("no cost rows for 2 gateway requests", gw)},
 		{name: "nil evidence", ev: nil, want: schemas.Unknown("no cost evidence", gw)},
 	}

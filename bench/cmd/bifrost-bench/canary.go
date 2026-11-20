@@ -156,7 +156,7 @@ func canaryInit(args []string, out io.Writer) int {
 	if *cron != "" {
 		d.Schedule = &canary.ScheduleSpec{Cron: *cron, Timezone: *tz}
 	}
-	cfg, err := lib.LoadConfig(*f.config)
+	cfg, err := loadConfig(*f.config)
 	if err != nil {
 		return fail("%v", err)
 	}
@@ -186,7 +186,7 @@ func canaryStatus(args []string, out io.Writer, listOnly bool) int {
 		fmt.Fprintln(os.Stderr, canaryUsage)
 		return exitUsage
 	}
-	cfg, err := lib.LoadConfig(*f.config)
+	cfg, err := loadConfig(*f.config)
 	if err != nil {
 		return fail("%v", err)
 	}

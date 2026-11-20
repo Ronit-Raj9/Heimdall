@@ -337,25 +337,45 @@ func (s *Store) LatestByTarget(ctx context.Context, orgID, kind string) (map[str
 // that already ended answers ErrFinished.
 func (s *Store) Cancel(ctx context.Context, orgID, id string) (*Job, error) {
 	now := s.millis()
+	// Each transition is one conditional UPDATE whose affected-row count
+	// decides the outcome. Under PostgreSQL's READ COMMITTED a SELECT of
+	// 'queued' followed by an UPDATE can race a concurrent claim, leaving the
+	// row running with no cancel request while the caller is told it worked.
 	err := s.db.Tx(ctx, func(tx *sql.Tx) error {
+		res, err := tx.ExecContext(ctx, s.q(`UPDATE jobs SET status = ?, cancel_requested = 1, finished_at = ?, error = ?
+			WHERE org_id = ? AND id = ? AND status = ?`), string(StatusCancelled), now, "cancelled before it started", orgID, id, string(StatusQueued))
+		if err != nil {
+			return err
+		}
+		if n, err := res.RowsAffected(); err != nil {
+			return err
+		} else if n == 1 {
+			return nil
+		}
+		res, err = tx.ExecContext(ctx, s.q(`UPDATE jobs SET cancel_requested = 1 WHERE org_id = ? AND id = ? AND status = ?`),
+			orgID, id, string(StatusRunning))
+		if err != nil {
+			return err
+		}
+		if n, err := res.RowsAffected(); err != nil {
+			return err
+		} else if n == 1 {
+			return nil
+		}
 		var status string
-		err := tx.QueryRowContext(ctx, s.q(`SELECT status FROM jobs WHERE org_id = ? AND id = ?`), orgID, id).Scan(&status)
+		err = tx.QueryRowContext(ctx, s.q(`SELECT status FROM jobs WHERE org_id = ? AND id = ?`), orgID, id).Scan(&status)
 		if errors.Is(err, sql.ErrNoRows) {
 			return fmt.Errorf("%w: %s", ErrNotFound, id)
 		}
 		if err != nil {
 			return err
 		}
-		switch Status(status) {
-		case StatusQueued:
-			_, err = tx.ExecContext(ctx, s.q(`UPDATE jobs SET status = ?, cancel_requested = 1, finished_at = ?, error = ?
-				WHERE org_id = ? AND id = ? AND status = ?`), string(StatusCancelled), now, "cancelled before it started", orgID, id, string(StatusQueued))
-		case StatusRunning:
-			_, err = tx.ExecContext(ctx, s.q(`UPDATE jobs SET cancel_requested = 1 WHERE org_id = ? AND id = ?`), orgID, id)
-		default:
-			return fmt.Errorf("%w: %s is %s", ErrFinished, id, status)
+		if Status(status) == StatusQueued || Status(status) == StatusRunning {
+			// The row moved between the two updates (claimed, then requeued);
+			// report a conflict rather than an acknowledged no-op.
+			return fmt.Errorf("job %s changed state during cancel; retry", id)
 		}
-		return err
+		return fmt.Errorf("%w: %s is %s", ErrFinished, id, status)
 	})
 	if err != nil {
 		return nil, err
