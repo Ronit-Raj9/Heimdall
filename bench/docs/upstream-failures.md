@@ -2,7 +2,7 @@
 
 A run's model calls go agent, Bifrost, fault proxy, provider API. When the fault proxy cannot reach the provider (DNS, connect, TLS or a response-header timeout), the agent sees a 502 `fault proxy could not reach the upstream` on every call and usually exits with nothing done. That is the infrastructure failing, not the agent, so it must never be scored as a `fail`.
 
-This happened on a live experiment: the host changed networks, Docker DNS broke, and the fault proxy logged `upstream request failed ... dial tcp: lookup api.openai.com ... i/o timeout` for every call. Codex exited 1 after 0 answered model turns and the runs were sealed as `fail`.
+This happened on a live experiment: the host changed networks, Docker DNS broke, and the fault proxy logged `upstream request failed ... dial tcp: lookup api.openai.com ... i/o timeout` for every call. Codex exited 1 after 0 answered model turns and the bench of that day sealed the runs as agent `fail`: they were misclassified, and the experiment (`e_memory_trap_guw7`) was excluded from the published results by hand. The rules below are the fix that incident prompted; `TestRunSlotUpstreamUnreachable` and `TestRegateOutcomeUpstream` (in `engine/`) cover the post-fix classification.
 
 ## How it is recorded
 

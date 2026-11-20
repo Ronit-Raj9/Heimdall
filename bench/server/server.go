@@ -157,11 +157,11 @@ func New(cfg *lib.Config, deps Deps) (*Server, error) {
 func registerOrgRoutes(r *router.Router, cfg *lib.Config, deps Deps, write lib.Middleware, common []lib.Middleware) *handlers.ExperimentsHandler {
 	mode := cfg.Server.Mode
 	experiments := handlers.NewExperimentsHandler(mode, deps.Index, deps.Analyzer, deps.Launcher, deps.Catalog, write)
-	handlers.NewHealthHandler(mode, deps.Version, deps.Doctor).RegisterRoutes(r, common...)
+	handlers.NewHealthHandler(mode, deps.Version, deps.Doctor).WithLaunch(deps.Launcher != nil).RegisterRoutes(r, common...)
 	handlers.NewReadinessHandler(mode, deps.Version, deps.Ready).RegisterRoutes(r, common...) // Deploy area: GET /healthz and /readyz at the site root (handlers/readiness.go)
 	handlers.NewCatalogHandler(mode, deps.Catalog).RegisterRoutes(r, common...)
 	experiments.RegisterRoutes(r, common...)
-	handlers.NewRunsHandler(mode, deps.Index).RegisterRoutes(r, common...)
+	handlers.NewRunsHandler(mode, deps.Index).WithSuites(deps.Suites).RegisterRoutes(r, common...)
 	handlers.NewRunListHandler(mode, deps.Index, deps.Suites).RegisterRoutes(r, common...) // UI regroup (U2): GET /runs (handlers/runlist.go)
 	handlers.NewPairsHandler(mode, deps.Index).RegisterRoutes(r, common...)
 	handlers.NewTriageHandler(mode, deps.Index, deps.Catalog).RegisterRoutes(r, common...)

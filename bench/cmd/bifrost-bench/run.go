@@ -32,7 +32,8 @@ func runPlan(args []string) int {
 	allowUnpriced := fs.Bool("allow-unpriced", false, "plan matrix models the price snapshot does not list") // Forecast and matrix area (estimate.go)
 	// Suite health area: -include-quarantined (suitehealth.go).
 	fs.BoolVar(&includeQuarantined, "include-quarantined", false, "let an explicit task list name a quarantined task")
-	if err := fs.Parse(args); err != nil || fs.NArg() != 1 {
+	pos, err := parseInterspersed(fs, args) // flags may follow the file (7-C-01)
+	if err != nil || len(pos) != 1 {
 		fmt.Fprintln(os.Stderr, "usage: bifrost-bench plan [-config deploy/bench.yaml] [-allow-unpriced] experiments/<file>.yaml")
 		return exitUsage
 	}
@@ -42,7 +43,7 @@ func runPlan(args []string) int {
 	if err != nil {
 		return fail("%v", err)
 	}
-	exp, err := loadExperiment(fs.Arg(0))
+	exp, err := loadExperiment(firstArg(pos))
 	if err != nil {
 		return fail("%v", err)
 	}
@@ -130,7 +131,8 @@ func runRun(args []string) int {
 	debug := fs.Bool("debug", false, "debug logging")
 	// Suite health area: -include-quarantined (suitehealth.go).
 	fs.BoolVar(&includeQuarantined, "include-quarantined", false, "let an explicit task list name a quarantined task")
-	if err := fs.Parse(args); err != nil || (fs.NArg() != 1 && *resume == "") {
+	pos, err := parseInterspersed(fs, args) // flags may follow the file (7-C-01)
+	if err != nil || len(pos) > 1 || (len(pos) != 1 && *resume == "") {
 		fmt.Fprintln(os.Stderr, "usage: bifrost-bench run [-config deploy/bench.yaml] [-concurrency n] experiments/<file>.yaml | -resume <exp_id> [-allow-version-drift]")
 		return exitUsage
 	}
@@ -140,7 +142,7 @@ func runRun(args []string) int {
 	if err != nil {
 		return fail("%v", err)
 	}
-	m, code := a.manifestFor(ctx, fs.Arg(0), *resume, *allowDrift)
+	m, code := a.manifestFor(ctx, firstArg(pos), *resume, *allowDrift)
 	if m == nil {
 		return code
 	}
@@ -242,14 +244,15 @@ func runCheck(args []string) int {
 	exp := fs.String("exp", "", "re-analyze an existing experiment id instead of running a file")
 	failOn := fs.String("fail-on", "regressed,invalid", "comma-separated verdicts that fail the check")
 	out := fs.String("out", "report.md", "markdown report path")
-	policyFile := fs.String("policy", "", "release policy file; overrides the one the experiment froze")
+	policyFile := fs.String("policy", "", "release policy file; overrides the one the experiment froze (its frozen hash check does not apply to an override); none turns policy evaluation off")
 	gradeSource := fs.String("grade-source", schemas.GradeSourceOriginal, "original, reviewed (human reviews applied, see docs/human-review.md), or a regrade id (from regate or a regrade) to analyze with")
-	if err := fs.Parse(args); err != nil || (fs.NArg() != 1 && *exp == "") {
+	pos, err := parseInterspersed(fs, args) // flags may follow the file (7-C-01)
+	if err != nil || len(pos) > 1 || (len(pos) != 1 && *exp == "") {
 		fmt.Fprintln(os.Stderr, "usage: bifrost-bench check [-fail-on regressed,invalid] [-policy policies/default.yaml] [-grade-source original|reviewed|<regrade_id>] [-out report.md] experiments/<file>.yaml | -exp <exp_id>")
 		fmt.Fprintln(os.Stderr, "exit: 0 ok, 1 regressed, 2 inconclusive, 3 invalid (each only when listed in -fail-on), 4 infrastructure error, 5 blocked by the release policy")
 		return exitUsage
 	}
-	if *policyFile != "" {
+	if *policyFile != "" && *policyFile != policyNone {
 		// Fail before a long run, not after it.
 		if _, _, err := policy.Load(*policyFile); err != nil {
 			return fail("%v", err)
@@ -263,7 +266,7 @@ func runCheck(args []string) int {
 	}
 	expID := *exp
 	if expID == "" {
-		m, code := a.manifestFor(ctx, fs.Arg(0), "", false)
+		m, code := a.manifestFor(ctx, firstArg(pos), "", false)
 		if m == nil {
 			return code
 		}

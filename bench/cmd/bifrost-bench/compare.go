@@ -40,7 +40,7 @@ const compareUsage = `usage: bifrost-bench compare --baseline <ref> --candidate 
        bifrost-bench compare --a model=<m1> --b model=<m2> [--base agents/<agent>.yaml]   (any key=value override, comma-separated)
    common: [--suite <suite>] [--trials 3] [--fault model-outage]... [--tier <tier>] [--budget-usd <usd, required unless every arm is scripted>] [--yes]
            [--name <experiment name>] [--concurrency 2] [--policy policies/default.yaml|none] [--fail-on regressed,invalid] [--write-only] [--config ...]
-exit: 0 ok, 1 regressed, 2 inconclusive, 3 invalid (each only when listed in --fail-on), 4 infrastructure error, 5 blocked by the release policy, 64 usage`
+exit: 0 ok, 1 regressed, 2 inconclusive, 3 invalid (each only when listed in --fail-on), 4 infrastructure error, 5 blocked by the release policy, 6 not run (consent declined or not given; no verdict), 64 usage`
 
 // listFlag is a repeatable string flag.
 type listFlag []string
@@ -378,23 +378,9 @@ func compare(ctx context.Context, f compareFlags, in io.Reader, out io.Writer) i
 	} else {
 		fmt.Fprintf(out, "forecast: none (%v)\n", ferr)
 	}
-	episodes := len(m.Slots)
-	switch {
-	case setup.opts.Smoke:
-		fmt.Fprintf(out, "every arm is a scripted agent: $0, no consent needed; running %d episodes\n", episodes)
-	case f.yes:
-		fmt.Fprintf(out, "--yes: running %d episodes (budget cap $%.2f)\n", episodes, f.budget)
-	default:
-		if !interactive(in) {
-			fmt.Fprintf(out, "not run: this spends real model money; rerun with --yes, or run it with\n  (cd %s && %s run %s)\n", a.cfg.Root, progName, setup.rel)
-			return exitOK
-		}
-		fmt.Fprintf(out, "run %d agent episodes (budget cap $%.2f)? [y/N] ", episodes, f.budget)
-		answer, _ := bufio.NewReader(in).ReadString('\n')
-		if a := strings.ToLower(strings.TrimSpace(answer)); a != "y" && a != "yes" {
-			fmt.Fprintln(out, "not run")
-			return exitOK
-		}
+	if !confirmSpend(in, out, setup.opts.Smoke, f.yes, len(m.Slots), f.budget,
+		fmt.Sprintf("(cd %s && %s run %s)", a.cfg.Root, progName, setup.rel)) {
+		return exitNotRun
 	}
 	if err := a.store.CreateExperiment(ctx, m); err != nil {
 		return fail("freeze %s: %v", m.ExpID, err)
@@ -428,6 +414,31 @@ func compare(ctx context.Context, f compareFlags, in io.Reader, out io.Writer) i
 }
 
 // interactive reports whether in is a terminal a person can answer on.
+// confirmSpend reports whether compare may run the experiment: always for an
+// all-scripted experiment or --yes, otherwise only after a "y" on an
+// interactive stdin. A declined or unasked run is not a verdict, so the caller
+// exits exitNotRun rather than 0 (finding 7-B-08).
+func confirmSpend(in io.Reader, out io.Writer, smoke, yes bool, episodes int, budget float64, runCmd string) bool {
+	switch {
+	case smoke:
+		fmt.Fprintf(out, "every arm is a scripted agent: $0, no consent needed; running %d episodes\n", episodes)
+	case yes:
+		fmt.Fprintf(out, "--yes: running %d episodes (budget cap $%.2f)\n", episodes, budget)
+	default:
+		if !interactive(in) {
+			fmt.Fprintf(out, "not run (exit %d, no verdict): this spends real model money; rerun with --yes, or run it with\n  %s\n", exitNotRun, runCmd)
+			return false
+		}
+		fmt.Fprintf(out, "run %d agent episodes (budget cap $%.2f)? [y/N] ", episodes, budget)
+		answer, _ := bufio.NewReader(in).ReadString('\n')
+		if a := strings.ToLower(strings.TrimSpace(answer)); a != "y" && a != "yes" {
+			fmt.Fprintf(out, "not run (exit %d, no verdict)\n", exitNotRun)
+			return false
+		}
+	}
+	return true
+}
+
 func interactive(in io.Reader) bool {
 	f, ok := in.(*os.File)
 	if !ok {

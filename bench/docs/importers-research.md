@@ -326,7 +326,7 @@ scores are the bench's. No judge was called here.
 |---|---|
 | `evidence_recall` (new, `metrics/evidencerecall.go`) | share of the task's evidence pages that the run's own successful searches returned, from the ledger: Tavily search rows and the corpus service's `POST /search` rows. Fetches do not count, as in BrowseComp-Plus's Recall. Not applicable without evidence pages; unknown without a ledger. Higher is better, a rate |
 | `sources_cited`, `citation_precision` | the research track's, from `sources.json` and `research.json` |
-| `searches`, `citations_grounded` | the research track's. **They count Tavily rows only**, so on a BrowseComp-Plus suite `searches` reads 0 and `citations_grounded` reads 0 for a run that cites, until `research.IsSearch` and `research.IsFetch` also accept the corpus service's rows (a change requested from the research track's owner). Use `evidence_recall` and the ledger meanwhile |
+| `searches`, `citations_grounded` | the research track's. On a BrowseComp-Plus suite they also read the corpus service's rows: when the suite declares the corpus tool service, `research.TavilyAPIs` adds it to the run's search APIs, so `searches` counts its `POST /search` calls and `citations_grounded` checks cited URLs against the pages its searches and fetches returned. `evidence_recall` (above) is a different question: how many of the task's known evidence pages the searches surfaced |
 
 ### Comparability
 

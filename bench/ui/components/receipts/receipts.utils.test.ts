@@ -31,3 +31,14 @@ describe("ratioShares", () => {
 		expect(ratioShares({ num: 5, den: 4, unknown: 3 })).toEqual({ yes: 1, unknown: 0 });
 	});
 });
+// 6-C-05: the four newer probe layers have readable names, and an unknown one never shows its key.
+describe("probeLayerLabel", () => {
+	it("names every layer of the Go catalog and falls back to the literal", async () => {
+		const i18n = (await import("@/lib/i18n")).default;
+		const t = i18n.getFixedT("en", "bench");
+		const { probeLayerLabel } = await import("./receipts.utils");
+		expect(probeLayerLabel("a2a", t)).toBe("A2A stream");
+		for (const layer of ["adapter", "tool", "service", "tool_shim"]) expect(probeLayerLabel(layer, t)).not.toContain("receipts.");
+		expect(probeLayerLabel("future_layer", t)).toBe("future layer");
+	});
+});

@@ -1,6 +1,6 @@
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import type { TrendMetric, TrendSynthetic } from "@/lib/types/bench";
-import { cn } from "@/lib/utils";
+import { cn, controlledSelectValue } from "@/lib/utils";
 import { useId } from "react";
 import { useTranslation } from "react-i18next";
 import { ALL_VALUE, TREND_METRICS, TREND_SYNTHETIC } from "./trends.utils";
@@ -109,7 +109,7 @@ function Picker({ label, value, options, labels, onChange, disabled, testId, cla
 			<label htmlFor={id} className="text-muted-foreground text-xs">
 				{label}
 			</label>
-			<Select value={value || undefined} onValueChange={onChange} disabled={disabled}>
+			<Select value={controlledSelectValue(value)} onValueChange={onChange} disabled={disabled}>
 				<SelectTrigger id={id} className={cn("font-mono text-xs", className)} data-testid={testId}>
 					<SelectValue />
 				</SelectTrigger>

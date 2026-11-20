@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -24,8 +25,10 @@ type VoiceReader interface {
 }
 
 // VoiceCall is GET /api/bench/runs/{id}/voice: the caller's timeline read
-// the way the voice metrics read it, with the default bounds (the run's
-// metrics carry the task's own), and which audio tracks the run kept.
+// the way the voice metrics read it, with the task's own barge-in and dead air
+// bounds when the frozen suite version still loads (BoundsSource "task"),
+// else the defaults (BoundsSource "default"), and which audio tracks the run
+// kept.
 type VoiceCall struct {
 	RunID    string          `json:"run_id"`
 	Caller   string          `json:"caller"`
@@ -34,6 +37,39 @@ type VoiceCall struct {
 	Analysis *voice.Analysis `json:"analysis,omitempty"`
 	Audio    []VoiceTrack    `json:"audio"`
 	Witness  string          `json:"witness"`
+	// BoundsSource says which thresholds classified the call: "task" (the
+	// task's voice settings, as the sealed metrics used) or "default".
+	BoundsSource string `json:"bounds_source"`
+}
+
+// Voice bounds sources (VoiceCall.BoundsSource).
+const (
+	VoiceBoundsTask    = "task"
+	VoiceBoundsDefault = "default"
+)
+
+// voiceSpec is the task's voice settings for a run, read from the suite only
+// when it still loads at the version the experiment froze, so the Voice tab
+// classifies the call with the same bounds as the run's metrics. Nil (the
+// defaults) otherwise.
+func (h *RunsHandler) voiceSpec(ctx context.Context, rv *RunView) (*schemas.VoiceSpec, string) {
+	if h.suites == nil {
+		return nil, VoiceBoundsDefault
+	}
+	m, ok := h.index.Manifest(rv.Slot.ExpID)
+	if !ok || m == nil || rv.Slot.Suite == "" {
+		return nil, VoiceBoundsDefault
+	}
+	s, err := h.suites.LoadSuite(ctx, rv.Slot.Suite)
+	if err != nil || s == nil || s.Version != m.SuiteVersion {
+		return nil, VoiceBoundsDefault
+	}
+	for _, t := range s.Tasks {
+		if t != nil && t.ID == rv.Slot.Task && t.Voice != nil && (rv.Slot.TaskVersion == "" || t.Version == rv.Slot.TaskVersion) {
+			return t.Voice, VoiceBoundsTask
+		}
+	}
+	return nil, VoiceBoundsDefault
 }
 
 // VoiceTrack is one kept audio track of the call.
@@ -130,7 +166,7 @@ func (h *RunsHandler) getRunVoice(ctx *fasthttp.RequestCtx) {
 		sendNotFound(ctx, h.mode, "voice call of run", runID)
 		return
 	}
-	out := VoiceCall{RunID: runID, Caller: caller, Audio: []VoiceTrack{}, Witness: voiceWitness}
+	out := VoiceCall{RunID: runID, Caller: caller, Audio: []VoiceTrack{}, Witness: voiceWitness, BoundsSource: VoiceBoundsDefault}
 	if rec.Error != "" {
 		out.Reason = "the timeline export failed: " + rec.Error
 		lib.SendJSON(ctx, h.mode, fasthttp.StatusOK, out)
@@ -148,7 +184,9 @@ func (h *RunsHandler) getRunVoice(ctx *fasthttp.RequestCtx) {
 	case err != nil:
 		out.Reason = "the timeline does not parse: " + err.Error()
 	default:
-		a, aerr := voice.Analyze(events, nil)
+		spec, source := h.voiceSpec(ctx, rv)
+		a, aerr := voice.Analyze(events, spec)
+		out.BoundsSource = source
 		if aerr != nil {
 			out.Reason = aerr.Error()
 			break

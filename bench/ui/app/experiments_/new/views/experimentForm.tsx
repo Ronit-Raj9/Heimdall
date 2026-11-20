@@ -13,6 +13,7 @@ import { cn } from "@/lib/utils";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useId, useState } from "react";
 import { Controller, useFieldArray, useForm, useWatch, type Control, type FieldError, type UseFormRegister } from "react-hook-form";
+import { probeLayerLabel } from "@/components/receipts/receipts.utils";
 import { useTranslation } from "react-i18next";
 import {
 	conditionsFor,
@@ -355,6 +356,19 @@ export function ExperimentForm({ catalog, defaults, onStarted }: ExperimentFormP
 								/>
 							)}
 						</Field>
+						{!tokenBox && (
+							<Field label={t("experiments.new.fields.runnerPool")} error={formState.errors.runnerPool}>
+								{(id, describedBy) => (
+									<Input
+										id={id}
+										placeholder="default"
+										aria-describedby={describedBy}
+										data-testid="experiment-runner-pool-input"
+										{...register("runnerPool")}
+									/>
+								)}
+							</Field>
+						)}
 						<Field label={t("experiments.new.fields.totalUsd")} error={formState.errors.totalUsd}>
 							{(id, describedBy) => (
 								<Input
@@ -482,7 +496,7 @@ function ConditionsEditor({
 								<span className="font-mono text-sm">{field.condition}</span>
 								<span className="text-muted-foreground text-xs">
 									{probe
-										? t("experiments.new.fields.conditionProbe", { layer: t(`receipts.layers.${probe.layer}`) })
+										? t("experiments.new.fields.conditionProbe", { layer: probeLayerLabel(probe.layer, t) })
 										: t("experiments.new.fields.conditionClean")}
 								</span>
 							</label>

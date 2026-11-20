@@ -128,7 +128,7 @@ func (im *importer) Import(ctx context.Context, opts importers.Options) (*import
 			want[id] = true
 		}
 	}
-	suiteDir := importers.SuiteDir(opts.BenchRoot, opts.SuiteID)
+	suiteDir := opts.SuiteDir()
 	res := &importers.Result{Suite: opts.SuiteID, SuiteDir: suiteDir}
 	found := map[string]bool{}
 	tokens := 0

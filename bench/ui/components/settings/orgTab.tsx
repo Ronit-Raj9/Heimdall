@@ -6,7 +6,7 @@ import { CopyId } from "@/components/ui/copyId";
 import { Input } from "@/components/ui/input";
 import { canUse, useSession } from "@/lib/session/sessionContext";
 import { getBenchErrorMessage } from "@/lib/store/apis/benchApi";
-import { useGetOrgQuery, useRemoveMemberMutation, useRenameOrgMutation, useSetPublicReadMutation } from "@/lib/store/apis/platformApi";
+import { useGetOrgQuery, useLeaveOrgMutation, useRenameOrgMutation, useSetPublicReadMutation } from "@/lib/store/apis/platformApi";
 import type { OrgInfo, OrgSummary } from "@/lib/types/bench";
 import { cn } from "@/lib/utils";
 import { Check, Eye, EyeOff, TriangleAlert } from "lucide-react";
@@ -56,7 +56,7 @@ function OrgSettings({ info }: { info: OrgInfo }) {
 	useEffect(() => setName(info.name), [info.name]);
 	const [rename, renameState] = useRenameOrgMutation();
 	const [setPublic, publicState] = useSetPublicReadMutation();
-	const [leave, leaveState] = useRemoveMemberMutation();
+	const [leave, leaveState] = useLeaveOrgMutation();
 	const [saved, setSaved] = useState(false);
 
 	const onRename = async (event: FormEvent) => {
@@ -72,7 +72,7 @@ function OrgSettings({ info }: { info: OrgInfo }) {
 	const onLeave = async () => {
 		if (!session.user) return;
 		try {
-			await leave({ orgId: info.id, userId: session.user.id }).unwrap();
+			await leave({ orgId: info.id }).unwrap();
 			window.location.assign("/");
 		} catch {
 			// leaveState.error renders the failure.

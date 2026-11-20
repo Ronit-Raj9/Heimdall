@@ -222,11 +222,25 @@ Calibration items can hold images (`CalibrationItem.image`, the sha256 of
 load for presence, hash and a 16 MiB cap; an item without an image keeps
 its id exactly as before):
 
+Calibration needs a judged suite. The stock `examples/acme-visual` suite is
+not one: its checks are deterministic, no task has a rubric or a vision
+judge, and `visual calibrate acme-visual` stops with `suite acme-visual has
+no task with a rubric and a vision judge`. Make a judged copy first (here
+`acme-visual-judged`, with the revenue chart task only): add
+`rubric: verifier/rubric.md` and a pinned `judge:` (as in the YAML above) to
+the task's `output.visual`, and set `grading: judged` in its `suite.yaml`.
+`visual label` refuses a task without a rubric and a vision judge, since
+calibration would never use that label.
+
+A run's capture sits under its slot folder:
+`<runs_root>/<exp>/slots/<slot>/runs/<run>/visual/capture.png`.
+
 ```sh
-bifrost-bench visual label acme-visual -task revenue-chart -image runs/<exp>/<run>/visual/capture.png \
+bifrost-bench visual label acme-visual-judged -task revenue-chart \
+    -image runs/<exp>/slots/<slot>/runs/<run>/visual/capture.png \
     -label correct -labeller dana -note "matches the spec"
-bifrost-bench visual calibrate acme-visual          # forecast only
-bifrost-bench visual calibrate acme-visual -yes     # spends: one key, two passes of every item
+bifrost-bench visual calibrate acme-visual-judged          # forecast only
+bifrost-bench visual calibrate acme-visual-judged -yes     # spends: one key, two passes of every item
 ```
 
 `visual calibrate` runs the pinned vision judge on every labelled image

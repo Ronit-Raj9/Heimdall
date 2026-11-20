@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"errors"
 	"flag"
 	"fmt"
 	"os"
@@ -9,7 +10,26 @@ import (
 	"strings"
 
 	"github.com/maximhq/bifrost/bench/importers"
+	"github.com/maximhq/bifrost/bench/lib"
 )
+
+// importBenchmarksDir is the config's resolved benchmarks_root, the folder
+// suite lint, plan and run read suites from. A missing config means the
+// default (empty: <root>/benchmarks), since import works before a config
+// exists; a config that exists but cannot be loaded is an error.
+func importBenchmarksDir(config string) (string, error) {
+	if _, err := os.Stat(config); errors.Is(err, os.ErrNotExist) {
+		return "", nil
+	}
+	cfg, err := lib.LoadConfig(config)
+	if err != nil {
+		return "", err
+	}
+	if cfg.BenchmarksRoot == "" {
+		return "", nil
+	}
+	return cfg.Path(cfg.BenchmarksRoot), nil
+}
 
 func init() {
 	register("import", "convert tasks of a public benchmark into a suite: import list | import <format> -from <path> -suite <id>", runImport)
@@ -77,7 +97,11 @@ func runImport(args []string) int {
 	if err != nil {
 		return fail("%v", err)
 	}
-	opts := importers.Options{BenchRoot: root, From: src, SuiteID: *suiteID, Limit: *limit, Force: *force, Extra: extra}
+	benchmarks, err := importBenchmarksDir(*config)
+	if err != nil {
+		return fail("%v", err)
+	}
+	opts := importers.Options{BenchRoot: root, BenchmarksDir: benchmarks, From: src, SuiteID: *suiteID, Limit: *limit, Force: *force, Extra: extra}
 	if *ids != "" {
 		opts.IDs = strings.Split(*ids, ",")
 	}

@@ -41,6 +41,17 @@ type VisualPlannedItem struct {
 	Msg   visionMessage
 }
 
+// VisualJudged reports whether task t of suite s can be calibrated: it has an
+// output.visual rubric and pins a vision judge. A label on any other task is
+// never used by visual calibrate.
+func VisualJudged(s *schemas.Suite, t *schemas.Task) bool {
+	if t == nil {
+		return false
+	}
+	v := VisualSpec(s, t)
+	return v != nil && v.Rubric != "" && v.Judge != nil
+}
+
 // PlanVisualCalibration resolves each labelled image item of suite s to its
 // task's rubric and reference. Every task with a rubric must pin the same
 // vision judge (one record covers one judge); text items and items whose

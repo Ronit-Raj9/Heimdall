@@ -1,6 +1,7 @@
 import { useExperimentId } from "@/components/experiments/useExperimentId";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { useGetGridQuery } from "@/lib/store/apis/benchApi";
+import { EntityLink } from "@/components/shell/entityLink";
+import { useGetExperimentQuery, useGetGridQuery } from "@/lib/store/apis/benchApi";
 import type { GridRow } from "@/lib/types/bench";
 import { cn } from "@/lib/utils";
 import { skipToken } from "@reduxjs/toolkit/query/react";
@@ -19,6 +20,8 @@ export function PairPicker({ expParam, onPick }: PairPickerProps) {
 	const { t } = useTranslation("bench");
 	const experiment = useExperimentId(expParam);
 	const grid = useGetGridQuery(experiment.expId ?? skipToken);
+	// The experiment's suite, so each task links to its verifier and capabilities.
+	const status = useGetExperimentQuery(experiment.expId ?? skipToken);
 
 	if (experiment.isLoading) return <BlockSkeleton rows={5} testId="pair-picker-loading" />;
 	if (experiment.error) {
@@ -43,13 +46,23 @@ export function PairPicker({ expParam, onPick }: PairPickerProps) {
 			) : !grid.data || grid.data.rows.length === 0 ? (
 				<EmptyNote testId="pair-picker-empty">{t("runs.picker.noRows")}</EmptyNote>
 			) : (
-				<PairTable rows={grid.data.rows} arms={grid.data.arms} onPick={onPick} />
+				<PairTable rows={grid.data.rows} arms={grid.data.arms} suite={status.data?.suite} onPick={onPick} />
 			)}
 		</Section>
 	);
 }
 
-function PairTable({ rows, arms, onPick }: { rows: readonly GridRow[]; arms: readonly string[]; onPick: (pairId: string) => void }) {
+export function PairTable({
+	rows,
+	arms,
+	suite,
+	onPick,
+}: {
+	rows: readonly GridRow[];
+	arms: readonly string[];
+	suite?: string;
+	onPick: (pairId: string) => void;
+}) {
 	const { t } = useTranslation("bench");
 	return (
 		<Table stickyColumns={1} data-testid="pair-picker-table">
@@ -63,7 +76,9 @@ function PairTable({ rows, arms, onPick }: { rows: readonly GridRow[]; arms: rea
 			<TableBody>
 				{rows.map((row) => (
 					<TableRow key={`${row.task}-${row.condition}`} data-testid={`pair-picker-row-${row.task}-${row.condition}`}>
-						<TableCell className="font-mono text-xs">{row.task}</TableCell>
+						<TableCell className="font-mono text-xs">
+							<EntityLink kind="task" id={row.task} suite={suite} testId={`pair-picker-task-${row.task}`} />
+						</TableCell>
 						<TableCell>
 							<span className="flex items-center gap-2">
 								<span className="font-mono text-xs">{row.condition}</span>

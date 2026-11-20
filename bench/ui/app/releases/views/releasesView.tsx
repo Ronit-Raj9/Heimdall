@@ -14,8 +14,8 @@ export default function ReleasesView() {
 	return (
 		<section className="flex flex-col gap-6" data-testid="releases-screen">
 			<PageHeader title={t("releases.title")} subtitle={t("releases.subtitle")} />
-			<div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_22rem] xl:items-start">
-				<div className="flex flex-col gap-3">
+			<div className="grid grid-cols-[minmax(0,1fr)] gap-6 xl:grid-cols-[minmax(0,1fr)_22rem] xl:items-start" data-testid="releases-layout">
+				<div className="flex min-w-0 flex-col gap-3">
 					<h2 className="text-sm font-medium">{t("releases.timeline.title")}</h2>
 					<p className="text-muted-foreground text-xs" data-testid="releases-disclaimer">
 						{t("releases.disclaimer")}
@@ -33,7 +33,7 @@ export default function ReleasesView() {
 						<ReleaseTimeline releases={releases.data?.releases ?? []} chainOk={releases.data?.chain_ok ?? false} />
 					)}
 				</div>
-				<aside className="xl:sticky xl:top-0">
+				<aside className="min-w-0 xl:sticky xl:top-0">
 					<ReleasePanel />
 				</aside>
 			</div>

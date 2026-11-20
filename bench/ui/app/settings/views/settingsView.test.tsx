@@ -23,7 +23,7 @@ import { errorQuery, loadingQuery, mutation, okQuery, render, tagOf } from "@/li
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import SettingsView, { settingsTab } from "./settingsView";
 
-const api = vi.hoisted(() => ({ q: {} as Record<string, unknown>, m: {} as Record<string, Record<string, unknown>> }));
+const api = vi.hoisted(() => ({ q: {} as Record<string, unknown>, m: {} as Record<string, Record<string, unknown>>, calls: [] as string[] }));
 vi.mock("@tanstack/react-router", async () => (await import("@/lib/testing/routerMock")).routerMock);
 vi.mock("@/lib/store/apis/platformApi", async (importOriginal) => {
 	const real = await importOriginal<typeof import("@/lib/store/apis/platformApi")>();
@@ -40,7 +40,14 @@ vi.mock("@/lib/store/apis/platformApi", async (importOriginal) => {
 		useGetAuditLogQuery: q("audit"),
 		useGetOrgQuery: q("org"),
 		useUpdateMemberMutation: w("updateMember"),
-		useRemoveMemberMutation: w("removeMember"),
+		useRemoveMemberMutation: (...a: unknown[]) => {
+			api.calls.push("removeMember");
+			return w("removeMember")(...(a as []));
+		},
+		useLeaveOrgMutation: (...a: unknown[]) => {
+			api.calls.push("leaveOrg");
+			return w("leaveOrg")(...(a as []));
+		},
 		useCreateInvitationMutation: w("createInvitation"),
 		useRevokeInvitationMutation: w("revokeInvitation"),
 		useCreateApiTokenMutation: w("createToken"),
@@ -66,6 +73,7 @@ beforeEach(() => {
 		org: okQuery(ORG),
 	};
 	api.m = {};
+	api.calls = [];
 });
 
 describe("SettingsView", () => {
@@ -220,6 +228,14 @@ describe("OrgTab", () => {
 		expect(html).toContain("org-rename-form");
 		expect(html).not.toContain("org-public-toggle");
 		expect(html).toContain("Needs owner or above. Your role: admin.");
+	});
+	it("leaves through the self-service route, not the admin-only remove (6-C-01)", async () => {
+		const html = render(<OrgTab org={org} />, hostedSession("viewer"));
+		expect(html).toContain('data-testid="org-leave"');
+		expect(api.calls).toContain("leaveOrg");
+		expect(api.calls).not.toContain("removeMember");
+		const { leaveOrgRequest } = await import("@/lib/store/apis/platformApi");
+		expect(leaveOrgRequest("org 1")).toEqual({ url: "/orgs/org%201/leave", method: "POST" });
 	});
 	it("shows the public state", () => {
 		api.q.org = okQuery({ ...ORG, public_read: true });

@@ -110,7 +110,7 @@ func (im *importer) Import(ctx context.Context, opts importers.Options) (*import
 	if err != nil {
 		return nil, err
 	}
-	suiteDir := importers.SuiteDir(opts.BenchRoot, opts.SuiteID)
+	suiteDir := opts.SuiteDir()
 	prev, err := readSuite(suiteDir)
 	if err != nil {
 		return nil, err

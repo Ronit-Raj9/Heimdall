@@ -300,7 +300,9 @@ export function JobLogPanel({ log, active }: { log: JobLogState; active: boolean
 								className="hover:bg-accent/50 grid grid-cols-[3.5rem_4.5rem_minmax(0,1fr)] gap-3 px-3"
 								data-testid={`job-log-line-${line.seq}`}
 							>
-								<span className="text-muted-foreground/70 text-right tabular-nums select-none">{line.seq}</span>
+								<span className="text-muted-foreground text-right tabular-nums select-none" data-testid={`job-log-seq-${line.seq}`}>
+									{line.seq}
+								</span>
 								<span className="text-muted-foreground tabular-nums select-none">{timeOf(line.at)}</span>
 								<span className={cn("break-words whitespace-pre-wrap", LEVEL_CLASS[line.level])}>{line.line}</span>
 							</li>

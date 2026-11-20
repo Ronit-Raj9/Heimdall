@@ -113,7 +113,8 @@
 					"state": "not_applicable",
 					"v": null
 				}
-			}
+			},
+			"synthetic": true
 		},
 		{
 			"arm": "B",
@@ -226,7 +227,8 @@
 					"state": "not_applicable",
 					"v": null
 				}
-			}
+			},
+			"synthetic": true
 		},
 		{
 			"arm": "C",
@@ -339,7 +341,8 @@
 					"state": "not_applicable",
 					"v": null
 				}
-			}
+			},
+			"synthetic": true
 		}
 	],
 	"alignment": [

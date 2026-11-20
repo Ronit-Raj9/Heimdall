@@ -37,3 +37,29 @@ func TestPairWithOneRunHasNoAlignment(t *testing.T) {
 		t.Fatalf("pair = %v", body)
 	}
 }
+
+// 6-A-03 and 6-A-05: a pair carries each arm's own provenance (independent of
+// the server mode) and the suite its task links into.
+func TestPairProvenanceAndSuite(t *testing.T) {
+	idx := testIndex()
+	m := idx.manifests[testExp]
+	m.SuiteID = "coding-core"
+	b := m.Arms["B"]
+	b.Config.Adapter = "scripted"
+	m.Arms["B"] = b
+	d := fullDeps()
+	d.index = idx
+	body := decodeBody(t, newTestClient(t, d).do(t, "GET", "/api/bench/pairs/p_t01", nil, nil))
+	if body["suite"] != "coding-core" {
+		t.Fatalf("suite = %v", body["suite"])
+	}
+	runs, _ := body["runs"].([]any)
+	got := map[string]any{}
+	for _, r := range runs {
+		rm := r.(map[string]any)
+		got[rm["arm"].(string)] = rm["synthetic"]
+	}
+	if got["A"] != false || got["B"] != true {
+		t.Fatalf("synthetic by arm = %v", got)
+	}
+}

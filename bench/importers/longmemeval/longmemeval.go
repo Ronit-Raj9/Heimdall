@@ -126,7 +126,7 @@ func (im *importer) Import(ctx context.Context, opts importers.Options) (*import
 	if err != nil {
 		return nil, err
 	}
-	suiteDir := importers.SuiteDir(opts.BenchRoot, opts.SuiteID)
+	suiteDir := opts.SuiteDir()
 	res := &importers.Result{Suite: opts.SuiteID, SuiteDir: suiteDir}
 	seen := map[string]string{}
 	tokens := 0

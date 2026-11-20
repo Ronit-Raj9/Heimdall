@@ -61,3 +61,13 @@ describe("ReleaseTimeline", () => {
 		expect(html).toContain("No releases recorded yet.");
 	});
 });
+// 6-B-03: on a 390 px phone the timeline shrinks to the pane instead of scrolling the whole page.
+describe("ReleaseTimeline at narrow widths", () => {
+	it("gives every track a shrinkable minimum and lets long ids wrap", () => {
+		const html = render(fixture.releases, fixture.chain_ok);
+		expect(html).not.toContain("grid-cols-[max-content_1fr]");
+		expect(html).toContain("grid-cols-[max-content_minmax(0,1fr)]");
+		expect(html).toMatch(/class="min-w-0 rounded-sm border/);
+		expect(html).toMatch(/class="min-w-0 font-mono text-xs break-all" data-testid="release-id-/);
+	});
+});

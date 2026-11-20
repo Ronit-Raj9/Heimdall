@@ -25,6 +25,10 @@ const (
 	exitOK    = 0
 	exitInfra = 4
 	exitUsage = 64
+	// exitNotRun is compare's exit when the experiment was written but not
+	// run (consent declined or not given): no verdict exists, so it must not
+	// read as success. --write-only is the explicit success-without-run.
+	exitNotRun = 6
 )
 
 func register(name, summary string, run func(args []string) int) {

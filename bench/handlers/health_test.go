@@ -2,7 +2,11 @@ package handlers
 
 import (
 	"context"
+	"encoding/json"
 	"testing"
+
+	"github.com/fasthttp/router"
+	"github.com/valyala/fasthttp"
 
 	"github.com/maximhq/bifrost/bench/schemas"
 )
@@ -37,5 +41,29 @@ func TestHealth(t *testing.T) {
 	body := decodeBody(t, newTestClient(t, testDeps{}).do(t, "GET", "/api/bench/health", nil, nil))
 	if body["status"] != "ok" || body["version"] != "test" || body["mode"] != string(testMode) {
 		t.Fatalf("health = %v", body)
+	}
+}
+
+// 6-A-06: health says whether the server launches, so an offline server's UI
+// does not advertise the experiment creation workflow.
+func TestHealthLaunchCapability(t *testing.T) {
+	for _, launch := range []bool{true, false} {
+		r := router.New()
+		NewHealthHandler(testMode, "test", nil).WithLaunch(launch).RegisterRoutes(r)
+		ctx := &fasthttp.RequestCtx{}
+		ctx.Request.Header.SetMethod("GET")
+		ctx.Request.SetRequestURI("/api/bench/health")
+		r.Handler(ctx)
+		var body map[string]any
+		if err := json.Unmarshal(ctx.Response.Body(), &body); err != nil {
+			t.Fatal(err)
+		}
+		if body["launch"] != launch {
+			t.Fatalf("launch = %v, want %v (body %s)", body["launch"], launch, ctx.Response.Body())
+		}
+	}
+	body := decodeBody(t, newTestClient(t, testDeps{}).do(t, "GET", "/api/bench/health", nil, nil))
+	if _, ok := body["launch"]; ok {
+		t.Fatalf("unknown launch capability must be omitted: %v", body)
 	}
 }

@@ -40,9 +40,31 @@ describe("ExportMenu", () => {
 	});
 });
 
+// 6-C-07: the EEE link waits for the server's synthetic classification and says when it failed.
+describe("ExportMenu before classification", () => {
+	it("offers no EEE link while the classification is unknown", () => {
+		const html = renderToStaticMarkup(<ExportMenu expId="e_smoke" synthetic={null} />);
+		expect(html).not.toContain("format=eee");
+		expect(html).toContain('data-testid="export-eee-pending"');
+		expect(html).toContain('href="/api/bench/experiments/e_smoke/export?format=jsonl"');
+	});
+	it("says the classification failed", () => {
+		const html = renderToStaticMarkup(<ExportMenu expId="e_smoke" synthetic={null} classifyError={{ status: 500, data: {} }} />);
+		expect(html).toContain('role="alert"');
+		expect(html).not.toContain("format=eee");
+	});
+});
+
+// 6-C-08: fixture mode has no server to download from, so no export menu is offered.
+describe("fixture mode", () => {
+	it("hides the suite export menu", () => {
+		expect(renderToStaticMarkup(<SuiteExportMenu suiteId="coding-core" fixtureMode />)).toBe("");
+	});
+});
+
 describe("SuiteExportMenu", () => {
 	it("offers the withheld Harbor tar and names the CLI for a runnable export", () => {
-		const html = renderToStaticMarkup(<SuiteExportMenu suiteId="coding-core" />);
+		const html = renderToStaticMarkup(<SuiteExportMenu suiteId="coding-core" fixtureMode={false} />);
 		expect(html).toContain('href="/api/bench/suites/coding-core/export?format=harbor"');
 		expect(html).toContain('download="coding-core.harbor.tar.gz"');
 		expect(html).toContain("withheld");

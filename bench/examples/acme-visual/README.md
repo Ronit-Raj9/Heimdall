@@ -56,7 +56,7 @@ cd examples/acme-visual
 bifrost-bench suite lint acme-visual -config deploy/bench.yaml
 bifrost-bench suite lock acme-visual -config deploy/bench.yaml
 bifrost-bench suite admit acme-visual -config deploy/bench.yaml
-bifrost-bench run experiments/visual-smoke.yaml -config deploy/bench.yaml
+bifrost-bench run -config deploy/bench.yaml experiments/visual-smoke.yaml
 ```
 
 Try a check on any image, or remake a reference with the grader's own

@@ -31,6 +31,7 @@ import type { Pair, PairResponse, PairRun } from "@/lib/types/bench";
 import { skipToken } from "@reduxjs/toolkit/query/react";
 import { ArrowLeft } from "lucide-react";
 import { parseAsString, useQueryState } from "nuqs";
+import { cn } from "@/lib/utils";
 import { useTranslation } from "react-i18next";
 
 /**
@@ -310,7 +311,8 @@ function PairHeader({ pair, back }: { pair: PairResponse; back: React.ReactNode 
 			{back}
 			<div className="flex flex-wrap items-center gap-3">
 				<h2 className="text-foreground text-lg font-semibold" data-testid="runs-pair-heading">
-					{t("runs.pairHeading", { task: pair.task, condition: pair.condition, trial: pair.trial })}
+					<EntityLink kind="task" id={pair.task} suite={pair.suite} testId="runs-pair-task" />{" "}
+					{t("runs.pairHeadingAfterTask", { condition: pair.condition, trial: pair.trial })}
 				</h2>
 				<ModeBadge mode={pair.mode} />
 			</div>
@@ -322,7 +324,8 @@ function PairHeader({ pair, back }: { pair: PairResponse; back: React.ReactNode 
 				<span className="flex flex-wrap items-center gap-x-2">
 					{pair.runs.map((run) => (
 						<span key={run.run.run_id}>
-							{t("runs.arm", { arm: run.arm })} <EntityLink kind="run" id={run.run.run_id} testId={`runs-pair-run-${run.arm}`} />
+							{t("runs.arm", { arm: run.arm })} <EntityLink kind="run" id={run.run.run_id} testId={`runs-pair-run-${run.arm}`} />{" "}
+							<ArmProvenance synthetic={run.synthetic} arm={run.arm} />
 						</span>
 					))}
 				</span>
@@ -333,6 +336,27 @@ function PairHeader({ pair, back }: { pair: PairResponse; back: React.ReactNode 
 				</p>
 			)}
 		</div>
+	);
+}
+
+/**
+ * One arm's own provenance: scripted (a control agent, smoke run or scripted ledger) or model-played.
+ * The server mode badge alone cannot say this: a live server can hold scripted controls.
+ */
+export function ArmProvenance({ synthetic, arm }: { synthetic: boolean | undefined; arm: string }) {
+	const { t } = useTranslation("bench");
+	if (synthetic === undefined) return null;
+	return (
+		<span
+			className={cn(
+				"rounded-sm border px-1 text-[10px] font-medium",
+				synthetic ? "border-chart-warning/60 text-chart-warning-ink" : "text-muted-foreground",
+			)}
+			data-testid={`runs-pair-provenance-${arm}`}
+			data-synthetic={synthetic}
+		>
+			{synthetic ? t("runs.provenance.scripted") : t("runs.provenance.model")}
+		</span>
 	);
 }
 

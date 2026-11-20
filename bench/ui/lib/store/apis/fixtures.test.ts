@@ -43,13 +43,13 @@ describe("resolveFixture", () => {
 		{ method: "GET", url: `${BENCH_API_BASE}/catalog`, want: "catalog.json" },
 		{ method: "POST", url: "/experiments/plan", want: "experiments.plan.json" },
 		{ method: "POST", url: `${BENCH_API_BASE}/estimate`, want: "estimate.json" },
-		{ method: "GET", url: "/experiments/e_x/matrix?condition=clean&grade_source=original", want: "experiments.matrix.json" },
+		{ method: "GET", url: "/experiments/e_synthetic-matrix/matrix?condition=clean&grade_source=original", want: "experiments.matrix.json" },
 		{ method: "POST", url: "/experiments", want: "experiments.create.json" },
 		{ method: "post", url: "/experiments/e_x/start", want: "experiments.start.json" },
-		{ method: "GET", url: "/experiments/e_x", want: "experiments.get.json" },
+		{ method: "GET", url: "/experiments/e_x", want: "experiments.get.e_x.json" },
 		{ method: "GET", url: `${BENCH_API_BASE}/experiments`, want: "experiments.list.json" },
 		{ method: "GET", url: "/experiments/e_synthetic-nightly/events?since=48", want: "experiments.events.e_synthetic-nightly.json" }, // U1 home
-		{ method: "GET", url: "/experiments/e_x/verdict?x=1", want: "experiments.verdict.json" },
+		{ method: "GET", url: "/experiments/e_synthetic-codewins/verdict?x=1", want: "experiments.verdict.json" },
 		{ method: "GET", url: "/runs?exp=e_x&arm=C&offset=100", want: "runs.list.json" }, // U2 UI regroup
 		{ method: "GET", url: "/runs/r_abc", want: "runs.r_abc.json" },
 		{ method: "GET", url: "/runs/r_abc/events", want: "runs.r_abc.events.json" },
@@ -73,8 +73,8 @@ describe("resolveFixture", () => {
 		{ method: "GET", url: "/agents/diff/versions", want: "agents.diff.versions.json" },
 		{ method: "GET", url: `${BENCH_API_BASE}/imports`, want: "imports.json" },
 		{ method: "GET", url: "/workers", want: "workers.json" },
-		{ method: "GET", url: "/experiments/e_x/reviews/queue?reason=veto", want: "experiments.reviews.queue.json" },
-		{ method: "GET", url: "/experiments/e_x/reviews", want: "experiments.reviews.json" },
+		{ method: "GET", url: "/experiments/e_synthetic-codewins/reviews/queue?reason=veto", want: "experiments.reviews.queue.json" },
+		{ method: "GET", url: "/experiments/e_synthetic-codewins/reviews", want: "experiments.reviews.json" },
 		{ method: "GET", url: "/runs/r_abc/reviews", want: "runs.r_abc.reviews.json" },
 		{ method: "POST", url: "/reviews", want: "reviews.create.json" },
 		{ method: "POST", url: "/experiments/e_x/regrade", want: "experiments.regrade.json" },
@@ -230,7 +230,6 @@ function contractFor(file: string): { type: string; nested: Record<string, strin
 			nested: { "rows[]": "MatrixRow", "pairs[]": "MatrixPair", "excluded[]": "LeaderboardExclusion" },
 		},
 		"experiments.create.json": { type: "ExperimentCreated", nested: {} },
-		"experiments.get.json": { type: "ExperimentStatus", nested: { slots: "SlotProgress" } },
 		"experiments.start.json": { type: "ExperimentStatus", nested: { slots: "SlotProgress" } },
 		"experiments.list.json": { type: "ExperimentList", nested: { "experiments[]": "ExperimentStatus" } },
 		// U1 home: the poll form of the events route for the running fixture experiment.
@@ -409,6 +408,10 @@ function contractFor(file: string): { type: string; nested: Record<string, strin
 			nested: { filters: "ClusterFilters", cluster: "ClusterSummary", "cluster.layers[]": "ClusterLayer", "runs[]": "ClusterRun" },
 		};
 	}
+	if (file === "experiments.migration.json") return { type: "MigrationReport", nested: { from: "MigrationArmRef", "models[]": "MigrationModelSummary" } };
+	if (file === "experiments.cost-explain.json") return { type: "CostExplanation", nested: { a: "CostArm", b: "CostArm" } };
+	if (file === "experiments.pareto.json" || file === "leaderboard.pareto.json") return { type: "Pareto", nested: { "points[]": "ParetoPoint" } };
+	if (file.startsWith("experiments.get.")) return { type: "ExperimentStatus", nested: { slots: "SlotProgress" } };
 	if (file.startsWith("pairs.")) return { type: "Pair", nested: { "runs[]": "PairRun" } };
 	if (file.startsWith("jobs.") && file.endsWith(".logs.json")) return { type: "JobLogs", nested: { "lines[]": "JobLogLine" } };
 	if (file.startsWith("jobs.")) return { type: "Job", nested: {} };
@@ -452,6 +455,37 @@ function keyProblems(where: string, obj: JsonObject, type: string, topLevel: boo
 	];
 }
 
+// 6-B-01: an experiment's detail, verdict and grid are its own; other ids answer 404, never another experiment.
+describe("fixture experiments keyed by id", () => {
+	it("gives every listed experiment its own status file", () => {
+		const list = readFixture<{ experiments: { exp_id: string; state: string }[] }>("experiments.list.json");
+		for (const exp of list.experiments) {
+			const file = resolveFixture("GET", `/experiments/${exp.exp_id}`)!;
+			const body = readFixture<{ exp_id: string; state: string }>(file);
+			expect([body.exp_id, body.state]).toEqual([exp.exp_id, exp.state]);
+		}
+	});
+	it("answers analysis only for the analysed experiment and the matrix only for its own", () => {
+		expect(resolveFixture("GET", "/experiments/e_synthetic-nightly/verdict")).toBeNull();
+		expect(resolveFixture("GET", "/experiments/e_synthetic-draft/grid")).toBeNull();
+		expect(resolveFixture("GET", "/experiments/e_synthetic-codewins/matrix")).toBeNull();
+		const matrix = readFixture<{ exp_id: string; rows: { arm: string }[] }>("experiments.matrix.json");
+		const status = readFixture<{ exp_id: string; arms: string[] }>(resolveFixture("GET", `/experiments/${matrix.exp_id}`)!);
+		expect(status.arms).toEqual(matrix.rows.map((row) => row.arm));
+	});
+});
+
+// 6-B-02: the Cost and Migration tabs of the analysed fixture experiment have data.
+describe("fixture migration, cost and pareto", () => {
+	it("resolve for the analysed experiment and the board", () => {
+		expect(resolveFixture("GET", "/experiments/e_synthetic-codewins/migration?from=A")).toBe("experiments.migration.json");
+		expect(resolveFixture("GET", "/experiments/e_synthetic-codewins/cost-explain")).toBe("experiments.cost-explain.json");
+		expect(resolveFixture("GET", "/experiments/e_synthetic-codewins/pareto")).toBe("experiments.pareto.json");
+		expect(resolveFixture("GET", "/leaderboard/pareto?suite=x")).toBe("leaderboard.pareto.json");
+		expect(readFixture<{ exp_id: string }>("experiments.migration.json").exp_id).toBe("e_synthetic-codewins");
+	});
+});
+
 describe("fixture shapes", () => {
 	it("match the Go contract key lists", () => {
 		const problems: string[] = [];
@@ -473,6 +507,17 @@ describe("fixture shapes", () => {
 		const plan = readFixture<PlanResponse>("experiments.plan.json");
 		for (const estimate of [plan.est_wall_s, plan.est_usd]) {
 			expect(estimate).toMatchObject({ state: "unknown", v: null, reason: "no pilot yet" });
+		}
+	});
+});
+// 6-B-05: every linked run-list row has its run detail and pair fixture.
+describe("fixture run list", () => {
+	it("lists only runs whose detail and pair fixtures exist", () => {
+		const list = readFixture<{ runs: { run_id: string; pair_id?: string }[] }>("runs.list.json");
+		expect(list.runs.length).toBeGreaterThan(0);
+		for (const row of list.runs) {
+			expect(fixtureFiles, row.run_id).toContain(resolveFixture("GET", `/runs/${row.run_id}`));
+			if (row.pair_id) expect(fixtureFiles, row.pair_id).toContain(resolveFixture("GET", `/pairs/${row.pair_id}`));
 		}
 	});
 });

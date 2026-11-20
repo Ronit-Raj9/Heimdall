@@ -1,0 +1,25 @@
+{
+	"_comment": "Fixture: GET /experiments/{id} for one listed experiment; keyed by id so a detail URL never shows another experiment (6-B-01).",
+	"mode": "synthetic",
+	"exp_id": "e_synthetic-nightly",
+	"name": "SYNTHETIC nightly prompt change",
+	"state": "running",
+	"manifest_hash": "sha256:9f1c2e7a5b3d4c6e8f0a1b2c3d4e5f60718293a4b5c6d7e8f9a0b1c2d3e4f5a6",
+	"frozen_at": "2026-11-14T17:38:12Z",
+	"started_at": "2026-11-14T17:40:00Z",
+	"slots": {
+		"total": 36,
+		"done": 21,
+		"running": 3,
+		"failed": 1
+	},
+	"spent_usd": {
+		"state": "observed",
+		"v": 5.12,
+		"evidence": "gateway"
+	},
+	"arms": [
+		"A",
+		"B"
+	]
+}

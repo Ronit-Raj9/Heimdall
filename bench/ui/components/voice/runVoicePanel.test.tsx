@@ -46,6 +46,7 @@ const call: VoiceCall = {
 	analysis,
 	audio: [{ track: "agent", sha256: "c3d7", bytes: 689836, url: "/api/bench/runs/r_v1/voice/audio/agent" }],
 	witness: "voice caller timeline (bench-owned service; boundary evidence)",
+	bounds_source: "task",
 };
 
 describe("voice panel", () => {
@@ -65,9 +66,14 @@ describe("voice panel", () => {
 		expect(html).toContain("&lt;b&gt;I have looked&lt;/b&gt;");
 	});
 
+	it("warns when the call was classified with the default bounds (6-C-11)", () => {
+		expect(renderToStaticMarkup(<VoicePanel data={call} />)).not.toContain("voice-default-bounds");
+		expect(renderToStaticMarkup(<VoicePanel data={{ ...call, bounds_source: "default" }} />)).toContain('data-testid="voice-default-bounds"');
+	});
+
 	it("says why there is no call", () => {
 		const html = renderToStaticMarkup(
-			<VoicePanel data={{ run_id: "r_n", caller: "customer", called: false, reason: "the agent never called the voice caller", audio: [], witness: "w" }} />,
+			<VoicePanel data={{ run_id: "r_n", caller: "customer", called: false, reason: "the agent never called the voice caller", audio: [], witness: "w", bounds_source: "default" }} />,
 		);
 		expect(html).toContain('data-testid="voice-no-call"');
 		expect(html).toContain("the agent never called the voice caller");

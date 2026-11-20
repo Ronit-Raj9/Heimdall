@@ -36,6 +36,7 @@
 	--color-chart-info: var(--chart-info);
 	--color-chart-neutral: var(--chart-neutral);
 	--color-chart-success-ink: var(--chart-success-ink);
+	--color-chart-success-on: var(--chart-success-on);
 	--color-chart-error-ink: var(--chart-error-ink);
 	--color-chart-warning-ink: var(--chart-warning-ink);
 	--color-chart-info-ink: var(--chart-info-ink);
@@ -172,6 +173,8 @@
 	   text clears WCAG 4.5:1 on the card and on a 10% tint of itself. Fills,
 	   swatches and bars keep the base tokens. */
 	--chart-success-ink: oklch(0.45 0.1 182);
+	/* Icon ink on a --chart-success fill: white on the darker light-theme teal. */
+	--chart-success-on: oklch(1 0 0);
 	--chart-error-ink: oklch(0.48 0.16 27);
 	--chart-warning-ink: oklch(0.5 0.12 62);
 	--chart-info-ink: oklch(0.47 0.11 245);
@@ -236,6 +239,8 @@
 	--chart-info: oklch(0.72 0.1 240);
 	--chart-neutral: oklch(0.55 0.015 220);
 	--chart-success-ink: oklch(0.84 0.1 182);
+	/* Dark ink on the bright dark-theme teal: white falls below 3:1 there (6-B-06). */
+	--chart-success-on: oklch(0.2 0.03 182);
 	--chart-error-ink: oklch(0.82 0.12 27);
 	--chart-warning-ink: oklch(0.86 0.11 62);
 	--chart-info-ink: oklch(0.84 0.08 240);

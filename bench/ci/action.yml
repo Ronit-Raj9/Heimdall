@@ -27,7 +27,7 @@ inputs:
     required: false
     default: recorded
   policy:
-    description: "release policy file, relative to bench/; empty uses policies/default.yaml when it exists; none turns policy off. Ignored, with a warning, by a bifrost-bench without -policy"
+    description: "release policy file, relative to bench/; empty uses policies/default.yaml when it exists; none turns policy off, including the policy the experiment froze. Ignored, with a warning, by a bifrost-bench without -policy"
     required: false
     default: ""
   fail-on:
@@ -96,8 +96,9 @@ runs:
         go build -o "$bin" ./cmd/bifrost-bench
         echo "bin=$bin" >> "$GITHUB_OUTPUT"
 
-    # check -exp reads sealed runs without re-hashing them, so verify every
-    # seal of the bundle first: a hand-edited bundle fails here.
+    # Bundle-wide verification: every seal of every experiment in the bundle
+    # and each seals.log chain, not only the runs the selected analysis
+    # counts (check -exp verifies those itself). A hand-edited bundle fails here.
     - name: Verify recorded bundle seals
       if: inputs.mode == 'recorded'
       shell: bash

@@ -3,7 +3,7 @@ import { ConfirmButton } from "@/components/platform/badges";
 import { ForbiddenNote, isRoleRefusal } from "@/components/platform/forbiddenNote";
 import { Button } from "@/components/ui/button";
 import { useSession } from "@/lib/session/sessionContext";
-import { getBenchErrorMessage, useRegradeMutation } from "@/lib/store/apis/benchApi";
+import { getBenchErrorMessage, useRegradeMutation, useStartExperimentMutation } from "@/lib/store/apis/benchApi";
 import { useCancelExperimentMutation, useResumeExperimentMutation } from "@/lib/store/apis/platformApi";
 import type { ExperimentStatus, Role } from "@/lib/types/bench";
 import { Link } from "@tanstack/react-router";
@@ -23,15 +23,19 @@ function ActionError({ error, title, testId, min = "member" }: { error: unknown;
 
 /**
  * Cancel a running experiment, resume a cancelled or failed one (POST /experiments/{id}/cancel and
- * /resume, served by the job runner). Members and up; demo visitors see nothing.
+ * /resume, served by the job runner), or start a frozen one that never started (POST /experiments/{id}/start). Members and up; demo visitors see nothing.
  */
 export function ExperimentRunActions({ status }: { status: ExperimentStatus }) {
 	const { t } = useTranslation("platform");
 	const [cancel, cancelState] = useCancelExperimentMutation();
 	const [resume, resumeState] = useResumeExperimentMutation();
+	const [start, startState] = useStartExperimentMutation();
 	const running = status.state === "running";
 	const resumable = status.state === "cancelled" || status.state === "failed";
-	if (!running && !resumable) return null;
+	// Frozen but never started (for example a create-and-start whose start failed): start it again
+	// under the same experiment ID.
+	const startable = status.state === "created";
+	if (!running && !resumable && !startable) return null;
 	return (
 		<RoleGate min="member">
 			<div className="flex flex-wrap items-center gap-2" data-testid="experiment-run-actions">
@@ -59,6 +63,15 @@ export function ExperimentRunActions({ status }: { status: ExperimentStatus }) {
 						<Play className="size-3.5" aria-hidden="true" />
 						{t("experimentActions.resume")}
 					</Button>
+				)}
+				{startable && (
+					<Button size="sm" className="gap-1.5" isLoading={startState.isLoading} onClick={() => void start(status.exp_id)} dataTestId="experiment-start">
+						<Play className="size-3.5" aria-hidden="true" />
+						{t("experimentActions.start")}
+					</Button>
+				)}
+				{startState.error && (
+					<ActionError error={startState.error} title={t("experimentActions.startError")} testId="experiment-start-error" />
 				)}
 				{cancelState.error && (
 					<ActionError error={cancelState.error} title={t("experimentActions.cancelError")} testId="experiment-cancel-error" />

@@ -90,7 +90,7 @@ func (im *importer) Import(ctx context.Context, opts importers.Options) (*import
 	if len(raw) == 0 {
 		return nil, fmt.Errorf("no rows in %s", opts.From)
 	}
-	suiteDir := importers.SuiteDir(opts.BenchRoot, opts.SuiteID)
+	suiteDir := opts.SuiteDir()
 	prev, err := readSuite(suiteDir)
 	if err != nil {
 		return nil, err

@@ -11,15 +11,15 @@ Both follow the bench's rules for imports: the importer reads a local copy and n
 
 ## Getting the data
 
-Downloads go to `bench/datasets/` (git-ignored).
+Downloads go to `bench/datasets/` (git-ignored). Run every command below from `bench/`; none of them changes directory (`--output-dir` needs curl 7.73 or later).
 
 ```sh
 # LongMemEval: the repository has the code and prompts, the data is on Hugging Face.
 git clone --depth 1 https://github.com/xiaowu0162/LongMemEval.git datasets/longmemeval
-mkdir -p datasets/longmemeval/data && cd datasets/longmemeval/data
+mkdir -p datasets/longmemeval/data
 R=98d7416c24c778c2fee6e6f3006e7a073259d48f   # dataset revision checked on 15 Nov 2026
-curl -LO https://huggingface.co/datasets/xiaowu0162/longmemeval-cleaned/resolve/$R/longmemeval_oracle.json      # 15 MB
-curl -LO https://huggingface.co/datasets/xiaowu0162/longmemeval-cleaned/resolve/$R/longmemeval_s_cleaned.json   # 277 MB
+curl -L --output-dir datasets/longmemeval/data -O https://huggingface.co/datasets/xiaowu0162/longmemeval-cleaned/resolve/$R/longmemeval_oracle.json      # 15 MB
+curl -L --output-dir datasets/longmemeval/data -O https://huggingface.co/datasets/xiaowu0162/longmemeval-cleaned/resolve/$R/longmemeval_s_cleaned.json   # 277 MB
 
 # LoCoMo: the data file is in the repository.
 git clone --depth 1 https://github.com/snap-research/locomo.git datasets/locomo

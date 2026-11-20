@@ -1,3 +1,4 @@
+import { IS_FIXTURE_MODE, getBenchErrorMessage } from "@/lib/store/apis/benchApi";
 import { experimentExportUrl, suiteHarborUrl, useGetExperimentRunTableQuery } from "@/lib/store/apis/exportApi";
 import { Download } from "lucide-react";
 import { useState } from "react";
@@ -34,8 +35,14 @@ function ExportLink({ href, download, label, note, testId }: ExportLinkProps) {
 
 export interface ExperimentExportMenuProps {
 	expId: string;
-	/** Synthetic results (scripted agent or model, smoke): the EEE link asks for them labelled. */
-	synthetic?: boolean;
+	/**
+	 * Synthetic results (scripted agent or model, smoke): the EEE link asks for them labelled. Null
+	 * while the server's classification is unknown: the EEE link waits, since an unlabelled request
+	 * for synthetic results is refused (409).
+	 */
+	synthetic?: boolean | null;
+	/** The classification request failed: said in place of the EEE link. */
+	classifyError?: unknown;
 	/** Sealed runs counted, when known (shown in the summary line). */
 	runs?: number | null;
 	open?: boolean;
@@ -43,7 +50,7 @@ export interface ExperimentExportMenuProps {
 }
 
 /** The experiment Export menu: Every Eval Ever records, the run table as JSONL or CSV, traces. */
-export function ExportMenu({ expId, synthetic = false, runs = null, open, onToggle }: ExperimentExportMenuProps) {
+export function ExportMenu({ expId, synthetic = false, classifyError, runs = null, open, onToggle }: ExperimentExportMenuProps) {
 	const { t } = useTranslation("bench");
 	return (
 		<details
@@ -57,13 +64,25 @@ export function ExportMenu({ expId, synthetic = false, runs = null, open, onTogg
 				{runs !== null ? <span className="text-muted-foreground ml-2 font-normal">{t("export.runs", { count: runs })}</span> : null}
 			</summary>
 			<ul className="mt-2 flex flex-col gap-2">
-				<ExportLink
-					href={experimentExportUrl(expId, "eee", synthetic)}
-					download={`${expId}.eee.jsonl`}
-					label={t("export.eee")}
-					note={synthetic ? t("export.eeeSyntheticNote") : t("export.eeeNote")}
-					testId="export-eee"
-				/>
+				{synthetic === null ? (
+					<li className="flex min-w-0 flex-col gap-0.5" data-testid="export-eee-pending">
+						<span className="text-muted-foreground inline-flex items-center gap-1 text-sm font-medium">
+							<Download className="size-3.5" aria-hidden="true" />
+							{t("export.eee")}
+						</span>
+						<span className={classifyError ? "text-chart-error-ink text-xs" : "text-muted-foreground text-xs"} role={classifyError ? "alert" : undefined}>
+							{classifyError ? t("export.eeeClassifyError", { error: getBenchErrorMessage(classifyError) }) : t("export.eeeClassifying")}
+						</span>
+					</li>
+				) : (
+					<ExportLink
+						href={experimentExportUrl(expId, "eee", synthetic)}
+						download={`${expId}.eee.jsonl`}
+						label={t("export.eee")}
+						note={synthetic ? t("export.eeeSyntheticNote") : t("export.eeeNote")}
+						testId="export-eee"
+					/>
+				)}
 				<ExportLink
 					href={experimentExportUrl(expId, "jsonl")}
 					download={`${expId}.runs.jsonl`}
@@ -90,16 +109,29 @@ export function ExportMenu({ expId, synthetic = false, runs = null, open, onTogg
  * The experiment Export menu. Once opened it reads the run table, to count the sealed runs and to learn
  * whether they are synthetic, so the EEE link asks for synthetic results labelled only when they are.
  */
-export function ExperimentExportMenu({ expId }: { expId: string }) {
+export function ExperimentExportMenu({ expId, fixtureMode = IS_FIXTURE_MODE }: { expId: string; fixtureMode?: boolean }) {
 	const [open, setOpen] = useState(false);
-	const q = useGetExperimentRunTableQuery(expId, { skip: !open });
-	const synthetic = q.data ? q.data.some((row) => row.synthetic) : false;
-	return <ExportMenu expId={expId} synthetic={synthetic} runs={q.data ? q.data.length : null} open={open} onToggle={setOpen} />;
+	const q = useGetExperimentRunTableQuery(expId, { skip: !open || fixtureMode });
+	// Fixture mode has no server to download from, so the menu is not offered (6-C-08).
+	if (fixtureMode) return null;
+	// Unknown until the run table answers: the EEE link is offered only once the server classified the runs.
+	const synthetic = q.data ? q.data.some((row) => row.synthetic) : null;
+	return (
+		<ExportMenu
+			expId={expId}
+			synthetic={synthetic}
+			classifyError={q.error}
+			runs={q.data ? q.data.length : null}
+			open={open}
+			onToggle={setOpen}
+		/>
+	);
 }
 
 /** The suite Export menu: the admitted public tasks as Harbor task folders, verifiers withheld. */
-export function SuiteExportMenu({ suiteId }: { suiteId: string }) {
+export function SuiteExportMenu({ suiteId, fixtureMode = IS_FIXTURE_MODE }: { suiteId: string; fixtureMode?: boolean }) {
 	const { t } = useTranslation("bench");
+	if (fixtureMode) return null;
 	return (
 		<details className="flex min-w-0 flex-col gap-2 rounded-md border p-3 text-xs" data-testid="suite-export-menu">
 			<summary className="cursor-pointer text-sm font-medium">{t("export.title")}</summary>

@@ -206,3 +206,27 @@ describe("defaultFormValues with null lists", () => {
 		expect(defaultFormValues({ suites: null, agents: null, metrics: null } as unknown as Catalog, 7).suite).toBe("");
 	});
 });
+// 6-C-06: the TypeScript Experiment request carries every field of the Go schemas.Experiment, and
+// the form sends a hosted runner pool.
+describe("Experiment request contract", () => {
+	it("has every json field of schemas.Experiment", async () => {
+		const fs = await import("node:fs");
+		const path = await import("node:path");
+		const go = fs.readFileSync(path.resolve(__dirname, "../../../../../schemas/experiment.go"), "utf8");
+		const body = go.slice(go.indexOf("type Experiment struct {"), go.indexOf("\n}\n", go.indexOf("type Experiment struct {")));
+		const goKeys = [...body.matchAll(/json:"([a-z_]+)/g)].map((m) => m[1]);
+		const ts = fs.readFileSync(path.resolve(__dirname, "../../../../lib/types/bench.ts"), "utf8");
+		const start = ts.indexOf("export interface Experiment {");
+		const iface = ts.slice(start, ts.indexOf("\n}\n", start));
+		const tsKeys = new Set([...iface.matchAll(/^\t([a-z_]+)\??:/gm)].map((m) => m[1]));
+		expect(goKeys.length).toBeGreaterThan(20);
+		expect(goKeys.filter((key) => !tsKeys.has(key))).toEqual([]);
+	});
+	it("sends the runner pool only when one is chosen", async () => {
+		const { toExperiment, defaultFormValues } = await import("./experimentFormSchema");
+		const catalog = { suites: [], agents: [], metrics: [] } as never;
+		const base = { ...defaultFormValues(catalog, 1), overridePath: "a.b", overrideValue: "1" };
+		expect(toExperiment(base).runner).toBeUndefined();
+		expect(toExperiment({ ...base, runnerPool: " gpu " }).runner).toEqual({ pool: "gpu" });
+	});
+});

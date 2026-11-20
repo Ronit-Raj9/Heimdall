@@ -1,0 +1,28 @@
+{
+	"_comment": "Fixture: the three-arm experiment the matrix fixture belongs to, so its Matrix tab has a consistent detail (6-B-01).",
+	"mode": "synthetic",
+	"exp_id": "e_synthetic-matrix",
+	"name": "SYNTHETIC three-model matrix",
+	"state": "done",
+	"manifest_hash": "sha256:52b5454d8f01de367a0a3baf9d55499ffab1b0b0343bd4585e4cc1c962fc9338",
+	"frozen_at": "2026-11-14T18:11:00Z",
+	"started_at": "2026-11-14T18:12:04Z",
+	"finished_at": "2026-11-14T19:21:37Z",
+	"slots": {
+		"total": 48,
+		"done": 48,
+		"running": 0,
+		"failed": 0
+	},
+	"spent_usd": {
+		"state": "observed",
+		"v": 16.84,
+		"evidence": "gateway"
+	},
+	"arms": [
+		"A",
+		"B",
+		"C"
+	],
+	"suite": "coding-core@1.0.0"
+}

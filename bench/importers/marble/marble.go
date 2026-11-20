@@ -191,7 +191,7 @@ func (im *importer) Import(ctx context.Context, opts importers.Options) (*import
 		}
 		return nil, fmt.Errorf("no %s tasks in %s (pick another with -set %s=...)", set.scenario, where, setScenario)
 	}
-	suiteDir := importers.SuiteDir(opts.BenchRoot, opts.SuiteID)
+	suiteDir := opts.SuiteDir()
 	res := &importers.Result{Suite: opts.SuiteID, SuiteDir: suiteDir}
 	picked, missing := pick(recs, opts.IDs, opts.Limit)
 	for _, id := range missing {

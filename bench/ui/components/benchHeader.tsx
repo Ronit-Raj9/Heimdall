@@ -7,6 +7,7 @@ import { ThemeToggle } from "@/components/themeToggle";
 import { Button } from "@/components/ui/button";
 import { canUse, useSession } from "@/lib/session/sessionContext";
 import { IS_FIXTURE_MODE, useGetHealthQuery } from "@/lib/store";
+import { launchAvailable } from "@/lib/types/bench";
 import { Link, useRouterState } from "@tanstack/react-router";
 import { Menu, Plus } from "lucide-react";
 import { useTranslation } from "react-i18next";
@@ -28,7 +29,8 @@ export function BenchHeader({ onOpenNav, navOpen = false }: BenchHeaderProps) {
 	const session = useSession();
 	const pathname = useRouterState({ select: (state) => state.location.pathname });
 	const { data, isLoading, isError } = useGetHealthQuery();
-	const canStart = canUse(session, "member") && pathname !== "/experiments/new";
+	// An offline server never plans or starts, so it does not advertise the workflow.
+	const canStart = canUse(session, "member") && pathname !== "/experiments/new" && launchAvailable(data);
 
 	return (
 		<header className="flex h-13 shrink-0 items-center gap-2 px-3 md:gap-2.5 md:px-4" data-testid="bench-header">

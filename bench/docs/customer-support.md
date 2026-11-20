@@ -232,7 +232,7 @@ a value unknown, never zero.
 
 ## Support scorecard
 
-`GET /api/experiments/{id}/support` (and the card on the verdict page) shows,
+`GET /api/bench/experiments/{id}/support` (and the card on the verdict page) shows,
 per arm over the clean runs (`?condition=` for another): **Resolution**
 (verified passes over decided runs), **Cost per resolution** (the agent's cost
 of every run over resolved runs, unknown when any run's cost is unknown),

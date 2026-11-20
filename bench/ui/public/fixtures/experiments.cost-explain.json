@@ -1,0 +1,432 @@
+{
+	"_comment": "Fixture mode: the recorded e_pilot_mixed_nc93 payload, relabelled synthetic, (components/migration/migration.fixtures.ts) served for the analysed fixture experiment so the tab can be demoed without a server (6-B-02).",
+	"mode": "synthetic",
+	"exp_id": "e_synthetic-codewins",
+	"suite": "coding-core@1.0.0",
+	"condition": "clean",
+	"conditions": [
+		"clean",
+		"empty-test-run",
+		"model-outage",
+		"stale-notes",
+		"test-crash"
+	],
+	"price_ref": "bifrost-datasheet-2026-11-14-openai@sha256:064520900aeda8c3b5dec578dbbbe095f8fd366c388837fb21667ba2acf02000",
+	"synthetic": true,
+	"a": {
+		"arm": "A",
+		"label": "codex gpt-5.4-mini",
+		"model": "gpt-5.4-mini",
+		"served_models": [
+			"gpt-5.4-mini-2026-03-17"
+		],
+		"runs": 1,
+		"successes": 1,
+		"cost_per_run": {
+			"state": "observed",
+			"v": 0.031790849999999996,
+			"evidence": "gateway"
+		},
+		"cost_per_success": {
+			"state": "observed",
+			"v": 0.031790849999999996,
+			"evidence": "gateway"
+		},
+		"cache_neutral_per_run": {
+			"state": "observed",
+			"v": 0.08026125,
+			"evidence": "gateway"
+		},
+		"cache_neutral_per_success": {
+			"state": "observed",
+			"v": 0.08026125,
+			"evidence": "gateway"
+		},
+		"failed_run_cost_per_run": {
+			"state": "observed",
+			"v": 0,
+			"evidence": "gateway"
+		},
+		"cache_read_share": {
+			"state": "observed",
+			"v": 0.8129422286626439,
+			"evidence": "gateway"
+		},
+		"cache_write_share": {
+			"state": "observed",
+			"v": 0,
+			"evidence": "gateway"
+		},
+		"turns_per_run": 7,
+		"input_tokens_per_turn": 12618.714285714286,
+		"output_tokens_per_turn": 444.85714285714283,
+		"tokens": {
+			"fresh": 16523,
+			"cache_read": 71808,
+			"cache_write": 0,
+			"out": 3114
+		},
+		"price_input": 0.7499999999999999,
+		"price_cache_read": 0.075,
+		"price_output": 4.5,
+		"attempts_per_run": 7,
+		"wasted_attempts_per_run": 0,
+		"retries_per_run": 0,
+		"fallbacks_per_run": 0,
+		"rejected_per_run": 0,
+		"refusals_per_run": 0,
+		"latency_ms_per_turn": {
+			"state": "observed",
+			"v": 2877.124629428571,
+			"evidence": "gateway"
+		},
+		"unpriced_rows": 0,
+		"unattributed_rows": 0,
+		"runs_without_rows": 0,
+		"prompt_hashes": [
+			"b6160f41fd37"
+		],
+		"tool_hashes": [
+			"62004cccf98d"
+		],
+		"keys": [
+			"oa-slot-4"
+		]
+	},
+	"b": {
+		"arm": "B",
+		"label": "custom-python gpt-5.4-mini",
+		"model": "gpt-5.4-mini",
+		"served_models": [
+			"gpt-5.4-mini-2026-03-17"
+		],
+		"runs": 1,
+		"successes": 1,
+		"cost_per_run": {
+			"state": "observed",
+			"v": 0.0106143,
+			"evidence": "gateway"
+		},
+		"cost_per_success": {
+			"state": "observed",
+			"v": 0.0106143,
+			"evidence": "gateway"
+		},
+		"cache_neutral_per_run": {
+			"state": "observed",
+			"v": 0.023401500000000002,
+			"evidence": "gateway"
+		},
+		"cache_neutral_per_success": {
+			"state": "observed",
+			"v": 0.023401500000000002,
+			"evidence": "gateway"
+		},
+		"failed_run_cost_per_run": {
+			"state": "observed",
+			"v": 0,
+			"evidence": "gateway"
+		},
+		"cache_read_share": {
+			"state": "observed",
+			"v": 0.7872994763527554,
+			"evidence": "gateway"
+		},
+		"cache_write_share": {
+			"state": "observed",
+			"v": 0,
+			"evidence": "gateway"
+		},
+		"turns_per_run": 7,
+		"input_tokens_per_turn": 3437.4285714285716,
+		"output_tokens_per_turn": 170,
+		"tokens": {
+			"fresh": 5118,
+			"cache_read": 18944,
+			"cache_write": 0,
+			"out": 1190
+		},
+		"price_input": 0.75,
+		"price_cache_read": 0.075,
+		"price_output": 4.5,
+		"attempts_per_run": 7,
+		"wasted_attempts_per_run": 0,
+		"retries_per_run": 0,
+		"fallbacks_per_run": 0,
+		"rejected_per_run": 0,
+		"refusals_per_run": 0,
+		"latency_ms_per_turn": {
+			"state": "observed",
+			"v": 2578.459448,
+			"evidence": "gateway"
+		},
+		"unpriced_rows": 0,
+		"unattributed_rows": 0,
+		"runs_without_rows": 0,
+		"prompt_hashes": [
+			"dce78ad81e2b"
+		],
+		"tool_hashes": [
+			"ab8f0c3e5cb4"
+		],
+		"keys": [
+			"oa-slot-3"
+		]
+	},
+	"per_run": {
+		"basis": "per_run",
+		"from": {
+			"state": "observed",
+			"v": 0.031790849999999996,
+			"evidence": "gateway"
+		},
+		"to": {
+			"state": "observed",
+			"v": 0.0106143,
+			"evidence": "gateway"
+		},
+		"total": {
+			"state": "observed",
+			"v": -0.021176549999999995,
+			"evidence": "gateway"
+		},
+		"parts": [
+			{
+				"id": "price",
+				"label": "Price of the served model",
+				"usd": {
+					"state": "observed",
+					"v": 0,
+					"evidence": "gateway"
+				},
+				"detail": "USD per million tokens, A then B: input $0.750 vs $0.750, cache read $0.075 vs $0.075, cache write $0 vs $0, output $4.500 vs $4.500"
+			},
+			{
+				"id": "input_tokens",
+				"label": "Input tokens per turn",
+				"usd": {
+					"state": "observed",
+					"v": -0.013491247227873256,
+					"evidence": "gateway"
+				},
+				"detail": "12619 vs 3437 input tokens per turn (fresh, cache read and cache write together)"
+			},
+			{
+				"id": "output_tokens",
+				"label": "Output tokens per turn",
+				"usd": {
+					"state": "observed",
+					"v": -0.008658000000000042,
+					"evidence": "gateway"
+				},
+				"detail": "445 vs 170 output tokens per turn, reasoning included"
+			},
+			{
+				"id": "cache_read_share",
+				"label": "Cache read share",
+				"usd": {
+					"state": "observed",
+					"v": 0.0009726972278732823,
+					"evidence": "gateway"
+				},
+				"detail": "81.3% vs 78.7% of input tokens read from the prompt cache"
+			},
+			{
+				"id": "cache_write_share",
+				"label": "Cache write share",
+				"usd": {
+					"state": "observed",
+					"v": 0,
+					"evidence": "gateway"
+				},
+				"detail": "0.0% vs 0.0% of input tokens written to the prompt cache"
+			},
+			{
+				"id": "turns",
+				"label": "Model turns per run",
+				"usd": {
+					"state": "observed",
+					"v": 0,
+					"evidence": "gateway"
+				},
+				"detail": "7.0 vs 7.0 priced model turns per run"
+			},
+			{
+				"id": "wasted_attempts",
+				"label": "Wasted attempts (retries, fallbacks, rejected requests)",
+				"usd": {
+					"state": "observed",
+					"v": 0,
+					"evidence": "gateway"
+				},
+				"detail": "0.0 vs 0.0 attempts per run that returned no usage; providers bill none of a failed attempt, so this is usually $0 and the time is the cost"
+			},
+			{
+				"id": "unattributed",
+				"label": "Priced rows the snapshot cannot split",
+				"usd": {
+					"state": "observed",
+					"v": 0,
+					"evidence": "gateway"
+				},
+				"detail": "0 vs 0 priced rows whose model is not in the price snapshot or was priced with another one, and 0 vs 0 runs without cost rows (cost_usd only)"
+			}
+		],
+		"known": -0.02117655000000002,
+		"reason": ""
+	},
+	"per_success": {
+		"basis": "per_success",
+		"from": {
+			"state": "observed",
+			"v": 0.031790849999999996,
+			"evidence": "gateway"
+		},
+		"to": {
+			"state": "observed",
+			"v": 0.0106143,
+			"evidence": "gateway"
+		},
+		"total": {
+			"state": "observed",
+			"v": -0.021176549999999995,
+			"evidence": "gateway"
+		},
+		"parts": [
+			{
+				"id": "price",
+				"label": "Price of the served model",
+				"usd": {
+					"state": "observed",
+					"v": 0,
+					"evidence": "gateway"
+				},
+				"detail": "USD per million tokens, A then B: input $0.750 vs $0.750, cache read $0.075 vs $0.075, cache write $0 vs $0, output $4.500 vs $4.500"
+			},
+			{
+				"id": "input_tokens",
+				"label": "Input tokens per turn",
+				"usd": {
+					"state": "observed",
+					"v": -0.013491247227873256,
+					"evidence": "gateway"
+				},
+				"detail": "12619 vs 3437 input tokens per turn (fresh, cache read and cache write together)"
+			},
+			{
+				"id": "output_tokens",
+				"label": "Output tokens per turn",
+				"usd": {
+					"state": "observed",
+					"v": -0.008658000000000042,
+					"evidence": "gateway"
+				},
+				"detail": "445 vs 170 output tokens per turn, reasoning included"
+			},
+			{
+				"id": "cache_read_share",
+				"label": "Cache read share",
+				"usd": {
+					"state": "observed",
+					"v": 0.0009726972278732823,
+					"evidence": "gateway"
+				},
+				"detail": "81.3% vs 78.7% of input tokens read from the prompt cache"
+			},
+			{
+				"id": "cache_write_share",
+				"label": "Cache write share",
+				"usd": {
+					"state": "observed",
+					"v": 0,
+					"evidence": "gateway"
+				},
+				"detail": "0.0% vs 0.0% of input tokens written to the prompt cache"
+			},
+			{
+				"id": "turns",
+				"label": "Model turns per run",
+				"usd": {
+					"state": "observed",
+					"v": 0,
+					"evidence": "gateway"
+				},
+				"detail": "7.0 vs 7.0 priced model turns per run"
+			},
+			{
+				"id": "wasted_attempts",
+				"label": "Wasted attempts (retries, fallbacks, rejected requests)",
+				"usd": {
+					"state": "observed",
+					"v": 0,
+					"evidence": "gateway"
+				},
+				"detail": "0.0 vs 0.0 attempts per run that returned no usage; providers bill none of a failed attempt, so this is usually $0 and the time is the cost"
+			},
+			{
+				"id": "unattributed",
+				"label": "Priced rows the snapshot cannot split",
+				"usd": {
+					"state": "observed",
+					"v": 0,
+					"evidence": "gateway"
+				},
+				"detail": "0 vs 0 priced rows whose model is not in the price snapshot or was priced with another one, and 0 vs 0 runs without cost rows (cost_usd only)"
+			},
+			{
+				"id": "success_rate",
+				"label": "Success rate (cost of failed runs)",
+				"usd": {
+					"state": "observed",
+					"v": 0,
+					"evidence": "gateway"
+				},
+				"detail": "1 of 1 vs 1 of 1 runs verified; every failed run's cost is carried by the successes"
+			}
+		],
+		"known": -0.02117655000000002,
+		"reason": ""
+	},
+	"apart": [
+		{
+			"id": "judge",
+			"label": "Judge model (report-only, not in cost_usd)",
+			"a": {
+				"state": "not_applicable",
+				"v": null,
+				"reason": "not recorded: no judge or simulator in these runs"
+			},
+			"b": {
+				"state": "not_applicable",
+				"v": null,
+				"reason": "not recorded: no judge or simulator in these runs"
+			},
+			"diff": {
+				"state": "not_applicable",
+				"v": null
+			}
+		},
+		{
+			"id": "simulator",
+			"label": "User simulator (report-only, not in cost_usd)",
+			"a": {
+				"state": "not_applicable",
+				"v": null,
+				"reason": "not recorded: no judge or simulator in these runs"
+			},
+			"b": {
+				"state": "not_applicable",
+				"v": null,
+				"reason": "not recorded: no judge or simulator in these runs"
+			},
+			"diff": {
+				"state": "not_applicable",
+				"v": null
+			}
+		}
+	],
+	"cache": [],
+	"notes": [
+		"Parts are an exact Shapley split of cost per run over its factors (turns, tokens per turn, cache shares, bucket prices): they sum to the total difference, and the split does not depend on an order."
+	]
+}

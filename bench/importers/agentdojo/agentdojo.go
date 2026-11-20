@@ -135,7 +135,7 @@ func (im *importer) Import(ctx context.Context, opts importers.Options) (*import
 	if err != nil {
 		return nil, fmt.Errorf("agentdojo: %w", err)
 	}
-	res := &importers.Result{Suite: opts.SuiteID, SuiteDir: importers.SuiteDir(opts.BenchRoot, opts.SuiteID)}
+	res := &importers.Result{Suite: opts.SuiteID, SuiteDir: opts.SuiteDir()}
 	w := &writer{set: set, up: up, suiteDir: res.SuiteDir}
 	if err := w.writeImage(); err != nil {
 		return nil, fmt.Errorf("agentdojo: %w", err)

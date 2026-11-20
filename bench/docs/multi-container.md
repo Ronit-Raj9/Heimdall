@@ -361,7 +361,7 @@ whole cache, deleting the wrong key; always reporting up, reporting down with
   privileged service at load with its place, lint reports changed settings,
   the lock hash moves when the compose file changes, `task init
   -from-compose` writes a task that loads.
-- `go test ./environments/ ./graders/ -run Compose|ServiceLimits|WithTaskEnv`:
+- `GOWORK=off go test ./environments/ ./graders/ -run 'Compose|ServiceLimits|WithTaskEnv'`:
   the docker flags a compose service gets, the caps, the workspace
   environment, the verifier's networks and the refusal of a regrade without
   services.

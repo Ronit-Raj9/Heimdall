@@ -11,7 +11,18 @@ export interface FixtureRoute {
 	/** Path below BENCH_API_BASE; ":id" matches one path segment, "*" any one segment (not used in the file name). */
 	pattern: string;
 	file: string;
+	/**
+	 * The only path ids this file answers for; any other id answers 404. Fixtures hold the full
+	 * analysis of one experiment, so another experiment's detail never shows it (6-B-01).
+	 */
+	ids?: readonly string[];
 }
+
+/** The completed experiment whose analysis the shared experiment-level fixtures hold. */
+export const FIXTURE_ANALYSED_EXP = "e_synthetic-codewins";
+/** The three-arm experiment the matrix fixture belongs to. */
+export const FIXTURE_MATRIX_EXP = "e_synthetic-matrix";
+const ANALYSED = [FIXTURE_ANALYSED_EXP] as const;
 
 /**
  * Every route in DESIGN.md 16.7 that returns JSON. Experiment-level routes share one fixture
@@ -28,22 +39,28 @@ export const FIXTURE_ROUTES: readonly FixtureRoute[] = [
 	{ method: "POST", pattern: "/experiments", file: "experiments.create.json" },
 	{ method: "POST", pattern: "/experiments/:id/start", file: "experiments.start.json" },
 	{ method: "GET", pattern: "/experiments", file: "experiments.list.json" },
-	{ method: "GET", pattern: "/experiments/:id", file: "experiments.get.json" },
+	// One status per listed experiment (and the matrix's own), keyed by id; unknown ids answer 404.
+	{ method: "GET", pattern: "/experiments/:id", file: "experiments.get.{id}.json" },
 	// U1 home: the JSON (poll) form of the events route for a running experiment; other ids answer 404.
 	{ method: "GET", pattern: "/experiments/:id/events", file: "experiments.events.{id}.json" },
-	{ method: "GET", pattern: "/experiments/:id/verdict", file: "experiments.verdict.json" },
-	{ method: "GET", pattern: "/experiments/:id/diagnostics", file: "experiments.diagnostics.json" },
-	{ method: "GET", pattern: "/experiments/:id/grid", file: "experiments.grid.json" },
-	{ method: "GET", pattern: "/experiments/:id/triage", file: "experiments.triage.json" },
+	{ method: "GET", pattern: "/experiments/:id/verdict", file: "experiments.verdict.json", ids: ANALYSED },
+	{ method: "GET", pattern: "/experiments/:id/diagnostics", file: "experiments.diagnostics.json", ids: ANALYSED },
+	{ method: "GET", pattern: "/experiments/:id/grid", file: "experiments.grid.json", ids: ANALYSED },
+	{ method: "GET", pattern: "/experiments/:id/triage", file: "experiments.triage.json", ids: ANALYSED },
 	// Failure clusters: one list for every filter; one cluster's detail per signature, others answer 404.
 	{ method: "GET", pattern: "/clusters", file: "clusters.json" },
 	{ method: "GET", pattern: "/clusters/:id", file: "clusters.{id}.json" },
 	// Human review: the queue, the review log, one run's reviews and the created review.
-	{ method: "GET", pattern: "/experiments/:id/reviews/queue", file: "experiments.reviews.queue.json" },
-	{ method: "GET", pattern: "/experiments/:id/reviews", file: "experiments.reviews.json" },
+	{ method: "GET", pattern: "/experiments/:id/reviews/queue", file: "experiments.reviews.queue.json", ids: ANALYSED },
+	{ method: "GET", pattern: "/experiments/:id/reviews", file: "experiments.reviews.json", ids: ANALYSED },
 	{ method: "GET", pattern: "/runs/:id/reviews", file: "runs.{id}.reviews.json" },
 	{ method: "POST", pattern: "/reviews", file: "reviews.create.json" },
-	{ method: "GET", pattern: "/experiments/:id/matrix", file: "experiments.matrix.json" },
+	// Migration, cost explanation and Pareto of the analysed experiment (6-B-02); board Pareto for every filter.
+	{ method: "GET", pattern: "/experiments/:id/migration", file: "experiments.migration.json", ids: ANALYSED },
+	{ method: "GET", pattern: "/experiments/:id/cost-explain", file: "experiments.cost-explain.json", ids: ANALYSED },
+	{ method: "GET", pattern: "/experiments/:id/pareto", file: "experiments.pareto.json", ids: ANALYSED },
+	{ method: "GET", pattern: "/leaderboard/pareto", file: "leaderboard.pareto.json" },
+	{ method: "GET", pattern: "/experiments/:id/matrix", file: "experiments.matrix.json", ids: [FIXTURE_MATRIX_EXP] },
 	// W3 customer support: the scorecard of one support experiment; other ids answer 404 and the card stays hidden.
 	{ method: "GET", pattern: "/experiments/:id/support", file: "experiments.support.{id}.json" },
 	{ method: "GET", pattern: "/runs", file: "runs.list.json" }, // U2 UI regroup: the run list; one page for every filter
@@ -108,6 +125,7 @@ export function resolveFixture(method: string, url: string): string | null {
 		const id = matchPattern(splitPath(route.pattern), segments);
 		if (id === undefined) continue;
 		if (id !== null && !/^[A-Za-z0-9_-]+$/.test(id)) return null;
+		if (route.ids && (id === null || !route.ids.includes(id))) return null;
 		return id === null ? route.file : route.file.replace("{id}", id);
 	}
 	return null;

@@ -97,17 +97,6 @@ export function sourceLabel(t: TFn, source: string | undefined): string {
 	return known ? t(`runs.agents.source.${known}`) : clipText(source, 32);
 }
 
-/** The attribution source as plain text. */
-export function SourceText({ source, testId }: { source: string | undefined; testId?: string }) {
-	const { t } = useTranslation("bench");
-	if (!source) return null;
-	return (
-		<span className="text-muted-foreground font-mono text-[11px]" data-testid={testId}>
-			{sourceLabel(t, source)}
-		</span>
-	);
-}
-
 const EXIT_ICON: Record<string, LucideIcon> = { good: CircleCheck, bad: CircleAlert, warn: Clock };
 
 /** How an agent ended. Completed, error and timeout are translated; "exit code n" and others are shown as text. */

@@ -21,7 +21,6 @@ import type {
 	MeOrgResponse,
 	MemberListResponse,
 	MemberResponse,
-	OrgListResponse,
 	OrgResponse,
 	Role,
 	RunnerListResponse,
@@ -160,6 +159,12 @@ export const platformApi = benchApi.injectEndpoints({
 			query: ({ orgId, userId }) => ({ url: `/orgs/${id(orgId)}/members/${id(userId)}/remove`, method: "POST" }),
 			invalidatesTags: ["Members", "AuditLog"],
 		}),
+		// Self-service departure: any member leaves for themselves. The handler resolves the member
+		// from the session, so a viewer or member never needs the admin-only remove route.
+		leaveOrg: builder.mutation<unknown, { orgId: string }>({
+			query: ({ orgId }) => leaveOrgRequest(orgId),
+			invalidatesTags: ["Members", "AuditLog"],
+		}),
 		listInvitations: builder.query<InvitationListResponse, string>({
 			query: (orgId) => `/orgs/${id(orgId)}/invitations`,
 			providesTags: ["Invitations"],
@@ -216,10 +221,6 @@ export const platformApi = benchApi.injectEndpoints({
 		}),
 
 		// Organizations: the user's list, rename (admin), public read (owner).
-		listOrgs: builder.query<OrgListResponse, void>({
-			query: () => "/orgs",
-			providesTags: ["AuthMe"],
-		}),
 		getOrg: builder.query<OrgResponse, string>({
 			query: (orgId) => `/orgs/${id(orgId)}`,
 			providesTags: ["AuthMe"],
@@ -286,6 +287,7 @@ export const {
 	useListMembersQuery,
 	useUpdateMemberMutation,
 	useRemoveMemberMutation,
+	useLeaveOrgMutation,
 	useListInvitationsQuery,
 	useCreateInvitationMutation,
 	useRevokeInvitationMutation,
@@ -298,7 +300,6 @@ export const {
 	useCreateRunnerTokenMutation,
 	useRevokeRunnerTokenMutation,
 	useGetAuditLogQuery,
-	useListOrgsQuery,
 	useGetOrgQuery,
 	useRenameOrgMutation,
 	useSetPublicReadMutation,
@@ -309,3 +310,7 @@ export const {
 	useCancelExperimentMutation,
 	useResumeExperimentMutation,
 } = platformApi;
+/** The request that leaves an organization: POST /orgs/{org}/leave (any member, for themselves). */
+export function leaveOrgRequest(orgId: string): { url: string; method: "POST" } {
+	return { url: `/orgs/${encodeURIComponent(orgId)}/leave`, method: "POST" };
+}

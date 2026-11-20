@@ -187,7 +187,7 @@ func (im *importer) Import(ctx context.Context, opts importers.Options) (*import
 	if err != nil {
 		return nil, fmt.Errorf("tau2: %w", err)
 	}
-	res := &importers.Result{Suite: opts.SuiteID, SuiteDir: importers.SuiteDir(opts.BenchRoot, opts.SuiteID)}
+	res := &importers.Result{Suite: opts.SuiteID, SuiteDir: opts.SuiteDir()}
 	var picked []candidate
 	sets := map[string]string{}
 	for _, domain := range set.domains {

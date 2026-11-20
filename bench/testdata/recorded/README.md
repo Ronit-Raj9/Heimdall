@@ -56,6 +56,11 @@ The `analysis/` folder keeps the three analyses written before the copy. `a_dt5a
 - `.gitattributes` turns off line-ending conversion: seals are sha256 over raw bytes.
 - Never edit a file in a sealed run. A hand-edited bundle fails `go test ./ci/` and the CI gate.
 
-## Next
+## Replaying each experiment
 
-A real recorded run (a real agent and a real provider model through the same stack) will join this bundle as a second experiment folder, with its own section here. The CI job then points `exp-id` at it and sets `data-mode: recorded`.
+The bundle holds two experiments, so the CI wrapper needs the id:
+
+```bash
+BENCH_CI_EXP_ID=e_pilot_mixed_nc93 ci/check.sh recorded                            # the real pilot
+BENCH_CI_EXP_ID=e_smoke_sdoj BENCH_CI_DATA_MODE=synthetic ci/check.sh recorded     # the synthetic smoke
+```

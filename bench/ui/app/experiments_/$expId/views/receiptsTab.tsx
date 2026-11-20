@@ -13,6 +13,7 @@ import { Link } from "@tanstack/react-router";
 import { OutageCard } from "@/components/safety/outageCard"; // Safety probes area (S1)
 import { EntityLink } from "@/components/shell/entityLink";
 import { parseAsString, useQueryState } from "nuqs";
+import { probeLayerLabel } from "@/components/receipts/receipts.utils";
 import { useTranslation } from "react-i18next";
 
 /**
@@ -113,7 +114,7 @@ function ConditionFunnel({ row, probe }: { row: DiagnosticsRow; probe: ProbeSpec
 				<span className="flex flex-wrap items-center gap-2 text-xs">
 					<span className="text-muted-foreground font-mono">{row.axis}</span>
 					<span className="rounded-sm border px-1.5 py-0.5 font-medium" data-testid="receipts-layer">
-						{layer ? t("receipts.layer", { layer: t(`receipts.layers.${layer}`) }) : t("receipts.layerUnknown")}
+						{layer ? t("receipts.layer", { layer: probeLayerLabel(layer, t) }) : t("receipts.layerUnknown")}
 					</span>
 				</span>
 			}

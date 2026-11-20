@@ -1134,14 +1134,23 @@ Every response carries `mode: live | recorded | synthetic`.
 
 ### 16.8 CLI
 
+Make targets (in `bench/Makefile`, not `bifrost-bench` commands): `make up`
+(build and start the stack), `make down` (stop it) and `make demo`, which is
+`up`, then `smoke` (the synthetic smoke experiment), then `serve` (the UI and
+API); there is no separate replay step.
+
+Binary commands. Flags come before the experiment file (they may also
+follow it); a resume takes an experiment id, not a file:
+
 ```
-bifrost-bench up | down | doctor
+bifrost-bench doctor
 bifrost-bench suite lint | admit | lock
 bifrost-bench plan   experiments/<file>.yaml
-bifrost-bench run    experiments/<file>.yaml [--resume]
-bifrost-bench check  experiments/<file>.yaml --fail-on regressed,invalid
+bifrost-bench run    experiments/<file>.yaml
+bifrost-bench run    -resume <exp_id>
+bifrost-bench check  -fail-on regressed,invalid experiments/<file>.yaml
+bifrost-bench check  -exp <exp_id>
 bifrost-bench audit  table.csv
-bifrost-bench demo                      # replays the recorded run, then runs the synthetic smoke test
 bifrost-bench serve | proxy
 bifrost-bench init <dir> [-force]
 bifrost-bench suite init <id> -template python-pytest|node-test|go-test|generic-reward [-image <tag>]

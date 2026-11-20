@@ -30,7 +30,9 @@ A registered route missing from the table still appears, as a bare operation tag
 ## Mode, auth, errors
 
 - **Mode.** Both clients return the server's object with its `mode`; raw downloads expose the header's mode. `require_live=True` (Python) or `{ requireLive: true }` (TypeScript) turns every non-live answer into a `ModeError`, so a CI job cannot pass on a recorded demo. `serve -offline` never answers live (a live bench.yaml is served as recorded), and the verdict route carries the analysis's own mode, so a smoke experiment on a live server answers synthetic.
-- **Auth.** The prompt for this work assumed the server has no auth. It does: every POST route requires the write token, `Authorization: Bearer <BENCH_WRITE_TOKEN>` (`lib.RequireWriteToken`; the server prints a generated token once when the variable is unset), and the worker routes require `BENCH_WORKER_TOKEN`. Read routes need nothing beyond the loopback host check. The clients take one optional bearer token and send it on every request; the worker routes are not wrapped.
+- **Auth, local mode** (`auth.mode` unset, the default). Every POST route requires the write token, `Authorization: Bearer <BENCH_WRITE_TOKEN>` (`lib.RequireWriteToken`; the server prints a generated token once when the variable is unset), and the worker routes require `BENCH_WORKER_TOKEN`. Read routes need nothing beyond the loopback host check.
+- **Auth, hosted mode** (`auth.mode: hosted`, `docs/auth.md`). There is no shared write token. Reads and writes need a signed-in session (cookie plus CSRF value) or an API token (`Authorization: Bearer <token>`, created under `/api/bench/auth/tokens`), and each route checks the caller's role in the current organization. Sign-in, signup, `auth/config` and invitation lookups are open to anyone. Hosted runners use their own runner tokens (`docs/auth.md`, `docs/remote-execution.md`).
+- The clients take one optional bearer token and send it on every request: the local write token, or a hosted API token. The worker and runner routes are not wrapped.
 - **Errors.** The server's one error shape `{"mode", "error": {"message", "type"}}` becomes `HeimdallError` with `status`, `type`, the server message and `mode`. A recorded server answers plan, create and start with `503 unavailable` (no launcher).
 - **Timeouts and retries.** Every request has a timeout (30 s default). Reads retry on connection errors, 502 and 504; writes are never retried.
 
@@ -45,13 +47,14 @@ A registered route missing from the table still appears, as a bare operation tag
 | Start a run | `create_experiment`, `start_experiment`, `run_experiment` | `createExperiment`, `startExperiment`, `runExperiment` | `POST /experiments`, `/experiments/{id}/start` |
 | Run status | `experiment(id)`, `events(id, since)` | `experiment(id)`, `events(id, since)` | `GET /experiments/{id}`, `/events` |
 | Runs | `runs(exp)`, `run`, `run_diff`, `run_patch`, `run_receipts`, `run_events`, `run_file`, `pair` | same in camelCase | `GET /experiments/{id}/grid`, `/runs/{id}/...`, `/pairs/{id}` |
+| Run list (across experiments) | none yet: call the route directly | none yet | `GET /runs?exp=&suite=&arm=&task=&condition=&outcome=&track=&limit=&offset=` |
 | Verdict, analysis | `verdict(id)`, `analysis(id)`, `triage(id)`, `audit(rows)` | `verdict`, `analysis`, `triage`, `audit` | `GET /experiments/{id}/verdict`, `/diagnostics`, `/triage`, `POST /audit` |
 | Leaderboard | `leaderboard(**params)` | `leaderboard(params)` | `GET /leaderboard` |
 | Releases | `releases`, `release`, `create_release`, `release_evidence` | same in camelCase | `/releases...` |
 | Imports, workers | `imports()`, `workers()` | `imports()`, `workers()` | `GET /imports`, `/workers` |
 | CI | `wait_for_experiment(id, timeout, interval)`, `check(id)` | `waitForExperiment(id, opts)`, `check(id)` | |
 
-There is no run list route: `runs(exp_id)` reads the experiment grid and returns every slot that has a run. `check` returns the verdict's decision (`improved`, `regressed`, `inconclusive`, `invalid`), its action (`ship`, `hold`, `no_decision`, `fix_harness`) and the release policy result; it unpacks as `(decision, action, policy_result)` and has `blocked` (policy says `block`), `policy_decision` and `mode`.
+`runs(exp_id)` reads one experiment's grid and returns every slot that has a run. The server also has a cross-experiment run list, `GET /api/bench/runs` (filters above, paged), which the clients do not wrap yet. `check` returns the verdict's decision (`improved`, `regressed`, `inconclusive`, `invalid`), its action (`ship`, `hold`, `no_decision`, `fix_harness`) and the release policy result; it unpacks as `(decision, action, policy_result)` and has `blocked` (policy says `block`), `policy_decision` and `mode`.
 
 ## Types
 

@@ -24,6 +24,9 @@ export function ValueCell({ value, kind, className, testId }: ValueCellProps) {
 	const view = describeValue(value, kind, getLocale());
 
 	if (view.state === "observed") {
+		// The evidence level is readable on hover and by assistive technology, not only in a data
+		// attribute, so a bare number still says where it was measured (DESIGN.md 8.1 rule 6).
+		const provenance = view.evidence ? t(`value.evidence.${view.evidence}`, { defaultValue: view.evidence }) : undefined;
 		return (
 			<span
 				data-slot="value-cell"
@@ -31,9 +34,11 @@ export function ValueCell({ value, kind, className, testId }: ValueCellProps) {
 				data-kind={kind}
 				data-evidence={view.evidence}
 				data-testid={testId ?? "value-cell-observed"}
+				title={provenance}
 				className={cn("tabular-nums", className)}
 			>
 				{view.text}
+				{provenance && <span className="sr-only"> ({provenance})</span>}
 			</span>
 		);
 	}

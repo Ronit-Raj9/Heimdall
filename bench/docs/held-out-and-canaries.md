@@ -3,9 +3,12 @@
 A benchmark is only useful while the agents it measures have not seen its
 tasks. Heimdall has two tools for that, and they protect different things:
 
-- **Held-out tasks** keep some tasks out of everything Heimdall shows or
-  serves, so they do not leak into repositories, screenshots, issue trackers
-  or model training data by accident.
+- **Held-out tasks** are kept out of the suite pages and suites API, the
+  default (public) leaderboard and its Pareto plane, and trends, so they do
+  not leak into screenshots, issue trackers or model training data by
+  accident. Run pages are **not** filtered: a run of a held-out task serves
+  its agent stream, which holds the instruction (see "What the UI and API
+  never serve" below).
 - **Canaries** are GUIDs stamped into task instructions, so a leak that did
   happen can be detected later when text copied verbatim from the suite shows
   up in a model's output or on a web page.
@@ -26,11 +29,21 @@ split: held_out   # optional; default public
 The values are `public` (the default when the field is absent) and
 `held_out`; `suite lint` refuses any other value, so a typo can never turn a
 held-out task public. The field is `omitempty`: a task without it encodes
-exactly as before. The lock hashes a task's instruction, repo, verifier,
-controls and fixtures, not `task.yaml` itself, so for most tasks marking it
-held out leaves the lock as it was; a task whose `repo_dir` is its own folder
-hashes `task.yaml` with its repo, and `suite lint` then reports the lock
-stale until you run `suite lock` and `suite admit` again.
+exactly as before. What changing it does to the lock depends on the lock:
+
+- A lock with a fingerprints section (every suite locked by a current
+  binary, `coding-core` included; `docs/lock-fingerprints.md`) fingerprints
+  the whole parsed `task.yaml`, `split` included, and the whole task folder.
+  Changing a task's split is drift: `plan`, `run` and `doctor` refuse it, and
+  `suite lock` reports the task as a MAJOR change and sends it back to draft
+  until `suite admit` admits it again.
+- A legacy lock without that section hashes the task's instruction, repo,
+  verifier, controls and fixtures, not `task.yaml` itself, so for most tasks
+  marking it held out leaves the lock as it was.
+
+`suite lint` does not compare fingerprints, so it reports 0 problems after a
+split change either way. Run `suite lock` (then `suite admit`) after
+changing a split, and check `doctor` or `plan` rather than lint.
 
 ### Which runs include held-out tasks
 

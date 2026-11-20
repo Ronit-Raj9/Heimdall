@@ -135,7 +135,7 @@ func (im *importer) Import(ctx context.Context, opts importers.Options) (*import
 	if err != nil {
 		return nil, err
 	}
-	suiteDir := importers.SuiteDir(opts.BenchRoot, opts.SuiteID)
+	suiteDir := opts.SuiteDir()
 	if set.grading == gradingJudged && !insideDatasets(suiteDir) {
 		return nil, fmt.Errorf("-set grading=judged writes BrowseComp-Plus answers in plain text into the suite (the judge grader reads them from answer.yaml), and plain-text answers must stay inside a git-ignored datasets/ folder: %s is not inside one. Use a project whose benchmarks folder is under bench/datasets/ (docs/importers-research.md)", suiteDir)
 	}

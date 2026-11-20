@@ -394,6 +394,8 @@
 	"experimentActions": {
 		"cancel": "Cancel run",
 		"resume": "Resume",
+		"start": "Start",
+		"startError": "Could not start the experiment",
 		"regrade": "Regrade",
 		"regradeHint": "Re-run the graders over the sealed runs as a job. The original grades stay.",
 		"cancelError": "Could not cancel the experiment",

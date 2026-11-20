@@ -156,7 +156,7 @@ func (im *importer) Import(ctx context.Context, opts importers.Options) (*import
 	if err != nil {
 		return nil, fmt.Errorf("mcpmark: %w", err)
 	}
-	res := &importers.Result{Suite: opts.SuiteID, SuiteDir: importers.SuiteDir(opts.BenchRoot, opts.SuiteID)}
+	res := &importers.Result{Suite: opts.SuiteID, SuiteDir: opts.SuiteDir()}
 	picked, skips, err := selectTasks(up, set, opts.IDs)
 	if err != nil {
 		return nil, fmt.Errorf("mcpmark: %w", err)

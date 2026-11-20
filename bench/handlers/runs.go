@@ -53,8 +53,15 @@ var runFileTypes = map[string]string{
 
 // RunsHandler serves one run: its record, events, diff, receipts and files.
 type RunsHandler struct {
-	mode  schemas.Mode
-	index ReadIndex
+	mode   schemas.Mode
+	index  ReadIndex
+	suites SuiteSource // optional: the task voice bounds of the Voice tab (runvoice.go)
+}
+
+// WithSuites lets the Voice tab read a run's task voice bounds from its suite.
+func (h *RunsHandler) WithSuites(s SuiteSource) *RunsHandler {
+	h.suites = s
+	return h
 }
 
 // NewRunsHandler creates the runs handler. index may be nil.

@@ -103,7 +103,7 @@ func (im *importer) Import(ctx context.Context, opts importers.Options) (*import
 		return nil, err
 	}
 	up := describeUpstream(opts.From, cfg)
-	suiteDir := importers.SuiteDir(opts.BenchRoot, opts.SuiteID)
+	suiteDir := opts.SuiteDir()
 	res := &importers.Result{Suite: opts.SuiteID, SuiteDir: suiteDir, Tasks: []string{}, Skipped: []importers.Skip{}}
 	selected, missing := selectDirs(dirs, opts.IDs)
 	for _, id := range missing {

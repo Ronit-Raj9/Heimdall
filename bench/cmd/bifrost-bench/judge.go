@@ -681,7 +681,9 @@ func (a *app) judgeCalibration(ctx context.Context, m *schemas.Manifest, an *sch
 		in.SetSHA256, _ = utils.SHA256File(calibration.LabelsPath(root))
 	}
 	path := policyOverride
-	if path == "" && m.Experiment.Policy != "" {
+	if path == policyNone {
+		path = ""
+	} else if path == "" && m.Experiment.Policy != "" {
 		path = a.cfg.Path(m.Experiment.Policy)
 	}
 	if path != "" {

@@ -1,14 +1,11 @@
 import i18n from "@/lib/i18n";
 import type {
 	AgentsResponse,
-	AuditRequest,
-	AuditResponse,
 	CatalogResponse,
 	ClusterDetailResponse,
 	ClusterListResponse,
 	ClusterParams,
 	DiagnosticsResponse,
-	DoctorResponse,
 	ExperimentCreatedResponse,
 	ExperimentListResponse,
 	ExperimentResponse,
@@ -28,7 +25,6 @@ import type {
 	ReleaseListResponse,
 	ReleaseRequest,
 	ReleaseResponse,
-	ReviewLogResponse,
 	ReviewQueueResponse,
 	ReviewRequest,
 	ReviewResponse,
@@ -282,10 +278,6 @@ export const benchApi = createApi({
 			query: () => "/health",
 			providesTags: ["BenchHealth"],
 		}),
-		getDoctor: builder.query<DoctorResponse, void>({
-			query: () => "/doctor",
-			providesTags: ["BenchDoctor"],
-		}),
 		getCatalog: builder.query<CatalogResponse, void>({
 			query: () => "/catalog",
 			transformResponse: (raw: unknown) => normalizeCatalog(raw),
@@ -402,10 +394,6 @@ export const benchApi = createApi({
 			query: () => "/releases",
 			providesTags: [{ type: "BenchRelease", id: "LIST" }],
 		}),
-		getRelease: builder.query<ReleaseResponse, string>({
-			query: (releaseId) => `/releases/${id(releaseId)}`,
-			providesTags: (_result, _error, releaseId) => [{ type: "BenchRelease", id: releaseId }],
-		}),
 		createRelease: builder.mutation<ReleaseResponse, ReleaseRequest>({
 			query: (body) => ({ url: "/releases", method: "POST", body }),
 			invalidatesTags: [{ type: "BenchRelease", id: "LIST" }],
@@ -462,36 +450,16 @@ export const benchApi = createApi({
 			},
 			providesTags: (_result, _error, { expId }) => [{ type: "BenchReviews", id: `queue:${expId}` }],
 		}),
-		getReviewLog: builder.query<ReviewLogResponse, string>({
-			query: (expId) => `/experiments/${id(expId)}/reviews`,
-			providesTags: (_result, _error, expId) => [{ type: "BenchReviews", id: `log:${expId}` }],
-		}),
 		getRunReviews: builder.query<RunReviewsResponse, string>({
 			query: (runId) => `/runs/${id(runId)}/reviews`,
 			providesTags: (_result, _error, runId) => [{ type: "BenchReviews", id: `run:${runId}` }],
 		}),
 		createReview: builder.mutation<ReviewResponse, ReviewRequest>({
 			query: (body) => ({ url: "/reviews", method: "POST", body }),
-			invalidatesTags: (result, _error, { run_id, exp_id }) => {
-				const expId = result?.exp_id ?? exp_id;
-				return [
-					{ type: "BenchReviews", id: `run:${run_id}` },
-					...(expId
-						? [
-								{ type: "BenchReviews" as const, id: `queue:${expId}` },
-								{ type: "BenchReviews" as const, id: `log:${expId}` },
-								{ type: "BenchVerdict" as const, id: expId },
-							]
-						: []),
-					"BenchLeaderboard",
-				];
-			},
+			invalidatesTags: (result, _error, arg) => reviewInvalidatedTags(result?.exp_id ?? arg.exp_id, arg.run_id),
 		}),
 
 		// Analysis
-		auditTable: builder.mutation<AuditResponse, AuditRequest>({
-			query: (body) => ({ url: "/audit", method: "POST", body }),
-		}),
 		// A regrade runs as an experiment.regate job (handlers/experimentjobs.go): 202 with the queued
 		// job. The original grades stay; once the job succeeds, ?grade=<regrade id> on the verdict
 		// reads the new ones, so nothing cached is stale yet. The jobs list picks the job up.
@@ -504,7 +472,6 @@ export const benchApi = createApi({
 
 export const {
 	useGetHealthQuery,
-	useGetDoctorQuery,
 	useGetCatalogQuery,
 	useListExperimentsQuery,
 	usePlanExperimentMutation,
@@ -533,12 +500,42 @@ export const {
 	useGetImportsQuery,
 	useGetWorkersQuery,
 	useListReleasesQuery,
-	useGetReleaseQuery,
 	useCreateReleaseMutation,
-	useAuditTableMutation,
 	useRegradeMutation,
 	useGetReviewQueueQuery,
-	useGetReviewLogQuery,
 	useGetRunReviewsQuery,
 	useCreateReviewMutation,
 } = benchApi;
+/**
+ * The caches a human review changes. Every analysis slice that consumes reviews refreshes together,
+ * so a reviewed verdict never shows next to diagnostics from before the review.
+ */
+export function reviewInvalidatedTags(expId: string | undefined, runId: string) {
+	return [
+		{ type: "BenchReviews" as const, id: `run:${runId}` },
+		...(expId
+			? [
+					{ type: "BenchReviews" as const, id: `queue:${expId}` },
+					{ type: "BenchReviews" as const, id: `log:${expId}` },
+					{ type: "BenchVerdict" as const, id: expId },
+					{ type: "BenchDiagnostics" as const, id: expId },
+				]
+			: []),
+		"BenchLeaderboard" as const,
+	];
+}
+
+/**
+ * The result caches of one experiment that change while it runs: refreshed once when it stops
+ * running, so the header's Done never sits next to a partial verdict, grid or run list.
+ */
+export function experimentResultTags(expId: string) {
+	return [
+		{ type: "BenchVerdict" as const, id: expId },
+		{ type: "BenchDiagnostics" as const, id: expId },
+		{ type: "BenchGrid" as const, id: expId },
+		{ type: "BenchMatrix" as const, id: expId },
+		{ type: "BenchTriage" as const, id: expId },
+		{ type: "BenchRun" as const, id: "LIST" },
+	];
+}

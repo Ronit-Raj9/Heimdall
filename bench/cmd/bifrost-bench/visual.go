@@ -255,6 +255,10 @@ func runVisualLabel(args []string) int {
 	}
 	if t := s.TaskByID(*task); t == nil || graders.VisualSpec(s, t) == nil {
 		return fail("visual label: suite %s has no task %s with output.visual", s.ID, *task)
+	} else if !graders.VisualJudged(s, t) {
+		// Only a task with a rubric and a pinned vision judge is calibrated;
+		// a label on a deterministic-only task would never be used (7-C-03).
+		return fail("visual label: task %s of suite %s has no output.visual rubric and vision judge, so visual calibrate would never use this label", *task, s.ID)
 	}
 	data, err := os.ReadFile(*image)
 	if err != nil {

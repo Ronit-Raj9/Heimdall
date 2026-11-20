@@ -326,7 +326,13 @@
 		"noReason": "no reason recorded",
 		"missing": "value missing from the response",
 		"notApplicable": "n/a",
-		"notApplicableHint": "Not applicable"
+		"notApplicableHint": "Not applicable",
+		"evidence": {
+			"outcome": "Evidence: the verifier and the engine clock",
+			"gateway": "Evidence: gateway rows and the proxy ledger",
+			"native": "Evidence: the agent's own stream, through a parser",
+			"boundary": "Evidence: tool shims and fixture counters"
+		}
 	},
 	"configDiff": {
 		"path": "Setting",
@@ -479,21 +485,6 @@
 		"newExperiment": "New experiment",
 		"loadError": "Could not load the verdict for {{id}}: {{error}}",
 		"retry": "Retry",
-		"picker": {
-			"label": "Experiment",
-			"placeholder": "Choose an experiment",
-			"option": "{{name}} · {{id}}",
-			"newest": "newest",
-			"loadError": "Could not load the experiment list: {{error}}",
-			"state": {
-				"created": "created",
-				"running": "running",
-				"analyzing": "analyzing",
-				"done": "done",
-				"failed": "failed",
-				"cancelled": "cancelled"
-			}
-		},
 		"header": {
 			"manifest": "manifest",
 			"manifestHint": "Manifest hash {{hash}}. The plan and primary endpoint were hashed before the first run.",
@@ -716,7 +707,11 @@
 			"sealMismatch": "Trace not offered: the run does not match its seal"
 		},
 		"empty": "No pair selected.",
-		"pairHeading": "{{task}} under {{condition}}, trial {{trial}}",
+		"pairHeadingAfterTask": "under {{condition}}, trial {{trial}}",
+		"provenance": {
+			"scripted": "scripted",
+			"model": "model-played"
+		},
 		"pairId": "pair {{id}}",
 		"experiment": "experiment {{id}}",
 		"choosePair": "Choose another pair",
@@ -1508,7 +1503,11 @@
 		"layers": {
 			"fixture": "fixture",
 			"gateway": "gateway",
-			"tool_shim": "tool shim"
+			"tool_shim": "tool shim",
+			"adapter": "adapter",
+			"a2a": "A2A stream",
+			"tool": "tool proxy",
+			"service": "service"
 		},
 		"funnel": {
 			"title": "Receipt funnel",
@@ -1786,6 +1785,7 @@
 			"subtitle": "Two arms that differ in one setting; nothing runs until you plan and start.",
 			"catalogError": "Could not load the catalog.",
 			"catalogEmpty": "The catalog has no suites or agents, so no experiment can be planned.",
+			"offline": "This server is offline (replay only): it serves recorded runs and cannot plan or start experiments. Start a live server to launch one.",
 			"sections": {
 				"what": "What runs",
 				"arms": "Arms",
@@ -1821,6 +1821,7 @@
 				"trials": "Trials",
 				"seed": "Seed",
 				"concurrency": "Concurrency",
+				"runnerPool": "Runner pool",
 				"totalUsd": "Total spend cap (USD)",
 				"token": "Write token",
 				"tokenPlaceholder": "printed by the server at first start",
@@ -3546,6 +3547,8 @@
 		"eee": "Every Eval Ever records (JSON lines)",
 		"eeeNote": "One aggregate record per arm, validated against the vendored Every Eval Ever schema 0.3.0, with the manifest and seal hashes.",
 		"eeeSyntheticNote": "Synthetic results (scripted agent, scripted model or smoke run): exported labelled synthetic, not as findings.",
+		"eeeClassifying": "Checking whether the runs are synthetic before offering the download.",
+		"eeeClassifyError": "Could not check whether the runs are synthetic, so the download is not offered: {{error}}",
 		"jsonl": "Run table (JSONL)",
 		"csv": "Run table (CSV)",
 		"tableNote": "One row per sealed run: ids, outcome, cost and every metric; an unobserved metric is empty, never zero.",
@@ -3814,6 +3817,7 @@
 		"ended": "ended by {{by}} after {{length}}",
 		"noCall": "No call to show: {{reason}}",
 		"noAudio": "The run kept no call audio (hashes only, or nothing was played).",
+		"defaultBounds": "Classified with the default barge-in and dead air bounds: the task's own could not be read at the frozen suite version, so this view can differ from the run's sealed voice metrics.",
 		"summary": "First agent audio after {{first}}; {{turns}} answered turns; dead air {{deadAir}} (gaps over {{bound}}); {{clears}} clear messages from the agent.",
 		"who": {
 			"caller": "caller",
@@ -4053,12 +4057,6 @@
 			"body": "No experiment has run here yet: set up a project, mine tasks, then compare two versions.",
 			"open": "Get started",
 			"newExperiment": "New experiment"
-		},
-		"stats": {
-			"experiments": "Experiments",
-			"running": "Running",
-			"suites": "Suites",
-			"agents": "Agents"
 		},
 		"quickstart": {
 			"title": "Get started",

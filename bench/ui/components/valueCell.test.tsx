@@ -75,3 +75,14 @@ describe("ValueCell", () => {
 		expect(html).toContain('data-testid="verdict-cell-steps"');
 	});
 });
+// 6-B-07: an observed value's evidence level is readable, not only a data attribute.
+describe("ValueCell provenance", () => {
+	it("names the evidence level in the title and for screen readers", () => {
+		const html = render({ state: "observed", v: 1.5, evidence: "gateway" }, "usd");
+		expect(html).toContain('title="Evidence: gateway rows and the proxy ledger"');
+		expect(html).toContain('<span class="sr-only"> (Evidence: gateway rows and the proxy ledger)</span>');
+	});
+	it("adds nothing when the value has no evidence level", () => {
+		expect(render({ state: "observed", v: 1.5 } as Value, "usd")).not.toContain("sr-only");
+	});
+});

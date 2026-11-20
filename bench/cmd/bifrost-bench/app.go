@@ -325,13 +325,26 @@ func (a *app) analyzeWith(ctx context.Context, expID, gradeSource, policyOverrid
 // override that cannot be loaded is an error. A frozen policy that cannot be
 // loaded gives a blocking result instead, so a deleted or broken policy file
 // can never let a release through, and the verdict page still renders.
+// policyNone is the -policy value that turns release policy evaluation off.
+const policyNone = "none"
+
 func (a *app) releasePolicy(m *schemas.Manifest, an *schemas.Analysis, runs []schemas.SealedRun, override string) (*schemas.PolicyResult, error) {
+	if override == policyNone {
+		// An explicit "none" turns the release policy off for this check,
+		// including the one the experiment froze.
+		return nil, nil
+	}
 	if override != "" {
 		p, raw, err := policy.Load(override)
 		if err != nil {
 			return nil, err
 		}
-		return policy.Evaluate(p, policy.Hash(raw), m, an, runs), nil
+		// A deliberate override is a different file by design, so the frozen
+		// hash (which guards the frozen file against drift) does not apply.
+		// The result records the override's own hash in PolicyHash.
+		mm := *m
+		mm.PolicyHash = ""
+		return policy.Evaluate(p, policy.Hash(raw), &mm, an, runs), nil
 	}
 	if m.Experiment.Policy == "" {
 		return nil, nil

@@ -23,7 +23,7 @@ Bifrost Bench ships a pull-request gate: every pull request that touches an agen
 
 With a release policy (`-policy`, below), a `block` decision fails the gate whatever the verdict. A candidate that is better on average but breaks a block-severity check does not merge.
 
-The job also verifies the recorded bundle's seals first: `check -exp` reads sealed runs without re-hashing them, so `go test ./ci/` recomputes every file hash and the `seals.log` chain and fails on any changed, added or removed file.
+The job also verifies the whole recorded bundle's seals first with `go test ./ci/`: it recomputes every file hash of every sealed run of every experiment in the bundle and checks each `seals.log` chain, failing on any changed, added or removed file. `check -exp` itself verifies the counted runs and the chain of the experiment it analyses (`docs/evidence-integrity.md`); the bundle-wide test also covers the other experiments and any run the selected analysis does not count.
 
 ## When it runs
 
@@ -54,7 +54,7 @@ Recorded mode copies the bundle to a temp runs root (`BENCH_RUNS_ROOT`) before `
 1. run the live job on a self-hosted runner (below), or
 2. bring the evidence: run the experiment with the changed agent locally (`bifrost-bench run experiments/<file>.yaml`), copy the sealed `runs/<exp_id>` folder into `testdata/recorded/`, and set `exp-id` in the workflow. CI verifies the seals and re-derives the verdict from the sealed runs; nobody's local report is trusted. Seals are local hashes without an external anchor, so this catches accidents and careless edits, not a determined forger. Live mode is the trustworthy path.
 
-The bundle checked in today is the **synthetic** smoke run (toy agent, scripted model, real Bifrost v2.5.1); its numbers are not findings. A real recorded run will join it. See `testdata/recorded/README.md`.
+The bundle checked in today holds two experiments: `e_pilot_mixed_nc93`, a **real** 10-run pilot (Codex vs custom-python on `gpt-5.4-mini`), and `e_smoke_sdoj`, a **synthetic** smoke run (toy agent, scripted model, real Bifrost v2.5.1) whose numbers are not findings. With two experiments in the bundle, `exp-id` (`BENCH_CI_EXP_ID`) is required. See `testdata/recorded/README.md`.
 
 ## Exit codes
 
@@ -74,7 +74,7 @@ A verdict not listed in fail-on exits 0. The policy code is checked before the v
 
 Policies are YAML files in `bench/policies/` (`default.yaml`, `strict.yaml`), evaluated by `bifrost-bench check -policy <file>`. A policy only adds requirements; the integrity gates always run.
 
-- Leave the action's `policy` input empty and the gate passes `-policy policies/default.yaml` when that file exists and `check -h` lists `-policy`. Name another file to use it, or `none` to turn policy off.
+- Leave the action's `policy` input empty and the gate passes `-policy policies/default.yaml` when that file exists and `check -h` lists `-policy`. Name another file to use it instead of the experiment's frozen policy (an explicit override is not failed by the frozen policy's hash check; drift of the frozen file still is), or `none` to turn policy off, including a policy the experiment froze (`check -policy none`). A binary whose `check -h` does not document `-policy none` cannot turn the frozen policy off; the wrapper then says so in the summary.
 - `check.sh` detects the flag from `bifrost-bench check -h`. A binary without it runs the gate without the policy and says so in the job summary (a warning annotation when the policy was named explicitly), so the workflow works before and after policy-as-code lands.
 - An experiment can also reference its policy (`policy: policies/default.yaml`) so the policy hash is frozen in its manifest.
 - `policies/**` is a trigger path: a pull request that loosens a policy runs the gate.
@@ -114,7 +114,7 @@ The workflow carries a commented-out `live` job that follows these rules: start 
 
 Outputs: `verdict`, `action`, `policy-decision`, `exit-code`, `report` (path on the runner). The report and `report.json` are uploaded as the `bench-check-report` artifact, and the report is appended to the job summary.
 
-Locally, from `bench/`: `BENCH_CI_DATA_MODE=synthetic ci/check.sh recorded`. Every input is a `BENCH_CI_*` variable listed at the top of `check.sh`.
+Locally, from `bench/`: `BENCH_CI_EXP_ID=e_smoke_sdoj BENCH_CI_DATA_MODE=synthetic ci/check.sh recorded` for the synthetic smoke, or `BENCH_CI_EXP_ID=e_pilot_mixed_nc93 ci/check.sh recorded` for the real pilot. Without `BENCH_CI_EXP_ID` the wrapper exits 64, because the bundle holds two experiments. Every input is a `BENCH_CI_*` variable listed at the top of `check.sh`.
 
 ## Sample job summary
 

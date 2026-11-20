@@ -7,7 +7,7 @@ domain's tools (look up a reservation, cancel it, issue a refund), and the
 final state of the domain database decides the outcome.
 
 The customer is scripted by default, not played by a model; `-set user=llm`
-imports upstream's model-played user instead ([below](#the-model-played-user-set-userllm)).
+imports upstream's model-played user instead ([below](#the-model-played-user--set-userllm)).
 Read [Not comparable with the leaderboard](#not-comparable-with-the-leaderboard)
 before you compare any number with a published one.
 

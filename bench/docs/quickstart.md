@@ -17,6 +17,13 @@ text prints the name you started it as, and every command below works under
 either name. Nothing calls a model until `compare` runs a real agent, and
 `compare` shows its forecast and asks first.
 
+`compare` exits with `check`'s codes when it runs (0 ok, 1 regressed, 2
+inconclusive, 3 invalid, each only when listed in `--fail-on`, 4
+infrastructure, 5 policy block). When it does not run (you answer no, or
+stdin is not a terminal and `--yes` is not given), it exits **6**: no
+verdict exists, so a script never reads a skipped compare as a pass. Only
+`--write-only` stops before running and exits 0, because you asked for it.
+
 The rest of this page is a walk-through run for real at $0: a throwaway
 Python library with a history of small fixes, the four commands, the output
 they printed and how long each step took. Then what a real user still does by

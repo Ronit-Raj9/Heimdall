@@ -46,6 +46,8 @@ export const experimentFormSchema = z
 			.min(1, msg("concurrencyRange"))
 			.max(64, msg("concurrencyRange")),
 		totalUsd: z.number({ error: msg("budgetPositive") }).positive(msg("budgetPositive")),
+		// Hosted mode: the runner pool that runs the slots (schemas.RunnerSpec); empty takes the default pool.
+		runnerPool: z.string().trim(),
 	})
 	.superRefine((v, ctx) => {
 		if (v.armALabel.trim().toLowerCase() === v.armBLabel.trim().toLowerCase() && v.armBLabel.trim() !== "") {
@@ -102,6 +104,7 @@ export function defaultFormValues(catalog: Catalog, seed: number): ExperimentFor
 		seed,
 		concurrency: 4,
 		totalUsd: 25,
+		runnerPool: "",
 	};
 }
 
@@ -143,6 +146,7 @@ export function toExperiment(v: ExperimentFormValues): Experiment {
 		seed: v.seed,
 		concurrency: v.concurrency,
 		manifest_mode: "agent_exposure",
+		...(v.runnerPool.trim() ? { runner: { pool: v.runnerPool.trim() } } : {}),
 	};
 }
 

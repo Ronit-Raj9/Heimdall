@@ -35,7 +35,8 @@ export function stringSearch(search: Record<string, unknown>): Record<string, st
  * exp they go to the experiment list.
  */
 export function legacyExperimentTarget(path: LegacyExperimentPath, rawSearch: Record<string, unknown>): LegacyTarget {
-	const { exp, ...rest } = stringSearch(rawSearch);
+	// A stale tab in the old URL never overrides the page the bookmark names (or the verdict default).
+	const { exp, tab: _staleTab, ...rest } = stringSearch(rawSearch);
 	if (!exp) return { to: "/experiments" };
 	const tab = LEGACY_EXPERIMENT_TABS[path];
 	const search = tab ? { tab, ...rest } : rest;

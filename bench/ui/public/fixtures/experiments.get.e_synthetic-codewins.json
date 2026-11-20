@@ -1,5 +1,5 @@
 {
-	"_comment": "SYNTHETIC fixture for UI development. Not a benchmark result.",
+	"_comment": "Fixture: GET /experiments/{id} for one listed experiment; keyed by id so a detail URL never shows another experiment (6-B-01).",
 	"mode": "synthetic",
 	"exp_id": "e_synthetic-codewins",
 	"name": "SYNTHETIC code-wins sentence",
@@ -19,5 +19,9 @@
 		"v": 16.84,
 		"evidence": "gateway"
 	},
-	"analysis_id": "a_synth00001"
+	"analysis_id": "a_synth00001",
+	"arms": [
+		"A",
+		"B"
+	]
 }

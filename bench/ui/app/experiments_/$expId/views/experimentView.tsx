@@ -13,7 +13,8 @@ import { StatusBadge } from "@/components/shell/statusBadge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { useGetExperimentAdaptiveQuery } from "@/lib/store/apis/adaptiveApi";
-import { EXPERIMENT_POLL_MS, useGetExperimentQuery, useGetGridQuery, useGetVerdictQuery } from "@/lib/store/apis/benchApi";
+import { useAppDispatch } from "@/lib/store";
+import { EXPERIMENT_POLL_MS, benchApi, experimentResultTags, useGetExperimentQuery, useGetGridQuery, useGetVerdictQuery } from "@/lib/store/apis/benchApi";
 import { useGetExperimentResearchQuery } from "@/lib/store/apis/researchApi";
 import { useGetExperimentRoutingQuery } from "@/lib/store/apis/routingApi";
 import { errorStatus } from "@/lib/store/apis/session";
@@ -22,6 +23,7 @@ import { compareSearch } from "@/components/experiments/legacyRoutes";
 import { Link } from "@tanstack/react-router";
 import { GitCompareArrows, Hourglass, SearchX } from "lucide-react";
 import { parseAsString, useQueryState } from "nuqs";
+import { useEffect, useRef } from "react";
 import { useTranslation } from "react-i18next";
 import { CostTab } from "./costTab";
 import { EXPERIMENT_TABS, hiddenExperimentTabs, type ExperimentTabId } from "./experimentTabs";
@@ -47,7 +49,16 @@ export default function ExperimentView({ expId }: { expId: string }) {
 	// An experiment that has not started has no runs to analyse, so nothing asks for its verdict.
 	const notStarted = status.data?.state === "created";
 	const verdict = useGetVerdictQuery(grade ? { expId, gradeSource: grade } : expId, { skip: !status.data || notStarted });
-	const grid = useGetGridQuery(expId, { skip: !status.data });
+	// The grid fills in while the experiment runs, so it polls alongside the status.
+	const grid = useGetGridQuery(expId, { skip: !status.data, pollingInterval: live ? EXPERIMENT_POLL_MS : 0, skipPollingIfUnfocused: true });
+	// When a running experiment stops, its verdict, diagnostics, grid and runs were computed from a
+	// partial experiment: refresh them once.
+	const dispatch = useAppDispatch();
+	const wasLive = useRef(live);
+	useEffect(() => {
+		if (wasLive.current && !live) dispatch(benchApi.util.invalidateTags(experimentResultTags(expId)));
+		wasLive.current = live;
+	}, [live, expId, dispatch]);
 	// The facts that decide the tabs. Each is the request its tab makes anyway, so nothing is fetched twice.
 	const adaptive = useGetExperimentAdaptiveQuery(expId, { skip: !status.data });
 	const support = useGetExperimentSupportQuery(expId, { skip: !status.data });

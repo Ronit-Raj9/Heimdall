@@ -1,0 +1,26 @@
+{
+	"_comment": "Fixture: GET /experiments/{id} for one listed experiment; keyed by id so a detail URL never shows another experiment (6-B-01).",
+	"mode": "synthetic",
+	"exp_id": "e_synthetic-outage",
+	"name": "SYNTHETIC gateway outage drill",
+	"state": "failed",
+	"manifest_hash": "sha256:5e6f7a8b9c0d1e2f3a4b5c6d7e8f9a0b1c2d3e4f5a6b7c8d9e0f1a2b3c4d5e6f",
+	"frozen_at": "2026-11-13T09:12:00Z",
+	"started_at": "2026-11-13T09:13:30Z",
+	"finished_at": "2026-11-13T09:31:02Z",
+	"slots": {
+		"total": 12,
+		"done": 7,
+		"running": 0,
+		"failed": 5
+	},
+	"spent_usd": {
+		"state": "observed",
+		"v": 1.37,
+		"evidence": "gateway"
+	},
+	"arms": [
+		"A",
+		"B"
+	]
+}

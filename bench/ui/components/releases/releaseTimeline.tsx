@@ -62,23 +62,23 @@ function ReleaseEntry({ record, linked }: { record: ReleaseRecord; linked: boole
 	const id = record.release_id;
 	return (
 		<li
-			className={cn("rounded-sm border px-4 py-3 text-sm", record.override && "border-l-chart-error border-l-4")}
+			className={cn("min-w-0 rounded-sm border px-4 py-3 text-sm", record.override && "border-l-chart-error border-l-4")}
 			data-testid={`release-entry-${id}`}
 		>
 			<div className="flex flex-wrap items-baseline justify-between gap-2">
-				<span className="font-mono text-xs" data-testid={`release-id-${id}`}>
+				<span className="min-w-0 font-mono text-xs break-all" data-testid={`release-id-${id}`}>
 					{id}
 				</span>
 				<time className="text-muted-foreground text-xs" dateTime={record.created_at} data-testid={`release-created-${id}`}>
 					{formatReleaseTime(record.created_at)}
 				</time>
 			</div>
-			<dl className="mt-2 grid grid-cols-[max-content_1fr] gap-x-4 gap-y-1">
+			<dl className="mt-2 grid grid-cols-[max-content_minmax(0,1fr)] gap-x-4 gap-y-1">
 				<Row label={t("releases.timeline.experiment")}>
 					<EntityLink kind="experiment" id={record.exp_id} className="text-xs" testId={`release-exp-${id}`} />
 				</Row>
 				<Row label={t("releases.timeline.config")}>
-					<span data-testid={`release-config-${id}`}>
+					<span className="break-all" data-testid={`release-config-${id}`}>
 						{t("releases.timeline.configValue", {
 							arm: record.arm,
 							id: record.agent_config_id || "-",

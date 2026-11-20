@@ -190,7 +190,7 @@ every existing manifest runs and hashes as before.
 bifrost-bench suite lock coding-core      # adds or refreshes fingerprints, prints drift
 bifrost-bench doctor                      # one "lock fingerprints" row per suite
 # change a verifier command, a required test id, a timeout, a probe list ...
-bifrost-bench plan -exp experiments/x.yaml   # refused, names what drifted
+bifrost-bench plan experiments/x.yaml        # refused, names what drifted
 bifrost-bench suite lock coding-core      # records the change; changed tasks go back to draft
 bifrost-bench suite admit coding-core     # re-admits under the new fingerprints
 ```

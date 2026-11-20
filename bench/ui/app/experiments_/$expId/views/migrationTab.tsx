@@ -3,6 +3,7 @@ import { ModeBadge } from "@/components/modeBadge";
 import { BlockSkeleton, LoadError } from "@/components/runs/screenStates";
 import { GradeSourceTag } from "@/components/verdict/gradeSourceTag";
 import { cn } from "@/lib/utils";
+import type { MigrationParams } from "@/lib/types/bench";
 import { useGetMigrationQuery } from "@/lib/store/apis/migrationApi";
 import { parseAsString, useQueryState } from "nuqs";
 import { useTranslation } from "react-i18next";
@@ -11,12 +12,29 @@ import { useTranslation } from "react-i18next";
  * The Migration tab (docs/model-migration.md): moving from one arm to the others. ?from= is one arm
  * (default A), ?to= a comma list (default every other arm); both are picked from the experiment's arms.
  */
+/** The migration request of the tab's URL state; empty values fall back to the server defaults. */
+export function migrationParams(
+	expId: string,
+	search: { from?: string | null; to?: string | null; condition?: string | null; alpha?: string | null; grade_source?: string | null },
+): MigrationParams {
+	const out: MigrationParams = { expId };
+	for (const key of ["from", "to", "condition", "alpha", "grade_source"] as const) {
+		const value = search[key];
+		if (value) out[key] = value;
+	}
+	return out;
+}
+
 export function MigrationTab({ expId, arms }: { expId: string; arms: readonly string[] }) {
 	const { t } = useTranslation("bench");
 	const [from, setFrom] = useQueryState("from", parseAsString);
 	const [to, setTo] = useQueryState("to", parseAsString);
 	const [condition] = useQueryState("condition", parseAsString);
-	const report = useGetMigrationQuery({ expId, from: from ?? undefined, to: to ?? undefined, condition: condition ?? undefined });
+	// alpha and grade_source come along from a bookmark (legacy /migration redirect included); the
+	// server honours both, so the report must be the one the address bar names.
+	const [alpha] = useQueryState("alpha", parseAsString);
+	const [gradeSource] = useQueryState("grade_source", parseAsString);
+	const report = useGetMigrationQuery(migrationParams(expId, { from, to, condition, alpha, grade_source: gradeSource }));
 	const fromArm = from ?? report.data?.from.arm ?? arms[0];
 	const targets = arms.filter((arm) => arm !== fromArm);
 	const chosen = to ? to.split(",").filter((arm) => targets.includes(arm)) : targets;
@@ -62,7 +80,12 @@ export function MigrationTab({ expId, arms }: { expId: string; arms: readonly st
 				{report.data && (
 					<span className="flex items-center gap-2">
 						<ModeBadge mode={report.data.mode} />
-						<GradeSourceTag testId="migration-source" />
+						<GradeSourceTag source={gradeSource ?? undefined} testId="migration-source" />
+						{alpha && (
+							<span className="text-muted-foreground text-xs tabular-nums" data-testid="migration-alpha">
+								α = {alpha}
+							</span>
+						)}
 					</span>
 				)}
 			</div>

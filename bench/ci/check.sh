@@ -19,7 +19,8 @@
 #   BENCH_CI_CONFIG          bench config (default deploy/bench.yaml)
 #   BENCH_CI_FAIL_ON         verdicts that fail the gate (default regressed,invalid)
 #   BENCH_CI_POLICY          policy file; empty uses BENCH_CI_DEFAULT_POLICY when it
-#                            exists; "none" turns policy off
+#                            exists; "none" turns policy off, including the
+#                            policy the experiment froze (check -policy none)
 #   BENCH_CI_DEFAULT_POLICY  default policy file (default policies/default.yaml)
 #   BENCH_CI_OUT             markdown report path (default
 #                            $RUNNER_TEMP/bench-check/report.md); check writes
@@ -147,6 +148,16 @@ policy_args=()
 policy_auto=false
 if [ "$policy" = "none" ]; then
   policy=""
+  # "none" must also switch off the policy the experiment froze, which only a
+  # bifrost-bench that accepts -policy none can do. An older binary still
+  # evaluates the frozen policy; say so instead of claiming policy is off.
+  if grep -q 'none turns policy evaluation off' <<<"$check_help"; then
+    policy_args=(-policy none)
+    policy_note="off (\`-policy none\`)"
+  else
+    policy_note="no override; this bifrost-bench still evaluates the policy the experiment froze"
+    echo "check.sh: policy none: this bifrost-bench cannot turn off the frozen policy" >&2
+  fi
 elif [ -z "$policy" ] && [ -f "$(bench_path "$default_policy")" ]; then
   policy=$default_policy
   policy_auto=true

@@ -52,7 +52,7 @@ func (m *searchesMetric) Descriptor() schemas.MetricDescriptor {
 		Kind:           schemas.KindCount,
 		HigherIsBetter: false,
 		MinEvidence:    schemas.EvidenceBoundary,
-		Description:    "Calls to Tavily's search endpoint that the tool proxy recorded for the run (through the websearch tool or direct, answered or not), averaged over runs of research tasks.",
+		Description:    "Calls to a search endpoint (Tavily, or the fixed-corpus search service when the suite declares it) that the tool proxy recorded for the run (through the websearch tool or direct, answered or not), averaged over runs of research tasks.",
 	}
 }
 
@@ -137,7 +137,7 @@ func (m *citationsGroundedMetric) Descriptor() schemas.MetricDescriptor {
 		Kind:           schemas.KindRate,
 		HigherIsBetter: true,
 		MinEvidence:    schemas.EvidenceBoundary,
-		Description:    "Share of the run's cited URLs that one of its own successful Tavily search or extract calls returned according to the tool proxy's ledger, averaged over research runs that cite at least one URL.",
+		Description:    "Share of the run's cited URLs that one of its own successful search or fetch calls (Tavily, or the fixed-corpus search service when the suite declares it) returned according to the tool proxy's ledger, averaged over research runs that cite at least one URL.",
 	}
 }
 

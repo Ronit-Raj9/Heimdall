@@ -6,11 +6,12 @@
 # still mints the simulator's key (never the agent's), lets the customer
 # service reach the gateway, records every simulator turn in the
 # transcript, reads the key's gateway rows as simulator_cost_usd and revokes
-# the key. Only the reference control runs (oracle), on the two tasks whose
-# checks do not need a customer reply with content.
+# the key. Two arms run, the reference control (oracle) and noop, on the two
+# tasks whose checks do not need a customer reply with content.
 #
 # Results are labelled "simulated user (model: anthropic/claude-sonnet-4-5)"
-# and are never compared with scripted-user runs. Slots: 2.
+# and are never compared with scripted-user runs. Slots: 4 (2 arms x 2 tasks
+# x 1 trial).
 name: helpdesk-llm-smoke
 smoke: true
 suite: acme-helpdesk@1.0.0

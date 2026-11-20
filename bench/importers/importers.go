@@ -33,14 +33,17 @@ type Info struct {
 
 // Options are the inputs of one import.
 type Options struct {
-	BenchRoot string            // the project folder (holds benchmarks/)
-	From      string            // local path of the upstream data
-	SuiteID   string            // suite to create or extend
-	IDs       []string          // upstream task ids to import; empty means all, up to Limit
-	Limit     int               // at most this many tasks; 0 means no limit
-	Force     bool              // replace task folders that already exist
-	Extra     map[string]string // importer-specific settings from repeated -set key=value
-	Logger    schemas.Logger
+	BenchRoot string // the project folder (holds benchmarks/)
+	// BenchmarksDir is the resolved benchmarks_root of the project config.
+	// Empty means BenchRoot/benchmarks.
+	BenchmarksDir string
+	From          string            // local path of the upstream data
+	SuiteID       string            // suite to create or extend
+	IDs           []string          // upstream task ids to import; empty means all, up to Limit
+	Limit         int               // at most this many tasks; 0 means no limit
+	Force         bool              // replace task folders that already exist
+	Extra         map[string]string // importer-specific settings from repeated -set key=value
+	Logger        schemas.Logger
 }
 
 // Skip is an upstream task the importer left out, with the reason.
@@ -101,7 +104,18 @@ func All() []Info {
 	return out
 }
 
-// SuiteDir is where an imported suite is written.
+// SuiteDir is where this import writes its suite: under the configured
+// benchmarks root when one is set, so the suite commands that read
+// benchmarks_root find it (finding 7-C-09).
+func (o Options) SuiteDir() string {
+	if o.BenchmarksDir != "" {
+		return filepath.Join(o.BenchmarksDir, o.SuiteID)
+	}
+	return SuiteDir(o.BenchRoot, o.SuiteID)
+}
+
+// SuiteDir is where an imported suite is written under the default
+// benchmarks root.
 func SuiteDir(benchRoot, suiteID string) string {
 	return filepath.Join(benchRoot, "benchmarks", suiteID)
 }

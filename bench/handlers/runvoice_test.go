@@ -2,14 +2,18 @@ package handlers
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"fmt"
 	"os"
 	"path/filepath"
 	"testing"
 
+	"github.com/fasthttp/router"
 	"github.com/maximhq/bifrost/bench/schemas"
 	"github.com/maximhq/bifrost/bench/utils"
+	"github.com/maximhq/bifrost/bench/voice"
+	"github.com/valyala/fasthttp"
 )
 
 // X8 voice agents: GET /runs/{id}/voice and /runs/{id}/voice/audio/{track}.
@@ -123,5 +127,54 @@ func TestRunVoiceNoCall(t *testing.T) {
 	c = newTestClient(t, d)
 	if resp := c.do(t, "GET", APIPrefix+"/runs/r_t01_A/voice", nil, nil); resp.StatusCode() != 404 {
 		t.Fatalf("plain run: %d", resp.StatusCode())
+	}
+}
+
+// voiceSuites serves one suite whose task t01 has its own voice bounds.
+type voiceSuites struct{ version string }
+
+func (voiceSuites) SuiteIDs(context.Context) ([]string, error) { return []string{"coding-core"}, nil }
+func (v voiceSuites) LoadSuite(_ context.Context, id string) (*schemas.Suite, error) {
+	return &schemas.Suite{ID: id, Version: v.version, Tasks: []*schemas.Task{
+		{ID: "t01", Voice: &schemas.VoiceSpec{BargeInBoundMS: 1, DeadAirMS: 50}},
+	}}, nil
+}
+func (voiceSuites) LockDrift(context.Context, *schemas.Suite) ([]schemas.SuiteDrift, error) {
+	return nil, nil
+}
+func (voiceSuites) FingerprintDrift(context.Context, *schemas.Suite) ([]schemas.FingerprintDrift, error) {
+	return nil, nil
+}
+
+// 6-C-11: the Voice tab classifies the call with the task's own bounds (as
+// the sealed metrics do) when the frozen suite version loads, and says which.
+func TestRunVoiceUsesTaskBounds(t *testing.T) {
+	for _, tt := range []struct {
+		name, version, source string
+		bargeIn               int
+	}{
+		{"frozen version", "1.0.0", VoiceBoundsTask, 1},
+		{"suite changed since", "2.0.0", VoiceBoundsDefault, voice.DefaultBargeInBoundMS},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			idx := voiceFixture(t)
+			idx.manifests[testExp].SuiteVersion = "1.0.0"
+			r := router.New()
+			NewRunsHandler(testMode, idx).WithSuites(voiceSuites{version: tt.version}).RegisterRoutes(r)
+			ctx := &fasthttp.RequestCtx{}
+			ctx.Request.Header.SetMethod("GET")
+			ctx.Request.SetRequestURI(APIPrefix + "/runs/r_t01_A/voice")
+			r.Handler(ctx)
+			var out VoiceCall
+			if err := json.Unmarshal(ctx.Response.Body(), &out); err != nil {
+				t.Fatalf("%v: %s", err, ctx.Response.Body())
+			}
+			if out.BoundsSource != tt.source || out.Analysis == nil || out.Analysis.BargeInBoundMS != tt.bargeIn {
+				t.Fatalf("bounds %q analysis %+v", out.BoundsSource, out.Analysis)
+			}
+			if tt.source == VoiceBoundsTask && out.Analysis.BargeIns[0].Handled {
+				t.Fatalf("a 1 ms bound cannot be met: %+v", out.Analysis.BargeIns[0])
+			}
+		})
 	}
 }

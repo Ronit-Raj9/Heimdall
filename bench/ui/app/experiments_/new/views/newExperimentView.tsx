@@ -4,7 +4,8 @@ import { TERMINAL_STATES } from "@/components/experiments/experiments.utils";
 import { BlockSkeleton, EmptyNote, LoadError } from "@/components/runs/screenStates";
 import { PageHeader } from "@/components/shell/pageHeader";
 import { Card, CardContent } from "@/components/ui/card";
-import { EXPERIMENT_POLL_MS, useGetCatalogQuery, useGetExperimentQuery } from "@/lib/store/apis/benchApi";
+import { EXPERIMENT_POLL_MS, useGetCatalogQuery, useGetExperimentQuery, useGetHealthQuery } from "@/lib/store/apis/benchApi";
+import { launchAvailable } from "@/lib/types/bench";
 import { parseAsString, useQueryState } from "nuqs";
 import { useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
@@ -17,6 +18,7 @@ export default function NewExperimentView() {
 	const [expId, setExpId] = useQueryState("exp", parseAsString);
 	const [capUsd, setCapUsd] = useState<number | undefined>(undefined);
 	const catalog = useGetCatalogQuery();
+	const health = useGetHealthQuery();
 	const defaults = useMemo(() => (catalog.data ? defaultFormValues(catalog.data, dateSeed(new Date())) : null), [catalog.data]);
 
 	return (
@@ -29,7 +31,9 @@ export default function NewExperimentView() {
 
 			{expId && <LiveProgress expId={expId} capUsd={capUsd} onNew={() => void setExpId(null)} />}
 
-			{catalog.isLoading ? (
+			{!launchAvailable(health.data) ? (
+				<EmptyNote testId="new-experiment-offline">{t("experiments.new.offline")}</EmptyNote>
+			) : catalog.isLoading ? (
 				<BlockSkeleton rows={10} testId="new-experiment-loading" />
 			) : catalog.error || !catalog.data ? (
 				<LoadError
@@ -62,7 +66,9 @@ function LiveProgress({ expId, capUsd, onNew }: { expId: string; capUsd: number 
 	const { t } = useTranslation("bench");
 	const [finished, setFinished] = useState(false);
 	const status = useGetExperimentQuery(expId, { pollingInterval: finished ? 0 : EXPERIMENT_POLL_MS, skipPollingIfUnfocused: true });
-	const terminal = status.data ? TERMINAL_STATES.has(status.data.state) : false;
+	// A created experiment (its start failed) is idle until someone starts it: stop polling; the
+	// Start action invalidates this status, which resumes polling once it runs.
+	const terminal = status.data ? TERMINAL_STATES.has(status.data.state) || status.data.state === "created" : false;
 
 	useEffect(() => {
 		setFinished(terminal);

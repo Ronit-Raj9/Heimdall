@@ -82,6 +82,11 @@ export function VoicePanel({ data }: { data: VoiceCall }) {
 			) : (
 				<>
 					<Summary a={a} />
+					{data.bounds_source === "default" && (
+						<p className="text-chart-warning-ink" data-testid="voice-default-bounds">
+							{t("voice.defaultBounds")}
+						</p>
+					)}
 					<Timeline a={a} />
 					<Turns a={a} />
 					{a.barge_ins.length > 0 ? <BargeIns a={a} /> : null}

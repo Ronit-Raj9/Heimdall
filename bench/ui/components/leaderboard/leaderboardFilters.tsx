@@ -2,7 +2,7 @@ import { UNKNOWN_TRACK, isTrack, type TrackGroup } from "@/components/scenario/s
 import { Select, SelectContent, SelectGroup, SelectItem, SelectLabel, SelectTrigger, SelectValue } from "@/components/ui/select";
 import type { LeaderboardScope, LeaderboardSynthetic } from "@/lib/types/bench";
 import type { TFunction } from "i18next";
-import { cn } from "@/lib/utils";
+import { cn, controlledSelectValue } from "@/lib/utils";
 import { useId } from "react";
 import { useTranslation } from "react-i18next";
 
@@ -156,7 +156,7 @@ function Picker({ label, value, options, labels, groups, placeholder, onChange, 
 			<label htmlFor={id} className="text-muted-foreground text-xs">
 				{label}
 			</label>
-			<Select value={value || undefined} onValueChange={onChange} disabled={disabled}>
+			<Select value={controlledSelectValue(value)} onValueChange={onChange} disabled={disabled}>
 				<SelectTrigger id={id} className={cn("font-mono text-xs", className)} data-testid={testId}>
 					<SelectValue placeholder={placeholder} />
 				</SelectTrigger>

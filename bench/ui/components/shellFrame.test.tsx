@@ -8,9 +8,10 @@ import { BenchHeader } from "./benchHeader";
 import { BenchSidebar, visibleNavGroups } from "./benchSidebar";
 
 vi.mock("@tanstack/react-router", async () => (await import("@/lib/testing/routerMock")).routerMock);
+const health = vi.hoisted(() => ({ launch: undefined as boolean | undefined }));
 vi.mock("@/lib/store", async (importOriginal) => ({
 	...(await importOriginal<typeof import("@/lib/store")>()),
-	useGetHealthQuery: () => okQuery({ mode: "live", status: "ok", version: "test" }),
+	useGetHealthQuery: () => okQuery({ mode: "live", status: "ok", version: "test", launch: health.launch }),
 }));
 vi.mock("@/lib/store/apis/platformApi", async (importOriginal) => ({
 	...(await importOriginal<typeof import("@/lib/store/apis/platformApi")>()),
@@ -23,7 +24,10 @@ function at(pathname: string) {
 	routerState.location = { pathname, href: pathname, search: {} };
 }
 
-afterEach(() => at("/verdict"));
+afterEach(() => {
+	at("/verdict");
+	health.launch = undefined;
+});
 
 describe("BenchSidebar", () => {
 	it("renders the five groups with toggles and labelled lists", () => {
@@ -87,6 +91,14 @@ describe("BenchHeader", () => {
 		expect(render(<BenchHeader />, hostedSession("member"))).toContain("header-new-experiment");
 		at("/experiments/new");
 		expect(render(<BenchHeader />)).not.toContain("header-new-experiment");
+	});
+
+	it("hides New experiment on an offline server that cannot launch (6-A-06)", () => {
+		at("/");
+		health.launch = false;
+		expect(render(<BenchHeader />, LOCAL_SESSION)).not.toContain("header-new-experiment");
+		health.launch = true;
+		expect(render(<BenchHeader />, LOCAL_SESSION)).toContain("header-new-experiment");
 	});
 
 	it("keeps the platform pieces in hosted mode", () => {

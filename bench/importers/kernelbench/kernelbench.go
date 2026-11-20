@@ -152,7 +152,7 @@ func (im *importer) Import(ctx context.Context, opts importers.Options) (*import
 	if err != nil {
 		return nil, err
 	}
-	dir := importers.SuiteDir(opts.BenchRoot, opts.SuiteID)
+	dir := opts.SuiteDir()
 	res := &importers.Result{Suite: opts.SuiteID, SuiteDir: dir}
 	want := map[string]bool{}
 	for _, id := range opts.IDs {

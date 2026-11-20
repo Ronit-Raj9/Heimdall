@@ -49,7 +49,7 @@ The worker token is the worker API's only authentication. There is no TLS built 
 
 ### The API
 
-Every route is under `/api/bench/workers`. All but the list require the bearer token: a missing or wrong token answers 401, and every worker route answers 503 when worker mode is off.
+Every route is under `/api/bench/workers`. All but the list require the bearer token: a missing or wrong token answers 401, and every token route answers 503 when worker mode is off. The list (`GET /api/bench/workers`) is the exception: it is a discovery route that always answers 200, with `"enabled": false` and an empty `workers` list when worker mode is off. Clients must read `enabled`, not the status code, to learn whether worker mode is on.
 
 | Method and path | Body | Answer |
 |---|---|---|

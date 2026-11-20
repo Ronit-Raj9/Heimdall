@@ -67,3 +67,18 @@ describe("TaskGrid", () => {
 		expect(html).toContain('data-testid="verdict-grid-empty"');
 	});
 });
+// 6-B-06: the pass check is dark ink on the bright dark-theme success fill, white on the light one.
+describe("pass cell icon contrast", () => {
+	it("uses the paired success-on token, dark in the dark theme", async () => {
+		const { CELL_CLASS } = await import("./taskGrid");
+		expect(CELL_CLASS.pass).toContain("text-chart-success-on");
+		expect(CELL_CLASS.pass).not.toContain("text-white");
+		const fs = await import("node:fs");
+		const path = await import("node:path");
+		const css = fs.readFileSync(path.resolve(__dirname, "../../app/globals.css"), "utf8");
+		const dark = css.slice(css.indexOf(".dark {"));
+		const lightness = (block: string) => Number(/--chart-success-on: oklch\(([\d.]+)/.exec(block)?.[1]);
+		expect(lightness(dark)).toBeLessThan(0.35); // fill is L 0.72
+		expect(lightness(css.slice(css.indexOf(":root {", 100)))).toBeGreaterThan(0.9); // fill is L 0.63
+	});
+});

@@ -1,7 +1,8 @@
+import type { TFunction } from "i18next";
 import { RECEIPT_STEPS, type ProbeLayerName, type Ratio, type ReceiptStep } from "@/lib/types/bench";
 
 /** Steps each probe layer applies (DESIGN.md 10.3). Any other step is not_applicable for that layer, never blank. */
-export const LAYER_STEPS: Record<ProbeLayerName, readonly ReceiptStep[]> = {
+export const LAYER_STEPS: Partial<Record<ProbeLayerName, readonly ReceiptStep[]>> = {
 	fixture: ["assigned", "armed", "visible", "acknowledged", "effect"],
 	tool_shim: ["assigned", "armed", "fired", "visible", "acknowledged", "effect"],
 	gateway: RECEIPT_STEPS,
@@ -14,7 +15,8 @@ export type ArmRatios = Record<string, Partial<Record<ReceiptStep, Ratio>>>;
  * recorded a ratio for is treated as not applicable.
  */
 export function stepApplies(step: ReceiptStep, layer: ProbeLayerName | null | undefined, ratios: ArmRatios | undefined): boolean {
-	if (layer && layer in LAYER_STEPS) return LAYER_STEPS[layer].includes(step);
+	const steps = layer ? LAYER_STEPS[layer] : undefined;
+	if (steps) return steps.includes(step);
 	return Object.values(ratios ?? {}).some((byStep) => byStep[step] !== undefined);
 }
 
@@ -32,3 +34,12 @@ export function ratioShares(ratio: Ratio | undefined): RatioShares | null {
 	const yes = clamp(ratio.num / ratio.den);
 	return { yes, unknown: clamp(Math.min(ratio.unknown / ratio.den, 1 - yes)) };
 }
+/**
+ * The readable name of a probe layer. A layer this UI has no translation for (a newer server)
+ * shows its own name with spaces, never the internal translation key.
+ */
+export function probeLayerLabel(layer: string, t: TFunction<"bench">): string {
+	return KNOWN_LAYERS.has(layer) ? t(`receipts.layers.${layer as ProbeLayerName}`) : layer.replace(/_/g, " ");
+}
+
+const KNOWN_LAYERS: ReadonlySet<string> = new Set<ProbeLayerName>(["fixture", "gateway", "tool_shim", "adapter", "a2a", "tool", "service"]);

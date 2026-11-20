@@ -1,0 +1,57 @@
+{
+	"_comment": "Fixture mode: the recorded e_pilot_mixed_nc93 payload, relabelled synthetic, (components/migration/migration.fixtures.ts) served for the analysed fixture experiment so the tab can be demoed without a server (6-B-02).",
+	"mode": "synthetic",
+	"x": "cost_per_success",
+	"x_label": "Cost per verified success (USD, failures included)",
+	"y": "verified_success",
+	"points": [
+		{
+			"id": "B",
+			"label": "custom-python gpt-5.4-mini",
+			"agent": "custom-python",
+			"model": "gpt-5.4-mini",
+			"x": {
+				"state": "observed",
+				"v": 0.0106143,
+				"evidence": "gateway"
+			},
+			"y": {
+				"state": "observed",
+				"v": 1,
+				"evidence": "outcome",
+				"reason": "one task: no interval"
+			},
+			"placed": true,
+			"frontier": true,
+			"dominated_by": [],
+			"reason": ""
+		},
+		{
+			"id": "A",
+			"label": "codex gpt-5.4-mini",
+			"agent": "codex",
+			"model": "gpt-5.4-mini",
+			"x": {
+				"state": "observed",
+				"v": 0.03179085,
+				"evidence": "gateway"
+			},
+			"y": {
+				"state": "observed",
+				"v": 1,
+				"evidence": "outcome",
+				"reason": "one task: no interval"
+			},
+			"placed": true,
+			"frontier": false,
+			"dominated_by": [
+				"B"
+			],
+			"reason": ""
+		}
+	],
+	"frontier": [
+		"B"
+	],
+	"note": "2 of 2 configs placed; 1 on the frontier. The frontier is read from point estimates: where success intervals overlap, the order between two points is not established."
+}

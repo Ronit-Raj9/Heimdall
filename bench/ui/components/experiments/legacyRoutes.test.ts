@@ -57,3 +57,15 @@ describe("compare links", () => {
 		expect(stringSearch({ a: 1, b: "x", c: "", d: null, e: true })).toEqual({ a: "1", b: "x", e: "true" });
 	});
 });
+
+// 6-A-01: a stale tab in an old bookmark never overrides the page the bookmark names.
+describe("legacyExperimentTarget with a stale tab", () => {
+	it("keeps the legacy page's tab", () => {
+		expect(legacyExperimentTarget("/receipts", { exp: "e1", tab: "cost" }).search).toEqual({ tab: "receipts" });
+		expect(legacyExperimentTarget("/matrix", { exp: "e1", tab: "runs", run: "r1" }).search).toEqual({ tab: "matrix", run: "r1" });
+	});
+	it("drops the stale tab for the verdict default", () => {
+		expect(legacyExperimentTarget("/verdict", { exp: "e1", tab: "cost" }).search).toEqual({});
+	});
+});
+

@@ -10,6 +10,7 @@ const api = vi.hoisted(() => ({
 	regrade: {} as Record<string, unknown>,
 	cancel: {} as Record<string, unknown>,
 	resume: {} as Record<string, unknown>,
+	start: {} as Record<string, unknown>,
 }));
 vi.mock("@tanstack/react-router", async () => (await import("@/lib/testing/routerMock")).routerMock);
 vi.mock("@/lib/store/apis/platformApi", async (importOriginal) => ({
@@ -20,6 +21,7 @@ vi.mock("@/lib/store/apis/platformApi", async (importOriginal) => ({
 vi.mock("@/lib/store/apis/benchApi", async (importOriginal) => ({
 	...(await importOriginal<typeof import("@/lib/store/apis/benchApi")>()),
 	useRegradeMutation: () => mutation(api.regrade),
+	useStartExperimentMutation: () => mutation(api.start),
 }));
 
 const status = (state: ExperimentStatus["state"]) =>
@@ -32,6 +34,11 @@ beforeEach(() => {
 });
 
 describe("ExperimentRunActions", () => {
+	it("offers Start again for a created experiment whose start failed (6-A-07)", () => {
+		const html = render(<ExperimentRunActions status={status("created")} />, hostedSession("member"));
+		expect(html).toContain('data-testid="experiment-start"');
+		expect(html).not.toContain("experiment-resume");
+	});
 	it("offers cancel while running and resume after a cancel or failure", () => {
 		expect(render(<ExperimentRunActions status={status("running")} />, hostedSession("member"))).toContain(
 			'data-testid="experiment-cancel"',

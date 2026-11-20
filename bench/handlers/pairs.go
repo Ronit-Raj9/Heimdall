@@ -2,11 +2,15 @@ package handlers
 
 import (
 	"cmp"
+	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
+	"io/fs"
 	"slices"
 
 	"github.com/fasthttp/router"
+	"github.com/maximhq/bifrost/bench/leaderboard"
 	"github.com/maximhq/bifrost/bench/lib"
 	"github.com/maximhq/bifrost/bench/schemas"
 	"github.com/valyala/fasthttp"
@@ -67,6 +71,10 @@ func (h *PairsHandler) getPair(ctx *fasthttp.RequestCtx) {
 		}
 		out.Runs = append(out.Runs, schemas.PairRun{Arm: rv.Slot.Arm, Slot: rv.Slot, Run: rv.Run, Metrics: metrics})
 	}
+	if err := h.provenance(ctx, &out); err != nil {
+		sendDepError(ctx, h.mode, "classify pair "+id, err)
+		return
+	}
 	if len(views) >= 2 && views[0].Slot.Counted && views[1].Slot.Counted {
 		a, err := readEvents(h.index, views[0].Run.RunID)
 		if err != nil {
@@ -81,6 +89,40 @@ func (h *PairsHandler) getPair(ctx *fasthttp.RequestCtx) {
 		out.Alignment, out.FirstDivergence = AlignPair(a, b).Steps(views[0].Slot.Arm, views[1].Slot.Arm, a, b)
 	}
 	lib.SendJSON(ctx, h.mode, fasthttp.StatusOK, out)
+}
+
+// provenance fills the pair's suite and each arm's synthetic flag from the
+// experiment's manifest and the runs' proxy ledgers (leaderboard.SyntheticArms).
+// A pair whose manifest is not indexed keeps the defaults.
+func (h *PairsHandler) provenance(ctx context.Context, out *schemas.Pair) error {
+	m, ok := h.index.Manifest(out.ExpID)
+	if !ok || m == nil {
+		return nil
+	}
+	out.Suite = m.SuiteID
+	runs := make([]schemas.SealedRun, 0, len(out.Runs))
+	for _, pr := range out.Runs {
+		runs = append(runs, schemas.SealedRun{Slot: pr.Slot, Run: pr.Run})
+	}
+	// The ledger is read only to classify; it is never served (runFileTypes).
+	read := func(sr *schemas.SealedRun, name string) ([]byte, bool, error) {
+		data, err := h.index.RunFile(sr.Run.RunID, name)
+		if err != nil {
+			if errors.Is(err, fs.ErrNotExist) || errors.Is(err, schemas.ErrNotFound) {
+				return nil, false, nil
+			}
+			return nil, false, err
+		}
+		return data, true, nil
+	}
+	synthetic, err := leaderboard.SyntheticArms(ctx, m, runs, read)
+	if err != nil {
+		return err
+	}
+	for i := range out.Runs {
+		out.Runs[i].Synthetic = synthetic[out.Runs[i].Arm]
+	}
+	return nil
 }
 
 // readMetrics reads a run's metrics.json (metric name -> value). A run whose

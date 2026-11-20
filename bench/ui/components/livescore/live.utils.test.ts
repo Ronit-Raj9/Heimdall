@@ -1,4 +1,4 @@
-import { livePullRequest, liveSessionsPath } from "@/lib/store/apis/livescoreApi";
+import { livePullRequest } from "@/lib/store/apis/livescoreApi";
 import { describe, expect, it } from "vitest";
 import { formatE, formatSignal, inboxLink, resultVariant, seriesRange, sortSignalResults, sparkPoints } from "./live.utils";
 import type { LiveSignalDef, LiveSignalResult } from "./livescore.types";
@@ -43,8 +43,6 @@ describe("live utils", () => {
 	});
 
 	it("builds the API paths and the inbox link", () => {
-		expect(liveSessionsPath({})).toBe("/livescore/sessions");
-		expect(liveSessionsPath({ version: "v2", flag: "abandoned", limit: 5 })).toBe("/livescore/sessions?version=v2&flag=abandoned&limit=5");
 		expect(livePullRequest()).toEqual({
 			url: "/livescore/pull",
 			method: "POST",

@@ -8,8 +8,8 @@ import { useMemo } from "react";
 import { useTranslation } from "react-i18next";
 import { cellTone, formatSignedPp, sortGridRows, type CellTone } from "./verdict.utils";
 
-const CELL_CLASS = {
-	pass: "bg-chart-success text-white border-transparent",
+export const CELL_CLASS = {
+	pass: "bg-chart-success text-chart-success-on border-transparent",
 	zero: "bg-chart-error/85 text-white border-transparent",
 	integrity: "bg-chart-error text-white border-chart-error-ink ring-2 ring-chart-error-ink/60",
 	unknown: "bench-hatched text-muted-foreground border-dashed border-muted-foreground/50",

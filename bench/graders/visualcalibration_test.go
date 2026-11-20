@@ -117,3 +117,16 @@ func TestVisualJudgeGoesThroughTheInstrument(t *testing.T) {
 		t.Fatalf("with a record: %s, %s (%s)", an.JudgeCalibration.State, an.Verdict.Decision, an.JudgeCalibration.Detail)
 	}
 }
+
+// TestVisualJudged covers 7-C-03: only a task with a rubric and a pinned
+// vision judge can take a calibration label.
+func TestVisualJudged(t *testing.T) {
+	_, _, _, rc := judgedVisual(t, []string{`{"verdict":"pass","score":1}`}, "", 1)
+	if !VisualJudged(rc.Suite, rc.Task) {
+		t.Fatal("judged task not recognised")
+	}
+	det := &schemas.Task{ID: "det", Output: &schemas.OutputSpec{Visual: &schemas.VisualCheck{}}}
+	if VisualJudged(&schemas.Suite{}, det) || VisualJudged(rc.Suite, nil) {
+		t.Fatal("deterministic-only or missing task accepted")
+	}
+}

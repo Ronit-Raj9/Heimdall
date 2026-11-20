@@ -87,6 +87,11 @@ type PairRun struct {
 	Slot    Slot             `json:"slot"`
 	Run     Run              `json:"run"`
 	Metrics map[string]Value `json:"metrics"`
+	// Synthetic is the arm's own provenance by the board's rules
+	// (leaderboard.SyntheticArms): a smoke experiment, a scripted control
+	// agent, or a proxy ledger showing the scripted model. It is independent
+	// of the server's mode, so a scripted pair on a live server says so.
+	Synthetic bool `json:"synthetic"`
 }
 
 // AlignedStep is one aligned position: the event id of each arm at that step,
@@ -110,6 +115,7 @@ type Pair struct {
 	PairID          string           `json:"pair_id"`
 	ExpID           string           `json:"exp_id"`
 	Task            string           `json:"task"`
+	Suite           string           `json:"suite,omitempty"` // the experiment's suite id, so the task links to its evidence
 	Condition       string           `json:"condition"`
 	Trial           int              `json:"trial"`
 	Runs            []PairRun        `json:"runs"`
@@ -269,6 +275,9 @@ type EventsPoll struct {
 type Health struct {
 	Status  string `json:"status"` // ok
 	Version string `json:"version"`
+	// Launch says whether this server plans and starts experiments. False on
+	// an offline (replay-only) server; absent where the router does not know.
+	Launch *bool `json:"launch,omitempty"`
 }
 
 // DoctorStatus is one preflight check's state.
