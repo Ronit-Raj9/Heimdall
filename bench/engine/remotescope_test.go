@@ -565,7 +565,16 @@ func TestRunnerSpendCap(t *testing.T) {
 	for side.b.w.count("exec") < 2 && time.Now().Before(deadline) {
 		time.Sleep(20 * time.Millisecond)
 	}
-	time.Sleep(300 * time.Millisecond)
+	// Cancel only once both runs are charged: cancelling while the second
+	// run is still measured stops it with an unknown cost, which charges
+	// the reserve instead of its 0.60 USD.
+	for time.Now().Before(deadline) {
+		if sp, err := newRunnerSpend(1.0, spendFile); err == nil && sp.state.Runs >= 2 {
+			break
+		}
+		time.Sleep(20 * time.Millisecond)
+	}
+	time.Sleep(100 * time.Millisecond) // a third lease would start here if the cap failed
 	cancel()
 	<-stopped
 	if n := side.b.w.count("exec"); n != 2 {
