@@ -67,6 +67,16 @@ func TestCheckGPURefusesWithTheReason(t *testing.T) {
 	if err := with.checkGPU(nil, team, conds("t")); err == nil || !strings.Contains(err.Error(), "team") {
 		t.Errorf("GPU team task: %v", err)
 	}
+	// Audit 2-B-03: a team declared by the arm, on a GPU task with no team of
+	// its own, must be refused the same way.
+	solo := &schemas.Suite{Tasks: []*schemas.Task{{ID: "t", Resources: &schemas.Resources{GPU: &schemas.GPURequest{Count: 1}}}}}
+	armTeam := schemas.ArmManifest{Config: schemas.AgentConfig{Team: []schemas.TeamMember{{ID: "a"}, {ID: "b"}}}}
+	if err := with.checkGPU(nil, solo, conds("t"), schemas.ArmManifest{}, armTeam); err == nil || !strings.Contains(err.Error(), "team") {
+		t.Errorf("GPU task with an arm team: %v", err)
+	}
+	if err := with.checkGPU(nil, solo, conds("t"), schemas.ArmManifest{}); err != nil {
+		t.Errorf("GPU task with a single arm: %v", err)
+	}
 }
 
 func TestSlotQueueKinds(t *testing.T) {

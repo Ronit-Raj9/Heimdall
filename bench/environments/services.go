@@ -99,9 +99,11 @@ type toolRoute struct {
 // task services, in file order, each ready before the next starts. They run
 // on a per-run internal network (no route out) that the agent joins in Exec;
 // a hidden service sits only on a second internal network that every other
-// service also joins, so the agent cannot reach it. When any service is
-// proxied the tool proxy starts last and the handles of proxied services
-// carry its URL. A run without services gets no network and nil results. On
+// service also joins, so the agent cannot reach it. A proxied service sits
+// only on that second network too, which the tool proxy also joins, so the
+// agent reaches it through the proxy and its ledger, never directly. When
+// any service is proxied the tool proxy starts last and the handles of
+// proxied services carry its URL. A run without services gets no network and nil results. On
 // failure the error is a *ServiceError naming the service; the results
 // collected so far are returned with it, and Destroy removes what started.
 func (e *dockerWorkspace) StartServices(ctx context.Context, rc *schemas.RunContext) ([]schemas.ServiceHandle, []schemas.ServiceResult, error) {
@@ -124,7 +126,7 @@ func (e *dockerWorkspace) StartServices(ctx context.Context, rc *schemas.RunCont
 	}
 	hidden := false
 	for _, s := range svcs {
-		hidden = hidden || s.spec.Hidden
+		hidden = hidden || s.spec.Hidden || proxied(s.spec)
 	}
 	if err := e.createNetworks(ctx, expID, runID, hidden); err != nil {
 		return nil, nil, &ServiceError{Service: "network", Err: err}
@@ -159,7 +161,7 @@ func (e *dockerWorkspace) StartServices(ctx context.Context, rc *schemas.RunCont
 	if err := e.startExternalEgress(ctx, rc, expID, runID, ext); err != nil { // External APIs area: forwarders for live and record APIs
 		return handles, results, &ServiceError{Service: "external", Err: err}
 	}
-	if err := e.startToolProxy(ctx, rc, expID, runID, routes, probe, ext); err != nil {
+	if err := e.startToolProxy(ctx, rc, expID, runID, routes, probe, ext, hidden); err != nil {
 		return handles, results, &ServiceError{Service: ToolProxyHost, Err: err}
 	}
 	e.markCollector(runID) // Agent events area: the tool proxy serves the collector (eventcollector.go)
@@ -304,6 +306,14 @@ func proxied(s schemas.ServiceSpec) bool {
 	return !s.Hidden && utils.ServiceProxied(s)
 }
 
+// offAgentNetwork reports whether the service sits only on the hidden
+// network, out of the agent's reach: a hidden service, and a proxied one,
+// which the agent must reach through the tool proxy so every call is in the
+// ledger.
+func offAgentNetwork(s schemas.ServiceSpec) bool {
+	return s.Hidden || proxied(s)
+}
+
 // proxyRoutes builds routes.json entries for the proxied services. It is
 // pure.
 func proxyRoutes(svcs []runService) ([]toolRoute, error) {
@@ -328,8 +338,8 @@ func proxyRoutes(svcs []runService) ([]toolRoute, error) {
 }
 
 // createNetworks replaces any leftover run networks with fresh internal
-// ones: the service network the agent joins and, when a service is hidden,
-// the hidden network only services join.
+// ones: the service network the agent joins and, when a service is hidden or proxied,
+// the hidden network only services and the tool proxy join.
 func (e *dockerWorkspace) createNetworks(ctx context.Context, expID, runID string, hidden bool) error {
 	nets := []string{serviceNetwork(runID)}
 	if hidden {
@@ -393,7 +403,7 @@ func (e *dockerWorkspace) startService(ctx context.Context, rc *schemas.RunConte
 		return h, res, fmt.Errorf("start: %w", err)
 	}
 	h.Network = serviceNetwork(runID) // X2: where the verifier finds it (compose.go)
-	if spec.Hidden {
+	if offAgentNetwork(spec) {
 		h.Network = hiddenNetwork(runID)
 	}
 	if runOnce(spec) { // X2: a one-shot compose service must exit 0 before the next one starts (compose.go)
@@ -443,7 +453,7 @@ func (e *dockerWorkspace) createService(ctx context.Context, rc *schemas.RunCont
 	spec, name := s.spec, serviceContainer(runID, s.spec.ID)
 	e.removeContainers(ctx, name)
 	primary := serviceNetwork(runID)
-	if spec.Hidden {
+	if offAgentNetwork(spec) {
 		primary = hiddenNetwork(runID)
 	}
 	args := append([]string{"create", "--name", name}, utils.LabelArgs(expID, runID)...)
@@ -470,7 +480,7 @@ func (e *dockerWorkspace) createService(ctx context.Context, rc *schemas.RunCont
 	if err := e.connectGatewayNetwork(ctx, rc, spec, name); err != nil { // W3 customer support
 		return err
 	}
-	if hidden && !spec.Hidden {
+	if hidden && !offAgentNetwork(spec) {
 		connect := append([]string{"network", "connect", "--alias", spec.ID}, hiddenAliasArgs(spec)...) // X2: compose aliases (compose.go)
 		if _, err := e.cfg.Docker.MustRun(ctx, append(connect, hiddenNetwork(runID), name)...); err != nil {
 			return fmt.Errorf("connect hidden network: %w", err)
@@ -603,7 +613,7 @@ func (e *dockerWorkspace) logTail(ctx context.Context, name string) string {
 // host name toolproxy, its routes in a config volume at /cfg (the tool probe
 // layer later copies fault.json there) and its ledger in a volume at /ledger,
 // and waits for GET /healthz.
-func (e *dockerWorkspace) startToolProxy(ctx context.Context, rc *schemas.RunContext, expID, runID string, routes []toolRoute, probe string, ext []externalAPI) error {
+func (e *dockerWorkspace) startToolProxy(ctx context.Context, rc *schemas.RunContext, expID, runID string, routes []toolRoute, probe string, ext []externalAPI, upstreams bool) error {
 	image := e.toolProxyImage()
 	info, err := InspectImage(ctx, e.cfg.Docker, image)
 	if err != nil {
@@ -633,6 +643,11 @@ func (e *dockerWorkspace) startToolProxy(ctx context.Context, rc *schemas.RunCon
 		"-fault", toolProxyCfg+"/fault.json", "-ledger", toolProxyLedger)
 	if _, err := e.cfg.Docker.MustRun(ctx, args...); err != nil {
 		return fmt.Errorf("create tool proxy: %w", err)
+	}
+	if upstreams { // the proxied services sit on the hidden network only
+		if _, err := e.cfg.Docker.MustRun(ctx, "network", "connect", hiddenNetwork(runID), name); err != nil {
+			return fmt.Errorf("connect tool proxy to the upstream network: %w", err)
+		}
 	}
 	raw, err := json.Marshal(struct {
 		RunID   string            `json:"run_id"`

@@ -270,9 +270,23 @@ func (p *Pipeline) runTeam(ctx context.Context, st *runState) error {
 	if err != nil {
 		return wrapPart("environment", st.env, fmt.Errorf("exec team: %w", err))
 	}
+	if err := memberFailure(results); err != nil {
+		return wrapPart("environment", st.env, err)
+	}
+	return nil
+}
+
+// memberFailure is the first member that did not run or whose run ended in
+// an infrastructure error (output capture, exit code inspection). Such a
+// member's exec result is not a trustworthy agent outcome, so the run must
+// not be graded as counted. It is pure.
+func memberFailure(results []schemas.MemberResult) error {
 	for _, r := range results {
 		if r.Exec == nil {
-			return wrapPart("environment", st.env, fmt.Errorf("team member %s did not run: %s", r.AgentID, r.Error))
+			return fmt.Errorf("team member %s did not run: %s", r.AgentID, r.Error)
+		}
+		if r.Error != "" {
+			return fmt.Errorf("team member %s: %s", r.AgentID, r.Error)
 		}
 	}
 	return nil

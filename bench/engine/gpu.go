@@ -7,6 +7,7 @@ import (
 
 	"github.com/maximhq/bifrost/bench/gpu"
 	"github.com/maximhq/bifrost/bench/schemas"
+	"github.com/maximhq/bifrost/bench/utils"
 )
 
 // X7: GPU scheduling (docs/gpu-tasks.md).
@@ -33,9 +34,11 @@ func WithoutGPUCheck() PlannerOption {
 // checkGPU refuses, at plan time and with the reason, every selected task
 // whose GPU request this machine cannot meet: no GPU pool, no GPU, too few
 // GPUs, or too little memory. It also refuses what GPU tasks cannot be
-// combined with: the Kubernetes driver and multi-container team tasks. A
-// plan without GPU tasks is never refused here.
-func (p *Planner) checkGPU(e *schemas.Experiment, suite *schemas.Suite, conds []condPlan) error {
+// combined with: the Kubernetes driver and multi-container team runs, whether
+// the team is the task's or an arm's (the effective team, utils.TeamOf, as
+// at run time), since team members get no GPU devices. A plan without GPU
+// tasks is never refused here.
+func (p *Planner) checkGPU(e *schemas.Experiment, suite *schemas.Suite, conds []condPlan, arms ...schemas.ArmManifest) error {
 	if p.skipGPU {
 		return nil
 	}
@@ -48,7 +51,7 @@ func (p *Planner) checkGPU(e *schemas.Experiment, suite *schemas.Suite, conds []
 		switch {
 		case e != nil && e.Environment != nil && e.Environment.Driver != "" && e.Environment.Driver != "docker":
 			problems = append(problems, fmt.Sprintf("task %s needs a GPU and runs on the Docker driver only, not %s", id, e.Environment.Driver))
-		case len(t.Team) > 0:
+		case len(t.Team) > 0 || armTeamOn(t, arms):
 			problems = append(problems, fmt.Sprintf("task %s needs a GPU and declares a team; GPU team runs are not supported", id))
 		case p.reg.GPUs == nil:
 			problems = append(problems, fmt.Sprintf("task %s needs a GPU but GPU tasks are off on this machine (gpu.mode: off, or no NVIDIA driver; bifrost-bench gpu check)", id))
@@ -62,6 +65,16 @@ func (p *Planner) checkGPU(e *schemas.Experiment, suite *schemas.Suite, conds []
 		return nil
 	}
 	return fmt.Errorf("gpu: %s", strings.Join(problems, "; "))
+}
+
+// armTeamOn reports whether any arm runs a team on task t.
+func armTeamOn(t *schemas.Task, arms []schemas.ArmManifest) bool {
+	for i := range arms {
+		if len(utils.TeamOf(&schemas.RunContext{Agent: &arms[i].Config, Task: t})) > 0 {
+			return true
+		}
+	}
+	return false
 }
 
 // gpuSlots counts the manifest's slots whose task asks for a GPU.

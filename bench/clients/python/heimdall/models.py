@@ -679,6 +679,7 @@ class ArmManifest(_ArmManifestRequired, total=False):
     capability_gaps: List[str]
     identity: Optional[CanonicalArmIdentity]
     image_id: str
+    members: Dict[str, MemberManifest]
     task_image_ids: Dict[str, str]
     task_images: Dict[str, str]
 
@@ -2976,6 +2977,11 @@ class MeOrg(TypedDict):
     name: str
     role: str
     slug: str
+
+
+class MemberManifest(TypedDict, total=False):
+    files: Dict[str, Dict[str, str]]
+    image_id: str
 
 
 class Meter(TypedDict):
@@ -6252,6 +6258,7 @@ __all__ = [
     'MatrixSpec',
     'Me',
     'MeOrg',
+    'MemberManifest',
     'Meter',
     'MetricDelta',
     'MetricDescriptor',

@@ -426,6 +426,12 @@ func adoptUnrepeatable(local, remote *schemas.Manifest) {
 	for id, am := range local.Arms {
 		if ra, ok := remote.Arms[id]; ok {
 			am.ImageID = ra.ImageID
+			for mid, rm := range ra.Members {
+				if lm, ok := am.Members[mid]; ok {
+					lm.ImageID = rm.ImageID
+					am.Members[mid] = lm
+				}
+			}
 			local.Arms[id] = am
 		}
 	}

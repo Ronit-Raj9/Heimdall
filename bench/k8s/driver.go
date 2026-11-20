@@ -21,6 +21,7 @@ import (
 
 	"github.com/maximhq/bifrost/bench/environments"
 	"github.com/maximhq/bifrost/bench/schemas"
+	"github.com/maximhq/bifrost/bench/suite"
 	"github.com/maximhq/bifrost/bench/utils"
 )
 
@@ -154,11 +155,28 @@ func (d *Driver) ImageRepoDigests(ctx context.Context, ref string) ([]string, er
 
 // ImageRoles implements engine.ImageRoler: the helper image starts beside
 // every agent here too (prep, observers, bench helper).
+//
+// The helper and collector roles name this driver's own images, so the
+// manifest freezes what the pod actually runs; the collector is a role of
+// its own, frozen whenever the driver runs it, even in a suite without
+// services or external APIs.
 func (d *Driver) ImageRoles() map[string]string {
+	out := map[string]string{}
 	if r, ok := d.cfg.Local.(interface{ ImageRoles() map[string]string }); ok {
-		return r.ImageRoles()
+		for k, v := range r.ImageRoles() {
+			out[k] = v
+		}
 	}
-	return nil
+	if d.cfg.HelperImage != "" {
+		out[suite.ImageHelper] = d.cfg.HelperImage
+	}
+	if d.cfg.EventsCollector && d.cfg.CollectorImage != "" {
+		out[roleCollector] = d.cfg.CollectorImage
+	}
+	if len(out) == 0 {
+		return nil
+	}
+	return out
 }
 
 // runRef names a run's objects.
@@ -205,6 +223,9 @@ func (d *Driver) Create(ctx context.Context, rc *schemas.RunContext) (*schemas.E
 	}
 	protected, err := environments.ProtectedHashes(repoDir, rc.Task.Protected)
 	if err != nil {
+		return nil, fmt.Errorf("create workspace for run %s: %w", r.runID, err)
+	}
+	if err := d.checkFrozenRoles(ctx, rc); err != nil { // Lock fingerprints: frozen evaluator images (suiteimages.go)
 		return nil, fmt.Errorf("create workspace for run %s: %w", r.runID, err)
 	}
 	h := &schemas.EnvironmentHandle{
@@ -349,6 +370,9 @@ func (d *Driver) Exec(ctx context.Context, rc *schemas.RunContext, plan *schemas
 		return nil, fmt.Errorf("exec run %s: create pod: %w", r.runID, err)
 	}
 	if err := d.waitContainer(ctx, r, ctrPrep, true, podStartTimeout); err != nil {
+		return nil, fmt.Errorf("exec run %s: %w", r.runID, err)
+	}
+	if err := d.checkHelperOnNode(ctx, rc, r, in.HelperImage); err != nil { // before the helper seeds the workspace (suiteimages.go)
 		return nil, fmt.Errorf("exec run %s: %w", r.runID, err)
 	}
 	ref, err := d.seed(ctx, rc, r, in)
@@ -834,39 +858,63 @@ func (d *Driver) checkImages(ctx context.Context, rc *schemas.RunContext, r runR
 	rec.Node = p.Spec.NodeName
 	rec.ImageIDs = map[string]string{}
 	var agentID string
+	helper := d.helperImage(rc)
 	for _, cs := range append(append([]ContainerStatus(nil), p.Status.InitContainerStatuses...), p.Status.ContainerStatuses...) {
 		if cs.ImageID != "" {
 			rec.ImageIDs[cs.Name] = cs.ImageID
 		}
-		if cs.Name == ctrAgent {
+		var err error
+		switch cs.Name {
+		case ctrAgent:
 			agentID = cs.ImageID
+		case ctrPrep, ctrFSWatch, ctrProcWatch, ctrBench: // Lock fingerprints: frozen helper image (suiteimages.go)
+			err = d.checkNodeRole(ctx, rc, rec, d.helperRole(), helper, cs.Name, cs.ImageID)
+		case ctrCollector:
+			err = d.checkNodeRole(ctx, rc, rec, roleCollector, d.cfg.CollectorImage, cs.Name, cs.ImageID)
+		}
+		if err != nil {
+			return err
 		}
 	}
 	want := environments.FrozenImageID(rc)
 	if want == "" || rc.Agent == nil || rc.Agent.Image == "" {
 		return nil
 	}
-	if imageMatches(agentID, want, nil) {
+	if d.agentImageFrozen(ctx, rec, agentID, want, rc.Agent.Image) {
 		return nil
-	}
-	digests, _ := d.ImageRepoDigests(ctx, rc.Agent.Image)
-	if imageMatches(agentID, want, digests) {
-		return nil
-	}
-	if d.nodeImageHasDigest(ctx, rec.Node, agentID, want) {
-		return nil
-	}
-	if local, err := d.ImageID(ctx, rc.Agent.Image); err == nil && local == want {
-		cfg, cerr := d.configDigest(ctx, rc.Agent.Image, "linux/"+d.nodeArch(ctx, rec.Node))
-		if cerr == nil && cfg == agentID {
-			rec.Notes = append(rec.Notes, "agent image "+agentID+" is the config of the frozen image "+want)
-			return nil
-		}
-		if cerr != nil {
-			rec.Notes = append(rec.Notes, "config digest of "+rc.Agent.Image+": "+cerr.Error())
-		}
 	}
 	return fmt.Errorf("agent image on node %s is %s, but experiment %s was planned with %s; load or push the planned image", rec.Node, agentID, rc.Manifest.ExpID, want)
+}
+
+// agentImageFrozen reports whether the node's agent image id is the frozen
+// image: the frozen id itself, a node image pinned to the frozen digest, or,
+// only while the local tag still names the frozen id, one of that image's
+// registry digests or its config digest. Digests read from the tag are never
+// trusted once the tag has moved, since they then describe another image.
+func (d *Driver) agentImageFrozen(ctx context.Context, rec *record, agentID, want, ref string) bool {
+	if imageMatches(agentID, want, nil) {
+		return true
+	}
+	if d.nodeImageHasDigest(ctx, rec.Node, agentID, want) {
+		return true
+	}
+	local, err := d.ImageID(ctx, ref)
+	if err != nil || local != want {
+		return false
+	}
+	digests, _ := d.ImageRepoDigests(ctx, ref)
+	if imageMatches(agentID, want, digests) {
+		return true
+	}
+	cfg, cerr := d.configDigest(ctx, ref, want, "linux/"+d.nodeArch(ctx, rec.Node))
+	if cerr == nil && cfg == agentID {
+		rec.Notes = append(rec.Notes, "agent image "+agentID+" is the config of the frozen image "+want)
+		return true
+	}
+	if cerr != nil {
+		rec.Notes = append(rec.Notes, "config digest of "+ref+": "+cerr.Error())
+	}
+	return false
 }
 
 // nodeImageHasDigest reports whether the node lists the container's image

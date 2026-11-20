@@ -723,15 +723,33 @@ func (e *dockerWorkspace) waitOrKill(ctx context.Context, cmd *exec.Cmd, name st
 }
 
 // exitCode reads the container's exit code from docker, which is more
-// reliable than the attached client's own status.
+// reliable than the attached client's own status. A container that never
+// started, or that is not in the exited state, has no trustworthy exit code:
+// its zero initial value would otherwise be scored as an agent result, so it
+// is reported as an infrastructure error instead.
 func (e *dockerWorkspace) exitCode(ctx context.Context, name string) (int, error) {
-	res, err := e.cfg.Docker.MustRun(ctx, "inspect", "--format", "{{.State.ExitCode}}", name)
+	res, err := e.cfg.Docker.MustRun(ctx, "inspect", "--format", "{{.State.ExitCode}} {{.State.Status}} {{.State.StartedAt}}", name)
 	if err != nil {
 		return 0, fmt.Errorf("inspect agent container: %w", err)
 	}
-	code, err := strconv.Atoi(strings.TrimSpace(string(res.Stdout)))
+	return parseAgentState(string(res.Stdout))
+}
+
+// parseAgentState parses "<exit code> <status> <started at>" from inspect.
+func parseAgentState(out string) (int, error) {
+	f := strings.Fields(out)
+	if len(f) != 3 {
+		return 0, fmt.Errorf("inspect agent container: unexpected state %q", strings.TrimSpace(out))
+	}
+	code, err := strconv.Atoi(f[0])
 	if err != nil {
 		return 0, fmt.Errorf("inspect agent container: parse exit code: %w", err)
+	}
+	if started, err := time.Parse(time.RFC3339Nano, f[2]); err != nil || started.Year() <= 1 {
+		return 0, fmt.Errorf("agent container never started (status %s, started_at %s)", f[1], f[2])
+	}
+	if f[1] != "exited" {
+		return 0, fmt.Errorf("agent container did not exit (status %s)", f[1])
 	}
 	return code, nil
 }

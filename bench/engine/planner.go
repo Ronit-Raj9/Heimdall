@@ -311,7 +311,14 @@ func (p *Planner) plan(ctx context.Context, exp *schemas.Experiment, mode planMo
 	if m.Experiment.Environment, err = p.planDriver(&e, suite, all, m); err != nil { // X3: driver refusals, the frozen driver (driverplan.go)
 		return nil, fmt.Errorf("plan %s: %w", e.ID, err)
 	}
-	if err := p.checkGPU(&e, suite, all); err != nil { // X7: GPU tasks this machine cannot run are refused with the reason (gpu.go)
+	gpuArms := make([]schemas.ArmManifest, 0, len(m.Arms)+1)
+	for _, id := range sortedKeys(m.Arms) {
+		gpuArms = append(gpuArms, m.Arms[id])
+	}
+	if m.Compatibility != nil {
+		gpuArms = append(gpuArms, *m.Compatibility)
+	}
+	if err := p.checkGPU(&e, suite, all, gpuArms...); err != nil { // X7: GPU tasks this machine cannot run are refused with the reason (gpu.go)
 		return nil, fmt.Errorf("plan %s: %w", e.ID, err)
 	}
 	if err := p.checkExternal(&e, suite, all); err != nil { // External APIs area: modes and cassettes (externalplan.go)
@@ -648,10 +655,36 @@ func (p *Planner) resolveArm(ctx context.Context, label, cfgPath string, set map
 	if err != nil {
 		return am, err
 	}
+	members, err := p.memberManifests(ctx, &cfg, suite, conds)
+	if err != nil {
+		return am, err
+	}
 	snapshot := effectiveBudgetSnapshot(&cfg, suite, conds)
 	identity := p.armIdentity(&cfg, hash)
 	identity.BudgetSnapshot = &snapshot
-	return schemas.ArmManifest{Label: label, Config: cfg, ConfigHash: hash, Identity: &identity, BudgetSnapshot: &snapshot, Files: files, ImageID: p.imageID(ctx, suite, cfg.Image)}, nil
+	return schemas.ArmManifest{Label: label, Config: cfg, ConfigHash: hash, Identity: &identity, BudgetSnapshot: &snapshot, Files: files, ImageID: p.imageID(ctx, suite, cfg.Image), Members: members}, nil
+}
+
+// memberManifests freezes the image id and laid files of every team member
+// that runs a config of its own, so a rebuilt member tag or a changed member
+// notes or skill file is bound to the manifest like the arm's own. A member
+// without a config of its own runs the arm's and is covered by the arm.
+func (p *Planner) memberManifests(ctx context.Context, cfg *schemas.AgentConfig, suite *schemas.Suite, conds []condPlan) (map[string]schemas.MemberManifest, error) {
+	var out map[string]schemas.MemberManifest
+	for _, m := range cfg.Team {
+		if m.Config == nil {
+			continue
+		}
+		files, err := p.layFiles(m.Config, suite, conds)
+		if err != nil {
+			return nil, fmt.Errorf("team member %s: %w", m.ID, err)
+		}
+		if out == nil {
+			out = map[string]schemas.MemberManifest{}
+		}
+		out[m.ID] = schemas.MemberManifest{ImageID: p.imageID(ctx, suite, m.Config.Image), Files: files}
+	}
+	return out, nil
 }
 
 // imageID returns the local image id of ref when the suite's environment can

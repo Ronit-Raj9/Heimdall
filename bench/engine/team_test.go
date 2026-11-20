@@ -179,3 +179,44 @@ func TestMintTeamSlots(t *testing.T) {
 		t.Errorf("single-agent run: %v %+v", err, single.rc.Key)
 	}
 }
+
+// TestMemberFailureInfraError reproduces audit 2-B-06: a member with an exec
+// result but an infrastructure error (failed inspect or output capture) must
+// fail the run instead of reaching counted grading.
+func TestMemberFailureInfraError(t *testing.T) {
+	ok := schemas.MemberResult{AgentID: "lead", Exec: &schemas.ExecResult{}}
+	if err := memberFailure([]schemas.MemberResult{ok}); err != nil {
+		t.Fatalf("clean team: %v", err)
+	}
+	bad := schemas.MemberResult{AgentID: "w", Exec: &schemas.ExecResult{}, Error: "inspect agent container: boom"}
+	err := memberFailure([]schemas.MemberResult{ok, bad})
+	if err == nil || !strings.Contains(err.Error(), "team member w") || !strings.Contains(err.Error(), "boom") {
+		t.Fatalf("infra error lost: %v", err)
+	}
+	if err := memberFailure([]schemas.MemberResult{{AgentID: "x", Error: "create"}}); err == nil {
+		t.Fatal("member that did not run accepted")
+	}
+}
+
+// TestMemberManifests reproduces audit 2-B-09 at plan time: a member that
+// runs its own config gets its laid files (here its notes file) frozen in
+// the arm manifest, so a later edit is visible against the manifest.
+func TestMemberManifests(t *testing.T) {
+	root := t.TempDir()
+	if err := os.WriteFile(filepath.Join(root, "notes.md"), []byte("v1"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	p := NewPlanner(&schemas.Registry{}, root, nil)
+	mc := &schemas.AgentConfig{ID: "coder", Image: "member:1", Notes: schemas.AgentNotes{UserFile: "notes.md", UserPath: "/home/agent/NOTES.md"}}
+	cfg := &schemas.AgentConfig{Team: []schemas.TeamMember{{ID: "lead"}, {ID: "coder", Config: mc}}}
+	got, err := p.memberManifests(context.Background(), cfg, &schemas.Suite{}, []condPlan{{id: "clean"}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, ok := got["lead"]; ok || len(got) != 1 {
+		t.Fatalf("members = %+v", got)
+	}
+	if got["coder"].Files["clean"]["/home/agent/NOTES.md"] == "" {
+		t.Fatalf("member notes not frozen: %+v", got["coder"])
+	}
+}

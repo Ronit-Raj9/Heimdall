@@ -21,11 +21,14 @@ import (
 // compared: the node runs the frozen image when the local image still has
 // the frozen id and its config digest is the one the node reports.
 
-var configDigests sync.Map // ref + "|" + platform -> digest
+var configDigests sync.Map // image id + "|" + platform -> digest
 
-// configDigest returns the config digest of ref for platform (os/arch).
-func (d *Driver) configDigest(ctx context.Context, ref, platform string) (string, error) {
-	key := ref + "|" + platform
+// configDigest returns the config digest of ref for platform (os/arch). id
+// is the immutable image id ref named when it was checked; the cache is keyed
+// by it, not by the mutable tag, so a retagged ref never reuses a stale
+// digest.
+func (d *Driver) configDigest(ctx context.Context, ref, id, platform string) (string, error) {
+	key := id + "|" + platform
 	if v, ok := configDigests.Load(key); ok {
 		return v.(string), nil
 	}
