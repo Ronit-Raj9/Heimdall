@@ -403,7 +403,9 @@ func TestHostedLostRunnerReleased(t *testing.T) {
 	hub := NewRemoteHub(RemoteOptions{StaleAfter: stale})
 	a := newHostedOrg(t, hub, "org_a")
 	m := a.side.b.plan(t, pooled(""))
-	_, done := attachTo(t, a.side, a.c, m, RunOptions{StaleAfter: stale, HeartbeatEvery: time.Hour})
+	freeze := freezableClock(a.c)
+	// r1 never heartbeats (RunSlot outside Work); r2 heartbeats through Work.
+	_, done := attachTo(t, a.side, a.c, m, RunOptions{StaleAfter: stale, HeartbeatEvery: stale / 6})
 	ctx := context.Background()
 	w1 := hostedRunner(t, a.url, tokADefault, "r1", "")
 	w2 := hostedRunner(t, a.url, tokADefault, "r2", "")
@@ -418,6 +420,7 @@ func TestHostedLostRunnerReleased(t *testing.T) {
 	}
 	time.Sleep(stale + 100*time.Millisecond)
 	a.c.Sweep(time.Now())
+	freeze()
 	l2 := lease(t, w2)
 	if l2 == nil || l2.Slot.SlotID != l1.Slot.SlotID {
 		t.Fatalf("lost slot not re-leased first: %+v", l2)
