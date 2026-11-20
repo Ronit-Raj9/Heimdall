@@ -11,6 +11,7 @@ import (
 	"os/signal"
 	"path/filepath"
 	"regexp"
+	"slices"
 	"strconv"
 	"strings"
 	"syscall"
@@ -117,7 +118,19 @@ func runMigratePlan(args []string) int {
 	if _, _, err := a.analyze(context.WithoutCancel(ctx), m.ExpID, ""); err != nil {
 		a.logger.Warn("analysis failed; the migration report is still written", "experiment", m.ExpID, "error", err)
 	}
-	rep, err := a.migrationReport(context.WithoutCancel(ctx), m.ExpID, schemas.GradeSourceOriginal, *policyFile, true, migration.Query{From: *from, To: toModels})
+	// The report names the frozen arms, not the model strings: one model
+	// through two providers would resolve to both arms on both sides
+	// (audit 5-C-07). migrationExperiment lists the old model first, and
+	// the matrix gives its arms the ids A, B, C... in that order.
+	q := migration.Query{From: "A"}
+	for i := range toModels {
+		q.To = append(q.To, string(rune('B'+i)))
+	}
+	reportPolicy := *policyFile
+	if reportPolicy == "" {
+		reportPolicy = "none"
+	}
+	rep, err := a.migrationReport(context.WithoutCancel(ctx), m.ExpID, schemas.GradeSourceOriginal, reportPolicy, true, q)
 	if err != nil {
 		return fail("migration report %s: %v", m.ExpID, err)
 	}
@@ -197,7 +210,9 @@ func (a *app) migrationReport(ctx context.Context, expID, gradeSource, policyFil
 	if withTasks {
 		in.Tasks = a.suiteTasks(ctx, m)
 	}
-	in.Policy, in.PolicyHash = a.migrationPolicy(m, policyFile)
+	if in.Policy, in.PolicyHash, in.PolicyFrozen, err = a.migrationPolicy(m, policyFile); err != nil {
+		return nil, err
+	}
 	if in.Invalid, err = a.releaseInvalid(ctx, m, runs); err != nil {
 		return nil, err
 	}
@@ -253,26 +268,36 @@ func (a *app) suiteTasks(ctx context.Context, m *schemas.Manifest) map[string]*s
 	return out
 }
 
-// migrationPolicy loads the release policy the recommendation follows.
-func (a *app) migrationPolicy(m *schemas.Manifest, file string) (*schemas.Policy, string) {
+// migrationPolicy loads the release policy the recommendation follows and
+// says whether it is the one the experiment froze. Audit 5-C-02: a policy
+// that was asked for (an explicit file, or the one the experiment names)
+// and cannot be read is an error, never a silent statistics-only report;
+// only the implicit policies/default.yaml may be absent, and "none" is the
+// explicit statistics-only choice.
+func (a *app) migrationPolicy(m *schemas.Manifest, file string) (*schemas.Policy, string, bool, error) {
+	implicit := false
 	switch {
 	case file == "none":
-		return nil, ""
+		return nil, "", false, nil
 	case file == "" && m.Experiment.Policy != "":
 		file = m.Experiment.Policy
 	case file == "":
-		file = "policies/default.yaml"
+		file, implicit = "policies/default.yaml", true
 	}
 	path := file
 	if !filepath.IsAbs(path) {
 		path = filepath.Join(a.cfg.Root, file)
 	}
 	p, raw, err := policy.Load(path)
-	if err != nil {
-		a.logger.Warn("release policy not loaded; the recommendation follows the statistics alone", "policy", file, "error", err)
-		return nil, ""
+	switch {
+	case err != nil && implicit && errors.Is(err, os.ErrNotExist):
+		a.logger.Warn("no release policy; the recommendation follows the statistics alone", "policy", file)
+		return nil, "", false, nil
+	case err != nil:
+		return nil, "", false, fmt.Errorf("release policy %s: %w (pass -policy none for a statistics-only report)", file, err)
 	}
-	return p, policy.Hash(raw)
+	frozen := m.Experiment.Policy != "" && filepath.Clean(file) == filepath.Clean(m.Experiment.Policy)
+	return p, policy.Hash(raw), frozen, nil
 }
 
 // writeMigrationReport writes report.md and report.json into dir.
@@ -292,7 +317,8 @@ func writeMigrationReport(dir string, rep *migration.Report) error {
 
 // migrationExperiment is the experiment file of a migration: a model matrix
 // of the agent on the old model first, then each new model, every condition
-// on the same tasks and trials, the paired verdict on clean.
+// on the same tasks and trials, the paired verdict on clean (else on the
+// first condition).
 func migrationExperiment(agent, suiteRef, from string, to []string, provider string, conditions, tasks []string, trials int, budget float64, policyFile string, allowUnpriced bool) string {
 	var b strings.Builder
 	b.WriteString("# Written by `migrate` (docs/model-migration.md). Edit and run with `run` if you like.\n")
@@ -308,7 +334,16 @@ func migrationExperiment(agent, suiteRef, from string, to []string, provider str
 	if allowUnpriced {
 		b.WriteString("  allow_unpriced: true\n")
 	}
-	b.WriteString("primary: {condition: clean, metric: verified_success}\nguards:\n  - {rule: no_new_integrity_violation}\nconditions:\n")
+	if len(conditions) == 0 {
+		conditions = []string{schemas.ConditionClean}
+	}
+	// The verdict is on clean when it is run, else on the first condition
+	// asked for (audit 5-C-06: a fault-only plan must still be valid).
+	primary := conditions[0]
+	if slices.Contains(conditions, schemas.ConditionClean) {
+		primary = schemas.ConditionClean
+	}
+	fmt.Fprintf(&b, "primary: {condition: %s, metric: verified_success}\nguards:\n  - {rule: no_new_integrity_violation}\nconditions:\n", quote(primary))
 	sel := "all"
 	if len(tasks) > 0 {
 		q := make([]string, len(tasks))
@@ -316,9 +351,6 @@ func migrationExperiment(agent, suiteRef, from string, to []string, provider str
 			q[i] = quote(t)
 		}
 		sel = "[" + strings.Join(q, ", ") + "]"
-	}
-	if len(conditions) == 0 {
-		conditions = []string{schemas.ConditionClean}
 	}
 	for _, c := range conditions {
 		fmt.Fprintf(&b, "  - {id: %s, tasks: %s, trials: %d}\n", quote(c), sel, trials)

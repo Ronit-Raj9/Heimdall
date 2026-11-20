@@ -110,7 +110,9 @@ func (st *Store) saveState(s *State) error {
 	return writeAtomic(filepath.Join(st.dir, StateFile), append(data, '\n'))
 }
 
-// Sessions reads every scored session, oldest first.
+// Sessions reads every scored session, oldest first. A session id recorded
+// more than once (an append that a crashed pull never checkpointed, then
+// repeated) is returned once, its first record.
 func (st *Store) Sessions() ([]SessionRecord, error) {
 	f, err := os.Open(filepath.Join(st.dir, SessionsFile))
 	if errors.Is(err, os.ErrNotExist) {
@@ -125,6 +127,7 @@ func (st *Store) Sessions() ([]SessionRecord, error) {
 	sc.Buffer(make([]byte, 0, 64<<10), 1<<20)
 	n := 0
 	var bad error
+	seen := map[string]bool{}
 	for sc.Scan() {
 		n++
 		line := bytes.TrimSpace(sc.Bytes())
@@ -142,6 +145,10 @@ func (st *Store) Sessions() ([]SessionRecord, error) {
 			bad = fmt.Errorf("read scored sessions: line %d: %w", n, err)
 			continue
 		}
+		if seen[r.ID] {
+			continue
+		}
+		seen[r.ID] = true
 		out = append(out, r)
 	}
 	return out, sc.Err()

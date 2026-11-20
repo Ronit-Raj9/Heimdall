@@ -46,16 +46,16 @@ func (s *toolLedgerSource) GetName() string { return ToolLedger }
 // GetVersion implements schemas.Part.
 func (s *toolLedgerSource) GetVersion() string { return version }
 
-// Collect implements schemas.EvidenceSource. It acts only when the task has
-// a proxied service. A ledger that is present fills ev.ToolCalls, with an
+// Collect implements schemas.EvidenceSource. It acts only when the run has
+// a tool ledger (ToolLedgerExpected). A ledger that is present fills ev.ToolCalls, with an
 // empty (not nil) slice when no call was made. A missing ledger is a collect
 // failure and leaves ev.ToolCalls nil, so the tool metrics read unknown, not
-// zero. Malformed lines are skipped with a warning: a proxy killed mid-write
-// leaves a torn last line and the rest is still good evidence, but only a
-// prefix, so ev.ToolLedgerProblem records it and exact counts read unknown.
-// A ledger over the read cap is marked the same way.
+// zero. A ledger that misses rows (malformed lines, a Seq gap, a status file
+// reporting failed writes or calls in flight, or a ledger over the read cap)
+// is a collect failure: a prefix of the calls is not the observed call set,
+// so every tool metric and gate reads unknown (1-C-04, 3-D-08).
 func (s *toolLedgerSource) Collect(_ context.Context, rc *schemas.RunContext, ev *schemas.Evidence) error {
-	if len(ProxiedServices(rc)) == 0 {
+	if !ToolLedgerExpected(rc) {
 		return nil
 	}
 	id := runID(rc)
@@ -74,15 +74,53 @@ func (s *toolLedgerSource) Collect(_ context.Context, rc *schemas.RunContext, ev
 	if err != nil {
 		return fmt.Errorf("read tool ledger for run %s: %w", id, err)
 	}
-	ev.ToolCalls = calls
-	if bad > 0 {
-		pickLogger(s.logger, rc).Warn("tool ledger has malformed lines", "run_id", id, "lines", bad)
-		ev.ToolLedgerProblem = fmt.Sprintf("tool ledger has %d malformed lines", bad)
-	}
+	why := ledgerIncomplete(rc.Dir, calls, bad)
 	if n, _ := io.Copy(io.Discard, io.LimitReader(f, 1)); n > 0 {
-		ev.ToolLedgerProblem = fmt.Sprintf("tool ledger exceeds the %d byte read cap", toolLedgerMax)
+		why = fmt.Sprintf("tool ledger exceeds the %d byte read cap", toolLedgerMax)
 	}
+	if why != "" {
+		return fmt.Errorf("read tool ledger for run %s: %w: %s", id, errToolLedgerIncomplete, why)
+	}
+	ev.ToolCalls = calls
 	return nil
+}
+
+// errToolLedgerIncomplete is a ledger that is present but misses rows.
+var errToolLedgerIncomplete = errors.New("tool ledger incomplete")
+
+// ledgerIncomplete says why the ledger is not the whole record of the run's
+// calls, or "" when it is: unparsable lines, a gap in Seq (the proxy numbers
+// a row even when writing it fails), or a status file (written by the proxy,
+// copied by the exporter) that reports failed writes, calls still in flight,
+// or more rows than the ledger holds. A run folder without a status file
+// comes from a proxy that kept none and is judged on the rows alone.
+func ledgerIncomplete(dir string, calls []schemas.ToolCall, bad int) string {
+	if bad > 0 {
+		return fmt.Sprintf("%d malformed lines", bad)
+	}
+	for i, c := range calls {
+		if c.Seq != i+1 {
+			return fmt.Sprintf("row %d has seq %d: rows are missing", i+1, c.Seq)
+		}
+	}
+	raw, err := os.ReadFile(filepath.Join(dir, schemas.ToolLedgerStatusFile))
+	if errors.Is(err, os.ErrNotExist) {
+		return ""
+	}
+	if err != nil {
+		return "status: " + err.Error()
+	}
+	var st schemas.ToolLedgerStatus
+	if err := json.Unmarshal(raw, &st); err != nil {
+		return "status unreadable: " + err.Error()
+	}
+	if why := st.Incomplete(); why != "" {
+		return why
+	}
+	if st.Rows > len(calls) {
+		return fmt.Sprintf("the proxy numbered %d rows, the ledger holds %d", st.Rows, len(calls))
+	}
+	return ""
 }
 
 // ParseToolLedger parses tools.jsonl: one schemas.ToolCall per line. It
@@ -141,6 +179,17 @@ func ProxiedServices(rc *schemas.RunContext) []string {
 		ids = append(ids, schemas.MailboxServer)
 	}
 	return ids
+}
+
+// ToolLedgerExpected reports whether the run's tool proxy keeps a ledger:
+// it fronts a proxied service, a team mailbox or an external API. It is the
+// same rule the environment uses to export tools.jsonl, so an external-only
+// run (no proxied service) still has its calls collected.
+func ToolLedgerExpected(rc *schemas.RunContext) bool {
+	if rc == nil {
+		return false
+	}
+	return len(ProxiedServices(rc)) > 0 || len(utils.ExternalAPIs(rc.Suite, rc.Task)) > 0 // External APIs area
 }
 
 // newToolLedgerSource returns the tool_ledger source.

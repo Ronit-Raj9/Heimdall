@@ -347,8 +347,12 @@ func (v *Version) matches(r *Row) (ok, unchecked bool) {
 }
 
 // listRows pages GET /api/logs for one version over [from, to], at most
-// MaxRowsPerPull rows. truncated is set when the cap stopped it.
-func (c *client) listRows(ctx context.Context, v *Version, from, to time.Time) (rows []Row, truncated bool, err error) {
+// MaxRowsPerPull rows. truncated is set when the cap stopped it. Rows that
+// skip reports (already scored or skipped by sampling) are dropped while
+// paging and do not count toward the cap: a backlog denser than the cap
+// would otherwise refill the capped page with the same old rows on every
+// pull and never reach the rest.
+func (c *client) listRows(ctx context.Context, v *Version, from, to time.Time, skip func(id string) bool) (rows []Row, truncated bool, err error) {
 	q := v.query(from, to)
 	for offset := 0; ; offset += pageSize {
 		q.Set("offset", strconv.Itoa(offset))
@@ -358,7 +362,12 @@ func (c *client) listRows(ctx context.Context, v *Version, from, to time.Time) (
 		if err := c.get(ctx, "/api/logs?"+q.Encode(), &page); err != nil {
 			return rows, false, err
 		}
-		rows = append(rows, page.Logs...)
+		for _, r := range page.Logs {
+			if skip != nil && skip(r.ID) {
+				continue
+			}
+			rows = append(rows, r)
+		}
 		if len(page.Logs) < pageSize {
 			return rows, false, nil
 		}

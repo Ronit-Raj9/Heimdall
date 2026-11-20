@@ -143,16 +143,20 @@ synthetic looks: true per-task success rates evenly spread over 0.75 to 0.95
 (reliable tasks) or over 0.15 to 0.85 (`-spread`), cost, tokens and latency
 with log-normal run noise (sigma 0.15), a confirmation after every first
 flag, and a re-pin after every alarm. 400 replications of 365 daily triggers,
-8 tasks (test: `canary/simulate_test.go`, `CANARY_SIM=1` prints the table):
+8 tasks (test: `canary/simulate_test.go`, `CANARY_SIM=1` prints the table).
+The 30-day and 365-day columns are the share of replications that alarmed
+within that many triggers, so they keep the correlation of looks that share a
+baseline. A run with fewer triggers than a horizon prints an extrapolation
+from the per-trigger rate instead and labels it as assuming independence:
 
 | sensitivity | trials | flag per look | false alarms per trigger | P(any false alarm, 30 days) | P(any, 365 days) |
 |---|---|---|---|---|---|
-| low (0.05) | 1 | 0.0071 | 0.00025 | 0.7% | 8.6% |
-| low (0.05) | 3 | 0.0054 | 0.00011 | 0.3% | 3.9% |
-| normal (0.10) | 1 | 0.0125 | 0.00038 | 1.1% | 12.8% |
-| normal (0.10) | 3 | 0.0097 | 0.00026 | 0.8% | 9.1% |
-| high (0.20) | 1 | 0.0222 | 0.00089 | 2.6% | 27.8% |
-| high (0.20) | 3 | 0.0197 | 0.00103 | 3.1% | 31.5% |
+| low (0.05) | 1 | 0.0071 | 0.00025 | 2.2% | 8.5% |
+| low (0.05) | 3 | 0.0054 | 0.00011 | 0.7% | 3.5% |
+| normal (0.10) | 1 | 0.0125 | 0.00038 | 2.5% | 12.0% |
+| normal (0.10) | 3 | 0.0097 | 0.00026 | 2.0% | 8.5% |
+| high (0.20) | 1 | 0.0222 | 0.00089 | 7.5% | 24.8% |
+| high (0.20) | 3 | 0.0197 | 0.00103 | 6.8% | 26.5% |
 
 With the wide spread of task rates the normal rates are 0.00045 (1 trial)
 and 0.00055 (3 trials) per trigger. The flag-per-look column is also the

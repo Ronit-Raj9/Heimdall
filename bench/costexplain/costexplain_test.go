@@ -450,3 +450,50 @@ func TestShapleyIsExactAndSymmetric(t *testing.T) {
 		}
 	}
 }
+
+// TestCacheKeyEvidenceCountsEachRowOnce pins the counts the prompt_cache_key
+// cause cites: two of three rows in A carry a key and none of two in B.
+func TestCacheKeyEvidenceCountsEachRowOnce(t *testing.T) {
+	prices := testPrices()
+	f := newFixture()
+	f.m.Arms["B"] = f.m.Arms["A"]
+	keyed := func(on bool) map[string]any {
+		r := rawRow("p", "bash", "k1", false)
+		if on {
+			r["raw"].(map[string]any)["params"] = map[string]any{"prompt_cache_key": "pk"}
+		}
+		return r
+	}
+	f.add("A", "t1", true, []schemas.CostRow{row("small", 1000, 9000, 0, 100, prices)}, []map[string]any{keyed(true), keyed(true), keyed(false)})
+	f.add("B", "t1", true, []schemas.CostRow{row("small", 9000, 1000, 0, 100, prices)}, []map[string]any{keyed(false), keyed(false)})
+	e := f.explain(t, prices)
+	var found bool
+	for _, c := range e.Cache {
+		if strings.Contains(c.Cause, "prompt_cache_key") {
+			found = true
+			if !strings.Contains(c.Cause, "on 2 of 3 rows and arm B on 0 of 2") {
+				t.Errorf("cause = %q, want counts 2 of 3 and 0 of 2", c.Cause)
+			}
+		}
+	}
+	if !found {
+		t.Fatalf("cache findings = %+v, want the prompt_cache_key cause", e.Cache)
+	}
+}
+
+// TestDefaultArmsSkipTheAACopy pins that the default comparison is the
+// baseline against the candidate, never the baseline against its A/A copy.
+func TestDefaultArmsSkipTheAACopy(t *testing.T) {
+	f := newFixture()
+	f.m.Arms["A2"] = f.m.Arms["A"]
+	q, err := resolveQuery(f.m, Query{})
+	if err != nil || q.A != "A" || q.B != "B" {
+		t.Fatalf("default query = %+v, %v; want A vs B", q, err)
+	}
+	if q, err := resolveQuery(f.m, Query{A: "A", B: "A2"}); err != nil || q.B != "A2" {
+		t.Errorf("explicit A2 = %+v, %v; want it kept", q, err)
+	}
+	if q, _ := resolveQuery(f.m, Query{A: "B"}); q.B != "A" {
+		t.Errorf("default b with a=B is %q, want A", q.B)
+	}
+}

@@ -387,6 +387,10 @@ type ToolCall struct {
 	Started      time.Time `json:"started"`
 	LatencyMS    int64     `json:"latency_ms"`
 	Undelivered  bool      `json:"undelivered,omitempty"` // the proxy could not hand the answer to the agent (it hung up first)
+	// FaultDelivered is set on a lost_ack row whose synthetic timeout answer
+	// reached the agent. Undelivered there means the real answer was
+	// withheld, so it cannot say whether the agent saw the fault.
+	FaultDelivered bool `json:"fault_delivered,omitempty"`
 
 	// External API calls (Protocol external) only.
 	Replayed  bool `json:"replayed,omitempty"`  // answered from the task's cassette, no network

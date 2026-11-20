@@ -5097,6 +5097,7 @@ class ToolCall(_ToolCallRequired, total=False):
     blocked: bool
     content_type: str
     fault: str
+    fault_delivered: bool
     http_method: str
     kind: str
     nonce: str

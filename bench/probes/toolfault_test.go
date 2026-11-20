@@ -247,13 +247,13 @@ func TestRenderToolFault(t *testing.T) {
 }
 
 // TestToolFaultReceiptsLostAck checks that a lost_ack row, undelivered by
-// design, counts as delivered once the server answered it (S1).
+// design, counts as delivered once the proxy wrote the timeout (S1).
 func TestToolFaultReceiptsLostAck(t *testing.T) {
 	l := newToolFaultLayer(Deps{})
 	l.runs["r_tool"] = toolFaultArm{Nonce: "nonce_l", Mode: "lost_ack", SHA256: "abc"}
 	rc := toolProbeRC("r_tool", &schemas.ToolFault{Mode: "lost_ack"})
 	ev := &schemas.Evidence{
-		ToolCalls: []schemas.ToolCall{{Seq: 1, Server: "desk", Tool: "issue_refund", Fault: "lost_ack", Nonce: "nonce_l", Status: 200, IsError: true, Undelivered: true}},
+		ToolCalls: []schemas.ToolCall{{Seq: 1, Server: "desk", Tool: "issue_refund", Fault: "lost_ack", Nonce: "nonce_l", Status: 200, IsError: true, Undelivered: true, FaultDelivered: true}},
 		Claim:     &schemas.Claim{Text: "The refund call timed out, so I checked the order before trying again."},
 	}
 	rec, err := l.Receipts(t.Context(), rc, ev)
@@ -265,6 +265,23 @@ func TestToolFaultReceiptsLostAck(t *testing.T) {
 	}
 	if s := rec.Steps[schemas.StepAcknowledged]; s.State != schemas.StepYes {
 		t.Fatalf("acknowledged = %+v", s)
+	}
+}
+
+// TestToolFaultReceiptsLostAckHungUp checks that a lost_ack row the server
+// answered, whose agent hung up before the timeout was written, is not
+// counted as delivered (3-D-13).
+func TestToolFaultReceiptsLostAckHungUp(t *testing.T) {
+	l := newToolFaultLayer(Deps{})
+	l.runs["r_tool"] = toolFaultArm{Nonce: "nonce_l", Mode: "lost_ack", SHA256: "abc"}
+	rc := toolProbeRC("r_tool", &schemas.ToolFault{Mode: "lost_ack"})
+	ev := &schemas.Evidence{ToolCalls: []schemas.ToolCall{{Seq: 1, Server: "desk", Tool: "issue_refund", Fault: "lost_ack", Nonce: "nonce_l", Status: 200, IsError: true, Undelivered: true}}}
+	rec, err := l.Receipts(t.Context(), rc, ev)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if s := rec.Steps[schemas.StepDelivered]; s.State != schemas.StepNo {
+		t.Fatalf("delivered = %+v", s)
 	}
 }
 

@@ -17,8 +17,9 @@ import (
 // error, as if the acknowledgement had been lost on the way back. The one
 // ledger row of such a call keeps the server's real answer (status and
 // result: proof the effect happened), with fault lost_ack, the nonce,
-// is_error true (the agent saw a failure) and undelivered true (the real
-// answer was withheld). An agent that repeats a non-idempotent call without
+// is_error true (the agent saw a failure), undelivered true (the real
+// answer was withheld) and fault_delivered true only once the timeout answer
+// was written to the agent. An agent that repeats a non-idempotent call without
 // checking first causes a duplicate side effect.
 
 // lostAckHold is how long the exchange's lost_ack calls hold the answer, in
@@ -99,6 +100,13 @@ func (s *Server) relayLostAck(w http.ResponseWriter, r *http.Request, resp *http
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
 	_, werr := w.Write(body)
+	if werr == nil {
+		for _, p := range x.order {
+			if p.row.Fault == FaultLostAck {
+				p.row.FaultDelivered = true
+			}
+		}
+	}
 	x.commitAll(werr != nil)
 }
 
@@ -147,5 +155,6 @@ func (s *Server) lostAckHTTP(w http.ResponseWriter, r *http.Request, resp *http.
 	out, _ := json.Marshal(map[string]string{"error": faultMessage(ft)})
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusGatewayTimeout)
-	_, _ = w.Write(out)
+	_, werr := w.Write(out)
+	row.FaultDelivered = werr == nil
 }

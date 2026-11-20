@@ -242,3 +242,47 @@ func TestReportGolden(t *testing.T) {
 		t.Errorf("report differs from %s (run go test ./migration -update and review the diff):\n%s", path, got)
 	}
 }
+
+// TestSameModelTwoProvidersComparesOneDirection pins audit 5-C-07: a model
+// served through two providers resolves to both arms, and the report must
+// not compare them in both directions.
+func TestSameModelTwoProvidersComparesOneDirection(t *testing.T) {
+	in := fixture()
+	b := in.Manifest.Arms["B"]
+	b.Config.Model = "old-model"
+	b.Config.Gateway.Provider = "bedrock"
+	in.Manifest.Arms["B"] = b
+	a := in.Manifest.Arms["A"]
+	a.Config.Gateway.Provider = "anthropic"
+	in.Manifest.Arms["A"] = a
+	if _, err := Build(context.Background(), in, Query{From: "old-model", To: []string{"old-model"}}); err == nil {
+		t.Error("a model naming both arms on both sides: want an error asking for arms")
+	}
+	for _, q := range []Query{{From: "A", To: []string{"B"}}, {From: "anthropic/old-model", To: []string{"bedrock/old-model"}}} {
+		r := build(t, in, q)
+		if len(r.Pairs) != 1 || r.Pairs[0].From.Arm != "A" || r.Pairs[0].To.Arm != "B" {
+			t.Errorf("query %+v: pairs %+v, want only A to B", q, r.Pairs)
+		}
+	}
+}
+
+// TestFrozenPolicyKeepsItsHashCheck pins audit 5-C-02: the policy the
+// experiment froze is evaluated against the frozen hash, so an edited file
+// blocks; a policy chosen for the report only is not held to that hash.
+func TestFrozenPolicyKeepsItsHashCheck(t *testing.T) {
+	max := 1.0
+	p := &schemas.Policy{PolicyVersion: 1, Name: "p", Checks: []schemas.PolicyCheck{{ID: "fc", Metric: "false_completion", Max: &max}}}
+	for _, frozen := range []bool{true, false} {
+		in := fixture()
+		in.Manifest.PolicyHash = "frozenhash0000000000"
+		in.Policy, in.PolicyHash, in.PolicyFrozen = p, "editedhash1111111111", frozen
+		pr := pairTo(t, build(t, in, Query{From: "A", To: []string{"B"}}), "B").Recommendation.Policy
+		if pr == nil {
+			t.Fatalf("frozen %v: no policy result", frozen)
+		}
+		blocked := pr.Decision == schemas.PolicyBlock
+		if blocked != frozen {
+			t.Errorf("frozen %v: decision %s, want block only for the frozen policy", frozen, pr.Decision)
+		}
+	}
+}

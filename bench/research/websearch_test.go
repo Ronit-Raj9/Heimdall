@@ -260,3 +260,34 @@ func TestCopiesMatchCanonical(t *testing.T) {
 		}
 	}
 }
+
+// TestSearchBodyUnicodeParity runs server.py's search_body on queries whose
+// Python and Go lowercase mappings differ (dotted capital I, final sigma,
+// Unicode white space) and checks research.SearchBody writes the same bytes,
+// so a recorded query is not a 599 at replay (finding 3-D-07).
+func TestSearchBodyUnicodeParity(t *testing.T) {
+	py := python(t)
+	queries := []string{"İstanbul ΟΣ", "ΣΑΣ ΣΑΣ.", "AΣ'Σ x", "ΌΣΟΣ BAR baz", "Straße ǅ Ω"}
+	in, err := json.Marshal(queries)
+	if err != nil {
+		t.Fatal(err)
+	}
+	script := `import json, runpy, sys
+f = runpy.run_path("websearch/server.py")["search_body"]
+sys.stdout.write(json.dumps([f(q).decode("utf-8") for q in json.loads(sys.stdin.read())]))`
+	cmd := exec.Command(py, "-I", "-c", script)
+	cmd.Stdin = bytes.NewReader(in)
+	out, err := cmd.Output()
+	if err != nil {
+		t.Fatalf("python: %v", err)
+	}
+	var want []string
+	if err := json.Unmarshal(out, &want); err != nil {
+		t.Fatal(err)
+	}
+	for i, q := range queries {
+		if got := string(research.SearchBody(q)); got != want[i] {
+			t.Errorf("SearchBody(%q) = %s, python %s", q, got, want[i])
+		}
+	}
+}

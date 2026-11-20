@@ -150,6 +150,21 @@ class ProtocolTest(unittest.TestCase):
             c.recv(5)
         self.assertEqual(got["msgs"], [("binary", 200000), ("text", 5), ("binary", 0)])
 
+    def test_listen_returns_one_queued_utterance(self):
+        # Audit 8-E-01: two utterances already queued, 1.5 s of silence
+        # apart, are two listens, not one.
+        phone = voiceclient.VoiceCall.__new__(voiceclient.VoiceCall)
+        phone.lock = threading.Condition()
+        phone.ended, phone.end_reason = False, ""
+        pcm = tonecode.encode("opening line", tail_ms=60) + tonecode.silence(1500) + tonecode.encode("reprompt line", tail_ms=60)
+        t = time.monotonic()
+        phone.frames = [(t, f) for f in tonecode.frames(pcm)]
+        self.assertEqual(tonecode.decode(phone.listen(end_silence_ms=700, max_wait_s=1)), "opening line")
+        phone.ended, phone.end_reason = True, "caller_done"
+        self.assertEqual(tonecode.decode(phone.listen(end_silence_ms=700, max_wait_s=1)), "reprompt line")
+        with self.assertRaises(voiceclient.Hangup):
+            phone.listen(end_silence_ms=700, max_wait_s=1)
+
     def test_tone_code(self):
         pcm = tonecode.encode("Order B-3001: 45.00", lead_ms=77, tail_ms=200)
         self.assertEqual(tonecode.decode(pcm), "Order B-3001: 45.00")
@@ -287,7 +302,12 @@ class CallerTest(unittest.TestCase):
         try:
             phone = voiceclient.VoiceCall(c.url)
             phone.say_tone("Hello, how can I help?")
-            time.sleep(0.8)  # the caller has started its opening (about 3 s)
+            # Wait until the caller's reply (about 3 s) is audibly under way, not
+            # a fixed sleep: on a loaded machine the reply can start late.
+            deadline = time.monotonic() + 10
+            while not phone.caller_speaking() and time.monotonic() < deadline:
+                time.sleep(0.01)
+            self.assertTrue(phone.caller_speaking(), "the caller never started its reply")
             phone.say_tone("I have refunded the full 45.00.", realtime=False)
             phone.wait_end(20)
             ev = c.wait_done()

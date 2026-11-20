@@ -30,17 +30,24 @@ type SimConfig struct {
 type SimResult struct {
 	Config            SimConfig `json:"config"`
 	Alpha             float64   `json:"alpha"`
-	Triggers          int       `json:"triggers"`             // scheduled triggers simulated
-	Looks             int       `json:"looks"`                // triggers plus confirmation looks
-	Flags             int       `json:"flags"`                // looks that flagged
-	Alarms            int       `json:"alarms"`               // transitions into drifted
-	AlarmPerTrigger   float64   `json:"alarm_per_trigger"`    // alarms over triggers
-	FlagPerLook       float64   `json:"flag_per_look"`        // the single-look flag rate, before confirmation
-	ConfirmPerTrigger float64   `json:"confirm_per_trigger"`  // extra confirmation looks per trigger (the cost overhead)
-	AnyAlarm30        float64   `json:"any_alarm_30"`         // chance of at least one alarm in 30 daily triggers
-	AnyAlarm365       float64   `json:"any_alarm_365"`        // the same over a year
-	DetectFirst       float64   `json:"detect_first_trigger"` // with a drift: share of replications alarmed on the first trigger
-	DetectBy3         float64   `json:"detect_by_3"`          // with a drift: alarmed within three triggers
+	Triggers          int       `json:"triggers"`            // scheduled triggers simulated
+	Looks             int       `json:"looks"`               // triggers plus confirmation looks
+	Flags             int       `json:"flags"`               // looks that flagged
+	Alarms            int       `json:"alarms"`              // transitions into drifted
+	AlarmPerTrigger   float64   `json:"alarm_per_trigger"`   // alarms over triggers
+	FlagPerLook       float64   `json:"flag_per_look"`       // the single-look flag rate, before confirmation
+	ConfirmPerTrigger float64   `json:"confirm_per_trigger"` // extra confirmation looks per trigger (the cost overhead)
+	AnyAlarm30        float64   `json:"any_alarm_30"`        // chance of at least one alarm in 30 daily triggers
+	AnyAlarm365       float64   `json:"any_alarm_365"`       // the same over a year
+	// Measured30 and Measured365 say the horizon chance above is the share
+	// of replications that alarmed within it, which keeps the correlation
+	// of looks sharing one baseline. False means the replications were
+	// shorter than the horizon and the value is 1-(1-p)^N from the
+	// per-trigger rate, which assumes independent triggers.
+	Measured30  bool    `json:"any_alarm_30_measured"`
+	Measured365 bool    `json:"any_alarm_365_measured"`
+	DetectFirst float64 `json:"detect_first_trigger"` // with a drift: share of replications alarmed on the first trigger
+	DetectBy3   float64 `json:"detect_by_3"`          // with a drift: alarmed within three triggers
 }
 
 // Simulate runs the study. With DropPoints or ShiftRel zero for both, every
@@ -136,7 +143,7 @@ func Simulate(c SimConfig) SimResult {
 		if alarmAt < 0 || alarmAt >= 30 {
 			noAlarm30++
 		}
-		if alarmAt < 0 {
+		if alarmAt < 0 || alarmAt >= 365 {
 			noAlarm365++
 		}
 		if alarmAt == 0 {
@@ -149,17 +156,21 @@ func Simulate(c SimConfig) SimResult {
 	res.AlarmPerTrigger = float64(res.Alarms) / float64(res.Triggers)
 	res.FlagPerLook = float64(res.Flags) / float64(res.Looks)
 	res.ConfirmPerTrigger /= float64(res.Triggers)
-	// Chance of at least one alarm over a horizon, from the per-trigger rate
-	// (alarms are rare and nearly independent across triggers once a
-	// re-pin follows each one); the per-replication counts above cover only
-	// the simulated horizon.
-	res.AnyAlarm30 = 1 - math.Pow(1-res.AlarmPerTrigger, 30)
-	res.AnyAlarm365 = 1 - math.Pow(1-res.AlarmPerTrigger, 365)
+	// Chance of at least one alarm over a horizon: measured as the share of
+	// replications that alarmed within it when they are long enough, else
+	// extrapolated from the per-trigger rate under independence (flagged by
+	// Measured30 and Measured365).
+	horizon := func(n, noAlarm int) (float64, bool) {
+		if c.Triggers >= n {
+			return 1 - float64(noAlarm)/float64(c.Reps), true
+		}
+		return 1 - math.Pow(1-res.AlarmPerTrigger, float64(n)), false
+	}
+	res.AnyAlarm30, res.Measured30 = horizon(30, noAlarm30)
+	res.AnyAlarm365, res.Measured365 = horizon(365, noAlarm365)
 	if drifting {
 		res.DetectFirst = float64(first) / float64(c.Reps)
 		res.DetectBy3 = float64(by3) / float64(c.Reps)
 	}
-	_ = noAlarm30
-	_ = noAlarm365
 	return res
 }

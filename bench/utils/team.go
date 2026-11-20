@@ -48,18 +48,19 @@ func TeamIDs(team []schemas.TeamMember) []string {
 }
 
 // MemberRouteURL rewrites a tool proxy service URL (http://toolproxy:9200/s/
-// <id>/...) onto a member's route (/m/<token>/s/<id>/...), so the proxy
-// stamps the member on its calls. Any other URL is returned unchanged.
+// <id>/...) or external API URL (http://toolproxy:9200/x/<id>/...) onto a
+// member's route (/m/<token>/s/<id>/... or /m/<token>/x/<id>/...), so the
+// proxy stamps the member on its calls. Any other URL is returned unchanged.
 func MemberRouteURL(u, token string) string {
 	if token == "" {
 		return u
 	}
-	const marker = ":9200/s/"
-	i := strings.Index(u, marker)
-	if i < 0 {
-		return u
+	for _, marker := range []string{":9200/s/", ":9200" + ExternalPathPrefix} {
+		if i := strings.Index(u, marker); i >= 0 {
+			return u[:i] + ":9200/m/" + token + u[i+len(":9200"):]
+		}
 	}
-	return u[:i] + ":9200/m/" + token + "/s/" + u[i+len(marker):]
+	return u
 }
 
 // MemberRoutes is the tool proxy's token to member map of a run.

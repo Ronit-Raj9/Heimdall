@@ -142,3 +142,39 @@ func TestMigrationExperimentPlans(t *testing.T) {
 		t.Errorf("experiment %+v", exp)
 	}
 }
+
+// TestMigrationExperimentFaultOnly pins audit 5-C-06: a plan of fault
+// conditions only names one of them as primary, so the file is valid.
+func TestMigrationExperimentFaultOnly(t *testing.T) {
+	text := migrationExperiment("agents/codex.yaml", "coding-core@1.0.0", "gpt-5.4-mini", []string{"gpt-5.4"}, "",
+		[]string{"model-outage"}, []string{"t01"}, 1, 0, "", false)
+	path := filepath.Join(t.TempDir(), "experiment.yaml")
+	if err := os.WriteFile(path, []byte(text), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	exp, err := loadExperiment(path)
+	if err != nil {
+		t.Fatalf("the generated experiment does not load: %v\n%s", err, text)
+	}
+	if exp.Primary.Condition != "model-outage" {
+		t.Errorf("primary condition %q, want model-outage", exp.Primary.Condition)
+	}
+}
+
+// TestMigrateReportRequestedPolicyMustLoad pins audit 5-C-02: a policy that
+// was asked for and cannot be read fails the report instead of falling back
+// to the statistics alone; "none" stays the explicit statistics-only choice.
+func TestMigrateReportRequestedPolicyMustLoad(t *testing.T) {
+	a := recordedApp(t)
+	ctx := context.Background()
+	if _, err := a.migrationReport(ctx, "e_pilot_mixed_nc93", schemas.GradeSourceOriginal, "absent-policy.yaml", true, migration.Query{}); err == nil {
+		t.Error("an absent explicit policy: want an error")
+	}
+	rep, err := a.migrationReport(ctx, "e_pilot_mixed_nc93", schemas.GradeSourceOriginal, "none", true, migration.Query{})
+	if err != nil {
+		t.Fatalf("policy none: %v", err)
+	}
+	if rep.Policy != "" {
+		t.Errorf("policy none: policy %q, want a statistics-only report", rep.Policy)
+	}
+}

@@ -114,29 +114,38 @@ class VoiceCall:
         start_wait = time.monotonic()
         speech = bytearray()
         speaking = False
-        last_voiced = 0.0
+        quiet_ms = 0.0      # unvoiced audio heard since the last voiced frame
+        last_arrival = 0.0  # when the last consumed frame arrived
         idx = 0
         while True:
             with self.lock:
+                idx = min(idx, len(self.frames))  # drain() may have emptied the buffer
                 while idx >= len(self.frames) and not self.ended:
                     if not self.lock.wait(timeout=0.05):
                         break
                 new = self.frames[idx:]
-                idx = len(self.frames)
                 ended = self.ended
-            now = time.monotonic()
+            # Silence is measured on the audio itself while frames are
+            # queued, so one call returns one utterance even when the next
+            # one already arrived; only the frames up to its end are taken.
             for t, f in new:
-                voiced = tonecode.rms(f) > VOICED_RMS
-                if voiced:
+                idx += 1
+                last_arrival = t
+                if tonecode.rms(f) > VOICED_RMS:
                     speaking = True
-                    last_voiced = t
+                    quiet_ms = 0.0
+                elif speaking:
+                    quiet_ms += len(f) / 32.0
                 if speaking:
                     speech += f
-            if speaking and now - last_voiced >= end_silence_ms / 1000.0:
-                with self.lock:
-                    del self.frames[:idx]
-                return bytes(speech)
-            if speaking and len(speech) > max_utterance_s * 32000:
+                if speaking and (quiet_ms >= end_silence_ms or len(speech) > max_utterance_s * 32000):
+                    with self.lock:
+                        del self.frames[:idx]
+                    return bytes(speech)
+            now = time.monotonic()
+            # No more audio queued: the time since the last frame counts as
+            # silence too (a caller sends nothing between utterances).
+            if speaking and quiet_ms + (now - last_arrival) * 1000.0 >= end_silence_ms and not new:
                 with self.lock:
                     del self.frames[:idx]
                 return bytes(speech)
@@ -147,6 +156,8 @@ class VoiceCall:
                     return bytes(speech)
                 raise Hangup(self.end_reason)
             if not speaking and now - start_wait > max_wait_s:
+                with self.lock:
+                    del self.frames[:idx]
                 return None
 
     # -- speaking --

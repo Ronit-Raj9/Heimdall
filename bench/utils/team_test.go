@@ -44,6 +44,7 @@ func TestTeamHelpers(t *testing.T) {
 		{"http://toolproxy:9200/s/db/mcp", "t1", "http://toolproxy:9200/m/t1/s/db/mcp"},
 		{"http://toolproxy:9200/s/db/mcp", "", "http://toolproxy:9200/s/db/mcp"},
 		{"http://other:8080/x", "t1", "http://other:8080/x"},
+		{"http://toolproxy:9200/x/weather", "t1", "http://toolproxy:9200/m/t1/x/weather"}, // finding 3-D-06
 	} {
 		if got := MemberRouteURL(tc.in, tc.tok); got != tc.want {
 			t.Errorf("MemberRouteURL(%s) = %s", tc.in, got)

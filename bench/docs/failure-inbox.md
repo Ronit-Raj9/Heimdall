@@ -213,8 +213,9 @@ when it is in chat form.
 
 Point an OpenTelemetry collector's `file` exporter (OTLP JSON, one request
 per line) at a folder. Each pull reads only the complete lines added since the
-last one (a byte offset per file; a file that shrank was rotated and is read
-from the start) and flags a trace when a span has status ERROR or a tool call
+last one (a byte offset and a hash of the file's first bytes per file; a file
+that shrank, or whose first bytes changed because it was replaced by rename or
+copy-truncate, was rotated and is read from the start) and flags a trace when a span has status ERROR or a tool call
 failed. Spans of one trace that land in two pulls are read as two partial
 sessions; the collector's batch settings decide how often that happens. Turn
 on message content capture in your instrumentation, or the spans hold no

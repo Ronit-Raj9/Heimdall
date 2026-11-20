@@ -1,6 +1,7 @@
 package toolproxy
 
 import (
+	"bufio"
 	"bytes"
 	"compress/flate"
 	"compress/gzip"
@@ -282,9 +283,24 @@ func decodeReader(r io.Reader, enc string) (io.Reader, error) {
 	case "gzip", "x-gzip":
 		return gzip.NewReader(r)
 	case "deflate":
-		return flate.NewReader(r), nil
+		// RFC 9110 deflate is zlib; some servers send raw deflate. Peek
+		// the two header bytes so the raw fallback still sees them.
+		br := bufio.NewReader(r)
+		if hdr, err := br.Peek(2); err == nil && isZlibHeader(hdr) {
+			return zlib.NewReader(br)
+		}
+		return flate.NewReader(br), nil
 	}
 	return nil, fmt.Errorf("content encoding %q is not decoded", enc)
+}
+
+// isZlibHeader reports whether b starts with an RFC 1950 header: method 8
+// (deflate), a window of at most 32 KiB, and a valid FCHECK.
+func isZlibHeader(b []byte) bool {
+	if len(b) < 2 {
+		return false
+	}
+	return b[0]&0x0f == 8 && b[0]>>4 <= 7 && (uint16(b[0])<<8|uint16(b[1]))%31 == 0
 }
 
 // notJSONType returns the media type of a request whose declared content

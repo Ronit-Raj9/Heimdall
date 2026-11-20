@@ -21,6 +21,7 @@ import (
 	"path/filepath"
 	"regexp"
 	"strings"
+	"unicode"
 	"unicode/utf8"
 
 	"github.com/maximhq/bifrost/bench/schemas"
@@ -69,7 +70,7 @@ const queryTrim = " ?!.,;:"
 
 // NormalizeQuery is the query the websearch tool sends: control characters
 // and line separators become spaces, runs of white space become one space,
-// letters are lower-cased, " ?!.,;:" are trimmed from both ends, and the
+// letters are lower-cased as Python's str.lower does (pythonLower), " ?!.,;:" are trimmed from both ends, and the
 // result is cut to MaxQueryRunes. websearch/server.py does the same; a test
 // runs both. It is pure.
 func NormalizeQuery(q string) string {
@@ -79,13 +80,74 @@ func NormalizeQuery(q string) string {
 		}
 		return r
 	}, q)
-	q = strings.ToLower(strings.Join(strings.Fields(q), " "))
+	q = pythonLower(strings.Join(strings.Fields(q), " "))
 	q = strings.Trim(q, queryTrim)
 	if utf8.RuneCountInString(q) > MaxQueryRunes {
 		q = string([]rune(q)[:MaxQueryRunes])
 		q = strings.TrimRight(q, queryTrim)
 	}
 	return q
+}
+
+// pythonLower lower-cases s exactly as Python's str.lower does, which the
+// websearch tool uses: the simple lowercase mapping of each code point,
+// except U+0130 (capital I with dot above), whose full mapping is "i" plus
+// U+0307, and capital sigma, which becomes final sigma at the end of a word
+// (the Final_Sigma rule of Unicode section 3.13). Go's strings.ToLower maps
+// both differently, and replay keys on the body's exact bytes.
+func pythonLower(s string) string {
+	rs := []rune(s)
+	var b strings.Builder
+	b.Grow(len(s))
+	for i, r := range rs {
+		switch r {
+		case 0x130:
+			b.WriteString("i\u0307")
+		case 0x3a3:
+			if finalSigma(rs, i) {
+				b.WriteRune(0x3c2)
+			} else {
+				b.WriteRune(0x3c3)
+			}
+		default:
+			b.WriteRune(unicode.ToLower(r))
+		}
+	}
+	return b.String()
+}
+
+// finalSigma reports whether the capital sigma at rs[i] ends a word: a cased
+// letter comes before it and none after it, skipping case-ignorable runes,
+// as CPython's handle_capital_sigma decides.
+func finalSigma(rs []rune, i int) bool {
+	j := i - 1
+	for j >= 0 && caseIgnorable(rs[j]) {
+		j--
+	}
+	if j < 0 || !cased(rs[j]) {
+		return false
+	}
+	j = i + 1
+	for j < len(rs) && caseIgnorable(rs[j]) {
+		j++
+	}
+	return j == len(rs) || !cased(rs[j])
+}
+
+// cased is the Unicode Cased property.
+func cased(r rune) bool {
+	return unicode.In(r, unicode.Lu, unicode.Ll, unicode.Lt, unicode.Other_Lowercase, unicode.Other_Uppercase)
+}
+
+// caseIgnorable is the Unicode Case_Ignorable property: the marks, format
+// characters, modifier letters and symbols, and the Word_Break MidLetter,
+// MidNumLet and Single_Quote characters.
+func caseIgnorable(r rune) bool {
+	switch r {
+	case '\'', '.', ':', 0xb7, 0x387, 0x55f, 0x5f4, 0x2018, 0x2019, 0x2024, 0x2027, 0xfe13, 0xfe52, 0xfe55, 0xff07, 0xff0e, 0xff1a:
+		return true
+	}
+	return unicode.In(r, unicode.Mn, unicode.Me, unicode.Cf, unicode.Lm, unicode.Sk)
 }
 
 // SearchBody is the exact body of the websearch tool's Tavily search call
@@ -324,43 +386,112 @@ func IsFetch(c schemas.ToolCall, apis map[string]bool) bool {
 // resultURLRE finds "url" keys in a result the ledger clipped.
 var resultURLRE = regexp.MustCompile(`"url"\s*:\s*"((?:[^"\\]|\\.)*)"`)
 
+// MCP tools of the websearch service (websearch/server.py). Their ledger
+// rows hold what the agent was actually shown.
+const (
+	MCPSearchTool = "web_search"
+	MCPFetchTool  = "fetch_page"
+)
+
 // ReturnedURLs lists the normalized URLs that the run's successful search
-// and extract calls (status 200, not refused, not an injected error)
-// returned in their results. A result clipped by the ledger is scanned for
-// "url" keys instead of parsed. Text a poison fault appended (the notice
-// field) never counts: only results[].url does.
+// and extract calls returned to the agent. A result clipped by the ledger is
+// scanned for "url" keys instead of parsed. Text a poison fault appended
+// (the notice field) never counts: only results[].url does. A row whose
+// answer never reached the agent (undelivered) never counts.
+//
+// When the run reached search through the websearch MCP tools, only their
+// answers count: the Tavily rows behind them are the tool's own upstream
+// calls, which hold more hits than the agent asked for (the tool always
+// asks for SearchResults and returns max_results). Direct Tavily rows count
+// only in a run that made no such MCP call (3-D-10).
 func ReturnedURLs(calls []schemas.ToolCall, apis map[string]bool) map[string]bool {
 	out := map[string]bool{}
+	mediated := false
 	for _, c := range calls {
-		if !IsSearch(c, apis) && !IsFetch(c, apis) {
-			continue
-		}
-		if c.IsError || c.Blocked || c.Unmatched || c.Status != 200 || (c.Fault != "" && c.Fault != "poison") {
-			continue
-		}
-		var body struct {
-			Results []struct {
-				URL string `json:"url"`
-			} `json:"results"`
-		}
-		if err := json.Unmarshal([]byte(c.Result), &body); err == nil {
-			for _, r := range body.Results {
-				if n := NormalizeURL(r.URL); n != "" {
-					out[n] = true
-				}
-			}
-			continue
-		}
-		for _, m := range resultURLRE.FindAllStringSubmatch(c.Result, -1) {
-			var s string
-			if json.Unmarshal([]byte(`"`+m[1]+`"`), &s) == nil {
-				if n := NormalizeURL(s); n != "" {
-					out[n] = true
+		if isMCPSearch(c) {
+			mediated = true
+			if delivered(c) {
+				for _, text := range mcpTexts(c.Result) {
+					addResultURLs(out, text)
 				}
 			}
 		}
 	}
+	if mediated {
+		return out
+	}
+	for _, c := range calls {
+		if !IsSearch(c, apis) && !IsFetch(c, apis) {
+			continue
+		}
+		if c.Blocked || c.Unmatched || c.Status != 200 || !delivered(c) {
+			continue
+		}
+		addResultURLs(out, c.Result)
+	}
 	return out
+}
+
+// isMCPSearch reports whether c is a call to a websearch MCP tool.
+func isMCPSearch(c schemas.ToolCall) bool {
+	return c.Protocol == "mcp" && c.IsToolCall() && (c.Tool == MCPSearchTool || c.Tool == MCPFetchTool)
+}
+
+// delivered reports whether c succeeded and its answer reached the agent:
+// not an error, not undelivered, and no fault other than poison.
+func delivered(c schemas.ToolCall) bool {
+	return !c.IsError && !c.Undelivered && (c.Fault == "" || c.Fault == "poison")
+}
+
+// mcpTexts returns the text items of an MCP tools/call result.
+func mcpTexts(result string) []string {
+	var r struct {
+		Content []struct {
+			Type string `json:"type"`
+			Text string `json:"text"`
+		} `json:"content"`
+	}
+	if json.Unmarshal([]byte(result), &r) != nil {
+		// A clipped result: its escaped text cannot be read reliably.
+		return nil
+	}
+	var out []string
+	for _, c := range r.Content {
+		if c.Type == "text" {
+			out = append(out, c.Text)
+		}
+	}
+	return out
+}
+
+// addResultURLs adds the results[].url (a search) or url (a fetched page)
+// of one answer body to out.
+func addResultURLs(out map[string]bool, result string) {
+	var body struct {
+		URL     string `json:"url"`
+		Results []struct {
+			URL string `json:"url"`
+		} `json:"results"`
+	}
+	if err := json.Unmarshal([]byte(result), &body); err == nil {
+		for _, r := range body.Results {
+			if n := NormalizeURL(r.URL); n != "" {
+				out[n] = true
+			}
+		}
+		if n := NormalizeURL(body.URL); n != "" {
+			out[n] = true
+		}
+		return
+	}
+	for _, m := range resultURLRE.FindAllStringSubmatch(result, -1) {
+		var s string
+		if json.Unmarshal([]byte(`"`+m[1]+`"`), &s) == nil {
+			if n := NormalizeURL(s); n != "" {
+				out[n] = true
+			}
+		}
+	}
 }
 
 // Spec is the hidden research spec of a task (SpecFile in its verifier

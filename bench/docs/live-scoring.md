@@ -354,7 +354,8 @@ into a tool-use suite wrote a draft with the incident provenance).
 
 `judge:` scores a sample of sessions through an OpenAI-compatible chat
 endpoint: the redacted transcript, a fixed prompt (or `prompt_file`), and a
-`SCORE: <0 to 1>` answer. A judge score is reported per session and over
+`SCORE: <0 to 1>` answer (a plain decimal such as `0.75`; an out-of-range
+number, a sign or an exponent is rejected, never cut to a valid prefix). A judge score is reported per session and over
 time, and it never decides anything unless a judge calibration record
 ([judge-calibration.md](judge-calibration.md)) in the `calibration` suite
 covers the exact model and the prompt's hash (template name
@@ -457,7 +458,8 @@ No real provider, no real Langfuse or Maxim, and no real judge was called.
   sessions (see `-simulate`). Narrow `compare.signals` to what you care about
   for more power.
 - A pull reads at most 20,000 list rows per version and 5,000 detail rows;
-  past that it stops, holds the cursor and says so.
+  past that it stops, holds the cursor and says so. Rows already scored do
+  not count toward the 20,000, so the next pull reads past them.
 - Teams, customers and models as selectors are verified from the v2.5.1
   source only, not on a stack.
 - The judge has been tested against a fake endpoint only.

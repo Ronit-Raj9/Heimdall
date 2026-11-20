@@ -311,9 +311,14 @@ func toolFaultRows(ev *schemas.Evidence, nonce string) (schemas.ReceiptEntry, sc
 		ref := "tools.jsonl:seq=" + strconv.Itoa(c.Seq)
 		fired = append(fired, ref)
 		// A lost_ack row is undelivered by design (the real answer was
-		// withheld); what the agent got is the timeout, so a row the server
-		// answered counts as delivered (S1).
-		if !c.Undelivered || (c.Fault == "lost_ack" && c.Status > 0) {
+		// withheld); what the agent got is the timeout, which counts as
+		// delivered only when the proxy wrote it (S1). An agent that hung
+		// up during the hold never saw it.
+		if c.Fault == "lost_ack" {
+			if c.FaultDelivered {
+				delivered = append(delivered, ref)
+			}
+		} else if !c.Undelivered {
 			delivered = append(delivered, ref)
 		}
 	}

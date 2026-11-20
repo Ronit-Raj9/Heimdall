@@ -57,6 +57,15 @@ not the order requests arrived: a request sent right after another one's
 answer can be numbered first. `started` is the arrival time. Arguments and the result are kept up to 64 KiB each; the sha256 on
 the row always covers the whole value.
 
+Next to the ledger the proxy keeps `tools.status.json`: the highest `seq`
+numbered, the calls still in flight (answered, row not yet written) and any
+failed write. A failed write keeps its `seq` (a gap) and stays reported on
+`/healthz` for the rest of the run. The exporter copies the status first,
+waiting up to 5 s for calls in flight, then the ledger. Evidence collection
+refuses a ledger with malformed lines, a `seq` gap, or a status reporting
+failed writes, calls in flight or more rows than the ledger holds: tool
+metrics and gates then read unknown instead of counting a prefix.
+
 **Nothing passes unrecorded.** Every request the proxy relays to a service
 gets at least one row. A row with an empty `kind` is a tool call, as every
 row was before kinds existed; every other row has a `kind`
@@ -102,7 +111,8 @@ own row, and an element that is not a JSON-RPC message gets an opaque row.
   sent plain, without the header. An answer the server compressed anyway
   (`deflate`, or `gzip` it was not asked for) is decoded to be parsed and
   relayed as sent, unless a fault rewrote it. A compressed event stream is
-  decoded and relayed decoded. Any other coding (`br`, `zstd`) is not read: an
+  decoded and relayed decoded; `deflate` there is the zlib framing of RFC 9110,
+with raw deflate accepted as a fallback. Any other coding (`br`, `zstd`) is not read: an
   opaque row.
 - A GET that opens the server's event stream is a `transport` row written when
   the stream ends; each message on the stream is parsed one event at a time as
@@ -233,7 +243,9 @@ The row of a quiet fault records what the agent got, with `fault` and
   answered like `timeout`. The one row of the call keeps the server's real
   answer (`status`, `result`: the proof the effect happened), with `fault`
   `lost_ack`, the nonce, `is_error` true (the agent saw a failure) and
-  `undelivered` true (the real answer never reached it). An MCP answer that
+  `undelivered` true (the real answer never reached it), and
+  `fault_delivered` true only once the timeout answer was written to the
+  agent (an agent that hangs up during the hold leaves it unset). An MCP answer that
   came as an event stream is read whole and answered as plain JSON, which the
   streamable HTTP transport allows. In a batch, the other calls' answers are
   relayed after the hold. It applies to MCP and plain HTTP tool routes; an
@@ -254,7 +266,7 @@ receipt reads them:
 | Step | From |
 |---|---|
 | fired | rows carrying the run's nonce: how many calls (or, for the listing modes, listings) the fault took |
-| delivered | those rows without `undelivered`; a `lost_ack` row counts when the server answered it, since what the agent got is the timeout |
+| delivered | those rows without `undelivered`; a `lost_ack` row counts when it has `fault_delivered` (the proxy wrote the timeout to the agent), since what the agent gets is the timeout, not the withheld answer |
 | visible | the nonce in a later gateway request |
 | acknowledged | the final message naming the failure (or the injection, for poison and the listing modes; the inconsistency, for the quiet modes; the timeout or the check, for `lost_ack`) |
 | effect | the grade |

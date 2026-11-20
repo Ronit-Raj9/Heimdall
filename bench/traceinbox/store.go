@@ -43,14 +43,19 @@ type Store interface {
 // Cursor is how far a source's pulls got. Since is the newest flag time
 // seen; Seen holds the trace ids flagged at or after Since minus the
 // overlap, so the overlap never counts a trace twice; Files holds the byte
-// offsets read in an OTLP folder.
+// offsets read in an OTLP folder and FileHeads the identity of each file.
 type Cursor struct {
-	Since     time.Time            `json:"since,omitzero"`
-	Seen      map[string]time.Time `json:"seen,omitempty"`
-	Files     map[string]int64     `json:"files,omitempty"`
-	LastPull  time.Time            `json:"last_pull,omitzero"`
-	LastError string               `json:"last_error,omitempty"`
-	Pulled    int                  `json:"pulled,omitempty"` // sessions taken in by the last pull
+	Since time.Time            `json:"since,omitzero"`
+	Seen  map[string]time.Time `json:"seen,omitempty"`
+	Files map[string]int64     `json:"files,omitempty"`
+	// FileHeads holds, per OTLP file, the sha256 of the bytes before its
+	// offset (at most otlpHeadBytes). A file whose head no longer matches
+	// was replaced (rename and create, or copy-truncate that regrew) and is
+	// read from the start, whatever its size.
+	FileHeads map[string]string `json:"file_heads,omitempty"`
+	LastPull  time.Time         `json:"last_pull,omitzero"`
+	LastError string            `json:"last_error,omitempty"`
+	Pulled    int               `json:"pulled,omitempty"` // sessions taken in by the last pull
 }
 
 // maxSeen caps the remembered trace ids of one cursor.

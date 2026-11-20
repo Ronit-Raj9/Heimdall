@@ -52,6 +52,10 @@ func fakeStdioServer() {
 			send(map[string]any{"jsonrpc": "2.0", "id": m.ID, "result": map[string]any{"content": []any{map[string]any{"type": "text", "text": name + " " + string(args)}}}})
 		case "exit":
 			os.Exit(3)
+		case "huge":
+			// A response line over the bridge's limit; the server stays up.
+			fmt.Fprintf(w, `{"jsonrpc":"2.0","id":%s,"result":{"text":"%s"}}`+"\n", m.ID, strings.Repeat("z", maxStdioLine))
+			w.Flush()
 		case "":
 			// The bridge's answer to roots/list: it must be a refusal.
 			if strings.Contains(sc.Text(), `"srv-1"`) && strings.Contains(sc.Text(), `"error"`) {
@@ -135,6 +139,38 @@ func TestBridge(t *testing.T) {
 			t.Fatalf("healthz %d after exit", resp.StatusCode)
 		}
 	})
+}
+
+// TestBridgeReaderFailure checks that a response line over the limit, from
+// a server that keeps running, stops the server and fails the call instead
+// of leaving a healthy bridge whose calls never get an answer.
+func TestBridgeReaderFailure(t *testing.T) {
+	b, srv := startTestBridge(t)
+	done := make(chan string, 1)
+	go func() {
+		_, _, body := post(t, srv.URL, "/mcp", `{"jsonrpc":"2.0","id":5,"method":"huge"}`, nil)
+		done <- body
+	}()
+	select {
+	case body := <-done:
+		if !strings.Contains(body, "stdio server exited") {
+			t.Fatalf("body %q", body)
+		}
+	case <-time.After(30 * time.Second):
+		t.Fatal("call hung after the reader stopped")
+	}
+	<-b.Exited()
+	if err := b.ExitErr(); err == nil || !strings.Contains(err.Error(), "unreadable") {
+		t.Fatalf("exit error %v", err)
+	}
+	resp, err := http.Get(srv.URL + "/healthz")
+	if err != nil {
+		t.Fatal(err)
+	}
+	resp.Body.Close()
+	if resp.StatusCode != http.StatusServiceUnavailable {
+		t.Fatalf("healthz %d after reader failure", resp.StatusCode)
+	}
 }
 
 func TestStartBridgeErrors(t *testing.T) {

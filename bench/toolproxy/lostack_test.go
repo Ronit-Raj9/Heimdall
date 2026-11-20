@@ -1,6 +1,7 @@
 package toolproxy
 
 import (
+	"context"
 	"fmt"
 	"io"
 	"net/http"
@@ -45,7 +46,7 @@ func TestProxyLostAckMCP(t *testing.T) {
 				}
 				rows := tp.waitCallRows(t, 1)
 				r := rows[0]
-				if r.Fault != FaultLostAck || r.Nonce != "nonce_abc" || !r.IsError || !r.Undelivered || r.Status != 200 || !strings.Contains(r.Result, "echo: refund") {
+				if r.Fault != FaultLostAck || r.Nonce != "nonce_abc" || !r.IsError || !r.Undelivered || !r.FaultDelivered || r.Status != 200 || !strings.Contains(r.Result, "echo: refund") {
 					t.Fatalf("row %+v", r)
 				}
 				// The next call is not lost (calls: 1).
@@ -87,7 +88,40 @@ func TestProxyLostAckHTTP(t *testing.T) {
 		t.Fatalf("server hits %d", hits)
 	}
 	rows := tp.waitCallRows(t, 1)
-	if r := rows[0]; r.Fault != FaultLostAck || !r.Undelivered || r.Status != 200 || !strings.Contains(r.Result, "created") {
+	if r := rows[0]; r.Fault != FaultLostAck || !r.Undelivered || !r.FaultDelivered || r.Status != 200 || !strings.Contains(r.Result, "created") {
 		t.Fatalf("row %+v", r)
+	}
+}
+
+// TestProxyLostAckHangUp checks that an agent that hangs up during the hold
+// leaves a lost_ack row whose timeout answer is not marked delivered, on both
+// the MCP and the plain HTTP route (3-D-13).
+func TestProxyLostAckHangUp(t *testing.T) {
+	for _, proto := range []string{ProtocolMCP, ProtocolHTTP} {
+		t.Run(proto, func(t *testing.T) {
+			var upstream *httptest.Server
+			if proto == ProtocolMCP {
+				upstream = httptest.NewServer(&fakeMCP{})
+			} else {
+				upstream = httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+					_, _ = io.WriteString(w, `{"status":"created"}`)
+				}))
+			}
+			defer upstream.Close()
+			tp := newTestProxy(t, upstream.URL, proto)
+			tp.setFault(t, `{"mode":"lost_ack","server":"fs","timeout_s":3,"nonce":"nonce_h"}`)
+			tp.srv.hold = func(context.Context, time.Duration) error { return context.Canceled }
+			body, path := callBody(1, "echo", "refund"), "/s/fs/mcp"
+			if proto == ProtocolHTTP {
+				body, path = `{"sku":"KT-12"}`, "/s/fs/orders"
+			}
+			if resp, err := http.Post(tp.front.URL+path, "application/json", strings.NewReader(body)); err == nil {
+				resp.Body.Close()
+			}
+			rows := tp.waitCallRows(t, 1)
+			if r := rows[0]; r.Fault != FaultLostAck || r.Status != 200 || r.FaultDelivered {
+				t.Fatalf("row %+v", r)
+			}
+		})
 	}
 }

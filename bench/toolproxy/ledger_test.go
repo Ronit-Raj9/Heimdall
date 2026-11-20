@@ -3,6 +3,7 @@ package toolproxy
 import (
 	"crypto/sha256"
 	"encoding/hex"
+	"encoding/json"
 	"os"
 	"path/filepath"
 	"strings"
@@ -106,4 +107,64 @@ func TestCapture(t *testing.T) {
 			}
 		})
 	}
+}
+
+// TestLedgerStatusAndStickyError checks the ledger status file (3-D-08): it
+// counts calls in flight, a failed write leaves a Seq gap, and the error
+// stays after a later write succeeds, on Healthy and in the status.
+func TestLedgerStatusAndStickyError(t *testing.T) {
+	dir := t.TempDir()
+	l, err := OpenLedger(filepath.Join(dir, "tools.jsonl"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	status := func() schemas.ToolLedgerStatus {
+		t.Helper()
+		raw, err := os.ReadFile(filepath.Join(dir, LedgerStatusFile))
+		if err != nil {
+			t.Fatal(err)
+		}
+		var st schemas.ToolLedgerStatus
+		if err := json.Unmarshal(raw, &st); err != nil {
+			t.Fatal(err)
+		}
+		return st
+	}
+	end := l.Begin()
+	if st := status(); st.InFlight != 1 || st.Incomplete() == "" {
+		t.Fatalf("in flight status %+v", st)
+	}
+	if err := l.Append(&schemas.ToolCall{Server: "a", Tool: "x"}); err != nil {
+		t.Fatal(err)
+	}
+	end()
+	end() // a second end is a no-op
+	if st := status(); st.InFlight != 0 || st.Rows != 1 || st.Incomplete() != "" {
+		t.Fatalf("settled status %+v", st)
+	}
+	good := l.f
+	bad, err := os.Open(filepath.Join(dir, "tools.jsonl")) // read-only: writes fail
+	if err != nil {
+		t.Fatal(err)
+	}
+	l.f = bad
+	if err := l.Append(&schemas.ToolCall{Server: "a", Tool: "y"}); err == nil {
+		t.Fatal("write to a read-only file worked")
+	}
+	_ = bad.Close()
+	l.f = good
+	c := &schemas.ToolCall{Server: "a", Tool: "z"}
+	if err := l.Append(c); err != nil {
+		t.Fatal(err)
+	}
+	if c.Seq != 3 {
+		t.Fatalf("seq after a failed row = %d, want 3 (a gap)", c.Seq)
+	}
+	if l.Healthy() == nil {
+		t.Fatal("the write error was cleared by a later write")
+	}
+	if st := status(); st.Failed != 1 || st.Rows != 3 || st.Incomplete() == "" {
+		t.Fatalf("status after a failed row %+v", st)
+	}
+	_ = l.Close()
 }

@@ -106,10 +106,12 @@ end to end with nothing leaving the machine:
 To point the task at a real service, change `base_url`, the allowlist and
 `auth_env` in `task.yaml`, then record a cassette once: copy the smoke
 experiment, add `external: record`, set the key in the host environment
-(`export ACME_WEATHER_KEY=...`), plan and run it with the oracle arm only.
-The proxy then reaches the real host through a per-run forwarder that
-connects to that one host and port, and writes
-`runs/<exp>/<run>/external/weather.cassette.jsonl` (the key redacted). Copy
-that file over the task's cassette and lock the suite again. Recording or
+(`export ACME_WEATHER_KEY=...`), plan and run it. Keep both arms: an
+experiment needs at least two, and the noop arm makes no calls, so only the
+oracle run records. The proxy then reaches the real host through a per-run
+forwarder that connects to that one host and port, and writes
+`runs/<exp>/slots/<slot>/runs/<run>/external/weather.cassette.jsonl` in the
+oracle run's folder (the key redacted). Copy that file over the task's
+cassette and lock the suite again. Recording or
 running live (`external: live`) costs you repeatability: the experiment is
 labelled "not repeatable" in the report and kept off the leaderboard.
