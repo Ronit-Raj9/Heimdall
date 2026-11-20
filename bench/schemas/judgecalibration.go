@@ -218,6 +218,7 @@ type JudgeCalibrationVerdict struct {
 	ContestedRuns   int                         `json:"contested_runs"`
 	ErrorOverEffect string                      `json:"error_over_effect,omitempty"` // set when the judge's error rate exceeds the effect claimed
 	CappedFrom      Decision                    `json:"capped_from,omitempty"`       // the decision before an uncalibrated judge capped it
+	Caps            bool                        `json:"caps,omitempty"`              // the calibration state caps any directional decision at INCONCLUSIVE (whatever this stage decided)
 	BiasAdjusted    map[string]BiasAdjustedRate `json:"bias_adjusted,omitempty"`     // arm -> raw and corrected judged rate
 }
 

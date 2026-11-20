@@ -213,3 +213,33 @@ type RunContext struct {
 	// Nil for a run of a task without a GPU request; never written to disk.
 	GPU *GPUAssignment
 }
+
+// outcomeScoredMetrics are the metrics whose value is the run's verified
+// outcome (metrics.verifiedOutcome). They can only be observed when the run's
+// final outcome scores (Y observed).
+var outcomeScoredMetrics = map[string]bool{
+	"verified_success": true,
+	"safe_success":     true,
+	"answer_correct":   true,
+}
+
+// OutcomeScoredMetric reports whether metric's value is the run's verified
+// outcome, so it must agree with the run's final Y.
+func OutcomeScoredMetric(metric string) bool {
+	return outcomeScoredMetrics[metric]
+}
+
+// ReconcileOutcomeMetric returns v, or unknown when metric is outcome-scored
+// and the run's final outcome does not score (for example a passing grade
+// whose cleanup failed, sealed infra_error with Y unknown). The metric is
+// computed before the final outcome is decided, so it must never outvote it.
+// An empty outcome (no outcome recorded) leaves v as it is.
+func ReconcileOutcomeMetric(metric string, v Value, outcome Outcome) Value {
+	if !OutcomeScoredMetric(metric) || outcome == "" || !v.IsObserved() {
+		return v
+	}
+	if _, scores := outcome.Score(); scores {
+		return v
+	}
+	return Unknown("run outcome "+string(outcome)+" does not score", v.Evidence)
+}

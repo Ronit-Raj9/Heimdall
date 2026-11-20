@@ -45,6 +45,10 @@ type Input struct {
 	PolicyHash string
 	// Synthetic marks synthetic arms (leaderboard.SyntheticArms).
 	Synthetic map[string]bool
+	// Invalid are the experiment's release verdict invalid reasons
+	// (instrument gates, evidence problems). Any withholds every
+	// directional recommendation: the evidence cannot decide.
+	Invalid []string
 }
 
 // Build writes the migration report. It is pure apart from reading run
@@ -127,7 +131,7 @@ func Build(ctx context.Context, in Input, q Query) (*Report, error) {
 		if in.Policy != nil {
 			pr = evaluatePolicy(in.Policy, in.PolicyHash, m, in.Runs, p[0], p[1])
 		}
-		pair.Recommendation = recommend(pair, pr, synthetic)
+		pair.Recommendation = recommend(pair, pr, synthetic, in.Invalid)
 		rep.Pairs = append(rep.Pairs, pair)
 	}
 	mx, err := leaderboard.Matrix(m, in.Runs, synthetic, leaderboard.MatrixQuery{Condition: q.Condition, Alpha: q.Alpha})
@@ -677,12 +681,13 @@ func evaluatePolicy(p *schemas.Policy, hash string, m *schemas.Manifest, runs []
 	return policy.Evaluate(p, hash, &mc, nil, pairRuns)
 }
 
-// recommend turns the statistics and the policy into the plain answer. It
+// recommend turns the statistics and the policy into the plain answer. An
+// INVALID release verdict (invalid reasons) withholds any direction. It
 // is never stronger than the statistics: migrate needs a significant gain
 // overall, no significant loss in any stratum and a policy that does not
 // block; do not migrate needs a significant loss or a failed blocking
 // check; everything else is not enough evidence.
-func recommend(p Pair, pr *schemas.PolicyResult, synthetic bool) Recommendation {
+func recommend(p Pair, pr *schemas.PolicyResult, synthetic bool, invalid []string) Recommendation {
 	r := Recommendation{Policy: pr, Caveats: []string{TunedPromptNote}}
 	var worseStrata []string
 	for _, s := range p.Strata {
@@ -704,6 +709,8 @@ func recommend(p Pair, pr *schemas.PolicyResult, synthetic bool) Recommendation 
 	switch {
 	case synthetic:
 		r.Action, r.Reason = ActionNotEnough, "synthetic experiment: its numbers are not findings"
+	case len(invalid) > 0:
+		r.Action, r.Reason = ActionNotEnough, "the release verdict is INVALID, so the evidence cannot decide a migration; fix the harness first: "+strings.Join(invalid, "; ")
 	case p.Overall.Result == ResultWorse:
 		r.Action, r.Reason = ActionDoNotMigrate, "overall on "+p.Overall.Condition+": "+p.Overall.Reason
 	case len(worseStrata) > 0:

@@ -73,7 +73,27 @@ func noiseFloor(cfg settings, idx runIndex, hasAA bool) (*schemas.VarianceCard, 
 	}
 	card.Detail = varianceDetail(card, metric)
 	check.Status, check.Detail = aaStatus(eff, decision, cfg.alpha)
+	// Audit 1-B-10: the filled bounds count missing A2 slots as tasks, so a
+	// small A/A arm with no sealed observation can pass. Coverage is read
+	// from counted sealed observations only.
+	if check.Status == schemas.InstrumentPass {
+		if obs, n := observedRuns(idx.armRuns(clean, ArmAA), metric); n == 0 || float64(obs) < minCoverage*float64(n) || eff.NTasks == 0 {
+			check.Status = schemas.InstrumentUnknown
+			check.Detail = fmt.Sprintf("arm %s has an observed %s on %d of %d counted runs on %s (%d tasks observed beside arm %s), below %.2f coverage, so harness noise was not measured",
+				ArmAA, metric, obs, n, clean, eff.NTasks, ArmBaseline, minCoverage)
+		}
+	}
 	return card, check
+}
+
+// observedRuns counts the runs with an observed metric value, and all runs.
+func observedRuns(runs []schemas.SealedRun, metric string) (observed, n int) {
+	for _, r := range runs {
+		if metricValue(r, metric).IsObserved() {
+			observed++
+		}
+	}
+	return observed, len(runs)
 }
 
 // aaDecision is the A/A comparison read as a release decision: improved or

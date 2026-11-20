@@ -159,12 +159,34 @@ func (p *Pipeline) RunSlot(ctx context.Context, in SlotInput) (*SlotResult, erro
 			Error: cause.Error() + "; the run was stopped and is not counted; a resume runs the slot again"})
 	}
 	st.rc.Run.Y = scoreOf(st.rc.Run.Outcome)
+	p.reconcileMetrics(cctx, st)
 	if pf, ok := upstreamFailure(up, st.rc.Run.Outcome); ok {
 		st.rc.Run.Failures = append(st.rc.Run.Failures, pf)
 		p.logger.Warn("provider unreachable during run", "run", st.rc.Run.RunID, "slot", st.rc.Slot.SlotID,
 			"outcome", string(st.rc.Run.Outcome), "upstream_errors", up.Errors, "answered", up.Answered)
 	}
 	return p.seal(cctx, st)
+}
+
+// reconcileMetrics makes every outcome-scored metric agree with the final Y:
+// measure ran before cleanup and before the outcome was decided, so a graded
+// pass of a run later sealed infra_error must not stay an observed 1.
+// metrics.json is rewritten only when a value changed.
+func (p *Pipeline) reconcileMetrics(ctx context.Context, st *runState) {
+	changed := false
+	for name, v := range st.metrics {
+		nv := schemas.ReconcileOutcomeMetric(name, v, st.rc.Run.Outcome)
+		if nv.State != v.State {
+			st.metrics[name] = nv
+			changed = true
+		}
+	}
+	if !changed {
+		return
+	}
+	if err := p.writeJSON(ctx, st, "metrics.json", st.metrics); err != nil {
+		st.rc.Run.Failures = append(st.rc.Run.Failures, schemas.PartFailure{Stage: schemas.StageMeasure, Part: "engine", Error: err.Error()})
+	}
 }
 
 // SealInterrupted seals a run that a crashed process left unsealed. A run

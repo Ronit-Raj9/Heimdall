@@ -449,9 +449,12 @@ func (p *Planner) checkParts(e *schemas.Experiment, suite *schemas.Suite, conds 
 		}
 	}
 	errs = append(errs, codescan.CheckPolicy(e.CodeScan), codescan.CheckSuite(suite)) // X4: code scan veto level, ignored rules and external scanners
-	known := map[string]bool{}
+	known, reportOnly := map[string]bool{}, map[string]bool{}
 	for _, m := range selectMetrics(p.reg, e.Metrics) {
 		known[m.GetName()], known[metricName(m)] = true, true
+		if m.Descriptor().ReportOnly {
+			reportOnly[m.GetName()], reportOnly[metricName(m)] = true, true
+		}
 	}
 	for _, n := range e.Metrics {
 		if !known[n] {
@@ -461,9 +464,15 @@ func (p *Planner) checkParts(e *schemas.Experiment, suite *schemas.Suite, conds 
 	if !known[e.Primary.Metric] {
 		errs = append(errs, fmt.Errorf("primary metric %q is not measured", e.Primary.Metric))
 	}
+	if reportOnly[e.Primary.Metric] {
+		errs = append(errs, fmt.Errorf("primary metric %q is report-only (agent-reported evidence) and cannot decide a verdict", e.Primary.Metric))
+	}
 	for _, g := range e.Guards {
 		if g.Metric != "" && !known[g.Metric] {
 			errs = append(errs, fmt.Errorf("guard metric %q is not measured", g.Metric))
+		}
+		if g.Metric != "" && reportOnly[g.Metric] {
+			errs = append(errs, fmt.Errorf("guard metric %q is report-only (agent-reported evidence) and cannot decide a verdict", g.Metric))
 		}
 	}
 	return errors.Join(errs...)

@@ -142,9 +142,37 @@ func Apply(an *schemas.Analysis, in Input) {
 		}
 		jc.Reminders = Reminders(rec, th, in.SetSHA256, served, in.Now)
 	}
+	// Audit 1-C-12: every other judge model that graded a counted run needs
+	// its own passing record; the majority model's record never covers it.
+	for _, other := range judgeModels(in.Runs) {
+		if other == model || jc.State == schemas.CalibrationStateUnreliable {
+			continue
+		}
+		orec, _ := in.Records.Covering(other, templates)
+		switch {
+		case orec == nil || orec.HumanLabels == 0:
+			jc.State = schemas.CalibrationStateUncalibrated
+			jc.Detail += fmt.Sprintf("; judge not calibrated: no calibration record with human labels for judge model %s, which also graded counted runs", other)
+			capVerdict = true
+		default:
+			bounds, pass := boundsText(orec, th)
+			switch {
+			case orec.HumanLabels >= th.MinLabels && !pass:
+				jc.State = schemas.CalibrationStateUnreliable
+				jc.Detail = fmt.Sprintf("judge unreliable: judge model %s: %s (record %s, %d human labels)", other, bounds, orec.RecordID, orec.HumanLabels)
+			case !pass:
+				if jc.State == schemas.CalibrationStateCalibrated {
+					jc.State = schemas.CalibrationStateFewLabels
+				}
+				jc.Detail += fmt.Sprintf("; judge model %s calibrated on %d human labels, too few to show it reliable: %s", other, orec.HumanLabels, bounds)
+				capVerdict = true
+			}
+		}
+	}
 	if in.Records != nil && len(in.Records.Problems) > 0 {
 		jc.Reminders = append(jc.Reminders, fmt.Sprintf("%d calibration record problem(s): %s", len(in.Records.Problems), in.Records.Problems[0]))
 	}
+	jc.Caps = capVerdict && !allowed
 	if capVerdict && allowed {
 		jc.State = schemas.CalibrationStateAllowed
 		jc.Detail += "; allowed by allow_uncalibrated_judge, so the verdict is labelled, not capped"
@@ -234,6 +262,18 @@ func judgedRuns(runs []schemas.SealedRun) (model string, templates []string, n i
 		}
 	}
 	return model, sortedSet(tmpl), n, sortedSet(srv)
+}
+
+// judgeModels returns every judge model of the counted judged runs, sorted.
+func judgeModels(runs []schemas.SealedRun) []string {
+	models := map[string]bool{}
+	for _, r := range runs {
+		if !r.Slot.Counted || r.Grade == nil || r.Grade.Judge == nil || len(r.Grade.Judge.Votes) == 0 {
+			continue
+		}
+		models[r.Grade.Judge.Model] = true
+	}
+	return sortedSet(models)
 }
 
 func boolKeys(m map[string]int) map[string]bool {

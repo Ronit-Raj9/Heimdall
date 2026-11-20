@@ -45,6 +45,9 @@ func CombineExtension(parent *schemas.Manifest, parentRuns []schemas.SealedRun, 
 	if pc.primary != cc.primary {
 		return nil, fmt.Errorf("combine: primary endpoints differ: %s/%s and %s/%s", pc.primary.Condition, pc.primary.Metric, cc.primary.Condition, cc.primary.Metric)
 	}
+	if err := sameComparison(parent, child, pc, cc, ref.Kind); err != nil {
+		return nil, fmt.Errorf("combine: %w", err)
+	}
 	res := &schemas.ExtensionResult{Parent: parent.ExpID, Child: child.ExpID, Kind: ref.Kind, Rule: schemas.ExtensionExploratory}
 	pe := stageEffect(parent, parentRuns, pc.primary)
 	ce := stageEffect(child, childRuns, cc.primary)
@@ -89,6 +92,106 @@ func CombineExtension(parent *schemas.Manifest, parentRuns []schemas.SealedRun, 
 		res.Decision = schemas.DecisionInconclusive
 	}
 	return res, nil
+}
+
+// sameComparison checks that child repeats parent's frozen comparison (audit
+// 1-B-03): the same arm configs, suite and alpha, and only the change its
+// kind permits: fresh tasks the parent never ran (tasks) or more trials of
+// the parent's own tasks (trials) on the primary condition.
+func sameComparison(parent, child *schemas.Manifest, pc, cc settings, kind string) error {
+	for _, arm := range []string{ArmBaseline, ArmCandidate} {
+		pa, okP := parent.Arms[arm]
+		ca, okC := child.Arms[arm]
+		if !okP || !okC || pa.ConfigHash != ca.ConfigHash {
+			return fmt.Errorf("arm %s config hash differs between %s (%s) and %s (%s): not the same comparison", arm, parent.ExpID, pa.ConfigHash, child.ExpID, ca.ConfigHash)
+		}
+	}
+	if parent.SuiteID != child.SuiteID {
+		return fmt.Errorf("suites differ: %s and %s", parent.SuiteID, child.SuiteID)
+	}
+	if pc.alpha != cc.alpha {
+		return fmt.Errorf("verdict alpha differs: %v and %v", pc.alpha, cc.alpha)
+	}
+	parentTasks := slotTasks(parent, pc.primary.Condition)
+	for task := range slotTasks(child, cc.primary.Condition) {
+		switch kind {
+		case "tasks":
+			if parentTasks[task] {
+				return fmt.Errorf("a tasks follow-up reruns task %s of %s; only fresh tasks may join the combination", task, parent.ExpID)
+			}
+		case "trials":
+			if !parentTasks[task] {
+				return fmt.Errorf("a trials follow-up runs task %s that %s never ran", task, parent.ExpID)
+			}
+		default:
+			return fmt.Errorf("follow-up kind %q: want tasks or trials", kind)
+		}
+	}
+	return nil
+}
+
+// slotTasks are the tasks of m's counted slots on condition.
+func slotTasks(m *schemas.Manifest, condition string) map[string]bool {
+	out := map[string]bool{}
+	for _, sl := range m.Slots {
+		if sl.Counted && sl.Condition == condition {
+			out[sl.Task] = true
+		}
+	}
+	return out
+}
+
+// AuthorizedFollowUp returns the id of the one follow-up of parent the
+// combination may use: the first planned (earliest frozen manifest, then
+// smallest id) among candidates extending parent at its manifest hash. The
+// pre-declared alpha pays for one follow-up only; a later child of the same
+// parent, planned after more evidence was seen, never joins (audit 1-B-03).
+func AuthorizedFollowUp(parent *schemas.Manifest, candidates []*schemas.Manifest) string {
+	var best *schemas.Manifest
+	for _, c := range candidates {
+		if c == nil || c.Experiment.Extends == nil || c.Experiment.Extends.ExpID != parent.ExpID || c.Experiment.Extends.ManifestHash != parent.Hash {
+			continue
+		}
+		if best == nil || c.CreatedAt.Before(best.CreatedAt) || (c.CreatedAt.Equal(best.CreatedAt) && c.ExpID < best.ExpID) {
+			best = c
+		}
+	}
+	if best == nil {
+		return ""
+	}
+	return best.ExpID
+}
+
+// ExtensionStageProblems lists why a stage's own analysis forbids a
+// directional combined decision (audit 1-B-09): a judge whose calibration
+// caps or invalidates its verdict, or an instrument that could not observe.
+func ExtensionStageProblems(an *schemas.Analysis) []string {
+	if an == nil {
+		return []string{"stage has no analysis"}
+	}
+	var out []string
+	if jc := an.JudgeCalibration; jc != nil && (jc.Caps || jc.State == schemas.CalibrationStateUnreliable) {
+		out = append(out, fmt.Sprintf("stage %s judge calibration is %s: %s", an.ExpID, jc.State, jc.Detail))
+	}
+	for _, c := range an.Verdict.Instruments {
+		if c.Status == schemas.InstrumentUnknown {
+			out = append(out, fmt.Sprintf("stage %s instrument %s is unknown", an.ExpID, c.Name))
+		}
+	}
+	return out
+}
+
+// HoldExtension makes a directional combined decision INCONCLUSIVE when any
+// problem stands, with the problems as reasons. An INVALID one stays.
+func HoldExtension(res *schemas.ExtensionResult, problems []string) {
+	if res == nil || len(problems) == 0 {
+		return
+	}
+	if res.Decision == schemas.DecisionImproved || res.Decision == schemas.DecisionRegressed {
+		res.Reasons = append(res.Reasons, fmt.Sprintf("combined %s withheld: the stage evidence cannot decide", res.Decision))
+		res.Decision = schemas.DecisionInconclusive
+	}
+	res.Reasons = append(res.Reasons, problems...)
 }
 
 // stageEffect is the primary effect of one stage, with its missingness

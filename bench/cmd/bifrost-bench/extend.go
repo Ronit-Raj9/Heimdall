@@ -213,6 +213,18 @@ func runExtendStatus(args []string) int {
 	if err != nil {
 		return fail("%v", err)
 	}
+	// Audit 1-B-09: a stage capped by its judge calibration or an unknown
+	// instrument cannot help a combined decision.
+	problems := append(verdict.ExtensionStageProblems(pa), verdict.ExtensionStageProblems(ca)...)
+	// Audit 1-B-03: the pre-declared alpha pays for one follow-up only.
+	siblings, err := a.followUps(ctx, parent)
+	if err != nil {
+		return fail("%v", err)
+	}
+	if bound := verdict.AuthorizedFollowUp(parent, siblings); bound != child.ExpID {
+		problems = append(problems, fmt.Sprintf("%s is not the follow-up bound to %s (the first planned one is %s): only one follow-up may join the pre-declared combination", child.ExpID, parent.ExpID, bound))
+	}
+	verdict.HoldExtension(res, problems)
 	if *asJSON {
 		enc := json.NewEncoder(os.Stdout)
 		enc.SetIndent("", "  ")
@@ -231,6 +243,25 @@ func runExtendStatus(args []string) int {
 		return 3
 	}
 	return exitOK
+}
+
+// followUps loads every stored experiment that extends parent.
+func (a *app) followUps(ctx context.Context, parent *schemas.Manifest) ([]*schemas.Manifest, error) {
+	ids, err := a.store.ListExperiments(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("list experiments: %w", err)
+	}
+	var out []*schemas.Manifest
+	for _, id := range ids {
+		m, err := a.store.LoadManifest(ctx, id)
+		if err != nil {
+			return nil, fmt.Errorf("load %s: %w", id, err)
+		}
+		if m.Experiment.Extends != nil && m.Experiment.Extends.ExpID == parent.ExpID {
+			out = append(out, m)
+		}
+	}
+	return out, nil
 }
 
 func printExtension(w io.Writer, r *schemas.ExtensionResult) {

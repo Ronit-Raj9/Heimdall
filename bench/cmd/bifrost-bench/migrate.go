@@ -197,7 +197,42 @@ func (a *app) migrationReport(ctx context.Context, expID, gradeSource, policyFil
 		in.Tasks = a.suiteTasks(ctx, m)
 	}
 	in.Policy, in.PolicyHash = a.migrationPolicy(m, policyFile)
+	if in.Invalid, err = a.releaseInvalid(ctx, m, runs); err != nil {
+		return nil, err
+	}
 	return migration.Build(ctx, in, q)
+}
+
+// releaseInvalid is the release verdict's invalid reasons for m, computed
+// the way analyze does (policy decision, then the seal chain) without
+// saving an analysis. Audit 5-C-01: a migration recommendation never
+// outranks an INVALID release verdict.
+func (a *app) releaseInvalid(ctx context.Context, m *schemas.Manifest, runs []schemas.SealedRun) ([]string, error) {
+	name := m.Experiment.Verdict.Policy
+	if name == "" {
+		name = "paired_signflip"
+	}
+	var vp schemas.VerdictPolicy
+	for _, p := range a.reg.Policies {
+		if p.GetName() == name {
+			vp = p
+		}
+	}
+	if vp == nil {
+		return nil, fmt.Errorf("verdict policy %q is not registered", name)
+	}
+	an, err := vp.Decide(ctx, m, runs)
+	if err != nil {
+		return nil, fmt.Errorf("decide: %w", err)
+	}
+	reasons := an.Verdict.InvalidReasons
+	if err := a.store.VerifyChain(m.ExpID); err != nil {
+		if !errors.Is(err, schemas.ErrSealMismatch) {
+			return nil, fmt.Errorf("verify seal chain: %w", err)
+		}
+		reasons = append(reasons, "evidence: seals.log chain does not verify: "+err.Error())
+	}
+	return reasons, nil
 }
 
 // firstArm is the experiment's first arm id in order.

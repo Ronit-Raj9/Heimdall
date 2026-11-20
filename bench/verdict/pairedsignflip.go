@@ -351,8 +351,16 @@ func noRegressionGuard(g schemas.GuardSpec, cfg settings, idx runIndex) schemas.
 		return res
 	}
 	worse := -better(g.Metric)
-	lo := significant(eff.LowerBound, cfg.alpha, worse)
-	hi := significant(eff.UpperBound, cfg.alpha, worse)
+	// A guard on the exact primary endpoint (the default clean guard) re-tests
+	// the primary difference, so it uses the primary's planned threshold (a
+	// sequential look or first-stage alpha); the nominal alpha would spend
+	// alpha the plan never allotted (audit 1-B-01).
+	alpha := cfg.alpha
+	if (schemas.Endpoint{Condition: g.Condition, Metric: g.Metric}) == cfg.primary {
+		alpha = cfg.primaryAlpha()
+	}
+	lo := significant(eff.LowerBound, alpha, worse)
+	hi := significant(eff.UpperBound, alpha, worse)
 	bounds := fmt.Sprintf("d_bar %+.1f pp at the lower bound, %+.1f pp at the upper bound, %d discordant",
 		100*eff.LowerBound.DBar, 100*eff.UpperBound.DBar, eff.NNonzero)
 	switch {

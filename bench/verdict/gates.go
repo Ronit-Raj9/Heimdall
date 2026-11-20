@@ -11,15 +11,22 @@ import (
 // instrumentGates returns one reason per instrument gate that fired (DESIGN.md
 // 9.4). Any reason makes the experiment INVALID. Evidence problems the store
 // found while loading (a seal that does not verify, a slot with more than one
-// counted run) come first. Coverage is checked on the conditions the decision
-// reads (the primary condition and every no_regression guard condition); the
+// counted run) come first. Coverage is checked on the endpoints the decision
+// reads (the primary condition and metric, and every no_regression guard's
+// condition with its own effective metric); the
 // other gates look at every counted run, and egress at every run, counted or
 // not, because a successful outbound connection means the harness itself
 // leaked.
 func instrumentGates(m *schemas.Manifest, cfg settings, idx runIndex, runs []schemas.SealedRun) []string {
 	reasons := evidenceReasons(runs)
-	for _, cond := range decisionConditions(cfg) {
-		reasons = append(reasons, coverageReasons(idx, cond, cfg.primary.Metric)...)
+	for _, ep := range decisionEndpoints(cfg) {
+		got := coverageReasons(idx, ep.Condition, ep.Metric)
+		if ep.Metric != cfg.primary.Metric {
+			for i := range got {
+				got[i] += " (guard metric " + ep.Metric + ")"
+			}
+		}
+		reasons = append(reasons, got...)
 	}
 	reasons = append(reasons, egressReasons(runs)...)
 	reasons = append(reasons, invalidateGateReasons(idx)...)
@@ -29,22 +36,26 @@ func instrumentGates(m *schemas.Manifest, cfg settings, idx runIndex, runs []sch
 	return reasons
 }
 
-// decisionConditions returns the primary condition followed by every
-// no_regression guard condition, without repeats.
-func decisionConditions(cfg settings) []string {
-	out := []string{cfg.primary.Condition}
-	seen := map[string]bool{cfg.primary.Condition: true}
+// decisionEndpoints returns the primary endpoint followed by every
+// no_regression guard endpoint (its condition, clean by default, and its
+// metric, the primary metric by default), without repeats.
+func decisionEndpoints(cfg settings) []schemas.Endpoint {
+	out := []schemas.Endpoint{cfg.primary}
+	seen := map[schemas.Endpoint]bool{cfg.primary: true}
 	for _, g := range cfg.guards {
 		if g.Rule != RuleNoRegression {
 			continue
 		}
-		c := g.Condition
-		if c == "" {
-			c = schemas.ConditionClean
+		ep := schemas.Endpoint{Condition: g.Condition, Metric: g.Metric}
+		if ep.Condition == "" {
+			ep.Condition = schemas.ConditionClean
 		}
-		if !seen[c] {
-			seen[c] = true
-			out = append(out, c)
+		if ep.Metric == "" {
+			ep.Metric = cfg.primary.Metric
+		}
+		if !seen[ep] {
+			seen[ep] = true
+			out = append(out, ep)
 		}
 	}
 	return out

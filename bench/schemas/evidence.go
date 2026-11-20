@@ -213,6 +213,9 @@ type MetricDescriptor struct {
 	MinEvidence    EvidenceLevel `json:"min_evidence"`
 	Description    string        `json:"description"`
 	PS2            bool          `json:"ps2"` // one of the six metrics PS2 requires
+	// ReportOnly marks a metric built only from unwitnessed evidence (the
+	// agent's own reports). It is shown, never a primary or guard endpoint.
+	ReportOnly bool `json:"report_only,omitempty"`
 }
 
 // Metric computes one value for one run. A value it cannot observe is unknown,

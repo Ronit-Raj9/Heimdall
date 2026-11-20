@@ -104,7 +104,7 @@ func newReportedStepsMetric() *reportedMetric {
 	return &reportedMetric{needEvents: true,
 		desc: schemas.MetricDescriptor{
 			Name: ReportedSteps, Version: version, Label: "Reported steps (agent's own word)", Kind: schemas.KindCount,
-			HigherIsBetter: false, MinEvidence: schemas.EvidenceNative,
+			HigherIsBetter: false, MinEvidence: schemas.EvidenceNative, ReportOnly: true,
 			Description: "Internal steps the agent reported about itself through OpenTelemetry spans or the native event protocol (plans, subagent runs, handoffs, memory reads and writes, retrievals and distinct tool calls), agent-reported evidence that is never added to agent_steps, averaged over runs whose agent reported at least one event.",
 		},
 		count: func(ev *schemas.Evidence) float64 {
@@ -124,7 +124,7 @@ func newReportedToolCallsMetric() *reportedMetric {
 	return &reportedMetric{needEvents: true,
 		desc: schemas.MetricDescriptor{
 			Name: ReportedToolCalls, Version: version, Label: "Reported tool calls", Kind: schemas.KindCount,
-			HigherIsBetter: false, MinEvidence: schemas.EvidenceNative,
+			HigherIsBetter: false, MinEvidence: schemas.EvidenceNative, ReportOnly: true,
 			Description: "Tool calls the agent reported about itself (tool spans and tool_call events, a tool_result with no reported call counting once), including internal tools no gateway or tool proxy sees, as agent-reported evidence averaged over runs whose agent reported at least one event.",
 		},
 		count: func(ev *schemas.Evidence) float64 { return float64(countReportedTools(reportedEvents(ev))) },
@@ -135,7 +135,7 @@ func newSubagentsSpawnedMetric() *reportedMetric {
 	return &reportedMetric{needEvents: true,
 		desc: schemas.MetricDescriptor{
 			Name: SubagentsSpawned, Version: version, Label: "Subagents spawned (reported)", Kind: schemas.KindCount,
-			HigherIsBetter: false, MinEvidence: schemas.EvidenceNative,
+			HigherIsBetter: false, MinEvidence: schemas.EvidenceNative, ReportOnly: true,
 			Description: "Subagent runs the agent reported (subagent_start events and agent spans nested in another agent span), as agent-reported evidence averaged over runs whose agent reported at least one event.",
 		},
 		count: func(ev *schemas.Evidence) float64 {
@@ -154,7 +154,7 @@ func newEventsDroppedMetric() *reportedMetric {
 	return &reportedMetric{
 		desc: schemas.MetricDescriptor{
 			Name: EventsDropped, Version: version, Label: "Reported events dropped", Kind: schemas.KindCount,
-			HigherIsBetter: false, MinEvidence: schemas.EvidenceNative,
+			HigherIsBetter: false, MinEvidence: schemas.EvidenceNative, ReportOnly: true,
 			Description: "Agent-reported events the bench refused (lines that did not parse, events over the per-run cap, request bodies over the size cap), so a count above zero makes the reported metrics a lower bound, averaged over runs where the collector ran or something was reported.",
 		},
 		count: func(ev *schemas.Evidence) float64 { return float64(ev.AgentEvents.Dropped) },

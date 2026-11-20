@@ -139,7 +139,7 @@ func (idx runIndex) cells(condition, arm, metric string) map[string]cell {
 		}
 		var c cell
 		for _, r := range runs {
-			c.add(metricValue(r, metric), rate)
+			c.add(decisionValue(metricValue(r, metric)), rate)
 		}
 		out[task] = c
 	}
@@ -161,11 +161,24 @@ func (idx runIndex) armRuns(condition, arm string) []schemas.SealedRun {
 }
 
 // metricValue returns the run's value for metric. A metric the run never
-// recorded is unknown, never zero.
+// recorded is unknown, never zero. An outcome-scored metric of a run whose
+// final Y is unknown (infra_error after a graded pass, for example) is
+// unknown too, so it never votes against the sealed outcome.
 func metricValue(r schemas.SealedRun, metric string) schemas.Value {
 	v, ok := r.Metrics[metric]
 	if !ok {
 		return schemas.Unknown("metric "+metric+" not recorded", "")
+	}
+	return schemas.ReconcileOutcomeMetric(metric, v, r.Run.Outcome)
+}
+
+// decisionValue is v as decision arithmetic may use it. A value whose only
+// source is the agent's own report is not witnessed evidence, so it is
+// unknown for an effect, and with no bounds (unless a rate) the effect can
+// never be IMPROVED or REGRESSED on it (extensions-design.md rule 2).
+func decisionValue(v schemas.Value) schemas.Value {
+	if v.IsObserved() && v.Source == schemas.EvidenceSourceAgentReported {
+		return schemas.Unknown("agent-reported value cannot decide a verdict", v.Evidence)
 	}
 	return v
 }

@@ -149,6 +149,24 @@ func checkTrials(e *schemas.Experiment, conds []condPlan) error {
 	if _, ok := e.Arms[verdict.ArmCandidate]; !ok {
 		return errors.New("adaptive trials need arms A and B")
 	}
+	known := map[string]bool{}
+	for _, c := range conds {
+		known[c.id] = true
+	}
+	for _, id := range t.Conditions {
+		if !known[id] {
+			return fmt.Errorf("trials condition %q is not a condition of the experiment", id)
+		}
+	}
+	if t.Rule == schemas.AdaptiveSequential && len(t.Conditions) > 0 {
+		primary := e.Primary.Condition
+		if primary == "" {
+			primary = schemas.ConditionClean
+		}
+		if len(t.Conditions) != 1 || t.Conditions[0] != primary {
+			return fmt.Errorf("rule sequential: conditions %v must be only the primary condition %s, since the looks stop the primary endpoint", t.Conditions, primary)
+		}
+	}
 	adaptive := adaptiveConditions(e, conds)
 	if len(adaptive) == 0 {
 		return errors.New("no condition of the experiment is adaptive")
