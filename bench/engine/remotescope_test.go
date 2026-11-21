@@ -672,3 +672,20 @@ func TestHostedSameNameOtherTokenRefused(t *testing.T) {
 		t.Fatalf("restart under the same token: %v", err)
 	}
 }
+
+func TestSharedPoolServesDefaultPool(t *testing.T) {
+	for _, tc := range []struct {
+		worker, exp string
+		want        bool
+	}{
+		{schemas.DefaultRunnerPool, schemas.DefaultRunnerPool, true},
+		{schemas.SharedRunnerPool, schemas.DefaultRunnerPool, true},
+		{schemas.SharedRunnerPool, schemas.SharedRunnerPool, true},
+		{schemas.SharedRunnerPool, "gpu", false},
+		{"gpu", schemas.DefaultRunnerPool, false},
+	} {
+		if got := poolServes(tc.worker, tc.exp); got != tc.want {
+			t.Errorf("poolServes(%q, %q) = %v, want %v", tc.worker, tc.exp, got, tc.want)
+		}
+	}
+}

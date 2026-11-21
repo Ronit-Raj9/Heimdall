@@ -58,7 +58,14 @@ func (c *Coordinator) workerLocked(workerID string, scope schemas.RunnerScope) (
 // hosted coordinator only when its runner pool (schemas.DefaultRunnerPool
 // when it names none) is the worker's pool.
 func (c *Coordinator) openTo(w *remoteWorker, r *schedRun) bool {
-	return !c.hosted() || r.m.Experiment.RunnerPool() == w.scope.Pool
+	return !c.hosted() || poolServes(w.scope.Pool, r.m.Experiment.RunnerPool())
+}
+
+// poolServes reports whether a worker in pool workerPool may run an
+// experiment of pool expPool: its own pool, and the shared runner also takes
+// experiments that name no pool, so an org with no runner of its own can run.
+func poolServes(workerPool, expPool string) bool {
+	return workerPool == expPool || (workerPool == schemas.SharedRunnerPool && expPool == schemas.DefaultRunnerPool)
 }
 
 // infoLocked copies a worker's list entry. The caller holds mu.
@@ -107,7 +114,7 @@ func (c *Coordinator) Whoami(ctx context.Context) (*schemas.RunnerWhoami, error)
 		}
 	}
 	for _, r := range c.exps {
-		if !c.hosted() || r.m.Experiment.RunnerPool() == scope.Pool {
+		if !c.hosted() || poolServes(scope.Pool, r.m.Experiment.RunnerPool()) {
 			out.Open++
 		}
 	}

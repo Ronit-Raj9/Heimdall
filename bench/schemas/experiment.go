@@ -99,6 +99,10 @@ type RunnerSpec struct {
 // DefaultRunnerPool is the pool of a hosted experiment that names none.
 const DefaultRunnerPool = "default"
 
+// SharedRunnerPool is the shared runner's pool (sharedpool.Pool): it also
+// serves DefaultRunnerPool experiments of the orgs it is assigned to.
+const SharedRunnerPool = "shared"
+
 // RunnerPool is the pool the experiment runs on in hosted mode: its
 // runner.pool, or DefaultRunnerPool.
 func (e *Experiment) RunnerPool() string {

@@ -31,7 +31,7 @@ import (
 // Names.
 const (
 	// Pool is the runner pool of the shared runners.
-	Pool = "shared"
+	Pool = schemas.SharedRunnerPool
 	// SecretEnv holds the secret the shared runner presents to fetch its
 	// assignments. Unset, the shared pool is off.
 	SecretEnv = "HEIMDALL_SHARED_RUNNER_SECRET"
