@@ -180,6 +180,11 @@ func (c *copier) tree(src, rel string) error {
 			if r != "." && (d.Name() == ".git" || d.Name() == "node_modules") {
 				return filepath.SkipDir
 			}
+			// Make every folder, empty ones too: a task's repo_dir may be an
+			// empty repo/ the suite loader requires to exist.
+			if dst, err := c.dest(filepath.Join(rel, r)); err == nil {
+				_ = os.MkdirAll(dst, 0o755)
+			}
 			return nil
 		case d.Type().IsRegular():
 			return c.file(path, filepath.Join(rel, r))
