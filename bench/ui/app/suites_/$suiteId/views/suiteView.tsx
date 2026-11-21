@@ -16,6 +16,7 @@ import { Link } from "@tanstack/react-router";
 import { AlertTriangle, Boxes, ChevronRight, Trophy } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { SuiteCalibrationTab } from "./calibrationTab";
+import { OpsTab } from "./opsTab";
 import { SuiteExportTab, SuiteHealthTab, SuiteTiersTab } from "./suiteTabs";
 import { SuiteTasksTab } from "./tasksTab";
 
@@ -87,6 +88,7 @@ function SuiteBody({
 		{ id: "tiers", label: t("suites.tabs.tiers"), badge: suite.tiers?.length || undefined },
 		{ id: "calibration", label: t("suites.tabs.calibration"), hidden: !judged },
 		{ id: "export", label: t("suites.tabs.export") },
+		{ id: "ops", label: t("tab", { ns: "suiteops" }) },
 	];
 
 	return (
@@ -164,6 +166,8 @@ function SuiteBody({
 								<SuiteTiersTab suite={suite} />
 							) : active === "calibration" ? (
 								<SuiteCalibrationTab suite={suite} />
+							) : active === "ops" ? (
+								<OpsTab suite={suite} />
 							) : active === "export" ? (
 								<SuiteExportTab suite={suite} />
 							) : (

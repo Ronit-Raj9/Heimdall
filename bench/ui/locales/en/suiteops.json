@@ -1,0 +1,59 @@
+{
+	"tab": "Ops",
+	"viewerNote": "You can see this suite's operations, but only members can run them. Ask an org owner for the member role.",
+	"checks": {
+		"title": "Checks and admission",
+		"description": "Lint checks suite.yaml and every task. Lock pins task hashes and images. Admit runs each task's reference solution and verifier so the task can be used in experiments.",
+		"lint": "Lint",
+		"lock": "Lock",
+		"admit": "Admit all tasks",
+		"admitConfirm": "Admit every task of {{suite}}? This builds images and runs each reference solution in containers.",
+		"hostedAdmit": "Admission starts containers, so it runs on your own machine: bifrost-bench suite admit {{suite}}"
+	},
+	"health": {
+		"title": "Quarantine",
+		"description": "A quarantined task is skipped by new plans. suite.lock and finished experiments are unchanged. Restore puts it back.",
+		"flaky": "Quarantine flaky tasks",
+		"flakyConfirm": "Quarantine every task of {{suite}} with verifier flakiness evidence?",
+		"empty": "This suite has no tasks yet. Cut one from a commit below.",
+		"task": "Task",
+		"state": "State",
+		"active": "Active",
+		"quarantined": "Quarantined: {{reason}}",
+		"redacted": "held out",
+		"reasonPlaceholder": "Why? (required)",
+		"quarantine": "Quarantine",
+		"restore": "Restore",
+		"reasonRequired": "Type a reason first: say why the task is kept out of new plans."
+	},
+	"source": {
+		"github": "GitHub repository",
+		"githubPlaceholder": "owner/name",
+		"githubHint": "Private repositories need GitHub connected in Settings. Public ones work without it.",
+		"branch": "Branch (optional)",
+		"local": "Local folder",
+		"localPlaceholder": ". (the project's own repository)",
+		"localHint": "A git repository on the server's disk, absolute or relative to the project folder."
+	},
+	"fromCommit": {
+		"title": "Task from a commit",
+		"description": "Cut a task from a fix: the agent starts at the base commit, and the reference commit gives the solution and the hidden tests.",
+		"id": "Task id",
+		"base": "Base commit",
+		"reference": "Reference commit",
+		"tests": "Test globs (optional, comma-separated)",
+		"run": "Create task",
+		"missing": "Fill in task id, base and reference, and pick a repository."
+	},
+	"mine": {
+		"title": "Mine tasks from history",
+		"description": "Rank recent fix commits that change tests and cut proven tasks from the best ones.",
+		"since": "Since (commit, tag or YYYY-MM-DD, optional)",
+		"limit": "Tasks to cut",
+		"dryRun": "Preview only (write nothing)",
+		"hostedDryRun": "Hosted servers preview candidates only; cut and prove them locally with bifrost-bench tasks mine.",
+		"run": "Mine tasks",
+		"preview": "Preview candidates",
+		"missing": "Pick a repository first."
+	}
+}
