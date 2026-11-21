@@ -42,7 +42,7 @@ func registerJobKind(s jobKindSpec) {
 	jobKindsMu.Lock()
 	defer jobKindsMu.Unlock()
 	for _, k := range jobKinds {
-		if k.Kind == s.Kind {
+		if k.Kind == s.Kind && ((k.Local && s.Local) || (k.Hosted && s.Hosted)) { // a local and a hosted variant may share a name
 			panic("job kind registered twice: " + s.Kind)
 		}
 	}
