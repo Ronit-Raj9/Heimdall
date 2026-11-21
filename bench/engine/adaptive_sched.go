@@ -62,12 +62,6 @@ func (r *schedRun) releaseOptional(ctx context.Context) bool {
 	if r.m.Adaptive == nil || ctx.Err() != nil {
 		return false
 	}
-	r.mu.Lock()
-	stopped := r.stopped
-	r.mu.Unlock()
-	if stopped {
-		return false
-	}
 	if r.w7 == nil {
 		r.w7 = &adaptiveState{queued: map[string]bool{}}
 		for _, sl := range initialSlots(r.m) {
@@ -94,6 +88,15 @@ func (r *schedRun) releaseOptional(ctx context.Context) bool {
 	// it; one left to a live lease elsewhere is still open (2-C-04).
 	rep := verdict.ReplayAdaptiveSettled(r.m, runs, func(id string) bool { return done[id] || (r.w7.queued[id] && !unsettled[id]) })
 	r.w7.last = rep
+	// A stopped spend cap releases nothing, but the replay above still runs
+	// so the summary's stop reason is the rule's state after the last run,
+	// not the stale one of the replay before it.
+	r.mu.Lock()
+	stopped := r.stopped
+	r.mu.Unlock()
+	if stopped {
+		return false
+	}
 	var fresh []*schemas.Slot
 	for i := range r.m.Slots {
 		sl := &r.m.Slots[i]
