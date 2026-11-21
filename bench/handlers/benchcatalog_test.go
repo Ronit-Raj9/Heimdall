@@ -44,7 +44,7 @@ func TestBenchCatalogListAndAdd(t *testing.T) {
 	fj := &catalogFakeJobs{}
 	h := &benchCatalogHandler{
 		env:    OrgEnv{Cfg: &lib.Config{Root: project}, Mode: schemas.ModeLive, Services: Services{OrgID: "org_a", Jobs: fj}},
-		source: func() benchcatalog.Source { return benchcatalog.Source{Root: root} },
+		source: func() benchcatalog.Source { return benchcatalog.Source{Root: root, Examples: true} },
 	}
 
 	ctx := &fasthttp.RequestCtx{}
@@ -87,6 +87,23 @@ func TestBenchCatalogListAndAdd(t *testing.T) {
 	}
 	if len(fj.created) != 0 {
 		t.Fatal("copy entries must not create jobs")
+	}
+}
+
+// TestCatalogSourceHidesExamplesWhenHosted: a hosted org is never offered
+// the Acme practice examples, even with the dev flag set; a local server
+// offers them only with the dev flag.
+func TestCatalogSourceHidesExamplesWhenHosted(t *testing.T) {
+	t.Setenv(benchcatalog.DevEnv, "1")
+	if catalogSource(OrgEnv{Services: Services{Hosted: true}}).Examples {
+		t.Fatal("hosted org offered practice examples")
+	}
+	if !catalogSource(OrgEnv{}).Examples {
+		t.Fatal("local dev server hides practice examples with the dev flag")
+	}
+	t.Setenv(benchcatalog.DevEnv, "")
+	if catalogSource(OrgEnv{}).Examples {
+		t.Fatal("practice examples offered without the dev flag")
 	}
 }
 

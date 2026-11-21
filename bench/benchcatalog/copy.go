@@ -47,6 +47,9 @@ func (s Source) Add(project string, e Entry) (*AddResult, error) {
 		}
 		c.res.Suites = []string{e.SuiteID}
 	case KindExample:
+		if !s.Examples {
+			return nil, errors.New("practice examples are not offered on this server")
+		}
 		name := strings.TrimPrefix(e.ID, "example-")
 		if !validName(name) {
 			return nil, fmt.Errorf("bad example %q", name)
@@ -70,8 +73,11 @@ func (s Source) Add(project string, e Entry) (*AddResult, error) {
 	return c.res, nil
 }
 
-// StarterAgents are the agents every new org starts with.
-var StarterAgents = []string{"codex", "claude-code", "mini-swe-agent", "fw-plain-openai", "custom-python", "oracle", "noop"}
+// StarterAgents are the agents every new org starts with. The scripted
+// controls (oracle, noop) are not among them: users never see them, and the
+// admission checks that need them write them on first use
+// (ControlAgentFiles).
+var StarterAgents = []string{"codex", "claude-code", "mini-swe-agent", "fw-plain-openai", "custom-python"}
 
 // StarterSuites are the suites every new org starts with.
 var StarterSuites = []string{"coding-core"}

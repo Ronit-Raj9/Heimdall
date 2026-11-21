@@ -2,11 +2,13 @@ package handlers
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"strings"
 	"testing"
 
 	"github.com/maximhq/bifrost/bench/schemas"
+	"github.com/valyala/fasthttp"
 )
 
 // fakeAgents returns two configs and one file that failed to decode. The
@@ -124,4 +126,31 @@ func toStrings(v any) []string {
 		out = append(out, s.(string))
 	}
 	return out
+}
+
+// TestAgentsHiddenControls: with WithHiddenControls the scripted controls
+// leave the list; every other config, including a broken file, stays.
+func TestAgentsHiddenControls(t *testing.T) {
+	for _, hide := range []bool{true, false} {
+		ctx := &fasthttp.RequestCtx{}
+		NewAgentsHandler(schemas.ModeLive, fakeAgents{}, nil).WithHiddenControls(hide).getAgents(ctx)
+		var list schemas.AgentList
+		if err := json.Unmarshal(ctx.Response.Body(), &list); err != nil {
+			t.Fatal(err)
+		}
+		var paths []string
+		for _, a := range list.Agents {
+			paths = append(paths, a.Path)
+		}
+		want := "agents/bad.yaml,agents/custom.yaml,agents/codex.yaml"
+		if !hide {
+			want += ",agents/noop.yaml"
+		}
+		if got := strings.Join(paths, ","); got != want {
+			t.Fatalf("hide=%v: agents %s, want %s", hide, got, want)
+		}
+	}
+	if !IsControlAgent(&schemas.AgentConfig{Adapter: "scripted"}) || IsControlAgent(&schemas.AgentConfig{Adapter: "command"}) || IsControlAgent(nil) {
+		t.Fatal("IsControlAgent")
+	}
 }

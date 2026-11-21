@@ -51,6 +51,8 @@ const fx = vi.hoisted(() => {
 			benchmarks: [
 				{ id: "coding-core", ok: true, requires: ["shell"], missing: [], reason: "" },
 				{ id: "acme-memory", ok: false, requires: ["sessions"], missing: ["sessions"], reason: "needs sessions" },
+				{ id: "team-coding", ok: true, requires: ["shell"], missing: [], reason: "" },
+				{ id: "team-memory", ok: false, requires: ["sessions"], missing: ["sessions"], reason: "needs sessions" },
 			],
 		},
 		packs: [
@@ -135,6 +137,13 @@ const fx = vi.hoisted(() => {
 
 const fixtures = path.resolve(__dirname, "../public/fixtures");
 fx.data.suites = JSON.parse(fs.readFileSync(path.join(fixtures, "suites.json"), "utf8"));
+{
+	// The wizard offers only the org's own and built-in benchmarks with ready tasks (no practice
+	// examples), so add two of the org's own next to the fixture list.
+	const list = fx.data.suites as { suites: Array<Record<string, unknown>> };
+	const core = list.suites.find((x) => x.id === "coding-core")!;
+	list.suites.push({ ...core, id: "team-coding" }, { ...core, id: "team-memory", track: "memory" });
+}
 
 vi.mock("@/lib/store/apis/evaluationsApi", async (importOriginal) => fx.safeOriginal(importOriginal));
 vi.mock("@/lib/store/apis/modelsApi", async (importOriginal) => fx.safeOriginal(importOriginal));
@@ -233,8 +242,12 @@ describe.skipIf(!wizardFile)("evaluate wizard smoke", () => {
 		expect(pages[0]).toMatch(/agent/i);
 		expect(pages[1]).toMatch(/v1|v2|version/i);
 		// Benchmarks: the compatible one offered, the incompatible one shown with its reason.
-		expect(pages[2]).toContain("coding-core");
-		expect(pages[2]).toMatch(/needs sessions|sessions/i);
+		expect(pages[2]).toContain("team-coding");
+		expect(pages[2]).toMatch(/needs sessions/i);
+		// No practice examples and no benchmark without a ready task.
+		expect(pages[2]).not.toContain('data-testid="step3-benchmark-coding-core"');
+		expect(pages[2]).not.toContain('data-testid="step3-benchmark-acme-payments"');
+		expect(pages[2]).not.toContain('data-testid="step3-benchmark-harbor-shell"');
 		// Model step: the model catalog and the live estimate.
 		expect(pages[3]).toMatch(/claude-sonnet-4-5|deepseek/);
 		expect(pages[3]).toMatch(/1\.25|2\.50?|20 runs|\b20\b/);

@@ -92,6 +92,15 @@ func TestImportFixtures(t *testing.T) {
 	if s.Track != schemas.TrackMLEngineering || s.Imported == nil || s.Imported.Revision != revision || s.BaseImage.Tag != defaultImage {
 		t.Errorf("suite %+v", s)
 	}
+	if !strings.HasPrefix(defaultImage, "bench/") || strings.Contains(defaultImage, "example") {
+		t.Errorf("default image %s is not a bench/ base image", defaultImage)
+	}
+	if df, err := os.ReadFile(filepath.Join(dir, "base", "Dockerfile")); err != nil || !strings.Contains(string(df), "torch==2.15.0") {
+		t.Errorf("base/Dockerfile not written: %v", err)
+	}
+	if _, err := os.Stat(filepath.Join(dir, "base", "requirements.txt")); err != nil {
+		t.Errorf("base/requirements.txt not written: %v", err)
+	}
 	for _, task := range s.Tasks {
 		if task.GPUCount() != 1 || task.Resources.GPU.MinVRAMMB != defaultMinVRAMMB {
 			t.Errorf("%s: resources %+v", task.ID, task.Resources)

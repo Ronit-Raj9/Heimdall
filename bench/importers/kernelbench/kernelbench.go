@@ -41,10 +41,13 @@ const (
 	source   = "https://github.com/ScalingIntelligence/KernelBench"
 	revision = "423217d9fda91e0c2d67e4a43bf62f96f6d104f1"
 	license  = "MIT"
-	// defaultImage is the acme-gpu example's CUDA image (PyTorch 2.15 with
-	// CUDA 13.2, Triton 3.9): the agent, the controls and the verifier all
-	// run in it. -set image=<tag> names another with PyTorch on CUDA.
-	defaultImage      = "heimdall-example/acme-gpu-cuda:1"
+	// defaultImage is the bench GPU base image (PyTorch 2.15 with CUDA
+	// 13.2, Triton 3.9): the agent, the controls and the verifier all run
+	// in it. The importer writes its Dockerfile into the suite's base/
+	// folder, so admission builds it where it is missing. -set image=<tag>
+	// names another with PyTorch on CUDA (no base/ folder is written then).
+	defaultImage      = "bench/gpu-cuda:1"
+	baseDockerfile    = "base/Dockerfile"
 	defaultMaxInputMB = 256
 	defaultMinVRAMMB  = 2048
 	defaultAgentS     = 1800
@@ -54,7 +57,7 @@ const (
 	maxCalls        = 16
 )
 
-//go:embed templates/verify.py templates/harness.py
+//go:embed templates/verify.py templates/harness.py templates/base/Dockerfile templates/base/requirements.txt
 var templates embed.FS
 
 func init() {
@@ -74,7 +77,7 @@ func (im *importer) Info() importers.Info {
 		Grading:    schemas.GradingVerified,
 		Needs: []string{
 			"an NVIDIA GPU: every task asks for one (resources.gpu); bifrost-bench gpu check",
-			"an image with PyTorch on CUDA and Triton: default " + defaultImage + " (examples/acme-gpu), or -set image=<tag>",
+			"an image with PyTorch on CUDA and Triton: default " + defaultImage + " (built from the suite's base/Dockerfile), or -set image=<tag>",
 		},
 		Summary: "rewrite a PyTorch reference model as a faster ModelNew with custom GPU kernels; correct within atol = rtol = 1e-2, speedup measured in the clean room with an interval",
 	}
@@ -882,7 +885,8 @@ type suiteDoc struct {
 }
 
 type imageDoc struct {
-	Tag string `yaml:"tag"`
+	Dockerfile string `yaml:"dockerfile,omitempty"`
+	Tag        string `yaml:"tag"`
 }
 
 type suiteVerifierDoc struct {
@@ -919,7 +923,7 @@ func writeSuite(dir, id string, tasks []string, set settings) error {
 		Track:       schemas.TrackMLEngineering,
 		Environment: "docker_workspace",
 		Grader:      "verifier_command",
-		BaseImage:   imageDoc{Tag: set.image},
+		BaseImage:   baseImage(dir, set.image),
 		Workdir:     "/workspace",
 		Verifier: suiteVerifierDoc{Command: []string{"python3", "-I", "-B", "/grader/tests/verify.py"}, Result: schemas.VerifierResultReward,
 			ResultPath: "/grader/out/reward.json", PassThreshold: 1, Restore: []string{"problem.py"}, TimeoutS: defaultVerifyS},
@@ -935,5 +939,38 @@ func writeSuite(dir, id string, tasks []string, set settings) error {
 	if err := os.MkdirAll(dir, 0o755); err != nil {
 		return fmt.Errorf("write suite: %w", err)
 	}
+	if doc.BaseImage.Dockerfile != "" {
+		if err := writeBase(dir); err != nil {
+			return err
+		}
+	}
 	return os.WriteFile(path, out, 0o644)
+}
+
+// baseImage is the suite's base_image: the default image is built from the
+// base/ folder the importer writes; another tag is used as given.
+func baseImage(dir, tag string) imageDoc {
+	if tag == defaultImage {
+		return imageDoc{Dockerfile: baseDockerfile, Tag: tag}
+	}
+	return imageDoc{Tag: tag}
+}
+
+// writeBase writes the GPU base image's build folder (base/Dockerfile and
+// its pinned requirements) into the suite.
+func writeBase(dir string) error {
+	base := filepath.Join(dir, filepath.Dir(baseDockerfile))
+	if err := os.MkdirAll(base, 0o755); err != nil {
+		return fmt.Errorf("write base image folder: %w", err)
+	}
+	for _, name := range []string{"Dockerfile", "requirements.txt"} {
+		b, err := templates.ReadFile("templates/base/" + name)
+		if err != nil {
+			return err
+		}
+		if err := os.WriteFile(filepath.Join(base, name), b, 0o644); err != nil {
+			return fmt.Errorf("write base/%s: %w", name, err)
+		}
+	}
+	return nil
 }

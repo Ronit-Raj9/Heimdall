@@ -22,38 +22,61 @@ function keepGitkeep(): Plugin {
 	};
 }
 
-export default defineConfig({
-	plugins: [
-		tanstackRouter({
-			target: "react",
-			routesDirectory: "./app",
-			generatedRouteTree: "./app/routeTree.gen.ts",
-			// Same convention as ui/: routes live in layout.tsx, page.tsx is composition only,
-			// so a screen folder can move into ui/app/workspace/benchmarks/ unchanged.
-			routeToken: "layout",
-			routeFileIgnorePattern: "^(?!layout\\.tsx$|__root\\.tsx$).+\\.(tsx|ts|jsx|js)$",
-			autoCodeSplitting: true,
-		}),
-		react(),
-		tailwindcss(),
-		keepGitkeep(),
-	],
-	resolve: {
-		alias: {
-			"@": path.resolve(__dirname),
+// Fixture mode (lib/store/apis/fixtures.ts) is for building screens without a server: on for
+// the dev server, off for a production build unless VITE_BENCH_FIXTURE=1 is set at build time.
+// Off, __BENCH_FIXTURES__ is the literal false (the fixture code is dropped) and the copied
+// public/fixtures folder is removed from dist, so no install ever ships fixture data.
+function dropFixtures(enabled: boolean): Plugin {
+	let dir = outDir;
+	return {
+		name: "bench-drop-fixtures",
+		apply: "build",
+		configResolved(config) {
+			dir = path.resolve(config.root, config.build.outDir);
 		},
-	},
-	server: {
-		port: 3001,
-		proxy: {
-			"/api/bench": {
-				target: "http://127.0.0.1:8090",
-				changeOrigin: true,
+		closeBundle() {
+			if (!enabled) fs.rmSync(path.join(dir, "fixtures"), { recursive: true, force: true });
+		},
+	};
+}
+
+export default defineConfig(({ command }) => {
+	const fixtures = command === "serve" || process.env.VITE_BENCH_FIXTURE === "1";
+	return {
+		define: { __BENCH_FIXTURES__: JSON.stringify(fixtures) },
+		plugins: [
+			tanstackRouter({
+				target: "react",
+				routesDirectory: "./app",
+				generatedRouteTree: "./app/routeTree.gen.ts",
+				// Same convention as ui/: routes live in layout.tsx, page.tsx is composition only,
+				// so a screen folder can move into ui/app/workspace/benchmarks/ unchanged.
+				routeToken: "layout",
+				routeFileIgnorePattern: "^(?!layout\\.tsx$|__root\\.tsx$).+\\.(tsx|ts|jsx|js)$",
+				autoCodeSplitting: true,
+			}),
+			react(),
+			tailwindcss(),
+			keepGitkeep(),
+			dropFixtures(fixtures),
+		],
+		resolve: {
+			alias: {
+				"@": path.resolve(__dirname),
 			},
 		},
-	},
-	build: {
-		outDir,
-		emptyOutDir: true,
-	},
+		server: {
+			port: 3001,
+			proxy: {
+				"/api/bench": {
+					target: "http://127.0.0.1:8090",
+					changeOrigin: true,
+				},
+			},
+		},
+		build: {
+			outDir,
+			emptyOutDir: true,
+		},
+	};
 });

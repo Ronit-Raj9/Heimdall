@@ -9,7 +9,6 @@ import {
 } from "@/lib/store/apis/evaluationsApi";
 import type { SuiteSummary } from "@/lib/types/bench";
 import { cn } from "@/lib/utils";
-import { ChevronRight } from "lucide-react";
 import { useEffect } from "react";
 import { useEvaluateDraft } from "./evaluateDraft";
 
@@ -142,9 +141,18 @@ export interface BenchmarkGroup {
 	suites: SuiteRow[];
 }
 
-/** Built-in and org benchmarks grouped by capability (groups in CAPABILITY_ORDER, rows in display order). */
-export function groupBenchmarks(suites: readonly SuiteRow[]): { groups: BenchmarkGroup[]; practice: SuiteRow[] } {
-	const sections = suiteSections(suites);
+/** Whether a benchmark has at least one ready (admitted) task: only those are offered for an evaluation. */
+export function hasReadyTasks(s: Pick<SuiteRow, "admitted_count">): boolean {
+	return (s.admitted_count ?? 0) > 0;
+}
+
+/**
+ * Built-in and org benchmarks grouped by capability (groups in CAPABILITY_ORDER, rows in display
+ * order). A real evaluation runs real benchmarks only: the practice examples (Acme, coding-core) and
+ * benchmarks with no ready task are left out; the Benchmarks page lists the latter as "Not ready yet".
+ */
+export function groupBenchmarks(suites: readonly SuiteRow[]): { groups: BenchmarkGroup[] } {
+	const sections = suiteSections(suites.filter(hasReadyTasks));
 	const byCap = new Map<BenchmarkCapability, SuiteRow[]>();
 	for (const s of [...sections.builtin, ...sections.org]) {
 		const cap = benchmarkCapability(s);
@@ -155,7 +163,7 @@ export function groupBenchmarks(suites: readonly SuiteRow[]): { groups: Benchmar
 		label: CAPABILITY_LABEL[c],
 		suites: byCap.get(c)!,
 	}));
-	return { groups, practice: sections.practice };
+	return { groups };
 }
 
 /** selected without the benchmarks compatibility says the agent cannot run. */
@@ -166,7 +174,7 @@ export function keepRunnable(selected: readonly string[], compatibility: AgentCo
 
 /** Pack members present in the suite list and runnable by the agent. */
 export function packSelection(pack: EvaluationPack, suites: readonly SuiteRow[], compat: Map<string, BenchmarkCompatibility>): string[] {
-	const present = new Set(suites.map((s) => s.id));
+	const present = new Set(suites.filter(hasReadyTasks).map((s) => s.id));
 	return pack.benchmarks.filter((id) => present.has(id) && !incompatibleReason(compatFor(compat, id)));
 }
 
@@ -191,7 +199,7 @@ export function Step3BenchmarksView({ suites, packs, compatibility, selected, pa
 	const compat = compatibilityMap(compatibility);
 	const ready = new Map(suites.map((s) => [s.id, s.admitted_count ?? 0]));
 	const chosen = new Set(selected);
-	const { groups, practice } = groupBenchmarks(suites);
+	const { groups } = groupBenchmarks(suites);
 
 	const toggle = (id: string) => {
 		const next = chosen.has(id) ? selected.filter((b) => b !== id) : [...selected, id];
@@ -252,7 +260,7 @@ export function Step3BenchmarksView({ suites, packs, compatibility, selected, pa
 				) : (
 					<div className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-3">
 						{packs.map((p) => {
-							const members = p.benchmarks.filter((id) => ready.has(id));
+							const members = p.benchmarks.filter((id) => (ready.get(id) ?? 0) > 0);
 							const runnable = packSelection(p, suites, compat);
 							const tasks = runnable.reduce((n, id) => n + (ready.get(id) ?? 0), 0);
 							const active = pack === p.id;
@@ -286,8 +294,8 @@ export function Step3BenchmarksView({ suites, packs, compatibility, selected, pa
 
 			<section>
 				<h3 className="mb-2 text-sm font-medium">Or pick benchmarks</h3>
-				{groups.length === 0 && practice.length === 0 ? (
-					<p className="text-muted-foreground text-sm">{loading ? "Loading benchmarks..." : "No benchmarks yet."}</p>
+				{groups.length === 0 ? (
+					<p className="text-muted-foreground text-sm">{loading ? "Loading benchmarks..." : "No benchmark has ready tasks yet. Benchmarks that are not ready yet are listed on the Benchmarks page."}</p>
 				) : (
 					<div className="flex flex-col gap-4">
 						{groups.map((g) => (
@@ -296,15 +304,6 @@ export function Step3BenchmarksView({ suites, packs, compatibility, selected, pa
 								<ul className="flex flex-col">{g.suites.map(row)}</ul>
 							</div>
 						))}
-						{practice.length > 0 && (
-							<details data-testid="step3-practice" className="group/practice">
-								<summary className="text-muted-foreground hover:text-foreground inline-flex cursor-pointer list-none items-center gap-1 px-2 text-xs font-medium select-none [&::-webkit-details-marker]:hidden">
-									<ChevronRight className="size-3.5 transition-transform group-open/practice:rotate-90" aria-hidden="true" />
-									Practice examples ({practice.length})
-								</summary>
-								<ul className="mt-1 flex flex-col">{practice.map(row)}</ul>
-							</details>
-						)}
 					</div>
 				)}
 			</section>

@@ -65,10 +65,13 @@ describe("benchmark grouping", () => {
 		expect(benchmarkCapability({ id: "my-support", track: "support" })).toBe("support");
 	});
 
-	it("keeps practice examples apart and orders groups", () => {
-		const { groups, practice } = groupBenchmarks(suites);
-		expect(groups.map((g) => g.capability)).toEqual(["terminal", "coding", "support", "memory", "voice", "gpu"]);
-		expect(practice.map((p) => p.id)).toEqual(["coding-core", "acme-orders"]);
+	it("leaves out practice examples and benchmarks with no ready task, and orders groups", () => {
+		const { groups } = groupBenchmarks(suites);
+		expect(groups.map((g) => g.capability)).toEqual(["terminal", "coding", "support", "voice", "gpu"]);
+		const ids = groups.flatMap((g) => g.suites.map((x: { id: string }) => x.id));
+		expect(ids).not.toContain("longmemeval");
+		expect(ids).not.toContain("acme-orders");
+		expect(ids).not.toContain("coding-core");
 	});
 
 	it("explains why a benchmark cannot run", () => {
@@ -81,6 +84,8 @@ describe("benchmark grouping", () => {
 		const map = new Map(compat.benchmarks.map((b) => [b.id, b]));
 		expect(packSelection(packs[0], suites, map)).toEqual(["hd-harbor-tb2", "hd-swe-verified"]);
 		expect(packSelection(packs[1], suites, map)).toEqual([]);
+		const memory: EvaluationPack = { id: "memory", name: "Memory", benchmarks: ["longmemeval"], capability: "memory" };
+		expect(packSelection(memory, suites, map)).toEqual([]);
 	});
 });
 
@@ -104,7 +109,7 @@ describe("Step3BenchmarksView", () => {
 		expect(ok).not.toContain("data-disabled");
 		expect(ok).toContain("Terminal-Bench 2");
 		expect(ok).toContain("80 ready tasks");
-		expect(block(html, "step3-benchmark-longmemeval")).toContain("No ready tasks");
+		expect(html).not.toContain('data-testid="step3-benchmark-longmemeval"');
 	});
 
 	it("shows the GPU worker note when compatibility is unknown", () => {
@@ -112,10 +117,11 @@ describe("Step3BenchmarksView", () => {
 		expect(block(html, "step3-benchmark-kernelbench-l2")).toContain("Needs a GPU worker");
 	});
 
-	it("collapses practice examples", () => {
+	it("offers no practice examples", () => {
 		const html = render();
-		expect(html).toMatch(/<details data-testid="step3-practice"(?![^>]*open)/);
-		expect(html).toContain("Practice examples (2)");
+		expect(html).not.toContain("step3-practice");
+		expect(html).not.toContain("Practice examples");
+		expect(html).not.toContain('data-testid="step3-benchmark-acme-orders"');
 	});
 
 	it("summarises the selection", () => {

@@ -200,7 +200,9 @@ func TestHostedTasksMineDropsUnproven(t *testing.T) {
 	}
 }
 
-// Hosted full mine is accepted only when the oracle and noop agents exist.
+// Hosted full mine needs the oracle and noop controls: a new org has none
+// (they are not seeded and users never see them), so validation writes them
+// from the binary, and a broken control path still refuses.
 func TestHostedTasksMineValidation(t *testing.T) {
 	initQuickRepo(t)
 	a, err := newApp(context.Background(), defaultConfig, appOptions{})
@@ -209,16 +211,14 @@ func TestHostedTasksMineValidation(t *testing.T) {
 	}
 	env := jobEnv{App: a, ProjectRoot: a.cfg.Root, Hosted: true}
 	_ = os.Remove(filepath.Join(a.cfg.Root, bridgeOracleAgent))
+	_ = os.Remove(filepath.Join(a.cfg.Root, bridgeNoopAgent))
 	raw := json.RawMessage(`{"suite":"lib","github":"acme/app"}`)
-	if _, _, err := validateTasksMine(context.Background(), env, raw); err == nil || !strings.Contains(err.Error(), "oracle") {
-		t.Fatalf("missing oracle accepted: %v", err)
-	}
-	for _, f := range []string{bridgeOracleAgent, bridgeNoopAgent} {
-		if err := os.WriteFile(filepath.Join(a.cfg.Root, f), []byte("id: x\n"), 0o644); err != nil {
-			t.Fatal(err)
-		}
-	}
 	if _, target, err := validateTasksMine(context.Background(), env, raw); err != nil || target != "suite:lib" {
 		t.Fatalf("hosted full mine refused: %v %q", err, target)
+	}
+	for _, f := range []string{bridgeOracleAgent, bridgeNoopAgent} {
+		if _, err := os.Stat(filepath.Join(a.cfg.Root, f)); err != nil {
+			t.Fatalf("control %s not written: %v", f, err)
+		}
 	}
 }

@@ -6,12 +6,14 @@ import { useTranslation } from "react-i18next";
 
 export { suiteDisplayName } from "./suiteDisplay";
 
-export type SuiteReadiness = "ready" | "needsAdmission" | "needsLock" | "noTasks" | "error";
+export type SuiteReadiness = "ready" | "needsAdmission" | "notReady" | "needsLock" | "noTasks" | "error";
 
 /** One status for the whole suite: ready means every task admitted and the lock current. */
 export function suiteReadiness(suite: Pick<SuiteSummary, "error" | "task_count" | "admitted_count" | "lock_state">): SuiteReadiness {
 	if (suite.error) return "error";
 	if (suite.task_count === 0) return "noTasks";
+	// Tasks listed, none admitted: nothing can run yet (packs and the wizard leave it out).
+	if ((suite.admitted_count ?? 0) === 0) return "notReady";
 	if (suite.admitted_count < suite.task_count) return "needsAdmission";
 	return suite.lock_state === "locked" ? "ready" : "needsLock";
 }
@@ -19,6 +21,7 @@ export function suiteReadiness(suite: Pick<SuiteSummary, "error" | "task_count" 
 const DOT_TONE: Record<SuiteReadiness, string> = {
 	ready: "bg-chart-success",
 	needsAdmission: "bg-chart-warning",
+	notReady: "bg-muted-foreground/60",
 	needsLock: "bg-chart-warning",
 	noTasks: "bg-muted-foreground/60",
 	error: "bg-chart-error",

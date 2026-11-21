@@ -55,6 +55,13 @@ func (h *UIHandler) serve(ctx *fasthttp.RequestCtx) {
 			return
 		}
 	}
+	// fixtures/ holds synthetic screen data for building the UI without a
+	// server. A production build leaves it out (vite.config.mts), and the
+	// server never serves it even from a build that kept it.
+	if name == "fixtures" || strings.HasPrefix(name, "fixtures/") {
+		h.notFound(ctx, reqPath)
+		return
+	}
 	data, err := fs.ReadFile(h.dist, name)
 	if err != nil && errors.Is(err, fs.ErrNotExist) && path.Ext(name) == "" {
 		name = indexFile

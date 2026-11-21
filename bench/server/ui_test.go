@@ -26,6 +26,8 @@ func TestUIHandler(t *testing.T) {
 		{"traversal stays inside the UI", testUI(), "/../../etc/passwd", 200, "<title>bench</title>", "no-cache"},
 		{"api path", testUI(), "/api/other", 404, `"type":"not_found"`, ""},
 		{"not built", fstest.MapFS{".gitkeep": {}}, "/", 404, "UI not built", ""},
+		{"fixture data never served", withFixture(testUI()), "/fixtures/experiments.list.json", 404, "not found", ""},
+		{"fixture folder never served", withFixture(testUI()), "/fixtures", 404, "not found", ""},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -45,4 +47,10 @@ func TestUIHandler(t *testing.T) {
 			}
 		})
 	}
+}
+
+// withFixture adds a fixture file, as a UI build that kept public/fixtures has.
+func withFixture(m fstest.MapFS) fstest.MapFS {
+	m["fixtures/experiments.list.json"] = &fstest.MapFile{Data: []byte(`{"experiments":[{"id":"e_synthetic-codewins"}]}`)}
+	return m
 }

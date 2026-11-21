@@ -192,6 +192,38 @@ func TestBridgeValidators(t *testing.T) {
 	bad(validateHostedCanaryRun, `{"name":"c1","baseline":true,"inject":"model-outage"}`)
 }
 
+// TestSuiteAdmitWritesMissingControls: a new org has no oracle or noop
+// agent (they are not seeded and users never see them), so the admission
+// bridge writes them from the binary on first use, and keeps a file the
+// org already has.
+func TestSuiteAdmitWritesMissingControls(t *testing.T) {
+	root := t.TempDir()
+	if err := os.MkdirAll(filepath.Join(root, "agents"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(root, "agents", "noop.yaml"), []byte("id: noop\n# org copy\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	env := jobEnv{ProjectRoot: root, Hosted: true}
+	if _, _, err := validateHostedSuiteAdmit(context.Background(), env, json.RawMessage(`{"suite":"coding-core"}`)); err != nil {
+		t.Fatal(err)
+	}
+	b, err := os.ReadFile(filepath.Join(root, "agents", "oracle.yaml"))
+	if err != nil || !strings.Contains(string(b), "kind: oracle") {
+		t.Fatalf("oracle control not written: %v %s", err, b)
+	}
+	if b, _ := os.ReadFile(filepath.Join(root, "agents", "noop.yaml")); !strings.Contains(string(b), "# org copy") {
+		t.Fatalf("existing noop replaced: %s", b)
+	}
+	// A path other than the two controls is never written.
+	if err := ensureControlAgent(root, "agents/toy.yaml"); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := os.Stat(filepath.Join(root, "agents", "toy.yaml")); err == nil {
+		t.Fatal("ensureControlAgent wrote a non-control agent")
+	}
+}
+
 func TestBridgeKindsHostedOnly(t *testing.T) {
 	want := map[string]bool{kindAgentCheck: true, kindSuiteAdmit: true, kindCanaryRun: true}
 	jobKindsMu.Lock()

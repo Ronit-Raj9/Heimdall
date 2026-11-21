@@ -29,7 +29,48 @@ func fixture(t *testing.T) (Source, string) {
 	write(t, filepath.Join(ex, "benchmarks", "acme-demo", "suite.yaml"), "id: acme-demo\n")
 	write(t, filepath.Join(ex, "agents", "demo.yaml"), "id: demo\nbuild:\n  dockerfile: agents/images/codex/Dockerfile\n")
 	write(t, filepath.Join(ex, "deploy", "bench.yaml"), "x: 1\n")
-	return Source{Root: root}, t.TempDir()
+	return Source{Root: root, Examples: true}, t.TempDir()
+}
+
+// TestExamplesOffByDefault: the Acme example projects are developer content;
+// a Source without Examples (every hosted org) never lists or adds them.
+func TestExamplesOffByDefault(t *testing.T) {
+	src, project := fixture(t)
+	src.Examples = false
+	for _, e := range src.List(project) {
+		if e.Kind == KindExample {
+			t.Fatalf("example listed without Examples: %+v", e)
+		}
+	}
+	if _, ok := src.Find(project, "example-acme-demo"); ok {
+		t.Fatal("example found without Examples")
+	}
+	if _, ok := src.Find(project, "suite-extra-suite"); !ok {
+		t.Fatal("bundled suites must still be listed")
+	}
+}
+
+func TestDevContent(t *testing.T) {
+	t.Setenv(DevEnv, "1")
+	if !DevContent(false) {
+		t.Fatal("dev flag ignored locally")
+	}
+	if DevContent(true) {
+		t.Fatal("a hosted server offered developer content")
+	}
+	t.Setenv(DevEnv, "")
+	if DevContent(false) {
+		t.Fatal("developer content on without the flag")
+	}
+}
+
+// TestStarterHasNoControls: a new org never gets the scripted controls.
+func TestStarterHasNoControls(t *testing.T) {
+	for _, a := range StarterAgents {
+		if a == "oracle" || a == "noop" {
+			t.Fatalf("starter agents include %s", a)
+		}
+	}
 }
 
 func TestListAndAdd(t *testing.T) {
@@ -90,20 +131,23 @@ func TestSeedOnce(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(res.Agents) != 2 || len(res.Suites) != 1 {
+	if len(res.Agents) != 1 || len(res.Suites) != 1 {
 		t.Fatalf("seed = %+v", res)
 	}
-	for _, p := range []string{"agents/codex.yaml", "agents/noop.yaml", "agents/images/codex/Dockerfile", "benchmarks/coding-core/suite.yaml", SeedMarker} {
+	for _, p := range []string{"agents/codex.yaml", "agents/images/codex/Dockerfile", "benchmarks/coding-core/suite.yaml", SeedMarker} {
 		if _, err := os.Stat(filepath.Join(project, p)); err != nil {
 			t.Fatalf("%s missing: %v", p, err)
 		}
 	}
+	if _, err := os.Stat(filepath.Join(project, "agents", "noop.yaml")); err == nil {
+		t.Fatal("the noop control was seeded into a new org")
+	}
 	// The org deletes an agent: a later start does not bring it back.
-	_ = os.Remove(filepath.Join(project, "agents", "noop.yaml"))
+	_ = os.Remove(filepath.Join(project, "agents", "codex.yaml"))
 	if _, err := src.Seed(project); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := os.Stat(filepath.Join(project, "agents", "noop.yaml")); err == nil {
+	if _, err := os.Stat(filepath.Join(project, "agents", "codex.yaml")); err == nil {
 		t.Fatal("seed ran twice")
 	}
 	// Local serve from the bench folder itself seeds nothing.

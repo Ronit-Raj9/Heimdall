@@ -20,6 +20,7 @@ import (
 	"strings"
 	"time"
 
+	benchagents "github.com/maximhq/bifrost/bench/agents"
 	"github.com/maximhq/bifrost/bench/canary"
 	"github.com/maximhq/bifrost/bench/engine"
 	"github.com/maximhq/bifrost/bench/handlers"
@@ -123,6 +124,45 @@ func validSuiteRef(ref string) error {
 
 // validAgentFile checks an agent config path: a .yaml file inside the
 // project folder that exists.
+// ensureControlAgent writes a scripted control agent (agents/oracle.yaml,
+// agents/noop.yaml) into the project from the configs shipped in the binary
+// when it is missing. New orgs are not seeded with the controls and the
+// agent list hides them from users, but the admission checks still need
+// them by path. Any other path, or a file already there, is left alone.
+func ensureControlAgent(root, rel string) error {
+	if rel != bridgeOracleAgent && rel != bridgeNoopAgent {
+		return nil
+	}
+	b, err := benchagents.Files.ReadFile(filepath.Base(rel))
+	if err != nil {
+		return fmt.Errorf("control agent %s is not shipped in this build: %w", rel, err)
+	}
+	if err := os.MkdirAll(filepath.Join(root, filepath.Dir(rel)), 0o755); err != nil {
+		return err
+	}
+	// The folder must resolve inside the project (no symlink out of it).
+	dir, err := ops.Confine(root, "agent", filepath.Dir(rel))
+	if err != nil {
+		return err
+	}
+	p := filepath.Join(dir, filepath.Base(rel))
+	if _, err := os.Lstat(p); err == nil {
+		return nil
+	}
+	f, err := os.OpenFile(p, os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0o644)
+	if err != nil {
+		if errors.Is(err, os.ErrExist) {
+			return nil
+		}
+		return err
+	}
+	if _, err := f.Write(b); err != nil {
+		f.Close()
+		return err
+	}
+	return f.Close()
+}
+
 func validAgentFile(root, what, rel string) error {
 	ext := strings.ToLower(filepath.Ext(rel))
 	if ext != ".yaml" && ext != ".yml" {
@@ -180,11 +220,13 @@ func validateHostedSuiteAdmit(ctx context.Context, env jobEnv, raw json.RawMessa
 	if p.Noop == "" {
 		p.Noop = bridgeNoopAgent
 	}
-	if err := validAgentFile(env.ProjectRoot, "oracle", p.Oracle); err != nil {
-		return nil, "", invalid(err)
-	}
-	if err := validAgentFile(env.ProjectRoot, "noop", p.Noop); err != nil {
-		return nil, "", invalid(err)
+	for _, a := range [][2]string{{"oracle", p.Oracle}, {"noop", p.Noop}} {
+		if err := ensureControlAgent(env.ProjectRoot, a[1]); err != nil {
+			return nil, "", err
+		}
+		if err := validAgentFile(env.ProjectRoot, a[0], a[1]); err != nil {
+			return nil, "", invalid(err)
+		}
 	}
 	if _, err := bridgeTimeout(p.TimeoutMin); err != nil {
 		return nil, "", invalid(err)

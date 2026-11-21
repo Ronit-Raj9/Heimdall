@@ -81,13 +81,15 @@ func (h *Handler) getPacks(ctx *fasthttp.RequestCtx) {
 }
 
 // Views resolves every pack against the loadable benchmarks in sums. A
-// benchmark that failed to load is left out. Every pack is listed, even one
-// with no benchmark available, so the UI can show it greyed.
+// benchmark that failed to load, or has no ready (admitted) task, is left
+// out: a pack never offers what cannot run (the Benchmarks page lists those
+// as not ready yet). Every pack is listed, even one with no benchmark
+// available, so the UI can show it greyed.
 func Views(sums []schemas.SuiteSummary) []PackView {
 	ready := make(map[string]int, len(sums))
 	ids := make([]string, 0, len(sums))
 	for _, s := range sums {
-		if s.ID == "" || s.Error != "" {
+		if s.ID == "" || s.Error != "" || s.AdmittedCount <= 0 {
 			continue
 		}
 		ids = append(ids, s.ID)

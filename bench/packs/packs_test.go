@@ -125,6 +125,7 @@ func TestHandler(t *testing.T) {
 		{ID: "hd-swe-verified", AdmittedCount: 3},
 		{ID: "agentdojo-banking", AdmittedCount: 5},
 		{ID: "hd-swe-rebench", Error: "broken"},
+		{ID: "agentdojo-slack", AdmittedCount: 0, TaskCount: 20}, // N19: listed tasks, none ready
 	}
 	code, body := serve(t, fakeLister{sums: sums})
 	if code != 200 {
@@ -145,7 +146,7 @@ func TestHandler(t *testing.T) {
 	if v := by["voice"]; v.Benchmarks == nil || len(v.Benchmarks) != 0 {
 		t.Errorf("voice = %+v", v)
 	}
-	if v := by["safety"]; !slices.Equal(v.Benchmarks, []string{"agentdojo-banking"}) || v.TotalReady != 5 {
+	if v := by["safety"]; !slices.Equal(v.Benchmarks, []string{"agentdojo-banking"}) || v.TotalReady != 5 { // agentdojo-slack has no ready task
 		t.Errorf("safety = %+v", v)
 	}
 	if v := by[AllCompatible]; len(v.Benchmarks) != 3 {
