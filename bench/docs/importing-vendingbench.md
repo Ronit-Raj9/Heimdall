@@ -4,12 +4,16 @@
 
 ```sh
 git clone --depth 1 https://github.com/ProsusAI/vending-bench datasets/vending-bench
-bifrost-bench import vendingbench -from datasets/vending-bench -suite vending-bench
+# the 365-day tasks: upstream's own frozen full-year task (config, briefing, reference world)
+(cd datasets/vending-bench && python3 scripts/prepare_task.py --days 365 --output ../vending-bench-365d)
+bifrost-bench import vendingbench -from datasets/vending-bench -suite vending-bench -set year_task=datasets/vending-bench-365d
 ```
+
+Without `year_task` the five 365-day tasks are skipped with that reason. The shipped task's `solution/world.json` is rendered for 30 days, so its reference cannot finish a year (tried: reward 0 on seeds 1 and 2).
 
 ## Tasks
 
-Ten tasks, matching upstream's published baseline matrix (`results/baselines/scripted-reference`): `vending-30d-seed1..5` (the default 30-day challenge) and `vending-365d-seed1..5` (`variants/full-year.toml`). The seed and config are written into the compose file (`VENDING_SEED`, `VENDING_CONFIG`). Agent timeout: 4 h for 30 days, 12 h for 365 days (upstream: 12 h).
+Ten tasks, matching upstream's published baseline matrix (`results/baselines/scripted-reference`): `vending-30d-seed1..5` (the default 30-day challenge) and `vending-365d-seed1..5` (staged from `prepare_task.py --days 365`, the same world as `variants/full-year.toml`). The seed is written into the compose file (`VENDING_SEED`). Agent timeout: 4 h for 30 days, 12 h for 365 days (upstream: 12 h).
 
 ## What changes
 

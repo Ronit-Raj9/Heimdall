@@ -74,7 +74,7 @@ func variants(seeds []int) []variant {
 		out = append(out, variant{id: fmt.Sprintf("vending-30d-seed%d", s), days: 30, seed: s})
 	}
 	for _, s := range seeds {
-		out = append(out, variant{id: fmt.Sprintf("vending-365d-seed%d", s), days: 365, config: "/config/full-year.toml", seed: s})
+		out = append(out, variant{id: fmt.Sprintf("vending-365d-seed%d", s), days: 365, seed: s})
 	}
 	return out
 }
@@ -93,16 +93,36 @@ func (importer) Import(ctx context.Context, opts importers.Options) (*importers.
 		return nil, errors.New("vendingbench: the harbor importer is not linked")
 	}
 	seeds := []int{1, 2, 3, 4, 5}
+	// The 365-day tasks come from upstream's own frozen full-year task
+	// (scripts/prepare_task.py --days 365): its config.toml, briefing and
+	// reference world.json are rendered for the year. The shipped task's
+	// world.json is the 30-day one, so its reference cannot finish a year.
+	yearTask := opts.Extra["year_task"]
+	extraIn := map[string]string{}
+	for k, v := range opts.Extra {
+		if k != "year_task" {
+			extraIn[k] = v
+		}
+	}
 	stage, err := os.MkdirTemp("", "vendingbench-stage-")
 	if err != nil {
 		return nil, err
 	}
 	defer os.RemoveAll(stage)
+	var skipped []importers.Skip
 	for _, v := range variants(seeds) {
 		if len(opts.IDs) > 0 && !contains(opts.IDs, v.id) {
 			continue
 		}
-		if err := stageVariant(task, filepath.Join(stage, v.id), v); err != nil {
+		src := task
+		if v.days == 365 {
+			if yearTask == "" {
+				skipped = append(skipped, importers.Skip{ID: v.id, Reason: "no full-year task: run `python3 scripts/prepare_task.py --days 365 --output <dir>` in the clone and pass -set year_task=<dir>"})
+				continue
+			}
+			src = yearTask
+		}
+		if err := stageVariant(src, filepath.Join(stage, v.id), v); err != nil {
 			return nil, fmt.Errorf("vendingbench: stage %s: %w", v.id, err)
 		}
 	}
@@ -114,7 +134,7 @@ func (importer) Import(ctx context.Context, opts importers.Options) (*importers.
 	if rev := gitHead(opts.From); rev != "" {
 		extra["revision"] = rev
 	}
-	for k, v := range opts.Extra {
+	for k, v := range extraIn {
 		extra[k] = v
 	}
 	hopts := opts
@@ -130,6 +150,7 @@ func (importer) Import(ctx context.Context, opts importers.Options) (*importers.
 		}
 		return res, err
 	}
+	res.Skipped = append(res.Skipped, skipped...)
 	if err := setPassThreshold(opts.SuiteDir(), "1500"); err != nil {
 		return nil, err
 	}
@@ -174,7 +195,7 @@ var (
 	reSeparate   = regexp.MustCompile(`(?m)^environment_mode\s*=.*\n`)
 	reCollect    = regexp.MustCompile(`(?ms)^\[\[verifier\.collect\]\]\n.*?\n\n`)
 	reMCP        = regexp.MustCompile(`(?ms)^\[\[environment\.mcp_servers\]\]\n.*?\n\n`)
-	reName       = regexp.MustCompile(`(?m)^name\s*=\s*"prosus/prosus-vending-bench"`)
+	reName       = regexp.MustCompile(`(?m)^name\s*=\s*"prosus/prosus-vending-bench[^"]*"`)
 	reAgentLimit = regexp.MustCompile(`(?m)^(\[agent\]\ntimeout_sec\s*=\s*)[0-9.]+`)
 )
 
@@ -248,11 +269,8 @@ func rewriteInstruction(path string, v variant) error {
 		return err
 	}
 	s := string(b)
-	if v.days == 365 {
-		if !strings.Contains(s, "**30 simulated days**") {
-			return errors.New("instruction.md: horizon text not found")
-		}
-		s = strings.Replace(s, "**30 simulated days**", "**365 simulated days**", 1)
+	if !strings.Contains(s, fmt.Sprintf("**%d simulated days**", v.days)) {
+		return fmt.Errorf("instruction.md: horizon %d days not stated (wrong source folder?)", v.days)
 	}
 	s += "\nThe simulation is reached through the MCP server `sim-server` configured for you (tools such as search_web, email and machine management). Keep going until the simulation reports that it has ended.\n"
 	return os.WriteFile(path, []byte(s), 0o644)
