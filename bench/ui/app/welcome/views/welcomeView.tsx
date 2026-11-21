@@ -86,6 +86,14 @@ export default function WelcomeView() {
 
 	const suiteObj = suites.data?.suites.find((s) => s.id === suite);
 	const agentObj = agents.data?.agents.find((a) => a.id === agent);
+	// Start the model step on the agent's own model, so Continue works without typing.
+	const [prefilledFor, setPrefilledFor] = useState<string | null>(null);
+	useEffect(() => {
+		if (agentObj?.model && prefilledFor !== agentObj.id) {
+			setPrefilledFor(agentObj.id);
+			setModel({ provider: providerForModel(agentObj.model), model: agentObj.model });
+		}
+	}, [agentObj?.id, agentObj?.model, prefilledFor]);
 
 	return (
 		<section className="mx-auto flex w-full max-w-4xl min-w-0 flex-col gap-6 pb-10" data-testid="welcome-view">
@@ -569,4 +577,12 @@ function VerdictStep({ expId, suite, agent, onRestart }: { expId: string; suite?
 			</div>
 		</StepCard>
 	);
+}
+
+/** Best guess of the gateway provider of an agent's default model name. */
+function providerForModel(model: string): ModelRef["provider"] {
+	const m = model.toLowerCase();
+	if (m.startsWith("claude")) return "anthropic";
+	if (m.startsWith("gemini")) return "gemini";
+	return "openai";
 }
