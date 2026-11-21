@@ -1,0 +1,1 @@
+{"audio": "audio/0000.wav", "id": "0000", "prompt": "Which of these would let the most heat travel through?\nA. a new pair of jeans\nB. a steel spoon in a cafeteria\nC. a cotton candy at a store\nD. a calvin klein cotton hat\n\nWhat is the answer?", "reference": "B", "row": 0, "shard": "openbookqa/test-00000-of-00001.parquet", "subset": "openbookqa"}
