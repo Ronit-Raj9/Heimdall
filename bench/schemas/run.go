@@ -217,6 +217,13 @@ type RunContext struct {
 	// schemas/gpu.go): only the agent container and the verifier get them.
 	// Nil for a run of a task without a GPU request; never written to disk.
 	GPU *GPUAssignment
+
+	// Secrets are the org secret values this run names (external api
+	// auth_env, agent env {{secret.NAME}}), resolved at prepare
+	// (schemas/secrets.go). Nil means the run reads the bench's own
+	// environment (no secret source). Held in memory only: never logged,
+	// written to disk or sealed.
+	Secrets map[string]string `json:"-"`
 }
 
 // outcomeScoredMetrics are the metrics whose value is the run's verified

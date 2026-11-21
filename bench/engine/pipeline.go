@@ -67,6 +67,10 @@ type SlotInput struct {
 	// gpu.go); nil for a task without a GPU request, or when RunSlot should
 	// take them from the registry's pool itself.
 	GPU *schemas.GPUAssignment
+	// Secrets are the org secret values a remote worker received with the
+	// lease (G01, remotecreds.go). Non-nil, they are the run's only secret
+	// source; nil, the registry's Secrets source resolves them.
+	Secrets map[string]string
 }
 
 // SlotResult is a finished run.

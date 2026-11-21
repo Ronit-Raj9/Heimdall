@@ -144,5 +144,39 @@ func (h *leaseCredsHandler) get(ctx *fasthttp.RequestCtx) {
 		out.Credentials = append(out.Credentials, schemas.ProviderCredential{KeyID: k.ID, Provider: k.Provider,
 			BaseURL: k.BaseURL, Models: k.Models, Value: v})
 	}
+	if len(holder.SecretNames) > 0 { // G01: the org secrets this slot names, and no others
+		secrets, err := h.leaseSecrets(work, holder.SecretNames)
+		if err != nil {
+			lib.SendError(ctx, h.mode, fasthttp.StatusInternalServerError, lib.ErrTypeInternal, "read the organization's secrets failed")
+			return
+		}
+		out.Secrets = secrets
+	}
 	lib.SendJSON(ctx, h.mode, fasthttp.StatusOK, out)
+}
+
+// leaseSecrets reveals the org secrets named in names (keystore kind
+// secret, name in Label). A name the org has no secret for is left out: the
+// runner's run then fails naming it and pointing to Settings > Secrets.
+func (h *leaseCredsHandler) leaseSecrets(ctx context.Context, names []string) (map[string]string, error) {
+	want := map[string]bool{}
+	for _, n := range names {
+		want[n] = true
+	}
+	keys, err := h.keys.List(ctx, h.orgID, keystore.KindSecret)
+	if err != nil {
+		return nil, err
+	}
+	out := map[string]string{}
+	for _, k := range keys {
+		if !want[k.Label] || out[k.Label] != "" || (k.Kind != "" && k.Kind != keystore.KindSecret) {
+			continue
+		}
+		v, err := h.keys.Reveal(ctx, h.orgID, k.ID)
+		if err != nil || v == "" {
+			continue // never echoed
+		}
+		out[k.Label] = v
+	}
+	return out, nil
 }

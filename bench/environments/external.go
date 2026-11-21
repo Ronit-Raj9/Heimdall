@@ -94,8 +94,12 @@ func externalAPIs(rc *schemas.RunContext, svcs []runService) ([]externalAPI, err
 			}
 		default:
 			if r.API.AuthEnv != "" {
-				if v, ok := lookupEnv(r.API.AuthEnv); !ok || v == "" {
-					return nil, fmt.Errorf("external api %s runs %s but auth_env %s is not set in the bench's environment", r.API.ID, mode, r.API.AuthEnv)
+				if rc.Secrets != nil { // G01: the org's secrets are the run's only source
+					if rc.Secrets[r.API.AuthEnv] == "" {
+						return nil, fmt.Errorf("external api %s runs %s but org secret %s is not set: %s", r.API.ID, mode, r.API.AuthEnv, schemas.SecretsHint)
+					}
+				} else if v, ok := lookupEnv(r.API.AuthEnv); !ok || v == "" {
+					return nil, fmt.Errorf("external api %s runs %s but auth_env %s is not set in the bench's environment (or %s)", r.API.ID, mode, r.API.AuthEnv, schemas.SecretsHint)
 				}
 			}
 		}
@@ -142,8 +146,10 @@ func externalRoutes(runID string, ext []externalAPI) []toolRoute {
 
 // externalProxyEnv is the docker create flags that hand the tool proxy the
 // credentials of its live and record APIs: `-e NAME` with no value, so the
-// docker CLI copies the value from the bench's environment and it never
-// appears on a command line, in a log or in routes.json. It is pure.
+// docker CLI copies the value from its own environment and it never
+// appears on a command line, in a log or in routes.json. That environment
+// is the bench's, or, when the run has org secrets, the bench's with the
+// secrets layered over it (externalProxySecretEnv). It is pure.
 func externalProxyEnv(ext []externalAPI) []string {
 	var args []string
 	seen := map[string]bool{}
@@ -156,6 +162,30 @@ func externalProxyEnv(ext []externalAPI) []string {
 		args = append(args, "-e", name)
 	}
 	return args
+}
+
+// externalProxySecretEnv is the NAME=value pairs the docker CLI that
+// creates the tool proxy runs with, so `-e NAME` copies the org secret
+// (G01). Nil when the run has no org secrets (the bench's environment
+// serves). Only the proxy's own credentials are included. The pairs go
+// into the CLI process environment, never onto its command line.
+func externalProxySecretEnv(rc *schemas.RunContext, ext []externalAPI) []string {
+	if rc == nil || rc.Secrets == nil {
+		return nil
+	}
+	var env []string
+	seen := map[string]bool{}
+	for _, x := range ext {
+		name := x.ref.API.AuthEnv
+		if x.mode == schemas.ExternalReplay || name == "" || seen[name] {
+			continue
+		}
+		seen[name] = true
+		if v := rc.Secrets[name]; v != "" {
+			env = append(env, name+"="+v)
+		}
+	}
+	return env
 }
 
 // externalLive reports whether any external API of the run reaches the real

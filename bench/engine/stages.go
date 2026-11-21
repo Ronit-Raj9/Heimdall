@@ -60,6 +60,9 @@ func (p *Pipeline) prepare(ctx context.Context, st *runState) error {
 	if err := p.checkTaskAgentImage(ctx, st); err != nil {
 		return err
 	}
+	if err := p.resolveSecrets(ctx, st); err != nil { // G01: org secrets the run names (secrets.go)
+		return err
+	}
 	h, err := st.env.Create(ctx, st.rc)
 	if err != nil {
 		return wrapPart("environment", st.env, fmt.Errorf("create workspace: %w", err))

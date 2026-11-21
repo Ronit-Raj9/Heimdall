@@ -159,6 +159,9 @@ export function SecretsTab(_props: Record<string, unknown> = {}) {
 				<p className="text-muted-foreground text-xs" data-testid="secrets-usage">
 					{t("usage")}
 				</p>
+				<p className="text-muted-foreground text-xs" data-testid="secrets-agent-usage">
+					{t("agentUsage", { ref: "{{secret.TAVILY_API_KEY}}" })}
+				</p>
 				{list.isLoading ? (
 					<BlockSkeleton rows={3} testId="secrets-loading" />
 				) : list.isError || !list.data ? (

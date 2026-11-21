@@ -21,7 +21,13 @@ type LeaseCredentials struct {
 	LeaseID     string               `json:"lease_id"`
 	ExpID       string               `json:"exp_id,omitempty"`
 	Credentials []ProviderCredential `json:"credentials"`
-	IssuedAt    time.Time            `json:"issued_at"`
+	// Secrets are the org secrets the leased slot names (external api
+	// auth_env, agent env {{secret.NAME}}; gap G01), name to value. Only the
+	// names of that slot, only to a runner token of the lease's org. The
+	// runner holds them in memory and hands them to the run's tool proxy
+	// and agent env; never logged or written to a run folder.
+	Secrets  map[string]string `json:"secrets,omitempty"`
+	IssuedAt time.Time         `json:"issued_at"`
 }
 
 // LeaseHolder is who holds a coordinator lease: the worker, the runner token
@@ -31,4 +37,7 @@ type LeaseHolder struct {
 	TokenID  string
 	OrgID    string
 	ExpID    string
+	// SecretNames are the org secrets the leased slot names (G01): the
+	// credentials route reveals these and no others.
+	SecretNames []string
 }

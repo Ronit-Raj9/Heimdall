@@ -270,7 +270,11 @@ func (w *Worker) Work(ctx context.Context, lease *schemas.WorkerLease) *schemas.
 		w.release(ctx, lease, "the leased slot is not the manifest's slot "+lease.Slot.SlotID, true, nil)
 		return nil
 	}
-	if why := w.applyLeaseCredentials(sctx, lease); why != "" { // F4 key delivery (remotecreds.go)
+	leaseSecrets, why := w.applyLeaseCredentials(sctx, lease) // F4 key delivery, G01 org secrets (remotecreds.go)
+	if leaseSecrets == nil && exp.m.Gateway.Deferred() {
+		leaseSecrets = map[string]string{} // G01: a hosted org's run never reads this runner's own environment
+	}
+	if why != "" {
 		w.logger.Warn("lease refused", "lease", lease.LeaseID, "experiment", lease.ExpID, "reason", why)
 		stop()
 		w.release(ctx, lease, why, false, nil)
@@ -307,7 +311,7 @@ func (w *Worker) Work(ctx context.Context, lease *schemas.WorkerLease) *schemas.
 		}
 		return nil
 	}
-	in := SlotInput{Manifest: runM, Suite: exp.suite, Slot: slot, Attempt: lease.Attempt}
+	in := SlotInput{Manifest: runM, Suite: exp.suite, Slot: slot, Attempt: lease.Attempt, Secrets: leaseSecrets}
 	if len(lease.GPUs) > 0 { // QC2-10-09: the devices the coordinator reserved, not the pool's first fit
 		a, release, why := w.leasedGPUs(sctx, lease.GPUs)
 		if why != "" {

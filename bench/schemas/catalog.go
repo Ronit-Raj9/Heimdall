@@ -75,4 +75,8 @@ type Registry struct {
 	Fault         FaultController // nil when no fault proxy is configured
 	Store         Store
 	GPUs          GPUAllocator // X7: GPU pool of this machine (schemas/gpu.go); nil when GPU tasks are not supported here
+	// Secrets resolves the org secrets a run names (external api auth_env,
+	// agent env {{secret.NAME}}); nil keeps the bench's own environment
+	// (schemas/secrets.go).
+	Secrets SecretSource
 }

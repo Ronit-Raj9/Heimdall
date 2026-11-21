@@ -40,7 +40,17 @@ type Docker struct {
 // Run executes `docker args...`. A non-zero exit is returned in ExitCode with a
 // nil error; err is non-nil only when docker could not run or ctx ended.
 func (d Docker) Run(ctx context.Context, args ...string) (*DockerResult, error) {
+	return d.RunEnv(ctx, nil, args...)
+}
+
+// RunEnv is Run with extra NAME=value pairs layered over the process
+// environment of the docker CLI, so a `-e NAME` flag copies a value that
+// must never appear on a command line (org secrets, G01).
+func (d Docker) RunEnv(ctx context.Context, env []string, args ...string) (*DockerResult, error) {
 	cmd := exec.CommandContext(ctx, d.bin(), args...)
+	if len(env) > 0 {
+		cmd.Env = append(os.Environ(), env...)
+	}
 	var stdout, stderr bytes.Buffer
 	cmd.Stdout = &stdout
 	cmd.Stderr = &stderr
@@ -60,7 +70,12 @@ func (d Docker) Run(ctx context.Context, args ...string) (*DockerResult, error) 
 
 // MustRun is Run that turns a non-zero exit into an error carrying stderr.
 func (d Docker) MustRun(ctx context.Context, args ...string) (*DockerResult, error) {
-	res, err := d.Run(ctx, args...)
+	return d.MustRunEnv(ctx, nil, args...)
+}
+
+// MustRunEnv is MustRun with RunEnv's extra environment.
+func (d Docker) MustRunEnv(ctx context.Context, env []string, args ...string) (*DockerResult, error) {
+	res, err := d.RunEnv(ctx, env, args...)
 	if err != nil {
 		return res, err
 	}

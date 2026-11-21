@@ -7,6 +7,7 @@ import (
 	"net/url"
 
 	"github.com/maximhq/bifrost/bench/schemas"
+	"github.com/maximhq/bifrost/bench/utils"
 )
 
 // F4 key delivery (lane L05): a hosted runner fetches its organization's
@@ -39,6 +40,9 @@ func (c *Coordinator) LeaseHolder(leaseID string) (schemas.LeaseHolder, bool) {
 	out := schemas.LeaseHolder{WorkerID: l.worker, OrgID: c.opts.OrgID}
 	if l.slot != nil {
 		out.ExpID = l.slot.ExpID
+		if l.r != nil { // G01: only the secrets this slot's runs name
+			out.SecretNames = utils.SlotSecretNames(l.r.m, l.r.suite, l.slot)
+		}
 	}
 	if w, ok := c.workers[l.worker]; ok && w != nil {
 		out.TokenID = w.scope.TokenID
@@ -47,33 +51,37 @@ func (c *Coordinator) LeaseHolder(leaseID string) (schemas.LeaseHolder, bool) {
 }
 
 // applyLeaseCredentials fetches the lease's organization keys and applies
-// them to the runner's gateway. It returns a refusal reason only when the
-// coordinator refused the runner (another organization's lease); every other
+// them to the runner's gateway, and returns the org secrets the lease
+// delivered (G01; nil when the server delivered none). It returns a refusal
+// reason only when the coordinator refused the runner (another
+// organization's lease) or the keys could not be applied; every other
 // failure (a server without key delivery, an org without keys) falls back to
 // the runner-wide keys and is logged.
-func (w *Worker) applyLeaseCredentials(ctx context.Context, lease *schemas.WorkerLease) string {
-	if w.reg == nil || w.reg.Gateway == nil {
-		return ""
-	}
-	gw, ok := w.reg.Gateway.(OrgCredentialGateway)
-	if !ok {
-		return ""
+func (w *Worker) applyLeaseCredentials(ctx context.Context, lease *schemas.WorkerLease) (map[string]string, string) {
+	var gw OrgCredentialGateway
+	if w.reg != nil && w.reg.Gateway != nil {
+		gw, _ = w.reg.Gateway.(OrgCredentialGateway)
 	}
 	var out schemas.LeaseCredentials
 	err := w.call(ctx, http.MethodGet, workerAPI+"/leases/"+url.PathEscape(lease.LeaseID)+"/credentials", nil, &out)
 	switch {
 	case errors.Is(err, schemas.ErrWorkerScope) || errors.Is(err, schemas.ErrWorkerAuth):
-		return "the coordinator refused the lease's credentials: " + err.Error()
+		return nil, "the coordinator refused the lease's credentials: " + err.Error()
 	case err != nil:
 		w.logger.Info("no organization keys for the lease; using this runner's own provider keys", "lease", lease.LeaseID, "reason", err.Error())
-		return ""
-	case len(out.Credentials) == 0 || out.OrgID == "":
-		return ""
+		return nil, ""
+	}
+	secrets := out.Secrets
+	if secrets == nil {
+		secrets = map[string]string{} // the server answered: its org secrets are the run's only source
+	}
+	if gw == nil || len(out.Credentials) == 0 || out.OrgID == "" {
+		return secrets, ""
 	}
 	if err := gw.ApplyOrgCredentials(ctx, out.OrgID, out.Credentials); err != nil {
-		return "apply the organization's provider keys: " + err.Error()
+		return nil, "apply the organization's provider keys: " + err.Error()
 	}
 	gw.BindExperimentOrg(lease.ExpID, out.OrgID)
 	w.logger.Info("organization provider keys applied", "lease", lease.LeaseID, "org", out.OrgID, "keys", len(out.Credentials))
-	return ""
+	return secrets, ""
 }

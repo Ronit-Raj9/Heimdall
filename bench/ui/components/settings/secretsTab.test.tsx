@@ -1,4 +1,4 @@
-import "@/lib/i18n";
+import i18n from "@/lib/i18n";
 
 import { normalizeSecretName, secretNameProblem } from "@/lib/types/secrets";
 import { renderToStaticMarkup } from "react-dom/server";
@@ -37,5 +37,13 @@ describe("secret names", () => {
 		expect(secretNameProblem("HEIMDALL_MASTER_KEY")).toBe("reserved");
 		expect(secretNameProblem("PATH")).toBe("reserved");
 		expect(secretNameProblem("TAVILY_API_KEY")).toBeNull();
+	});
+});
+
+describe("secrets usage note", () => {
+	it("documents the agent env {{secret.NAME}} reference verbatim", () => {
+		const note = i18n.t("agentUsage", { ns: "secrets", ref: "{{secret.TAVILY_API_KEY}}" });
+		expect(note).toContain("{{secret.TAVILY_API_KEY}}");
+		expect(note).toContain("agent YAML");
 	});
 });
