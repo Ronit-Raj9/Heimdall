@@ -46,6 +46,7 @@
 		"failed": "The job failed:",
 		"succeeded": "Done.",
 		"cancelled": "Cancelled.",
-		"startError": "Could not start the job"
+		"startError": "Could not start the job",
+		"experiment": "Open experiment {{expId}}"
 	}
 }

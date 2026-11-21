@@ -326,17 +326,31 @@ type proof struct {
 // tasks list. A record that fails either test is dropped and reported:
 // that task needs `task admit` again.
 func recordProofs(ctx context.Context, a *app, suiteID string, before []byte, proofs map[string]proof) ([]string, error) {
+	s, lock, dropped, err := buildProofLock(ctx, a, suiteID, before, proofs)
+	if err != nil {
+		return nil, err
+	}
+	if _, err := suite.WriteLock(filepath.Join(s.Root, "suite.lock"), lock); err != nil {
+		return nil, fmt.Errorf("write suite.lock: %w", err)
+	}
+	return dropped, nil
+}
+
+// buildProofLock is recordProofs without the write: the loaded suite, the
+// fresh lock with the proofs recorded, and the dropped task ids. The hosted
+// tasks.mine and suite.admit jobs write the lock through the project store.
+func buildProofLock(ctx context.Context, a *app, suiteID string, before []byte, proofs map[string]proof) (*schemas.Suite, *schemas.SuiteLock, []string, error) {
 	s, err := loadSuite(ctx, a.cfg.Path(a.cfg.BenchmarksRoot), suiteID)
 	if err != nil {
-		return nil, fmt.Errorf("load suite %s: %w", suiteID, err)
+		return nil, nil, nil, fmt.Errorf("load suite %s: %w", suiteID, err)
 	}
 	after, err := os.ReadFile(filepath.Join(s.Root, "suite.yaml"))
 	if err != nil {
-		return nil, err
+		return nil, nil, nil, err
 	}
 	sameSuite, err := sameExceptTasks(before, after)
 	if err != nil {
-		return nil, err
+		return nil, nil, nil, err
 	}
 	all := map[string]proof{}
 	if prev := s.Lock; prev != nil && prev.Fingerprints != nil {
@@ -351,7 +365,7 @@ func recordProofs(ctx context.Context, a *app, suiteID string, before []byte, pr
 	}
 	lock, err := suite.LockWith(s, time.Now().UTC(), lockFingerprintOptions(ctx, a.cfg, a.docker, suite.LockPinsLocal(s.Lock)))
 	if err != nil {
-		return nil, fmt.Errorf("lock: %w", err)
+		return nil, nil, nil, fmt.Errorf("lock: %w", err)
 	}
 	var dropped []string
 	ids := make([]string, 0, len(all))
@@ -370,13 +384,10 @@ func recordProofs(ctx context.Context, a *app, suiteID string, before []byte, pr
 			continue
 		}
 		if err := suite.RecordAdmission(lock, id, p.rec); err != nil {
-			return nil, err
+			return nil, nil, nil, err
 		}
 	}
-	if _, err := suite.WriteLock(filepath.Join(s.Root, "suite.lock"), lock); err != nil {
-		return nil, fmt.Errorf("write suite.lock: %w", err)
-	}
-	return dropped, nil
+	return s, lock, dropped, nil
 }
 
 // sameSuiteExceptTasks compares two suite fingerprints on every settings

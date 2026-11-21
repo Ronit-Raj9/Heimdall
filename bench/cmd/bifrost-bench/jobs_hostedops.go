@@ -33,7 +33,6 @@ import (
 const (
 	bridgeDefaultTimeout = 30 * time.Minute
 	bridgeMaxTimeout     = 6 * time.Hour
-	bridgePollEvery      = 3 * time.Second
 	// bridgeIdlePolls is how many polls in a row must see the experiment
 	// inactive before it counts as ended: the run job is queued a moment
 	// after Start returns.
@@ -43,6 +42,10 @@ const (
 	bridgeOracleAgent = "agents/oracle.yaml"
 	bridgeNoopAgent   = "agents/noop.yaml"
 )
+
+// bridgePollEvery is how often a bridge job polls its experiment (a var so
+// tests poll fast).
+var bridgePollEvery = 3 * time.Second
 
 // errNoRunner is what a bridge job answers when no runner can take its slots.
 var errNoRunner = errors.New("no runner online: hosted checks run as experiments on runners; start a runner (Runners page) or ask your server owner to enable the shared pool")
@@ -63,7 +66,6 @@ func init() {
 		Validate: validateHostedCanaryRun, Run: runHostedCanaryRun,
 	})
 }
-
 
 // Params of the bridge kinds.
 type (
@@ -524,6 +526,8 @@ type hostedAdmitReport struct {
 	Tasks    []hostedAdmitTask `json:"tasks"`
 	Admitted int               `json:"admitted"`
 	Failed   int               `json:"failed"`
+	LockPath string            `json:"lock,omitempty"`
+	Dropped  []string          `json:"dropped,omitempty"`
 	Note     string            `json:"note"`
 }
 
@@ -616,8 +620,27 @@ func runHostedSuiteAdmit(ctx context.Context, env jobEnv, j *jobs.Job, log jobs.
 	if err != nil {
 		return nil, err
 	}
-	if err := requireRunner(l); err != nil {
+	if err := bridgeRequireRunner(l); err != nil {
 		return nil, err
+	}
+	if env.App == nil || env.App.cfg == nil {
+		return nil, errors.New("no organization app")
+	}
+	// As local `suite admit`: static validation first; any error refuses the
+	// admission before a runner is used and nothing is written.
+	suiteID, _, _ := strings.Cut(p.Suite, "@")
+	st, err := snapshotSuite(ctx, env.App, suiteID)
+	if err != nil {
+		return nil, err
+	}
+	if p.Task != "" && st.suite.TaskByID(p.Task) == nil {
+		return nil, fmt.Errorf("suite %s has no task %q in its tasks list", suiteID, p.Task)
+	}
+	if errs := staticErrors(ctx, st.suite, p.Task); len(errs) > 0 {
+		for _, e := range errs {
+			log.Warnf("error   %s", e)
+		}
+		return nil, fmt.Errorf("static validation found %d errors; fix them (Edit tab) and admit again", len(errs))
 	}
 	m, err := l.Plan(ctx, admitExperiment(p))
 	if err != nil {
@@ -635,15 +658,25 @@ func runHostedSuiteAdmit(ctx context.Context, env jobEnv, j *jobs.Job, log jobs.
 		return nil, fmt.Errorf("suite %s has %d tasks; admit at most %d at once (name one task)", p.Suite, len(tasks), bridgeMaxTasks)
 	}
 	rep := &hostedAdmitReport{Suite: p.Suite, ExpID: m.ExpID,
-		Note: "hosted admission proves the controls on a runner; it does not write suite.lock (lock the suite from a local checkout)"}
+		Note: "hosted admission proves the oracle and noop controls on a runner and records each result in suite.lock"}
+	log.Printf("admission controls run in experiment %s (open it on the Experiments page)", m.ExpID)
 	if err := runExperiment(ctx, l, m, timeout, log); err != nil {
 		return rep, err
 	}
-	runs, err := sealedRuns(ctx, env, m.ExpID)
+	runs, err := bridgeSealedRuns(ctx, env, m.ExpID)
 	if err != nil {
 		return rep, err
 	}
 	rep.Tasks = admitVerdict(runs, tasks)
+	path, dropped, err := recordHostedAdmissions(ctx, env, st, rep.Tasks, m.ExpID, jobActor(j))
+	if err != nil {
+		return rep, fmt.Errorf("record the admission: %w", err)
+	}
+	rep.LockPath, rep.Dropped = path, dropped
+	log.Printf("wrote %s", path)
+	for _, id := range dropped {
+		log.Warnf("the admission of %s was not recorded: the task or suite changed during the run; admit it again", id)
+	}
 	for _, t := range rep.Tasks {
 		if t.Admitted {
 			rep.Admitted++

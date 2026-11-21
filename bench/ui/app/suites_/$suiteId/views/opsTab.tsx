@@ -4,11 +4,12 @@ import { EmptyState } from "@/components/shell/emptyState";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { canUse, useSession } from "@/lib/session/sessionContext";
-import { getBenchErrorMessage } from "@/lib/store/apis/benchApi";
+import { benchApi, getBenchErrorMessage } from "@/lib/store/apis/benchApi";
 import { useQuarantineTaskMutation, useRestoreTaskMutation } from "@/lib/store/apis/suiteOpsApi";
+import { useAppDispatch } from "@/lib/store/hooks";
 import type { SuiteSummary, SuiteTask } from "@/lib/types/bench";
 import { SUITE_OPS_KINDS, type RepoSource, type TaskFromCommitParams, type TasksMineParams } from "@/lib/types/suiteops";
-import { useState } from "react";
+import { useCallback, useState } from "react";
 import { useTranslation } from "react-i18next";
 
 declare module "@/lib/i18n/resources" {
@@ -46,21 +47,29 @@ export function OpsTab({ suite }: { suite: SuiteSummary }) {
 	);
 }
 
+/** Refreshes the suite list and its tasks once a job that writes suite.lock or tasks ends. */
+function useRefreshSuite(suiteId: string) {
+	const dispatch = useAppDispatch();
+	return useCallback(() => {
+		dispatch(benchApi.util.invalidateTags([{ type: "BenchSuites", id: "LIST" }, { type: "BenchSuites", id: `${suiteId}/health` }]));
+	}, [dispatch, suiteId]);
+}
+
 function ChecksSection({ suite, writable, hosted, t }: { suite: SuiteSummary; writable: boolean; hosted: boolean; t: T }) {
+	const refresh = useRefreshSuite(suite.id);
 	return (
 		<Section title={t("checks.title")} description={t("checks.description")} testId="suite-ops-checks">
 			{writable ? (
 				<div className="flex flex-wrap items-start gap-2">
 					<JobRunButton kind={SUITE_OPS_KINDS.lint} params={{ suite: suite.id }} label={t("checks.lint")} variant="outline" />
-					<JobRunButton kind={SUITE_OPS_KINDS.lock} params={{ suite: suite.id }} label={t("checks.lock")} variant="outline" />
-					{!hosted && (
-						<JobRunButton
-							kind={SUITE_OPS_KINDS.admit}
-							params={{ suite: suite.id }}
-							label={t("checks.admit")}
-							confirm={t("checks.admitConfirm", { suite: suite.id })}
-						/>
-					)}
+					<JobRunButton kind={SUITE_OPS_KINDS.lock} params={{ suite: suite.id }} label={t("checks.lock")} variant="outline" onDone={refresh} />
+					<JobRunButton
+						kind={SUITE_OPS_KINDS.admit}
+						params={{ suite: suite.id }}
+						label={t("checks.admit")}
+						confirm={hosted ? t("checks.hostedAdmitConfirm", { suite: suite.id }) : t("checks.admitConfirm", { suite: suite.id })}
+						onDone={refresh}
+					/>
 				</div>
 			) : null}
 			{hosted && (
@@ -270,7 +279,8 @@ function MineSection({ suite, hosted, t }: { suite: SuiteSummary; hosted: boolea
 	const [limit, setLimit] = useState(5);
 	const [dryRun, setDryRun] = useState(true);
 	const repo = repoParams(src);
-	const preview = hosted || dryRun;
+	const refresh = useRefreshSuite(suite.id);
+	const preview = dryRun;
 	const params: TasksMineParams | null = repo
 		? { suite: suite.id, ...repo, limit, dry_run: preview, ...(since.trim() ? { since: since.trim() } : {}) }
 		: null;
@@ -287,17 +297,18 @@ function MineSection({ suite, hosted, t }: { suite: SuiteSummary; hosted: boolea
 						<Input type="number" min={1} max={50} value={limit} onChange={(e) => setLimit(Math.min(50, Math.max(1, Number(e.target.value) || 1)))} />
 					</Field>
 				</div>
-				{hosted ? (
-					<p className="text-muted-foreground text-xs">{t("mine.hostedDryRun")}</p>
-				) : (
-					<label className="flex items-center gap-2 text-sm">
-						<input type="checkbox" checked={dryRun} onChange={(e) => setDryRun(e.target.checked)} data-testid="suite-ops-mine-dry-run" />
-						{t("mine.dryRun")}
-					</label>
+				<label className="flex items-center gap-2 text-sm">
+					<input type="checkbox" checked={dryRun} onChange={(e) => setDryRun(e.target.checked)} data-testid="suite-ops-mine-dry-run" />
+					{t("mine.dryRun")}
+				</label>
+				{hosted && !dryRun && (
+					<p className="text-muted-foreground text-xs" data-testid="suite-ops-mine-hosted">
+						{t("mine.hostedDryRun")}
+					</p>
 				)}
 				<div>
 					{params ? (
-						<JobRunButton kind={SUITE_OPS_KINDS.mine} params={params} label={label} />
+						<JobRunButton kind={SUITE_OPS_KINDS.mine} params={params} label={label} onDone={preview ? undefined : refresh} />
 					) : (
 						<Button disabled title={t("mine.missing")} data-testid="suite-ops-mine-disabled">
 							{label}

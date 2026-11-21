@@ -1,6 +1,7 @@
 import "@/lib/i18n";
 
 import { LOCAL_SESSION } from "@/lib/session/sessionContext";
+import { hostedSession } from "@/lib/testing/platformFixtures";
 import { mutation, render } from "@/lib/testing/render";
 import type { SuiteSummary } from "@/lib/types/bench";
 import { describe, expect, it, vi } from "vitest";
@@ -11,6 +12,7 @@ vi.mock("@/lib/store/apis/suiteOpsApi", () => ({
 	useRestoreTaskMutation: () => mutation(),
 }));
 vi.mock("@/lib/store/apis/jobRunApi", () => ({ useCreateJobMutation: () => mutation() }));
+vi.mock("@/lib/store/hooks", () => ({ useAppDispatch: () => vi.fn() }));
 
 const suite = {
 	id: "coding-core",
@@ -38,6 +40,12 @@ describe("OpsTab", () => {
 		expect(html).not.toContain("job-run-");
 		expect(html).not.toContain("suite-ops-restore-fix-a");
 		expect(html).toContain('data-testid="suite-ops-hosted-admit"');
+	});
+	it("offers hosted admission and a full mine to a hosted member", () => {
+		const html = render(<OpsTab suite={suite} />, hostedSession("member"));
+		expect(html).toContain('data-testid="job-run-suite.admit"');
+		expect(html).toContain('data-testid="suite-ops-hosted-admit"');
+		expect(html).toContain('data-testid="suite-ops-mine-dry-run"');
 	});
 	it("builds repository params", () => {
 		expect(repoParams({ github: " acme/app " })).toEqual({ github: "acme/app" });

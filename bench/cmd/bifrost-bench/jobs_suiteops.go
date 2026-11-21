@@ -31,7 +31,8 @@ import (
 //     local repository (local mode) or a connected GitHub repository.
 //   - tasks.mine: rank fix commits of a repository and, outside dry-run, cut
 //     and admit proven tasks. Dry-run is in-process and runs in both modes;
-//     a full mine starts containers, so it is local only.
+//     a full mine proves tasks in containers: locally through the CLI, on a
+//     hosted server as a bridge experiment on runners (jobs_hostedadmit.go).
 //   - suite.quarantine-flaky: the `suite health -auto-quarantine` action:
 //     quarantine every task with verifier flakiness evidence.
 //
@@ -396,7 +397,13 @@ func validateTasksMine(ctx context.Context, env jobEnv, raw json.RawMessage) (an
 		return nil, "", invalid(errors.New("license is too long"))
 	}
 	if env.Hosted && !p.DryRun {
-		return nil, "", invalid(errors.New("hosted servers only preview mined commits (dry run): proving a task starts containers; run tasks mine locally to cut and admit them"))
+		// G04: the hosted full mine proves the cuts on a runner with the
+		// oracle and noop controls of the suite.admit bridge.
+		for _, a := range [][2]string{{"oracle", bridgeOracleAgent}, {"noop", bridgeNoopAgent}} {
+			if err := validAgentFile(env.ProjectRoot, a[0], a[1]); err != nil {
+				return nil, "", invalid(fmt.Errorf("%v (hosted mining proves tasks with it)", err))
+			}
+		}
 	}
 	if err := p.suiteOpsRepo.check(env); err != nil {
 		return nil, "", err
@@ -424,6 +431,9 @@ func runTasksMineJob(ctx context.Context, env jobEnv, j *jobs.Job, log jobs.Logg
 	defer cleanup()
 	if p.DryRun {
 		return suiteOpsMinePreview(ctx, env, p, suiteDir, repo, log)
+	}
+	if env.Hosted {
+		return runHostedTasksMine(ctx, env, j, p, suiteDir, repo, log)
 	}
 	config := filepath.Join(env.ProjectRoot, "deploy", "bench.yaml")
 	if _, err := os.Stat(config); err != nil {
