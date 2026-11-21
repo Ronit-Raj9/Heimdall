@@ -10,7 +10,6 @@ import (
 	"time"
 
 	"github.com/fasthttp/router"
-	"github.com/maximhq/bifrost/bench/compat"
 	"github.com/maximhq/bifrost/bench/evalstore"
 	"github.com/maximhq/bifrost/bench/lib"
 	"github.com/maximhq/bifrost/bench/projectfs"

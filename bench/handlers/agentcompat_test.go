@@ -43,7 +43,7 @@ func TestAgentCompatibility(t *testing.T) {
 	if code != 200 {
 		t.Fatalf("status %d", code)
 	}
-	if out.Agent != "codex" || !out.Defaulted || len(out.Capabilities) != 3 || out.Capabilities[0] != "shell" {
+	if out.Agent != "codex" || !out.Defaulted || len(out.Capabilities) != 4 || out.Capabilities[0] != "shell" {
 		t.Fatalf("agent part = %+v", out)
 	}
 	if len(out.Benchmarks) != 3 {
@@ -53,7 +53,9 @@ func TestAgentCompatibility(t *testing.T) {
 	if !tb.OK || tb.Requires[0] != "shell" || len(tb.Missing) != 0 || tb.Reason != "" {
 		t.Fatalf("tb2 = %+v", tb)
 	}
-	if mem.OK || len(mem.Missing) != 1 || mem.Missing[0] != "sessions" || mem.Reason != "agent codex cannot run benchmark longmemeval: needs sessions" {
+	// CLI coding agents default to sessions: memory benchmarks run them
+	// across sessions through the notes and memory folder.
+	if !mem.OK || len(mem.Missing) != 0 || mem.Reason != "" {
 		t.Fatalf("longmemeval = %+v", mem)
 	}
 	if !tau.OK {

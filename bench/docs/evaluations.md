@@ -64,7 +64,7 @@ Not every agent can run every benchmark. A chat agent behind an HTTP endpoint ha
 
 | Adapter | Default capabilities |
 |---|---|
-| CLI coding agents (codex, claude-code, opencode, gemini-cli, mini-swe-agent and similar) | shell, tools, mcp |
+| CLI coding agents (codex, claude-code, opencode, gemini-cli, mini-swe-agent and similar) | shell, tools, mcp, sessions (memory benchmarks run them across sessions through the notes and memory folder) |
 | `remote_http`, `a2a`, `openai_agent` | tools, sessions |
 | voice adapters | voice, sessions |
 | computer use | desktop, browser, shell |

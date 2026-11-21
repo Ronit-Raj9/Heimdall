@@ -10,3 +10,8 @@ func init() {
 	OrgPolicy[key("POST", api+"/evaluations/{id}/cancel")] = org(member)
 	OrgPolicy[key("GET", api+"/evaluation-packs")] = org(viewer)
 }
+
+// Agent compatibility (agent-first lane A01): viewers read.
+func init() {
+	OrgPolicy[key("GET", api+"/agents/{id}/compatibility")] = org(viewer)
+}

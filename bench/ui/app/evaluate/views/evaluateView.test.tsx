@@ -85,7 +85,7 @@ describe("evaluateDraft", () => {
 
 describe("evaluate utils", () => {
 	it("defaults capabilities by adapter", () => {
-		expect(agentCapabilities(agent("codex"))).toEqual(["shell", "tools", "mcp"]);
+		expect(agentCapabilities(agent("codex"))).toEqual(["shell", "tools", "mcp", "sessions"]);
 		expect(agentCapabilities(agent("x", { adapter: "remote_http" }))).toEqual(["tools", "sessions"]);
 		expect(agentCapabilities(agent("x", { capabilities: ["voice"] }))).toEqual(["voice"]);
 		expect(agentCapabilities(agent("x"))).toEqual(["shell", "tools"]);

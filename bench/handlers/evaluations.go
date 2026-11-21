@@ -68,8 +68,14 @@ type evaluationsHandler struct {
 	now func() time.Time
 }
 
-// evalCompat is the compatibility check; tests replace it.
-var evalCompat = compat.Check
+// evalCompat is the compatibility check; tests replace it. An agent whose
+// config is not in the project here (nil) is left to the planner.
+var evalCompat = func(a *schemas.AgentConfig, s *schemas.Suite) (bool, []schemas.Capability, string) {
+	if a == nil {
+		return true, nil, ""
+	}
+	return compat.Check(a, s)
+}
 
 var evalArmIDRe = regexp.MustCompile(`^[A-Z][A-Za-z0-9]{0,15}$`)
 
@@ -516,11 +522,10 @@ func (h *evaluationsHandler) launchChild(work context.Context, ctx *fasthttp.Req
 		}
 	}
 	for _, a := range spec.Arms {
-		ag := agents["agents/"+a.Agent+".yaml"]
-		if ag == nil || st == nil {
-			continue // nothing to check here; the planner refuses an unknown agent or suite
+		if st == nil {
+			continue // no suite loader here: the planner checks
 		}
-		if ok, missing, reason := evalCompat(ag, st); !ok {
+		if ok, missing, reason := evalCompat(agents["agents/"+a.Agent+".yaml"], st); !ok {
 			if reason == "" {
 				reason = compat.Reason(a.Agent, suiteID, missing)
 			}
