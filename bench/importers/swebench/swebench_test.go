@@ -20,7 +20,7 @@ func TestImport(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if want := []string{"acme--calc-1", "acme--calc-2", "django--django-11099", "sympy--sympy-20590"}; !reflect.DeepEqual(res.Tasks, want) {
+	if want := []string{"acme--calc-1", "acme--calc-2", "django--django-11099", "sympy--sympy-20590-oneoff"}; !reflect.DeepEqual(res.Tasks, want) {
 		t.Fatalf("tasks %v, want %v", res.Tasks, want)
 	}
 	if len(res.Skipped) != 3 {
@@ -43,7 +43,7 @@ func TestImport(t *testing.T) {
 		if task.Environment == nil || task.Environment.Image == "" || task.Environment.WorkspacePath != defaultWorkspace {
 			t.Errorf("%s environment %+v", task.ID, task.Environment)
 		}
-		if task.Impossible != (task.ID == "sympy--sympy-20590") {
+		if task.Impossible != (task.ID == "sympy--sympy-20590-oneoff") {
 			t.Errorf("%s impossible=%v", task.ID, task.Impossible)
 		}
 		if task.Provenance == nil || !strings.HasPrefix(task.Provenance.ImportedFrom, "fixture ") {

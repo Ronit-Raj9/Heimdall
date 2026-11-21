@@ -165,7 +165,7 @@ type specTest struct {
 
 // convert turns a row into task files. It is pure.
 func convert(r row, st settings) task {
-	id := sanitizeID(r.InstanceID)
+	id := taskID(r)
 	t := task{ID: id}
 	impossible := st.Impossible && r.ImpossibleType != "original"
 	if r.ImpossibleType != "" && r.ImpossibleType != "original" {
@@ -626,6 +626,17 @@ func sourceOf(r row) string {
 		return "swe-bench-live"
 	}
 	return "swe-bench"
+}
+
+// taskID is the bench task id of a row: the sanitized instance id, plus
+// "-<impossible_type>" for an Impossible-SWEbench row, so the oneoff,
+// conflicting and original splits (which share every instance id) can live
+// in one suite, as the livecodebench variant's ids do. It is pure.
+func taskID(r row) string {
+	if r.ImpossibleType != "" {
+		return sanitizeID(r.InstanceID + "-" + r.ImpossibleType)
+	}
+	return sanitizeID(r.InstanceID)
 }
 
 // sanitizeID lowercases s and replaces every character a task id cannot hold
