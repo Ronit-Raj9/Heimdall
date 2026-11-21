@@ -81,6 +81,11 @@ type JudgeConfig struct {
 	Price    func(model string, tok schemas.Tokens) (float64, bool)
 	PriceRef string
 	Logger   schemas.Logger
+	// CalibrationExpID names the experiment a calibration's judge key is
+	// minted under; "" is the shared "calibration". A hosted calibration
+	// sets a per-org id so the gateway binds the key to the org's own
+	// provider keys (G06).
+	CalibrationExpID string
 }
 
 var _ schemas.Grader = (*judge)(nil)

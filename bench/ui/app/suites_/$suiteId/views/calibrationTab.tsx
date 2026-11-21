@@ -1,3 +1,4 @@
+import { CalibrateJudgeForm } from "@/components/calibration/calibrateJudgeForm";
 import { CalibrationCard, LabelForm, LabelsTable } from "@/components/calibration/calibrationPanel";
 import { BlockSkeleton, LoadError, Section } from "@/components/runs/screenStates";
 import { useAddCalibrationLabelMutation, useGetCalibrationLabelsQuery, useGetCalibrationQuery } from "@/lib/store/apis/calibrationApi";
@@ -8,8 +9,8 @@ import { useTranslation } from "react-i18next";
 /**
  * Calibration tab of a judged suite (W8, docs/judge-calibration.md; the old /calibration?suite=):
  * the calibration card (state, agreement, kappa, false-positive bound, set size, date), the
- * labelling form (write token, live mode only) and every label. Running the judge stays on the
- * command line, behind a forecast.
+ * labelling form (write token, live mode only), every label, and "Calibrate judge" (G06): the
+ * calibrate.run job behind a forecast and an explicit cost confirmation.
  */
 export function SuiteCalibrationTab({ suite }: { suite: SuiteSummary }) {
 	const { t } = useTranslation("bench");
@@ -50,6 +51,15 @@ export function SuiteCalibrationTab({ suite }: { suite: SuiteSummary }) {
 						}
 					/>
 				</div>
+			)}
+			{status.data && (
+				<CalibrateJudgeForm
+					status={status.data}
+					onDone={() => {
+						void status.refetch();
+						void labels.refetch();
+					}}
+				/>
 			)}
 			<Section title={t("calibration.labelsTitle")} testId="calibration-labels-section">
 				{labels.data ? (

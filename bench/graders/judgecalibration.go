@@ -181,8 +181,12 @@ func RunCalibration(ctx context.Context, cfg JudgeConfig, plan *CalibrationPlan,
 		return nil, nil, errors.New("judge is not wired to the gateway")
 	}
 	runID := "r_cal" + strings.TrimPrefix(utils.NewID("x", 10), "x_")
+	expID := calibrationExpID
+	if cfg.CalibrationExpID != "" {
+		expID = cfg.CalibrationExpID
+	}
 	key, err := g.cfg.Gateway.MintKey(ctx, &schemas.RunContext{
-		Run:   &schemas.Run{RunID: runID, ExpID: calibrationExpID},
+		Run:   &schemas.Run{RunID: runID, ExpID: expID},
 		Agent: &schemas.AgentConfig{ID: JudgeType, Model: plan.Spec.Model, Gateway: schemas.GatewayPolicy{Provider: plan.Spec.Provider}},
 	})
 	if err != nil {
