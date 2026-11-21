@@ -85,7 +85,19 @@ const (
 	MaxFileBytes  = 1 << 20
 	MaxZipBytes   = 50 << 20
 	MaxZipEntries = 5000
+	// MaxUploadFileBytes is the per-file cap of the uploads area (datasets
+	// for importers). It equals lib.MaxUploadBytes, the request body limit
+	// of upload routes. Every other area keeps MaxFileBytes.
+	MaxUploadFileBytes = 64 << 20
 )
+
+// MaxFileBytesFor is the per-file cap of area a.
+func MaxFileBytesFor(a Area) int {
+	if a == AreaUploads {
+		return MaxUploadFileBytes
+	}
+	return MaxFileBytes
+}
 
 // Validator checks a file before it is written.
 type Validator func(a Area, rel string, data []byte) error
@@ -299,7 +311,7 @@ func (s *store) Read(ctx context.Context, a Area, rel string) ([]byte, Entry, er
 	if st.IsDir() {
 		return nil, Entry{}, ErrInvalid
 	}
-	if st.Size() > MaxFileBytes {
+	if st.Size() > int64(MaxFileBytesFor(a)) {
 		return nil, Entry{}, ErrTooLarge
 	}
 	data, err := os.ReadFile(full)

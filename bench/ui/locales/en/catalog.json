@@ -1,6 +1,6 @@
 {
 	"title": "Benchmark catalog",
-	"subtitle": "Add a ready-made benchmark to your project in one click. Examples and bundled suites copy straight in; public benchmarks are imported from data on the server.",
+	"subtitle": "Add a ready-made benchmark to your project in one click. Examples and bundled suites copy straight in; public benchmarks import from a dataset you upload or the server fetches from a public URL.",
 	"filterAll": "All",
 	"filterExample": "Examples",
 	"filterBundled": "Bundled suites",
@@ -20,7 +20,7 @@
 	"source": "Get the data",
 	"needs": "Needs",
 	"fromLabel": "Data path on the server",
-	"fromHelp": "A clone or download of the upstream data. Relative paths resolve against your project folder.",
+	"fromHelp": "For data already on the server (local mode or HEIMDALL_DATASETS_DIR). Relative paths resolve against your project folder.",
 	"suiteLabel": "Suite id",
 	"limitLabel": "Tasks to import",
 	"startImport": "Start import",
@@ -38,5 +38,18 @@
 	"open": "Open",
 	"unavailableAction": "How to bring the data",
 	"memberOnly": "Members can add",
-	"noSourceAction": "Upload a project zip instead"
+	"noSourceAction": "Upload a project zip instead",
+	"modeUpload": "Upload dataset",
+	"modeUrl": "Fetch from URL",
+	"modePath": "Path on the server",
+	"uploadLabel": "Dataset file",
+	"uploadHelp": "Expects: {{expects}}. Up to 64 MiB; a zip is unpacked. It is stored in {{path}} and replaces the last upload.",
+	"urlLabel": "Public https URL",
+	"urlHelp": "The server downloads it (public https only, up to 64 MiB, 3 minute limit) into your uploads area, then imports. Private or gated data: download it yourself and use Upload dataset.",
+	"refLabel": "Upstream commit (ref)",
+	"cardUpload": "Upload:",
+	"cardFetch": "Fetch from URL:",
+	"cardFetchKnown": "works, the public URL is prefilled",
+	"cardFetchAny": "works with a public https link to that file",
+	"cardFetchNo": "not possible (gated or needs extra steps); upload instead"
 }

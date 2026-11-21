@@ -4,6 +4,9 @@ import (
 	"bytes"
 	"encoding/json"
 	"errors"
+	"fmt"
+	"io"
+	"mime"
 	"strings"
 
 	"github.com/fasthttp/router"
@@ -11,6 +14,7 @@ import (
 	"github.com/maximhq/bifrost/bench/benchcatalog"
 	"github.com/maximhq/bifrost/bench/jobs"
 	"github.com/maximhq/bifrost/bench/lib"
+	"github.com/maximhq/bifrost/bench/projectfs"
 	"github.com/valyala/fasthttp"
 )
 
@@ -28,6 +32,7 @@ type BenchCatalogList struct {
 // entries need no body; importer entries need From.
 type BenchCatalogAdd struct {
 	From  string            `json:"from,omitempty"`
+	URL   string            `json:"url,omitempty"` // public https URL fetched server side (instead of From)
 	Suite string            `json:"suite,omitempty"`
 	Limit int               `json:"limit,omitempty"`
 	IDs   []string          `json:"ids,omitempty"`
@@ -44,6 +49,15 @@ type BenchCatalogAdded struct {
 	Job    *jobs.Job               `json:"job,omitempty"`
 }
 
+// BenchCatalogDataset answers POST /benchmarks/catalog/{id}/dataset: the
+// project path the uploaded data landed in, to pass as From.
+type BenchCatalogDataset struct {
+	Entry string `json:"entry"`
+	From  string `json:"from"`
+	Size  int    `json:"size"`
+	Zip   bool   `json:"zip"`
+}
+
 type benchCatalogHandler struct {
 	env    OrgEnv
 	source func() benchcatalog.Source
@@ -56,6 +70,7 @@ func init() {
 		}}
 		r.GET(APIPrefix+"/benchmarks/catalog", env.R(h.list))
 		r.POST(APIPrefix+"/benchmarks/catalog/{id}/add", env.W(h.add))
+		r.POST(APIPrefix+"/benchmarks/catalog/{id}/dataset", env.U(h.dataset))
 	})
 }
 
@@ -141,10 +156,10 @@ func (h *benchCatalogHandler) add(ctx *fasthttp.RequestCtx) {
 		sendUnavailable(ctx, mode, "job runner")
 		return
 	}
-	params := benchcatalog.ImportParams{Entry: id, From: body.From, Suite: body.Suite, Limit: body.Limit, IDs: body.IDs, Set: body.Set, Force: body.Force}
-	if strings.TrimSpace(params.From) == "" {
+	params := benchcatalog.ImportParams{Entry: id, From: body.From, URL: strings.TrimSpace(body.URL), Suite: body.Suite, Limit: body.Limit, IDs: body.IDs, Set: body.Set, Force: body.Force}
+	if strings.TrimSpace(params.From) == "" && params.URL == "" {
 		lib.SendError(ctx, mode, fasthttp.StatusBadRequest, lib.ErrTypeBadRequest,
-			"from is required: fetch the data on the server first ("+e.Source+") and give its path")
+			"the import needs data: upload it (Upload dataset: "+e.UploadExpects+") or give a public https url to fetch")
 		return
 	}
 	raw, _ := json.Marshal(params)
@@ -160,4 +175,92 @@ func (h *benchCatalogHandler) add(ctx *fasthttp.RequestCtx) {
 		return
 	}
 	lib.SendJSON(ctx, mode, fasthttp.StatusAccepted, BenchCatalogAdded{Entry: id, Kind: e.Kind, Job: j})
+}
+
+// dataset handles POST /benchmarks/catalog/{id}/dataset: the multipart
+// "file" part (or the raw body with ?filename=) is stored under
+// uploads/datasets/<id>/ (a zip is extracted), up to lib.MaxUploadBytes.
+func (h *benchCatalogHandler) dataset(ctx *fasthttp.RequestCtx) {
+	mode := h.env.Mode
+	_, p, ok := h.caller(ctx)
+	if !ok {
+		return
+	}
+	project := h.project()
+	if project == "" {
+		sendUnavailable(ctx, mode, "project folder")
+		return
+	}
+	id, _ := ctx.UserValue("id").(string)
+	e, found := h.source().Find(project, id)
+	if !found {
+		lib.SendError(ctx, mode, fasthttp.StatusNotFound, lib.ErrTypeNotFound, "no catalog entry "+id+"; reload the catalog")
+		return
+	}
+	if e.Kind != benchcatalog.KindImporter {
+		lib.SendError(ctx, mode, fasthttp.StatusBadRequest, lib.ErrTypeBadRequest, "entry "+id+" needs no dataset: use Add")
+		return
+	}
+	store := h.env.Services.Projects
+	if store == nil {
+		lib.SendError(ctx, mode, fasthttp.StatusServiceUnavailable, lib.ErrTypeUnavailable,
+			"project files are not available on this server: the project folder could not be opened")
+		return
+	}
+	name, data, err := datasetBody(ctx)
+	if err != nil {
+		lib.SendError(ctx, mode, fasthttp.StatusBadRequest, lib.ErrTypeBadRequest, err.Error())
+		return
+	}
+	if len(data) > lib.MaxUploadBytes {
+		lib.SendError(ctx, mode, fasthttp.StatusRequestEntityTooLarge, lib.ErrTypeTooLarge,
+			fmt.Sprintf("dataset is larger than %d MiB: upload a smaller split, or use Fetch from URL for public data", lib.MaxUploadBytes>>20))
+		return
+	}
+	work, cancel := workContext(ctx, readTimeout)
+	defer cancel()
+	from, err := benchcatalog.SaveDataset(work, store, id, name, data, createdBy(p))
+	if err != nil {
+		status, typ := fasthttp.StatusBadRequest, lib.ErrTypeBadRequest
+		switch {
+		case errors.Is(err, projectfs.ErrTooLarge):
+			status, typ = fasthttp.StatusRequestEntityTooLarge, lib.ErrTypeTooLarge
+		case errors.Is(err, projectfs.ErrOutside), errors.Is(err, projectfs.ErrInvalid):
+		default:
+			if !strings.Contains(err.Error(), "zip") {
+				status, typ = fasthttp.StatusInternalServerError, lib.ErrTypeInternal
+			}
+		}
+		lib.SendError(ctx, mode, status, typ, "save dataset: "+err.Error())
+		return
+	}
+	lib.SendJSON(ctx, mode, fasthttp.StatusOK, BenchCatalogDataset{Entry: id, From: from, Size: len(data), Zip: benchcatalog.IsZip(name, data)})
+}
+
+// datasetBody is the uploaded file: the multipart "file" part, else the raw
+// body named by ?filename=.
+func datasetBody(ctx *fasthttp.RequestCtx) (string, []byte, error) {
+	mt, _, _ := mime.ParseMediaType(string(ctx.Request.Header.ContentType()))
+	if mt == "multipart/form-data" {
+		fh, err := ctx.FormFile("file")
+		if err != nil {
+			return "", nil, errors.New(`multipart upload needs the dataset in a form field named "file"`)
+		}
+		f, err := fh.Open()
+		if err != nil {
+			return "", nil, err
+		}
+		defer f.Close()
+		data, err := io.ReadAll(io.LimitReader(f, lib.MaxUploadBytes+1))
+		return fh.Filename, data, err
+	}
+	body := ctx.PostBody()
+	if len(body) == 0 {
+		return "", nil, errors.New("empty body: send the dataset file as a multipart field named \"file\"")
+	}
+	name := string(ctx.QueryArgs().Peek("filename"))
+	if name == "" {
+		name = "data"
+	}
+	return name, body, nil
 }

@@ -17,6 +17,7 @@ import (
 type ImportParams struct {
 	Entry string            `json:"entry"`           // catalog entry id
 	From  string            `json:"from"`            // path of the local upstream data
+	URL   string            `json:"url,omitempty"`   // public https URL the job fetches into uploads/datasets/<entry> (instead of From)
 	Suite string            `json:"suite,omitempty"` // suite id; default the entry's
 	Limit int               `json:"limit,omitempty"` // at most this many tasks (default 5, 0 kept as 5)
 	IDs   []string          `json:"ids,omitempty"`
@@ -48,7 +49,7 @@ func ResolveFrom(project, from string, hosted bool) (string, error) {
 	p = filepath.Clean(p)
 	real, err := filepath.EvalSymlinks(p)
 	if err != nil {
-		return "", fmt.Errorf("data path %q not found on the server; fetch the data there first", from)
+		return "", fmt.Errorf("data path %q not found on the server; use Upload dataset or Fetch from URL on the catalog import form", from)
 	}
 	if hosted {
 		ok := within(real, project)
@@ -104,6 +105,18 @@ func (s Source) Normalize(project string, p *ImportParams, hosted bool) (string,
 		set[k] = v
 	}
 	p.Set = set
+	if strings.TrimSpace(p.URL) != "" {
+		if strings.TrimSpace(p.From) != "" {
+			return "", "", errors.New("give either from (a path on the server) or url (a public URL to fetch), not both")
+		}
+		if !DataFor(e.ID, e.Importer).Fetch {
+			return "", "", fmt.Errorf("entry %q cannot be fetched from a URL: upload %s instead", p.Entry, DataFor(e.ID, e.Importer).Upload)
+		}
+		if _, err := NewFetcher().CheckURL(p.URL); err != nil {
+			return "", "", err
+		}
+		return e.Importer, "", nil // the job fetches, then resolves the path
+	}
 	from, err := ResolveFrom(project, p.From, hosted)
 	if err != nil {
 		return "", "", err

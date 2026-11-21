@@ -23,6 +23,16 @@ export interface CatalogEntry {
 	installed: boolean;
 	needs_data: boolean;
 	hint?: string;
+	/** What "Upload dataset" takes (zip or the importer's own file). */
+	upload_expects?: string;
+	/** "Fetch from URL" can work (public data). */
+	fetch_allowed?: boolean;
+	/** Known public URL to prefill. */
+	fetch_url?: string;
+	/** Extra step the import needs (e.g. set ref=<commit>). */
+	data_note?: string;
+	/** Project path the data lands in. */
+	dataset_path?: string;
 }
 
 export interface CatalogListResponse {
@@ -34,6 +44,9 @@ export interface CatalogListResponse {
 export interface CatalogAddRequest {
 	id: string;
 	from?: string;
+	/** Public https URL the server fetches instead of from. */
+	url?: string;
+	set?: Record<string, string>;
 	suite?: string;
 	limit?: number;
 }
@@ -51,4 +64,12 @@ export interface CatalogAddResponse {
 	kind: CatalogKind;
 	result?: CatalogAddResult;
 	job?: { id: string; kind: string; status: string };
+}
+
+/** POST /benchmarks/catalog/{id}/dataset answer. */
+export interface CatalogDatasetResponse {
+	entry: string;
+	from: string;
+	size: number;
+	zip: boolean;
 }

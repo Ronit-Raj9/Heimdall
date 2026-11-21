@@ -4,8 +4,8 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { canUse, useSession } from "@/lib/session/sessionContext";
-import { useAddCatalogEntryMutation, useGetBenchCatalogQuery } from "@/lib/store/apis/catalogApi";
-import type { CatalogAddResponse, CatalogEntry, CatalogKind } from "@/lib/types/catalog";
+import { useAddCatalogEntryMutation, useGetBenchCatalogQuery, useUploadCatalogDatasetMutation } from "@/lib/store/apis/catalogApi";
+import type { CatalogAddRequest, CatalogAddResponse, CatalogEntry, CatalogKind } from "@/lib/types/catalog";
 import { Link } from "@tanstack/react-router";
 import { Library } from "lucide-react";
 import { type ReactNode, useMemo, useState } from "react";
@@ -29,11 +29,34 @@ export function filterEntries(entries: CatalogEntry[], filter: CatalogFilter, qu
 	});
 }
 
+/** Where the import's data comes from. */
+export type DataMode = "upload" | "url" | "path";
+
 export interface ImportForm {
+	mode: DataMode;
 	from: string;
+	url: string;
+	file?: File | null;
+	/** Upstream commit for repo zips without git history (set ref=...). */
+	ref: string;
 	suite: string;
 	limit: number;
 }
+
+/** The form an importer entry opens with: upload by default, the known URL prefilled. */
+export function initialImportForm(e: CatalogEntry): ImportForm {
+	return { mode: "upload", from: e.dataset_path ?? "", url: e.fetch_url ?? "", file: null, ref: "", suite: e.suite_id ?? "", limit: 5 };
+}
+
+/** The start button is enabled once the chosen data option has its input. */
+export function importReady(f: ImportForm): boolean {
+	if (f.mode === "upload") return !!f.file;
+	if (f.mode === "url") return /^https:\/\/\S+$/.test(f.url.trim());
+	return !!f.from.trim();
+}
+
+const MODES: DataMode[] = ["upload", "url", "path"];
+const MODE_KEY = { upload: "modeUpload", url: "modeUrl", path: "modePath" } as const;
 
 export interface CatalogBodyProps {
 	entries: CatalogEntry[];
@@ -141,15 +164,68 @@ export function CatalogBody(props: CatalogBodyProps) {
 							{t("source")}: <code>{props.importFor.source}</code>
 						</div>
 					)}
-					<label className="text-sm">
-						{t("fromLabel")}
-						<Input
-							value={props.importForm.from}
-							onChange={(ev) => props.onImportForm?.({ ...props.importForm!, from: ev.target.value })}
-							data-testid="catalog-import-from"
-						/>
-						<span className="text-muted-foreground text-xs">{t("fromHelp")}</span>
-					</label>
+					<div className="flex flex-wrap gap-2" role="tablist">
+						{MODES.filter((m) => m !== "url" || props.importFor!.fetch_allowed).map((m) => (
+							<Button
+								key={m}
+								size="sm"
+								variant={props.importForm!.mode === m ? "default" : "outline"}
+								onClick={() => props.onImportForm?.({ ...props.importForm!, mode: m })}
+								data-testid={`catalog-mode-${m}`}
+							>
+								{t(MODE_KEY[m])}
+							</Button>
+						))}
+					</div>
+					{props.importForm.mode === "upload" && (
+						<label className="text-sm">
+							{t("uploadLabel")}
+							<Input
+								type="file"
+								accept=".zip,.jsonl,.json,.parquet,.csv,.tsv,.txt"
+								onChange={(ev) => props.onImportForm?.({ ...props.importForm!, file: ev.target.files?.[0] ?? null })}
+								data-testid="catalog-import-file"
+							/>
+							<span className="text-muted-foreground text-xs">
+								{t("uploadHelp", { expects: props.importFor.upload_expects ?? "", path: props.importFor.dataset_path ?? "uploads/datasets" })}
+							</span>
+						</label>
+					)}
+					{props.importForm.mode === "url" && (
+						<label className="text-sm">
+							{t("urlLabel")}
+							<Input
+								value={props.importForm.url}
+								placeholder="https://"
+								onChange={(ev) => props.onImportForm?.({ ...props.importForm!, url: ev.target.value })}
+								data-testid="catalog-import-url"
+							/>
+							<span className="text-muted-foreground text-xs">{t("urlHelp")}</span>
+						</label>
+					)}
+					{props.importForm.mode === "path" && (
+						<label className="text-sm">
+							{t("fromLabel")}
+							<Input
+								value={props.importForm.from}
+								onChange={(ev) => props.onImportForm?.({ ...props.importForm!, from: ev.target.value })}
+								data-testid="catalog-import-from"
+							/>
+							<span className="text-muted-foreground text-xs">{t("fromHelp")}</span>
+						</label>
+					)}
+					{props.importFor.data_note && (
+						<label className="text-sm">
+							{t("refLabel")}
+							<Input
+								value={props.importForm.ref}
+								placeholder="40-hex commit"
+								onChange={(ev) => props.onImportForm?.({ ...props.importForm!, ref: ev.target.value })}
+								data-testid="catalog-import-ref"
+							/>
+							<span className="text-muted-foreground text-xs">{props.importFor.data_note}</span>
+						</label>
+					)}
 					<div className="flex gap-2">
 						<label className="flex-1 text-sm">
 							{t("suiteLabel")}
@@ -174,7 +250,7 @@ export function CatalogBody(props: CatalogBodyProps) {
 					<div className="flex gap-2">
 						<Button
 							size="sm"
-							disabled={!props.importForm.from.trim() || props.busyId === props.importFor.id}
+							disabled={!importReady(props.importForm) || props.busyId === props.importFor.id}
 							onClick={props.onStartImport}
 							data-testid="catalog-import-start"
 						>
@@ -208,6 +284,18 @@ export function CatalogBody(props: CatalogBodyProps) {
 								</div>
 							)}
 							{e.suite_id && e.kind !== "example" && <div className="font-mono text-xs">{e.suite_id}</div>}
+							{e.kind === "importer" && e.available && !e.installed && e.upload_expects && (
+								<div className="bg-muted/40 rounded p-2 text-xs" data-testid={`catalog-data-${e.id}`}>
+									<div>
+										<span className="font-medium">{t("cardUpload")}</span> {e.upload_expects}
+									</div>
+									<div>
+										<span className="font-medium">{t("cardFetch")}</span>{" "}
+										{e.fetch_allowed ? (e.fetch_url ? t("cardFetchKnown") : t("cardFetchAny")) : t("cardFetchNo")}
+									</div>
+									{e.data_note && <div className="text-muted-foreground">{e.data_note}</div>}
+								</div>
+							)}
 							<div className="mt-auto flex items-center justify-between gap-2 pt-2">
 								<span className="text-muted-foreground text-xs">{e.track}</span>
 								{e.installed ? (
@@ -251,11 +339,12 @@ export default function CatalogView() {
 	const { t } = useTranslation("catalog");
 	const { data, isLoading, isError, refetch } = useGetBenchCatalogQuery();
 	const [addEntry] = useAddCatalogEntryMutation();
+	const [uploadDataset] = useUploadCatalogDatasetMutation();
 	const [filter, setFilter] = useState<CatalogFilter>("all");
 	const [query, setQuery] = useState("");
 	const [busyId, setBusyId] = useState<string | null>(null);
 	const [importFor, setImportFor] = useState<CatalogEntry | null>(null);
-	const [importForm, setImportForm] = useState<ImportForm>({ from: "", suite: "", limit: 5 });
+	const [importForm, setImportForm] = useState<ImportForm>({ mode: "upload", from: "", url: "", file: null, ref: "", suite: "", limit: 5 });
 	const [lastAdded, setLastAdded] = useState<CatalogAddResponse | null>(null);
 	const [error, setError] = useState<string | null>(null);
 	const [jobId, setJobId] = useState<string | null>(null);
@@ -269,10 +358,14 @@ export default function CatalogView() {
 			</div>
 		);
 
-	const run = async (e: CatalogEntry, body: { from?: string; suite?: string; limit?: number } = {}) => {
+	const run = async (e: CatalogEntry, body: Omit<CatalogAddRequest, "id"> = {}, file?: File | null) => {
 		setBusyId(e.id);
 		setError(null);
 		try {
+			if (file) {
+				const up = await uploadDataset({ id: e.id, file }).unwrap();
+				body = { ...body, from: up.from };
+			}
 			const res = await addEntry({ id: e.id, ...body }).unwrap();
 			setLastAdded(res);
 			if (res.job) setJobId(res.job.id);
@@ -297,7 +390,7 @@ export default function CatalogView() {
 			onAdd={(e) => {
 				if (e.kind === "importer") {
 					setImportFor(e);
-					setImportForm({ from: e.importer ? `datasets/${e.id}` : "", suite: e.suite_id ?? "", limit: 5 });
+					setImportForm(initialImportForm(e));
 					return;
 				}
 				void run(e);
@@ -305,7 +398,15 @@ export default function CatalogView() {
 			importFor={importFor}
 			importForm={importForm}
 			onImportForm={setImportForm}
-			onStartImport={() => importFor && void run(importFor, { from: importForm.from, suite: importForm.suite, limit: importForm.limit })}
+			onStartImport={() => {
+				if (!importFor) return;
+				const f = importForm;
+				const body: Omit<CatalogAddRequest, "id"> = { suite: f.suite, limit: f.limit };
+				if (f.ref.trim()) body.set = { ref: f.ref.trim() };
+				if (f.mode === "url") body.url = f.url.trim();
+				if (f.mode === "path") body.from = f.from.trim();
+				void run(importFor, body, f.mode === "upload" ? f.file : null);
+			}}
 			onCancelImport={() => setImportFor(null)}
 			lastAdded={lastAdded}
 			error={error}

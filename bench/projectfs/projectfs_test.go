@@ -66,7 +66,7 @@ func TestWriteVersionsAndIfMatch(t *testing.T) {
 	if err != nil || string(old) != "one" {
 		t.Errorf("ReadVersion = %q, %v", old, err)
 	}
-	if _, err := s.Write(ctx, AreaUploads, "big.bin", make([]byte, MaxFileBytes+1), WriteOpts{}); !errors.Is(err, ErrTooLarge) {
+	if _, err := s.Write(ctx, AreaAgents, "big.bin", make([]byte, MaxFileBytes+1), WriteOpts{}); !errors.Is(err, ErrTooLarge) {
 		t.Errorf("big write = %v", err)
 	}
 	if err := s.Delete(ctx, AreaUploads, "notes/a.txt", WriteOpts{}); err != nil {
@@ -146,5 +146,26 @@ func TestExtractZip(t *testing.T) {
 	}
 	if _, err := os.Stat(filepath.Join(filepath.Dir(s.Root()), "evil.txt")); err == nil {
 		t.Error("zip slip wrote outside the project")
+	}
+}
+
+func TestUploadsAreaLargeFileCap(t *testing.T) {
+	s, err := Open(t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	ctx := context.Background()
+	big := make([]byte, 2<<20)
+	if _, err := s.Write(ctx, AreaUploads, "datasets/x/rows.jsonl", big, WriteOpts{}); err != nil {
+		t.Fatalf("uploads 2 MiB: %v", err)
+	}
+	if _, _, err := s.Read(ctx, AreaUploads, "datasets/x/rows.jsonl"); err != nil {
+		t.Fatalf("read uploads 2 MiB: %v", err)
+	}
+	if _, err := s.Write(ctx, AreaAgents, "big.txt", big, WriteOpts{}); !errors.Is(err, ErrTooLarge) {
+		t.Fatalf("agents 2 MiB: %v, want too large", err)
+	}
+	if _, err := s.Write(ctx, AreaUploads, "datasets/x/huge", make([]byte, MaxUploadFileBytes+1), WriteOpts{}); !errors.Is(err, ErrTooLarge) {
+		t.Fatalf("uploads over cap: %v", err)
 	}
 }

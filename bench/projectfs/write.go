@@ -67,7 +67,7 @@ func checkMatch(full, ifMatch string) error {
 }
 
 func (s *store) Write(ctx context.Context, a Area, rel string, data []byte, o WriteOpts) (Entry, error) {
-	if len(data) > MaxFileBytes {
+	if len(data) > MaxFileBytesFor(a) {
 		return Entry{}, ErrTooLarge
 	}
 	full, err := s.Resolve(a, rel)
@@ -93,6 +93,9 @@ func (s *store) Write(ctx context.Context, a Area, rel string, data []byte, o Wr
 		return Entry{}, err
 	}
 	e := Entry{Path: c, Size: int64(len(data)), ModTime: time.Now().UTC(), SHA256: sum(data)}
+	if len(data) > MaxFileBytes {
+		return e, nil // large upload files are not versioned (like zip extraction)
+	}
 	if err := s.recordVersion(a, c, data, o, false); err != nil {
 		return e, err
 	}
