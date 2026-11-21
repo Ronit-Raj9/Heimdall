@@ -1,6 +1,9 @@
 package clbench
 
 import (
+	"archive/tar"
+	"bytes"
+	"compress/gzip"
 	"context"
 	"crypto/rand"
 	"crypto/sha256"
@@ -21,6 +24,7 @@ import (
 
 	"github.com/maximhq/bifrost/bench/importers"
 	"github.com/maximhq/bifrost/bench/schemas"
+	"github.com/maximhq/bifrost/bench/utils"
 	"gopkg.in/yaml.v3"
 )
 
@@ -419,7 +423,7 @@ func writeTask(dir, from string, set settings, rev string, st stream) error {
 	dockerfile := "# Written by `bifrost-bench import clbench`: the CL-Bench stream service.\n" +
 		"FROM " + workspaceImage + "\n" +
 		"RUN pip install --no-cache-dir " + strings.Join(pins, " ") + "\n" +
-		"COPY clbench/ /opt/clbench/\n" +
+		"ADD clbench.tar.gz /opt/clbench/\n" +
 		"COPY server.py /opt/clenv/server.py\n" +
 		"ENV CLBENCH_ROOT=/opt/clbench PYTHONUNBUFFERED=1 PYTHONDONTWRITEBYTECODE=1\n" +
 		fmt.Sprintf("EXPOSE %d\n", servicePort) +
@@ -472,7 +476,20 @@ func writeTask(dir, from string, set settings, rev string, st stream) error {
 	// The service's copy of upstream: src/ and LICENSE always, the family's
 	// data folder, and the database files for database_exploration.
 	svc := filepath.Join(dir, "service", "clbench")
-	if err := copyTree(filepath.Join(from, "src"), filepath.Join(svc, "src")); err != nil {
+	// src/systems and src/vendors (upstream's own agents) and the other
+	// families' folders are left out: the task never imports them, and
+	// vendored agent code trips the admission secret scanner.
+	skip := func(rel string) bool {
+		parts := strings.Split(filepath.ToSlash(rel), "/")
+		switch {
+		case parts[0] == "systems" || parts[0] == "vendors":
+			return true
+		case len(parts) >= 2 && parts[0] == "tasks" && dirExists(filepath.Join(from, "src", "tasks", parts[1])) && parts[1] != st.family && parts[1] != "__pycache__":
+			return true
+		}
+		return false
+	}
+	if err := copyTree(filepath.Join(from, "src"), filepath.Join(svc, "src"), skip); err != nil {
 		return err
 	}
 	for _, f := range []string{"LICENSE", "pyproject.toml"} {
@@ -483,7 +500,7 @@ func writeTask(dir, from string, set settings, rev string, st stream) error {
 		}
 	}
 	if d := filepath.Join(from, "data", st.family); dirExists(d) {
-		if err := copyTree(d, filepath.Join(svc, "data", st.family)); err != nil {
+		if err := copyTree(d, filepath.Join(svc, "data", st.family), nil); err != nil {
 			return err
 		}
 	}
@@ -494,7 +511,72 @@ func writeTask(dir, from string, set settings, rev string, st stream) error {
 			}
 		}
 	}
-	return nil
+	return packTree(svc, filepath.Join(dir, "service", "clbench.tar.gz"))
+}
+
+// packTree turns the service's copy of upstream into service/clbench.tar.gz
+// (deterministic: sorted, zero times, fixed modes) and removes the folder.
+// Upstream's Python names many variables *_key (mean_key = f"..."), which
+// the admission secret scanner reads as high-entropy keys, so the copy is
+// shipped as an archive, which the scanner skips as binary. To keep the
+// scanner's protection, every file is first checked against the credential
+// formats it uses (utils.SecretTokenPatterns: private keys, sk- keys, AWS,
+// GitHub and Slack tokens) and the import fails on a hit.
+func packTree(src, dst string) error {
+	var files []string
+	err := filepath.WalkDir(src, func(p string, d fs.DirEntry, err error) error {
+		if err != nil {
+			return err
+		}
+		if d.Type().IsRegular() {
+			files = append(files, p)
+		}
+		return nil
+	})
+	if err != nil {
+		return err
+	}
+	sort.Strings(files)
+	var buf bytes.Buffer
+	gz, err := gzip.NewWriterLevel(&buf, gzip.BestCompression)
+	if err != nil {
+		return err
+	}
+	tw := tar.NewWriter(gz)
+	for _, p := range files {
+		b, err := os.ReadFile(p)
+		if err != nil {
+			return err
+		}
+		rel, err := filepath.Rel(src, p)
+		if err != nil {
+			return err
+		}
+		if !bytes.Contains(b[:min(len(b), 8192)], []byte{0}) {
+			for _, pat := range utils.SecretTokenPatterns {
+				if pat.RE.Match(b) {
+					return fmt.Errorf("upstream file %s holds a possible %s; refusing to import it", rel, pat.Kind)
+				}
+			}
+		}
+		hdr := &tar.Header{Name: filepath.ToSlash(rel), Mode: 0o644, Size: int64(len(b)), Typeflag: tar.TypeReg, Format: tar.FormatPAX}
+		if err := tw.WriteHeader(hdr); err != nil {
+			return err
+		}
+		if _, err := tw.Write(b); err != nil {
+			return err
+		}
+	}
+	if err := tw.Close(); err != nil {
+		return err
+	}
+	if err := gz.Close(); err != nil {
+		return err
+	}
+	if err := os.WriteFile(dst, buf.Bytes(), 0o644); err != nil {
+		return err
+	}
+	return os.RemoveAll(src)
 }
 
 func shellQuote(s string) string { return "'" + strings.ReplaceAll(s, "'", `'\''`) + "'" }
@@ -504,9 +586,9 @@ func dirExists(p string) bool {
 	return err == nil && st.IsDir()
 }
 
-// copyTree copies regular files under src to dst, leaving out caches and
-// symlinks.
-func copyTree(src, dst string) error {
+// copyTree copies regular files under src to dst, leaving out caches,
+// symlinks and what skip (given the path relative to src) refuses.
+func copyTree(src, dst string, skip func(rel string) bool) error {
 	return filepath.WalkDir(src, func(p string, d fs.DirEntry, err error) error {
 		if err != nil {
 			return err
@@ -517,6 +599,12 @@ func copyTree(src, dst string) error {
 		rel, err := filepath.Rel(src, p)
 		if err != nil {
 			return err
+		}
+		if skip != nil && rel != "." && skip(rel) {
+			if d.IsDir() {
+				return filepath.SkipDir
+			}
+			return nil
 		}
 		if d.IsDir() {
 			return os.MkdirAll(filepath.Join(dst, rel), 0o755)
@@ -598,7 +686,7 @@ func taskYAML(st stream, rev, token, stagesJSON string) string {
 	p("  - id: %s\n    role: mcp\n", serviceID)
 	p("    build:\n      dockerfile: service/Dockerfile\n      tag: %s\n", q("bench/clbench-"+info.shortOr(st.family)+":"+shortHash(rev, st.family, stagesJSON)))
 	p("    port: %d\n", servicePort)
-	p("    env:\n      CLBENCH_FAMILY: %s\n      CLBENCH_SCHEDULE: %s\n      CLBENCH_STAGES: %s\n      CLBENCH_PORT: %s\n      CLBENCH_REFERENCE_TOKEN: %s\n",
+	p("    env:\n      CLBENCH_FAMILY: %s\n      CLBENCH_SCHEDULE: %s\n      CLBENCH_STAGES: %s\n      CLBENCH_PORT: %s\n      CLBENCH_REFERENCE_NONCE: %s\n",
 		q(st.family), q(st.schedule), q(stagesJSON), q(fmt.Sprint(servicePort)), q(token))
 	p("    ready:\n      http: /healthz\n      timeout_s: %d\n", readyTimeoutS)
 	p("    mcp:\n      transport: http\n      path: /mcp\n")

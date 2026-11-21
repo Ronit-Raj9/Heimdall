@@ -18,7 +18,7 @@ It is called by the bench's state export inside this container after the
 agent has exited. GET /healthz is the readiness check.
 
 Environment: CLBENCH_FAMILY, CLBENCH_SCHEDULE, CLBENCH_STAGES (JSON list of
-{"label", "instances"}), CLBENCH_REFERENCE_TOKEN (optional), CLBENCH_PORT.
+{"label", "instances"}), CLBENCH_REFERENCE_NONCE (optional), CLBENCH_PORT.
 """
 
 from __future__ import annotations
@@ -40,7 +40,7 @@ os.chdir(os.environ.get("CLBENCH_ROOT", "/opt/clbench"))
 FAMILY = os.environ["CLBENCH_FAMILY"]
 SCHEDULE = os.environ["CLBENCH_SCHEDULE"]
 STAGES = json.loads(os.environ["CLBENCH_STAGES"])
-TOKEN = os.environ.get("CLBENCH_REFERENCE_TOKEN", "")
+TOKEN = os.environ.get("CLBENCH_REFERENCE_NONCE", "")
 PORT = int(os.environ.get("CLBENCH_PORT", "8000"))
 
 

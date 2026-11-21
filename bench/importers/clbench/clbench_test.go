@@ -1,7 +1,10 @@
 package clbench
 
 import (
+	"archive/tar"
+	"compress/gzip"
 	"context"
+	"io"
 	"os"
 	"path/filepath"
 	"slices"
@@ -71,13 +74,22 @@ func TestImportStreams(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !strings.Contains(string(ref), env["CLBENCH_REFERENCE_TOKEN"]) || strings.Contains(string(ref), "__SESSIONS__") {
+	if !strings.Contains(string(ref), env["CLBENCH_REFERENCE_NONCE"]) || strings.Contains(string(ref), "__SESSIONS__") {
 		t.Fatal("reference control does not carry the service token and session count")
 	}
-	for _, f := range []string{"service/clbench/src/interface.py", "service/clbench/LICENSE", "service/clbench/data/exploitable_poker/hands.json", "service/server.py", "sessions/session-2.md", "verifier/tests/runverify.py"} {
+	for _, f := range []string{"service/clbench.tar.gz", "service/server.py", "sessions/session-2.md", "verifier/tests/runverify.py"} {
 		if _, err := os.Stat(filepath.Join(dir, f)); err != nil {
 			t.Errorf("missing %s", f)
 		}
+	}
+	names := tarNames(t, filepath.Join(dir, "service", "clbench.tar.gz"))
+	for _, want := range []string{"src/interface.py", "LICENSE", "data/exploitable_poker/hands.json", "src/tasks/exploitable_poker/task.py"} {
+		if !slices.Contains(names, want) {
+			t.Errorf("archive lacks %s: %v", want, names)
+		}
+	}
+	if slices.Contains(names, "src/tasks/sales_prediction/task.py") {
+		t.Error("archive carries another family's folder")
 	}
 	sales, err := os.ReadFile(filepath.Join(bench, "cl-bench", "tasks", "clb-sales-default", "controls", "reference.sh"))
 	if err != nil {
@@ -92,6 +104,31 @@ func TestImportStreams(t *testing.T) {
 	}
 	if !strings.Contains(string(y), "pass_threshold: 0.5") || !strings.Contains(string(y), "track: memory") {
 		t.Fatalf("suite.yaml:\n%s", y)
+	}
+}
+
+func tarNames(t *testing.T, p string) []string {
+	t.Helper()
+	f, err := os.Open(p)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer f.Close()
+	gz, err := gzip.NewReader(f)
+	if err != nil {
+		t.Fatal(err)
+	}
+	tr := tar.NewReader(gz)
+	var out []string
+	for {
+		h, err := tr.Next()
+		if err == io.EOF {
+			return out
+		}
+		if err != nil {
+			t.Fatal(err)
+		}
+		out = append(out, h.Name)
 	}
 }
 
