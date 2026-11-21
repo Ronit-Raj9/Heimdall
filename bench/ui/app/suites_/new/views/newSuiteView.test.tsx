@@ -15,11 +15,11 @@ vi.mock("@/lib/store/apis/suiteAuthoringApi", async (importOriginal) => ({
 }));
 
 describe("NewSuiteView", () => {
-	it("offers the templates with the default checked", () => {
+	it("starts from the team's own questions: no template list, no sample task", () => {
 		const html = render(<NewSuiteView />);
 		expect(html).toContain('data-testid="suites-new-form"');
-		expect(html).toContain("python-pytest");
-		expect(html).toContain(">qa<");
-		expect(html).toMatch(/checked="" value="python-pytest"/);
+		expect(html).toMatch(/checked="" value="questions"/);
+		expect(html).toContain('data-testid="suites-new-start-code"');
+		expect(html).not.toContain('data-testid="suites-new-templates"');
 	});
 });

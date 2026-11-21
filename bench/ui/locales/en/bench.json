@@ -2408,7 +2408,7 @@
 		"actions": {
 			"title": "What to do",
 			"label": "Action",
-			"accept": "Make a test task",
+			"accept": "Turn into task",
 			"reject": "Reject",
 			"snooze": "Snooze",
 			"readOnly": "This server runs in {{mode}} mode, so you can only look here, not change anything.",
@@ -2427,7 +2427,7 @@
 				"kindHint": "Suggested: {{kind}}.",
 				"taskId": "Task name (optional)",
 				"taskIdPlaceholder": "made up for you if empty",
-				"submit": "Make a draft test task"
+				"submit": "Turn this failure into a task"
 			},
 			"rejectForm": {
 				"reason": "Reason",

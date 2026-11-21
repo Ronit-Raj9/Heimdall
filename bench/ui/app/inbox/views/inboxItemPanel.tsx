@@ -1,6 +1,7 @@
 import { InboxActions, type InboxAction } from "@/components/inbox/inboxActions";
 import { InboxItemDetailView } from "@/components/inbox/inboxDetail";
 import { InboxDraftResult } from "@/components/inbox/inboxDraft";
+import { InboxDraftNext } from "@/components/inbox/inboxDraftNext";
 import { BlockSkeleton, LoadError } from "@/components/runs/screenStates";
 import { getBenchErrorMessage } from "@/lib/store/apis/benchApi";
 import {
@@ -54,6 +55,7 @@ export function InboxItemPanel({ itemId, suites, onClose }: { itemId: string; su
 			actions={
 				<>
 					{draft && <InboxDraftResult draft={draft} />}
+					{draft && <InboxDraftNext draft={draft} />}
 					<InboxActions
 						item={detail.data.item}
 						suites={suites}

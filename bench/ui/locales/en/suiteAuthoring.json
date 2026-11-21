@@ -13,6 +13,15 @@
 		"failed": "Could not create the suite",
 		"invalidId": "Use lowercase letters, digits, '.', '_' or '-', starting with a letter or digit.",
 		"scenario": "Comes with a complete sample task",
+		"start": {
+			"title": "Where do the tasks come from?",
+			"questions": "Questions, spreadsheets or tickets",
+			"questionsHint": "Your own Q&A rows, support tickets or production failures. Graded by exact answer or a rubric judge. Starts empty.",
+			"code": "Commits in your repository",
+			"codeHint": "Each task is a real change from your repo, graded by hidden tests.",
+			"other": "Another template",
+			"otherHint": "Tools, browser, memory, support, voice and more, each with a sample task to adapt."
+		},
 		"notVisible": "The suite was written to benchmarks/, but this server reads suites from another folder (benchmarks_root). Ask your server owner to point it at the project's benchmarks/.",
 		"templates": {
 			"python-pytest": "Python repo tasks graded by hidden pytest files",

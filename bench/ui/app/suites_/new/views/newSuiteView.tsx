@@ -9,6 +9,12 @@ import { useTranslation } from "react-i18next";
 
 const ID_RE = /^[a-z0-9][a-z0-9._-]{0,63}$/;
 const FALLBACK_TEMPLATES = ["python-pytest", "node-test", "go-test", "generic-reward"];
+/** Templates of a benchmark cut from repository commits, graded by tests. */
+const CODE_TEMPLATES = new Set(["python-pytest", "node-test", "go-test", "generic-reward"]);
+
+/** Where a new benchmark's tasks come from (X13): own questions and tickets, repository commits, or any template. */
+export type StartingPoint = "questions" | "code" | "other";
+const STARTS: StartingPoint[] = ["questions", "code", "other"];
 
 /** /suites/new: create benchmarks/<id>/ from a template, then open its Edit tab. */
 export default function NewSuiteView() {
@@ -19,23 +25,27 @@ export default function NewSuiteView() {
 	const [createSuite, { isLoading, error }] = useCreateSuiteMutation();
 	const navigate = useNavigate();
 	const [id, setId] = useState("");
+	const [start, setStart] = useState<StartingPoint>("questions");
 	const [template, setTemplate] = useState("");
 	const [image, setImage] = useState("");
 	const [notVisible, setNotVisible] = useState(false);
-	const templates = templatesQuery.data?.templates ?? FALLBACK_TEMPLATES.map((tid) => ({ id: tid, scenario: false }));
-	const chosen = template || templatesQuery.data?.default || "python-pytest";
+	const allTemplates = templatesQuery.data?.templates ?? FALLBACK_TEMPLATES.map((tid) => ({ id: tid, scenario: false }));
+	const templates = start === "code" ? allTemplates.filter((tpl) => CODE_TEMPLATES.has(tpl.id)) : allTemplates;
+	const fallback = templatesQuery.data?.default || "python-pytest";
+	const chosen = start === "questions" ? "qa" : templates.some((tpl) => tpl.id === template) ? template : fallback;
 	const idOk = ID_RE.test(id);
 
 	const submit = async (e: FormEvent) => {
 		e.preventDefault();
 		if (!idOk || !writable) return;
-		const res = await createSuite({ id, template: chosen, image: image.trim() || undefined });
+		const blank = start === "questions";
+		const res = await createSuite({ id, template: chosen, image: image.trim() || undefined, ...(blank ? { blank: true } : {}) });
 		if ("data" in res && res.data) {
 			if (!res.data.visible) {
 				setNotVisible(true);
 				return;
 			}
-			void navigate({ to: "/suites/$suiteId", params: { suiteId: res.data.id }, search: { tab: "edit" } as never });
+			void navigate({ to: "/suites/$suiteId", params: { suiteId: res.data.id }, search: { tab: blank ? "build" : "edit" } as never });
 		}
 	};
 
@@ -60,6 +70,25 @@ export default function NewSuiteView() {
 					<span className="text-muted-foreground text-xs font-normal">{id !== "" && !idOk ? t("new.invalidId") : t("new.idHint")}</span>
 				</label>
 				<fieldset className="flex flex-col gap-2">
+					<legend className="mb-1.5 text-sm font-medium">{t("new.start.title")}</legend>
+					<div className="grid grid-cols-1 gap-2 sm:grid-cols-3" data-testid="suites-new-start">
+						{STARTS.map((sp) => (
+							<label
+								key={sp}
+								className={`flex cursor-pointer flex-col gap-0.5 rounded-md border px-3 py-2 text-sm ${start === sp ? "border-primary bg-primary/5" : ""}`}
+								data-testid={`suites-new-start-${sp}`}
+							>
+								<span className="flex items-center gap-2 font-medium">
+									<input type="radio" name="start" value={sp} checked={start === sp} onChange={() => setStart(sp)} />
+									{t(`new.start.${sp}`)}
+								</span>
+								<span className="text-muted-foreground text-xs">{t(`new.start.${sp}Hint`)}</span>
+							</label>
+						))}
+					</div>
+				</fieldset>
+				{start !== "questions" && (
+				<fieldset className="flex flex-col gap-2">
 					<legend className="mb-1.5 text-sm font-medium">{t("new.template")}</legend>
 					<div className="grid grid-cols-1 gap-2 sm:grid-cols-2" data-testid="suites-new-templates">
 						{templates.map((tpl) => (
@@ -79,6 +108,7 @@ export default function NewSuiteView() {
 						))}
 					</div>
 				</fieldset>
+				)}
 				<label className="flex flex-col gap-1.5 text-sm font-medium">
 					{t("new.image")}
 					<Input value={image} onChange={(e) => setImage(e.target.value)} placeholder="python:3.12-slim" data-testid="suites-new-image" />

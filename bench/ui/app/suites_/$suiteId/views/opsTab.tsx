@@ -234,7 +234,7 @@ export function repoParams(v: RepoSource): RepoSource | null {
 	return branch ? { github, branch } : { github };
 }
 
-function FromCommitSection({ suite, hosted, t }: { suite: SuiteSummary; hosted: boolean; t: T }) {
+export function FromCommitSection({ suite, hosted, t }: { suite: SuiteSummary; hosted: boolean; t: T }) {
 	const [src, setSrc] = useState<RepoSource>({ github: "" });
 	const [id, setId] = useState("");
 	const [base, setBase] = useState("");
