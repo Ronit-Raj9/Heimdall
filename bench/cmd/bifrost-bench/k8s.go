@@ -183,7 +183,7 @@ func runK8sGateway(verb string, args []string) int {
 	image := toolProxyImage(a.cfg)
 	err = k8s.GatewayUp(ctx, client, k8s.GatewayOptions{Namespace: ns, BenchRoot: a.cfg.Root, FaultProxyImage: image,
 		SetupToken: os.Getenv(a.cfg.Gateway.AdminTokenEnv), ControlToken: os.Getenv("BENCH_FAULTPROXY_TOKEN"),
-		BifrostNodePort: *gwNode, ControlNodePort: *ctlNode, PullPolicy: kc.ImagePullPolicy})
+		BifrostNodePort: *gwNode, ControlNodePort: *ctlNode, PullPolicy: kc.ImagePullPolicy, KeySlots: a.cfg.Gateway.KeySlots})
 	if err != nil {
 		return fail("gateway up: %v", err)
 	}

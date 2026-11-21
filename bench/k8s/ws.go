@@ -70,6 +70,10 @@ func wsDial(hc *http.Client, req *http.Request, protocols []string) (*wsConn, er
 	if err != nil {
 		return nil, fmt.Errorf("websocket key: %w", err)
 	}
+	// No Accept header: the upgrade negotiates by Sec-WebSocket-Protocol,
+	// and Kubernetes 1.37 refuses an exec or attach upgrade that asks for
+	// application/json with 406 Not Acceptable.
+	req.Header.Del("Accept")
 	req.Header.Set("Connection", "Upgrade")
 	req.Header.Set("Upgrade", "websocket")
 	req.Header.Set("Sec-WebSocket-Version", "13")

@@ -32,11 +32,21 @@ func (c *Client) Create(ctx context.Context, collection string, obj, out any) er
 }
 
 // Apply creates obj, or replaces the existing object of the same name with
-// a merge patch of obj when it exists already (gateway objects).
+// a merge patch of obj when it exists already (gateway objects). A create
+// can fail validation before the API server sees that the name is taken: a
+// NodePort Service sent again with its own node port is refused 422
+// "provided port is already allocated", not 409. So any failed create is
+// followed by a read, and an object that exists is patched.
 func (c *Client) Apply(ctx context.Context, collection, name string, obj any) error {
 	err := c.Create(ctx, collection, obj, nil)
+	if err == nil {
+		return nil
+	}
 	if !IsConflict(err) {
-		return err
+		var existing map[string]any
+		if gerr := c.Get(ctx, collection+"/"+url.PathEscape(name), &existing); gerr != nil {
+			return err
+		}
 	}
 	b, merr := jsonMarshal(obj)
 	if merr != nil {
