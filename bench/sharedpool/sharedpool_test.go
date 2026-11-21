@@ -150,6 +150,28 @@ func TestAssignments(t *testing.T) {
 	if all, _ := s.Assignments(ctx, ""); len(all.Assignments) != 2 {
 		t.Fatalf("all runtimes: %+v", all)
 	}
+	// X19a: org3 has no shared pool but its own platform: it is served, on
+	// its platform; org1 stays on the shared worker.
+	s.Platform = func(_ context.Context, org string) (*PlatformAssignment, error) {
+		if org == "org3" {
+			return &PlatformAssignment{Name: "e2b", Token: "e2b_tok"}, nil
+		}
+		return nil, nil
+	}
+	plat, err := s.Assignments(ctx, "runc")
+	if err != nil || len(plat.Assignments) != 2 || plat.Assignments[0].Platform != nil ||
+		plat.Assignments[1].OrgID != "org3" || plat.Assignments[1].Platform == nil || plat.Assignments[1].Platform.Name != "e2b" {
+		t.Fatalf("platform assignments: %+v %v", plat, err)
+	}
+	// The list never carries the platform token, only a stamp; the claim
+	// hands it over.
+	if p := plat.Assignments[1].Platform; p.Token != "" || p.Stamp == "" {
+		t.Fatalf("assignment platform carries its token or no stamp: %+v", p)
+	}
+	claim, err := s.ClaimToken(ctx, "org3", "runc")
+	if err != nil || claim.Platform == nil || claim.Platform.Token != "e2b_tok" || claim.Platform.Stamp != plat.Assignments[1].Platform.Stamp {
+		t.Fatalf("claim platform: %+v %v", claim, err)
+	}
 	_ = q.SetKillSwitch(ctx, true, "admin")
 	killed, _ := s.Assignments(ctx, "")
 	if !killed.KillSwitch || len(killed.Assignments) != 0 {

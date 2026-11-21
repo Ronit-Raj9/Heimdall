@@ -135,8 +135,9 @@ func New(cfg *lib.Config, deps Deps) (*Server, error) {
 	jobsHandler := handlers.NewJobsHandler(mode, deps.Jobs, write)
 	jobsHandler.RegisterRoutes(r, common...)
 	s.closers = append(s.closers, jobsHandler.Close)
-	handlers.NewAuthHandler(mode, nil).RegisterRoutes(r, common...)         // Auth area (P2): local mode answers GET /auth/config and /auth/me (local principal); hosted-only routes 404 (handlers/auth.go)
-	handlers.NewRunnersHandler(mode, nil, nil).RegisterRoutes(r, common...) // Runners area (P5): runner admin is hosted only; local mode answers 503 (handlers/runners.go)
+	handlers.NewAuthHandler(mode, nil).RegisterRoutes(r, common...)                 // Auth area (P2): local mode answers GET /auth/config and /auth/me (local principal); hosted-only routes 404 (handlers/auth.go)
+	handlers.NewRunnersHandler(mode, nil, nil).RegisterRoutes(r, common...)         // Runners area (P5): runner admin is hosted only; local mode answers 503 (handlers/runners.go)
+	handlers.NewWorkerPlatformsHandler(mode, nil, nil).RegisterRoutes(r, common...) // X19a: cloud sandbox platforms are hosted only; local mode answers 503
 	if deps.UI != nil {
 		NewUIHandler(mode, deps.UI).RegisterRoutes(r)
 	}

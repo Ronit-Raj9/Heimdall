@@ -228,10 +228,11 @@ func claimSharedToken(ctx context.Context, c *http.Client, server, secret, org, 
 
 // sharedLoop is one org's worker loop.
 type sharedLoop struct {
-	slots  int
-	policy *utils.DockerPolicy // nil in tests
-	cancel context.CancelFunc
-	done   chan struct{}
+	slots    int
+	policy   *utils.DockerPolicy // nil in tests
+	platform string              // platformKey of the assignment's platform; "" on the runner's Docker
+	cancel   context.CancelFunc
+	done     chan struct{}
 
 	mu      sync.Mutex
 	tokenID string // the claimed token's id; "" until claimed
@@ -278,7 +279,7 @@ func reconcileShared(loops map[string]*sharedLoop, as *sharedpool.Assignments, f
 			ended = true
 		default:
 		}
-		if ok && !ended && sharedSlots(a.MaxConcurrentRuns, flagSlots) == l.slots {
+		if ok && !ended && sharedSlots(a.MaxConcurrentRuns, flagSlots) == l.slots && platformKey(a.Platform) == l.platform {
 			if id := l.claimed(); id == "" || id == a.TokenID {
 				if l.policy != nil {
 					l.policy.SetApproved(a.Images)
@@ -488,7 +489,7 @@ func runSharedRunner(args []string) int {
 	var wg sync.WaitGroup
 	start := func(as sharedpool.Assignment, slots int) *sharedLoop {
 		lctx, cancel := context.WithCancel(ctx)
-		l := &sharedLoop{slots: slots, cancel: cancel, done: make(chan struct{})}
+		l := &sharedLoop{slots: slots, platform: platformKey(as.Platform), cancel: cancel, done: make(chan struct{})}
 		root := filepath.Join(f.projectsDir, as.OrgID)
 		l.policy = h.orgPolicy(as.OrgID, as.Images, root)
 		wg.Add(1)
@@ -563,11 +564,21 @@ func (h *sharedHost) serveOrg(ctx context.Context, org string, slots int, root s
 		name = name[:128]
 	}
 	reg, planRoot := sharedOrgProject(oa, root)
+	labels := []string{"shared", "runtime=" + h.runtime}
+	if claim.Platform != nil { // X19a: the org's own sandbox platform runs its runs
+		pr, err := sandboxRegistry(ctx, oa, reg, claim.Platform)
+		if err != nil {
+			a.logger.Error("shared runner: org's worker platform not usable; its runs wait", "org", org, "platform", claim.Platform.Name, "error", err.Error())
+			return
+		}
+		reg = pr
+		labels = append(labels, "platform="+claim.Platform.Name)
+	}
 	plan := engine.NewPlanner(reg, planRoot, oa.logger, engine.WithIgnoreQuarantine(), engine.WithoutGPUCheck(), engine.WithAgentLibrary(suite.LibraryDir())).Plan
 	w, err := engine.NewWorker(reg, engine.NewPipeline(reg, planRoot, oa.logger),
 		sharedEnsureImages(oa, reg, planRoot, proj.refresh, plan),
 		engine.WorkerOptions{Server: h.f.server, Token: claim.Token, WorkerID: name, Host: h.host, Version: benchVersion,
-			Slots: slots, Logger: oa.logger, Pool: sharedpool.Pool, Labels: []string{"shared", "runtime=" + h.runtime},
+			Slots: slots, Logger: oa.logger, Pool: sharedpool.Pool, Labels: labels,
 			Disk: h.hygiene.DiskState, ImageUse: h.hygiene.NoteImages, KeepRunFolders: a.cfg.Runner.Disk.KeepRunFolders})
 	// No Jobs: hosted CLI jobs would run the docker CLI outside the org's
 	// policy; the worker refuses them and they go to the org's own workers.

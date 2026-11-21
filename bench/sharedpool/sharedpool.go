@@ -16,7 +16,9 @@ package sharedpool
 
 import (
 	"context"
+	"crypto/sha256"
 	"crypto/subtle"
+	"encoding/hex"
 	"errors"
 	"fmt"
 	"os"
@@ -124,6 +126,32 @@ type Assignment struct {
 	Runtime           string   `json:"runtime"`
 	MaxConcurrentRuns int      `json:"max_concurrent_runs"`
 	Images            []string `json:"images,omitempty"` // approved custom images (digest pinned); the runner pulls only these
+	// Platform is the org's own cloud sandbox platform when it chose one as
+	// its default worker (bench/sandbox): the shared runner then runs the
+	// org's runs in that platform instead of on its own Docker daemon. In
+	// the assignment list it carries no token, only the platform's name,
+	// endpoint and Stamp; the token comes with the claim (ClaimedToken) and
+	// the runner keeps it in memory only.
+	Platform *PlatformAssignment `json:"platform,omitempty"`
+}
+
+// PlatformAssignment is an org's default sandbox platform and credentials.
+type PlatformAssignment struct {
+	Name     string `json:"name"`
+	Token    string `json:"token,omitempty"` // only in a ClaimedToken
+	Endpoint string `json:"endpoint,omitempty"`
+	// Stamp changes when the token or endpoint does (a short hash, never the
+	// token), so a runner restarts the org's loop on a rotated credential.
+	Stamp string `json:"stamp,omitempty"`
+}
+
+// publicView is p without its token, stamped.
+func (p *PlatformAssignment) publicView() *PlatformAssignment {
+	if p == nil {
+		return nil
+	}
+	sum := sha256.Sum256([]byte(p.Token + "\x00" + p.Endpoint))
+	return &PlatformAssignment{Name: p.Name, Endpoint: p.Endpoint, Stamp: hex.EncodeToString(sum[:8])}
 }
 
 // Assignments is the answer of GET /api/bench/admin/pool/assignments.
@@ -138,6 +166,9 @@ type ClaimedToken struct {
 	OrgID   string `json:"org_id"`
 	TokenID string `json:"token_id"`
 	Token   string `json:"token"`
+	// Platform is the org's sandbox platform with its token, when it chose
+	// one (Assignment.Platform); nil runs on the runner's own Docker.
+	Platform *PlatformAssignment `json:"platform,omitempty"`
 }
 
 // ErrNotAssigned refuses a token claim for an org the shared pool does not serve.
@@ -151,19 +182,31 @@ type Service struct {
 	Images *ImageStore // nil: no custom images
 	// Orgs lists every org id.
 	Orgs func(ctx context.Context) ([]string, error)
+	// Platform returns an org's default sandbox platform, nil when the org
+	// runs on the shared worker. An org with one is served even without the
+	// shared pool: the compute is its own. nil: no platforms.
+	Platform func(ctx context.Context, orgID string) (*PlatformAssignment, error)
 
 	mu sync.Mutex // one claim at a time
 }
 
-// assigned returns the org's normalized limits and whether the shared pool
-// serves it for runtime ("" any).
-func (s *Service) assigned(ctx context.Context, org, runtime string) (quota.Limits, bool, error) {
+// assigned returns the org's normalized limits, its sandbox platform (nil
+// when it runs on the shared worker) and whether the shared pool serves it
+// for runtime ("" any). An org with its own platform is served even
+// without the shared pool: the compute is its own.
+func (s *Service) assigned(ctx context.Context, org, runtime string) (quota.Limits, *PlatformAssignment, bool, error) {
 	l, err := s.Quota.Get(ctx, org)
 	if err != nil {
-		return l, false, err
+		return l, nil, false, err
 	}
 	l = quota.Normalize(l)
-	return l, l.SharedPool && (runtime == "" || l.Runtime == runtime), nil
+	var plat *PlatformAssignment
+	if s.Platform != nil {
+		if plat, err = s.Platform(ctx, org); err != nil {
+			return l, nil, false, fmt.Errorf("org %s: worker platform: %w", org, err)
+		}
+	}
+	return l, plat, (l.SharedPool || plat != nil) && (runtime == "" || l.Runtime == runtime), nil
 }
 
 // liveTokenID is the id of the org's unrevoked shared pool token ("" none).
@@ -202,7 +245,7 @@ func (s *Service) Assignments(ctx context.Context, runtime string) (*Assignments
 		return nil, err
 	}
 	for _, org := range orgs {
-		l, ok, err := s.assigned(ctx, org, runtime)
+		l, plat, ok, err := s.assigned(ctx, org, runtime)
 		if err != nil {
 			return nil, err
 		}
@@ -213,7 +256,7 @@ func (s *Service) Assignments(ctx context.Context, runtime string) (*Assignments
 		if err != nil {
 			return nil, fmt.Errorf("org %s: %w", org, err)
 		}
-		a := Assignment{OrgID: org, Pool: Pool, TokenID: id, Runtime: l.Runtime, MaxConcurrentRuns: l.MaxConcurrentRuns}
+		a := Assignment{OrgID: org, Pool: Pool, TokenID: id, Runtime: l.Runtime, MaxConcurrentRuns: l.MaxConcurrentRuns, Platform: plat.publicView()}
 		if s.Images != nil && l.AllowCustomImages {
 			if a.Images, err = s.Images.Approved(ctx, org); err != nil {
 				return nil, err
@@ -239,7 +282,8 @@ func (s *Service) ClaimToken(ctx context.Context, org, runtime string) (*Claimed
 	} else if kill {
 		return nil, ErrNotAssigned
 	}
-	if _, ok, err := s.assigned(ctx, org, runtime); err != nil {
+	_, plat, ok, err := s.assigned(ctx, org, runtime)
+	if err != nil {
 		return nil, err
 	} else if !ok {
 		return nil, ErrNotAssigned
@@ -262,7 +306,12 @@ func (s *Service) ClaimToken(ctx context.Context, org, runtime string) (*Claimed
 	if err != nil {
 		return nil, err
 	}
-	return &ClaimedToken{OrgID: org, TokenID: created.Info.ID, Token: created.Token}, nil
+	if plat != nil {
+		stamped := *plat
+		stamped.Stamp = plat.publicView().Stamp
+		plat = &stamped
+	}
+	return &ClaimedToken{OrgID: org, TokenID: created.Info.ID, Token: created.Token, Platform: plat}, nil
 }
 
 // dropLegacyCopies deletes the readable token copies older servers kept in

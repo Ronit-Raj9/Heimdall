@@ -240,10 +240,9 @@ func TestAgentVersionsRegisterCandidate(t *testing.T) {
 	if vs := versionsOf(t, r, "ci-agent"); vs.Live != 1 {
 		t.Fatalf("live before: %+v", vs)
 	}
-	pr := strings.Replace(doc.YAML, "model: "+doc.Fields.Model, "model: gpt-5-mini", 1)
-	if pr == doc.YAML {
-		t.Fatalf("no model line in:\n%s", doc.YAML)
-	}
+	// Versions are told apart by agent hash (the config without its model),
+	// so the pull request changes the agent itself, not only its model.
+	pr := strings.TrimRight(doc.YAML, "\n") + "\nagent_version: 9.9.9-pr7\n"
 	code, body = abCall(r, "POST", APIPrefix+"/agents/ci-agent/versions", AgentVersionCreate{YAML: pr, Note: "pull request #7"})
 	if code != 201 {
 		t.Fatalf("register: %d %s", code, body)

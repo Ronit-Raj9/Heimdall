@@ -26,6 +26,19 @@ import SettingsView, { settingsTab, settingsTabsFor } from "./settingsView";
 
 const api = vi.hoisted(() => ({ q: {} as Record<string, unknown>, m: {} as Record<string, Record<string, unknown>>, calls: [] as string[] }));
 vi.mock("@tanstack/react-router", async () => (await import("@/lib/testing/routerMock")).routerMock);
+// X19a: Workers tab, connect a platform.
+vi.mock("@/lib/store/apis/workerPlatformsApi", async (importOriginal) => {
+	const real = await importOriginal<typeof import("@/lib/store/apis/workerPlatformsApi")>();
+	const { mutation: m } = await import("@/lib/testing/render");
+	return {
+		...real,
+		useListWorkerPlatformsQuery: () => ({ data: { platforms: [], default: "" }, isLoading: false }),
+		useConnectWorkerPlatformMutation: () => m({}),
+		useTestWorkerPlatformMutation: () => m({}),
+		useSetDefaultWorkerMutation: () => m({}),
+		useDisconnectWorkerPlatformMutation: () => m({}),
+	};
+});
 vi.mock("@/lib/store/apis/accountSafetyApi", async () => {
 	const { mutation: m } = await import("@/lib/testing/render");
 	return { useCreateResetLinkMutation: () => m({}) }; // L22 reset links

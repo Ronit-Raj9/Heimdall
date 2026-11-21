@@ -7,6 +7,7 @@ import (
 	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 
@@ -57,7 +58,7 @@ func TestReconcileShared(t *testing.T) {
 	start := func(a sharedpool.Assignment, slots int) *sharedLoop {
 		started++
 		d := make(chan struct{})
-		l := &sharedLoop{slots: slots, done: d, policy: &utils.DockerPolicy{}}
+		l := &sharedLoop{slots: slots, platform: platformKey(a.Platform), done: d, policy: &utils.DockerPolicy{}}
 		l.cancel = func() { close(d) }
 		return l
 	}
@@ -89,6 +90,19 @@ func TestReconcileShared(t *testing.T) {
 	reconcileShared(loops, as, 2, start)
 	if started != 4 {
 		t.Fatalf("ended loop not restarted: started %d", started)
+	}
+	// X19a: choosing or changing a platform restarts that org's loop only.
+	as.Assignments[1].Platform = &sharedpool.PlatformAssignment{Name: "modal", Token: "ak:as"}
+	reconcileShared(loops, as, 2, start)
+	if started != 5 || loops["b"].platform == "" {
+		t.Fatalf("platform change: started %d, loop %+v", started, loops["b"])
+	}
+	reconcileShared(loops, as, 2, start)
+	if started != 5 {
+		t.Fatal("restarted an unchanged platform loop")
+	}
+	if strings.Contains(loops["b"].platform, "ak:as") {
+		t.Fatal("the loop key holds the token")
 	}
 	reconcileShared(loops, &sharedpool.Assignments{KillSwitch: true}, 2, start)
 	if len(loops) != 0 {

@@ -222,3 +222,72 @@ admin approved for that organization. Setup and guardrails:
 - Prove the runner ran the agent faithfully. As in docs/remote-execution.md,
   the seal proves the folder arrived as the runner sealed it, for the leased
   slot and attempt; admit only machines you control.
+
+## Cloud sandbox platforms (bring your own worker)
+
+An organization can run its agents in its own Modal, Daytona or E2B account
+instead of on the shared worker: **Settings, Workers, Connect a platform**.
+The admin pastes the platform's API token; the server tests it with a cheap
+authenticated read and keeps it only when the platform accepts it, as an org
+secret in the keystore (AES-GCM, never returned, never logged; answers carry
+its last four characters). One connected platform can be chosen as the
+org's default worker; choosing the shared worker again, or disconnecting the
+platform, goes back to the shared worker.
+
+Code: `sandbox/` (platform clients, driver, connections), `handlers/workerplatforms.go`
+(routes under `/api/bench/worker-platforms`), `cmd/bifrost-bench/workerplatforms_hosted.go`,
+`cmd/bifrost-bench/runnerplatform.go`.
+
+How a run gets there: the shared runner's assignments carry the org's default
+platform and token (`sharedpool.Assignment.Platform`); an org with one is
+served even when its shared pool is off, since the compute is its own. That
+org's worker loop runs every run with the sandbox driver of its platform,
+and its gateway preflight probes egress from a sandbox of that platform.
+
+The sandbox driver is an `environments.Placement`: it runs the
+docker_workspace plan unchanged (same images, workspace seed, launch, diff
+export), so the manifest still freezes the Docker driver and the server's
+hash and the runner's agree. Where the run actually ran is in the run
+folder's `sandbox.json` (platform, sandbox id, registry image, egress rule,
+isolation check). Per run:
+
+1. One sandbox from the agent image, pulled by registry digest (an image
+   that exists only on the runner is refused: push it first), with a hard
+   lifetime of the wall budget plus 45 minutes, labelled with the run.
+2. Egress: none for `network: none`, otherwise only the public gateway host
+   (`gateway.public_url`, required; agent variables naming
+   `gateway.agent_url` are rewritten to it). Daytona `domainAllowList` /
+   `networkAllowList`, E2B `network.allowOut` with everything else denied,
+   Modal `outbound_domain_allowlist` / `block_network`.
+3. The workspace is seeded with the Docker driver's populate script from a
+   tar of the task repo (the image needs `sh`, `tar` and `git`); before the
+   agent starts, a check from inside the sandbox must fail to reach
+   1.1.1.1:443, or the run fails as infrastructure.
+4. The agent starts in the background as its uid (`setpriv`, or
+   `chroot --userspec`), with its environment in a root-only file; the
+   driver polls for its exit code under the wall budget and kills every
+   agent process on expiry. Both streams are capped and redacted.
+5. The diff is exported inside the sandbox after the agent stopped, then
+   filtered on the runner; Destroy deletes the sandbox (idempotent, and it
+   finds the sandbox from `sandbox.json` after a runner restart).
+
+Refused at plan time, with the reason: services, external APIs, mailboxes,
+compose, teams, sessions, memory, skills folders, remote_http and a2a
+agents, snapshot grading, tasks with their own image, GPU tasks, realism
+neutral, and any fault layer but the gateway. Observers and the event
+collector do not run in a sandbox (recorded as off).
+
+Platform APIs, all plain HTTP from Go except Modal:
+
+| Platform | Token | API |
+|---|---|---|
+| Daytona | API key (bearer) | `https://app.daytona.io/api` sandbox create/get/delete; the sandbox toolbox for `process/execute` and `files/upload-v2` / `files/download`. Endpoint field: a self-hosted API URL. |
+| E2B | team API key (`X-API-Key`) | `https://api.e2b.app`: template v3 + build `fromImage` (cached per image), `POST /v2/sandboxes`, `DELETE /sandboxes/{id}`; envd on `sandbox.e2b.app` for `process.Process/Start` (Connect streaming) and `/files`. Endpoint field: a self-hosted domain. |
+| Modal | API token `ak-...:as-...` | Modal has no public REST sandbox API. The runner runs `sandbox/modal_helper.py` with the official `modal` Python package (`HEIMDALL_MODAL_PYTHON`, default `python3`) per call; the token reaches it only as `MODAL_TOKEN_ID` / `MODAL_TOKEN_SECRET`, with an empty `MODAL_CONFIG_PATH` so no local profile is used. Sandboxes run under the app `heimdall-sandboxes`. Endpoint field: an optional Modal environment name. |
+
+Real-platform tests are behind a build tag and skip without a token:
+`go test -tags integration -run TestReal ./sandbox/` with `MODAL_TOKEN_ID` /
+`MODAL_TOKEN_SECRET`, `DAYTONA_API_KEY` or `E2B_API_KEY`. Each creates one
+alpine sandbox without network, runs a command, round-trips a file and
+deletes it. A new platform implements `sandbox.Platform` (Check, Create,
+Exec, Upload, Download, Destroy) and calls `sandbox.Register` in `init`.

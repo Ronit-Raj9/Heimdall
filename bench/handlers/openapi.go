@@ -4,6 +4,7 @@ import (
 	"cmp"
 	"encoding/json"
 	"fmt"
+	"github.com/maximhq/bifrost/bench/sandbox"
 	"path"
 	"reflect"
 	"regexp"
@@ -279,6 +280,18 @@ var APIRoutes = []RouteDoc{
 		Auth: AuthWrite, Response: schemas.RunnerTokenView{}},
 	{Method: "GET", Path: APIPrefix + "/runners/install.sh", Tag: "runners", Summary: "Runner install script for a fresh Ubuntu or Debian box (deploy/runner/install.sh)",
 		Raw: "text/x-shellscript"},
+
+	// Bring your own worker (X19a, handlers/workerplatforms.go): the org's own cloud sandbox platforms.
+	{Method: "GET", Path: APIPrefix + "/worker-platforms", Tag: "runners", Summary: "Cloud sandbox platforms (Modal, Daytona, E2B), which are connected and the org's default worker; tokens are never returned",
+		Auth: AuthWrite, Response: sandbox.ConnectionsList{}},
+	{Method: "POST", Path: APIPrefix + "/worker-platforms/default", Tag: "runners", Summary: "Choose the org's default worker: a connected platform, or \"\" for the shared worker",
+		Auth: AuthWrite, Request: PlatformDefaultRequest{}, Response: sandbox.ConnectionsList{}},
+	{Method: "POST", Path: APIPrefix + "/worker-platforms/{platform}/connect", Tag: "runners", Summary: "Test a platform token and keep it as an org secret when the platform accepts it",
+		Auth: AuthWrite, Request: PlatformConnectRequest{}, Response: sandbox.ConnectionView{}},
+	{Method: "POST", Path: APIPrefix + "/worker-platforms/{platform}/test", Tag: "runners", Summary: "Test a connected platform's token again",
+		Auth: AuthWrite, Response: sandbox.ConnectionView{}},
+	{Method: "POST", Path: APIPrefix + "/worker-platforms/{platform}/disconnect", Tag: "runners", Summary: "Delete a platform's token; a default platform goes back to the shared worker",
+		Auth: AuthWrite, Response: sandbox.ConnectionsList{}},
 
 	// Jobs area (P4, handlers/jobs.go, docs/platform-design.md): background jobs of the caller's org.
 	{Method: "GET", Path: APIPrefix + "/jobs", Tag: "jobs", Summary: "Jobs of the org, newest first, and the kinds POST /jobs accepts", Response: JobList{}, Query: []QueryDoc{
