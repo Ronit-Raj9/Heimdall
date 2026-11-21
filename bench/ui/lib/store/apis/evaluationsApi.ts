@@ -49,6 +49,8 @@ export interface AgentVersion {
 export interface AgentVersionList {
 	agent: string;
 	versions: AgentVersion[];
+	/** The version holding the saved config: what pull requests are compared with. */
+	live?: number;
 }
 
 /** GET /agents/{id}/versions/{n} */

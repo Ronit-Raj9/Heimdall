@@ -63,6 +63,22 @@ export interface CIWorkflowPreview {
 	path: string;
 	mode: string;
 	workflow: string;
+	/** github or gitlab (hosted mode). */
+	provider?: string;
+}
+
+/** Query of GET /integrations/ci/workflow. Hosted mode takes the rest. */
+export interface CIWorkflowParams {
+	mode: string;
+	agent?: string;
+	provider?: "github" | "gitlab";
+	source?: "config" | "image" | "endpoint";
+	config?: string;
+	url?: string;
+	pack?: string;
+	benchmarks?: string;
+	faults?: string;
+	fail_on?: string;
 }
 
 /** Params of the integrations.export job. */

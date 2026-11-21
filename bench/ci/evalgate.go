@@ -208,7 +208,7 @@ func EvaluationComment(in CommentInput) string {
 	fmt.Fprintf(&b, "### Heimdall: %s v%d (this pull request) vs v%d (live)\n\n", in.Agent, in.PRVersion, in.LiveVersion)
 	fmt.Fprintf(&b, "**Gate %s: %s.**", verdict, outcomeText(in.Gate.Outcome))
 	if len(in.Gate.Reasons) > 0 {
-		b.WriteString(" " + capitalize(strings.Join(in.Gate.Reasons, "; ")) + ".")
+		b.WriteString(" Why: " + strings.Join(in.Gate.Reasons, "; ") + ".")
 	}
 	b.WriteString("\n\n")
 	if in.Note != "" {

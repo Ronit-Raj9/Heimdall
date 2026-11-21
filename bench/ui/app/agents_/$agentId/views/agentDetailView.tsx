@@ -9,13 +9,14 @@ import { useAgentJobs } from "../../../agents/views/agentJobs";
 import { useAgentSummary } from "./agentOps.shared";
 import ChecksTab from "./checksTab";
 import ConfigTab from "./configTab";
+import PullRequestsTab from "./pullRequestsTab";
 import ReportCardTab from "./reportCardTab";
 import ToolsTab from "./toolsTab";
 import VersionsTab from "./versionsTab";
 
 /**
  * One agent (/agents/$agentId?tab=): a header with capabilities, Evaluate, Run, Check and Edit, then
- * Config, Checks, Tools, Versions and Report card.
+ * Config, Checks, Tools, Versions, Report card and Pull requests (test on every pull request).
  */
 export default function AgentDetailView() {
 	const { t } = useTranslation("agentBuilder");
@@ -32,6 +33,7 @@ export default function AgentDetailView() {
 		{ id: "tools", label: t("detail.tabs.tools") },
 		{ id: "versions", label: t("detail.tabs.versions") },
 		{ id: "report-card", label: t("detail.tabs.reportCard") },
+		{ id: "pull-requests", label: t("detail.tabs.pullRequests") },
 	];
 	const Icon = agent ? adapterIcon(agent.adapter) : null;
 	const state = agent ? (agent.error ? "broken" : jobState(lastJobFor(jobs, "agent.check", agent.path, agent.id))) : null;
@@ -118,6 +120,8 @@ export default function AgentDetailView() {
 						<VersionsTab agentId={agentId} />
 					) : active === "report-card" ? (
 						<ReportCardTab agentId={agentId} />
+					) : active === "pull-requests" ? (
+						<PullRequestsTab agentId={agentId} />
 					) : (
 						<ConfigTab agentId={agentId} />
 					)

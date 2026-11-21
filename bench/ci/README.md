@@ -1,11 +1,13 @@
 # bench/ci: the agent release gate
 
-Runs `bifrost-bench check` on a pull request and fails the build on a bad agent. The full guide is [`../docs/ci.md`](../docs/ci.md).
+Tests an agent on every pull request. The default (evaluate mode) calls a hosted Heimdall with an org API token: `bifrost-bench ci evaluate` registers the pull request's config as a version, evaluates it against the live version, comments the report card summary and sets the commit status. Recorded and live modes run `bifrost-bench check` without a hosted Heimdall. The full guide is [`../docs/ci.md`](../docs/ci.md).
 
 | File | What |
 |---|---|
 | `check.sh` | The gate. `recorded` mode replays a sealed experiment from `testdata/recorded/` on a temp copy; `live` mode runs an experiment file against a running stack. Exits with `check`'s code |
-| `action.yml` | Composite action: set up Go, build the binary (`GOWORK=off`), verify the bundle's seals, run `check.sh`, upload the report |
+| `action.yml` | Composite action: set up Go, build the binary (`GOWORK=off`); evaluate mode runs `ci evaluate`; recorded and live modes verify the bundle's seals and run `check.sh`; upload the report |
+| `heimdall.gitlab-ci.yml` | GitLab CI template (hidden job `.heimdall-evaluate`) that builds Heimdall and runs `ci evaluate` on merge requests |
+| `evalgate.go`, `hosted.go` | The evaluation gate and comment, and the hosted GitHub/GitLab workflow generators |
 | `ci.go`, `ci_test.go` | The seal guard: verifies every seal of the recorded bundle and proves a tampered run fails |
 
 The workflow is `.github/workflows/bench-check.yml` at the repo root.

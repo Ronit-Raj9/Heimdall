@@ -42,7 +42,8 @@
 			"checks": "Readiness",
 			"tools": "Tools",
 			"versions": "Versions",
-			"reportCard": "Report card"
+			"reportCard": "Report card",
+			"pullRequests": "Pull requests"
 		},
 		"capabilities": "Capabilities",
 		"evaluate": "Evaluate",
@@ -112,5 +113,43 @@
 			"envHelp": "One KEY=value per line. For the model API key, use the placeholder shown here; never paste a real key.",
 			"argv": "Start command"
 		}
+	},
+	"ci": {
+		"title": "Test on every pull request",
+		"description": "Each pull request registers its agent config as a new version, evaluates it against the live version on the benchmarks you pick, posts the report card summary as a comment and sets the check status.",
+		"liveVersion": "Pull requests are compared with the live version: v{{version}}, the saved config of this agent.",
+		"noLiveVersion": "This agent has no saved version yet. Save its config once; pull requests are compared with that version.",
+		"provider": "CI service",
+		"source": "What the pull request changes",
+		"sourceConfig": "Agent config file",
+		"sourceImage": "Agent image (built earlier in the pipeline)",
+		"sourceEndpoint": "Preview deployment URL",
+		"configPath": "Config file in your repository",
+		"pack": "Benchmarks",
+		"faults": "Faults to test",
+		"fault": {
+			"model-down": "Model down",
+			"broken-tool": "Broken tool",
+			"misleading-instruction": "Misleading instruction"
+		},
+		"failInconclusive": "Also fail when the result is unclear",
+		"gateRule": "The check fails when the pull request is worse than the live version on any benchmark (a real gap, not chance) or when the evaluation does not finish.",
+		"stepsTitle": "Set it up",
+		"tokenIntro": "Create an org API token for CI. It is shown once.",
+		"tokenLocal": "This server runs without sign-in. Pull request evaluations need a hosted Heimdall that CI can reach; use its org API token as HEIMDALL_TOKEN.",
+		"createToken": "Create a CI token",
+		"manageTokens": "Manage API tokens",
+		"tokenCreated": "CI token created",
+		"tokenName": "Secret name",
+		"secretsGithub": "In your GitHub repository, open Settings, then Secrets and variables, then Actions, and add:",
+		"secretsGitlab": "In your GitLab project, open Settings, then CI/CD, then Variables, and add (masked):",
+		"varToken": "the CI token (a secret)",
+		"varUrl": "the address of this Heimdall (a variable)",
+		"varGitlab": "a project access token with the api scope, for the comment and the status",
+		"commitFile": "Commit this file:",
+		"gitlabInclude": "and include it from .gitlab-ci.yml.",
+		"copy": "Copy",
+		"copied": "Copied",
+		"previewError": "Could not make the workflow file"
 	}
 }
