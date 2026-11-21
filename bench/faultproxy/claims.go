@@ -447,7 +447,7 @@ func (s *Server) knownSlots(w http.ResponseWriter, slots []string) bool {
 			return false
 		}
 		seen[sl] = true
-		if !s.names[sl] {
+		if !s.knownSlot(sl) { // F4: organization slots too (orgslots.go)
 			s.controlError(w, http.StatusNotFound, fmt.Sprintf("unknown slot %q", sl))
 			return false
 		}

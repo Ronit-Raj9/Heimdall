@@ -47,6 +47,7 @@ func (s *Server) ControlHandler() http.Handler {
 	mux.HandleFunc("POST /claims/renew", s.handleRenew)
 	mux.HandleFunc("POST /claims/release", s.handleRelease)
 	mux.HandleFunc("GET /claims", s.handleClaims)
+	mux.HandleFunc("PUT /orgslots", s.handleOrgSlots) // F4 key delivery (orgslots.go)
 	return mux
 }
 
@@ -166,7 +167,7 @@ func (s *Server) controlSlot(w http.ResponseWriter, r *http.Request) (string, bo
 		return "", false
 	}
 	slot := r.PathValue("slot")
-	if !s.names[slot] {
+	if !s.knownSlot(slot) { // F4: organization slots too (orgslots.go)
 		s.controlError(w, http.StatusNotFound, fmt.Sprintf("unknown slot %q", slot))
 		return "", false
 	}

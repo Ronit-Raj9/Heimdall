@@ -266,7 +266,10 @@ func (g *Gateway) runProvider(rc *schemas.RunContext) (ProviderSetup, string, er
 			name = DefaultProvider
 		}
 	}
-	p, ok := g.provider(name)
+	p, ok := g.orgProvider(rc, name) // F4: the experiment's organization keys (orgcreds.go)
+	if !ok {
+		p, ok = g.provider(name)
+	}
 	if !ok {
 		return ProviderSetup{}, "", fmt.Errorf("agent provider %s is not the gateway provider (configured: %s)", name, g.providerNames())
 	}

@@ -270,6 +270,12 @@ func (w *Worker) Work(ctx context.Context, lease *schemas.WorkerLease) *schemas.
 		w.release(ctx, lease, "the leased slot is not the manifest's slot "+lease.Slot.SlotID, true, nil)
 		return nil
 	}
+	if why := w.applyLeaseCredentials(sctx, lease); why != "" { // F4 key delivery (remotecreds.go)
+		w.logger.Warn("lease refused", "lease", lease.LeaseID, "experiment", lease.ExpID, "reason", why)
+		stop()
+		w.release(ctx, lease, why, false, nil)
+		return nil
+	}
 	// Tenancy area: a hosted manifest defers the gateway preflight to this
 	// runner; it runs before every slot and refuses the lease on a failure
 	// (remotegateway.go).
