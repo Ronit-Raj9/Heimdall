@@ -47,7 +47,9 @@ describe("CatalogBody", () => {
 		expect(sectionOf(entries[0])).toBe("featured");
 		expect(sectionOf(entries[1])).toBe("try");
 		expect(sectionOf(entries[3])).toBe("import");
-		expect(html).toContain('data-testid="catalog-filter-gpu"');
+		expect(html).toContain('data-testid="catalog-filter-category"');
+		expect(html).toContain('<option value="gpu">GPU</option>');
+		expect(html).toContain('data-testid="catalog-source-ready"');
 		expect(html).not.toContain('data-testid="catalog-data-terminal-bench-2"');
 	});
 

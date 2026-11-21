@@ -6,7 +6,7 @@ import { formatRelative, formatWhen } from "@/components/platform/platform.utils
 import { BlockSkeleton, LoadError } from "@/components/runs/screenStates";
 import { EmptyState } from "@/components/shell/emptyState";
 import { EntityLink } from "@/components/shell/entityLink";
-import { Input } from "@/components/ui/input";
+import { FilterSelect, FilterTokens, ToolbarSearch, type FilterToken } from "@/components/ui/toolbar";
 import { ValueCell } from "@/components/valueCell";
 import { getLocale } from "@/lib/i18n";
 import { useListExperimentsQuery } from "@/lib/store/apis/benchApi";
@@ -126,12 +126,11 @@ const STATE_TONE: Record<ExperimentState, Tone> = {
 	cancelled: "grey",
 };
 
-/** Status chips: each maps to one state filter in the URL. */
-const CHIPS: readonly {
-	key: "all" | "active" | "done" | "failed" | "created";
-	state: string | null;
+/** Status choices: each maps to one state filter in the URL. */
+const STATUSES: readonly {
+	key: "active" | "done" | "failed" | "created";
+	state: string;
 }[] = [
-	{ key: "all", state: null },
 	{ key: "active", state: "running" },
 	{ key: "done", state: "done" },
 	{ key: "failed", state: "failed" },
@@ -200,24 +199,7 @@ function RunsProgress({ e }: { e: ExperimentStatus }) {
 	);
 }
 
-function Chip({ active, onClick, children, testId }: { active: boolean; onClick: () => void; children: React.ReactNode; testId: string }) {
-	return (
-		<button
-			type="button"
-			aria-pressed={active}
-			onClick={onClick}
-			className={cn(
-				"inline-flex h-7 items-center gap-1.5 rounded-full border px-3 text-xs font-medium transition-colors",
-				active ? "border-foreground/20 bg-foreground text-background" : "text-muted-foreground hover:bg-muted hover:text-foreground",
-			)}
-			data-testid={testId}
-		>
-			{children}
-		</button>
-	);
-}
-
-/** /experiments body: search, status and suite chips, and one row per experiment with a readable name. */
+/** /experiments body: one toolbar (search, status, benchmark), and one row per experiment with a readable name. */
 export function ExperimentBoard() {
 	const { t } = useTranslation("experimentsUx");
 	const { t: tb } = useTranslation("bench");
@@ -252,6 +234,15 @@ export function ExperimentBoard() {
 	}, [all, filters, named]);
 	const suites = useMemo(() => [...new Set(all.map((e) => e.suite).filter((s): s is string => Boolean(s)))].sort(), [all]);
 	const clear = () => void setFilters({ q: null, state: null, suite: null });
+	const statusKey = STATUSES.find((c) => c.state === filters.state)?.key;
+	const tokens: FilterToken[] = [
+		filters.state && {
+			key: "state",
+			label: `${t("col.status")}: ${statusKey ? t(`chips.${statusKey}`) : filters.state}`,
+			onRemove: () => void setFilters({ state: null }),
+		},
+		filters.suite && { key: "suite", label: `${t("chips.benchmark")}: ${suiteName(filters.suite)}`, onRemove: () => void setFilters({ suite: null }) },
+	].filter((x): x is FilterToken => Boolean(x));
 
 	if (list.isLoading) return <BlockSkeleton rows={6} testId="experiment-list-loading" />;
 	if (list.error || !list.data) {
@@ -277,50 +268,33 @@ export function ExperimentBoard() {
 
 	return (
 		<div className="flex min-w-0 flex-col gap-4" data-testid="experiment-list">
-			<div className="flex flex-col gap-3" role="search" aria-label={tb("experiments.list.filtersLabel")}>
-				<div className="relative max-w-md">
-					<Search
-						className="text-muted-foreground pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2"
-						aria-hidden="true"
-					/>
-					<Input
-						type="search"
-						aria-label={tb("experiments.list.search")}
+			<div className="flex flex-col gap-2" role="search" aria-label={tb("experiments.list.filtersLabel")}>
+				<div className="flex flex-wrap items-center gap-2" role="toolbar" data-testid="experiment-toolbar">
+					<ToolbarSearch
 						value={filters.q ?? ""}
-						onChange={(e) => void setFilters({ q: e.target.value || null })}
+						onChange={(v) => void setFilters({ q: v || null })}
 						placeholder={t("searchPlaceholder")}
-						className="h-9 pl-9 text-sm"
-						data-testid="experiment-search"
+						label={tb("experiments.list.search")}
+						testId="experiment-search"
 					/>
-				</div>
-				<div className="flex flex-wrap items-center gap-1.5" role="group" aria-label={t("chips.label")}>
-					{CHIPS.map((c) => (
-						<Chip
-							key={c.key}
-							active={(filters.state ?? null) === c.state}
-							onClick={() => void setFilters({ state: c.state })}
-							testId={`experiment-chip-${c.key}`}
-						>
-							{t(`chips.${c.key}`)}
-						</Chip>
-					))}
-					{suites.length > 1 && <span className="bg-border mx-1 h-4 w-px" aria-hidden="true" />}
-					{suites.length > 1 &&
-						suites.map((s) => {
-							const Icon = suiteIcon(s);
-							const on = filters.suite === s;
-							return (
-								<Chip
-									key={s}
-									active={on}
-									onClick={() => void setFilters({ suite: on ? null : s })}
-									testId={`experiment-chip-suite-${suiteName(s)}`}
-								>
-									<Icon className="size-3.5" aria-hidden="true" />
-									{suiteName(s)}
-								</Chip>
-							);
-						})}
+					<FilterSelect
+						label={t("col.status")}
+						allLabel={t("chips.all")}
+						options={STATUSES.map((c) => ({ value: c.state, label: t(`chips.${c.key}`) }))}
+						value={filters.state}
+						onChange={(v) => void setFilters({ state: v })}
+						testId="experiment-filter-status"
+					/>
+					{(suites.length > 1 || filters.suite) && (
+						<FilterSelect
+							label={t("chips.benchmark")}
+							allLabel={t("chips.all")}
+							options={suites.map((s) => ({ value: s, label: suiteName(s) }))}
+							value={filters.suite}
+							onChange={(v) => void setFilters({ suite: v })}
+							testId="experiment-filter-suite"
+						/>
+					)}
 					{systemCount > 0 && (
 						<label className="text-muted-foreground ml-auto inline-flex items-center gap-2 text-xs" title={t("system.toggleHint")}>
 							<input
@@ -334,6 +308,7 @@ export function ExperimentBoard() {
 						</label>
 					)}
 				</div>
+				<FilterTokens tokens={tokens} onClear={clear} testId="experiment-tokens" />
 			</div>
 
 			{shown.length === 0 ? (

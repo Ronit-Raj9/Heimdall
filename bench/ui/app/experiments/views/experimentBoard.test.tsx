@@ -76,14 +76,17 @@ describe("experiment list helpers", () => {
 });
 
 describe("ExperimentBoard", () => {
-	it("renders readable names, status, verdict words, progress and chips", () => {
+	it("renders readable names, status, verdict words, progress and the filter toolbar", () => {
 		const html = render(<ExperimentBoard />);
 		expect(html).toContain("Quick run on coding-core");
 		expect(html).toContain("Prompt v2 vs v1");
 		expect(html).toContain("B is better");
 		expect(html).toContain("3 of 8");
-		expect(html).toContain('data-testid="experiment-chip-active"');
-		expect(html).toContain('data-testid="experiment-chip-suite-terminal-ops"');
+		expect(html).toContain('data-testid="experiment-filter-status"');
+		expect(html).toContain('<option value="running">Running</option>');
+		expect(html).toContain('data-testid="experiment-filter-suite"');
+		expect(html).toContain(">terminal-ops</option>");
+		expect(html).not.toContain("experiment-chip-");
 		expect(html).toContain("animate-ping");
 		expect(html).not.toContain(">quick-20261121-101500-ab12<");
 	});

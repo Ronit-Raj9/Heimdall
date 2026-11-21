@@ -1,5 +1,5 @@
 import { cn } from "@/lib/utils";
-import { X } from "lucide-react";
+import { ChevronDown, Search, X } from "lucide-react";
 import * as React from "react";
 import { useTranslation } from "react-i18next";
 
@@ -96,5 +96,183 @@ export function FilterChips<T extends string = string>({
 				</button>
 			)}
 		</div>
+	);
+}
+export interface FilterSelectOption {
+	value: string;
+	label: string;
+}
+
+export interface FilterSelectProps {
+	/** Shown before the value, for example "Status". Also the accessible name. */
+	label: string;
+	options: readonly FilterSelectOption[];
+	/** Selected value; null means no filter. */
+	value: string | null;
+	onChange: (next: string | null) => void;
+	/** Text of the "no filter" option. Default "All". */
+	allLabel?: string;
+	className?: string;
+	testId?: string;
+	disabled?: boolean;
+}
+
+/**
+ * Small native dropdown for one toolbar filter. A value missing from the options (an old URL)
+ * is kept as an extra option so the select never lies about the filter in force.
+ */
+export function FilterSelect({ label, options, value, onChange, allLabel = "All", className, testId, disabled }: FilterSelectProps) {
+	const choices = value && !options.some((o) => o.value === value) ? [{ value, label: value }, ...options] : options;
+	return (
+		<label
+			data-slot="filter-select"
+			className={cn(
+				"border-input bg-card hover:border-ring/50 focus-within:ring-ring/40 relative inline-flex h-8 shrink-0 items-center rounded-md border text-sm shadow-xs transition-colors focus-within:ring-2",
+				disabled && "opacity-50",
+				className,
+			)}
+		>
+			<span className="text-muted-foreground pointer-events-none pl-2.5 text-xs">{label}</span>
+			<select
+				aria-label={label}
+				value={value ?? ""}
+				disabled={disabled}
+				onChange={(e) => onChange(e.target.value || null)}
+				data-testid={testId}
+				className="text-foreground h-full max-w-48 cursor-pointer appearance-none truncate bg-transparent pr-7 pl-1.5 text-sm font-medium outline-none disabled:cursor-not-allowed"
+			>
+				<option value="">{allLabel}</option>
+				{choices.map((o) => (
+					<option key={o.value} value={o.value}>
+						{o.label}
+					</option>
+				))}
+			</select>
+			<ChevronDown className="text-muted-foreground pointer-events-none absolute right-2 size-3.5" aria-hidden="true" />
+		</label>
+	);
+}
+
+export interface FilterToken {
+	key: string;
+	/** For example "Agent: codex". */
+	label: React.ReactNode;
+	onRemove: () => void;
+}
+
+/** Active filters as small removable tokens, plus Clear when more than one is set. Renders nothing when none is set. */
+export function FilterTokens({ tokens, onClear, className, testId }: { tokens: readonly FilterToken[]; onClear?: () => void; className?: string; testId?: string }) {
+	const { t } = useTranslation("ui");
+	if (tokens.length === 0) return null;
+	return (
+		<div data-slot="filter-tokens" data-testid={testId} className={cn("flex flex-wrap items-center gap-1.5", className)}>
+			{tokens.map((tk) => (
+				<span
+					key={tk.key}
+					className="bg-muted text-foreground inline-flex h-6 items-center gap-1 rounded-md pr-1 pl-2 text-xs"
+					data-testid={testId ? `${testId}-${tk.key}` : undefined}
+				>
+					{tk.label}
+					<button
+						type="button"
+						onClick={tk.onRemove}
+						aria-label={`${t("clearFilters")} ${typeof tk.label === "string" ? tk.label : tk.key}`}
+						className="text-muted-foreground hover:text-foreground focus-visible:ring-ring/50 inline-flex size-4 cursor-pointer items-center justify-center rounded-sm focus-visible:ring-2 focus-visible:outline-none"
+					>
+						<X className="size-3" aria-hidden="true" />
+					</button>
+				</span>
+			))}
+			{onClear && tokens.length > 1 && (
+				<button
+					type="button"
+					onClick={onClear}
+					data-testid={testId ? `${testId}-clear` : undefined}
+					className="text-muted-foreground hover:text-foreground cursor-pointer px-1 text-xs"
+				>
+					{t("clearFilters")}
+				</button>
+			)}
+		</div>
+	);
+}
+
+/** A few mutually exclusive options as one small segmented control. */
+export function SegmentedControl<T extends string>({
+	options,
+	value,
+	onChange,
+	label,
+	testId,
+	className,
+}: {
+	options: readonly { value: T; label: React.ReactNode }[];
+	value: T;
+	onChange: (next: T) => void;
+	label?: string;
+	testId?: string;
+	className?: string;
+}) {
+	return (
+		<div
+			role="radiogroup"
+			aria-label={label}
+			data-slot="segmented-control"
+			data-testid={testId}
+			className={cn("bg-muted inline-flex h-8 shrink-0 items-center gap-0.5 rounded-md p-0.5", className)}
+		>
+			{options.map((o) => {
+				const on = o.value === value;
+				return (
+					<button
+						key={o.value}
+						type="button"
+						role="radio"
+						aria-checked={on}
+						onClick={() => onChange(o.value)}
+						data-testid={testId ? `${testId}-${o.value}` : undefined}
+						className={cn(
+							"focus-visible:ring-ring/50 h-full cursor-pointer rounded-[5px] px-2.5 text-xs font-medium whitespace-nowrap transition-colors focus-visible:ring-2 focus-visible:outline-none",
+							on ? "bg-background text-foreground shadow-xs" : "text-muted-foreground hover:text-foreground",
+						)}
+					>
+						{o.label}
+					</button>
+				);
+			})}
+		</div>
+	);
+}
+
+/** Search box sized for a toolbar row. */
+export function ToolbarSearch({
+	value,
+	onChange,
+	placeholder,
+	label,
+	testId,
+	className,
+}: {
+	value: string;
+	onChange: (next: string) => void;
+	placeholder?: string;
+	label: string;
+	testId?: string;
+	className?: string;
+}) {
+	return (
+		<label className={cn("relative min-w-40 flex-1 sm:max-w-xs", className)}>
+			<span className="sr-only">{label}</span>
+			<Search className="text-muted-foreground pointer-events-none absolute top-1/2 left-2.5 size-3.5 -translate-y-1/2" aria-hidden="true" />
+			<input
+				type="search"
+				value={value}
+				onChange={(e) => onChange(e.target.value)}
+				placeholder={placeholder}
+				aria-label={label}
+				data-testid={testId}
+				className="border-input bg-card placeholder:text-muted-foreground focus-visible:ring-ring/40 h-8 w-full rounded-md border pr-2.5 pl-8 text-sm shadow-xs focus-visible:ring-2 focus-visible:outline-none"
+			/>
+		</label>
 	);
 }

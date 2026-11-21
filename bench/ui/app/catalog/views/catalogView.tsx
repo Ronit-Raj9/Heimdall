@@ -3,12 +3,13 @@ import { EmptyState } from "@/components/shell/emptyState";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
+import { FilterSelect, FilterTokens, SegmentedControl, ToolbarSearch, type FilterToken } from "@/components/ui/toolbar";
 import { canUse, useSession } from "@/lib/session/sessionContext";
 import { useAddCatalogEntryMutation, useGetBenchCatalogQuery, useUploadCatalogDatasetMutation } from "@/lib/store/apis/catalogApi";
 import type { CatalogAddRequest, CatalogAddResponse, CatalogEntry } from "@/lib/types/catalog";
 import { cn } from "@/lib/utils";
 import { Link } from "@tanstack/react-router";
-import { CheckCircle2, LayoutGrid, Library, Search as SearchIcon, X } from "lucide-react";
+import { CheckCircle2, Library, X } from "lucide-react";
 import { type ReactNode, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import {
@@ -310,23 +311,6 @@ function EntryCard({ e, props, canWrite }: { e: CatalogEntry; props: CatalogBody
 	);
 }
 
-function Chip({ active, onClick, children, testId }: { active: boolean; onClick(): void; children: ReactNode; testId: string }) {
-	return (
-		<button
-			type="button"
-			onClick={onClick}
-			aria-pressed={active}
-			data-testid={testId}
-			className={cn(
-				"inline-flex shrink-0 items-center gap-1.5 rounded-full border px-3 py-1.5 text-sm transition-colors",
-				active ? "border-foreground bg-foreground text-background" : "border-border text-muted-foreground hover:text-foreground hover:bg-muted",
-			)}
-		>
-			{children}
-		</button>
-	);
-}
-
 /** The catalog screen without data fetching (tested directly). */
 export function CatalogBody(props: CatalogBodyProps) {
 	const { t } = useTranslation("catalog");
@@ -338,57 +322,41 @@ export function CatalogBody(props: CatalogBodyProps) {
 		for (const e of props.entries) for (const c of entryCategories(e)) s.add(c);
 		return CATEGORIES.filter((c) => s.has(c));
 	}, [props.entries]);
+	const set = (patch: Partial<CatalogFilters>) => props.onFilters({ ...filters, ...patch });
+	const tokens: FilterToken[] = [
+		filters.category !== "all" && { key: "category", label: `${t("category")}: ${t(`cat_${filters.category}`)}`, onRemove: () => set({ category: "all" }) },
+		filters.source !== "all" && { key: "source", label: t(SOURCE_KEY[filters.source]), onRemove: () => set({ source: "all" }) },
+	].filter((x): x is FilterToken => Boolean(x));
 	const res = props.lastAdded?.result;
 	const grouped = SECTIONS.map((id) => ({ id, items: shown.filter((e) => sectionOf(e) === id) })).filter((g) => g.items.length > 0);
 	const details = props.detailsFor && !props.importFor ? props.detailsFor : null;
 	return (
 		<div className="mx-auto flex w-full max-w-[1200px] flex-col gap-8 p-4 sm:p-6" data-testid="catalog-view">
 			<header className="flex flex-col gap-5">
-				<div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
-					<div>
-						<h1 className="text-2xl font-semibold tracking-tight sm:text-3xl">{t("title")}</h1>
-						<p className="text-muted-foreground mt-1 text-sm">{t("subtitle")}</p>
-					</div>
-					<div className="relative w-full sm:w-72">
-						<SearchIcon className="text-muted-foreground pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2" aria-hidden />
-						<Input
-							className="pl-9"
-							placeholder={t("search")}
-							value={filters.query}
-							onChange={(ev) => props.onFilters({ ...filters, query: ev.target.value })}
-							data-testid="catalog-search"
+				<div>
+					<h1 className="text-2xl font-semibold tracking-tight sm:text-3xl">{t("title")}</h1>
+					<p className="text-muted-foreground mt-1 text-sm">{t("subtitle")}</p>
+				</div>
+				<div className="flex flex-col gap-2">
+					<div className="flex flex-wrap items-center gap-2" role="toolbar" data-testid="catalog-toolbar">
+						<ToolbarSearch value={filters.query} onChange={(v) => set({ query: v })} placeholder={t("search")} label={t("search")} testId="catalog-search" />
+						<FilterSelect
+							label={t("category")}
+							allLabel={t("filterAll")}
+							options={present.map((c) => ({ value: c, label: t(`cat_${c}`) }))}
+							value={filters.category === "all" ? null : filters.category}
+							onChange={(v) => set({ category: (v ?? "all") as Category | "all" })}
+							testId="catalog-filter-category"
+						/>
+						<SegmentedControl
+							label={t("sourceLabel")}
+							options={SOURCES.map((s) => ({ value: s, label: t(SOURCE_KEY[s]) }))}
+							value={filters.source}
+							onChange={(v) => set({ source: v })}
+							testId="catalog-source"
 						/>
 					</div>
-				</div>
-				<div className="-mx-4 flex gap-2 overflow-x-auto px-4 pb-1 sm:mx-0 sm:flex-wrap sm:px-0" data-testid="catalog-categories">
-					<Chip active={filters.category === "all"} onClick={() => props.onFilters({ ...filters, category: "all" })} testId="catalog-filter-all">
-						<LayoutGrid className="size-4" aria-hidden />
-						{t("filterAll")}
-					</Chip>
-					{present.map((c) => {
-						const Icon = CATEGORY_ICON[c];
-						return (
-							<Chip key={c} active={filters.category === c} onClick={() => props.onFilters({ ...filters, category: c })} testId={`catalog-filter-${c}`}>
-								<Icon className="size-4" aria-hidden />
-								{t(`cat_${c}`)}
-							</Chip>
-						);
-					})}
-				</div>
-				<div className="bg-muted inline-flex w-fit gap-1 rounded-lg p-1" role="tablist">
-					{SOURCES.map((s) => (
-						<button
-							key={s}
-							type="button"
-							role="tab"
-							aria-selected={filters.source === s}
-							onClick={() => props.onFilters({ ...filters, source: s })}
-							data-testid={`catalog-source-${s}`}
-							className={cn("rounded-md px-3 py-1 text-sm transition-colors", filters.source === s ? "bg-background shadow-sm" : "text-muted-foreground hover:text-foreground")}
-						>
-							{t(SOURCE_KEY[s])}
-						</button>
-					))}
+					<FilterTokens tokens={tokens} onClear={() => set({ category: "all", source: "all" })} testId="catalog-tokens" />
 				</div>
 			</header>
 			{!props.sourceAvailable && (
