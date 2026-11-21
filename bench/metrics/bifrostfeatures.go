@@ -2,6 +2,8 @@ package metrics
 
 import (
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"fmt"
 	"sort"
 	"strings"
@@ -236,8 +238,30 @@ func (m *bifrostMCPMetric) Compute(_ context.Context, _ *schemas.RunContext, ev 
 	if ev.ToolLedgerProblem != "" {
 		return schemas.Unknown("tool proxy ledger incomplete: "+ev.ToolLedgerProblem, schemas.EvidenceBoundary), nil
 	}
+	if n := clippedMCPArgs(ev.ToolCalls); n > 0 {
+		// The ledger kept only a prefix of these arguments, so their full
+		// canonical hash is not known: no confident mismatch (QC2-04-08).
+		return schemas.Unknown(fmt.Sprintf("tool proxy ledger kept a prefix of %d large MCP argument(s); the full arguments cannot be compared", n), schemas.EvidenceBoundary), nil
+	}
 	only, _ := MCPWitnessDiff(ev.ToolCalls, b.Calls)
 	return schemas.Observed(float64(len(only)), schemas.EvidenceBoundary), nil
+}
+
+// clippedMCPArgs counts the ledger's MCP calls whose recorded arguments are
+// not the whole value: their text does not hash to the row's args_sha256,
+// which always covers the whole value (toolproxy.Capture).
+func clippedMCPArgs(ledger []schemas.ToolCall) int {
+	n := 0
+	for _, c := range ledger {
+		if c.Kind != "" || c.Protocol != "mcp" || c.ArgsSHA256 == "" {
+			continue
+		}
+		sum := sha256.Sum256([]byte(c.Arguments))
+		if hex.EncodeToString(sum[:]) != c.ArgsSHA256 {
+			n++
+		}
+	}
+	return n
 }
 
 // MCPWitnessDiff matches the tool proxy ledger's MCP tool calls with

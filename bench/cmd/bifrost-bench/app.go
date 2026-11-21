@@ -296,8 +296,9 @@ func (a *app) analyzeOpt(ctx context.Context, expID, gradeSource, policyOverride
 	a.judgeCalibration(ctx, m, an, runs, policyOverride) // W8 judge calibration: judge_calibration instrument of judged experiments (judge.go)
 	an.AnalysisID = utils.NewID("a", 8)
 	an.Mode = a.cfg.Server.Mode
-	// A declared smoke experiment is never a finding, whatever the server mode.
-	if m.Experiment.Smoke {
+	// A declared smoke or scripted_upstream experiment is never a finding,
+	// whatever the server mode: its model answers were scripted (QC2-15-01).
+	if m.Experiment.NoPaidTraffic() {
 		an.Mode = schemas.ModeSynthetic
 	}
 	an.GradeSource = gradeSource

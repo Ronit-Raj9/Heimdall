@@ -101,3 +101,12 @@ func TestRunnerStatus(t *testing.T) {
 		t.Fatalf("status without a token file: %d", code)
 	}
 }
+
+// TestRunnerFlagsRejectNonFiniteCap is QC2-07-11.
+func TestRunnerFlagsRejectNonFiniteCap(t *testing.T) {
+	for _, c := range []string{"NaN", "+Inf", "inf"} {
+		if _, err := parseRunnerFlags("runner", []string{"-server", "http://x", "-token-file", "t", "-spend-cap-usd", c}); err == nil {
+			t.Errorf("-spend-cap-usd %s accepted", c)
+		}
+	}
+}

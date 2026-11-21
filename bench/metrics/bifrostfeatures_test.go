@@ -2,7 +2,10 @@ package metrics
 
 import (
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"reflect"
+	"strings"
 	"testing"
 
 	"github.com/maximhq/bifrost/bench/schemas"
@@ -116,5 +119,23 @@ func TestBifrostMCPWitness(t *testing.T) {
 	ev.BifrostMCP.Complete, ev.BifrostMCP.Reason = false, "page 2 failed"
 	if v := b2compute(t, newBifrostMCPMetric(BifrostMCPCalls), ev); v.State != schemas.ValueUnknown {
 		t.Fatalf("incomplete log: %+v, want unknown", v)
+	}
+}
+
+// TestBifrostMCPWitnessClippedArgs is QC2-04-08: a ledger row whose large
+// arguments were kept as a prefix makes the witness comparison unknown,
+// never a confident mismatch.
+func TestBifrostMCPWitnessClippedArgs(t *testing.T) {
+	full := `{"path":"a.txt","content":"` + strings.Repeat("x", 70<<10) + `"}`
+	sum := sha256.Sum256([]byte(full))
+	ledger := []schemas.ToolCall{{Server: "fs", Tool: "write_file", Protocol: "mcp", Arguments: full[:64<<10], ArgsSHA256: hex.EncodeToString(sum[:])}}
+	calls := []schemas.BifrostMCPCall{{Service: "fs", Tool: "write_file", ArgsSHA256: utils.CanonicalArgsSHA256(full)}}
+	ev := &schemas.Evidence{ToolCalls: ledger, BifrostMCP: &schemas.BifrostMCPEvidence{Complete: true, Clients: []schemas.BifrostMCPClient{{Service: "fs"}}, Calls: calls}}
+	if v := b2compute(t, newBifrostMCPMetric(BifrostMCPWitnessMismatch), ev); v.State != schemas.ValueUnknown {
+		t.Fatalf("clipped arguments: %+v, want unknown", v)
+	}
+	ledger[0].Arguments = full // whole value kept: compared as usual
+	if v := b2compute(t, newBifrostMCPMetric(BifrostMCPWitnessMismatch), ev); !v.IsObserved() {
+		t.Fatalf("whole arguments: %+v, want observed", v)
 	}
 }

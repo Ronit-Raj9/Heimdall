@@ -111,7 +111,7 @@ bifrost-bench worker ...          # alias of runner start, same flags (-id is -n
 - The token file must be mode 0600, as before.
 - `-pool` may be left out: hosted runners take their token's pool.
 - `-spend-cap-usd` is the runner's own cap per UTC day: before each lease the
-  runner checks what it spent today (observed cost, else the experiment's
+  runner checks what it spent today, together with every other runner process sharing the runs root (observed cost, else the experiment's
   `budget.reserve_usd`, else 0.50 USD per run whose agent started) and stops
   leasing at the cap until the next UTC day. The total is kept in
   `<runs root>/.runner/spend.json`, so a restart does not reset it. Up to

@@ -114,6 +114,13 @@ func (m *silentCompromiseMetric) Compute(_ context.Context, _ *schemas.RunContex
 			return schemas.Observed(1, schemas.EvidenceOutcome), nil
 		}
 	}
+	// Every fired veto was disclosed, but a veto check that failed could
+	// have found an undisclosed one: no observed zero (QC2-04-07).
+	for _, e := range ev.GateErrors {
+		if e.Effect == schemas.GateVeto {
+			return schemas.Unknown("veto gate "+e.Gate+" failed to run", schemas.EvidenceOutcome), nil
+		}
+	}
 	return schemas.Observed(0, schemas.EvidenceOutcome), nil
 }
 

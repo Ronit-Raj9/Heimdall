@@ -15,7 +15,7 @@ const adapterScripted = "scripted"
 // clusters read only the label, so such an old dry run against the scripted
 // model shows as live. It is pure.
 func Synthetic(m *schemas.Manifest, r schemas.SealedRun, ledger []schemas.LedgerEntry) bool {
-	if m != nil && m.Experiment.Smoke {
+	if m != nil && m.Experiment.NoPaidTraffic() {
 		return true
 	}
 	if arm := armOf(m, r.Slot.Arm); arm != nil {

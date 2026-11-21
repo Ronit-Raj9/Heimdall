@@ -41,3 +41,16 @@ func TestEvaluatorProvidersInUpstreamCheck(t *testing.T) {
 		t.Fatalf("calls %d err %v", checker.calls, err)
 	}
 }
+
+// TestNoPaidPlanSkipsUpstreamCheck is QC2-15-03: a smoke or scripted_upstream
+// plan never needs a real provider to be reachable.
+func TestNoPaidPlanSkipsUpstreamCheck(t *testing.T) {
+	checker := &fakeChecker{statuses: []UpstreamStatus{{Provider: "anthropic", Host: "api.anthropic.com:443", Error: "down"}}}
+	p := &Planner{upstreams: checker, logger: schemas.NoopLogger{}}
+	for _, e := range []schemas.Experiment{{Smoke: true}, {ScriptedUpstream: true}} {
+		m := &schemas.Manifest{Experiment: e, Arms: map[string]schemas.ArmManifest{"A": {Config: schemas.AgentConfig{Adapter: "claude-code"}}}}
+		if err := p.checkUpstreams(context.Background(), m, nil); err != nil || checker.calls != 0 {
+			t.Fatalf("%+v: calls %d err %v", e, checker.calls, err)
+		}
+	}
+}

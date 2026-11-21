@@ -126,7 +126,7 @@ func taskWallTimes(ctx context.Context, src taskhealth.Source, suiteID string) (
 			continue
 		}
 		for _, r := range runs {
-			if !r.Slot.Counted || m.Experiment.Smoke || m.Arms[r.Slot.Arm].Config.Adapter == "scripted" {
+			if !r.Slot.Counted || m.Experiment.NoPaidTraffic() || m.Arms[r.Slot.Arm].Config.Adapter == "scripted" {
 				continue
 			}
 			if x, ok := r.Metrics["wall_time_s"].Float(); ok && x > 0 {

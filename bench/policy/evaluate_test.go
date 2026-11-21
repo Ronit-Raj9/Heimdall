@@ -20,9 +20,15 @@ var cleanGates = []schemas.GateResult{{Gate: "g1_protected_paths", Effect: schem
 // mkRun is one counted run with its metrics and a clean gate list.
 func mkRun(cond, task, arm string, trial int, metrics map[string]schemas.Value) schemas.SealedRun {
 	id := fmt.Sprintf("r_%s_%s_%s_%d", cond, task, arm, trial)
+	outcome := schemas.OutcomeFail
+	for name, v := range metrics { // QC2-04-03: an outcome-scored 1 needs a passing outcome to stand
+		if f, ok := v.Float(); ok && f > 0 && schemas.OutcomeScoredMetric(name) {
+			outcome = schemas.OutcomePass
+		}
+	}
 	return schemas.SealedRun{
 		Slot:    schemas.Slot{Task: task, Arm: arm, Condition: cond, Trial: trial, Counted: true},
-		Run:     schemas.Run{RunID: id, Outcome: schemas.OutcomeFail},
+		Run:     schemas.Run{RunID: id, Outcome: outcome},
 		Metrics: metrics,
 		Gates:   cleanGates,
 	}

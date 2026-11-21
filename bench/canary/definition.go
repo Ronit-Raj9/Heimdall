@@ -17,6 +17,7 @@ import (
 	"fmt"
 	"io"
 	"io/fs"
+	"math"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -257,6 +258,9 @@ func (d *Definition) Validate() error {
 	if d.Budget.PerRunUSD < 0 || d.Budget.PerDayUSD < 0 {
 		errs = append(errs, errors.New("budget caps must not be negative"))
 	}
+	if !finite(d.Budget.PerRunUSD) || !finite(d.Budget.PerDayUSD) { // QC2-15-09: a non-finite cap never holds
+		errs = append(errs, errors.New("budget caps must be finite numbers"))
+	}
 	if !d.Smoke {
 		if d.Budget.PerRunUSD <= 0 || d.Budget.PerDayUSD <= 0 {
 			errs = append(errs, errors.New("budget.per_run_usd and budget.per_day_usd are required for a canary that can spend (only a smoke canary may leave them out)"))
@@ -455,3 +459,6 @@ func writeAtomic(p string, data []byte) error {
 	}
 	return nil
 }
+
+// finite reports whether v is neither NaN nor an infinity.
+func finite(v float64) bool { return !math.IsNaN(v) && !math.IsInf(v, 0) }

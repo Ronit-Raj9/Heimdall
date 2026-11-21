@@ -92,6 +92,10 @@ func (g *Gateway) FetchRequests(ctx context.Context, key *schemas.RunKey, expect
 	}
 }
 
+// directEmptyReason marks an empty direct-provider log incomplete: no
+// ledger witnesses that no request was made.
+const directEmptyReason = "direct provider: an empty log has no ledger witness, so a dropped row cannot be ruled out"
+
 // listRow is the part of a list row needed to decide whether to fetch it.
 type listRow struct {
 	ID     string `json:"id"`
@@ -162,6 +166,12 @@ func (g *Gateway) snapshot(ctx context.Context, key *schemas.RunKey, since time.
 		log.Reason = fmt.Sprintf("%d rows still processing", processing)
 	case !join.complete():
 		log.Reason = join.reason()
+	case direct && len(parsed) == 0:
+		// QC2-07-10: a direct provider has no ledger witness, so an empty
+		// row list cannot rule out a billed request whose row Bifrost
+		// dropped; it never reads as a proven zero-cost run.
+		log.Complete = false
+		log.Reason = directEmptyReason
 	}
 	return &snapshot{log: log, sig: strings.Join(sig, ","), processing: processing, join: join}, nil
 }

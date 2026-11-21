@@ -44,7 +44,11 @@ type toolLedgerSource struct {
 func (s *toolLedgerSource) GetName() string { return ToolLedger }
 
 // GetVersion implements schemas.Part.
-func (s *toolLedgerSource) GetVersion() string { return version }
+func (s *toolLedgerSource) GetVersion() string { return toolLedgerVersion }
+
+// toolLedgerVersion is 1.1.0 since a malformed, gapped or in-flight ledger
+// is refused instead of read as a complete witness (QC2-04-05).
+const toolLedgerVersion = "1.1.0"
 
 // Collect implements schemas.EvidenceSource. It acts only when the run has
 // a tool ledger (ToolLedgerExpected). A ledger that is present fills ev.ToolCalls, with an

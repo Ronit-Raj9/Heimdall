@@ -328,7 +328,7 @@ func armConfig(m *schemas.Manifest, arm string) *schemas.AgentConfig {
 // difficulty and variance but still count for infra and, when the agent is
 // the scripted oracle, for verifier flakiness.
 func synthetic(m *schemas.Manifest, cfg *schemas.AgentConfig) bool {
-	return m.Experiment.Smoke || cfg == nil || cfg.Adapter == "scripted"
+	return m.Experiment.NoPaidTraffic() || cfg == nil || cfg.Adapter == "scripted"
 }
 
 // oracle reports whether cfg is the scripted oracle, which applies the

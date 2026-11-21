@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"math"
 	"net/http"
 	"net/url"
 	"os"
@@ -131,8 +132,8 @@ func NewWorker(reg *schemas.Registry, runner SlotRunner, replan Replanner, opts 
 	if err := validLabels(opts.Pool, opts.Labels); err != nil {
 		return nil, fmt.Errorf("worker: %w", err)
 	}
-	if opts.SpendCapUSD < 0 {
-		return nil, errors.New("worker: negative spend cap")
+	if opts.SpendCapUSD < 0 || math.IsNaN(opts.SpendCapUSD) || math.IsInf(opts.SpendCapUSD, 0) { // QC2-07-11
+		return nil, errors.New("worker: spend cap must be a finite, non-negative number")
 	}
 	spend, err := newRunnerSpend(opts.SpendCapUSD, opts.SpendFile)
 	if err != nil {
@@ -771,10 +772,13 @@ func costValue(res *SlotResult) schemas.Value {
 	if res == nil {
 		return schemas.Unknown("no run result on the worker", schemas.EvidenceGateway)
 	}
-	if c, ok := spendCost(res.Dir, res.Metrics, res.Run); ok {
+	c, ok := spendCost(res.Dir, res.Metrics, res.Run)
+	if ok {
 		return schemas.Observed(c, schemas.EvidenceGateway)
 	}
-	return schemas.Unknown("cost_usd was not observed on the worker", schemas.EvidenceGateway)
+	// The observed part is a lower bound the coordinator charges at least
+	// (QC2-07-01); the upper end is open.
+	return schemas.UnknownWithin("spend was not fully observed on the worker", schemas.EvidenceGateway, c, math.MaxFloat64)
 }
 
 // mapDiff lists the keys whose values differ between got and want, sorted,

@@ -243,7 +243,12 @@ func ReconcileOutcomeMetric(metric string, v Value, outcome Outcome) Value {
 	if !OutcomeScoredMetric(metric) || outcome == "" || !v.IsObserved() {
 		return v
 	}
-	if _, scores := outcome.Score(); scores {
+	if y, scores := outcome.Score(); scores {
+		if got, _ := v.Float(); y == 0 && got > 0 {
+			// QC2-04-03: a scoring failure outcome (an early session crash)
+			// outranks a passing grade; the metric never votes a pass.
+			return Observed(0, v.Evidence)
+		}
 		return v
 	}
 	return Unknown("run outcome "+string(outcome)+" does not score", v.Evidence)

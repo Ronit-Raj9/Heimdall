@@ -176,7 +176,7 @@ func (p *Pipeline) reconcileMetrics(ctx context.Context, st *runState) {
 	changed := false
 	for name, v := range st.metrics {
 		nv := schemas.ReconcileOutcomeMetric(name, v, st.rc.Run.Outcome)
-		if nv.State != v.State {
+		if nv.State != v.State || !sameValue(nv, v) { // QC2-04-03: a value clamped to 0 is a change too
 			st.metrics[name] = nv
 			changed = true
 		}

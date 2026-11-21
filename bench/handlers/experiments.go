@@ -225,7 +225,11 @@ func (h *ExperimentsHandler) getVerdict(ctx *fasthttp.RequestCtx) {
 	// The verdict carries the analysis's own mode (a smoke experiment is
 	// synthetic on a live server), never a stronger label than its evidence
 	// (audit 7-B-03).
-	lib.SendJSON(ctx, analysisMode(h.mode, a), fasthttp.StatusOK, schemas.VerdictPayload{
+	mode := analysisMode(h.mode, a)
+	if m.Experiment.NoPaidTraffic() { // QC2-15-01: scripted model answers are synthetic evidence, also for an analysis stored before
+		mode = schemas.ModeSynthetic
+	}
+	lib.SendJSON(ctx, mode, fasthttp.StatusOK, schemas.VerdictPayload{
 		ExpID: m.ExpID, AnalysisID: a.AnalysisID, GradeSource: a.GradeSource, Suite: m.Experiment.Suite,
 		Verdict: a.Verdict, Naive: a.Naive, Gates: gates, ConfigDiff: diff, Policy: a.Policy,
 		ReviewedRuns: a.ReviewedRuns, ReviewChangedRuns: a.ReviewChangedRuns, // human review counts (docs/human-review.md)

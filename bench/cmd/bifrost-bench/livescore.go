@@ -401,6 +401,17 @@ func (l liveSource) Pull(ctx context.Context) (*livescore.PullResult, error) {
 	return s.Pull(ctx)
 }
 
+// unattendedScorer turns off the paid judge of a scorer the daemon runs and
+// reports whether one was on: its calls would be outside every spend cap and
+// the daemon's ledger (QC2-15-06).
+func unattendedScorer(s *livescore.Scorer) bool {
+	if s == nil || s.Judge == nil {
+		return false
+	}
+	s.Judge = nil
+	return true
+}
+
 // addLivescoreSchedule adds the scheduled pull when livescore/config.yaml
 // sets schedule: and schedules.yaml names no schedule livescore-pull.
 func addLivescoreSchedule(a *app, file *schedule.File) {
@@ -421,11 +432,16 @@ func addLivescoreSchedule(a *app, file *schedule.File) {
 }
 
 // runLivescoreSchedule is the livescore-pull job: one pull. It spends
-// nothing (reads only; a configured judge spends on its own key).
+// nothing: it reads only, and a scheduled pull never calls the paid judge
+// (unattendedScorer), since the daemon has no daily cap or cost record for
+// a built-in job.
 func runLivescoreSchedule(ctx context.Context, a *app, _ schedule.Schedule) (*schedule.Result, error) {
 	s, err := scorerFor(a)
 	if err != nil {
 		return nil, err
+	}
+	if unattendedScorer(s) {
+		a.logger.Warn("scheduled live pull runs without the judge: a built-in schedule has no daily cap or cost record for paid calls; run `livescore pull` by hand to judge")
 	}
 	res, err := s.Pull(ctx)
 	if res == nil {

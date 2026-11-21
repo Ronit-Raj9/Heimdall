@@ -434,6 +434,9 @@ func (r scheduleRunner) Run(ctx context.Context, s schedule.Schedule) (*schedule
 	if err != nil {
 		return nil, err
 	}
+	if err := s.Approved.CheckExperiment(exp); err != nil { // QC2-15-05: the file read here is the one that runs
+		return nil, err
+	}
 	if err := a.validatePolicy(exp); err != nil {
 		return nil, err
 	}
@@ -508,9 +511,9 @@ func (r scheduleRunner) tally(ctx context.Context, res *schedule.Result) {
 		if sr.Run.Outcome == schemas.OutcomeInfraError || sr.Run.Outcome == schemas.OutcomeAbortedInfra {
 			res.RunErrors++
 		}
-		if v, ok := sr.Metrics["cost_usd"].Float(); ok {
-			observed += v
-		}
+		run := sr.Run
+		c, _ := engine.RunSpendUSD(sr.Dir, sr.Metrics, &run) // every producer, not only the agent's cost_usd (QC2-07-07)
+		observed += c
 	}
 	res.CostUSD = max(res.CostUSD, observed)
 }
