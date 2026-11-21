@@ -57,7 +57,7 @@ Every route is under `/api/bench/workers`. All but the list require the bearer t
 | `POST /register` | `schemas.WorkerRegister`: worker id, host, build version, part versions, slots | `schemas.WorkerRegistered`: upload cap and chunk size |
 | `POST /lease` | `{"worker_id"}` | 204 when there is no work now, else `schemas.WorkerLease`: lease id, slot, attempt, manifest hash, suite lock hash, part versions, heartbeat interval and stale threshold |
 | `GET /manifests/{exp_id}?worker_id=` | | the experiment's manifest |
-| `POST /leases/{id}/heartbeat` | `{"worker_id"}` | 204, or 410 when the lease is gone |
+| `POST /leases/{id}/heartbeat` | `{"worker_id", "events"?}` | 204, or 410 when the lease is gone. `events` are the slot run's live progress events (see below) |
 | `POST /leases/{id}/upload?worker_id=&offset=` | raw archive bytes, at most 512 KiB per call | `{"lease_id", "bytes"}` held so far |
 | `POST /leases/{id}/complete` | `schemas.WorkerComplete`: run id, seal.json sha256, archive sha256 and size, outcome, observed cost | `schemas.WorkerResult`: accepted, or rejected with the reason |
 | `POST /leases/{id}/release` | `schemas.WorkerRelease`: reason, refuse, cost | 204 |
@@ -79,6 +79,7 @@ A refusal releases the lease with `refuse: true`. It costs nothing, the slot goe
 
 A remote lease is an ordinary store lease on the slot, held by the coordinator for owner `worker:<worker id>:<lease id>`, with the same rules as a local slot (`docs/runner-safety.md`): the worker heartbeats at the scheduler's interval (15 s) and each heartbeat refreshes the store lease.
 
+- **Live events.** While a slot runs, the worker forwards its pipeline's progress events (`run_started`, `stage`) on the heartbeat, and between heartbeats flushes them every 2 s when any wait. The coordinator puts them on the experiment's live event stream with the lease's slot id, exactly as a local run emits them, so the Home running cards, experiment progress and the SSE stream show a remote run as it goes. At most 200 events per heartbeat and 1024 bytes per message; messages are redacted on both sides; any other kind is dropped, so a runner can never make the server count or charge a run. Only the runner holding the lease, under its own organization's token, may post them. They are display only: the uploaded, sealed run stays the record.
 - **Lost worker.** A lease with no heartbeat for longer than the stale threshold (2 min) is lost: the summary counts it in `lease_lost`, the run the worker may have started is charged at the per-run estimate (its cost can never be observed here), the slot goes back to the queue, and since its store lease is stale by then, whoever leases the slot next reclaims it under the existing rules.
 - **Lease lost to another owner.** When the store says another owner holds the slot or the lease is gone, the heartbeat answers 410 and the worker cancels the slot with an `ErrLeaseLost` cause. The pipeline seals that run as `aborted_infra` in the worker's own store and nothing is uploaded.
 - **Late upload.** A complete call for a lease that is gone is refused with 410 and logged, so a slot that was re-leased never gets two counted runs. Right before an accepted run is written, the coordinator also refreshes the store lease and checks that the slot has no counted run.

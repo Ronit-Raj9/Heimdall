@@ -108,7 +108,29 @@ type WorkerHeartbeat struct {
 	// Logs are new log lines of a runner job lease (already redacted by
 	// the runner); empty for slot leases.
 	Logs []string `json:"logs,omitempty"`
+	// Events are the slot run's live progress events since the last
+	// heartbeat (run_started, stage), display only: the sealed run the
+	// worker uploads stays the record. Empty for job leases.
+	Events []WorkerEvent `json:"events,omitempty"`
 }
+
+// WorkerEvent is one live progress event of a leased slot's run. The slot
+// id is the lease's; the coordinator never takes it from the worker.
+type WorkerEvent struct {
+	Kind    string    `json:"kind"` // run_started | stage
+	RunID   string    `json:"run_id,omitempty"`
+	Stage   Stage     `json:"stage,omitempty"`
+	Message string    `json:"message,omitempty"`
+	At      time.Time `json:"at"`
+}
+
+// Live event bounds of one heartbeat: a worker sends at most
+// MaxHeartbeatEvents events, each message at most MaxWorkerEventMessage
+// bytes; the routes and the coordinator cut anything longer.
+const (
+	MaxHeartbeatEvents    = 200
+	MaxWorkerEventMessage = 1024
+)
 
 // WorkerUploadState is the answer to one upload chunk: how many bytes of the
 // archive the coordinator holds for the lease.
@@ -248,6 +270,26 @@ func WithHeartbeatLogs(ctx context.Context, lines []string) context.Context {
 		return ctx
 	}
 	return context.WithValue(ctx, heartbeatLogsKey{}, lines)
+}
+
+type heartbeatEventsKey struct{}
+
+// WithHeartbeatEvents returns ctx carrying the live events a heartbeat of a
+// slot lease brought.
+func WithHeartbeatEvents(ctx context.Context, events []WorkerEvent) context.Context {
+	if len(events) == 0 {
+		return ctx
+	}
+	return context.WithValue(ctx, heartbeatEventsKey{}, events)
+}
+
+// HeartbeatEventsFrom returns the heartbeat live events on ctx, if any.
+func HeartbeatEventsFrom(ctx context.Context) []WorkerEvent {
+	if ctx == nil {
+		return nil
+	}
+	e, _ := ctx.Value(heartbeatEventsKey{}).([]WorkerEvent)
+	return e
 }
 
 // HeartbeatLogsFrom returns the heartbeat log lines on ctx, if any.

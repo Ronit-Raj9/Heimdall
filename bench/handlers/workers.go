@@ -275,9 +275,13 @@ func (h *WorkersHandler) heartbeat(ctx *fasthttp.RequestCtx) {
 	if len(req.Logs) > maxHeartbeatLogs {
 		req.Logs = req.Logs[len(req.Logs)-maxHeartbeatLogs:]
 	}
+	if len(req.Events) > schemas.MaxHeartbeatEvents { // live events of a slot lease: the newest only
+		req.Events = req.Events[len(req.Events)-schemas.MaxHeartbeatEvents:]
+	}
 	work, cancel := h.work(ctx, readTimeout)
 	defer cancel()
 	work = schemas.WithHeartbeatLogs(work, req.Logs) // runner jobs (gap G05): log lines of a job lease
+	work = schemas.WithHeartbeatEvents(work, req.Events)
 	if err := h.api.Heartbeat(work, leaseID, req.WorkerID); err != nil {
 		h.sendErr(ctx, "heartbeat", err)
 		return
