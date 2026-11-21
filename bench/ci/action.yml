@@ -91,6 +91,11 @@ runs:
         go-version: ${{ inputs.go-version }}
         go-version-file: ${{ inputs.go-version == '' && format('{0}/go.mod', steps.paths.outputs.bench) || '' }}
         cache-dependency-path: ${{ steps.paths.outputs.bench }}/go.sum
+        # With a prebuilt binary the caller already set up Go and restored the
+        # module cache; a second restore into the same GOMODCACHE makes tar
+        # report thousands of "Cannot open: File exists" errors (seen on
+        # GitHub, test #18).
+        cache: ${{ inputs.bin == '' }}
 
     - name: Build bifrost-bench
       id: build

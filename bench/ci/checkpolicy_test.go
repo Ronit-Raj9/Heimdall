@@ -155,3 +155,27 @@ func TestActionResolvesBundleOnce(t *testing.T) {
 		t.Fatal("the bundle is not resolved against the gate's project folder")
 	}
 }
+
+// TestActionSkipsGoCacheWithPrebuiltBinary: when the caller passes a
+// prebuilt binary (heimdall ci install), it has already run setup-go with
+// the module cache, so the action's own setup-go must not restore that
+// cache again. On GitHub the second restore over the same GOMODCACHE made
+// tar log about 10,000 "Cannot open: File exists" error annotations.
+func TestActionSkipsGoCacheWithPrebuiltBinary(t *testing.T) {
+	raw, err := os.ReadFile("action.yml")
+	if err != nil {
+		t.Fatal(err)
+	}
+	s := string(raw)
+	i := strings.Index(s, "uses: actions/setup-go@")
+	if i < 0 {
+		t.Fatal("action.yml has no setup-go step")
+	}
+	step := s[i:]
+	if j := strings.Index(step, "\n    - name:"); j >= 0 {
+		step = step[:j]
+	}
+	if !strings.Contains(step, "cache: ${{ inputs.bin == '' }}") {
+		t.Fatalf("setup-go restores the module cache even with a prebuilt binary:\n%s", step)
+	}
+}
