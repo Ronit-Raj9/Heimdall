@@ -102,7 +102,7 @@
         "version": "39fe4a40977d0585fd5704359e3685b0ada5cf5ee061e5d97385601d120cd0ec",
         "workdir": "4384b4849b7f004db243393653c15565c0a2ab2a8951d8513646c37d2a14a51f"
       },
-      "files": "d538bdcc3456f3beb5358770cdd5bfbee649ed7449de73ab7c3160ef34ce4894",
+      "files": "88cc7c76d232e654aec7d2f415265b268dd698fe901e3f313ac6e7aaf39f2ead",
       "images": {
         "base": "tag only: bench/coding-core-base:1"
       }
