@@ -183,3 +183,22 @@ func TestDefaultModelPicksCheapestUsable(t *testing.T) {
 		t.Fatal("default without keys")
 	}
 }
+
+func TestDefaultModelPrefersReportedModels(t *testing.T) {
+	keys := []ModelKeyView{
+		{ID: "g", Provider: "gemini", Status: "ok", Models: []string{}},
+		{ID: "o", Provider: "openai-compatible", Status: "ok", Models: []string{}, ModelsAvailable: []string{"gpt-6.1", "gpt-6.2-sol"}},
+	}
+	if d := defaultModel(keys); d == nil || d.KeyID != "o" || d.Model != "gpt-6.2-sol" {
+		t.Fatalf("default = %+v", d)
+	}
+	keys[1].ModelsAvailable = []string{"zeta-1", "alpha-2"}
+	if d := defaultModel(keys); d == nil || d.KeyID != "o" || d.Model != "zeta-1" {
+		t.Fatalf("first reported = %+v", d)
+	}
+	// An untested key's old report does not count: the static suggestion wins.
+	keys[1].Status = "untested"
+	if d := defaultModel(keys); d == nil || d.KeyID != "g" {
+		t.Fatalf("untested report = %+v", d)
+	}
+}
