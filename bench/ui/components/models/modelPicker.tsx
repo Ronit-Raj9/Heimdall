@@ -1,10 +1,23 @@
+import {
+	familyOf,
+	groupProviders,
+	isOpenWeights,
+	keyUsable,
+	OPEN_FAMILIES,
+	providerName,
+	type ProviderGroup,
+} from "@/components/models/providerCatalog";
 import { useGetModelsQuery } from "@/lib/store/apis/modelsApi";
 import type { ModelKey, ModelProviderInfo, ModelPurpose } from "@/lib/types/models";
 import { Link } from "@tanstack/react-router";
 import { useEffect, useId, useState } from "react";
 import { useTranslation } from "react-i18next";
 
-export type ProviderId = "openai" | "anthropic" | "gemini" | "openrouter" | "groq" | "sarvam" | "openai-compatible";
+/** Providers the UI knew before the server listed every Bifrost provider. */
+export type KnownProviderId = "openai" | "anthropic" | "gemini" | "openrouter" | "groq" | "sarvam" | "openai-compatible";
+
+/** A provider id from GET /models providers[]: any Bifrost provider or a custom one. */
+export type ProviderId = KnownProviderId | (string & {});
 
 export interface ModelRef {
 	provider: ProviderId;
@@ -22,17 +35,26 @@ export interface ModelPickerProps {
 	testId?: string;
 }
 
+/** Fallback provider list while the catalog has not loaded. */
 export const PROVIDERS: readonly ProviderId[] = ["openai", "anthropic", "gemini", "openrouter", "groq", "sarvam", "openai-compatible"];
 
-/** Which providers a purpose can use: speech purposes only list providers with a speech model. */
+/** Purposes that call a chat model, where a provider's full model list is worth offering. */
+const CHAT_PURPOSES: readonly ModelPurpose[] = ["agent", "judge", "simuser"];
+
+/**
+ * Which providers a purpose can use: every provider the catalog lists (or the allowed ones).
+ * Speech purposes only list providers with a speech model; a provider with no suggested models
+ * (custom endpoints, self-hosted servers) serves chat purposes only.
+ */
 export function providersFor(purpose: ModelPurpose, catalog: ModelProviderInfo[], allowed?: readonly ProviderId[]): ProviderId[] {
-	const base = allowed ?? PROVIDERS;
-	if (catalog.length === 0) return [...base];
+	if (catalog.length === 0) return [...(allowed ?? PROVIDERS)];
+	const base = allowed ?? catalog.map((p) => p.id);
 	return base.filter((id) => {
 		const info = catalog.find((p) => p.id === id);
 		if (!info) return false;
-		if (id === "openai-compatible") return purpose === "agent" || purpose === "judge" || purpose === "simuser";
-		return info.models.some((m) => m.purposes.includes(purpose));
+		const models = info.models ?? [];
+		if (id === "openai-compatible" || models.length === 0) return CHAT_PURPOSES.includes(purpose);
+		return models.some((m) => m.purposes.includes(purpose));
 	});
 }
 
@@ -46,9 +68,6 @@ export function modelSuggestions(provider: ProviderId, purpose: ModelPurpose, ca
 		.map((m) => m.id);
 }
 
-/** Purposes that call a chat model, where a provider's full model list is worth offering. */
-const CHAT_PURPOSES: readonly ModelPurpose[] = ["agent", "judge", "simuser"];
-
 export interface ModelChoices {
 	/** Model ids the org's keys reported or allow, in the order the keys give them. */
 	reported: string[];
@@ -61,7 +80,13 @@ export interface ModelChoices {
  * allowed models, then the ids its provider listed at the last successful test), then the
  * catalog's suggestions. With key set only that key counts; invalid keys never do.
  */
-export function modelChoices(provider: ProviderId, purpose: ModelPurpose, catalog: ModelProviderInfo[], keys: ModelKey[], key?: ModelKey): ModelChoices {
+export function modelChoices(
+	provider: ProviderId,
+	purpose: ModelPurpose,
+	catalog: ModelProviderInfo[],
+	keys: ModelKey[],
+	key?: ModelKey,
+): ModelChoices {
 	const usable = (key ? [key] : keys.filter((k) => k.provider === provider)).filter((k) => k.status !== "invalid");
 	const seen = new Set<string>();
 	const reported: string[] = [];
@@ -85,14 +110,67 @@ function firstChoice(c: ModelChoices, key?: ModelKey): string {
 
 const selectClass = "border-input bg-background h-8 rounded-md border px-2 text-sm disabled:opacity-50";
 const OTHER = "__other__";
+const SEP = "::";
+
+/** True when the catalog marks (or the id suggests) open weights for this model of this provider. */
+export function modelIsOpen(provider: ProviderId, model: string, catalog: ModelProviderInfo[]): boolean {
+	const info = catalog.find((p) => p.id === provider)?.models?.find((m) => m.id === model);
+	return isOpenWeights(info ?? { id: model });
+}
+
+export interface SearchHit {
+	provider: ProviderId;
+	model: string;
+	open: boolean;
+}
 
 /**
- * Picks a provider, a model and (when the org has several) the key to use. Providers with a usable
- * key come first; with no value yet it adopts the server's default (the cheapest model a working
- * key can call). The model is a dropdown of what the org's keys reported and the provider's
- * suggestions; "Other model..." reveals a text box for any other id.
+ * Models across providers that match every word of the query. A word matches the model id, the
+ * provider id or name, or the model's open family name; the word "open" matches open-weight models only.
  */
-export function ModelPicker({ value, onChange, purpose = "agent", allowedProviders, disabled, showAddKeyLink = true, testId }: ModelPickerProps) {
+export function searchModels(
+	query: string,
+	providers: readonly ProviderId[],
+	purpose: ModelPurpose,
+	catalog: ModelProviderInfo[],
+	keys: ModelKey[],
+): SearchHit[] {
+	const words = query.toLowerCase().split(/\s+/).filter(Boolean);
+	if (words.length === 0) return [];
+	const hits: SearchHit[] = [];
+	for (const p of providers) {
+		const c = modelChoices(p, purpose, catalog, keys);
+		const pname = providerName(p, catalog).toLowerCase();
+		for (const model of [...c.reported, ...c.suggested]) {
+			const info = catalog.find((x) => x.id === p)?.models?.find((m) => m.id === model) ?? { id: model };
+			const open = isOpenWeights(info);
+			const fam = familyOf(info);
+			const famName = OPEN_FAMILIES.find((f) => f.id === fam)?.name.toLowerCase() ?? "";
+			const hay = `${model.toLowerCase()} ${p} ${pname} ${famName}`;
+			if (words.every((w) => (w === "open" ? open : hay.includes(w)))) hits.push({ provider: p, model, open });
+		}
+	}
+	return hits;
+}
+
+/**
+ * Picks a provider, a model and (when the org has several) the key to use. A search box finds a
+ * model across every provider, grouped by provider, with open-weight models tagged "open".
+ * Providers are grouped (frontier APIs, open model hosts, cloud, self-hosted, custom); once any
+ * provider has a working key, providers without one are disabled with a hint to add a key. With
+ * no value yet it adopts the server's default (the cheapest model a working key can call). The
+ * model is a dropdown of what the org's keys reported and the provider's suggestions; "Other
+ * model..." reveals a text box for any other id.
+ */
+export function ModelPicker({
+	value,
+	onChange,
+	purpose = "agent",
+	allowedProviders,
+	disabled,
+	showAddKeyLink = true,
+	testId,
+}: ModelPickerProps) {
 	const { t } = useTranslation("models");
 	const id = useId();
 	const tid = testId ?? "model-picker";
@@ -101,8 +179,8 @@ export function ModelPicker({ value, onChange, purpose = "agent", allowedProvide
 	const catalog = models.data?.providers ?? [];
 	const keys = models.data?.keys ?? [];
 	const providers = providersFor(purpose, catalog, allowedProviders);
-	const keyed = new Set(keys.filter((k) => k.status !== "invalid").map((k) => k.provider));
-	const broken = new Set(keys.filter((k) => k.status === "invalid").map((k) => k.provider));
+	const keyed = new Set(keys.filter(keyUsable).map((k) => k.provider));
+	const broken = new Set(keys.filter((k) => !keyUsable(k)).map((k) => k.provider));
 	const ordered = [...providers].sort((a, b) => Number(keyed.has(b)) - Number(keyed.has(a)));
 	const provider: ProviderId = value?.provider ?? ordered[0] ?? "openai";
 	const providerKeys = keys.filter((k) => k.provider === provider);
@@ -112,10 +190,14 @@ export function ModelPicker({ value, onChange, purpose = "agent", allowedProvide
 	const def = models.data?.default;
 	const model = value?.model ?? "";
 	const [otherPicked, setOtherPicked] = useState(false);
+	const [query, setQuery] = useState("");
 	// A model the lists do not carry is a custom one once the catalog has loaded; while it loads the
 	// current id is shown as its own option so the select never looks empty.
 	const other = otherPicked || (loaded && model !== "" && !listed.includes(model));
 	const current = !other && model !== "" && !listed.includes(model) ? model : null;
+	// Only lock providers out once some provider works, so a new org can still look around.
+	const lockNoKey = loaded && keyed.size > 0;
+	const blocked = (p: ProviderId) => lockNoKey && !keyed.has(p) && p !== provider;
 
 	// Adopt the server default once, when nothing is picked yet.
 	useEffect(() => {
@@ -127,7 +209,7 @@ export function ModelPicker({ value, onChange, purpose = "agent", allowedProvide
 	}, [def?.provider, def?.model, def?.key_id, value === null]);
 
 	const setProvider = (p: ProviderId) => {
-		const first = keys.find((k) => k.provider === p && k.status !== "invalid");
+		const first = keys.find((k) => k.provider === p && keyUsable(k));
 		setOtherPicked(false);
 		onChange({ provider: p, model: firstChoice(modelChoices(p, purpose, catalog, keys, first), first), keyId: first?.id });
 	};
@@ -142,110 +224,185 @@ export function ModelPicker({ value, onChange, purpose = "agent", allowedProvide
 		onChange({ provider, model: m, keyId: value?.keyId });
 	};
 
+	const pickHit = (v: string) => {
+		const at = v.indexOf(SEP);
+		if (at < 0) return;
+		const p = v.slice(0, at);
+		const m = v.slice(at + SEP.length);
+		const first = keys.find((k) => k.provider === p && keyUsable(k));
+		setOtherPicked(false);
+		setQuery("");
+		onChange({ provider: p, model: m, keyId: p === provider ? value?.keyId : first?.id });
+	};
+
 	const providerLabel = (p: ProviderId) => {
-		const name = catalog.find((c) => c.id === p)?.name ?? p;
+		const name = providerName(p, catalog);
 		if (keyed.has(p) || !loaded) return name;
 		return `${name} (${broken.has(p) ? t("picker.keyInvalid") : t("picker.noKeyShort")})`;
 	};
+	const modelLabel = (m: string) => (modelIsOpen(provider, m, catalog) ? `${m} (${t("picker.openTag")})` : m);
+
+	const grouped = groupProviders(ordered.map((p) => ({ id: p, custom_base_url: catalog.find((c) => c.id === p)?.custom_base_url })));
+	const groupLabel = (g: ProviderGroup) => t(`groups.${g}`);
+	const hits = query.trim() ? searchModels(query, ordered, purpose, catalog, keys) : [];
+	const hitGroups = ordered.map((p) => ({ provider: p, hits: hits.filter((h) => h.provider === p) })).filter((g) => g.hits.length > 0);
 
 	return (
-		<div className="flex flex-wrap items-center gap-2" data-testid={tid}>
-			<label className="sr-only" htmlFor={`${id}-provider`}>
-				{t("picker.provider")}
-			</label>
-			<select
-				id={`${id}-provider`}
-				className={selectClass}
-				value={provider}
-				disabled={disabled}
-				onChange={(e) => setProvider(e.target.value as ProviderId)}
-				data-testid={`${tid}-provider`}
-			>
-				{ordered.map((p) => (
-					<option key={p} value={p}>
-						{providerLabel(p)}
-					</option>
-				))}
-			</select>
-			<label className="sr-only" htmlFor={`${id}-model`}>
-				{t("picker.model")}
-			</label>
-			<select
-				id={`${id}-model`}
-				className={`${selectClass} max-w-72 min-w-48`}
-				value={other ? OTHER : model}
-				disabled={disabled}
-				onChange={(e) => setModel(e.target.value)}
-				data-testid={`${tid}-model`}
-			>
-				{model === "" && !other && (
-					<option value="" disabled>
-						{t("picker.choose")}
-					</option>
-				)}
-				{current && (
-					<optgroup label={t("picker.current")}>
-						<option value={current}>{current}</option>
-					</optgroup>
-				)}
-				{choices.reported.length > 0 && (
-					<optgroup label={t("picker.fromKeys")}>
-						{choices.reported.map((m) => (
-							<option key={m} value={m}>
-								{m}
-							</option>
-						))}
-					</optgroup>
-				)}
-				{choices.suggested.length > 0 && (
-					<optgroup label={t("picker.suggested")}>
-						{choices.suggested.map((m) => (
-							<option key={m} value={m}>
-								{m}
-							</option>
-						))}
-					</optgroup>
-				)}
-				<option value={OTHER}>{t("picker.other")}</option>
-			</select>
-			{other && (
-				<>
-					<label className="sr-only" htmlFor={`${id}-model-other`}>
-						{t("picker.custom")}
-					</label>
-					<input
-						id={`${id}-model-other`}
-						className={`${selectClass} min-w-48`}
-						value={model}
-						disabled={disabled}
-						placeholder={t("picker.custom")}
-						onChange={(e) => onChange({ provider, model: e.target.value, keyId: value?.keyId })}
-						data-testid={`${tid}-model-other`}
-					/>
-				</>
-			)}
-			{providerKeys.length > 1 && (
-				<select
-					className={selectClass}
-					aria-label={t("picker.key")}
-					value={value?.keyId ?? ""}
+		<div className="flex flex-col gap-2" data-testid={tid}>
+			<div className="flex flex-wrap items-center gap-2">
+				<label className="sr-only" htmlFor={`${id}-search`}>
+					{t("picker.search")}
+				</label>
+				<input
+					id={`${id}-search`}
+					type="search"
+					autoComplete="off"
+					className={`${selectClass} min-w-40`}
+					value={query}
 					disabled={disabled}
-					onChange={(e) => onChange({ provider, model, keyId: e.target.value || undefined })}
-					data-testid={`${tid}-key`}
+					placeholder={t("picker.searchPlaceholder")}
+					onChange={(e) => setQuery(e.target.value)}
+					data-testid={`${tid}-search`}
+				/>
+				<label className="sr-only" htmlFor={`${id}-provider`}>
+					{t("picker.provider")}
+				</label>
+				<select
+					id={`${id}-provider`}
+					className={selectClass}
+					value={provider}
+					disabled={disabled}
+					onChange={(e) => setProvider(e.target.value)}
+					data-testid={`${tid}-provider`}
 				>
-					<option value="">{t("picker.anyKey")}</option>
-					{providerKeys.map((k) => (
-						<option key={k.id} value={k.id}>
-							{k.label || k.provider} {k.last4 ? `...${k.last4}` : ""}
-						</option>
-					))}
+					{!ordered.includes(provider) && <option value={provider}>{providerLabel(provider)}</option>}
+					{grouped.length > 1
+						? grouped.map((g) => (
+								<optgroup key={g.group} label={groupLabel(g.group)}>
+									{g.providers.map(({ id: p }) => (
+										<option key={p} value={p} disabled={blocked(p)}>
+											{providerLabel(p)}
+										</option>
+									))}
+								</optgroup>
+							))
+						: ordered.map((p) => (
+								<option key={p} value={p} disabled={blocked(p)}>
+									{providerLabel(p)}
+								</option>
+							))}
 				</select>
-			)}
-			{showAddKeyLink && providerKeys.length === 0 && (
-				<Link to="/models" search={{ add: provider } as never} className="text-primary text-xs underline" data-testid={`${tid}-add-key`}>
-					{t("picker.noKey")}: {t("picker.addKey")}
-				</Link>
-			)}
+				<label className="sr-only" htmlFor={`${id}-model`}>
+					{t("picker.model")}
+				</label>
+				<select
+					id={`${id}-model`}
+					className={`${selectClass} max-w-72 min-w-48`}
+					value={other ? OTHER : model}
+					disabled={disabled}
+					onChange={(e) => setModel(e.target.value)}
+					data-testid={`${tid}-model`}
+				>
+					{model === "" && !other && (
+						<option value="" disabled>
+							{t("picker.choose")}
+						</option>
+					)}
+					{current && (
+						<optgroup label={t("picker.current")}>
+							<option value={current}>{current}</option>
+						</optgroup>
+					)}
+					{choices.reported.length > 0 && (
+						<optgroup label={t("picker.fromKeys")}>
+							{choices.reported.map((m) => (
+								<option key={m} value={m}>
+									{modelLabel(m)}
+								</option>
+							))}
+						</optgroup>
+					)}
+					{choices.suggested.length > 0 && (
+						<optgroup label={t("picker.suggested")}>
+							{choices.suggested.map((m) => (
+								<option key={m} value={m}>
+									{modelLabel(m)}
+								</option>
+							))}
+						</optgroup>
+					)}
+					<option value={OTHER}>{t("picker.other")}</option>
+				</select>
+				{other && (
+					<>
+						<label className="sr-only" htmlFor={`${id}-model-other`}>
+							{t("picker.custom")}
+						</label>
+						<input
+							id={`${id}-model-other`}
+							className={`${selectClass} min-w-48`}
+							value={model}
+							disabled={disabled}
+							placeholder={t("picker.custom")}
+							onChange={(e) => onChange({ provider, model: e.target.value, keyId: value?.keyId })}
+							data-testid={`${tid}-model-other`}
+						/>
+					</>
+				)}
+				{providerKeys.length > 1 && (
+					<select
+						className={selectClass}
+						aria-label={t("picker.key")}
+						value={value?.keyId ?? ""}
+						disabled={disabled}
+						onChange={(e) => onChange({ provider, model, keyId: e.target.value || undefined })}
+						data-testid={`${tid}-key`}
+					>
+						<option value="">{t("picker.anyKey")}</option>
+						{providerKeys.map((k) => (
+							<option key={k.id} value={k.id}>
+								{k.label || k.provider} {k.last4 ? `...${k.last4}` : ""}
+							</option>
+						))}
+					</select>
+				)}
+				{showAddKeyLink && !keyed.has(provider) && loaded && (
+					<Link to="/models" search={{ add: provider } as never} className="text-primary text-xs underline" data-testid={`${tid}-add-key`}>
+						{providerKeys.length === 0 ? t("picker.noKey") : t("picker.keyInvalidLong")}: {t("picker.addKey")}
+					</Link>
+				)}
+			</div>
+			{query.trim() !== "" &&
+				(hitGroups.length > 0 ? (
+					<select
+						className="border-input bg-background max-w-full rounded-md border p-1 text-sm"
+						size={Math.min(10, hits.length + hitGroups.length)}
+						aria-label={t("picker.results")}
+						value=""
+						disabled={disabled}
+						onChange={(e) => pickHit(e.target.value)}
+						data-testid={`${tid}-results`}
+					>
+						{hitGroups.map((g) => (
+							<optgroup
+								key={g.provider}
+								label={
+									blocked(g.provider) ? `${providerName(g.provider, catalog)} (${t("picker.needsKey")})` : providerName(g.provider, catalog)
+								}
+							>
+								{g.hits.map((h) => (
+									<option key={h.model} value={`${h.provider}${SEP}${h.model}`} disabled={blocked(h.provider)}>
+										{h.open ? `${h.model} (${t("picker.openTag")})` : h.model}
+									</option>
+								))}
+							</optgroup>
+						))}
+					</select>
+				) : (
+					<p className="text-muted-foreground text-xs" data-testid={`${tid}-no-results`}>
+						{t("picker.noResults")}
+					</p>
+				))}
 		</div>
 	);
 }

@@ -38,6 +38,10 @@ export interface ModelOption {
 	cheap?: boolean;
 	purposes: ModelPurpose[];
 	rank: number;
+	/** True when the model's weights are published (DeepSeek, Qwen, Llama...). Optional: older servers omit it. */
+	open_weights?: boolean;
+	/** Model family id, e.g. "deepseek", "qwen", "glm". Optional. */
+	family?: string;
 }
 
 export interface ModelProviderInfo {
@@ -48,6 +52,10 @@ export interface ModelProviderInfo {
 	key_hint: string;
 	key_prefix?: string;
 	models: ModelOption[];
+	/** The Bifrost core provider this entry routes through (e.g. "openrouter"). Optional. */
+	bifrost_provider?: string;
+	/** True for a custom OpenAI-compatible provider that needs the user's base URL. Optional. */
+	custom_base_url?: boolean;
 }
 
 export interface ModelRefView {
