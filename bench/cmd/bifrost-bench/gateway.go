@@ -63,9 +63,7 @@ func providerSetups(cfg *lib.Config) []bifrost.ProviderSetup {
 	}
 	oaNames := cfg.Gateway.OpenAIKeySlots // must match the fault proxy's --openai-slots
 	if len(oaNames) == 0 {
-		for i := 1; i <= 4; i++ {
-			oaNames = append(oaNames, fmt.Sprintf("oa-slot-%d", i))
-		}
+		oaNames = lib.SlotNames("oa", lib.DefaultSlotsPerProvider)
 	}
 	oa := make([]bifrost.Slot, 0, len(oaNames))
 	for _, n := range oaNames {

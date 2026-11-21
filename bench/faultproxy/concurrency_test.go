@@ -33,15 +33,15 @@ func TestConcurrencyPerProvider(t *testing.T) {
 	}
 }
 
-func TestConcurrencyDefaultFour(t *testing.T) {
+func TestConcurrencyDefault24(t *testing.T) {
 	srv, err := NewServer(Config{LedgerPath: filepath.Join(t.TempDir(), "l.jsonl"), Upstream: UpstreamScripted})
 	if err != nil {
 		t.Fatal(err)
 	}
 	defer srv.Close()
 	for _, c := range srv.Concurrency() {
-		if c.Slots != 4 {
-			t.Fatalf("%s has %d slots, want the default 4", c.Provider, c.Slots)
+		if c.Slots != 24 {
+			t.Fatalf("%s has %d slots, want the default 24", c.Provider, c.Slots)
 		}
 	}
 }

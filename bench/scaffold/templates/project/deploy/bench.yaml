@@ -23,7 +23,10 @@ gateway:
   agent_url: http://bifrost:8080     # from inside the evaluation network
   admin_token_env: BIFROST_SETUP_TOKEN
   provider: anthropic
-  key_slots: [fp-slot-1, fp-slot-2, fp-slot-3, fp-slot-4, fp-slot-5, fp-slot-6, fp-slot-7, fp-slot-8] # a team of N members holds N slots; keep in step with the proxy --slots in docker-compose.yml
+  # Runs that may use one provider at once: fp-slot-1..N (anthropic) and
+  # oa-slot-1..N (openai). Keep it equal to the proxy --slots-per-provider in
+  # docker-compose.yml. A team of N members holds N slots.
+  slots_per_provider: 24
 
 faultproxy:
   control_url: http://127.0.0.1:19101

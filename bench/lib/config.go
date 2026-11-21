@@ -98,7 +98,7 @@ type GatewayConfig struct {
 	Provider      string   `yaml:"provider" json:"provider"`
 	KeySlots      []string `yaml:"key_slots" json:"key_slots"`
 	// OpenAIKeySlots are the openai provider's key slots (default
-	// oa-slot-1..4). A team of N members on an openai model holds N of them
+	// oa-slot-1..24). A team of N members on an openai model holds N of them
 	// at once, so a 5-member team needs 5 here and the same names in the
 	// fault proxy's --openai-slots.
 	OpenAIKeySlots []string `yaml:"openai_key_slots" json:"openai_key_slots,omitempty"`

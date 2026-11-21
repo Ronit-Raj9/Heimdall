@@ -623,7 +623,7 @@ func resolveUpstreams(cfg Config, t *providerTable) (map[string]upstream, error)
 	return out, nil
 }
 
-// withDefaultSlots adds <prefix>-slot-1..4 (auth = name) for every provider
+// withDefaultSlots adds <prefix>-slot-1..24 (auth = name) for every provider
 // cfg lists no slot for. Slots without a provider are anthropic's.
 func withDefaultSlots(cfg []SlotConfig, t *providerTable) []SlotConfig {
 	return withDefaultSlotsN(cfg, t, defaultSlotsPerProvider)
@@ -656,7 +656,7 @@ func withDefaultSlotsN(cfg []SlotConfig, t *providerTable, n int) []SlotConfig {
 }
 
 // DefaultSlots returns the slots a provider gets when none are configured:
-// <slot_prefix>-slot-1..4, each with its name as the placeholder value.
+// <slot_prefix>-slot-1..24, each with its name as the placeholder value.
 func DefaultSlots(p ProviderSpec) []SlotConfig {
 	return DefaultSlotsN(p, defaultSlotsPerProvider)
 }

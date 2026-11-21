@@ -11,6 +11,7 @@ import (
 	"syscall"
 
 	"github.com/maximhq/bifrost/bench/faultproxy"
+	"github.com/maximhq/bifrost/bench/lib"
 	"github.com/maximhq/bifrost/bench/utils"
 )
 
@@ -29,8 +30,8 @@ func runProxy(args []string) int {
 	ledger := fs.String("ledger", envOr("BENCH_FAULTPROXY_LEDGER", "faultproxy.ledger.jsonl"), "ledger file path")
 	_ = fs.String("config", "", "bench config (accepted for compose; the proxy reads only its flags and environment)")
 	slots := fs.String("slots", envOr("BENCH_FAULTPROXY_SLOTS", ""), "comma-separated anthropic key slots; each slot's placeholder key value equals its name (empty: fp-slot-1..N, N from -slots-per-provider)")
-	perProvider := fs.Int("slots-per-provider", envInt("BENCH_FAULTPROXY_SLOTS_PER_PROVIDER", 4), "key slots of every provider no list names (<prefix>-slot-1..N): how many runs may use one provider at once; keep in step with gateway.slots_per_provider")
-	openaiSlots := fs.String("openai-slots", envOr("BENCH_FAULTPROXY_OPENAI_SLOTS", ""), "comma-separated key slots of the openai provider (empty: oa-slot-1..4); keep in step with gateway.openai_key_slots")
+	perProvider := fs.Int("slots-per-provider", envInt("BENCH_FAULTPROXY_SLOTS_PER_PROVIDER", lib.DefaultSlotsPerProvider), "key slots of every provider no list names (<prefix>-slot-1..N): how many runs may use one provider at once; keep in step with gateway.slots_per_provider")
+	openaiSlots := fs.String("openai-slots", envOr("BENCH_FAULTPROXY_OPENAI_SLOTS", ""), "comma-separated key slots of the openai provider (empty: oa-slot-1..N); keep in step with gateway.openai_key_slots")
 	debug := fs.Bool("debug", false, "debug logging")
 	if err := fs.Parse(args); err != nil {
 		return exitUsage
@@ -99,7 +100,7 @@ func defaultUpstream() string {
 
 // proxySlots turns the --slots (anthropic) and --openai-slots lists into the
 // proxy's slot table. An empty openai list leaves openai on its default
-// oa-slot-1..4 (faultproxy.DefaultSlots); a non-empty one replaces them.
+// oa-slot-1..N (-slots-per-provider); a non-empty one replaces them.
 func proxySlots(anthropic, openai string) []faultproxy.SlotConfig {
 	var out []faultproxy.SlotConfig
 	for _, s := range strings.Split(anthropic, ",") {

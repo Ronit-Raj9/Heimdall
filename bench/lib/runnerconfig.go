@@ -14,6 +14,10 @@ const (
 	DefaultImageMaxUnusedH  = 48
 	DefaultBuildCacheKeepGB = 10
 	DefaultJanitorEveryMin  = 10
+	// DefaultSlotsPerProvider is how many runs may use one provider at once
+	// when no slot list or count is configured; the fault proxy's default
+	// is the same. Parallel admission of 10 to 14 runs waited at 8.
+	DefaultSlotsPerProvider = 24
 )
 
 // maxSlotsPerProvider bounds gateway.slots_per_provider: every slot is a
@@ -109,11 +113,22 @@ func gbOrDefault(gb, def int) int64 {
 
 // expandSlots applies gateway.slots_per_provider: fp-slot-1..N for the
 // anthropic provider and oa-slot-1..N for openai, replacing the lists.
+// An unset count fills an empty list with DefaultSlotsPerProvider names;
+// a list that is set is kept.
 func (g *GatewayConfig) expandSlots() {
-	if g.SlotsPerProvider <= 0 || g.SlotsPerProvider > maxSlotsPerProvider {
+	if g.SlotsPerProvider > maxSlotsPerProvider {
 		return
 	}
-	g.KeySlots, g.OpenAIKeySlots = SlotNames("fp", g.SlotsPerProvider), SlotNames("oa", g.SlotsPerProvider)
+	if g.SlotsPerProvider > 0 {
+		g.KeySlots, g.OpenAIKeySlots = SlotNames("fp", g.SlotsPerProvider), SlotNames("oa", g.SlotsPerProvider)
+		return
+	}
+	if len(g.KeySlots) == 0 {
+		g.KeySlots = SlotNames("fp", DefaultSlotsPerProvider)
+	}
+	if len(g.OpenAIKeySlots) == 0 {
+		g.OpenAIKeySlots = SlotNames("oa", DefaultSlotsPerProvider)
+	}
 }
 
 func (g GatewayConfig) validateSlots() error {
