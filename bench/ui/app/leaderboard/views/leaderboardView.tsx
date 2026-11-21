@@ -22,7 +22,6 @@ import { LeaderboardFilters } from "@/components/leaderboard/leaderboardFilters"
 import { LeaderboardFootnote } from "@/components/leaderboard/leaderboardFootnote";
 import { LeaderboardTable } from "@/components/leaderboard/leaderboardTable";
 import { Podium } from "@/components/leaderboard/podium";
-import { SuiteTabs } from "@/components/leaderboard/suiteTabs";
 import { ModeBadge } from "@/components/modeBadge";
 import { PageHeader, RouteTabs, type RouteTab } from "@/components/shell";
 import { GRADE_SOURCE_MODES, GradeSourcePicker } from "@/components/review/gradeSourcePicker";
@@ -136,7 +135,6 @@ export function LeaderboardTab() {
 					testId="leaderboard-reviewed-badge"
 				/>
 			</div>
-			<SuiteTabs groups={trackGroups} track={track} onTrack={onTrack} disabled={board.isLoading} />
 			{showBanner && <LeaderboardSyntheticBanner />}
 			{data?.split === "held_out" && <LeaderboardHeldOutBanner />}
 			{judged && (

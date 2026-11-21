@@ -11,7 +11,7 @@ import { KeyValueList } from "./keyValueList";
 import { PageHeader, Section } from "./section";
 import { StatCard } from "./statCard";
 import { StatusPill } from "./statusPill";
-import { FilterChips, Toolbar } from "./toolbar";
+import { FilterChips, FilterSelect, FilterTokens, SegmentedControl, Toolbar } from "./toolbar";
 
 describe("StatusPill", () => {
 	it("renders tone, dot and label; running pulses", () => {
@@ -91,6 +91,24 @@ describe("layout primitives", () => {
 		const kv = renderToStaticMarkup(<KeyValueList items={[{ label: "Digest", value: "sha256:abc", mono: true }]} />);
 		expect(kv).toContain("<dt");
 		expect(kv).toContain("font-mono");
+	});
+	it("FilterSelect keeps an unknown URL value and FilterTokens hide when empty", () => {
+		const html = renderToStaticMarkup(
+			<FilterSelect label="Agent" options={[{ value: "codex", label: "codex" }]} value="old" onChange={() => undefined} testId="s" />,
+		);
+		expect(html).toContain('aria-label="Agent"');
+		expect(html).toContain('<option value="old" selected="">old</option>');
+		expect(html).toContain('<option value="codex">codex</option>');
+		expect(renderToStaticMarkup(<FilterTokens tokens={[]} />)).toBe("");
+		const tokens = renderToStaticMarkup(
+			<FilterTokens tokens={[{ key: "a", label: "Agent: codex", onRemove: () => undefined }]} testId="t" />,
+		);
+		expect(tokens).toContain('data-testid="t-a"');
+		const seg = renderToStaticMarkup(
+			<SegmentedControl options={[{ value: "x", label: "X" }, { value: "y", label: "Y" }]} value="y" onChange={() => undefined} testId="g" />,
+		);
+		expect(seg).toContain('data-testid="g-y"');
+		expect(seg).toContain('aria-checked="true"');
 	});
 	it("FilterChips marks pressed chips and offers Clear", () => {
 		const html = renderToStaticMarkup(

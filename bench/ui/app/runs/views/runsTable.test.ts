@@ -1,9 +1,9 @@
 import { describe, expect, it } from "vitest";
 import type { RunListRow } from "@/lib/types/bench";
-import { formatDuration, orderRuns, runDuration, runsRequest } from "./runsTable";
+import { agentOptions, formatDuration, orderRuns, runAgent, runDuration, runsRequest } from "./runsTable";
 
-const row = (id: string, sealed: boolean, task = "t", arm = "a"): RunListRow =>
-	({ run_id: id, sealed, task, arm, suite: "s@1", outcome: "pass" }) as RunListRow;
+const row = (id: string, sealed: boolean, task = "t", arm = "a", config_id = ""): RunListRow =>
+	({ run_id: id, sealed, task, arm, config_id, suite: "s@1", outcome: "pass" }) as RunListRow;
 
 describe("runsTable utils", () => {
 	it("puts running runs first and keeps order", () => {
@@ -14,7 +14,15 @@ describe("runsTable utils", () => {
 		const out = orderRuns([row("1", true, "fix-bug", "codex"), row("2", true, "other", "claude")], "CLAUDE");
 		expect(out.map((r) => r.run_id)).toEqual(["2"]);
 	});
-	it("builds the request from chips and page", () => {
+	it("filters by agent name, never arm id", () => {
+		const rows = [row("1", true, "t", "A", "codex"), row("2", true, "t", "B", "claude-code")];
+		expect(orderRuns(rows, null, "claude-code").map((r) => r.run_id)).toEqual(["2"]);
+		expect(runAgent(rows[0])).toBe("codex");
+		expect(runAgent(row("3", true, "t", "A"))).toBe("A");
+		expect(agentOptions(["opencode", "codex"], rows)).toEqual(["claude-code", "codex", "opencode"]);
+		expect(agentOptions([], [row("4", true, "t", "A")])).toEqual([]);
+	});
+	it("builds the request from filters and page", () => {
 		expect(runsRequest({ outcome: "pass", suite: null, arm: "x" }, 3)).toEqual({ limit: 50, outcome: "pass", arm: "x", offset: 100 });
 	});
 	it("formats durations", () => {

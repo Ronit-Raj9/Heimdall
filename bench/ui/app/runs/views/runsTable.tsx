@@ -2,13 +2,14 @@ import { EmptyState } from "@/components/shell/emptyState";
 import { BlockSkeleton, LoadError } from "@/components/runs/screenStates";
 import { outcomeTone } from "@/components/runs/runs.utils";
 import { Button } from "@/components/ui/button";
+import { FilterSelect, FilterTokens, ToolbarSearch, type FilterToken } from "@/components/ui/toolbar";
 import { ValueCell } from "@/components/valueCell";
 import { getLocale } from "@/lib/i18n";
-import { useListRunsQuery } from "@/lib/store/apis/benchApi";
+import { useGetAgentsQuery, useListRunsQuery } from "@/lib/store/apis/benchApi";
 import type { RunListParams, RunListRow } from "@/lib/types/bench";
 import { cn } from "@/lib/utils";
 import { useNavigate } from "@tanstack/react-router";
-import { ChevronLeft, ChevronRight, ListX, Search, X } from "lucide-react";
+import { ChevronLeft, ChevronRight, ListX } from "lucide-react";
 import { parseAsInteger, parseAsString, useQueryStates } from "nuqs";
 import { useMemo, type KeyboardEvent } from "react";
 import { useTranslation } from "react-i18next";
@@ -19,11 +20,12 @@ const parsers = {
 	outcome: parseAsString,
 	suite: parseAsString,
 	arm: parseAsString,
+	agent: parseAsString,
 	q: parseAsString,
 	page: parseAsInteger,
 };
 
-/** The server request for the chips and page; the search box filters the page on the client. */
+/** The server request for the filters and page; the search box filters the page on the client. */
 export function runsRequest(f: { outcome?: string | null; suite?: string | null; arm?: string | null }, page: number | null): RunListParams {
 	const params: RunListParams = { limit: RUNS_PAGE };
 	if (f.outcome) params.outcome = f.outcome;
@@ -34,11 +36,23 @@ export function runsRequest(f: { outcome?: string | null; suite?: string | null;
 	return params;
 }
 
-/** Running runs first, then the server's newest-first order; a search narrows by task, agent or model. */
-export function orderRuns(rows: readonly RunListRow[], query: string | null): RunListRow[] {
+/** The agent a run used: its agent config id, or the arm id when the run has none. */
+export function runAgent(r: Pick<RunListRow, "config_id" | "arm">): string {
+	return r.config_id || r.arm;
+}
+
+/** Agent names for the Agent filter: every configured agent plus any agent seen on the page. Never arm ids. */
+export function agentOptions(configured: readonly string[], rows: readonly Pick<RunListRow, "config_id">[]): string[] {
+	const seen = new Set(configured.filter(Boolean));
+	for (const r of rows) if (r.config_id) seen.add(r.config_id);
+	return [...seen].sort((a, b) => a.localeCompare(b));
+}
+
+/** Running runs first, then the server's newest-first order; a search narrows by task, agent or model, the agent filter by agent name. */
+export function orderRuns(rows: readonly RunListRow[], query: string | null, agent: string | null = null): RunListRow[] {
 	const q = (query ?? "").trim().toLowerCase();
-	const hit = (r: RunListRow) => !q || [r.task, r.arm, r.model ?? "", r.suite].some((v) => v.toLowerCase().includes(q));
-	const shown = rows.filter(hit);
+	const hit = (r: RunListRow) => !q || [r.task, r.arm, r.config_id ?? "", r.model ?? "", r.suite].some((v) => v.toLowerCase().includes(q));
+	const shown = rows.filter((r) => hit(r) && (!agent || runAgent(r) === agent));
 	return [...shown.filter((r) => !r.sealed), ...shown.filter((r) => r.sealed)];
 }
 
@@ -109,54 +123,7 @@ export function OutcomePill({ row }: { row: Pick<RunListRow, "sealed" | "outcome
 	);
 }
 
-function Chips({
-	label,
-	options,
-	value,
-	onChange,
-	render,
-	testId,
-}: {
-	label: string;
-	options: readonly string[];
-	value: string | null;
-	onChange: (v: string | null) => void;
-	render?: (v: string) => string;
-	testId: string;
-}) {
-	const { t } = useTranslation("u12");
-	if (options.length === 0 && !value) return null;
-	const choices = value && !options.includes(value) ? [value, ...options] : options;
-	const chip = (active: boolean) =>
-		cn(
-			"rounded-full border px-2.5 py-1 text-xs whitespace-nowrap transition-colors focus-visible:ring-ring/50 focus-visible:ring-2 focus-visible:outline-none",
-			active ? "bg-foreground text-background border-foreground" : "text-muted-foreground hover:text-foreground hover:bg-muted",
-		);
-	return (
-		<div className="flex min-w-0 items-center gap-2" role="group" aria-label={label} data-testid={testId}>
-			<span className="text-muted-foreground w-16 shrink-0 text-xs font-medium">{label}</span>
-			<div className="flex min-w-0 gap-1.5 overflow-x-auto pb-0.5">
-				<button type="button" className={chip(!value)} aria-pressed={!value} onClick={() => onChange(null)}>
-					{t("runs.all")}
-				</button>
-				{choices.map((o) => (
-					<button
-						key={o}
-						type="button"
-						className={chip(value === o)}
-						aria-pressed={value === o}
-						onClick={() => onChange(value === o ? null : o)}
-						data-testid={`${testId}-${o}`}
-					>
-						{render ? render(o) : o}
-					</button>
-				))}
-			</div>
-		</div>
-	);
-}
-
-/** /runs: live runs on top, chip filters in the URL, a search box, and one click to open a run. */
+/** /runs: live runs on top, toolbar filters in the URL, a search box, and one click to open a run. */
 export function RunsTable() {
 	const { t: tu } = useTranslation("u12");
 	const { t: tb } = useTranslation("bench");
@@ -164,12 +131,25 @@ export function RunsTable() {
 	const navigate = useNavigate();
 	const [search, setSearch] = useQueryStates(parsers, { history: "replace" });
 	const list = useListRunsQuery(runsRequest(search, search.page));
-	const rows = useMemo(() => orderRuns(list.data?.runs ?? [], search.q), [list.data, search.q]);
+	const agentsQuery = useGetAgentsQuery();
+	const rows = useMemo(() => orderRuns(list.data?.runs ?? [], search.q, search.agent), [list.data, search.q, search.agent]);
+	const agents = useMemo(
+		() => agentOptions((agentsQuery.data?.agents ?? []).map((a) => a.id), list.data?.runs ?? []),
+		[agentsQuery.data, list.data],
+	);
 	const live = rows.filter((r) => !r.sealed).length;
-	const active = Boolean(search.outcome || search.suite || search.arm || search.q);
+	const active = Boolean(search.outcome || search.suite || search.arm || search.agent || search.q);
 	const page = Math.max(1, search.page ?? 1);
 	const facets = list.data?.facets;
-	const clear = () => void setSearch({ outcome: null, suite: null, arm: null, q: null, page: null });
+	const clear = () => void setSearch({ outcome: null, suite: null, arm: null, agent: null, q: null, page: null });
+	const outcomeLabel = (o: string) => tb(`runs.outcome.${o}`, { defaultValue: o });
+	const tokens: FilterToken[] = [
+		search.outcome && { key: "outcome", label: `${tu("runs.outcome")}: ${outcomeLabel(search.outcome)}`, onRemove: () => void setSearch({ outcome: null, page: null }) },
+		search.suite && { key: "suite", label: `${tu("runs.suite")}: ${search.suite.replace(/@.*$/, "")}`, onRemove: () => void setSearch({ suite: null, page: null }) },
+		search.agent && { key: "agent", label: `${tu("runs.agent")}: ${search.agent}`, onRemove: () => void setSearch({ agent: null, page: null }) },
+		// An older link may still carry an arm id; show it so it can be removed.
+		search.arm && { key: "arm", label: `${tu("runs.agent")}: ${search.arm}`, onRemove: () => void setSearch({ arm: null, page: null }) },
+	].filter((x): x is FilterToken => Boolean(x));
 	const open = (row: RunListRow) => void navigate({ to: "/runs/$runId", params: { runId: row.run_id } } as never);
 	const onKey = (e: KeyboardEvent, row: RunListRow) => {
 		if (e.key === "Enter" || e.key === " ") {
@@ -180,55 +160,47 @@ export function RunsTable() {
 
 	return (
 		<div className="flex min-w-0 flex-col gap-4" data-testid="runs-table-screen">
-			<div className="bg-card flex flex-col gap-3 rounded-xl border p-4">
-				<div className="flex flex-wrap items-center gap-3">
-					<label className="relative min-w-0 flex-1 sm:max-w-sm">
-						<span className="sr-only">{tu("runs.searchLabel")}</span>
-						<Search className="text-muted-foreground pointer-events-none absolute top-1/2 left-2.5 size-4 -translate-y-1/2" aria-hidden="true" />
-						<input
-							type="search"
-							value={search.q ?? ""}
-							onChange={(e) => void setSearch({ q: e.target.value || null })}
-							placeholder={tu("runs.search")}
-							className="bg-background focus-visible:ring-ring/50 h-9 w-full rounded-lg border pr-3 pl-8 text-sm focus-visible:ring-2 focus-visible:outline-none"
-							data-testid="runs-search"
-						/>
-					</label>
+			<div className="flex flex-col gap-2">
+				<div className="flex flex-wrap items-center gap-2" role="toolbar" aria-label={tu("runs.filters")} data-testid="runs-toolbar">
+					<ToolbarSearch
+						value={search.q ?? ""}
+						onChange={(v) => void setSearch({ q: v || null })}
+						placeholder={tu("runs.search")}
+						label={tu("runs.searchLabel")}
+						testId="runs-search"
+					/>
+					<FilterSelect
+						label={tu("runs.outcome")}
+						allLabel={tu("runs.all")}
+						options={(facets?.outcomes ?? []).map((o) => ({ value: o, label: outcomeLabel(o) }))}
+						value={search.outcome}
+						onChange={(v) => void setSearch({ outcome: v, page: null })}
+						testId="runs-filter-outcome"
+					/>
+					<FilterSelect
+						label={tu("runs.suite")}
+						allLabel={tu("runs.all")}
+						options={(facets?.suites ?? []).map((v) => ({ value: v, label: v.replace(/@.*$/, "") }))}
+						value={search.suite}
+						onChange={(v) => void setSearch({ suite: v, page: null })}
+						testId="runs-filter-suite"
+					/>
+					<FilterSelect
+						label={tu("runs.agent")}
+						allLabel={tu("runs.all")}
+						options={agents.map((v) => ({ value: v, label: v }))}
+						value={search.agent}
+						onChange={(v) => void setSearch({ agent: v, page: null })}
+						testId="runs-filter-agent"
+					/>
 					{live > 0 && (
-						<span className="text-chart-info-ink inline-flex items-center gap-1.5 text-xs font-medium" data-testid="runs-live-count">
+						<span className="text-chart-info-ink ml-auto inline-flex items-center gap-1.5 text-xs font-medium" data-testid="runs-live-count">
 							<span className="bg-chart-info size-1.5 animate-pulse rounded-full" />
 							{tu("runs.liveCount", { count: live })}
 						</span>
 					)}
-					{active && (
-						<Button variant="ghost" size="sm" onClick={clear} className="ml-auto" dataTestId="runs-clear">
-							<X aria-hidden="true" />
-							{tu("runs.clear")}
-						</Button>
-					)}
 				</div>
-				<Chips
-					label={tu("runs.outcome")}
-					options={facets?.outcomes ?? []}
-					value={search.outcome}
-					onChange={(v) => void setSearch({ outcome: v, page: null })}
-					render={(o) => tb(`runs.outcome.${o}`, { defaultValue: o })}
-					testId="runs-chips-outcome"
-				/>
-				<Chips
-					label={tu("runs.suite")}
-					options={facets?.suites ?? []}
-					value={search.suite}
-					onChange={(v) => void setSearch({ suite: v, page: null })}
-					testId="runs-chips-suite"
-				/>
-				<Chips
-					label={tu("runs.agent")}
-					options={facets?.arms ?? []}
-					value={search.arm}
-					onChange={(v) => void setSearch({ arm: v, page: null })}
-					testId="runs-chips-agent"
-				/>
+				<FilterTokens tokens={tokens} onClear={clear} testId="runs-tokens" />
 			</div>
 
 			{list.isLoading ? (
@@ -298,8 +270,8 @@ export function RunsTable() {
 											</div>
 										</td>
 										<td className="max-w-56 px-3 py-3">
-											<span className="truncate" title={row.model ? `${row.arm} · ${row.model}` : row.arm}>
-												<span className="font-medium">{row.arm}</span>
+											<span className="truncate" title={row.model ? `${runAgent(row)} · ${row.model}` : runAgent(row)}>
+												<span className="font-medium">{runAgent(row)}</span>
 												{row.model && <span className="text-muted-foreground"> · {row.model}</span>}
 											</span>
 										</td>

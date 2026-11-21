@@ -3,6 +3,8 @@
 	"subtitle": "Ready-made benchmarks. Add one to your project, then run an agent on it.",
 	"search": "Search benchmarks",
 	"filterAll": "All",
+	"category": "Category",
+	"sourceLabel": "Source",
 	"sourceAll": "Any source",
 	"sourceReady": "Ready to add",
 	"sourceNeedsData": "Needs data",
