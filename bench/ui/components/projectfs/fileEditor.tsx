@@ -12,6 +12,7 @@ import {
 import { errorStatus } from "@/lib/store/apis/session";
 import { canUse, useSession } from "@/lib/session/sessionContext";
 import type { ProjectArea, ProjectFileSaved } from "@/lib/types/projectfiles";
+import { Check, ChevronRight, Download, FileText, History, Save, Trash2, X } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { FILES_NS } from "./i18n";
@@ -42,6 +43,7 @@ export function FileEditor({ area, path, onSaved, onDeleted, onClose }: FileEdit
 	const loadedText = file.data && file.data.encoding === "utf-8" ? file.data.content : "";
 	const [text, setText] = useState(loadedText);
 	const [note, setNote] = useState("");
+	const [showHistory, setShowHistory] = useState(false);
 	const [message, setMessage] = useState<{ kind: "ok" | "error" | "conflict"; text: string } | null>(null);
 
 	const missing = errorStatus(file.error) === 404;
@@ -83,96 +85,134 @@ export function FileEditor({ area, path, onSaved, onDeleted, onClose }: FileEdit
 
 	const loadError = file.error && !missing ? getBenchErrorMessage(file.error) : null;
 
+	const dirty = !binary && text !== loadedText;
+	const segments = path.split("/");
+
 	return (
-		<div className="flex flex-col gap-3" data-testid="file-editor">
-			<div className="flex flex-wrap items-center justify-between gap-2">
-				<code className="text-sm font-medium break-all" data-testid="file-editor-path">
-					{area}/{path}
-				</code>
-				<div className="flex gap-2">
+		<div className="bg-card flex min-w-0 flex-col overflow-hidden rounded-xl border" data-testid="file-editor">
+			<div className="flex flex-wrap items-center gap-2 border-b px-3 py-2">
+				<div className="flex min-w-0 flex-1 items-center gap-1.5 text-sm" data-testid="file-editor-path" title={`${area}/${path}`}>
+					<FileText className="text-muted-foreground size-4 shrink-0" aria-hidden="true" />
+					<span className="text-muted-foreground shrink-0">{area}</span>
+					{segments.map((seg, i) => (
+						<span key={i} className="flex min-w-0 items-center gap-1.5">
+							<ChevronRight className="text-muted-foreground size-3 shrink-0" aria-hidden="true" />
+							<span className={i === segments.length - 1 ? "truncate font-medium" : "text-muted-foreground truncate"}>{seg}</span>
+						</span>
+					))}
+					{dirty && (
+						<span className="ml-1 flex shrink-0 items-center gap-1 rounded-full bg-amber-500/10 px-2 py-0.5 text-xs text-amber-700 dark:text-amber-400">
+							<span className="size-1.5 rounded-full bg-amber-500" aria-hidden="true" />
+							{t("editor.unsaved")}
+						</span>
+					)}
+				</div>
+				<div className="flex flex-wrap items-center gap-1">
+					{canWrite && !binary && (
+						<Button size="sm" disabled={saveState.isLoading || file.isLoading} onClick={onSave} data-testid="file-editor-save">
+							<Save className="size-4" aria-hidden="true" />
+							{saveState.isLoading ? t("editor.saving") : t("editor.save")}
+						</Button>
+					)}
+					<Button size="sm" variant={showHistory ? "secondary" : "ghost"} onClick={() => setShowHistory((v) => !v)} aria-expanded={showHistory} data-testid="file-editor-history">
+						<History className="size-4" aria-hidden="true" />
+						{t("editor.history")}
+					</Button>
 					{!missing && (
 						<Button asChild size="sm" variant="ghost">
-							<a href={projectRawUrl(area, path)}>{t("editor.download")}</a>
+							<a href={projectRawUrl(area, path)}>
+								<Download className="size-4" aria-hidden="true" />
+								{t("editor.download")}
+							</a>
+						</Button>
+					)}
+					{canWrite && !binary && !missing && (
+						<Button size="sm" variant="ghost" className="text-destructive hover:text-destructive" disabled={removeState.isLoading} onClick={onDelete} data-testid="file-editor-delete">
+							<Trash2 className="size-4" aria-hidden="true" />
+							{t("editor.delete")}
 						</Button>
 					)}
 					{onClose && (
-						<Button size="sm" variant="ghost" onClick={onClose}>
-							{t("editor.close")}
+						<Button size="sm" variant="ghost" onClick={onClose} aria-label={t("editor.close")} title={t("editor.close")}>
+							<X className="size-4" aria-hidden="true" />
 						</Button>
 					)}
 				</div>
 			</div>
-			{file.isLoading && <p className="text-muted-foreground text-sm">{t("editor.loading")}</p>}
-			{missing && <p className="text-muted-foreground text-sm" data-testid="file-editor-new">{t("editor.newFile")}</p>}
-			{loadError && <p className="text-destructive text-sm">{loadError}</p>}
-			{binary ? (
-				<p className="text-muted-foreground text-sm" data-testid="file-editor-binary">{t("editor.binary")}</p>
-			) : (
-				<textarea
-					aria-label={`${area}/${path}`}
-					className="bg-background min-h-80 w-full rounded-md border p-3 font-mono text-xs leading-5"
-					data-testid="file-editor-text"
-					readOnly={!canWrite}
-					spellCheck={false}
-					value={text}
-					onChange={(e) => setText(e.target.value)}
-				/>
+			{(file.isLoading || missing || loadError || message) && (
+				<div className="flex flex-col gap-1 border-b px-3 py-2">
+					{file.isLoading && <p className="text-muted-foreground text-sm">{t("editor.loading")}</p>}
+					{missing && <p className="text-muted-foreground text-sm" data-testid="file-editor-new">{t("editor.newFile")}</p>}
+					{loadError && <p className="text-destructive text-sm">{loadError}</p>}
+					{message && (
+						<div
+							className={message.kind === "ok" ? "flex items-center gap-1.5 text-sm text-emerald-600 dark:text-emerald-400" : "text-destructive flex flex-wrap items-center gap-2 text-sm"}
+							data-testid={`file-editor-${message.kind}`}
+							role="status"
+						>
+							{message.kind === "ok" && <Check className="size-4" aria-hidden="true" />}
+							{message.text}
+							{message.kind === "conflict" && (
+								<Button size="sm" variant="outline" onClick={() => void file.refetch()}>
+									{t("editor.reload")}
+								</Button>
+							)}
+						</div>
+					)}
+				</div>
 			)}
+			<div className={showHistory ? "grid min-w-0 md:grid-cols-[minmax(0,1fr)_16rem]" : "min-w-0"}>
+				{binary ? (
+					<p className="text-muted-foreground p-6 text-sm" data-testid="file-editor-binary">{t("editor.binary")}</p>
+				) : (
+					<textarea
+						aria-label={`${area}/${path}`}
+						className="bg-background min-h-[28rem] w-full resize-y border-0 p-4 font-mono text-xs leading-5 focus-visible:outline-none"
+						data-testid="file-editor-text"
+						readOnly={!canWrite}
+						spellCheck={false}
+						value={text}
+						onChange={(e) => setText(e.target.value)}
+					/>
+				)}
+				{showHistory && (
+					<div className="flex flex-col gap-2 border-t p-3 text-sm md:border-t-0 md:border-l" data-testid="file-editor-versions">
+						<h3 className="text-muted-foreground text-xs font-medium tracking-wide uppercase">{t("editor.versions")}</h3>
+						{(versions.data?.versions.length ?? 0) === 0 ? (
+							<p className="text-muted-foreground text-xs">{t("editor.noVersions")}</p>
+						) : (
+							<ul className="flex max-h-[28rem] flex-col gap-1 overflow-y-auto">
+								{versions.data?.versions.map((v) => (
+									<li key={v.id} className="hover:bg-accent/50 flex flex-col gap-0.5 rounded-md px-2 py-1.5">
+										<span className="text-xs font-medium tabular-nums">{new Date(v.at).toLocaleString()}</span>
+										<span className="text-muted-foreground line-clamp-2 text-xs">
+											{v.actor && t("editor.by", { actor: v.actor })}
+											{v.note && <span className="italic"> {v.note === "deleted" ? t("editor.deleted") : v.note}</span>}
+										</span>
+										{v.sha256 && canWrite && !binary && (
+											<Button size="sm" variant="link" className="h-auto self-start p-0 text-xs" onClick={() => void onRestore(v.id)}>
+												{t("editor.restore")}
+											</Button>
+										)}
+									</li>
+								))}
+							</ul>
+						)}
+					</div>
+				)}
+			</div>
 			{canWrite && !binary && (
-				<div className="flex flex-wrap items-center gap-2">
+				<div className="border-t px-3 py-2">
 					<input
 						aria-label={t("editor.note")}
-						className="bg-background h-8 min-w-48 flex-1 rounded-md border px-2 text-sm"
+						className="placeholder:text-muted-foreground h-7 w-full bg-transparent text-xs focus-visible:outline-none"
 						maxLength={200}
 						placeholder={t("editor.note")}
 						value={note}
 						onChange={(e) => setNote(e.target.value)}
 					/>
-					<Button size="sm" disabled={saveState.isLoading || file.isLoading} onClick={onSave} data-testid="file-editor-save">
-						{saveState.isLoading ? t("editor.saving") : t("editor.save")}
-					</Button>
-					{!missing && (
-						<Button size="sm" variant="destructive" disabled={removeState.isLoading} onClick={onDelete}>
-							{t("editor.delete")}
-						</Button>
-					)}
 				</div>
 			)}
-			{message && (
-				<div
-					className={message.kind === "ok" ? "text-sm text-emerald-600" : "text-destructive flex items-center gap-2 text-sm"}
-					data-testid={`file-editor-${message.kind}`}
-					role="status"
-				>
-					{message.text}
-					{message.kind === "conflict" && (
-						<Button size="sm" variant="outline" onClick={() => void file.refetch()}>
-							{t("editor.reload")}
-						</Button>
-					)}
-				</div>
-			)}
-			<details className="text-sm" data-testid="file-editor-versions">
-				<summary className="cursor-pointer font-medium">{t("editor.versions")}</summary>
-				{(versions.data?.versions.length ?? 0) === 0 ? (
-					<p className="text-muted-foreground mt-2">{t("editor.noVersions")}</p>
-				) : (
-					<ul className="mt-2 flex flex-col gap-1">
-						{versions.data?.versions.map((v) => (
-							<li key={v.id} className="flex flex-wrap items-center gap-2">
-								<span className="font-mono text-xs">{new Date(v.at).toLocaleString()}</span>
-								{v.actor && <span className="text-muted-foreground">{t("editor.by", { actor: v.actor })}</span>}
-								{v.note && <span className="italic">{v.note === "deleted" ? t("editor.deleted") : v.note}</span>}
-								{v.sha256 && canWrite && !binary && (
-									<Button size="sm" variant="link" onClick={() => void onRestore(v.id)}>
-										{t("editor.restore")}
-									</Button>
-								)}
-							</li>
-						))}
-					</ul>
-				)}
-			</details>
 		</div>
 	);
 }

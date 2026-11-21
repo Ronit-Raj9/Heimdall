@@ -1,10 +1,14 @@
 {
 	"title": "Integrations",
-	"subtitle": "Send results to the tools you already use: CI on every pull request, trace and results exports, and webhooks when an experiment finishes.",
-	"tabs": { "ci": "CI", "exports": "Exports", "webhooks": "Webhooks" },
+	"subtitle": "Connect Heimdall to CI, trace tools and webhooks.",
+	"tabs": {
+		"ci": "CI",
+		"exports": "Exports",
+		"webhooks": "Webhooks"
+	},
 	"ci": {
 		"heading": "Gate pull requests with Heimdall",
-		"intro": "Opens a pull request in your repository that adds .github/workflows/heimdall.yml. The workflow re-checks your agent on every pull request and comments the verdict. No secret is written into the file.",
+		"intro": "Adds a workflow that re-checks your agent on every pull request and comments the verdict.",
 		"mode": "Mode",
 		"modeRecorded": "Recorded (re-check a sealed experiment, no runner needed)",
 		"modeLive": "Live (fresh baseline vs candidate on a self-hosted runner)",
@@ -21,7 +25,7 @@
 	},
 	"exports": {
 		"heading": "Export results and traces",
-		"intro": "Exports run as a background job; the file appears below when it is ready.",
+		"intro": "Runs in the background. The file appears below when ready.",
 		"format": "Format",
 		"formats": {
 			"otlp": "OTLP traces (Langfuse, LangSmith, Phoenix, Jaeger, any OpenTelemetry backend)",
@@ -49,7 +53,7 @@
 	},
 	"webhooks": {
 		"heading": "Webhooks",
-		"intro": "Heimdall POSTs a signed JSON event to each URL. Verify X-Heimdall-Signature: sha256 HMAC of \"<X-Heimdall-Timestamp>.<body>\" with the webhook's secret.",
+		"intro": "Each URL gets a signed JSON event.",
 		"hostedNote": "This server delivers only to public https URLs.",
 		"url": "Payload URL",
 		"urlPlaceholder": "https://example.com/hooks/heimdall",
@@ -76,11 +80,34 @@
 		"lastOk": "last delivery OK",
 		"lastFail": "last delivery failed",
 		"never": "never delivered",
-		"deliveries": "Recent deliveries"
+		"deliveries": "Recent deliveries",
+		"signing": "Verify X-Heimdall-Signature: sha256 HMAC of \"<X-Heimdall-Timestamp>.<body>\" with the webhook's secret.",
+		"signingTitle": "How to verify"
 	},
 	"errors": {
 		"load": "Could not load this section. Reload the page; if it keeps failing, check that the server is running.",
 		"adminOnly": "Changing webhooks needs the admin role. Ask an org admin.",
 		"generic": "Something went wrong. Try again."
+	},
+	"cards": {
+		"webhooks": {
+			"desc": "Get a signed POST when an experiment finishes.",
+			"none": "Not set up",
+			"count_one": "{{count}} active",
+			"count_other": "{{count}} active",
+			"failing": "Delivery failing"
+		},
+		"exports": {
+			"desc": "Send traces and results to your tools.",
+			"none": "No exports yet",
+			"count_one": "{{count}} file",
+			"count_other": "{{count}} files"
+		},
+		"ci": {
+			"desc": "Check your agent on every pull request.",
+			"connected": "GitHub connected",
+			"notConnected": "Not connected",
+			"manual": "Manual setup"
+		}
 	}
 }

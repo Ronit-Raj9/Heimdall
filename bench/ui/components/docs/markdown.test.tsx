@@ -1,6 +1,6 @@
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
-import { Markdown, parseBlocks, safeHref, slugify } from "./markdown";
+import { Markdown, parseBlocks, parseCallout, safeHref, slugify } from "./markdown";
 
 describe("Markdown", () => {
 	it("parses the common blocks", () => {
@@ -22,5 +22,14 @@ describe("Markdown", () => {
 		expect(html).toContain('href="?doc=runners"');
 		expect(safeHref("data:text/html,x")).toBeNull();
 		expect(slugify("Hello `World`!")).toBe("hello-world");
+	});
+
+	it("renders callouts and code blocks with a copy button", () => {
+		expect(parseCallout("[!WARNING] careful")).toEqual({ kind: "warning", label: "Warning", body: "careful" });
+		expect(parseCallout("**Note:** read this")?.kind).toBe("note");
+		expect(parseCallout("just a quote")).toBeNull();
+		const html = renderToStaticMarkup(<Markdown source={"> [!TIP] use it\n\n```sh\nmake\n```"} />);
+		expect(html).toContain('data-callout="tip"');
+		expect(html).toContain('data-testid="code-copy"');
 	});
 });

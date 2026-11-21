@@ -1,13 +1,14 @@
 {
 	"title": "Project files",
-	"subtitle": "Agents, suites, experiments and policies of this project. Every save is checked and versioned.",
+	"subtitle": "Edit your agents, suites and policies. Every save is versioned.",
 	"export": "Download project (zip)",
 	"sync": {
 		"title": "Sync with your machine",
 		"body": "Keep a local copy of this project in step with the server. Set HEIMDALL_TOKEN to an API token, then run:",
 		"rules": "pull never overwrites a file you changed since the last sync and push never overwrites a file changed here; both list conflicts and stop. Add -force to overwrite. Files up to 64 MiB sync; files over 1 MiB are not versioned.",
 		"tokenLink": "Create an API token (Settings, API tokens)",
-		"localToken": "On a local server the token is its write token (BENCH_WRITE_TOKEN); pull works without one."
+		"localToken": "On a local server the token is its write token (BENCH_WRITE_TOKEN); pull works without one.",
+		"summary": "Push and pull with the CLI"
 	},
 	"areas": {
 		"agents": "Agents",
@@ -18,7 +19,7 @@
 	},
 	"root": "Top",
 	"up": "Up one folder",
-	"empty": "This folder is empty. Create a file below, or upload a zip of your project.",
+	"empty": "This folder is empty. Create a file or upload a zip.",
 	"newFile": "New file",
 	"newFilePlaceholder": "name.yaml or folder/name.yaml",
 	"create": "Create",
@@ -29,7 +30,7 @@
 		"modified": "Modified"
 	},
 	"loadError": "Could not load the files: {{message}}",
-	"readOnly": "You can read these files. Ask an org admin for the member role to edit them.",
+	"readOnly": "Read only. Ask an admin for the member role to edit.",
 	"editor": {
 		"loading": "Loading file...",
 		"newFile": "New file: it is created when you save.",
@@ -49,9 +50,14 @@
 		"noVersions": "No saved versions yet.",
 		"restore": "Load into editor",
 		"deleted": "deleted",
-		"by": "by {{actor}}"
+		"by": "by {{actor}}",
+		"history": "History",
+		"hideHistory": "Hide history",
+		"unsaved": "Unsaved"
 	},
 	"emptyViewer": "This folder is empty. A member can add files here or from the catalog.",
 	"emptyUpload": "Upload a zip",
-	"emptyCatalog": "Browse the catalog"
+	"emptyCatalog": "Browse the catalog",
+	"pickFile": "Pick a file on the left, or create a new one.",
+	"explorer": "Files"
 }

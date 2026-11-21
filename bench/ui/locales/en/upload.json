@@ -1,22 +1,23 @@
 {
 	"title": "Upload",
-	"subtitle": "Bring sealed runs, a project folder or an agent folder from your machine as a zip.",
+	"subtitle": "Bring your work from your machine as a zip.",
 	"tabs": {
 		"runs": "Sealed runs",
 		"project": "Project folder",
 		"agent": "Agent folder"
 	},
 	"help": {
-		"runs": "Zip your runs folder (each experiment folder with its manifest.json). Every seal and the seals.log chain are verified; an experiment that does not verify is refused and nothing of it is kept.",
-		"project": "Zip your project folder. Files under agents/, benchmarks/, experiments/ and policies/ are written; anything else is skipped. Existing files are replaced and keep their history.",
-		"agent": "Zip one agent folder (its config, skills and tools). It lands in agents/<name>/. Leave the name empty to use the zip's top folder name."
+		"runs": "Each experiment's seals are checked. Anything that does not verify is refused.",
+		"project": "Files under agents/, benchmarks/, experiments/ and policies/ are written. Old versions are kept.",
+		"agent": "Lands in agents/<name>/. Leave the name empty to use the zip's folder name."
 	},
 	"drop": {
-		"prompt": "Drop a .zip here or click to choose one",
+		"prompt": "Drop a .zip here",
 		"limit": "Up to {{mb}} MiB",
 		"selected": "{{name}} ({{size}})",
 		"notZip": "Choose a .zip file.",
-		"tooLarge": "This zip is larger than {{mb}} MiB; split it into several zips."
+		"tooLarge": "This zip is larger than {{mb}} MiB; split it into several zips.",
+		"browse": "or click to browse"
 	},
 	"agentName": "Agent name (optional)",
 	"agentNamePlaceholder": "my-agent",
@@ -29,11 +30,12 @@
 		"empty": "The zip held no experiment folder. To upload agents or suites, pick the Project folder tab instead.",
 		"openExperiments": "Open experiments",
 		"status": {
-			"imported": "imported",
-			"skipped": "skipped",
-			"refused": "refused"
+			"imported": "Imported",
+			"skipped": "Skipped",
+			"refused": "Refused"
 		},
-		"openFiles": "Open project files"
+		"openFiles": "Open project files",
+		"runCount": "{{count}} runs"
 	},
 	"files": {
 		"summary": "{{written}} written, {{refused}} refused, {{skipped}} skipped",
@@ -41,5 +43,18 @@
 		"refused": "Refused",
 		"skipped": "Skipped",
 		"openFiles": "Open files"
+	},
+	"cards": {
+		"runs": "Verified runs from your machine",
+		"project": "Agents, suites and policies",
+		"agent": "One agent folder"
+	},
+	"result": "Result",
+	"stats": {
+		"imported": "Imported",
+		"skipped": "Skipped",
+		"refused": "Refused",
+		"runs": "Runs",
+		"written": "Written"
 	}
 }
