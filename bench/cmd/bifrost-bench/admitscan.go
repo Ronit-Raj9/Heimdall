@@ -34,11 +34,15 @@ Exit 0 admitted (or admitted with override), 1 blocked, 4 scan error, 64 usage.`
 const mcpUsage = `usage: bifrost-bench mcp scan <service config> [<service config> ...] [-allow-host host ...] [-helper-image ref] [-rug-wait 5s] [-override "<reason>"] [-by name] [-json] [-o report.md|report.json] [-config deploy/bench.yaml]
 A service config is one service spec (the shape of a task's services: entry) or a task.yaml/suite.yaml whose services of role mcp are scanned.
 Each server runs in a sandbox with canary credentials; the scan lists its tools, prompts and resources, checks them for poisoning and
-shadowing, calls one harmless tool and lists again (rug pulls). One admission record per server; exit 1 when any is blocked.`
+shadowing, calls one harmless tool and lists again (rug pulls). One admission record per server; exit 1 when any is blocked.
+
+usage: bifrost-bench mcp serve [-url https://heimdall.example.com] [-token-env HEIMDALL_TOKEN]
+Serves the Heimdall MCP server on stdio (docs/mcp-server.md): agents, benchmarks, estimates, evaluations,
+report cards, traces and failure explanations over the public API v1.`
 
 func init() {
 	register("skill", "admission scan of an agent skill folder: skill scan <dir> | skill rules (docs/admission-scan.md)", runSkillCmd)
-	register("mcp", "admission scan of an MCP server in a sandbox: mcp scan <service config> (docs/admission-scan.md)", runMCPCmd)
+	register("mcp", "MCP servers: mcp scan <service config> admission-scans one in a sandbox (docs/admission-scan.md); mcp serve runs the Heimdall MCP server on stdio (docs/mcp-server.md)", runMCPCmd)
 }
 
 // csvFlag collects a repeatable flag; commas also separate values.
@@ -124,6 +128,9 @@ func runSkillScan(args []string) int {
 }
 
 func runMCPCmd(args []string) int {
+	if len(args) > 0 && args[0] == "serve" {
+		return runMCPServe(args[1:]) // Public API v1: the Heimdall MCP server (mcpserve.go)
+	}
 	if len(args) == 0 || args[0] != "scan" {
 		fmt.Fprintln(os.Stderr, mcpUsage)
 		return exitUsage
