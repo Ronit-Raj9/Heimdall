@@ -5,14 +5,9 @@ export type ReplayLabel = "hit" | "divergence" | "edited" | "exhausted";
 export type HoldAction = "continue" | "step" | "edit" | "abort";
 export type DivergencePolicy = "stop" | "live" | "serve";
 
-/** run.json debug: where a debug run came from. */
-export interface RunDebug {
-	mode: DebugMode;
-	from_run?: string;
-	from_exp?: string;
-	call?: number;
-	held_ms?: number;
-}
+/** run.json debug: where a debug run came from (defined beside the run in bench.ts). */
+import type { RunDebugInfo } from "./bench";
+export type RunDebug = RunDebugInfo;
 
 export interface Breakpoints {
 	calls?: number[];

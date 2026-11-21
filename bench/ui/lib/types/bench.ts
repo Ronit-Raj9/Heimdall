@@ -554,7 +554,16 @@ export interface Run {
 	/** X7: the GPUs a GPU task's run held (schemas/gpu.go); absent for every other run. */
 	hardware?: HardwareRecord;
 	/** X20b: a replay, fork or breakpoint run's link to the run it came from (lib/types/runDebug.ts). */
-	debug?: import("./runDebug").RunDebug;
+	debug?: RunDebugInfo;
+}
+
+/** run.json debug (schemas/debug.go): where a debug run came from. lib/types/runDebug.ts re-exports it as RunDebug. */
+export interface RunDebugInfo {
+	mode: "replay" | "fork" | "step";
+	from_run?: string;
+	from_exp?: string;
+	call?: number;
+	held_ms?: number;
 }
 
 // X7: GPU benchmarking (schemas/gpu.go, docs/gpu-tasks.md).

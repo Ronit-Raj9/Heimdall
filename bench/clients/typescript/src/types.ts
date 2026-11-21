@@ -516,6 +516,8 @@ export interface RunAgentInfo {
 	config_hash: string;
 	exit_code?: number;
 	timed_out: boolean;
+	/** The out-of-memory killer ended the agent: an infrastructure error, excluded from scores. */
+	oom_killed?: boolean;
 	capability_gaps?: string[];
 }
 
@@ -554,6 +556,17 @@ export interface Run {
 	failures?: PartFailure[];
 	/** X7: the GPUs a GPU task's run held (schemas/gpu.go); absent for every other run. */
 	hardware?: HardwareRecord;
+	/** X20b: a replay, fork or breakpoint run's link to the run it came from (lib/types/runDebug.ts). */
+	debug?: RunDebugInfo;
+}
+
+/** run.json debug (schemas/debug.go): where a debug run came from. lib/types/runDebug.ts re-exports it as RunDebug. */
+export interface RunDebugInfo {
+	mode: "replay" | "fork" | "step";
+	from_run?: string;
+	from_exp?: string;
+	call?: number;
+	held_ms?: number;
 }
 
 // X7: GPU benchmarking (schemas/gpu.go, docs/gpu-tasks.md).
@@ -867,13 +880,26 @@ export interface Experiment {
 	safety?: string;
 	codescan?: Record<string, unknown>;
 	environment?: Record<string, unknown>;
+	/** The evaluation that created this experiment, when one did. */
+	evaluation_id?: string;
+	/** Twin arms of a base arm that differ only in a framing preamble (docs/control-evals.md). */
+	framing_pairs?: Record<string, unknown>[];
+	/** Overrides of the retry rules of the failure classes that allow it. */
+	error_policy?: Record<string, unknown>;
+	/** The experiment whose failed tasks this one runs again ("Rerun failures"): exploratory, never counted. */
+	rerun_of?: string;
+	/** A debug run of one recorded run: replay, fork or breakpoints. */
+	debug?: Record<string, unknown>;
+	/** Runs chained over the tasks, with memory carried from one run to the next when memory is carry. */
+	stream?: { memory: "carry" | "fresh"; order?: "suite" | "seeded"; fresh_arm?: string; replay?: number; threshold?: number };
 }
 
 // ---------------------------------------------------------------------------------------------
 // verdict.go: verdict and analysis (DESIGN.md 9.3, 9.4, 9.6)
 // ---------------------------------------------------------------------------------------------
 
-export type Decision = "improved" | "regressed" | "inconclusive" | "invalid";
+/** score: a one-setup experiment, scored on its own with no comparison (Verdict.score). */
+export type Decision = "improved" | "regressed" | "inconclusive" | "invalid" | "score";
 
 export type Action = "ship" | "hold" | "no_decision" | "fix_harness";
 
@@ -955,6 +981,29 @@ export interface Verdict {
 	frozen_at: string;
 	/** Eval integrity area (S2): the noise floor behind the MDE. Absent on analyses written before it. */
 	variance?: VarianceCard;
+	/** Set (and decision is score or invalid) when the experiment has one setup: its score with an interval, no comparison. */
+	score?: Score;
+}
+
+/** schemas.Score: the primary metric of a one-setup experiment's only arm. Rates are fractions (0.62 = 62%). */
+export interface Score {
+	arm: string;
+	label?: string;
+	condition: string;
+	metric: string;
+	/** Over observed runs; absent when none was observed. */
+	mean?: number;
+	/** conf interval of mean; absent when it cannot be computed. */
+	interval?: [number, number];
+	conf: number;
+	method: string;
+	/** Every unknown run at its lowest possible value. */
+	low?: number;
+	/** Every unknown run at its highest possible value. */
+	high?: number;
+	tasks: number;
+	runs: number;
+	observed: number;
 }
 
 /** fail makes the experiment INVALID; unknown is never a pass and holds an IMPROVED verdict; warn changes nothing unless declared as a guard. */
@@ -1294,6 +1343,8 @@ export interface RunDetail {
 	sealed: boolean;
 	/** Empty until the run is sealed. */
 	seal_hash: string;
+	/** Run control: requeued by an operator; kept, never counted. */
+	superseded?: boolean;
 	grade: Grade | null;
 	/** "original": the grade the run was sealed with. */
 	grade_source: string;
@@ -1628,6 +1679,21 @@ export interface RunListRow {
 	config_id: string;
 	started?: string;
 	sealed_at?: string;
+	/** The first part failure's error of a non-pass run; absent when it recorded none. Inert text. */
+	error?: string;
+	/** Why a sealed run is left out of scores: out_of_memory, infra_error, invalid_evaluator, unknown. */
+	excluded?: string;
+	/** Run metrics from metrics.json; absent until observed, and the list shows a dash. */
+	model?: string;
+	steps?: number;
+	tool_calls?: number;
+	tokens?: number;
+	/** The agent's own version string, when it declares one. */
+	agent_version?: string;
+	/** The registered agent version (v1, v2) whose config matches; absent when none. */
+	version?: number;
+	/** The fault injected in this run (model-down, broken-tool, misleading-instruction, ...); absent for a clean run. */
+	fault?: string;
 }
 
 /** The distinct values of each run list filter, across every run. */
@@ -1639,6 +1705,11 @@ export interface RunListFacets {
 	conditions: string[];
 	outcomes: string[];
 	tracks: string[];
+	/** Agent names (config ids) seen across every run. */
+	agents: string[];
+	/** Fault names seen across every run; "clean" for runs without one. */
+	faults: string[];
+	models: string[];
 }
 
 /** GET /runs: one page, newest first; total counts every run that matched. */
@@ -1659,6 +1730,13 @@ export interface RunListParams {
 	condition?: string;
 	outcome?: string;
 	track?: string;
+	/** Agent config id; matched on the server across every page. */
+	agent?: string;
+	/** Suite id with or without its version. */
+	benchmark?: string;
+	/** Fault name, or "clean". */
+	fault?: string;
+	model?: string;
 	limit?: number;
 	offset?: number;
 }
@@ -1794,6 +1872,66 @@ export interface ReleaseRecord {
 	created_at: string;
 	prev_hash: string;
 	hash: string;
+	/** The agent this release put live, the version, and the version it replaced (absent or 0: none was live). */
+	agent_id?: string;
+	version?: number;
+	replaces_version?: number;
+	/** Set when the release covers a whole evaluation; exp_id then names its first benchmark. */
+	evaluation_id?: string;
+	children?: ReleaseChild[];
+	summary?: ReleaseSummary;
+	/** The evaluation's gate at release time: pass, fail or no_baseline. */
+	gate?: string;
+}
+
+/** One benchmark of a release that covers an evaluation. */
+export interface ReleaseChild {
+	benchmark: string;
+	exp_id: string;
+	analysis_id: string;
+	decision: Decision;
+	action: Action;
+	policy_name?: string;
+	policy_decision?: ReleasePolicyDecision;
+	manifest_hash: string;
+	seals_digest: string;
+	runs: number;
+}
+
+/** A score with its 95% interval and run count. */
+export interface ScoreCI {
+	score: number;
+	ci_low: number;
+	ci_high: number;
+	runs: number;
+}
+
+/** One agent version's numbers in a release summary; absent fields are unknown. */
+export interface ReleaseSide extends ScoreCI {
+	label: string;
+	agent: string;
+	version?: number;
+	model?: string;
+	evaluation_id?: string;
+	cost_per_solved_usd?: number;
+	/** Share of failed runs the agent claimed as solved. */
+	false_completion?: number;
+	/** Success rate on runs with a fault injected. */
+	fault_survival?: number;
+}
+
+export interface ReleaseCapabilityScore {
+	capability: string;
+	candidate: ScoreCI;
+	baseline?: ScoreCI;
+}
+
+/** Before (baseline) and after (candidate) of a release. */
+export interface ReleaseSummary {
+	candidate: ReleaseSide;
+	baseline?: ReleaseSide;
+	capabilities?: ReleaseCapabilityScore[];
+	note?: string;
 }
 
 /** POST /releases */
@@ -2344,6 +2482,10 @@ export interface SuiteSummary {
 	probes: SuiteProbe[];
 	tasks: SuiteTask[];
 	error?: string;
+	/** Served from the server's read-only built-in library (HEIMDALL_LIBRARY_DIR). */
+	builtin?: boolean;
+	/** "library" for a built-in pack; absent for the org's own. */
+	source?: "library";
 	// Scenario fields (scenario.go).
 	/** Leaderboard track; the server sends coding when the suite sets none. */
 	track?: Track;
@@ -2625,6 +2767,8 @@ export interface AgentSummary {
 	error?: string;
 	/** How the agent reports its own steps when its config shows it ("native" for the generic_jsonl parser); absent when not known from the config. */
 	reports_events?: "native";
+	/** The agent brings its own model (HTTP endpoint, A2A agent, OpenAI-compatible endpoint naming its model): evaluations may leave the model blank. */
+	owns_model?: boolean;
 }
 
 /** GET /agents: every agents/*.yaml config, sorted by file name. */
@@ -3734,11 +3878,16 @@ export interface ApiToken {
 	/** hm_<prefix>: enough to recognise the token, not to use it. */
 	prefix: string;
 	role: Role;
+	/** What the token may do below its role (auth.Scopes); absent on tokens made before scopes, which the role alone limits. */
+	scopes?: ApiTokenScope[];
 	created_at: PlatformTime;
 	last_used_at?: PlatformTime;
 	expires_at?: PlatformTime;
 	revoked_at?: PlatformTime;
 }
+
+/** API token scopes, narrowest first: read, evaluate (read plus running evaluations), admin (everything the role allows). */
+export type ApiTokenScope = "read" | "evaluate" | "admin";
 
 /** GET /auth/tokens. */
 export interface ApiTokenList {
@@ -3750,6 +3899,7 @@ export interface ApiTokenRequest {
 	name: string;
 	role?: Role;
 	expires_in_days?: number;
+	scopes?: ApiTokenScope[];
 }
 
 /** POST /auth/tokens (auth.TokenCreated): the secret, shown once, and the token row. */
