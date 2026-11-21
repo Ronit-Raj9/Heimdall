@@ -191,7 +191,12 @@ func verifyWrapper(id string, t *upstreamTask, workdir string, up upstream, sepa
 		// Harbor's separate verifier: the task.toml artifacts arrive from the
 		// agent's container at /grader/collect and are uploaded to their own
 		// paths in the verifier image, as Harbor uploads them.
-		env.WriteString("if [ -d /grader/collect ]; then cp -a /grader/collect/. / || fail \"cannot place the agent's artifacts\"; fi\n")
+		// Existing folders (/, /app, ...) keep their owner and mode: upstream
+		// verifiers refuse a /tests whose parent is not root-owned.
+		env.WriteString("if [ -d /grader/collect ]; then\n" +
+			"\tif tar --version 2>/dev/null | grep -q GNU; then (cd /grader/collect && tar -cf - .) | tar -xf - -C / --no-overwrite-dir || fail \"cannot place the agent's artifacts\"\n" +
+			"\telse for e in /grader/collect/* /grader/collect/.[!.]*; do [ -e \"$e\" ] && { cp -a \"$e\" / || fail \"cannot place the agent's artifacts\"; }; done; fi\n" +
+			"fi\n")
 	}
 	for _, k := range sortedEnvKeys(t.VerifierEnv) {
 		fmt.Fprintf(&env, "export %s=%s\n", k, shellQuote(t.VerifierEnv[k]))

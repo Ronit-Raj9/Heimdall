@@ -452,7 +452,7 @@ func TestImportSeparateVerifier(t *testing.T) {
 		if !strings.HasPrefix(env.VerifierImage, "example/sep-ok-verifier@sha256:") || strings.Join(env.VerifierArtifacts, ",") != "/app/greeting.txt,/app/out/" {
 			t.Errorf("environment = %+v", env)
 		}
-		if v := readFile(t, filepath.Join(root, "benchmarks/s/tasks/sep-ok/verifier/tests/harbor/verify.sh")); !strings.Contains(v, "cp -a /grader/collect/. /") {
+		if v := readFile(t, filepath.Join(root, "benchmarks/s/tasks/sep-ok/verifier/tests/harbor/verify.sh")); !strings.Contains(v, "--no-overwrite-dir") {
 			t.Errorf("verify.sh:\n%s", v)
 		}
 	})
