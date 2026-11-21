@@ -202,6 +202,7 @@ on a stack built from this repository.
 | Config | What |
 |---|---|
 | `agents/voice-cascaded.yaml` | `bench/voice/cascadedagent.py`: transcribes each caller utterance at `/v1/audio/transcriptions`, runs the conversation and the helpdesk's MCP tools at `/v1/chat/completions`, speaks at `/v1/audio/speech` (WAV), all on the run's key; stops and sends `clear` when the caller barges in; says it cannot hear and never acts when transcription fails, and hangs up after three failures |
+| `agents/voice-cascaded-sarvam.yaml` | the same program with Sarvam AI speech: `openai/saaras:v4` transcribes, `openai/bulbul:v3` speaks (speaker `shubh`), chat on the arm's model (below, "Sarvam AI speech"); paid with a Sarvam key |
 | `agents/voice-broken.yaml` | the same program with `--mode broken`: talks straight over the caller (one burst, no `clear`), 4.5 s of dead air before every answer, and halves every refund the model decides. For checking the benchmark itself |
 | `agents/voice-realtime.yaml` | `bench/voice/realtimebridge.py`: the caller's audio to an OpenAI Realtime event endpoint and back (`docs/voice-protocol.md`), by default the gateway's `/v1/realtime`; barge-in from the server's voice activity detection; tools as Realtime function calls over MCP |
 
@@ -285,6 +286,68 @@ message rows only. Bifrost v2.5.1 writes a `realtime.turn` row with no cost
 for a cancelled response (the agent cancelled it on barge-in, seen in the
 pipeline runs below), so a Realtime run with a cancelled turn has its cost
 and `voice_cost_per_minute` unknown, not zero.
+
+## Sarvam AI speech
+
+A cascaded agent can use Sarvam AI (docs.sarvam.ai) for speech to text and
+text to speech while its chat turns stay on any model of the run's
+provider: `agents/voice-cascaded-sarvam.yaml` in the example transcribes
+with `saaras:v4` and speaks with `bulbul:v3` (speaker `shubh`). The agent
+still calls `/v1/audio/transcriptions` and `/v1/audio/speech` on Bifrost
+with its run key, model `openai/saaras:v4` and `openai/bulbul:v3`; Bifrost
+logs every call; only the fault proxy holds the Sarvam key.
+
+How: the openai provider entry of the fault proxy carries a `sarvam_audio`
+block (`faultproxy/sarvam.go`, on by default in the built-in table). An
+audio request whose model matches it (`saaras:*`, `saarika:*`, `bulbul:*`
+by default) is translated, not forwarded:
+
+| OpenAI shape (from Bifrost) | Sarvam API |
+|---|---|
+| `POST /v1/audio/transcriptions`, multipart `file`, `model`, `language` | `POST /speech-to-text`, multipart `file`, `model`, `language_code` (`en` becomes `en-IN`; none: the block's `language`, default `en-IN`); `transcript` comes back as `{"text": ...}` with `language` and the WAV's seconds as `usage` (`response_format: text` gets plain text) |
+| `POST /v1/audio/speech`, JSON `model`, `input`, `voice`, `response_format`, `speed`, `language_code` | `POST /text-to-speech`, JSON `text`, `target_language_code`, `model`, `speaker` (an OpenAI voice name such as `alloy` is dropped for the block's `speaker`, else Sarvam's default), `pace`, `output_audio_codec` (wav, mp3, flac, aac; `pcm` is `linear16` and `opus` at 24 kHz); the first base64 entry of `audios` comes back as the audio bytes |
+| the slot placeholder in `Authorization` | the real key in `api-subscription-key`, read once from `SARVAM_API_KEY` (the block's `key_env`) |
+
+A Sarvam error keeps its status and message in the OpenAI error envelope,
+so Bifrost records it as a provider error; a transport failure is a 502 with
+`upstream_error` on the ledger line, as for any forwarded call. Everything
+else is the provider's: the slot, the run's fault plan, the audio call
+numbers, the ledger line (kind `audio`, upstream `real`). Without the key a
+Sarvam model gets a 503 naming `SARVAM_API_KEY` when the provider is real,
+and the scripted model's tone code when the provider is scripted (as every
+audio model). Other audio models (`whisper-1`) are untouched.
+
+Block fields (all optional): `base_url` (`https://api.sarvam.ai`),
+`key_env` (`SARVAM_API_KEY`), `models` (globs on the model, provider prefix
+removed), `language`, `speaker`. A provider table file that replaces the
+openai entry must restate `audio:` and `sarvam_audio:` to keep them.
+
+**Faults.** An STT outage on Sarvam is the same model-filtered plan with
+`model: saaras:v4`: the proxy fails the transcription before calling
+Sarvam, and speech and chat pass (`TestSarvamSTTOutage`).
+
+**Cost.** Bifrost's datasheet has no price for Sarvam models under the
+openai provider, so Bifrost writes their rows without a cost and the cost
+ledger marks them unknown ("audio row without Bifrost's price"), never
+zero; `voice_cost_per_minute` is then unknown too.
+
+**Why not Bifrost's own `sarvam` provider.** Bifrost v2.5.1 has one (it
+translates the same routes itself), but a run key serves one provider on
+one key slot, and the slot is what binds the run's fault plan and ledger
+lines. Speech on a second provider would need a second slot per run and
+evidence joined across two slots; translating in the proxy keeps one slot,
+one plan and one ledger per run.
+
+**Checked against Sarvam**, 21 Nov 2026, from the server, with the exact
+bodies the proxy sends: `text-to-speech` with `target_language_code: en-IN`,
+`model: bulbul:v3`, `speaker: shubh` answered 200 with one base64 WAV
+(22,050 Hz, mono, 16-bit, 3.6 s for a 48-character line, 1.9 s round trip);
+`speech-to-text` with that WAV, `model: saaras:v4`, `language_code: en-IN`
+answered 200, transcript "Hello, I would like a refund for order B3001."
+(1.2 s). Sarvam's current docs name the speech language field
+`language_code`; `target_language_code` (Bifrost's own provider sends it
+too) is still accepted. Unit tests run against a fake Sarvam
+(`faultproxy/sarvam_test.go`).
 
 ## $0 fakes
 
@@ -383,6 +446,7 @@ Not measured, and not claimed:
   errors.
 - **Faults inside a Realtime session.** The proxy relays the session's
   bytes without parsing them: a session can be refused, not broken half way.
-- No real provider has been called: every speech, transcription, chat and
+- Apart from the two direct Sarvam calls above, no real provider has been
+  called for the numbers here: every speech, transcription, chat and
   Realtime answer came from the scripted model, the fake or the local
   engines.

@@ -1,0 +1,36 @@
+# The reference cascaded voice agent (bench/voice/cascadedagent.py) with
+# Sarvam AI for speech: saaras:v4 transcribes the caller and bulbul:v3
+# speaks the answers; the chat turns stay on the arm's model. Every call goes
+# through Bifrost on the run's key (provider openai): the fault proxy sends
+# the audio calls for Sarvam models to Sarvam's API with SARVAM_API_KEY,
+# which only the proxy holds (docs/voice-agents.md, "Sarvam AI speech").
+# With the key set these are paid calls.
+id: voice-cascaded-sarvam
+adapter: command
+image: heimdall-example/voice-agent:1
+build:
+  dockerfile: agents/images/voice-agent/Dockerfile
+  tag: heimdall-example/voice-agent:1
+argv: ["python3", "/opt/voice-agent/cascadedagent.py", "--mode", "good", "{{instruction}}"]
+env:
+  VOICE_GATEWAY_URL: "{{gateway.url}}"
+  VOICE_GATEWAY_KEY: "{{run.key}}"
+  VOICE_SESSION: "{{run.session}}"
+  VOICE_CHAT_MODEL: "openai/{{model}}"
+  VOICE_STT_MODEL: openai/saaras:v4
+  VOICE_TTS_MODEL: openai/bulbul:v3
+  VOICE_TTS_VOICE: shubh
+model: gpt-4o-mini
+notes:
+  project_file: AGENTS.md
+mcp:
+  format: env
+budgets:
+  wall_s: 420
+  cpus: 1
+  mem_gb: 1
+gateway:
+  provider: openai
+  max_retries: 0
+  # The Sarvam speech models the run's key may also call.
+  models: ["saaras:v4", "bulbul:v3"]

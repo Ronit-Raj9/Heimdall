@@ -49,6 +49,9 @@ type ProviderSpec struct {
 	Models      []string `json:"models,omitempty" yaml:"models"`
 	Audio       []string `json:"audio,omitempty" yaml:"audio"`             // X8 voice agents: speech and transcription routes (KindAudio)
 	SlotPrefix  string   `json:"slot_prefix,omitempty" yaml:"slot_prefix"` // default slots are <prefix>-slot-1..4
+	// SarvamAudio sends the audio requests for Sarvam models to Sarvam AI
+	// (sarvam.go); nil: none.
+	SarvamAudio *SarvamAudio `json:"sarvam_audio,omitempty" yaml:"sarvam_audio"`
 }
 
 // Auth is where a provider carries its key: a header with an optional
@@ -99,6 +102,7 @@ func DefaultProviders() []ProviderSpec {
 			CountTokens: []string{"POST /v1/responses/input_tokens"},
 			Models:      []string{"GET /v1/models", "GET /v1/models/*"},
 			Audio:       []string{"POST /v1/audio/transcriptions", "POST /v1/audio/speech", "GET /v1/realtime"}, // X8 voice agents
+			SarvamAudio: &SarvamAudio{},                                                                         // saaras/bulbul models to Sarvam AI when SARVAM_API_KEY is set
 		},
 		{
 			Name: ProviderGemini, BaseURL: "https://generativelanguage.googleapis.com/v1beta", KeyEnv: "GEMINI_API_KEY",
@@ -196,6 +200,11 @@ func (p ProviderSpec) Validate() error {
 	}
 	for _, pat := range append(append(append([]string{}, p.Message...), p.CountTokens...), p.Models...) {
 		if _, _, err := splitPattern(pat); err != nil {
+			errs = append(errs, err)
+		}
+	}
+	if p.SarvamAudio != nil {
+		if err := p.SarvamAudio.validate(p); err != nil {
 			errs = append(errs, err)
 		}
 	}

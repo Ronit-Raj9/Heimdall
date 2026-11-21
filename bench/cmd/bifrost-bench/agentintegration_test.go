@@ -216,7 +216,7 @@ func startAgentITStack(ctx context.Context, t *testing.T) *agentITStack {
 // running this tree's binary, and free loopback ports.
 func (st *agentITStack) override(bin string) string {
 	keys := []string{"ANTHROPIC_API_KEY", "OPENAI_API_KEY", "GEMINI_API_KEY", "GROQ_API_KEY", "MISTRAL_API_KEY", "XAI_API_KEY",
-		"OPENROUTER_API_KEY", "FIREWORKS_API_KEY", "DEEPSEEK_API_KEY", "CEREBRAS_API_KEY", "PERPLEXITY_API_KEY"}
+		"OPENROUTER_API_KEY", "FIREWORKS_API_KEY", "DEEPSEEK_API_KEY", "CEREBRAS_API_KEY", "PERPLEXITY_API_KEY", "SARVAM_API_KEY"}
 	var env strings.Builder
 	for _, k := range keys {
 		fmt.Fprintf(&env, "      %s: \"\"\n", k)

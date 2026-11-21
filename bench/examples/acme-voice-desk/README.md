@@ -30,6 +30,7 @@ acme-voice-desk/
   deploy/bench.yaml                   paths, gateway, networks, helper image; server on 127.0.0.1:28502
   agents/oracle.yaml, noop.yaml       scripted controls for the free smoke run
   agents/voice-cascaded.yaml          the reference cascaded agent (STT, chat, TTS through the gateway)
+  agents/voice-cascaded-sarvam.yaml   the same agent with Sarvam AI speech (saaras:v4, bulbul:v3; paid)
   agents/voice-broken.yaml            the deliberately broken one (talks over, dead air, half refunds)
   agents/voice-realtime.yaml          the Realtime bridge (speech to speech through the gateway's /v1/realtime)
   agents/images/voice-agent/          their image: copies of bench/voice/*.py on the bench helper image

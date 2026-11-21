@@ -101,6 +101,8 @@ services:
       DEEPSEEK_API_KEY: ${DEEPSEEK_API_KEY:-}
       CEREBRAS_API_KEY: ${CEREBRAS_API_KEY:-}
       PERPLEXITY_API_KEY: ${PERPLEXITY_API_KEY:-}
+      # Sarvam AI speech (saaras/bulbul models on the openai provider, faultproxy/sarvam.go).
+      SARVAM_API_KEY: ${SARVAM_API_KEY:-}
     volumes:
       - ./bench.yaml:/etc/bench/bench.yaml:ro
       - ledger:/var/lib/bench/ledger

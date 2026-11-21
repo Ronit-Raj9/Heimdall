@@ -99,9 +99,10 @@ type Server struct {
 // upstream is how one provider is answered: the real API with a key, the
 // scripted model, or not at all.
 type upstream struct {
-	mode string
-	base string
-	key  string
+	mode      string
+	base      string
+	key       string
+	sarvamKey string // the provider's sarvam_audio key (sarvam.go); never logged
 }
 
 // slotRef is a slot and the provider it belongs to.
@@ -327,6 +328,10 @@ func (s *Server) answerCut(sw *statusWriter, r *http.Request, p ProviderSpec, ki
 // a 503 when the provider has neither.
 func (s *Server) answer(w http.ResponseWriter, r *http.Request, p ProviderSpec, kind, slot string, body []byte, e *schemas.LedgerEntry) {
 	up := s.upstreams[p.Name]
+	if s.sarvamRoute(p, r, kind, body) && (up.sarvamKey != "" || up.mode != modeScripted) { // Sarvam AI audio (sarvam.go); keyless and scripted stays scripted
+		s.serveSarvam(w, r, p, up, body, e)
+		return
+	}
 	switch {
 	case up.mode == modeReal && isWebSocketUpgrade(r): // X8 voice agents: a Realtime session (realtime.go)
 		s.relayWebSocket(w, r, p, up, e)
@@ -481,6 +486,9 @@ func (s *Server) upstreamLabel() map[string]string {
 		if up.mode == modeReal {
 			out[name] = up.base
 		}
+		if p := s.providers.byName[name]; p.SarvamAudio != nil && up.sarvamKey != "" {
+			out[name+".sarvam_audio"] = p.SarvamAudio.base()
+		}
 	}
 	return out
 }
@@ -563,6 +571,9 @@ func resolveUpstreams(cfg Config, t *providerTable) (map[string]upstream, error)
 		up := upstream{base: p.BaseURL}
 		if p.KeyEnv != "" {
 			up.key = strings.TrimSpace(getenv(p.KeyEnv))
+		}
+		if p.SarvamAudio != nil {
+			up.sarvamKey = strings.TrimSpace(getenv(p.SarvamAudio.keyEnv()))
 		}
 		switch {
 		case up.key != "" || p.Keyless:
