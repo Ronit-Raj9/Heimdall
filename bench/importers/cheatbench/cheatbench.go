@@ -212,6 +212,13 @@ func (im *importer) Import(ctx context.Context, opts importers.Options) (*import
 				t := task{ID: id, Upstream: name, Variant: set.variant, Row: r, Instruction: instr,
 					Rubric: rubric(string(schema), r), Draft: reason, EnvDir: set.envDir, TimeoutS: ut.TimeoutS,
 					Revision: revision}
+				if ms := mirrorPorted[name]; reason == "" && ms != nil {
+					tag, err := writeMirrorImage(suiteDir, tdir, set, name, ms)
+					if err != nil {
+						return nil, err
+					}
+					t.Mirror, t.MirrorTag = ms, tag
+				}
 				if reason == "" && ut.Grader.Kind == yaml.MappingNode {
 					rv, err := readReview(root, tdir, set.envDir, ut, r)
 					if err != nil {
@@ -317,6 +324,22 @@ var mcpPorted = map[string]bool{"prime_factorization": true, "subset_sum": true}
 // the suite's pinned judge model (svc/heimdall_review.py).
 var reviewPorted = map[string]bool{"creative_writings": true}
 
+// mirrorSpec is an upstream environment/setup.py that puts an HTTPS mirror
+// (sandbox.start_mirror) in front of the episode under real host names. It
+// runs here as the task's "mirror" compose service, on those names as
+// network aliases, with the mirror's CA added to the workspace image's trust
+// stores as upstream adds it to the container's.
+type mirrorSpec struct {
+	Hosts     []string
+	Server    string // the server script, relative to environment/
+	Overrides bool   // pass the variant's overrides.json and --only <row id>
+}
+
+var mirrorPorted = map[string]*mirrorSpec{
+	"openmath":       {Hosts: []string{"terrytao.wordpress.com", "public-api.wordpress.com"}, Server: "server/mirror.py", Overrides: true},
+	"openmath_agent": {Hosts: []string{"openai.com"}, Server: "server.py"},
+}
+
 // draftReason is why the task's rows cannot run here, empty when they can.
 func draftReason(name string, ut *upstreamTask, dir string) string {
 	exists := func(rel string) bool { _, err := os.Stat(filepath.Join(dir, rel)); return err == nil }
@@ -337,6 +360,8 @@ func draftReason(name string, ut *upstreamTask, dir string) string {
 		return "mcp-grader-tool: needs the agent-callable MCP tool of " + ut.Grader.Value + " hosted by upstream's agent adapter; not ported"
 	case ut.Service.Kind != 0:
 		return "host-service: needs the per-episode host service of the task's service module; not ported"
+	case exists("environment/setup.py") && mirrorPorted[name] != nil:
+		return ""
 	case exists("environment/setup.py"):
 		return "host-service: needs the per-episode host service of environment/setup.py (private network endpoint); not ported"
 	}
@@ -499,6 +524,64 @@ type task struct {
 	Revision              string
 	Grader                *graderSvc
 	Review                *reviewSvc
+	Mirror                *mirrorSpec
+	MirrorTag             string
+}
+
+// writeMirrorImage writes services/<task>-mirror/ in the suite once per
+// import (the capture is shared by every row: openmath's is 450 MB) and
+// returns its tag.
+func writeMirrorImage(suiteDir, tdir string, set dataset, name string, ms *mirrorSpec) (string, error) {
+	svcName := strings.ReplaceAll(name, "_", "-") + "-mirror"
+	tag := "bench/cheatbench-" + svcName + ":1"
+	dir := filepath.Join(suiteDir, "services", svcName)
+	if _, err := os.Stat(filepath.Join(dir, "Dockerfile")); err == nil {
+		return tag, nil
+	}
+	env := filepath.Join(tdir, "environment")
+	srcDir := filepath.Dir(filepath.Join(env, filepath.FromSlash(ms.Server)))
+	if err := copyTree(srcDir, filepath.Join(dir, "server")); err != nil {
+		return "", err
+	}
+	if err := copyTree(filepath.Join(env, "site"), filepath.Join(dir, "site")); err != nil {
+		return "", err
+	}
+	if ms.Overrides {
+		if err := copyTree(set.envDir, filepath.Join(dir, "variant")); err != nil {
+			return "", err
+		}
+	} else if err := os.MkdirAll(filepath.Join(dir, "variant"), 0o755); err != nil {
+		return "", err
+	}
+	df := "# CheatBench " + name + " mirror: upstream's server and capture, unchanged.\nFROM " + baseTag +
+		"\nUSER root\nCOPY server/ /opt/mirror/server/\nCOPY site/ /opt/mirror/site/\nCOPY variant/ /opt/mirror/variant/\n" +
+		"RUN chmod -R a+rX /opt/mirror\nEXPOSE 443\n"
+	return tag, os.WriteFile(filepath.Join(dir, "Dockerfile"), []byte(df), 0o644)
+}
+
+// mirrorCompose is the task's compose file: the mirror service beside the
+// task's own workspace image.
+func mirrorCompose(t task) string {
+	argv := []string{"python3", "/opt/mirror/server/" + filepath.Base(t.Mirror.Server), "--mirror", "/opt/mirror/site",
+		"--cert", "/opt/mirror/site/tls/site.crt", "--key", "/opt/mirror/site/tls/site.key", "--port", "443", "--bind", "0.0.0.0"}
+	if t.Mirror.Overrides {
+		argv = append(argv, "--overrides", "/opt/mirror/variant/overrides.json", "--only", t.Row.ID)
+	}
+	q := func(v string) string { b, _ := json.Marshal(v); return string(b) }
+	var cmd, al []string
+	for _, a := range argv {
+		cmd = append(cmd, q(a))
+	}
+	for _, h := range t.Mirror.Hosts {
+		al = append(al, q(h))
+	}
+	return "# Written by bifrost-bench import (cheatbench): upstream's per-episode HTTPS mirror.\n" +
+		"services:\n  mirror:\n    image: " + t.MirrorTag + "\n    user: root\n" +
+		"    command: [" + strings.Join(cmd, ", ") + "]\n" +
+		"    networks:\n      default:\n        aliases: [" + strings.Join(al, ", ") + "]\n" +
+		"    healthcheck:\n      test: [\"CMD\", \"python3\", \"-c\", \"import socket; socket.create_connection(('127.0.0.1', 443), 2)\"]\n" +
+		"      interval: 2s\n      retries: 60\n" +
+		"    x-heimdall:\n      role: data\n"
 }
 
 // reviewSvc is upstream's per-episode review endpoint served as a service.
@@ -728,7 +811,7 @@ func writeTask(suiteDir string, t task, force bool) error {
 		}
 	}
 	var env *envYAML
-	if len(t.Row.FilesAbs) > 0 || inImage {
+	if len(t.Row.FilesAbs) > 0 || inImage || t.Mirror != nil {
 		if err := os.MkdirAll(filepath.Join(dir, "env", "abs"), 0o755); err != nil {
 			return err
 		}
@@ -744,6 +827,17 @@ func writeTask(suiteDir string, t task, force bool) error {
 		df := taskDockerfile
 		if inImage {
 			df = taskDockerfileWorkspace
+		}
+		if t.Mirror != nil {
+			if err := copyFile(filepath.Join(t.EnvDir, ".."), "site/tls/ca.crt", filepath.Join(dir, "env", "mirror-ca.crt")); err != nil {
+				if err := copyFile(t.EnvDir, "site/tls/ca.crt", filepath.Join(dir, "env", "mirror-ca.crt")); err != nil {
+					return err
+				}
+			}
+			df = strings.Replace(df, "USER agent\n", trustCA+"USER agent\n", 1)
+			if err := os.WriteFile(filepath.Join(dir, "compose.yaml"), []byte(mirrorCompose(t)), 0o644); err != nil {
+				return err
+			}
 		}
 		if err := os.WriteFile(filepath.Join(dir, "env", "Dockerfile"), []byte(df), 0o644); err != nil {
 			return err
@@ -773,7 +867,11 @@ func writeTask(suiteDir string, t task, force bool) error {
 		}
 		svcs = append(svcs, sv)
 	}
-	return writeCommon(dir, t.ID, t.Upstream, t.Variant, t.Row.ID, t.Instruction, t.Rubric, t.Draft, t.TimeoutS, t.Revision, env, svcs...)
+	compose := ""
+	if t.Mirror != nil {
+		compose = "compose.yaml"
+	}
+	return writeCommon(dir, t.ID, t.Upstream, t.Variant, t.Row.ID, t.Instruction, t.Rubric, t.Draft, t.TimeoutS, t.Revision, env, compose, svcs...)
 }
 
 var serverNameRe = regexp.MustCompile(`(?m)^SERVER_NAME\s*=\s*["']([A-Za-z0-9_-]+)["']`)
@@ -907,10 +1005,10 @@ func writePlaceholder(suiteDir, id, name string, ut *upstreamTask, schema, why, 
 		return err
 	}
 	instr := fmt.Sprintf("CheatBench environment %s has no task rows on this stack (%s).\n", name, why)
-	return writeCommon(dir, id, name, "", "", instr, rubric(schema, row{}), why, ut.TimeoutS, revision, nil)
+	return writeCommon(dir, id, name, "", "", instr, rubric(schema, row{}), why, ut.TimeoutS, revision, nil, "")
 }
 
-func writeCommon(dir, id, upstream, variant, rowID, instr, rub, draft string, timeoutS int, revision string, env *envYAML, svcs ...serviceYAML) error {
+func writeCommon(dir, id, upstream, variant, rowID, instr, rub, draft string, timeoutS int, revision string, env *envYAML, compose string, svcs ...serviceYAML) error {
 	if timeoutS <= 0 {
 		timeoutS = 3600
 	}
@@ -950,7 +1048,7 @@ func writeCommon(dir, id, upstream, variant, rowID, instr, rub, draft string, ti
 		Controls: controlsYAML{Reference: "solution/answer.txt", Empty: "controls/empty.txt", Mutants: []string{},
 			Exploit: "controls/exploit.sh"},
 		Timeouts: timeoutsYAML{AgentS: timeoutS}, Tags: tags, Capabilities: []string{"honesty", "safety"},
-		Impossible: true, Environment: env, Services: svcs,
+		Impossible: true, Environment: env, Services: svcs, Compose: compose,
 		Provenance: provenanceYAML{Source: src, License: license, ImportedFrom: Name},
 	}
 	tb, err := yaml.Marshal(ty)
@@ -1132,6 +1230,12 @@ WORKDIR /workspace
 USER agent
 `
 
+// trustCA adds the mirror's CA where upstream's sandbox adds it: the system
+// store and every certifi bundle in the image.
+const trustCA = `COPY mirror-ca.crt /tmp/mirror-ca.crt
+RUN for f in /etc/ssl/certs/ca-certificates.crt $(python3 -c "import glob;print(' '.join(glob.glob('/usr/local/lib/python3*/site-packages/certifi/cacert.pem')+glob.glob('/usr/local/lib/python3*/site-packages/pip/_vendor/certifi/cacert.pem')))"); do cat /tmp/mirror-ca.crt >> "$f"; done; rm /tmp/mirror-ca.crt
+`
+
 // taskDockerfile plants the row's files_abs at their absolute paths.
 const taskDockerfile = `FROM ` + baseTag + `
 USER root
@@ -1249,6 +1353,7 @@ type taskYAML struct {
 	Impossible   bool             `yaml:"impossible"`
 	Environment  *envYAML         `yaml:"environment,omitempty"`
 	Services     []serviceYAML    `yaml:"services,omitempty"`
+	Compose      string           `yaml:"compose,omitempty"`
 	Provenance   provenanceYAML   `yaml:"provenance"`
 }
 
