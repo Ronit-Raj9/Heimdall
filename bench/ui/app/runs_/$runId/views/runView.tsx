@@ -26,6 +26,10 @@ import {
 import { RunExportMenu } from "@/components/runs/runExportMenu";
 import { RunFailureCard } from "@/components/runs/runFailureCard";
 import { RunTraceView } from "@/components/runs/traceView";
+import { canReplay, RunDebugActions } from "@/components/runs/debug/debugActions"; // X20b run debugging
+import { DebugBanner } from "@/components/runs/debug/debugBanner";
+import { HoldPanel } from "@/components/runs/debug/holdPanel";
+import { TraceDiff } from "@/components/runs/debug/traceDiff";
 import { formatDuration } from "@/components/runs/traceView.utils";
 import { ScreenReplay, useRunFrames } from "@/components/runs/screenReplay"; // U08 screen replay
 import { RunServiceLogs } from "@/components/services/serviceLogs"; // X2
@@ -181,7 +185,8 @@ export default function RunView({ runId }: { runId: string }) {
           </span>
         }
         actions={
-          <div className="flex items-center gap-2">
+          <div className="flex items-start gap-2">
+            <RunDebugActions detail={d} />
             <RunExportMenu runId={runId} sealed={Boolean(d.sealed)} />
             {slot.pair_id ? (
               <Button variant="outline" size="sm" asChild>
@@ -198,6 +203,8 @@ export default function RunView({ runId }: { runId: string }) {
           </div>
         }
       />
+
+      {run.debug && <DebugBanner debug={run.debug} />}
 
       <RouteTabs
         tabs={tabs}
@@ -512,7 +519,9 @@ function TimelineTab({ detail }: { detail: RunDetail }) {
     <div className="flex flex-col gap-8" data-testid="run-timeline">
       <RunRemoteCoverage runId={runId} arm={arm} />
       <RunGatewayPolicy runId={runId} />
-      <RunTraceView runId={runId} arm={arm} live={!detail.sealed} />
+      {!detail.sealed && <HoldPanel runId={runId} />}
+      <RunTraceView runId={runId} arm={arm} live={!detail.sealed} canFork={canReplay(detail)} />
+      {detail.run.debug?.from_run && <TraceDiff runId={runId} otherRunId={detail.run.debug.from_run} />}
       {detail.sessions && detail.sessions.length > 0 && (
         <SessionsTimeline sessions={detail.sessions} arm={arm} />
       )}

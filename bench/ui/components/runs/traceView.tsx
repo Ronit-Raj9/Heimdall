@@ -6,6 +6,8 @@ import {
 import { Input } from "@/components/ui/input";
 import { useGetRunEventsQuery } from "@/lib/store/apis/benchApi";
 import { useGetRunStepsQuery } from "@/lib/store/apis/runStepsApi";
+import { useGetRunCallsQuery } from "@/lib/store/apis/runDebugApi"; // X20b step inspector
+import type { RunCall } from "@/lib/types/runDebug";
 import type { BenchEvent, RunSteps, StepRecord } from "@/lib/types/bench";
 import { cn } from "@/lib/utils";
 import {
@@ -21,6 +23,9 @@ import {
 } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
+import { callsByRequest, stepIndex } from "./debug/debug.utils"; // X20b
+import { ReplayBadge } from "./debug/replayBadge";
+import { StepInspector } from "./debug/stepInspector";
 import { AgentEventsLine, ObserverStatusLine } from "./stepTimeline";
 import { clipText, stepTime } from "./stepTimeline.utils";
 import {
@@ -68,10 +73,13 @@ export function RunTraceView({
   runId,
   arm,
   live = false,
+  canFork = false,
 }: {
   runId: string;
   arm: string;
   live?: boolean;
+  /** X20b: offer Fork from this step (a sealed run without a fault). */
+  canFork?: boolean;
 }) {
   const { t } = useTranslation("bench");
   const poll = {
@@ -80,6 +88,7 @@ export function RunTraceView({
   };
   const steps = useGetRunStepsQuery(runId, poll);
   const events = useGetRunEventsQuery(runId, poll);
+  const calls = useGetRunCallsQuery(runId, poll); // X20b: replay labels and the step inspector
   if (steps.isLoading)
     return <BlockSkeleton rows={6} testId={`trace-${arm}-loading`} />;
   if (steps.error || !steps.data) {
@@ -98,6 +107,10 @@ export function RunTraceView({
       events={events.data?.events}
       arm={arm}
       live={live}
+      runId={runId}
+      calls={calls.data?.calls}
+      firstDivergence={calls.data?.first_divergence?.call}
+      canFork={canFork}
     />
   );
 }
@@ -108,6 +121,11 @@ export interface TraceViewProps {
   arm: string;
   live?: boolean;
   initialFilter?: TraceFilter;
+  /** X20b: with a run id the trace gets the step inspector (j/k stepping, raw calls, fork). */
+  runId?: string;
+  calls?: readonly RunCall[];
+  firstDivergence?: number;
+  canFork?: boolean;
 }
 
 /**
@@ -121,9 +139,14 @@ export function TraceView({
   arm,
   live = false,
   initialFilter = "all",
+  runId,
+  calls,
+  firstDivergence,
+  canFork = true,
 }: TraceViewProps) {
   const { t } = useTranslation("runTrace");
   const { t: tb } = useTranslation("bench");
+  const { t: td } = useTranslation("runDebug");
   const [filter, setFilter] = useState<TraceFilter>(initialFilter);
   const [query, setQuery] = useState("");
   const [autoScroll, setAutoScroll] = useState(true);
@@ -133,6 +156,29 @@ export function TraceView({
     [data.steps, filter, query],
   );
   const usage = useMemo(() => usageByRequest(events), [events]);
+  const callMap = useMemo(() => callsByRequest(calls), [calls]);
+  const [selected, setSelected] = useState<number | null>(null);
+  const selIndex = selected === null ? -1 : visible.findIndex((s) => s.seq === selected);
+  const selStep = selIndex >= 0 ? visible[selIndex] : null;
+  useEffect(() => {
+    if (!runId) return;
+    const onKey = (e: KeyboardEvent) => {
+      const el = e.target as HTMLElement | null;
+      if (el && (el.tagName === "INPUT" || el.tagName === "TEXTAREA" || el.isContentEditable)) return;
+      if (e.key === "j" || e.key === "k") {
+        const next = stepIndex(selIndex, e.key === "j" ? 1 : -1, visible.length);
+        if (next >= 0) {
+          setSelected(visible[next].seq);
+          document.querySelector(`[data-testid="trace-row-${arm}-${visible[next].seq}"]`)?.scrollIntoView?.({ block: "nearest" });
+        }
+      } else if (e.key === "Escape") {
+        setSelected(null);
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [runId, selIndex, visible, arm]);
+  const firstError = visible.find(isErrorStep);
   const endRef = useRef<HTMLDivElement>(null);
   const seenRef = useRef<Set<number> | null>(null);
   if (seenRef.current === null)
@@ -229,12 +275,29 @@ export function TraceView({
           </div>
         )}
       </div>
-      <p
-        className="text-muted-foreground text-xs"
-        data-testid={`trace-${arm}-summary`}
-      >
-        {t("shown", { shown: visible.length, total: data.steps.length })}
-      </p>
+      <div className="flex flex-wrap items-center gap-3">
+        <p
+          className="text-muted-foreground text-xs"
+          data-testid={`trace-${arm}-summary`}
+        >
+          {t("shown", { shown: visible.length, total: data.steps.length })}
+        </p>
+        {runId && firstError && (
+          <button
+            type="button"
+            className="text-chart-error-ink text-xs underline-offset-2 hover:underline"
+            onClick={() => setSelected(firstError.seq)}
+            data-testid={`trace-${arm}-first-error`}
+          >
+            {td("inspector.firstError")}
+          </button>
+        )}
+        {firstDivergence !== undefined && (
+          <p className="text-chart-error-ink text-xs font-medium" data-testid={`trace-${arm}-divergence`}>
+            {td("replay.firstDivergence", { call: firstDivergence })}
+          </p>
+        )}
+      </div>
       {data.steps.length === 0 ? (
         <EmptyNote testId={`trace-${arm}-empty`}>
           {live ? t("waiting") : t("empty")}
@@ -242,20 +305,36 @@ export function TraceView({
       ) : visible.length === 0 ? (
         <EmptyNote testId={`trace-${arm}-filtered`}>{t("noMatch")}</EmptyNote>
       ) : (
-        <ol
-          className="flex min-w-0 flex-col divide-y rounded-xl border"
-          aria-label={tb("runs.steps.label", { arm })}
-        >
-          {visible.map((step) => (
-            <TraceRow
-              key={step.seq}
-              step={step}
-              arm={arm}
-              usage={step.request_id ? usage.get(step.request_id) : undefined}
-              fresh={fresh.has(step.seq)}
-            />
-          ))}
-        </ol>
+        <div className={cn("grid min-w-0 gap-4", runId && "lg:grid-cols-[minmax(0,1fr)_minmax(0,26rem)]")}>
+          <ol
+            className="flex min-w-0 flex-col divide-y self-start rounded-xl border"
+            aria-label={tb("runs.steps.label", { arm })}
+          >
+            {visible.map((step) => (
+              <TraceRow
+                key={step.seq}
+                step={step}
+                arm={arm}
+                usage={step.request_id ? usage.get(step.request_id) : undefined}
+                fresh={fresh.has(step.seq)}
+                call={step.request_id ? callMap.get(step.request_id) : undefined}
+                selected={selected === step.seq}
+                onSelect={runId ? () => setSelected(step.seq) : undefined}
+              />
+            ))}
+          </ol>
+          {runId && (
+            <div className="min-w-0 lg:sticky lg:top-4 lg:self-start">
+              <StepInspector
+                runId={runId}
+                step={selStep}
+                call={selStep?.request_id ? callMap.get(selStep.request_id) : undefined}
+                canFork={canFork}
+                onClose={() => setSelected(null)}
+              />
+            </div>
+          )}
+        </div>
       )}
       <div ref={endRef} />
       <details className="text-xs" data-testid={`trace-${arm}-observers`}>
@@ -282,11 +361,17 @@ function TraceRow({
   arm,
   usage,
   fresh,
+  call,
+  selected = false,
+  onSelect,
 }: {
   step: StepRecord;
   arm: string;
   usage?: StepUsage;
   fresh: boolean;
+  call?: RunCall;
+  selected?: boolean;
+  onSelect?: () => void;
 }) {
   const { t } = useTranslation("runTrace");
   const { t: tb } = useTranslation("bench");
@@ -304,14 +389,19 @@ function TraceRow({
         "min-w-0",
         fresh && "animate-in fade-in bg-chart-info/5",
         error && "bg-chart-error/5",
+        selected && "bg-primary/5 ring-primary/40 ring-1 ring-inset",
       )}
+      data-selected={selected}
       data-testid={`trace-row-${arm}-${step.seq}`}
       data-kind={kind}
       data-error={error}
     >
       <button
         type="button"
-        onClick={() => setOpen((v) => !v)}
+        onClick={() => {
+          setOpen((v) => !v);
+          onSelect?.();
+        }}
         aria-expanded={open}
         aria-label={t("expand", { seq: step.seq })}
         className="hover:bg-muted/40 focus-visible:ring-ring/50 flex w-full min-w-0 items-center gap-3 px-3 py-2.5 text-left transition-colors focus-visible:ring-[3px] focus-visible:outline-none"
@@ -350,6 +440,7 @@ function TraceRow({
           )}
         </span>
         <span className="hidden shrink-0 items-center gap-1.5 sm:flex">
+          {call?.replay && <ReplayBadge label={call.replay} testId={`trace-row-${arm}-${step.seq}-replay`} />}
           {usage && usage.tokens > 0 && (
             <Chip testId={`trace-row-${arm}-${step.seq}-tokens`}>
               {t("tokens", { value: usage.tokens.toLocaleString() })}

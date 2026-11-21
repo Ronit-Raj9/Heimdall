@@ -359,7 +359,7 @@ func (h *runDebugHandler) debugExperiment(ctx context.Context, rv *RunView, m *s
 	}
 	arm, ok := m.Experiment.Arms[rv.Slot.Arm]
 	if !ok {
-		return nil, fmt.Errorf("%w: arm %s is not in the experiment's plan", errDebugConflict, rv.Slot.Arm)
+		return nil, fmt.Errorf("%w: agent version %s is not in the evaluation's plan", errDebugConflict, rv.Slot.Arm)
 	}
 	d := &schemas.DebugSpec{Mode: mode, FromRun: rv.Run.RunID, FromExp: rv.Slot.ExpID, OnDivergence: req.OnDivergence, Breakpoints: req.Breakpoints}
 	switch mode {
@@ -375,7 +375,7 @@ func (h *runDebugHandler) debugExperiment(ctx context.Context, rv *RunView, m *s
 	}
 	if mode != schemas.DebugStep {
 		if !rv.Sealed {
-			return nil, fmt.Errorf("%w: the run is still running; replay or fork it once it is sealed", errDebugConflict)
+			return nil, fmt.Errorf("%w: the run is still running; replay or fork it once it has finished", errDebugConflict)
 		}
 		if sv, ok := h.env.Services.Index.(SealVerifier); ok {
 			if err := sv.VerifySeal(ctx, rv.Run.RunID); err != nil {

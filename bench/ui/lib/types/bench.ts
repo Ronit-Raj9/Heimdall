@@ -551,6 +551,8 @@ export interface Run {
 	failures?: PartFailure[];
 	/** X7: the GPUs a GPU task's run held (schemas/gpu.go); absent for every other run. */
 	hardware?: HardwareRecord;
+	/** X20b: a replay, fork or breakpoint run's link to the run it came from (lib/types/runDebug.ts). */
+	debug?: import("./runDebug").RunDebug;
 }
 
 // X7: GPU benchmarking (schemas/gpu.go, docs/gpu-tasks.md).
