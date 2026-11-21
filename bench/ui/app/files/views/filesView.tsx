@@ -1,5 +1,6 @@
 import { FileEditor } from "@/components/projectfs/fileEditor";
 import { FILES_NS } from "@/components/projectfs/i18n";
+import { SyncCard } from "@/components/projectfs/syncCard";
 import { EmptyState } from "@/components/shell/emptyState";
 import { PageHeader } from "@/components/shell/pageHeader";
 import { Button } from "@/components/ui/button";
@@ -179,7 +180,8 @@ export default function FilesView() {
 						</div>
 					)}
 				</section>
-				<section>
+				<section className="flex flex-col gap-4">
+					{!openPath && <SyncCard />}
 					{openPath && (
 						<FileEditor
 							key={`${area}/${openPath}`}

@@ -2,6 +2,7 @@ import { errorQuery, mutation, okQuery, render } from "@/lib/testing/render";
 import { routerState } from "@/lib/testing/routerMock";
 import { describe, expect, it, vi } from "vitest";
 import { encodeProjectPath, projectFilePath, saveProjectFileRequest } from "@/lib/store/apis/projectFilesApi";
+import { syncCommands } from "@/components/projectfs/syncCard";
 import FilesView, { validNewName } from "./filesView";
 
 vi.mock("@tanstack/react-router", async () => (await import("@/lib/testing/routerMock")).routerMock);
@@ -30,6 +31,17 @@ describe("FilesView", () => {
 		expect(html).toContain('data-testid="files-empty"');
 		expect(html).toContain('data-testid="files-new-name"');
 		expect(html).toContain('data-testid="files-export"');
+		expect(html).toContain("Download project (zip)");
+		expect(html).toContain('data-testid="files-sync-card"');
+		expect(html).toContain("bifrost-bench pull -server");
+		expect(html).toContain("bifrost-bench push -server");
+	});
+
+	it("builds the sync commands for this server and org", () => {
+		const c = syncCommands("https://heimdall.example.com", "acme");
+		expect(c.pull).toBe("bifrost-bench pull -server https://heimdall.example.com -org acme -token $HEIMDALL_TOKEN -dir .");
+		expect(c.push).toBe("bifrost-bench push -server https://heimdall.example.com -org acme -token $HEIMDALL_TOKEN -dir .");
+		expect(syncCommands("http://127.0.0.1:8090").pull).not.toContain("-org");
 	});
 
 	it("lists entries and opens the editor for ?path", () => {

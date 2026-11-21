@@ -143,7 +143,7 @@ func (h *projectFilesHandler) sendStoreError(ctx *fasthttp.RequestCtx, rel strin
 			"the file changed since you opened it: reload it, then apply your edit again")
 	case errors.Is(err, projectfs.ErrTooLarge):
 		lib.SendError(ctx, h.mode, fasthttp.StatusRequestEntityTooLarge, lib.ErrTypeTooLarge,
-			fmt.Sprintf("file is larger than %d bytes: upload big files as a zip on the Upload page", projectfs.MaxFileBytes))
+			fmt.Sprintf("file is larger than the %d byte editor limit: download it with Download (GET /project/blobs/...), and save big files with bifrost-bench push or a zip on the Upload page", projectfs.MaxFileBytes))
 	case errors.Is(err, projectfs.ErrInvalid):
 		msg := strings.TrimPrefix(err.Error(), projectfs.ErrInvalid.Error()+": ")
 		if msg == projectfs.ErrInvalid.Error() {

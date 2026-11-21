@@ -10,7 +10,14 @@ package main
 // /project/export.zip and writes only the files whose hash differs. Push
 // sends each changed file with PUT /project/files/{area}/{path} (If-Match on
 // the server's hash, so a file someone edited on the web is not silently
-// overwritten); files over the 1 MiB per-file limit are skipped and listed
+// overwritten). Files over the 1 MiB editor limit go through the raw
+// PUT /project/blobs/{area}/{path} route (up to the area's large-file cap,
+// at most lib.MaxUploadBytes); bigger ones are skipped and listed.
+//
+// Both sides use the base hashes saved in .heimdall/sync.json after each
+// sync: push refuses a file changed on the server since then, pull refuses
+// a file changed locally since then. Either lists the conflicts and exits 4;
+// -force overwrites.
 
 import (
 	"archive/zip"
@@ -39,7 +46,7 @@ import (
 
 func init() {
 	register("push", "upload changed project files to a Heimdall server: push -server URL -token TOKEN [-dir .] [-delete] [-force] [-dry-run]", runPush)
-	register("pull", "download the server's project files: pull -server URL [-token TOKEN] [-dir .] [-delete] [-dry-run]", runPull)
+	register("pull", "download the server's project files: pull -server URL [-token TOKEN] [-dir .] [-delete] [-force] [-dry-run]", runPull)
 }
 
 const (
@@ -47,6 +54,9 @@ const (
 	syncServerEnv = "HEIMDALL_SERVER"
 	// maxPullExportBytes caps the export zip a pull downloads.
 	maxPullExportBytes = 1 << 30
+	// maxPushFileBytes caps one file push sends (lib.MaxUploadBytes, the
+	// blob route's body limit).
+	maxPushFileBytes = projectfs.MaxLargeFileBytes
 	// maxSyncFileBytes caps one file a pull writes.
 	maxSyncFileBytes = 256 << 20
 )
@@ -70,6 +80,8 @@ func syncFlags(name string, args []string) (*syncOpts, int) {
 	fs.DurationVar(&o.timeout, "timeout", 10*time.Minute, "overall time limit")
 	if name == "push" {
 		fs.BoolVar(&o.force, "force", false, "overwrite server files even when they changed since the last sync")
+	} else {
+		fs.BoolVar(&o.force, "force", false, "overwrite local files even when you changed them since the last sync")
 	}
 	if err := fs.Parse(args); err != nil {
 		if errors.Is(err, flag.ErrHelp) {
@@ -365,11 +377,15 @@ func pushProject(ctx context.Context, o *syncOpts, out io.Writer) (syncStats, er
 			st.conflicts++
 			continue
 		}
-		if lf.Size > projectfs.MaxFileBytes {
-			// The server keeps project files up to MaxFileBytes each.
-			fmt.Fprintf(out, "skip %s (%d bytes, over the server's %d byte per-file limit)\n", k, lf.Size, projectfs.MaxFileBytes)
+		if lf.Size > maxPushFileBytes {
+			fmt.Fprintf(out, "skip %s (%d bytes, over the server's %d byte per-file limit)\n", k, lf.Size, maxPushFileBytes)
 			st.skipped++
 			continue
+		}
+		route := "/project/files/"
+		if lf.Size > projectfs.MaxFileBytes {
+			// Over the editor limit: the raw large-file route.
+			route = "/project/blobs/"
 		}
 		fmt.Fprintf(out, "put  %s\n", k)
 		if o.dryRun {
@@ -384,7 +400,7 @@ func pushProject(ctx context.Context, o *syncOpts, out io.Writer) (syncStats, er
 		if onServer && !o.force {
 			hdr["If-Match"] = rf.SHA256
 		}
-		p := "/project/files/" + lf.Area + "/" + escapePath(lf.Path)
+		p := route + lf.Area + "/" + escapePath(lf.Path)
 		resp, err := c.do(ctx, http.MethodPut, p, bytes.NewReader(data), hdr)
 		if err != nil {
 			return st, err
@@ -393,6 +409,14 @@ func pushProject(ctx context.Context, o *syncOpts, out io.Writer) (syncStats, er
 			resp.Body.Close()
 			fmt.Fprintf(out, "conflict %s (changed on the server)\n", k)
 			st.conflicts++
+			continue
+		}
+		if resp.StatusCode == http.StatusRequestEntityTooLarge {
+			// The area's cap on this server is lower than ours.
+			err := apiError("PUT", p, resp)
+			resp.Body.Close()
+			fmt.Fprintf(out, "skip %s (%v)\n", k, err)
+			st.skipped++
 			continue
 		}
 		if resp.StatusCode/100 != 2 {
@@ -455,7 +479,6 @@ func pushProject(ctx context.Context, o *syncOpts, out io.Writer) (syncStats, er
 	return st, nil
 }
 
-
 func runPull(args []string) int {
 	o, code := syncFlags("pull", args)
 	if o == nil {
@@ -463,8 +486,13 @@ func runPull(args []string) int {
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), o.timeout)
 	defer cancel()
-	if _, err := pullProject(ctx, o, os.Stdout); err != nil {
+	st, err := pullProject(ctx, o, os.Stdout)
+	if err != nil {
 		return fail("pull: %v", err)
+	}
+	if st.conflicts > 0 {
+		fmt.Fprintf(os.Stderr, "pull: %d file(s) changed locally since your last sync were not overwritten; push them first, move them aside, or pull -force to overwrite\n", st.conflicts)
+		return exitInfra
 	}
 	return exitOK
 }
@@ -483,10 +511,20 @@ func pullProject(ctx context.Context, o *syncOpts, out io.Writer) (syncStats, er
 	if err != nil {
 		return st, fmt.Errorf("read local project %s: %w", o.dir, err)
 	}
+	base := loadSyncBase(o.dir, c.base)
+	// conflicted keys keep their old base, so a later pull still refuses them.
+	conflicted := map[string]bool{}
 	need := map[string]handlers.ManifestFile{}
 	for _, k := range sortedKeys(remote) {
-		if lf, ok := local[k]; ok && lf.SHA256 == remote[k].SHA256 {
+		lf, ok := local[k]
+		if ok && lf.SHA256 == remote[k].SHA256 {
 			st.unchanged++
+			continue
+		}
+		if ok && !o.force && base[k] != lf.SHA256 {
+			fmt.Fprintf(out, "conflict %s (changed locally since your last sync)\n", k)
+			st.conflicts++
+			conflicted[k] = true
 			continue
 		}
 		need[k] = remote[k]
@@ -503,12 +541,18 @@ func pullProject(ctx context.Context, o *syncOpts, out io.Writer) (syncStats, er
 			if _, ok := remote[k]; ok {
 				continue
 			}
+			lf := local[k]
+			if !o.force && base[k] != lf.SHA256 {
+				fmt.Fprintf(out, "conflict %s (not deleting: changed locally since your last sync)\n", k)
+				st.conflicts++
+				conflicted[k] = true
+				continue
+			}
 			fmt.Fprintf(out, "del  %s\n", k)
 			st.deleted++
 			if o.dryRun {
 				continue
 			}
-			lf := local[k]
 			if err := os.Remove(filepath.Join(o.dir, lf.Area, filepath.FromSlash(lf.Path))); err != nil && !errors.Is(err, fs.ErrNotExist) {
 				return st, err
 			}
@@ -517,10 +561,23 @@ func pullProject(ctx context.Context, o *syncOpts, out io.Writer) (syncStats, er
 	verb := "pulled"
 	if o.dryRun {
 		verb = "would pull"
-	} else if err := saveSyncBase(o.dir, c.base, remote); err != nil {
-		return st, fmt.Errorf("save sync state: %w", err)
+	} else {
+		saved := make(map[string]handlers.ManifestFile, len(remote))
+		for k, f := range remote {
+			if !conflicted[k] {
+				saved[k] = f
+			}
+		}
+		for k := range conflicted {
+			if h, ok := base[k]; ok {
+				saved[k] = handlers.ManifestFile{SHA256: h}
+			}
+		}
+		if err := saveSyncBase(o.dir, c.base, saved); err != nil {
+			return st, fmt.Errorf("save sync state: %w", err)
+		}
 	}
-	fmt.Fprintf(out, "%s %d file(s), deleted %d, %d unchanged\n", verb, st.put, st.deleted, st.unchanged)
+	fmt.Fprintf(out, "%s %d file(s), deleted %d, %d unchanged, %d conflict(s)\n", verb, st.put, st.deleted, st.unchanged, st.conflicts)
 	return st, nil
 }
 

@@ -100,9 +100,9 @@ export function projectExportUrl(): string {
 	return `${BENCH_API_BASE}/project/export.zip`;
 }
 
-/** The raw download URL of one file. */
+/** The raw download URL of one file, any size (the blobs route streams it). */
 export function projectRawUrl(area: ProjectArea, path: string): string {
-	return `${BENCH_API_BASE}${projectFilePath(area, path)}?raw=true`;
+	return `${BENCH_API_BASE}/project/blobs/${area}/${encodeProjectPath(path)}`;
 }
 
 export const {

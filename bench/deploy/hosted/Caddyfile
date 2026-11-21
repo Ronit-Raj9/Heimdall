@@ -45,7 +45,8 @@
 
 	# Zip uploads (runs, project and agent folders) get their own body cap,
 	# matching the server's 64 MiB upload limit (lib.MaxUploadBytes).
-	@uploads path /api/bench/uploads /api/bench/uploads/*
+	# Large project files (bifrost-bench push, PUT /project/blobs/...) too.
+	@uploads path /api/bench/uploads /api/bench/uploads/* /api/bench/project/blobs/*
 	handle @uploads {
 		request_body {
 			max_size {$HEIMDALL_MAX_UPLOAD:64MiB}

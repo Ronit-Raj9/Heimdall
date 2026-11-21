@@ -10,3 +10,9 @@ func init() {
 	OrgPolicy[key("GET", api+"/project/versions/{area}/{path:*}")] = org(viewer)
 	OrgPolicy[key("GET", api+"/project/export.zip")] = org(viewer)
 }
+
+// Project blobs (handlers/projectblobs.go): raw large files.
+func init() {
+	OrgPolicy[key("GET", api+"/project/blobs/{area}/{path:*}")] = org(viewer)
+	OrgPolicy[key("PUT", api+"/project/blobs/{area}/{path:*}")] = org(member)
+}
