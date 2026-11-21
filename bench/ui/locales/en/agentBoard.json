@@ -1,0 +1,42 @@
+{
+	"tabs": {
+		"agents": "Agents",
+		"byBenchmark": "By benchmark"
+	},
+	"title": "Agents",
+	"description": "One row per agent version and model. Each score is the share of runs solved on that capability's benchmarks (newest version of each, clean runs), with a 95% range.",
+	"loadError": "Could not load the agent leaderboard.",
+	"empty": "No agent has finished runs yet. Run an evaluation to fill this board.",
+	"emptyFiltered": "No agent matches these filters.",
+	"resetFilters": "Clear filters",
+	"filters": {
+		"label": "Agent leaderboard filters",
+		"capability": "Capability",
+		"model": "Model",
+		"all": "All"
+	},
+	"columns": {
+		"agent": "Agent",
+		"version": "Version",
+		"model": "Model",
+		"cost": "Cost per run",
+		"runs": "Runs"
+	},
+	"baseline": "baseline",
+	"baselineHint": "A built-in agent, shown for comparison",
+	"noVersion": "unsaved",
+	"noScore": "not run",
+	"range": "95% range {{low}} to {{high}}, {{runs}} runs",
+	"openReportCard": "Open the report card for {{agent}}",
+	"capability": {
+		"terminal": "Terminal",
+		"coding": "Coding",
+		"memory": "Memory",
+		"support": "Support",
+		"research": "Research",
+		"voice": "Voice",
+		"safety": "Safety",
+		"team": "Team",
+		"gpu": "GPU"
+	}
+}
