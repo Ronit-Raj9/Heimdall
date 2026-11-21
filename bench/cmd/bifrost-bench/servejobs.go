@@ -14,6 +14,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/maximhq/bifrost/bench/selfmetrics"
 	"path/filepath"
 	"strings"
 	"sync"
@@ -26,9 +27,9 @@ import (
 	"github.com/maximhq/bifrost/bench/jobs"
 	"github.com/maximhq/bifrost/bench/ops"
 	"github.com/maximhq/bifrost/bench/schemas"
-	"github.com/maximhq/bifrost/bench/suite"
 	"github.com/maximhq/bifrost/bench/server"
 	"github.com/maximhq/bifrost/bench/store"
+	"github.com/maximhq/bifrost/bench/suite"
 	"github.com/maximhq/bifrost/bench/tenancy"
 	"github.com/maximhq/bifrost/bench/utils"
 	"github.com/valyala/fasthttp"
@@ -350,11 +351,11 @@ func (l *launcher) execute(ctx context.Context, m *schemas.Manifest, run *liveRu
 				prog.Sealed++
 				log.Printf("sealed %s (slot %s): %s", ev.RunID, ev.SlotID, ev.Outcome)
 				_ = l.rebuild(context.WithoutCancel(ctx))
-				evidenceOnSeal(l.org, m.ExpID) // Evidence storage area (P6), wired by Tenancy: mirror the sealed run now (evidence.go)
+				evidenceOnSeal(l.org, m.ExpID)          // Evidence storage area (P6), wired by Tenancy: mirror the sealed run now (evidence.go)
 				l.chargeKeySpend(ctx, m, ev.RunID, log) // G10: the run's cost to its model key (keybudget.go)
 			case engine.EventRunRecovered:
 				log.Warnf("sealed interrupted run %s (slot %s): %s", ev.RunID, ev.SlotID, ev.Outcome)
-				evidenceOnSeal(l.org, m.ExpID) // Evidence storage area (P6), wired by Tenancy (evidence.go)
+				evidenceOnSeal(l.org, m.ExpID)          // Evidence storage area (P6), wired by Tenancy (evidence.go)
 				l.chargeKeySpend(ctx, m, ev.RunID, log) // G10 (keybudget.go)
 			case engine.EventSlotSkipped:
 				prog.Skipped++
@@ -596,6 +597,7 @@ func newJobsHub(d *db.DB, logger schemas.Logger, hosted, launches bool, configPa
 	h := &jobsHub{runner: jobs.New(d, opts), db: d, hosted: hosted, launches: launches, configPath: configPath,
 		orgs: map[string]*launcher{}}
 	h.registerKinds()
+	registerJobMetrics(selfmetrics.Default, h.runner) // N9: /metrics job queue and statuses (servemetrics.go)
 	return h
 }
 

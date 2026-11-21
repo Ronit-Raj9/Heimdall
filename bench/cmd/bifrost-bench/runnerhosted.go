@@ -8,6 +8,7 @@ package main
 
 import (
 	"context"
+	"github.com/maximhq/bifrost/bench/selfmetrics"
 	"os"
 	"runtime/debug"
 	"sync"
@@ -74,6 +75,7 @@ func runnersOf(env *hostedEnv) *hostedRunners {
 	rs := v.(*hostedRunners)
 	if !loaded {
 		auth.RegisterRunnerVerifier(rs.svc.VerifyPrincipal)
+		registerCoordinatorMetrics(selfmetrics.Default, rs.hub.Coordinators) // N9 (servemetrics.go)
 	}
 	return rs
 }

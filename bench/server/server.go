@@ -7,6 +7,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"github.com/maximhq/bifrost/bench/selfmetrics"
 	"io/fs"
 	"net"
 	"sync"
@@ -148,7 +149,7 @@ func New(cfg *lib.Config, deps Deps) (*Server, error) {
 		auth.Middleware(auth.Config{ServerMode: mode}, nil), // Auth area (P2): every local request carries the local-org owner principal (docs/auth.md)
 	)
 	s.server = &fasthttp.Server{
-		Handler:               s.handler,
+		Handler:               selfmetrics.Default.Middleware(s.handler), // N9: API latency for /metrics
 		Name:                  "bifrost-bench",
 		MaxRequestBodySize:    lib.MaxUploadBytes, // per-route limits: lib.BodyLimit in common/upload middlewares
 		ErrorHandler:          lib.RequestErrorHandler(mode, lib.MaxUploadBytes),

@@ -92,6 +92,7 @@ type Coordinator struct {
 	leases  map[string]*remoteLease
 	ended   map[string]string // lease id -> why it ended; a late call for it is refused with this
 	rj      runnerJobs        // runner jobs (gap G05, remotejobs.go)
+	runs    map[string]int    // uploaded runs by result: accepted (by outcome) or rejected; /metrics (remotedisk.go)
 }
 
 // remoteWorker is one registered worker.
@@ -585,6 +586,7 @@ func (c *Coordinator) Complete(ctx context.Context, leaseID string, req *schemas
 	} else if w != nil {
 		w.info.Completed++
 	}
+	c.countRunLocked(reason, req.Outcome)
 	c.mu.Unlock()
 	c.remove(l.archive)
 	if reason != "" {

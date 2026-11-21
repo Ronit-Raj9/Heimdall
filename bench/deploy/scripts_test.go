@@ -322,3 +322,85 @@ func TestUpgradeRollbackTagPerStack(t *testing.T) {
 		})
 	}
 }
+
+// TestBackupLeavesEnvFileOut is S8: the env file holds HEIMDALL_MASTER_KEY,
+// so the backup never copies it next to the database dump in plain text; it
+// warns instead, and --env-dir puts a copy in another folder only.
+func TestBackupLeavesEnvFileOut(t *testing.T) {
+	bin, _ := stubDocker(t, false)
+	dir := t.TempDir()
+	env := backupEnv(t, "HEIMDALL_MASTER_KEY=secret-master-key\n")
+	base := []string{"HEIMDALL_ENV_FILE=" + env, "HEIMDALL_PROJECT=s8-backup"}
+	out, err := runScript(t, bin, base, "hosted/backup.sh", "--dir", dir, "--db-only")
+	if err != nil {
+		t.Fatalf("backup.sh: %v\n%s", err, out)
+	}
+	if m, _ := filepath.Glob(filepath.Join(dir, "heimdall-env-*")); len(m) != 0 {
+		t.Fatalf("env file copied beside the dump: %v", m)
+	}
+	if !strings.Contains(out, "is not in this backup") {
+		t.Fatalf("no warning about the env file:\n%s", out)
+	}
+	envDir := t.TempDir()
+	if out, err := runScript(t, bin, base, "hosted/backup.sh", "--dir", dir, "--db-only", "--env-dir", envDir); err != nil {
+		t.Fatalf("backup.sh --env-dir: %v\n%s", err, out)
+	}
+	if m, _ := filepath.Glob(filepath.Join(envDir, "heimdall-env-*")); len(m) != 1 {
+		t.Fatalf("env copy in --env-dir = %v", m)
+	}
+	if m, _ := filepath.Glob(filepath.Join(dir, "heimdall-env-*")); len(m) != 0 {
+		t.Fatalf("env file in the backup folder: %v", m)
+	}
+	if out, err := runScript(t, bin, base, "hosted/backup.sh", "--dir", dir, "--db-only", "--env-dir", dir); err == nil {
+		t.Fatalf("--env-dir equal to --dir accepted:\n%s", out)
+	}
+}
+
+// TestBackupEncryptsEnvWithPassphrase is S8: with a passphrase file the env
+// file is written encrypted (openssl enc), never in plain text.
+func TestBackupEncryptsEnvWithPassphrase(t *testing.T) {
+	bin, _ := stubDocker(t, false)
+	if err := os.Remove(filepath.Join(bin, "openssl")); err != nil { // the real openssl
+		t.Fatal(err)
+	}
+	if _, err := exec.LookPath("openssl"); err != nil {
+		t.Skip("openssl not installed")
+	}
+	dir := t.TempDir()
+	env := backupEnv(t, "HEIMDALL_MASTER_KEY=secret-master-key\n")
+	pass := filepath.Join(t.TempDir(), "pass")
+	if err := os.WriteFile(pass, []byte("correct horse"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	out, err := runScript(t, bin, []string{"HEIMDALL_ENV_FILE=" + env, "HEIMDALL_PROJECT=s8-enc", "HEIMDALL_BACKUP_PASSPHRASE_FILE=" + pass}, "hosted/backup.sh", "--dir", dir, "--db-only")
+	if err != nil {
+		t.Fatalf("backup.sh: %v\n%s", err, out)
+	}
+	m, _ := filepath.Glob(filepath.Join(dir, "heimdall-env-*.enc"))
+	if len(m) != 1 {
+		t.Fatalf("encrypted env = %v\n%s", m, out)
+	}
+	raw, _ := os.ReadFile(m[0])
+	if strings.Contains(string(raw), "secret-master-key") {
+		t.Fatal("the master key is readable in the encrypted copy")
+	}
+	dec, err := exec.Command("openssl", "enc", "-d", "-aes-256-cbc", "-pbkdf2", "-iter", "200000", "-pass", "file:"+pass, "-in", m[0]).Output()
+	if err != nil || !strings.Contains(string(dec), "HEIMDALL_MASTER_KEY=secret-master-key") {
+		t.Fatalf("decrypt: %v %q", err, dec)
+	}
+}
+
+// TestBootstrapGeneratesMasterKey is S8: bootstrap.sh fills in an empty
+// HEIMDALL_MASTER_KEY and never replaces one that is set.
+func TestBootstrapGeneratesMasterKey(t *testing.T) {
+	bin, _ := stubDocker(t, false)
+	for _, tc := range []struct{ have, want string }{{"HEIMDALL_MASTER_KEY=\n", "HEIMDALL_MASTER_KEY=00"}, {"HEIMDALL_MASTER_KEY=keep-me\n", "HEIMDALL_MASTER_KEY=keep-me"}} {
+		env := backupEnv(t, tc.have)
+		// The stub docker makes the later steps no-ops; only step 1 matters here.
+		out, _ := runScript(t, bin, []string{"HEIMDALL_ENV_FILE=" + env, "HEIMDALL_PROJECT=s8-boot"}, "hosted/bootstrap.sh", "--no-build", "--no-demo")
+		raw, _ := os.ReadFile(env)
+		if !strings.Contains(string(raw), tc.want+"\n") || strings.Count(string(raw), "HEIMDALL_MASTER_KEY=") != 1 {
+			t.Fatalf("have %q: env file:\n%s\noutput:\n%s", tc.have, raw, out)
+		}
+	}
+}

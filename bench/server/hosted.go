@@ -19,6 +19,7 @@ package server
 import (
 	"errors"
 	"fmt"
+	"github.com/maximhq/bifrost/bench/selfmetrics"
 	"io/fs"
 	"net/url"
 	"sync"
@@ -105,7 +106,7 @@ func NewHosted(cfg *lib.Config, h Hosted) (*Server, error) {
 		h.Auth,
 	)
 	s.server = &fasthttp.Server{
-		Handler:               s.handler,
+		Handler:               selfmetrics.Default.Middleware(s.handler), // N9: API latency for /metrics
 		Name:                  "heimdall",
 		MaxRequestBodySize:    lib.MaxUploadBytes, // per-route limits: lib.BodyLimit in common/upload middlewares
 		ErrorHandler:          lib.RequestErrorHandler(mode, lib.MaxUploadBytes),

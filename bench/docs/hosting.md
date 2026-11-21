@@ -166,8 +166,15 @@ machine's `deploy/.env`. Details, flags, upgrades and troubleshooting:
 deploy/hosted/backup.sh --dir /var/backups/heimdall --keep-days 14
 ```
 
-Writes `heimdall-db-<time>.dump` (`pg_dump`, custom format) and a copy of
-`.env` to the folder (mode 700). Evidence: with the S3 mirror set
+Writes `heimdall-db-<time>.dump` (`pg_dump`, custom format) to the folder
+(mode 700). `.env` holds `HEIMDALL_MASTER_KEY`, which decrypts every stored
+provider key, so it is never copied beside the dump in plain text: set
+`HEIMDALL_BACKUP_PASSPHRASE_FILE` (a passphrase file kept elsewhere) for an
+encrypted `heimdall-env-<time>.enc`, or pass `--env-dir DIR` (another folder,
+another disk or a vault mount) for a plain copy there. With neither, the
+backup warns and leaves `.env` out: keep it, or at least the master key, in
+your secrets manager. `bootstrap.sh` generates the master key when it is
+empty and never replaces one. Evidence: with the S3 mirror set
 (`HEIMDALL_S3_BUCKET` and its keys in `.env`, or `HEIMDALL_S3_BUCKET` in the
 shell, which wins over `.env` as it does for compose; create the bucket first, the
 mirror never creates one, and keep it private) it runs
@@ -194,7 +201,9 @@ Sealed run folders are the evidence; the database holds users, tokens, jobs,
 runners, audit and an index that can be rebuilt from the folders.
 
 Restore on a new machine: sections 1 to 3 (DNS pointed at the new machine),
-the backed-up `.env` copied to `deploy/hosted/.env` (mode 600), then
+`.env` restored to `deploy/hosted/.env` (mode 600) from your secrets manager,
+`--env-dir` or the encrypted copy
+(`openssl enc -d -aes-256-cbc -pbkdf2 -iter 200000 -pass file:<passphrase file> -in heimdall-env-<time>.enc`), then
 
 ```sh
 cd /opt/heimdall/bench && C="docker compose -f deploy/hosted/docker-compose.yml --env-file deploy/hosted/.env"
@@ -260,6 +269,33 @@ $C exec heimdall wget -qO- http://127.0.0.1:8090/readyz   # database, migrations
 curl -fsS https://heimdall.example.com/healthz             # public liveness, for uptime checks
 $C exec heimdall bifrost-bench <command>                    # CLI against the live data
 ```
+
+Metrics: set `HEIMDALL_METRICS_LISTEN=0.0.0.0:9090` in `.env` and the server
+serves Prometheus metrics at `http://heimdall:9090/metrics` on the compose
+network only (no port is published and the endpoint has no login, so never
+publish it): `heimdall_http_request_duration_seconds` (API latency by method,
+area and status class), `heimdall_job_queue_depth` and `heimdall_jobs` (by kind
+and status; evaluation runs are `experiment.run`), `heimdall_leases_in_flight`,
+`heimdall_lease_oldest_heartbeat_age_seconds`, `heimdall_workers` (by state),
+`heimdall_workers_disk_low` and `heimdall_remote_runs_total` (uploaded runs
+by result and outcome).
+
+Runner disk: every runner (`runner start`, the shared runner) sweeps every 10
+minutes: leftovers of crashed runs (the janitor), Heimdall task and agent
+images (label `bifrost-bench=1`, tags under `bench/` or `org-<org id>/` only)
+that no run used for 48 hours, never one a container uses or one listed in
+`runner.disk.pinned_images`, and the build cache of Heimdall's own buildx
+builder (`runner.disk.builder` or `BUILDX_BUILDER`; with neither the shared
+default builder is left alone). A run folder is deleted once the server
+accepted its upload (`runner.disk.keep_run_folders` keeps it). Below
+`runner.disk.min_free_gb` free (default 10, `HEIMDALL_RUNNER_MIN_FREE_GB`) the
+runner takes no work and the server shows `disk` with `low: true` in its
+workers list.
+
+Provider concurrency: `HEIMDALL_PROVIDER_SLOTS` (default 32) is how many runs
+may use one provider at once through the shared fault proxy, and per
+organization key; the proxy's `/health` lists each provider's slots and live
+claims under `providers`.
 
 `/healthz` answers while the process serves. `/readyz` checks the database,
 that migrations are current and that the runs root is writable; it is the

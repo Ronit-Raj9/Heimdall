@@ -464,3 +464,31 @@ func (s *Store) appendLog(ctx context.Context, jobID string, at time.Time, level
 		}
 	}
 }
+
+// KindStatusCount is how many jobs of one kind are in one status.
+type KindStatusCount struct {
+	Kind   string
+	Status Status
+	Count  int
+}
+
+// CountByStatus counts every organization's jobs by kind and status, for
+// the server's /metrics (queue depth, runs by status).
+func (s *Store) CountByStatus(ctx context.Context) ([]KindStatusCount, error) {
+	rows, err := s.db.SQL().QueryContext(ctx, s.q(`SELECT kind, status, COUNT(*) FROM jobs GROUP BY kind, status ORDER BY kind, status`))
+	if err != nil {
+		return nil, fmt.Errorf("count jobs: %w", err)
+	}
+	defer rows.Close()
+	var out []KindStatusCount
+	for rows.Next() {
+		var c KindStatusCount
+		var st string
+		if err := rows.Scan(&c.Kind, &st, &c.Count); err != nil {
+			return nil, err
+		}
+		c.Status = Status(st)
+		out = append(out, c)
+	}
+	return out, rows.Err()
+}

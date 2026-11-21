@@ -93,6 +93,7 @@ func serveHosted(ctx context.Context, a *app, offline bool) int {
 	}
 	defer closeEnv()
 	startEvidenceMirror(ctx, a) // Evidence storage area (P6): mirror and sweeper over runs/orgs/*; seals notify through evidenceOnSeal (evidence.go)
+	serveMetrics(ctx, a.cfg.Server.MetricsListen, a.logger) // N9: Prometheus on the admin address (servemetrics.go)
 	srv, err := newHostedServer(env)
 	if err != nil {
 		return fail("server: %v", err)

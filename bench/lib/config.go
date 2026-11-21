@@ -84,6 +84,10 @@ type ServerConfig struct {
 	Mode         schemas.Mode `yaml:"mode" json:"mode"`
 	AllowedHosts []string     `yaml:"allowed_hosts" json:"allowed_hosts"`
 	CORSOrigins  []string     `yaml:"cors_origins" json:"cors_origins"`
+	// MetricsListen serves Prometheus metrics (GET /metrics) on a separate
+	// admin address, e.g. 0.0.0.0:9090 on an internal network. Empty: off.
+	// It has no authentication: never publish it.
+	MetricsListen string `yaml:"metrics_listen" json:"metrics_listen,omitempty"`
 }
 
 // GatewayConfig points at the stock Bifrost gateway.
@@ -191,6 +195,11 @@ func (c *Config) Validate() error {
 	}
 	if c.RunsRoot == "" {
 		return fmt.Errorf("runs_root is empty")
+	}
+	if c.Server.MetricsListen != "" {
+		if _, _, err := net.SplitHostPort(c.Server.MetricsListen); err != nil {
+			return fmt.Errorf("server.metrics_listen %q: %w", c.Server.MetricsListen, err)
+		}
 	}
 	if err := c.Auth.Validate(); err != nil { // Auth area (P2)
 		return err
