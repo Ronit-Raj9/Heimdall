@@ -1,6 +1,6 @@
 {
 	"title": "Welcome to Heimdall",
-	"subtitle": "Four choices and one click: pick a suite, an agent and a model, then get a verdict you can trust.",
+	"subtitle": "Pick a suite, an agent and a model. Get a verdict in minutes.",
 	"skip": "Skip to Home",
 	"back": "Back",
 	"next": "Continue",
@@ -14,7 +14,7 @@
 	},
 	"suite": {
 		"heading": "What should the agent work on?",
-		"help": "A suite is a fixed set of tasks with automatic tests. Start with coding-core if you are unsure.",
+		"help": "Each suite is a set of tasks with automatic checks.",
 		"recommended": "Recommended",
 		"tasks_one": "{{count}} task",
 		"tasks_other": "{{count}} tasks",
@@ -25,7 +25,7 @@
 	},
 	"agent": {
 		"heading": "Which agent should run?",
-		"help": "An agent is a coding CLI or loop plus its settings. The starter agents work out of the box.",
+		"help": "The starter agents work out of the box.",
 		"defaultModel": "Default model: {{model}}",
 		"empty": "No agents yet. Create one from a template: Codex, Claude Code, mini-swe and more.",
 		"create": "Create agent from template",
@@ -34,13 +34,13 @@
 	},
 	"model": {
 		"heading": "Which model should drive it?",
-		"help": "Pick a model you have a key for. No key yet? Add one and press Test, then come back.",
+		"help": "Pick a provider with a ready key, then a model.",
 		"addKey": "Add a model key",
 		"required": "Choose a model to continue."
 	},
 	"run": {
 		"heading": "Ready to run",
-		"help": "A small first run: a few tasks, one trial each. Most finish in a few minutes.",
+		"help": "A small first run. Most finish in a few minutes.",
 		"suite": "Suite",
 		"agent": "Agent",
 		"model": "Model",

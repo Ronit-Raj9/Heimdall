@@ -4,7 +4,9 @@ import { Input } from "@/components/ui/input";
 import { useGetAgentsQuery, useGetSuitesQuery } from "@/lib/store/apis/benchApi";
 import { useQuickRunMutation } from "@/lib/store/apis/quickrunApi";
 import type { QuickRunRequest, QuickRunResponse } from "@/lib/types/quickrun";
+import "@/lib/types/wizardI18n";
 import { Link } from "@tanstack/react-router";
+import { CircleCheck, Play, SlidersHorizontal, X, Zap } from "lucide-react";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
 
@@ -54,6 +56,7 @@ function formatCost(res: QuickRunResponse): string | null {
 /** The QuickRun dialog: asks only for what the caller did not give, then one POST /quickrun. */
 export function QuickRunDialog({ suite, agent, model, tasks, onClose }: QuickRunDialogProps) {
 	const { t } = useTranslation("quickrun");
+	const { t: tz } = useTranslation("wizard");
 	const suites = useGetSuitesQuery(undefined, { skip: !!suite });
 	const agents = useGetAgentsQuery(undefined, { skip: !!agent });
 	const [run, state] = useQuickRunMutation();
@@ -89,29 +92,46 @@ export function QuickRunDialog({ suite, agent, model, tasks, onClose }: QuickRun
 	const done = state.data;
 	const suiteList = suites.data?.suites ?? [];
 	const agentList = agents.data?.agents ?? [];
-	const fieldCls = "border-input bg-background w-full rounded-md border px-2 py-1 text-sm";
+	const fieldCls = "border-input bg-background h-9 w-full rounded-lg border px-2.5 text-sm transition-shadow focus-visible:ring-ring/50 focus-visible:ring-2 focus-visible:outline-none";
 
 	return (
-		<div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" data-testid="quickrun-backdrop">
+		<div className="animate-in fade-in fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4 backdrop-blur-sm duration-200" data-testid="quickrun-backdrop">
 			<div
 				role="dialog"
 				aria-modal="true"
 				aria-labelledby="quickrun-title"
-				className="bg-card text-card-foreground w-full max-w-lg space-y-4 rounded-lg border p-5 shadow-lg"
+				className="bg-card text-card-foreground animate-in zoom-in-95 slide-in-from-bottom-2 max-h-[90vh] w-full max-w-lg space-y-5 overflow-y-auto rounded-2xl border p-6 shadow-2xl duration-200"
 				data-testid="quickrun-dialog"
 			>
-				<div>
-					<h2 id="quickrun-title" className="text-lg font-semibold">
-						{t("title")}
-					</h2>
-					<p className="text-muted-foreground text-sm">{t("intro")}</p>
+				<div className="flex items-start gap-3">
+					<span className="bg-primary text-primary-foreground flex size-10 shrink-0 items-center justify-center rounded-xl shadow-sm" aria-hidden="true">
+						<Zap className="size-5" />
+					</span>
+					<div className="flex min-w-0 flex-1 flex-col gap-0.5">
+						<h2 id="quickrun-title" className="text-lg font-semibold tracking-tight">
+							{tz("quick.title")}
+						</h2>
+						<p className="text-muted-foreground text-sm">{tz("quick.intro")}</p>
+					</div>
+					<button type="button" onClick={onClose} className="text-muted-foreground hover:bg-accent hover:text-foreground -mt-1 -mr-1 rounded-lg p-1.5 transition-colors" aria-label={t("close")}>
+						<X className="size-4" aria-hidden="true" />
+					</button>
 				</div>
 
 				{done ? (
-					<div className="space-y-2 text-sm" data-testid="quickrun-done">
-						<p className="font-medium">{done.started ? t("started", { id: done.exp_id }) : t("created", { id: done.exp_id })}</p>
-						<p>{formatCost(done) ? t("estimate", { cost: formatCost(done) }) : t("estimateUnknown")}</p>
-						<p className="text-muted-foreground font-mono text-xs">{t("savedAs", { path: done.path })}</p>
+					<div className="animate-in fade-in zoom-in-95 space-y-4 text-sm duration-300" data-testid="quickrun-done">
+						<div className="bg-chart-success/10 border-chart-success/40 flex flex-col items-center gap-2 rounded-xl border p-5 text-center">
+							<span className="bg-chart-success/15 text-chart-success-ink flex size-12 items-center justify-center rounded-full">
+								<CircleCheck className="size-6" aria-hidden="true" />
+							</span>
+							<p className="text-base font-semibold">{done.started ? tz("quick.startedTitle") : tz("quick.createdTitle")}</p>
+							<p className="text-muted-foreground">{done.started ? t("started", { id: done.exp_id }) : t("created", { id: done.exp_id })}</p>
+						</div>
+						<p className="text-center">{formatCost(done) ? t("estimate", { cost: formatCost(done) }) : t("estimateUnknown")}</p>
+						<details className="text-muted-foreground text-xs">
+							<summary className="cursor-pointer">{tz("quick.details")}</summary>
+							<p className="mt-1 font-mono">{t("savedAs", { path: done.path })}</p>
+						</details>
 						<div className="flex justify-end gap-2 pt-2">
 							<Button variant="outline" onClick={onClose}>
 								{t("close")}
@@ -125,7 +145,7 @@ export function QuickRunDialog({ suite, agent, model, tasks, onClose }: QuickRun
 					</div>
 				) : (
 					<form
-						className="space-y-3"
+						className="space-y-4"
 						onSubmit={(e) => {
 							e.preventDefault();
 							submit();
@@ -173,9 +193,9 @@ export function QuickRunDialog({ suite, agent, model, tasks, onClose }: QuickRun
 								<ModelPicker value={modelV} onChange={setModel} purpose="agent" testId="quickrun-model" />
 							</div>
 						)}
-						<div className="space-y-1 text-sm">
-							<label className="flex items-center gap-2">
-								<input type="checkbox" checked={compareOn} onChange={(e) => setCompareOn(e.target.checked)} data-testid="quickrun-compare-toggle" />
+						<div className="bg-muted/30 space-y-2 rounded-xl border p-3 text-sm">
+							<label className="flex cursor-pointer items-center gap-2 font-medium">
+								<input type="checkbox" className="accent-primary size-4" checked={compareOn} onChange={(e) => setCompareOn(e.target.checked)} data-testid="quickrun-compare-toggle" />
 								<span>{t("compare")}</span>
 							</label>
 							{compareOn ? (
@@ -184,7 +204,15 @@ export function QuickRunDialog({ suite, agent, model, tasks, onClose }: QuickRun
 								<p className="text-muted-foreground text-xs">{t("compareHint")}</p>
 							)}
 						</div>
-						<div className="grid grid-cols-3 gap-2">
+						<details className="group rounded-xl border">
+							<summary className="hover:bg-accent/40 flex cursor-pointer list-none items-center gap-2 rounded-xl px-3 py-2.5 text-sm font-medium">
+								<SlidersHorizontal className="text-muted-foreground size-4" aria-hidden="true" />
+								{tz("quick.advanced")}
+								<span className="text-muted-foreground ml-auto text-xs tabular-nums">
+									{tasksV} x {trialsV}, ${budgetV}
+								</span>
+							</summary>
+						<div className="grid grid-cols-3 gap-2 border-t p-3">
 							<label className="space-y-1 text-sm">
 								<span className="font-medium">{t("tasks")}</span>
 								<Input type="number" min={1} max={50} value={tasksV} onChange={(e) => setTasks(Math.max(1, Number(e.target.value) || 1))} data-testid="quickrun-tasks" />
@@ -198,6 +226,7 @@ export function QuickRunDialog({ suite, agent, model, tasks, onClose }: QuickRun
 								<Input type="number" min={0.5} max={100} step={0.5} value={budgetV} onChange={(e) => setBudget(Math.max(0.5, Number(e.target.value) || 5))} />
 							</label>
 						</div>
+						</details>
 						{missingModel && (
 							<p className="text-destructive text-sm" role="alert">
 								{t("modelRequired")}
@@ -212,7 +241,8 @@ export function QuickRunDialog({ suite, agent, model, tasks, onClose }: QuickRun
 							<Button type="button" variant="outline" onClick={onClose}>
 								{t("cancel")}
 							</Button>
-							<Button type="submit" disabled={state.isLoading} data-testid="quickrun-submit">
+							<Button type="submit" disabled={state.isLoading} className="min-w-32 shadow-sm" data-testid="quickrun-submit">
+								<Play className={state.isLoading ? "size-4 animate-pulse" : "size-4"} aria-hidden="true" />
 								{state.isLoading ? t("submitting") : t("submit")}
 							</Button>
 						</div>

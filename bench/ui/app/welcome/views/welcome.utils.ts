@@ -80,3 +80,75 @@ export function errorMessageOf(err: unknown, fallback: string): string {
 	const m = data?.message ?? data?.error?.message;
 	return typeof m === "string" && m ? m : fallback;
 }
+
+/** Benchmark families the wizard groups suites into, in display order. */
+export const SUITE_CATEGORIES = ["coding", "terminal", "memory", "computer", "browser", "voice", "support", "research", "safety", "multiagent", "tools"] as const;
+export type SuiteCategory = (typeof SUITE_CATEGORIES)[number];
+
+const TRACK_CATEGORY: Record<string, SuiteCategory> = {
+	coding: "coding",
+	artifact: "coding",
+	skills: "coding",
+	terminal: "terminal",
+	memory: "memory",
+	computer_use: "computer",
+	browser: "browser",
+	support: "support",
+	qa: "research",
+	safety: "safety",
+	tool_use: "tools",
+	mcp: "tools",
+};
+
+const KEYWORD_CATEGORY: [RegExp, SuiteCategory][] = [
+	[/voice|speech|audio|stt|tts/, "voice"],
+	[/multi[-_ ]?agent|swarm|team/, "multiagent"],
+	[/research|search|deep[-_ ]?dive/, "research"],
+	[/memory|recall|longmem/, "memory"],
+	[/browser|web[-_ ]?arena|webshop/, "browser"],
+	[/computer|desktop|osworld|gui/, "computer"],
+	[/support|customer|helpdesk|tau/, "support"],
+	[/safety|jailbreak|red[-_ ]?team|harm/, "safety"],
+	[/terminal|shell|bash|cli/, "terminal"],
+];
+
+/** The benchmark family of a suite: obvious words in its id or description first, then its track. */
+export function categoryOf(suite: Pick<SuiteSummary, "id" | "description" | "track">): SuiteCategory {
+	const text = `${suite.id} ${suite.description ?? ""}`.toLowerCase();
+	const strong = KEYWORD_CATEGORY.find(([re]) => re.test(suite.id.toLowerCase()));
+	if (strong) return strong[1];
+	if (suite.track && suite.track !== "coding" && TRACK_CATEGORY[suite.track]) return TRACK_CATEGORY[suite.track];
+	const weak = KEYWORD_CATEGORY.find(([re]) => re.test(text));
+	return weak?.[1] ?? (suite.track ? (TRACK_CATEGORY[suite.track] ?? "coding") : "coding");
+}
+
+/** A suite can run right now: it has tasks and no load error. */
+export function suiteReady(suite: Pick<SuiteSummary, "task_count" | "error">): boolean {
+	return suite.task_count > 0 && !suite.error;
+}
+
+/** "coding-core" as "Coding core". */
+export function prettyName(id: string): string {
+	const s = id.replace(/[-_]+/g, " ").trim();
+	return s ? s[0].toUpperCase() + s.slice(1) : id;
+}
+
+/** Rough dollars of one run of a model: small models cost cents, frontier models more. */
+export function roughRunUsd(model: string): number {
+	const m = model.toLowerCase();
+	if (/nano|mini|flash|haiku|small|lite|8b|7b/.test(m)) return 0.02;
+	if (/opus|ultra|pro|o1|o3|large/.test(m)) return 0.4;
+	return 0.12;
+}
+
+/** Rough cost of a wizard run: two arms of tasks x trials runs each. */
+export function roughCostUsd(model: string, tasks: number, trials = 1): number {
+	return Math.round(roughRunUsd(model) * tasks * trials * 2 * 100) / 100;
+}
+
+/** Two-letter badge text of a name: "claude-code" as "CC", "codex" as "CO". */
+export function initialsOf(name: string): string {
+	const parts = name.split(/[-_ /.]+/).filter(Boolean);
+	if (parts.length >= 2) return (parts[0][0] + parts[1][0]).toUpperCase();
+	return name.slice(0, 2).toUpperCase();
+}

@@ -1,5 +1,6 @@
 import type { ModelRef } from "@/components/models/modelPicker";
 import { Button } from "@/components/ui/button";
+import { Play } from "lucide-react";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { QuickRunDialog } from "./quickRunDialog";
@@ -18,7 +19,8 @@ export function RunButton({ suite, agent, model, tasks, label }: RunButtonProps)
 	const [open, setOpen] = useState(false);
 	return (
 		<>
-			<Button onClick={() => setOpen(true)} data-testid="run-button">
+			<Button onClick={() => setOpen(true)} className="gap-1.5" data-testid="run-button">
+				<Play className="size-3.5" aria-hidden="true" />
 				{label ?? t("button")}
 			</Button>
 			{open && <QuickRunDialog suite={suite} agent={agent} model={model} tasks={tasks} onClose={() => setOpen(false)} />}
