@@ -149,6 +149,15 @@ func (l *launcher) chargeKeySpend(ctx context.Context, m *schemas.Manifest, runI
 // not observed (an unpriced model).
 func runKeyCharge(dir string, metrics map[string]schemas.Value, run *schemas.Run, m *schemas.Manifest) float64 {
 	c, known := engine.RunSpendUSD(dir, metrics, run)
+	// A run that never reached the model (an infrastructure abort before
+	// the agent started, or no model attempt at all) costs what was observed:
+	// charging it the unknown-cost estimate drained budgets on broken runs.
+	if run != nil && run.Outcome == schemas.OutcomeAbortedInfra {
+		return c
+	}
+	if v, ok := metrics["model_attempts"]; ok && v.V != nil && *v.V == 0 {
+		return c
+	}
 	if !known {
 		est := engine.DefaultUnknownRunUSD
 		if m != nil && m.Experiment.Budget.ReserveUSD > 0 {
