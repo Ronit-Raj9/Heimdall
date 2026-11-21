@@ -276,3 +276,36 @@ func TestHelperToolsCheck(t *testing.T) {
 		})
 	}
 }
+
+// TestToolProxyBinaryCheck runs the doctor row against a fake docker. The
+// "dynamic binary" case is what Docker prints when bin/bifrost-bench was built
+// without CGO_ENABLED=0 and copied into the Alpine image: image inspect
+// passes, but the binary cannot start, so every tool proxy and event
+// collector exits 255 (seen live on 21 Nov 2026).
+func TestToolProxyBinaryCheck(t *testing.T) {
+	tests := []struct {
+		name   string
+		img    string
+		script string // body of the fake docker; $1 is the docker subcommand
+		want   schemas.DoctorCheck
+	}{
+		{"static binary", "", `[ "$1" = image ] && { echo sha256:abc; exit 0; }; echo 0.1.0`,
+			schemas.DoctorCheck{ID: "tool proxy binary", Status: schemas.DoctorPass, Detail: "bench/bifrost-bench:dev runs bifrost-bench 0.1.0"}},
+		{"dynamic binary", "", `[ "$1" = image ] && { echo sha256:abc; exit 0; }; echo "exec /usr/local/bin/bifrost-bench: no such file or directory" >&2; exit 255`,
+			schemas.DoctorCheck{ID: "tool proxy binary", Status: schemas.DoctorFail, Detail: "bifrost-bench in bench/bifrost-bench:dev exited 255: exec /usr/local/bin/bifrost-bench: no such file or directory; rebuild it static: make -C bench bin, then docker build -t bench/bifrost-bench:dev bench"}},
+		{"configured image missing", "acme/tp:1", `echo "No such image" >&2; exit 1`,
+			schemas.DoctorCheck{ID: "tool proxy binary", Status: schemas.DoctorWarn, Detail: "acme/tp:1 missing; run make -C bench images"}},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			bin := filepath.Join(t.TempDir(), "docker")
+			if err := os.WriteFile(bin, []byte("#!/bin/sh\n"+tt.script+"\n"), 0o755); err != nil {
+				t.Fatal(err)
+			}
+			a := &app{cfg: &lib.Config{Images: lib.ImagesConfig{ToolProxy: tt.img}}, docker: utils.Docker{Binary: bin}}
+			if got := a.toolProxyBinaryCheck(context.Background()); got != tt.want {
+				t.Fatalf("got %+v, want %+v", got, tt.want)
+			}
+		})
+	}
+}
