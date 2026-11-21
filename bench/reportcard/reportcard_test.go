@@ -322,8 +322,8 @@ func TestBuildScoreModeHidesRepeatArm(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(rep.Arms) != 1 || rep.Arms[0].Label != "A" {
-		t.Fatalf("arms %+v", rep.Arms)
+	if len(rep.Arms) != 1 || rep.Arms[0].Label != "A" || rep.Mode != "score" {
+		t.Fatalf("arms %+v mode %q", rep.Arms, rep.Mode)
 	}
 	if rep.Overall != nil || rep.Benchmarks[0].Verdict != nil {
 		t.Fatalf("score mode has no verdict: %+v %+v", rep.Overall, rep.Benchmarks[0].Verdict)

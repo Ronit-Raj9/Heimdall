@@ -118,6 +118,7 @@ type Safety struct {
 type Report struct {
 	Evaluation   string                    `json:"evaluation"`
 	Status       string                    `json:"status,omitempty"`
+	Mode         string                    `json:"mode,omitempty"` // the evaluation's mode; "score" has one arm and no verdict
 	Arms         []Arm                     `json:"arms"`
 	Capabilities []Capability              `json:"capabilities"`
 	Benchmarks   []Benchmark               `json:"benchmarks"`
@@ -168,7 +169,7 @@ func Build(ctx context.Context, src leaderboard.Source, ev *schemas.Evaluation, 
 		faultOf = DefaultFault
 	}
 	rep := &Report{
-		Evaluation: ev.ID, Status: ev.Status, Arms: []Arm{}, Capabilities: []Capability{}, Benchmarks: []Benchmark{},
+		Evaluation: ev.ID, Status: ev.Status, Mode: ev.Spec.Mode, Arms: []Arm{}, Capabilities: []Capability{}, Benchmarks: []Benchmark{},
 		Reliability: []Reliability{}, Safety: Safety{AttackResisted: map[string]float64{}, CheatRate: map[string]float64{}},
 	}
 	// Score mode runs a hidden repeat of the one arm (to satisfy the

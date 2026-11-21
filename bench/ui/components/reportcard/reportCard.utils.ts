@@ -31,7 +31,34 @@ export function faultName(id: string): string {
 }
 
 export function isAB(report: Report): boolean {
-	return report.arms.length >= 2;
+	return report.mode !== "score" && report.arms.length >= 2;
+}
+
+function onlyLabel<T>(arms: Record<string, T> | undefined, label: string): Record<string, T> {
+	return arms && label in arms ? { [label]: arms[label] } : {};
+}
+
+/**
+ * The report as the page shows it. Mode "score" runs a hidden repeat of the one arm (the planner
+ * needs two arms); only the arm asked for is shown, with no A/B verdict.
+ */
+export function visibleReport(report: Report): Report {
+	if (report.mode !== "score") return report;
+	const arm = report.arms[0];
+	const label = arm?.label ?? "A";
+	return {
+		...report,
+		arms: arm ? [arm] : [],
+		capabilities: report.capabilities.map((c) => ({ ...c, arms: onlyLabel(c.arms, label) })),
+		benchmarks: report.benchmarks.map(({ verdict: _verdict, ...b }) => ({ ...b, arms: onlyLabel(b.arms, label) })),
+		reliability: report.reliability.map((r) => ({ ...r, arms: onlyLabel(r.arms, label) })),
+		safety: report.safety && {
+			...report.safety,
+			attack_resisted: onlyLabel(report.safety.attack_resisted, label),
+			cheat_rate: onlyLabel(report.safety.cheat_rate, label),
+		},
+		overall: undefined,
+	};
 }
 
 /** "codex v2 on gpt-6.2-sol". */

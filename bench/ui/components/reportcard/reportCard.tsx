@@ -18,6 +18,7 @@ import {
 	faultName,
 	headline,
 	isAB,
+	visibleReport,
 	pct,
 	points,
 	reportFileName,
@@ -30,7 +31,8 @@ export interface ReportCardProps {
 }
 
 /** The report card of one evaluation: headline answer, capabilities, benchmarks, reliability, safety. */
-export function ReportCard({ report, className }: ReportCardProps) {
+export function ReportCard({ report: raw, className }: ReportCardProps) {
+	const report = visibleReport(raw);
 	const ab = isAB(report);
 	const head = headline(report);
 	return (
