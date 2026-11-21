@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"math"
+	"net/url"
 	"sort"
 	"strings"
 	"unicode/utf8"
@@ -31,9 +32,11 @@ type corpusIndex struct {
 
 // buildCorpus makes the suite's corpus from the documents of the selected
 // queries (gold, evidence and hard negatives), one per docid, sorted by
-// docid. Two documents with one URL are refused: pages are cited and
-// fetched by URL.
+// docid. Pages are cited and fetched by URL, so two documents with one URL
+// (upstream has a few: two crawls of one page) are told apart first by
+// distinctURLs, which rewrites the queries in place.
 func buildCorpus(qs []query) (*corpusIndex, error) {
+	distinctURLs(qs)
 	byID := map[string]doc{}
 	for _, q := range qs {
 		for _, set := range [][]doc{q.Gold, q.Evidence, q.Negative} {
@@ -94,6 +97,100 @@ func buildCorpus(qs []query) (*corpusIndex, error) {
 		return nil, fmt.Errorf("index the corpus: %w", err)
 	}
 	return ix, nil
+}
+
+// docidQuery is the query parameter distinctURLs adds to a duplicate URL.
+const docidQuery = "bcp-docid"
+
+// distinctURLs gives every docid its own URL. Upstream's corpus has
+// documents with the same URL (after research.NormalizeURL) and different
+// texts. The smallest docid keeps the URL; every other one gets the
+// parameter bcp-docid=<docid> added to its query, in every query's gold,
+// evidence and negative lists, so citations, fetches and evidence recall
+// still name one page each.
+func distinctURLs(qs []query) {
+	// First give every page an http(s) URL: the corpus service and the
+	// websearch tool serve only those, and upstream has a few others
+	// (chrome-extension://.../https://..., empty).
+	for qi := range qs {
+		for _, set := range [][]doc{qs[qi].Gold, qs[qi].Evidence, qs[qi].Negative} {
+			for i := range set {
+				set[i].URL = httpURL(set[i].URL, set[i].DocID)
+			}
+		}
+	}
+	byKey := map[string][]string{}
+	urlOf := map[string]string{}
+	for _, q := range qs {
+		for _, set := range [][]doc{q.Gold, q.Evidence, q.Negative} {
+			for _, d := range set {
+				if _, ok := urlOf[d.DocID]; ok {
+					continue
+				}
+				urlOf[d.DocID] = d.URL
+				k := research.NormalizeURL(d.URL)
+				byKey[k] = append(byKey[k], d.DocID)
+			}
+		}
+	}
+	rewrite := map[string]string{}
+	for _, ids := range byKey {
+		if len(ids) < 2 {
+			continue
+		}
+		sort.Slice(ids, func(i, j int) bool { return docidLess(ids[i], ids[j]) })
+		for _, id := range ids[1:] {
+			rewrite[id] = withDocID(urlOf[id], id)
+		}
+	}
+	if len(rewrite) == 0 {
+		return
+	}
+	for qi := range qs {
+		for _, set := range [][]doc{qs[qi].Gold, qs[qi].Evidence, qs[qi].Negative} {
+			for i := range set {
+				if u, ok := rewrite[set[i].DocID]; ok {
+					set[i].URL = u
+				}
+			}
+		}
+	}
+}
+
+// placeholderHost names pages whose upstream URL holds no http(s) URL.
+const placeholderHost = "https://browsecomp-plus.invalid/doc/"
+
+// httpURL returns raw when it is an http(s) URL with a host, else the first
+// http(s) URL embedded in it (chrome-extension://<id>/https://...), else a
+// placeholder naming the docid.
+func httpURL(raw, id string) string {
+	if isHTTP(raw) {
+		return raw
+	}
+	for _, scheme := range []string{"https://", "http://"} {
+		if i := strings.Index(raw, scheme); i > 0 && isHTTP(raw[i:]) {
+			return raw[i:]
+		}
+	}
+	return placeholderHost + url.PathEscape(id)
+}
+
+func isHTTP(raw string) bool {
+	u, err := url.Parse(strings.TrimSpace(raw))
+	return err == nil && (u.Scheme == "http" || u.Scheme == "https") && u.Host != ""
+}
+
+// withDocID adds bcp-docid=<id> to the query of raw, before any fragment.
+func withDocID(raw, id string) string {
+	frag := ""
+	if i := strings.IndexByte(raw, '#'); i >= 0 {
+		raw, frag = raw[:i], raw[i:]
+	}
+	sep := "?"
+	if strings.Contains(raw, "?") {
+		sep = "&"
+	}
+	return raw + sep + docidQuery + "=" + id + frag
 }
 
 // docidLess orders numeric docids numerically, others as text.
