@@ -51,7 +51,14 @@
 		"anyKey": "Any key for this provider",
 		"noKey": "No key for this provider yet",
 		"addKey": "Add key",
-		"custom": "Type a model name"
+		"custom": "Type a model name",
+		"choose": "Choose a model",
+		"fromKeys": "From your keys",
+		"suggested": "Suggested",
+		"other": "Other model...",
+		"current": "Current",
+		"noKeyShort": "no key",
+		"keyInvalid": "key not working"
 	},
 	"unavailableAction": "Read the hosting guide",
 	"emptyViewer": "No API keys yet. Ask an org admin to add one. Meanwhile you can browse finished comparisons.",

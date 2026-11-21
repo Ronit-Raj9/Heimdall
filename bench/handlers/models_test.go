@@ -134,6 +134,25 @@ func TestModelKeyTestCall(t *testing.T) {
 	if r.StatusCode() != 200 {
 		t.Fatalf("catalog: %d", r.StatusCode())
 	}
+	// The catalog carries the models each key's provider listed at its last
+	// successful test, so the picker can offer them in a dropdown.
+	var cat ModelsCatalogResponse
+	if err := json.Unmarshal(r.Body(), &cat); err != nil {
+		t.Fatal(err)
+	}
+	got := map[string][]string{}
+	for _, k := range cat.Keys {
+		got[k.ID] = k.ModelsAvailable
+	}
+	if g := got[good]; len(g) != 2 || g[0] != "llama-3-8b" || g[1] != "qwen-7b" {
+		t.Fatalf("good key models_available: %v (%s)", g, r.Body())
+	}
+	if g, ok := got[bad]; !ok || g == nil || len(g) != 0 {
+		t.Fatalf("bad key models_available: %v", g)
+	}
+	if !strings.Contains(string(r.Body()), `"models_available":[]`) {
+		t.Fatalf("empty models_available must be [] not null: %s", r.Body())
+	}
 }
 
 func TestModelKeysHostedBaseURL(t *testing.T) {

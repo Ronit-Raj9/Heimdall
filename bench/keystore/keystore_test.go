@@ -53,6 +53,27 @@ func TestStoreRoundTrip(t *testing.T) {
 			if err := s.SetStatus(ctx, "org_a", k.ID, keystore.StatusOK, time.Now()); err != nil {
 				t.Fatal(err)
 			}
+			// Listed models are stored sorted, deduplicated and capped.
+			as, ok := s.(keystore.AvailableSetter)
+			if !ok {
+				t.Fatal("store does not remember listed models")
+			}
+			if len(k.ModelsAvailable) != 0 {
+				t.Fatalf("new key models_available = %v", k.ModelsAvailable)
+			}
+			many := []string{"zeta", "alpha", "alpha", ""}
+			for i := 0; i < 300; i++ {
+				many = append(many, "m"+strings.Repeat("x", i%7)+string(rune('a'+i%26))+time.Duration(i).String())
+			}
+			if err := as.SetModelsAvailable(ctx, "org_a", k.ID, many); err != nil {
+				t.Fatal(err)
+			}
+			if g, _ := s.Get(ctx, "org_a", k.ID); len(g.ModelsAvailable) != keystore.MaxModelsAvailable || g.ModelsAvailable[0] != "alpha" {
+				t.Fatalf("models_available = %d %v", len(g.ModelsAvailable), g.ModelsAvailable[:3])
+			}
+			if err := as.SetModelsAvailable(ctx, "org_b", k.ID, []string{"x"}); !errors.Is(err, keystore.ErrNotFound) {
+				t.Fatalf("cross-org set models: %v", err)
+			}
 			// Update without a value keeps it and the status.
 			u, err := s.Update(ctx, "org_a", k.ID, keystore.Put{Provider: "openai", Label: "renamed", BudgetUSD: 5}, "u1")
 			if err != nil || u.Label != "renamed" || u.Status != keystore.StatusOK || u.Last4 != "abcd" {

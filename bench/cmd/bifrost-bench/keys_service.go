@@ -147,3 +147,16 @@ func (l *lazyKeyStore) AddSpend(ctx context.Context, orgID, id string, usd float
 	}
 	return s.AddSpend(ctx, orgID, id, usd)
 }
+
+// SetModelsAvailable passes through to the opened store when it remembers
+// listed models (keystore.AvailableSetter).
+func (l *lazyKeyStore) SetModelsAvailable(ctx context.Context, orgID, id string, models []string) error {
+	s, err := l.get(ctx)
+	if err != nil {
+		return err
+	}
+	if as, ok := s.(keystore.AvailableSetter); ok {
+		return as.SetModelsAvailable(ctx, orgID, id, models)
+	}
+	return nil
+}

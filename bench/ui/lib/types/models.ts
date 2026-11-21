@@ -12,6 +12,8 @@ export interface ModelKey {
 	last4: string;
 	status: ModelKeyStatus;
 	models: string[];
+	/** Model ids the provider listed at the key's last successful test (sorted, at most 200). */
+	models_available?: string[];
 	budget_usd: number;
 	month_spent_usd: number;
 	over_budget: boolean;
