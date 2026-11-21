@@ -158,8 +158,22 @@ func (im *importer) Import(ctx context.Context, opts importers.Options) (*import
 			if fi, err := os.Stat(src); err != nil || !fi.IsDir() {
 				continue
 			}
-			if err := copyTree(src, filepath.Join(dst, "skill-sets", set)); err != nil {
+			skills, err := os.ReadDir(src)
+			if err != nil {
 				return nil, err
+			}
+			for _, sk := range skills {
+				if !sk.IsDir() {
+					continue
+				}
+				if _, err := os.Stat(filepath.Join(src, sk.Name(), "SKILL.md")); err != nil {
+					continue // incomplete download: a skill without SKILL.md would refuse the run
+				}
+				// Upstream names such as "benchflow-ai--FFmpeg Audio
+				// Processing" are not valid skill folder names.
+				if err := copyTree(filepath.Join(src, sk.Name()), filepath.Join(dst, "skill-sets", set, safeName(sk.Name()))); err != nil {
+					return nil, err
+				}
 			}
 			counts[set]++
 		}
@@ -291,6 +305,17 @@ EXPOSE 8742
 CMD ["python", "http_server.py", "--port", "8742"]
 `
 	return os.WriteFile(filepath.Join(dst, "Dockerfile"), []byte(df), 0o644)
+}
+
+func safeName(n string) string {
+	b := []byte(n)
+	for i, c := range b {
+		ok := c >= 'a' && c <= 'z' || c >= 'A' && c <= 'Z' || c >= '0' && c <= '9' || (i > 0 && (c == '.' || c == '_' || c == '-'))
+		if !ok {
+			b[i] = '-'
+		}
+	}
+	return string(b)
 }
 
 func asList(v any) []any { l, _ := v.([]any); return l }

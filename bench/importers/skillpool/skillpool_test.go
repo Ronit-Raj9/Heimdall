@@ -37,13 +37,15 @@ func TestImport(t *testing.T) {
 	})
 	from := filepath.Join(tmp, "ds")
 	write(t, from, map[string]string{
-		"repo/data/find-skills/SKILL.md":                           "---\nname: finding-skills\n---\ncurl -s \"http://localhost:8742/keyword?q=x\"\n",
-		"repo/search_server/http_server.py":                        "x",
-		"repo/search_server/bm25_search.py":                        "x",
-		"repo/search_server/semantic_search.py":                    "x",
-		"hf/unz/skills.db":                                         "db",
-		"hf/unz/o--n/SKILL.md":                                     "pool skill",
-		"hf/skillsbench/curated/t1/skills/a/SKILL.md":              "a",
+		"repo/data/find-skills/SKILL.md":                                  "---\nname: finding-skills\n---\ncurl -s \"http://localhost:8742/keyword?q=x\"\n",
+		"repo/search_server/http_server.py":                               "x",
+		"repo/search_server/bm25_search.py":                               "x",
+		"repo/search_server/semantic_search.py":                           "x",
+		"hf/unz/skills.db":                                                "db",
+		"hf/unz/o--n/SKILL.md":                                            "pool skill",
+		"hf/skillsbench/curated/t1/skills/a/SKILL.md":                     "a",
+		"hf/skillsbench/curated/t1/skills/x Y (z)/SKILL.md":               "s",
+		"hf/skillsbench/curated/t1/skills/partial/scripts/a.py":           "no SKILL.md",
 		"hf/skillsbench/retrieved_w_curated/claude/t1/skills/r/SKILL.md":  "r",
 		"hf/skillsbench/retrieved_wo_curated/claude/t2/skills/q/SKILL.md": "q",
 	})
@@ -57,7 +59,7 @@ func TestImport(t *testing.T) {
 		t.Fatalf("tasks %v", res.Tasks)
 	}
 	sd := res.SuiteDir
-	for _, p := range []string{"base/Dockerfile", "tasks/t1/skills/a/SKILL.md", "tasks/t1/skill-sets/curated/a/SKILL.md",
+	for _, p := range []string{"base/Dockerfile", "tasks/t1/skills/a/SKILL.md", "tasks/t1/skill-sets/curated/a/SKILL.md", "tasks/t1/skill-sets/curated/x-Y--z-/SKILL.md",
 		"tasks/t1/skill-sets/retrieved/r/SKILL.md", "tasks/t2/skill-sets/retrieved-wo-curated/q/SKILL.md",
 		"tasks/t2/skill-sets/pool/finding-skills/SKILL.md", "services/skills-pool/Dockerfile",
 		"services/skills-pool/search_server/index/skills.db", "services/skills-pool/skills/o--n/SKILL.md", "experiment-skills-pool.yaml"} {
