@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"encoding/json"
+	"math"
 	"os"
 	"path/filepath"
 	"testing"
@@ -41,7 +42,7 @@ func TestAgentLeaderboardRows(t *testing.T) {
 	if err := os.WriteFile(filepath.Join(dir, "versions.json"), []byte(`[{"version":1,"hash":"aaa"},{"version":2,"hash":"sha256:bbb"}]`), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	status, b := getAgentBoard(t, leaderboardIndex(), root, "")
+	status, b := getAgentBoard(t, leaderboardIndex(), root, "?capability=coding")
 	if status != fasthttp.StatusOK {
 		t.Fatalf("status = %d", status)
 	}
@@ -68,7 +69,7 @@ func TestAgentLeaderboardRows(t *testing.T) {
 }
 
 func TestAgentLeaderboardNoVersions(t *testing.T) {
-	_, b := getAgentBoard(t, leaderboardIndex(), t.TempDir(), "")
+	_, b := getAgentBoard(t, leaderboardIndex(), t.TempDir(), "?capability=coding")
 	// Without an index each config hash is its own row, version 0.
 	if len(b.Rows) != 2 || b.Rows[0].Version != 0 || b.Rows[0].ConfigHash != "sha256:bbb" {
 		t.Errorf("rows = %+v", b.Rows)
@@ -101,5 +102,66 @@ func TestAgentLeaderboardFilters(t *testing.T) {
 	}
 	if status, _ := getAgentBoard(t, nil, "", ""); status != fasthttp.StatusServiceUnavailable {
 		t.Errorf("no index status = %d", status)
+	}
+}
+
+// TestAgentLeaderboardNeverBlendsCapabilities: rows rank only by the
+// selected capability. A row strong on coding but weak on memory must not
+// lose to a row with a higher mean over whatever capabilities it has; with
+// no capability selected there is no score order at all.
+func TestAgentLeaderboardNeverBlendsCapabilities(t *testing.T) {
+	mk := func(agent string, runs int, caps map[string][2]int) *rowAcc {
+		acc := &rowAcc{row: AgentLeaderboardRow{Agent: agent, Model: "m", ConfigHash: agent, Runs: runs}, caps: map[string]*capAcc{}}
+		for c, sn := range caps {
+			acc.caps[c] = &capAcc{succ: sn[0], n: sn[1], benchmarks: []string{c + "-bench"}}
+		}
+		return acc
+	}
+	rows := func() map[string]*rowAcc {
+		return map[string]*rowAcc{
+			// coding 0.9, memory 0.1: mean 0.5
+			"zeta": mk("zeta", 20, map[string][2]int{"coding": {9, 10}, "memory": {1, 10}}),
+			// coding 0.6 only: mean 0.6
+			"alpha": mk("alpha", 10, map[string][2]int{"coding": {6, 10}}),
+			// memory 0.5 only
+			"mid": mk("mid", 30, map[string][2]int{"memory": {5, 10}}),
+		}
+	}
+	now := time.Date(2026, 11, 21, 0, 0, 0, 0, time.UTC)
+	order := func(b *AgentLeaderboard) []string {
+		var out []string
+		for _, r := range b.Rows {
+			out = append(out, r.Agent)
+		}
+		return out
+	}
+	eq := func(a, b []string) bool {
+		if len(a) != len(b) {
+			return false
+		}
+		for i := range a {
+			if a[i] != b[i] {
+				return false
+			}
+		}
+		return true
+	}
+	if got := order(foldRows(rows(), "coding", "", now)); !eq(got, []string{"zeta", "alpha"}) {
+		t.Errorf("by coding = %v, want [zeta alpha] (coding 0.9 over 0.6, memory ignored)", got)
+	}
+	if got := order(foldRows(rows(), "memory", "", now)); !eq(got, []string{"mid", "zeta"}) {
+		t.Errorf("by memory = %v, want [mid zeta]", got)
+	}
+	// No capability: listed by agent name, not by a blended mean (which
+	// would put alpha 0.6 > zeta 0.5 > mid 0.5 or similar).
+	if got := order(foldRows(rows(), "", "", now)); !eq(got, []string{"alpha", "mid", "zeta"}) {
+		t.Errorf("no capability = %v, want by agent [alpha mid zeta]", got)
+	}
+	// Scores themselves stay per capability.
+	b := foldRows(rows(), "", "", now)
+	for _, r := range b.Rows {
+		if r.Agent == "zeta" && (math.Abs(r.Capabilities["coding"].Score-0.9) > 1e-9 || math.Abs(r.Capabilities["memory"].Score-0.1) > 1e-9) {
+			t.Errorf("zeta capabilities = %+v", r.Capabilities)
+		}
 	}
 }

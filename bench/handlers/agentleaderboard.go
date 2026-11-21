@@ -175,9 +175,11 @@ func (h *LeaderboardHandler) buildAgentBoard(ctx context.Context, capFilter, mod
 	return foldRows(rows, capFilter, modelFilter, now), nil
 }
 
-// foldRows finishes the rows, applies the filters and orders them: by the
-// filtered capability's score, else by the mean of the row's capability
-// scores, then by more runs, then by agent, version and model.
+// foldRows finishes the rows, applies the filters and orders them. With a
+// capability filter, rows rank by that capability's score; without one there
+// is no single score to rank by (capabilities come from different benchmarks
+// and are never blended), so rows are listed by agent, then more runs, then
+// version and model. Ties break on more runs, agent, version, model, hash.
 func foldRows(rows map[string]*rowAcc, capFilter, modelFilter string, now time.Time) *AgentLeaderboard {
 	out := &AgentLeaderboard{Capabilities: []string{}, Models: []string{}, Capability: capFilter, Model: modelFilter, Rows: []AgentLeaderboardRow{}, GeneratedAt: now}
 	capsSeen, modelsSeen := map[string]bool{}, map[string]bool{}
@@ -218,24 +220,18 @@ func foldRows(rows map[string]*rowAcc, capFilter, modelFilter string, now time.T
 		}
 		out.Rows = append(out.Rows, r)
 	}
-	scoreOf := func(r AgentLeaderboardRow) float64 {
-		if capFilter != "" {
-			return r.Capabilities[capFilter].Score
-		}
-		var sum float64
-		for _, c := range r.Capabilities {
-			sum += c.Score
-		}
-		return sum / float64(len(r.Capabilities))
-	}
 	slices.SortStableFunc(out.Rows, func(ra, rb AgentLeaderboardRow) int {
-		ka, kb := scoreOf(ra), scoreOf(rb)
-		switch {
-		case ka != kb:
-			if ka > kb {
-				return -1
+		if capFilter != "" {
+			if ka, kb := ra.Capabilities[capFilter].Score, rb.Capabilities[capFilter].Score; ka != kb {
+				if ka > kb {
+					return -1
+				}
+				return 1
 			}
-			return 1
+		} else if ra.Agent != rb.Agent {
+			return strings.Compare(ra.Agent, rb.Agent)
+		}
+		switch {
 		case ra.Runs != rb.Runs:
 			return rb.Runs - ra.Runs
 		case ra.Agent != rb.Agent:
