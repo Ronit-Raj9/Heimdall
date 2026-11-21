@@ -1,0 +1,45 @@
+{
+	"title": "Usage and spend",
+	"subtitle": "What your runs cost, from each sealed run's metrics, plus the month spend recorded on your provider keys.",
+	"from": "From",
+	"to": "To",
+	"groupBy": "Group by",
+	"group": { "day": "Day", "model": "Model", "agent": "Agent", "key": "Key" },
+	"scope": { "org": "This organization", "platform": "Whole platform" },
+	"totals": {
+		"cost": "Run cost",
+		"tokens": "Tokens",
+		"runs": "Sealed runs",
+		"keys": "Key spend this month",
+		"unknown": "{{count}} run(s) without a measured cost are left out of the cost total."
+	},
+	"table": {
+		"group": "Group",
+		"cost": "Cost (USD)",
+		"tokens": "Tokens",
+		"runs": "Runs",
+		"unknown": "Cost unknown",
+		"label": "Usage by {{group}}"
+	},
+	"keys": {
+		"title": "Provider keys",
+		"label": "Key",
+		"provider": "Provider",
+		"budget": "Monthly budget",
+		"spent": "Spent this month",
+		"noBudget": "none",
+		"empty": "No provider keys yet. Add one on Models & keys so runs can use your own account.",
+		"add": "Add a key"
+	},
+	"chart": { "summary": "Cost by {{group}}, {{count}} groups, total {{total}}" },
+	"empty": "No sealed runs between {{from}} and {{to}}. Run an experiment, or widen the date range.",
+	"emptyAction": "Start a run",
+	"error": "Could not load usage: {{message}}",
+	"admin": {
+		"title": "Platform usage by organization",
+		"org": "Organization",
+		"forbidden": "Platform usage is for server admins. Ask the operator to add your email to HEIMDALL_SERVER_ADMINS.",
+		"empty": "No organizations yet.",
+		"orgError": "Could not read: {{error}}"
+	}
+}
