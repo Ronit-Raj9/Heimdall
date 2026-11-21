@@ -294,13 +294,19 @@ func (h *evaluationsHandler) create(ctx *fasthttp.RequestCtx) {
 		h.fail(ctx, statusOf(err), err.Error())
 		return
 	}
-	if s.Keys != nil { // G10: refuse a model whose org keys are all over budget before anything is written
-		var provs, ids []string
+	{ // G10 budgets, X01 own keys: refuse before anything is written
+		var provs []string
 		for _, a := range spec.Arms {
-			provs, ids = append(provs, a.Provider), append(ids, "")
+			provs = append(provs, a.Provider)
 		}
-		if err := KeyBudgetRefusal(work, s.Keys, quickOrgID(ctx, s.OrgID), provs, ids); err != nil {
-			h.fail(ctx, fasthttp.StatusConflict, err.Error())
+		var keys KeySource
+		if s.Keys != nil {
+			keys = s.Keys
+		}
+		if err := ModelKeyRefusal(work, keys, quickOrgID(ctx, s.OrgID), provs, nil, s.Hosted); err != nil {
+			if !SendModelKeyRefusal(ctx, h.env.Mode, err) {
+				h.fail(ctx, fasthttp.StatusConflict, err.Error())
+			}
 			return
 		}
 	}

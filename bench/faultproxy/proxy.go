@@ -55,8 +55,10 @@ const (
 //
 // Each provider's real key is read once, at NewServer, from the environment
 // variable its ProviderSpec names (through Getenv). A provider with no key
-// answers from the scripted model when its format has one (anthropic,
-// openai) and with a 503 "no key configured" otherwise. Upstream and
+// answers with a 503 "no key configured", unless ScriptedFallback is set (or
+// its table entry says scripted) and its format has a scripted model
+// (anthropic, openai). A run bound to a scripted plan is answered by the
+// scripted model either way. Upstream and
 // UpstreamKey are the older single-provider form and apply to anthropic
 // only: "scripted" forces its scripted model, a URL replaces its base URL and
 // then needs UpstreamKey.
@@ -68,9 +70,13 @@ type Config struct {
 	UpstreamKey   string // anthropic only: real key for Upstream, never logged
 	Providers     []ProviderSpec
 	Getenv        func(string) string // os.Getenv when nil
-	LedgerPath    string
-	Slots         []SlotConfig
-	Logger        schemas.Logger
+	// ScriptedFallback answers anthropic and openai requests from the
+	// scripted model when their key is empty (local development only; the
+	// ledger labels every such call scripted). Off by default (X01).
+	ScriptedFallback bool
+	LedgerPath       string
+	Slots            []SlotConfig
+	Logger           schemas.Logger
 }
 
 // SlotConfig is one key slot of a provider in Bifrost. Bifrost key names are
@@ -131,6 +137,9 @@ func NewServer(cfg Config) (*Server, error) {
 	specs := cfg.Providers
 	if len(specs) == 0 {
 		specs = DefaultProviders()
+	}
+	if cfg.ScriptedFallback {
+		specs = withScriptedFallback(specs)
 	}
 	table, err := indexProviders(specs)
 	if err != nil {

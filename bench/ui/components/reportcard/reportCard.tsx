@@ -51,6 +51,11 @@ export function ReportCard({ report: raw, className }: ReportCardProps) {
 						{head.detail}
 					</p>
 					{ab && <ArmLegend arms={report.arms} />}
+					{report.practice_runs ? (
+						<p data-testid="report-card-practice" className="text-muted-foreground max-w-prose text-xs">
+							{report.note || `${report.practice_runs} practice runs were left out.`}
+						</p>
+					) : null}
 				</div>
 				<ExportButtons report={report} />
 			</header>

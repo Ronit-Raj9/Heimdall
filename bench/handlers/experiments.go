@@ -141,6 +141,9 @@ func (h *ExperimentsHandler) createExperiment(ctx *fasthttp.RequestCtx) {
 		return
 	}
 	if err != nil {
+		if SendModelKeyRefusal(ctx, h.mode, err) { // X01: a missing model key links to Models & keys
+			return
+		}
 		lib.SendError(ctx, h.mode, fasthttp.StatusBadRequest, lib.ErrTypeBadRequest, "plan experiment: "+err.Error())
 		return
 	}

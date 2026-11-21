@@ -65,7 +65,11 @@ func sendDepError(ctx *fasthttp.RequestCtx, mode schemas.Mode, what string, err 
 	switch {
 	case errors.Is(err, schemas.ErrNotFound):
 		lib.SendError(ctx, mode, fasthttp.StatusNotFound, lib.ErrTypeNotFound, what+": "+err.Error())
-	case errors.Is(err, schemas.ErrExists), errors.Is(err, ErrKeyOverBudget): // G10: a model key over its budget (keybudget.go)
+	case errors.Is(err, ErrKeyOverBudget), errors.Is(err, ErrModelKeyMissing): // G10 budgets, X01 own keys (keybudget.go)
+		lib.SendErrorLink(ctx, mode, fasthttp.StatusConflict, lib.ErrTypeConflict, what+": "+err.Error(), ModelKeysLink)
+	case errors.Is(err, ErrKeyStoreUnavailable), errors.Is(err, ErrDailyCap): // X01: fail closed; daily caps
+		lib.SendError(ctx, mode, fasthttp.StatusServiceUnavailable, lib.ErrTypeUnavailable, what+": "+err.Error())
+	case errors.Is(err, schemas.ErrExists):
 		lib.SendError(ctx, mode, fasthttp.StatusConflict, lib.ErrTypeConflict, what+": "+err.Error())
 	case errors.Is(err, schemas.ErrReadOnly):
 		lib.SendError(ctx, mode, fasthttp.StatusForbidden, lib.ErrTypeForbidden, what+": "+err.Error())

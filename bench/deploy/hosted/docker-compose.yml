@@ -223,9 +223,9 @@ services:
       BENCH_FAULTPROXY_LISTEN: ":9100"
       BENCH_FAULTPROXY_CONTROL_LISTEN: "0.0.0.0:9101"
       BENCH_FAULTPROXY_LEDGER: /var/lib/heimdall/ledger.jsonl
-      # Provider keys live here only. Empty: the scripted model, no spend.
-      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
-      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      # No server-wide provider keys and no scripted fallback: every org run
+      # uses the org's own keys from Models & keys, which runners register
+      # per lease. A keyless call fails with "no key configured".
     volumes:
       - ../bench.yaml:/etc/bench/bench.yaml:ro
       - faultproxy-ledger:/var/lib/heimdall

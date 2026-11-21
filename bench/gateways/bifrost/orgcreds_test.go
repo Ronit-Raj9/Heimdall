@@ -2,6 +2,7 @@ package bifrost
 
 import (
 	"context"
+	"errors"
 	"strings"
 	"testing"
 
@@ -10,7 +11,8 @@ import (
 
 // TestOrgProviderBinding checks that a run of an experiment bound to an
 // organization picks the organization's slots for a provider it has a key
-// for, and the shared slots otherwise.
+// for, the shared slots for an unbound experiment, and a refusal for a
+// bound experiment the organization has no key for (X01).
 func TestOrgProviderBinding(t *testing.T) {
 	g, err := New(Config{URL: "http://bifrost", SetupToken: "t", FaultProxyURL: "http://fp:9100",
 		Providers: []ProviderSetup{{Name: "anthropic", Model: "claude-sonnet-4-5", Slots: []Slot{{Name: "fp-slot-1", Value: "fp-slot-1"}}}}})
@@ -36,6 +38,35 @@ func TestOrgProviderBinding(t *testing.T) {
 	}
 	if _, _, err := g.runProvider(rc("exp_1", "openai")); err == nil {
 		t.Fatal("a provider neither the org nor the gateway has was accepted")
+	}
+	// X01: a bound experiment never falls back to the runner's own slots.
+	g.BindExperimentOrg("exp_3", "org_nokeys")
+	if _, _, err := g.runProvider(rc("exp_3", "anthropic")); !errors.Is(err, ErrNoOrgKey) || !strings.Contains(err.Error(), "Models & keys") {
+		t.Fatalf("bound run with no org key: %v, want ErrNoOrgKey", err)
+	}
+	practice := rc("exp_3", "anthropic")
+	practice.Experiment = &schemas.Experiment{Smoke: true}
+	if p, _, err := g.runProvider(practice); err != nil || p.Slots[0].Name != "fp-slot-1" {
+		t.Fatalf("practice run (scripted model only) must keep the shared slots: %+v %v", p, err)
+	}
+	oracle := rc("exp_3", "anthropic")
+	oracle.Agent.Adapter, oracle.Agent.Scripted = "scripted", &schemas.ScriptedSpec{Kind: "oracle"}
+	if _, _, err := g.runProvider(oracle); err != nil {
+		t.Fatalf("a scripted control that makes no model call: %v", err)
+	}
+	remote := rc("exp_3", "anthropic")
+	remote.Agent.Remote = &schemas.RemoteAgent{URL: "https://agent.example"}
+	if _, _, err := g.runProvider(remote); err != nil {
+		t.Fatalf("a deployed agent with external model traffic: %v", err)
+	}
+	remote.Agent.Remote.ModelTraffic = "gateway"
+	if _, _, err := g.runProvider(remote); !errors.Is(err, ErrNoOrgKey) {
+		t.Fatalf("a deployed agent routed through the gateway: %v, want ErrNoOrgKey", err)
+	}
+	toy := rc("exp_3", "anthropic")
+	toy.Agent.Adapter, toy.Agent.Scripted = "scripted", &schemas.ScriptedSpec{Kind: "toy"}
+	if _, _, err := g.runProvider(toy); !errors.Is(err, ErrNoOrgKey) {
+		t.Fatalf("the toy agent calls the model: %v, want ErrNoOrgKey", err)
 	}
 	if sp, ok := g.slotProvider(org.Slots[0].Name); !ok || sp.Name != "anthropic" {
 		t.Fatal("slotProvider does not know the org slot")

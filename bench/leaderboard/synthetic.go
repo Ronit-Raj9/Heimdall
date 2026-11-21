@@ -62,6 +62,10 @@ func classify(ctx context.Context, src Source, recs []*record) (map[string]bool,
 			if !r.sealed {
 				continue
 			}
+			if r.run.Practice { // X01: labelled practice in run.json
+				out[k] = true
+				break
+			}
 			// The seal is checked before any file of the run is read: a run
 			// whose files changed is excluded later as a seal mismatch and
 			// its ledger never decides anything (finding 1-D-06).

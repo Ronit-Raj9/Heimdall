@@ -46,6 +46,7 @@ const (
 	FaultBrokenTool  = "broken-tool"
 	FaultMisleading  = "misleading-instruction"
 	fileMetrics      = "metrics.json"
+	fileLedger       = "proxy.ledger.jsonl"
 	capabilityOther  = "other"
 	capabilitySafety = "safety"
 )
@@ -125,6 +126,10 @@ type Report struct {
 	Reliability  []Reliability             `json:"reliability"`
 	Safety       Safety                    `json:"safety"`
 	Overall      *verdictab.OverallVerdict `json:"overall,omitempty"`
+	// PracticeRuns counts the runs left out because the scripted practice
+	// model answered them (X01); Note explains it when it is not zero.
+	PracticeRuns int    `json:"practice_runs,omitempty"`
+	Note         string `json:"note,omitempty"`
 }
 
 // Options tune Build. Zero values take the defaults.
@@ -150,8 +155,9 @@ type graded struct {
 
 // childRuns is one child experiment's graded runs by arm label.
 type childRuns struct {
-	child schemas.EvaluationChild
-	arms  map[string][]graded
+	child    schemas.EvaluationChild
+	arms     map[string][]graded
+	practice int // runs left out as practice (scripted model)
 }
 
 // Build computes the report of ev over src. A child with no experiment or
@@ -199,6 +205,10 @@ func Build(ctx context.Context, src leaderboard.Source, ev *schemas.Evaluation, 
 			return nil, err
 		}
 		children = append(children, cr)
+		rep.PracticeRuns += cr.practice
+	}
+	if rep.PracticeRuns > 0 {
+		rep.Note = fmt.Sprintf("%d practice runs were left out: the scripted practice model answered them, so they are not findings.", rep.PracticeRuns)
 	}
 
 	// Benchmarks: clean condition only.
@@ -274,6 +284,10 @@ func readChild(ctx context.Context, src leaderboard.Source, arms []schemas.Evalu
 		return cr, nil
 	}
 	armLabel := mapArms(arms, m)
+	practice, err := practiceArms(ctx, src, m, c.ExperimentID)
+	if err != nil {
+		return cr, err
+	}
 	bySlot := map[string][]leaderboard.Run{}
 	for _, r := range src.Runs(c.ExperimentID) {
 		bySlot[r.Slot.SlotID] = append(bySlot[r.Slot.SlotID], r)
@@ -301,6 +315,10 @@ func readChild(ctx context.Context, src leaderboard.Source, arms []schemas.Evalu
 		if _, scores := r.Run.Outcome.Score(); !scores {
 			continue
 		}
+		if practice[r.Slot.Arm] { // X01: the scripted practice model's numbers are not findings
+			cr.practice++
+			continue
+		}
 		metrics, err := readMetrics(src, r.Run.RunID)
 		if err != nil {
 			return cr, err
@@ -310,6 +328,38 @@ func readChild(ctx context.Context, src leaderboard.Source, arms []schemas.Evalu
 		cr.arms[label] = append(cr.arms[label], graded{task: r.Slot.Task, condition: cond, success: int(y), metrics: metrics})
 	}
 	return cr, nil
+}
+
+// practiceArms marks the experiment's arms whose runs are practice data, by
+// the leaderboard's rule: a smoke or scripted_upstream experiment, a scripted
+// control agent, or any sealed run of the arm labelled practice or whose
+// proxy ledger shows the scripted model. One such run makes the whole arm
+// practice, since an arm's runs share the proxy's upstream.
+func practiceArms(ctx context.Context, src leaderboard.Source, m *schemas.Manifest, expID string) (map[string]bool, error) {
+	out := map[string]bool{}
+	for id, a := range m.Arms {
+		out[id] = m.Experiment.NoPaidTraffic() || a.Config.Adapter == "scripted" || a.Config.Scripted != nil
+	}
+	for _, r := range src.Runs(expID) {
+		if err := ctx.Err(); err != nil {
+			return nil, fmt.Errorf("reportcard: %w", err)
+		}
+		if !r.Sealed || out[r.Slot.Arm] {
+			continue
+		}
+		if r.Run.Practice {
+			out[r.Slot.Arm] = true
+			continue
+		}
+		data, err := src.RunFile(r.Run.RunID, fileLedger)
+		if err != nil {
+			continue // no ledger: nothing shows the scripted model
+		}
+		if p, _ := leaderboard.LedgerProvenance(data); p == leaderboard.ProvenanceScripted || p == leaderboard.ProvenanceMixed {
+			out[r.Slot.Arm] = true
+		}
+	}
+	return out, nil
 }
 
 // mapArms maps the experiment's arm ids to evaluation arm labels: an arm id

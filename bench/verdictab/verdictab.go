@@ -49,6 +49,9 @@ type TaskOutcome struct {
 	Trial   int     `json:"trial"`
 	Success bool    `json:"success"`
 	Score   float64 `json:"score"`
+	// Practice marks a run the scripted practice model answered (X01). It
+	// never counts: Compare drops it before anything is computed.
+	Practice bool `json:"practice,omitempty"`
 }
 
 // BenchmarkVerdict is the A/B verdict on one benchmark. Delta is B's success
@@ -91,8 +94,9 @@ type OverallVerdict struct {
 }
 
 // Compare returns the A/B verdict for one benchmark from A's and B's runs.
-// Only tasks both arms ran are compared.
+// Only tasks both arms ran are compared, and practice runs never count.
 func Compare(a, b []TaskOutcome) BenchmarkVerdict {
+	a, b = realOutcomes(a), realOutcomes(b)
 	out := BenchmarkVerdict{Winner: WinnerUnclear, RunsA: len(a), RunsB: len(b)}
 	switch {
 	case len(a) == 0 && len(b) == 0:
@@ -139,6 +143,17 @@ func Compare(a, b []TaskOutcome) BenchmarkVerdict {
 		out.Winner = tieOrUnclear(out.Tasks, ok, lo, hi)
 	}
 	out.Summary = benchmarkSummary(out)
+	return out
+}
+
+// realOutcomes drops the practice runs (TaskOutcome.Practice).
+func realOutcomes(xs []TaskOutcome) []TaskOutcome {
+	out := make([]TaskOutcome, 0, len(xs))
+	for _, x := range xs {
+		if !x.Practice {
+			out = append(out, x)
+		}
+	}
 	return out
 }
 

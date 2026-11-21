@@ -101,7 +101,13 @@ type Run struct {
 	BudgetSnapshot *BudgetSnapshot       `json:"budget_snapshot,omitempty"`
 	Gateway        RunGatewayInfo        `json:"gateway"`
 	Failures       []PartFailure         `json:"failures,omitempty"`
-	Hardware       *HardwareRecord       `json:"hardware,omitempty"` // X7: the GPUs a GPU task's run held (schemas/gpu.go); nil otherwise
+	// Practice marks a run whose model calls the fault proxy's scripted
+	// model answered (a smoke or scripted_upstream experiment, a scripted
+	// control agent, or a scripted ledger line): its numbers are not
+	// findings, and report cards, leaderboards and verdicts leave it out
+	// (X01).
+	Practice bool            `json:"practice,omitempty"`
+	Hardware *HardwareRecord `json:"hardware,omitempty"` // X7: the GPUs a GPU task's run held (schemas/gpu.go); nil otherwise
 }
 
 // RunTiming records when the run passed its milestones.

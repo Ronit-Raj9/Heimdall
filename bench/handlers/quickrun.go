@@ -192,15 +192,21 @@ func (h *quickRunHandler) post(ctx *fasthttp.RequestCtx) {
 		h.fail(ctx, statusOf(err), err.Error())
 		return
 	}
-	if s.Keys != nil { // G10: a model whose org keys are all over budget is refused before anything is written
+	{ // G10 budgets, X01 own keys: refused before anything is written
 		var provs, ids []string
 		for _, m := range []*QuickRunModel{req.Model, req.CompareModel} {
 			if m != nil {
 				provs, ids = append(provs, m.Provider), append(ids, m.KeyID)
 			}
 		}
-		if err := KeyBudgetRefusal(work, s.Keys, quickOrgID(ctx, s.OrgID), provs, ids); err != nil {
-			h.fail(ctx, fasthttp.StatusConflict, err.Error())
+		var keys KeySource
+		if s.Keys != nil {
+			keys = s.Keys
+		}
+		if err := ModelKeyRefusal(work, keys, quickOrgID(ctx, s.OrgID), provs, ids, s.Hosted); err != nil {
+			if !SendModelKeyRefusal(ctx, h.env.Mode, err) {
+				h.fail(ctx, fasthttp.StatusConflict, err.Error())
+			}
 			return
 		}
 	}
@@ -217,6 +223,9 @@ func (h *quickRunHandler) post(ctx *fasthttp.RequestCtx) {
 	if err != nil {
 		if errors.Is(err, context.DeadlineExceeded) {
 			sendDepError(ctx, h.env.Mode, "plan experiment", err)
+			return
+		}
+		if SendModelKeyRefusal(ctx, h.env.Mode, err) { // X01
 			return
 		}
 		h.fail(ctx, fasthttp.StatusBadRequest, "plan experiment: "+err.Error()+". Pick another suite, agent or model, or open the experiment builder for the full form.")

@@ -24,7 +24,8 @@ func runProxy(args []string) int {
 	fs := flag.NewFlagSet("proxy", flag.ContinueOnError)
 	listen := fs.String("listen", envOr("BENCH_FAULTPROXY_LISTEN", ":9100"), "data-plane address Bifrost's base_url points at")
 	control := fs.String("control", envOr("BENCH_FAULTPROXY_CONTROL_LISTEN", "127.0.0.1:9101"), "control API address")
-	upstream := fs.String("upstream", envOr("BENCH_FAULTPROXY_UPSTREAM", defaultUpstream()), `"scripted" or the provider URL, e.g. https://api.anthropic.com`)
+	upstream := fs.String("upstream", envOr("BENCH_FAULTPROXY_UPSTREAM", ""), `anthropic only: "scripted" or the provider URL, e.g. https://api.anthropic.com; empty reads each provider's key from the environment`)
+	scriptedFallback := fs.Bool("scripted-fallback", envBool("BENCH_FAULTPROXY_SCRIPTED_FALLBACK"), "answer anthropic and openai calls from the scripted model when their key is empty (local development only; never on a hosted stack)")
 	ledger := fs.String("ledger", envOr("BENCH_FAULTPROXY_LEDGER", "faultproxy.ledger.jsonl"), "ledger file path")
 	_ = fs.String("config", "", "bench config (accepted for compose; the proxy reads only its flags and environment)")
 	slots := fs.String("slots", "fp-slot-1,fp-slot-2,fp-slot-3,fp-slot-4", "comma-separated key slots; each slot's placeholder key value equals its name")
@@ -42,6 +43,8 @@ func runProxy(args []string) int {
 		UpstreamKey:   os.Getenv("ANTHROPIC_API_KEY"),
 		LedgerPath:    *ledger,
 		Logger:        logger,
+
+		ScriptedFallback: *scriptedFallback,
 	}
 	if file := os.Getenv("BENCH_FAULTPROXY_PROVIDERS"); file != "" { // X8: the provider table file the compose files pass (faultproxy.LoadProviders)
 		list, err := faultproxy.LoadProviders(file)
@@ -51,7 +54,7 @@ func runProxy(args []string) int {
 		cfg.Providers = list
 	}
 	cfg.Slots = proxySlots(*slots, *openaiSlots)
-	if *upstream != "scripted" && cfg.UpstreamKey == "" {
+	if *upstream != "" && *upstream != "scripted" && cfg.UpstreamKey == "" {
 		return fail("upstream %s needs ANTHROPIC_API_KEY in the environment", *upstream)
 	}
 	srv, err := faultproxy.NewServer(cfg)
@@ -70,13 +73,13 @@ func runProxy(args []string) int {
 	return exitOK
 }
 
-// defaultUpstream is the real Anthropic API when a key is present, otherwise
-// the scripted model, so a stack with no key still runs end to end.
-func defaultUpstream() string {
-	if os.Getenv("ANTHROPIC_API_KEY") != "" {
-		return "https://api.anthropic.com"
+// envBool reads a boolean environment variable: 1, true, yes or on.
+func envBool(name string) bool {
+	switch strings.ToLower(strings.TrimSpace(os.Getenv(name))) {
+	case "1", "true", "yes", "on":
+		return true
 	}
-	return "scripted"
+	return false
 }
 
 // proxySlots turns the --slots (anthropic) and --openai-slots lists into the

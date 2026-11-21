@@ -82,4 +82,12 @@ describe("ReportCard", () => {
 		expect(html).toContain("A drop");
 		expect(html).toContain('href="/experiments/exp_6"');
 	});
+
+	it("says when practice runs were left out", () => {
+		const note = "6 practice runs were left out: the scripted practice model answered them, so they are not findings.";
+		const html = renderToStaticMarkup(<ReportCard report={{ ...scoreReport, practice_runs: 6, note }} />);
+		expect(html).toContain('data-testid="report-card-practice"');
+		expect(html).toContain(note);
+		expect(renderToStaticMarkup(<ReportCard report={scoreReport} />)).not.toContain("report-card-practice");
+	});
 });

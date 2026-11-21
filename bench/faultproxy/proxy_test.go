@@ -38,6 +38,15 @@ func newTestEnv(t *testing.T, upstream, key string) *testEnv {
 // into a test.
 func newTestEnvConfig(t *testing.T, cfg Config) *testEnv {
 	t.Helper()
+	// These tests exercise the scripted model of a keyless provider; the
+	// default (no fallback) is covered by TestNoScriptedFallbackByDefault.
+	cfg.ScriptedFallback = true
+	return startTestEnv(t, cfg)
+}
+
+// startTestEnv is newTestEnvConfig with cfg's ScriptedFallback as given.
+func startTestEnv(t *testing.T, cfg Config) *testEnv {
+	t.Helper()
 	path := filepath.Join(t.TempDir(), "ledger.jsonl")
 	cfg.LedgerPath = path
 	if cfg.Slots == nil {
@@ -894,5 +903,35 @@ func TestLedgerUpstream(t *testing.T) {
 					tc.slot, tc.wantAction, tc.want)
 			}
 		})
+	}
+}
+
+// TestNoScriptedFallbackByDefault covers X01: with no key and no fallback,
+// anthropic and openai calls fail loudly (503, ledger upstream empty) instead
+// of being answered by the scripted model, while a run bound to a scripted
+// plan still gets the scripted model and is labelled scripted.
+func TestNoScriptedFallbackByDefault(t *testing.T) {
+	msgBody := `{"model":"claude-haiku-5-5","max_tokens":16,"messages":[{"role":"user","content":"hi"}]}`
+	chatBody := `{"model":"gpt-5-mini","messages":[{"role":"user","content":"hi"}]}`
+	env := startTestEnv(t, Config{})
+	for _, c := range []struct{ slot, header, value, path, body string }{
+		{"slot-a", "x-api-key", "auth-a", "/v1/messages", msgBody},
+		{"oa-1", "Authorization", "Bearer oa-auth-1", "/v1/chat/completions", chatBody},
+	} {
+		resp, body := env.callAs(t, http.MethodPost, c.path, c.header, c.value, c.body)
+		if resp.StatusCode != http.StatusServiceUnavailable || !strings.Contains(string(body), "no key configured") {
+			t.Fatalf("%s: status %d, want 503 no key configured: %s", c.slot, resp.StatusCode, body)
+		}
+		if last := env.last(t); last.Upstream == schemas.LedgerUpstreamScripted {
+			t.Errorf("%s: ledger labelled scripted with no fallback", c.slot)
+		}
+	}
+	env.setPlan(t, "slot-a", schemas.FaultPlan{Mode: ModeNone, RunID: "r_practice", Scripted: true})
+	resp, body := env.callAs(t, http.MethodPost, "/v1/messages", "x-api-key", "auth-a", msgBody)
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("scripted plan: status %d: %s", resp.StatusCode, body)
+	}
+	if last := env.last(t); last.Upstream != schemas.LedgerUpstreamScripted {
+		t.Errorf("scripted plan ledger upstream %q, want scripted", last.Upstream)
 	}
 }

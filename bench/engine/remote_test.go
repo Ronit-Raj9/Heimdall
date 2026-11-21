@@ -90,6 +90,11 @@ func serveWorkers(t *testing.T, api handlers.WorkerAPI) string {
 	t.Helper()
 	r := router.New()
 	handlers.NewWorkersHandler(schemas.ModeLive, api).RegisterRoutes(r)
+	// X01: a hosted lease needs the org's key delivery; this org has no keys.
+	r.GET(handlers.LeaseCredentialsPath, func(ctx *fasthttp.RequestCtx) {
+		ctx.SetContentType("application/json")
+		ctx.SetBodyString(`{"org_id":"org_test","lease_id":"` + ctx.UserValue("lease_id").(string) + `"}`)
+	})
 	ln, err := net.Listen("tcp", "127.0.0.1:0")
 	if err != nil {
 		t.Fatal(err)

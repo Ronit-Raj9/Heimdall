@@ -60,6 +60,9 @@ type launcher struct {
 	hub        *jobsHub            // the hub that holds it (hosted), for Detach
 	coord      *engine.Coordinator // Remote area: opens runs to remote workers (worker.go)
 	remoteOnly bool                // Runners area: run no slot locally (hosted mode)
+	// caps refuses a start once the org reached a daily cap a server admin
+	// set (X01; nil or a nil error: no cap). Hosted only.
+	caps func(ctx context.Context) error
 
 	mu     sync.Mutex
 	active map[string]*liveRun
@@ -158,6 +161,11 @@ func (l *launcher) invalidateStates() {
 // Start queues the experiment's run job (or, with no job runner, runs it in
 // this process). An experiment whose run job is queued or running is refused.
 func (l *launcher) Start(ctx context.Context, expID string) error {
+	if l.caps != nil {
+		if err := l.caps(ctx); err != nil { // X01: daily run and spend caps (sharedpool_hosted.go)
+			return err
+		}
+	}
 	if m, err := l.a.store.LoadManifest(ctx, expID); err == nil {
 		if err := l.keyBudgetCheck(ctx, m); err != nil { // G10 (keybudget.go)
 			return err

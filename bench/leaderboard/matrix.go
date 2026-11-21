@@ -135,6 +135,10 @@ func SyntheticArms(ctx context.Context, m *schemas.Manifest, runs []schemas.Seal
 		if out[sr.Slot.Arm] || len(sr.Problems) > 0 {
 			continue
 		}
+		if sr.Run.Practice { // X01: labelled practice in run.json
+			out[sr.Slot.Arm] = true
+			continue
+		}
 		data, found, err := read(sr, fileLedger)
 		if err != nil {
 			return nil, fmt.Errorf("synthetic arms: run %s: %w", sr.Run.RunID, err)

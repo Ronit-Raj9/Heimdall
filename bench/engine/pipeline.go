@@ -164,6 +164,7 @@ func (p *Pipeline) RunSlot(ctx context.Context, in SlotInput) (*SlotResult, erro
 	sctx, scancel := context.WithTimeout(context.WithoutCancel(ctx), sealTimeout)
 	defer scancel()
 	up := utils.TallyUpstream(st.ev.Ledger, st.ev.Requests)
+	st.rc.Run.Practice = practiceRun(st.rc, st.ev.Ledger) // X01: labelled in run.json
 	st.rc.Run.Outcome = decideOutcome(st, up)
 	p.ownerAbort(ctx, st)
 	st.rc.Run.Y = scoreOf(st.rc.Run.Outcome)
@@ -849,4 +850,26 @@ func flatten(err error) []error {
 		return out
 	}
 	return []error{err}
+}
+
+// practiceRun reports whether a run's numbers come from the scripted model
+// rather than a real one (schemas.Run.Practice): a smoke or
+// scripted_upstream experiment, a scripted control agent, or any proxy
+// ledger line answered by the scripted model.
+func practiceRun(rc *schemas.RunContext, ledger []schemas.LedgerEntry) bool {
+	if rc == nil {
+		return false
+	}
+	if rc.Experiment.NoPaidTraffic() || (rc.Manifest != nil && rc.Manifest.Experiment.NoPaidTraffic()) {
+		return true
+	}
+	if a := rc.Agent; a != nil && (a.Adapter == adapterScripted || a.Scripted != nil) {
+		return true
+	}
+	for _, e := range ledger {
+		if e.Upstream == schemas.LedgerUpstreamScripted {
+			return true
+		}
+	}
+	return false
 }

@@ -2,9 +2,11 @@ package main
 
 import (
 	"context"
+	"errors"
 	"testing"
 	"time"
 
+	"github.com/maximhq/bifrost/bench/handlers"
 	"github.com/maximhq/bifrost/bench/keystore"
 	"github.com/maximhq/bifrost/bench/schemas"
 )
@@ -98,5 +100,44 @@ func TestRunKeyCharge(t *testing.T) {
 	}
 	if got := runKeyCharge("", nil, &schemas.Run{RunID: "r_b"}, m); got != 0 {
 		t.Fatalf("a run whose agent never started charged %v", got)
+	}
+}
+
+// TestHostedLauncherRequiresOrgKeys covers X01: a hosted (remote only)
+// launcher refuses a provider the org has no usable key for, refuses
+// everything when no key store is ready, and lets a smoke experiment
+// (scripted model only) through.
+func TestHostedLauncherRequiresOrgKeys(t *testing.T) {
+	ctx := context.Background()
+	ks := keystore.NewMemory()
+	if _, err := ks.Create(ctx, "org_h", keystore.KindProvider, keystore.Put{Provider: "anthropic", Label: "main", Value: "sk-main-123456789"}, "t"); err != nil {
+		t.Fatal(err)
+	}
+	withLauncherKeys(t, ks)
+	l := &launcher{a: &app{reg: &schemas.Registry{}}, org: "org_h", remoteOnly: true}
+	m := &schemas.Manifest{ExpID: "exp_h", Arms: map[string]schemas.ArmManifest{}}
+	arm := schemas.ArmManifest{}
+	arm.Config.Adapter = "command"
+	arm.Config.Gateway.Provider = "openai"
+	m.Arms["A"] = arm
+	if err := l.keyBudgetCheck(ctx, m); !errors.Is(err, handlers.ErrModelKeyMissing) {
+		t.Fatalf("hosted launcher with no openai key: %v", err)
+	}
+	local := &launcher{a: &app{reg: &schemas.Registry{}}, org: "org_h"}
+	if err := local.keyBudgetCheck(ctx, m); err != nil {
+		t.Fatalf("a local launcher must not require a key: %v", err)
+	}
+	arm.Config.Gateway.Provider = "anthropic"
+	m.Arms["A"] = arm
+	if err := l.keyBudgetCheck(ctx, m); err != nil {
+		t.Fatalf("usable key refused: %v", err)
+	}
+	launcherKeys = func(*launcher) keyBudgetStore { return nil }
+	if err := l.keyBudgetCheck(ctx, m); !errors.Is(err, handlers.ErrKeyStoreUnavailable) {
+		t.Fatalf("hosted with no key store: %v", err)
+	}
+	m.Experiment.Smoke = true
+	if err := l.keyBudgetCheck(ctx, m); err != nil {
+		t.Fatalf("smoke experiment refused: %v", err)
 	}
 }

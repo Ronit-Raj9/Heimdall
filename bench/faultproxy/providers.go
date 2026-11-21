@@ -84,7 +84,10 @@ var openAIChatPaths = []string{"POST /v1/chat/completions", "POST /v1/completion
 
 // DefaultProviders returns the built-in provider table. Base URLs and request
 // paths are Bifrost v2.5.1's defaults for each provider. A new slice is
-// returned on every call.
+// returned on every call. No entry falls back to the scripted model when its
+// key is empty (X01): a keyless request fails with "no key configured", so a
+// run can never look real while a script answered it. Config.ScriptedFallback
+// turns the fallback back on for anthropic and openai (local development).
 func DefaultProviders() []ProviderSpec {
 	compat := func(name, base, env string, paths ...string) ProviderSpec {
 		if len(paths) == 0 {
@@ -98,14 +101,14 @@ func DefaultProviders() []ProviderSpec {
 	out := []ProviderSpec{
 		{
 			Name: ProviderAnthropic, BaseURL: "https://api.anthropic.com", KeyEnv: "ANTHROPIC_API_KEY",
-			Auth: AuthXAPIKey, Format: FormatAnthropic, SlotPrefix: "fp", Scripted: true,
+			Auth: AuthXAPIKey, Format: FormatAnthropic, SlotPrefix: "fp",
 			Message:     []string{"POST /v1/messages"},
 			CountTokens: []string{"POST /v1/messages/count_tokens"},
 			Models:      []string{"GET /v1/models", "GET /v1/models/*"},
 		},
 		{
 			Name: ProviderOpenAI, BaseURL: "https://api.openai.com", KeyEnv: "OPENAI_API_KEY",
-			Auth: AuthBearer, Format: FormatOpenAI, SlotPrefix: "oa", Scripted: true,
+			Auth: AuthBearer, Format: FormatOpenAI, SlotPrefix: "oa",
 			Message:     []string{"POST /v1/chat/completions", "POST /v1/responses"},
 			CountTokens: []string{"POST /v1/responses/input_tokens"},
 			Models:      []string{"GET /v1/models", "GET /v1/models/*"},
@@ -255,6 +258,19 @@ func (p ProviderSpec) Validate() error {
 // without a key fails loudly instead of looking like a real run.
 func (p ProviderSpec) scriptable() bool {
 	return p.Scripted && (p.Format == FormatAnthropic || p.Format == FormatOpenAI)
+}
+
+// withScriptedFallback returns a copy of specs with the scripted fallback
+// on for the built-in anthropic and openai entries (Config.ScriptedFallback).
+func withScriptedFallback(specs []ProviderSpec) []ProviderSpec {
+	out := make([]ProviderSpec, len(specs))
+	copy(out, specs)
+	for i := range out {
+		if out[i].Name == ProviderAnthropic || out[i].Name == ProviderOpenAI {
+			out[i].Scripted = true
+		}
+	}
+	return out
 }
 
 // slotPrefix is the default slot name prefix.

@@ -31,7 +31,8 @@ var (
 
 // SetLeaseHolders installs how the credentials route finds an organization's
 // coordinator. The hosted serve sets it from its runner hub; without it the
-// route answers 503 and runners keep their own environment keys.
+// route answers 503 and hosted runners refuse the lease (X01: never the
+// runner's own provider keys).
 func SetLeaseHolders(f func(orgID string) LeaseHolders) {
 	leaseHoldersMu.Lock()
 	defer leaseHoldersMu.Unlock()
@@ -103,7 +104,7 @@ func (h *leaseCredsHandler) get(ctx *fasthttp.RequestCtx) {
 	}
 	if h.keys == nil {
 		lib.SendError(ctx, h.mode, fasthttp.StatusServiceUnavailable, lib.ErrTypeUnavailable,
-			"model keys are not configured on this server (set HEIMDALL_MASTER_KEY); runners use their own provider keys")
+			"model keys are not configured on this server (set HEIMDALL_MASTER_KEY); runs that need a model key are refused")
 		return
 	}
 	var lh LeaseHolders
@@ -112,7 +113,7 @@ func (h *leaseCredsHandler) get(ctx *fasthttp.RequestCtx) {
 	}
 	if lh == nil {
 		lib.SendError(ctx, h.mode, fasthttp.StatusServiceUnavailable, lib.ErrTypeUnavailable,
-			"no runner coordinator for this organization; runners use their own provider keys")
+			"no runner coordinator for this organization; runs that need a model key are refused")
 		return
 	}
 	holder, ok := lh.LeaseHolder(leaseID)
