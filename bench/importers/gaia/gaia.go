@@ -50,6 +50,10 @@ const (
 	setCassettes = "cassettes"
 	setVersion   = "version"
 	setRevision  = "revision"
+	// setWeb says what happens to a web question with no cassette: refuse
+	// (the default) or live (import it with the search tool and an empty
+	// cassette; an experiment opts into the real web with external: live).
+	setWeb = "web"
 )
 
 // systemPrompt is GAIA's prompt for the assistant, verbatim from content.py
@@ -75,7 +79,7 @@ func (im *importer) Info() importers.Info {
 		Grading:    schemas.GradingVerified,
 		Needs: []string{
 			"a local copy of 2023/validation (metadata.jsonl and the attached files) downloaded by you after accepting GAIA's terms",
-			"questions that need the live web run only with a recorded Tavily cassette per question (-set cassettes=<folder>); the rest are refused",
+			"questions that need the live web run only with a recorded Tavily cassette per question (-set cassettes=<folder>); the rest are refused, or with -set web=live imported to run with external: live (TAVILY_API_KEY, not repeatable)",
 		},
 		Summary: "GAIA validation questions as answer tasks graded by GAIA's quasi-exact match (answer_match gaia)",
 	}
@@ -121,11 +125,11 @@ func (im *importer) Import(ctx context.Context, opts importers.Options) (*import
 		want[strings.TrimSpace(id)] = true
 	}
 	var (
-		written                   []string
-		offline, fromCas, needWeb int
-		considered                int
-		webTag                    string
-		covered                   []string
+		written                         []string
+		offline, fromCas, live, needWeb int
+		considered                      int
+		webTag                          string
+		covered                         []string
 	)
 	for _, r := range rows {
 		if err := ctx.Err(); err != nil {
@@ -142,9 +146,12 @@ func (im *importer) Import(ctx context.Context, opts importers.Options) (*import
 		if skip == "" && t.web {
 			needWeb++
 			cas, why := findCassette(set.cassettes, r.TaskID)
-			if why != "" {
+			switch {
+			case why != "" && set.web == webLive:
+				t.liveWeb = true
+			case why != "":
 				skip = "needs the live web (" + t.webWhy + "), which runs here do not have; " + why
-			} else {
+			default:
 				t.cassette = cas
 			}
 		}
@@ -152,7 +159,7 @@ func (im *importer) Import(ctx context.Context, opts importers.Options) (*import
 			res.Skipped = append(res.Skipped, importers.Skip{ID: r.TaskID, Reason: skip})
 			continue
 		}
-		if t.cassette != nil {
+		if t.cassette != nil || t.liveWeb {
 			if webTag == "" {
 				files, tag, err := researchkit.WebsearchFiles()
 				if err != nil {
@@ -188,6 +195,8 @@ func (im *importer) Import(ctx context.Context, opts importers.Options) (*import
 		if t.cassette != nil {
 			fromCas++
 			covered = append(covered, fmt.Sprintf("web question %s: %s", r.TaskID, t.cassette.checked))
+		} else if t.liveWeb {
+			live++
 		} else {
 			offline++
 		}
@@ -215,8 +224,8 @@ func (im *importer) Import(ctx context.Context, opts importers.Options) (*import
 	}
 	sort.Slice(res.Skipped, func(i, j int) bool { return res.Skipped[i].ID < res.Skipped[j].ID })
 	res.Notes = []string{
-		fmt.Sprintf("%d of %d questions considered need the live web; %d of them had a cassette and were imported, %d were refused. %d offline questions imported.",
-			needWeb, considered, fromCas, needWeb-fromCas, offline),
+		fmt.Sprintf("%d of %d questions considered need the live web; %d of them had a cassette and were imported, %d were imported for live web runs (-set web=live), %d were refused. %d offline questions imported.",
+			needWeb, considered, fromCas, live, needWeb-fromCas-live, offline),
 		"GAIA's terms: do not reshare these files outside a gated or private repository. The suite folder's .gitignore keeps them out of git; " + researchkit.LicenseFile + " repeats the terms.",
 	}
 	res.Notes = append(res.Notes, covered...)
@@ -238,10 +247,16 @@ type settings struct {
 	cassettes string
 	version   string
 	revision  string
+	web       string // webRefuse or webLive
 }
 
+const (
+	webRefuse = "refuse"
+	webLive   = "live"
+)
+
 func parseSettings(extra map[string]string) (settings, error) {
-	s := settings{version: "1.0.0"}
+	s := settings{version: "1.0.0", web: webRefuse}
 	for k, v := range extra {
 		switch k {
 		case setSplit:
@@ -261,8 +276,13 @@ func parseSettings(extra map[string]string) (settings, error) {
 			s.version = v
 		case setRevision:
 			s.revision = v
+		case setWeb:
+			if v != webRefuse && v != webLive {
+				return s, fmt.Errorf("-set web=%s: want refuse or live", v)
+			}
+			s.web = v
 		default:
-			return s, fmt.Errorf("unknown setting %q (known: split, cassettes, version, revision)", k)
+			return s, fmt.Errorf("unknown setting %q (known: split, cassettes, web, version, revision)", k)
 		}
 	}
 	return s, nil
@@ -379,6 +399,7 @@ type task struct {
 	web                                 bool
 	webWhy                              string
 	cassette                            *cassette
+	liveWeb                             bool // web question imported for live runs (-set web=live)
 	websearchTag                        string
 	wrong                               []string
 	revision                            string
@@ -572,6 +593,14 @@ func (t *task) files() (map[string][]byte, error) {
 		ty.External = []researchkit.External{researchkit.TavilyReplay("cassettes/tavily.cassette.jsonl")}
 		out["cassettes/tavily.cassette.jsonl"] = t.cassette.tape
 		out["cassettes/queries.json"] = t.cassette.queries
+	} else if t.liveWeb {
+		// An empty cassette: by default (replay, and always at admission)
+		// every search is answered "not recorded"; an experiment with
+		// external: live sends them to Tavily with the bench's key.
+		ty.Services = []researchkit.Service{researchkit.WebsearchServiceSpec(t.websearchTag, "http://toolproxy:9200/x/"+researchkit.TavilyID)}
+		ty.External = []researchkit.External{researchkit.TavilyReplay("cassettes/tavily.cassette.jsonl")}
+		ty.External[0].Mode = ""
+		out["cassettes/tavily.cassette.jsonl"] = []byte{}
 	}
 	body, err := researchkit.MarshalYAML(ty)
 	if err != nil {
@@ -596,6 +625,9 @@ func (t *task) tags() []string {
 	if t.web {
 		tags = append(tags, "needs-web")
 	}
+	if t.liveWeb {
+		tags = append(tags, "live-web")
+	}
 	return tags
 }
 
@@ -608,7 +640,9 @@ func (t *task) instruction() string {
 	if t.file != "" {
 		fmt.Fprintf(&b, "The file attached to this question is `%s` in your workspace.\n\n", t.file)
 	}
-	if t.cassette != nil {
+	if t.liveWeb {
+		b.WriteString("Search the web with the `web_search` and `fetch_page` tools of the `websearch` MCP server. Whether they reach the live web depends on how the run is set up; when they do not, a search returns no result.\n\n")
+	} else if t.cassette != nil {
 		b.WriteString("Search the web with the `web_search` and `fetch_page` tools of the `websearch` MCP server. Searches are answered from a recording made for this question, so a query worded very differently from the recorded ones may get no result.\n\n")
 	} else {
 		b.WriteString("You have no internet access; everything you need is in the question")
