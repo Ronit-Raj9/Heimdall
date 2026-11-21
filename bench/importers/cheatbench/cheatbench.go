@@ -25,7 +25,9 @@ package cheatbench
 import (
 	"bufio"
 	"context"
+	"crypto/rand"
 	_ "embed"
+	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -210,6 +212,15 @@ func (im *importer) Import(ctx context.Context, opts importers.Options) (*import
 				t := task{ID: id, Upstream: name, Variant: set.variant, Row: r, Instruction: instr,
 					Rubric: rubric(string(schema), r), Draft: reason, EnvDir: set.envDir, TimeoutS: ut.TimeoutS,
 					Revision: revision}
+				if reason == "" && ut.Grader.Kind == yaml.MappingNode {
+					rv, err := readReview(root, tdir, set.envDir, ut, r)
+					if err != nil {
+						res.Skipped = append(res.Skipped, importers.Skip{ID: up, Reason: err.Error()})
+						delete(seen, id)
+						continue
+					}
+					t.Review = rv
+				}
 				if reason == "" && ut.Grader.Kind == yaml.ScalarNode && ut.Grader.Value != "" {
 					g, err := readGrader(root, tdir, ut.Grader.Value)
 					if err != nil {
@@ -301,6 +312,11 @@ func readUpstreamTask(dir string) (*upstreamTask, error) {
 // agent's workspace or an episode service.
 var mcpPorted = map[string]bool{"prime_factorization": true, "subset_sum": true}
 
+// reviewPorted are the tasks whose staged grader calls upstream's review
+// endpoint (core/review_server.py), run as the task's "review" service with
+// the suite's pinned judge model (svc/heimdall_review.py).
+var reviewPorted = map[string]bool{"creative_writings": true}
+
 // draftReason is why the task's rows cannot run here, empty when they can.
 func draftReason(name string, ut *upstreamTask, dir string) string {
 	exists := func(rel string) bool { _, err := os.Stat(filepath.Join(dir, rel)); return err == nil }
@@ -311,6 +327,8 @@ func draftReason(name string, ut *upstreamTask, dir string) string {
 		return "chat-runner: a one-message chat probe scored by probability shift (run_chat.py), not an agent trajectory"
 	case name == "software_engineering":
 		return "harbor-runner: SWE-bench Pro instances run through upstream's separate Harbor workflow (harbor-datasets images); not ported"
+	case ut.Grader.Kind == yaml.MappingNode && reviewPorted[name]:
+		return ""
 	case ut.Grader.Kind == yaml.MappingNode:
 		return "paid-grader: the staged grader calls an upstream LLM grader model we hold no key for"
 	case ut.Grader.Kind == yaml.ScalarNode && ut.Grader.Value != "" && mcpPorted[name]:
@@ -480,7 +498,124 @@ type task struct {
 	TimeoutS              int
 	Revision              string
 	Grader                *graderSvc
+	Review                *reviewSvc
 }
+
+// reviewSvc is upstream's per-episode review endpoint served as a service.
+type reviewSvc struct {
+	Core, Prompt, Gold, Staged, Token string
+	Gen                               map[string]any
+}
+
+// reviewModel is the model the review endpoint asks: the suite's judge.
+const (
+	reviewProvider = "openai"
+	reviewModel    = "gpt-6.2-sol"
+)
+
+func readReview(root, tdir, envDir string, ut *upstreamTask, r row) (*reviewSvc, error) {
+	var g struct {
+		Prompt string         `yaml:"prompt"`
+		Staged string         `yaml:"staged_grader"`
+		Gen    map[string]any `yaml:"generation_config"`
+	}
+	if err := ut.Grader.Decode(&g); err != nil {
+		return nil, fmt.Errorf("grader: %w", err)
+	}
+	var meta struct {
+		Gold string `json:"gold_name"`
+	}
+	_ = json.Unmarshal(r.Meta, &meta)
+	if g.Prompt == "" || g.Staged == "" || meta.Gold == "" {
+		return nil, errors.New("review grader needs prompt, staged_grader and the row's meta.gold_name")
+	}
+	prompt, err := os.ReadFile(filepath.Join(root, filepath.FromSlash(g.Prompt)))
+	if err != nil {
+		return nil, err
+	}
+	gold, err := os.ReadFile(filepath.Join(envDir, "files", "golds", meta.Gold))
+	if err != nil {
+		return nil, err
+	}
+	tok := make([]byte, 16)
+	if _, err := rand.Read(tok); err != nil {
+		return nil, err
+	}
+	if g.Gen == nil {
+		g.Gen = map[string]any{}
+	}
+	return &reviewSvc{Core: root, Prompt: string(prompt), Gold: string(gold), Staged: g.Staged, Token: hex.EncodeToString(tok), Gen: g.Gen}, nil
+}
+
+//go:embed svc/heimdall_review.py
+var reviewFront string
+
+// writeReviewService writes svc/ for the review endpoint: upstream's core/
+// package and configs/ verbatim, the task's pairwise prompt and the row's
+// reference, and stages grading/.review (the endpoint and its token) in the
+// workspace, where upstream's host writes it.
+func writeReviewService(dir, wsRoot string, t task) (serviceYAML, error) {
+	svc := filepath.Join(dir, "svc")
+	for _, d := range []string{"core", "configs"} {
+		if err := copyTree(filepath.Join(t.Review.Core, d), filepath.Join(svc, "cheatbench", d)); err != nil {
+			return serviceYAML{}, err
+		}
+	}
+	cfg, err := json.Marshal(map[string]any{"judge": reviewModel, "model": reviewProvider + "/" + reviewModel,
+		"generation_config": t.Review.Gen, "staged_grader": t.Review.Staged, "token": t.Review.Token})
+	if err != nil {
+		return serviceYAML{}, err
+	}
+	dotReview, _ := json.Marshal(map[string]string{"url": "http://review:8000/review", "token": t.Review.Token})
+	files := map[string]string{
+		"heimdall_review.py": reviewFront,
+		"task/review.json":   string(cfg),
+		"task/prompt.md":     t.Review.Prompt,
+		"task/gold.md":       t.Review.Gold,
+		"Dockerfile":         reviewDockerfile,
+	}
+	for rel, body := range files {
+		p := filepath.Join(svc, rel)
+		if err := os.MkdirAll(filepath.Dir(p), 0o755); err != nil {
+			return serviceYAML{}, err
+		}
+		if err := os.WriteFile(p, []byte(body), 0o644); err != nil {
+			return serviceYAML{}, err
+		}
+	}
+	rp, err := safeDest(wsRoot, filepath.Join(filepath.Dir(t.Review.Staged), ".review"))
+	if err != nil {
+		return serviceYAML{}, err
+	}
+	if err := os.MkdirAll(filepath.Dir(rp), 0o755); err != nil {
+		return serviceYAML{}, err
+	}
+	if err := os.WriteFile(rp, dotReview, 0o644); err != nil {
+		return serviceYAML{}, err
+	}
+	no := false
+	return serviceYAML{
+		ID: "review", Role: "tool", Port: 8000, Proxy: &no,
+		Build:   &imageBuildYAML{Dockerfile: "svc/Dockerfile", Tag: "bench/cheatbench-svc-" + t.ID + ":1"},
+		Ready:   &readyYAML{HTTP: "/healthz", TimeoutS: 120},
+		Gateway: &gatewayYAML{Provider: reviewProvider, Model: reviewModel},
+		Export:  []exportYAML{{ID: "review.json", Path: "/state/review.json"}},
+	}, nil
+}
+
+const reviewDockerfile = `# CheatBench review endpoint: upstream core/review_server.py with the
+# pinned judge model through the gateway (heimdall_review.py).
+FROM ` + baseTag + `
+USER root
+RUN pip install --no-cache-dir anthropic==2.12.0 litellm==1.110.2 openai==3.57.0 pydantic==2.14.4 python-dotenv==1.2.4 tqdm==4.70.1
+COPY cheatbench/ /opt/cheatbench/
+COPY task/ /opt/task/
+COPY heimdall_review.py /opt/heimdall_review.py
+RUN chmod -R a+rX,go-w /opt/cheatbench /opt/task /opt/heimdall_review.py && mkdir -p /state && chown agent:agent /state
+USER agent
+EXPOSE 8000
+CMD ["python3", "/opt/heimdall_review.py"]
+`
 
 // graderSvc is an upstream grader tool served as the task's MCP service.
 type graderSvc struct {
@@ -624,6 +759,13 @@ func writeTask(suiteDir string, t task, force bool) error {
 		}
 	}
 	var svcs []serviceYAML
+	if t.Review != nil {
+		sv, err := writeReviewService(dir, wsRoot, t)
+		if err != nil {
+			return err
+		}
+		svcs = append(svcs, sv)
+	}
 	if t.Grader != nil {
 		sv, err := writeGraderService(dir, t)
 		if err != nil {
@@ -715,12 +857,25 @@ CMD ["python3", "/opt/heimdall/heimdall_grader.py"]
 `
 
 type serviceYAML struct {
-	ID    string          `yaml:"id"`
-	Role  string          `yaml:"role"`
-	Build *imageBuildYAML `yaml:"build,omitempty"`
-	Port  int             `yaml:"port"`
-	Ready *readyYAML      `yaml:"ready,omitempty"`
-	MCP   *mcpYAML        `yaml:"mcp,omitempty"`
+	ID      string          `yaml:"id"`
+	Role    string          `yaml:"role"`
+	Build   *imageBuildYAML `yaml:"build,omitempty"`
+	Port    int             `yaml:"port"`
+	Ready   *readyYAML      `yaml:"ready,omitempty"`
+	MCP     *mcpYAML        `yaml:"mcp,omitempty"`
+	Proxy   *bool           `yaml:"proxy,omitempty"`
+	Gateway *gatewayYAML    `yaml:"gateway,omitempty"`
+	Export  []exportYAML    `yaml:"export,omitempty"`
+}
+
+type gatewayYAML struct {
+	Provider string `yaml:"provider"`
+	Model    string `yaml:"model"`
+}
+
+type exportYAML struct {
+	ID   string `yaml:"id"`
+	Path string `yaml:"path"`
 }
 
 type imageBuildYAML struct {
