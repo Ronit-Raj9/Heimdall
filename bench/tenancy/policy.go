@@ -241,6 +241,8 @@ var OrgPolicy = map[string]Rule{
 	key("GET", api+"/leaderboard/pareto"):              org(viewer),
 	key("GET", api+"/runs/{id}/routing"):               org(viewer),
 	key("GET", api+"/runs/{id}/visual/{name}"):         org(viewer),
+	key("GET", api+"/runs/{id}/frames"):                org(viewer),
+	key("GET", api+"/runs/{id}/frames/{n}"):            org(viewer),
 	key("GET", api+"/runs/{id}/voice"):                 org(viewer),
 	key("GET", api+"/runs/{id}/voice/audio/{track}"):   org(viewer),
 	key("GET", api+"/suites/{id}/export"):              org(viewer),

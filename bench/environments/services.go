@@ -216,6 +216,7 @@ func (e *dockerWorkspace) ExportState(ctx context.Context, rc *schemas.RunContex
 		if err := e.copyLedger(ctx, runID, rc.Dir); err != nil {
 			e.cfg.Logger.Warn("tool proxy ledger not copied; tool evidence is unknown", "run", runID, "error", err.Error())
 		}
+		e.copyFrames(ctx, runID, rc.Dir) // screen replay frames (frames.go)
 	}
 	e.captureServiceLogs(ctx, runID, rc.Dir, svcs)           // X2: compose services' output as services/<id>.log (compose.go)
 	e.copyAgentEvents(ctx, runID, rc.Dir)                    // Agent events area: the collector's ledger (eventcollector.go)

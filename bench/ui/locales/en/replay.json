@@ -1,0 +1,19 @@
+{
+	"tab": "Replay",
+	"title": "Screen replay",
+	"subtitle": "What the agent saw, step by step.",
+	"empty": "No screenshots were recorded for this run.",
+	"loadError": "Could not load the replay.",
+	"play": "Play",
+	"pause": "Pause",
+	"speed": "Playback speed",
+	"prev": "Previous frame",
+	"next": "Next frame",
+	"fullscreen": "Fullscreen",
+	"download": "Download frame",
+	"scrubber": "Replay timeline",
+	"steps": "Steps",
+	"frameOf": "Frame {{n}} of {{total}}",
+	"look": "Looked at the screen",
+	"live": "Live, updating"
+}

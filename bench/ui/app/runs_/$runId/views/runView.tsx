@@ -27,6 +27,7 @@ import {
 import { RunExportMenu } from "@/components/runs/runExportMenu";
 import { RunTraceView } from "@/components/runs/traceView";
 import { formatDuration } from "@/components/runs/traceView.utils";
+import { ScreenReplay, useRunFrames } from "@/components/runs/screenReplay"; // U08 screen replay
 import { RunServiceLogs } from "@/components/services/serviceLogs"; // X2
 import { EmptyState } from "@/components/shell/emptyState";
 import { EntityLink } from "@/components/shell/entityLink";
@@ -78,6 +79,8 @@ export default function RunView({ runId }: { runId: string }) {
   if (detail.data && live === Boolean(sealedNow)) setLive(!sealedNow);
   const agents = useGetRunAgentsQuery(runId, { skip: !detail.data });
   const voice = useGetRunVoiceQuery(runId, { skip: !detail.data });
+  const { t: tReplay } = useTranslation("replay"); // U08
+  const frames = useRunFrames(runId, detail.data ? !detail.data.sealed : false); // U08
 
   if (detail.isLoading) return <BlockSkeleton rows={8} testId="run-loading" />;
   if (detail.error || !detail.data) {
@@ -118,6 +121,7 @@ export default function RunView({ runId }: { runId: string }) {
     hidden: hidden.has(id),
     testId: `run-tab-${id}`,
   }));
+  if (frames.data?.frames.length) tabs.splice(2, 0, { id: "replay", label: tReplay("tab"), testId: "run-tab-replay" }); // U08
 
   return (
     <div
@@ -196,9 +200,13 @@ export default function RunView({ runId }: { runId: string }) {
         label={t("runs.page.tabsLabel")}
         testId="run-tabs"
       >
-        {(active) => (
-          <RunTab tab={active as RunTabId} detail={d} agents={agents.data} />
-        )}
+        {(active) =>
+          active === "replay" ? (
+            <ScreenReplay runId={runId} live={!d.sealed} />
+          ) : (
+            <RunTab tab={active as RunTabId} detail={d} agents={agents.data} />
+          )
+        }
       </RouteTabs>
     </div>
   );
