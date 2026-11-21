@@ -113,7 +113,7 @@ func testReport() *reportcard.Report {
 		Evaluation: "ev_1", Mode: "score",
 		Arms: []reportcard.Arm{{Label: "A", Agent: "codex", Version: 2, Model: "gpt-5"}, {Label: "B", Agent: "codex", Version: 2, Model: "gpt-5"}},
 		Benchmarks: []reportcard.Benchmark{{Benchmark: "tb2", Capability: "terminal", Arms: map[string]reportcard.Metrics{
-			"A": {Score: 0.75, CILow: 0.5, CIHigh: 0.9, Runs: 8, CostUSD: 1.2, WallS: 75},
+			"A": {Score: 0.75, CILow: 0.5, CIHigh: 0.9, Runs: 8, CostUSD: ptrF(1.2), WallS: 75},
 			"B": {Score: 0.5, Runs: 8},
 		}}},
 	}
@@ -153,3 +153,6 @@ func TestRenderAndBadge(t *testing.T) {
 		t.Fatal("badge text not escaped")
 	}
 }
+
+// ptrF is a pointer to x, for an optional cost.
+func ptrF(x float64) *float64 { return &x }

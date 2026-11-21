@@ -136,6 +136,7 @@ type podInput struct {
 	FSWatch         bool
 	IntervalMS      int
 	ServiceAccount  string
+	RuntimeClass    string // kubernetes.runtime_class; "" uses the cluster default
 	NodeSelector    map[string]string
 	Tolerations     []Toleration
 	GatewayIP       string // "" when the plan has no network
@@ -248,6 +249,7 @@ func buildPod(in podInput, owner []OwnerReference) Pod {
 		ShareProcessNamespace:         boolPtr(true),
 		AutomountServiceAccountToken:  boolPtr(false),
 		ServiceAccountName:            in.ServiceAccount,
+		RuntimeClassName:              in.RuntimeClass,
 		EnableServiceLinks:            boolPtr(false),
 		DNSPolicy:                     "None",
 		DNSConfig:                     &PodDNSConfig{Nameservers: []string{"127.0.0.1"}},

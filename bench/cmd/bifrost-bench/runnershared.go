@@ -300,6 +300,7 @@ func reconcileShared(loops map[string]*sharedLoop, as *sharedpool.Assignments, f
 // sharedHost is what every org loop of one shared runner shares.
 type sharedHost struct {
 	base        *app
+	hygiene     *engine.Hygiene // one disk and image sweep for every org's loop (runnerhygiene.go)
 	f           *sharedFlags
 	secret      string
 	runtime     string // container runtime of every org
@@ -482,6 +483,8 @@ func runSharedRunner(args []string) int {
 	if h.prefix == "" {
 		h.prefix = "shared-" + host
 	}
+	h.hygiene = newRunnerHygiene(a, f.projectsDir) // E6: one sweep for every org's loop: they share this runner's store and Docker (runnerhygiene.go)
+	go h.hygiene.Run(ctx)
 	var wg sync.WaitGroup
 	start := func(as sharedpool.Assignment, slots int) *sharedLoop {
 		lctx, cancel := context.WithCancel(ctx)
@@ -564,7 +567,8 @@ func (h *sharedHost) serveOrg(ctx context.Context, org string, slots int, root s
 	w, err := engine.NewWorker(reg, engine.NewPipeline(reg, planRoot, oa.logger),
 		sharedEnsureImages(oa, reg, planRoot, proj.refresh, plan),
 		engine.WorkerOptions{Server: h.f.server, Token: claim.Token, WorkerID: name, Host: h.host, Version: benchVersion,
-			Slots: slots, Logger: oa.logger, Pool: sharedpool.Pool, Labels: []string{"shared", "runtime=" + h.runtime}})
+			Slots: slots, Logger: oa.logger, Pool: sharedpool.Pool, Labels: []string{"shared", "runtime=" + h.runtime},
+			Disk: h.hygiene.DiskState, ImageUse: h.hygiene.NoteImages, KeepRunFolders: a.cfg.Runner.Disk.KeepRunFolders})
 	// No Jobs: hosted CLI jobs would run the docker CLI outside the org's
 	// policy; the worker refuses them and they go to the org's own workers.
 	if err != nil {

@@ -120,6 +120,7 @@ func (s *Server) handleHealth(w http.ResponseWriter, _ *http.Request) {
 		PlanModes: PlanModes, ScriptedProviders: s.scriptedProviders(),
 		PlanFields: PlanFields, // W9: model-filtered plans
 		SlotClaims: true,       // F1: the claim API (claims.go)
+		Providers:  s.Concurrency(),
 	})
 }
 
@@ -188,6 +189,9 @@ type Health struct {
 	ScriptedProviders []string          `json:"scripted_providers,omitempty"`
 	PlanFields        []string          `json:"plan_fields,omitempty"` // W9: optional plan fields honoured; an older proxy rejects a plan that sets one
 	SlotClaims        bool              `json:"slot_claims,omitempty"` // F1: the proxy enforces key slot claims (claims.go); false from an older proxy
+	// Providers is each provider's concurrency: slots and live claims
+	// (concurrency.go). Empty from an older proxy.
+	Providers []ProviderConcurrency `json:"providers,omitempty"`
 }
 
 // Supports reports whether the proxy honours plan mode.

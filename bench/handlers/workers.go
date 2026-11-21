@@ -40,6 +40,12 @@ type WorkerAPI interface {
 	Whoami(ctx context.Context) (*schemas.RunnerWhoami, error)
 }
 
+// WorkerDiskReporter is a WorkerAPI that records the free disk a worker
+// sends with its lease request (E6). engine.Coordinator is one.
+type WorkerDiskReporter interface {
+	NoteDisk(ctx context.Context, workerID string, d schemas.WorkerDisk) error
+}
+
 // HostedWorkerAPI is a WorkerAPI that serves one hosted organization
 // (engine.Coordinator with RemoteOptions.OrgID set). Its routes authenticate
 // by runner token instead of the shared worker token (Runners area,
@@ -236,6 +242,18 @@ func (h *WorkersHandler) lease(ctx *fasthttp.RequestCtx) {
 	}
 	work, cancel := h.work(ctx, workerCallTimeout)
 	defer cancel()
+	if req.Disk != nil { // E6: a runner below its free disk floor asks for no work
+		if dr, ok := h.api.(WorkerDiskReporter); ok {
+			if err := dr.NoteDisk(work, req.WorkerID, *req.Disk); err != nil {
+				h.sendErr(ctx, "lease", err)
+				return
+			}
+		}
+		if req.Disk.Low {
+			ctx.SetStatusCode(fasthttp.StatusNoContent)
+			return
+		}
+	}
 	out, err := h.api.Lease(work, req.WorkerID)
 	if err != nil {
 		h.sendErr(ctx, "lease", err)

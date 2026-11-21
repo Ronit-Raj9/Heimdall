@@ -1,68 +1,270 @@
 # What the Kubernetes driver needs when the bench runs inside the cluster
-# with a service account (docs/kubernetes.md, "Running the bench in the
-# cluster"). The driver creates one namespace per run, so these are cluster
-# permissions; `bifrost-bench k8s check` asks the API server for each verb
-# and names any that is denied.
+# with a service account (docs/kubernetes.md, "Namespace pool"). This is the
+# default: namespace-scoped. The driver runs in namespace pool mode
+# (kubernetes.namespaces: [heimdall-run-1, ..., heimdall-run-4]); it never
+# creates or deletes a namespace, and every permission that touches run pods
+# (secrets, pods/exec) is a Role inside a pool namespace, which holds only
+# run pods. There are no cluster-wide secrets and no namespace delete.
 #
 #   kubectl apply -f deploy/k8s/rbac.yaml
 #
+# `bifrost-bench k8s check` asks the API server for each verb in each pool
+# namespace and names any that is denied. The legacy per-run-namespace mode
+# needs deploy/k8s/rbac-cluster.yaml instead.
+#
 # The run pods themselves get no permissions at all: their service account
 # token is never mounted (automountServiceAccountToken: false).
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: heimdall-system
+---
 apiVersion: v1
 kind: ServiceAccount
 metadata:
   name: heimdall-bench
   namespace: heimdall-system
 ---
-apiVersion: rbac.authorization.k8s.io/v1
-kind: ClusterRole
+# Pool namespace: one run at a time, leased by the run's anchor config map.
+apiVersion: v1
+kind: Namespace
 metadata:
-  name: heimdall-bench-driver
+  name: heimdall-run-1
+  labels:
+    heimdall.run: "1"
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: heimdall-bench-run
+  namespace: heimdall-run-1
 rules:
-  # One namespace per run, removed with everything in it.
-  - apiGroups: [""]
-    resources: [namespaces]
-    verbs: [create, get, list, delete]
-  # The run pod, its env secret, its anchor and observer scripts, and the
-  # tokenless kubernetes.service_account created in each run namespace.
+  # The run pod, its env secret, its anchor (the lease) and observer
+  # scripts, and the tokenless kubernetes.service_account.
   - apiGroups: [""]
     resources: [pods, secrets, configmaps, serviceaccounts]
-    verbs: [create, get, list, delete, patch]
-  # Seeding, export, observers and the agent's own streams.
+    verbs: [create, get, list, delete]
+  # Seeding, export, observers and the agent's own streams; only run pods
+  # live here, so exec reaches nothing else.
   - apiGroups: [""]
     resources: [pods/exec, pods/attach]
     verbs: [create, get]
   - apiGroups: [""]
     resources: [pods/log, events]
     verbs: [get, list]
-  # The gateway Service the agents reach, and the cluster DNS and API server
-  # addresses the egress probe tries.
+  - apiGroups: [networking.k8s.io]
+    resources: [networkpolicies]
+    verbs: [create, get, list, delete]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: heimdall-bench-run
+  namespace: heimdall-run-1
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: heimdall-bench-run
+subjects:
+  - kind: ServiceAccount
+    name: heimdall-bench
+    namespace: heimdall-system
+---
+# Pool namespace: one run at a time, leased by the run's anchor config map.
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: heimdall-run-2
+  labels:
+    heimdall.run: "1"
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: heimdall-bench-run
+  namespace: heimdall-run-2
+rules:
+  # The run pod, its env secret, its anchor (the lease) and observer
+  # scripts, and the tokenless kubernetes.service_account.
   - apiGroups: [""]
-    resources: [services]
-    verbs: [get, list, create, patch, delete]
+    resources: [pods, secrets, configmaps, serviceaccounts]
+    verbs: [create, get, list, delete]
+  # Seeding, export, observers and the agent's own streams; only run pods
+  # live here, so exec reaches nothing else.
   - apiGroups: [""]
-    resources: [nodes]
+    resources: [pods/exec, pods/attach]
+    verbs: [create, get]
+  - apiGroups: [""]
+    resources: [pods/log, events]
     verbs: [get, list]
   - apiGroups: [networking.k8s.io]
     resources: [networkpolicies]
     verbs: [create, get, list, delete]
-  # `k8s gateway up|down` only.
-  - apiGroups: [apps]
-    resources: [deployments]
-    verbs: [create, get, list, patch, delete]
-  # `k8s check`.
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: heimdall-bench-run
+  namespace: heimdall-run-2
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: heimdall-bench-run
+subjects:
+  - kind: ServiceAccount
+    name: heimdall-bench
+    namespace: heimdall-system
+---
+# Pool namespace: one run at a time, leased by the run's anchor config map.
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: heimdall-run-3
+  labels:
+    heimdall.run: "1"
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: heimdall-bench-run
+  namespace: heimdall-run-3
+rules:
+  # The run pod, its env secret, its anchor (the lease) and observer
+  # scripts, and the tokenless kubernetes.service_account.
+  - apiGroups: [""]
+    resources: [pods, secrets, configmaps, serviceaccounts]
+    verbs: [create, get, list, delete]
+  # Seeding, export, observers and the agent's own streams; only run pods
+  # live here, so exec reaches nothing else.
+  - apiGroups: [""]
+    resources: [pods/exec, pods/attach]
+    verbs: [create, get]
+  - apiGroups: [""]
+    resources: [pods/log, events]
+    verbs: [get, list]
+  - apiGroups: [networking.k8s.io]
+    resources: [networkpolicies]
+    verbs: [create, get, list, delete]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: heimdall-bench-run
+  namespace: heimdall-run-3
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: heimdall-bench-run
+subjects:
+  - kind: ServiceAccount
+    name: heimdall-bench
+    namespace: heimdall-system
+---
+# Pool namespace: one run at a time, leased by the run's anchor config map.
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: heimdall-run-4
+  labels:
+    heimdall.run: "1"
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: heimdall-bench-run
+  namespace: heimdall-run-4
+rules:
+  # The run pod, its env secret, its anchor (the lease) and observer
+  # scripts, and the tokenless kubernetes.service_account.
+  - apiGroups: [""]
+    resources: [pods, secrets, configmaps, serviceaccounts]
+    verbs: [create, get, list, delete]
+  # Seeding, export, observers and the agent's own streams; only run pods
+  # live here, so exec reaches nothing else.
+  - apiGroups: [""]
+    resources: [pods/exec, pods/attach]
+    verbs: [create, get]
+  - apiGroups: [""]
+    resources: [pods/log, events]
+    verbs: [get, list]
+  - apiGroups: [networking.k8s.io]
+    resources: [networkpolicies]
+    verbs: [create, get, list, delete]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: heimdall-bench-run
+  namespace: heimdall-run-4
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: heimdall-bench-run
+subjects:
+  - kind: ServiceAccount
+    name: heimdall-bench
+    namespace: heimdall-system
+---
+# The gateway Service the agents reach (kubernetes.gateway_url): read only,
+# in the gateway namespace only. `k8s gateway up|down` needs write access
+# here (services, deployments); run those as an administrator or grant it
+# separately.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: heimdall-bench-gateway-read
+  namespace: heimdall-gw
+rules:
+  - apiGroups: [""]
+    resources: [services]
+    verbs: [get]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: heimdall-bench-gateway-read
+  namespace: heimdall-gw
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: heimdall-bench-gateway-read
+subjects:
+  - kind: ServiceAccount
+    name: heimdall-bench
+    namespace: heimdall-system
+---
+# The only cluster-scoped grant, all read-only or self-review:
+# - nodes get/list: the driver checks that the node a run pod landed on has
+#   the frozen agent image digest and reads its architecture (Lock
+#   fingerprints), and `k8s check` lists the images on the nodes.
+# - selfsubjectaccessreviews create: `k8s check` asks which verbs it holds
+#   (most clusters already grant this to every authenticated user).
+# - runtimeclasses get: `k8s check` verifies kubernetes.runtime_class exists.
+# The egress probe also tries to read the kube-dns and kubernetes Services
+# for extra forbidden targets; without access it skips those targets.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: heimdall-bench-cluster-read
+rules:
+  - apiGroups: [""]
+    resources: [nodes]
+    verbs: [get, list]
   - apiGroups: [authorization.k8s.io]
     resources: [selfsubjectaccessreviews]
     verbs: [create]
+  - apiGroups: [node.k8s.io]
+    resources: [runtimeclasses]
+    verbs: [get]
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRoleBinding
 metadata:
-  name: heimdall-bench-driver
+  name: heimdall-bench-cluster-read
 roleRef:
   apiGroup: rbac.authorization.k8s.io
   kind: ClusterRole
-  name: heimdall-bench-driver
+  name: heimdall-bench-cluster-read
 subjects:
   - kind: ServiceAccount
     name: heimdall-bench

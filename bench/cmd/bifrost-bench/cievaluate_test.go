@@ -135,8 +135,8 @@ func regressedReport() reportcard.Report {
 		Benchmarks: []reportcard.Benchmark{{
 			Benchmark: "hd-harbor-tb2",
 			Arms: map[string]reportcard.Metrics{
-				"A": {Score: 0.6, CILow: 0.5, CIHigh: 0.7, Runs: 20, CostUSD: 2},
-				"B": {Score: 0.3, CILow: 0.2, CIHigh: 0.4, Runs: 20, CostUSD: 2.5},
+				"A": {Score: 0.6, CILow: 0.5, CIHigh: 0.7, Runs: 20, CostUSD: ptrF(2)},
+				"B": {Score: 0.3, CILow: 0.2, CIHigh: 0.4, Runs: 20, CostUSD: ptrF(2.5)},
 			},
 			Verdict: &verdictab.BenchmarkVerdict{Winner: "A", Delta: -0.3, Significant: true},
 		}},
@@ -380,3 +380,6 @@ func TestCIInstallHosted(t *testing.T) {
 		t.Fatal(err)
 	}
 }
+
+// ptrF is a pointer to x, for an optional cost.
+func ptrF(x float64) *float64 { return &x }

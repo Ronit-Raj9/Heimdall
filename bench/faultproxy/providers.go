@@ -30,7 +30,7 @@ const (
 
 // defaultSlotsPerProvider is how many slots a provider gets when Config.Slots
 // names none for it.
-const defaultSlotsPerProvider = 4
+const defaultSlotsPerProvider = 24 // field data: parallel admission of 10 to 14 runs waited at 8 and hit unknown oa-slot-5 at 4
 
 // ProviderSpec is one upstream provider as the proxy sees it. Bifrost's
 // provider of the same name points its base_url at the proxy, so the proxy
@@ -49,7 +49,7 @@ type ProviderSpec struct {
 	CountTokens []string `json:"count_tokens,omitempty" yaml:"count_tokens"`
 	Models      []string `json:"models,omitempty" yaml:"models"`
 	Audio       []string `json:"audio,omitempty" yaml:"audio"`             // X8 voice agents: speech and transcription routes (KindAudio)
-	SlotPrefix  string   `json:"slot_prefix,omitempty" yaml:"slot_prefix"` // default slots are <prefix>-slot-1..4
+	SlotPrefix  string   `json:"slot_prefix,omitempty" yaml:"slot_prefix"` // default slots are <prefix>-slot-1..24
 	// SarvamAudio sends the audio requests for Sarvam models to Sarvam AI
 	// (sarvam.go); nil: none.
 	SarvamAudio *SarvamAudio `json:"sarvam_audio,omitempty" yaml:"sarvam_audio"`

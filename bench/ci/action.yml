@@ -9,9 +9,8 @@ description: >
 
 inputs:
   mode:
-    description: "evaluate (hosted Heimdall), recorded (re-analyze a sealed bundle you name) or live (run an experiment against a running stack)"
-    required: false
-    default: evaluate
+    description: "evaluate (hosted Heimdall), recorded (re-analyze a sealed bundle you name) or live (run an experiment against a running stack). Required: there is no default"
+    required: true
   url:
     description: "evaluate: your Heimdall address, e.g. https://heimdall.example.com (usually vars.HEIMDALL_URL)"
     required: false
@@ -166,6 +165,7 @@ runs:
       run: |
         case $MODE in
           evaluate|recorded|live) ;;
+          "") echo "::error title=Heimdall::set the mode input to evaluate, recorded or live"; exit 64 ;;
           *) echo "::error title=Heimdall::mode $MODE: want evaluate, recorded or live"; exit 64 ;;
         esac
         # No fixture default: recorded mode re-checks only the bundle you name.

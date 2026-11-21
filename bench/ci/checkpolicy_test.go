@@ -4,6 +4,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"regexp"
 	"strings"
 	"testing"
 )
@@ -215,6 +216,9 @@ func TestCheckScriptNoDefaults(t *testing.T) {
 	}
 }
 
+// nextInput matches the start of an action input line ("\n  name:").
+var nextInput = regexp.MustCompile(`\n  [a-z][a-z0-9-]*:\n`)
+
 // TestActionHasNoDemoDefaults: the composite action requires mode and has
 // no default bundle (D4: the old default re-checked testdata/recorded).
 func TestActionHasNoDemoDefaults(t *testing.T) {
@@ -226,8 +230,14 @@ func TestActionHasNoDemoDefaults(t *testing.T) {
 	if strings.Contains(s, "default: testdata/recorded") {
 		t.Fatal("action.yml still defaults to the recorded test bundle")
 	}
+	// The mode input's own block: from "  mode:" to the next input.
 	i := strings.Index(s, "  mode:\n")
-	j := strings.Index(s, "  experiment:\n")
+	j := -1
+	if i >= 0 {
+		if m := nextInput.FindStringIndex(s[i+1:]); m != nil {
+			j = i + 1 + m[0]
+		}
+	}
 	if i < 0 || j < i || !strings.Contains(s[i:j], "required: true") || strings.Contains(s[i:j], "default:") {
 		t.Fatal("the mode input is not required or still has a default")
 	}

@@ -71,6 +71,10 @@ type Config struct {
 	// the pool holds, and the host-side sampler.
 	GPU GPUConfig `yaml:"gpu" json:"gpu,omitzero"`
 
+	// Runner is how a runner machine keeps its disk healthy (janitor, image
+	// GC, build cache prune, free disk floor; lib/runnerconfig.go).
+	Runner RunnerConfig `yaml:"runner" json:"runner,omitzero"`
+
 	Root string `yaml:"-" json:"-"` // bench root that relative paths resolve against
 }
 
@@ -80,6 +84,10 @@ type ServerConfig struct {
 	Mode         schemas.Mode `yaml:"mode" json:"mode"`
 	AllowedHosts []string     `yaml:"allowed_hosts" json:"allowed_hosts"`
 	CORSOrigins  []string     `yaml:"cors_origins" json:"cors_origins"`
+	// MetricsListen serves Prometheus metrics (GET /metrics) on a separate
+	// admin address, e.g. 0.0.0.0:9090 on an internal network. Empty: off.
+	// It has no authentication: never publish it.
+	MetricsListen string `yaml:"metrics_listen" json:"metrics_listen,omitempty"`
 }
 
 // GatewayConfig points at the stock Bifrost gateway.
@@ -90,7 +98,7 @@ type GatewayConfig struct {
 	Provider      string   `yaml:"provider" json:"provider"`
 	KeySlots      []string `yaml:"key_slots" json:"key_slots"`
 	// OpenAIKeySlots are the openai provider's key slots (default
-	// oa-slot-1..4). A team of N members on an openai model holds N of them
+	// oa-slot-1..24). A team of N members on an openai model holds N of them
 	// at once, so a 5-member team needs 5 here and the same names in the
 	// fault proxy's --openai-slots.
 	OpenAIKeySlots []string `yaml:"openai_key_slots" json:"openai_key_slots,omitempty"`
@@ -99,6 +107,14 @@ type GatewayConfig struct {
 	// When set, a remote_http agent with model_traffic gateway is sent this
 	// URL instead of AgentURL.
 	PublicURL string `yaml:"public_url" json:"public_url,omitempty"`
+	// SlotsPerProvider, when above 0, replaces key_slots with
+	// fp-slot-1..N and openai_key_slots with oa-slot-1..N: how many runs
+	// may use one shared provider at once. Keep it equal to the fault
+	// proxy's --slots-per-provider (lib/runnerconfig.go).
+	SlotsPerProvider int `yaml:"slots_per_provider" json:"slots_per_provider,omitempty"`
+	// OrgSlotsPerProvider is how many runs of one organization may use one
+	// of its own provider keys at once (0: the gateway's default of 8).
+	OrgSlotsPerProvider int `yaml:"org_slots_per_provider" json:"org_slots_per_provider,omitempty"`
 }
 
 // RemoteToolsConfig is the remote_tools section. Listen is the bench-host
@@ -160,6 +176,7 @@ func LoadConfig(path string) (*Config, error) {
 		return nil, fmt.Errorf("resolve config path %s: %w", path, err)
 	}
 	cfg.Root = filepath.Dir(filepath.Dir(abs))
+	cfg.Gateway.expandSlots()
 	if err := cfg.Validate(); err != nil {
 		return nil, fmt.Errorf("config %s: %w", path, err)
 	}
@@ -179,6 +196,11 @@ func (c *Config) Validate() error {
 	if c.RunsRoot == "" {
 		return fmt.Errorf("runs_root is empty")
 	}
+	if c.Server.MetricsListen != "" {
+		if _, _, err := net.SplitHostPort(c.Server.MetricsListen); err != nil {
+			return fmt.Errorf("server.metrics_listen %q: %w", c.Server.MetricsListen, err)
+		}
+	}
 	if err := c.Auth.Validate(); err != nil { // Auth area (P2)
 		return err
 	}
@@ -192,6 +214,12 @@ func (c *Config) Validate() error {
 	case "", "docker", "kubernetes":
 	default:
 		return fmt.Errorf("environment.driver must be docker or kubernetes, got %q", c.Environment.Driver)
+	}
+	if err := c.Runner.Validate(); err != nil {
+		return err
+	}
+	if err := c.Gateway.validateSlots(); err != nil {
+		return err
 	}
 	if n := len(c.Kubernetes.NamespacePrefix); n > maxNamespacePrefix { // keeps room for the run ID in a 63-character namespace name
 		return fmt.Errorf("kubernetes.namespace_prefix is %d characters; at most %d", n, maxNamespacePrefix)
@@ -344,6 +372,16 @@ type KubernetesConfig struct {
 	NodeSelector    map[string]string      `yaml:"node_selector,omitempty" json:"node_selector,omitempty"`
 	Tolerations     []KubernetesToleration `yaml:"tolerations,omitempty" json:"tolerations,omitempty"`
 	KindCluster     string                 `yaml:"kind_cluster,omitempty" json:"kind_cluster,omitempty"` // `k8s images load` target
+	// RuntimeClass is the RuntimeClass every run pod uses, e.g. gvisor or
+	// kata, so untrusted agents run in a sandbox runtime instead of runc.
+	// Empty keeps the cluster default. `k8s check` verifies it exists.
+	RuntimeClass string `yaml:"runtime_class,omitempty" json:"runtime_class,omitempty"`
+	// Namespaces is a pool of namespaces an administrator created up front
+	// (deploy/k8s/rbac.yaml). When set, each run takes a free one of them
+	// instead of creating its own namespace, so the driver needs only a
+	// namespaced Role in each: no cluster-wide secrets, no namespace create
+	// or delete. A pool namespace holds one run at a time.
+	Namespaces []string `yaml:"namespaces,omitempty" json:"namespaces,omitempty"`
 }
 
 // KubernetesToleration is one pod toleration.

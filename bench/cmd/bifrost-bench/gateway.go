@@ -30,16 +30,17 @@ func newGateway(ctx context.Context, cfg *lib.Config, docker utils.Docker, logge
 		return nil, fmt.Errorf("gateway: %s is not set (see deploy/.env.example)", cfg.Gateway.AdminTokenEnv)
 	}
 	gw, err := bifrost.New(bifrost.Config{
-		URL:           cfg.Gateway.URL,
-		SetupToken:    token,
-		FaultProxyURL: envOr("BENCH_GATEWAY_FAULT_PROXY_URL", defaultFaultProxyURL),
-		Providers:     providerSetups(cfg),
-		MaxRetries:    0,
-		EvalNetwork:   cfg.Networks.Eval,
-		HelperImage:   cfg.Images.Helper,
-		Docker:        docker,
-		Logger:        logger,
-		Claims:        claims, // F1: claimed at the fault proxy before a key is minted (gateways/bifrost/slotclaims.go)
+		URL:                 cfg.Gateway.URL,
+		SetupToken:          token,
+		FaultProxyURL:       envOr("BENCH_GATEWAY_FAULT_PROXY_URL", defaultFaultProxyURL),
+		Providers:           providerSetups(cfg),
+		MaxRetries:          0,
+		EvalNetwork:         cfg.Networks.Eval,
+		HelperImage:         cfg.Images.Helper,
+		Docker:              docker,
+		Logger:              logger,
+		OrgSlotsPerProvider: cfg.Gateway.OrgSlotsPerProvider, // E8: runs of one org per own provider key
+		Claims:              claims,                          // F1: claimed at the fault proxy before a key is minted (gateways/bifrost/slotclaims.go)
 	})
 	if err != nil {
 		return nil, fmt.Errorf("gateway: %w", err)
@@ -62,9 +63,7 @@ func providerSetups(cfg *lib.Config) []bifrost.ProviderSetup {
 	}
 	oaNames := cfg.Gateway.OpenAIKeySlots // must match the fault proxy's --openai-slots
 	if len(oaNames) == 0 {
-		for i := 1; i <= 4; i++ {
-			oaNames = append(oaNames, fmt.Sprintf("oa-slot-%d", i))
-		}
+		oaNames = lib.SlotNames("oa", lib.DefaultSlotsPerProvider)
 	}
 	oa := make([]bifrost.Slot, 0, len(oaNames))
 	for _, n := range oaNames {

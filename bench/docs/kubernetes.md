@@ -67,6 +67,29 @@ kubernetes:
   node_selector: {}             # e.g. {heimdall.dev/pool: agents}
   tolerations: []               # [{key, operator, value, effect, toleration_seconds}]
   kind_cluster: ""              # target of `k8s images load`
+  namespaces: []                # namespace pool, e.g. [heimdall-run-1, heimdall-run-2]; empty: one namespace per run
+  runtime_class: ""             # RuntimeClass of every run and probe pod, e.g. gvisor or kata; empty: cluster default
+```
+
+### Namespace pool
+
+By default the driver creates one namespace per run and deletes it afterwards, which needs a ClusterRole with namespace create/delete, secrets and `pods/exec` everywhere (`deploy/k8s/rbac-cluster.yaml`, the legacy alternative). Many clusters refuse that. Set `kubernetes.namespaces` to namespaces an administrator created up front and the driver never creates or deletes a namespace: each run leases one free pool namespace by creating its anchor config map `run` there. A conflict means another run holds it and the next one is tried; an anchor left by an earlier attempt of the same run is removed (with the objects it owns) and created again; when none is free the run fails with `no free namespace in kubernetes.namespaces`. `Destroy` deletes the anchor (its dependents are garbage-collected), deletes the run's pod, secret and policies itself and waits until they are gone, since the next run reuses the names. The egress probe and `k8s check` lease a pool namespace the same way, and `k8s check` asks for the namespaced verbs in each pool namespace. `k8s cleanup` in pool mode removes stale anchors of this install, never a namespace. A service account an administrator put in a pool namespace is used as it is. Give the pool at least as many namespaces as runs in flight. `deploy/k8s/rbac.yaml` creates `heimdall-run-1` to `heimdall-run-4` (label `heimdall.run: "1"`), a Role and RoleBinding in each, read access to the gateway Service in its namespace only, and a small read-only ClusterRole (nodes get/list for the node image checks, `selfsubjectaccessreviews` for `k8s check`, `runtimeclasses` get).
+
+```yaml
+kubernetes:
+  namespaces: [heimdall-run-1, heimdall-run-2, heimdall-run-3, heimdall-run-4]
+```
+
+### Sandboxed runtime
+
+`kubernetes.runtime_class` sets `runtimeClassName` on every run and probe pod, so agents run under a sandboxed runtime such as gVisor or Kata. `k8s check` fails when the RuntimeClass does not exist or cannot be read. The cluster administrator installs the runtime on the nodes and its RuntimeClass, for example:
+
+```yaml
+apiVersion: node.k8s.io/v1
+kind: RuntimeClass
+metadata:
+  name: gvisor
+handler: runsc
 ```
 
 An experiment may name the driver it must run on (`spec/experiment.schema.json`):
@@ -165,7 +188,7 @@ The fault proxy's ledger lives on an emptyDir: a restarted proxy pod loses the l
 
 ## Cleanup
 
-Every object of a run is owned by its anchor config map (owner references), and everything lives in the run's namespace. `Destroy` deletes the anchor, which garbage-collects its dependents, then the namespace; both are idempotent and work after a failed `Create`. Namespaces carry `heimdall.dev/bench`, `heimdall.dev/run`, `heimdall.dev/exp` and `heimdall.dev/role` labels; `k8s cleanup` lists the namespaces named `<namespace_prefix>-...` except the gateway's, so another install on the same cluster is never touched, and classifies each as the Docker janitor does: a run whose slot lease is fresh is kept, a dead or sealed run is stale, and a namespace with no lease information is stale only when older than `-grace` (6h). `-delete` removes the stale ones only. A run namespace whose name already exists with another run's labels is never replaced; the run fails instead. Long prefixes (at most 40 characters) keep run namespaces unique by ending a cut name in a hash of the run ID.
+Every object of a run is owned by its anchor config map (owner references), and everything lives in the run's namespace. `Destroy` deletes the anchor, which garbage-collects its dependents, then the namespace; both are idempotent and work after a failed `Create`. Namespaces carry `heimdall.dev/bench`, `heimdall.dev/run`, `heimdall.dev/exp` and `heimdall.dev/role` labels; `k8s cleanup` lists the namespaces named `<namespace_prefix>-...` except the gateway's, so another install on the same cluster is never touched, and classifies each as the Docker janitor does: a run whose slot lease is fresh is kept, a dead or sealed run is stale, and a namespace with no lease information is stale only when older than `-grace` (6h). `-delete` removes the stale ones only. A run namespace whose name already exists with another run's labels is never replaced; the run fails instead. Long prefixes (at most 40 characters) keep run namespaces unique by ending a cut name in a hash of the run ID. In pool mode (`kubernetes.namespaces`) nothing above deletes a namespace: `Destroy` releases the anchor and the run's objects, and `k8s cleanup` lists this install's anchors in the pool namespaces with the same live/dead/grace rules and with `-delete` releases the stale ones.
 
 ## Exec and attach protocol
 

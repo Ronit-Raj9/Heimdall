@@ -3,6 +3,7 @@ package main
 import (
 	"errors"
 	"fmt"
+	"github.com/maximhq/bifrost/bench/selfmetrics"
 	"os"
 	"strings"
 
@@ -66,7 +67,8 @@ func withWorkers(a *app, l handlers.Launcher) (handlers.Launcher, handlers.Worke
 		return l, nil
 	}
 	a.logger.Info("worker mode on: remote workers may lease slots of launched experiments (docs/remote-execution.md)")
-	base.coord = c // Jobs area: the experiment.run job runs with the coordinator attached (servejobs.go)
+	registerCoordinatorMetrics(selfmetrics.Default, func() []*engine.Coordinator { return []*engine.Coordinator{c} }) // N9 (servemetrics.go)
+	base.coord = c                                                                                                    // Jobs area: the experiment.run job runs with the coordinator attached (servejobs.go)
 	return &workerLauncher{launcher: base, coord: c}, c
 }
 

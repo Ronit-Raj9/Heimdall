@@ -104,6 +104,7 @@ func runServe(args []string) int {
 	}
 	serveEvidenceMirror(ctx, a, *offline)               // Evidence storage area (P6): background mirror and sweeper when storage.mirror_dir or storage.s3 is set; seal hook evidenceOnSeal (evidence.go)
 	applyServiceHooks(a, &deps, auth.LocalOrgID, false) // web parity: deps.Services (servicehooks.go)
+	serveMetrics(ctx, a.cfg.Server.MetricsListen, a.logger) // N9: Prometheus on the admin address (servemetrics.go)
 	srv, err := server.New(a.cfg, deps)
 	if err != nil {
 		return fail("server: %v", err)

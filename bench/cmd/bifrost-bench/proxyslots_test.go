@@ -25,7 +25,7 @@ func TestProxySlots(t *testing.T) {
 }
 
 // TestProviderSetupsOpenAISlots: the bench's openai slots follow
-// gateway.openai_key_slots, default oa-slot-1..4. Before, they were fixed at
+// gateway.openai_key_slots, default oa-slot-1..24. Before, they were fixed at
 // 4, so a 5-member team could never run on an openai model.
 func TestProviderSetupsOpenAISlots(t *testing.T) {
 	names := func(cfg *lib.Config) []string {
@@ -40,7 +40,7 @@ func TestProviderSetupsOpenAISlots(t *testing.T) {
 		}
 		return nil
 	}
-	if got := names(&lib.Config{}); !reflect.DeepEqual(got, []string{"oa-slot-1", "oa-slot-2", "oa-slot-3", "oa-slot-4"}) {
+	if got := names(&lib.Config{}); !reflect.DeepEqual(got, lib.SlotNames("oa", 24)) {
 		t.Fatalf("default %v", got)
 	}
 	six := []string{"oa-slot-1", "oa-slot-2", "oa-slot-3", "oa-slot-4", "oa-slot-5", "oa-slot-6"}

@@ -226,8 +226,8 @@ func TestDefaultSlots(t *testing.T) {
 		byProvider[s.Provider] = append(byProvider[s.Provider], s.Name)
 	}
 	if strings.Join(byProvider["anthropic"], ",") != "fp-slot-1" ||
-		strings.Join(byProvider["openai"], ",") != "oa-slot-1,oa-slot-2,oa-slot-3,oa-slot-4" ||
-		strings.Join(byProvider["groq"], ",") != "groq-slot-1,groq-slot-2,groq-slot-3,groq-slot-4" ||
+		len(byProvider["openai"]) != 24 || byProvider["openai"][23] != "oa-slot-24" ||
+		len(byProvider["groq"]) != 24 || byProvider["groq"][0] != "groq-slot-1" ||
 		byProvider["gemini"][0] != "gm-slot-1" {
 		t.Errorf("slots = %v", byProvider)
 	}

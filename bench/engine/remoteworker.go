@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"io/fs"
 	"math"
 	"net/http"
 	"net/url"
@@ -44,19 +45,19 @@ type Replanner func(ctx context.Context, e *schemas.Experiment) (*schemas.Manife
 
 // WorkerOptions configures a remote Worker.
 type WorkerOptions struct {
-	Server     string // coordinator base URL, e.g. http://127.0.0.1:8090
-	Token      string // the shared worker token; sent only in the Authorization header, never logged
-	WorkerID   string // default: host name plus a random suffix
-	Host       string
-	Version    string
-	Slots      int           // concurrent slots; default 1
-	PollEvery  time.Duration // wait between lease requests that found no work
+	Server    string // coordinator base URL, e.g. http://127.0.0.1:8090
+	Token     string // the shared worker token; sent only in the Authorization header, never logged
+	WorkerID  string // default: host name plus a random suffix
+	Host      string
+	Version   string
+	Slots     int           // concurrent slots; default 1
+	PollEvery time.Duration // wait between lease requests that found no work
 	// LiveEventEvery is how often buffered live run events are flushed
 	// between lease heartbeats (default DefaultLiveEventEvery).
 	LiveEventEvery time.Duration
-	ScratchDir string        // archives are built here; default the system temp folder
-	HTTP       *http.Client
-	Logger     schemas.Logger
+	ScratchDir     string // archives are built here; default the system temp folder
+	HTTP           *http.Client
+	Logger         schemas.Logger
 	// Runners area (docs/runners.md): the pool the runner asks for (hosted:
 	// its token's pool when empty), free-form labels, and the runner's own
 	// spend cap per UTC day (0 = none), kept in SpendFile across restarts.
@@ -67,6 +68,14 @@ type WorkerOptions struct {
 	// Jobs runs runner job leases (gap G05, remotejobs.go); nil refuses
 	// them, and the coordinator then offers this worker no job again.
 	Jobs JobExecutor
+	// E6 runner hygiene (runnerhygiene.go). Disk reports the run store's
+	// free disk before every lease request: while it is low the runner asks
+	// for no work and the server shows why. ImageUse records the images a
+	// slot runs, for image GC. KeepRunFolders keeps a run's local folder
+	// after the server accepted its upload (removed by default).
+	Disk           func() schemas.WorkerDisk
+	ImageUse       func(ids ...string)
+	KeepRunFolders bool
 }
 
 // Worker is the remote side of remote execution: it registers with a
@@ -223,8 +232,21 @@ func (w *Worker) loop(ctx context.Context, stop context.CancelCauseFunc) {
 			continue
 		}
 		w.capLogged.Store(false)
+		req := schemas.WorkerLeaseRequest{WorkerID: w.opts.WorkerID}
+		if w.opts.Disk != nil {
+			if d := w.opts.Disk(); d.FreeBytes >= 0 {
+				req.Disk = &d
+			}
+		}
 		var lease schemas.WorkerLease
-		err := w.call(ctx, http.MethodPost, workerAPI+"/lease", schemas.WorkerLeaseRequest{WorkerID: w.opts.WorkerID}, &lease)
+		err := w.call(ctx, http.MethodPost, workerAPI+"/lease", req, &lease)
+		if err == nil && lease.LeaseID != "" && req.Disk != nil && req.Disk.Low {
+			// A server that does not know the disk field leased anyway: hand
+			// the lease straight back so another runner takes it.
+			w.release(ctx, &lease, "runner disk is low", false, nil)
+			sleepCtx(ctx, w.opts.PollEvery)
+			continue
+		}
 		switch {
 		case errors.Is(err, schemas.ErrWorkerUnknown):
 			if rerr := w.register(ctx); rerr != nil {
@@ -337,6 +359,13 @@ func (w *Worker) Work(ctx context.Context, lease *schemas.WorkerLease) *schemas.
 		defer release()
 		in.GPU = a
 	}
+	if w.opts.ImageUse != nil && runnerImgs != nil {
+		ids := make([]string, 0, len(runnerImgs.IDs))
+		for _, id := range runnerImgs.IDs {
+			ids = append(ids, id)
+		}
+		w.opts.ImageUse(ids...)
+	}
 	res, err := w.runner.RunSlot(sctx, in)
 	if res != nil {
 		res.RunnerGateway = runnerGW  // Tenancy area: uploaded with the run
@@ -376,6 +405,7 @@ func (w *Worker) Work(ctx context.Context, lease *schemas.WorkerLease) *schemas.
 	}
 	if out.Accepted {
 		w.logger.Info("run accepted", "lease", lease.LeaseID, "run", out.RunID, "outcome", string(res.Run.Outcome))
+		w.removeRunFolder(res.Dir)
 	} else {
 		w.logger.Error("run rejected by the coordinator", "lease", lease.LeaseID, "run", out.RunID, "reason", out.Reason)
 	}
@@ -967,4 +997,41 @@ func (w *Worker) leasedGPUs(ctx context.Context, uuids []string) (*schemas.GPUAs
 		return nil, func() {}, "leased GPUs: " + err.Error()
 	}
 	return a, release, ""
+}
+
+// removeRunFolder deletes an uploaded run's local folder once the server
+// accepted it (E6): the server holds the sealed copy, and a runner that kept
+// every run would fill its disk. Only a folder inside the worker's own store
+// is removed; KeepRunFolders keeps it.
+func (w *Worker) removeRunFolder(dir string) {
+	if w.opts.KeepRunFolders || dir == "" || w.reg == nil || w.reg.Store == nil {
+		return
+	}
+	root, err := filepath.Abs(w.reg.Store.Root())
+	if err != nil || root == "" {
+		return
+	}
+	abs, err := filepath.Abs(dir)
+	if err != nil {
+		return
+	}
+	if rel, err := filepath.Rel(root, abs); err != nil || rel == "." || strings.HasPrefix(rel, "..") || filepath.IsAbs(rel) {
+		w.logger.Warn("run folder is outside the runner's store; not removed", "dir", dir)
+		return
+	}
+	if err := removeSealedTree(abs); err != nil {
+		w.logger.Warn("remove uploaded run folder", "dir", dir, "error", err.Error())
+	}
+}
+
+// removeSealedTree removes a sealed run folder: sealing leaves its folders
+// read-only (0555), so they are made writable first.
+func removeSealedTree(dir string) error {
+	_ = filepath.WalkDir(dir, func(p string, d fs.DirEntry, err error) error {
+		if err == nil && d.IsDir() {
+			_ = os.Chmod(p, 0o700)
+		}
+		return nil
+	})
+	return os.RemoveAll(dir)
 }

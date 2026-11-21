@@ -129,12 +129,15 @@ func runRunnerStart(cmd string, args []string) int {
 		host = ""
 	}
 	a.reg = withLibrary(a.reg, a.cfg.Path(a.cfg.BenchmarksRoot)) // built-in library suites (suite/library.go), e.g. the demo runner
+	hy := newRunnerHygiene(a)                                    // E6: janitor, image GC, build cache prune, free disk floor (runnerhygiene.go)
+	go hy.Run(ctx)
 	w, err := engine.NewWorker(a.reg, engine.NewPipeline(a.reg, a.cfg.Root, a.logger),
 		engine.NewPlanner(a.reg, a.cfg.Root, a.logger, engine.WithIgnoreQuarantine(), engine.WithoutGPUCheck(), engine.WithAgentLibrary(suite.LibraryDir())).Plan, // Suite health area: a replan reproduces a frozen manifest (engine/taskscreen.go); X7: no GPU check, the coordinator leases GPU slots by the GPUs a runner registers
 		engine.WorkerOptions{Server: f.server, Token: token, WorkerID: f.name, Host: host, Version: benchVersion,
 			Slots: f.slots, Logger: a.logger, Pool: f.pool, Labels: f.labelList(),
 			SpendCapUSD: f.spendCap, SpendFile: filepath.Join(a.store.Root(), ".runner", "spend.json"),
-			Jobs: newRunnerJobExecutor(a)}) // gap G05: hosted CLI jobs (runnerjob.go)
+			Jobs: newRunnerJobExecutor(a), // gap G05: hosted CLI jobs (runnerjob.go)
+			Disk: hy.DiskState, ImageUse: hy.NoteImages, KeepRunFolders: a.cfg.Runner.Disk.KeepRunFolders})
 	if err != nil {
 		return fail("%v", err)
 	}

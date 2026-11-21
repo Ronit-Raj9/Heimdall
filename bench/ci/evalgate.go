@@ -131,8 +131,9 @@ func judge(rep *reportcard.Report, o GateOptions) (string, []string) {
 		}
 	}
 	if o.MaxCostIncrease > 0 {
-		liveCost, prCost := totalCost(rep, ArmLive), totalCost(rep, ArmPR)
-		if liveCost > 0 && prCost > liveCost*(1+o.MaxCostIncrease)+1e-9 {
+		liveCost, liveKnown := totalCost(rep, ArmLive)
+		prCost, prKnown := totalCost(rep, ArmPR)
+		if liveKnown && prKnown && liveCost > 0 && prCost > liveCost*(1+o.MaxCostIncrease)+1e-9 {
 			regress = append(regress, fmt.Sprintf("cost rose %.0f%% ($%.2f to $%.2f), over the %.0f%% limit",
 				(prCost/liveCost-1)*100, liveCost, prCost, o.MaxCostIncrease*100))
 		}
@@ -150,12 +151,30 @@ func judge(rep *reportcard.Report, o GateOptions) (string, []string) {
 	return OutcomeInconclusive, []string{"no real gap yet: more tasks or trials would settle it"}
 }
 
-func totalCost(rep *reportcard.Report, arm string) float64 {
-	s := 0.0
+// totalCost sums arm's cost over every benchmark; known is false when any
+// benchmark's cost is not known (an unpriced model), and the sum is then
+// never used: a partial sum would read as the full cost.
+func totalCost(rep *reportcard.Report, arm string) (total float64, known bool) {
+	known = true
 	for _, b := range rep.Benchmarks {
-		s += b.Arms[arm].CostUSD
+		m := b.Arms[arm]
+		if m.CostUSD == nil {
+			if m.Runs > 0 {
+				known = false
+			}
+			continue
+		}
+		total += *m.CostUSD
 	}
-	return s
+	return total, known
+}
+
+// costCell is a cost for the comment table, "not known" when it is not.
+func costCell(c float64, known bool) string {
+	if !known {
+		return "not known"
+	}
+	return fmt.Sprintf("$%.2f", c)
 }
 
 func pts(d float64) string {
@@ -224,9 +243,13 @@ func EvaluationComment(in CommentInput) string {
 			live, pr := x.Arms[ArmLive], x.Arms[ArmPR]
 			fmt.Fprintf(&b, "| %s | %s | %s | %s | %s |\n", mdCell(x.Benchmark), scoreCell(live), scoreCell(pr), changeCell(live, pr), verdictCell(x.Verdict))
 		}
-		liveCost, prCost := totalCost(rep, ArmLive), totalCost(rep, ArmPR)
-		if liveCost > 0 || prCost > 0 {
+		liveCost, liveKnown := totalCost(rep, ArmLive)
+		prCost, prKnown := totalCost(rep, ArmPR)
+		switch {
+		case liveKnown && prKnown && (liveCost > 0 || prCost > 0):
 			fmt.Fprintf(&b, "| Cost | $%.2f | $%.2f | %s | |\n", liveCost, prCost, costChange(liveCost, prCost))
+		case !liveKnown || !prKnown:
+			fmt.Fprintf(&b, "| Cost | %s | %s | | |\n", costCell(liveCost, liveKnown), costCell(prCost, prKnown))
 		}
 		b.WriteString("\n")
 	}

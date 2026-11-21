@@ -15,3 +15,22 @@ func init() {
 func init() {
 	OrgPolicy[key("GET", api+"/agents/{id}/compatibility")] = org(viewer)
 }
+
+// Release from an evaluation, schedule it and the live version (X12), and
+// failure patterns per agent and evaluation (X11): viewers read; members
+// release (the release gate and its approver rule apply inside) and
+// schedule, as for POST /releases and schedules.
+func init() {
+	OrgPolicy[key("GET", api+"/evaluations/{id}/release-preview")] = org(viewer)
+	OrgPolicy[key("POST", api+"/evaluations/{id}/release")] = org(member)
+	OrgPolicy[key("POST", api+"/evaluations/{id}/schedule")] = org(member)
+	OrgPolicy[key("GET", api+"/agents/{id}/live-version")] = org(viewer)
+	OrgPolicy[key("GET", api+"/agents/{id}/failure-patterns")] = org(viewer)
+	OrgPolicy[key("GET", api+"/evaluations/{id}/failure-patterns")] = org(viewer)
+}
+
+// Test an endpoint before saving the agent (X10): members, as for creating
+// an agent.
+func init() {
+	OrgPolicy[key("POST", api+"/agents/test-endpoint")] = org(member)
+}

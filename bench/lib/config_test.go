@@ -20,7 +20,7 @@ func TestLoadShippedConfig(t *testing.T) {
 		"listen": cfg.Server.Listen == "127.0.0.1:8090", "mode": cfg.Server.Mode == schemas.ModeLive,
 		"gateway.url": cfg.Gateway.URL == "http://127.0.0.1:18080", "agent_url": cfg.Gateway.AgentURL == "http://bifrost:8080",
 		"admin_token_env": cfg.Gateway.AdminTokenEnv == "BIFROST_SETUP_TOKEN", "provider": cfg.Gateway.Provider == "anthropic",
-		"key_slots":   reflect.DeepEqual(cfg.Gateway.KeySlots, []string{"fp-slot-1", "fp-slot-2", "fp-slot-3", "fp-slot-4", "fp-slot-5", "fp-slot-6", "fp-slot-7", "fp-slot-8"}),
+		"key_slots":   reflect.DeepEqual(cfg.Gateway.KeySlots, SlotNames("fp", 24)) && reflect.DeepEqual(cfg.Gateway.OpenAIKeySlots, SlotNames("oa", 24)),
 		"control_url": cfg.FaultProxy.ControlURL == "http://127.0.0.1:19101", "eval": cfg.Networks.Eval == "bench-evalnet",
 		"helper": cfg.Images.Helper == "bench/coding-core-base:1", "pricing": cfg.Pricing == "deploy/pricing-snapshot.json",
 	}
@@ -41,6 +41,7 @@ func TestEnvOverrides(t *testing.T) {
 	t.Setenv("BENCH_SERVER_MODE", "recorded")
 	t.Setenv("BENCH_SERVER_LISTEN", "127.0.0.1:9999")
 	t.Setenv("BENCH_GATEWAY_KEY_SLOTS", "a, b ,,c")
+	t.Setenv("BENCH_GATEWAY_SLOTS_PER_PROVIDER", "0") // the shipped count would replace the list
 	t.Setenv("BENCH_FAULTPROXY_CONTROL_URL", "http://x")
 	t.Setenv("BENCH_RUNS_ROOT", "/tmp/runs")
 	cfg, err := LoadConfig("../deploy/bench.yaml")

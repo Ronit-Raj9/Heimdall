@@ -69,10 +69,14 @@ func points(x float64) string {
 	return fmt.Sprintf("%d pts", p)
 }
 
-func usd(x float64, runs int) string {
-	if runs > 0 && x == 0 {
-		return "unknown"
+func usd(p *float64, runs int) string {
+	if runs == 0 {
+		return "-"
 	}
+	if p == nil {
+		return "not known" // an unpriced model is never $0
+	}
+	x := *p
 	if x < 10 {
 		return fmt.Sprintf("$%.2f", x)
 	}

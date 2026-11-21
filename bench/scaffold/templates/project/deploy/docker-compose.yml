@@ -82,7 +82,7 @@ services:
   faultproxy:
     image: bench/bifrost-bench:dev
     labels: *labels
-    command: ["proxy", "--config", "/etc/bench/bench.yaml", "--slots", "fp-slot-1,fp-slot-2,fp-slot-3,fp-slot-4,fp-slot-5,fp-slot-6,fp-slot-7,fp-slot-8"] # keep in step with gateway.key_slots in bench.yaml
+    command: ["proxy", "--config", "/etc/bench/bench.yaml", "--slots-per-provider", "24"] # keep in step with gateway.slots_per_provider in bench.yaml
     environment:
       BENCH_FAULTPROXY_TOKEN: ${BENCH_FAULTPROXY_TOKEN:-}
       BENCH_FAULTPROXY_LISTEN: ":9100"

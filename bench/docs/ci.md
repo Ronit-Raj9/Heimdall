@@ -53,6 +53,7 @@ jobs:
           persist-credentials: false
       - uses: Ronit-Raj9/Heimdall/bench/ci@main # pin a commit
         with:
+          mode: evaluate
           url: ${{ vars.HEIMDALL_URL }}
           token: ${{ secrets.HEIMDALL_TOKEN }}
           agent: my-agent
@@ -262,7 +263,7 @@ The workflow carries a commented-out `live` job that follows these rules: start 
 - id: gate
   uses: ./bench/ci
   with:
-    mode: recorded            # required: recorded or live (no default)
+    mode: recorded            # required: evaluate, recorded or live (no default)
     bundle: testdata/recorded # recorded: required, your sealed bundle folder (this one is Heimdall's own test bundle)
     exp-id: e_smoke_sdoj      # recorded: which bundled experiment
     data-mode: synthetic      # recorded: label for a scripted-model bundle

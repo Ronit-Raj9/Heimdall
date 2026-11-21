@@ -62,7 +62,7 @@ func newKubernetesDriver(cfg *lib.Config, dockerCfg environments.DockerWorkspace
 		ServiceAccount: kc.ServiceAccount, NodeSelector: kc.NodeSelector, Tolerations: tols,
 		ProcessWatch: dockerCfg.ProcessWatch, WorkspaceWatch: dockerCfg.WorkspaceWatch, WatchIntervalMS: dockerCfg.WatchIntervalMS,
 		EventsCollector: dockerCfg.EventsCollector, Local: environments.NewDockerDriver(dockerCfg), Docker: a.docker, Logger: a.logger,
-		Install: k8s.InstallID(cfg.Root),
+		Install: k8s.InstallID(cfg.Root), RuntimeClass: kc.RuntimeClass, Namespaces: kc.Namespaces,
 	})
 	if err != nil {
 		return nil, fmt.Errorf("kubernetes driver: %w", err)
@@ -270,6 +270,9 @@ func runK8sCleanup(args []string) int {
 	if err != nil {
 		return fail("%v", err)
 	}
+	if len(a.cfg.Kubernetes.Namespaces) > 0 {
+		return k8sCleanupPool(ctx, a, client, *del, *grace)
+	}
 	var list struct {
 		Items []k8s.Namespace `json:"items"`
 	}
@@ -306,6 +309,50 @@ func runK8sCleanup(args []string) int {
 		}
 	}
 	fmt.Printf("%d namespaces of prefix %s, %d stale\n", len(verdicts), prefix, removable)
+	return exitOK
+}
+
+// k8sCleanupPool is `k8s cleanup` in namespace pool mode: it lists, and
+// with -delete releases, this install's stale anchors in the pool
+// namespaces (with the run objects they left). It never deletes a
+// namespace.
+func k8sCleanupPool(ctx context.Context, a *app, client *k8s.Client, del bool, grace time.Duration) int {
+	var anchors []k8s.PoolAnchor
+	for _, ns := range a.cfg.Kubernetes.Namespaces {
+		var cm k8s.ConfigMap
+		err := client.Get(ctx, "/api/v1/namespaces/"+url.PathEscape(ns)+"/configmaps/run", &cm)
+		if k8s.IsNotFound(err) {
+			continue
+		}
+		if err != nil {
+			return fail("read the anchor in %s (nothing deleted): %v", ns, err)
+		}
+		anchors = append(anchors, k8s.PoolAnchor{Namespace: ns, Anchor: cm})
+	}
+	lv, err := engine.ScanRunLiveness([]string{a.store.Root(), filepath.Join(a.cfg.Root, engine.ChecksRoot)}, engine.DefaultStaleAfter, time.Now())
+	if err != nil {
+		return fail("read run leases (nothing deleted): %v", err)
+	}
+	verdicts := k8s.ClassifyPoolAnchors(anchors, k8s.CleanupInput{Install: k8s.InstallID(a.cfg.Root), Live: lv.Live, Dead: lv.Dead, Grace: grace, Now: time.Now()})
+	removable := 0
+	for _, v := range verdicts {
+		action := "keep"
+		if v.Remove {
+			action = "stale"
+			removable++
+		}
+		l := v.Anchor.Metadata.Labels
+		fmt.Printf("%s anchor run=%s role=%s %s (%s)\n", v.Namespace, l[k8s.LabelRun], l[k8s.LabelRole], action, v.Reason)
+		if del && v.Remove {
+			cctx, cancel := context.WithTimeout(ctx, 3*time.Minute)
+			err := k8s.ReleaseStaleAnchor(cctx, client, v.Namespace, v.Anchor)
+			cancel()
+			if err != nil {
+				return fail("release %s: %v", v.Namespace, err)
+			}
+		}
+	}
+	fmt.Printf("%d anchors of this install in %d pool namespaces, %d stale\n", len(verdicts), len(a.cfg.Kubernetes.Namespaces), removable)
 	return exitOK
 }
 

@@ -14,8 +14,8 @@ func rep(winner string, sig bool, liveScore, prScore, liveCost, prCost float64) 
 		Evaluation: "ev_x",
 		Benchmarks: []reportcard.Benchmark{{Benchmark: "b1",
 			Arms: map[string]reportcard.Metrics{
-				ArmLive: {Score: liveScore, Runs: 10, CostUSD: liveCost},
-				ArmPR:   {Score: prScore, Runs: 10, CostUSD: prCost},
+				ArmLive: {Score: liveScore, Runs: 10, CostUSD: &liveCost},
+				ArmPR:   {Score: prScore, Runs: 10, CostUSD: &prCost},
 			},
 			Verdict: &verdictab.BenchmarkVerdict{Winner: winner, Significant: sig, Delta: prScore - liveScore}}},
 		Overall: &verdictab.OverallVerdict{Winner: winner, Significant: sig, Delta: prScore - liveScore, Benchmarks: 1,
@@ -129,7 +129,7 @@ func TestActionEvaluateMode(t *testing.T) {
 		t.Fatal(err)
 	}
 	s := string(raw)
-	for _, want := range []string{"    default: evaluate\n", `"$BIN" ci evaluate || code=$?`, "HEIMDALL_TOKEN: ${{ inputs.token }}", "recorded mode needs the bundle input"} {
+	for _, want := range []string{"evaluate|recorded|live) ;;", `"$BIN" ci evaluate || code=$?`, "HEIMDALL_TOKEN: ${{ inputs.token }}", "recorded mode needs the bundle input"} {
 		if !strings.Contains(s, want) {
 			t.Errorf("action.yml lacks %q", want)
 		}
