@@ -14,6 +14,7 @@ import { useAgentSummary } from "./agentOps.shared";
 import AgentRunsTab from "./agentRunsTab";
 import ChecksTab from "./checksTab";
 import ConfigTab from "./configTab";
+import PullRequestsTab from "./pullRequestsTab";
 import ReportCardTab from "./reportCardTab";
 import ToolsTab from "./toolsTab";
 import VersionsTab from "./versionsTab";
@@ -26,8 +27,8 @@ export function latestVersion(versions: ReadonlyArray<{ version: number }> | und
 
 /**
  * One agent (/agents/$agentId?tab=): name, version, capabilities, one primary Evaluate button and a
- * "more" menu, then Report card (default), Versions, Runs, Setup and Tools. ?tab=checks (the
- * readiness check, from the menu) and the old ?tab=config still open.
+ * "more" menu, then Report card (default), Versions, Runs, Setup, Tools and Pull requests (test on
+ * every pull request). ?tab=checks (the readiness check, from the menu) and the old ?tab=config still open.
  */
 export default function AgentDetailView() {
 	const { t } = useTranslation("agentFirst");
@@ -46,6 +47,7 @@ export default function AgentDetailView() {
 		{ id: "runs", label: t("detail.tabs.runs") },
 		{ id: "setup", label: t("detail.tabs.setup") },
 		{ id: "tools", label: t("detail.tabs.tools") },
+		{ id: "pull-requests", label: t("detail.tabs.pullRequests") },
 		{ id: "checks", label: t("detail.tabs.checks"), hidden: true },
 		{ id: "config", label: t("detail.tabs.setup"), hidden: true },
 	];
@@ -128,6 +130,8 @@ export default function AgentDetailView() {
 						<ToolsTab agentId={agentId} />
 					) : active === "versions" ? (
 						<VersionsTab agentId={agentId} />
+					) : active === "pull-requests" ? (
+						<PullRequestsTab agentId={agentId} />
 					) : active === "runs" ? (
 						<AgentRunsTab agentId={agentId} />
 					) : active === "setup" || active === "config" ? (

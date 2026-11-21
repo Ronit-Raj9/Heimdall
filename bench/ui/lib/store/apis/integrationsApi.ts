@@ -1,4 +1,5 @@
 import type {
+	CIWorkflowParams,
 	CIWorkflowPreview,
 	IntegrationExportList,
 	Webhook,
@@ -42,11 +43,20 @@ export const integrationsApi = benchApi.enhanceEndpoints({ addTagTypes: ["Integr
 			query: (name) => ({ url: `/integrations/exports/${encodeURIComponent(name)}`, method: "DELETE" }),
 			invalidatesTags: ["IntegrationExports"],
 		}),
-		getCIWorkflow: builder.query<CIWorkflowPreview, { mode: string; agent?: string }>({
-			query: ({ mode, agent }) => ({ url: "/integrations/ci/workflow", params: agent ? { mode, agent } : { mode } }),
+		getCIWorkflow: builder.query<CIWorkflowPreview, CIWorkflowParams>({
+			query: (args) => ({ url: "/integrations/ci/workflow", params: ciWorkflowParams(args) }),
 		}),
 	}),
 });
+
+/** The query of the CI workflow preview without empty values. */
+export function ciWorkflowParams(args: CIWorkflowParams): Record<string, string> {
+	const out: Record<string, string> = {};
+	for (const [k, v] of Object.entries(args)) {
+		if (typeof v === "string" && v !== "") out[k] = v;
+	}
+	return out;
+}
 
 /** The download URL of an export file. */
 export function exportDownloadUrl(name: string): string {

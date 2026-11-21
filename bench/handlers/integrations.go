@@ -80,6 +80,8 @@ type CIWorkflowPreview struct {
 	Path     string `json:"path"`
 	Mode     string `json:"mode"`
 	Workflow string `json:"workflow"`
+	// Provider is github or gitlab (hosted mode).
+	Provider string `json:"provider,omitempty"`
 }
 
 type integrationsHandler struct {
@@ -379,6 +381,10 @@ func (h *integrationsHandler) ciWorkflow(ctx *fasthttp.RequestCtx) {
 	if mode == "" {
 		mode = ci.ModeRecorded
 	}
+	if mode == ci.ModeHosted {
+		h.ciHostedWorkflow(ctx)
+		return
+	}
 	o := ci.WorkflowOptions{Mode: mode, Source: DefaultCISource, SourceRef: "main"}
 	if ref := string(q.Peek("source_ref")); ref != "" {
 		if !validID(ref) {
@@ -400,4 +406,48 @@ func (h *integrationsHandler) ciWorkflow(ctx *fasthttp.RequestCtx) {
 		return
 	}
 	lib.SendJSON(ctx, h.mode, fasthttp.StatusOK, CIWorkflowPreview{Path: ".github/workflows/heimdall.yml", Mode: mode, Workflow: wf})
+}
+
+// ciHostedWorkflow renders the hosted "test on every pull request" file for
+// GitHub Actions or GitLab CI (agent page panel). Every value is validated
+// by the ci package; no secret is ever written in the file.
+func (h *integrationsHandler) ciHostedWorkflow(ctx *fasthttp.RequestCtx) {
+	q := ctx.QueryArgs()
+	get := func(k string) string { return strings.TrimSpace(string(q.Peek(k))) }
+	list := func(k string) []string {
+		var out []string
+		for _, v := range strings.Split(get(k), ",") {
+			if v = strings.TrimSpace(v); v != "" {
+				out = append(out, v)
+			}
+		}
+		return out
+	}
+	o := ci.HostedOptions{
+		Agent: get("agent"), Config: get("config"), URL: get("url"), Source: DefaultCISource, SourceRef: "main",
+		Pack: get("pack"), Benchmarks: list("benchmarks"), Faults: list("faults"), FailOn: get("fail_on"),
+	}
+	switch get("source") {
+	case "image":
+		o.Image, o.Config = true, ""
+	case "endpoint":
+		o.Endpoint, o.Config = true, ""
+	default:
+		if o.Config == "" && o.Agent != "" {
+			o.Config = "agents/" + o.Agent + ".yaml"
+		}
+	}
+	if ref := get("source_ref"); ref != "" {
+		o.SourceRef = ref
+	}
+	provider := get("provider")
+	if provider == "" {
+		provider = ci.ProviderGitHub
+	}
+	path, wf, err := ci.HostedWorkflow(provider, o)
+	if err != nil {
+		lib.SendError(ctx, h.mode, fasthttp.StatusBadRequest, lib.ErrTypeBadRequest, err.Error())
+		return
+	}
+	lib.SendJSON(ctx, h.mode, fasthttp.StatusOK, CIWorkflowPreview{Path: path, Mode: ci.ModeHosted, Workflow: wf, Provider: provider})
 }

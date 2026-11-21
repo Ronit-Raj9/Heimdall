@@ -221,3 +221,62 @@ func (v *versionsIndex) Runs(string) []RunView {
 	}
 	return []RunView{run("A", "h"), run("A", "h"), run("A", ""), run("B", "")}
 }
+
+// TestAgentVersionsRegisterCandidate covers CI registration: a pull
+// request's config becomes a version without changing the saved config, the
+// live version stays the saved one, and the same config again (or the live
+// config) reuses its version.
+func TestAgentVersionsRegisterCandidate(t *testing.T) {
+	r, _, _ := versionsRouter(t, nil, "")
+	if code, body := abCall(r, "POST", APIPrefix+"/agents/from-template", AgentFromTemplateRequest{Template: "codex", ID: "ci-agent"}); code != 201 {
+		t.Fatalf("create: %d %s", code, body)
+	}
+	code, body := abCall(r, "GET", APIPrefix+"/agents/ci-agent/config", nil)
+	if code != 200 {
+		t.Fatal(code)
+	}
+	var doc AgentConfigDoc
+	json.Unmarshal(body, &doc)
+	if vs := versionsOf(t, r, "ci-agent"); vs.Live != 1 {
+		t.Fatalf("live before: %+v", vs)
+	}
+	pr := strings.Replace(doc.YAML, "model: "+doc.Fields.Model, "model: gpt-5-mini", 1)
+	if pr == doc.YAML {
+		t.Fatalf("no model line in:\n%s", doc.YAML)
+	}
+	code, body = abCall(r, "POST", APIPrefix+"/agents/ci-agent/versions", AgentVersionCreate{YAML: pr, Note: "pull request #7"})
+	if code != 201 {
+		t.Fatalf("register: %d %s", code, body)
+	}
+	var made AgentVersionCreated
+	json.Unmarshal(body, &made)
+	if made.Version != 2 || !made.Created || made.Note != "pull request #7" {
+		t.Fatalf("registered: %+v", made)
+	}
+	// The saved config did not change and stays live.
+	code, body = abCall(r, "GET", APIPrefix+"/agents/ci-agent/config", nil)
+	var after AgentConfigDoc
+	json.Unmarshal(body, &after)
+	if after.YAML != doc.YAML {
+		t.Fatal("registering a candidate changed the saved config")
+	}
+	if vs := versionsOf(t, r, "ci-agent"); vs.Live != 1 || len(vs.Versions) != 2 {
+		t.Fatalf("live after: %+v", vs)
+	}
+	// Same candidate again, and the live config: no new version.
+	for _, y := range []string{pr, doc.YAML} {
+		code, body = abCall(r, "POST", APIPrefix+"/agents/ci-agent/versions", AgentVersionCreate{YAML: y})
+		var again AgentVersionCreated
+		json.Unmarshal(body, &again)
+		if code != 200 || again.Created {
+			t.Fatalf("re-register: %d %s", code, body)
+		}
+	}
+	if n := len(versionsOf(t, r, "ci-agent").Versions); n != 2 {
+		t.Fatalf("re-register made versions: %d", n)
+	}
+	// A config that does not decode is refused.
+	if code, body := abCall(r, "POST", APIPrefix+"/agents/ci-agent/versions", AgentVersionCreate{YAML: "adapter: [unclosed"}); code != 400 {
+		t.Fatalf("bad yaml: %d %s", code, body)
+	}
+}

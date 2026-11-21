@@ -21,8 +21,11 @@ func init() {
 		RouteDoc{Method: "GET", Path: APIPrefix + "/integrations/exports", Tag: "integrations", Summary: "Export files written by integrations.export jobs (OTLP traces, EEE records, run tables, Harbor tars), newest first", Response: IntegrationExportList{}},
 		RouteDoc{Method: "GET", Path: APIPrefix + "/integrations/exports/{name}", Tag: "integrations", Summary: "Download one export file", Raw: "application/octet-stream"},
 		RouteDoc{Method: "DELETE", Path: APIPrefix + "/integrations/exports/{name}", Tag: "integrations", Summary: "Delete one export file (member)", Auth: AuthWrite, Status: fasthttp.StatusNoContent},
-		RouteDoc{Method: "GET", Path: APIPrefix + "/integrations/ci/workflow", Tag: "integrations", Summary: "Preview the GitHub Actions workflow the CI install pull request adds (.github/workflows/heimdall.yml); no secret is ever written in it",
-			Query:    []QueryDoc{{Name: "mode", Description: "recorded (default) or live"}, {Name: "agent", Description: "live: agent id both arms start from"}, {Name: "source_ref", Description: "Heimdall ref to build, default main"}},
+		RouteDoc{Method: "GET", Path: APIPrefix + "/integrations/ci/workflow", Tag: "integrations", Summary: "Preview the CI workflow: the GitHub Actions file the CI install pull request adds, or (mode hosted) the GitHub Actions or GitLab CI file that evaluates every pull request on this Heimdall; no secret is ever written in it",
+			Query: []QueryDoc{{Name: "mode", Description: "recorded (default), live, or hosted (evaluate each pull request on this Heimdall with an org API token)"}, {Name: "agent", Description: "live: agent id both arms start from; hosted: the agent to test"}, {Name: "source_ref", Description: "Heimdall ref to build, default main"},
+				{Name: "provider", Description: "hosted: github (default) or gitlab"}, {Name: "source", Description: "hosted: config (default), image or endpoint"}, {Name: "config", Description: "hosted: agent config path in the repository, default agents/<agent>.yaml"},
+				{Name: "url", Description: "hosted: this Heimdall's address; empty reads the HEIMDALL_URL CI variable"}, {Name: "pack", Description: "hosted: benchmark pack"}, {Name: "benchmarks", Description: "hosted: comma-separated benchmark ids"},
+				{Name: "faults", Description: "hosted: comma-separated faults"}, {Name: "fail_on", Description: "hosted: outcomes that fail, default regressed,failed"}},
 			Response: CIWorkflowPreview{}},
 	)
 }

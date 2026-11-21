@@ -371,3 +371,49 @@ func LibraryVersion(path string) ([]byte, schemas.AgentVersion, error) {
 	}
 	return b, v, nil
 }
+
+// Register freezes doc as a new version of agent id without touching the
+// agent's current config: a pull request's candidate config, registered by
+// `bifrost-bench ci evaluate`. Unlike Snapshot it reuses ANY existing version
+// with the same config hash, not only the latest, so re-running CI on the
+// same commit, or on a pull request that restores the live config, adds
+// nothing. It returns the version that holds doc and whether it was created.
+func Register(root, id string, doc []byte, actor, note string) (schemas.AgentVersion, bool, error) {
+	if !ValidID(id) {
+		return schemas.AgentVersion{}, false, fmt.Errorf("agent id %q is not valid", id)
+	}
+	hash, err := ConfigHash(doc)
+	if err != nil {
+		return schemas.AgentVersion{}, false, err
+	}
+	dir := agentDir(root, id)
+	unlock := lockFor(dir)
+	vs, err := readIndex(dir)
+	unlock()
+	if err != nil {
+		return schemas.AgentVersion{}, false, err
+	}
+	for i := len(vs) - 1; i >= 0; i-- {
+		if vs[i].Hash == hash {
+			return vs[i], false, nil
+		}
+	}
+	return Record(root, id, []Source{{Doc: doc, Actor: actor, Note: note}})
+}
+
+// Live returns the newest version whose config hash equals current, the
+// agent's saved config (agents/<id>.yaml): the version the agent page runs
+// and the baseline a pull request is compared with. It returns 0 when no
+// version holds current.
+func Live(vs []schemas.AgentVersion, current []byte) int {
+	hash, err := ConfigHash(current)
+	if err != nil {
+		return 0
+	}
+	for i := len(vs) - 1; i >= 0; i-- {
+		if vs[i].Hash == hash {
+			return vs[i].Version
+		}
+	}
+	return 0
+}
