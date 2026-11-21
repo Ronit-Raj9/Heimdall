@@ -18,6 +18,11 @@ RUN addgroup -S -g 10001 bench \
     && chown -R bench:bench /var/lib/bench
 
 COPY bifrost-bench /usr/local/bin/bifrost-bench
+# Fail the build when the binary cannot start here: one built without
+# CGO_ENABLED=0 links glibc, which Alpine lacks, and would only fail later
+# as "exec /usr/local/bin/bifrost-bench: no such file or directory" in every
+# fault proxy, tool proxy and event collector.
+RUN ["/usr/local/bin/bifrost-bench", "version"]
 
 USER 10001:10001
 ENTRYPOINT ["/usr/local/bin/bifrost-bench"]

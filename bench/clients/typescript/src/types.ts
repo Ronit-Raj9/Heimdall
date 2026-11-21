@@ -2164,7 +2164,7 @@ export interface Trends {
 	points: number;
 	/** Runs the index lists as rejected (seal failed); never charted. */
 	rejected: number;
-	/** Indexed runs with evidence problems (e.g. a slot with two counted runs); never charted. */
+	/** Indexed runs of an experiment whose newest verdict is INVALID, or with evidence problems (e.g. a slot with two counted runs); never charted. */
 	invalid: number;
 	/** When the index was last written. */
 	indexed_at: string;
@@ -3608,6 +3608,8 @@ export interface AuthMe {
 	role?: Role;
 	/** Session CSRF value: sent as X-Heimdall-CSRF on every cookie-authenticated write. */
 	csrf?: string;
+	/** A user listed in HEIMDALL_SERVER_ADMINS (auth/serveradmin.go). */
+	server_admin?: boolean;
 }
 
 /** GET /auth/config (auth.AuthInfo): what the sign-in page offers, answered to anyone. */
@@ -3617,6 +3619,10 @@ export interface AuthConfig {
 	github: boolean;
 	/** An empty install: the first sign-up creates the owner account and its organization. */
 	bootstrap?: boolean;
+	/** Sign-up needs an hCaptcha token (HEIMDALL_CAPTCHA_SECRET is set). */
+	captcha?: boolean;
+	/** hCaptcha site key for the sign-up widget. */
+	captcha_site_key?: string;
 }
 
 /** POST /auth/login. */

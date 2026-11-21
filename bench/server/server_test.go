@@ -134,9 +134,13 @@ func TestServerBodyLimit(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer conn.Close()
-	// Headers only: the server must refuse from Content-Length alone.
+	// The server reads bodies up to lib.MaxUploadBytes (upload routes); the
+	// per-route limit then refuses anything over lib.MaxBodyBytes.
 	fmt.Fprintf(conn, "POST /api/bench/audit HTTP/1.1\r\nHost: 127.0.0.1\r\nAuthorization: Bearer tok\r\n"+
 		"Content-Type: text/csv\r\nContent-Length: %d\r\n\r\n", lib.MaxBodyBytes+1)
+	if _, err := conn.Write(make([]byte, lib.MaxBodyBytes+1)); err != nil {
+		t.Fatal(err)
+	}
 	resp := &fasthttp.Response{}
 	if err := resp.Read(bufio.NewReader(conn)); err != nil {
 		t.Fatal(err)

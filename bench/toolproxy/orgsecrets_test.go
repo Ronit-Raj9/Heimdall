@@ -33,7 +33,7 @@ func TestOrgSecretsGetenvInjectsRouteCredential(t *testing.T) {
 		t.Fatal(err)
 	}
 	// A provider key with the same label must never be injected as a secret.
-	if _, err := ks.Create(ctx, "o1", keystore.KindProvider, keystore.Put{Label: "OTHER_KEY", Value: "prov"}, "a"); err != nil {
+	if _, err := ks.Create(ctx, "o1", keystore.KindProvider, keystore.Put{Provider: "openai", Label: "OTHER_KEY", Value: "prov"}, "a"); err != nil {
 		t.Fatal(err)
 	}
 	rs := &Routes{Routes: []Route{
