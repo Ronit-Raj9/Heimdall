@@ -1,7 +1,7 @@
 {
 	"policies": {
 		"title": "Release policies",
-		"subtitle": "The rules a candidate must pass before it ships. Experiments reference them as policies/<file>.",
+		"subtitle": "Rules a candidate must pass before it ships.",
 		"new": "New policy",
 		"empty": "No release policies yet. Start from the default rules, then adjust them.",
 		"createDefault": "Create from default rules",
@@ -52,7 +52,7 @@
 		"readGuide": "Read the release guide"
 	},
 	"releases": {
-		"actions": "Release log actions",
+		"actions": "Audit tools",
 		"verify": "Verify chain and evidence",
 		"verifyHint": "Re-hashes every record and evidence pack. Use it before an audit.",
 		"compliance": "Write compliance pack",
@@ -65,8 +65,8 @@
 			"loadError": "Could not list compliance packs",
 			"retry": "Retry",
 			"empty": "No compliance pack yet. Pick a release above and press Write compliance pack.",
-			"markdown": "Download .md",
-			"json": "Download .json"
+			"markdown": "Report .md",
+			"json": "Data .json"
 		}
 	},
 	"monitors": {

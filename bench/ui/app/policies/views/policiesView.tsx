@@ -22,7 +22,7 @@ import {
 } from "@/lib/store/apis/governApi";
 import type { PolicySaveRequest, ReleasePolicy } from "@/lib/types/govern";
 import { cn } from "@/lib/utils";
-import { FilePlus2, ShieldCheck } from "lucide-react";
+import { Code2, FilePlus2, ListChecks, ShieldAlert, ShieldCheck } from "lucide-react";
 import { parseAsString, useQueryState } from "nuqs";
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
@@ -42,7 +42,7 @@ export default function PoliciesView() {
 	};
 
 	return (
-		<section className="flex flex-col gap-6" data-testid="policies-screen">
+		<section className="mx-auto flex w-full max-w-[1200px] flex-col gap-8" data-testid="policies-screen">
 			<PageHeader
 				title={t("policies.title")}
 				subtitle={t("policies.subtitle")}
@@ -67,36 +67,51 @@ export default function PoliciesView() {
 					testId="policies-empty"
 				/>
 			) : (
-				<div className="grid grid-cols-[minmax(0,1fr)] gap-6 lg:grid-cols-[16rem_minmax(0,1fr)] lg:items-start">
-					<ul className="flex flex-col gap-1" data-testid="policies-list">
-						{policies.map((p) => (
-							<li key={p.file}>
-								<button
-									type="button"
-									onClick={() => {
-										setCreating(false);
-										void setFile(p.file);
-									}}
-									className={cn(
-										"hover:bg-muted w-full rounded-sm border px-3 py-2 text-left text-sm",
-										file === p.file && !creating && "bg-muted border-primary/40",
-									)}
-									data-testid={`policies-item-${p.file}`}
-								>
-									<div className="font-mono text-xs break-all">{p.file}</div>
-									<div className="text-muted-foreground mt-1 flex items-center gap-2 text-xs">
-										{p.valid ? (
-											<span>{t("policies.checks", { count: p.checks })}</span>
-										) : (
-											<Badge variant="destructive">{t("policies.invalid")}</Badge>
+				<div className="grid grid-cols-[minmax(0,1fr)] gap-6 lg:grid-cols-[18rem_minmax(0,1fr)] lg:items-start">
+					<ul className="flex flex-col gap-2" data-testid="policies-list">
+						{policies.map((p) => {
+							const active = file === p.file && !creating;
+							return (
+								<li key={p.file}>
+									<button
+										type="button"
+										onClick={() => {
+											setCreating(false);
+											void setFile(p.file);
+										}}
+										className={cn(
+											"bg-card hover:border-primary/40 flex w-full items-center gap-3 rounded-xl border p-4 text-left transition hover:shadow-md",
+											active && "border-primary/60 ring-primary/20 ring-2",
 										)}
-									</div>
-								</button>
-							</li>
-						))}
+										data-testid={`policies-item-${p.file}`}
+									>
+										<span
+											className={cn(
+												"flex size-9 shrink-0 items-center justify-center rounded-lg",
+												p.valid ? "bg-primary/10 text-primary" : "bg-destructive/10 text-chart-error-ink",
+											)}
+										>
+											{p.valid ? <ShieldCheck className="size-4.5" aria-hidden="true" /> : <ShieldAlert className="size-4.5" aria-hidden="true" />}
+										</span>
+										<span className="flex min-w-0 flex-col gap-0.5">
+											<span className="truncate text-sm font-semibold" title={p.file}>
+												{p.file.replace(/\.ya?ml$/, "")}
+											</span>
+											{p.valid ? (
+												<span className="text-muted-foreground text-xs">{t("policies.checks", { count: p.checks })}</span>
+											) : (
+												<Badge variant="destructive" className="w-fit">
+													{t("policies.invalid")}
+												</Badge>
+											)}
+										</span>
+									</button>
+								</li>
+							);
+						})}
 					</ul>
-					<Card>
-						<CardContent>
+					<Card className="rounded-xl">
+						<CardContent className="p-5 sm:p-6">
 							{creating ? (
 								<PolicyEditor
 									key="new"
@@ -192,7 +207,7 @@ export function PolicyEditor({ isNew, file, initialYAML, initialPolicy, sha256, 
 	const v = validation.data;
 
 	return (
-		<div className="flex flex-col gap-4" data-testid="policy-editor">
+		<div className="flex flex-col gap-6" data-testid="policy-editor">
 			<div className="flex flex-wrap items-end justify-between gap-3">
 				{isNew ? (
 					<label className="flex min-w-60 flex-col gap-1 text-sm" title={t("policies.fileNameHint")}>
@@ -201,15 +216,40 @@ export function PolicyEditor({ isNew, file, initialYAML, initialPolicy, sha256, 
 						{!nameOk && <span className="text-destructive text-xs">{t("policies.fileNameHint")}</span>}
 					</label>
 				) : (
-					<span className="font-mono text-sm">policies/{file}</span>
+					<span className="flex min-w-0 flex-col">
+						<span className="truncate text-lg font-semibold tracking-tight">{file?.replace(/\.ya?ml$/, "")}</span>
+						<span className="text-muted-foreground font-mono text-xs">policies/{file}</span>
+					</span>
 				)}
-				<div className="flex gap-1" role="tablist">
-					<Button size="sm" variant={mode === "form" ? "default" : "outline"} onClick={() => void switchMode("form")} data-testid="policy-mode-form">
+				<div className="bg-muted inline-flex rounded-lg p-1" role="tablist">
+					<button
+						type="button"
+						role="tab"
+						aria-selected={mode === "form"}
+						className={cn(
+							"inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-medium transition",
+							mode === "form" ? "bg-background shadow-sm" : "text-muted-foreground hover:text-foreground",
+						)}
+						onClick={() => void switchMode("form")}
+						data-testid="policy-mode-form"
+					>
+						<ListChecks className="size-3.5" aria-hidden="true" />
 						{t("policies.form")}
-					</Button>
-					<Button size="sm" variant={mode === "yaml" ? "default" : "outline"} onClick={() => void switchMode("yaml")} data-testid="policy-mode-yaml">
+					</button>
+					<button
+						type="button"
+						role="tab"
+						aria-selected={mode === "yaml"}
+						className={cn(
+							"inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-medium transition",
+							mode === "yaml" ? "bg-background shadow-sm" : "text-muted-foreground hover:text-foreground",
+						)}
+						onClick={() => void switchMode("yaml")}
+						data-testid="policy-mode-yaml"
+					>
+						<Code2 className="size-3.5" aria-hidden="true" />
 						{t("policies.yaml")}
-					</Button>
+					</button>
 				</div>
 			</div>
 
@@ -219,7 +259,7 @@ export function PolicyEditor({ isNew, file, initialYAML, initialPolicy, sha256, 
 				<div className="flex flex-col gap-1">
 					<p className="text-muted-foreground text-xs">{t("policies.yamlHint")}</p>
 					<textarea
-						className="border-input bg-background min-h-96 w-full rounded-md border p-3 font-mono text-xs"
+						className="border-input bg-muted/30 min-h-96 w-full rounded-lg border p-4 font-mono text-xs leading-relaxed"
 						spellCheck={false}
 						value={yaml}
 						onChange={(e) => setYaml(e.target.value)}
@@ -261,7 +301,7 @@ export function PolicyEditor({ isNew, file, initialYAML, initialPolicy, sha256, 
 
 			<RoleNote min="member" />
 			<RoleGate min="member" fallback={null}>
-			<div className="flex flex-wrap justify-between gap-2">
+			<div className="flex flex-wrap justify-between gap-2 border-t pt-5">
 				<div>
 					{!isNew && file && (
 						<Button

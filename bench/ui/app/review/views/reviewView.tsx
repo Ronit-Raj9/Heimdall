@@ -1,17 +1,18 @@
 import { ModeBadge } from "@/components/modeBadge";
 import { filterQueue, isReviewReason } from "@/components/review/review.utils";
 import { ReviewQueueTable } from "@/components/review/reviewQueueTable";
-import { BlockSkeleton, EmptyNote, LoadError, Section } from "@/components/runs/screenStates";
+import { BlockSkeleton, EmptyNote, LoadError } from "@/components/runs/screenStates";
 import { Button } from "@/components/ui/button";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { PageHeader } from "@/components/shell";
 import { ExperimentSelect, experimentsNewestFirst } from "@/components/triage/experimentSelect";
 import { useGetReviewQueueQuery, useListExperimentsQuery } from "@/lib/store/apis/benchApi";
 import { REVIEW_REASONS, type ReviewQueueResponse } from "@/lib/types/bench";
 import { Link } from "@tanstack/react-router";
-import { AlertTriangle } from "lucide-react";
+import { AlertTriangle, Filter, Inbox, MousePointerClick } from "lucide-react";
+import { EmptyState } from "@/components/shell/emptyState";
+import { cn } from "@/lib/utils";
 import { parseAsString, useQueryState } from "nuqs";
-import { useId, useMemo } from "react";
+import { useMemo } from "react";
 import { useTranslation } from "react-i18next";
 import { ReviewRunPanel } from "./reviewRunPanel";
 
@@ -25,6 +26,7 @@ const ALL_REASONS = "~all";
  */
 export default function ReviewView() {
 	const { t } = useTranslation("bench");
+	const { t: tu } = useTranslation("u14");
 	const [exp, setExp] = useQueryState("exp", parseAsString);
 	const [reason, setReason] = useQueryState("reason", parseAsString);
 	const [runId, setRunId] = useQueryState("run", parseAsString);
@@ -33,8 +35,8 @@ export default function ReviewView() {
 	const selectedExp = exp ?? experiments[0]?.exp_id;
 
 	return (
-		<section className="flex min-w-0 flex-col gap-6" data-testid="review-screen">
-			<PageHeader title={t("review.title")} subtitle={<span data-testid="review-explainer">{t("review.subtitle")}</span>} />
+		<section className="mx-auto flex w-full max-w-[1400px] min-w-0 flex-col gap-8" data-testid="review-screen">
+			<PageHeader title={t("review.title")} subtitle={<span data-testid="review-explainer">{tu("review.subtitle")}</span>} />
 			<div className="flex flex-wrap items-end gap-3">
 				<ExperimentSelect
 					experiments={experiments}
@@ -128,25 +130,24 @@ export function QueueBody({
 	const problems = data.problems ?? [];
 
 	return (
-		<div className="grid min-w-0 grid-cols-1 items-start gap-6 2xl:grid-cols-[minmax(0,3fr)_minmax(0,2fr)]">
-			<Section
-				title={t("review.queue.title")}
-				description={t("review.queue.description")}
-				testId="review-queue"
-				actions={
-					<div className="flex items-center gap-3">
-						<ModeBadge mode={data.mode} />
-						<ReasonFilter reasons={reasons} value={reason} onChange={onReason} counts={countReasons(data)} />
+		<div className="grid min-w-0 grid-cols-1 items-start gap-6 xl:grid-cols-[minmax(0,3fr)_minmax(0,2fr)]">
+			<div className="bg-card flex min-w-0 flex-col gap-4 rounded-xl border p-4 sm:p-5" data-testid="review-queue">
+				<div className="flex flex-wrap items-center justify-between gap-3">
+					<div className="flex items-center gap-2">
+						<Inbox className="text-muted-foreground size-4" aria-hidden="true" />
+						<h2 className="text-sm font-semibold">{t("review.queue.title")}</h2>
+						<span className="bg-muted text-muted-foreground rounded-full px-2 py-0.5 text-xs tabular-nums">{items.length}</span>
 					</div>
-				}
-			>
+					<ModeBadge mode={data.mode} />
+				</div>
+				<ReasonFilter reasons={reasons} value={reason} onChange={onReason} counts={countReasons(data)} total={(data.items ?? []).length} />
 				<div className="flex flex-col gap-4">
 					{items.length === 0 ? (
 						<EmptyNote testId={reason ? "review-queue-empty-filtered" : "review-queue-empty"}>
 							{reason ? t("review.queue.emptyFiltered") : t("review.queue.empty")}
 						</EmptyNote>
 					) : (
-						<div className="min-w-0 overflow-x-auto rounded-sm border">
+						<div className="min-w-0 overflow-x-auto rounded-lg border">
 							<ReviewQueueTable items={items} selectedRunId={runId} onSelect={(item) => onRun(item.run_id)} />
 						</div>
 					)}
@@ -168,8 +169,12 @@ export function QueueBody({
 						</div>
 					)}
 				</div>
-			</Section>
-			{selected ? <ReviewRunPanel item={selected} /> : <EmptyNote testId="review-select-run">{t("review.panel.select")}</EmptyNote>}
+			</div>
+			{selected ? (
+				<ReviewRunPanel item={selected} />
+			) : (
+				<EmptyState icon={MousePointerClick} message={t("review.panel.select")} testId="review-select-run" />
+			)}
 		</div>
 	);
 }
@@ -186,32 +191,47 @@ function ReasonFilter({
 	value,
 	onChange,
 	counts,
+	total,
 }: {
+	total: number;
 	reasons: readonly string[];
 	value: string | null;
 	onChange: (reason: string | null) => void;
 	counts: Record<string, number>;
 }) {
 	const { t } = useTranslation("bench");
-	const id = useId();
+	const { t: tu } = useTranslation("u14");
+	const chip = (key: string, label: string, count: number | undefined, active: boolean, onClick: () => void, testId?: string) => (
+		<button
+			key={key}
+			type="button"
+			role="radio"
+			aria-checked={active}
+			onClick={onClick}
+			className={cn(
+				"inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-xs font-medium transition",
+				active ? "border-primary bg-primary text-primary-foreground" : "bg-background text-muted-foreground hover:text-foreground hover:bg-muted",
+			)}
+			data-testid={testId}
+		>
+			{label}
+			{count !== undefined && (
+				<span className={cn("rounded-full px-1.5 tabular-nums", active ? "bg-primary-foreground/20" : "bg-muted")}>{count}</span>
+			)}
+		</button>
+	);
 	return (
-		<div className="flex items-center gap-2">
-			<label htmlFor={id} className="text-muted-foreground text-xs">
-				{t("review.filter.label")}
-			</label>
-			<Select value={value ?? ALL_REASONS} onValueChange={(next) => onChange(next === ALL_REASONS ? null : next)}>
-				<SelectTrigger id={id} className="min-w-44 text-xs" data-testid="review-reason-filter">
-					<SelectValue />
-				</SelectTrigger>
-				<SelectContent>
-					<SelectItem value={ALL_REASONS}>{t("review.filter.all")}</SelectItem>
-					{reasons.map((r) => (
-						<SelectItem key={r} value={r} data-testid={`review-reason-option-${r}`}>
-							{isReviewReason(r) ? t(`review.reason.${r}`) : r} ({counts[r] ?? 0})
-						</SelectItem>
-					))}
-				</SelectContent>
-			</Select>
+		<div
+			role="radiogroup"
+			aria-label={t("review.filter.label")}
+			className="flex flex-wrap items-center gap-1.5"
+			data-testid="review-reason-filter"
+		>
+			<Filter className="text-muted-foreground mr-1 size-3.5" aria-hidden="true" />
+			{chip(ALL_REASONS, tu("review.all"), total, value === null, () => onChange(null))}
+			{reasons.map((r) =>
+				chip(r, isReviewReason(r) ? t(`review.reason.${r}`) : r, counts[r] ?? 0, value === r, () => onChange(r), `review-reason-option-${r}`),
+			)}
 		</div>
 	);
 }
