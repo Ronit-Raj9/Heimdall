@@ -23,7 +23,7 @@ describe("LeaderboardFootnote", () => {
 		expect(html).toContain(">1 run<");
 		expect(html).toContain('href="/experiments/e_synthetic-flaky"');
 		expect(html).toContain("Scope all: each entry is measured over its own tasks");
-		expect(html).toContain("Rank alone is never a claim that one agent beats another.");
+		expect(html).toContain("Rank alone does not prove one agent beats another.");
 		expect(html).toContain("Resilience columns appear on the clean board only");
 		expect(html).toContain("Sorted by verified_success; tiers at alpha 0.05.");
 	});
@@ -39,7 +39,7 @@ describe("LeaderboardFootnote", () => {
 
 	it("says when no task is common to every entry", () => {
 		const html = renderToStaticMarkup(<LeaderboardFootnote board={{ ...board, common_tasks: [] }} hasResilience={false} />);
-		expect(html).toContain("No task was run by every listed entry.");
+		expect(html).toContain("No task was run by every agent listed.");
 	});
 });
 
@@ -47,7 +47,7 @@ describe("LeaderboardSyntheticBanner", () => {
 	it("says the numbers are not findings", () => {
 		const html = renderToStaticMarkup(<LeaderboardSyntheticBanner />);
 		expect(html).toContain('data-testid="leaderboard-synthetic-banner"');
-		expect(html).toContain("they are not findings.");
+		expect(html).toContain("they are not real results.");
 	});
 });
 

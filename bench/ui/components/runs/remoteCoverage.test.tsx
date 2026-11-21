@@ -18,10 +18,10 @@ describe("RemoteCoverage", () => {
 	it("shows each channel, the three lists and the self-report under its badge", () => {
 		const html = renderToStaticMarkup(<RemoteCoverage remote={remote} arm="A" />);
 		expect(html).toContain('data-testid="remote-coverage-A"');
-		expect(html).toContain("Model traffic through the gateway: off");
-		expect(html).toContain("Tools through the bench: on");
+		expect(html).toContain("Model calls through Bifrost: off");
+		expect(html).toContain("Tool uses through Heimdall: on");
 		expect(html).toContain("tool ledger");
-		expect(html).toContain("agent-reported");
+		expect(html).toContain("agent&#x27;s word");
 		expect(html).toContain("120 tokens");
 		expect(html).toContain("$0.2500");
 		expect(html).toContain("3 events");
@@ -38,7 +38,7 @@ describe("RemoteCoverage", () => {
 		const html = renderToStaticMarkup(
 			<RemoteCoverage remote={{ channels: { model_traffic: "on", tools: "missing", self_report: "off" }, trusted: ["tokens"] }} arm="B" />,
 		);
-		expect(html).toContain("Tools through the bench: missing");
+		expect(html).toContain("Tool uses through Heimdall: missing");
 		expect(html).not.toContain('data-testid="remote-self-report-B"');
 		expect(html).not.toContain('data-testid="remote-unknown-B"');
 	});

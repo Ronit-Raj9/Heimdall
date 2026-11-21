@@ -1,7 +1,7 @@
 {
 	"tab": "Replay",
 	"title": "Screen replay",
-	"subtitle": "What the agent saw, step by step.",
+	"subtitle": "What the agent saw on screen, step by step.",
 	"empty": "No screenshots were recorded for this run.",
 	"loadError": "Could not load the replay.",
 	"play": "Play",

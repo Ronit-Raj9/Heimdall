@@ -121,10 +121,10 @@ describe("RunScenarioEvidence", () => {
 describe("ToolCallTable", () => {
 	it("lists calls in order with server, tool, result, fault and latency, details closed", () => {
 		const html = renderToStaticMarkup(<ToolCallTable calls={calls} arm="A" />);
-		expect(html).toContain('aria-label="Tool calls of arm A"');
+		expect(html).toContain('aria-label="Tool uses, Setup A"');
 		expect(html).toContain("2 calls");
 		expect(html).toContain("1 error");
-		expect(html).toContain("1 injected fault");
+		expect(html).toContain("1 problem injected on purpose");
 		expect(html).toMatch(/data-testid="run-tool-call-1"[^>]*data-error="false"/);
 		expect(html).toContain("find_ticket");
 		expect(html).toMatch(/data-testid="run-tool-call-2-fault" data-tone="warn">.*injected error/);

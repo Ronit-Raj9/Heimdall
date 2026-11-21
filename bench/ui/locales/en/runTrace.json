@@ -2,8 +2,8 @@
   "filters": {
     "label": "Filter steps",
     "all": "All",
-    "model": "Model",
-    "tools": "Tools",
+    "model": "Model thinking",
+    "tools": "Tool uses",
     "commands": "Commands",
     "errors": "Errors"
   },
@@ -18,34 +18,34 @@
   "output": "Output",
   "record": "Step record",
   "expand": "Show details of step {{seq}}",
-  "tokens": "{{value}} tok",
+  "tokens": "{{value}} tokens",
   "cost": "${{value}}",
   "duration": "{{value}}",
   "kind": {
-    "model": "Model turn",
-    "tool": "Tool call",
-    "command": "Command",
-    "file": "File edit",
-    "verifier": "Verifier",
+    "model": "Model thinking",
+    "tool": "Used a tool",
+    "command": "Ran a command",
+    "file": "Edited a file",
+    "verifier": "Grader checked",
     "other": "Step"
   },
   "export": {
     "button": "Export",
-    "json": "Trace JSON",
+    "json": "Full record (JSON)",
     "jsonNote": "Steps and events",
     "otlp": "OTLP JSON",
-    "otlpNote": "OpenTelemetry, sealed runs only",
-    "jsonl": "Agent stream (JSONL)",
+    "otlpNote": "OpenTelemetry format, saved runs only",
+    "jsonl": "Agent log (JSONL)",
     "jsonlNote": "One step per line"
   },
   "overview": {
-    "agentSaid": "Agent said vs grader",
+    "agentSaid": "What the agent said vs what the grader found",
     "steps": "Steps",
-    "toolCalls": "Tool calls",
+    "toolCalls": "Tool uses",
     "cost": "Cost",
-    "time": "Wall time",
+    "time": "Time taken",
     "details": "Details",
-    "allMetrics": "All metrics",
+    "allMetrics": "All measurements",
     "running": "Running"
   }
 }

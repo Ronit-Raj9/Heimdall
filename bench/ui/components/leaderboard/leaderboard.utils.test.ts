@@ -211,13 +211,13 @@ describe("leaderboardMarkdown", () => {
 		expect(tableLines).toHaveLength(2 + board.entries.length);
 		const columns = tableLines[0].split(" | ").length;
 		for (const line of tableLines) expect(line.split(/(?<!\\) \| /).length).toBe(columns);
-		expect(tableLines[0]).toContain("| Rank | Tier | Agent config |");
-		expect(tableLines[0]).toContain("model-outage vs clean");
+		expect(tableLines[0]).toContain("| Rank | Group | Agent setup |");
+		expect(tableLines[0]).toContain("model-outage vs normal");
 		expect(tableLines[1]).toMatch(/^\| ---: \| --- \|/);
 	});
 
 	it("labels synthetic data and keeps the no-blended-score explainer", () => {
-		expect(md).toContain("> SYNTHETIC: scripted agents or scripted models.");
+		expect(md).toContain("> PRACTICE DATA: no real model was used.");
 		expect(md).toContain("No blended score.");
 	});
 
@@ -227,7 +227,7 @@ describe("leaderboardMarkdown", () => {
 		expect(mini).toContain("| not run | not run | not run |");
 		const custom = tableLines.find((line) => line.includes("custom-python"))!;
 		expect(custom).toMatch(/\| 25% \| 0% - 57% \| 2\/8 \| unknown \| 1 \|/);
-		expect(custom).toContain("Tier 2 (p 0.012 on 8 common tasks)");
+		expect(custom).toContain("Behind (p 0.012 on 8 common tasks)");
 		const baseline = tableLines.find((line) => line.includes("A: baseline"))!;
 		expect(baseline).toContain("| -20.8 pts | -4.2 pts | unknown |");
 	});

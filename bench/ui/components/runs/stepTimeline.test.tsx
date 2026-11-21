@@ -137,22 +137,22 @@ describe("StepTimeline", () => {
 	it("renders turns, badges, conflict and the steps label", () => {
 		const html = renderToStaticMarkup(<StepTimeline data={data} arm="A" />);
 		expect(html).toContain('data-testid="step-timeline-A"');
-		expect(html).toContain("Agent steps (all witnessed actions): 2");
-		expect(html).toContain("Before the first model response");
-		expect(html).toContain("Turn 1");
-		expect(html).toContain("Turn 2");
+		expect(html).toContain("Actions Heimdall saw: 2");
+		expect(html).toContain("Before the model&#x27;s first reply");
+		expect(html).toContain("Model reply 1");
+		expect(html).toContain("Model reply 2");
 		// Turn 1's model row comes before the rows it caused.
 		expect(html.indexOf('data-testid="step-row-A-2"')).toBeLessThan(html.indexOf('data-testid="step-row-A-3"'));
 		expect(html).toContain('data-testid="step-row-A-3-execution"');
-		expect(html).toContain("executed, witnessed");
-		expect(html).toContain("no witness");
+		expect(html).toContain("ran, Heimdall saw it");
+		expect(html).toContain("no sign it ran");
 		expect(html).not.toContain('data-testid="step-row-A-4-execution"');
 		expect(html).toContain('data-testid="step-row-A-5-conflict"');
 		expect(html).toContain("observer saw exit 1, agent reports exit 0");
-		expect(html).toContain("witnessed by #4");
-		expect(html).toContain("witnesses #3");
-		for (const label of ["gateway", "process observer", "workspace observer", "agent stream"]) expect(html).toContain(label);
-		expect(html).toContain("proof verified");
+		expect(html).toContain("confirmed by #4");
+		expect(html).toContain("confirms #3");
+		for (const label of ["Bifrost (model calls)", "command watcher", "file watcher", "agent&#x27;s own log"]) expect(html).toContain(label);
+		expect(html).toContain("proof: verified");
 		expect(html).toContain("8 of 8 rows shown");
 	});
 
@@ -188,7 +188,7 @@ describe("StepTimeline", () => {
 	it("says when a run has no timeline", () => {
 		const html = renderToStaticMarkup(<StepTimeline data={{ run_id: "r_old", available: false, steps: [], observers: [] }} arm="B" />);
 		expect(html).toContain('data-testid="step-timeline-B-unavailable"');
-		expect(html).toContain("No step timeline recorded for this run");
+		expect(html).toContain("No step-by-step record for this run");
 		expect(html).not.toContain("step-filter-");
 	});
 
@@ -201,11 +201,11 @@ describe("StepTimeline", () => {
 	it("renders the fixtures", () => {
 		const read = (file: string) => JSON.parse(fs.readFileSync(path.join(FIXTURES, file), "utf8")) as RunSteps;
 		const withSteps = renderToStaticMarkup(<StepTimeline data={read("runs.r_fmw1z7ouim.steps.json")} arm="A" />);
-		expect(withSteps).toContain("Agent steps (all witnessed actions): 3");
+		expect(withSteps).toContain("Actions Heimdall saw: 3");
 		expect(withSteps).toContain('data-testid="step-row-A-12-reported"');
 		expect(withSteps).toMatch(/data-testid="step-row-A-14"[^>]*data-depth="2"/);
 		const missing = renderToStaticMarkup(<StepTimeline data={read("runs.r_pww2l7yame.steps.json")} arm="B" />);
-		expect(missing).toContain("Agent steps (all witnessed actions): 2");
+		expect(missing).toContain("Actions Heimdall saw: 2");
 		expect(missing).toContain("inotify watch limit reached");
 	});
 });
@@ -213,11 +213,11 @@ describe("StepTimeline", () => {
 describe("ObserverStatusLine", () => {
 	it("shows state, interval, coverage, drops and the missing reason", () => {
 		const html = renderToStaticMarkup(<ObserverStatusLine observers={data.observers} arm="A" locale="en" />);
-		expect(html).toContain("Process observer");
+		expect(html).toContain("Command watcher");
 		expect(html).toContain("every 50 ms");
 		expect(html).toContain("full");
 		expect(html).toContain("3 dropped");
-		expect(html).toContain("4 of 5 PIDs seen");
+		expect(html).toContain("saw 4 of 5 processes");
 		expect(html).toContain('data-state="missing"');
 		expect(html).toContain("inotify watch limit reached");
 		expect(html).toMatch(/data-testid="step-observer-A-process-0"[^>]*data-degraded="true"/);
@@ -225,7 +225,7 @@ describe("ObserverStatusLine", () => {
 
 	it("says when no observer status was recorded", () => {
 		const html = renderToStaticMarkup(<ObserverStatusLine observers={[]} arm="A" locale="en" />);
-		expect(html).toContain("No observer status recorded for this run.");
+		expect(html).toContain("No record of how Heimdall watched this run.");
 	});
 });
 
@@ -322,13 +322,13 @@ describe("agent-reported rows", () => {
 		// Distinct from the agent stream badge: its own testid, dashed, with the channel.
 		expect(html).toMatch(/class="[^"]*border-dashed[^"]*"[^>]*data-testid="step-row-A-9-reported"/);
 		expect(html).not.toContain('data-testid="step-row-A-5-reported"');
-		expect(html).toContain("agent reported");
+		expect(html).toContain("agent says");
 		expect(html).toMatch(/data-testid="step-row-A-9-reported-channel">OTLP</);
 		expect(html).toMatch(/data-testid="step-row-A-10-reported-channel">native</);
 		expect(html).toMatch(/data-testid="step-row-A-9-event-type">plan</);
 		expect(html).toMatch(/data-testid="step-row-A-10-event-type">subagent start</);
 		expect(html).toMatch(/data-testid="step-row-A-9-corroboration" data-tone="warn"/);
-		expect(html).toContain("reported only");
+		expect(html).toContain("agent&#x27;s word only");
 		expect(html).toMatch(/data-testid="step-row-A-11-corroboration" data-tone="good"/);
 		expect(html).toMatch(/data-testid="step-row-A-12-corroboration" data-tone="bad"/);
 		expect(html).not.toContain('data-testid="step-row-A-10-corroboration"');
@@ -392,7 +392,7 @@ describe("agent events status", () => {
 
 	it("says when the agent reported nothing", () => {
 		const html = renderToStaticMarkup(<StepTimeline data={{ ...data, agent_events: { collector: "on", received: 0, kept: 0 } }} arm="A" />);
-		expect(html).toContain("The agent reported nothing (gateway and observer evidence only)");
+		expect(html).toContain("The agent reported nothing about itself (only Heimdall&#x27;s own records shown)");
 		expect(html).not.toContain("Agent reported 0");
 		expect(html).not.toContain("step-agent-events-A-channels");
 		expect(html).not.toContain("step-agent-events-A-reason");
@@ -408,7 +408,7 @@ describe("agent events status", () => {
 		const html = renderToStaticMarkup(<AgentEventsLine status={status} arm="A" locale="en" />);
 		expect(html).toContain('data-collector="missing"');
 		expect(html).toContain("The agent reported nothing");
-		expect(html).toMatch(/data-testid="step-agent-events-A-collector" data-tone="bad">collector missing</);
+		expect(html).toMatch(/data-testid="step-agent-events-A-collector" data-tone="bad">listener missing</);
 		expect(html).toContain("&lt;script&gt;alert(&#x27;r&#x27;)&lt;/script&gt; port 4318 busy next");
 		expect(html).not.toContain("<script>");
 		expect(html).toMatch(/class="text-chart-error-ink" data-testid="step-agent-events-A-reason"/);
