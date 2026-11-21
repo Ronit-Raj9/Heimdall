@@ -68,7 +68,7 @@ Settings (`-set key=value`):
 | `track` | `skills` when any task brings skills, else `terminal` | leaderboard track |
 | `agent` | `agents/codex.yaml` | base agent config of the skills experiment |
 | `image` | `build` | `prebuilt` starts each task image `FROM` the image `task.toml` names (`docker_image`) instead of building the upstream Dockerfile |
-| `keep_networked` | `false` | `true` also imports tasks whose reference solution downloads at run time; they cannot pass admission without network |
+| `keep_networked` | `false` | `true` also imports tasks whose reference solution downloads at run time, and tasks whose `test.sh` downloads in a way that cannot move to the build (those lines are kept as they are and listed in `IMPORT.md`); they cannot pass admission without network and stay drafts |
 | `hack_verifiable` | `skip` | `keep` imports tasks with a planted `admin/` honeypot (HVTB) as plain tasks, with `admin/**` protected |
 
 ## What a converted task looks like

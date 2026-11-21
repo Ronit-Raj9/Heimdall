@@ -29,7 +29,7 @@ const (
 	SetTasksDir      = "tasks_dir"       // folder of task folders, relative to -from; default detected
 	SetTrack         = "track"           // terminal or skills; default skills when a task has skills
 	SetAgent         = "agent"           // base agent config of the skills experiment; default agents/codex.yaml
-	SetKeepNetworked = "keep_networked"  // true imports tasks whose reference downloads at run time
+	SetKeepNetworked = "keep_networked"  // true imports tasks whose reference or test script downloads at run time (they fail admission: drafts)
 	SetImage         = "image"           // build (default) builds the upstream Dockerfile; prebuilt starts FROM the image task.toml names
 	SetHackVerify    = "hack_verifiable" // skip (default) or keep tasks with a planted honeypot (Hack-Verifiable Terminal-Bench)
 )
@@ -370,7 +370,7 @@ func plan(t *upstreamTask, cfg settings) (*taskPlan, string) {
 	if err != nil {
 		return nil, "cannot read test.sh: " + err.Error()
 	}
-	tests, err := planTestScript(string(testSrc))
+	tests, err := planTestScriptKeep(string(testSrc), cfg.keepNetworked)
 	if err != nil {
 		return nil, err.Error()
 	}

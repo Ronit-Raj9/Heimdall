@@ -132,3 +132,27 @@ func TestLogicalLinesSkipsHeredocBodies(t *testing.T) {
 		t.Errorf("solutionFetch read a heredoc body: %q", got)
 	}
 }
+
+func TestPlanTestScriptKeepNetworked(t *testing.T) {
+	src := "apt-get install -y curl\ngit clone https://github.com/x/y src\nuvx --with-requirements r.txt pytest\npytest /tests -rA\n"
+	if _, err := planTestScriptKeep(src, false); err == nil {
+		t.Fatal("want a refusal without keep_networked")
+	}
+	p, err := planTestScriptKeep(src, true)
+	if err != nil {
+		t.Fatalf("keep_networked: %v", err)
+	}
+	for _, want := range []string{"\ngit clone https://github.com/x/y src\n", "\nuvx --with-requirements r.txt pytest\n", "\npytest /tests -rA"} {
+		if !strings.Contains(p.Script, want) {
+			t.Errorf("script lacks %q:\n%s", want, p.Script)
+		}
+	}
+	if len(p.Bake) != 1 || len(p.Changes) != 3 {
+		t.Errorf("bake %q changes %q, want 1 bake and 3 changes", p.Bake, p.Changes)
+	}
+	for _, c := range p.Changes[1:] {
+		if !strings.HasPrefix(c, "kept as is, needs the network") {
+			t.Errorf("change %q", c)
+		}
+	}
+}

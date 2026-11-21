@@ -41,6 +41,15 @@ type logicalLine struct {
 // unsupported, and the error quotes it: running it offline would fail the
 // reference for a reason that is not the agent's.
 func planTestScript(src string) (*testPlan, error) {
+	return planTestScriptKeep(src, false)
+}
+
+// planTestScriptKeep is planTestScript; with keepNetworked (-set
+// keep_networked=true) a line it cannot move to the build is kept unchanged
+// instead of refusing the task, and recorded as a change. The verifier has no
+// network, so such a task fails admission and stays a draft whose reason is
+// visible, rather than being left out of the suite.
+func planTestScriptKeep(src string, keepNetworked bool) (*testPlan, error) {
 	phys := strings.Split(strings.ReplaceAll(src, "\r\n", "\n"), "\n")
 	plan := &testPlan{}
 	out := make([]string, 0, len(phys)+4)
@@ -66,6 +75,12 @@ func planTestScript(src string) (*testPlan, error) {
 		case lineUVX:
 			venvs++
 			step, line, err := planUVX(code, venvs, uvInstalled)
+			if err != nil && keepNetworked {
+				venvs--
+				plan.Changes = append(plan.Changes, "kept as is, needs the network at verify time (the verifier has none, so admission fails): "+err.Error())
+				out = append(out, orig...)
+				continue
+			}
 			if err != nil {
 				return nil, err
 			}
@@ -73,6 +88,11 @@ func planTestScript(src string) (*testPlan, error) {
 			plan.Changes = append(plan.Changes, fmt.Sprintf("uvx replaced by a virtual environment built at image build: %s", short(code)))
 			out = append(out, "# "+bakeMarker+": "+short(ll.text), line)
 		default:
+			if keepNetworked {
+				plan.Changes = append(plan.Changes, fmt.Sprintf("kept as is, needs the network at verify time (%s; the verifier has none, so admission fails): %s", kind, short(code)))
+				out = append(out, orig...)
+				continue
+			}
 			return nil, fmt.Errorf("test.sh fetches from the network at verify time in a way the importer cannot move to the image build (%s): %s", kind, short(code))
 		}
 	}
