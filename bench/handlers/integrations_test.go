@@ -78,3 +78,34 @@ func TestIntegrationsCIWorkflowPreview(t *testing.T) {
 		t.Fatalf("preview %d %s", ctx.Response.StatusCode(), ctx.Response.Body())
 	}
 }
+
+func TestIntegrationsCIHostedWorkflow(t *testing.T) {
+	h := &integrationsHandler{mode: "live"}
+	ctx := integCtx("GET", "", nil)
+	ctx.QueryArgs().Set("mode", "hosted")
+	ctx.QueryArgs().Set("agent", "my-agent")
+	ctx.QueryArgs().Set("pack", "coding")
+	ctx.QueryArgs().Set("faults", "model-down,broken-tool")
+	ctx.QueryArgs().Set("url", "https://heimdall.example.com")
+	h.ciWorkflow(ctx)
+	body := string(ctx.Response.Body())
+	if ctx.Response.StatusCode() != 200 || !strings.Contains(body, "heimdall-evaluate.yml") || !strings.Contains(body, `agents/my-agent.yaml`) || !strings.Contains(body, "model-down,broken-tool") {
+		t.Fatalf("github %d %s", ctx.Response.StatusCode(), body)
+	}
+	ctx = integCtx("GET", "", nil)
+	ctx.QueryArgs().Set("mode", "hosted")
+	ctx.QueryArgs().Set("provider", "gitlab")
+	ctx.QueryArgs().Set("agent", "my-agent")
+	ctx.QueryArgs().Set("benchmarks", "hd-harbor-tb2")
+	h.ciWorkflow(ctx)
+	if ctx.Response.StatusCode() != 200 || !strings.Contains(string(ctx.Response.Body()), "merge_request_event") {
+		t.Fatalf("gitlab %d %s", ctx.Response.StatusCode(), ctx.Response.Body())
+	}
+	ctx = integCtx("GET", "", nil)
+	ctx.QueryArgs().Set("mode", "hosted")
+	ctx.QueryArgs().Set("agent", "my-agent")
+	h.ciWorkflow(ctx)
+	if ctx.Response.StatusCode() != 400 {
+		t.Fatalf("no benchmarks: %d", ctx.Response.StatusCode())
+	}
+}

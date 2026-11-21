@@ -1,15 +1,89 @@
-name: Bifrost Bench gate
+name: Heimdall evaluation
 description: >
-  Run `bifrost-bench check` on an agent change and fail the job on the listed
-  verdicts or a release-policy block. Recorded mode re-analyzes a sealed,
-  checked-in experiment and needs no Docker, gateway or key; live mode runs an
-  experiment against a running bench stack.
+  Test your agent on every pull request. Evaluate mode (the default) calls
+  your hosted Heimdall with an org API token: it registers the pull request's
+  agent config as a new version, evaluates it against the live version,
+  posts the report card summary as one pull-request comment, sets the commit
+  status and fails the job when the evaluation gate fails. Recorded and live
+  modes run `bifrost-bench check` on a sealed bundle or a local bench stack.
 
 inputs:
   mode:
-    description: "recorded (re-analyze a sealed bundle) or live (run an experiment against a running stack)"
+    description: "evaluate (hosted Heimdall), recorded (re-analyze a sealed bundle you name) or live (run an experiment against a running stack)"
     required: false
-    default: recorded
+    default: evaluate
+  url:
+    description: "evaluate: your Heimdall address, e.g. https://heimdall.example.com (usually vars.HEIMDALL_URL)"
+    required: false
+    default: ""
+  token:
+    description: "evaluate: an org API token from Heimdall (Settings > API tokens); pass secrets.HEIMDALL_TOKEN, never a literal"
+    required: false
+    default: ""
+  agent:
+    description: "evaluate: the agent id on your Heimdall"
+    required: false
+    default: ""
+  config:
+    description: "evaluate: the agent config file in this repository, registered as the pull request's version"
+    required: false
+    default: ""
+  image:
+    description: "evaluate: instead of a config file, an image this workflow built (ref@sha256:...): the live config with this image"
+    required: false
+    default: ""
+  endpoint:
+    description: "evaluate: instead of a config file, a preview deployment URL: the live config with this remote endpoint"
+    required: false
+    default: ""
+  baseline:
+    description: "evaluate: version to compare with, live (the agent's saved config) or a version number"
+    required: false
+    default: live
+  model:
+    description: "evaluate: model for both versions; empty uses each version's own model"
+    required: false
+    default: ""
+  pack:
+    description: "evaluate: benchmark pack, e.g. coding"
+    required: false
+    default: ""
+  benchmarks:
+    description: "evaluate: comma-separated benchmark ids (with or instead of pack)"
+    required: false
+    default: ""
+  faults:
+    description: "evaluate: comma-separated faults besides clean: model-down, broken-tool, misleading-instruction"
+    required: false
+    default: ""
+  trials:
+    description: "evaluate: repeats per task; empty uses the server default"
+    required: false
+    default: ""
+  tasks:
+    description: "evaluate: tasks per benchmark; empty uses the server default"
+    required: false
+    default: ""
+  budget-usd:
+    description: "evaluate: spend cap of the evaluation in USD; empty uses the server default"
+    required: false
+    default: ""
+  max-score-drop:
+    description: "evaluate: fail when a benchmark's score falls by more than this (0.05 = 5 points); empty is off"
+    required: false
+    default: ""
+  max-cost-increase:
+    description: "evaluate: fail when total cost grows by more than this fraction (0.25 = 25%); empty is off"
+    required: false
+    default: ""
+  timeout:
+    description: "evaluate: how long to wait for the evaluation"
+    required: false
+    default: 3h
+  github-token:
+    description: "evaluate: token for the pull request comment and commit status"
+    required: false
+    default: ${{ github.token }}
   experiment:
     description: "live: experiment file, relative to bench/ (e.g. experiments/codewins.reduced.yaml)"
     required: false
@@ -19,9 +93,9 @@ inputs:
     required: false
     default: ""
   bundle:
-    description: "recorded: bundle root, relative to the project folder (BENCH_CI_BENCH_DIR, else bench/)"
+    description: "recorded: bundle root, relative to the project folder (BENCH_CI_BENCH_DIR, else bench/); required in recorded mode"
     required: false
-    default: testdata/recorded
+    default: ""
   data-mode:
     description: "recorded: the mode the report is labelled with, recorded or synthetic (use synthetic for a scripted-model bundle)"
     required: false
@@ -31,9 +105,9 @@ inputs:
     required: false
     default: ""
   fail-on:
-    description: "comma-separated verdicts that fail the gate"
+    description: "comma-separated outcomes that fail the gate; empty uses regressed,failed (evaluate) or regressed,invalid (recorded, live)"
     required: false
-    default: regressed,invalid
+    default: ""
   go-version:
     description: "Go version; empty uses the go directive of bench/go.mod"
     required: false
@@ -41,13 +115,25 @@ inputs:
   artifact-name:
     description: "name of the uploaded report artifact"
     required: false
-    default: bench-check-report
+    default: heimdall-report
   bin:
     description: "path of a prebuilt bifrost-bench (or heimdall) binary; empty builds one from this checkout. Set BENCH_CI_BENCH_DIR in the step env to run in another project folder (heimdall ci install does both)"
     required: false
     default: ""
 
 outputs:
+  outcome:
+    description: "evaluate: improved, same, inconclusive, regressed, failed or no-change"
+    value: ${{ steps.evaluate.outputs.outcome }}
+  evaluation:
+    description: "evaluate: the evaluation id on your Heimdall"
+    value: ${{ steps.evaluate.outputs.evaluation }}
+  report-url:
+    description: "evaluate: the report card on your Heimdall"
+    value: ${{ steps.evaluate.outputs.report-url }}
+  version:
+    description: "evaluate: the agent version the pull request registered"
+    value: ${{ steps.evaluate.outputs.version }}
   verdict:
     description: "improved, regressed, inconclusive, invalid, or none when check stopped before a verdict"
     value: ${{ steps.check.outputs.verdict }}
@@ -59,7 +145,7 @@ outputs:
     value: ${{ steps.check.outputs.policy-decision }}
   exit-code:
     description: "bifrost-bench check exit code: 0 pass, 1 regressed, 2 inconclusive, 3 invalid, 4 infrastructure, 5 policy block, 64 usage"
-    value: ${{ steps.check.outputs.gate }}
+    value: ${{ steps.check.outputs.gate || steps.evaluate.outputs.gate }}
   report:
     description: "path of the markdown report on the runner (report.json sits beside it)"
     value: ${{ steps.check.outputs.report }}
@@ -75,7 +161,17 @@ runs:
       shell: bash
       env:
         BUNDLE: ${{ inputs.bundle }}
+        MODE: ${{ inputs.mode }}
       run: |
+        case $MODE in
+          evaluate|recorded|live) ;;
+          *) echo "::error title=Heimdall::mode $MODE: want evaluate, recorded or live"; exit 64 ;;
+        esac
+        # No fixture default: recorded mode re-checks only the bundle you name.
+        if [ "$MODE" = recorded ] && [ -z "$BUNDLE" ]; then
+          echo "::error title=Heimdall::recorded mode needs the bundle input (a folder of sealed experiments)"
+          exit 64
+        fi
         bench=$(cd "$GITHUB_ACTION_PATH/.." && pwd)
         project=$(cd "${BENCH_CI_BENCH_DIR:-$bench}" && pwd)
         case $BUNDLE in
@@ -130,6 +226,7 @@ runs:
     # uploaded; the last step carries the gate's exit code.
     - name: Run bifrost-bench check
       id: check
+      if: inputs.mode != 'evaluate'
       shell: bash
       env:
         BENCH_CI_MODE: ${{ inputs.mode }}
@@ -139,11 +236,45 @@ runs:
         BENCH_CI_BUNDLE: ${{ steps.paths.outputs.bundle }}
         BENCH_CI_DATA_MODE: ${{ inputs.data-mode }}
         BENCH_CI_POLICY: ${{ inputs.policy }}
-        BENCH_CI_FAIL_ON: ${{ inputs.fail-on }}
+        BENCH_CI_FAIL_ON: ${{ inputs.fail-on || 'regressed,invalid' }}
         BENCH_CI_OUT: ${{ runner.temp }}/bench-check/report.md
       run: |
         code=0
         "$GITHUB_ACTION_PATH/check.sh" || code=$?
+        echo "gate=$code" >> "$GITHUB_OUTPUT"
+
+    # Evaluate mode: every input reaches `ci evaluate` as a HEIMDALL_*
+    # variable, so no value is spliced into a shell command line. The step
+    # always succeeds so the outputs are set; the last step carries the gate.
+    - name: Evaluate on Heimdall
+      id: evaluate
+      if: inputs.mode == 'evaluate'
+      shell: bash
+      env:
+        BIN: ${{ steps.build.outputs.bin }}
+        HEIMDALL_URL: ${{ inputs.url }}
+        HEIMDALL_TOKEN: ${{ inputs.token }}
+        HEIMDALL_AGENT: ${{ inputs.agent }}
+        HEIMDALL_CONFIG: ${{ inputs.config }}
+        HEIMDALL_IMAGE: ${{ inputs.image }}
+        HEIMDALL_ENDPOINT: ${{ inputs.endpoint }}
+        HEIMDALL_BASELINE: ${{ inputs.baseline }}
+        HEIMDALL_MODEL: ${{ inputs.model }}
+        HEIMDALL_PACK: ${{ inputs.pack }}
+        HEIMDALL_BENCHMARKS: ${{ inputs.benchmarks }}
+        HEIMDALL_FAULTS: ${{ inputs.faults }}
+        HEIMDALL_TRIALS: ${{ inputs.trials }}
+        HEIMDALL_TASKS: ${{ inputs.tasks }}
+        HEIMDALL_BUDGET_USD: ${{ inputs.budget-usd }}
+        HEIMDALL_MAX_SCORE_DROP: ${{ inputs.max-score-drop }}
+        HEIMDALL_MAX_COST_INCREASE: ${{ inputs.max-cost-increase }}
+        HEIMDALL_FAIL_ON: ${{ inputs.fail-on || 'regressed,failed' }}
+        HEIMDALL_TIMEOUT: ${{ inputs.timeout }}
+        HEIMDALL_OUT: ${{ runner.temp }}/heimdall-evaluate
+        GITHUB_TOKEN: ${{ inputs.github-token }}
+      run: |
+        code=0
+        "$BIN" ci evaluate || code=$?
         echo "gate=$code" >> "$GITHUB_OUTPUT"
 
     - name: Upload report
@@ -154,10 +285,11 @@ runs:
         path: |
           ${{ runner.temp }}/bench-check/report.md
           ${{ runner.temp }}/bench-check/report.json
+          ${{ runner.temp }}/heimdall-evaluate/
         if-no-files-found: warn
 
     - name: Gate
       shell: bash
       env:
-        GATE: ${{ steps.check.outputs.gate }}
+        GATE: ${{ steps.check.outputs.gate || steps.evaluate.outputs.gate }}
       run: exit "${GATE:-4}"

@@ -1,0 +1,52 @@
+# Heimdall evaluation for GitLab CI: test your agent on every merge request.
+#
+# Each merge request registers its agent config as a new version on your
+# hosted Heimdall, evaluates it against the live version, posts the report
+# card summary as one merge request comment (updated in place), sets the
+# commit status, and fails the job when the evaluation gate fails.
+#
+# Use it from .gitlab-ci.yml:
+#
+#   include:
+#     - remote: https://raw.githubusercontent.com/Ronit-Raj9/Heimdall/main/bench/ci/heimdall.gitlab-ci.yml
+#
+#   heimdall-evaluate:
+#     extends: .heimdall-evaluate
+#     variables:
+#       HEIMDALL_AGENT: my-agent
+#       HEIMDALL_CONFIG: agents/my-agent.yaml
+#       HEIMDALL_PACK: coding
+#       HEIMDALL_FAULTS: model-down
+#
+# CI/CD variables (Settings > CI/CD > Variables; mask the tokens):
+#   HEIMDALL_URL    the address of your Heimdall, e.g. https://heimdall.example.com
+#   HEIMDALL_TOKEN  an org API token from Heimdall (Settings > API tokens)
+#   GITLAB_TOKEN    a project access token with the api scope, for the comment
+#                   and the commit status (the CI job token cannot write them)
+#
+# Optional: HEIMDALL_BENCHMARKS (comma-separated), HEIMDALL_IMAGE or
+# HEIMDALL_ENDPOINT (instead of a config file), HEIMDALL_BASELINE (live or a
+# version), HEIMDALL_MODEL, HEIMDALL_TRIALS, HEIMDALL_TASKS,
+# HEIMDALL_BUDGET_USD, HEIMDALL_FAIL_ON (default regressed,failed),
+# HEIMDALL_MAX_SCORE_DROP, HEIMDALL_MAX_COST_INCREASE, HEIMDALL_TIMEOUT.
+# Run `heimdall ci evaluate -h` for what each does.
+.heimdall-evaluate:
+  stage: test
+  image: golang:1.26
+  timeout: 4h
+  interruptible: true # a newer push cancels the older evaluation
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+  variables:
+    HEIMDALL_SOURCE: Ronit-Raj9/Heimdall
+    HEIMDALL_SOURCE_REF: main # pin a commit for a reproducible gate
+  script:
+    - git init -q /tmp/heimdall
+    - git -C /tmp/heimdall fetch -q --depth 1 "https://github.com/$HEIMDALL_SOURCE.git" "$HEIMDALL_SOURCE_REF"
+    - git -C /tmp/heimdall checkout -q FETCH_HEAD
+    - (cd /tmp/heimdall/bench && GOWORK=off CGO_ENABLED=0 go build -o /usr/local/bin/heimdall ./cmd/bifrost-bench)
+    - heimdall ci evaluate -out heimdall-report
+  artifacts:
+    when: always
+    paths:
+      - heimdall-report/
