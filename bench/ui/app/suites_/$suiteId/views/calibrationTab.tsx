@@ -1,3 +1,5 @@
+import { BuiltinReadOnlyNote } from "@/components/suites/builtinReadOnly";
+import { isBuiltinSuite } from "@/components/suites/suiteDisplay";
 import { CalibrateJudgeForm } from "@/components/calibration/calibrateJudgeForm";
 import { CalibrationCard, LabelForm, LabelsTable } from "@/components/calibration/calibrationPanel";
 import { BlockSkeleton, LoadError, Section } from "@/components/runs/screenStates";
@@ -37,6 +39,9 @@ export function SuiteCalibrationTab({ suite }: { suite: SuiteSummary }) {
 			) : (
 				<div className="grid gap-6 lg:grid-cols-2">
 					<CalibrationCard status={status.data} />
+					{isBuiltinSuite(suite) ? (
+						<BuiltinReadOnlyNote testId="calibration-builtin" />
+					) : (
 					<LabelForm
 						key={`${suite.id}-${formKey}`}
 						tasks={suite.tasks.map((task) => task.id)}
@@ -50,6 +55,7 @@ export function SuiteCalibrationTab({ suite }: { suite: SuiteSummary }) {
 								.catch(() => {})
 						}
 					/>
+					)}
 				</div>
 			)}
 			{status.data && (

@@ -81,6 +81,17 @@ func PickSuiteDir(orgBenchmarks, libBenchmarks, id string) (dir string, fromLibr
 	return libDir, true
 }
 
+// IsLibrarySuite reports that suite id of the organization whose packs live
+// in orgBenchmarks loads from the server's built-in library (LibraryEnv): it
+// is read-only on the web and in suite jobs.
+func IsLibrarySuite(orgBenchmarks, id string) bool {
+	_, lib := PickSuiteDir(orgBenchmarks, LibraryBenchmarks(LibraryDir()), id)
+	return lib
+}
+
+// ErrLibraryReadOnly is the refusal of a change to a built-in library suite.
+const ErrLibraryReadOnly = "Built-in benchmark, read-only"
+
 // suiteTaskCount reads the task list length of dir/suite.yaml without
 // loading the pack. ok is false when there is no readable suite.yaml.
 func suiteTaskCount(dir string) (n int, ok bool) {

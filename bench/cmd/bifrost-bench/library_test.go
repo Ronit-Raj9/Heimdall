@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"errors"
 	"io"
 	"log/slog"
 	"os"
@@ -9,11 +10,15 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/fasthttp/router"
 	"github.com/maximhq/bifrost/bench/engine"
+	"github.com/maximhq/bifrost/bench/handlers"
 	"github.com/maximhq/bifrost/bench/lib"
 	"github.com/maximhq/bifrost/bench/schemas"
 	"github.com/maximhq/bifrost/bench/suite"
+	"github.com/maximhq/bifrost/bench/taskhealth"
 	"github.com/maximhq/bifrost/bench/tenancy"
+	"github.com/valyala/fasthttp"
 )
 
 // libraryFixture is a library root holding the mini pack as hd-lib and an
@@ -123,5 +128,66 @@ func TestSharedOrgProjectLibrary(t *testing.T) {
 	reg, _ := sharedOrgProject(context.Background(), a, "org_a")
 	if _, err := engine.LoadSuite(context.Background(), reg, "a-own"); err != nil {
 		t.Errorf("org_a own suite lost: %v", err)
+	}
+}
+
+// emptyRuns is a run store with no experiments: health of a fresh suite.
+type emptyRuns struct{}
+
+func (emptyRuns) Experiments(context.Context) ([]string, error) { return nil, nil }
+func (emptyRuns) Manifest(context.Context, string) (*schemas.Manifest, error) {
+	return nil, schemas.ErrNotFound
+}
+func (emptyRuns) SealedRuns(context.Context, string, string) ([]schemas.SealedRun, error) {
+	return nil, nil
+}
+func (emptyRuns) SlotAttempts(context.Context, string, string) ([]schemas.RunRecord, error) {
+	return nil, nil
+}
+func (emptyRuns) Regrades(context.Context, string) ([]taskhealth.Regrade, error) { return nil, nil }
+
+// Read paths of a library suite: task detail and health over the org's
+// suite source; write paths: the suite jobs and the judge refuse it.
+func TestLibrarySuiteReadPathsAndWritesRefused(t *testing.T) {
+	libRoot, _, orgB := libraryFixture(t)
+	t.Setenv(suite.LibraryEnv, libRoot)
+	src := serveSuites{root: filepath.Join(orgB, "benchmarks"), library: suite.LibraryBenchmarks(libRoot)}
+
+	r := router.New()
+	handlers.NewSuitesHandler(schemas.ModeLive, src).RegisterRoutes(r)
+	handlers.NewSuiteHealthHandler(schemas.ModeLive, src, emptyRuns{}).RegisterRoutes(r)
+	get := func(path string) (int, string) {
+		var ctx fasthttp.RequestCtx
+		ctx.Request.SetRequestURI(path)
+		ctx.Request.Header.SetMethod("GET")
+		r.Handler(&ctx)
+		return ctx.Response.StatusCode(), string(ctx.Response.Body())
+	}
+	if code, body := get(handlers.APIPrefix + "/suites/mini/tasks/m01"); code != 200 {
+		t.Fatalf("task detail = %d %s", code, body)
+	}
+	if code, body := get(handlers.APIPrefix + "/suites/mini/health"); code != 200 || !strings.Contains(body, "m01") {
+		t.Fatalf("health = %d %s", code, body)
+	}
+	if code, body := get(handlers.APIPrefix + "/suites"); code != 200 || !strings.Contains(body, `"builtin":true`) {
+		t.Fatalf("list = %d %s", code, body)
+	}
+
+	a := &app{cfg: &lib.Config{Root: orgB, BenchmarksRoot: "benchmarks"}, logger: slog.New(slog.NewTextHandler(io.Discard, nil)), reg: &schemas.Registry{}}
+	l := &launcher{a: a}
+	if err := validateSuite(l, "mini", true); err == nil || !strings.Contains(err.Error(), schemas.ErrReadOnly.Error()) {
+		t.Errorf("lock/admit of a library suite: %v", err)
+	}
+	if err := validateSuite(l, "mini", false); err != nil {
+		t.Errorf("lint of a library suite refused: %v", err)
+	}
+	if _, err := suiteOpsCheckSuite(jobEnv{App: a}, "mini"); err == nil || !strings.Contains(err.Error(), schemas.ErrReadOnly.Error()) {
+		t.Errorf("suite ops on a library suite: %v", err)
+	}
+	if _, err := (judgeSvc{a: a}).AddCalibrationLabel(context.Background(), "mini", &schemas.CalibrationLabelRequest{Task: "m01"}); !errors.Is(err, schemas.ErrReadOnly) {
+		t.Errorf("judge label on a library suite: %v", err)
+	}
+	if _, err := snapshotSuite(context.Background(), a, "mini"); !errors.Is(err, schemas.ErrReadOnly) {
+		t.Errorf("hosted admission of a library suite: %v", err)
 	}
 }

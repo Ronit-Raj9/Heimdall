@@ -67,6 +67,8 @@ func sendDepError(ctx *fasthttp.RequestCtx, mode schemas.Mode, what string, err 
 		lib.SendError(ctx, mode, fasthttp.StatusNotFound, lib.ErrTypeNotFound, what+": "+err.Error())
 	case errors.Is(err, schemas.ErrExists), errors.Is(err, ErrKeyOverBudget): // G10: a model key over its budget (keybudget.go)
 		lib.SendError(ctx, mode, fasthttp.StatusConflict, lib.ErrTypeConflict, what+": "+err.Error())
+	case errors.Is(err, schemas.ErrReadOnly):
+		lib.SendError(ctx, mode, fasthttp.StatusForbidden, lib.ErrTypeForbidden, what+": "+err.Error())
 	case errors.Is(err, context.DeadlineExceeded):
 		lib.SendError(ctx, mode, fasthttp.StatusGatewayTimeout, lib.ErrTypeUnavailable, what+": timed out")
 	default:

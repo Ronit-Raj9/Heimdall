@@ -1,3 +1,4 @@
+import { BuiltinReadOnlyNote } from "@/components/suites/builtinReadOnly";
 import { BlockSkeleton, LoadError } from "@/components/runs/screenStates";
 import { GradingBadge } from "@/components/scenario/scenarioBadges";
 import { suiteGrading } from "@/components/scenario/scenario.utils";
@@ -9,7 +10,7 @@ import {
   type RouteTab,
 } from "@/components/shell";
 import { suiteVersionOf } from "@/components/shell/entityLink";
-import { suiteDisplayDescription } from "@/components/suites/suiteDisplay";
+import { isBuiltinSuite, suiteDisplayDescription } from "@/components/suites/suiteDisplay";
 import {
   SuiteStatusPill,
   suiteDisplayName,
@@ -135,6 +136,7 @@ function SuiteBody({
   });
   const health = healthState(healthQuery);
   const judged = suiteGrading(suite) === "judged";
+  const builtin = isBuiltinSuite(suite);
   const tasks = suite.tasks.length;
   const tabs: RouteTab[] = [
     { id: "tasks", label: tu("tabs.tasks"), badge: tasks },
@@ -148,7 +150,7 @@ function SuiteBody({
     },
     { id: "calibration", label: tu("tabs.calibration"), hidden: !judged },
     { id: "ops", label: tu("tabs.ops") },
-    { id: "edit", label: tu("tabs.edit") }, // L10 suite authoring
+    { id: "edit", label: tu("tabs.edit"), hidden: builtin }, // L10 suite authoring; a built-in library suite is read-only
     { id: "export", label: tu("tabs.export") },
   ];
   const runs = health.state === "ready" ? health.health.runs : null;
@@ -288,6 +290,7 @@ function SuiteBody({
         <BrokenSuite suite={suite} />
       ) : (
         <>
+          {builtin && <BuiltinReadOnlyNote />}
           <SuiteDriftNotice suite={suite} />
           <FingerprintDriftNotice suite={suite} />
           <RouteTabs

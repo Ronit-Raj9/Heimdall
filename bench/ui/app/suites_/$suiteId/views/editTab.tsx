@@ -1,3 +1,5 @@
+import { BuiltinReadOnlyNote } from "@/components/suites/builtinReadOnly";
+import { isBuiltinSuite } from "@/components/suites/suiteDisplay";
 import { useConfirm } from "@/components/platform/confirmDialog";
 import { JobRunButton } from "@/components/jobs/jobRunButton";
 import { EmptyState } from "@/components/shell/emptyState";
@@ -28,6 +30,7 @@ export function EditTab({ suite }: { suite: SuiteSummary }) {
 	const { t } = useTranslation("suiteAuthoring");
 	const writable = canUse(useSession(), "member");
 	const [selected, setSelected] = useState<string | null>(null);
+	if (isBuiltinSuite(suite)) return <BuiltinReadOnlyNote testId="suite-edit-builtin" />;
 	if (!writable) {
 		return <EmptyState icon={Lock} compact message={t("edit.readOnly")} testId="suite-edit-readonly" />;
 	}

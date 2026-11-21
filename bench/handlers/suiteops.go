@@ -39,8 +39,8 @@ type QuarantineResult struct {
 func init() {
 	RegisterOrgArea("suiteops", func(env OrgEnv, r *router.Router) {
 		h := &suiteOpsHandler{mode: env.Mode, suites: env.Services.Suites}
-		r.POST(APIPrefix+"/suites/{id}/tasks/{task}/quarantine", env.W(h.quarantine))
-		r.POST(APIPrefix+"/suites/{id}/tasks/{task}/restore", env.W(h.restore))
+		r.POST(APIPrefix+"/suites/{id}/tasks/{task}/quarantine", env.W(refuseBuiltin(env.Mode, h.suites, h.quarantine)))
+		r.POST(APIPrefix+"/suites/{id}/tasks/{task}/restore", env.W(refuseBuiltin(env.Mode, h.suites, h.restore)))
 	})
 }
 

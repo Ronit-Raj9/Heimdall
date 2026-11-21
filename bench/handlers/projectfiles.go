@@ -69,13 +69,28 @@ type ProjectFileVersions struct {
 const maxExportBytes = 512 << 20
 
 type projectFilesHandler struct {
-	mode  schemas.Mode
-	store projectfs.Store
+	mode   schemas.Mode
+	store  projectfs.Store
+	suites SuiteSource // built-in library suites are read-only (suites.go)
+}
+
+// refuseBuiltinPath answers 403 for a change under benchmarks/<id>/ when id
+// is a built-in library suite.
+func (h *projectFilesHandler) refuseBuiltinPath(ctx *fasthttp.RequestCtx, a projectfs.Area, rel string) bool {
+	if a != projectfs.AreaBenchmarks {
+		return false
+	}
+	id, _, _ := strings.Cut(strings.TrimPrefix(rel, "/"), "/")
+	if !isBuiltinSuite(h.suites, id) {
+		return false
+	}
+	sendBuiltinReadOnly(ctx, h.mode, id)
+	return true
 }
 
 func init() {
 	RegisterOrgArea("projectfiles", func(env OrgEnv, r *router.Router) {
-		h := &projectFilesHandler{mode: env.Mode, store: env.Services.Projects}
+		h := &projectFilesHandler{mode: env.Mode, store: env.Services.Projects, suites: env.Services.Suites}
 		r.GET(APIPrefix+"/project/files", env.R(h.list))
 		r.GET(APIPrefix+"/project/files/{area}/{path:*}", env.R(h.get))
 		r.PUT(APIPrefix+"/project/files/{area}/{path:*}", env.W(h.put))
@@ -274,7 +289,7 @@ func (h *projectFilesHandler) put(ctx *fasthttp.RequestCtx) {
 		return
 	}
 	a, rel, ok := h.pathParams(ctx)
-	if !ok {
+	if !ok || h.refuseBuiltinPath(ctx, a, rel) {
 		return
 	}
 	body := ctx.PostBody()
@@ -296,7 +311,7 @@ func (h *projectFilesHandler) del(ctx *fasthttp.RequestCtx) {
 		return
 	}
 	a, rel, ok := h.pathParams(ctx)
-	if !ok {
+	if !ok || h.refuseBuiltinPath(ctx, a, rel) {
 		return
 	}
 	if err := h.store.Delete(ctx, a, rel, writeOpts(ctx)); err != nil {

@@ -334,12 +334,9 @@ func (c *catalogSource) build() *schemas.Catalog {
 	a := c.a
 	cat := &schemas.Catalog{Mode: a.cfg.Server.Mode, Parts: engine.PartVersions(a.reg)}
 	root := a.cfg.Path(a.cfg.BenchmarksRoot)
-	entries, _ := os.ReadDir(root)
-	for _, e := range entries {
-		if !e.IsDir() {
-			continue
-		}
-		s, err := loadSuite(context.Background(), root, e.Name())
+	ids, _ := (serveSuites{root: root, library: suite.LibraryBenchmarks(a.library)}).SuiteIDs(context.Background()) // org packs and the built-in library
+	for _, id := range ids {
+		s, err := loadSuite(context.Background(), root, id)
 		if err != nil {
 			continue
 		}

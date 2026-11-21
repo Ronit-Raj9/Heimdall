@@ -1,4 +1,6 @@
 import { JobRunButton } from "@/components/jobs/jobRunButton";
+import { BuiltinReadOnlyNote } from "@/components/suites/builtinReadOnly";
+import { isBuiltinSuite } from "@/components/suites/suiteDisplay";
 import { Section } from "@/components/runs/screenStates";
 import { EmptyState } from "@/components/shell/emptyState";
 import { Button } from "@/components/ui/button";
@@ -30,16 +32,18 @@ const splitList = (s: string) =>
 export function OpsTab({ suite }: { suite: SuiteSummary }) {
 	const { t } = useTranslation("suiteops");
 	const session = useSession();
-	const writable = canUse(session, "member");
+	const builtin = isBuiltinSuite(suite); // built-in library: read-only for every org
+	const writable = canUse(session, "member") && !builtin;
 	const hosted = session.authMode === "hosted";
 	return (
 		<div className="flex min-w-0 flex-col gap-6" data-testid="suite-ops-tab">
-			{!writable && (
+			{builtin && <BuiltinReadOnlyNote testId="suite-ops-builtin" />}
+			{!writable && !builtin && (
 				<p role="note" className="text-muted-foreground rounded-sm border px-4 py-2 text-sm" data-testid="suite-ops-viewer">
 					{t("viewerNote")}
 				</p>
 			)}
-			<ChecksSection suite={suite} writable={writable} hosted={hosted} t={t} />
+			<ChecksSection suite={suite} writable={writable} hosted={hosted && !builtin} t={t} />
 			<QuarantineSection suite={suite} writable={writable} t={t} />
 			{writable && <FromCommitSection suite={suite} hosted={hosted} t={t} />}
 			{writable && <MineSection suite={suite} hosted={hosted} t={t} />}

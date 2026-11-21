@@ -79,7 +79,7 @@ func (j judgeSvc) suiteRoot(id string) (string, error) {
 	if id == "" || strings.ContainsAny(id, "/\\@") || id == "." || id == ".." {
 		return "", fmt.Errorf("suite %q: %w", id, schemas.ErrNotFound)
 	}
-	root := filepath.Join(j.a.cfg.Path(j.a.cfg.BenchmarksRoot), id)
+	root, _ := suite.PickSuiteDir(j.a.cfg.Path(j.a.cfg.BenchmarksRoot), suite.LibraryBenchmarks(suite.LibraryDir()), id) // built-in library too
 	if fi, err := os.Stat(filepath.Join(root, suite.SuiteFile)); err != nil || !fi.Mode().IsRegular() {
 		return "", fmt.Errorf("suite %s: %w", id, schemas.ErrNotFound)
 	}
@@ -128,6 +128,9 @@ func (j judgeSvc) CalibrationLabels(_ context.Context, id string) (*schemas.Cali
 // AddCalibrationLabel implements handlers.CalibrationSource: one label
 // from the labelling page, for a task of the suite.
 func (j judgeSvc) AddCalibrationLabel(ctx context.Context, id string, req *schemas.CalibrationLabelRequest) (*schemas.CalibrationItem, error) {
+	if suite.IsLibrarySuite(j.a.cfg.Path(j.a.cfg.BenchmarksRoot), id) {
+		return nil, fmt.Errorf("suite %s: %w", id, schemas.ErrReadOnly)
+	}
 	s, err := j.load(ctx, id)
 	if err != nil {
 		return nil, err
@@ -595,7 +598,7 @@ func runJudgeStatus(args []string) int {
 	j := judgeSvc{a: a}
 	ids := []string{id}
 	if id == "" {
-		if ids, err = (serveSuites{root: a.cfg.Path(a.cfg.BenchmarksRoot)}).SuiteIDs(ctx); err != nil {
+		if ids, err = (serveSuites{root: a.cfg.Path(a.cfg.BenchmarksRoot), library: suite.LibraryBenchmarks(a.library)}).SuiteIDs(ctx); err != nil {
 			return fail("judge status: %v", err)
 		}
 	}

@@ -96,6 +96,9 @@ type hostedSuiteState struct {
 
 // snapshotSuite loads suite id and fingerprints it, as proveTask does.
 func snapshotSuite(ctx context.Context, a *app, id string) (*hostedSuiteState, error) {
+	if suite.IsLibrarySuite(a.cfg.Path(a.cfg.BenchmarksRoot), id) {
+		return nil, fmt.Errorf("suite %s: %w", id, schemas.ErrReadOnly) // built-in library: admitted on the server, never from an org
+	}
 	s, err := loadSuite(ctx, a.cfg.Path(a.cfg.BenchmarksRoot), id)
 	if err != nil {
 		return nil, fmt.Errorf("load suite %s: %w", id, err)

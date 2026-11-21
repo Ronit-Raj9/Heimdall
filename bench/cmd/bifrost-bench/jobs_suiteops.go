@@ -137,6 +137,9 @@ func suiteOpsCheckSuite(env jobEnv, id string) (string, error) {
 	if err != nil {
 		return "", invalid(err)
 	}
+	if suite.IsLibrarySuite(root, id) {
+		return "", invalid(fmt.Errorf("suite %s: %w", id, schemas.ErrReadOnly)) // built-in library: no org copy
+	}
 	dir, err := ops.Confine(root, "suite", id)
 	if err != nil {
 		return "", invalid(err)

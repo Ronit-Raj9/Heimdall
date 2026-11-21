@@ -580,3 +580,22 @@ func TestSuitesListBuiltinFlag(t *testing.T) {
 		}
 	}
 }
+
+// A write route on a built-in library suite answers 403 and never runs.
+func TestRefuseBuiltinWrite(t *testing.T) {
+	src := libraryFakeSuites{fakeSuites: &fakeSuites{}, builtin: map[string]bool{"hd-harbor-tb2": true}}
+	ran := false
+	h := refuseBuiltin(testMode, src, func(*fasthttp.RequestCtx) { ran = true })
+	var ctx fasthttp.RequestCtx
+	ctx.SetUserValue("id", "hd-harbor-tb2")
+	h(&ctx)
+	if ran || ctx.Response.StatusCode() != fasthttp.StatusForbidden || !strings.Contains(string(ctx.Response.Body()), "Built-in benchmark, read-only") {
+		t.Fatalf("library write: ran=%v status=%d body=%s", ran, ctx.Response.StatusCode(), ctx.Response.Body())
+	}
+	var own fasthttp.RequestCtx
+	own.SetUserValue("id", "my-suite")
+	h(&own)
+	if !ran {
+		t.Fatal("org suite write refused")
+	}
+}

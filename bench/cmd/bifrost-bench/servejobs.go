@@ -26,6 +26,7 @@ import (
 	"github.com/maximhq/bifrost/bench/jobs"
 	"github.com/maximhq/bifrost/bench/ops"
 	"github.com/maximhq/bifrost/bench/schemas"
+	"github.com/maximhq/bifrost/bench/suite"
 	"github.com/maximhq/bifrost/bench/server"
 	"github.com/maximhq/bifrost/bench/store"
 	"github.com/maximhq/bifrost/bench/tenancy"
@@ -711,9 +712,17 @@ func validateExp(ctx context.Context, l *launcher, expID string) error {
 }
 
 // validateSuite checks a suite id names a folder of the org's benchmarks.
-func validateSuite(l *launcher, id string) error {
+// A built-in library suite (suite/library.go) passes only a read-only job
+// (write false); lock and admit are refused.
+func validateSuite(l *launcher, id string, write bool) error {
 	if err := ops.ValidID("suite", id); err != nil {
 		return invalid(err)
+	}
+	if suite.IsLibrarySuite(l.a.cfg.Path(l.a.cfg.BenchmarksRoot), id) {
+		if write {
+			return invalid(fmt.Errorf("suite %s: %w", id, schemas.ErrReadOnly))
+		}
+		return nil
 	}
 	if _, err := ops.Confine(l.a.cfg.Path(l.a.cfg.BenchmarksRoot), "suite", id); err != nil {
 		return invalid(err)
@@ -850,7 +859,7 @@ func (h *jobsHub) registerOps() {
 			if err := strictParams(raw, &p); err != nil {
 				return nil, "", err
 			}
-			if err := validateSuite(l, p.Suite); err != nil {
+			if err := validateSuite(l, p.Suite, true); err != nil {
 				return nil, "", err
 			}
 			if p.Task != "" {
@@ -872,7 +881,7 @@ func (h *jobsHub) registerOps() {
 		if p.Task != "" || p.PinLocalImages != nil {
 			return nil, "", invalid(errors.New("suite.lint takes only suite"))
 		}
-		if err := validateSuite(l, p.Suite); err != nil {
+		if err := validateSuite(l, p.Suite, false); err != nil {
 			return nil, "", err
 		}
 		return p, "", nil // read-only: lints may run beside anything

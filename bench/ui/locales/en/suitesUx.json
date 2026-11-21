@@ -54,5 +54,7 @@
 		"org": "Added by your team",
 		"practice": "Practice examples (small, made-up data)"
 	},
-	"builtIn": "Built in"
+	"builtIn": "Built in",
+	"builtinReadOnly": "Built-in benchmark, read-only",
+	"builtinReadOnlyHint": "Shared by every organization on this server. Run it as it is; editing, re-importing, admitting and deleting are turned off."
 }

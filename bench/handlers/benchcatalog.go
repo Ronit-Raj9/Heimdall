@@ -143,6 +143,13 @@ func (h *benchCatalogHandler) add(ctx *fasthttp.RequestCtx) {
 		lib.SendError(ctx, mode, fasthttp.StatusConflict, lib.ErrTypeConflict, "entry "+id+" cannot be added on this server: "+e.Hint)
 		return
 	}
+	if target := strings.TrimSpace(body.Suite); isBuiltinSuite(h.env.Services.Suites, target) || (target == "" && isBuiltinSuite(h.env.Services.Suites, e.SuiteID)) {
+		if target == "" {
+			target = e.SuiteID
+		}
+		sendBuiltinReadOnly(ctx, mode, target) // built in already: run it, no org copy
+		return
+	}
 	if e.Kind != benchcatalog.KindImporter {
 		res, err := src.Add(project, e)
 		if err != nil {

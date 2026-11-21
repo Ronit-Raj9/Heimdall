@@ -37,6 +37,13 @@ describe("EditTab", () => {
 		expect(html).toContain('data-testid="suite-edit-readonly"');
 		expect(html).not.toContain("suite-edit-files");
 	});
+	it("is read-only for a built-in library suite, even for a member", () => {
+		const html = render(<EditTab suite={{ ...suite, builtin: true, source: "library" } as SuiteSummary} />);
+		expect(html).toContain('data-testid="suite-edit-builtin"');
+		expect(html).toContain("Built-in benchmark, read-only");
+		expect(html).not.toContain("suite-edit-tab");
+		expect(html).not.toContain("job-run-suite.lock");
+	});
 	it("lists lint problems and a load error", () => {
 		const bad = render(
 			<LintResult

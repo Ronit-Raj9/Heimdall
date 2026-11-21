@@ -43,8 +43,11 @@ type localLoader struct {
 	library string // read-only built-in benchmarks folder (library.go); "" for none
 }
 
+// newLocalLoader resolves against benchmarksRoot with the server's built-in
+// library (LibraryEnv) layered in, so every reader (lint, LoadTask, health,
+// judge, the planner) sees a library suite the same way. Layered overrides it.
 func newLocalLoader(benchmarksRoot string) *localLoader {
-	return &localLoader{root: benchmarksRoot}
+	return &localLoader{root: benchmarksRoot, library: LibraryBenchmarks(LibraryDir())}
 }
 
 // GetName implements schemas.Part.

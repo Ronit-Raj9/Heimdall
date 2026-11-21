@@ -69,6 +69,10 @@ type SealRecord struct {
 	Hash   string `json:"-"` // sha256 of seal.json bytes, filled when read
 }
 
+// ErrReadOnly refuses a change to a suite of the server's built-in benchmark
+// library (suite/library.go): it is shared by every org.
+var ErrReadOnly = errors.New("Built-in benchmark, read-only")
+
 // Sentinel errors shared across packages.
 var (
 	ErrExists       = errors.New("already exists")

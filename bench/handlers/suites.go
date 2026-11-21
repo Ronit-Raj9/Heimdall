@@ -65,6 +65,30 @@ type suiteOrigin interface {
 	SuiteBuiltin(id string) bool
 }
 
+// isBuiltinSuite reports that src serves suite id from the built-in library.
+func isBuiltinSuite(src SuiteSource, id string) bool {
+	o, ok := src.(suiteOrigin)
+	return ok && id != "" && o.SuiteBuiltin(id)
+}
+
+// sendBuiltinReadOnly answers a change to a built-in library suite: 403.
+func sendBuiltinReadOnly(ctx *fasthttp.RequestCtx, mode schemas.Mode, id string) {
+	lib.SendError(ctx, mode, fasthttp.StatusForbidden, lib.ErrTypeForbidden,
+		schemas.ErrReadOnly.Error()+": "+id+" is shared by every organization and cannot be edited, re-imported, admitted or deleted here")
+}
+
+// refuseBuiltin wraps a write route on /suites/{id}/...: a built-in library
+// suite is refused with 403 before next runs, never copied into the org.
+func refuseBuiltin(mode schemas.Mode, src SuiteSource, next fasthttp.RequestHandler) fasthttp.RequestHandler {
+	return func(ctx *fasthttp.RequestCtx) {
+		if id := pathParam(ctx, "id"); isBuiltinSuite(src, id) {
+			sendBuiltinReadOnly(ctx, mode, id)
+			return
+		}
+		next(ctx)
+	}
+}
+
 // SuitesHandler serves the benchmark packs on disk: what each suite holds,
 // whether its lock still matches its files, and per task its provenance and
 // admission record. It is read-only and never serves a hidden test, a

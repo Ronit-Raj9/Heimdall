@@ -80,7 +80,7 @@ func newApp(ctx context.Context, configPath string, opts appOptions) (*app, erro
 		return nil, err
 	}
 	logger := utils.NewStdLogger(os.Stderr, opts.debug)
-	a := &app{cfg: cfg, logger: logger, docker: utils.Docker{}}
+	a := &app{cfg: cfg, logger: logger, docker: utils.Docker{}, library: suite.LibraryDir()} // built-in library (suite/library.go)
 
 	st, err := store.NewFSStore(cfg.Path(cfg.RunsRoot), logger)
 	if err != nil {

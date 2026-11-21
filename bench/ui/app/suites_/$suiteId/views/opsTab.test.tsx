@@ -47,6 +47,16 @@ describe("OpsTab", () => {
 		expect(html).toContain('data-testid="suite-ops-hosted-admit"');
 		expect(html).toContain('data-testid="suite-ops-mine-dry-run"');
 	});
+	it("keeps a built-in library suite read-only, even for a member", () => {
+		const lib = { ...suite, id: "hd-harbor-tb2", builtin: true, source: "library" } as unknown as SuiteSummary;
+		const html = render(<OpsTab suite={lib} />, hostedSession("member"));
+		expect(html).toContain('data-testid="suite-ops-builtin"');
+		expect(html).toContain("Built-in benchmark, read-only");
+		expect(html).not.toContain("job-run-");
+		expect(html).not.toContain("suite-ops-restore-fix-a");
+		expect(html).not.toContain("suite-ops-mine");
+		expect(html).not.toContain("suite-ops-hosted-admit");
+	});
 	it("builds repository params", () => {
 		expect(repoParams({ github: " acme/app " })).toEqual({ github: "acme/app" });
 		expect(repoParams({ github: "acme/app", branch: "main" })).toEqual({ github: "acme/app", branch: "main" });

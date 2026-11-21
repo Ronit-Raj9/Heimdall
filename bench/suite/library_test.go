@@ -67,3 +67,26 @@ func TestLayeredLoaderLoadsLibrarySuite(t *testing.T) {
 		t.Fatal("plain loader found the library pack")
 	}
 }
+
+// With LibraryEnv set, every plain loader (LoadTask, Builtin) reads a
+// library suite: the task page, health and judge all go through these.
+func TestLoadTaskFromLibrary(t *testing.T) {
+	org, lib := t.TempDir(), t.TempDir()
+	if err := os.CopyFS(filepath.Join(lib, "benchmarks", "mini"), os.DirFS(filepath.Join("testdata", "valid", "mini"))); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv(LibraryEnv, lib)
+	s, task, err := LoadTask(org, "mini", "m01")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.HasPrefix(s.Root, lib) || !strings.HasPrefix(task.Dir, lib) {
+		t.Fatalf("root %s task %s: want under the library", s.Root, task.Dir)
+	}
+	if _, err := Builtin(org)[0].Load(context.Background(), "mini"); err != nil {
+		t.Fatalf("Builtin loader misses the library: %v", err)
+	}
+	if !IsLibrarySuite(org, "mini") || IsLibrarySuite(org, "other") {
+		t.Fatal("IsLibrarySuite wrong")
+	}
+}

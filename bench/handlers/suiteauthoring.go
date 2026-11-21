@@ -152,13 +152,13 @@ func init() {
 		}
 		r.GET(APIPrefix+"/suite-templates", env.R(h.templates))
 		r.POST(APIPrefix+"/suites", env.W(h.createSuite))
-		r.POST(APIPrefix+"/suites/{id}/tasks", env.W(h.createTask))
+		r.POST(APIPrefix+"/suites/{id}/tasks", env.W(refuseBuiltin(env.Mode, h.suites, h.createTask)))
 		r.GET(APIPrefix+"/suites/{id}/lint", env.R(h.lint))
 		r.GET(APIPrefix+"/suites/{id}/files", env.R(h.listFiles))
-		r.POST(APIPrefix+"/suites/{id}/upload", env.U(h.upload))
+		r.POST(APIPrefix+"/suites/{id}/upload", env.U(refuseBuiltin(env.Mode, h.suites, h.upload)))
 		r.GET(APIPrefix+"/suites/{id}/files/{path:*}", env.R(h.readFile))
-		r.PUT(APIPrefix+"/suites/{id}/files/{path:*}", env.W(h.writeFile))
-		r.DELETE(APIPrefix+"/suites/{id}/files/{path:*}", env.W(h.deleteFile))
+		r.PUT(APIPrefix+"/suites/{id}/files/{path:*}", env.W(refuseBuiltin(env.Mode, h.suites, h.writeFile)))
+		r.DELETE(APIPrefix+"/suites/{id}/files/{path:*}", env.W(refuseBuiltin(env.Mode, h.suites, h.deleteFile)))
 	})
 }
 
@@ -240,6 +240,10 @@ func (h *suiteAuthoring) createSuite(ctx *fasthttp.RequestCtx) {
 		return
 	}
 	req.ID = strings.TrimSpace(req.ID)
+	if isBuiltinSuite(h.suites, req.ID) {
+		sendBuiltinReadOnly(ctx, h.mode, req.ID)
+		return
+	}
 	if req.Template == "" {
 		req.Template = scaffold.TemplatePythonPytest
 	}
