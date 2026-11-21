@@ -13,6 +13,7 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"slices"
 	"sync"
 	"time"
 
@@ -212,6 +213,57 @@ func Record(root, id string, history []Source) (schemas.AgentVersion, bool, erro
 		}
 	}
 	return vs[len(vs)-1], created, nil
+}
+
+// Derive freezes doc as a version produced from version parent of agent id
+// (an improvement run's candidate). lin carries the lineage fields; Version,
+// Hash and CreatedAt are set here. A doc whose config hash equals any
+// stored version's adds nothing and returns that version, so a candidate
+// identical to an earlier one keeps its first lineage.
+func Derive(root, id string, doc []byte, lin schemas.AgentVersion) (schemas.AgentVersion, bool, error) {
+	if !ValidID(id) {
+		return schemas.AgentVersion{}, false, fmt.Errorf("agent id %q is not valid", id)
+	}
+	hash, err := ConfigHash(doc)
+	if err != nil {
+		return schemas.AgentVersion{}, false, err
+	}
+	dir := agentDir(root, id)
+	defer lockFor(dir)()
+	vs, err := readIndex(dir)
+	if err != nil {
+		return schemas.AgentVersion{}, false, err
+	}
+	for _, v := range vs {
+		if v.Hash == hash {
+			return v, false, nil
+		}
+	}
+	if lin.Parent != 0 && !slices.ContainsFunc(vs, func(v schemas.AgentVersion) bool { return v.Version == lin.Parent }) {
+		return schemas.AgentVersion{}, false, fmt.Errorf("agent %s has no parent version v%d", id, lin.Parent)
+	}
+	v := lin
+	v.Version, v.Hash, v.CreatedAt = 1, hash, time.Now().UTC()
+	if len(vs) > 0 {
+		v.Version = vs[len(vs)-1].Version + 1
+	}
+	if len(v.Note) > 200 {
+		v.Note = v.Note[:200]
+	}
+	if err := os.MkdirAll(dir, 0o755); err != nil {
+		return v, false, err
+	}
+	if err := writeAtomic(filepath.Join(dir, fmt.Sprintf("v%d.yaml", v.Version)), doc); err != nil {
+		return v, false, err
+	}
+	b, err := json.MarshalIndent(append(vs, v), "", "  ")
+	if err != nil {
+		return v, false, err
+	}
+	if err := writeAtomic(filepath.Join(dir, "versions.json"), append(b, '\n')); err != nil {
+		return v, false, err
+	}
+	return v, true, nil
 }
 
 func writeAtomic(path string, data []byte) error {

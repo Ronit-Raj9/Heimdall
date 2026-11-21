@@ -24,7 +24,23 @@ type AgentVersion struct {
 	// project file version this snapshot was taken from.
 	FileVersion string `json:"file_version,omitempty"`
 	FileSHA256  string `json:"file_sha256,omitempty"`
+	// Lineage of a version an improvement run produced (bench/improve):
+	// the version it was derived from, who wrote it (AuthorHuman or
+	// AuthorAgent), the improvement run, its round, the improver's run and
+	// the hash of the editable bundle. All empty for a human save.
+	Parent        int    `json:"parent,omitempty"`
+	Author        string `json:"author,omitempty"`
+	Improvement   string `json:"improvement,omitempty"`
+	Round         int    `json:"round,omitempty"`
+	ProducedByRun string `json:"produced_by_run,omitempty"`
+	BundleHash    string `json:"bundle_hash,omitempty"`
 }
+
+// Authors of an agent version (AgentVersion.Author).
+const (
+	AuthorHuman = "human"
+	AuthorAgent = "agent"
+)
 
 // agentVersionRef is agents/<id>.yaml@v<N> (or .yml).
 var agentVersionRef = regexp.MustCompile(`^agents/([A-Za-z0-9][A-Za-z0-9._-]{0,62})\.ya?ml@v([1-9][0-9]{0,8})$`)
