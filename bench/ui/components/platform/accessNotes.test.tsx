@@ -14,6 +14,9 @@ describe("DemoBanner", () => {
 		expect(html).toContain('data-testid="demo-banner"');
 		expect(html).toContain("Public demo, read only");
 		expect(html).toContain('href="/login?return_to=%2Fverdict"');
+		const gh = render(<DemoBanner />, { ...demoSession(), github: true });
+		expect(gh).toContain("Sign in with GitHub to run your own benchmark");
+		expect(gh).toContain('data-testid="demo-banner-github"');
 		for (const session of [LOCAL_SESSION, hostedSession("viewer"), signedOutSession()]) {
 			expect(render(<DemoBanner />, session)).toBe("");
 		}
