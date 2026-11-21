@@ -50,6 +50,7 @@ const (
 	KindBifrost   = "bifrost"
 	KindOTLPDir   = "otlp_dir"
 	KindWebhook   = "webhook"
+	KindMaxim     = "maxim" // X23: the hackathon sponsor's log repositories (maxim.go)
 )
 
 // Release statuses (ReleaseStatus.Status).
