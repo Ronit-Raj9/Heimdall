@@ -35,6 +35,8 @@ const (
 	SetHackVerify    = "hack_verifiable" // skip (default) or keep tasks with a planted honeypot (Hack-Verifiable Terminal-Bench)
 	SetAgentTimeout  = "agent_timeout"   // seconds: every task's agent budget (Harbor's override_timeout_sec); default task.toml's
 	SetPassThreshold = "pass_threshold"  // lowest passing reward, for partial-credit benchmarks; default 1
+	SetMaxSolution   = "max_solution_mb" // largest packed solution+skills the reference control embeds, in MiB; default 2
+	SetLintWaivers   = "lint_waivers"    // none (default) or upstream: waive the instruction-words and high-entropy-identifier checks on verbatim upstream text (task.yaml lint_waivers)
 	SetUnrunnable    = "unrunnable"      // skip (default) or draft: import tasks the bench cannot admit as drafts with the reason
 )
 
@@ -182,6 +184,8 @@ type settings struct {
 	agentTimeoutS                        int
 	passThreshold                        float64
 	drafts                               bool
+	maxSolutionBytes                     int
+	waive                                bool
 }
 
 func readSettings(extra map[string]string) (settings, error) {
@@ -229,13 +233,24 @@ func readSettings(extra map[string]string) (settings, error) {
 				return cfg, fmt.Errorf("harbor: -set pass_threshold=%s: want a reward above 0 and at most 1", v)
 			}
 			cfg.passThreshold = f
+		case SetMaxSolution:
+			n, err := strconv.Atoi(v)
+			if err != nil || n <= 0 || n > 256 {
+				return cfg, fmt.Errorf("harbor: -set max_solution_mb=%s: want a whole number of MiB from 1 to 256", v)
+			}
+			cfg.maxSolutionBytes = n << 20
+		case SetLintWaivers:
+			if v != "none" && v != "upstream" {
+				return cfg, fmt.Errorf("harbor: -set lint_waivers=%s: want none or upstream", v)
+			}
+			cfg.waive = v == "upstream"
 		case SetUnrunnable:
 			if v != "skip" && v != "draft" {
 				return cfg, fmt.Errorf("harbor: -set unrunnable=%s: want skip or draft", v)
 			}
 			cfg.drafts = v == "draft"
 		default:
-			return cfg, fmt.Errorf("harbor: unknown setting %q (known: benchmark, source, revision, license, tasks_dir, track, agent, keep_networked, image, hack_verifiable, agent_timeout, pass_threshold, unrunnable)", k)
+			return cfg, fmt.Errorf("harbor: unknown setting %q (known: benchmark, source, revision, license, tasks_dir, track, agent, keep_networked, image, hack_verifiable, agent_timeout, pass_threshold, max_solution_mb, lint_waivers, unrunnable)", k)
 		}
 	}
 	return cfg, nil
@@ -323,6 +338,8 @@ func (im *importer) importTask(dir, suiteDir string, up upstream, cfg settings, 
 	if p == nil {
 		return nil, reason, nil
 	}
+	p.waive = cfg.waive
+	p.passThreshold = cfg.passThreshold
 	taskDir := filepath.Join(suiteDir, "tasks", id)
 	if _, err := os.Stat(taskDir); err == nil {
 		if !force {
@@ -363,6 +380,12 @@ type taskPlan struct {
 	// it is written with a reference control that fails with this reason,
 	// so admission refuses it and it stays a draft in the suite.
 	draft string
+	// solveChanges are the IMPORT.md lines of a solve.sh made offline
+	// (offline.go).
+	solveChanges  []string
+	waive         bool // -set lint_waivers=upstream
+	sepNotes      []string
+	passThreshold float64 // -set pass_threshold, for the IMPORT.md note
 }
 
 // plan checks t against what the bench can run and prepares the rewritten
@@ -374,8 +397,12 @@ func plan(t *upstreamTask, cfg settings) (*taskPlan, string) {
 	switch {
 	case t.GPUs > 0:
 		return nil, fmt.Sprintf("needs %d GPU(s); the bench schedules none", t.GPUs)
-	case t.SeparateVerifier:
-		return nil, "grades in a separate verifier container ([verifier] environment_mode, [verifier.environment] or [[verifier.collect]]), which the importer does not map; it grades in a snapshot of the agent's container"
+	case t.SeparateVerifier && len(t.verifierCollect) > 0:
+		return nil, "grades in a separate verifier container with [[verifier.collect]], which the importer does not map"
+	case t.SeparateVerifier && t.VerifierImage != "":
+		return nil, "grades in a separate verifier container from a prebuilt image ([verifier.environment] docker_image), which the importer does not map"
+	case t.SeparateVerifier && !isFile(filepath.Join(t.TestsDir, "Dockerfile")):
+		return nil, "grades in a separate verifier container whose image is not built from tests/Dockerfile (none there), which the importer does not map"
 	case t.MCPServers > 0:
 		return nil, "declares MCP servers in task.toml; the importer does not map them to services"
 	case !hasDockerfile && (cfg.image != "prebuilt" || t.DockerImage == ""):
@@ -398,18 +425,34 @@ func plan(t *upstreamTask, cfg settings) (*taskPlan, string) {
 	if err != nil {
 		return nil, "cannot read solve.sh: " + err.Error()
 	}
+	var solveSrc string
+	var solveBake, solveChanges []string
 	if line := solutionFetch(string(solve)); line != "" && !cfg.keepNetworked {
-		return nil, "the reference solution downloads at run time (" + line + "); runs have no network, so the agent could not do it either"
+		var bad string
+		solveSrc, solveBake, solveChanges, bad = planSolveScript(string(solve), buildRequires(t.EnvDir))
+		if bad != "" || solveSrc == "" {
+			if bad != "" {
+				line = bad
+			}
+			return nil, "the reference solution downloads at run time (" + line + "); runs have no network, so the agent could not do it either"
+		}
 	}
 	testSrc, err := os.ReadFile(filepath.Join(t.TestsDir, "test.sh"))
 	if err != nil {
 		return nil, "cannot read test.sh: " + err.Error()
 	}
-	tests, err := planTestScriptKeep(string(testSrc), cfg.keepNetworked)
-	if err != nil {
+	var sep *sepPlan
+	var tests *testPlan
+	if t.SeparateVerifier {
+		var reason string
+		if sep, reason = planSeparate(t); reason != "" {
+			return nil, reason
+		}
+		tests = &testPlan{Script: separateTestScript(t, sep), Changes: []string{"replaced by the separate-verifier driver: upstream test.sh runs unchanged, chrooted in the verifier image's file system (" + verifierRoot + ")"}}
+	} else if tests, err = planTestScriptKeep(string(testSrc), cfg.keepNetworked); err != nil {
 		return nil, err.Error()
 	}
-	p := &taskPlan{tests: tests, agentS: agentSeconds(t, cfg), verifierS: seconds(t.VerifierTimeoutS, defaultVerifierS)}
+	p := &taskPlan{tests: tests, agentS: agentSeconds(t, cfg), verifierS: seconds(t.VerifierTimeoutS, defaultVerifierS), solveChanges: solveChanges}
 	var src string
 	if hasDockerfile {
 		b, err := os.ReadFile(dockerfile)
@@ -448,8 +491,16 @@ func plan(t *upstreamTask, cfg settings) (*taskPlan, string) {
 	if p.skills {
 		dirs = append(dirs, defaultSkillRoot)
 	}
-	p.dockerfile = strings.TrimRight(src, "\n") + "\n" + bakeSection(tests.Bake, dirs, t.EnvEnv, info.User)
-	if p.solution, err = tarGz(t.SolutionDir); err != nil {
+	if sep != nil {
+		src = sep.stage + "\n" + strings.TrimRight(src, "\n") + "\n# The separate verifier's file system (sepverify.go).\nCOPY --from=harbor-verifier / " + verifierRoot + "/\n"
+		p.sepNotes = sep.notes
+	}
+	p.dockerfile = strings.TrimRight(src, "\n") + "\n" + bakeSection(append(append([]string{}, tests.Bake...), solveBake...), dirs, t.EnvEnv, info.User)
+	var override map[string][]byte
+	if solveSrc != "" {
+		override = map[string][]byte{"solve.sh": []byte(solveSrc)}
+	}
+	if p.solution, err = tarGzWith(t.SolutionDir, override); err != nil {
 		return nil, "cannot pack the solution folder: " + err.Error()
 	}
 	if p.skills {
@@ -458,8 +509,12 @@ func plan(t *upstreamTask, cfg settings) (*taskPlan, string) {
 		}
 		p.skillRoots = skillRoots(t.SolutionDir)
 	}
-	if n := len(p.solution) + len(p.skillsTar); n > maxSolutionBytes {
-		return nil, fmt.Sprintf("the solution and skills folders pack to %d bytes, over the %d the reference control embeds", n, maxSolutionBytes)
+	limit := maxSolutionBytes
+	if cfg.maxSolutionBytes > 0 {
+		limit = cfg.maxSolutionBytes
+	}
+	if n := len(p.solution) + len(p.skillsTar); n > limit {
+		return nil, fmt.Sprintf("the solution and skills folders pack to %d bytes, over the %d the reference control embeds (-set max_solution_mb raises it)", n, limit)
 	}
 	return p, ""
 }

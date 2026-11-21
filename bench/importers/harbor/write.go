@@ -18,6 +18,7 @@ import (
 	"gopkg.in/yaml.v3"
 
 	"github.com/maximhq/bifrost/bench/schemas"
+	"github.com/maximhq/bifrost/bench/suite"
 )
 
 // Paths inside an imported task folder.
@@ -91,7 +92,71 @@ func writeTask(dir, id string, t *upstreamTask, p *taskPlan, up upstream) error 
 			return err
 		}
 	}
-	return writeYAML(filepath.Join(dir, "task.yaml"), taskRecord(id, t, p, up))
+	rec := taskRecord(id, t, p, up)
+	if p.waive {
+		ws, err := lintWaivers(dir, t)
+		if err != nil {
+			return err
+		}
+		rec.LintWaivers = ws
+		if len(ws) > 0 {
+			if err := appendFile(filepath.Join(dir, "IMPORT.md"), waiverNotes(ws)); err != nil {
+				return err
+			}
+		}
+	}
+	return writeYAML(filepath.Join(dir, "task.yaml"), rec)
+}
+
+// waiverReason is the reason every import waiver gives.
+const waiverReason = "verbatim upstream instruction, no test content"
+
+// lintWaivers (-set lint_waivers=upstream) are the waivers of a library task
+// whose upstream text trips the two heuristic checks: each leak word of the
+// verbatim instruction, and each high-entropy *_KEY/*_TOKEN finding in the
+// written task folder. Real secret patterns are never waived.
+func lintWaivers(dir string, t *upstreamTask) ([]schemas.LintWaiver, error) {
+	var out []schemas.LintWaiver
+	for _, term := range suite.InstructionLeakTerms(t.Instruction) {
+		out = append(out, schemas.LintWaiver{Rule: schemas.LintRuleInstructionTerm, Path: "instruction.md", Match: term, Reason: waiverReason})
+	}
+	found, err := suite.ScanSecrets(dir)
+	if err != nil {
+		return nil, err
+	}
+	for _, f := range found {
+		if strings.HasPrefix(f.Kind, "high-entropy ") {
+			out = append(out, schemas.LintWaiver{Rule: schemas.LintRuleHighEntropy, Path: f.Path, Line: f.Line, Match: f.Masked,
+				Reason: "verbatim upstream file, an identifier and not a secret; no test content"})
+		}
+	}
+	return out, nil
+}
+
+// waiverNotes is the IMPORT.md section listing the waivers.
+func waiverNotes(ws []schemas.LintWaiver) string {
+	var b strings.Builder
+	b.WriteString("\n## Lint waivers\n\nRecorded in `task.yaml` (`lint_waivers`, -set lint_waivers=upstream); each turns one static-validation error into a warning:\n\n")
+	for _, w := range ws {
+		where := w.Path
+		if w.Line > 0 {
+			where = fmt.Sprintf("%s line %d", w.Path, w.Line)
+		}
+		fmt.Fprintf(&b, "- `%s` in %s, matched `%s`: %s.\n", w.Rule, where, w.Match, w.Reason)
+	}
+	return b.String()
+}
+
+func appendFile(path, text string) error {
+	f, err := os.OpenFile(path, os.O_APPEND|os.O_WRONLY, 0o644)
+	if err != nil {
+		return err
+	}
+	if _, err := f.WriteString(text); err != nil {
+		f.Close()
+		return err
+	}
+	return f.Close()
 }
 
 // taskRecord is the task.yaml of a converted task.
@@ -368,6 +433,15 @@ func importNotes(id string, t *upstreamTask, p *taskPlan, up upstream) string {
 	}
 	for _, c := range p.tests.Changes {
 		fmt.Fprintf(&b, "- test.sh, %s\n", c)
+	}
+	if p.passThreshold > 0 {
+		fmt.Fprintf(&b, "- The suite passes a grade at reward >= %g (`-set pass_threshold`), not Harbor's 1; the raw reward is kept on every grade (partial credit). Long-Horizon Terminal-Bench's paper counts a task solved at >= 0.95, so a pass here between %g and 0.95 is not a paper solve.\n", p.passThreshold, p.passThreshold)
+	}
+	for _, n := range p.sepNotes {
+		b.WriteString("- " + n + "\n")
+	}
+	for _, c := range p.solveChanges {
+		fmt.Fprintf(&b, "- %s. `solution/` is upstream's; the reference control embeds the rewritten solve.sh.\n", c)
 	}
 	b.WriteString("- The agent, the reference script and the verifier run as root (`environment.user: root`), as Harbor runs them.\n")
 	if t.AgentUser != "" && t.AgentUser != "root" {
@@ -689,7 +763,11 @@ func inside(root, p string) bool {
 // tarGz packs the regular files and folders under dir into a gzip tar with
 // fixed times and owners, so the same folder always packs to the same bytes
 // and the suite lock hash of the reference control is stable.
-func tarGz(dir string) ([]byte, error) {
+func tarGz(dir string) ([]byte, error) { return tarGzWith(dir, nil) }
+
+// tarGzWith is tarGz with the content of some files (by slash path relative
+// to dir) replaced, for a solve.sh the import rewrote.
+func tarGzWith(dir string, override map[string][]byte) ([]byte, error) {
 	var paths []string
 	err := filepath.WalkDir(dir, func(p string, d fs.DirEntry, err error) error {
 		if err != nil {
@@ -725,6 +803,9 @@ func tarGz(dir string) ([]byte, error) {
 			h.Typeflag, h.Name, h.Mode = tar.TypeDir, h.Name+"/", 0o755
 		default:
 			h.Typeflag, h.Size, h.Mode = tar.TypeReg, info.Size(), 0o644
+			if b, ok := override[h.Name]; ok {
+				h.Size = int64(len(b))
+			}
 			if info.Mode()&0o111 != 0 {
 				h.Mode = 0o755
 			}
@@ -733,9 +814,11 @@ func tarGz(dir string) ([]byte, error) {
 			return nil, err
 		}
 		if h.Typeflag == tar.TypeReg {
-			b, err := os.ReadFile(p)
-			if err != nil {
-				return nil, err
+			b, ok := override[h.Name]
+			if !ok {
+				if b, err = os.ReadFile(p); err != nil {
+					return nil, err
+				}
 			}
 			if _, err := tw.Write(b); err != nil {
 				return nil, err

@@ -72,6 +72,8 @@ Settings (`-set key=value`):
 | `hack_verifiable` | `skip` | `keep` imports tasks with a planted `admin/` honeypot (HVTB) as plain tasks, with `admin/**` protected |
 | `agent_timeout` | task.toml's `[agent] timeout_sec` | seconds: one agent budget for every task (Harbor's `override_timeout_sec`) |
 | `pass_threshold` | 1 | lowest passing reward, written to `verifier.pass_threshold`; the reward itself is always kept on the grade (partial credit) |
+| `max_solution_mb` | 2 | largest packed solution (plus skills) the reference control embeds, in MiB, up to 256; library imports with large upstream solutions raise it |
+| `lint_waivers` | `none` | `upstream` records a waiver in `task.yaml` (`lint_waivers`) and `IMPORT.md` for each static-validation error that verbatim upstream text trips in two heuristic checks only: leak words in the instruction (`instruction-term`, e.g. "hidden tests") and high-entropy `*_KEY`/`*_TOKEN` identifiers (`secret-high-entropy`). The error becomes a warning; real secret patterns, tests visible in the repo and every other check stay errors. Waivers apply only to tasks with `provenance.imported_from` |
 | `unrunnable` | `skip` | `draft` writes every task the bench cannot admit (skip reasons below) as a draft: tag `draft`, the reason in `IMPORT.md`, and a reference control that fails with it, so admission refuses it and it stays visible in the suite |
 
 ## What a converted task looks like
@@ -113,14 +115,18 @@ LHTB 2.0 (https://github.com/zli12321/LHTB, 77 tasks in `tasks/` and `tasks-2.0/
 ```sh
 for d in tasks tasks-2.0; do
   bifrost-bench import harbor -from datasets/lhtb2 -suite lhtb2 -set tasks_dir=$d \
-    -set image=prebuilt -set unrunnable=draft -set pass_threshold=0.95
+    -set image=prebuilt -set unrunnable=draft -set pass_threshold=0.9 \\
+    -set max_solution_mb=48 -set lint_waivers=upstream
 done
 ```
 
 - `[agent] continue_until_timeout = true` (all 77): LHTB's Harbor resumes the agent with a bare rejection until the timeout. The bench runs the agent once up to the task's budget (1 to 8 hours here; `agent_timeout` overrides it) and grades once. Tasks get the tag `continue-until-timeout` and an `IMPORT.md` note; scores can be lower than the paper's.
 - `[agent] user` and `[environment.healthcheck] command` are read and listed in `IMPORT.md` (the bench runs the agent as root and does not run the healthcheck).
-- Graders give partial credit. The paper counts a task solved at reward >= 0.95, hence `pass_threshold=0.95`; mean reward is the reward on each grade.
-- At commit 7ca0cac: 32 importable, 45 drafts (30 tasks-2.0 reconstruction tasks ship no `solve.sh`; 6 reference solutions pip install at run time; 3 `test.sh` pip install from a mirror at verify time; 3 separate verifier containers; 2 solution folders over 2 MiB; 1 compose file without a workspace image).
+- Graders give partial credit. The paper counts a task solved at reward >= 0.95; the library suite passes at >= 0.9 (several upstream reference solutions score 0.90 to 0.95), noted in every `IMPORT.md`. The raw reward is kept on every grade.
+- Reference solutions that end with `python -m pip install -e .` (6 tasks) run offline: the project's `[build-system] requires` and the pinned extras are baked at build, and the line runs with `--no-index --no-build-isolation`. A `test.sh` install that logs to a file (3 tasks) is baked like any other install.
+- Separate verifier containers (3 tasks, `[verifier] environment_mode = "separate"`): tests/Dockerfile up to its first `COPY` is built as a stage of the task image and its file system copied to `/opt/harbor-verifier`; at verify time the driver replays the rest of tests/Dockerfile with the tests, runs `[verifier.environment.healthcheck]`, copies the task.toml `artifacts` from the agent's container to the same paths (honouring `regular_file_only` and `max_bytes`), and runs the upstream `test.sh` chrooted there (the root verifier keeps `SYS_CHROOT`). `[[verifier.collect]]` and a prebuilt verifier image are still refused.
+- A compose file whose `main` service names no image or build (chess-mate) now maps: under Harbor conventions main is the task image.
+- At commit 7ca0cac: 47 importable, 30 drafts (tasks-2.0 reconstruction tasks ship no `solve.sh`).
 - Git LFS holds only 5 `reference_play` gif/mp4 files under `solution/`.
 
 ### Test tools are baked into the image

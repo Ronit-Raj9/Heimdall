@@ -1,1 +1,3 @@
 Create the file /app/hello.txt containing exactly the line `hello, world`.
+
+The hidden tests check the file.

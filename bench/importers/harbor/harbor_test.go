@@ -1,7 +1,12 @@
 package harbor
 
 import (
+	"archive/tar"
+	"bytes"
+	"compress/gzip"
 	"context"
+	"encoding/base64"
+	"io"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -440,14 +445,14 @@ func TestImportLongHorizon(t *testing.T) {
 	from := filepath.Join("testdata", "lhtb")
 	t.Run("drafts skipped by default", func(t *testing.T) {
 		_, res := runImport(t, from, "s", importers.Options{})
-		if strings.Join(res.Tasks, ",") != "long-game" || len(res.Skipped) != 1 || res.Skipped[0].ID != "no-solution" {
+		if strings.Join(res.Tasks, ",") != "long-game,pip-solve,sep-verify" || len(res.Skipped) != 1 || res.Skipped[0].ID != "no-solution" {
 			t.Errorf("result = %+v", res)
 		}
 	})
 	t.Run("settings", func(t *testing.T) {
 		root, res := runImport(t, from, "s", importers.Options{Extra: map[string]string{
-			"unrunnable": "draft", "agent_timeout": "10800", "pass_threshold": "0.5"}})
-		if strings.Join(res.Tasks, ",") != "long-game,no-solution" {
+			"unrunnable": "draft", "agent_timeout": "10800", "pass_threshold": "0.5", "lint_waivers": "upstream"}})
+		if strings.Join(res.Tasks, ",") != "long-game,no-solution,pip-solve,sep-verify" {
 			t.Fatalf("result = %+v", res)
 		}
 		s := loadSuite(t, root, "s")
@@ -473,10 +478,92 @@ func TestImportLongHorizon(t *testing.T) {
 		}
 	})
 	t.Run("bad settings", func(t *testing.T) {
-		for k, v := range map[string]string{"agent_timeout": "0", "pass_threshold": "1.5", "unrunnable": "maybe"} {
+		for k, v := range map[string]string{"agent_timeout": "0", "pass_threshold": "1.5", "unrunnable": "maybe", "max_solution_mb": "0", "lint_waivers": "all"} {
 			if _, err := readSettings(map[string]string{k: v}); err == nil {
 				t.Errorf("%s=%s accepted", k, v)
 			}
 		}
 	})
+}
+
+// TestImportLongHorizonOffline covers the pieces that make LHTB tasks run
+// offline: lint waivers on verbatim text, an editable pip install in
+// solve.sh, a test.sh install logged to a file, a separate verifier
+// container, and the solution size limit.
+func TestImportLongHorizonOffline(t *testing.T) {
+	from := filepath.Join("testdata", "lhtb")
+	root, _ := runImport(t, from, "s", importers.Options{Extra: map[string]string{"lint_waivers": "upstream"}})
+	s := loadSuite(t, root, "s") // fails on any lint error, so the waiver must hold
+	long := s.TaskByID("long-game")
+	if len(long.LintWaivers) != 1 || long.LintWaivers[0].Rule != schemas.LintRuleInstructionTerm || long.LintWaivers[0].Match != "hidden test" {
+		t.Errorf("waivers = %+v", long.LintWaivers)
+	}
+	if notes := readFile(t, filepath.Join(root, "benchmarks/s/tasks/long-game/IMPORT.md")); !strings.Contains(notes, "verbatim upstream instruction, no test content") {
+		t.Errorf("IMPORT.md:\n%s", notes)
+	}
+
+	df := readFile(t, filepath.Join(root, "benchmarks/s/tasks/pip-solve/environment/Dockerfile"))
+	for _, want := range []string{"RUN python3 -m pip install --no-cache-dir 'setuptools>=68' 'wheel' pytest==8.4.1",
+		"RUN python -m pip install --no-cache-dir -i https://mirrors.example.com/simple pytest==8.4.1 || true"} {
+		if !strings.Contains(df, want) {
+			t.Errorf("Dockerfile lacks %q:\n%s", want, df)
+		}
+	}
+	ref := readFile(t, filepath.Join(root, "benchmarks/s/tasks/pip-solve/controls/reference.sh"))
+	if !strings.Contains(unpackReference(t, ref)["solve.sh"], "python3 -m pip install --no-index --no-build-isolation -e . pytest==8.4.1") {
+		t.Errorf("solve.sh not rewritten")
+	}
+
+	df = readFile(t, filepath.Join(root, "benchmarks/s/tasks/sep-verify/environment/Dockerfile"))
+	if !strings.HasPrefix(df, "FROM python:3.11-slim AS harbor-verifier\nRUN python -m pip install --no-cache-dir pytest==8.4.1\nENV PIP_NO_INDEX=1\nWORKDIR /app\n") ||
+		!strings.Contains(df, "COPY --from=harbor-verifier / /opt/harbor-verifier/") || strings.Contains(df, "COPY . /tests/") {
+		t.Errorf("Dockerfile:\n%s", df)
+	}
+	drv := readFile(t, filepath.Join(root, "benchmarks/s/tasks/sep-verify/verifier/tests/harbor/test.sh"))
+	for _, want := range []string{`copy_in "$U" "$R"'/tests/'`, "chmod +x /tests/test.sh", "rm -rf /app/outputs && mkdir -p /app/outputs",
+		"copy_artifact '/app/hello.txt' false 0", "copy_artifact '/app/out.bin' true 100", "PIP_NO_INDEX='1'", "bash /tests/test.sh"} {
+		if !strings.Contains(drv, want) {
+			t.Errorf("driver lacks %q:\n%s", want, drv)
+		}
+	}
+
+	_, res := runImport(t, from, "s", importers.Options{IDs: []string{"long-game"}, Extra: map[string]string{"max_solution_mb": "1"}})
+	if len(res.Tasks) != 1 {
+		t.Errorf("result = %+v", res)
+	}
+}
+
+// unpackReference returns the files of the solution tar a reference control
+// embeds, by name.
+func unpackReference(t *testing.T, script string) map[string]string {
+	t.Helper()
+	start := strings.Index(script, "<<'HARBOR_SOLUTION'\n")
+	end := strings.Index(script, "HARBOR_SOLUTION\n")
+	if start < 0 {
+		t.Fatalf("no embedded solution:\n%s", script)
+	}
+	body := script[start+len("<<'HARBOR_SOLUTION'\n"):]
+	body = body[:strings.Index(body, "HARBOR_SOLUTION")]
+	_ = end
+	raw, err := base64.StdEncoding.DecodeString(strings.ReplaceAll(body, "\n", ""))
+	if err != nil {
+		t.Fatal(err)
+	}
+	gz, err := gzip.NewReader(bytes.NewReader(raw))
+	if err != nil {
+		t.Fatal(err)
+	}
+	tr := tar.NewReader(gz)
+	out := map[string]string{}
+	for {
+		h, err := tr.Next()
+		if err == io.EOF {
+			return out
+		}
+		if err != nil {
+			t.Fatal(err)
+		}
+		b, _ := io.ReadAll(tr)
+		out[h.Name] = string(b)
+	}
 }

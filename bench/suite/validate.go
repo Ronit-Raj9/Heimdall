@@ -106,6 +106,7 @@ func ValidateTask(ctx context.Context, s *schemas.Suite, t *schemas.Task) []Prob
 			}
 		}
 	}
+	out = ApplyLintWaivers(s.Root, t, out)
 	sort.SliceStable(out, func(i, j int) bool { return out[i].Path < out[j].Path })
 	return out
 }

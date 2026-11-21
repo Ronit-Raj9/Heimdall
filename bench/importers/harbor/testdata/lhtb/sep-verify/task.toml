@@ -1,0 +1,54 @@
+schema_version = "1.1"
+artifacts = [
+  "/app/hello.txt",
+  { source = "/app/out.bin", regular_file_only = true, max_bytes = 100 },
+]
+
+[task]
+name = "terminal-bench/hello-file"
+description = "Write a greeting file."
+keywords = ["files", "basics"]
+[[task.authors]]
+name = "Fixture Author"
+email = "fixture@example.com"
+
+[metadata]
+author_name = "Fixture Author"
+difficulty = "easy"
+category = "file-operations"
+tags = ["shell"]
+expert_time_estimate_min = 2.0
+
+[verifier]
+timeout_sec = 120.0
+environment_mode = "separate"
+
+[verifier.environment]
+cpus = 1
+
+[verifier.environment.healthcheck]
+command = "rm -rf /app/outputs && mkdir -p /app/outputs"
+
+[agent]
+continue_until_timeout = true
+user = "agent"
+timeout_sec = 14400.0
+
+[environment]
+build_timeout_sec = 600.0
+docker_image = "example/hello-file:20251031"
+cpus = 1
+memory_mb = 2048
+gpus = 0
+allow_internet = true
+mcp_servers = []
+
+[verifier.env]
+
+[environment.healthcheck]
+command = "/opt/start-server.sh"
+
+[environment.env]
+GREETING_LANG = "en"
+
+[solution.env]
