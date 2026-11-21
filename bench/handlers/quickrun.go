@@ -12,6 +12,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"math"
 	"os"
 	"path"
 	"path/filepath"
@@ -436,7 +437,7 @@ func (h *quickRunHandler) build(ctx context.Context, req *QuickRunRequest) ([]by
 		Primary:      schemas.Endpoint{Condition: schemas.ConditionClean, Metric: "verified_success"},
 		Guards:       []schemas.GuardSpec{{Rule: "no_new_integrity_violation"}},
 		Conditions:   []quickCondition{{ID: schemas.ConditionClean, Tasks: tasks, Trials: req.Trials}},
-		Budget:       schemas.BudgetSpec{TotalUSD: req.BudgetUSD},
+		Budget:       schemas.BudgetSpec{TotalUSD: req.BudgetUSD, ReserveUSD: quickReserve(req.BudgetUSD, 2*req.Tasks*req.Trials)},
 		Verdict:      quickVerdict{Policy: "paired_signflip"},
 		Seed:         now.Unix(),
 		Concurrency:  2,
@@ -513,4 +514,15 @@ func quickOrgID(ctx *fasthttp.RequestCtx, orgID string) string {
 		return p.OrgID
 	}
 	return auth.LocalOrgID
+}
+
+// quickReserve is the per-run charge of a run whose cost the price table can
+// not compute (an unpriced model): the budget split over the planned runs,
+// so one unpriced run no longer uses the whole budget and stops the rest.
+func quickReserve(budget float64, runs int) float64 {
+	if budget <= 0 || runs <= 0 {
+		return 0
+	}
+	r := budget / float64(runs)
+	return math.Round(r*100) / 100
 }
