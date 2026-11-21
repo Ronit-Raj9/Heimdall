@@ -11,7 +11,7 @@ Implement the source code that builds an executable with exactly the same behavi
 - Leave a `./compile.sh` in the workspace root that produces an executable `./executable` in the workspace root. It must be executable and must build from the source you wrote, offline. If it fails on a fresh copy of your workspace, the task has failed.
 - Keep build artifacts (including the executable) out of git with `.gitignore`, and commit your changes.
 
-Grading runs your `compile.sh` with no network, then runs hidden tests against the `./executable` it produced. The score is the fraction of hidden tests that pass; the task counts as resolved only when all pass.
+Your `compile.sh` will be run with no network, and the `./executable` it produces must behave exactly like the original.
 
 ## Rules (upstream ProgramBench rules; breaking them is a disqualification)
 
