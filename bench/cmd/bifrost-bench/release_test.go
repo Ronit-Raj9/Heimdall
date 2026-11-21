@@ -41,6 +41,15 @@ func TestReleaseExportCompliance(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	// The recorded analyses predate inputs digests and are never released
+	// (audit qc2-01-03): analyse afresh first.
+	a, err := newApp(context.Background(), cfg, appOptions{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, _, err := a.analyze(context.Background(), "e_pilot_mixed_nc93", ""); err != nil {
+		t.Fatal(err)
+	}
 	rec, err := l.Create(context.Background(), &schemas.ReleaseRequest{ExpID: "e_pilot_mixed_nc93", Approver: "test", Override: "test export"})
 	if err != nil {
 		t.Fatal(err)

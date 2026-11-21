@@ -18,7 +18,6 @@ import (
 	"syscall"
 
 	"github.com/maximhq/bifrost/bench/costexplain"
-	"github.com/maximhq/bifrost/bench/engine"
 	"github.com/maximhq/bifrost/bench/handlers"
 	"github.com/maximhq/bifrost/bench/leaderboard"
 	"github.com/maximhq/bifrost/bench/migration"
@@ -214,7 +213,7 @@ func (a *app) migrationReport(ctx context.Context, expID, gradeSource, policyFil
 	if in.Policy, in.PolicyHash, in.PolicyFrozen, err = a.migrationPolicy(m, policyFile); err != nil {
 		return nil, err
 	}
-	if in.Invalid, err = a.releaseInvalid(ctx, m, runs); err != nil {
+	if in.Invalid, in.Vetoes, err = a.releaseInvalid(ctx, m, runs); err != nil {
 		return nil, err
 	}
 	rep, err := migration.Build(ctx, in, q)
@@ -225,27 +224,22 @@ func (a *app) migrationReport(ctx context.Context, expID, gradeSource, policyFil
 	return rep, nil
 }
 
-// releaseInvalid is the release verdict's invalid reasons for m, computed
-// the way analyze does (policy decision, then the seal chain) without
+// releaseInvalid is the release verdict's invalid reasons for m and its
+// decision vetoes, computed by the same releaseVerdict analyze uses (policy
+// decision, seal chain, frozen manifest hash, judge calibration) without
 // saving an analysis. Audit 5-C-01: a migration recommendation never
-// outranks an INVALID release verdict.
-func (a *app) releaseInvalid(ctx context.Context, m *schemas.Manifest, runs []schemas.SealedRun) ([]string, error) {
-	vp, err := engine.FindVerdictPolicy(a.reg, m.Experiment.Verdict.Policy)
+// outranks an INVALID release verdict. A judge calibration cap leaves the
+// release verdict INCONCLUSIVE whatever the statistics say, so it vetoes a
+// directional migration too (audit qc2-05-08).
+func (a *app) releaseInvalid(ctx context.Context, m *schemas.Manifest, runs []schemas.SealedRun) (invalid, vetoes []string, err error) {
+	an, err := a.releaseVerdict(ctx, m, runs, "")
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
-	an, err := vp.Decide(ctx, m, runs)
-	if err != nil {
-		return nil, fmt.Errorf("decide: %w", err)
+	if jc := an.JudgeCalibration; jc != nil && jc.Caps {
+		vetoes = append(vetoes, "judge calibration caps the release verdict: "+jc.Detail)
 	}
-	reasons := an.Verdict.InvalidReasons
-	if err := a.store.VerifyChain(m.ExpID); err != nil {
-		if !errors.Is(err, schemas.ErrSealMismatch) {
-			return nil, fmt.Errorf("verify seal chain: %w", err)
-		}
-		reasons = append(reasons, "evidence: seals.log chain does not verify: "+err.Error())
-	}
-	return reasons, nil
+	return an.Verdict.InvalidReasons, vetoes, nil
 }
 
 // firstArm is the experiment's first arm id in order.

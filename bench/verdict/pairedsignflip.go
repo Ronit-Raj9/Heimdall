@@ -91,10 +91,10 @@ func (p *pairedSignFlipPolicy) Decide(ctx context.Context, m *schemas.Manifest, 
 	}
 	cfg := settingsFor(m)
 	raw := runs
-	runs = CompleteSlots(m, AdaptiveRuns(m, runs))                           // W7 adaptive trials: slots the frozen rule never released are not missing (sequential.go)
+	runs = DecisionRuns(m, runs)                                             // W7 adaptive trials: slots the frozen rule never released are not missing (sequential.go)
 	cfg.decisionAlpha = DecisionAlpha(m, cfg.alpha, ReplayAdaptive(m, runs)) // W7: look alpha or first-stage alpha
 	idx := newRunIndex(runs)
-	v := verdictFor(m, cfg, idx, runs, hasAAArm(m))
+	v := verdictFor(m, cfg, idx, runs, raw, hasAAArm(m))
 	w7Verdict(m, cfg, raw, runs, idx, &v) // W7 adaptive report, tier, buy more evidence (sequential_verdict.go)
 	return &schemas.Analysis{
 		AnalysisID:  utils.NewID("a", 10),
@@ -113,7 +113,12 @@ func (p *pairedSignFlipPolicy) Decide(ctx context.Context, m *schemas.Manifest, 
 // and checks, integrity, decision, action, the minimal detectable effect and
 // the variance card behind it (noiseFloor). A directional A/A result fails
 // the aa_noise_floor check, whose detail becomes an invalid reason.
-func verdictFor(m *schemas.Manifest, cfg settings, idx runIndex, runs []schemas.SealedRun, hasAA bool) schemas.Verdict {
+//
+// executed is every run the caller supplied, before the adaptive rule left
+// any out: evidence problems and egress are read from it, so a run the
+// stopping rule no longer needs still has its integrity checked (audit
+// qc2-03-07).
+func verdictFor(m *schemas.Manifest, cfg settings, idx runIndex, runs, executed []schemas.SealedRun, hasAA bool) schemas.Verdict {
 	pc, pm := cfg.primary.Condition, cfg.primary.Metric
 	primary := pairedEffect(pc, pm, ArmBaseline, ArmCandidate, idx.cells(pc, ArmBaseline, pm), idx.cells(pc, ArmCandidate, pm), true)
 	guards := evaluateGuards(cfg, idx)
@@ -121,7 +126,7 @@ func verdictFor(m *schemas.Manifest, cfg settings, idx runIndex, runs []schemas.
 	checks := append(instrumentChecks(m, idx), slotCoverage(m, runs), aaCheck)
 	fair, fairChecks := fairnessFor(m, idx) // Multi-agent area: equal-budget fairness (fairness.go)
 	checks = append(checks, fairChecks...)
-	invalid := append(instrumentGates(m, cfg, idx, runs), instrumentReasons(checks)...)
+	invalid := append(instrumentGates(m, cfg, idx, runs, executed), instrumentReasons(checks)...)
 	integrity := integrityStatus(idx)
 	decision := decide(invalid, primary, guards, cfg.primaryAlpha()) // W7: alpha of the primary decision (sequential_verdict.go)
 
@@ -351,14 +356,13 @@ func noRegressionGuard(g schemas.GuardSpec, cfg settings, idx runIndex) schemas.
 		return res
 	}
 	worse := -better(g.Metric)
-	// A guard on the exact primary endpoint (the default clean guard) re-tests
-	// the primary difference, so it uses the primary's planned threshold (a
-	// sequential look or first-stage alpha); the nominal alpha would spend
-	// alpha the plan never allotted (audit 1-B-01).
-	alpha := cfg.alpha
-	if (schemas.Endpoint{Condition: g.Condition, Metric: g.Metric}) == cfg.primary {
-		alpha = cfg.primaryAlpha()
-	}
+	// A no_regression guard moves the decision (REGRESSED), so it is tested
+	// at the planned threshold (a sequential look or first-stage alpha), not
+	// only when it names the exact primary endpoint: another metric on the
+	// same sequentially sampled condition, such as safe_success beside
+	// verified_success, would otherwise spend alpha the plan never allotted
+	// (audits 1-B-01, qc2-03-04). Without a plan primaryAlpha is alpha.
+	alpha := cfg.primaryAlpha()
 	lo := significant(eff.LowerBound, alpha, worse)
 	hi := significant(eff.UpperBound, alpha, worse)
 	bounds := fmt.Sprintf("d_bar %+.1f pp at the lower bound, %+.1f pp at the upper bound, %d discordant",

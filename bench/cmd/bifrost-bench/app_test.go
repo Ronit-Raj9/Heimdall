@@ -278,3 +278,42 @@ func TestAnalyzeVerifiesSeals(t *testing.T) {
 		})
 	}
 }
+
+// Audit qc2-05-02: migration's validity reads the same release verdict as
+// analyze, so an edited manifest.json withholds a migration too.
+func TestReleaseInvalidVerifiesManifest(t *testing.T) {
+	ctx := context.Background()
+	a, m := analysisFixture(t)
+	runs, err := a.store.SealedRuns(ctx, m.ExpID, "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if invalid, _, err := a.releaseInvalid(ctx, m, runs); err != nil || len(invalid) != 0 {
+		t.Fatalf("untouched: invalid %q err %v", invalid, err)
+	}
+	p := filepath.Join(a.store.Root(), m.ExpID, "manifest.json")
+	writable(t, filepath.Dir(p))
+	b, err := os.ReadFile(p)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var raw map[string]any
+	if err := json.Unmarshal(b, &raw); err != nil {
+		t.Fatal(err)
+	}
+	raw["experiment"].(map[string]any)["verdict"] = map[string]any{"alpha": 0.5}
+	if b, err = json.Marshal(raw); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(p, b, 0o644); err != nil {
+		t.Fatal(err)
+	}
+	edited, err := a.store.LoadManifest(ctx, m.ExpID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	invalid, _, err := a.releaseInvalid(ctx, edited, runs)
+	if err != nil || !strings.Contains(strings.Join(invalid, "\n"), "does not match its hash") {
+		t.Fatalf("edited manifest: invalid %q err %v", invalid, err)
+	}
+}

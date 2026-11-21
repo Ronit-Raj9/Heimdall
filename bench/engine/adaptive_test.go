@@ -310,3 +310,29 @@ func TestSchedulerHeldMinimumNotSettled(t *testing.T) {
 		}
 	}
 }
+
+// TestExtendTaskRuleKeepsRetainedConditions is the regression test for audit
+// qc2-03-02: a task rule naming a descriptive condition that the follow-up
+// does not repeat still plans, with the rule narrowed to what remains.
+func TestExtendTaskRuleKeepsRetainedConditions(t *testing.T) {
+	b := newBench(t)
+	e := testExperiment(
+		schemas.ConditionSpec{ID: "clean", Tasks: schemas.TaskSelector{IDs: []string{"t01", "t02", "t03", "t04"}}, Trials: 3},
+		schemas.ConditionSpec{ID: "model-outage", Tasks: schemas.TaskSelector{IDs: []string{"t01", "t02"}}, Trials: 3},
+	)
+	e.Trials = &schemas.TrialsPolicy{Mode: schemas.TrialsAdaptive, Rule: schemas.AdaptiveTask, Min: 1, Max: 3, Conditions: []string{"clean", "model-outage"}}
+	m := b.plan(t, e)
+	child, _, err := ExtendExperiment(m, b.suite, ExtendTasks, 2)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if child.Trials == nil || strings.Join(child.Trials.Conditions, ",") != "clean" {
+		t.Fatalf("follow-up trials %+v, want the rule on clean only", child.Trials)
+	}
+	if e.Trials.Conditions[1] != "model-outage" {
+		t.Fatal("the parent's rule was changed")
+	}
+	if cm := b.plan(t, child); cm.Adaptive == nil {
+		t.Fatal("follow-up lost its adaptive plan")
+	}
+}

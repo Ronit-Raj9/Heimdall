@@ -91,7 +91,7 @@ type Point struct {
 	Suite           string     `json:"suite"` // id@version
 	Arm             string     `json:"arm"`
 	ConfigHash      string     `json:"config_hash"`
-	ConfigChanged   bool       `json:"config_changed"` // config hash differs from the previous point's
+	ConfigChanged   bool       `json:"config_changed"` // config hash differs from the point the regression compared against (Regression.Against); false without one
 	Synthetic       bool       `json:"synthetic"`
 	Tasks           int        `json:"tasks"` // distinct tasks with a scored run
 	Runs            int        `json:"runs"`  // scored runs

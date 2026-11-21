@@ -1,6 +1,8 @@
 package leaderboard
 
 import (
+	"context"
+	"errors"
 	"fmt"
 	"math"
 	"math/rand/v2"
@@ -112,7 +114,9 @@ func TestRankTiers(t *testing.T) {
 	few := calc("h_few", 8, c, tasks(8, 5, 1, 0, "t"))
 	apart := calc("h_apart", 8, c, tasks(3, 0, 1, 0.5, "u"))
 	calcs := []*entryCalc{apart, few, behind, same, leader}
-	rank(calcs, DefaultAlpha)
+	if err := rank(context.Background(), calcs, DefaultAlpha); err != nil {
+		t.Fatal(err)
+	}
 	byHash := map[string]*entryCalc{}
 	for i, c := range calcs {
 		if c.e.Rank != i+1 {
@@ -166,7 +170,9 @@ func TestRankAheadOnCommonTasks(t *testing.T) {
 		otherRates[k] = v
 	}
 	calcs := []*entryCalc{calc("h_other", 28, obs(1), otherRates), calc("h_leader", 20, obs(1), leaderRates)}
-	rank(calcs, DefaultAlpha)
+	if err := rank(context.Background(), calcs, DefaultAlpha); err != nil {
+		t.Fatal(err)
+	}
 	e := calcs[1].e
 	if e.ConfigHash != "h_other" || e.Tier != 1 || e.TierReason != "p 0.0078 on 8 common tasks, ahead of the leader on them: the task sets differ" {
 		t.Errorf("got %s tier %d %q", e.ConfigHash, e.Tier, e.TierReason)
@@ -201,9 +207,28 @@ func TestRankHolmCoversAllPairsAfterLeaderSelection(t *testing.T) {
 		}
 	}
 	calcs := []*entryCalc{calc("h_last", 13, obs(0.1), last), calc("h_middle", 13, obs(0.1), middle), calc("h_first", 13, obs(0.1), first)}
-	rank(calcs, DefaultAlpha)
+	if err := rank(context.Background(), calcs, DefaultAlpha); err != nil {
+		t.Fatal(err)
+	}
 	e := calcs[2].e
 	if e.ConfigHash != "h_last" || e.PVsLeader == nil || math.Abs(*e.PVsLeader-3*0.0224609375) > 1e-12 || e.Tier != TierLeader {
 		t.Fatalf("last arm: %s p %v tier %d %q", e.ConfigHash, e.PVsLeader, e.Tier, e.TierReason)
+	}
+}
+
+// Audit qc2-05-09: the all-pair family stops when the request ends.
+func TestRankStopsOnCancelledContext(t *testing.T) {
+	var calcs []*entryCalc
+	for i := range 3 {
+		rates := map[string]float64{}
+		for task := range 30 {
+			rates[fmt.Sprintf("t%02d", task)] = float64((task + i) % 2)
+		}
+		calcs = append(calcs, &entryCalc{rates: rates})
+	}
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+	if err := rank(ctx, calcs, DefaultAlpha); !errors.Is(err, context.Canceled) {
+		t.Fatalf("err = %v, want context.Canceled", err)
 	}
 }

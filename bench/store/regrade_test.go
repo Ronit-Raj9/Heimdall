@@ -7,6 +7,7 @@ import (
 	"io/fs"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -359,5 +360,88 @@ func TestWriteAnalysisStagedAndLatest(t *testing.T) {
 	}
 	if _, err := s.LatestAnalysis(ctx, "e_test"); err == nil {
 		t.Fatal("unreadable verdict.json: want error")
+	}
+}
+
+// TestCommitLegacyRegate is the regression test for audit qc2-01-02: a
+// complete regate of the old writer (no coverage record) becomes a grade
+// source once committed, and an incomplete one stays refused.
+func TestCommitLegacyRegate(t *testing.T) {
+	ctx := context.Background()
+	s := newTestStore(t, nil)
+	m := mustCreateExp(t, s, "e_test")
+	r1, _ := sealedRun(t, s, m, "s_a1", "r_1")
+	r2, _ := sealedRun(t, s, m, "s_b1", "r_2")
+	res := func() *GateRegrade {
+		return &GateRegrade{Outcome: schemas.OutcomePass, SealedOutcome: schemas.OutcomeIntegrityViolation,
+			Y: schemas.Observed(1, schemas.EvidenceOutcome), Gates: []schemas.GateResult{{Gate: "g1_protected_paths", Version: "1.1.0"}}}
+	}
+	info := RegradeInfo{SuiteVersion: "1.0.0", GateVersions: map[string]string{"g1_protected_paths": "1.1.0"}}
+	if err := s.WriteGateRegrades(ctx, "e_test", "rg_new", info, map[string]*GateRegrade{r1.RunID: res(), r2.RunID: res()}); err != nil {
+		t.Fatal(err)
+	}
+	legacy := func(name string, dropRun string) string {
+		t.Helper()
+		src := filepath.Join(s.Root(), "e_test", "regrades", "rg_new")
+		dst := filepath.Join(s.Root(), "e_test", "regrades", name)
+		if err := os.CopyFS(dst, os.DirFS(src)); err != nil {
+			t.Fatal(err)
+		}
+		var raw map[string]any
+		if err := readJSON(filepath.Join(dst, regradeFile), &raw); err != nil {
+			t.Fatal(err)
+		}
+		delete(raw, "runs")
+		b, _ := json.Marshal(raw)
+		if err := os.WriteFile(filepath.Join(dst, regradeFile), b, 0o644); err != nil {
+			t.Fatal(err)
+		}
+		if dropRun != "" {
+			if err := os.RemoveAll(filepath.Join(dst, runsDir, dropRun)); err != nil {
+				t.Fatal(err)
+			}
+		}
+		return dst
+	}
+	legacy("rg_old", "")
+	if _, err := s.SealedRuns(ctx, "e_test", "rg_old"); !errors.Is(err, schemas.ErrNotFound) {
+		t.Fatalf("uncommitted legacy regate accepted: %v", err)
+	}
+	got, err := s.CommitLegacyRegate(ctx, "e_test", "rg_old")
+	if err != nil {
+		t.Fatalf("CommitLegacyRegate: %v", err)
+	}
+	if !slices.Equal(got.Runs, []string{r1.RunID, r2.RunID}) {
+		t.Fatalf("runs %v", got.Runs)
+	}
+	runs, err := s.SealedRuns(ctx, "e_test", "rg_old")
+	if err != nil {
+		t.Fatalf("committed legacy regate: %v", err)
+	}
+	for _, r := range runs {
+		if r.GradeSource != "rg_old" || len(r.Problems) != 0 {
+			t.Fatalf("run %s source %s problems %v", r.Run.RunID, r.GradeSource, r.Problems)
+		}
+	}
+	if _, err := s.CommitLegacyRegate(ctx, "e_test", "rg_old"); !errors.Is(err, schemas.ErrExists) {
+		t.Fatalf("second commit: %v", err)
+	}
+	// An interrupted batch (one result missing) stays refused.
+	legacy("rg_cut", r2.RunID)
+	if _, err := s.CommitLegacyRegate(ctx, "e_test", "rg_cut"); err == nil || !strings.Contains(err.Error(), "incomplete") {
+		t.Fatalf("incomplete batch committed: %v", err)
+	}
+	// A result whose content was edited fails its hash.
+	dst := legacy("rg_edit", "")
+	p := filepath.Join(dst, runsDir, r1.RunID, regateFile)
+	b, err := os.ReadFile(p)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(p, []byte(strings.Replace(string(b), `"pass"`, `"fail"`, 1)), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := s.CommitLegacyRegate(ctx, "e_test", "rg_edit"); !errors.Is(err, schemas.ErrSealMismatch) {
+		t.Fatalf("edited result committed: %v", err)
 	}
 }

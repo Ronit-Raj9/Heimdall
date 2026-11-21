@@ -290,3 +290,37 @@ func TestBuildLeavesOutProblemRuns(t *testing.T) {
 		t.Fatalf("points %d invalid %d: want e_1 left out and counted invalid", r.Points, r.Invalid)
 	}
 }
+
+// TestConfigChangedReadsComparisonReference is the regression test for audit
+// qc2-05-06: points A (suite S1, config x), B (S2, y), C (S1, y). C compares
+// against A, so its config label says changed (x to y), not unchanged (B to C).
+func TestConfigChangedReadsComparisonReference(t *testing.T) {
+	day := func(d int) time.Time { return time.Date(2026, 11, d, 9, 0, 0, 0, time.UTC) }
+	one := 1.0
+	var runs []resultsindex.RunRow
+	add := func(exp string, d int, suite, hash string) {
+		for task := 1; task <= 4; task++ {
+			runs = append(runs, resultsindex.RunRow{Experiment: exp, ExperimentCreated: day(d), RunID: fmt.Sprintf("r_%s_%d", exp, task),
+				Suite: suite, Task: fmt.Sprintf("t%02d", task), Arm: "A", Agent: "codex", Model: "m1", ConfigHash: hash,
+				Condition: "clean", Trial: 1, Outcome: "pass", Success: &one, Metrics: map[string]float64{}})
+		}
+	}
+	add("e_a", 1, "s1@1", "sha256:x")
+	add("e_b", 2, "s2@1", "sha256:y")
+	add("e_c", 3, "s1@1", "sha256:y")
+	resp, err := Build(&resultsindex.Snapshot{RunRows: runs}, Query{}, day(10))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(resp.Lineages) != 1 || len(resp.Lineages[0].Points) != 3 {
+		t.Fatalf("lineages %+v", resp.Lineages)
+	}
+	c := resp.Lineages[0].Points[2]
+	if c.Regression.Against != "e_a" || !c.ConfigChanged {
+		t.Fatalf("point C against %q config_changed %v, want e_a and true", c.Regression.Against, c.ConfigChanged)
+	}
+	b := resp.Lineages[0].Points[1]
+	if b.ConfigChanged {
+		t.Fatal("point B has no reference, so its config label must be false")
+	}
+}

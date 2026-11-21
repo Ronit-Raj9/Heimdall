@@ -177,9 +177,6 @@ func (l *Log) Create(ctx context.Context, req *schemas.ReleaseRequest) (*schemas
 	if err != nil {
 		return nil, err
 	}
-	if err := checkRelease(m, ev, r.Override); err != nil {
-		return nil, err
-	}
 	if cv, ok := l.d.Store.(ChainVerifier); ok {
 		if err := cv.VerifyChain(m.ExpID); err != nil {
 			if errors.Is(err, schemas.ErrSealMismatch) {
@@ -198,6 +195,11 @@ func (l *Log) Create(ctx context.Context, req *schemas.ReleaseRequest) (*schemas
 			}
 			return nil, fmt.Errorf("create release: verify run %s: %w", run.Run.RunID, err)
 		}
+	}
+	// The release rule runs after the integrity checks, so a damaged run
+	// is refused as such and never reported as a changed snapshot.
+	if err := checkRelease(m, ev, r.Override); err != nil {
+		return nil, err
 	}
 	rec, err := newRecord(m, ev, r, l.d.Now().UTC())
 	if err != nil {
@@ -491,16 +493,18 @@ func checkRelease(m *schemas.Manifest, ev *evidence, override string) error {
 	// The saved verdict is only released with the evidence it was computed
 	// from: a review, regrade or run added since makes the inputs differ, and
 	// the release needs a fresh analysis (audit 1-A-03). An analysis written
-	// before inputs_digest existed has no snapshot to compare and is
-	// released on its manifest and seal checks alone.
-	if a.InputsDigest != "" {
-		d, err := utils.AnalysisInputsDigest(ev.runs)
-		if err != nil {
-			return fmt.Errorf("create release: digest inputs: %w", err)
-		}
-		if d != a.InputsDigest {
-			return &RefusedError{Reason: fmt.Sprintf("the sealed runs, grades or reviews of %s changed after analysis %s (inputs %s, now %s); run a fresh analysis and release that", m.ExpID, a.AnalysisID, a.InputsDigest, d)}
-		}
+	// before inputs_digest existed has no snapshot to compare, so its saved
+	// action cannot be tied to today's reviews and runs: it stays readable
+	// but is never released (audit qc2-01-03).
+	if a.InputsDigest == "" {
+		return &RefusedError{Reason: fmt.Sprintf("analysis %s predates evidence snapshots (no inputs_digest), so its decision cannot be matched to the current runs, grades and reviews; run a fresh analysis and release that", a.AnalysisID)}
+	}
+	d, err := utils.AnalysisInputsDigest(ev.runs)
+	if err != nil {
+		return fmt.Errorf("create release: digest inputs: %w", err)
+	}
+	if d != a.InputsDigest {
+		return &RefusedError{Reason: fmt.Sprintf("the sealed runs, grades or reviews of %s changed after analysis %s (inputs %s, now %s); run a fresh analysis and release that", m.ExpID, a.AnalysisID, a.InputsDigest, d)}
 	}
 	var blocked []string
 	if a.Verdict.Action != schemas.ActionShip {

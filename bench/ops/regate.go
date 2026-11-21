@@ -126,6 +126,48 @@ func CheckSuiteDrift(m *schemas.Manifest, s *schemas.Suite, frozenLock string) e
 			return err
 		}
 	}
+	return sameFingerprints(m, &frozen, s.Lock)
+}
+
+// sameFingerprints compares the evaluator fingerprints of the frozen lock
+// with the current lock's for the suite and every task and probe the slots
+// use. The legacy task entries hash the instruction, repository, tests,
+// controls and fixtures, not the evaluator settings (protected paths, gate
+// options), so a re-lock after a settings edit keeps them equal while
+// CheckEvaluator, which reads only the current lock, accepts the edit (audit
+// qc2-01-01). Images are left out: gates read the sealed run folder. A
+// frozen lock without fingerprints pinned no settings, so a re-locked suite
+// cannot be shown to grade as it did and the regate is refused.
+func sameFingerprints(m *schemas.Manifest, frozen, now *schemas.SuiteLock) error {
+	if frozen.Fingerprints == nil {
+		return fmt.Errorf("the frozen lock of suite %s records no fingerprints, so the evaluator settings the experiment ran under are not pinned and cannot be compared with the re-locked suite; regate against the unchanged suite instead", m.Experiment.Suite)
+	}
+	if now.Fingerprints == nil {
+		return fmt.Errorf("suite %s lock records no fingerprints to compare with the frozen lock", m.Experiment.Suite)
+	}
+	f, n := frozen.Fingerprints, now.Fingerprints
+	if err := sameFingerprint("suite "+m.Experiment.Suite, f.Suite, n.Suite); err != nil {
+		return err
+	}
+	for _, sl := range m.Slots {
+		if err := sameFingerprint("task "+sl.Task, f.Tasks[sl.Task], n.Tasks[sl.Task]); err != nil {
+			return err
+		}
+		if sl.Condition == schemas.ConditionClean {
+			continue
+		}
+		if err := sameFingerprint("probe "+sl.Condition, f.Probes[sl.Condition], n.Probes[sl.Condition]); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// sameFingerprint compares the settings and files parts of two fingerprints.
+func sameFingerprint(what string, frozen, now schemas.Fingerprint) error {
+	if frozen.Settings != now.Settings || frozen.Files != now.Files {
+		return fmt.Errorf("%s evaluator settings or files changed since the experiment was frozen; its gates cannot be recomputed against the current suite", what)
+	}
 	return nil
 }
 

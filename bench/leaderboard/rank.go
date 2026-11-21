@@ -2,6 +2,7 @@ package leaderboard
 
 import (
 	"cmp"
+	"context"
 	"fmt"
 	"math"
 	"slices"
@@ -34,13 +35,17 @@ const (
 // Everything else is tier 1, with the reason in plain words: too few
 // differing tasks for any split to reach alpha (stats.MinPossibleP), no
 // task in common, equal on every common task, or not significant.
-func rank(calcs []*entryCalc, alpha float64) {
+//
+// The family test stops when ctx ends: up to G(G-1)/2 exact or Monte Carlo
+// tests run inside the board request, which must not outlive its deadline
+// (audit qc2-05-09).
+func rank(ctx context.Context, calcs []*entryCalc, alpha float64) error {
 	slices.SortStableFunc(calcs, compareEntries)
 	for i, c := range calcs {
 		c.e.Rank = i + 1
 	}
 	if len(calcs) == 0 {
-		return
+		return nil
 	}
 	leader := calcs[0]
 	leader.e.Tier, leader.e.TierReason, leader.e.PVsLeader = TierLeader, "leader", nil
@@ -63,7 +68,11 @@ func rank(calcs []*entryCalc, alpha float64) {
 			c.e.TierReason = "no tasks in common with the leader"
 			continue
 		}
-		tests = append(tests, test{c: c, d: d, res: stats.SignFlip(d), mean: stats.Mean(d)})
+		res, err := stats.SignFlipCtx(ctx, d)
+		if err != nil {
+			return fmt.Errorf("rank: %w", err)
+		}
+		tests = append(tests, test{c: c, d: d, res: res, mean: stats.Mean(d)})
 	}
 	raw := make([]float64, len(tests), len(calcs)*(len(calcs)-1)/2)
 	for i, t := range tests {
@@ -78,7 +87,11 @@ func rank(calcs []*entryCalc, alpha float64) {
 				}
 			}
 			if len(d) > 0 {
-				raw = append(raw, stats.SignFlip(d).P)
+				res, err := stats.SignFlipCtx(ctx, d)
+				if err != nil {
+					return fmt.Errorf("rank: %w", err)
+				}
+				raw = append(raw, res.P)
 			}
 		}
 	}
@@ -103,6 +116,7 @@ func rank(calcs []*entryCalc, alpha float64) {
 			t.c.e.TierReason = fmt.Sprintf("p %s on %d common tasks: behind the leader", formatP(p), n)
 		}
 	}
+	return nil
 }
 
 // compareEntries is the board order.

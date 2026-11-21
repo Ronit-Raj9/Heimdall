@@ -101,7 +101,10 @@ func TestInsertSection(t *testing.T) {
 func TestCheckSuiteDrift(t *testing.T) {
 	frozen := schemas.SuiteLock{Suite: "coding-core",
 		Tasks:  map[string]schemas.TaskLock{"t08": {Version: "1.0.0", RepoTreeSHA256: "aa"}},
-		Probes: map[string]schemas.ProbeLock{"stale-notes": {Version: "1.0.0", SHA256: "bb"}}}
+		Probes: map[string]schemas.ProbeLock{"stale-notes": {Version: "1.0.0", SHA256: "bb"}},
+		Fingerprints: &schemas.LockFingerprints{Version: 1, Suite: schemas.Fingerprint{Settings: "s", Files: "f"},
+			Tasks:  map[string]schemas.Fingerprint{"t08": {Settings: "ts", Files: "tf"}},
+			Probes: map[string]schemas.Fingerprint{"stale-notes": {Settings: "ps", Files: "pf"}}}}
 	raw, err := json.Marshal(frozen)
 	if err != nil {
 		t.Fatal(err)

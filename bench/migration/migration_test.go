@@ -41,6 +41,7 @@ func fixture() Input {
 			Metrics: map[string]schemas.Value{
 				"cost_usd":         schemas.Observed(cost, schemas.EvidenceGateway),
 				"false_completion": schemas.NotApplicable(),
+				"verified_success": schemas.Observed(map[bool]float64{true: 1}[pass], schemas.EvidenceOutcome),
 			},
 		}
 		if gate {
@@ -168,19 +169,19 @@ func TestRecommendationNeverOutrunsTheStatistics(t *testing.T) {
 		t.Errorf("A to C = %s, want not enough evidence (3 worse tasks cannot be told apart)", a)
 	}
 	worse := Pair{Overall: Verdict{Result: ResultCannotTell, Reason: "cannot tell"}, Strata: []Verdict{{Dimension: DimCondition, Value: "model-outage", Result: ResultWorse, Reason: "new model worse"}}}
-	if rec := recommend(worse, nil, false, nil); rec.Action != ActionDoNotMigrate || !strings.Contains(rec.Reason, "model-outage") {
+	if rec := recommend(worse, nil, false, nil, nil); rec.Action != ActionDoNotMigrate || !strings.Contains(rec.Reason, "model-outage") {
 		t.Errorf("a significantly worse stratum = %+v, want do not migrate naming it", rec)
 	}
 	better := Pair{Overall: Verdict{Result: ResultBetter, Condition: "clean", Reason: "new model better"}}
 	block := &schemas.PolicyResult{PolicyName: "p", Decision: schemas.PolicyBlock, Checks: []schemas.PolicyCheckResult{{ID: "no-integrity-violations", Status: schemas.PolicyFail, Blocking: true, Reason: "1 veto"}}}
-	if rec := recommend(better, block, false, nil); rec.Action != ActionDoNotMigrate {
+	if rec := recommend(better, block, false, nil, nil); rec.Action != ActionDoNotMigrate {
 		t.Errorf("better but the policy blocks on a failed check = %s, want do not migrate", rec.Action)
 	}
 	unknownBlock := &schemas.PolicyResult{PolicyName: "p", Decision: schemas.PolicyBlock, Checks: []schemas.PolicyCheckResult{{ID: "fc", Status: schemas.PolicyUnknown, Blocking: true}}}
-	if rec := recommend(better, unknownBlock, false, nil); rec.Action != ActionNotEnough {
+	if rec := recommend(better, unknownBlock, false, nil, nil); rec.Action != ActionNotEnough {
 		t.Errorf("better but the policy blocks on an unknown = %s, want not enough evidence", rec.Action)
 	}
-	if rec := recommend(better, nil, true, nil); rec.Action != ActionNotEnough {
+	if rec := recommend(better, nil, true, nil, nil); rec.Action != ActionNotEnough {
 		t.Errorf("synthetic = %s, want not enough evidence", rec.Action)
 	}
 }

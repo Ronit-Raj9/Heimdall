@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io/fs"
 	"maps"
+	"os"
 	"path/filepath"
 	"strings"
 	"sync"
@@ -107,9 +108,34 @@ func (s *FSStore) verifySealedRun(dir, runID string, logged map[string]string) (
 		return rec, fmt.Errorf("seal format %s lacks %s: %w", rec.Format, strings.Join(missing, ", "), schemas.ErrSealMismatch)
 	}
 	if logged[runID] != rec.Hash {
-		return rec, fmt.Errorf("seal hash %s not in seals.log: %w", rec.Hash, schemas.ErrSealMismatch)
+		// A run absent from the log snapshot may have been sealed after the
+		// snapshot was read (a scheduler worker sealing while an analysis
+		// loads). That is ordinary progress, not a mismatch, so the log is
+		// read again once before failing (audit qc2-01-05).
+		if _, had := logged[runID]; had || !loggedNow(dir, runID, rec.Hash) {
+			return rec, fmt.Errorf("seal hash %s not in seals.log: %w", rec.Hash, schemas.ErrSealMismatch)
+		}
 	}
 	return rec, nil
+}
+
+// loggedNow rereads the seals.log of the experiment holding run folder dir
+// (<exp>/slots/<slot>/runs/<run>) and reports whether its last entry for
+// runID records hash.
+func loggedNow(dir, runID, hash string) bool {
+	expDir := filepath.Dir(filepath.Dir(filepath.Dir(filepath.Dir(dir))))
+	b, err := os.ReadFile(filepath.Join(expDir, sealsLogFile))
+	if err != nil {
+		return false
+	}
+	entries, _ := parseSealsLog(b)
+	got := ""
+	for _, e := range entries {
+		if e.RunID == runID {
+			got = e.Hash
+		}
+	}
+	return got == hash
 }
 
 // loggedSeals returns run id -> seal hash from an experiment's seals.log. A run

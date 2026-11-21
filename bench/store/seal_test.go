@@ -420,3 +420,56 @@ func TestSealRequiresMandatoryArtifacts(t *testing.T) {
 		t.Fatalf("unknown format missing = %v", got)
 	}
 }
+
+// TestVerifyChainToleratesConcurrentSeal: a run sealed between the seals.log
+// read and the folder sweep is ordinary progress, not a broken chain (audit
+// qc2-01-05). A sealed run that the log really lacks still fails.
+func TestVerifyChainToleratesConcurrentSeal(t *testing.T) {
+	s := newTestStore(t, nil)
+	m := mustCreateExp(t, s, "e_test")
+	sealedRun(t, s, m, "s_a1", "r_0")
+	late := mustNewRun(t, s, m, "s_b1", "r_1", 1, schemas.OutcomePass)
+	mustWrite(t, s, late, "events.jsonl", `{"seq":1}`+"\n")
+	if err := s.AppendTransition(context.Background(), late, tr(schemas.StageCleanup, schemas.TransitionCompleted)); err != nil {
+		t.Fatal(err)
+	}
+	fired := false
+	afterChainLogRead = func(string) {
+		if !fired {
+			fired = true
+			mustSeal(t, s, late)
+		}
+	}
+	t.Cleanup(func() { afterChainLogRead = nil })
+	if err := s.VerifyChain("e_test"); err != nil {
+		t.Fatalf("VerifyChain with a concurrent seal: %v", err)
+	}
+	if !fired {
+		t.Fatal("hook did not run")
+	}
+	afterChainLogRead = nil
+	logPath := filepath.Join(s.Root(), "e_test", "seals.log")
+	b, err := os.ReadFile(logPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	writeTampered(t, logPath, []byte(strings.SplitAfter(string(b), "\n")[0]))
+	if err := s.VerifyChain("e_test"); !errors.Is(err, schemas.ErrSealMismatch) || !strings.Contains(err.Error(), "missing from seals.log") {
+		t.Fatalf("err = %v, want missing from seals.log", err)
+	}
+}
+
+// TestVerifySealedRunRereadsStaleLog: SealedRuns reads seals.log once before
+// loading attempts; a run sealed after that read verifies against a fresh read
+// instead of failing (audit qc2-01-05).
+func TestVerifySealedRunRereadsStaleLog(t *testing.T) {
+	s := newTestStore(t, nil)
+	m := mustCreateExp(t, s, "e_test")
+	r, _ := sealedRun(t, s, m, "s_a1", "r_0")
+	if _, err := s.verifySealedRun(s.runDir(r), "r_0", map[string]string{}); err != nil {
+		t.Fatalf("stale snapshot without the run: %v", err)
+	}
+	if _, err := s.verifySealedRun(s.runDir(r), "r_0", map[string]string{"r_0": strings.Repeat("0", 64)}); !errors.Is(err, schemas.ErrSealMismatch) {
+		t.Fatalf("snapshot with another hash: err = %v, want ErrSealMismatch", err)
+	}
+}

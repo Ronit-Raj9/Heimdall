@@ -128,6 +128,14 @@ func (s *FSStore) SealedRuns(ctx context.Context, expID, gradeSource string) ([]
 		}
 		rec, counted := countedRun(recs)
 		if rec == nil {
+			if len(supersededProblems) > 0 {
+				// No attempt counts yet (a retry is still running or was
+				// interrupted), but a sealed earlier attempt no longer
+				// verifies. The slot enters as an unknown carrying that
+				// problem instead of vanishing into ordinary missing
+				// coverage (audit qc2-01-06).
+				out = append(out, unfinishedSlotRun(expID, slot, supersededProblems))
+			}
 			continue
 		}
 		sr, err := s.loadSealedRun(expID, slot, rec, regradeID, logged)
@@ -152,6 +160,58 @@ func (s *FSStore) SealedRuns(ctx context.Context, expID, gradeSource string) ([]
 				slot.SlotID, len(counted), strings.Join(counted, ", ")))
 		}
 		out = append(out, *sr)
+	}
+	return out, nil
+}
+
+// HarnessAttempts loads every sealed attempt SealedRuns does not count: the
+// runs of uncounted (compatibility) slots and the superseded attempts of
+// counted slots (an aborted_infra retry, or any attempt beside the counted
+// one). Each is verified against its seal like a counted run and carries its
+// own sealed gates; every returned run has Slot.Counted false, so the verdict
+// reads it only for harness-level checks (egress) and never in paired
+// arithmetic (audit qc2-02-05). Damaged attempts are already reported on
+// their slot by SealedRuns, and come back here with no gates.
+func (s *FSStore) HarnessAttempts(ctx context.Context, expID string) ([]schemas.SealedRun, error) {
+	if err := validateID("exp_id", expID); err != nil {
+		return nil, fmt.Errorf("harness attempts: %w", err)
+	}
+	slots, err := s.listSlots(expID)
+	if err != nil {
+		return nil, fmt.Errorf("harness attempts %s: %w", expID, err)
+	}
+	logged, err := s.loggedSeals(expID)
+	if err != nil {
+		return nil, fmt.Errorf("harness attempts %s: %w", expID, err)
+	}
+	var out []schemas.SealedRun
+	for i := range slots {
+		if err := ctx.Err(); err != nil {
+			return nil, err
+		}
+		slot := &slots[i]
+		recs, err := s.loadSlotRuns(slot, false)
+		if err != nil {
+			return nil, fmt.Errorf("harness attempts %s: slot %s: %w", expID, slot.SlotID, err)
+		}
+		picked := ""
+		if slot.Counted {
+			if rec, _ := countedRun(recs); rec != nil {
+				picked = rec.Run.RunID
+			}
+		}
+		for j := range recs {
+			rec := &recs[j]
+			if !rec.Sealed || rec.Run.RunID == picked {
+				continue
+			}
+			sr, err := s.loadSealedRun(expID, slot, rec, "", logged)
+			if err != nil {
+				return nil, fmt.Errorf("harness attempts %s: run %s: %w", expID, rec.Run.RunID, err)
+			}
+			sr.Slot.Counted = false
+			out = append(out, *sr)
+		}
 	}
 	return out, nil
 }
@@ -564,7 +624,7 @@ func (s *FSStore) committedRegate(expID, regradeID string) (map[string]bool, err
 		return nil, nil
 	}
 	if len(info.Runs) == 0 {
-		return nil, fmt.Errorf("regrade %s has no coverage record: it was interrupted or not written in one batch, so it is not a grade source; regate again under a new id: %w", regradeID, schemas.ErrNotFound)
+		return nil, fmt.Errorf("regrade %s has no coverage record: it was interrupted or not written in one batch, so it is not a grade source; regate again under a new id, or, for a regate written before coverage records existed, commit it with regate -commit-legacy: %w", regradeID, schemas.ErrNotFound)
 	}
 	cover := make(map[string]bool, len(info.Runs))
 	for _, id := range info.Runs {
@@ -600,6 +660,31 @@ func countedRun(recs []schemas.RunRecord) (*schemas.RunRecord, []string) {
 		return last, []string{last.Run.RunID}
 	}
 	return nil, nil
+}
+
+// unfinishedSlotRun is the stand-in for a counted slot with no counted run
+// whose sealed attempts have integrity problems: the same unknown the verdict
+// adds for a missing slot (verdict.CompleteSlots), with the problems attached
+// in run id order.
+func unfinishedSlotRun(expID string, slot *schemas.Slot, problems map[string]string) schemas.SealedRun {
+	sl := *slot
+	if sl.ExpID == "" {
+		sl.ExpID = expID
+	}
+	ids := make([]string, 0, len(problems))
+	for id := range problems {
+		ids = append(ids, id)
+	}
+	sort.Strings(ids)
+	sr := schemas.SealedRun{
+		Slot:    sl,
+		Run:     schemas.Run{SlotID: sl.SlotID, PairID: sl.PairID, ExpID: sl.ExpID, Outcome: schemas.OutcomeUnknown, Y: schemas.Unknown("no counted run", schemas.EvidenceOutcome)},
+		Metrics: map[string]schemas.Value{},
+	}
+	for _, id := range ids {
+		sr.Problems = append(sr.Problems, problems[id])
+	}
+	return sr
 }
 
 // verifySupersededAttempts verifies every sealed attempt of one slot and

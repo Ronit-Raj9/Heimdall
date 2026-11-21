@@ -158,6 +158,14 @@ func (s *FSStore) CreateExperiment(ctx context.Context, m *schemas.Manifest) err
 		return fmt.Errorf("create experiment %s: %w", m.ExpID, err)
 	}
 	s.logger.Info("experiment created", "exp_id", m.ExpID, "slots", len(m.Slots))
+	// A follow-up binds itself to its parent at freeze time when it is the
+	// first one, so the parent's combination alpha stays with the first
+	// planned child however children are later archived (audit qc2-03-01).
+	if ref := m.Experiment.Extends; ref != nil && ref.ExpID != "" {
+		if _, err := s.BindFollowUp(ref.ExpID, ref.ManifestHash, m.ExpID); err != nil && !errors.Is(err, schemas.ErrNotFound) {
+			s.logger.Warn("follow-up binding not written", "exp_id", m.ExpID, "parent", ref.ExpID, "error", err.Error())
+		}
+	}
 	return nil
 }
 

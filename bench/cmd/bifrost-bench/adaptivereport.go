@@ -53,21 +53,7 @@ func adaptiveMarkdown(an *schemas.Analysis) string {
 		}
 	}
 	if me := v.MoreEvidence; me != nil {
-		sd := "measured"
-		if me.SDAssumed {
-			sd = "assumed"
-		}
-		cost := "cost unknown"
-		if me.CostUSD != nil {
-			cost = fmt.Sprintf("estimated cost %.2f USD", *me.CostUSD)
-		}
-		if me.Over {
-			fmt.Fprintf(&b, "- Buy more evidence: to detect %.1f pp you need more than %d tasks in all (SD %.2f %s); runs and cost not estimated (%s).",
-				me.TargetPP, me.TasksTotal, me.SD, sd, me.CostBasis)
-		} else {
-			fmt.Fprintf(&b, "- Buy more evidence: to detect %.1f pp you need about %d more tasks (%d in all, SD %.2f %s), %d runs, %s (%s).",
-				me.TargetPP, me.Tasks, me.TasksTotal, me.SD, sd, me.Runs, cost, me.CostBasis)
-		}
+		b.WriteString("- Buy more evidence: " + sizingText(me) + ".")
 		if me.Combination == schemas.ExtensionInverseNormal {
 			fmt.Fprintf(&b, " A follow-up is decided together with this experiment by the pre-declared inverse-normal rule at alpha %.4f.", me.AlphaKept)
 		} else {
@@ -101,4 +87,25 @@ func printAdaptivePlan(m *schemas.Manifest) {
 		}
 		fmt.Printf("    futility %s\n", p.Futility)
 	}
+}
+
+// sizingText is the "buy more evidence" estimate in words, shared by the
+// adaptive report section and `extend`, so the two never drift (audit
+// qc2-03-06). Beyond the sizing cap (Over) it names the cap instead of a
+// task count, since Tasks is then zero, not an estimate.
+func sizingText(me *schemas.MoreEvidence) string {
+	sd := "measured"
+	if me.SDAssumed {
+		sd = "assumed"
+	}
+	if me.Over {
+		return fmt.Sprintf("to detect %.1f pp you need more than %d tasks in all (SD %.2f %s); runs and cost not estimated (%s)",
+			me.TargetPP, me.TasksTotal, me.SD, sd, me.CostBasis)
+	}
+	cost := "cost unknown"
+	if me.CostUSD != nil {
+		cost = fmt.Sprintf("estimated cost %.2f USD", *me.CostUSD)
+	}
+	return fmt.Sprintf("to detect %.1f pp you need about %d more tasks (%d in all, SD %.2f %s), %d runs, %s (%s)",
+		me.TargetPP, me.Tasks, me.TasksTotal, me.SD, sd, me.Runs, cost, me.CostBasis)
 }
