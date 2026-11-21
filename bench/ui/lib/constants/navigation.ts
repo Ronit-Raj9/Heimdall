@@ -17,6 +17,7 @@ import {
 	Wrench,
 	CirclePlay,
 	ClipboardCheck,
+	ClipboardList,
 	FlaskConical,
 	House,
 	Inbox,
@@ -37,6 +38,7 @@ export interface BenchNavItem {
 		| "/"
 		| "/welcome"
 		| "/experiments"
+		| "/evaluations"
 		| "/runs"
 		| "/leaderboard"
 		| "/agents"
@@ -65,6 +67,7 @@ export interface BenchNavItem {
 		| "shell.nav.home"
 		| "shell.nav.welcome"
 		| "shell.nav.experiments"
+		| "shell.nav.evaluations"
 		| "shell.nav.runs"
 		| "shell.nav.leaderboard"
 		| "shell.nav.agents"
@@ -104,7 +107,13 @@ export interface BenchNavItem {
 
 export interface BenchNavGroup {
 	id: BenchNavGroupId;
-	labelKey: "shell.groups.start" | "shell.groups.benchmark" | "shell.groups.build" | "shell.groups.production" | "shell.groups.govern" | "shell.groups.operate";
+	labelKey:
+		| "shell.groups.start"
+		| "shell.groups.benchmark"
+		| "shell.groups.build"
+		| "shell.groups.production"
+		| "shell.groups.govern"
+		| "shell.groups.operate";
 	items: readonly BenchNavItem[];
 	/** Closed until the user opens it (or visits one of its pages). */
 	defaultClosed?: boolean;
@@ -134,6 +143,13 @@ export const BENCH_NAV_GROUPS: readonly BenchNavGroup[] = [
 				icon: FlaskConical,
 				testId: "nav-link-experiments",
 				also: ["/verdict", "/matrix", "/migration", "/receipts"],
+			},
+			{
+				to: "/evaluations",
+				labelKey: "shell.nav.evaluations",
+				icon: ClipboardList,
+				testId: "nav-link-evaluations",
+				also: ["/evaluations_"],
 			},
 			{ to: "/runs", labelKey: "shell.nav.runs", icon: CirclePlay, testId: "nav-link-runs", also: ["/compare"] },
 			{ to: "/leaderboard", labelKey: "shell.nav.leaderboard", icon: ListOrdered, testId: "nav-link-leaderboard", also: ["/trends"] },
@@ -189,7 +205,9 @@ export const BENCH_NAV_GROUPS: readonly BenchNavGroup[] = [
 ];
 
 /** Groups that start closed for a visitor who has not toggled any group yet. */
-export const DEFAULT_CLOSED_GROUPS: readonly BenchNavGroupId[] = BENCH_NAV_GROUPS.filter((group) => group.defaultClosed).map((group) => group.id);
+export const DEFAULT_CLOSED_GROUPS: readonly BenchNavGroupId[] = BENCH_NAV_GROUPS.filter((group) => group.defaultClosed).map(
+	(group) => group.id,
+);
 
 /** The i18n key of an entry's one-line plain description (bench shell.navHint.*), shown on hover. */
 export function navHintKey(item: BenchNavItem): `shell.navHint.${string}` {
