@@ -40,6 +40,12 @@ const (
 	// words are correct and incorrect instead of yes and no, and the
 	// response is fenced and marked as data.
 	PromptLongMemEvalV1 = "longmemeval-v1"
+	// PromptAgentVistaV1 applies AgentVista's verifier rule (written for the
+	// bench, not copied: the upstream repository has no licence): the
+	// prediction, the last <answer>...</answer> when the response has one,
+	// is correct when it matches the ground truth in meaning; synonyms and
+	// paraphrases count.
+	PromptAgentVistaV1 = "agentvista-v1"
 )
 
 const (
@@ -238,7 +244,7 @@ func (g *judge) check(rc *schemas.RunContext) (schemas.JudgeSpec, error) {
 	case spec.MaxTokens < 0:
 		return spec, fmt.Errorf("judge max_tokens %d is negative", spec.MaxTokens)
 	case !knownPromptVersion(spec.PromptVersion):
-		return spec, fmt.Errorf("judge prompt_version %q is not shipped (want %s or %s)", spec.PromptVersion, PromptQAv1, PromptLongMemEvalV1)
+		return spec, fmt.Errorf("judge prompt_version %q is not shipped (want %s, %s or %s)", spec.PromptVersion, PromptQAv1, PromptLongMemEvalV1, PromptAgentVistaV1)
 	case g.cfg.Gateway == nil || g.cfg.URL == "":
 		return spec, errors.New("judge grader is not wired to the gateway (register graders.NewJudge with the gateway and its URL)")
 	case rc.Run == nil || !judgeKeyNameRe.MatchString(rc.Run.RunID):
@@ -444,7 +450,7 @@ func tally(votes []string, tmpl string) (passed, invalid bool, reason string) {
 
 // knownPromptVersion reports whether version is shipped.
 func knownPromptVersion(version string) bool {
-	return version == PromptQAv1 || version == PromptLongMemEvalV1
+	return version == PromptQAv1 || version == PromptLongMemEvalV1 || version == PromptAgentVistaV1
 }
 
 // judgeTemplate picks the template of version for ans and returns its name
@@ -482,6 +488,11 @@ func judgeTemplate(version string, ans *schemas.AnswerSpec) (string, string, err
 		default:
 			return "", "", fmt.Errorf("prompt %s has no template for question type %q", version, ans.Category)
 		}
+	case PromptAgentVistaV1:
+		if len(ans.Expected) == 0 {
+			return "", "", errors.New("answer spec has no expected answer for the judge")
+		}
+		name = "agentvista-v1"
 	default:
 		return "", "", fmt.Errorf("prompt version %q is not shipped", version)
 	}
