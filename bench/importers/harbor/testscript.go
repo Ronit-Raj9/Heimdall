@@ -179,7 +179,7 @@ func planUVX(code string, n int, uvInstalled bool) (string, string, error) {
 	}
 	prefix, rest := code[:start], strings.Fields(code[start+len("uvx"):])
 	var python, from string
-	var with []string
+	var with, index []string // index: package index options, passed on to uv pip install
 	i := 0
 	for ; i < len(rest); i++ {
 		tok := rest[i]
@@ -187,7 +187,8 @@ func planUVX(code string, n int, uvInstalled bool) (string, string, error) {
 			break
 		}
 		name, val, hasVal := strings.Cut(tok, "=")
-		takesValue := name == "-p" || name == "--python" || name == "-w" || name == "--with" || name == "--from"
+		isIndex := uvxIndexOptions[name]
+		takesValue := isIndex || name == "-p" || name == "--python" || name == "-w" || name == "--with" || name == "--from"
 		switch {
 		case name == "-q" || name == "--quiet" || name == "--isolated" || name == "--no-progress":
 			continue
@@ -208,12 +209,15 @@ func planUVX(code string, n int, uvInstalled bool) (string, string, error) {
 		case "--from":
 			from = val
 		}
+		if isIndex {
+			index = append(index, name, val)
+		}
 	}
 	if i >= len(rest) {
 		return "", "", fmt.Errorf("test.sh: uvx line names no command: %s", short(code))
 	}
 	cmd := rest[i]
-	for _, v := range append([]string{python, from, cmd}, with...) {
+	for _, v := range append(append([]string{python, from, cmd}, with...), index...) {
 		if strings.ContainsAny(v, "$`\"'") {
 			return "", "", fmt.Errorf("test.sh: uvx line uses shell variables or quotes, which are only known when it runs: %s", short(code))
 		}
@@ -234,13 +238,26 @@ func planUVX(code string, n int, uvInstalled bool) (string, string, error) {
 	if python != "" {
 		pyArg = " --python " + python
 	}
-	step := fmt.Sprintf("export UV_PYTHON_INSTALL_DIR=%s UV_CACHE_DIR=/tmp/harbor-uv-cache && %s venv%s %s && %s pip install --python %s/bin/python %s && rm -rf /tmp/harbor-uv-cache && chmod -R a+rX %s",
-		uvPythonDir, uv, pyArg, venv, uv, venv, strings.Join(pkgs, " "), toolsRoot)
+	idxArg := ""
+	if len(index) > 0 {
+		idxArg = strings.Join(index, " ") + " "
+	}
+	step := fmt.Sprintf("export UV_PYTHON_INSTALL_DIR=%s UV_CACHE_DIR=/tmp/harbor-uv-cache && %s venv%s %s && %s pip install --python %s/bin/python %s%s && rm -rf /tmp/harbor-uv-cache && chmod -R a+rX %s",
+		uvPythonDir, uv, pyArg, venv, uv, venv, idxArg, strings.Join(pkgs, " "), toolsRoot)
 	line := prefix + venv + "/bin/" + cmd
 	if args := rest[i+1:]; len(args) > 0 {
 		line += " " + strings.Join(args, " ")
 	}
 	return step, line, nil
+}
+
+// uvxIndexOptions are the uvx options that choose where packages come from.
+// uv pip install takes the same options, so they move to the build step
+// unchanged (Terminal-Bench pytorch-model-cli installs torch from the
+// PyTorch CPU index).
+var uvxIndexOptions = map[string]bool{
+	"--index": true, "--default-index": true, "--index-url": true, "-i": true,
+	"--extra-index-url": true, "--index-strategy": true, "--find-links": true, "-f": true,
 }
 
 // hasPackage reports whether pkgs already holds the distribution name.

@@ -67,6 +67,10 @@ func TestPlanTestScriptLines(t *testing.T) {
 		{name: "plain commands are kept", src: "mkdir -p /logs/verifier\npytest /tests -rA\n", wantLine: "pytest /tests -rA"},
 		{name: "uvx with the image's uv", src: "uvx -w pytest==8.4.1 pytest -rA\n", wantBake: []string{"export UV_PYTHON_INSTALL_DIR=/opt/harbor-tests/python UV_CACHE_DIR=/tmp/harbor-uv-cache && uv venv /opt/harbor-tests/venv1 && " +
 			"uv pip install --python /opt/harbor-tests/venv1/bin/python pytest==8.4.1 && rm -rf /tmp/harbor-uv-cache && chmod -R a+rX /opt/harbor-tests"}, wantLine: "/opt/harbor-tests/venv1/bin/pytest -rA"},
+		{name: "uvx with a package index", src: "uvx \\\n  --index https://download.pytorch.org/whl/cpu \\\n  --index-strategy unsafe-best-match \\\n  -p 3.13 -w torch==2.7.1 -w pytest==8.4.1 pytest /tests/t.py -rA\n",
+			wantBake: []string{"export UV_PYTHON_INSTALL_DIR=/opt/harbor-tests/python UV_CACHE_DIR=/tmp/harbor-uv-cache && uv venv --python 3.13 /opt/harbor-tests/venv1 && " +
+				"uv pip install --python /opt/harbor-tests/venv1/bin/python --index https://download.pytorch.org/whl/cpu --index-strategy unsafe-best-match torch==2.7.1 pytest==8.4.1 && rm -rf /tmp/harbor-uv-cache && chmod -R a+rX /opt/harbor-tests"},
+			wantLine: "/opt/harbor-tests/venv1/bin/pytest /tests/t.py -rA"},
 		{name: "uvx with a variable", src: "curl -LsSf https://astral.sh/uv/0.9.5/install.sh | sh\nuvx -w git+https://x/y@${COMMIT} pytest\n", wantErr: "shell variables"},
 		{name: "uvx unknown option", src: "curl -LsSf https://astral.sh/uv/0.9.5/install.sh | sh\nuvx --with-requirements r.txt pytest\n", wantErr: "uvx option --with-requirements"},
 		{name: "git clone", src: "git clone https://github.com/x/y src\n", wantErr: "package or source download"},

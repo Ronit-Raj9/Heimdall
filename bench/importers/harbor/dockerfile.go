@@ -23,16 +23,23 @@ type dockerInstruction struct {
 
 // parseDockerfile reads the instructions of src. WORKDIR and USER reset at
 // each FROM, so the result describes the final stage. A WORKDIR that uses a
-// variable is reported as "" because its value is only known to docker.
+// variable set by an earlier ENV, or an ARG with a default, of the same stage
+// is expanded (SkillsBench fix-druid-loophole-cve: ENV WORKSPACE=/root, then
+// WORKDIR ${WORKSPACE}); any other variable is only known to docker, so the
+// WORKDIR is reported as "".
 func parseDockerfile(src string) dockerfileInfo {
 	var info dockerfileInfo
+	vars := map[string]string{}
 	for _, in := range dockerInstructions(src) {
 		switch in.Cmd {
 		case "FROM":
 			info.Stages++
 			info.Workdir, info.User = "", ""
+			vars = map[string]string{}
+		case "ENV", "ARG":
+			setDockerVars(vars, in.Cmd, in.Args)
 		case "WORKDIR":
-			wd := strings.Trim(strings.TrimSpace(in.Args), `"'`)
+			wd := expandDockerVars(strings.Trim(strings.TrimSpace(in.Args), `"'`), vars)
 			switch {
 			case strings.Contains(wd, "$") || wd == "":
 				info.Workdir = ""
@@ -48,6 +55,50 @@ func parseDockerfile(src string) dockerfileInfo {
 		}
 	}
 	return info
+}
+
+var dockerVarRE = regexp.MustCompile(`\$\{([A-Za-z_][A-Za-z0-9_]*)\}|\$([A-Za-z_][A-Za-z0-9_]*)`)
+
+// setDockerVars records the literal values an ENV or ARG line sets: ENV
+// K=V ..., the legacy ENV K V, and ARG K=default (an ARG without a default
+// has no value known here). A value that itself names a variable is expanded
+// with the values known so far, else dropped.
+func setDockerVars(vars map[string]string, cmd, args string) {
+	fields := strings.Fields(args)
+	if cmd == "ENV" && len(fields) >= 2 && !strings.Contains(fields[0], "=") {
+		setDockerVar(vars, fields[0], strings.Join(fields[1:], " "))
+		return
+	}
+	for _, f := range fields {
+		k, v, ok := strings.Cut(f, "=")
+		if !ok {
+			delete(vars, k)
+			continue
+		}
+		setDockerVar(vars, k, v)
+	}
+}
+
+func setDockerVar(vars map[string]string, k, v string) {
+	v = expandDockerVars(strings.Trim(v, `"'`), vars)
+	if strings.Contains(v, "$") {
+		delete(vars, k)
+		return
+	}
+	vars[k] = v
+}
+
+// expandDockerVars replaces $VAR and ${VAR} with known values; an unknown
+// variable is left in place, so the caller still sees a "$".
+func expandDockerVars(s string, vars map[string]string) string {
+	return dockerVarRE.ReplaceAllStringFunc(s, func(m string) string {
+		sub := dockerVarRE.FindStringSubmatch(m)
+		name := sub[1] + sub[2]
+		if v, ok := vars[name]; ok {
+			return v
+		}
+		return m
+	})
 }
 
 // dockerInstructions splits src into logical instructions. Comment lines are
