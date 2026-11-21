@@ -206,7 +206,7 @@ func TestHealthCapabilities(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if h.Status != "ok" || !h.Supports(ModeScripted) || !h.Supports(ModeNone) || h.Supports("flaky") {
+	if h.Status != "ok" || !h.Supports(ModeScripted) || !h.Supports(ModeNone) || !h.Supports(ModeFlaky) || h.Supports("explode") {
 		t.Errorf("health = %+v", h)
 	}
 	for _, p := range []string{ProviderAnthropic, ProviderOpenAI, "groq", "fireworks", "ollama"} {

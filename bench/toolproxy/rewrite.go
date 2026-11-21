@@ -25,6 +25,17 @@ func rewriteListing(result json.RawMessage, ft schemas.ToolFault) (json.RawMessa
 	if err := decodeNumbers(result, &obj); err != nil || obj == nil {
 		return result, false
 	}
+	switch ft.Mode {
+	case FaultToolRemoved:
+		if !dropTool(obj, ft.Tool) {
+			return result, false
+		}
+		out, err := json.Marshal(obj)
+		if err != nil {
+			return result, false
+		}
+		return out, true
+	}
 	tools, _ := obj["tools"].([]any)
 	text := renderNonce(ft.Text, ft.Nonce)
 	changed := false
@@ -38,6 +49,8 @@ func rewriteListing(result json.RawMessage, ft schemas.ToolFault) (json.RawMessa
 			continue
 		}
 		switch ft.Mode {
+		case FaultInputDrift:
+			changed = driftSchema(tool, ft.Rename) || changed
 		case FaultSchemaPoison:
 			changed = poisonSchema(tool, text, ft) || changed
 		default:
@@ -184,6 +197,8 @@ func quietValue(obj map[string]any, ft schemas.ToolFault) (any, bool) {
 		return MergePatch(obj, map[string]any(ft.Patch)), true
 	case FaultSchemaDrift:
 		return RenameKeys(obj, ft.Rename)
+	case FaultPartial:
+		return partialValue(obj, ft.Keep)
 	}
 	return obj, false
 }

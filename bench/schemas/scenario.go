@@ -399,6 +399,13 @@ type ToolCall struct {
 	// reached the agent. Undelivered there means the real answer was
 	// withheld, so it cannot say whether the agent saw the fault.
 	FaultDelivered bool `json:"fault_delivered,omitempty"`
+	// RetryAfterS is the wait a rate_limit fault told the agent to respect
+	// (the Retry-After header or the isError text), so a metric can check
+	// whether the next call to the same tool waited that long.
+	RetryAfterS int `json:"retry_after_s,omitempty"`
+	// Effects is how many times the call reached the tool server: 2 on a
+	// duplicate_effect row, whose call was forwarded twice; 0 means once.
+	Effects int `json:"effects,omitempty"`
 
 	// External API calls (Protocol external) only.
 	Replayed  bool `json:"replayed,omitempty"`  // answered from the task's cassette, no network
@@ -434,7 +441,7 @@ type ToolCall struct {
 // (Rename) rewrite a real result while it stays a success; lost_ack forwards
 // the call to the server and answers the agent with a timeout instead.
 type ToolFault struct {
-	Mode     string `json:"mode" yaml:"mode"`                     // error | timeout | poison | describe_poison | rug_pull | shadow | schema_poison | plausible_wrong | schema_drift | lost_ack
+	Mode     string `json:"mode" yaml:"mode"`                     // error | timeout | poison | describe_poison | rug_pull | shadow | schema_poison | plausible_wrong | schema_drift | lost_ack | rate_limit | slow | flaky | partial | auth_expired | tool_removed | input_drift | duplicate_effect
 	Server   string `json:"server,omitempty" yaml:"server"`       // service id; empty matches every server
 	Tool     string `json:"tool,omitempty" yaml:"tool"`           // tool name; empty matches every tool
 	FromCall int    `json:"from_call,omitempty" yaml:"from_call"` // first affected matching call, 1-based (default 1)
@@ -449,7 +456,17 @@ type ToolFault struct {
 	Agent string `json:"agent,omitempty" yaml:"-"`
 
 	Patch  map[string]any    `json:"patch,omitempty" yaml:"patch"`   // Safety probes area (S1): plausible_wrong merge patch; schema_poison parameters
-	Rename map[string]string `json:"rename,omitempty" yaml:"rename"` // Safety probes area (S1): schema_drift field renames, old to new
+	Rename map[string]string `json:"rename,omitempty" yaml:"rename"` // Safety probes area (S1): schema_drift field renames, old to new; input_drift parameter renames, old to new
+
+	// Resilience modes (toolproxy/faultmodes.go).
+	Limit       int     `json:"limit,omitempty" yaml:"limit"`                 // rate_limit: calls allowed per window
+	WindowS     int     `json:"window_s,omitempty" yaml:"window_s"`           // rate_limit: window length in seconds
+	RetryAfterS int     `json:"retry_after_s,omitempty" yaml:"retry_after_s"` // rate_limit: the Retry-After value; 0 = until the window frees a call
+	DelayMS     int     `json:"delay_ms,omitempty" yaml:"delay_ms"`           // slow: hold before forwarding
+	Prob        float64 `json:"prob,omitempty" yaml:"prob"`                   // flaky: failure probability, seeded by the nonce
+	Keep        int     `json:"keep,omitempty" yaml:"keep"`                   // partial: array items kept in the result
+	Refresh     string  `json:"refresh,omitempty" yaml:"refresh"`             // auth_expired: the tool whose call renews the token
+	Version     string  `json:"version,omitempty" yaml:"version"`             // input_drift: the new API version named in errors
 }
 
 // LayerTool is the probe layer of tool faults: it acts in the tool proxy.

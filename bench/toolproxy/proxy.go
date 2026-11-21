@@ -29,6 +29,7 @@ import (
 	"net"
 	"net/http"
 	"net/url"
+	"strconv"
 	"strings"
 	"time"
 
@@ -280,6 +281,9 @@ func (s *Server) serveMCP(w http.ResponseWriter, r *http.Request, rt Route, path
 	var forward, synthetic []json.RawMessage
 	var faulted []*pending
 	hold := 0
+	var slow time.Duration // lane X22: the longest slow fault among the forwarded calls
+	duplicate, rebuilt := false, false
+	retryAfter := 0
 	for _, it := range items {
 		key := idKey(it.msg.ID)
 		switch m := it.msg; {
@@ -299,7 +303,43 @@ func (s *Server) serveMCP(w http.ResponseWriter, r *http.Request, rt Route, path
 			p := x.track(key, name, args)
 			p.row.RequestBytes = int64(len(it.raw))
 			ft, hit := s.faults.decide(rt.Service, name, rt.Agent)
+			stale := false
+			if hit && ft.Mode == FaultInputDrift { // lane X22: a new-shape call is translated and forwarded
+				var nargs []byte
+				if nargs, stale = driftCall(ft, args); !stale {
+					hit = false
+					if !bytes.Equal(nargs, args) {
+						if nr, ok := withArguments(it.raw, nargs); ok {
+							it.raw, rebuilt = nr, true
+						}
+					}
+				}
+			}
 			switch {
+			case hit && ft.Mode == FaultSlow: // lane X22: held, then forwarded
+				p.row.Fault, p.row.Nonce = ft.Mode, ft.Nonce
+				slow = max(slow, slowHold(ft))
+			case hit && ft.Mode == FaultDuplicateEffect: // lane X22: forwarded twice
+				p.row.Fault, p.row.Nonce, p.row.Effects = ft.Mode, ft.Nonce, 2
+				duplicate = true
+			case hit && ft.Mode == FaultToolRemoved && key != "": // lane X22: a protocol error, not a tool result
+				p.row.Fault, p.row.Nonce = ft.Mode, ft.Nonce
+				faulted = append(faulted, p)
+				resp, e := rpcErrorResponse(it.msg.ID, rpcMethodNotFound, syntheticMessage(ft))
+				synthetic = append(synthetic, resp)
+				p.answer(e, true, 0, s.now())
+				continue
+			case hit && key != "" && (stale || (answersItself(ft.Mode) && ft.Mode != FaultError && ft.Mode != FaultTimeout)): // lane X22
+				p.row.Fault, p.row.Nonce = ft.Mode, ft.Nonce
+				if ft.Mode == FaultRateLimit {
+					p.row.RetryAfterS = ft.RetryAfterS
+					retryAfter = max(retryAfter, ft.RetryAfterS)
+				}
+				faulted = append(faulted, p)
+				res := toolErrorResult(syntheticMessage(ft))
+				synthetic = append(synthetic, responseWithResult(it.msg.ID, res))
+				p.answer(res, true, 0, s.now())
+				continue
 			case hit && ft.Mode == FaultPoison:
 				p.poison = &ft
 			case hit && IsQuietMode(ft.Mode): // Safety probes area (S1)
@@ -336,17 +376,33 @@ func (s *Server) serveMCP(w http.ResponseWriter, r *http.Request, rt Route, path
 		if batch {
 			out = encodeBatch(synthetic)
 		}
+		if retryAfter > 0 {
+			w.Header().Set("Retry-After", strconv.Itoa(retryAfter))
+		}
 		w.Header().Set("Content-Type", "application/json")
 		_, werr := w.Write(out)
 		x.commitAll(werr != nil)
 		return
 	}
+	if slow > 0 {
+		if err := s.hold(r.Context(), slow); err != nil {
+			x.abandon("the agent hung up during an injected delay", true)
+			return
+		}
+	}
 	out := body
-	if len(forward) != len(items) {
+	switch {
+	case rebuilt && !batch && len(forward) == 1:
+		out = forward[0]
+	case rebuilt || len(forward) != len(items):
 		out = encodeBatch(forward)
 	}
+	plain := decoded && (rebuilt || len(forward) != len(items))
+	if duplicate {
+		s.sendDuplicate(r, rt, path, out, plain)
+	}
 	upReq := s.upstreamRequest(r, rt, path, out)
-	if decoded && len(forward) != len(items) {
+	if plain {
 		upReq.Header.Del("Content-Encoding") // the rebuilt batch is sent plain
 	}
 	resp, err := s.client.Do(upReq)
@@ -655,6 +711,29 @@ func (s *Server) serveHTTPTool(w http.ResponseWriter, r *http.Request, rt Route,
 	row.Arguments, row.ArgsSHA256 = Capture(args)
 	row.RequestBytes = int64(len(body))
 	ft, hit := s.faults.decide(rt.Service, row.Tool, rt.Agent)
+	if hit && ft.Mode == FaultInputDrift { // lane X22
+		nb, stale := driftCall(ft, body)
+		if !stale {
+			hit, body = false, nb
+		}
+	}
+	if hit && (answersItself(ft.Mode) || ft.Mode == FaultInputDrift) && ft.Mode != FaultError && ft.Mode != FaultTimeout { // lane X22
+		s.syntheticHTTP(w, &row, ft)
+		return
+	}
+	if hit && ft.Mode == FaultSlow { // lane X22
+		row.Fault, row.Nonce = ft.Mode, ft.Nonce
+		if err := s.hold(r.Context(), slowHold(ft)); err != nil {
+			row.Undelivered = true
+			row.LatencyMS = s.now().Sub(started).Milliseconds()
+			s.append(&row)
+			return
+		}
+	}
+	if hit && ft.Mode == FaultDuplicateEffect { // lane X22
+		row.Fault, row.Nonce, row.Effects = ft.Mode, ft.Nonce, 2
+		s.sendDuplicate(r, rt, path, body, false)
+	}
 	if hit && (ft.Mode == FaultError || ft.Mode == FaultTimeout) {
 		row.Fault, row.Nonce, row.IsError = ft.Mode, ft.Nonce, true
 		status := http.StatusInternalServerError
@@ -692,7 +771,7 @@ func (s *Server) serveHTTPTool(w http.ResponseWriter, r *http.Request, rt Route,
 		return
 	}
 	var poison *schemas.ToolFault
-	if hit {
+	if hit && (ft.Mode == FaultPoison || IsQuietMode(ft.Mode)) {
 		poison = &ft
 	}
 	s.relayHTTPTool(w, resp, &row, poison, nil)

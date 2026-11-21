@@ -182,9 +182,32 @@ func (s *Server) serveExternal(w http.ResponseWriter, r *http.Request, rest, age
 	}
 	row.Arguments, row.ArgsSHA256 = Capture(x.redactBytes(args))
 	ft, hit := s.faults.decide(id, row.Tool, agent) // Multi-agent area: a member's route names the member
+	if hit && ft.Mode == FaultInputDrift { // lane X22: a new-shape call is translated and forwarded
+		nb, stale := driftCall(ft, body)
+		if !stale {
+			hit, body = false, nb
+		}
+	}
 	if hit && (ft.Mode == FaultError || ft.Mode == FaultTimeout) {
 		s.externalFault(w, r, &row, ft)
 		return
+	}
+	if hit && (answersItself(ft.Mode) || ft.Mode == FaultInputDrift) { // lane X22
+		s.syntheticHTTP(w, &row, ft)
+		return
+	}
+	if hit && ft.Mode == FaultSlow { // lane X22
+		row.Fault, row.Nonce = ft.Mode, ft.Nonce
+		if err := s.hold(r.Context(), slowHold(ft)); err != nil {
+			row.Undelivered = true
+			row.LatencyMS = s.now().Sub(row.Started).Milliseconds()
+			s.append(&row)
+			return
+		}
+	}
+	if hit && ft.Mode == FaultDuplicateEffect && x.tape == nil { // lane X22: a live call is sent twice; a replay has no effect to repeat
+		row.Fault, row.Nonce, row.Effects = ft.Mode, ft.Nonce, 2
+		s.externalDuplicate(r, x, path, body)
 	}
 	var poison *schemas.ToolFault
 	if hit && (ft.Mode == FaultPoison || IsQuietMode(ft.Mode)) { // lost_ack is not applied to external routes (S1)
@@ -529,4 +552,22 @@ func prefixMatch(path, prefix string) bool {
 		return false
 	}
 	return len(path) == len(prefix) || strings.HasSuffix(prefix, "/") || path[len(prefix)] == '/' || path[len(prefix)] == '?'
+}
+
+// externalDuplicate sends a live external call once more before the real
+// one (duplicate_effect). It counts against the route's call cap like any
+// call, and its answer is drained and dropped.
+func (s *Server) externalDuplicate(r *http.Request, x *externalRoute, path string, body []byte) {
+	if !x.take() {
+		return
+	}
+	ctx, cancel := context.WithTimeout(r.Context(), x.timeout)
+	defer cancel()
+	resp, err := x.client.Do(x.request(ctx, r, path, body))
+	if err != nil {
+		s.logger.Warn("duplicate_effect: the extra external send failed", "error", x.redact(transportError(err)))
+		return
+	}
+	_, _ = io.Copy(io.Discard, io.LimitReader(resp.Body, x.maxBytes))
+	resp.Body.Close()
 }

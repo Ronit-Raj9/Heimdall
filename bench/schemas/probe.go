@@ -77,6 +77,24 @@ type ProbeApply struct {
 	Agent string `json:"agent,omitempty" yaml:"agent"`
 	// B1: a2a: the client-side stream fault the launcher applies (a2a.go).
 	A2A *A2AFault `json:"a2a,omitempty" yaml:"a2a"`
+	// compound: a fault schedule (lane X22). Each step arms one layer's
+	// fault, at the start of the run or AtS seconds into it; call windows
+	// stay in the step's own fault (from_call, calls). At most one step per
+	// layer. Only a probe of layer compound reads it.
+	Faults []FaultStep `json:"faults,omitempty" yaml:"faults"`
+}
+
+// LayerCompound is the probe layer that arms a schedule of other layers'
+// faults (ProbeApply.Faults).
+const LayerCompound ProbeLayerName = "compound"
+
+// FaultStep is one step of a compound fault schedule: the layer it arms
+// (gateway or tool), when, and that layer's own fault block.
+type FaultStep struct {
+	Layer ProbeLayerName `json:"layer" yaml:"layer"`
+	AtS   int            `json:"at_s,omitempty" yaml:"at_s"` // seconds after the run starts; 0 arms with the run
+	Fault *FaultPlan     `json:"fault,omitempty" yaml:"fault"`
+	Tool  *ToolFault     `json:"tool,omitempty" yaml:"tool"`
 }
 
 // OverlaySpec copies From (relative to the task folder) to To (relative to the
@@ -108,8 +126,19 @@ type FaultPlan struct {
 	Status      int    `json:"status,omitempty" yaml:"status"`       // e.g. 503
 	RetryAfterS int    `json:"retry_after_s,omitempty" yaml:"retry_after_s"`
 	Model       string `json:"model,omitempty" yaml:"model,omitempty"` // W9: fail only requests for this model ("*" = all); a routed run's gateway probe sets its primary target when empty
-	Nonce       string `json:"nonce,omitempty" yaml:"-"`               // secret per run, set when armed, never from YAML
-	RunID       string `json:"run_id,omitempty" yaml:"-"`
+	// Recovery windows (lane X22). Calls ends a persistent or flaky fault
+	// after that many calls from FromCall; UntilS ends it that many seconds
+	// after its first fired call, so the model comes back and recovery is
+	// measurable. DelayMS holds every call of the window before it goes
+	// upstream; FirstByteDelayMS holds the answer before its first byte.
+	// FailProb is the flaky mode's failure chance, seeded by the nonce.
+	Calls            int     `json:"calls,omitempty" yaml:"calls,omitempty"`
+	UntilS           int     `json:"until_s,omitempty" yaml:"until_s,omitempty"`
+	DelayMS          int     `json:"delay_ms,omitempty" yaml:"delay_ms,omitempty"`
+	FirstByteDelayMS int     `json:"first_byte_delay_ms,omitempty" yaml:"first_byte_delay_ms,omitempty"`
+	FailProb         float64 `json:"fail_prob,omitempty" yaml:"fail_prob,omitempty"`
+	Nonce            string  `json:"nonce,omitempty" yaml:"-"` // secret per run, set when armed, never from YAML
+	RunID            string  `json:"run_id,omitempty" yaml:"-"`
 	// Scripted answers every call the plan does not fault from the proxy's
 	// scripted model, never the real upstream: a fault probe on a no-paid
 	// (smoke or scripted_upstream) run. Set by the bench, never from YAML.
@@ -146,24 +175,28 @@ type FaultController interface {
 // caller went away before the provider answered, and on every line a proxy
 // older than the field wrote (omitempty keeps their hashes).
 type LedgerEntry struct {
-	Slot          string    `json:"slot"`
-	RunID         string    `json:"run_id"`
-	Call          int       `json:"call"` // 1-based count of conversation requests; 0 for uncounted kinds
-	Kind          string    `json:"kind"` // message | count_tokens | models | other
-	Path          string    `json:"path"`
-	Stream        bool      `json:"stream"`
-	Action        string    `json:"action"`             // pass | inject | reject
-	Upstream      string    `json:"upstream,omitempty"` // real | scripted
-	Status        int       `json:"status"`
-	ReqSHA256     string    `json:"req_sha256"`
-	ResponseID    string    `json:"response_id,omitempty"`
-	Nonce         string    `json:"nonce,omitempty"` // present when a fault payload carried it
-	Tokens        *Tokens   `json:"tokens,omitempty"`
-	UpstreamMS    float64   `json:"upstream_ms"`
-	UpstreamError string    `json:"upstream_error,omitempty"` // transport error reaching the provider; see above
-	At            time.Time `json:"at"`
-	PrevHash      string    `json:"prev_hash"`
-	Hash          string    `json:"hash"`
+	Slot          string  `json:"slot"`
+	RunID         string  `json:"run_id"`
+	Call          int     `json:"call"` // 1-based count of conversation requests; 0 for uncounted kinds
+	Kind          string  `json:"kind"` // message | count_tokens | models | other
+	Path          string  `json:"path"`
+	Stream        bool    `json:"stream"`
+	Action        string  `json:"action"`             // pass | inject | reject
+	Upstream      string  `json:"upstream,omitempty"` // real | scripted
+	Status        int     `json:"status"`
+	ReqSHA256     string  `json:"req_sha256"`
+	ResponseID    string  `json:"response_id,omitempty"`
+	Nonce         string  `json:"nonce,omitempty"` // present when a fault payload carried it
+	Tokens        *Tokens `json:"tokens,omitempty"`
+	UpstreamMS    float64 `json:"upstream_ms"`
+	UpstreamError string  `json:"upstream_error,omitempty"` // transport error reaching the provider; see above
+	// DelayMS is the hold a slow plan (lane X22) put on this pass line,
+	// before the upstream request and before the first answer byte together;
+	// omitempty keeps the hashes of older lines.
+	DelayMS  int       `json:"delay_ms,omitempty"`
+	At       time.Time `json:"at"`
+	PrevHash string    `json:"prev_hash"`
+	Hash     string    `json:"hash"`
 }
 
 // Ledger upstream values (LedgerEntry.Upstream).
@@ -221,6 +254,9 @@ type Receipt struct {
 	ProbeID string                       `json:"probe_id"`
 	Layer   ProbeLayerName               `json:"layer"`
 	Steps   map[ReceiptStep]ReceiptEntry `json:"steps"`
+	// Parts holds one receipt per step of a compound fault schedule; the
+	// parent's steps are their union (yes when any part says yes).
+	Parts []Receipt `json:"parts,omitempty"`
 }
 
 // ReceiptEntry is one step's state with its evidence.

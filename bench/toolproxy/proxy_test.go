@@ -76,6 +76,10 @@ func (f *fakeMCP) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 				result = map[string]any{"content": []any{map[string]any{"type": "text", "text": "disk full"}}, "isError": true}
 			case "rpcerr":
 				rpcErr = map[string]any{"code": -32602, "message": "bad params"}
+			case "many": // a page of results, what a partial fault cuts (lane X22)
+				rec := map[string]any{"results": []any{"a", "b", "c"}}
+				b, _ := json.Marshal(rec)
+				result = map[string]any{"content": []any{map[string]any{"type": "text", "text": string(b)}}, "structuredContent": rec, "isError": false}
 			case "order":
 				// A JSON record as text and as structured content: what the
 				// quiet faults rewrite (Safety probes area, S1).
