@@ -1,0 +1,42 @@
+{
+	"subtitle": "Every comparison you ran, newest first.",
+	"quickRun": "Quick run on {{suite}}",
+	"armsVs": "{{arms}} on {{suite}}",
+	"noSuite": "an unknown suite",
+	"searchPlaceholder": "Search by name, suite or id",
+	"chips": {
+		"label": "Filter by status",
+		"suiteLabel": "Filter by suite",
+		"all": "All",
+		"active": "Running",
+		"done": "Done",
+		"failed": "Failed",
+		"created": "Not started"
+	},
+	"status": {
+		"running": "Running",
+		"analyzing": "Analyzing",
+		"created": "Not started",
+		"done": "Done",
+		"failed": "Failed",
+		"cancelled": "Cancelled"
+	},
+	"verdict": {
+		"improved": "Better",
+		"regressed": "Worse",
+		"inconclusive": "No clear difference",
+		"invalid": "Invalid",
+		"pending": "Pending"
+	},
+	"col": {
+		"experiment": "Experiment",
+		"status": "Status",
+		"verdict": "Result",
+		"runs": "Runs",
+		"cost": "Cost",
+		"when": "Started"
+	},
+	"runs": "{{done}} / {{total}}",
+	"runsAria": "{{done}} of {{total}} runs finished",
+	"count": "{{shown}} of {{total}}"
+}

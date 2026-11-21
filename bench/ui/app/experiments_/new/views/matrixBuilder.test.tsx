@@ -48,6 +48,20 @@ describe("MatrixBuilder", () => {
 		expect(html).not.toContain("builder-write-token");
 	});
 
+	it("lays the form out as four steps with Extras collapsed and a summary card", () => {
+		const html = render(
+			<MatrixBuilder catalog={catalog} defaults={defaultBuilderValues(catalog, 1)} onStarted={() => undefined} />,
+			hostedSession("member"),
+		);
+		for (const n of [1, 2, 3]) expect(html).toContain(`data-testid="builder-step-${n}"`);
+		expect(html).toMatch(/<details[^>]*data-testid="builder-extras"/);
+		expect(html).not.toMatch(/<details[^>]*open=""[^>]*data-testid="builder-extras"/);
+		const summary = html.slice(html.indexOf('data-testid="builder-summary"'));
+		expect(summary).toContain('data-testid="builder-preview"');
+		expect(summary).toContain('data-testid="builder-plan"');
+		expect(summary).toContain('data-testid="builder-run"');
+	});
+
 	it("asks for the write token in local mode before estimate and plan", () => {
 		const html = render(<MatrixBuilder catalog={catalog} defaults={defaultBuilderValues(catalog, 1)} onStarted={() => undefined} />);
 		expect(html).toContain('data-testid="builder-write-token"');

@@ -18,7 +18,7 @@ import {
 } from "@/lib/store/apis/benchApi";
 import type { Catalog, Experiment, ExperimentPlan } from "@/lib/types/bench";
 import { cn } from "@/lib/utils";
-import { Plus, X } from "lucide-react";
+import { ChevronDown, Plus, X } from "lucide-react";
 import { useId, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { suiteRef } from "./experimentFormSchema";
@@ -47,9 +47,15 @@ export function MatrixBuilder({ catalog, defaults, onStarted }: MatrixBuilderPro
 	const [touched, setTouched] = useState(false);
 	const [token, setToken] = useState(readWriteToken);
 	const tokenBox = usesWriteToken(useSession());
-	const [planned, setPlanned] = useState<{ experiment: Experiment; plan: ExperimentPlan } | null>(null);
+	const [planned, setPlanned] = useState<{
+		experiment: Experiment;
+		plan: ExperimentPlan;
+	} | null>(null);
 	const [estimated, setEstimated] = useState<Experiment | null>(null);
-	const [actionError, setActionError] = useState<{ title: string; error: unknown } | null>(null);
+	const [actionError, setActionError] = useState<{
+		title: string;
+		error: unknown;
+	} | null>(null);
 	const [plan, planState] = usePlanExperimentMutation();
 	const [estimate, estimateState] = useEstimateExperimentMutation();
 	const [create, createState] = useCreateExperimentMutation();
@@ -60,6 +66,9 @@ export function MatrixBuilder({ catalog, defaults, onStarted }: MatrixBuilderPro
 	const valid = Object.keys(errors).length === 0;
 	const shown = touched ? errors : {};
 	const preview = useMemo(() => matrixPreview(v, suite), [v, suite]);
+	const [extrasOpen, setExtrasOpen] = useState(false);
+	// A field error inside the collapsed Extras opens it, so the message is never hidden.
+	const extrasError = Boolean(shown.adaptiveMin || shown.concurrency || shown.seed);
 	const set = <K extends keyof BuilderValues>(k: K, value: BuilderValues[K]) => setV((prev) => ({ ...prev, [k]: value }));
 
 	const needsToken = tokenBox && !token.trim();
@@ -126,20 +135,24 @@ export function MatrixBuilder({ catalog, defaults, onStarted }: MatrixBuilderPro
 		setPlanned(null);
 	};
 
-	const setModel = (i: number, m: ModelRef) => set("models", v.models.map((row, j) => (j === i ? m : row)));
-	const toggleAgent = (path: string, on: boolean) =>
-		set("agents", on ? [...v.agents, path] : v.agents.filter((p) => p !== path));
+	const setModel = (i: number, m: ModelRef) =>
+		set(
+			"models",
+			v.models.map((row, j) => (j === i ? m : row)),
+		);
+	const toggleAgent = (path: string, on: boolean) => set("agents", on ? [...v.agents, path] : v.agents.filter((p) => p !== path));
 	const toggleProbe = (id: string, on: boolean) => set("probes", on ? [...v.probes, id] : v.probes.filter((p) => p !== id));
 
 	return (
-		<div className="grid items-start gap-6 xl:grid-cols-[minmax(0,1fr)_26rem]" data-testid="matrix-builder">
-			<div className="flex min-w-0 flex-col gap-6">
-				<Section title={t("sections.what")}>
+		<div
+			className="grid items-start gap-6 lg:grid-cols-[minmax(0,1fr)_22rem] xl:grid-cols-[minmax(0,1fr)_24rem]"
+			data-testid="matrix-builder"
+		>
+			<div className="flex min-w-0 flex-col gap-4">
+				<Step n={1} title={t("steps.what")} hint={t("steps.whatHint")}>
 					<div className="grid gap-4 md:grid-cols-2">
 						<Field label={t("fields.name")} error={shown.name}>
-							{(id) => (
-								<Input id={id} value={v.name} onChange={(e) => set("name", e.target.value)} data-testid="builder-name-input" />
-							)}
+							{(id) => <Input id={id} value={v.name} onChange={(e) => set("name", e.target.value)} data-testid="builder-name-input" />}
 						</Field>
 						<Field label={t("fields.suite")} error={shown.suite}>
 							{(id) => (
@@ -161,7 +174,11 @@ export function MatrixBuilder({ catalog, defaults, onStarted }: MatrixBuilderPro
 									<SelectContent>
 										{catalog.suites.map((s) => (
 											<SelectItem key={suiteRef(s)} value={suiteRef(s)} data-testid={`builder-suite-option-${s.id}`}>
-												{t("fields.suiteOption", { id: s.id, version: s.version, count: s.tasks.length })}
+												{t("fields.suiteOption", {
+													id: s.id,
+													version: s.version,
+													count: s.tasks.length,
+												})}
 											</SelectItem>
 										))}
 									</SelectContent>
@@ -169,243 +186,308 @@ export function MatrixBuilder({ catalog, defaults, onStarted }: MatrixBuilderPro
 							)}
 						</Field>
 					</div>
-				</Section>
+				</Step>
 
-				<Section title={t("sections.agents")} description={t("sections.agentsHint")} error={shown.agents}>
-					<ul className="flex flex-wrap gap-2" data-testid="builder-agents">
-						{catalog.agents.map((a) => {
-							const on = v.agents.includes(a.path);
-							return (
-								<li key={a.path}>
-									<label
-										className={cn(
-											"flex cursor-pointer items-center gap-2 rounded-sm border px-3 py-2 text-sm",
-											on && "border-primary bg-primary/10",
-										)}
+				<Step n={2} title={t("steps.who")} hint={t("steps.whoHint")}>
+					<SubSection title={t("sections.agents")} description={t("sections.agentsHint")} error={shown.agents}>
+						<ul className="flex flex-wrap gap-2" data-testid="builder-agents">
+							{catalog.agents.map((a) => {
+								const on = v.agents.includes(a.path);
+								return (
+									<li key={a.path}>
+										<label
+											className={cn(
+												"flex cursor-pointer items-center gap-2 rounded-sm border px-3 py-2 text-sm",
+												on && "border-primary bg-primary/10",
+											)}
+										>
+											<input
+												type="checkbox"
+												className="accent-primary size-4"
+												checked={on}
+												onChange={(e) => toggleAgent(a.path, e.target.checked)}
+												data-testid={`builder-agent-${a.id}`}
+											/>
+											<span className="font-mono">{a.id}</span>
+											{a.model && <span className="text-muted-foreground text-xs">{t("fields.agentModel", { model: a.model })}</span>}
+										</label>
+									</li>
+								);
+							})}
+						</ul>
+					</SubSection>
+					<SubSection title={t("sections.models")} description={t("sections.modelsHint")} error={shown.models}>
+						<ul className="flex flex-col gap-2" data-testid="builder-models">
+							{v.models.map((m, i) => (
+								<li key={i} className="flex flex-wrap items-center gap-2">
+									<span className="text-muted-foreground w-5 text-xs">{i + 1}.</span>
+									<ModelPicker value={m} purpose="agent" onChange={(next) => setModel(i, next)} testId={`builder-model-${i}`} />
+									<Button
+										type="button"
+										variant="ghost"
+										size="sm"
+										aria-label={t("fields.removeModel", { n: i + 1 })}
+										onClick={() =>
+											set(
+												"models",
+												v.models.filter((_, j) => j !== i),
+											)
+										}
+										dataTestId={`builder-model-remove-${i}`}
 									>
-										<input
-											type="checkbox"
-											className="accent-primary size-4"
-											checked={on}
-											onChange={(e) => toggleAgent(a.path, e.target.checked)}
-											data-testid={`builder-agent-${a.id}`}
-										/>
-										<span className="font-mono">{a.id}</span>
-										{a.model && <span className="text-muted-foreground text-xs">{t("fields.agentModel", { model: a.model })}</span>}
-									</label>
+										<X aria-hidden="true" />
+									</Button>
+									{shown[`models.${i}`] && <ErrorText code={shown[`models.${i}`]!} />}
 								</li>
-							);
-						})}
-					</ul>
-				</Section>
-
-				<Section title={t("sections.models")} description={t("sections.modelsHint")} error={shown.models}>
-					<ul className="flex flex-col gap-2" data-testid="builder-models">
-						{v.models.map((m, i) => (
-							<li key={i} className="flex flex-wrap items-center gap-2">
-								<span className="text-muted-foreground w-5 text-xs">{i + 1}.</span>
-								<ModelPicker value={m} purpose="agent" onChange={(next) => setModel(i, next)} testId={`builder-model-${i}`} />
-								<Button
-									type="button"
-									variant="ghost"
-									size="sm"
-									aria-label={t("fields.removeModel", { n: i + 1 })}
-									onClick={() => set("models", v.models.filter((_, j) => j !== i))}
-									dataTestId={`builder-model-remove-${i}`}
-								>
-									<X aria-hidden="true" />
-								</Button>
-								{shown[`models.${i}`] && <ErrorText code={shown[`models.${i}`]!} />}
-							</li>
-						))}
-					</ul>
-					<div className="flex flex-wrap items-center gap-4">
-						<Button
-							type="button"
-							variant="outline"
-							size="sm"
-							className="gap-1.5"
-							onClick={() => {
-								const last = v.models[v.models.length - 1];
-								const agentModel = catalogAgent(catalog, v.agents[0] ?? "")?.model ?? "";
-								set("models", [...v.models, { provider: last?.provider ?? guessProvider(agentModel) ?? "openai", model: "" }]);
-							}}
-							dataTestId="builder-model-add"
-						>
-							<Plus aria-hidden="true" />
-							{t("fields.addModel")}
-						</Button>
-						<label className="flex items-center gap-2 text-xs">
-							<input
-								type="checkbox"
-								className="accent-primary"
-								checked={v.allowUnpriced}
-								onChange={(e) => set("allowUnpriced", e.target.checked)}
-								data-testid="builder-allow-unpriced"
-							/>
-							{t("fields.allowUnpriced")}
-						</label>
-					</div>
-				</Section>
-
-				<Section title={t("sections.size")}>
-					<div className="grid gap-4 md:grid-cols-2">
-						<div className="flex flex-col gap-2 text-sm" role="radiogroup" data-testid="builder-task-scope">
-							<label className="flex items-center gap-2">
+							))}
+						</ul>
+						<div className="flex flex-wrap items-center gap-4">
+							<Button
+								type="button"
+								variant="outline"
+								size="sm"
+								className="gap-1.5"
+								onClick={() => {
+									const last = v.models[v.models.length - 1];
+									const agentModel = catalogAgent(catalog, v.agents[0] ?? "")?.model ?? "";
+									set("models", [
+										...v.models,
+										{
+											provider: last?.provider ?? guessProvider(agentModel) ?? "openai",
+											model: "",
+										},
+									]);
+								}}
+								dataTestId="builder-model-add"
+							>
+								<Plus aria-hidden="true" />
+								{t("fields.addModel")}
+							</Button>
+							<label className="flex items-center gap-2 text-xs">
 								<input
-									type="radio"
+									type="checkbox"
 									className="accent-primary"
-									checked={v.taskScope === "first"}
-									onChange={() => set("taskScope", "first")}
-									data-testid="builder-tasks-first"
+									checked={v.allowUnpriced}
+									onChange={(e) => set("allowUnpriced", e.target.checked)}
+									data-testid="builder-allow-unpriced"
 								/>
-								{t("fields.tasksFirst")}
+								{t("fields.allowUnpriced")}
+							</label>
+						</div>
+					</SubSection>
+				</Step>
+
+				<Step n={3} title={t("steps.size")} hint={t("steps.sizeHint")}>
+					<div className="grid gap-5 md:grid-cols-3">
+						<div className="flex flex-col gap-1.5 md:col-span-3">
+							<span className="text-xs font-medium">{t("fields.tasks")}</span>
+							<div className="flex flex-col gap-2 text-sm" role="radiogroup" data-testid="builder-task-scope">
+								<label className="flex items-center gap-2">
+									<input
+										type="radio"
+										className="accent-primary"
+										checked={v.taskScope === "first"}
+										onChange={() => set("taskScope", "first")}
+										data-testid="builder-tasks-first"
+									/>
+									{t("fields.tasksFirst")}
+									<Input
+										type="number"
+										min={1}
+										max={suite?.tasks.length}
+										className="h-8 w-20"
+										disabled={v.taskScope !== "first"}
+										value={Number.isNaN(v.taskCount) ? "" : v.taskCount}
+										onChange={(e) => set("taskCount", e.target.valueAsNumber)}
+										data-testid="builder-task-count"
+									/>
+									<span className="text-muted-foreground text-xs">
+										{t("fields.tasksFirstSuffix", {
+											count: suite?.tasks.length ?? 0,
+										})}
+									</span>
+								</label>
+								<label className="flex items-center gap-2">
+									<input
+										type="radio"
+										className="accent-primary"
+										checked={v.taskScope === "all"}
+										onChange={() => set("taskScope", "all")}
+										data-testid="builder-tasks-all"
+									/>
+									{t("fields.tasksAll", { count: suite?.tasks.length ?? 0 })}
+								</label>
+								{shown.taskCount && <ErrorText code={shown.taskCount} />}
+							</div>
+						</div>
+						<Field label={t("fields.trials")} error={shown.trials}>
+							{(id) => (
 								<Input
+									id={id}
 									type="number"
 									min={1}
-									max={suite?.tasks.length}
-									className="h-8 w-20"
-									disabled={v.taskScope !== "first"}
-									value={Number.isNaN(v.taskCount) ? "" : v.taskCount}
-									onChange={(e) => set("taskCount", e.target.valueAsNumber)}
-									data-testid="builder-task-count"
+									max={50}
+									value={Number.isNaN(v.trials) ? "" : v.trials}
+									onChange={(e) => set("trials", e.target.valueAsNumber)}
+									data-testid="builder-trials"
 								/>
-								<span className="text-muted-foreground text-xs">{t("fields.tasksFirstSuffix", { count: suite?.tasks.length ?? 0 })}</span>
-							</label>
-							<label className="flex items-center gap-2">
-								<input
-									type="radio"
-									className="accent-primary"
-									checked={v.taskScope === "all"}
-									onChange={() => set("taskScope", "all")}
-									data-testid="builder-tasks-all"
-								/>
-								{t("fields.tasksAll", { count: suite?.tasks.length ?? 0 })}
-							</label>
-							{shown.taskCount && <ErrorText code={shown.taskCount} />}
-						</div>
-						<div className="flex flex-col gap-3">
-							<Field label={t("fields.trials")} error={shown.trials}>
+							)}
+						</Field>
+						<NumberField
+							label={t("fields.totalUsd")}
+							value={v.totalUsd}
+							step="0.01"
+							error={shown.totalUsd}
+							onChange={(n) => set("totalUsd", n)}
+							testId="builder-total-usd"
+						/>
+					</div>
+				</Step>
+
+				<details
+					className="group bg-card rounded-xl border"
+					open={extrasOpen || extrasError}
+					onToggle={(e) => setExtrasOpen(e.currentTarget.open)}
+					data-testid="builder-extras"
+				>
+					<summary className="hover:bg-muted/40 flex cursor-pointer list-none items-center gap-3 rounded-xl px-5 py-4 select-none [&::-webkit-details-marker]:hidden">
+						<span className="bg-muted text-muted-foreground flex size-7 shrink-0 items-center justify-center rounded-full text-xs font-semibold">
+							4
+						</span>
+						<span className="flex min-w-0 flex-1 flex-col">
+							<span className="text-sm font-semibold tracking-tight">{t("steps.extras")}</span>
+							<span className="text-muted-foreground text-xs">{t("steps.extrasHint")}</span>
+						</span>
+						<ChevronDown className="text-muted-foreground size-4 transition-transform group-open:rotate-180" aria-hidden="true" />
+					</summary>
+					<div className="flex flex-col gap-5 border-t px-5 py-5">
+						<label className="flex items-start gap-2 text-sm">
+							<input
+								type="checkbox"
+								className="accent-primary mt-1"
+								checked={v.adaptive}
+								onChange={(e) => {
+									const on = e.target.checked;
+									setV((prev) => ({
+										...prev,
+										adaptive: on,
+										trials: on && !(prev.trials >= 2) ? 3 : prev.trials,
+										adaptiveMin: 1,
+									}));
+								}}
+								data-testid="builder-adaptive"
+							/>
+							<span className="flex flex-col">
+								{t("fields.adaptive")}
+								<span className="text-muted-foreground text-xs">{t("fields.adaptiveHint")}</span>
+							</span>
+						</label>
+						{v.adaptive && (
+							<Field label={t("fields.adaptiveMin")} error={shown.adaptiveMin}>
 								{(id) => (
 									<Input
 										id={id}
 										type="number"
 										min={1}
-										max={50}
-										value={Number.isNaN(v.trials) ? "" : v.trials}
-										onChange={(e) => set("trials", e.target.valueAsNumber)}
-										data-testid="builder-trials"
+										value={Number.isNaN(v.adaptiveMin) ? "" : v.adaptiveMin}
+										onChange={(e) => set("adaptiveMin", e.target.valueAsNumber)}
+										data-testid="builder-adaptive-min"
 									/>
 								)}
 							</Field>
-							<label className="flex items-start gap-2 text-sm">
-								<input
-									type="checkbox"
-									className="accent-primary mt-1"
-									checked={v.adaptive}
-									onChange={(e) => {
-										const on = e.target.checked;
-										setV((prev) => ({
-											...prev,
-											adaptive: on,
-											trials: on && !(prev.trials >= 2) ? 3 : prev.trials,
-											adaptiveMin: 1,
-										}));
-									}}
-									data-testid="builder-adaptive"
-								/>
-								<span className="flex flex-col">
-									{t("fields.adaptive")}
-									<span className="text-muted-foreground text-xs">{t("fields.adaptiveHint")}</span>
-								</span>
-							</label>
-							{v.adaptive && (
-								<Field label={t("fields.adaptiveMin")} error={shown.adaptiveMin}>
+						)}
+						{(suite?.probes?.length ?? 0) > 0 && (
+							<div className="flex flex-col gap-1.5">
+								<span className="text-xs font-medium">{t("fields.probes")}</span>
+								<div className="flex flex-wrap gap-1.5">
+									{suite!.probes.map((p) => (
+										<label
+											key={p}
+											className={cn(
+												"flex cursor-pointer items-center gap-1.5 rounded-sm border px-2 py-1 font-mono text-xs",
+												v.probes.includes(p) && "border-primary bg-primary/10",
+											)}
+										>
+											<input
+												type="checkbox"
+												className="accent-primary"
+												checked={v.probes.includes(p)}
+												onChange={(e) => toggleProbe(p, e.target.checked)}
+												data-testid={`builder-probe-${p}`}
+											/>
+											{p}
+										</label>
+									))}
+								</div>
+								<p className="text-muted-foreground text-[11px]">{t("fields.probesHint")}</p>
+							</div>
+						)}
+						<div className="grid gap-4 sm:grid-cols-3">
+							<NumberField
+								label={t("fields.concurrency")}
+								value={v.concurrency}
+								error={shown.concurrency}
+								onChange={(n) => set("concurrency", n)}
+								testId="builder-concurrency"
+							/>
+							<NumberField
+								label={t("fields.seed")}
+								value={v.seed}
+								error={shown.seed}
+								onChange={(n) => set("seed", n)}
+								testId="builder-seed"
+							/>
+							{!tokenBox && (
+								<Field label={t("fields.runnerPool")}>
 									{(id) => (
 										<Input
 											id={id}
-											type="number"
-											min={1}
-											value={Number.isNaN(v.adaptiveMin) ? "" : v.adaptiveMin}
-											onChange={(e) => set("adaptiveMin", e.target.valueAsNumber)}
-											data-testid="builder-adaptive-min"
+											placeholder="default"
+											value={v.runnerPool}
+											onChange={(e) => set("runnerPool", e.target.value)}
+											data-testid="builder-runner-pool"
 										/>
 									)}
 								</Field>
 							)}
 						</div>
 					</div>
-					{(suite?.probes?.length ?? 0) > 0 && (
-						<div className="flex flex-col gap-1.5">
-							<span className="text-xs font-medium">{t("fields.probes")}</span>
-							<div className="flex flex-wrap gap-1.5">
-								{suite!.probes.map((p) => (
-									<label
-										key={p}
-										className={cn(
-											"flex cursor-pointer items-center gap-1.5 rounded-sm border px-2 py-1 font-mono text-xs",
-											v.probes.includes(p) && "border-primary bg-primary/10",
-										)}
-									>
-										<input
-											type="checkbox"
-											className="accent-primary"
-											checked={v.probes.includes(p)}
-											onChange={(e) => toggleProbe(p, e.target.checked)}
-											data-testid={`builder-probe-${p}`}
-										/>
-										{p}
-									</label>
-								))}
-							</div>
-							<p className="text-muted-foreground text-[11px]">{t("fields.probesHint")}</p>
-						</div>
-					)}
-				</Section>
-
-				<Section title={t("sections.limits")}>
-					<div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-						<NumberField label={t("fields.totalUsd")} value={v.totalUsd} step="0.01" error={shown.totalUsd} onChange={(n) => set("totalUsd", n)} testId="builder-total-usd" />
-						<NumberField label={t("fields.concurrency")} value={v.concurrency} error={shown.concurrency} onChange={(n) => set("concurrency", n)} testId="builder-concurrency" />
-						<NumberField label={t("fields.seed")} value={v.seed} error={shown.seed} onChange={(n) => set("seed", n)} testId="builder-seed" />
-						{!tokenBox && (
-							<Field label={t("fields.runnerPool")}>
-								{(id) => (
-									<Input
-										id={id}
-										placeholder="default"
-										value={v.runnerPool}
-										onChange={(e) => set("runnerPool", e.target.value)}
-										data-testid="builder-runner-pool"
-									/>
-								)}
-							</Field>
-						)}
-					</div>
-				</Section>
+				</details>
 			</div>
 
-			<aside className="flex flex-col gap-4 xl:sticky xl:top-0">
-				<Card className="gap-3 py-4 shadow-none" data-testid="builder-preview">
-					<CardHeader className="px-4">
-						<CardTitle className="text-sm">{t("preview.title")}</CardTitle>
+			<aside className="flex flex-col gap-4 lg:sticky lg:top-4" data-testid="builder-summary">
+				<Card className="gap-4 rounded-xl py-5 shadow-sm" data-testid="builder-preview">
+					<CardHeader className="px-5">
+						<CardTitle className="text-base">{t("preview.title")}</CardTitle>
 						<CardDescription className="text-xs">{t("preview.description")}</CardDescription>
 					</CardHeader>
-					<CardContent className="flex flex-col gap-2 px-4">
+					<CardContent className="flex flex-col gap-4 px-5">
 						{preview.arms.length === 0 || (preview.arms.length === 1 && !preview.arms[0].label) ? (
 							<p className="text-muted-foreground text-xs" data-testid="builder-preview-empty">
 								{t("preview.empty")}
 							</p>
 						) : (
-							<ol className="flex flex-col divide-y rounded-sm border text-xs" data-testid="builder-preview-arms">
+							<ol className="flex max-h-64 flex-col divide-y overflow-y-auto rounded-lg border text-xs" data-testid="builder-preview-arms">
 								{preview.arms.map((arm) => (
-									<li key={arm.id} className="flex items-center gap-2 px-2 py-1.5" data-testid={`builder-arm-${arm.id}`}>
+									<li key={arm.id} className="flex items-center gap-2 px-2.5 py-1.5" data-testid={`builder-arm-${arm.id}`}>
 										<span className="bg-muted rounded-sm px-1.5 font-mono font-semibold">{arm.id}</span>
-										<span className="truncate font-mono">{arm.label || arm.agent}</span>
+										<span className="truncate font-mono" title={arm.label || arm.agent}>
+											{arm.label || arm.agent}
+										</span>
 									</li>
 								))}
 							</ol>
 						)}
+						<dl className="grid grid-cols-2 gap-3 text-xs">
+							<div className="bg-muted/50 flex flex-col gap-0.5 rounded-lg px-3 py-2">
+								<dt className="text-muted-foreground">{t("summary.runs")}</dt>
+								<dd className="text-base font-semibold tabular-nums">{preview.maxRuns}</dd>
+							</div>
+							<div className="bg-muted/50 flex flex-col gap-0.5 rounded-lg px-3 py-2">
+								<dt className="text-muted-foreground">{t("summary.budget")}</dt>
+								<dd className="text-base font-semibold tabular-nums">{Number.isFinite(v.totalUsd) ? `$${v.totalUsd}` : "-"}</dd>
+							</div>
+						</dl>
 						<p className="text-muted-foreground text-[11px]" data-testid="builder-preview-runs">
 							{t("preview.arms", { count: preview.arms.length })}
 							{", "}
@@ -418,10 +500,7 @@ export function MatrixBuilder({ catalog, defaults, onStarted }: MatrixBuilderPro
 							})}
 						</p>
 					</CardContent>
-				</Card>
-
-				<Card className="gap-3 py-4 shadow-none" data-testid="builder-actions">
-					<CardContent className="flex flex-col gap-3 px-4">
+					<CardContent className="flex flex-col gap-3 border-t px-5 pt-4" data-testid="builder-actions">
 						{tokenBox && (
 							<Field label={t("fields.token")} hint={t("fields.tokenHint")}>
 								{(id) => (
@@ -503,7 +582,25 @@ export function MatrixBuilder({ catalog, defaults, onStarted }: MatrixBuilderPro
 	);
 }
 
-function Section({
+/** One numbered step of the builder: a card with its number, a short title and a one-line hint. */
+function Step({ n, title, hint, children }: { n: number; title: string; hint?: string; children: React.ReactNode }) {
+	return (
+		<section className="bg-card flex flex-col gap-5 rounded-xl border p-5" data-testid={`builder-step-${n}`}>
+			<div className="flex items-center gap-3">
+				<span className="bg-primary/10 text-primary flex size-7 shrink-0 items-center justify-center rounded-full text-xs font-semibold">
+					{n}
+				</span>
+				<div className="flex min-w-0 flex-col">
+					<h2 className="text-sm font-semibold tracking-tight">{title}</h2>
+					{hint && <p className="text-muted-foreground text-xs">{hint}</p>}
+				</div>
+			</div>
+			{children}
+		</section>
+	);
+}
+
+function SubSection({
 	title,
 	description,
 	error,
@@ -515,14 +612,14 @@ function Section({
 	children: React.ReactNode;
 }) {
 	return (
-		<section className="flex flex-col gap-3">
+		<div className="flex flex-col gap-2.5">
 			<div className="flex flex-col gap-0.5">
-				<h2 className="text-sm font-semibold tracking-tight">{title}</h2>
+				<h3 className="text-xs font-medium">{title}</h3>
 				{description && <p className="text-muted-foreground text-xs">{description}</p>}
 			</div>
 			{children}
 			{error && <ErrorText code={error} />}
-		</section>
+		</div>
 	);
 }
 
