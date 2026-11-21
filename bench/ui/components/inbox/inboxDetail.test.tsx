@@ -96,14 +96,13 @@ describe("sources and empty state", () => {
 	});
 
 	it("says when no source is configured", () => {
-		expect(renderToStaticMarkup(<InboxSourcesTable sources={[]} />)).toContain("inbox/sources.yaml");
+		expect(renderToStaticMarkup(<InboxSourcesTable sources={[]} />)).toContain("heimdall inbox pull");
 	});
 
 	it("explains how items get in", () => {
 		const html = renderToStaticMarkup(<InboxEmpty />);
 		expect(html).toContain("heimdall inbox pull");
-		expect(html).toContain("inbox/sources.yaml");
-		expect(html).toContain("docs/failure-inbox.md");
+		expect(html).toContain("Connect a trace source");
 	});
 
 	it("notes when push ingest is off", () => {

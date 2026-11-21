@@ -1,7 +1,9 @@
 import { EmptyNote } from "@/components/runs/screenStates";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import type { InboxSourceStatus } from "@/lib/types/bench";
-import { Info } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Info, Radar } from "lucide-react";
+import { FeatureHero, revealAnchor } from "./featureHero";
 import { useTranslation } from "react-i18next";
 import { formatInboxTime } from "./inboxBadges";
 
@@ -64,19 +66,32 @@ export function InboxIngestOffNote() {
 	);
 }
 
-/** The empty inbox: how items get in (heimdall inbox pull over inbox/sources.yaml) and where the docs are. */
+/** The empty inbox: one sentence, a "Connect a trace source" action that opens the setup, and the CLI command. */
 export function InboxEmpty() {
-	const { t } = useTranslation("bench");
+	const { t: u } = useTranslation("ux13");
 	return (
-		<div
-			className="text-muted-foreground bg-muted/30 flex flex-col items-center gap-3 rounded-lg border border-dashed px-4 py-8 text-center text-sm"
-			data-testid="inbox-empty"
+		<FeatureHero
+			icon={Radar}
+			title={u("inbox.heroTitle")}
+			message={u("inbox.heroMessage")}
+			testId="inbox-empty"
+			action={
+				<Button asChild>
+					<a
+						href="#inbox-source-setup"
+						onClick={(e) => {
+							e.preventDefault();
+							revealAnchor("inbox-source-setup");
+						}}
+						data-testid="inbox-hero-connect"
+					>
+						{u("inbox.heroAction")}
+					</a>
+				</Button>
+			}
 		>
-			<p className="text-foreground font-medium">{t("inbox.empty.title")}</p>
-			<p>{t("inbox.empty.pull")}</p>
-			<pre className="bg-card text-foreground rounded-sm border px-3 py-1.5 font-mono text-xs">heimdall inbox pull</pre>
-			<p className="max-w-prose">{t("inbox.empty.sources", { file: "inbox/sources.yaml" })}</p>
-			<p className="max-w-prose">{t("inbox.empty.docs", { doc: "docs/failure-inbox.md" })}</p>
-		</div>
+			<span>{u("inbox.cli")}</span>
+			<code className="bg-muted text-foreground rounded-md px-2 py-1 font-mono">heimdall inbox pull</code>
+		</FeatureHero>
 	);
 }

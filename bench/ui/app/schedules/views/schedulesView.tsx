@@ -1,5 +1,7 @@
 import { PageHeader } from "@/components/shell";
-import { BlockSkeleton, EmptyNote, LoadError, Section } from "@/components/runs/screenStates";
+import { BlockSkeleton, EmptyNote, LoadError } from "@/components/runs/screenStates";
+import { Collapsible, FeatureHero, Pill, SetupCard, Step, type PillTone } from "@/components/inbox/featureHero";
+import { BellRing, CalendarClock, Code2, Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -32,12 +34,13 @@ export default function SchedulesView() {
 	};
 
 	return (
-		<section className="flex min-w-0 flex-col gap-6 p-6" data-testid="schedules-screen">
+		<section className="mx-auto flex w-full max-w-[1200px] min-w-0 flex-col gap-6" data-testid="schedules-screen">
 			<PageHeader
 				title={t("title")}
 				subtitle={t("subtitle")}
-				meta={
-					<Button size="sm" variant="outline" onClick={() => setYamlMode((v) => !v)} data-testid="schedules-yaml-toggle">
+				actions={
+					<Button size="sm" variant="ghost" onClick={() => setYamlMode((v) => !v)} data-testid="schedules-yaml-toggle">
+						<Code2 className="size-4" aria-hidden="true" />
 						{yamlMode ? t("yaml.hide") : t("yaml.show")}
 					</Button>
 				}
@@ -90,6 +93,8 @@ export interface SchedulesBodyProps {
 /** The loaded schedules, the add form and the webhook alerts. Exported for tests. */
 export function SchedulesBody({ data, busy, onSave }: SchedulesBodyProps) {
 	const { t } = useTranslation("schedules");
+	const { t: u } = useTranslation("ux13");
+	const [adding, setAdding] = useState(false);
 	const file = data.file;
 	const saveWith = (patch: Partial<SchedulesFile>) => onSave({ alerts: file.alerts ?? [], schedules: file.schedules ?? [], ...patch });
 	return (
@@ -110,21 +115,60 @@ export function SchedulesBody({ data, busy, onSave }: SchedulesBodyProps) {
 					</a>
 				</p>
 			)}
-			<Section title={t("title")} testId="schedules-list">
-				{data.rows.length === 0 ? (
-					<EmptyNote testId="schedules-empty">{t("empty")}</EmptyNote>
-				) : (
-					<ScheduleTable
-						rows={data.rows}
-						onRemove={(name) => saveWith({ schedules: file.schedules.filter((s) => s.name !== name) })}
+			{data.rows.length === 0 && !adding ? (
+				<FeatureHero
+					icon={CalendarClock}
+					title={u("schedules.heroTitle")}
+					message={u("schedules.heroMessage")}
+					testId="schedules-empty"
+					action={
+						<Button onClick={() => setAdding(true)} data-testid="schedules-hero-add">
+							{u("schedules.heroAction")}
+						</Button>
+					}
+				/>
+			) : (
+				data.rows.length > 0 && (
+					<section className="flex flex-col gap-3" data-testid="schedules-list">
+						<div className="flex items-center justify-between gap-3">
+							<h2 className="text-foreground text-base font-semibold tracking-tight">{t("title")}</h2>
+							{!adding && (
+								<Button size="sm" onClick={() => setAdding(true)} data-testid="schedules-add-open">
+									<Plus className="size-4" aria-hidden="true" />
+									{u("schedules.newAction")}
+								</Button>
+							)}
+						</div>
+						<ScheduleTable
+							rows={data.rows}
+							onRemove={(name) => saveWith({ schedules: file.schedules.filter((s) => s.name !== name) })}
+							busy={busy}
+						/>
+					</section>
+				)
+			)}
+			{adding && (
+				<SetupCard
+					icon={CalendarClock}
+					title={t("add.title")}
+					testId="schedules-add"
+					actions={
+						<Button size="sm" variant="ghost" onClick={() => setAdding(false)} data-testid="schedules-add-close">
+							{u("schedules.close")}
+						</Button>
+					}
+				>
+					<AddScheduleForm
 						busy={busy}
+						onAdd={(s) => {
+							saveWith({ schedules: [...(file.schedules ?? []), s] });
+							setAdding(false);
+						}}
 					/>
-				)}
-			</Section>
-			<Section title={t("add.title")} testId="schedules-add">
-				<AddScheduleForm busy={busy} onAdd={(s) => saveWith({ schedules: [...(file.schedules ?? []), s] })} />
-			</Section>
-			<Section title={t("alerts.title")} description={t("alerts.description")} testId="schedules-alerts">
+				</SetupCard>
+			)}
+			<Collapsible icon={BellRing} title={u("schedules.integrations")} hint={u("schedules.integrationsHint")} testId="schedules-alerts">
+				<p className="text-muted-foreground text-sm">{t("alerts.description")}</p>
 				<AlertsEditor
 					alerts={file.alerts ?? []}
 					events={data.events}
@@ -132,13 +176,23 @@ export function SchedulesBody({ data, busy, onSave }: SchedulesBodyProps) {
 					busy={busy}
 					onChange={(alerts) => saveWith({ alerts })}
 				/>
-			</Section>
+			</Collapsible>
 		</div>
 	);
 }
 
+/** The pill tone for a schedule's last run status. */
+function lastTone(status: string): PillTone {
+	const s = status.toLowerCase();
+	if (s === "ok" || s === "success" || s === "succeeded" || s === "done") return "ok";
+	if (s === "running" || s === "queued") return "running";
+	if (s === "skipped") return "warn";
+	return "error";
+}
+
 function ScheduleTable({ rows, onRemove, busy }: { rows: ScheduleRow[]; onRemove(name: string): void; busy: boolean }) {
 	const { t } = useTranslation("schedules");
+	const { t: u } = useTranslation("ux13");
 	const [run, runState] = useRunScheduleMutation();
 	const [note, setNote] = useState<string | null>(null);
 	const runNow = async (name: string) => {
@@ -149,57 +203,74 @@ function ScheduleTable({ rows, onRemove, busy }: { rows: ScheduleRow[]; onRemove
 	};
 	return (
 		<div className="flex flex-col gap-2">
-			<table className="w-full text-sm" data-testid="schedules-table">
-				<thead className="text-muted-foreground text-left text-xs">
-					<tr>
-						<th>{t("table.name")}</th>
-						<th>{t("table.kind")}</th>
-						<th>{t("table.cron")}</th>
-						<th>{t("table.next")}</th>
-						<th>{t("table.last")}</th>
-						<th>{t("table.spent")}</th>
-						<th>{t("table.actions")}</th>
-					</tr>
-				</thead>
-				<tbody>
-					{rows.map((r) => (
-						<tr key={r.name} className="border-t align-top" data-testid={`schedule-row-${r.name}`}>
-							<td className="py-2 font-medium">
-								{r.name}
-								{r.problem && <div className="text-chart-error-ink text-xs">{r.problem}</div>}
-							</td>
-							<td className="py-2">
-								{r.kind}
-								<div className="text-muted-foreground text-xs">{r.job || r.experiment}</div>
-							</td>
-							<td className="py-2 font-mono text-xs">
-								{r.cron}
-								{r.timezone ? ` ${r.timezone}` : ""}
-							</td>
-							<td className="py-2 text-xs">{r.next ? new Date(r.next).toLocaleString() : "-"}</td>
-							<td className="py-2 text-xs">
-								{r.last ? `${r.last.status}${r.last.reason ? `: ${r.last.reason}` : ""}` : t("never")}
-							</td>
-							<td className="py-2 text-xs">
-								{r.spent_today_usd.toFixed(2)}
-								{r.max_usd_per_day ? ` / ${r.max_usd_per_day.toFixed(2)}` : ""}
-							</td>
-							<td className="flex gap-2 py-2">
-								<Button size="sm" variant="outline" disabled={runState.isLoading} onClick={() => void runNow(r.name)} data-testid={`schedule-run-${r.name}`}>
-									{t("runNow")}
-								</Button>
-								{r.source === "web" ? (
-									<Button size="sm" variant="ghost" disabled={busy} onClick={() => onRemove(r.name)} data-testid={`schedule-remove-${r.name}`}>
-										{t("remove")}
-									</Button>
-								) : (
-									<span className="text-muted-foreground self-center text-xs">{t("fromCanary")}</span>
-								)}
-							</td>
+			<div className="bg-card min-w-0 overflow-x-auto rounded-xl border">
+				<table className="w-full text-sm" data-testid="schedules-table">
+					<thead className="bg-muted/40 text-muted-foreground sticky top-0 text-left text-xs">
+						<tr>
+							<th className="px-4 py-2.5 font-medium">{t("table.name")}</th>
+							<th className="px-4 py-2.5 font-medium">{t("table.cron")}</th>
+							<th className="px-4 py-2.5 font-medium">{t("table.last")}</th>
+							<th className="px-4 py-2.5 text-right font-medium">{t("table.spent")}</th>
+							<th className="px-4 py-2.5 text-right font-medium">
+								<span className="sr-only">{t("table.actions")}</span>
+							</th>
 						</tr>
-					))}
-				</tbody>
-			</table>
+					</thead>
+					<tbody>
+						{rows.map((r) => (
+							<tr key={r.name} className="hover:bg-muted/30 border-t align-middle transition-colors" data-testid={`schedule-row-${r.name}`}>
+								<td className="max-w-64 px-4 py-3">
+									<div className="truncate font-medium" title={r.name}>
+										{r.name}
+									</div>
+									<div className="text-muted-foreground truncate text-xs" title={r.job || r.experiment}>
+										{r.kind}
+										{r.job || r.experiment ? ` · ${r.job || r.experiment}` : ""}
+									</div>
+								</td>
+								<td className="px-4 py-3 whitespace-nowrap">
+									<div className="font-mono text-xs">
+										{r.cron}
+										{r.timezone ? ` ${r.timezone}` : ""}
+									</div>
+									<div className="text-muted-foreground text-xs">{r.next ? new Date(r.next).toLocaleString() : "-"}</div>
+								</td>
+								<td className="px-4 py-3">
+									{r.problem ? (
+										<Pill tone="warn" title={r.problem}>
+											{u("schedules.pillProblem")}
+										</Pill>
+									) : r.last ? (
+										<Pill tone={lastTone(r.last.status)} title={r.last.reason}>
+											{r.last.status}
+										</Pill>
+									) : (
+										<Pill tone="muted">{t("never")}</Pill>
+									)}
+								</td>
+								<td className="px-4 py-3 text-right text-xs whitespace-nowrap tabular-nums">
+									{r.spent_today_usd.toFixed(2)}
+									{r.max_usd_per_day ? ` / ${r.max_usd_per_day.toFixed(2)}` : ""}
+								</td>
+								<td className="px-4 py-3">
+									<div className="flex justify-end gap-2">
+										<Button size="sm" variant="outline" disabled={runState.isLoading} onClick={() => void runNow(r.name)} data-testid={`schedule-run-${r.name}`}>
+											{t("runNow")}
+										</Button>
+										{r.source === "web" ? (
+											<Button size="sm" variant="ghost" disabled={busy} onClick={() => onRemove(r.name)} data-testid={`schedule-remove-${r.name}`}>
+												{t("remove")}
+											</Button>
+										) : (
+											<span className="text-muted-foreground self-center text-xs whitespace-nowrap">{t("fromCanary")}</span>
+										)}
+									</div>
+								</td>
+							</tr>
+						))}
+					</tbody>
+				</table>
+			</div>
 			{note && (
 				<p className="text-xs" data-testid="schedules-run-note">
 					{note}
@@ -220,12 +291,13 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
 
 function AddScheduleForm({ busy, onAdd }: { busy: boolean; onAdd(s: Schedule): void }) {
 	const { t } = useTranslation("schedules");
+	const { t: u } = useTranslation("ux13");
 	const [s, setS] = useState({ name: "", experiment: "", cron: "0 6 * * *", timezone: "", max: "" });
 	const set = (k: keyof typeof s) => (e: React.ChangeEvent<HTMLInputElement>) => setS({ ...s, [k]: e.target.value });
 	const ok = s.name && s.experiment && s.cron;
 	return (
 		<form
-			className="grid gap-3 md:grid-cols-5"
+			className="flex flex-col"
 			onSubmit={(e) => {
 				e.preventDefault();
 				if (!ok) return;
@@ -240,27 +312,39 @@ function AddScheduleForm({ busy, onAdd }: { busy: boolean; onAdd(s: Schedule): v
 			}}
 			data-testid="schedule-add-form"
 		>
-			<Field label={t("add.name")}>
-				<Input value={s.name} onChange={set("name")} placeholder={t("add.namePlaceholder")} data-testid="schedule-add-name" />
-			</Field>
-			<Field label={t("add.experiment")}>
-				<Input value={s.experiment} onChange={set("experiment")} placeholder={t("add.experimentPlaceholder")} data-testid="schedule-add-experiment" />
-			</Field>
-			<Field label={t("add.cron")}>
-				<Input value={s.cron} onChange={set("cron")} className="font-mono" data-testid="schedule-add-cron" />
-			</Field>
-			<Field label={t("add.timezone")}>
-				<Input value={s.timezone} onChange={set("timezone")} placeholder={t("add.timezonePlaceholder")} />
-			</Field>
-			<Field label={t("add.maxUsd")}>
-				<Input value={s.max} onChange={set("max")} inputMode="decimal" data-testid="schedule-add-max" />
-			</Field>
-			<p className="text-muted-foreground text-xs md:col-span-4">{t("add.hint")}</p>
-			<div>
-				<Button type="submit" size="sm" disabled={busy || !ok} data-testid="schedule-add-submit">
-					{t("add.submit")}
-				</Button>
-			</div>
+			<Step n={1} title={u("schedules.stepWhat")}>
+				<div className="grid gap-3 sm:grid-cols-2">
+					<Field label={t("add.name")}>
+						<Input value={s.name} onChange={set("name")} placeholder={t("add.namePlaceholder")} data-testid="schedule-add-name" />
+					</Field>
+					<Field label={t("add.experiment")}>
+						<Input value={s.experiment} onChange={set("experiment")} placeholder={t("add.experimentPlaceholder")} data-testid="schedule-add-experiment" />
+					</Field>
+				</div>
+			</Step>
+			<Step n={2} title={u("schedules.stepWhen")}>
+				<div className="grid gap-3 sm:grid-cols-2">
+					<Field label={t("add.cron")}>
+						<Input value={s.cron} onChange={set("cron")} className="font-mono" data-testid="schedule-add-cron" />
+					</Field>
+					<Field label={t("add.timezone")}>
+						<Input value={s.timezone} onChange={set("timezone")} placeholder={t("add.timezonePlaceholder")} />
+					</Field>
+				</div>
+				<p className="text-muted-foreground text-xs">{t("add.hint")}</p>
+			</Step>
+			<Step n={3} title={u("schedules.stepCap")} last>
+				<div className="grid gap-3 sm:grid-cols-2">
+					<Field label={t("add.maxUsd")}>
+						<Input value={s.max} onChange={set("max")} inputMode="decimal" data-testid="schedule-add-max" />
+					</Field>
+				</div>
+				<div>
+					<Button type="submit" disabled={busy || !ok} data-testid="schedule-add-submit">
+						{t("add.submit")}
+					</Button>
+				</div>
+			</Step>
 		</form>
 	);
 }

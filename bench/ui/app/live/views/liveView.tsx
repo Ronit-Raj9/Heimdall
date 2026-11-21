@@ -6,6 +6,9 @@ import { Button } from "@/components/ui/button";
 import { useGetPullReadinessQuery } from "@/lib/store/apis/liveinboxApi";
 import { useGetLivescoreQuery, usePullLivescoreMutation } from "@/lib/store/apis/livescoreApi";
 import { LiveActions, LiveSetup } from "./liveActions";
+import { FeatureHero } from "@/components/inbox/featureHero";
+import { Activity } from "lucide-react";
+import { useState } from "react";
 import { useTranslation } from "react-i18next";
 
 /**
@@ -14,6 +17,7 @@ import { useTranslation } from "react-i18next";
  */
 export default function LiveView() {
 	const { t } = useTranslation("bench");
+	const { t: u } = useTranslation("ux13");
 	const status = useGetLivescoreQuery();
 	const data = status.data;
 	// The readiness read says whether this is the hosted server and what a pull still needs.
@@ -21,6 +25,8 @@ export default function LiveView() {
 	const hosted = ready?.hosted ?? false;
 	const configured = Boolean(data?.configured && !data.problem);
 	const needSetup = !configured || Boolean(ready?.live.steps.some((s) => s.link === "#live-setup"));
+	// The setup form opens from the hero, or straight away when a "#live-setup" link brought the user here.
+	const [setupOpen, setSetupOpen] = useState(() => typeof window !== "undefined" && window.location.hash === "#live-setup");
 	return (
 		<section className="flex min-w-0 flex-col gap-6" data-testid="live-screen">
 			<PageHeader
@@ -35,9 +41,22 @@ export default function LiveView() {
 			) : (
 				<>
 					{data.mode === "live" && <LiveActions configured={configured} hosted={hosted} check={ready?.live} />}
-					{data.mode === "live" && needSetup && (
+					{data.mode === "live" && needSetup && !setupOpen && (
+						<FeatureHero
+							icon={Activity}
+							title={u("live.heroTitle")}
+							message={u("live.heroMessage")}
+							testId="live-hero"
+							action={
+								<Button onClick={() => setSetupOpen(true)} data-testid="live-hero-setup">
+									{u("live.heroAction")}
+								</Button>
+							}
+						/>
+					)}
+					{data.mode === "live" && needSetup && setupOpen && (
 						<div id="live-setup" className="scroll-mt-4">
-							<LiveSetup existing={Boolean(data.problem) || configured} hosted={hosted} />
+							<LiveSetup existing={Boolean(data.problem) || configured} hosted={hosted} onClose={() => setSetupOpen(false)} />
 						</div>
 					)}
 					<LiveBody status={data} actions={data.mode === "live" && !hosted ? <PullButton /> : undefined} />
