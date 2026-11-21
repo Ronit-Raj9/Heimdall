@@ -11,6 +11,7 @@ vi.mock("@/lib/store/apis/benchApi", async (importOriginal) => ({
 	...(await importOriginal<typeof import("@/lib/store/apis/benchApi")>()),
 	useGetVerdictQuery: () => okQuery({ verdict: { decision: "improved", action: "ship" } }),
 	useGetClustersQuery: () => okQuery({ clusters: [{ signature: "sig_timeout", title: "Agent timed out", count: 3 }] }),
+	useGetAgentsQuery: () => okQuery({ agents: [{ id: "stub", path: "agents/stub.yaml" }] }),
 }));
 vi.mock("@/lib/store/apis/integrityApi", () => ({
 	useGetAwarenessQuery: () =>
@@ -38,6 +39,9 @@ describe("AnalysisTab", () => {
 		expect(html).toContain('data-testid="analysis-link-cost-explain"');
 		expect(html).toContain('data-testid="analysis-link-pareto"');
 		expect(html).toContain('data-testid="analysis-audit-submit"');
+		// tier-2 blame replay sits on the blame card
+		expect(html).toContain('data-testid="job-run-blame.replay"');
+		expect(html).toContain('data-testid="blame-replay-stub"');
 	});
 	it("passes exp_id only to the per-experiment kinds", () => {
 		const check = ANALYSIS_JOBS.find((s) => s.kind === "check.run")!;

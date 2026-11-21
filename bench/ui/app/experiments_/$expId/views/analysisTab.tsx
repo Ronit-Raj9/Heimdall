@@ -1,3 +1,4 @@
+import { BlameReplay } from "@/components/experiments/blameReplay";
 import { JobRunButton } from "@/components/jobs/jobRunButton";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -238,6 +239,7 @@ function AnalysisJobCard({ spec, expId, onFinished }: { spec: AnalysisJobSpec; e
 						{summary ? `: ${summary}` : ""}
 					</span>
 				)}
+				{spec.key === "blame" && <BlameReplay expId={expId} />}
 			</CardContent>
 		</Card>
 	);

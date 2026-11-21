@@ -3,8 +3,9 @@ package main
 // Web parity lane L15 (Analysis): the analysis commands as background jobs,
 // run in-process on the org's launcher. Every kind reads sealed run folders
 // only and starts no container, so each one also runs on the hosted server.
-// blame.run is tier 1 only: a tier-2 replay runs agents again and stays a
-// CLI command (`bifrost-bench blame -replay`).
+// blame.run is tier 1 only: a tier-2 replay runs agents again, so it is its
+// own kind, blame.replay (jobs_blamereplay.go), which runs through the
+// launcher.
 
 import (
 	"context"
@@ -320,7 +321,7 @@ func blameRunJob(ctx context.Context, l *launcher, p analysisParams, log jobs.Lo
 	if p.RunID != "" && res.Runs+res.Skipped == 0 {
 		return nil, fmt.Errorf("%w: run %s is not a sealed run of %s", jobs.ErrNotFound, p.RunID, p.ExpID)
 	}
-	log.Printf("blame written for %d runs: %d failed, %d pinned on one agent (tier 1; replays stay a CLI step)", res.Runs, res.Failed, res.Blamed)
+	log.Printf("blame written for %d runs: %d failed, %d pinned on one agent (tier 1; run blame.replay for tier 2)", res.Runs, res.Failed, res.Blamed)
 	return res, nil
 }
 
