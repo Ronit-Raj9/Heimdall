@@ -2,7 +2,7 @@ import { ForbiddenNote, isRoleRefusal } from "@/components/platform/accessNotes"
 import { ConfirmButton, RunnerStatusBadge } from "@/components/platform/badges";
 import { CopyBlock, OneTimeSecret } from "@/components/platform/oneTimeSecret";
 import { isValidPool, runnerStartCommand } from "@/components/platform/platform.utils";
-import { isSharedWorker } from "@/components/workers/workersTable";
+import { isSharedWorker, SharedWorkerNote } from "@/components/workers/workersTable";
 import { BlockSkeleton, EmptyNote, LoadError } from "@/components/runs/screenStates";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -90,6 +90,9 @@ export function RunnersTab({ org }: { org: OrgSummary }) {
 									</div>
 									<RunnerStatusBadge state={runner.state} />
 								</div>
+								{isSharedWorker(runner.name, runner.pool) && (
+									<SharedWorkerNote slots={runner.slots} setupHref="#runner-token-setup" testId={`runner-row-${runner.id}-shared-note`} />
+								)}
 								<div className="text-muted-foreground flex flex-wrap items-center gap-x-4 gap-y-1 text-xs">
 									<Badge variant="outline" className="rounded-full px-2 font-mono">
 										{runner.pool}
@@ -138,7 +141,9 @@ export function RunnersTab({ org }: { org: OrgSummary }) {
 					testId="runner-start-command"
 				/>
 			</SettingsSection>
-			<RunnerTokensSection />
+			<div id="runner-token-setup" className="scroll-mt-6">
+				<RunnerTokensSection />
+			</div>
 		</div>
 	);
 }
