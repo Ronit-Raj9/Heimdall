@@ -352,6 +352,23 @@ func TestCacheBreakNamesTheCause(t *testing.T) {
 			t.Errorf("findings = %v, want over-time drops in A and B", kinds)
 		}
 	})
+	t.Run("unpriced new model: the model change is named", func(t *testing.T) {
+		// Live migration report, 21 Nov 2026: gpt-6.1-sol (priced) to
+		// gpt-6.2-sol (unpriced). The served model of the unpriced arm was
+		// not recorded, so the cause claimed the served model was the same.
+		f := newFixture()
+		f.add("A", "t1", true, []schemas.CostRow{row("small", 1000, 9000, 0, 100, prices)}, nil)
+		unpriced := schemas.CostRow{RequestID: "u", Attempt: 1, Model: "mystery", Tokens: schemas.Tokens{Fresh: 9000, CacheRead: 1000, Out: 100},
+			USD: schemas.UnknownWithin("no price", schemas.EvidenceGateway, 0, 0.5)}
+		f.add("B", "t1", true, []schemas.CostRow{unpriced}, nil)
+		e := f.explain(t, prices)
+		if len(e.Cache) != 1 || !strings.HasPrefix(e.Cache[0].Cause, "served model changed (small vs mystery)") {
+			t.Fatalf("cache findings = %+v, want the served model change as the cause", e.Cache)
+		}
+		if strings.Join(e.B.ServedModels, ",") != "mystery" {
+			t.Errorf("B served models = %v, want [mystery]", e.B.ServedModels)
+		}
+	})
 	t.Run("no drop, no finding", func(t *testing.T) {
 		f := newFixture()
 		f.add("A", "t1", true, []schemas.CostRow{row("small", 1000, 9000, 0, 100, prices)}, nil)

@@ -301,6 +301,12 @@ func (g *agg) addRun(ev *RunEvidence, prices *evidence.PriceTable) (known, lo, h
 		g.allTokens.CacheRead += row.Tokens.CacheRead
 		g.allTokens.CacheWrite += row.Tokens.CacheWrite
 		g.allTokens.Out += row.Tokens.Out
+		// The served model is recorded for every row that carried tokens,
+		// priced or not: an arm on an unpriced model still served that
+		// model, and the cache finding needs it to name a model change.
+		if tok := row.Tokens; row.Model != "" && tok.Fresh+tok.CacheRead+tok.CacheWrite+tok.Out > 0 {
+			g.models[row.Model]++
+		}
 		usd, ok := row.USD.Float()
 		if !ok || !finite(usd) {
 			g.unpricedRows++
@@ -321,9 +327,6 @@ func (g *agg) addRun(ev *RunEvidence, prices *evidence.PriceTable) (known, lo, h
 			g.wasted += usd
 			g.wastedRows++
 			continue
-		}
-		if row.Model != "" {
-			g.models[row.Model]++
 		}
 		p, ok := prices.Lookup(row.Model)
 		if !ok || math.Abs(p.Cost(tok)-usd) > splitTolerance*math.Max(usd, 1e-9) {
