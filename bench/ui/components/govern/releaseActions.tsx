@@ -1,14 +1,17 @@
 import { JobRunButton } from "@/components/jobs/jobRunButton";
 import { Card, CardContent } from "@/components/ui/card";
+import { useListCompliancePacksQuery } from "@/lib/store/apis/governApi";
 import type { ReleaseRecord } from "@/lib/types/bench";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
+import { CompliancePacks } from "./compliancePacks";
 
 /** Release log actions as background jobs: verify the hash chain and evidence, write a release's compliance pack. */
 export function ReleaseActions({ releases, onDone }: { releases: ReleaseRecord[]; onDone?(): void }) {
 	const { t } = useTranslation("govern");
 	const newest = releases.length > 0 ? releases[releases.length - 1].release_id : "";
 	const [picked, setPicked] = useState("");
+	const packs = useListCompliancePacksQuery();
 	const releaseId = picked || newest;
 	return (
 		<Card data-testid="release-actions">
@@ -39,10 +42,17 @@ export function ReleaseActions({ releases, onDone }: { releases: ReleaseRecord[]
 								))}
 							</select>
 						</label>
-						<JobRunButton kind="release.compliance" params={{ release_id: releaseId }} label={t("releases.compliance")} variant="outline" />
+						<JobRunButton
+							kind="release.compliance"
+							params={{ release_id: releaseId }}
+							label={t("releases.compliance")}
+							variant="outline"
+							onDone={() => void packs.refetch()}
+						/>
 						<p className="text-muted-foreground text-xs">{t("releases.complianceHint")}</p>
 					</div>
 				)}
+				<CompliancePacks />
 			</CardContent>
 		</Card>
 	);

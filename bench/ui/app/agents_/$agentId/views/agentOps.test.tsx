@@ -4,6 +4,7 @@ import type { AgentMCPResponse, AgentSkillsResponse } from "@/lib/types/agentops
 import type { AgentSummary } from "@/lib/types/bench";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it, vi } from "vitest";
+import en from "@/locales/en/agentops.json";
 import { ChecksTab } from "./checksTab";
 import { ToolsTab, skillNameFromFile } from "./toolsTab";
 
@@ -69,7 +70,10 @@ describe("agent ops tabs", () => {
 
 	it("checks tab points to New agent when the agent is missing", () => {
 		state.agents = [];
-		expect(renderToStaticMarkup(<ChecksTab agentId="ghost" />)).toContain('data-testid="checks-no-agent"');
+		const html = renderToStaticMarkup(<ChecksTab agentId="ghost" />);
+		expect(html).toContain('data-testid="checks-no-agent"');
+		expect(html).toContain("No agent &quot;ghost&quot; in this project");
+		expect(html).toContain('href="/agents/new"');
 	});
 
 	it("tools tab lists skills with a scan job and the MCP servers", () => {
@@ -100,6 +104,21 @@ describe("agent ops tabs", () => {
 	it("tools tab shows the empty skills state", () => {
 		state.skills = { agent: "codex", config_path: "agents/codex.yaml", dir: "agents/codex/skills", installed: false, skills: [] };
 		expect(renderToStaticMarkup(<ToolsTab agentId="codex" />)).toContain('data-testid="agent-skills-empty"');
+	});
+
+	it("reads every visible string from locales/en/agentops.json", () => {
+		state.agents = [codex];
+		state.hosted = false;
+		const checks = renderToStaticMarkup(<ChecksTab agentId="codex" />);
+		expect(checks).toContain(en.checks.check.title);
+		expect(checks).toContain(en.checks.build.hintDockerfile.replace("{{image}}", "bench/codex:1").replace("{{dockerfile}}", "agents/images/codex/Dockerfile"));
+		expect(checks).toContain(en.checks.diff.open);
+		const tools = renderToStaticMarkup(<ToolsTab agentId="codex" />);
+		expect(tools).toContain(en.tools.skills.title);
+		expect(tools).toContain(en.tools.mcp.title);
+		expect(tools).toContain(en.tools.skills.upload);
+		expect(tools).not.toMatch(/tools\.(skills|mcp)\./);
+		expect(checks).not.toMatch(/checks\.(check|build|diff)\./);
 	});
 
 	it("derives a skill name from the zip name", () => {

@@ -7,3 +7,6 @@
 /deploy/.env
 # The bench binary copied in to build the fault proxy image.
 /deploy/bifrost-bench
+# Server state: per-job config copies and local exports, schedules, webhooks and sync records.
+/.heimdall-jobs/
+/.heimdall/

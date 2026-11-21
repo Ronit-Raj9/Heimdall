@@ -66,6 +66,20 @@ export interface PolicyValidation {
 	policy?: ReleasePolicy;
 }
 
+/** One compliance pack file (handlers.CompliancePack): compliance-<release_id>.md or .json. */
+export interface CompliancePack {
+	name: string;
+	release_id: string;
+	format: "md" | "json";
+	size: number;
+	created_at: string;
+}
+
+/** GET /compliance-packs. */
+export interface CompliancePackList {
+	packs: CompliancePack[];
+}
+
 declare module "@/lib/i18n/resources" {
 	interface LaneResources {
 		govern: typeof import("@/locales/en/govern.json");

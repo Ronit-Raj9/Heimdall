@@ -1,3 +1,4 @@
+import { jobKindLabel } from "@/components/jobs/jobKindLabels";
 import { JobStatusBadge } from "@/components/platform/badges";
 import { BlockSkeleton, LoadError } from "@/components/runs/screenStates";
 import { Button } from "@/components/ui/button";
@@ -18,12 +19,12 @@ const IDLE_POLL_MS = 30_000;
 /** Finished jobs listed in the drawer. */
 const RECENT_LIMIT = 12;
 
-/** A job's kind in words ("experiment.run" is jobs.kinds.experiment_run); unknown kinds show as written. */
+/** A job's kind in words ("experiment.run" is jobs.kinds.experiment_run); then the shared kind map (jobKindLabels.ts); unknown kinds show as written. */
 export function useJobKindLabel(): (kind: string) => string {
 	const { t, i18n } = useTranslation("platform");
 	return (kind) => {
 		const key = `jobs.kinds.${kind.replace(/\./g, "_")}`;
-		return i18n.exists(key, { ns: "platform" }) ? t(key as "jobs.kinds.suite_lint") : kind;
+		return i18n.exists(key, { ns: "platform" }) ? t(key as "jobs.kinds.suite_lint") : jobKindLabel(kind);
 	};
 }
 

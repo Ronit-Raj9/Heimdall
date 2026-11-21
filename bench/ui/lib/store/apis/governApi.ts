@@ -1,8 +1,9 @@
-import type { PolicyDocument, PolicyList, PolicySaveRequest, PolicyValidation } from "@/lib/types/govern";
+import type { CompliancePackList, PolicyDocument, PolicyList, PolicySaveRequest, PolicyValidation } from "@/lib/types/govern";
 import { benchApi } from "./benchApi";
+import { BENCH_API_BASE } from "./fixtures";
 
 /** Govern area (web parity lane L16): the release policy editor over handlers/policies.go. */
-export const governApi = benchApi.enhanceEndpoints({ addTagTypes: ["BenchPolicy"] }).injectEndpoints({
+export const governApi = benchApi.enhanceEndpoints({ addTagTypes: ["BenchPolicy", "CompliancePacks"] }).injectEndpoints({
 	endpoints: (builder) => ({
 		listPolicies: builder.query<PolicyList, void>({
 			query: () => "/policies",
@@ -29,8 +30,17 @@ export const governApi = benchApi.enhanceEndpoints({ addTagTypes: ["BenchPolicy"
 				{ type: "BenchPolicy", id: file },
 			],
 		}),
+		listCompliancePacks: builder.query<CompliancePackList, void>({
+			query: () => "/compliance-packs",
+			providesTags: [{ type: "CompliancePacks", id: "LIST" }],
+		}),
 	}),
 });
+
+/** The download URL of one compliance pack file (GET /compliance-packs/{name}). */
+export function compliancePackUrl(name: string): string {
+	return `${BENCH_API_BASE}/compliance-packs/${encodeURIComponent(name)}`;
+}
 
 /** A policy file's path, escaped as one segment. */
 export function policyPath(file: string): string {
@@ -54,4 +64,5 @@ export const {
 	useSavePolicyMutation,
 	useValidatePolicyMutation,
 	useDeletePolicyMutation,
+	useListCompliancePacksQuery,
 } = governApi;
