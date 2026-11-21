@@ -10,7 +10,7 @@
 # the team's patch is the diff of that tree against the base commit (test
 # files dropped, as upstream does), and the rest is upstream's procedure with
 # upstream's runner.sh (a trusted copy, not the image's).
-import json, os, re, shutil, subprocess, sys, tempfile
+import base64, json, os, re, shutil, subprocess, sys, tempfile
 
 G = "/grader/tests"
 OUT = "/grader/out"
@@ -118,7 +118,10 @@ def run_feature(work, patches, n, patch):
     git(work, "checkout", "--force", BASE, check=False)
     git(work, "reset", "--hard", BASE)
     git(work, "clean", "-fd", check=False)
-    shutil.copy(os.path.join(G, "tests%d.patch" % n), os.path.join(patches, "tests.patch"))
+    with open(os.path.join(G, "tests%d.patch.b64" % n), "rb") as f:
+        tests = base64.b64decode(f.read())
+    with open(os.path.join(patches, "tests.patch"), "wb") as f:
+        f.write(tests)
     open(os.path.join(patches, "agent.patch"), "w", encoding="utf-8", errors="surrogateescape").write(patch)
     runner = runner_copy(work, patches)
     try:

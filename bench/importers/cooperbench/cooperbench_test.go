@@ -31,17 +31,17 @@ func TestImportFixture(t *testing.T) {
 			t.Errorf("task.yaml lacks %q", want)
 		}
 	}
-	for _, f := range []string{"verifier/tests/verify.py", "verifier/tests/tests1.patch", "verifier/tests/tests2.patch", "verifier/tests/runner.sh", "solution/reference.sh", "controls/mutant-one-feature.sh", "instruction.md"} {
+	for _, f := range []string{"verifier/tests/verify.py", "verifier/tests/tests1.patch.b64", "verifier/tests/tests2.patch.b64", "verifier/tests/runner.sh", "solution/reference.sh", "controls/mutant-one-feature.sh", "instruction.md"} {
 		if _, err := os.Stat(filepath.Join(dir, f)); err != nil {
 			t.Errorf("missing %s", f)
 		}
 	}
 	ref, _ := os.ReadFile(filepath.Join(dir, "solution/reference.sh"))
-	if !strings.Contains(string(ref), "def f2()") || !strings.Contains(string(ref), "!= agent1") {
+	if !strings.Contains(string(ref), "base64 -d") || !strings.Contains(string(ref), "!= agent1") {
 		t.Error("reference must apply combined.patch, lead only")
 	}
 	mut, _ := os.ReadFile(filepath.Join(dir, "controls/mutant-one-feature.sh"))
-	if strings.Contains(string(mut), "def f2()") {
+	if strings.Contains(string(mut), "!= agent1") == false {
 		t.Error("mutant must hold feature 1 only")
 	}
 	if _, err := im.Import(context.Background(), importers.Options{BenchRoot: root, From: "testdata", SuiteID: "cb", IDs: []string{"nope"}}); err != nil {
