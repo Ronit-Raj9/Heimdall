@@ -21,7 +21,7 @@ func init() {
 
 const suiteUsage = `usage: bifrost-bench suite init <suite id> -template python-pytest|node-test|go-test|generic-reward|tool-use|mcp|browser|memory|qa|artifact|external-api|computer-use|research [-image <existing image>] [-config deploy/bench.yaml]
        bifrost-bench suite lint|lock [-config deploy/bench.yaml | -root benchmarks] [-pin-local-images] <suite id>
-       bifrost-bench suite admit [-config deploy/bench.yaml] [-task t01] <suite id>
+       bifrost-bench suite admit [-config deploy/bench.yaml] [-task t01 ...] [-tasks-file ids.txt] [-parallel N] <suite id>
        bifrost-bench suite health|quarantine|restore|canary|canary-check ... (run one with -h for its flags)`
 
 func runSuite(args []string) int {
@@ -139,13 +139,67 @@ func loadSuite(ctx context.Context, root, ref string) (*schemas.Suite, error) {
 func runAdmit(args []string) int {
 	fs := flag.NewFlagSet("suite admit", flag.ContinueOnError)
 	config := fs.String("config", defaultConfig, "bench config")
-	only := fs.String("task", "", "admit only this task")
+	var tasks multiFlag
+	fs.Var(&tasks, "task", "admit only this task (repeatable)")
+	tasksFile := fs.String("tasks-file", "", "file of task ids to admit, one per line (# comments allowed)")
+	parallel := fs.Int("parallel", 1, "admit this many tasks at once")
 	pos, err := parseArgs(fs, args)
 	if err != nil || len(pos) != 1 {
 		fmt.Fprintln(os.Stderr, suiteUsage)
 		return exitUsage
 	}
-	return admitSuite(context.Background(), *config, pos[0], *only)
+	ids := []string(tasks)
+	if *tasksFile != "" {
+		more, err := readTaskIDs(*tasksFile)
+		if err != nil {
+			return fail("%v", err)
+		}
+		if len(more) == 0 {
+			return fail("%s lists no tasks", *tasksFile)
+		}
+		ids = append(ids, more...)
+	}
+	return admitSuiteMany(context.Background(), *config, pos[0], ids, *parallel)
+}
+
+// multiFlag is a repeatable string flag.
+type multiFlag []string
+
+func (m *multiFlag) String() string     { return strings.Join(*m, ",") }
+func (m *multiFlag) Set(v string) error { *m = append(*m, v); return nil }
+
+// readTaskIDs reads one task id per line; blank lines and # comments skip.
+func readTaskIDs(path string) ([]string, error) {
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return nil, err
+	}
+	var ids []string
+	for _, line := range strings.Split(string(data), "\n") {
+		if i := strings.IndexByte(line, '#'); i >= 0 {
+			line = line[:i]
+		}
+		if line = strings.TrimSpace(line); line != "" {
+			ids = append(ids, line)
+		}
+	}
+	return ids, nil
+}
+
+// admitSuiteMany admits the chosen tasks (every task when ids is empty) with
+// parallel workers through ops.SuiteAdmitMany: the suite loads once, only the
+// chosen tasks are hashed, suite.lock is written after each task, and a
+// refused or failed task is recorded and skipped. It exits 0 when every task
+// ran, admitted or not.
+func admitSuiteMany(ctx context.Context, config, ref string, ids []string, parallel int) int {
+	a, err := newApp(ctx, config, appOptions{})
+	if err != nil {
+		return fail("%v", err)
+	}
+	if _, err := ops.SuiteAdmitMany(ctx, a.admitEnv(config), ref, ops.AdmitManyOptions{Tasks: ids, Parallel: parallel}, os.Stdout); err != nil {
+		return fail("%v", err)
+	}
+	return exitOK
 }
 
 // admitSuite admits the tasks of suite ref (only one when only is set) with
