@@ -26,3 +26,4 @@
 # config copies and local exports, schedules, webhooks and sync records.
 /.heimdall-jobs/
 /.heimdall/
+/cmd/bifrost-bench/bifrost-bench
