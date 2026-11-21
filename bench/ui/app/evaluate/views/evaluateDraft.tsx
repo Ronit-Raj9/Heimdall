@@ -103,6 +103,19 @@ export function draftToSpec(d: EvaluateDraft): EvaluationSpec {
 	};
 }
 
+/** The draft fields a step that edits an EvaluationSpec (steps 4 and 5) changes. The name stays the draft's. */
+export function specToPatch(spec: EvaluationSpec): Partial<EvaluateDraft> {
+	return {
+		arms: spec.arms,
+		benchmarks: spec.benchmarks,
+		pack: spec.pack ? spec.pack : null,
+		tasksPerBenchmark: spec.tasks_per_benchmark,
+		trials: spec.trials,
+		faults: spec.faults,
+		budgetUsd: spec.budget_usd ?? null,
+	};
+}
+
 export function defaultName(d: EvaluateDraft): string {
 	const who = d.agent ? `${d.agent}${d.version != null ? ` v${d.version}` : ""}` : "agent";
 	switch (d.mode) {

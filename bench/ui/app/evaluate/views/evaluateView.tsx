@@ -7,7 +7,7 @@ import { ArrowLeft, ArrowRight, Check } from "lucide-react";
 import { parseAsInteger, parseAsString, useQueryState } from "nuqs";
 import { useEffect } from "react";
 import { useTranslation } from "react-i18next";
-import { EvaluateDraftProvider, learnStepReady, useEvaluateDraft, type EvaluateDraft } from "./evaluateDraft";
+import { draftToSpec, EvaluateDraftProvider, learnStepReady, specToPatch, useEvaluateDraft, type EvaluateDraft } from "./evaluateDraft";
 import { asEvaluateStep, EVALUATE_STEPS, type EvaluateStep } from "./evaluate.utils";
 import { Step1Agent } from "./step1Agent";
 import { Step2Learn } from "./step2Learn";
@@ -119,8 +119,8 @@ function EvaluateWizard() {
 				{step === 1 && <Step1Agent />}
 				{step === 2 && <Step2Learn />}
 				{step === 3 && <Step3Benchmarks />}
-				{step === 4 && <Step4Setup />}
-				{step === 5 && <Step5Launch />}
+				{step === 4 && <Step4Setup spec={draftToSpec(draft)} onChange={(s) => update(specToPatch(s))} />}
+				{step === 5 && <Step5Launch spec={draftToSpec(draft)} onChange={(s) => update(specToPatch(s))} />}
 			</div>
 
 			<div className="flex items-center justify-between border-t pt-4">
