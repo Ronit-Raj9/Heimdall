@@ -10,7 +10,11 @@ policy blocks. Or, with --exp, gate an experiment that already ran.
 Environment: HEIMDALL_URL (default http://127.0.0.1:8090) and
 BENCH_WRITE_TOKEN (needed to plan and start; reads need no token).
 
-Exit codes: 0 gate passed, 1 policy blocks, 2 experiment did not finish,
+The gate fails on the verdicts in --fail-on (default regressed,invalid, as
+`bifrost-bench check -fail-on`) and on a release policy block; --policy-only
+gates on the policy alone.
+
+Exit codes: 0 gate passed, 1 verdict or policy fails the gate, 2 experiment did not finish,
 3 server is not live (a recorded or synthetic answer is never a real result
 unless --allow-recorded), 4 plan refused or request failed.
 """
@@ -38,6 +42,8 @@ def main(argv=None) -> int:
     ap.add_argument("--interval", type=float, default=10, help="seconds between status polls")
     ap.add_argument("--allow-recorded", action="store_true", help="accept a recorded or synthetic server (demos only)")
     ap.add_argument("--fail-on-warn", action="store_true", help="also fail when the policy warns")
+    ap.add_argument("--fail-on", default=DEFAULT_FAIL_ON, help="comma-separated verdicts that fail the gate (default %s)" % DEFAULT_FAIL_ON)
+    ap.add_argument("--policy-only", action="store_true", help="gate on the release policy alone, ignoring the verdict")
     args = ap.parse_args(argv)
     if bool(args.experiment) == bool(args.exp):
         ap.error("give an experiment file or --exp, not both")
@@ -69,11 +75,31 @@ def main(argv=None) -> int:
     for c in (policy or {}).get("checks", []):
         if c["status"] != "pass":
             print("  %s %s: %s %s" % (c["status"], c["id"], c.get("threshold", ""), c.get("reason", "")))
-    if result.blocked or (args.fail_on_warn and result.policy_decision == "warn"):
-        print("gate FAILED: release policy %s" % result.policy_decision)
+    reason = gate_failure(result, [] if args.policy_only else parse_fail_on(args.fail_on), args.fail_on_warn)
+    if reason:
+        print("gate FAILED: %s" % reason)
         return 1
     print("gate passed")
     return 0
+
+
+DEFAULT_FAIL_ON = "regressed,invalid"
+
+
+def parse_fail_on(value: str):
+    """The verdicts of a --fail-on list."""
+    return [v.strip() for v in value.split(",") if v.strip()]
+
+
+def gate_failure(result, fail_on, fail_on_warn: bool = False):
+    """Why the gate fails, or None. A verdict listed in fail_on fails it, as
+    the direct CLI's default -fail-on does (QC2-22-03), and so does a policy
+    block (or warn with fail_on_warn)."""
+    if result.blocked or (fail_on_warn and result.policy_decision == "warn"):
+        return "release policy %s" % result.policy_decision
+    if result.decision in fail_on:
+        return "verdict %s, action %s" % (result.decision, result.action)
+    return None
 
 
 def run(client: Client, path: str, timeout: float, interval: float):

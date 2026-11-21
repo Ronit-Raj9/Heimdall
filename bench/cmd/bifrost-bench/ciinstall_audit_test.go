@@ -6,6 +6,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"regexp"
 	"strings"
 	"sync/atomic"
 	"testing"
@@ -67,6 +68,27 @@ func TestCheckFailsWithoutJSONReport(t *testing.T) {
 	}
 }
 
+// QC2-21-05, QC2-21-08: check refuses a -out that is also its JSON sidecar,
+// and a saved experiment id together with an experiment file; run refuses
+// -resume with a file. All before anything runs.
+func TestCheckRefusesAmbiguousOutputAndTargets(t *testing.T) {
+	_, config := evidenceSandbox(t, "")
+	dir := t.TempDir()
+	out := filepath.Join(dir, "claimed-markdown.json")
+	if code := runCheck([]string{"-config", config, "-exp", "e_smoke_sdoj", "-out", out}); code != exitUsage {
+		t.Fatalf("check -out x.json: exit %d", code)
+	}
+	if _, err := os.Stat(out); err == nil {
+		t.Fatal("check wrote the colliding report")
+	}
+	if code := runCheck([]string{"-config", config, "-exp", "e_smoke_sdoj", "absent-experiment.yaml", "-out", filepath.Join(dir, "r.md")}); code != exitUsage {
+		t.Fatalf("check with -exp and a file: exit %d", code)
+	}
+	if code := runRun([]string{"-config", config, "-resume", "e_smoke_sdoj", "absent-experiment.yaml"}); code != exitUsage {
+		t.Fatalf("run with -resume and a file: exit %d", code)
+	}
+}
+
 // plan, run and check read the experiment file before they set the gateway
 // up: a missing file changes nothing on the gateway (audit 5-B-08).
 func TestPlanReadsExperimentBeforeGatewaySetup(t *testing.T) {
@@ -100,6 +122,27 @@ func TestPlanReadsExperimentBeforeGatewaySetup(t *testing.T) {
 	}
 	if n := calls.Load(); n != 0 {
 		t.Fatalf("%d gateway calls before the experiment was read", n)
+	}
+	// QC2-21-10: a schema-valid experiment naming a missing suite also
+	// fails before the gateway is set up.
+	raw, err := os.ReadFile("../../experiments/smoke.yaml")
+	if err != nil {
+		t.Skip("no experiments/smoke.yaml")
+	}
+	noSuite := filepath.Join(dir, "no-suite.yaml")
+	if err := os.WriteFile(noSuite, []byte(regexp.MustCompile(`(?m)^suite: .*$`).ReplaceAllString(string(raw), "suite: no-such-suite@1.0.0")), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := loadExperiment(noSuite); err != nil {
+		t.Fatalf("fixture not schema-valid: %v", err)
+	}
+	for _, run := range []func([]string) int{runPlan, runRun, runCheck} {
+		if code := run([]string{"-config", config, noSuite}); code == exitOK {
+			t.Fatal("missing suite: exit 0")
+		}
+	}
+	if n := calls.Load(); n != 0 {
+		t.Fatalf("%d gateway calls for an experiment with a missing suite", n)
 	}
 }
 

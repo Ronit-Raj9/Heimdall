@@ -187,22 +187,27 @@ func (g *visualGrader) judge(ctx context.Context, rc *schemas.RunContext, spec *
 		res.Rationale = rationales[0]
 	}
 	res.Verdict, res.Score = tallyVisual(res.Votes, res.Scores, res.Aggregate, j.PassScore)
-	g.calibrate(rc, res)
+	id := visualJudgeID(j)
+	g.calibrate(rc, res, id)
 	rec := &schemas.JudgeRecord{Model: j.Model, PromptVersion: j.PromptVersion, PromptSHA256: promptSHA, Votes: textVotes(res.Votes),
-		USD: res.USD, PriceRef: res.PriceRef, ServedModel: res.ServedModel, Calibration: res.Calibration}
+		USD: res.USD, PriceRef: res.PriceRef, ServedModel: res.ServedModel, Calibration: res.Calibration,
+		Provider: id.Provider, Aggregate: id.Aggregate, PassScore: id.PassScore}
 	return res, rec, nil
 }
 
 // calibrate looks up the W8 calibration record for the judge's model that
 // covers the vision template, and keeps its agreement numbers beside the
 // grade. Without one the judge reports and the verdict instrument caps it.
-func (g *visualGrader) calibrate(rc *schemas.RunContext, res *schemas.VisualJudgeResult) {
+//
+// The record must have measured this judge configuration: provider, votes
+// and, for aggregate mean, the pass score (QC2-25-03, QC2-25-05).
+func (g *visualGrader) calibrate(rc *schemas.RunContext, res *schemas.VisualJudgeResult, id calibration.JudgeID) {
 	recs, err := calibration.ReadRecords(rc.Suite.Root)
 	if err != nil || rc.Suite.Root == "" {
 		res.Reason = fmt.Sprintf("no calibration record for %s and %s (%s)", res.Model, res.PromptVersion, short(res.PromptSHA256))
 		return
 	}
-	rec, _ := recs.Covering(res.Model, []string{res.PromptSHA256})
+	rec, _ := recs.Covering(id, []string{res.PromptSHA256})
 	if rec == nil {
 		res.Reason = fmt.Sprintf("no calibration record for %s and %s (%s); judge_calibration caps the verdict at INCONCLUSIVE", res.Model, res.PromptVersion, short(res.PromptSHA256))
 		return
@@ -387,6 +392,20 @@ func textVotes(votes []string) []string {
 		}
 	}
 	return out
+}
+
+// visualJudgeID is the calibration identity of a vision judge spec. Only
+// aggregate mean is recorded (majority is the default) and only then the
+// pass score, defaulted.
+func visualJudgeID(j *schemas.VisualJudgeSpec) calibration.JudgeID {
+	id := calibration.JudgeID{Provider: j.Provider, Model: j.Model, Votes: max(j.Votes, 1)}
+	if aggregateOf(j) == visualAggMean {
+		id.Aggregate, id.PassScore = visualAggMean, j.PassScore
+		if id.PassScore == 0 {
+			id.PassScore = visualMeanDefault
+		}
+	}
+	return id
 }
 
 func aggregateOf(j *schemas.VisualJudgeSpec) string {

@@ -13,6 +13,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/maximhq/bifrost/bench/calibration"
 	"github.com/maximhq/bifrost/bench/schemas"
 	"github.com/maximhq/bifrost/bench/utils"
 )
@@ -182,8 +183,9 @@ func (g *judge) Grade(ctx context.Context, rc *schemas.RunContext, diff *schemas
 		return nil, fmt.Errorf("%s: %w", JudgeType, err)
 	}
 	rec.PromptSHA256 = utils.SHA256Bytes([]byte(tmpl))
-	rec.Calibration = calibrationRef(rc.Suite, spec.Model, rec.PromptSHA256) // W8 judge calibration: the record in force (judgecalibration.go)
-	if spec.Auditor != nil {                                                 // W8 judge calibration: the auditor never decides
+	rec.Provider = spec.Provider                                                                // calibration identity (QC2-25-05)
+	rec.Calibration = calibrationRef(rc.Suite, calibration.GradeJudgeID(rec), rec.PromptSHA256) // W8 judge calibration: the record in force (judgecalibration.go)
+	if spec.Auditor != nil {                                                                    // W8 judge calibration: the auditor never decides
 		rec.Audit = g.audit(ctx, rc, spec, renderJudgePrompt(tmpl, ans, answer), rec.Votes)
 	}
 	grade.Judged, grade.Judge = true, rec

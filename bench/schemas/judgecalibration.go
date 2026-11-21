@@ -145,6 +145,8 @@ type CalibrationRecord struct {
 	PromptSHA256  string                    `json:"prompt_sha256"` // sha256 over the prompt version's template hashes
 	Templates     map[string]string         `json:"templates"`     // templates the items were judged with: name -> sha256 of its text, as JudgeRecord.PromptSHA256
 	Votes         int                       `json:"votes"`
+	Aggregate     string                    `json:"aggregate,omitempty"`     // vision judge: majority | mean, how a grade's votes decide; "" is majority
+	PassScore     float64                   `json:"pass_score,omitempty"`    // vision judge with aggregate mean: the score a grade's mean must reach
 	ServedModels  []string                  `json:"served_models,omitempty"` // model ids the gateway reported
 	SetSHA256     string                    `json:"set_sha256"`              // sha256 of the labels.jsonl snapshot (sets/<sha>.jsonl)
 	SetRows       int                       `json:"set_rows"`
@@ -155,6 +157,7 @@ type CalibrationRecord struct {
 	Human         CalibrationStats          `json:"human"`
 	Seed          *CalibrationStats         `json:"seed,omitempty"`
 	Categories    []CalibrationCategory     `json:"categories,omitempty"`
+	ByTemplate    []CalibrationCategory     `json:"by_template,omitempty"` // human-item statistics per template sha256 (Category is the hash); a template without an entry has no human evidence
 	Consistency   CalibrationConsistency    `json:"consistency"`
 	Perturbations []CalibrationPerturbation `json:"perturbations,omitempty"`
 	Items         []CalibrationItemResult   `json:"items"`

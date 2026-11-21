@@ -183,6 +183,39 @@ describe("Client", () => {
 		await assert.rejects(new Client(base, { timeoutMs: 100, readRetries: 0 }).health(), HeimdallTimeout);
 	});
 
+	it("times out a body that stalls after the headers (QC2-20-04)", async () => {
+		// Headers arrive at once; the body waits 300 ms unless the request is aborted.
+		const stalled: typeof fetch = async (_url, init) => {
+			const signal = init?.signal as AbortSignal;
+			const body = new ReadableStream<Uint8Array>({
+				start(controller) {
+					const t = setTimeout(() => {
+						controller.enqueue(new TextEncoder().encode(JSON.stringify({ mode: "live", status: "ok" })));
+						controller.close();
+					}, 300);
+					signal.addEventListener("abort", () => {
+						clearTimeout(t);
+						controller.error(new DOMException("aborted", "AbortError"));
+					});
+				},
+			});
+			return new Response(body, { status: 200, headers: { "Content-Type": "application/json", "X-Bench-Mode": "live" } });
+		};
+		const started = Date.now();
+		await assert.rejects(new Client(base, { timeoutMs: 30, readRetries: 0, fetch: stalled }).health(), HeimdallTimeout);
+		assert.ok(Date.now() - started < 250, "the timeout covers the body");
+	});
+
+	it("never accepts a terminal answer after the wait deadline (QC2-20-07)", async () => {
+		routes.set("GET /api/bench/experiments/e1", [async () => {
+			await new Promise((r) => setTimeout(r, 300));
+			return jsonReply(200, statusPayload("done"));
+		}]);
+		const started = Date.now();
+		await assert.rejects(new Client(base, { readRetries: 0 }).waitForExperiment("e1", { timeoutMs: 50, intervalMs: 5 }), HeimdallTimeout);
+		assert.ok(Date.now() - started < 250, "the status request is limited to the time left");
+	});
+
 	it("reports an unreachable server", async () => {
 		await assert.rejects(new Client("http://127.0.0.1:9", { readRetries: 0, timeoutMs: 2000 }).health(),
 			(err: unknown) => err instanceof HeimdallError && err.status === 0 && err.type === "connection");

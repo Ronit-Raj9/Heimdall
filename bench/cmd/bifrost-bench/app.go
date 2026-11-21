@@ -56,6 +56,12 @@ type app struct {
 	planConfine  string                          // agent config files (notes) must resolve inside it (hosted)
 	deferGateway bool                            // the gateway preflight is the runners' (hosted: deferred_to_runner)
 	results      resultsindex.Source             // the org's database index (db.OrgIndex); nil uses the JSONL index
+
+	// defaultPolicy is evaluated only when the experiment froze no policy
+	// (`check -default-policy`, the CI wrapper's implicit default). Unlike an
+	// override it never replaces a frozen policy or skips its hash check
+	// (QC2-22-02).
+	defaultPolicy string
 }
 
 // appOptions says which live services a command needs.
@@ -365,7 +371,14 @@ func (a *app) releasePolicy(m *schemas.Manifest, an *schemas.Analysis, runs []sc
 		return policy.Evaluate(p, policy.Hash(raw), &mm, an, runs), nil
 	}
 	if m.Experiment.Policy == "" {
-		return nil, nil
+		if a.defaultPolicy == "" {
+			return nil, nil
+		}
+		p, raw, err := policy.Load(a.defaultPolicy)
+		if err != nil {
+			return nil, err
+		}
+		return policy.Evaluate(p, policy.Hash(raw), m, an, runs), nil
 	}
 	p, raw, err := policy.Load(a.cfg.Path(m.Experiment.Policy))
 	if err != nil {

@@ -220,7 +220,7 @@ func TestContested(t *testing.T) {
 	if !Contested(&split, nil) {
 		t.Fatal("split votes are contested")
 	}
-	plain := judgedRun("r2", "A", []string{i}, "")
+	plain := judgedRun("r2", "A", []string{i, i, i}, "") // the same three-vote judge as split (QC2-25-05)
 	if Contested(&plain, nil) {
 		t.Fatal("a unanimous, unreviewed run is not contested")
 	}
@@ -249,7 +249,9 @@ func TestContested(t *testing.T) {
 		t.Fatal("the newest decision review counts")
 	}
 	an := analysis(schemas.DecisionImproved, 0.3)
-	Apply(an, Input{Manifest: judgedManifest(false), Runs: []schemas.SealedRun{split, plain}, Records: records(testRecord(30, 30, 30, 30, t0)),
+	threeVotes := testRecord(30, 30, 30, 30, t0)
+	threeVotes.Votes = 3
+	Apply(an, Input{Manifest: judgedManifest(false), Runs: []schemas.SealedRun{split, plain}, Records: records(threeVotes),
 		Reviews: map[string][]schemas.Review{"r2": review(schemas.ReviewPass, plain.SealHash)}, Now: now})
 	if an.JudgeCalibration.ContestedRuns != 2 || !strings.Contains(an.JudgeCalibration.Detail, "2 of 2 judged runs contested") {
 		t.Fatalf("contested %d detail %q", an.JudgeCalibration.ContestedRuns, an.JudgeCalibration.Detail)
@@ -281,7 +283,8 @@ func TestSectionAndNotApplicable(t *testing.T) {
 func TestStatus(t *testing.T) {
 	root := t.TempDir()
 	s := &schemas.Suite{ID: "qa", Root: root, Grading: schemas.GradingJudged, Judge: &schemas.JudgeSpec{Provider: "openai", Model: "judge-model", PromptVersion: "qa-v1"}}
-	tmpl := map[string]string{"qa-v1-answer": "aaa", "qa-v1-rubric": "bbb"}
+	tmpl := &StatusJudge{ID: JudgeID{Provider: "openai", Model: "judge-model", Votes: 1}, PromptVersion: "qa-v1",
+		Templates: map[string]string{"qa-v1-answer": "aaa", "qa-v1-rubric": "bbb"}, Used: []string{"aaa"}}
 	st, err := Status(s, tmpl, Thresholds(nil, ""), now)
 	if err != nil || st.State != schemas.CalibrationStateUncalibrated || !st.Judged {
 		t.Fatalf("status %+v %v", st, err)
@@ -299,6 +302,12 @@ func TestStatus(t *testing.T) {
 	}
 	if len(st.Reminders) != 1 || !strings.Contains(st.Reminders[0], "labels changed") {
 		t.Fatalf("reminders %v", st.Reminders)
+	}
+	// QC2-25-09: a suite that can also use the rubric template, which no
+	// human item measured, is not calibrated.
+	tmpl.Used = []string{"aaa", "bbb"}
+	if st, _ = Status(s, tmpl, Thresholds(nil, ""), now); st.State != schemas.CalibrationStateUncalibrated || !strings.Contains(st.Detail, "bbb") {
+		t.Fatalf("uncovered template: %+v", st)
 	}
 	s.Grading = ""
 	if st, _ := Status(s, nil, Thresholds(nil, ""), now); st.State != StateNotJudged {

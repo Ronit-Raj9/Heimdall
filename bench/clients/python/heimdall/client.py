@@ -331,15 +331,33 @@ class Client:
         :class:`HeimdallTimeout` when ``timeout`` seconds pass first.
         """
         deadline = time.monotonic() + timeout
+        last: Optional[models.ExperimentStatusResponse] = None
+
+        def late() -> HeimdallTimeout:
+            state = last["state"] if last is not None else "unknown"
+            return HeimdallTimeout(0, "experiment %s still %s after %.0fs" % (exp_id, state, timeout), "timeout", self.last_mode)
+
+        # Each status request is limited to the time left, and an answer
+        # after the deadline is a timeout, never a late success (QC2-20-07).
         while True:
-            status = self.experiment(exp_id)
+            if deadline - time.monotonic() <= 0:
+                raise late()
+            try:
+                status = cast(models.ExperimentStatusResponse, self._get("/experiments/%s" % _seg(exp_id), deadline=deadline))
+            except HeimdallTimeout:
+                if time.monotonic() >= deadline:
+                    raise late() from None
+                raise
+            if time.monotonic() > deadline:
+                raise late()
+            last = status
             if on_status is not None:
                 on_status(status)
             if status["state"] in TERMINAL_STATES:
                 return status
             left = deadline - time.monotonic()
             if left <= 0:
-                raise HeimdallTimeout(0, "experiment %s still %s after %.0fs" % (exp_id, status["state"], timeout), "timeout", self.last_mode)
+                raise late()
             time.sleep(min(interval, left))
 
     def check(self, exp_id: str, grade_source: Optional[str] = None) -> CheckResult:
@@ -350,8 +368,8 @@ class Client:
 
     # Transport
 
-    def _get(self, path: str, query: Optional[Mapping[str, Optional[str]]] = None) -> Dict[str, Any]:
-        _, body, _ = self._request("GET", path, query)
+    def _get(self, path: str, query: Optional[Mapping[str, Optional[str]]] = None, deadline: Optional[float] = None) -> Dict[str, Any]:
+        _, body, _ = self._request("GET", path, query, deadline=deadline)
         return self._json(body, "GET", path)
 
     def _post(self, path: str, payload: Any) -> Dict[str, Any]:
@@ -382,8 +400,10 @@ class Client:
             raise ModeError(0, "server mode is %r, not live: refusing to treat it as a real result" % mode, "mode", mode, method, path)
 
     def _request(
-        self, method: str, path: str, query: Optional[Mapping[str, Optional[str]]] = None, payload: Any = None
+        self, method: str, path: str, query: Optional[Mapping[str, Optional[str]]] = None, payload: Any = None, deadline: Optional[float] = None
     ) -> Tuple[int, bytes, Mapping[str, str]]:
+        """Send one request. ``deadline`` (time.monotonic seconds), when
+        given, caps every attempt's timeout and the waits between them."""
         url = self.base_url + API_PREFIX + path
         q = {k: v for k, v in (query or {}).items() if v is not None and v != ""}
         if q:
@@ -401,10 +421,15 @@ class Client:
                 data = b""
         attempts = 1 + (self.read_retries if method == "GET" else 0)
         for attempt in range(attempts):
-            last = attempt == attempts - 1
+            timeout = self.timeout
+            if deadline is not None:
+                timeout = min(timeout, deadline - time.monotonic())
+                if timeout <= 0:
+                    raise HeimdallTimeout(0, "no answer within %.0fs" % self.timeout, "timeout", None, method, path)
+            last = attempt == attempts - 1 or (deadline is not None and time.monotonic() + 0.5 * (attempt + 1) >= deadline)
             req = urllib.request.Request(url, data=data, method=method, headers=headers)
             try:
-                with urllib.request.urlopen(req, timeout=self.timeout) as resp:
+                with urllib.request.urlopen(req, timeout=timeout) as resp:
                     body = resp.read()
                     self.last_mode = resp.headers.get(MODE_HEADER) or self.last_mode
                     return resp.status, body, resp.headers

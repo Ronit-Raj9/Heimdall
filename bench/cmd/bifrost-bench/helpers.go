@@ -22,6 +22,17 @@ func trimExt(p string) string {
 	return strings.TrimSuffix(p, filepath.Ext(p))
 }
 
+// sameFile reports whether two paths name the same file, comparing their
+// absolute, cleaned forms.
+func sameFile(a, b string) bool {
+	aa, errA := filepath.Abs(a)
+	bb, errB := filepath.Abs(b)
+	if errA != nil || errB != nil {
+		return filepath.Clean(a) == filepath.Clean(b)
+	}
+	return aa == bb
+}
+
 // parseDecisions turns "regressed,invalid" into decisions. An unknown
 // decision is an error: a misspelled -fail-on would otherwise silently
 // never fail the gate (audit 5-B-10).

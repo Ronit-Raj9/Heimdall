@@ -27,11 +27,12 @@ Records are appended with `O_APPEND`, one write per line, then `fsync`, under an
 | the experiment has counted sealed runs | refusal, not overridable |
 | verdict action is `ship` | refusal unless `override` gives a reason |
 | policy decision, when a policy was evaluated, is not `block` | refusal unless `override` gives a reason |
+| when the experiment froze a policy, the analysis evaluated that policy (same `policy_hash`), not `check -policy none` or another file | refusal unless `override` gives a reason |
 | `override` is set only when something needs overriding | refusal |
 | every counted run's seal verifies (`Store.Verify`) | refusal, not overridable |
 | the existing log's chain verifies | refusal, not overridable |
 
-The policy result is read from the analysis (`Analysis.Policy`), or from `policy.json` beside `verdict.json` when the analysis has none. No policy result means no policy was evaluated, and only the action rule applies.
+The policy result is read from the analysis (`Analysis.Policy`), or from `policy.json` beside `verdict.json` when the analysis has none. No policy result means no policy was evaluated; for an experiment without a frozen policy only the action rule applies.
 
 An override is recorded in the record and shown in red on the timeline. It never bypasses a seal mismatch or a broken chain.
 

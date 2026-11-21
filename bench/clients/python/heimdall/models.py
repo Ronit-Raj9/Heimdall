@@ -1084,8 +1084,11 @@ class _CalibrationRecordRequired(TypedDict):
 
 
 class CalibrationRecord(_CalibrationRecordRequired, total=False):
+    aggregate: str
+    by_template: List[CalibrationCategory]
     categories: List[CalibrationCategory]
     labellers: List[str]
+    pass_score: float
     perturbations: List[CalibrationPerturbation]
     price_ref: str
     seed: Optional[CalibrationStats]
@@ -2719,9 +2722,12 @@ class _JudgeRecordRequired(TypedDict):
 
 
 class JudgeRecord(_JudgeRecordRequired, total=False):
+    aggregate: str
     audit: Optional[JudgeAudit]
     calibration: str
+    pass_score: float
     price_ref: str
+    provider: str
     served_model: str
 
 

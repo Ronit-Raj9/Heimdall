@@ -9,7 +9,11 @@
 // Environment: HEIMDALL_URL (default http://127.0.0.1:8090) and BENCH_WRITE_TOKEN
 // (needed to plan and start; reads need no token).
 //
-// Exit codes: 0 gate passed, 1 policy blocks, 2 experiment did not finish,
+// The gate fails on the verdicts in --fail-on (default regressed,invalid, as
+// `bifrost-bench check -fail-on`) and on a release policy block; --policy-only
+// gates on the policy alone.
+//
+// Exit codes: 0 gate passed, 1 verdict or policy fails the gate, 2 experiment did not finish,
 // 3 server is not live (unless --allow-recorded), 4 plan refused or request failed.
 import { readFileSync } from "node:fs";
 import { parseArgs } from "node:util";
@@ -25,6 +29,8 @@ const { values, positionals } = parseArgs({
 		interval: { type: "string", default: "10" },
 		"allow-recorded": { type: "boolean", default: false },
 		"fail-on-warn": { type: "boolean", default: false },
+		"fail-on": { type: "string", default: "regressed,invalid" },
+		"policy-only": { type: "boolean", default: false },
 	},
 });
 
@@ -50,8 +56,14 @@ async function main(): Promise<number> {
 		for (const c of result.policyResult?.checks ?? []) {
 			if (c.status !== "pass") console.log(`  ${c.status} ${c.id}: ${c.threshold} ${c.reason ?? ""}`);
 		}
+		// A listed verdict fails the gate like the direct CLI's -fail-on (QC2-22-03).
+		const failOn = values["policy-only"] ? [] : values["fail-on"]!.split(",").map((v) => v.trim()).filter(Boolean);
 		if (result.blocked || (values["fail-on-warn"] && result.policyDecision === "warn")) {
 			console.log(`gate FAILED: release policy ${result.policyDecision}`);
+			return 1;
+		}
+		if (failOn.includes(result.decision)) {
+			console.log(`gate FAILED: verdict ${result.decision}, action ${result.action}`);
 			return 1;
 		}
 		console.log("gate passed");

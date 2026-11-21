@@ -19,8 +19,10 @@
 #   BENCH_CI_CONFIG          bench config (default deploy/bench.yaml)
 #   BENCH_CI_FAIL_ON         verdicts that fail the gate (default regressed,invalid)
 #   BENCH_CI_POLICY          policy file; empty uses BENCH_CI_DEFAULT_POLICY when it
-#                            exists; "none" turns policy off, including the
-#                            policy the experiment froze (check -policy none)
+#                            exists and the experiment froze no policy (check
+#                            -default-policy); "none" turns policy off,
+#                            including the policy the experiment froze (check
+#                            -policy none)
 #   BENCH_CI_DEFAULT_POLICY  default policy file (default policies/default.yaml)
 #   BENCH_CI_OUT             markdown report path (default
 #                            $RUNNER_TEMP/bench-check/report.md); check writes
@@ -123,7 +125,14 @@ esac
 work=$(mktemp -d "${RUNNER_TEMP:-${TMPDIR:-/tmp}}/bench-check.XXXXXX")
 out=$(bench_path "$out")
 mkdir -p "$(dirname "$out")"
-report_json="${out%.*}.json"
+# The JSON sidecar is the report path with the extension of its last
+# component replaced, as check derives it (filepath.Ext): a dot in a folder
+# name is not an extension (QC2-22-07).
+out_base=${out##*/}
+case $out_base in
+  *.*) report_json="${out%/*}/${out_base%.*}.json" ;;
+  *) report_json="$out.json" ;;
+esac
 rm -f "$out" "$report_json"
 
 # The binary: given, or built here with the module's own go.mod.
@@ -164,7 +173,13 @@ elif [ -z "$policy" ] && [ -f "$(bench_path "$default_policy")" ]; then
 fi
 if [ -n "$policy" ]; then
   [ -f "$(bench_path "$policy")" ] || usage_error "policy file $policy not found"
-  if $supports_policy; then
+  if $policy_auto && grep -Eq '^[[:space:]]+-default-policy([[:space:]]|$)' <<<"$check_help"; then
+    # The implicit default only fills in for an experiment that froze no
+    # policy: as -policy it would replace the frozen one and skip its hash
+    # check (QC2-22-02).
+    policy_args=(-default-policy "$policy")
+    policy_note="\`$policy\` when the experiment froze no policy"
+  elif $supports_policy; then
     policy_args=(-policy "$policy")
     policy_note="\`$policy\`"
   else

@@ -204,7 +204,7 @@ func TestGradeCarriesCalibrationAndAudit(t *testing.T) {
 	s := judgedSuite(t, &schemas.JudgeAuditorSpec{Provider: "anthropic", Model: "judge-model"})
 	b, _ := judgePromptFS.ReadFile("judgeprompts/qa-v1-answer.txt")
 	tmpls, _ := PromptTemplates(PromptQAv1)
-	rec := &schemas.CalibrationRecord{Suite: "qa", Model: "judge-model", PromptVersion: PromptQAv1, Templates: tmpls, PromptSHA256: calibration.PromptHash(tmpls), CreatedAt: time.Now().UTC()}
+	rec := &schemas.CalibrationRecord{Suite: "qa", Provider: "openai", Model: "judge-model", PromptVersion: PromptQAv1, Votes: 1, Templates: tmpls, PromptSHA256: calibration.PromptHash(tmpls), CreatedAt: time.Now().UTC()}
 	if err := calibration.WriteRecord(s.Root, rec); err != nil {
 		t.Fatal(err)
 	}

@@ -253,7 +253,7 @@ func RunCalibration(ctx context.Context, cfg JudgeConfig, plan *CalibrationPlan,
 // calibrationRef names the newest valid calibration record of the suite
 // that covers the judge model and template a grade used, "" when none.
 // It reads files only; a suite without a calibration folder costs a stat.
-func calibrationRef(s *schemas.Suite, model, promptSHA string) string {
+func calibrationRef(s *schemas.Suite, id calibration.JudgeID, promptSHA string) string {
 	if s == nil || s.Root == "" || promptSHA == "" {
 		return ""
 	}
@@ -261,7 +261,7 @@ func calibrationRef(s *schemas.Suite, model, promptSHA string) string {
 	if err != nil {
 		return ""
 	}
-	rec, _ := recs.Covering(model, []string{promptSHA})
+	rec, _ := recs.Covering(id, []string{promptSHA})
 	return calibration.Ref(rec)
 }
 
@@ -303,4 +303,50 @@ func (g *judge) audit(ctx context.Context, rc *schemas.RunContext, spec schemas.
 	out.Verdict = calibration.Majority(rec.Votes)
 	out.Agrees = out.Verdict == calibration.Majority(judgeVotes)
 	return out
+}
+
+// StatusJudge resolves the judge that decides suite s's grades for `judge
+// status`: the suite's text judge, with the templates its tasks can be
+// graded with, or else the vision judge its task rubrics pin, as visual
+// calibrate does (QC2-25-06, QC2-25-09). Nil when neither exists.
+func StatusJudge(s *schemas.Suite) *calibration.StatusJudge {
+	if s == nil {
+		return nil
+	}
+	if j := s.Judge; j != nil {
+		sj := &calibration.StatusJudge{ID: calibration.JudgeID{Provider: j.Provider, Model: j.Model, Votes: max(j.Votes, 1)}, PromptVersion: j.PromptVersion}
+		sj.Templates, _ = PromptTemplates(j.PromptVersion)
+		used := map[string]bool{}
+		for _, t := range s.Tasks {
+			ans, err := LoadAnswerSpec(t)
+			if err != nil {
+				continue
+			}
+			name, _, err := judgeTemplate(j.PromptVersion, ans)
+			if err != nil {
+				continue
+			}
+			if h, ok := sj.Templates[name]; ok {
+				used[h] = true
+			}
+		}
+		for h := range used {
+			sj.Used = append(sj.Used, h)
+		}
+		sort.Strings(sj.Used)
+		return sj
+	}
+	for _, t := range s.Tasks {
+		if !VisualJudged(s, t) {
+			continue
+		}
+		v := VisualSpec(s, t).Judge
+		_, sha, err := VisualPrompt(v.PromptVersion)
+		if err != nil {
+			return nil
+		}
+		return &calibration.StatusJudge{ID: visualJudgeID(v), PromptVersion: v.PromptVersion,
+			Templates: map[string]string{v.PromptVersion: sha}, Used: []string{sha}}
+	}
+	return nil
 }

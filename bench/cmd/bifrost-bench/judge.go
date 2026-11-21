@@ -95,11 +95,7 @@ func (j judgeSvc) load(ctx context.Context, id string) (*schemas.Suite, error) {
 
 // status is the calibration status of one loaded suite.
 func (j judgeSvc) status(s *schemas.Suite, th schemas.JudgeCalibrationThresholds) (*schemas.CalibrationStatus, error) {
-	var tmpls map[string]string
-	if s.Judge != nil && s.Judge.PromptVersion != "" {
-		tmpls, _ = graders.PromptTemplates(s.Judge.PromptVersion)
-	}
-	return calibration.Status(s, tmpls, th, time.Now().UTC())
+	return calibration.Status(s, graders.StatusJudge(s), th, time.Now().UTC())
 }
 
 // CalibrationStatus implements handlers.CalibrationSource with the default
@@ -577,7 +573,7 @@ func runJudgeStatus(args []string) int {
 			}
 			continue
 		}
-		if id == "" && (s.Grading != schemas.GradingJudged || s.Judge == nil) {
+		if id == "" && (s.Grading != schemas.GradingJudged || graders.StatusJudge(s) == nil) {
 			continue
 		}
 		st, err := j.status(s, th)

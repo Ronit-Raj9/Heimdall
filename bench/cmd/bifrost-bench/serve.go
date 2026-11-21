@@ -49,8 +49,10 @@ func runServe(args []string) int {
 	}
 	// An offline server runs nothing and reaches no gateway: everything it
 	// serves is replayed from disk, so it is never a live answer, whatever
-	// bench.yaml says (audit 7-B-03). Synthetic stays synthetic.
-	a.cfg.Server.Mode = offlineMode(a.cfg.Server.Mode, *offline)
+	// bench.yaml says (audit 7-B-03). Synthetic stays synthetic. A hosted
+	// server keeps its mode: its runners still run fresh experiments, and
+	// -offline changes nothing there (QC2-20-01).
+	a.cfg.Server.Mode = serveMode(a.cfg.Server.Mode, *offline, a.cfg.Auth.IsHosted())
 	// Tenancy area (P3): auth.mode hosted serves every organization from its
 	// own folders through the tenancy registry (servetenancy.go).
 	if a.cfg.Auth.IsHosted() {
@@ -67,6 +69,10 @@ func runServe(args []string) int {
 	}
 	if !*offline {
 		deps.Launcher = newLauncher(a, ix)
+	} else {
+		// The Docker-backed doctor can start the helper image's self-test
+		// container; a replay server launches nothing (QC2-20-02).
+		deps.Doctor = offlineDoctor
 	}
 	deps.Launcher, deps.Workers = withWorkers(a, deps.Launcher) // Remote area: worker mode when BENCH_WORKER_TOKEN is set (worker.go)
 	// Index and trends area: trends source and optional schedule daemon (serveextras.go).
@@ -88,8 +94,8 @@ func runServe(args []string) int {
 	// resume after a restart) and the ops kinds serve /jobs (servejobs.go).
 	stopJobs := startLocalJobs(ctx, a, *config, deps.Launcher, ix, &deps)
 	defer stopJobs()
-	deps.Ready = readyChecks(a) // Deploy area: /readyz checks (serveready.go)
-	startEvidenceMirror(ctx, a) // Evidence storage area (P6): background mirror and sweeper when storage.mirror_dir or storage.s3 is set; seal hook evidenceOnSeal (evidence.go)
+	deps.Ready = readyChecks(a)           // Deploy area: /readyz checks (serveready.go)
+	serveEvidenceMirror(ctx, a, *offline) // Evidence storage area (P6): background mirror and sweeper when storage.mirror_dir or storage.s3 is set; seal hook evidenceOnSeal (evidence.go)
 	srv, err := server.New(a.cfg, deps)
 	if err != nil {
 		return fail("server: %v", err)
@@ -352,6 +358,40 @@ func (c *catalogSource) build() *schemas.Catalog {
 
 // Jobs area: the launcher (experiments as experiment.run jobs, live events,
 // cancel and resume) is in servejobs.go.
+
+// serveEvidenceMirror starts the background evidence mirror of a local
+// server, except offline: a replay server serves recorded runs only and
+// must not push evidence to a remote store on its own (QC2-20-06).
+func serveEvidenceMirror(ctx context.Context, a *app, offline bool) {
+	if offline {
+		if a.cfg.Storage.Enabled() {
+			a.logger.Info("evidence mirror off", "reason", "serve -offline replays recorded runs; run the mirror from a live server or `bifrost-bench evidence`")
+		}
+		return
+	}
+	startEvidenceMirror(ctx, a)
+}
+
+// offlineDoctor is GET /doctor of `serve -offline`: static rows only, no
+// Docker command and no gateway preflight, since a replay server launches
+// nothing (QC2-20-02).
+func offlineDoctor(context.Context) []schemas.DoctorCheck {
+	return []schemas.DoctorCheck{
+		{ID: "docker", Status: schemas.DoctorSkip, Detail: "offline: a replay server runs no container"},
+		{ID: "gateway", Status: schemas.DoctorSkip, Detail: "offline"},
+	}
+}
+
+// serveMode is the mode label serve uses: offlineMode for a local server.
+// A hosted server's runners execute fresh experiments whatever -offline
+// says, so relabelling their results recorded (and refusing review and
+// calibration writes) would be wrong; its configured mode stands.
+func serveMode(configured schemas.Mode, offline, hosted bool) schemas.Mode {
+	if hosted {
+		return configured
+	}
+	return offlineMode(configured, offline)
+}
 
 // offlineMode is the mode label a server serves: an offline server replays
 // recorded runs, so a configured live mode becomes recorded.

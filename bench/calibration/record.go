@@ -56,6 +56,13 @@ type ItemRun struct {
 	Votes     []string            // first pass, each call's verdict (correct, incorrect, unparsable)
 	Repeat    []string            // second pass
 	Perturbed map[string][]string // perturbation -> votes
+
+	// Verdict and RepeatVerdict, when set, are the item's decision as the
+	// production grader takes it (a vision judge's mean score against its
+	// pass_score); unset, the majority of Votes and Repeat decides
+	// (QC2-25-03).
+	Verdict       string
+	RepeatVerdict string
 }
 
 // Build assembles a record from the runs: statistics over the human items
@@ -63,7 +70,7 @@ type ItemRun struct {
 // sensitivity. Everything about the judge and the set is filled by the
 // caller; Build fills the statistics, the items and the counts.
 func Build(rec *schemas.CalibrationRecord, runs []ItemRun, disputed int) {
-	var hl, hv, hc []string
+	var hl, hv, hc, ht []string
 	var sl, sv []string
 	var firstVotes [][]string
 	var first, second []string
@@ -73,7 +80,13 @@ func Build(rec *schemas.CalibrationRecord, runs []ItemRun, disputed int) {
 	rec.Items = make([]schemas.CalibrationItemResult, 0, len(runs))
 	for _, r := range runs {
 		v1 := Majority(r.Votes)
+		if r.Verdict != "" {
+			v1 = r.Verdict
+		}
 		v2 := Majority(r.Repeat)
+		if r.RepeatVerdict != "" {
+			v2 = r.RepeatVerdict
+		}
 		res := schemas.CalibrationItemResult{
 			ItemID: r.Item.Item.ID, Task: r.Item.Item.Task, Category: r.Category, Template: r.Template,
 			Label: r.Item.Label, Source: r.Item.Item.Source, Votes: append([]string(nil), r.Votes...), Verdict: v1, Repeat: v2,
@@ -83,6 +96,16 @@ func Build(rec *schemas.CalibrationRecord, runs []ItemRun, disputed int) {
 			sl, sv = append(sl, r.Item.Label), append(sv, v1)
 		} else {
 			hl, hv, hc = append(hl, r.Item.Label), append(hv, v1), append(hc, r.Category)
+			th := rec.Templates[r.Template]
+			if th == "" && r.Template == "" && len(rec.Templates) == 1 {
+				for _, h := range rec.Templates {
+					th = h // the record's only template
+				}
+			}
+			if th == "" {
+				th = r.Template
+			}
+			ht = append(ht, th)
 			for _, l := range r.Item.Labellers {
 				labellers[l] = true
 			}
@@ -109,8 +132,10 @@ func Build(rec *schemas.CalibrationRecord, runs []ItemRun, disputed int) {
 		s := Compare(sl, sv)
 		rec.Seed = &s
 	}
+	rec.ByTemplate = nil
 	if len(hl) > 0 {
 		rec.Categories = ByCategory(hc, hl, hv)
+		rec.ByTemplate = ByCategory(ht, hl, hv)
 	}
 	rec.Consistency = Consistency(rec.Votes, firstVotes, first, second)
 	rec.Perturbations = nil
@@ -322,26 +347,124 @@ func checkRecord(root, id, hash, prev string, broken bool) (*schemas.Calibration
 	return &rec, nil
 }
 
-// Covering returns the newest valid record for the judge model that
-// covers every template hash in templates, and, when there is none, the
-// newest record for the model at all (to say what it lacks).
-func (s *RecordSet) Covering(model string, templates []string) (covering, newest *schemas.CalibrationRecord) {
+// JudgeID is what a calibration record must have measured to cover a
+// grade: the judge model, the provider it was called through, how many
+// votes it casts, and how a vision judge's votes decide. An empty Provider
+// or Aggregate on a grade sealed before they were recorded, or zero Votes,
+// is not compared (QC2-25-03, QC2-25-05).
+type JudgeID struct {
+	Provider  string
+	Model     string
+	Votes     int
+	Aggregate string // "" or majority | mean
+	PassScore float64
+}
+
+// GradeJudgeID is the calibration identity of a judged grade.
+func GradeJudgeID(j *schemas.JudgeRecord) JudgeID {
+	if j == nil {
+		return JudgeID{}
+	}
+	return JudgeID{Provider: j.Provider, Model: j.Model, Votes: len(j.Votes), Aggregate: j.Aggregate, PassScore: j.PassScore}
+}
+
+// String names the judge for messages: the model, with the provider and
+// any non-default vote configuration.
+func (id JudgeID) String() string {
+	s := id.Model
+	if id.Provider != "" {
+		s = id.Provider + "/" + s
+	}
+	if id.Votes > 1 {
+		s += fmt.Sprintf(" (%d votes)", id.Votes)
+	}
+	if aggregateOf(id.Aggregate) == aggregateMean {
+		s += fmt.Sprintf(" (mean >= %g)", passScoreOf(id.PassScore))
+	}
+	return s
+}
+
+const (
+	aggregateMajority = "majority"
+	aggregateMean     = "mean"
+	defaultPassScore  = 0.5 // graders' visualMeanDefault
+)
+
+func aggregateOf(a string) string {
+	if a == "" {
+		return aggregateMajority
+	}
+	return a
+}
+
+func passScoreOf(p float64) float64 {
+	if p == 0 {
+		return defaultPassScore
+	}
+	return p
+}
+
+// measured reports whether record r measured the judge id names.
+func (id JudgeID) measured(r *schemas.CalibrationRecord) bool {
+	switch {
+	case r.Model != id.Model:
+		return false
+	case id.Provider != "" && r.Provider != id.Provider:
+		return false
+	case id.Votes > 0 && r.Votes > 0 && r.Votes != id.Votes:
+		return false
+	case aggregateOf(r.Aggregate) != aggregateOf(id.Aggregate):
+		return false
+	case aggregateOf(id.Aggregate) == aggregateMean && passScoreOf(r.PassScore) != passScoreOf(id.PassScore):
+		return false
+	}
+	return true
+}
+
+// Covering returns the newest valid record that measured the judge id and
+// covers every template hash in templates with human evidence of its own,
+// and, when there is none, the newest record for the model at all (to say
+// what it lacks).
+func (s *RecordSet) Covering(id JudgeID, templates []string) (covering, newest *schemas.CalibrationRecord) {
 	if s == nil {
 		return nil, nil
 	}
 	for i := len(s.Valid) - 1; i >= 0; i-- {
 		r := &s.Valid[i]
-		if r.Model != model {
+		if r.Model != id.Model {
 			continue
 		}
 		if newest == nil {
 			newest = r
 		}
-		if covers(r, templates) {
+		if id.measured(r) && covers(r, templates) {
 			return r, newest
 		}
 	}
 	return nil, newest
+}
+
+// TemplateStats is the human-item statistics of record r for one template
+// hash, nil when no human item used it. A record written before
+// per-template statistics has them only when it covers a single template:
+// then every human item used it.
+func TemplateStats(r *schemas.CalibrationRecord, template string) *schemas.CalibrationStats {
+	if r == nil {
+		return nil
+	}
+	for i := range r.ByTemplate {
+		if r.ByTemplate[i].Category == template {
+			return &r.ByTemplate[i].Stats
+		}
+	}
+	if r.ByTemplate == nil && len(r.Templates) == 1 && r.HumanLabels > 0 {
+		for _, h := range r.Templates {
+			if h == template {
+				return &r.Human
+			}
+		}
+	}
+	return nil
 }
 
 // ForPrompt returns the newest valid record for the judge model and the
@@ -365,6 +488,13 @@ func covers(r *schemas.CalibrationRecord, templates []string) bool {
 	}
 	for _, t := range templates {
 		if !have[t] {
+			return false
+		}
+		// A template exercised only by admission seeds has no human
+		// evidence of its own and is not covered (QC2-25-04). A record
+		// with no human labels at all still covers, so the instrument can
+		// say it has seeds only.
+		if r.HumanLabels > 0 && TemplateStats(r, t) == nil {
 			return false
 		}
 	}

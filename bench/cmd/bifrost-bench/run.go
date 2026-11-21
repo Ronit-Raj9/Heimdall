@@ -45,6 +45,9 @@ func runPlan(args []string) int {
 	if err != nil {
 		return fail("%v", err)
 	}
+	if err := preflightExperiment(ctx, *config, exp); err != nil {
+		return fail("%v", err)
+	}
 	// The planner runs the gateway preflight, so plan needs the live gateway.
 	a, err := newApp(ctx, *config, appOptions{gateway: true})
 	if err != nil {
@@ -125,6 +128,26 @@ func progressLine(ev engine.Event) string {
 	return line
 }
 
+// preflightExperiment resolves what planning needs from files alone, the
+// suite and the release policy, before the gateway is set up: a
+// schema-valid experiment naming a missing suite fails here instead of
+// after the gateway's providers and slots were configured (QC2-21-10).
+func preflightExperiment(ctx context.Context, config string, exp *schemas.Experiment) error {
+	cfg, err := loadConfig(config)
+	if err != nil {
+		return err
+	}
+	if _, err := loadSuite(ctx, cfg.Path(cfg.BenchmarksRoot), exp.Suite); err != nil {
+		return fmt.Errorf("load suite %s: %w", exp.Suite, err)
+	}
+	if exp.Policy != "" {
+		if _, _, err := policy.Load(cfg.Path(exp.Policy)); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
 func runRun(args []string) int {
 	fs := flag.NewFlagSet("run", flag.ContinueOnError)
 	config := fs.String("config", defaultConfig, "bench config")
@@ -135,12 +158,16 @@ func runRun(args []string) int {
 	// Suite health area: -include-quarantined (suitehealth.go).
 	fs.BoolVar(&includeQuarantined, "include-quarantined", false, "let an explicit task list name a quarantined task")
 	pos, err := parseInterspersed(fs, args) // flags may follow the file (7-C-01)
-	if err != nil || len(pos) > 1 || (len(pos) != 1 && *resume == "") {
+	if err != nil || len(pos) > 1 || (len(pos) != 1 && *resume == "") || (len(pos) == 1 && *resume != "") {
 		fmt.Fprintln(os.Stderr, "usage: bifrost-bench run [-config deploy/bench.yaml] [-concurrency n] experiments/<file>.yaml | -resume <exp_id> [-allow-version-drift]")
 		return exitUsage
 	}
 	if *resume == "" { // 5-B-08: a bad experiment file fails before the gateway is set up
-		if _, err := loadExperiment(firstArg(pos)); err != nil {
+		e, err := loadExperiment(firstArg(pos))
+		if err != nil {
+			return fail("%v", err)
+		}
+		if err := preflightExperiment(context.Background(), *config, e); err != nil {
 			return fail("%v", err)
 		}
 	}
@@ -257,9 +284,12 @@ func runCheck(args []string) int {
 	failOn := fs.String("fail-on", "regressed,invalid", "comma-separated verdicts that fail the check")
 	out := fs.String("out", "report.md", "markdown report path")
 	policyFile := fs.String("policy", "", "release policy file; overrides the one the experiment froze (its frozen hash check does not apply to an override); none turns policy evaluation off")
+	defaultPolicy := fs.String("default-policy", "", "release policy file evaluated only when the experiment froze none; a frozen policy and its hash check still apply")
 	gradeSource := fs.String("grade-source", schemas.GradeSourceOriginal, "original, reviewed (human reviews applied, see docs/human-review.md), or a regrade id (from regate or a regrade) to analyze with")
 	pos, err := parseInterspersed(fs, args) // flags may follow the file (7-C-01)
-	if err != nil || len(pos) > 1 || (len(pos) != 1 && *exp == "") {
+	// One target: a saved experiment (-exp) or a file, never both, or the
+	// file would be silently ignored (QC2-21-08).
+	if err != nil || len(pos) > 1 || (len(pos) != 1 && *exp == "") || (len(pos) == 1 && *exp != "") {
 		fmt.Fprintln(os.Stderr, "usage: bifrost-bench check [-fail-on regressed,invalid] [-policy policies/default.yaml] [-grade-source original|reviewed|<regrade_id>] [-out report.md] experiments/<file>.yaml | -exp <exp_id>")
 		fmt.Fprintln(os.Stderr, "exit: 0 ok, 1 regressed, 2 inconclusive, 3 invalid (each only when listed in -fail-on), 4 infrastructure error, 5 blocked by the release policy")
 		return exitUsage
@@ -269,14 +299,34 @@ func runCheck(args []string) int {
 		fmt.Fprintln(os.Stderr, "error:", err)
 		return exitUsage
 	}
+	// The JSON sidecar is written beside the report as <out minus ext>.json;
+	// a report path that is that same file would be overwritten by it
+	// (QC2-21-05).
+	if sameFile(*out, trimExt(*out)+".json") {
+		fmt.Fprintf(os.Stderr, "error: -out %s is also where the JSON report goes; use a markdown path such as report.md\n", *out)
+		return exitUsage
+	}
 	if *policyFile != "" && *policyFile != policyNone {
 		// Fail before a long run, not after it.
 		if _, _, err := policy.Load(*policyFile); err != nil {
 			return fail("%v", err)
 		}
 	}
+	if *defaultPolicy != "" {
+		if *policyFile != "" {
+			fmt.Fprintln(os.Stderr, "error: -default-policy and -policy are exclusive")
+			return exitUsage
+		}
+		if _, _, err := policy.Load(*defaultPolicy); err != nil {
+			return fail("%v", err)
+		}
+	}
 	if *exp == "" { // 5-B-08: a bad experiment file fails before the gateway is set up
-		if _, err := loadExperiment(firstArg(pos)); err != nil {
+		e, err := loadExperiment(firstArg(pos))
+		if err != nil {
+			return fail("%v", err)
+		}
+		if err := preflightExperiment(context.Background(), *config, e); err != nil {
 			return fail("%v", err)
 		}
 	}
@@ -286,6 +336,7 @@ func runCheck(args []string) int {
 	if err != nil {
 		return fail("%v", err)
 	}
+	a.defaultPolicy = *defaultPolicy
 	expID := *exp
 	if expID == "" {
 		m, code := a.manifestFor(ctx, firstArg(pos), "", false)

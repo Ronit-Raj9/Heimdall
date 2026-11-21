@@ -101,7 +101,7 @@ func TestVisualJudgeGoesThroughTheInstrument(t *testing.T) {
 	if an.Verdict.Decision != schemas.DecisionInconclusive || jc.CappedFrom != schemas.DecisionImproved {
 		t.Fatalf("verdict %s, capped from %s", an.Verdict.Decision, jc.CappedFrom)
 	}
-	rec := &schemas.CalibrationRecord{RecordID: "cr_visual2", Model: "vision-model", PromptVersion: PromptVisualV1, Templates: map[string]string{PromptVisualV1: sha},
+	rec := &schemas.CalibrationRecord{RecordID: "cr_visual2", Provider: "anthropic", Model: "vision-model", Votes: 1, PromptVersion: PromptVisualV1, Templates: map[string]string{PromptVisualV1: sha},
 		HumanLabels: 40, Human: schemas.CalibrationStats{Items: 40, Agreement: calibration.Rate(39, 40), TNR: calibration.Rate(20, 20), FPR: calibration.Rate(0, 20)},
 		CreatedAt: time.Now().UTC()}
 	if err := calibration.WriteRecord(rc.Suite.Root, rec); err != nil {
@@ -128,5 +128,90 @@ func TestVisualJudged(t *testing.T) {
 	det := &schemas.Task{ID: "det", Output: &schemas.OutputSpec{Visual: &schemas.VisualCheck{}}}
 	if VisualJudged(&schemas.Suite{}, det) || VisualJudged(rc.Suite, nil) {
 		t.Fatal("deterministic-only or missing task accepted")
+	}
+}
+
+// QC2-25-03: with aggregate mean, calibration measures the decision the
+// grader takes (the mean score against pass_score), not the pass/fail
+// words, and the record names the aggregation so it covers only grades
+// decided the same way.
+func TestVisualCalibrationUsesTheGradersAggregation(t *testing.T) {
+	g, sv, gw, rc := judgedVisual(t, []string{`{"verdict":"pass","score":0.7}`}, "mean", 1)
+	s := rc.Suite
+	s.Tasks = []*schemas.Task{rc.Task}
+	VisualSpec(s, rc.Task).Judge.PassScore = 0.8
+	sum, err := calibration.AddImage(s.Root, chartPNG(t, barBlue, 30))
+	if err != nil {
+		t.Fatal(err)
+	}
+	it := schemas.CalibrationItem{Task: "chart", Image: sum, Label: schemas.CalibrationCorrect, Labeller: "ana", Source: schemas.CalibrationSourceLabel, At: time.Now().UTC().Truncate(time.Second)}
+	it.ID = calibration.ItemIDOf(it)
+	if _, err := calibration.Append(s.Root, []schemas.CalibrationItem{it}); err != nil {
+		t.Fatal(err)
+	}
+	set, err := calibration.LoadSet(s.Root)
+	if err != nil {
+		t.Fatal(err)
+	}
+	human, _, disputed := calibration.Resolve(set.Items)
+	plan, err := PlanVisualCalibration(s, human)
+	if err != nil {
+		t.Fatal(err)
+	}
+	srv := httptest.NewServer(sv)
+	defer srv.Close()
+	runs, spend, err := RunVisualCalibration(t.Context(), JudgeConfig{Gateway: gw, URL: srv.URL}, plan, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if runs[0].Votes[0] != VoteCorrect || runs[0].Verdict != schemas.CalibrationVerdictIncorrect {
+		t.Fatalf("item run %+v: a pass word with mean 0.7 < 0.8 is the grader's fail", runs[0])
+	}
+	rec := VisualCalibrationRecord(s, plan, set, runs, spend, disputed, "snap@x")
+	if rec.Human.FN != 1 || rec.Human.TP != 0 || rec.Aggregate != "mean" || rec.PassScore != 0.8 {
+		t.Fatalf("record aggregate %q pass %v human %+v", rec.Aggregate, rec.PassScore, rec.Human)
+	}
+	gr, err := g.Grade(t.Context(), rc, &schemas.Diff{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if gr.Passed || gr.Judge.Aggregate != "mean" || gr.Judge.PassScore != 0.8 || gr.Judge.Provider != "anthropic" {
+		t.Fatalf("grade passed %v judge %+v", gr.Passed, gr.Judge)
+	}
+	other := *rec
+	other.PassScore = 0.5
+	recs := &calibration.RecordSet{Valid: []schemas.CalibrationRecord{other}}
+	if cov, _ := recs.Covering(calibration.GradeJudgeID(gr.Judge), []string{gr.Judge.PromptSHA256}); cov != nil {
+		t.Fatal("a record measured at another pass_score covers the grade")
+	}
+}
+
+// QC2-25-06: a judged suite whose vision judge is pinned in task rubrics,
+// with no suite-level text judge, is judged in `judge status`, and a
+// visual calibration record makes it calibrated.
+func TestStatusResolvesTaskPinnedVisionJudge(t *testing.T) {
+	_, _, _, rc := judgedVisual(t, []string{`{"verdict":"pass","score":1}`}, "", 1)
+	s := rc.Suite
+	s.Tasks = []*schemas.Task{rc.Task}
+	s.Judge = nil
+	sj := StatusJudge(s)
+	if sj == nil || sj.ID.Model != "vision-model" || sj.ID.Provider != "anthropic" {
+		t.Fatalf("status judge %+v", sj)
+	}
+	th := calibration.Thresholds(nil, "")
+	st, err := calibration.Status(s, sj, th, time.Now().UTC())
+	if err != nil || st.State != schemas.CalibrationStateUncalibrated || !st.Judged {
+		t.Fatalf("status %+v %v", st, err)
+	}
+	_, sha, _ := VisualPrompt(PromptVisualV1)
+	rec := &schemas.CalibrationRecord{RecordID: "cr_visual3", Provider: "anthropic", Model: "vision-model", Votes: 1, PromptVersion: PromptVisualV1,
+		Templates: map[string]string{PromptVisualV1: sha}, HumanLabels: 40,
+		Human:     schemas.CalibrationStats{Items: 40, Agreement: calibration.Rate(39, 40), TNR: calibration.Rate(20, 20), FPR: calibration.Rate(0, 20)},
+		CreatedAt: time.Now().UTC()}
+	if err := calibration.WriteRecord(s.Root, rec); err != nil {
+		t.Fatal(err)
+	}
+	if st, err = calibration.Status(s, sj, th, time.Now().UTC()); err != nil || st.State != schemas.CalibrationStateCalibrated {
+		t.Fatalf("status after visual calibrate %+v %v", st, err)
 	}
 }

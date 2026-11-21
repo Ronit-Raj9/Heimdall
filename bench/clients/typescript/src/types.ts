@@ -4626,6 +4626,10 @@ export interface CalibrationRecord {
 	prompt_sha256: string;
 	templates: Record<string, string>;
 	votes: number;
+	/** Vision judge: majority or mean, how a grade's votes decide; absent is majority. */
+	aggregate?: string;
+	/** Vision judge with aggregate mean: the score a grade's mean must reach. */
+	pass_score?: number;
 	served_models?: string[];
 	set_sha256: string;
 	set_rows: number;
@@ -4636,6 +4640,8 @@ export interface CalibrationRecord {
 	human: CalibrationStats;
 	seed?: CalibrationStats;
 	categories?: CalibrationCategory[];
+	/** Human-item statistics per template sha256 (category is the hash). */
+	by_template?: CalibrationCategory[];
 	consistency: CalibrationConsistency;
 	perturbations?: CalibrationPerturbation[];
 	items: CalibrationItemResult[] | null;

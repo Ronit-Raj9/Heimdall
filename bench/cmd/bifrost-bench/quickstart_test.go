@@ -86,6 +86,11 @@ func TestCompareRefsRefusesUnusedPromptChange(t *testing.T) {
 		if err == nil || !strings.Contains(err.Error(), "prompts/style.txt") {
 			t.Errorf("paths %s: prompt-only change accepted: %v", paths, err)
 		}
+		// QC2-21-04: the advice never recommends a config reference, which
+		// does not make the file compared.
+		if err != nil && (strings.Contains(err.Error(), "reference the file from the agent config") || !strings.Contains(err.Error(), "referencing it does not make it compared")) {
+			t.Errorf("paths %s: misleading advice: %v", paths, err)
+		}
 	}
 }
 
@@ -391,5 +396,65 @@ func TestSameSuiteExceptTasks(t *testing.T) {
 		if sameSuiteExceptTasks(fp, other) {
 			t.Errorf("%+v counted as the same suite", other)
 		}
+	}
+}
+
+// TestCompareRefsRefusesDeletedNotesWithFallback is QC2-21-03: a candidate
+// that deletes AGENTS.md would inherit the agent config's own
+// notes.user_file, which may hold the same instructions, so the deletion
+// would not reach the runs. The comparison is refused.
+func TestCompareRefsRefusesDeletedNotesWithFallback(t *testing.T) {
+	dir, _, _ := initQuickRepo(t)
+	cfg, err := lib.LoadConfig(filepath.Join(dir, ".heimdall", "deploy", "bench.yaml"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	agentPath := filepath.Join(cfg.Root, "agents", "claude-code.yaml")
+	raw, err := os.ReadFile(agentPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	withUser := strings.Replace(string(raw), "\nnotes:\n", "\nnotes:\n  user_file: notes/current.md\n", 1)
+	if withUser == string(raw) {
+		t.Fatal("fixture: agent config has no notes block")
+	}
+	if err := os.WriteFile(agentPath, []byte(withUser), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	gitFixture(t, dir, "add", "-f", agentPath)
+	gitFixture(t, dir, "-c", "user.name=T", "-c", "user.email=t@example.com", "commit", "-q", "-m", "commit the agent config")
+	baseline := gitFixture(t, dir, "rev-parse", "HEAD")
+	gitFixture(t, dir, "rm", "-q", "AGENTS.md")
+	gitFixture(t, dir, "-c", "user.name=T", "-c", "user.email=t@example.com", "commit", "-q", "-m", "drop notes")
+	candidate := gitFixture(t, dir, "rev-parse", "HEAD")
+	f := compareFlags{baseline: baseline, candidate: candidate, trials: 1, repo: dir, paths: strings.Join(scaffold.DefaultAgentPaths, ","),
+		name: "removed-notes", base: "agents/claude-code.yaml"}
+	_, err = buildCompare(context.Background(), f, cfg)
+	if err == nil || !strings.Contains(err.Error(), "notes/current.md") {
+		t.Fatalf("deleted notes with a fallback accepted: %v", err)
+	}
+}
+
+// TestCompareRefsKeepsOthersFixtures is QC2-21-07: a same-name compare that
+// finds the fixture folder taken refuses without deleting it.
+func TestCompareRefsKeepsOthersFixtures(t *testing.T) {
+	dir, base, ref := initQuickRepo(t)
+	cfg, err := lib.LoadConfig(filepath.Join(dir, ".heimdall", "deploy", "bench.yaml"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	theirs := filepath.Join(cfg.Root, "experiments", "fixtures", "same", "A", "AGENTS.md")
+	if err := os.MkdirAll(filepath.Dir(theirs), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(theirs, []byte("other invocation\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	f := compareFlags{baseline: base, candidate: ref, trials: 1, repo: dir, paths: "AGENTS.md", name: "same", base: "agents/claude-code.yaml"}
+	if _, err := buildCompare(context.Background(), f, cfg); err == nil || !strings.Contains(err.Error(), "exists") {
+		t.Fatalf("same-name compare: %v", err)
+	}
+	if _, err := os.Stat(theirs); err != nil {
+		t.Fatalf("the other invocation's fixture was removed: %v", err)
 	}
 }

@@ -296,7 +296,11 @@ export class Client {
 
 	// CI helpers
 
-	/** Poll until the experiment is done, failed or cancelled; rejects with HeimdallTimeout first. */
+	/**
+	 * Poll until the experiment is done, failed or cancelled; rejects with HeimdallTimeout first.
+	 * Each status request is limited to the time left, so an answer after the deadline is a timeout,
+	 * never a late success.
+	 */
 	async waitForExperiment(
 		expId: string,
 		options: { timeoutMs?: number; intervalMs?: number; onStatus?: (status: ExperimentResponse) => void } = {},
@@ -304,13 +308,26 @@ export class Client {
 		const timeoutMs = options.timeoutMs ?? 3_600_000;
 		const intervalMs = options.intervalMs ?? 5_000;
 		const deadline = Date.now() + timeoutMs;
+		const late = (state: string, mode: string) =>
+			new HeimdallTimeout(`experiment ${expId} still ${state} after ${Math.round(timeoutMs / 1000)}s`, mode);
+		let last: ExperimentResponse | undefined;
 		for (;;) {
-			const status = await this.experiment(expId);
+			const left = deadline - Date.now();
+			if (left <= 0) throw late(last?.state ?? "unknown", last?.mode ?? "");
+			let status: ExperimentResponse;
+			try {
+				status = await this.get<ExperimentResponse>(`/experiments/${seg(expId)}`, undefined, deadline);
+			} catch (err) {
+				if (err instanceof HeimdallTimeout && Date.now() >= deadline) throw late(last?.state ?? "unknown", last?.mode ?? "");
+				throw err;
+			}
+			if (Date.now() > deadline) throw late(status.state, status.mode);
+			last = status;
 			options.onStatus?.(status);
 			if (TERMINAL_STATES.includes(status.state)) return status;
-			const left = deadline - Date.now();
-			if (left <= 0) throw new HeimdallTimeout(`experiment ${expId} still ${status.state} after ${Math.round(timeoutMs / 1000)}s`, status.mode);
-			await sleep(Math.min(intervalMs, left));
+			const wait = deadline - Date.now();
+			if (wait <= 0) throw late(status.state, status.mode);
+			await sleep(Math.min(intervalMs, wait));
 		}
 	}
 
@@ -321,8 +338,8 @@ export class Client {
 
 	// Transport
 
-	private async get<T>(path: string, query?: Query): Promise<T> {
-		const res = await this.request("GET", path, query);
+	private async get<T>(path: string, query?: Query, deadline?: number): Promise<T> {
+		const res = await this.request("GET", path, query, undefined, deadline);
 		return this.json<T>(res, "GET", path);
 	}
 
@@ -335,11 +352,11 @@ export class Client {
 		const res = await this.request("GET", path, query);
 		const mode = res.headers.get(MODE_HEADER) ?? "";
 		this.checkMode(mode, "GET", path);
-		return new RawResponse(new Uint8Array(await res.arrayBuffer()), res.headers.get("Content-Type") ?? "", mode);
+		return new RawResponse(res.body, res.headers.get("Content-Type") ?? "", mode);
 	}
 
-	private async json<T>(res: Response, method: string, path: string): Promise<T> {
-		const text = await res.text();
+	private async json<T>(res: Answer, method: string, path: string): Promise<T> {
+		const text = new TextDecoder().decode(res.body);
 		if (!text.trim()) return { mode: this.lastMode ?? "" } as T;
 		let data: unknown;
 		try {
@@ -360,7 +377,12 @@ export class Client {
 		if (this.requireLive && mode !== "live") throw new ModeError(mode, method, path);
 	}
 
-	private async request(method: "GET" | "POST", path: string, query?: Query, payload?: unknown): Promise<Response> {
+	/**
+	 * Sends one request and reads its whole body under the per-request timeout: a body that stalls
+	 * after the headers is a timeout like a late answer, with the same retry rules. deadline (epoch
+	 * ms), when given, also caps every attempt and the waits between them.
+	 */
+	private async request(method: "GET" | "POST", path: string, query?: Query, payload?: unknown, deadline?: number): Promise<Answer> {
 		let url = this.baseUrl + API_PREFIX + path;
 		const params = new URLSearchParams();
 		for (const [k, v] of Object.entries(query ?? {})) {
@@ -382,38 +404,48 @@ export class Client {
 		}
 		const attempts = 1 + (method === "GET" ? this.readRetries : 0);
 		for (let attempt = 0; ; attempt++) {
-			const last = attempt >= attempts - 1;
+			let timeout = this.timeoutMs;
+			if (deadline !== undefined) timeout = Math.min(timeout, deadline - Date.now());
+			if (timeout <= 0) throw new HeimdallTimeout(`no answer within ${this.timeoutMs}ms`, "", method, path);
+			const last = attempt >= attempts - 1 || (deadline !== undefined && Date.now() + 500 * (attempt + 1) >= deadline);
 			const controller = new AbortController();
-			const timer = setTimeout(() => controller.abort(), this.timeoutMs);
+			const timer = setTimeout(() => controller.abort(), timeout);
 			let res: Response;
+			let data: Uint8Array;
 			try {
 				res = await this.fetchImpl(url, { method, headers, body, signal: controller.signal });
+				data = new Uint8Array(await res.arrayBuffer());
 			} catch (err) {
-				clearTimeout(timer);
 				const timedOut = controller.signal.aborted;
 				if (last) {
-					if (timedOut) throw new HeimdallTimeout(`no answer within ${this.timeoutMs}ms`, "", method, path);
+					if (timedOut) throw new HeimdallTimeout(`no answer within ${timeout}ms`, "", method, path);
 					throw new HeimdallError(0, `cannot reach ${this.baseUrl}: ${String(err)}`, "connection", "", method, path);
 				}
 				await sleep(500 * (attempt + 1));
 				continue;
+			} finally {
+				clearTimeout(timer);
 			}
-			clearTimeout(timer);
 			this.lastMode = res.headers.get(MODE_HEADER) ?? this.lastMode;
-			if (res.ok) return res;
+			if (res.ok) return { headers: res.headers, body: data };
 			if ((res.status === 502 || res.status === 504) && !last) {
-				await res.arrayBuffer();
 				await sleep(500 * (attempt + 1));
 				continue;
 			}
-			throw await httpError(res, method, path);
+			throw httpError(res, data, method, path);
 		}
 	}
 }
 
+/** A response whose body was read in full within the request's timeout. */
+interface Answer {
+	headers: Headers;
+	body: Uint8Array;
+}
+
 /** Builds the error from the server's {mode, error: {message, type}} body. */
-async function httpError(res: Response, method: string, path: string): Promise<HeimdallError> {
-	const text = await res.text();
+function httpError(res: Response, body: Uint8Array, method: string, path: string): HeimdallError {
+	const text = new TextDecoder().decode(body);
 	let message = text.trim();
 	let type = "";
 	let mode = res.headers.get(MODE_HEADER) ?? "";

@@ -30,7 +30,7 @@ type fixture struct {
 
 // newFixture writes the experiment and an analysis "a_one" with action and,
 // when policy is not "", a policy result with that decision.
-func newFixture(t *testing.T, action schemas.Action, policy schemas.PolicyDecision) *fixture {
+func newFixture(t *testing.T, action schemas.Action, policy schemas.PolicyDecision, opts ...func(*schemas.Manifest)) *fixture {
 	t.Helper()
 	base := t.TempDir()
 	f := &fixture{t: t, runsRoot: filepath.Join(base, "runs")}
@@ -54,6 +54,9 @@ func newFixture(t *testing.T, action schemas.Action, policy schemas.PolicyDecisi
 		}
 	}
 	f.m.Slots = append(f.m.Slots, schemas.Slot{SlotID: "s_compat", PairID: "p_c", Task: "t01", Arm: "C", Condition: "clean", Trial: 1})
+	for _, o := range opts {
+		o(f.m)
+	}
 	// The real hash: release creation recomputes it (audit 1-A-02).
 	if f.m.Hash, err = utils.ManifestHash(f.m); err != nil {
 		t.Fatal(err)
@@ -247,6 +250,55 @@ func checkRecord(t *testing.T, f *fixture, rec *schemas.ReleaseRecord, req *sche
 	}
 }
 
+// TestCreateNeedsFrozenPolicy: an analysis written by `check -policy none`
+// or with another policy file does not stand in for the policy the
+// experiment froze; releasing it needs an override reason (QC2-22-01).
+func TestCreateNeedsFrozenPolicy(t *testing.T) {
+	frozen := func(m *schemas.Manifest) {
+		m.Experiment.Policy = "policies/team.yaml"
+		m.PolicyHash = "sha256:pol"
+	}
+	tests := []struct {
+		name     string
+		hash     string // policy hash of the analysis's result; "" means no policy result
+		override string
+		refused  string
+	}{
+		{name: "frozen policy evaluated", hash: "sha256:pol"},
+		{name: "policy none", refused: "did not evaluate the frozen policy"},
+		{name: "other policy file", hash: "sha256:other", refused: "not the frozen policy"},
+		{name: "policy none with override", override: "frozen policy waived for hotfix"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			f := newFixture(t, schemas.ActionShip, "", frozen)
+			a := &schemas.Analysis{AnalysisID: "a_two", ExpID: testExp, CreatedAt: time.Date(2026, 11, 14, 11, 0, 0, 0, time.UTC),
+				GradeSource: schemas.GradeSourceOriginal, Verdict: schemas.Verdict{Decision: schemas.DecisionImproved,
+					Action: schemas.ActionShip, ManifestHash: f.m.Hash, Effect: &schemas.Effect{ArmA: "A", ArmB: "B"}}}
+			if tt.hash != "" {
+				a.Policy = &schemas.PolicyResult{PolicyName: "team", PolicyHash: tt.hash, Decision: schemas.PolicyAllow}
+			}
+			if err := f.st.WriteAnalysis(context.Background(), a, nil); err != nil {
+				t.Fatal(err)
+			}
+			rec, err := f.log.Create(context.Background(), request("ana", tt.override))
+			if tt.refused != "" {
+				var refused *RefusedError
+				if !errors.As(err, &refused) || !strings.Contains(err.Error(), tt.refused) {
+					t.Fatalf("err = %v, want refusal %q", err, tt.refused)
+				}
+				return
+			}
+			if err != nil {
+				t.Fatalf("Create: %v", err)
+			}
+			if rec.AnalysisID != "a_two" || rec.Override != tt.override {
+				t.Errorf("record analysis %s override %q", rec.AnalysisID, rec.Override)
+			}
+		})
+	}
+}
+
 func TestCreatePicksAnalysis(t *testing.T) {
 	f := newFixture(t, schemas.ActionHold, "")
 	f.writeAnalysis("a_two", time.Date(2026, 11, 14, 11, 0, 0, 0, time.UTC), schemas.ActionShip, "")
@@ -380,5 +432,24 @@ func TestSealsDigestIgnoresOrder(t *testing.T) {
 	a := SealsDigest([]string{"bb", "aa"})
 	if a != SealsDigest([]string{"aa", "bb"}) || a != utils.SHA256Bytes([]byte("aa\nbb\n")) {
 		t.Errorf("digest %s", a)
+	}
+}
+
+// TestChainSealsReadsPackedLog covers QC2-22-04: chain documents come from
+// the seals.log bytes the pack holds, never a second read of the live log.
+func TestChainSealsReadsPackedLog(t *testing.T) {
+	f := newFixture(t, schemas.ActionShip, "")
+	expDir := filepath.Join(f.runsRoot, testExp)
+	live, err := os.ReadFile(filepath.Join(expDir, "seals.log"))
+	if err != nil || len(live) == 0 {
+		t.Fatalf("seals.log: %v", err)
+	}
+	// A packed snapshot taken before any seal: the live log's lines must not
+	// leak into the chain.
+	if out, err := chainSeals(expDir, nil, nil); err != nil || len(out) != 0 {
+		t.Fatalf("empty packed log gave %d chain files, %v", len(out), err)
+	}
+	if out, err := chainSeals(expDir, live, nil); err != nil || len(out) != len(f.runs) {
+		t.Fatalf("packed log gave %d chain files, want %d (%v)", len(out), len(f.runs), err)
 	}
 }

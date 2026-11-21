@@ -9,6 +9,7 @@ import (
 	"flag"
 	"fmt"
 	"io"
+	"io/fs"
 	"os"
 	"os/signal"
 	"path"
@@ -149,8 +150,18 @@ func buildCompare(ctx context.Context, f compareFlags, cfg *lib.Config) (_ *comp
 			return nil, fmt.Errorf("--baseline/--candidate need --base agents/<agent>.yaml: the agent whose files differ between the refs")
 		}
 		fixtures := filepath.Join(cfg.Root, "experiments", "fixtures", name)
-		if _, err := os.Stat(fixtures); err == nil {
-			return nil, fmt.Errorf("%s exists; pass another --name", fixtures)
+		// Reserve the fixture folder with an exclusive mkdir: a stat check
+		// lets two same-name invocations both proceed, and the loser's
+		// cleanup would delete the winner's inputs (QC2-21-07). Only a folder
+		// this call created is removed on failure.
+		if err := os.MkdirAll(filepath.Dir(fixtures), 0o755); err != nil {
+			return nil, err
+		}
+		if err := os.Mkdir(fixtures, 0o755); err != nil {
+			if errors.Is(err, fs.ErrExist) {
+				return nil, fmt.Errorf("%s exists; pass another --name", fixtures)
+			}
+			return nil, err
 		}
 		defer func() {
 			if retErr != nil { // the fixture tree belongs to the experiment this call did not write
@@ -214,6 +225,7 @@ func refArms(ctx context.Context, f compareFlags, root, name, base string) (quic
 	var arms [2]quickstart.ArmInput
 	var exported [2]*scaffold.ExportedRef
 	var dsts [2]string
+	var notesOf [2]string
 	used := map[string]bool{} // repository paths some arm feeds to its runs
 	for i, ref := range []string{f.baseline, f.candidate} {
 		id := []string{"A", "B"}[i]
@@ -228,6 +240,7 @@ func refArms(ctx context.Context, f compareFlags, root, name, base string) (quic
 		if notes := pickNotes(ex.Files, root, base); notes != "" {
 			arm.Set["notes.user_file"] = path.Join(rel, notes)
 			used[notes] = true
+			notesOf[i] = notes
 		}
 		if skills := skillFolders(ex.Files); len(skills) > 0 {
 			var extra []any
@@ -253,6 +266,24 @@ func refArms(ctx context.Context, f compareFlags, root, name, base string) (quic
 		}
 		arms[i] = arm
 	}
+	// A ref without the notes file gets no notes.user_file override, so its
+	// arm would fall back to the agent config's own notes file, possibly
+	// the very instructions the other ref deleted (QC2-21-03). That arm's
+	// absence of notes cannot be represented then: refuse.
+	for i := range arms {
+		other := 1 - i
+		if notesOf[i] != "" || notesOf[other] == "" {
+			continue
+		}
+		cfgPath := filepath.Join(root, filepath.FromSlash(base))
+		if arms[i].Agent != "" {
+			cfgPath = filepath.Join(root, filepath.FromSlash(arms[i].Agent))
+		}
+		if fallback := configUserNotes(cfgPath); fallback != "" {
+			ref := []string{f.baseline, f.candidate}[i]
+			return arms[0], arms[1], "", fmt.Errorf("%s has no %s while %s has it, but the agent config's notes.user_file (%s) would stand in for it at %s, so the removal would not reach the runs; drop notes.user_file from the agent config or compare with --a/--b", ref, notesOf[other], []string{f.baseline, f.candidate}[other], fallback, ref)
+		}
+	}
 	if exported[0].Hash == exported[1].Hash {
 		return arms[0], arms[1], "", fmt.Errorf("%s and %s have the same agent files under %s; nothing to compare: %w", f.baseline, f.candidate, strings.Join(paths, ","), errNoAgentChange)
 	}
@@ -264,11 +295,32 @@ func refArms(ctx context.Context, f compareFlags, root, name, base string) (quic
 	// config) would leave both arms running the same inputs while the report
 	// credits the change, so it is refused (audit 5-B-01).
 	if ignored := unusedChanges(exported, dsts, used); len(ignored) > 0 {
-		return arms[0], arms[1], "", fmt.Errorf("%s and %s differ in %s, which neither arm feeds to its runs (only the notes file, skill folders and .heimdall/%s are used); narrow --paths or reference the file from the agent config", f.baseline, f.candidate, strings.Join(ignored, ", "), base)
+		// A file the committed agent config references is not copied per
+		// ref, so referencing it does not make it part of the comparison
+		// (QC2-21-04): do not suggest that.
+		return arms[0], arms[1], "", fmt.Errorf("%s and %s differ in %s, which neither arm feeds to its runs (only the notes file, skill folders and .heimdall/%s itself are copied per ref; a file the agent config references is not, so referencing it does not make it compared); narrow --paths, or move the change into the notes file or a skill folder", f.baseline, f.candidate, strings.Join(ignored, ", "), base)
 	}
 	subject := fmt.Sprintf("agent files at `%s` (%s, %d files) vs `%s` (%s, %d files)", f.baseline, exported[0].Commit[:12], len(exported[0].Files),
 		f.candidate, exported[1].Commit[:12], len(exported[1].Files))
 	return arms[0], arms[1], subject, nil
+}
+
+// configUserNotes is the notes.user_file an agent config file names, "" when
+// it names none or cannot be read.
+func configUserNotes(p string) string {
+	raw, err := os.ReadFile(p)
+	if err != nil {
+		return ""
+	}
+	var cfg struct {
+		Notes struct {
+			UserFile string `yaml:"user_file"`
+		} `yaml:"notes"`
+	}
+	if yaml.Unmarshal(raw, &cfg) != nil {
+		return ""
+	}
+	return cfg.Notes.UserFile
 }
 
 // unusedChanges lists the exported files that differ between the two refs

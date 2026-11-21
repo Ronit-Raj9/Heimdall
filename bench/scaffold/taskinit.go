@@ -105,16 +105,19 @@ func InitTask(ctx context.Context, opts TaskInitOptions) (*TaskInitResult, error
 	if err != nil {
 		return nil, err
 	}
+	// The suite edit is validated before the task is published, and a
+	// failed suite write takes the new task folder back, so a failure leaves
+	// no unlisted task that blocks a retry (QC2-21-09).
+	edited, changed, err := AddTaskID(suiteYAML, opts.ID)
+	if err != nil {
+		return nil, fmt.Errorf("%s: %w", suitePath, err)
+	}
 	if err := writeTask(ctx, res.Dir, src, files, opts.Force); err != nil {
 		return nil, err
 	}
-	edited, changed, err := AddTaskID(suiteYAML, opts.ID)
-	if err != nil {
-		return nil, fmt.Errorf("task written to %s, but: %w", res.Dir, err)
-	}
 	if changed {
 		if err := os.WriteFile(suitePath, edited, 0o644); err != nil {
-			return nil, fmt.Errorf("task written to %s, but update %s: %w", res.Dir, suitePath, err)
+			return nil, errors.Join(fmt.Errorf("update %s: %w", suitePath, err), os.RemoveAll(res.Dir))
 		}
 		res.SuiteEdited = true
 	}

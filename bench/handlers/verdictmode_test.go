@@ -40,31 +40,34 @@ func TestVerdictCarriesAnalysisMode(t *testing.T) {
 		{schemas.ModeLive, schemas.ModeLive, schemas.ModeLive},
 		{schemas.ModeLive, "", schemas.ModeLive},
 		{schemas.ModeRecorded, schemas.ModeLive, schemas.ModeRecorded},
+		{schemas.ModeRecorded, schemas.ModeSynthetic, schemas.ModeSynthetic}, // QC2-20-08
 	}
 	for _, tt := range tests {
-		t.Run(string(tt.server)+"/"+string(tt.analysis), func(t *testing.T) {
-			d := fullDeps()
-			r := router.New()
-			NewExperimentsHandler(tt.server, d.index, &modeAnalyzer{mode: tt.analysis}, d.launcher, d.catalog, nil).RegisterRoutes(r)
-			ctx := &fasthttp.RequestCtx{}
-			ctx.Request.SetRequestURI(APIPrefix + "/experiments/e_test/verdict")
-			ctx.Request.Header.SetMethod(http.MethodGet)
-			r.Handler(ctx)
-			if ctx.Response.StatusCode() != http.StatusOK {
-				t.Fatalf("status %d: %s", ctx.Response.StatusCode(), ctx.Response.Body())
-			}
-			if got := string(ctx.Response.Header.Peek(lib.ModeHeader)); got != string(tt.want) {
-				t.Errorf("header mode %q, want %q", got, tt.want)
-			}
-			var body struct {
-				Mode string `json:"mode"`
-			}
-			if err := json.Unmarshal(ctx.Response.Body(), &body); err != nil {
-				t.Fatal(err)
-			}
-			if body.Mode != string(tt.want) {
-				t.Errorf("body mode %q, want %q", body.Mode, tt.want)
-			}
-		})
+		for _, route := range []string{"verdict", "diagnostics"} { // QC2-20-08: diagnostics too
+			t.Run(route+"/"+string(tt.server)+"/"+string(tt.analysis), func(t *testing.T) {
+				d := fullDeps()
+				r := router.New()
+				NewExperimentsHandler(tt.server, d.index, &modeAnalyzer{mode: tt.analysis}, d.launcher, d.catalog, nil).RegisterRoutes(r)
+				ctx := &fasthttp.RequestCtx{}
+				ctx.Request.SetRequestURI(APIPrefix + "/experiments/e_test/" + route)
+				ctx.Request.Header.SetMethod(http.MethodGet)
+				r.Handler(ctx)
+				if ctx.Response.StatusCode() != http.StatusOK {
+					t.Fatalf("status %d: %s", ctx.Response.StatusCode(), ctx.Response.Body())
+				}
+				if got := string(ctx.Response.Header.Peek(lib.ModeHeader)); got != string(tt.want) {
+					t.Errorf("header mode %q, want %q", got, tt.want)
+				}
+				var body struct {
+					Mode string `json:"mode"`
+				}
+				if err := json.Unmarshal(ctx.Response.Body(), &body); err != nil {
+					t.Fatal(err)
+				}
+				if body.Mode != string(tt.want) {
+					t.Errorf("body mode %q, want %q", body.Mode, tt.want)
+				}
+			})
+		}
 	}
 }

@@ -86,6 +86,7 @@ func main() {
 		usage()
 		exit(exitUsage)
 	}
+	configExplicit = namesConfig(os.Args[2:]) // QC2-21-01: an explicit -config is loaded literally (quickstart.go)
 	exit(cmd.run(os.Args[2:]))
 }
 

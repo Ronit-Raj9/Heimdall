@@ -24,6 +24,7 @@ import (
 	"github.com/maximhq/bifrost/bench/livescore" // X6 live scoring
 	"github.com/maximhq/bifrost/bench/migration" // W6 migration report
 	"github.com/maximhq/bifrost/bench/schemas"
+	"github.com/maximhq/bifrost/bench/tenancy"
 	"github.com/maximhq/bifrost/bench/traceinbox"
 	"github.com/valyala/fasthttp"
 )
@@ -390,6 +391,51 @@ func BuildHostedOpenAPI(registered map[string][]string, version string, mode sch
 	return buildOpenAPI(registered, version, mode, true)
 }
 
+// hostedRule is the tenancy rule the hosted dispatcher applies to a route:
+// the platform router's entry, else the org router's (whose GETs without an
+// entry read as viewer).
+func hostedRule(method, pattern string) tenancy.Rule {
+	pol := tenancy.DefaultPolicy()
+	if r, ok := pol.PlatformRule(method, pattern); ok {
+		return r
+	}
+	r, _ := pol.OrgRule(method, pattern)
+	return r
+}
+
+// hostedSecurity sets an operation's security from its tenancy rule
+// (QC2-20-03): public routes need nothing; account-only routes take the
+// session cookie alone; org and signed-in routes take the session or an
+// API token; runner routes take a runner token. The session's CSRF value
+// is required only on unsafe methods, as auth middleware enforces it. An
+// org read open to viewers is also open to anonymous callers on an org with
+// public_read, shown as an empty requirement.
+func hostedSecurity(op map[string]any, method string, rule tenancy.Rule) {
+	session := map[string]any{"session": []string{}}
+	if !tenancy.IsRead(method) {
+		session["csrf"] = []string{}
+	}
+	token := map[string]any{"apiToken": []string{}}
+	switch rule.Access {
+	case tenancy.AccessPublic:
+		op["security"] = []any{}
+	case tenancy.AccessUser:
+		op["security"] = []any{session}
+	case tenancy.AccessSignedIn:
+		op["security"] = []any{session, token}
+	case tenancy.AccessRunner:
+		op["security"] = []any{map[string]any{"runnerToken": []string{}}}
+	case tenancy.AccessOrg:
+		sec := []any{session, token}
+		if tenancy.IsRead(method) && rule.Min == auth.RoleViewer {
+			sec = append(sec, map[string]any{})
+			op["x-heimdall-public-read"] = true
+		}
+		op["security"] = sec
+		op["x-heimdall-min-role"] = string(rule.Min)
+	}
+}
+
 // mergeRoutes unions two method -> patterns maps.
 func mergeRoutes(a, b map[string][]string) map[string][]string {
 	out := map[string][]string{}
@@ -422,12 +468,23 @@ func buildOpenAPI(registered map[string][]string, version string, mode schemas.M
 			if !strings.HasPrefix(p, "/api/") {
 				continue
 			}
+			var rule *tenancy.Rule
+			if hosted {
+				r := hostedRule(method, p)
+				if r.Access == tenancy.AccessDeny {
+					continue // the hosted dispatcher refuses it for every caller (QC2-20-03)
+				}
+				rule = &r
+			}
 			rd, ok := table[method+" "+p]
 			if !ok {
 				undocumented = append(undocumented, method+" "+p)
 				rd = RouteDoc{Method: method, Path: p, Tag: "undocumented", Summary: "Not yet described in handlers/openapi.go"}
 			}
 			op := g.operation(rd)
+			if rule != nil {
+				hostedSecurity(op, method, *rule)
+			}
 			key := openAPIPath(p)
 			if paths[key] == nil {
 				paths[key] = map[string]any{}
@@ -519,12 +576,9 @@ func (g *schemaGen) operation(rd RouteDoc) map[string]any {
 		op["parameters"] = params
 	}
 	switch {
-	case g.hosted && rd.Auth == AuthWrite:
-		op["security"] = []any{map[string]any{"session": []string{}, "csrf": []string{}}, map[string]any{"apiToken": []string{}}}
-	case g.hosted && rd.Auth == AuthWorker:
-		op["security"] = []any{map[string]any{"runnerToken": []string{}}}
-	case g.hosted && rd.Auth == AuthInbox:
-		// The inbox webhook is local mode only (tenancy/policy.go denies it).
+	case g.hosted:
+		// Hosted security comes from the tenancy policy the dispatcher
+		// enforces (hostedSecurity), not from the local token tags.
 	case rd.Auth == AuthWrite:
 		op["security"] = []any{map[string]any{"writeToken": []string{}}}
 	case rd.Auth == AuthWorker:

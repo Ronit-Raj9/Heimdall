@@ -298,6 +298,14 @@ type JudgeRecord struct {
 	ServedModel string      `json:"served_model,omitempty"`
 	Calibration string      `json:"calibration,omitempty"`
 	Audit       *JudgeAudit `json:"audit,omitempty"`
+
+	// The rest of the judge's calibration identity: the provider it was
+	// called through and, for a vision judge, how its votes decide. A
+	// calibration record covers a grade only when these match what it
+	// measured (QC2-25-03, QC2-25-05). Empty on grades sealed before them.
+	Provider  string  `json:"provider,omitempty"`
+	Aggregate string  `json:"aggregate,omitempty"`
+	PassScore float64 `json:"pass_score,omitempty"`
 }
 
 // ImportRecord says where an imported suite came from (Suite.Imported).

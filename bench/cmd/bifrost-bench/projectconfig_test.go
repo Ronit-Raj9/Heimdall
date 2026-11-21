@@ -41,6 +41,24 @@ func TestDefaultConfigFindsInitProject(t *testing.T) {
 	}
 }
 
+// QC2-21-01: -config deploy/bench.yaml named on the command line is loaded
+// literally; a missing file does not fall back to the .heimdall project.
+func TestExplicitDefaultConfigIsLiteral(t *testing.T) {
+	initQuickRepo(t)
+	if !namesConfig([]string{"-exp", "e", "-config", defaultConfig}) || !namesConfig([]string{"--config=" + defaultConfig}) ||
+		namesConfig([]string{"-exp", "e"}) || namesConfig([]string{"--", "-config"}) {
+		t.Fatal("namesConfig")
+	}
+	configExplicit = true
+	t.Cleanup(func() { configExplicit = false })
+	if got := resolveConfigPath(defaultConfig); got != defaultConfig {
+		t.Fatalf("explicit default rewritten to %s", got)
+	}
+	if _, err := loadConfig(defaultConfig); err == nil {
+		t.Fatal("a named, missing config loaded another project's")
+	}
+}
+
 // A rejected admission after review fails the command, and a retry proves
 // again instead of stopping at "already reviewed" (audit 5-B-05).
 func TestTaskReviewRejectedFailsAndRetries(t *testing.T) {
@@ -151,5 +169,29 @@ func TestCompareNoAgentChangeExitCode(t *testing.T) {
 	}
 	if !strings.Contains(wf, "if: steps.write.outputs.changed == 'true'") || !strings.Contains(wf, `-eq 6 ]`) {
 		t.Fatalf("live workflow does not skip the gate on no agent change:\n%s", wf)
+	}
+}
+
+// QC2-21-02: agent init from the repository root of an init'd project
+// scaffolds into .heimdall, where the planner resolves agents/.
+func TestAgentInitUsesDiscoveredProject(t *testing.T) {
+	dir, _, _ := initQuickRepo(t)
+	var out strings.Builder
+	if code := runAgentInit([]string{"demo-agent", "-template", "command"}, &out); code != exitOK {
+		t.Fatalf("agent init: exit %d", code)
+	}
+	if _, err := os.Stat(filepath.Join(dir, ".heimdall", "agents", "demo-agent.yaml")); err != nil {
+		t.Fatalf("agent not in the project: %v\n%s", err, out.String())
+	}
+	if _, err := os.Stat(filepath.Join(dir, "agents", "demo-agent.yaml")); err == nil {
+		t.Fatal("agent written at the repository root")
+	}
+}
+
+// QC2-21-06: a review whose fresh proof recordProofs dropped is not
+// reported as admitted.
+func TestReviewProofDropped(t *testing.T) {
+	if !reviewProofDropped([]string{"old", "t1"}, "t1") || reviewProofDropped([]string{"old"}, "t1") {
+		t.Fatal("reviewProofDropped")
 	}
 }

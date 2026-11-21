@@ -93,96 +93,75 @@ func Apply(an *schemas.Analysis, in Input) {
 	}
 	th := Thresholds(in.Policy, in.PolicySource)
 	check := schemas.InstrumentCheck{Name: InstrumentName, Threshold: thresholdText(th)}
-	model, templates, judged, served := judgedRuns(in.Runs)
+	groups := judgeGroups(in.Runs)
+	judged := 0
+	for _, g := range groups {
+		judged += g.n
+	}
 	if judged == 0 {
 		check.Status = schemas.InstrumentNotApplicable
 		check.Detail = "no counted run was graded by the judge"
 		an.Verdict.Instruments = append(an.Verdict.Instruments, check)
 		return
 	}
-	jc := &schemas.JudgeCalibrationVerdict{Model: model, Templates: templates, Thresholds: th, JudgedRuns: judged}
+	jc := &schemas.JudgeCalibrationVerdict{Model: groups[0].id.Model, Templates: allTemplates(groups), Thresholds: th, JudgedRuns: judged}
 	for _, r := range in.Runs {
 		if r.Slot.Counted && Contested(&r, in.Reviews[r.Run.RunID]) {
 			jc.ContestedRuns++
 		}
 	}
 	allowed := in.Manifest != nil && in.Manifest.Experiment.Verdict.AllowUncalibratedJudge
-	rec, newest := in.Records.Covering(model, templates)
+	// Every judge configuration that graded a counted run is assessed on
+	// its own record for its own templates (audit 1-C-12, QC2-25-02); the
+	// results combine by severity, so a measured reliability failure of any
+	// judge stays INVALID whatever the others say (QC2-25-01).
 	capVerdict := false
-	switch {
-	case rec == nil:
-		jc.State = schemas.CalibrationStateUncalibrated
-		jc.Detail = fmt.Sprintf("judge not calibrated: no calibration record for model %s with the prompt the runs used (%s)", model, shortList(templates))
-		if newest != nil {
-			jc.Detail += fmt.Sprintf("; the newest record for the model, %s, does not cover it", newest.RecordID)
-		}
-		capVerdict = true
-	case rec.HumanLabels == 0:
-		fillRecord(jc, rec)
-		jc.State = schemas.CalibrationStateUncalibrated
-		jc.Detail = fmt.Sprintf("judge not calibrated: record %s has no human labels (%d admission-control seeds only)", rec.RecordID, rec.SeedItems)
-		capVerdict = true
-	default:
-		fillRecord(jc, rec)
-		bounds, pass := boundsText(rec, th)
-		switch {
-		case rec.HumanLabels < th.MinLabels:
-			jc.State = schemas.CalibrationStateFewLabels
-			jc.Detail = fmt.Sprintf("judge calibrated on %d human labels, fewer than %d: %s", rec.HumanLabels, th.MinLabels, bounds)
-			if !pass {
-				jc.Detail += "; too few labels to show the judge reliable"
-				capVerdict = true
+	var majority *schemas.CalibrationRecord
+	for i, g := range groups {
+		as := assess(g, in.Records, th, len(groups) > 1)
+		if i == 0 {
+			majority = as.rec
+			if as.rec != nil {
+				fillRecord(jc, as.rec)
 			}
-		case !pass:
-			jc.State = schemas.CalibrationStateUnreliable
-			jc.Detail = fmt.Sprintf("judge unreliable: %s (record %s, %d human labels)", bounds, rec.RecordID, rec.HumanLabels)
-		default:
-			jc.State = schemas.CalibrationStateCalibrated
-			jc.Detail = fmt.Sprintf("judge calibrated on %d human labels: %s (record %s)", rec.HumanLabels, bounds, rec.RecordID)
-		}
-		jc.Reminders = Reminders(rec, th, in.SetSHA256, served, in.Now)
-	}
-	// Audit 1-C-12: every other judge model that graded a counted run needs
-	// its own passing record; the majority model's record never covers it.
-	for _, other := range judgeModels(in.Runs) {
-		if other == model || jc.State == schemas.CalibrationStateUnreliable {
-			continue
-		}
-		orec, _ := in.Records.Covering(other, templates)
-		switch {
-		case orec == nil || orec.HumanLabels == 0:
-			jc.State = schemas.CalibrationStateUncalibrated
-			jc.Detail += fmt.Sprintf("; judge not calibrated: no calibration record with human labels for judge model %s, which also graded counted runs", other)
-			capVerdict = true
-		default:
-			bounds, pass := boundsText(orec, th)
+			jc.State, jc.Detail = as.state, as.detail
+		} else if as.state != schemas.CalibrationStateCalibrated {
 			switch {
-			case orec.HumanLabels >= th.MinLabels && !pass:
-				jc.State = schemas.CalibrationStateUnreliable
-				jc.Detail = fmt.Sprintf("judge unreliable: judge model %s: %s (record %s, %d human labels)", other, bounds, orec.RecordID, orec.HumanLabels)
-			case !pass:
-				if jc.State == schemas.CalibrationStateCalibrated {
-					jc.State = schemas.CalibrationStateFewLabels
-				}
-				jc.Detail += fmt.Sprintf("; judge model %s calibrated on %d human labels, too few to show it reliable: %s", other, orec.HumanLabels, bounds)
-				capVerdict = true
+			case severity(as.state) > severity(jc.State) && as.state == schemas.CalibrationStateUnreliable:
+				jc.Detail = as.detail
+			default:
+				jc.Detail += "; " + as.detail
 			}
+			if severity(as.state) > severity(jc.State) {
+				jc.State = as.state
+			}
+		}
+		capVerdict = capVerdict || as.caps
+		if as.rec != nil { // drift of each judge against its own record (QC2-25-07)
+			jc.Reminders = append(jc.Reminders, Reminders(as.rec, th, in.SetSHA256, g.served, in.Now)...)
 		}
 	}
 	if in.Records != nil && len(in.Records.Problems) > 0 {
 		jc.Reminders = append(jc.Reminders, fmt.Sprintf("%d calibration record problem(s): %s", len(in.Records.Problems), in.Records.Problems[0]))
 	}
-	jc.Caps = capVerdict && !allowed
-	if capVerdict && allowed {
+	unreliable := jc.State == schemas.CalibrationStateUnreliable
+	jc.Caps = capVerdict && !allowed && !unreliable
+	if capVerdict && allowed && !unreliable {
 		jc.State = schemas.CalibrationStateAllowed
 		jc.Detail += "; allowed by allow_uncalibrated_judge, so the verdict is labelled, not capped"
+	}
+	if allowed || unreliable {
 		capVerdict = false
+	}
+	rec := majority
+	if len(groups) > 1 {
+		rec = nil // one judge's error rates do not describe a mixture (QC2-25-07)
 	}
 	if jc.ContestedRuns > 0 {
 		jc.Detail += fmt.Sprintf("; %d of %d judged runs contested (in the review queue)", jc.ContestedRuns, judged)
 	}
 	jc.ErrorOverEffect = errorOverEffect(rec, an.Verdict.Effect)
-	jc.BiasAdjusted = biasAdjusted(in.Runs, an.Verdict.Primary.Condition, rec)
+	jc.BiasAdjusted = biasAdjusted(in.Runs, an.Verdict.Primary.Condition, rec, len(groups) > 1)
 
 	switch jc.State {
 	case schemas.CalibrationStateCalibrated:
@@ -235,53 +214,147 @@ func judgedExperiment(m *schemas.Manifest, runs []schemas.SealedRun) bool {
 	return false
 }
 
-// judgedRuns returns the judge model of the counted judged runs (the most
-// common one), every prompt template hash they used (sorted), how many
-// there are, and the served model ids they recorded.
-func judgedRuns(runs []schemas.SealedRun) (model string, templates []string, n int, served []string) {
-	models := map[string]int{}
-	tmpl := map[string]bool{}
-	srv := map[string]bool{}
+// judgeGroup is the counted judged runs of one judge configuration.
+type judgeGroup struct {
+	id        JudgeID
+	templates []string // prompt template hashes its runs used, sorted
+	served    []string // served model ids its runs recorded, sorted
+	n         int
+}
+
+// judgeGroups groups the counted judged runs by judge configuration, the
+// most common first (ties by name).
+func judgeGroups(runs []schemas.SealedRun) []judgeGroup {
+	type acc struct {
+		tmpl, srv map[string]bool
+		n         int
+	}
+	m := map[JudgeID]*acc{}
 	for _, r := range runs {
 		if !r.Slot.Counted || r.Grade == nil || r.Grade.Judge == nil || len(r.Grade.Judge.Votes) == 0 {
 			continue
 		}
-		n++
-		models[r.Grade.Judge.Model]++
-		if r.Grade.Judge.PromptSHA256 != "" {
-			tmpl[r.Grade.Judge.PromptSHA256] = true
+		id := GradeJudgeID(r.Grade.Judge)
+		a, ok := m[id]
+		if !ok {
+			a = &acc{tmpl: map[string]bool{}, srv: map[string]bool{}}
+			m[id] = a
 		}
-		if r.Grade.Judge.ServedModel != "" {
-			srv[r.Grade.Judge.ServedModel] = true
+		a.n++
+		if h := r.Grade.Judge.PromptSHA256; h != "" {
+			a.tmpl[h] = true
+		}
+		if sm := r.Grade.Judge.ServedModel; sm != "" {
+			a.srv[sm] = true
 		}
 	}
-	best := -1
-	for _, m := range sortedSet(boolKeys(models)) {
-		if models[m] > best {
-			model, best = m, models[m]
+	out := make([]judgeGroup, 0, len(m))
+	for id, a := range m {
+		out = append(out, judgeGroup{id: id, templates: sortedSet(a.tmpl), served: sortedSet(a.srv), n: a.n})
+	}
+	sort.Slice(out, func(i, j int) bool {
+		if out[i].n != out[j].n {
+			return out[i].n > out[j].n
 		}
-	}
-	return model, sortedSet(tmpl), n, sortedSet(srv)
-}
-
-// judgeModels returns every judge model of the counted judged runs, sorted.
-func judgeModels(runs []schemas.SealedRun) []string {
-	models := map[string]bool{}
-	for _, r := range runs {
-		if !r.Slot.Counted || r.Grade == nil || r.Grade.Judge == nil || len(r.Grade.Judge.Votes) == 0 {
-			continue
-		}
-		models[r.Grade.Judge.Model] = true
-	}
-	return sortedSet(models)
-}
-
-func boolKeys(m map[string]int) map[string]bool {
-	out := make(map[string]bool, len(m))
-	for k := range m {
-		out[k] = true
-	}
+		return out[i].id.String() < out[j].id.String()
+	})
 	return out
+}
+
+func allTemplates(groups []judgeGroup) []string {
+	set := map[string]bool{}
+	for _, g := range groups {
+		for _, t := range g.templates {
+			set[t] = true
+		}
+	}
+	return sortedSet(set)
+}
+
+// severity orders calibration states: a worse state wins when judges
+// combine.
+func severity(state string) int {
+	switch state {
+	case schemas.CalibrationStateUnreliable:
+		return 3
+	case schemas.CalibrationStateUncalibrated:
+		return 2
+	case schemas.CalibrationStateFewLabels:
+		return 1
+	}
+	return 0
+}
+
+// assessment is one judge configuration's calibration result.
+type assessment struct {
+	state, detail string
+	caps          bool
+	rec           *schemas.CalibrationRecord
+}
+
+// assess finds the record for one judge configuration and its templates
+// and checks it against the thresholds: pooled over its human items and for
+// every template the judge used, each on that template's own human items
+// (QC2-25-04). named prefixes the detail with the judge when several judged.
+func assess(g judgeGroup, recs *RecordSet, th schemas.JudgeCalibrationThresholds, named bool) assessment {
+	who := ""
+	if named {
+		who = "judge " + g.id.String() + ": "
+	}
+	rec, newest := recs.Covering(g.id, g.templates)
+	switch {
+	case rec == nil:
+		d := fmt.Sprintf("%sjudge not calibrated: no calibration record for model %s with the prompt the runs used (%s)", who, g.id.String(), shortList(g.templates))
+		if newest != nil {
+			d += fmt.Sprintf("; the newest record for the model, %s, does not cover it (judge configuration or human labels for each template)", newest.RecordID)
+		}
+		return assessment{state: schemas.CalibrationStateUncalibrated, detail: d, caps: true}
+	case rec.HumanLabels == 0:
+		return assessment{state: schemas.CalibrationStateUncalibrated, caps: true, rec: rec,
+			detail: fmt.Sprintf("%sjudge not calibrated: record %s has no human labels (%d admission-control seeds only)", who, rec.RecordID, rec.SeedItems)}
+	}
+	as := assessment{rec: rec}
+	bounds, pass := boundsText(&rec.Human, th)
+	switch {
+	case rec.HumanLabels < th.MinLabels:
+		as.state = schemas.CalibrationStateFewLabels
+		as.detail = fmt.Sprintf("%sjudge calibrated on %d human labels, fewer than %d: %s", who, rec.HumanLabels, th.MinLabels, bounds)
+		if !pass {
+			as.detail += "; too few labels to show the judge reliable"
+			as.caps = true
+		}
+	case !pass:
+		as.state = schemas.CalibrationStateUnreliable
+		as.detail = fmt.Sprintf("%sjudge unreliable: %s (record %s, %d human labels)", who, bounds, rec.RecordID, rec.HumanLabels)
+		return as
+	default:
+		as.state = schemas.CalibrationStateCalibrated
+		as.detail = fmt.Sprintf("%sjudge calibrated on %d human labels: %s (record %s)", who, rec.HumanLabels, bounds, rec.RecordID)
+	}
+	if len(rec.Templates) < 2 {
+		return as // the pooled statistics are the template's
+	}
+	for _, t := range g.templates {
+		ts := TemplateStats(rec, t)
+		if ts == nil {
+			continue // Covering already required one
+		}
+		tb, tpass := boundsText(ts, th)
+		switch {
+		case ts.Items >= th.MinLabels && !tpass:
+			as.state = schemas.CalibrationStateUnreliable
+			as.detail = fmt.Sprintf("%sjudge unreliable on %s: %s (record %s, %d human labels for that template)", who, shortList([]string{t}), tb, rec.RecordID, ts.Items)
+			as.caps = false
+			return as
+		case !tpass:
+			if as.state == schemas.CalibrationStateCalibrated {
+				as.state = schemas.CalibrationStateFewLabels
+			}
+			as.detail += fmt.Sprintf("; %s has %d human labels of its own, too few to show the judge reliable on it: %s", shortList([]string{t}), ts.Items, tb)
+			as.caps = true
+		}
+	}
+	return as
 }
 
 func fillRecord(jc *schemas.JudgeCalibrationVerdict, rec *schemas.CalibrationRecord) {
@@ -296,8 +369,7 @@ func fillRecord(jc *schemas.JudgeCalibrationVerdict, rec *schemas.CalibrationRec
 // the thresholds and reports whether both bounds pass. An unmeasured TNR
 // (no human label is incorrect) does not pass: the judge's false positives
 // were never tested.
-func boundsText(rec *schemas.CalibrationRecord, th schemas.JudgeCalibrationThresholds) (string, bool) {
-	h := rec.Human
+func boundsText(h *schemas.CalibrationStats, th schemas.JudgeCalibrationThresholds) (string, bool) {
 	pass := true
 	var parts []string
 	if h.Agreement.Lo == nil || *h.Agreement.Lo < th.MinAgreement {
@@ -397,14 +469,19 @@ func errorOverEffect(rec *schemas.CalibrationRecord, eff *schemas.Effect) string
 // biasAdjusted is, per arm on the condition, the raw judged success rate
 // (passed over runs the judge decided) and its Rogan-Gladen correction from
 // the record's TPR and TNR.
-func biasAdjusted(runs []schemas.SealedRun, condition string, rec *schemas.CalibrationRecord) map[string]schemas.BiasAdjustedRate {
+//
+// Only the judge's own decisions count: a run whose outcome a human review
+// replaced is left out, since its pass is a person's label, not the
+// judge's (QC2-25-08). With several judge configurations no single record
+// describes the error rates, so nothing is corrected (QC2-25-07).
+func biasAdjusted(runs []schemas.SealedRun, condition string, rec *schemas.CalibrationRecord, mixed bool) map[string]schemas.BiasAdjustedRate {
 	if condition == "" {
 		condition = schemas.ConditionClean
 	}
 	type kn struct{ k, n int }
 	arms := map[string]*kn{}
 	for _, r := range runs {
-		if !r.Slot.Counted || r.Slot.Condition != condition || r.Grade == nil || !r.Grade.Judged || r.Grade.InvalidEvaluator {
+		if !r.Slot.Counted || r.Slot.Condition != condition || r.Grade == nil || !r.Grade.Judged || r.Grade.InvalidEvaluator || r.Review != nil {
 			continue
 		}
 		a, ok := arms[r.Slot.Arm]
@@ -428,6 +505,10 @@ func biasAdjusted(runs []schemas.SealedRun, condition string, rec *schemas.Calib
 	out := map[string]schemas.BiasAdjustedRate{}
 	for _, a := range names {
 		c := arms[a]
+		if mixed {
+			out[a] = schemas.BiasAdjustedRate{Raw: Rate(c.k, c.n), Note: "several judge configurations graded the runs, so one record's error rates cannot correct the judged rate"}
+			continue
+		}
 		if rec == nil || rec.HumanLabels == 0 {
 			out[a] = schemas.BiasAdjustedRate{Raw: Rate(c.k, c.n), Note: "no calibration record with human labels, so the judged rate cannot be corrected"}
 			continue
