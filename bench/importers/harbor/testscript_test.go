@@ -67,6 +67,10 @@ func TestPlanTestScriptLines(t *testing.T) {
 		{name: "plain commands are kept", src: "mkdir -p /logs/verifier\npytest /tests -rA\n", wantLine: "pytest /tests -rA"},
 		{name: "uvx with the image's uv", src: "uvx -w pytest==8.4.1 pytest -rA\n", wantBake: []string{"export UV_PYTHON_INSTALL_DIR=/opt/harbor-tests/python UV_CACHE_DIR=/tmp/harbor-uv-cache && uv venv /opt/harbor-tests/venv1 && " +
 			"uv pip install --python /opt/harbor-tests/venv1/bin/python pytest==8.4.1 && rm -rf /tmp/harbor-uv-cache && chmod -R a+rX /opt/harbor-tests"}, wantLine: "/opt/harbor-tests/venv1/bin/pytest -rA"},
+		{name: "uvx with a package index", src: "uvx \\\n  --index https://download.pytorch.org/whl/cpu \\\n  --index-strategy unsafe-best-match \\\n  -p 3.13 -w torch==2.7.1 -w pytest==8.4.1 pytest /tests/t.py -rA\n",
+			wantBake: []string{"export UV_PYTHON_INSTALL_DIR=/opt/harbor-tests/python UV_CACHE_DIR=/tmp/harbor-uv-cache && uv venv --python 3.13 /opt/harbor-tests/venv1 && " +
+				"uv pip install --python /opt/harbor-tests/venv1/bin/python --index https://download.pytorch.org/whl/cpu --index-strategy unsafe-best-match torch==2.7.1 pytest==8.4.1 && rm -rf /tmp/harbor-uv-cache && chmod -R a+rX /opt/harbor-tests"},
+			wantLine: "/opt/harbor-tests/venv1/bin/pytest /tests/t.py -rA"},
 		{name: "uvx with a variable", src: "curl -LsSf https://astral.sh/uv/0.9.5/install.sh | sh\nuvx -w git+https://x/y@${COMMIT} pytest\n", wantErr: "shell variables"},
 		{name: "uvx unknown option", src: "curl -LsSf https://astral.sh/uv/0.9.5/install.sh | sh\nuvx --with-requirements r.txt pytest\n", wantErr: "uvx option --with-requirements"},
 		{name: "git clone", src: "git clone https://github.com/x/y src\n", wantErr: "package or source download"},
@@ -126,5 +130,29 @@ func TestLogicalLinesSkipsHeredocBodies(t *testing.T) {
 	}
 	if got := solutionFetch(src); got != "" {
 		t.Errorf("solutionFetch read a heredoc body: %q", got)
+	}
+}
+
+func TestPlanTestScriptKeepNetworked(t *testing.T) {
+	src := "apt-get install -y curl\ngit clone https://github.com/x/y src\nuvx --with-requirements r.txt pytest\npytest /tests -rA\n"
+	if _, err := planTestScriptKeep(src, false); err == nil {
+		t.Fatal("want a refusal without keep_networked")
+	}
+	p, err := planTestScriptKeep(src, true)
+	if err != nil {
+		t.Fatalf("keep_networked: %v", err)
+	}
+	for _, want := range []string{"\ngit clone https://github.com/x/y src\n", "\nuvx --with-requirements r.txt pytest\n", "\npytest /tests -rA"} {
+		if !strings.Contains(p.Script, want) {
+			t.Errorf("script lacks %q:\n%s", want, p.Script)
+		}
+	}
+	if len(p.Bake) != 1 || len(p.Changes) != 3 {
+		t.Errorf("bake %q changes %q, want 1 bake and 3 changes", p.Bake, p.Changes)
+	}
+	for _, c := range p.Changes[1:] {
+		if !strings.HasPrefix(c, "kept as is, needs the network") {
+			t.Errorf("change %q", c)
+		}
 	}
 }

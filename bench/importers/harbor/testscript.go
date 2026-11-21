@@ -41,6 +41,15 @@ type logicalLine struct {
 // unsupported, and the error quotes it: running it offline would fail the
 // reference for a reason that is not the agent's.
 func planTestScript(src string) (*testPlan, error) {
+	return planTestScriptKeep(src, false)
+}
+
+// planTestScriptKeep is planTestScript; with keepNetworked (-set
+// keep_networked=true) a line it cannot move to the build is kept unchanged
+// instead of refusing the task, and recorded as a change. The verifier has no
+// network, so such a task fails admission and stays a draft whose reason is
+// visible, rather than being left out of the suite.
+func planTestScriptKeep(src string, keepNetworked bool) (*testPlan, error) {
 	phys := strings.Split(strings.ReplaceAll(src, "\r\n", "\n"), "\n")
 	plan := &testPlan{}
 	out := make([]string, 0, len(phys)+4)
@@ -66,6 +75,12 @@ func planTestScript(src string) (*testPlan, error) {
 		case lineUVX:
 			venvs++
 			step, line, err := planUVX(code, venvs, uvInstalled)
+			if err != nil && keepNetworked {
+				venvs--
+				plan.Changes = append(plan.Changes, "kept as is, needs the network at verify time (the verifier has none, so admission fails): "+err.Error())
+				out = append(out, orig...)
+				continue
+			}
 			if err != nil {
 				return nil, err
 			}
@@ -73,6 +88,11 @@ func planTestScript(src string) (*testPlan, error) {
 			plan.Changes = append(plan.Changes, fmt.Sprintf("uvx replaced by a virtual environment built at image build: %s", short(code)))
 			out = append(out, "# "+bakeMarker+": "+short(ll.text), line)
 		default:
+			if keepNetworked {
+				plan.Changes = append(plan.Changes, fmt.Sprintf("kept as is, needs the network at verify time (%s; the verifier has none, so admission fails): %s", kind, short(code)))
+				out = append(out, orig...)
+				continue
+			}
 			return nil, fmt.Errorf("test.sh fetches from the network at verify time in a way the importer cannot move to the image build (%s): %s", kind, short(code))
 		}
 	}
@@ -179,7 +199,7 @@ func planUVX(code string, n int, uvInstalled bool) (string, string, error) {
 	}
 	prefix, rest := code[:start], strings.Fields(code[start+len("uvx"):])
 	var python, from string
-	var with []string
+	var with, index []string // index: package index options, passed on to uv pip install
 	i := 0
 	for ; i < len(rest); i++ {
 		tok := rest[i]
@@ -187,7 +207,8 @@ func planUVX(code string, n int, uvInstalled bool) (string, string, error) {
 			break
 		}
 		name, val, hasVal := strings.Cut(tok, "=")
-		takesValue := name == "-p" || name == "--python" || name == "-w" || name == "--with" || name == "--from"
+		isIndex := uvxIndexOptions[name]
+		takesValue := isIndex || name == "-p" || name == "--python" || name == "-w" || name == "--with" || name == "--from"
 		switch {
 		case name == "-q" || name == "--quiet" || name == "--isolated" || name == "--no-progress":
 			continue
@@ -208,12 +229,15 @@ func planUVX(code string, n int, uvInstalled bool) (string, string, error) {
 		case "--from":
 			from = val
 		}
+		if isIndex {
+			index = append(index, name, val)
+		}
 	}
 	if i >= len(rest) {
 		return "", "", fmt.Errorf("test.sh: uvx line names no command: %s", short(code))
 	}
 	cmd := rest[i]
-	for _, v := range append([]string{python, from, cmd}, with...) {
+	for _, v := range append(append([]string{python, from, cmd}, with...), index...) {
 		if strings.ContainsAny(v, "$`\"'") {
 			return "", "", fmt.Errorf("test.sh: uvx line uses shell variables or quotes, which are only known when it runs: %s", short(code))
 		}
@@ -234,13 +258,26 @@ func planUVX(code string, n int, uvInstalled bool) (string, string, error) {
 	if python != "" {
 		pyArg = " --python " + python
 	}
-	step := fmt.Sprintf("export UV_PYTHON_INSTALL_DIR=%s UV_CACHE_DIR=/tmp/harbor-uv-cache && %s venv%s %s && %s pip install --python %s/bin/python %s && rm -rf /tmp/harbor-uv-cache && chmod -R a+rX %s",
-		uvPythonDir, uv, pyArg, venv, uv, venv, strings.Join(pkgs, " "), toolsRoot)
+	idxArg := ""
+	if len(index) > 0 {
+		idxArg = strings.Join(index, " ") + " "
+	}
+	step := fmt.Sprintf("export UV_PYTHON_INSTALL_DIR=%s UV_CACHE_DIR=/tmp/harbor-uv-cache && %s venv%s %s && %s pip install --python %s/bin/python %s%s && rm -rf /tmp/harbor-uv-cache && chmod -R a+rX %s",
+		uvPythonDir, uv, pyArg, venv, uv, venv, idxArg, strings.Join(pkgs, " "), toolsRoot)
 	line := prefix + venv + "/bin/" + cmd
 	if args := rest[i+1:]; len(args) > 0 {
 		line += " " + strings.Join(args, " ")
 	}
 	return step, line, nil
+}
+
+// uvxIndexOptions are the uvx options that choose where packages come from.
+// uv pip install takes the same options, so they move to the build step
+// unchanged (Terminal-Bench pytorch-model-cli installs torch from the
+// PyTorch CPU index).
+var uvxIndexOptions = map[string]bool{
+	"--index": true, "--default-index": true, "--index-url": true, "-i": true,
+	"--extra-index-url": true, "--index-strategy": true, "--find-links": true, "-f": true,
 }
 
 // hasPackage reports whether pkgs already holds the distribution name.

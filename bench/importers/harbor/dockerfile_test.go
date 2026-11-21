@@ -13,9 +13,13 @@ func TestParseDockerfile(t *testing.T) {
 		{"simple", "FROM ubuntu:24.04\nWORKDIR /app\n", dockerfileInfo{Workdir: "/app", Stages: 1}},
 		{"relative workdir and user", "FROM python:3.12\nWORKDIR /srv/\nworkdir project\nUSER worker\n", dockerfileInfo{Workdir: "/srv/project", User: "worker", Stages: 1}},
 		{"final stage only", "FROM golang AS build\nWORKDIR /src\nUSER builder\nFROM debian\nWORKDIR /app\n", dockerfileInfo{Workdir: "/app", Stages: 2}},
-		{"variable workdir", "FROM ubuntu\nARG D=/x\nWORKDIR $D\n", dockerfileInfo{Stages: 1}},
+		{"workdir from arg default", "FROM ubuntu\nARG D=/x\nWORKDIR $D\n", dockerfileInfo{Workdir: "/x", Stages: 1}},
+		{"variable workdir", "FROM ubuntu\nARG D\nWORKDIR $D\n", dockerfileInfo{Stages: 1}},
 		{"none", "FROM ubuntu\nRUN true\n", dockerfileInfo{Stages: 1}},
 		{"continuation and comment", "FROM ubuntu\nRUN apt-get update && \\\n# a comment\n    apt-get install -y x\nWORKDIR \"/root\"\n", dockerfileInfo{Workdir: "/root", Stages: 1}},
+		{"workdir from env", "FROM ubuntu\nENV WORKSPACE=/root\nRUN mkdir -p ${WORKSPACE}/x\nWORKDIR ${WORKSPACE}\n", dockerfileInfo{Workdir: "/root", Stages: 1}},
+		{"workdir from legacy env and arg default", "FROM ubuntu\nARG BASE=/srv\nENV APP $BASE/app\nWORKDIR $APP\n", dockerfileInfo{Workdir: "/srv/app", Stages: 1}},
+		{"env does not cross stages", "FROM ubuntu AS b\nENV W=/root\nFROM debian\nWORKDIR ${W}\n", dockerfileInfo{Stages: 2}},
 		{"heredoc body ignored", "FROM ubuntu\nWORKDIR /app\nRUN <<EOF\nWORKDIR /nope\nEOF\n", dockerfileInfo{Workdir: "/app", Stages: 1}},
 	}
 	for _, c := range cases {
