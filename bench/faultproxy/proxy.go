@@ -94,6 +94,7 @@ type Server struct {
 	client    *http.Client
 	logger    schemas.Logger
 	token     string
+	org       orgSlots // F4: organization key slots (orgslots.go)
 }
 
 // upstream is how one provider is answered: the real API with a key, the
@@ -327,7 +328,7 @@ func (s *Server) answerCut(sw *statusWriter, r *http.Request, p ProviderSpec, ki
 // answer passes one request on: to the real upstream, the scripted model, or
 // a 503 when the provider has neither.
 func (s *Server) answer(w http.ResponseWriter, r *http.Request, p ProviderSpec, kind, slot string, body []byte, e *schemas.LedgerEntry) {
-	up := s.upstreams[p.Name]
+	up := s.orgUpstream(slot, p, s.upstreams[p.Name]) // F4: an organization slot's own key (orgslots.go)
 	if s.sarvamRoute(p, r, kind, body) && (up.sarvamKey != "" || up.mode != modeScripted) { // Sarvam AI audio (sarvam.go); keyless and scripted stays scripted
 		s.serveSarvam(w, r, p, up, body, e)
 		return
@@ -471,6 +472,9 @@ func (s *Server) slotOf(r *http.Request) (slotRef, bool) {
 	for _, a := range s.providers.auths {
 		if v := a.credential(r); v != "" {
 			if ref, ok := s.slots[v]; ok {
+				return ref, true
+			}
+			if ref, ok := s.org.lookupAuth(v); ok { // F4 (orgslots.go)
 				return ref, true
 			}
 		}

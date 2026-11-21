@@ -127,6 +127,7 @@ type Gateway struct {
 	teams    map[string]string          // run key id -> Bifrost team id of a team run (team.go)
 	memberOf map[string]string          // member key id -> its run id (teamslots.go)
 	claims   *claimState                // F1: this process's key slot claims at the fault proxy (slotclaims.go)
+	orgSt    *orgCreds                  // F4: organization key slots (orgcreds.go)
 }
 
 // mintRecord remembers what this process minted, so RevokeKey releases the
@@ -506,7 +507,7 @@ func (g *Gateway) slotProvider(slot string) (ProviderSetup, bool) {
 			}
 		}
 	}
-	return ProviderSetup{}, false
+	return g.orgSlotProvider(slot) // F4: organization key slots (orgcreds.go)
 }
 
 func providerPath(name string) string {
