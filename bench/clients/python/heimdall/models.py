@@ -4294,6 +4294,7 @@ class _LeaseCredentialsRequired(TypedDict):
 
 class LeaseCredentials(_LeaseCredentialsRequired, total=False):
     exp_id: str
+    prompt_logging: Optional[PromptLogPolicy]
     secrets: Dict[str, str]
 
 
@@ -5150,6 +5151,11 @@ class PackView(TypedDict):
     total_ready: int
 
 
+class Page(TypedDict):
+    rows: List[Row]
+    total: int
+
+
 class _PairRequired(TypedDict):
     alignment: List[AlignedStep]
     condition: str
@@ -5512,6 +5518,22 @@ class ProjectFileVersions(TypedDict):
 class ProjectManifest(TypedDict):
     files: List[ManifestFile]
     generated_at: str
+
+
+class PromptLogPolicy(TypedDict):
+    keep_content: bool
+    retention_days: int
+
+
+class PromptLogging(TypedDict):
+    gateway_logs: bool
+    keep_content: bool
+    max_retention_days: int
+    retention_days: int
+
+
+class PromptLogsDeleted(TypedDict):
+    deleted: int
 
 
 class _ProviderCredentialRequired(TypedDict):
@@ -6309,6 +6331,23 @@ class _RoutingTargetUseRequired(TypedDict):
 class RoutingTargetUse(_RoutingTargetUseRequired, total=False):
     cost_usd: Optional[float]
     latency_ms: Optional[float]
+
+
+class _RowRequired(TypedDict):
+    completion_tokens: int
+    content_stored: bool
+    cost_usd: float
+    id: str
+    latency_ms: float
+    prompt_tokens: int
+    timestamp: str
+
+
+class Row(_RowRequired, total=False):
+    model: str
+    provider: str
+    run_id: str
+    status: str
 
 
 class _RowImportRequestRequired(TypedDict):
@@ -9302,6 +9341,10 @@ class OperateStatusResponse(OperateStatus):
     mode: Mode
 
 
+class PageResponse(Page):
+    mode: Mode
+
+
 class PairResponse(Pair):
     mode: Mode
 
@@ -9339,6 +9382,14 @@ class ProjectFileVersionsResponse(ProjectFileVersions):
 
 
 class ProjectManifestResponse(ProjectManifest):
+    mode: Mode
+
+
+class PromptLoggingResponse(PromptLogging):
+    mode: Mode
+
+
+class PromptLogsDeletedResponse(PromptLogsDeleted):
     mode: Mode
 
 
@@ -10164,6 +10215,7 @@ __all__ = [
     'OverallVerdict',
     'OverlaySpec',
     'PackView',
+    'Page',
     'Pair',
     'PairRun',
     'Pair_migration',
@@ -10202,6 +10254,9 @@ __all__ = [
     'ProjectFileSaved',
     'ProjectFileVersions',
     'ProjectManifest',
+    'PromptLogPolicy',
+    'PromptLogging',
+    'PromptLogsDeleted',
     'ProviderCredential',
     'ProviderField',
     'ProviderTest',
@@ -10272,6 +10327,7 @@ __all__ = [
     'RoutingPolicy',
     'RoutingSummary',
     'RoutingTargetUse',
+    'Row',
     'RowImportRequest',
     'RowImportResult',
     'RowProblem',
@@ -10592,6 +10648,7 @@ __all__ = [
     'MonitorCertificateResponse',
     'OperateBackupListResponse',
     'OperateStatusResponse',
+    'PageResponse',
     'PairResponse',
     'ParetoResponse',
     'PolicyDocumentResponse',
@@ -10602,6 +10659,8 @@ __all__ = [
     'ProjectFileSavedResponse',
     'ProjectFileVersionsResponse',
     'ProjectManifestResponse',
+    'PromptLoggingResponse',
+    'PromptLogsDeletedResponse',
     'PullReadinessResponse',
     'PullResultResponse',
     'QuarantineResultResponse',
