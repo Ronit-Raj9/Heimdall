@@ -33,6 +33,15 @@ func TestTokens(t *testing.T) {
 			want: schemas.Observed(10, gw),
 		},
 		{name: "no requests", ev: &schemas.Evidence{Requests: completeLog()}, want: schemas.Observed(0, gw)},
+		{
+			name: "error row without usage skipped",
+			ev: &schemas.Evidence{Requests: completeLog(
+				withTokens("a", tok(1, 2, 3, 4)),
+				schemas.GatewayRequest{ID: "f", Kind: "message", Status: "error"}, // injected fault, then a fallback answered
+				withTokens("b", tok(10, 0, 0, 5)),
+			)},
+			want: schemas.Observed(25, gw),
+		},
 		{name: "one row without usage", ev: &schemas.Evidence{Requests: completeLog(okMsg("a"), withTokens("b", nil))}, want: schemas.Unknown("message request b has no usage", gw)},
 		{
 			name: "incomplete log",

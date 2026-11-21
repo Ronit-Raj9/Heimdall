@@ -37,7 +37,10 @@ func (m *tokensMetric) Descriptor() schemas.MetricDescriptor {
 
 // Compute implements schemas.Metric. One row without usage makes the total
 // unknown: the buckets are summed only when every one of them was recorded,
-// so a partial sum is never shown as the run's total.
+// so a partial sum is never shown as the run's total. An error row without
+// usage is skipped, as the usage tally and input_tokens skip it: a refused,
+// failed or injected request consumed no tokens, so a fallback or outage run
+// still has a known total.
 func (m *tokensMetric) Compute(_ context.Context, _ *schemas.RunContext, ev *schemas.Evidence) (schemas.Value, error) {
 	ev = orEmpty(ev)
 	if v, bad := requestLogProblem(ev.Requests); bad {
@@ -45,6 +48,9 @@ func (m *tokensMetric) Compute(_ context.Context, _ *schemas.RunContext, ev *sch
 	}
 	var sum int64
 	for _, r := range messageRows(ev.Requests.Requests) {
+		if r.Status == "error" && r.Tokens == nil {
+			continue // a refused, failed or injected request has no usage to record (RequestLog.Tally, inputSplit)
+		}
 		if r.Tokens == nil {
 			return schemas.Unknown(fmt.Sprintf("message request %s has no usage", r.ID), schemas.EvidenceGateway), nil
 		}
