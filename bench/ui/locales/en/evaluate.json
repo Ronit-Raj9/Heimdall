@@ -1,0 +1,280 @@
+{
+	"home": {
+		"cta": "Evaluate your agent",
+		"ctaHint": "Run your agent on many benchmarks at once and get a report card.",
+		"oldWizard": "Prefer the quick single test? Use the old start page."
+	},
+	"wizard": {
+		"title": "Evaluate your agent",
+		"subtitle": "Pick your agent, choose what to learn, pick benchmarks, then launch. You get one report card per agent version and model.",
+		"back": "Back",
+		"next": "Continue",
+		"launch": "Launch evaluation",
+		"launching": "Starting...",
+		"cancel": "Cancel",
+		"stepOf": "Step {{step}} of {{total}}",
+		"steps": {
+			"agent": "Your agent",
+			"goal": "What to learn",
+			"benchmarks": "Benchmarks",
+			"settings": "Model, trials, faults",
+			"launch": "Launch"
+		}
+	},
+	"agent": {
+		"heading": "Which agent do you want to test?",
+		"help": "Pick one of your agents or a built-in one. Your agent is saved once and reused in every evaluation.",
+		"register": "Register a new agent",
+		"registerHint": "Start from a template: Codex, Claude Code, an HTTP service, your own command and more.",
+		"search": "Search agents",
+		"builtIn": "Built-in",
+		"yours": "Yours",
+		"baseline": "Baseline",
+		"empty": "No agents yet. Register one from a template to start.",
+		"loadError": "Could not load your agents.",
+		"version": "Version",
+		"versionLatest": "v{{version}} (latest)",
+		"versionItem": "v{{version}}, saved {{when}}",
+		"versionNote": "Note: {{note}}",
+		"versionHelp": "Each saved change to an agent is a new version. The report card is for the exact version you pick.",
+		"capabilities": "What this agent can do",
+		"capabilitiesDefault": "Default for this kind of agent",
+		"capabilitiesEdit": "Change in the agent settings"
+	},
+	"goal": {
+		"heading": "What do you want to learn?",
+		"help": "Pick one. You can run another evaluation later.",
+		"score": {
+			"title": "How good is my agent?",
+			"body": "One setup. You get scores, cost and reliability for each benchmark and skill."
+		},
+		"versions": {
+			"title": "Is my new version better?",
+			"body": "Run two versions of your agent on the same tasks and see which one wins on each benchmark.",
+			"pickA": "Current version (A)",
+			"pickB": "New version (B)",
+			"sameVersion": "Pick two different versions.",
+			"needTwo": "This agent has only one version. Save a change to the agent to make a second one."
+		},
+		"models": {
+			"title": "Which model works best with my agent?",
+			"body": "Run the same agent with two models on the same tasks.",
+			"pickA": "Model A",
+			"pickB": "Model B",
+			"sameModel": "Pick two different models."
+		},
+		"opponent": {
+			"title": "How does my agent compare to a well-known agent?",
+			"body": "Run your agent and a baseline agent (Codex, Claude Code, mini-swe-agent, OpenCode, Gemini CLI) on the same tasks.",
+			"pick": "Baseline agent"
+		}
+	},
+	"benchmarks": {
+		"heading": "Which benchmarks should it run?",
+		"help": "Pick a pack for one skill, or pick benchmarks one by one. Only ready tasks are used.",
+		"packs": "Packs",
+		"single": "Single benchmarks",
+		"pack": {
+			"coding": "Coding agent",
+			"terminal": "Terminal agent",
+			"support": "Support and tool use",
+			"memory": "Memory",
+			"research": "Research",
+			"voice": "Voice",
+			"safety": "Safety",
+			"all-compatible": "Everything my agent can run"
+		},
+		"packCount_one": "{{count}} benchmark",
+		"packCount_other": "{{count}} benchmarks",
+		"selected_one": "{{count}} benchmark selected",
+		"selected_other": "{{count}} benchmarks selected",
+		"selectAll": "Select all that fit",
+		"clear": "Clear",
+		"readyTasks": "{{ready}} of {{total}} tasks ready",
+		"noReadyTasks": "No ready tasks yet",
+		"incompatible": "Your agent cannot run this",
+		"needs": "Needs: {{caps}}",
+		"missing": "Your agent is missing: {{caps}}",
+		"empty": "No benchmarks yet. Add some from the catalog.",
+		"browseCatalog": "Browse the catalog",
+		"loadError": "Could not load the benchmarks.",
+		"compatError": "Could not check which benchmarks your agent can run. All are shown."
+	},
+	"capability": {
+		"shell": "Shell",
+		"tools": "Tools",
+		"mcp": "MCP",
+		"sessions": "Several sessions",
+		"browser": "Browser",
+		"desktop": "Desktop",
+		"voice": "Voice",
+		"gpu": "GPU"
+	},
+	"skill": {
+		"terminal": "Terminal",
+		"coding": "Coding",
+		"memory": "Memory",
+		"support": "Support",
+		"research": "Research",
+		"voice": "Voice",
+		"safety": "Safety",
+		"team": "Teams",
+		"gpu": "GPU"
+	},
+	"settings": {
+		"heading": "Model, trials and faults",
+		"model": "Model",
+		"modelHelp": "Any model from any provider you have a key for. Every call goes through Bifrost.",
+		"modelSearch": "Search models",
+		"openOnly": "Open-weight models only",
+		"openWeights": "Open weights",
+		"noKey": "No key yet",
+		"addKey": "Add a key",
+		"customModel": "Use a model id that is not listed",
+		"provider": "Provider",
+		"tasks": "Tasks per benchmark",
+		"tasksHelp": "How many ready tasks to take from each benchmark. Five spots big gaps; more tasks spot smaller ones.",
+		"trials": "Repeats per task",
+		"trialsHelp": "Each task runs this many times per setup. More repeats give steadier scores.",
+		"faults": "Faults",
+		"faultsHelp": "Normal conditions always run. Each fault you add runs the same tasks again with something going wrong.",
+		"fault": {
+			"clean": "Normal conditions",
+			"cleanHint": "Always included.",
+			"model-down": "Model goes down",
+			"model-downHint": "The model provider stops answering for part of the run.",
+			"broken-tool": "A tool breaks",
+			"broken-toolHint": "Some tool calls return errors.",
+			"misleading-instruction": "Misleading instructions",
+			"misleading-instructionHint": "Only on benchmarks that have this test. Others skip it."
+		},
+		"budget": "Spending cap (USD)",
+		"budgetHelp": "The evaluation stops starting new runs when it reaches this amount. Leave empty for no cap."
+	},
+	"estimate": {
+		"heading": "Estimate",
+		"runs_one": "{{count}} run",
+		"runs_other": "{{count}} runs",
+		"cost": "About ${{low}} to ${{high}}",
+		"costUnknown": "Cost unknown: no official price for {{model}}",
+		"time": "About {{low}} to {{high}} minutes",
+		"loading": "Working out the estimate...",
+		"error": "Could not work out an estimate.",
+		"overBudget": "The estimate is above your spending cap.",
+		"perBenchmark": "Per benchmark"
+	},
+	"launch": {
+		"heading": "Ready to launch",
+		"summary": "{{agent}} on {{benchmarks}} benchmarks, {{runs}} runs",
+		"skippedTitle": "Left out",
+		"skipped": "{{benchmark}}: {{reason}}",
+		"error": "Could not start the evaluation.",
+		"done": "Evaluation started"
+	},
+	"list": {
+		"title": "Evaluations",
+		"new": "New evaluation",
+		"empty": "No evaluations yet. Press Evaluate your agent to start one.",
+		"loadError": "Could not load evaluations.",
+		"columns": {
+			"name": "Name",
+			"agent": "Agent",
+			"mode": "What to learn",
+			"benchmarks": "Benchmarks",
+			"status": "Status",
+			"created": "Started"
+		}
+	},
+	"mode": {
+		"score": "Score",
+		"versions": "Version vs version",
+		"models": "Model vs model",
+		"opponent": "Vs a baseline agent"
+	},
+	"status": {
+		"queued": "Waiting to start",
+		"running": "Running",
+		"done": "Done",
+		"failed": "Failed",
+		"cancelled": "Stopped"
+	},
+	"evaluation": {
+		"progress": "{{done}} of {{total}} benchmarks done",
+		"runsProgress": "{{done}} of {{total}} runs done",
+		"cancel": "Stop evaluation",
+		"cancelConfirm": "Stop this evaluation? Runs already finished are kept.",
+		"cancelled": "Evaluation stopped",
+		"openComparison": "Open comparison",
+		"skippedBenchmark": "Skipped: {{reason}}",
+		"loadError": "Could not load this evaluation.",
+		"notFound": "This evaluation does not exist.",
+		"reportPending": "The report card appears here as benchmarks finish."
+	},
+	"reportCard": {
+		"title": "Report card",
+		"for": "{{agent}} v{{version}} with {{model}}",
+		"arm": "Setup {{label}}",
+		"bySkill": "By skill",
+		"byBenchmark": "By benchmark",
+		"reliability": "When things go wrong",
+		"reliabilityHelp": "Score under each fault, and how far it dropped from normal conditions.",
+		"safety": "Safety",
+		"overall": "Overall",
+		"empty": "No finished runs for this agent, version and model yet.",
+		"metric": {
+			"score": "Score",
+			"scoreHelp": "Share of runs that passed the hidden checks and every safety check.",
+			"range": "Likely range",
+			"rangeHelp": "The true score most likely falls in this range. Few runs give a wide range.",
+			"runs": "Runs",
+			"cost": "Cost",
+			"costUnknown": "Unknown",
+			"costUnknownHelp": "No official price for this model, so the cost is not guessed.",
+			"tokens": "Tokens",
+			"steps": "Steps per run",
+			"toolCalls": "Tool calls per run",
+			"time": "Time per run",
+			"drop": "Drop",
+			"dropValue": "{{points}} points",
+			"attackResisted": "Attacks resisted",
+			"attackResistedHelp": "Share of attacked runs where the agent did not do what the attacker wanted.",
+			"cheatRate": "Cheating caught",
+			"cheatRateHelp": "Share of runs where a safety check caught the agent cheating."
+		},
+		"verdict": {
+			"winner": "{{label}} wins",
+			"tie": "No clear winner yet",
+			"tieHelp": "Not enough evidence to tell the setups apart. Add tasks or repeats.",
+			"broken": "Test was broken",
+			"brokenHelp": "Something went wrong while measuring. This benchmark counts for neither side.",
+			"delta": "{{label}} solves {{points}} points more",
+			"significant": "Clear difference",
+			"wins": "{{label}} better on {{count}} of {{total}} benchmarks"
+		},
+		"download": "Download report card (JSON)",
+		"openAgent": "Open agent page"
+	},
+	"agentTabs": {
+		"reportCard": "Report card",
+		"versions": "Versions",
+		"versionsEmpty": "No saved versions yet. Saving the agent's settings makes version 1.",
+		"saveVersion": "Save current settings as a new version",
+		"versionNoteLabel": "Note (optional)",
+		"versionSaved": "Saved as v{{version}}",
+		"versionUnchanged": "Nothing changed since the latest version, so no new version was made.",
+		"versionRuns_one": "{{count}} run",
+		"versionRuns_other": "{{count}} runs",
+		"viewYaml": "View settings"
+	},
+	"leaderboard": {
+		"agentsTab": "Agents",
+		"modelsTab": "Models",
+		"baseline": "Baseline",
+		"skillFilter": "Skill",
+		"modelFilter": "Model",
+		"allSkills": "All skills",
+		"allModels": "All models",
+		"lastEvaluation": "Last evaluation",
+		"empty": "No finished evaluations yet."
+	}
+}
