@@ -163,7 +163,11 @@ func (d *Dispatcher) Handle(ctx *fasthttp.RequestCtx) {
 		return
 	}
 	rule, _ := d.c.Policy.OrgRule(method, pat)
-	o, eff, ok := d.authorize(ctx, rule, method, p, "")
+	shareRef := ""
+	if rule.Access == AccessShare {
+		shareRef = userString(ctx, SharePathParam)
+	}
+	o, eff, ok := d.authorize(ctx, rule, method, p, shareRef)
 	if !ok {
 		return
 	}
@@ -190,7 +194,7 @@ func (d *Dispatcher) Handle(ctx *fasthttp.RequestCtx) {
 	lib.SetStreamGuard(ctx, func() bool {
 		gctx, cancel := workContext()
 		defer cancel()
-		ro, reff, err := Resolve(gctx, d.c.Dir, rule, p, "", headerRef, d.c.DemoSlug)
+		ro, reff, err := Resolve(gctx, d.c.Dir, rule, p, shareRef, headerRef, d.c.DemoSlug)
 		if err == nil {
 			err = Authorize(rule, method, reff, ro)
 		}

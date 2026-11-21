@@ -1,0 +1,387 @@
+import { useConfirm } from "@/components/platform/confirmDialog";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { canUse, useSession } from "@/lib/session/sessionContext";
+import {
+	badgeMarkdown,
+	reportExportUrl,
+	reproduceUrl,
+	shareUrl,
+	useCreateShareMutation,
+	useListSharesQuery,
+	useRevokeShareMutation,
+	type Share,
+	type ShareKind,
+} from "@/lib/store/apis/shareApi";
+import "@/lib/types/shareI18n";
+import { cn } from "@/lib/utils";
+import { Check, Copy, Download, FileCode2, FileText, Link2, Package, Printer, Share2, X } from "lucide-react";
+import { useEffect, useId, useRef, useState, type ReactNode } from "react";
+import { useTranslation } from "react-i18next";
+
+/** Expiry choices, in days; 0 is never. */
+export const EXPIRY_CHOICES = [1, 7, 30, 90, 0] as const;
+
+export interface ShareTarget {
+	kind: ShareKind;
+	target: string;
+	/** The view's filters as a URL query (report card: version, model; leaderboard: its filters). */
+	query?: string;
+	/** Set for an evaluation: offers the HTML, Markdown and PDF downloads and the reproduce bundle. */
+	evaluationId?: string;
+}
+
+/** Turns a filter object into the query a link carries, dropping empty values. */
+export function shareQuery(params: Record<string, string | number | undefined | null>): string {
+	const q = new URLSearchParams();
+	for (const [k, v] of Object.entries(params)) {
+		if (v !== undefined && v !== null && String(v).trim() !== "") q.set(k, String(v));
+	}
+	return q.toString();
+}
+
+/** Loads an HTML export and opens the print dialog on it (Save as PDF), without leaving the page. */
+export async function printExport(url: string): Promise<boolean> {
+	try {
+		const res = await fetch(url, { credentials: "same-origin" });
+		if (!res.ok) return false;
+		const html = await res.text();
+		const frame = document.createElement("iframe");
+		frame.setAttribute("aria-hidden", "true");
+		frame.style.cssText = "position:fixed;right:0;bottom:0;width:0;height:0;border:0;visibility:hidden";
+		frame.srcdoc = html;
+		document.body.appendChild(frame);
+		await new Promise<void>((resolve) => {
+			frame.onload = () => resolve();
+		});
+		frame.contentWindow?.focus();
+		frame.contentWindow?.print();
+		window.setTimeout(() => frame.remove(), 60_000);
+		return true;
+	} catch {
+		return false;
+	}
+}
+
+function CopyButton({ text, testId }: { text: string; testId: string }) {
+	const { t } = useTranslation("share");
+	const [state, setState] = useState<"" | "ok" | "fail">("");
+	const copy = async () => {
+		try {
+			await navigator.clipboard.writeText(text);
+			setState("ok");
+		} catch {
+			setState("fail");
+		}
+		window.setTimeout(() => setState(""), 2000);
+	};
+	return (
+		<Button type="button" variant="outline" size="sm" onClick={copy} dataTestId={testId} aria-live="polite">
+			{state === "ok" ? <Check aria-hidden="true" /> : <Copy aria-hidden="true" />}
+			{state === "ok" ? t("copied") : state === "fail" ? t("copyFailed") : t("copy")}
+		</Button>
+	);
+}
+
+function formatDate(iso?: string): string {
+	if (!iso) return "";
+	const d = new Date(iso);
+	return Number.isNaN(d.getTime())
+		? iso
+		: d.toLocaleDateString(undefined, {
+				year: "numeric",
+				month: "short",
+				day: "numeric",
+			});
+}
+
+/** The Share button that opens the dialog. Put it in a page header or toolbar. */
+export function ShareButton({ className, ...target }: ShareTarget & { className?: string }) {
+	const { t } = useTranslation("share");
+	const [open, setOpen] = useState(false);
+	return (
+		<>
+			<Button type="button" variant="outline" size="sm" className={className} onClick={() => setOpen(true)} dataTestId="share-open">
+				<Share2 aria-hidden="true" />
+				{t("button")}
+			</Button>
+			{open && <ShareDialog {...target} onClose={() => setOpen(false)} />}
+		</>
+	);
+}
+
+function Row({ icon, title, help, children }: { icon: ReactNode; title: string; help?: string; children: ReactNode }) {
+	return (
+		<div className="flex flex-wrap items-center gap-3 py-2.5">
+			<span className="text-muted-foreground flex size-8 shrink-0 items-center justify-center rounded-lg border">{icon}</span>
+			<div className="min-w-0 flex-1">
+				<p className="text-sm font-medium">{title}</p>
+				{help && <p className="text-muted-foreground text-xs">{help}</p>}
+			</div>
+			<div className="flex shrink-0 flex-wrap gap-2">{children}</div>
+		</div>
+	);
+}
+
+/** The share dialog: make a read-only link, list and turn off links to this item, downloads. */
+export function ShareDialog({ kind, target, query, evaluationId, onClose }: ShareTarget & { onClose(): void }) {
+	const { t } = useTranslation("share");
+	const session = useSession();
+	const confirm = useConfirm();
+	const titleId = useId();
+	const panelRef = useRef<HTMLDivElement>(null);
+	const canCreate = canUse(session, "member");
+	const [days, setDays] = useState<number>(30);
+	const [hidePrompts, setHidePrompts] = useState(false);
+	const [label, setLabel] = useState("");
+	const [created, setCreated] = useState<Share | null>(null);
+	const [pdfFailed, setPdfFailed] = useState(false);
+	const links = useListSharesQuery({ kind, target });
+	const [create, createState] = useCreateShareMutation();
+	const [revoke] = useRevokeShareMutation();
+	// Only links with the same view filters belong to this exact view.
+	const mine = (links.data?.shares ?? []).filter((s) => (s.query ?? "") === (query ?? ""));
+
+	useEffect(() => {
+		const prev = document.activeElement as HTMLElement | null;
+		panelRef.current?.focus();
+		const onKey = (e: KeyboardEvent) => {
+			if (e.key === "Escape") {
+				e.stopPropagation();
+				onClose();
+			}
+		};
+		window.addEventListener("keydown", onKey, true);
+		return () => {
+			window.removeEventListener("keydown", onKey, true);
+			prev?.focus?.();
+		};
+	}, [onClose]);
+
+	const submit = async () => {
+		const res = await create({
+			kind,
+			target,
+			query,
+			label: label.trim() || undefined,
+			hide_prompts: hidePrompts,
+			expires_in_days: days,
+		});
+		if ("data" in res && res.data) setCreated(res.data);
+	};
+
+	const turnOff = async (s: Share) => {
+		if (
+			!(await confirm(t("revokeConfirm"), {
+				destructive: true,
+				confirmLabel: t("revoke"),
+			}))
+		)
+			return;
+		await revoke(s.id);
+		if (created?.id === s.id) setCreated(null);
+	};
+
+	const newUrl = created ? shareUrl(created) : "";
+	const showBadge = kind === "evaluation" || kind === "report_card" || kind === "verdict";
+
+	return (
+		<div
+			className="fixed inset-0 z-[90] flex items-end justify-center bg-black/40 p-0 sm:items-center sm:p-4"
+			data-testid="share-dialog-backdrop"
+			onMouseDown={(e) => {
+				if (e.target === e.currentTarget) onClose();
+			}}
+		>
+			<div
+				ref={panelRef}
+				role="dialog"
+				aria-modal="true"
+				aria-labelledby={titleId}
+				tabIndex={-1}
+				className="bg-card text-card-foreground flex max-h-[90dvh] w-full max-w-lg flex-col overflow-hidden rounded-t-xl border shadow-lg outline-none sm:rounded-xl"
+				data-testid="share-dialog"
+			>
+				<header className="flex items-start justify-between gap-4 border-b px-5 py-4">
+					<div className="min-w-0">
+						<h2 id={titleId} className="text-base font-semibold">
+							{t("title", { what: t(`what.${kind}`) })}
+						</h2>
+						<p className="text-muted-foreground mt-1 text-sm">{t("intro")}</p>
+					</div>
+					<Button type="button" variant="ghost" size="icon" onClick={onClose} aria-label={t("close")} dataTestId="share-close">
+						<X aria-hidden="true" />
+					</Button>
+				</header>
+
+				<div className="flex flex-col gap-5 overflow-y-auto px-5 py-4">
+					{canCreate ? (
+						<section className="flex flex-col gap-3" data-testid="share-create">
+							<fieldset className="flex flex-col gap-2">
+								<legend className="text-sm font-medium">{t("expiry")}</legend>
+								<div className="bg-muted/60 inline-flex w-fit flex-wrap gap-1 rounded-lg p-1" role="radiogroup">
+									{EXPIRY_CHOICES.map((d) => (
+										<button
+											key={d}
+											type="button"
+											role="radio"
+											aria-checked={days === d}
+											onClick={() => setDays(d)}
+											data-testid={`share-expiry-${d}`}
+											className={cn(
+												"rounded-md px-2.5 py-1 text-xs font-medium transition-colors",
+												days === d ? "bg-background text-foreground shadow-xs" : "text-muted-foreground hover:text-foreground",
+											)}
+										>
+											{t(`expiryOption.${d}`)}
+										</button>
+									))}
+								</div>
+							</fieldset>
+							<label className="flex items-start gap-2.5 text-sm">
+								<input
+									type="checkbox"
+									className="accent-primary mt-0.5 size-4"
+									checked={hidePrompts}
+									onChange={(e) => setHidePrompts(e.target.checked)}
+									data-testid="share-hide-prompts"
+								/>
+								<span>
+									{t("hidePrompts")}
+									<span className="text-muted-foreground block text-xs">{t("hidePromptsHelp")}</span>
+								</span>
+							</label>
+							<label className="flex flex-col gap-1.5 text-sm">
+								<span className="font-medium">{t("label")}</span>
+								<Input
+									value={label}
+									maxLength={120}
+									placeholder={t("labelPlaceholder")}
+									onChange={(e) => setLabel(e.target.value)}
+									data-testid="share-label"
+								/>
+							</label>
+							<div className="flex items-center gap-3">
+								<Button type="button" onClick={submit} isLoading={createState.isLoading} dataTestId="share-create-submit">
+									<Link2 aria-hidden="true" />
+									{t("create")}
+								</Button>
+								{createState.isError && (
+									<p role="alert" className="text-destructive text-sm">
+										{t("createError")}
+									</p>
+								)}
+							</div>
+							{created && newUrl && (
+								<div className="bg-muted/50 flex flex-col gap-2 rounded-lg border p-3" data-testid="share-created">
+									<div className="flex items-center gap-2">
+										<Input
+											readOnly
+											value={newUrl}
+											onFocus={(e) => e.currentTarget.select()}
+											className="font-mono text-xs"
+											data-testid="share-created-url"
+										/>
+										<CopyButton text={newUrl} testId="share-copy-url" />
+									</div>
+									{showBadge && created.token && (
+										<div className="flex flex-col gap-1.5">
+											<p className="text-xs font-medium">{t("badge")}</p>
+											<div className="flex items-center gap-2">
+												<Input
+													readOnly
+													value={badgeMarkdown(created.token, newUrl)}
+													onFocus={(e) => e.currentTarget.select()}
+													className="font-mono text-xs"
+												/>
+												<CopyButton text={badgeMarkdown(created.token, newUrl)} testId="share-copy-badge" />
+											</div>
+											<p className="text-muted-foreground text-xs">{t("badgeHelp")}</p>
+										</div>
+									)}
+								</div>
+							)}
+						</section>
+					) : (
+						<p className="text-muted-foreground text-sm" data-testid="share-read-only">
+							{t("readOnlyRole")}
+						</p>
+					)}
+
+					<section className="flex flex-col gap-2" data-testid="share-links">
+						<h3 className="text-sm font-medium">{t("links")}</h3>
+						{mine.length === 0 ? (
+							<p className="text-muted-foreground text-sm">{t("noLinks")}</p>
+						) : (
+							<ul className="divide-border/80 flex flex-col divide-y rounded-lg border">
+								{mine.map((s) => (
+									<li key={s.id} className="flex flex-wrap items-center gap-2 px-3 py-2 text-sm" data-testid={`share-link-${s.id}`}>
+										<span
+											className={cn(
+												"rounded-full px-2 py-0.5 text-xs font-medium",
+												s.state === "active"
+													? "bg-emerald-500/10 text-emerald-700 dark:text-emerald-400"
+													: "bg-muted text-muted-foreground",
+											)}
+										>
+											{t(`state.${s.state}`)}
+										</span>
+										<span className="min-w-0 flex-1 truncate">{s.label || formatDate(s.created_at)}</span>
+										<span className="text-muted-foreground text-xs">
+											{s.expires_at ? t("expires", { when: formatDate(s.expires_at) }) : t("neverExpires")}
+										</span>
+										{s.state === "active" && shareUrl(s) && <CopyButton text={shareUrl(s)} testId={`share-copy-${s.id}`} />}
+										{s.state === "active" && canCreate && (
+											<Button type="button" variant="ghost" size="sm" onClick={() => void turnOff(s)} dataTestId={`share-revoke-${s.id}`}>
+												{t("revoke")}
+											</Button>
+										)}
+									</li>
+								))}
+							</ul>
+						)}
+					</section>
+
+					{evaluationId && (
+						<section className="flex flex-col" data-testid="share-downloads">
+							<h3 className="text-sm font-medium">{t("downloads")}</h3>
+							<Row icon={<FileText className="size-4" aria-hidden="true" />} title={t("html")}>
+								<Button asChild variant="outline" size="sm">
+									<a href={reportExportUrl(evaluationId, "html")} download data-testid="share-download-html">
+										<Download aria-hidden="true" />
+										HTML
+									</a>
+								</Button>
+								<Button asChild variant="outline" size="sm">
+									<a href={reportExportUrl(evaluationId, "md")} download data-testid="share-download-md">
+										<FileCode2 aria-hidden="true" />
+										{t("markdown")}
+									</a>
+								</Button>
+								<Button
+									type="button"
+									variant="outline"
+									size="sm"
+									dataTestId="share-download-pdf"
+									onClick={async () => setPdfFailed(!(await printExport(reportExportUrl(evaluationId, "html"))))}
+								>
+									<Printer aria-hidden="true" />
+									{t("pdf")}
+								</Button>
+							</Row>
+							<p className={cn("text-xs", pdfFailed ? "text-destructive" : "text-muted-foreground")}>{t("pdfHint")}</p>
+							<Row icon={<Package className="size-4" aria-hidden="true" />} title={t("reproduce")} help={t("reproduceHelp")}>
+								<Button asChild variant="outline" size="sm">
+									<a href={reproduceUrl(evaluationId)} download data-testid="share-download-reproduce">
+										<Download aria-hidden="true" />
+										.zip
+									</a>
+								</Button>
+							</Row>
+						</section>
+					)}
+				</div>
+			</div>
+		</div>
+	);
+}

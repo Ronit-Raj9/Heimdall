@@ -35,10 +35,14 @@ function costText(m: ReportArmMetrics): string {
 export interface ReportCardProps {
 	report: Report;
 	className?: string;
+	/** Replaces the default JSON download and copy link buttons (the Share menu). */
+	actions?: React.ReactNode;
+	/** A shared, read-only view: no links into the organization's pages. */
+	readOnly?: boolean;
 }
 
 /** The report card of one evaluation: headline answer, capabilities, benchmarks, reliability, safety. */
-export function ReportCard({ report: raw, className }: ReportCardProps) {
+export function ReportCard({ report: raw, className, actions, readOnly = false }: ReportCardProps) {
 	const report = visibleReport(raw);
 	const ab = isAB(report);
 	const head = headline(report);
@@ -69,7 +73,7 @@ export function ReportCard({ report: raw, className }: ReportCardProps) {
 						</p>
 					) : null}
 				</div>
-				<ExportButtons report={report} />
+				{actions ?? (readOnly ? null : <ExportButtons report={report} />)}
 			</header>
 
 			<Section title="By capability" description="Score is the share of runs solved. The bar shows the 95% confidence range.">
@@ -77,7 +81,7 @@ export function ReportCard({ report: raw, className }: ReportCardProps) {
 			</Section>
 
 			<Section title="By benchmark" description="Open a row for the verdict and a link to the experiment.">
-				<BenchmarkList report={report} />
+				<BenchmarkList report={report} readOnly={readOnly} />
 			</Section>
 
 			{report.reliability.length > 0 && (
@@ -266,20 +270,20 @@ function CapabilityTable({ report }: { report: Report }) {
 	);
 }
 
-function BenchmarkList({ report }: { report: Report }) {
+function BenchmarkList({ report, readOnly }: { report: Report; readOnly: boolean }) {
 	if (report.benchmarks.length === 0) return <p className="text-muted-foreground text-sm">No benchmark results yet.</p>;
 	return (
 		<ul data-testid="report-benchmarks" className="border-border/80 divide-border/80 divide-y rounded-lg border">
 			{report.benchmarks.map((row) => (
 				<li key={row.benchmark}>
-					<BenchmarkRow report={report} row={row} />
+					<BenchmarkRow report={report} row={row} readOnly={readOnly} />
 				</li>
 			))}
 		</ul>
 	);
 }
 
-function BenchmarkRow({ report, row }: { report: Report; row: ReportBenchmark }) {
+function BenchmarkRow({ report, row, readOnly }: { report: Report; row: ReportBenchmark; readOnly: boolean }) {
 	const ab = isAB(report);
 	const [a, b] = report.arms;
 	const result = ab ? benchmarkWinner(row, a.label, b.label) : undefined;
@@ -353,7 +357,7 @@ function BenchmarkRow({ report, row }: { report: Report; row: ReportBenchmark })
 						</p>
 					);
 				})}
-				{row.experiment_id && (
+				{row.experiment_id && !readOnly && (
 					<Link
 						to="/experiments/$expId"
 						params={{ expId: row.experiment_id }}

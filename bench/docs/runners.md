@@ -1,12 +1,28 @@
 # Runners
 
-On the hosted platform (`auth.mode: hosted`, docs/platform-design.md) agents
-never run on the hosted server. Each organization runs them on **runners**:
-machines it owns that lease slots from the server, run them with the normal
-pipeline and their own provider keys, and upload the sealed run folders. The
-server only coordinates, verifies and stores. A runner is the remote worker
-of docs/remote-execution.md with a per-organization token instead of the
-shared `BENCH_WORKER_TOKEN`.
+On the hosted platform (`auth.mode: hosted`) the server process never runs
+an agent. Agents run on **runners** (called workers in the web app):
+processes that lease slots from the server, run them with the normal
+pipeline, and upload the sealed run folders. The server coordinates,
+verifies and stores. An organization has two kinds:
+
+- **The shared worker.** Run by the server operator on the server's machine
+  (compose profile `shared-runner`, [hosting.md](hosting.md) section 9) and
+  available to every organization, with the built-in agents and benchmarks
+  and server-approved images. Nothing to set up. Uncapped by default; the
+  operator can set per-organization limits.
+- **Your own runners.** Any Linux machine or VM with Docker that you
+  control, registered with a runner token of your organization. Use one for
+  your own Docker images, private networks, GPUs or more slots.
+
+Either way, runs use **your organization's own provider keys**: the keys you
+added in Models & keys, stored encrypted on the server and handed to the
+runner per lease (below). There is no fallback to a key of the server or of
+the runner: a run on a provider your organization has no working key for is
+refused before it starts.
+
+A runner is the remote worker of [remote-execution.md](remote-execution.md)
+with a per-organization token instead of the shared `BENCH_WORKER_TOKEN`.
 
 Local mode is unchanged: `serve` with `BENCH_WORKER_TOKEN` opens experiments
 to `bifrost-bench runner start` (or its old name `worker`) exactly as before,
@@ -132,10 +148,21 @@ nothing. Full flags and the upgrade and uninstall steps:
 `deploy/runner/README.md`. The hosted server also serves the script at
 `GET /api/bench/runners/install.sh`.
 
-**Provider keys stay on the runner.** They go in
-`<prefix>/src/bench/deploy/.env` on the runner (`ANTHROPIC_API_KEY`,
-`OPENAI_API_KEY`, ...), where only the fault proxy container reads them. The
-hosted server never sees them.
+## Provider keys per lease
+
+Provider keys live in the server's keystore, encrypted under
+`HEIMDALL_MASTER_KEY`; nobody reads a value back over HTTP, owners included.
+When a runner takes a lease it calls `GET
+/api/bench/workers/leases/{lease_id}/credentials`. Only a runner token of the
+lease's organization, from the runner that holds that lease, gets an answer
+(`tenancy/policy_workercreds.go`, `handlers/workercreds.go`): the
+organization's keys for the providers the run uses, for the length of that
+run. The runner registers them with its Bifrost gateway for that
+organization (`engine/remotecreds.go`), so every model call of the lease
+(agent, judges, simulated users) goes agent, Bifrost, fault proxy, provider
+on the organization's own keys. They are not written to the run folder or
+the sealed evidence. Keys in a
+runner machine's own `deploy/.env` are not used for hosted organizations.
 
 ## Admin API
 
@@ -173,25 +200,18 @@ once; a runner whose token is still valid registers again on its next call,
 so revoke its token to keep it out. Revoking a token refuses its next call
 and drops every runner registered with it.
 
-## The demo runner
+## The shared worker
 
-The public demo organization (`demo.org` in the config) runs on a normal
-runner registered to it, in pool `demo`, under a spend cap. Nothing about it
-is special to the server.
-
-1. As an admin of the demo organization, create its token:
-   `POST /api/bench/runners/tokens {"pool": "demo", "name": "demo-runner"}`
-   (Settings > Runners in the UI, or `deploy/runner/demo-runner.sh`, which
-   calls the API with an admin API token and writes the token file 0600).
-2. Install it like any runner, on the hosted box itself or a spare one:
-   `sudo bash install.sh --server <public url> --token-file ./runner-token --pool demo --name demo-runner --slots 1 --spend-cap-usd 5`.
-3. Give the demo organization's experiments `runner: {pool: demo}` and a
-   `budget.total_usd`. Three caps then hold: the experiment's spend cap on the
-   server, the runner's own daily cap (`-spend-cap-usd`), and the provider
-   budget of the keys in the runner's `deploy/.env`.
-
-`deploy/runner/demo-runner.env.example` holds the settings
-`demo-runner.sh` reads.
+The shared worker is a normal runner process with one difference: instead of
+one runner token it holds `HEIMDALL_SHARED_RUNNER_SECRET` and fetches its
+assignments from the server (`GET /api/bench/admin/pool/assignments`), one
+per organization whose shared pool is on. For each it runs a worker loop
+with that organization's token, so every lease, upload and key delivery is
+scoped exactly as for an organization's own runner. It replans every
+experiment with the server's checkout, so it runs only what the built-in
+agent templates and the built-in library reproduce, plus images a server
+admin approved for that organization. Setup and guardrails:
+[hosting.md](hosting.md) section 9.
 
 ## What a runner token can not do
 

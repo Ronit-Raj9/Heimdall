@@ -62,10 +62,11 @@ describe("LoginView", () => {
 	});
 });
 describe("LoginView layout", () => {
-	it("leads with GitHub above the email form and shows the judge hint", () => {
+	it("leads with GitHub above the email form and shows no judge hint", () => {
 		const html = render(<LoginView />, signedOutSession());
 		expect(html.indexOf('data-testid="auth-github"')).toBeLessThan(html.indexOf('data-testid="login-form"'));
-		expect(html).toContain('data-testid="login-judge-hint"');
+		expect(html).not.toContain('data-testid="login-judge-hint"');
+		expect(html).not.toMatch(/judg/i);
 		expect(html).toContain("or sign in with email");
 	});
 });

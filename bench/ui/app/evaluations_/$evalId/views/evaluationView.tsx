@@ -4,6 +4,7 @@ import { useConfirm } from "@/components/platform/confirmDialog";
 import { EvaluationReportCard } from "@/components/reportcard/evaluationReportCard";
 import { GateResultCard, PromoteEvaluation, RepeatEvaluation } from "@/components/releases/promoteEvaluation";
 import { BlockSkeleton, EmptyNote, LoadError, Section } from "@/components/runs/screenStates";
+import { ShareButton } from "@/components/share/shareDialog";
 import { PageHeader } from "@/components/shell/pageHeader";
 import { Button } from "@/components/ui/button";
 import { useGetExperimentQuery } from "@/lib/store/apis/benchApi";
@@ -53,7 +54,12 @@ export function EvaluationBody({ evaluation }: { evaluation: Evaluation }) {
 				subtitle={t("detail.subtitle")}
 				breadcrumbs={[{ label: t("detail.crumb"), to: "/evaluations" }, { label: spec.name || evaluation.id }]}
 				meta={<EvaluationStatusPill status={evaluation.status} testId="evaluation-status" />}
-				actions={active ? <CancelButton id={evaluation.id} /> : <RepeatEvaluation evaluationId={evaluation.id} />}
+				actions={
+					<div className="flex flex-wrap items-center gap-2">
+						<ShareButton kind="evaluation" target={evaluation.id} evaluationId={evaluation.id} />
+						{active ? <CancelButton id={evaluation.id} /> : <RepeatEvaluation evaluationId={evaluation.id} />}
+					</div>
+				}
 			/>
 			<section className="bg-card flex flex-col gap-4 rounded-xl border p-5" data-testid="evaluation-header">
 				<div className="flex flex-wrap items-baseline gap-x-4 gap-y-1 text-sm">

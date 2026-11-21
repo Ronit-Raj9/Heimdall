@@ -146,6 +146,11 @@ export function safeReturnTo(raw: unknown): string {
 	return raw;
 }
 
+/** Share links (/s/<token>, lane X14): a read-only page anyone holding the link may open. */
+export function isSharePage(pathname: string): boolean {
+	return pathname.startsWith("/s/");
+}
+
 /** Paths that render without the app shell and never redirect to the login page. */
 export function isAuthPage(pathname: string): boolean {
 	return pathname === "/login" || pathname === "/signup" || pathname === "/reset-password" || pathname.startsWith("/invite/");

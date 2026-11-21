@@ -69,6 +69,9 @@ func Resolve(ctx context.Context, dir Directory, rule Rule, p *auth.Principal, p
 	if p == nil {
 		p = auth.Anonymous()
 	}
+	if rule.Access == AccessShare {
+		return resolveShare(ctx, dir, pathRef)
+	}
 	if rule.Access != AccessOrg && rule.Access != AccessRunner {
 		return nil, p, nil
 	}
@@ -141,6 +144,37 @@ func Resolve(ctx context.Context, dir Directory, rule Rule, p *auth.Principal, p
 		return &o, &eff, nil
 	}
 	return nil, nil, forbidden("unknown principal kind " + string(p.Kind))
+}
+
+// SharePathParam is the path parameter AccessShare routes carry the share
+// token in.
+const SharePathParam = "token"
+
+// ShareTokenOrg returns the org id a share token names (the part before its
+// first dot), without checking the token: the org's own share store does.
+func ShareTokenOrg(token string) (string, bool) {
+	org, _, ok := strings.Cut(token, ".")
+	return org, ok && ValidOrgID(org) == nil
+}
+
+// resolveShare resolves an AccessShare route: the org the token names, and
+// an anonymous reader in it, whoever the caller is. A token naming no org
+// answers 404, as a bad signature does later.
+func resolveShare(ctx context.Context, dir Directory, token string) (*Org, *auth.Principal, error) {
+	orgID, ok := ShareTokenOrg(token)
+	if !ok {
+		return nil, nil, notFound("this share link does not exist")
+	}
+	o, err := dir.OrgByID(ctx, orgID)
+	if err != nil {
+		if errors.Is(err, ErrOrgNotFound) {
+			return nil, nil, notFound("this share link does not exist")
+		}
+		return nil, nil, err
+	}
+	eff := auth.Anonymous()
+	eff.OrgID = o.ID
+	return &o, eff, nil
 }
 
 func lookupErr(err error) error {

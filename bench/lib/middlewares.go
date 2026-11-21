@@ -95,6 +95,13 @@ func BodyLimit(mode schemas.Mode, limit int) Middleware {
 	}
 }
 
+// CORPHeader and CORPCrossOrigin: a handler that sets this header to this
+// value keeps it through SecurityHeaders (an embeddable badge).
+const (
+	CORPHeader      = "Cross-Origin-Resource-Policy"
+	CORPCrossOrigin = "cross-origin"
+)
+
 // SecurityHeaders sets the CSP and the usual hardening headers on every
 // response, API and UI alike. A handler that asked for a sandboxed response
 // (a CSP of exactly "sandbox", as the artifact download does for
@@ -113,7 +120,12 @@ func SecurityHeaders() Middleware {
 			h.Set("X-Frame-Options", "DENY")
 			h.Set("Referrer-Policy", "no-referrer")
 			h.Set("Cross-Origin-Opener-Policy", "same-origin")
-			h.Set("Cross-Origin-Resource-Policy", "same-origin")
+			// A response made to be embedded anywhere (a share link's badge
+			// SVG) asks for cross-origin itself; everything else stays
+			// same-origin.
+			if string(h.Peek(CORPHeader)) != CORPCrossOrigin {
+				h.Set(CORPHeader, "same-origin")
+			}
 		}
 	}
 }

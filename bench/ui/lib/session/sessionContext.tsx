@@ -1,7 +1,7 @@
 // The session every screen reads: local or hosted, who is signed in, in which organization, with
 // which role. The default is local mode, so screens rendered without the provider (tests, the
 // standalone bench before the platform) behave exactly as before.
-import { errorStatus, getAuthState, isAuthPage, isUnauthorized, roleAtLeast } from "@/lib/store/apis/session";
+import { errorStatus, getAuthState, isAuthPage, isSharePage, isUnauthorized, roleAtLeast } from "@/lib/store/apis/session";
 import type { AuthConfig, AuthMe, AuthMode, OrgSummary, PlatformUser, PrincipalKind, Role } from "@/lib/types/bench";
 import { createContext, useContext } from "react";
 
@@ -133,10 +133,12 @@ export function useSession(): SessionInfo {
 }
 
 /**
- * What the app frame shows for a path: the auth pages without the shell, the login page for a
- * hosted visitor who is neither signed in nor reading a public demo, else the app shell.
+ * What the app frame shows for a path: a share link's page on its own (whatever the session), the
+ * auth pages without the shell, the login page for a hosted visitor who is neither signed in nor
+ * reading a public demo, else the app shell.
  */
-export function frameFor(session: SessionInfo, pathname: string): "auth" | "login" | "app" | "error" {
+export function frameFor(session: SessionInfo, pathname: string): "share" | "auth" | "login" | "app" | "error" {
+	if (isSharePage(pathname)) return "share";
 	if (session.status === "error") return "error";
 	if (isAuthPage(pathname)) return "auth";
 	if (session.authMode === "hosted" && session.status === "ready" && !session.signedIn && !session.demo) return "login";

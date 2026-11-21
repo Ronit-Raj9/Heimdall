@@ -1,9 +1,9 @@
 # Hosting Heimdall
 
 From a fresh Linux VM to a working Heimdall at `https://<your domain>`: teams
-sign in, belong to organizations and run benchmarks on runners they own; the
-hosted server stores sealed results, renders the UI and coordinates. Design:
-`docs/platform-design.md`. Files: `deploy/hosted/`.
+sign up, belong to organizations and benchmark their own agents; the hosted
+server stores sealed results, renders the UI and coordinates the workers that
+run the agents. Files: `deploy/hosted/`.
 
 ```
 browser / runner --HTTPS--> Caddy (80, 443) --> heimdall:8090 --> Postgres
@@ -11,9 +11,26 @@ browser / runner --HTTPS--> Caddy (80, 443) --> heimdall:8090 --> Postgres
                             service              embedded          not published
 ```
 
-The server runs no agent: runners do, on machines you control, with provider
-keys that never reach the server. The only exception is the optional demo
-runner, which serves the public demo organization under a spend cap.
+The server process runs no agent. Agents run on **workers** (runners): the
+optional **shared worker** on this same machine, which every organization
+can use (section 9), and each organization's own workers on machines it
+controls (section 6).
+
+What the server holds, and what it does not:
+
+- **Provider keys.** Each organization adds its own keys in Models & keys.
+  They are stored encrypted in the keystore under `HEIMDALL_MASTER_KEY` and
+  are never shown again, not even to owners. A worker receives an
+  organization's keys only while it holds a run of that organization, over
+  the authenticated lease credentials route, and never writes them to the
+  sealed evidence.
+- **Own key required.** Runs never fall back to a key of the server or of
+  the worker. An evaluation or experiment on a provider the organization has
+  no working key for is refused before anything runs, with a pointer to
+  Models & keys.
+- **No public demo.** A fresh install has no demo organization, no
+  anonymous access and no sample data. Every visitor signs in and sees only
+  their own organization's work.
 
 ## 1. Machine
 
@@ -23,7 +40,7 @@ runner, which serves the public demo organization under a spend cap.
 | Disk | 20 GB | 100 GB+ SSD; sealed runs grow by roughly 2 to 3 MB per run (318 runs took 745 MB) |
 | OS | Any 64-bit Linux with Docker Engine 24+ and the Compose plugin v2.20+ (tested: Docker 29.9, Compose 5.6) | Ubuntu 24.04 LTS or Debian 12 |
 
-The demo runner (section 9) runs agent containers on the same machine: add
+The shared worker (section 9) runs agent containers on the same machine: add
 2 vCPU and 4 GB per concurrent slot, or leave it off.
 
 ## 2. DNS and firewall
@@ -84,9 +101,10 @@ deploy/hosted/bootstrap.sh --domain heimdall.example.com --email ops@example.com
 It is safe to run again; each step skips what is done. In order:
 
 1. creates `deploy/hosted/.env` (mode 600) from `.env.example`, with random
-   Postgres and gateway secrets, your domain and ACME e-mail. Review the file:
-   signup policy (`HEIMDALL_SIGNUP`: `invite` by default, `open`, `closed`),
-   GitHub, S3 mirror.
+   Postgres and gateway secrets, the keystore master key
+   (`HEIMDALL_MASTER_KEY`, base64 of 32 random bytes), your domain and ACME
+   e-mail. Review the file: signup policy (`HEIMDALL_SIGNUP`: `invite` by
+   default, `open`, `closed`), GitHub, S3 mirror, shared worker.
 2. builds the server image from this checkout (`deploy/hosted/Dockerfile.server`:
    `npm ci` and the UI build, then a static Go binary with the UI embedded, on
    a non-root Alpine runtime; about 5 minutes the first time)
@@ -109,32 +127,28 @@ account to sign up on the empty install becomes the owner, with signup
 web signup works at all and accounts come only from `user create`. Later
 signups follow the policy (`invite`: only with an invitation link).
 
-The demo organization gets the `--owner-email` account as its owner. A demo
-created by a run without `--owner-email` has no admin, and nobody can create
-its runner token. To repair it, run bootstrap again with `--owner-email`:
-when the demo already exists it adds that account as an owner
-(`bifrost-bench org member add -org demo -email <email> -role owner`, a no-op
-for an existing member). The same command run by hand, `$C run --rm
---no-deps heimdall org member add -org demo -email you@example.com -role
-owner`, repairs any organization left without an admin.
+An organization left without an admin is repaired with
+`$C run --rm --no-deps heimdall org member add -org <org> -email
+you@example.com -role owner`.
 
 Open `https://heimdall.example.com/`, sign in (your organization was created
 with the account), invite your team (Settings > Members).
 
 Each organization has a project folder in the data volume,
-`/var/lib/heimdall/runs/projects/<org id>/` (suites, agent configs,
-experiments, policies), next to its sealed runs in `runs/orgs/<org id>/`. An
-organization created in the UI or with `org create` starts with the
-`coding-core` suite. There is no upload for agent configs yet; copy one in
-through the container:
+`/var/lib/heimdall/runs/projects/<org id>/` (agent configs and their saved
+versions, its own benchmarks, evaluations, experiments, policies), next to
+its sealed runs in `runs/orgs/<org id>/`. Organizations add agents in the
+browser: from a template, by editing the config (`PUT
+/api/bench/agents/{id}/config`), or by uploading a config file (`POST
+/api/bench/uploads/agent`). No shell access to the server is needed.
 
-```sh
-docker compose -f deploy/hosted/docker-compose.yml --env-file deploy/hosted/.env exec -T heimdall \
-    sh -c 'cat > /var/lib/heimdall/runs/projects/<org id>/agents/my-agent.yaml' < agents/my-agent.yaml
-```
-
-The runners need the same file at the same path in their checkout, since
-they plan every experiment again and refuse one that comes out different.
+**Built-in library.** Every organization also sees the server's read-only
+benchmark and agent library (`HEIMDALL_LIBRARY_DIR`, the checkout's
+`benchmarks/` and `agents/` by default) without copying anything: public
+benchmarks such as Terminal-Bench, SWE-bench Verified, tau2 and AgentDojo,
+and the built-in agents (Codex, Claude Code, OpenCode, Gemini CLI,
+mini-swe-agent). An organization's own benchmark or agent with the same id
+wins over the library's.
 
 Configuration lives in
 `deploy/hosted/bench.hosted.yaml` (mounted read-only; secrets are only ever
@@ -142,12 +156,13 @@ named by environment variable) and `deploy/hosted/.env`. Site-specific compose
 changes go in `deploy/hosted/docker-compose.override.yml`, which the scripts
 pick up.
 
-## 6. Runners
+## 6. Organization workers
 
-A runner is a machine you control that runs the agent containers and
-uploads sealed runs. An org admin creates a runner token (`hmr_...`, one org,
-one pool, shown once) in Settings > Runners, which also shows the install
-command. On the runner machine (Ubuntu or Debian, Docker installed):
+An organization that wants its agents on its own machines connects its own
+worker: any Linux machine or VM with Docker, in its own cloud account or
+data center. An org admin creates a worker token (`hmr_...`, one org, one
+pool, shown once) on the Workers page, which also shows the install command.
+On the worker machine (Ubuntu or Debian, Docker installed):
 
 ```sh
 curl -fsSLO https://heimdall.example.com/api/bench/runners/install.sh
@@ -156,8 +171,11 @@ sudo bash install.sh --server https://heimdall.example.com --token-file ./runner
 ```
 
 It installs `bifrost-bench runner start` as the `heimdall-runner` systemd
-service with its own Bifrost gateway stack. Details, flags, upgrades and
-troubleshooting: `deploy/runner/README.md`.
+service with its own Bifrost gateway stack. The worker receives the
+organization's provider keys per run from the keystore (section intro), so
+no key has to be copied to it; keys put in that machine's `deploy/.env`
+are not used for hosted organizations. Details, flags, upgrades and
+troubleshooting: [runners.md](runners.md) and `deploy/runner/README.md`.
 
 Model keys: every organization's runs use only that organization's own keys
 from Models & keys, which the server hands to the runner per lease. There is
@@ -176,8 +194,11 @@ report cards, leaderboards and verdicts.
 deploy/hosted/backup.sh --dir /var/backups/heimdall --keep-days 14
 ```
 
-Writes `heimdall-db-<time>.dump` (`pg_dump`, custom format) and a copy of
-`.env` to the folder (mode 700). Evidence: with the S3 mirror set
+Writes `heimdall-db-<time>.dump` (`pg_dump`, custom format) to the folder
+(mode 700). Keep `deploy/hosted/.env` in your secret manager, apart from the
+backups: it holds `HEIMDALL_MASTER_KEY`, and stored provider keys cannot be
+decrypted without it, so a backup that travels with it would carry every
+organization's keys. Evidence: with the S3 mirror set
 (`HEIMDALL_S3_BUCKET` and its keys in `.env`, or `HEIMDALL_S3_BUCKET` in the
 shell, which wins over `.env` as it does for compose; create the bucket first, the
 mirror never creates one, and keep it private) it runs
@@ -204,7 +225,7 @@ Sealed run folders are the evidence; the database holds users, tokens, jobs,
 runners, audit and an index that can be rebuilt from the folders.
 
 Restore on a new machine: sections 1 to 3 (DNS pointed at the new machine),
-the backed-up `.env` copied to `deploy/hosted/.env` (mode 600), then
+your saved `.env` copied to `deploy/hosted/.env` (mode 600), then
 
 ```sh
 cd /opt/heimdall/bench && C="docker compose -f deploy/hosted/docker-compose.yml --env-file deploy/hosted/.env"
@@ -227,7 +248,7 @@ deploy/hosted/upgrade.sh --ref v1.2.0    # a specific tag or commit
 ```
 
 It takes a database backup first, tags the image IDs of the running server
-and demo-runner containers `:previous` (a service with no running container
+and shared worker containers `:previous` (a service with no running container
 keeps its existing `:previous`, so a retried upgrade never moves the rollback
 tag onto a half-finished build; a stack with its own image tag,
 `HEIMDALL_IMAGE=heimdall/server:<tag>`, gets `:<tag>-previous` instead, so
@@ -239,26 +260,74 @@ check out the previous commit, retag `:previous` as `:local`,
 version runs on the migrated database; if not, restore the dump. Upgrade
 runners to the same commit (`deploy/runner/README.md`, Upgrade).
 
-## 9. Demo runner (optional)
+## 9. Shared worker (optional)
 
-Runs the demo organization's experiments on this machine, in compose profile
-`demo-runner`: its own Bifrost gateway, fault proxy and Postgres, and a
-runner container that starts agent containers through the host's Docker
-socket (which is root-equivalent: keep it to the demo org).
+The shared worker lets every organization run the built-in agents and
+benchmarks without connecting a worker of its own. It runs in compose
+profile `shared-runner` on this machine: a worker container that starts
+agent containers through the host's Docker socket, with its own Bifrost
+gateway and fault proxy. It serves every organization whose shared pool is
+on, which is every organization without its own quota row.
 
-1. Sign in as the owner, open the `demo` organization, Settings > Runners,
-   create a token for pool `demo`. Put it in `.env` as
-   `HEIMDALL_DEMO_RUNNER_TOKEN`; set `HEIMDALL_DEMO_SPEND_CAP_USD` (default
-   5, per UTC day) and, for a real model, a spend-limited `OPENAI_API_KEY` or
-   `ANTHROPIC_API_KEY` (empty runs the scripted model at no cost).
-2. Build the task and agent images the demo experiments use, e.g.
-   `docker build -t bench/coding-core-base:1 benchmarks/coding-core/base` and
-   `docker build -t bench/agent-custom-python:1 agents/images/custom-python`.
-3. `sudo install -d -o 10001 -g 10001 -m 750 /var/lib/heimdall-runner`, then
-   `deploy/hosted/bootstrap.sh --demo-runner`.
+1. Set the secrets in `deploy/hosted/.env` (bootstrap generates both on a
+   fresh install; add them with `openssl rand` on an older one):
 
-The checkout and `/var/lib/heimdall-runner` are mounted at their host paths,
-so paths the runner hands to `docker run -v` mean the same on the host.
+| Variable | Where | What |
+|---|---|---|
+| `HEIMDALL_SHARED_RUNNER_SECRET` | server and `shared-runner` | Secret the shared worker fetches its assignments with (`GET /api/bench/admin/pool/assignments`, no tokens in the answer) and claims one runner token per org with (`POST /api/bench/admin/pool/assignments/{org}/token`; each claim revokes that org's earlier token and is audited in the org's log). Empty turns the shared pool off. Generate with `openssl rand -hex 32`. |
+| `HEIMDALL_MASTER_KEY` | server | Base64 32-byte keystore key: provider keys are encrypted under it. `openssl rand -base64 32`. Losing it loses every stored key. Shared worker tokens are not stored readable: the server keeps only their hashes. |
+| `HEIMDALL_SERVER_ADMINS` | server | Comma-separated emails of server admins: quotas, image approval, kill switch. |
+| `HEIMDALL_SHARED_RUNTIME` | `shared-runner` | `auto` (default): every container runs under gVisor (`--runtime runsc`) when the Docker host has a `runsc` runtime, serving every org; without it the runner logs a warning, uses runc and serves only orgs whose runtime is `runc`. `runsc` refuses to start without gVisor; `runc` forces runc. |
+| `HEIMDALL_SHARED_BUILDKIT` | `shared-runner` | Address of the isolated BuildKit (`tcp://buildkitd:1234`, the `buildkitd` service of the profile). Images from org-written Dockerfiles build only there, never on the host daemon, and load as `org-<org id>/<tag>`. Empty refuses them (built-in and approved images still run). |
+| `HEIMDALL_SHARED_PLATFORM_IMAGES` | `shared-runner` | Comma-separated images every org may pull (a trailing `/` or `:` is a prefix). Otherwise an org pulls only its approved, digest-pinned images. |
+| `HEIMDALL_SHARED_GATEWAY_CONTAINER` | `shared-runner` | The gateway container every org network joins. Empty finds the compose project's `bifrost` service. |
+| `HEIMDALL_SHARED_SLOTS` | `shared-runner` | Slots per organization, capped by its max concurrent runs. |
+
+2. Build the task and agent images the built-in benchmarks use, e.g.
+   `docker build -t bench/coding-core-base:1 benchmarks/coding-core/base`.
+3. `docker compose -f deploy/hosted/docker-compose.yml --env-file deploy/hosted/.env --profile shared-runner up -d`.
+
+Each run uses the keys of the organization it belongs to, delivered for that
+run only; the shared worker has no provider key of its own. The Docker
+socket is root-equivalent, so the shared worker runs only built-in agent
+templates and server-approved images: an organization's own Docker image
+needs a server admin's approval (below) or a worker of its own.
+
+Isolation between orgs on the shared host:
+
+- Each org's agents run on their own internal network,
+  `heimdall-evalnet-<org id>`, which only the gateway joins; one org's
+  containers cannot reach another's.
+- The shared worker mounts no server data. Each org's project (suites,
+  agents, experiments, policies; never `.git`, `.heimdall/` state or the
+  release log) is downloaded with that org's own runner token from
+  `GET /api/bench/workers/project` before every lease.
+- Org Dockerfiles build on the rootless `buildkitd` service (no Docker socket,
+  its own network). BuildKit there cannot see images on the host daemon, so an
+  org Dockerfile's `FROM` must name an image from a registry. Tags are
+  namespaced per org (`org-<org id>/...`); an org cannot use or overwrite
+  another org's images or a platform tag. After upgrading, remove images that
+  orgs built under global tags before this change (`docker image ls`).
+- Hosted CLI jobs (agent build and similar) do not run on the shared worker;
+  they run on an org's own workers.
+- Run one shared worker per runtime: a second one with the same secret claims
+  the same orgs' tokens and revokes the first one's.
+
+Guardrails (server admin, `/api/bench/admin/...`):
+
+- Per-org limits: `GET/PUT /admin/quotas/{org_id}` (concurrent runs, runs per
+  day, spend per day, image size, shared pool on or off, custom images,
+  runtime `runc` or `runsc`). The caps exist but are off by default: an
+  organization without a row has the shared pool on and no run or spend cap.
+  Set them per organization when you need them; once set, runs per day and
+  spend per day are checked when a run starts and at every lease, over the
+  org's sealed runs and their known spend that UTC day.
+- Custom images: members request one with `POST /api/bench/images`. It must be
+  pinned by digest (`name@sha256:<64 hex>`) and fit the org's image size
+  limit. A server admin approves it with `POST /admin/images/{id}/approve`.
+- Kill switch: `POST /admin/killswitch {"on": true}` empties the shared
+  worker's assignments and stops every coordinator from handing out new
+  leases; slots already running finish.
 
 ## 10. Operating it
 
@@ -321,8 +390,9 @@ upgrading production.
       Sessions expire after `session_ttl_h`; `bifrost-bench user
       set-password` (password recovery) ends every session of that user.
 - [ ] Backups scheduled, copied off the machine, and a restore tried once.
-- [ ] No provider keys in this `.env` or on shared runners: organizations add
-      their own on Models & keys.
+- [ ] No provider keys in this `.env`: organizations bring their own, and
+      runs never fall back to a server key.
+- [ ] `HEIMDALL_MASTER_KEY` kept in a secret manager, not beside the backups.
 - [ ] Upgrade regularly; base images are pinned by digest and move with the
       repository.
 
@@ -341,57 +411,4 @@ caps request bodies at 2 MiB and hides `/readyz`; the server adds its CSP,
   this machine (and the S3 mirror you configure).
 - High availability: one server process and one Postgres; scale up, not out.
 - Email delivery: invitations are links an admin copies and sends.
-
-## Shared runner pool and guardrails
-
-New organizations can run the built-in agents and suites without bringing
-their own runner. The shared runner replans every experiment with the
-server's checkout, so it runs only what the built-in templates reproduce.
-
-| Variable | Where | What |
-|---|---|---|
-| `HEIMDALL_SHARED_RUNNER_SECRET` | server and `shared-runner` | Secret the shared runner fetches its assignments with (`GET /api/bench/admin/pool/assignments`, no tokens in the answer) and claims one runner token per org with (`POST /api/bench/admin/pool/assignments/{org}/token`; each claim revokes that org's earlier token and is audited in the org's log). Empty turns the shared pool off. Generate with `openssl rand -hex 32`. |
-| `HEIMDALL_MASTER_KEY` | server | Base64 32-byte key for the keystore (org provider keys). Shared pool runner tokens are no longer stored readable: the server keeps only their hashes. |
-| `HEIMDALL_SERVER_ADMINS` | server | Comma-separated emails of server admins: quotas, image approval, kill switch. |
-| `HEIMDALL_SHARED_RUNTIME` | `shared-runner` | `auto` (default): every container runs under gVisor (`--runtime runsc`) when the Docker host has a `runsc` runtime, serving every org; without it the runner logs a warning, uses runc and serves only orgs whose runtime is `runc`. `runsc` refuses to start without gVisor; `runc` forces runc. |
-| `HEIMDALL_SHARED_BUILDKIT` | `shared-runner` | Address of the isolated BuildKit (`tcp://buildkitd:1234`, the `buildkitd` service of the profile). Images from org-written Dockerfiles build only there, never on the host daemon, and load as `org-<org id>/<tag>`. Empty refuses them (built-in and approved images still run). |
-| `HEIMDALL_SHARED_PLATFORM_IMAGES` | `shared-runner` | Comma-separated images every org may pull (a trailing `/` or `:` is a prefix). Otherwise an org pulls only its approved, digest-pinned images. |
-| `HEIMDALL_SHARED_GATEWAY_CONTAINER` | `shared-runner` | The gateway container every org network joins. Empty finds the compose project's `bifrost` service. |
-| `HEIMDALL_SHARED_SLOTS` | `shared-runner` | Slots per organization, capped by its max concurrent runs. |
-
-Start it with `docker compose --profile shared-runner up -d`.
-
-Isolation between orgs on the shared host:
-
-- Each org's agents run on their own internal network,
-  `heimdall-evalnet-<org id>`, which only the gateway joins; one org's
-  containers cannot reach another's.
-- The shared runner mounts no server data. Each org's project (suites,
-  agents, experiments, policies; never `.git`, `.heimdall/` state or the
-  release log) is downloaded with that org's own runner token from
-  `GET /api/bench/workers/project` before every lease.
-- Org Dockerfiles build on the rootless `buildkitd` service (no Docker socket,
-  its own network). BuildKit there cannot see images on the host daemon, so an
-  org Dockerfile's `FROM` must name an image from a registry. Tags are
-  namespaced per org (`org-<org id>/...`); an org cannot use or overwrite
-  another org's images or a platform tag. After upgrading, remove images that
-  orgs built under global tags before this change (`docker image ls`).
-- Hosted CLI jobs (agent build and similar) do not run on the shared runner;
-  they run on an org's own workers.
-- Run one shared runner per runtime: a second one with the same secret claims
-  the same orgs' tokens and revokes the first one's.
-
-Guardrails (server admin, `/api/bench/admin/...`):
-
-- Per-org limits: `GET/PUT /admin/quotas/{org_id}` (concurrent runs, runs per
-  day, spend per day, image size, shared pool on or off, custom images,
-  runtime `runc` or `runsc`). With the shared runner secret set, the shared
-  pool is on for orgs that have no row. Runs per day and spend per day are 0
-  (off) by default; once set, they are checked when a run starts and at every
-  lease, over the org's sealed runs and their known spend that UTC day.
-- Custom images: members request one with `POST /api/bench/images`. It must be
-  pinned by digest (`name@sha256:<64 hex>`) and fit the org's image size
-  limit. A server admin approves it with `POST /admin/images/{id}/approve`.
-- Kill switch: `POST /admin/killswitch {"on": true}` empties the shared
-  runner's assignments and stops every coordinator from handing out new
-  leases; slots already running finish.
+- Master key rotation or a KMS: `HEIMDALL_MASTER_KEY` is one static key.

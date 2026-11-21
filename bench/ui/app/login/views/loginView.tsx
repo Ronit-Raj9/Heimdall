@@ -7,7 +7,7 @@ import { Link } from "@tanstack/react-router";
 import { Info } from "lucide-react";
 import { useEffect, useState, type FormEvent } from "react";
 import { useTranslation } from "react-i18next";
-import { GithubPrimary, JudgeHint, OrDivider } from "./authParts";
+import { GithubPrimary, OrDivider } from "./authParts";
 
 /** Full-page navigation after signing in, so every cached answer is fetched again as the new user. */
 function go(path: string) {
@@ -108,7 +108,6 @@ export default function LoginView({ returnTo, oauthError }: { returnTo?: string;
 					{t("auth.login.submit")}
 				</Button>
 			</form>
-			<JudgeHint />
 			{signupOffered(session) && (
 				<p className="text-muted-foreground text-center text-sm">
 					{t("auth.login.noAccount")}{" "}
