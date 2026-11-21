@@ -1,0 +1,5 @@
+name: toy
+image: python311
+timeout_s: 600
+prompts:
+  instruction: prompts/instruction.md

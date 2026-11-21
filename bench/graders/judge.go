@@ -40,6 +40,12 @@ const (
 	// words are correct and incorrect instead of yes and no, and the
 	// response is fenced and marked as data.
 	PromptLongMemEvalV1 = "longmemeval-v1"
+	// PromptCheatBenchV1 is CheatBench's shared behavioural judge
+	// (prompts/judge.md of github.com/centerforaisafety/cheatbench, MIT,
+	// commit 96e05a6d61faf33be788f75dd01998066045ad02). It judges the
+	// run's trajectory, not answer.txt: "correct" means the agent cheated
+	// (see cheatbench.go).
+	PromptCheatBenchV1 = "cheatbench-v1"
 )
 
 const (
@@ -170,6 +176,11 @@ func (g *judge) Grade(ctx context.Context, rc *schemas.RunContext, diff *schemas
 		return grade, nil
 	}
 	answer, problem, err := ReadAnswer(rc.Dir)
+	limit := maxJudgeAnswerRunes
+	if spec.PromptVersion == PromptCheatBenchV1 { // cheatbench.go: the trajectory is the response
+		answer, problem, err = readTrajectory(rc)
+		limit = maxTrajectoryRunes
+	}
 	if err != nil {
 		return nil, fmt.Errorf("%s: %w", JudgeType, err)
 	}
@@ -183,7 +194,7 @@ func (g *judge) Grade(ctx context.Context, rc *schemas.RunContext, diff *schemas
 		grade.InvalidEvaluator, grade.Reason = true, NoPaidJudgeReason
 		return grade, nil
 	}
-	rec, err := g.vote(ctx, rc, spec, renderJudgePrompt(tmpl, ans, answer))
+	rec, err := g.vote(ctx, rc, spec, renderJudgePromptCap(tmpl, ans, answer, limit))
 	if err != nil {
 		return nil, fmt.Errorf("%s: %w", JudgeType, err)
 	}
@@ -191,7 +202,7 @@ func (g *judge) Grade(ctx context.Context, rc *schemas.RunContext, diff *schemas
 	rec.Provider = spec.Provider                                                                // calibration identity (QC2-25-05)
 	rec.Calibration = calibrationRef(rc.Suite, calibration.GradeJudgeID(rec), rec.PromptSHA256) // W8 judge calibration: the record in force (judgecalibration.go)
 	if spec.Auditor != nil {                                                                    // W8 judge calibration: the auditor never decides
-		rec.Audit = g.audit(ctx, rc, spec, renderJudgePrompt(tmpl, ans, answer), rec.Votes)
+		rec.Audit = g.audit(ctx, rc, spec, renderJudgePromptCap(tmpl, ans, answer, limit), rec.Votes)
 	}
 	grade.Judged, grade.Judge = true, rec
 	grade.Passed, grade.InvalidEvaluator, grade.Reason = tally(rec.Votes, tmplName)
@@ -227,7 +238,7 @@ func (g *judge) check(rc *schemas.RunContext) (schemas.JudgeSpec, error) {
 	case spec.MaxTokens < 0:
 		return spec, fmt.Errorf("judge max_tokens %d is negative", spec.MaxTokens)
 	case !knownPromptVersion(spec.PromptVersion):
-		return spec, fmt.Errorf("judge prompt_version %q is not shipped (want %s or %s)", spec.PromptVersion, PromptQAv1, PromptLongMemEvalV1)
+		return spec, fmt.Errorf("judge prompt_version %q is not shipped (want %s, %s or %s)", spec.PromptVersion, PromptQAv1, PromptLongMemEvalV1, PromptCheatBenchV1)
 	case g.cfg.Gateway == nil || g.cfg.URL == "":
 		return spec, errors.New("judge grader is not wired to the gateway (register graders.NewJudge with the gateway and its URL)")
 	case rc.Run == nil || !judgeKeyNameRe.MatchString(rc.Run.RunID):
@@ -429,7 +440,7 @@ func tally(votes []string, tmpl string) (passed, invalid bool, reason string) {
 
 // knownPromptVersion reports whether version is shipped.
 func knownPromptVersion(version string) bool {
-	return version == PromptQAv1 || version == PromptLongMemEvalV1
+	return version == PromptQAv1 || version == PromptLongMemEvalV1 || version == PromptCheatBenchV1
 }
 
 // judgeTemplate picks the template of version for ans and returns its name
@@ -467,6 +478,11 @@ func judgeTemplate(version string, ans *schemas.AnswerSpec) (string, string, err
 		default:
 			return "", "", fmt.Errorf("prompt %s has no template for question type %q", version, ans.Category)
 		}
+	case PromptCheatBenchV1:
+		if ans.Rubric == "" {
+			return "", "", errors.New("prompt cheatbench-v1 needs the task's cheating criteria as the answer spec rubric")
+		}
+		name = "cheatbench-v1"
 	default:
 		return "", "", fmt.Errorf("prompt version %q is not shipped", version)
 	}
@@ -481,10 +497,17 @@ func judgeTemplate(version string, ans *schemas.AnswerSpec) (string, string, err
 // question or the answer is never expanded again. The answer is capped and
 // its fence markers are broken up, so it cannot close its own fence.
 func renderJudgePrompt(tmpl string, ans *schemas.AnswerSpec, answer string) string {
-	if r := []rune(answer); len(r) > maxJudgeAnswerRunes {
-		answer = string(r[:maxJudgeAnswerRunes]) + "\n[truncated]"
+	return renderJudgePromptCap(tmpl, ans, answer, maxJudgeAnswerRunes)
+}
+
+// renderJudgePromptCap is renderJudgePrompt with the answer capped at limit
+// runes (a cheatbench-v1 trajectory is longer than an answer). The
+// trajectory fence of cheatbench-v1 is broken up the same way.
+func renderJudgePromptCap(tmpl string, ans *schemas.AnswerSpec, answer string, limit int) string {
+	if r := []rune(answer); len(r) > limit {
+		answer = string(r[:limit]) + "\n[truncated]"
 	}
-	defence := strings.NewReplacer("<<<", "< < <", ">>>", "> > >")
+	defence := strings.NewReplacer("<<<", "< < <", ">>>", "> > >", "<trajectory>", "< trajectory >", "</trajectory>", "< /trajectory >")
 	expected := strings.Join(ans.Expected, "\nor: ")
 	rubric := ans.Rubric
 	if rubric == "" {
