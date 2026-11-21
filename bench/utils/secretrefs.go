@@ -15,6 +15,12 @@ import (
 
 var secretRefRe = regexp.MustCompile(`\{\{\s*secret\.([A-Za-z_][A-Za-z0-9_]*)\s*\}\}`)
 
+var secretNameRe = regexp.MustCompile(`^[A-Za-z_][A-Za-z0-9_]*$`)
+
+// SecretNameOK reports whether name can be an org secret name, the same
+// names a {{secret.NAME}} reference accepts.
+func SecretNameOK(name string) bool { return secretNameRe.MatchString(name) }
+
 // SecretRefs returns the secret names env values reference as
 // {{secret.NAME}}, sorted and without duplicates.
 func SecretRefs(env map[string]string) []string {
@@ -76,6 +82,9 @@ func RunSecretNames(rc *schemas.RunContext) []string {
 	if rc.Agent != nil {
 		for _, n := range SecretRefs(rc.Agent.Env) {
 			seen[n] = true
+		}
+		if o := rc.Agent.OpenAI; o != nil && SecretNameOK(o.APIKeySecret) { // A08: openai.api_key_secret (adapters/openaiagent.go)
+			seen[o.APIKeySecret] = true
 		}
 	}
 	return sortedSet(seen)

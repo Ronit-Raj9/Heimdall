@@ -229,6 +229,10 @@ func checkHostPort(hp string) error {
 // are unknown when its model calls do not go through the gateway.
 const ExternalTrafficReason = "the remote agent's model calls do not go through this gateway (remote.model_traffic external), so its tokens, cost and steps cannot be observed"
 
+// OpenAIExternalReason is why an openai_agent run's tokens, cost and steps
+// from the gateway are unknown: the endpoint's model calls are its own.
+const OpenAIExternalReason = "the agent is an OpenAI-compatible endpoint whose model calls do not go through this gateway, so gateway tokens, cost and steps cannot be observed (the endpoint's own reported usage is in the agent trace)"
+
 // MarkExternalTraffic marks the gateway request log of a run whose agent is
 // a remote_http service with external model traffic (the default) as
 // incomplete, with ExternalTrafficReason. Every metric built on the log
@@ -240,6 +244,11 @@ func MarkExternalTraffic(rc *schemas.RunContext, log *schemas.RequestLog) {
 			log.Complete = false
 			log.Reason = A2ANoCredentialReason
 		}
+		return
+	}
+	if rc != nil && rc.Agent != nil && rc.Agent.OpenAI != nil && log != nil { // A08: an openai_agent endpoint calls its models out of sight
+		log.Complete = false
+		log.Reason = OpenAIExternalReason
 		return
 	}
 	if rc == nil || rc.Agent == nil || rc.Agent.Remote == nil || log == nil || rc.Agent.Remote.ModelTraffic == "gateway" {

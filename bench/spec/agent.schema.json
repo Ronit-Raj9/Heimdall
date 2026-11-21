@@ -8,7 +8,7 @@
   "required": ["id", "adapter"],
   "properties": {
     "id": {"type": "string", "pattern": "^[a-z0-9][a-z0-9._-]*$"},
-    "adapter": {"enum": ["command", "scripted", "remote_http", "a2a"]},
+    "adapter": {"enum": ["command", "scripted", "remote_http", "a2a", "openai_agent"]},
     "image": {"type": "string", "minLength": 1},
     "build": {"$ref": "#/$defs/image"},
     "argv": {"type": "array", "items": {"type": "string"}},
@@ -112,6 +112,22 @@
         "sign_env": {"type": "string", "pattern": "^[A-Za-z_][A-Za-z0-9_]*$", "description": "Host environment variable holding the HMAC secret each request body is signed with."}
       }
     },
+    "openai": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["url"],
+      "description": "A08: an agent served as an OpenAI-compatible chat/completions or Responses endpoint, read by the openai_agent adapter. Mirrors schemas.OpenAIAgent (docs/openai-agents.md).",
+      "properties": {
+        "url": {"type": "string", "pattern": "^https?://", "description": "API base (https://host/v1) or the full .../chat/completions or .../responses URL."},
+        "api": {"enum": ["chat", "responses"]},
+        "model": {"type": "string", "description": "Model field sent; default the agent's model."},
+        "api_key_secret": {"type": "string", "pattern": "^[A-Za-z_][A-Za-z0-9_]*$", "description": "Org secret (Settings > Secrets) sent as a Bearer token."},
+        "tools": {"enum": ["auto", "off"]},
+        "max_turns": {"type": "integer", "minimum": 1},
+        "system": {"type": "string"},
+        "timeout_s": {"type": "integer", "minimum": 1}
+      }
+    },
     "a2a": {
       "type": "object",
       "additionalProperties": false,
@@ -169,6 +185,10 @@
     {
       "if": {"required": ["adapter"], "properties": {"adapter": {"const": "a2a"}}},
       "then": {"required": ["a2a"]}
+    },
+    {
+      "if": {"required": ["adapter"], "properties": {"adapter": {"const": "openai_agent"}}},
+      "then": {"required": ["openai"]}
     }
   ],
   "$defs": {
