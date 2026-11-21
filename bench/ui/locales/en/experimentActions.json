@@ -1,0 +1,55 @@
+{
+	"tab": "Actions",
+	"intro": "Buy more evidence, add fault probes, or compare models. Each action writes a new experiment, freezes it and starts it as a background job.",
+	"job": {
+		"follow": "Follow the job",
+		"running": "Job {{status}}",
+		"failed": "The job failed: {{error}}",
+		"open": "Open {{expId}}",
+		"notStarted": "Frozen, not started: start it from its page."
+	},
+	"extend": {
+		"title": "Extend",
+		"description": "Run a follow-up of this experiment. Its analysis is combined with this one under the pre-declared rule.",
+		"decision": "Current verdict: {{decision}}",
+		"sizing": "Suggested: about {{tasks}} more tasks to reach {{target}} pp.",
+		"already": "This experiment is itself a follow-up of {{expId}}. Extend the first experiment instead.",
+		"mode": "What to add",
+		"trials": "More trials of the same tasks",
+		"tasks": "Tasks this experiment did not run",
+		"count": "How many",
+		"force": "Extend anyway (the verdict is not inconclusive)",
+		"run": "Extend",
+		"confirm": "Start a follow-up experiment of {{expId}}? It spends model budget.",
+		"notInconclusive": "The verdict is not inconclusive: tick \"Extend anyway\" to run a follow-up regardless."
+	},
+	"probe": {
+		"title": "Probe sweep",
+		"description": "Re-run the same arms on the clean condition and the suite's fault probes, so the receipts tab shows how each arm holds up.",
+		"none": "The suite declares no probes. Add probes to its suite.yaml, then come back.",
+		"loading": "Loading the suite's probes",
+		"pick": "Probes (none ticked means all)",
+		"trials": "Trials per condition",
+		"run": "Run probe sweep",
+		"confirm": "Start a probe sweep of {{expId}}? It spends model budget."
+	},
+	"migrate": {
+		"title": "Compare models",
+		"description": "Run one agent on its current model and on one or more candidates over the same tasks. The migration report opens on the new experiment.",
+		"agent": "Agent",
+		"agentPlaceholder": "Pick an agent",
+		"noAgents": "No agents yet. Create one from a template first.",
+		"suite": "Suite (id@version)",
+		"from": "Current model",
+		"to": "Candidate models (comma-separated)",
+		"trials": "Trials per task",
+		"budget": "Budget (USD, 0 for none)",
+		"missing": "Pick an agent and fill the suite, the current model and at least one candidate.",
+		"run": "Compare",
+		"confirm": "Start a model comparison? It spends model budget."
+	},
+	"launch": {
+		"title": "Compare agents or models",
+		"description": "No pair picked? Start a new comparison: one agent across models on a suite."
+	}
+}

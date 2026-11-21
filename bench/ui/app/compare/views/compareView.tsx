@@ -9,6 +9,7 @@ import { GatewayLane } from "@/components/runs/gatewayLane";
 import { IncompleteNotice } from "@/components/runs/incompleteNotice";
 import { MetricStrip } from "@/components/runs/metricStrip";
 import { PairPicker } from "@/components/runs/pairPicker";
+import { CompareLaunch } from "./compareLaunch";
 import { RunRemoteCoverage } from "@/components/runs/remoteCoverage";
 import { RunGatewayPolicy } from "@/components/routing/gatewayPolicyCard"; // W9 routing policy under test
 import { RunVisualPanel } from "@/components/visual/runVisualPanel"; // X1 vision grading
@@ -62,7 +63,10 @@ export default function CompareView() {
 			{pairId ? (
 				<PairComparison pairId={pairId} onClear={() => void setPairId(null)} />
 			) : (
-				<PairPicker expParam={expParam} onPick={(id) => void setPairId(id)} />
+				<>
+					<PairPicker expParam={expParam} onPick={(id) => void setPairId(id)} />
+					<CompareLaunch />
+				</>
 			)}
 		</div>
 	);
