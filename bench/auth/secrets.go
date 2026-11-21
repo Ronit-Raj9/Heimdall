@@ -17,6 +17,11 @@ const (
 	APITokenPrefix = "hm_"
 	// RunnerTokenPrefix starts a runner token, verified by the runners area.
 	RunnerTokenPrefix = "hmr_"
+	// InboxTokenPrefix starts an org's inbox ingest token (gap G02,
+	// bench/inboxtoken). The middleware makes no principal of it: the
+	// request goes on anonymous and the ingest handler checks the token
+	// against that org's stored hashes.
+	InboxTokenPrefix = "hmi_"
 
 	secretBytes     = 32
 	secretB64Len    = 43 // base64url, no padding, of 32 bytes

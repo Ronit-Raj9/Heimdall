@@ -69,7 +69,8 @@ export function InboxTab() {
 				<LoadError title={t("inbox.loadError")} error={list.error} onRetry={() => void list.refetch()} testId="inbox-error" />
 			) : (
 				<InboxBody
-					data={data}
+					// Hosted takes pushes per org behind its ingest tokens (Push failures in, below), so the local "push is off" note does not apply.
+					data={hosted ? { ...data, ingest_enabled: true } : data}
 					filter={filter}
 					onFilter={(next) => void setFilter(next === DEFAULT_FILTER ? null : next)}
 					source={source}

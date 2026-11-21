@@ -9,11 +9,39 @@ export interface InboxWebhookInfo {
 	rate_per_minute?: number;
 	max_bytes?: number;
 	hosted: boolean;
+	/** True on the hosted server: per-org ingest tokens at /inbox/tokens. */
+	ingest_tokens?: boolean;
 	problem?: string;
 	next?: string;
 	example: string;
 	sources_snippet?: string;
 	mode?: string;
+}
+
+/** One inbox ingest token as listed (handlers/inboxingest.go): never the token itself. */
+export interface InboxToken {
+	id: string;
+	org_id: string;
+	label: string;
+	last4: string;
+	created_by?: string;
+	created_at: string;
+	last_used_at?: string;
+}
+
+/** GET /inbox/tokens. */
+export interface InboxTokenList {
+	tokens: InboxToken[];
+	url: string;
+	max: number;
+}
+
+/** POST /inbox/tokens: the only answer that carries the token (secret). */
+export interface InboxTokenCreated {
+	token: InboxToken;
+	secret: string;
+	url: string;
+	example: string;
 }
 
 /** Params of the livescore.init job (cmd/bifrost-bench/jobs_live.go). */

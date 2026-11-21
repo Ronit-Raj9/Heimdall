@@ -37,7 +37,7 @@
 			"label": "Pull now",
 			"since": "Window",
 			"sinceCursor": "Since last pull",
-			"hosted": "Pulls read your trace tools with a credential, so they run only on a local Heimdall."
+			"hosted": "Pulls read your trace tools with a credential, so they run only on a local Heimdall. Here, push failures in with an ingest token (Push failures in, below)."
 		},
 		"webhook": {
 			"title": "Push failures in",
@@ -56,6 +56,25 @@
 			"copy": "Copy",
 			"copied": "Copied",
 			"loadError": "Could not read the webhook setup"
+		},
+		"tokens": {
+			"title": "Ingest tokens",
+			"label": "Label (optional)",
+			"labelPlaceholder": "e.g. production gateway",
+			"full": "This org has {{max}} tokens; revoke one to make another.",
+			"viewer": "Only org admins can generate or revoke ingest tokens. Ask an admin of this org (Settings, Members).",
+			"createdOnce": "Copy this token now: it is shown only once. Heimdall keeps only its hash. Export it where your tool runs, then push with the curl line below.",
+			"empty": "No ingest tokens yet. An org admin generates one here.",
+			"emptyAdmin": "No ingest tokens yet. Generate one to start pushing failures in.",
+			"colLabel": "Label",
+			"colToken": "Token",
+			"colCreated": "Created",
+			"colUsed": "Last used",
+			"never": "never",
+			"revoke": "Revoke",
+			"revokeQuestion": "Revoke this token? Tools using it stop pushing.",
+			"cancel": "Cancel",
+			"loadError": "Could not read the ingest tokens"
 		}
 	}
 }

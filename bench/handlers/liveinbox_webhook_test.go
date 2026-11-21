@@ -69,6 +69,13 @@ func TestInboxWebhookInfo(t *testing.T) {
 	if got = webhookInfo(t, root, schemas.ModeLive, true, nil, "x"); got.Enabled || got.Problem == "" || !got.Hosted {
 		t.Fatalf("hosted: %+v", got)
 	}
+	// Hosted with an org: this org's URL, token management, no problem.
+	h := inboxWebhookHandler{env: OrgEnv{Cfg: &lib.Config{Root: root}, Mode: schemas.ModeLive, Services: Services{Hosted: true, OrgID: "org_a"}}, getenv: func(string) string { return "" }}
+	ctx := &fasthttp.RequestCtx{}
+	ctx.Request.Header.SetHost("heimdall.example")
+	if got = h.info(ctx); got.Problem != "" || !got.IngestTokens || !got.Enabled || got.URL != "http://heimdall.example/api/bench/orgs/org_a/inbox/ingest" || !strings.Contains(got.Example, got.URL) {
+		t.Fatalf("hosted org: %+v", got)
+	}
 	// A crafted host header falls back to localhost.
 	if got = webhookInfo(t, root, schemas.ModeLive, false, nil, "evil.com<script>"); !strings.HasPrefix(got.URL, "http://localhost/") {
 		t.Fatalf("crafted host url %q", got.URL)
