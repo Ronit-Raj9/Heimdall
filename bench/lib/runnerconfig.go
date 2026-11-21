@@ -2,6 +2,7 @@ package lib
 
 import (
 	"fmt"
+	"strings"
 	"time"
 )
 
@@ -40,6 +41,12 @@ type RunnerDiskConfig struct {
 	// organization tags only) that no run used for this many hours. Images
 	// in use by a container and pinned images are never removed.
 	ImageMaxUnusedH int `yaml:"image_max_unused_h" json:"image_max_unused_h,omitempty"`
+	// ImageGC is auto (default), on or off. auto removes unused images on a
+	// remote runner and leaves them alone on a runner that shares its host
+	// with a benchmark library (HEIMDALL_LIBRARY_DIR set), whose copied task
+	// images may sit unused for days. Even when on, an image any suite under
+	// the benchmarks roots needs is never removed.
+	ImageGC string `yaml:"image_gc" json:"image_gc,omitempty"`
 	// PinnedImages are image references (tag or id) image GC never removes.
 	PinnedImages []string `yaml:"pinned_images" json:"pinned_images,omitempty"`
 	// Builder is Heimdall's own buildx builder. Build cache is pruned only in
@@ -62,6 +69,11 @@ func (r RunnerConfig) Validate() error {
 	if d.MinFreeGB > 1<<20 || d.BuildCacheKeepGB > 1<<20 {
 		return fmt.Errorf("runner.disk sizes are in GB; %d/%d is too large", d.MinFreeGB, d.BuildCacheKeepGB)
 	}
+	switch d.ImageGC {
+	case "", ImageGCAuto, ImageGCOn, ImageGCOff:
+	default:
+		return fmt.Errorf("runner.disk.image_gc must be auto, on or off, got %q", d.ImageGC)
+	}
 	if d.JanitorEveryMin > 24*60 {
 		return fmt.Errorf("runner.disk.janitor_every_min must be at most 1440, got %d", d.JanitorEveryMin)
 	}
@@ -71,6 +83,25 @@ func (r RunnerConfig) Validate() error {
 // MinFreeBytes is the free disk floor in bytes; 0 means no floor.
 func (d RunnerDiskConfig) MinFreeBytes() int64 {
 	return gbOrDefault(d.MinFreeGB, DefaultMinFreeGB)
+}
+
+// runner.disk.image_gc values.
+const (
+	ImageGCAuto = "auto"
+	ImageGCOn   = "on"
+	ImageGCOff  = "off"
+)
+
+// ImageGCOn reports whether image GC runs on this runner; libraryDir is
+// HEIMDALL_LIBRARY_DIR (auto turns it off when a library shares the host).
+func (d RunnerDiskConfig) ImageGCOn(libraryDir string) bool {
+	switch d.ImageGC {
+	case ImageGCOn:
+		return true
+	case ImageGCOff:
+		return false
+	}
+	return strings.TrimSpace(libraryDir) == ""
 }
 
 // BuildCacheKeepBytes is the build cache to keep in Heimdall's builder; -1

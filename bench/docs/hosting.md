@@ -283,8 +283,13 @@ by result and outcome).
 Runner disk: every runner (`runner start`, the shared runner) sweeps every 10
 minutes: leftovers of crashed runs (the janitor), Heimdall task and agent
 images (label `bifrost-bench=1`, tags under `bench/` or `org-<org id>/` only)
-that no run used for 48 hours, never one a container uses or one listed in
-`runner.disk.pinned_images`, and the build cache of Heimdall's own buildx
+that no run used for 48 hours, never one a container uses, one listed in
+`runner.disk.pinned_images`, or one any suite needs (task, base, service and
+helper images of every suite, admitted or draft, under this checkout's
+benchmarks, `HEIMDALL_LIBRARY_DIR` and each org project; when that set
+cannot be read, nothing is removed). `runner.disk.image_gc` is `auto` by
+default: on for a remote runner, off for a runner that shares its host with
+a library (`HEIMDALL_LIBRARY_DIR` set); `on` or `off` force it, and the build cache of Heimdall's own buildx
 builder (`runner.disk.builder` or `BUILDX_BUILDER`; with neither the shared
 default builder is left alone). A run folder is deleted once the server
 accepted its upload (`runner.disk.keep_run_folders` keeps it). Below

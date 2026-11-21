@@ -50,3 +50,17 @@ func TestSlotsPerProviderFromEnv(t *testing.T) {
 		t.Fatal("bad metrics_listen accepted")
 	}
 }
+
+func TestImageGCOn(t *testing.T) {
+	for _, tc := range []struct {
+		mode, lib string
+		want      bool
+	}{{"", "", true}, {"auto", "", true}, {"", "/srv/library", false}, {"auto", "/srv/library", false}, {"on", "/srv/library", true}, {"off", "", false}} {
+		if got := (RunnerDiskConfig{ImageGC: tc.mode}).ImageGCOn(tc.lib); got != tc.want {
+			t.Errorf("image_gc %q, library %q: %v, want %v", tc.mode, tc.lib, got, tc.want)
+		}
+	}
+	if err := (RunnerConfig{Disk: RunnerDiskConfig{ImageGC: "maybe"}}).Validate(); err == nil {
+		t.Fatal("image_gc maybe accepted")
+	}
+}

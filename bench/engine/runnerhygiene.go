@@ -48,7 +48,11 @@ type HygieneOptions struct {
 	Pinned         []string      // image references (tag or id) never removed
 	Builder        string        // Heimdall's buildx builder; empty: no build cache prune
 	BuildCacheKeep int64         // bytes of build cache kept in Builder; negative: off
-	Logger         schemas.Logger
+	// Keep returns the images image GC must never remove (every image a
+	// suite under the benchmarks roots needs, SuiteImageKeeper.KeepSet).
+	// When it fails, no image is removed that sweep.
+	Keep   func(ctx context.Context) (*ImageKeep, error)
+	Logger schemas.Logger
 }
 
 // Hygiene keeps one runner's disk healthy. It is safe for concurrent use.
@@ -263,6 +267,12 @@ func (h *Hygiene) GCImages(ctx context.Context) (int, error) {
 	if err != nil {
 		return 0, err
 	}
+	var keep *ImageKeep
+	if h.opts.Keep != nil {
+		if keep, err = h.opts.Keep(ctx); err != nil {
+			return 0, fmt.Errorf("suite image keep set not built, no image removed: %w", err)
+		}
+	}
 	pinned := map[string]bool{}
 	for _, p := range h.opts.Pinned {
 		pinned[strings.TrimSpace(p)] = true
@@ -277,7 +287,7 @@ func (h *Hygiene) GCImages(ctx context.Context) (int, error) {
 	now := h.now()
 	var drop []gcImage
 	for _, img := range imgs {
-		if !gcEligible(img, inUse, pinned) {
+		if !gcEligible(img, inUse, pinned) || keptBySuite(img, keep) {
 			continue
 		}
 		last := img.created
@@ -329,6 +339,22 @@ func gcEligible(img gcImage, inUse, pinned map[string]bool) bool {
 		}
 	}
 	return true
+}
+
+// keptBySuite reports whether a suite needs the image (by id or any tag).
+func keptBySuite(img gcImage, keep *ImageKeep) bool {
+	if keep == nil {
+		return false
+	}
+	if keep.Keeps(img.id) {
+		return true
+	}
+	for _, r := range img.refs {
+		if keep.Keeps(r) {
+			return true
+		}
+	}
+	return false
 }
 
 // heimdallRef reports whether a reference is a Heimdall task or agent image:
