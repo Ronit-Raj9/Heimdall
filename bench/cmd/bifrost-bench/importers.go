@@ -15,4 +15,5 @@ import (
 	_ "github.com/maximhq/bifrost/bench/importers/swebench"
 	_ "github.com/maximhq/bifrost/bench/importers/tau2"
 	_ "github.com/maximhq/bifrost/bench/importers/voicebench" // B5: VoiceBench spoken questions
+	_ "github.com/maximhq/bifrost/bench/importers/webarenapro" // L03: WebArena-Pro (Harbor export)
 )

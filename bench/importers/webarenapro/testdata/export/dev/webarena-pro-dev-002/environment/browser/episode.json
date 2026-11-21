@@ -1,0 +1,3 @@
+{"schema_version":1,"task":{"intent":"Post hello","sites":["x-lite"],"task_id":"002","eval":{"operator":"AND","nodes":[
+{"id":"r1","type":"tiered","eval_config":{"strategies":[{"tier":0,"type":"backend_state","config":{}},{"tier":2,"type":"llm_judge","config":{}}]}}]}},
+"urls":{"x-lite":"http://x-lite:80"},"images":{"x-lite":"webarenapro/x-lite@sha256:11"},"setup_timeout":60}
