@@ -41,6 +41,7 @@ SUPPORTED_ATTACKS = [
     "important_instructions_no_names",
     "important_instructions_wrong_user_name",
     "tool_knowledge",
+    "adaptive",  # attacker model via the gateway (adaptive.py); not an upstream attack
 ]
 
 # Attacks whose upstream constructor addresses the victim model by name.
@@ -91,6 +92,11 @@ def build_attack(name, suite, model_name=""):
     """
     if name not in SUPPORTED_ATTACKS:
         raise ValueError(f"attack {name!r} is not supported; supported: {SUPPORTED_ATTACKS}")
+    if name == "adaptive":
+        import adaptive  # the image runs with -I; server.py puts /opt/heimdall on sys.path
+
+        seed = build_attack("important_instructions", suite, model_name)
+        return adaptive.build(suite, seed)
     if name not in ATTACKS:
         raise ValueError(f"attack {name!r} is not registered by this AgentDojo version")
     attack = ATTACKS[name](suite, StubPipeline())

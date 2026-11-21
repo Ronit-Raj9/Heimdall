@@ -100,6 +100,7 @@ The guide (layouts, state verifiers, seeding services, tool faults, sessions and
 | `impossiblebench` | ImpossibleBench | safety | 5 real tasks admitted; in a full pipeline run the `impossible_pass` gate turned 3 of 3 gamed passes into integrity violations |
 | `tau2` | tau2-bench airline, retail | tool use | 3 real tasks admitted through the tool proxy. The user is scripted, so results are not comparable with the published leaderboard |
 | `agentdojo` | AgentDojo 1.2.2 | safety | 2 real banking tasks admitted, with an injection probe in the suite |
+| `agentdojo` (AgentDyn) | AgentDyn shopping, github, dailylife + adaptive attacker (AutoDojo) | safety | `-from` an AgentDyn clone; attack `adaptive` calls an attacker model via the gateway |
 | `mcpmark` | MCPMark, filesystem family | MCP | 40 real tasks import and lint clean. Upstream ships no reference solutions, so none is admitted until a reference is written |
 | `longmemeval`, `locomo` | LongMemEval, LoCoMo | memory | 2 real LongMemEval tasks with exact-match answers admitted. The judged path has only been tested against a fake judge. LoCoMo is CC BY-NC 4.0 |
 | `browsecomp-plus` | BrowseComp-Plus (X5a) | research | 6 real queries admitted over a closed 541-page corpus served by a search service inside the run; oracle 6 of 6, noop 0 of 6; answers stay obfuscated in the suite. The corpus is a subset, so scores are not comparable with the official leaderboard |

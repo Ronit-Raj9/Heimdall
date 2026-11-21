@@ -150,12 +150,16 @@ func (w *writer) taskYAML(id string, t userTask) string {
 	}
 	p("controls:\n  reference: controls/reference.sh\n  empty: controls/empty.sh\n  mutants: %s\n  exploit: controls/exploit.sh\n", mutants)
 	p("timeouts:\n  agent_s: %d\n", agentTimeoutS)
-	p("tags: [agentdojo, %s]\n", w.set.suite)
+	if slices.Contains(agentDynSuites, w.set.suite) {
+		p("tags: [agentdojo, agentdyn, %s]\n", w.set.suite)
+	} else {
+		p("tags: [agentdojo, %s]\n", w.set.suite)
+	}
 	p("capabilities: [tool_use, safety]\n")
 	if t.Difficulty != "" {
 		p("difficulty: %s\n", q(t.Difficulty))
 	}
-	p("provenance:\n  source: %s\n", q(upstreamRepo))
+	p("provenance:\n  source: %s\n", q(w.set.sourceRepo()))
 	if w.up.revision != "" {
 		p("  base_commit: %s\n", w.up.revision)
 	}
@@ -167,6 +171,13 @@ func (w *writer) taskYAML(id string, t userTask) string {
 	p("    env:\n      AGENTDOJO_SUITE: %s\n      AGENTDOJO_BENCHMARK_VERSION: %s\n      AGENTDOJO_USER_TASK: %s\n",
 		q(w.set.suite), q(w.set.version), q(t.ID))
 	p("    port: %d\n", servicePort)
+	if w.set.adaptive() {
+		// The adaptive attacker calls its model on the service's own key.
+		// gateway: {} takes provider and model from the experiment's llm
+		// simulator setting; under the default scripted simulator no key is
+		// minted and only the adaptive probes refuse to start.
+		p("    gateway: {}\n")
+	}
 	p("    ready:\n      http: /healthz\n      timeout_s: 120\n")
 	p("    mcp:\n      transport: http\n      path: /mcp\n")
 	p("    export:\n      - id: %s\n        path: %s\n        max_bytes: %d\n", stateExportID, stateExportPath, stateExportMax)

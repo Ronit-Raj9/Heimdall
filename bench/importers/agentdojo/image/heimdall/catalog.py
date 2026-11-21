@@ -86,7 +86,7 @@ def main():
         "injection_vectors": sorted(vectors),
         "user_tasks": user_tasks,
         "injection_tasks": injection_tasks,
-        "attacks": [a for a in common.SUPPORTED_ATTACKS if a in common.ATTACKS],
+        "attacks": [a for a in common.SUPPORTED_ATTACKS if a in common.ATTACKS or a == "adaptive"],
     }
     json.dump(out, sys.stdout, ensure_ascii=False, indent=1)
     sys.stdout.write("\n")
