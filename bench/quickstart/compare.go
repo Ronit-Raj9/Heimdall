@@ -39,6 +39,7 @@ type CompareOptions struct {
 	Faults      []string // probe ids, one condition each
 	Tier        string
 	BudgetUSD   float64
+	ReserveUSD  float64 // budget.reserve_usd; 0 leaves it out
 	Concurrency int
 	Policy      string // "" uses DefaultPolicy; "none" leaves it out
 	Seed        int64
@@ -217,7 +218,7 @@ func ExperimentYAML(o CompareOptions) ([]byte, error) {
 		seen[f] = true
 		fmt.Fprintf(&b, "  - {id: %s, tasks: all, trials: %d}\n", f, o.Trials)
 	}
-	fmt.Fprintf(&b, "budget: {total_usd: %s}\n", strconv.FormatFloat(o.BudgetUSD, 'f', -1, 64))
+	b.WriteString(BudgetLine(o.BudgetUSD, o.ReserveUSD))
 	b.WriteString("verdict: {policy: paired_signflip, alpha: 0.05, assumed_sd: 0.30}\n")
 	seed := o.Seed
 	if seed == 0 {
@@ -243,4 +244,16 @@ func yamlScalar(s string) string {
 		return s
 	}
 	return strconv.Quote(s)
+}
+
+// BudgetLine is an experiment file's budget line. reserve_usd is written only
+// when positive: it is what the scheduler counts for a run whose cost is
+// unknown (an unpriced model), and without it the first such run is counted
+// at the whole remaining budget, so an experiment on an unpriced model stops
+// after one run (live check, 21 Nov 2026).
+func BudgetLine(total, reserve float64) string {
+	if reserve > 0 {
+		return fmt.Sprintf("budget: {total_usd: %s, reserve_usd: %s}\n", strconv.FormatFloat(total, 'f', -1, 64), strconv.FormatFloat(reserve, 'f', -1, 64))
+	}
+	return fmt.Sprintf("budget: {total_usd: %s}\n", strconv.FormatFloat(total, 'f', -1, 64))
 }

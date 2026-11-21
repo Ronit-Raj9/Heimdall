@@ -126,7 +126,7 @@ func TestMigrateUsage(t *testing.T) {
 
 func TestMigrationExperimentPlans(t *testing.T) {
 	text := migrationExperiment("agents/codex.yaml", "coding-core@1.0.0", "gpt-5.4-mini", []string{"gpt-5.4", "gpt-5.4-nano"}, "openai",
-		[]string{"clean", "model-outage"}, []string{"t01", "t02"}, 3, 2.5, "policies/default.yaml", false)
+		[]string{"clean", "model-outage"}, []string{"t01", "t02"}, 3, 2.5, 0, "policies/default.yaml", false)
 	path := filepath.Join(t.TempDir(), "experiment.yaml")
 	if err := os.WriteFile(path, []byte(text), 0o644); err != nil {
 		t.Fatal(err)
@@ -143,11 +143,34 @@ func TestMigrationExperimentPlans(t *testing.T) {
 	}
 }
 
+// TestMigrationExperimentReserve: -reserve-usd reaches budget.reserve_usd, so
+// a migration to an unpriced model is not stopped after its first run (an
+// unknown cost is otherwise counted at the whole remaining budget; live
+// check, 21 Nov 2026).
+func TestMigrationExperimentReserve(t *testing.T) {
+	text := migrationExperiment("agents/codex.yaml", "coding-core@1.0.0", "gpt-6.1-sol", []string{"gpt-6.2-sol"}, "",
+		[]string{"clean"}, []string{"t01"}, 2, 1.92, 0.1, "", true)
+	path := filepath.Join(t.TempDir(), "experiment.yaml")
+	if err := os.WriteFile(path, []byte(text), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	exp, err := loadExperiment(path)
+	if err != nil {
+		t.Fatalf("the generated experiment does not load: %v\n%s", err, text)
+	}
+	if exp.Budget.TotalUSD != 1.92 || exp.Budget.ReserveUSD != 0.1 {
+		t.Errorf("budget %+v, want total 1.92 reserve 0.1", exp.Budget)
+	}
+	if code := runMigratePlan([]string{"-agent", "a.yaml", "-from", "m1", "-to", "m2", "-suite", "s@1", "-reserve-usd", "-1"}); code != exitUsage {
+		t.Errorf("negative -reserve-usd: exit %d, want %d", code, exitUsage)
+	}
+}
+
 // TestMigrationExperimentFaultOnly pins audit 5-C-06: a plan of fault
 // conditions only names one of them as primary, so the file is valid.
 func TestMigrationExperimentFaultOnly(t *testing.T) {
 	text := migrationExperiment("agents/codex.yaml", "coding-core@1.0.0", "gpt-5.4-mini", []string{"gpt-5.4"}, "",
-		[]string{"model-outage"}, []string{"t01"}, 1, 0, "", false)
+		[]string{"model-outage"}, []string{"t01"}, 1, 0, 0, "", false)
 	path := filepath.Join(t.TempDir(), "experiment.yaml")
 	if err := os.WriteFile(path, []byte(text), 0o644); err != nil {
 		t.Fatal(err)

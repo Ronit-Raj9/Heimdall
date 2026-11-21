@@ -12,7 +12,7 @@ the page `/migration` (`ui/app/migration/`, `ui/components/migration/`).
 ```
 heimdall migrate -agent agents/codex.yaml -from gpt-5.4-mini -to gpt-5.4,gpt-5.4-nano \
   -suite coding-core@1.0.0 [-trials 3] [-conditions clean,model-outage] [-tasks t01,t02] \
-  [-provider openai] [-budget-usd 5] [-policy policies/default.yaml] [-out migrations/x] [-allow-unpriced] [-yes]
+  [-provider openai] [-budget-usd 5] [-reserve-usd 0.1] [-policy policies/default.yaml] [-out migrations/x] [-allow-unpriced] [-yes]
 
 heimdall migrate report -exp <id> [-from <model|arm>] [-to <model|arm>[,...]] [-condition clean] \
   [-alpha 0.05] [-grade-source original] [-policy <file>|none] [-suite-tasks=false] [-out <dir>] [-json]
@@ -25,8 +25,11 @@ GET /api/bench/experiments/{id}/migration?from=&to=&condition=&alpha=&grade_sour
 1. Writes `experiment.yaml` into `-out` (default `migrations/<from>-to-<to>`):
    a `matrix:` of the old model first, then each new one (with `-provider`
    when it differs from the agent config's), the same tasks, trials and
-   conditions for every model, `budget.total_usd` from `-budget-usd`, and the
-   release policy. The primary condition is `clean` when it is run, else the
+   conditions for every model, `budget.total_usd` from `-budget-usd`,
+   `budget.reserve_usd` from `-reserve-usd` (set it with `-allow-unpriced`:
+   a run of an unpriced model has an unknown cost, and without a reserve the
+   scheduler counts the first such run at the whole remaining budget, so the
+   experiment stops after one run), and the release policy. The primary condition is `clean` when it is run, else the
    first of `-conditions`. The report afterwards names the frozen arms (A for
    the old model, then B, C...), so one model through two providers compares
    one direction only. In `migrate report`, `provider/model` names one of

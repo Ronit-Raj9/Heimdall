@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -206,5 +207,38 @@ func TestOwnImageRow(t *testing.T) {
 		if r.Status == checkWarn {
 			t.Errorf("%s: warned: %+v", name, r)
 		}
+	}
+}
+
+// TestCheckGatewayFailure: a check run whose agent never started because the
+// gateway could not mint a key (all key slots held by other bench processes,
+// seen live on 21 Nov 2026) is a check that could not run, not an agent that
+// failed; any other run is left to the rows.
+func TestCheckGatewayFailure(t *testing.T) {
+	mint := schemas.PartFailure{Stage: schemas.StagePrepare, Part: "gateway/bifrost", Error: "mint key: no free key slot for openai"}
+	code := 0
+	cases := []struct {
+		name string
+		run  *schemas.Run
+		want bool
+	}{
+		{"no run", nil, false},
+		{"key mint failed", &schemas.Run{Failures: []schemas.PartFailure{mint}}, true},
+		{"agent ran", &schemas.Run{Agent: schemas.RunAgentInfo{ExitCode: &code}, Failures: []schemas.PartFailure{mint}}, false},
+		{"environment failed", &schemas.Run{Failures: []schemas.PartFailure{{Stage: schemas.StagePrepare, Part: "environment/docker", Error: "x"}}}, false},
+		{"run stage failed", &schemas.Run{Failures: []schemas.PartFailure{{Stage: schemas.StageRun, Part: "gateway/bifrost", Error: "x"}}}, false},
+	}
+	for _, c := range cases {
+		got := checkGatewayFailure(c.run)
+		if (got != "") != c.want {
+			t.Errorf("%s: checkGatewayFailure = %q, want failure %v", c.name, got, c.want)
+		}
+	}
+	if got := checkGatewayFailure(&schemas.Run{Failures: []schemas.PartFailure{mint}}); !strings.Contains(got, "no free key slot") {
+		t.Errorf("failure text %q lacks the cause", got)
+	}
+	rep := (&checkReport{}).fail(errors.New("the check could not run"))
+	if checkReportExit(rep) != exitInfra {
+		t.Errorf("exit = %d, want %d", checkReportExit(rep), exitInfra)
 	}
 }

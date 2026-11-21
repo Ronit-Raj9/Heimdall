@@ -22,10 +22,11 @@ import (
 	"github.com/maximhq/bifrost/bench/leaderboard"
 	"github.com/maximhq/bifrost/bench/migration"
 	"github.com/maximhq/bifrost/bench/policy"
+	"github.com/maximhq/bifrost/bench/quickstart"
 	"github.com/maximhq/bifrost/bench/schemas"
 )
 
-const migrateUsage = `usage: bifrost-bench migrate [-config deploy/bench.yaml] -agent agents/<config>.yaml -from <model> -to <model>[,<model>...] -suite <id@version> [-trials 3] [-conditions clean,...] [-tasks t01,t02] [-provider <p>] [-budget-usd n] [-policy policies/default.yaml] [-out <dir>] [-allow-unpriced] [-yes]
+const migrateUsage = `usage: bifrost-bench migrate [-config deploy/bench.yaml] -agent agents/<config>.yaml -from <model> -to <model>[,<model>...] -suite <id@version> [-trials 3] [-conditions clean,...] [-tasks t01,t02] [-provider <p>] [-budget-usd n] [-reserve-usd n] [-policy policies/default.yaml] [-out <dir>] [-allow-unpriced] [-yes]
        bifrost-bench migrate report [-config deploy/bench.yaml] -exp <id> [-from <model|arm>] [-to <model|arm>[,...]] [-condition <id>] [-alpha 0.05] [-grade-source original] [-policy <file>] [-suite-tasks=false] [-out <dir>] [-json]
 migrate plans a model matrix experiment (the agent on the old model and each new one), prints the plan and the cost and time forecast, and with -yes runs it and writes the migration report (docs/model-migration.md). Without -yes nothing runs.
 migrate report writes the report for an existing matrix experiment from its sealed runs: verdict per model pair overall and per stratum, cost per verified success and why it moved, behaviour differences, flipped tasks and a recommendation that follows the release policy. It reads the run folder only; with -out it writes report.md and report.json there.`
@@ -54,11 +55,12 @@ func runMigratePlan(args []string) int {
 	tasks := fs.String("tasks", "", "task ids, comma-separated (default: all public tasks)")
 	provider := fs.String("provider", "", "gateway provider for the new models when it differs from the agent config's")
 	budget := fs.Float64("budget-usd", 0, "budget.total_usd: refuse to run when the forecast says it is exceeded")
+	reserve := fs.Float64("reserve-usd", 0, "budget.reserve_usd: what the scheduler counts per run whose cost is unknown (an unpriced model); without it the first such run is counted at the whole remaining budget")
 	policyFile := fs.String("policy", "policies/default.yaml", "release policy the recommendation follows (empty for none)")
 	out := fs.String("out", "", "folder for the experiment file and the report (default migrations/<from>-to-<to>)")
 	allowUnpriced := fs.Bool("allow-unpriced", false, "plan models the price snapshot does not list")
 	yes := fs.Bool("yes", false, "run the experiment after the forecast; without it nothing runs")
-	if err := fs.Parse(args); err != nil || fs.NArg() != 0 || *agent == "" || *from == "" || *to == "" || *suiteRef == "" || *trials < 1 {
+	if err := fs.Parse(args); err != nil || fs.NArg() != 0 || *agent == "" || *from == "" || *to == "" || *suiteRef == "" || *trials < 1 || *reserve < 0 {
 		fmt.Fprintln(os.Stderr, migrateUsage)
 		return exitUsage
 	}
@@ -67,7 +69,7 @@ func runMigratePlan(args []string) int {
 	if dir == "" {
 		dir = filepath.Join("migrations", slug(*from+"-to-"+strings.Join(toModels, "-")))
 	}
-	text := migrationExperiment(*agent, *suiteRef, *from, toModels, *provider, splitList(*conditions), splitList(*tasks), *trials, *budget, *policyFile, *allowUnpriced)
+	text := migrationExperiment(*agent, *suiteRef, *from, toModels, *provider, splitList(*conditions), splitList(*tasks), *trials, *budget, *reserve, *policyFile, *allowUnpriced)
 	if err := os.MkdirAll(dir, 0o755); err != nil {
 		return fail("migrate: %v", err)
 	}
@@ -319,7 +321,7 @@ func writeMigrationReport(dir string, rep *migration.Report) error {
 // of the agent on the old model first, then each new model, every condition
 // on the same tasks and trials, the paired verdict on clean (else on the
 // first condition).
-func migrationExperiment(agent, suiteRef, from string, to []string, provider string, conditions, tasks []string, trials int, budget float64, policyFile string, allowUnpriced bool) string {
+func migrationExperiment(agent, suiteRef, from string, to []string, provider string, conditions, tasks []string, trials int, budget, reserve float64, policyFile string, allowUnpriced bool) string {
 	var b strings.Builder
 	b.WriteString("# Written by `migrate` (docs/model-migration.md). Edit and run with `run` if you like.\n")
 	fmt.Fprintf(&b, "name: %s\n", quote("migrate "+from+" to "+strings.Join(to, ", ")))
@@ -355,7 +357,7 @@ func migrationExperiment(agent, suiteRef, from string, to []string, provider str
 	for _, c := range conditions {
 		fmt.Fprintf(&b, "  - {id: %s, tasks: %s, trials: %d}\n", quote(c), sel, trials)
 	}
-	fmt.Fprintf(&b, "budget: {total_usd: %s}\n", strconv.FormatFloat(budget, 'f', -1, 64))
+	b.WriteString(quickstart.BudgetLine(budget, reserve))
 	b.WriteString("verdict: {policy: paired_signflip, alpha: 0.05, assumed_sd: 0.30}\nseed: 20261118\nconcurrency: 2\nmanifest_mode: agent_exposure\n")
 	if policyFile != "" && policyFile != "none" {
 		fmt.Fprintf(&b, "policy: %s\n", quote(policyFile))

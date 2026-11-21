@@ -225,6 +225,9 @@ func agentCheck(ctx context.Context, opts checkOptions, log io.Writer) *checkRep
 	if err != nil {
 		return rep.fail(err)
 	}
+	if why := checkGatewayFailure(in.run); why != "" {
+		return rep.fail(fmt.Errorf("the check could not run (run %s, nothing about the agent was tested): %s", rep.RunID, why))
+	}
 	in.image = info
 	rep.Rows = append([]checkRow{row}, checkRows(in)...)
 	return rep.finish()
@@ -501,6 +504,23 @@ func checkReportExit(rep *checkReport) int {
 	default:
 		return exitOK
 	}
+}
+
+// checkGatewayFailure returns the gateway's prepare failure of a check run
+// whose agent never started (for example no free key slot because other
+// bench processes hold them all), else "". Such a run says nothing about the
+// agent, so the check reports ERROR (exit 4) instead of failing rows that
+// blame the agent's image.
+func checkGatewayFailure(run *schemas.Run) string {
+	if run == nil || run.Agent.ExitCode != nil {
+		return ""
+	}
+	for _, f := range run.Failures {
+		if f.Stage == schemas.StagePrepare && (f.Part == "gateway" || strings.HasPrefix(f.Part, "gateway/")) {
+			return f.Part + ": " + f.Error
+		}
+	}
+	return ""
 }
 
 // fail marks the report as not run.

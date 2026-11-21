@@ -336,3 +336,30 @@ func TestExtendTaskRuleKeepsRetainedConditions(t *testing.T) {
 		t.Fatal("follow-up lost its adaptive plan")
 	}
 }
+
+// TestAdaptiveSummaryAfterCapStop: when the spend cap is reached by the last
+// run the rule needs, the summary's stop reason is the rule's final state,
+// not the stale "waiting" of the replay before that run (live adaptive
+// experiment, 21 Nov 2026: summary said waiting, the verdict max_reached).
+func TestAdaptiveSummaryAfterCapStop(t *testing.T) {
+	b := newBench(t)
+	b.reg.Graders = []schemas.Grader{armGrader{part{"hidden_tests"}, func(sl *schemas.Slot) bool {
+		if sl.Task == "t03" || sl.Task == "t04" {
+			return true
+		}
+		return sl.Arm == "B"
+	}}}
+	e := testExperiment(fourTasks(3)...)
+	e.Trials = &schemas.TrialsPolicy{Mode: schemas.TrialsAdaptive, Rule: schemas.AdaptiveTask, Min: 1, Max: 3}
+	e.Budget = schemas.BudgetSpec{TotalUSD: 1.6, ReserveUSD: 0.1}
+	b.w.cost, b.w.costUnknown = 0.1, true // every run counted at the reserve: the 16th reaches the cap
+	m := b.plan(t, e)
+	sum, err := NewScheduler(b.reg, b.root, nil, nil).Run(context.Background(), m, RunOptions{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Logf("summary %+v", sum)
+	if sum.StopReason != verdict.StopMaxReached || sum.NotRequired != 8 {
+		t.Fatalf("summary %+v, want stop reason %s and 8 not required", sum, verdict.StopMaxReached)
+	}
+}
