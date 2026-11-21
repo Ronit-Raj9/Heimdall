@@ -14,9 +14,10 @@ import (
 	"github.com/maximhq/bifrost/bench/schemas"
 )
 
-// WithIncludeQuarantined lets an explicit task list name a quarantined task
-// (the CLI's -include-quarantined). `tasks: all` still skips quarantined
-// tasks: including one is always a named, deliberate choice.
+// WithIncludeQuarantined lets an explicit task list run a quarantined task
+// (the CLI's -include-quarantined); without it the task is skipped alone.
+// `tasks: all` still skips quarantined tasks: including one is always a
+// named, deliberate choice.
 func WithIncludeQuarantined(include bool) PlannerOption {
 	return func(p *Planner) { p.includeQuarantined = include }
 }
@@ -54,12 +55,18 @@ func frozenTasks(ctx context.Context) map[string]bool {
 // conditions, for a new plan only; a manifest already written is never
 // re-screened, so existing experiments and their analysis are unaffected.
 //
-// A condition with `tasks: all` keeps the tasks of its split (public unless
-// the condition sets split: held_out) and drops quarantined tasks, logging
-// one line per dropped task. An explicit task list is taken as written,
-// whatever each task's split, but naming a quarantined task is refused
-// unless WithIncludeQuarantined is set; under warnOnly (an agent check) it
-// only warns. A condition left with no task is refused.
+// Every condition keeps only the tasks of its split (public unless the
+// condition sets split: held_out), whether it says `tasks: all` or names its
+// tasks: a held-out task runs only in a condition that asks for the held-out
+// split, so an explicit list can never leak one into a public plan. A task of
+// the other split is dropped with one warning line.
+//
+// A quarantined task is dropped alone, with a warning that carries its
+// reason; the rest of the condition still runs. An explicit list may keep a
+// quarantined task with WithIncludeQuarantined. Under warnOnly (an agent
+// check on the scripted model, which exposes nothing to a real model) an
+// explicit list is taken as written and only warned about. A condition left
+// with no task is refused.
 func (p *Planner) screenTasks(ctx context.Context, suite *schemas.Suite, specs []schemas.ConditionSpec, conds []condPlan, warnOnly bool) ([]condPlan, error) {
 	var quarantined map[string]schemas.TaskQuarantine
 	frozen := frozenTasks(ctx)
@@ -86,19 +93,41 @@ func (p *Planner) screenTasks(ctx context.Context, suite *schemas.Suite, specs [
 			return nil, fmt.Errorf("condition %s: split must be %s or %s, got %q", cp.id, schemas.SplitPublic, schemas.SplitHeldOut, spec.Split)
 		}
 		kept := make([]string, 0, len(cp.tasks))
+		var dropped []string
 		for _, id := range cp.tasks {
 			q, isQ := quarantined[id]
+			taskOf := taskSplit(suite.TaskByID(id))
 			if !spec.Tasks.All {
-				if isQ && !p.includeQuarantined {
-					if !warnOnly {
-						return nil, fmt.Errorf("condition %s names task %s, which is quarantined (%s); pass -include-quarantined to run it anyway, or `suite restore` it", cp.id, id, q.Reason)
+				if p.ignoreQuarantine {
+					// A worker's replan reproduces the frozen list as
+					// written: the coordinator screened it already.
+					kept = append(kept, id)
+					continue
+				}
+				if warnOnly {
+					if isQ {
+						p.logger.Warn("agent check runs a quarantined task", "condition", cp.id, "task", id, "reason", q.Reason)
 					}
-					p.logger.Warn("agent check runs a quarantined task", "condition", cp.id, "task", id, "reason", q.Reason)
+					if taskOf != split {
+						p.logger.Warn("agent check runs a task of another split", "condition", cp.id, "task", id, "split", taskOf)
+					}
+					kept = append(kept, id)
+					continue
+				}
+				if taskOf != split {
+					p.logger.Warn("skipping task of another split: a held-out task runs only when the condition asks for split held_out", "condition", cp.id, "task", id, "task_split", taskOf, "condition_split", split)
+					dropped = append(dropped, id+" ("+taskOf+" split)")
+					continue
+				}
+				if isQ && !p.includeQuarantined {
+					p.logger.Warn("skipping quarantined task for this new plan", "condition", cp.id, "task", id, "reason", q.Reason, "since", q.At.Format("2006-01-02"))
+					dropped = append(dropped, id+" (quarantined: "+q.Reason+")")
+					continue
 				}
 				kept = append(kept, id)
 				continue
 			}
-			if taskSplit(suite.TaskByID(id)) != split {
+			if taskOf != split {
 				continue
 			}
 			if replan && !frozen[id] {
@@ -111,6 +140,9 @@ func (p *Planner) screenTasks(ctx context.Context, suite *schemas.Suite, specs [
 			kept = append(kept, id)
 		}
 		if len(kept) == 0 {
+			if len(dropped) > 0 {
+				return nil, fmt.Errorf("condition %s selects no tasks after the %s split and the quarantine (dropped %s; pass -include-quarantined to run a quarantined task anyway, or `suite restore` it)", cp.id, split, strings.Join(dropped, ", "))
+			}
 			return nil, fmt.Errorf("condition %s selects no tasks after the %s split and the quarantine", cp.id, split)
 		}
 		cp.tasks = kept

@@ -36,6 +36,10 @@ export interface AgentLeaderboardRow {
 	runs?: number;
 	last_evaluation: string;
 	last_experiment?: string;
+	/** "simulated customer" when a model played the customer; ranked apart from scripted runs. */
+	customer?: string;
+	/** The simulator pin (provider/model@prompt_version) of a simulated-customer row. */
+	simulator?: string;
 }
 
 export interface AgentLeaderboardResponse {

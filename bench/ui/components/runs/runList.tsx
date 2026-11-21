@@ -276,7 +276,8 @@ export function RunTable({ rows, showExperiment = true }: { rows: readonly RunLi
 /** The run list on a phone: one card per run with the same links, in place of the wide table. */
 /** The outcome badge; an infra error also shows its short reason, with the full first line as a tooltip. */
 export function RowOutcome({ row, testId = true }: { row: RunListRow; testId?: boolean }) {
-	const reason = INFRA_OUTCOMES.includes(row.outcome) ? shortReason(row.error, 80) : "";
+	const reason =
+		row.excluded === "out_of_memory" ? "excluded: out of memory" : INFRA_OUTCOMES.includes(row.outcome) ? shortReason(row.error, 80) : "";
 	const badge = <OutcomeBadge outcome={row.outcome} testId={testId ? `run-row-${row.run_id}-outcome` : undefined} />;
 	if (!reason) return badge;
 	return (

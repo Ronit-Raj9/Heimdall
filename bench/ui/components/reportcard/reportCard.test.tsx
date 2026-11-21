@@ -2,7 +2,7 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it, vi } from "vitest";
 import { ReportCard } from "./reportCard";
 import { abReport, scoreReport } from "./reportCard.fixtures";
-import { armDescription, capabilityRows, compareArms, costDisplay, duration, headline, overallScore, points } from "./reportCard.utils";
+import { armDescription, capabilityRows, compareArms, costDisplay, duration, excludedText, headline, overallScore, points } from "./reportCard.utils";
 
 vi.mock("@tanstack/react-router", () => ({
 	Link: ({ to, params, children, ...rest }: { to: string; params?: Record<string, string>; children: React.ReactNode }) => (
@@ -48,6 +48,27 @@ describe("report card utils", () => {
 		expect(points(-0.21)).toBe("-21 pts");
 		expect(points(0.08)).toBe("+8 pts");
 		expect(duration(410)).toBe("6m 50s");
+	});
+});
+
+describe("excluded runs", () => {
+	it("names out of memory first in plain words", () => {
+		expect(excludedText({ infra_error: 1, out_of_memory: 2, invalid_evaluator: 0 })).toBe("excluded: 2 out of memory, 1 infrastructure error");
+		expect(excludedText(undefined)).toBe("");
+		expect(excludedText({ unknown: 0 })).toBe("");
+	});
+
+	it("shows excluded counts and the held-out split on the card", () => {
+		const bench = scoreReport.benchmarks[0];
+		const label = scoreReport.arms[0].label;
+		const report = {
+			...scoreReport,
+			split: "held_out",
+			benchmarks: [{ ...bench, arms: { ...bench.arms, [label]: { ...bench.arms[label], excluded: { out_of_memory: 3 } } } }, ...scoreReport.benchmarks.slice(1)],
+		};
+		const html = renderToStaticMarkup(<ReportCard report={report} />);
+		expect(html).toContain("Excluded: 3 out of memory. Not counted in the score.");
+		expect(html).toContain("Held-out tasks only");
 	});
 });
 

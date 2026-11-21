@@ -401,17 +401,7 @@ func estimateBenchmark(ctx context.Context, suites SuiteSource, src ForecastSour
 // evalAdmittedTasks are the admitted task ids of s, sorted; every task when
 // s has no lock (the planner then refuses, which the forecast reports).
 func evalAdmittedTasks(st *schemas.Suite) []string {
-	var ids []string
-	for _, t := range st.Tasks {
-		if st.Lock == nil || summarizeTask(st, t, nil).Admitted {
-			ids = append(ids, t.ID)
-		}
-	}
-	if len(ids) == 0 && st.Lock == nil {
-		ids = append(ids, st.TaskIDs...)
-	}
-	sort.Strings(ids)
-	return ids
+	return admittedTasks(st, schemas.SplitPublic).IDs
 }
 
 // evalArmIDs names the spec arms A, B.

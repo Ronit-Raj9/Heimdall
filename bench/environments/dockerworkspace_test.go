@@ -309,3 +309,29 @@ func TestCreateRefusesEscapingRepo(t *testing.T) {
 		t.Fatalf("Create = %v, want the escaping repo refused", err)
 	}
 }
+
+// TestParseAgentStateOOM checks docker's OOMKilled record marks an
+// out-of-memory exit, and that exit 137 alone (the wall-budget kill sends
+// the same signal) does not.
+func TestParseAgentStateOOM(t *testing.T) {
+	const at = "2026-11-22T10:00:00.123Z"
+	for _, tt := range []struct {
+		in       string
+		code     int
+		oom, bad bool
+	}{
+		{"137 exited " + at + " true", 137, true, false},
+		{"137 exited " + at + " false", 137, false, false},
+		{"0 exited " + at, 0, false, false}, // an older format without the field
+		{"1 running " + at + " false", 0, false, true},
+		{"1 exited", 0, false, true},
+	} {
+		st, err := parseAgentState(tt.in)
+		if (err != nil) != tt.bad {
+			t.Fatalf("%q: err %v", tt.in, err)
+		}
+		if !tt.bad && (st.code != tt.code || st.oom != tt.oom) {
+			t.Fatalf("%q: got %+v", tt.in, st)
+		}
+	}
+}

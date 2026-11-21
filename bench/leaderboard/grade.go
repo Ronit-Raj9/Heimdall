@@ -61,7 +61,7 @@ type pool map[string]map[string][]gradedRun
 // outcome's score when the metric is missing (a run measured before it
 // existed). A record read from a regrade (readGradeSource) carries its
 // outcome and metrics already; any other reads metrics.json.
-func grade(ctx context.Context, src Source, recs []*record) (pool, []excludedRun, error) {
+func grade(ctx context.Context, src Source, recs []*record, simulated bool) (pool, []excludedRun, error) {
 	p := pool{}
 	var excluded []excludedRun
 	for _, r := range recs {
@@ -69,6 +69,9 @@ func grade(ctx context.Context, src Source, recs []*record) (pool, []excludedRun
 			return nil, nil, fmt.Errorf("leaderboard: %w", err)
 		}
 		reason := excludeReason(r)
+		if simulated && reason == ReasonSimulatedUser {
+			reason = excludeReasonSimulated(r) // the simulated board's own instrument
+		}
 		if reason == "" {
 			var err error
 			if reason, err = sealReason(ctx, src, r); err != nil {
@@ -198,6 +201,18 @@ func excludeReason(r *record) string {
 		return reasonNoOutcome
 	}
 	return string(r.run.Outcome)
+}
+
+// excludeReasonSimulated is excludeReason on a simulated-customer board,
+// where a model-played user is the board's instrument, not a reason.
+func excludeReasonSimulated(r *record) string {
+	m := *r.exp.m
+	m.Simulator = nil
+	exp := *r.exp
+	exp.m = &m
+	cp := *r
+	cp.exp = &exp
+	return excludeReason(&cp)
 }
 
 // sealReason returns ReasonSealMismatch when src can verify seals and the

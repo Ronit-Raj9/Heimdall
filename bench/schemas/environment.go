@@ -43,6 +43,11 @@ type ExecResult struct {
 	StdoutPath string    `json:"stdout_path"` // agent.stream.jsonl in the run folder
 	StderrPath string    `json:"stderr_path"`
 	Truncated  bool      `json:"truncated"` // output exceeded the capture cap
+	// OOMKilled is true when the kernel's out-of-memory killer ended the
+	// agent (docker State.OOMKilled from the container's cgroup memory
+	// events, or a Kubernetes container terminated with reason OOMKilled).
+	// The run is then an infrastructure error, never the agent's failure.
+	OOMKilled bool `json:"oom_killed,omitempty"`
 }
 
 // Diff is the exported workspace patch.

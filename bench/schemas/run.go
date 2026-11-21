@@ -66,6 +66,30 @@ const (
 	OutcomeAbortedInfra       Outcome = "aborted_infra"       // not counted: failed before the agent started, or no model call was answered because the provider was unreachable; the slot gets a new run
 )
 
+// ExcludedOutOfMemory is the exclusion reason of a run the out-of-memory
+// killer ended (RunAgentInfo.OOMKilled): infrastructure, never the agent's.
+const ExcludedOutOfMemory = "out_of_memory"
+
+// ExcludedReason is why a sealed run is left out of scores: out_of_memory
+// for a run the out-of-memory killer ended, else the outcome itself
+// (infra_error, invalid_evaluator, unknown); "" when the run scores or is
+// not counted at all (aborted_infra gets a new run).
+func ExcludedReason(r *Run) string {
+	if r == nil || r.Outcome == OutcomeAbortedInfra {
+		return ""
+	}
+	if _, ok := r.Outcome.Score(); ok {
+		return ""
+	}
+	if r.Agent.OOMKilled {
+		return ExcludedOutOfMemory
+	}
+	if r.Outcome == "" {
+		return string(OutcomeUnknown)
+	}
+	return string(r.Outcome)
+}
+
 // Score maps an outcome to the verdict's 0/1 scale. ok is false for outcomes
 // that count as unknown or are not counted.
 func (o Outcome) Score() (y float64, ok bool) {
@@ -134,6 +158,9 @@ type RunAgentInfo struct {
 	CapabilityGaps   []string             `json:"capability_gaps,omitempty"`
 	ExitCode         *int                 `json:"exit_code,omitempty"`
 	TimedOut         bool                 `json:"timed_out"`
+	// OOMKilled: the out-of-memory killer ended the agent (ExecResult). The
+	// run is infra_error and is excluded from scores as "out of memory".
+	OOMKilled bool `json:"oom_killed,omitempty"`
 }
 
 // RunGatewayInfo links the run to its gateway records.

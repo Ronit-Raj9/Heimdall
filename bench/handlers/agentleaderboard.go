@@ -68,6 +68,11 @@ type AgentLeaderboardRow struct {
 	Runs           int      `json:"runs"`
 	LastEvaluation string   `json:"last_evaluation"`
 	LastExperiment string   `json:"last_experiment"`
+	// Customer is "simulated customer" on a row of runs whose customer a
+	// pinned model played, with Simulator the pin; such a row is ranked on
+	// its own, never pooled with scripted-user runs. Empty otherwise.
+	Customer  string `json:"customer,omitempty"`
+	Simulator string `json:"simulator,omitempty"`
 }
 
 // AgentLeaderboardCapability is one capability score of a row: pooled
@@ -178,55 +183,19 @@ func (h *LeaderboardHandler) buildAgentBoard(ctx context.Context, orgID, capFilt
 			return nil, err
 		}
 		capability := packs.CapabilityOf(id, h.suiteTrack(ctx, id))
-		for _, e := range lb.Entries {
-			if e.Runs == 0 || e.Synthetic {
+		h.foldEntries(rows, versions, lb, id, capability, "")
+		// Runs whose customer a model played rank on their own board per
+		// simulator pin, as separate "simulated customer" rows.
+		for _, pin := range leaderboard.SimulatorPins(src, sv) {
+			sim, err := leaderboard.Build(ctx, src, leaderboard.Query{Suite: sv, Condition: schemas.ConditionClean, Now: now,
+				Customer: leaderboard.CustomerSimulated, Simulator: pin})
+			if errors.Is(err, leaderboard.ErrBadQuery) {
 				continue
 			}
-			agentHash := h.entryAgentHash(e)
-			version := versions.lookup(e.Agent, agentHash)
-			key := e.Agent + "\x00" + e.Model + "\x00"
-			switch {
-			case version > 0:
-				key += "v" + strconv.Itoa(version)
-			case agentHash != "":
-				key += agentHash
-			default:
-				key += e.ConfigHash
+			if err != nil {
+				return nil, err
 			}
-			acc := rows[key]
-			if acc == nil {
-				acc = &rowAcc{
-					row: AgentLeaderboardRow{
-						Agent: e.Agent, Version: version, Model: e.Model, Label: e.Label,
-						ConfigHash: e.ConfigHash, AgentHash: agentHash, Baseline: baselineAgents[e.Agent],
-					},
-					caps:      map[string]*capAcc{},
-					costKnown: true,
-				}
-				rows[key] = acc
-			}
-			ca := acc.caps[capability]
-			if ca == nil {
-				ca = &capAcc{}
-				acc.caps[capability] = ca
-			}
-			ca.succ += e.Passes.Num
-			ca.n += e.Passes.Den
-			for task, r := range e.TaskPasses {
-				ca.tasks = append(ca.tasks, reportcard.TaskTally{Key: id + "\x00" + task, Succ: r.Num, Runs: r.Den})
-			}
-			ca.benchmarks = append(ca.benchmarks, id)
-			acc.row.Runs += e.Runs
-			acc.addCost(e)
-			if len(e.Experiments) > 0 {
-				if m, ok := h.index.Manifest(e.Experiments[0]); ok && (acc.row.LastExperiment == "" || m.CreatedAt.After(acc.newest)) {
-					acc.newest = m.CreatedAt
-					acc.row.LastExperiment = e.Experiments[0]
-					acc.row.Label = e.Label
-				} else if acc.row.LastExperiment == "" {
-					acc.row.LastExperiment = e.Experiments[0]
-				}
-			}
+			h.foldEntries(rows, versions, sim, id, capability, pin)
 		}
 	}
 	return foldRows(rows, capFilter, modelFilter, now), nil
@@ -291,6 +260,68 @@ func capabilityNote(runs, tasks int) string {
 	}
 	return fmt.Sprintf("not enough runs: %d runs over %d tasks; ranking needs %d runs over %d tasks",
 		runs, tasks, AgentBoardMinRuns, AgentBoardMinTasks)
+}
+
+// foldEntries adds the entries of one suite's board to the rows. pin is the
+// simulator pin of a simulated-customer board, "" for the default board; its
+// rows are keyed apart so the two instruments never pool.
+func (h *LeaderboardHandler) foldEntries(rows map[string]*rowAcc, versions *versionIndex, lb *schemas.Leaderboard, id, capability, pin string) {
+	for _, e := range lb.Entries {
+		if e.Runs == 0 || e.Synthetic {
+			continue
+		}
+		agentHash := h.entryAgentHash(e)
+		version := versions.lookup(e.Agent, agentHash)
+		key := e.Agent + "\x00" + e.Model + "\x00"
+		if pin != "" {
+			key += "sim:" + pin + "\x00"
+		}
+		switch {
+		case version > 0:
+			key += "v" + strconv.Itoa(version)
+		case agentHash != "":
+			key += agentHash
+		default:
+			key += e.ConfigHash
+		}
+		acc := rows[key]
+		if acc == nil {
+			acc = &rowAcc{
+				row: AgentLeaderboardRow{
+					Agent: e.Agent, Version: version, Model: e.Model, Label: e.Label,
+					ConfigHash: e.ConfigHash, AgentHash: agentHash, Baseline: baselineAgents[e.Agent],
+				},
+				caps:      map[string]*capAcc{},
+				costKnown: true,
+			}
+			if pin != "" {
+				acc.row.Customer, acc.row.Simulator = leaderboard.SimulatedCustomerLabel, pin
+			}
+			rows[key] = acc
+		}
+		ca := acc.caps[capability]
+		if ca == nil {
+			ca = &capAcc{}
+			acc.caps[capability] = ca
+		}
+		ca.succ += e.Passes.Num
+		ca.n += e.Passes.Den
+		for task, r := range e.TaskPasses {
+			ca.tasks = append(ca.tasks, reportcard.TaskTally{Key: id + "\x00" + task, Succ: r.Num, Runs: r.Den})
+		}
+		ca.benchmarks = append(ca.benchmarks, id)
+		acc.row.Runs += e.Runs
+		acc.addCost(e)
+		if len(e.Experiments) > 0 {
+			if m, ok := h.index.Manifest(e.Experiments[0]); ok && (acc.row.LastExperiment == "" || m.CreatedAt.After(acc.newest)) {
+				acc.newest = m.CreatedAt
+				acc.row.LastExperiment = e.Experiments[0]
+				acc.row.Label = e.Label
+			} else if acc.row.LastExperiment == "" {
+				acc.row.LastExperiment = e.Experiments[0]
+			}
+		}
+	}
 }
 
 // foldRows finishes the rows, applies the filters and orders them. With a

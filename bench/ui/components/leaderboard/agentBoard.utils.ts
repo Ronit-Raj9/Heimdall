@@ -37,7 +37,7 @@ export function reportCardSearch(row: AgentLeaderboardRow): { tab: string; versi
 
 /** A stable React key for a row. */
 export function rowKey(row: AgentLeaderboardRow): string {
-	return [row.agent, row.version, row.model, row.config_hash ?? ""].join("|");
+	return [row.agent, row.version, row.model, row.config_hash ?? "", row.simulator ?? ""].join("|");
 }
 
 /** The value a filter select shows for "no filter". Never a real capability or model. */

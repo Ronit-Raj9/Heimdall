@@ -224,3 +224,20 @@ export function capabilityRows(report: Report): CapabilityRow[] {
 export function reportFileName(report: Report): string {
 	return `report-card-${(report.evaluation || "evaluation").replace(/[^a-zA-Z0-9_-]/g, "_")}.json`;
 }
+/** Plain words for why runs were left out of a score. */
+const EXCLUDED_NAMES: Record<string, string> = {
+	out_of_memory: "out of memory",
+	infra_error: "infrastructure error",
+	invalid_evaluator: "grader could not decide",
+	unknown: "unknown result",
+};
+
+/** "excluded: 2 out of memory, 1 infrastructure error", or "" when nothing was left out. Out of memory comes first. */
+export function excludedText(excluded: Record<string, number> | undefined): string {
+	if (!excluded) return "";
+	const keys = Object.keys(excluded)
+		.filter((k) => excluded[k] > 0)
+		.sort((x, y) => (x === "out_of_memory" ? -1 : y === "out_of_memory" ? 1 : x.localeCompare(y)));
+	if (keys.length === 0) return "";
+	return "excluded: " + keys.map((k) => `${excluded[k]} ${EXCLUDED_NAMES[k] ?? k.replace(/_/g, " ")}`).join(", ");
+}

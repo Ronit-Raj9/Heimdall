@@ -262,6 +262,7 @@ func (p *Pipeline) execOnce(ctx context.Context, st *runState, sess *schemas.Ses
 		code := res.ExitCode
 		run.Agent.ExitCode = &code
 		run.Agent.TimedOut = res.TimedOut
+		run.Agent.OOMKilled = run.Agent.OOMKilled || res.OOMKilled
 		if first && !res.Started.IsZero() {
 			s := res.Started.UTC()
 			run.Timing.AgentStarted = &s

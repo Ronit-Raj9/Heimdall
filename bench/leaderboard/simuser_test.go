@@ -31,3 +31,34 @@ func TestSimulatedUserExclusion(t *testing.T) {
 		})
 	}
 }
+
+func TestSimulatorPinAndBoard(t *testing.T) {
+	llm := &schemas.Manifest{Simulator: &schemas.SimulatorSpec{Mode: schemas.SimulatorLLM, Provider: "anthropic", Model: "claude-sim", PromptVersion: "v2"}}
+	if got := SimulatorPin(llm); got != "anthropic/claude-sim@v2" {
+		t.Fatalf("pin %q", got)
+	}
+	if SimulatorPin(&schemas.Manifest{Simulator: &schemas.SimulatorSpec{Mode: schemas.SimulatorScripted}}) != "" || SimulatorPin(nil) != "" {
+		t.Fatal("scripted or no simulator has no pin")
+	}
+	sim := &record{exp: &expInfo{id: "e", m: llm}, sealed: true, run: schemas.Run{Outcome: schemas.OutcomePass}}
+	plain := &record{exp: &expInfo{id: "p", m: &schemas.Manifest{}}, sealed: true, run: schemas.Run{Outcome: schemas.OutcomePass}}
+	q := Query{Customer: CustomerSimulated}
+	if !onCustomerBoard(sim, q) || onCustomerBoard(plain, q) {
+		t.Fatal("simulated board keeps only model-played runs")
+	}
+	if q.Simulator = "other/x"; onCustomerBoard(sim, q) {
+		t.Fatal("simulated board keeps only its pin")
+	}
+	if !onCustomerBoard(sim, Query{}) || !onCustomerBoard(plain, Query{}) {
+		t.Fatal("default board sees every run (exclusion lists the model-played ones)")
+	}
+	if got := excludeReasonSimulated(sim); got != "" {
+		t.Fatalf("simulated board excluded its own run: %q", got)
+	}
+	if got := excludeReason(sim); got != ReasonSimulatedUser {
+		t.Fatalf("default board reason %q", got)
+	}
+	if _, err := (Query{Customer: "robot"}).Normalize(); err == nil {
+		t.Fatal("bad customer accepted")
+	}
+}

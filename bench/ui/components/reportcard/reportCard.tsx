@@ -16,6 +16,7 @@ import {
 	type ComparisonResult,
 	costDisplay,
 	duration,
+	excludedText,
 	faultName,
 	headline,
 	isAB,
@@ -55,6 +56,11 @@ export function ReportCard({ report: raw, className }: ReportCardProps) {
 					<p data-testid="report-card-verdict" className="text-muted-foreground max-w-prose text-sm">
 						{head.detail}
 					</p>
+					{report.split === "held_out" && (
+						<p data-testid="report-card-split" className="text-muted-foreground text-xs">
+							Held-out tasks only
+						</p>
+					)}
 					{ab && <ArmLegend arms={report.arms} />}
 					{report.practice_runs ? (
 						<p data-testid="report-card-practice" className="text-muted-foreground max-w-prose text-xs">
@@ -307,6 +313,15 @@ function BenchmarkRow({ report, row }: { report: Report; row: ReportBenchmark })
 			</summary>
 			<div className="flex flex-col gap-3 px-4 pb-4 pl-12 text-sm">
 				<p className="text-foreground">{summary}</p>
+				{report.arms.map((arm) => {
+					const text = excludedText(row.arms[arm.label]?.excluded);
+					if (!text) return null;
+					return (
+						<p key={arm.label} data-testid={`benchmark-excluded-${row.benchmark}`} className="text-muted-foreground text-xs">
+							{ab ? `${arm.label} ${text}` : text[0].toUpperCase() + text.slice(1)}. Not counted in the score.
+						</p>
+					);
+				})}
 				{row.verdict && ab && (
 					<p className="text-muted-foreground text-xs">
 						{points(row.verdict.delta)}, {row.verdict.significant ? "a real difference" : "within noise"}

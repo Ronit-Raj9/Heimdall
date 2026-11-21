@@ -53,6 +53,17 @@ type EvaluationSpec struct {
 	Trials            int             `json:"trials"`              // repeats per task, default 2
 	Faults            []string        `json:"faults"`              // "clean" always; plus model-down, broken-tool, misleading-instruction
 	BudgetUSD         float64         `json:"budget_usd,omitempty"`
+	// Split is the task split the evaluation runs: public (the default) or
+	// held_out, an explicit opt-in for a held-out evaluation. Tasks of the
+	// other split never run in it.
+	Split string `json:"split,omitempty"`
+}
+
+// EvaluationSkippedTask is one task left out of a benchmark that still runs
+// (a quarantined task), with the reason.
+type EvaluationSkippedTask struct {
+	Task   string `json:"task"`
+	Reason string `json:"reason"`
 }
 
 // EvaluationChild is one benchmark of an evaluation and its experiment.
@@ -61,6 +72,13 @@ type EvaluationChild struct {
 	ExperimentID string `json:"experiment_id"`
 	Status       string `json:"status"`
 	Skipped      string `json:"skipped,omitempty"`
+	// SkippedTasks are tasks left out of this benchmark alone (quarantined);
+	// the rest of the benchmark runs.
+	SkippedTasks []EvaluationSkippedTask `json:"skipped_tasks,omitempty"`
+	// FaultOf maps each condition id of the child experiment to the fault
+	// it stands for (clean, model-down, broken-tool, misleading-instruction),
+	// fixed at launch from faults.Conditions; the report card reads it.
+	FaultOf map[string]string `json:"fault_of,omitempty"`
 }
 
 // Evaluation is stored as .heimdall/evaluations/<id>.json in the project.

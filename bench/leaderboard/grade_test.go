@@ -51,7 +51,7 @@ func TestGradeSuccess(t *testing.T) {
 	if err != nil {
 		t.Fatalf("collect: %v", err)
 	}
-	p, excluded, err := grade(context.Background(), f, recs)
+	p, excluded, err := grade(context.Background(), f, recs, false)
 	if err != nil {
 		t.Fatalf("grade: %v", err)
 	}
@@ -121,7 +121,7 @@ func TestGradeSealMismatch(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			p, excluded, err := grade(context.Background(), tt.src, recs)
+			p, excluded, err := grade(context.Background(), tt.src, recs, false)
 			if tt.err {
 				if err == nil {
 					t.Fatal("want an error")

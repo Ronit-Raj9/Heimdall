@@ -423,6 +423,7 @@ func (p *Pipeline) finishTeam(st *runState, results []schemas.MemberResult) {
 	st.rc.Exec, st.ev.Exec = x, x
 	code := x.ExitCode
 	run.Agent.ExitCode, run.Agent.TimedOut = &code, x.TimedOut
+	run.Agent.OOMKilled = x.OOMKilled
 	if !x.Started.IsZero() {
 		s := x.Started.UTC()
 		run.Timing.AgentStarted = &s
@@ -460,6 +461,7 @@ func combineResults(results []schemas.MemberResult) *schemas.ExecResult {
 			out.ExitCode = x.ExitCode
 		}
 		out.TimedOut = out.TimedOut || x.TimedOut
+		out.OOMKilled = out.OOMKilled || x.OOMKilled
 		out.Truncated = out.Truncated || x.Truncated
 	}
 	return out

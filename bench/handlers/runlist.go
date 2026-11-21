@@ -45,6 +45,9 @@ type RunListRow struct {
 	Started   *time.Time      `json:"started,omitempty"`
 	SealedAt  *time.Time      `json:"sealed_at,omitempty"`
 	Error     string          `json:"error,omitempty"` // the first part failure's error of a non-pass run, cut to 600 bytes; empty when none
+	// Excluded is why a sealed run is left out of scores (schemas.ExcludedReason):
+	// out_of_memory, infra_error, invalid_evaluator or unknown; empty when it scores.
+	Excluded string `json:"excluded,omitempty"`
 }
 
 // RunListFacets are the distinct values of every filter across all runs, so
@@ -246,6 +249,9 @@ func runListRow(rv RunView, suites map[string]suiteFacts) RunListRow {
 	}
 	if t := rv.Run.Timing.Started; !t.IsZero() {
 		row.Started = &t
+	}
+	if rv.Sealed {
+		row.Excluded = schemas.ExcludedReason(&rv.Run)
 	}
 	if rv.Run.Outcome != schemas.OutcomePass {
 		for _, f := range rv.Run.Failures {

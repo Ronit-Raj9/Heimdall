@@ -513,6 +513,8 @@ export interface RunAgentInfo {
 	config_hash: string;
 	exit_code?: number;
 	timed_out: boolean;
+	/** The out-of-memory killer ended the agent: an infrastructure error, excluded from scores. */
+	oom_killed?: boolean;
 	capability_gaps?: string[];
 }
 
@@ -1653,6 +1655,8 @@ export interface RunListRow {
 	sealed_at?: string;
 	/** The first part failure's error of a non-pass run; absent when it recorded none. Inert text. */
 	error?: string;
+	/** Why a sealed run is left out of scores: out_of_memory, infra_error, invalid_evaluator, unknown. */
+	excluded?: string;
 	/** Optional run metrics; the list shows a dash when the server leaves them out. */
 	model?: string;
 	steps?: number;

@@ -641,11 +641,14 @@ func (e *dockerWorkspace) attach(ctx context.Context, name, stdoutPath, stderrPa
 	if ctx.Err() != nil {
 		return res, fmt.Errorf("agent run interrupted: %w", ctx.Err())
 	}
-	code, err := e.exitCode(ctx, name)
+	st, err := e.exitCode(ctx, name)
 	if err != nil {
 		return res, err
 	}
-	res.ExitCode = code
+	res.ExitCode, res.OOMKilled = st.code, st.oom
+	if st.oom {
+		e.cfg.Logger.Warn("agent container ended by the out-of-memory killer", "container", name, "exit_code", st.code)
+	}
 	return res, nil
 }
 
@@ -722,38 +725,54 @@ func (e *dockerWorkspace) waitOrKill(ctx context.Context, cmd *exec.Cmd, name st
 	return timedOut
 }
 
+// agentExit is the agent container's end state from docker inspect.
+type agentExit struct {
+	code int
+	oom  bool // State.OOMKilled: the cgroup's out-of-memory killer fired
+}
+
 // exitCode reads the container's exit code from docker, which is more
-// reliable than the attached client's own status. A container that never
+// reliable than the attached client's own status, and whether the kernel's
+// out-of-memory killer ended it (State.OOMKilled, set from the container's
+// cgroup memory events; the cgroup is gone once the container exits, so
+// docker's record is the one that survives). A container that never
 // started, or that is not in the exited state, has no trustworthy exit code:
 // its zero initial value would otherwise be scored as an agent result, so it
 // is reported as an infrastructure error instead.
-func (e *dockerWorkspace) exitCode(ctx context.Context, name string) (int, error) {
-	res, err := e.cfg.Docker.MustRun(ctx, "inspect", "--format", "{{.State.ExitCode}} {{.State.Status}} {{.State.StartedAt}}", name)
+func (e *dockerWorkspace) exitCode(ctx context.Context, name string) (agentExit, error) {
+	res, err := e.cfg.Docker.MustRun(ctx, "inspect", "--format", "{{.State.ExitCode}} {{.State.Status}} {{.State.StartedAt}} {{.State.OOMKilled}}", name)
 	if err != nil {
-		return 0, fmt.Errorf("inspect agent container: %w", err)
+		return agentExit{}, fmt.Errorf("inspect agent container: %w", err)
 	}
 	return parseAgentState(string(res.Stdout))
 }
 
-// parseAgentState parses "<exit code> <status> <started at>" from inspect.
-func parseAgentState(out string) (int, error) {
+// parseAgentState parses "<exit code> <status> <started at> [<oom killed>]"
+// from inspect. An exit code of 137 (SIGKILL) alone is not taken as out of
+// memory: the wall-budget kill sends the same signal, so only docker's
+// OOMKilled record, which comes from the cgroup memory events, marks it.
+func parseAgentState(out string) (agentExit, error) {
 	f := strings.Fields(out)
-	if len(f) != 3 {
-		return 0, fmt.Errorf("inspect agent container: unexpected state %q", strings.TrimSpace(out))
+	if len(f) != 3 && len(f) != 4 {
+		return agentExit{}, fmt.Errorf("inspect agent container: unexpected state %q", strings.TrimSpace(out))
 	}
 	code, err := strconv.Atoi(f[0])
 	if err != nil {
-		return 0, fmt.Errorf("inspect agent container: parse exit code: %w", err)
+		return agentExit{}, fmt.Errorf("inspect agent container: parse exit code: %w", err)
 	}
 	if started, err := time.Parse(time.RFC3339Nano, f[2]); err != nil || started.Year() <= 1 {
 		// QC2-09-02: docker itself says the agent never ran, so the attempt is
 		// a confirmed pre-start failure the pipeline may retry.
-		return 0, notLaunched(fmt.Errorf("agent container never started (status %s, started_at %s)", f[1], f[2]))
+		return agentExit{}, notLaunched(fmt.Errorf("agent container never started (status %s, started_at %s)", f[1], f[2]))
 	}
 	if f[1] != "exited" {
-		return 0, fmt.Errorf("agent container did not exit (status %s)", f[1])
+		return agentExit{}, fmt.Errorf("agent container did not exit (status %s)", f[1])
 	}
-	return code, nil
+	st := agentExit{code: code}
+	if len(f) == 4 {
+		st.oom = f[3] == "true"
+	}
+	return st, nil
 }
 
 // removeContainers force-removes containers by name, ignoring ctx so cleanup

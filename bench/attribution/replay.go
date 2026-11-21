@@ -74,13 +74,19 @@ func PlanReplay(parent *schemas.Experiment, slot schemas.Slot, team []schemas.Te
 	}
 	stubArm.Set["team"] = swapped
 	control := schemas.ArmSpec{Label: "replay control: arm " + slot.Arm + " as run", Agent: arm.Agent, Set: arm.Set}
+	split := "" // the replay runs its task in the parent condition's split
+	for _, c := range parent.Conditions {
+		if c.ID == slot.Condition {
+			split = c.Split
+		}
+	}
 	exp := &schemas.Experiment{
 		Name:         "replay " + b.RunID,
 		Suite:        parent.Suite,
 		Base:         parent.Base,
 		Arms:         map[string]schemas.ArmSpec{ReplayControlArm: control, ReplayStubArm: stubArm},
 		Primary:      schemas.Endpoint{Condition: slot.Condition, Metric: parent.Primary.Metric},
-		Conditions:   []schemas.ConditionSpec{{ID: slot.Condition, Tasks: schemas.TaskSelector{IDs: []string{slot.Task}}, Trials: 1}},
+		Conditions:   []schemas.ConditionSpec{{ID: slot.Condition, Tasks: schemas.TaskSelector{IDs: []string{slot.Task}}, Trials: 1, Split: split}},
 		Budget:       parent.Budget,
 		Verdict:      parent.Verdict,
 		ExtraGates:   parent.ExtraGates,

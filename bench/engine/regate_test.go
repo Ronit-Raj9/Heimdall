@@ -218,6 +218,7 @@ func TestOutcomeFrom(t *testing.T) {
 	veto := []schemas.GateResult{{Effect: schemas.GateVeto, Fired: true}}
 	pass, fail := &schemas.Grade{Passed: true}, &schemas.Grade{}
 	timedOut := &schemas.ExecResult{TimedOut: true}
+	oom := &schemas.ExecResult{ExitCode: 137, OOMKilled: true}
 	none := utils.UpstreamTally{}
 	never := utils.UpstreamTally{Errors: 3, LastFailed: true}
 	lost := utils.UpstreamTally{Errors: 2, Answered: 4, LastFailed: true}
@@ -248,6 +249,11 @@ func TestOutcomeFrom(t *testing.T) {
 		{"lost after answers but passed", false, false, nil, pass, nil, lost, schemas.OutcomePass},
 		{"recovered errors change nothing", false, false, nil, fail, nil, recovered, schemas.OutcomeFail},
 		{"DNS incident sealed as fail is aborted", false, false, nil, fail, nil, incident, schemas.OutcomeAbortedInfra},
+		{"out of memory is infra, not the agent's fail", false, false, nil, fail, oom, none, schemas.OutcomeInfraError},
+		{"out of memory with no grade is infra", false, false, nil, nil, oom, none, schemas.OutcomeInfraError},
+		{"out of memory but passed", false, false, nil, pass, oom, none, schemas.OutcomePass},
+		{"veto beats out of memory", false, false, veto, fail, oom, none, schemas.OutcomeIntegrityViolation},
+		{"plain exit 137 is not out of memory", false, false, nil, fail, &schemas.ExecResult{ExitCode: 137}, none, schemas.OutcomeFail},
 	}
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
@@ -453,5 +459,20 @@ func TestSealedScenarioArtifacts(t *testing.T) {
 	gone.Path = "artifacts/mesh/gone.obj"
 	if err := sealedScenario(dir, &schemas.Evidence{Artifacts: []schemas.ArtifactFile{gone}}); err == nil {
 		t.Fatal("missing artifact file accepted")
+	}
+}
+
+// TestOOMFailure checks an out-of-memory run carries a part failure that
+// says so, and only when the run was made infrastructure.
+func TestOOMFailure(t *testing.T) {
+	oom := &schemas.ExecResult{ExitCode: 137, OOMKilled: true}
+	if pf, ok := oomFailure(oom, schemas.OutcomeInfraError); !ok || !strings.Contains(pf.Error, "out of memory") || pf.Stage != schemas.StageRun {
+		t.Fatalf("failure %+v %v", pf, ok)
+	}
+	if _, ok := oomFailure(oom, schemas.OutcomePass); ok {
+		t.Fatal("a passed run got an out-of-memory failure")
+	}
+	if _, ok := oomFailure(&schemas.ExecResult{ExitCode: 137}, schemas.OutcomeInfraError); ok {
+		t.Fatal("exit 137 alone is not out of memory")
 	}
 }

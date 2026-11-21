@@ -169,6 +169,10 @@ func (p *Pipeline) RunSlot(ctx context.Context, in SlotInput) (*SlotResult, erro
 	p.ownerAbort(ctx, st)
 	st.rc.Run.Y = scoreOf(st.rc.Run.Outcome)
 	p.reconcileMetrics(sctx, st)
+	if pf, ok := oomFailure(st.rc.Exec, st.rc.Run.Outcome); ok {
+		st.rc.Run.Failures = append(st.rc.Run.Failures, pf)
+		p.logger.Warn("agent ended by the out-of-memory killer; run excluded from scores", "run", st.rc.Run.RunID, "slot", st.rc.Slot.SlotID)
+	}
 	if pf, ok := upstreamFailure(up, st.rc.Run.Outcome); ok {
 		st.rc.Run.Failures = append(st.rc.Run.Failures, pf)
 		p.logger.Warn("provider unreachable during run", "run", st.rc.Run.RunID, "slot", st.rc.Slot.SlotID,
@@ -682,6 +686,10 @@ func outcomeFrom(aborted, broken bool, ended schemas.Outcome, gates []schemas.Ga
 		return schemas.OutcomeIntegrityViolation
 	case up.NeverAnswered():
 		return schemas.OutcomeAbortedInfra
+	case exec != nil && exec.OOMKilled && (grade == nil || !grade.Passed):
+		// The out-of-memory killer ended the agent: the machine ran out of
+		// memory, which says nothing about the agent's ability (P0 OOM).
+		return schemas.OutcomeInfraError
 	case ended != "":
 		return ended
 	case broken, grade == nil:
@@ -697,6 +705,16 @@ func outcomeFrom(aborted, broken bool, ended schemas.Outcome, gates []schemas.Ga
 	default:
 		return schemas.OutcomeFail
 	}
+}
+
+// oomFailure is the part failure that records why the out-of-memory rule of
+// outcomeFrom made a run infrastructure: ok is false when it did not.
+func oomFailure(exec *schemas.ExecResult, o schemas.Outcome) (schemas.PartFailure, bool) {
+	if exec == nil || !exec.OOMKilled || o != schemas.OutcomeInfraError {
+		return schemas.PartFailure{}, false
+	}
+	return schemas.PartFailure{Stage: schemas.StageRun, Part: "environment",
+		Error: fmt.Sprintf("out of memory: the out-of-memory killer ended the agent (exit code %d); excluded from scores as infrastructure", exec.ExitCode)}, true
 }
 
 // upstreamFailure is the part failure that records why the upstream rule of
