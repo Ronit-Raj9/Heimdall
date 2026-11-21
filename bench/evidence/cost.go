@@ -72,7 +72,8 @@ func (s *costSource) Collect(_ context.Context, rc *schemas.RunContext, ev *sche
 // A request without an attempt trail counts as one attempt. Only the attempt
 // that returned the response carries the row's usage and Bifrost's own cost.
 // An injected failure (ledger action inject, or a 5xx status) costs 0 with
-// FaultInject set, and a request the provider rejected with a 4xx costs 0,
+// FaultInject set, a call the proxy served from a debug run's cassette
+// (ledger upstream replay) costs 0 with Replayed set, and a request the provider rejected with a 4xx costs 0,
 // because providers bill neither. Requests that are not conversation turns
 // (token counting, model listing) are not_applicable. Usage that was not
 // recorded, or an attempt that failed without a status, is unknown. A model
@@ -257,6 +258,14 @@ func priceAttempt(a physAttempt, led *schemas.LedgerEntry, prices *PriceTable) s
 		row.USD.Reason = "not billed: " + r.Kind + " request"
 	case r.CacheHit:
 		row.USD = schemas.Observed(0, schemas.EvidenceGateway)
+	case led != nil && led.Upstream == schemas.LedgerUpstreamReplay:
+		// A debug run's call the fault proxy answered from the source run's
+		// cassette (or an operator's edited answer): no provider was called,
+		// so nothing was paid, whatever usage the recorded answer carries.
+		// Bifrost's own cost would price that recorded usage: drop it.
+		row.USD = schemas.Observed(0, schemas.EvidenceGateway)
+		row.Replayed = true
+		row.BifrostUSD = nil
 	case injected:
 		row.USD = schemas.Observed(0, schemas.EvidenceGateway)
 		row.FaultInject = true

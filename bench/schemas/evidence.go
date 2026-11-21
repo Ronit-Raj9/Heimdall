@@ -112,6 +112,10 @@ type CostRow struct {
 	USD         Value    `json:"usd"`
 	BifrostUSD  *float64 `json:"bifrost_usd,omitempty"`
 	FaultInject bool     `json:"fault_inject"` // an injected failure; billed as zero by the provider
+	// Replayed marks a debug run's call the fault proxy answered from a
+	// cassette (ledger upstream replay): no provider call, so it costs 0 and
+	// never counts against a budget.
+	Replayed bool `json:"replayed,omitempty"`
 }
 
 // ShimCall is one invocation recorded by a tool shim.

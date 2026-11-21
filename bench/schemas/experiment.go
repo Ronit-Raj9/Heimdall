@@ -100,6 +100,11 @@ type Experiment struct {
 	// ("Rerun failures"). Such an experiment is exploratory: it never joins
 	// the parent's verdict, a follow-up combination or a leaderboard.
 	RerunOf string `json:"rerun_of,omitempty" yaml:"rerun_of,omitempty"`
+
+	// Debug makes this a debug run of one recorded run: replay, fork or
+	// breakpoints (debug.go). Its slots are never counted. nil keeps
+	// recorded manifests' hashes.
+	Debug *DebugSpec `json:"debug,omitempty" yaml:"debug,omitempty"`
 }
 
 // Exploratory reports an experiment whose result decides nothing: a rerun

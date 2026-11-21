@@ -32,7 +32,7 @@ const (
 // PlanModes lists every plan mode this proxy honours, in the order /health
 // reports them. A caller that needs a mode checks for it there first: an
 // older proxy rejects a mode it does not know with 400.
-var PlanModes = []string{ModeNone, ModePersistent, ModeOnce, ModeScripted, ModeStreamCut}
+var PlanModes = []string{ModeNone, ModePersistent, ModeOnce, ModeScripted, ModeStreamCut, ModeReplay}
 
 // Request kinds recorded in the ledger. Only KindMessage is counted.
 const (
@@ -60,11 +60,14 @@ func ValidatePlan(p schemas.FaultPlan) error {
 	if p.RetryAfterS < 0 {
 		return fmt.Errorf("retry_after_s must be >= 0, got %d", p.RetryAfterS)
 	}
+	if err := validateDebugPlan(p); err != nil { // X20b debug runs (debug.go)
+		return err
+	}
 	if p.Model != "" && p.Mode != ModePersistent && p.Mode != ModeOnce { // W9: a model filter only narrows a fault
 		return fmt.Errorf("model %q needs mode persistent or once, got %q", p.Model, p.Mode)
 	}
 	switch p.Mode {
-	case "", ModeNone:
+	case "", ModeNone, ModeReplay:
 		return nil
 	case ModeScripted:
 		if p.FromCall != 0 || p.Call != 0 || p.Status != 0 || p.RetryAfterS != 0 {
@@ -88,7 +91,7 @@ func ValidatePlan(p schemas.FaultPlan) error {
 		}
 		return nil
 	default:
-		return fmt.Errorf("mode must be none, persistent, once, scripted or stream_cut, got %q", p.Mode)
+		return fmt.Errorf("mode must be none, persistent, once, scripted, stream_cut or replay, got %q", p.Mode)
 	}
 	if p.Status < 400 || p.Status > 599 {
 		return fmt.Errorf("status must be 4xx or 5xx, got %d", p.Status)
@@ -423,7 +426,7 @@ func filtered(p schemas.FaultPlan) bool {
 // "scripted" answers every call a fault plan does not fault from the
 // scripted model (a probe on a no-paid run); a proxy without it refuses the
 // plan, so such a run fails closed.
-var PlanFields = []string{"model", "scripted"}
+var PlanFields = []string{"model", "scripted", "replay", "hold"}
 
 // ModelAll is the plan model that fails every model, as an empty one does;
 // it lets a probe say so explicitly for a routed run, whose gateway probe

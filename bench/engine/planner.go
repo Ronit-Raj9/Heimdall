@@ -189,6 +189,12 @@ func NewPlanner(reg *schemas.Registry, benchRoot string, logger schemas.Logger, 
 // the suite-level scenario inputs are hashed (scenarioHashes); each is
 // absent from a plan without scenario tasks.
 func (p *Planner) Plan(ctx context.Context, exp *schemas.Experiment) (*schemas.Manifest, error) {
+	if exp != nil && exp.Debug != nil { // X20b: a debug run has one arm and is never counted (debugrun.go)
+		if err := exp.Debug.Validate(); err != nil {
+			return nil, fmt.Errorf("plan %s: debug: %w", exp.Name, err)
+		}
+		return p.planMatrix(ctx, exp, planMode{minArms: 1})
+	}
 	return p.planMatrix(ctx, exp, experimentMode) // Forecast and matrix area: expands matrix sugar first, else exactly plan (matrixplan.go)
 }
 
@@ -1801,7 +1807,7 @@ func buildSlots(m *schemas.Manifest, suite *schemas.Suite, conds, compat []condP
 			Condition:   c.id,
 			Trial:       trial,
 			OrderIndex:  len(slots),
-			Counted:     counted,
+			Counted:     counted && m.Experiment.Debug == nil, // X20b: debug runs never count
 		})
 	}
 	var aaFirst map[string]bool

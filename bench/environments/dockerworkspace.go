@@ -701,12 +701,8 @@ func (e *dockerWorkspace) waitOrKill(ctx context.Context, cmd *exec.Cmd, name st
 		}
 		close(done)
 	}()
-	wctx, cancel := context.WithTimeout(ctx, wall)
-	defer cancel()
-	select {
-	case <-done:
+	if !waitWall(ctx, done, wall, schemas.HeldClockFrom(ctx)) {
 		return false
-	case <-wctx.Done():
 	}
 	timedOut := ctx.Err() == nil
 	kctx, kcancel := context.WithTimeout(context.WithoutCancel(ctx), killGrace)
@@ -1054,4 +1050,35 @@ func agentContainer(runID string) string {
 
 func helperName(runID, step string) string {
 	return "bench-" + runID + "-" + step + "-" + strings.TrimPrefix(utils.NewID("h", 6), "h_")
+}
+
+// waitWall waits for done within the wall budget and reports whether the
+// budget (or ctx) ran out first. With a held clock (X20b debug runs) the
+// budget is extended by the time a breakpoint held the run, so a paused run
+// never times out while it waits for the operator.
+func waitWall(ctx context.Context, done <-chan struct{}, wall time.Duration, held schemas.HeldClock) bool {
+	start := time.Now()
+	for {
+		budget := wall
+		if held != nil {
+			budget += held()
+		}
+		left := budget - time.Since(start)
+		if left <= 0 {
+			return true
+		}
+		if held != nil && left > time.Second {
+			left = time.Second
+		}
+		t := time.NewTimer(left)
+		select {
+		case <-done:
+			t.Stop()
+			return false
+		case <-ctx.Done():
+			t.Stop()
+			return true
+		case <-t.C:
+		}
+	}
 }

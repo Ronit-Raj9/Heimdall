@@ -81,6 +81,7 @@ type Config struct {
 	// shared proxy is not the platform's concurrency ceiling.
 	SlotsPerProvider int
 	Logger           schemas.Logger
+	MaxHold          time.Duration // X20b: longest a breakpoint holds a request; DefaultMaxHold when zero
 }
 
 // SlotConfig is one key slot of a provider in Bifrost. Bifrost key names are
@@ -104,7 +105,8 @@ type Server struct {
 	client    *http.Client
 	logger    schemas.Logger
 	token     string
-	org       orgSlots // F4: organization key slots (orgslots.go)
+	org       orgSlots    // F4: organization key slots (orgslots.go)
+	debug     *debugState // X20b: replay cassettes and breakpoints (debug.go)
 }
 
 // upstream is how one provider is answered: the real API with a key, the
@@ -172,10 +174,18 @@ func NewServer(cfg Config) (*Server, error) {
 		lg.close()
 		return nil, err
 	}
+	dbg, err := newDebugState(CassettesPath(cfg.LedgerPath)) // X20b: loaded cassettes survive a restart too
+	if err != nil {
+		lg.close()
+		return nil, err
+	}
+	if cfg.MaxHold > 0 {
+		dbg.maxHold = cfg.MaxHold
+	}
 	return &Server{
 		cfg: cfg, providers: table, upstreams: ups, slots: slots, names: names,
 		plans: plans, ledger: lg, client: newUpstreamClient(),
-		logger: logger, token: token,
+		logger: logger, token: token, debug: dbg,
 	}, nil
 }
 
@@ -285,6 +295,17 @@ func (s *Server) serveData(w http.ResponseWriter, r *http.Request) {
 	}
 	d := s.plans.beginModel(slot.name, kind, requestModel(p, r, kind, body)) // W9: the model lets a plan fail one target
 	e.Slot, e.RunID, e.Call, e.Stream = slot.name, d.RunID, d.Call, req.Stream
+	if kind == KindMessage && d.Call > 0 && d.Unpersisted == nil && !d.Inject { // X20b debug runs: replay, fork edit, breakpoints (debug.go)
+		if plan, bound := s.plans.get(slot.name); bound && (plan.Replay != nil || !plan.Hold.Empty()) {
+			handled, nb := s.serveDebug(sw, r, p, slot.name, plan, d, body, req.Stream, e)
+			if handled {
+				e.Status = sw.status()
+				s.record(e)
+				return
+			}
+			body = nb
+		}
+	}
 	switch {
 	case d.Unpersisted != nil: // QC2-13-02: fail closed when the slot's progress cannot survive a restart
 		s.logger.Error("fault plan state not persisted; refusing the request", "slot", slot.name, "err", d.Unpersisted)

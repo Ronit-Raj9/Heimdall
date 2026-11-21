@@ -132,6 +132,7 @@ type Run struct {
 	// (X01).
 	Practice bool            `json:"practice,omitempty"`
 	Hardware *HardwareRecord `json:"hardware,omitempty"` // X7: the GPUs a GPU task's run held (schemas/gpu.go); nil otherwise
+	Debug    *RunDebug       `json:"debug,omitempty"`    // a debug run's link to its source run (debug.go); nil otherwise
 }
 
 // RunTiming records when the run passed its milestones.

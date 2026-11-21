@@ -32,6 +32,9 @@ func describeRow(r schemas.CostRow) string {
 	if r.FaultInject {
 		s += " inject"
 	}
+	if r.Replayed {
+		s += " replayed"
+	}
 	return s
 }
 
@@ -112,6 +115,12 @@ func TestCostRows(t *testing.T) {
 			want:   []string{"r5#1 0.000000 inject", "r5#2 3.000000"}},
 		{name: "contradicting ledger is not paired", reqs: []schemas.GatewayRequest{plain}, ledger: []schemas.LedgerEntry{inject(1, 503)}, want: []string{"r7#1 0.011475"}},
 		{name: "attempt failed without status", reqs: []schemas.GatewayRequest{timedOut}, want: []string{"r6#1 unknown", "r6#2 0.011475"}},
+		{name: "debug replay from a cassette costs nothing", reqs: []schemas.GatewayRequest{plain, retriedNoUsage},
+			ledger: []schemas.LedgerEntry{
+				{Kind: "message", Call: 1, Action: "pass", Status: 200, Upstream: schemas.LedgerUpstreamReplay, Tokens: tok},
+				inject(1, 503), pass(2, "", &schemas.Tokens{Fresh: 1_000_000}),
+			},
+			want: []string{"r7#1 0.000000 replayed", "r5#1 0.000000 inject", "r5#2 3.000000"}},
 		{name: "cache hit", reqs: []schemas.GatewayRequest{cached}, want: []string{"r8#1 0.000000"}},
 		{name: "token counting does not apply", reqs: []schemas.GatewayRequest{countTokens}, want: []string{"c1#1 n/a"}},
 		{name: "no price table", reqs: []schemas.GatewayRequest{plain}, prices: &PriceTable{}, want: []string{"r7#1 unknown"}},
