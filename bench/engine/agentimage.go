@@ -238,3 +238,50 @@ func (p *Pipeline) checkTaskAgentImage(ctx context.Context, st *runState) error 
 	}
 	return nil
 }
+
+// snapshotOwnImageAgents refuses, at plan time, an arm whose agent would run
+// in its own image on a task that brings its own image while the suite
+// grades a snapshot of the agent's container (verifier mode snapshot, every
+// imported Harbor suite). The snapshot is then the agent's image, not the
+// task's, so the verifier misses what the task image provides (Harbor's
+// /opt/harbor-tests venvs, the task's tools and files) and every run grades
+// 0 as if the model had failed: live run e_live_l10_tb2_m7r2, Codex CLI
+// without build.base_arg, 0 of 3 on Terminal-Bench tasks whose answers pass
+// the upstream tests. A scripted control runs in the task image, and an
+// agent with build.base_arg is built on it, so neither is refused.
+func snapshotOwnImageAgents(suite *schemas.Suite, conds, compat []condPlan, m *schemas.Manifest) error {
+	if suite == nil || suite.Verifier.Mode != schemas.VerifierSnapshot {
+		return nil
+	}
+	refused := func(cfg *schemas.AgentConfig) bool {
+		return cfg.Adapter != scriptedAdapter && cfg.Image != "" && (cfg.Build == nil || cfg.Build.BaseArg == "")
+	}
+	ownImage := func(id string) bool {
+		t := suite.TaskByID(id)
+		if t == nil || t.Environment == nil {
+			return false
+		}
+		_, ok, err := utils.TaskImage(suite.ID, t)
+		return err == nil && ok
+	}
+	var errs []error
+	check := func(name string, cfg *schemas.AgentConfig, cs []condPlan) {
+		if !refused(cfg) {
+			return
+		}
+		for _, id := range usedTasks(cs) {
+			if ownImage(id) {
+				errs = append(errs, fmt.Errorf("%s, task %s: the task brings its own image and suite %s grades a snapshot of the agent's container, but agent %s has no build.base_arg, so it would run in its own image %s and the verifier would not find the task's environment (every run would grade 0); build the agent on the task image with build.base_arg (docs/scenarios-design.md) or leave the task out",
+					name, id, suite.ID, cfg.ID, cfg.Image))
+			}
+		}
+	}
+	for _, arm := range sortedKeys(m.Arms) {
+		am := m.Arms[arm]
+		check("arm "+arm, &am.Config, conds)
+	}
+	if m.Compatibility != nil {
+		check("compatibility agent", &m.Compatibility.Config, compat)
+	}
+	return errors.Join(errs...)
+}

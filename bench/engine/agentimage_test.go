@@ -162,3 +162,26 @@ func TestRunSlotUsesPerTaskAgentImage(t *testing.T) {
 		})
 	}
 }
+
+// An agent without build.base_arg on a task with its own image, in a suite
+// graded by snapshot, would be graded in a snapshot of its own image and
+// score 0 whatever it did (live e_live_l10_tb2_m7r2): the plan refuses it.
+// With base_arg, or with the default clean_room verifier, it plans.
+func TestPlanRefusesOwnImageAgentUnderSnapshotVerifier(t *testing.T) {
+	b, fb := taskImageBench(t)
+	b.suite.Verifier.Mode = schemas.VerifierSnapshot
+	e := testExperiment()
+	e.Arms["B"] = schemas.ArmSpec{Label: "plain", Agent: "agents/plain-agent.yaml"}
+	_, err := NewPlanner(b.reg, b.root, nil, WithAgentImageBuilder(fb)).Plan(context.Background(), e)
+	if err == nil || !strings.Contains(err.Error(), "arm B, task t01: the task brings its own image") || !strings.Contains(err.Error(), "no build.base_arg") {
+		t.Fatalf("err = %v, want arm B refused on t01", err)
+	}
+	if strings.Contains(err.Error(), "arm A") {
+		t.Errorf("arm A has base_arg and must not be refused: %v", err)
+	}
+
+	b2, fb2 := taskImageBench(t)
+	if _, err := NewPlanner(b2.reg, b2.root, nil, WithAgentImageBuilder(fb2)).Plan(context.Background(), e); err != nil {
+		t.Fatalf("clean_room suite: %v", err)
+	}
+}
