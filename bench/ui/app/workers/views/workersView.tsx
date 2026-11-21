@@ -4,7 +4,7 @@ import { BlockSkeleton, EmptyNote, LoadError } from "@/components/runs/screenSta
 import { WorkersOff, WorkersTable } from "@/components/workers/workersTable";
 import { isWorkersOff, useGetWorkersQuery } from "@/lib/store/apis/benchApi";
 import { cn } from "@/lib/utils";
-import { AlertTriangle } from "lucide-react";
+import { AlertTriangle, Server } from "lucide-react";
 import { useTranslation } from "react-i18next";
 
 /**
@@ -12,6 +12,25 @@ import { useTranslation } from "react-i18next";
  * mode is off (enabled false, or a 404 from a server without the route) the screen says so
  * instead of showing an error or an empty table.
  */
+/** Where runner tokens live: a pointer to Settings, runners tab (create a token, copy its start command). */
+export function AddRunnerCard() {
+	const { t } = useTranslation("operate");
+	return (
+		<div className="bg-card flex min-w-0 flex-wrap items-center justify-between gap-3 rounded-sm border px-4 py-3" data-testid="workers-add-runner">
+			<div className="flex min-w-0 items-start gap-2">
+				<Server className="text-muted-foreground mt-0.5 size-4 shrink-0" aria-hidden="true" />
+				<div className="min-w-0">
+					<p className="text-foreground text-sm font-medium">{t("workers.runnersTitle")}</p>
+					<p className="text-muted-foreground text-xs">{t("workers.runnersBody")}</p>
+				</div>
+			</div>
+			<a href="/settings?tab=runners" className="text-primary text-sm font-medium underline-offset-4 hover:underline" data-testid="workers-runner-tokens-link">
+				{t("workers.runnersLink")}
+			</a>
+		</div>
+	);
+}
+
 export default function WorkersView() {
 	const { t } = useTranslation("bench");
 	const query = useGetWorkersQuery();
@@ -34,6 +53,7 @@ export default function WorkersView() {
 					{t("workers.synthetic")}
 				</p>
 			)}
+			<AddRunnerCard />
 			{query.isLoading ? (
 				<BlockSkeleton rows={4} testId="workers-loading" />
 			) : off ? (
