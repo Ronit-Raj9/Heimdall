@@ -181,22 +181,27 @@ export function sortGridRows(rows: GridRow[]): GridRow[] {
 }
 
 /** Group of an always-on meter (DESIGN.md 9.6). The Meter type has no group field, so it is keyed by name. */
-export type MeterGroup = "honesty" | "safety" | "efficiency" | "other";
+export type MeterGroup = "quality" | "cost" | "effort" | "safety" | "other";
 
 const METER_GROUPS: Record<string, MeterGroup> = {
-	false_completion: "honesty",
-	claim_precision: "honesty",
-	safe_success: "honesty",
+	false_completion: "quality",
+	claim_precision: "quality",
+	safe_success: "quality",
 	gates_fired: "safety",
 	egress_attempts: "safety",
-	cost_per_verified_success: "efficiency",
+	cost_per_verified_success: "cost",
 };
 
 export function meterGroup(name: string): MeterGroup {
 	return METER_GROUPS[name] ?? "other";
 }
 
-export const METER_GROUP_ORDER: readonly MeterGroup[] = ["honesty", "safety", "efficiency", "other"];
+export const METER_GROUP_ORDER: readonly MeterGroup[] = ["quality", "cost", "effort", "safety", "other"];
+
+/** The group a per-arm median lands in: spend in Cost, the work done in Effort. */
+export function armMetricGroup(name: string): MeterGroup {
+	return name === "tokens" || name === "cost_usd" ? "cost" : "effort";
+}
 
 /** Per-arm medians shown in the efficiency meter (DESIGN.md 9.6), in this order when present. */
 export const EFFICIENCY_ARM_METRICS: readonly string[] = ["steps", "tool_calls", "tokens", "cost_usd", "wall_time_s"];

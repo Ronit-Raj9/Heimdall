@@ -135,10 +135,10 @@ describe("sortGridRows", () => {
 
 describe("meterGroup", () => {
 	const cases = [
-		{ name: "false_completion", want: "honesty" },
+		{ name: "false_completion", want: "quality" },
 		{ name: "gates_fired", want: "safety" },
 		{ name: "egress_attempts", want: "safety" },
-		{ name: "cost_per_verified_success", want: "efficiency" },
+		{ name: "cost_per_verified_success", want: "cost" },
 		{ name: "new_meter", want: "other" },
 	];
 	for (const c of cases) it(c.name, () => expect(meterGroup(c.name)).toBe(c.want));

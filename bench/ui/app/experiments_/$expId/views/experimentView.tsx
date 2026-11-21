@@ -1,5 +1,4 @@
 import { ExperimentTrialsPanel, hasContent } from "@/components/adaptive/trialsPanel"; // W7 adaptive trials and suite tiers
-import { ExperimentProgressCard } from "@/components/experiments/experimentProgress";
 import { TERMINAL_STATES } from "@/components/experiments/experiments.utils";
 import { ExperimentExportMenu } from "@/components/export/exportMenu"; // W10 export
 import { ExperimentRunActions, RegradeAction } from "@/components/platform/experimentActions";
@@ -11,7 +10,6 @@ import { PageHeader } from "@/components/shell/pageHeader";
 import { RouteTabs, type RouteTab } from "@/components/shell/routeTabs";
 import { StatusBadge } from "@/components/shell/statusBadge";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
 import { useGetExperimentAdaptiveQuery } from "@/lib/store/apis/adaptiveApi";
 import { useAppDispatch } from "@/lib/store";
 import { EXPERIMENT_POLL_MS, benchApi, experimentResultTags, useGetExperimentQuery, useGetGridQuery, useGetVerdictQuery } from "@/lib/store/apis/benchApi";
@@ -21,7 +19,7 @@ import { errorStatus } from "@/lib/store/apis/session";
 import { useGetExperimentSupportQuery } from "@/lib/store/apis/supportApi";
 import { compareSearch } from "@/components/experiments/legacyRoutes";
 import { Link } from "@tanstack/react-router";
-import { GitCompareArrows, Hourglass, SearchX } from "lucide-react";
+import { Download, GitCompareArrows, Hourglass, SearchX } from "lucide-react";
 import { parseAsString, useQueryState } from "nuqs";
 import { useEffect, useRef } from "react";
 import { useTranslation } from "react-i18next";
@@ -30,6 +28,8 @@ import { ANALYSIS_TAB_ID, AnalysisTab, AnalysisTabLabel } from "./analysisTab"; 
 import { CostTab } from "./costTab";
 import { EXPERIMENT_TABS, defaultExperimentTab, hiddenExperimentTabs, type ExperimentTabId } from "./experimentTabs";
 import { IntegrityTab } from "./integrityTab";
+import { LiveProgress } from "./liveProgress";
+import { suiteIcon } from "./suiteIcon";
 import { MatrixTab } from "./matrixTab";
 import { MigrationTab } from "./migrationTab";
 import { ReceiptsTab } from "./receiptsTab";
@@ -44,7 +44,8 @@ export default function ExperimentView({ expId }: { expId: string }) {
 	const { t } = useTranslation("bench");
 	const { t: tActions } = useTranslation("experimentActions");
 	const [grade] = useQueryState("grade", parseAsString);
-	const [tabParam] = useQueryState("tab", parseAsString);
+	const { t: tPage } = useTranslation("experimentPage");
+	const [tabParam, setTab] = useQueryState("tab", parseAsString);
 	const status = useGetExperimentQuery(expId);
 	const live = status.data ? !TERMINAL_STATES.has(status.data.state) && status.data.state !== "created" : false;
 	// Poll while it runs, so the header, the progress card and the runs tab stay current.
@@ -104,7 +105,7 @@ export default function ExperimentView({ expId }: { expId: string }) {
 	const shownOnRequest = (id: ExperimentTabId) => id === "matrix" && tabParam === "matrix" && arms.length >= 2;
 	const tabs: RouteTab[] = EXPERIMENT_TABS.map((id) => ({
 		id,
-		label: id === "actions" ? tActions("tab") : t(`experiments.page.tabs.${id}`),
+		label: id === "actions" ? tActions("tab") : tPage(`tabs.${id}`),
 		hidden: hidden.has(id) && !shownOnRequest(id),
 		testId: `experiment-tab-${id}`,
 	}));
@@ -115,7 +116,12 @@ export default function ExperimentView({ expId }: { expId: string }) {
 		<div className="flex min-w-0 flex-col gap-6" data-testid="experiment-screen" data-exp-id={expId}>
 			<PageHeader
 				breadcrumbs={[{ label: t("experiments.list.title"), to: "/experiments" }, { label: st.name || expId }]}
-				title={st.name || expId}
+				title={
+					<span className="flex min-w-0 items-center gap-2.5">
+						<SuiteGlyph suite={st.suite} />
+						<span className="truncate">{st.name || expId}</span>
+					</span>
+				}
 				meta={
 					<>
 						<StatusBadge state={st.state} testId="experiment-state" />
@@ -123,39 +129,33 @@ export default function ExperimentView({ expId }: { expId: string }) {
 					</>
 				}
 				subtitle={
-					<span className="flex flex-wrap items-center gap-x-3 gap-y-1" data-testid="experiment-facts">
-						<EntityLink kind="experiment" id={expId} className="text-xs" />
-						{st.suite && (
-							<span className="text-xs">
-								{t("experiments.page.suite")} <EntityLink kind="suite" id={st.suite} />
-							</span>
-						)}
-						{arms.length > 0 && (
-							<span className="text-xs">{t("experiments.page.arms", { arms: arms.join(", "), count: arms.length })}</span>
-						)}
+					<span className="text-muted-foreground flex flex-wrap items-center gap-x-3 gap-y-1 text-xs" data-testid="experiment-facts">
+						{st.suite && <EntityLink kind="suite" id={st.suite} />}
+						{arms.length > 0 && <span>{t("experiments.page.arms", { arms: arms.join(" vs "), count: arms.length })}</span>}
+						<EntityLink kind="experiment" id={expId} className="text-xs opacity-70" />
 					</span>
 				}
 				actions={
-					<>
+					<div className="flex flex-wrap items-center gap-1.5" data-testid="experiment-actions">
 						<ExperimentRunActions status={st} />
-						<RegradeAction expId={expId} />
-						<Button variant="outline" size="sm" asChild>
-							<Link to="/compare" search={compareSearch(undefined, expId) as never} data-testid="experiment-compare">
-								<GitCompareArrows aria-hidden="true" />
-								{t("experiments.page.compare")}
-							</Link>
-						</Button>
-					</>
+						<div className="bg-muted/40 flex items-center gap-0.5 rounded-lg border p-0.5">
+							<RegradeAction expId={expId} />
+							<Button variant="ghost" size="sm" asChild>
+								<Link to="/compare" search={compareSearch(undefined, expId) as never} data-testid="experiment-compare">
+									<GitCompareArrows aria-hidden="true" />
+									{t("experiments.page.compare")}
+								</Link>
+							</Button>
+							<Button variant="ghost" size="sm" onClick={() => void setTab("export")} dataTestId="experiment-export">
+								<Download aria-hidden="true" />
+								{tPage("header.export")}
+							</Button>
+						</div>
+					</div>
 				}
 			/>
 
-			{live && (
-				<Card className="py-4 shadow-none" data-testid="experiment-progress">
-					<CardContent className="px-4">
-						<ExperimentProgressCard status={st} />
-					</CardContent>
-				</Card>
-			)}
+			{live && <LiveProgress status={st} />}
 
 			<RouteTabs tabs={tabs} defaultTab={defaultExperimentTab(arms.length)} label={t("experiments.page.tabsLabel")} testId="experiment-tabs">
 				{(active) =>
@@ -169,6 +169,15 @@ export default function ExperimentView({ expId }: { expId: string }) {
 				}
 			</RouteTabs>
 		</div>
+	);
+}
+
+function SuiteGlyph({ suite }: { suite?: string }) {
+	const Icon = suiteIcon(suite);
+	return (
+		<span className="bg-muted text-muted-foreground flex size-9 shrink-0 items-center justify-center rounded-lg" aria-hidden="true">
+			<Icon className="size-5" />
+		</span>
 	);
 }
 
