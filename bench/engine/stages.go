@@ -550,7 +550,7 @@ func clearGatewayRequestBodies(ev *schemas.Evidence) {
 }
 
 // cleanup destroys the workspace, revokes the key and then clears the key
-// slots' fault plans. It runs after every run, failed or not; Destroy is safe
+// slots' fault plans; the slots stay held until their plans are cleared. It runs after every run, failed or not; Destroy is safe
 // after a failed Create.
 func (p *Pipeline) cleanup(ctx context.Context, st *runState) error {
 	var errs []error
@@ -575,7 +575,18 @@ func (p *Pipeline) cleanup(ctx context.Context, st *runState) error {
 	errs = append(errs, p.cleanupA2A(ctx, st)) // B1: the run's agent gateway registrations (a2a.go)
 	revoked := true
 	if st.rc.Key != nil && p.reg.Gateway != nil {
-		if err := p.reg.Gateway.RevokeKey(ctx, st.rc.Key); err != nil {
+		revoke := p.reg.Gateway.RevokeKey
+		// live-11: a gateway that can keep the key's slots held until their
+		// plans are cleared does so. Freed at revocation, a slot could be
+		// claimed by another run, which arms its plan before this run's
+		// ClearPlan: the clear then fails on the other owner's claim (409,
+		// seen live as infra_error on a finished run) or, inside one
+		// process, wipes the new run's plan.
+		if h, ok := p.reg.Gateway.(schemas.SlotHoldingRevoker); ok {
+			revoke = h.RevokeKeyHoldSlots
+			defer h.ReleaseKeySlots(st.rc.Key)
+		}
+		if err := revoke(ctx, st.rc.Key); err != nil {
 			revoked = false
 			errs = append(errs, wrapPart("gateway", p.reg.Gateway, fmt.Errorf("revoke key: %w", err)))
 		}

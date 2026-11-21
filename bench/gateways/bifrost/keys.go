@@ -99,17 +99,59 @@ func (g *Gateway) MintKey(ctx context.Context, rc *schemas.RunContext) (*schemas
 // revoked. The slot is released only when this process minted the key, so a
 // stale RunKey can never free a slot another run holds.
 func (g *Gateway) RevokeKey(ctx context.Context, key *schemas.RunKey) error {
+	return g.revokeKey(ctx, key, "")
+}
+
+// RevokeKeyHoldSlots implements schemas.SlotHoldingRevoker: it revokes like
+// RevokeKey but keeps the key's slots, and their claims at the fault proxy,
+// held as "draining" until ReleaseKeySlots. The engine clears the slots'
+// fault plans in between, so no other run can take a slot and arm a plan
+// that the clear would then refuse (409, another owner) or wipe (this
+// process).
+func (g *Gateway) RevokeKeyHoldSlots(ctx context.Context, key *schemas.RunKey) error {
 	if key == nil || key.ID == "" {
 		return nil
 	}
-	g.releaseReserved(key.Name)
+	return g.revokeKey(ctx, key, key.Name)
+}
+
+// ReleaseKeySlots implements schemas.SlotHoldingRevoker: it frees every slot
+// held for key's run (draining after RevokeKeyHoldSlots, or reserved and
+// never used) and releases their claims. Slots still held by a key whose
+// revocation failed stay held, as after a failed RevokeKey.
+func (g *Gateway) ReleaseKeySlots(key *schemas.RunKey) {
+	if key == nil || key.Name == "" {
+		return
+	}
+	drop := map[string]string{}
+	g.mu.Lock()
+	for name, holder := range g.inUse {
+		if holder == drainingPrefix+key.Name || holder == reservedPrefix+key.Name {
+			delete(g.inUse, name)
+			g.unclaimLocked(name, drop)
+		}
+	}
+	g.mu.Unlock()
+	g.releaseClaims(drop)
+}
+
+// revokeKey is RevokeKey; with hold set (the run's key name) the freed slots
+// stay held as drainingPrefix+hold and reserved slots stay reserved, until
+// ReleaseKeySlots.
+func (g *Gateway) revokeKey(ctx context.Context, key *schemas.RunKey, hold string) error {
+	if key == nil || key.ID == "" {
+		return nil
+	}
+	if hold == "" {
+		g.releaseReserved(key.Name)
+	}
 	// 3-A-02: every independent cleanup step runs and the errors are joined,
 	// so one failed member or team DELETE never leaves the lead key, its
 	// routing rule or its slot behind. The team id stays recorded until its
 	// DELETE is confirmed, so a retry still knows what to delete.
 	var errs []error
 	teamID := g.teamFor(key.ID)
-	membersErr := g.revokeMemberKeys(ctx, key)
+	membersErr := g.revokeMemberKeys(ctx, key, hold)
 	if membersErr != nil {
 		errs = append(errs, fmt.Errorf("revoke members of virtual key %s (%s): %w", key.ID, key.Name, membersErr))
 	}
@@ -122,7 +164,7 @@ func (g *Gateway) RevokeKey(ctx context.Context, key *schemas.RunKey) error {
 	if keyErr != nil {
 		errs = append(errs, fmt.Errorf("revoke virtual key %s (%s): %w", key.ID, key.Name, keyErr))
 	} else {
-		g.forget(key.ID)
+		g.forgetHold(key.ID, hold)
 		g.logger.Info("virtual key revoked", "virtual_key_id", key.ID, "name", key.Name, "key_slot", key.KeySlot)
 	}
 	if teamID != "" && membersErr == nil && keyErr == nil { // a team goes once the keys in it are gone
@@ -285,6 +327,16 @@ func (g *Gateway) releaseSlot(slot, runID string) {
 // forget drops a minted key and frees its slot and the slot's claim at the
 // fault proxy (F1).
 func (g *Gateway) forget(vkID string) {
+	g.forgetHold(vkID, "")
+}
+
+// drainingPrefix marks a slot whose key was revoked by RevokeKeyHoldSlots:
+// still held, with its claim, until ReleaseKeySlots frees it.
+const drainingPrefix = "draining:"
+
+// forgetHold is forget; with hold set the slot stays held as
+// drainingPrefix+hold and keeps its claim.
+func (g *Gateway) forgetHold(vkID, hold string) {
 	drop := map[string]string{}
 	g.mu.Lock()
 	rec, ok := g.minted[vkID]
@@ -294,8 +346,12 @@ func (g *Gateway) forget(vkID string) {
 	}
 	delete(g.minted, vkID)
 	if g.inUse[rec.slot] == vkID {
-		delete(g.inUse, rec.slot)
-		g.unclaimLocked(rec.slot, drop)
+		if hold != "" {
+			g.inUse[rec.slot] = drainingPrefix + hold
+		} else {
+			delete(g.inUse, rec.slot)
+			g.unclaimLocked(rec.slot, drop)
+		}
 	}
 	g.mu.Unlock()
 	g.releaseClaims(drop)

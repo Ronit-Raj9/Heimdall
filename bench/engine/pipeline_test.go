@@ -525,3 +525,38 @@ func TestSmokeRunIsScriptedEndToEnd(t *testing.T) {
 		t.Fatalf("plans %+v, want one scripted plan for %s", b.w.plans, res.Run.RunID)
 	}
 }
+
+// holdingGateway is a fakeGateway that can keep the key's slots held until
+// the engine releases them (schemas.SlotHoldingRevoker).
+type holdingGateway struct{ *fakeGateway }
+
+func (g *holdingGateway) RevokeKeyHoldSlots(context.Context, *schemas.RunKey) error {
+	return g.w.hit("revoke_hold")
+}
+
+func (g *holdingGateway) ReleaseKeySlots(*schemas.RunKey) { _ = g.w.hit("release_slots") }
+
+// live-11: with a gateway that can hold slots, cleanup revokes the key with
+// its slots held, clears the slot's plan and only then frees the slot, so no
+// other run can claim the slot and arm a plan before the clear (seen live:
+// ClearPlan 409 on another bench process's claim, run sealed infra_error).
+func TestCleanupHoldsSlotUntilPlanCleared(t *testing.T) {
+	b, m, slot := pipelineFixture(t, "clean")
+	b.reg.Gateway = &holdingGateway{b.gw}
+	res, err := runOne(context.Background(), t, b, m, slot)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var got []string
+	for _, op := range b.w.seq {
+		if op == "revoke" || op == "revoke_hold" || op == "release_slots" || op == "fault_clear" {
+			got = append(got, op)
+		}
+	}
+	if want := "revoke_hold fault_clear release_slots"; strings.Join(got, " ") != want {
+		t.Fatalf("cleanup calls %v, want %s", got, want)
+	}
+	if res.Run.Outcome == schemas.OutcomeInfraError {
+		t.Fatalf("outcome %s", res.Run.Outcome)
+	}
+}
