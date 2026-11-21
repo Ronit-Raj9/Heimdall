@@ -178,7 +178,12 @@ class ScriptedUser:
             parts.append("What I do not know:\n" + self.unknown.strip())
         if self.how:
             parts.append("How I want this handled:\n" + self.how)
-        return "\n\n".join(parts)
+        text = "\n\n".join(parts)
+        # Scenarios that tell the customer when to output a stop token (tau3
+        # banking_knowledge) must not end the conversation in the opening.
+        for tok in STOP_TOKENS:
+            text = text.replace(tok, "(" + tok.strip("#").lower().replace("-", " ") + " token)")
+        return text
 
     def reply(self, message):
         self.turns += 1
