@@ -48,7 +48,7 @@ const (
 var bridgePollEvery = 3 * time.Second
 
 // errNoRunner is what a bridge job answers when no runner can take its slots.
-var errNoRunner = errors.New("no runner online: hosted checks run as experiments on runners; start a runner (Runners page) or ask your server owner to enable the shared pool")
+var errNoRunner = errors.New("no worker online: hosted checks run as experiments on workers; start a worker (Workers page) or ask your server owner to enable the shared worker")
 
 func init() {
 	// The hosted server runs at most four bridge jobs at once (out of its six

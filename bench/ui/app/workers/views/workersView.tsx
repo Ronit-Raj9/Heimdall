@@ -1,8 +1,7 @@
 import { ModeBadge } from "@/components/modeBadge";
 import { PageHeader } from "@/components/shell";
 import { BlockSkeleton, EmptyNote, LoadError } from "@/components/runs/screenStates";
-import { WorkerStateBadge, WorkersOff } from "@/components/workers/workersTable";
-import { CopyId } from "@/components/ui/copyId";
+import { isSharedWorker, WorkerStateBadge, WorkersOff } from "@/components/workers/workersTable";
 import { formatRelative } from "@/components/platform/platform.utils";
 import { getLocale } from "@/lib/i18n";
 import type { WorkerInfo } from "@/lib/types/bench";
@@ -17,7 +16,7 @@ import { useTranslation } from "react-i18next";
  * mode is off (enabled false, or a 404 from a server without the route) the screen says so
  * instead of showing an error or an empty table.
  */
-/** Where runner tokens live: a pointer to Settings, runners tab (create a token, copy its start command). */
+/** Where worker tokens live: a pointer to Settings, workers tab (create a token, copy its start command). */
 export function AddRunnerCard() {
 	const { t } = useTranslation("operate");
 	return (
@@ -44,13 +43,15 @@ export function AddRunnerCard() {
 
 const STATE_TONE: Record<string, Tone> = { running: "good", idle: "idle", lost: "bad" };
 
-/** One runner: online pulse, host, slots in use as a bar, completed runs and last heartbeat. */
+/** One worker: online pulse, a human title (raw id on hover only), host, slots in use as a bar, completed runs and last heartbeat. */
 export function RunnerCard({ worker }: { worker: WorkerInfo }) {
 	const { t } = useTranslation("operate");
 	const running = (worker.running ?? []).length;
 	const pct = worker.slots > 0 ? Math.min(100, (running / worker.slots) * 100) : 0;
 	const tone = STATE_TONE[worker.state] ?? "idle";
 	const seen = formatRelative(worker.last_seen, getLocale());
+	const shared = isSharedWorker(worker.id);
+	const title = shared ? t("workers.sharedTitle") : worker.id || worker.host;
 	return (
 		<article
 			className="bg-card flex min-w-0 flex-col gap-4 rounded-xl border p-5 transition-shadow hover:shadow-md"
@@ -64,10 +65,14 @@ export function RunnerCard({ worker }: { worker: WorkerInfo }) {
 						<StatusDot tone={tone} pulse={worker.state === "running"} className="absolute -top-0.5 -right-0.5" />
 					</span>
 					<div className="min-w-0">
-						<p className="text-foreground truncate text-base font-semibold" title={worker.host}>
-							{worker.host || worker.id}
+						<p className="text-foreground truncate text-base font-semibold" title={worker.id}>
+							{title}
 						</p>
-						<CopyId value={worker.id} className="max-w-48 text-xs" />
+						{worker.host && worker.host !== title && (
+							<p className="text-muted-foreground truncate text-xs" title={worker.host}>
+								{worker.host}
+							</p>
+						)}
 					</div>
 				</div>
 				<WorkerStateBadge state={worker.state} testId={`workers-row-${worker.id}-state`} />

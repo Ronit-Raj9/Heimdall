@@ -446,7 +446,7 @@ func runnerDoctorRows(ctx context.Context, env jobEnv, workers []schemas.WorkerI
 			Detail: "runner coordinator not available for this organization; ask the server owner to check the server log"})
 	case own+shared == 0:
 		checks = append(checks, schemas.DoctorCheck{ID: "runners.online", Status: schemas.DoctorWarn,
-			Detail: "no runner online: create a runner token on the Runners page and start a runner, or use the shared pool"})
+			Detail: "no worker online: create a worker token in Settings > Workers and start a worker, or use the shared worker"})
 	default:
 		checks = append(checks, schemas.DoctorCheck{ID: "runners.online", Status: schemas.DoctorPass,
 			Detail: fmt.Sprintf("%d runner(s) online: %d of your own, %d shared", own+shared, own, shared)})
@@ -476,9 +476,9 @@ func runnerDoctorRows(ctx context.Context, env jobEnv, workers []schemas.WorkerI
 	case kill:
 		sp.Status, sp.Detail = schemas.DoctorWarn, "the server owner paused new runs (kill switch); running slots finish"
 	case sharedpool.Secret() == "":
-		sp.Status, sp.Detail = schemas.DoctorSkip, "no shared runner on this server: start your own runner (Runners page)"
+		sp.Status, sp.Detail = schemas.DoctorSkip, "no shared worker on this server: start your own worker (Workers page)"
 	case !limits.SharedPool:
-		sp.Status, sp.Detail = schemas.DoctorWarn, "shared runners are off for your organization: start your own runner, or ask the server owner to enable them"
+		sp.Status, sp.Detail = schemas.DoctorWarn, "the shared worker is off for your organization: start your own worker, or ask the server owner to enable it"
 	case shared == 0:
 		sp.Status, sp.Detail = schemas.DoctorWarn, "shared pool enabled but no shared runner is online right now; runs wait until one connects"
 	default:

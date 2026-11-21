@@ -3,7 +3,7 @@
 	"subtitle": "Check the server is healthy and keep a safe copy of your saved results.",
 	"loading": "Checking what this server can run",
 	"loadError": "Could not load the operations status",
-	"hostedNote": "GPU, voice and screenshot checks run on your worker machines, not on the server.",
+	"hostedNote": "GPU, voice and screenshot checks run on your workers, not on the server.",
 	"health": {
 		"title": "Server health",
 		"description": "Checks that Docker, the model gateway, your benchmarks and your agents are working.",
@@ -13,7 +13,7 @@
 		"k8s": "Kubernetes status",
 		"gpuMode": "GPU mode: {{mode}}",
 		"driver": "Driver: {{driver}}",
-		"hostedDescription": "Your benchmarks, agents and worker machines that are online.",
+		"hostedDescription": "Your benchmarks, agents and workers that are online.",
 		"runnersLink": "Open Workers"
 	},
 	"evidence": {
@@ -70,11 +70,12 @@
 		"run": "Compare"
 	},
 	"workers": {
-		"runnersTitle": "Add a worker machine",
-		"runnersBody": "Worker machines run your agents. Create a runner token in Settings, then run its start command on the machine.",
-		"runnersLink": "Open runner tokens",
+		"runnersTitle": "Add a worker",
+		"runnersBody": "Workers run your agents. Create a worker token in Settings, then run its start command on the machine.",
+		"sharedTitle": "Shared worker",
+		"runnersLink": "Open worker tokens",
 		"cards": {
-			"label": "Worker machines",
+			"label": "Workers",
 			"slots": "Runs at once",
 			"done": "Finished runs",
 			"seen": "Last check-in",
@@ -87,8 +88,8 @@
 		"online": "Online",
 		"hosted": "Shared server, many organizations",
 		"local": "Running on this machine",
-		"runners": "Worker machines",
-		"yourRunners": "Your worker machines",
+		"runners": "Workers",
+		"yourRunners": "Your workers",
 		"thisMachine": "This machine",
 		"runnersHosted": "See which are online in Workers",
 		"runnersLocal": "Runs happen in containers on this machine",

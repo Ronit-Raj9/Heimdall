@@ -143,7 +143,7 @@ function JobExperimentLink({ job }: { job: Job }) {
 
 export default JobLogPanel;
 
-/** needsRunner reports a job that failed because no runner was online (runner jobs, gap G05). */
+/** needsRunner reports a job that failed because no worker was online (runner jobs, gap G05). Older servers say "runner". */
 export function needsRunner(error?: string | null): boolean {
-	return !!error && /no runner online/i.test(error);
+	return !!error && /no (worker|runner) online/i.test(error);
 }

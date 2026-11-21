@@ -16,7 +16,7 @@
 	},
 	"stage": {
 		"planned": "Waiting to start",
-		"leased": "Getting a worker machine",
+		"leased": "Getting a worker",
 		"prepare": "Setting up the workspace",
 		"arm": "Turning on safety checks",
 		"run": "Agent is working",
@@ -38,7 +38,7 @@
 		"run_sealed": "Saved",
 		"run_recovered": "Run picked up again",
 		"slot_skipped": "Run skipped",
-		"lease_held": "Waiting for a free worker machine",
+		"lease_held": "Waiting for a free worker",
 		"budget_stop": "Stopped: spending limit reached",
 		"experiment_done": "Finished",
 		"cancelled": "Cancelled",

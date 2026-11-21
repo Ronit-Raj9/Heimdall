@@ -34,7 +34,7 @@
 		"totalUsd": "Budget (USD)",
 		"concurrency": "Concurrency",
 		"seed": "Seed",
-		"runnerPool": "Runner pool",
+		"runnerPool": "Worker group",
 		"token": "Write token",
 		"tokenHint": "Local mode: plan, estimate and run are writes. The token stays in this tab.",
 		"tokenPlaceholder": "paste the serve write token",

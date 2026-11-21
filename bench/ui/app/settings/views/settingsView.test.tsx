@@ -210,8 +210,8 @@ describe("RunnersTab", () => {
 		expect(render(<RunnersTab org={org} />, hostedSession())).toContain("Create a worker token below, then start the worker with it.");
 	});
 	it("shows the role refusal to members (runners are admin)", () => {
-		api.q.runners = errorQuery(403, "runners and runner tokens need the admin role");
-		api.q.runnerTokens = errorQuery(403, "runners and runner tokens need the admin role");
+		api.q.runners = errorQuery(403, "workers and worker tokens need the admin role");
+		api.q.runnerTokens = errorQuery(403, "workers and worker tokens need the admin role");
 		expect(render(<RunnersTab org={org} />, hostedSession("member"))).toContain("Your role cannot do this");
 	});
 	it("saves the token where the start command reads it", () => {

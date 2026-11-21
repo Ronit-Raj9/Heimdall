@@ -1,6 +1,6 @@
 {
 	"title": "Server admin",
-	"subtitle": "Manage who uses this server: users, organizations, limits and worker machines.",
+	"subtitle": "Manage who uses this server: users, organizations, limits and workers.",
 	"notAdmin": "Only server admins can open this page. Add your email to HEIMDALL_SERVER_ADMINS on the server, restart it and sign in again.",
 	"localMode": "The server admin page is for hosted servers. A local bench has one organization and no quotas.",
 	"loadFailed": "Could not load: {{message}}",
@@ -11,7 +11,7 @@
 		"orgs": "Organizations",
 		"images": "Custom images",
 		"usage": "Usage",
-		"containers": "Worker machines"
+		"containers": "Workers"
 	},
 	"overview": {
 		"users": "Users",
@@ -61,7 +61,7 @@
 		"maxSpend": "Spend per day (USD)",
 		"maxImage": "Largest agent image (GiB)",
 		"allowCustom": "Allow custom agent images (each needs approval)",
-		"sharedPool": "Use the shared worker machines",
+		"sharedPool": "Use the shared worker",
 		"runtime": "Sandbox type",
 		"runc": "Standard (runc, default)",
 		"runsc": "Extra isolation (gVisor runsc)",
@@ -97,9 +97,9 @@
 		"cost": "Spend (USD)"
 	},
 	"containers": {
-		"empty": "No worker machines registered. Hosted runs need the shared workers or a worker machine per organization.",
+		"empty": "No workers registered. Hosted runs need the shared workers or a worker per organization.",
 		"org": "Organization",
-		"runner": "Worker machine",
+		"runner": "Worker",
 		"pool": "Shared group",
 		"host": "Host",
 		"state": "State",

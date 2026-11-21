@@ -26,7 +26,7 @@
 	},
 	"replay": {
 		"title": "Replay blamed failures (tier 2)",
-		"description": "Runs each blamed team failure again with the suspect swapped for a stub agent, through your runners, and writes the replay verdict into blame.json. Runs agents again, so it costs model calls.",
+		"description": "Runs each blamed team failure again with the suspect swapped for a stub agent, through your workers, and writes the replay verdict into blame.json. Runs agents again, so it costs model calls.",
 		"stub": "Stub agent",
 		"stubDefault": "The experiment's attribution.stub",
 		"run": "Replay",

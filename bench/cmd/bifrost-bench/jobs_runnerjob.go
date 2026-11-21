@@ -32,9 +32,9 @@ import (
 
 // errNoJobRunner is the error of a runner job with no live runner. The UI
 // recognises its first words and offers the Runners settings next to it.
-var errNoJobRunner = errors.New("No runner online: this job starts containers, so on the hosted site it runs on a runner, never on the server. " +
-	"Open Settings > Runners and use \"Add a runner\" to start one on your machine (one command), " +
-	"or turn on the shared runner there if your server owner offers it (Settings > Runners shows its status).")
+var errNoJobRunner = errors.New("No worker online: this job starts containers, so on the hosted site it runs on a worker, never on the server. " +
+	"Open Settings > Workers and use \"Add a worker\" to start one on your machine (one command), " +
+	"or turn on the shared worker there if your server owner offers it (Settings > Workers shows its status).")
 
 // runnerJobSnapshotDirs are the project folders a runner job takes with it,
 // after the paths its argv names.

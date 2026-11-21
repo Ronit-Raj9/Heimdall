@@ -23,7 +23,7 @@
 			"suiteOptional": "Benchmark (optional)",
 			"needSuite": "Name the benchmark this container is for.",
 			"run": "Prepare container",
-			"runnerNote": "On hosted servers the container is prepared on your worker machine (Settings > Worker machines), never on the server. It stays on that machine, which also runs this agent."
+			"runnerNote": "On hosted servers the container is prepared on your worker (Settings > Workers), never on the server. It stays on that machine, which also runs this agent."
 		},
 		"diff": {
 			"title": "Compare versions",

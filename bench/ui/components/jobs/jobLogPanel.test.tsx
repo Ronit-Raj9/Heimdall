@@ -52,11 +52,11 @@ describe("JobLogPanel", () => {
 		expect(html).toContain("e_abc123");
 	});
 
-	it("links a no-runner failure to Settings > Runners", () => {
-		api.job = okQuery({ ...FAILED_JOB, mode: "live", error: "No runner online: this job starts containers" });
+	it("links a no-runner failure to Settings > Workers", () => {
+		api.job = okQuery({ ...FAILED_JOB, mode: "live", error: "No worker online: this job starts containers" });
 		const html = render(<JobLogPanel jobId={FAILED_JOB.id} />, hostedSession("member"));
 		expect(html).toContain('data-testid="job-log-panel-add-runner"');
-		expect(html).toContain("Settings &gt; Runners");
+		expect(html).toContain("Settings &gt; Workers");
 	});
 
 	it("offers no runner link for other failures", () => {

@@ -226,7 +226,7 @@ func TestRunnerDoctorRows(t *testing.T) {
 	now := time.Date(2026, 11, 21, 12, 0, 0, 0, time.UTC)
 	env := jobEnv{OrgID: "org_a", Services: handlers.Services{Quota: quota.NewStub()}}
 	rows := runnerDoctorRows(context.Background(), env, nil, true, now)
-	if len(rows) != 3 || rows[0].ID != "runners.online" || rows[0].Status != schemas.DoctorWarn || !strings.Contains(rows[0].Detail, "Runners page") {
+	if len(rows) != 3 || rows[0].ID != "runners.online" || rows[0].Status != schemas.DoctorWarn || !strings.Contains(rows[0].Detail, "Workers") {
 		t.Fatalf("no runners: %+v", rows)
 	}
 	workers := []schemas.WorkerInfo{

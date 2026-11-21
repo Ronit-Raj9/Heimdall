@@ -50,7 +50,7 @@
 		"trialNote": "Each task is tried once",
 		"button": "Start the test",
 		"starting": "Starting...",
-		"noLauncher": "This server cannot start tests right now: no worker machine is online. Ask the server owner to turn on the shared workers.",
+		"noLauncher": "This server cannot start tests right now: no worker is online. Ask the server owner to turn on the shared workers.",
 		"notFound": "This server cannot start a test in one click yet. Set it up step by step instead.",
 		"failed": "The test did not start: {{message}}",
 		"advanced": "Set it up step by step",

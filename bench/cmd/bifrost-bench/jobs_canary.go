@@ -272,7 +272,7 @@ func fireWebScheduleWith(ctx context.Context, env jobEnv, name string, log jobs.
 	var runner schedule.Runner = scheduleRunner{a: env.App}
 	if env.Hosted {
 		if env.Services.Launcher == nil {
-			return schedule.Record{}, errors.New("this organization has no launcher, so its schedules can not run on runners; ask your server owner to enable runners")
+			return schedule.Record{}, errors.New("this organization has no launcher, so its schedules can not run on workers; ask your server owner to enable the shared worker")
 		}
 		if err := handlers.CheckHostedSchedule(s, time.Now()); err != nil {
 			return schedule.Record{}, err
