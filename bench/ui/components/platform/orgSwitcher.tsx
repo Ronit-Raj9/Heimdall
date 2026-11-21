@@ -5,7 +5,7 @@ import { getBenchErrorMessage } from "@/lib/store/apis/benchApi";
 import { useSwitchOrgMutation } from "@/lib/store/apis/platformApi";
 import { cn } from "@/lib/utils";
 import { useNavigate, useRouterState } from "@tanstack/react-router";
-import { Building2, Eye, Loader2 } from "lucide-react";
+import { Building2, Loader2 } from "lucide-react";
 import { useTranslation } from "react-i18next";
 
 /** First letters of an organization name, for its square. */
@@ -39,17 +39,13 @@ export function OrgSwitcher() {
 		</span>
 	);
 
-	// A demo visitor and a member of one organization see its name, nothing to pick.
+	// A member of one organization see its name, nothing to pick.
 	if (org && (!session.signedIn || session.orgs.length <= 1)) {
 		return (
 			<div className="flex min-w-0 items-center gap-2 px-1" data-testid="org-current">
 				{square}
 				<span className="text-foreground truncate text-sm font-medium">{org.name}</span>
-				{session.demo ? (
-					<Eye className="text-muted-foreground size-3.5 shrink-0" aria-hidden="true" />
-				) : (
-					session.role && <RoleBadge role={session.role} className="hidden sm:inline-flex" />
-				)}
+				{session.role && <RoleBadge role={session.role} className="hidden sm:inline-flex" />}
 			</div>
 		);
 	}

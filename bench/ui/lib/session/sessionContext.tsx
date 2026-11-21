@@ -24,8 +24,6 @@ export interface SessionInfo {
 	signedIn: boolean;
 	/** A server admin (GET /auth/me server_admin): sees the Admin entry. */
 	serverAdmin?: boolean;
-	/** Hosted, anonymous visitor of a public-read organization: read only, no write controls. */
-	demo: boolean;
 	signup: AuthConfig["signup"];
 	github: boolean;
 	/** An empty install: the first sign-up creates the owner, whatever the signup policy. */
@@ -39,7 +37,6 @@ export const LOCAL_SESSION: SessionInfo = {
 	orgs: [],
 	role: "owner",
 	signedIn: false,
-	demo: false,
 	signup: undefined,
 	github: false,
 	bootstrap: false,
@@ -52,22 +49,20 @@ export interface SessionSources {
 	meLoading: boolean;
 	/** GET /auth/config: sign-up policy and GitHub, for visitors who are not signed in. */
 	config?: AuthConfig;
-	/** An anonymous read of an org-scoped route answered: this server serves a public demo. */
-	demoReadable?: boolean;
 }
 
 /**
  * The session from GET /auth/me. A 404 (a server from before the platform) or auth_mode local is
- * local mode; a 401 is a hosted server with nobody signed in, which is a public demo when an
- * anonymous read succeeds.
+ * local mode; a 401 is a hosted server with nobody signed in, who gets the login page (hosted installs
+ * serve no public demo).
  */
-export function sessionFromMe({ me, meError, meLoading, config, demoReadable = false }: SessionSources): SessionInfo {
+export function sessionFromMe({ me, meError, meLoading, config }: SessionSources): SessionInfo {
 	const offers = { signup: config?.signup, github: Boolean(config?.github), bootstrap: Boolean(config?.bootstrap) };
 	// A 401 wins over earlier data: the session ended since the last answer.
 	if (isUnauthorized(meError)) {
-		// Still loading while the sign-in options and the demo read are on their way.
+		// Still loading while the sign-in options are on their way.
 		const status = meLoading ? "loading" : "ready";
-		return { ...LOCAL_SESSION, ...offers, status, authMode: "hosted", kind: "anonymous", role: undefined, demo: demoReadable };
+		return { ...LOCAL_SESSION, ...offers, status, authMode: "hosted", kind: "anonymous", role: undefined };
 	}
 	if (me) {
 		if (me.auth_mode !== "hosted") return { ...LOCAL_SESSION };
@@ -88,7 +83,6 @@ export function sessionFromMe({ me, meError, meLoading, config, demoReadable = f
 			role: signedIn ? (me.role ?? org?.role) : undefined,
 			signedIn,
 			serverAdmin: me.server_admin === true,
-			demo: false,
 			...offers,
 		};
 	}
@@ -107,7 +101,7 @@ export function sessionFromMe({ me, meError, meLoading, config, demoReadable = f
 
 /**
  * Whether the session may use a control that needs at least min. Local mode always may (the write
- * token is the gate); a demo visitor or anonymous caller never may.
+ * token is the gate); an anonymous caller never may.
  */
 export function canUse(session: SessionInfo, min: Role = "member"): boolean {
 	if (session.authMode === "local") return true;
@@ -134,13 +128,13 @@ export function useSession(): SessionInfo {
 
 /**
  * What the app frame shows for a path: a share link's page on its own (whatever the session), the
- * auth pages without the shell, the login page for a hosted visitor who is neither signed in nor
- * reading a public demo, else the app shell.
+ * auth pages without the shell, the login page for a hosted visitor who is not signed in, else the
+ * app shell.
  */
 export function frameFor(session: SessionInfo, pathname: string): "share" | "auth" | "login" | "app" | "error" {
 	if (isSharePage(pathname)) return "share";
 	if (session.status === "error") return "error";
 	if (isAuthPage(pathname)) return "auth";
-	if (session.authMode === "hosted" && session.status === "ready" && !session.signedIn && !session.demo) return "login";
+	if (session.authMode === "hosted" && session.status === "ready" && !session.signedIn) return "login";
 	return "app";
 }

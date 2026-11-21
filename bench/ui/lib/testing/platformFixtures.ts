@@ -310,9 +310,12 @@ export function hostedSession(role: "viewer" | "member" | "admin" | "owner" = "o
 	return sessionFromMe({ me: { ...ME_OWNER, role }, meLoading: false, config: AUTH_CONFIG });
 }
 
-/** An anonymous visitor of a hosted server that serves a public demo. */
+/**
+ * An anonymous visitor of a hosted server. Hosted installs serve no public demo, so this is the same
+ * as signedOutSession; the name is kept for older tests that check write controls stay hidden.
+ */
 export function demoSession(): SessionInfo {
-	return sessionFromMe({ meError: { status: 401, data: {} }, meLoading: false, config: AUTH_CONFIG, demoReadable: true });
+	return signedOutSession();
 }
 
 /** An anonymous visitor of a hosted server with no public demo. */

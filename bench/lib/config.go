@@ -59,7 +59,7 @@ type Config struct {
 
 	Storage evconfig.Config `yaml:"storage" json:"storage,omitzero"` // Evidence storage area (P6): hosted root, mirror (folder or S3), sweeper (docs/evidence-storage.md)
 
-	Demo DemoConfig `yaml:"demo" json:"demo,omitzero"` // Tenancy area (P3): the public read-only demo organization (lib/democonfig.go)
+	Demo DemoConfig `yaml:"demo" json:"demo,omitzero"` // retired, ignored: hosted installs have no public demo organization (lib/democonfig.go)
 
 	// X3: where runs execute (docs/kubernetes.md). Environment.Driver is
 	// docker (the default) or kubernetes; Kubernetes configures the latter.

@@ -101,7 +101,7 @@ export function JobsIndicator() {
 	const session = useSession();
 	const [open, setOpen] = useState(false);
 	const triggerRef = useRef<HTMLButtonElement>(null);
-	const skip = session.demo || (session.authMode === "hosted" && !session.signedIn) || session.status === "loading";
+	const skip = (session.authMode === "hosted" && !session.signedIn) || session.status === "loading";
 	const [busy, setBusy] = useState(false);
 	const jobs = useListJobsQuery(undefined, {
 		skip,

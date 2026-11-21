@@ -11,7 +11,8 @@ import (
 )
 
 // OrgHeader selects the org of a request explicitly; it is checked against
-// the caller's membership (or the org's public_read for anonymous reads).
+// the caller's membership (or the org's public_read for signed-in
+// non-members' reads).
 const OrgHeader = "X-Heimdall-Org"
 
 // Directory looks orgs and memberships up. The database area implements it
@@ -62,10 +63,14 @@ func notFound(msg string) *Denied {
 //
 // Org selection: a path {org} for OrgFromPath routes; else the
 // X-Heimdall-Org header; else the session's current org, the token's org or
-// the runner's org; for anonymous callers, the demo org (demoSlug). A token
-// or runner can never select another org than its own. An org the caller
-// cannot see answers 404, whether it exists or not.
-func Resolve(ctx context.Context, dir Directory, rule Rule, p *auth.Principal, pathRef, headerRef, demoSlug string) (*Org, *auth.Principal, error) {
+// the runner's org. A token or runner can never select another org than its
+// own. An org the caller cannot see answers 404, whether it exists or not.
+//
+// Anonymous callers never resolve an org: a hosted install requires sign-in
+// for every org route, so there is no public demo org, and an org's
+// public_read setting admits only signed-in users who are not members
+// (read-only), never anonymous visitors.
+func Resolve(ctx context.Context, dir Directory, rule Rule, p *auth.Principal, pathRef, headerRef string) (*Org, *auth.Principal, error) {
 	if p == nil {
 		p = auth.Anonymous()
 	}
@@ -123,25 +128,7 @@ func Resolve(ctx context.Context, dir Directory, rule Rule, p *auth.Principal, p
 		eff.OrgID, eff.Role = o.ID, role
 		return &o, &eff, nil
 	case auth.KindAnonymous, "":
-		if ref == "" {
-			ref = demoSlug
-		}
-		if ref == "" {
-			return nil, nil, unauthorized("sign in required")
-		}
-		o, err := FindOrg(ctx, dir, ref)
-		if err != nil {
-			if errors.Is(err, ErrOrgNotFound) {
-				return nil, nil, unauthorized("sign in required")
-			}
-			return nil, nil, err
-		}
-		if !o.PublicRead {
-			return nil, nil, unauthorized("sign in required")
-		}
-		eff = *auth.Anonymous()
-		eff.OrgID = o.ID
-		return &o, &eff, nil
+		return nil, nil, unauthorized("sign in required")
 	}
 	return nil, nil, forbidden("unknown principal kind " + string(p.Kind))
 }

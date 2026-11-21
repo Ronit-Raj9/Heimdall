@@ -1,6 +1,5 @@
 import { BenchHeader } from "@/components/benchHeader";
 import { BenchSidebar } from "@/components/benchSidebar";
-import { DemoBanner } from "@/components/platform/accessNotes";
 import { AuthShell } from "@/components/platform/authShell";
 import { SharedFrame } from "@/components/share/sharedFrame";
 import { ConfirmProvider } from "@/components/platform/confirmDialog";
@@ -90,7 +89,7 @@ function Shell({ children }: { children: React.ReactNode }) {
 	useRouteChange();
 	return (
 		<div className="bg-sidebar flex min-h-dvh flex-col md:h-dvh">
-			{/* First in the tab order, before the demo banner and the navigation. */}
+			{/* First in the tab order, before the navigation. */}
 			<a
 				href="#bench-main"
 				className="bg-primary text-primary-foreground sr-only z-50 rounded-md px-3 py-2 text-sm focus:not-sr-only focus:fixed focus:top-3 focus:left-3"
@@ -98,7 +97,6 @@ function Shell({ children }: { children: React.ReactNode }) {
 			>
 				{t("app.skipToContent")}
 			</a>
-			<DemoBanner />
 			<div className="flex min-h-0 flex-1 flex-col md:flex-row">
 				<BenchSidebar drawerOpen={navOpen} onDrawerClose={closeNav} />
 				<div className="flex min-h-0 w-full min-w-0 flex-1 flex-col">

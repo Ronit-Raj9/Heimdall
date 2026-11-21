@@ -47,7 +47,7 @@ export function DeleteAction({
 	const confirm = useConfirm();
 	const [pending, setPending] = useState(false);
 	const [error, setError] = useState<string | null>(null);
-	if (session.demo || !canUse(session, "admin")) {
+	if (!canUse(session, "admin")) {
 		return (
 			<span className="sr-only" data-testid={`${testId}-admin-only`}>
 				{adminOnly}

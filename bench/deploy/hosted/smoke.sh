@@ -12,9 +12,9 @@
 #   - fetches the UI shell and one of its assets over HTTPS
 #   - signs up through the API, reads the session, creates an organization
 #     and lists it
-#   - creates the public demo organization and imports the recorded runs of
-#     bench/testdata/recorded into it with the CLI (bootstrap.sh's commands),
-#     then reads them anonymously over HTTPS
+#   - creates a public_read organization and imports the recorded runs of
+#     bench/testdata/recorded into it with the CLI, then checks that
+#     anonymous HTTPS reads are refused (hosted installs require sign-in)
 #   - with --demo-runner: builds the runner image, switches the session to
 #     the new organization and back, creates a runner token (pool demo) in
 #     the signup organization through the API, starts the demo-runner
@@ -333,22 +333,22 @@ code=$(curl -sS --cacert "$ca" --resolve "$domain:$https_port:127.0.0.1" -o /dev
 	--data "$(jq -nc --arg p "$password" '{email: "stranger@example.com", password: $p}')" "$origin/api/bench/auth/signup")
 case $code in 401 | 403) ok "second signup without an invitation refused ($code)" ;; *) fail "second signup answered $code" ;; esac
 
-# The public demo organization, as bootstrap.sh makes it: org create with
-# public read, org import of the recorded runs (seals verified), then an
-# anonymous read over HTTPS.
+# A public_read organization with imported runs (seals verified). Hosted
+# installs have no public demo: anonymous reads are refused even here.
 out=$(bench -- org create -slug demo -name Demo -public-read 2>&1) || fail "org create demo: $out"
 ok "org create demo -public-read"
 out=$(bench -v "$BENCH_DIR/testdata/recorded:/import:ro" -- org import -org demo -from /import 2>&1) || fail "org import: $out"
 ok "org import: $(printf '%s\n' "$out" | tail -n 1)"
-anon=$(curl -sS --cacert "$ca" --resolve "$domain:$https_port:127.0.0.1" "$origin/api/bench/experiments")
-for e in e_pilot_mixed_nc93 e_smoke_sdoj; do
-	printf '%s' "$anon" | jq -e --arg e "$e" '[.experiments[]?.exp_id] | index($e) != null' >/dev/null ||
-		fail "anonymous GET /api/bench/experiments does not list $e: ${anon:0:300}"
+for path in /api/bench/experiments /api/bench/catalog; do
+	for hdr in "" "X-Heimdall-Org: demo"; do
+		code=$(curl -sS --cacert "$ca" --resolve "$domain:$https_port:127.0.0.1" -o /dev/null -w '%{http_code}' ${hdr:+-H "$hdr"} "$origin$path")
+		[ "$code" = 401 ] || fail "anonymous GET $path ${hdr:+($hdr) }answered $code, want 401"
+	done
 done
-ok "anonymous HTTPS read of the demo org: $(printf '%s' "$anon" | jq -c '[.experiments[]? | "\(.exp_id) \(.state) \(.slots.done)/\(.slots.total)"]')"
+ok "anonymous HTTPS reads refused (401), public_read org included"
 code=$(curl -sS --cacert "$ca" --resolve "$domain:$https_port:127.0.0.1" -o /dev/null -w '%{http_code}' -X POST \
 	-H 'Content-Type: application/yaml' -H "Origin: $origin" --data-binary 'name: x' "$origin/api/bench/experiments")
-case $code in 401 | 403) ok "anonymous write to the demo org refused ($code)" ;; *) fail "anonymous POST /api/bench/experiments answered $code" ;; esac
+case $code in 401 | 403) ok "anonymous write refused ($code)" ;; *) fail "anonymous POST /api/bench/experiments answered $code" ;; esac
 
 if [ -n "$s3" ]; then
 	HEIMDALL_BACKUP_DIR=$work/backups "$HOSTED_DIR/backup.sh" >"$work/backup.log" 2>&1 || { tail -n 20 "$work/backup.log" >&2; fail "backup.sh with the S3 mirror"; }

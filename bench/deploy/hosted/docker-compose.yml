@@ -51,6 +51,11 @@ networks:
   upstream:
     enable_ipv6: false
     labels: *labels
+  # The server reaches the shared gateway's log API on this network only
+  # (per-organization prompt log list, delete and retention; lane X03).
+  gatewaylogs:
+    internal: true
+    labels: *labels
   builder:
     # shared-runner profile: the isolated BuildKit and the shared runner
     # only. Not internal (base images are pulled), but no Heimdall service,
@@ -184,6 +189,11 @@ services:
       # worker on Fly Machines or Kubernetes (empty: the published default).
       HEIMDALL_API_RATE_LIMITS: ${HEIMDALL_API_RATE_LIMITS:-}
       HEIMDALL_RUNNER_IMAGE: ${HEIMDALL_RUNNER_IMAGE:-}
+      # Per-organization prompt logs: the server lists, deletes and expires
+      # one organization's rows in the shared gateway's log store. Empty URL
+      # with the shared pool on means http://bifrost:8080; "off" disables it.
+      HEIMDALL_GATEWAY_LOGS_URL: ${HEIMDALL_GATEWAY_LOGS_URL:-}
+      BIFROST_SETUP_TOKEN: ${BIFROST_SETUP_TOKEN:-}
     volumes:
       - ./bench.hosted.yaml:/srv/heimdall/deploy/bench.yaml:ro
       - heimdall-data:/var/lib/heimdall
@@ -193,7 +203,7 @@ services:
       - ${HEIMDALL_LIBRARY_DIR:-/dev/null}:${HEIMDALL_LIBRARY_DIR:-/dev/null}:ro
     tmpfs:
       - /tmp
-    networks: [edge, backend]
+    networks: [edge, backend, gatewaylogs]
     depends_on:
       postgres:
         condition: service_healthy
@@ -275,7 +285,7 @@ services:
         condition: service_healthy
       faultproxy:
         condition: service_started
-    networks: [evalnet, upstream]
+    networks: [evalnet, upstream, gatewaylogs]
     healthcheck:
       test: ["CMD-SHELL", "wget -q -O /dev/null http://127.0.0.1:8080/health"]
       interval: 2s

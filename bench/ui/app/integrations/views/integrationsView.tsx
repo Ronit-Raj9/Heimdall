@@ -386,7 +386,7 @@ function DeliveryLogPanel() {
 				<DeliveryTable
 					deliveries={deliveries}
 					hookUrls={hookUrls}
-					canRetry={canUse(session, "member") && !session.demo}
+					canRetry={canUse(session, "member")}
 					queued={queued}
 					onRetry={async (id) => {
 						setMessage(null);

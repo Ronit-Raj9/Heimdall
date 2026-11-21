@@ -12,6 +12,7 @@ import (
 	"github.com/maximhq/bifrost/bench/lib"
 	"github.com/maximhq/bifrost/bench/schemas"
 	"github.com/maximhq/bifrost/bench/tenancy"
+	"github.com/maximhq/bifrost/bench/auth"
 	"github.com/valyala/fasthttp"
 )
 
@@ -78,10 +79,26 @@ func (h *ReleasesHandler) createRelease(ctx *fasthttp.RequestCtx) {
 	case req.AnalysisID != "" && !validID(req.AnalysisID):
 		lib.SendError(ctx, h.mode, fasthttp.StatusBadRequest, lib.ErrTypeBadRequest, "analysis_id is not a valid id")
 		return
-	case strings.TrimSpace(req.Approver) == "":
+	}
+	if isLocalCaller(ctx) && strings.TrimSpace(req.Approver) == "" {
 		lib.SendError(ctx, h.mode, fasthttp.StatusBadRequest, lib.ErrTypeBadRequest, "approver is required")
 		return
 	}
+	// Only an owner or admin may approve a release (audit N8). The policy
+	// table says so for hosted routes; this check holds even if a route is
+	// mounted without it. Local mode runs as owner.
+	if !isLocalCaller(ctx) && !auth.PrincipalFrom(ctx).Can(auth.RoleAdmin) {
+		lib.SendError(ctx, h.mode, fasthttp.StatusForbidden, lib.ErrTypeForbidden, "only an org owner or admin may approve a release")
+		return
+	}
+	// The approver is the signed-in caller; a body value is accepted for
+	// compatibility and ignored outside local mode.
+	approver, ok, why := signedActor(ctx, req.Approver)
+	if !ok {
+		lib.SendError(ctx, h.mode, fasthttp.StatusForbidden, lib.ErrTypeForbidden, why)
+		return
+	}
+	req.Approver = approver
 	work, cancel := workContext(ctx, analyzeTimeout)
 	defer cancel()
 	rec, err := h.releases.Create(work, &req)

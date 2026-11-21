@@ -3856,8 +3856,6 @@ export interface OrgInfo {
 	created_at: PlatformTime;
 	/** The caller's role in the org, empty for a public reader. */
 	role?: Role;
-	/** Tenancy area: the server's public read-only demo org (demo.org with public_read). */
-	demo?: boolean;
 }
 
 /** GET /orgs. */

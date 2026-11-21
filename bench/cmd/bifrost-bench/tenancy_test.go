@@ -2,7 +2,8 @@ package main
 
 // Tenancy area (P3): cross-org isolation suite. Two orgs with real sealed
 // evidence (copies of bench/testdata/recorded, never the originals), a
-// public demo org, and the real hosted server: the real org builder,
+// public_read org named demo (left over from the retired demo config, never
+// visible to anonymous callers), and the real hosted server: the real org builder,
 // orgDeps, registry, dispatcher and policy table, with a test auth
 // middleware in place of sessions. Table-driven over every registered route.
 
@@ -136,7 +137,7 @@ func newHostedFixtureWith(t *testing.T, realLauncher bool) *hostedFixture {
 		t.Fatal(err)
 	}
 	a.cfg.Auth = lib.AuthConfig{Mode: lib.AuthModeHosted, PublicURL: "https://heimdall.test"}
-	a.cfg.Demo.Org = "demo"
+	a.cfg.Demo.Org = "demo" // retired setting: must have no effect
 	a.logger = schemas.NoopLogger{}
 	d := dbtest.Open(t)
 
@@ -506,7 +507,7 @@ func TestHostedPlatformIsolation(t *testing.T) {
 		{"viewer rename", "POST", "/api/bench/orgs/acme/rename", "vera", map[string]any{"name": "v"}, 403},
 		{"viewer audit", "GET", "/api/bench/orgs/acme/audit", "vera", nil, 403},
 		{"anonymous private org", "GET", "/api/bench/orgs/acme", "", nil, 401},
-		{"anonymous demo org", "GET", "/api/bench/orgs/demo", "", nil, 200},
+		{"anonymous demo org", "GET", "/api/bench/orgs/demo", "", nil, 401},
 		{"anonymous demo members", "GET", "/api/bench/orgs/demo/members", "", nil, 401},
 		{"anonymous creates org", "POST", "/api/bench/orgs", "", map[string]any{"slug": "anon"}, 401},
 		{"token creates org", "POST", "/api/bench/orgs", "tokA", map[string]any{"slug": "tok"}, 403},
@@ -548,13 +549,18 @@ func TestHostedPlatformIsolation(t *testing.T) {
 	}
 }
 
-// TestHostedAnonymousAndRunners: anonymous visitors read the demo org and
-// nothing else; runners reach only their org's worker routes.
+// TestHostedAnonymousAndRunners: anonymous visitors reach no org at all,
+// not even a public_read one named in the retired demo config, and not the
+// benchmark library; runners reach only their org's worker routes.
 func TestHostedAnonymousAndRunners(t *testing.T) {
 	f := newHostedFixture(t)
-	r := f.do("GET", "/api/bench/experiments", "", nil, nil)
-	if r.status != 200 || !strings.Contains(r.body, f.aExp) || !strings.Contains(r.body, f.bExp) {
-		t.Fatalf("anonymous demo list: %d %s", r.status, trim(r.body))
+	for _, path := range []string{"/api/bench/experiments", "/api/bench/catalog", "/api/bench/benchmarks/catalog", "/api/bench/suites"} {
+		if r := f.do("GET", path, "", nil, nil); r.status != 401 {
+			t.Errorf("anonymous GET %s with no org: %d, want 401: %s", path, r.status, trim(r.body))
+		}
+		if r := f.do("GET", path, "", map[string]string{tenancy.OrgHeader: "demo"}, nil); r.status != 401 {
+			t.Errorf("anonymous GET %s on the public_read org: %d, want 401", path, r.status)
+		}
 	}
 	for _, path := range sortedGETs(f.routes) {
 		if !strings.HasPrefix(path, handlers.APIPrefix) || f.platformServed("GET", path) {
@@ -571,8 +577,12 @@ func TestHostedAnonymousAndRunners(t *testing.T) {
 			}
 			continue
 		}
-		for _, org := range []string{"acme", "beta", f.acme.ID} {
-			if r := f.do("GET", p, "", map[string]string{tenancy.OrgHeader: org}, nil); r.status != 401 {
+		for _, org := range []string{"", "acme", "beta", "demo", f.acme.ID} {
+			h := map[string]string{tenancy.OrgHeader: org}
+			if org == "" {
+				h = nil
+			}
+			if r := f.do("GET", p, "", h, nil); r.status != 401 {
 				t.Errorf("anonymous %s on %s: %d, want 401", p, org, r.status)
 			}
 		}
@@ -584,11 +594,11 @@ func TestHostedAnonymousAndRunners(t *testing.T) {
 		for _, pat := range pats {
 			p := f.fill(pat, f.bExp, f.bRuns[0], f.bPair)
 			if r := f.do(method, p, "", nil, map[string]any{}); r.status != 401 && r.status != 403 {
-				t.Errorf("anonymous %s %s on the demo: %d", method, p, r.status)
+				t.Errorf("anonymous %s %s: %d", method, p, r.status)
 			}
 		}
 	}
-	// Non-member signed-in users read the demo too, and only read.
+	// Signed-in non-members read a public_read org, and only read.
 	if r := f.do("GET", "/api/bench/experiments", "mallory", map[string]string{tenancy.OrgHeader: "demo"}, nil); r.status != 200 {
 		t.Fatalf("mallory reading the demo: %d", r.status)
 	}
@@ -978,7 +988,8 @@ func hostedSignup(t *testing.T, f *hostedFixture, email, org string) string {
 }
 
 // TestHostedLeaveAndDemoFlag: members leave for themselves only, never as
-// the last owner; the demo org is flagged in org answers.
+// the last owner; no org is flagged as a demo, and the retired demo org is
+// hidden from anonymous callers.
 func TestHostedLeaveAndDemoFlag(t *testing.T) {
 	f := newHostedFixture(t)
 	for _, c := range []struct {
@@ -1005,9 +1016,11 @@ func TestHostedLeaveAndDemoFlag(t *testing.T) {
 	if ms, _ := f.d.Members(context.Background(), f.acme.ID); len(ms) != 1 {
 		t.Fatalf("acme members after vera left: %+v", ms)
 	}
-	r := f.do("GET", "/api/bench/orgs/demo", "", nil, nil)
-	if r.status != 200 || !strings.Contains(r.body, `"demo":true`) {
-		t.Fatalf("demo org: %d %s", r.status, trim(r.body))
+	if r := f.do("GET", "/api/bench/orgs/demo", "", nil, nil); r.status != 401 {
+		t.Fatalf("anonymous demo org: %d %s", r.status, trim(r.body))
+	}
+	if r := f.do("GET", "/api/bench/orgs/demo", "mallory", nil, nil); r.status != 200 || strings.Contains(r.body, `"demo":true`) {
+		t.Fatalf("public_read org flagged as demo: %d %s", r.status, trim(r.body))
 	}
 	if r := f.do("GET", "/api/bench/orgs/acme", "alice", nil, nil); strings.Contains(r.body, `"demo"`) {
 		t.Fatalf("acme flagged as demo: %s", trim(r.body))
@@ -1254,5 +1267,44 @@ func TestHostedImprovementsForAdmins(t *testing.T) {
 	}
 	if r := f.do("POST", "/api/bench/improvements/imp_missing/stop", "alice", nil, nil); r.status == 403 {
 		t.Fatalf("member stop refused: %d %s", r.status, trim(r.body))
+	}
+}
+
+// TestHostedShareLinksWithoutLogin (X03 with X14): with no public demo org,
+// an anonymous caller resolves an org only through a valid share token. A
+// live link opens without login, a revoked one is 410, and every other org
+// route stays 401 for anonymous callers.
+func TestHostedShareLinksWithoutLogin(t *testing.T) {
+	f := newHostedFixture(t)
+	r := f.do("POST", "/api/bench/shares", "alice", nil, map[string]any{"kind": "verdict", "target": f.aExp})
+	if r.status != 201 && r.status != 200 {
+		t.Fatalf("create share: %d %s", r.status, trim(r.body))
+	}
+	var made struct {
+		ID    string `json:"id"`
+		Token string `json:"token"`
+	}
+	if err := json.Unmarshal([]byte(r.body), &made); err != nil || made.Token == "" || made.ID == "" {
+		t.Fatalf("share answer %s: %v", trim(r.body), err)
+	}
+	for _, p := range []string{"/api/bench/shared/" + made.Token, "/api/bench/shared/" + made.Token + "/badge.svg"} {
+		if r := f.do("GET", p, "", nil, nil); r.status != 200 {
+			t.Errorf("anonymous %s: %d %s", p, r.status, trim(r.body))
+		}
+	}
+	// The token names the org; a header naming another org changes nothing.
+	if r := f.do("GET", "/api/bench/shared/"+made.Token, "", map[string]string{tenancy.OrgHeader: "beta"}, nil); r.status != 200 || strings.Contains(r.body, f.bExp) {
+		t.Errorf("anonymous share with a beta header: %d %s", r.status, trim(r.body))
+	}
+	for _, p := range []string{"/api/bench/experiments", "/api/bench/experiments/" + f.aExp, "/api/bench/shares"} {
+		if r := f.do("GET", p, "", map[string]string{tenancy.OrgHeader: "acme"}, nil); r.status != 401 {
+			t.Errorf("anonymous %s: %d, want 401", p, r.status)
+		}
+	}
+	if r := f.do("POST", "/api/bench/shares/"+made.ID+"/revoke", "alice", nil, nil); r.status != 200 {
+		t.Fatalf("revoke: %d %s", r.status, trim(r.body))
+	}
+	if r := f.do("GET", "/api/bench/shared/"+made.Token, "", nil, nil); r.status != 410 {
+		t.Errorf("revoked share: %d %s, want 410", r.status, trim(r.body))
 	}
 }

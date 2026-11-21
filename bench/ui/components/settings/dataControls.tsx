@@ -64,7 +64,7 @@ export function RetentionForm({ policy }: { policy: RetentionPolicy }) {
 	const { t } = useTranslation("platform");
 	const session = useSession();
 	const formId = useId();
-	const canEdit = canUse(session, "admin") && !session.demo;
+	const canEdit = canUse(session, "admin");
 	const [choice, setChoice] = useState(retentionChoice(policy.run_days));
 	const [custom, setCustom] = useState(choice === "custom" ? String(policy.run_days) : "");
 	const [saved, setSaved] = useState(false);

@@ -18,12 +18,12 @@ func init() {
 }
 
 // Release from an evaluation, schedule it and the live version (X12), and
-// failure patterns per agent and evaluation (X11): viewers read; members
-// release (the release gate and its approver rule apply inside) and
-// schedule, as for POST /releases and schedules.
+// failure patterns per agent and evaluation (X11): viewers read; admins
+// release (as POST /releases; the release gate applies inside) and members
+// schedule, as for schedules.
 func init() {
 	OrgPolicy[key("GET", api+"/evaluations/{id}/release-preview")] = org(viewer)
-	OrgPolicy[key("POST", api+"/evaluations/{id}/release")] = org(member)
+	OrgPolicy[key("POST", api+"/evaluations/{id}/release")] = org(admin) // approving a release is owner/admin only, as POST /releases
 	OrgPolicy[key("POST", api+"/evaluations/{id}/schedule")] = org(member)
 	OrgPolicy[key("GET", api+"/agents/{id}/live-version")] = org(viewer)
 	OrgPolicy[key("GET", api+"/agents/{id}/failure-patterns")] = org(viewer)

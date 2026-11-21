@@ -84,6 +84,9 @@ func TestLeaseCredentials(t *testing.T) {
 	if c := out.Credentials[0]; c.Provider != "anthropic" || c.Value != "sk-ant-org-a" || len(c.Models) != 1 {
 		t.Fatalf("credential %+v", c)
 	}
+	if out.PromptLogging == nil || *out.PromptLogging != schemas.DefaultPromptLogPolicy() { // X03
+		t.Errorf("prompt logging = %+v", out.PromptLogging)
+	}
 	body := string(ctx.Response.Body())
 	for _, leak := range []string{"sk-ant-org-b", "ghp_secret", "sk-oa-over"} {
 		if strings.Contains(body, leak) {

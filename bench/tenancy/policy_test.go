@@ -179,14 +179,16 @@ func TestResolve(t *testing.T) {
 		{"token header naming own org", org(viewer), tok, "", "acme", "org_a", auth.RoleMember, 0},
 		{"runner own org", runner(true), run, "", "", "org_b", "", 0},
 		{"runner header to other org", runner(true), run, "", "acme", "", "", 404},
-		{"anonymous demo by default", org(viewer), auth.Anonymous(), "", "", "org_d", "", 0},
+		{"anonymous gets no default org", org(viewer), auth.Anonymous(), "", "", "", "", 401},
+		{"anonymous public_read org", org(viewer), auth.Anonymous(), "", "demo", "", "", 401},
+		{"anonymous public_read org by path", pathOrg(viewer), auth.Anonymous(), "demo", "", "", "", 401},
 		{"anonymous private org", org(viewer), auth.Anonymous(), "", "acme", "", "", 401},
 		{"anonymous unknown org", org(viewer), auth.Anonymous(), "", "zzz", "", "", 401},
 		{"no org rule", signedIn(), u, "", "beta", "", auth.RoleAdmin, 0},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			o, eff, err := Resolve(context.Background(), dir, tt.rule, tt.p, tt.path, tt.header, "demo")
+			o, eff, err := Resolve(context.Background(), dir, tt.rule, tt.p, tt.path, tt.header)
 			if tt.wantStatus != 0 {
 				if got := status(err); got != tt.wantStatus {
 					t.Fatalf("status %d, want %d (%v)", got, tt.wantStatus, err)
@@ -270,7 +272,7 @@ func TestStatusCodesAreHTTP(t *testing.T) {
 func TestShareLinkAccess(t *testing.T) {
 	dir := shareDir{orgs: map[string]Org{"org_a": {ID: "org_a", Slug: "a", Name: "A"}}}
 	rule := shareLink()
-	o, eff, err := Resolve(context.Background(), dir, rule, auth.Anonymous(), "org_a.shr_0123456789abcdef0123.sig", "", "")
+	o, eff, err := Resolve(context.Background(), dir, rule, auth.Anonymous(), "org_a.shr_0123456789abcdef0123.sig", "")
 	if err != nil || o == nil || o.ID != "org_a" || eff.OrgID != "org_a" || eff.Kind != auth.KindAnonymous || eff.Role != "" {
 		t.Fatalf("resolve %v %v %v", o, eff, err)
 	}
@@ -284,11 +286,11 @@ func TestShareLinkAccess(t *testing.T) {
 		t.Fatal("runner on a share route")
 	}
 	user := &auth.Principal{Kind: auth.KindUser, UserID: "usr_x", OrgID: "org_b", Role: auth.RoleOwner}
-	if _, eff, err := Resolve(context.Background(), dir, rule, user, "org_a.x.y", "", ""); err != nil || eff.Kind != auth.KindAnonymous || eff.Role != "" {
+	if _, eff, err := Resolve(context.Background(), dir, rule, user, "org_a.x.y", ""); err != nil || eff.Kind != auth.KindAnonymous || eff.Role != "" {
 		t.Fatalf("signed-in caller must read as anonymous: %v %v", eff, err)
 	}
 	for _, tok := range []string{"", "nodot", "Bad-Org.x.y", "org_missing.x.y"} {
-		if _, _, err := Resolve(context.Background(), dir, rule, auth.Anonymous(), tok, "", ""); err == nil {
+		if _, _, err := Resolve(context.Background(), dir, rule, auth.Anonymous(), tok, ""); err == nil {
 			t.Errorf("token %q resolved", tok)
 		}
 	}

@@ -138,6 +138,7 @@ type Gateway struct {
 	memberOf map[string]string          // member key id -> its run id (teamslots.go)
 	claims   *claimState                // F1: this process's key slot claims at the fault proxy (slotclaims.go)
 	orgSt    *orgCreds                  // F4: organization key slots (orgcreds.go)
+	logSt    *orgLogs                   // X03: per-organization log tags and content logging (orglogs.go)
 }
 
 // mintRecord remembers what this process minted, so RevokeKey releases the

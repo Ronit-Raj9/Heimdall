@@ -26,15 +26,16 @@ describe("sessionFromMe", () => {
 
 	it("reads a signed-in user: current org, role, every org for the switcher", () => {
 		const s = sessionFromMe({ me: ME_OWNER, meLoading: false, config: AUTH_CONFIG });
-		expect(s).toMatchObject({ authMode: "hosted", kind: "user", signedIn: true, demo: false, role: "owner", status: "ready" });
+		expect(s).toMatchObject({ authMode: "hosted", kind: "user", signedIn: true, role: "owner", status: "ready" });
 		expect(s.org).toMatchObject({ id: "org_acme", name: "Acme Agents" });
 		expect(s.orgs.map((o) => o.slug)).toEqual(["acme", "labs"]);
 		expect(s.github).toBe(true);
 	});
 
-	it("is a signed-out hosted visitor on 401, and a demo reader when an anonymous read answered", () => {
-		expect(signedOutSession()).toMatchObject({ authMode: "hosted", signedIn: false, demo: false, kind: "anonymous", role: undefined });
-		expect(demoSession()).toMatchObject({ authMode: "hosted", signedIn: false, demo: true });
+	it("is a signed-out hosted visitor on 401, never a demo reader", () => {
+		expect(signedOutSession()).toMatchObject({ authMode: "hosted", signedIn: false, kind: "anonymous", role: undefined });
+		expect(signedOutSession()).not.toHaveProperty("demo");
+		expect(demoSession()).toEqual(signedOutSession());
 	});
 
 	it("lets a 401 win over earlier data: the session ended", () => {
@@ -80,7 +81,7 @@ describe("frameFor", () => {
 		expect(frameFor(signedOutSession(), "/invite/tok")).toBe("auth");
 		expect(frameFor(signedOutSession(), "/s/org_a.shr_1.sig")).toBe("share");
 		expect(frameFor({ ...signedOutSession(), status: "error" }, "/s/org_a.shr_1.sig")).toBe("share");
-		expect(frameFor(demoSession(), "/verdict")).toBe("app");
+		expect(frameFor(demoSession(), "/verdict")).toBe("login");
 		expect(frameFor(hostedSession("viewer"), "/settings")).toBe("app");
 	});
 });

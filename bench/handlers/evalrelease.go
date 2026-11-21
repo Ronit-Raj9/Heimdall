@@ -58,7 +58,7 @@ type EvaluationReleasePreview struct {
 
 // EvaluationReleaseRequest is POST /evaluations/{id}/release.
 type EvaluationReleaseRequest struct {
-	Approver string `json:"approver,omitempty"` // default: the signed-in user
+	Approver string `json:"approver,omitempty"` // local mode only: hosted releases record the signed-in caller
 	Note     string `json:"note,omitempty"`
 	Override string `json:"override,omitempty"` // required to release against a block
 }
@@ -166,15 +166,21 @@ func (h *evalReleaseHandler) release(ctx *fasthttp.RequestCtx) {
 			return
 		}
 	}
-	approver := strings.TrimSpace(req.Approver)
-	if p := auth.PrincipalFrom(ctx); p != nil && approver == "" {
-		approver = p.Email
-		if approver == "" {
-			approver = p.UserID
-		}
-	}
-	if approver == "" {
+	if isLocalCaller(ctx) && strings.TrimSpace(req.Approver) == "" {
 		h.fail(ctx, fasthttp.StatusBadRequest, "approver is required")
+		return
+	}
+	// Only an owner or admin may approve a release (audit N8), as for POST
+	// /releases; local mode runs as owner.
+	if !isLocalCaller(ctx) && !auth.PrincipalFrom(ctx).Can(auth.RoleAdmin) {
+		h.fail(ctx, fasthttp.StatusForbidden, "only an org owner or admin may approve a release")
+		return
+	}
+	// The approver is the signed-in caller (signedActor); a body value counts
+	// only in local mode.
+	approver, ok, why := signedActor(ctx, req.Approver)
+	if !ok {
+		h.fail(ctx, fasthttp.StatusForbidden, why)
 		return
 	}
 	ev, ok := h.load(ctx)

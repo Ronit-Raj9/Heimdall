@@ -34,7 +34,7 @@
 	},
 	"roleNote": {
 		"needs": "Needs {{min}} or above. Your role: {{role}}.",
-		"demo": "Read only in the public demo."
+		"demo": "Sign in to use this."
 	},
 	"secret": {
 		"once": "Shown once",
@@ -395,6 +395,33 @@
 		"files": {
 			"browse": "Browse",
 			"upload": "Upload a zip"
+		},
+		"promptLogs": {
+			"title": "Prompt logs",
+			"description": "Model calls of your runs on the shared worker pass through a gateway that logs them. These logs belong to your organization only: nobody else can see or delete them.",
+			"keepTitle": "Keep prompt text",
+			"keepOn": "The gateway stores the prompt and response text of each model call.",
+			"keepOff": "The gateway stores token counts, cost and timing only. Traces show no model call text, and fault checks that read request text cannot run.",
+			"turnOff": "Stop keeping text",
+			"turnOn": "Keep text",
+			"retention": "Keep logs for",
+			"days_one": "{{count}} day",
+			"days_other": "{{count}} days",
+			"save": "Save",
+			"saved": "Saved",
+			"saveError": "Could not save the prompt log setting",
+			"loadError": "Could not load the prompt log setting",
+			"rows_one": "{{count}} model call logged now",
+			"rows_other": "{{count}} model calls logged now",
+			"deleteTitle": "Delete all prompt logs",
+			"deleteBody": "Deletes every gateway log row of this organization now. Saved results and traces are not affected.",
+			"delete": "Delete logs",
+			"deleteConfirm": "Delete every prompt log of this organization? This cannot be undone.",
+			"deleted_one": "Deleted {{count}} log row",
+			"deleted_other": "Deleted {{count}} log rows",
+			"deleteError": "Could not delete the prompt logs",
+			"noGateway": "This server has no shared gateway, so it keeps no prompt logs for you. Runs on your own worker log to your own gateway.",
+			"cancel": "Cancel"
 		}
 	},
 	"jobs": {

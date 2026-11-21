@@ -134,6 +134,8 @@ func (h *leaseCredsHandler) get(ctx *fasthttp.RequestCtx) {
 	}
 	out := schemas.LeaseCredentials{OrgID: h.orgID, LeaseID: leaseID, ExpID: holder.ExpID,
 		Credentials: creds, IssuedAt: h.now().UTC()}
+	pl := OrgPromptLogPolicy(work, h.orgID) // X03: the runner tags the lease's gateway keys with the org (promptlogs.go)
+	out.PromptLogging = &pl
 	if len(holder.SecretNames) > 0 { // G01: the org secrets this slot names, and no others
 		secrets, err := h.leaseSecrets(work, holder.SecretNames)
 		if err != nil {

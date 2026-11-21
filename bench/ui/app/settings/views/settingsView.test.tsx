@@ -42,6 +42,18 @@ vi.mock("@/lib/store/apis/workerPlatformsApi", async (importOriginal) => {
 		useDisconnectWorkerPlatformMutation: () => m({}),
 	};
 });
+// Prompt logs of the organization (X03), on the Organization tab.
+vi.mock("@/lib/store/apis/promptLogsApi", async (importOriginal) => {
+	const real = await importOriginal<typeof import("@/lib/store/apis/promptLogsApi")>();
+	const { mutation: m } = await import("@/lib/testing/render");
+	return {
+		...real,
+		useGetPromptLoggingQuery: () => ({ isLoading: false }),
+		useListPromptLogsQuery: () => ({ isLoading: false }),
+		useSetPromptLoggingMutation: () => m({}),
+		useDeletePromptLogsMutation: () => m({}),
+	};
+});
 // Where runs go and your own workers (one Workers settings page).
 vi.mock("@/lib/store/apis/workerTargetApi", async (importOriginal) => {
 	const real = await importOriginal<typeof import("@/lib/store/apis/workerTargetApi")>();

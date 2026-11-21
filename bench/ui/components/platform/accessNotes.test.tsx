@@ -1,26 +1,17 @@
 import "@/lib/i18n";
 
 import { LoadError } from "@/components/runs/screenStates";
-import { LOCAL_SESSION, demoSession, hostedSession, signedOutSession } from "@/lib/testing/platformFixtures";
+import { demoSession, hostedSession } from "@/lib/testing/platformFixtures";
 import { render } from "@/lib/testing/render";
 import { describe, expect, it, vi } from "vitest";
-import { DemoBanner, ForbiddenNote, RoleGate, RoleNote } from "./accessNotes";
+import * as accessNotes from "./accessNotes";
+import { ForbiddenNote, RoleGate, RoleNote } from "./accessNotes";
 
 vi.mock("@tanstack/react-router", async () => (await import("@/lib/testing/routerMock")).routerMock);
 
-describe("DemoBanner", () => {
-	it("shows only to anonymous readers of a public demo, with one sign-in call to action back here", () => {
-		const html = render(<DemoBanner />, { ...demoSession(), github: false });
-		expect(html).toContain('data-testid="demo-banner"');
-		expect(html).toContain("Public demo, read only");
-		expect(html).toContain('href="/login?return_to=%2Fverdict"');
-		const gh = render(<DemoBanner />, { ...demoSession(), github: true });
-		expect(gh).toContain("Sign in with GitHub to run your own test");
-		expect(gh).toContain('data-testid="demo-banner-github"');
-		expect(gh).not.toContain("demo-banner-sign-in");
-		for (const session of [LOCAL_SESSION, hostedSession("viewer"), signedOutSession()]) {
-			expect(render(<DemoBanner />, session)).toBe("");
-		}
+describe("no demo banner", () => {
+	it("is gone: hosted installs serve no public demo", () => {
+		expect("DemoBanner" in accessNotes).toBe(false);
 	});
 });
 
@@ -71,6 +62,6 @@ describe("RoleGate and RoleNote", () => {
 	});
 	it("shows a demo visitor nothing at all", () => {
 		expect(render(gated, demoSession())).toBe("");
-		expect(render(<RoleNote min="member" />, demoSession())).toContain("Read only in the public demo.");
+		expect(render(<RoleNote min="member" />, demoSession())).toContain("Sign in to use this.");
 	});
 });

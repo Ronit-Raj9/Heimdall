@@ -113,11 +113,10 @@ It is safe to run again; each step skips what is done. In order:
    generated password once. Sign in and change it under Settings, Account
    (`POST /api/bench/auth/password`). The change ends every other session of
    that user; the session that made it stays signed in.
-5. imports nothing by default: a production install holds real data only.
-   Only with `--demo-runs /path/to/runs` (your own sealed runs, copied to the
-   VM) does it create a public read-only `demo` organization and import them
-   with `bifrost-bench org import` (seals are verified on the way in).
-   Heimdall's test bundle `testdata/recorded` is refused.
+5. imports nothing: a production install holds real data only, and every
+   organization route needs sign-in (`--demo-runs` and `--no-demo` are
+   accepted and ignored, for older commands). Share links (`/s/<token>`)
+   are the only pages a visitor opens without an account.
 6. starts Caddy, the server and Postgres, waits until all are healthy
 
 Create the owner with `--owner-email` (it runs `bifrost-bench user create`,
@@ -435,6 +434,7 @@ each with a one-line meaning (`.env.example` has the same list):
 | `HEIMDALL_SERVER_ADMINS` | Comma-separated emails of server admins: quotas, image approval, kill switch. |
 | `HEIMDALL_API_RATE_LIMITS` | API rate limits per token and per organization (`cred_burst,cred_per_sec,org_burst,org_per_sec`, or `off`); empty is the default. |
 | `HEIMDALL_RUNNER_IMAGE` | Runner image Heimdall starts for an organization's own worker on Fly Machines or Kubernetes; empty is the published default. |
+| `HEIMDALL_GATEWAY_LOGS_URL` | The shared gateway's log API the server lists, deletes and expires one organization's prompt logs through; empty with the shared worker on is `http://bifrost:8080`, `off` disables it. |
 | `HEIMDALL_BACKUP_PASSPHRASE_FILE` | Passphrase file kept away from the backups; `backup.sh` then writes an encrypted copy of `.env` beside each dump. |
 
 `HEIMDALL_DEV` turns on the practice suite and examples for tests and

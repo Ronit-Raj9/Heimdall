@@ -13,6 +13,7 @@ import { Check, Eye, EyeOff } from "lucide-react";
 import { useEffect, useId, useState, type FormEvent, type ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 import { DeleteOrgRow, RetentionSection } from "./dataControls";
+import { PromptLogsSection } from "./promptLogsSection";
 import { SettingsSection, When } from "./settingsBits";
 
 /** A failed write: the role refusal when it is one, the server's reason otherwise. */
@@ -181,6 +182,8 @@ function OrgSettings({ info }: { info: OrgInfo }) {
 			</SettingsSection>
 
 			<RetentionSection />
+
+			<PromptLogsSection />
 
 			{(session.user || session.authMode === "hosted") && (
 			<SettingsSection title={t("settings.org.dangerTitle")} testId="settings-org-danger">
