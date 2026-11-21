@@ -19,6 +19,10 @@
 #   docker tag heimdall/server:previous heimdall/server:local
 #   docker tag heimdall/runner:previous heimdall/runner:local   # demo runner only
 #   docker compose -f deploy/hosted/docker-compose.yml --env-file deploy/hosted/.env up -d --no-build --wait
+# With the default tags (:local) the rollback tag is :previous. A stack with
+# its own tag (HEIMDALL_IMAGE=heimdall/server:<tag>, for a second stack on
+# the same Docker host) gets :<tag>-previous instead, so two stacks never
+# move each other's rollback image; retag that one as :<tag>.
 # Migrations only add tables and columns, so the previous server runs on the
 # migrated database. If one did not, restore the dump taken in step 1
 # (docs/hosting.md, Restore).
@@ -81,16 +85,31 @@ running_image_id() {
 	docker inspect --format '{{.Image}}' "$cid" 2>/dev/null || true
 }
 
+# previous_tag IMAGE prints the rollback tag of IMAGE: repo:previous for the
+# default :local tag (the documented rollback), repo:<tag>-previous for any
+# other tag, so a second stack on the same host with its own HEIMDALL_IMAGE
+# never retags the first stack's rollback image.
+previous_tag() {
+	local repo=${1%:*} tag=${1##*:}
+	case $tag in */*) repo=$1 tag=local ;; esac # no tag, only a registry port
+	if [ "$repo" = "$1" ] || [ "$tag" = local ]; then
+		echo "$repo:previous"
+	else
+		echo "$repo:$tag-previous"
+	fi
+}
+
 keep_previous() { # keep_previous SERVICE IMAGE
-	local id
+	local id prev
+	prev=$(previous_tag "$2")
 	id=$(running_image_id "$1")
 	if [ -n "$id" ]; then
-		docker tag "$id" "${2%:*}:previous"
-		log "kept running $1 image $id as ${2%:*}:previous for rollback"
-	elif docker image inspect "${2%:*}:previous" >/dev/null 2>&1; then
-		log "no running $1 container; keeping the existing ${2%:*}:previous"
+		docker tag "$id" "$prev"
+		log "kept running $1 image $id as $prev for rollback"
+	elif docker image inspect "$prev" >/dev/null 2>&1; then
+		log "no running $1 container; keeping the existing $prev"
 	else
-		log "no running $1 container and no ${2%:*}:previous; no rollback image for $1"
+		log "no running $1 container and no $prev; no rollback image for $1"
 	fi
 }
 keep_previous heimdall "$server_image"
