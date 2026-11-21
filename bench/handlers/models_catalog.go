@@ -9,6 +9,10 @@ type ModelOption struct {
 	Cheap    bool     `json:"cheap,omitempty"` // the provider's cheapest suggested model for its purposes
 	Purposes []string `json:"purposes"`        // agent, judge, simuser, voice-stt, voice-tts
 	Rank     int      `json:"rank"`            // lower is cheaper, across providers (rough list price)
+	// OpenWeights marks a model whose weights are published (anyone can
+	// self-host it); Family groups it ("deepseek", "glm", "kimi", "qwen"...).
+	OpenWeights bool   `json:"open_weights,omitempty"`
+	Family      string `json:"family,omitempty"`
 }
 
 // ModelProviderInfo describes a provider for the key form and the picker.
@@ -20,6 +24,11 @@ type ModelProviderInfo struct {
 	KeyHint        string        `json:"key_hint"` // where to get a key
 	KeyPrefix      string        `json:"key_prefix,omitempty"`
 	Models         []ModelOption `json:"models"`
+	// BifrostProvider is the Bifrost core provider that serves this entry
+	// ("openai" for an OpenAI-compatible vendor reached through a custom
+	// base URL). CustomBaseURL is true when Bifrost reaches it that way.
+	BifrostProvider string `json:"bifrost_provider"`
+	CustomBaseURL   bool   `json:"custom_base_url"`
 }
 
 var chatPurposes = []string{"agent", "judge", "simuser"}
@@ -28,40 +37,31 @@ func modelChat(id string, rank int, cheap bool) ModelOption {
 	return ModelOption{ID: id, Cheap: cheap, Purposes: chatPurposes, Rank: rank}
 }
 
+// modelOpen is a chat model with published weights.
+func modelOpen(id, family string, rank int, cheap bool) ModelOption {
+	o := modelChat(id, rank, cheap)
+	o.OpenWeights, o.Family = true, family
+	return o
+}
+
 func modelVoice(id, purpose string, rank int) ModelOption {
 	return ModelOption{ID: id, Purposes: []string{purpose}, Rank: rank}
 }
 
-// modelProviders is the static provider list. Ranks order models by rough
-// input price so the default is the cheapest model a working key can call.
+// modelProviders is the provider list (data in models_catalog_data.go).
+// Ranks order models by rough input price so the default is the cheapest
+// model a working key can call. BifrostProvider defaults to the entry id.
 func modelProviders() []ModelProviderInfo {
-	return []ModelProviderInfo{
-		{ID: "openai", Name: "OpenAI", DefaultBaseURL: "https://api.openai.com/v1", KeyPrefix: "sk-",
-			KeyHint: "Create a key at platform.openai.com/api-keys",
-			Models: []ModelOption{modelChat("gpt-4o-mini", 20, true), modelChat("gpt-4.1-mini", 30, false), modelChat("gpt-5-mini", 35, false),
-				modelChat("o4-mini", 60, false), modelChat("gpt-4.1", 70, false), modelChat("gpt-5", 75, false), modelChat("gpt-4o", 80, false),
-				modelVoice("gpt-4o-mini-transcribe", "voice-stt", 20), modelVoice("whisper-1", "voice-stt", 30), modelVoice("gpt-4o-mini-tts", "voice-tts", 20)}},
-		{ID: "anthropic", Name: "Anthropic", DefaultBaseURL: "https://api.anthropic.com/v1", KeyPrefix: "sk-ant-",
-			KeyHint: "Create a key at console.anthropic.com/settings/keys",
-			Models:  []ModelOption{modelChat("claude-haiku-4-5", 50, true), modelChat("claude-sonnet-4-5", 85, false), modelChat("claude-opus-4-5", 95, false)}},
-		{ID: "gemini", Name: "Google Gemini", DefaultBaseURL: "https://generativelanguage.googleapis.com/v1beta",
-			KeyHint: "Create a key at aistudio.google.com/apikey",
-			Models:  []ModelOption{modelChat("gemini-2.5-flash-lite", 10, true), modelChat("gemini-2.5-flash", 40, false), modelChat("gemini-2.5-pro", 80, false)}},
-		{ID: "openrouter", Name: "OpenRouter", DefaultBaseURL: "https://openrouter.ai/api/v1", KeyPrefix: "sk-or-",
-			KeyHint: "Create a key at openrouter.ai/settings/keys; model ids look like vendor/model",
-			Models: []ModelOption{modelChat("openai/gpt-4o-mini", 21, true), modelChat("google/gemini-2.5-flash", 41, false),
-				modelChat("meta-llama/llama-3.3-70b-instruct", 45, false), modelChat("anthropic/claude-sonnet-4.5", 86, false)}},
-		{ID: "groq", Name: "Groq", DefaultBaseURL: "https://api.groq.com/openai/v1", KeyPrefix: "gsk_",
-			KeyHint: "Create a key at console.groq.com/keys",
-			Models: []ModelOption{modelChat("llama-3.1-8b-instant", 5, true), modelChat("openai/gpt-oss-120b", 25, false), modelChat("llama-3.3-70b-versatile", 45, false),
-				modelVoice("whisper-large-v3-turbo", "voice-stt", 10)}},
-		{ID: "sarvam", Name: "Sarvam AI (speech)", DefaultBaseURL: "https://api.sarvam.ai",
-			KeyHint: "Create a subscription key at dashboard.sarvam.ai; used for Indian-language speech to text and text to speech",
-			Models:  []ModelOption{modelVoice("saarika:v2.5", "voice-stt", 15), modelVoice("bulbul:v2", "voice-tts", 15), modelChat("sarvam-m", 15, true)}},
-		{ID: "openai-compatible", Name: "OpenAI-compatible endpoint", NeedsBaseURL: true,
-			KeyHint: "Any server that speaks the OpenAI API (vLLM, Ollama, LiteLLM, Together, Fireworks, DeepSeek...): give its base URL ending in /v1",
-			Models:  []ModelOption{}},
+	ps := catalogProviders()
+	for i := range ps {
+		if ps[i].BifrostProvider == "" {
+			ps[i].BifrostProvider = ps[i].ID
+		}
+		if ps[i].Models == nil {
+			ps[i].Models = []ModelOption{}
+		}
 	}
+	return ps
 }
 
 // defaultModel is the cheapest suggested chat model a usable key can call:
@@ -104,9 +104,13 @@ func defaultModel(keys []ModelKeyView) *ModelRefView {
 			consider(model, rank-reportedBonus)
 			continue
 		}
-		for _, o := range providers[k.Provider].Models {
-			if hasPurpose(o, "agent") {
-				consider(o.ID, o.Rank)
+		// A custom endpoint's static list is only examples (it serves
+		// whatever its server serves), so it never sets the default.
+		if p := providers[k.Provider]; !p.NeedsBaseURL {
+			for _, o := range p.Models {
+				if hasPurpose(o, "agent") {
+					consider(o.ID, o.Rank)
+				}
 			}
 		}
 	}
