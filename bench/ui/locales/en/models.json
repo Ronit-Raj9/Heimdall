@@ -9,6 +9,7 @@
 	"labelPlaceholder": "e.g. team OpenAI key",
 	"value": "API key",
 	"valueKeep": "Leave empty to keep the stored key",
+	"valueKeepHint": "Leave empty to keep the current key",
 	"baseUrl": "Base URL",
 	"baseUrlOptional": "Optional: override the provider's default endpoint",
 	"models": "Allowed models",

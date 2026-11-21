@@ -18,7 +18,8 @@ import {
 	useRevokeRunnerTokenMutation,
 } from "@/lib/store/apis/platformApi";
 import type { OrgSummary, Runner, RunnerTokenCreated } from "@/lib/types/bench";
-import { BookOpen, ServerCog } from "lucide-react";
+import { cn } from "@/lib/utils";
+import { BookOpen, Server, ServerCog } from "lucide-react";
 import { useId, useState, type FormEvent } from "react";
 import { useTranslation } from "react-i18next";
 import { SettingsSection, TableFrame, When } from "./settingsBits";
@@ -37,12 +38,16 @@ export function saveTokenCommand(token: string, file: string): string {
 /** Runners of the organization and the runner tokens that register them (admin). */
 export function RunnersTab({ org }: { org: OrgSummary }) {
 	const { t } = useTranslation("platform");
+	const { t: tu } = useTranslation("u11");
 	const session = useSession();
-	const runners = useListRunnersQuery(undefined, { pollingInterval: 15_000, skipPollingIfUnfocused: true });
+	const runners = useListRunnersQuery(undefined, {
+		pollingInterval: 15_000,
+		skipPollingIfUnfocused: true,
+	});
 	const [removeRunner, removeState] = useRemoveRunnerMutation();
 	const list = runners.data?.runners ?? [];
 	return (
-		<div className="flex flex-col gap-10" data-testid="settings-runners">
+		<div className="flex flex-col gap-12" data-testid="settings-runners">
 			<SettingsSection
 				title={t("settings.runners.title")}
 				description={t("settings.runners.description", { org: org.name })}
@@ -51,81 +56,70 @@ export function RunnersTab({ org }: { org: OrgSummary }) {
 				{runners.isLoading ? (
 					<BlockSkeleton rows={3} testId="runners-loading" />
 				) : runners.isError || !runners.data ? (
-					<LoadError
-						title={t("settings.runners.loadError")}
-						error={runners.error}
-						onRetry={() => void runners.refetch()}
-						testId="runners-error"
-					/>
+					<LoadError title={t("settings.runners.loadError")} error={runners.error} onRetry={() => void runners.refetch()} testId="runners-error" />
 				) : list.length === 0 ? (
 					<EmptyNote testId="runners-empty">{t("settings.runners.empty")}</EmptyNote>
 				) : (
-					<TableFrame testId="runners-table">
-						<Table stickyColumns={1}>
-							<TableHeader>
-								<TableRow>
-									<TableHead>{t("settings.runners.name")}</TableHead>
-									<TableHead>{t("settings.runners.pool")}</TableHead>
-									<TableHead>{t("settings.runners.status")}</TableHead>
-									<TableHead>{t("settings.runners.slots")}</TableHead>
-									<TableHead>{t("settings.runners.version")}</TableHead>
-									<TableHead>{t("settings.runners.lastSeen")}</TableHead>
-									<TableHead>{t("settings.runners.registered")}</TableHead>
-									<TableHead className="text-right" />
-								</TableRow>
-							</TableHeader>
-							<TableBody>
-								{list.map((runner: Runner) => (
-									<TableRow key={runner.id} data-testid={`runner-row-${runner.id}`}>
-										<TableCell>
-											<div className="flex min-w-0 flex-col">
-												<span className="text-foreground flex items-center gap-1.5 font-medium">
-													{runner.name}
-													{runner.live && (
-														<span
-															className="bg-chart-success size-1.5 rounded-full"
-															title={t("settings.runners.live")}
-															aria-label={t("settings.runners.live")}
-														/>
-													)}
-												</span>
-												<span className="text-muted-foreground font-mono text-xs">{runner.host}</span>
-											</div>
-										</TableCell>
-										<TableCell>
-											<Badge variant="outline" className="font-mono">
-												{runner.pool}
-											</Badge>
-										</TableCell>
-										<TableCell>
-											<RunnerStatusBadge state={runner.state} />
-										</TableCell>
-										<TableCell className="text-muted-foreground tabular-nums">
-											{t("settings.runners.slotsBusy", { busy: runner.running_slots, slots: runner.slots })}
-										</TableCell>
-										<TableCell className="text-muted-foreground font-mono text-xs">{runner.version}</TableCell>
-										<TableCell className="text-muted-foreground">
-											<When value={runner.last_seen} />
-										</TableCell>
-										<TableCell className="text-muted-foreground">
-											<When value={runner.registered_at} />
-										</TableCell>
-										<TableCell className="text-right">
-											<ConfirmButton
-												label={t("settings.runners.remove")}
-												question={t("settings.runners.confirmRemove", { name: runner.name })}
-												confirmLabel={t("settings.runners.remove")}
-												cancelLabel={t("settings.runners.cancel")}
-												onConfirm={() => void removeRunner(runner.id)}
-												isLoading={removeState.isLoading && removeState.originalArgs === runner.id}
-												testId={`runner-remove-${runner.id}`}
-											/>
-										</TableCell>
-									</TableRow>
-								))}
-							</TableBody>
-						</Table>
-					</TableFrame>
+					<div className="grid gap-3 sm:grid-cols-2" data-testid="runners-table">
+						{list.map((runner: Runner) => (
+							<div
+								key={runner.id}
+								className="bg-card flex flex-col gap-4 rounded-xl border p-5 transition-shadow hover:shadow-md"
+								data-testid={`runner-row-${runner.id}`}
+							>
+								<div className="flex items-start gap-3">
+									<span className="bg-muted text-muted-foreground relative flex size-9 shrink-0 items-center justify-center rounded-lg">
+										<Server className="size-4" aria-hidden="true" />
+										<span
+											className={cn(
+												"ring-card absolute -top-0.5 -right-0.5 size-2.5 rounded-full ring-2",
+												runner.live ? "bg-chart-success animate-pulse" : "bg-muted-foreground/40",
+											)}
+											title={runner.live ? t("settings.runners.live") : tu("settings.offline")}
+											aria-label={runner.live ? t("settings.runners.live") : tu("settings.offline")}
+										/>
+									</span>
+									<div className="flex min-w-0 flex-1 flex-col">
+										<span className="text-foreground truncate text-sm font-semibold" title={runner.name}>
+											{runner.name}
+										</span>
+										<span className="text-muted-foreground truncate font-mono text-xs" title={runner.host}>
+											{runner.host}
+										</span>
+									</div>
+									<RunnerStatusBadge state={runner.state} />
+								</div>
+								<div className="text-muted-foreground flex flex-wrap items-center gap-x-4 gap-y-1 text-xs">
+									<Badge variant="outline" className="rounded-full px-2 font-mono">
+										{runner.pool}
+									</Badge>
+									<span className="tabular-nums">
+										{t("settings.runners.slotsBusy", {
+											busy: runner.running_slots,
+											slots: runner.slots,
+										})}
+									</span>
+									<span className="font-mono">{runner.version}</span>
+									<span>
+										{tu("settings.lastSeen")} <When value={runner.last_seen} />
+									</span>
+								</div>
+								<div className="flex justify-end border-t pt-3">
+									<ConfirmButton
+										label={t("settings.runners.remove")}
+										question={t("settings.runners.confirmRemove", {
+											name: runner.name,
+										})}
+										confirmLabel={t("settings.runners.remove")}
+										cancelLabel={t("settings.runners.cancel")}
+										onConfirm={() => void removeRunner(runner.id)}
+										isLoading={removeState.isLoading && removeState.originalArgs === runner.id}
+										testId={`runner-remove-${runner.id}`}
+									/>
+								</div>
+							</div>
+						))}
+					</div>
 				)}
 				{removeState.error &&
 					(isRoleRefusal(session, removeState.error) ? (
@@ -135,6 +129,13 @@ export function RunnersTab({ org }: { org: OrgSummary }) {
 							{t("settings.runners.removeError")}: {getBenchErrorMessage(removeState.error)}
 						</p>
 					))}
+			</SettingsSection>
+			<SettingsSection title={tu("settings.startCommand")} description={tu("settings.startCommandHint")} testId="runner-start">
+				<CopyBlock
+					value={runnerStartCommand(typeof window === "undefined" ? "" : window.location.origin, list[0]?.pool ?? "default")}
+					label={tu("settings.startCommand")}
+					testId="runner-start-command"
+				/>
 			</SettingsSection>
 			<RunnerTokensSection />
 		</div>
@@ -180,11 +181,7 @@ function RunnerTokensSection() {
 		);
 
 	return (
-		<SettingsSection
-			title={t("settings.runners.tokensTitle")}
-			description={t("settings.runners.tokensDescription")}
-			testId="settings-runner-tokens"
-		>
+		<SettingsSection title={t("settings.runners.tokensTitle")} description={t("settings.runners.tokensDescription")} testId="settings-runner-tokens">
 			{created ? (
 				<OneTimeSecret
 					title={t("settings.runners.created", { pool: created.info.pool })}
@@ -322,7 +319,9 @@ function RunnerTokensSection() {
 										{token.state === "active" && (
 											<ConfirmButton
 												label={t("settings.runners.revoke")}
-												question={t("settings.runners.confirmRevoke", { pool: token.pool })}
+												question={t("settings.runners.confirmRevoke", {
+													pool: token.pool,
+												})}
 												confirmLabel={t("settings.runners.confirm")}
 												cancelLabel={t("settings.runners.cancel")}
 												onConfirm={() => void revoke(token.id)}

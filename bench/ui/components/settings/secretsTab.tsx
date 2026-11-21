@@ -80,7 +80,10 @@ export function SecretsTable({ secrets, canWrite, onRotate, onDelete, deletingId
 										>
 											<Input
 												type="password"
+												name="heimdall-secret-rotate"
 												autoComplete="new-password"
+												data-1p-ignore="true"
+												data-lpignore="true"
 												className="h-8 w-56"
 												aria-label={t("rotateTitle", { name: s.name })}
 												placeholder={t("rotateTitle", { name: s.name })}
@@ -241,6 +244,7 @@ function AddSecretSection({ taken }: { taken: string[] }) {
 				className="bg-muted/30 grid gap-3 rounded-lg border p-4 sm:grid-cols-[minmax(0,1fr)_minmax(0,1.4fr)_auto] sm:items-start"
 				onSubmit={(event) => void onSubmit(event)}
 				noValidate
+				autoComplete="off"
 				data-testid="secret-form"
 			>
 				<div className="flex min-w-0 flex-col gap-1.5">
@@ -249,7 +253,10 @@ function AddSecretSection({ taken }: { taken: string[] }) {
 					</label>
 					<Input
 						id={`${formId}-name`}
+						name="heimdall-secret-name"
 						autoComplete="off"
+						data-1p-ignore="true"
+						data-lpignore="true"
 						spellCheck={false}
 						className="font-mono"
 						placeholder={t("namePlaceholder")}
@@ -270,7 +277,10 @@ function AddSecretSection({ taken }: { taken: string[] }) {
 					<Input
 						id={`${formId}-value`}
 						type="password"
+						name="heimdall-secret-value"
 						autoComplete="new-password"
+						data-1p-ignore="true"
+						data-lpignore="true"
 						placeholder={t("valuePlaceholder")}
 						value={value}
 						onChange={(event) => setValue(event.target.value)}

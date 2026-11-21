@@ -18,7 +18,16 @@ import { useTranslation } from "react-i18next";
 export const SETTINGS_TABS = ["members", "tokens", "secrets", "runners", "github", "audit", "org", "account"] as const;
 export type SettingsTab = (typeof SETTINGS_TABS)[number];
 
-const TAB_ICON = { members: Users, tokens: KeyRound, secrets: LockKeyhole, runners: Server, github: Github, audit: ScrollText, org: Building2, account: UserRound } as const;
+const TAB_ICON = {
+	members: Users,
+	tokens: KeyRound,
+	secrets: LockKeyhole,
+	runners: Server,
+	github: Github,
+	audit: ScrollText,
+	org: Building2,
+	account: UserRound,
+} as const;
 
 /** A tab name from the URL, or members for anything else. */
 export function settingsTab(raw: string | null | undefined): SettingsTab {
@@ -76,52 +85,64 @@ export default function SettingsView({ tab, onTabChange }: SettingsViewProps) {
 	}
 
 	return (
-		<section className="flex min-w-0 flex-col gap-6" data-testid="settings-screen" data-mode="hosted">
+		<section className="mx-auto flex w-full max-w-[1200px] min-w-0 flex-col gap-8" data-testid="settings-screen" data-mode="hosted">
 			<header className="flex flex-col gap-1.5">
 				<div className="flex flex-wrap items-center gap-3">
-					<h1 className="text-foreground">{t("settings.title")}</h1>
+					<h1 className="text-foreground text-2xl font-semibold tracking-tight">{t("settings.title")}</h1>
 					{session.role && <RoleBadge role={session.role} />}
 				</div>
 				<p className="text-muted-foreground text-sm">{t("settings.subtitle", { org: org.name })}</p>
 			</header>
-			<Tabs value={tab} onValueChange={(value) => onTabChange(settingsTab(value))} className="gap-6">
-				<div className="-mx-1 overflow-x-auto px-1 pb-1">
-					<TabsList className="h-10" aria-label={t("settings.title")}>
+			<Tabs
+				value={tab}
+				onValueChange={(value) => onTabChange(settingsTab(value))}
+				orientation="vertical"
+				className="gap-6 md:grid md:grid-cols-[200px_minmax(0,1fr)] md:items-start md:gap-10"
+			>
+				<div className="-mx-1 overflow-x-auto px-1 pb-1 md:sticky md:top-4 md:mx-0 md:overflow-visible md:p-0">
+					<TabsList className="h-auto w-max gap-1 bg-transparent p-0 md:w-full md:flex-col md:items-stretch" aria-label={t("settings.title")}>
 						{SETTINGS_TABS.map((id) => {
 							const Icon = TAB_ICON[id];
 							return (
-								<TabsTrigger key={id} value={id} className="gap-1.5 px-3" data-testid={`settings-tab-${id}`}>
-									<Icon className="size-3.5" aria-hidden="true" />
+								<TabsTrigger
+									key={id}
+									value={id}
+									className="text-muted-foreground hover:bg-muted hover:text-foreground data-[state=active]:bg-muted data-[state=active]:text-foreground h-9 flex-none justify-start gap-2.5 rounded-lg px-3 data-[state=active]:shadow-none md:w-full dark:data-[state=active]:border-transparent dark:data-[state=active]:bg-muted"
+									data-testid={`settings-tab-${id}`}
+								>
+									<Icon className="size-4" aria-hidden="true" />
 									{id === "secrets" ? tSecrets("tab") : id === "github" ? tGithub("tabLabel") : t(`settings.tabs.${id}`)}
 								</TabsTrigger>
 							);
 						})}
 					</TabsList>
 				</div>
-				<TabsContent value="members">
-					<MembersTab org={org} />
-				</TabsContent>
-				<TabsContent value="tokens">
-					<ApiTokensTab />
-				</TabsContent>
-				<TabsContent value="secrets">
-					<SecretsTab />
-				</TabsContent>
-				<TabsContent value="runners">
-					<RunnersTab org={org} />
-				</TabsContent>
-				<TabsContent value="github">
-					<GithubTab />
-				</TabsContent>
-				<TabsContent value="audit">
-					<AuditTab org={org} />
-				</TabsContent>
-				<TabsContent value="org">
-					<OrgTab org={org} />
-				</TabsContent>
-				<TabsContent value="account">
-					<PasswordTab />
-				</TabsContent>
+				<div className="min-w-0">
+					<TabsContent value="members">
+						<MembersTab org={org} />
+					</TabsContent>
+					<TabsContent value="tokens">
+						<ApiTokensTab />
+					</TabsContent>
+					<TabsContent value="secrets">
+						<SecretsTab />
+					</TabsContent>
+					<TabsContent value="runners">
+						<RunnersTab org={org} />
+					</TabsContent>
+					<TabsContent value="github">
+						<GithubTab />
+					</TabsContent>
+					<TabsContent value="audit">
+						<AuditTab org={org} />
+					</TabsContent>
+					<TabsContent value="org">
+						<OrgTab org={org} />
+					</TabsContent>
+					<TabsContent value="account">
+						<PasswordTab />
+					</TabsContent>
+				</div>
 			</Tabs>
 		</section>
 	);

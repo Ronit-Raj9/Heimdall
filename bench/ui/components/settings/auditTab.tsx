@@ -1,22 +1,26 @@
 import { BlockSkeleton, EmptyNote, LoadError } from "@/components/runs/screenStates";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { useGetAuditLogQuery, useListMembersQuery } from "@/lib/store/apis/platformApi";
 import type { AuditEntry, AuditList, OrgSummary } from "@/lib/types/bench";
 import { cn } from "@/lib/utils";
-import { ChevronLeft, ChevronRight, Search } from "lucide-react";
+import { Bot, ChevronLeft, ChevronRight, Cog, KeyRound, Search, Server, UserRound, type LucideIcon } from "lucide-react";
 import { useId, useMemo, useState, type FormEvent } from "react";
 import { useTranslation } from "react-i18next";
-import { SettingsSection, TableFrame, When } from "./settingsBits";
+import { SettingsSection, When } from "./settingsBits";
 
 /** Rows per page of the audit log. */
 export const AUDIT_PAGE_SIZE = 50;
 
 const ACTOR_TYPES = ["user", "token", "runner", "system"] as const;
 type ActorFilter = "all" | AuditEntry["actor_type"];
+const ACTOR_ICON: Record<string, LucideIcon> = {
+	user: UserRound,
+	token: KeyRound,
+	runner: Server,
+	system: Bot,
+};
 
 /**
  * The cursor= of the page after this one: the server's opaque next cursor, or null on the last page.
@@ -63,7 +67,12 @@ export function AuditTab({ org }: { org: OrgSummary }) {
 	// Cursors of the pages seen so far: [undefined] is the newest page.
 	const [cursors, setCursors] = useState<(string | undefined)[]>([undefined]);
 	const cursor = cursors[cursors.length - 1];
-	const audit = useGetAuditLogQuery({ orgId: org.id, action: action || undefined, cursor, limit: AUDIT_PAGE_SIZE });
+	const audit = useGetAuditLogQuery({
+		orgId: org.id,
+		action: action || undefined,
+		cursor,
+		limit: AUDIT_PAGE_SIZE,
+	});
 	// Users read as their email: the member list maps ids (both are admin routes, like this tab).
 	const members = useListMembersQuery(org.id);
 	const people = useMemo(() => {
@@ -89,11 +98,7 @@ export function AuditTab({ org }: { org: OrgSummary }) {
 	};
 
 	return (
-		<SettingsSection
-			title={t("settings.audit.title")}
-			description={t("settings.audit.description", { org: org.name })}
-			testId="settings-audit"
-		>
+		<SettingsSection title={t("settings.audit.title")} description={t("settings.audit.description", { org: org.name })} testId="settings-audit">
 			<form className="flex flex-wrap items-end gap-3" onSubmit={apply} data-testid="audit-filters">
 				<div className="flex min-w-48 flex-col gap-1.5">
 					<label htmlFor={`${formId}-action`} className="text-[13px] font-medium">
@@ -130,10 +135,7 @@ export function AuditTab({ org }: { org: OrgSummary }) {
 						{t("settings.audit.filterText")}
 					</label>
 					<div className="relative">
-						<Search
-							className="text-muted-foreground pointer-events-none absolute top-1/2 left-2.5 size-3.5 -translate-y-1/2"
-							aria-hidden="true"
-						/>
+						<Search className="text-muted-foreground pointer-events-none absolute top-1/2 left-2.5 size-3.5 -translate-y-1/2" aria-hidden="true" />
 						<Input
 							id={`${formId}-text`}
 							className="h-9 pl-8"
@@ -161,56 +163,51 @@ export function AuditTab({ org }: { org: OrgSummary }) {
 			) : shown.length === 0 ? (
 				<EmptyNote testId="audit-empty">{t("settings.audit.empty")}</EmptyNote>
 			) : (
-				<TableFrame testId="audit-table">
-					<Table stickyColumns={1} className={cn(audit.isFetching && "opacity-60")}>
-						<TableHeader>
-							<TableRow>
-								<TableHead>{t("settings.audit.at")}</TableHead>
-								<TableHead>{t("settings.audit.actor")}</TableHead>
-								<TableHead>{t("settings.audit.action")}</TableHead>
-								<TableHead>{t("settings.audit.target")}</TableHead>
-								<TableHead>{t("settings.audit.ip")}</TableHead>
-								<TableHead>{t("settings.audit.details")}</TableHead>
-							</TableRow>
-						</TableHeader>
-						<TableBody>
-							{shown.map((row) => (
-								<TableRow key={row.id} data-testid={`audit-row-${row.id}`}>
-									<TableCell className="text-muted-foreground">
-										<When value={row.at} />
-									</TableCell>
-									<TableCell>
-										<span className="flex items-center gap-2">
-											<Badge variant="outline" className="text-muted-foreground">
-												{t(`settings.audit.actorTypes.${row.actor_type}`)}
-											</Badge>
-											{row.actor_type === "user" && row.actor_id && people[row.actor_id] ? (
-												<span className="text-foreground max-w-56 truncate text-xs" title={row.actor_id}>
-													{people[row.actor_id]}
-												</span>
-											) : (
-												<span className="text-foreground max-w-48 truncate font-mono text-xs" title={row.actor_id}>
-													{row.actor_id || "-"}
+				<ol className={cn("relative flex flex-col", audit.isFetching && "opacity-60")} data-testid="audit-table">
+					{shown.map((row, i) => {
+						const Icon = ACTOR_ICON[row.actor_type] ?? Cog;
+						const who =
+							row.actor_type === "user" && row.actor_id && people[row.actor_id]
+								? people[row.actor_id]
+								: row.actor_id || t(`settings.audit.actorTypes.${row.actor_type}`);
+						const target = `${row.target_type ? `${row.target_type}:` : ""}${row.target_id || ""}`;
+						const details = detailsLine(row.details);
+						return (
+							<li key={row.id} className="relative flex gap-4 pb-6 last:pb-0" data-testid={`audit-row-${row.id}`}>
+								{i < shown.length - 1 && <span className="bg-border absolute top-9 bottom-0 left-[17px] w-px" aria-hidden="true" />}
+								<span className="bg-muted text-muted-foreground relative flex size-9 shrink-0 items-center justify-center rounded-full border">
+									<Icon className="size-4" aria-hidden="true" />
+								</span>
+								<div className="flex min-w-0 flex-1 flex-col gap-1 pt-1">
+									<div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-sm">
+										<span className="text-foreground max-w-64 truncate font-medium" title={row.actor_id}>
+											{who}
+										</span>
+										<code className="bg-muted text-foreground rounded px-1.5 py-0.5 font-mono text-xs">{row.action}</code>
+										{target && (
+											<span className="text-muted-foreground max-w-64 truncate font-mono text-xs" title={target}>
+												{target}
+											</span>
+										)}
+										<span className="text-muted-foreground ml-auto text-xs">
+											<When value={row.at} />
+										</span>
+									</div>
+									{(details || row.ip) && (
+										<div className="text-muted-foreground flex min-w-0 flex-wrap gap-x-3 font-mono text-xs">
+											{details && (
+												<span className="max-w-full truncate" title={details}>
+													{details}
 												</span>
 											)}
-										</span>
-									</TableCell>
-									<TableCell>
-										<code className="bg-muted text-foreground rounded px-1.5 py-0.5 font-mono text-xs">{row.action}</code>
-									</TableCell>
-									<TableCell className="text-muted-foreground max-w-56 truncate font-mono text-xs" title={row.target_id}>
-										{row.target_type ? `${row.target_type}:` : ""}
-										{row.target_id || (row.target_type ? "" : "-")}
-									</TableCell>
-									<TableCell className="text-muted-foreground font-mono text-xs">{row.ip || "-"}</TableCell>
-									<TableCell className="text-muted-foreground max-w-80 truncate font-mono text-xs" title={detailsLine(row.details)}>
-										{detailsLine(row.details) || "-"}
-									</TableCell>
-								</TableRow>
-							))}
-						</TableBody>
-					</Table>
-				</TableFrame>
+											{row.ip && <span>{row.ip}</span>}
+										</div>
+									)}
+								</div>
+							</li>
+						);
+					})}
+				</ol>
 			)}
 
 			<nav className="flex items-center justify-between gap-2" aria-label={t("settings.audit.title")} data-testid="audit-paging">

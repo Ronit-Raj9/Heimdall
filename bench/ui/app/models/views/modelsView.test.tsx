@@ -1,10 +1,11 @@
 import "@/lib/i18n";
 
 import { modelSuggestions, providersFor } from "@/components/models/modelPicker";
-import { errorQuery, okQuery, render } from "@/lib/testing/render";
+import { routerState } from "@/lib/testing/routerMock";
+import { errorQuery, okQuery, render, tagOf } from "@/lib/testing/render";
 import type { ModelsCatalogResponse } from "@/lib/types/models";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import ModelsView, { addParam, parseModels } from "./modelsView";
+import ModelsView, { addParam, keyRequestBody, parseModels } from "./modelsView";
 
 const api = vi.hoisted(() => ({ q: {} as Record<string, unknown> }));
 vi.mock("@tanstack/react-router", async () => (await import("@/lib/testing/routerMock")).routerMock);
@@ -67,6 +68,34 @@ describe("ModelsView", () => {
 	it("shows a load error", () => {
 		api.q = { models: errorQuery(500) };
 		expect(render(<ModelsView />)).toContain('data-testid="models-error"');
+	});
+});
+
+describe("key form autofill guard", () => {
+	it("never lets the browser fill the key value or label", () => {
+		routerState.location.search = { add: "openai" };
+		try {
+			const html = render(<ModelsView />);
+			const value = tagOf(html, "model-key-value") ?? "";
+			expect(value).toContain('autoComplete="new-password"');
+			expect(value).toContain('data-1p-ignore="true"');
+			expect(value).toContain('data-lpignore="true"');
+			const label = tagOf(html, "model-key-label") ?? "";
+			expect(label).toContain('autoComplete="off"');
+			expect(label).toContain('name="heimdall-key-label"');
+			expect(label).toContain('data-lpignore="true"');
+			expect(tagOf(html, "model-key-base-url")).toContain('autoComplete="off"');
+		} finally {
+			routerState.location.search = {};
+		}
+	});
+
+	it("omits an empty value so an edit keeps the stored key", () => {
+		const base = { provider: "openai" as const, label: " team ", baseUrl: "", modelsText: "a, b", budget: "5" };
+		const edit = keyRequestBody({ ...base, value: "   " });
+		expect("value" in edit).toBe(false);
+		expect(edit).toEqual({ provider: "openai", label: "team", base_url: "", models: ["a", "b"], budget_usd: 5 });
+		expect(keyRequestBody({ ...base, value: " sk-new " }).value).toBe("sk-new");
 	});
 });
 
