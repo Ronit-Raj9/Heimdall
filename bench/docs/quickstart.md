@@ -427,8 +427,11 @@ still yours:
    Only the notes file, skill folders and that committed config reach the
    runs. A difference anywhere else (a file under `prompts/`, another
    agent's config) is refused with the file named, since both arms would
-   run the same inputs; reference a prompt from the committed config so it
-   is part of the config change.
+   run the same inputs. Referencing a prompt file from the committed config
+   does not change that: referenced files are not copied per ref, so put
+   the change in the notes file or a skill folder. A ref that deletes the
+   notes file is refused when the agent config names its own
+   `notes.user_file`, since that file would stand in for the deleted one.
    A model swap is `--a model=<m1> --b model=<m2>`.
 7. **Wire CI.** Commit `.heimdall/` (its `.gitignore` keeps `runs/` and
    `deploy/.env` out) and the workflow. Recorded mode needs one sealed

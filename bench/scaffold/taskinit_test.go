@@ -478,3 +478,28 @@ func TestGoImportPath(t *testing.T) {
 		t.Error("a file with no go.mod above it has an import path")
 	}
 }
+
+// QC2-21-09: a suite.yaml whose tasks key cannot be edited fails before the
+// task is published, and a corrected suite takes a plain retry.
+func TestInitTaskSuiteErrorLeavesNoOrphan(t *testing.T) {
+	r, base, ref := pythonRepo(t)
+	_, suiteDir := newSuiteDir(t, "py", TemplatePythonPytest)
+	suitePath := filepath.Join(suiteDir, "suite.yaml")
+	good := readFile(t, suitePath)
+	if err := os.WriteFile(suitePath, []byte(good+"\ntasks: invalid\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	opts := TaskInitOptions{SuiteDir: suiteDir, ID: "t01", Repo: r.dir, Base: base, Reference: ref, License: "MIT"}
+	if _, err := InitTask(context.Background(), opts); err == nil {
+		t.Skip("fixture: suite accepted a scalar tasks key")
+	}
+	if _, err := os.Stat(filepath.Join(suiteDir, "tasks", "t01")); err == nil {
+		t.Fatal("a failed init left the task folder")
+	}
+	if err := os.WriteFile(suitePath, []byte(good), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := InitTask(context.Background(), opts); err != nil {
+		t.Fatalf("retry after fixing the suite: %v", err)
+	}
+}

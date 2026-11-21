@@ -269,13 +269,23 @@ func (s *Server) Serve(ctx context.Context, ln net.Listener) error {
 	s.closeHandlers()
 	shutdownCtx, cancel := context.WithTimeout(context.Background(), shutdownTimeout)
 	defer cancel()
-	if err := s.server.ShutdownWithContext(shutdownCtx); err != nil {
-		return fmt.Errorf("shut down bench API: %w", err)
+	shutdownErr := s.server.ShutdownWithContext(shutdownCtx)
+	// When ctx ended before the serving goroutine registered ln, the
+	// library's shutdown has nothing to close and Serve would then accept
+	// on ln forever: close it here too, and bound the wait (QC2-20-05).
+	_ = ln.Close()
+	select {
+	case err := <-errCh:
+		if shutdownErr != nil {
+			return fmt.Errorf("shut down bench API: %w", shutdownErr)
+		}
+		if err != nil && !errors.Is(err, net.ErrClosed) {
+			return fmt.Errorf("serve bench API: %w", err)
+		}
+		return nil
+	case <-shutdownCtx.Done():
+		return fmt.Errorf("shut down bench API: serving did not stop within %s", shutdownTimeout)
 	}
-	if err := <-errCh; err != nil {
-		return fmt.Errorf("serve bench API: %w", err)
-	}
-	return nil
 }
 
 // closeHandlers closes the live event streams: local mode's experiments

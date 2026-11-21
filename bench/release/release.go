@@ -455,6 +455,24 @@ func (l *Log) newestAnalysis(base string) (string, error) {
 	return best, nil
 }
 
+// frozenPolicySkipped reports why the analysis's policy result is not an
+// evaluation of the policy the experiment froze, or "". `check -policy none`
+// and `check -policy <other file>` write ordinary analyses; releasing one of
+// them without an override reason would let a policy the experiment never
+// agreed to (or no policy) stand in for the frozen one (QC2-22-01).
+func frozenPolicySkipped(m *schemas.Manifest, p *schemas.PolicyResult) string {
+	if m.Experiment.Policy == "" {
+		return ""
+	}
+	if p == nil {
+		return fmt.Sprintf("the analysis did not evaluate the frozen policy %s", m.Experiment.Policy)
+	}
+	if m.PolicyHash != "" && p.PolicyHash != m.PolicyHash {
+		return fmt.Sprintf("the analysis evaluated policy %s (%s), not the frozen policy %s (%s)", p.PolicyName, p.PolicyHash, m.Experiment.Policy, m.PolicyHash)
+	}
+	return ""
+}
+
 // checkRelease applies the release rule: ship and not blocked, or an
 // override reason. An override with nothing to override is refused so a red
 // override marker always means something. Integrity problems are never
@@ -490,6 +508,9 @@ func checkRelease(m *schemas.Manifest, ev *evidence, override string) error {
 	}
 	if ev.policy != nil && ev.policy.Decision == schemas.PolicyBlock {
 		blocked = append(blocked, fmt.Sprintf("policy %s decision is block", ev.policy.PolicyName))
+	}
+	if reason := frozenPolicySkipped(m, ev.policy); reason != "" {
+		blocked = append(blocked, reason)
 	}
 	switch {
 	case len(blocked) > 0 && override == "":

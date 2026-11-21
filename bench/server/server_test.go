@@ -222,3 +222,27 @@ func (l *countLogger) count(sub string) int {
 	}
 	return n
 }
+
+// TestServeAlreadyCancelled covers QC2-20-05: a context that ends before
+// the serving goroutine registers its listener still shuts down; Serve
+// never waits forever on a listener the library did not know about.
+func TestServeAlreadyCancelled(t *testing.T) {
+	for i := 0; i < 20; i++ {
+		s, err := New(testConfig(), Deps{})
+		if err != nil {
+			t.Fatal(err)
+		}
+		ctx, cancel := context.WithCancel(context.Background())
+		cancel()
+		done := make(chan error, 1)
+		go func() { done <- s.Serve(ctx, fasthttputil.NewInmemoryListener()) }()
+		select {
+		case err := <-done:
+			if err != nil {
+				t.Fatalf("Serve = %v", err)
+			}
+		case <-time.After(5 * time.Second):
+			t.Fatal("Serve with a cancelled context did not return")
+		}
+	}
+}

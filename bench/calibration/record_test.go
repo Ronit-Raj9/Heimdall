@@ -112,13 +112,13 @@ func TestRecordChain(t *testing.T) {
 	if got := set.ForPrompt("judge-model", r1.PromptSHA256); got == nil || got.RecordID != r2.RecordID {
 		t.Fatalf("ForPrompt = %+v, want the newest", got)
 	}
-	if cov, _ := set.Covering("judge-model", []string{"aaa"}); cov == nil || cov.RecordID != r2.RecordID {
+	if cov, _ := set.Covering(JudgeID{Model: "judge-model"}, []string{"aaa"}); cov == nil || cov.RecordID != r2.RecordID {
 		t.Fatalf("Covering = %+v", cov)
 	}
-	if cov, newest := set.Covering("judge-model", []string{"zzz"}); cov != nil || newest == nil {
+	if cov, newest := set.Covering(JudgeID{Model: "judge-model"}, []string{"zzz"}); cov != nil || newest == nil {
 		t.Fatalf("an uncovered template: %v %v", cov, newest)
 	}
-	if cov, newest := set.Covering("other", []string{"aaa"}); cov != nil || newest != nil {
+	if cov, newest := set.Covering(JudgeID{Model: "other"}, []string{"aaa"}); cov != nil || newest != nil {
 		t.Fatal("another model is not covered")
 	}
 	if Ref(r2) != r2.RecordID+"@"+r2.Hash {

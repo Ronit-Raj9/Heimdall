@@ -163,9 +163,9 @@ func GitHubWorkflow(o WorkflowOptions) (string, error) {
 		experiment = "experiments/pr-gate.yaml"
 		var args []string
 		args = append(args, "--baseline", "\"origin/${{ github.base_ref || 'main' }}\"", "--candidate", "\"${{ github.sha }}\"",
-			"--base", o.Base, "--trials", fmt.Sprint(o.Trials))
+			"--base", shellQuote(o.Base), "--trials", fmt.Sprint(o.Trials))
 		for _, f := range o.Faults {
-			args = append(args, "--fault", f)
+			args = append(args, "--fault", shellQuote(f)) // QC2-22-06: a path or value with spaces stays one argument
 		}
 		args = append(args, "--budget-usd", fmt.Sprint(o.BudgetUSD), "--name", "pr-gate", "--write-only")
 		w("      - name: Write the baseline-vs-candidate experiment")
@@ -178,6 +178,12 @@ func GitHubWorkflow(o WorkflowOptions) (string, error) {
 		w("          code=0")
 		w("          \"$RUNNER_TEMP/heimdall\" compare %s || code=$?", strings.Join(args, " "))
 		w("          if [ \"$code\" -eq %d ]; then", ExitNoAgentChange)
+		w("            # A release-policy change is not an agent change, but it must not")
+		w("            # pass unevaluated: fail so it is checked (QC2-22-05).")
+		w("            if ! git diff --quiet \"origin/${{ github.base_ref || 'main' }}\" \"${{ github.sha }}\" -- policies; then")
+		w("              echo \"::error title=Heimdall gate::.heimdall/policies changed without an agent change; run a recorded check with the new policy (heimdall check -exp <id> -policy <file>)\"")
+		w("              exit 1")
+		w("            fi")
 		w("            echo \"changed=false\" >> \"$GITHUB_OUTPUT\"")
 		w("            echo \"no agent change between the refs: gate skipped\"")
 		w("            exit 0")
@@ -255,4 +261,15 @@ func GitHubWorkflow(o WorkflowOptions) (string, error) {
 	w("            ${{ runner.temp }}/heimdall-card.md")
 	w("          if-no-files-found: warn")
 	return b.String(), nil
+}
+
+// shellQuote quotes s for a bash command line when it holds anything but
+// plain path characters.
+func shellQuote(s string) string {
+	if s != "" && strings.IndexFunc(s, func(r rune) bool {
+		return !(r >= 'a' && r <= 'z' || r >= 'A' && r <= 'Z' || r >= '0' && r <= '9' || strings.ContainsRune("._-/:=,+@", r))
+	}) < 0 {
+		return s
+	}
+	return "'" + strings.ReplaceAll(s, "'", `'"'"'`) + "'"
 }

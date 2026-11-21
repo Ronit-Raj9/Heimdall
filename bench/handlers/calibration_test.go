@@ -32,7 +32,7 @@ func newFakeCalibration(t *testing.T) *fakeCalibration {
 		t.Fatal(err)
 	}
 	tmpls := map[string]string{"qa-v1-answer": "aaa"}
-	rec := &schemas.CalibrationRecord{Suite: "qa", Model: "judge-model", PromptVersion: "qa-v1", Templates: tmpls, PromptSHA256: calibration.PromptHash(tmpls),
+	rec := &schemas.CalibrationRecord{Suite: "qa", Provider: "openai", Model: "judge-model", PromptVersion: "qa-v1", Templates: tmpls, PromptSHA256: calibration.PromptHash(tmpls),
 		Votes: 1, CreatedAt: time.Now().UTC(), USD: schemas.Observed(0.01, schemas.EvidenceGateway)}
 	var runs []calibration.ItemRun
 	for k := 0; k < 40; k++ {
@@ -56,7 +56,8 @@ func (f *fakeCalibration) CalibrationStatus(_ context.Context, id string) (*sche
 	if id != "qa" {
 		return nil, fmt.Errorf("suite %s: %w", id, schemas.ErrNotFound)
 	}
-	return calibration.Status(f.suite, map[string]string{"qa-v1-answer": "aaa"}, calibration.Thresholds(nil, ""), time.Now().UTC())
+	return calibration.Status(f.suite, &calibration.StatusJudge{ID: calibration.JudgeID{Provider: f.suite.Judge.Provider, Model: f.suite.Judge.Model, Votes: 1},
+		PromptVersion: f.suite.Judge.PromptVersion, Templates: map[string]string{"qa-v1-answer": "aaa"}}, calibration.Thresholds(nil, ""), time.Now().UTC())
 }
 
 func (f *fakeCalibration) CalibrationLabels(_ context.Context, id string) (*schemas.CalibrationLabels, error) {

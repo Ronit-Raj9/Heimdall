@@ -641,11 +641,35 @@ func reproveReviewed(ctx context.Context, a *app, root, suiteID, taskID string) 
 		fmt.Printf("%s/%s: NOT admitted after the review: %s\n", suiteID, taskID, failedChecks(rec))
 		return 1
 	}
-	if _, err := recordProofs(ctx, a, suiteID, before, map[string]proof{taskID: pr}); err != nil {
+	dropped, err := recordProofs(ctx, a, suiteID, before, map[string]proof{taskID: pr})
+	if err != nil {
 		return fail("%v", err)
+	}
+	// The proof counts only when the written lock holds it: recordProofs
+	// drops a proof whose task or suite changed while it ran (QC2-21-06).
+	if reviewProofDropped(dropped, taskID) {
+		fmt.Printf("%s/%s: proved, but the task or suite changed during the proof, so the admission was not recorded; run `%s task review %s/%s` again\n", suiteID, taskID, progName, suiteID, taskID)
+		return 1
+	}
+	if s, err := loadSuite(ctx, a.cfg.Path(a.cfg.BenchmarksRoot), suiteID); err != nil {
+		return fail("load suite %s: %v", suiteID, err)
+	} else if !admittedIn(s.Lock, taskID) {
+		fmt.Printf("%s/%s: proved, but suite.lock does not record its admission; run `%s task admit %s/%s`\n", suiteID, taskID, progName, suiteID, taskID)
+		return 1
 	}
 	fmt.Printf("%s/%s: proved again and admitted (%.1fs)\n", suiteID, taskID, time.Since(t0).Seconds())
 	return exitOK
+}
+
+// reviewProofDropped reports whether recordProofs dropped the reviewed
+// task's fresh proof.
+func reviewProofDropped(dropped []string, taskID string) bool {
+	for _, id := range dropped {
+		if id == taskID {
+			return true
+		}
+	}
+	return false
 }
 
 // admissionCurrent reports whether suite.lock holds an admission of the

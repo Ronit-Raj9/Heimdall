@@ -9,6 +9,8 @@ prompt_version
 prompt_sha256
 templates
 votes
+aggregate?
+pass_score?
 served_models?
 set_sha256
 set_rows
@@ -19,6 +21,7 @@ labellers?
 human
 seed?
 categories?
+by_template?
 consistency
 perturbations?
 items

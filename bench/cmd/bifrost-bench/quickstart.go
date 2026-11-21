@@ -179,12 +179,33 @@ func loadConfig(path string) (*lib.Config, error) {
 	return lib.LoadConfig(resolveConfigPath(path))
 }
 
-// resolveConfigPath is the config path loadConfig reads.
+// resolveConfigPath is the config path loadConfig reads. Only the implicit
+// default is discovered: a -config the caller named, even the conventional
+// deploy/bench.yaml, is loaded literally, so a missing file is an error
+// rather than a fall back to another project's store (QC2-21-01).
 func resolveConfigPath(path string) string {
-	if path != defaultConfig {
+	if path != defaultConfig || configExplicit {
 		return path
 	}
 	return projectConfig(path, false)
+}
+
+// configExplicit is set by main when the command line names -config.
+var configExplicit bool
+
+// namesConfig reports whether args set the -config flag (any of -config,
+// --config, with the value attached by = or following), before a "--".
+func namesConfig(args []string) bool {
+	for _, a := range args {
+		if a == "--" {
+			return false
+		}
+		name, _, _ := strings.Cut(strings.TrimLeft(a, "-"), "=")
+		if strings.HasPrefix(a, "-") && name == "config" {
+			return true
+		}
+	}
+	return false
 }
 
 // projectConfig returns the bench config a first-workflow command uses: the

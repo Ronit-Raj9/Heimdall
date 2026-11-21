@@ -247,7 +247,9 @@ func (h *ExperimentsHandler) getDiagnostics(ctx *fasthttp.RequestCtx) {
 	if !ok {
 		return
 	}
-	lib.SendJSON(ctx, h.mode, fasthttp.StatusOK, schemas.DiagnosticsPayload{
+	// The diagnostics are the same analysis's numbers: they carry its mode
+	// like the verdict does (QC2-20-08).
+	lib.SendJSON(ctx, analysisMode(h.mode, a), fasthttp.StatusOK, schemas.DiagnosticsPayload{
 		AnalysisID: a.AnalysisID, ExpID: m.ExpID, Diagnostics: a.Diagnostics, Meters: a.Meters, ArmMetrics: a.ArmMetrics,
 	})
 }
@@ -551,11 +553,26 @@ func (h *ExperimentsHandler) analyze(ctx *fasthttp.RequestCtx, expID string) (*s
 }
 
 // analysisMode is the mode a response about analysis a is labeled with: the
-// analysis's mode when it records one and the server is live, else the
-// server's. It is never live unless both the server and the analysis are.
+// weaker of the server's mode and the analysis's (live, then recorded, then
+// synthetic). It is never live unless both the server and the analysis are,
+// and a synthetic analysis is synthetic on a recorded server too (QC2-20-08).
 func analysisMode(server schemas.Mode, a *schemas.Analysis) schemas.Mode {
-	if server == schemas.ModeLive && a != nil && a.Mode != "" {
+	if a == nil || a.Mode == "" {
+		return server
+	}
+	if modeRank(a.Mode) < modeRank(server) {
 		return a.Mode
 	}
 	return server
+}
+
+// modeRank orders modes by how real their data is.
+func modeRank(m schemas.Mode) int {
+	switch m {
+	case schemas.ModeLive:
+		return 2
+	case schemas.ModeRecorded:
+		return 1
+	}
+	return 0
 }

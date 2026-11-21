@@ -83,7 +83,11 @@ func runAgentInit(args []string, out io.Writer) int {
 	if err != nil {
 		return fail("%v", err)
 	}
-	root, err := projectRoot(*config)
+	// The implicit default is discovered like every other command's config
+	// (the .heimdall project of the repository), so the agent lands where
+	// the planner resolves agents/ (QC2-21-02). Before any project exists
+	// discovery keeps deploy/bench.yaml and scaffolds beside it.
+	root, err := projectRoot(projectConfig(*config, flagSet(fs, "config")))
 	if err != nil {
 		return fail("%v", err)
 	}

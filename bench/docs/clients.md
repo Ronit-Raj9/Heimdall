@@ -68,7 +68,7 @@ HEIMDALL_URL=http://127.0.0.1:8090 BENCH_WRITE_TOKEN=... python3 bench/clients/e
 node --experimental-strip-types bench/clients/examples/ci-gate.ts experiments/smoke.yaml
 ```
 
-Both examples plan (and stop on planner errors), create and start, wait, then exit 0 when the gate passes, 1 when the release policy blocks (`--fail-on-warn` also fails on warn), 2 when the experiment did not finish, 3 when the server is not live, 4 when the plan was refused or a request failed. `--exp <id>` gates an experiment that already ran. Against the recorded bundle:
+Both examples plan (and stop on planner errors), create and start, wait, then exit 0 when the gate passes, 1 when the verdict is in `--fail-on` (default `regressed,invalid`, as `bifrost-bench check`) or the release policy blocks (`--fail-on-warn` also fails on warn; `--policy-only` ignores the verdict), 2 when the experiment did not finish, 3 when the server is not live, 4 when the plan was refused or a request failed. `--exp <id>` gates an experiment that already ran. Against the recorded bundle:
 
 ```text
 $ python3 bench/clients/examples/ci_gate.py --exp e_pilot_mixed_nc93 --allow-recorded

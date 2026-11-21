@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"flag"
+	"sort"
 	"strings"
 	"testing"
 
@@ -93,5 +94,62 @@ func TestHostedOpenAPIListsPlatformRoutes(t *testing.T) {
 	}
 	if _, ok := doc.Components.SecuritySchemes["writeToken"]; ok {
 		t.Error("hosted OpenAPI describes the local write token")
+	}
+}
+
+// TestHostedOpenAPISecurityFollowsPolicy covers QC2-20-03: hosted
+// operations describe the authentication the tenancy dispatcher enforces.
+// Account-only writes take the session (with CSRF), org reads take a
+// session without CSRF or an API token, and routes the hosted policy
+// denies are not advertised.
+func TestHostedOpenAPISecurityFollowsPolicy(t *testing.T) {
+	f := newHostedFixture(t)
+	r := f.do("GET", "/api/bench/openapi.json", "alice", nil, nil)
+	if r.status != 200 {
+		t.Fatalf("openapi: %d %s", r.status, trim(r.body))
+	}
+	var doc struct {
+		Paths map[string]map[string]struct {
+			Security []map[string][]string `json:"security"`
+		} `json:"paths"`
+	}
+	if err := json.Unmarshal([]byte(r.body), &doc); err != nil {
+		t.Fatal(err)
+	}
+	schemes := func(path, method string) []string {
+		op, ok := doc.Paths[path][method]
+		if !ok {
+			t.Fatalf("%s %s missing", method, path)
+		}
+		var out []string
+		for _, req := range op.Security {
+			var names []string
+			for k := range req {
+				names = append(names, k)
+			}
+			sort.Strings(names)
+			out = append(out, strings.Join(names, "+"))
+		}
+		return out
+	}
+	for _, tt := range []struct {
+		path, method string
+		want         []string
+	}{
+		{"/api/bench/auth/password", "post", []string{"csrf+session"}},
+		{"/api/bench/auth/switch-org", "post", []string{"csrf+session"}},
+		{"/api/bench/orgs", "post", []string{"csrf+session"}},
+		{"/api/bench/runners", "get", []string{"session", "apiToken"}},
+		{"/api/bench/auth/login", "post", nil},
+	} {
+		if got := schemes(tt.path, tt.method); strings.Join(got, ",") != strings.Join(tt.want, ",") {
+			t.Errorf("%s %s security %v, want %v", tt.method, tt.path, got, tt.want)
+		}
+	}
+	if _, ok := doc.Paths["/api/bench/canaries/{name}/run"]["post"]; ok {
+		t.Error("hosted OpenAPI advertises the denied canary run")
+	}
+	if _, ok := doc.Paths["/api/bench/livescore/pull"]["post"]; ok {
+		t.Error("hosted OpenAPI advertises the denied live-score pull")
 	}
 }

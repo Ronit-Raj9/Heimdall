@@ -170,12 +170,17 @@ func RunVisualCalibration(ctx context.Context, cfg JudgeConfig, plan *VisualCali
 	served := map[string]bool{}
 	var usd float64
 	priced, unpriced := true, ""
-	cast := func(msg visionMessage) ([]string, error) {
+	// Each pass is decided as the production grader decides a grade
+	// (tallyVisual: majority, or the mean score against pass_score), not by
+	// the majority of the pass/fail words (QC2-25-03).
+	cast := func(msg visionMessage) ([]string, string, error) {
 		votes := make([]string, 0, plan.Spec.Votes)
+		raw := make([]string, 0, plan.Spec.Votes)
+		var scores []float64
 		for i := 0; i < plan.Spec.Votes; i++ {
 			reply, tok, model, err := g.visionCall(ctx, key, &plan.Spec, msg)
 			if err != nil {
-				return nil, err
+				return nil, "", err
 			}
 			spend.Calls++
 			if model != "" {
@@ -193,18 +198,23 @@ func RunVisualCalibration(ctx context.Context, cfg JudgeConfig, plan *VisualCali
 				}
 				usd += c
 			}
-			v, _, _ := ParseVisualReply(reply)
+			v, score, _ := ParseVisualReply(reply)
 			votes = append(votes, textVotes([]string{v})[0])
+			raw = append(raw, v)
+			if v != visualVoteUnparsable {
+				scores = append(scores, score)
+			}
 		}
-		return votes, nil
+		verdict, _ := tallyVisual(raw, scores, aggregateOf(&plan.Spec), plan.Spec.PassScore)
+		return votes, calibrationVerdict(verdict), nil
 	}
 	out := make([]calibration.ItemRun, 0, len(plan.Items))
 	for n, it := range plan.Items {
 		r := calibration.ItemRun{Item: it.Item, Category: it.Item.Item.Task, Template: plan.Spec.PromptVersion}
-		if r.Votes, err = cast(it.Msg); err != nil {
+		if r.Votes, r.Verdict, err = cast(it.Msg); err != nil {
 			return nil, nil, fmt.Errorf("item %s: %w", it.Item.Item.ID, err)
 		}
-		if r.Repeat, err = cast(it.Msg); err != nil {
+		if r.Repeat, r.RepeatVerdict, err = cast(it.Msg); err != nil {
 			return nil, nil, fmt.Errorf("item %s repeat: %w", it.Item.Item.ID, err)
 		}
 		out = append(out, r)
@@ -234,6 +244,19 @@ func VisualCalibrationRecord(s *schemas.Suite, plan *VisualCalibrationPlan, set 
 		ServedModels: spend.ServedModels, SetSHA256: set.SHA256, SetRows: len(set.Items), Calls: spend.Calls, USD: spend.USD, PriceRef: priceRef,
 		CreatedAt: time.Now().UTC().Truncate(time.Second),
 	}
+	id := visualJudgeID(&plan.Spec)
+	rec.Aggregate, rec.PassScore = id.Aggregate, id.PassScore
 	calibration.Build(rec, runs, disputed)
 	return rec
+}
+
+// calibrationVerdict maps a vision verdict to the calibration's words.
+func calibrationVerdict(v string) string {
+	switch v {
+	case visualVerdictPass:
+		return schemas.CalibrationVerdictCorrect
+	case visualVerdictFail:
+		return schemas.CalibrationVerdictIncorrect
+	}
+	return schemas.CalibrationVerdictUndecided
 }

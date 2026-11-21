@@ -159,3 +159,21 @@ func TestGitHubWorkflowGolden(t *testing.T) {
 		t.Error("unknown mode accepted")
 	}
 }
+
+// QC2-22-05, QC2-22-06: the live workflow quotes a base path with spaces
+// and fails, instead of skipping, a change confined to .heimdall/policies.
+func TestLiveWorkflowQuotesBaseAndChecksPolicies(t *testing.T) {
+	got, err := GitHubWorkflow(WorkflowOptions{Mode: ModeLive, Source: "x/y", SourceRef: "main", Base: "agents/Research Agent.yaml", Trials: 1, BudgetUSD: 5})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(got, "--base 'agents/Research Agent.yaml' --trials") {
+		t.Errorf("base path not quoted:\n%s", got)
+	}
+	if !strings.Contains(got, "-- policies; then") || !strings.Contains(got, ".heimdall/policies changed without an agent change") {
+		t.Error("a policy-only change still skips the gate")
+	}
+	if shellQuote("agents/a.yaml") != "agents/a.yaml" || shellQuote("it's") != `'it'"'"'s'` {
+		t.Error("shellQuote")
+	}
+}

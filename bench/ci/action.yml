@@ -19,7 +19,7 @@ inputs:
     required: false
     default: ""
   bundle:
-    description: "recorded: bundle root, relative to bench/"
+    description: "recorded: bundle root, relative to the project folder (BENCH_CI_BENCH_DIR, else bench/)"
     required: false
     default: testdata/recorded
   data-mode:
@@ -67,10 +67,23 @@ outputs:
 runs:
   using: composite
   steps:
+    # The bundle is resolved once, against the project folder the gate runs
+    # in (BENCH_CI_BENCH_DIR, else this bench module), so the seal guard and
+    # the gate read the same files (QC2-22-08).
     - name: Locate the bench module
       id: paths
       shell: bash
-      run: echo "bench=$(cd "$GITHUB_ACTION_PATH/.." && pwd)" >> "$GITHUB_OUTPUT"
+      env:
+        BUNDLE: ${{ inputs.bundle }}
+      run: |
+        bench=$(cd "$GITHUB_ACTION_PATH/.." && pwd)
+        project=$(cd "${BENCH_CI_BENCH_DIR:-$bench}" && pwd)
+        case $BUNDLE in
+          /*) bundle=$BUNDLE ;;
+          *) bundle="$project/$BUNDLE" ;;
+        esac
+        echo "bench=$bench" >> "$GITHUB_OUTPUT"
+        echo "bundle=$bundle" >> "$GITHUB_OUTPUT"
 
     - name: Set up Go
       uses: actions/setup-go@4b73464bb391d4059bd26b0524d20df3927bd417 # v6.3.0
@@ -105,7 +118,7 @@ runs:
       working-directory: ${{ steps.paths.outputs.bench }}
       env:
         GOWORK: "off"
-        BENCH_CI_BUNDLE: ${{ inputs.bundle }}
+        BENCH_CI_BUNDLE: ${{ steps.paths.outputs.bundle }}
       run: go test -count=1 -run 'TestRecordedBundleSeals' ./ci/
 
     # The step always succeeds so its outputs are set and the report is
@@ -118,7 +131,7 @@ runs:
         BENCH_CI_BIN: ${{ steps.build.outputs.bin }}
         BENCH_CI_EXPERIMENT: ${{ inputs.experiment }}
         BENCH_CI_EXP_ID: ${{ inputs.exp-id }}
-        BENCH_CI_BUNDLE: ${{ inputs.bundle }}
+        BENCH_CI_BUNDLE: ${{ steps.paths.outputs.bundle }}
         BENCH_CI_DATA_MODE: ${{ inputs.data-mode }}
         BENCH_CI_POLICY: ${{ inputs.policy }}
         BENCH_CI_FAIL_ON: ${{ inputs.fail-on }}

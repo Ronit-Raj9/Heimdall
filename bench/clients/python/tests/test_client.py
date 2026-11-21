@@ -188,6 +188,20 @@ class ClientTest(unittest.TestCase):
             self.client.wait_for_experiment("e1", timeout=0.2, interval=0.05)
         self.assertLess(time.monotonic() - start, 2)
 
+    def test_wait_never_accepts_a_late_terminal_answer(self) -> None:
+        # QC2-20-07: a done answer that arrives after the deadline is a
+        # timeout, and the status request is limited to the time left.
+        def late() -> Reply:
+            time.sleep(0.6)
+            return json_reply(200, status_payload("done"))
+
+        self.fake.on_call("GET", "/api/bench/experiments/e1", late)
+        client = Client(self.fake.url, read_retries=0)
+        start = time.monotonic()
+        with self.assertRaises(HeimdallTimeout):
+            client.wait_for_experiment("e1", timeout=0.1, interval=0.01)
+        self.assertLess(time.monotonic() - start, 0.5)
+
     def test_check_unpacks_and_blocks(self) -> None:
         cases = [("block", True), ("warn", False), (None, False)]
         for policy, blocked in cases:

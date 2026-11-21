@@ -81,6 +81,12 @@ jobs:
           code=0
           "$RUNNER_TEMP/heimdall" compare --baseline "origin/${{ github.base_ref || 'main' }}" --candidate "${{ github.sha }}" --base agents/claude-code.yaml --trials 3 --fault model-outage --budget-usd 5 --name pr-gate --write-only || code=$?
           if [ "$code" -eq 6 ]; then
+            # A release-policy change is not an agent change, but it must not
+            # pass unevaluated: fail so it is checked (QC2-22-05).
+            if ! git diff --quiet "origin/${{ github.base_ref || 'main' }}" "${{ github.sha }}" -- policies; then
+              echo "::error title=Heimdall gate::.heimdall/policies changed without an agent change; run a recorded check with the new policy (heimdall check -exp <id> -policy <file>)"
+              exit 1
+            fi
             echo "changed=false" >> "$GITHUB_OUTPUT"
             echo "no agent change between the refs: gate skipped"
             exit 0

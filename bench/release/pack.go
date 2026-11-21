@@ -76,7 +76,10 @@ func packFiles(runsRoot string, rec *schemas.ReleaseRecord, ev *evidence) ([]pac
 	if err := add("seals.log", filepath.Join(expDir, sealsLogFile), true); err != nil {
 		return nil, err
 	}
-	chain, err := chainSeals(expDir, runs)
+	// The chain documents come from the same seals.log bytes the pack holds:
+	// a second read of the live log could include a seal appended meanwhile
+	// that the packed log lacks (QC2-22-04).
+	chain, err := chainSeals(expDir, files[len(files)-1].data, runs)
 	if err != nil {
 		return nil, err
 	}
@@ -162,11 +165,7 @@ func packFiles(runsRoot string, rec *schemas.ReleaseRecord, ev *evidence) ([]pac
 // the pack cannot check the prev_seal links through a superseded attempt
 // (audit 1-E-01). Only seal.json is copied: a superseded attempt's files are
 // not release evidence. Each copy must hash to its logged value.
-func chainSeals(expDir string, counted []schemas.SealedRun) ([]packFile, error) {
-	b, err := os.ReadFile(filepath.Join(expDir, sealsLogFile))
-	if err != nil {
-		return nil, fmt.Errorf("read seals.log: %w", err)
-	}
+func chainSeals(expDir string, b []byte, counted []schemas.SealedRun) ([]packFile, error) {
 	isCounted := make(map[string]bool, len(counted))
 	for _, r := range counted {
 		isCounted[r.Run.RunID] = true
