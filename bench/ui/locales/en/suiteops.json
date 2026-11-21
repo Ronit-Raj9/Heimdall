@@ -8,7 +8,8 @@
 		"lock": "Lock",
 		"admit": "Admit all tasks",
 		"admitConfirm": "Admit every task of {{suite}}? This builds images and runs each reference solution in containers.",
-		"hostedAdmit": "Admission starts containers, so it runs on your own machine: bifrost-bench suite admit {{suite}}"
+		"hostedAdmit": "Hosted admission runs the oracle and noop controls of each task on a runner (Runners page) and records the result in suite.lock. Admitted tasks can be run right after.",
+		"hostedAdmitConfirm": "Admit every task of {{suite}}? Each task runs its oracle and noop controls on a runner, with a scripted model (no model spend)."
 	},
 	"health": {
 		"title": "Quarantine",
@@ -51,7 +52,7 @@
 		"since": "Since (commit, tag or YYYY-MM-DD, optional)",
 		"limit": "Tasks to cut",
 		"dryRun": "Preview only (write nothing)",
-		"hostedDryRun": "Hosted servers preview candidates only; cut and prove them locally with bifrost-bench tasks mine.",
+		"hostedDryRun": "A full mine cuts the candidates, proves them with the oracle and noop controls on a runner (Runners page), keeps only the proven tasks and records their admission in suite.lock.",
 		"run": "Mine tasks",
 		"preview": "Preview candidates",
 		"missing": "Pick a repository first."

@@ -44,4 +44,11 @@ describe("JobLogPanel", () => {
 		expect(html).toContain('data-testid="job-log-panel-error"');
 		expect(html).not.toContain('data-testid="job-log-panel-cancel"');
 	});
+
+	it("links the experiment a bridge job ran on a runner", () => {
+		api.job = okQuery({ ...FAILED_JOB, kind: "suite.admit", mode: "live", result: { exp_id: "e_abc123" } });
+		const html = render(<JobLogPanel jobId={FAILED_JOB.id} />, hostedSession("member"));
+		expect(html).toContain('data-testid="job-log-panel-experiment"');
+		expect(html).toContain("e_abc123");
+	});
 });

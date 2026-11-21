@@ -84,6 +84,7 @@ export function JobLogPanel({ jobId, onClose, onFinished }: JobLogPanelProps) {
 				</div>
 			</header>
 			{data && <JobProgressBar job={data} />}
+			{data && <JobExperimentLink job={data} />}
 			{data?.status === "queued" && <p className="text-muted-foreground text-xs">{t("panel.queued")}</p>}
 			{data?.status === "failed" && (
 				<p role="alert" className="text-chart-error-ink text-xs" data-testid="job-log-panel-error">
@@ -97,6 +98,23 @@ export function JobLogPanel({ jobId, onClose, onFinished }: JobLogPanelProps) {
 			)}
 			<LogLines log={log} active={active} />
 		</section>
+	);
+}
+
+/** Exp id a job result names (bridge jobs on runners report exp_id), or null. */
+export function jobResultExpId(job: Job): string | null {
+	const id = job.result?.exp_id;
+	return typeof id === "string" && id !== "" ? id : null;
+}
+
+function JobExperimentLink({ job }: { job: Job }) {
+	const { t } = useTranslation("jobs");
+	const expId = jobResultExpId(job);
+	if (!expId) return null;
+	return (
+		<Link to="/experiments/$expId" params={{ expId }} className="text-primary text-xs underline" data-testid="job-log-panel-experiment">
+			{t("panel.experiment", { expId })}
+		</Link>
 	);
 }
 

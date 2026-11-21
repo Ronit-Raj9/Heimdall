@@ -466,6 +466,10 @@ func setHash(base string, rels []string) (string, error) {
 	return utils.SHA256Bytes(buf.Bytes()), nil
 }
 
+// EncodeLock returns the exact bytes WriteLock writes for l, for callers that
+// store the lock through another writer (the hosted project store).
+func EncodeLock(l *schemas.SuiteLock) ([]byte, error) { return encodeLock(l) }
+
 func encodeLock(l *schemas.SuiteLock) ([]byte, error) {
 	var buf bytes.Buffer
 	enc := json.NewEncoder(&buf)
