@@ -1,0 +1,51 @@
+{
+	"title": "Jobs",
+	"subtitle": "Every long action runs here as a background job: imports, mining, calibration, exports, scans and runs. Open one to follow its live log.",
+	"filters": {
+		"kind": "Kind",
+		"status": "Status",
+		"anyKind": "All kinds",
+		"anyStatus": "All statuses",
+		"clear": "Clear filters"
+	},
+	"columns": {
+		"kind": "Kind",
+		"target": "Target",
+		"status": "Status",
+		"created": "Created",
+		"actions": "Actions"
+	},
+	"empty": "No jobs yet. Buttons such as Import, Mine tasks, Calibrate judge and Export start a job, and it shows up here.",
+	"emptyFiltered": "No job matches these filters.",
+	"emptyAction": "Browse the catalog",
+	"loadError": "Could not load jobs",
+	"loadMore": "Load older jobs",
+	"cancel": "Cancel",
+	"confirmCancel": "Stop this job? A running command gets SIGTERM, then SIGKILL after 10 seconds.",
+	"confirm": "Stop job",
+	"keep": "Keep running",
+	"retry": "Retry",
+	"retryTitle": "Queue a new job with the same kind and parameters",
+	"retried": "Queued a new job:",
+	"openNew": "open it",
+	"actionError": "That did not work",
+	"kinds": {
+		"import_run": "Benchmark import",
+		"tasks_mine": "Mine tasks",
+		"calibrate_run": "Judge calibration",
+		"export_run": "Export",
+		"scan_skill": "Skill scan",
+		"scan_mcp": "MCP scan"
+	},
+	"panel": {
+		"title": "Job log",
+		"open": "Open job page",
+		"close": "Close",
+		"cancel": "Cancel",
+		"queued": "Queued. It starts when a worker is free.",
+		"failed": "The job failed:",
+		"succeeded": "Done.",
+		"cancelled": "Cancelled.",
+		"startError": "Could not start the job"
+	}
+}
