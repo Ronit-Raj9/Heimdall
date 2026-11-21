@@ -123,8 +123,8 @@ class Service:
             },
             "injections": self.injections,
             "planted": {"armed": bool(self.injections), "vectors": sorted(self.injections), "served": served},
-            "pre_environment": self.pre.model_dump(mode="json"),
-            "post_environment": self.env.model_dump(mode="json"),
+            "pre_environment": common.env_json(self.pre),
+            "post_environment": common.env_json(self.env),
             "environment_pickle": {"pre": common.dump_environment(self.pre), "post": common.dump_environment(self.env)},
             "calls": self.calls,
         }

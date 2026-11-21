@@ -105,6 +105,20 @@ def build_attack(name, suite, model_name=""):
     return attack
 
 
+def _json_fallback(value):
+    # AgentDyn environments keep upstream tool functions in their state (the
+    # shopping platform's verification_stack); JSON names them, the pickle
+    # keeps them.
+    if callable(value):
+        return f"<function {getattr(value, '__module__', '?')}.{getattr(value, '__qualname__', repr(value))}>"
+    raise TypeError(f"cannot serialize {type(value).__name__}")
+
+
+def env_json(env):
+    """The environment as JSON data, naming any function it holds."""
+    return env.model_dump(mode="json", fallback=_json_fallback)
+
+
 def plan_injections(suite, user_task, injection_task, attack):
     """Returns {vector id: text} for one condition, as upstream's runner does.
 
@@ -158,7 +172,7 @@ def normalize(text):
 def strings_in(value):
     """Yields every string inside a tool result (models, lists, dicts)."""
     if hasattr(value, "model_dump"):
-        value = value.model_dump(mode="json")
+        value = value.model_dump(mode="json", fallback=_json_fallback)
     if isinstance(value, str):
         yield value
     elif isinstance(value, dict):

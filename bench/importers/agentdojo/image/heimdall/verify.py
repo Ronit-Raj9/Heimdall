@@ -95,9 +95,9 @@ def decide(state, answer, expected):
         rebuilt = common.build_environment(suite, user_task, state.get("injections") or {})
     except Exception as e:  # upstream raises many kinds; any of them means undecided
         raise Undecided(f"load suite state: {type(e).__name__}: {e}")
-    if rebuilt.model_dump(mode="json") != pre.model_dump(mode="json"):
+    if common.env_json(rebuilt) != common.env_json(pre):
         raise Undecided("exported starting environment differs from the one rebuilt from the configuration")
-    if post.model_dump(mode="json") != state.get("post_environment"):
+    if common.env_json(post) != state.get("post_environment"):
         raise Undecided("exported final environment differs between its JSON and its pickle")
     calls = state.get("calls") or []
     traces = common.traces_from_records(calls)
