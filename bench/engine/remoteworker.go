@@ -74,7 +74,12 @@ type Worker struct {
 	opts   WorkerOptions
 	logger schemas.Logger
 
-	mu         sync.Mutex
+	mu sync.Mutex
+	// admitMu serializes admit, so the slots of one experiment leased at
+	// once on a fresh runner check and create it in the local store once:
+	// without it a second slot saw the store's experiment folder before its
+	// manifest was written and refused the experiment for good.
+	admitMu    sync.Mutex
 	registered *schemas.WorkerRegistered
 	exps       map[string]*workerExp
 	spend      *runnerSpend // Runners area: nil without a spend cap
@@ -146,20 +151,28 @@ func NewWorker(reg *schemas.Registry, runner SlotRunner, replan Replanner, opts 
 func (w *Worker) ID() string { return w.opts.WorkerID }
 
 // Run registers and works Slots slots until ctx ends. A wrong token stops it
-// at once; an unreachable coordinator is retried.
+// at once; an unreachable coordinator is retried. A token refused later (401:
+// revoked or expired; 403: out of its scope, e.g. the name was taken over by
+// another token's runner) stops every slot loop and Run returns the error, so
+// a revoked runner exits instead of asking for leases forever.
 func (w *Worker) Run(ctx context.Context) error {
 	if err := w.register(ctx); err != nil {
 		return err
 	}
+	ctx, cancel := context.WithCancelCause(ctx)
+	defer cancel(nil)
 	var wg sync.WaitGroup
 	for range w.opts.Slots {
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
-			w.loop(ctx)
+			w.loop(ctx, cancel)
 		}()
 	}
 	wg.Wait()
+	if cause := context.Cause(ctx); errors.Is(cause, schemas.ErrWorkerAuth) || errors.Is(cause, schemas.ErrWorkerScope) {
+		return fmt.Errorf("coordinator %s refused this runner: %w", w.opts.Server, cause)
+	}
 	return nil
 }
 
@@ -188,8 +201,9 @@ func (w *Worker) register(ctx context.Context) error {
 	}
 }
 
-// loop leases and works one slot at a time until ctx ends.
-func (w *Worker) loop(ctx context.Context) {
+// loop leases and works one slot at a time until ctx ends. A lease call the
+// coordinator refuses for the token (401 or 403) calls stop with that error.
+func (w *Worker) loop(ctx context.Context, stop context.CancelCauseFunc) {
 	for ctx.Err() == nil {
 		if reached, spent := w.spend.reached(); reached { // Runners area: the runner's own spend cap
 			if !w.capLogged.Swap(true) {
@@ -208,6 +222,12 @@ func (w *Worker) loop(ctx context.Context) {
 				w.logger.Error("register again", "error", rerr.Error())
 			}
 			continue
+		case errors.Is(err, schemas.ErrWorkerAuth) || errors.Is(err, schemas.ErrWorkerScope):
+			if ctx.Err() == nil {
+				w.logger.Error("coordinator refused the runner token; stopping", "error", err.Error())
+				stop(err)
+			}
+			return
 		case err != nil:
 			if ctx.Err() == nil {
 				w.logger.Warn("lease request failed", "error", err.Error())
@@ -346,6 +366,8 @@ func (w *Worker) Work(ctx context.Context, lease *schemas.WorkerLease) *schemas.
 // adoptUnrepeatable). A manifest that cannot be fetched is a refusal for
 // this lease only.
 func (w *Worker) admit(ctx context.Context, lease *schemas.WorkerLease) (*workerExp, string, bool) {
+	w.admitMu.Lock()
+	defer w.admitMu.Unlock()
 	w.mu.Lock()
 	e, ok := w.exps[lease.ExpID]
 	w.mu.Unlock()

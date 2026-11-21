@@ -2,6 +2,10 @@ package engine
 
 import (
 	"context"
+	"errors"
+	"net/http"
+	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -188,5 +192,84 @@ func TestRemoteSameBuildRestartClearsRejections(t *testing.T) {
 	}
 	if ws := rw.c.Workers(); ws[0].Rejected != 0 {
 		t.Fatalf("rejected %d after re-registration", ws[0].Rejected)
+	}
+}
+
+// TestRemoteConcurrentAdmitOnFreshRunner: a fresh runner with two slots
+// leases two slots of one experiment at once. Both admit it; the second must
+// not see the first one's half-created experiment folder (made before its
+// manifest is written) and refuse the experiment for good, which left every
+// other slot without a runner (live test l7, hosted runner).
+func TestRemoteConcurrentAdmitOnFreshRunner(t *testing.T) {
+	for i := 0; i < 5; i++ {
+		rw := newRemoteWorld(t, testExperiment(), RemoteOptions{})
+		done := rw.attach(t)
+		side := newRemoteSide(t)
+		w, err := NewWorker(side.b.reg, NewPipeline(side.b.reg, side.b.root, nil), NewPlanner(side.b.reg, side.b.root, nil).Plan,
+			WorkerOptions{Server: rw.url, Token: remoteTestToken, WorkerID: "w1", Version: BenchVersion, Slots: 2,
+				PollEvery: 10 * time.Millisecond, ScratchDir: t.TempDir()})
+		if err != nil {
+			t.Fatal(err)
+		}
+		if err := w.register(context.Background()); err != nil {
+			t.Fatal(err)
+		}
+		l1, l2 := lease(t, w), lease(t, w)
+		if l1 == nil || l2 == nil {
+			t.Fatal("want two leases")
+		}
+		var wg sync.WaitGroup
+		reasons := make([]string, 2)
+		for j, l := range []*schemas.WorkerLease{l1, l2} {
+			wg.Add(1)
+			go func(j int, l *schemas.WorkerLease) {
+				defer wg.Done()
+				_, reasons[j], _ = w.admit(context.Background(), l)
+			}(j, l)
+		}
+		wg.Wait()
+		done()
+		for j, r := range reasons {
+			if r != "" {
+				t.Fatalf("round %d: lease %d refused: %s", i, j, r)
+			}
+		}
+	}
+}
+
+// revokeAfterRegister sends a wrong token on every call but register, as a
+// coordinator sees a runner whose token was revoked after it registered.
+type revokeAfterRegister struct{ base http.RoundTripper }
+
+func (r revokeAfterRegister) RoundTrip(req *http.Request) (*http.Response, error) {
+	if !strings.HasSuffix(req.URL.Path, "/register") {
+		req = req.Clone(req.Context())
+		req.Header.Set("Authorization", "Bearer revoked")
+	}
+	return r.base.RoundTrip(req)
+}
+
+// TestRemoteRevokedTokenStopsRunner: a token refused after registration
+// (revoked or expired: 401) stops the runner with the error instead of
+// asking for leases forever (live test l7: a revoked hosted runner logged
+// "lease request failed ... 401" every poll and never exited).
+func TestRemoteRevokedTokenStopsRunner(t *testing.T) {
+	rw := newRemoteWorld(t, testExperiment(), RemoteOptions{})
+	side := newRemoteSide(t)
+	w, err := NewWorker(side.b.reg, NewPipeline(side.b.reg, side.b.root, nil), NewPlanner(side.b.reg, side.b.root, nil).Plan,
+		WorkerOptions{Server: rw.url, Token: remoteTestToken, WorkerID: "w1", Version: BenchVersion, Slots: 2,
+			PollEvery: 10 * time.Millisecond, ScratchDir: t.TempDir(),
+			HTTP: &http.Client{Timeout: 5 * time.Second, Transport: revokeAfterRegister{http.DefaultTransport}}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	err = w.Run(ctx)
+	if ctx.Err() != nil {
+		t.Fatal("runner with a revoked token kept running until the test deadline")
+	}
+	if !errors.Is(err, schemas.ErrWorkerAuth) {
+		t.Fatalf("run with a token revoked after registration: %v", err)
 	}
 }
