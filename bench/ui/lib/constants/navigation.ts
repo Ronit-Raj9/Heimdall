@@ -1,5 +1,6 @@
 import {
 	Activity,
+	Award,
 	Bot,
 	BookOpen,
 	Boxes,
@@ -36,6 +37,7 @@ export interface BenchNavItem {
 	to:
 		| "/"
 		| "/welcome"
+		| "/evaluations"
 		| "/experiments"
 		| "/runs"
 		| "/leaderboard"
@@ -64,6 +66,7 @@ export interface BenchNavItem {
 	labelKey:
 		| "shell.nav.home"
 		| "shell.nav.welcome"
+		| "shell.nav.evaluations"
 		| "shell.nav.experiments"
 		| "shell.nav.runs"
 		| "shell.nav.leaderboard"
@@ -128,6 +131,7 @@ export const BENCH_NAV_GROUPS: readonly BenchNavGroup[] = [
 		id: "benchmark",
 		labelKey: "shell.groups.benchmark",
 		items: [
+			{ to: "/evaluations", labelKey: "shell.nav.evaluations", icon: Award, testId: "nav-link-evaluations", also: ["/evaluate"] },
 			{
 				to: "/experiments",
 				labelKey: "shell.nav.experiments",

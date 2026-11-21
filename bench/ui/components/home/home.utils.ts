@@ -1,4 +1,5 @@
 import type { ExperimentStatus, LiveEvent, RunListRow, SuiteSummary } from "@/lib/types/bench";
+import type { Evaluation } from "@/lib/store/apis/evaluationsApi";
 
 /** Experiments whose slots are still being run or analyzed. */
 export const LIVE_STATES: ReadonlySet<ExperimentStatus["state"]> = new Set(["running", "analyzing"]);
@@ -139,4 +140,29 @@ export function humanExperimentName(
 	if (/^e_(admit|check)_/.test(exp.exp_id)) return labels.check;
 	if (name) return name.replace(/[-_]+/g, " ").replace(/^\w/, (c) => c.toUpperCase());
 	return labels.untitled;
+}
+
+/** Home's agent counts, read from the evaluation list (agent-first contract section 3). */
+export interface EvaluationStats {
+	/** Evaluations of any status. */
+	evaluations: number;
+	/** Evaluations still queued or running. */
+	active: number;
+	/** Distinct agents across every evaluation's arms. */
+	agents: number;
+}
+
+export function evaluationStats(evaluations: readonly Pick<Evaluation, "status" | "spec">[]): EvaluationStats {
+	const agents = new Set<string>();
+	for (const ev of evaluations) for (const arm of ev.spec?.arms ?? []) if (arm.agent) agents.add(arm.agent);
+	return {
+		evaluations: evaluations.length,
+		active: evaluations.filter((ev) => ev.status === "queued" || ev.status === "running").length,
+		agents: agents.size,
+	};
+}
+
+/** Newest evaluations first, by creation time. */
+export function newestEvaluations<T extends Pick<Evaluation, "created_at">>(evaluations: readonly T[], limit = 5): T[] {
+	return [...evaluations].sort((a, b) => (at(b.created_at) || 0) - (at(a.created_at) || 0)).slice(0, limit);
 }

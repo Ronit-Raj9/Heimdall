@@ -183,6 +183,22 @@ export default function WelcomeView() {
       className="mx-auto flex w-full max-w-4xl min-w-0 flex-col gap-6 pb-10"
       data-testid="welcome-view"
     >
+      <div
+        className="bg-card flex flex-col gap-3 rounded-xl border p-4 sm:flex-row sm:items-center"
+        role="note"
+        data-testid="welcome-evaluate-notice"
+      >
+        <p className="text-sm min-w-0 flex-1">
+          <span className="font-medium">{t("evaluateNotice.title")}</span>{" "}
+          <span className="text-muted-foreground">{t("evaluateNotice.body")}</span>
+        </p>
+        <Button asChild size="sm" className="shrink-0">
+          <Link to={"/evaluate" as never} data-testid="welcome-evaluate-link">
+            {t("evaluateNotice.open")}
+            <ArrowRight aria-hidden="true" />
+          </Link>
+        </Button>
+      </div>
       <header className="flex flex-col gap-3">
         <div className="flex items-start gap-3">
           <span className="bg-primary text-primary-foreground flex size-10 shrink-0 items-center justify-center rounded-xl shadow-sm">
@@ -196,6 +212,9 @@ export default function WelcomeView() {
               {t("title")}
             </h1>
             <p className="text-muted-foreground text-sm">{t("subtitle")}</p>
+            <p className="text-muted-foreground text-sm" data-testid="welcome-agent-vs-model">
+              {t("agentVsModel")}
+            </p>
           </div>
           <Button asChild variant="ghost" size="sm" className="shrink-0">
             <Link to="/" data-testid="welcome-skip">

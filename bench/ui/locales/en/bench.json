@@ -4007,6 +4007,8 @@
 			}
 		},
 		"newExperiment": "New experiment",
+		"evaluate": "Evaluate",
+		"evaluateHint": "Evaluate your agent on many benchmarks at once",
 		"openMenu": "Open navigation",
 		"closeMenu": "Close navigation",
 		"groupToggle": "Show or hide {{group}}",
@@ -4021,6 +4023,7 @@
 		"nav": {
 			"home": "Home",
 			"welcome": "Getting started",
+			"evaluations": "Evaluations",
 			"experiments": "Experiments",
 			"runs": "Runs",
 			"leaderboard": "Leaderboard",
@@ -4055,7 +4058,8 @@
 		},
 		"navHint": {
 			"home": "Your overview: recent results and what needs your attention.",
-			"welcome": "A short tour and the first steps to test an agent.",
+			"welcome": "A short tour, and how testing an agent differs from testing a model.",
+			"evaluations": "Your agent scored on many benchmarks at once, with a report card per version and model.",
 			"experiments": "Compare two setups (A and B) on the same tasks and see which is better.",
 			"runs": "Every attempt by an agent at a task, newest first.",
 			"leaderboard": "How each agent scores across all comparisons.",

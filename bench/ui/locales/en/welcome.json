@@ -1,6 +1,12 @@
 {
 	"title": "Welcome to Heimdall",
 	"subtitle": "Heimdall tests an AI agent on real tasks and tells you how it did. Five short steps, a result in minutes.",
+	"agentVsModel": "A model benchmark scores the AI model alone; Heimdall scores your whole agent, with its prompts, tools and settings, on top of whichever model you pick. That way you learn whether your agent got better, not just whether a new model is smarter.",
+	"evaluateNotice": {
+		"title": "There is a newer way to start.",
+		"body": "Evaluate your agent on many benchmarks at once and get one report card per version and model.",
+		"open": "Evaluate your agent"
+	},
 	"skip": "Skip, go to Home",
 	"back": "Back",
 	"next": "Continue",

@@ -7,10 +7,15 @@
 	},
 	"subtitle": "Below: what is running now, what finished recently, and which benchmarks are ready to use.",
 	"cta": {
-		"run": "Test an agent",
+		"run": "Evaluate your agent",
 		"newExperiment": "Compare two setups"
 	},
 	"kpi": {
+		"agents": "Agents evaluated",
+		"agentsHint": "Different agents across your evaluations",
+		"evaluations": "Evaluations",
+		"evaluationsHint_one": "{{count}} in progress",
+		"evaluationsHint_other": "{{count}} in progress",
 		"experiments": "Comparisons",
 		"experimentsHint_one": "{{count}} running",
 		"experimentsHint_other": "{{count}} running",
@@ -19,8 +24,8 @@
 		"passRate": "Tasks solved",
 		"passRateHint": "{{pass}} of {{total}} runs solved their task",
 		"passRateNone": "No scored runs yet",
-		"spend": "Spent this month",
-		"spendHint": "Since {{date}}"
+		"spend": "Spent",
+		"spendHint": "This month, since {{date}}"
 	},
 	"running": {
 		"title": "Running now",
@@ -37,6 +42,21 @@
 		"plainSuite_other": "Testing on {{suite}} · {{done}} of {{total}} runs done",
 		"checkName": "Readiness check",
 		"untitled": "Untitled comparison"
+	},
+	"evaluations": {
+		"title": "Recent evaluations",
+		"viewAll": "See all",
+		"empty": "No evaluations yet. Evaluate your agent on a few benchmarks to get its report card.",
+		"untitled": "Untitled evaluation",
+		"benchmarks_one": "{{count}} benchmark",
+		"benchmarks_other": "{{count}} benchmarks",
+		"status": {
+			"queued": "Queued",
+			"running": "Running",
+			"done": "Finished",
+			"failed": "Failed",
+			"cancelled": "Cancelled"
+		}
 	},
 	"recent": {
 		"title": "Recent comparisons",
@@ -59,9 +79,9 @@
 	},
 	"onboarding": {
 		"title": "Get your first result in about five minutes",
-		"body": "Pick a benchmark, an agent and an AI model. Heimdall runs a few tasks and tells you how the agent did.",
+		"body": "Pick your agent and a few benchmarks. Heimdall runs real tasks and gives your agent a report card.",
 		"open": "Start the guided setup",
 		"viewer": "Nothing has been tested yet. Ask a team member to run the first test."
 	},
-	"intro": "Heimdall tests AI agents on real tasks and tells you, with evidence, whether a new version is better."
+	"intro": "Heimdall tests your AI agent, not just its model, on real tasks and gives it a report card you can trust."
 }

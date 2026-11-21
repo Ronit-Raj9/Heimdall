@@ -77,30 +77,31 @@ describe("BenchSidebar", () => {
 });
 
 describe("BenchHeader", () => {
-	it("offers New experiment and the menu button in local mode", () => {
+	it("offers Evaluate and the menu button in local mode", () => {
 		at("/");
 		const html = render(<BenchHeader onOpenNav={() => undefined} />);
-		expect(tagOf(html, "header-new-experiment")).toContain('href="/experiments/new"');
+		expect(tagOf(html, "header-evaluate")).toContain('href="/evaluate"');
+		expect(html).toContain(">Evaluate<");
 		expect(tagOf(html, "nav-menu-button")).toContain('aria-label="Open navigation"');
 		expect(tagOf(html, "nav-menu-button")).toContain('aria-expanded="false"');
 		expect(html).toMatch(/>(Live|Sample) data</);
 	});
 
-	it("hides New experiment from viewers, demo visitors and the form itself", () => {
+	it("hides Evaluate from viewers, demo visitors and the wizard itself", () => {
 		at("/");
-		expect(render(<BenchHeader />, hostedSession("viewer"))).not.toContain("header-new-experiment");
-		expect(render(<BenchHeader />, demoSession())).not.toContain("header-new-experiment");
-		expect(render(<BenchHeader />, hostedSession("member"))).toContain("header-new-experiment");
-		at("/experiments/new");
-		expect(render(<BenchHeader />)).not.toContain("header-new-experiment");
+		expect(render(<BenchHeader />, hostedSession("viewer"))).not.toContain("header-evaluate");
+		expect(render(<BenchHeader />, demoSession())).not.toContain("header-evaluate");
+		expect(render(<BenchHeader />, hostedSession("member"))).toContain("header-evaluate");
+		at("/evaluate");
+		expect(render(<BenchHeader />)).not.toContain("header-evaluate");
 	});
 
-	it("hides New experiment on an offline server that cannot launch (6-A-06)", () => {
+	it("hides Evaluate on an offline server that cannot launch (6-A-06)", () => {
 		at("/");
 		health.launch = false;
-		expect(render(<BenchHeader />, LOCAL_SESSION)).not.toContain("header-new-experiment");
+		expect(render(<BenchHeader />, LOCAL_SESSION)).not.toContain("header-evaluate");
 		health.launch = true;
-		expect(render(<BenchHeader />, LOCAL_SESSION)).toContain("header-new-experiment");
+		expect(render(<BenchHeader />, LOCAL_SESSION)).toContain("header-evaluate");
 	});
 
 	it("keeps the platform pieces in hosted mode", () => {
