@@ -16,10 +16,11 @@ LICENSE file, no Hugging Face licence tag).
   | Set | SkillsBench folder | Terminal-Bench folder |
   |---|---|---|
   | `curated` | `skillsbench/curated` | none |
-  | `retrieved` | `skillsbench/retrieved_w_curated` (top 5 from the pool, curated in it) | `terminalbench/retrieved` |
-  | `retrieved-wo-curated` | `skillsbench/retrieved_wo_curated` | none |
+  | `retrieved` | `skillsbench/retrieved_w_curated/claude` (top 5 from the pool, curated in it) | `terminalbench/retrieved/claude` |
+  | `retrieved-wo-curated` | `skillsbench/retrieved_wo_curated/claude` | none |
   | `pool` | upstream `data/find-skills`, pointed at the pool service | same |
 
+  The retrieved sets are upstream's retrieval by Claude Opus 4.6 (the `claude` folder).
 - Suite service `skills-pool` (`http://skills-pool:8742`, image
   `bench/skills-pool:1`, build context `services/skills-pool`): upstream's
   `search_server` with the BM25 index `skills.db` and every `SKILL.md` of the

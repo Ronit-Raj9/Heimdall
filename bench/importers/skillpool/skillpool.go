@@ -36,15 +36,16 @@ const (
 	ServiceImage = "bench/skills-pool:1"
 )
 
-// sets maps the bench set name to the upstream folder per benchmark.
+// sets maps the bench set name to the upstream folder per benchmark. The
+// retrieved sets are the ones upstream retrieved with Claude Opus 4.6.
 var sets = map[string]map[string]string{
 	"skillsbench": {
 		"curated":              "skillsbench/curated",
-		"retrieved":            "skillsbench/retrieved_w_curated",
-		"retrieved-wo-curated": "skillsbench/retrieved_wo_curated",
+		"retrieved":            "skillsbench/retrieved_w_curated/claude",
+		"retrieved-wo-curated": "skillsbench/retrieved_wo_curated/claude",
 	},
 	"terminalbench": {
-		"retrieved": "terminalbench/retrieved",
+		"retrieved": "terminalbench/retrieved/claude",
 	},
 }
 

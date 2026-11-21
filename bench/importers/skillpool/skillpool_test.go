@@ -44,8 +44,8 @@ func TestImport(t *testing.T) {
 		"hf/unz/skills.db":                                         "db",
 		"hf/unz/o--n/SKILL.md":                                     "pool skill",
 		"hf/skillsbench/curated/t1/skills/a/SKILL.md":              "a",
-		"hf/skillsbench/retrieved_w_curated/t1/skills/r/SKILL.md":  "r",
-		"hf/skillsbench/retrieved_wo_curated/t2/skills/q/SKILL.md": "q",
+		"hf/skillsbench/retrieved_w_curated/claude/t1/skills/r/SKILL.md":  "r",
+		"hf/skillsbench/retrieved_wo_curated/claude/t2/skills/q/SKILL.md": "q",
 	})
 	im := &importer{}
 	res, err := im.Import(context.Background(), importers.Options{BenchRoot: tmp, From: from, SuiteID: "hd-harbor-skills-pool",
