@@ -81,7 +81,7 @@ jobs:
           exp-id: e_pilot_mixed_nc93
           data-mode: recorded
           policy: "" # bench/policies/default.yaml
-          fail-on: regressed,invalid
+          fail-on: regressed,invalid,inconclusive # gate-failure test: inconclusive must fail
           artifact-name: heimdall-report
 
       - name: Render the verdict card
