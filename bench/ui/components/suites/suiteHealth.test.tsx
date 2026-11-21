@@ -65,34 +65,34 @@ describe("health column", () => {
 
 	it("shows the flaky verifier in red with its evidence count, apart from agent variance", () => {
 		const p02 = row(renderTable(ready), "p02");
-		expect(p02).toMatch(/data-testid="suites-task-health-p02-flaky_verifier" data-tone="bad">.*Flaky verifier \(3\)/);
+		expect(p02).toMatch(/data-testid="suites-task-health-p02-flaky_verifier" data-tone="bad">.*Not ready: grader unreliable/);
 		expect(p02).toMatch(/data-testid="suites-task-health-p02-quarantined" data-tone="warn">/);
-		expect(p02).toContain("Declared hard, observed easy");
-		expect(p02).toContain("Infra 19%");
-		expect(p02).toContain("Timeouts 19%");
+		expect(p02).toContain("Labelled hard, acts easy");
+		expect(p02).toContain("Breaks while running (19%)");
+		expect(p02).toContain("Runs out of time (19%)");
 		// Variance is a muted line, never a toned badge.
 		expect(p02).toMatch(
-			/<span class="text-muted-foreground text-\[11px\]"[^>]*data-testid="suites-task-health-p02-variance">Agent variance: 1 of 2 configs mixed/,
+			/<span class="text-muted-foreground text-\[11px\]"[^>]*data-testid="suites-task-health-p02-variance">Agents mixed on it: 1 of 2/,
 		);
 	});
 
 	it("says no information for a task every config always passes", () => {
 		const p03 = row(renderTable(ready), "p03");
-		expect(p03).toMatch(/data-testid="suites-task-health-p03-no_discrimination" data-tone="warn">.*No information/);
+		expect(p03).toMatch(/data-testid="suites-task-health-p03-no_discrimination" data-tone="warn">.*Does not tell agents apart/);
 		expect(p03).not.toContain("suites-task-health-p03-saturated");
 	});
 
 	it("shows no issues for a healthy task with ordinary variance", () => {
 		const p01 = row(renderTable(ready), "p01");
 		expect(p01).toContain("suites-task-health-p01-ok");
-		expect(p01).toContain("Agent variance: 2 of 3 configs mixed");
+		expect(p01).toContain("Agents mixed on it: 2 of 3");
 		expect(p01).not.toContain('data-tone="bad"');
 	});
 
 	it("shows n/a when health is unavailable, but still shows a known quarantine", () => {
 		const quarantined = { ...acme.tasks[0], quarantine: { reason: "manual hold", at: "2026-11-15T10:30:00Z", source: "manual" as const } };
 		const html = renderTable(noStore, [quarantined, acme.tasks[1]]);
-		expect(row(html, acme.tasks[1].id)).toContain(">n/a<");
+		expect(row(html, acme.tasks[1].id)).toContain(">not known<");
 		expect(row(html, quarantined.id)).toContain(`suites-task-health-${quarantined.id}-quarantined`);
 		expect(row(html, quarantined.id)).toContain("manual hold");
 	});
@@ -128,7 +128,7 @@ describe("SuiteHealthSummary", () => {
 		expect(html).toMatch(/data-testid="suites-health-held-out".*?>2</);
 		expect(html).toMatch(/data-testid="suites-health-quarantined".*?>1</);
 		expect(html).toMatch(/data-testid="suites-health-canary".*?>set</);
-		expect(html).toMatch(/data-testid="suites-health-count-flaky_verifier" data-tone="bad">.*Flaky verifier: 1/);
+		expect(html).toMatch(/data-testid="suites-health-count-flaky_verifier" data-tone="bad">.*Unreliable grader: 1/);
 		expect(html).toContain("from 74 sealed runs across 4 experiments");
 		expect(html).toContain("easy at or above a 80% pass rate, hard at or below 20%");
 		expect(html).toContain("Synthetic runs count toward infra and verifier checks only");

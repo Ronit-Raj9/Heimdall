@@ -1,31 +1,31 @@
 {
-	"tab": "Ops",
-	"viewerNote": "You can see this suite's operations, but only members can run them. Ask an org owner for the member role.",
+	"tab": "Readiness & tools",
+	"viewerNote": "You can see these tools, but only members can use them. Ask an org owner for the member role.",
 	"checks": {
-		"title": "Checks and admission",
-		"description": "Lint checks suite.yaml and every task. Lock pins task hashes and images. Admit runs each task's reference solution and verifier so the task can be used in experiments.",
-		"lint": "Lint",
-		"lock": "Lock",
-		"admit": "Admit all tasks",
-		"admitConfirm": "Admit every task of {{suite}}? This builds images and runs each reference solution in containers.",
-		"hostedAdmit": "Hosted admission runs the oracle and noop controls of each task on a runner (Runners page) and records the result in suite.lock. Admitted tasks can be run right after.",
-		"hostedAdmitConfirm": "Admit every task of {{suite}}? Each task runs its oracle and noop controls on a runner, with a scripted model (no model spend)."
+		"title": "Readiness check",
+		"description": "Before a task is used in tests, Heimdall checks it is fair: a correct solution must pass and an agent that does nothing must fail. Step 1, Check files: finds mistakes in the task files. Step 2, Freeze: pins every task so each run sees the same version. Step 3, Run readiness check: tries each task and marks it Ready or Not ready.",
+		"lint": "Check files",
+		"lock": "Freeze",
+		"admit": "Run readiness check",
+		"admitConfirm": "Run the readiness check on every task of {{suite}}? This builds images and tries a correct solution for each task.",
+		"hostedAdmit": "The readiness check runs a perfect reference agent and a do-nothing agent on each task, on a worker machine (Runners page). Ready tasks can be run right after.",
+		"hostedAdmitConfirm": "Run the readiness check on every task of {{suite}}? Each task runs on a worker machine in practice mode (no real model, free)."
 	},
 	"health": {
-		"title": "Quarantine",
-		"description": "A quarantined task is skipped by new plans. suite.lock and finished experiments are unchanged. Restore puts it back.",
-		"flaky": "Quarantine flaky tasks",
-		"flakyConfirm": "Quarantine every task of {{suite}} with verifier flakiness evidence?",
+		"title": "Pause tasks",
+		"description": "A paused task is left out of new tests. Past results do not change. Restore puts it back.",
+		"flaky": "Pause tasks with an unreliable grader",
+		"flakyConfirm": "Pause every task of {{suite}} whose grader gave different answers for the same work?",
 		"empty": "This suite has no tasks yet. Cut one from a commit below.",
 		"task": "Task",
 		"state": "State",
-		"active": "Active",
-		"quarantined": "Quarantined: {{reason}}",
+		"active": "In use",
+		"quarantined": "Paused: {{reason}}",
 		"redacted": "held out",
 		"reasonPlaceholder": "Why? (required)",
-		"quarantine": "Quarantine",
+		"quarantine": "Pause",
 		"restore": "Restore",
-		"reasonRequired": "Type a reason first: say why the task is kept out of new plans."
+		"reasonRequired": "Type a reason first: say why the task is paused."
 	},
 	"source": {
 		"github": "GitHub repository",
@@ -38,22 +38,22 @@
 	},
 	"fromCommit": {
 		"title": "Task from a commit",
-		"description": "Cut a task from a fix: the agent starts at the base commit, and the reference commit gives the solution and the hidden tests.",
+		"description": "Make a task from a past bug fix: the agent starts from the code before the fix, and the fix itself becomes the correct solution and hidden checks.",
 		"id": "Task id",
-		"base": "Base commit",
-		"reference": "Reference commit",
-		"tests": "Test globs (optional, comma-separated)",
+		"base": "Commit before the fix",
+		"reference": "Commit with the fix",
+		"tests": "Which test files to hide (optional, comma-separated)",
 		"run": "Create task",
-		"missing": "Fill in task id, base and reference, and pick a repository."
+		"missing": "Fill in task id, both commits, and pick a repository."
 	},
 	"mine": {
-		"title": "Mine tasks from history",
-		"description": "Rank recent fix commits that change tests and cut proven tasks from the best ones.",
+		"title": "Find tasks in your history",
+		"description": "Looks through recent bug-fix commits that changed tests and makes ready tasks from the best ones.",
 		"since": "Since (commit, tag or YYYY-MM-DD, optional)",
 		"limit": "Tasks to cut",
 		"dryRun": "Preview only (write nothing)",
-		"hostedDryRun": "A full mine cuts the candidates, proves them with the oracle and noop controls on a runner (Runners page), keeps only the proven tasks and records their admission in suite.lock.",
-		"run": "Mine tasks",
+		"hostedDryRun": "A full search makes the tasks, runs the readiness check on a worker machine (Runners page), and keeps only the tasks that pass.",
+		"run": "Find tasks",
 		"preview": "Preview candidates",
 		"missing": "Pick a repository first."
 	}

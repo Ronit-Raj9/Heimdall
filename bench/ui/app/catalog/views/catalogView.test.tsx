@@ -31,9 +31,9 @@ describe("CatalogBody", () => {
 
 	it("cleans titles, pills and groups sections", () => {
 		const html = renderToStaticMarkup(<CatalogBody {...base} />);
-		expect(cleanTitle(entries[1])).toEqual({ name: "Memory", tagline: "Does an agent remember across sessions?", example: true });
+		expect(cleanTitle(entries[1])).toEqual({ name: "Memory test (example)", tagline: "Does an agent remember across sessions?", example: true });
 		expect(cleanTitle(entries[2]).name).toBe("Coding core");
-		expect(html).toContain(">Memory<");
+		expect(html).toContain(">Memory test (example)<");
 		expect(html).toContain("Free");
 		expect(html).toContain('data-testid="catalog-section-featured"');
 		expect(html).toContain('data-testid="catalog-section-try"');

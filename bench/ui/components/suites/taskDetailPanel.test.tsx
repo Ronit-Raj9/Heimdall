@@ -47,12 +47,12 @@ describe("TaskDetailBody", () => {
 		const draft = render("p03");
 		expect(draft).toMatch(/data-testid="suites-control-mutant" data-state="fail"/);
 		expect(draft).toMatch(/data-testid="suites-control-network" data-state="pass"/);
-		expect(render("h01")).toContain("Admission has not run for this task version.");
+		expect(render("h01")).toContain("The readiness check has not run for this version of the task.");
 	});
 
 	it("counts hidden tests without naming them and lists visible files and protected globs", () => {
 		const html = render("t01");
-		expect(html).toContain("Hidden test files: 2. Required test ids: 7.");
+		expect(html).toContain("Hidden check files: 2. Required checks: 7.");
 		expect(block(html, "suites-task-protected")).toContain("tests/**");
 		expect(block(html, "suites-task-files")).toContain("ledger/invoice.py");
 		expect(block(html, "suites-task-files")).toContain("4.1 KB");
