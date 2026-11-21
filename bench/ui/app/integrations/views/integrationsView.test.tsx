@@ -3,7 +3,7 @@ import "@/lib/i18n";
 import type { Webhook } from "@/lib/types/integrations";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it, vi } from "vitest";
-import { CIInstallLink, ExportTable, WebhookList, ciNextStep, exportParams } from "./integrationsView";
+import { CIInstallLink, DeliveryTable, ExportTable, WebhookList, anyRetrying, ciNextStep, exportParams } from "./integrationsView";
 
 vi.mock("@tanstack/react-router", async () => (await import("@/lib/testing/routerMock")).routerMock);
 
@@ -59,5 +59,35 @@ describe("integrations view", () => {
 		expect(install).toContain("Open Settings &gt; GitHub");
 		expect(renderToStaticMarkup(<CIInstallLink step="connect" />)).toContain("ci-not-connected");
 		expect(renderToStaticMarkup(<CIInstallLink step="manual" />)).toContain("by hand");
+	});
+});
+
+describe("delivery log (X16)", () => {
+	const base = { hook_id: "wh_1", event: "experiment.finished", event_id: "e1", at: "2026-11-21T00:00:00Z", duration_ms: 5 };
+	const rows = [
+		{ ...base, id: "d3", ok: false, attempts: 2, status_code: 503, error: "receiver answered HTTP 503", state: "retrying" as const, next_attempt_at: "2026-11-21T00:05:00Z" },
+		{ ...base, id: "d2", ok: false, attempts: 9, error: "connection refused", state: "failed" as const },
+		{ ...base, id: "d1", ok: true, attempts: 1, status_code: 204, state: "delivered" as const },
+	];
+
+	it("shows state badges, status, attempts and Retry only on failed rows for members", () => {
+		const html = renderToStaticMarkup(<DeliveryTable deliveries={rows} hookUrls={{ wh_1: "https://example.com/hook" }} canRetry onRetry={() => {}} />);
+		expect(html).toContain('data-testid="delivery-table"');
+		expect(html).toContain("Retrying");
+		expect(html).toContain("Failed");
+		expect(html).toContain("Delivered");
+		expect(html).toContain("503");
+		expect(html).toContain("connection refused");
+		expect(html).toContain("https://example.com/hook");
+		expect(html).toContain('data-testid="delivery-retry-d2"');
+		expect(html).not.toContain("delivery-retry-d3");
+		expect(html).not.toContain("delivery-retry-d1");
+		expect(renderToStaticMarkup(<DeliveryTable deliveries={rows} canRetry={false} onRetry={() => {}} />)).not.toContain("delivery-retry-");
+	});
+
+	it("refreshes only while a row is retrying and says when there is nothing yet", () => {
+		expect(anyRetrying(rows)).toBe(true);
+		expect(anyRetrying(rows.slice(1))).toBe(false);
+		expect(renderToStaticMarkup(<DeliveryTable deliveries={[]} canRetry onRetry={() => {}} />)).toContain("deliveries-empty");
 	});
 });

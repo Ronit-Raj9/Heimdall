@@ -9,9 +9,10 @@ import { getBenchErrorMessage } from "@/lib/store/apis/benchApi";
 import { useGetOrgQuery, useLeaveOrgMutation, useRenameOrgMutation, useSetPublicReadMutation, useSwitchOrgMutation } from "@/lib/store/apis/platformApi";
 import type { OrgInfo, OrgSummary } from "@/lib/types/bench";
 import { cn } from "@/lib/utils";
-import { Check, Eye, EyeOff, TriangleAlert } from "lucide-react";
+import { Check, Eye, EyeOff } from "lucide-react";
 import { useEffect, useId, useState, type FormEvent, type ReactNode } from "react";
 import { useTranslation } from "react-i18next";
+import { DeleteOrgRow, RetentionSection } from "./dataControls";
 import { SettingsSection, When } from "./settingsBits";
 
 /** A failed write: the role refusal when it is one, the server's reason otherwise. */
@@ -179,6 +180,9 @@ function OrgSettings({ info }: { info: OrgInfo }) {
 				)}
 			</SettingsSection>
 
+			<RetentionSection />
+
+			{(session.user || session.authMode === "hosted") && (
 			<SettingsSection title={t("settings.org.dangerTitle")} testId="settings-org-danger">
 				<div className="border-chart-error/40 divide-chart-error/20 flex flex-col divide-y rounded-lg border">
 					{session.user && (
@@ -199,18 +203,13 @@ function OrgSettings({ info }: { info: OrgInfo }) {
 							/>
 						</div>
 					)}
-					<div className="flex items-start gap-3 px-4 py-4" data-testid="org-delete-note">
-						<TriangleAlert className="text-chart-error-ink mt-0.5 size-4 shrink-0" aria-hidden="true" />
-						<div className="flex flex-col gap-1">
-							<span className="text-foreground text-sm font-medium">{t("settings.org.deleteTitle")}</span>
-							<span className="text-muted-foreground text-xs">{t("settings.org.deleteBody")}</span>
-						</div>
-					</div>
+					{session.authMode === "hosted" && <DeleteOrgRow info={info} />}
 				</div>
 				{leaveState.error && (
 					<WriteFailure error={leaveState.error} title={t("settings.org.leaveError")} testId="org-leave-error" min="admin" />
 				)}
 			</SettingsSection>
+			)}
 		</div>
 	);
 }

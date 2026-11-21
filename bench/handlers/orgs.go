@@ -161,6 +161,7 @@ func (h *OrgsHandler) RegisterRoutes(r *router.Router, middlewares ...lib.Middle
 	r.GET(p+"/{org}/audit", lib.ChainMiddlewares(h.getAudit, middlewares...))
 	r.POST(p+"/{org}/leave", lib.ChainMiddlewares(h.leaveOrg, middlewares...))
 	h.registerMemberRoutes(r, p, middlewares)
+	h.registerDataRoutes(r, p, middlewares) // lane X16: org deletion, audit export and verify (orgdata.go)
 }
 
 // OrgRouteDocs describe the org, member and invitation routes (hosted mode

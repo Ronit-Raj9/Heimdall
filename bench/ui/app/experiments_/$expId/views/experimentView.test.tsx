@@ -25,10 +25,12 @@ vi.mock("@/lib/store/apis/platformApi", async (importOriginal) => ({
 	useCancelExperimentMutation: () => [() => undefined, {}],
 	useResumeExperimentMutation: () => [() => undefined, {}],
 }));
+vi.mock("@/lib/store/apis/dataOpsApi", () => ({ useDeleteExperimentMutation: () => [() => undefined, {}] }));
 vi.mock("@/lib/store/apis/adaptiveApi", () => ({ useGetExperimentAdaptiveQuery: () => ({}) }));
 vi.mock("@/lib/store/apis/supportApi", () => ({ useGetExperimentSupportQuery: () => ({}) }));
 vi.mock("@/lib/store/apis/researchApi", () => ({ useGetExperimentResearchQuery: () => ({}) }));
 vi.mock("@/lib/store/apis/routingApi", () => ({ useGetExperimentRoutingQuery: () => ({}) }));
+vi.mock("./liveProgress", () => ({ LiveProgress: () => null, default: () => null }));
 vi.mock("@/components/shell/routeTabs", () => ({ RouteTabs: () => null }));
 
 const created = (id: string) => ({ exp_id: id, name: id, state: "created", slots: { total: 2, done: 0, running: 0, failed: 0 } });
@@ -44,5 +46,26 @@ describe("ExperimentView identity (QC2-28-04)", () => {
 		api.status = okQuery(created("e_next"));
 		const html = render(<ExperimentView expId="e_next" />);
 		expect(html).toContain('data-testid="experiment-start"');
+	});
+});
+
+describe("ExperimentView delete (X16)", () => {
+	it("offers Delete to an admin, disabled with the reason while the comparison runs", async () => {
+		const { hostedSession } = await import("@/lib/testing/platformFixtures");
+		const { tagOf } = await import("@/lib/testing/render");
+		api.status = okQuery(created("e_done"));
+		const idle = render(<ExperimentView expId="e_done" />, hostedSession("admin"));
+		expect(tagOf(idle, "experiment-delete")).not.toContain('disabled=""');
+		api.status = okQuery({ ...created("e_run"), state: "running" });
+		const running = render(<ExperimentView expId="e_run" />, hostedSession("admin"));
+		expect(tagOf(running, "experiment-delete")).toContain('disabled=""');
+		expect(running).toContain("Stop the comparison or wait for it to finish before deleting it.");
+	});
+	it("hides Delete below admin", async () => {
+		const { hostedSession } = await import("@/lib/testing/platformFixtures");
+		api.status = okQuery(created("e_done"));
+		const html = render(<ExperimentView expId="e_done" />, hostedSession("member"));
+		expect(html).not.toContain('data-testid="experiment-delete"');
+		expect(html).toContain("experiment-delete-admin-only");
 	});
 });

@@ -92,6 +92,8 @@ func serveHosted(ctx context.Context, a *app, offline bool) int {
 		return fail("hosted: %v", err)
 	}
 	defer closeEnv()
+	// Lane X16: org deletions, retention and the webhook outbox (dataops.go).
+	startHostedDataOps(ctx, env)
 	startEvidenceMirror(ctx, a) // Evidence storage area (P6): mirror and sweeper over runs/orgs/*; seals notify through evidenceOnSeal (evidence.go)
 	srv, err := newHostedServer(env)
 	if err != nil {
@@ -167,6 +169,7 @@ func newHostedServer(env *hostedEnv) (*server.Server, error) {
 		DemoSlug: strings.TrimSpace(env.base.cfg.Demo.Org), Platform: areas,
 		Ready: readyChecks(env.base), UI: builtUI(), Logger: env.base.logger, Version: benchVersion,
 		ClientIP: clientIPOf(env.auth),
+		Limits:   apiRateLimits(env.base.logger), // lane X16: per-token and per-org API rate limits (dataops.go)
 	})
 }
 

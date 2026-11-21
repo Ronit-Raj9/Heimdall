@@ -5,6 +5,7 @@ import {
 	normalizeCatalog,
 	normalizeWorkers,
 	prepareBenchHeaders,
+	rateLimitedError,
 	writeType,
 	readWriteToken,
 	saveWriteToken,
@@ -152,5 +153,14 @@ describe("writeType", () => {
 		expect(writeType("query", "/suites")).toBe("query");
 		expect(writeType("query", { url: "/suites" })).toBe("query");
 		expect(writeType("mutation", "/x")).toBe("mutation");
+	});
+});
+
+describe("rate limited answers (X16)", () => {
+	it("says how long to wait from Retry-After, in plain words", async () => {
+		await import("@/lib/i18n");
+		expect(rateLimitedError("7")).toEqual({ status: 429, data: { error: { message: "Too many requests. Try again in 7 seconds." } } });
+		expect(rateLimitedError("1")).toEqual({ status: 429, data: { error: { message: "Too many requests. Try again in 1 second." } } });
+		expect(rateLimitedError(null)).toEqual({ status: 429, data: { error: { message: "Too many requests. Try again in a moment." } } });
 	});
 });

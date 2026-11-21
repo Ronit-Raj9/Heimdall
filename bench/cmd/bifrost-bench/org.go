@@ -27,7 +27,7 @@ import (
 )
 
 func init() {
-	register("org", "hosted organizations: org create -slug <slug> [-owner <email>] [-public-read] | org list | org import -org <slug> -from <runs dir> | org member add -org <id|slug> -email <email> [-role owner]", runOrg)
+	register("org", "hosted organizations: org create -slug <slug> [-owner <email>] [-public-read] | org list | org import -org <slug> -from <runs dir> | org member add -org <id|slug> -email <email> [-role owner] | org audit-verify <export.jsonl|export.csv> | org audit-verify -org <id|slug>", runOrg)
 }
 
 func runOrg(args []string) int {
@@ -44,6 +44,8 @@ func runOrg(args []string) int {
 		return orgList(ctx, args[1:], os.Stdout)
 	case "import":
 		return orgImport(ctx, args[1:], os.Stdout)
+	case "audit-verify":
+		return orgAuditVerify(ctx, args[1:], os.Stdout)
 	case "member":
 		if len(args) > 1 && args[1] == "add" {
 			return orgMemberAdd(ctx, args[2:], os.Stdout)
@@ -52,7 +54,7 @@ func runOrg(args []string) int {
 		return exitUsage
 	}
 	// bootstrap.sh matches "unknown org command" to detect older builds.
-	fmt.Fprintf(os.Stderr, "unknown org command %q: want create, list, import or member\n", args[0])
+	fmt.Fprintf(os.Stderr, "unknown org command %q: want create, list, import, member or audit-verify\n", args[0])
 	return exitUsage
 }
 

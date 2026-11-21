@@ -1,6 +1,7 @@
 package db
 
 import (
+	"bytes"
 	"context"
 	"database/sql"
 	"encoding/base64"
@@ -34,6 +35,11 @@ type AuditEntry struct {
 	IP         string          `json:"ip,omitempty"`
 	At         time.Time       `json:"at"`
 	Details    json.RawMessage `json:"details,omitempty"`
+	// Seq, PrevHash and Hash place the row in its org's hash chain
+	// (auditchain.go). Seq 0 is a row written before the chain existed.
+	Seq      int64  `json:"seq"`
+	PrevHash string `json:"prev_hash"`
+	Hash     string `json:"hash"`
 }
 
 func (e *AuditEntry) prepare() error {
@@ -56,22 +62,33 @@ func (e *AuditEntry) prepare() error {
 	} else if !json.Valid(e.Details) {
 		return errors.New("db: audit details are not JSON")
 	}
+	// The hash covers the stored bytes; compact JSON is what every reader
+	// and exporter re-encodes it to, so the stored form must be compact too.
+	var buf bytes.Buffer
+	if err := json.Compact(&buf, e.Details); err != nil {
+		return fmt.Errorf("db: audit details: %w", err)
+	}
+	e.Details = buf.Bytes()
+	// Millisecond precision is what the column stores and the hash covers.
+	e.At = Time(Millis(e.At))
 	return nil
 }
 
-const auditInsert = `INSERT INTO audit_log (id, org_id, actor_type, actor_id, action, target_type, target_id, ip, at, details)
-	VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+const auditInsert = `INSERT INTO audit_log (id, org_id, actor_type, actor_id, action, target_type, target_id, ip, at, details, seq, prev_hash, hash)
+	VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
 
 func auditArgs(e *AuditEntry) []any {
-	return []any{e.ID, e.OrgID, e.ActorType, e.ActorID, e.Action, e.TargetType, e.TargetID, e.IP, Millis(e.At), string(e.Details)}
+	return []any{e.ID, e.OrgID, e.ActorType, e.ActorID, e.Action, e.TargetType, e.TargetID, e.IP, Millis(e.At), string(e.Details),
+		e.Seq, e.PrevHash, e.Hash}
 }
 
-// AppendAudit writes one audit row and returns it with ID and At filled.
+// AppendAudit writes one audit row at the head of its org's hash chain and
+// returns it with ID, At, Seq and the hashes filled.
 func (d *DB) AppendAudit(ctx context.Context, e AuditEntry) (AuditEntry, error) {
 	if err := e.prepare(); err != nil {
 		return e, err
 	}
-	_, err := d.Exec(ctx, auditInsert, auditArgs(&e)...)
+	err := d.Tx(ctx, func(tx *sql.Tx) error { return d.appendChained(ctx, tx, &e) })
 	return e, err
 }
 
@@ -81,7 +98,7 @@ func (d *DB) AppendAuditTx(ctx context.Context, tx *sql.Tx, e AuditEntry) (Audit
 	if err := e.prepare(); err != nil {
 		return e, err
 	}
-	_, err := tx.ExecContext(ctx, d.Rebind(auditInsert), auditArgs(&e)...)
+	err := d.appendChained(ctx, tx, &e)
 	return e, err
 }
 
@@ -158,7 +175,7 @@ func (d *DB) ListAudit(ctx context.Context, f AuditFilter) (AuditPage, error) {
 		}
 		add("(at < ? OR (at = ? AND id < ?))", at, at, id)
 	}
-	q := `SELECT id, org_id, actor_type, actor_id, action, target_type, target_id, ip, at, details FROM audit_log`
+	q := `SELECT ` + auditColumns + ` FROM audit_log`
 	if len(where) > 0 {
 		q += " WHERE " + strings.Join(where, " AND ")
 	}
@@ -171,13 +188,10 @@ func (d *DB) ListAudit(ctx context.Context, f AuditFilter) (AuditPage, error) {
 	defer rows.Close()
 	page := AuditPage{Entries: []AuditEntry{}}
 	for rows.Next() {
-		var e AuditEntry
-		var at int64
-		var details string
-		if err := rows.Scan(&e.ID, &e.OrgID, &e.ActorType, &e.ActorID, &e.Action, &e.TargetType, &e.TargetID, &e.IP, &at, &details); err != nil {
+		e, err := scanAudit(rows)
+		if err != nil {
 			return AuditPage{}, err
 		}
-		e.At, e.Details = Time(at), json.RawMessage(details)
 		page.Entries = append(page.Entries, e)
 	}
 	if err := rows.Err(); err != nil {

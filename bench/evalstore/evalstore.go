@@ -120,3 +120,19 @@ func (s *Store) List() ([]*schemas.Evaluation, error) {
 	})
 	return out, nil
 }
+
+// Delete removes one evaluation (lane X16). ErrNotFound when it is not
+// there.
+func (s *Store) Delete(id string) error {
+	if !ValidID(id) {
+		return fmt.Errorf("%w: %s", ErrNotFound, id)
+	}
+	mu := lockFor(s.dir)
+	mu.Lock()
+	defer mu.Unlock()
+	err := os.Remove(filepath.Join(s.dir, id+".json"))
+	if errors.Is(err, os.ErrNotExist) {
+		return fmt.Errorf("%w: %s", ErrNotFound, id)
+	}
+	return err
+}

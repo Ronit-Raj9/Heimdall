@@ -13,7 +13,9 @@ import {
 	type EvaluationArm,
 	type EvaluationChild,
 } from "@/lib/store/apis/evaluationsApi";
-import { Link } from "@tanstack/react-router";
+import { Link, useNavigate } from "@tanstack/react-router";
+import { DeleteAction } from "@/components/platform/deleteAction";
+import { useDeleteEvaluationMutation } from "@/lib/store/apis/dataOpsApi";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
 
@@ -52,7 +54,12 @@ export function EvaluationBody({ evaluation }: { evaluation: Evaluation }) {
 				subtitle={t("detail.subtitle")}
 				breadcrumbs={[{ label: t("detail.crumb"), to: "/evaluations" }, { label: spec.name || evaluation.id }]}
 				meta={<EvaluationStatusPill status={evaluation.status} testId="evaluation-status" />}
-				actions={active ? <CancelButton id={evaluation.id} /> : undefined}
+				actions={
+					<span className="flex items-center gap-2">
+						{active && <CancelButton id={evaluation.id} />}
+						<DeleteEvaluationAction id={evaluation.id} active={active} />
+					</span>
+				}
 			/>
 			<section className="bg-card flex flex-col gap-4 rounded-xl border p-5" data-testid="evaluation-header">
 				<div className="flex flex-wrap items-baseline gap-x-4 gap-y-1 text-sm">
@@ -164,6 +171,28 @@ export function ChildRow({ child, score = false }: { child: EvaluationChild; sco
 				</Link>
 			</span>
 		</li>
+	);
+}
+
+/** Delete (admin): confirm, delete with its benchmark comparisons, back to the list. Disabled while queued or running. */
+function DeleteEvaluationAction({ id, active }: { id: string; active: boolean }) {
+	const { t } = useTranslation("evaluations");
+	const navigate = useNavigate();
+	const [remove] = useDeleteEvaluationMutation();
+	return (
+		<DeleteAction
+			label={t("detail.delete")}
+			confirmTitle={t("detail.deleteConfirmTitle")}
+			confirmBody={t("detail.deleteConfirm")}
+			confirmLabel={t("detail.deleteConfirmOk")}
+			cancelLabel={t("detail.deleteKeep")}
+			busyReason={active ? t("detail.deleteBusy") : undefined}
+			adminOnly={t("detail.deleteAdminOnly")}
+			errorText={(error) => t("detail.deleteError", { error })}
+			onDelete={() => remove(id).unwrap()}
+			onDeleted={() => void navigate({ to: "/evaluations" })}
+			testId="evaluation-delete"
+		/>
 	);
 }
 

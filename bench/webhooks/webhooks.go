@@ -3,8 +3,15 @@
 //
 // Hooks live in <project root>/.heimdall/webhooks/hooks.json (0600), outside
 // every area the project files API serves, so a signing secret is never
-// readable through the files UI or the project export. The secret is shown
-// once when a hook is created; afterwards only its last four characters are.
+// readable through the files UI or the project export. With a Cipher (the
+// keystore's master key, OpenWith) the secret is stored encrypted and a
+// plaintext one from an older file is encrypted on first read. The secret
+// is shown once when a hook is created; afterwards only its last four
+// characters are.
+//
+// Deliveries go through a durable outbox (outbox.go): each event becomes one
+// file per subscribed hook under outbox/, retried with exponential backoff
+// for up to 24 hours, so a restart loses nothing.
 //
 // Each delivery is a POST of a JSON Event with these headers:
 //
@@ -71,9 +78,17 @@ type Hook struct {
 	Events      []string  `json:"events"`
 	Description string    `json:"description,omitempty"`
 	Enabled     bool      `json:"enabled"`
-	Secret      string    `json:"secret"`
+	Secret      string    `json:"secret,omitempty"`
+	SecretEnc   string    `json:"secret_enc,omitempty"` // Secret sealed by the Cipher; Secret is then empty on disk
 	CreatedBy   string    `json:"created_by,omitempty"`
 	CreatedAt   time.Time `json:"created_at"`
+}
+
+// Cipher seals hook secrets at rest. keystore.Sealer implements it with the
+// server's master key and the org as associated data.
+type Cipher interface {
+	Seal(id, plaintext string) (string, error)
+	Open(id, sealed string) (string, error)
 }
 
 // View is a hook as the API returns it: the secret reduced to its last four.
@@ -128,10 +143,24 @@ type Delivery struct {
 	Error      string    `json:"error,omitempty"`
 	Attempts   int       `json:"attempts"`
 	DurationMS int64     `json:"duration_ms"`
+	// State is delivered, retrying (in the outbox, NextAttemptAt says when)
+	// or failed (gave up; POST .../retry queues it again).
+	State         string     `json:"state"`
+	NextAttemptAt *time.Time `json:"next_attempt_at,omitempty"`
 }
 
-// Store keeps one project's hooks and recent deliveries.
-type Store struct{ dir string }
+// Delivery states.
+const (
+	StateDelivered = "delivered"
+	StateRetrying  = "retrying"
+	StateFailed    = "failed"
+)
+
+// Store keeps one project's hooks, outbox and recent deliveries.
+type Store struct {
+	dir    string
+	cipher Cipher
+}
 
 // One lock for every store: writes are rare and small.
 var mu sync.Mutex
@@ -139,6 +168,13 @@ var mu sync.Mutex
 // Open returns the store of a project root. Nothing is created until a write.
 func Open(projectRoot string) *Store {
 	return &Store{dir: filepath.Join(projectRoot, ".heimdall", "webhooks")}
+}
+
+// OpenWith is Open with secrets sealed by c at rest (nil: plaintext, 0600).
+func OpenWith(projectRoot string, c Cipher) *Store {
+	s := Open(projectRoot)
+	s.cipher = c
+	return s
 }
 
 func (s *Store) hooksPath() string      { return filepath.Join(s.dir, "hooks.json") }
@@ -156,6 +192,28 @@ func (s *Store) load() ([]Hook, error) {
 	if err := json.Unmarshal(b, &hs); err != nil {
 		return nil, fmt.Errorf("webhooks file is not valid JSON: %w", err)
 	}
+	legacy := false
+	for i := range hs {
+		h := &hs[i]
+		if h.SecretEnc != "" {
+			if s.cipher == nil {
+				return nil, fmt.Errorf("webhook %s: its secret is encrypted and this server has no master key", h.ID)
+			}
+			plain, err := s.cipher.Open(h.ID, h.SecretEnc)
+			if err != nil {
+				return nil, fmt.Errorf("webhook %s: decrypt secret: %w", h.ID, err)
+			}
+			h.Secret, h.SecretEnc = plain, ""
+		} else if h.Secret != "" && s.cipher != nil {
+			legacy = true
+		}
+	}
+	if legacy {
+		// A file written before secrets were sealed: seal it now.
+		if err := s.save(hs); err != nil {
+			return nil, fmt.Errorf("encrypt webhook secrets: %w", err)
+		}
+	}
 	return hs, nil
 }
 
@@ -163,7 +221,20 @@ func (s *Store) save(hs []Hook) error {
 	if err := os.MkdirAll(s.dir, 0o700); err != nil {
 		return err
 	}
-	b, err := json.MarshalIndent(hs, "", "  ")
+	disk := slices.Clone(hs)
+	if s.cipher != nil {
+		for i := range disk {
+			if disk[i].Secret == "" {
+				continue
+			}
+			enc, err := s.cipher.Seal(disk[i].ID, disk[i].Secret)
+			if err != nil {
+				return fmt.Errorf("webhook %s: encrypt secret: %w", disk[i].ID, err)
+			}
+			disk[i].Secret, disk[i].SecretEnc = "", enc
+		}
+	}
+	b, err := json.MarshalIndent(disk, "", "  ")
 	if err != nil {
 		return err
 	}
@@ -377,6 +448,20 @@ func (s *Store) Deliveries(limit int) ([]Delivery, error) {
 	if err != nil {
 		return nil, err
 	}
+	for i := range ds {
+		if ds[i].State == "" { // recorded before states existed
+			ds[i].State = StateFailed
+			if ds[i].OK {
+				ds[i].State = StateDelivered
+			}
+		}
+	}
+	queued, err := s.outboxDeliveries()
+	if err != nil {
+		return nil, err
+	}
+	ds = append(ds, queued...)
+	slices.SortStableFunc(ds, func(a, b Delivery) int { return a.At.Compare(b.At) })
 	slices.Reverse(ds)
 	if limit > 0 && len(ds) > limit {
 		ds = ds[:limit]
@@ -464,7 +549,13 @@ func Sign(secret string, ts int64, body []byte) string {
 func (snd Sender) Send(ctx context.Context, h Hook, ev Event) Delivery {
 	d := Delivery{ID: "whd_" + randHex(8), HookID: h.ID, Event: ev.Type, EventID: ev.ID, At: time.Now().UTC()}
 	start := time.Now()
-	defer func() { d.DurationMS = time.Since(start).Milliseconds() }()
+	defer func() {
+		d.DurationMS = time.Since(start).Milliseconds()
+		d.State = StateFailed
+		if d.OK {
+			d.State = StateDelivered
+		}
+	}()
 	body, err := json.Marshal(ev)
 	if err != nil {
 		d.Error = err.Error()
@@ -544,22 +635,15 @@ func scrubErr(err error, raw string) error {
 	return errors.New(msg)
 }
 
-// Dispatch sends ev to every enabled hook subscribed to its type and records
-// the deliveries.
+// Dispatch queues ev in the outbox for every enabled hook subscribed to its
+// type and makes the first attempt at once; failures stay queued for the
+// outbox worker (ProcessDue). It returns the deliveries after that attempt.
 func Dispatch(ctx context.Context, st *Store, snd Sender, ev Event) []Delivery {
-	hs, err := st.List()
-	if err != nil {
+	ids, err := st.Enqueue(ev)
+	if err != nil || len(ids) == 0 {
 		return nil
 	}
-	var out []Delivery
-	for _, h := range hs {
-		if !h.Enabled || !slices.Contains(h.Events, ev.Type) {
-			continue
-		}
-		out = append(out, snd.Send(ctx, h, ev))
-	}
-	_ = st.Record(out...)
-	return out
+	return st.processIDs(ctx, snd, time.Now().UTC(), ids)
 }
 
 // NewEvent builds an event with a fresh id.

@@ -2473,6 +2473,9 @@
 		"description": "There is no bench screen at this address."
 	},
 	"errors": {
+		"rateLimited_one": "Too many requests. Try again in {{count}} second.",
+		"rateLimited_other": "Too many requests. Try again in {{count}} seconds.",
+		"rateLimitedNoWait": "Too many requests. Try again in a moment.",
 		"noFixture": "No fixture file for {{method}} {{url}}.",
 		"fixtureLoad": "Could not load fixture {{file}}.",
 		"unexpected": "Unexpected error."

@@ -19,7 +19,9 @@ import { useGetExperimentRoutingQuery } from "@/lib/store/apis/routingApi";
 import { errorStatus } from "@/lib/store/apis/session";
 import { useGetExperimentSupportQuery } from "@/lib/store/apis/supportApi";
 import { compareSearch } from "@/components/experiments/legacyRoutes";
-import { Link } from "@tanstack/react-router";
+import { Link, useNavigate } from "@tanstack/react-router";
+import { DeleteAction } from "@/components/platform/deleteAction";
+import { useDeleteExperimentMutation } from "@/lib/store/apis/dataOpsApi";
 import { Bot, Download, GitCompareArrows, Hourglass, SearchX } from "lucide-react";
 import { parseAsString, useQueryState } from "nuqs";
 import { useEffect, useRef } from "react";
@@ -161,6 +163,7 @@ export default function ExperimentView({ expId }: { expId: string }) {
 								{tPage("header.export")}
 							</Button>
 						</div>
+						<DeleteExperimentAction expId={expId} running={live} />
 					</div>
 				}
 			/>
@@ -190,6 +193,28 @@ export default function ExperimentView({ expId }: { expId: string }) {
 				}
 			</RouteTabs>
 		</div>
+	);
+}
+
+/** Delete (admin): confirm, delete, back to the list. Disabled while the comparison runs. */
+function DeleteExperimentAction({ expId, running }: { expId: string; running: boolean }) {
+	const { t } = useTranslation("experimentPage");
+	const navigate = useNavigate();
+	const [remove] = useDeleteExperimentMutation();
+	return (
+		<DeleteAction
+			label={t("header.delete")}
+			confirmTitle={t("header.deleteConfirmTitle")}
+			confirmBody={t("header.deleteConfirm")}
+			confirmLabel={t("header.deleteConfirmOk")}
+			cancelLabel={t("header.deleteKeep")}
+			busyReason={running ? t("header.deleteBusy") : undefined}
+			adminOnly={t("header.deleteAdminOnly")}
+			errorText={(error) => t("header.deleteError", { error })}
+			onDelete={() => remove(expId).unwrap()}
+			onDeleted={() => void navigate({ to: "/experiments" })}
+			testId="experiment-delete"
+		/>
 	);
 }
 
