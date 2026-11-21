@@ -8,17 +8,15 @@ import { useAddCatalogEntryMutation, useGetBenchCatalogQuery, useUploadCatalogDa
 import type { CatalogAddRequest, CatalogAddResponse, CatalogEntry } from "@/lib/types/catalog";
 import { cn } from "@/lib/utils";
 import { Link } from "@tanstack/react-router";
-import { CheckCircle2, Info, LayoutGrid, Library, Search as SearchIcon, X } from "lucide-react";
+import { CheckCircle2, LayoutGrid, Library, Search as SearchIcon, X } from "lucide-react";
 import { type ReactNode, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import {
 	CATEGORIES,
 	CATEGORY_ICON,
-	CATEGORY_TINT,
 	type CatalogFilters,
 	type Category,
 	cardDescription,
-	cleanTitle,
 	entryCategories,
 	filterEntries,
 	installedHref,
@@ -28,7 +26,9 @@ import {
 	type SourceFilter,
 	sectionOf,
 } from "./catalogModel";
+import { displayFor } from "./catalogDisplay";
 
+export { displayFor } from "./catalogDisplay";
 export { cleanTitle, entryCategories, filterEntries, installedHref, sectionOf } from "./catalogModel";
 
 declare module "@/lib/i18n/resources" {
@@ -67,16 +67,11 @@ const MODES: DataMode[] = ["upload", "url", "path"];
 const MODE_KEY = { upload: "modeUpload", url: "modeUrl", path: "modePath" } as const;
 const SOURCES: SourceFilter[] = ["all", "ready", "needs"];
 const SOURCE_KEY = { all: "sourceAll", ready: "sourceReady", needs: "sourceNeedsData" } as const;
-const SECTION_KEY = {
-	featured: ["sectionFeatured", "sectionFeaturedHint"],
-	try: ["sectionTry", "sectionTryHint"],
-	import: ["sectionImport", "sectionImportHint"],
-} as const;
+const SECTION_KEY = { featured: "sectionFeatured", try: "sectionTry", import: "sectionImport" } as const;
 
 export interface CatalogBodyProps {
 	entries: CatalogEntry[];
 	sourceAvailable: boolean;
-	starterAgents: string[];
 	filters: CatalogFilters;
 	onFilters(f: CatalogFilters): void;
 	onAdd(e: CatalogEntry): void;
@@ -94,21 +89,15 @@ export interface CatalogBodyProps {
 	jobPanel?: ReactNode;
 }
 
-function Pill({ children, className, testId }: { children: ReactNode; className?: string; testId?: string }) {
-	return (
-		<span className={cn("inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium whitespace-nowrap", className)} data-testid={testId}>
-			{children}
-		</span>
-	);
+/** Quiet text tag, e.g. "Example". */
+function QuietTag({ children }: { children: ReactNode }) {
+	return <span className="text-muted-foreground shrink-0 text-xs">{children}</span>;
 }
 
-function CategoryTile({ category, size = "md" }: { category: Category; size?: "md" | "lg" }) {
+/** Small muted category icon shown inline with a title. */
+function CategoryIcon({ category }: { category: Category }) {
 	const Icon = CATEGORY_ICON[category];
-	return (
-		<span className={cn("flex shrink-0 items-center justify-center rounded-xl", CATEGORY_TINT[category], size === "lg" ? "size-12" : "size-10")}>
-			<Icon className={size === "lg" ? "size-6" : "size-5"} aria-hidden />
-		</span>
-	);
+	return <Icon className="text-muted-foreground size-4 shrink-0" aria-hidden />;
 }
 
 /** Upload and fetch options for an importer, shown in the side panel. */
@@ -143,6 +132,7 @@ function EntryFacts({ e }: { e: CatalogEntry }) {
 	const mono = (xs: string[]) => <span className="font-mono text-xs">{xs.join(", ")}</span>;
 	return (
 		<dl className="flex flex-col gap-3">
+			{e.importer && <Fact label={t("importer")}>{mono([e.importer])}</Fact>}
 			{e.suite_id && e.kind !== "example" && <Fact label={t("suiteId")}>{mono([e.suite_id])}</Fact>}
 			{(e.suites?.length ?? 0) > 0 && <Fact label={t("suites")}>{mono(e.suites!)}</Fact>}
 			{(e.agents?.length ?? 0) > 0 && <Fact label={t("agents")}>{mono(e.agents!)}</Fact>}
@@ -162,20 +152,20 @@ function EntryFacts({ e }: { e: CatalogEntry }) {
 /** Right-hand drawer: entry details, and the import form for importers. */
 function SidePanel({ e, onClose, children, testId }: { e: CatalogEntry; onClose(): void; children: ReactNode; testId: string }) {
 	const { t } = useTranslation("catalog");
-	const { name, tagline, example } = cleanTitle(e);
+	const { title: name, description, example } = displayFor(e);
 	const cat = entryCategories(e)[0];
 	return (
 		<div className="fixed inset-0 z-50 flex justify-end" role="dialog" aria-modal="true" aria-label={name}>
 			<button type="button" aria-label={t("close")} className="absolute inset-0 bg-black/30 backdrop-blur-[1px]" onClick={onClose} />
 			<aside className="bg-background border-border relative flex h-full w-full max-w-md flex-col gap-5 overflow-y-auto border-l p-6 shadow-xl" data-testid={testId}>
 				<div className="flex items-start gap-3">
-					<CategoryTile category={cat} size="lg" />
 					<div className="min-w-0 flex-1">
 						<div className="flex items-center gap-2">
+							<CategoryIcon category={cat} />
 							<h2 className="truncate text-lg font-semibold tracking-tight">{name}</h2>
-							{example && <Pill className="bg-secondary text-secondary-foreground">{t("pillExample")}</Pill>}
+							{example && <QuietTag>{t("pillExample")}</QuietTag>}
 						</div>
-						<p className="text-muted-foreground text-sm">{tagline ?? t(`cat_${cat}`)}</p>
+						<p className="text-muted-foreground mt-1 text-sm">{description}</p>
 					</div>
 					<Button size="icon" variant="ghost" onClick={onClose} aria-label={t("close")}>
 						<X className="size-4" />
@@ -291,43 +281,30 @@ function CardAction({ e, busy, canWrite, onAdd }: { e: CatalogEntry; busy: boole
 
 function EntryCard({ e, props, canWrite }: { e: CatalogEntry; props: CatalogBodyProps; canWrite: boolean }) {
 	const { t } = useTranslation("catalog");
-	const { name, example } = cleanTitle(e);
+	const { title, example } = displayFor(e);
 	const cat = entryCategories(e)[0];
 	return (
-		<div
-			className="border-border bg-card group flex flex-col gap-3 rounded-xl border p-5 transition-all hover:-translate-y-0.5 hover:shadow-md"
-			data-testid={`catalog-entry-${e.id}`}
-		>
-			<div className="flex items-start gap-3">
-				<CategoryTile category={cat} />
-				<div className="min-w-0 flex-1">
-					<div className="flex items-center gap-2">
-						<h3 className="truncate text-base font-semibold" title={e.title}>
-							{name}
-						</h3>
-						{example && <Pill className="bg-secondary text-secondary-foreground shrink-0">{t("pillExample")}</Pill>}
-					</div>
-					<p className="text-muted-foreground mt-1 line-clamp-2 text-sm">{cardDescription(e)}</p>
+		<div className="border-border bg-card flex flex-col gap-4 rounded-lg border p-4 transition-colors hover:border-foreground/20" data-testid={`catalog-entry-${e.id}`}>
+			<div className="min-w-0">
+				<div className="flex items-center gap-2">
+					<CategoryIcon category={cat} />
+					<h3 className="truncate text-sm font-medium" title={title}>
+						{title}
+					</h3>
+					{example && <QuietTag>{t("pillExample")}</QuietTag>}
 				</div>
+				<p className="text-muted-foreground mt-1 line-clamp-2 text-sm">{cardDescription(e)}</p>
 			</div>
-			<div className="mt-auto flex items-center justify-between gap-2 pt-1">
-				<div className="flex min-w-0 flex-wrap items-center gap-1.5">
-					<Pill className="bg-muted text-muted-foreground">{t(`cat_${cat}`)}</Pill>
-					{e.installed ? (
-						<Pill className="bg-chart-success/10 text-chart-success-ink" testId={`catalog-installed-${e.id}`}>
-							<CheckCircle2 className="size-3" aria-hidden />
-							{t("installed")}
-						</Pill>
-					) : (
-						e.kind === "example" && <Pill className="bg-chart-success/10 text-chart-success-ink">{t("pillFree")}</Pill>
-					)}
-				</div>
-				<div className="flex shrink-0 items-center gap-1">
-					<Button size="icon" variant="ghost" className="size-8" onClick={() => props.onDetails?.(e)} aria-label={t("details")} title={t("details")} data-testid={`catalog-details-${e.id}`}>
-						<Info className="size-4" />
-					</Button>
-					<CardAction e={e} busy={props.busyId === e.id} canWrite={canWrite} onAdd={() => props.onAdd(e)} />
-				</div>
+			<div className="mt-auto flex items-center justify-between gap-2">
+				<button
+					type="button"
+					className="text-muted-foreground hover:text-foreground text-sm underline-offset-4 hover:underline"
+					onClick={() => props.onDetails?.(e)}
+					data-testid={`catalog-details-${e.id}`}
+				>
+					{t("details")}
+				</button>
+				<CardAction e={e} busy={props.busyId === e.id} canWrite={canWrite} onAdd={() => props.onAdd(e)} />
 			</div>
 		</div>
 	);
@@ -413,11 +390,6 @@ export function CatalogBody(props: CatalogBodyProps) {
 						</button>
 					))}
 				</div>
-				{props.starterAgents.length > 0 && (
-					<p className="text-muted-foreground text-xs" data-testid="catalog-starter">
-						{t("starter", { agents: props.starterAgents.join(", ") })}
-					</p>
-				)}
 			</header>
 			{!props.sourceAvailable && (
 				<div className="border-chart-warning/60 bg-chart-warning/5 rounded-xl border p-4 text-sm" data-testid="catalog-no-source">
@@ -453,12 +425,9 @@ export function CatalogBody(props: CatalogBodyProps) {
 				<EmptyState icon={Library} message={t("empty")} testId="catalog-empty" action={{ label: t("clearFilters"), onClick: () => props.onFilters(NO_FILTERS) }} />
 			) : (
 				grouped.map((g) => (
-					<section key={g.id} className="flex flex-col gap-4" data-testid={`catalog-section-${g.id}`}>
-						<div>
-							<h2 className="text-lg font-semibold tracking-tight">{t(SECTION_KEY[g.id as SectionId][0])}</h2>
-							<p className="text-muted-foreground text-sm">{t(SECTION_KEY[g.id as SectionId][1])}</p>
-						</div>
-						<div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+					<section key={g.id} className="flex flex-col gap-3" data-testid={`catalog-section-${g.id}`}>
+						<h2 className="text-muted-foreground text-sm font-medium">{t(SECTION_KEY[g.id as SectionId])}</h2>
+						<div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
 							{g.items.map((e) => (
 								<EntryCard key={e.id} e={e} props={props} canWrite={canWrite} />
 							))}
@@ -565,7 +534,6 @@ export default function CatalogView() {
 		<CatalogBody
 			entries={entries}
 			sourceAvailable={data.source_available}
-			starterAgents={data.starter_agents ?? []}
 			filters={filters}
 			onFilters={setFilters}
 			busyId={busyId}

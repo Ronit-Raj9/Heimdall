@@ -1,4 +1,5 @@
 import type { CatalogEntry } from "@/lib/types/catalog";
+import { displayFor } from "./catalogDisplay";
 import {
   Brain,
   Code2,
@@ -47,23 +48,6 @@ export const CATEGORY_ICON: Record<Category, LucideIcon> = {
   multiagent: Users,
   gpu: Cpu,
   general: Library,
-};
-
-/** Soft tile colors per category (light and dark). */
-export const CATEGORY_TINT: Record<Category, string> = {
-  coding: "bg-sky-500/10 text-sky-600 dark:text-sky-400",
-  terminal: "bg-zinc-500/10 text-zinc-700 dark:text-zinc-300",
-  memory: "bg-violet-500/10 text-violet-600 dark:text-violet-400",
-  computer: "bg-indigo-500/10 text-indigo-600 dark:text-indigo-400",
-  browser: "bg-cyan-500/10 text-cyan-600 dark:text-cyan-400",
-  voice: "bg-pink-500/10 text-pink-600 dark:text-pink-400",
-  support: "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400",
-  tools: "bg-amber-500/10 text-amber-600 dark:text-amber-400",
-  research: "bg-teal-500/10 text-teal-600 dark:text-teal-400",
-  safety: "bg-rose-500/10 text-rose-600 dark:text-rose-400",
-  multiagent: "bg-orange-500/10 text-orange-600 dark:text-orange-400",
-  gpu: "bg-lime-500/10 text-lime-700 dark:text-lime-400",
-  general: "bg-muted text-muted-foreground",
 };
 
 /** Words in tags, tracks, importer names and ids that map to a category. */
@@ -162,7 +146,10 @@ export function filterEntries(
     if (f.source === "ready" && e.needs_data) return false;
     if (f.source === "needs" && !e.needs_data) return false;
     if (!q) return true;
+    const d = displayFor(e);
     return [
+      d.title,
+      d.description,
       e.title,
       e.id,
       e.summary,
@@ -206,9 +193,9 @@ export function cleanTitle(e: CatalogEntry): {
   return { name: e.title, example: e.kind === "example" };
 }
 
-/** One readable line for the card: the tagline, else the summary. */
+/** One readable line for the card (curated, see catalogDisplay). */
 export function cardDescription(e: CatalogEntry): string {
-  return cleanTitle(e).tagline ?? e.summary;
+  return displayFor(e).description;
 }
 
 const FEATURED = [

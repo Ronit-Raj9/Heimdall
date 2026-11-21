@@ -4,7 +4,7 @@ import type { CatalogEntry } from "@/lib/types/catalog";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 import { NO_FILTERS } from "./catalogModel";
-import { CatalogBody, type CatalogBodyProps, cleanTitle, entryCategories, filterEntries, importReady, initialImportForm, sectionOf } from "./catalogView";
+import { CatalogBody, type CatalogBodyProps, displayFor, entryCategories, filterEntries, importReady, initialImportForm, sectionOf } from "./catalogView";
 
 const noop = () => {};
 const entries: CatalogEntry[] = [
@@ -14,27 +14,33 @@ const entries: CatalogEntry[] = [
 	{ id: "suite-coding-core", title: "coding-core", kind: "bundled", summary: "starter", suite_id: "coding-core", available: true, installed: true, needs_data: false },
 	{ id: "import-gpu", title: "GPU thing", kind: "importer", summary: "x", available: false, installed: false, needs_data: true, track: "ml_engineering" },
 ];
-const base: CatalogBodyProps = { entries, sourceAvailable: true, starterAgents: ["codex", "noop"], filters: NO_FILTERS, onFilters: noop, onAdd: noop };
+const base: CatalogBodyProps = { entries, sourceAvailable: true, filters: NO_FILTERS, onFilters: noop, onAdd: noop };
 
 describe("CatalogBody", () => {
 	it("lists entries with add, installed and unavailable states", () => {
 		const html = renderToStaticMarkup(<CatalogBody {...base} />);
 		expect(html).toContain('data-testid="catalog-add-terminal-bench-2"');
 		expect(html).toContain('data-testid="catalog-add-example-acme-memory"');
-		expect(html).toContain('data-testid="catalog-installed-suite-coding-core"');
 		expect(html).toContain('data-testid="catalog-open-suite-coding-core"');
 		expect(html).toContain('data-testid="catalog-unavailable-import-gpu"');
 		expect(html).not.toContain('data-testid="catalog-add-import-gpu"');
-		expect(html).toContain("codex, noop");
+		expect(html).not.toContain("New orgs start with");
 		expect(html).not.toContain('data-testid="catalog-no-source"');
 	});
 
-	it("cleans titles, pills and groups sections", () => {
+	it("shows curated names, one line each, and groups sections", () => {
 		const html = renderToStaticMarkup(<CatalogBody {...base} />);
-		expect(cleanTitle(entries[1])).toEqual({ name: "Memory test (example)", tagline: "Does an agent remember across sessions?", example: true });
-		expect(cleanTitle(entries[2]).name).toBe("Coding core");
-		expect(html).toContain(">Memory test (example)<");
-		expect(html).toContain("Free");
+		expect(displayFor(entries[1])).toEqual({ title: "Memory", description: "Does an agent remember what it learned in earlier sessions?", example: true });
+		expect(displayFor(entries[2]).title).toBe("Coding core");
+		expect(displayFor(entries[3])).toEqual({ title: "GPU thing", description: "x", example: false });
+		expect(displayFor({ ...entries[1], id: "example-acme-new" }).title).toBe("Memory");
+		expect(html).toContain(">Memory<");
+		expect(html).toContain(">Example<");
+		expect(html).toContain("Hard real-world tasks an agent completes in a Linux terminal");
+		expect(html).not.toContain("terminal tasks");
+		expect(html).not.toContain("hd-harbor-tb2");
+		expect(html).not.toContain("Free");
+		expect(html).toContain('data-testid="catalog-details-terminal-bench-2"');
 		expect(html).toContain('data-testid="catalog-section-featured"');
 		expect(html).toContain('data-testid="catalog-section-try"');
 		expect(html).toContain('data-testid="catalog-section-import"');
@@ -74,6 +80,8 @@ describe("CatalogBody", () => {
 		expect(details).toContain('data-testid="catalog-data-terminal-bench-2"');
 		expect(details).toContain("Upload:");
 		expect(details).toContain("hd-harbor-tb2");
+		expect(details).toContain("harbor");
+		expect(details).toContain("terminal tasks");
 		const f = initialImportForm(entries[0]);
 		expect(f.url).toBe("https://github.com/x/y/archive/main.zip");
 		expect(importReady(f)).toBe(false);
