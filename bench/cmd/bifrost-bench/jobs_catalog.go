@@ -9,6 +9,7 @@ import (
 	"github.com/maximhq/bifrost/bench/benchcatalog"
 	"github.com/maximhq/bifrost/bench/handlers"
 	"github.com/maximhq/bifrost/bench/jobs"
+	"github.com/maximhq/bifrost/bench/projectfs"
 	"github.com/maximhq/bifrost/bench/tenancy"
 )
 
@@ -28,6 +29,11 @@ func init() {
 			p, importer, from, err := catalogImportParams(env, j.Params)
 			if err != nil {
 				return nil, err
+			}
+			if p.URL != "" {
+				if from, err = fetchCatalogDataset(ctx, env, j, p, log); err != nil {
+					return nil, err
+				}
 			}
 			log.Printf("importing %s with the %s importer into suite %s (limit %d)", p.Entry, importer, p.Suite, p.Limit)
 			benchmarks := ""
@@ -49,6 +55,36 @@ func init() {
 		},
 	})
 	orgInitHooks = append(orgInitHooks, seedStarterCatalog)
+}
+
+// fetchCatalogDataset downloads p.URL into uploads/datasets/<entry> (SSRF
+// guarded, size capped) and returns the resolved data path.
+func fetchCatalogDataset(ctx context.Context, env jobEnv, j *jobs.Job, p benchcatalog.ImportParams, log jobs.Logger) (string, error) {
+	store := env.Services.Projects
+	if store == nil {
+		s, err := projectfs.Open(env.ProjectRoot)
+		if err != nil {
+			return "", fmt.Errorf("open project files: %w", err)
+		}
+		store = s
+	}
+	log.Printf("fetching the dataset from %s (at most %d MiB)", redactQuery(p.URL), projectfs.MaxUploadFileBytes>>20)
+	rel, err := benchcatalog.FetchDataset(ctx, catalogFetcher, store, p.Entry, p.URL, j.CreatedBy)
+	if err != nil {
+		return "", err
+	}
+	log.Printf("dataset saved at %s", rel)
+	return benchcatalog.ResolveFrom(env.ProjectRoot, rel, env.Hosted)
+}
+
+// catalogFetcher is the dataset fetcher of catalog imports (nil = default).
+var catalogFetcher *benchcatalog.Fetcher
+
+func redactQuery(raw string) string {
+	if i := strings.IndexAny(raw, "?#"); i >= 0 {
+		return raw[:i]
+	}
+	return raw
 }
 
 func catalogImportParams(env jobEnv, raw json.RawMessage) (benchcatalog.ImportParams, string, string, error) {

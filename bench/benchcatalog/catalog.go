@@ -58,6 +58,12 @@ type Entry struct {
 	// NeedsData: Add needs the path of a local copy of the upstream data.
 	NeedsData bool   `json:"needs_data"`
 	Hint      string `json:"hint,omitempty"`
+	// Data options of importer entries (see DataSpec).
+	UploadExpects string `json:"upload_expects,omitempty"` // what "Upload dataset" takes
+	FetchAllowed  bool   `json:"fetch_allowed,omitempty"`  // "Fetch from URL" can work
+	FetchURL      string `json:"fetch_url,omitempty"`      // known public URL to prefill
+	DataNote      string `json:"data_note,omitempty"`      // extra step the import needs
+	DatasetPath   string `json:"dataset_path,omitempty"`   // project path data lands in
 }
 
 // recipe is a named public benchmark mapped to an importer, with the suite
@@ -173,6 +179,7 @@ func (s Source) List(project string) []Entry {
 			if !e.Available {
 				e.Hint = "The " + r.importer + " importer is not linked into this server build."
 			}
+			applyData(&e)
 		}
 		e.Installed = installed(r.suite)
 		add(e)
@@ -184,6 +191,7 @@ func (s Source) List(project string) []Entry {
 			SuiteID: in.Name, Summary: in.Summary, Track: in.Track, Grading: in.Grading, License: in.License,
 			Source: in.Source, Benchmarks: in.Benchmarks, Needs: in.Needs, Available: true, NeedsData: true,
 			Hint: "Fetch the data first (" + in.Source + "), then give its path."}
+		applyData(&e)
 		e.Installed = installed(e.SuiteID)
 		add(e)
 	}
