@@ -8,6 +8,7 @@ import { setQuotaRequest } from "@/lib/store/apis/adminApi";
 import AdminView, { adminTab } from "./adminView";
 import { AdminImagesPanel, AdminOrgsPanel, QuotaEditor } from "./adminPanels";
 
+vi.mock("@tanstack/react-router", async () => (await import("@/lib/testing/routerMock")).routerMock); // G15: empty states link out
 const tab = vi.hoisted(() => ({ value: null as string | null }));
 vi.mock("nuqs", async (importOriginal) => ({
 	...(await importOriginal<typeof import("nuqs")>()),

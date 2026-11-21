@@ -29,7 +29,7 @@ export function ChecksTab(props: AgentOpsTabProps = {}) {
 			<EmptyState
 				compact
 				message={`No agent "${id}" in this project. Create it first.`}
-				action={{ label: "New agent", to: "/agents_/new" }}
+				action={{ label: "New agent", to: "/agents/new" }}
 				testId="checks-no-agent"
 			/>
 		);

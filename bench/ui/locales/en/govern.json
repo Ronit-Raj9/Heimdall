@@ -48,7 +48,8 @@
 		"yamlHint": "Edit the YAML directly. The server validates it with the same parser the planner uses.",
 		"conflict": "Someone saved this policy after you opened it. Reload, then apply your edit again.",
 		"reload": "Reload",
-		"needCheck": "Add at least one check."
+		"needCheck": "Add at least one check.",
+		"readGuide": "Read the release guide"
 	},
 	"releases": {
 		"actions": "Release log actions",

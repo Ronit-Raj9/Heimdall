@@ -28,9 +28,11 @@
 		"creating": "Creating...",
 		"pickFirst": "Pick a template on the left to continue.",
 		"loadError": "Could not load agent templates",
-		"empty": "This server offers no agent templates.",
+		"empty": "This server offers no agent templates. Upload an agent folder as a zip instead.",
 		"willWrite": "Will write {{count}} files",
-		"docs": "Guide: {{docs}}"
+		"docs": "Guide: {{docs}}",
+		"emptyAction": "Upload an agent",
+		"memberOnly": "Creating an agent needs the member role. Ask an org admin."
 	},
 	"detail": {
 		"back": "Agents",

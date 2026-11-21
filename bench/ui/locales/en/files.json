@@ -18,7 +18,7 @@
 	},
 	"root": "Top",
 	"up": "Up one folder",
-	"empty": "This folder is empty. Create a file to get started.",
+	"empty": "This folder is empty. Create a file below, or upload a zip of your project.",
 	"newFile": "New file",
 	"newFilePlaceholder": "name.yaml or folder/name.yaml",
 	"create": "Create",
@@ -50,5 +50,8 @@
 		"restore": "Load into editor",
 		"deleted": "deleted",
 		"by": "by {{actor}}"
-	}
+	},
+	"emptyViewer": "This folder is empty. A member can add files here or from the catalog.",
+	"emptyUpload": "Upload a zip",
+	"emptyCatalog": "Browse the catalog"
 }

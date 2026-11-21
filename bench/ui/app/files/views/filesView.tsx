@@ -125,7 +125,7 @@ export default function FilesView() {
 							{t("loadError", { message: getBenchErrorMessage(list.error) })}
 						</p>
 					) : entries.length === 0 && !list.isLoading ? (
-						<EmptyState compact message={t("empty")} testId="files-empty" />
+						<EmptyState compact message={canWrite ? t("empty") : t("emptyViewer")} action={canWrite ? { label: t("emptyUpload"), to: "/upload" } : { label: t("emptyCatalog"), to: "/catalog" }} testId="files-empty" />
 					) : (
 						<Table data-testid="files-table">
 							<TableHeader>

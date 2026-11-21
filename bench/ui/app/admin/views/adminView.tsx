@@ -29,14 +29,14 @@ export default function AdminView() {
 	if (session.authMode === "local") {
 		return (
 			<div className="p-6">
-				<EmptyState message={t("localMode")} testId="admin-local" />
+				<EmptyState message={t("localMode")} action={{ label: t("localAction"), to: "/operate" }} testId="admin-local" />
 			</div>
 		);
 	}
 	if (!session.serverAdmin) {
 		return (
 			<div className="p-6">
-				<EmptyState icon={ShieldAlert} message={t("notAdmin")} testId="admin-forbidden" />
+				<EmptyState icon={ShieldAlert} message={t("notAdmin")} action={{ label: t("notAdminAction"), to: "/" }} testId="admin-forbidden" />
 			</div>
 		);
 	}

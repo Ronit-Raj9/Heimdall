@@ -34,5 +34,9 @@
 	"resultSkipped": "{{count}} already present, kept",
 	"openSuites": "Open suites",
 	"importStarted": "Import job started. Its log is below; the suite appears when it finishes.",
-	"addFailed": "Add failed: {{message}}"
+	"addFailed": "Add failed: {{message}}",
+	"open": "Open",
+	"unavailableAction": "How to bring the data",
+	"memberOnly": "Members can add",
+	"noSourceAction": "Upload a project zip instead"
 }

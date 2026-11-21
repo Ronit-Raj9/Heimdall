@@ -4,8 +4,16 @@
 	"from": "From",
 	"to": "To",
 	"groupBy": "Group by",
-	"group": { "day": "Day", "model": "Model", "agent": "Agent", "key": "Key" },
-	"scope": { "org": "This organization", "platform": "Whole platform" },
+	"group": {
+		"day": "Day",
+		"model": "Model",
+		"agent": "Agent",
+		"key": "Key"
+	},
+	"scope": {
+		"org": "This organization",
+		"platform": "Whole platform"
+	},
 	"totals": {
 		"cost": "Run cost",
 		"tokens": "Tokens",
@@ -31,7 +39,9 @@
 		"empty": "No provider keys yet. Add one on Models & keys so runs can use your own account.",
 		"add": "Add a key"
 	},
-	"chart": { "summary": "Cost by {{group}}, {{count}} groups, total {{total}}" },
+	"chart": {
+		"summary": "Cost by {{group}}, {{count}} groups, total {{total}}"
+	},
 	"empty": "No sealed runs between {{from}} and {{to}}. Run an experiment, or widen the date range.",
 	"emptyAction": "Start a run",
 	"error": "Could not load usage: {{message}}",
@@ -41,5 +51,6 @@
 		"forbidden": "Platform usage is for server admins. Ask the operator to add your email to HEIMDALL_SERVER_ADMINS.",
 		"empty": "No organizations yet.",
 		"orgError": "Could not read: {{error}}"
-	}
+	},
+	"retry": "Try again"
 }
