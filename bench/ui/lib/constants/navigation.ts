@@ -18,7 +18,6 @@ import {
 	Wrench,
 	CirclePlay,
 	ClipboardCheck,
-	ClipboardList,
 	FlaskConical,
 	House,
 	Inbox,
@@ -40,7 +39,6 @@ export interface BenchNavItem {
 		| "/welcome"
 		| "/evaluations"
 		| "/experiments"
-		| "/evaluations"
 		| "/runs"
 		| "/leaderboard"
 		| "/agents"
@@ -70,7 +68,6 @@ export interface BenchNavItem {
 		| "shell.nav.welcome"
 		| "shell.nav.evaluations"
 		| "shell.nav.experiments"
-		| "shell.nav.evaluations"
 		| "shell.nav.runs"
 		| "shell.nav.leaderboard"
 		| "shell.nav.agents"
@@ -147,13 +144,6 @@ export const BENCH_NAV_GROUPS: readonly BenchNavGroup[] = [
 				icon: FlaskConical,
 				testId: "nav-link-experiments",
 				also: ["/verdict", "/matrix", "/migration", "/receipts"],
-			},
-			{
-				to: "/evaluations",
-				labelKey: "shell.nav.evaluations",
-				icon: ClipboardList,
-				testId: "nav-link-evaluations",
-				also: ["/evaluations_"],
 			},
 			{ to: "/runs", labelKey: "shell.nav.runs", icon: CirclePlay, testId: "nav-link-runs", also: ["/compare"] },
 			{ to: "/leaderboard", labelKey: "shell.nav.leaderboard", icon: ListOrdered, testId: "nav-link-leaderboard", also: ["/trends"] },

@@ -10,11 +10,16 @@ import EvaluateView, { maxReachable, stepReady } from "./evaluateView";
 const agent = (id: string, extra: Partial<AgentWithCaps> = {}) => ({ id, adapter: "command", model: "gpt-x", scripted_kind: "", ...extra }) as AgentWithCaps;
 const agents = [agent("codex"), agent("my-bot", { adapter: "remote_http" }), agent("oracle", { scripted_kind: "oracle" }), agent("opencode")];
 
-vi.mock("@/lib/store/apis/benchApi", () => ({
+vi.mock("@/lib/store/apis/benchApi", async (orig) => ({
+	...(await orig<object>()),
 	useGetAgentsQuery: () => ({ isLoading: false, isError: false, data: { agents }, refetch: () => undefined }),
+	useGetSuitesQuery: () => ({ isLoading: false, data: { suites: [{ id: "hd-harbor-tb2", description: "", admitted_count: 80, builtin: true }] } }),
 }));
-vi.mock("@/lib/store/apis/evaluationsApi", () => ({
+vi.mock("@/lib/store/apis/evaluationsApi", async (orig) => ({
+	...(await orig<object>()),
 	BASELINE_AGENTS: ["codex", "claude-code", "mini-swe-agent", "opencode", "gemini-cli"],
+	useGetEvaluationPacksQuery: () => ({ isLoading: false, data: [] }),
+	useGetAgentCompatibilityQuery: () => ({ isLoading: false, data: undefined }),
 	useGetAgentVersionsQuery: () => ({ isLoading: false, data: { agent: "codex", versions: [{ version: 1, runs: 3 }, { version: 2, runs: 0 }] } }),
 }));
 vi.mock("@tanstack/react-router", () => ({
@@ -123,8 +128,8 @@ describe("EvaluateView", () => {
 		expect(html).toContain('data-testid="evaluate-step-1"');
 	});
 
-	it("renders the step 3 placeholder from its lane file", () => {
+	it("renders step 3 (benchmarks) from its lane file", () => {
 		const html = render("?step=3", { agent: "codex" });
-		expect(html).toContain('data-testid="evaluate-step-3');
+		expect(html).toContain('data-testid="step3-benchmarks"');
 	});
 });

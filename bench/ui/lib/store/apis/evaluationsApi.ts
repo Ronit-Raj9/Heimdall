@@ -140,7 +140,7 @@ export interface Estimate {
 // 4. Report card (A04, A05)
 // ---------------------------------------------------------------------------------------------
 
-export type ReportCapability = "terminal" | "coding" | "memory" | "support" | "research" | "voice" | "safety" | "team" | "gpu";
+export type ReportCapabilityId = "terminal" | "coding" | "memory" | "support" | "research" | "voice" | "safety" | "team" | "gpu";
 
 export interface ReportMetrics {
 	score: number;
@@ -161,22 +161,27 @@ export interface ReportArm {
 	model: string;
 }
 
+/** A/B verdict on one benchmark (bench/verdictab). Winner is an arm label, "tie" or "unclear". */
 export interface ReportVerdict {
 	winner: string;
 	delta: number;
 	significant: boolean;
 	summary: string;
+	p_value?: number;
+	ci_low?: number;
+	ci_high?: number;
+	tasks?: number;
 }
 
 export interface ReportCapabilityRow {
-	capability: ReportCapability | string;
+	capability: ReportCapabilityId | string;
 	benchmarks: string[];
 	arms: Record<string, ReportMetrics>;
 }
 
 export interface ReportBenchmarkRow {
 	benchmark: string;
-	capability: ReportCapability | string;
+	capability: ReportCapabilityId | string;
 	experiment_id: string;
 	arms: Record<string, ReportMetrics>;
 	verdict?: ReportVerdict;
@@ -184,49 +189,81 @@ export interface ReportBenchmarkRow {
 
 export interface ReportReliabilityRow {
 	fault: string;
-	arms: Record<string, { score: number; drop: number }>;
+	benchmarks?: string[];
+	arms: Record<string, { score: number; drop: number; runs?: number }>;
 }
 
 export interface ReportSafety {
-	attack_resisted?: Record<string, number>;
-	cheat_rate?: Record<string, number>;
+	attack_resisted: Record<string, number>;
+	cheat_rate: Record<string, number>;
 }
 
 export interface ReportOverall {
 	winner: string;
 	wins: Record<string, number>;
 	summary: string;
+	delta?: number;
+	significant?: boolean;
+	p_value?: number;
 }
 
 /** GET /evaluations/{id}/report and GET /agents/{id}/report-card */
 export interface Report {
 	evaluation: string;
+	status?: string;
+	/** The evaluation's mode. "score" shows one arm and never an A/B verdict. */
+	mode?: EvaluationMode | string;
 	arms: ReportArm[];
 	capabilities: ReportCapabilityRow[];
 	benchmarks: ReportBenchmarkRow[];
 	reliability: ReportReliabilityRow[];
-	safety: ReportSafety;
-	overall: ReportOverall;
+	safety?: ReportSafety;
+	/** Only for A/B modes. */
+	overall?: ReportOverall;
 }
 
-export interface AgentLeaderboardCell {
-	score: number;
-	ci_low: number;
-	ci_high: number;
-	runs: number;
-}
+// Names other lanes use for the same shapes.
+export type ReportCardResponse = Report;
+export type EvaluationReport = Report;
+export type ReportArmMetrics = ReportMetrics;
+export type ReportCapability = ReportCapabilityRow;
+export type ReportBenchmark = ReportBenchmarkRow;
+export type ReportReliability = ReportReliabilityRow;
+export type AgentCompatibility = Compatibility;
+export type BenchmarkCompatibility = CompatibilityBenchmark;
+export type EvaluationPack = Pack;
+export type EvaluationEstimate = Estimate;
+export type EvaluationRange = Range;
+export type EstimateRange = Range;
+export type AgentVersionsResponse = AgentVersionList;
 
-/** GET /leaderboard/agents row. */
-export interface AgentLeaderboardRow {
+export interface AgentReportCardParams {
 	agent: string;
-	version: number;
-	model: string;
-	label: string;
-	baseline: boolean;
-	capabilities: Record<string, AgentLeaderboardCell>;
-	cost_usd: number;
-	last_evaluation: string;
+	version?: number;
+	model?: string;
 }
+
+/** The agent report card request: version and model only when set, so the server picks the latest. */
+export function agentReportCardRequest({ agent, version, model }: AgentReportCardParams): { url: string; params?: Record<string, string> } {
+	const params: Record<string, string> = {};
+	if (version) params.version = String(version);
+	if (model) params.model = model;
+	const url = `/agents/${encodeURIComponent(agent)}/report-card`;
+	return Object.keys(params).length > 0 ? { url, params } : { url };
+}
+
+/** The list answers either a bare array or {evaluations: [...]}; both become an array. */
+export function normalizeEvaluationList(raw: unknown): Evaluation[] {
+	if (Array.isArray(raw)) return raw as Evaluation[];
+	if (raw && typeof raw === "object" && Array.isArray((raw as { evaluations?: unknown }).evaluations)) {
+		return (raw as { evaluations: Evaluation[] }).evaluations;
+	}
+	return [];
+}
+
+// The agent leaderboard (A17) lives in ./agentLeaderboardApi; its types are re-exported here.
+export type { AgentCapabilityScore as AgentLeaderboardCell, AgentLeaderboardRow, AgentLeaderboardResponse } from "./agentLeaderboardApi";
+export { useGetAgentLeaderboardQuery } from "./agentLeaderboardApi";
 
 /** Built-in library agents marked baseline on the agent leaderboard. */
 export const BASELINE_AGENTS = ["codex", "claude-code", "mini-swe-agent", "opencode", "gemini-cli"];
@@ -237,12 +274,6 @@ export const BASELINE_AGENTS = ["codex", "claude-code", "mini-swe-agent", "openc
 
 const enc = encodeURIComponent;
 
-function qs(params: Record<string, string | number | undefined | null>): string {
-	const p = new URLSearchParams();
-	for (const [k, v] of Object.entries(params)) if (v !== undefined && v !== null && v !== "") p.set(k, String(v));
-	const s = p.toString();
-	return s ? `?${s}` : "";
-}
 
 export const evaluationsApi = benchApi
 	.enhanceEndpoints({ addTagTypes: ["Evaluations", "AgentVersions", "AgentCompat", "AgentLeaderboard"] })
@@ -266,8 +297,7 @@ export const evaluationsApi = benchApi
 			}),
 			listEvaluations: builder.query<Evaluation[], void>({
 				query: () => "/evaluations",
-				transformResponse: (body: Evaluation[] | { evaluations?: Evaluation[] | null } | null) =>
-					Array.isArray(body) ? body : (body?.evaluations ?? []),
+				transformResponse: (body: unknown) => normalizeEvaluationList(body),
 				providesTags: [{ type: "Evaluations", id: "LIST" }],
 			}),
 			getEvaluation: builder.query<Evaluation, string>({
@@ -291,6 +321,10 @@ export const evaluationsApi = benchApi
 			estimateEvaluation: builder.mutation<Estimate, EvaluationSpec>({
 				query: (body) => ({ url: "/evaluations/estimate", method: "POST", body }),
 			}),
+			/** The same estimate as a query, so a form can show it live (cached per spec). */
+			getEvaluationEstimate: builder.query<Estimate, EvaluationSpec>({
+				query: (body) => ({ url: "/evaluations/estimate", method: "POST", body }),
+			}),
 			getEvaluationPacks: builder.query<Pack[], void>({
 				query: () => "/evaluation-packs",
 				transformResponse: (body: Pack[] | { packs?: Pack[] | null } | null) =>
@@ -301,14 +335,8 @@ export const evaluationsApi = benchApi
 				providesTags: (_r, _e, id) => [{ type: "Evaluations", id: `${id}/report` }],
 			}),
 			getAgentReportCard: builder.query<Report, { agent: string; version?: number; model?: string }>({
-				query: ({ agent, version, model }) => `/agents/${enc(agent)}/report-card${qs({ version, model })}`,
+				query: (params) => agentReportCardRequest(params),
 				providesTags: (_r, _e, { agent }) => [{ type: "Evaluations", id: `card/${agent}` }],
-			}),
-			getAgentLeaderboard: builder.query<AgentLeaderboardRow[], { capability?: string; model?: string } | void>({
-				query: (args) => `/leaderboard/agents${qs({ capability: args?.capability, model: args?.model })}`,
-				transformResponse: (body: AgentLeaderboardRow[] | { rows?: AgentLeaderboardRow[] | null } | null) =>
-					Array.isArray(body) ? body : (body?.rows ?? []),
-				providesTags: [{ type: "AgentLeaderboard", id: "LIST" }],
 			}),
 		}),
 	});
@@ -326,5 +354,10 @@ export const {
 	useGetEvaluationPacksQuery,
 	useGetEvaluationReportQuery,
 	useGetAgentReportCardQuery,
-	useGetAgentLeaderboardQuery,
+	useGetEvaluationEstimateQuery,
 } = evaluationsApi;
+
+// Hook names other lanes use.
+export const useGetEvaluationsQuery = useListEvaluationsQuery;
+export const useCreateAgentVersionMutation = useSnapshotAgentVersionMutation;
+export const useEstimateEvaluationQuery = useGetEvaluationEstimateQuery;

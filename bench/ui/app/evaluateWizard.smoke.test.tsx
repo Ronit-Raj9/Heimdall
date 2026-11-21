@@ -170,6 +170,22 @@ const chosen: Record<string, string> = {
 	tasks: "5",
 	faults: "clean",
 };
+// The same choices as a wizard draft, for a wizard that keeps them in state instead of the URL.
+const initialDraft = {
+	agent: "oracle",
+	version: 1,
+	mode: "versions",
+	compareVersion: 2,
+	arms: [
+		{ label: "A", agent: "oracle", version: 1, model: "claude-sonnet-4-5", provider: "anthropic" },
+		{ label: "B", agent: "oracle", version: 2, model: "claude-sonnet-4-5", provider: "anthropic" },
+	],
+	benchmarks: ["coding-core"],
+	pack: null,
+	tasksPerBenchmark: 5,
+	trials: 2,
+	faults: ["clean"],
+};
 const stepNames: string[][] = [
 	["agent"],
 	["goal", "learn", "mode", "what"],
@@ -193,7 +209,7 @@ describe.skipIf(!wizardFile)("evaluate wizard smoke", () => {
 		return render(
 			<NuqsTestingAdapter searchParams={search}>
 				<ReduxProvider>
-					<Wizard step={index + 1} initialStep={index + 1} />
+					<Wizard step={index + 1} initialStep={index + 1} initial={initialDraft} />
 				</ReduxProvider>
 			</NuqsTestingAdapter>,
 		);

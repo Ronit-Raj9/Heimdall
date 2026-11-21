@@ -864,6 +864,8 @@ export interface Experiment {
 	safety?: string;
 	codescan?: Record<string, unknown>;
 	environment?: Record<string, unknown>;
+	/** The evaluation that created this experiment, when one did. */
+	evaluation_id?: string;
 }
 
 // ---------------------------------------------------------------------------------------------

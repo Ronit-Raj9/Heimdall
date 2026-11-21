@@ -53,7 +53,7 @@ function range(low: number, high: number, fmt: (n: number) => string): string {
 }
 
 /** The estimate as three short phrases: runs, cost (or "price not known") and minutes. */
-export function estimateText(e: EvaluationEstimate): { runs: string; cost: string; minutes: string } {
+export function estimateText(e: Pick<EvaluationEstimate, "runs" | "est_cost_usd" | "est_minutes">): { runs: string; cost: string; minutes: string } {
 	const cost = e.est_cost_usd.known ? range(e.est_cost_usd.low, e.est_cost_usd.high, money) : "price not known";
 	const minutes = `${range(e.est_minutes.low, e.est_minutes.high, (n) => String(Math.round(n)))} min`;
 	return { runs: `${e.runs} ${e.runs === 1 ? "run" : "runs"}`, cost, minutes };

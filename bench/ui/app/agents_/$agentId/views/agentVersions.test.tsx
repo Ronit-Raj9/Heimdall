@@ -98,16 +98,17 @@ describe("report card tab", () => {
 			arms: [{ label: "A", agent: "codex", version: 2, model: "gpt-x" }],
 			capabilities: [{ capability: "terminal", benchmarks: ["hd-harbor-tb2"], arms: { A: { score: 0.41, ci_low: 0.3, ci_high: 0.52, runs: 30 } } }],
 			benchmarks: [],
+			reliability: [],
 		};
 		const html = renderToStaticMarkup(<ReportCardTab agentId="codex" />);
 		expect(html).toContain('data-testid="report-card"');
-		expect(html).toContain('data-testid="report-card-cap-terminal"');
+		expect(html).toContain('data-testid="capability-terminal"');
 		expect(html).toContain('value="2"');
 		expect(html).toContain('value="claude-y"');
 	});
 
 	it("helpers", () => {
-		expect(isEmptyReport({ evaluation: "", arms: [], capabilities: [], benchmarks: [] }, undefined)).toBe(true);
+		expect(isEmptyReport({ evaluation: "", arms: [], capabilities: [], benchmarks: [], reliability: [] }, undefined)).toBe(true);
 		expect(isEmptyReport(undefined, { status: 500 })).toBe(false);
 		expect(catalogModels([{ models: [{ id: "b" }, { id: "a" }] }, { models: [{ id: "a" }] }])).toEqual(["a", "b"]);
 		expect(agentReportCardRequest({ agent: "my agent" })).toEqual({ url: "/agents/my%20agent/report-card" });
