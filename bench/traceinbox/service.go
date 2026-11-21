@@ -167,13 +167,20 @@ func (s *Service) Ingest(ctx context.Context, body []byte) (*schemas.InboxIngest
 	if s.Gate() == nil {
 		return nil, ErrOff
 	}
+	return PushBody(ctx, s.Inbox, s.hook, body)
+}
+
+// PushBody decodes one pushed body strictly and ingests it into ib as src.
+// The local webhook (Service.Ingest) and the hosted per-org ingest route
+// (handlers/inboxingest.go) both write through it.
+func PushBody(ctx context.Context, ib *Inbox, src *Source, body []byte) (*schemas.InboxIngestResult, error) {
 	var req IngestRequest
 	dec := json.NewDecoder(bytes.NewReader(body))
 	dec.DisallowUnknownFields()
 	if err := dec.Decode(&req); err != nil {
 		return nil, fmt.Errorf("%w: parse push: %v", ErrInvalid, err)
 	}
-	res, err := s.Inbox.Ingest(ctx, s.hook, req)
+	res, err := ib.Ingest(ctx, src, req)
 	if err != nil {
 		return nil, classify(err)
 	}

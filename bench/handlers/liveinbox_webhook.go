@@ -8,6 +8,7 @@ import (
 	"github.com/fasthttp/router"
 	"github.com/maximhq/bifrost/bench/lib"
 	"github.com/maximhq/bifrost/bench/schemas"
+	"github.com/maximhq/bifrost/bench/tenancy"
 	"github.com/maximhq/bifrost/bench/traceinbox"
 	"github.com/valyala/fasthttp"
 )
@@ -27,11 +28,14 @@ type InboxWebhookInfo struct {
 	Source     string `json:"source,omitempty"`
 	TokenEnv   string `json:"token_env,omitempty"`
 	// TokenSet is true when the token variable is set on the server.
-	TokenSet      bool   `json:"token_set"`
-	RatePerMinute int    `json:"rate_per_minute,omitempty"`
-	MaxBytes      int64  `json:"max_bytes,omitempty"`
-	Hosted        bool   `json:"hosted"`
-	Problem       string `json:"problem,omitempty"`
+	TokenSet      bool  `json:"token_set"`
+	RatePerMinute int   `json:"rate_per_minute,omitempty"`
+	MaxBytes      int64 `json:"max_bytes,omitempty"`
+	Hosted        bool  `json:"hosted"`
+	// IngestTokens is true when this server keeps per-org ingest tokens
+	// (hosted): the page lists, creates and revokes them at /inbox/tokens.
+	IngestTokens bool   `json:"ingest_tokens,omitempty"`
+	Problem      string `json:"problem,omitempty"`
 	// Next says what to do to turn the webhook on, empty when it is on.
 	Next string `json:"next,omitempty"`
 	// Example is a curl line with a placeholder token.
@@ -64,8 +68,25 @@ func (h inboxWebhookHandler) info(ctx *fasthttp.RequestCtx) InboxWebhookInfo {
 	out := InboxWebhookInfo{URL: ingestURL(ctx), Hosted: h.env.Services.Hosted}
 	out.Example = "curl -X POST " + out.URL + ` -H "Authorization: Bearer $` + DefaultInboxTokenEnv + `" -H "Content-Type: application/json" --data @session.json`
 	if out.Hosted {
-		out.Problem = "the inbox webhook is not served on the hosted server yet"
-		out.Next = "push from a local Heimdall (bifrost-bench serve) or pull with `bifrost-bench inbox pull`, then upload the project"
+		// Gap G02: the hosted server takes pushes per org, on a URL with the
+		// org in its path, behind the org's own ingest tokens
+		// (handlers/inboxingest.go). Whether a token exists is the token
+		// list's business; the page reads it from GET /inbox/tokens.
+		orgID := h.env.Services.OrgID
+		if o, ok := tenancy.OrgFrom(ctx); ok {
+			orgID = o.ID
+		}
+		if orgID == "" {
+			out.Problem = "this request is not resolved to an organization"
+			out.Next = "sign in and pick an organization"
+			return out
+		}
+		out.URL = orgIngestURL(ctx, orgID)
+		out.Example = ingestExample(out.URL)
+		out.Configured, out.Enabled, out.IngestTokens = true, true, true
+		out.TokenEnv = DefaultInboxTokenEnv
+		out.RatePerMinute, out.MaxBytes = traceinbox.DefaultRate, traceinbox.DefaultMaxBody
+		out.Next = "generate an ingest token below (org admins), export it as " + DefaultInboxTokenEnv + " where your tool runs and push with the curl line"
 		return out
 	}
 	if h.env.Mode != schemas.ModeLive {

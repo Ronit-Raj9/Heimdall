@@ -96,6 +96,10 @@ func (s *Service) Authenticate(ctx *fasthttp.RequestCtx) (*Principal, error) {
 			p, err = verifyRunner(dctx, raw)
 		case strings.HasPrefix(raw, APITokenPrefix):
 			p, err = s.tokenPrincipal(dctx, raw)
+		case strings.HasPrefix(raw, InboxTokenPrefix):
+			// An inbox ingest token is no account credential: anonymous,
+			// and never a fallback to the session cookie (gap G02).
+			return Anonymous(), nil
 		default:
 			err = ErrInvalidToken
 		}

@@ -1,11 +1,21 @@
 import { JobRunButton } from "@/components/jobs/jobRunButton";
+import { ConfirmButton } from "@/components/platform/badges";
 import { LoadError, Section } from "@/components/runs/screenStates";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { useSession } from "@/lib/session/sessionContext";
+import { getBenchErrorMessage } from "@/lib/store/apis/benchApi";
 import { inboxApi } from "@/lib/store/apis/inboxApi";
-import { useGetInboxWebhookQuery } from "@/lib/store/apis/liveinboxApi";
+import {
+	useCreateInboxTokenMutation,
+	useGetInboxTokensQuery,
+	useGetInboxWebhookQuery,
+	useRevokeInboxTokenMutation,
+} from "@/lib/store/apis/liveinboxApi";
+import { roleAtLeast } from "@/lib/store/apis/session";
 import { useAppDispatch } from "@/lib/store/hooks";
-import type { InboxWebhookInfo } from "@/lib/types/liveinbox";
-import { useId, useState } from "react";
+import type { InboxTokenCreated, InboxTokenList, InboxWebhookInfo } from "@/lib/types/liveinbox";
+import { useId, useState, type FormEvent } from "react";
 import { useTranslation } from "react-i18next";
 
 const SINCE_OPTIONS = ["", "24h", "7d", "30d"] as const;
@@ -124,6 +134,7 @@ export function InboxWebhookCard({ info }: { info: InboxWebhookInfo }) {
 						</pre>
 					</div>
 				)}
+				{info.ingest_tokens && <InboxTokens envName={envName} />}
 				{!info.hosted && !info.enabled && (
 					<div className="flex flex-col gap-2">
 						<div>
@@ -150,6 +161,167 @@ export function InboxWebhookCard({ info }: { info: InboxWebhookInfo }) {
 				</div>
 			</div>
 		</Section>
+	);
+}
+
+function shortDate(iso?: string): string {
+	if (!iso) return "";
+	const d = new Date(iso);
+	return Number.isNaN(d.getTime()) ? iso : d.toLocaleString();
+}
+
+export interface InboxTokensViewProps {
+	list: InboxTokenList;
+	envName: string;
+	isAdmin: boolean;
+	/** The token just made: shown once, until the page is left. */
+	created: InboxTokenCreated | null;
+	creating?: boolean;
+	revokingId?: string | null;
+	error?: string | null;
+	onCreate(label: string): void;
+	onRevoke(id: string): void;
+}
+
+/** The hosted per-org ingest tokens: generate (admins, server side, shown once), list and revoke. Exported for tests. */
+export function InboxTokensView({ list, envName, isAdmin, created, creating, revokingId, error, onCreate, onRevoke }: InboxTokensViewProps) {
+	const { t } = useTranslation("liveinbox");
+	const [label, setLabel] = useState("");
+	const labelId = useId();
+	const full = list.tokens.length >= list.max;
+	const submit = (e: FormEvent) => {
+		e.preventDefault();
+		onCreate(label.trim());
+		setLabel("");
+	};
+	return (
+		<div className="flex flex-col gap-3" data-testid="inbox-tokens">
+			<span className="text-foreground font-medium">{t("inbox.tokens.title")}</span>
+			{isAdmin ? (
+				<form className="flex flex-wrap items-end gap-2" onSubmit={submit}>
+					<div className="flex flex-col gap-1">
+						<label htmlFor={labelId} className="text-muted-foreground">
+							{t("inbox.tokens.label")}
+						</label>
+						<Input
+							id={labelId}
+							value={label}
+							maxLength={80}
+							placeholder={t("inbox.tokens.labelPlaceholder")}
+							onChange={(e) => setLabel(e.target.value)}
+							data-testid="inbox-tokens-label"
+						/>
+					</div>
+					<Button type="submit" size="sm" variant="outline" disabled={full || creating} data-testid="inbox-webhook-generate">
+						{t("inbox.webhook.generate")}
+					</Button>
+					{full && <span className="text-muted-foreground">{t("inbox.tokens.full", { max: list.max })}</span>}
+				</form>
+			) : (
+				<p className="text-muted-foreground" data-testid="inbox-tokens-viewer">
+					{t("inbox.tokens.viewer")}
+				</p>
+			)}
+			{error && (
+				<p className="text-chart-error-ink" role="alert" data-testid="inbox-tokens-error">
+					{error}
+				</p>
+			)}
+			{created && (
+				<div className="flex flex-col gap-1 rounded border p-2" data-testid="inbox-webhook-token">
+					<p className="text-muted-foreground">{t("inbox.tokens.createdOnce")}</p>
+					<div className="flex items-center gap-2">
+						<code className="bg-muted rounded px-2 py-1 font-mono break-all">{`export ${envName}=${created.secret}`}</code>
+						<CopyButton text={`export ${envName}=${created.secret}`} testId="inbox-webhook-copy-token" />
+					</div>
+				</div>
+			)}
+			{list.tokens.length === 0 ? (
+				<p className="text-muted-foreground" data-testid="inbox-tokens-empty">
+					{isAdmin ? t("inbox.tokens.emptyAdmin") : t("inbox.tokens.empty")}
+				</p>
+			) : (
+				<table className="w-full text-left" data-testid="inbox-tokens-table">
+					<thead className="text-muted-foreground">
+						<tr>
+							<th className="py-1 pr-2 font-normal">{t("inbox.tokens.colLabel")}</th>
+							<th className="py-1 pr-2 font-normal">{t("inbox.tokens.colToken")}</th>
+							<th className="py-1 pr-2 font-normal">{t("inbox.tokens.colCreated")}</th>
+							<th className="py-1 pr-2 font-normal">{t("inbox.tokens.colUsed")}</th>
+							<th className="py-1 font-normal" />
+						</tr>
+					</thead>
+					<tbody>
+						{list.tokens.map((tok) => (
+							<tr key={tok.id} className="border-t" data-testid={`inbox-token-${tok.id}`}>
+								<td className="py-1 pr-2">{tok.label || "-"}</td>
+								<td className="py-1 pr-2 font-mono">{`hmi_...${tok.last4}`}</td>
+								<td className="py-1 pr-2">{shortDate(tok.created_at)}</td>
+								<td className="py-1 pr-2">{tok.last_used_at ? shortDate(tok.last_used_at) : t("inbox.tokens.never")}</td>
+								<td className="py-1 text-right">
+									{isAdmin && (
+										<ConfirmButton
+											label={t("inbox.tokens.revoke")}
+											question={t("inbox.tokens.revokeQuestion")}
+											confirmLabel={t("inbox.tokens.revoke")}
+											cancelLabel={t("inbox.tokens.cancel")}
+											variant="destructive"
+											isLoading={revokingId === tok.id}
+											onConfirm={() => onRevoke(tok.id)}
+											testId={`inbox-token-revoke-${tok.id}`}
+										/>
+									)}
+								</td>
+							</tr>
+						))}
+					</tbody>
+				</table>
+			)}
+		</div>
+	);
+}
+
+/** Loads the org's ingest tokens and wires generate and revoke. */
+function InboxTokens({ envName }: { envName: string }) {
+	const { t } = useTranslation("liveinbox");
+	const session = useSession();
+	const q = useGetInboxTokensQuery();
+	const [create, createState] = useCreateInboxTokenMutation();
+	const [revoke] = useRevokeInboxTokenMutation();
+	const [created, setCreated] = useState<InboxTokenCreated | null>(null);
+	const [revokingId, setRevokingId] = useState<string | null>(null);
+	const [error, setError] = useState<string | null>(null);
+	if (q.isLoading) return null;
+	if (q.error || !q.data)
+		return <LoadError title={t("inbox.tokens.loadError")} error={q.error} onRetry={() => void q.refetch()} testId="inbox-tokens-load-error" />;
+	return (
+		<InboxTokensView
+			list={q.data}
+			envName={envName}
+			isAdmin={roleAtLeast(session.role, "admin")}
+			created={created}
+			creating={createState.isLoading}
+			revokingId={revokingId}
+			error={error}
+			onCreate={(label) => {
+				setError(null);
+				create(label ? { label } : {})
+					.unwrap()
+					.then(setCreated)
+					.catch((e: unknown) => setError(getBenchErrorMessage(e)));
+			}}
+			onRevoke={(id) => {
+				setError(null);
+				setRevokingId(id);
+				revoke(id)
+					.unwrap()
+					.then(() => {
+						if (created?.token.id === id) setCreated(null);
+					})
+					.catch((e: unknown) => setError(getBenchErrorMessage(e)))
+					.finally(() => setRevokingId(null));
+			}}
+		/>
 	);
 }
 

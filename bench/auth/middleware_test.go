@@ -98,6 +98,7 @@ func TestMiddlewareHosted(t *testing.T) {
 		{"bad API token does not fall back to cookie", all(cookie, func(r *fasthttp.Request) { r.Header.Set("Authorization", "Bearer hm_bad") }), want{401, ""}},
 		{"unknown bearer scheme", func(r *fasthttp.Request) { r.Header.Set("Authorization", "Bearer abcdef") }, want{401, ""}},
 		{"runner token without verifier", func(r *fasthttp.Request) { r.Header.Set("Authorization", "Bearer hmr_x") }, want{401, ""}},
+		{"inbox ingest token is anonymous, never the cookie", all(post, cookie, func(r *fasthttp.Request) { r.Header.Set("Authorization", "Bearer hmi_x") }), want{200, KindAnonymous}},
 	}
 	for _, c := range cases {
 		p, ctx := run(mw, c.setup)
