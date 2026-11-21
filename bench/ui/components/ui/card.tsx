@@ -2,11 +2,23 @@ import * as React from "react";
 
 import { cn } from "@/lib/utils";
 
-function Card({ className, ...props }: React.ComponentProps<"div">) {
+function Card({
+	className,
+	interactive = false,
+	...props
+}: React.ComponentProps<"div"> & {
+	/** Hover lift for cards that open something (a link or a click target). */
+	interactive?: boolean;
+}) {
 	return (
 		<div
 			data-slot="card"
-			className={cn("bg-card text-card-foreground flex flex-col gap-6 rounded-lg border py-6 shadow-(--shadow-card)", className)}
+			data-interactive={interactive || undefined}
+			className={cn(
+				"bg-card text-card-foreground flex flex-col gap-6 rounded-xl border border-border/70 py-6 shadow-(--shadow-card) transition-[box-shadow,border-color,transform] duration-200 ease-(--ease-out)",
+				interactive && "hover:border-border cursor-pointer hover:-translate-y-0.5 hover:shadow-md motion-reduce:hover:translate-y-0",
+				className,
+			)}
 			{...props}
 		/>
 	);
@@ -26,7 +38,7 @@ function CardHeader({ className, ...props }: React.ComponentProps<"div">) {
 }
 
 function CardTitle({ className, ...props }: React.ComponentProps<"div">) {
-	return <div data-slot="card-title" className={cn("leading-tight font-semibold tracking-[-0.01em]", className)} {...props} />;
+	return <div data-slot="card-title" className={cn("text-base leading-tight font-semibold tracking-[-0.01em]", className)} {...props} />;
 }
 
 function CardDescription({ className, ...props }: React.ComponentProps<"div">) {

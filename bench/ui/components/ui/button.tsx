@@ -6,7 +6,7 @@ import { cn } from "@/lib/utils";
 import { Loader2 } from "lucide-react";
 
 const buttonVariants = cva(
-	"inline-flex items-center ring-none justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium transition-[background-color,color,border-color,box-shadow,transform] disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg:not([class*='size-'])]:size-4 shrink-0 [&_svg]:shrink-0 outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-offset-background aria-invalid:border-destructive active:scale-[0.97] duration-150 ease-(--ease-out)",
+	"inline-flex items-center ring-none justify-center gap-2 whitespace-nowrap rounded-lg text-sm font-medium transition-[background-color,color,border-color,box-shadow,transform] disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg:not([class*='size-'])]:size-4 shrink-0 [&_svg]:shrink-0 outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-offset-background aria-invalid:border-destructive active:scale-[0.97] duration-150 ease-(--ease-out)",
 	{
 		variants: {
 			variant: {
@@ -14,7 +14,7 @@ const buttonVariants = cva(
 				destructive:
 					"bg-destructive text-white font-normal hover:bg-destructive/90 focus-visible:ring-destructive/50 dark:bg-destructive/60",
 				outline:
-					"border bg-card shadow-xs hover:bg-accent hover:text-accent-foreground focus-visible:ring-ring/50 dark:bg-input/20 dark:border-input dark:hover:bg-input/40",
+					"border border-border/80 bg-card shadow-xs hover:bg-accent hover:border-border hover:text-accent-foreground focus-visible:ring-ring/50 dark:bg-input/20 dark:border-input dark:hover:bg-input/40",
 				secondary: "bg-secondary text-secondary-foreground hover:bg-secondary/80 focus-visible:ring-secondary-foreground/30",
 				ghost: "hover:bg-accent hover:text-accent-foreground focus-visible:ring-accent-foreground/30 dark:hover:bg-accent/50",
 				link: "text-primary underline-offset-4 hover:underline focus-visible:ring-primary/50",
