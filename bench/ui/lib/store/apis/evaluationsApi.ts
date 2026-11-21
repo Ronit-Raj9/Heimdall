@@ -19,6 +19,8 @@ export interface CompatibilityBenchmark {
 	requires: Capability[];
 	missing: Capability[];
 	reason: string;
+	/** The agent runs only some tasks: how many are skipped and why. */
+	note?: string;
 }
 
 /** GET /agents/{id}/compatibility */

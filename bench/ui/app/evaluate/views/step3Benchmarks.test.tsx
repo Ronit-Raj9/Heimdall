@@ -145,6 +145,22 @@ describe("compatibility matching", () => {
 		expect(block(html, "step3-benchmark-voicebench")).toMatch(/<input[^>]*disabled=""/);
 	});
 
+	it("greys out tool benchmarks a remote agent cannot run and notes skipped tasks", () => {
+		const raw = {
+			agent: "bot",
+			capabilities: ["tools"],
+			benchmarks: [
+				{ id: "voicebench", ok: false, requires: [], missing: [], reason: "Agent bot cannot run benchmark voicebench: turn on tool access (remote.tools: expose)." },
+				{ id: "hd-harbor-tb2", ok: true, requires: [], missing: [], reason: "", note: "2 of 10 tasks are skipped: needs tools." },
+			],
+		} as unknown as AgentCompatibility;
+		const html = renderToStaticMarkup(<Step3BenchmarksView suites={suites} packs={packs} compatibility={raw} selected={[]} onChange={() => {}} />);
+		expect(block(html, "step3-benchmark-voicebench")).toContain('data-disabled="true"');
+		expect(block(html, "step3-benchmark-voicebench")).toContain("turn on tool access");
+		expect(block(html, "step3-benchmark-hd-harbor-tb2")).not.toContain('data-disabled="true"');
+		expect(block(html, "step3-benchmark-hd-harbor-tb2")).toContain("2 of 10 tasks are skipped");
+	});
+
 	it("waits for the answer before rows can be picked", () => {
 		const html = renderToStaticMarkup(<Step3BenchmarksView suites={suites} packs={packs} selected={[]} onChange={() => {}} checking />);
 		expect(block(html, "step3-benchmark-voicebench")).toContain('data-disabled="true"');

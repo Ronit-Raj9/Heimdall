@@ -15,6 +15,12 @@ vi.mock("@/lib/store/apis/benchApi", async (importOriginal) => ({
 	useGetWorkersQuery: () => query.result,
 }));
 
+vi.mock("@/lib/store/apis/sharedpoolApi", () => ({
+	useGetPoolStatusQuery: () => ({ isLoading: false, data: undefined }),
+	useListImageRequestsQuery: () => ({ data: undefined }),
+	useRequestImageMutation: () => [vi.fn(), { isLoading: false }],
+}));
+
 const fixture = JSON.parse(fs.readFileSync(path.resolve(__dirname, "../../../public/fixtures/workers.json"), "utf8")) as WorkerList;
 const idle = { isLoading: false, isFetching: false, isError: false, data: undefined, error: undefined, refetch: () => undefined };
 

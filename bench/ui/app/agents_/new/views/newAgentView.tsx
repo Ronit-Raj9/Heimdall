@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { canUse, useSession } from "@/lib/session/sessionContext";
 import { getBenchErrorMessage } from "@/lib/store/apis/benchApi";
-import { useCreateAgentFromTemplateMutation, useGetAgentTemplatesQuery } from "@/lib/store/apis/agentBuilderApi";
+import { useCreateAgentFromTemplateMutation, useGetAgentTemplatesQuery, useTestEndpointMutation } from "@/lib/store/apis/agentBuilderApi";
 import type { AgentTemplate, TemplateCategory } from "@/lib/types/agentBuilder";
 import { cn } from "@/lib/utils";
 import { useNavigate } from "@tanstack/react-router";
@@ -13,6 +13,7 @@ import { Bot, Check, ChevronRight, Code2, Hammer, Layers, Plug, SquareTerminal, 
 import { AgentAvatar, useAdapterLabel } from "../../../agents/views/agentDisplay";
 import { parseAsString, useQueryState } from "nuqs";
 import { useEffect, useMemo, useState } from "react";
+import { defaultParams, EndpointTestPanel, missingParams, ParamFields, picksOwnModel, testable } from "./connectForm";
 import { useTranslation } from "react-i18next";
 
 const CATEGORIES: TemplateCategory[] = ["cli", "framework", "starter", "bring-your-own"];
@@ -53,23 +54,27 @@ export default function NewAgentView() {
 	const [preview, setPreview] = useState<string | null>(null);
 	const [create, createState] = useCreateAgentFromTemplateMutation();
 	const [dryRun, dryRunState] = useCreateAgentFromTemplateMutation();
+	const [testEndpoint, testState] = useTestEndpointMutation();
 
 	// Picking a template pre-fills the rest, so Create is the only other click.
 	useEffect(() => {
 		if (!tpl) return;
 		setName(defaultAgentName(tpl));
 		setModel({ provider: (tpl.providers[0] ?? "openai") as ProviderId, model: tpl.default_model });
-		setParams({});
+		setParams(defaultParams(tpl));
 		setPreview(null);
+		testState.reset();
+		// eslint-disable-next-line react-hooks/exhaustive-deps
 	}, [tpl]);
 
 	const nameOk = ID_RE.test(name);
-	const missingParam = tpl?.params.some((p) => p.required && !(params[p.name] ?? "").trim()) ?? true;
+	const missingParam = tpl ? missingParams(tpl, params).length > 0 : true;
+	const ownModel = tpl ? picksOwnModel(tpl, params) : false;
 	const body = tpl
 		? {
 				template: tpl.id,
 				id: name,
-				model: model ? { provider: model.provider, model: model.model } : undefined,
+				model: model && !ownModel ? { provider: model.provider, model: model.model } : undefined,
 				notes: notes || undefined,
 				params: tpl.params.length ? params : undefined,
 			}
@@ -88,6 +93,9 @@ export default function NewAgentView() {
 		if (!body) return;
 		const res = await dryRun({ ...body, dry_run: true });
 		if ("data" in res && res.data) setPreview(res.data.yaml);
+	};
+	const onTest = () => {
+		if (body) void testEndpoint({ template: body });
 	};
 	const error = createState.error ?? dryRunState.error;
 
@@ -195,32 +203,35 @@ export default function NewAgentView() {
 										{nameOk ? t("new.nameHelp") : t("new.nameInvalid")}
 									</span>
 								</label>
-								<div className="flex flex-col gap-1 text-sm">
-									<span className="font-medium">{t("new.model")}</span>
-									<ModelPicker
-										value={model}
-										onChange={setModel}
-										purpose="agent"
-										allowedProviders={tpl.providers as ProviderId[]}
-										testId="agent-model"
-									/>
-									<span className="text-muted-foreground text-xs">
-										{tpl.providers.length === 1 ? t("new.onlyProviders", { providers: tpl.providers.join(", ") }) : t("new.modelHelp")}
-									</span>
-								</div>
-								{tpl.params.map((p) => (
-									<label key={p.name} className="flex flex-col gap-1 text-sm">
-										<span className="font-medium">{p.label}</span>
-										<Input
-											value={params[p.name] ?? ""}
-											placeholder={p.placeholder}
-											required={p.required}
-											onChange={(e) => setParams((cur) => ({ ...cur, [p.name]: e.target.value }))}
-											data-testid={`param-${p.name}`}
+								{ownModel ? (
+									<p className="text-muted-foreground text-xs" data-testid="agent-own-model">
+										{t("new.ownModel")}
+									</p>
+								) : (
+									<div className="flex flex-col gap-1 text-sm">
+										<span className="font-medium">{t("new.model")}</span>
+										<ModelPicker
+											value={model}
+											onChange={setModel}
+											purpose="agent"
+											allowedProviders={tpl.providers as ProviderId[]}
+											testId="agent-model"
 										/>
-										{p.help && <span className="text-muted-foreground text-xs">{p.help}</span>}
-									</label>
-								))}
+										<span className="text-muted-foreground text-xs">
+											{tpl.providers.length === 1 ? t("new.onlyProviders", { providers: tpl.providers.join(", ") }) : t("new.modelHelp")}
+										</span>
+									</div>
+								)}
+								{tpl.params.length > 0 && <ParamFields tpl={tpl} params={params} onChange={setParams} />}
+								{testable(tpl) && canWrite && (
+									<div className="flex flex-col gap-2" data-testid="endpoint-test">
+										<Button type="button" variant="outline" className="w-fit" disabled={missingParam || testState.isLoading} onClick={onTest} data-testid="endpoint-test-button">
+											{t("new.test.button")}
+										</Button>
+										<span className="text-muted-foreground text-xs">{t("new.test.help")}</span>
+										<EndpointTestPanel result={testState.data} error={testState.error} loading={testState.isLoading} />
+									</div>
+								)}
 								{error && (
 									<p role="alert" className="text-destructive text-sm" data-testid="agents-new-create-error">
 										{getBenchErrorMessage(error)}

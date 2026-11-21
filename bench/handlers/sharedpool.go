@@ -40,6 +40,14 @@ type SharedPoolHandler struct {
 	audit  AuditFunc
 	// orgExists checks an org id for the admin quota routes; nil accepts any.
 	orgExists func(ctx context.Context, id string) bool
+	// isAdmin decides server admin routes; nil uses auth.IsServerAdmin.
+	isAdmin func(*auth.Principal) bool
+}
+
+// WithAdminCheck replaces the server admin check (tests).
+func (h *SharedPoolHandler) WithAdminCheck(f func(*auth.Principal) bool) *SharedPoolHandler {
+	h.isAdmin = f
+	return h
 }
 
 // NewSharedPoolHandler returns the handler. pool may be nil (no shared
@@ -142,7 +150,11 @@ func (h *SharedPoolHandler) serverAdmin(next fasthttp.RequestHandler) fasthttp.R
 		if h.unavailable(ctx) {
 			return
 		}
-		if !auth.IsServerAdmin(auth.PrincipalFrom(ctx)) {
+		check := h.isAdmin
+		if check == nil {
+			check = auth.IsServerAdmin
+		}
+		if !check(auth.PrincipalFrom(ctx)) {
 			lib.SendError(ctx, h.mode, fasthttp.StatusForbidden, lib.ErrTypeForbidden,
 				"server admins only: the server owner lists admin emails in "+auth.ServerAdminsEnv)
 			return
@@ -326,6 +338,13 @@ func (h *SharedPoolHandler) decide(approve bool) fasthttp.RequestHandler {
 				return
 			}
 		}
+		var limits quota.Limits
+		if approve {
+			if limits, err = h.quota.Get(work, cur.OrgID); err != nil {
+				h.internal(ctx, "read limits", err)
+				return
+			}
+		}
 		v, err := h.images.Decide(work, id, approve, auth.PrincipalFrom(ctx).ActorID(), body.Note)
 		switch {
 		case errors.Is(err, sharedpool.ErrNotPending):
@@ -337,6 +356,13 @@ func (h *SharedPoolHandler) decide(approve bool) fasthttp.RequestHandler {
 		case err != nil:
 			h.internal(ctx, "decide image request", err)
 			return
+		}
+		if approve && !limits.AllowCustomImages { // J6: approving an org's image lets it run custom images
+			limits.AllowCustomImages = true
+			if err := h.quota.Set(work, cur.OrgID, limits, auth.PrincipalFrom(ctx).ActorID()); err != nil {
+				h.internal(ctx, "allow custom images", err)
+				return
+			}
 		}
 		h.record(ctx, v.OrgID, "image."+v.Status, "image_request", v.ID, map[string]any{"image": v.Image})
 		lib.SendJSON(ctx, h.mode, fasthttp.StatusOK, v)

@@ -119,7 +119,7 @@ export function compatibilityMap(compatibility: AgentCompatibility | undefined):
 		const missing = Array.isArray(r.missing) ? r.missing : [];
 		const reason = r.reason ?? "";
 		const ok = typeof r.ok === "boolean" ? r.ok : missing.length === 0 && !reason;
-		out.set(benchmarkKey(id), { id, ok, requires: Array.isArray(r.requires) ? r.requires : [], missing, reason });
+		out.set(benchmarkKey(id), { id, ok, requires: Array.isArray(r.requires) ? r.requires : [], missing, reason, ...(r.note ? { note: r.note } : {}) });
 	}
 	return out;
 }
@@ -206,11 +206,12 @@ export function Step3BenchmarksView({ suites, packs, compatibility, selected, pa
 	const skipped = selected.filter((id) => incompatibleReason(compatFor(compat, id))).length;
 
 	const row = (s: SuiteRow) => {
-		const reason = incompatibleReason(compatFor(compat, s.id));
+		const c = compatFor(compat, s.id);
+		const reason = incompatibleReason(c);
 		const disabled = Boolean(reason) || Boolean(checking);
 		const on = chosen.has(s.id) && !disabled;
 		const n = s.admitted_count ?? 0;
-		const note = reason || (checking ? "Checking whether your agent can run it..." : "") || (isGpuBenchmark(s.id) ? "Needs a GPU worker" : "");
+		const note = reason || (checking ? "Checking whether your agent can run it..." : "") || (isGpuBenchmark(s.id) ? "Needs a GPU worker" : "") || (c?.ok ? (c.note ?? "") : "");
 		return (
 			<li key={s.id}>
 				<label
@@ -236,7 +237,9 @@ export function Step3BenchmarksView({ suites, packs, compatibility, selected, pa
 								{n ? `${plural(n, "ready task")}` : "No ready tasks"}
 							</span>
 						</span>
-						<span className="text-muted-foreground block truncate text-xs">{note ? note : suiteDisplayDescription(s)}</span>
+						<span className="text-muted-foreground block truncate text-xs" title={note || undefined}>
+							{note ? note : suiteDisplayDescription(s)}
+						</span>
 					</span>
 				</label>
 			</li>

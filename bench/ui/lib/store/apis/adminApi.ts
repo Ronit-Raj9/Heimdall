@@ -28,7 +28,7 @@ export function disableUserRequest(userId: string, disabled: boolean): FetchArgs
 
 /** POST /admin/images/{id}/approve or /reject (shared pool area, L03). */
 export function imageDecisionRequest(id: string, decision: "approve" | "reject", reason?: string): FetchArgs {
-	return { url: `/admin/images/${seg(id)}/${decision}`, method: "POST", body: reason ? { reason } : {} };
+	return { url: `/admin/images/${seg(id)}/${decision}`, method: "POST", body: reason ? { note: reason } : {} };
 }
 
 export const adminApi = benchApi.enhanceEndpoints({ addTagTypes: ["AdminUsers", "AdminOrgs", "AdminKill", "AdminImages", "AdminContainers"] }).injectEndpoints({
@@ -69,13 +69,13 @@ export const adminApi = benchApi.enhanceEndpoints({ addTagTypes: ["AdminUsers", 
 			query: () => "/admin/containers",
 			providesTags: ["AdminContainers"],
 		}),
-		listAdminImages: builder.query<{ images: AdminImage[] }, void>({
-			query: () => "/admin/images",
+		listAdminImages: builder.query<{ images: AdminImage[] }, AdminImage["status"] | void>({
+			query: (status) => (status ? `/admin/images?status=${encodeURIComponent(status)}` : "/admin/images"),
 			providesTags: ["AdminImages"],
 		}),
 		decideImage: builder.mutation<unknown, { id: string; decision: "approve" | "reject"; reason?: string }>({
 			query: ({ id, decision, reason }) => imageDecisionRequest(id, decision, reason),
-			invalidatesTags: ["AdminImages"],
+			invalidatesTags: ["AdminImages", "AdminOrgs"],
 		}),
 		getAdminUsage: builder.query<AdminUsage, { from?: string; to?: string }>({
 			query: (params) => ({ url: "/admin/usage", params: Object.fromEntries(Object.entries(params).filter(([, v]) => v)) }),

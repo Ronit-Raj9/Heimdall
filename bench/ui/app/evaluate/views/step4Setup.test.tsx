@@ -17,6 +17,10 @@ vi.mock("@/lib/store/apis/evaluationsApi", () => ({
 		return q.estimate;
 	},
 }));
+vi.mock("@/lib/store/apis/benchApi", async (orig) => ({
+	...(await orig<typeof import("@/lib/store/apis/benchApi")>()),
+	useGetAgentsQuery: () => ({ data: { agents: [{ id: "bot", owns_model: true }, { id: "codex" }] } }),
+}));
 vi.mock("@tanstack/react-router", async () => (await import("@/lib/testing/routerMock")).routerMock);
 
 const catalog: CatalogProvider[] = [
@@ -152,6 +156,17 @@ describe("Step4Setup", () => {
 		expect(html).toContain("The Mistral key does not work.");
 		expect(html).toContain('href="/models?add=mistral"');
 		expect(html).toContain("Mistral (key not working)");
+	});
+
+	it("lets an agent that brings its own model leave the model blank", () => {
+		const own = spec({ arms: [{ label: "A", agent: "bot", model: "" }] });
+		expect(specReady(own)).toBe(false);
+		expect(specReady(own, new Set(["bot"]))).toBe(true);
+		const html = render(<Step4Setup spec={own} onChange={() => undefined} />);
+		expect(html).toContain('data-testid="step4-own-model-A"');
+		expect(html).toContain("Its own model.");
+		expect(html).not.toContain('data-testid="step4-model-A"');
+		expect(q.estimateArgs[0]).toEqual([own, { skip: false }]);
 	});
 
 	it("shows one picker per arm and skips the estimate until ready", () => {

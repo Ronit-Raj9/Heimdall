@@ -1,4 +1,5 @@
 import { ModeBadge } from "@/components/modeBadge";
+import { ImageRequestsCard } from "@/components/sharedpool/imageRequests";
 import { PageHeader } from "@/components/shell";
 import { BlockSkeleton, EmptyNote, LoadError } from "@/components/runs/screenStates";
 import { isSharedWorker, SharedWorkerNote, WorkerStateBadge, WorkersOff } from "@/components/workers/workersTable";
@@ -155,6 +156,13 @@ export default function WorkersView() {
 					</ul>
 				</div>
 			)}
+			<ImageRequestsCard initialImage={imageFromURL()} />
 		</section>
 	);
+}
+
+/** ?image=<ref> from the agent page's "Request approval" link pre-fills the request form. */
+function imageFromURL(): string | undefined {
+	if (typeof window === "undefined") return undefined;
+	return new URLSearchParams(window.location.search).get("image") ?? undefined;
 }

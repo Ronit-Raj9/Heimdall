@@ -6,6 +6,8 @@ import type {
 	AgentFromTemplateRequest,
 	AgentFromTemplateResponse,
 	AgentTemplateList,
+	EndpointTestRequest,
+	EndpointTestResult,
 } from "@/lib/types/agentBuilder";
 import { benchApi } from "./benchApi";
 
@@ -30,6 +32,10 @@ export const agentBuilderApi = benchApi.enhanceEndpoints({ addTagTypes: ["AgentC
 			query: ({ id, ...body }) => ({ url: `/agents/${encodeURIComponent(id)}/config`, method: "PUT", body }),
 			invalidatesTags: (_r, _e, arg) => [{ type: "AgentConfig", id: arg.id }, "BenchAgents"],
 		}),
+		/** Sends one sample task to an endpoint agent (J3); waits up to about two minutes. */
+		testEndpoint: builder.mutation<EndpointTestResult, EndpointTestRequest>({
+			query: (body) => ({ url: "/agents/test-endpoint", method: "POST", body, timeout: 130_000 }),
+		}),
 		validateAgentConfig: builder.mutation<AgentConfigValidateResponse, AgentConfigValidateRequest>({
 			query: (body) => ({ url: "/agents/config/validate", method: "POST", body }),
 		}),
@@ -42,4 +48,5 @@ export const {
 	useGetAgentConfigQuery,
 	usePutAgentConfigMutation,
 	useValidateAgentConfigMutation,
+	useTestEndpointMutation,
 } = agentBuilderApi;

@@ -124,7 +124,7 @@ function ArmCard({ arm, single }: { arm: EvaluationArm; single: boolean }) {
 				<dt className="text-muted-foreground">{t("detail.armVersion")}</dt>
 				<dd>{arm.version ? t("detail.versionN", { n: arm.version }) : t("detail.latestVersion")}</dd>
 				<dt className="text-muted-foreground">{t("detail.armModel")}</dt>
-				<dd className="break-all">{arm.provider ? `${arm.provider}/${arm.model}` : arm.model}</dd>
+				<dd className="break-all">{!arm.model ? t("detail.ownModel", { defaultValue: "The agent's own model" }) : arm.provider ? `${arm.provider}/${arm.model}` : arm.model}</dd>
 			</dl>
 			<span className="sr-only">{armAgentLabel(arm)}</span>
 		</div>

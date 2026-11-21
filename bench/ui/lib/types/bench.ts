@@ -2634,6 +2634,8 @@ export interface AgentSummary {
 	error?: string;
 	/** How the agent reports its own steps when its config shows it ("native" for the generic_jsonl parser); absent when not known from the config. */
 	reports_events?: "native";
+	/** The agent brings its own model (HTTP endpoint, A2A agent, OpenAI-compatible endpoint naming its model): evaluations may leave the model blank. */
+	owns_model?: boolean;
 }
 
 /** GET /agents: every agents/*.yaml config, sorted by file name. */
