@@ -30,9 +30,15 @@ export function getAuthState(): Readonly<AuthState> {
 	return authState;
 }
 
-let authPending = false;
+// In the browser the first /auth/me starts with the app, often in the same tick as the first
+// write, so writes wait for it from page load. Tests set the state directly and never wait.
+let authPending = typeof window !== "undefined" && import.meta.env.MODE !== "test";
 let markAuthKnown: () => void = () => {};
-let authKnown = Promise.resolve();
+let authKnown: Promise<void> = authPending
+	? new Promise<void>((resolve) => {
+			markAuthKnown = resolve;
+		})
+	: Promise.resolve();
 
 /** Called when /auth/me is sent: writes wait for its answer so they carry the CSRF value. */
 export function expectAuth(): void {
