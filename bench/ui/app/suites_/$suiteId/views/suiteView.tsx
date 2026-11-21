@@ -17,6 +17,7 @@ import { AlertTriangle, Boxes, ChevronRight, Trophy } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { SuiteCalibrationTab } from "./calibrationTab";
 import { OpsTab } from "./opsTab";
+import { EditTab } from "./editTab";
 import { SuiteExportTab, SuiteHealthTab, SuiteTiersTab } from "./suiteTabs";
 import { SuiteTasksTab } from "./tasksTab";
 
@@ -77,6 +78,7 @@ function SuiteBody({
 	requestedVersion?: string | null;
 }) {
 	const { t } = useTranslation("bench");
+	const { t: ta } = useTranslation("suiteAuthoring");
 	// Health is a separate request: a failure or a 503 (no run store) shows "health unavailable" and never blocks the page.
 	const healthQuery = useGetSuiteHealthQuery(suite.id, { skip: Boolean(suite.error) });
 	const health = healthState(healthQuery);
@@ -89,6 +91,7 @@ function SuiteBody({
 		{ id: "calibration", label: t("suites.tabs.calibration"), hidden: !judged },
 		{ id: "export", label: t("suites.tabs.export") },
 		{ id: "ops", label: t("tab", { ns: "suiteops" }) },
+		{ id: "edit", label: ta("tab") }, // L10 suite authoring
 	];
 
 	return (
@@ -168,6 +171,8 @@ function SuiteBody({
 								<SuiteCalibrationTab suite={suite} />
 							) : active === "ops" ? (
 								<OpsTab suite={suite} />
+							) : active === "edit" ? (
+								<EditTab suite={suite} />
 							) : active === "export" ? (
 								<SuiteExportTab suite={suite} />
 							) : (
