@@ -232,8 +232,12 @@ func (l *lineLogger) emit(s string) {
 }
 
 func (l *lineLogger) Printf(format string, args ...any) { l.emit(fmt.Sprintf(format, args...)) }
-func (l *lineLogger) Warnf(format string, args ...any)  { l.emit("warning: " + fmt.Sprintf(format, args...)) }
-func (l *lineLogger) Errorf(format string, args ...any) { l.emit("error: " + fmt.Sprintf(format, args...)) }
+func (l *lineLogger) Warnf(format string, args ...any) {
+	l.emit("warning: " + fmt.Sprintf(format, args...))
+}
+func (l *lineLogger) Errorf(format string, args ...any) {
+	l.emit("error: " + fmt.Sprintf(format, args...))
+}
 func (l *lineLogger) Write(p []byte) (int, error) {
 	s := l.partial + string(p)
 	i := strings.LastIndexByte(s, '\n')
