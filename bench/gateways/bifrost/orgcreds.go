@@ -38,7 +38,7 @@ type OrgSlotRegistrar interface {
 
 // orgSlotsPerProvider is how many concurrent runs of one organization can
 // use one provider on this runner.
-const orgSlotsPerProvider = 4
+const orgSlotsPerProvider = 8 // a team agent takes one per member; 4 starved it behind single runs
 
 var orgIDSafe = regexp.MustCompile(`[^a-z0-9]+`)
 

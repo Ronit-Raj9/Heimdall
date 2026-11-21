@@ -105,10 +105,9 @@ func TestApplyOrgCredentialsRoundRobin(t *testing.T) {
 	if len(reg.got) != orgSlotsPerProvider {
 		t.Fatalf("registered %d slots", len(reg.got))
 	}
-	want := []string{"sk-one", "sk-two", "sk-one", "sk-two"}
 	for i, s := range reg.got {
-		if s.Key != want[i] {
-			t.Fatalf("slot %d key %q, want %q", i+1, s.Key, want[i])
+		if want := []string{"sk-one", "sk-two"}[i%2]; s.Key != want { // round robin over the two distinct keys
+			t.Fatalf("slot %d key %q", i+1, s.Key)
 		}
 	}
 	if id := g.orgSlotKeyID(OrgSlotName("org_a", "anthropic", 2)); id != "key_2" {
