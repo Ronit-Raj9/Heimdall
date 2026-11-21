@@ -19,7 +19,8 @@ import { useTranslation } from "react-i18next";
  * gates a release.
  */
 export default function TrendsTab() {
-	const { t } = useTranslation(["bench", "u12"]);
+	const { t } = useTranslation("bench");
+	const { t: tu } = useTranslation("u12");
 	const [suite, setSuite] = useQueryState("suite", parseAsString);
 	const [agent, setAgent] = useQueryState("agent", parseAsString);
 	const [metric, setMetric] = useQueryState("metric", parseAsStringLiteral(TREND_METRICS));
@@ -91,8 +92,8 @@ export default function TrendsTab() {
 					aria-busy={trends.isFetching}
 				>
 					<header className="flex flex-col gap-0.5">
-						<h2 className="text-base font-semibold tracking-tight">{t("u12:trends.title")}</h2>
-						<p className="text-muted-foreground text-sm">{t("u12:trends.subtitle")}</p>
+						<h2 className="text-base font-semibold tracking-tight">{tu("trends.title")}</h2>
+						<p className="text-muted-foreground text-sm">{tu("trends.subtitle")}</p>
 					</header>
 					<TrendsBoard data={data} onIncludeSynthetic={() => void setSynthetic("include")} />
 				</div>

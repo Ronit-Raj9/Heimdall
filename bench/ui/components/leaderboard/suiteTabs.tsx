@@ -50,7 +50,8 @@ export function SuiteTabs({
 	onTrack: (track: string | null) => void;
 	disabled?: boolean;
 }) {
-	const { t } = useTranslation(["u12", "bench"]);
+	const { t: tu } = useTranslation("u12");
+	const { t: tb } = useTranslation("bench");
 	if (groups.length < 2) return null;
 	const tab = (active: boolean) =>
 		cn(
@@ -58,10 +59,10 @@ export function SuiteTabs({
 			active ? "bg-foreground text-background" : "text-muted-foreground hover:bg-muted hover:text-foreground",
 		);
 	return (
-		<div role="tablist" aria-label={t("u12:board.suiteTabs")} className="flex gap-1 overflow-x-auto pb-1" data-testid="leaderboard-suite-tabs">
+		<div role="tablist" aria-label={tu("board.suiteTabs")} className="flex gap-1 overflow-x-auto pb-1" data-testid="leaderboard-suite-tabs">
 			<button type="button" role="tab" aria-selected={!track} className={tab(!track)} disabled={disabled} onClick={() => onTrack(null)}>
 				<Boxes className="size-4" aria-hidden="true" />
-				{t("u12:board.allSuites")}
+				{tu("board.allSuites")}
 			</button>
 			{groups.map((g) => {
 				const Icon = trackIcon(g.track);
@@ -78,7 +79,7 @@ export function SuiteTabs({
 						data-testid={`leaderboard-suite-tab-${g.track}`}
 					>
 						<Icon className="size-4" aria-hidden="true" />
-						{t(`bench:scenario.track.${g.track}`, { defaultValue: g.track.replace(/^~/, "").replace(/_/g, " ") })}
+						{tb(`scenario.track.${g.track}`, { defaultValue: g.track.replace(/^~/, "").replace(/_/g, " ") })}
 					</button>
 				);
 			})}

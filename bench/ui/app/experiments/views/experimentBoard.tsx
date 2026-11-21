@@ -224,7 +224,7 @@ export function ExperimentBoard() {
 		{ history: "replace", throttleMs: 200 },
 	);
 	const all = useMemo(() => list.data?.experiments ?? [], [list.data]);
-	const named = useMemo(() => new Map(all.map((e) => [e.exp_id, humanExperimentName(e, (k, o) => t(k, o ?? {}))] as const)), [all, t]);
+	const named = useMemo(() => new Map(all.map((e) => [e.exp_id, humanExperimentName(e, (k, o) => t(k as never, (o ?? {}) as never) as string)] as const)), [all, t]);
 	const shown = useMemo(() => {
 		const q = filters.q?.trim().toLowerCase() ?? "";
 		// The id and typed name match in filterExperiments; the readable name and the suite match here.

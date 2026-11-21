@@ -202,7 +202,8 @@ export function LeaderboardTab() {
 }
 
 function Board({ data, isFetching, onShowSynthetic }: { data: LeaderboardResponse; isFetching: boolean; onShowSynthetic: () => void }) {
-	const { t } = useTranslation(["bench", "u12"]);
+	const { t } = useTranslation("bench");
+	const { t: tu } = useTranslation("u12");
 	const [compact, setCompact] = useState(true);
 	const [sortKey, setSortKey] = useQueryState("sort", parseAsString);
 	const [sortDir, setSortDir] = useQueryState("dir", parseAsStringLiteral(SORT_DIRS));
@@ -230,7 +231,7 @@ function Board({ data, isFetching, onShowSynthetic }: { data: LeaderboardRespons
 					entries.length > 0 && (
 						<div className="flex items-center gap-2">
 							<Button variant="ghost" size="sm" onClick={() => setCompact((c) => !c)} dataTestId="leaderboard-columns-toggle">
-								{compact ? t("u12:board.more") : t("u12:board.less")}
+								{compact ? tu("board.more") : tu("board.less")}
 							</Button>
 							<CopyMarkdownButton build={() => leaderboardMarkdown(data, rows, faults, getLocale())} disabled={isFetching} />
 						</div>

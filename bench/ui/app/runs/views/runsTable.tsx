@@ -91,7 +91,8 @@ const DOT = {
 
 /** Outcome as a soft pill with a coloured dot; a running run pulses. */
 export function OutcomePill({ row }: { row: Pick<RunListRow, "sealed" | "outcome" | "run_id"> }) {
-	const { t } = useTranslation(["u12", "bench"]);
+	const { t: tu } = useTranslation("u12");
+	const { t: tb } = useTranslation("bench");
 	const tone = row.sealed ? outcomeTone(row.outcome) : "live";
 	return (
 		<span
@@ -103,7 +104,7 @@ export function OutcomePill({ row }: { row: Pick<RunListRow, "sealed" | "outcome
 				{tone === "live" && <span className={cn("absolute inline-flex size-full animate-ping rounded-full opacity-75", DOT.live)} />}
 				<span className={cn("relative inline-flex size-1.5 rounded-full", DOT[tone])} />
 			</span>
-			{row.sealed ? t(`bench:runs.outcome.${row.outcome}`, { defaultValue: row.outcome }) : t("u12:runs.live")}
+			{row.sealed ? tb(`runs.outcome.${row.outcome}`, { defaultValue: row.outcome }) : tu("runs.live")}
 		</span>
 	);
 }
@@ -157,7 +158,8 @@ function Chips({
 
 /** /runs: live runs on top, chip filters in the URL, a search box, and one click to open a run. */
 export function RunsTable() {
-	const { t } = useTranslation(["u12", "bench"]);
+	const { t: tu } = useTranslation("u12");
+	const { t: tb } = useTranslation("bench");
 	const locale = getLocale();
 	const navigate = useNavigate();
 	const [search, setSearch] = useQueryStates(parsers, { history: "replace" });
@@ -181,13 +183,13 @@ export function RunsTable() {
 			<div className="bg-card flex flex-col gap-3 rounded-xl border p-4">
 				<div className="flex flex-wrap items-center gap-3">
 					<label className="relative min-w-0 flex-1 sm:max-w-sm">
-						<span className="sr-only">{t("u12:runs.searchLabel")}</span>
+						<span className="sr-only">{tu("runs.searchLabel")}</span>
 						<Search className="text-muted-foreground pointer-events-none absolute top-1/2 left-2.5 size-4 -translate-y-1/2" aria-hidden="true" />
 						<input
 							type="search"
 							value={search.q ?? ""}
 							onChange={(e) => void setSearch({ q: e.target.value || null })}
-							placeholder={t("u12:runs.search")}
+							placeholder={tu("runs.search")}
 							className="bg-background focus-visible:ring-ring/50 h-9 w-full rounded-lg border pr-3 pl-8 text-sm focus-visible:ring-2 focus-visible:outline-none"
 							data-testid="runs-search"
 						/>
@@ -195,33 +197,33 @@ export function RunsTable() {
 					{live > 0 && (
 						<span className="text-chart-info-ink inline-flex items-center gap-1.5 text-xs font-medium" data-testid="runs-live-count">
 							<span className="bg-chart-info size-1.5 animate-pulse rounded-full" />
-							{t("u12:runs.liveCount", { count: live })}
+							{tu("runs.liveCount", { count: live })}
 						</span>
 					)}
 					{active && (
 						<Button variant="ghost" size="sm" onClick={clear} className="ml-auto" dataTestId="runs-clear">
 							<X aria-hidden="true" />
-							{t("u12:runs.clear")}
+							{tu("runs.clear")}
 						</Button>
 					)}
 				</div>
 				<Chips
-					label={t("u12:runs.outcome")}
+					label={tu("runs.outcome")}
 					options={facets?.outcomes ?? []}
 					value={search.outcome}
 					onChange={(v) => void setSearch({ outcome: v, page: null })}
-					render={(o) => t(`bench:runs.outcome.${o}`, { defaultValue: o })}
+					render={(o) => tb(`runs.outcome.${o}`, { defaultValue: o })}
 					testId="runs-chips-outcome"
 				/>
 				<Chips
-					label={t("u12:runs.suite")}
+					label={tu("runs.suite")}
 					options={facets?.suites ?? []}
 					value={search.suite}
 					onChange={(v) => void setSearch({ suite: v, page: null })}
 					testId="runs-chips-suite"
 				/>
 				<Chips
-					label={t("u12:runs.agent")}
+					label={tu("runs.agent")}
 					options={facets?.arms ?? []}
 					value={search.arm}
 					onChange={(v) => void setSearch({ arm: v, page: null })}
@@ -232,12 +234,12 @@ export function RunsTable() {
 			{list.isLoading ? (
 				<BlockSkeleton rows={8} testId="runs-loading" />
 			) : list.error || !list.data ? (
-				<LoadError title={t("u12:runs.loadError")} error={list.error} onRetry={() => void list.refetch()} testId="runs-error" />
+				<LoadError title={tu("runs.loadError")} error={list.error} onRetry={() => void list.refetch()} testId="runs-error" />
 			) : rows.length === 0 ? (
 				<EmptyState
 					icon={ListX}
-					message={active ? t("u12:runs.noMatch") : t("u12:runs.empty")}
-					action={active ? { label: t("u12:runs.clear"), onClick: clear } : { label: t("u12:runs.newExperiment"), to: "/experiments/new" }}
+					message={active ? tu("runs.noMatch") : tu("runs.empty")}
+					action={active ? { label: tu("runs.clear"), onClick: clear } : { label: tu("runs.newExperiment"), to: "/experiments/new" }}
 					testId="runs-empty"
 				/>
 			) : (
@@ -247,28 +249,28 @@ export function RunsTable() {
 							<thead className="bg-card sticky top-0 z-10">
 								<tr className="text-muted-foreground border-b text-xs">
 									<th scope="col" className="px-4 py-2.5 text-left font-medium">
-										{t("u12:runs.col.task")}
+										{tu("runs.col.task")}
 									</th>
 									<th scope="col" className="px-3 py-2.5 text-left font-medium">
-										{t("u12:runs.col.agent")}
+										{tu("runs.col.agent")}
 									</th>
 									<th scope="col" className="px-3 py-2.5 text-left font-medium">
-										{t("u12:runs.col.outcome")}
+										{tu("runs.col.outcome")}
 									</th>
 									<th scope="col" className="px-3 py-2.5 text-right font-medium">
-										{t("u12:runs.col.steps")}
+										{tu("runs.col.steps")}
 									</th>
 									<th scope="col" className="px-3 py-2.5 text-right font-medium">
-										{t("u12:runs.col.tokens")}
+										{tu("runs.col.tokens")}
 									</th>
 									<th scope="col" className="px-3 py-2.5 text-right font-medium">
-										{t("u12:runs.col.cost")}
+										{tu("runs.col.cost")}
 									</th>
 									<th scope="col" className="px-3 py-2.5 text-right font-medium">
-										{t("u12:runs.col.duration")}
+										{tu("runs.col.duration")}
 									</th>
 									<th scope="col" className="px-4 py-2.5 text-right font-medium">
-										{t("u12:runs.col.when")}
+										{tu("runs.col.when")}
 									</th>
 								</tr>
 							</thead>
@@ -278,7 +280,7 @@ export function RunsTable() {
 										key={row.run_id}
 										tabIndex={0}
 										role="link"
-										aria-label={t("u12:runs.open", { run: row.run_id })}
+										aria-label={tu("runs.open", { run: row.run_id })}
 										onClick={() => open(row)}
 										onKeyDown={(e) => onKey(e, row)}
 										className={cn(
