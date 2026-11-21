@@ -143,13 +143,13 @@ export function RunsTable() {
 	const facets = list.data?.facets;
 	const clear = () => void setSearch({ outcome: null, suite: null, arm: null, agent: null, q: null, page: null });
 	const outcomeLabel = (o: string) => tb(`runs.outcome.${o}`, { defaultValue: o });
-	const tokens: FilterToken[] = [
+	const tokens = ([
 		search.outcome && { key: "outcome", label: `${tu("runs.outcome")}: ${outcomeLabel(search.outcome)}`, onRemove: () => void setSearch({ outcome: null, page: null }) },
 		search.suite && { key: "suite", label: `${tu("runs.suite")}: ${search.suite.replace(/@.*$/, "")}`, onRemove: () => void setSearch({ suite: null, page: null }) },
 		search.agent && { key: "agent", label: `${tu("runs.agent")}: ${search.agent}`, onRemove: () => void setSearch({ agent: null, page: null }) },
 		// An older link may still carry an arm id; show it so it can be removed.
 		search.arm && { key: "arm", label: `${tu("runs.agent")}: ${search.arm}`, onRemove: () => void setSearch({ arm: null, page: null }) },
-	].filter((x): x is FilterToken => Boolean(x));
+	] as (FilterToken | false | "" | null | undefined)[]).filter((x): x is FilterToken => Boolean(x));
 	const open = (row: RunListRow) => void navigate({ to: "/runs/$runId", params: { runId: row.run_id } } as never);
 	const onKey = (e: KeyboardEvent, row: RunListRow) => {
 		if (e.key === "Enter" || e.key === " ") {

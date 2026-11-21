@@ -235,14 +235,14 @@ export function ExperimentBoard() {
 	const suites = useMemo(() => [...new Set(all.map((e) => e.suite).filter((s): s is string => Boolean(s)))].sort(), [all]);
 	const clear = () => void setFilters({ q: null, state: null, suite: null });
 	const statusKey = STATUSES.find((c) => c.state === filters.state)?.key;
-	const tokens: FilterToken[] = [
+	const tokens = ([
 		filters.state && {
 			key: "state",
 			label: `${t("col.status")}: ${statusKey ? t(`chips.${statusKey}`) : filters.state}`,
 			onRemove: () => void setFilters({ state: null }),
 		},
 		filters.suite && { key: "suite", label: `${t("chips.benchmark")}: ${suiteName(filters.suite)}`, onRemove: () => void setFilters({ suite: null }) },
-	].filter((x): x is FilterToken => Boolean(x));
+	] as (FilterToken | false | "" | null | undefined)[]).filter((x): x is FilterToken => Boolean(x));
 
 	if (list.isLoading) return <BlockSkeleton rows={6} testId="experiment-list-loading" />;
 	if (list.error || !list.data) {

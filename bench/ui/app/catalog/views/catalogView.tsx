@@ -323,10 +323,10 @@ export function CatalogBody(props: CatalogBodyProps) {
 		return CATEGORIES.filter((c) => s.has(c));
 	}, [props.entries]);
 	const set = (patch: Partial<CatalogFilters>) => props.onFilters({ ...filters, ...patch });
-	const tokens: FilterToken[] = [
+	const tokens = ([
 		filters.category !== "all" && { key: "category", label: `${t("category")}: ${t(`cat_${filters.category}`)}`, onRemove: () => set({ category: "all" }) },
 		filters.source !== "all" && { key: "source", label: t(SOURCE_KEY[filters.source]), onRemove: () => set({ source: "all" }) },
-	].filter((x): x is FilterToken => Boolean(x));
+	] as (FilterToken | false | "" | null | undefined)[]).filter((x): x is FilterToken => Boolean(x));
 	const res = props.lastAdded?.result;
 	const grouped = SECTIONS.map((id) => ({ id, items: shown.filter((e) => sectionOf(e) === id) })).filter((g) => g.items.length > 0);
 	const details = props.detailsFor && !props.importFor ? props.detailsFor : null;
