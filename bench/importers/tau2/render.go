@@ -38,6 +38,18 @@ func (w *writer) prepare(domains []string) error {
 	w.baseTag = "bench/tau2-base:" + shortHash(baseDockerfile)
 	w.writes = map[string]map[string]bool{}
 	for _, d := range domains {
+		if w.set.usesExport(d) {
+			e, _, err := readExport(w.set.exportDir, w.set.exportLanguage(), d)
+			if err != nil {
+				return err
+			}
+			w.policies[d] = e.Policy
+			w.writes[d] = map[string]bool{}
+			for _, n := range e.MutatingTools {
+				w.writes[d][n] = true
+			}
+			continue
+		}
 		p, err := w.up.policy(d)
 		if err != nil {
 			return err
@@ -59,15 +71,19 @@ func (w *writer) writeTask(dir string, c candidate) error {
 	if err != nil {
 		return err
 	}
-	scenario, err := scenarioJSON(c, w.set)
+	scenario, err := scenarioJSON(c, acts, w.set)
 	if err != nil {
 		return err
 	}
-	grading, err := json.MarshalIndent(map[string]string{
+	gdoc := map[string]any{
 		"domain":             c.domain,
 		"communicate_scorer": "substring",
 		"nl_assertions":      w.set.nl,
-	}, "", "  ")
+	}
+	for k, v := range envSettings(c, acts, w.set) {
+		gdoc[k] = v
+	}
+	grading, err := json.MarshalIndent(gdoc, "", "  ")
 	if err != nil {
 		return err
 	}
@@ -126,17 +142,51 @@ func (w *writer) writeTask(dir string, c candidate) error {
 // scenarioJSON is what the service needs and nothing more: the domain, the
 // starting state and the customer's scenario. The expected actions and the
 // rest of the evaluation criteria go only to the verifier.
-func scenarioJSON(c candidate, set settings) ([]byte, error) {
+func scenarioJSON(c candidate, acts []upAction, set settings) ([]byte, error) {
 	task := map[string]any{"id": c.task.ID, "user_scenario": c.task.UserScenario}
 	if c.task.InitialState != nil {
 		task["initial_state"] = c.task.InitialState
 	}
-	return json.MarshalIndent(map[string]any{
+	doc := map[string]any{
 		"domain":         c.domain,
 		"user":           set.user,
 		"max_user_turns": set.maxTurns,
 		"task":           task,
-	}, "", "  ")
+	}
+	for k, v := range envSettings(c, acts, set) {
+		doc[k] = v
+	}
+	return json.MarshalIndent(doc, "", "  ")
+}
+
+// envSettings are what the service and the verifier need to build the same
+// upstream environment: the language pack, and for banking_knowledge the
+// retrieval variant and the read-log allowlist upstream's runner derives from
+// the expected actions (the discoverable tools they call; reads outside it
+// are not logged, so they do not change the database hash).
+func envSettings(c candidate, acts []upAction, set settings) map[string]any {
+	out := map[string]any{}
+	if set.langSet {
+		out["language"] = set.language
+	}
+	if c.domain == "banking_knowledge" {
+		out["retrieval"] = set.retrieval
+		allow := []string{}
+		for _, a := range acts {
+			if a.Name != "call_discoverable_agent_tool" {
+				continue
+			}
+			var args struct {
+				Name string `json:"agent_tool_name"`
+			}
+			if json.Unmarshal(a.Arguments, &args) == nil && args.Name != "" && !slices.Contains(allow, args.Name) {
+				allow = append(allow, args.Name)
+			}
+		}
+		slices.Sort(allow)
+		out["read_log_allowlist"] = allow
+	}
+	return out
 }
 
 // q quotes s as a YAML double-quoted scalar (JSON string syntax, which YAML
@@ -169,7 +219,17 @@ func (w *writer) taskYAML(c candidate, acts []upAction, serviceImage string) str
 	}
 	p("  exploit: controls/exploit.sh\n")
 	p("timeouts:\n  agent_s: %d\n", agentTimeoutS)
-	p("tags: [tau2, %s]\n", c.domain)
+	tags := []string{"tau2", c.domain}
+	if w.set.langSet {
+		tags = append(tags, "lang-"+w.set.language)
+	}
+	if c.domain == "banking_knowledge" {
+		tags = append(tags, "tau3", "retrieval-"+w.set.retrieval)
+	}
+	if c.draft != "" {
+		tags = append(tags, draftUserToolsTag)
+	}
+	p("tags: [%s]\n", strings.Join(tags, ", "))
 	p("capabilities: [tool_use]\n")
 	p("provenance:\n  source: %s\n  base_commit: %s\n  license: %s\n  imported_from: %s\n  created_by: %s\n",
 		q(upstreamRepo), w.up.revision, upstreamLicense, q(fmt.Sprintf("tau2-bench %s task %s", c.domain, c.task.ID)), q("bifrost-bench import tau2"))

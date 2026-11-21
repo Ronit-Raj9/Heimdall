@@ -25,13 +25,17 @@ const Name = "tau2"
 
 // Importer settings (-set key=value).
 const (
-	SetDomains  = "domains"        // comma-separated domains; default airline,retail
-	SetTaskSet  = "task_set"       // published (default) or all
-	SetNL       = "nl_assertions"  // skip (default) or unscored
-	SetNoop     = "noop_tasks"     // skip (default) or include
-	SetUser     = "user"           // scripted (default) or llm (a pinned model plays the user, W3)
-	SetRef      = "ref"            // upstream commit, when -from is not a git clone
-	SetMaxTurns = "max_user_turns" // replies before the user leaves; default 30
+	SetDomains   = "domains"         // comma-separated domains; default airline,retail
+	SetTaskSet   = "task_set"        // published (default) or all
+	SetNL        = "nl_assertions"   // skip (default) or unscored
+	SetNoop      = "noop_tasks"      // skip (default) or include
+	SetUser      = "user"            // scripted (default) or llm (a pinned model plays the user, W3)
+	SetRef       = "ref"             // upstream commit, when -from is not a git clone
+	SetMaxTurns  = "max_user_turns"  // replies before the user leaves; default 30
+	SetRetrieval = "retrieval"       // banking_knowledge retrieval variant; default bm25
+	SetUserTools = "user_tool_tasks" // skip (default) or draft: tasks whose expected actions include the customer's own tool calls
+	SetLanguage  = "language"        // tau-i18n text-v1 language pack (en, es, pt, hi, zh, ko); unset: the registry tasks
+	SetExportDir = "export_dir"      // where `tau2svc.py export` files are; default <from>/.bench-export
 )
 
 // Values of the settings above.
@@ -44,12 +48,34 @@ const (
 	NoopInclude      = "include"
 	UserScripted     = "scripted"
 	UserLLM          = "llm" // W3 customer support: upstream's model-played user through bench/simuser
+	UserToolsSkip    = "skip"
+	UserToolsDraft   = "draft" // imported, tagged draft-user-tools: no bench user simulator can call the customer's tools, so admission refuses them
 )
 
-// supportedDomains are the domains whose tasks need only agent tools and a
-// customer who talks: telecom also needs user-side device tools, and
-// banking_knowledge a retrieval index and a judge.
-var supportedDomains = []string{"airline", "retail"}
+// retrievalTemplates maps the banking_knowledge retrieval variants this
+// importer supports (offline ones: no embedding API, no shell sandbox) to
+// their upstream prompt template in data/tau2/domains/banking_knowledge/prompts.
+var retrievalTemplates = map[string]string{
+	"bm25":         "classic_rag_bm25_no_grep.md",
+	"grep_only":    "grep_only.md",
+	"no_knowledge": "no_knowledge.md",
+}
+
+// languages are the tau-i18n language packs of tau2-bench 2.0.
+var languages = []string{"en", "es", "pt", "hi", "zh", "ko"}
+
+// draftUserToolsTag marks a task kept as a draft: its expected actions
+// include tool calls the customer makes, which no bench user simulator does.
+const draftUserToolsTag = "draft-user-tools"
+
+// supportedDomains are the domains this importer can run. airline and retail
+// need only agent tools and a customer who talks; banking_knowledge (tau3,
+// tau2-bench 1.0+) also needs a retrieval backend, which the service runs
+// in-process (offline BM25 by default). telecom needs user-side device tools.
+var supportedDomains = []string{"airline", "retail", "banking_knowledge"}
+
+// defaultDomains are imported when -set domains is not given.
+var defaultDomains = []string{"airline", "retail"}
 
 const (
 	upstreamRepo    = "https://github.com/sierra-research/tau2-bench"
@@ -89,7 +115,7 @@ type importer struct {
 func (im *importer) Info() importers.Info {
 	return importers.Info{
 		Name:       Name,
-		Benchmarks: []string{"tau2-bench 2.x text: airline (airline_50), retail (retail_50)"},
+		Benchmarks: []string{"tau2-bench 2.x text: airline (airline_50), retail (retail_50)", "tau3 banking_knowledge (banking_knowledge_97)", "tau-i18n text-v1 (en, es, pt, hi, zh, ko)"},
 		Source:     "git clone --depth 1 " + upstreamRepo + ".git datasets/tau2-bench",
 		License:    upstreamLicense,
 		Track:      schemas.TrackToolUse,
@@ -104,18 +130,40 @@ func (im *importer) Info() importers.Info {
 
 // settings are the parsed -set values of one import.
 type settings struct {
-	domains  []string
-	taskSet  string
-	nl       string
-	noop     string
-	user     string
-	ref      string
-	maxTurns int
+	domains   []string
+	taskSet   string
+	nl        string
+	noop      string
+	user      string
+	ref       string
+	maxTurns  int
+	retrieval string
+	userTools string
+	language  string
+	langSet   bool   // -set language given: tasks come from the language pack export
+	exportDir string // "" means <from>/.bench-export
+}
+
+// usesExport reports whether domain's tasks and policy come from an export
+// file: a language pack's tasks are built by upstream code (regional
+// database, localized names), and banking_knowledge's policy depends on the
+// retrieval variant.
+func (s settings) usesExport(domain string) bool {
+	return s.langSet || domain == "banking_knowledge"
+}
+
+// exportLanguage is the language part of domain's export file name.
+func (s settings) exportLanguage() string {
+	if s.langSet {
+		return s.language
+	}
+	return "en"
 }
 
 func parseSettings(extra map[string]string) (settings, error) {
-	s := settings{domains: supportedDomains, taskSet: TaskSetPublished, nl: NLSkip, noop: NoopSkip, user: UserScripted, maxTurns: 30}
-	known := []string{SetDomains, SetTaskSet, SetNL, SetNoop, SetUser, SetRef, SetMaxTurns}
+	s := settings{domains: defaultDomains, taskSet: TaskSetPublished, nl: NLSkip, noop: NoopSkip, user: UserScripted, maxTurns: 30,
+		retrieval: "bm25", userTools: UserToolsSkip, language: "en"}
+	known := []string{SetDomains, SetTaskSet, SetNL, SetNoop, SetUser, SetRef, SetMaxTurns, SetRetrieval, SetUserTools, SetLanguage, SetExportDir}
 	for k := range extra {
 		if !slices.Contains(known, k) {
 			return s, fmt.Errorf("unknown setting %q (known: %s)", k, strings.Join(known, ", "))
@@ -156,6 +204,30 @@ func parseSettings(extra map[string]string) (settings, error) {
 	if s.user, err = pick(SetUser, UserScripted, UserScripted, UserLLM); err != nil {
 		return s, err
 	}
+	if s.userTools, err = pick(SetUserTools, UserToolsSkip, UserToolsSkip, UserToolsDraft); err != nil {
+		return s, err
+	}
+	if s.language, err = pick(SetLanguage, "en", languages...); err != nil {
+		return s, err
+	}
+	if v := extra[SetRetrieval]; v != "" {
+		if _, ok := retrievalTemplates[v]; !ok {
+			return s, fmt.Errorf("%s=%q: want one of bm25, grep_only, no_knowledge (the offline variants)", SetRetrieval, v)
+		}
+		s.retrieval = v
+	}
+	s.langSet = extra[SetLanguage] != ""
+	s.exportDir = extra[SetExportDir]
+	if s.langSet {
+		if s.taskSet != TaskSetPublished {
+			return s, fmt.Errorf("%s=%s: only task_set=published (the text-v1 tasks of the language pack)", SetLanguage, s.language)
+		}
+		for _, d := range s.domains {
+			if d == "banking_knowledge" {
+				return s, fmt.Errorf("%s=%s: banking_knowledge has no text-v1 language pack tasks", SetLanguage, s.language)
+			}
+		}
+	}
 	s.ref = extra[SetRef]
 	if v := extra[SetMaxTurns]; v != "" {
 		n, err := strconv.Atoi(v)
@@ -172,6 +244,7 @@ type candidate struct {
 	domain string
 	task   upTask
 	id     string // bench task id
+	draft  string // why the task is kept as a draft (user_tool_tasks=draft), "" otherwise
 }
 
 // Import implements importers.Importer.
@@ -186,6 +259,9 @@ func (im *importer) Import(ctx context.Context, opts importers.Options) (*import
 	up, err := openUpstream(opts.From, set.ref)
 	if err != nil {
 		return nil, fmt.Errorf("tau2: %w", err)
+	}
+	if set.exportDir == "" {
+		set.exportDir = filepath.Join(opts.From, ".bench-export")
 	}
 	res := &importers.Result{Suite: opts.SuiteID, SuiteDir: opts.SuiteDir()}
 	var picked []candidate
@@ -271,7 +347,32 @@ func selectTasks(up *upstream, domain string, set settings, ids []string) ([]can
 	var tasks []upTask
 	var setName string
 	var err error
-	if set.taskSet == TaskSetPublished {
+	var writes map[string]bool
+	if set.usesExport(domain) {
+		var e *exported
+		e, tasks, err = readExport(set.exportDir, set.exportLanguage(), domain)
+		if err != nil {
+			return nil, "", nil, err
+		}
+		setName = e.Subset
+		writes = map[string]bool{}
+		for _, n := range e.MutatingTools {
+			writes[n] = true
+		}
+		if set.exportLanguage() == "en" && domain != "banking_knowledge" && set.taskSet == TaskSetPublished {
+			// The English pack binds the whole registry; text-v1 runs its subset.
+			pub, name, err := up.publishedTasks(domain)
+			if err != nil {
+				return nil, "", nil, err
+			}
+			keep := map[string]bool{}
+			for _, t := range pub {
+				keep[t.ID] = true
+			}
+			tasks = slices.DeleteFunc(tasks, func(t upTask) bool { return !keep[t.ID] })
+			setName = "text-v1/en/" + name
+		}
+	} else if set.taskSet == TaskSetPublished {
 		tasks, setName, err = up.publishedTasks(domain)
 	} else {
 		tasks, err = up.baseTasks(domain)
@@ -280,18 +381,28 @@ func selectTasks(up *upstream, domain string, set settings, ids []string) ([]can
 	if err != nil {
 		return nil, "", nil, err
 	}
-	writes, err := up.mutatingTools(domain)
-	if err != nil {
-		return nil, "", nil, err
+	if writes == nil {
+		if writes, err = up.mutatingTools(domain); err != nil {
+			return nil, "", nil, err
+		}
 	}
 	var out []candidate
 	var skips []importers.Skip
 	for _, t := range tasks {
 		id := taskID(domain, t.ID)
+		if set.langSet {
+			id = set.language + "-" + id
+		}
 		if len(ids) > 0 && !slices.Contains(ids, id) && !slices.Contains(ids, t.ID) {
 			continue
 		}
-		if reason := skipReason(t, writes, set); reason != "" {
+		reason := skipReason(t, writes, set)
+		if reason == userToolsReason && set.userTools == UserToolsDraft {
+			out = append(out, candidate{domain: domain, task: t, id: id, draft: reason})
+			skips = append(skips, importers.Skip{ID: id, Reason: "imported as a draft (tag " + draftUserToolsTag + "): " + reason})
+			continue
+		}
+		if reason != "" {
 			skips = append(skips, importers.Skip{ID: id, Reason: reason})
 			continue
 		}
@@ -312,13 +423,13 @@ func skipReason(t upTask, writes map[string]bool, set settings) string {
 	}
 	for _, b := range c.RewardBasis {
 		switch b {
-		case basisDB, basisCommunicate, basisNLAssertion:
+		case basisDB, basisCommunicate, basisNLAssertion, basisAction:
 		default:
-			return fmt.Sprintf("reward basis %s is not supported (only DB, COMMUNICATE and NL_ASSERTION)", b)
+			return fmt.Sprintf("reward basis %s is not supported (only DB, ACTION, COMMUNICATE and NL_ASSERTION)", b)
 		}
 	}
-	if !c.has(basisDB) {
-		return "reward basis has no DB check"
+	if !c.has(basisDB) && !c.has(basisAction) {
+		return "reward basis has no DB or ACTION check"
 	}
 	acts, err := c.actions()
 	if err != nil {
@@ -327,7 +438,7 @@ func skipReason(t upTask, writes map[string]bool, set settings) string {
 	mutates := false
 	for _, a := range acts {
 		if a.Requestor == "user" {
-			return "expected actions include user-side tool calls"
+			return userToolsReason
 		}
 		if writes[a.Name] {
 			mutates = true
@@ -337,11 +448,14 @@ func skipReason(t upTask, writes map[string]bool, set settings) string {
 		return fmt.Sprintf("needs a judge model for %d natural-language assertion(s) (-set %s=%s scores the rest)", len(c.NLAssertions), SetNL, NLUnscored)
 	}
 	communicates := c.has(basisCommunicate) && len(c.CommunicateInfo) > 0
-	if !mutates && !communicates && set.noop == NoopSkip {
+	if !mutates && !communicates && !(c.has(basisAction) && len(acts) > 0) && set.noop == NoopSkip {
 		return "the correct outcome is no database change and nothing to communicate, so doing nothing passes and the empty control cannot fail"
 	}
 	return ""
 }
+
+// userToolsReason is the skip reason of tasks the customer must act in.
+const userToolsReason = "expected actions include user-side tool calls (the customer runs tools), which the bench's user simulators cannot do"
 
 var badIDChars = regexp.MustCompile(`[^a-z0-9._-]+`)
 

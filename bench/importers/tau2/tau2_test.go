@@ -69,11 +69,11 @@ func TestRegistered(t *testing.T) {
 
 func TestImportPublished(t *testing.T) {
 	res, root := runImport(t, nil, nil, 0)
-	wantTasks := []string{"airline-a1", "airline-a3", "retail-1", "retail-3"}
+	wantTasks := []string{"airline-a1", "airline-a3", "airline-a5", "retail-1", "retail-3"}
 	if !slices.Equal(res.Tasks, wantTasks) {
 		t.Fatalf("tasks = %v, want %v", res.Tasks, wantTasks)
 	}
-	wantSkips := []string{"airline-a2", "airline-a4", "airline-a5", "airline-a6", "retail-2"}
+	wantSkips := []string{"airline-a2", "airline-a4", "airline-a6", "retail-2"}
 	if got := skipIDs(res); !slices.Equal(got, wantSkips) {
 		t.Fatalf("skipped = %v (%+v), want %v", got, res.Skipped, wantSkips)
 	}
@@ -198,7 +198,7 @@ func TestImportSettings(t *testing.T) {
 	}{
 		{name: "nl unscored keeps the judged task", extra: map[string]string{SetNL: NLUnscored, SetDomains: "retail"}, wantTasks: []string{"retail-1", "retail-2", "retail-3"}},
 		{name: "all tasks of a domain", extra: map[string]string{SetTaskSet: TaskSetAll, SetDomains: "retail"}, wantTasks: []string{"retail-1", "retail-3", "retail-4"}},
-		{name: "noop tasks included", extra: map[string]string{SetNoop: NoopInclude, SetDomains: "airline"}, wantTasks: []string{"airline-a1", "airline-a2", "airline-a3", "airline-a6"}},
+		{name: "noop tasks included", extra: map[string]string{SetNoop: NoopInclude, SetDomains: "airline"}, wantTasks: []string{"airline-a1", "airline-a2", "airline-a3", "airline-a5", "airline-a6"}},
 		{name: "ids by upstream id", extra: map[string]string{SetDomains: "airline"}, ids: []string{"a3"}, wantTasks: []string{"airline-a3"}},
 		{name: "limit", limit: 1, wantTasks: []string{"airline-a1"}},
 	}
@@ -232,7 +232,7 @@ func TestImportExtendsSuite(t *testing.T) {
 	if err := yaml.Unmarshal(b, &s); err != nil {
 		t.Fatal(err)
 	}
-	if want := []string{"airline-a1", "airline-a3", "retail-1", "retail-3"}; !slices.Equal(s.TaskIDs, want) {
+	if want := []string{"airline-a1", "airline-a3", "airline-a5", "retail-1", "retail-3"}; !slices.Equal(s.TaskIDs, want) {
 		t.Fatalf("tasks = %v, want %v", s.TaskIDs, want)
 	}
 	// A third run without -force leaves existing folders alone.

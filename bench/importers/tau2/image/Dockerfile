@@ -14,8 +14,8 @@ RUN git init -q /opt/tau2-bench \
  && git remote add origin "$TAU2_REPO" \
  && git fetch -q --depth 1 origin "$TAU2_REF" \
  && git checkout -q FETCH_HEAD \
- && pip install --no-cache-dir /opt/tau2-bench \
- && rm -rf .git data/voice data/tau2/results data/tau2/multilingual data/tau2/multilingual_extensions \
+ && pip install --no-cache-dir /opt/tau2-bench rank-bm25 \
+ && rm -rf .git data/voice data/tau2/results \
       web figs docs tests \
  && find data/tau2/domains -name 'tasks_voice.json' -delete \
  && find data/tau2/domains -name 'audio_difficulty.json' -delete

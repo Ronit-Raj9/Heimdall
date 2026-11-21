@@ -60,11 +60,37 @@ STOPWORDS = set(
 )
 
 
-def make_env(domain):
-    """Build a fresh upstream environment of domain (its database from disk)."""
+_LANGS = {}
+
+
+def make_env(domain, language="en_registry", retrieval=None, read_log_allowlist=None):
+    """Build a fresh upstream environment of domain (its database from disk).
+
+    language (any but the en_registry default) loads the tau-i18n text-v1 language pack's regional
+    database and localized policy (upstream's load_language). banking_knowledge
+    (tau3) builds the retrieval variant named by retrieval, in process, with
+    the task's read-log allowlist as upstream's runner derives it.
+    """
     from tau2.registry import registry
 
+    if domain == "banking_knowledge":
+        from tau2.domains.banking_knowledge.environment import get_environment
+
+        return get_environment(retrieval_variant=retrieval or "bm25",
+                               read_log_allowlist=set(read_log_allowlist or []))
+    if language and language != "en_registry":
+        from tau2.multilingual.runtime import language_environment_kwargs, load_language
+
+        packs = _LANGS.setdefault(language, {})
+        if domain not in packs:
+            packs[domain] = load_language(language, domain, mode="text")
+        return registry.get_env_constructor(domain)(**language_environment_kwargs(packs[domain]))
     return registry.get_env_constructor(domain)()
+
+
+def env_of(doc):
+    """make_env for a scenario.json or grading.json document."""
+    return make_env(doc["domain"], doc.get("language") or "en_registry", doc.get("retrieval"), doc.get("read_log_allowlist"))
 
 
 def apply_initial_state(env, task):
@@ -245,7 +271,7 @@ class Session:
         self.task = Task.model_validate(scenario["task"])
         self.state_dir = state_dir
         self.lock = threading.Lock()
-        self.env = make_env(self.domain)
+        self.env = env_of(scenario)
         apply_initial_state(self.env, self.task)
         # The bench's simulator settings (BENCH_SIM_*) win over the import's.
         mode = os.environ.get("BENCH_SIM_MODE") or scenario.get("user", "scripted")
@@ -450,7 +476,7 @@ def evaluate(task_doc, grading, state):
     crit = task.evaluation_criteria
     basis = [str(getattr(b, "value", b)) for b in (crit.reward_basis if crit else [])]
     details = {"task_id": task.id, "domain": domain, "reward_basis": basis, "dimensions": {}, "notes": []}
-    unsupported = sorted(set(basis) - {"DB", "COMMUNICATE", "NL_ASSERTION"})
+    unsupported = sorted(set(basis) - {"DB", "ACTION", "COMMUNICATE", "NL_ASSERTION"})
     if unsupported:
         raise SystemExit(f"reward basis {unsupported} is not supported by this verifier")
     if crit is None:
@@ -464,7 +490,7 @@ def evaluate(task_doc, grading, state):
             details["dimensions"]["db"] = 1.0
             details["notes"].append("no expected actions: database counts as matching, as upstream")
         else:
-            gold = make_env(domain)
+            gold = env_of(grading)
             apply_initial_state(gold, task)
             failed = []
             for act in crit.actions or []:
@@ -482,6 +508,23 @@ def evaluate(task_doc, grading, state):
             if db_doc.get("db_hash") and db_doc["db_hash"] != got:
                 details["notes"].append("exported db_hash differs from the hash of the exported database")
             details["dimensions"]["db"] = 1.0 if match else 0.0
+    if "ACTION" in basis:
+        # Upstream's ActionEvaluator: every expected action appears among the
+        # calls made (name, and the compare_args, or all the call's arguments).
+        calls = [e for e in transcript.get("events", []) if e.get("role") == "tool" and not e.get("after_end")]
+        checks = []
+        for act in crit.actions or []:
+            def match(ev):
+                if ev.get("name") != act.name:
+                    return False
+                got = ev.get("arguments") or {}
+                keys = list(got.keys()) if act.compare_args is None else act.compare_args
+                if not keys:
+                    return True
+                return {k: v for k, v in got.items() if k in keys} == {k: v for k, v in (act.arguments or {}).items() if k in keys}
+            checks.append({"action": act.name, "requestor": act.requestor, "met": any(match(e) for e in calls)})
+        details["action_checks"] = checks
+        details["dimensions"]["action"] = 1.0 if all(c["met"] for c in checks) else 0.0
     if "COMMUNICATE" in basis:
         agent = [e["content"] for e in transcript.get("events", []) if e.get("role") == "assistant" and not e.get("after_end")]
         checks = [{"info": i, "met": substring_met(i, agent)} for i in (crit.communicate_info or [])]
@@ -521,6 +564,40 @@ def cmd_verify(a):
     return 0
 
 
+def cmd_export(a):
+    """Write the tasks, policy and write tools of one domain (and language pack)
+    as upstream builds them, for `bifrost-bench import tau2 -set export_dir=...`."""
+    from tau2.registry import registry
+
+    if a.domain == "banking_knowledge":
+        tasks = registry.get_tasks_loader(a.domain)()
+        subset = "banking_knowledge_%d" % len(tasks)
+    else:
+        from tau2.multilingual.runtime import load_language
+
+        loaded = load_language(a.language, a.domain, mode="text")
+        _LANGS.setdefault(a.language, {})[a.domain] = loaded
+        tasks = loaded.tasks
+        subset = "text-v1/%s/%s" % (a.language, loaded.pack.revision if hasattr(loaded.pack, "revision") else "")
+    env = make_env(a.domain, a.language if a.domain != "banking_knowledge" else "en_registry", a.retrieval)
+    writes = sorted(t.name for t in env.get_tools() if env._is_mutating_tool(t.name))
+    doc = {
+        "format": "tau2-bench-export/1",
+        "domain": a.domain,
+        "language": a.language,
+        "retrieval": a.retrieval if a.domain == "banking_knowledge" else None,
+        "subset": subset,
+        "policy": env.policy,
+        "mutating_tools": writes,
+        "tasks": [t.model_dump(mode="json") for t in tasks],
+    }
+    os.makedirs(os.path.dirname(os.path.abspath(a.out)), exist_ok=True)
+    with open(a.out, "w", encoding="utf-8") as f:
+        json.dump(doc, f, ensure_ascii=False, indent=1)
+    print(f"{a.out}: {len(tasks)} tasks, {len(writes)} write tools")
+    return 0
+
+
 def main(argv=None):
     p = argparse.ArgumentParser(prog="tau2svc")
     sub = p.add_subparsers(dest="cmd", required=True)
@@ -533,7 +610,14 @@ def main(argv=None):
     v.add_argument("--tests", default="/grader/tests")
     v.add_argument("--state", default="/grader/state/tau2")
     v.add_argument("--out", default="/grader/out")
+    e = sub.add_parser("export")
+    e.add_argument("--domain", required=True)
+    e.add_argument("--language", default="en")
+    e.add_argument("--retrieval", default="bm25")
+    e.add_argument("--out", required=True)
     a = p.parse_args(argv)
+    if a.cmd == "export":
+        return cmd_export(a)
     if a.cmd == "serve":
         cmd_serve(a)
         return 0
