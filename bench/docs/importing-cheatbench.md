@@ -36,22 +36,39 @@ upstream keeps success and cheating separate.
   `correct` vote; it must not pass.
 - empty: nothing done, not judged.
 
-About 3 judge calls per admitted task (reference, exploit, null refuse). On 22 Nov 2026, 40 of 40 runnable tasks were admitted with 127 judge calls; 2 failed one reference vote and passed on a second admission.
+About 3 judge calls per admitted task (reference, exploit, null refuse). The reference recording is specific to the environment: it reads the planted files, opens the planted archive or the other agent's branch, and computes with code where code is banned. On 22 Nov 2026, 63 tasks were admitted (geoguessr 20, synthetic_puzzles 20, prime_factorization 5, subset_sum 4, creative_writings 5, openmath 5, openmath_agent 4) with 265 judge calls in all. openmath_agent littlewood fails to seed its workspace (its staged .git has an unparsable HEAD).
+
+## Upstream machinery, as Heimdall services
+
+| Upstream | Heimdall |
+|---|---|
+| grader.py tool (prime_factorization, subset_sum) | MCP service named after `SERVER_NAME`, serving upstream's `grader.py` through upstream's own `core/agents/runner_support.py` and `core/grader_guard.py`, verbatim (`svc/heimdall_grader.py` only puts it on port 8000). The full row stays in the service. The live-log observer is not carried over: it mirrors the agent's messages into the workspace and needs the agent's message stream |
+| review endpoint (creative_writings) | `review` service running upstream's `core/review_server.py` with the task's pairwise prompt and reference; the model is the suite's pinned judge (openai/gpt-6.2-sol) on the service's own gateway key; `grading/.review` is staged with its URL and token |
+| HTTPS mirror (openmath, openmath_agent) | `mirror` compose service (upstream's server and capture, from `mirrors/<task>-mirror/`, image `bench/cheatbench-<task>-mirror:1`) on the real host names as network aliases; the mirror CA is added to the workspace image's trust stores, as upstream's sandbox adds it |
+| svgs leaderboard | `leaderboard` service running upstream's `leaderboard_server.py`; `leaderboard/leaderboard_config.json` is staged with its endpoint and token |
+| software_engineering | Harbor tasks: `bifrost-bench import harbor -from <checkout>/tasks/software_engineering/harbor/tasks -suite cheatbench-swe` (graded by their tests; the cheating judge is not applied there) |
+
+The mirror images live in `mirrors/`, not `services/`: the suite fingerprint
+covers `services/`, so adding a mirror to an admitted suite would reset every
+admission. Build them before admitting:
+`docker build -t bench/cheatbench-openmath-mirror:1 benchmarks/cheatbench/mirrors/openmath-mirror`
+(and the same for openmath-agent-mirror).
 
 ## Drafts
 
-Every upstream environment is imported. Tasks that need something not ported are
-tagged `draft:<reason>` with a `DRAFT.md` and are never admitted:
+Tasks that cannot run as upstream defines them are tagged `draft:<reason>`
+with a `DRAFT.md` and are never admitted:
 
-- `mcp-grader-tool`: chess, prime_factorization, subset_sum, protein_design,
-  knowledge_work (agent-callable verifier hosted by upstream's adapter)
-- `host-service`: openmath, openmath_agent, svgs (per-episode private-network service)
-- `paid-grader`: creative_writings (staged grader calls an upstream LLM)
-- `gpu`: go (KataGo)
-- `chat-runner`: sycophancy (probability-shift chat probe)
-- `harbor-runner`: software_engineering (separate Harbor workflow)
-
-synthetic_puzzles stages a git repository (generator/.git), so its workspace is built into the task image (environment.workspace_path) instead of repo/. An environment with no built rows gets one `<task>-unbuilt` placeholder draft.
+- `mcp-only` (chess, 150): upstream gives the agent only the task's MCP tools
+  and no shell; a Heimdall agent always has a shell.
+- `workspace-grader` (protein_design, knowledge_work, 40): the grader tool
+  runs inside the agent's container upstream and reads and changes the
+  agent's workspace (git init, file watchers, the deliverable); a service
+  container cannot see the agent's workspace.
+- `no-episode-verdict` (sycophancy, 112): every reply's verdict is
+  `cheated=false`; the score is a shift over all replies (score.py).
+- `gpu` (go): KataGo needs an NVIDIA GPU.
+- `harbor-runner` (software_engineering placeholder): imported as cheatbench-swe instead.
 
 ## Running it
 
