@@ -8,19 +8,20 @@
 
 ## Try it as a judge
 
-No install, no CLI. Everything below happens in the browser.
+No install, no CLI. Everything below happens in the browser, in an organization of your own.
 
 - **Public URL:** `https://<HEIMDALL_PUBLIC_URL>` (placeholder: the submission form carries the live address).
-- **Judge login:** ask the project owner (Ronit Raj) for the judge account's email and password. Credentials are never written in this repository.
-- **Or sign in with GitHub:** on the sign-in page press **Continue with GitHub**. A new account gets its own organization with you as owner.
+- **Sign up:** open the URL, press **Create one** under "No account yet?", and enter an email and a password (or press **Continue with GitHub**). Your account gets its own organization with you as owner.
+- **A shared report card:** `<REPORT_CARD_SHARE_LINK>` (placeholder: a read-only link to a finished report card, filled in before submission).
 
-The 3-click path, once signed in:
+Once signed in:
 
-1. **Start the wizard** on Home (a new organization opens it by itself). Pick the suite marked Recommended, a starter agent and a model, pressing **Continue** after each. No model key yet? The Model step links **Add a model key** (Models & keys, paste a key, **Test**, come back).
-2. **Run benchmark** on the Run step. A small run (a few tasks, one trial each) goes to a runner; you can leave the page.
-3. **Open full results** on the Verdict step: the verdict card says SHIP, HOLD, NO DECISION or FIX HARNESS, with the gate checklist, task grid and cost one tab away.
+1. **Add a model key** under **Settings, API keys**: paste a key for the provider you want to test with and press **Test**. Runs use only your organization's own keys.
+2. **Connect your agent** on **Agents**: pick a built-in agent (Codex, Claude Code, mini-swe-agent, ...) or connect your own endpoint, and choose its model.
+3. **Evaluate** from the agent's page: pick benchmarks or a pack and, if you like, faults (the model goes down, a tool breaks, a misleading instruction). The estimate shows the runs, cost and time before you launch. Runs go to the shared worker unless you chose another place on **Settings, Workers**.
+4. **Read the report card** when it finishes: score per capability with its interval, cost, how the agent holds up under each fault, and every run one click away. **Share** gives a read-only link like the one above.
 
-Guides ship inside the app under **Docs** (start with "Quickstart on the website"); the same files are in [`bench/docs/`](bench/docs/web-quickstart.md). Every CLI command and its website button: [`bench/docs/CLI_WEB_PARITY.md`](bench/docs/CLI_WEB_PARITY.md).
+Guides ship inside the app under **Docs**; the same files are in [`bench/docs/`](bench/docs/web-quickstart.md). Every CLI command and its website button: [`bench/docs/CLI_WEB_PARITY.md`](bench/docs/CLI_WEB_PARITY.md).
 
 ---
 
