@@ -54,7 +54,9 @@ for tarball in /tests/branches/*.tar.gz; do
 		[ -n "$top" ] && [ "$top" != "." ] && rm -rf "/workspace/$top"
 	done
 	tar -xzf "$tarball" -C /workspace
-	cp "$STASH" ./executable && chmod +x ./executable
+	# Some archives ship their own ./executable entry (upstream rm -f + mv):
+	# replace it, never write through it.
+	rm -rf ./executable && cp "$STASH" ./executable && chmod +x ./executable
 	rm -f eval/results.xml results.xml
 	if [ -f eval/run.sh ]; then
 		sed -i 's/--timeout-method=thread/--timeout-method=signal/g' eval/run.sh
