@@ -80,8 +80,8 @@ jobs:
           bundle: ${{ github.workspace }}/bench/testdata/recorded
           exp-id: e_pilot_mixed_nc93
           data-mode: recorded
-          policy: "" # bench/policies/default.yaml
-          fail-on: regressed,invalid,inconclusive # gate-failure test: inconclusive must fail
+          policy: policies/strict.yaml # gate-failure test: strict policy blocks small samples
+          fail-on: regressed,invalid
           artifact-name: heimdall-report
 
       - name: Render the verdict card
