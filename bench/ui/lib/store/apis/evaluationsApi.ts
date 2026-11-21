@@ -40,6 +40,9 @@ export interface AgentVersion {
 	note: string;
 	/** Runs made with this version; present on the list endpoint. */
 	runs?: number;
+	/** The Files API version of agents/<id>.yaml this snapshot was taken from (GET /project/versions/agents/<id>.yaml). */
+	file_version?: string;
+	file_sha256?: string;
 }
 
 /** GET /agents/{id}/versions */
