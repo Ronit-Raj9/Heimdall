@@ -1,6 +1,9 @@
 import { ModeBadge } from "@/components/modeBadge";
 import { PageHeader, RouteTabs, type RouteTab } from "@/components/shell";
 import { useGetAgentsQuery } from "@/lib/store";
+import { Button } from "@/components/ui/button";
+import { Link } from "@tanstack/react-router";
+import { Plus } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import AgentDiffTab from "./agentDiffTab";
 import { AgentConfigsTab } from "./agentConfigsTab";
@@ -13,6 +16,7 @@ import { FrameworksTab } from "./frameworksTab";
  */
 export default function AgentsView() {
 	const { t } = useTranslation("bench");
+	const { t: tb } = useTranslation("agentBuilder");
 	const query = useGetAgentsQuery();
 	const data = query.data;
 	const tabs: RouteTab[] = [
@@ -25,6 +29,14 @@ export default function AgentsView() {
 			<PageHeader
 				title={t("agents.title")}
 				subtitle={t("agents.subtitle")}
+				actions={
+					<Button asChild size="sm" data-testid="agents-new">
+						<Link to="/agents/new">
+							<Plus aria-hidden="true" />
+							{tb("new.title")}
+						</Link>
+					</Button>
+				}
 				meta={<ModeBadge mode={data?.mode} isLoading={query.isLoading} isError={query.isError && !data} />}
 			/>
 			<RouteTabs tabs={tabs} defaultTab="configs" label={t("agents.tabs.label")} testId="agents-tabs">

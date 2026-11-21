@@ -1,0 +1,886 @@
+package handlers
+
+import (
+	"bytes"
+	"context"
+	"encoding/json"
+	"errors"
+	"fmt"
+	"io/fs"
+	"net/url"
+	"path"
+	"regexp"
+	"slices"
+	"strings"
+
+	"github.com/fasthttp/router"
+	"github.com/maximhq/bifrost/bench/agents"
+	agenttemplates "github.com/maximhq/bifrost/bench/agents/templates"
+	"github.com/maximhq/bifrost/bench/auth"
+	"github.com/maximhq/bifrost/bench/examples/frameworks"
+	"github.com/maximhq/bifrost/bench/lib"
+	"github.com/maximhq/bifrost/bench/projectfs"
+	"github.com/maximhq/bifrost/bench/schemas"
+	"github.com/maximhq/bifrost/bench/suite"
+	"github.com/valyala/fasthttp"
+	"gopkg.in/yaml.v3"
+)
+
+// Agent builder (web parity L08): a template catalog, "create an agent from a
+// template" and a form plus YAML editor for one agents/<id>.yaml. Every write
+// goes through the org's projectfs store (confined, size-limited) after the
+// planner's schema-checked decoder accepts the YAML.
+
+// Template categories, in the order the wizard groups them.
+const (
+	TemplateCategoryCLI       = "cli"
+	TemplateCategoryFramework = "framework"
+	TemplateCategoryStarter   = "starter"
+	TemplateCategoryBYO       = "bring-your-own"
+)
+
+// TemplateParam is one extra field a template asks for (a URL, an image).
+type TemplateParam struct {
+	Name        string `json:"name"`
+	Label       string `json:"label"`
+	Help        string `json:"help,omitempty"`
+	Placeholder string `json:"placeholder,omitempty"`
+	Required    bool   `json:"required"`
+}
+
+// AgentTemplate is one entry of GET /agents/templates.
+type AgentTemplate struct {
+	ID           string          `json:"id"`
+	Name         string          `json:"name"`
+	Category     string          `json:"category"`
+	Description  string          `json:"description"`
+	Adapter      string          `json:"adapter"`
+	Providers    []string        `json:"providers"` // gateway providers the template runs on; first is the default
+	DefaultModel string          `json:"default_model"`
+	Builds       bool            `json:"builds"` // an image is built from agents/images/<id>/
+	Params       []TemplateParam `json:"params"`
+	Docs         string          `json:"docs,omitempty"`
+
+	source   string // "repo:<agents yaml stem>", "skeleton:<templates name>", "inline"
+	multiEnv bool   // rewrite env "<provider>/{{model}}" values when the provider changes
+}
+
+// AgentTemplateList is GET /agents/templates.
+type AgentTemplateList struct {
+	Templates []AgentTemplate `json:"templates"`
+}
+
+// AgentModelRef is the model the wizard picked (the ModelPicker value).
+type AgentModelRef struct {
+	Provider string `json:"provider"`
+	Model    string `json:"model"`
+	KeyID    string `json:"key_id,omitempty"`
+}
+
+// AgentFromTemplateRequest is POST /agents/from-template.
+type AgentFromTemplateRequest struct {
+	Template string            `json:"template"`
+	ID       string            `json:"id"`
+	Model    *AgentModelRef    `json:"model,omitempty"`
+	Notes    string            `json:"notes,omitempty"`
+	Params   map[string]string `json:"params,omitempty"`
+	DryRun   bool              `json:"dry_run,omitempty"` // render and validate only, write nothing
+}
+
+// AgentFromTemplateResponse lists what was (or would be) written.
+type AgentFromTemplateResponse struct {
+	ID     string   `json:"id"`
+	Path   string   `json:"path"`
+	Files  []string `json:"files"`
+	YAML   string   `json:"yaml"`
+	DryRun bool     `json:"dry_run"`
+}
+
+// AgentConfigFields are the form fields of the config editor.
+type AgentConfigFields struct {
+	ID          string            `json:"id"`
+	Adapter     string            `json:"adapter"`
+	Image       string            `json:"image,omitempty"`
+	Model       string            `json:"model"`
+	Provider    string            `json:"provider"`
+	WallS       int               `json:"wall_s"`
+	CPUs        float64           `json:"cpus"`
+	MemGB       float64           `json:"mem_gb"`
+	Turns       int               `json:"turns"`
+	Argv        []string          `json:"argv,omitempty"`
+	Env         map[string]string `json:"env,omitempty"`
+	RemoteURL   string            `json:"remote_url,omitempty"`
+	A2ACardURL  string            `json:"a2a_card_url,omitempty"`
+	Description string            `json:"description,omitempty"`
+}
+
+// AgentConfigDoc is GET/PUT /agents/{id}/config.
+type AgentConfigDoc struct {
+	ID     string            `json:"id"`
+	Path   string            `json:"path"`
+	YAML   string            `json:"yaml"`
+	SHA256 string            `json:"sha256"`
+	Fields AgentConfigFields `json:"fields"`
+}
+
+// AgentConfigPut is the PUT body: yaml replaces the file; fields (when yaml
+// is empty) are applied to the current file, keeping its comments.
+type AgentConfigPut struct {
+	YAML    string             `json:"yaml,omitempty"`
+	Fields  *AgentConfigFields `json:"fields,omitempty"`
+	IfMatch string             `json:"if_match,omitempty"`
+}
+
+// AgentConfigValidateRequest is POST /agents/config/validate.
+type AgentConfigValidateRequest struct {
+	YAML   string             `json:"yaml,omitempty"`
+	Fields *AgentConfigFields `json:"fields,omitempty"` // applied to yaml first, so the form can preview its YAML
+}
+
+// AgentConfigValidateResponse says whether the YAML decodes, and why not.
+type AgentConfigValidateResponse struct {
+	OK     bool               `json:"ok"`
+	Error  string             `json:"error,omitempty"`
+	YAML   string             `json:"yaml"`
+	Fields *AgentConfigFields `json:"fields,omitempty"`
+}
+
+var agentIDRe = regexp.MustCompile(`^[a-z0-9][a-z0-9._-]{0,62}$`)
+
+// abProviderNames maps a ModelPicker provider to a Bifrost gateway provider.
+var abProviderNames = map[string]string{
+	"openai": "openai", "anthropic": "anthropic", "gemini": "gemini", "openrouter": "openrouter",
+	"groq": "groq", "sarvam": "sarvam", "openai-compatible": "openai",
+}
+
+var abAnyProvider = []string{"openai", "anthropic", "gemini", "openrouter", "groq"}
+
+func repoTemplate(id, name, cat, stem, desc string, providers []string, model string, multi bool) AgentTemplate {
+	return AgentTemplate{ID: id, Name: name, Category: cat, Description: desc, Adapter: "command", Providers: providers,
+		DefaultModel: model, Builds: true, Params: []TemplateParam{}, source: "repo:" + stem, multiEnv: multi}
+}
+
+// agentTemplates is the catalog. Repo templates copy a shipped agents/*.yaml
+// and its image folder; skeletons come from `agent init`; inline ones are
+// generated from the params.
+var agentTemplates = []AgentTemplate{
+	repoTemplate("codex", "Codex CLI", TemplateCategoryCLI, "codex", "OpenAI Codex CLI, headless, routed through Bifrost.", []string{"openai"}, "gpt-5.6-terra", false),
+	repoTemplate("claude-code", "Claude Code", TemplateCategoryCLI, "claude-code", "Anthropic Claude Code in print mode, routed through Bifrost.", []string{"anthropic"}, "claude-sonnet-4-5", false),
+	repoTemplate("mini-swe-agent", "mini-SWE-agent", TemplateCategoryCLI, "mini-swe-agent", "The 100-line SWE-agent loop with litellm, routed through Bifrost.", []string{"openai"}, "gpt-5.6-terra", false),
+	repoTemplate("opencode", "opencode", TemplateCategoryCLI, "opencode", "opencode CLI agent; runs on any provider Bifrost serves.", abAnyProvider, "claude-sonnet-4-5", true),
+	repoTemplate("gemini-cli", "Gemini CLI", TemplateCategoryCLI, "gemini-cli", "Google Gemini CLI, headless, routed through Bifrost.", []string{"gemini"}, "gemini-2.5-pro", false),
+	repoTemplate("langgraph", "LangGraph", TemplateCategoryFramework, "fw-langgraph", "A LangGraph coding agent (StateGraph + ToolNode).", abAnyProvider, "gpt-5.4-mini", true),
+	repoTemplate("crewai", "CrewAI", TemplateCategoryFramework, "fw-crewai", "A CrewAI coding crew with shell and file tools.", abAnyProvider, "gpt-5.4-mini", true),
+	repoTemplate("openai-agents", "OpenAI Agents SDK", TemplateCategoryFramework, "fw-openai-agents", "An OpenAI Agents SDK coding agent.", abAnyProvider, "gpt-5.4-mini", true),
+	repoTemplate("pydantic-ai", "Pydantic AI", TemplateCategoryFramework, "fw-pydantic-ai", "A Pydantic AI coding agent.", abAnyProvider, "gpt-5.4-mini", true),
+	repoTemplate("llamaindex", "LlamaIndex", TemplateCategoryFramework, "fw-llamaindex", "A LlamaIndex function-calling coding agent.", abAnyProvider, "gpt-5.4-mini", true),
+	repoTemplate("ai-sdk", "Vercel AI SDK", TemplateCategoryFramework, "fw-ai-sdk", "A Vercel AI SDK (Node) coding agent.", abAnyProvider, "gpt-5.4-mini", true),
+	repoTemplate("plain-loop", "Plain loop", TemplateCategoryFramework, "fw-plain-openai", "No framework: a tool-calling loop on the OpenAI SDK.", abAnyProvider, "gpt-5.4-mini", true),
+	{ID: "custom-python", Name: "Custom Python", Category: TemplateCategoryStarter, Adapter: "command", Providers: abAnyProvider,
+		DefaultModel: "claude-sonnet-4-5", Builds: true, Params: []TemplateParam{}, source: "skeleton:python", multiEnv: true,
+		Description: "A minimal coding agent in one standard-library Python file you edit.", Docs: "docs/adding-an-agent.md"},
+	{ID: "command", Name: "Any CLI", Category: TemplateCategoryStarter, Adapter: "command", Providers: abAnyProvider,
+		DefaultModel: "claude-sonnet-4-5", Builds: true, Params: []TemplateParam{}, source: "skeleton:command",
+		Description: "Wrap any command-line agent: put it in the Dockerfile and its command in argv.", Docs: "docs/adding-an-agent.md"},
+	{ID: "http-service", Name: "Agent server in the container", Category: TemplateCategoryStarter, Adapter: "command", Providers: abAnyProvider,
+		DefaultModel: "claude-sonnet-4-5", Builds: true, Params: []TemplateParam{}, source: "skeleton:http-service", multiEnv: true,
+		Description: "Your agent is a web server (FastAPI, LangGraph server): a launcher starts it and posts each task.", Docs: "docs/adding-an-agent.md"},
+	{ID: "http-url", Name: "Your HTTP endpoint", Category: TemplateCategoryBYO, Adapter: "remote_http", Providers: abAnyProvider,
+		DefaultModel: "claude-sonnet-4-5", source: "inline", Docs: "docs/remote-execution.md",
+		Description: "A deployed agent the bench calls over HTTP with each task.",
+		Params: []TemplateParam{{Name: "url", Label: "Endpoint URL", Placeholder: "https://agent.example.com/v1/answer", Required: true,
+			Help: "The bench POSTs each task here and reads the answer."}}},
+	{ID: "a2a-card", Name: "A2A agent card", Category: TemplateCategoryBYO, Adapter: "a2a", Providers: abAnyProvider,
+		DefaultModel: "claude-sonnet-4-5", source: "inline", Docs: "docs/a2a-agents.md",
+		Description: "An A2A agent reached through Bifrost's agent gateway by its agent card.",
+		Params: []TemplateParam{{Name: "card_url", Label: "Agent card URL", Placeholder: "https://agent.example.com/.well-known/agent-card.json", Required: true,
+			Help: "The agent card URL as Bifrost reaches it."}}},
+	{ID: "docker-image", Name: "Your Docker image", Category: TemplateCategoryBYO, Adapter: "command", Providers: abAnyProvider,
+		DefaultModel: "claude-sonnet-4-5", source: "inline", multiEnv: true, Docs: "docs/adding-an-agent.md",
+		Description: "A prebuilt image that already holds your agent. Hosted runs need a digest-pinned image (@sha256:).",
+		Params: []TemplateParam{
+			{Name: "image", Label: "Image", Placeholder: "ghcr.io/acme/agent@sha256:...", Required: true, Help: "Image reference; pin it by digest for hosted runs."},
+			{Name: "command", Label: "Command", Placeholder: "my-agent --task-file {{instruction_file}}", Required: true,
+				Help: "Split on spaces. Use {{instruction_file}} or {{instruction}} for the task."},
+		}},
+}
+
+func findTemplate(id string) (AgentTemplate, bool) {
+	for _, t := range agentTemplates {
+		if t.ID == id {
+			return t, true
+		}
+	}
+	return AgentTemplate{}, false
+}
+
+// renderedFile is one file a template writes, relative to the agents area.
+type renderedFile struct {
+	Rel  string
+	Data []byte
+}
+
+// renderAgentTemplate renders template t for req. The first file is always
+// <id>.yaml.
+func renderAgentTemplate(t AgentTemplate, req AgentFromTemplateRequest) ([]renderedFile, error) {
+	id := req.ID
+	provider, model := t.Providers[0], t.DefaultModel
+	if req.Model != nil {
+		if req.Model.Provider != "" {
+			p, ok := abProviderNames[req.Model.Provider]
+			if !ok {
+				return nil, fmt.Errorf("unknown provider %q", req.Model.Provider)
+			}
+			if !slices.Contains(t.Providers, p) {
+				return nil, fmt.Errorf("template %s runs only on %s, not %s", t.ID, strings.Join(t.Providers, ", "), p)
+			}
+			provider = p
+		}
+		if m := strings.TrimSpace(req.Model.Model); m != "" {
+			if strings.ContainsAny(m, " \t\n\"'{}") {
+				return nil, fmt.Errorf("model %q has characters a model id cannot hold", m)
+			}
+			model = m
+		}
+	}
+	tag := "bench/agent-" + id + ":1"
+	var files []renderedFile
+	var doc []byte
+	switch {
+	case strings.HasPrefix(t.source, "repo:"):
+		stem := strings.TrimPrefix(t.source, "repo:")
+		src, err := fs.ReadFile(agents.Files, stem+".yaml")
+		if err != nil {
+			return nil, fmt.Errorf("template %s: %w", t.ID, err)
+		}
+		dockerfile, err := abYAMLScalar(src, "build", "dockerfile")
+		if err != nil {
+			return nil, err
+		}
+		var fsys fs.FS
+		var dir string
+		switch {
+		case strings.HasPrefix(dockerfile, "agents/images/"):
+			fsys, dir = agents.Files, path.Dir(strings.TrimPrefix(dockerfile, "agents/"))
+		case strings.HasPrefix(dockerfile, "examples/frameworks/"):
+			fsys, dir = frameworks.Files, path.Dir(strings.TrimPrefix(dockerfile, "examples/frameworks/"))
+		default:
+			return nil, fmt.Errorf("template %s: unknown image folder %s", t.ID, dockerfile)
+		}
+		err = fs.WalkDir(fsys, dir, func(p string, d fs.DirEntry, err error) error {
+			if err != nil || d.IsDir() {
+				return err
+			}
+			b, err := fs.ReadFile(fsys, p)
+			if err != nil {
+				return err
+			}
+			files = append(files, renderedFile{Rel: path.Join("images", id, strings.TrimPrefix(p, dir+"/")), Data: b})
+			return nil
+		})
+		if err != nil {
+			return nil, fmt.Errorf("template %s image: %w", t.ID, err)
+		}
+		doc = src
+		doc, err = editAgentYAML(doc, func(root *yaml.Node) {
+			abSetPath(root, id, "id")
+			abSetPath(root, tag, "image")
+			abSetPath(root, "agents/images/"+id+"/Dockerfile", "build", "dockerfile")
+			abSetPath(root, tag, "build", "tag")
+		})
+		if err != nil {
+			return nil, err
+		}
+	case strings.HasPrefix(t.source, "skeleton:"):
+		out, err := agenttemplates.Render(strings.TrimPrefix(t.source, "skeleton:"), id, tag)
+		if err != nil {
+			return nil, err
+		}
+		for _, f := range out[1:] {
+			files = append(files, renderedFile{Rel: strings.TrimPrefix(f.Path, "agents/"), Data: f.Content})
+		}
+		doc = out[0].Content
+	default:
+		var err error
+		if doc, err = inlineAgentYAML(t, id, req.Params); err != nil {
+			return nil, err
+		}
+	}
+	doc, err := editAgentYAML(doc, func(root *yaml.Node) {
+		abSetPath(root, model, "model")
+		abSetPath(root, provider, "gateway", "provider")
+		if t.multiEnv {
+			rewriteModelEnv(root, provider)
+		}
+		head := "Created from the " + t.Name + " template in the web agent builder."
+		if n := strings.TrimSpace(req.Notes); n != "" {
+			head = n + "\n\n" + head
+		}
+		if root.HeadComment != "" {
+			head += "\n\n" + strings.TrimLeft(root.HeadComment, "# ")
+		}
+		root.HeadComment = head
+	})
+	if err != nil {
+		return nil, err
+	}
+	return append([]renderedFile{{Rel: id + ".yaml", Data: doc}}, files...), nil
+}
+
+// inlineAgentYAML builds the YAML of a bring-your-own template.
+func inlineAgentYAML(t AgentTemplate, id string, params map[string]string) ([]byte, error) {
+	get := func(name string) (string, error) {
+		v := strings.TrimSpace(params[name])
+		if v == "" {
+			return "", fmt.Errorf("%s is required for the %s template", name, t.Name)
+		}
+		if len(v) > 2048 || strings.ContainsAny(v, "\n\r") {
+			return "", fmt.Errorf("%s must be one line under 2048 characters", name)
+		}
+		return v, nil
+	}
+	httpURL := func(name string) (string, error) {
+		v, err := get(name)
+		if err != nil {
+			return "", err
+		}
+		u, err := url.Parse(v)
+		if err != nil || (u.Scheme != "http" && u.Scheme != "https") || u.Host == "" {
+			return "", fmt.Errorf("%s must be an http(s) URL, got %q", name, v)
+		}
+		return v, nil
+	}
+	cfg := map[string]any{"id": id, "adapter": t.Adapter, "model": t.DefaultModel,
+		"budgets": map[string]any{"wall_s": 900, "cpus": 1, "mem_gb": 2},
+		"gateway": map[string]any{"provider": t.Providers[0], "max_retries": 0}}
+	switch t.ID {
+	case "http-url":
+		u, err := httpURL("url")
+		if err != nil {
+			return nil, err
+		}
+		cfg["image"] = "bench/coding-core-base:1"
+		cfg["remote"] = map[string]any{"url": u, "timeout_s": 600}
+	case "a2a-card":
+		u, err := httpURL("card_url")
+		if err != nil {
+			return nil, err
+		}
+		cfg["image"] = "bench/coding-core-base:1"
+		cfg["a2a"] = map[string]any{"card_url": u, "timeout_s": 600}
+	case "docker-image":
+		img, err := get("image")
+		if err != nil {
+			return nil, err
+		}
+		if strings.ContainsAny(img, " \t\"'") {
+			return nil, fmt.Errorf("image %q is not a docker image reference", img)
+		}
+		cmd, err := get("command")
+		if err != nil {
+			return nil, err
+		}
+		cfg["image"] = img
+		cfg["argv"] = strings.Fields(cmd)
+		cfg["env"] = map[string]any{
+			"OPENAI_BASE_URL": "{{gateway.url}}/openai/v1", "OPENAI_API_KEY": "{{run.key}}",
+			"AGENT_MODEL": "{{model}}", "AGENT_SESSION_ID": "{{run.session}}",
+		}
+	default:
+		return nil, fmt.Errorf("template %s has no inline form", t.ID)
+	}
+	var buf bytes.Buffer
+	enc := yaml.NewEncoder(&buf)
+	enc.SetIndent(2)
+	if err := enc.Encode(cfg); err != nil {
+		return nil, err
+	}
+	return buf.Bytes(), nil
+}
+
+// modelEnvRe matches an env value that names the run's model, optionally
+// behind a provider prefix: "{{model}}" or "anthropic/{{model}}".
+var modelEnvRe = regexp.MustCompile(`^([a-z0-9-]+/)?\{\{model\}\}$`)
+
+// rewriteModelEnv points model env values at provider: a bare id goes to
+// openai, any other provider needs the provider/ prefix.
+func rewriteModelEnv(root *yaml.Node, provider string) {
+	env := abMapGet(root, "env")
+	if env == nil || env.Kind != yaml.MappingNode {
+		return
+	}
+	want := "{{model}}"
+	if provider != "openai" {
+		want = provider + "/{{model}}"
+	}
+	for i := 1; i < len(env.Content); i += 2 {
+		if v := env.Content[i]; v.Kind == yaml.ScalarNode && modelEnvRe.MatchString(v.Value) {
+			v.Value = want
+		}
+	}
+}
+
+// editAgentYAML parses doc, lets f change its root mapping and re-encodes
+// it, keeping comments.
+func editAgentYAML(doc []byte, f func(root *yaml.Node)) ([]byte, error) {
+	var n yaml.Node
+	if err := yaml.Unmarshal(doc, &n); err != nil {
+		return nil, fmt.Errorf("parse agent YAML: %w", err)
+	}
+	if n.Kind != yaml.DocumentNode || len(n.Content) != 1 || n.Content[0].Kind != yaml.MappingNode {
+		return nil, errors.New("agent YAML must be a mapping")
+	}
+	root := n.Content[0]
+	if n.HeadComment != "" && root.HeadComment == "" {
+		root.HeadComment, n.HeadComment = n.HeadComment, ""
+	}
+	f(root)
+	var buf bytes.Buffer
+	enc := yaml.NewEncoder(&buf)
+	enc.SetIndent(2)
+	if err := enc.Encode(&n); err != nil {
+		return nil, fmt.Errorf("encode agent YAML: %w", err)
+	}
+	return buf.Bytes(), nil
+}
+
+func abMapGet(m *yaml.Node, key string) *yaml.Node {
+	if m == nil || m.Kind != yaml.MappingNode {
+		return nil
+	}
+	for i := 0; i+1 < len(m.Content); i += 2 {
+		if m.Content[i].Value == key {
+			return m.Content[i+1]
+		}
+	}
+	return nil
+}
+
+// abSetPath sets the scalar at keys, creating mappings on the way. An existing
+// key that is not a scalar is left alone. An empty value removes the key.
+func abSetPath(m *yaml.Node, value string, keys ...string) {
+	for i, k := range keys {
+		last := i == len(keys)-1
+		var child *yaml.Node
+		idx := -1
+		for j := 0; j+1 < len(m.Content); j += 2 {
+			if m.Content[j].Value == k {
+				child, idx = m.Content[j+1], j
+				break
+			}
+		}
+		if last {
+			if value == "" {
+				if idx >= 0 {
+					m.Content = append(m.Content[:idx], m.Content[idx+2:]...)
+				}
+				return
+			}
+			if child == nil {
+				m.Content = append(m.Content, &yaml.Node{Kind: yaml.ScalarNode, Value: k}, &yaml.Node{Kind: yaml.ScalarNode, Value: value})
+				return
+			}
+			if child.Kind == yaml.ScalarNode {
+				child.Value, child.Tag, child.Style = value, "", 0
+				if value == "true" || value == "false" || value == "null" || abLooksNumeric(value) {
+					child.Style = yaml.DoubleQuotedStyle
+				}
+			}
+			return
+		}
+		if child == nil {
+			if value == "" {
+				return
+			}
+			child = &yaml.Node{Kind: yaml.MappingNode}
+			m.Content = append(m.Content, &yaml.Node{Kind: yaml.ScalarNode, Value: k}, child)
+		}
+		if child.Kind != yaml.MappingNode {
+			return
+		}
+		m = child
+	}
+}
+
+// abSetNumber sets a numeric scalar (budgets); zero removes it.
+func abSetNumber(m *yaml.Node, v float64, keys ...string) {
+	if v == 0 {
+		abSetPath(m, "", keys...)
+		return
+	}
+	s := fmt.Sprintf("%g", v)
+	abSetPath(m, s, keys...)
+	if n := abLookupPath(m, keys...); n != nil {
+		n.Style, n.Tag = 0, "!!"+map[bool]string{true: "int", false: "float"}[v == float64(int64(v))]
+	}
+}
+
+func abLookupPath(m *yaml.Node, keys ...string) *yaml.Node {
+	for _, k := range keys {
+		m = abMapGet(m, k)
+	}
+	return m
+}
+
+var abNumericRe = regexp.MustCompile(`^-?[0-9.]+([eE][-+]?[0-9]+)?$`)
+
+func abLooksNumeric(s string) bool { return abNumericRe.MatchString(s) }
+
+// abYAMLScalar reads one scalar of a YAML document.
+func abYAMLScalar(doc []byte, keys ...string) (string, error) {
+	var n yaml.Node
+	if err := yaml.Unmarshal(doc, &n); err != nil || len(n.Content) == 0 {
+		return "", fmt.Errorf("parse agent YAML: %v", err)
+	}
+	v := abLookupPath(n.Content[0], keys...)
+	if v == nil || v.Kind != yaml.ScalarNode {
+		return "", fmt.Errorf("agent YAML has no %s", strings.Join(keys, "."))
+	}
+	return v.Value, nil
+}
+
+// decodeAgent runs the planner's schema-checked decoder on doc.
+func decodeAgent(doc []byte, rel string) (*schemas.AgentConfig, error) {
+	var cfg schemas.AgentConfig
+	if err := suite.DecodeYAML(doc, rel, suite.SchemaAgent, &cfg); err != nil {
+		return nil, err
+	}
+	return &cfg, nil
+}
+
+// abFieldsOf turns a decoded config (and its YAML head comment) into form fields.
+func abFieldsOf(cfg *schemas.AgentConfig, doc []byte) AgentConfigFields {
+	f := AgentConfigFields{ID: cfg.ID, Adapter: cfg.Adapter, Image: cfg.Image, Model: cfg.Model,
+		WallS: cfg.Budgets.WallS, CPUs: cfg.Budgets.CPUs, MemGB: cfg.Budgets.MemGB, Turns: cfg.Budgets.Turns, Argv: cfg.Argv,
+		Provider: cfg.Gateway.Provider}
+	if len(cfg.Env) > 0 {
+		f.Env = map[string]string{}
+		for k, v := range cfg.Env {
+			f.Env[k] = v
+		}
+	}
+	if cfg.Remote != nil {
+		f.RemoteURL = cfg.Remote.URL
+	}
+	if cfg.A2A != nil {
+		f.A2ACardURL = cfg.A2A.CardURL
+	}
+	var n yaml.Node
+	if yaml.Unmarshal(doc, &n) == nil && len(n.Content) == 1 {
+		c := n.HeadComment
+		if c == "" {
+			c = n.Content[0].HeadComment
+		}
+		f.Description = abStripComment(c)
+	}
+	return f
+}
+
+func abStripComment(c string) string {
+	lines := strings.Split(c, "\n")
+	for i, l := range lines {
+		l = strings.TrimPrefix(l, "#")
+		lines[i] = strings.TrimPrefix(l, " ")
+	}
+	return strings.TrimSpace(strings.Join(lines, "\n"))
+}
+
+// abApplyFields writes the form fields onto doc, keeping everything else.
+// The id is never changed here: renaming is a new agent.
+func abApplyFields(doc []byte, f AgentConfigFields) ([]byte, error) {
+	return editAgentYAML(doc, func(root *yaml.Node) {
+		abSetPath(root, f.Model, "model")
+		abSetPath(root, f.Provider, "gateway", "provider")
+		if f.Image != "" {
+			abSetPath(root, f.Image, "image")
+		}
+		abSetNumber(root, float64(f.WallS), "budgets", "wall_s")
+		abSetNumber(root, f.CPUs, "budgets", "cpus")
+		abSetNumber(root, f.MemGB, "budgets", "mem_gb")
+		abSetNumber(root, float64(f.Turns), "budgets", "turns")
+		if f.RemoteURL != "" {
+			abSetPath(root, f.RemoteURL, "remote", "url")
+		}
+		if f.A2ACardURL != "" {
+			abSetPath(root, f.A2ACardURL, "a2a", "card_url")
+		}
+		if f.Env != nil {
+			env := abMapGet(root, "env")
+			if env == nil {
+				env = &yaml.Node{Kind: yaml.MappingNode}
+				root.Content = append(root.Content, &yaml.Node{Kind: yaml.ScalarNode, Value: "env"}, env)
+			}
+			if env.Kind == yaml.MappingNode {
+				kept := env.Content[:0]
+				for i := 0; i+1 < len(env.Content); i += 2 {
+					if _, ok := f.Env[env.Content[i].Value]; ok {
+						kept = append(kept, env.Content[i], env.Content[i+1])
+					}
+				}
+				env.Content = kept
+				keys := make([]string, 0, len(f.Env))
+				for k := range f.Env {
+					keys = append(keys, k)
+				}
+				slices.Sort(keys)
+				for _, k := range keys {
+					abSetPath(env, f.Env[k], k)
+				}
+			}
+		}
+		root.HeadComment = strings.TrimSpace(f.Description)
+	})
+}
+
+// agentBuilder serves the routes.
+type agentBuilder struct {
+	mode     schemas.Mode
+	projects projectfs.Store
+}
+
+func init() {
+	RegisterOrgArea("agentbuilder", func(env OrgEnv, r *router.Router) {
+		h := &agentBuilder{mode: env.Mode, projects: env.Services.Projects}
+		r.GET(APIPrefix+"/agents/templates", env.R(h.templates))
+		r.POST(APIPrefix+"/agents/from-template", env.W(h.fromTemplate))
+		r.POST(APIPrefix+"/agents/config/validate", env.R(h.validate))
+		r.GET(APIPrefix+"/agents/{id}/config", env.R(h.getConfig))
+		r.PUT(APIPrefix+"/agents/{id}/config", env.W(h.putConfig))
+	})
+}
+
+func (h *agentBuilder) templates(ctx *fasthttp.RequestCtx) {
+	lib.SendJSON(ctx, h.mode, fasthttp.StatusOK, AgentTemplateList{Templates: agentTemplates})
+}
+
+func (h *agentBuilder) noStore(ctx *fasthttp.RequestCtx) bool {
+	if h.projects == nil {
+		lib.SendError(ctx, h.mode, fasthttp.StatusServiceUnavailable, lib.ErrTypeUnavailable,
+			"project files are not available on this server: start it with a project folder (serve -root) to create and edit agents")
+		return true
+	}
+	return false
+}
+
+func (h *agentBuilder) badRequest(ctx *fasthttp.RequestCtx, msg string) {
+	lib.SendError(ctx, h.mode, fasthttp.StatusBadRequest, lib.ErrTypeBadRequest, msg)
+}
+
+func abDecodeBody(ctx *fasthttp.RequestCtx, out any) error {
+	dec := json.NewDecoder(bytes.NewReader(ctx.PostBody()))
+	dec.DisallowUnknownFields()
+	if err := dec.Decode(out); err != nil {
+		return fmt.Errorf("request body is not valid JSON: %v", err)
+	}
+	return nil
+}
+
+func (h *agentBuilder) storeError(ctx *fasthttp.RequestCtx, what string, err error) {
+	switch {
+	case errors.Is(err, projectfs.ErrConflict):
+		lib.SendError(ctx, h.mode, fasthttp.StatusConflict, lib.ErrTypeConflict, what+": the file changed since you opened it; reload and apply your edit again")
+	case errors.Is(err, projectfs.ErrTooLarge):
+		lib.SendError(ctx, h.mode, fasthttp.StatusRequestEntityTooLarge, lib.ErrTypeTooLarge, what+": file is over 1 MiB")
+	case errors.Is(err, projectfs.ErrInvalid), errors.Is(err, projectfs.ErrOutside):
+		h.badRequest(ctx, what+": "+err.Error())
+	case errors.Is(err, projectfs.ErrNotFound):
+		lib.SendError(ctx, h.mode, fasthttp.StatusNotFound, lib.ErrTypeNotFound, what+": not found")
+	default:
+		lib.SendError(ctx, h.mode, fasthttp.StatusInternalServerError, lib.ErrTypeInternal, what+": "+err.Error())
+	}
+}
+
+func abActor(ctx *fasthttp.RequestCtx) string {
+	p := auth.PrincipalFrom(ctx)
+	if p.Email != "" {
+		return p.Email
+	}
+	return p.UserID
+}
+
+func (h *agentBuilder) fromTemplate(ctx *fasthttp.RequestCtx) {
+	var req AgentFromTemplateRequest
+	if err := abDecodeBody(ctx, &req); err != nil {
+		h.badRequest(ctx, err.Error())
+		return
+	}
+	t, ok := findTemplate(req.Template)
+	if !ok {
+		h.badRequest(ctx, fmt.Sprintf("unknown template %q: GET /agents/templates lists them", req.Template))
+		return
+	}
+	req.ID = strings.TrimSpace(req.ID)
+	if !agentIDRe.MatchString(req.ID) {
+		h.badRequest(ctx, fmt.Sprintf("agent name %q: use lowercase letters, digits, '.', '_' or '-', starting with a letter or digit (max 63)", req.ID))
+		return
+	}
+	if req.ID == "new" || req.ID == "diff" || req.ID == "templates" || req.ID == "config" {
+		h.badRequest(ctx, fmt.Sprintf("agent name %q is reserved by the web UI: pick another", req.ID))
+		return
+	}
+	if len(req.Notes) > 4000 {
+		h.badRequest(ctx, "notes are limited to 4000 characters")
+		return
+	}
+	if !req.DryRun && h.noStore(ctx) {
+		return
+	}
+	files, err := renderAgentTemplate(t, req)
+	if err != nil {
+		h.badRequest(ctx, err.Error())
+		return
+	}
+	rel := "agents/" + req.ID + ".yaml"
+	if _, err := decodeAgent(files[0].Data, rel); err != nil {
+		h.badRequest(ctx, "the rendered agent does not validate: "+err.Error())
+		return
+	}
+	out := AgentFromTemplateResponse{ID: req.ID, Path: rel, YAML: string(files[0].Data), DryRun: req.DryRun, Files: make([]string, 0, len(files))}
+	for _, f := range files {
+		out.Files = append(out.Files, "agents/"+f.Rel)
+	}
+	if req.DryRun {
+		lib.SendJSON(ctx, h.mode, fasthttp.StatusOK, out)
+		return
+	}
+	work, cancel := workContext(ctx, readTimeout)
+	defer cancel()
+	for _, rp := range []string{files[0].Rel, path.Join("images", req.ID)} {
+		if _, _, err := h.projects.Read(work, projectfs.AreaAgents, rp); err == nil || !errors.Is(err, projectfs.ErrNotFound) {
+			if err == nil || errors.Is(err, projectfs.ErrInvalid) { // ErrInvalid: it is a folder
+				lib.SendError(ctx, h.mode, fasthttp.StatusConflict, lib.ErrTypeConflict,
+					fmt.Sprintf("an agent named %s already exists (agents/%s): pick another name", req.ID, rp))
+				return
+			}
+		}
+	}
+	opts := projectfs.WriteOpts{Actor: abActor(ctx), Note: "agent builder: from template " + t.ID}
+	// Image files first, the YAML last: a half-written agent never shows up in the list.
+	for i := len(files) - 1; i >= 0; i-- {
+		if _, err := h.projects.Write(work, projectfs.AreaAgents, files[i].Rel, files[i].Data, opts); err != nil {
+			h.storeError(ctx, "write agents/"+files[i].Rel, err)
+			return
+		}
+	}
+	lib.SendJSON(ctx, h.mode, fasthttp.StatusCreated, out)
+}
+
+func (h *agentBuilder) agentID(ctx *fasthttp.RequestCtx) (string, bool) {
+	id, _ := ctx.UserValue("id").(string)
+	if !agentIDRe.MatchString(id) {
+		h.badRequest(ctx, fmt.Sprintf("agent id %q is not valid", id))
+		return "", false
+	}
+	return id, true
+}
+
+func (h *agentBuilder) readDoc(work context.Context, id string) ([]byte, projectfs.Entry, error) {
+	return h.projects.Read(work, projectfs.AreaAgents, id+".yaml")
+}
+
+func (h *agentBuilder) sendDoc(ctx *fasthttp.RequestCtx, status int, id string, doc []byte, sha string) {
+	out := AgentConfigDoc{ID: id, Path: "agents/" + id + ".yaml", YAML: string(doc), SHA256: sha}
+	if cfg, err := decodeAgent(doc, out.Path); err == nil {
+		out.Fields = abFieldsOf(cfg, doc)
+	} else {
+		out.Fields = AgentConfigFields{ID: id}
+	}
+	lib.SendJSON(ctx, h.mode, status, out)
+}
+
+func (h *agentBuilder) getConfig(ctx *fasthttp.RequestCtx) {
+	id, ok := h.agentID(ctx)
+	if !ok || h.noStore(ctx) {
+		return
+	}
+	work, cancel := workContext(ctx, readTimeout)
+	defer cancel()
+	doc, e, err := h.readDoc(work, id)
+	if err != nil {
+		h.storeError(ctx, "read agents/"+id+".yaml", err)
+		return
+	}
+	h.sendDoc(ctx, fasthttp.StatusOK, id, doc, e.SHA256)
+}
+
+func (h *agentBuilder) putConfig(ctx *fasthttp.RequestCtx) {
+	id, ok := h.agentID(ctx)
+	if !ok || h.noStore(ctx) {
+		return
+	}
+	var req AgentConfigPut
+	if err := abDecodeBody(ctx, &req); err != nil {
+		h.badRequest(ctx, err.Error())
+		return
+	}
+	work, cancel := workContext(ctx, readTimeout)
+	defer cancel()
+	rel := "agents/" + id + ".yaml"
+	var doc []byte
+	switch {
+	case req.YAML != "":
+		doc = []byte(req.YAML)
+	case req.Fields != nil:
+		cur, e, err := h.readDoc(work, id)
+		if err != nil {
+			h.storeError(ctx, "read "+rel, err)
+			return
+		}
+		if req.IfMatch == "" {
+			req.IfMatch = e.SHA256
+		}
+		if doc, err = abApplyFields(cur, *req.Fields); err != nil {
+			h.badRequest(ctx, err.Error())
+			return
+		}
+	default:
+		h.badRequest(ctx, "send yaml or fields")
+		return
+	}
+	cfg, err := decodeAgent(doc, rel)
+	if err != nil {
+		h.badRequest(ctx, err.Error())
+		return
+	}
+	if cfg.ID != id {
+		h.badRequest(ctx, fmt.Sprintf("id in the YAML (%s) must stay %s: create a new agent to rename it", cfg.ID, id))
+		return
+	}
+	e, err := h.projects.Write(work, projectfs.AreaAgents, id+".yaml", doc,
+		projectfs.WriteOpts{Actor: abActor(ctx), Note: "agent builder: edit config", IfMatch: req.IfMatch})
+	if err != nil {
+		h.storeError(ctx, "write "+rel, err)
+		return
+	}
+	h.sendDoc(ctx, fasthttp.StatusOK, id, doc, e.SHA256)
+}
+
+func (h *agentBuilder) validate(ctx *fasthttp.RequestCtx) {
+	var req AgentConfigValidateRequest
+	if err := abDecodeBody(ctx, &req); err != nil {
+		h.badRequest(ctx, err.Error())
+		return
+	}
+	if len(req.YAML) > projectfs.MaxFileBytes {
+		lib.SendError(ctx, h.mode, fasthttp.StatusRequestEntityTooLarge, lib.ErrTypeTooLarge, "YAML is over 1 MiB")
+		return
+	}
+	doc := []byte(req.YAML)
+	if req.Fields != nil {
+		var err error
+		if doc, err = abApplyFields(doc, *req.Fields); err != nil {
+			lib.SendJSON(ctx, h.mode, fasthttp.StatusOK, AgentConfigValidateResponse{Error: err.Error(), YAML: req.YAML})
+			return
+		}
+	}
+	out := AgentConfigValidateResponse{YAML: string(doc)}
+	cfg, err := decodeAgent(doc, "agent.yaml")
+	if err != nil {
+		out.Error = err.Error()
+	} else {
+		out.OK = true
+		f := abFieldsOf(cfg, doc)
+		out.Fields = &f
+	}
+	lib.SendJSON(ctx, h.mode, fasthttp.StatusOK, out)
+}
