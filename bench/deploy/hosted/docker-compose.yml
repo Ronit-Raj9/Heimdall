@@ -361,6 +361,7 @@ services:
       BIFROST_SETUP_TOKEN: ${BIFROST_SETUP_TOKEN:-}
       BENCH_FAULTPROXY_TOKEN: ${BENCH_FAULTPROXY_TOKEN:-}
       HEIMDALL_SHARED_PROJECTS_DIR: /var/lib/heimdall/runs/projects
+      HEIMDALL_SHARED_PROJECTS_MIRROR: ${HEIMDALL_RUNNER_DIR:-/var/lib/heimdall-shared-runner}/projects
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
       - ${HEIMDALL_BENCH_DIR:?run through deploy/hosted/*.sh or set HEIMDALL_BENCH_DIR}:${HEIMDALL_BENCH_DIR:?run through deploy/hosted/*.sh or set HEIMDALL_BENCH_DIR}:ro

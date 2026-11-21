@@ -20,6 +20,7 @@ import (
 	"github.com/maximhq/bifrost/bench/suite"
 	"github.com/maximhq/bifrost/bench/tenancy"
 	"io"
+	"io/fs"
 	"net/http"
 	"net/url"
 	"os"
@@ -188,7 +189,7 @@ func runSharedRunner(args []string) int {
 			if len(name) > 128 {
 				name = name[:128]
 			}
-			reg, root := sharedOrgProject(a, org)
+			reg, root := sharedOrgProject(lctx, a, org)
 			w, err := engine.NewWorker(reg, engine.NewPipeline(reg, root, a.logger),
 				engine.NewPlanner(reg, root, a.logger, engine.WithIgnoreQuarantine(), engine.WithoutGPUCheck()).Plan,
 				engine.WorkerOptions{Server: f.server, Token: token, WorkerID: name, Host: host, Version: benchVersion,
@@ -241,7 +242,7 @@ const sharedProjectsEnv = "HEIMDALL_SHARED_PROJECTS_DIR"
 
 // sharedOrgProject is the registry and project root the shared runner uses
 // for org: the org's project folder when it is mounted, else the runner's own.
-func sharedOrgProject(a *app, org string) (*schemas.Registry, string) {
+func sharedOrgProject(ctx context.Context, a *app, org string) (*schemas.Registry, string) {
 	dir := strings.TrimSpace(os.Getenv(sharedProjectsEnv))
 	if dir == "" || tenancy.ValidOrgID(org) != nil {
 		return a.reg, a.cfg.Root
@@ -250,6 +251,32 @@ func sharedOrgProject(a *app, org string) (*schemas.Registry, string) {
 	if fi, err := os.Stat(filepath.Join(root, "benchmarks")); err != nil || !fi.IsDir() {
 		return a.reg, a.cfg.Root
 	}
+	// Agent and task containers are started by the host's docker daemon,
+	// which cannot see a path inside the server's volume: bind mounts of
+	// task files would come up empty. Mirror the project into a folder the
+	// host sees at the same path, and keep the mirror fresh.
+	if m := strings.TrimSpace(os.Getenv(sharedMirrorEnv)); m != "" {
+		dst := filepath.Join(m, org)
+		if err := mirrorTree(root, dst); err != nil {
+			a.logger.Warn("shared runner: mirror org project", "org", org, "error", err.Error())
+		} else {
+			go func() {
+				t := time.NewTicker(15 * time.Second)
+				defer t.Stop()
+				for {
+					select {
+					case <-ctx.Done():
+						return
+					case <-t.C:
+						if err := mirrorTree(root, dst); err != nil {
+							a.logger.Warn("shared runner: mirror org project", "org", org, "error", err.Error())
+						}
+					}
+				}
+			}()
+			root = dst
+		}
+	}
 	reg := *a.reg
 	reg.Loaders = suite.Builtin(filepath.Join(root, "benchmarks"))
 	reg.Adapters = adapters.Builtin(adapters.CommandConfig{
@@ -257,4 +284,77 @@ func sharedOrgProject(a *app, org string) (*schemas.Registry, string) {
 		GatewayPublicURL: a.cfg.Gateway.PublicURL,
 	})
 	return &reg, root
+}
+
+// sharedMirrorEnv names the folder (bind-mounted at the same path on the
+// host) where the shared runner mirrors each org's project.
+const sharedMirrorEnv = "HEIMDALL_SHARED_PROJECTS_MIRROR"
+
+// mirrorTree copies src into dst: new and changed files (size or mtime),
+// folders, modes. Links are skipped, .git and .heimdall left out, and files
+// gone from src removed from dst.
+func mirrorTree(src, dst string) error {
+	seen := map[string]bool{}
+	err := filepath.WalkDir(src, func(path string, d fs.DirEntry, err error) error {
+		if err != nil {
+			return err
+		}
+		rel, err := filepath.Rel(src, path)
+		if err != nil {
+			return err
+		}
+		if rel != "." && d.IsDir() && (d.Name() == ".git" || d.Name() == ".heimdall") {
+			return filepath.SkipDir
+		}
+		seen[rel] = true
+		out := filepath.Join(dst, rel)
+		switch {
+		case d.Type()&fs.ModeSymlink != 0:
+			return nil
+		case d.IsDir():
+			return os.MkdirAll(out, 0o755)
+		case !d.Type().IsRegular():
+			return nil
+		}
+		si, err := d.Info()
+		if err != nil {
+			return err
+		}
+		if di, err := os.Stat(out); err == nil && di.Size() == si.Size() && di.ModTime().Equal(si.ModTime()) {
+			return nil
+		}
+		b, err := os.ReadFile(path)
+		if err != nil {
+			return err
+		}
+		tmp := out + ".mirror-tmp"
+		if err := os.WriteFile(tmp, b, si.Mode().Perm()); err != nil {
+			return err
+		}
+		if err := os.Chtimes(tmp, si.ModTime(), si.ModTime()); err != nil {
+			return err
+		}
+		return os.Rename(tmp, out)
+	})
+	if err != nil {
+		return err
+	}
+	var stale []string
+	_ = filepath.WalkDir(dst, func(path string, d fs.DirEntry, err error) error {
+		if err != nil {
+			return nil
+		}
+		rel, _ := filepath.Rel(dst, path)
+		if rel != "." && !seen[rel] {
+			stale = append(stale, path)
+			if d.IsDir() {
+				return filepath.SkipDir
+			}
+		}
+		return nil
+	})
+	for _, p := range stale {
+		_ = os.RemoveAll(p)
+	}
+	return nil
 }
