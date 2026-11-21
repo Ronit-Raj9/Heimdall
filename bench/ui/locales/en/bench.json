@@ -2090,7 +2090,7 @@
 		"subtitle": "A small pinned suite re-run on a schedule and tested against a known-good baseline, so silent drift is caught.",
 		"loadError": "Could not load the drift canaries.",
 		"detailError": "Could not load canary {{name}}.",
-		"empty": "No canaries yet. Write one with `heimdall canary init`, then pin a baseline with `heimdall canary baseline`.",
+		"empty": "No canaries yet. Create one with the form below, then press Record baseline on it (CLI: heimdall canary init).",
 		"definitionError": "{{name}}: {{error}}",
 		"smoke": "smoke: synthetic",
 		"unknown": "unknown",
@@ -2295,7 +2295,7 @@
 		},
 		"empty": {
 			"title": "Nothing in the inbox yet.",
-			"pull": "Failed traces arrive when this command reads the trace sources:",
+			"pull": "Failed traces arrive when you press Pull now (or push them with an ingest token below), or when this command reads the trace sources:",
 			"sources": "Sources are listed in {{file}}. Each pull reads a source from where the last one stopped.",
 			"docs": "How sources, redaction and accepting work: {{doc}}.",
 			"filtered": "No items in this state.",
@@ -2315,7 +2315,7 @@
 			},
 			"never": "never",
 			"ok": "no error",
-			"none": "No trace source is configured. Add one to inbox/sources.yaml, then run heimdall inbox pull.",
+			"none": "No trace source is configured. Add one with Pull failures from your tools below, then press Pull now (CLI: heimdall inbox pull).",
 			"ingestOff": "Push ingest is off on this server: POST /api/bench/inbox/ingest takes no traces, so items arrive only through heimdall inbox pull. docs/failure-inbox.md says how to turn it on."
 		},
 		"detail": {
@@ -3572,7 +3572,7 @@
 		"pulled": "Pulled: {{sessions}} sessions scored",
 		"pullError": "The pull failed",
 		"evidenceLabel": "Live evidence.",
-		"unconfigured": "Live scoring is not configured. Run `bifrost-bench livescore init` and set the versions in livescore/config.yaml (docs/live-scoring.md).",
+		"unconfigured": "Live scoring is not configured yet. Fill in Set up live scoring above (CLI: bifrost-bench livescore init; docs/live-scoring.md).",
 		"problem": "Live scoring is off: {{problem}}",
 		"result": {
 			"better": "Better",
