@@ -128,7 +128,10 @@ func (s *Server) validOrgSlot(sl OrgSlot) (OrgSlot, error) {
 		if !strings.HasPrefix(base, "https://") {
 			return sl, fmt.Errorf("slot %q: base url must be https", sl.Name)
 		}
-		sl.BaseURL = base
+		// Keys are saved with the OpenAI-style base (".../v1", what the key
+		// test calls) while agent requests already carry /v1/...: drop it so
+		// the upstream is not .../v1/v1/chat/completions.
+		sl.BaseURL = strings.TrimSuffix(base, "/v1")
 	}
 	sl.Key = strings.TrimSpace(sl.Key)
 	return sl, nil
