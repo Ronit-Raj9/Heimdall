@@ -5594,6 +5594,7 @@ class WorkerInfo(_WorkerInfoRequired, total=False):
     gpus: List[GPUInfo]
     labels: List[str]
     pool: str
+    rejected: int
     token_id: str
 
 

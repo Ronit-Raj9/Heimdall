@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"os"
 	"path/filepath"
 	"strings"
 	"time"
@@ -14,9 +15,9 @@ import (
 	"github.com/maximhq/bifrost/bench/utils"
 )
 
-// cleanupTimeout bounds cleanup and seal when they run on a fresh context
-// after the run's own context was cancelled.
-const cleanupTimeout = 2 * time.Minute
+// cleanupTimeout bounds cleanup, and separately the seal, each on its own
+// fresh context detached from the run's own context.
+var cleanupTimeout = 2 * time.Minute // a variable so a test can shorten it
 
 // upstreamPart names the provider's API in the part failure the upstream rule
 // records.
@@ -93,10 +94,12 @@ type runState struct {
 	receipts     []schemas.Receipt
 	metrics      map[string]schemas.Value
 	agentStarted bool
-	aborted      bool   // a stage failed before the agent started
-	broken       bool   // a stage failed after the agent started
-	taskImageID  string // id the manifest froze for the per-task agent image; empty when the run has none
-	artifactErr  string // why an artifact task's files could not be exported; the grade is then invalid_evaluator
+	aborted      bool            // a stage failed before the agent started
+	broken       bool            // a stage failed after the agent started
+	taskImageID  string          // id the manifest froze for the per-task agent image; empty when the run has none
+	artifactErr  string          // why an artifact task's files could not be exported; the grade is then invalid_evaluator
+	owner        context.Context // the run's own context, read by seal at its commit point; nil on recovery
+	ownerAborted bool            // ownerAbort already sealed the run as aborted_infra
 }
 
 // NewPipeline returns a pipeline. benchRoot resolves the relative
@@ -147,25 +150,52 @@ func (p *Pipeline) RunSlot(ctx context.Context, in SlotInput) (*SlotResult, erro
 	cctx, cancel := afterContext(ctx)
 	defer cancel()
 	p.runStage(cctx, st, schemas.StageCleanup)
+	// QC2-06-01: final evidence and the seal get their own bounded context,
+	// so a cleanup that used up its deadline cannot also fail the seal of a
+	// finished run. An expired cleanup is recorded as a cleanup failure.
+	sctx, scancel := afterContext(ctx)
+	defer scancel()
 	up := utils.TallyUpstream(st.ev.Ledger, st.ev.Requests)
 	st.rc.Run.Outcome = decideOutcome(st, up)
-	if cause := context.Cause(ctx); errors.Is(cause, ErrLeaseLost) {
-		st.rc.Run.Outcome = schemas.OutcomeAbortedInfra
-		st.rc.Run.Failures = append(st.rc.Run.Failures, schemas.PartFailure{Stage: schemas.StageLeased, Part: "engine",
-			Error: cause.Error() + "; the run was stopped and is not counted, since another owner may run the slot"})
-	} else if errors.Is(cause, ErrRunCancelled) { // Jobs area: a cancelled or stopping experiment's in-flight run never counts (cancel.go)
-		st.rc.Run.Outcome = schemas.OutcomeAbortedInfra
-		st.rc.Run.Failures = append(st.rc.Run.Failures, schemas.PartFailure{Stage: schemas.StageLeased, Part: "engine",
-			Error: cause.Error() + "; the run was stopped and is not counted; a resume runs the slot again"})
-	}
+	p.ownerAbort(ctx, st)
 	st.rc.Run.Y = scoreOf(st.rc.Run.Outcome)
-	p.reconcileMetrics(cctx, st)
+	p.reconcileMetrics(sctx, st)
 	if pf, ok := upstreamFailure(up, st.rc.Run.Outcome); ok {
 		st.rc.Run.Failures = append(st.rc.Run.Failures, pf)
 		p.logger.Warn("provider unreachable during run", "run", st.rc.Run.RunID, "slot", st.rc.Slot.SlotID,
 			"outcome", string(st.rc.Run.Outcome), "upstream_errors", up.Errors, "answered", up.Answered)
 	}
-	return p.seal(cctx, st)
+	st.owner = ctx
+	return p.seal(sctx, st)
+}
+
+// ownerAbort seals the run as aborted_infra when ctx was cancelled because
+// the slot's lease was lost (ErrLeaseLost) or its owner stopped it
+// (ErrRunCancelled). It applies once and reports whether it changed the
+// outcome now. RunSlot calls it after cleanup, and seal calls it again at
+// the commit point just before Store.Seal (QC2-06-02), so a cancel that
+// arrives while the final artifacts are written still keeps the run from
+// counting. A cancel after Store.Seal began is after the commit.
+func (p *Pipeline) ownerAbort(ctx context.Context, st *runState) bool {
+	if ctx == nil || st.ownerAborted {
+		return false
+	}
+	cause := context.Cause(ctx)
+	var note string
+	switch {
+	case errors.Is(cause, ErrLeaseLost):
+		note = "; the run was stopped and is not counted, since another owner may run the slot"
+	case errors.Is(cause, ErrRunCancelled): // Jobs area: a cancelled or stopping experiment's in-flight run never counts (cancel.go)
+		note = "; the run was stopped and is not counted; a resume runs the slot again"
+	default:
+		return false
+	}
+	st.ownerAborted = true
+	st.rc.Run.Outcome = schemas.OutcomeAbortedInfra
+	st.rc.Run.Y = scoreOf(st.rc.Run.Outcome)
+	st.rc.Run.Failures = append(st.rc.Run.Failures, schemas.PartFailure{Stage: schemas.StageLeased, Part: "engine",
+		Error: cause.Error() + note})
+	return true
 }
 
 // reconcileMetrics makes every outcome-scored metric agree with the final Y:
@@ -205,6 +235,22 @@ func (p *Pipeline) SealInterrupted(ctx context.Context, in SlotInput, rec schema
 		ev:           &schemas.Evidence{},
 		agentStarted: run.Timing.AgentStarted != nil || stageCompleted(rec.Transitions, schemas.StageRun),
 	}
+	// QC2-06-03: evidence the run already wrote is kept, never replaced by
+	// an empty record.
+	final := loadRunArtifacts(rec.Dir, st)
+	if final {
+		// Every final artifact, run.json last, was written before the
+		// crash: only Store.Seal was missing. Finish that seal as written.
+		p.logger.Warn("finishing a seal interrupted after its artifacts were written", "run", run.RunID, "outcome", string(run.Outcome))
+		p.appendTransition(ctx, st, schemas.StageSeal, schemas.TransitionStarted, "resumed: the final artifacts were written before the process stopped")
+		p.appendTransition(ctx, st, schemas.StageSeal, schemas.TransitionCompleted, "")
+		sealRec, err := p.reg.Store.Seal(ctx, &run)
+		res := &SlotResult{Run: &run, Dir: st.rc.Dir, Metrics: st.metrics, Seal: sealRec}
+		if err != nil {
+			return res, fmt.Errorf("seal run %s: %w", run.RunID, wrapPart("store", p.reg.Store, err))
+		}
+		return res, nil
+	}
 	open := openStage(rec.Transitions)
 	if open != "" {
 		p.appendTransition(ctx, st, open, schemas.TransitionFailed, "interrupted: the process stopped before the stage finished")
@@ -223,6 +269,49 @@ func (p *Pipeline) SealInterrupted(ctx context.Context, in SlotInput, rec schema
 	}
 	run.Y = scoreOf(run.Outcome)
 	return p.seal(ctx, st)
+}
+
+// loadRunArtifacts reads the evidence, plan and metrics an interrupted run
+// already wrote into st, so recovery seals them rather than empty
+// replacements. It reports whether the run's final artifact set is complete:
+// writeArtifacts writes run.json last, so a run.json at the seal stage with a
+// seal time and an outcome means every other final file is in place.
+func loadRunArtifacts(dir string, st *runState) bool {
+	if dir == "" {
+		return false
+	}
+	read := func(name string, v any) bool {
+		b, err := os.ReadFile(filepath.Join(dir, name))
+		if err != nil {
+			return false
+		}
+		return json.Unmarshal(b, v) == nil
+	}
+	var ev schemas.Evidence
+	evOK := read("evidence.json", &ev)
+	if evOK {
+		st.ev = &ev
+	}
+	var gates []schemas.GateResult
+	if read("gates.json", &gates) && gates != nil {
+		st.ev.Gates = gates
+	}
+	var grade *schemas.Grade
+	if read("grade.json", &grade) && grade != nil {
+		st.ev.Grade = grade
+	}
+	var plan *schemas.RunPlan
+	if read("plan.json", &plan) {
+		st.plan = plan
+	}
+	var metrics map[string]schemas.Value
+	if read("metrics.json", &metrics) {
+		st.metrics = metrics
+	}
+	run := st.rc.Run
+	_, canonErr := os.Stat(filepath.Join(dir, "canonical.json"))
+	return evOK && canonErr == nil && run.Stage == schemas.StageSeal && run.Timing.Sealed != nil &&
+		run.CanonicalHash != "" && run.Outcome != "" && run.Outcome != schemas.OutcomeUnknown
 }
 
 // begin creates the run record and folder.
@@ -303,6 +392,13 @@ func (p *Pipeline) parserVersion(name string) string {
 func (p *Pipeline) runStage(ctx context.Context, st *runState, stage schemas.Stage) {
 	if err := p.appendTransition(ctx, st, stage, schemas.TransitionStarted, ""); err != nil {
 		p.fail(ctx, st, stage, err)
+		if stage == schemas.StageCleanup {
+			// QC2-06-09: teardown never depends on the run's log being
+			// writable; containers, registrations and the key still go.
+			if derr := p.do(ctx, st, stage); derr != nil {
+				p.fail(ctx, st, stage, derr)
+			}
+		}
 		return
 	}
 	p.emit(st, Event{Kind: EventStage, Stage: stage, Message: string(schemas.TransitionStarted)})
@@ -377,6 +473,12 @@ func (p *Pipeline) seal(ctx context.Context, st *runState) (*SlotResult, error) 
 	}
 	if err := p.appendTransition(ctx, st, schemas.StageSeal, schemas.TransitionCompleted, ""); err != nil {
 		return sealFailed(err)
+	}
+	if p.ownerAbort(st.owner, st) { // QC2-06-02: the commit point; a cancel that came in while artifacts were written still aborts
+		p.reconcileMetrics(ctx, st)
+		if err := p.writeArtifacts(ctx, st); err != nil {
+			return sealFailed(err)
+		}
 	}
 	rec, err := p.reg.Store.Seal(ctx, run)
 	if err != nil {

@@ -223,3 +223,18 @@ func TestRedactPlanKnownSecrets(t *testing.T) {
 		t.Fatalf("an unrelated value changed: %q", out.Env["PLAIN"])
 	}
 }
+
+// TestPlanChecksCompatibilityTaskTeams is QC2-11-06: a task-owned team that
+// only the compatibility condition selects goes through the same task-team
+// checks as the main arms' tasks.
+func TestPlanChecksCompatibilityTaskTeams(t *testing.T) {
+	b := newBench(t)
+	b.suite.TaskByID("t05").Team = []schemas.TeamMember{{ID: "lead", Role: "lead"}, {ID: "w1", Agent: "agents/other.yaml"}}
+	e := testExperiment()
+	e.Compatibility = &schemas.CompatibilitySpec{Agent: "agents/mini-swe-agent.yaml",
+		Conditions: []string{"clean"}, Tasks: schemas.TaskSelector{IDs: []string{"t05"}}, Trials: 1}
+	_, err := NewPlanner(b.reg, b.root, nil).Plan(t.Context(), e)
+	if err == nil || !strings.Contains(err.Error(), "compatibility") || !strings.Contains(err.Error(), "sets agent") {
+		t.Fatalf("plan err %v, want the compatibility task-team refusal", err)
+	}
+}

@@ -218,6 +218,14 @@ func (a *app) manifestFor(ctx context.Context, path, resume string, allowDrift b
 }
 
 // execute runs every slot and prints progress lines.
+// runContext is the scheduler context for a CLI run or check: an interrupt
+// or SIGTERM ending ctx is an owner stop (engine.ErrRunCancelled), as in the
+// hosted launcher, so an in-flight run seals as aborted_infra and never
+// counts, and run -resume runs its slot again (QC2-06-05).
+func runContext(ctx context.Context) (context.Context, func()) {
+	return engine.CancelContext(ctx)
+}
+
 func (a *app) execute(ctx context.Context, m *schemas.Manifest, concurrency int) int {
 	events := make(chan engine.Event, 256)
 	done := make(chan struct{})
@@ -233,7 +241,9 @@ func (a *app) execute(ctx context.Context, m *schemas.Manifest, concurrency int)
 	}()
 	janitor := engine.NewJanitor(a.reg.Gateway, a.docker, a.logger)
 	sched := engine.NewScheduler(a.reg, a.cfg.Root, a.logger, janitor)
-	sum, err := sched.Run(ctx, m, engine.RunOptions{Resume: true, Concurrency: concurrency, Events: events})
+	rctx, stopRun := runContext(ctx)
+	defer stopRun()
+	sum, err := sched.Run(rctx, m, engine.RunOptions{Resume: true, Concurrency: concurrency, Events: events})
 	close(events)
 	<-done
 	if sum != nil {

@@ -105,3 +105,19 @@ func TestSleepCtx(t *testing.T) {
 		t.Fatal("live context reported done")
 	}
 }
+
+// TestAdoptCompatibilityMemberImages is QC2-09-01 / QC2-11-02: a
+// compatibility team member's image id the coordinator froze (or deferred
+// as empty) is adopted like an ordinary arm member's, so the replanned
+// manifest still matches.
+func TestAdoptCompatibilityMemberImages(t *testing.T) {
+	arm := func(member string) *schemas.ArmManifest {
+		return &schemas.ArmManifest{ImageID: "sha256:arm", Members: map[string]schemas.MemberManifest{"w1": {ImageID: member}}}
+	}
+	local := &schemas.Manifest{Compatibility: arm("sha256:local-build")}
+	remote := &schemas.Manifest{Compatibility: arm("")}
+	adoptUnrepeatable(local, remote)
+	if got := local.Compatibility.Members["w1"].ImageID; got != "" {
+		t.Fatalf("compatibility member image %q, want the coordinator's", got)
+	}
+}

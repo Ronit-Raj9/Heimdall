@@ -1,7 +1,9 @@
 package engine
 
 import (
+	"bytes"
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"path/filepath"
@@ -83,6 +85,16 @@ func (p *Planner) planMatrix(ctx context.Context, exp *schemas.Experiment, mode 
 	if exp == nil || exp.Matrix == nil {
 		return p.plan(ctx, exp, mode)
 	}
+	if len(exp.Arms) > 0 {
+		// QC2-11-01: a frozen manifest keeps the matrix beside the arms it
+		// expanded to. A replan of that experiment (a remote worker) plans
+		// those arms as frozen, provided they are exactly the matrix's
+		// expansion; the price check was the coordinator's planning decision.
+		if !expandedFromMatrix(exp) {
+			return nil, fmt.Errorf("plan %s: matrix: set either matrix or arms, not both", exp.Name)
+		}
+		return p.plan(ctx, exp, mode)
+	}
 	expanded, err := ExpandMatrix(exp)
 	if err != nil {
 		return nil, fmt.Errorf("plan %s: %w", exp.Name, err)
@@ -91,6 +103,21 @@ func (p *Planner) planMatrix(ctx context.Context, exp *schemas.Experiment, mode 
 		return nil, fmt.Errorf("plan %s: %w", exp.Name, err)
 	}
 	return p.plan(ctx, expanded, mode)
+}
+
+// expandedFromMatrix reports whether exp's arms are exactly what its matrix
+// expands to, as in a manifest's frozen experiment. Arms are compared in
+// their JSON form, so a manifest that went through JSON still matches.
+func expandedFromMatrix(exp *schemas.Experiment) bool {
+	bare := *exp
+	bare.Arms = nil
+	expanded, err := ExpandMatrix(&bare)
+	if err != nil {
+		return false
+	}
+	want, err1 := json.Marshal(expanded.Arms)
+	got, err2 := json.Marshal(exp.Arms)
+	return err1 == nil && err2 == nil && bytes.Equal(want, got)
 }
 
 // checkMatrixPrices refuses a matrix model the price snapshot does not list,

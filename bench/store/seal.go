@@ -65,6 +65,11 @@ func (s *FSStore) Seal(ctx context.Context, run *schemas.Run) (*schemas.SealReco
 	if err != nil {
 		return nil, fmt.Errorf("seal run %s: %w", run.RunID, err)
 	}
+	logInfo, err := log.Stat()
+	if err != nil {
+		return nil, fmt.Errorf("seal run %s: %w", run.RunID, err)
+	}
+	logSize := logInfo.Size()
 	sealed, err := isSealed(dir)
 	if err != nil {
 		return nil, fmt.Errorf("seal run %s: %w", run.RunID, err)
@@ -104,14 +109,36 @@ func (s *FSStore) Seal(ctx context.Context, run *schemas.Run) (*schemas.SealReco
 		return nil, fmt.Errorf("seal run %s: %w", run.RunID, err)
 	}
 	rec.Hash = utils.SHA256Bytes(b)
-	if err := appendLineTo(log, []byte(run.RunID+" "+rec.Hash)); err != nil {
-		return nil, fmt.Errorf("seal run %s: append seals.log: %w", run.RunID, err)
+	if err := appendSealLine(log, []byte(run.RunID+" "+rec.Hash)); err != nil {
+		// QC2-06-04: roll the half-made seal back while the log lock is still
+		// held. A seal.json left without its log line would let a successor
+		// seal chain past it, and the stranded run could then never be
+		// finished; without seal.json the run stays an ordinary unsealed run.
+		return nil, errors.Join(fmt.Errorf("seal run %s: append seals.log: %w", run.RunID, err), s.rollbackSeal(dir, log, logSize))
 	}
 	if err := makeReadOnly(dir); err != nil {
 		return nil, fmt.Errorf("seal run %s: %w", run.RunID, err)
 	}
 	s.logger.Info("run sealed", "run_id", run.RunID, "files", len(files), "seal", rec.Hash)
 	return rec, nil
+}
+
+// appendSealLine appends a new seal's seals.log line; a variable so a test
+// can make the append fail.
+var appendSealLine = appendLineTo
+
+// rollbackSeal undoes a Seal whose seals.log append failed: the log is cut
+// back to its size before the append (dropping a torn line) and seal.json is
+// removed, so no successor can chain past a seal the log never recorded.
+func (s *FSStore) rollbackSeal(dir string, log *os.File, size int64) error {
+	var errs []error
+	if err := log.Truncate(size); err != nil {
+		errs = append(errs, fmt.Errorf("roll back seals.log: %w", err))
+	}
+	if err := os.Remove(filepath.Join(dir, sealFile)); err != nil && !errors.Is(err, os.ErrNotExist) {
+		errs = append(errs, fmt.Errorf("roll back seal.json: %w", err))
+	}
+	return errors.Join(errs...)
 }
 
 // SealFormatV1 is the seal format of a current-format run: one with a

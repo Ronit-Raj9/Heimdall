@@ -265,10 +265,7 @@ func (e *dockerWorkspace) suiteImageTag(rc *schemas.RunContext, role string) str
 			if sv.ID != id {
 				continue
 			}
-			if sv.Build != nil && sv.Build.Tag != "" {
-				return sv.Build.Tag
-			}
-			return sv.Image
+			return serviceTag(rc, sv, rc.Task.Dir, rc.Task.Environment != nil && rc.Task.Environment.BuildNetwork)
 		}
 		return ""
 	}
@@ -276,23 +273,31 @@ func (e *dockerWorkspace) suiteImageTag(rc *schemas.RunContext, role string) str
 	if !ok || id == "" {
 		return ""
 	}
-	var services []schemas.ServiceSpec
 	if rc.Suite != nil {
-		services = append(services, rc.Suite.Services...)
+		for _, sv := range rc.Suite.Services {
+			if sv.ID == id {
+				return serviceTag(rc, sv, rc.Suite.Root, false)
+			}
+		}
 	}
 	if rc.Task != nil {
-		services = append(services, rc.Task.Services...)
-	}
-	for _, sv := range services {
-		if sv.ID != id {
-			continue
+		for _, sv := range rc.Task.Services {
+			if sv.ID == id {
+				return serviceTag(rc, sv, rc.Task.Dir, rc.Task.Environment != nil && rc.Task.Environment.BuildNetwork)
+			}
 		}
-		if sv.Build != nil && sv.Build.Tag != "" {
-			return sv.Build.Tag
-		}
-		return sv.Image
 	}
 	return ""
+}
+
+// serviceTag is the tag a run starts for a service (utils.ServiceImage, as
+// the launch computes it), or "" when its build cannot be resolved.
+func serviceTag(rc *schemas.RunContext, sv schemas.ServiceSpec, base string, network bool) string {
+	img, err := serviceImage(rc, runService{spec: sv, base: base, network: network})
+	if err != nil {
+		return ""
+	}
+	return img.Tag
 }
 
 // otherTaskRole reports whether role is a task service role of a task other

@@ -338,3 +338,23 @@ func TestRemoteGPUAcceptMatchesFreeDevices(t *testing.T) {
 		t.Fatal("16 GiB slot refused with every device free")
 	}
 }
+
+// TestCheckGPUScopesCompatibilityTeam is QC2-09-06 / QC2-11-03: a CPU-only
+// compatibility team must not refuse a main-arm GPU task it never runs, and
+// still refuses a GPU task in its own conditions.
+func TestCheckGPUScopesCompatibilityTeam(t *testing.T) {
+	suite := &schemas.Suite{Tasks: []*schemas.Task{
+		{ID: "gpu", Resources: &schemas.Resources{GPU: &schemas.GPURequest{Count: 1}}},
+		{ID: "cpu"},
+	}}
+	p := &Planner{reg: &schemas.Registry{GPUs: gtxPool(t)}}
+	arms := map[string]schemas.ArmManifest{"a": {}, "b": {}}
+	compatTeam := &schemas.ArmManifest{Config: schemas.AgentConfig{Team: []schemas.TeamMember{{ID: "x"}, {ID: "y"}}}}
+	main := []condPlan{{id: "clean", tasks: []string{"gpu"}, trials: 1}}
+	if err := p.checkGPUScoped(nil, suite, main, []condPlan{{id: "compat", tasks: []string{"cpu"}, trials: 1}}, arms, compatTeam); err != nil {
+		t.Fatalf("compatibility team refused an unrelated GPU task: %v", err)
+	}
+	if err := p.checkGPUScoped(nil, suite, main, []condPlan{{id: "compat", tasks: []string{"gpu"}, trials: 1}}, arms, compatTeam); err == nil || !strings.Contains(err.Error(), "team") {
+		t.Fatalf("compatibility team on its own GPU task: %v", err)
+	}
+}

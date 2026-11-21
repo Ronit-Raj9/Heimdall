@@ -591,14 +591,17 @@ type ArtifactEnvironment interface {
 
 // WorkerInfo is one remote worker as GET /workers lists it.
 type WorkerInfo struct {
-	ID        string    `json:"id"`
-	Host      string    `json:"host"`
-	Version   string    `json:"version"` // bench build the worker runs
-	State     string    `json:"state"`   // idle | running | lost
-	Slots     int       `json:"slots"`   // concurrent runs it offers
-	Running   []string  `json:"running"` // slot ids it holds
-	Completed int       `json:"completed"`
-	LastSeen  time.Time `json:"last_seen"`
+	ID        string   `json:"id"`
+	Host      string   `json:"host"`
+	Version   string   `json:"version"` // bench build the worker runs
+	State     string   `json:"state"`   // idle | running | lost
+	Slots     int      `json:"slots"`   // concurrent runs it offers
+	Running   []string `json:"running"` // slot ids it holds
+	Completed int      `json:"completed"`
+	// Rejected counts the worker's rejected uploads since it last
+	// registered; at 3 it is leased nothing more until it registers again.
+	Rejected int       `json:"rejected,omitempty"`
+	LastSeen time.Time `json:"last_seen"`
 	// Runners area (docs/runners.md): the runner's pool and labels; in
 	// hosted mode also the runner token it registered with.
 	Pool    string    `json:"pool,omitempty"`

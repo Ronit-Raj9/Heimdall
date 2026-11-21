@@ -432,8 +432,9 @@ func (e *dockerWorkspace) Destroy(ctx context.Context, rc *schemas.RunContext) e
 	if err != nil {
 		return err
 	}
-	e.revokeServiceKeys(ctx, runID) // W3 customer support: any service key still live (servicegateway.go)
-	defer forgetCollector(runID)    // Agent events area: the run's collector bookkeeping ends with the run (eventcollector.go)
+	e.revokeServiceKeys(ctx, runID)       // W3 customer support: any service key still live (servicegateway.go)
+	defer forgetCollector(runID)          // Agent events area: the run's collector bookkeeping ends with the run (eventcollector.go)
+	defer gatewayForwarders.Delete(runID) // QC2-09-05: the run's gateway forwarder bookkeeping (servicegateway.go)
 	filter := "label=" + utils.LabelRun + "=" + runID
 	var errs []error
 	ps, err := e.cfg.Docker.MustRun(ctx, "ps", "-aq", "--filter", filter)
@@ -745,7 +746,9 @@ func parseAgentState(out string) (int, error) {
 		return 0, fmt.Errorf("inspect agent container: parse exit code: %w", err)
 	}
 	if started, err := time.Parse(time.RFC3339Nano, f[2]); err != nil || started.Year() <= 1 {
-		return 0, fmt.Errorf("agent container never started (status %s, started_at %s)", f[1], f[2])
+		// QC2-09-02: docker itself says the agent never ran, so the attempt is
+		// a confirmed pre-start failure the pipeline may retry.
+		return 0, notLaunched(fmt.Errorf("agent container never started (status %s, started_at %s)", f[1], f[2]))
 	}
 	if f[1] != "exited" {
 		return 0, fmt.Errorf("agent container did not exit (status %s)", f[1])

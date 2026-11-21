@@ -232,12 +232,17 @@ func (c *Coordinator) Register(ctx context.Context, req *schemas.WorkerRegister)
 	}
 	// A restarted worker may have been corrected: its refusals are asked
 	// again (a refusal costs nothing), and its rejection count starts over
-	// when it comes back as a different build (2-C-05).
+	// (2-C-05). A worker registers only when its process starts (or after an
+	// operator forgot it), so a same-build restart after an environment fix
+	// is leased again (QC2-08-03); a still-broken one is stopped again after
+	// maxRejections uploads. WorkerInfo.Rejected shows the count meanwhile.
 	if ok {
 		w.refused = map[string]string{}
-		if w.info.Version != req.Version || !sameStrings(w.parts, req.Parts) {
-			w.rejected = 0
+		if w.rejected > 0 {
+			c.logger.Warn("remote worker registered again; its rejected-upload count starts over", "worker", req.WorkerID,
+				"rejected", w.rejected, "same_build", w.info.Version == req.Version && sameStrings(w.parts, req.Parts))
 		}
+		w.rejected = 0
 	}
 	w.info = schemas.WorkerInfo{ID: req.WorkerID, Host: req.Host, Version: req.Version, State: schemas.WorkerIdle,
 		Slots: req.Slots, Running: []string{}, Completed: w.info.Completed, LastSeen: c.now().UTC(),
@@ -426,9 +431,14 @@ func (c *Coordinator) Upload(ctx context.Context, leaseID, workerID string, offs
 		return have, fmt.Errorf("lease %s: another upload call is in progress: %w", leaseID, schemas.ErrUploadOffset)
 	case offset != l.received:
 		have := l.received
-		l.uploading = offset+int64(len(data)) == have && len(data) > 0 // a possible replay: hold the file still while comparing
+		// QC2-08-01: the replay decision is a local taken under the lock, and
+		// this call releases only the guard it set itself.
+		replay := offset+int64(len(data)) == have && len(data) > 0 // a possible replay: hold the file still while comparing
+		if replay {
+			l.uploading = true
+		}
 		c.mu.Unlock()
-		if l.uploading {
+		if replay {
 			same := sameBytesAt(l.archive, offset, data)
 			c.mu.Lock()
 			l.uploading = false

@@ -72,6 +72,11 @@ while True:
     threading.Thread(target=serve, args=(c,), daemon=True).start()
 `
 
+// TCPForwarderProgram is remoteForwarder for other one-destination
+// forwarders: run with python3 -I -c, it listens on RemoteEgressPort and
+// forwards every connection to BENCH_EGRESS_TARGET only.
+func TCPForwarderProgram() string { return remoteForwarder }
+
 // EgressRecord is egress.json in the run folder.
 type EgressRecord struct {
 	Allowed   []string  `json:"allowed"`   // the only destinations the run could reach outside the evaluation network

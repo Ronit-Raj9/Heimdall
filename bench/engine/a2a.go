@@ -294,7 +294,7 @@ func (p *Pipeline) cleanupA2A(ctx context.Context, st *runState) error {
 	}
 	var errs []error
 	for _, n := range st.rc.A2A.Owned {
-		if err := gw.DeleteA2A(context.WithoutCancel(ctx), n); err != nil {
+		if err := gw.DeleteA2A(ctx, n); err != nil { // QC2-06-01: ctx is cleanup's detached, bounded context; its deadline is kept
 			errs = append(errs, wrapPart("gateway", p.reg.Gateway, fmt.Errorf("a2a cleanup: %w", err)))
 		}
 	}

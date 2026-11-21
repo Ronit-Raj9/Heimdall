@@ -5,10 +5,12 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"net/url"
 	"os"
 	"path"
 	"path/filepath"
 	"sort"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -196,11 +198,15 @@ func (e *dockerWorkspace) prepareServiceGateway(ctx context.Context, rc *schemas
 	if g == nil {
 		return nil, func() {}, nil
 	}
+	gwURL, err := e.serviceGatewayURL(spec)
+	if err != nil {
+		return nil, func() {}, err
+	}
 	key, err := e.mintServiceKey(ctx, rc, runID, spec, g)
 	if err != nil {
 		return nil, func() {}, err
 	}
-	f, err := serviceGatewayEnvFile(e.cfg.ServiceGateway.AgentURL, g, key)
+	f, err := serviceGatewayEnvFile(gwURL, g, key)
 	if err != nil {
 		return nil, func() {}, err
 	}
@@ -212,17 +218,98 @@ func (e *dockerWorkspace) prepareServiceGateway(ctx context.Context, rc *schemas
 	return []string{"--env-file", f}, cleanup, nil
 }
 
-// connectGatewayNetwork puts a service with gateway access on the
-// evaluation network, where the gateway is.
+// connectGatewayNetwork gives a service with gateway access its route to
+// the gateway. A service already on the agent's service network joins the
+// evaluation network, where the gateway is. A service kept off the agent
+// network (hidden, or proxied so the tool proxy mediates every agent call)
+// never joins the evaluation network, where gateway-enabled agents run:
+// it reaches the gateway through the run's gateway forwarder on its hidden
+// network instead (QC2-09-05).
 func (e *dockerWorkspace) connectGatewayNetwork(ctx context.Context, rc *schemas.RunContext, spec schemas.ServiceSpec, container string) error {
 	if serviceGateway(rc, spec) == nil {
 		return nil
+	}
+	if offAgentNetwork(spec) {
+		return e.ensureGatewayForwarder(ctx, rc)
 	}
 	if _, err := e.cfg.Docker.MustRun(ctx, "network", "connect", e.cfg.EvalNetwork, container); err != nil {
 		return fmt.Errorf("connect evaluation network for gateway access: %w", err)
 	}
 	return nil
 }
+
+// gatewayForwarderAlias is the host name a hidden or proxied service reaches
+// the gateway at, on the run's hidden network.
+const gatewayForwarderAlias = "bench-gateway"
+
+func gatewayForwarderName(runID string) string { return "bench-gwf-" + runID }
+
+// serviceGatewayURL is the gateway URL handed to spec: the gateway's own
+// for a service on the agent network, the run's forwarder (same scheme and
+// path) for one kept off it.
+func (e *dockerWorkspace) serviceGatewayURL(spec schemas.ServiceSpec) (string, error) {
+	agentURL := e.cfg.ServiceGateway.AgentURL
+	if !offAgentNetwork(spec) {
+		return agentURL, nil
+	}
+	u, err := url.Parse(agentURL)
+	if err != nil || u.Host == "" {
+		return "", fmt.Errorf("gateway.agent_url %q is not a URL", agentURL)
+	}
+	u.Host = gatewayForwarderAlias + ":" + strconv.Itoa(utils.RemoteEgressPort)
+	return u.String(), nil
+}
+
+// ensureGatewayForwarder starts, once per run, the forwarder that carries
+// hidden or proxied services' model calls to the gateway: the helper image
+// on the evaluation network, joined to the hidden network as
+// gatewayForwarderAlias, forwarding TCP to the gateway's host and port only.
+// It runs as nobody with every capability dropped and a read-only root, and
+// carries the run's labels, so Destroy and the janitor remove it.
+func (e *dockerWorkspace) ensureGatewayForwarder(ctx context.Context, rc *schemas.RunContext) error {
+	expID, runID, err := runIDs(rc)
+	if err != nil {
+		return err
+	}
+	name := gatewayForwarderName(runID)
+	mu, _ := gatewayForwarders.LoadOrStore(runID, &gatewayForwarder{})
+	f := mu.(*gatewayForwarder)
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	if f.started {
+		return nil
+	}
+	target, err := utils.RemoteEgressTarget(e.cfg.ServiceGateway.AgentURL)
+	if err != nil {
+		return fmt.Errorf("gateway forwarder: %w", err)
+	}
+	steps := [][]string{
+		append(append([]string{"create", "--name", name}, utils.LabelArgs(expID, runID)...),
+			"--user", "65534", "--cap-drop", "ALL", "--security-opt", "no-new-privileges", "--read-only",
+			"--pids-limit", "64", "--memory", "64m", "--network", e.cfg.EvalNetwork, "-e", "BENCH_EGRESS_TARGET="+target,
+			"--entrypoint", "python3", e.helperImage(rc), "-I", "-c", utils.TCPForwarderProgram()),
+		{"network", "connect", "--alias", gatewayForwarderAlias, hiddenNetwork(runID), name},
+		{"start", name},
+	}
+	for _, args := range steps {
+		if _, err := e.cfg.Docker.MustRun(ctx, args...); err != nil {
+			e.removeContainers(ctx, name)
+			return fmt.Errorf("gateway forwarder for hidden services: %w", err)
+		}
+	}
+	f.started = true
+	return nil
+}
+
+// gatewayForwarder records whether a run's gateway forwarder is started.
+type gatewayForwarder struct {
+	mu      sync.Mutex
+	started bool
+}
+
+// gatewayForwarders maps a run id to its *gatewayForwarder; Destroy forgets
+// the run (its container goes with the run's labelled containers).
+var gatewayForwarders sync.Map
 
 // finishServiceKeys reads each live service key's rows into
 // state/<service>/_gateway.json, revokes the key and returns one StateFile

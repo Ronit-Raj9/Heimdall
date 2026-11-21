@@ -135,6 +135,7 @@ type schedRun struct {
 
 	returned  map[string]int  // slot id -> times a remote worker gave it back without a run; under mu (remote.go)
 	unsettled map[string]bool // slots left without a disposition (held elsewhere, store error); under mu (adaptive_sched.go)
+	stuck     map[string]bool // slots with a pending seal that could not be finished; under mu (QC2-06-04)
 
 	w7 *adaptiveState // W7 adaptive trials: slots queued and the last replay (adaptive_sched.go)
 	// X7: the GPUs each GPU worker holds, by slot id (gpu.go).
@@ -296,6 +297,11 @@ func (s *Scheduler) start(ctx context.Context, m *schemas.Manifest, opts RunOpti
 	if err := checkFingerprints(ctx, s.reg, suite, s.logger, m.Experiment.Smoke, "run", m.ExpID); err != nil {
 		return nil, fmt.Errorf("run %s: %w", m.ExpID, err)
 	}
+	if opts.Resume && !opts.RemoteOnly { // QC2-09-03: a local resume runs the frozen input bytes or nothing (frozeninputs.go)
+		if err := s.verifyFrozenInputs(m, suite); err != nil {
+			return nil, fmt.Errorf("resume %s: %w", m.ExpID, err)
+		}
+	}
 	if opts.Owner == "" {
 		opts.Owner = utils.NewID("w", 8)
 	}
@@ -385,9 +391,13 @@ func (r *schedRun) spentSoFar(ctx context.Context) error {
 // run verifies before resume counts or skips it, and before any newer seal
 // moves the chain tail past it. A seal that cannot be finished is an
 // integrity failure and is reported as a slot error, never skipped silently.
-func (r *schedRun) finishSeal(ctx context.Context, slot *schemas.Slot, rec schemas.RunRecord) {
+//
+// It reports false when the seal could not be finished. Such a slot is
+// marked stuck: its pending run is neither counted nor skipped, and the slot
+// gets no new run in this Run call (QC2-06-04).
+func (r *schedRun) finishSeal(ctx context.Context, slot *schemas.Slot, rec schemas.RunRecord) bool {
 	if !rec.Sealed || !rec.SealPending {
-		return
+		return true
 	}
 	run := rec.Run
 	_, err := r.s.reg.Store.Seal(ctx, &run)
@@ -397,8 +407,31 @@ func (r *schedRun) finishSeal(ctx context.Context, slot *schemas.Slot, rec schem
 		r.count(func(s *Summary) { s.Recovered++ })
 	case errors.Is(err, schemas.ErrSealed):
 	default:
-		r.slotError(slot, fmt.Errorf("run %s: interrupted seal cannot be finished: %w", run.RunID, err))
+		r.mu.Lock()
+		first := !r.stuck[slot.SlotID]
+		if r.stuck == nil {
+			r.stuck = map[string]bool{}
+		}
+		r.stuck[slot.SlotID] = true
+		r.mu.Unlock()
+		if first {
+			r.slotError(slot, fmt.Errorf("run %s: interrupted seal cannot be finished: %w", run.RunID, err))
+		}
+		return false
 	}
+	return true
+}
+
+// finishSeals finishes every pending seal of recs; false when one could not
+// be finished or the slot was already found stuck.
+func (r *schedRun) finishSeals(ctx context.Context, slot *schemas.Slot, recs []schemas.RunRecord) bool {
+	ok := true
+	for _, rec := range recs {
+		ok = r.finishSeal(ctx, slot, rec) && ok
+	}
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	return ok && !r.stuck[slot.SlotID]
 }
 
 // process runs one slot to a counted run, or decides it needs none.
@@ -414,6 +447,9 @@ func (r *schedRun) process(ctx context.Context, slot *schemas.Slot) {
 	recs, err := slotRuns(ctx, r.s.reg.Store, r.m.ExpID, slot.SlotID)
 	if err != nil {
 		r.slotError(slot, err)
+		return
+	}
+	if !r.finishSeals(ctx, slot, recs) { // QC2-06-04: a pending seal that cannot be finished is never counted or skipped
 		return
 	}
 	if r.skipDone(slot, recs) {
@@ -491,6 +527,7 @@ func (r *schedRun) attempts(ctx context.Context, slot *schemas.Slot, est float64
 func (r *schedRun) leaseLost(sctx context.Context, slot *schemas.Slot) {
 	cause := context.Cause(sctx)
 	r.count(func(s *Summary) { s.LeaseLost++ })
+	r.markUnsettled(slot.SlotID) // QC2-06-06: the new holder has not finished the slot; the adaptive rule must not read it as settled
 	r.s.logger.Error("slot lease lost: the slot's run was cancelled, and a run sealed after the loss is aborted_infra, never counted; the slot is left to the owner that holds it",
 		"experiment", r.m.ExpID, "slot", slot.SlotID, "owner", r.opts.Owner, "cause", cause.Error())
 	r.emit(Event{Kind: EventError, SlotID: slot.SlotID, Message: cause.Error()})
@@ -507,8 +544,8 @@ func (r *schedRun) settle(ctx context.Context, slot *schemas.Slot, est float64) 
 		r.slotError(slot, err)
 		return 0, true
 	}
-	for _, rec := range recs {
-		r.finishSeal(ctx, slot, rec)
+	if !r.finishSeals(ctx, slot, recs) {
+		return len(recs), true
 	}
 	if r.skipDone(slot, recs) {
 		return len(recs), true

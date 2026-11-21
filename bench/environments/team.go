@@ -56,7 +56,9 @@ func (e *dockerWorkspace) ExecTeam(ctx context.Context, rc *schemas.RunContext, 
 	defer e.removeContainers(context.WithoutCancel(ctx), names...)
 	for i, m := range members {
 		if err := e.createMember(ctx, rc, expID, runID, names[i], m); err != nil {
-			return nil, fmt.Errorf("exec team of run %s: member %s: %w", runID, m.Member.ID, err)
+			// QC2-06-07: no member is attached before every one is created,
+			// so no agent ran and the attempt may be retried.
+			return nil, notLaunched(fmt.Errorf("exec team of run %s: member %s: %w", runID, m.Member.ID, err))
 		}
 	}
 	results := make([]schemas.MemberResult, len(members))

@@ -34,6 +34,8 @@ func TestValidateRouting(t *testing.T) {
 		{"retries differ", &schemas.RoutingPolicy{Strategy: "fixed", Targets: []schemas.RouteTarget{tgt("claude-sonnet-4-6", 0)}, Retries: &one}, "Bifrost sets retries per provider"},
 		{"bad duration", &schemas.RoutingPolicy{Strategy: "fixed", Targets: []schemas.RouteTarget{tgt("claude-sonnet-4-6", 0)}, Limits: &schemas.RouteLimits{RequestMax: 3, RequestReset: "1 hour"}}, "not a Bifrost duration"},
 		{"duplicate target", &schemas.RoutingPolicy{Strategy: "weighted", Targets: []schemas.RouteTarget{tgt("claude-sonnet-4-6", 0.5), tgt("claude-sonnet-4-6", 0.5)}}, "listed twice"},
+		// QC2-11-08: an omitted provider is the arm's, so these two rows are one route.
+		{"duplicate after the provider default", &schemas.RoutingPolicy{Strategy: "weighted", Targets: []schemas.RouteTarget{tgt("claude-sonnet-4-6", 0.5), {Provider: "anthropic", Model: "claude-sonnet-4-6", Weight: 0.5}}}, "listed twice"},
 		{"when outside rule", &schemas.RoutingPolicy{Strategy: "fixed", When: "true", Targets: []schemas.RouteTarget{tgt("claude-sonnet-4-6", 0)}}, "when is only read by strategy rule"},
 	}
 	for _, c := range cases {
@@ -85,7 +87,7 @@ func TestCheckRoutingManifest(t *testing.T) {
 
 // TestRoutingOverride: an arm sets the policy with set: like any field.
 func TestRoutingOverride(t *testing.T) {
-	doc := []byte("id: toy\nadapter: scripted\nmodel: claude-sonnet-4-6\ngateway:\n  provider: anthropic\n")
+	doc := []byte("id: toy\nadapter: scripted\nscripted: {kind: toy}\nmodel: claude-sonnet-4-6\ngateway:\n  provider: anthropic\n")
 	cfg, err := ResolveAgentConfig(doc, map[string]any{
 		"gateway.routing": map[string]any{"strategy": "fallback_chain",
 			"targets":   []any{map[string]any{"model": "claude-sonnet-4-6"}},

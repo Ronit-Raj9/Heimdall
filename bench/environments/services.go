@@ -430,14 +430,11 @@ func (e *dockerWorkspace) startService(ctx context.Context, rc *schemas.RunConte
 // serviceImage is the service's prebuilt image, or its Dockerfile build
 // tagged bench/svc-<suite>-<service>:<content hash>.
 func serviceImage(rc *schemas.RunContext, s runService) (utils.LocalImage, error) {
-	if s.spec.Build == nil {
-		return utils.LocalImage{Tag: s.spec.Image}, nil
-	}
 	suiteID := ""
 	if rc.Suite != nil {
 		suiteID = rc.Suite.ID
 	}
-	img, err := utils.BuildImageSpec(s.base, s.spec.Build.Dockerfile, s.spec.Build.Context, "svc-"+suiteID+"-"+s.spec.ID, s.network)
+	img, err := utils.ServiceImage(s.spec, s.base, suiteID, s.network) // QC2-09-04: the tag the freeze and the image check name too
 	if err != nil {
 		return utils.LocalImage{}, fmt.Errorf("image: %w", err)
 	}

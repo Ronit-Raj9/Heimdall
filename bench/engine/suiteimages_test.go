@@ -38,7 +38,7 @@ func TestSuiteImages(t *testing.T) {
 	}{
 		{"every role with services", imageRoleEnv{inspectingEnv{fakeEnv{part{"docker_workspace"}, nil}, ids}, roles}, withServices,
 			map[string]string{"base": "sha256:base", "helper": "sha256:helper", "toolproxy": "sha256:tp",
-				"service/db": "sha256:db", "service/api": "sha256:built"}, ""},
+				"service/db": "sha256:db"}, ""}, // QC2-09-04: api's launch builds a content-derived tag from a Dockerfile it lacks, never build.tag, so nothing is frozen for it
 		{"no tool proxy without services", imageRoleEnv{inspectingEnv{fakeEnv{part{"docker_workspace"}, nil}, ids}, roles}, coding,
 			map[string]string{"base": "sha256:base", "helper": "sha256:helper"}, ""},
 		{"task service needs the tool proxy", imageRoleEnv{inspectingEnv{fakeEnv{part{"docker_workspace"}, nil}, ids}, roles}, taskService,

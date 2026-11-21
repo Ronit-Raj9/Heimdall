@@ -3,9 +3,11 @@ package engine
 import (
 	"context"
 	"errors"
+	"net"
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -193,5 +195,66 @@ func TestCoordinatorReapsStaleStaging(t *testing.T) {
 		if _, err := os.Stat(p); err != nil {
 			t.Fatalf("%s removed: %v", p, err)
 		}
+	}
+}
+
+// TestRemoteConcurrentUploadReplays is QC2-08-01: concurrent replays and
+// stale-offset chunks decide replay under the lock and release only their
+// own guard; afterwards the next chunk still appends (run with -race).
+func TestRemoteConcurrentUploadReplays(t *testing.T) {
+	rw := newRemoteWorld(t, testExperiment(), RemoteOptions{ChunkBytes: 8})
+	done := rw.attach(t)
+	defer done()
+	w := rw.worker(t, "w1", newRemoteSide(t))
+	l := lease(t, w)
+	ctx := context.Background()
+	first := []byte("abcdefgh")
+	if n, err := rw.c.Upload(ctx, l.LeaseID, "w1", 0, first); err != nil || n != 8 {
+		t.Fatal(n, err)
+	}
+	var wg sync.WaitGroup
+	for g := range 8 {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			for range 40 {
+				if g%2 == 0 {
+					rw.c.Upload(ctx, l.LeaseID, "w1", 0, first) //nolint:errcheck // a replay may race another call
+				} else {
+					rw.c.Upload(ctx, l.LeaseID, "w1", 3, []byte("zz")) //nolint:errcheck // a stale offset is refused
+				}
+			}
+		}()
+	}
+	wg.Wait()
+	if n, err := rw.c.Upload(ctx, l.LeaseID, "w1", 8, []byte("ijk")); err != nil || n != 11 {
+		t.Fatalf("next chunk after concurrent replays: %d %v", n, err)
+	}
+}
+
+// TestConfirmLeaseRequiresPositiveAnswer is QC2-08-02: a coordinator that
+// cannot be reached before the slot starts is no permission to run it.
+func TestConfirmLeaseRequiresPositiveAnswer(t *testing.T) {
+	oldTries, oldBackoff := confirmTries, confirmBackoff
+	confirmTries, confirmBackoff = 2, time.Millisecond
+	defer func() { confirmTries, confirmBackoff = oldTries, oldBackoff }()
+	rw := newRemoteWorld(t, testExperiment(), RemoteOptions{})
+	done := rw.attach(t)
+	defer done()
+	w := rw.worker(t, "w1", newRemoteSide(t))
+	l := lease(t, w)
+	if why, _ := w.confirmLease(context.Background(), l); why != "" {
+		t.Fatalf("held lease not confirmed: %s", why)
+	}
+	ln, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		t.Fatal(err)
+	}
+	dead := "http://" + ln.Addr().String()
+	ln.Close()
+	w.opts.Server = dead
+	why, transient := w.confirmLease(context.Background(), l)
+	if why == "" || !transient {
+		t.Fatalf("unreachable coordinator: why=%q transient=%v, want a refusal", why, transient)
 	}
 }

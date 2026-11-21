@@ -106,6 +106,20 @@ func BuildImageSpec(base, dockerfile, context, name string, network bool) (Local
 	return LocalImage{Tag: "bench/" + ImageName(name) + ":" + sum[:12], Dockerfile: df, Context: ctxDir, Network: network}, nil
 }
 
+// ServiceImage is the image a run starts for a suite or task service: its
+// prebuilt image, or its Dockerfile build tagged
+// bench/svc-<suite>-<service>:<content hash>. base is the suite root for a
+// suite service and the task folder for a task service; network says the
+// build may use the network. The planner's image freeze, the environment's
+// frozen-image check and the service launch all name a service's image
+// through it, so they agree on the tag a run really starts (QC2-09-04).
+func ServiceImage(spec schemas.ServiceSpec, base, suiteID string, network bool) (LocalImage, error) {
+	if spec.Build == nil {
+		return LocalImage{Tag: spec.Image}, nil
+	}
+	return BuildImageSpec(base, spec.Build.Dockerfile, spec.Build.Context, "svc-"+suiteID+"-"+spec.ID, network)
+}
+
 // ImageName turns any id into a docker repository path component: lower
 // case, runs of other characters replaced by "-", no separator at either end.
 // It is pure.

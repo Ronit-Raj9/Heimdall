@@ -16,6 +16,7 @@ import (
 const baseAgent = `id: claude-code
 adapter: command
 image: bench/agent:1
+argv: [agent]
 env: {A: "1"}
 model: claude-test
 notes:
@@ -65,7 +66,12 @@ func TestResolveAgentConfig(t *testing.T) {
 		{name: "override value the agent schema refuses", doc: baseAgent, set: map[string]any{"scripted.kind": "nooop"}, wantErr: "scripted.kind"},
 		{name: "a2a override", doc: baseAgent, set: map[string]any{"a2a.card_url": "http://127.0.0.1:23000/card"},
 			check: func(t *testing.T, _, _ string, _ int, _ map[string]string, _ string) {}},
-		{name: "unknown field in base file", doc: baseAgent + "extra: 1\n", wantErr: "field extra not found"},
+		{name: "unknown field in base file", doc: baseAgent + "extra: 1\n", wantErr: "extra"},
+		// QC2-11-07: an override that changes the adapter makes the block the
+		// schema then requires missing; the effective config is refused.
+		{name: "discriminator override needs its block", doc: baseAgent, set: map[string]any{"adapter": "scripted"}, wantErr: "scripted: required field missing"},
+		{name: "discriminator override with its block", doc: baseAgent, set: map[string]any{"adapter": "scripted", "scripted.kind": "noop"},
+			check: func(t *testing.T, _, _ string, _ int, _ map[string]string, _ string) {}},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

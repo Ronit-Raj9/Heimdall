@@ -2,6 +2,7 @@ package engine
 
 import (
 	"context"
+	"errors"
 	"os"
 	"path/filepath"
 	"strings"
@@ -171,5 +172,204 @@ func TestPipelineNotLaunchedIsRetried(t *testing.T) {
 		if res.Run.Outcome != want || (notLaunched && res.Run.Timing.AgentStarted != nil) {
 			t.Fatalf("not_launched=%v: outcome %s, agent started %v", notLaunched, res.Run.Outcome, res.Run.Timing.AgentStarted)
 		}
+	}
+}
+
+// TestSchedulerStrandedSealIsNotSkipped is QC2-06-04: a pending seal whose
+// log line is missing while a successor already moved the chain tail cannot
+// be finished. Resume must report it as a slot error and neither count nor
+// skip that slot as done.
+func TestSchedulerStrandedSealIsNotSkipped(t *testing.T) {
+	side := newRemoteSide(t)
+	b := side.b
+	m := b.plan(t, testExperiment())
+	ctx := context.Background()
+	if _, err := NewScheduler(b.reg, b.root, nil, nil).Run(ctx, m, RunOptions{}); err != nil {
+		t.Fatal(err)
+	}
+	logPath := filepath.Join(side.st.Root(), m.ExpID, "seals.log")
+	raw, err := os.ReadFile(logPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	lines := strings.Split(strings.TrimSpace(string(raw)), "\n")
+	if len(lines) < 2 {
+		t.Fatalf("need two seals, have %d", len(lines))
+	}
+	stranded := strings.Fields(lines[len(lines)-2])[0]
+	kept := append(append([]string{}, lines[:len(lines)-2]...), lines[len(lines)-1])
+	if err := os.WriteFile(logPath, []byte(strings.Join(kept, "\n")+"\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	for _, slot := range m.Slots {
+		recs, _ := side.st.SlotRuns(ctx, m.ExpID, slot.SlotID)
+		for _, rec := range recs {
+			if rec.Run.RunID == stranded {
+				if err := os.Chmod(rec.Dir, 0o755); err != nil {
+					t.Fatal(err)
+				}
+			}
+		}
+	}
+	sum, _ := NewScheduler(b.reg, b.root, nil, nil).Run(ctx, m, RunOptions{Resume: true})
+	if sum == nil || sum.Errors != 1 || sum.Skipped != len(m.Slots)-1 {
+		t.Fatalf("summary %+v, want 1 error and %d skipped", sum, len(m.Slots)-1)
+	}
+}
+
+// transitionHook is a store that calls hook before every transition append
+// and fails the append when hook returns an error.
+type transitionHook struct {
+	schemas.Store
+	hook func(schemas.Transition) error
+}
+
+func (h *transitionHook) AppendTransition(ctx context.Context, run *schemas.Run, tr schemas.Transition) error {
+	if err := h.hook(tr); err != nil {
+		return err
+	}
+	return h.Store.AppendTransition(ctx, run, tr)
+}
+
+// TestPipelineSlowCleanupStillSeals is QC2-06-01: a cleanup that uses its
+// whole deadline must not leave the seal without time of its own.
+func TestPipelineSlowCleanupStillSeals(t *testing.T) {
+	side := newRemoteSide(t)
+	b := side.b
+	m := b.plan(t, testExperiment())
+	ctx := context.Background()
+	if err := side.st.CreateExperiment(ctx, m); err != nil {
+		t.Fatal(err)
+	}
+	old := cleanupTimeout
+	cleanupTimeout = 300 * time.Millisecond
+	defer func() { cleanupTimeout = old }()
+	b.w.onHit = map[string]func(){"destroy": func() { time.Sleep(400 * time.Millisecond) }}
+	res, err := NewPipeline(b.reg, b.root, nil).RunSlot(ctx, SlotInput{Manifest: m, Suite: b.suite, Slot: &m.Slots[0], Attempt: 1})
+	if err != nil || res.Seal == nil {
+		t.Fatalf("run slot: sealed=%v err=%v", res != nil && res.Seal != nil, err)
+	}
+	if err := side.st.Verify(ctx, m.ExpID, res.Run.RunID); err != nil {
+		t.Fatal(err)
+	}
+}
+
+// TestPipelineCancelAtSealCommitAborts is QC2-06-02: an owner cancel that
+// arrives after cleanup, while the final artifacts are written, still seals
+// the run as owner-stopped aborted_infra.
+func TestPipelineCancelAtSealCommitAborts(t *testing.T) {
+	side := newRemoteSide(t)
+	b := side.b
+	m := b.plan(t, testExperiment())
+	ctx := context.Background()
+	if err := side.st.CreateExperiment(ctx, m); err != nil {
+		t.Fatal(err)
+	}
+	parent, cancelParent := context.WithCancel(ctx)
+	rctx, stop := CancelContext(parent)
+	defer stop()
+	b.reg.Store = &transitionHook{Store: side.st, hook: func(tr schemas.Transition) error {
+		if tr.Stage == schemas.StageSeal && tr.Status == schemas.TransitionStarted {
+			cancelParent()
+			<-rctx.Done()
+		}
+		return nil
+	}}
+	res, err := NewPipeline(b.reg, b.root, nil).RunSlot(rctx, SlotInput{Manifest: m, Suite: b.suite, Slot: &m.Slots[0], Attempt: 1})
+	if err != nil {
+		t.Fatalf("run slot: %v", err)
+	}
+	if res.Seal == nil || res.Run.Outcome != schemas.OutcomeAbortedInfra || !OwnerStopped(res.Run) {
+		t.Fatalf("sealed=%v outcome=%s owner_stopped=%v", res.Seal != nil, res.Run.Outcome, OwnerStopped(res.Run))
+	}
+	if err := side.st.Verify(ctx, m.ExpID, res.Run.RunID); err != nil {
+		t.Fatal(err)
+	}
+}
+
+// TestPipelineCleanupRunsWhenItsLogFails is QC2-06-09: a failed append of
+// cleanup's started transition must not skip teardown.
+func TestPipelineCleanupRunsWhenItsLogFails(t *testing.T) {
+	side := newRemoteSide(t)
+	b := side.b
+	m := b.plan(t, testExperiment())
+	ctx := context.Background()
+	if err := side.st.CreateExperiment(ctx, m); err != nil {
+		t.Fatal(err)
+	}
+	b.reg.Store = &transitionHook{Store: side.st, hook: func(tr schemas.Transition) error {
+		if tr.Stage == schemas.StageCleanup && tr.Status == schemas.TransitionStarted {
+			return errors.New("injected transition write failure")
+		}
+		return nil
+	}}
+	res, _ := NewPipeline(b.reg, b.root, nil).RunSlot(ctx, SlotInput{Manifest: m, Suite: b.suite, Slot: &m.Slots[0], Attempt: 1})
+	if n := b.w.count("destroy"); n != 1 {
+		t.Fatalf("destroy calls = %d, want 1", n)
+	}
+	if res == nil || res.Run.Outcome != schemas.OutcomeInfraError {
+		t.Fatalf("result %+v", res)
+	}
+}
+
+// sealCrash is a store whose Seal fails, standing in for a process that
+// stopped after the final artifacts were written but before Store.Seal.
+type sealCrash struct{ schemas.Store }
+
+func (sealCrash) Seal(context.Context, *schemas.Run) (*schemas.SealRecord, error) {
+	return nil, errors.New("process stopped")
+}
+
+// TestResumeKeepsArtifactsWrittenBeforeSeal is QC2-06-03: recovery of a run
+// whose final artifacts were all written must seal them as written, not
+// replace its grade and gates with empty ones.
+func TestResumeKeepsArtifactsWrittenBeforeSeal(t *testing.T) {
+	side := newRemoteSide(t)
+	b := side.b
+	m := b.plan(t, testExperiment())
+	ctx := context.Background()
+	if err := side.st.CreateExperiment(ctx, m); err != nil {
+		t.Fatal(err)
+	}
+	b.reg.Store = sealCrash{side.st}
+	res, err := NewPipeline(b.reg, b.root, nil).RunSlot(ctx, SlotInput{Manifest: m, Suite: b.suite, Slot: &m.Slots[0], Attempt: 1})
+	if err == nil {
+		t.Fatal("crash simulation sealed")
+	}
+	before, err := os.ReadFile(filepath.Join(res.Dir, "grade.json"))
+	if err != nil || strings.TrimSpace(string(before)) == "null" {
+		t.Fatalf("grade before resume: %q %v", before, err)
+	}
+	b.reg.Store = side.st
+	recs, err := side.st.SlotRuns(ctx, m.ExpID, m.Slots[0].SlotID)
+	if err != nil || len(recs) != 1 {
+		t.Fatalf("runs %d %v", len(recs), err)
+	}
+	out, err := NewPipeline(b.reg, b.root, nil).SealInterrupted(ctx, SlotInput{Manifest: m, Suite: b.suite, Slot: &m.Slots[0], Attempt: 1}, recs[0])
+	if err != nil {
+		t.Fatal(err)
+	}
+	if out.Run.Outcome != schemas.OutcomePass {
+		t.Fatalf("outcome %s, want the written pass", out.Run.Outcome)
+	}
+	after, err := os.ReadFile(filepath.Join(res.Dir, "grade.json"))
+	if err != nil || string(after) != string(before) {
+		t.Fatalf("grade.json changed on resume: %q", after)
+	}
+	if err := side.st.Verify(ctx, m.ExpID, out.Run.RunID); err != nil {
+		t.Fatal(err)
+	}
+}
+
+// TestLeaseLostLeavesSlotUnsettled is QC2-06-06: a slot whose lease this
+// scheduler lost mid-run is still the new holder's to finish; the adaptive
+// replay must not read it as settled.
+func TestLeaseLostLeavesSlotUnsettled(t *testing.T) {
+	r := &schedRun{s: &Scheduler{logger: schemas.NoopLogger{}}, m: &schemas.Manifest{ExpID: "e1"}}
+	sctx, cancel := context.WithCancelCause(context.Background())
+	cancel(ErrLeaseLost)
+	r.leaseLost(sctx, &schemas.Slot{SlotID: "s1"})
+	if !r.unsettled["s1"] || r.sum.LeaseLost != 1 {
+		t.Fatalf("unsettled=%v lease_lost=%d", r.unsettled, r.sum.LeaseLost)
 	}
 }

@@ -3,6 +3,7 @@ package schemas
 import (
 	"bytes"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"sort"
 	"strconv"
@@ -287,12 +288,22 @@ func (s *TaskSelector) UnmarshalJSON(b []byte) error {
 		}
 		*s = TaskSelector{IDs: ids}
 	default:
+		// QC2-11-09: the object form is decoded as strictly as the request
+		// around it, and names exactly one selection.
 		var obj struct {
 			All bool     `json:"all"`
 			IDs []string `json:"ids"`
 		}
-		if err := json.Unmarshal(b, &obj); err != nil {
+		dec := json.NewDecoder(bytes.NewReader(b))
+		dec.DisallowUnknownFields()
+		if err := dec.Decode(&obj); err != nil {
 			return fmt.Errorf("tasks: %w", err)
+		}
+		if dec.More() {
+			return errors.New("tasks: trailing data after the object")
+		}
+		if obj.All == (len(obj.IDs) > 0) {
+			return errors.New(`tasks: the object form takes exactly one of "all": true or a non-empty "ids" list`)
 		}
 		*s = TaskSelector{All: obj.All, IDs: obj.IDs}
 	}
