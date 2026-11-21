@@ -41,6 +41,8 @@ export default function NewAgentView() {
 	const navigate = useNavigate();
 	const query = useGetAgentTemplatesQuery();
 	const [templateId, setTemplateId] = useQueryState("template", parseAsString.withOptions({ history: "replace" }));
+	// ?return=/evaluate: the /evaluate wizard sent the user here and gets the new agent back.
+	const [returnTo] = useQueryState("return", parseAsString);
 	const templates = useMemo(() => query.data?.templates ?? [], [query.data]);
 	const tpl = templates.find((x) => x.id === templateId) ?? null;
 
@@ -77,7 +79,8 @@ export default function NewAgentView() {
 		if (!body) return;
 		const res = await create(body);
 		if ("data" in res && res.data) {
-			void navigate({ to: "/agents/$agentId", params: { agentId: res.data.id } });
+			if (returnTo === "/evaluate") void navigate({ to: "/evaluate", search: { agent: res.data.id } as never });
+			else void navigate({ to: "/agents/$agentId", params: { agentId: res.data.id } });
 		}
 	};
 	const onPreview = async () => {

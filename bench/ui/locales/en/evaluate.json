@@ -1,0 +1,72 @@
+{
+	"title": "Evaluate your agent",
+	"subtitle": "Pick your agent, say what you want to learn, choose benchmarks, and get one report card.",
+	"steps": {
+		"1": "Your agent",
+		"2": "What to learn",
+		"3": "Benchmarks",
+		"4": "Model and setup",
+		"5": "Launch"
+	},
+	"stepOf": "Step {{n}} of 5",
+	"back": "Back",
+	"next": "Next",
+	"startOver": "Start over",
+	"oldWizard": "Quick single run instead",
+	"agent": {
+		"heading": "Which agent do you want to test?",
+		"hint": "Pick one of your agents or a built-in one. Each card shows what the agent can do.",
+		"yours": "Your agents",
+		"builtin": "Built-in agents",
+		"noneYours": "You have not registered an agent yet.",
+		"register": "Register your agent",
+		"registerHint": "Start from a template (CLI, HTTP endpoint, framework). You come back here after.",
+		"baseline": "baseline",
+		"defaultModel": "Default model",
+		"loading": "Loading agents",
+		"loadError": "Could not load agents.",
+		"retry": "Try again",
+		"empty": "No agents found.",
+		"version": "Version",
+		"latest": "Latest",
+		"versionOption": "v{{n}}",
+		"versionRuns": "v{{n}} ({{runs}} runs)",
+		"noVersions": "No saved versions yet. The current config is used.",
+		"pickFirst": "Pick an agent to continue."
+	},
+	"capability": {
+		"shell": "Shell",
+		"tools": "Tools",
+		"mcp": "MCP",
+		"sessions": "Sessions",
+		"browser": "Browser",
+		"desktop": "Desktop",
+		"voice": "Voice",
+		"gpu": "GPU"
+	},
+	"learn": {
+		"heading": "What do you want to learn?",
+		"hint": "This decides how many setups run side by side.",
+		"mode": {
+			"score": "Its score",
+			"versions": "Version 1 vs version 2",
+			"models": "Two models",
+			"opponent": "Against a baseline agent"
+		},
+		"modeHelp": {
+			"score": "Run your agent once per task and get a report card of how well it does.",
+			"versions": "Run two saved versions of your agent on the same tasks and see which is better.",
+			"models": "Run your agent with two different models and see which model helps it more.",
+			"opponent": "Run your agent and a well-known agent on the same tasks and compare them."
+		},
+		"compareVersion": "Compare with version",
+		"needTwoVersions": "This agent has fewer than two saved versions. Save a change to the agent to make a second one.",
+		"sameVersion": "Pick a different version than the one in step 1.",
+		"opponent": "Baseline agent",
+		"pickOpponent": "Pick a baseline agent",
+		"modelsLater": "You choose the two models in step 4.",
+		"arms": "Setups that will run",
+		"armLabel": "Setup {{label}}"
+	},
+	"placeholder": "This step is coming soon."
+}
