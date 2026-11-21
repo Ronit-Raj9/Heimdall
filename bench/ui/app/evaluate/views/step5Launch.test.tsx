@@ -7,6 +7,10 @@ import { Step5Launch, parseBudget, summaryLines } from "./step5Launch";
 const q = vi.hoisted(() => ({ create: [] as unknown as readonly [unknown, Record<string, unknown>] }));
 vi.mock("@/lib/store/apis/evaluationsApi", () => ({ useCreateEvaluationMutation: () => q.create }));
 vi.mock("@/lib/store/apis/modelsApi", () => ({ useGetModelsQuery: () => ({}) }));
+vi.mock("@/lib/store/apis/benchApi", async (orig) => ({
+	...(await orig<typeof import("@/lib/store/apis/benchApi")>()),
+	useGetAgentsQuery: () => ({ data: { agents: [{ id: "bot", owns_model: true }, { id: "codex" }] } }),
+}));
 vi.mock("@tanstack/react-router", async () => (await import("@/lib/testing/routerMock")).routerMock);
 
 const spec = (over: Partial<EvaluationSpec> = {}): EvaluationSpec => ({
@@ -21,6 +25,10 @@ beforeEach(() => {
 });
 
 describe("summaryLines", () => {
+	it("says an own-model arm runs on its own model", () => {
+		expect(summaryLines(spec({ arms: [{ label: "A", agent: "bot", model: "" }] }))[0]).toBe("Score bot on its own model.");
+	});
+
 	it("describes a score evaluation in plain sentences", () => {
 		expect(summaryLines(spec({ faults: ["clean", "model-down", "broken-tool"], budget_usd: 25 }))).toEqual([
 			"Score codex v2 on openai/gpt-4o-mini.",

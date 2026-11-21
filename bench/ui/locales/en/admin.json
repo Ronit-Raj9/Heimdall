@@ -72,7 +72,7 @@
 		"zeroHint": "0 means none allowed."
 	},
 	"images": {
-		"empty": "No custom image requests. Organizations ask for one in their settings when their limits allow custom images.",
+		"empty": "No image requests here. Organizations ask for one on their Workers page; approving it also lets that org run custom images.",
 		"unavailable": "Image approval is not available on this server yet (shared workers are not turned on).",
 		"ref": "Image",
 		"org": "Organization",
@@ -81,10 +81,12 @@
 		"requested": "Requested",
 		"approve": "Approve",
 		"reject": "Reject",
-		"rejectReason": "Why is this image rejected? (shown to the org)",
+		"rejectReason": "Why not? (shown to the org)",
 		"pending": "Pending",
 		"approved": "Approved",
-		"rejected": "Rejected"
+		"rejected": "Rejected",
+		"all": "All",
+		"cancel": "Cancel"
 	},
 	"usage": {
 		"unavailable": "Platform usage is not available on this server yet.",

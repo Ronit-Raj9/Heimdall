@@ -372,6 +372,18 @@ type RemoteAgent struct {
 	Tools     string `json:"tools,omitempty" yaml:"tools"`         // expose | off (default)
 	Artifacts string `json:"artifacts,omitempty" yaml:"artifacts"` // inline | none (default)
 	SignEnv   string `json:"sign_env,omitempty" yaml:"sign_env"`
+
+	// Org-secret auth (lane X10, J3). AuthSecret and SignSecret name org
+	// secrets (Settings > Secrets) used instead of the host variables
+	// AuthEnv and SignEnv, so a hosted org never reads the server's own
+	// environment. AuthHeader is the header the token goes in: empty or
+	// Authorization sends "Bearer <token>", any other sends the raw token.
+	// ToolAllow limits, with tools expose, which tool and MCP services (and
+	// external APIs) the deployment is sent; empty sends every one.
+	AuthSecret string   `json:"auth_secret,omitempty" yaml:"auth_secret"`
+	AuthHeader string   `json:"auth_header,omitempty" yaml:"auth_header"`
+	SignSecret string   `json:"sign_secret,omitempty" yaml:"sign_secret"`
+	ToolAllow  []string `json:"tool_allow,omitempty" yaml:"tool_allow"`
 }
 
 // ToolCall is one tool invocation recorded by the per-run tool proxy

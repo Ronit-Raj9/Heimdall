@@ -24,6 +24,7 @@ import (
 	"github.com/maximhq/bifrost/bench/faults"
 	"github.com/maximhq/bifrost/bench/lib"
 	"github.com/maximhq/bifrost/bench/schemas"
+	"github.com/maximhq/bifrost/bench/utils"
 	"github.com/valyala/fasthttp"
 )
 
@@ -198,7 +199,20 @@ func estimateEvaluation(ctx context.Context, suites SuiteSource, src ForecastSou
 		out.Notes = append(out.Notes, "the price snapshot is not available on this server, so no cost is known")
 	}
 	var unpriced []string
-	for _, a := range req.Arms {
+	for i, a := range req.Arms {
+		if a.Model == "" { // J2: the agent's own model, which it reports itself
+			if agents != nil {
+				path, _ := normalizeAgent(a.Agent)
+				if cfg := agents[path]; cfg != nil && !utils.OwnsModel(cfg) {
+					return nil, badf("arms[%d]: pick a model: agent %s runs on the model you give it", i, a.Agent)
+				}
+			}
+			if !slices.Contains(unpriced, "") {
+				unpriced = append(unpriced, "")
+				out.Notes = append(out.Notes, "the agent picks its own model, so its cost is reported by the agent and not estimated here")
+			}
+			continue
+		}
 		if pricer == nil || !pricer.Priced(a.Model) {
 			if !slices.Contains(unpriced, a.Model) {
 				unpriced = append(unpriced, a.Model)
@@ -208,6 +222,9 @@ func estimateEvaluation(ctx context.Context, suites SuiteSource, src ForecastSou
 	if pricer != nil {
 		out.UnpricedModels = append(out.UnpricedModels, unpriced...)
 		for _, m := range unpriced {
+			if m == "" {
+				continue
+			}
 			out.Notes = append(out.Notes, fmt.Sprintf("model %s has no official price in the price snapshot, so its cost is not known; set a price on its key in Models & keys to cost its finished runs", m))
 		}
 	}
@@ -272,7 +289,7 @@ func normalizeEvalRequest(req *EvalEstimateRequest) error {
 	for i := range req.Arms {
 		a := &req.Arms[i]
 		a.Model, a.Provider = strings.TrimSpace(a.Model), strings.TrimSpace(a.Provider)
-		if a.Model == "" || !quickModelRe.MatchString(a.Model) {
+		if a.Model != "" && !quickModelRe.MatchString(a.Model) { // J2: blank is the agent's own model
 			return badf("arms[%d].model %q is not a valid model name", i, a.Model)
 		}
 		if a.Version < 0 {
@@ -371,10 +388,21 @@ func estimateBenchmark(ctx context.Context, suites SuiteSource, src ForecastSour
 		be.Skipped = "cannot load benchmark: " + err.Error()
 		return be
 	}
-	tasks := evalPickTasks(st, schemas.SplitPublic, req.TasksPerBenchmark) // the same tasks the launch runs
+	cfgs := make([]*schemas.AgentConfig, len(req.Arms))
+	for i, a := range req.Arms {
+		path, _ := normalizeAgent(a.Agent)
+		cfgs[i] = agents[path]
+	}
+	tasks, why := evalPickTasks(st, schemas.SplitPublic, req.TasksPerBenchmark, cfgs) // the same tasks the launch runs (J5 included)
 	if len(tasks) == 0 {
 		be.Skipped = "benchmark has no admitted task"
+		if why != "" {
+			be.Skipped = why
+		}
 		return be
+	}
+	if why != "" {
+		be.Notes = append(be.Notes, "some tasks are skipped: "+why)
 	}
 	sets := make([]map[string]any, len(req.Arms))
 	for i, a := range req.Arms {
@@ -442,7 +470,7 @@ func evalExperiment(st *schemas.Suite, req *EvalEstimateRequest, tasks, conds []
 		if i == 0 {
 			base = agent
 		}
-		arm := armFor(&QuickRunModel{Provider: a.Provider, Model: a.Model})
+		arm := evalArmFor(a.Provider, a.Model)
 		arm.Agent = agent
 		if a.Label != "" {
 			arm.Label = a.Label

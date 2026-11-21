@@ -8,6 +8,12 @@ export interface TemplateParam {
 	help?: string;
 	placeholder?: string;
 	required: boolean;
+	/** How the form shows it: text (default), secret (a Settings > Secrets name), bool, number, select, multiline. */
+	kind?: "text" | "secret" | "bool" | "number" | "select" | "multiline";
+	options?: string[];
+	default?: string;
+	/** Fold the field sits under: auth, tools, advanced; none means always shown. */
+	group?: "auth" | "tools" | "advanced";
 }
 
 export interface AgentTemplate {
@@ -99,4 +105,31 @@ declare module "@/lib/i18n/resources" {
 	interface LaneResources {
 		agentBuilder: typeof import("@/locales/en/agentBuilder.json");
 	}
+}
+
+/** POST /agents/test-endpoint: a saved agent or the new-agent form. */
+export interface EndpointTestRequest {
+	agent?: string;
+	template?: AgentFromTemplateRequest;
+}
+
+export interface EndpointTestStep {
+	at_ms: number;
+	kind: "request" | "response" | "poll" | "answer" | "event" | "note" | "error" | string;
+	detail: string;
+}
+
+/** One sample task sent to the endpoint, with its answer and trace (handlers/agenttest.go). */
+export interface EndpointTestResult {
+	ok: boolean;
+	matched: boolean;
+	adapter: string;
+	url: string;
+	status?: number;
+	latency_ms: number;
+	answer?: string;
+	error?: string;
+	reported?: Record<string, unknown>;
+	trace: EndpointTestStep[];
+	notes: string[];
 }

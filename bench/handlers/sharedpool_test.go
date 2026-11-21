@@ -80,10 +80,29 @@ func TestSharedPoolRoutes(t *testing.T) {
 	if code, _ := spServe(t, h, member, "POST", "/api/bench/admin/images/x/approve", `{}`, ""); code != 403 {
 		t.Fatalf("non admin approve: %d", code)
 	}
+	// J6: a server admin approves; approval lets the org run custom images.
+	var reqs ImageRequestList
+	_, body := spServe(t, h, viewer, "GET", "/api/bench/images", "", "")
+	_ = json.Unmarshal([]byte(body), &reqs)
+	if l, _ := q.Get(context.Background(), "org1"); l.AllowCustomImages {
+		t.Fatal("custom images allowed before approval")
+	}
+	admin := &auth.Principal{Kind: auth.KindUser, UserID: "a1", OrgID: "org1", Role: auth.RoleMember, Email: "admin@x.io"}
+	ha := NewSharedPoolHandler(schemas.ModeLive, q, images, svc, nil).WithAdminCheck(func(p *auth.Principal) bool { return p != nil && p.Email == "admin@x.io" })
+	if code, body := spServe(t, ha, admin, "POST", "/api/bench/admin/images/"+reqs.Images[0].ID+"/approve", `{"note":"ok"}`, ""); code != 200 || !strings.Contains(body, "approved") {
+		t.Fatalf("approve: %d %s", code, body)
+	}
+	if l, _ := q.Get(context.Background(), "org1"); !l.AllowCustomImages {
+		t.Fatal("approval did not allow custom images")
+	}
+	if code, _ := spServe(t, ha, member, "POST", "/api/bench/admin/images/"+reqs.Images[0].ID+"/reject", `{}`, ""); code != 403 {
+		t.Fatalf("member reject: %d", code)
+	}
 	if code, _ := spServe(t, h, nil, "GET", "/api/bench/admin/pool/assignments", "", "Bearer wrong"); code != 401 {
 		t.Fatalf("bad secret: %d", code)
 	}
 	code, body := spServe(t, h, nil, "GET", "/api/bench/admin/pool/assignments", "", "Bearer s3cret")
+	_ = body
 	var as sharedpool.Assignments
 	if code != 200 || json.Unmarshal([]byte(body), &as) != nil || len(as.Assignments) != 1 || strings.Contains(body, "hmr_") {
 		t.Fatalf("assignments (must hold no token): %d %s", code, body)

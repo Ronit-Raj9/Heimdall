@@ -2,6 +2,7 @@ import { Button } from "@/components/ui/button";
 import { type EvaluationArm, type EvaluationSpec, useCreateEvaluationMutation } from "@/lib/store/apis/evaluationsApi";
 import { Link, useNavigate } from "@tanstack/react-router";
 import { useState } from "react";
+import { OWN_MODEL_LABEL, useOwnModelAgents } from "./ownModel";
 import { FAULTS, specReady } from "./step4Setup";
 
 /** Wizard step 5: a plain summary of the evaluation, an optional budget and the Launch button. */
@@ -9,7 +10,7 @@ import { FAULTS, specReady } from "./step4Setup";
 function armText(a: EvaluationArm): string {
 	const agent = a.agent || "your agent";
 	const version = a.version ? ` v${a.version}` : "";
-	const model = a.model ? ` on ${a.provider ? `${a.provider}/` : ""}${a.model}` : "";
+	const model = a.model ? ` on ${a.provider ? `${a.provider}/` : ""}${a.model}` : a.agent ? ` on ${OWN_MODEL_LABEL}` : "";
 	return `${agent}${version}${model}`;
 }
 
@@ -64,7 +65,7 @@ export function Step5Launch({ spec, onChange }: Step5LaunchProps) {
 	const navigate = useNavigate();
 	const [create, state] = useCreateEvaluationMutation();
 	const [budget, setBudget] = useState(spec.budget_usd ? String(spec.budget_usd) : "");
-	const ready = specReady(spec);
+	const ready = specReady(spec, useOwnModelAgents());
 
 	const launch = async () => {
 		const body: EvaluationSpec = { ...spec, name: spec.name.trim() || summaryLines(spec)[0].replace(/\.$/, "") };

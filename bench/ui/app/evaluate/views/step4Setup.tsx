@@ -1,5 +1,7 @@
+import { useState } from "react";
 import { GroupedModelPicker } from "@/components/models/groupedModelPicker";
 import { type EvaluationEstimate, type EvaluationSpec, useEstimateEvaluationQuery } from "@/lib/store/apis/evaluationsApi";
+import { armHasModel, useOwnModelAgents } from "./ownModel";
 
 /**
  * Wizard step 4: the model for each arm, how many tasks per benchmark, trials and faults, with a
@@ -39,9 +41,12 @@ export function toggleFault(faults: string[], fault: string, on: boolean): strin
 	return ["clean", ...(on ? [...rest, fault] : rest)];
 }
 
-/** Whether the spec is complete enough to estimate or launch: benchmarks and a model on every arm. */
-export function specReady(spec: EvaluationSpec): boolean {
-	return (spec.benchmarks.length > 0 || Boolean(spec.pack)) && spec.arms.length > 0 && spec.arms.every((a) => a.model.trim() !== "");
+/**
+ * Whether the spec is complete enough to estimate or launch: benchmarks and a model on every arm. An
+ * arm on an agent in `owns` (it brings its own model) may leave the model blank.
+ */
+export function specReady(spec: EvaluationSpec, owns: ReadonlySet<string> = new Set()): boolean {
+	return (spec.benchmarks.length > 0 || Boolean(spec.pack)) && spec.arms.length > 0 && spec.arms.every((a) => armHasModel(a, owns));
 }
 
 function money(n: number): string {
@@ -166,7 +171,9 @@ export interface Step4SetupProps {
 }
 
 export function Step4Setup({ spec, onChange }: Step4SetupProps) {
-	const ready = specReady(spec);
+	const owns = useOwnModelAgents();
+	const [picking, setPicking] = useState<Set<string>>(() => new Set());
+	const ready = specReady(spec, owns);
 	const estimate = useEstimateEvaluationQuery(spec, { skip: !ready });
 	const setArm = (i: number, provider: string, model: string) =>
 		onChange({ ...spec, arms: spec.arms.map((a, j) => (j === i ? { ...a, provider, model } : a)) });
@@ -182,11 +189,37 @@ export function Step4Setup({ spec, onChange }: Step4SetupProps) {
 							{arm.agent || "Your agent"}
 							{arm.version ? ` v${arm.version}` : ""} uses
 						</span>
-						<GroupedModelPicker
-							value={arm.model || arm.provider ? { provider: arm.provider ?? "", model: arm.model } : null}
-							onChange={(v) => setArm(i, v.provider, v.model)}
-							testId={`step4-model-${arm.label}`}
-						/>
+						{owns.has(arm.agent) && !arm.model && !picking.has(arm.label) ? (
+							<div className="bg-muted/40 flex flex-wrap items-center justify-between gap-2 rounded-md border px-3 py-2 text-sm" data-testid={`step4-own-model-${arm.label}`}>
+								<span>
+									<span className="font-medium">Its own model.</span>{" "}
+									<span className="text-muted-foreground">This agent picks its model itself; cost is what the agent reports.</span>
+								</span>
+								<button type="button" className="text-primary text-xs hover:underline" onClick={() => setPicking((p) => new Set(p).add(arm.label))} data-testid={`step4-pick-model-${arm.label}`}>
+									Pick a model instead
+								</button>
+							</div>
+						) : (
+							<>
+								<GroupedModelPicker
+									value={arm.model || arm.provider ? { provider: arm.provider ?? "", model: arm.model } : null}
+									onChange={(v) => setArm(i, v.provider, v.model)}
+									testId={`step4-model-${arm.label}`}
+								/>
+								{owns.has(arm.agent) && (
+									<button type="button" className="text-primary w-fit text-xs hover:underline" onClick={() => {
+											setPicking((p) => {
+												const n = new Set(p);
+												n.delete(arm.label);
+												return n;
+											});
+											setArm(i, "", "");
+										}} data-testid={`step4-use-own-${arm.label}`}>
+										Use the agent's own model
+									</button>
+								)}
+							</>
+						)}
 					</div>
 				))}
 			</section>

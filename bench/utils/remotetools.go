@@ -172,3 +172,18 @@ func RemoteToolURLs(a *schemas.RemoteToolsAccess) map[string]RemoteToolEntry {
 	}
 	return out
 }
+
+// AllowedRemoteTools keeps the entries of urls whose id is in allow (J3:
+// remote.tool_allow). An empty allow keeps every entry. It is pure.
+func AllowedRemoteTools(urls map[string]RemoteToolEntry, allow []string) map[string]RemoteToolEntry {
+	if len(allow) == 0 || urls == nil {
+		return urls
+	}
+	out := map[string]RemoteToolEntry{}
+	for _, id := range allow {
+		if e, ok := urls[id]; ok {
+			out[id] = e
+		}
+	}
+	return out
+}

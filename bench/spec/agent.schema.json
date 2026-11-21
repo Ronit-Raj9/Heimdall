@@ -110,7 +110,11 @@
         "model_traffic": {"enum": ["gateway", "external"]},
         "tools": {"enum": ["expose", "off"], "description": "expose publishes the run's tool proxy to the deployment behind a per-run bearer token (docs/remote-execution.md)."},
         "artifacts": {"enum": ["inline", "none"], "description": "inline: the deployment returns artifact files in its response."},
-        "sign_env": {"type": "string", "pattern": "^[A-Za-z_][A-Za-z0-9_]*$", "description": "Host environment variable holding the HMAC secret each request body is signed with."}
+        "sign_env": {"type": "string", "pattern": "^[A-Za-z_][A-Za-z0-9_]*$", "description": "Host environment variable holding the HMAC secret each request body is signed with."},
+        "auth_secret": {"type": "string", "pattern": "^[A-Za-z_][A-Za-z0-9_]*$", "description": "Org secret (Settings > Secrets) sent as the auth token; used instead of auth_env."},
+        "auth_header": {"type": "string", "pattern": "^[A-Za-z0-9-]{1,64}$", "description": "Header the token goes in. Empty or Authorization sends 'Authorization: Bearer <token>'; another name sends the raw token."},
+        "sign_secret": {"type": "string", "pattern": "^[A-Za-z_][A-Za-z0-9_]*$", "description": "Org secret (Settings > Secrets) each request body is signed with (HMAC-SHA256); used instead of sign_env."},
+        "tool_allow": {"type": "array", "items": {"type": "string", "minLength": 1}, "description": "With tools expose: only these tool and MCP service ids (and external API ids) are sent to the deployment. Empty sends every one."}
       }
     },
     "openai": {

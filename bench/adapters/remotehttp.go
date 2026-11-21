@@ -33,6 +33,9 @@ const (
 // envNamePattern is a portable environment variable name.
 var envNamePattern = regexp.MustCompile(`^[A-Za-z_][A-Za-z0-9_]*$`)
 
+// authHeaderPattern is a header name remote.auth_header may hold.
+var authHeaderPattern = regexp.MustCompile(`^[A-Za-z0-9-]{1,64}$`)
+
 //go:embed remotehttp.py
 var remoteLauncherSource string
 
@@ -176,7 +179,13 @@ func (a *remoteHTTPAdapter) remoteEnv(rc *schemas.RunContext, spec *schemas.Remo
 		"BENCH_REMOTE_OUTPUT":        kind,
 		utils.EnvAnswerPath:          utils.AnswerContainerPath(rc.Suite, rc.Task),
 	}
-	if spec.AuthEnv != "" {
+	switch {
+	case spec.AuthSecret != "": // J3: an org secret, expanded by the engine (engine/secrets.go)
+		if !envNamePattern.MatchString(spec.AuthSecret) {
+			return nil, fmt.Errorf("remote.auth_secret %q is not a secret name", spec.AuthSecret)
+		}
+		env["BENCH_REMOTE_TOKEN"] = "{{secret." + spec.AuthSecret + "}}"
+	case spec.AuthEnv != "":
 		if !envNamePattern.MatchString(spec.AuthEnv) {
 			return nil, fmt.Errorf("remote.auth_env %q is not an environment variable name", spec.AuthEnv)
 		}
@@ -185,6 +194,12 @@ func (a *remoteHTTPAdapter) remoteEnv(rc *schemas.RunContext, spec *schemas.Remo
 			return nil, fmt.Errorf("host environment variable %s (remote.auth_env) is not set", spec.AuthEnv)
 		}
 		env["BENCH_REMOTE_TOKEN"] = tok
+	}
+	if h := spec.AuthHeader; h != "" && !strings.EqualFold(h, "Authorization") {
+		if !authHeaderPattern.MatchString(h) {
+			return nil, fmt.Errorf("remote.auth_header %q is not a header name", h)
+		}
+		env["BENCH_REMOTE_AUTH_HEADER"] = h
 	}
 	if traffic == RemoteTrafficGateway {
 		if rc.Key == nil || rc.Key.Value == "" {

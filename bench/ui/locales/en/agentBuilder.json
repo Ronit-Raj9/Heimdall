@@ -7,7 +7,7 @@
 		"step2": "2. Name and model",
 		"categories": {
 			"cli": "Coding command-line tools",
-			"framework": "Agent frameworks",
+			"framework": "Example agents (frameworks)",
 			"starter": "Write your own",
 			"bring-your-own": "Bring your own"
 		},
@@ -32,7 +32,33 @@
 		"willWrite": "Will write {{count}} files",
 		"docs": "Guide: {{docs}}",
 		"emptyAction": "Upload an agent",
-		"memberOnly": "Only members can create agents. Ask an org admin."
+		"memberOnly": "Only members can create agents. Ask an org admin.",
+		"groups": {
+			"auth": "Authentication",
+			"tools": "Tools",
+			"advanced": "Advanced"
+		},
+		"ownModel": "This agent picks its own model. Evaluations report it as the agent's own model.",
+		"secretHelp": "Add secrets on Settings > Secrets.",
+		"frameworkHint": {
+			"langgraph": "LangGraph: add a small /run route that calls graph.invoke({\"messages\": [...]}) and returns {status, final_message}.",
+			"crewai": "CrewAI: add a /run route that calls crew.kickoff(inputs={\"task\": instruction}) and returns {status, final_message}.",
+			"openai-agents": "OpenAI Agents SDK: add a /run route that awaits Runner.run(agent, instruction) and returns {status, final_message: result.final_output}.",
+			"custom": "Your server answers POST on the run path with {status: \"completed\", final_message: \"...\"}."
+		},
+		"detected": "Looks like {{framework}}",
+		"useDetected": "Use it",
+		"test": {
+			"button": "Test my endpoint",
+			"running": "Sending a sample task...",
+			"help": "Sends one real sample task to your endpoint, with the auth and signature above, and shows the answer. Takes up to 2 minutes.",
+			"ok": "Your endpoint answered in {{ms}} ms",
+			"okNoMatch": "Your endpoint answered in {{ms}} ms (not with READY, which is fine for a task agent)",
+			"failed": "The test failed",
+			"answer": "Answer",
+			"trace": "Trace",
+			"status": "HTTP {{status}}"
+		}
 	},
 	"detail": {
 		"back": "Agents",

@@ -130,7 +130,7 @@ func TestEvaluationTaskImageVariant(t *testing.T) {
 
 	ctx = evalCall(r, "POST", APIPrefix+"/evaluations",
 		`{"mode":"score","arms":[{"label":"A","agent":"svc","model":"gpt-5.6-terra"}],"benchmarks":["hd-harbor-tb2"],"trials":1}`)
-	if ev := decodeEval(t, ctx); ev.Children[0].Skipped != taskImageSkipReason {
+	if ev := decodeEval(t, ctx); !strings.Contains(ev.Children[0].Skipped, "runs outside that workspace") { // J5: the output rule skips it first
 		t.Fatalf("remote child %+v", ev.Children[0])
 	}
 }
@@ -150,7 +150,7 @@ func TestEstimateTaskImageVariant(t *testing.T) {
 	}
 	req = &EvalEstimateRequest{Arms: []EvalEstimateArm{{Agent: "svc", Model: "gpt-x"}}, Benchmarks: []string{"hd-harbor-tb2"}}
 	est, err = EstimateEvaluationWith(context.Background(), suites, src, req, agents, "")
-	if err != nil || est.PerBenchmark[0].Skipped != taskImageSkipReason || est.Runs != 0 {
+	if err != nil || !strings.Contains(est.PerBenchmark[0].Skipped, "runs outside that workspace") || est.Runs != 0 { // J5
 		t.Fatalf("remote estimate %v %+v", err, est)
 	}
 }

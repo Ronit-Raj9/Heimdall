@@ -64,18 +64,21 @@ export interface AdminOverview {
 }
 
 /** A custom image an org asked to use (L03 GET /admin/images). Fields beyond id/ref/status are optional. */
+/** One image request (sharedpool.ImageRequest): GET /admin/images. */
 export interface AdminImage {
 	id: string;
-	ref: string;
-	status: "pending" | "approved" | "rejected" | string;
-	org_id?: string;
-	org_slug?: string;
-	digest?: string;
-	size_bytes?: number;
-	runtime?: string;
+	org_id: string;
+	image: string;
+	size_bytes: number;
+	/** The org's note to the admin. */
+	note?: string;
+	status: "pending" | "approved" | "rejected";
 	requested_by?: string;
-	requested_at?: string;
-	reason?: string;
+	decided_by?: string;
+	/** The admin's note on approve or reject. */
+	decision?: string;
+	created_at: string;
+	decided_at?: string;
 }
 
 /** L25 GET /admin/usage, read defensively: only the fields the page shows. */

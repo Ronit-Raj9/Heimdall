@@ -6,6 +6,8 @@ import { Cpu, Gauge, GitCompare, ListChecks, Pencil, Play } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { AgentAvatar, CheckPill, adapterIcon, jobState, lastJobFor, useAdapterLabel } from "../../../agents/views/agentDisplay";
 import { useAgentJobs } from "../../../agents/views/agentJobs";
+import { AgentImageApproval } from "@/components/sharedpool/imageRequests";
+import { SavedEndpointTest } from "../../new/views/connectForm";
 import { useAgentSummary } from "./agentOps.shared";
 import ChecksTab from "./checksTab";
 import ConfigTab from "./configTab";
@@ -108,6 +110,8 @@ export default function AgentDetailView() {
 					</div>
 				}
 			/>
+			{agent?.adapter === "command" && agent.image && <AgentImageApproval image={agent.image} />}
+			{agent && (agent.adapter === "remote_http" || agent.adapter === "openai_agent") && <SavedEndpointTest agentId={agentId} />}
 			<RouteTabs tabs={tabs} defaultTab="config" label={t("detail.tabs.label")} testId="agent-detail-tabs">
 				{(active) =>
 					active === "checks" ? (

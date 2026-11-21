@@ -274,68 +274,107 @@ export function QuotaEditor({ org, onClose }: { org: AdminOrg; onClose(): void }
 	);
 }
 
+const IMAGE_FILTERS = ["pending", "approved", "rejected", "all"] as const;
+type ImageFilter = (typeof IMAGE_FILTERS)[number];
+
+/** Image requests from orgs (J6): pending first, approve or reject with a note the org sees. */
 export function AdminImagesPanel() {
 	const { t } = useTranslation("admin");
-	const q = useListAdminImagesQuery();
+	const [filter, setFilter] = useState<ImageFilter>("pending");
+	const q = useListAdminImagesQuery(filter === "all" ? undefined : filter);
 	const [decide, state] = useDecideImageMutation();
+	const [rejecting, setRejecting] = useState<string | null>(null);
+	const [note, setNote] = useState("");
 	const gate = useGate(q, "admin-images", t("images.unavailable"));
+	const statusLabel = (s: string) => (s === "approved" ? t("images.approved") : s === "rejected" ? t("images.rejected") : t("images.pending"));
+	const filters = (
+		<div className="flex gap-1" role="tablist" aria-label={t("images.status")} data-testid="admin-images-filter">
+			{IMAGE_FILTERS.map((f) => (
+				<Button key={f} size="sm" variant={filter === f ? "secondary" : "ghost"} role="tab" aria-selected={filter === f} onClick={() => setFilter(f)} data-testid={`admin-images-filter-${f}`}>
+					{f === "all" ? t("images.all", { defaultValue: "All" }) : statusLabel(f)}
+				</Button>
+			))}
+		</div>
+	);
 	if (gate) return gate;
 	const images = q.data?.images ?? [];
-	if (images.length === 0) return <EmptyState compact message={t("images.empty")} testId="admin-images-empty" />;
-	const reject = (id: string) => {
-		const reason = window.prompt(t("images.rejectReason"));
-		if (reason === null) return;
-		void decide({ id, decision: "reject", reason: reason.trim() || undefined });
+	const confirmReject = (id: string) => {
+		void decide({ id, decision: "reject", reason: note.trim() || undefined });
+		setRejecting(null);
+		setNote("");
 	};
-	const statusLabel = (s: string) => (s === "approved" ? t("images.approved") : s === "rejected" ? t("images.rejected") : t("images.pending"));
 	return (
 		<div className="flex flex-col gap-3" data-testid="admin-images">
+			{filters}
 			{state.error && <p className="text-destructive text-sm">{getBenchErrorMessage(state.error)}</p>}
-			<div className="bg-card min-w-0 overflow-x-auto rounded-xl border">
-			<Table>
-				<TableHeader>
-					<TableRow>
-						<TableHead>{t("images.ref")}</TableHead>
-						<TableHead>{t("images.org")}</TableHead>
-						<TableHead>{t("images.size")}</TableHead>
-						<TableHead>{t("images.status")}</TableHead>
-						<TableHead>{t("images.requested")}</TableHead>
-						<TableHead />
-					</TableRow>
-				</TableHeader>
-				<TableBody>
-					{images.map((img) => (
-						<TableRow key={img.id} data-testid={`admin-image-${img.id}`}>
-							<TableCell className="max-w-md truncate font-mono text-xs" title={img.ref}>
-								{img.ref}
-							</TableCell>
-							<TableCell>{img.org_slug ?? img.org_id}</TableCell>
-							<TableCell>{fmtBytes(img.size_bytes)}</TableCell>
-							<TableCell>
-								<Badge variant={img.status === "approved" ? "success" : img.status === "rejected" ? "destructive" : "warning"}>
-									{statusLabel(img.status)}
-								</Badge>
-							</TableCell>
-							<TableCell>
-								{img.requested_by} {fmtDate(img.requested_at)}
-							</TableCell>
-							<TableCell className="flex justify-end gap-2">
-								{img.status !== "approved" && (
-									<Button size="sm" disabled={state.isLoading} onClick={() => void decide({ id: img.id, decision: "approve" })}>
-										{t("images.approve")}
-									</Button>
-								)}
-								{img.status !== "rejected" && (
-									<Button size="sm" variant="outline" disabled={state.isLoading} onClick={() => reject(img.id)}>
-										{t("images.reject")}
-									</Button>
-								)}
-							</TableCell>
-						</TableRow>
-					))}
-				</TableBody>
-			</Table>
-			</div>
+			{images.length === 0 ? (
+				<EmptyState compact message={t("images.empty")} testId="admin-images-empty" />
+			) : (
+				<div className="bg-card min-w-0 overflow-x-auto rounded-xl border">
+					<Table>
+						<TableHeader>
+							<TableRow>
+								<TableHead>{t("images.ref")}</TableHead>
+								<TableHead>{t("images.org")}</TableHead>
+								<TableHead>{t("images.size")}</TableHead>
+								<TableHead>{t("images.status")}</TableHead>
+								<TableHead>{t("images.requested")}</TableHead>
+								<TableHead />
+							</TableRow>
+						</TableHeader>
+						<TableBody>
+							{images.map((img) => (
+								<TableRow key={img.id} data-testid={`admin-image-${img.id}`}>
+									<TableCell className="max-w-md">
+										<span className="block truncate font-mono text-xs" title={img.image}>
+											{img.image}
+										</span>
+										{img.note && <span className="text-muted-foreground block text-xs">{img.note}</span>}
+										{img.decision && <span className="text-muted-foreground block text-xs">{img.decision}</span>}
+									</TableCell>
+									<TableCell>{img.org_id}</TableCell>
+									<TableCell>{fmtBytes(img.size_bytes)}</TableCell>
+									<TableCell>
+										<Badge variant={img.status === "approved" ? "success" : img.status === "rejected" ? "destructive" : "warning"}>{statusLabel(img.status)}</Badge>
+									</TableCell>
+									<TableCell>
+										{img.requested_by} {fmtDate(img.created_at)}
+									</TableCell>
+									<TableCell>
+										{img.status === "pending" &&
+											(rejecting === img.id ? (
+												<div className="flex items-center justify-end gap-2">
+													<Input
+														className="h-8 w-48"
+														value={note}
+														placeholder={t("images.rejectReason")}
+														onChange={(e) => setNote(e.target.value)}
+														data-testid={`admin-image-note-${img.id}`}
+													/>
+													<Button size="sm" variant="outline" disabled={state.isLoading} onClick={() => confirmReject(img.id)}>
+														{t("images.reject")}
+													</Button>
+													<Button size="sm" variant="ghost" onClick={() => setRejecting(null)}>
+														{t("images.cancel", { defaultValue: "Cancel" })}
+													</Button>
+												</div>
+											) : (
+												<div className="flex justify-end gap-2">
+													<Button size="sm" disabled={state.isLoading} onClick={() => void decide({ id: img.id, decision: "approve" })} data-testid={`admin-image-approve-${img.id}`}>
+														{t("images.approve")}
+													</Button>
+													<Button size="sm" variant="outline" disabled={state.isLoading} onClick={() => setRejecting(img.id)} data-testid={`admin-image-reject-${img.id}`}>
+														{t("images.reject")}
+													</Button>
+												</div>
+											))}
+									</TableCell>
+								</TableRow>
+							))}
+						</TableBody>
+					</Table>
+				</div>
+			)}
 		</div>
 	);
 }

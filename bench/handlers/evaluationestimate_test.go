@@ -114,14 +114,14 @@ func TestEstimateForecastsTheTasksTheLaunchRuns(t *testing.T) {
 	st := &schemas.Suite{ID: "wide", Version: "1", TaskIDs: []string{"t1", "t2", "t3", "t4", "t5"},
 		Tasks: []*schemas.Task{{ID: "t1"}, {ID: "t2"}, {ID: "t3"}, {ID: "t4"}, {ID: "t5"}},
 		Lock:  &schemas.SuiteLock{Tasks: map[string]schemas.TaskLock{"t1": admitted(), "t2": admitted(), "t3": {Status: schemas.TaskAdmitted}, "t4": admitted(), "t5": admitted()}}}
-	want := evalPickTasks(st, schemas.SplitPublic, 2)
+	want, _ := evalPickTasks(st, schemas.SplitPublic, 2, nil)
 	if !slices.Equal(want, []string{"t1", "t4"}) {
 		t.Fatalf("pick = %v, want spread over admitted t1 t2 t4 t5", want)
 	}
 	// A suite head (no Tasks) picks the same.
 	head := *st
 	head.Tasks = nil
-	if got := evalPickTasks(&head, schemas.SplitPublic, 2); !slices.Equal(got, want) {
+	if got, _ := evalPickTasks(&head, schemas.SplitPublic, 2, nil); !slices.Equal(got, want) {
 		t.Fatalf("head pick = %v, want %v", got, want)
 	}
 	src := &fakeForecast{}

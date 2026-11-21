@@ -2,6 +2,8 @@
 // capabilities (its capabilities: list or the defaults of its adapter)
 // against what the benchmark needs (suite.Requires). The planner, the
 // compatibility API and evaluations all use Check, so they never disagree.
+// Full adds the output rules of agents that run outside the workspace
+// (outputs.go), which the planner applies per task.
 package compat
 
 import (

@@ -4,12 +4,15 @@ package handlers
 // agent can run. GET /agents/{id}/compatibility checks the agent's
 // capabilities (its capabilities: list or its adapter's defaults) against
 // every benchmark the org sees, built-in library benchmarks included, with
-// compat.Check, the same rule the planner refuses arms with.
+// compat.Full: the planner's capability rule (compat.Check) plus the output
+// rules it applies per task to agents outside the workspace.
 //
 // What a benchmark needs comes from suite.yaml alone (suite.Requires reads
 // requires, track and environment), so the check reads each pack's head
 // (suite.yaml and suite.lock, cached by stamp) instead of loading every task,
-// and the whole answer is cached per agent config hash and pack stamps.
+// and the whole answer is cached per agent config hash and pack stamps. Only
+// an agent outside the workspace (compat.ChecksTasks) needs the output rules
+// per task, so for it the full pack is loaded, cached by stamp the same way.
 
 import (
 	"context"
@@ -36,6 +39,9 @@ type BenchmarkCompatibility struct {
 	Requires []string `json:"requires"`
 	Missing  []string `json:"missing"`
 	Reason   string   `json:"reason"`
+	// Note says how many tasks the agent skips when it can run only some
+	// (an endpoint without tool access on a mixed benchmark). "" otherwise.
+	Note string `json:"note,omitempty"`
 }
 
 // AgentCompatibility is GET /agents/{id}/compatibility.
@@ -111,7 +117,7 @@ func (h *agentCompatHandler) get(ctx *fasthttp.RequestCtx) {
 	complete := true
 	for _, sid := range ids {
 		row := BenchmarkCompatibility{ID: sid, Requires: []string{}, Missing: []string{}}
-		s, err := compatSuite(work, src, sid)
+		s, err := compatSuite(work, src, sid, compat.ChecksTasks(cfg))
 		if err != nil || s == nil {
 			row.Reason = "could not load this benchmark"
 			out.Benchmarks = append(out.Benchmarks, row)
@@ -119,8 +125,8 @@ func (h *agentCompatHandler) get(ctx *fasthttp.RequestCtx) {
 			continue
 		}
 		row.Requires = suite.Requires(s).Strings()
-		ok, missing, reason := compat.Check(cfg, s)
-		row.OK, row.Reason = ok, reason
+		ok, missing, reason, note := compat.Full(cfg, s)
+		row.OK, row.Reason, row.Note = ok, reason, note
 		row.Missing = schemas.CapabilitySet(missing).Strings()
 		out.Benchmarks = append(out.Benchmarks, row)
 	}
@@ -147,22 +153,33 @@ type headEntry struct {
 	s     *schemas.Suite
 }
 
-// compatSuite is what compat.Check needs of pack id: its head (suite.yaml
+// compatSuite is what compat.Full needs of pack id: its head (suite.yaml
 // and suite.lock) when the source can read one, cached by stamp, else the
-// full load.
-func compatSuite(ctx context.Context, src SuiteSource, id string) (*schemas.Suite, error) {
+// full load. With tasks set (an agent outside the workspace, whose output
+// rules are checked per task) it is the full load, cached by stamp too.
+func compatSuite(ctx context.Context, src SuiteSource, id string, tasks bool) (*schemas.Suite, error) {
 	st, ok := src.(suiteStamper)
 	if !ok {
 		return src.LoadSuite(ctx, id)
 	}
 	dir, stamp := st.SuiteStamp(id)
+	key := dir
+	if tasks {
+		key = "full\x00" + dir
+	}
 	suiteHeads.mu.Lock()
-	e, hit := suiteHeads.m[dir]
+	e, hit := suiteHeads.m[key]
 	suiteHeads.mu.Unlock()
 	if hit && e.stamp == stamp {
 		return e.s, nil
 	}
-	s, err := st.SuiteHead(id)
+	var s *schemas.Suite
+	var err error
+	if tasks {
+		s, err = src.LoadSuite(ctx, id)
+	} else {
+		s, err = st.SuiteHead(id)
+	}
 	if err != nil {
 		return nil, err
 	}
@@ -170,7 +187,7 @@ func compatSuite(ctx context.Context, src SuiteSource, id string) (*schemas.Suit
 		s.ID = id
 	}
 	suiteHeads.mu.Lock()
-	suiteHeads.m[dir] = headEntry{stamp: stamp, s: s}
+	suiteHeads.m[key] = headEntry{stamp: stamp, s: s}
 	suiteHeads.mu.Unlock()
 	return s, nil
 }

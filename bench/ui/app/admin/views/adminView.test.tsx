@@ -10,6 +10,7 @@ import { AdminImagesPanel, AdminOrgsPanel, QuotaEditor } from "./adminPanels";
 
 vi.mock("@tanstack/react-router", async () => (await import("@/lib/testing/routerMock")).routerMock); // G15: empty states link out
 const tab = vi.hoisted(() => ({ value: null as string | null }));
+const imgs = vi.hoisted(() => ({ result: null as unknown }));
 vi.mock("nuqs", async (importOriginal) => ({
 	...(await importOriginal<typeof import("nuqs")>()),
 	useQueryState: () => [tab.value, () => undefined],
@@ -39,7 +40,7 @@ vi.mock("@/lib/store/apis/adminApi", async (importOriginal) => ({
 	useSetKillSwitchMutation: () => mutation(),
 	useListAdminOrgsQuery: () => okQuery({ orgs: [ORG] }),
 	useSetOrgQuotaMutation: () => mutation(),
-	useListAdminImagesQuery: () => errorQuery(404, "no route"),
+	useListAdminImagesQuery: () => imgs.result ?? errorQuery(404, "no route"),
 	useDecideImageMutation: () => mutation(),
 }));
 
@@ -78,7 +79,24 @@ describe("AdminView", () => {
 	});
 
 	it("says image approval is not enabled when the route is missing", () => {
+		imgs.result = null;
 		expect(render(<AdminImagesPanel />, admin())).toContain('data-testid="admin-images-unavailable"');
+	});
+
+	it("lists pending image requests with the image, the org's note and approve or reject", () => {
+		imgs.result = okQuery({
+			images: [
+				{ id: "ir1", org_id: "org_acme", image: "ghcr.io/acme/a@sha256:" + "a".repeat(64), size_bytes: 900 << 20, note: "support agent", status: "pending", requested_by: "u1", created_at: "2026-11-20T00:00:00Z" },
+			],
+		});
+		const html = render(<AdminImagesPanel />, admin());
+		expect(html).toContain('data-testid="admin-images-filter-pending"');
+		expect(html).toContain("ghcr.io/acme/a@sha256:");
+		expect(html).toContain("support agent");
+		expect(html).toContain("org_acme");
+		expect(html).toContain('data-testid="admin-image-approve-ir1"');
+		expect(html).toContain('data-testid="admin-image-reject-ir1"');
+		imgs.result = null;
 	});
 
 	it("builds the quota request and parses tabs", () => {

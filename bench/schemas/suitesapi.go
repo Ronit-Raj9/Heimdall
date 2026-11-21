@@ -256,4 +256,8 @@ type AgentSummary struct {
 	// known from the config; agent check shows what a run actually reported
 	// (docs/agent-events.md).
 	ReportsEvents string `json:"reports_events,omitempty"`
+	// OwnsModel: the agent brings its own model (an HTTP endpoint, an A2A
+	// agent, an OpenAI-compatible endpoint that names its model), so an
+	// evaluation may leave its model blank (utils.OwnsModel).
+	OwnsModel bool `json:"owns_model,omitempty"`
 }
