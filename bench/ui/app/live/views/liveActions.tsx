@@ -12,6 +12,8 @@ import { JobLogPanel } from "@/components/jobs/jobLogPanel";
 import { useId, useState } from "react";
 import { useAppDispatch } from "@/lib/store/hooks";
 import { useTranslation } from "react-i18next";
+import { SetupCard, Step } from "@/components/inbox/featureHero";
+import { Activity } from "lucide-react";
 
 /** Refreshes the Live status once a job has been queued (the job keeps running; the user can refresh again). */
 function useRefreshLive() {
@@ -104,8 +106,9 @@ export function liveInitParams(split: LiveSplit, v: Required<Omit<LiveInitParams
 const EMPTY = { url: "", token_env: "", baseline_key: "", candidate_key: "", tag_header: "x-bf-lh-agent-version", baseline_tag: "", candidate_tag: "" };
 
 /** The setup form: queues livescore.init, which writes livescore/config.yaml. */
-export function LiveSetup({ existing, hosted }: { existing?: boolean; hosted?: boolean }) {
+export function LiveSetup({ existing, hosted, onClose }: { existing?: boolean; hosted?: boolean; onClose?(): void }) {
 	const { t } = useTranslation("liveinbox");
+	const { t: u } = useTranslation("ux13");
 	const refresh = useRefreshLive();
 	const [split, setSplit] = useState<LiveSplit>("keys");
 	const [v, setV] = useState(EMPTY);
@@ -137,56 +140,77 @@ export function LiveSetup({ existing, hosted }: { existing?: boolean; hosted?: b
 	};
 	const errorText = state.error ? getBenchErrorMessage(state.error) : "";
 	return (
-		<Section title={t("live.setup.title")} description={t("live.setup.description")} testId="live-setup">
-			<div className="flex flex-col gap-4 rounded-lg border p-4">
-				<fieldset className="flex flex-wrap items-center gap-4 text-xs">
-					<legend className="text-foreground mb-2 font-medium">{t("live.setup.split")}</legend>
-					{(["keys", "tag", "later"] as const).map((s) => (
-						<label key={s} className="flex items-center gap-1">
-							<input type="radio" name={`${ids}-split`} checked={split === s} onChange={() => setSplit(s)} data-testid={`live-setup-split-${s}`} />
-							{t(`live.setup.${s}`)}
-						</label>
-					))}
-				</fieldset>
-				{split === "keys" && (
-					<div className="flex flex-wrap gap-3">
-						{field("baseline_key", t("live.setup.baselineKey"), undefined, "vk-prod")}
-						{field("candidate_key", t("live.setup.candidateKey"), undefined, "vk-canary")}
-					</div>
-				)}
-				{split === "tag" && (
-					<div className="flex flex-wrap gap-3">
-						{field("tag_header", t("live.setup.tagHeader"))}
-						{field("baseline_tag", t("live.setup.baselineTag"), undefined, "v1")}
-						{field("candidate_tag", t("live.setup.candidateTag"), undefined, "v2")}
-					</div>
-				)}
-				<div className="flex flex-wrap gap-3">
-					{field("url", t("live.setup.url"), hosted ? t("live.setup.urlHintHosted") : t("live.setup.urlHint"), hosted ? "https://gateway.example.com" : "http://localhost:8080")}
-					{field(
-						"token_env",
-						hosted ? t("live.setup.tokenEnvHosted") : t("live.setup.tokenEnv"),
-						hosted ? t("live.setup.tokenEnvHintHosted") : t("live.setup.tokenEnvHint"),
-						"BIFROST_ADMIN_TOKEN",
-					)}
-				</div>
-				<label className="text-muted-foreground flex items-center gap-1 text-xs">
-					<input type="checkbox" checked={force} onChange={(e) => setForce(e.target.checked)} data-testid="live-setup-force" />
-					{t("live.setup.force")}
-				</label>
-				<div className="flex flex-wrap items-center gap-3">
-					<Button disabled={!params || state.isLoading} onClick={() => void submit()} data-testid="live-setup-submit">
-						{t("live.setup.submit")}
+		<SetupCard
+			icon={Activity}
+			title={u("live.setupTitle")}
+			description={u("live.setupDescription")}
+			testId="live-setup"
+			actions={
+				onClose && (
+					<Button size="sm" variant="ghost" onClick={onClose} data-testid="live-setup-close">
+						{u("live.close")}
 					</Button>
-					{!params && <span className="text-muted-foreground text-xs">{t("live.setup.incomplete")}</span>}
-					{state.isError && (
-						<span className="text-chart-error-ink text-xs" role="alert" data-testid="live-setup-error">
-							{errorText}
-						</span>
+				)
+			}
+		>
+			<div className="flex flex-col">
+				<Step n={1} title={u("live.stepSplit")}>
+					<fieldset className="flex flex-wrap items-center gap-2 text-sm">
+						<legend className="sr-only">{t("live.setup.split")}</legend>
+						{(["keys", "tag", "later"] as const).map((s) => (
+							<label
+								key={s}
+								className={`flex cursor-pointer items-center gap-2 rounded-full border px-3 py-1.5 text-xs transition-colors ${split === s ? "border-primary bg-primary/10 text-foreground" : "text-muted-foreground hover:bg-muted"}`}
+							>
+								<input type="radio" className="sr-only" name={`${ids}-split`} checked={split === s} onChange={() => setSplit(s)} data-testid={`live-setup-split-${s}`} />
+								{t(`live.setup.${s}`)}
+							</label>
+						))}
+					</fieldset>
+					{split === "keys" && (
+						<div className="flex flex-wrap gap-3">
+							{field("baseline_key", t("live.setup.baselineKey"), undefined, "vk-prod")}
+							{field("candidate_key", t("live.setup.candidateKey"), undefined, "vk-canary")}
+						</div>
 					)}
-				</div>
-				{jobId && <JobLogPanel jobId={jobId} onClose={() => setJobId(null)} />}
+					{split === "tag" && (
+						<div className="flex flex-wrap gap-3">
+							{field("tag_header", t("live.setup.tagHeader"))}
+							{field("baseline_tag", t("live.setup.baselineTag"), undefined, "v1")}
+							{field("candidate_tag", t("live.setup.candidateTag"), undefined, "v2")}
+						</div>
+					)}
+				</Step>
+				<Step n={2} title={u("live.stepGateway")}>
+					<div className="flex flex-wrap gap-3">
+						{field("url", t("live.setup.url"), hosted ? t("live.setup.urlHintHosted") : t("live.setup.urlHint"), hosted ? "https://gateway.example.com" : "http://localhost:8080")}
+						{field(
+							"token_env",
+							hosted ? t("live.setup.tokenEnvHosted") : t("live.setup.tokenEnv"),
+							hosted ? t("live.setup.tokenEnvHintHosted") : t("live.setup.tokenEnvHint"),
+							"BIFROST_ADMIN_TOKEN",
+						)}
+					</div>
+				</Step>
+				<Step n={3} title={u("live.stepSave")} last>
+					<label className="text-muted-foreground flex items-center gap-2 text-xs">
+						<input type="checkbox" checked={force} onChange={(e) => setForce(e.target.checked)} data-testid="live-setup-force" />
+						{t("live.setup.force")}
+					</label>
+					<div className="flex flex-wrap items-center gap-3">
+						<Button disabled={!params || state.isLoading} onClick={() => void submit()} data-testid="live-setup-submit">
+							{t("live.setup.submit")}
+						</Button>
+						{!params && <span className="text-muted-foreground text-xs">{t("live.setup.incomplete")}</span>}
+						{state.isError && (
+							<span className="text-chart-error-ink text-xs" role="alert" data-testid="live-setup-error">
+								{errorText}
+							</span>
+						)}
+					</div>
+					{jobId && <JobLogPanel jobId={jobId} onClose={() => setJobId(null)} />}
+				</Step>
 			</div>
-		</Section>
+		</SetupCard>
 	);
 }

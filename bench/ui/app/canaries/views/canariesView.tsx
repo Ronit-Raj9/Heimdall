@@ -4,7 +4,9 @@ import { CanaryList } from "@/components/canaries/canaryList";
 import { sortCanaries } from "@/components/canaries/canary.utils";
 import { ModeBadge } from "@/components/modeBadge";
 import { PageHeader } from "@/components/shell";
-import { BlockSkeleton, EmptyNote, LoadError, Section } from "@/components/runs/screenStates";
+import { BlockSkeleton, LoadError, Section } from "@/components/runs/screenStates";
+import { FeatureHero } from "@/components/inbox/featureHero";
+import { Bird, Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { JobRunButton } from "@/components/jobs/jobRunButton";
 import { useGetCanariesQuery, useGetCanaryQuery } from "@/lib/store/apis/canaryApi";
@@ -12,7 +14,7 @@ import { useDeleteCanaryMutation } from "@/lib/store/apis/schedulesApi";
 import { NewCanaryForm } from "./newCanaryForm";
 import type { CanaryListResponse } from "@/lib/types/bench";
 import { parseAsString, useQueryState } from "nuqs";
-import type { ReactNode } from "react";
+import { useState, type ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 
 /**
@@ -26,6 +28,9 @@ export default function CanariesView() {
 	const list = useGetCanariesQuery();
 	const data = list.data;
 	const open = name ?? (data ? (sortCanaries(data.canaries)[0]?.name ?? null) : null);
+	const { t: u } = useTranslation("ux13");
+	const [formOpen, setFormOpen] = useState(false);
+	const hasAny = Boolean(data && (data.canaries.length > 0 || data.errors.length > 0));
 
 	return (
 		<section className="flex min-w-0 flex-col gap-6" data-testid="canaries-screen">
@@ -33,7 +38,24 @@ export default function CanariesView() {
 				title={t("canaries.title")}
 				subtitle={t("canaries.subtitle")}
 				meta={<ModeBadge mode={data?.mode} isLoading={list.isLoading} isError={list.isError && !data} />}
+				actions={
+					hasAny && !formOpen ? (
+						<Button size="sm" onClick={() => setFormOpen(true)} data-testid="canary-new-open">
+							<Plus className="size-4" aria-hidden="true" />
+							{u("canaries.newAction")}
+						</Button>
+					) : undefined
+				}
 			/>
+			{formOpen && (
+				<NewCanaryForm
+					onClose={() => setFormOpen(false)}
+					onCreated={(n) => {
+						setFormOpen(false);
+						void setName(n);
+					}}
+				/>
+			)}
 			{list.isLoading ? (
 				<BlockSkeleton rows={4} testId="canaries-loading" />
 			) : list.error || !data ? (
@@ -44,9 +66,9 @@ export default function CanariesView() {
 					selected={open}
 					onSelect={(next) => void setName(next)}
 					panel={open ? <CanaryPanel key={open} name={open} /> : null}
+					onCreate={formOpen ? undefined : () => setFormOpen(true)}
 				/>
 			)}
-			<NewCanaryForm onCreated={(n) => void setName(n)} />
 		</section>
 	);
 }
@@ -57,13 +79,32 @@ export interface CanariesBodyProps {
 	onSelect: (name: string) => void;
 	/** The open canary's panel; null when none is open. */
 	panel: ReactNode;
+	/** Opens the new-canary form; the empty state's primary action. */
+	onCreate?: () => void;
 }
 
 /** The loaded list, definition errors, and the open canary. Exported for tests. */
-export function CanariesBody({ data, selected, onSelect, panel }: CanariesBodyProps) {
+export function CanariesBody({ data, selected, onSelect, panel, onCreate }: CanariesBodyProps) {
 	const { t } = useTranslation("bench");
+	const { t: u } = useTranslation("ux13");
 	if (data.canaries.length === 0 && data.errors.length === 0) {
-		return <EmptyNote testId="canaries-empty">{t("canaries.empty")}</EmptyNote>;
+		return (
+			<FeatureHero
+				icon={Bird}
+				title={u("canaries.heroTitle")}
+				message={u("canaries.heroMessage")}
+				testId="canaries-empty"
+				action={
+					onCreate && (
+						<Button onClick={onCreate} data-testid="canaries-hero-create">
+							{u("canaries.heroAction")}
+						</Button>
+					)
+				}
+			>
+				<span>{u("canaries.cli")}</span>
+			</FeatureHero>
+		);
 	}
 	return (
 		<div className="flex min-w-0 flex-col gap-6">

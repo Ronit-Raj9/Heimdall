@@ -15,6 +15,8 @@ import { InboxPullButton, InboxPullSetup, InboxWebhook } from "./inboxConnect";
 import { useGetInboxWebhookQuery, useGetPullReadinessQuery } from "@/lib/store/apis/liveinboxApi";
 import { InboxItemPanel } from "./inboxItemPanel";
 import TriageTab from "./triageTab";
+import { Collapsible } from "@/components/inbox/featureHero";
+import { Plug } from "lucide-react";
 
 /** The state the screen opens on: what still needs a decision. */
 const DEFAULT_FILTER: InboxFilter = "new";
@@ -49,6 +51,7 @@ export default function InboxView() {
  */
 export function InboxTab() {
 	const { t } = useTranslation("bench");
+	const { t: u } = useTranslation("ux13");
 	const [filter, setFilter] = useQueryState("state", parseAsStringLiteral(INBOX_FILTERS).withDefault(DEFAULT_FILTER));
 	const [source, setSource] = useQueryState("source", parseAsString);
 	const [itemId, setItemId] = useQueryState("item", parseAsString);
@@ -83,8 +86,18 @@ export function InboxTab() {
 					}
 				/>
 			)}
-			{data?.mode === "live" && <InboxPullSetup check={ready?.inbox} hosted={ready?.hosted} />}
-			{data?.mode === "live" && <InboxWebhook />}
+			{data?.mode === "live" && (
+				<Collapsible
+					icon={Plug}
+					title={u("inbox.integrations")}
+					hint={u("inbox.integrationsHint")}
+					defaultOpen={Boolean(ready?.inbox && !ready.inbox.ready)}
+					testId="inbox-integrations"
+				>
+					<InboxPullSetup check={ready?.inbox} hosted={ready?.hosted} />
+					<InboxWebhook />
+				</Collapsible>
+			)}
 		</section>
 	);
 }

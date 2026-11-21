@@ -17,6 +17,7 @@ import { roleAtLeast } from "@/lib/store/apis/session";
 import { useAppDispatch } from "@/lib/store/hooks";
 import type { InboxSourceParams, InboxTokenCreated, InboxTokenList, InboxWebhookInfo, PullCheck } from "@/lib/types/liveinbox";
 import { PullSteps } from "@/components/inbox/pullSteps";
+import { revealAnchor } from "@/components/inbox/featureHero";
 import { useId, useState, type FormEvent } from "react";
 import { useTranslation } from "react-i18next";
 
@@ -32,7 +33,15 @@ export function InboxPullButton({ check }: { check?: PullCheck }) {
 	const { t } = useTranslation("liveinbox");
 	if (check && !check.ready) {
 		return (
-			<a href="#inbox-source-setup" className="text-primary text-xs font-medium underline underline-offset-2" data-testid="inbox-pull-setup-link">
+			<a
+				href="#inbox-source-setup"
+				onClick={(e) => {
+					e.preventDefault();
+					revealAnchor("inbox-source-setup");
+				}}
+				className="text-primary text-xs font-medium underline underline-offset-2"
+				data-testid="inbox-pull-setup-link"
+			>
 				{t("inbox.pull.needsSetup")}
 			</a>
 		);

@@ -1,0 +1,51 @@
+{
+	"live": {
+		"heroTitle": "Score real traffic",
+		"heroMessage": "Read real sessions from your gateway and compare two live versions, no labels needed.",
+		"heroAction": "Set up live scoring",
+		"setupTitle": "Set up live scoring",
+		"setupDescription": "Three steps. Heimdall writes the config for you.",
+		"stepSplit": "How do you tell the two versions apart?",
+		"stepGateway": "Where is your gateway?",
+		"stepSave": "Save",
+		"close": "Close",
+		"reconfigure": "Change setup"
+	},
+	"canaries": {
+		"heroTitle": "Catch silent model drift",
+		"heroMessage": "A canary re-runs a small pinned suite on a schedule and flags when results move.",
+		"heroAction": "Create a canary",
+		"newAction": "New canary",
+		"cli": "Prefer the terminal? Run heimdall canary init.",
+		"stepWhat": "What to test",
+		"stepWhere": "Which models",
+		"stepWhen": "When and how much",
+		"close": "Close"
+	},
+	"schedules": {
+		"heroTitle": "Run experiments on autopilot",
+		"heroMessage": "Queue an experiment on a cron schedule with a daily spend cap.",
+		"heroAction": "Add a schedule",
+		"newAction": "Add schedule",
+		"stepWhat": "What to run",
+		"stepWhen": "When",
+		"stepCap": "Spend cap",
+		"close": "Close",
+		"integrations": "Integrations",
+		"integrationsHint": "Webhook alerts for regressions and failed runs",
+		"advanced": "Advanced",
+		"pillOk": "OK",
+		"pillFailed": "Failed",
+		"pillNever": "Not run yet",
+		"pillProblem": "Needs attention"
+	},
+	"inbox": {
+		"heroTitle": "Turn production failures into tests",
+		"heroMessage": "Pull failed traces from your gateway or tracing tool and keep the ones worth fixing.",
+		"heroAction": "Connect a trace source",
+		"integrations": "Integrations",
+		"integrationsHint": "Trace sources, push webhook and ingest tokens",
+		"sources": "Sources",
+		"cli": "Or pull from your terminal:"
+	}
+}
