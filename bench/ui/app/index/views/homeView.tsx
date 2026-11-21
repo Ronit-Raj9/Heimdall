@@ -1,5 +1,6 @@
 import { Pill, StatCard } from "@/components/home/homeBits";
-import { homeStats, isSystemCheck, monthStart, splitExperiments, type ExperimentListItem } from "@/components/home/home.utils";
+import { evaluationStats, homeStats, isSystemCheck, monthStart, newestEvaluations, splitExperiments, type ExperimentListItem } from "@/components/home/home.utils";
+import { RecentEvaluations } from "@/components/home/recentEvaluations";
 import { RecentExperiments } from "@/components/home/recentExperiments";
 import { RunningExperiments } from "@/components/home/runningExperiments";
 import { SuitesPanel } from "@/components/home/suitesPanel";
@@ -12,15 +13,18 @@ import { getLocale } from "@/lib/i18n";
 import { canUse, useSession } from "@/lib/session/sessionContext";
 import { useGetSuitesQuery, useListExperimentsQuery } from "@/lib/store";
 import { useListRunsQuery } from "@/lib/store/apis/benchApi";
+import { useListEvaluationsQuery } from "@/lib/store/apis/evaluationsApi";
 import "@/lib/types/homeI18n";
 import { cn } from "@/lib/utils";
 import { Link, Navigate } from "@tanstack/react-router";
-import { ArrowRight, Boxes, CircleCheck, FlaskConical, Play, Rocket, Wallet } from "lucide-react";
+import { ArrowRight, Award, Bot, Boxes, CircleCheck, FlaskConical, GitCompare, Play, Wallet } from "lucide-react";
 import { useMemo, type ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 
 /** How often the list itself refreshes, so a new or finished experiment shows up. */
 const LIST_POLL_MS = 30_000;
+/** Evaluations listed on Home. */
+const EVALUATIONS_SHOWN = 5;
 /** Newest runs read for the KPI row (the server's page cap). */
 const RUNS_PAGE = 500;
 
@@ -30,8 +34,9 @@ function greetingKey(now: Date): "morning" | "afternoon" | "evening" {
 }
 
 /**
- * Home: a greeting with the one thing to do, four KPIs, the experiments running now with live
- * progress, the newest finished ones and the suites. A fresh org gets one onboarding card that
+ * Home: a greeting with the one thing to do (evaluate your agent), four agent KPIs, the
+ * experiments running now with live progress, the newest evaluations, the newest finished
+ * comparisons and the suites. A fresh org gets one onboarding card that
  * leads to the setup wizard.
  */
 export default function HomeView() {
@@ -40,7 +45,11 @@ export default function HomeView() {
 	const list = useListExperimentsQuery(undefined, { pollingInterval: LIST_POLL_MS, skipPollingIfUnfocused: true });
 	const suites = useGetSuitesQuery();
 	const runs = useListRunsQuery({ limit: RUNS_PAGE }, { pollingInterval: LIST_POLL_MS, skipPollingIfUnfocused: true });
+	const evals = useListEvaluationsQuery(undefined, { pollingInterval: LIST_POLL_MS, skipPollingIfUnfocused: true });
 	const experiments = (list.data?.experiments ?? []) as ExperimentListItem[];
+	const evaluations = evals.data ?? [];
+	const evStats = evaluationStats(evaluations);
+	const recentEvaluations = newestEvaluations(evaluations, EVALUATIONS_SHOWN);
 	const split = splitExperiments(experiments);
 	// Readiness checks Heimdall starts on its own stay out of "Running now"; Recent labels them.
 	const running = split.running.filter((exp) => !isSystemCheck(exp));
@@ -55,7 +64,7 @@ export default function HomeView() {
 	const trackOf = (suite: string | undefined) => (suite ? tracks.get(suiteIdOf(suite)) : undefined);
 
 	// First sign-in to an org with no experiment: open the setup wizard once per browser.
-	if (empty && session.signedIn && mayRun && !welcomeSeen()) {
+	if (empty && evaluations.length === 0 && session.signedIn && mayRun && !welcomeSeen()) {
 		return <Navigate to="/welcome" replace />;
 	}
 
@@ -76,8 +85,14 @@ export default function HomeView() {
 				</div>
 				{mayRun && (
 					<div className="flex shrink-0 flex-wrap gap-2">
+						<Button asChild variant="outline" dataTestId="home-cta-compare">
+							<Link to="/experiments/new">
+								<GitCompare aria-hidden="true" />
+								{t("cta.newExperiment")}
+							</Link>
+						</Button>
 						<Button asChild dataTestId="home-cta-run">
-							<Link to="/welcome">
+							<Link to={"/evaluate" as never}>
 								<Play aria-hidden="true" />
 								{t("cta.run")}
 							</Link>
@@ -90,20 +105,20 @@ export default function HomeView() {
 
 			<div className="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-4" data-testid="home-kpis">
 				<StatCard
-					icon={FlaskConical}
-					label={t("kpi.experiments")}
-					value={stats.experiments}
-					hint={t("kpi.experimentsHint", { count: stats.running })}
-					loading={list.isLoading}
-					testId="home-kpi-experiments"
+					icon={Bot}
+					label={t("kpi.agents")}
+					value={evals.error ? "-" : evStats.agents}
+					hint={t("kpi.agentsHint")}
+					loading={evals.isLoading}
+					testId="home-kpi-agents"
 				/>
 				<StatCard
-					icon={Rocket}
-					label={t("kpi.runsWeek")}
-					value={runs.error ? "-" : stats.runsWeek}
-					hint={t("kpi.runsWeekHint")}
-					loading={runs.isLoading}
-					testId="home-kpi-runs"
+					icon={Award}
+					label={t("kpi.evaluations")}
+					value={evals.error ? "-" : evStats.evaluations}
+					hint={t("kpi.evaluationsHint", { count: evStats.active })}
+					loading={evals.isLoading}
+					testId="home-kpi-evaluations"
 				/>
 				<StatCard
 					icon={CircleCheck}
@@ -140,6 +155,31 @@ export default function HomeView() {
 				</HomeSection>
 			)}
 
+			{!evals.error && (!empty || evaluations.length > 0) && (
+				<HomeSection
+					title={t("evaluations.title")}
+					testId="home-section-evaluations"
+					link={{ to: "/evaluations", label: t("evaluations.viewAll") }}
+				>
+					<div className="bg-card overflow-hidden rounded-xl border shadow-(--shadow-card)">
+						{evals.isLoading ? (
+							<ListSkeleton rows={3} testId="home-evaluations-loading" />
+						) : recentEvaluations.length === 0 ? (
+							<EmptyState
+								icon={Award}
+								message={t("evaluations.empty")}
+								action={mayRun ? { label: t("cta.run"), to: "/evaluate" } : undefined}
+								compact
+								className="m-3"
+								testId="home-evaluations-empty"
+							/>
+						) : (
+							<RecentEvaluations evaluations={recentEvaluations} />
+						)}
+					</div>
+				</HomeSection>
+			)}
+
 			<div className="grid min-w-0 gap-8 lg:grid-cols-[minmax(0,1.6fr)_minmax(0,1fr)] lg:gap-6">
 				{!empty && (
 					<HomeSection title={t("recent.title")} testId="home-section-recent" link={{ to: "/experiments", label: t("recent.viewAll") }}>
@@ -158,7 +198,7 @@ export default function HomeView() {
 								<EmptyState
 									icon={FlaskConical}
 									message={t("recent.empty")}
-									action={mayRun ? { label: t("cta.run"), to: "/welcome" } : undefined}
+									action={mayRun ? { label: t("cta.newExperiment"), to: "/experiments/new" } : undefined}
 									compact
 									className="m-3"
 									testId="home-recent-empty"
@@ -257,7 +297,7 @@ function ListSkeleton({ rows, testId }: { rows: number; testId: string }) {
 	);
 }
 
-/** The one onboarding card on a fresh org: a big way into the /welcome wizard. */
+/** The one onboarding card on a fresh org: a big way into the /evaluate wizard. */
 function OnboardingCard({ mayRun }: { mayRun: boolean }) {
 	const { t } = useTranslation("home");
 	return (
@@ -271,7 +311,7 @@ function OnboardingCard({ mayRun }: { mayRun: boolean }) {
 			</div>
 			{mayRun && (
 				<Button asChild className="shrink-0">
-					<Link to="/welcome" data-testid="home-welcome-open">
+					<Link to={"/evaluate" as never} data-testid="home-welcome-open">
 						{t("onboarding.open")}
 						<ArrowRight className="size-4" aria-hidden="true" />
 					</Link>

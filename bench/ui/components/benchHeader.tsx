@@ -20,9 +20,9 @@ export interface BenchHeaderProps {
 
 /**
  * Slim top bar: the menu button and mark on a narrow screen, breadcrumbs (section, then page) on
- * the left, and on the right the data mode, the New experiment action, jobs, the help link (the glossary guide), the theme switch and
+ * the left, and on the right the data mode, the Evaluate action (the agent-first wizard), jobs, the help link (the glossary guide), the theme switch and
  * the account menu. The organization lives at the top of the sidebar. In local mode the account
- * part renders nothing. A viewer or demo visitor cannot start experiments, so the action is not
+ * part renders nothing. A viewer or demo visitor cannot start evaluations, so the action is not
  * offered to them.
  */
 export function BenchHeader({ onOpenNav, navOpen = false }: BenchHeaderProps) {
@@ -31,7 +31,7 @@ export function BenchHeader({ onOpenNav, navOpen = false }: BenchHeaderProps) {
 	const pathname = useRouterState({ select: (state) => state.location.pathname });
 	const { data, isLoading, isError } = useGetHealthQuery();
 	// An offline server never plans or starts, so it does not advertise the workflow.
-	const canStart = canUse(session, "member") && pathname !== "/experiments/new" && launchAvailable(data);
+	const canStart = canUse(session, "member") && pathname !== "/evaluate" && launchAvailable(data);
 
 	return (
 		<header className="flex h-13 shrink-0 items-center gap-2 px-3 md:gap-2 md:px-4" data-testid="bench-header">
@@ -69,10 +69,10 @@ export function BenchHeader({ onOpenNav, navOpen = false }: BenchHeaderProps) {
 			)}
 			<ModeBadge variant="dot" mode={data?.mode} isLoading={isLoading} isError={isError} className="hidden sm:inline-flex" />
 			{canStart && (
-				<Button asChild size="sm" className="max-sm:size-8 max-sm:px-0" dataTestId="header-new-experiment">
-					<Link to="/experiments/new" aria-label={t("shell.newExperiment")} title={t("shell.newExperiment")}>
+				<Button asChild size="sm" className="max-sm:size-8 max-sm:px-0" dataTestId="header-evaluate">
+					<Link to={"/evaluate" as never} aria-label={t("shell.evaluateHint")} title={t("shell.evaluateHint")}>
 						<Plus aria-hidden="true" />
-						<span className="hidden sm:inline">{t("shell.newExperiment")}</span>
+						<span className="hidden sm:inline">{t("shell.evaluate")}</span>
 					</Link>
 				</Button>
 			)}

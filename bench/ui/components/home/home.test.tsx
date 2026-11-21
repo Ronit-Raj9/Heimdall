@@ -5,7 +5,8 @@ import { errorQuery, loadingQuery, okQuery, render, tagOf } from "@/lib/testing/
 import fs from "node:fs";
 import path from "node:path";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { byNewest, homeStats, humanExperimentName, isSystemCheck, mergeEvents, splitExperiments, suiteAdmission, suiteReady } from "./home.utils";
+import { byNewest, evaluationStats, homeStats, newestEvaluations, humanExperimentName, isSystemCheck, mergeEvents, splitExperiments, suiteAdmission, suiteReady } from "./home.utils";
+import { RecentEvaluations, evaluationWho } from "./recentEvaluations";
 import { RecentExperiments } from "./recentExperiments";
 import { RunningCardBody, RunningExperiments } from "./runningExperiments";
 import { SuitesPanel } from "./suitesPanel";
@@ -165,5 +166,35 @@ describe("humanExperimentName", () => {
 		expect(humanExperimentName({ name: "admit-coding-core", exp_id: "e_x" }, labels)).toBe("Readiness check: coding-core");
 		expect(humanExperimentName({ name: "codex-vs-claude_nightly", exp_id: "e_x" }, labels)).toBe("Codex vs claude nightly");
 		expect(humanExperimentName({ name: "", exp_id: "e_x" }, labels)).toBe("Untitled comparison");
+	});
+});
+
+describe("RecentEvaluations", () => {
+	const ev = (id: string, created_at: string, status: string, arms: { label: string; agent: string; version?: number; model: string }[]) =>
+		({
+			id,
+			created_at,
+			status,
+			spec: { name: `eval ${id}`, mode: arms.length > 1 ? "versions" : "score", arms, benchmarks: ["hd-harbor-tb2", "tau2"], tasks_per_benchmark: 5, trials: 2, faults: ["clean"] },
+			children: [],
+		}) as unknown as import("@/lib/store/apis/evaluationsApi").Evaluation;
+	const list = [
+		ev("ev_1", "2026-11-01T00:00:00Z", "done", [{ label: "A", agent: "codex", model: "gpt-x" }]),
+		ev("ev_2", "2026-11-20T00:00:00Z", "running", [
+			{ label: "A", agent: "mybot", version: 1, model: "m" },
+			{ label: "B", agent: "mybot", version: 2, model: "m" },
+		]),
+	];
+	it("counts agents and evaluations, newest first", () => {
+		expect(evaluationStats(list)).toEqual({ evaluations: 2, active: 1, agents: 2 });
+		expect(newestEvaluations(list).map((e) => e.id)).toEqual(["ev_2", "ev_1"]);
+		expect(newestEvaluations(list, 1)).toHaveLength(1);
+	});
+	it("links each evaluation with who it tested and its status", () => {
+		expect(evaluationWho(list[1])).toBe("mybot v1 · m vs mybot v2 · m");
+		const html = render(<RecentEvaluations evaluations={list} />);
+		expect(html).toContain('href="/evaluations/ev_1"');
+		expect(html).toContain("2 benchmarks");
+		expect(tagOf(html, "home-evaluation-status-ev_2")).toContain('data-status="running"');
 	});
 });

@@ -8,6 +8,7 @@ describe("navigation", () => {
 		expect(BENCH_NAV.map((item) => item.to)).toEqual([
 			"/",
 			"/welcome",
+			"/evaluations",
 			"/experiments",
 			"/evaluations",
 			"/runs",
@@ -47,6 +48,9 @@ describe("navigation", () => {
 			["/", "/"],
 			["/welcome", "/welcome"],
 			["/quickstart", "/"],
+			["/evaluations", "/evaluations"],
+			["/evaluations/ev_1", "/evaluations"],
+			["/evaluate", "/evaluations"],
 			["/experiments", "/experiments"],
 			["/experiments/e_1", "/experiments"],
 			["/experiments/e_1/", "/experiments"],
