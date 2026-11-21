@@ -2,6 +2,10 @@
 
 Heimdall is the project name; the folder, the Go module and the `bifrost-bench` command keep the code name. Older docs call it Bifrost Bench.
 
+**Evaluate your agent: register it once, run it on many benchmarks at once, get one report card per version and model.**
+
+Heimdall benchmarks agents, not models. You bring your own agent (a CLI coding agent, an HTTP service, an A2A agent, a voice agent, your own script), tell Heimdall what it can do (shell, tools, MCP, sessions, browser, desktop, voice, GPU), and pick an evaluation: a pack of benchmarks for one skill (coding, terminal, support, memory, research, voice, safety) or every benchmark your agent can run. Heimdall skips the benchmarks your agent cannot run and says why, runs the rest, and gives back a report card: a score with a confidence interval per skill and per benchmark, cost, tokens, steps and time, how much the score drops under faults (a model outage, a broken tool, a misleading instruction), and safety numbers. Compare two versions of your agent, two models, or your agent against a baseline agent (Codex, Claude Code, mini-swe-agent, OpenCode, Gemini CLI) and each benchmark gets a verdict that says "no clear winner yet" when the evidence is too thin. Every model call goes through Bifrost, so any model Bifrost reaches can be used, open-weight models included: [`docs/evaluations.md`](docs/evaluations.md), [`docs/models-and-providers.md`](docs/models-and-providers.md).
+
 **Crash tests for coding agents, ending in a release verdict that knows when it cannot tell.**
 
 Bifrost Bench answers one question for anyone who changes a coding agent (a new model, a new prompt, a new notes file, a new tool, a new gateway rule): *did this change make my agent better, worse, or can we not tell yet, where is it weak, and what does a verified success cost?*
@@ -297,6 +301,31 @@ The fault proxy is registered as the base URL of Bifrost's provider, so faults g
 **Bifrost + Tavily.** A research agent's model calls go through Bifrost and its web searches through Tavily, and both are evidence the agent cannot edit: Bifrost's log for every model call, the tool proxy's ledger for every Tavily search and fetch, with the Tavily key injected by the proxy so the agent never holds it. Searches are recorded once and replayed, so two agents or two models are compared on the same search results at no search cost: [`docs/research-tasks.md`](docs/research-tasks.md). Tavily's API was verified from its documentation on 18 Nov 2026; no real Tavily call has been made (the committed cassettes come from a local stand-in).
 
 ## Quick start
+
+### Evaluate your agent
+
+Start the stack and the web app (`make up`, then `make serve`; see [Running the bench's own suites](#running-the-benchs-own-suites)), open http://127.0.0.1:8090 and press **Evaluate your agent**. The wizard has five steps:
+
+1. **Your agent.** Pick one, or register yours from a template (Codex, Claude Code, an HTTP service, your own command). Pick the version to test.
+2. **What to learn.** A score for one setup, version 1 against version 2, two models, or your agent against a baseline agent.
+3. **Benchmarks.** Pick a pack or single benchmarks. Benchmarks your agent cannot run are greyed out with the reason.
+4. **Model, trials, faults.** Any model from any provider you have a key for, how many times to repeat each task, and which faults to add. The cost and time estimate updates as you choose.
+5. **Launch.** You land on the evaluation page, which shows progress and then the report card.
+
+The same through the API:
+
+```bash
+curl -sS http://127.0.0.1:8090/api/bench/agents/codex/compatibility           # what codex can and cannot run
+curl -sS -X POST http://127.0.0.1:8090/api/bench/evaluations \
+  -H "Authorization: Bearer $HEIMDALL_TOKEN" -H 'Content-Type: application/json' \
+  -d '{"name":"codex on coding","mode":"score","arms":[{"label":"A","agent":"codex","model":"gpt-6.2-sol"}],
+       "pack":"coding","tasks_per_benchmark":5,"trials":2,"faults":["clean","model-down"]}'
+curl -sS http://127.0.0.1:8090/api/bench/evaluations/ev_.../report             # the report card
+```
+
+How every number on the report card is computed, the verdict rules and the limits: [`docs/evaluations.md`](docs/evaluations.md).
+
+### Check a change to a coding agent
 
 <!-- First workflow (W1): the four commands; docs/quickstart.md has the walk-through with real output and timings -->
 "Will this change break my coding agent?" in four commands, from inside your own git repository (needs Docker and the binary: `make heimdall` builds `bin/heimdall`, the same program as `bifrost-bench`):

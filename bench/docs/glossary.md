@@ -17,6 +17,17 @@ Tip: anywhere in the app, a word with a dotted underline has an explanation. Hov
 - **Skills tested** (technical: `capabilities`). The kinds of ability a benchmark checks, such as coding, browsing or tool use.
 - **License** (technical: `license`). The terms under which the tasks may be used and shared.
 
+## Evaluations and report cards
+
+- **Evaluation** (technical: `evaluation`). One request to test your agent on many benchmarks at once. Heimdall runs one comparison per benchmark and puts the results together in a report card.
+- **Report card** (technical: `report card`). The result of an evaluation for one agent version and model: a score per skill and per benchmark with a range of likely values, cost, tokens, steps, time, how much the score drops under faults, and safety numbers.
+- **Pack** (technical: `pack`). A ready-made group of benchmarks for one skill, such as coding, support or memory. "All compatible" means every benchmark your agent can run.
+- **Capability** (technical: `capability`). Something an agent can do, or a benchmark needs: shell, tools, MCP, sessions, browser, desktop, voice or GPU. A benchmark is greyed out when your agent lacks what it needs.
+- **Version** (technical: `agent version`, `v<N>`). A saved snapshot of an agent's settings. Every change makes a new numbered version, so a report card always says exactly which setup earned it.
+- **Baseline** (technical: `baseline`). The setup you compare against. In an evaluation it can be your current version, or a well-known built-in agent (Codex, Claude Code, mini-swe-agent, OpenCode, Gemini CLI), which the agent leaderboard marks as a baseline.
+- **Fault** (technical: `fault` / `condition`). Something going wrong on purpose during a run: the model goes down, a tool breaks, or the instructions mislead. Normal conditions always run too.
+- **Score range** (technical: `confidence interval`, `ci_low` / `ci_high`). The range the true score most likely falls in. Few runs give a wide range.
+
 ## Comparisons and results
 
 - **Comparison** (technical: `experiment`). Runs two setups (A and B) on the same tasks and tells you which is better.
@@ -65,9 +76,10 @@ Tip: anywhere in the app, a word with a dotted underline has an explanation. Hov
 
 ## How the pieces fit
 
-1. You pick a **benchmark** (a set of tasks) and the **agents** you want to test.
+1. You register your **agent** and start an **evaluation**: pick a **pack** or single **benchmarks** (sets of tasks). Benchmarks that need a **capability** your agent lacks are skipped.
 2. Heimdall runs a **readiness check** on each task. Only **ready** tasks are used.
 3. A **comparison** runs Setup A and Setup B on the same tasks. Each attempt at one task is a **run**.
 4. A hidden **grader** scores every run. **Safety checks** fail runs that cheated or did something unsafe.
 5. The **result** says B is better, B is worse, no clear winner yet, or the test was broken.
-6. In production, **drift monitors** re-run small tests on a schedule, and **release rules** decide whether a new version may ship.
+6. The **report card** puts every benchmark's numbers together, per skill, for one agent **version** and model.
+7. In production, **drift monitors** re-run small tests on a schedule, and **release rules** decide whether a new version may ship.
