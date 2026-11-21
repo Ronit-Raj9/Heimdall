@@ -870,6 +870,16 @@ export interface Experiment {
 	environment?: Record<string, unknown>;
 	/** The evaluation that created this experiment, when one did. */
 	evaluation_id?: string;
+	/** Twin arms of a base arm that differ only in a framing preamble (docs/control-evals.md). */
+	framing_pairs?: Record<string, unknown>[];
+	/** Overrides of the retry rules of the failure classes that allow it. */
+	error_policy?: Record<string, unknown>;
+	/** The experiment whose failed tasks this one runs again ("Rerun failures"): exploratory, never counted. */
+	rerun_of?: string;
+	/** A debug run of one recorded run: replay, fork or breakpoints. */
+	debug?: Record<string, unknown>;
+	/** Runs chained over the tasks, with memory carried from one run to the next when memory is carry. */
+	stream?: { memory: "carry" | "fresh"; order?: "suite" | "seeded"; fresh_arm?: string; replay?: number; threshold?: number };
 }
 
 // ---------------------------------------------------------------------------------------------

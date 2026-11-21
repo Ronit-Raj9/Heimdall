@@ -67,7 +67,7 @@
 			"labelPlaceholder": "e.g. production gateway",
 			"full": "This organization already has {{max}} tokens. Remove one to make another.",
 			"viewer": "Only organization admins can create or remove access tokens. Ask an admin (Settings, Members).",
-			"createdOnce": "Copy this token now: it is shown only once. Heimdall keeps only a signature of it. Save it where your tool runs, then send failures with the curl line below.",
+			"createdOnce": "Copy this token now: it is shown only once. Heimdall keeps only a fingerprint of it. Save it where your tool runs, then send failures with the curl line below.",
 			"empty": "No access tokens yet. An organization admin can create one here.",
 			"emptyAdmin": "No access tokens yet. Create one to start sending failures in.",
 			"colLabel": "Label",

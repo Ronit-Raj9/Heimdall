@@ -34,7 +34,7 @@ describe("LeaderboardFilters", () => {
 
 	it("labels every control", () => {
 		const html = renderToStaticMarkup(<LeaderboardFilters {...props} />);
-		for (const label of [">Benchmark<", ">Failure test<", ">Tasks<", ">Runs<"]) expect(html).toContain(label);
+		for (const label of [">Benchmark<", ">Fault<", ">Tasks<", ">Runs<"]) expect(html).toContain(label);
 		expect(html).toContain('aria-label="Board filters"');
 	});
 

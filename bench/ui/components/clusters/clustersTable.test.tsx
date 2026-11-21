@@ -27,7 +27,7 @@ describe("ClustersTable", () => {
 			">How widespread<",
 			">Tasks<",
 			">Agents<",
-			">Failure test<",
+			">Fault<",
 			">Comparisons<",
 			">Last seen<",
 		]) {

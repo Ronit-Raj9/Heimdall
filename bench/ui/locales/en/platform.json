@@ -38,7 +38,7 @@
 	},
 	"secret": {
 		"once": "Shown once",
-		"onceHint": "Copy it now. Heimdall keeps only a signature of it, so it cannot be shown again.",
+		"onceHint": "Copy it now. Heimdall keeps only a fingerprint of it, so it cannot be shown again.",
 		"copy": "Copy",
 		"copied": "Copied",
 		"done": "I have copied it",

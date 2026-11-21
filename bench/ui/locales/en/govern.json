@@ -61,7 +61,7 @@
 	"releases": {
 		"actions": "Audit tools",
 		"verify": "Check the log has not been changed",
-		"verifyHint": "Recomputes the signature of every record and evidence file. Use it before an audit.",
+		"verifyHint": "Recomputes the fingerprint of every record and evidence file. Use it before an audit.",
 		"compliance": "Write compliance report",
 		"complianceHint": "Writes a report (.md and .json) into exports/compliance in the project folder.",
 		"pickRelease": "Release record",

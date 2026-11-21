@@ -6,7 +6,7 @@
 		"systemBannerAgent": "This is an automatic agent check Heimdall ran, not a comparison you started.",
 		"systemBannerDrift": "This is an automatic drift monitor run: a small test Heimdall re-runs on a schedule to catch an agent or model silently getting worse. It is not a comparison you started.",
 		"details": "Details",
-		"detailsHint": "Technical details: test recipe signature, when it was frozen, and which scores are shown.",
+		"detailsHint": "Technical details: test recipe fingerprint, when it was frozen, and which scores are shown.",
 		"practice": "Practice mode",
 		"practiceHint": "Practice mode: no real model is called, results are scripted and it costs nothing. Use it to try Heimdall out.",
 		"subtitle": "Runs two setups (A and B) on the same tasks and tells you which one is better.",
@@ -77,7 +77,7 @@
 	"sections": {
 		"guards": "Safety rules",
 		"gates": "Safety checks",
-		"diagnostics": "Details by failure test",
+		"diagnostics": "Details by fault",
 		"meters": "Measurements",
 		"statistics": "Advanced statistics",
 		"changes": "What changed between A and B",

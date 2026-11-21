@@ -20,7 +20,7 @@ describe("TrendsTable", () => {
 			"Comparison",
 			"Date",
 			"Setup",
-			"Setup signature",
+			"Setup fingerprint",
 			"Cost per solved task",
 			"Tokens",
 			"Wall time",

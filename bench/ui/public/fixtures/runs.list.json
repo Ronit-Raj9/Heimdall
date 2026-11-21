@@ -89,6 +89,11 @@
 		],
 		"tracks": [
 			"coding"
-		]
+		],
+		"agents": [
+			"claude-code"
+		],
+		"faults": [],
+		"models": []
 	}
 }

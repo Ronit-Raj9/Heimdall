@@ -60,7 +60,7 @@
 		"noEvents": "Nothing has happened yet.",
 		"loadError": "Live updates paused. Trying again.",
 		"details": "Details",
-		"manifest": "Test recipe (signature)",
+		"manifest": "Test recipe (fingerprint)",
 		"expId": "Comparison id",
 		"openVerdict": "See the result",
 		"newExperiment": "Plan another comparison",

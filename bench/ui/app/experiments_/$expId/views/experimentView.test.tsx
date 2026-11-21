@@ -26,6 +26,13 @@ vi.mock("@/lib/store/apis/platformApi", async (importOriginal) => ({
 	useResumeExperimentMutation: () => [() => undefined, {}],
 }));
 vi.mock("@/lib/store/apis/dataOpsApi", () => ({ useDeleteExperimentMutation: () => [() => undefined, {}] }));
+// Run controls (X21) beside Cancel.
+vi.mock("@/lib/store/apis/runControlApi", async (orig) => ({
+	...(await orig<object>()),
+	useGetRunControlsQuery: () => ({}),
+	usePauseExperimentMutation: () => [() => undefined, { isLoading: false }],
+	useUnpauseExperimentMutation: () => [() => undefined, { isLoading: false }],
+}));
 vi.mock("@/lib/store/apis/adaptiveApi", () => ({ useGetExperimentAdaptiveQuery: () => ({}) }));
 vi.mock("@/lib/store/apis/supportApi", () => ({ useGetExperimentSupportQuery: () => ({}) }));
 vi.mock("@/lib/store/apis/researchApi", () => ({ useGetExperimentResearchQuery: () => ({}) }));

@@ -118,7 +118,7 @@
 	},
 	"agentDiff": {
 		"title": "Agent diff",
-		"subtitle": "What changed between two versions of an agent and which tasks flipped, over verified saved runs of one benchmark and failure test.",
+		"subtitle": "What changed between two versions of an agent and which tasks flipped, over verified saved runs of one benchmark, in the normal run or under one fault.",
 		"synthetic": "Synthetic runs: scripted agents or models, or fixture data. The numbers show the screen works; they are not findings.",
 		"loadError": "Could not compute the agent diff.",
 		"versionsError": "Could not load the agent versions for the pickers.",
@@ -134,10 +134,10 @@
 			"optionHint_one": "{{hash}}, {{count}} saved run",
 			"optionHint_other": "{{hash}}, {{count}} saved runs",
 			"swap": "Swap A and B",
-			"scope": "Benchmark and failure test",
+			"scope": "Benchmark and fault",
 			"suite": "Benchmark",
 			"suitePlaceholder": "newest both ran",
-			"condition": "Failure test",
+			"condition": "Fault",
 			"conditionPlaceholder": "clean",
 			"apply": "Apply",
 			"synthetic": "Include synthetic runs",
@@ -236,7 +236,7 @@
 		"tasks": {
 			"title": "Tasks that flipped",
 			"description": "Passes over verified trials per common task. A flip is a stable pass becoming a stable fail or back; a move is a rate change where one side is unstable.",
-			"noCommon": "No common task: A and B ran no task in common on this benchmark and failure test.",
+			"noCommon": "No common task: A and B ran no task in common on this benchmark and fault.",
 			"noneChanged": "No task flipped or moved between A and B.",
 			"task": "Task",
 			"class": "Class",
@@ -360,7 +360,7 @@
 		"filters": {
 			"label": "Board filters",
 			"suite": "Benchmark",
-			"condition": "Failure test",
+			"condition": "Fault",
 			"scope": "Tasks",
 			"scopeAll": "All tasks",
 			"scopeAllHint": "Each entry over its own tasks.",
@@ -447,7 +447,7 @@
 			"scopeCommon_other": "Scope common: every entry is measured over the same {{count}} common tasks only.",
 			"commonTasks_one": "Common task ({{count}})",
 			"commonTasks_other": "Common tasks ({{count}})",
-			"commonTasksHint": "Tasks every listed entry ran under this failure test.",
+			"commonTasksHint": "Tasks every listed entry ran, in the normal run or under this fault.",
 			"noCommon": "No task was run by every agent listed.",
 			"excluded": "Runs left out",
 			"excludedRuns_one": "{{count}} run",
@@ -491,7 +491,7 @@
 		"retry": "Retry",
 		"header": {
 			"manifest": "Test recipe",
-			"manifestHint": "Test recipe signature {{hash}}. The plan and the main measure were signed before the first run, so they cannot change afterwards.",
+			"manifestHint": "Test recipe fingerprint {{hash}}. The plan and the main measure were fingerprinted before the first run, so they cannot change afterwards.",
 			"frozen": "frozen {{time}}",
 			"suite": "Benchmark",
 			"gradeSource": "Scores",
@@ -588,7 +588,7 @@
 			"pValue": {
 				"name": "exact p-value",
 				"definition": "Exact two-sided sign-flip test: the share of all 2^n sign patterns of the per-task differences whose mean is at least as far from zero as the observed one. Above 22 differing tasks it is estimated from 1,000,000 random sign patterns and marked sampled.",
-				"denominator": "Denominator: all 2^n sign vectors over the n tasks of the primary failure test; the task is the unit, so tries of one task never count as separate wins."
+				"denominator": "Denominator: all 2^n sign vectors over the n tasks of the primary measure (the normal run unless the experiment names a fault); the task is the unit, so tries of one task never count as separate wins."
 			},
 			"mde": {
 				"name": "minimal detectable effect",
@@ -624,8 +624,8 @@
 		},
 		"diagnostics": {
 			"title": "Diagnostics",
-			"description": "One row per failure test that ran. Only the primary row carries the release decision; every other row is descriptive.",
-			"condition": "Failure test",
+			"description": "One row for the normal run and one per fault that ran. Only the primary row carries the release decision; every other row is descriptive.",
+			"condition": "Fault",
 			"axis": "Axis",
 			"releaseEffect": "Release effect",
 			"tasks": "Tasks",
@@ -649,9 +649,9 @@
 		},
 		"grid": {
 			"title": "Task grid",
-			"description": "One row per task and failure test, discordant first. Each cell is one run; select it to compare the matched runs of that pair.",
+			"description": "One row per task, in the normal run and under each fault, discordant first. Each cell is one run; select it to compare the matched runs of that pair.",
 			"task": "Task",
-			"condition": "Failure test",
+			"condition": "Fault",
 			"armTrials": "Setup {{arm}} tries",
 			"trial": "{{arm}}{{trial}}",
 			"d": "d",
@@ -772,7 +772,7 @@
 			"listError": "Could not load the experiment list.",
 			"gridError": "Could not load the task grid.",
 			"task": "Task",
-			"condition": "Failure test",
+			"condition": "Fault",
 			"trials": "Attempts",
 			"discordant": "results differ",
 			"trial": "Attempt {{trial}}",
@@ -1438,8 +1438,8 @@
 			"quality": "Quality",
 			"available": "Available",
 			"missing": "Missing",
-			"taskHash": "Task signature",
-			"runInputHash": "Run settings signature",
+			"taskHash": "Task fingerprint",
+			"runInputHash": "Run settings fingerprint",
 			"level": "How sure Heimdall is",
 			"unknownReasons": "Why some numbers are not known",
 			"tools": "Tool uses asked for / actually ran",
@@ -1464,7 +1464,7 @@
 				"exp": "Comparison",
 				"arm": "Setup",
 				"task": "Task",
-				"condition": "Failure test",
+				"condition": "Fault",
 				"outcome": "Result",
 				"track": "Track"
 			},
@@ -1473,7 +1473,7 @@
 				"experiment": "Comparison",
 				"task": "Task",
 				"arm": "Setup",
-				"condition": "Failure test",
+				"condition": "Fault",
 				"outcome": "Result",
 				"score": "Score",
 				"cost": "Cost",
@@ -1527,7 +1527,7 @@
 				"attempt": "Attempt",
 				"started": "Started",
 				"sealed": "Saved and tamper-proof",
-				"seal": "Tamper-proof signature",
+				"seal": "Tamper-proof fingerprint",
 				"notSealed": "Not saved yet (still running or broken)",
 				"sealMismatch": "Files were changed after saving: do not trust this run"
 			},
@@ -1546,7 +1546,7 @@
 		"experiment": "comparison {{id}}",
 		"noExperiments": "No comparisons yet. Create one, or start the server with a recorded comparison.",
 		"listError": "Could not load the comparison list.",
-		"diagnosticsError": "Could not load the details by failure test.",
+		"diagnosticsError": "Could not load the details by fault.",
 		"conditions": "Failure tests",
 		"layer": "{{layer}} layer",
 		"layerUnknown": "layer not in the catalog",
@@ -1623,12 +1623,12 @@
 	},
 	"matrix": {
 		"title": "Model matrix",
-		"subtitle": "Every setup of one experiment on one failure test, ranked by verified success. Every pair is tested on the tasks both ran with the sign-flip test (exact up to 22 differing tasks, sampled above), Holm-adjusted across all pairs.",
+		"subtitle": "Every setup of one experiment in the normal run or under one fault, ranked by verified success. Every pair is tested on the tasks both ran with the sign-flip test (exact up to 22 differing tasks, sampled above), Holm-adjusted across all pairs.",
 		"experiment": "Experiment {{id}}",
 		"noExperiments": "No experiments yet. Plan and run one, then compare its setups here.",
 		"listError": "Could not load experiments",
 		"loadError": "Could not load the model matrix",
-		"condition": "Failure test",
+		"condition": "Fault",
 		"gradeSource": "Grades: {{source}}",
 		"facts": "{{suite}}, common tasks {{tasks}}, alpha {{alpha}}",
 		"notSeparable": "Cannot separate",
@@ -1652,7 +1652,7 @@
 			"noP": "none"
 		},
 		"excluded": "Left out: {{reason}} ({{runs}} runs)",
-		"empty": "No setup has a graded run on this failure test yet."
+		"empty": "No setup has a graded run here yet."
 	},
 	"triage": {
 		"subtitle": "Common ways runs failed, counted for Setup A and Setup B of one comparison.",
@@ -1753,7 +1753,7 @@
 			"scope": "How widespread",
 			"tasks": "Tasks",
 			"agents": "Agents",
-			"conditions": "Failure test",
+			"conditions": "Fault",
 			"experiments": "Comparisons",
 			"lastSeen": "Last seen",
 			"more": "+{{count}} more",
@@ -1787,7 +1787,7 @@
 			"close": "Close",
 			"loadError": "Could not load this group.",
 			"notFound": "This group is not in the filtered list. Change the filters or close it.",
-			"signature": "Failure signature",
+			"signature": "Failure fingerprint",
 			"counts_one": "{{count}} run, {{share}} of failures",
 			"counts_other": "{{count}} runs, {{share}} of failures",
 			"seen": "First seen {{first}}, last seen {{last}}",
@@ -1805,7 +1805,7 @@
 				"error": "Error",
 				"provider": "Model provider status",
 				"last_tool": "Last tool",
-				"condition": "Failure test"
+				"condition": "Fault"
 			},
 			"errorText": "Error message",
 			"errorTextHint": "As recorded, shown as plain text.",
@@ -1918,8 +1918,8 @@
 				"mdeSd": "SD {{sd}}, measured",
 				"estTime": "Estimated time",
 				"estCost": "Estimated cost",
-				"perCondition": "Per failure test",
-				"condition": "Failure test",
+				"perCondition": "Per fault",
+				"condition": "Fault",
 				"tasks": "Tasks",
 				"trials": "Trials",
 				"conditionSlots": "Slots",
@@ -2034,7 +2034,7 @@
 	"releases": {
 		"title": "Release records",
 		"subtitle": "Who approved which agent version, based on which test results.",
-		"disclaimer": "Each record is linked to the one before it by a signature, so any later change to the log is detected. This is not a digital signature and not a compliance certificate.",
+		"disclaimer": "Each record is linked to the one before it by a fingerprint, so any later change to the log is detected. This is not a digital signature and not a compliance certificate.",
 		"timeline": {
 			"title": "Release history",
 			"empty": "No releases recorded yet.",
@@ -2054,7 +2054,7 @@
 			"override": "Released despite the rules",
 			"linked": "linked to the previous record",
 			"linkBroken": "link broken",
-			"hashTitle": "signature {{hash}}, previous {{prev}}",
+			"hashTitle": "fingerprint {{hash}}, previous {{prev}}",
 			"evidence": "Evidence files"
 		},
 		"panel": {
@@ -2117,14 +2117,14 @@
 		"columns": {
 			"status": "Status",
 			"check": "Check",
-			"target": "Failure test / setup",
+			"target": "Fault / setup",
 			"observed": "Observed",
 			"threshold": "Threshold",
 			"n": "n",
 			"reason": "Reason",
 			"evidence": "Evidence"
 		},
-		"allConditions": "all failure tests",
+		"allConditions": "the normal run and every fault",
 		"target": "{{condition}} / {{arm}}",
 		"dbar": "{{value}} pp",
 		"dbarHint": "Release effect d_bar, setup {{arm}} minus Setup A",
@@ -2386,8 +2386,8 @@
 			"preview": "What happened (private data removed)",
 			"previewHint": "Plain text exactly as saved, up to 16 KiB.",
 			"previewEmpty": "No log text was saved for this failure.",
-			"signature": "Failure signature",
-			"signatureHint": "Logs with the same request, tool and error get the same signature and share one row.",
+			"signature": "Failure fingerprint",
+			"signatureHint": "Logs with the same request, tool and error get the same fingerprint and share one row.",
 			"parts": {
 				"request": "Request",
 				"tool": "Tool",
@@ -2527,7 +2527,7 @@
 			"threshold": "Pass threshold",
 			"image": "Base image",
 			"digest": "Image digest",
-			"lockHash": "Frozen version (signature)",
+			"lockHash": "Frozen version (fingerprint)",
 			"lockedAt": "Frozen at",
 			"seconds": "{{count}} s",
 			"none": "none",
@@ -2545,14 +2545,14 @@
 			"lockError": "Could not check the frozen version: {{error}}"
 		},
 		"lockKind": {
-			"fingerprinted": "Frozen with signatures",
+			"fingerprinted": "Frozen with fingerprints",
 			"legacy": "Frozen (older format)",
 			"fingerprintedHint": "Every grader setting, task file and image is fingerprinted. Any change blocks new tests until the benchmark is frozen and checked again.",
-			"legacyHint": "Grader settings are not signed. Freeze again to add signatures."
+			"legacyHint": "Grader settings are not fingerprinted. Freeze again to add fingerprints."
 		},
 		"fingerprintDrift": {
 			"title": "Files no longer match the frozen version",
-			"description": "These no longer match the frozen signatures, so new tests and resumed runs are blocked.",
+			"description": "These no longer match the frozen fingerprints, so new tests and resumed runs are blocked.",
 			"row": "{{scope}} {{id}}: {{part}}",
 			"rowFields": "{{scope}} {{id}}: {{part}} ({{fields}})"
 		},
@@ -3185,7 +3185,7 @@
 			"agent": "Agent",
 			"allAgents": "All agents",
 			"metric": "Measurement",
-			"condition": "Failure test",
+			"condition": "Fault",
 			"synthetic": "Runs",
 			"syntheticOption": {
 				"exclude": "Real model",
@@ -3242,7 +3242,7 @@
 			"experiment": "Comparison",
 			"date": "Date",
 			"arm": "Setup",
-			"config": "Setup signature",
+			"config": "Setup fingerprint",
 			"configChanged": "changed",
 			"value": "{{metric}}",
 			"success": "Solve rate",
@@ -3287,7 +3287,7 @@
 				"run": "Run",
 				"task": "Task",
 				"arm": "Setup",
-				"condition": "Failure test",
+				"condition": "Fault",
 				"trial": "Attempt",
 				"reasons": "Why",
 				"sealed": "Original score",
@@ -3340,7 +3340,7 @@
 			"claim": "What the agent said",
 			"claimMade": "claimed success",
 			"claimNone": "no success claim",
-			"sealHash": "Signature"
+			"sealHash": "Fingerprint"
 		},
 		"timeline": {
 			"title": "Reviews",
@@ -3357,7 +3357,7 @@
 			"problems": "Ignored reviews",
 			"sealed": "Original outcome",
 			"effective": "Outcome under reviews",
-			"hash": "Signature {{hash}}"
+			"hash": "Fingerprint {{hash}}"
 		},
 		"form": {
 			"title": "Record a review",
@@ -3604,7 +3604,7 @@
 		"runs_one": "{{count}} saved run",
 		"runs_other": "{{count}} saved runs",
 		"eee": "Every Eval Ever records (JSON lines)",
-		"eeeNote": "One aggregate record per setup, validated against the vendored Every Eval Ever schema 0.3.0, with the manifest and signature hashes.",
+		"eeeNote": "One aggregate record per setup, validated against the vendored Every Eval Ever schema 0.3.0, with the fingerprints of the test recipe and of the saved runs.",
 		"eeeSyntheticNote": "Synthetic results (scripted agent, scripted model or smoke run): exported labelled synthetic, not as findings.",
 		"eeeClassifying": "Checking whether the runs are synthetic before offering the download.",
 		"eeeClassifyError": "Could not check whether the runs are synthetic, so the download is not offered: {{error}}",
@@ -3737,7 +3737,7 @@
 			"result": "Result"
 		},
 		"dimension": {
-			"condition": "Failure test",
+			"condition": "Fault",
 			"task_kind": "Task kind",
 			"capability": "Capability",
 			"tag": "Tag",
@@ -3768,7 +3768,7 @@
 			"both": "in both"
 		},
 		"conditions": {
-			"condition": "Failure test",
+			"condition": "Fault",
 			"runs": "Runs (old / new)",
 			"success": "Success (old / new)",
 			"falseCompletion": "False completion (old / new)"

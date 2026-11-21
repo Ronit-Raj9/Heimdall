@@ -36,7 +36,7 @@ describe("TrendsFilters", () => {
 		]) {
 			expect(html).toContain(`data-testid="${id}"`);
 		}
-		for (const label of [">Benchmark<", ">Agent<", ">Measurement<", ">Failure test<", ">Runs<"]) expect(html).toContain(label);
+		for (const label of [">Benchmark<", ">Agent<", ">Measurement<", ">Fault<", ">Runs<"]) expect(html).toContain(label);
 		// Each picker's label points at its trigger.
 		expect(html).toMatch(/<label for="([^"]+)"[^>]*>Measurement<\/label><button[^>]*id="\1"/);
 	});
