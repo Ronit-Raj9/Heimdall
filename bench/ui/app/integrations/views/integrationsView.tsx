@@ -4,7 +4,6 @@ import { EmptyState } from "@/components/shell/emptyState";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useGetAgentsQuery, useGetSuitesQuery, useListExperimentsQuery } from "@/lib/store/apis/benchApi";
 import {
 	apiErrorMessage,
@@ -28,6 +27,10 @@ import type {
 	WebhookDelivery,
 	WebhookEventType,
 } from "@/lib/types/integrations";
+import { PageHeader } from "@/components/shell/pageHeader";
+import { Skeleton } from "@/components/ui/skeleton";
+import { cn } from "@/lib/utils";
+import { Download, FileDown, GitPullRequest, Webhook as WebhookIcon, type LucideIcon } from "lucide-react";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
 
@@ -42,45 +45,107 @@ const EVENTS: WebhookEventType[] = ["experiment.finished", "job.failed"];
 const selectClass = "border-input bg-background h-9 w-full rounded-md border px-2 text-sm";
 
 /** Integrations (web parity L19): CI workflow (install PR via Settings > GitHub), exports with download, experiment-finished webhooks. */
+type IntegrationTab = "webhooks" | "exports" | "ci";
+
+const TAB_ICONS: Record<IntegrationTab, LucideIcon> = { webhooks: WebhookIcon, exports: FileDown, ci: GitPullRequest };
+
+type Tone = "ok" | "warn" | "bad" | "idle";
+
+const TONE_PILL: Record<Tone, string> = {
+	ok: "bg-emerald-500/10 text-emerald-700 dark:text-emerald-400",
+	warn: "bg-amber-500/10 text-amber-700 dark:text-amber-400",
+	bad: "bg-red-500/10 text-red-700 dark:text-red-400",
+	idle: "bg-muted text-muted-foreground",
+};
+
+const TONE_DOT: Record<Tone, string> = { ok: "bg-emerald-500", warn: "bg-amber-500", bad: "bg-red-500", idle: "bg-muted-foreground/50" };
+
+/** A small status pill: colored dot plus a few words. */
+export function StatusDot({ tone, label }: { tone: Tone; label: string }) {
+	return (
+		<span className={cn("inline-flex items-center gap-1.5 rounded-full px-2 py-0.5 text-xs", TONE_PILL[tone])}>
+			<span className={cn("size-1.5 rounded-full", TONE_DOT[tone])} aria-hidden="true" />
+			{label}
+		</span>
+	);
+}
+
+/** Integrations (web parity L19): CI workflow (install PR via Settings > GitHub), exports with download, experiment-finished webhooks. */
 export default function IntegrationsView() {
 	const { t } = useTranslation("integrations");
+	const [tab, setTab] = useState<IntegrationTab>("webhooks");
+	const hooks = useListWebhooksQuery();
+	const exportsList = useListExportsQuery();
+	const gh = useGetGithubStatusQuery();
+
+	const status = (k: IntegrationTab): { tone: Tone; label: string } | null => {
+		if (k === "webhooks") {
+			if (!hooks.data) return null;
+			const live = hooks.data.webhooks.filter((h) => h.enabled);
+			if (live.some((h) => h.last_delivery && !h.last_delivery.ok)) return { tone: "bad", label: t("cards.webhooks.failing") };
+			return live.length ? { tone: "ok", label: t("cards.webhooks.count", { count: live.length }) } : { tone: "idle", label: t("cards.webhooks.none") };
+		}
+		if (k === "exports") {
+			if (!exportsList.data) return null;
+			const n = exportsList.data.exports.length;
+			return n ? { tone: "ok", label: t("cards.exports.count", { count: n }) } : { tone: "idle", label: t("cards.exports.none") };
+		}
+		if (gh.isLoading) return null;
+		const step = ciNextStep(gh.data, gh.isError);
+		if (step === "install") return { tone: "ok", label: t("cards.ci.connected") };
+		if (step === "connect") return { tone: "warn", label: t("cards.ci.notConnected") };
+		return { tone: "idle", label: t("cards.ci.manual") };
+	};
+
 	return (
-		<div className="flex flex-col gap-4 p-6" data-testid="integrations-view">
-			<div>
-				<h1 className="text-xl font-semibold">{t("title")}</h1>
-				<p className="text-muted-foreground text-sm">{t("subtitle")}</p>
+		<div className="mx-auto flex w-full max-w-[1200px] flex-col gap-6 p-6" data-testid="integrations-view">
+			<PageHeader title={t("title")} subtitle={t("subtitle")} />
+			<div className="grid gap-3 sm:grid-cols-3" role="tablist" aria-label={t("title")}>
+				{(["webhooks", "exports", "ci"] as const).map((k) => {
+					const Icon = TAB_ICONS[k];
+					const active = k === tab;
+					const st = status(k);
+					return (
+						<button
+							key={k}
+							type="button"
+							role="tab"
+							aria-selected={active}
+							onClick={() => setTab(k)}
+							className={cn(
+								"bg-card focus-visible:ring-ring/60 flex flex-col gap-3 rounded-xl border p-5 text-left transition-all hover:shadow-md focus-visible:ring-2 focus-visible:outline-none",
+								active ? "border-primary ring-primary/30 ring-1" : "hover:border-foreground/20",
+							)}
+							data-testid={`integrations-tab-${k}`}
+						>
+							<div className="flex items-center justify-between gap-2">
+								<span className={cn("flex size-9 items-center justify-center rounded-lg", active ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground")}>
+									<Icon className="size-4.5" aria-hidden="true" />
+								</span>
+								{st ? <StatusDot tone={st.tone} label={st.label} /> : <Skeleton className="h-5 w-20 rounded-full" />}
+							</div>
+							<div className="flex flex-col gap-0.5">
+								<span className="text-base font-semibold">{t(`tabs.${k}`)}</span>
+								<span className="text-muted-foreground line-clamp-2 text-sm">{t(`cards.${k}.desc`)}</span>
+							</div>
+						</button>
+					);
+				})}
 			</div>
-			<Tabs defaultValue="webhooks">
-				<TabsList>
-					<TabsTrigger value="webhooks" data-testid="integrations-tab-webhooks">
-						{t("tabs.webhooks")}
-					</TabsTrigger>
-					<TabsTrigger value="exports" data-testid="integrations-tab-exports">
-						{t("tabs.exports")}
-					</TabsTrigger>
-					<TabsTrigger value="ci" data-testid="integrations-tab-ci">
-						{t("tabs.ci")}
-					</TabsTrigger>
-				</TabsList>
-				<TabsContent value="webhooks">
-					<WebhooksPanel />
-				</TabsContent>
-				<TabsContent value="exports">
-					<ExportsPanel />
-				</TabsContent>
-				<TabsContent value="ci">
-					<CIPanel />
-				</TabsContent>
-			</Tabs>
+			<div role="tabpanel">
+				{tab === "webhooks" && <WebhooksPanel />}
+				{tab === "exports" && <ExportsPanel />}
+				{tab === "ci" && <CIPanel />}
+			</div>
 		</div>
 	);
 }
 
 function Section({ title, intro, children }: { title: string; intro?: string; children: React.ReactNode }) {
 	return (
-		<section className="border-border flex flex-col gap-3 rounded-lg border p-4">
-			<div>
-				<h2 className="font-medium">{title}</h2>
+		<section className="border-border bg-card flex flex-col gap-4 rounded-xl border p-5">
+			<div className="flex flex-col gap-0.5">
+				<h2 className="text-base font-semibold">{title}</h2>
 				{intro && <p className="text-muted-foreground text-sm">{intro}</p>}
 			</div>
 			{children}
@@ -129,6 +194,10 @@ function WebhooksPanel() {
 	return (
 		<Section title={t("webhooks.heading")} intro={t("webhooks.intro")}>
 			{data?.hosted && <p className="text-muted-foreground text-xs">{t("webhooks.hostedNote")}</p>}
+			<details className="text-muted-foreground text-xs">
+				<summary className="hover:text-foreground cursor-pointer">{t("webhooks.signingTitle")}</summary>
+				<p className="mt-1 font-mono break-words">{t("webhooks.signing")}</p>
+			</details>
 			<form
 				className="grid gap-2 sm:grid-cols-[2fr_1fr_auto]"
 				onSubmit={(e) => {
@@ -210,14 +279,15 @@ export function WebhookList({ hooks, tests = {}, onTest, onToggle, onDelete }: W
 	const { t } = useTranslation("integrations");
 	if (hooks.length === 0) return <EmptyState compact message={t("webhooks.empty")} testId="webhooks-empty" />;
 	return (
-		<ul className="divide-border flex flex-col divide-y" data-testid="webhook-list">
+		<ul className="divide-border flex flex-col divide-y rounded-lg border" data-testid="webhook-list">
 			{hooks.map((h) => {
 				const last = h.last_delivery;
 				const test = tests[h.id];
 				return (
-					<li key={h.id} className="flex flex-col gap-1 py-2" data-testid={`webhook-${h.id}`}>
+					<li key={h.id} className="hover:bg-muted/30 flex flex-col gap-1.5 px-4 py-3 transition-colors" data-testid={`webhook-${h.id}`}>
 						<div className="flex flex-wrap items-center gap-2">
-							<span className="font-mono text-sm break-all">{h.url}</span>
+							<WebhookIcon className="text-muted-foreground size-4 shrink-0" aria-hidden="true" />
+							<span className="min-w-0 truncate font-mono text-sm" title={h.url}>{h.url}</span>
 							<Badge variant={h.enabled ? "success" : "secondary"}>{h.enabled ? t("webhooks.enabled") : t("webhooks.disabled")}</Badge>
 							{last ? (
 								<Badge variant={last.ok ? "success" : "destructive"} title={last.error}>
@@ -378,28 +448,30 @@ export function ExportTable({ exports, onDelete }: { exports: IntegrationExport[
 	const { t } = useTranslation("integrations");
 	if (exports.length === 0) return <EmptyState compact message={t("exports.empty")} testId="exports-empty" />;
 	return (
+		<div className="overflow-x-auto rounded-lg border">
 		<table className="w-full text-sm" data-testid="export-table">
-			<thead className="text-muted-foreground text-left text-xs">
+			<thead className="bg-muted/50 text-muted-foreground text-left text-xs">
 				<tr>
-					<th className="py-1">{t("exports.name")}</th>
-					<th>{t("exports.format")}</th>
-					<th>{t("exports.size")}</th>
-					<th>{t("exports.created")}</th>
+					<th className="px-3 py-2 font-medium">{t("exports.name")}</th>
+					<th className="px-3 font-medium">{t("exports.format")}</th>
+					<th className="px-3 text-right font-medium">{t("exports.size")}</th>
+					<th className="px-3 font-medium">{t("exports.created")}</th>
 					<th />
 				</tr>
 			</thead>
 			<tbody>
 				{exports.map((x) => (
-					<tr key={x.name} className="border-border border-t">
-						<td className="py-1.5 font-mono text-xs break-all">{x.name}</td>
-						<td>
+					<tr key={x.name} className="border-border hover:bg-muted/30 border-t transition-colors">
+						<td className="max-w-[16rem] truncate px-3 py-2 font-mono text-xs" title={x.name}>{x.name}</td>
+						<td className="px-3">
 							<Badge variant="outline">{x.format}</Badge>
 						</td>
-						<td>{formatBytes(x.size)}</td>
-						<td>{new Date(x.created_at).toLocaleString()}</td>
-						<td className="flex justify-end gap-2 py-1">
+						<td className="px-3 text-right tabular-nums">{formatBytes(x.size)}</td>
+						<td className="text-muted-foreground px-3 text-xs whitespace-nowrap">{new Date(x.created_at).toLocaleString()}</td>
+						<td className="flex justify-end gap-1 px-3 py-1.5">
 							<Button asChild size="sm" variant="outline">
 								<a href={exportDownloadUrl(x.name)} download={x.name} data-testid={`export-download-${x.name}`}>
+									<Download className="size-4" aria-hidden="true" />
 									{t("exports.download")}
 								</a>
 							</Button>
@@ -411,6 +483,7 @@ export function ExportTable({ exports, onDelete }: { exports: IntegrationExport[
 				))}
 			</tbody>
 		</table>
+		</div>
 	);
 }
 
@@ -491,7 +564,7 @@ function CIPanel() {
 							{copied ? t("ci.copied") : t("ci.copy")}
 						</Button>
 					</div>
-					<pre className="bg-muted max-h-96 overflow-auto rounded p-2 text-xs" data-testid="ci-workflow">
+					<pre className="bg-muted/50 max-h-96 overflow-auto rounded-lg border p-4 font-mono text-xs leading-5" data-testid="ci-workflow">
 						{preview.data.workflow}
 					</pre>
 				</div>

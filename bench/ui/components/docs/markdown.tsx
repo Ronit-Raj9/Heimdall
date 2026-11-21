@@ -1,5 +1,6 @@
 import { cn } from "@/lib/utils";
-import type { ReactNode } from "react";
+import { TriangleAlert, Check, Copy, Info, Lightbulb, OctagonAlert, type LucideIcon } from "lucide-react";
+import { useState, type ReactNode } from "react";
 
 /**
  * A small, safe markdown renderer for the in-app guides. It builds React elements only (never
@@ -141,7 +142,7 @@ function renderInline(text: string, onDocLink: MarkdownProps["onDocLink"], keyBa
 		const key = `${keyBase}-${n++}`;
 		if (m[1]) {
 			out.push(
-				<code key={key} className="bg-muted rounded px-1 py-0.5 font-mono text-[0.85em]">
+				<code key={key} className="bg-muted rounded-md border px-1.5 py-0.5 font-mono text-[0.85em]">
 					{tok.slice(1, -1)}
 				</code>,
 			);
@@ -191,18 +192,78 @@ function renderInline(text: string, onDocLink: MarkdownProps["onDocLink"], keyBa
 }
 
 const HEADING_CLASS = [
-	"text-2xl font-semibold tracking-tight mt-2",
-	"text-xl font-semibold tracking-tight mt-6 border-b pb-1",
-	"text-base font-semibold mt-5",
-	"text-sm font-semibold mt-4",
-	"text-sm font-semibold mt-3",
-	"text-sm font-medium mt-3",
+	"text-3xl font-semibold tracking-tight mb-2 scroll-mt-20",
+	"text-xl font-semibold tracking-tight mt-8 border-b pb-2 scroll-mt-20",
+	"text-base font-semibold mt-6 scroll-mt-20",
+	"text-sm font-semibold mt-4 scroll-mt-20",
+	"text-sm font-semibold mt-3 scroll-mt-20",
+	"text-sm font-medium mt-3 scroll-mt-20",
 ];
+
+type CalloutKind = "note" | "tip" | "warning" | "danger";
+
+const CALLOUT_WORDS: Record<string, CalloutKind> = {
+	note: "note",
+	info: "note",
+	important: "note",
+	tip: "tip",
+	hint: "tip",
+	warning: "warning",
+	caution: "danger",
+	danger: "danger",
+};
+
+const CALLOUT_STYLE: Record<CalloutKind, { icon: LucideIcon; box: string; ink: string }> = {
+	note: { icon: Info, box: "border-sky-500/30 bg-sky-500/5", ink: "text-sky-700 dark:text-sky-400" },
+	tip: { icon: Lightbulb, box: "border-emerald-500/30 bg-emerald-500/5", ink: "text-emerald-700 dark:text-emerald-400" },
+	warning: { icon: TriangleAlert, box: "border-amber-500/40 bg-amber-500/5", ink: "text-amber-700 dark:text-amber-400" },
+	danger: { icon: OctagonAlert, box: "border-red-500/30 bg-red-500/5", ink: "text-red-700 dark:text-red-400" },
+};
+
+/** A quote that opens with [!NOTE], **Note:** or Warning: becomes a callout. Exported for tests. */
+export function parseCallout(text: string): { kind: CalloutKind; label: string; body: string } | null {
+	const m = /^(?:\[!(\w+)\]|\*\*(\w+):?\*\*:?|(\w+):)\s*(.*)$/s.exec(text.trim());
+	if (!m) return null;
+	const word = (m[1] ?? m[2] ?? m[3] ?? "").toLowerCase();
+	const kind = CALLOUT_WORDS[word];
+	if (!kind) return null;
+	return { kind, label: word.charAt(0).toUpperCase() + word.slice(1), body: m[4] ?? "" };
+}
+
+function CodeBlock({ lang, text }: { lang: string; text: string }) {
+	const [copied, setCopied] = useState(false);
+	const copy = () => {
+		void navigator.clipboard?.writeText(text).then(() => {
+			setCopied(true);
+			setTimeout(() => setCopied(false), 1500);
+		});
+	};
+	return (
+		<div className="group bg-muted/50 relative min-w-0 overflow-hidden rounded-lg border">
+			<div className="text-muted-foreground flex items-center justify-between border-b px-3 py-1 text-[11px]">
+				<span className="font-mono tracking-wide">{lang || "text"}</span>
+				<button
+					type="button"
+					onClick={copy}
+					className="hover:bg-accent hover:text-foreground focus-visible:ring-ring/60 flex items-center gap-1 rounded px-1.5 py-0.5 transition-colors focus-visible:ring-2 focus-visible:outline-none"
+					aria-label={copied ? "Copied" : "Copy code"}
+					data-testid="code-copy"
+				>
+					{copied ? <Check className="size-3.5" aria-hidden="true" /> : <Copy className="size-3.5" aria-hidden="true" />}
+					{copied ? "Copied" : "Copy"}
+				</button>
+			</div>
+			<pre className="overflow-x-auto p-4 font-mono text-xs leading-5">
+				<code>{text}</code>
+			</pre>
+		</div>
+	);
+}
 
 export function Markdown({ source, onDocLink, className, testId = "markdown" }: MarkdownProps) {
 	const blocks = parseBlocks(source);
 	return (
-		<article className={cn("flex min-w-0 flex-col gap-3 text-sm leading-6", className)} data-testid={testId}>
+		<article className={cn("text-foreground/90 flex min-w-0 flex-col gap-4 text-[15px] leading-7", className)} data-testid={testId}>
 			{blocks.map((b, i) => {
 				const k = `b${i}`;
 				switch (b.kind) {
@@ -215,35 +276,46 @@ export function Markdown({ source, onDocLink, className, testId = "markdown" }: 
 						);
 					}
 					case "code":
-						return (
-							<pre key={k} className="bg-muted/70 overflow-x-auto rounded-md border p-3 font-mono text-xs leading-5">
-								<code>{b.text}</code>
-							</pre>
-						);
+						return <CodeBlock key={k} lang={b.lang} text={b.text} />;
 					case "list": {
 						const Tag = b.ordered ? "ol" : "ul";
 						return (
-							<Tag key={k} className={cn("flex flex-col gap-1 pl-5", b.ordered ? "list-decimal" : "list-disc")}>
+							<Tag key={k} className={cn("marker:text-muted-foreground flex flex-col gap-1.5 pl-6", b.ordered ? "list-decimal" : "list-disc")}>
 								{b.items.map((it, j) => (
 									<li key={j}>{renderInline(it, onDocLink, `${k}-${j}`)}</li>
 								))}
 							</Tag>
 						);
 					}
-					case "quote":
+					case "quote": {
+						const c = parseCallout(b.text);
+						if (c) {
+							const st = CALLOUT_STYLE[c.kind];
+							const Icon = st.icon;
+							return (
+								<aside key={k} className={cn("flex gap-3 rounded-lg border px-4 py-3", st.box)} data-callout={c.kind}>
+									<Icon className={cn("mt-1 size-4 shrink-0", st.ink)} aria-hidden="true" />
+									<div className="min-w-0">
+										<p className={cn("text-xs font-semibold tracking-wide uppercase", st.ink)}>{c.label}</p>
+										<p>{renderInline(c.body, onDocLink, k)}</p>
+									</div>
+								</aside>
+							);
+						}
 						return (
-							<blockquote key={k} className="text-muted-foreground border-l-2 pl-3">
+							<blockquote key={k} className="text-muted-foreground border-primary/40 border-l-4 py-0.5 pl-4 italic">
 								{renderInline(b.text, onDocLink, k)}
 							</blockquote>
 						);
+					}
 					case "table":
 						return (
-							<div key={k} className="overflow-x-auto rounded-md border">
-								<table className="w-full text-left text-xs">
-									<thead className="bg-muted/60">
+							<div key={k} className="overflow-x-auto rounded-lg border">
+								<table className="w-full text-left text-[13px]">
+									<thead className="bg-muted/60 text-muted-foreground text-xs">
 										<tr>
 											{b.head.map((h, j) => (
-												<th key={j} className="px-2 py-1.5 font-medium">
+												<th key={j} className="px-3 py-2 font-medium">
 													{renderInline(h, onDocLink, `${k}-h${j}`)}
 												</th>
 											))}
@@ -251,9 +323,9 @@ export function Markdown({ source, onDocLink, className, testId = "markdown" }: 
 									</thead>
 									<tbody>
 										{b.rows.map((r, ri) => (
-											<tr key={ri} className="border-t">
+											<tr key={ri} className="hover:bg-muted/30 border-t transition-colors">
 												{r.map((c, ci) => (
-													<td key={ci} className="px-2 py-1.5 align-top">
+													<td key={ci} className="px-3 py-2 align-top">
 														{renderInline(c, onDocLink, `${k}-${ri}-${ci}`)}
 													</td>
 												))}
@@ -264,7 +336,7 @@ export function Markdown({ source, onDocLink, className, testId = "markdown" }: 
 							</div>
 						);
 					case "rule":
-						return <hr key={k} className="my-2" />;
+						return <hr key={k} className="my-4" />;
 					default:
 						return <p key={k}>{renderInline(b.text, onDocLink, k)}</p>;
 				}

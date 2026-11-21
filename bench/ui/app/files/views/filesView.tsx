@@ -4,13 +4,14 @@ import { SyncCard } from "@/components/projectfs/syncCard";
 import { EmptyState } from "@/components/shell/emptyState";
 import { PageHeader } from "@/components/shell/pageHeader";
 import { Button } from "@/components/ui/button";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Skeleton } from "@/components/ui/skeleton";
 import { getBenchErrorMessage } from "@/lib/store/apis/benchApi";
 import { projectExportUrl, useListProjectFilesQuery } from "@/lib/store/apis/projectFilesApi";
 import { canUse, useSession } from "@/lib/session/sessionContext";
 import { PROJECT_AREAS, type ProjectArea, type ProjectEntry } from "@/lib/types/projectfiles";
 import { useNavigate, useSearch } from "@tanstack/react-router";
-import { File, Folder, FolderOpen } from "lucide-react";
+import { cn } from "@/lib/utils";
+import { Bot, ChevronRight, CornerLeftUp, Download, FilePlus, FileText, FlaskConical, Folder, FolderOpen, Lock, ShieldCheck, Upload, ListChecks, type LucideIcon } from "lucide-react";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
 
@@ -24,6 +25,14 @@ export function validNewName(name: string): boolean {
 function asArea(raw: unknown): ProjectArea {
 	return PROJECT_AREAS.includes(raw as ProjectArea) ? (raw as ProjectArea) : "agents";
 }
+
+const AREA_ICONS: Partial<Record<ProjectArea, LucideIcon>> = {
+	agents: Bot,
+	benchmarks: ListChecks,
+	experiments: FlaskConical,
+	policies: ShieldCheck,
+	uploads: Upload,
+};
 
 function parentDir(dir: string): string {
 	const i = dir.lastIndexOf("/");
@@ -77,93 +86,140 @@ export default function FilesView() {
 
 	const entries = list.data?.entries ?? [];
 
+	const crumbs = dir ? dir.split("/") : [];
+
 	return (
-		<div className="flex flex-col gap-4 p-6" data-testid="files-view">
+		<div className="mx-auto flex w-full max-w-[1400px] flex-col gap-6 p-6" data-testid="files-view">
 			<PageHeader
 				title={t("title")}
 				subtitle={t("subtitle")}
 				actions={
 					<Button asChild size="sm" variant="outline">
 						<a href={projectExportUrl()} data-testid="files-export">
+							<Download className="size-4" aria-hidden="true" />
 							{t("export")}
 						</a>
 					</Button>
 				}
 			/>
-			<div className="flex flex-wrap gap-1" role="tablist" data-testid="files-areas">
-				{PROJECT_AREAS.map((a) => (
-					<Button
-						key={a}
-						role="tab"
-						aria-selected={a === area}
-						size="sm"
-						variant={a === area ? "default" : "ghost"}
-						onClick={() => go({ area: a, dir: "", path: undefined })}
-						data-testid={`files-area-${a}`}
-					>
-						{t(`areas.${a}`)}
-					</Button>
-				))}
-			</div>
-			{!canWrite && <p className="text-muted-foreground text-sm">{t("readOnly")}</p>}
-			<div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.4fr)]">
-				<section className="flex flex-col gap-3">
-					<div className="flex items-center gap-2 text-sm">
-						<FolderOpen className="size-4" aria-hidden="true" />
-						<button type="button" className="hover:underline" onClick={() => go({ dir: "", path: undefined })}>
+			{!canWrite && (
+				<p className="text-muted-foreground flex items-center gap-2 text-sm">
+					<Lock className="size-3.5" aria-hidden="true" />
+					{t("readOnly")}
+				</p>
+			)}
+			<div className="grid min-w-0 gap-4 lg:grid-cols-[18rem_minmax(0,1fr)]">
+				<aside className="bg-card flex min-w-0 flex-col rounded-xl border" aria-label={t("explorer")}>
+					<div className="flex flex-col gap-0.5 border-b p-2" role="tablist" data-testid="files-areas">
+						{PROJECT_AREAS.map((a) => {
+							const Icon = AREA_ICONS[a] ?? Folder;
+							const active = a === area;
+							return (
+								<button
+									key={a}
+									type="button"
+									role="tab"
+									aria-selected={active}
+									onClick={() => go({ area: a, dir: "", path: undefined })}
+									className={cn(
+										"focus-visible:ring-ring/60 flex items-center gap-2 rounded-md px-2.5 py-1.5 text-left text-sm transition-colors focus-visible:ring-2 focus-visible:outline-none",
+										active ? "bg-accent text-foreground font-medium" : "text-muted-foreground hover:bg-accent/60 hover:text-foreground",
+									)}
+									data-testid={`files-area-${a}`}
+								>
+									<Icon className="size-4 shrink-0" aria-hidden="true" />
+									{t(`areas.${a}`)}
+								</button>
+							);
+						})}
+					</div>
+					<nav aria-label={t("explorer")} className="flex min-w-0 items-center gap-1 border-b px-3 py-2 text-xs">
+						<button
+							type="button"
+							className="text-muted-foreground hover:text-foreground shrink-0 font-medium transition-colors"
+							onClick={() => go({ dir: "", path: undefined })}
+						>
 							{t(`areas.${area}`)}
 						</button>
-						{dir && <span className="font-mono break-all" data-testid="files-dir">/ {dir}</span>}
+						{crumbs.map((part, i) => (
+							<span key={i} className="flex min-w-0 items-center gap-1">
+								<ChevronRight className="text-muted-foreground size-3 shrink-0" aria-hidden="true" />
+								<button
+									type="button"
+									className={cn("truncate font-mono transition-colors", i === crumbs.length - 1 ? "text-foreground" : "text-muted-foreground hover:text-foreground")}
+									onClick={() => go({ dir: crumbs.slice(0, i + 1).join("/"), path: undefined })}
+									title={crumbs.slice(0, i + 1).join("/")}
+								>
+									{part}
+								</button>
+							</span>
+						))}
+						{dir && <span className="sr-only" data-testid="files-dir">/ {dir}</span>}
+					</nav>
+					<div className="flex min-h-0 flex-1 flex-col p-1.5">
 						{dir && (
-							<Button size="sm" variant="ghost" onClick={() => go({ dir: parentDir(dir), path: undefined })}>
+							<button
+								type="button"
+								onClick={() => go({ dir: parentDir(dir), path: undefined })}
+								className="text-muted-foreground hover:bg-accent/60 hover:text-foreground flex items-center gap-2 rounded-md px-2 py-1.5 text-left text-sm transition-colors"
+							>
+								<CornerLeftUp className="size-4" aria-hidden="true" />
 								{t("up")}
-							</Button>
+							</button>
 						)}
-					</div>
-					{list.error ? (
-						<p className="text-destructive text-sm" data-testid="files-error">
-							{t("loadError", { message: getBenchErrorMessage(list.error) })}
-						</p>
-					) : entries.length === 0 && !list.isLoading ? (
-						<EmptyState compact message={canWrite ? t("empty") : t("emptyViewer")} action={canWrite ? { label: t("emptyUpload"), to: "/upload" } : { label: t("emptyCatalog"), to: "/catalog" }} testId="files-empty" />
-					) : (
-						<Table data-testid="files-table">
-							<TableHeader>
-								<TableRow>
-									<TableHead>{t("columns.name")}</TableHead>
-									<TableHead className="text-right">{t("columns.size")}</TableHead>
-									<TableHead>{t("columns.modified")}</TableHead>
-								</TableRow>
-							</TableHeader>
-							<TableBody>
-								{entries.map((e) => (
-									<TableRow key={e.path} data-state={e.path === openPath ? "selected" : undefined}>
-										<TableCell>
+						{list.error ? (
+							<p className="text-destructive p-2 text-sm" data-testid="files-error">
+								{t("loadError", { message: getBenchErrorMessage(list.error) })}
+							</p>
+						) : list.isLoading ? (
+							<div className="flex flex-col gap-1.5 p-2">
+								{[0, 1, 2, 3].map((i) => (
+									<Skeleton key={i} className="h-6 w-full" />
+								))}
+							</div>
+						) : entries.length === 0 ? (
+							<EmptyState compact icon={FolderOpen} className="m-1.5 border-0" message={canWrite ? t("empty") : t("emptyViewer")} action={canWrite ? { label: t("emptyUpload"), to: "/upload" } : { label: t("emptyCatalog"), to: "/catalog" }} testId="files-empty" />
+						) : (
+							<ul className="flex max-h-[60vh] flex-col gap-0.5 overflow-y-auto" data-testid="files-table">
+								{entries.map((e) => {
+									const selected = e.path === openPath;
+									return (
+										<li key={e.path}>
 											<button
 												type="button"
-												className="flex items-center gap-2 text-left hover:underline"
+												className={cn(
+													"group flex w-full min-w-0 items-center gap-2 rounded-md px-2 py-1.5 text-left text-sm transition-colors",
+													selected ? "bg-primary/10 text-foreground" : "hover:bg-accent/60",
+												)}
+												aria-current={selected ? "true" : undefined}
 												onClick={() => openEntry(e)}
+												title={e.mod_time ? `${baseName(e.path)} · ${new Date(e.mod_time).toLocaleString()}` : baseName(e.path)}
 												data-testid={`files-entry-${e.path}`}
 											>
-												{e.dir ? <Folder className="size-4" aria-hidden="true" /> : <File className="size-4" aria-hidden="true" />}
-												<span className="font-mono text-xs break-all">{baseName(e.path)}</span>
+												{e.dir ? (
+													<Folder className="size-4 shrink-0 fill-amber-400/30 text-amber-500" aria-hidden="true" />
+												) : (
+													<FileText className="text-muted-foreground size-4 shrink-0" aria-hidden="true" />
+												)}
+												<span className="min-w-0 flex-1 truncate">{baseName(e.path)}</span>
+												{e.dir ? (
+													<ChevronRight className="text-muted-foreground size-3.5 shrink-0 opacity-0 transition-opacity group-hover:opacity-100" aria-hidden="true" />
+												) : (
+													<span className="text-muted-foreground shrink-0 text-xs tabular-nums">{formatSize(e.size)}</span>
+												)}
 											</button>
-										</TableCell>
-										<TableCell className="text-right text-xs">{e.dir ? "" : formatSize(e.size)}</TableCell>
-										<TableCell className="text-muted-foreground text-xs">
-											{e.mod_time ? new Date(e.mod_time).toLocaleString() : ""}
-										</TableCell>
-									</TableRow>
-								))}
-							</TableBody>
-						</Table>
-					)}
+										</li>
+									);
+								})}
+							</ul>
+						)}
+					</div>
 					{canWrite && (
-						<div className="flex flex-col gap-1">
-							<div className="flex gap-2">
+						<div className="flex flex-col gap-1 border-t p-2">
+							<div className="flex gap-1.5">
 								<input
 									aria-label={t("newFile")}
-									className="bg-background h-8 flex-1 rounded-md border px-2 font-mono text-sm"
+									className="bg-background focus-visible:ring-ring/60 h-8 min-w-0 flex-1 rounded-md border px-2 font-mono text-xs focus-visible:ring-2 focus-visible:outline-none"
 									placeholder={t("newFilePlaceholder")}
 									value={newName}
 									onChange={(e) => setNewName(e.target.value)}
@@ -172,17 +228,16 @@ export default function FilesView() {
 									}}
 									data-testid="files-new-name"
 								/>
-								<Button size="sm" variant="outline" onClick={createFile}>
-									{t("create")}
+								<Button size="sm" variant="outline" onClick={createFile} aria-label={t("create")} title={t("create")}>
+									<FilePlus className="size-4" aria-hidden="true" />
 								</Button>
 							</div>
 							{nameError && <p className="text-destructive text-xs">{t("badName")}</p>}
 						</div>
 					)}
-				</section>
-				<section className="flex flex-col gap-4">
-					{!openPath && <SyncCard />}
-					{openPath && (
+				</aside>
+				<section className="flex min-w-0 flex-col gap-4">
+					{openPath ? (
 						<FileEditor
 							key={`${area}/${openPath}`}
 							area={area}
@@ -190,7 +245,10 @@ export default function FilesView() {
 							onDeleted={() => go({ path: undefined })}
 							onClose={() => go({ path: undefined })}
 						/>
+					) : (
+						<EmptyState icon={FileText} className="bg-card min-h-80 rounded-xl" message={t("pickFile")} testId="files-pick" />
 					)}
+					<SyncCard />
 				</section>
 			</div>
 		</div>

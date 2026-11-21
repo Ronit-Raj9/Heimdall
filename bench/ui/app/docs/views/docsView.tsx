@@ -1,4 +1,4 @@
-import { Markdown } from "@/components/docs/markdown";
+import { Markdown, parseBlocks, slugify } from "@/components/docs/markdown";
 import { BlockSkeleton, LoadError } from "@/components/runs/screenStates";
 import { EmptyState, PageHeader } from "@/components/shell";
 import { Input } from "@/components/ui/input";
@@ -54,6 +54,13 @@ export default function DocsView() {
 		return f ? all.filter((d) => d.title.toLowerCase().includes(f) || d.name.includes(f)) : all;
 	}, [list.data, filter]);
 
+	const toc = useMemo(() => {
+		if (!doc.data) return [];
+		return parseBlocks(doc.data.markdown)
+			.filter((b): b is { kind: "heading"; level: number; text: string } => b.kind === "heading" && (b.level === 2 || b.level === 3))
+			.map((b) => ({ id: slugify(b.text), text: b.text, level: b.level }));
+	}, [doc.data]);
+
 	// After a cross-guide link with an anchor, scroll to that heading once the guide renders.
 	useEffect(() => {
 		if (!anchor || !doc.data) return;
@@ -77,16 +84,16 @@ export default function DocsView() {
 			) : (list.data?.docs.length ?? 0) === 0 ? (
 				<EmptyState icon={BookOpen} message={t("docs.none")} testId="docs-none" />
 			) : (
-				<div className="grid min-w-0 gap-6 md:grid-cols-[16rem_minmax(0,1fr)]">
-					<nav className="flex min-w-0 flex-col gap-2 md:sticky md:top-0 md:max-h-[calc(100dvh-10rem)]" aria-label={t("docs.title")}>
+				<div className="grid min-w-0 gap-8 md:grid-cols-[15rem_minmax(0,1fr)] xl:grid-cols-[15rem_minmax(0,1fr)_12rem]">
+					<nav className="flex min-w-0 flex-col gap-3 md:sticky md:top-0 md:max-h-[calc(100dvh-10rem)]" aria-label={t("docs.title")}>
 						<div className="relative">
-							<Search className="text-muted-foreground absolute top-1/2 left-2 size-3.5 -translate-y-1/2" aria-hidden="true" />
+							<Search className="text-muted-foreground absolute top-1/2 left-2.5 size-4 -translate-y-1/2" aria-hidden="true" />
 							<Input
 								value={filter}
 								onChange={(e) => setFilter(e.target.value)}
 								placeholder={t("docs.search")}
 								aria-label={t("docs.search")}
-								className="h-8 pl-7 text-sm"
+								className="bg-card h-9 rounded-lg pl-8 text-sm"
 								data-testid="docs-filter"
 							/>
 						</div>
@@ -99,16 +106,16 @@ export default function DocsView() {
 										onClick={() => open(d.name)}
 										aria-current={d.name === selected ? "page" : undefined}
 										className={cn(
-											"hover:bg-accent focus-visible:ring-ring/60 w-full truncate rounded-md px-2 py-1 text-left text-[13px] transition-colors focus-visible:ring-2 focus-visible:outline-none",
-											d.name === selected ? "bg-accent text-foreground font-medium" : "text-muted-foreground",
+											"hover:bg-accent/60 hover:text-foreground focus-visible:ring-ring/60 flex w-full items-center gap-2 truncate rounded-md border-l-2 px-2.5 py-1.5 text-left text-[13px] transition-colors focus-visible:ring-2 focus-visible:outline-none",
+											d.name === selected ? "border-primary bg-accent text-foreground font-medium" : "text-muted-foreground border-transparent",
 										)}
 										title={d.title}
 										data-testid={`docs-item-${d.name}`}
 									>
 										{d.name === START_DOC && (
-											<span className="bg-primary text-primary-foreground mr-1.5 rounded px-1 text-[10px] font-semibold">{t("docs.start")}</span>
+											<span className="bg-primary/10 text-primary shrink-0 rounded-full px-1.5 py-0.5 text-[10px] font-semibold">{t("docs.start")}</span>
 										)}
-										{d.title}
+										<span className="truncate">{d.title}</span>
 									</button>
 								</li>
 							))}
@@ -125,6 +132,30 @@ export default function DocsView() {
 							<EmptyState icon={BookOpen} message={t("docs.pick")} testId="doc-pick" />
 						)}
 					</div>
+					{toc.length > 1 && (
+						<aside className="hidden xl:block" aria-label={t("docs.onThisPage")}>
+							<div className="sticky top-0 flex flex-col gap-2 text-[13px]">
+								<p className="text-muted-foreground text-xs font-medium tracking-wide uppercase">{t("docs.onThisPage")}</p>
+								<ul className="flex flex-col gap-1 border-l">
+									{toc.map((h) => (
+										<li key={h.id}>
+											<a
+												href={`#${h.id}`}
+												onClick={(e) => {
+													e.preventDefault();
+													document.getElementById(h.id)?.scrollIntoView({ block: "start", behavior: "smooth" });
+												}}
+												className={cn("text-muted-foreground hover:text-foreground -ml-px block truncate border-l border-transparent py-0.5 transition-colors hover:border-foreground/40", h.level === 3 ? "pl-6" : "pl-3")}
+												title={h.text}
+											>
+												{h.text.replace(/[`*_]/g, "")}
+											</a>
+										</li>
+									))}
+								</ul>
+							</div>
+						</aside>
+					)}
 				</div>
 			)}
 		</section>

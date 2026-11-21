@@ -93,13 +93,14 @@
 	},
 	"docs": {
 		"title": "Docs",
-		"subtitle": "Every guide that ships with this server, readable here.",
-		"search": "Filter guides",
+		"subtitle": "Guides for every part of Heimdall.",
+		"search": "Search guides",
 		"empty": "No guide matches this filter.",
 		"none": "This server ships no guides.",
 		"pick": "Pick a guide on the left.",
 		"loadError": "Could not load the guides.",
 		"docError": "Could not load this guide.",
-		"start": "Start here"
+		"start": "Start here",
+		"onThisPage": "On this page"
 	}
 }
