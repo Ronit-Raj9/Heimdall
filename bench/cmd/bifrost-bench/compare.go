@@ -40,7 +40,7 @@ func init() {
 const compareUsage = `usage: bifrost-bench compare --baseline <ref> --candidate <ref> [--base agents/<agent>.yaml] [--paths AGENTS.md,CLAUDE.md,...]
        bifrost-bench compare --a agents/x.yaml --b agents/y.yaml
        bifrost-bench compare --a model=<m1> --b model=<m2> [--base agents/<agent>.yaml]   (any key=value override, comma-separated)
-   common: [--suite <suite>] [--trials 3] [--fault model-outage]... [--tier <tier>] [--budget-usd <usd, required unless every arm is scripted>] [--yes]
+   common: [--suite <suite>] [--trials 3] [--fault model-outage]... [--tier <tier>] [--budget-usd <usd, required unless every arm is scripted>] [--reserve-usd <usd per unpriced run>] [--yes]
            [--name <experiment name>] [--concurrency 2] [--policy policies/default.yaml|none] [--fail-on regressed,invalid] [--write-only] [--config ...]
 exit: 0 ok, 1 regressed, 2 inconclusive, 3 invalid (each only when listed in --fail-on), 4 infrastructure error, 5 blocked by the release policy, 6 not run (consent declined or not given; no verdict), 64 usage`
 
@@ -57,7 +57,7 @@ func (l *listFlag) Set(v string) error {
 type compareFlags struct {
 	config, baseline, candidate, a, b, base, suite, tier, name, policy, failOn, paths, repo string
 	trials, concurrency                                                                     int
-	budget                                                                                  float64
+	budget, reserve                                                                         float64
 	faults                                                                                  listFlag
 	yes, writeOnly                                                                          bool
 }
@@ -81,6 +81,7 @@ func runCompare(args []string) int {
 	fs.IntVar(&f.trials, "trials", quickstart.DefaultTrials, "trials per task, arm and condition")
 	fs.IntVar(&f.concurrency, "concurrency", 2, "runs at once")
 	fs.Float64Var(&f.budget, "budget-usd", 0, "total spend cap in USD; the scheduler stops leasing runs past it. Required (> 0) unless every arm is a scripted agent: 0 would leave the run uncapped")
+	fs.Float64Var(&f.reserve, "reserve-usd", 0, "budget.reserve_usd: what the scheduler counts per run whose cost is unknown (an unpriced model); without it the first such run is counted at the whole remaining budget")
 	fs.Var(&f.faults, "fault", "a fault condition (probe id) to add, e.g. model-outage; repeatable")
 	fs.BoolVar(&f.yes, "yes", false, "run without asking, even when the forecast says it costs money")
 	fs.BoolVar(&f.writeOnly, "write-only", false, "write the experiment file (and its fixtures) and stop; nothing is planned or run")
@@ -131,7 +132,7 @@ func buildCompare(ctx context.Context, f compareFlags, cfg *lib.Config) (_ *comp
 	name = quickstart.ExperimentName(name)
 	o := quickstart.CompareOptions{
 		Name: name, Suite: suiteID, Base: f.base, Trials: f.trials, Faults: f.faults, Tier: f.tier,
-		BudgetUSD: f.budget, Concurrency: f.concurrency, Policy: f.policy,
+		BudgetUSD: f.budget, ReserveUSD: f.reserve, Concurrency: f.concurrency, Policy: f.policy,
 		Command: progName + " compare " + strings.Join(os.Args[2:], " "),
 	}
 	if o.Base == "" && pf != nil && len(pf.Agents) > 0 && (f.baseline != "" || !strings.HasSuffix(f.a, ".yaml") || !strings.HasSuffix(f.b, ".yaml")) {

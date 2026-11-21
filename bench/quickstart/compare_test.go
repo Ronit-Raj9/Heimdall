@@ -94,6 +94,20 @@ func TestExperimentYAMLForms(t *testing.T) {
 			t.Errorf("label %q", e.Arms["B"].Label)
 		}
 	})
+	t.Run("reserve", func(t *testing.T) {
+		a, _ := ParseArm("model=gpt-6.1-sol")
+		b, _ := ParseArm("model=gpt-6.2-sol")
+		raw, err := ExperimentYAML(CompareOptions{Name: "c4", Suite: "s", Base: "agents/codex.yaml", A: a, B: b, BudgetUSD: 0.96, ReserveUSD: 0.1})
+		if err != nil {
+			t.Fatal(err)
+		}
+		if e := decode(t, raw); e.Budget.TotalUSD != 0.96 || e.Budget.ReserveUSD != 0.1 {
+			t.Errorf("budget %+v, want total 0.96 reserve 0.1", e.Budget)
+		}
+		if got := BudgetLine(5, 0); got != "budget: {total_usd: 5}\n" {
+			t.Errorf("no reserve: %q", got)
+		}
+	})
 	t.Run("refs", func(t *testing.T) {
 		raw, err := ExperimentYAML(CompareOptions{Name: "c3", Suite: "s", Base: "agents/claude-code.yaml",
 			A: ArmInput{Label: "main (abc)", Set: map[string]any{"notes.user_file": "experiments/fixtures/c3/A/CLAUDE.md"}},
