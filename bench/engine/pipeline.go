@@ -19,6 +19,10 @@ import (
 // fresh context detached from the run's own context.
 var cleanupTimeout = 2 * time.Minute // a variable so a test can shorten it
 
+// sealTimeout bounds the final artifact writes and the seal, apart from
+// cleanup, so a slow cleanup never shortens the seal (QC2-06-01).
+var sealTimeout = 2 * time.Minute
+
 // upstreamPart names the provider's API in the part failure the upstream rule
 // records.
 const upstreamPart = "upstream"
@@ -153,7 +157,7 @@ func (p *Pipeline) RunSlot(ctx context.Context, in SlotInput) (*SlotResult, erro
 	// QC2-06-01: final evidence and the seal get their own bounded context,
 	// so a cleanup that used up its deadline cannot also fail the seal of a
 	// finished run. An expired cleanup is recorded as a cleanup failure.
-	sctx, scancel := afterContext(ctx)
+	sctx, scancel := context.WithTimeout(context.WithoutCancel(ctx), sealTimeout)
 	defer scancel()
 	up := utils.TallyUpstream(st.ev.Ledger, st.ev.Requests)
 	st.rc.Run.Outcome = decideOutcome(st, up)
