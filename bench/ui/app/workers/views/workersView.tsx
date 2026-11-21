@@ -1,5 +1,6 @@
 import { ModeBadge } from "@/components/modeBadge";
 import { ImageRequestsCard } from "@/components/sharedpool/imageRequests";
+import { ConnectedWorkers } from "@/components/workers/connectedWorkers";
 import { PageHeader } from "@/components/shell";
 import { BlockSkeleton, EmptyNote, LoadError } from "@/components/runs/screenStates";
 import { isSharedWorker, SharedWorkerNote, WorkerStateBadge, WorkersOff } from "@/components/workers/workersTable";
@@ -136,6 +137,7 @@ export default function WorkersView({ tokensLink = true }: { /** The pointer to 
 					{t("workers.synthetic")}
 				</p>
 			)}
+			<ConnectedWorkers />
 			{tokensLink && <AddRunnerCard />}
 			{query.isLoading ? (
 				<BlockSkeleton rows={4} testId="workers-loading" />

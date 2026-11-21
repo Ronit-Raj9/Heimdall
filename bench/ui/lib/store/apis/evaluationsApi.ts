@@ -101,6 +101,8 @@ export interface EvaluationSpec {
 	split?: "public" | "held_out";
 	/** Checked automatically when the evaluation finishes. */
 	gate?: EvaluationGate;
+	/** The connected worker (its pool) the evaluation runs on; unset is the org's default worker, "shared" the shared worker. */
+	worker?: string;
 }
 
 /** What an evaluation must show to pass. Scores are fractions (0 to 1). */

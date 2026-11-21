@@ -58,6 +58,10 @@ type EvaluationSpec struct {
 	// other split never run in it.
 	Split string          `json:"split,omitempty"`
 	Gate  *EvaluationGate `json:"gate,omitempty"` // checked automatically when the evaluation finishes
+	// Worker is the connected worker (its pool) the evaluation runs on;
+	// "" is the org's default worker, "shared" the shared worker. The saved
+	// evaluation holds the resolved pool ("" for the shared worker).
+	Worker string `json:"worker,omitempty"`
 }
 
 // EvaluationGate is what an evaluation must show to pass. Scores are

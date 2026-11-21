@@ -1,4 +1,5 @@
 import { Button } from "@/components/ui/button";
+import { EvaluationWorkerPicker } from "@/components/workers/connectedWorkers";
 import { type EvaluationArm, type EvaluationSpec, useCreateEvaluationMutation } from "@/lib/store/apis/evaluationsApi";
 import { Link, useNavigate } from "@tanstack/react-router";
 import { useState } from "react";
@@ -105,6 +106,8 @@ export function Step5Launch({ spec, onChange }: Step5LaunchProps) {
 				/>
 				<span className="text-muted-foreground text-xs">The evaluation stops when model spending reaches this amount.</span>
 			</section>
+
+			<EvaluationWorkerPicker value={spec.worker ?? ""} onChange={(worker) => onChange({ ...spec, worker: worker || undefined })} />
 
 			{state.error ? (
 				<p className="text-chart-error-ink text-sm" role="alert" data-testid="step5-error">

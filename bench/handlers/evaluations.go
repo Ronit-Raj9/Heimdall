@@ -20,6 +20,7 @@ import (
 	"regexp"
 	"sort"
 	"strings"
+	"sync/atomic"
 	"time"
 
 	"github.com/fasthttp/router"
@@ -318,6 +319,10 @@ func (h *evaluationsHandler) create(ctx *fasthttp.RequestCtx) {
 	work, cancel := workContext(ctx, evaluationLaunchTimeout)
 	defer cancel()
 	if err := h.normalize(work, &spec); err != nil {
+		h.fail(ctx, statusOf(err), err.Error())
+		return
+	}
+	if err := resolveEvaluationWorker(work, quickOrgID(ctx, s.OrgID), &spec); err != nil {
 		h.fail(ctx, statusOf(err), err.Error())
 		return
 	}
@@ -751,6 +756,9 @@ func (h *evaluationsHandler) launchChild(work context.Context, start context.Con
 	if err == nil {
 		body, err = appendEvalID(body, ev.ID)
 	}
+	if err == nil {
+		body, err = appendRunnerPool(body, spec.Worker)
+	}
 	if err != nil {
 		return skip("encode experiment: %v", err)
 	}
@@ -818,6 +826,50 @@ func appendEvalID(body []byte, id string) ([]byte, error) {
 		return nil, fmt.Errorf("bad evaluation id %q", id)
 	}
 	return append(body, []byte("evaluation_id: "+id+"\n")...), nil
+}
+
+// evaluationPoolResolver resolves the worker an evaluation runs on (hosted
+// bring-your-own-worker, byoworker.Service.EvaluationPool): the worker it
+// names, else the org's default; "" is the shared worker. nil off the
+// hosted platform.
+var evaluationPoolResolver atomic.Value // func(ctx, orgID, worker string) (string, error)
+
+// SetEvaluationPoolResolver installs the hosted worker resolver.
+func SetEvaluationPoolResolver(f func(ctx context.Context, orgID, worker string) (string, error)) {
+	evaluationPoolResolver.Store(f)
+}
+
+// resolveEvaluationWorker replaces spec.Worker with the runner pool the
+// evaluation's experiments go to, so the saved evaluation records where it
+// ran. Without a resolver (local mode) a named worker is refused.
+func resolveEvaluationWorker(ctx context.Context, orgID string, spec *schemas.EvaluationSpec) error {
+	spec.Worker = strings.TrimSpace(spec.Worker)
+	f, _ := evaluationPoolResolver.Load().(func(context.Context, string, string) (string, error))
+	if f == nil || orgID == "" {
+		if spec.Worker != "" && spec.Worker != schemas.DefaultRunnerPool && spec.Worker != schemas.SharedRunnerPool {
+			return badf("worker %q: choosing a worker needs the hosted platform; this server runs evaluations itself", spec.Worker)
+		}
+		spec.Worker = ""
+		return nil
+	}
+	pool, err := f(ctx, orgID, spec.Worker)
+	if err != nil {
+		return badf("%v", err)
+	}
+	spec.Worker = pool
+	return nil
+}
+
+// appendRunnerPool adds the runner block of an evaluation's worker; the
+// shared worker ("") adds nothing, so those experiments hash as before.
+func appendRunnerPool(body []byte, pool string) ([]byte, error) {
+	if pool == "" {
+		return body, nil
+	}
+	if !schemas.ValidPoolName(pool) {
+		return nil, fmt.Errorf("bad worker pool %q", pool)
+	}
+	return append(body, []byte("runner:\n  pool: "+pool+"\n")...), nil
 }
 
 // evalArms turns the spec's arms into experiment arms, one per spec arm.

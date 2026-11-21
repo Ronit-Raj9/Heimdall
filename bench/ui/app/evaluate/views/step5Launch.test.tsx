@@ -11,6 +11,10 @@ vi.mock("@/lib/store/apis/benchApi", async (orig) => ({
 	...(await orig<typeof import("@/lib/store/apis/benchApi")>()),
 	useGetAgentsQuery: () => ({ data: { agents: [{ id: "bot", owns_model: true }, { id: "codex" }] } }),
 }));
+vi.mock("@/lib/store/apis/workerConnectionsApi", async (importOriginal) => ({
+	...(await importOriginal<typeof import("@/lib/store/apis/workerConnectionsApi")>()),
+	useListWorkerConnectionsQuery: () => ({}),
+}));
 vi.mock("@tanstack/react-router", async () => (await import("@/lib/testing/routerMock")).routerMock);
 
 const spec = (over: Partial<EvaluationSpec> = {}): EvaluationSpec => ({

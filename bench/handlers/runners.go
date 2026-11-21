@@ -4,6 +4,8 @@ import (
 	"bytes"
 	"context"
 	"errors"
+	"regexp"
+	"strings"
 
 	"github.com/fasthttp/router"
 	"github.com/maximhq/bifrost/bench/auth"
@@ -50,6 +52,40 @@ func NewRunnersHandler(mode schemas.Mode, api RunnerAdmin, audit AuditFunc) *Run
 func (h *RunnersHandler) WithInstallScript(script []byte) *RunnersHandler {
 	h.install = script
 	return h
+}
+
+// WithInstallDefaults fills the install script's defaults (the
+// HEIMDALL_DEFAULT_* lines) with this server's address, the repository and
+// the commit runners must run, so the one-line install
+// (curl .../install.sh | sudo HEIMDALL_RUNNER_TOKEN=... sh) needs nothing
+// else. A value that is not plainly safe in a shell assignment is left out.
+// Call it after WithInstallScript.
+func (h *RunnersHandler) WithInstallDefaults(server, repo, ref string) *RunnersHandler {
+	h.install = InstallScriptWithDefaults(h.install, server, repo, ref)
+	return h
+}
+
+var (
+	installServerRe = regexp.MustCompile(`^https?://[A-Za-z0-9.-]+(:[0-9]{1,5})?(/[A-Za-z0-9._~/-]*)?$`)
+	installRepoRe   = regexp.MustCompile(`^(https://|ssh://|git@)[A-Za-z0-9._~:/@+-]+$`)
+	installRefRe    = regexp.MustCompile(`^[A-Za-z0-9._/-]{1,128}$`)
+)
+
+// InstallScriptWithDefaults returns script with its HEIMDALL_DEFAULT_*
+// assignments set to the values that pass their pattern.
+func InstallScriptWithDefaults(script []byte, server, repo, ref string) []byte {
+	out := script
+	set := func(name, v string, re *regexp.Regexp) {
+		v = strings.TrimRight(strings.TrimSpace(v), "/")
+		if v == "" || !re.MatchString(v) || strings.Contains(v, "..") && name == "HEIMDALL_DEFAULT_REF" {
+			return
+		}
+		out = bytes.Replace(out, []byte("\n"+name+"=\"\"\n"), []byte("\n"+name+"='"+v+"'\n"), 1)
+	}
+	set("HEIMDALL_DEFAULT_SERVER", server, installServerRe)
+	set("HEIMDALL_DEFAULT_REPO", repo, installRepoRe)
+	set("HEIMDALL_DEFAULT_REF", ref, installRefRe)
+	return out
 }
 
 // RegisterRoutes registers the runner admin routes.

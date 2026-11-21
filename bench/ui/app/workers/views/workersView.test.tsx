@@ -21,6 +21,8 @@ vi.mock("@/lib/store/apis/sharedpoolApi", () => ({
 	useRequestImageMutation: () => [vi.fn(), { isLoading: false }],
 }));
 
+vi.mock("@/components/workers/connectedWorkers", () => ({ ConnectedWorkers: () => null }));
+
 const fixture = JSON.parse(fs.readFileSync(path.resolve(__dirname, "../../../public/fixtures/workers.json"), "utf8")) as WorkerList;
 const idle = { isLoading: false, isFetching: false, isError: false, data: undefined, error: undefined, refetch: () => undefined };
 
