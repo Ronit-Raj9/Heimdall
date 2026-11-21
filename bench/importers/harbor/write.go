@@ -68,8 +68,10 @@ func writeTask(dir, id string, t *upstreamTask, p *taskPlan, up upstream) error 
 	if err := copyTree(t.TestsDir, filepath.Join(dir, filepath.FromSlash(upstreamTests)), nil); err != nil {
 		return err
 	}
-	if err := copyTree(t.SolutionDir, filepath.Join(dir, solutionDir), nil); err != nil {
-		return err
+	if isDir(t.SolutionDir) {
+		if err := copyTree(t.SolutionDir, filepath.Join(dir, solutionDir), nil); err != nil {
+			return err
+		}
 	}
 	files := map[string]string{
 		"instruction.md":         t.Instruction,
@@ -137,6 +139,12 @@ func taskRecord(id string, t *upstreamTask, p *taskPlan, up upstream) *schemas.T
 	if p.honeypot {
 		task.Protected = []string{"admin/**"}
 		task.Tags = dedupe(append(task.Tags, "hack-verifiable"))
+	}
+	if t.ContinueUntilTimeout {
+		task.Tags = dedupe(append(task.Tags, "continue-until-timeout"))
+	}
+	if p.draft != "" {
+		task.Tags = dedupe(append(task.Tags, "draft"))
 	}
 	return task
 }
@@ -249,6 +257,9 @@ exit $code
 // embedded as a tar, unpacked where Harbor uploads it, then solve.sh run from
 // the task's working directory with the solution environment.
 func referenceScript(t *upstreamTask, p *taskPlan) string {
+	if p.draft != "" {
+		return draftReference(p.draft)
+	}
 	var env strings.Builder
 	for _, k := range sortedEnvKeys(t.SolutionEnv) {
 		fmt.Fprintf(&env, "export %s=%s\n", k, shellQuote(t.SolutionEnv[k]))
@@ -328,6 +339,14 @@ done
 exit 0
 `
 
+// draftReference is the reference control of a draft task: it fails with
+// the reason, so admission refuses the task and the reason shows in its
+// admission record.
+func draftReference(reason string) string {
+	return "#!/bin/sh\n# Draft task (bifrost-bench import harbor -set unrunnable=draft): the bench\n# cannot admit it, so this control fails on purpose. See IMPORT.md.\necho " +
+		shellQuote("draft: "+reason) + " >&2\nexit 1\n"
+}
+
 // importNotes is IMPORT.md: where the task came from and every change the
 // import made to it, so a reader can judge the converted task.
 func importNotes(id string, t *upstreamTask, p *taskPlan, up upstream) string {
@@ -337,6 +356,10 @@ func importNotes(id string, t *upstreamTask, p *taskPlan, up upstream) string {
 		fmt.Fprintf(&b, " at %s", up.Revision)
 	}
 	fmt.Fprintf(&b, "), upstream folder `%s`, %s layout. License: %s.\n\n", t.ID, t.Layout, up.License)
+	if p.draft != "" {
+		b.WriteString("## Draft\n\nThis task is in the suite as a draft, and admission refuses it: " + p.draft +
+			". The reference control fails with that reason on purpose; `solution/` is the upstream folder when there is one, unused.\n\n")
+	}
 	b.WriteString("## Changes made by the import\n\n")
 	b.WriteString("- The verifier runs `verifier/tests/harbor/verify.sh` in a snapshot of the agent's container (verifier mode snapshot). " +
 		"It copies `verifier/tests/upstream` to " + t.TestsMount + ", replaces `test.sh` with `verifier/tests/harbor/test.sh` and copies the reward to `/grader/out/reward.json`.\n")
@@ -347,6 +370,19 @@ func importNotes(id string, t *upstreamTask, p *taskPlan, up upstream) string {
 		fmt.Fprintf(&b, "- test.sh, %s\n", c)
 	}
 	b.WriteString("- The agent, the reference script and the verifier run as root (`environment.user: root`), as Harbor runs them.\n")
+	if t.AgentUser != "" && t.AgentUser != "root" {
+		fmt.Fprintf(&b, "- Upstream runs the agent as `%s` (`[agent] user`), not root; the bench runs it as root, so anything that relied on the agent being unprivileged (root-only files, a root daemon it cannot restart) no longer holds.\n", t.AgentUser)
+	}
+	if t.Healthcheck != "" {
+		fmt.Fprintf(&b, "- Upstream runs `%s` (`[environment.healthcheck]`) before the agent starts; the bench does not, so whatever it starts is started on first use instead.\n", t.Healthcheck)
+	}
+	if p.agentS != seconds(t.AgentTimeoutS, defaultAgentS) {
+		fmt.Fprintf(&b, "- The agent budget is %d s (`-set agent_timeout`, Harbor's override_timeout_sec), not task.toml's %.0f s.\n", p.agentS, t.AgentTimeoutS)
+	}
+	if t.ContinueUntilTimeout {
+		b.WriteString("- `continue_until_timeout = true` (Long-Horizon Terminal-Bench): its modified Harbor runs the verifier when the agent stops and, unless it passed, resumes the agent with a bare rejection until the timeout. " +
+			"The bench runs the agent once, up to `timeouts.agent_s`, and grades once, as stock Harbor does; an agent that stops early is not resumed, so scores can be lower than the paper's. The reward is kept on the grade (partial credit).\n")
+	}
 	b.WriteString("- The appended Dockerfile section also copies root's git settings to /etc/gitconfig and trusts every repository, because Harbor's agent is root and the bench's is uid 1000.\n")
 	if p.skillCopy > 0 {
 		fmt.Fprintf(&b, "- The Dockerfile copied the skills folder into the image (%d line(s)); those lines are disabled, and the skills are installed by the bench from `skills/` only when skills are enabled.\n", p.skillCopy)
@@ -373,7 +409,11 @@ func importNotes(id string, t *upstreamTask, p *taskPlan, up upstream) string {
 			b.WriteString("- " + n + "\n")
 		}
 	}
-	b.WriteString("- The reference control embeds `solution/` and runs `solve.sh`; the empty control does nothing; the exploit control plants a fake reward.\n")
+	if p.draft == "" {
+		b.WriteString("- The reference control embeds `solution/` and runs `solve.sh`; the empty control does nothing; the exploit control plants a fake reward.\n")
+	} else {
+		b.WriteString("- The reference control fails on purpose (draft); the empty control does nothing; the exploit control plants a fake reward.\n")
+	}
 	return b.String()
 }
 
@@ -406,7 +446,7 @@ func checkExistingSuite(dir, id string, up upstream) error {
 
 // writeSuite writes suite.yaml, or extends the one already there with the
 // new tasks, and the suite's small base image.
-func writeSuite(dir, id string, up upstream, track string, tasks []*converted, now time.Time) error {
+func writeSuite(dir, id string, up upstream, track string, tasks []*converted, passThreshold float64, now time.Time) error {
 	s := &schemas.Suite{}
 	path := filepath.Join(dir, "suite.yaml")
 	if b, err := os.ReadFile(path); err == nil {
@@ -449,6 +489,9 @@ func writeSuite(dir, id string, up upstream, track string, tasks []*converted, n
 	}
 	if s.Track != schemas.TrackSkills {
 		s.Track = track
+	}
+	if passThreshold > 0 {
+		s.Verifier.PassThreshold = passThreshold
 	}
 	s.Imported = &schemas.ImportRecord{Importer: Name, Benchmark: up.Benchmark, Source: up.Source, Revision: up.Revision, License: up.License, At: now.UTC().Truncate(time.Second)}
 	if err := os.MkdirAll(filepath.Join(dir, "base"), 0o755); err != nil {

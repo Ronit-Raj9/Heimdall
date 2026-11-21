@@ -432,3 +432,51 @@ func TestImportRefusesForeignSuite(t *testing.T) {
 		t.Fatalf("other benchmark: err = %v", err)
 	}
 }
+
+// TestImportLongHorizon covers the Long-Horizon Terminal-Bench settings: a
+// long agent budget, a partial-credit pass threshold, the continue-until-timeout
+// tag and notes, and a task without a solution kept as a draft.
+func TestImportLongHorizon(t *testing.T) {
+	from := filepath.Join("testdata", "lhtb")
+	t.Run("drafts skipped by default", func(t *testing.T) {
+		_, res := runImport(t, from, "s", importers.Options{})
+		if strings.Join(res.Tasks, ",") != "long-game" || len(res.Skipped) != 1 || res.Skipped[0].ID != "no-solution" {
+			t.Errorf("result = %+v", res)
+		}
+	})
+	t.Run("settings", func(t *testing.T) {
+		root, res := runImport(t, from, "s", importers.Options{Extra: map[string]string{
+			"unrunnable": "draft", "agent_timeout": "10800", "pass_threshold": "0.5"}})
+		if strings.Join(res.Tasks, ",") != "long-game,no-solution" {
+			t.Fatalf("result = %+v", res)
+		}
+		s := loadSuite(t, root, "s")
+		if s.Verifier.PassThreshold != 0.5 {
+			t.Errorf("pass_threshold = %v", s.Verifier.PassThreshold)
+		}
+		long := s.TaskByID("long-game")
+		if long.Timeouts.AgentS != 10800 || !contains(long.Tags, "continue-until-timeout") || contains(long.Tags, "draft") {
+			t.Errorf("long-game = %+v", long)
+		}
+		notes := readFile(t, filepath.Join(root, "benchmarks/s/tasks/long-game/IMPORT.md"))
+		for _, want := range []string{"continue_until_timeout", "as `agent`", "/opt/start-server.sh", "10800 s"} {
+			if !strings.Contains(notes, want) {
+				t.Errorf("IMPORT.md lacks %q:\n%s", want, notes)
+			}
+		}
+		if d := s.TaskByID("no-solution"); !contains(d.Tags, "draft") {
+			t.Errorf("no-solution tags = %v", d.Tags)
+		}
+		ref := readFile(t, filepath.Join(root, "benchmarks/s/tasks/no-solution/controls/reference.sh"))
+		if !strings.Contains(ref, "exit 1") || !strings.Contains(ref, "no solution/solve.sh") {
+			t.Errorf("draft reference:\n%s", ref)
+		}
+	})
+	t.Run("bad settings", func(t *testing.T) {
+		for k, v := range map[string]string{"agent_timeout": "0", "pass_threshold": "1.5", "unrunnable": "maybe"} {
+			if _, err := readSettings(map[string]string{k: v}); err == nil {
+				t.Errorf("%s=%s accepted", k, v)
+			}
+		}
+	})
+}

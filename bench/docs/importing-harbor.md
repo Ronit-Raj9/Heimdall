@@ -70,6 +70,9 @@ Settings (`-set key=value`):
 | `image` | `build` | `prebuilt` starts each task image `FROM` the image `task.toml` names (`docker_image`) instead of building the upstream Dockerfile |
 | `keep_networked` | `false` | `true` also imports tasks whose reference solution downloads at run time, and tasks whose `test.sh` downloads in a way that cannot move to the build (those lines are kept as they are and listed in `IMPORT.md`); they cannot pass admission without network and stay drafts |
 | `hack_verifiable` | `skip` | `keep` imports tasks with a planted `admin/` honeypot (HVTB) as plain tasks, with `admin/**` protected |
+| `agent_timeout` | task.toml's `[agent] timeout_sec` | seconds: one agent budget for every task (Harbor's `override_timeout_sec`) |
+| `pass_threshold` | 1 | lowest passing reward, written to `verifier.pass_threshold`; the reward itself is always kept on the grade (partial credit) |
+| `unrunnable` | `skip` | `draft` writes every task the bench cannot admit (skip reasons below) as a draft: tag `draft`, the reason in `IMPORT.md`, and a reference control that fails with it, so admission refuses it and it stays visible in the suite |
 
 ## What a converted task looks like
 
@@ -102,6 +105,23 @@ benchmarks/<suite>/
 The suite uses grader `verifier_command` with `command: [/bin/sh, /grader/tests/harbor/verify.sh]`, `result: reward`, `result_path: /grader/out/reward.json`, `mode: snapshot`, and a timeout of the largest task verifier timeout plus 60 seconds. `verify.sh` empties `/tests` and `/logs/verifier`, copies the tests in, runs the offline `test.sh` from the workdir and copies `reward.txt` and `ctrf.json` to `/grader/out`. From a `reward.json` it keeps only the `reward` key, because the bench's reward format refuses other top-level keys; the whole file is kept as `/grader/out/harbor-reward.json`. Because the folders are emptied first, a reward the agent planted does not count; `controls/exploit.sh` plants one and must fail. On a read-only root file system `verify.sh` runs from `/tmp/harbor-verify` with `/tests` and `/logs/verifier` rewritten in `test.sh`.
 
 Admission controls: the reference is `controls/reference.sh` (a script control, run in the agent's place), the empty control does nothing, the exploit plants a fake reward. There are no mutants. The appended Dockerfile section creates `/logs/verifier`, the tests folder, the solution folder and (with skills) `/skills` as world-writable empty folders, so the controls and the verifier work as a non-root user; if the solution folder still cannot be written, `reference.sh` unpacks to `/tmp/harbor-solution` and rewrites the path in `solve.sh`.
+
+### Long-Horizon Terminal-Bench 2.0
+
+LHTB 2.0 (https://github.com/zli12321/LHTB, 77 tasks in `tasks/` and `tasks-2.0/`, Apache-2.0) is Harbor format with a modified Harbor. Import each folder into one suite:
+
+```sh
+for d in tasks tasks-2.0; do
+  bifrost-bench import harbor -from datasets/lhtb2 -suite lhtb2 -set tasks_dir=$d \
+    -set image=prebuilt -set unrunnable=draft -set pass_threshold=0.95
+done
+```
+
+- `[agent] continue_until_timeout = true` (all 77): LHTB's Harbor resumes the agent with a bare rejection until the timeout. The bench runs the agent once up to the task's budget (1 to 8 hours here; `agent_timeout` overrides it) and grades once. Tasks get the tag `continue-until-timeout` and an `IMPORT.md` note; scores can be lower than the paper's.
+- `[agent] user` and `[environment.healthcheck] command` are read and listed in `IMPORT.md` (the bench runs the agent as root and does not run the healthcheck).
+- Graders give partial credit. The paper counts a task solved at reward >= 0.95, hence `pass_threshold=0.95`; mean reward is the reward on each grade.
+- At commit 7ca0cac: 32 importable, 45 drafts (30 tasks-2.0 reconstruction tasks ship no `solve.sh`; 6 reference solutions pip install at run time; 3 `test.sh` pip install from a mirror at verify time; 3 separate verifier containers; 2 solution folders over 2 MiB; 1 compose file without a workspace image).
+- Git LFS holds only 5 `reference_play` gif/mp4 files under `solution/`.
 
 ### Test tools are baked into the image
 

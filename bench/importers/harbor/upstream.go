@@ -41,6 +41,15 @@ type upstreamTask struct {
 	AgentTimeoutS    float64
 	VerifierTimeoutS float64
 
+	// Long-Horizon Terminal-Bench (LHTB) additions to [agent] and
+	// [environment]: its modified Harbor resumes the agent after a failed
+	// verifier pass until the timeout (continue_until_timeout), runs the
+	// agent as a named user, and starts daemons from a healthcheck command
+	// before the agent's first turn.
+	ContinueUntilTimeout bool
+	AgentUser            string
+	Healthcheck          string
+
 	DockerImage   string // prebuilt image upstream also publishes
 	Workdir       string // workdir override from the task file (task.md sandbox.workdir)
 	GPUs          int64
@@ -124,8 +133,12 @@ func (t *upstreamTask) readHarbor() error {
 	t.Category = tomlString(meta, "category")
 	t.Tags = dedupe(append(tomlStrings(meta, "tags"), tomlStrings(task, "keywords")...))
 	verifier := tomlTable(doc, "verifier")
-	t.AgentTimeoutS = tomlNumber(tomlTable(doc, "agent"), "timeout_sec")
+	agent := tomlTable(doc, "agent")
+	t.AgentTimeoutS = tomlNumber(agent, "timeout_sec")
 	t.VerifierTimeoutS = tomlNumber(verifier, "timeout_sec")
+	t.ContinueUntilTimeout = tomlBool(agent, "continue_until_timeout")
+	t.AgentUser = tomlString(agent, "user")
+	t.Healthcheck = tomlString(tomlTable(env, "healthcheck"), "command")
 	_, hasEnv := verifier["environment"].(map[string]any)
 	t.SeparateVerifier = tomlString(verifier, "environment_mode") == "separate" || hasEnv || len(tomlList(verifier, "collect")) > 0
 	t.DockerImage = tomlString(env, "docker_image")
