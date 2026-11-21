@@ -92,7 +92,10 @@ export function readinessReport(result: unknown): ReadinessReport | null {
 }
 
 /** A check's name in plain words: "Wrong answer 2 is caught", "The right answer passes". */
-export function checkLabel(name: string, t: (key: string, opts?: Record<string, unknown>) => string): string {
+/** A translate function, loose enough for any namespace's t. */
+export type LabelT = (key: string, opts?: Record<string, unknown>) => string;
+
+export function checkLabel(name: string, t: LabelT): string {
 	const n = name.match(/^(reference|mutant|wrong_answer|honest_original)_(\d+)$/);
 	if (n) {
 		const i = Number(n[2]);
@@ -166,7 +169,7 @@ export function ReadinessResults({ report }: { report: ReadinessReport }) {
 														<XCircle className="text-chart-error-ink size-3.5" aria-label={t("readiness.failed")} />
 													)}
 												</td>
-												<td className="py-0.5 pr-3 align-top">{checkLabel(c.name, t)}</td>
+												<td className="py-0.5 pr-3 align-top">{checkLabel(c.name, t as unknown as LabelT)}</td>
 												<td className="text-muted-foreground py-0.5 align-top">
 													{c.got ? t("readiness.got", { got: c.got, want: c.want }) : null}
 													{c.detail ? <span className="block break-words">{c.detail}</span> : null}
