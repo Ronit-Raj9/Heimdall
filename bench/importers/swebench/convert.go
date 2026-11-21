@@ -308,7 +308,7 @@ func testPlan(r row, st settings, files []string) (string, string, string, strin
 		if !ok {
 			return "", "", "", fmt.Sprintf("no test command: the row has none and %s is not a SWE-bench repository; pass -set test_cmd=...", r.Repo)
 		}
-		cmds, from = []string{withDirectives(c, r.Repo, files)}, "the SWE-bench harness table for "+r.Repo
+		cmds, from = append(legacyPrelude(r.Repo), withDirectives(c, r.Repo, files)), "the SWE-bench harness table for "+r.Repo
 	}
 	parser := r.LogParser
 	if r.InstallConfig != nil && r.InstallConfig.LogParser != "" {
