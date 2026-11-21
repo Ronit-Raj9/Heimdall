@@ -108,19 +108,21 @@ func (s *Connections) List(ctx context.Context, org string) (*ConnectionsList, e
 		byProvider[k.Provider] = k
 	}
 	out := &ConnectionsList{Platforms: []ConnectionView{}}
-	if d, ok := byProvider[providerDefault]; ok && IsPlatform(d.Label) {
-		if _, connected := byProvider[providerPrefix+d.Label]; connected {
-			out.Default = d.Label
+	for prov := range byProvider {
+		if name, ok := strings.CutPrefix(prov, providerDefault+":"); ok && IsPlatform(name) {
+			if _, connected := byProvider[providerPrefix+name]; connected {
+				out.Default = name
+			}
 		}
 	}
 	for _, info := range Platforms() {
 		v := ConnectionView{Info: info}
 		if k, ok := byProvider[providerPrefix+info.Name]; ok {
-			v.Connected, v.Status, v.LastTestedAt, v.ConnectedBy = true, k.Status, k.LastTestedAt, k.CreatedBy
+			v.Connected, v.Status, v.LastTestedAt, v.ConnectedBy = true, k.Status, k.LastTestedAt, strings.TrimPrefix(k.CreatedBy, actorPrefix)
 			created := k.CreatedAt
 			v.ConnectedAt = &created
 			v.Endpoint = s.endpointOf(ctx, org, &k)
-			v.TokenLast4 = k.Label
+			v.TokenLast4 = labelLast4(k.Label)
 			v.Default = out.Default == info.Name
 		}
 		out.Platforms = append(out.Platforms, v)
@@ -167,17 +169,16 @@ func (s *Connections) Connect(ctx context.Context, org, name, token, endpoint, a
 	if err != nil {
 		return nil, err
 	}
-	// The endpoint goes in the value (it need not be a URL); the label
-	// keeps the token's last four characters for the view.
-	put := keystore.Put{Provider: providerPrefix + name, Label: last4(token), Value: string(raw)}
-	if put.Label == "" {
-		put.Label = info.Title
-	}
+	// The endpoint goes in the value (it need not be a URL). The label is
+	// never a valid secret name (it has spaces), so no {{secret.NAME}}
+	// reference can resolve to a platform token, and the "heimdall:" actor
+	// keeps it off the Secrets screen (handlers/secrets.go systemSecret).
+	put := keystore.Put{Provider: providerPrefix + name, Label: connectionLabel(info.Title, token), Value: string(raw)}
 	var k *keystore.Key
 	if old != nil {
-		k, err = s.Keys.Update(ctx, org, old.ID, put, actor)
+		k, err = s.Keys.Update(ctx, org, old.ID, put, actorPrefix+actor)
 	} else {
-		k, err = s.Keys.Create(ctx, org, keystore.KindSecret, put, actor)
+		k, err = s.Keys.Create(ctx, org, keystore.KindSecret, put, actorPrefix+actor)
 	}
 	if err != nil {
 		return nil, err
@@ -276,25 +277,35 @@ func (s *Connections) SetDefault(ctx context.Context, org, name, actor string) (
 			return nil, ErrNotConnected
 		}
 	}
-	old, err := s.find(ctx, org, providerDefault)
-	if err != nil {
+	if err := s.clearDefault(ctx, org, ""); err != nil {
 		return nil, err
 	}
-	switch {
-	case name == "" && old != nil:
-		if err := s.Keys.Delete(ctx, org, old.ID, actor); err != nil && !errors.Is(err, keystore.ErrNotFound) {
-			return nil, err
-		}
-	case name != "" && old != nil:
-		if _, err := s.Keys.Update(ctx, org, old.ID, keystore.Put{Provider: providerDefault, Label: name, Value: name}, actor); err != nil {
-			return nil, err
-		}
-	case name != "":
-		if _, err := s.Keys.Create(ctx, org, keystore.KindSecret, keystore.Put{Provider: providerDefault, Label: name, Value: name}, actor); err != nil {
+	if name != "" {
+		put := keystore.Put{Provider: providerDefault + ":" + name, Label: "worker platform default", Value: name}
+		if _, err := s.Keys.Create(ctx, org, keystore.KindSecret, put, actorPrefix+actor); err != nil {
 			return nil, err
 		}
 	}
 	return s.List(ctx, org)
+}
+
+// clearDefault deletes the org's default marker; only one naming only
+// (non-empty) when only is set.
+func (s *Connections) clearDefault(ctx context.Context, org, only string) error {
+	keys, err := s.Keys.List(ctx, org, keystore.KindSecret)
+	if err != nil {
+		return err
+	}
+	for _, k := range keys {
+		name, ok := strings.CutPrefix(k.Provider, providerDefault+":")
+		if !ok || (only != "" && name != only) {
+			continue
+		}
+		if err := s.Keys.Delete(ctx, org, k.ID, Actor); err != nil && !errors.Is(err, keystore.ErrNotFound) {
+			return err
+		}
+	}
+	return nil
 }
 
 // Disconnect deletes a platform's token; a platform that was the default
@@ -310,10 +321,8 @@ func (s *Connections) Disconnect(ctx context.Context, org, name, actor string) (
 	if k == nil {
 		return nil, ErrNotConnected
 	}
-	if d, err := s.find(ctx, org, providerDefault); err == nil && d != nil && d.Label == name {
-		if err := s.Keys.Delete(ctx, org, d.ID, actor); err != nil && !errors.Is(err, keystore.ErrNotFound) {
-			return nil, err
-		}
+	if err := s.clearDefault(ctx, org, name); err != nil {
+		return nil, err
 	}
 	if err := s.Keys.Delete(ctx, org, k.ID, actor); err != nil && !errors.Is(err, keystore.ErrNotFound) {
 		return nil, err
@@ -324,11 +333,11 @@ func (s *Connections) Disconnect(ctx context.Context, org, name, actor string) (
 // Resolve returns the org's default platform and its credentials, or nil
 // when the org runs on the shared worker. Server internal only.
 func (s *Connections) Resolve(ctx context.Context, org string) (*Resolved, error) {
-	d, err := s.find(ctx, org, providerDefault)
-	if err != nil || d == nil || !IsPlatform(d.Label) {
+	l, err := s.List(ctx, org)
+	if err != nil || l.Default == "" {
 		return nil, err
 	}
-	k, err := s.find(ctx, org, providerPrefix+d.Label)
+	k, err := s.find(ctx, org, providerPrefix+l.Default)
 	if err != nil || k == nil {
 		return nil, err
 	}
@@ -336,11 +345,30 @@ func (s *Connections) Resolve(ctx context.Context, org string) (*Resolved, error
 	if err != nil {
 		return nil, err
 	}
-	return &Resolved{Platform: d.Label, Credentials: c}, nil
+	return &Resolved{Platform: l.Default, Credentials: c}, nil
 }
 
 // IsPlatformSecret reports whether a keystore secret belongs to this
 // package (the secrets screen may hide or label it).
 func IsPlatformSecret(provider string) bool {
-	return strings.HasPrefix(provider, providerPrefix) || provider == providerDefault
+	return strings.HasPrefix(provider, providerPrefix) || strings.HasPrefix(provider, providerDefault+":")
+}
+
+// actorPrefix marks keystore rows this package writes for an admin.
+const actorPrefix = "heimdall:worker-platforms:"
+
+// connectionLabel is a connection's keystore label: the platform and the
+// token's last four characters, with spaces, so never a secret name.
+func connectionLabel(title, token string) string {
+	if l4 := last4(token); l4 != "" {
+		return title + " worker token ending " + l4
+	}
+	return title + " worker token"
+}
+
+func labelLast4(label string) string {
+	if _, l4, ok := strings.Cut(label, " ending "); ok {
+		return l4
+	}
+	return ""
 }

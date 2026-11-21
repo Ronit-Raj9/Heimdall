@@ -52,6 +52,15 @@ func TestConnectionsLifecycle(t *testing.T) {
 	if err != nil || l.Default != PlatformDaytona {
 		t.Fatalf("default = %+v %v", l, err)
 	}
+	stored, _ := keys.List(ctx, "org1", keystore.KindSecret)
+	for _, k := range stored {
+		if !strings.Contains(k.Label, " ") || !strings.HasPrefix(k.CreatedBy, "heimdall:") || strings.Contains(k.Label, "dtn_good") {
+			t.Fatalf("platform secret %+v could be read as an org secret", k)
+		}
+	}
+	if l.Platforms[1].ConnectedBy != "u1" && l.Platforms[0].ConnectedBy != "u1" {
+		t.Fatalf("connected by = %+v", l.Platforms)
+	}
 	r, err := c.Resolve(ctx, "org1")
 	if err != nil || r == nil || r.Platform != PlatformDaytona || r.Credentials.Token != "dtn_good_token_abcd" {
 		t.Fatalf("resolve = %+v %v", r, err)
