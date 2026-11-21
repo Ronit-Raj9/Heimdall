@@ -126,7 +126,7 @@ func orgDeps(ctx context.Context, a *app) (server.Deps, *store.Index, error) {
 	}
 	deps := server.Deps{
 		Index:    indexAdapter{ix: ix, root: a.store.Root()},
-		Analyzer: analyzerAdapter{a: a, ix: ix},
+		Analyzer: analyzerAdapter{a: a, ix: ix, locks: &sync.Map{}},
 		Catalog:  &catalogSource{a: a},
 		Auditor:  auditor{},
 		Doctor:   a.doctor,
@@ -260,9 +260,19 @@ func (x indexAdapter) VerifySeal(ctx context.Context, runID string) error {
 type analyzerAdapter struct {
 	a  *app
 	ix *store.Index
+	// locks serializes on-demand analyses per experiment and grade source.
+	// One page load asks for the verdict, the diagnostics and the cost at
+	// once; without it each request found no matching saved analysis and
+	// saved its own identical copy.
+	locks *sync.Map
 }
 
 func (x analyzerAdapter) Analyze(ctx context.Context, expID, gradeSource string) (*schemas.Analysis, error) {
+	if x.locks != nil {
+		mu, _ := x.locks.LoadOrStore(expID+"\x00"+gradeSource, &sync.Mutex{})
+		mu.(*sync.Mutex).Lock()
+		defer mu.(*sync.Mutex).Unlock()
+	}
 	an, _, err := x.a.analyzeView(ctx, expID, gradeSource)
 	if err != nil {
 		return nil, err
