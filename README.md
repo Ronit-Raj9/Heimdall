@@ -4,7 +4,23 @@
 >
 > A team can also benchmark its own agent on tasks cut from its own repositories, in any language and without Go code: [`bench/docs/bring-your-own.md`](bench/docs/bring-your-own.md).
 >
-> In Norse myth Heimdall guards Bifrost, the bridge to Asgard: nothing crosses without passing him. Heimdall is built inside a fork of [Bifrost](https://github.com/maximhq/bifrost) (Apache-2.0); everything below this section is upstream Bifrost's own README.
+> In Norse myth Heimdall guards Bifrost, the bridge to Asgard: nothing crosses without passing him. Heimdall is built inside a fork of [Bifrost](https://github.com/maximhq/bifrost) (Apache-2.0); everything after the next horizontal rule is upstream Bifrost's own README.
+
+## Try it as a judge
+
+No install, no CLI. Everything below happens in the browser.
+
+- **Public URL:** `https://<HEIMDALL_PUBLIC_URL>` (placeholder: the submission form carries the live address).
+- **Judge login:** ask the project owner (Ronit Raj) for the judge account's email and password. Credentials are never written in this repository.
+- **Or sign in with GitHub:** on the sign-in page press **Continue with GitHub**. A new account gets its own organization with you as owner.
+
+The 3-click path, once signed in:
+
+1. **Start the wizard** on Home (a new organization opens it by itself). Pick the suite marked Recommended, a starter agent and a model, pressing **Continue** after each. No model key yet? The Model step links **Add a model key** (Models & keys, paste a key, **Test**, come back).
+2. **Run benchmark** on the Run step. A small run (a few tasks, one trial each) goes to a runner; you can leave the page.
+3. **Open full results** on the Verdict step: the verdict card says SHIP, HOLD, NO DECISION or FIX HARNESS, with the gate checklist, task grid and cost one tab away.
+
+Guides ship inside the app under **Docs** (start with "Quickstart on the website"); the same files are in [`bench/docs/`](bench/docs/web-quickstart.md). Every CLI command and its website button: [`bench/docs/CLI_WEB_PARITY.md`](bench/docs/CLI_WEB_PARITY.md).
 
 ---
 
