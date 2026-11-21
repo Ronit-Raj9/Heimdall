@@ -9,7 +9,6 @@ import { useTranslation } from "react-i18next";
 /** Monitor certifications as cards: name, labelled set, and the headline catch rate as a bar. */
 export function MonitorCards({ certs }: { certs: MonitorCertificationSummary[] }) {
 	const { t } = useTranslation("u14");
-	const { t: tb } = useTranslation("bench");
 	const locale = getLocale();
 	return (
 		<ul className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3" data-testid="monitor-cert-list">
@@ -41,9 +40,9 @@ export function MonitorCards({ certs }: { certs: MonitorCertificationSummary[] }
 							</div>
 							<div className="flex flex-col gap-2">
 								<div className="flex items-baseline justify-between gap-2">
-									<span className="text-muted-foreground text-xs">
+									<span className="text-muted-foreground text-xs" title={t("monitors.catchRateHint")}>
 										{t("monitors.catchRate")}
-										{h && ` @ ${formatFpr(h.target_fpr, locale)}`}
+										{h && ` ${t("monitors.falseAlarm", { fpr: formatFpr(h.target_fpr, locale) })}`}
 									</span>
 									{h && h.catch_rate !== null ? (
 										<span className="text-2xl font-semibold tracking-tight tabular-nums" title={formatInterval(h.catch_interval, locale)}>
@@ -65,7 +64,7 @@ export function MonitorCards({ certs }: { certs: MonitorCertificationSummary[] }
 										{t("monitors.warnings", { count: warnings })}
 									</span>
 								) : (
-									<span className="sr-only">{tb("integrity.monitors.title")}</span>
+									<span className="sr-only">{t("monitors.title")}</span>
 								)}
 							</div>
 						</Link>

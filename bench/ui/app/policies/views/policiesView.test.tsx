@@ -16,7 +16,7 @@ describe("PolicyForm", () => {
 		expect(html).toContain('data-testid="policy-check-2"');
 		expect(html).toContain('data-testid="policy-check-threshold-1"');
 		expect(html).not.toContain('data-testid="policy-check-threshold-0"');
-		expect(html).toContain("Add check");
+		expect(html).toContain("Add rule");
 	});
 
 	it("moves a check between rule kinds and keeps the threshold", () => {

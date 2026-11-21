@@ -43,7 +43,7 @@ describe("CalibrateJudgeForm", () => {
 	it("shows the model picker, sample size, call estimate and run buttons", () => {
 		const html = render(<CalibrateJudgeForm status={status} />, hostedSession("member"));
 		expect(html).toContain('data-testid="calibrate-judge-sample"');
-		expect(html).toContain("About 48 judge call(s)");
+		expect(html).toContain("About 48 grader call(s)");
 		expect(html).toContain("Hosted cap: 400 calls");
 		expect(html).toContain('data-testid="job-run-calibrate.run"');
 		expect(html).not.toContain('data-testid="calibrate-judge-addkey"');

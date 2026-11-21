@@ -23,7 +23,7 @@ export default function ReleasesView() {
 	return (
 		<section className="mx-auto flex w-full max-w-[1200px] flex-col gap-8" data-testid="releases-screen">
 			<PageHeader
-				title={t("releases.title")}
+				title={tu("releases.title")}
 				subtitle={tu("releases.subtitle")}
 				actions={
 					<Button onClick={() => setOpen(true)} data-testid="release-new">

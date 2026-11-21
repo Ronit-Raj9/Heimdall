@@ -26,6 +26,7 @@ export function ChainBadge({ ok }: { ok: boolean }) {
 				"inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-medium",
 				ok ? "bg-chart-success/15 text-chart-success-ink" : "bg-destructive/10 text-chart-error-ink",
 			)}
+			title={t("releases.tamperHint")}
 			data-testid="release-chain-status"
 			data-chain-ok={ok}
 		>
@@ -85,15 +86,16 @@ function ReleaseCard({ record, linked }: { record: ReleaseRecord; linked: boolea
 								"inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium",
 								ship ? "bg-chart-success/15 text-chart-success-ink" : "bg-chart-warning/15 text-chart-warning-ink",
 							)}
-							title={record.decision}
+							title={record.decision || record.action}
 							data-testid={`release-action-${id}`}
 						>
 							{ship ? <Rocket className="size-3" aria-hidden="true" /> : <TriangleAlert className="size-3" aria-hidden="true" />}
-							{record.action}
+							{ship ? t("releases.shipped") : t("releases.held")}
 						</span>
 						{record.override && (
 							<span
 								className="bg-destructive/10 text-chart-error-ink inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium"
+								title={t("releases.overrideHint")}
 								data-testid={`release-override-tag-${id}`}
 							>
 								{t("releases.override")}
@@ -177,7 +179,7 @@ function ReleaseCard({ record, linked }: { record: ReleaseRecord; linked: boolea
 								</span>
 							</Row>
 						)}
-						<Row label="ID">
+						<Row label={t("releases.recordId")}>
 							<CopyId value={id} testId={`release-id-${id}`} />
 						</Row>
 						<Row label={t("releases.hash")}>

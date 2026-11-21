@@ -24,7 +24,7 @@ export default function MonitorsView() {
 	return (
 		<section className="mx-auto flex w-full max-w-[1200px] flex-col gap-8" data-testid="monitors-screen">
 			<PageHeader
-				title={t("integrity.monitors.title")}
+				title={tu("monitors.title")}
 				subtitle={tu("monitors.subtitle")}
 				actions={
 					cert ? undefined : (
@@ -34,11 +34,11 @@ export default function MonitorsView() {
 						</Button>
 					)
 				}
-				breadcrumbs={cert ? [{ label: t("integrity.monitors.title"), to: "/monitors" }, { label: cert }] : undefined}
+				breadcrumbs={cert ? [{ label: tu("monitors.title"), to: "/monitors" }, { label: cert }] : undefined}
 			/>
 			{cert ? <CertificationScreen certId={cert} /> : <CertificationList certifying={certifying} onCertifying={setCertifying} />}
-			<p className="text-muted-foreground line-clamp-2 max-w-3xl text-xs" data-testid="monitors-disclaimer" title={t("integrity.monitors.disclaimer")}>
-				{t("integrity.monitors.disclaimer")}
+			<p className="text-muted-foreground line-clamp-2 max-w-3xl text-xs" data-testid="monitors-disclaimer" title={tu("monitors.disclaimer")}>
+				{tu("monitors.disclaimer")}
 			</p>
 		</section>
 	);
@@ -91,6 +91,7 @@ function CertificationList({ certifying, onCertifying }: { certifying: boolean; 
 
 function CertificationScreen({ certId }: { certId: string }) {
 	const { t } = useTranslation("bench");
+	const { t: tu } = useTranslation("u14");
 	const q = useGetMonitorCertificationQuery(certId);
 	return (
 		<div className="flex flex-col gap-4">
@@ -98,7 +99,7 @@ function CertificationScreen({ certId }: { certId: string }) {
 				<Button variant="ghost" size="sm" asChild>
 					<Link to="/monitors" data-testid="monitors-back">
 						<ArrowLeft className="size-4" aria-hidden="true" />
-						{t("integrity.monitors.back")}
+						{tu("monitors.back")}
 					</Link>
 				</Button>
 			</div>

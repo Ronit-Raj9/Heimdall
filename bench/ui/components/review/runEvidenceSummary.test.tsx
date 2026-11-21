@@ -12,7 +12,7 @@ describe("RunEvidenceSummary", () => {
 		expect(html).toMatch(/data-testid="review-evidence-outcome"[^>]*data-outcome="fail"/);
 		expect(html).toContain("failed");
 		expect(html).toContain("tests/test_dates.p");
-		expect(html).toContain("Not judged");
+		expect(html).toContain("No AI grader");
 	});
 
 	it("shows judge votes, fired gates and the answer of a judged run", () => {
