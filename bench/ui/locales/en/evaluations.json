@@ -67,7 +67,15 @@
 		"cancelKeep": "Keep running",
 		"cancelError": "Could not cancel: {{error}}",
 		"reportWaiting": "The report card appears here when every benchmark has finished.",
-		"noBenchmarks": "No benchmark in this evaluation could be run."
+		"noBenchmarks": "No benchmark in this evaluation could be run.",
+		"delete": "Delete",
+		"deleteConfirmTitle": "Delete this evaluation?",
+		"deleteConfirm": "The evaluation, its report card and its benchmark comparisons with their runs and traces are deleted. This cannot be undone.",
+		"deleteConfirmOk": "Delete evaluation",
+		"deleteKeep": "Keep",
+		"deleteBusy": "Cancel the evaluation or wait for it to finish before deleting it.",
+		"deleteAdminOnly": "Only admins can delete an evaluation.",
+		"deleteError": "Could not delete: {{error}}"
 	},
 	"fault": {
 		"clean": "normal run",

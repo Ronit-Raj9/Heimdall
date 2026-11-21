@@ -24,6 +24,8 @@ vi.mock("@/components/releases/promoteEvaluation", () => ({
 	GateResultCard: ({ gate }: { gate: { state: string } }) => <div data-testid="gate-mock">{gate.state}</div>,
 }));
 
+vi.mock("@/lib/store/apis/dataOpsApi", () => ({ useDeleteEvaluationMutation: () => [() => ({ unwrap: () => Promise.resolve() }), {}] }));
+
 const { EvaluationBody } = await import("./evaluationView");
 
 const base: Evaluation = {
@@ -83,5 +85,17 @@ describe("EvaluationBody", () => {
 		const html = render(<EvaluationBody evaluation={base} />);
 		expect(html).not.toContain('data-testid="promote-mock"');
 		expect(html).not.toContain('data-testid="repeat-mock"');
+	});
+
+describe("EvaluationBody delete (X16)", () => {
+	it("disables Delete while the evaluation runs and enables it once done", async () => {
+		const { hostedSession } = await import("@/lib/testing/platformFixtures");
+		const { tagOf } = await import("@/lib/testing/render");
+		const running = render(<EvaluationBody evaluation={base} />, hostedSession("admin"));
+		expect(tagOf(running, "evaluation-delete")).toContain('disabled=""');
+		expect(running).toContain("Cancel the evaluation or wait for it to finish before deleting it.");
+		const done = render(<EvaluationBody evaluation={{ ...base, status: "done" }} />, hostedSession("admin"));
+		expect(tagOf(done, "evaluation-delete")).not.toContain('disabled=""');
+		expect(render(<EvaluationBody evaluation={{ ...base, status: "done" }} />, hostedSession("viewer"))).not.toContain('data-testid="evaluation-delete"');
 	});
 });

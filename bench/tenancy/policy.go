@@ -90,6 +90,10 @@ type Rule struct {
 	// NoAudit marks a write that is not worth an audit row of its own
 	// (a runner heartbeat or upload chunk); the request is still checked.
 	NoAudit bool
+	// AuditRead marks a read of sensitive data (a trace, evidence, an
+	// export, the audit log itself): a successful GET leaves an audit row
+	// too, so "who viewed this trace" has an answer (lane X16, audit N11).
+	AuditRead bool
 	// Why documents the decision; shown in the denial for AccessDeny.
 	Why string
 }
@@ -312,18 +316,22 @@ func IsRead(method string) bool { return method == http.MethodGet || method == h
 // PlatformRule returns the rule of a platform route. A route without an
 // entry is denied.
 func (p *Policy) PlatformRule(method, pattern string) (Rule, bool) {
-	r, ok := p.Platform[key(readMethod(method), pattern)]
+	k := key(readMethod(method), pattern)
+	r, ok := p.Platform[k]
 	if !ok {
 		return deny("no policy entry for " + method + " " + pattern), false
 	}
+	r.AuditRead = r.AuditRead || SensitiveReads[k]
 	return r, true
 }
 
 // OrgRule returns the rule of an org route. A GET without an entry reads as
 // viewer of the org; any other method without an entry is denied.
 func (p *Policy) OrgRule(method, pattern string) (Rule, bool) {
-	r, ok := p.Org[key(readMethod(method), pattern)]
+	k := key(readMethod(method), pattern)
+	r, ok := p.Org[k]
 	if ok {
+		r.AuditRead = r.AuditRead || SensitiveReads[k]
 		return r, true
 	}
 	if IsRead(method) {

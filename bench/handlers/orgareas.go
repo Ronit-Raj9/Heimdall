@@ -11,6 +11,7 @@ import (
 	"github.com/maximhq/bifrost/bench/projectfs"
 	"github.com/maximhq/bifrost/bench/quota"
 	"github.com/maximhq/bifrost/bench/schemas"
+	"github.com/maximhq/bifrost/bench/webhooks"
 	"github.com/valyala/fasthttp"
 )
 
@@ -40,6 +41,13 @@ type Services struct {
 	// and, hosted, the database results index) up to date after runs were
 	// added outside a job, such as a sealed-run upload. nil: nothing to do.
 	Reindex func(ctx context.Context) error
+
+	// Data erases stored data on request (lane X16, dataops.go). nil: the
+	// delete routes answer 503.
+	Data DataEraser
+	// WebhookCipher seals webhook signing secrets at rest (the keystore's
+	// master key); nil stores them in plaintext (0600).
+	WebhookCipher webhooks.Cipher
 }
 
 // OrgEnv is what an org area gets when it registers its routes.

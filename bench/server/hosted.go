@@ -61,6 +61,9 @@ type Hosted struct {
 	// ClientIP resolves the caller's address through the trusted proxies
 	// for audit rows (auth.Service.ClientIP). Nil: the transport peer.
 	ClientIP func(*fasthttp.RequestCtx) string
+	// Limits are the per-credential and per-org API rate limits; nil
+	// limits nothing.
+	Limits *tenancy.RateLimits
 }
 
 // NewHosted builds the hosted server. cfg.Auth must say hosted.
@@ -92,7 +95,7 @@ func NewHosted(cfg *lib.Config, h Hosted) (*Server, error) {
 	disp, err := tenancy.NewDispatcher(tenancy.DispatcherConfig{
 		Mode: mode, Policy: h.Policy, Dir: h.Directory, Registry: h.Registry, DemoSlug: h.DemoSlug,
 		Platform: platform.Handler, PlatformRoutes: platform.List(), OrgRoutes: OrgRoutes(cfg),
-		Fallback: fallback, Audit: h.Audit, Logger: logger, ClientIP: h.ClientIP,
+		Fallback: fallback, Audit: h.Audit, Logger: logger, ClientIP: h.ClientIP, Limits: h.Limits,
 	})
 	if err != nil {
 		return nil, fmt.Errorf("new hosted server: %w", err)

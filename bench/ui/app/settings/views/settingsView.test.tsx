@@ -39,6 +39,17 @@ vi.mock("@/lib/store/apis/secretsApi", async () => {
 		useDeleteSecretMutation: () => m({}),
 	}; // G15: local settings shows the secrets tab
 });
+vi.mock("@/lib/store/apis/dataOpsApi", async (importOriginal) => {
+	const real = await importOriginal<typeof import("@/lib/store/apis/dataOpsApi")>();
+	const { mutation: m } = await import("@/lib/testing/render");
+	return {
+		auditExportUrl: real.auditExportUrl,
+		useVerifyAuditMutation: () => m(api.m.verify ?? {}),
+		useGetRetentionQuery: () => api.q.retention,
+		useSetRetentionMutation: () => m(api.m.retention ?? {}),
+		useDeleteOrgMutation: () => m(api.m.deleteOrg ?? {}),
+	};
+});
 vi.mock("@/lib/store/apis/platformApi", async (importOriginal) => {
 	const real = await importOriginal<typeof import("@/lib/store/apis/platformApi")>();
 	const { mutation: m } = await import("@/lib/testing/render");
@@ -87,6 +98,7 @@ beforeEach(() => {
 		runnerTokens: okQuery(RUNNER_TOKENS),
 		audit: okQuery(AUDIT),
 		org: okQuery(ORG),
+		retention: okQuery({ run_days: 0, min_days: 1, max_days: 3650 }),
 	};
 	api.m = {};
 	api.calls = [];
@@ -305,5 +317,67 @@ describe("PasswordTab", () => {
 		const html = render(<PasswordTab />, hostedSession("member"));
 		expect(html).toContain('data-testid="password-error"');
 		expect(html).toContain("current password is wrong");
+	});
+});
+
+describe("audit export and integrity (X16)", () => {
+	it("links JSONL and CSV downloads and offers the integrity check", () => {
+		const html = render(<AuditTab org={org} />, hostedSession("admin"));
+		expect(html).toContain(`href="/api/bench/orgs/${org.id}/audit/export?format=jsonl"`);
+		expect(html).toContain(`href="/api/bench/orgs/${org.id}/audit/export?format=csv"`);
+		expect(html).toContain('data-testid="audit-verify"');
+		expect(html).toContain("Reads of traces, evidence and exports are logged here too");
+	});
+	it("shows an intact chain with its head and the older unchained entries", () => {
+		api.m.verify = { data: { ok: true, entries: 120, chained: 118, legacy: 2, head_seq: 118, head_hash: "abcdef0123456789", broken_at: 0, reason: "" } };
+		const html = render(<AuditTab org={org} />, hostedSession("admin"));
+		expect(html).toContain("Audit log intact: 120 entries, chain head abcdef012345");
+		expect(html).toContain("2 older entries were written before the chain existed");
+	});
+	it("shows where a tampered chain breaks", () => {
+		api.m.verify = { data: { ok: false, entries: 120, chained: 118, legacy: 0, head_seq: 118, head_hash: "ff", broken_at: 57, reason: "hash mismatch" } };
+		const html = render(<AuditTab org={org} />, hostedSession("admin"));
+		expect(html).toContain('data-testid="audit-verify-broken"');
+		expect(html).toContain("the chain breaks at entry 57");
+		expect(html).toContain("Reason: hash mismatch");
+		api.m.verify = {};
+	});
+});
+
+describe("data retention and organization delete (X16)", () => {
+	it("lets an admin pick how long comparisons are kept, with the last clean-up", async () => {
+		const { retentionChoice, retentionDays } = await import("@/components/settings/dataControls");
+		api.q.retention = okQuery({ run_days: 90, min_days: 1, max_days: 3650, last_sweep_at: "2026-11-20T00:00:00Z", last_deleted: 3 });
+		const html = render(<OrgTab org={org} />, hostedSession("admin"));
+		expect(html).toContain('data-testid="retention-form"');
+		expect(html).toContain("Comparisons older than 90 days are deleted.");
+		expect(html).toContain("3 comparisons deleted.");
+		expect(html).toContain("The audit log is kept.");
+		expect(retentionChoice(0)).toBe("0");
+		expect(retentionChoice(45)).toBe("custom");
+		expect(retentionDays("custom", "45", { min_days: 1, max_days: 3650 })).toBe(45);
+		expect(retentionDays("custom", "0", { min_days: 1, max_days: 3650 })).toBeNull();
+		expect(retentionDays("custom", "4000", { min_days: 1, max_days: 3650 })).toBeNull();
+		expect(retentionDays("365", "", { min_days: 1, max_days: 3650 })).toBe(365);
+	});
+	it("shows retention read-only below admin", () => {
+		api.q.retention = okQuery({ run_days: 0, min_days: 1, max_days: 3650 });
+		const html = render(<OrgTab org={org} />, hostedSession("member"));
+		expect(html).not.toContain('data-testid="retention-form"');
+		expect(html).toContain("Everything is kept until you delete it.");
+	});
+	it("offers Delete organization to owners only", () => {
+		api.q.retention = okQuery({ run_days: 0, min_days: 1, max_days: 3650 });
+		expect(render(<OrgTab org={org} />, hostedSession("owner"))).toContain('data-testid="org-delete"');
+		const admin = render(<OrgTab org={org} />, hostedSession("admin"));
+		expect(admin).not.toContain('data-testid="org-delete"');
+		expect(admin).toContain("Only owners can delete the organization.");
+	});
+	it("unlocks the delete dialog only when the short name is typed exactly", async () => {
+		const { DeleteOrgDialog } = await import("@/components/settings/dataControls");
+		const html = render(<DeleteOrgDialog info={ORG} onClose={() => {}} />, hostedSession("owner"));
+		expect(html).toContain(`Type ${ORG.slug} to confirm`);
+		expect(html).toContain("Audit log entries are kept.");
+		expect(tagOf(html, "org-delete-submit")).toContain('disabled=""');
 	});
 });

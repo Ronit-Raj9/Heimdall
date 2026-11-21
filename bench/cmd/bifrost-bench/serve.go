@@ -98,7 +98,10 @@ func runServe(args []string) int {
 	// resume after a restart) and the ops kinds serve /jobs (servejobs.go).
 	stopJobs := startLocalJobs(ctx, a, *config, deps.Launcher, ix, &deps)
 	defer stopJobs()
-	deps.Ready = readyChecks(a)                         // Deploy area: /readyz checks (serveready.go)
+	deps.Ready = readyChecks(a) // Deploy area: /readyz checks (serveready.go)
+	if !*offline {
+		startLocalDataOps(ctx, a) // lane X16: retention sweeper and webhook outbox (dataops.go)
+	}
 	serveEvidenceMirror(ctx, a, *offline)               // Evidence storage area (P6): background mirror and sweeper when storage.mirror_dir or storage.s3 is set; seal hook evidenceOnSeal (evidence.go)
 	applyServiceHooks(a, &deps, auth.LocalOrgID, false) // web parity: deps.Services (servicehooks.go)
 	srv, err := server.New(a.cfg, deps)

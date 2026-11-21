@@ -9,7 +9,15 @@
 		"detailsHint": "Technical details: test recipe signature, when it was frozen, and which scores are shown.",
 		"practice": "Practice mode",
 		"practiceHint": "Practice mode: no real model is called, results are scripted and it costs nothing. Use it to try Heimdall out.",
-		"subtitle": "Runs two setups (A and B) on the same tasks and tells you which one is better."
+		"subtitle": "Runs two setups (A and B) on the same tasks and tells you which one is better.",
+		"delete": "Delete",
+		"deleteConfirmTitle": "Delete this comparison?",
+		"deleteConfirm": "The comparison, its runs, traces and results are deleted. This cannot be undone.",
+		"deleteConfirmOk": "Delete comparison",
+		"deleteKeep": "Keep",
+		"deleteBusy": "Stop the comparison or wait for it to finish before deleting it.",
+		"deleteAdminOnly": "Only admins can delete a comparison.",
+		"deleteError": "Could not delete: {{error}}"
 	},
 	"tabs": {
 		"verdict": "Result",

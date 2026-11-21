@@ -18,6 +18,8 @@ import {
 	useUpdateWebhookMutation,
 } from "@/lib/store/apis/integrationsApi";
 import { useGetGithubStatusQuery } from "@/lib/store/apis/githubApi";
+import { DELIVERY_POLL_MS, useListDeliveriesQuery, useRetryDeliveryMutation } from "@/lib/store/apis/dataOpsApi";
+import { canUse, useSession } from "@/lib/session/sessionContext";
 import type { GithubStatus } from "@/lib/types/github";
 import type {
 	IntegrationExport,
@@ -31,7 +33,7 @@ import { PageHeader } from "@/components/shell/pageHeader";
 import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
 import { Download, FileDown, GitPullRequest, Webhook as WebhookIcon, type LucideIcon } from "lucide-react";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 
 declare module "@/lib/i18n/resources" {
@@ -133,7 +135,12 @@ export default function IntegrationsView() {
 				})}
 			</div>
 			<div role="tabpanel">
-				{tab === "webhooks" && <WebhooksPanel />}
+				{tab === "webhooks" && (
+					<div className="flex flex-col gap-6">
+						<WebhooksPanel />
+						<DeliveryLogPanel />
+					</div>
+				)}
 				{tab === "exports" && <ExportsPanel />}
 				{tab === "ci" && <CIPanel />}
 			</div>
@@ -321,6 +328,133 @@ export function WebhookList({ hooks, tests = {}, onTest, onToggle, onDelete }: W
 				);
 			})}
 		</ul>
+	);
+}
+
+// ----------------------------------------------------------------------------------------------
+// Delivery log
+
+type DeliveryState = NonNullable<WebhookDelivery["state"]>;
+
+/** A row's state: the server's, or derived from ok for a server that does not send one. */
+export function deliveryState(d: WebhookDelivery): DeliveryState {
+	return d.state ?? (d.ok ? "delivered" : "failed");
+}
+
+/** True while any delivery waits for another attempt, so the log keeps refreshing. */
+export function anyRetrying(deliveries: readonly WebhookDelivery[]): boolean {
+	return deliveries.some((d) => deliveryState(d) === "retrying");
+}
+
+const STATE_BADGE: Record<DeliveryState, "success" | "warning" | "destructive"> = {
+	delivered: "success",
+	retrying: "warning",
+	failed: "destructive",
+};
+
+function DeliveryLogPanel() {
+	const { t } = useTranslation("integrations");
+	const session = useSession();
+	const [polling, setPolling] = useState(false);
+	const { data, error, isLoading } = useListDeliveriesQuery(100, { pollingInterval: polling ? DELIVERY_POLL_MS : 0 });
+	const hooks = useListWebhooksQuery();
+	const [retry] = useRetryDeliveryMutation();
+	const [message, setMessage] = useState<string | null>(null);
+	const [queued, setQueued] = useState<Record<string, boolean>>({});
+	const deliveries = data?.deliveries ?? [];
+	const retrying = anyRetrying(deliveries);
+	useEffect(() => setPolling(retrying), [retrying]);
+	const hookUrls = Object.fromEntries((hooks.data?.webhooks ?? []).map((h) => [h.id, h.url]));
+	return (
+		<Section title={t("deliveryLog.heading")} intro={t("deliveryLog.intro")}>
+			{message && <ErrorNote message={message} testId="delivery-error" />}
+			{error ? (
+				<ErrorNote message={apiErrorMessage(error, t("errors.load"))} />
+			) : isLoading ? (
+				<Skeleton className="h-24 w-full" />
+			) : (
+				<DeliveryTable
+					deliveries={deliveries}
+					hookUrls={hookUrls}
+					canRetry={canUse(session, "member") && !session.demo}
+					queued={queued}
+					onRetry={async (id) => {
+						setMessage(null);
+						setQueued((cur) => ({ ...cur, [id]: true }));
+						const res = await retry(id);
+						if ("error" in res) {
+							setQueued((cur) => ({ ...cur, [id]: false }));
+							setMessage(apiErrorMessage(res.error, t("errors.generic")));
+						}
+					}}
+				/>
+			)}
+		</Section>
+	);
+}
+
+export interface DeliveryTableProps {
+	deliveries: WebhookDelivery[];
+	hookUrls?: Record<string, string>;
+	canRetry: boolean;
+	queued?: Record<string, boolean>;
+	onRetry(id: string): void;
+}
+
+/** Webhook deliveries, newest first, with Retry on failed rows. */
+export function DeliveryTable({ deliveries, hookUrls = {}, canRetry, queued = {}, onRetry }: DeliveryTableProps) {
+	const { t } = useTranslation("integrations");
+	if (deliveries.length === 0) return <EmptyState compact message={t("deliveryLog.empty")} testId="deliveries-empty" />;
+	const when = (at?: string) => (at ? new Date(at).toLocaleString() : "");
+	return (
+		<div className="overflow-x-auto rounded-lg border">
+			<table className="w-full text-sm" data-testid="delivery-table">
+				<thead className="bg-muted/50 text-muted-foreground text-left text-xs">
+					<tr>
+						<th className="px-3 py-2 font-medium">{t("deliveryLog.time")}</th>
+						<th className="px-3 font-medium">{t("deliveryLog.event")}</th>
+						<th className="px-3 font-medium">{t("deliveryLog.webhook")}</th>
+						<th className="px-3 font-medium">{t("deliveryLog.state")}</th>
+						<th className="px-3 text-right font-medium">{t("deliveryLog.status")}</th>
+						<th className="px-3 text-right font-medium">{t("deliveryLog.attempts")}</th>
+						<th className="px-3 font-medium">{t("deliveryLog.next")}</th>
+						<th className="px-3 font-medium">{t("deliveryLog.error")}</th>
+						<th />
+					</tr>
+				</thead>
+				<tbody>
+					{deliveries.map((d) => {
+						const state = deliveryState(d);
+						const url = hookUrls[d.hook_id];
+						return (
+							<tr key={d.id} className="border-border hover:bg-muted/30 border-t transition-colors" data-testid={`delivery-${d.id}`} data-state={state}>
+								<td className="text-muted-foreground px-3 py-2 text-xs whitespace-nowrap">{when(d.at)}</td>
+								<td className="px-3 text-xs whitespace-nowrap">{d.event}</td>
+								<td className="max-w-[14rem] truncate px-3 font-mono text-xs" title={url ?? d.hook_id}>
+									{url ?? t("deliveryLog.unknownHook")}
+								</td>
+								<td className="px-3">
+									<Badge variant={STATE_BADGE[state]}>{t(`deliveryLog.states.${state}`)}</Badge>
+								</td>
+								<td className="px-3 text-right tabular-nums">{d.status_code ?? ""}</td>
+								<td className="px-3 text-right tabular-nums">{d.attempts}</td>
+								<td className="text-muted-foreground px-3 text-xs whitespace-nowrap">{state === "retrying" ? when(d.next_attempt_at) : ""}</td>
+								<td className="text-chart-error-ink max-w-[16rem] truncate px-3 text-xs" title={d.error}>
+									{d.error ?? ""}
+								</td>
+								<td className="px-3 py-1.5 text-right">
+									{state === "failed" && canRetry && (
+										<Button size="sm" variant="outline" disabled={queued[d.id]} onClick={() => onRetry(d.id)} data-testid={`delivery-retry-${d.id}`}>
+											{queued[d.id] ? t("deliveryLog.retrying") : t("deliveryLog.retry")}
+										</Button>
+									)}
+								</td>
+							</tr>
+						);
+					})}
+				</tbody>
+			</table>
+		</div>
 	);
 }
 

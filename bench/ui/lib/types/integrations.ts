@@ -13,6 +13,9 @@ export interface WebhookDelivery {
 	error?: string;
 	attempts: number;
 	duration_ms: number;
+	/** Delivery log state: retrying rows are queued for another attempt (backoff, up to 24 h). */
+	state?: "delivered" | "retrying" | "failed";
+	next_attempt_at?: string;
 }
 
 export interface Webhook {

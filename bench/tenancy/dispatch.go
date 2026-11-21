@@ -90,6 +90,9 @@ type DispatcherConfig struct {
 	// (auth.Service.ClientIP). Nil uses the transport peer, which behind a
 	// reverse proxy is the proxy.
 	ClientIP func(*fasthttp.RequestCtx) string
+	// Limits are the per-credential and per-org API rate limits
+	// (ratelimit.go); nil limits nothing.
+	Limits *RateLimits
 }
 
 // Dispatcher is the hosted root handler behind the auth middleware: it
@@ -138,11 +141,17 @@ func (d *Dispatcher) Handle(ctx *fasthttp.RequestCtx) {
 		if !ok {
 			return
 		}
+		if !d.c.Limits.allow(ctx, d.c.Mode, p, o) {
+			return
+		}
 		if o != nil {
 			SetOrg(ctx, o)
 		}
 		auth.SetPrincipal(ctx, eff)
 		d.c.Platform(ctx)
+		if o != nil && rule.AuditRead && IsRead(method) && ctx.Response.StatusCode() < 400 {
+			d.auditRead(ctx, o.ID, method, pat)
+		}
 		return
 	}
 	if path != APIPrefix && !strings.HasPrefix(path, APIPrefix+"/") {
@@ -176,6 +185,9 @@ func (d *Dispatcher) Handle(ctx *fasthttp.RequestCtx) {
 		lib.SendError(ctx, d.c.Mode, fasthttp.StatusForbidden, lib.ErrTypeForbidden, "route has no organization")
 		return
 	}
+	if !d.c.Limits.allow(ctx, d.c.Mode, p, o) {
+		return
+	}
 	actx, cancel := workContext()
 	defer cancel()
 	rt, release, err := d.c.Registry.Acquire(actx, *o)
@@ -203,6 +215,9 @@ func (d *Dispatcher) Handle(ctx *fasthttp.RequestCtx) {
 	rt.Handler(ctx)
 	if !IsRead(method) && !rule.NoAudit && ctx.Response.StatusCode() < 400 {
 		d.audit(ctx, o.ID, method, pat)
+	}
+	if IsRead(method) && rule.AuditRead && ctx.Response.StatusCode() < 400 {
+		d.auditRead(ctx, o.ID, method, pat)
 	}
 }
 
@@ -267,6 +282,25 @@ func (d *Dispatcher) audit(ctx *fasthttp.RequestCtx, orgID, method, pattern stri
 	defer cancel()
 	if err := d.c.Audit.Audit(actx, e); err != nil {
 		d.c.Logger.Error("audit write failed", "org", orgID, "action", action, "error", err.Error())
+	}
+}
+
+// auditRead writes the row of a successful read of sensitive data: the
+// route's action with ".read" appended (runs.trace.read on runs/<id>).
+func (d *Dispatcher) auditRead(ctx *fasthttp.RequestCtx, orgID, method, pattern string) {
+	if d.c.Audit == nil {
+		return
+	}
+	action, targetType, targetID := ActionOf(ctx, method, pattern)
+	details := map[string]any{"route": method + " " + pattern}
+	if q := ctx.QueryArgs().String(); q != "" && len(q) <= 512 {
+		details["query"] = q
+	}
+	e := EntryFor(ctx, orgID, action+".read", targetType, targetID, details)
+	actx, cancel := workContext()
+	defer cancel()
+	if err := d.c.Audit.Audit(actx, e); err != nil {
+		d.c.Logger.Error("audit write failed", "org", orgID, "action", e.Action, "error", err.Error())
 	}
 }
 

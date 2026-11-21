@@ -15,7 +15,9 @@ import {
 	type EvaluationArm,
 	type EvaluationChild,
 } from "@/lib/store/apis/evaluationsApi";
-import { Link } from "@tanstack/react-router";
+import { Link, useNavigate } from "@tanstack/react-router";
+import { DeleteAction } from "@/components/platform/deleteAction";
+import { useDeleteEvaluationMutation } from "@/lib/store/apis/dataOpsApi";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
 
@@ -58,6 +60,7 @@ export function EvaluationBody({ evaluation }: { evaluation: Evaluation }) {
 					<div className="flex flex-wrap items-center gap-2">
 						<ShareButton kind="evaluation" target={evaluation.id} evaluationId={evaluation.id} />
 						{active ? <CancelButton id={evaluation.id} /> : <RepeatEvaluation evaluationId={evaluation.id} />}
+						<DeleteEvaluationAction id={evaluation.id} active={active} />
 					</div>
 				}
 			/>
@@ -181,6 +184,28 @@ export function ChildRow({ child, score = false }: { child: EvaluationChild; sco
 				</Link>
 			</span>
 		</li>
+	);
+}
+
+/** Delete (admin): confirm, delete with its benchmark comparisons, back to the list. Disabled while queued or running. */
+function DeleteEvaluationAction({ id, active }: { id: string; active: boolean }) {
+	const { t } = useTranslation("evaluations");
+	const navigate = useNavigate();
+	const [remove] = useDeleteEvaluationMutation();
+	return (
+		<DeleteAction
+			label={t("detail.delete")}
+			confirmTitle={t("detail.deleteConfirmTitle")}
+			confirmBody={t("detail.deleteConfirm")}
+			confirmLabel={t("detail.deleteConfirmOk")}
+			cancelLabel={t("detail.deleteKeep")}
+			busyReason={active ? t("detail.deleteBusy") : undefined}
+			adminOnly={t("detail.deleteAdminOnly")}
+			errorText={(error) => t("detail.deleteError", { error })}
+			onDelete={() => remove(id).unwrap()}
+			onDeleted={() => void navigate({ to: "/evaluations" })}
+			testId="evaluation-delete"
+		/>
 	);
 }
 

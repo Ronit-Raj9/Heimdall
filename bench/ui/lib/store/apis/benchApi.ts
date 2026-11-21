@@ -168,8 +168,24 @@ const httpBaseQuery: BenchBaseQuery = async (args, api, extraOptions) => {
 	if (type === "mutation" && !url.startsWith("/auth/")) await whenAuthKnown();
 	const result = await fetchBenchQuery(args, type === api.type ? api : { ...api, type }, extraOptions);
 	if (result.error && errorStatus(result.error) === 401) notifyUnauthorized(typeof args === "string" ? args : args.url);
+	if (result.error && errorStatus(result.error) === 429) {
+		return { ...result, error: rateLimitedError((result.meta as { response?: Response } | undefined)?.response?.headers.get("Retry-After") ?? null) };
+	}
 	return result;
 };
+
+/**
+ * A 429 answer with its message in plain words: "Too many requests. Try again in N seconds." The
+ * wait comes from Retry-After (seconds); without one the message leaves the number out.
+ */
+export function rateLimitedError(retryAfter: string | null): FetchBaseQueryError {
+	const seconds = retryAfter !== null && /^\d+$/.test(retryAfter.trim()) ? Number(retryAfter.trim()) : null;
+	const message =
+		seconds !== null
+			? i18n.t("errors.rateLimited", { ns: "bench", count: Math.max(1, seconds) })
+			: i18n.t("errors.rateLimitedNoWait", { ns: "bench" });
+	return { status: 429, data: { error: { message } } } as FetchBaseQueryError;
+}
 
 const fixtureBaseQuery: BenchBaseQuery = async (args) => {
 	const url = typeof args === "string" ? args : args.url;

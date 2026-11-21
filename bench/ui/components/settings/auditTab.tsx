@@ -2,10 +2,13 @@ import { BlockSkeleton, EmptyNote, LoadError } from "@/components/runs/screenSta
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { getBenchErrorMessage } from "@/lib/store/apis/benchApi";
+import { auditExportUrl, useVerifyAuditMutation } from "@/lib/store/apis/dataOpsApi";
 import { useGetAuditLogQuery, useListMembersQuery } from "@/lib/store/apis/platformApi";
+import type { AuditVerifyResult } from "@/lib/types/dataops";
 import type { AuditEntry, AuditList, OrgSummary } from "@/lib/types/bench";
 import { cn } from "@/lib/utils";
-import { Bot, ChevronLeft, ChevronRight, Cog, KeyRound, Search, Server, UserRound, type LucideIcon } from "lucide-react";
+import { Bot, ChevronLeft, ChevronRight, Cog, Download, KeyRound, Search, Server, ShieldAlert, ShieldCheck, UserRound, type LucideIcon } from "lucide-react";
 import { useId, useMemo, useState, type FormEvent } from "react";
 import { useTranslation } from "react-i18next";
 import { SettingsSection, When } from "./settingsBits";
@@ -50,6 +53,89 @@ export function detailsLine(details: AuditEntry["details"]): string {
 	return Object.entries(details)
 		.map(([key, value]) => `${key}=${typeof value === "string" ? value : JSON.stringify(value)}`)
 		.join("  ");
+}
+
+/** The chain head as a short hash for the result line. */
+export function shortHash(hash: string): string {
+	return hash.length > 12 ? hash.slice(0, 12) : hash;
+}
+
+/** The integrity check's answer: intact with the entry count and chain head, or where it breaks. */
+export function AuditVerifyNote({ result }: { result: AuditVerifyResult }) {
+	const { t } = useTranslation("platform");
+	if (!result.ok) {
+		return (
+			<div
+				role="alert"
+				className="border-chart-error/40 bg-chart-error/[0.06] flex items-start gap-2 rounded-lg border px-3 py-2.5 text-sm"
+				data-testid="audit-verify-broken"
+			>
+				<ShieldAlert className="text-chart-error-ink mt-0.5 size-4 shrink-0" aria-hidden="true" />
+				<div className="flex flex-col gap-0.5">
+					<span className="text-chart-error-ink font-medium">{t("settings.audit.verifyBroken", { seq: result.broken_at })}</span>
+					{result.reason && <span className="text-muted-foreground text-xs">{t("settings.audit.verifyReason", { reason: result.reason })}</span>}
+				</div>
+			</div>
+		);
+	}
+	return (
+		<div className="flex items-start gap-2 rounded-lg border px-3 py-2.5 text-sm" role="status" data-testid="audit-verify-ok">
+			<ShieldCheck className="text-chart-success-ink mt-0.5 size-4 shrink-0" aria-hidden="true" />
+			<div className="flex flex-col gap-0.5">
+				<span className="text-foreground">
+					{t("settings.audit.verifyOk", { entries: result.entries, hash: shortHash(result.head_hash) })}
+				</span>
+				{result.legacy > 0 && (
+					<span className="text-muted-foreground text-xs" data-testid="audit-verify-legacy">
+						{t("settings.audit.verifyLegacy", { count: result.legacy })}
+					</span>
+				)}
+			</div>
+		</div>
+	);
+}
+
+/** Export (JSONL, CSV) as plain downloads and the integrity check with its result inline. */
+function AuditTools({ org }: { org: OrgSummary }) {
+	const { t } = useTranslation("platform");
+	const [verify, state] = useVerifyAuditMutation();
+	return (
+		<div className="flex flex-col gap-3" data-testid="audit-tools">
+			<div className="flex flex-wrap items-center gap-2">
+				<span className="text-muted-foreground mr-1 text-[13px] font-medium">{t("settings.audit.export")}</span>
+				<Button asChild variant="outline" size="sm" className="gap-1">
+					<a href={auditExportUrl(org.id, "jsonl")} download data-testid="audit-export-jsonl">
+						<Download className="size-3.5" aria-hidden="true" />
+						{t("settings.audit.exportJsonl")}
+					</a>
+				</Button>
+				<Button asChild variant="outline" size="sm" className="gap-1">
+					<a href={auditExportUrl(org.id, "csv")} download data-testid="audit-export-csv">
+						<Download className="size-3.5" aria-hidden="true" />
+						{t("settings.audit.exportCsv")}
+					</a>
+				</Button>
+				<Button
+					variant="outline"
+					size="sm"
+					className="ml-auto gap-1"
+					isLoading={state.isLoading}
+					onClick={() => void verify(org.id)}
+					dataTestId="audit-verify"
+				>
+					<ShieldCheck className="size-3.5" aria-hidden="true" />
+					{state.isLoading ? t("settings.audit.verifying") : t("settings.audit.verify")}
+				</Button>
+			</div>
+			<p className="text-muted-foreground text-xs">{t("settings.audit.readsLogged")}</p>
+			{state.data && <AuditVerifyNote result={state.data} />}
+			{state.error && (
+				<p role="alert" className="text-chart-error-ink text-xs" data-testid="audit-verify-error">
+					{t("settings.audit.verifyError")}: {getBenchErrorMessage(state.error)}
+				</p>
+			)}
+		</div>
+	);
 }
 
 /**
@@ -99,6 +185,7 @@ export function AuditTab({ org }: { org: OrgSummary }) {
 
 	return (
 		<SettingsSection title={t("settings.audit.title")} description={t("settings.audit.description", { org: org.name })} testId="settings-audit">
+			<AuditTools org={org} />
 			<form className="flex flex-wrap items-end gap-3" onSubmit={apply} data-testid="audit-filters">
 				<div className="flex min-w-48 flex-col gap-1.5">
 					<label htmlFor={`${formId}-action`} className="text-[13px] font-medium">

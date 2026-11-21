@@ -267,7 +267,7 @@ func deliverWebhookEvent(org string, ev webhooks.Event) {
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
 	defer cancel()
-	webhooks.Dispatch(ctx, webhooks.Open(o.root), webhooks.Sender{AllowPrivate: !o.hosted}, ev)
+	webhooks.Dispatch(ctx, webhookStore(org, o.root, o.hosted), webhooks.Sender{AllowPrivate: !o.hosted}, ev)
 }
 
 // notifyInProcessFinished fires experiment.finished for an experiment the

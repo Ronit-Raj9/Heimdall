@@ -84,15 +84,21 @@ type CIWorkflowPreview struct {
 	Provider string `json:"provider,omitempty"`
 }
 
+// WebhookDeliveryRetried is POST /integrations/deliveries/{id}/retry (202).
+type WebhookDeliveryRetried struct {
+	Delivery webhooks.Delivery `json:"delivery"`
+}
+
 type integrationsHandler struct {
 	mode   schemas.Mode
 	root   string
 	hosted bool
+	cipher webhooks.Cipher
 }
 
 func init() {
 	RegisterOrgArea("integrations", func(env OrgEnv, r *router.Router) {
-		h := &integrationsHandler{mode: env.Mode, hosted: env.Services.Hosted}
+		h := &integrationsHandler{mode: env.Mode, hosted: env.Services.Hosted, cipher: env.Services.WebhookCipher}
 		if env.Cfg != nil {
 			h.root = env.Cfg.Root
 		}
@@ -102,6 +108,7 @@ func init() {
 		r.DELETE(APIPrefix+"/integrations/webhooks/{id}", env.W(h.deleteHook))
 		r.POST(APIPrefix+"/integrations/webhooks/{id}/test", env.W(h.testHook))
 		r.GET(APIPrefix+"/integrations/deliveries", env.R(h.deliveries))
+		r.POST(APIPrefix+"/integrations/deliveries/{id}/retry", env.W(h.retryDelivery))
 		r.GET(APIPrefix+"/integrations/exports", env.R(h.listExports))
 		r.GET(APIPrefix+"/integrations/exports/{name}", env.R(h.downloadExport))
 		r.DELETE(APIPrefix+"/integrations/exports/{name}", env.W(h.deleteExport))
@@ -114,7 +121,7 @@ func (h *integrationsHandler) store(ctx *fasthttp.RequestCtx) (*webhooks.Store, 
 		sendUnavailable(ctx, h.mode, "integrations (no project folder)")
 		return nil, false
 	}
-	return webhooks.Open(h.root), true
+	return webhooks.OpenWith(h.root, h.cipher), true
 }
 
 func (h *integrationsHandler) sendHookErr(ctx *fasthttp.RequestCtx, err error) {
@@ -269,6 +276,26 @@ func (h *integrationsHandler) deliveries(ctx *fasthttp.RequestCtx) {
 		ds = []webhooks.Delivery{}
 	}
 	lib.SendJSON(ctx, h.mode, fasthttp.StatusOK, WebhookDeliveries{Deliveries: ds})
+}
+
+// retryDelivery queues a failed delivery again; the outbox worker sends it
+// within seconds.
+func (h *integrationsHandler) retryDelivery(ctx *fasthttp.RequestCtx) {
+	st, ok := h.store(ctx)
+	if !ok {
+		return
+	}
+	id, _ := ctx.UserValue("id").(string)
+	d, err := st.Retry(id)
+	if errors.Is(err, webhooks.ErrAlreadyDelivered) {
+		lib.SendError(ctx, h.mode, fasthttp.StatusConflict, lib.ErrTypeConflict, "delivery "+id+" already succeeded")
+		return
+	}
+	if err != nil {
+		h.sendHookErr(ctx, err)
+		return
+	}
+	lib.SendJSON(ctx, h.mode, fasthttp.StatusAccepted, WebhookDeliveryRetried{Delivery: d})
 }
 
 // exportFormatOf names the format of an export file from its extension.

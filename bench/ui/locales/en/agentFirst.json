@@ -6,7 +6,8 @@
 			"runs": "Runs",
 			"setup": "Setup",
 			"tools": "Tools",
-			"checks": "Readiness check"
+			"checks": "Readiness check",
+			"pullRequests": "Pull requests"
 		},
 		"noVersion": "No saved version",
 		"noVersionHint": "Save a version in the Versions tab to compare changes over time.",

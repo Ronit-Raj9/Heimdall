@@ -109,5 +109,26 @@
 			"notConnected": "Not connected",
 			"manual": "Manual setup"
 		}
+	},
+	"deliveryLog": {
+		"heading": "Delivery log",
+		"intro": "Every webhook delivery, newest first. Failed deliveries are tried again with growing waits for up to 24 hours.",
+		"time": "Time",
+		"event": "Event",
+		"webhook": "Webhook",
+		"state": "State",
+		"status": "HTTP",
+		"attempts": "Attempts",
+		"next": "Next attempt",
+		"error": "Error",
+		"states": {
+			"delivered": "Delivered",
+			"retrying": "Retrying",
+			"failed": "Failed"
+		},
+		"retry": "Retry",
+		"retrying": "Queued",
+		"empty": "No deliveries yet. They appear here when an event fires.",
+		"unknownHook": "Deleted webhook"
 	}
 }
