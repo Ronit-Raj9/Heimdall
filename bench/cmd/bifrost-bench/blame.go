@@ -131,21 +131,10 @@ func tier1Of(sr *schemas.SealedRun) (*attribution.Blame, *schemas.Evidence, erro
 // replayBlame plans, freezes and runs the tier-2 child experiment of one
 // blamed run, then judges its two runs into b.
 func (a *app) replayBlame(ctx context.Context, m *schemas.Manifest, sr *schemas.SealedRun, b *attribution.Blame, stub string) error {
-	team := m.Arms[sr.Slot.Arm].Config.Team
-	if len(team) == 0 {
-		suite, err := engine.LoadSuite(ctx, a.reg, m.Experiment.Suite)
-		if err != nil {
-			return err
-		}
-		if t := suite.TaskByID(sr.Slot.Task); t != nil {
-			team = t.Team
-		}
-	}
-	exp, err := attribution.PlanReplay(&m.Experiment, sr.Slot, team, b, stub)
+	exp, err := a.replayExperiment(ctx, m, sr, b, stub)
 	if err != nil {
 		return err
 	}
-	exp.Name = "replay " + sr.Run.RunID + " " + utils.NewID("rp", 4)
 	rm, err := a.newPlanner().Plan(ctx, exp)
 	if err != nil {
 		return fmt.Errorf("plan replay: %w", err)
@@ -156,9 +145,36 @@ func (a *app) replayBlame(ctx context.Context, m *schemas.Manifest, sr *schemas.
 	if code := a.execute(ctx, rm, 1); code != exitOK {
 		return fmt.Errorf("replay %s did not finish (exit %d)", rm.ExpID, code)
 	}
-	runs, err := a.store.SealedRuns(ctx, rm.ExpID, "")
+	return a.judgeReplay(ctx, rm.ExpID, b, stub)
+}
+
+// replayExperiment is the tier-2 child experiment of one blamed run: the
+// same slot as a control arm and with the suspect swapped for stub.
+func (a *app) replayExperiment(ctx context.Context, m *schemas.Manifest, sr *schemas.SealedRun, b *attribution.Blame, stub string) (*schemas.Experiment, error) {
+	team := m.Arms[sr.Slot.Arm].Config.Team
+	if len(team) == 0 {
+		suite, err := engine.LoadSuite(ctx, a.reg, m.Experiment.Suite)
+		if err != nil {
+			return nil, err
+		}
+		if t := suite.TaskByID(sr.Slot.Task); t != nil {
+			team = t.Team
+		}
+	}
+	exp, err := attribution.PlanReplay(&m.Experiment, sr.Slot, team, b, stub)
 	if err != nil {
-		return fmt.Errorf("read replay %s: %w", rm.ExpID, err)
+		return nil, err
+	}
+	exp.Name = "replay " + sr.Run.RunID + " " + utils.NewID("rp", 4)
+	return exp, nil
+}
+
+// judgeReplay reads the sealed runs of the finished replay experiment and
+// judges them into b.
+func (a *app) judgeReplay(ctx context.Context, replayID string, b *attribution.Blame, stub string) error {
+	runs, err := a.store.SealedRuns(ctx, replayID, "")
+	if err != nil {
+		return fmt.Errorf("read replay %s: %w", replayID, err)
 	}
 	var control, stubRun *attribution.ReplayRun
 	for _, r := range runs {
@@ -175,7 +191,7 @@ func (a *app) replayBlame(ctx context.Context, m *schemas.Manifest, sr *schemas.
 			stubRun = rr
 		}
 	}
-	attribution.Judge(b, rm.ExpID, stub, control, stubRun)
+	attribution.Judge(b, replayID, stub, control, stubRun)
 	return nil
 }
 

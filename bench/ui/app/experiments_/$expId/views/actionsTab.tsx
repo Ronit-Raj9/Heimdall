@@ -1,3 +1,4 @@
+import { CompareRefsForm } from "@/components/experiments/compareRefsForm";
 import { FollowUpJob } from "@/components/experiments/followUpJob";
 import { MigrateForm } from "@/components/experiments/migrateForm";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -37,7 +38,23 @@ export function ActionsTab({ expId, suite, suiteVersion }: ActionsTabProps) {
 					<MigrateForm suite={suiteRef} testId="actions-migrate-form" />
 				</CardContent>
 			</Card>
+			<CompareRefsCard suite={suiteRef} />
 		</div>
+	);
+}
+
+function CompareRefsCard({ suite }: { suite: string }) {
+	const { t } = useTranslation("refCompare");
+	return (
+		<Card className="shadow-none" data-testid="actions-compare-refs">
+			<CardHeader>
+				<CardTitle>{t("compare.title")}</CardTitle>
+				<CardDescription>{t("compare.description")}</CardDescription>
+			</CardHeader>
+			<CardContent>
+				<CompareRefsForm suite={suite} testId="actions-compare-refs-form" />
+			</CardContent>
+		</Card>
 	);
 }
 

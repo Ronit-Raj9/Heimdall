@@ -60,6 +60,10 @@ type compareFlags struct {
 	budget, reserve                                                                         float64
 	faults                                                                                  listFlag
 	yes, writeOnly                                                                          bool
+	// export reads the agent files at one ref (nil: scaffold.ExportAgentFiles
+	// on repo); the web job sets it to read a GitHub repository.
+	export  func(ctx context.Context, ref string, paths []string, dst string) (*scaffold.ExportedRef, error)
+	command string // recorded in the file header instead of os.Args when set
 }
 
 func runCompare(args []string) int {
@@ -134,6 +138,9 @@ func buildCompare(ctx context.Context, f compareFlags, cfg *lib.Config) (_ *comp
 		Name: name, Suite: suiteID, Base: f.base, Trials: f.trials, Faults: f.faults, Tier: f.tier,
 		BudgetUSD: f.budget, ReserveUSD: f.reserve, Concurrency: f.concurrency, Policy: f.policy,
 		Command: progName + " compare " + strings.Join(os.Args[2:], " "),
+	}
+	if f.command != "" {
+		o.Command = f.command
 	}
 	if o.Base == "" && pf != nil && len(pf.Agents) > 0 && (f.baseline != "" || !strings.HasSuffix(f.a, ".yaml") || !strings.HasSuffix(f.b, ".yaml")) {
 		o.Base = pf.Agents[0].Config
@@ -232,7 +239,13 @@ func refArms(ctx context.Context, f compareFlags, root, name, base string) (quic
 		id := []string{"A", "B"}[i]
 		rel := path.Join("experiments", "fixtures", name, id)
 		dst := filepath.Join(root, filepath.FromSlash(rel))
-		ex, err := scaffold.ExportAgentFiles(ctx, f.repo, ref, paths, dst)
+		export := f.export
+		if export == nil {
+			export = func(ctx context.Context, ref string, paths []string, dst string) (*scaffold.ExportedRef, error) {
+				return scaffold.ExportAgentFiles(ctx, f.repo, ref, paths, dst)
+			}
+		}
+		ex, err := export(ctx, ref, paths, dst)
 		if err != nil {
 			return arms[0], arms[1], "", fmt.Errorf("read agent files at %s: %w", ref, err)
 		}

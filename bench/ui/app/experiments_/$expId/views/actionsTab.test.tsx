@@ -15,6 +15,11 @@ vi.mock("@/lib/store/apis/benchApi", () => ({
 	useGetAgentsQuery: () => ({ data: { agents: [{ id: "codex", path: "agents/codex.yaml", model: "gpt-5-mini" }] }, isSuccess: true }),
 }));
 vi.mock("@/lib/store/apis/platformApi", () => ({ useGetJobQuery: () => ({}) }));
+vi.mock("@/lib/store/apis/githubApi", () => ({
+	useGetGithubStatusQuery: () => ({ data: { configured: true, connected: false } }),
+	useListGithubReposQuery: () => ({}),
+	useGetGithubRefsQuery: () => ({}),
+}));
 vi.mock("@/lib/store/apis/jobRunApi", () => ({ useCreateJobMutation: () => [vi.fn(), { isLoading: false }] }));
 vi.mock("@tanstack/react-router", () => ({ Link: ({ children }: { children: unknown }) => children }));
 
@@ -30,6 +35,9 @@ describe("ActionsTab", () => {
 		expect(html).toContain('value="coding-core@1.0.0"');
 		// the migrate form waits for an agent and candidate models
 		expect(html).toContain('data-testid="actions-migrate-form-job-disabled"');
+		// the compare-refs card waits for refs and links GitHub connect when it is not connected
+		expect(html).toContain('data-testid="actions-compare-refs-form-job-disabled"');
+		expect(html).toContain('data-testid="actions-compare-refs-form-connect"');
 	});
 	it("refuses to extend a follow-up and explains a suite without probes", () => {
 		api.adaptive = { data: { decision: "inconclusive", more_evidence: null, extends: { exp_id: "e0", kind: "trials" } } };
