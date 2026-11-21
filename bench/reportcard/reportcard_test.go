@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io/fs"
+	"strings"
 	"testing"
 	"time"
 
@@ -134,6 +135,8 @@ func TestBuildABReport(t *testing.T) {
 		fail("A", "i2", 1, map[string]float64{metricCheatingRate: 0}),
 		fail("B", "i1", 1, map[string]float64{metricCheatingRate: 0}),
 		fail("B", "i2", 1, map[string]float64{metricCheatingRate: 0}),
+		// A run under a probe never counts toward the cheat rate (clean only).
+		{arm: "B", task: "i1", cond: "hint-probe", outcome: schemas.OutcomeFail, metrics: map[string]float64{metricCheatingRate: 1}},
 	})
 	// AgentDojo attack condition.
 	src.add("exp_adj", "agentdojo-banking", []string{"A", "B"}, []fixRun{
@@ -176,6 +179,13 @@ func TestBuildABReport(t *testing.T) {
 	}
 	if rep.Overall == nil || rep.Overall.Wins["B"] != 1 {
 		t.Fatalf("overall %+v", rep.Overall)
+	}
+	// Summaries name the agents (same agent: by version), never "A" or "B".
+	if !strings.HasPrefix(b.Verdict.Summary, "codex v2 solves ") || !strings.Contains(b.Verdict.Summary, " more than agents/codex.yaml@v1 ") {
+		t.Fatalf("benchmark summary %q", b.Verdict.Summary)
+	}
+	if strings.Contains(rep.Overall.Summary, "B is") || !strings.Contains(rep.Overall.Summary, "codex v2 is better on ") {
+		t.Fatalf("overall summary %q", rep.Overall.Summary)
 	}
 
 	// capabilities: safety pools ImpossibleBench and AgentDojo clean runs.
@@ -335,6 +345,24 @@ func TestBuildScoreModeHidesRepeatArm(t *testing.T) {
 	for _, c := range rep.Capabilities {
 		if _, ok := c.Arms["B"]; ok {
 			t.Fatalf("capability shows B: %+v", c)
+		}
+	}
+}
+
+func TestArmNames(t *testing.T) {
+	cases := []struct {
+		a, b   Arm
+		na, nb string
+	}{
+		{Arm{Label: "A", Agent: "codex"}, Arm{Label: "B", Agent: "claude-code"}, "codex", "claude-code"},
+		{Arm{Label: "A", Agent: "codex", Version: 1}, Arm{Label: "B", Agent: "codex", Version: 2}, "codex v1", "codex v2"},
+		{Arm{Label: "A", Agent: "codex", Model: "m1"}, Arm{Label: "B", Agent: "codex", Model: "m2"}, "codex on m1", "codex on m2"},
+		{Arm{Label: "A", Agent: "codex", Model: "m"}, Arm{Label: "B", Agent: "codex", Model: "m"}, "codex on m (A)", "codex on m (B)"},
+		{Arm{Label: "Baseline", Agent: "codex"}, Arm{Label: "Candidate", Agent: "codex"}, "Baseline", "Candidate"},
+	}
+	for _, c := range cases {
+		if na, nb := ArmNames(c.a, c.b); na != c.na || nb != c.nb {
+			t.Errorf("ArmNames(%+v, %+v) = %q, %q, want %q, %q", c.a, c.b, na, nb, c.na, c.nb)
 		}
 	}
 }

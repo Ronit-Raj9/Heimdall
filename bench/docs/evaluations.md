@@ -22,7 +22,7 @@ What you choose:
 | `tasks_per_benchmark` | How many tasks to take from each benchmark. Only ready (admitted) tasks are used, chosen to be different from each other. At least 6 are needed before any A/B gap can be called real; 8 leaves room for the correction across benchmarks. | 8 |
 | `trials` | How many times each task is repeated per arm. | 2 |
 | `faults` | Fault conditions to add. Normal conditions (`clean`) are always included. | `["clean"]` |
-| `budget_usd` | A spending cap for the whole evaluation. | none |
+| `budget_usd` | A spending cap for the whole evaluation, split evenly over its benchmarks. | $5 per benchmark when not set |
 
 Status of an evaluation is one of `queued`, `running`, `done`, `failed` or `cancelled`. While it runs, its status is worked out live from its children (one child per benchmark, each with its own comparison id and status). A benchmark that could not run is still listed, with a `skipped` reason, so you always see what was left out and why.
 
@@ -116,7 +116,11 @@ Faults cost runs: each fault adds as many runs as the normal condition.
 
 ## How many runs, and the estimate
 
-Runs per benchmark = arms x tasks x trials x conditions. For example, 2 arms, 8 tasks, 2 trials, clean plus `model-down` is 2 x 8 x 2 x 2 = 64 runs per benchmark.
+Runs per benchmark = arms x tasks x trials x conditions, where tasks is the smaller of `tasks_per_benchmark` and the benchmark's ready tasks. For example, 2 arms, 8 tasks, 2 trials, clean plus `model-down` is 2 x 8 x 2 x 2 = 64 runs per benchmark.
+
+In `score` mode the one setup is also launched a second time as a hidden repeat (the comparison planner needs two setups; the report card ignores the repeat). Until that repeat is removed, a score evaluation runs 2 x tasks x trials x conditions per benchmark, twice what the arms alone suggest, and the repeat spends from the same benchmark budget.
+
+The estimate forecasts exactly the tasks the launch will pick (the same spread over the ready tasks). When there is no sealed history for a setup the time is "not known" rather than zero.
 
 Before you launch, `POST /api/bench/evaluations/estimate` (same body as creating one) returns the number of runs, a cost range and a time range, overall and per benchmark. The cost comes from the pinned price list. If any model in the evaluation has no known price, the answer says `"known": false` and the cost is not guessed. See [Pricing](models-and-providers.md#pricing-unknown-stays-unknown).
 
@@ -147,7 +151,7 @@ Every number comes from the measurements Heimdall already records for each run (
 | `score` | Success rate: runs that passed the hidden checks (and every safety check) divided by counted runs. |
 | `ci_low`, `ci_high` | 95% interval for the score from a task-clustered bootstrap: tasks are resampled (each with all its trials), because repeated trials of one task are not independent evidence. With one task it falls back to the exact Clopper-Pearson interval over runs. With few tasks the interval is wide; that is the honest answer. |
 | `runs` | Counted runs for that arm. |
-| `cost_usd` | Sum of each run's cost, re-priced from the pinned price list using the token counts Bifrost recorded. Missing when any model's price is unknown. |
+| `cost_usd` | Sum of each run's cost, re-priced from the pinned price list using the token counts Bifrost recorded. Only runs with a known cost are summed: a run whose model has no known price adds nothing, so the total can be lower than the real spend when a price is missing. |
 | `tokens` | Sum of input and output tokens Bifrost recorded for the arm's model calls. |
 | `steps` | Median agent steps per run. |
 | `tool_calls` | Median tool calls per run. |

@@ -117,7 +117,7 @@ func TestHostedCalibrateRefusesWithoutYes(t *testing.T) {
 		t.Fatalf("estimate: %v\n%s", err, log)
 	}
 	r := res.(*calibrateResult)
-	if gw.minted != 0 || r.Calls != 8 || r.ForecastUSD == nil || r.RecordID != "" || r.KeyID == "" {
+	if gw.minted != 0 || r.Calls != 16 || r.ForecastUSD == nil || r.RecordID != "" || r.KeyID == "" {
 		t.Fatalf("estimate result %+v minted %d", r, gw.minted)
 	}
 }
@@ -130,7 +130,7 @@ func TestHostedCalibrateUsesOrgKey(t *testing.T) {
 		t.Fatalf("calibrate: %v\n%s", err, log)
 	}
 	r := res.(*calibrateResult)
-	if r.RecordID == "" || r.Human == nil || r.SeedItems != 2 || r.KeyID != key.ID || r.SpentUSD <= 0 {
+	if r.RecordID == "" || r.Human == nil || r.SeedItems != 4 || r.KeyID != key.ID || r.SpentUSD <= 0 {
 		t.Fatalf("result %+v\n%s", r, log)
 	}
 	if len(gw.creds) != 1 || gw.creds[0].Value != "sk-org-own" || gw.creds[0].KeyID != key.ID || gw.bound["calibration-org1"] != "org1" || gw.minted != 1 {
@@ -156,18 +156,18 @@ func TestHostedCalibrateUsesOrgKey(t *testing.T) {
 func TestHostedCalibrateCapsCalls(t *testing.T) {
 	env, _, _, gw, _ := hostedCalibrateFixture(t)
 	old := hostedCalibrateMaxCalls
-	hostedCalibrateMaxCalls = 4
+	hostedCalibrateMaxCalls = 12
 	t.Cleanup(func() { hostedCalibrateMaxCalls = old })
 	_, _, err := runCal(env, `{"suite":"qa","yes":true}`)
-	if err == nil || !strings.Contains(err.Error(), "over the cap of 4") || gw.minted != 0 {
+	if err == nil || !strings.Contains(err.Error(), "over the cap of 12") || gw.minted != 0 {
 		t.Fatalf("over cap: %v minted %d", err, gw.minted)
 	}
-	// A sample of one item fits (4 calls).
+	// A sample of one item fits: it and the two adversarial controls, 12 calls.
 	res, log, err := runCal(env, `{"suite":"qa","yes":true,"sample":1}`)
 	if err != nil {
 		t.Fatalf("sampled: %v\n%s", err, log)
 	}
-	if r := res.(*calibrateResult); r.Calls != 4 || r.Items != 1 {
+	if r := res.(*calibrateResult); r.Calls != 12 || r.Items != 3 {
 		t.Fatalf("sampled result %+v", r)
 	}
 	// The transport stops at the cap even when the forecast was wrong.

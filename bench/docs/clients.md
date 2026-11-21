@@ -47,7 +47,7 @@ A registered route missing from the table still appears, as a bare operation tag
 | Start a run | `create_experiment`, `start_experiment`, `run_experiment` | `createExperiment`, `startExperiment`, `runExperiment` | `POST /experiments`, `/experiments/{id}/start` |
 | Run status | `experiment(id)`, `events(id, since)` | `experiment(id)`, `events(id, since)` | `GET /experiments/{id}`, `/events` |
 | Runs | `runs(exp)`, `run`, `run_diff`, `run_patch`, `run_receipts`, `run_events`, `run_file`, `pair` | same in camelCase | `GET /experiments/{id}/grid`, `/runs/{id}/...`, `/pairs/{id}` |
-| Run list (across experiments) | none yet: call the route directly | none yet | `GET /runs?exp=&suite=&arm=&task=&condition=&outcome=&track=&limit=&offset=` |
+| Run list (across experiments) | none yet: call the route directly | none yet | `GET /runs?exp=&suite=&benchmark=&arm=&agent=&model=&task=&condition=&fault=&outcome=&track=&limit=&offset=` |
 | Verdict, analysis | `verdict(id)`, `analysis(id)`, `triage(id)`, `audit(rows)` | `verdict`, `analysis`, `triage`, `audit` | `GET /experiments/{id}/verdict`, `/diagnostics`, `/triage`, `POST /audit` |
 | Leaderboard | `leaderboard(**params)` | `leaderboard(params)` | `GET /leaderboard` |
 | Releases | `releases`, `release`, `create_release`, `release_evidence` | same in camelCase | `/releases...` |

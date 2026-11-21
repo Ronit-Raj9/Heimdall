@@ -97,6 +97,22 @@ func PlanCalibration(s *schemas.Suite, items []calibration.Labelled, price func(
 	if maxTok == 0 {
 		maxTok = defaultJudgeTokens
 	}
+	// Adversarial controls (judgeguard.go): per task, an answer that tells
+	// the judge to reply correct and a bare refusal, both labelled incorrect.
+	var known []calibration.Labelled
+	for _, it := range items {
+		if s.TaskByID(it.Item.Task) != nil {
+			known = append(known, it)
+		}
+	}
+	items = append(append([]calibration.Labelled(nil), items...), AdversarialControls(known, func(task string) bool {
+		t := s.TaskByID(task)
+		if t == nil {
+			return false
+		}
+		ans, err := LoadAnswerSpec(t)
+		return err == nil && answerNonAnswer(ans, adversarialRefusalText) != ""
+	})...)
 	for _, it := range items {
 		t := s.TaskByID(it.Item.Task)
 		if t == nil {
@@ -148,7 +164,7 @@ func pinnedJudge(s *schemas.Suite) (schemas.JudgeSpec, error) {
 	}
 	spec := *s.Judge
 	if spec.Votes == 0 {
-		spec.Votes = 1
+		spec.Votes = defaultJudgeVotes
 	}
 	switch {
 	case spec.Provider == "" || spec.Model == "" || spec.PromptVersion == "":

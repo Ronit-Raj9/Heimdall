@@ -164,7 +164,7 @@ func TestJudgeGradeVotes(t *testing.T) {
 				if r.path != chatCompletionsPath || r.vk != "sk-bf-judge-key" || strings.Contains(r.auth, "run-key") {
 					t.Fatalf("request path %s vk %q auth %q", r.path, r.vk, r.auth)
 				}
-				if r.body.Model != "openai/judge-model" || r.body.Temperature != 0 || r.body.MaxTokens != defaultJudgeTokens || len(r.body.Messages) != 1 {
+				if r.body.Model != "openai/judge-model" || r.body.Temperature != 0 || r.body.MaxTokens != defaultJudgeTokens || len(r.body.Messages) != 2 || r.body.Messages[0].Role != "system" || r.body.Messages[0].Content != judgeGuardSystem {
 					t.Fatalf("request body %+v", r.body)
 				}
 			}
@@ -201,7 +201,7 @@ func TestJudgeRecordAndCost(t *testing.T) {
 	if fj.requests[0].body.MaxTokens != 4 {
 		t.Fatalf("max_tokens %d, want 4", fj.requests[0].body.MaxTokens)
 	}
-	prompt := fj.requests[0].body.Messages[0].Content
+	prompt := fj.requests[0].body.Messages[1].Content
 	for _, want := range []string{"What is my dog's name?", "Max", "Reply with exactly one word: correct or incorrect."} {
 		if !strings.Contains(prompt, want) {
 			t.Fatalf("prompt lacks %q:\n%s", want, prompt)
@@ -408,7 +408,7 @@ func TestRenderJudgePromptDefends(t *testing.T) {
 		t.Fatalf("expected answers not rendered:\n%s", got)
 	}
 	long := strings.Repeat("x", maxJudgeAnswerRunes+10)
-	if r := renderJudgePrompt("{{response}}", ans, long); !strings.HasSuffix(r, "[truncated]") || len(r) > maxJudgeAnswerRunes+20 {
+	if r := renderJudgePrompt("{{response}}", ans, long); !strings.Contains(r, "[truncated]\nEND GRADED RESPONSE ") || len(r) > maxJudgeAnswerRunes+80 {
 		t.Fatalf("long answer not capped: %d", len(r))
 	}
 }

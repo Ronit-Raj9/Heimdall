@@ -45,6 +45,7 @@ const (
 const (
 	judgeVersion         = "1.0.0"
 	defaultJudgeTokens   = 16
+	defaultJudgeVotes    = 3 // a suite that sets no votes: majority of three
 	maxJudgeVotes        = 9
 	maxJudgeAnswerRunes  = 16000
 	maxJudgeResponseBody = 1 << 20
@@ -177,6 +178,16 @@ func (g *judge) Grade(ctx context.Context, rc *schemas.RunContext, diff *schemas
 		grade.Reason = problem
 		return grade, nil
 	}
+	// Judge hardening (judgeguard.go): an answer that addresses the grader,
+	// or no answer at all, fails without a judge call.
+	if inj := JudgeInjection(answer); inj != "" {
+		grade.Reason = "judge not asked: the answer " + inj + ", which fails it"
+		return grade, nil
+	}
+	if why := answerNonAnswer(ans, answer); why != "" {
+		grade.Reason = "judge not asked: " + why
+		return grade, nil
+	}
 	if rc.NoPaidTraffic {
 		// The judge's own key is not bound to the scripted model, so on a
 		// run promised to cost nothing the model judge refuses to call.
@@ -215,7 +226,7 @@ func (g *judge) check(rc *schemas.RunContext) (schemas.JudgeSpec, error) {
 	}
 	spec := *rc.Suite.Judge
 	if spec.Votes == 0 {
-		spec.Votes = 1
+		spec.Votes = defaultJudgeVotes
 	}
 	switch {
 	case spec.Provider == "" || spec.Model == "" || spec.PromptVersion == "":
@@ -349,7 +360,7 @@ func (g *judge) call(ctx context.Context, key *schemas.RunKey, spec schemas.Judg
 	}
 	body, err := json.Marshal(chatRequest{
 		Model:       spec.Provider + "/" + spec.Model,
-		Messages:    []chatMessage{{Role: "user", Content: prompt}},
+		Messages:    []chatMessage{{Role: "system", Content: judgeGuardSystem}, {Role: "user", Content: prompt}},
 		Temperature: 0,
 		MaxTokens:   maxTokens,
 	})
@@ -478,8 +489,9 @@ func judgeTemplate(version string, ans *schemas.AnswerSpec) (string, string, err
 }
 
 // renderJudgePrompt fills the template in one pass, so text inside the
-// question or the answer is never expanded again. The answer is capped and
-// its fence markers are broken up, so it cannot close its own fence.
+// question or the answer is never expanded again. The answer is capped, its
+// fence markers are broken up, so it cannot close its own fence, and it is
+// wrapped in markers tagged with its own hash (judgeguard.go).
 func renderJudgePrompt(tmpl string, ans *schemas.AnswerSpec, answer string) string {
 	if r := []rune(answer); len(r) > maxJudgeAnswerRunes {
 		answer = string(r[:maxJudgeAnswerRunes]) + "\n[truncated]"
@@ -494,7 +506,7 @@ func renderJudgePrompt(tmpl string, ans *schemas.AnswerSpec, answer string) stri
 		"{{question}}", ans.Question,
 		"{{expected}}", expected,
 		"{{rubric}}", rubric,
-		"{{response}}", defence.Replace(strings.TrimSpace(answer)),
+		"{{response}}", fenceAnswer(defence.Replace(strings.TrimSpace(answer))),
 	).Replace(tmpl)
 }
 

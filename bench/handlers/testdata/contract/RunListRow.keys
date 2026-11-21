@@ -20,3 +20,10 @@ cost_usd?
 config_id
 started?
 sealed_at?
+steps?
+tool_calls?
+tokens?
+model?
+agent_version?
+version?
+fault?

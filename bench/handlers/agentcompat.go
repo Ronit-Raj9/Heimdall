@@ -5,9 +5,19 @@ package handlers
 // capabilities (its capabilities: list or its adapter's defaults) against
 // every benchmark the org sees, built-in library benchmarks included, with
 // compat.Check, the same rule the planner refuses arms with.
+//
+// What a benchmark needs comes from suite.yaml alone (suite.Requires reads
+// requires, track and environment), so the check reads each pack's head
+// (suite.yaml and suite.lock, cached by stamp) instead of loading every task,
+// and the whole answer is cached per agent config hash and pack stamps.
 
 import (
+	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"fmt"
+	"strings"
+	"sync"
 
 	"github.com/fasthttp/router"
 	"github.com/maximhq/bifrost/bench/compat"
@@ -36,7 +46,14 @@ type AgentCompatibility struct {
 	Benchmarks   []BenchmarkCompatibility `json:"benchmarks"`
 }
 
-type agentCompatHandler struct{ env OrgEnv }
+type agentCompatHandler struct {
+	env   OrgEnv
+	mu    sync.Mutex
+	cache map[string]*AgentCompatibility // key: agent config hash and every pack stamp
+}
+
+// compatCacheMax bounds the answers kept per org; past it the cache restarts.
+const compatCacheMax = 256
 
 func init() {
 	RegisterOrgArea("agentcompat", registerAgentCompat)
@@ -44,7 +61,7 @@ func init() {
 
 // registerAgentCompat registers GET /agents/{id}/compatibility.
 func registerAgentCompat(env OrgEnv, r *router.Router) {
-	h := &agentCompatHandler{env: env}
+	h := &agentCompatHandler{env: env, cache: map[string]*AgentCompatibility{}}
 	r.GET(APIPrefix+"/agents/{id}/compatibility", env.R(h.get))
 }
 
@@ -75,18 +92,30 @@ func (h *agentCompatHandler) get(ctx *fasthttp.RequestCtx) {
 		sendDepError(ctx, h.env.Mode, "list benchmarks", err)
 		return
 	}
+	key := compatKey(cfg, src, ids)
+	if key != "" {
+		h.mu.Lock()
+		hit := h.cache[key]
+		h.mu.Unlock()
+		if hit != nil {
+			lib.SendJSON(ctx, h.env.Mode, fasthttp.StatusOK, hit)
+			return
+		}
+	}
 	out := AgentCompatibility{
 		Agent:        cfg.ID,
 		Capabilities: schemas.EffectiveCapabilities(cfg).Strings(),
 		Defaulted:    len(cfg.Capabilities) == 0,
 		Benchmarks:   make([]BenchmarkCompatibility, 0, len(ids)),
 	}
+	complete := true
 	for _, sid := range ids {
 		row := BenchmarkCompatibility{ID: sid, Requires: []string{}, Missing: []string{}}
-		s, err := src.LoadSuite(work, sid)
+		s, err := compatSuite(work, src, sid)
 		if err != nil || s == nil {
 			row.Reason = "could not load this benchmark"
 			out.Benchmarks = append(out.Benchmarks, row)
+			complete = false
 			continue
 		}
 		row.Requires = suite.Requires(s).Strings()
@@ -95,7 +124,72 @@ func (h *agentCompatHandler) get(ctx *fasthttp.RequestCtx) {
 		row.Missing = schemas.CapabilitySet(missing).Strings()
 		out.Benchmarks = append(out.Benchmarks, row)
 	}
+	if key != "" && complete {
+		h.mu.Lock()
+		if len(h.cache) >= compatCacheMax {
+			h.cache = map[string]*AgentCompatibility{}
+		}
+		h.cache[key] = &out
+		h.mu.Unlock()
+	}
 	lib.SendJSON(ctx, h.env.Mode, fasthttp.StatusOK, &out)
+}
+
+// suiteHeads caches pack heads process-wide by folder and stamp: library
+// packs are shared by every org.
+var suiteHeads = struct {
+	mu sync.Mutex
+	m  map[string]headEntry
+}{m: map[string]headEntry{}}
+
+type headEntry struct {
+	stamp string
+	s     *schemas.Suite
+}
+
+// compatSuite is what compat.Check needs of pack id: its head (suite.yaml
+// and suite.lock) when the source can read one, cached by stamp, else the
+// full load.
+func compatSuite(ctx context.Context, src SuiteSource, id string) (*schemas.Suite, error) {
+	st, ok := src.(suiteStamper)
+	if !ok {
+		return src.LoadSuite(ctx, id)
+	}
+	dir, stamp := st.SuiteStamp(id)
+	suiteHeads.mu.Lock()
+	e, hit := suiteHeads.m[dir]
+	suiteHeads.mu.Unlock()
+	if hit && e.stamp == stamp {
+		return e.s, nil
+	}
+	s, err := st.SuiteHead(id)
+	if err != nil {
+		return nil, err
+	}
+	if s.ID == "" {
+		s.ID = id
+	}
+	suiteHeads.mu.Lock()
+	suiteHeads.m[dir] = headEntry{stamp: stamp, s: s}
+	suiteHeads.mu.Unlock()
+	return s, nil
+}
+
+// compatKey is the cache key of one answer: the agent config hash and every
+// pack's folder and stamp. "" when the source has no stamps (no caching).
+func compatKey(cfg *schemas.AgentConfig, src SuiteSource, ids []string) string {
+	st, ok := src.(suiteStamper)
+	if !ok {
+		return ""
+	}
+	var b strings.Builder
+	b.WriteString(agentConfigHash(cfg))
+	for _, id := range ids {
+		dir, stamp := st.SuiteStamp(id)
+		b.WriteString("\x00" + id + "\x00" + dir + "\x00" + stamp)
+	}
+	sum := sha256.Sum256([]byte(b.String()))
+	return hex.EncodeToString(sum[:])
 }
 
 // agentConfig finds agent id: through the org's agent source (which holds

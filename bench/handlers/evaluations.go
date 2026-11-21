@@ -18,7 +18,6 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
-	"sort"
 	"strings"
 	"time"
 
@@ -538,7 +537,7 @@ func (h *evaluationsHandler) launchChild(work context.Context, ctx *fasthttp.Req
 		if len(ids) == 0 {
 			return skip("benchmark %s has no admitted task yet", suiteID)
 		}
-		tasks = schemas.TaskSelector{IDs: spreadPick(ids, spec.TasksPerBenchmark)}
+		tasks = schemas.TaskSelector{IDs: evalPickTasks(st, spec.TasksPerBenchmark)}
 	}
 	// Benchmarks whose tasks bring their own image need the agent built on
 	// each task image: derive that variant per arm, or skip.
@@ -689,19 +688,7 @@ func evalArms(spec schemas.EvaluationSpec) map[string]schemas.ArmSpec {
 
 // admittedTasks is the suite's admitted task ids, sorted (the planner
 // refuses a draft task in a locked suite).
-func admittedTasks(st *schemas.Suite) []string {
-	ids := append([]string(nil), st.TaskIDs...)
-	if st.Lock != nil {
-		ids = ids[:0]
-		for _, t := range st.Tasks {
-			if summarizeTask(st, t, nil).Admitted {
-				ids = append(ids, t.ID)
-			}
-		}
-	}
-	sort.Strings(ids)
-	return ids
-}
+func admittedTasks(st *schemas.Suite) []string { return sortedAdmitted(st) }
 
 // spreadPick takes n ids spread evenly over the sorted list, so the tasks
 // come from across the benchmark rather than its first few.

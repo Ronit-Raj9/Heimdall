@@ -3,7 +3,8 @@ package handlers
 // Agent-first evaluations, lane A07: POST /api/bench/evaluations/estimate
 // (AGENTFIRST_CONTRACT.md section 3). It builds the same one experiment per
 // benchmark an evaluation would launch (arms from the spec, conditions from
-// the faults through package faults, the first N admitted tasks, trials) and
+// the faults through package faults, the same N admitted tasks the launch
+// picks (evalpick.go), trials) and
 // asks the org's forecast (forecast/ over sealed history, the planner and the
 // price snapshot) for each. Nothing is written and nothing runs. A cost is
 // known only when every benchmark has a history range and the price snapshot
@@ -17,6 +18,7 @@ import (
 	"slices"
 	"sort"
 	"strings"
+	"sync"
 
 	"github.com/fasthttp/router"
 	"github.com/maximhq/bifrost/bench/faults"
@@ -108,7 +110,7 @@ type modelPricer interface {
 
 func init() {
 	RegisterOrgArea("evaluationestimate", func(env OrgEnv, r *router.Router) {
-		h := &evalEstimateHandler{env: env, forecast: func() ForecastSource { return quickRunForecast(env.Cfg.Root) }}
+		h := &evalEstimateHandler{env: env, forecast: func() ForecastSource { return quickRunForecast(env.Cfg.Root) }, cache: newForecastCache()}
 		r.POST(APIPrefix+"/evaluations/estimate", env.W(h.post))
 	})
 }
@@ -116,6 +118,7 @@ func init() {
 type evalEstimateHandler struct {
 	env      OrgEnv
 	forecast func() ForecastSource
+	cache    *forecastCache // forecasts by experiment, agent configs and suite stamp (evalestimatecache.go)
 }
 
 func (h *evalEstimateHandler) post(ctx *fasthttp.RequestCtx) {
@@ -141,7 +144,7 @@ func (h *evalEstimateHandler) post(ctx *fasthttp.RequestCtx) {
 	} else if h.env.Cfg != nil {
 		root = h.env.Cfg.Root
 	}
-	est, err := EstimateEvaluationWith(work, h.env.Services.Suites, src, &req, agents, root)
+	est, err := estimateEvaluation(work, h.env.Services.Suites, src, &req, agents, root, h.cache)
 	if err != nil {
 		if errors.Is(err, errQuickBad) {
 			lib.SendError(ctx, h.env.Mode, fasthttp.StatusBadRequest, lib.ErrTypeBadRequest, err.Error())
@@ -165,6 +168,15 @@ func EstimateEvaluation(ctx context.Context, suites SuiteSource, src ForecastSou
 // bring their own image is estimated with the task-image variant of each
 // agent the evaluation would launch, or skipped as it would be.
 func EstimateEvaluationWith(ctx context.Context, suites SuiteSource, src ForecastSource, req *EvalEstimateRequest, agents map[string]*schemas.AgentConfig, root string) (*EvalEstimate, error) {
+	return estimateEvaluation(ctx, suites, src, req, agents, root, nil)
+}
+
+// estimateParallel is how many benchmarks one estimate forecasts at once.
+const estimateParallel = 4
+
+// estimateEvaluation is EstimateEvaluationWith with an optional forecast
+// cache; the benchmarks are estimated side by side, in request order.
+func estimateEvaluation(ctx context.Context, suites SuiteSource, src ForecastSource, req *EvalEstimateRequest, agents map[string]*schemas.AgentConfig, root string, cache *forecastCache) (*EvalEstimate, error) {
 	if err := normalizeEvalRequest(req); err != nil {
 		return nil, err
 	}
@@ -193,9 +205,21 @@ func EstimateEvaluationWith(ctx context.Context, suites SuiteSource, src Forecas
 			out.Notes = append(out.Notes, fmt.Sprintf("model %s has no official price in the price snapshot, so its cost is unknown", m))
 		}
 	}
+	per := make([]EvalBenchmarkEstimate, len(ids))
+	var wg sync.WaitGroup
+	sem := make(chan struct{}, estimateParallel)
+	for i, id := range ids {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			sem <- struct{}{}
+			defer func() { <-sem }()
+			per[i] = estimateBenchmark(ctx, suites, src, req, id, agents, root, cache)
+		}()
+	}
+	wg.Wait()
 	allKnown, timeKnown, ran := true, true, false
-	for _, id := range ids {
-		be := estimateBenchmark(ctx, suites, src, req, id, agents, root)
+	for _, be := range per {
 		if be.Skipped == "" {
 			ran = true
 			if len(unpriced) > 0 {
@@ -317,7 +341,7 @@ func evalBenchmarks(ctx context.Context, suites SuiteSource, req *EvalEstimateRe
 
 // estimateBenchmark estimates one benchmark. Problems become Skipped or
 // notes, never an error.
-func estimateBenchmark(ctx context.Context, suites SuiteSource, src ForecastSource, req *EvalEstimateRequest, id string, agents map[string]*schemas.AgentConfig, root string) EvalBenchmarkEstimate {
+func estimateBenchmark(ctx context.Context, suites SuiteSource, src ForecastSource, req *EvalEstimateRequest, id string, agents map[string]*schemas.AgentConfig, root string, cache *forecastCache) EvalBenchmarkEstimate {
 	be := EvalBenchmarkEstimate{Benchmark: id, Conditions: []string{}, FaultsSkip: []faults.Skip{}, Notes: []string{}}
 	suiteID, _, _ := strings.Cut(id, "@")
 	st, err := suites.LoadSuite(ctx, suiteID)
@@ -325,13 +349,10 @@ func estimateBenchmark(ctx context.Context, suites SuiteSource, src ForecastSour
 		be.Skipped = "cannot load benchmark: " + err.Error()
 		return be
 	}
-	tasks := evalAdmittedTasks(st)
+	tasks := evalPickTasks(st, req.TasksPerBenchmark) // the same tasks the launch runs
 	if len(tasks) == 0 {
 		be.Skipped = "benchmark has no admitted task"
 		return be
-	}
-	if len(tasks) > req.TasksPerBenchmark {
-		tasks = tasks[:req.TasksPerBenchmark]
 	}
 	sets := make([]map[string]any, len(req.Arms))
 	for i, a := range req.Arms {
@@ -367,29 +388,13 @@ func estimateBenchmark(ctx context.Context, suites SuiteSource, src ForecastSour
 			}
 		}
 	}
-	f, err := src.Estimate(ctx, exp)
+	f, err := cache.estimate(ctx, src, exp, forecastKey(root, st, exp, req, agents))
 	if err != nil {
 		be.Notes = append(be.Notes, "no forecast: "+err.Error())
 		return be
 	}
 	applyForecast(&be, f, len(req.Arms))
 	return be
-}
-
-// evalAdmittedTasks are the admitted task ids of s, sorted; every task when
-// s has no lock (the planner then refuses, which the forecast reports).
-func evalAdmittedTasks(st *schemas.Suite) []string {
-	var ids []string
-	for _, t := range st.Tasks {
-		if st.Lock == nil || summarizeTask(st, t, nil).Admitted {
-			ids = append(ids, t.ID)
-		}
-	}
-	if len(ids) == 0 && st.Lock == nil {
-		ids = append(ids, st.TaskIDs...)
-	}
-	sort.Strings(ids)
-	return ids
 }
 
 // evalArmIDs names the spec arms A, B.

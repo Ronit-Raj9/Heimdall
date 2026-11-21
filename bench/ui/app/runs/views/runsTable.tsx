@@ -21,16 +21,22 @@ const parsers = {
 	suite: parseAsString,
 	arm: parseAsString,
 	agent: parseAsString,
+	fault: parseAsString,
 	q: parseAsString,
 	page: parseAsInteger,
 };
 
-/** The server request for the filters and page; the search box filters the page on the client. */
-export function runsRequest(f: { outcome?: string | null; suite?: string | null; arm?: string | null }, page: number | null): RunListParams {
+/** The server request for the filters and page; agent and fault filter on the server across every page, the search box filters the page on the client. */
+export function runsRequest(
+	f: { outcome?: string | null; suite?: string | null; arm?: string | null; agent?: string | null; fault?: string | null },
+	page: number | null,
+): RunListParams {
 	const params: RunListParams = { limit: RUNS_PAGE };
 	if (f.outcome) params.outcome = f.outcome;
 	if (f.suite) params.suite = f.suite;
 	if (f.arm) params.arm = f.arm;
+	if (f.agent) params.agent = f.agent;
+	if (f.fault) params.fault = f.fault;
 	const p = Math.max(1, page ?? 1);
 	if (p > 1) params.offset = (p - 1) * RUNS_PAGE;
 	return params;
@@ -41,10 +47,11 @@ export function runAgent(r: Pick<RunListRow, "config_id" | "arm">): string {
 	return r.config_id || r.arm;
 }
 
-/** Agent names for the Agent filter: every configured agent plus any agent seen on the page. Never arm ids. */
-export function agentOptions(configured: readonly string[], rows: readonly Pick<RunListRow, "config_id">[]): string[] {
+/** Agent names for the Agent filter: every configured agent, every agent the server saw in any run, and any agent on the page. Never arm ids. */
+export function agentOptions(configured: readonly string[], rows: readonly Pick<RunListRow, "config_id">[], seenOnServer: readonly string[] = []): string[] {
 	const seen = new Set(configured.filter(Boolean));
 	for (const r of rows) if (r.config_id) seen.add(r.config_id);
+	for (const a of seenOnServer) if (a) seen.add(a);
 	return [...seen].sort((a, b) => a.localeCompare(b));
 }
 
@@ -54,6 +61,16 @@ export function orderRuns(rows: readonly RunListRow[], query: string | null, age
 	const hit = (r: RunListRow) => !q || [r.task, r.arm, r.config_id ?? "", r.model ?? "", r.suite].some((v) => v.toLowerCase().includes(q));
 	const shown = rows.filter((r) => hit(r) && (!agent || runAgent(r) === agent));
 	return [...shown.filter((r) => !r.sealed), ...shown.filter((r) => r.sealed)];
+}
+
+/** The agent version shown next to its name: the registered version (v2), else the agent's own version string. */
+export function agentVersionLabel(r: Pick<RunListRow, "version" | "agent_version">): string {
+	if (r.version && r.version > 0) return `v${r.version}`;
+	return r.agent_version ?? "";
+}
+
+function agentTitle(r: RunListRow): string {
+	return [runAgent(r), agentVersionLabel(r), r.model].filter(Boolean).join(" · ");
 }
 
 /** Seconds between start and seal, or null while either is missing. */
@@ -134,19 +151,21 @@ export function RunsTable() {
 	const agentsQuery = useGetAgentsQuery();
 	const rows = useMemo(() => orderRuns(list.data?.runs ?? [], search.q, search.agent), [list.data, search.q, search.agent]);
 	const agents = useMemo(
-		() => agentOptions((agentsQuery.data?.agents ?? []).map((a) => a.id), list.data?.runs ?? []),
+		() => agentOptions((agentsQuery.data?.agents ?? []).map((a) => a.id), list.data?.runs ?? [], list.data?.facets.agents ?? []),
 		[agentsQuery.data, list.data],
 	);
 	const live = rows.filter((r) => !r.sealed).length;
-	const active = Boolean(search.outcome || search.suite || search.arm || search.agent || search.q);
+	const active = Boolean(search.outcome || search.suite || search.arm || search.agent || search.fault || search.q);
 	const page = Math.max(1, search.page ?? 1);
 	const facets = list.data?.facets;
-	const clear = () => void setSearch({ outcome: null, suite: null, arm: null, agent: null, q: null, page: null });
+	const clear = () => void setSearch({ outcome: null, suite: null, arm: null, agent: null, fault: null, q: null, page: null });
 	const outcomeLabel = (o: string) => tb(`runs.outcome.${o}`, { defaultValue: o });
+	const faultLabel = (f: string) => tu(`runs.faultName.${f}`, { defaultValue: f.replace(/-/g, " ") });
 	const tokens = ([
 		search.outcome && { key: "outcome", label: `${tu("runs.outcome")}: ${outcomeLabel(search.outcome)}`, onRemove: () => void setSearch({ outcome: null, page: null }) },
 		search.suite && { key: "suite", label: `${tu("runs.suite")}: ${search.suite.replace(/@.*$/, "")}`, onRemove: () => void setSearch({ suite: null, page: null }) },
 		search.agent && { key: "agent", label: `${tu("runs.agent")}: ${search.agent}`, onRemove: () => void setSearch({ agent: null, page: null }) },
+		search.fault && { key: "fault", label: `${tu("runs.fault")}: ${faultLabel(search.fault)}`, onRemove: () => void setSearch({ fault: null, page: null }) },
 		// An older link may still carry an arm id; show it so it can be removed.
 		search.arm && { key: "arm", label: `${tu("runs.agent")}: ${search.arm}`, onRemove: () => void setSearch({ arm: null, page: null }) },
 	] as (FilterToken | false | "" | null | undefined)[]).filter((x): x is FilterToken => Boolean(x));
@@ -193,6 +212,16 @@ export function RunsTable() {
 						onChange={(v) => void setSearch({ agent: v, page: null })}
 						testId="runs-filter-agent"
 					/>
+					{(facets?.faults ?? []).some((f) => f !== "clean") && (
+						<FilterSelect
+							label={tu("runs.fault")}
+							allLabel={tu("runs.all")}
+							options={(facets?.faults ?? []).map((v) => ({ value: v, label: faultLabel(v) }))}
+							value={search.fault}
+							onChange={(v) => void setSearch({ fault: v, page: null })}
+							testId="runs-filter-fault"
+						/>
+					)}
 					{live > 0 && (
 						<span className="text-chart-info-ink ml-auto inline-flex items-center gap-1.5 text-xs font-medium" data-testid="runs-live-count">
 							<span className="bg-chart-info size-1.5 animate-pulse rounded-full" />
@@ -217,7 +246,7 @@ export function RunsTable() {
 			) : (
 				<>
 					<div className="bg-card overflow-x-auto rounded-xl border">
-						<table className="w-full min-w-[760px] text-sm" data-testid="runs-table">
+						<table className="w-full min-w-[960px] text-sm" data-testid="runs-table">
 							<thead className="bg-card sticky top-0 z-10">
 								<tr className="text-muted-foreground border-b text-xs">
 									<th scope="col" className="px-4 py-2.5 text-left font-medium">
@@ -233,10 +262,16 @@ export function RunsTable() {
 										{tu("runs.col.steps")}
 									</th>
 									<th scope="col" className="px-3 py-2.5 text-right font-medium">
+										{tu("runs.col.toolCalls")}
+									</th>
+									<th scope="col" className="px-3 py-2.5 text-right font-medium">
 										{tu("runs.col.tokens")}
 									</th>
 									<th scope="col" className="px-3 py-2.5 text-right font-medium">
 										{tu("runs.col.cost")}
+									</th>
+									<th scope="col" className="px-3 py-2.5 text-left font-medium">
+										{tu("runs.col.fault")}
 									</th>
 									<th scope="col" className="px-3 py-2.5 text-right font-medium">
 										{tu("runs.col.duration")}
@@ -270,8 +305,9 @@ export function RunsTable() {
 											</div>
 										</td>
 										<td className="max-w-56 px-3 py-3">
-											<span className="truncate" title={row.model ? `${runAgent(row)} · ${row.model}` : runAgent(row)}>
+											<span className="truncate" title={agentTitle(row)} data-testid={`runs-agent-${row.run_id}`}>
 												<span className="font-medium">{runAgent(row)}</span>
+												{agentVersionLabel(row) && <span className="text-muted-foreground"> {agentVersionLabel(row)}</span>}
 												{row.model && <span className="text-muted-foreground"> · {row.model}</span>}
 											</span>
 										</td>
@@ -279,9 +315,13 @@ export function RunsTable() {
 											<OutcomePill row={row} />
 										</td>
 										<td className="px-3 py-3 text-right tabular-nums">{formatNumber(row.steps, locale)}</td>
+										<td className="px-3 py-3 text-right tabular-nums">{formatNumber(row.tool_calls, locale)}</td>
 										<td className="px-3 py-3 text-right tabular-nums">{formatNumber(row.tokens, locale)}</td>
 										<td className="px-3 py-3 text-right">
 											<ValueCell value={row.cost_usd} kind="usd" />
+										</td>
+										<td className="text-muted-foreground px-3 py-3 text-xs whitespace-nowrap" data-testid={`runs-fault-${row.run_id}`}>
+											{row.fault ? faultLabel(row.fault) : "-"}
 										</td>
 										<td className="px-3 py-3 text-right tabular-nums">{row.sealed ? formatDuration(runDuration(row)) : "-"}</td>
 										<td
