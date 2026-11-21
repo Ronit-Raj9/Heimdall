@@ -1,4 +1,5 @@
-import { AuthError, AuthField, AuthHeading, GithubButton } from "@/components/platform/authForm";
+import { AuthError, AuthField, AuthHeading } from "@/components/platform/authForm";
+import { GithubPrimary, OrDivider } from "@/app/login/views/authParts";
 import { RoleBadge } from "@/components/platform/badges";
 import { HCaptcha, useCaptchaConfig } from "@/components/platform/hcaptcha";
 import { looksLikeEmail } from "@/components/platform/platform.utils";
@@ -21,6 +22,7 @@ export const MIN_PASSWORD = 12;
  */
 export default function SignupView({ invitation }: { invitation?: string }) {
 	const { t } = useTranslation("platform");
+	const { t: tu } = useTranslation("u19");
 	const session = useSession();
 	const invite = useGetInvitationQuery(invitation ?? "", { skip: !invitation });
 	const [name, setName] = useState("");
@@ -41,11 +43,11 @@ export default function SignupView({ invitation }: { invitation?: string }) {
 	const notice = (text: string, testId: string) => (
 		<div className="flex flex-col gap-6" data-testid={testId}>
 			<AuthHeading title={t("auth.signup.title")} />
-			<p className="border-border bg-muted/40 text-muted-foreground flex items-start gap-2.5 rounded-md border px-3 py-3 text-sm">
+			<p className="bg-muted/50 text-muted-foreground flex items-start gap-2.5 rounded-xl px-3.5 py-3 text-sm">
 				<Info className="mt-0.5 size-4 shrink-0" aria-hidden="true" />
 				{text}
 			</p>
-			<p className="text-muted-foreground text-sm">
+			<p className="text-muted-foreground text-center text-sm">
 				{t("auth.signup.haveAccount")}{" "}
 				<Link to="/login" className="text-primary font-medium underline-offset-4 hover:underline">
 					{t("auth.signup.signIn")}
@@ -89,10 +91,16 @@ export default function SignupView({ invitation }: { invitation?: string }) {
 		? t("auth.signup.subtitleInvite", { org: invite.data.org_name, role: t(`roles.${invite.data.role}`).toLowerCase() })
 		: t("auth.signup.subtitle");
 	return (
-		<div className="flex flex-col gap-7" data-testid="signup-screen">
+		<div className="flex flex-col gap-6" data-testid="signup-screen">
 			<AuthHeading title={t("auth.signup.title")} subtitle={subtitle} />
+			{session.github && !invitation && (
+				<div className="flex flex-col gap-5">
+					<GithubPrimary returnTo="/" />
+					<OrDivider label={tu("signup.orEmail")} />
+				</div>
+			)}
 			{invite.data && (
-				<div className="bg-muted/40 flex items-center gap-2 rounded-md border px-3 py-2 text-sm" data-testid="signup-invite-org">
+				<div className="bg-muted/50 flex items-center gap-2 rounded-xl px-3.5 py-2.5 text-sm" data-testid="signup-invite-org">
 					<span className="text-foreground truncate font-medium">{invite.data.org_name}</span>
 					<RoleBadge role={invite.data.role} className="ml-auto" />
 				</div>
@@ -139,12 +147,18 @@ export default function SignupView({ invitation }: { invitation?: string }) {
 					</p>
 				)}
 				{state.error && <AuthError title={t("auth.signup.error")} message={getBenchErrorMessage(state.error)} testId="signup-error" />}
-				<Button type="submit" size="lg" className="mt-1 h-10 w-full" isLoading={state.isLoading} dataTestId="signup-submit">
+				<Button
+					type="submit"
+					size="lg"
+					variant={session.github && !invitation ? "outline" : "default"}
+					className="mt-1 h-10 w-full"
+					isLoading={state.isLoading}
+					dataTestId="signup-submit"
+				>
 					{t("auth.signup.submit")}
 				</Button>
-				{session.github && !invitation && <GithubButton returnTo="/" />}
 			</form>
-			<p className="text-muted-foreground text-sm">
+			<p className="text-muted-foreground text-center text-sm">
 				{t("auth.signup.haveAccount")}{" "}
 				<Link
 					to="/login"

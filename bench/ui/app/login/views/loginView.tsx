@@ -1,4 +1,4 @@
-import { AuthError, AuthField, AuthHeading, GithubButton, loginErrorMessage } from "@/components/platform/authForm";
+import { AuthError, AuthField, AuthHeading, loginErrorMessage } from "@/components/platform/authForm";
 import { Button } from "@/components/ui/button";
 import { signupOffered, useSession } from "@/lib/session/sessionContext";
 import { useLoginMutation } from "@/lib/store/apis/platformApi";
@@ -7,6 +7,7 @@ import { Link } from "@tanstack/react-router";
 import { Info } from "lucide-react";
 import { useEffect, useState, type FormEvent } from "react";
 import { useTranslation } from "react-i18next";
+import { GithubPrimary, JudgeHint, OrDivider } from "./authParts";
 
 /** Full-page navigation after signing in, so every cached answer is fetched again as the new user. */
 function go(path: string) {
@@ -19,6 +20,7 @@ function go(path: string) {
  */
 export default function LoginView({ returnTo, oauthError }: { returnTo?: string; oauthError?: string }) {
 	const { t } = useTranslation("platform");
+	const { t: tu } = useTranslation("u19");
 	const session = useSession();
 	const target = safeReturnTo(returnTo);
 	const [email, setEmail] = useState("");
@@ -34,7 +36,7 @@ export default function LoginView({ returnTo, oauthError }: { returnTo?: string;
 		return (
 			<div className="flex flex-col gap-6" data-testid="login-local">
 				<AuthHeading title={t("auth.login.title")} />
-				<p className="border-border bg-muted/40 text-muted-foreground flex items-start gap-2.5 rounded-md border px-3 py-3 text-sm">
+				<p className="bg-muted/50 text-muted-foreground flex items-start gap-2.5 rounded-xl px-3.5 py-3 text-sm">
 					<Info className="mt-0.5 size-4 shrink-0" aria-hidden="true" />
 					{t("auth.login.localMode")}
 				</p>
@@ -56,8 +58,14 @@ export default function LoginView({ returnTo, oauthError }: { returnTo?: string;
 	};
 
 	return (
-		<div className="flex flex-col gap-7" data-testid="login-screen">
-			<AuthHeading title={t("auth.login.title")} subtitle={t("auth.login.subtitle")} />
+		<div className="flex flex-col gap-6" data-testid="login-screen">
+			<AuthHeading title={tu("login.title")} subtitle={tu("login.subtitle")} />
+			{session.github && (
+				<div className="flex flex-col gap-5">
+					<GithubPrimary returnTo={target} />
+					<OrDivider label={tu("login.orEmail")} />
+				</div>
+			)}
 			<form className="flex flex-col gap-4" onSubmit={(event) => void onSubmit(event)} noValidate data-testid="login-form">
 				<AuthField
 					label={t("auth.email")}
@@ -65,7 +73,7 @@ export default function LoginView({ returnTo, oauthError }: { returnTo?: string;
 					name="email"
 					autoComplete="username"
 					required
-					autoFocus
+					autoFocus={!session.github}
 					value={email}
 					onChange={(event) => setEmail(event.target.value)}
 					testId="login-email"
@@ -91,6 +99,7 @@ export default function LoginView({ returnTo, oauthError }: { returnTo?: string;
 				<Button
 					type="submit"
 					size="lg"
+					variant={session.github ? "outline" : "default"}
 					className="mt-1 h-10 w-full"
 					isLoading={state.isLoading}
 					disabled={!email.trim() || !password}
@@ -98,10 +107,10 @@ export default function LoginView({ returnTo, oauthError }: { returnTo?: string;
 				>
 					{t("auth.login.submit")}
 				</Button>
-				{session.github && <GithubButton returnTo={target} />}
 			</form>
+			<JudgeHint />
 			{signupOffered(session) && (
-				<p className="text-muted-foreground text-sm">
+				<p className="text-muted-foreground text-center text-sm">
 					{t("auth.login.noAccount")}{" "}
 					<Link to="/signup" className="text-primary font-medium underline-offset-4 hover:underline" data-testid="login-signup-link">
 						{t("auth.login.signUp")}

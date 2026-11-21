@@ -85,7 +85,7 @@ export default function ResetPasswordView({ token }: { token?: string }) {
 	};
 
 	return (
-		<div className="flex flex-col gap-7" data-testid="reset-screen">
+		<div className="flex flex-col gap-6" data-testid="reset-screen">
 			<div className="bg-primary/10 text-primary flex size-11 items-center justify-center rounded-xl">
 				<KeyRound className="size-5" aria-hidden="true" />
 			</div>

@@ -65,12 +65,12 @@ export default function InviteView({ token }: { token: string }) {
 	};
 
 	return (
-		<div className="flex flex-col gap-7" data-testid="invite-screen">
+		<div className="flex flex-col gap-6" data-testid="invite-screen">
 			<div className="bg-primary/10 text-primary flex size-11 items-center justify-center rounded-xl">
 				<MailCheck className="size-5" aria-hidden="true" />
 			</div>
 			<AuthHeading title={t("auth.invite.title")} subtitle={t("auth.invite.body", { email: data.email, org: data.org_name, role })} />
-			<div className="flex flex-col gap-3 rounded-lg border p-4" data-testid="invite-card">
+			<div className="bg-muted/40 flex flex-col gap-3 rounded-xl border p-4" data-testid="invite-card">
 				<div className="flex items-center gap-3">
 					<span className="bg-foreground text-background flex size-9 items-center justify-center rounded-lg text-sm font-semibold">
 						{data.org_name.charAt(0).toUpperCase()}
@@ -106,7 +106,7 @@ export default function InviteView({ token }: { token: string }) {
 				</div>
 			) : session.signedIn ? (
 				<div className="flex flex-col gap-3" data-testid="invite-wrong-account">
-					<p className="border-chart-warning/50 bg-chart-warning/10 text-foreground rounded-md border px-3 py-2.5 text-sm">
+					<p className="border-chart-warning/50 bg-chart-warning/10 text-foreground rounded-xl border px-3.5 py-3 text-sm">
 						{t("auth.invite.wrongAccount", { email: data.email })}
 					</p>
 					<Button variant="outline" className="h-10 w-full" onClick={() => void onSwitchAccount()} dataTestId="invite-switch-account">

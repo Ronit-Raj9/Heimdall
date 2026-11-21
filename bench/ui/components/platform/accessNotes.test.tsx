@@ -9,14 +9,15 @@ import { DemoBanner, ForbiddenNote, RoleGate, RoleNote } from "./accessNotes";
 vi.mock("@tanstack/react-router", async () => (await import("@/lib/testing/routerMock")).routerMock);
 
 describe("DemoBanner", () => {
-	it("shows only to anonymous readers of a public demo, with a sign-in link back here", () => {
-		const html = render(<DemoBanner />, demoSession());
+	it("shows only to anonymous readers of a public demo, with one sign-in call to action back here", () => {
+		const html = render(<DemoBanner />, { ...demoSession(), github: false });
 		expect(html).toContain('data-testid="demo-banner"');
 		expect(html).toContain("Public demo, read only");
 		expect(html).toContain('href="/login?return_to=%2Fverdict"');
 		const gh = render(<DemoBanner />, { ...demoSession(), github: true });
 		expect(gh).toContain("Sign in with GitHub to run your own benchmark");
 		expect(gh).toContain('data-testid="demo-banner-github"');
+		expect(gh).not.toContain("demo-banner-sign-in");
 		for (const session of [LOCAL_SESSION, hostedSession("viewer"), signedOutSession()]) {
 			expect(render(<DemoBanner />, session)).toBe("");
 		}
