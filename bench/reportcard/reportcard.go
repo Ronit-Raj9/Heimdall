@@ -19,6 +19,7 @@ import (
 	"slices"
 	"strings"
 
+	"github.com/maximhq/bifrost/bench/faults"
 	"github.com/maximhq/bifrost/bench/leaderboard"
 	"github.com/maximhq/bifrost/bench/schemas"
 	"github.com/maximhq/bifrost/bench/stats"
@@ -89,6 +90,9 @@ type Benchmark struct {
 	ExperimentID string                      `json:"experiment_id"`
 	Arms         map[string]Metrics          `json:"arms"`
 	Verdict      *verdictab.BenchmarkVerdict `json:"verdict,omitempty"`
+	// ReliabilityCard is each arm's repeatability on the clean runs; an arm
+	// with no clean runs has no entry.
+	ReliabilityCard map[string]*ReliabilityCard `json:"reliability_card"`
 }
 
 // FaultScore is one arm's score under a fault and its change from clean on
@@ -123,6 +127,7 @@ type Report struct {
 	Capabilities []Capability              `json:"capabilities"`
 	Benchmarks   []Benchmark               `json:"benchmarks"`
 	Reliability  []Reliability             `json:"reliability"`
+	Resilience   []Resilience              `json:"resilience"`
 	Safety       Safety                    `json:"safety"`
 	Overall      *verdictab.OverallVerdict `json:"overall,omitempty"`
 }
@@ -170,7 +175,7 @@ func Build(ctx context.Context, src leaderboard.Source, ev *schemas.Evaluation, 
 	}
 	rep := &Report{
 		Evaluation: ev.ID, Status: ev.Status, Mode: ev.Spec.Mode, Arms: []Arm{}, Capabilities: []Capability{}, Benchmarks: []Benchmark{},
-		Reliability: []Reliability{}, Safety: Safety{AttackResisted: map[string]float64{}, CheatRate: map[string]float64{}},
+		Reliability: []Reliability{}, Resilience: []Resilience{}, Safety: Safety{AttackResisted: map[string]float64{}, CheatRate: map[string]float64{}},
 	}
 	// Score mode runs a hidden repeat of the one arm (to satisfy the
 	// planner's two-arm rule); the report shows only the arm asked for and
@@ -207,9 +212,13 @@ func Build(ctx context.Context, src leaderboard.Source, ev *schemas.Evaluation, 
 	var verdictRow []int        // rep.Benchmarks index of each verdict
 	byCap := map[string][]int{} // capability -> indexes into rep.Benchmarks
 	for _, cr := range children {
-		b := Benchmark{Benchmark: cr.child.Benchmark, Capability: capOf(cr.child.Benchmark), ExperimentID: cr.child.ExperimentID, Arms: map[string]Metrics{}}
+		b := Benchmark{Benchmark: cr.child.Benchmark, Capability: capOf(cr.child.Benchmark), ExperimentID: cr.child.ExperimentID, Arms: map[string]Metrics{}, ReliabilityCard: map[string]*ReliabilityCard{}}
 		for _, l := range labels {
-			b.Arms[l] = metricsOf(filter(cr.arms[l], schemas.ConditionClean))
+			clean := filter(cr.arms[l], schemas.ConditionClean)
+			b.Arms[l] = metricsOf(clean)
+			if card := reliabilityCard(clean); card != nil {
+				b.ReliabilityCard[l] = card
+			}
 		}
 		if ab {
 			v := compare(filter(cr.arms[labels[0]], schemas.ConditionClean), filter(cr.arms[labels[1]], schemas.ConditionClean))
@@ -254,6 +263,7 @@ func Build(ctx context.Context, src leaderboard.Source, ev *schemas.Evaluation, 
 	}
 
 	rep.Reliability = reliability(children, labels, faultOf)
+	rep.Resilience = resilience(children, labels, faultOf)
 	rep.Safety = safety(children, labels, faultOf)
 	return rep, nil
 }
@@ -607,14 +617,28 @@ func safety(children []childRuns, labels []string, faultOf func(string) string) 
 
 func isAgentDojo(benchmark string) bool { return strings.HasPrefix(benchmark, "agentdojo") }
 
+// FaultIDs are the evaluation fault ids the fault catalog ships besides
+// clean (bench/faults.Catalog). A condition id equal to one of them, or to
+// the bench's generic probe for it ("heimdall-" and the id), is that fault.
+var FaultIDs = func() []string {
+	out := make([]string, 0, len(faults.Catalog))
+	for _, f := range faults.Catalog {
+		out = append(out, f.ID)
+	}
+	return out
+}()
+
 // DefaultFault maps a condition id to an evaluation fault by name: the
-// fault's own id, or a condition id naming an outage, a tool fault or a
+// fault's own id (any id in FaultIDs, or a compound- id), or a condition id naming an outage, a tool fault or a
 // misleading or stale instruction. Anything else is not a fault.
 func DefaultFault(condition string) string {
 	c := strings.ToLower(condition)
+	bare := strings.TrimPrefix(c, "heimdall-")
 	switch {
 	case c == "" || c == schemas.ConditionClean:
 		return ""
+	case slices.Contains(FaultIDs, bare) || strings.HasPrefix(bare, "compound-"):
+		return bare
 	case c == FaultModelDown || strings.Contains(c, "model-down") || strings.Contains(c, "model_down") || strings.Contains(c, "outage"):
 		return FaultModelDown
 	case c == FaultBrokenTool || strings.Contains(c, "broken-tool") || strings.Contains(c, "broken_tool") || strings.Contains(c, "tool-error") || strings.Contains(c, "tool_error") || strings.Contains(c, "toolfault"):

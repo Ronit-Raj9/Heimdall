@@ -23,7 +23,9 @@ import {
 	points,
 	reportFileName,
 	usd,
+	reliabilityCards,
 } from "./reportCard.utils";
+import { ReliabilityCards, ResilienceCard } from "./reliabilityCards";
 
 export interface ReportCardProps {
 	report: Report;
@@ -63,8 +65,26 @@ export function ReportCard({ report: raw, className }: ReportCardProps) {
 				<BenchmarkList report={report} />
 			</Section>
 
+			{reliabilityCards(report).length > 0 && (
+				<Section
+					title="Reliability"
+					description="How steady the agent is across repeat tries. The gap between the two lines is flakiness: tasks it solves sometimes but not every time."
+				>
+					<ReliabilityCards report={report} />
+				</Section>
+			)}
+
+			{(report.resilience?.length ?? 0) > 0 && (
+				<Section
+					title="Resilience"
+					description="Under each fault, the share of clean success kept (x1.00 is no loss, with its 95% range), how often clean successes still succeed, the change in cost and the time to recover."
+				>
+					<ResilienceCard report={report} />
+				</Section>
+			)}
+
 			{report.reliability.length > 0 && (
-				<Section title="Reliability" description="Score when something goes wrong, and how far it drops from a clean run.">
+				<Section title="Faults" description="Score when something goes wrong, and how far it drops from a clean run.">
 					<ReliabilityTable report={report} />
 				</Section>
 			)}
@@ -412,7 +432,9 @@ export function ExportButtons({ report }: { report: Report }) {
 	const [copied, setCopied] = React.useState<"" | "ok" | "fail">("");
 
 	const download = () => {
-		const blob = new Blob([JSON.stringify(report, null, 2)], { type: "application/json" });
+		const blob = new Blob([JSON.stringify(report, null, 2)], {
+			type: "application/json",
+		});
 		const url = URL.createObjectURL(blob);
 		const a = document.createElement("a");
 		a.href = url;

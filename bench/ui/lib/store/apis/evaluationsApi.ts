@@ -64,7 +64,19 @@ export interface AgentVersionDetail {
 
 export type EvaluationMode = "score" | "versions" | "models" | "opponent";
 export type EvaluationStatus = "queued" | "running" | "done" | "failed" | "cancelled";
-export type EvaluationFault = "clean" | "model-down" | "broken-tool" | "misleading-instruction";
+/** "clean" or a fault id from GET /faults (model-down, tool-rate-limit, ...). */
+export type EvaluationFault = string;
+
+export type FaultLayer = "model" | "tool" | "instructions" | "compound";
+
+/** GET /faults item: a fault an evaluation can add besides clean. */
+export interface FaultCatalogItem {
+	id: string;
+	label: string;
+	help: string;
+	layer: FaultLayer | string;
+	group: "Model" | "Tools" | "Instructions" | "Combined" | string;
+}
 export type PackId = "coding" | "terminal" | "support" | "memory" | "research" | "voice" | "safety" | "all-compatible";
 
 export interface EvaluationArm {
@@ -88,7 +100,7 @@ export interface EvaluationSpec {
 	/** Repeats per task, default 2. */
 	trials: number;
 	/** "clean" always; plus "model-down", "broken-tool", "misleading-instruction". */
-	faults: (EvaluationFault | string)[];
+	faults: EvaluationFault[];
 	budget_usd?: number;
 }
 
@@ -133,12 +145,26 @@ export interface EstimateBenchmark {
 	[key: string]: unknown;
 }
 
+/** Smallest detectable change in percentage points; null when it cannot be decided. */
+export interface EstimatePower {
+	per_benchmark: {
+		benchmark: string;
+		tasks: number;
+		decidable: boolean;
+		mde_pp: number | null;
+	}[];
+	overall: { tasks: number; mde_pp: number | null };
+	sd_source: "assumed" | "measured" | string;
+	advice: string;
+}
+
 /** POST /evaluations/estimate */
 export interface Estimate {
 	runs: number;
 	est_cost_usd: Range & { known: boolean };
 	est_minutes: Range & { known?: boolean };
 	per_benchmark: EstimateBenchmark[];
+	power?: EstimatePower;
 	notes?: string[] | null;
 }
 
@@ -193,6 +219,55 @@ export interface ReportBenchmarkRow {
 	experiment_id: string;
 	arms: Record<string, ReportMetrics>;
 	verdict?: ReportVerdict;
+	/** Repeatability per arm on clean runs. */
+	reliability_card?: Record<string, ReportReliabilityCard | null>;
+}
+
+export interface ReportCurvePoint {
+	k: number;
+	tasks: number;
+	pass_at_k: number;
+	pass_at_k_low: number;
+	pass_at_k_high: number;
+	pass_hat_k: number;
+	pass_hat_k_low: number;
+	pass_hat_k_high: number;
+}
+
+/** null means unknown, never zero. */
+export interface ReportReliabilityCard {
+	k: number;
+	tasks: number;
+	pass1: number | null;
+	pass_at_k: number | null;
+	pass_hat_k: number | null;
+	curve: ReportCurvePoint[] | null;
+	consistency: number | null;
+	flip_rate: number | null;
+	cost_per_solved: number | null;
+}
+
+/** One arm under one fault vs its clean runs on the same tasks. null means unknown. */
+export interface ReportResilienceArm {
+	tasks: number;
+	success_clean: number;
+	success_fault: number;
+	recovery_rate: number | null;
+	degradation_ratio: number | null;
+	degradation_ratio_low: number | null;
+	degradation_ratio_high: number | null;
+	cost_inflation: number | null;
+	cost_inflation_low: number | null;
+	cost_inflation_high: number | null;
+	time_to_recover_s: number | null;
+	recovered_share: number | null;
+	retry_after_respected: number | null;
+}
+
+export interface ReportResilienceRow {
+	fault: string;
+	benchmarks: string[];
+	arms: Record<string, ReportResilienceArm>;
 }
 
 export interface ReportReliabilityRow {
@@ -225,6 +300,7 @@ export interface Report {
 	capabilities: ReportCapabilityRow[];
 	benchmarks: ReportBenchmarkRow[];
 	reliability: ReportReliabilityRow[];
+	resilience?: ReportResilienceRow[];
 	safety?: ReportSafety;
 	/** Only for A/B modes. */
 	overall?: ReportOverall;
@@ -282,9 +358,10 @@ export const BASELINE_AGENTS = ["codex", "claude-code", "mini-swe-agent", "openc
 
 const enc = encodeURIComponent;
 
-
 export const evaluationsApi = benchApi
-	.enhanceEndpoints({ addTagTypes: ["Evaluations", "AgentVersions", "AgentCompat", "AgentLeaderboard"] })
+	.enhanceEndpoints({
+		addTagTypes: ["Evaluations", "AgentVersions", "AgentCompat", "AgentLeaderboard"],
+	})
 	.injectEndpoints({
 		endpoints: (builder) => ({
 			getAgentCompatibility: builder.query<Compatibility, string>({
@@ -300,7 +377,11 @@ export const evaluationsApi = benchApi
 				providesTags: (_r, _e, { agent, version }) => [{ type: "AgentVersions", id: `${agent}@${version}` }],
 			}),
 			snapshotAgentVersion: builder.mutation<AgentVersion, { agent: string; note?: string }>({
-				query: ({ agent, note }) => ({ url: `/agents/${enc(agent)}/versions`, method: "POST", body: { note: note ?? "" } }),
+				query: ({ agent, note }) => ({
+					url: `/agents/${enc(agent)}/versions`,
+					method: "POST",
+					body: { note: note ?? "" },
+				}),
 				invalidatesTags: (_r, _e, { agent }) => [{ type: "AgentVersions", id: agent }],
 			}),
 			listEvaluations: builder.query<Evaluation[], void>({
@@ -320,23 +401,39 @@ export const evaluationsApi = benchApi
 				],
 			}),
 			cancelEvaluation: builder.mutation<Evaluation, string>({
-				query: (id) => ({ url: `/evaluations/${enc(id)}/cancel`, method: "POST" }),
+				query: (id) => ({
+					url: `/evaluations/${enc(id)}/cancel`,
+					method: "POST",
+				}),
 				invalidatesTags: (_r, _e, id) => [
 					{ type: "Evaluations", id },
 					{ type: "Evaluations", id: "LIST" },
 				],
 			}),
 			estimateEvaluation: builder.mutation<Estimate, EvaluationSpec>({
-				query: (body) => ({ url: "/evaluations/estimate", method: "POST", body }),
+				query: (body) => ({
+					url: "/evaluations/estimate",
+					method: "POST",
+					body,
+				}),
 			}),
 			/** The same estimate as a query, so a form can show it live (cached per spec). */
 			getEvaluationEstimate: builder.query<Estimate, EvaluationSpec>({
-				query: (body) => ({ url: "/evaluations/estimate", method: "POST", body }),
+				query: (body) => ({
+					url: "/evaluations/estimate",
+					method: "POST",
+					body,
+				}),
 			}),
 			getEvaluationPacks: builder.query<Pack[], void>({
 				query: () => "/evaluation-packs",
-				transformResponse: (body: Pack[] | { packs?: Pack[] | null } | null) =>
-					Array.isArray(body) ? body : (body?.packs ?? []),
+				transformResponse: (body: Pack[] | { packs?: Pack[] | null } | null) => (Array.isArray(body) ? body : (body?.packs ?? [])),
+			}),
+			/** The fault catalog for the wizard (clean excluded). */
+			getBenchFaults: builder.query<FaultCatalogItem[], void>({
+				query: () => "/faults",
+				transformResponse: (body: { faults?: FaultCatalogItem[] | null } | FaultCatalogItem[] | null) =>
+					Array.isArray(body) ? body : (body?.faults ?? []),
 			}),
 			getEvaluationReport: builder.query<Report, string>({
 				query: (id) => `/evaluations/${enc(id)}/report`,
@@ -363,6 +460,7 @@ export const {
 	useGetEvaluationReportQuery,
 	useGetAgentReportCardQuery,
 	useGetEvaluationEstimateQuery,
+	useGetBenchFaultsQuery,
 } = evaluationsApi;
 
 // Hook names other lanes use.

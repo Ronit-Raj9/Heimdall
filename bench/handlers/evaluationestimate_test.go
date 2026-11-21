@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"slices"
+	"strings"
 	"testing"
 
 	"github.com/maximhq/bifrost/bench/schemas"
@@ -97,5 +98,41 @@ func TestEstimateEvaluationBadRequest(t *testing.T) {
 		if _, err := EstimateEvaluation(context.Background(), estimateSuites(), nil, req); !errors.Is(err, errQuickBad) {
 			t.Fatalf("%+v: got %v, want bad request", req, err)
 		}
+	}
+}
+
+func TestEstimateEvaluationPower(t *testing.T) {
+	req := &EvalEstimateRequest{Arms: []EvalEstimateArm{{Agent: "codex", Model: "gpt-x"}}, Benchmarks: []string{"coding-core", "plain", "missing"},
+		TasksPerBenchmark: 3, Trials: 4, Faults: []string{"clean"}}
+	est, err := EstimateEvaluation(context.Background(), estimateSuites(), nil, req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	p := est.Power
+	if p.SDSource != "assumed" || len(p.PerBenchmark) != 2 || p.Overall.Tasks != 4 {
+		t.Fatalf("power %+v", p)
+	}
+	// 3 and 1 tasks cannot reach alpha 0.025 with a sign-flip test.
+	for _, b := range p.PerBenchmark {
+		if b.Decidable || b.MDEpp != nil {
+			t.Fatalf("benchmark %+v should not be decidable", b)
+		}
+	}
+	if p.Overall.MDEpp == nil || *p.Overall.MDEpp <= 10 {
+		t.Fatalf("overall mde %v", p.Overall.MDEpp)
+	}
+	if !strings.Contains(p.Advice, "point change overall") || !strings.Contains(p.Advice, "trials") {
+		t.Fatalf("advice %q", p.Advice)
+	}
+}
+
+func TestEvalPowerDecidable(t *testing.T) {
+	p := evalPower([]EvalBenchmarkEstimate{{Benchmark: "x", Tasks: 100}}, 2)
+	b := p.PerBenchmark[0]
+	if !b.Decidable || b.MDEpp == nil || *b.MDEpp > 10 || p.Overall.MDEpp == nil {
+		t.Fatalf("power %+v", p)
+	}
+	if !strings.Contains(p.Advice, "Enough tasks") || strings.Contains(p.Advice, "trials") {
+		t.Fatalf("advice %q", p.Advice)
 	}
 }

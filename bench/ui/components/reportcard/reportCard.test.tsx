@@ -26,14 +26,24 @@ describe("report card utils", () => {
 	});
 
 	it("prefers the server overall verdict", () => {
-		const h = headline({ ...abReport, overall: { winner: "A", wins: { A: 4, B: 1, tie: 1 }, summary: "A is better on 4 of 6" } });
+		const h = headline({
+			...abReport,
+			overall: {
+				winner: "A",
+				wins: { A: 4, B: 1, tie: 1 },
+				summary: "A is better on 4 of 6",
+			},
+		});
 		expect(h.title).toBe("A is better on 4 of 6 benchmarks");
 		expect(h.detail).toBe("A is better on 4 of 6");
 	});
 
 	it("calls overlapping intervals a tie", () => {
 		expect(compareArms(abReport.capabilities[1].arms, "A", "B")?.winner).toBe("tie");
-		expect(compareArms(abReport.capabilities[0].arms, "A", "B")).toMatchObject({ winner: "B", significant: true });
+		expect(compareArms(abReport.capabilities[0].arms, "A", "B")).toMatchObject({
+			winner: "B",
+			significant: true,
+		});
 	});
 
 	it("lists the seven fixed capability rows first", () => {
@@ -81,5 +91,75 @@ describe("ReportCard", () => {
 		expect(html).toContain("B solves 30 points more");
 		expect(html).toContain("A drop");
 		expect(html).toContain('href="/experiments/exp_6"');
+	});
+
+	it("renders the reliability and resilience cards with unknowns as a dash", () => {
+		const curve = [1, 2, 3].map((k) => ({
+			k,
+			tasks: 4,
+			pass_at_k: 0.5 + 0.1 * k,
+			pass_at_k_low: 0.4,
+			pass_at_k_high: 0.9,
+			pass_hat_k: 0.6 - 0.15 * k,
+			pass_hat_k_low: 0,
+			pass_hat_k_high: 0.6,
+		}));
+		const report = {
+			...scoreReport,
+			benchmarks: [
+				{
+					...scoreReport.benchmarks[0],
+					reliability_card: {
+						A: {
+							k: 3,
+							tasks: 4,
+							pass1: 0.6,
+							pass_at_k: 0.8,
+							pass_hat_k: 0.15,
+							curve,
+							consistency: 0.42,
+							flip_rate: 0.5,
+							cost_per_solved: null,
+						},
+					},
+				},
+			],
+			resilience: [
+				{
+					fault: "tool-rate-limit",
+					benchmarks: ["hd-harbor-tb2"],
+					arms: {
+						A: {
+							tasks: 4,
+							success_clean: 0.6,
+							success_fault: 0.45,
+							recovery_rate: 0.7,
+							degradation_ratio: 0.75,
+							degradation_ratio_low: 0.5,
+							degradation_ratio_high: 0.95,
+							cost_inflation: 1.4,
+							cost_inflation_low: 1.1,
+							cost_inflation_high: 1.8,
+							time_to_recover_s: 12,
+							recovered_share: null,
+							retry_after_respected: null,
+						},
+					},
+				},
+			],
+		};
+		const html = renderToStaticMarkup(<ReportCard report={report} />);
+		expect(html).toContain('data-testid="reliability-chart-hd-harbor-tb2-A"');
+		expect(html).toContain("flakiness");
+		expect(html).toContain("Solved in all 3 tries");
+		expect(html).toMatch(/reliability-consistency-hd-harbor-tb2-A">42%/);
+		expect(html).toMatch(/reliability-flip-hd-harbor-tb2-A">50%/);
+		expect(html).toMatch(/reliability-cost-hd-harbor-tb2-A">-</);
+		expect(html).toContain("Tool rate limit");
+		expect(html).toMatch(/resilience-ratio-tool-rate-limit-A">x0.75/);
+		expect(html).toContain("x0.50 to x0.95");
+		expect(html).toContain("x1.40");
+		expect(html).toContain("12s");
+		expect(html).not.toContain(" arm");
 	});
 });

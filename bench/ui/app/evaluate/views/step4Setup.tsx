@@ -1,5 +1,11 @@
 import { GroupedModelPicker } from "@/components/models/groupedModelPicker";
-import { type EvaluationEstimate, type EvaluationSpec, useEstimateEvaluationQuery } from "@/lib/store/apis/evaluationsApi";
+import {
+	type EvaluationEstimate,
+	type EvaluationSpec,
+	type FaultCatalogItem,
+	useEstimateEvaluationQuery,
+	useGetBenchFaultsQuery,
+} from "@/lib/store/apis/evaluationsApi";
 
 /**
  * Wizard step 4: the model for each arm, how many tasks per benchmark, trials and faults, with a
@@ -10,15 +16,67 @@ import { type EvaluationEstimate, type EvaluationSpec, useEstimateEvaluationQuer
 export const TASK_CHOICES = [3, 5, 8, 10, 20] as const;
 export const TRIAL_CHOICES = [1, 2, 3, 5] as const;
 
-export const FAULTS: readonly { id: string; label: string; help: string }[] = [
-	{ id: "model-down", label: "Model down", help: "The model stops answering for a while, to see if the agent waits and recovers." },
-	{ id: "broken-tool", label: "Broken tool", help: "Some tool calls return errors, to see if the agent notices and works around them." },
+/** Shown while GET /faults loads or when it fails. */
+export const FAULTS: readonly FaultCatalogItem[] = [
+	{
+		id: "model-down",
+		label: "Model down",
+		help: "The model stops answering for a while, to see if the agent waits and recovers.",
+		layer: "model",
+		group: "Model",
+	},
+	{
+		id: "broken-tool",
+		label: "Broken tool",
+		help: "Some tool calls return errors, to see if the agent notices and works around them.",
+		layer: "tool",
+		group: "Tools",
+	},
 	{
 		id: "misleading-instruction",
 		label: "Misleading instruction",
 		help: "The task comes with a wrong or stale hint, to see if the agent checks before trusting it. Skipped on benchmarks without one.",
+		layer: "instructions",
+		group: "Instructions",
 	},
 ];
+
+const GROUP_ORDER = ["Model", "Tools", "Instructions", "Combined"];
+
+/** Faults grouped for the checklist: known groups in a fixed order, then any other group, clean left out. */
+export function groupFaults(faults: readonly FaultCatalogItem[]): { group: string; faults: FaultCatalogItem[] }[] {
+	const by = new Map<string, FaultCatalogItem[]>();
+	for (const f of faults) {
+		if (f.id === "clean") continue;
+		const g = f.group || "Other";
+		by.set(g, [...(by.get(g) ?? []), f]);
+	}
+	const groups = [...by.keys()].sort((a, b) => {
+		const ia = GROUP_ORDER.indexOf(a);
+		const ib = GROUP_ORDER.indexOf(b);
+		return (ia < 0 ? 99 : ia) - (ib < 0 ? 99 : ib) || a.localeCompare(b);
+	});
+	return groups.map((group) => ({ group, faults: by.get(group)! }));
+}
+
+/** The power line: "These settings can detect a change of about X points overall (Y per benchmark)." */
+export function powerText(e: Pick<EvaluationEstimate, "power">): { line: string; advice: string } | undefined {
+	const p = e.power;
+	if (!p) return undefined;
+	const overall = p.overall?.mde_pp;
+	const per = (p.per_benchmark ?? []).map((b) => b.mde_pp).filter((x): x is number => typeof x === "number" && Number.isFinite(x));
+	const perText =
+		(p.per_benchmark ?? []).length === 0
+			? ""
+			: per.length === 0
+				? " (too few tasks to decide per benchmark)"
+				: ` (${Math.round(Math.max(...per))} per benchmark)`;
+	const line =
+		typeof overall === "number" && Number.isFinite(overall)
+			? `These settings can detect a change of about ${Math.round(overall)} points overall${perText}.`
+			: "These settings have too few tasks to detect a change.";
+	return { line, advice: p.advice ?? "" };
+}
 
 /** A starting spec for the wizard when no draft exists yet. */
 export function defaultEvaluationSpec(): EvaluationSpec {
@@ -56,7 +114,11 @@ function range(low: number, high: number, fmt: (n: number) => string): string {
  * The estimate as three short phrases: runs, cost (or "price not known") and minutes (or "time not
  * known"). Tolerates missing ranges, so a partial answer still reads.
  */
-export function estimateText(e: Pick<EvaluationEstimate, "runs" | "est_cost_usd" | "est_minutes">): { runs: string; cost: string; minutes: string } {
+export function estimateText(e: Pick<EvaluationEstimate, "runs" | "est_cost_usd" | "est_minutes">): {
+	runs: string;
+	cost: string;
+	minutes: string;
+} {
 	const runs = Number(e.runs) || 0;
 	const c = e.est_cost_usd;
 	const cost = c?.known ? range(c.low, c.high, money) : "price not known";
@@ -79,7 +141,12 @@ export function estimateNotes(e: Pick<EvaluationEstimate, "per_benchmark" | "not
 	if (general.length) out.push({ benchmark: "", notes: general });
 	for (const b of e.per_benchmark ?? []) {
 		const notes = [...(b.notes ?? []), ...(b.faults_skipped ?? []).map((f) => `${f.fault} is skipped: ${f.reason}`)].filter(Boolean);
-		if (b.skipped || notes.length) out.push({ benchmark: b.benchmark, skipped: b.skipped || undefined, notes });
+		if (b.skipped || notes.length)
+			out.push({
+				benchmark: b.benchmark,
+				skipped: b.skipped || undefined,
+				notes,
+			});
 	}
 	return out;
 }
@@ -93,6 +160,7 @@ export function estimateFailed(error: unknown): boolean {
 export function EstimateSummary({ estimate, updating }: { estimate: EvaluationEstimate; updating?: boolean }) {
 	const est = estimateText(estimate);
 	const notes = estimateNotes(estimate);
+	const power = powerText(estimate);
 	const skipped = notes.filter((n) => n.skipped).length;
 	return (
 		<div className="flex flex-col gap-2">
@@ -101,10 +169,17 @@ export function EstimateSummary({ estimate, updating }: { estimate: EvaluationEs
 				<strong data-testid="step4-est-minutes">{est.minutes}</strong>.
 				{updating && <span className="text-muted-foreground"> Updating...</span>}
 			</span>
+			{power && (
+				<span data-testid="step4-power">
+					{power.line}
+					{power.advice && <span className="text-muted-foreground"> {power.advice}</span>}
+				</span>
+			)}
 			{notes.length > 0 && (
 				<details data-testid="step4-est-notes">
 					<summary className="text-muted-foreground hover:text-foreground cursor-pointer text-xs select-none">
-						Details{skipped > 0 ? ` (${skipped} ${skipped === 1 ? "benchmark" : "benchmarks"} skipped)` : ""}
+						Details
+						{skipped > 0 ? ` (${skipped} ${skipped === 1 ? "benchmark" : "benchmarks"} skipped)` : ""}
 					</summary>
 					<ul className="mt-1.5 flex flex-col gap-1.5 text-xs">
 						{notes.map((n) => (
@@ -168,8 +243,13 @@ export interface Step4SetupProps {
 export function Step4Setup({ spec, onChange }: Step4SetupProps) {
 	const ready = specReady(spec);
 	const estimate = useEstimateEvaluationQuery(spec, { skip: !ready });
+	const catalog = useGetBenchFaultsQuery();
+	const faultGroups = groupFaults(catalog.data && catalog.data.length > 0 ? catalog.data : FAULTS);
 	const setArm = (i: number, provider: string, model: string) =>
-		onChange({ ...spec, arms: spec.arms.map((a, j) => (j === i ? { ...a, provider, model } : a)) });
+		onChange({
+			...spec,
+			arms: spec.arms.map((a, j) => (j === i ? { ...a, provider, model } : a)),
+		});
 
 	return (
 		<div className="flex flex-col gap-6" data-testid="step4-setup">
@@ -213,19 +293,29 @@ export function Step4Setup({ spec, onChange }: Step4SetupProps) {
 				<p className="text-muted-foreground text-sm">
 					Every evaluation runs clean. Add faults to see how the agent copes when things go wrong.
 				</p>
-				{FAULTS.map((f) => (
-					<label key={f.id} className="flex items-start gap-2 text-sm" data-testid={`step4-fault-${f.id}`}>
-						<input
-							type="checkbox"
-							className="mt-1"
-							checked={spec.faults.includes(f.id)}
-							onChange={(e) => onChange({ ...spec, faults: toggleFault(spec.faults, f.id, e.target.checked) })}
-						/>
-						<span>
-							<span className="font-medium">{f.label}</span>
-							<span className="text-muted-foreground block">{f.help}</span>
-						</span>
-					</label>
+				{faultGroups.map((g) => (
+					<fieldset key={g.group} className="flex flex-col gap-2" data-testid={`step4-fault-group-${g.group}`}>
+						<legend className="text-muted-foreground mb-1 text-xs font-medium tracking-wide uppercase">{g.group}</legend>
+						{g.faults.map((f) => (
+							<label key={f.id} className="flex items-start gap-2 text-sm" data-testid={`step4-fault-${f.id}`}>
+								<input
+									type="checkbox"
+									className="mt-1"
+									checked={spec.faults.includes(f.id)}
+									onChange={(e) =>
+										onChange({
+											...spec,
+											faults: toggleFault(spec.faults, f.id, e.target.checked),
+										})
+									}
+								/>
+								<span>
+									<span className="font-medium">{f.label}</span>
+									<span className="text-muted-foreground block">{f.help}</span>
+								</span>
+							</label>
+						))}
+					</fieldset>
 				))}
 			</section>
 

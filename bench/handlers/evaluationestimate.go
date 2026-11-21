@@ -14,6 +14,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"math"
 	"slices"
 	"sort"
 	"strings"
@@ -22,6 +23,7 @@ import (
 	"github.com/maximhq/bifrost/bench/faults"
 	"github.com/maximhq/bifrost/bench/lib"
 	"github.com/maximhq/bifrost/bench/schemas"
+	"github.com/maximhq/bifrost/bench/stats"
 	"github.com/valyala/fasthttp"
 )
 
@@ -97,7 +99,91 @@ type EvalEstimate struct {
 	EstCostUSD   EvalCostRange           `json:"est_cost_usd"`
 	EstMinutes   EvalMinutesRange        `json:"est_minutes"`
 	PerBenchmark []EvalBenchmarkEstimate `json:"per_benchmark"`
+	Power        EvalPower               `json:"power"`
 	Notes        []string                `json:"notes"`
+}
+
+// Power check settings: the assumed per-task SD of the paired difference
+// (verdict/pairedsignflip.go default), the test level, the power, and the
+// change the advice aims at.
+const (
+	EvalPowerSD     = 0.30
+	EvalPowerAlpha  = 0.05
+	EvalPowerPower  = 0.8
+	EvalPowerTarget = 0.10
+	evalPowerMaxN   = 10000
+)
+
+// EvalPowerBenchmark is one benchmark's smallest detectable change, in
+// percentage points, at alpha 0.05 split over the benchmarks (Holm worst
+// case). Decidable is false when the task count cannot reach that level at
+// all with the paired sign-flip test; MDEpp is then null.
+type EvalPowerBenchmark struct {
+	Benchmark string   `json:"benchmark"`
+	Tasks     int      `json:"tasks"`
+	Decidable bool     `json:"decidable"`
+	MDEpp     *float64 `json:"mde_pp"`
+}
+
+// EvalPowerOverall is the pooled test over every task at alpha 0.05.
+type EvalPowerOverall struct {
+	Tasks int      `json:"tasks"`
+	MDEpp *float64 `json:"mde_pp"`
+}
+
+// EvalPower is the power check of the estimate (RESEARCH_R4 R3). The unit
+// is the task: trials steady each task's score but do not add tasks.
+type EvalPower struct {
+	PerBenchmark []EvalPowerBenchmark `json:"per_benchmark"`
+	Overall      EvalPowerOverall     `json:"overall"`
+	SDSource     string               `json:"sd_source"`
+	Advice       string               `json:"advice"`
+}
+
+func mdePP(n int, alpha float64) *float64 {
+	m := stats.MDE(n, EvalPowerSD, alpha, EvalPowerPower)
+	if math.IsNaN(m) || math.IsInf(m, 0) {
+		return nil
+	}
+	v := math.Round(m*1000) / 10
+	return &v
+}
+
+// evalPower computes the power check over the benchmarks that run.
+func evalPower(per []EvalBenchmarkEstimate, trials int) EvalPower {
+	p := EvalPower{PerBenchmark: []EvalPowerBenchmark{}, SDSource: "assumed"}
+	var run []EvalBenchmarkEstimate
+	for _, b := range per {
+		if b.Skipped == "" && b.Tasks > 0 {
+			run = append(run, b)
+		}
+	}
+	if len(run) == 0 {
+		p.Advice = "No benchmark can run, so nothing can be detected."
+		return p
+	}
+	alphaB := EvalPowerAlpha / float64(len(run))
+	for _, b := range run {
+		row := EvalPowerBenchmark{Benchmark: b.Benchmark, Tasks: b.Tasks, Decidable: stats.MinPossibleP(b.Tasks) <= alphaB}
+		if row.Decidable {
+			row.MDEpp = mdePP(b.Tasks, alphaB)
+		}
+		p.PerBenchmark = append(p.PerBenchmark, row)
+		p.Overall.Tasks += b.Tasks
+	}
+	p.Overall.MDEpp = mdePP(p.Overall.Tasks, EvalPowerAlpha)
+	target := int(EvalPowerTarget * 100)
+	var advice []string
+	if p.Overall.MDEpp != nil && *p.Overall.MDEpp <= EvalPowerTarget*100 {
+		advice = append(advice, fmt.Sprintf("Enough tasks to detect a %d point change overall.", target))
+	} else if need := stats.TasksNeeded(EvalPowerTarget, EvalPowerSD, EvalPowerAlpha, EvalPowerPower, 2, evalPowerMaxN); need > p.Overall.Tasks {
+		advice = append(advice, fmt.Sprintf("Add %d tasks to detect a %d point change overall.", need-p.Overall.Tasks, target))
+	}
+	if trials > 2 {
+		advice = append(advice, "More tasks narrow the margin faster than more trials: trials steady each task's score but do not add tasks.")
+	}
+	p.Advice = strings.Join(advice, " ")
+	return p
 }
 
 // modelPricer is the optional ForecastSource method that says whether the
@@ -212,6 +298,7 @@ func EstimateEvaluationWith(ctx context.Context, suites SuiteSource, src Forecas
 		out.PerBenchmark = append(out.PerBenchmark, be)
 	}
 	out.EstCostUSD.Known = ran && allKnown
+	out.Power = evalPower(out.PerBenchmark, req.Trials)
 	out.EstMinutes.Known = ran && timeKnown
 	if !ran {
 		out.Notes = append(out.Notes, "no benchmark of this evaluation can run")
