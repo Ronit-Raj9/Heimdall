@@ -32,8 +32,8 @@ describe("ReleaseCards", () => {
 	});
 
 	it("shows chain status and approver initials", () => {
-		expect(renderToStaticMarkup(<ChainBadge ok />)).toContain("Chain verified");
-		expect(renderToStaticMarkup(<ChainBadge ok={false} />)).toContain("Chain broken");
+		expect(renderToStaticMarkup(<ChainBadge ok />)).toContain("Log not tampered with");
+		expect(renderToStaticMarkup(<ChainBadge ok={false} />)).toContain("Log was changed after it was written");
 		expect(initials("ada.lovelace@x.io")).toBe("AL");
 		expect(initials("raj")).toBe("RA");
 		expect(initials("")).toBe("?");

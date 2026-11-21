@@ -15,8 +15,8 @@ describe("ReviewQueueTable", () => {
 		}
 		expect(html).toContain(">t02<");
 		expect(html).toContain(">stale-notes<");
-		expect(html).toContain("False completion");
-		expect(html).toContain("Flagged");
+		expect(html).toContain("Agent claimed success but failed");
+		expect(html).toContain("Flagged by someone");
 	});
 
 	it("shows the sealed outcome beside the outcome in effect and the decision", () => {

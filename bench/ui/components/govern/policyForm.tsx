@@ -17,6 +17,7 @@ import {
 } from "lucide-react";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
+import type { TFunction } from "i18next";
 
 /** Metrics a check can test (docs/release-policy.md); the field also accepts any per-run metric. */
 export const POLICY_METRICS = [
@@ -154,11 +155,23 @@ export function PolicyForm({ value, onChange, disabled }: PolicyFormProps) {
 			</div>
 			<datalist id="policy-metrics">
 				{POLICY_METRICS.map((m) => (
-					<option key={m} value={m} />
+					<option key={m} value={m} label={tu(`policies.metricLabel.${m}`)} />
 				))}
 			</datalist>
 		</fieldset>
 	);
+}
+
+/** A plain-language metric name, falling back to the raw metric for custom ones. */
+export function metricLabel(metric: string, tu: TFunction<"u14">): string {
+	return POLICY_METRICS.includes(metric) ? String(tu(`policies.metricLabel.${metric}` as never)) : metric;
+}
+
+/** One rule row as a plain sentence, e.g. "Block the release if share of tasks solved gets worse than the current version." */
+export function checkSentence(c: PolicyCheck, tu: TFunction<"u14">): string {
+	const kind = checkKind(c);
+	const action = String(tu(`policies.sentenceAction.${c.severity === "warn" ? "warn" : "block"}` as never));
+	return String(tu(`policies.sentence.${kind}` as never, { action, metric: metricLabel(c.metric, tu), value: thresholdOf(c) ?? 0 } as never));
 }
 
 const chipSelect = "border-input bg-background h-8 rounded-md border px-2 text-xs";
@@ -187,6 +200,7 @@ function CheckRow({ index, check, onChange, onRemove }: { index: number; check: 
 				<Input
 					list="policy-metrics"
 					aria-label={t("policies.metric")}
+					title={metricLabel(check.metric, tu)}
 					className="h-8 w-48 text-xs"
 					value={check.metric}
 					onChange={(e) => onChange({ ...check, metric: e.target.value })}
@@ -252,6 +266,9 @@ function CheckRow({ index, check, onChange, onRemove }: { index: number; check: 
 					</Button>
 				</span>
 			</div>
+			<p className="text-muted-foreground pl-10 text-xs" data-testid={`policy-check-sentence-${index}`}>
+				{checkSentence(check, tu)}
+			</p>
 			{advanced && (
 				<div className="grid grid-cols-1 gap-3 border-t pt-3 sm:grid-cols-3">
 					<label className="text-muted-foreground flex flex-col gap-1 text-xs">

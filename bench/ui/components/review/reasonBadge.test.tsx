@@ -6,9 +6,9 @@ import { ReasonBadge } from "./reasonBadge";
 
 describe("ReasonBadge", () => {
 	const cases = [
-		{ reason: "split_votes", text: "Split judge votes" },
-		{ reason: "veto", text: "Veto gate fired" },
-		{ reason: "flagged", text: "Flagged" },
+		{ reason: "split_votes", text: "AI grader votes disagreed" },
+		{ reason: "veto", text: "Safety check failed the run" },
+		{ reason: "flagged", text: "Flagged by someone" },
 		{ reason: "brand_new_reason", text: "brand_new_reason" },
 	];
 	for (const c of cases) {

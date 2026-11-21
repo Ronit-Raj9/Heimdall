@@ -94,8 +94,8 @@ describe("ReleaseForm", () => {
 
 	it("names each blocker", () => {
 		const html = render("no_decision", "block", { approver: "maya" });
-		expect(html).toContain("The verdict action is no_decision, not ship.");
-		expect(html).toContain("The policy decision is block.");
+		expect(html).toContain("The result is no_decision, not ship.");
+		expect(html).toContain("The release rules block this release.");
 		expect(html).not.toContain('data-testid="release-override-reason"');
 	});
 

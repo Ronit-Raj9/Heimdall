@@ -41,7 +41,7 @@ describe("ReviewTimeline", () => {
 		expect(html).toMatch(/data-testid="tl-entry-rv_synth0002"[^>]*data-state="superseded"/);
 		expect(html).toMatch(/data-testid="tl-entry-rv_synth0003"[^>]*data-state="current"/);
 		expect(html.indexOf("tl-entry-rv_synth0002")).toBeLessThan(html.indexOf("tl-entry-rv_synth0003"));
-		expect(html).toContain("Supersedes rv_synth0002.");
+		expect(html).toContain("Replaces rv_synth0002.");
 	});
 
 	it("shows a flag without an outcome change", () => {
