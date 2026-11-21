@@ -331,3 +331,32 @@ caps request bodies at 2 MiB and hides `/readyz`; the server adds its CSP,
   this machine (and the S3 mirror you configure).
 - High availability: one server process and one Postgres; scale up, not out.
 - Email delivery: invitations are links an admin copies and sends.
+
+## Shared runner pool and guardrails
+
+New organizations can run the built-in agents and suites without bringing
+their own runner. The shared runner replans every experiment with the
+server's checkout, so it runs only what the built-in templates reproduce.
+
+| Variable | Where | What |
+|---|---|---|
+| `HEIMDALL_SHARED_RUNNER_SECRET` | server and `shared-runner` | Secret the shared runner fetches its assignments with (`GET /api/bench/admin/pool/assignments`). Empty turns the shared pool off. Generate with `openssl rand -hex 32`. |
+| `HEIMDALL_MASTER_KEY` | server | Base64 32-byte key. The per-org shared pool runner tokens are kept in the keystore under it. |
+| `HEIMDALL_SERVER_ADMINS` | server | Comma-separated emails of server admins: quotas, image approval, kill switch. |
+| `HEIMDALL_SHARED_RUNTIME` | `shared-runner` | `runc` (default) or `runsc`. One shared runner serves one runtime; a `runsc` runner needs a Docker daemon whose default runtime is gVisor (set `DOCKER_HOST`). |
+| `HEIMDALL_SHARED_SLOTS` | `shared-runner` | Slots per organization, capped by its max concurrent runs. |
+
+Start it with `docker compose --profile shared-runner up -d`.
+
+Guardrails (server admin, `/api/bench/admin/...`):
+
+- Per-org limits: `GET/PUT /admin/quotas/{org_id}` (concurrent runs, runs per
+  day, spend per day, image size, shared pool on or off, custom images,
+  runtime `runc` or `runsc`). With the shared runner secret set, the shared
+  pool is on for orgs that have no row.
+- Custom images: members request one with `POST /api/bench/images`. It must be
+  pinned by digest (`name@sha256:<64 hex>`) and fit the org's image size
+  limit. A server admin approves it with `POST /admin/images/{id}/approve`.
+- Kill switch: `POST /admin/killswitch {"on": true}` empties the shared
+  runner's assignments and stops every coordinator from handing out new
+  leases; slots already running finish.

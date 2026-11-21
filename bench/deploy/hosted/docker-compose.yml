@@ -158,6 +158,13 @@ services:
       HEIMDALL_S3_ENDPOINT: ${HEIMDALL_S3_ENDPOINT:-}
       HEIMDALL_S3_ACCESS_KEY: ${HEIMDALL_S3_ACCESS_KEY:-}
       HEIMDALL_S3_SECRET_KEY: ${HEIMDALL_S3_SECRET_KEY:-}
+      # Web parity guardrails (docs/hosting.md "Shared runner pool"): server
+      # admins by email, the master key the keystore encrypts org keys and
+      # shared pool runner tokens with, and the secret the shared runner
+      # fetches its assignments with (empty: no shared pool).
+      HEIMDALL_SERVER_ADMINS: ${HEIMDALL_SERVER_ADMINS:-}
+      HEIMDALL_MASTER_KEY: ${HEIMDALL_MASTER_KEY:-}
+      HEIMDALL_SHARED_RUNNER_SECRET: ${HEIMDALL_SHARED_RUNNER_SECRET:-}
     volumes:
       - ./bench.hosted.yaml:/srv/heimdall/deploy/bench.yaml:ro
       - heimdall-data:/var/lib/heimdall
@@ -179,7 +186,7 @@ services:
   # runs agent containers, and only for the demo organization's suites.
 
   bifrost-postgres:
-    profiles: [demo-runner]
+    profiles: [demo-runner, shared-runner]
     image: postgres:18@sha256:979bccfde35445db618c65107d27d08c6c21339d8dc3ad4c830c6633947be0e4
     labels: *labels
     <<: *logging
@@ -201,7 +208,7 @@ services:
     restart: unless-stopped
 
   faultproxy:
-    profiles: [demo-runner]
+    profiles: [demo-runner, shared-runner]
     image: ${HEIMDALL_IMAGE:-heimdall/server:local}
     labels: *labels
     <<: [*hardening, *logging]
@@ -225,7 +232,7 @@ services:
     restart: unless-stopped
 
   bifrost:
-    profiles: [demo-runner]
+    profiles: [demo-runner, shared-runner]
     image: maximhq/bifrost:v2.5.1@sha256:5ec9873acaf1687556b6e4dd854b92b539d9debf87a5a683b66338648b84d3c8
     labels: *labels
     <<: *logging
@@ -294,6 +301,69 @@ services:
       - /var/run/docker.sock:/var/run/docker.sock
       - ${HEIMDALL_BENCH_DIR:?run through deploy/hosted/*.sh or set HEIMDALL_BENCH_DIR}:${HEIMDALL_BENCH_DIR:?run through deploy/hosted/*.sh or set HEIMDALL_BENCH_DIR}:ro
       - ${HEIMDALL_RUNNER_DIR:-/var/lib/heimdall-runner}:${HEIMDALL_RUNNER_DIR:-/var/lib/heimdall-runner}
+    tmpfs:
+      - /tmp
+    networks: [edge, upstream]
+    depends_on:
+      heimdall:
+        condition: service_healthy
+      bifrost:
+        condition: service_healthy
+    restart: unless-stopped
+
+  # Profile shared-runner: the shared runner pool (web parity F3). Serves
+  # every org whose limits allow the shared pool, one worker loop per org,
+  # with only the server's built-in agents and suites (it replans every
+  # experiment with this checkout). Needs HEIMDALL_SHARED_RUNNER_SECRET on
+  # both sides and HEIMDALL_MASTER_KEY on the server.
+  #   docker compose ... --profile shared-runner up -d
+  # For gVisor, point DOCKER_HOST at a daemon whose default runtime is runsc
+  # and set HEIMDALL_SHARED_RUNTIME=runsc.
+  shared-runner:
+    profiles: [shared-runner]
+    build:
+      context: ../..
+      dockerfile: deploy/hosted/Dockerfile.server
+      target: runner
+    image: ${HEIMDALL_RUNNER_IMAGE:-heimdall/runner:local}
+    labels: *labels
+    <<: [*hardening, *logging]
+    # Agent containers are started on the host's Docker through its socket,
+    # so every path the runner hands to `docker run -v` must mean the same on
+    # the host: the checkout and the runner's data folder are mounted at
+    # their host paths.
+    group_add: ["${HEIMDALL_DOCKER_GID:-0}"]
+    working_dir: ${HEIMDALL_BENCH_DIR:?run through deploy/hosted/*.sh or set HEIMDALL_BENCH_DIR}
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - |
+        set -eu
+        umask 077
+        [ -n "$${HEIMDALL_SHARED_RUNNER_SECRET:-}" ] || { echo "HEIMDALL_SHARED_RUNNER_SECRET is empty: set it in deploy/hosted/.env (docs/hosting.md)" >&2; exit 64; }
+        printf '%s' "$$HEIMDALL_SHARED_RUNNER_SECRET" > /tmp/shared.secret
+        unset HEIMDALL_SHARED_RUNNER_SECRET
+        exec bifrost-bench runner start -shared -server http://heimdall:8090 -secret-file /tmp/shared.secret \
+          -config "$$HEIMDALL_BENCH_DIR/deploy/bench.yaml" -name shared-runner \
+          -runtime "$$HEIMDALL_SHARED_RUNTIME" -slots "$$HEIMDALL_SHARED_SLOTS"
+    environment:
+      HOME: /tmp
+      HEIMDALL_SHARED_RUNNER_SECRET: ${HEIMDALL_SHARED_RUNNER_SECRET:-}
+      HEIMDALL_SHARED_RUNTIME: ${HEIMDALL_SHARED_RUNTIME:-runc}
+      HEIMDALL_SHARED_SLOTS: ${HEIMDALL_SHARED_SLOTS:-1}
+      HEIMDALL_BENCH_DIR: ${HEIMDALL_BENCH_DIR:?run through deploy/hosted/*.sh or set HEIMDALL_BENCH_DIR}
+      BENCH_RUNS_ROOT: ${HEIMDALL_RUNNER_DIR:-/var/lib/heimdall-shared-runner}/runs
+      BENCH_RELEASES_ROOT: ${HEIMDALL_RUNNER_DIR:-/var/lib/heimdall-shared-runner}/releases
+      BENCH_GATEWAY_URL: http://bifrost:8080
+      BENCH_GATEWAY_AGENT_URL: http://bifrost:8080
+      BENCH_GATEWAY_FAULT_PROXY_URL: http://faultproxy:9100
+      BENCH_FAULTPROXY_CONTROL_URL: http://faultproxy:9101
+      BENCH_NETWORKS_EVAL: ${HEIMDALL_EVAL_NETWORK:-heimdall-evalnet}
+      BIFROST_SETUP_TOKEN: ${BIFROST_SETUP_TOKEN:-}
+      BENCH_FAULTPROXY_TOKEN: ${BENCH_FAULTPROXY_TOKEN:-}
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - ${HEIMDALL_BENCH_DIR:?run through deploy/hosted/*.sh or set HEIMDALL_BENCH_DIR}:${HEIMDALL_BENCH_DIR:?run through deploy/hosted/*.sh or set HEIMDALL_BENCH_DIR}:ro
+      - ${HEIMDALL_RUNNER_DIR:-/var/lib/heimdall-shared-runner}:${HEIMDALL_RUNNER_DIR:-/var/lib/heimdall-shared-runner}
     tmpfs:
       - /tmp
     networks: [edge, upstream]
