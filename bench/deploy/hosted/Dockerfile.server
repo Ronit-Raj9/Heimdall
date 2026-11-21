@@ -50,7 +50,8 @@ RUN test -f ui/dist/index.html \
 # server, for `bifrost-bench evidence backup` (database dump uploaded to the
 # evidence mirror) and `db backup`.
 FROM alpine:3.23@sha256:469c9ea410b9215eaee7976ba6c0639039b444be8e5d638f7abbada189971eb2 AS server
-RUN apk add --no-cache 'postgresql18-client~18' \
+# git: task from a commit, mining and git-ref compares clone public repos.
+RUN apk add --no-cache 'postgresql18-client~18' git \
     && addgroup -S -g 10001 heimdall \
     && adduser -S -D -H -h /var/lib/heimdall -u 10001 -G heimdall heimdall \
     && mkdir -p /srv/heimdall/deploy /var/lib/heimdall/runs /var/lib/heimdall/releases \
