@@ -960,13 +960,14 @@ func suiteLockJob(ctx context.Context, l *launcher, j *jobs.Job, log jobs.Logger
 		Docker: l.a.docker, Pin: p.PinLocalImages}, log)
 }
 
-func suiteAdmitJob(ctx context.Context, l *launcher, j *jobs.Job, log jobs.Logger, _ func(any)) (any, error) {
+func suiteAdmitJob(ctx context.Context, l *launcher, j *jobs.Job, log jobs.Logger, progress func(any)) (any, error) {
 	var p suiteParams
 	if err := j.DecodeParams(&p); err != nil {
 		return nil, err
 	}
 	env := ops.AdmitEnv{Config: l.a.cfg, Docker: l.a.docker, Logger: l.a.logger,
-		Registry: func(context.Context, bool) (*schemas.Registry, error) { return l.a.reg, nil }} // serve's app already has the gateway
+		Registry: func(context.Context, bool) (*schemas.Registry, error) { return l.a.reg, nil }, // serve's app already has the gateway
+		Progress: admitProgress(progress)}
 	rep, err := ops.SuiteAdmit(ctx, env, p.Suite, p.Task, log)
 	if err != nil {
 		return rep, err
@@ -975,6 +976,25 @@ func suiteAdmitJob(ctx context.Context, l *launcher, j *jobs.Job, log jobs.Logge
 		return rep, fmt.Errorf("suite %s: %d tasks not admitted", rep.Suite, rep.Failed)
 	}
 	return rep, nil
+}
+
+// admitProgress reports a suite.admit job's progress: {done, total, task,
+// admitted, refused} (lane X13: live readiness checks on the website).
+func admitProgress(progress func(any)) func(done, total int, task string, rec *schemas.AdmissionRecord) {
+	if progress == nil {
+		return nil
+	}
+	admitted, refused := 0, 0
+	return func(done, total int, task string, rec *schemas.AdmissionRecord) {
+		if rec != nil {
+			if rec.Admitted {
+				admitted++
+			} else {
+				refused++
+			}
+		}
+		progress(map[string]any{"done": done, "total": total, "task": task, "admitted": admitted, "refused": refused})
+	}
 }
 
 func (h *jobsHub) agentCheckJob(ctx context.Context, l *launcher, j *jobs.Job, log jobs.Logger, _ func(any)) (any, error) {

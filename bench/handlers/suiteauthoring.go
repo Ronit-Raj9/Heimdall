@@ -60,6 +60,9 @@ type CreateSuiteRequest struct {
 	Template string `json:"template"`
 	// Image is an existing toolchain image; empty writes base/Dockerfile.
 	Image string `json:"image,omitempty"`
+	// Blank leaves out a scenario template's sample task: the suite starts
+	// with no tasks (lane X13, tasks come from the team's own data).
+	Blank bool `json:"blank,omitempty"`
 }
 
 // CreateSuiteResponse says what POST /suites wrote.
@@ -236,7 +239,7 @@ func (h *suiteAuthoring) createSuite(ctx *fasthttp.RequestCtx) {
 	}
 	var req CreateSuiteRequest
 	if err := decodeAuthoring(ctx.PostBody(), &req); err != nil {
-		h.bad(ctx, `body must be {"id","template","image"?}: `+err.Error())
+		h.bad(ctx, `body must be {"id","template","image"?,"blank"?}: `+err.Error())
 		return
 	}
 	req.ID = strings.TrimSpace(req.ID)
@@ -260,6 +263,12 @@ func (h *suiteAuthoring) createSuite(ctx *fasthttp.RequestCtx) {
 		h.bad(ctx, err.Error())
 		return
 	}
+	if req.Blank {
+		if files, err = scaffold.BlankSuite(files); err != nil {
+			h.bad(ctx, err.Error())
+			return
+		}
+	}
 	// A fresh project may have no benchmarks/ yet; the store resolves paths
 	// against existing folders, so create the area first.
 	if err := os.MkdirAll(filepath.Join(h.projects.Root(), string(projectfs.AreaBenchmarks)), 0o755); err != nil {
@@ -279,11 +288,16 @@ func (h *suiteAuthoring) createSuite(ctx *fasthttp.RequestCtx) {
 		h.sendStoreError(ctx, "write suite "+req.ID, err)
 		return
 	}
-	out := CreateSuiteResponse{ID: req.ID, Template: req.Template, Sample: scaffold.ScenarioSample(req.Template), Visible: h.visible(dir)}
+	out := CreateSuiteResponse{ID: req.ID, Template: req.Template, Visible: h.visible(dir)}
+	if !req.Blank {
+		out.Sample = scaffold.ScenarioSample(req.Template)
+	}
 	for _, f := range files {
 		out.Files = append(out.Files, f.Path)
 	}
-	if out.Sample != "" {
+	if req.Blank {
+		out.Next = "Add tasks from your own data, choose the grader, then run the readiness checks."
+	} else if out.Sample != "" {
 		out.Next = "Open the sample task " + out.Sample + ", adapt it, then run Lint and Lock."
 	} else {
 		out.Next = "Add a task, upload its repo and hidden tests, then run Lint and Lock."

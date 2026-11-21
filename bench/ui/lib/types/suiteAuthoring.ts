@@ -15,6 +15,8 @@ export interface CreateSuiteRequest {
 	id: string;
 	template: string;
 	image?: string;
+	/** Leave out a scenario template's sample task (the suite starts empty). */
+	blank?: boolean;
 }
 
 export interface CreateSuiteResponse {

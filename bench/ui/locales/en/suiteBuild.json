@@ -1,0 +1,131 @@
+{
+	"intro": "Build your own benchmark here: pick how answers are checked, add tasks from your own data, keep some tasks private, then run the readiness checks. Evaluations only use tasks that passed them.",
+	"viewerNote": "You can see this benchmark, but only members can change it. Ask an admin of your organization for the member role.",
+	"tab": "Build",
+	"inbox": {
+		"open": "Finish the task",
+		"check": "Run its readiness check",
+		"hint": "Fill in the files marked EDIT ME first; the readiness check fails while they remain."
+	},
+	"grader": {
+		"title": "1. How answers are checked",
+		"description": "Exact answer checks the agent's answer against yours with no model. Rubric judge asks a model you pin to grade the answer against your rubric.",
+		"fixed": "This benchmark checks code or workspace changes with its own tests. Its grader comes with its template; question-and-answer benchmarks can switch between exact answer and rubric judge.",
+		"current": "In use",
+		"choice": {
+			"tests": "Tests",
+			"state": "State check",
+			"exact": "Exact answer",
+			"judge": "Rubric judge"
+		},
+		"hint": {
+			"tests": "Hidden tests run on the agent's code change.",
+			"state": "A script checks the state the agent left behind (database, files, tickets).",
+			"exact": "Matches the expected answer: exact, contains all, number, pattern or choice.",
+			"judge": "A pinned model grades each answer against your rubric."
+		},
+		"provider": "Judge provider",
+		"model": "Judge model",
+		"votes": "Votes",
+		"votesHint": "Independent judge calls per answer; the majority decides.",
+		"pinHint": "The judge is pinned: every grade records this exact model and prompt. Judge calls use your organization's key for this provider.",
+		"pin": "Pin judge",
+		"save": "Use exact answer",
+		"calibrate": "Check the judge against your own labels"
+	},
+	"add": {
+		"title": "2. Add tasks",
+		"description": "Each row, ticket, commit or failure becomes one task with a hidden check. New tasks are not used until they pass the readiness checks.",
+		"source": {
+			"rows": "Spreadsheet or JSONL",
+			"tickets": "Support tickets",
+			"commit": "Repository commit",
+			"traces": "Production failures"
+		},
+		"codeSuite": "Spreadsheets and tickets go into a question-and-answer benchmark. Create one from Benchmarks > New to add them.",
+		"traces": "Failures your agent had in production arrive in the inbox (from Langfuse, LangSmith, OpenTelemetry or the webhook). Open one and choose Turn into task to add it to this benchmark, then run the readiness checks here.",
+		"openInbox": "Open the inbox"
+	},
+	"rows": {
+		"help": "One row per task. Columns: question (or instruction, input, prompt), answer (or expected) for the exact grader, rubric (or check) for the rubric judge. Optional: id, title, wrong_answers (separated by |), category, split (held_out).",
+		"ticketsHelp": "Paste a JSON array of tickets (subject, body, resolution), JSON Lines, or plain text: first line the subject, then the message, then a line starting with Expected: and what a good reply does. Separate tickets with a line of ---.",
+		"ticketsNeedJudge": "A reply to a ticket has no single exact answer. Switch the grader to Rubric judge above before importing tickets.",
+		"file": "File",
+		"format": "Format",
+		"match": "Answer match",
+		"matchMode": {
+			"exact": "Exact (ignores case and spacing)",
+			"contains_all": "Contains every expected part",
+			"numeric": "Number",
+			"regex": "Pattern (regular expression)",
+			"choice": "Multiple choice"
+		},
+		"paste": "Rows",
+		"csvPlaceholder": "question,answer,wrong_answers\nHow many days is the refund window?,30,14 | 60",
+		"jsonlPlaceholder": "{\"question\": \"How many days is the refund window?\", \"answer\": \"30\"}\n{\"instruction\": \"Summarise our refund policy\", \"rubric\": \"Mentions the 30 day window\", \"reference\": \"Refunds within 30 days.\"}",
+		"ticketsPlaceholder": "Charged twice\nI was billed two times in May.\nExpected: Apologise, confirm the duplicate charge and refund it within 5 days.\n---\nCannot log in\nThe reset link expired.\nExpected: Send a new reset link and say it lasts one hour.",
+		"heldOut": "Keep these tasks private (held out): evaluations use them only when asked, and their content is never shown",
+		"preview": "Preview",
+		"importIdle": "Import",
+		"import_one": "Import 1 task",
+		"import_other": "Import {{count}} tasks",
+		"previewSummary": "{{ok}} rows can become tasks, {{bad}} cannot.",
+		"done_one": "Added 1 task.",
+		"done_other": "Added {{count}} tasks.",
+		"problem": "Row {{line}}: {{message}}",
+		"col": {
+			"line": "Row",
+			"task": "Task",
+			"question": "Question",
+			"answer": "Expected answer",
+			"rubric": "Rubric"
+		}
+	},
+	"private": {
+		"title": "3. Private tasks",
+		"description": "Held-out tasks stay private: they never run unless an evaluation asks for them, and their instructions and checks are never shown. Use them to catch agents tuned to the public tasks.",
+		"empty": "No tasks yet. Add some above.",
+		"count": "{{heldOut}} of {{total}} tasks held out.",
+		"heldOut": "held out",
+		"public": "public",
+		"makeHeldOut": "Hold out",
+		"makePublic": "Make public"
+	},
+	"readiness": {
+		"title": "4. Readiness checks",
+		"description": "Each task must show its check is sound: the right answer passes, an empty answer and wrong answers fail, and a gaming attempt scores nothing. Only ready tasks are used in evaluations.",
+		"state": "{{ready}} of {{total}} tasks ready.",
+		"noTasks": "Add tasks first.",
+		"scope": "Check",
+		"all_one": "The task",
+		"all_other": "All {{count}} tasks",
+		"run": "Run readiness checks",
+		"confirm_one": "Run the readiness checks on 1 task? This builds the task's image and tries the right answer and the wrong ones.",
+		"confirm_other": "Run the readiness checks on all {{count}} tasks? This builds images and tries the right answer and the wrong ones for each task.",
+		"confirmHosted_one": "Run the readiness checks on 1 task? It runs on a worker with scripted answers, no model calls.",
+		"confirmHosted_other": "Run the readiness checks on all {{count}} tasks? They run on a worker with scripted answers, no model calls.",
+		"confirmOne": "Run the readiness checks on {{task}}?",
+		"summary": "{{ready}} of {{total}} tasks passed.",
+		"ready": "ready",
+		"notReady": "not ready",
+		"passed": "passed",
+		"failed": "failed",
+		"got": "got {{got}}, wanted {{want}}",
+		"check": {
+			"static": "Files are complete and valid",
+			"reference": "The right answer passes (try {{n}})",
+			"reference1": "The right answer passes",
+			"honest": "The honest solution passes the original tests (try {{n}})",
+			"empty": "An empty answer fails",
+			"mutant": "Near miss {{n}} is caught",
+			"wrongAnswer": "Wrong answer {{n}} is caught",
+			"exploit": "A gaming attempt scores nothing",
+			"instruction": "The instruction was written for this task",
+			"secrets": "No secrets in the task files",
+			"network": "The check runs without network",
+			"staleNotes": "Stale project notes do not break the right answer",
+			"doNothing": "Doing nothing fails",
+			"refuse": "Refusing fails"
+		}
+	}
+}

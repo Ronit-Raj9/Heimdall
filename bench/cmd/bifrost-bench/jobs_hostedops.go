@@ -642,7 +642,7 @@ func admitVerdict(runs []bridgeRun, wantTasks []string) []hostedAdmitTask {
 	return out
 }
 
-func runHostedSuiteAdmit(ctx context.Context, env jobEnv, j *jobs.Job, log jobs.Logger, _ func(any)) (any, error) {
+func runHostedSuiteAdmit(ctx context.Context, env jobEnv, j *jobs.Job, log jobs.Logger, progress func(any)) (any, error) {
 	var p hostedSuiteAdmitParams
 	if err := j.DecodeParams(&p); err != nil {
 		return nil, err
@@ -701,6 +701,9 @@ func runHostedSuiteAdmit(ctx context.Context, env jobEnv, j *jobs.Job, log jobs.
 	rep := &hostedAdmitReport{Suite: p.Suite, ExpID: m.ExpID,
 		Note: "hosted admission proves the oracle and noop controls on a runner and records each result in suite.lock"}
 	log.Printf("admission controls run in experiment %s (open it on the Experiments page)", m.ExpID)
+	if progress != nil {
+		progress(map[string]any{"done": 0, "total": len(tasks), "exp_id": m.ExpID})
+	}
 	if err := runExperiment(ctx, l, m, timeout, log); err != nil {
 		return rep, err
 	}
@@ -726,6 +729,9 @@ func runHostedSuiteAdmit(ctx context.Context, env jobEnv, j *jobs.Job, log jobs.
 			rep.Failed++
 			log.Warnf("REFUSE  %s: %s", t.Task, t.Reason)
 		}
+	}
+	if progress != nil {
+		progress(map[string]any{"done": len(rep.Tasks), "total": len(tasks), "exp_id": m.ExpID, "admitted": rep.Admitted, "refused": rep.Failed})
 	}
 	if rep.Failed > 0 {
 		return rep, fmt.Errorf("suite %s: %d tasks not admitted", p.Suite, rep.Failed)

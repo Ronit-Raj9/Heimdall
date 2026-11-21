@@ -185,6 +185,9 @@ type AdmitEnv struct {
 	// Registry returns the registry; gateway asks for the live gateway (a
 	// judged suite's grader calls its model through it).
 	Registry func(ctx context.Context, gateway bool) (*schemas.Registry, error)
+	// Progress, when set, is told each task's admission as it ends: done of
+	// total, the task and its record (the website's readiness checks).
+	Progress func(done, total int, task string, rec *schemas.AdmissionRecord)
 }
 
 // AdmitReport is what suite admit did.
@@ -276,6 +279,13 @@ func SuiteAdmit(ctx context.Context, env AdmitEnv, ref, only string, w io.Writer
 	if err != nil {
 		return rep, fmt.Errorf("lock: %w", err)
 	}
+	total := len(s.Tasks)
+	if only != "" {
+		total = 1
+	}
+	if env.Progress != nil {
+		env.Progress(0, total, "", nil)
+	}
 	for _, t := range s.Tasks {
 		if only != "" && t.ID != only {
 			continue
@@ -293,6 +303,9 @@ func SuiteAdmit(ctx context.Context, env AdmitEnv, ref, only string, w io.Writer
 		rep.Tasks[t.ID] = rec
 		rep.Order = append(rep.Order, t.ID)
 		PrintAdmission(w, t.ID, rec)
+		if env.Progress != nil {
+			env.Progress(len(rep.Order), total, t.ID, rec)
+		}
 	}
 	path := filepath.Join(s.Root, "suite.lock")
 	if _, err := suite.WriteLock(path, lock); err != nil {
