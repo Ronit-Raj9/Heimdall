@@ -1,10 +1,10 @@
 // Package projectfs is the confined file store over an org's project folder:
-// agents, benchmarks, experiments, policies and uploads. Phase 0 skeleton;
-// lane L01 completes versioning, validation and zip extraction.
+// agents, benchmarks, experiments, policies and uploads. Every write is
+// atomic, validated (validate.go) and versioned (versions.go, under
+// .heimdall/versions/); ExtractZip (zip.go) unpacks an archive safely.
 package projectfs
 
 import (
-	"bytes"
 	"context"
 	"crypto/sha256"
 	"encoding/hex"
@@ -42,11 +42,16 @@ type Entry struct {
 	SHA256  string    `json:"sha256,omitempty"`
 }
 
-// Version is one stored version of a file.
+// Version is one stored version of a file. A deletion is recorded as a
+// version with an empty SHA256 and Note "deleted".
 type Version struct {
-	ID, Path, SHA256, Actor, Note string
-	Size                          int64
-	At                            time.Time
+	ID     string    `json:"id"`
+	Path   string    `json:"path"`
+	SHA256 string    `json:"sha256"`
+	Actor  string    `json:"actor,omitempty"`
+	Note   string    `json:"note,omitempty"`
+	Size   int64     `json:"size"`
+	At     time.Time `json:"at"`
 }
 
 // WriteOpts carry the actor, a note and an optimistic-lock hash.
@@ -105,6 +110,9 @@ func RegisterValidator(a Area, glob string, v Validator) {
 }
 
 func validate(a Area, rel string, data []byte) error {
+	if err := validateSyntax(a, rel, data); err != nil {
+		return fmt.Errorf("%w: %v", ErrInvalid, err)
+	}
 	validatorsMu.RLock()
 	defer validatorsMu.RUnlock()
 	for _, e := range validators {
@@ -180,25 +188,30 @@ func (s *store) Resolve(a Area, rel string) (string, error) {
 	if !within(base, full) {
 		return "", ErrOutside
 	}
-	// Symlink escape: resolve the longest existing prefix.
-	probe := full
-	for {
+	// Symlink escape: resolve the longest existing prefix below the root
+	// and require it to stay inside the area (the area folder itself must
+	// not point out of the project either).
+	realBase := base
+	if rb, err := filepath.EvalSymlinks(base); err == nil {
+		if !within(s.root, rb) {
+			return "", ErrOutside
+		}
+		realBase = rb
+	}
+	for probe := full; within(base, probe); probe = filepath.Dir(probe) {
 		real, err := filepath.EvalSymlinks(probe)
 		if err == nil {
-			realBase, berr := filepath.EvalSymlinks(base)
-			if berr != nil {
-				realBase = base
-			}
 			if !within(realBase, real) {
 				return "", ErrOutside
 			}
 			break
 		}
-		parent := filepath.Dir(probe)
-		if parent == probe || !within(s.root, parent) {
+		if li, lerr := os.Lstat(probe); lerr == nil && li.Mode()&os.ModeSymlink != 0 {
+			return "", ErrOutside // dangling symlink
+		}
+		if probe == base {
 			break
 		}
-		probe = parent
 	}
 	return full, nil
 }
@@ -230,6 +243,9 @@ func (s *store) List(ctx context.Context, a Area, dir string, recursive bool) ([
 	out := []Entry{}
 	walk := func(p string, d fs.DirEntry) error {
 		name := d.Name()
+		if strings.HasPrefix(name, tmpPrefix) {
+			return nil
+		}
 		if name == ".git" || name == ".heimdall" {
 			if d.IsDir() {
 				return filepath.SkipDir
@@ -292,88 +308,4 @@ func (s *store) Read(ctx context.Context, a Area, rel string) ([]byte, Entry, er
 	}
 	c, _ := cleanRel(rel)
 	return data, Entry{Path: c, Size: int64(len(data)), ModTime: st.ModTime(), SHA256: sum(data)}, nil
-}
-
-func (s *store) Write(ctx context.Context, a Area, rel string, data []byte, o WriteOpts) (Entry, error) {
-	if len(data) > MaxFileBytes {
-		return Entry{}, ErrTooLarge
-	}
-	full, err := s.Resolve(a, rel)
-	if err != nil {
-		return Entry{}, err
-	}
-	c, _ := cleanRel(rel)
-	if c == "" || c == "." {
-		return Entry{}, ErrInvalid
-	}
-	if o.IfMatch != "" {
-		cur, err := os.ReadFile(full)
-		if err != nil || sum(cur) != o.IfMatch {
-			return Entry{}, ErrConflict
-		}
-	}
-	if err := validate(a, c, data); err != nil {
-		return Entry{}, err
-	}
-	if err := os.MkdirAll(filepath.Dir(full), 0o755); err != nil {
-		return Entry{}, err
-	}
-	tmp, err := os.CreateTemp(filepath.Dir(full), ".pfs-*")
-	if err != nil {
-		return Entry{}, err
-	}
-	if _, err := io.Copy(tmp, bytes.NewReader(data)); err != nil {
-		tmp.Close()
-		os.Remove(tmp.Name())
-		return Entry{}, err
-	}
-	if err := tmp.Close(); err != nil {
-		os.Remove(tmp.Name())
-		return Entry{}, err
-	}
-	if err := os.Rename(tmp.Name(), full); err != nil {
-		os.Remove(tmp.Name())
-		return Entry{}, err
-	}
-	return Entry{Path: c, Size: int64(len(data)), ModTime: time.Now(), SHA256: sum(data)}, nil
-}
-
-func (s *store) Delete(ctx context.Context, a Area, rel string, o WriteOpts) error {
-	full, err := s.Resolve(a, rel)
-	if err != nil {
-		return err
-	}
-	c, _ := cleanRel(rel)
-	if c == "" || c == "." {
-		return ErrInvalid
-	}
-	st, err := os.Lstat(full)
-	if errors.Is(err, fs.ErrNotExist) {
-		return ErrNotFound
-	}
-	if err != nil {
-		return err
-	}
-	if o.IfMatch != "" && !st.IsDir() {
-		cur, err := os.ReadFile(full)
-		if err != nil || sum(cur) != o.IfMatch {
-			return ErrConflict
-		}
-	}
-	if st.IsDir() {
-		return os.RemoveAll(full)
-	}
-	return os.Remove(full)
-}
-
-func (s *store) Versions(ctx context.Context, a Area, rel string) ([]Version, error) {
-	return nil, nil
-}
-
-func (s *store) ReadVersion(ctx context.Context, a Area, rel, id string) ([]byte, error) {
-	return nil, ErrNotImplemented
-}
-
-func (s *store) ExtractZip(ctx context.Context, a Area, dir string, r io.ReaderAt, size int64, o WriteOpts) ([]Entry, error) {
-	return nil, ErrNotImplemented
 }

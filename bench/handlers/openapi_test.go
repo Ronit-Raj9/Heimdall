@@ -69,7 +69,8 @@ func TestAPIRoutesAreRegistered(t *testing.T) {
 	paths := doc["paths"].(map[string]any)
 	var stale []string
 	for _, rd := range handlers.APIRoutes {
-		item, ok := paths[rd.Path].(map[string]any)
+		// The document drops a catch-all's ":*" ({path:*} -> {path}).
+		item, ok := paths[strings.ReplaceAll(rd.Path, ":*}", "}")].(map[string]any)
 		if !ok || item[strings.ToLower(rd.Method)] == nil {
 			stale = append(stale, rd.Method+" "+rd.Path)
 		}
