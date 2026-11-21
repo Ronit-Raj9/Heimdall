@@ -26,6 +26,7 @@ import { parseAsString, useQueryState } from "nuqs";
 import { useEffect, useRef } from "react";
 import { useTranslation } from "react-i18next";
 import { ActionsTab } from "./actionsTab";
+import { ANALYSIS_TAB_ID, AnalysisTab, AnalysisTabLabel } from "./analysisTab"; // L15 analysis jobs
 import { CostTab } from "./costTab";
 import { EXPERIMENT_TABS, defaultExperimentTab, hiddenExperimentTabs, type ExperimentTabId } from "./experimentTabs";
 import { IntegrityTab } from "./integrityTab";
@@ -107,6 +108,7 @@ export default function ExperimentView({ expId }: { expId: string }) {
 		hidden: hidden.has(id) && !shownOnRequest(id),
 		testId: `experiment-tab-${id}`,
 	}));
+	tabs.push({ id: ANALYSIS_TAB_ID, label: <AnalysisTabLabel />, testId: `experiment-tab-${ANALYSIS_TAB_ID}` });
 	const decision = verdict.data?.verdict.decision;
 
 	return (
@@ -157,7 +159,9 @@ export default function ExperimentView({ expId }: { expId: string }) {
 
 			<RouteTabs tabs={tabs} defaultTab={defaultExperimentTab(arms.length)} label={t("experiments.page.tabsLabel")} testId="experiment-tabs">
 				{(active) =>
-					notStarted && active === "verdict" ? (
+					active === ANALYSIS_TAB_ID ? (
+						<AnalysisTab expId={expId} />
+					) : notStarted && active === "verdict" ? (
 						<EmptyState icon={Hourglass} message={t("experiments.page.notStarted")} testId="experiment-not-started" />
 					) : (
 						<ExperimentTab tab={active as ExperimentTabId} expId={expId} arms={arms} suite={st.suite} suiteVersion={st.suite_version} />
