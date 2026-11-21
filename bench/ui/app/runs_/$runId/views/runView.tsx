@@ -16,6 +16,7 @@ import { RunOutput, runOutputKind } from "@/components/runs/runOutput";
 import { ServicesList, SessionsTimeline, ToolCallTable } from "@/components/runs/runScenario";
 import { stripMetricKinds } from "@/components/runs/runs.utils";
 import { BlockSkeleton, LoadError, Section } from "@/components/runs/screenStates";
+import { ScreenReplay, useRunFrames } from "@/components/runs/screenReplay"; // U08 screen replay
 import { RunStepTimeline } from "@/components/runs/stepTimeline";
 import { RunServiceLogs } from "@/components/services/serviceLogs"; // X2
 import { EmptyState } from "@/components/shell/emptyState";
@@ -46,9 +47,11 @@ import { RUN_TABS, hiddenRunTabs, type RunTabId } from "./runTabs";
  */
 export default function RunView({ runId }: { runId: string }) {
 	const { t } = useTranslation("bench");
+	const { t: tReplay } = useTranslation("replay"); // U08
 	const detail = useGetRunQuery(runId);
 	const agents = useGetRunAgentsQuery(runId, { skip: !detail.data });
 	const voice = useGetRunVoiceQuery(runId, { skip: !detail.data });
+	const frames = useRunFrames(runId, detail.data ? !detail.data.sealed : false); // U08
 
 	if (detail.isLoading) return <BlockSkeleton rows={8} testId="run-loading" />;
 	if (detail.error || !detail.data) {
@@ -82,6 +85,7 @@ export default function RunView({ runId }: { runId: string }) {
 		hidden: hidden.has(id),
 		testId: `run-tab-${id}`,
 	}));
+	if (frames.data?.frames.length) tabs.splice(2, 0, { id: "replay", label: tReplay("tab"), testId: "run-tab-replay" }); // U08
 
 	return (
 		<div className="flex min-w-0 flex-col gap-6" data-testid="run-screen" data-run-id={runId} data-output={output}>
@@ -127,7 +131,7 @@ export default function RunView({ runId }: { runId: string }) {
 			/>
 
 			<RouteTabs tabs={tabs} defaultTab="overview" label={t("runs.page.tabsLabel")} testId="run-tabs">
-				{(active) => <RunTab tab={active as RunTabId} detail={d} agents={agents.data} />}
+				{(active) => (active === "replay" ? <ScreenReplay runId={runId} live={!d.sealed} /> : <RunTab tab={active as RunTabId} detail={d} agents={agents.data} />)}
 			</RouteTabs>
 		</div>
 	);

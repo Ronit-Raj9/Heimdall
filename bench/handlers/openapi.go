@@ -138,6 +138,8 @@ var APIRoutes = []RouteDoc{
 	{Method: "GET", Path: APIPrefix + "/runs/{id}/evidence/{name}", Tag: "runs", Summary: "Raw audit evidence from a sealed, verified run", Raw: "application/octet-stream"},
 	{Method: "GET", Path: APIPrefix + "/runs/{id}/artifacts/{artifact}/{name}", Tag: "runs", Summary: "One file of a run's output artifact, raw and sandboxed", Raw: "application/octet-stream"},
 	{Method: "GET", Path: APIPrefix + "/runs/{id}/visual/{name}", Tag: "runs", Summary: "One image of a run's visual grade (capture.png, reference.png or diff.png), checked against the grade and the seal", Raw: "image/png"}, // X1 vision grading
+	{Method: "GET", Path: APIPrefix + "/runs/{id}/frames", Tag: "runs", Summary: "Screen replay frames of a computer-use or browser run: index, time, action and image URL"},
+	{Method: "GET", Path: APIPrefix + "/runs/{id}/frames/{n}", Tag: "runs", Summary: "One screen replay frame image of a run (png or jpeg)", Raw: "image/png"},
 
 	{Method: "GET", Path: APIPrefix + "/runs/{id}/voice", Tag: "runs", Summary: "The run's voice call: the caller's timeline read as the voice metrics read it, and the kept audio tracks", Response: VoiceCall{}},                       // X8 voice agents
 	{Method: "GET", Path: APIPrefix + "/runs/{id}/voice/audio/{track}", Tag: "runs", Summary: "One audio track of a run's voice call (caller or agent), from a sealed run, checked against the evidence and the seal", Raw: "audio/wav"}, // X8 voice agents

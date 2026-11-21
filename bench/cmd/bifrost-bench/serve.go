@@ -244,6 +244,11 @@ func (x indexAdapter) RunVisual(runID, name string) ([]byte, error) {
 	return x.ix.RunVisual(runID, name)
 }
 
+// RunFrame implements handlers.FrameReader (screen replay, store/runframes.go).
+func (x indexAdapter) RunFrame(runID, name string) ([]byte, error) {
+	return x.ix.RunFrame(runID, name)
+}
+
 // RunVoiceFile implements handlers.VoiceReader (X8 voice agents, store/runvoice.go).
 func (x indexAdapter) RunVoiceFile(runID, service, name string) ([]byte, error) {
 	return x.ix.RunVoiceFile(runID, service, name)

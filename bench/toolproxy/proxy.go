@@ -76,6 +76,8 @@ type Server struct {
 	external map[string]*externalRoute
 	// members maps team member route tokens to member ids (members.go).
 	members map[string]string
+	// frames saves the screenshots agents get, for the screen replay (frames.go).
+	frames *frameRecorder
 }
 
 // New loads the routes, opens the ledger and returns a server ready to
@@ -107,6 +109,7 @@ func newServer(cfg Config, rs *Routes) (*Server, error) {
 		routes:  map[string]Route{},
 		targets: map[string]*url.URL{},
 		ledger:  l,
+		frames:  newFrameRecorder(cfg.LedgerPath),
 		faults:  newFaultFile(cfg.FaultPath, cfg.Logger),
 		client: &http.Client{Transport: &http.Transport{
 			Proxy:               nil,

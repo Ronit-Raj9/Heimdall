@@ -21,6 +21,7 @@ type pending struct {
 	committed   bool
 	undelivered bool
 	noReply     bool // sent without an id: a notification, never answered
+	full        []byte // the whole result, kept only when it may carry an image (frames.go)
 }
 
 // exchange is one request to an MCP endpoint and the calls it carries. Each
@@ -66,6 +67,9 @@ func (x *exchange) trackAs(kind, key, tool string, args []byte) *pending {
 // answer fills the result side of the row.
 func (p *pending) answer(result []byte, isError bool, status int, now time.Time) {
 	p.row.Result, p.row.ResultSHA256 = Capture(result)
+	if !isError && bytes.Contains(result, []byte(`"image`)) {
+		p.full = result
+	}
 	p.row.IsError = isError
 	p.row.Status = status
 	p.row.LatencyMS = now.Sub(p.row.Started).Milliseconds()
@@ -223,6 +227,8 @@ func (x *exchange) commit(p *pending) {
 	p.committed = true
 	p.row.Undelivered = p.undelivered
 	x.s.append(&p.row)
+	x.s.frames.record(&p.row, p.full)
+	p.full = nil
 }
 
 // commitFaulted writes the rows of calls an error or timeout fault answered.

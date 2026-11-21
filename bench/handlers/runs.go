@@ -125,6 +125,8 @@ func (h *RunsHandler) RegisterRoutes(r *router.Router, middlewares ...lib.Middle
 	r.GET(p+"/codescan", lib.ChainMiddlewares(h.getRunCodeScan, middlewares...))                    // X4: code scan of added lines (handlers/runcodescan.go)
 	r.GET(p+"/services", lib.ChainMiddlewares(h.getRunServices, middlewares...))                    // X2: services of the run and their logs (handlers/runservices.go)
 	r.GET(p+"/services/{service}/log", lib.ChainMiddlewares(h.getRunServiceLog, middlewares...))    // X2
+	r.GET(p+"/frames", lib.ChainMiddlewares(h.getRunFrames, middlewares...))                        // screen replay frames (handlers/runframes.go)
+	r.GET(p+"/frames/{n}", lib.ChainMiddlewares(h.getRunFrame, middlewares...))
 }
 
 // getRun handles GET /api/bench/runs/{id}: the run record with its grade,
