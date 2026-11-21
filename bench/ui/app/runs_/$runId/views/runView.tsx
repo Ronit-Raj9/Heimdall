@@ -450,7 +450,7 @@ function RunGates({ gates }: { gates: readonly GateResult[] }) {
 /** A metric value as short text, or a dash when it is not known. */
 function metricText(value: Value | undefined, unit?: "usd"): string {
   if (!value || typeof value.v !== "number" || value.state !== "observed")
-    return unit === "usd" ? i18n.t("bench:runs.page.costUnknown") : "-";
+    return unit === "usd" ? String(i18n.t("runs.page.costUnknown" as never, { ns: "bench" } as never)) : "-";
   return unit === "usd"
     ? `$${value.v.toFixed(value.v < 1 ? 4 : 2)}`
     : value.v.toLocaleString();

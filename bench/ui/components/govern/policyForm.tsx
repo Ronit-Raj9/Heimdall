@@ -155,7 +155,7 @@ export function PolicyForm({ value, onChange, disabled }: PolicyFormProps) {
 			</div>
 			<datalist id="policy-metrics">
 				{POLICY_METRICS.map((m) => (
-					<option key={m} value={m} label={tu(`policies.metricLabel.${m}`)} />
+					<option key={m} value={m} label={String(tu(`policies.metricLabel.${m}` as never))} />
 				))}
 			</datalist>
 		</fieldset>
