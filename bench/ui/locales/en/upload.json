@@ -1,0 +1,44 @@
+{
+	"title": "Upload",
+	"subtitle": "Bring sealed runs, a project folder or an agent folder from your machine as a zip.",
+	"tabs": {
+		"runs": "Sealed runs",
+		"project": "Project folder",
+		"agent": "Agent folder"
+	},
+	"help": {
+		"runs": "Zip your runs folder (each experiment folder with its manifest.json). Every seal and the seals.log chain are verified; an experiment that does not verify is refused and nothing of it is kept.",
+		"project": "Zip your project folder. Files under agents/, benchmarks/, experiments/ and policies/ are written; anything else is skipped. Existing files are replaced and keep their history.",
+		"agent": "Zip one agent folder (its config, skills and tools). It lands in agents/<name>/. Leave the name empty to use the zip's top folder name."
+	},
+	"drop": {
+		"prompt": "Drop a .zip here or click to choose one",
+		"limit": "Up to {{mb}} MiB",
+		"selected": "{{name}} ({{size}})",
+		"notZip": "Choose a .zip file.",
+		"tooLarge": "This zip is larger than {{mb}} MiB; split it into several zips."
+	},
+	"agentName": "Agent name (optional)",
+	"agentNamePlaceholder": "my-agent",
+	"submit": "Upload",
+	"uploading": "Uploading...",
+	"clear": "Clear",
+	"failed": "Upload failed. Check the zip and try again.",
+	"runs": {
+		"summary": "{{imported}} imported, {{skipped}} skipped, {{refused}} refused ({{runs}} sealed runs)",
+		"empty": "The zip held no experiment folder.",
+		"openExperiments": "Open experiments",
+		"status": {
+			"imported": "imported",
+			"skipped": "skipped",
+			"refused": "refused"
+		}
+	},
+	"files": {
+		"summary": "{{written}} written, {{refused}} refused, {{skipped}} skipped",
+		"written": "Written",
+		"refused": "Refused",
+		"skipped": "Skipped",
+		"openFiles": "Open files"
+	}
+}
