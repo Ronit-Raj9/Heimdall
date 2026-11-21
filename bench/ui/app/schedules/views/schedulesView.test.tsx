@@ -1,0 +1,68 @@
+import "@/lib/i18n";
+
+import { buildCanaryRequest } from "@/app/canaries/views/newCanaryForm";
+import type { SchedulesResponse } from "@/lib/types/schedules";
+import { configureStore } from "@reduxjs/toolkit";
+import { renderToStaticMarkup } from "react-dom/server";
+import { Provider } from "react-redux";
+import { describe, expect, it } from "vitest";
+import { benchApi } from "@/lib/store/apis/benchApi";
+import { SchedulesBody } from "./schedulesView";
+
+const store = configureStore({
+	reducer: { [benchApi.reducerPath]: benchApi.reducer },
+	middleware: (g) => g().concat(benchApi.middleware),
+});
+
+const DATA: SchedulesResponse = {
+	file: { alerts: [{ url_env: "SLACK_URL", format: "slack" }], schedules: [{ name: "nightly", experiment: "experiments/n.yaml", cron: "0 6 * * *", max_usd_per_day: 5 }] },
+	yaml: "",
+	rows: [
+		{ name: "nightly", experiment: "experiments/n.yaml", cron: "0 6 * * *", max_usd_per_day: 5, kind: "experiment", source: "web", spent_today_usd: 1.5, next: "2026-11-22T06:00:00Z" },
+		{ name: "canary-gpt", experiment: "canaries/gpt.yaml", cron: "0 7 * * *", kind: "canary", source: "canary", spent_today_usd: 0 },
+	],
+	events: ["verdict_regressed", "schedule_failed"],
+	secrets: ["SLACK_URL"],
+	hosted: false,
+	ticker: true,
+};
+
+function render(data: SchedulesResponse) {
+	return renderToStaticMarkup(
+		<Provider store={store}>
+			<SchedulesBody data={data} busy={false} onSave={() => {}} />
+		</Provider>,
+	);
+}
+
+describe("SchedulesBody", () => {
+	it("lists schedules with run buttons, canary rows read-only, and webhook receivers", () => {
+		const html = render(DATA);
+		expect(html).toContain('data-testid="schedule-run-nightly"');
+		expect(html).toContain('data-testid="schedule-remove-nightly"');
+		expect(html).not.toContain('data-testid="schedule-remove-canary-gpt"');
+		expect(html).toContain("1.50 / 5.00");
+		expect(html).toContain('data-testid="alert-test-0"');
+		expect(html).toContain("SLACK_URL");
+		expect(html).not.toContain('data-testid="schedules-no-ticker"');
+	});
+
+	it("shows the empty state, the no-secret hint and the no-ticker note", () => {
+		const html = render({ ...DATA, file: { schedules: [] }, rows: [], secrets: [], ticker: false });
+		expect(html).toContain('data-testid="schedules-empty"');
+		expect(html).toContain('data-testid="alerts-no-secrets"');
+		expect(html).toContain('data-testid="schedules-no-ticker"');
+	});
+});
+
+describe("buildCanaryRequest", () => {
+	it("splits tasks and provider/model targets", () => {
+		const r = buildCanaryRequest({ name: " n ", agent: "agents/a.yaml", suite: "s@1", tasks: "t1, t2", targets: "openai/gpt-x, m2", cron: "", perRun: "1", perDay: "2", smoke: false, force: true });
+		expect(r.name).toBe("n");
+		expect(r.tasks).toEqual(["t1", "t2"]);
+		expect(r.targets).toEqual([{ provider: "openai", model: "gpt-x" }, { model: "m2" }]);
+		expect(r.schedule).toBeUndefined();
+		expect(r.force).toBe(true);
+		expect(buildCanaryRequest({ name: "n", agent: "", suite: "s", tasks: "all", targets: "m", cron: "0 6 * * *", perRun: "", perDay: "", smoke: true, force: false }).tasks).toBe("all");
+	});
+});
