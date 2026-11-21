@@ -242,9 +242,18 @@ func (s *Server) externalLive(w http.ResponseWriter, r *http.Request, x *externa
 		raw = d
 	}
 	raw = x.redactBytes(raw)
+	if int64(len(raw)) > x.maxBytes {
+		// Redaction can lengthen an answer; the cap holds on the bytes
+		// relayed and recorded, as replay checks them.
+		row.Blocked = true
+		s.externalError(w, x, row, http.StatusBadGateway, fmt.Sprintf("answer of external api %s is over its %d byte cap", row.Server, x.maxBytes))
+		return
+	}
 	h := x.redactHeader(resp.Header)
 	if x.rec != nil {
 		if err := x.rec.Append(NewCassetteEntry(r.Method, path, r.URL.RawQuery, body, resp.StatusCode, h, raw)); err != nil {
+			// The writer keeps the error, moves the cassette aside and
+			// fails Close, so the capture is never published as complete.
 			s.logger.Error("external cassette write failed", "service", row.Server, "error", err.Error())
 		}
 	}

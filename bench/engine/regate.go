@@ -9,6 +9,7 @@ import (
 	"os"
 	"path/filepath"
 
+	"github.com/maximhq/bifrost/bench/evidence"
 	"github.com/maximhq/bifrost/bench/schemas"
 	"github.com/maximhq/bifrost/bench/utils"
 )
@@ -316,7 +317,9 @@ func sealedScenario(dir string, ev *schemas.Evidence) error {
 		}
 	}
 	if len(ev.ToolCalls) == 0 {
-		calls, err := readToolLedger(filepath.Join(dir, fileToolLedger))
+		// The collection rule decides: a ledger collection refused as
+		// incomplete stays unknown (nil), never an empty or partial list.
+		calls, _, err := evidence.ReadRunToolLedger(dir)
 		if err != nil {
 			return err
 		}
@@ -337,32 +340,6 @@ func sealedScenario(dir string, ev *schemas.Evidence) error {
 
 // fileToolLedger is the tool proxy's ledger in the run folder.
 const fileToolLedger = "tools.jsonl"
-
-// readToolLedger reads one schemas.ToolCall per line. A missing file is nil
-// (the calls are unknown); a present file without calls is an empty, non-nil
-// list (no call was made), which evidence.json cannot tell apart because the
-// field is omitted when empty.
-func readToolLedger(path string) ([]schemas.ToolCall, error) {
-	b, err := os.ReadFile(path)
-	if errors.Is(err, os.ErrNotExist) {
-		return nil, nil
-	}
-	if err != nil {
-		return nil, fmt.Errorf("read tool ledger: %w", err)
-	}
-	out := []schemas.ToolCall{}
-	for i, line := range bytes.Split(b, []byte("\n")) {
-		if len(bytes.TrimSpace(line)) == 0 {
-			continue
-		}
-		var c schemas.ToolCall
-		if err := json.Unmarshal(line, &c); err != nil {
-			return nil, fmt.Errorf("tool ledger line %d: %w", i+1, err)
-		}
-		out = append(out, c)
-	}
-	return out, nil
-}
 
 // readOptional decodes a JSON file into v; a missing file leaves v as is.
 func readOptional(path string, v any) error {

@@ -405,6 +405,24 @@ func TestSealedScenario(t *testing.T) {
 	if err := sealedScenario(noCalls, &reloaded); err != nil || reloaded.ToolCalls == nil || len(reloaded.ToolCalls) != 0 {
 		t.Fatalf("empty ledger reloaded as %#v (%v), want an empty list", reloaded.ToolCalls, err)
 	}
+
+	// A ledger collection refused as incomplete (a call still in flight, a
+	// seq gap) stays unknown on regrade, never an empty or partial list.
+	if err := os.WriteFile(filepath.Join(noCalls, schemas.ToolLedgerStatusFile), []byte(`{"rows":0,"inflight":1}`), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	inflight := &schemas.Evidence{}
+	if err := sealedScenario(noCalls, inflight); err != nil || inflight.ToolCalls != nil {
+		t.Fatalf("in-flight ledger reloaded as %#v (%v), want unknown", inflight.ToolCalls, err)
+	}
+	gap := t.TempDir()
+	if err := os.WriteFile(filepath.Join(gap, fileToolLedger), []byte(`{"seq":2,"server":"db","tool":"query"}`+"\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	gapped := &schemas.Evidence{}
+	if err := sealedScenario(gap, gapped); err != nil || gapped.ToolCalls != nil {
+		t.Fatalf("gapped ledger reloaded as %#v (%v), want unknown", gapped.ToolCalls, err)
+	}
 }
 
 func TestSealedScenarioArtifacts(t *testing.T) {

@@ -347,8 +347,8 @@ func (v *Version) matches(r *Row) (ok, unchecked bool) {
 }
 
 // listRows pages GET /api/logs for one version over [from, to], at most
-// MaxRowsPerPull rows. truncated is set when the cap stopped it. Rows that
-// skip reports (already scored or skipped by sampling) are dropped while
+// MaxRowsPerPull rows. truncated is set when the cap stopped it. Rows the
+// version's selector rejects, and rows that skip reports (already scored or skipped by sampling) are dropped while
 // paging and do not count toward the cap: a backlog denser than the cap
 // would otherwise refill the capped page with the same old rows on every
 // pull and never reach the rest.
@@ -364,6 +364,12 @@ func (c *client) listRows(ctx context.Context, v *Version, from, to time.Time, s
 		}
 		for _, r := range page.Logs {
 			if skip != nil && skip(r.ID) {
+				continue
+			}
+			// Rows the version's selector rejects (another provider under
+			// the same model name) are never scored either: counting them
+			// toward the cap would refill the capped page with them forever.
+			if ok, _ := v.matches(&r); !ok {
 				continue
 			}
 			rows = append(rows, r)

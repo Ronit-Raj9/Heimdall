@@ -490,3 +490,73 @@ func TestReadNewLinesDetectsReplacement(t *testing.T) {
 		t.Fatalf("copy-truncate read = %q %v, want the whole regrown file", chunk, err)
 	}
 }
+
+// TestReadNewLinesCommonPrefixReplacement covers QC2-26-07: a replacement
+// sharing the first otlpHeadBytes with the old file but differing before
+// the old offset is read from the start.
+func TestReadNewLinesCommonPrefixReplacement(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "traces.jsonl")
+	common := strings.Repeat(`{"batch":"common"}`+"\n", 300) // over otlpHeadBytes
+	old := common + strings.Repeat(`{"old":1}`+"\n", 50)
+	if err := os.WriteFile(path, []byte(old), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	_, off, mark, err := readNewLines(path, 0, "", 1<<20)
+	if err != nil {
+		t.Fatal(err)
+	}
+	repl := common + strings.Repeat(`{"new":2}`+"\n", 80)
+	if err := os.WriteFile(path, []byte(repl), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	chunk, _, _, err := readNewLines(path, off, mark, 1<<20)
+	if err != nil || string(chunk) != repl {
+		t.Fatalf("replacement read %d bytes (%v), want the whole new file of %d", len(chunk), err, len(repl))
+	}
+}
+
+// failingUpdate is a FileStore whose Update fails once armed.
+type failingUpdate struct {
+	*FileStore
+	fail bool
+}
+
+func (f *failingUpdate) Update(fn func([]Item) ([]Item, error)) error {
+	if f.fail {
+		return errors.New("disk full")
+	}
+	return f.FileStore.Update(fn)
+}
+
+// TestAcceptRollsBackOnFailedUpdate covers QC2-26-09: a failed final item
+// write leaves no draft and no suite edit behind.
+func TestAcceptRollsBackOnFailedUpdate(t *testing.T) {
+	ib, _ := newTestInbox(t, webhookCfg, nil)
+	res := ingest(t, ib, chatTrace("t-1", "A-1001", 30), "thumbs down")
+	suitePath := filepath.Join(ib.BenchmarksRoot, "tools", "suite.yaml")
+	before, _ := os.ReadFile(suitePath)
+	ib.Store = &failingUpdate{FileStore: ib.Store.(*FileStore), fail: true}
+	if _, err := ib.Accept(context.Background(), res.ItemID, AcceptOptions{Suite: "tools", TaskID: "refund-timeout"}); err == nil {
+		t.Fatal("accept with a failing store write passed")
+	}
+	if _, err := os.Stat(filepath.Join(ib.BenchmarksRoot, "tools", "tasks", "refund-timeout")); !os.IsNotExist(err) {
+		t.Fatalf("draft left behind: %v", err)
+	}
+	if after, _ := os.ReadFile(suitePath); string(before) != string(after) {
+		t.Fatal("suite.yaml not restored")
+	}
+}
+
+// TestResolvedItemsFreeIntake covers QC2-26-08: accepted and rejected items
+// do not count toward the open-item cap, and the oldest resolved ones are
+// pruned past the stored cap.
+func TestResolvedItemsFreeIntake(t *testing.T) {
+	items := []Item{{ID: "a", State: StateRejected}, {ID: "b", State: StateNew}, {ID: "c", State: StateAccepted, Updated: testNow}}
+	if n := OpenItems(items); n != 1 {
+		t.Fatalf("open items %d, want 1", n)
+	}
+	got := pruneResolved(items, 2)
+	if len(got) != 2 || got[0].ID != "b" || got[1].ID != "c" {
+		t.Fatalf("pruned %+v, want the oldest resolved item dropped", got)
+	}
+}

@@ -49,9 +49,10 @@ const (
 )
 
 // voiceSpec is the task's voice settings for a run, read from the suite only
-// when it still loads at the version the experiment froze, so the Voice tab
-// classifies the call with the same bounds as the run's metrics. Nil (the
-// defaults) otherwise.
+// when it still loads at the version the experiment froze and the task still
+// hashes to the identity the run's slot recorded, so the Voice tab classifies
+// the call with the same bounds as the run's metrics. Nil (the defaults)
+// otherwise, including runs whose slot recorded no task hash.
 func (h *RunsHandler) voiceSpec(ctx context.Context, rv *RunView) (*schemas.VoiceSpec, string) {
 	if h.suites == nil {
 		return nil, VoiceBoundsDefault
@@ -66,10 +67,26 @@ func (h *RunsHandler) voiceSpec(ctx context.Context, rv *RunView) (*schemas.Voic
 	}
 	for _, t := range s.Tasks {
 		if t != nil && t.ID == rv.Slot.Task && t.Voice != nil && (rv.Slot.TaskVersion == "" || t.Version == rv.Slot.TaskVersion) {
+			// Versions match after a same-version edit too: the task's
+			// settings are attributed to the run only when the task still
+			// hashes to the identity its slot recorded.
+			th, ok := h.suites.(taskHasher)
+			if !ok || rv.Slot.TaskHash == "" {
+				return nil, VoiceBoundsDefault
+			}
+			if sum, err := th.TaskHash(s, t); err != nil || sum != rv.Slot.TaskHash {
+				return nil, VoiceBoundsDefault
+			}
 			return t.Voice, VoiceBoundsTask
 		}
 	}
 	return nil, VoiceBoundsDefault
+}
+
+// taskHasher is the optional SuiteSource method that hashes a loaded task
+// the way the planner did for its slots (engine Planner.TaskHash).
+type taskHasher interface {
+	TaskHash(s *schemas.Suite, t *schemas.Task) (string, error)
 }
 
 // VoiceTrack is one kept audio track of the call.

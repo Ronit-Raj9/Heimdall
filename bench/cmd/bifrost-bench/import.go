@@ -89,7 +89,10 @@ func runImport(args []string) int {
 		fmt.Fprintln(os.Stderr, importUsage)
 		return exitUsage
 	}
-	root, err := projectRoot(*config)
+	// The config every suite command reads: deploy/bench.yaml here, else
+	// the repository's .heimdall project, so lint and plan find the suite.
+	cfgPath := resolveConfigPath(*config)
+	root, err := projectRoot(cfgPath)
 	if err != nil {
 		return fail("%v", err)
 	}
@@ -97,7 +100,7 @@ func runImport(args []string) int {
 	if err != nil {
 		return fail("%v", err)
 	}
-	benchmarks, err := importBenchmarksDir(*config)
+	benchmarks, err := importBenchmarksDir(cfgPath)
 	if err != nil {
 		return fail("%v", err)
 	}

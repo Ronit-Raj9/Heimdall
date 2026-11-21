@@ -335,6 +335,12 @@ func (s *FSStore) WriteAnalysis(ctx context.Context, a *schemas.Analysis, files 
 // newest record said INVALID, so it must fail closed. No analysis returns
 // (nil, nil).
 func (s *FSStore) LatestAnalysis(ctx context.Context, expID string) (*schemas.Analysis, error) {
+	return s.LatestAnalysisFor(ctx, expID, "")
+}
+
+// LatestAnalysisFor is LatestAnalysis among the analyses of one grade source
+// ("" is any grade source).
+func (s *FSStore) LatestAnalysisFor(ctx context.Context, expID, gradeSource string) (*schemas.Analysis, error) {
 	if err := ctx.Err(); err != nil {
 		return nil, err
 	}
@@ -364,6 +370,9 @@ func (s *FSStore) LatestAnalysis(ctx context.Context, expID string) (*schemas.An
 		}
 		if a.AnalysisID == "" {
 			a.AnalysisID = e.Name()
+		}
+		if gradeSource != "" && a.GradeSource != gradeSource {
+			continue
 		}
 		if best == nil || a.CreatedAt.After(best.CreatedAt) || (a.CreatedAt.Equal(best.CreatedAt) && a.AnalysisID > best.AnalysisID) {
 			best = &a

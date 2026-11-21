@@ -443,7 +443,7 @@ func runExportFormat(format string, args []string, stdout, stderr io.Writer) int
 	if format == "eee" {
 		recs, err := export.EEE(ctx, in, export.EEEOptions{Organization: *org, Relationship: *relationship, AllowSynthetic: *allowSynthetic,
 			GradeSource: *gradeSource, BenchVersion: benchVersion})
-		if errors.Is(err, export.ErrSynthetic) || errors.Is(err, export.ErrInvalid) {
+		if errors.Is(err, export.ErrSynthetic) || errors.Is(err, export.ErrInvalid) || errors.Is(err, export.ErrStale) {
 			fmt.Fprintf(stderr, "export eee: %v\n", err)
 			return exitUsage
 		}
@@ -501,8 +501,36 @@ func loadResultsFrom(ctx context.Context, st *store.FSStore, expID, gradeSource 
 	if err != nil {
 		return export.EEEInput{}, err
 	}
-	d, _ := (indexAdapter{root: st.Root()}).LatestDecision(expID)
-	return export.EEEInput{Manifest: m, Runs: runs, Synthetic: synthetic, Invalid: d == schemas.DecisionInvalid}, nil
+	in := export.EEEInput{Manifest: m, Runs: runs, Synthetic: synthetic}
+	if in.Invalid, in.Stale, err = exportValidity(ctx, st, expID, gradeSource, runs); err != nil {
+		return export.EEEInput{}, err
+	}
+	return in, nil
+}
+
+// exportValidity reads the verdict that speaks for the exported snapshot:
+// the newest analysis of the same grade source. An analysis that records
+// the digest of the runs it read and no longer matches them is stale: its
+// verdict cannot authorize (or block) these runs. An analysis written
+// before digests existed is taken as is; no analysis is not invalid.
+func exportValidity(ctx context.Context, st *store.FSStore, expID, gradeSource string, runs []schemas.SealedRun) (invalid, stale bool, err error) {
+	if gradeSource == "" {
+		gradeSource = schemas.GradeSourceOriginal
+	}
+	a, err := st.LatestAnalysisFor(ctx, expID, gradeSource)
+	if err != nil || a == nil {
+		return false, false, err
+	}
+	if a.InputsDigest != "" {
+		d, err := utils.AnalysisInputsDigest(runs)
+		if err != nil {
+			return false, false, err
+		}
+		if d != a.InputsDigest {
+			return false, true, nil
+		}
+	}
+	return a.Verdict.Decision == schemas.DecisionInvalid, false, nil
 }
 
 // writeEEE writes the records: JSON lines to stdout, one file (one record),
@@ -604,7 +632,7 @@ func (s serveExport) ExperimentExport(ctx context.Context, expID, format string,
 	switch format {
 	case handlers.ExportFormatEEE:
 		recs, err := export.EEE(ctx, in, export.EEEOptions{AllowSynthetic: allowSynthetic, GradeSource: schemas.GradeSourceOriginal, BenchVersion: benchVersion})
-		if errors.Is(err, export.ErrSynthetic) || errors.Is(err, export.ErrInvalid) {
+		if errors.Is(err, export.ErrSynthetic) || errors.Is(err, export.ErrInvalid) || errors.Is(err, export.ErrStale) {
 			return nil, "", fmt.Errorf("%w: %v", handlers.ErrExportRefused, err)
 		}
 		if err != nil {

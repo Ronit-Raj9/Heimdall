@@ -37,3 +37,31 @@ func TestImportHonorsBenchmarksRoot(t *testing.T) {
 		t.Fatalf("missing config: %q, %v", d, err)
 	}
 }
+
+// TestImportFindsProjectConfig covers QC2-23-01: with no deploy/bench.yaml
+// here, import uses the repository's .heimdall project, as lint and plan do.
+func TestImportFindsProjectConfig(t *testing.T) {
+	from, err := filepath.Abs("../../importers/longmemeval/testdata/longmemeval_oracle.json")
+	if err != nil {
+		t.Fatal(err)
+	}
+	project := t.TempDir()
+	deploy := filepath.Join(project, ".heimdall", "deploy")
+	if err := os.MkdirAll(deploy, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	body := "runs_root: runs\nbenchmarks_root: datasets/benchmarks\nserver:\n  listen: 127.0.0.1:0\n  mode: live\n"
+	if err := os.WriteFile(filepath.Join(deploy, "bench.yaml"), []byte(body), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	t.Chdir(project)
+	if code := runImport([]string{"longmemeval", "-from", from, "-suite", "placed", "-set", "grading=match", "-ids", "fx_count_1"}); code != exitOK {
+		t.Fatalf("import exit %d", code)
+	}
+	if _, err := os.Stat(filepath.Join(project, ".heimdall", "datasets", "benchmarks", "placed", "suite.yaml")); err != nil {
+		t.Fatalf("suite not in the project's benchmarks_root: %v", err)
+	}
+	if _, err := os.Stat(filepath.Join(project, "benchmarks", "placed")); !os.IsNotExist(err) {
+		t.Fatalf("suite written to the repository's top-level benchmarks: %v", err)
+	}
+}

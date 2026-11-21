@@ -90,7 +90,8 @@ func (f *faultFile) decide(server, tool, agent string) (schemas.ToolFault, bool)
 	if IsListingMode(ft.Mode) {
 		// A listing fault takes no call; it counts the server's calls so a
 		// rug pull knows when to change the listing.
-		if ft.Server == "" || ft.Server == server {
+		// A listing fault aimed at team members counts only their calls.
+		if (ft.Server == "" || ft.Server == server) && (ft.Agent == "" || targetsAgent(ft.Agent, agent)) {
 			if f.calls == nil {
 				f.calls = map[string]int{}
 			}
@@ -129,8 +130,9 @@ func targetsAgent(targets, agent string) bool {
 // listing returns the listing fault that applies to a tools/list answer of
 // server, if any. A rug pull applies only once the server has taken
 // FromCall-1 tool calls under the current fault; before that the listing is
-// served clean.
-func (f *faultFile) listing(server string) (schemas.ToolFault, bool) {
+// served clean. A fault aimed at team members (ToolFault.Agent) rewrites
+// only the listings those members fetch; agent is the caller's member id.
+func (f *faultFile) listing(server, agent string) (schemas.ToolFault, bool) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	f.reload()
@@ -139,6 +141,9 @@ func (f *faultFile) listing(server string) (schemas.ToolFault, bool) {
 	}
 	ft := *f.fault
 	if ft.Server != "" && ft.Server != server {
+		return schemas.ToolFault{}, false
+	}
+	if ft.Agent != "" && !targetsAgent(ft.Agent, agent) {
 		return schemas.ToolFault{}, false
 	}
 	if ft.Mode == FaultRugPull && f.calls[server] < ft.FromCall-1 {

@@ -1,6 +1,7 @@
 package livescore
 
 import (
+	"errors"
 	"fmt"
 	"net/url"
 	"slices"
@@ -116,8 +117,14 @@ func pushInbox(store traceinbox.Store, cands []*candidate, limit int, suite, uiU
 				}
 			}
 			if idx < 0 {
-				if len(items) >= traceinbox.MaxItems {
-					return nil, fmt.Errorf("the inbox holds %d items, the cap", len(items))
+				if n := traceinbox.OpenItems(items); n >= traceinbox.MaxItems {
+					return nil, fmt.Errorf("the inbox holds %d open items, the cap", n)
+				}
+				// The session and preview are written before the item that
+				// lists them, so a failed write leaves no published item
+				// without a payload (the direct inbox pull does the same).
+				if err := saveInboxSession(store, id, head); err != nil {
+					return nil, err
 				}
 				created = true
 				src := InboxSourceName(head.rec.Version)
@@ -135,6 +142,15 @@ func pushInbox(store traceinbox.Store, cands []*candidate, limit int, suite, uiU
 				}
 				items = append(items, it)
 				idx = len(items) - 1
+			}
+			if !created {
+				// Repair an item an older producer published before its
+				// payload was saved: acceptance needs the session file.
+				if _, err := store.Session(id); errors.Is(err, traceinbox.ErrNotFound) {
+					if err := saveInboxSession(store, id, head); err != nil {
+						return nil, err
+					}
+				}
 			}
 			it := &items[idx]
 			for _, c := range g.cands {
@@ -190,11 +206,6 @@ func pushInbox(store traceinbox.Store, cands []*candidate, limit int, suite, uiU
 		if err != nil {
 			return touched, err
 		}
-		if created {
-			if err := store.SaveSession(id, head.session, traceinbox.Preview(head.session, head.reasons, InboxSourceName(head.rec.Version))); err != nil {
-				return touched, fmt.Errorf("inbox item %s: %w", id, err)
-			}
-		}
 		for _, c := range g.cands {
 			c.rec.InboxItem = id
 		}
@@ -235,4 +246,13 @@ func oneLine(s string, n int) string {
 		cut--
 	}
 	return s[:cut] + "..."
+}
+
+// saveInboxSession writes the item's session and preview from its head
+// candidate.
+func saveInboxSession(store traceinbox.Store, id string, head *candidate) error {
+	if err := store.SaveSession(id, head.session, traceinbox.Preview(head.session, head.reasons, InboxSourceName(head.rec.Version))); err != nil {
+		return fmt.Errorf("inbox item %s: %w", id, err)
+	}
+	return nil
 }

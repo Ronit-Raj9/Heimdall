@@ -45,6 +45,7 @@ func TestCheckTask(t *testing.T) {
 		"hidden":      func(t *schemas.Task) { t.Services[0].Hidden = true },
 		"proxied":     func(t *schemas.Task) { t.Services[0].Proxy = &yes },
 		"no timeline": func(t *schemas.Task) { t.Services[0].Export = t.Services[0].Export[1:] },
+		"sessions":    func(t *schemas.Task) { t.Sessions = []schemas.SessionSpec{{ID: "a"}, {ID: "b"}} }, // QC2-24-03
 	} {
 		s, task := voiceTask()
 		mut(task)

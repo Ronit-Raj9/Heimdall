@@ -12,6 +12,7 @@ import (
 	"os"
 	"path/filepath"
 	"sort"
+	"strings"
 	"time"
 
 	"github.com/maximhq/bifrost/bench/traceimport"
@@ -131,8 +132,9 @@ const otlpHeadBytes = 4096
 // readNewLines reads the complete lines of a file after offset, at most
 // limit bytes, and returns them with the offset after the last full line
 // and the hash of the file's head up to that offset. head is the hash
-// saved with offset: a file that shrank or whose head changed is a
-// replacement and is read from the start (audit 5-C-04). A cursor saved
+// saved with offset (fileMark): a file that shrank, or whose head or bytes
+// just before the offset changed, is a replacement and is read from the
+// start (audit 5-C-04, QC2-26-07). A cursor saved
 // before heads were kept has none and is trusted as it was.
 func readNewLines(path string, offset int64, head string, limit int64) ([]byte, int64, string, error) {
 	f, err := os.Open(path)
@@ -148,9 +150,12 @@ func readNewLines(path string, offset int64, head string, limit int64) ([]byte, 
 		offset, head = 0, "" // rotated or truncated: read from the start
 	}
 	if offset > 0 && head != "" {
-		got, err := headHash(f, offset)
+		got, err := fileMark(f, offset)
 		if err != nil {
 			return nil, offset, head, err
+		}
+		if !strings.Contains(head, ".") {
+			got, _, _ = strings.Cut(got, ".") // a mark saved before tails were kept
 		}
 		if got != head {
 			offset, head = 0, "" // replaced by a file at least as long
@@ -174,12 +179,28 @@ func readNewLines(path string, offset int64, head string, limit int64) ([]byte, 
 		return nil, offset, head, nil // a line still being written
 	}
 	next := offset + int64(end+1)
-	if head == "" || offset < otlpHeadBytes {
-		if head, err = headHash(f, next); err != nil {
-			return nil, offset, "", err
-		}
+	if head, err = fileMark(f, next); err != nil {
+		return nil, offset, "", err
 	}
 	return data[:end+1], next, head, nil
+}
+
+// fileMark identifies the first n bytes of f: the hash of its head and,
+// after a dot, the hash of the otlpHeadBytes before n. A replacement that
+// shares the head (a collector's common first batch) differs near the
+// checkpoint (QC2-26-07).
+func fileMark(f *os.File, n int64) (string, error) {
+	h, err := headHash(f, n)
+	if err != nil {
+		return "", err
+	}
+	start := max(n-otlpHeadBytes, 0)
+	buf := make([]byte, n-start)
+	if _, err := f.ReadAt(buf, start); err != nil {
+		return "", err
+	}
+	sum := sha256.Sum256(buf)
+	return h + "." + hex.EncodeToString(sum[:]), nil
 }
 
 // headHash is the sha256 of the first min(n, otlpHeadBytes) bytes of f.

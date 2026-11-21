@@ -109,6 +109,11 @@ func (im *importer) Import(ctx context.Context, opts importers.Options) (*import
 	for _, id := range missing {
 		res.Skipped = append(res.Skipped, importers.Skip{ID: id, Reason: "no task folder with this name under " + opts.From})
 	}
+	// Refuse a suite this importer cannot extend before any task folder is
+	// staged, so a refused import changes nothing on disk.
+	if err := checkExistingSuite(suiteDir, opts.SuiteID, up); err != nil {
+		return nil, err
+	}
 	if err := os.MkdirAll(filepath.Join(suiteDir, "tasks"), 0o755); err != nil {
 		return nil, fmt.Errorf("harbor: %w", err)
 	}

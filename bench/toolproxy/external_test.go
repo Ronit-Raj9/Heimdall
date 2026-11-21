@@ -636,3 +636,45 @@ func TestExternalMemberRoute(t *testing.T) {
 		t.Fatalf("rows %+v", rows)
 	}
 }
+
+// TestExternalCapHoldsAfterRedaction proves an answer at the cap that
+// redaction lengthens is refused in live mode, as replay would refuse the
+// recorded bytes (finding QC2-14-08).
+func TestExternalCapHoldsAfterRedaction(t *testing.T) {
+	const short = "k1" // shorter than the redaction marker
+	up := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		_, _ = io.WriteString(w, short+strings.Repeat("x", 30))
+	}))
+	defer up.Close()
+	tape := filepath.Join(t.TempDir(), "acme.cassette.jsonl")
+	rec := liveRoute()
+	rec.Mode, rec.RecordTo = schemas.ExternalRecord, tape
+	tp := newExtProxy(t, up.URL, rec, nil, nil)
+	x := tp.srv.external["acme"]
+	x.secret, x.maxBytes = short, 32
+	if s, _, body := call(t, tp.front.URL, "GET", "/x/acme/rates", "", nil); s != http.StatusBadGateway || !strings.Contains(body, "byte cap") {
+		t.Fatalf("reply %d %q, want the cap refusal", s, body)
+	}
+	if b, _ := os.ReadFile(tape); len(b) != 0 {
+		t.Fatalf("over-cap answer recorded: %s", b)
+	}
+}
+
+// TestExternalMemberRouteKeepsEscapedPath proves the member prefix comes off
+// without decoding the tail, so an encoded slash is refused on a member's
+// route exactly as on the lead's (QC2-14-03).
+func TestExternalMemberRouteKeepsEscapedPath(t *testing.T) {
+	api := &fakeAPI{}
+	up := httptest.NewServer(api)
+	defer up.Close()
+	tp := newExtProxy(t, up.URL, liveRoute(), nil, nil)
+	tp.srv.members = map[string]string{"tok1": "worker-a"}
+	lead, _, _ := call(t, tp.front.URL, "GET", "/x/acme/rates%2Fadmin", "", nil)
+	member, _, _ := call(t, tp.front.URL, "GET", "/m/tok1/x/acme/rates%2Fadmin", "", nil)
+	if lead == 200 || member != lead {
+		t.Fatalf("encoded path: lead %d, member %d; want the same refusal", lead, member)
+	}
+	if got := api.seen(); len(got) != 0 {
+		t.Fatalf("upstream saw %+v", got)
+	}
+}

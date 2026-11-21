@@ -144,6 +144,13 @@ func (b *Bridge) servePost(w http.ResponseWriter, r *http.Request) {
 	}
 	var waits []wait
 	var early []json.RawMessage
+	// Every id this request registered is released on every exit (answer,
+	// cancel, write failure), so none stays reserved against later calls.
+	defer func() {
+		for _, wt := range waits {
+			b.unregister(idKey(wt.id), wt.ch)
+		}
+	}()
 	for _, it := range items {
 		key := idKey(it.msg.ID)
 		if it.msg.Method != "" && key != "" {
@@ -172,7 +179,6 @@ func (b *Bridge) servePost(w http.ResponseWriter, r *http.Request) {
 			}
 			out = append(out, resp)
 		case <-r.Context().Done():
-			b.unregister(idKey(wt.id))
 			return
 		}
 	}
@@ -200,10 +206,14 @@ func (b *Bridge) register(key string) (chan json.RawMessage, error) {
 	return ch, nil
 }
 
-func (b *Bridge) unregister(key string) {
+// unregister releases key when it is still reserved by ch, and leaves a
+// later registration of the same id alone.
+func (b *Bridge) unregister(key string, ch chan json.RawMessage) {
 	b.mu.Lock()
 	defer b.mu.Unlock()
-	delete(b.waiters, key)
+	if b.waiters[key] == ch {
+		delete(b.waiters, key)
+	}
 }
 
 // send writes one message as one line on the server's stdin.
@@ -257,7 +267,15 @@ func (b *Bridge) readLoop(stdout io.Reader) {
 	}
 	err := sc.Err()
 	if err == nil || errors.Is(err, os.ErrClosed) {
-		return // stdout closed: the server is exiting and Wait reports it
+		// stdout closed: normally the server is exiting and Wait reports
+		// it. A server that stays up without stdout can never answer, so
+		// after a short grace it is stopped like an unreadable one.
+		select {
+		case <-b.exited:
+			return
+		case <-time.After(stdoutEOFGrace):
+		}
+		err = errors.New("stdout closed while the server kept running")
 	}
 	// Nothing else reads stdout, so no response can arrive any more. Stop
 	// the server: the exit path then fails pending and future requests and
@@ -274,6 +292,10 @@ func (b *Bridge) readLoop(stdout io.Reader) {
 		_ = b.cmd.Process.Kill()
 	}
 }
+
+// stdoutEOFGrace is how long a stdio server may keep running after closing
+// its stdout before the bridge stops it.
+var stdoutEOFGrace = 2 * time.Second
 
 // ServeBridge runs a bridge's HTTP server until ctx ends or the stdio server
 // exits.

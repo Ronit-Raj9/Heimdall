@@ -80,10 +80,39 @@ func OpenLedger(path string) (*Ledger, error) {
 		return nil, err
 	}
 	l := &Ledger{path: path, f: f, seq: seq}
+	l.carryStatus()
 	l.mu.Lock()
 	l.writeStatus()
 	l.mu.Unlock()
 	return l, nil
+}
+
+// carryStatus folds the status a previous proxy left next to the ledger into
+// l before the first rewrite, so a restart cannot erase the only witness
+// that rows are missing: its failures stay, its numbering is never reused,
+// and calls it still had in flight (whose rows can no longer be written)
+// count as failed rows.
+func (l *Ledger) carryStatus() {
+	raw, err := os.ReadFile(filepath.Join(filepath.Dir(l.path), LedgerStatusFile))
+	if errors.Is(err, os.ErrNotExist) {
+		return
+	}
+	var prev schemas.ToolLedgerStatus
+	if err == nil {
+		err = json.Unmarshal(raw, &prev)
+	}
+	if err != nil {
+		l.fail(fmt.Errorf("read previous ledger status: %w", err))
+		return
+	}
+	l.seq = max(l.seq, prev.Rows)
+	l.failed = prev.Failed + prev.InFlight
+	if prev.Error != "" {
+		l.fail(errors.New(prev.Error))
+	}
+	if prev.InFlight > 0 {
+		l.fail(fmt.Errorf("the proxy restarted with %d calls in flight", prev.InFlight))
+	}
 }
 
 // Begin marks a call in flight until the returned end is called, after its

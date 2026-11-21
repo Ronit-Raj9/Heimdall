@@ -286,6 +286,11 @@ class Call:
         self.floor_since = 0.0
         self.reprompts = 0
         self.pending_reply = None
+        # The caller's answer from the moment it is committed (text being
+        # made, then synthesis) until its last frame: the one outgoing
+        # speech owner, so an interrupt never starts a second line whose
+        # frames would interleave with it.
+        self.answering = False
         self.barge = None
         self.barges = 0
         self.stop_after_speaking = False
@@ -414,11 +419,15 @@ class Call:
         # From here the caller is answering: the agent talking again no longer
         # withholds the answer (and cannot cancel the hangup after a last line).
         self.pending_reply = None
-        text, is_error = await asyncio.get_running_loop().run_in_executor(None, self.respond_text, content, utt, engine)
-        if is_error:
-            self.log("simulator_error", text=text)
-            return
-        await self.say(text, "reply")
+        self.answering = True
+        try:
+            text, is_error = await asyncio.get_running_loop().run_in_executor(None, self.respond_text, content, utt, engine)
+            if is_error:
+                self.log("simulator_error", text=text)
+                return
+            await self.say(text, "reply")
+        finally:
+            self.answering = False
 
     def respond_text(self, content, utt, engine):
         """The simulated customer's answer to what the agent said (the text simulator's turn)."""
@@ -529,7 +538,7 @@ class Call:
             # caller_speaking: the text and the audio are made in an executor,
             # and a slow one (a loaded machine) must not let the next tick
             # start a second opening whose frames interleave with the first.
-            starting = self.speak_task is not None and not self.speak_task.done()
+            starting = (self.speak_task is not None and not self.speak_task.done()) or self.answering
             busy = starting or self.caller_speaking or self.agent_speaking or (self.pending_reply and not self.pending_reply.done())
             if not busy and not self.stop_after_speaking:
                 if self.caller_turn == 0 and not self.agent_ever and now >= self.s["first_wait_ms"]:

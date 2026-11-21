@@ -402,6 +402,16 @@ func (s *Scorer) RestartCompare() (*Comparison, error) {
 	if err != nil {
 		return nil, err
 	}
+	// Reconcile as Pull does: a pull that appended sessions and stopped
+	// before saving the state left durable records past state.Seq, and they
+	// were scored before this restart.
+	prior, err := s.Store.Sessions()
+	if err != nil {
+		return nil, err
+	}
+	for _, r := range prior {
+		state.Seq = max(state.Seq, r.Seq)
+	}
 	restarts := 0
 	if state.Compare != nil {
 		restarts = state.Compare.Restarts + 1

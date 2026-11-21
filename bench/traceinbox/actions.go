@@ -199,12 +199,17 @@ func (ib *Inbox) Accept(ctx context.Context, id string, opts AcceptOptions) (*Ac
 	}
 	incident := schemas.TaskIncident{ID: it.ID, Source: it.Source, TraceID: it.TraceID, Link: it.Link,
 		FirstSeen: it.FirstSeen.UTC().Format(time.RFC3339), Signature: it.Signature}
-	if err := markIncident(filepath.Join(res.Dir, "task.yaml"), incident); err != nil {
+	// rollback removes the draft and restores the suite, so a failed accept
+	// leaves no registered draft behind (a retry then needs no -force).
+	rollback := func() error {
 		rmErr := os.RemoveAll(res.Dir)
 		if res.SuiteEdited {
 			rmErr = errors.Join(rmErr, os.WriteFile(suitePath, suiteBefore, 0o644))
 		}
-		return nil, errors.Join(fmt.Errorf("mark the draft as an incident: %w", err), rmErr)
+		return rmErr
+	}
+	if err := markIncident(filepath.Join(res.Dir, "task.yaml"), incident); err != nil {
+		return nil, errors.Join(fmt.Errorf("mark the draft as an incident: %w", err), rollback())
 	}
 	now := ib.now()
 	rel := res.Dir
@@ -232,7 +237,9 @@ func (ib *Inbox) Accept(ctx context.Context, id string, opts AcceptOptions) (*Ac
 		return nil, fmt.Errorf("item %s: %w", id, ErrNotFound)
 	})
 	if err != nil {
-		return nil, err
+		// The item did not change state (a failed write, or a concurrent
+		// reject): the draft must not outlive the failed accept (QC2-26-09).
+		return nil, errors.Join(err, rollback())
 	}
 	_ = ib.Store.Log(LogEvent{At: now, Event: "accept", Item: id, Detail: opts.Suite + "/" + taskID})
 	return &AcceptResult{Item: accepted, Draft: res, Task: opts.Suite + "/" + taskID}, nil

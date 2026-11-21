@@ -55,7 +55,7 @@ func taskTOML(s *schemas.Suite, t *schemas.Task, shape, status string, env *envP
 		{"heimdall_lock_status", status},
 		{"heimdall_exporter", opts.Exporter},
 	}
-	if s.Lock != nil {
+	if s.Lock != nil && status != lockStatusChanged {
 		if tl, ok := s.Lock.Tasks[t.ID]; ok {
 			meta = append(meta,
 				[2]string{"heimdall_instruction_sha256", tl.InstructionSHA256},
@@ -65,6 +65,9 @@ func taskTOML(s *schemas.Suite, t *schemas.Task, shape, status string, env *envP
 	}
 	if withheld {
 		meta = append(meta, [2]string{"heimdall_verifier", "withheld"})
+	}
+	if t.GPUCount() > 0 && t.Resources.GPU.MinVRAMMB > 0 {
+		meta = append(meta, [2]string{"heimdall_gpu_min_vram_mb", strconv.Itoa(t.Resources.GPU.MinVRAMMB)})
 	}
 	if pv := t.Provenance; pv != nil {
 		meta = append(meta, [2]string{"heimdall_license", pv.License}, [2]string{"heimdall_upstream", pv.Source}, [2]string{"heimdall_imported_from", pv.ImportedFrom})
@@ -88,6 +91,11 @@ func taskTOML(s *schemas.Suite, t *schemas.Task, shape, status string, env *envP
 	}
 	fmt.Fprintf(&b, "timeout_sec = %s\n", tomlFloat(float64(agentS)))
 	b.WriteString("\n[environment]\nbuild_timeout_sec = 600.0\n")
+	if n := t.GPUCount(); n > 0 {
+		// Harbor's environment asks for whole GPUs; the per-GPU memory
+		// floor has no Harbor field and is kept in [metadata].
+		fmt.Fprintf(&b, "gpus = %d\n", n)
+	}
 	if env.dockerImage != "" {
 		fmt.Fprintf(&b, "docker_image = %s\n", tomlStr(env.dockerImage))
 	}

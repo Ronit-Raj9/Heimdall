@@ -125,3 +125,36 @@ func TestProxyLostAckHangUp(t *testing.T) {
 		})
 	}
 }
+
+// TestProxyLostAckOpenStream checks the hold starts once the lost call's
+// response arrives, while the server keeps its event stream open
+// (QC2-14-05).
+func TestProxyLostAckOpenStream(t *testing.T) {
+	release := make(chan struct{})
+	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "text/event-stream")
+		fmt.Fprint(w, "event: message\ndata: {\"jsonrpc\":\"2.0\",\"id\":1,\"result\":{\"content\":[{\"type\":\"text\",\"text\":\"echo: refund\"}]}}\n\n")
+		w.(http.Flusher).Flush()
+		select { // idle stream, open until the test ends
+		case <-release:
+		case <-r.Context().Done():
+		}
+	}))
+	defer upstream.Close()
+	defer close(release)
+	tp := newTestProxy(t, upstream.URL, ProtocolMCP)
+	tp.setFault(t, `{"mode":"lost_ack","server":"fs","tool":"echo","calls":1,"timeout_s":7,"nonce":"nonce_abc"}`)
+	done := make(chan string, 1)
+	go func() {
+		_, _, got := post(t, tp.front.URL, "/s/fs/mcp", callBody(1, "echo", "refund"), nil)
+		done <- got
+	}()
+	select {
+	case got := <-done:
+		if !strings.Contains(got, "timed out after 7s") {
+			t.Fatalf("agent answer %s", got)
+		}
+	case <-time.After(5 * time.Second):
+		t.Fatal("lost_ack waited for the open stream to end")
+	}
+}

@@ -131,7 +131,10 @@ func TestRunVoiceNoCall(t *testing.T) {
 }
 
 // voiceSuites serves one suite whose task t01 has its own voice bounds.
-type voiceSuites struct{ version string }
+type voiceSuites struct{ version, hash string }
+
+// TaskHash is the task identity the loaded task hashes to now.
+func (v voiceSuites) TaskHash(*schemas.Suite, *schemas.Task) (string, error) { return v.hash, nil }
 
 func (voiceSuites) SuiteIDs(context.Context) ([]string, error) { return []string{"coding-core"}, nil }
 func (v voiceSuites) LoadSuite(_ context.Context, id string) (*schemas.Suite, error) {
@@ -150,17 +153,25 @@ func (voiceSuites) FingerprintDrift(context.Context, *schemas.Suite) ([]schemas.
 // the sealed metrics do) when the frozen suite version loads, and says which.
 func TestRunVoiceUsesTaskBounds(t *testing.T) {
 	for _, tt := range []struct {
-		name, version, source string
-		bargeIn               int
+		name, version, recorded, now, source string
+		bargeIn                              int
 	}{
-		{"frozen version", "1.0.0", VoiceBoundsTask, 1},
-		{"suite changed since", "2.0.0", VoiceBoundsDefault, voice.DefaultBargeInBoundMS},
+		{"frozen version", "1.0.0", "h1", "h1", VoiceBoundsTask, 1},
+		{"suite changed since", "2.0.0", "h1", "h1", VoiceBoundsDefault, voice.DefaultBargeInBoundMS},
+		// QC2-24-02: a same-version edit changes the task hash.
+		{"task edited at the same version", "1.0.0", "h1", "h2", VoiceBoundsDefault, voice.DefaultBargeInBoundMS},
+		{"no task hash recorded", "1.0.0", "", "h1", VoiceBoundsDefault, voice.DefaultBargeInBoundMS},
 	} {
 		t.Run(tt.name, func(t *testing.T) {
 			idx := voiceFixture(t)
 			idx.manifests[testExp].SuiteVersion = "1.0.0"
+			for i := range idx.runs {
+				if idx.runs[i].Run.RunID == "r_t01_A" {
+					idx.runs[i].Slot.TaskHash = tt.recorded
+				}
+			}
 			r := router.New()
-			NewRunsHandler(testMode, idx).WithSuites(voiceSuites{version: tt.version}).RegisterRoutes(r)
+			NewRunsHandler(testMode, idx).WithSuites(voiceSuites{version: tt.version, hash: tt.now}).RegisterRoutes(r)
 			ctx := &fasthttp.RequestCtx{}
 			ctx.Request.Header.SetMethod("GET")
 			ctx.Request.SetRequestURI(APIPrefix + "/runs/r_t01_A/voice")

@@ -287,7 +287,7 @@ func (s *Server) serveMCP(w http.ResponseWriter, r *http.Request, rt Route, path
 			p := s.clientMessage(x, it, key)
 			p.row.RequestBytes = int64(len(it.raw))
 			if m.Method == methodToolsList && key != "" {
-				if ft, ok := s.faults.listing(rt.Service); ok { // Safety probes area (S1): MCP tool poisoning
+				if ft, ok := s.faults.listing(rt.Service, rt.Agent); ok { // Safety probes area (S1): MCP tool poisoning
 					p.listing = &ft
 				}
 			}
@@ -485,11 +485,11 @@ func (s *Server) relaySSE(w http.ResponseWriter, r *http.Request, resp *http.Res
 			flusher.Flush()
 		}
 	}
-	for _, m := range synthetic {
-		write([]byte("event: message\ndata: " + string(m) + "\n\n"))
-	}
-	x.commitFaulted(werr != nil)
 	if undecodable != "" {
+		// The stream is passed through under its own coding, so a plain
+		// synthetic event cannot be mixed into it: the faulted calls'
+		// answers are omitted and their rows say undelivered.
+		x.commitFaulted(len(synthetic) > 0)
 		m := newMeter()
 		_, _ = io.Copy(writerFunc(func(b []byte) { m.Write(b); write(b) }), src)
 		sha, n := m.sum()
@@ -497,6 +497,10 @@ func (s *Server) relaySSE(w http.ResponseWriter, r *http.Request, resp *http.Res
 		x.commitAll(werr != nil || r.Context().Err() != nil)
 		return
 	}
+	for _, m := range synthetic {
+		write([]byte("event: message\ndata: " + string(m) + "\n\n"))
+	}
+	x.commitFaulted(werr != nil)
 	rd := newSSEReader(src, int(s.parseCap))
 	var bigSHA string
 	var bigN int64

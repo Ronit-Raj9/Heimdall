@@ -10,6 +10,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/maximhq/bifrost/bench/engine"
 	"github.com/maximhq/bifrost/bench/handlers"
 	"github.com/maximhq/bifrost/bench/lib"
 	"github.com/maximhq/bifrost/bench/schemas"
@@ -21,8 +22,18 @@ import (
 // package, so the page shows a pack exactly as `suite lint` loads it and a
 // lock exactly as `suite lock` would rewrite it.
 type serveSuites struct {
-	root string      // benchmarks folder
-	cfg  *lib.Config // bench config for the helper and tool proxy image roles; nil leaves them out
+	root string            // benchmarks folder
+	cfg  *lib.Config       // bench config for the helper and tool proxy image roles; nil leaves them out
+	reg  *schemas.Registry // the graders whose versions a task hash covers; nil means task hashes are unavailable
+}
+
+// TaskHash implements the Voice tab's task identity check: the hash a plan
+// records on a slot, of the task as it loads now.
+func (s serveSuites) TaskHash(st *schemas.Suite, t *schemas.Task) (string, error) {
+	if s.reg == nil {
+		return "", errors.New("no registry to hash tasks with")
+	}
+	return engine.NewPlanner(s.reg, "", nil).TaskHash(st, t)
 }
 
 // SuiteIDs lists the folders under the benchmarks root that hold a

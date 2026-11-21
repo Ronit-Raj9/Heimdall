@@ -125,7 +125,7 @@ func orgDeps(ctx context.Context, a *app) (server.Deps, *store.Index, error) {
 		Auditor:  auditor{},
 		Doctor:   a.doctor,
 		Releases: a.serveReleases(), // Tenancy area: a hosted org's own release log (servetenancy.go)
-		Suites:   serveSuites{root: a.cfg.Path(a.cfg.BenchmarksRoot), cfg: a.cfg},
+		Suites:   serveSuites{root: a.cfg.Path(a.cfg.BenchmarksRoot), cfg: a.cfg, reg: a.reg},
 		Agents:   serveAgents{root: a.cfg.Root},
 		UI:       builtUI(),
 		Logger:   a.logger,

@@ -869,6 +869,12 @@ type taskContentHashes struct {
 	Fixtures    string `json:"fixtures"`
 }
 
+// TaskHash is the task identity a plan records on each slot (taskHash), so a
+// reader can tell whether a loaded task is still the one a run used.
+func (p *Planner) TaskHash(suite *schemas.Suite, task *schemas.Task) (string, error) {
+	return p.taskHash(suite, task)
+}
+
 // taskHash returns the identity of the task package. It excludes conditions,
 // probes, arms, models and run-specific values; those belong to run_input_hash.
 func (p *Planner) taskHash(suite *schemas.Suite, task *schemas.Task) (string, error) {

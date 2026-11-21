@@ -2,6 +2,7 @@ package longmemeval
 
 import (
 	"context"
+	"encoding/json"
 	"os"
 	"path/filepath"
 	"reflect"
@@ -316,5 +317,55 @@ func TestImportRealData(t *testing.T) {
 			}
 			t.Logf("lint: %d tasks, %d problems", len(s.Tasks), len(problems))
 		})
+	}
+}
+
+// A refused extension (other grading) must leave the existing task's
+// reference answer untouched, even under -force.
+func TestRefusedImportKeepsExistingTask(t *testing.T) {
+	root, _ := runImport(t, map[string]string{"grading": "match"}, []string{"fx_count_1"})
+	answer := filepath.Join(root, "benchmarks", "lme", "tasks", "fx-count-1", "solution", "answer.txt")
+	before := readFile(t, answer)
+	if err := os.WriteFile(answer, []byte("sentinel\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	im := &importer{now: fixedNow}
+	_, err := im.Import(context.Background(), importers.Options{BenchRoot: root, From: "testdata", SuiteID: "lme",
+		IDs: []string{"fx_count_1"}, Force: true, Extra: map[string]string{"grading": "judged"}})
+	if err == nil || !strings.Contains(err.Error(), "new suite id") {
+		t.Fatalf("judged into a match suite: err = %v", err)
+	}
+	if got := readFile(t, answer); got != "sentinel\n" {
+		t.Fatalf("refused import rewrote the task (was %q, now %q)", before, got)
+	}
+}
+
+// A truncated array with no closing bracket is refused unless a -limit
+// deliberately stopped the scan early.
+func TestTruncatedDatasetRefused(t *testing.T) {
+	raw := readFile(t, "testdata", "longmemeval_oracle.json")
+	dec := json.NewDecoder(strings.NewReader(raw))
+	if _, err := dec.Token(); err != nil {
+		t.Fatal(err)
+	}
+	var first json.RawMessage
+	if err := dec.Decode(&first); err != nil {
+		t.Fatal(err)
+	}
+	file := filepath.Join(t.TempDir(), "longmemeval_oracle.json")
+	if err := os.WriteFile(file, append([]byte("[\n"), first...), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := readEntries(context.Background(), file, nil, 0); err == nil || !strings.Contains(err.Error(), "truncated") {
+		t.Fatalf("truncated array: err = %v", err)
+	}
+	if got, err := readEntries(context.Background(), file, nil, 1); err != nil || len(got) != 1 {
+		t.Fatalf("limit 1 on truncated array: %d entries, err %v", len(got), err)
+	}
+	if err := os.WriteFile(file, append(append([]byte("[\n"), first...), "\n] x"...), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := readEntries(context.Background(), file, nil, 0); err == nil {
+		t.Fatal("trailing data after the array was accepted")
 	}
 }

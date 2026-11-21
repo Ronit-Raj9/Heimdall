@@ -31,6 +31,10 @@ const EEESchemaCommit = "0791adc3c2488cc8c91d109b3c541da492238e49"
 //go:embed schemas/eee/eval.schema.json
 var eeeSchemaJSON []byte
 
+// ErrStale refuses to export runs that changed since the newest analysis of
+// their grade source: analyze again first.
+var ErrStale = errors.New("the runs changed since the newest analysis of this grade source: analyze the experiment again before exporting")
+
 // ErrInvalid refuses to export an experiment whose verdict is INVALID.
 var ErrInvalid = errors.New("the experiment's newest verdict is INVALID: its instrument failed, so its results are not findings and are not exported")
 
@@ -68,6 +72,10 @@ type EEEInput struct {
 	// INVALID. EEE refuses such an experiment (ErrInvalid); the flat run
 	// table still lists its runs, labelled.
 	Invalid bool
+	// Stale is true when the newest analysis of the exported grade source
+	// read other runs than these (its inputs digest differs): its verdict
+	// says nothing about this snapshot, so EEE refuses it (ErrStale).
+	Stale bool
 	// Split selects the frozen held-out split of the flat run table
 	// (RunTable): "" or public drops every run of a held-out task,
 	// held_out keeps only those, all keeps both. EEE always publishes the
@@ -128,6 +136,9 @@ func EEE(ctx context.Context, in EEEInput, opts EEEOptions) ([]EEERecord, error)
 	}
 	if in.Invalid {
 		return nil, ErrInvalid
+	}
+	if in.Stale {
+		return nil, ErrStale
 	}
 	if anySynthetic && !opts.AllowSynthetic {
 		return nil, ErrSynthetic

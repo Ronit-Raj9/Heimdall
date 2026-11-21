@@ -116,6 +116,7 @@ class VoiceCall:
         speaking = False
         quiet_ms = 0.0      # unvoiced audio heard since the last voiced frame
         last_arrival = 0.0  # when the last consumed frame arrived
+        last_ms = 0.0       # play length of the last consumed frame
         idx = 0
         while True:
             with self.lock:
@@ -129,8 +130,16 @@ class VoiceCall:
             # queued, so one call returns one utterance even when the next
             # one already arrived; only the frames up to its end are taken.
             for t, f in new:
+                # The caller sends no frames between utterances: a gap in
+                # arrival times past the last frame's play length is silence
+                # even when both utterances are already queued.
+                gap_ms = (t - last_arrival) * 1000.0 - last_ms if last_arrival else 0.0
+                if speaking and quiet_ms + max(gap_ms, 0.0) >= end_silence_ms:
+                    with self.lock:
+                        del self.frames[:idx]
+                    return bytes(speech)
                 idx += 1
-                last_arrival = t
+                last_arrival, last_ms = t, len(f) / 32.0
                 if tonecode.rms(f) > VOICED_RMS:
                     speaking = True
                     quiet_ms = 0.0

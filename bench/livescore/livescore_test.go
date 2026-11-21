@@ -521,3 +521,47 @@ func TestStaleOpenSessionIsScoredCut(t *testing.T) {
 		t.Fatalf("scored %v, flags %v: a session open past the window is scored and cut", res.Sessions, all)
 	}
 }
+
+// TestRestartCountsUnsavedSessions covers QC2-26-10: a session appended by
+// a pull that stopped before saving its state was scored before the
+// restart, so the restarted comparison never consumes it.
+func TestRestartCountsUnsavedSessions(t *testing.T) {
+	now := time.Date(2026, 11, 18, 6, 0, 0, 0, time.UTC)
+	cfg := testConfig("http://127.0.0.1:1")
+	s, _, _ := newTestScorer(t, cfg, &now)
+	if err := s.Store.saveState(&State{Seq: 9}); err != nil {
+		t.Fatal(err)
+	}
+	if err := s.Store.appendSessions([]SessionRecord{{Seq: 10, ID: "ls_unsaved", Version: "v1", Ended: now}}); err != nil {
+		t.Fatal(err)
+	}
+	c, err := s.RestartCompare()
+	if err != nil {
+		t.Fatal(err)
+	}
+	st, _ := s.Store.State()
+	if st.Compare.LastSeq != 10 || c.SessionsA != 0 {
+		t.Fatalf("restart cutoff %d, want 10 (the durable session)", st.Compare.LastSeq)
+	}
+}
+
+// TestAppendRepairsTornTail covers QC2-26-03: an append after a pull died
+// mid-record starts on a line boundary, so the new sessions read back.
+func TestAppendRepairsTornTail(t *testing.T) {
+	st := NewStore(t.TempDir())
+	if err := st.appendSessions([]SessionRecord{{Seq: 1, ID: "ls_a"}}); err != nil {
+		t.Fatal(err)
+	}
+	f, _ := os.OpenFile(filepath.Join(st.Dir(), SessionsFile), os.O_APPEND|os.O_WRONLY, 0o644)
+	_, _ = f.WriteString(`{"seq":2,"id":"ls_b","sig`)
+	f.Close()
+	for _, recs := range [][]SessionRecord{{{Seq: 2, ID: "ls_c"}}, {{Seq: 3, ID: "ls_d"}, {Seq: 4, ID: "ls_e"}}} {
+		if err := st.appendSessions(recs); err != nil {
+			t.Fatal(err)
+		}
+	}
+	all, err := st.Sessions()
+	if err != nil || len(all) != 4 || all[1].ID != "ls_c" || all[3].ID != "ls_e" {
+		t.Fatalf("sessions %+v, %v", all, err)
+	}
+}

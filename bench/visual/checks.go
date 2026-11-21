@@ -318,10 +318,18 @@ func FindRegion(m, crop *Image, search Rect, mask *Mask, at *Pt, maxOffset int) 
 		d    float64
 	}
 	var cands []cand
-	if crop.W >= 4*f && crop.H >= 2*f {
-		sm, sc := reduce(m, f), reduce(crop, f)
-		sx0, sy0 := (search.X+f-1)/f, (search.Y+f-1)/f
-		sx1, sy1 := (search.X+search.W)/f-sc.W, (search.Y+search.H)/f-sc.H
+	coarse := crop.W >= 4*f && crop.H >= 2*f
+	var sm, sc *Image
+	var sx0, sy0, sx1, sy1 int
+	if coarse {
+		sm, sc = reduce(m, f), reduce(crop, f)
+		sx0, sy0 = (search.X+f-1)/f, (search.Y+f-1)/f
+		sx1, sy1 = (search.X+search.W)/f-sc.W, (search.Y+search.H)/f-sc.H
+		// A narrow search area can hold full-size positions but no
+		// position on the reduced grid: scan it at full size instead.
+		coarse = sx0 <= sx1 && sy0 <= sy1
+	}
+	if coarse {
 		for y := sy0; y <= sy1; y++ {
 			for x := sx0; x <= sx1; x++ {
 				cands = append(cands, cand{x * f, y * f, meanDiff(sm, sc, x, y, nil, math.Inf(1))})

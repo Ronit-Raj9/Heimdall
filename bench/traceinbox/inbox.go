@@ -23,6 +23,7 @@ import (
 	"errors"
 	"fmt"
 	"slices"
+	"sort"
 	"time"
 
 	"github.com/maximhq/bifrost/bench/schemas"
@@ -61,17 +62,18 @@ const (
 // Caps. An item never grows without bound and the inbox refuses to grow past
 // MaxItems; a pull stops at the per-pull caps and says so.
 const (
-	MaxItems          = 5000      // items kept in items.jsonl
-	MaxTraceRefs      = 20        // trace references kept per item, newest last
-	MaxFlagged        = 8         // reasons kept per item
-	MaxPreviewBytes   = 16 << 10  // preview.md
-	MaxSessionBytes   = 8 << 20   // session.json of one item
-	MaxTitleBytes     = 160       // the one-line title
-	DefaultMaxPerPull = 200       // sessions fetched per source per pull
-	MaxRejectReason   = 500       // bytes of a reject reason
-	MaxSnoozeDays     = 90        // longest snooze
-	maxLogLineBytes   = 4 << 10   // one log.jsonl line
-	maxItemsFileBytes = 256 << 20 // items.jsonl read cap
+	MaxItems          = 5000         // open items (not accepted or rejected); the intake cap
+	maxStoredItems    = 4 * MaxItems // items kept in items.jsonl; the oldest resolved ones go first
+	MaxTraceRefs      = 20           // trace references kept per item, newest last
+	MaxFlagged        = 8            // reasons kept per item
+	MaxPreviewBytes   = 16 << 10     // preview.md
+	MaxSessionBytes   = 8 << 20      // session.json of one item
+	MaxTitleBytes     = 160          // the one-line title
+	DefaultMaxPerPull = 200          // sessions fetched per source per pull
+	MaxRejectReason   = 500          // bytes of a reject reason
+	MaxSnoozeDays     = 90           // longest snooze
+	maxLogLineBytes   = 4 << 10      // one log.jsonl line
+	maxItemsFileBytes = 256 << 20    // items.jsonl read cap
 )
 
 // ErrConflict marks an action the item's state does not allow.
@@ -137,4 +139,44 @@ func validState(s string) bool { return slices.Contains(States(), s) }
 // stateError is the conflict error for an action the state does not allow.
 func stateError(it *Item, action string) error {
 	return fmt.Errorf("%w: item %s is %s; only new or snoozed items can be %s", ErrConflict, it.ID, it.State, action)
+}
+
+// OpenItems counts the items still waiting for a decision: accepted and
+// rejected items keep their record (recurrence history) but no longer count
+// toward MaxItems, so resolving old items frees intake (QC2-26-08).
+func OpenItems(items []Item) int {
+	n := 0
+	for i := range items {
+		if items[i].State != StateAccepted && items[i].State != StateRejected {
+			n++
+		}
+	}
+	return n
+}
+
+// pruneResolved drops the least recently updated accepted or rejected items
+// until at most limit items remain; open items are never dropped.
+func pruneResolved(items []Item, limit int) []Item {
+	excess := len(items) - limit
+	if excess <= 0 {
+		return items
+	}
+	var resolved []int
+	for i := range items {
+		if items[i].State == StateAccepted || items[i].State == StateRejected {
+			resolved = append(resolved, i)
+		}
+	}
+	sort.SliceStable(resolved, func(a, b int) bool { return items[resolved[a]].Updated.Before(items[resolved[b]].Updated) })
+	drop := map[int]bool{}
+	for _, i := range resolved[:min(excess, len(resolved))] {
+		drop[i] = true
+	}
+	out := items[:0:0]
+	for i := range items {
+		if !drop[i] {
+			out = append(out, items[i])
+		}
+	}
+	return out
 }

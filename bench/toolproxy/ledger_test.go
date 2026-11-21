@@ -168,3 +168,39 @@ func TestLedgerStatusAndStickyError(t *testing.T) {
 	}
 	_ = l.Close()
 }
+
+// TestLedgerReopenKeepsIncompleteStatus proves a restart cannot erase the
+// status that marks rows missing: calls the old proxy had in flight count as
+// failed rows, and its numbering is never reused (QC2-14-02).
+func TestLedgerReopenKeepsIncompleteStatus(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "tools.jsonl")
+	l, err := OpenLedger(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := l.Append(&schemas.ToolCall{Server: "a", Tool: "x"}); err != nil {
+		t.Fatal(err)
+	}
+	_ = l.Begin() // a call whose row is never written: the proxy dies
+	_ = l.f.Close()
+	l2, err := OpenLedger(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer l2.Close()
+	raw, err := os.ReadFile(filepath.Join(dir, LedgerStatusFile))
+	if err != nil {
+		t.Fatal(err)
+	}
+	var st schemas.ToolLedgerStatus
+	if err := json.Unmarshal(raw, &st); err != nil {
+		t.Fatal(err)
+	}
+	if st.Incomplete() == "" || st.Failed != 1 || st.Rows != 1 {
+		t.Fatalf("status after restart %+v, want one failed row", st)
+	}
+	if l2.Healthy() == nil {
+		t.Fatal("restarted ledger reports healthy")
+	}
+}
