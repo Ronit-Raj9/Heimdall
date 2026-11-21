@@ -409,7 +409,19 @@ func (h *quickRunHandler) build(ctx context.Context, req *QuickRunRequest) ([]by
 		if !strings.Contains(suite, "@") && st.Version != "" {
 			suite = suiteID + "@" + st.Version
 		}
+		// Only admitted tasks: the planner refuses a draft task in the lock.
 		ids := append([]string(nil), st.TaskIDs...)
+		if st.Lock != nil {
+			ids = ids[:0]
+			for _, t := range st.Tasks {
+				if summarizeTask(st, t, nil).Admitted {
+					ids = append(ids, t.ID)
+				}
+			}
+		}
+		if len(ids) == 0 && len(st.TaskIDs) > 0 {
+			return nil, "", badf("suite %s has no admitted task yet: open the suite, Ops tab, and press Admit all tasks", suiteID)
+		}
 		if len(ids) == 0 {
 			return nil, "", badf("suite %s has no tasks: add tasks on its page first", suiteID)
 		}
