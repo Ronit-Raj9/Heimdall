@@ -38,6 +38,8 @@ case " $* " in
 *" evidence backup "*) exit "${STUB_EVIDENCE_RC:-0}" ;;
 *"seals.log"*) n=$(cat ` + logPath + `.seal 2>/dev/null || echo 0); if [ "$n" -lt "${STUB_SEAL_HALF:-0}" ]; then echo $((n + 1)) >` + logPath + `.seal; exit 75; fi ;;
 *" network inspect "*) exit 1 ;;
+*" ps -q "*) [ -z "${STUB_RUNNING:-}" ] || echo 0123456789ab ;;
+*"inspect --format "*) echo sha256:feedfacecafe ;;
 *" pg_dump "*) echo dump ;;
 *" tar "*"-cf"*) echo archive ;;
 *" help"*) printf '  evidence   mirror and restore\n' ;;
@@ -288,5 +290,35 @@ func TestSmokeOverridesCallerImage(t *testing.T) {
 	}
 	if !strings.Contains(string(b), "export HEIMDALL_IMAGE=$smoke_image HEIMDALL_RUNNER_IMAGE=$smoke_runner_image") {
 		t.Fatal("smoke.sh does not export its image tags over the caller's")
+	}
+}
+
+// TestUpgradeRollbackTagPerStack is live-test l13: upgrade.sh tagged the
+// running image repo:previous whatever HEIMDALL_IMAGE said, so upgrading a
+// second stack on the same host (its own project and image tag) moved the
+// first stack's rollback image. The default :local tag keeps :previous; any
+// other tag gets :<tag>-previous.
+func TestUpgradeRollbackTagPerStack(t *testing.T) {
+	cases := []struct {
+		image, want string
+	}{
+		{"", "tag sha256:feedfacecafe heimdall/server:previous"},
+		{"heimdall/server:local", "tag sha256:feedfacecafe heimdall/server:previous"},
+		{"heimdall/server:hb-ops", "tag sha256:feedfacecafe heimdall/server:hb-ops-previous"},
+		{"registry.example:5000/heimdall/server", "tag sha256:feedfacecafe registry.example:5000/heimdall/server:previous"},
+	}
+	for _, tc := range cases {
+		t.Run(tc.image, func(t *testing.T) {
+			bin, logPath := stubDocker(t, false)
+			env := []string{"HEIMDALL_ENV_FILE=" + backupEnv(t, ""), "HEIMDALL_PROJECT=l13-upgrade", "STUB_RUNNING=1", "HEIMDALL_IMAGE=" + tc.image}
+			out, err := runScript(t, bin, env, "hosted/upgrade.sh", "--no-pull", "--no-backup")
+			if err != nil {
+				t.Fatalf("upgrade.sh: %v\n%s", err, out)
+			}
+			b, _ := os.ReadFile(logPath)
+			if !strings.Contains(string(b), tc.want+"\n") {
+				t.Fatalf("want %q in docker calls:\n%s", tc.want, b)
+			}
+		})
 	}
 }

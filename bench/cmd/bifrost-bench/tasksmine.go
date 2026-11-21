@@ -232,7 +232,7 @@ func mineOne(ctx context.Context, a *app, f mineFlags, suiteID, suiteDir, testCm
 	if err != nil {
 		return false, "task init: " + err.Error(), nil // nothing was written
 	}
-	if err := scaffold.MarkMined(res.Dir, scaffold.MinedInstruction(c.Subject, c.Body, c.TestNames), testCmd); err != nil {
+	if err := scaffold.MarkMined(res.Dir, scaffold.MinedInstruction(c.Subject, c.Body, c.InstructionTests()), testCmd); err != nil {
 		return drop("draft: " + err.Error())
 	}
 	findings, err := suite.ScanSecrets(res.Dir)

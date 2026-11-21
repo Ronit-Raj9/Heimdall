@@ -104,6 +104,9 @@ func TestBuild(t *testing.T) {
 	if len(resp.Lineages) != 1 || resp.Points != 3 {
 		t.Fatalf("lineages = %+v, points %d; want codex only (toy synthetic, e_3 invalid) with 3 points", resp.Lineages, resp.Points)
 	}
+	if resp.Invalid != 8 { // live test l13: e_3's 8 runs (newest verdict INVALID) are counted, not dropped silently
+		t.Fatalf("invalid = %d, want 8 (the runs of e_3)", resp.Invalid)
+	}
 	if fmt.Sprint(resp.Conditions) != "[clean tool_timeout]" || fmt.Sprint(resp.Agents) != "[codex]" || fmt.Sprint(resp.Suites) != "[core@1]" {
 		t.Fatalf("pickers = %v %v %v", resp.Conditions, resp.Agents, resp.Suites)
 	}
@@ -286,7 +289,7 @@ func TestBuildLeavesOutProblemRuns(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if r.Points != 2 || r.Lineages[0].Points[0].Experiment != "e_2" || r.Invalid != 9 {
+	if r.Points != 2 || r.Lineages[0].Points[0].Experiment != "e_2" || r.Invalid != 9+8 { // e_1 problem runs plus e_3 (verdict INVALID)
 		t.Fatalf("points %d invalid %d: want e_1 left out and counted invalid", r.Points, r.Invalid)
 	}
 }

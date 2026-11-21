@@ -219,7 +219,9 @@ deploy/hosted/upgrade.sh --ref v1.2.0    # a specific tag or commit
 It takes a database backup first, tags the image IDs of the running server
 and demo-runner containers `:previous` (a service with no running container
 keeps its existing `:previous`, so a retried upgrade never moves the rollback
-tag onto a half-finished build),
+tag onto a half-finished build; a stack with its own image tag,
+`HEIMDALL_IMAGE=heimdall/server:<tag>`, gets `:<tag>-previous` instead, so
+two stacks on one Docker host never move each other's rollback image),
 rebuilds, applies migrations and recreates what changed, then waits for
 health. Rollback steps are in the script's header (`upgrade.sh --help`):
 check out the previous commit, retag `:previous` as `:local`,

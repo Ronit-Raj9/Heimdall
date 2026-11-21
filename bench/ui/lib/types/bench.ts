@@ -2161,7 +2161,7 @@ export interface Trends {
 	points: number;
 	/** Runs the index lists as rejected (seal failed); never charted. */
 	rejected: number;
-	/** Indexed runs with evidence problems (e.g. a slot with two counted runs); never charted. */
+	/** Indexed runs of an experiment whose newest verdict is INVALID, or with evidence problems (e.g. a slot with two counted runs); never charted. */
 	invalid: number;
 	/** When the index was last written. */
 	indexed_at: string;

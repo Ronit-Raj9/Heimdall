@@ -79,6 +79,7 @@ type Candidate struct {
 	Source, Tests  []string // changed non-test files and hidden test files (prefix-relative)
 	Lines          int      // added plus deleted lines over the whole change
 	TestNames      []string // test functions defined in the hidden test files
+	NewTestNames   []string // the TestNames the parent commit does not define (tests the commit added)
 	Area           string   // top folder of the first source file ("." at the root)
 	Score          float64  // lower is better
 	Skip           string   // "" for a candidate
@@ -347,8 +348,61 @@ func (r *gitRepo) classifyCommit(ctx context.Context, hc historyCommit, opts Min
 		}
 	}
 	c.TestNames = dedupe(c.TestNames)
+	if c.Skip == "" {
+		if c.NewTestNames, err = r.newTestNames(ctx, c.Parent, isTest, c.TestNames); err != nil {
+			return c, err
+		}
+	}
 	c.Area = area(c.Source)
 	return c, nil
+}
+
+// newTestNames returns the names in names that the parent commit's
+// versions of the test files do not define: the tests the commit added.
+func (r *gitRepo) newTestNames(ctx context.Context, parent string, isTest map[string]bool, names []string) ([]string, error) {
+	tree, err := r.tree(ctx, parent)
+	if err != nil {
+		return nil, err
+	}
+	var entries []treeEntry
+	for _, e := range tree {
+		if isTest[e.Path] && e.Type == "blob" {
+			entries = append(entries, e)
+		}
+	}
+	old := map[string]bool{}
+	err = r.catBlobs(ctx, shasOf(entries), func(sha string, data []byte) error {
+		for _, e := range entries {
+			if e.SHA == sha {
+				for _, n := range TestNames(e.Path, data) {
+					old[n] = true
+				}
+			}
+		}
+		return nil
+	})
+	if err != nil {
+		return nil, err
+	}
+	var added []string
+	for _, n := range names {
+		if !old[n] {
+			added = append(added, n)
+		}
+	}
+	return added, nil
+}
+
+// InstructionTests are the test names a mined instruction lists: the tests
+// the commit added, or every test of the hidden files when it added none
+// (it only changed existing tests). Listing every test of a large test file
+// buries the one behaviour the commit is about (live test l13: a two-line
+// fix in toolz listed 51 test names).
+func (c Candidate) InstructionTests() []string {
+	if len(c.NewTestNames) > 0 {
+		return c.NewTestNames
+	}
+	return c.TestNames
 }
 
 func touchesAny(paths, prefixes []string) bool {

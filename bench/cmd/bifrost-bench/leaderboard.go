@@ -119,9 +119,21 @@ func leaderboardHints(suiteFlag string, lb, synth *schemas.Leaderboard) []string
 		hints = append(hints, fmt.Sprintf("suites with runs: %s; this board is %s, pick another with -suite <id@version>",
 			strings.Join(lb.Suites, ", "), lb.Suite))
 	}
+	if len(lb.Entries) == 0 && len(lb.Excluded) > 0 {
+		// Live runs exist but none could be ranked (live test l13: a live
+		// experiment with an INVALID verdict was reported as "no live runs").
+		parts := make([]string, 0, len(lb.Excluded))
+		for _, x := range lb.Excluded {
+			parts = append(parts, fmt.Sprintf("%s: %d runs (%s)", x.Reason, x.Runs, strings.Join(x.Experiments, ", ")))
+		}
+		hints = append(hints, fmt.Sprintf("no live runs ranked on %s: every live run was excluded; %s", lb.Suite, strings.Join(parts, "; ")))
+	}
 	if synth != nil && len(lb.Entries) == 0 && len(synth.Suites) > 0 {
-		hints = append(hints, fmt.Sprintf("no live runs to rank; scripted runs (control agents or the scripted model) exist for %s: add -synthetic only to see them",
-			strings.Join(synth.Suites, ", ")))
+		format := "no live runs to rank; scripted runs (control agents or the scripted model) exist for %s: add -synthetic only to see them"
+		if len(lb.Excluded) > 0 {
+			format = "scripted runs (control agents or the scripted model) also exist for %s: add -synthetic only to see them"
+		}
+		hints = append(hints, fmt.Sprintf(format, strings.Join(synth.Suites, ", ")))
 	}
 	return hints
 }

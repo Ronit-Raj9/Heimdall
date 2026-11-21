@@ -116,6 +116,19 @@ func TestMineCandidates(t *testing.T) {
 	if !slices.Equal(calc.TestNames, []string{"test_pos", "test_keeps_sign"}) || calc.Area != "calc" {
 		t.Errorf("calc candidate: names %v area %q", calc.TestNames, calc.Area)
 	}
+	// live test l13: the instruction lists the test the commit added, not
+	// test_pos, which the parent already had.
+	if !slices.Equal(calc.NewTestNames, []string{"test_keeps_sign"}) || !slices.Equal(calc.InstructionTests(), []string{"test_keeps_sign"}) {
+		t.Errorf("calc candidate: new tests %v, instruction tests %v", calc.NewTestNames, calc.InstructionTests())
+	}
+	text := good[slices.Index(got, ids["text"])]
+	if !slices.Equal(text.NewTestNames, []string{"test_spaces_collapse"}) {
+		t.Errorf("text candidate: new tests %v (a new test file: every test is new)", text.NewTestNames)
+	}
+	onlyChanged := Candidate{TestNames: []string{"test_a", "test_b"}}
+	if !slices.Equal(onlyChanged.InstructionTests(), onlyChanged.TestNames) {
+		t.Errorf("no added test: instruction tests %v, want every hidden test", onlyChanged.InstructionTests())
+	}
 }
 
 func TestMineSinceAndPaths(t *testing.T) {
