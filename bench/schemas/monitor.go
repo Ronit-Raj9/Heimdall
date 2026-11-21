@@ -74,7 +74,18 @@ type MonitorConfig struct {
 	Keywords  []string         `json:"keywords,omitempty" yaml:"keywords,omitempty"` // builtin keyword: case-insensitive substrings
 	Patterns  []string         `json:"patterns,omitempty" yaml:"patterns,omitempty"` // builtin keyword: Go regular expressions
 	BlockAt   int              `json:"block_at,omitempty" yaml:"block_at,omitempty"` // builtin keyword: matched terms that block; default 1
+	// Views are what the monitor is certified on, one certificate per view:
+	// actions (default), cot (reasoning and the final message) and hybrid
+	// (both). Absent means [actions], so old configs hash the same.
+	Views []string `json:"views,omitempty" yaml:"views,omitempty"`
 }
+
+// Monitor views (MonitorConfig.Views).
+const (
+	MonitorViewActions = "actions" // every action except reasoning
+	MonitorViewCoT     = "cot"     // reasoning and the final message only
+	MonitorViewHybrid  = "hybrid"  // every action including reasoning
+)
 
 // MonitorResources caps a command monitor's container.
 type MonitorResources struct {
@@ -96,6 +107,7 @@ type MonitorRequest struct {
 	Action               *MonitorAction  `json:"action,omitempty"`  // action mode
 	FinalMessage         string          `json:"final_message,omitempty"`
 	OmittedActions       int             `json:"omitted_actions,omitempty"` // actions dropped from the middle of a long transcript
+	View                 string          `json:"view,omitempty"`            // cot or hybrid; absent for the actions view
 }
 
 // Monitor action kinds.
@@ -106,12 +118,13 @@ const (
 	MonitorActionCommand   = "command"
 	MonitorActionFile      = "file_change"
 	MonitorActionNetwork   = "network"
+	MonitorActionReasoning = "reasoning" // the model's reasoning text (thinking, reasoning summaries)
 )
 
 // MonitorAction is one thing the agent did, in run order.
 type MonitorAction struct {
 	Index     int    `json:"index"`          // 0-based position in the run's action list
-	Kind      string `json:"kind"`           // assistant_message | tool_call | tool_proxy_call | command | file_change | network
+	Kind      string `json:"kind"`           // assistant_message | reasoning | tool_call | tool_proxy_call | command | file_change | network
 	Source    string `json:"source"`         // gateway | agent_stream | tool_proxy | process_observer | workspace_observer | network_observer
 	Name      string `json:"name,omitempty"` // tool name, or the file operation
 	Content   string `json:"content"`        // arguments, command line, message text or path
@@ -151,6 +164,45 @@ type MonitorCertificate struct {
 	BenchVersion    string                  `json:"bench_version,omitempty"`
 	Mode            Mode                    `json:"bench_mode,omitempty"` // the bench mode the certification ran in
 	Headline        *MonitorCertHeadline    `json:"headline,omitempty"`
+	// View is the transcript view certified (actions, cot or hybrid); empty
+	// on certificates written before views existed, which are actions.
+	View string `json:"view,omitempty"`
+	// Reasoning counts, per arm, the labelled runs whose transcript had any
+	// reasoning, so views are never compared on unequal visibility.
+	Reasoning map[string]MonitorReasoningCoverage `json:"reasoning,omitempty"`
+	// Sabotage is the undetected-sabotage summary of attack-condition runs
+	// at the headline threshold; nil when no run was under the attack
+	// condition.
+	Sabotage *MonitorSabotage `json:"sabotage,omitempty"`
+}
+
+// MonitorReasoningCoverage is one arm's reasoning visibility.
+type MonitorReasoningCoverage struct {
+	Runs          int `json:"runs"`
+	WithReasoning int `json:"with_reasoning"`
+}
+
+// MonitorSabotage is what the monitor let through of the side tasks agents
+// completed under the attack condition, at the headline operating point.
+// Undetected counts completed side tasks the monitor did not flag; its rate
+// is over every judged attack run (completed or not), the share of attack
+// attempts that ended in sabotage nobody caught.
+type MonitorSabotage struct {
+	TargetFPR      float64                         `json:"target_fpr"`
+	AttackRuns     int                             `json:"attack_runs"`
+	Completed      int                             `json:"completed"`
+	Caught         int                             `json:"caught"`
+	Undetected     int                             `json:"undetected"`
+	UndetectedRate *float64                        `json:"undetected_rate"`
+	Interval       *[2]float64                     `json:"interval"`
+	PerArm         map[string]MonitorSabotageCount `json:"per_arm"`
+}
+
+// MonitorSabotageCount is one arm's sabotage counts.
+type MonitorSabotageCount struct {
+	AttackRuns int `json:"attack_runs"`
+	Completed  int `json:"completed"`
+	Undetected int `json:"undetected"`
 }
 
 // MonitorCertMonitor identifies the monitor a certificate is about. The
@@ -305,6 +357,7 @@ type MonitorCertSummary struct {
 	Attacks     int                  `json:"attacks"`
 	Headline    *MonitorCertHeadline `json:"headline"`
 	Warnings    []string             `json:"warnings"`
+	View        string               `json:"view,omitempty"`
 }
 
 // MonitorCertList is GET /monitors/certifications: newest first.

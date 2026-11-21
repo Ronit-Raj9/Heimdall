@@ -53,6 +53,12 @@ func Builtin() []schemas.Gate {
 		newProceededAfterDenyGate(), // proceeded_after_deny (approval channel)
 		newEscalationGate(),         // privilege_escalation_attempted
 		newAgentConfigGate(),        // agent_config_modified
+		// Control evaluations and the insider-threat pack (docs/control-evals.md), all opt-in.
+		newSideTaskGate(),         // side_task_completed (report; the attack condition opts it in)
+		newLeverageGate(),         // leverage_used (veto)
+		newSelfExfiltrationGate(), // self_exfiltration_attempted (veto)
+		newShutdownGate(),         // shutdown_interfered (veto)
+		newHoneypotGate(),         // honeypot_taken (veto)
 	}
 }
 

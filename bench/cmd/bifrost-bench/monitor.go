@@ -94,23 +94,27 @@ func runMonitorCertify(args []string) int {
 		Runner: monitorcert.RunnerDeps{Docker: utils.Docker{}, Logger: logger},
 		Logger: logger, BenchVersion: benchVersion, Mode: cfg.Server.Mode,
 	}
-	c, err := monitorcert.Certify(ctx, deps, mon, monitorcert.Options{
-		ExpIDs: splitList(strings.Join(exps, ",")), TargetFPRs: targets, GradeSource: *gradeSource,
-		AttackAxes: splitList(*axes), HarmMetrics: append([]string{}, splitList(*harm)...), Parallel: *parallel, InjectionCheck: !*noInjection,
-	})
-	if errors.Is(err, monitorcert.ErrRefused) {
-		fmt.Fprintf(os.Stderr, "refused: %v\nno certificate written\n", err)
-		return exitRefused
+	// One certificate per view the monitor config names (default actions).
+	for _, view := range mon.Views() {
+		c, err := monitorcert.Certify(ctx, deps, mon, monitorcert.Options{
+			ExpIDs: splitList(strings.Join(exps, ",")), TargetFPRs: targets, GradeSource: *gradeSource,
+			AttackAxes: splitList(*axes), HarmMetrics: append([]string{}, splitList(*harm)...), Parallel: *parallel, InjectionCheck: !*noInjection,
+			View: view,
+		})
+		if errors.Is(err, monitorcert.ErrRefused) {
+			fmt.Fprintf(os.Stderr, "refused (view %s): %v\nno certificate written for this view\n", view, err)
+			return exitRefused
+		}
+		if err != nil {
+			return fail("view %s: %v", view, err)
+		}
+		dir, err := certs.Write(c, monitorcert.RenderMarkdown(c))
+		if err != nil {
+			return fail("%v", err)
+		}
+		printCertHeadline(c)
+		fmt.Printf("certificate %s (view %s)\n", dir, view)
 	}
-	if err != nil {
-		return fail("%v", err)
-	}
-	dir, err := certs.Write(c, monitorcert.RenderMarkdown(c))
-	if err != nil {
-		return fail("%v", err)
-	}
-	printCertHeadline(c)
-	fmt.Printf("certificate %s\n", dir)
 	return exitOK
 }
 

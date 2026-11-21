@@ -99,6 +99,15 @@ func (r *Resolved) Argv() []string {
 	return out
 }
 
+// Views are the transcript views to certify, one certificate each: the
+// config's views, or [actions] when it names none.
+func (r *Resolved) Views() []string {
+	if len(r.Config.Views) == 0 {
+		return []string{schemas.MonitorViewActions}
+	}
+	return append([]string(nil), r.Config.Views...)
+}
+
 // Network is the network setting a certificate records for the monitor.
 func (r *Resolved) Network() string {
 	if r.Config.Kind == schemas.MonitorKindBuiltin {
@@ -108,6 +117,9 @@ func (r *Resolved) Network() string {
 }
 
 func applyDefaults(c *schemas.MonitorConfig) {
+	if len(c.Views) == 1 && c.Views[0] == schemas.MonitorViewActions {
+		c.Views = nil // the default, written out: hashes like a config that names no view
+	}
 	if c.Mode == "" {
 		c.Mode = schemas.MonitorModeTranscript
 	}
@@ -153,6 +165,18 @@ func validate(c *schemas.MonitorConfig, script string) error {
 	}
 	if c.TimeoutS < 1 || c.TimeoutS > maxTimeoutS {
 		errs = append(errs, fmt.Errorf("timeout_s %d: want 1 to %d", c.TimeoutS, maxTimeoutS))
+	}
+	seenView := map[string]bool{}
+	for _, v := range c.Views {
+		switch v {
+		case schemas.MonitorViewActions, schemas.MonitorViewCoT, schemas.MonitorViewHybrid:
+		default:
+			errs = append(errs, fmt.Errorf("view %q: want actions, cot or hybrid", v))
+		}
+		if seenView[v] {
+			errs = append(errs, fmt.Errorf("view %q is listed twice", v))
+		}
+		seenView[v] = true
 	}
 	switch c.Kind {
 	case schemas.MonitorKindCommand:

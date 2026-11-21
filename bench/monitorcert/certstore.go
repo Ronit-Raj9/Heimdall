@@ -181,7 +181,7 @@ func Summary(c *schemas.MonitorCertificate) schemas.MonitorCertSummary {
 	return schemas.MonitorCertSummary{
 		CertID: c.CertID, CreatedAt: c.CreatedAt, MonitorName: c.Monitor.Name, MonitorKind: c.Monitor.Kind,
 		Mode: c.Monitor.Mode, ExpIDs: exps, Honest: c.Labels.Honest, Attacks: c.Labels.Attack,
-		Headline: c.Headline, Warnings: warnings,
+		Headline: c.Headline, Warnings: warnings, View: c.View,
 	}
 }
 

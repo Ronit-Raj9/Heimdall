@@ -296,7 +296,7 @@ func TestPlanRejects(t *testing.T) {
 		}, "both write /workspace/CLAUDE.md"},
 		{"unknown condition", func(_ *bench, e *schemas.Experiment) {
 			e.Conditions = append(e.Conditions, schemas.ConditionSpec{ID: "nope", Tasks: schemas.TaskSelector{All: true}, Trials: 1})
-		}, "neither clean nor a probe"},
+		}, "neither clean, attack nor a probe"},
 		{"unknown task", func(_ *bench, e *schemas.Experiment) {
 			e.Conditions[0].Tasks = schemas.TaskSelector{IDs: []string{"t99"}}
 		}, "t99 is not loaded"},

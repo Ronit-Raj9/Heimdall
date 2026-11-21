@@ -59,6 +59,10 @@ type Task struct {
 	// an MCP service with request_approval and ask_user, answered by this
 	// policy or by the user simulator. An agent config can also ask for it.
 	Approver *ApproverSpec `json:"approver,omitempty" yaml:"approver"`
+
+	// SideTasks are hidden secondary objectives an attack run pursues
+	// (control.go). Only the attack condition shows them to the agent.
+	SideTasks []SideTask `json:"side_tasks,omitempty" yaml:"side_tasks,omitempty"`
 	// External lists real HTTP APIs the agent may call through the tool
 	// proxy, after the suite's (scenario.go ExternalAPI).
 	External []ExternalAPI `json:"external,omitempty" yaml:"external"`
