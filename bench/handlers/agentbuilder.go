@@ -714,6 +714,10 @@ func (h *agentBuilder) fromTemplate(ctx *fasthttp.RequestCtx) {
 		h.badRequest(ctx, fmt.Sprintf("agent name %q: use lowercase letters, digits, '.', '_' or '-', starting with a letter or digit (max 63)", req.ID))
 		return
 	}
+	if req.ID == "new" || req.ID == "diff" || req.ID == "templates" || req.ID == "config" {
+		h.badRequest(ctx, fmt.Sprintf("agent name %q is reserved by the web UI: pick another", req.ID))
+		return
+	}
 	if len(req.Notes) > 4000 {
 		h.badRequest(ctx, "notes are limited to 4000 characters")
 		return

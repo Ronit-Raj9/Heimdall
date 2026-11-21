@@ -5,7 +5,7 @@ import ChecksTab from "./checksTab";
 import ConfigTab from "./configTab";
 import ToolsTab from "./toolsTab";
 
-/** One agent (/agents_/$agentId?tab=): Config (form and YAML), Checks and Tools. */
+/** One agent (/agents/$agentId?tab=): Config (form and YAML), Checks and Tools. */
 export default function AgentDetailView() {
 	const { t } = useTranslation("agentBuilder");
 	const { agentId } = useParams({ from: "/agents_/$agentId" });

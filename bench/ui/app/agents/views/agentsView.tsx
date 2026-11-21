@@ -31,7 +31,7 @@ export default function AgentsView() {
 				subtitle={t("agents.subtitle")}
 				actions={
 					<Button asChild size="sm" data-testid="agents-new">
-						<Link to="/agents_/new">
+						<Link to="/agents/new">
 							<Plus aria-hidden="true" />
 							{tb("new.title")}
 						</Link>

@@ -22,7 +22,7 @@ export function defaultAgentName(t: AgentTemplate): string {
 }
 
 /**
- * New agent wizard (/agents_/new?template=): pick a template (one click), the name and model are
+ * New agent wizard (/agents/new?template=): pick a template (one click), the name and model are
  * pre-filled, Create writes agents/<name>.yaml through the project store and opens the agent.
  */
 export default function NewAgentView() {
@@ -66,7 +66,7 @@ export default function NewAgentView() {
 		if (!body) return;
 		const res = await create(body);
 		if ("data" in res && res.data) {
-			void navigate({ to: "/agents_/$agentId", params: { agentId: res.data.id } });
+			void navigate({ to: "/agents/$agentId", params: { agentId: res.data.id } });
 		}
 	};
 	const onPreview = async () => {

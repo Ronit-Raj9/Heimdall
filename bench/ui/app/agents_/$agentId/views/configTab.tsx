@@ -45,7 +45,7 @@ export function ConfigTab({ agentId }: { agentId?: string } & Record<string, unk
 				<EmptyState
 					icon={FileCode2}
 					message={t("config.notFound", { id: agentId })}
-					action={{ label: t("config.createOne"), to: "/agents_/new" }}
+					action={{ label: t("config.createOne"), to: "/agents/new" }}
 					testId="config-not-found"
 				/>
 			);
