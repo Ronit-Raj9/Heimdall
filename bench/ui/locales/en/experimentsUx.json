@@ -1,42 +1,51 @@
 {
-	"subtitle": "Every comparison you ran, newest first.",
+	"subtitle": "A comparison runs two setups (A and B) on the same tasks and tells you which one is better. Newest first.",
 	"quickRun": "Quick run on {{suite}}",
 	"armsVs": "{{arms}} on {{suite}}",
-	"noSuite": "an unknown suite",
-	"searchPlaceholder": "Search by name, suite or id",
+	"noSuite": "an unknown benchmark",
+	"searchPlaceholder": "Search by name or benchmark",
 	"chips": {
 		"label": "Filter by status",
-		"suiteLabel": "Filter by suite",
+		"suiteLabel": "Filter by benchmark",
 		"all": "All",
 		"active": "Running",
-		"done": "Done",
+		"done": "Finished",
 		"failed": "Failed",
 		"created": "Not started"
 	},
 	"status": {
 		"running": "Running",
-		"analyzing": "Analyzing",
+		"analyzing": "Working out the result",
 		"created": "Not started",
-		"done": "Done",
+		"done": "Finished",
 		"failed": "Failed",
 		"cancelled": "Cancelled"
 	},
 	"verdict": {
-		"improved": "Better",
-		"regressed": "Worse",
-		"inconclusive": "No clear difference",
-		"invalid": "Invalid",
-		"pending": "Pending"
+		"improved": "B is better",
+		"regressed": "B is worse",
+		"inconclusive": "No clear winner yet",
+		"invalid": "Test was broken",
+		"pending": "Waiting for result"
 	},
 	"col": {
-		"experiment": "Experiment",
+		"experiment": "Comparison",
 		"status": "Status",
 		"verdict": "Result",
-		"runs": "Runs",
+		"runs": "Runs done",
 		"cost": "Cost",
 		"when": "Started"
 	},
-	"runs": "{{done}} / {{total}}",
+	"runs": "{{done}} of {{total}}",
 	"runsAria": "{{done}} of {{total}} runs finished",
-	"count": "{{shown}} of {{total}}"
+	"count": "Showing {{shown}} of {{total}}",
+	"system": {
+		"readiness": "Readiness check for {{name}}",
+		"agent": "Agent check for {{name}}",
+		"drift": "Drift monitor: {{name}}",
+		"tag": "automatic check",
+		"toggle": "Show system checks ({{count}})",
+		"toggleHint": "Automatic checks Heimdall runs by itself: benchmark readiness checks, agent checks and drift monitors. They are not comparisons you started.",
+		"hidden": "({{count}} system checks hidden)"
+	}
 }

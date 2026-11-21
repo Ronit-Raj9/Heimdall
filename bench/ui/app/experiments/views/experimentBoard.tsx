@@ -1,6 +1,7 @@
 import "./experimentsI18n";
 
 import { filterExperiments } from "@/components/experiments/experimentList";
+import { systemExperiment } from "@/components/experiments/experiments.utils";
 import { formatRelative, formatWhen } from "@/components/platform/platform.utils";
 import { BlockSkeleton, LoadError } from "@/components/runs/screenStates";
 import { EmptyState } from "@/components/shell/emptyState";
@@ -30,7 +31,7 @@ import {
 	X,
 } from "lucide-react";
 import { parseAsString, useQueryStates } from "nuqs";
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 
 /** A name the server wrote for the user (QuickRun) rather than one the user typed. */
@@ -53,8 +54,11 @@ export function isAutoName(e: Pick<ExperimentStatus, "name" | "exp_id">): boolea
  */
 export function humanExperimentName(
 	e: Pick<ExperimentStatus, "name" | "exp_id" | "suite" | "arms">,
-	t: (key: "quickRun" | "armsVs" | "noSuite", opts?: Record<string, string>) => string,
+	t: (key: "quickRun" | "armsVs" | "noSuite" | "system.readiness" | "system.agent" | "system.drift", opts?: Record<string, string>) => string,
 ): string {
+	// Heimdall's own checks (admit-*, check-*, canary-*) read as what they are, not as comparisons.
+	const sys = systemExperiment(e);
+	if (sys) return t(`system.${sys.kind}`, { name: sys.subject });
 	if (!isAutoName(e)) return e.name.trim();
 	const suite = suiteName(e.suite) || t("noSuite");
 	const arms = (e.arms ?? []).filter(Boolean);
@@ -223,7 +227,11 @@ export function ExperimentBoard() {
 		{ q: parseAsString, state: parseAsString, suite: parseAsString },
 		{ history: "replace", throttleMs: 200 },
 	);
-	const all = useMemo(() => list.data?.experiments ?? [], [list.data]);
+	const everything = useMemo(() => list.data?.experiments ?? [], [list.data]);
+	// Automatic readiness, agent and drift checks are hidden unless asked for.
+	const [showSystem, setShowSystem] = useState(false);
+	const systemCount = useMemo(() => everything.filter((e) => systemExperiment(e)).length, [everything]);
+	const all = useMemo(() => (showSystem ? everything : everything.filter((e) => !systemExperiment(e))), [everything, showSystem]);
 	const named = useMemo(() => new Map(all.map((e) => [e.exp_id, humanExperimentName(e, (k, o) => String(t(k as never, (o ?? {}) as never)))] as const)), [all, t]);
 	const shown = useMemo(() => {
 		const q = filters.q?.trim().toLowerCase() ?? "";
@@ -256,7 +264,7 @@ export function ExperimentBoard() {
 			/>
 		);
 	}
-	if (all.length === 0) {
+	if (everything.length === 0) {
 		return (
 			<EmptyState
 				icon={FlaskConical}
@@ -313,6 +321,18 @@ export function ExperimentBoard() {
 								</Chip>
 							);
 						})}
+					{systemCount > 0 && (
+						<label className="text-muted-foreground ml-auto inline-flex items-center gap-2 text-xs" title={t("system.toggleHint")}>
+							<input
+								type="checkbox"
+								checked={showSystem}
+								onChange={(ev) => setShowSystem(ev.target.checked)}
+								className="accent-primary size-3.5"
+								data-testid="experiment-show-system"
+							/>
+							{t("system.toggle", { count: systemCount })}
+						</label>
+					)}
 				</div>
 			</div>
 
@@ -363,8 +383,12 @@ export function ExperimentBoard() {
 											</EntityLink>
 											<span className="text-muted-foreground truncate text-xs">
 												{suiteName(e.suite)}
-												{e.arms && e.arms.length > 0 && <span className="font-mono"> · {e.arms.join(" vs ")}</span>}
-												<span className="font-mono opacity-70"> · {e.exp_id}</span>
+												{systemExperiment(e) ? (
+													<span> · {t("system.tag")}</span>
+												) : (
+													e.arms && e.arms.length > 0 && <span className="font-mono"> · {e.arms.join(" vs ")}</span>
+												)}
+												<span className="font-mono text-[10px] opacity-50"> · {e.exp_id}</span>
 											</span>
 										</span>
 									</span>
@@ -396,6 +420,7 @@ export function ExperimentBoard() {
 			)}
 			<p className="text-muted-foreground text-xs tabular-nums" data-testid="experiment-list-count">
 				{t("count", { shown: shown.length, total: all.length })}
+				{!showSystem && systemCount > 0 && ` ${t("system.hidden", { count: systemCount })}`}
 			</p>
 		</div>
 	);

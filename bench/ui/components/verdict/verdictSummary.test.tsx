@@ -15,12 +15,12 @@ const render = (overrides: Parameters<typeof verdictWith>[0]) =>
 describe("VerdictSummary", () => {
 	it("says which arm is better and by how much", () => {
 		const html = render({ decision: "improved", action: "ship" });
-		expect(html).toMatch(new RegExp(`${arms[1]} is better by [0-9.]+ pp`));
+		expect(html).toMatch(new RegExp(`B \\(${arms[1]}\\) is better by [0-9.]+ pp`));
 		expect(html).toContain(">Export report<");
 	});
 	it("says no clear difference and invalid plainly", () => {
-		expect(render({ decision: "inconclusive", action: "no_decision" })).toContain("No clear difference yet");
-		expect(render({ decision: "invalid", action: "fix_harness" })).toContain("Invalid: fix the harness");
+		expect(render({ decision: "inconclusive", action: "no_decision" })).toContain("No clear winner yet");
+		expect(render({ decision: "invalid", action: "fix_harness" })).toContain("Test was broken");
 	});
 	it("shows a pass rate bar, cost and tokens per arm", () => {
 		const html = render({ decision: "inconclusive", action: "no_decision" });

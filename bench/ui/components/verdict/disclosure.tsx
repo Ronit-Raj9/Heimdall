@@ -4,6 +4,8 @@ import type { ReactNode } from "react";
 
 export interface DisclosureProps {
 	title: string;
+	/** One plain line under the title saying what the section is, visible while closed. */
+	description?: string;
 	icon?: LucideIcon;
 	/** Short facts beside the title, visible while closed (a count, a status pill). */
 	meta?: ReactNode;
@@ -18,7 +20,7 @@ export interface DisclosureProps {
  * A collapsed section of the verdict: the title row is always visible, the body opens on click.
  * A native details element, so the content stays in the markup (search, print, tests) while closed.
  */
-export function Disclosure({ title, icon: Icon, meta, action, defaultOpen = false, testId, children }: DisclosureProps) {
+export function Disclosure({ title, description, icon: Icon, meta, action, defaultOpen = false, testId, children }: DisclosureProps) {
 	return (
 		<details
 			className="group bg-card rounded-xl border transition-shadow open:shadow-sm hover:shadow-sm"
@@ -28,7 +30,10 @@ export function Disclosure({ title, icon: Icon, meta, action, defaultOpen = fals
 			<summary className="flex cursor-pointer list-none items-center gap-3 px-5 py-4 select-none [&::-webkit-details-marker]:hidden">
 				<ChevronRight className="text-muted-foreground size-4 shrink-0 transition-transform group-open:rotate-90" aria-hidden="true" />
 				{Icon && <Icon className="text-muted-foreground size-4 shrink-0" aria-hidden="true" />}
-				<span className="text-sm font-semibold tracking-tight">{title}</span>
+				<span className="flex min-w-0 flex-col">
+					<span className="text-sm font-semibold tracking-tight">{title}</span>
+					{description && <span className="text-muted-foreground text-xs font-normal">{description}</span>}
+				</span>
 				{meta && <span className="text-muted-foreground flex min-w-0 items-center gap-2 text-xs">{meta}</span>}
 				{action && <span className={cn("ml-auto flex items-center")}>{action}</span>}
 			</summary>

@@ -103,7 +103,25 @@ export function VerdictTab({ expId }: { expId: string }) {
 	return (
 		<div className="flex flex-col gap-6" data-testid="verdict-content" data-exp-id={payload.exp_id}>
 			<div className="flex flex-wrap items-center justify-between gap-3">
-				<VerdictHeaderStrip payload={payload} />
+				<div className="flex flex-wrap items-center gap-2">
+					{payload.mode === "synthetic" && (
+						<span
+							className="bg-chart-warning/10 text-chart-warning-ink inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium"
+							title={tPage("header.practiceHint")}
+							data-testid="verdict-practice-mode"
+						>
+							{tPage("header.practice")}
+						</span>
+					)}
+					<details className="group text-xs" data-testid="verdict-details">
+						<summary className="text-muted-foreground hover:text-foreground cursor-pointer list-none select-none" title={tPage("header.detailsHint")}>
+							{tPage("header.details")}
+						</summary>
+						<div className="mt-2">
+							<VerdictHeaderStrip payload={payload} />
+						</div>
+					</details>
+				</div>
 				<GradeSourcePicker value={grade} judged={judged} onChange={(next) => void setGrade(next)} />
 			</div>
 			{grade && (
@@ -135,6 +153,7 @@ export function VerdictTab({ expId }: { expId: string }) {
 			<div className="flex flex-col gap-3">
 				<Disclosure
 					title={tPage("sections.guards")}
+					description={tPage("sectionHints.guards")}
 					icon={Shield}
 					meta={guardMeta(payload.verdict.guards)}
 					testId="verdict-guards-section"
@@ -142,12 +161,14 @@ export function VerdictTab({ expId }: { expId: string }) {
 					<GuardList guards={payload.verdict.guards} />
 				</Disclosure>
 
-				<Disclosure title={tPage("sections.gates")} icon={ListChecks} action={tag("verdict-gates-source", true)} testId="verdict-gates">
+				<Disclosure title={tPage("sections.gates")}
+					description={tPage("sectionHints.gates")} icon={ListChecks} action={tag("verdict-gates-source", true)} testId="verdict-gates">
 					<GateChecklist gates={payload.gates} />
 				</Disclosure>
 
 				<Disclosure
 					title={tPage("sections.diagnostics")}
+					description={tPage("sectionHints.diagnostics")}
 					icon={Activity}
 					action={tag("verdict-diagnostics-source")}
 					testId="verdict-diagnostics"
@@ -155,15 +176,18 @@ export function VerdictTab({ expId }: { expId: string }) {
 					{diagnosticsBody("conditions")}
 				</Disclosure>
 
-				<Disclosure title={tPage("sections.meters")} icon={Gauge} testId="verdict-meters">
+				<Disclosure title={tPage("sections.meters")}
+					description={tPage("sectionHints.meters")} icon={Gauge} testId="verdict-meters">
 					{diagnosticsBody("meters")}
 				</Disclosure>
 
-				<Disclosure title={tPage("sections.statistics")} icon={Sigma} action={tag("verdict-card-source")} testId="verdict-statistics">
+				<Disclosure title={tPage("sections.statistics")}
+					description={tPage("sectionHints.statistics")} icon={Sigma} action={tag("verdict-card-source")} testId="verdict-statistics">
 					<VerdictCard verdict={payload.verdict} metricLabel={metrics[payload.verdict.primary.metric]?.label} showGuards={false} />
 				</Disclosure>
 
-				<Disclosure title={tPage("sections.changes")} icon={GitCompare} testId="verdict-config-diff">
+				<Disclosure title={tPage("sections.changes")}
+					description={tPage("sectionHints.changes")} icon={GitCompare} testId="verdict-config-diff">
 					<div className="grid grid-cols-1 items-start gap-4 lg:grid-cols-[minmax(0,2fr)_minmax(0,1fr)]">
 						<ConfigDiff changes={payload.config_diff} armLabels={arms.length === 2 ? { a: arms[0], b: arms[1] } : undefined} />
 						<div className="flex flex-col gap-2">
@@ -173,7 +197,8 @@ export function VerdictTab({ expId }: { expId: string }) {
 					</div>
 				</Disclosure>
 
-				<Disclosure title={tPage("sections.policy")} icon={Scale} action={tag("verdict-policy-source")} testId="verdict-policy">
+				<Disclosure title={tPage("sections.policy")}
+					description={tPage("sectionHints.policy")} icon={Scale} action={tag("verdict-policy-source")} testId="verdict-policy">
 					<PolicyScorecard policy={payload.policy} expId={payload.exp_id} metrics={metrics} runPairs={runPairs} onOpenPair={openPair} />
 				</Disclosure>
 
@@ -181,7 +206,8 @@ export function VerdictTab({ expId }: { expId: string }) {
 				{payload.judge_calibration && <VerdictCalibration jc={payload.judge_calibration} />}
 
 				{/* The grid shows each run's sealed outcome; a regrade does not change it, and the tag says so. */}
-				<Disclosure title={tPage("sections.tasks")} icon={Table2} action={tag("verdict-grid-source", true)} testId="verdict-grid">
+				<Disclosure title={tPage("sections.tasks")}
+					description={tPage("sectionHints.tasks")} icon={Table2} action={tag("verdict-grid-source", true)} testId="verdict-grid">
 					{grid.isLoading ? (
 						<TableSkeleton testId="verdict-grid-loading" />
 					) : grid.isError || !grid.data ? (

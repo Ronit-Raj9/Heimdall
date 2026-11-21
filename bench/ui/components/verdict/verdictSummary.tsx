@@ -59,9 +59,16 @@ export function VerdictSummary({ verdict, arms, naive, armMetrics, onNext, class
 		>
 			<div className="flex items-start gap-3">
 				<Icon className={cn("mt-0.5 size-8 shrink-0", INK[tone])} strokeWidth={2.25} aria-hidden="true" />
-				<h2 className={cn("text-2xl font-semibold tracking-tight sm:text-3xl", INK[tone])} data-testid="verdict-summary-headline">
-					{headline(verdict, a, b, locale, t)}
-				</h2>
+				<div className="flex flex-col gap-1">
+					<h2 className={cn("text-2xl font-semibold tracking-tight sm:text-3xl", INK[tone])} data-testid="verdict-summary-headline">
+						{headline(verdict, a, b, locale, t)}
+					</h2>
+					{(verdict.decision === "inconclusive" || verdict.decision === "invalid") && (
+						<p className="text-muted-foreground text-sm" data-testid="verdict-summary-hint">
+							{t(verdict.decision === "inconclusive" ? "summary.inconclusiveHint" : "summary.invalidHint")}
+						</p>
+					)}
+				</div>
 			</div>
 
 			<div className="grid grid-cols-1 gap-4 sm:grid-cols-2" data-testid="verdict-summary-arms">
@@ -89,7 +96,9 @@ function ArmPanel({ arm, colour, ratio, metrics }: { arm: string; colour: string
 	const rate = ratio && ratio.den > 0 ? ratio.num / ratio.den : null;
 	const value = (name: string, kind: "usd" | "tokens") => {
 		const v = metrics?.[name];
-		return v && v.state === "observed" && typeof v.v === "number" ? formatValueNumber(v.v, kind, locale) : t("summary.unknown");
+		if (v && v.state === "observed" && typeof v.v === "number") return formatValueNumber(v.v, kind, locale);
+		// An unknown cost almost always means the model has no price in the catalog.
+		return kind === "usd" ? t("summary.costUnknown") : t("summary.unknown");
 	};
 	return (
 		<div className="bg-card flex flex-col gap-3 rounded-lg border p-4" data-testid={`verdict-summary-arm-${arm}`}>

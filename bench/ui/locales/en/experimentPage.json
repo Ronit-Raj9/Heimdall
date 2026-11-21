@@ -1,57 +1,68 @@
 {
 	"header": {
 		"export": "Export",
-		"moreActions": "Actions"
+		"moreActions": "Actions",
+		"systemBanner": "This is an automatic readiness check Heimdall ran on the benchmark's tasks, not a comparison you started.",
+		"systemBannerAgent": "This is an automatic agent check Heimdall ran, not a comparison you started.",
+		"systemBannerDrift": "This is an automatic drift monitor run: a small test Heimdall re-runs on a schedule to catch an agent or model silently getting worse. It is not a comparison you started.",
+		"details": "Details",
+		"detailsHint": "Technical details: test recipe fingerprint, when it was frozen, and which scores are shown.",
+		"practice": "Practice mode",
+		"practiceHint": "Practice mode: no real model is called, results are scripted and it costs nothing. Use it to try Heimdall out.",
+		"subtitle": "Runs two setups (A and B) on the same tasks and tells you which one is better."
 	},
 	"tabs": {
-		"verdict": "Verdict",
+		"verdict": "Result",
 		"runs": "Runs",
-		"matrix": "Arms",
+		"matrix": "Setups",
 		"cost": "Cost",
-		"migration": "Migration",
-		"adaptive": "Trials",
+		"migration": "Model switch",
+		"adaptive": "Extra trials",
 		"scorecards": "Scores",
-		"receipts": "Faults",
-		"integrity": "Integrity",
+		"receipts": "Problems found",
+		"integrity": "Cheating checks",
 		"export": "Export"
 	},
 	"summary": {
 		"headline": {
-			"improved": "{{arm}} is better by {{pp}}",
-			"regressed": "{{arm}} is worse by {{pp}}",
-			"improvedNoEffect": "{{arm}} is better",
-			"regressedNoEffect": "{{arm}} is worse",
-			"inconclusive": "No clear difference yet",
-			"invalid": "Invalid: fix the harness"
+			"improved": "B ({{arm}}) is better by {{pp}}",
+			"regressed": "B ({{arm}}) is worse by {{pp}}",
+			"improvedNoEffect": "B ({{arm}}) is better",
+			"regressedNoEffect": "B ({{arm}}) is worse",
+			"inconclusive": "No clear winner yet",
+			"invalid": "Test was broken: fix it and re-check"
 		},
-		"passRate": "Pass rate",
-		"passCount": "{{num}}/{{den}} passed",
+		"passRate": "Share of tasks solved",
+		"passCount": "{{num}} of {{den}} tasks solved",
 		"cost": "Cost per run",
 		"tokens": "Tokens per run",
-		"unknown": "n/a",
+		"unknown": "Not known",
 		"next": {
-			"ship": "Ship {{arm}}. Export the report to share it.",
-			"holdRegressed": "Keep {{arm}}. Open the runs where the new arm failed.",
-			"holdViolations": "Hold. A guard or gate failed; review it below.",
-			"no_decision": "Not enough signal. Compare the runs that differ, or add tasks.",
-			"fix_harness": "The measurement broke. Check the failing runs, fix, then regrade."
+			"ship": "Use {{arm}}. Export the report to share it.",
+			"holdRegressed": "Keep {{arm}}. Open the runs where the new setup failed.",
+			"holdViolations": "Hold off. A safety rule or safety check failed; review it below.",
+			"no_decision": "Not enough evidence yet. Compare the runs that differ, or add more tasks.",
+			"fix_harness": "The measurement broke, not the agent. Check the failed runs, fix the problem, then re-score."
 		},
 		"button": {
 			"ship": "Export report",
 			"hold": "Compare runs",
 			"no_decision": "Compare runs",
 			"fix_harness": "Open runs"
-		}
+		},
+		"costUnknown": "Not known: this model has no price set",
+		"inconclusiveHint": "Not enough evidence to pick a winner. Run more tasks.",
+		"invalidHint": "Something went wrong while measuring (not the agent's fault). Fix it and re-check."
 	},
 	"sections": {
-		"guards": "Guards",
-		"gates": "Gates",
-		"diagnostics": "Diagnostics",
-		"meters": "Meters",
-		"statistics": "Statistics",
-		"changes": "What changed",
-		"policy": "Policy",
-		"tasks": "Tasks"
+		"guards": "Safety rules",
+		"gates": "Safety checks",
+		"diagnostics": "Details by condition",
+		"meters": "Measurements",
+		"statistics": "Advanced statistics",
+		"changes": "What changed between A and B",
+		"policy": "Release rule",
+		"tasks": "Task by task"
 	},
 	"meterGroup": {
 		"quality": "Quality",
@@ -61,20 +72,30 @@
 		"other": "Other"
 	},
 	"live": {
-		"title": "Running",
+		"title": "Running now",
 		"slots": "{{done}} of {{total}} done",
 		"running": "{{count}} running",
 		"failed": "{{count}} failed",
 		"spent": "Spent {{usd}}",
-		"slotsTitle": "Slots",
-		"eventsTitle": "Latest events",
-		"noEvents": "Waiting for the first event.",
+		"slotsTitle": "Runs",
+		"eventsTitle": "Latest activity",
+		"noEvents": "Waiting for the first run to start.",
 		"slot": {
-			"pending": "Queued",
+			"pending": "Waiting",
 			"running": "Running",
-			"pass": "Passed",
-			"fail": "Failed",
+			"pass": "Solved",
+			"fail": "Not solved",
 			"error": "Error"
 		}
+	},
+	"sectionHints": {
+		"guards": "Limits B must stay within, such as cost or safety, even when it scores better.",
+		"gates": "Rules that fail a run that cheated or did something unsafe.",
+		"diagnostics": "How A and B did under normal conditions and under each stress test.",
+		"meters": "Cost, effort, quality and safety numbers for each setup.",
+		"statistics": "The math behind the result, for experts.",
+		"changes": "The settings that differ between the two setups, and the raw solved counts.",
+		"policy": "Whether this result meets your rule for releasing a change.",
+		"tasks": "Each task, with how A and B did on it. Click a cell to compare the two runs."
 	}
 }

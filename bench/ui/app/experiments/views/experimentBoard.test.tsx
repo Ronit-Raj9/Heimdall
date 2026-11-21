@@ -31,6 +31,17 @@ const rows: ExperimentStatus[] = [
 		arms: ["A", "B"],
 		decision: "improved",
 	},
+	{
+		exp_id: "e_admit_acme_safety_5e8q",
+		name: "admit-acme-safety",
+		state: "done",
+		manifest_hash: "h",
+		frozen_at: "2026-11-19T10:15:00Z",
+		slots: { total: 2, done: 2, running: 0, failed: 0 },
+		spent_usd: { state: "observed", v: 0 },
+		suite: "acme-safety@1.0.0",
+		arms: ["oracle", "noop"],
+	},
 ];
 
 vi.mock("@tanstack/react-router", async () => (await import("@/lib/testing/routerMock")).routerMock);
@@ -52,6 +63,7 @@ describe("experiment list helpers", () => {
 		expect(humanExperimentName(rows[0], t)).toBe("quickRun::coding-core");
 		expect(humanExperimentName({ ...rows[0], arms: ["codex-gpt", "claude-code"] }, t)).toBe("armsVs:codex-gpt vs claude-code:coding-core");
 		expect(humanExperimentName(rows[1], t)).toBe("Prompt v2 vs v1");
+		expect(humanExperimentName(rows[2], (k, o) => `${k}:${o?.name}`)).toBe("system.readiness:acme-safety");
 	});
 	it("maps verdicts to plain words and suites to icons", () => {
 		expect(verdictTone("improved")).toEqual({ key: "improved", tone: "green" });
@@ -68,11 +80,16 @@ describe("ExperimentBoard", () => {
 		const html = render(<ExperimentBoard />);
 		expect(html).toContain("Quick run on coding-core");
 		expect(html).toContain("Prompt v2 vs v1");
-		expect(html).toContain("Better");
-		expect(html).toContain("3 / 8");
+		expect(html).toContain("B is better");
+		expect(html).toContain("3 of 8");
 		expect(html).toContain('data-testid="experiment-chip-active"');
 		expect(html).toContain('data-testid="experiment-chip-suite-terminal-ops"');
 		expect(html).toContain("animate-ping");
 		expect(html).not.toContain(">quick-20261121-101500-ab12<");
+	});
+	it("hides automatic readiness checks behind a toggle", () => {
+		const html = render(<ExperimentBoard />);
+		expect(html).not.toContain("experiment-row-e_admit_acme_safety_5e8q");
+		expect(html).toContain("Show system checks (1)");
 	});
 });

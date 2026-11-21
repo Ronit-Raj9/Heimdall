@@ -1,5 +1,6 @@
 import { ExperimentTrialsPanel, hasContent } from "@/components/adaptive/trialsPanel"; // W7 adaptive trials and suite tiers
-import { TERMINAL_STATES } from "@/components/experiments/experiments.utils";
+import { TERMINAL_STATES, systemExperiment } from "@/components/experiments/experiments.utils";
+import { humanExperimentName } from "@/app/experiments/views/experimentBoard";
 import { ExperimentExportMenu } from "@/components/export/exportMenu"; // W10 export
 import { ExperimentRunActions, RegradeAction } from "@/components/platform/experimentActions";
 import { RunList } from "@/components/runs/runList";
@@ -19,7 +20,7 @@ import { errorStatus } from "@/lib/store/apis/session";
 import { useGetExperimentSupportQuery } from "@/lib/store/apis/supportApi";
 import { compareSearch } from "@/components/experiments/legacyRoutes";
 import { Link } from "@tanstack/react-router";
-import { Download, GitCompareArrows, Hourglass, SearchX } from "lucide-react";
+import { Bot, Download, GitCompareArrows, Hourglass, SearchX } from "lucide-react";
 import { parseAsString, useQueryState } from "nuqs";
 import { useEffect, useRef } from "react";
 import { useTranslation } from "react-i18next";
@@ -45,6 +46,7 @@ export default function ExperimentView({ expId }: { expId: string }) {
 	const { t: tActions } = useTranslation("experimentActions");
 	const [grade] = useQueryState("grade", parseAsString);
 	const { t: tPage } = useTranslation("experimentPage");
+	const { t: tx } = useTranslation("experimentsUx");
 	const [tabParam, setTab] = useQueryState("tab", parseAsString);
 	const status = useGetExperimentQuery(expId);
 	const live = status.data ? !TERMINAL_STATES.has(status.data.state) && status.data.state !== "created" : false;
@@ -111,15 +113,21 @@ export default function ExperimentView({ expId }: { expId: string }) {
 	}));
 	tabs.push({ id: ANALYSIS_TAB_ID, label: <AnalysisTabLabel />, testId: `experiment-tab-${ANALYSIS_TAB_ID}` });
 	const decision = verdict.data?.verdict.decision;
+	// Lead with a human title ("codex on coding-core", "Readiness check for acme-safety"); the raw id stays small below.
+	const system = systemExperiment(st);
+	const title = humanExperimentName({ ...st, arms }, (k, o) => String(tx(k as never, (o ?? {}) as never)));
+	const bannerKey = system?.kind === "agent" ? "header.systemBannerAgent" : system?.kind === "drift" ? "header.systemBannerDrift" : "header.systemBanner";
 
 	return (
 		<div className="flex min-w-0 flex-col gap-6" data-testid="experiment-screen" data-exp-id={expId}>
 			<PageHeader
-				breadcrumbs={[{ label: t("experiments.list.title"), to: "/experiments" }, { label: st.name || expId }]}
+				breadcrumbs={[{ label: t("experiments.list.title"), to: "/experiments" }, { label: title }]}
 				title={
 					<span className="flex min-w-0 items-center gap-2.5">
 						<SuiteGlyph suite={st.suite} />
-						<span className="truncate">{st.name || expId}</span>
+						<span className="truncate" title={expId}>
+							{title}
+						</span>
 					</span>
 				}
 				meta={
@@ -129,10 +137,13 @@ export default function ExperimentView({ expId }: { expId: string }) {
 					</>
 				}
 				subtitle={
-					<span className="text-muted-foreground flex flex-wrap items-center gap-x-3 gap-y-1 text-xs" data-testid="experiment-facts">
-						{st.suite && <EntityLink kind="suite" id={st.suite} />}
-						{arms.length > 0 && <span>{t("experiments.page.arms", { arms: arms.join(" vs "), count: arms.length })}</span>}
-						<EntityLink kind="experiment" id={expId} className="text-xs opacity-70" />
+					<span className="flex flex-col gap-1">
+						{!system && <span className="text-muted-foreground text-sm">{tPage("header.subtitle")}</span>}
+						<span className="text-muted-foreground flex flex-wrap items-center gap-x-3 gap-y-1 text-xs" data-testid="experiment-facts">
+							{st.suite && <EntityLink kind="suite" id={st.suite} />}
+							{arms.length > 0 && !system && <span>{t("experiments.page.arms", { arms: arms.join(" vs "), count: arms.length })}</span>}
+							<EntityLink kind="experiment" id={expId} className="text-[10px] opacity-50" />
+						</span>
 					</span>
 				}
 				actions={
@@ -154,6 +165,17 @@ export default function ExperimentView({ expId }: { expId: string }) {
 					</div>
 				}
 			/>
+
+			{system && (
+				<p
+					className="bg-muted/60 text-foreground flex items-start gap-2 rounded-lg border px-4 py-3 text-sm"
+					role="note"
+					data-testid="experiment-system-banner"
+				>
+					<Bot className="text-muted-foreground mt-0.5 size-4 shrink-0" aria-hidden="true" />
+					{tPage(bannerKey)}
+				</p>
+			)}
 
 			{live && <LiveProgress status={st} />}
 
