@@ -3,7 +3,7 @@ import "@/lib/i18n";
 import { okQuery, loadingQuery, render, tagOf } from "@/lib/testing/render";
 import type { ModelKey, ModelProviderInfo, ModelsCatalogResponse } from "@/lib/types/models";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { ModelPicker, modelChoices } from "./modelPicker";
+import { ModelPicker, modelChoices, providersFor, searchModels } from "./modelPicker";
 
 const q = vi.hoisted(() => ({ models: {} as Record<string, unknown> }));
 vi.mock("@/lib/store/apis/modelsApi", () => ({ useGetModelsQuery: () => q.models }));
@@ -27,8 +27,25 @@ const providers: ModelProviderInfo[] = [
 			{ id: "whisper-1", purposes: ["voice-stt"], rank: 1 },
 		],
 	},
-	{ id: "anthropic", name: "Anthropic", needs_base_url: false, key_hint: "", models: [{ id: "claude-haiku", purposes: ["agent"], rank: 1 }] },
+	{
+		id: "anthropic",
+		name: "Anthropic",
+		needs_base_url: false,
+		key_hint: "",
+		models: [{ id: "claude-haiku", purposes: ["agent"], rank: 1 }],
+	},
 	{ id: "groq", name: "Groq", needs_base_url: false, key_hint: "", models: [{ id: "llama-3-8b", purposes: ["agent"], rank: 1 }] },
+	{
+		id: "deepseek",
+		name: "DeepSeek",
+		needs_base_url: false,
+		key_hint: "",
+		models: [
+			{ id: "deepseek-chat", purposes: ["agent"], rank: 3, open_weights: true, family: "deepseek" },
+			{ id: "deepseek-reasoner", purposes: ["agent"], rank: 4 },
+		],
+	},
+	{ id: "ollama", name: "Ollama", needs_base_url: true, key_hint: "", models: [] },
 ] as unknown as ModelProviderInfo[];
 
 const key = (over: Partial<ModelKey>): ModelKey => ({
@@ -52,7 +69,10 @@ function catalog(keys: ModelKey[], extra: Partial<ModelsCatalogResponse> = {}) {
 }
 
 const options = (html: string) => [...html.matchAll(/<option[^>]*value="([^"]*)"/g)].map((m) => m[1]);
-const modelSelect = (html: string) => html.slice(html.indexOf('data-testid="mp-model"'), html.indexOf("</select>", html.indexOf('data-testid="mp-model"')));
+const providerSelect = (html: string) =>
+	html.slice(html.indexOf('data-testid="mp-provider"'), html.indexOf("</select>", html.indexOf('data-testid="mp-provider"')));
+const modelSelect = (html: string) =>
+	html.slice(html.indexOf('data-testid="mp-model"'), html.indexOf("</select>", html.indexOf('data-testid="mp-model"')));
 
 beforeEach(() => {
 	catalog([key({ models_available: ["gpt-4o", "gpt-5-preview", "o3"] }), key({ id: "k2", provider: "anthropic", status: "invalid" })]);
@@ -61,12 +81,18 @@ beforeEach(() => {
 describe("modelChoices", () => {
 	it("lists key-reported models first, then suggestions not already listed", () => {
 		const keys = [key({ models: ["gpt-custom"], models_available: ["gpt-4o", "o3"] })];
-		expect(modelChoices("openai", "agent", providers, keys)).toEqual({ reported: ["gpt-custom", "gpt-4o", "o3"], suggested: ["gpt-4o-mini"] });
+		expect(modelChoices("openai", "agent", providers, keys)).toEqual({
+			reported: ["gpt-custom", "gpt-4o", "o3"],
+			suggested: ["gpt-4o-mini"],
+		});
 	});
 
 	it("ignores invalid keys and listed models for speech purposes", () => {
 		expect(modelChoices("openai", "agent", providers, [key({ status: "invalid", models_available: ["x"] })]).reported).toEqual([]);
-		expect(modelChoices("openai", "voice-stt", providers, [key({ models_available: ["x"] })])).toEqual({ reported: [], suggested: ["whisper-1"] });
+		expect(modelChoices("openai", "voice-stt", providers, [key({ models_available: ["x"] })])).toEqual({
+			reported: [],
+			suggested: ["whisper-1"],
+		});
 	});
 
 	it("uses only the chosen key when one is given", () => {
@@ -94,7 +120,31 @@ describe("ModelPicker", () => {
 		expect(html).toContain("Anthropic (key not working)");
 		expect(html).toContain("Groq (no key)");
 		// Providers with a usable key come first.
-		expect(options(html.slice(0, html.indexOf("</select>")))[0]).toBe("openai");
+		expect(options(providerSelect(html))[0]).toBe("openai");
+	});
+
+	it("groups providers and disables those without a working key", () => {
+		const html = render(<ModelPicker value={{ provider: "openai", model: "gpt-4o" }} onChange={() => undefined} testId="mp" />);
+		const sel = providerSelect(html);
+		expect(sel).toContain('<optgroup label="Frontier APIs">');
+		expect(sel).toContain('<optgroup label="Open-weight model hosts">');
+		expect(sel).toContain('<optgroup label="Self-hosted (Ollama, vLLM, SGLang)">');
+		expect(sel).toMatch(/<option value="groq" disabled="">Groq \(no key\)<\/option>/);
+		expect(sel).toMatch(/<option value="openai"( selected="")?>OpenAI<\/option>/);
+	});
+
+	it("keeps every provider enabled when no key works yet", () => {
+		catalog([]);
+		const html = render(<ModelPicker value={{ provider: "openai", model: "gpt-4o" }} onChange={() => undefined} testId="mp" />);
+		expect(providerSelect(html)).not.toContain('disabled=""');
+	});
+
+	it("tags open-weight models", () => {
+		catalog([key({ provider: "deepseek" })]);
+		const html = render(<ModelPicker value={{ provider: "deepseek", model: "deepseek-chat" }} onChange={() => undefined} testId="mp" />);
+		expect(modelSelect(html)).toContain(">deepseek-chat (open)</option>");
+		expect(modelSelect(html)).toContain(">deepseek-reasoner (open)</option>");
+		expect(tagOf(html, "mp-search")).toContain('autoComplete="off"');
 	});
 
 	it("reveals the text box for a model the lists do not carry", () => {
@@ -120,6 +170,27 @@ describe("ModelPicker", () => {
 	it("keeps the default test ids and the key select", () => {
 		catalog([key({}), key({ id: "k2", label: "backup" })]);
 		const html = render(<ModelPicker value={{ provider: "openai", model: "gpt-4o" }} onChange={() => undefined} />);
-		for (const id of ["model-picker", "model-picker-provider", "model-picker-model", "model-picker-key"]) expect(html).toContain(`data-testid="${id}"`);
+		for (const id of ["model-picker", "model-picker-provider", "model-picker-model", "model-picker-key"])
+			expect(html).toContain(`data-testid="${id}"`);
+	});
+});
+
+describe("searchModels", () => {
+	const keys = [key({}), key({ id: "k2", provider: "deepseek" })];
+	const ids = ["openai", "anthropic", "groq", "deepseek", "ollama"];
+
+	it("matches model ids, provider names and the open tag, grouped in provider order", () => {
+		expect(searchModels("mini", ids, "agent", providers, keys).map((h) => `${h.provider}/${h.model}`)).toEqual(["openai/gpt-4o-mini"]);
+		expect(searchModels("groq", ids, "agent", providers, keys).map((h) => h.model)).toEqual(["llama-3-8b"]);
+		const open = searchModels("open", ids, "agent", providers, keys);
+		expect(open.map((h) => h.model)).toEqual(["llama-3-8b", "deepseek-chat", "deepseek-reasoner"]);
+		expect(open.every((h) => h.open)).toBe(true);
+		expect(searchModels("deepseek chat", ids, "agent", providers, keys).map((h) => h.model)).toEqual(["deepseek-chat"]);
+		expect(searchModels("  ", ids, "agent", providers, keys)).toEqual([]);
+	});
+
+	it("lists providers without suggested models for chat only", () => {
+		expect(providersFor("agent", providers)).toContain("ollama");
+		expect(providersFor("voice-stt", providers)).toEqual(["openai"]);
 	});
 });

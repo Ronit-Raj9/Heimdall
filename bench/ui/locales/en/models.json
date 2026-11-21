@@ -58,7 +58,14 @@
 		"other": "Other model...",
 		"current": "Current",
 		"noKeyShort": "no key",
-		"keyInvalid": "key not working"
+		"keyInvalid": "key not working",
+		"search": "Search models",
+		"searchPlaceholder": "Search models, e.g. qwen or open",
+		"results": "Matching models by provider",
+		"noResults": "No model matches. Pick a provider and choose \"Other model...\" to type any id.",
+		"openTag": "open",
+		"needsKey": "add a working key to use",
+		"keyInvalidLong": "This provider's key is not working"
 	},
 	"unavailableAction": "Read the hosting guide",
 	"emptyViewer": "No API keys yet. Ask an org admin to add one. Meanwhile you can browse finished comparisons.",
@@ -66,5 +73,39 @@
 	"secretsHint": "Passwords and API keys your agent's tools need (for example a web search key) live under Secrets.",
 	"secretsLink": "Manage secrets",
 	"priceHint": "Price per 1M tokens: not set (costs will show as unknown)",
-	"priceHintTitle": "Heimdall works out cost from the model's price per 1 million tokens. When no price is set for a model, its cost shows as unknown, not as zero."
+	"priceHintTitle": "Heimdall works out cost from the model's price per 1 million tokens. When no price is set for a model, its cost shows as unknown, not as zero.",
+	"groups": {
+		"frontier": "Frontier APIs",
+		"open-hosts": "Open-weight model hosts",
+		"cloud": "Cloud platforms",
+		"self-hosted": "Self-hosted (Ollama, vLLM, SGLang)",
+		"custom": "Custom OpenAI-compatible",
+		"other": "Other providers"
+	},
+	"groupHints": {
+		"frontier": "The model makers' own APIs.",
+		"open-hosts": "Services that run open-weight models such as DeepSeek, Qwen, Llama and gpt-oss.",
+		"cloud": "Models through your cloud account.",
+		"self-hosted": "A model server you run yourself. Give its base URL.",
+		"custom": "Any server that speaks the OpenAI API. Give its base URL ending in /v1.",
+		"other": "More providers the server supports."
+	},
+	"providerStatus": {
+		"ok": "Works",
+		"untested": "Not tested yet",
+		"over-budget": "Over budget",
+		"failed": "Key not working",
+		"none": "No key"
+	},
+	"filterProviders": "Find a provider",
+	"noProviderMatch": "No provider matches.",
+	"selfHostedKeyHint": "If your server has no key, type any text here.",
+	"open": {
+		"title": "Open models",
+		"subtitle": "Open-weight model families and the providers that serve them. Add a key for one of those providers to use the family.",
+		"servedBy": "Served by",
+		"none": "No provider in this server's list serves it yet.",
+		"custom": "Or add a custom OpenAI-compatible endpoint from {{maker}}.",
+		"hasKey": "you have a key"
+	}
 }

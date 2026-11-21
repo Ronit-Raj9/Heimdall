@@ -1,4 +1,16 @@
 import { PROVIDERS, type ProviderId } from "@/components/models/modelPicker";
+import {
+	BIFROST_PROVIDERS,
+	familyServing,
+	groupProviders,
+	keyUsable,
+	providerGroup,
+	providerInitials,
+	providerKeyState,
+	providerName,
+	type ProviderGroup,
+	type ProviderKeyState,
+} from "@/components/models/providerCatalog";
 import { ConfirmButton } from "@/components/platform/badges";
 import { BlockSkeleton, LoadError } from "@/components/runs/screenStates";
 import { EmptyState } from "@/components/shell/emptyState";
@@ -28,10 +40,12 @@ const STATUS_VARIANT = {
 	error: "warning",
 } as const;
 
-/** The provider named by ?add=<provider>, when it is one we know. */
-export function addParam(search: unknown): ProviderId | null {
+/** The provider named by ?add=<provider>, when it is one we know (the server's list, else the Bifrost list). */
+export function addParam(search: unknown, known?: readonly string[]): ProviderId | null {
 	const add = (search as { add?: unknown } | undefined)?.add;
-	return typeof add === "string" && (PROVIDERS as readonly string[]).includes(add) ? (add as ProviderId) : null;
+	if (typeof add !== "string") return null;
+	const ids = known && known.length ? known : [...PROVIDERS, ...Object.keys(BIFROST_PROVIDERS)];
+	return ids.includes(add) ? add : null;
 }
 
 /** Comma or newline separated model list to an array. */
@@ -46,44 +60,39 @@ export function formatUSD(v: number): string {
 	return `$${v.toFixed(2)}`;
 }
 
-/** Short tile text and tint per provider. */
-const PROVIDER_TILE: Record<ProviderId, { initials: string; name: string; tint: string }> = {
-	openai: {
-		initials: "OA",
-		name: "OpenAI",
-		tint: "bg-emerald-500/10 text-emerald-700 dark:text-emerald-300",
-	},
-	anthropic: {
-		initials: "AN",
-		name: "Anthropic",
-		tint: "bg-orange-500/10 text-orange-700 dark:text-orange-300",
-	},
-	gemini: {
-		initials: "GE",
-		name: "Gemini",
-		tint: "bg-blue-500/10 text-blue-700 dark:text-blue-300",
-	},
-	openrouter: {
-		initials: "OR",
-		name: "OpenRouter",
-		tint: "bg-violet-500/10 text-violet-700 dark:text-violet-300",
-	},
-	groq: {
-		initials: "GQ",
-		name: "Groq",
-		tint: "bg-rose-500/10 text-rose-700 dark:text-rose-300",
-	},
-	sarvam: {
-		initials: "SV",
-		name: "Sarvam",
-		tint: "bg-amber-500/10 text-amber-700 dark:text-amber-300",
-	},
-	"openai-compatible": {
-		initials: "OC",
-		name: "OpenAI-compatible",
-		tint: "bg-slate-500/10 text-slate-700 dark:text-slate-300",
-	},
+/** Tile tint per provider group. */
+const GROUP_TINT: Record<ProviderGroup, string> = {
+	frontier: "bg-emerald-500/10 text-emerald-700 dark:text-emerald-300",
+	"open-hosts": "bg-violet-500/10 text-violet-700 dark:text-violet-300",
+	cloud: "bg-blue-500/10 text-blue-700 dark:text-blue-300",
+	"self-hosted": "bg-amber-500/10 text-amber-700 dark:text-amber-300",
+	custom: "bg-slate-500/10 text-slate-700 dark:text-slate-300",
+	other: "bg-slate-500/10 text-slate-700 dark:text-slate-300",
 };
+
+const PROVIDER_STATUS_VARIANT: Record<ProviderKeyState, "success" | "outline" | "destructive" | "neutral"> = {
+	ok: "success",
+	untested: "outline",
+	"over-budget": "destructive",
+	failed: "destructive",
+	none: "neutral",
+};
+
+/** Whether a provider's key form must have a base URL. */
+export function needsBaseUrl(info?: Pick<ModelProviderInfo, "needs_base_url" | "custom_base_url">): boolean {
+	return Boolean(info?.needs_base_url || info?.custom_base_url);
+}
+
+/** Providers whose id, name or group label contains the filter text. */
+export function filterProviders<T extends Pick<ModelProviderInfo, "id" | "name">>(
+	providers: readonly T[],
+	filter: string,
+	groupLabel: (g: ProviderGroup) => string,
+): T[] {
+	const f = filter.trim().toLowerCase();
+	if (!f) return [...providers];
+	return providers.filter((p) => `${p.id} ${p.name} ${groupLabel(providerGroup(p))}`.toLowerCase().includes(f));
+}
 
 const STATUS_DOT = {
 	untested: "bg-muted-foreground/50",
@@ -107,15 +116,23 @@ export default function ModelsView() {
 	const models = useGetModelsQuery();
 	const isAdmin = canUse(session, "admin");
 	const canTest = canUse(session, "member");
-	const initialAdd = addParam(search);
+	const providers = models.data?.providers ?? [];
+	const keys = models.data?.keys ?? [];
+	const initialAdd = addParam(
+		search,
+		providers.map((p) => p.id),
+	);
+	const [filter, setFilter] = useState("");
 	const [form, setForm] = useState<{
 		provider: ProviderId;
 		key?: ModelKey;
 	} | null>(initialAdd && isAdmin ? { provider: initialAdd } : null);
 
-	const providers = models.data?.providers ?? [];
-	const keys = models.data?.keys ?? [];
-	const providerIds: ProviderId[] = providers.length ? (PROVIDERS.filter((p) => providers.some((x) => x.id === p)) as ProviderId[]) : [...PROVIDERS];
+	const listed: ModelProviderInfo[] = providers.length
+		? providers
+		: PROVIDERS.map((id) => ({ id, name: providerName(id, []), needs_base_url: id === "openai-compatible", key_hint: "", models: [] }));
+	const groups = groupProviders(filterProviders(listed, filter, (g) => t(`groups.${g}`)));
+	const firstProvider: ProviderId = listed[0]?.id ?? "openai";
 
 	return (
 		<div className="mx-auto flex w-full max-w-[1200px] flex-col gap-8 p-4 sm:p-6" data-testid="models-view">
@@ -136,7 +153,7 @@ export default function ModelsView() {
 					</p>
 				</div>
 				{isAdmin && models.data?.keys_ready && (
-					<Button size="sm" className="gap-1.5" onClick={() => setForm({ provider: "openai" })} data-testid="models-add">
+					<Button size="sm" className="gap-1.5" onClick={() => setForm({ provider: firstProvider })} data-testid="models-add">
 						<Plus className="size-4" aria-hidden="true" />
 						{tu("models.addKey")}
 					</Button>
@@ -169,10 +186,7 @@ export default function ModelsView() {
 								<span className="text-muted-foreground text-xs">{tu("models.defaultLabel")}</span>
 								<span className="truncate text-sm font-medium">
 									{models.data.default.model}
-									<span className="text-muted-foreground font-normal">
-										{" "}
-										· {PROVIDER_TILE[models.data.default.provider as ProviderId]?.name ?? models.data.default.provider}
-									</span>
+									<span className="text-muted-foreground font-normal"> · {providerName(models.data.default.provider, providers)}</span>
 								</span>
 							</div>
 						) : (
@@ -194,30 +208,61 @@ export default function ModelsView() {
 								isAdmin
 									? {
 											label: t("add"),
-											onClick: () => setForm({ provider: "openai" }),
+											onClick: () => setForm({ provider: firstProvider }),
 										}
 									: { label: t("emptyViewerAction"), to: "/experiments" }
 							}
 							testId="models-empty"
 						/>
 					)}
-					<div className="grid gap-4 md:grid-cols-2" data-testid="models-table">
-						{providerIds.map((p) => (
-							<ProviderCard
-								key={p}
-								provider={p}
-								name={providers.find((x) => x.id === p)?.name ?? PROVIDER_TILE[p].name}
-								keys={keys.filter((k) => k.provider === p)}
-								isAdmin={isAdmin}
-								canTest={canTest}
-								onAdd={() => setForm({ provider: p })}
-								onEdit={(k) => setForm({ provider: k.provider, key: k })}
+					<div className="flex flex-col gap-6" data-testid="models-table">
+						<div className="flex flex-wrap items-center justify-between gap-3">
+							<h2 className="text-lg font-semibold">{t("providersTitle")}</h2>
+							<Input
+								type="search"
+								autoComplete="off"
+								className="h-8 w-56"
+								value={filter}
+								placeholder={t("filterProviders")}
+								aria-label={t("filterProviders")}
+								onChange={(e) => setFilter(e.target.value)}
+								data-testid="models-filter"
 							/>
+						</div>
+						{groups.length === 0 && <p className="text-muted-foreground text-sm">{t("noProviderMatch")}</p>}
+						{groups.map((g) => (
+							<section key={g.group} className="flex flex-col gap-3" data-testid={`provider-group-${g.group}`}>
+								<div className="flex flex-col gap-0.5">
+									<h3 className="text-sm font-semibold">{t(`groups.${g.group}`)}</h3>
+									<p className="text-muted-foreground text-xs">{t(`groupHints.${g.group}`)}</p>
+								</div>
+								<div className="grid gap-4 md:grid-cols-2">
+									{g.providers.map((p) => (
+										<ProviderCard
+											key={p.id}
+											provider={p.id}
+											name={p.name || providerName(p.id, providers)}
+											group={g.group}
+											keys={keys.filter((k) => k.provider === p.id)}
+											isAdmin={isAdmin}
+											canTest={canTest}
+											onAdd={() => setForm({ provider: p.id })}
+											onEdit={(k) => setForm({ provider: k.provider, key: k })}
+										/>
+									))}
+								</div>
+							</section>
 						))}
 					</div>
+					<OpenModels providers={providers} keys={keys} />
 					{form && (
 						<SidePanel title={form.key ? t("editTitle") : t("addTitle")} onClose={() => setForm(null)}>
-							<KeyForm key={`${form.provider}-${form.key?.id ?? "new"}`} providers={providers} initial={form} onDone={() => setForm(null)} />
+							<KeyForm
+								key={`${form.provider}-${form.key?.id ?? "new"}`}
+								providers={providers}
+								initial={form}
+								onDone={() => setForm(null)}
+							/>
 						</SidePanel>
 					)}
 				</>
@@ -226,21 +271,81 @@ export default function ModelsView() {
 	);
 }
 
-function ProviderTile({ provider, className }: { provider: ProviderId; className?: string }) {
-	const tile = PROVIDER_TILE[provider];
+function ProviderTile({ provider, group, className }: { provider: ProviderId; group: ProviderGroup; className?: string }) {
 	return (
 		<span
-			className={cn("flex size-10 shrink-0 items-center justify-center rounded-lg text-sm font-semibold tracking-tight", tile.tint, className)}
+			className={cn(
+				"flex size-10 shrink-0 items-center justify-center rounded-lg text-sm font-semibold tracking-tight",
+				GROUP_TINT[group],
+				className,
+			)}
 			aria-hidden="true"
 		>
-			{tile.initials}
+			{providerInitials(provider)}
 		</span>
+	);
+}
+
+/** Open model families and which providers in the catalog serve them. */
+function OpenModels({ providers, keys }: { providers: ModelProviderInfo[]; keys: ModelKey[] }) {
+	const { t } = useTranslation("models");
+	const rows = familyServing(providers);
+	const keyed = new Set(keys.filter(keyUsable).map((k) => k.provider));
+	return (
+		<section className="flex flex-col gap-3" data-testid="open-models">
+			<div className="flex flex-col gap-0.5">
+				<h2 className="text-lg font-semibold">{t("open.title")}</h2>
+				<p className="text-muted-foreground text-sm">{t("open.subtitle")}</p>
+			</div>
+			<ul className="bg-card flex flex-col divide-y rounded-xl border">
+				{rows.map(({ family, providers: serving }) => (
+					<li
+						key={family.id}
+						className="flex flex-col gap-1.5 px-5 py-3 sm:flex-row sm:items-start sm:gap-4"
+						data-testid={`open-family-${family.id}`}
+					>
+						<div className="flex w-40 shrink-0 flex-col">
+							<span className="text-sm font-medium">{family.name}</span>
+							<span className="text-muted-foreground text-xs">{family.maker}</span>
+						</div>
+						<div className="flex min-w-0 flex-1 flex-col gap-1">
+							{serving.length > 0 ? (
+								<div className="flex flex-wrap items-center gap-1.5">
+									<span className="text-muted-foreground text-xs">{t("open.servedBy")}</span>
+									{serving.map((p) => (
+										<Badge
+											key={p.id}
+											variant={keyed.has(p.id) ? "success" : "outline"}
+											className="rounded-full px-2"
+											title={p.models.join(", ") || undefined}
+											data-testid={`open-family-${family.id}-${p.id}`}
+										>
+											{p.name}
+											{keyed.has(p.id) && <span className="sr-only"> ({t("open.hasKey")})</span>}
+										</Badge>
+									))}
+								</div>
+							) : (
+								<span className="text-muted-foreground text-xs">{t("open.none")}</span>
+							)}
+							{serving.length > 0 && (
+								<span className="text-muted-foreground truncate font-mono text-[11px]" title={serving.flatMap((p) => p.models).join(", ")}>
+									{[...new Set(serving.flatMap((p) => p.models))].slice(0, 6).join(", ")}
+								</span>
+							)}
+							{!family.nativeProvider && <span className="text-muted-foreground text-xs">{t("open.custom", { maker: family.maker })}</span>}
+						</div>
+					</li>
+				))}
+			</ul>
+		</section>
 	);
 }
 
 function ProviderCard({
 	provider,
 	name,
+	group,
 	keys,
 	isAdmin,
 	canTest,
@@ -249,24 +354,32 @@ function ProviderCard({
 }: {
 	provider: ProviderId;
 	name: string;
+	group: ProviderGroup;
 	keys: ModelKey[];
 	isAdmin: boolean;
 	canTest: boolean;
 	onAdd(): void;
 	onEdit(k: ModelKey): void;
 }) {
+	const { t } = useTranslation("models");
 	const { t: tu } = useTranslation("u11");
+	const state = providerKeyState(keys);
 	return (
 		<section
 			className="bg-card flex flex-col gap-4 rounded-xl border p-5 transition-shadow hover:shadow-md"
 			data-testid={`provider-card-${provider}`}
 		>
 			<div className="flex items-center gap-3">
-				<ProviderTile provider={provider} />
+				<ProviderTile provider={provider} group={group} />
 				<div className="flex min-w-0 flex-1 flex-col">
 					<h2 className="truncate text-base font-semibold">{name}</h2>
-					<span className="text-muted-foreground text-xs">{keys.length ? tu("models.keysCount", { count: keys.length }) : tu("models.noKeys")}</span>
+					<span className="text-muted-foreground text-xs">
+						{keys.length ? tu("models.keysCount", { count: keys.length }) : tu("models.noKeys")}
+					</span>
 				</div>
+				<Badge variant={PROVIDER_STATUS_VARIANT[state]} className="rounded-full px-2" data-testid={`provider-status-${provider}`}>
+					{t(`providerStatus.${state}`)}
+				</Badge>
 				{isAdmin && (
 					<Button size="sm" variant="ghost" className="gap-1" onClick={onAdd} data-testid={`provider-add-${provider}`}>
 						<Plus className="size-3.5" aria-hidden="true" />
@@ -506,12 +619,16 @@ function KeyForm({
 	const error = createState.error ?? updateState.error;
 
 	const valueError = touched && !editing && !value.trim() ? t("valueRequired") : undefined;
-	const urlError = touched && info?.needs_base_url && !baseUrl.trim() ? t("baseUrlRequired") : undefined;
+	const urlRequired = needsBaseUrl(info);
+	const urlError = touched && urlRequired && !baseUrl.trim() ? t("baseUrlRequired") : undefined;
+	const formProviders: Pick<ModelProviderInfo, "id" | "name" | "custom_base_url">[] = providers.length
+		? providers
+		: PROVIDERS.map((p) => ({ id: p, name: providerName(p, []) }));
 
 	const onSubmit = async (e: FormEvent) => {
 		e.preventDefault();
 		setTouched(true);
-		if ((!editing && !value.trim()) || (info?.needs_base_url && !baseUrl.trim())) return;
+		if ((!editing && !value.trim()) || (urlRequired && !baseUrl.trim())) return;
 		const body = keyRequestBody({
 			provider,
 			label,
@@ -543,16 +660,21 @@ function KeyForm({
 					className="border-input bg-background h-9 rounded-md border px-2 text-sm"
 					value={provider}
 					disabled={Boolean(editing)}
-					onChange={(e) => setProvider(e.target.value as ProviderId)}
+					onChange={(e) => setProvider(e.target.value)}
 					data-testid="model-key-provider"
 				>
-					{(providers.length ? providers.map((p) => p.id) : [...PROVIDERS]).map((p) => (
-						<option key={p} value={p}>
-							{providers.find((x) => x.id === p)?.name ?? p}
-						</option>
+					{!formProviders.some((p) => p.id === provider) && <option value={provider}>{providerName(provider, providers)}</option>}
+					{groupProviders(formProviders).map((g) => (
+						<optgroup key={g.group} label={t(`groups.${g.group}`)}>
+							{g.providers.map((p) => (
+								<option key={p.id} value={p.id}>
+									{p.name || providerName(p.id, providers)}
+								</option>
+							))}
+						</optgroup>
 					))}
 				</select>
-				{info && <p className="text-muted-foreground text-xs">{info.key_hint}</p>}
+				{info?.key_hint && <p className="text-muted-foreground text-xs">{info.key_hint}</p>}
 			</div>
 			<div className={field}>
 				<label className={lbl} htmlFor={`${id}-label`}>
@@ -587,11 +709,13 @@ function KeyForm({
 				/>
 				{valueError ? (
 					<p className="text-chart-error-ink text-xs">{valueError}</p>
+				) : editing ? (
+					<p className="text-muted-foreground text-xs" data-testid="model-key-value-keep">
+						{t("valueKeepHint")}
+					</p>
 				) : (
-					editing && (
-						<p className="text-muted-foreground text-xs" data-testid="model-key-value-keep">
-							{t("valueKeepHint")}
-						</p>
+					providerGroup({ id: provider, custom_base_url: info?.custom_base_url }) === "self-hosted" && (
+						<p className="text-muted-foreground text-xs">{t("selfHostedKeyHint")}</p>
 					)
 				)}
 			</div>
@@ -610,7 +734,7 @@ function KeyForm({
 					aria-invalid={Boolean(urlError) || undefined}
 					data-testid="model-key-base-url"
 				/>
-				<p className="text-muted-foreground text-xs">{urlError ?? (info?.needs_base_url ? t("baseUrlRequired") : t("baseUrlOptional"))}</p>
+				<p className="text-muted-foreground text-xs">{urlError ?? (urlRequired ? t("baseUrlRequired") : t("baseUrlOptional"))}</p>
 			</div>
 			<div className={field}>
 				<label className={lbl} htmlFor={`${id}-models`}>
@@ -622,7 +746,7 @@ function KeyForm({
 					autoComplete="off"
 					{...NO_AUTOFILL}
 					value={modelsText}
-					placeholder={info?.models
+					placeholder={(info?.models ?? [])
 						.map((m) => m.id)
 						.slice(0, 3)
 						.join(", ")}
