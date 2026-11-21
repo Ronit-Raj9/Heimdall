@@ -5,7 +5,7 @@ import type { DiagnosticsPayload, DiagnosticsRow, MetricDescriptor, Ratio, Value
 import { cn } from "@/lib/utils";
 import { useTranslation } from "react-i18next";
 import { MethodHint } from "./methodHint";
-import { EFFICIENCY_ARM_METRICS, METER_GROUP_ORDER, formatCount, formatSignedPp, meterGroup, type MeterGroup } from "./verdict.utils";
+import { EFFICIENCY_ARM_METRICS, METER_GROUP_ORDER, armMetricGroup, formatCount, formatSignedPp, meterGroup, type MeterGroup } from "./verdict.utils";
 
 export interface DiagnosticsTableProps {
 	diagnostics: Pick<DiagnosticsPayload, "diagnostics" | "meters" | "arm_metrics">;
@@ -13,22 +13,24 @@ export interface DiagnosticsTableProps {
 	arms: string[];
 	/** Metric descriptors by name, from the catalog: labels and value kinds for the efficiency medians. */
 	metrics?: Record<string, MetricDescriptor>;
+	/** Which half to render: the condition table, the meters, or both (the default). */
+	part?: "all" | "conditions" | "meters";
 	className?: string;
 }
 
 /** One row per condition that ran, then the honesty, safety and efficiency meters (DESIGN.md 9.6). */
-export function DiagnosticsTable({ diagnostics, arms, metrics, className }: DiagnosticsTableProps) {
+export function DiagnosticsTable({ diagnostics, arms, metrics, part = "all", className }: DiagnosticsTableProps) {
 	const { t } = useTranslation("bench");
 	return (
 		<div className={cn("flex flex-col gap-6", className)}>
-			{diagnostics.diagnostics.length === 0 ? (
+			{part === "meters" ? null : diagnostics.diagnostics.length === 0 ? (
 				<p className="text-muted-foreground text-sm" data-testid="verdict-diagnostics-empty">
 					{t("verdict.diagnostics.empty")}
 				</p>
 			) : (
 				<ConditionTable rows={diagnostics.diagnostics} arms={arms} />
 			)}
-			<MeterTable diagnostics={diagnostics} arms={arms} metrics={metrics} />
+			{part !== "conditions" && <MeterTable diagnostics={diagnostics} arms={arms} metrics={metrics} />}
 		</div>
 	);
 }
@@ -123,8 +125,9 @@ interface MeterLine {
 	method?: "costPerSuccess";
 }
 
-function MeterTable({ diagnostics, arms, metrics }: Omit<DiagnosticsTableProps, "className">) {
+function MeterTable({ diagnostics, arms, metrics }: Omit<DiagnosticsTableProps, "className" | "part">) {
 	const { t } = useTranslation("bench");
+	const { t: tPage } = useTranslation("experimentPage");
 
 	const lines: MeterLine[] = diagnostics.meters.map((meter) => ({
 		key: `meter-${meter.name}`,
@@ -140,7 +143,7 @@ function MeterTable({ diagnostics, arms, metrics }: Omit<DiagnosticsTableProps, 
 		const descriptor = metrics?.[name];
 		lines.push({
 			key: `arm-${name}`,
-			group: "efficiency",
+			group: armMetricGroup(name),
 			label: t("verdict.diagnostics.median", { label: descriptor?.label ?? name }),
 			// Without a descriptor the kind is unknown; count prints the number plainly.
 			kind: descriptor?.kind ?? "count",
@@ -181,7 +184,7 @@ function MeterTable({ diagnostics, arms, metrics }: Omit<DiagnosticsTableProps, 
 						<TableRow key={line.key} data-testid={`verdict-meter-row-${line.key}`} data-group={group}>
 							{index === 0 && (
 								<TableCell rowSpan={groupLines.length} className="align-top text-xs font-medium">
-									{t(`verdict.diagnostics.meterGroup.${group}`)}
+									{tPage(`meterGroup.${group}`)}
 								</TableCell>
 							)}
 							<TableCell className="text-xs">

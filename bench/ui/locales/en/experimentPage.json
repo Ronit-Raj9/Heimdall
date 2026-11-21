@@ -1,0 +1,80 @@
+{
+	"header": {
+		"export": "Export",
+		"moreActions": "Actions"
+	},
+	"tabs": {
+		"verdict": "Verdict",
+		"runs": "Runs",
+		"matrix": "Arms",
+		"cost": "Cost",
+		"migration": "Migration",
+		"adaptive": "Trials",
+		"scorecards": "Scores",
+		"receipts": "Faults",
+		"integrity": "Integrity",
+		"export": "Export"
+	},
+	"summary": {
+		"headline": {
+			"improved": "{{arm}} is better by {{pp}}",
+			"regressed": "{{arm}} is worse by {{pp}}",
+			"improvedNoEffect": "{{arm}} is better",
+			"regressedNoEffect": "{{arm}} is worse",
+			"inconclusive": "No clear difference yet",
+			"invalid": "Invalid: fix the harness"
+		},
+		"passRate": "Pass rate",
+		"passCount": "{{num}}/{{den}} passed",
+		"cost": "Cost per run",
+		"tokens": "Tokens per run",
+		"unknown": "n/a",
+		"next": {
+			"ship": "Ship {{arm}}. Export the report to share it.",
+			"holdRegressed": "Keep {{arm}}. Open the runs where the new arm failed.",
+			"holdViolations": "Hold. A guard or gate failed; review it below.",
+			"no_decision": "Not enough signal. Compare the runs that differ, or add tasks.",
+			"fix_harness": "The measurement broke. Check the failing runs, fix, then regrade."
+		},
+		"button": {
+			"ship": "Export report",
+			"hold": "Compare runs",
+			"no_decision": "Compare runs",
+			"fix_harness": "Open runs"
+		}
+	},
+	"sections": {
+		"guards": "Guards",
+		"gates": "Gates",
+		"diagnostics": "Diagnostics",
+		"meters": "Meters",
+		"statistics": "Statistics",
+		"changes": "What changed",
+		"policy": "Policy",
+		"tasks": "Tasks"
+	},
+	"meterGroup": {
+		"quality": "Quality",
+		"cost": "Cost",
+		"effort": "Effort",
+		"safety": "Safety",
+		"other": "Other"
+	},
+	"live": {
+		"title": "Running",
+		"slots": "{{done}} of {{total}} done",
+		"running": "{{count}} running",
+		"failed": "{{count}} failed",
+		"spent": "Spent {{usd}}",
+		"slotsTitle": "Slots",
+		"eventsTitle": "Latest events",
+		"noEvents": "Waiting for the first event.",
+		"slot": {
+			"pending": "Queued",
+			"running": "Running",
+			"pass": "Passed",
+			"fail": "Failed",
+			"error": "Error"
+		}
+	}
+}

@@ -1,20 +1,23 @@
 import { VerdictCalibration } from "@/components/calibration/calibrationPanel"; // W8 judge calibration
 import { ConfigDiff } from "@/components/configDiff";
-import { compareHref } from "@/components/experiments/legacyRoutes";
+import { compareHref, compareSearch } from "@/components/experiments/legacyRoutes";
 import { Button } from "@/components/ui/button";
 import { Card, CardAction, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
 import { DiagnosticsTable } from "@/components/verdict/diagnosticsTable";
+import { Disclosure } from "@/components/verdict/disclosure";
 import { GateChecklist } from "@/components/verdict/gateChecklist";
 import { GradeSourceTag } from "@/components/verdict/gradeSourceTag";
 import { NaiveScoreboard } from "@/components/verdict/naiveScoreboard";
 import { PolicyScorecard } from "@/components/verdict/policyScorecard";
 import { TaskGrid } from "@/components/verdict/taskGrid";
 import { armOrder } from "@/components/verdict/verdict.utils";
-import { VerdictCard } from "@/components/verdict/verdictCard";
+import { GuardList, VerdictCard } from "@/components/verdict/verdictCard";
+import { VerdictSummary } from "@/components/verdict/verdictSummary";
 import { getBenchErrorMessage, useGetCatalogQuery, useGetDiagnosticsQuery, useGetGridQuery, useGetVerdictQuery } from "@/lib/store";
-import type { MetricDescriptor } from "@/lib/types/bench";
+import type { Action, MetricDescriptor } from "@/lib/types/bench";
+import { Activity, Gauge, GitCompare, ListChecks, Scale, Shield, Sigma, Table2 } from "lucide-react";
 import { useNavigate } from "@tanstack/react-router";
 import { parseAsString, useQueryState } from "nuqs";
 import { useCallback, useMemo, type ReactNode } from "react";
@@ -29,8 +32,10 @@ import { VerdictHeaderStrip } from "./verdictHeaderStrip";
  */
 export function VerdictTab({ expId }: { expId: string }) {
 	const { t } = useTranslation("bench");
+	const { t: tPage } = useTranslation("experimentPage");
 	const navigate = useNavigate();
 	const [grade, setGrade] = useQueryState("grade", parseAsString);
+	const [, setTab] = useQueryState("tab", parseAsString);
 	const verdict = useGetVerdictQuery(grade ? { expId, gradeSource: grade } : expId);
 	// The diagnostics come from the same analysis as the verdict, so they read the same grade source.
 	const diagnostics = useGetDiagnosticsQuery(grade ? { expId, gradeSource: grade } : expId);
@@ -53,6 +58,14 @@ export function VerdictTab({ expId }: { expId: string }) {
 	}, [grid.data]);
 
 	const openPair = useCallback((pairId: string) => void navigate({ href: compareHref(pairId, expId) }), [navigate, expId]);
+	const onNext = useCallback(
+		(action: Action) => {
+			if (action === "ship") void setTab("export");
+			else if (action === "fix_harness") void setTab("runs");
+			else void navigate({ to: "/compare", search: compareSearch(undefined, expId) as never });
+		},
+		[navigate, setTab, expId],
+	);
 
 	if (verdict.isLoading) return <VerdictSkeleton />;
 	if (verdict.isError || !verdict.data) {
@@ -73,6 +86,19 @@ export function VerdictTab({ expId }: { expId: string }) {
 	const tag = (testId: string, sealedOnly = false) => (
 		<GradeSourceTag source={source} judged={judged} sealedOnly={sealedOnly} testId={testId} />
 	);
+
+	const diagnosticsBody = (part: "conditions" | "meters") =>
+		diagnostics.isLoading ? (
+			<TableSkeleton testId={`verdict-${part}-loading`} />
+		) : diagnostics.isError || !diagnostics.data ? (
+			<ErrorState
+				message={t("verdict.diagnostics.loadError", { error: getBenchErrorMessage(diagnostics.error) })}
+				onRetry={diagnostics.refetch}
+				testId={`verdict-${part === "conditions" ? "diagnostics" : "meters"}-error`}
+			/>
+		) : (
+			<DiagnosticsTable diagnostics={diagnostics.data} arms={arms} metrics={metrics} part={part} />
+		);
 
 	return (
 		<div className="flex flex-col gap-6" data-testid="verdict-content" data-exp-id={payload.exp_id}>
@@ -98,85 +124,90 @@ export function VerdictTab({ expId }: { expId: string }) {
 				</p>
 			)}
 
-			<div className="flex flex-col gap-2">
-				<div className="flex justify-end">{tag("verdict-card-source")}</div>
-				<VerdictCard verdict={payload.verdict} metricLabel={metrics[payload.verdict.primary.metric]?.label} />
+			<VerdictSummary
+				verdict={payload.verdict}
+				arms={arms}
+				naive={payload.naive}
+				armMetrics={diagnostics.data?.arm_metrics}
+				onNext={onNext}
+			/>
+
+			<div className="flex flex-col gap-3">
+				<Disclosure
+					title={tPage("sections.guards")}
+					icon={Shield}
+					meta={guardMeta(payload.verdict.guards)}
+					testId="verdict-guards-section"
+				>
+					<GuardList guards={payload.verdict.guards} />
+				</Disclosure>
+
+				<Disclosure title={tPage("sections.gates")} icon={ListChecks} action={tag("verdict-gates-source", true)} testId="verdict-gates">
+					<GateChecklist gates={payload.gates} />
+				</Disclosure>
+
+				<Disclosure
+					title={tPage("sections.diagnostics")}
+					icon={Activity}
+					action={tag("verdict-diagnostics-source")}
+					testId="verdict-diagnostics"
+				>
+					{diagnosticsBody("conditions")}
+				</Disclosure>
+
+				<Disclosure title={tPage("sections.meters")} icon={Gauge} testId="verdict-meters">
+					{diagnosticsBody("meters")}
+				</Disclosure>
+
+				<Disclosure title={tPage("sections.statistics")} icon={Sigma} action={tag("verdict-card-source")} testId="verdict-statistics">
+					<VerdictCard verdict={payload.verdict} metricLabel={metrics[payload.verdict.primary.metric]?.label} showGuards={false} />
+				</Disclosure>
+
+				<Disclosure title={tPage("sections.changes")} icon={GitCompare} testId="verdict-config-diff">
+					<div className="grid grid-cols-1 items-start gap-4 lg:grid-cols-[minmax(0,2fr)_minmax(0,1fr)]">
+						<ConfigDiff changes={payload.config_diff} armLabels={arms.length === 2 ? { a: arms[0], b: arms[1] } : undefined} />
+						<div className="flex flex-col gap-2">
+							<div className="flex justify-end">{tag("verdict-naive-source")}</div>
+							<NaiveScoreboard naive={payload.naive} arms={arms} />
+						</div>
+					</div>
+				</Disclosure>
+
+				<Disclosure title={tPage("sections.policy")} icon={Scale} action={tag("verdict-policy-source")} testId="verdict-policy">
+					<PolicyScorecard policy={payload.policy} expId={payload.exp_id} metrics={metrics} runPairs={runPairs} onOpenPair={openPair} />
+				</Disclosure>
+
+				{/* W8 judge calibration: nothing for a verified suite */}
+				{payload.judge_calibration && <VerdictCalibration jc={payload.judge_calibration} />}
+
+				{/* The grid shows each run's sealed outcome; a regrade does not change it, and the tag says so. */}
+				<Disclosure title={tPage("sections.tasks")} icon={Table2} action={tag("verdict-grid-source", true)} testId="verdict-grid">
+					{grid.isLoading ? (
+						<TableSkeleton testId="verdict-grid-loading" />
+					) : grid.isError || !grid.data ? (
+						<ErrorState
+							message={t("verdict.grid.loadError", { error: getBenchErrorMessage(grid.error) })}
+							onRetry={grid.refetch}
+							testId="verdict-grid-error"
+						/>
+					) : (
+						<TaskGrid grid={grid.data} onOpenPair={openPair} suite={payload.suite} />
+					)}
+				</Disclosure>
 			</div>
-
-			<div className="grid grid-cols-1 items-start gap-4 lg:grid-cols-[minmax(0,2fr)_minmax(0,1fr)]">
-				<Section title={t("verdict.configDiff.title")} description={t("verdict.configDiff.description")} testId="verdict-config-diff">
-					<ConfigDiff changes={payload.config_diff} armLabels={arms.length === 2 ? { a: arms[0], b: arms[1] } : undefined} />
-				</Section>
-				<div className="flex flex-col gap-2">
-					<div className="flex justify-end">{tag("verdict-naive-source")}</div>
-					<NaiveScoreboard naive={payload.naive} arms={arms} />
-				</div>
-			</div>
-
-			<Section
-				title={t("policy.title")}
-				description={t("policy.description")}
-				testId="verdict-policy"
-				action={tag("verdict-policy-source")}
-			>
-				<PolicyScorecard policy={payload.policy} expId={payload.exp_id} metrics={metrics} runPairs={runPairs} onOpenPair={openPair} />
-			</Section>
-
-			<Section
-				title={t("verdict.gates.title")}
-				description={t("verdict.gates.description")}
-				testId="verdict-gates"
-				action={tag("verdict-gates-source", true)}
-			>
-				<GateChecklist gates={payload.gates} />
-			</Section>
-
-			{/* W8 judge calibration: nothing for a verified suite */}
-			{payload.judge_calibration && <VerdictCalibration jc={payload.judge_calibration} />}
-
-			<Section
-				title={t("verdict.diagnostics.title")}
-				description={t("verdict.diagnostics.description")}
-				testId="verdict-diagnostics"
-				action={tag("verdict-diagnostics-source")}
-			>
-				{diagnostics.isLoading ? (
-					<TableSkeleton testId="verdict-diagnostics-loading" />
-				) : diagnostics.isError || !diagnostics.data ? (
-					<ErrorState
-						message={t("verdict.diagnostics.loadError", { error: getBenchErrorMessage(diagnostics.error) })}
-						onRetry={diagnostics.refetch}
-						testId="verdict-diagnostics-error"
-					/>
-				) : (
-					<DiagnosticsTable diagnostics={diagnostics.data} arms={arms} metrics={metrics} />
-				)}
-			</Section>
-
-			{/* The grid shows each run's sealed outcome; a regrade does not change it, and the tag says so. */}
-			<Section
-				title={t("verdict.grid.title")}
-				description={t("verdict.grid.description")}
-				testId="verdict-grid"
-				action={tag("verdict-grid-source", true)}
-			>
-				{grid.isLoading ? (
-					<TableSkeleton testId="verdict-grid-loading" />
-				) : grid.isError || !grid.data ? (
-					<ErrorState
-						message={t("verdict.grid.loadError", { error: getBenchErrorMessage(grid.error) })}
-						onRetry={grid.refetch}
-						testId="verdict-grid-error"
-					/>
-				) : (
-					<TaskGrid grid={grid.data} onOpenPair={openPair} suite={payload.suite} />
-				)}
-			</Section>
 		</div>
 	);
 }
 
 const SEALED = "original";
+
+/** Guard counts for the closed Guards row: "2 pass, 1 fail". */
+function guardMeta(guards: { status: string }[]): string | undefined {
+	if (guards.length === 0) return undefined;
+	const counts = new Map<string, number>();
+	for (const guard of guards) counts.set(guard.status, (counts.get(guard.status) ?? 0) + 1);
+	return [...counts].map(([status, n]) => `${n} ${status}`).join(", ");
+}
 
 /** Which grades the verdict reads: the sealed ones, human reviews, or the regrade named in the URL. */
 function GradeSourcePicker({

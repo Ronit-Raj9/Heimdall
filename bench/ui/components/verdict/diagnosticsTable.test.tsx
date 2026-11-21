@@ -49,9 +49,10 @@ describe("DiagnosticsTable", () => {
 
 	it("renders the meters through ValueCell by kind, unknown hatched", () => {
 		const html = render();
-		expect(html).toContain(">Honesty<");
+		expect(html).toContain(">Quality<");
 		expect(html).toContain(">Safety<");
-		expect(html).toContain(">Efficiency<");
+		expect(html).toContain(">Cost<");
+		expect(html).toContain(">Effort<");
 		expect(html).toContain(">27.8%<");
 		expect(html).toContain(">$0.41<");
 		expect(html).toMatch(/data-state="unknown" data-kind="usd" data-testid="verdict-meter-meter-cost_per_verified_success-B"/);

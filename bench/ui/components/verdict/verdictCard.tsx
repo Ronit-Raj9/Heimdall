@@ -60,6 +60,8 @@ export interface VerdictCardProps {
 	verdict: Verdict;
 	/** Display label of the primary metric, from the catalog; the metric id when absent. */
 	metricLabel?: string;
+	/** False when the page shows the guards in their own section. */
+	showGuards?: boolean;
 	className?: string;
 }
 
@@ -68,7 +70,7 @@ export interface VerdictCardProps {
  * effect with its descriptive interval, discordant tasks, the exact p-value, the MDE, guards,
  * integrity and the one action.
  */
-export function VerdictCard({ verdict, metricLabel, className }: VerdictCardProps) {
+export function VerdictCard({ verdict, metricLabel, showGuards = true, className }: VerdictCardProps) {
 	const { t } = useTranslation("bench");
 	const locale = getLocale();
 	const tone = DECISION_TONE[verdict.decision];
@@ -163,7 +165,7 @@ export function VerdictCard({ verdict, metricLabel, className }: VerdictCardProp
 					)}
 				</dl>
 
-				<GuardList guards={verdict.guards} />
+				{showGuards && <GuardList guards={verdict.guards} />}
 
 				{verdict.invalid_reasons && verdict.invalid_reasons.length > 0 && (
 					<section className="flex flex-col gap-1" data-testid="verdict-invalid-reasons">
@@ -228,7 +230,7 @@ function PValue({ effect }: { effect: Effect | undefined }) {
 	return <>{formatPValue(effect.p_value, locale)}{sampled}</>;
 }
 
-function GuardList({ guards }: { guards: GuardResult[] }) {
+export function GuardList({ guards }: { guards: GuardResult[] }) {
 	const { t } = useTranslation("bench");
 	return (
 		<section className="flex flex-col gap-2" data-testid="verdict-guards">
