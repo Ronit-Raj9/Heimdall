@@ -9,26 +9,16 @@ import { useTranslation } from "react-i18next";
  * compare one agent at two git refs (gap lane G07). Each is a compact card; its form opens on demand.
  */
 export function CompareLaunch() {
-  const { t } = useTranslation("experimentActions");
-  const { t: tRefs } = useTranslation("refCompare");
-  return (
-    <div className="grid items-start gap-3 lg:grid-cols-2">
-      <ActionCard
-        icon={GitCompareArrows}
-        title={t("launch.title")}
-        description={t("launch.description")}
-        testId="compare-launch"
-      >
-        <MigrateForm testId="compare-launch-form" />
-      </ActionCard>
-      <ActionCard
-        icon={GitBranch}
-        title={tRefs("compare.title")}
-        description={tRefs("compare.description")}
-        testId="compare-launch-refs"
-      >
-        <CompareRefsForm testId="compare-launch-refs-form" />
-      </ActionCard>
-    </div>
-  );
+	const { t } = useTranslation("experimentActions");
+	const { t: tRefs } = useTranslation("refCompare");
+	return (
+		<div className="grid items-start gap-3 lg:grid-cols-2">
+			<ActionCard icon={GitCompareArrows} title={t("launch.title")} description={t("launch.description")} testId="compare-launch">
+				<MigrateForm testId="compare-launch-form" />
+			</ActionCard>
+			<ActionCard icon={GitBranch} title={tRefs("compare.title")} description={tRefs("compare.description")} testId="compare-launch-refs">
+				<CompareRefsForm testId="compare-launch-refs-form" />
+			</ActionCard>
+		</div>
+	);
 }

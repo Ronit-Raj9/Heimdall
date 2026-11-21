@@ -1,37 +1,37 @@
 {
-  "diff": {
-    "title": "Side by side",
-    "subtitle": "Rows that differ are highlighted.",
-    "field": "Field",
-    "differs": "Differs",
-    "same": "Same",
-    "outcome": "Outcome",
-    "steps": "Steps",
-    "tokens": "Tokens",
-    "cost": "Cost",
-    "time": "Wall time",
-    "output": "Final output",
-    "noOutput": "No final message",
-    "arm": "Arm {{arm}}",
-    "details": "Run details"
-  },
-  "launch": {
-    "pickTitle": "Pick a pair",
-    "pickSubtitle": "Choose a task to see its arms side by side.",
-    "newTitle": "Start a comparison",
-    "newSubtitle": "Run new arms instead of opening an existing pair."
-  },
-  "card": {
-    "open": "Set up",
-    "close": "Hide"
-  },
-  "actions": {
-    "intro": "Each action starts a new experiment in the background."
-  },
-  "analysis": {
-    "intro": "Re-run analysis on sealed runs. Views refresh when a job ends.",
-    "views": "Results",
-    "result": "Result",
-    "tools": "More tools"
-  }
+	"diff": {
+		"title": "Side by side",
+		"subtitle": "Rows that differ are highlighted.",
+		"field": "Field",
+		"differs": "Differs",
+		"same": "Same",
+		"outcome": "Outcome",
+		"steps": "Steps",
+		"tokens": "Tokens",
+		"cost": "Cost",
+		"time": "Wall time",
+		"output": "Final output",
+		"noOutput": "No final message",
+		"arm": "Arm {{arm}}",
+		"details": "Run details"
+	},
+	"launch": {
+		"pickTitle": "Pick a pair",
+		"pickSubtitle": "Choose a task to see its arms side by side.",
+		"newTitle": "Start a comparison",
+		"newSubtitle": "Run new arms instead of opening an existing pair."
+	},
+	"card": {
+		"open": "Set up",
+		"close": "Hide"
+	},
+	"actions": {
+		"intro": "Each action starts a new experiment in the background."
+	},
+	"analysis": {
+		"intro": "Re-run analysis on sealed runs. Views refresh when a job ends.",
+		"views": "Results",
+		"result": "Result",
+		"tools": "More tools"
+	}
 }
