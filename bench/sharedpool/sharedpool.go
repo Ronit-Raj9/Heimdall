@@ -121,6 +121,19 @@ type Assignment struct {
 	Runtime           string   `json:"runtime"`
 	MaxConcurrentRuns int      `json:"max_concurrent_runs"`
 	Images            []string `json:"images,omitempty"` // approved custom images
+	// Platform is the org's own cloud sandbox platform when it chose one as
+	// its default worker (bench/sandbox): the shared runner then runs the
+	// org's runs in that platform with the org's token instead of on its
+	// own Docker daemon. The token is the org's; the runner keeps it in
+	// memory only.
+	Platform *PlatformAssignment `json:"platform,omitempty"`
+}
+
+// PlatformAssignment is an org's default sandbox platform and credentials.
+type PlatformAssignment struct {
+	Name     string `json:"name"`
+	Token    string `json:"token"`
+	Endpoint string `json:"endpoint,omitempty"`
 }
 
 // Assignments is the answer of GET /api/bench/admin/pool/assignments.
@@ -137,6 +150,10 @@ type Service struct {
 	Images *ImageStore // nil: no custom images
 	// Orgs lists every org id.
 	Orgs func(ctx context.Context) ([]string, error)
+	// Platform returns an org's default sandbox platform, nil when the org
+	// runs on the shared worker. An org with one is served even without the
+	// shared pool: the compute is its own. nil: no platforms.
+	Platform func(ctx context.Context, orgID string) (*PlatformAssignment, error)
 
 	mu sync.Mutex // one mint at a time
 }
@@ -167,14 +184,20 @@ func (s *Service) Assignments(ctx context.Context, runtime string) (*Assignments
 			return nil, err
 		}
 		l = quota.Normalize(l)
-		if !l.SharedPool || (runtime != "" && l.Runtime != runtime) {
+		var plat *PlatformAssignment
+		if s.Platform != nil {
+			if plat, err = s.Platform(ctx, org); err != nil {
+				return nil, fmt.Errorf("org %s: worker platform: %w", org, err)
+			}
+		}
+		if (!l.SharedPool && plat == nil) || (runtime != "" && l.Runtime != runtime) {
 			continue
 		}
 		tok, err := s.EnsureToken(ctx, org)
 		if err != nil {
 			return nil, fmt.Errorf("org %s: %w", org, err)
 		}
-		a := Assignment{OrgID: org, Pool: Pool, Token: tok, Runtime: l.Runtime, MaxConcurrentRuns: l.MaxConcurrentRuns}
+		a := Assignment{OrgID: org, Pool: Pool, Token: tok, Runtime: l.Runtime, MaxConcurrentRuns: l.MaxConcurrentRuns, Platform: plat}
 		if s.Images != nil && l.AllowCustomImages {
 			if a.Images, err = s.Images.Approved(ctx, org); err != nil {
 				return nil, err

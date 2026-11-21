@@ -117,10 +117,11 @@ func fetchAssignments(ctx context.Context, c *http.Client, server, secret, runti
 
 // sharedLoop is one org's worker loop.
 type sharedLoop struct {
-	token  string
-	slots  int
-	cancel context.CancelFunc
-	done   chan struct{}
+	token    string
+	slots    int
+	platform string // platformKey of the assignment's platform; "" on the runner's Docker
+	cancel   context.CancelFunc
+	done     chan struct{}
 }
 
 // sharedSlots is the slot count for one assignment.
@@ -134,7 +135,7 @@ func sharedSlots(max, flagSlots int) int {
 // reconcileShared starts, restarts and stops loops so that exactly the
 // assigned orgs run. start begins one org's loop.
 func reconcileShared(loops map[string]*sharedLoop, as *sharedpool.Assignments, flagSlots int,
-	start func(org, token string, slots int) *sharedLoop) {
+	start func(a sharedpool.Assignment, slots int) *sharedLoop) {
 	want := map[string]sharedpool.Assignment{}
 	if !as.KillSwitch {
 		for _, a := range as.Assignments {
@@ -143,7 +144,7 @@ func reconcileShared(loops map[string]*sharedLoop, as *sharedpool.Assignments, f
 	}
 	for org, l := range loops {
 		a, ok := want[org]
-		if ok && a.Token == l.token && sharedSlots(a.MaxConcurrentRuns, flagSlots) == l.slots {
+		if ok && a.Token == l.token && sharedSlots(a.MaxConcurrentRuns, flagSlots) == l.slots && platformKey(a.Platform) == l.platform {
 			continue
 		}
 		l.cancel()
@@ -152,7 +153,7 @@ func reconcileShared(loops map[string]*sharedLoop, as *sharedpool.Assignments, f
 	}
 	for org, a := range want {
 		if _, ok := loops[org]; !ok {
-			loops[org] = start(org, a.Token, sharedSlots(a.MaxConcurrentRuns, flagSlots))
+			loops[org] = start(a, sharedSlots(a.MaxConcurrentRuns, flagSlots))
 		}
 	}
 }
@@ -179,9 +180,10 @@ func runSharedRunner(args []string) int {
 		prefix = "shared-" + host
 	}
 	var wg sync.WaitGroup
-	start := func(org, token string, slots int) *sharedLoop {
+	start := func(as sharedpool.Assignment, slots int) *sharedLoop {
+		org, token := as.OrgID, as.Token
 		lctx, cancel := context.WithCancel(ctx)
-		l := &sharedLoop{token: token, slots: slots, cancel: cancel, done: make(chan struct{})}
+		l := &sharedLoop{token: token, slots: slots, platform: platformKey(as.Platform), cancel: cancel, done: make(chan struct{})}
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
@@ -191,11 +193,21 @@ func runSharedRunner(args []string) int {
 				name = name[:128]
 			}
 			reg, root := sharedOrgProject(lctx, a, org)
+			labels := []string{"shared", "runtime=" + f.runtime}
+			if as.Platform != nil { // X19a: the org's own sandbox platform runs its runs
+				pr, err := sandboxRegistry(lctx, a, reg, as.Platform)
+				if err != nil {
+					a.logger.Error("shared runner: org's worker platform not usable; its runs wait", "org", org, "platform", as.Platform.Name, "error", err.Error())
+					return
+				}
+				reg = pr
+				labels = append(labels, "platform="+as.Platform.Name)
+			}
 			plan := engine.NewPlanner(reg, root, a.logger, engine.WithIgnoreQuarantine(), engine.WithoutGPUCheck(), engine.WithAgentLibrary(suite.LibraryDir())).Plan
 			w, err := engine.NewWorker(reg, engine.NewPipeline(reg, root, a.logger),
 				sharedEnsureImages(a, reg, root, plan),
 				engine.WorkerOptions{Server: f.server, Token: token, WorkerID: name, Host: host, Version: benchVersion,
-					Slots: slots, Logger: a.logger, Pool: sharedpool.Pool, Labels: []string{"shared", "runtime=" + f.runtime},
+					Slots: slots, Logger: a.logger, Pool: sharedpool.Pool, Labels: labels,
 					Jobs: newRunnerJobExecutor(a)}) // gap G05: hosted CLI jobs (runnerjob.go)
 			if err != nil {
 				a.logger.Error("shared runner: worker not started", "org", org, "error", err.Error())

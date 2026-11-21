@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"strings"
 	"testing"
 
 	"github.com/maximhq/bifrost/bench/handlers"
@@ -47,10 +48,10 @@ func TestKillSwitchBlocksLeases(t *testing.T) {
 func TestReconcileShared(t *testing.T) {
 	loops := map[string]*sharedLoop{}
 	started := 0
-	start := func(org, token string, slots int) *sharedLoop {
+	start := func(a sharedpool.Assignment, slots int) *sharedLoop {
 		started++
 		d := make(chan struct{})
-		l := &sharedLoop{token: token, slots: slots, done: d}
+		l := &sharedLoop{token: a.Token, slots: slots, platform: platformKey(a.Platform), done: d}
 		l.cancel = func() { close(d) }
 		return l
 	}
@@ -62,6 +63,19 @@ func TestReconcileShared(t *testing.T) {
 	reconcileShared(loops, as, 2, start)
 	if started != 2 {
 		t.Fatal("restarted unchanged loops")
+	}
+	// X19a: choosing or changing a platform restarts that org's loop only.
+	as.Assignments[1].Platform = &sharedpool.PlatformAssignment{Name: "modal", Token: "ak:as"}
+	reconcileShared(loops, as, 2, start)
+	if started != 3 || loops["b"].platform == "" {
+		t.Fatalf("platform change: started %d, loop %+v", started, loops["b"])
+	}
+	reconcileShared(loops, as, 2, start)
+	if started != 3 {
+		t.Fatal("restarted an unchanged platform loop")
+	}
+	if strings.Contains(loops["b"].platform, "ak:as") {
+		t.Fatal("the loop key holds the token")
 	}
 	reconcileShared(loops, &sharedpool.Assignments{KillSwitch: true}, 2, start)
 	if len(loops) != 0 {

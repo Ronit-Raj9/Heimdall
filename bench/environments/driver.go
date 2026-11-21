@@ -94,6 +94,29 @@ func DriverOf(env schemas.Environment) string {
 	return DriverDocker
 }
 
+// Placement is a Driver that runs another driver's plan on other
+// infrastructure, unchanged: the cloud sandbox drivers (bench/sandbox) run
+// the docker_workspace plan (same images, same workspace seed, same diff
+// export) in an organization's Modal, Daytona or E2B account. The manifest
+// freezes the plan identity, so a server that planned an experiment for
+// Docker and a worker that runs it in a sandbox agree on its hash; where it
+// actually ran is recorded in the run folder (sandbox.json). Its refusals
+// still apply when the experiment is planned.
+type Placement interface {
+	Driver
+	// PlansAs is the driver whose plan this one runs (DriverDocker).
+	PlansAs() string
+}
+
+// PlanIdentity is the driver name an experiment planned for env freezes:
+// PlansAs for a Placement, DriverOf otherwise.
+func PlanIdentity(env schemas.Environment) string {
+	if p, ok := env.(Placement); ok {
+		return p.PlansAs()
+	}
+	return DriverOf(env)
+}
+
 // FrozenDriver is the driver an experiment's manifest froze: its
 // environment.driver, or docker when unset (every manifest recorded before
 // the seam, and every Docker experiment since, which keeps their hashes).
@@ -133,7 +156,7 @@ func PlanDriver(envs []schemas.Environment, suite *schemas.Suite, exp *schemas.E
 	if env == nil {
 		return exp.Environment, nil // checkParts reports the missing environment
 	}
-	driver := DriverOf(env)
+	driver := PlanIdentity(env)
 	if exp.Environment != nil && exp.Environment.Driver != "" && exp.Environment.Driver != driver {
 		return nil, fmt.Errorf("experiment asks for the %s driver, but this bench is configured for the %s driver (environment.driver in bench.yaml)", exp.Environment.Driver, driver)
 	}

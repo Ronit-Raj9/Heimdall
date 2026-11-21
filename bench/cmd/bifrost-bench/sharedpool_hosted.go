@@ -70,6 +70,7 @@ func sharedPoolService(env *hostedEnv, q quota.Store, images *sharedpool.ImageSt
 	}
 	d := env.db
 	return &sharedpool.Service{Quota: q, Keys: keys, Minter: runnersOf(env).svc, Images: images,
+		Platform: platformAssignment(platformConnections(env)), // X19a: an org's own sandbox platform (workerplatforms_hosted.go)
 		Orgs: func(ctx context.Context) ([]string, error) {
 			rows, err := d.Query(ctx, `SELECT id FROM orgs ORDER BY id`)
 			if err != nil {
