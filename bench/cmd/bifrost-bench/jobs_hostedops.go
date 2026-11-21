@@ -476,7 +476,7 @@ func checkExperiment(agent, suite, task string) *schemas.Experiment {
 		Base:  agent,
 		Arms: map[string]schemas.ArmSpec{
 			"A": {Label: "check"},
-			"B": {Label: "check (repeat)"},
+			"B": {Label: "check (repeat)", Set: map[string]any{"env.HEIMDALL_CHECK_ARM": "B"}}, // the planner refuses identical arms
 		},
 		Primary:          schemas.Endpoint{Condition: schemas.ConditionClean, Metric: "verified_success"},
 		Guards:           []schemas.GuardSpec{{Rule: "no_new_integrity_violation"}},
