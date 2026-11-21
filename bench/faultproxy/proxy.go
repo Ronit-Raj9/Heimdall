@@ -268,17 +268,21 @@ func (s *Server) serveData(w http.ResponseWriter, r *http.Request) {
 	d := s.plans.beginModel(slot.name, kind, requestModel(p, r, kind, body)) // W9: the model lets a plan fail one target
 	e.Slot, e.RunID, e.Call, e.Stream = slot.name, d.RunID, d.Call, req.Stream
 	switch {
+	case d.Unpersisted != nil: // QC2-13-02: fail closed when the slot's progress cannot survive a restart
+		s.logger.Error("fault plan state not persisted; refusing the request", "slot", slot.name, "err", d.Unpersisted)
+		s.writeError(sw, p.Format, http.StatusServiceUnavailable, errUpstream, "fault proxy could not persist its plan state")
+		e.Action = ActionReject
 	case d.Inject:
 		s.writeFault(sw, p, d)
 		e.Action, e.Nonce = ActionInject, d.Nonce
+	case d.Cut && req.Stream: // Safety probes area (S1): stream_cut; before scripted, which answerCut also serves (QC2-13-01)
+		s.answerCut(sw, r, p, kind, slot.name, body, e, d)
+		return
 	case d.Scripted:
 		e.Action, e.Upstream = ActionPass, schemas.LedgerUpstreamScripted
 		upstreamStart := time.Now()
 		s.answerScripted(sw, r, p, kind, slot.name, body, e)
 		e.UpstreamMS = float64(time.Since(upstreamStart).Microseconds()) / 1000
-	case d.Cut && req.Stream: // Safety probes area (S1): stream_cut
-		s.answerCut(sw, r, p, kind, slot.name, body, e, d)
-		return
 	default:
 		e.Action = ActionPass
 		upstreamStart := time.Now()

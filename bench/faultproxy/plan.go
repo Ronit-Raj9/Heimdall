@@ -51,7 +51,7 @@ const (
 const (
 	ActionPass   = "pass"
 	ActionInject = "inject"
-	ActionReject = "reject" // unknown credential; never tied to a run
+	ActionReject = "reject" // unknown credential (never tied to a run), or a request refused for unpersisted plan state
 )
 
 // ValidatePlan checks a fault plan before it is bound to a slot. An empty mode
@@ -130,6 +130,10 @@ type decision struct {
 	RetryAfterS int
 	Scripted    bool // the run is bound to ModeScripted: answer from the scripted model, never upstream
 	Cut         bool // ModeStreamCut takes this call: a streamed answer is cut after its first tool-call delta
+	// Unpersisted is set when the slot's advanced counters could not be
+	// written to the plan file (QC2-13-02): the request is refused, since a
+	// restart would replay the call numbers and could fire a fault twice.
+	Unpersisted error
 }
 
 func newPlanTable() *planTable {
@@ -160,26 +164,59 @@ func (t *planTable) clear(slot string) error {
 // so a plan the proxy acknowledged survives a restart. When the write fails
 // nothing changes. Called with t.mu held.
 func (t *planTable) commitLocked(slot string, st *slotState) error {
-	if t.path != "" {
-		plans := map[string]schemas.FaultPlan{}
-		for name, cur := range t.slots {
-			if cur.hasPlan && name != slot {
-				plans[name] = cur.plan
-			}
+	prev, had := t.slots[slot]
+	t.slots[slot] = st
+	if err := t.persistLocked(); err != nil {
+		if had {
+			t.slots[slot] = prev
+		} else {
+			delete(t.slots, slot)
 		}
-		if st.hasPlan {
-			plans[slot] = st.plan
-		}
-		if err := writePlans(t.path, plans); err != nil {
-			return fmt.Errorf("persist fault plans: %w", err)
+		return err
+	}
+	return nil
+}
+
+// persistedSlot is one slot's record in the plan file: the plan and, since
+// QC2-13-02, its run's progress, so a restart neither fires a one-shot
+// fault again nor serves the scripted tool turn twice.
+type persistedSlot struct {
+	Plan       schemas.FaultPlan `json:"plan"`
+	Calls      int               `json:"calls,omitempty"`
+	ModelCalls int               `json:"model_calls,omitempty"`
+	AudioCalls int               `json:"audio_calls,omitempty"`
+	ToolServed bool              `json:"tool_served,omitempty"`
+}
+
+// planFile is the plan file's current format. Older files are a bare map
+// of slot to plan (no progress), read by loadPlanTable as such.
+type planFile struct {
+	Version int                      `json:"version"`
+	Slots   map[string]persistedSlot `json:"slots"`
+}
+
+const planFileVersion = 2
+
+// persistLocked writes every bound plan with its counters to t.path.
+// Called with t.mu held.
+func (t *planTable) persistLocked() error {
+	if t.path == "" {
+		return nil
+	}
+	f := planFile{Version: planFileVersion, Slots: map[string]persistedSlot{}}
+	for name, cur := range t.slots {
+		if cur.hasPlan {
+			f.Slots[name] = persistedSlot{Plan: cur.plan, Calls: cur.calls, ModelCalls: cur.modelCalls, AudioCalls: cur.audioCalls, ToolServed: cur.toolServed}
 		}
 	}
-	t.slots[slot] = st
+	if err := writePlans(t.path, f); err != nil {
+		return fmt.Errorf("persist fault plans: %w", err)
+	}
 	return nil
 }
 
 // writePlans replaces the plan file atomically.
-func writePlans(path string, plans map[string]schemas.FaultPlan) error {
+func writePlans(path string, plans any) error {
 	b, err := json.Marshal(plans)
 	if err != nil {
 		return err
@@ -206,8 +243,9 @@ func writePlans(path string, plans map[string]schemas.FaultPlan) error {
 }
 
 // loadPlanTable returns a plan table that persists to path, holding the
-// plans a previous proxy process bound (3-B-01). Call counters start again
-// at zero. A plan file that cannot be read or holds an invalid plan is an
+// plans a previous proxy process bound (3-B-01) with their call counters and
+// scripted progress (QC2-13-02; a file of the older format restores plans
+// with counters at zero). A plan file that cannot be read or holds an invalid plan is an
 // error: starting without it could forward a scripted run's calls.
 func loadPlanTable(path string) (*planTable, error) {
 	t := newPlanTable()
@@ -222,15 +260,36 @@ func loadPlanTable(path string) (*planTable, error) {
 	if err != nil {
 		return nil, fmt.Errorf("read fault plans %s: %w", path, err)
 	}
-	var plans map[string]schemas.FaultPlan
-	if err := json.Unmarshal(b, &plans); err != nil {
-		return nil, fmt.Errorf("fault plans %s: %w", path, err)
+	var head struct {
+		Version int `json:"version"`
 	}
-	for slot, p := range plans {
-		if err := ValidatePlan(p); err != nil {
+	slots := map[string]persistedSlot{}
+	if json.Unmarshal(b, &head) == nil && head.Version != 0 {
+		if head.Version != planFileVersion {
+			return nil, fmt.Errorf("fault plans %s: unknown format version %d", path, head.Version)
+		}
+		var f planFile
+		if err := json.Unmarshal(b, &f); err != nil {
+			return nil, fmt.Errorf("fault plans %s: %w", path, err)
+		}
+		slots = f.Slots
+	} else {
+		var plans map[string]schemas.FaultPlan
+		if err := json.Unmarshal(b, &plans); err != nil {
+			return nil, fmt.Errorf("fault plans %s: %w", path, err)
+		}
+		for slot, p := range plans {
+			slots[slot] = persistedSlot{Plan: p}
+		}
+	}
+	for slot, ps := range slots {
+		if err := ValidatePlan(ps.Plan); err != nil {
 			return nil, fmt.Errorf("fault plans %s: slot %s: %w", path, slot, err)
 		}
-		t.slots[slot] = &slotState{plan: p, hasPlan: true}
+		if ps.Calls < 0 || ps.ModelCalls < 0 || ps.AudioCalls < 0 {
+			return nil, fmt.Errorf("fault plans %s: slot %s: negative call counter", path, slot)
+		}
+		t.slots[slot] = &slotState{plan: ps.Plan, hasPlan: true, calls: ps.Calls, modelCalls: ps.ModelCalls, audioCalls: ps.AudioCalls, toolServed: ps.ToolServed}
 	}
 	return t, nil
 }
@@ -254,11 +313,27 @@ func (t *planTable) get(slot string) (schemas.FaultPlan, bool) {
 // ledger call number still counts every message call of the slot.
 func (t *planTable) begin(slot, kind string) decision { return t.beginModel(slot, kind, "") }
 
-// beginModel is begin for a request whose model is known (W9).
+// beginModel is begin for a request whose model is known (W9). A counted
+// call of a bound plan is persisted before it is decided (QC2-13-02); when
+// that write fails the counters roll back and the decision carries
+// Unpersisted, which the proxy refuses.
 func (t *planTable) beginModel(slot, kind, model string) decision {
 	t.mu.Lock()
 	defer t.mu.Unlock()
 	st := t.state(slot)
+	before := *st
+	d := t.decideLocked(st, kind, model)
+	if st.hasPlan && (st.calls != before.calls || st.modelCalls != before.modelCalls || st.audioCalls != before.audioCalls) {
+		if err := t.persistLocked(); err != nil {
+			*st = before
+			return decision{RunID: d.RunID, Nonce: d.Nonce, Scripted: d.Scripted, Unpersisted: err}
+		}
+	}
+	return d
+}
+
+// decideLocked counts the request on st and decides. Called with t.mu held.
+func (t *planTable) decideLocked(st *slotState, kind, model string) decision {
 	d := decision{RunID: st.plan.RunID, Nonce: st.plan.Nonce, Scripted: st.plan.Mode == ModeScripted || st.plan.Scripted}
 	if kind == KindAudio { // X8 voice agents: audio counts only for a plan aimed at its model
 		st.audioCalls++
@@ -307,6 +382,12 @@ func (t *planTable) takeToolTurn(slot string) bool {
 		return false
 	}
 	st.toolServed = true
+	if st.hasPlan {
+		if err := t.persistLocked(); err != nil { // QC2-13-02: an unrecorded tool turn could repeat after a restart
+			st.toolServed = false
+			return false
+		}
+	}
 	return true
 }
 

@@ -52,6 +52,9 @@ func (d *Driver) checkFrozenRoles(ctx context.Context, rc *schemas.RunContext) e
 	if rc == nil || rc.Manifest == nil || len(rc.Manifest.SuiteImages) == 0 {
 		return nil
 	}
+	if err := d.checkRoleSet(ctx, rc); err != nil {
+		return err
+	}
 	tags := d.roleTags(rc)
 	roles := make([]string, 0, len(tags))
 	for role := range tags {
@@ -71,6 +74,40 @@ func (d *Driver) checkFrozenRoles(ctx context.Context, rc *schemas.RunContext) e
 		if got != want {
 			return fmt.Errorf("%s image %s is now %s but experiment %s was planned with %s; restore that image or plan a new experiment",
 				role, tags[role], got, rc.Manifest.ExpID, want)
+		}
+	}
+	return nil
+}
+
+// checkRoleSet refuses a run whose evaluator roles differ from the planned
+// ones (QC2-10-10): checkFrozenRoles only compares roles both sides have, so
+// a helper configured or removed after planning, or a collector turned on
+// or off, would otherwise start an evaluator image the manifest never froze.
+// A role added since planning whose tag cannot be inspected now is left to
+// the warning path, as an uninspectable frozen role is; a manifest with no
+// frozen ids at all is not checked (the caller returns before).
+func (d *Driver) checkRoleSet(ctx context.Context, rc *schemas.RunContext) error {
+	frozen := rc.Manifest.SuiteImages
+	collector := d.cfg.EventsCollector && d.cfg.CollectorImage != ""
+	localHelper := ""
+	if r, ok := d.cfg.Local.(interface{ ImageRoles() map[string]string }); ok {
+		localHelper = r.ImageRoles()[suite.ImageHelper]
+	}
+	refuse := func(what string) error {
+		return fmt.Errorf("%s since experiment %s was planned; restore the planned configuration or plan a new experiment", what, rc.Manifest.ExpID)
+	}
+	switch {
+	case frozen[suite.ImageHelper] != "" && d.cfg.HelperImage == "" && localHelper == "":
+		return refuse("kubernetes.helper_image was removed (the run would use the suite base image as its helper)")
+	case d.cfg.HelperImage != "" && frozen[suite.ImageHelper] == "" && frozen[suite.ImageBase] != "":
+		if id, err := d.ImageID(ctx, d.cfg.HelperImage); err == nil && id != "" {
+			return refuse("helper image " + d.cfg.HelperImage + " was configured (the plan used the suite base image as its helper)")
+		}
+	case frozen[roleCollector] != "" && !collector:
+		return refuse("the agent event collector was turned off")
+	case collector && frozen[roleCollector] == "":
+		if id, err := d.ImageID(ctx, d.cfg.CollectorImage); err == nil && id != "" {
+			return refuse("the agent event collector " + d.cfg.CollectorImage + " was turned on")
 		}
 	}
 	return nil

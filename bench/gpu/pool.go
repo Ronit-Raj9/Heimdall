@@ -3,6 +3,7 @@ package gpu
 import (
 	"context"
 	"fmt"
+	"slices"
 	"strings"
 	"sync"
 
@@ -127,6 +128,41 @@ func (p *Pool) Acquire(ctx context.Context, req *schemas.GPURequest) (*schemas.G
 			}
 		}
 		if len(picked) == count {
+			for _, g := range picked {
+				p.busy[g.UUID] = true
+			}
+			p.mu.Unlock()
+			var once sync.Once
+			release := func() { once.Do(func() { p.release(picked) }) }
+			return &schemas.GPUAssignment{Mode: p.mode, GPUs: picked, SampleMS: p.sampleMS, SMI: p.smi}, release, nil
+		}
+		wait := p.changed
+		p.mu.Unlock()
+		select {
+		case <-ctx.Done():
+			return nil, func() {}, ctx.Err()
+		case <-wait:
+		}
+	}
+}
+
+// AcquireDevices takes exactly the GPUs with the given UUIDs, waiting while
+// any of them is held: a remote worker runs a lease on the devices the
+// coordinator reserved for it, never on others its own first fit would pick
+// (QC2-10-09). A UUID the pool does not have is an error.
+func (p *Pool) AcquireDevices(ctx context.Context, uuids []string) (*schemas.GPUAssignment, func(), error) {
+	var picked []schemas.GPUInfo
+	for _, id := range uuids {
+		i := slices.IndexFunc(p.devs, func(g schemas.GPUInfo) bool { return g.UUID == id })
+		if i < 0 {
+			return nil, func() {}, fmt.Errorf("gpu %s is not in this machine's pool", id)
+		}
+		picked = append(picked, p.devs[i])
+	}
+	for {
+		p.mu.Lock()
+		free := !slices.ContainsFunc(picked, func(g schemas.GPUInfo) bool { return p.busy[g.UUID] })
+		if free {
 			for _, g := range picked {
 				p.busy[g.UUID] = true
 			}

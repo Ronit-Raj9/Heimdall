@@ -44,6 +44,7 @@ func TestModelFidelityRouted(t *testing.T) {
 		{"model outside the policy fires", rc(chain), []schemas.GatewayRequest{row("r1", "opus", 0)}, true, []string{"r1"}, "1 served by a model outside the routing policy"},
 		{"fallback without declared fallbacks fires", rc(split), []schemas.GatewayRequest{row("r1", "cheap", 1)}, true, []string{"r1"}, "1 undeclared fallback"},
 		{"cache hit fires", rc(chain), []schemas.GatewayRequest{cached}, true, []string{"c1"}, "1 cache hit"},
+		{"cache hit on a routed semantic cache arm is intended (QC2-12-01)", cacheArm(rc(chain)), []schemas.GatewayRequest{cached}, false, nil, ""},
 	}
 	g := newModelFidelityGate()
 	for _, c := range cases {
@@ -57,6 +58,12 @@ func TestModelFidelityRouted(t *testing.T) {
 			}
 		})
 	}
+}
+
+// cacheArm turns on Bifrost's semantic cache for rc's arm.
+func cacheArm(rc *schemas.RunContext) *schemas.RunContext {
+	rc.Agent.Gateway.Bifrost = &schemas.BifrostFeatures{SemanticCache: &schemas.BifrostSemanticCache{}}
+	return rc
 }
 
 // TestModelFidelityComplexityRouterDefaultModel is 8-B-01: a complexity

@@ -356,15 +356,39 @@ func TestEnvFileOrderAndRaw(t *testing.T) {
 		"compose.yaml": "services:\n  app:\n    image: x\n    working_dir: /a\n    x-heimdall: {workspace: true}\n  db:\n    image: x\n    environment: {E: explicit}\n    env_file: [a.env, b.env, {path: r.env, format: raw}]\n",
 		"a.env":        "A=first\nE=from-a\nK=keep\n",
 		"b.env":        "A=second\n",
-		"r.env":        "R=\"q\\n\" # x\n",
+		"r.env":        "R=\"q\\n\" # x\nT=word  \t\n",
 	})
 	res, err := Expand(dir, "compose.yaml", nil, Options{})
 	if err != nil {
 		t.Fatal(err)
 	}
-	want := map[string]string{"A": "second", "E": "explicit", "K": "keep", "R": `"q\n" # x`}
+	want := map[string]string{"A": "second", "E": "explicit", "K": "keep", "R": `"q\n" # x`, "T": "word  \t"} // QC2-10-06: trailing blanks kept
 	if db := res.Services[0]; len(res.Refused()) != 0 || !reflect.DeepEqual(db.Env, want) {
 		t.Fatalf("db env %q findings %v", db.Env, res.Findings)
+	}
+}
+
+// QC2-10-04: command: null and entrypoint: null keep the image's defaults,
+// like omitted keys; an explicit empty list is still an override.
+func TestNullCommandKeepsImageDefaults(t *testing.T) {
+	dir := writeTask(t, map[string]string{
+		"compose.yaml": "services:\n  app:\n    image: x\n    working_dir: /a\n    x-heimdall: {workspace: true}\n  db:\n    image: x\n    command: null\n    entrypoint: ~\n  e:\n    image: x\n    entrypoint: []\n",
+	})
+	p, err := Parse(dir, "compose.yaml", Options{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, s := range p.Services {
+		switch s.Name {
+		case "db":
+			if s.HasCommand || s.HasEntrypoint {
+				t.Fatalf("null set an override: %+v", s)
+			}
+		case "e":
+			if !s.HasEntrypoint {
+				t.Fatalf("explicit empty entrypoint lost: %+v", s)
+			}
+		}
 	}
 }
 

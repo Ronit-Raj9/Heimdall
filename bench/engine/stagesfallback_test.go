@@ -18,6 +18,8 @@ func TestGatewayIntegrityDeclaredFallback(t *testing.T) {
 	declared.Gateway.Routing = &schemas.RoutingPolicy{Strategy: schemas.RoutingFallbackChain,
 		Targets: []schemas.RouteTarget{{Model: "gpt-4o", Weight: 1}}, Fallbacks: []schemas.RouteTarget{{Model: "claude-haiku-4-5"}}}
 	plain := &schemas.AgentConfig{Model: "gpt-4o"}
+	legacy := &schemas.AgentConfig{Model: "gpt-4o"} // QC2-12-06: the older gateway.fallbacks declaration
+	legacy.Gateway.Fallbacks = []string{"anthropic/claude-haiku-4-5"}
 	for _, tc := range []struct {
 		name   string
 		agent  *schemas.AgentConfig
@@ -26,6 +28,7 @@ func TestGatewayIntegrityDeclaredFallback(t *testing.T) {
 	}{
 		{"declared", declared, schemas.EventFallback, schemas.EventStatusSuccess},
 		{"undeclared", plain, schemas.EventIntegrity, schemas.EventStatusError},
+		{"legacy gateway.fallbacks", legacy, schemas.EventFallback, schemas.EventStatusSuccess},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			evs := gatewayIntegrityEvents(&schemas.RunContext{Run: run, Agent: tc.agent}, log)

@@ -3,7 +3,6 @@ package engine
 import (
 	"errors"
 	"fmt"
-	"slices"
 	"strings"
 
 	"github.com/maximhq/bifrost/bench/schemas"
@@ -51,11 +50,15 @@ func (p *Planner) checkTaskTeams(arms map[string]schemas.ArmManifest, suite *sch
 					continue
 				}
 				team := utils.TeamOf(&schemas.RunContext{Agent: &cfg, Task: task})
-				if len(team) == 0 || !slices.Equal(utils.TeamIDs(team), utils.TeamIDs(task.Team)) {
+				if !taskTeamSelected(&cfg, team) { // QC2-12-07: the arm's own team wins, even with the task's member ids
 					continue
 				}
 				if cfg.Gateway.Routing != nil { // 3-A-05: the policy would bind the lead's key only
 					errs = append(errs, fmt.Errorf("arm %s, task %s: gateway.routing cannot be combined with the task's team: the policy applies to the lead's key only, not per member; set topology single or leave the task out", armID, id))
+					continue
+				}
+				if cfg.Gateway.Bifrost != nil && cfg.Gateway.Bifrost.MCP != nil { // QC2-12-05: one run-level MCP key and route would serve every member
+					errs = append(errs, fmt.Errorf("arm %s, task %s: gateway.bifrost.mcp cannot be combined with the task's team: serving MCP through Bifrost to a team is not built (members would share one MCP key and route); set topology single or leave the task out", armID, id))
 					continue
 				}
 				if err := ValidateTeam(team, task); err != nil {
@@ -81,6 +84,13 @@ func (p *Planner) checkTaskTeams(arms map[string]schemas.ArmManifest, suite *sch
 		}
 	}
 	return errors.Join(errs...)
+}
+
+// taskTeamSelected reports whether team, the effective team of a run of cfg
+// (utils.TeamOf), is the task's own team: there is one, and the arm config
+// declares none of its own (an arm team always wins, whatever its ids).
+func taskTeamSelected(cfg *schemas.AgentConfig, team []schemas.TeamMember) bool {
+	return len(team) > 0 && len(cfg.Team) == 0
 }
 
 // checkTeamCombos refuses, at plan time, every slot whose effective team

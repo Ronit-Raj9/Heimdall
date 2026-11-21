@@ -38,3 +38,40 @@ func TestClassifyCleanup(t *testing.T) {
 		}
 	}
 }
+
+// QC2-10-02: with an install id, another install's namespaces under the same
+// default prefix are never selected, an old one of this install is, and an
+// unlabelled (legacy) one only when this install's store shows it ended.
+func TestClassifyCleanupInstallOwner(t *testing.T) {
+	now := time.Date(2026, 11, 21, 12, 0, 0, 0, time.UTC)
+	old := now.Add(-48 * time.Hour).Format(time.RFC3339)
+	ns := func(name, run, install string) Namespace {
+		l := map[string]string{LabelBench: "1", LabelRun: run, LabelRole: RoleRun}
+		if install != "" {
+			l[LabelInstall] = install
+		}
+		return Namespace{Metadata: ObjectMeta{Name: name, CreationTimestamp: old, Labels: l}}
+	}
+	items := []Namespace{
+		ns("heimdall-run-r-mine", "r_mine", "me"),
+		ns("heimdall-run-r-theirs", "r_theirs", "them"),
+		ns("heimdall-run-r-legacy", "r_legacy", ""),
+		ns("heimdall-run-r-legacy-dead", "r_legacy_dead", ""),
+	}
+	got := map[string]bool{}
+	for _, v := range ClassifyCleanup(items, CleanupInput{Prefix: "heimdall-run", Install: "me", Dead: map[string]bool{"r_legacy_dead": true}, Grace: 6 * time.Hour, Now: now}) {
+		got[v.Namespace.Metadata.Name] = v.Remove
+	}
+	want := map[string]bool{"heimdall-run-r-mine": true, "heimdall-run-r-legacy": false, "heimdall-run-r-legacy-dead": true}
+	if len(got) != len(want) {
+		t.Fatalf("selected %v", got)
+	}
+	for k, v := range want {
+		if got[k] != v {
+			t.Fatalf("%s remove=%v, want %v", k, got[k], v)
+		}
+	}
+	if id := InstallID("/srv/a"); len(id) != 16 || id == InstallID("/srv/b") {
+		t.Fatalf("install ids %q", id)
+	}
+}

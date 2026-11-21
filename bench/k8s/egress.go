@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"maps"
 	"net/url"
 	"sort"
 	"strconv"
@@ -129,7 +130,7 @@ func (d *Driver) RunEgressProbe(ctx context.Context, policy bool, targets []prob
 	ns := NamespaceFor(d.cfg.NamespacePrefix, "check-"+id)
 	labels := map[string]string{LabelBench: "1", LabelRole: RoleCheck}
 	rep := &EgressReport{Namespace: ns, Policy: policy, Results: map[string]string{}}
-	if err := d.cfg.Client.Create(ctx, "/api/v1/namespaces", Namespace{APIVersion: "v1", Kind: "Namespace", Metadata: ObjectMeta{Name: ns, Labels: labels}}, nil); err != nil {
+	if err := d.cfg.Client.Create(ctx, "/api/v1/namespaces", Namespace{APIVersion: "v1", Kind: "Namespace", Metadata: ObjectMeta{Name: ns, Labels: d.ownedLabels(maps.Clone(labels))}}, nil); err != nil {
 		return nil, fmt.Errorf("probe namespace: %w", err)
 	}
 	defer func() {

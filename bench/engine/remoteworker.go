@@ -276,7 +276,19 @@ func (w *Worker) Work(ctx context.Context, lease *schemas.WorkerLease) *schemas.
 		w.logger.Error("lease gone before the slot started; not running it", "lease", lease.LeaseID, "slot", slot.SlotID, "why", why)
 		return nil
 	}
-	res, err := w.runner.RunSlot(sctx, SlotInput{Manifest: runM, Suite: exp.suite, Slot: slot, Attempt: lease.Attempt})
+	in := SlotInput{Manifest: runM, Suite: exp.suite, Slot: slot, Attempt: lease.Attempt}
+	if len(lease.GPUs) > 0 { // QC2-10-09: the devices the coordinator reserved, not the pool's first fit
+		a, release, why := w.leasedGPUs(sctx, lease.GPUs)
+		if why != "" {
+			w.logger.Warn("lease refused", "lease", lease.LeaseID, "experiment", lease.ExpID, "reason", why)
+			stop()
+			w.release(ctx, lease, why, false, nil)
+			return nil
+		}
+		defer release()
+		in.GPU = a
+	}
+	res, err := w.runner.RunSlot(sctx, in)
 	if res != nil {
 		res.RunnerGateway = runnerGW  // Tenancy area: uploaded with the run
 		res.RunnerImages = runnerImgs // Deploy area: uploaded with the run
@@ -841,4 +853,21 @@ func sleepCtx(ctx context.Context, d time.Duration) bool {
 	case <-t.C:
 		return true
 	}
+}
+
+// leasedGPUs takes the GPUs a lease names from the worker's pool, waiting
+// while they are held. It returns a refusal reason when the pool cannot
+// take named devices or does not have them.
+func (w *Worker) leasedGPUs(ctx context.Context, uuids []string) (*schemas.GPUAssignment, func(), string) {
+	pool, ok := w.reg.GPUs.(interface {
+		AcquireDevices(context.Context, []string) (*schemas.GPUAssignment, func(), error)
+	})
+	if w.reg.GPUs == nil || !ok {
+		return nil, func() {}, "the lease names GPUs " + strings.Join(uuids, ",") + " but this worker's pool cannot assign named devices"
+	}
+	a, release, err := pool.AcquireDevices(ctx, uuids)
+	if err != nil {
+		return nil, func() {}, "leased GPUs: " + err.Error()
+	}
+	return a, release, ""
 }

@@ -362,11 +362,17 @@ func (p *Project) strList(n *yaml.Node, where string) []string {
 	return out
 }
 
+// isNull reports whether n is YAML null (null, ~ or an empty value), which
+// Compose treats as an unset key, unlike an explicit "" or [].
+func isNull(n *yaml.Node) bool {
+	return n.Kind == yaml.ScalarNode && n.Tag == "!!null"
+}
+
 // command reads command or entrypoint: a string split like a shell would,
 // or a list taken as it is.
 func (p *Project) command(n *yaml.Node, where string) []string {
 	if n.Kind == yaml.ScalarNode {
-		if n.Tag == "!!null" {
+		if isNull(n) {
 			return nil
 		}
 		s := p.str(n, where)

@@ -183,7 +183,8 @@ func (l *gatewayLayer) Arm(ctx context.Context, rc *schemas.RunContext) (*schema
 }
 
 // Disarm clears the run's slot, and the targeted members' slots of a probe
-// aimed at team members. The arm record is kept for Receipts.
+// aimed at team members; a no-paid run's slots are left on a no-fault
+// scripted plan instead. The arm record is kept for Receipts.
 func (l *gatewayLayer) Disarm(ctx context.Context, rc *schemas.RunContext) error {
 	if rc == nil || rc.Key == nil || rc.Key.KeySlot == "" {
 		return errors.New("gateway disarm: run has no key slot")
@@ -197,6 +198,15 @@ func (l *gatewayLayer) Disarm(ctx context.Context, rc *schemas.RunContext) error
 	}
 	var errs []error
 	for _, s := range slots {
+		if rc.NoPaidTraffic && rc.Run != nil {
+			// QC2-13-06: the plan's Scripted flag is the no-paid fence. Until
+			// cleanup revokes the keys, a disarmed slot keeps a no-fault
+			// scripted plan, never an empty one that forwards upstream.
+			if err := l.ctrl.SetPlan(ctx, s, schemas.FaultPlan{Mode: "none", RunID: rc.Run.RunID, Scripted: true}); err != nil {
+				errs = append(errs, fmt.Errorf("disarm slot %s to a scripted plan: %w", s, err))
+			}
+			continue
+		}
 		errs = append(errs, ClearSlot(ctx, l.ctrl, s))
 	}
 	return errors.Join(errs...)

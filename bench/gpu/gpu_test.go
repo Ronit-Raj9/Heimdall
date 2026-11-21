@@ -305,3 +305,32 @@ func readLines(path string) ([]string, error) {
 	}
 	return strings.Split(strings.TrimSpace(string(b)), "\n"), nil
 }
+
+// TestPoolAcquireDevices is QC2-10-09: a lease's named devices are taken
+// exactly, the big device is not given to a small lease's first fit, and a
+// held named device is waited for.
+func TestPoolAcquireDevices(t *testing.T) {
+	big, small := gtx(0, "GPU-big", 24576), gtx(1, "GPU-small", 8192)
+	p, err := NewPool("", []schemas.GPUInfo{big, small}, 0, "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	a, release, err := p.AcquireDevices(context.Background(), []string{"GPU-small"})
+	if err != nil || len(a.GPUs) != 1 || a.GPUs[0].UUID != "GPU-small" {
+		t.Fatalf("named acquire: %+v %v", a, err)
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 50*time.Millisecond)
+	defer cancel()
+	if _, _, err := p.AcquireDevices(ctx, []string{"GPU-small"}); !errors.Is(err, context.DeadlineExceeded) {
+		t.Fatalf("held device: %v, want a wait", err)
+	}
+	b, r2, err := p.AcquireDevices(context.Background(), []string{"GPU-big"})
+	if err != nil || b.GPUs[0].UUID != "GPU-big" {
+		t.Fatalf("big device: %+v %v", b, err)
+	}
+	r2()
+	release()
+	if _, _, err := p.AcquireDevices(context.Background(), []string{"GPU-none"}); err == nil {
+		t.Fatal("an unknown device was accepted")
+	}
+}

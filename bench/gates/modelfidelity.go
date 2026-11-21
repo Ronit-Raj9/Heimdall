@@ -52,7 +52,7 @@ func (g *modelFidelityGate) Check(_ context.Context, rc *schemas.RunContext, ev 
 	if rc != nil && rc.Agent != nil {
 		fallbacks = rc.Agent.Gateway.Fallbacks
 		if pol := rc.Agent.Gateway.Routing; pol != nil { // W9: the arm's routing policy decides which models may serve (modelfidelityrouting.go)
-			return g.checkRouted(rc.Agent.Model, pol, ev), nil
+			return g.checkRouted(rc.Agent.Model, pol, semanticCacheOn(rc), ev), nil
 		}
 	}
 	var swapped, undeclared, cached int
@@ -61,7 +61,7 @@ func (g *modelFidelityGate) Check(_ context.Context, rc *schemas.RunContext, ev 
 	cacheOK := false
 	if rc != nil && rc.Agent != nil {
 		declared = rc.Agent.Gateway.Models
-		cacheOK = rc.Agent.Gateway.Bifrost != nil && rc.Agent.Gateway.Bifrost.SemanticCache != nil
+		cacheOK = semanticCacheOn(rc)
 	}
 	for _, r := range ev.Requests.Requests {
 		if r.Kind == "audio" { // X8 voice agents: an audio row is a swap only when the served model is neither the requested nor a declared one
@@ -97,6 +97,12 @@ func (g *modelFidelityGate) Check(_ context.Context, rc *schemas.RunContext, ev 
 	detail := fmt.Sprintf("%d request(s): %d served by another model, %d undeclared fallback, %d cache hit",
 		len(evidence), swapped, undeclared, cached)
 	return newResult(g, true, detail, evidence), nil
+}
+
+// semanticCacheOn reports whether the run's arm turns on Bifrost's semantic
+// cache, which makes a cache hit intended (routed or not, QC2-12-01).
+func semanticCacheOn(rc *schemas.RunContext) bool {
+	return rc != nil && rc.Agent != nil && rc.Agent.Gateway.Bifrost != nil && rc.Agent.Gateway.Bifrost.SemanticCache != nil
 }
 
 // newModelFidelityGate returns the model fidelity gate.

@@ -69,6 +69,10 @@ type Config struct {
 	WatchIntervalMS int
 	EventsCollector bool
 	OutputCapBytes  int64
+	// Install is this install's owner id (InstallID), set as a label on
+	// every namespace the driver creates, so `k8s cleanup` of another
+	// install with the same namespace prefix never selects them (QC2-10-02).
+	Install string
 	// Local is the Docker driver on the controller: image metadata (PATH,
 	// entrypoint, ids, digests) is read from the controller's daemon, where
 	// the images are built and from where they are loaded or pushed.
@@ -270,7 +274,7 @@ func (d *Driver) Create(ctx context.Context, rc *schemas.RunContext) (*schemas.E
 // freshNamespace replaces a leftover namespace of the same run (a crashed
 // earlier attempt) with a new, labelled, empty one.
 func (d *Driver) freshNamespace(ctx context.Context, r runRef) error {
-	ns := Namespace{APIVersion: "v1", Kind: "Namespace", Metadata: ObjectMeta{Name: r.ns, Labels: runLabels(r.runID, r.expID)}}
+	ns := Namespace{APIVersion: "v1", Kind: "Namespace", Metadata: ObjectMeta{Name: r.ns, Labels: d.ownedLabels(runLabels(r.runID, r.expID))}}
 	err := d.cfg.Client.Create(ctx, "/api/v1/namespaces", ns, nil)
 	if !IsConflict(err) {
 		if err != nil {
@@ -284,7 +288,7 @@ func (d *Driver) freshNamespace(ctx context.Context, r runRef) error {
 	if err := d.cfg.Client.Get(ctx, nsPath(r.ns), &cur); err != nil {
 		return fmt.Errorf("namespace %s exists and cannot be read: %w", r.ns, err)
 	}
-	if l := cur.Metadata.Labels; l[LabelBench] != "1" || l[LabelRole] != RoleRun || l[LabelRun] != r.runID {
+	if !ownsRunNamespace(cur, r.runID) {
 		return fmt.Errorf("namespace %s already exists and does not belong to run %s; refusing to replace it", r.ns, r.runID)
 	}
 	d.cfg.Logger.Warn("leftover run namespace; replacing it", "namespace", r.ns)
@@ -300,23 +304,59 @@ func (d *Driver) freshNamespace(ctx context.Context, r runRef) error {
 	return nil
 }
 
+// ownedLabels adds this install's owner label to a namespace's labels.
+func (d *Driver) ownedLabels(l map[string]string) map[string]string {
+	if d.cfg.Install != "" {
+		l[LabelInstall] = d.cfg.Install
+	}
+	return l
+}
+
+// InstallID is the owner id of the install whose root folder is root: a
+// stable label value derived from the folder's absolute path.
+func InstallID(root string) string {
+	if abs, err := filepath.Abs(root); err == nil {
+		root = abs
+	}
+	return utils.SHA256Bytes([]byte(root))[:16]
+}
+
+// ownsRunNamespace reports whether ns carries the labels of runID's own
+// run namespace (an earlier or the current attempt of that run).
+func ownsRunNamespace(ns Namespace, runID string) bool {
+	l := ns.Metadata.Labels
+	return l[LabelBench] == "1" && l[LabelRole] == RoleRun && l[LabelRun] == runID
+}
+
 // createServiceAccount creates kubernetes.service_account in a fresh run or
 // probe namespace (2-D-05): a pod may only name an account of its own
 // namespace, and every bench namespace is new. The account mounts no token
 // and gets no role binding, so it only carries the name (and any image pull
 // secrets a cluster admission policy attaches to it). With no configured
-// account, the pods use the namespace's default account.
+// account, or one named "default", the pods use the namespace's default
+// account, which Kubernetes creates itself (QC2-10-11). An account that
+// already exists in the fresh namespace was put there by cluster admission
+// policy and is used as it is; the pods still opt out of its token.
 func (d *Driver) createServiceAccount(ctx context.Context, ns string, labels map[string]string, owner []OwnerReference) error {
-	if d.cfg.ServiceAccount == "" {
+	if !ownServiceAccount(d.cfg.ServiceAccount) {
 		return nil
 	}
 	sa := ServiceAccount{APIVersion: "v1", Kind: "ServiceAccount", AutomountServiceAccountToken: boolPtr(false),
 		Metadata: ObjectMeta{Name: d.cfg.ServiceAccount, Labels: labels, OwnerReferences: owner}}
-	if err := d.cfg.Client.Create(ctx, corePath(ns, "serviceaccounts"), sa, nil); err != nil {
+	err := d.cfg.Client.Create(ctx, corePath(ns, "serviceaccounts"), sa, nil)
+	if IsConflict(err) {
+		d.cfg.Logger.Warn("service account already exists in the new namespace; using it", "namespace", ns, "account", d.cfg.ServiceAccount)
+		return nil
+	}
+	if err != nil {
 		return fmt.Errorf("service account %s: %w", d.cfg.ServiceAccount, err)
 	}
 	return nil
 }
+
+// ownServiceAccount reports whether the driver creates the configured
+// account itself: any name but empty or the namespace's "default".
+func ownServiceAccount(name string) bool { return name != "" && name != "default" }
 
 // createAnchor creates the run's anchor config map and returns the owner
 // reference every other object of the run carries.
@@ -935,11 +975,13 @@ func (d *Driver) agentImageFrozen(ctx context.Context, rec *record, agentID, wan
 	if err != nil || local != want {
 		return false
 	}
-	digests, _ := d.ImageRepoDigests(ctx, ref)
+	// QC2-10-07: the digests are read from the checked immutable id, never
+	// the tag again, which may have moved since the line above.
+	digests, _ := d.ImageRepoDigests(ctx, want)
 	if imageMatches(agentID, want, digests) {
 		return true
 	}
-	cfg, cerr := d.configDigest(ctx, ref, want, "linux/"+d.nodeArch(ctx, rec.Node))
+	cfg, cerr := d.configDigest(ctx, want, want, "linux/"+d.nodeArch(ctx, rec.Node))
 	if cerr == nil && cfg == agentID {
 		rec.Notes = append(rec.Notes, "agent image "+agentID+" is the config of the frozen image "+want)
 		return true
@@ -1055,13 +1097,18 @@ func (d *Driver) attach(ctx context.Context, rc *schemas.RunContext, r runRef, p
 	attCtx, attCancel := context.WithCancel(actx)
 	defer attCancel()
 	var drain *time.Timer
+	var timedOut, interrupted, drained bool
+	var mu sync.Mutex
 	stopStream := func() { // called with mu held
 		if drain == nil {
-			drain = time.AfterFunc(d.attachDrain, attCancel)
+			drain = time.AfterFunc(d.attachDrain, func() {
+				mu.Lock()
+				drained = true
+				mu.Unlock()
+				attCancel()
+			})
 		}
 	}
-	var timedOut, interrupted bool
-	var mu sync.Mutex
 	timer := time.AfterFunc(wall, func() {
 		mu.Lock()
 		timedOut = true
@@ -1093,6 +1140,10 @@ func (d *Driver) attach(ctx context.Context, rc *schemas.RunContext, r runRef, p
 	}
 	mu.Lock()
 	res.TimedOut = timedOut && !interrupted
+	// QC2-10-08: the drain timer closing a stalled stream after the wall
+	// expiry is this driver's own doing, not a transport failure; the run
+	// is an ordinary timeout once the pod reported its exit.
+	ownClose := drained && res.TimedOut && errors.Is(aerr, context.Canceled)
 	mu.Unlock()
 	res.Truncated = res.Truncated || stdout.Truncated() || stderr.Truncated()
 	if err := firstErr(stdout.Close(), stderr.Close(), outF.Sync(), errF.Sync()); err != nil {
@@ -1101,7 +1152,7 @@ func (d *Driver) attach(ctx context.Context, rc *schemas.RunContext, r runRef, p
 	if interrupted {
 		return res, fmt.Errorf("agent run interrupted: %w", ctx.Err())
 	}
-	if aerr != nil && !early {
+	if aerr != nil && !early && !ownClose {
 		return res, fmt.Errorf("attach agent: %w", aerr)
 	}
 	if werr != nil {
@@ -1226,11 +1277,24 @@ func (d *Driver) Destroy(ctx context.Context, rc *schemas.RunContext) error {
 	cctx, cancel := context.WithTimeout(context.WithoutCancel(ctx), killGrace)
 	defer cancel()
 	var errs []error
-	if err := d.cfg.Client.Delete(cctx, corePath(r.ns, "configmaps")+"/"+anchorName); err != nil {
-		errs = append(errs, err)
-	}
-	if err := d.cfg.Client.Delete(cctx, nsPath(r.ns)); err != nil {
-		errs = append(errs, err)
+	// QC2-10-01: cleanup runs even when Create refused a namespace of the
+	// same name that belongs to someone else (or failed before creating
+	// one). Delete only a namespace that is provably this run's, and only
+	// that very object (UID precondition), never one that replaced it.
+	var cur Namespace
+	switch err := d.cfg.Client.Get(cctx, nsPath(r.ns), &cur); {
+	case IsNotFound(err):
+	case err != nil:
+		errs = append(errs, fmt.Errorf("namespace %s: %w", r.ns, err))
+	case !ownsRunNamespace(cur, r.runID):
+		d.cfg.Logger.Warn("namespace does not belong to this run; not deleting it", "namespace", r.ns, "run", r.runID)
+	default:
+		if err := d.cfg.Client.Delete(cctx, corePath(r.ns, "configmaps")+"/"+anchorName); err != nil {
+			errs = append(errs, err)
+		}
+		if err := d.cfg.Client.DeleteUID(cctx, nsPath(r.ns), cur.Metadata.UID); err != nil {
+			errs = append(errs, err)
+		}
 	}
 	if stagedLayer(rc) || (rc.Handle != nil && rc.Handle.Volume != "") {
 		if err := d.removeStaging(cctx, r); err != nil {

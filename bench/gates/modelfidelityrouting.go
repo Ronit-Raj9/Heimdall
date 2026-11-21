@@ -14,7 +14,7 @@ import (
 // never a fire. The gate fires, as for any run, on a served model the policy
 // does not name, a fallback row when the policy declares no fallback, and a
 // cache hit. Runs without a policy keep the unrouted rule unchanged.
-func (g *modelFidelityGate) checkRouted(requested string, pol *schemas.RoutingPolicy, ev *schemas.Evidence) *schemas.GateResult {
+func (g *modelFidelityGate) checkRouted(requested string, pol *schemas.RoutingPolicy, cacheOK bool, ev *schemas.Evidence) *schemas.GateResult {
 	allowed := pol.EffectiveModels(requested) // a rule's unmatched requests keep the agent's model
 	var swapped, undeclared, cached, expected int
 	var evidence []string
@@ -35,7 +35,7 @@ func (g *modelFidelityGate) checkRouted(requested string, pol *schemas.RoutingPo
 			undeclared++
 			bad = true
 		}
-		if r.CacheHit {
+		if r.CacheHit && !cacheOK {
 			cached++
 			bad = true
 		}

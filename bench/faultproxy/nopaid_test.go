@@ -130,3 +130,71 @@ func TestCorruptPlanFileRefusesStart(t *testing.T) {
 		t.Fatal("NewServer started over an invalid plan file")
 	}
 }
+
+// QC2-13-01: a stream cut on a no-paid run (plan Scripted set) still cuts
+// the scripted stream after its first tool-call delta, and never forwards.
+func TestStreamCutOnScriptedPlan(t *testing.T) {
+	sink, hits := realSink(t)
+	env := newTestEnvConfig(t, realConfig(sink.URL))
+	env.setPlan(t, "slot-a", schemas.FaultPlan{Mode: ModeStreamCut, Call: 1, RunID: "r_smoke", Nonce: "nonce_cut", Scripted: true})
+	stream := strings.Replace(toolsBody, `"max_tokens":64,`, `"max_tokens":64,"stream":true,`, 1)
+	got, err := streamCall(t, env, "/v1/messages", "x-api-key", "auth-a", stream)
+	if err == nil || !strings.Contains(got, "input_json_delta") {
+		t.Fatalf("stream was not cut: %v %s", err, got)
+	}
+	if e := env.last(t); e.Action != ActionInject || e.Nonce != "nonce_cut" || e.Upstream != schemas.LedgerUpstreamScripted {
+		t.Fatalf("ledger line %+v", e)
+	}
+	if n := hits.Load(); n != 0 {
+		t.Fatalf("real upstream got %d request(s)", n)
+	}
+}
+
+// QC2-13-02: a restart restores each slot's call counters and scripted
+// progress, so a once fault that fired does not fire again and the scripted
+// tool turn is not served twice.
+func TestRestartKeepsPlanProgress(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "ledger.jsonl.plans.json")
+	tb, err := loadPlanTable(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := tb.set("slot-a", schemas.FaultPlan{Mode: ModeOnce, Call: 1, Status: 503, RunID: "r1", Nonce: "n1"}); err != nil {
+		t.Fatal(err)
+	}
+	if d := tb.begin("slot-a", KindMessage); !d.Inject || d.Call != 1 {
+		t.Fatalf("first call %+v", d)
+	}
+	if !tb.takeToolTurn("slot-a") {
+		t.Fatal("no tool turn")
+	}
+	tb, err = loadPlanTable(path) // the restart
+	if err != nil {
+		t.Fatal(err)
+	}
+	if d := tb.begin("slot-a", KindMessage); d.Inject || d.Call != 2 || d.RunID != "r1" {
+		t.Fatalf("call after restart %+v", d)
+	}
+	if tb.takeToolTurn("slot-a") {
+		t.Fatal("tool turn served again after restart")
+	}
+}
+
+// QC2-13-05: a second proxy on the same ledger (and so the same plan file)
+// is refused for as long as the first one holds it.
+func TestSecondProxyOnLedgerRefused(t *testing.T) {
+	sink, _ := realSink(t)
+	cfg := realConfig(sink.URL)
+	cfg.LedgerPath = filepath.Join(t.TempDir(), "ledger.jsonl")
+	first, err := NewServer(cfg)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer first.Close()
+	if second, err := NewServer(cfg); err == nil || !strings.Contains(err.Error(), "already open") {
+		if second != nil {
+			second.Close()
+		}
+		t.Fatalf("second proxy: %v", err)
+	}
+}

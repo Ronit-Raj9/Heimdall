@@ -62,6 +62,7 @@ func newKubernetesDriver(cfg *lib.Config, dockerCfg environments.DockerWorkspace
 		ServiceAccount: kc.ServiceAccount, NodeSelector: kc.NodeSelector, Tolerations: tols,
 		ProcessWatch: dockerCfg.ProcessWatch, WorkspaceWatch: dockerCfg.WorkspaceWatch, WatchIntervalMS: dockerCfg.WatchIntervalMS,
 		EventsCollector: dockerCfg.EventsCollector, Local: environments.NewDockerDriver(dockerCfg), Docker: a.docker, Logger: a.logger,
+		Install: k8s.InstallID(cfg.Root),
 	})
 	if err != nil {
 		return nil, fmt.Errorf("kubernetes driver: %w", err)
@@ -285,7 +286,7 @@ func runK8sCleanup(args []string) int {
 	if prefix == "" {
 		prefix = k8s.DefaultNamespacePrefix
 	}
-	verdicts := k8s.ClassifyCleanup(list.Items, k8s.CleanupInput{Prefix: prefix, Live: lv.Live, Dead: lv.Dead, Grace: *grace, Now: time.Now()})
+	verdicts := k8s.ClassifyCleanup(list.Items, k8s.CleanupInput{Prefix: prefix, Install: k8s.InstallID(a.cfg.Root), Live: lv.Live, Dead: lv.Dead, Grace: *grace, Now: time.Now()})
 	removable := 0
 	for _, v := range verdicts {
 		n := v.Namespace

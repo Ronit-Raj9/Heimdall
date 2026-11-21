@@ -114,10 +114,10 @@ func (p *Project) parseService(name string, v *yaml.Node, at string) *Service {
 			s.Image = p.str(n, kat)
 		case "build":
 			s.Build = p.parseBuild(n, kat)
-		case "command":
-			s.Command, s.HasCommand = p.command(n, kat), true
+		case "command": // QC2-10-04: null keeps the image's command, like an omitted key
+			s.Command, s.HasCommand = p.command(n, kat), !isNull(n)
 		case "entrypoint":
-			s.Entrypoint, s.HasEntrypoint = p.command(n, kat), true
+			s.Entrypoint, s.HasEntrypoint = p.command(n, kat), !isNull(n)
 		case "environment":
 			p.parseEnvironment(s, n, kat)
 		case "env_file":

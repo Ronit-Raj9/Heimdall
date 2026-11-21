@@ -8,11 +8,16 @@ import (
 // CleanupInput is what `k8s cleanup` knows when it decides which bench
 // namespaces are leftovers.
 type CleanupInput struct {
-	Prefix string          // this install's namespace prefix; other installs' namespaces are never selected
-	Live   map[string]bool // runs whose slot lease is fresh: kept
-	Dead   map[string]bool // runs whose lease is stale or that are sealed: removed
-	Grace  time.Duration   // a namespace with no lease information is removed only when older than this
-	Now    time.Time
+	Prefix string // this install's namespace prefix; other installs' namespaces are never selected
+	// Install is this install's owner id (InstallID). A namespace labelled
+	// with another install's id is never selected, and one with no owner
+	// label (created before the label existed) only when this install's
+	// store shows its run ended: its age alone proves nothing (QC2-10-02).
+	Install string
+	Live    map[string]bool // runs whose slot lease is fresh: kept
+	Dead    map[string]bool // runs whose lease is stale or that are sealed: removed
+	Grace   time.Duration   // a namespace with no lease information is removed only when older than this
+	Now     time.Time
 }
 
 // CleanupVerdict is one namespace and whether cleanup removes it, with why.
@@ -35,6 +40,11 @@ func ClassifyCleanup(items []Namespace, in CleanupInput) []CleanupVerdict {
 		if !strings.HasPrefix(n.Metadata.Name, prefix) || n.Metadata.Labels[LabelRole] == RoleGW {
 			continue
 		}
+		owner := n.Metadata.Labels[LabelInstall]
+		if in.Install != "" && owner != "" && owner != in.Install {
+			continue
+		}
+		legacy := in.Install != "" && owner == ""
 		v := CleanupVerdict{Namespace: n}
 		run := n.Metadata.Labels[LabelRun]
 		created, err := time.Parse(time.RFC3339, n.Metadata.CreationTimestamp)
@@ -43,6 +53,8 @@ func ClassifyCleanup(items []Namespace, in CleanupInput) []CleanupVerdict {
 			v.Reason = "run is live"
 		case run != "" && in.Dead[run]:
 			v.Remove, v.Reason = true, "run is no longer live"
+		case legacy:
+			v.Reason = "no install owner label; removed only when this install's store shows its run ended"
 		case err != nil:
 			v.Reason = "age unknown"
 		case in.Now.Sub(created) > in.Grace:

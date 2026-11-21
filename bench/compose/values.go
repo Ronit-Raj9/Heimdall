@@ -194,10 +194,13 @@ func parseDotenv(data string) (map[string]string, []string, error) {
 func parseDotenvMode(data string, raw bool) (map[string]string, []string, error) {
 	out := map[string]string{}
 	var order []string
-	for n, line := range strings.Split(strings.ReplaceAll(data, "\r\n", "\n"), "\n") {
-		line = strings.TrimSpace(line)
+	for n, orig := range strings.Split(strings.ReplaceAll(data, "\r\n", "\n"), "\n") {
+		line := strings.TrimSpace(orig)
 		if line == "" || strings.HasPrefix(line, "#") {
 			continue
+		}
+		if raw { // QC2-10-06: a raw value keeps its trailing spaces and tabs
+			line = strings.TrimLeft(orig, " \t")
 		}
 		line = strings.TrimPrefix(line, "export ")
 		k, v, ok := strings.Cut(line, "=")

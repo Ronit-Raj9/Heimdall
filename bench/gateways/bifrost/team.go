@@ -113,9 +113,15 @@ func (g *Gateway) mintMember(ctx context.Context, runID string, p ProviderSetup,
 		g.releaseSlot(slot.Name, name)
 		return schemas.MemberKey{}, err
 	}
+	if !g.publishMint(slot.Name, "pending:"+name, key, mintRecord{slot: slot.Name, at: time.Now()}) { // QC2-12-03
+		err := fmt.Errorf("member %s: the claim on key slot %s was lost while the key was created", m.ID, slot.Name)
+		if derr := g.deleteVirtualKey(ctx, key.ID); derr != nil {
+			err = errors.Join(err, fmt.Errorf("delete virtual key %s: %w", key.ID, derr))
+		}
+		g.releaseSlot(slot.Name, name)
+		return schemas.MemberKey{}, err
+	}
 	g.mu.Lock()
-	g.inUse[slot.Name] = key.ID
-	g.minted[key.ID] = mintRecord{slot: slot.Name, at: time.Now()}
 	g.memberOf[key.ID] = runID
 	g.mu.Unlock()
 	return schemas.MemberKey{AgentID: m.ID, ID: key.ID, Name: key.Name, Value: key.Value, KeySlot: key.KeySlot,

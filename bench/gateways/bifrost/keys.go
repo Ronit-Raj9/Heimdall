@@ -76,10 +76,20 @@ func (g *Gateway) MintKey(ctx context.Context, rc *schemas.RunContext) (*schemas
 		g.releaseReserved(runID) // F1: a team's reserved slots (and their claims) go too
 		return nil, fmt.Errorf("mint key for run %s: %w", runID, err)
 	}
-	g.mu.Lock()
-	g.inUse[slot.Name] = key.ID
-	g.minted[key.ID] = mintRecord{slot: slot.Name, at: time.Now(), run: runID}
-	g.mu.Unlock()
+	if !g.publishMint(slot.Name, "pending:"+runID, key, mintRecord{slot: slot.Name, at: time.Now(), run: runID}) {
+		err := fmt.Errorf("the claim on key slot %s was lost while the key was created", slot.Name)
+		if key.RoutingRuleID != "" {
+			if derr := g.deleteRouteRule(ctx, key.RoutingRuleID); derr != nil {
+				err = errors.Join(err, fmt.Errorf("delete routing rule %s: %w", key.RoutingRuleID, derr))
+			}
+		}
+		if derr := g.deleteVirtualKey(ctx, key.ID); derr != nil {
+			err = errors.Join(err, fmt.Errorf("delete virtual key %s: %w", key.ID, derr))
+		}
+		g.releaseSlot(slot.Name, runID)
+		g.releaseReserved(runID)
+		return nil, fmt.Errorf("mint key for run %s: %w", runID, err)
+	}
 	g.logger.Info("virtual key minted", "run_id", runID, "virtual_key_id", key.ID, "provider", p.Name,
 		"mode", p.Mode, "key_slot", slot.Name, "model", model)
 	return key, nil
@@ -384,7 +394,8 @@ func (g *Gateway) ensureSlotModel(ctx context.Context, p ProviderSetup, slot Slo
 			return fmt.Errorf("direct provider %s: %s is not set", p.Name, p.KeyEnv)
 		}
 	}
-	if _, err := g.upsertKey(ctx, p.Name, slot, keyID, models); err != nil {
+	_, models, err := g.upsertKey(ctx, p.Name, slot, keyID, models)
+	if err != nil {
 		return err
 	}
 	g.mu.Lock()

@@ -607,4 +607,9 @@ func TestSetupAdoptsConcurrentlyCreatedKey(t *testing.T) {
 			t.Fatalf("adopted key models %v", k["models"])
 		}
 	}
+	// QC2-12-04: the model cache holds the merged list, so a later mint
+	// for another model keeps the adopted key's model.
+	if !g.models["fp-slot-1"]["claude-run-model"] || !g.models["fp-slot-1"][testModel] {
+		t.Fatalf("cached models %v", g.models["fp-slot-1"])
+	}
 }

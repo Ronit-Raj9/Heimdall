@@ -5597,7 +5597,7 @@ class WorkerInfo(_WorkerInfoRequired, total=False):
     token_id: str
 
 
-class WorkerLease(TypedDict):
+class _WorkerLeaseRequired(TypedDict):
     attempt: int
     bench_version: str
     exp_id: str
@@ -5609,6 +5609,10 @@ class WorkerLease(TypedDict):
     stale_after_ms: int
     suite_lock_hash: str
     worker_id: str
+
+
+class WorkerLease(_WorkerLeaseRequired, total=False):
+    gpus: List[str]
 
 
 class WorkerLeaseRequest(TypedDict):

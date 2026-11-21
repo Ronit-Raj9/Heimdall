@@ -85,13 +85,18 @@ type claimState struct {
 	renewing bool
 	closed   bool
 	direct   map[string]bool // direct providers already noted in the log
+	// fenced holds the slots whose claim was lost but whose holder is not
+	// yet revoked (QC2-12-03): slot -> the virtual key id whose DELETE
+	// failed and is retried each renewal, or the "pending:" holder of a mint
+	// in flight, whose key publishMint then refuses and deletes.
+	fenced map[string]string
 
 	stop     chan struct{}
 	stopOnce sync.Once
 }
 
 func newClaimState() *claimState {
-	return &claimState{claimed: map[string]string{}, until: map[string]time.Time{}, direct: map[string]bool{}, stop: make(chan struct{})}
+	return &claimState{claimed: map[string]string{}, until: map[string]time.Time{}, direct: map[string]bool{}, fenced: map[string]string{}, stop: make(chan struct{})}
 }
 
 // heldElsewhereError is a slot claim refused because another bench process
@@ -327,10 +332,17 @@ func (g *Gateway) renewOnce() bool {
 	c.takeMu.Lock()
 	defer c.takeMu.Unlock()
 	g.mu.Lock()
-	if len(c.claimed) == 0 || c.closed {
+	if c.closed || (len(c.claimed) == 0 && len(c.fenced) == 0) {
 		c.renewing = false
 		g.mu.Unlock()
 		return false
+	}
+	g.mu.Unlock()
+	g.retryFences() // QC2-12-03: a failed revocation is retried until it is confirmed
+	g.mu.Lock()
+	if len(c.claimed) == 0 {
+		g.mu.Unlock()
+		return true
 	}
 	slots := make([]faultproxy.RenewSlot, 0, len(c.claimed))
 	for s, run := range c.claimed {
@@ -378,22 +390,79 @@ func (g *Gateway) renewOnce() bool {
 // proxy (it may be another owner's) and revokes the virtual key that holds
 // the slot here, so its run's agent fails closed instead of sending calls
 // that the slot's new plan would answer or forward. Called with takeMu held.
+//
+// The fence is kept in claims.fenced until it is done (QC2-12-03): a failed
+// DELETE is retried by every later renewal, and a mint still in flight on
+// the slot is refused when it publishes its key (publishMint).
 func (g *Gateway) fenceSlot(slot string) {
 	g.mu.Lock()
 	delete(g.claims.claimed, slot)
 	delete(g.claims.until, slot)
 	vk := g.inUse[slot]
-	g.mu.Unlock()
-	if vk == "" || strings.HasPrefix(vk, "pending:") {
+	if vk == "" || strings.HasPrefix(vk, reservedPrefix) {
+		g.mu.Unlock()
 		return
 	}
+	g.claims.fenced[slot] = vk
+	g.mu.Unlock()
+	if strings.HasPrefix(vk, "pending:") {
+		return
+	}
+	g.revokeFenced(slot, vk)
+}
+
+// revokeFenced deletes the fenced virtual key vk on slot and drops the fence
+// once Bifrost confirmed it.
+func (g *Gateway) revokeFenced(slot, vk string) {
 	ctx, cancel := context.WithTimeout(context.Background(), claimCallTimeout)
 	defer cancel()
 	if err := g.deleteVirtualKey(ctx, vk); err != nil {
-		g.logger.Error("revoke virtual key on a lost key slot failed", "slot", slot, "virtual_key_id", vk, "error", err.Error())
+		g.logger.Error("revoke virtual key on a lost key slot failed; retrying at the next renewal", "slot", slot, "virtual_key_id", vk, "error", err.Error())
 		return
 	}
+	g.mu.Lock()
+	if g.claims.fenced[slot] == vk {
+		delete(g.claims.fenced, slot)
+	}
+	g.mu.Unlock()
 	g.logger.Warn("virtual key revoked: its key slot claim was lost", "slot", slot, "virtual_key_id", vk)
+}
+
+// retryFences retries every fence whose revocation is still unconfirmed and
+// drops a pending-mint fence whose mint ended without publishing a key.
+// Called with takeMu held.
+func (g *Gateway) retryFences() {
+	g.mu.Lock()
+	todo := map[string]string{}
+	for slot, vk := range g.claims.fenced {
+		if strings.HasPrefix(vk, "pending:") {
+			if g.inUse[slot] != vk { // the mint failed and freed the slot
+				delete(g.claims.fenced, slot)
+			}
+			continue
+		}
+		todo[slot] = vk
+	}
+	g.mu.Unlock()
+	for slot, vk := range todo {
+		g.revokeFenced(slot, vk)
+	}
+}
+
+// publishMint records key as the holder of slot for a mint that held it as
+// holder ("pending:" + name). It refuses, returning false, when the slot's
+// claim was lost and fenced while the key was being created (QC2-12-03);
+// the caller then deletes the key it created.
+func (g *Gateway) publishMint(slot, holder string, key *schemas.RunKey, rec mintRecord) bool {
+	g.mu.Lock()
+	defer g.mu.Unlock()
+	if g.claims.fenced[slot] == holder {
+		delete(g.claims.fenced, slot)
+		return false
+	}
+	g.inUse[slot] = key.ID
+	g.minted[key.ID] = rec
+	return true
 }
 
 // Close stops claim renewal and releases every claim this process holds.

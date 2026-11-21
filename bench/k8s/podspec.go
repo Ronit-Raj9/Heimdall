@@ -57,10 +57,12 @@ const (
 	LabelRun   = "heimdall.dev/run"
 	LabelExp   = "heimdall.dev/exp"
 	LabelRole  = "heimdall.dev/role"
-	RoleRun    = "run"
-	RoleCheck  = "check"
-	RoleGW     = "gateway"
-	nsNameKey  = "kubernetes.io/metadata.name"
+	// LabelInstall names the install that created a namespace (InstallID).
+	LabelInstall = "heimdall.dev/install"
+	RoleRun      = "run"
+	RoleCheck    = "check"
+	RoleGW       = "gateway"
+	nsNameKey    = "kubernetes.io/metadata.name"
 
 	// activeDeadlineMargin bounds a pod the bench lost track of: the wall
 	// budget plus this, then the kubelet kills every container.

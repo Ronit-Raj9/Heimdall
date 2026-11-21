@@ -56,6 +56,20 @@ func (c *Client) Delete(ctx context.Context, path string) error {
 	return err
 }
 
+// DeleteUID deletes one object only while it is still the object with uid
+// (a DeleteOptions UID precondition), with background propagation. A
+// missing object, or one replaced by an object with another UID, is left
+// alone and is not an error: it is no longer the object the caller owned.
+func (c *Client) DeleteUID(ctx context.Context, path, uid string) error {
+	body := map[string]any{"apiVersion": "v1", "kind": "DeleteOptions", "propagationPolicy": "Background",
+		"preconditions": map[string]any{"uid": uid}}
+	err := c.Do(ctx, http.MethodDelete, path, nil, body, nil)
+	if IsNotFound(err) || IsConflict(err) {
+		return nil
+	}
+	return err
+}
+
 // Get decodes one object; a 404 is an error the caller tests with
 // IsNotFound.
 func (c *Client) Get(ctx context.Context, path string, out any) error {

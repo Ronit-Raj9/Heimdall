@@ -105,6 +105,27 @@ func TestGatewayArmDisarm(t *testing.T) {
 	}
 }
 
+// QC2-13-06: disarming a no-paid run leaves a no-fault scripted plan with
+// the run's id, never an empty plan that would forward upstream.
+func TestGatewayDisarmNoPaidStaysScripted(t *testing.T) {
+	ctrl := &gatewayFakeCtrl{}
+	layer := newGatewayLayer(ctrl, nil)
+	rc := gatewayRC("r_1", gatewayOutage, "claude-code", 0)
+	rc.NoPaidTraffic = true
+	if _, err := layer.Arm(context.Background(), rc); err != nil {
+		t.Fatal(err)
+	}
+	if err := layer.Disarm(context.Background(), rc); err != nil {
+		t.Fatal(err)
+	}
+	if len(ctrl.cleared) != 0 {
+		t.Fatalf("cleared = %v", ctrl.cleared)
+	}
+	if p := ctrl.plans["fp-slot-1"]; !p.Scripted || p.Mode != "none" || p.RunID != "r_1" || p.Nonce != "" {
+		t.Fatalf("plan after disarm = %+v", p)
+	}
+}
+
 func TestGatewayArmErrors(t *testing.T) {
 	cases := []struct {
 		name   string

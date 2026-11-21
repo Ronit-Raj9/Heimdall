@@ -309,16 +309,17 @@ func TestRunSlotCancelledContext(t *testing.T) {
 }
 
 // TestRunSlotFaultPlan checks that every run's key slot is bound to its run
-// id at the fault proxy and cleared before the key is revoked. A gateway
-// probe binds its own plan when it arms, so the engine only clears it.
+// id at the fault proxy and cleared only after the key is revoked
+// (QC2-13-06). A gateway probe binds its own plan when it arms, so the
+// engine only clears it.
 func TestRunSlotFaultPlan(t *testing.T) {
 	tests := []struct {
 		cond string
 		want []string
 	}{
-		{"clean", []string{"mint", "fault_set", "fault_clear", "revoke"}},
-		{"stale-notes", []string{"mint", "fault_set", "fault_clear", "revoke"}},
-		{"model-outage", []string{"mint", "fault_clear", "revoke"}},
+		{"clean", []string{"mint", "fault_set", "revoke", "fault_clear"}},
+		{"stale-notes", []string{"mint", "fault_set", "revoke", "fault_clear"}},
+		{"model-outage", []string{"mint", "revoke", "fault_clear"}},
 	}
 	for _, tt := range tests {
 		t.Run(tt.cond, func(t *testing.T) {
@@ -342,6 +343,23 @@ func TestRunSlotFaultPlan(t *testing.T) {
 				}
 			}
 		})
+	}
+}
+
+// QC2-13-06: a no-paid run whose key revocation fails keeps its scripted
+// plan bound; clearing it would let the still-live key reach the upstream.
+func TestNoPaidKeepsPlanWhenRevokeFails(t *testing.T) {
+	b, m, slot := pipelineFixture(t, "clean")
+	m.Experiment.ScriptedUpstream = true
+	b.w.fail["revoke"] = true
+	if _, err := runOne(context.Background(), t, b, m, slot); err != nil {
+		t.Fatal(err)
+	}
+	if b.w.count("revoke") != 1 || b.w.count("fault_clear") != 0 {
+		t.Fatalf("revoke %d, fault_clear %d", b.w.count("revoke"), b.w.count("fault_clear"))
+	}
+	if p := b.w.plans[0]; p.Mode != "scripted" {
+		t.Fatalf("bound plan %+v", p)
 	}
 }
 

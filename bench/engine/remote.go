@@ -947,7 +947,8 @@ func (c *Coordinator) leaseView(l *remoteLease) *schemas.WorkerLease {
 	m := l.r.m
 	return &schemas.WorkerLease{LeaseID: l.id, WorkerID: l.worker, ExpID: m.ExpID, Slot: *l.slot, Attempt: l.attempt,
 		ManifestHash: m.Hash, SuiteLockHash: m.SuiteLockHash, Parts: copyStrings(m.Parts), BenchVersion: m.BenchVersion,
-		HeartbeatEveryMS: l.r.opts.HeartbeatEvery.Milliseconds(), StaleAfterMS: l.r.opts.StaleAfter.Milliseconds()}
+		HeartbeatEveryMS: l.r.opts.HeartbeatEvery.Milliseconds(), StaleAfterMS: l.r.opts.StaleAfter.Milliseconds(),
+		GPUs: append([]string(nil), l.gpuIDs...)}
 }
 
 // refusedLate records a call for a lease that is gone, most often an upload

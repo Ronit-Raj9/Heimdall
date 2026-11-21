@@ -326,20 +326,28 @@ func gatewayIntegrityEvents(rc *schemas.RunContext, log *schemas.RequestLog) []s
 // policy declares: the policy has a fallback chain and the row was served by
 // a model of the policy (or the served model is unknown). It is the same
 // rule the routed model_fidelity gate applies (gates/modelfidelityrouting.go).
+//
+// Without a routing policy the older gateway.fallbacks list decides, as in
+// the unrouted model_fidelity rule (gates/modelfidelity.go, QC2-12-06): the
+// row was served by one of the declared fallback models.
 func declaredFallback(agent *schemas.AgentConfig, req schemas.GatewayRequest) bool {
+	same := func(m string) bool {
+		return m == req.ModelServed || strings.HasSuffix(req.ModelServed, "/"+m) || strings.HasSuffix(m, "/"+req.ModelServed)
+	}
 	pol := agent.Gateway.Routing
-	if pol == nil || len(pol.Fallbacks) == 0 {
+	if pol == nil {
+		if req.ModelServed == "" {
+			return false
+		}
+		return slices.ContainsFunc(agent.Gateway.Fallbacks, same)
+	}
+	if len(pol.Fallbacks) == 0 {
 		return false
 	}
 	if req.ModelServed == "" {
 		return true
 	}
-	for _, m := range pol.EffectiveModels(agent.Model) {
-		if m == req.ModelServed || strings.HasSuffix(req.ModelServed, "/"+m) || strings.HasSuffix(m, "/"+req.ModelServed) {
-			return true
-		}
-	}
-	return false
+	return slices.ContainsFunc(pol.EffectiveModels(agent.Model), same)
 }
 
 func availableEvidence(ev *schemas.Evidence) []string {
@@ -539,8 +547,8 @@ func clearGatewayRequestBodies(ev *schemas.Evidence) {
 	}
 }
 
-// cleanup destroys the workspace, clears the key slot's fault plan and
-// revokes the key. It runs after every run, failed or not; Destroy is safe
+// cleanup destroys the workspace, revokes the key and then clears the key
+// slots' fault plans. It runs after every run, failed or not; Destroy is safe
 // after a failed Create.
 func (p *Pipeline) cleanup(ctx context.Context, st *runState) error {
 	var errs []error
@@ -562,16 +570,26 @@ func (p *Pipeline) cleanup(ctx context.Context, st *runState) error {
 			errs = append(errs, wrapPart("environment", st.env, fmt.Errorf("destroy: %w", err)))
 		}
 	}
+	errs = append(errs, p.cleanupA2A(ctx, st)) // B1: the run's agent gateway registrations (a2a.go)
+	revoked := true
+	if st.rc.Key != nil && p.reg.Gateway != nil {
+		if err := p.reg.Gateway.RevokeKey(ctx, st.rc.Key); err != nil {
+			revoked = false
+			errs = append(errs, wrapPart("gateway", p.reg.Gateway, fmt.Errorf("revoke key: %w", err)))
+		}
+	}
+	// QC2-13-06: the key is revoked before its slots' plans are cleared, so
+	// an agent call still in flight never meets a slot without its plan. A
+	// no-paid run whose revocation failed keeps its scripted plans bound:
+	// the live key must never reach the real upstream.
+	if !revoked && st.rc.NoPaidTraffic {
+		p.logger.Warn("key revocation failed; keeping the no-paid scripted plans bound", "run_id", st.rc.Run.RunID)
+		return errors.Join(errs...)
+	}
 	errs = append(errs, p.clearTeamPlans(ctx, st)) // Multi-agent area: team member slots (team.go)
-	errs = append(errs, p.cleanupA2A(ctx, st))     // B1: the run's agent gateway registrations (a2a.go)
 	if st.rc.Key != nil && p.reg.Fault != nil {
 		if err := p.reg.Fault.ClearPlan(ctx, st.rc.Key.KeySlot); err != nil {
 			errs = append(errs, &partError{part: faultPart, err: fmt.Errorf("clear plan of key slot %s: %w", st.rc.Key.KeySlot, err)})
-		}
-	}
-	if st.rc.Key != nil && p.reg.Gateway != nil {
-		if err := p.reg.Gateway.RevokeKey(ctx, st.rc.Key); err != nil {
-			errs = append(errs, wrapPart("gateway", p.reg.Gateway, fmt.Errorf("revoke key: %w", err)))
 		}
 	}
 	return errors.Join(errs...)

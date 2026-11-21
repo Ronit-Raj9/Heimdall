@@ -221,7 +221,7 @@ func (g *Gateway) setupProvider(ctx context.Context, p ProviderSetup) error {
 			s.Value = secret
 		}
 		models := mergeModels(byName[s.Name].Models, p.Model)
-		id, err := g.upsertKey(ctx, p.Name, s, byName[s.Name].ID, models)
+		id, models, err := g.upsertKey(ctx, p.Name, s, byName[s.Name].ID, models)
 		if err != nil {
 			return err
 		}
@@ -422,7 +422,12 @@ func (g *Gateway) baseURL(p ProviderSetup) string {
 // upsertKey creates the slot's provider key, or updates it in place when id
 // is set, and returns the key id. Weight 1 is required for routing. The value
 // may be a real key (direct mode); it is sent only in the request body.
-func (g *Gateway) upsertKey(ctx context.Context, provider string, s Slot, id string, models []string) (string, error) {
+//
+// It returns the key id and the models the key serves after the write
+// (QC2-12-04): after a create conflict that is the merged list, not the
+// caller's, so the caller's model cache never drops a model the existing
+// key already served.
+func (g *Gateway) upsertKey(ctx context.Context, provider string, s Slot, id string, models []string) (string, []string, error) {
 	body := map[string]any{"name": s.Name, "value": s.Value, "models": models, "weight": 1, "enabled": true}
 	var out providerKey
 	if id == "" {
@@ -435,7 +440,7 @@ func (g *Gateway) upsertKey(ctx context.Context, provider string, s Slot, id str
 			// keeping the models it already serves.
 			k, ferr := g.findKey(ctx, provider, s.Name)
 			if ferr != nil {
-				return "", fmt.Errorf("create key slot %s: %w (after %v)", s.Name, ferr, err)
+				return "", nil, fmt.Errorf("create key slot %s: %w (after %v)", s.Name, ferr, err)
 			}
 			id, out = k.ID, providerKey{}
 			merged := k.Models
@@ -443,22 +448,26 @@ func (g *Gateway) upsertKey(ctx context.Context, provider string, s Slot, id str
 				merged = mergeModels(merged, m)
 			}
 			body["models"] = merged
+			models = merged
 		case err != nil:
-			return "", fmt.Errorf("create key slot %s: %w", s.Name, err)
+			return "", nil, fmt.Errorf("create key slot %s: %w", s.Name, err)
 		}
 	}
 	if out.ID == "" && id != "" {
 		if err := g.call(ctx, http.MethodPut, providerPath(provider)+"/keys/"+id, body, &out); err != nil {
-			return "", fmt.Errorf("update key slot %s: %w", s.Name, err)
+			return "", nil, fmt.Errorf("update key slot %s: %w", s.Name, err)
 		}
 	}
 	if out.ID == "" {
 		out.ID = id
 	}
 	if out.ID == "" {
-		return "", fmt.Errorf("key slot %s: bifrost returned no key id", s.Name)
+		return "", nil, fmt.Errorf("key slot %s: bifrost returned no key id", s.Name)
 	}
-	return out.ID, nil
+	if len(out.Models) > 0 { // the server's own list is authoritative
+		models = out.Models
+	}
+	return out.ID, models, nil
 }
 
 // findKey reads the provider's keys again and returns the one named name.

@@ -68,6 +68,9 @@ type WorkerLease struct {
 	BenchVersion     string            `json:"bench_version"`
 	HeartbeatEveryMS int64             `json:"heartbeat_every_ms"` // the experiment scheduler's heartbeat interval
 	StaleAfterMS     int64             `json:"stale_after_ms"`     // a lease with no heartbeat for this long is lost
+	// GPUs are the worker's devices (UUIDs) the coordinator set aside for
+	// this lease; the worker runs the slot on exactly these (QC2-10-09).
+	GPUs []string `json:"gpus,omitempty"`
 }
 
 // WorkerHeartbeat is the body of POST /api/bench/workers/leases/{id}/heartbeat.

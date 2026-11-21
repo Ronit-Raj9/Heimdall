@@ -37,9 +37,10 @@ type fakeAPI struct {
 	deleted   []string
 	key       string
 	noEnforce bool
-	stall     chan struct{} // non-nil: attach marks the agent done, then never answers until closed
-	workspace string        // the artifact script's workspace root
-	laid      []string      // staged tars extracted in prep: destination and member names
+	stall     chan struct{}   // non-nil: attach marks the agent done, then never answers until closed
+	workspace string          // the artifact script's workspace root
+	laid      []string        // staged tars extracted in prep: destination and member names
+	deny      map[string]bool // access reviews answered "denied", by "verb resource[/sub]"
 }
 
 const fakeRef = "0123456789abcdef0123456789abcdef01234567"
@@ -65,6 +66,19 @@ func (f *fakeAPI) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	case strings.HasSuffix(p, "/pods/egress-probe/log"):
 		f.probeLog(w, p)
+		return
+	case strings.HasSuffix(p, "/selfsubjectaccessreviews"):
+		var rv struct {
+			Spec struct {
+				RA struct{ Verb, Resource, Subresource string } `json:"resourceAttributes"`
+			} `json:"spec"`
+		}
+		json.NewDecoder(r.Body).Decode(&rv)
+		name := rv.Spec.RA.Verb + " " + rv.Spec.RA.Resource
+		if rv.Spec.RA.Subresource != "" {
+			name += "/" + rv.Spec.RA.Subresource
+		}
+		json.NewEncoder(w).Encode(map[string]any{"status": map[string]any{"allowed": !f.deny[name]}})
 		return
 	case strings.HasSuffix(p, "/events"):
 		w.Write([]byte(`{"items":[{"type":"Normal","reason":"Started","message":"Started container agent","involvedObject":{"kind":"Pod","name":"run"}}]}`))
@@ -103,6 +117,20 @@ func (f *fakeAPI) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		}
 		json.NewEncoder(w).Encode(obj)
 	case http.MethodDelete:
+		var opts struct {
+			Preconditions struct {
+				UID string `json:"uid"`
+			} `json:"preconditions"`
+		}
+		json.NewDecoder(r.Body).Decode(&opts)
+		if want := opts.Preconditions.UID; want != "" {
+			meta, _ := f.objs[p]["metadata"].(map[string]any)
+			if got, _ := meta["uid"].(string); f.objs[p] != nil && got != want {
+				w.WriteHeader(http.StatusConflict)
+				w.Write([]byte(`{"kind":"Status","reason":"Conflict","message":"uid precondition failed"}`))
+				return
+			}
+		}
 		f.deleted = append(f.deleted, p)
 		nsScope := ""
 		if strings.HasPrefix(p, "/api/v1/namespaces/") && strings.Count(p, "/") == 4 {

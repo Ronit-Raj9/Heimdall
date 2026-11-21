@@ -302,6 +302,9 @@ func (p *Planner) plan(ctx context.Context, exp *schemas.Experiment, mode planMo
 			return nil, fmt.Errorf("plan %s: compatibility agent: %w", e.ID, err)
 		}
 		m.Compatibility = &c
+		if err := p.checkTaskTeams(map[string]schemas.ArmManifest{CompatArm: c}, suite, compat); err != nil { // QC2-12-02: the compatibility agent runs task teams too
+			return nil, fmt.Errorf("plan %s: %w", e.ID, err)
+		}
 		if gaps, err := checkCapabilities(&e.Requirements, map[string]schemas.ArmManifest{CompatArm: c}); err != nil {
 			return nil, fmt.Errorf("plan %s: compatibility capabilities: %w", e.ID, err)
 		} else if len(gaps[CompatArm]) > 0 {

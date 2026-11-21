@@ -21,6 +21,14 @@ func TestCheckTaskTeams(t *testing.T) {
 	arm := func(topology string, team []schemas.TeamMember) schemas.ArmManifest {
 		return schemas.ArmManifest{Config: schemas.AgentConfig{Topology: topology, Team: team, Gateway: schemas.GatewayPolicy{Provider: "anthropic"}}}
 	}
+	routed := func(a schemas.ArmManifest) schemas.ArmManifest {
+		a.Config.Gateway.Routing = &schemas.RoutingPolicy{Strategy: schemas.RoutingFixed, Targets: []schemas.RouteTarget{{Model: "m"}}}
+		return a
+	}
+	mcp := func(a schemas.ArmManifest) schemas.ArmManifest {
+		a.Config.Gateway.Bifrost = &schemas.BifrostFeatures{MCP: &schemas.BifrostMCP{}}
+		return a
+	}
 	conds := func(tasks ...string) []condPlan {
 		return []condPlan{{id: "clean", tasks: tasks}, {id: "again", tasks: tasks}}
 	}
@@ -40,6 +48,11 @@ func TestCheckTaskTeams(t *testing.T) {
 		{"task member agent refused", map[string]schemas.ArmManifest{"team": arm(schemas.TopologyTeam, nil)}, []string{"member-agent"},
 			[]string{"arm team, task member-agent: team member agent2 sets agent \"agents/missing.yaml\""}},
 		{"invalid task team", map[string]schemas.ArmManifest{"team": arm(schemas.TopologyTeam, nil)}, []string{"bad-team"}, []string{"arm team, task bad-team: team: member id \"Agent1\""}},
+		{"arm team reusing the task's ids is not the task's (QC2-12-07)", map[string]schemas.ArmManifest{"own": arm(schemas.TopologyTeam, []schemas.TeamMember{{ID: "agent1", Role: "lead"}, {ID: "agent2"}})}, []string{"member-agent"}, nil},
+		{"routing with a task team refused (QC2-12-02)", map[string]schemas.ArmManifest{"routed": routed(arm("", nil))}, []string{"coding-1"},
+			[]string{"arm routed, task coding-1: gateway.routing cannot be combined with the task's team"}},
+		{"bifrost mcp with a task team refused (QC2-12-05)", map[string]schemas.ArmManifest{"mcp": mcp(arm("", nil))}, []string{"coding-1"},
+			[]string{"arm mcp, task coding-1: gateway.bifrost.mcp cannot be combined with the task's team"}},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			err := p.checkTaskTeams(tc.arms, suite, conds(tc.tasks...))

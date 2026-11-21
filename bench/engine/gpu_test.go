@@ -299,8 +299,8 @@ func TestRemoteLeasesGPUSlotsOnlyToFreeGPUs(t *testing.T) {
 	gpuSide := newRemoteSide(t)
 	gpuSide.b.reg.GPUs = gtxPool(t)
 	g := worker("gpu", gpuSide)
-	if l := lease(t, g); l == nil || l.Slot.Task != "t01" {
-		t.Fatalf("the GPU worker gets a GPU slot: %+v", l)
+	if l := lease(t, g); l == nil || l.Slot.Task != "t01" || len(l.GPUs) != 1 || l.GPUs[0] != gpuSide.b.reg.GPUs.Devices()[0].UUID {
+		t.Fatalf("the GPU worker gets a GPU slot naming its reserved device (QC2-10-09): %+v", l)
 	}
 	if l := lease(t, g); l != nil {
 		t.Fatalf("its one GPU is held, so the second GPU slot must wait: %+v", l)

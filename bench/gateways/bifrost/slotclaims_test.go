@@ -662,3 +662,63 @@ func TestLapsedClaimFencesOldRun(t *testing.T) {
 		t.Fatal("the run's key survived a lapsed claim")
 	}
 }
+
+// TestFailedFenceIsRetried is QC2-12-03: a lapsed claim whose virtual key
+// DELETE fails stays fenced, and the next renewal revokes the key.
+func TestFailedFenceIsRetried(t *testing.T) {
+	f := newFakeBifrost(t)
+	proxy := newClaimProxy(t, 1)
+	a, _ := claimGateway(t, f, 1, failingRenew{proxy.client("host-a")}, func(c *Config) { c.ClaimTTL = 5 * time.Minute })
+	ka, err := a.MintKey(context.Background(), runContext("r_old", testModel))
+	if err != nil {
+		t.Fatal(err)
+	}
+	a.mu.Lock()
+	a.claims.until[ka.KeySlot] = time.Now().Add(-time.Second)
+	a.mu.Unlock()
+	f.mu.Lock()
+	if f.down == nil {
+		f.down = map[string]bool{}
+	}
+	f.down["DELETE /api/governance/virtual-keys/{id}"] = true
+	f.mu.Unlock()
+	if !a.renewOnce() {
+		t.Fatal("renewal loop stopped with a fence pending")
+	}
+	if !hasVK(f, ka.ID) {
+		t.Fatal("key gone although its DELETE failed")
+	}
+	f.mu.Lock()
+	f.down["DELETE /api/governance/virtual-keys/{id}"] = false
+	f.mu.Unlock()
+	a.renewOnce()
+	if hasVK(f, ka.ID) {
+		t.Fatal("the failed fence was never retried")
+	}
+	a.mu.Lock()
+	n := len(a.claims.fenced)
+	a.mu.Unlock()
+	if n != 0 || a.renewOnce() {
+		t.Fatalf("fence not dropped after its revocation (%d left)", n)
+	}
+}
+
+// TestFencedPendingMintRefused is QC2-12-03: a claim lost while the run's
+// key is being created makes the mint refuse to publish, and delete, it.
+func TestFencedPendingMintRefused(t *testing.T) {
+	f := newFakeBifrost(t)
+	proxy := newClaimProxy(t, 1)
+	a, _ := claimGateway(t, f, 1, proxy.client("host-a"), nil)
+	slot := "pending-slot"
+	a.mu.Lock()
+	a.inUse[slot] = "pending:r_x"
+	a.mu.Unlock()
+	a.fenceSlot(slot)
+	key := &schemas.RunKey{ID: "vk-x"}
+	if a.publishMint(slot, "pending:r_x", key, mintRecord{slot: slot}) {
+		t.Fatal("a fenced pending mint was published")
+	}
+	if a.publishMint(slot, "pending:r_x", key, mintRecord{slot: slot}) != true {
+		t.Fatal("the fence was not consumed by the refused publication")
+	}
+}
