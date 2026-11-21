@@ -1,7 +1,7 @@
 {
 	"models": {
-		"subtitle": "Provider keys your agents and judges call.",
-		"addKey": "Add key",
+		"subtitle": "API keys let your agents (and the graders) call an AI model. You pay the provider for what they use.",
+		"addKey": "Add API key",
 		"keysCount_one": "{{count}} key",
 		"keysCount_other": "{{count}} keys",
 		"noKeys": "No keys yet",
@@ -16,8 +16,8 @@
 		"nav": "Settings sections",
 		"online": "Online",
 		"offline": "Offline",
-		"startCommand": "Start a runner",
-		"startCommandHint": "Run this on any machine that holds a runner token.",
+		"startCommand": "Start a worker machine",
+		"startCommandHint": "Run this on any machine that has a worker token.",
 		"lastSeen": "Seen",
 		"version": "v{{version}}"
 	}

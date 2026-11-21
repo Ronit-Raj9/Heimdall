@@ -1,18 +1,18 @@
 {
-	"subtitle": "The agents you benchmark. Pick one to run, check or edit.",
+	"subtitle": "An agent is the AI program you want to test, plus the model it uses. Pick one to run, check or edit.",
 	"adapter": {
-		"command": "CLI agent",
-		"remote_http": "HTTP endpoint",
-		"a2a": "A2A agent",
-		"scripted": "Test agent",
-		"other": "Custom"
+		"command": "Runs as a command-line program",
+		"remote_http": "Runs as a web service (HTTP)",
+		"a2a": "Talks over the agent-to-agent protocol (A2A)",
+		"scripted": "Practice agent (no real model, free)",
+		"other": "Custom setup"
 	},
 	"status": {
-		"passed": "Check passed",
-		"failed": "Check failed",
-		"running": "Checking",
-		"never": "Not checked",
-		"broken": "Config error"
+		"passed": "Works",
+		"failed": "Problem: last check failed",
+		"running": "Checking...",
+		"never": "Not checked yet",
+		"broken": "Problem: settings file has an error"
 	},
 	"actions": {
 		"run": "Run",
@@ -21,9 +21,9 @@
 		"open": "Open {{name}}"
 	},
 	"list": {
-		"testAgents": "Test agents",
-		"testAgentsHint": "Scripted controls used for dry runs and admission. Not real agents.",
-		"noModel": "No default model",
+		"testAgents": "Reference agents (used for checks)",
+		"testAgentsHint": "Built-in perfect and do-nothing agents. Heimdall uses them to check that tasks are fair. They are not real agents.",
+		"noModel": "No model chosen",
 		"runs": "{{count}} runs",
 		"runs_one": "{{count}} run"
 	},
@@ -32,43 +32,43 @@
 		"step2": "Name and model",
 		"more": "More options",
 		"pickFirst": "Pick a template to continue.",
-		"builds": "Builds an image"
+		"builds": "Builds a container image"
 	},
 	"detail": {
 		"subtitle": "{{adapter}} on {{model}}",
 		"subtitleNoModel": "{{adapter}}"
 	},
 	"checks": {
-		"title": "Readiness",
-		"subtitle": "Run each step to make sure this agent is ready to benchmark.",
+		"title": "Is this agent ready?",
+		"subtitle": "Run each step to confirm this agent works before you test it on a benchmark.",
 		"lastRun": "Last run {{when}}",
 		"options": "Options",
 		"step": {
-			"check": "Conformance check",
-			"build": "Image build",
+			"check": "Quick test run",
+			"build": "Prepare the container",
 			"diff": "Compare versions"
 		},
 		"hint": {
-			"check": "A free dry run on one task. No model key is used.",
-			"build": "Builds the agent's container image.",
-			"buildNone": "Uses a prebuilt image. Nothing to build.",
-			"diff": "What changed between the two newest versions."
+			"check": "A free practice run on one task. No real model and no API key are used.",
+			"build": "Packages the agent so it can run in its own isolated container.",
+			"buildNone": "Uses a ready-made container. Nothing to prepare.",
+			"diff": "What changed between the two newest versions of this agent."
 		},
 		"state": {
-			"passed": "Passed",
-			"failed": "Failed",
+			"passed": "Works",
+			"failed": "Problem: this step failed",
 			"running": "Running",
 			"never": "Not run yet",
-			"broken": "Config error",
+			"broken": "Problem: settings file has an error",
 			"skipped": "Not needed"
 		}
 	},
 	"config": {
 		"basics": "Basics",
-		"basicsHint": "How the agent runs and which model it uses.",
+		"basicsHint": "How the agent starts and which AI model it uses.",
 		"limits": "Limits",
-		"limitsHint": "Time and resources each task may use.",
+		"limitsHint": "How much time, CPU and memory the agent gets for each task.",
 		"environment": "Environment",
-		"environmentHint": "Command line and variables passed to the agent."
+		"environmentHint": "The command that starts the agent, and settings passed to it."
 	}
 }

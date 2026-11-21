@@ -44,7 +44,7 @@ describe("NewAgentView", () => {
 		const html = render();
 		expect(html).toContain('data-testid="template-codex"');
 		expect(html).toContain('data-testid="template-http-url"');
-		expect(html).toContain("Coding CLIs");
+		expect(html).toContain("Coding command-line tools");
 		expect(html).toContain("Bring your own");
 		expect(html).toContain("Pick a template to continue.");
 	});

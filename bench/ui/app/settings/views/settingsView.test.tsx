@@ -116,7 +116,7 @@ describe("SettingsView", () => {
 	it("shows the six tabs and the organization in hosted mode", () => {
 		const html = render(<SettingsView tab="members" onTabChange={() => undefined} />, hostedSession());
 		for (const tab of ["members", "tokens", "runners", "audit", "org", "account"]) expect(html).toContain(`data-testid="settings-tab-${tab}"`);
-		expect(html).toContain("Members, access and runners of Acme Agents.");
+		expect(html).toContain("Who can use Acme Agents, access keys for scripts, and the machines that run your agents.");
 		expect(html).toContain('data-testid="settings-members"');
 	});
 	it("reads the tab from the URL, members by default", () => {
@@ -207,7 +207,7 @@ describe("RunnersTab", () => {
 	});
 	it("says how to get a first runner", () => {
 		api.q.runners = okQuery({ mode: "live", runners: [] });
-		expect(render(<RunnersTab org={org} />, hostedSession())).toContain("Create a runner token, then start a runner with it.");
+		expect(render(<RunnersTab org={org} />, hostedSession())).toContain("Create a worker token below, then start the worker with it.");
 	});
 	it("shows the role refusal to members (runners are admin)", () => {
 		api.q.runners = errorQuery(403, "runners and runner tokens need the admin role");

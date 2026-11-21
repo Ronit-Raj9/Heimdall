@@ -44,6 +44,6 @@ describe("secrets usage note", () => {
 	it("documents the agent env {{secret.NAME}} reference verbatim", () => {
 		const note = i18n.t("agentUsage", { ns: "secrets", ref: "{{secret.TAVILY_API_KEY}}" });
 		expect(note).toContain("{{secret.TAVILY_API_KEY}}");
-		expect(note).toContain("agent YAML");
+		expect(note).toContain("agent settings");
 	});
 });
