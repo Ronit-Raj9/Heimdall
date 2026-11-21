@@ -4,6 +4,7 @@ package main
 import (
 	_ "github.com/maximhq/bifrost/bench/importers/agentdojo"
 	_ "github.com/maximhq/bifrost/bench/importers/browsecompplus" // X5a
+	_ "github.com/maximhq/bifrost/bench/importers/enterpriseops"  // L14: EnterpriseOps-Gym
 	_ "github.com/maximhq/bifrost/bench/importers/gaia"           // X5a
 	_ "github.com/maximhq/bifrost/bench/importers/harbor"
 	_ "github.com/maximhq/bifrost/bench/importers/impossiblebench"
