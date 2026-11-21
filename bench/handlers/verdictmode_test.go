@@ -68,3 +68,21 @@ func TestVerdictCarriesAnalysisMode(t *testing.T) {
 		})
 	}
 }
+
+// TestScriptedUpstreamVerdictIsSynthetic is QC2-15-01: a scripted_upstream
+// experiment's verdict is synthetic on a live server, even when its stored
+// analysis says live.
+func TestScriptedUpstreamVerdictIsSynthetic(t *testing.T) {
+	d := fullDeps()
+	idx := testIndex()
+	idx.manifests[testExp].Experiment.ScriptedUpstream = true
+	r := router.New()
+	NewExperimentsHandler(schemas.ModeLive, idx, &modeAnalyzer{mode: schemas.ModeLive}, d.launcher, d.catalog, nil).RegisterRoutes(r)
+	ctx := &fasthttp.RequestCtx{}
+	ctx.Request.SetRequestURI(APIPrefix + "/experiments/e_test/verdict")
+	ctx.Request.Header.SetMethod(http.MethodGet)
+	r.Handler(ctx)
+	if got := string(ctx.Response.Header.Peek(lib.ModeHeader)); got != string(schemas.ModeSynthetic) {
+		t.Fatalf("mode %q (status %d), want synthetic", got, ctx.Response.StatusCode())
+	}
+}

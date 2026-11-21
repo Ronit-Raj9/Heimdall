@@ -330,7 +330,16 @@ func (c *Coordinator) Lease(ctx context.Context, workerID string) (*schemas.Work
 		w.info.Running = append(w.info.Running, slot.SlotID)
 		w.info.State = schemas.WorkerRunning
 		c.mu.Unlock()
-		c.journal(r, "leased", l, "")
+		// The reservation is journaled before the lease is answered, so a
+		// coordinator crash or stop never forgets it (QC2-07-02); a lease
+		// whose reservation cannot be made durable is not handed out.
+		if err := c.journalLease(r, l); err != nil {
+			c.mu.Lock()
+			c.endLocked(l, "journal write failed")
+			c.mu.Unlock()
+			r.endRemote(l, true)
+			return nil, fmt.Errorf("lease %s: reservation not journaled: %w", id, err)
+		}
 		r.emit(Event{Kind: EventStage, SlotID: slot.SlotID, Stage: schemas.StageLeased,
 			Message: fmt.Sprintf("leased to remote worker %s (attempt %d)", workerID, attempt)})
 		return c.leaseView(l), nil
@@ -511,7 +520,14 @@ func (c *Coordinator) Complete(ctx context.Context, leaseID string, req *schemas
 		// A run sealed here that then failed verification stays in the
 		// store for an operator (verify/recover); queueing the slot again
 		// would only see it and reject every later upload.
-		l.r.endRemote(l, !unverified)
+		again := !unverified
+		if again && l.r.noteReturned(l.slot.SlotID) >= maxAttempts {
+			// A run that executed and was refused counts toward the slot's
+			// attempt bound across every worker (QC2-07-12).
+			again = false
+			l.r.slotError(l.slot, fmt.Errorf("remote uploads of the slot were rejected or given back %d times; last: %s", maxAttempts, reason))
+		}
+		l.r.endRemote(l, again)
 		return out, nil
 	}
 	out.SealHash = res.Seal.Hash
@@ -654,7 +670,10 @@ func (c *Coordinator) attach(r *schedRun) func() {
 		r.remoteOps.Wait() // every in-flight lease, completion or release call has settled
 		for _, l := range left {
 			c.remove(l.archive)
-			c.journal(r, "stopped", l, "the experiment's scheduler stopped")
+			// The worker may have started and spent: the lease is charged
+			// its reservation, durably, like a lost one (QC2-07-02).
+			usd, known := r.charge(nil, l.est, "stopped lease "+l.id)
+			c.journalCharge(r, "stopped", l, "the experiment's scheduler stopped", usd, known)
 			r.count(func(s *Summary) { s.Pending++ })
 			r.endRemote(l, false)
 		}
@@ -911,7 +930,9 @@ func (c *Coordinator) loseLocked(l *remoteLease, why string) {
 	r.count(func(s *Summary) { s.LeaseLost++ })
 	usd, known := r.charge(nil, l.est, "lost lease "+l.id)
 	r.emit(Event{Kind: EventError, SlotID: l.slot.SlotID, Message: "remote lease lost: " + why})
-	c.journalLocked(r, journalEntry{Event: "lost", Detail: why, ChargedUSD: &usd, CostKnown: known}, l)
+	if err := c.journalLocked(r, journalEntry{Event: "lost", Detail: why, ChargedUSD: &usd, CostKnown: known}, l); err != nil {
+		r.failAccounting(err) // QC2-07-03
+	}
 	r.release(l.est)
 	r.requeue(l.slot)
 }
@@ -976,32 +997,51 @@ type journalEntry struct {
 	// lease.
 	ChargedUSD *float64 `json:"charged_usd,omitempty"`
 	CostKnown  bool     `json:"cost_known,omitempty"`
+	// ReservedUSD is the reservation a leased event set aside. A lease with
+	// no later event (the coordinator crashed) is charged it on resume
+	// (QC2-07-02).
+	ReservedUSD *float64 `json:"reserved_usd,omitempty"`
 }
 
 func (c *Coordinator) journal(r *schedRun, event string, l *remoteLease, detail string) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
-	c.journalLocked(r, journalEntry{Event: event, Detail: detail}, l)
+	if err := c.journalLocked(r, journalEntry{Event: event, Detail: detail}, l); err != nil {
+		c.logger.Warn("remote journal write failed", "experiment", r.m.ExpID, "error", err.Error())
+	}
+}
+
+// journalLease journals a lease and its reservation; the caller refuses the
+// lease when it fails.
+func (c *Coordinator) journalLease(r *schedRun, l *remoteLease) error {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	est := l.est
+	return c.journalLocked(r, journalEntry{Event: "leased", ReservedUSD: &est}, l)
 }
 
 // journalCharge journals an event that charged an unsealed run's spend.
 func (c *Coordinator) journalCharge(r *schedRun, event string, l *remoteLease, detail string, usd float64, known bool) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
-	c.journalLocked(r, journalEntry{Event: event, Detail: detail, ChargedUSD: &usd, CostKnown: known}, l)
+	if err := c.journalLocked(r, journalEntry{Event: event, Detail: detail, ChargedUSD: &usd, CostKnown: known}, l); err != nil {
+		r.failAccounting(err) // QC2-07-03: the charge is not durable, so leasing stops
+	}
 }
 
 // journalLocked appends one journal line (e's event, detail and charge, the
-// rest from l); a failure is logged, never fatal.
-func (c *Coordinator) journalLocked(r *schedRun, e journalEntry, l *remoteLease) {
+// rest from l) and syncs it. It returns the failure: a charge or reservation
+// line is the only durable copy of that spend (QC2-07-03).
+func (c *Coordinator) journalLocked(r *schedRun, e journalEntry, l *remoteLease) error {
 	e.At, e.Lease, e.Worker, e.Slot, e.Attempt = c.now().UTC(), l.id, l.worker, l.slot.SlotID, l.attempt
 	b, err := json.Marshal(e)
 	if err == nil {
-		err = appendFile(filepath.Join(c.opts.StagingDir, r.m.ExpID+".jsonl"), append(b, '\n'))
+		err = appendSynced(filepath.Join(c.opts.StagingDir, r.m.ExpID+".jsonl"), append(b, '\n'))
 	}
 	if err != nil {
-		c.logger.Warn("remote journal write failed", "experiment", r.m.ExpID, "error", err.Error())
+		c.logger.Error("remote journal write failed", "experiment", r.m.ExpID, "event", e.Event, "error", err.Error())
 	}
+	return err
 }
 
 // leaseRemote takes the next slot for a remote worker the way process does
@@ -1232,6 +1272,23 @@ func sameBytesAt(p string, offset int64, data []byte) bool {
 	return bytes.Equal(got, data)
 }
 
+// appendSynced is appendFile that syncs the file before closing it, for the
+// remote journal's accounting lines.
+func appendSynced(p string, data []byte) error {
+	f, err := os.OpenFile(p, os.O_WRONLY|os.O_CREATE|os.O_APPEND, 0o600)
+	if err != nil {
+		return err
+	}
+	_, err = f.Write(data)
+	if err == nil {
+		err = f.Sync()
+	}
+	if cerr := f.Close(); err == nil {
+		err = cerr
+	}
+	return err
+}
+
 func appendFile(p string, data []byte) error {
 	f, err := os.OpenFile(p, os.O_WRONLY|os.O_CREATE|os.O_APPEND, 0o600)
 	if err != nil {
@@ -1254,37 +1311,80 @@ func (c *Coordinator) remove(p string) {
 // remoteCharges reads the remote journal of r's experiment for the spend
 // charged to runs that were never sealed here, one entry per lease, so a
 // resumed scheduler counts that spend again: sealed runs alone would reset
-// it. The journal is under the attached coordinator's staging folder, else
-// the default one under the store root. No journal means no charges; a line
-// that does not parse is skipped with a warning.
-func (r *schedRun) remoteCharges() ([]journalEntry, error) {
+// it. A lease whose run is sealed in the store (sealed, keyed by lease id)
+// is counted by its seal only, never again by a charge (QC2-07-08). A lease
+// with a journaled reservation and no later event, left by a coordinator
+// crash, is charged that reservation as an unknown cost (QC2-07-02). The
+// journal is under the attached coordinator's staging folder, else the
+// default one under the store root. No journal means no charges. torn
+// counts lines that do not parse: each may have been a charge, so the
+// caller counts it at the per-run estimate (QC2-07-03).
+func (r *schedRun) remoteCharges(sealed map[string]bool) (out []journalEntry, torn int, _ error) {
 	dir := filepath.Join(r.s.reg.Store.Root(), stagingFolder)
 	if r.opts.Remote != nil && r.opts.Remote.opts.StagingDir != "" {
 		dir = r.opts.Remote.opts.StagingDir
 	}
 	b, err := os.ReadFile(filepath.Join(dir, r.m.ExpID+".jsonl"))
 	if errors.Is(err, fs.ErrNotExist) {
-		return nil, nil
+		return nil, 0, nil
 	}
 	if err != nil {
-		return nil, fmt.Errorf("read remote journal: %w", err)
+		return nil, 0, fmt.Errorf("read remote journal: %w", err)
 	}
-	var out []journalEntry
-	seen := map[string]bool{}
+	charged := map[string]bool{}
+	ended := map[string]bool{}
+	if r.returned == nil {
+		r.returned = map[string]int{}
+	}
+	var open []journalEntry
 	for _, line := range bytes.Split(b, []byte("\n")) {
 		if len(bytes.TrimSpace(line)) == 0 {
 			continue
 		}
 		var e journalEntry
 		if err := json.Unmarshal(line, &e); err != nil {
-			r.s.logger.Warn("unreadable remote journal line", "experiment", r.m.ExpID, "error", err.Error())
+			r.s.logger.Warn("unreadable remote journal line; counted at the per-run estimate", "experiment", r.m.ExpID, "error", err.Error())
+			torn++
 			continue
 		}
-		if e.ChargedUSD == nil || *e.ChargedUSD < 0 || seen[e.Lease] {
+		if e.Event != "leased" {
+			ended[e.Lease] = true
+		}
+		if (e.Event == "rejected" || e.Event == "released") && e.Slot != "" {
+			r.returned[e.Slot]++ // QC2-07-12: returns of earlier sessions count toward the slot's bound
+		}
+		switch {
+		case e.Event == "leased":
+			if e.ReservedUSD != nil {
+				open = append(open, e)
+			}
+		case e.ChargedUSD == nil || *e.ChargedUSD < 0 || charged[e.Lease] || sealed[e.Lease]:
+		default:
+			charged[e.Lease] = true
+			out = append(out, e)
+		}
+	}
+	for _, e := range open {
+		if ended[e.Lease] || sealed[e.Lease] {
 			continue
 		}
-		seen[e.Lease] = true
+		usd := max(*e.ReservedUSD, 0)
+		e.Event, e.ChargedUSD, e.CostKnown = "unsettled", &usd, false
 		out = append(out, e)
 	}
-	return out, nil
+	return out, torn, nil
+}
+
+// remoteLeaseOf is the lease id of a run a remote worker sealed and the
+// coordinator stored (remote/worker.json), or "" for a local run.
+func remoteLeaseOf(dir string) string {
+	b, err := os.ReadFile(filepath.Join(dir, remoteFolder, "worker.json"))
+	if err != nil {
+		return ""
+	}
+	var rec remoteRecord
+	if json.Unmarshal(b, &rec) != nil {
+		return ""
+	}
+	return rec.LeaseID
 }

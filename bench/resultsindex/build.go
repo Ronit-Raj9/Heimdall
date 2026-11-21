@@ -372,7 +372,7 @@ func suiteRef(m *schemas.Manifest) string {
 func classify(m *schemas.Manifest, srs []schemas.SealedRun) map[string]bool {
 	out := map[string]bool{}
 	for id, arm := range m.Arms {
-		out[id] = m.Experiment.Smoke || arm.Config.Adapter == adapterScripted || arm.Config.Scripted != nil
+		out[id] = m.Experiment.NoPaidTraffic() || arm.Config.Adapter == adapterScripted || arm.Config.Scripted != nil
 	}
 	for i := range srs {
 		sr := &srs[i]
@@ -380,7 +380,7 @@ func classify(m *schemas.Manifest, srs []schemas.SealedRun) map[string]bool {
 		if out[arm] || sealProblem(sr) != "" {
 			continue
 		}
-		if _, ok := m.Arms[arm]; !ok && (m.Experiment.Smoke || sr.Run.Agent.Adapter == adapterScripted) {
+		if _, ok := m.Arms[arm]; !ok && (m.Experiment.NoPaidTraffic() || sr.Run.Agent.Adapter == adapterScripted) {
 			out[arm] = true
 			continue
 		}

@@ -1101,6 +1101,12 @@ func (p *Planner) checkUpstreams(ctx context.Context, m *schemas.Manifest, extra
 	if p.upstreams == nil {
 		return nil
 	}
+	if m.Experiment.NoPaidTraffic() {
+		// Every model call of a smoke or scripted_upstream experiment is
+		// answered by the scripted model, so no real provider has to be
+		// reachable (QC2-15-03).
+		return nil
+	}
 	used := armProviders(m)
 	for _, prov := range sortedKeys(extra) {
 		used[prov] = append(used[prov], extra[prov]...)

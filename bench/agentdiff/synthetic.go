@@ -27,7 +27,7 @@ var scriptedResponseID = regexp.MustCompile(`^(?:(?:msg|resp)_|chatcmpl-)[0-9a-z
 // because the leaderboard keeps it unexported and this package depends on
 // no other feature package.
 func syntheticArm(src Source, a *armRecord, cands []candidate) (bool, error) {
-	if a.m.Experiment.Smoke || a.arm.Config.Adapter == adapterScripted || a.arm.Config.Scripted != nil {
+	if a.m.Experiment.NoPaidTraffic() || a.arm.Config.Adapter == adapterScripted || a.arm.Config.Scripted != nil {
 		return true, nil
 	}
 	for _, c := range cands {

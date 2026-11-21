@@ -119,10 +119,10 @@ func SyntheticArms(ctx context.Context, m *schemas.Manifest, runs []schemas.Seal
 		return out, nil
 	}
 	for id, arm := range m.Arms {
-		out[id] = m.Experiment.Smoke || arm.Config.Adapter == adapterScripted || arm.Config.Scripted != nil
+		out[id] = m.Experiment.NoPaidTraffic() || arm.Config.Adapter == adapterScripted || arm.Config.Scripted != nil
 	}
 	if m.Compatibility != nil {
-		out["compat"] = m.Experiment.Smoke || m.Compatibility.Config.Adapter == adapterScripted || m.Compatibility.Config.Scripted != nil
+		out["compat"] = m.Experiment.NoPaidTraffic() || m.Compatibility.Config.Adapter == adapterScripted || m.Compatibility.Config.Scripted != nil
 	}
 	if read == nil {
 		return out, nil

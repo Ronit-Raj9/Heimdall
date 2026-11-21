@@ -15,17 +15,21 @@ var _ schemas.Metric = (*retryAmplificationMetric)(nil)
 // cost. 1.0 means no retries and no fallbacks.
 type retryAmplificationMetric struct{}
 
+// retryAmplificationVersion is 1.1.0 since a cache hit with an empty
+// attempt trail is no physical attempt (QC2-04-05).
+const retryAmplificationVersion = "1.1.0"
+
 // GetName implements schemas.Part.
 func (m *retryAmplificationMetric) GetName() string { return RetryAmplification }
 
 // GetVersion implements schemas.Part.
-func (m *retryAmplificationMetric) GetVersion() string { return version }
+func (m *retryAmplificationMetric) GetVersion() string { return retryAmplificationVersion }
 
 // Descriptor implements schemas.Metric.
 func (m *retryAmplificationMetric) Descriptor() schemas.MetricDescriptor {
 	return schemas.MetricDescriptor{
 		Name:           RetryAmplification,
-		Version:        version,
+		Version:        retryAmplificationVersion,
 		Label:          "Retry amplification",
 		Kind:           schemas.KindCount,
 		HigherIsBetter: false,

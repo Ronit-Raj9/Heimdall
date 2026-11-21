@@ -286,3 +286,20 @@ func TestRemoteHTTPLauncherTLS(t *testing.T) {
 		t.Fatalf("wrong host name accepted: answer %q, err %v\n%s", answer, err, out)
 	}
 }
+
+// TestRemoteHTTPNoPaidNeedsGateway is QC2-15-08: a no-paid run never goes to
+// a remote agent whose model traffic is outside the bench.
+func TestRemoteHTTPNoPaidNeedsGateway(t *testing.T) {
+	for _, traffic := range []string{"", RemoteTrafficExternal} {
+		rc, cfg := remoteFixture(t, remoteAgent(traffic))
+		rc.NoPaidTraffic = true
+		if _, err := newRemoteHTTPAdapter(cfg).Plan(context.Background(), rc); err == nil || !strings.Contains(err.Error(), "model_traffic gateway") {
+			t.Fatalf("traffic %q: err %v", traffic, err)
+		}
+	}
+	rc, cfg := remoteFixture(t, remoteAgent(RemoteTrafficGateway))
+	rc.NoPaidTraffic = true
+	if _, err := newRemoteHTTPAdapter(cfg).Plan(context.Background(), rc); err != nil {
+		t.Fatal(err)
+	}
+}

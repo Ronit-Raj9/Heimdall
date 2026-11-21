@@ -1,6 +1,8 @@
 package main
 
 import (
+	"os"
+	"regexp"
 	"strings"
 	"testing"
 
@@ -17,5 +19,17 @@ func TestSpendNoteNamesTheBasis(t *testing.T) {
 	mod := spendNote(&engine.Summary{SpentUSD: 1.5, SpendBasis: engine.SpendModeled})
 	if !strings.Contains(mod, "1.5000 USD modeled") || !strings.Contains(mod, "not a provider bill") {
 		t.Fatalf("modeled note %q", mod)
+	}
+}
+
+// TestRunKeepsSchedulerSpendBasis is QC2-15-02: the run command never
+// replaces the scheduler's spend basis from the server's display mode.
+func TestRunKeepsSchedulerSpendBasis(t *testing.T) {
+	src, err := os.ReadFile("run.go")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if regexp.MustCompile(`SpendBasis\s*=[^=]`).Match(src) {
+		t.Fatal("run.go overwrites the scheduler's spend basis")
 	}
 }

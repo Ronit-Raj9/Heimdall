@@ -668,6 +668,43 @@ func loadScheduled(path string) (*schemas.Experiment, error) {
 	return &schemas.Experiment{Name: "canary-" + d.Name, Smoke: d.Smoke, Budget: schemas.BudgetSpec{TotalUSD: d.Budget.PerRunUSD}}, nil
 }
 
+// canaryScheduleOptions checks a scheduled canary's definition, read for
+// the run, against what the daemon approved (QC2-15-05), and gives the run
+// an allowance hook: a look past the one the daemon reserved (the
+// confirmation) first reserves its per-run cap under the schedule's daily
+// cap, so the stricter of the schedule's and the canary's daily caps holds
+// (QC2-15-04).
+func canaryScheduleOptions(d *canary.Definition, ap *schedule.Approval) (canary.RunOptions, error) {
+	if ap == nil {
+		return canary.RunOptions{}, nil
+	}
+	if !ap.Limited {
+		if !d.Smoke {
+			return canary.RunOptions{}, errors.New("the canary definition changed since the daily cap check: it is no longer a smoke canary, and the schedule has no max_usd_per_day")
+		}
+		return canary.RunOptions{}, nil
+	}
+	if err := ap.CheckCap(d.Budget.PerRunUSD); err != nil {
+		return canary.RunOptions{}, err
+	}
+	reserved := ap.CapUSD
+	allow := func(spent float64) string {
+		need := spent + d.Budget.PerRunUSD - reserved
+		if need <= 1e-9 {
+			return ""
+		}
+		if ap.Reserve == nil {
+			return "the schedule reserved no room for another look today"
+		}
+		if why := ap.Reserve(need); why != "" {
+			return why
+		}
+		reserved += need
+		return ""
+	}
+	return canary.RunOptions{Allow: allow}, nil
+}
+
 // isCanarySchedule reports whether a daemon schedule is a canary.
 func isCanarySchedule(a *app, s schedule.Schedule) bool {
 	return s.Job == "" && isCanaryFile(schedule.Resolve(a.cfg.Root, s.Experiment))
@@ -682,7 +719,11 @@ func runCanarySchedule(ctx context.Context, a *app, s schedule.Schedule) (*sched
 	if err != nil {
 		return nil, err
 	}
-	recs, err := newCanaryRunner(a).Run(ctx, d, canary.RunOptions{})
+	opts, err := canaryScheduleOptions(d, s.Approved)
+	if err != nil {
+		return nil, err
+	}
+	recs, err := newCanaryRunner(a).Run(ctx, d, opts)
 	res := &schedule.Result{}
 	for _, r := range recs {
 		res.CostUSD += r.CostUSD

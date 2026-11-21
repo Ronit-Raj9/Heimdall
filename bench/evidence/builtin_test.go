@@ -38,7 +38,7 @@ func TestBuiltinOrder(t *testing.T) {
 				t.Errorf("source %d is %q, want %q", i, s.GetName(), want[i])
 			}
 			wantVersion := "1.0.0"
-			if s.GetName() == AgentStream {
+			if s.GetName() == AgentStream || s.GetName() == ToolLedger { // QC2-04-05: the tool ledger refuses incomplete witnesses since 1.1.0
 				wantVersion = "1.1.0"
 			}
 			if s.GetVersion() != wantVersion {

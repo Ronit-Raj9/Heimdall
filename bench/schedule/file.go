@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"io/fs"
+	"math"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -46,6 +47,59 @@ type Schedule struct {
 	// Jobs); such a schedule names no experiment and spends nothing. Failure
 	// inbox area: inbox-pull (docs/failure-inbox.md).
 	Job string `json:"job,omitempty" yaml:"job,omitempty"`
+
+	// Approved is what the daemon's cap check approved for this trigger; the
+	// daemon sets it on the copy it hands the Runner, never in the file. A
+	// Runner checks the experiment it actually runs against it, so a file
+	// replaced between the check and the run cannot spend past the cap the
+	// daemon approved (QC2-15-05).
+	Approved *Approval `json:"-" yaml:"-"`
+}
+
+// Approval is the daemon's cap decision for one trigger (Schedule.Approved).
+type Approval struct {
+	// CapUSD is the experiment spend cap (budget.total_usd, a canary's
+	// per_run_usd) the daemon checked and reserved; 0 with Limited false.
+	CapUSD float64
+	// Limited is false only for a smoke schedule without max_usd_per_day.
+	Limited bool
+	// Reserve durably adds usd to today's reservation before more spend
+	// starts (a canary's confirmation look) and returns why it may not, or
+	// "". nil when nothing more may be reserved.
+	Reserve func(usd float64) string
+}
+
+// CheckExperiment returns why exp may not run under the approval, or nil:
+// with a daily cap its spend cap must be a finite, positive amount within
+// the approved one; without one it must be a smoke experiment.
+func (a *Approval) CheckExperiment(exp *schemas.Experiment) error {
+	if a == nil || exp == nil {
+		return nil
+	}
+	if !a.Limited {
+		if !exp.Smoke {
+			return errors.New("the experiment file changed since the daily cap check: it is no longer a smoke experiment, and the schedule has no max_usd_per_day")
+		}
+		return nil
+	}
+	return a.CheckCap(exp.Budget.TotalUSD)
+}
+
+// CheckCap returns why a run with spend cap usd may not start under the
+// approval, or nil.
+func (a *Approval) CheckCap(usd float64) error {
+	if a == nil || !a.Limited {
+		return nil
+	}
+	if !finitePositive(usd) || usd > a.CapUSD+1e-9 {
+		return fmt.Errorf("the experiment file changed since the daily cap check: its spend cap %v USD is not within the approved %.2f USD", usd, a.CapUSD)
+	}
+	return nil
+}
+
+// finitePositive reports whether v is a finite number above zero.
+func finitePositive(v float64) bool {
+	return v > 0 && !math.IsInf(v, 0) && !math.IsNaN(v)
 }
 
 // Built-in jobs (Schedule.Job). The CLI's runner implements each.
@@ -201,8 +255,8 @@ func (s Schedule) Validate(root string, load ExperimentLoader) error {
 	if c.Next(time.Now().In(loc)).IsZero() {
 		return wrap("cron %q never fires", s.Cron)
 	}
-	if s.MaxUSDPerDay < 0 {
-		return wrap("max_usd_per_day %v is negative", s.MaxUSDPerDay)
+	if s.MaxUSDPerDay < 0 || math.IsNaN(s.MaxUSDPerDay) || math.IsInf(s.MaxUSDPerDay, 0) { // QC2-15-09: a non-finite cap never holds
+		return wrap("max_usd_per_day %v is not a finite, non-negative number", s.MaxUSDPerDay)
 	}
 	for _, d := range s.FailOn {
 		switch schemas.Decision(d) {
@@ -249,7 +303,7 @@ func (s Schedule) Validate(root string, load ExperimentLoader) error {
 	if s.MaxUSDPerDay <= 0 {
 		return wrap("max_usd_per_day is required for a non-smoke experiment, so a forgotten schedule cannot spend without limit")
 	}
-	if exp.Budget.TotalUSD <= 0 {
+	if !finitePositive(exp.Budget.TotalUSD) {
 		return wrap("experiment %s has no spend cap (budget.total_usd); a scheduled non-smoke experiment needs one so max_usd_per_day can hold", s.Experiment)
 	}
 	if exp.Budget.TotalUSD > s.MaxUSDPerDay {

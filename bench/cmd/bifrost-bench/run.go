@@ -237,9 +237,8 @@ func (a *app) execute(ctx context.Context, m *schemas.Manifest, concurrency int)
 	close(events)
 	<-done
 	if sum != nil {
-		if a.cfg.Server.Mode == schemas.ModeSynthetic {
-			sum.SpendBasis = engine.SpendSimulated // scripted model answers (BENCH_SERVER_MODE=synthetic)
-		}
+		// The scheduler's spend basis stands: the server's display mode
+		// proves nothing about where model calls went (QC2-15-02).
 		b, _ := json.Marshal(sum)
 		fmt.Fprintf(os.Stderr, "summary: %s\n", b)
 		fmt.Fprintln(os.Stderr, spendNote(sum))

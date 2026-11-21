@@ -72,7 +72,7 @@ func (h *ResearchHandler) getResearch(ctx *fasthttp.RequestCtx) {
 func ExperimentResearch(index ReadIndex, m *schemas.Manifest, condition string) (*schemas.ResearchSummary, error) {
 	ext := m.Experiment.External
 	out := &schemas.ResearchSummary{ExpID: m.ExpID, Suite: m.SuiteID + "@" + m.SuiteVersion, Condition: condition,
-		Replay: ext == "" || ext == schemas.ExternalReplay, Synthetic: m.Experiment.Smoke, Arms: []schemas.ResearchArm{}}
+		Replay: ext == "" || ext == schemas.ExternalReplay, Synthetic: m.Experiment.NoPaidTraffic(), Arms: []schemas.ResearchArm{}}
 	byArm := map[string][]map[string]schemas.Value{}
 	for _, rv := range countedRuns(index.Runs(m.ExpID)) {
 		if !rv.Sealed || !rv.Slot.Counted || rv.Slot.Condition != condition {

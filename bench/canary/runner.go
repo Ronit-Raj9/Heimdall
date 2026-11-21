@@ -79,6 +79,11 @@ type RunOptions struct {
 	Inject string
 	// NoConfirm skips the immediate confirmation look after a flag.
 	NoConfirm bool
+	// Allow, when set, is asked before each look with what this Run's
+	// earlier looks cost and returns why the look may not start, or "". The
+	// schedule daemon sets it so a confirmation look fits the schedule's
+	// daily cap too, not only the canary's own (QC2-15-04).
+	Allow func(spentUSD float64) string
 }
 
 // BaselineOptions tune `canary baseline`.
@@ -120,14 +125,22 @@ func (r *Runner) Run(ctx context.Context, d *Definition, opts RunOptions) ([]Rec
 	if base == nil {
 		return nil, ErrNoBaseline
 	}
-	rec, err := r.look(ctx, d, base, KindRun, opts.Inject)
+	rec, err := r.look(ctx, d, base, KindRun, opts.Inject, opts.allow(0))
 	out := []Record{rec}
 	if err != nil || opts.NoConfirm || rec.Outcome != OutcomeFlagged || rec.State != StateWatching {
 		return out, err
 	}
 	r.logger().Info("canary flagged; taking a confirmation look now", "canary", d.Name, "flagged", strings.Join(rec.Comparison.Flagged, ", "))
-	conf, err := r.look(ctx, d, base, KindConfirmation, opts.Inject)
+	conf, err := r.look(ctx, d, base, KindConfirmation, opts.Inject, opts.allow(rec.CostUSD))
 	return append(out, conf), err
+}
+
+// allow binds Allow to what the earlier looks spent; nil without Allow.
+func (o RunOptions) allow(spent float64) func() string {
+	if o.Allow == nil {
+		return nil
+	}
+	return func() string { return o.Allow(spent) }
 }
 
 // Baseline pins a known-good baseline: a fresh run of the frozen config, or
@@ -208,7 +221,7 @@ func (r *Runner) Baseline(ctx context.Context, d *Definition, opts BaselineOptio
 }
 
 // look is one comparison against the baseline.
-func (r *Runner) look(ctx context.Context, d *Definition, base *Baseline, kind, inject string) (Record, error) {
+func (r *Runner) look(ctx context.Context, d *Definition, base *Baseline, kind, inject string, allow func() string) (Record, error) {
 	records, err := ReadRecords(r.Root, d.Name)
 	if err != nil {
 		return Record{}, err
@@ -233,6 +246,11 @@ func (r *Runner) look(ctx context.Context, d *Definition, base *Baseline, kind, 
 	// The daily cap is checked before anything is planned.
 	if reason := r.capRefusal(d, records); reason != "" {
 		return finish(OutcomeRefused, prevState, deferred(reason), alerts.EventScheduleFailed)
+	}
+	if allow != nil {
+		if reason := allow(); reason != "" {
+			return finish(OutcomeRefused, prevState, deferred(reason), alerts.EventScheduleFailed)
+		}
 	}
 	plan, err := r.Exec.Plan(ctx, d, inject)
 	if err != nil {
@@ -320,6 +338,9 @@ func (r *Runner) look(ctx context.Context, d *Definition, base *Baseline, kind, 
 // the daily cap, because the engine may spend up to the cap before it stops
 // leasing.
 func (r *Runner) capRefusal(d *Definition, records []Record) string {
+	if !finite(d.Budget.PerRunUSD) || !finite(d.Budget.PerDayUSD) { // QC2-15-09
+		return "budget caps must be finite numbers"
+	}
 	if !d.Smoke && (d.Budget.PerRunUSD <= 0 || d.Budget.PerDayUSD <= 0) {
 		return "budget.per_run_usd and budget.per_day_usd are required for a canary that can spend"
 	}

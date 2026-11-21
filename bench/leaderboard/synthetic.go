@@ -50,7 +50,7 @@ func classify(ctx context.Context, src Source, recs []*record) (map[string]bool,
 		}
 		group := byKey[k]
 		// A declared smoke experiment stays off the live board even with a real agent.
-		if e := group[0].exp; e != nil && e.m != nil && e.m.Experiment.Smoke {
+		if e := group[0].exp; e != nil && e.m != nil && e.m.Experiment.NoPaidTraffic() {
 			out[k] = true
 			continue
 		}

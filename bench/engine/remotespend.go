@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"io/fs"
+	"math"
 	"os"
 	"path/filepath"
 	"sync"
@@ -40,24 +41,41 @@ type spendState struct {
 }
 
 func newRunnerSpend(capUSD float64, path string) (*runnerSpend, error) {
+	if math.IsNaN(capUSD) || math.IsInf(capUSD, 0) { // QC2-07-11: a non-finite cap never trips
+		return nil, fmt.Errorf("spend cap %v is not a finite number", capUSD)
+	}
 	if capUSD <= 0 {
 		return nil, nil
 	}
 	s := &runnerSpend{capUSD: capUSD, path: path, now: time.Now}
-	if path == "" {
-		return s, nil
-	}
-	b, err := os.ReadFile(path)
-	switch {
-	case errors.Is(err, fs.ErrNotExist):
-	case err != nil:
-		return nil, fmt.Errorf("spend file: %w", err)
-	default:
-		if err := json.Unmarshal(b, &s.state); err != nil {
-			return nil, fmt.Errorf("spend file %s: %w", path, err)
-		}
+	if err := s.load(); err != nil {
+		return nil, err
 	}
 	return s, nil
+}
+
+// load reads the spend file into state; a missing file is an empty total.
+// The caller holds mu or owns s alone.
+func (s *runnerSpend) load() error {
+	if s.path == "" {
+		return nil
+	}
+	b, err := os.ReadFile(s.path)
+	switch {
+	case errors.Is(err, fs.ErrNotExist):
+		return nil
+	case err != nil:
+		return fmt.Errorf("spend file: %w", err)
+	}
+	var st spendState
+	if err := json.Unmarshal(b, &st); err != nil {
+		return fmt.Errorf("spend file %s: %w", s.path, err)
+	}
+	if math.IsNaN(st.SpentUSD) || math.IsInf(st.SpentUSD, 0) || st.SpentUSD < 0 {
+		return fmt.Errorf("spend file %s: spent_usd %v is not a finite, non-negative number", s.path, st.SpentUSD)
+	}
+	s.state = st
+	return nil
 }
 
 // rollLocked starts a new day's total. The caller holds mu.
@@ -68,34 +86,55 @@ func (s *runnerSpend) rollLocked() {
 }
 
 // reached reports whether today's spend is at or past the cap, and the
-// total.
+// total. It reads the file again, so a total another runner process on the
+// same runs root added is seen; a file that cannot be read counts as
+// reached (fail closed).
 func (s *runnerSpend) reached() (bool, float64) {
 	if s == nil {
 		return false, 0
 	}
 	s.mu.Lock()
 	defer s.mu.Unlock()
+	if err := s.load(); err != nil {
+		return true, s.state.SpentUSD
+	}
 	s.rollLocked()
 	return s.state.SpentUSD >= s.capUSD, s.state.SpentUSD
 }
 
-// add charges one finished run: its observed cost, else the experiment's
-// reserve, else DefaultUnknownRunUSD. A run whose agent never started costs
-// nothing.
+// add charges one finished run: its observed cost, else its observed part
+// plus the experiment's reserve, else plus DefaultUnknownRunUSD. A run whose
+// agent never started costs nothing. Under an interprocess lock it reads the
+// file again and adds to that total, so runner processes sharing one runs
+// root never overwrite each other's spend (QC2-07-09).
 func (s *runnerSpend) add(res *SlotResult, m *schemas.Manifest) error {
 	if s == nil || res == nil || res.Run == nil {
 		return nil
 	}
 	c, ok := spendCost(res.Dir, res.Metrics, res.Run)
 	unknown := !ok
-	if unknown {
-		c = DefaultUnknownRunUSD
+	if unknown { // the observed subtotal stays; the estimate covers only the unknown rest (QC2-07-01)
+		est := DefaultUnknownRunUSD
 		if m != nil && m.Experiment.Budget.ReserveUSD > 0 {
-			c = m.Experiment.Budget.ReserveUSD
+			est = m.Experiment.Budget.ReserveUSD
 		}
+		c += est
 	}
 	s.mu.Lock()
 	defer s.mu.Unlock()
+	if s.path != "" {
+		if err := os.MkdirAll(filepath.Dir(s.path), 0o700); err != nil {
+			return err
+		}
+		unlock, err := lockSpendFile(s.path)
+		if err != nil {
+			return err
+		}
+		defer unlock()
+		if err := s.load(); err != nil {
+			return err
+		}
+	}
 	s.rollLocked()
 	s.state.SpentUSD += c
 	s.state.Runs++
@@ -109,12 +148,20 @@ func (s *runnerSpend) add(res *SlotResult, m *schemas.Manifest) error {
 	if err != nil {
 		return err
 	}
-	if err := os.MkdirAll(filepath.Dir(s.path), 0o700); err != nil {
+	tmp, err := os.CreateTemp(filepath.Dir(s.path), filepath.Base(s.path)+".*.tmp")
+	if err != nil {
 		return err
 	}
-	tmp := s.path + ".tmp"
-	if err := os.WriteFile(tmp, b, 0o600); err != nil {
+	_, err = tmp.Write(b)
+	if err == nil {
+		err = tmp.Sync()
+	}
+	if cerr := tmp.Close(); err == nil {
+		err = cerr
+	}
+	if err != nil {
+		os.Remove(tmp.Name())
 		return err
 	}
-	return os.Rename(tmp, s.path)
+	return os.Rename(tmp.Name(), s.path)
 }

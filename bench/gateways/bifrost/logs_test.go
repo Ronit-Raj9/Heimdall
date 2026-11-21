@@ -217,3 +217,18 @@ func TestDroppedLogs(t *testing.T) {
 		})
 	}
 }
+
+// TestDirectEmptyLogNotComplete is QC2-07-10: an empty direct-provider log
+// has no ledger witness, so it is never a complete, provably free log.
+func TestDirectEmptyLogNotComplete(t *testing.T) {
+	_, g := fakeWithRows(t)
+	g.providers = append(g.providers, ProviderSetup{Name: "openai", Mode: ModeDirect, Slots: []Slot{{Name: "oa-slot-1"}}})
+	key := &schemas.RunKey{ID: fixtureKey.ID, KeySlot: "oa-slot-1"}
+	log, err := g.FetchRequests(context.Background(), key, schemas.FetchExpectation{Timeout: 2 * time.Second, PollEvery: 10 * time.Millisecond})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if log.Complete || !strings.Contains(log.Reason, "direct provider") {
+		t.Fatalf("direct empty log complete=%t reason %q", log.Complete, log.Reason)
+	}
+}

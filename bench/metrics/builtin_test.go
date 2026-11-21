@@ -116,6 +116,9 @@ func TestBuiltin(t *testing.T) {
 			if tt.name == ToolCallsExecuted {
 				want = toolCallsExecutedVersion // ledger and observer witnesses count since 1.1.0
 			}
+			if tt.name == CostUSD || tt.name == RetryAmplification {
+				want = "1.1.0" // QC2-04-05: changed semantics carry a new version
+			}
 			if tt.name == InsecureFindings || tt.name == InsecureFindingsHigh || tt.name == SecretsAdded {
 				want = codescan.RulesVersion // X4: code scan metrics follow the rules
 			}

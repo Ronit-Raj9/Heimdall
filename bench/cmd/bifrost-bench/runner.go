@@ -6,6 +6,7 @@ import (
 	"flag"
 	"fmt"
 	"io"
+	"math"
 	"os"
 	"os/signal"
 	"path/filepath"
@@ -80,8 +81,8 @@ func parseRunnerFlags(cmd string, args []string) (*runnerFlags, error) {
 		return nil, errors.New("-server and -token-file are required")
 	case f.slots < 1 || f.slots > 64:
 		return nil, errors.New("-slots must be 1 to 64")
-	case f.spendCap < 0:
-		return nil, errors.New("-spend-cap-usd must not be negative")
+	case f.spendCap < 0 || math.IsNaN(f.spendCap) || math.IsInf(f.spendCap, 0): // QC2-07-11: a non-finite cap never trips
+		return nil, errors.New("-spend-cap-usd must be a finite number, not negative")
 	case f.pool != "" && !schemas.ValidPoolName(f.pool):
 		return nil, fmt.Errorf("-pool %q: 1 to 64 letters, digits, '.', '_' or '-'", f.pool)
 	}

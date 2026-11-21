@@ -455,13 +455,15 @@ func (p *Pipeline) measure(ctx context.Context, st *runState) error {
 	return errors.Join(errs...)
 }
 
-// accountingMetrics returns the registered cost metrics the scheduler's
-// spend cap reads that the experiment's display selection left out. A
-// positive budget.total_usd always needs the measured cost, so choosing a
-// metric subset never turns a measurable run into an unknown one charged at
-// the per-run estimate. The values land in metrics.json, so resume sees them.
+// accountingMetrics returns the registered cost metrics the spend caps read
+// that the experiment's display selection left out. Every cap (the
+// experiment's budget.total_usd, a runner's own daily cap, a schedule's daily
+// cap) needs the measured cost, whatever the experiment's budget, so choosing
+// a metric subset never turns a measurable run into an unknown one charged at
+// the per-run estimate (QC2-07-06). The values land in metrics.json, so
+// resume sees them.
 func accountingMetrics(reg *schemas.Registry, e *schemas.Experiment, selected []schemas.Metric) []schemas.Metric {
-	if reg == nil || e == nil || e.Budget.TotalUSD <= 0 {
+	if reg == nil || e == nil {
 		return nil
 	}
 	have := map[string]bool{}

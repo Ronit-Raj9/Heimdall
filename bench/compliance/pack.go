@@ -139,8 +139,8 @@ func experimentWarnings(ex *ExperimentInput) []string {
 	} else if ex.Analysis.Mode == schemas.ModeSynthetic {
 		w = append(w, fmt.Sprintf("%s: synthetic mode; its runs are not findings", id))
 	}
-	if ex.Manifest.Experiment.Smoke {
-		w = append(w, fmt.Sprintf("%s: smoke experiment; its runs are never findings", id))
+	if ex.Manifest.Experiment.NoPaidTraffic() {
+		w = append(w, fmt.Sprintf("%s: smoke or scripted_upstream experiment; its runs are never findings", id))
 	}
 	if ex.Probes == nil {
 		w = append(w, fmt.Sprintf("%s: suite %s could not be loaded; probes are mapped by id only", id, ex.Manifest.SuiteID))

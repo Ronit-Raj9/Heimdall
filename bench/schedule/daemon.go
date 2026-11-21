@@ -8,6 +8,7 @@ import (
 	"errors"
 	"fmt"
 	"io/fs"
+	"math"
 	"os"
 	"path/filepath"
 	"slices"
@@ -258,18 +259,50 @@ func (d *Daemon) trigger(ctx context.Context, s Schedule, at time.Time) Record {
 		return d.finish(ctx, s, rec, []string{alerts.EventScheduleFailed})
 	}
 	day := rec.Started.In(loc).Format(time.DateOnly)
-	if reason := d.capRefusal(s, day); reason != "" {
+	approval, reason := d.approve(s, day)
+	if reason != "" {
 		rec.Status, rec.Reason = StatusRefused, reason
 		rec.SpentTodayUSD = d.spent(s.Name, day)
 		d.o.Logger.Warn("schedule run refused", "schedule", s.Name, "reason", reason)
 		return d.finish(ctx, s, rec, []string{alerts.EventScheduleFailed})
 	}
+	// The approved cap is reserved in the ledger before the run starts, so
+	// a crash or a failed settlement after spending never frees it
+	// (QC2-15-10); the settlement below replaces it with the run's cost.
+	var reserved float64
+	if approval != nil && approval.Limited {
+		if _, err := d.addAmount(s.Name, day, approval.CapUSD); err != nil {
+			rec.Status, rec.Reason = StatusRefused, "spend ledger: the run's reservation could not be written: "+err.Error()
+			d.o.Logger.Error("schedule run refused", "schedule", s.Name, "reason", rec.Reason)
+			return d.finish(ctx, s, rec, []string{alerts.EventScheduleFailed})
+		}
+		reserved = approval.CapUSD
+		approval.Reserve = func(usd float64) string {
+			if !(usd > 0) || math.IsInf(usd, 0) {
+				return fmt.Sprintf("reservation %v USD is not a finite, positive amount", usd)
+			}
+			if spent := d.spent(s.Name, day); spent+usd > s.MaxUSDPerDay+1e-9 {
+				return fmt.Sprintf("daily cap: spent %.4f USD today (reservations included) plus %.2f USD would pass max_usd_per_day %.2f USD", spent, usd, s.MaxUSDPerDay)
+			}
+			if _, err := d.addAmount(s.Name, day, usd); err != nil {
+				return "spend ledger: the reservation could not be written: " + err.Error()
+			}
+			reserved += usd
+			return ""
+		}
+	}
+	s.Approved = approval
 	d.o.Logger.Info("schedule run starting", "schedule", s.Name, "experiment", s.Experiment)
 	res, runErr := d.o.Runner.Run(ctx, s)
 	rec.Result = res
-	spent, lerr := d.addSpend(s.Name, day, res)
+	cost := 0.0
+	if res != nil && res.CostUSD > 0 && !math.IsInf(res.CostUSD, 0) {
+		cost = res.CostUSD
+	}
+	spent, lerr := d.addAmount(s.Name, day, cost-reserved)
 	if lerr != nil {
-		d.o.Logger.Error("spend ledger not updated; the daily cap may undercount", "schedule", s.Name, "error", lerr.Error())
+		d.o.Logger.Error("spend ledger not settled; the run's reservation stays counted", "schedule", s.Name, "error", lerr.Error())
+		spent = d.spent(s.Name, day)
 	}
 	rec.SpentTodayUSD = spent
 	rec.Status = StatusOK
@@ -339,30 +372,41 @@ func (d *Daemon) acquire(name string) (func() error, error) {
 // cap must fit under max_usd_per_day, because the engine may spend up to the
 // cap (and counts unknown costs at its estimate) before it stops leasing.
 func (d *Daemon) capRefusal(s Schedule, day string) string {
+	_, reason := d.approve(s, day)
+	return reason
+}
+
+// approve is capRefusal that also returns what it approved, for the Runner
+// to check the experiment it runs against (Schedule.Approved). A built-in
+// job is approved with nil.
+func (d *Daemon) approve(s Schedule, day string) (*Approval, string) {
 	if s.Job != "" {
-		return "" // a built-in job spends nothing
+		return nil, "" // a built-in job spends nothing
+	}
+	if math.IsNaN(s.MaxUSDPerDay) || math.IsInf(s.MaxUSDPerDay, 0) || s.MaxUSDPerDay < 0 { // QC2-15-09
+		return nil, fmt.Sprintf("max_usd_per_day %v is not a finite, non-negative number", s.MaxUSDPerDay)
 	}
 	exp, err := d.o.Load(Resolve(d.o.Root, s.Experiment))
 	if err != nil {
-		return "experiment file: " + err.Error()
+		return nil, "experiment file: " + err.Error()
 	}
 	if s.MaxUSDPerDay <= 0 {
 		if exp.Smoke {
-			return ""
+			return &Approval{}, ""
 		}
-		return "max_usd_per_day is required for a non-smoke experiment"
+		return nil, "max_usd_per_day is required for a non-smoke experiment"
 	}
-	if exp.Budget.TotalUSD <= 0 {
+	if !finitePositive(exp.Budget.TotalUSD) {
 		// A stated daily cap holds for smoke experiments too: smoke does not
 		// prove every part (model-played users, judges) is scripted.
-		return "the experiment has no spend cap (budget.total_usd), so max_usd_per_day cannot hold"
+		return nil, "the experiment has no spend cap (budget.total_usd), so max_usd_per_day cannot hold"
 	}
 	spent := d.spent(s.Name, day)
 	if spent+exp.Budget.TotalUSD > s.MaxUSDPerDay+1e-9 {
-		return fmt.Sprintf("daily cap: spent %.4f USD today plus the experiment's spend cap %.2f USD would pass max_usd_per_day %.2f USD",
+		return nil, fmt.Sprintf("daily cap: spent %.4f USD today plus the experiment's spend cap %.2f USD would pass max_usd_per_day %.2f USD",
 			spent, exp.Budget.TotalUSD, s.MaxUSDPerDay)
 	}
-	return ""
+	return &Approval{CapUSD: exp.Budget.TotalUSD, Limited: true}, ""
 }
 
 // EventsFor returns the alert events a run's outcome calls for, in the
@@ -433,12 +477,10 @@ func (d *Daemon) spent(name, day string) float64 {
 	return l[name][day]
 }
 
-// addSpend adds a run's cost to the ledger and returns the day's total.
-func (d *Daemon) addSpend(name, day string, res *Result) (float64, error) {
-	cost := 0.0
-	if res != nil && res.CostUSD > 0 {
-		cost = res.CostUSD
-	}
+// addAmount adds usd (a reservation, or a settlement that may be negative)
+// to a schedule's day in the ledger and returns the day's total, never
+// below zero.
+func (d *Daemon) addAmount(name, day string, cost float64) (float64, error) {
 	d.ledgerMu.Lock()
 	defer d.ledgerMu.Unlock()
 	unlock, err := d.lockLedger()
@@ -453,7 +495,7 @@ func (d *Daemon) addSpend(name, day string, res *Result) (float64, error) {
 	if l[name] == nil {
 		l[name] = map[string]float64{}
 	}
-	l[name][day] += cost
+	l[name][day] = max(l[name][day]+cost, 0)
 	total := l[name][day]
 	prune(l, d.o.Clock.Now())
 	if err := writeJSONAtomic(p, l); err != nil {
@@ -496,6 +538,13 @@ func readLedger(p string) (spendLedger, error) {
 	l := spendLedger{}
 	if err := json.Unmarshal(b, &l); err != nil {
 		return nil, fmt.Errorf("parse spend ledger %s: %w", p, err)
+	}
+	for name, days := range l { // QC2-15-09: a persisted total that is not a finite amount refuses runs
+		for day, v := range days {
+			if math.IsNaN(v) || math.IsInf(v, 0) || v < 0 {
+				return nil, fmt.Errorf("spend ledger %s: %s on %s is %v, not a finite, non-negative amount", p, name, day, v)
+			}
+		}
 	}
 	return l, nil
 }

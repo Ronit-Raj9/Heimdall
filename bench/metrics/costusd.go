@@ -17,17 +17,22 @@ var _ schemas.Metric = (*costUSDMetric)(nil)
 // only and is never summed.
 type costUSDMetric struct{}
 
+// costUSDVersion is 1.1.0 since a complete empty gateway log reads as an
+// observed zero and an incomplete one keeps its priced subtotal as a lower
+// bound (QC2-04-05): the same evidence yields a different value than 1.0.0.
+const costUSDVersion = "1.1.0"
+
 // GetName implements schemas.Part.
 func (m *costUSDMetric) GetName() string { return CostUSD }
 
 // GetVersion implements schemas.Part.
-func (m *costUSDMetric) GetVersion() string { return version }
+func (m *costUSDMetric) GetVersion() string { return costUSDVersion }
 
 // Descriptor implements schemas.Metric.
 func (m *costUSDMetric) Descriptor() schemas.MetricDescriptor {
 	return schemas.MetricDescriptor{
 		Name:           CostUSD,
-		Version:        version,
+		Version:        costUSDVersion,
 		Label:          "Cost (USD)",
 		Kind:           schemas.KindUSD,
 		HigherIsBetter: false,

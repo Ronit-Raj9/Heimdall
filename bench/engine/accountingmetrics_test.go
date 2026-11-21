@@ -16,8 +16,8 @@ func TestAccountingMetricsAddCostUnderSpendCap(t *testing.T) {
 	}}
 	e := &schemas.Experiment{Metrics: []string{"verified_success"}}
 	sel := selectMetrics(reg, e.Metrics)
-	if got := accountingMetrics(reg, e, sel); len(got) != 0 {
-		t.Fatalf("no budget: got %d extra metrics, want 0", len(got))
+	if got := accountingMetrics(reg, e, sel); len(got) != 2 { // QC2-07-06: runner and schedule caps read it too
+		t.Fatalf("no budget: got %d extra metrics, want 2", len(got))
 	}
 	e.Budget.TotalUSD = 5
 	got := accountingMetrics(reg, e, sel)

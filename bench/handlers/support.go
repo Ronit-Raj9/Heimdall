@@ -71,7 +71,7 @@ func (h *SupportHandler) getSupport(ctx *fasthttp.RequestCtx) {
 // counted runs of condition.
 func ExperimentSupport(index ReadIndex, m *schemas.Manifest, condition string) (*schemas.SupportSummary, error) {
 	out := &schemas.SupportSummary{ExpID: m.ExpID, Suite: m.SuiteID + "@" + m.SuiteVersion, Condition: condition,
-		SimulatorLabel: "scripted user", Synthetic: m.Experiment.Smoke, Arms: []schemas.SupportArm{}}
+		SimulatorLabel: "scripted user", Synthetic: m.Experiment.NoPaidTraffic(), Arms: []schemas.SupportArm{}}
 	if sim := m.Simulator; sim != nil {
 		out.Support, out.SimulatorMode = true, sim.Mode
 		if sim.Mode == schemas.SimulatorLLM {

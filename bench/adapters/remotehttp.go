@@ -123,6 +123,11 @@ func (a *remoteHTTPAdapter) Plan(_ context.Context, rc *schemas.RunContext) (*sc
 	if err != nil {
 		return nil, fmt.Errorf("plan run %s: %w", rc.Run.RunID, err)
 	}
+	if rc.NoPaidTraffic && traffic != RemoteTrafficGateway {
+		// QC2-15-08: an external deployment's model calls are outside this
+		// bench, so nothing can hold them to the scripted model.
+		return nil, fmt.Errorf("plan run %s: %s", rc.Run.RunID, RemoteNoPaidReason)
+	}
 	instruction, err := readTaskFile(rc.Task, rc.Task.Instruction)
 	if err != nil {
 		return nil, fmt.Errorf("plan run %s: %w", rc.Run.RunID, err)
@@ -199,6 +204,10 @@ func (a *remoteHTTPAdapter) remoteEnv(rc *schemas.RunContext, spec *schemas.Remo
 }
 
 // remoteTraffic is the config's model traffic, external when unset.
+// RemoteNoPaidReason refuses a no-paid-traffic run (smoke, scripted_upstream,
+// agent check) of a remote agent whose model traffic is external.
+const RemoteNoPaidReason = "a smoke or scripted_upstream run needs remote.model_traffic gateway: with external model traffic the deployment's model calls are outside the bench and cannot be held to the scripted model"
+
 func remoteTraffic(spec *schemas.RemoteAgent) (string, error) {
 	switch spec.ModelTraffic {
 	case "", RemoteTrafficExternal:
