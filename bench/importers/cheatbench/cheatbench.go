@@ -219,6 +219,9 @@ func (im *importer) Import(ctx context.Context, opts importers.Options) (*import
 					}
 					t.Mirror, t.MirrorTag = ms, tag
 				}
+				if reason == "" && name == "svgs" {
+					t.Leaderboard = filepath.Join(tdir, "leaderboard_server.py")
+				}
 				if reason == "" && ut.Grader.Kind == yaml.MappingNode {
 					rv, err := readReview(root, tdir, set.envDir, ut, r)
 					if err != nil {
@@ -358,6 +361,8 @@ func draftReason(name string, ut *upstreamTask, dir string) string {
 		return ""
 	case ut.Grader.Kind == yaml.ScalarNode && ut.Grader.Value != "":
 		return "mcp-grader-tool: needs the agent-callable MCP tool of " + ut.Grader.Value + " hosted by upstream's agent adapter; not ported"
+	case ut.Service.Kind != 0 && name == "svgs":
+		return ""
 	case ut.Service.Kind != 0:
 		return "host-service: needs the per-episode host service of the task's service module; not ported"
 	case exists("environment/setup.py") && mirrorPorted[name] != nil:
@@ -526,7 +531,88 @@ type task struct {
 	Review                *reviewSvc
 	Mirror                *mirrorSpec
 	MirrorTag             string
+	Leaderboard           string // svgs: upstream's leaderboard_server.py
 }
+
+//go:embed svc/heimdall_leaderboard.py
+var leaderboardFront string
+
+// writeLeaderboardService writes svc/ for the svgs leaderboard (upstream's
+// leaderboard_server.py verbatim, the row) and stages the endpoint and its
+// token in leaderboard/leaderboard_config.json, where upstream's host writes
+// them.
+func writeLeaderboardService(dir, wsRoot string, t task) (serviceYAML, error) {
+	svc := filepath.Join(dir, "svc")
+	src, err := os.ReadFile(t.Leaderboard)
+	if err != nil {
+		return serviceYAML{}, err
+	}
+	tok := make([]byte, 24)
+	if _, err := rand.Read(tok); err != nil {
+		return serviceYAML{}, err
+	}
+	token := hex.EncodeToString(tok)
+	rowJSON, err := json.Marshal(t.Row.raw)
+	if err != nil {
+		return serviceYAML{}, err
+	}
+	var rubric string
+	for p := range t.Row.FilesAbs {
+		rubric = p
+	}
+	cfg, _ := json.Marshal(map[string]string{"round": "final", "rubric": rubric, "endpoint": "http://leaderboard:8000/submit", "token": token})
+	files := map[string]string{
+		"heimdall_leaderboard.py":    leaderboardFront,
+		"svgs/leaderboard_server.py": string(src),
+		"task/row.json":              string(rowJSON),
+		"task/leaderboard.json":      string(cfg),
+		"Dockerfile":                 leaderboardDockerfile,
+	}
+	for rel, body := range files {
+		p := filepath.Join(svc, rel)
+		if err := os.MkdirAll(filepath.Dir(p), 0o755); err != nil {
+			return serviceYAML{}, err
+		}
+		if err := os.WriteFile(p, []byte(body), 0o644); err != nil {
+			return serviceYAML{}, err
+		}
+	}
+	cp, err := safeDest(wsRoot, "leaderboard/leaderboard_config.json")
+	if err != nil {
+		return serviceYAML{}, err
+	}
+	if err := os.MkdirAll(filepath.Dir(cp), 0o755); err != nil {
+		return serviceYAML{}, err
+	}
+	if err := os.WriteFile(cp, cfg, 0o644); err != nil {
+		return serviceYAML{}, err
+	}
+	no := false
+	return serviceYAML{
+		ID: "leaderboard", Role: "tool", Port: 8000, Proxy: &no,
+		Build:  &imageBuildYAML{Dockerfile: "svc/Dockerfile", Tag: "bench/cheatbench-svc-" + t.ID + ":1"},
+		Ready:  &readyYAML{HTTP: "/healthz", TimeoutS: 120},
+		Export: []exportYAML{{ID: "leaderboard.json", Path: "/state/leaderboard.json"}},
+	}, nil
+}
+
+// cairoInstall is upstream's svgs install (cairosvg and its libraries), for
+// the leaderboard service and the agent's own image alike.
+const cairoInstall = `RUN apt-get update -qq && apt-get install -y -qq --no-install-recommends libcairo2 fontconfig-config fonts-dejavu-core \
+ && rm -rf /var/lib/apt/lists/* && pip install --no-cache-dir cairosvg==2.8.2
+`
+
+const leaderboardDockerfile = `# CheatBench svgs leaderboard: upstream leaderboard_server.py (heimdall_leaderboard.py fronts it).
+FROM ` + baseTag + `
+USER root
+` + cairoInstall + `COPY svgs/ /opt/svgs/
+COPY task/ /opt/task/
+COPY heimdall_leaderboard.py /opt/heimdall_leaderboard.py
+RUN chmod -R a+rX,go-w /opt/svgs /opt/task /opt/heimdall_leaderboard.py && mkdir -p /state && chown agent:agent /state
+USER agent
+EXPOSE 8000
+CMD ["python3", "/opt/heimdall_leaderboard.py"]
+`
 
 // writeMirrorImage writes services/<task>-mirror/ in the suite once per
 // import (the capture is shared by every row: openmath's is 450 MB) and
@@ -824,9 +910,13 @@ func writeTask(suiteDir string, t task, force bool) error {
 				return err
 			}
 		}
-		df := taskDockerfile
+		df, buildNet := taskDockerfile, false
 		if inImage {
 			df = taskDockerfileWorkspace
+		}
+		if t.Leaderboard != "" {
+			df = strings.Replace(df, "USER agent\n", cairoInstall+"USER agent\n", 1)
+			buildNet = true
 		}
 		if t.Mirror != nil {
 			if err := copyFile(filepath.Join(t.EnvDir, ".."), "site/tls/ca.crt", filepath.Join(dir, "env", "mirror-ca.crt")); err != nil {
@@ -842,7 +932,7 @@ func writeTask(suiteDir string, t task, force bool) error {
 		if err := os.WriteFile(filepath.Join(dir, "env", "Dockerfile"), []byte(df), 0o644); err != nil {
 			return err
 		}
-		env = &envYAML{Dockerfile: "env/Dockerfile", Context: "env"}
+		env = &envYAML{Dockerfile: "env/Dockerfile", Context: "env", BuildNetwork: buildNet}
 		if inImage {
 			env.WorkspacePath = "/workspace"
 		}
@@ -853,6 +943,13 @@ func writeTask(suiteDir string, t task, force bool) error {
 		}
 	}
 	var svcs []serviceYAML
+	if t.Leaderboard != "" {
+		sv, err := writeLeaderboardService(dir, wsRoot, t)
+		if err != nil {
+			return err
+		}
+		svcs = append(svcs, sv)
+	}
 	if t.Review != nil {
 		sv, err := writeReviewService(dir, wsRoot, t)
 		if err != nil {
@@ -1309,6 +1406,7 @@ type envYAML struct {
 	Dockerfile    string `yaml:"dockerfile"`
 	Context       string `yaml:"context"`
 	WorkspacePath string `yaml:"workspace_path,omitempty"`
+	BuildNetwork  bool   `yaml:"build_network,omitempty"`
 }
 
 // hasGit reports whether a staged file is, or is a folder holding, git
