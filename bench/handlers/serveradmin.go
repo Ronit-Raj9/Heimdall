@@ -183,7 +183,7 @@ func (h *ServerAdminHandler) write(ctx *fasthttp.RequestCtx, orgID, action, tt, 
 	}
 }
 
-func actorOf(ctx *fasthttp.RequestCtx) string {
+func serverAdminActor(ctx *fasthttp.RequestCtx) string {
 	if p := auth.PrincipalFrom(ctx); p != nil {
 		if p.Email != "" {
 			return p.Email
@@ -424,7 +424,7 @@ func (h *ServerAdminHandler) setQuota(ctx *fasthttp.RequestCtx) {
 		lib.SendError(ctx, h.mode, fasthttp.StatusBadRequest, lib.ErrTypeBadRequest, "set quota: "+err.Error())
 		return
 	}
-	if err := h.quota.Set(wctx, id, l, actorOf(ctx)); err != nil {
+	if err := h.quota.Set(wctx, id, l, serverAdminActor(ctx)); err != nil {
 		sendDepError(ctx, h.mode, "set quota", err)
 		return
 	}
@@ -463,7 +463,7 @@ func (h *ServerAdminHandler) setKill(ctx *fasthttp.RequestCtx) {
 	}
 	wctx, cancel := workContext(ctx, readTimeout)
 	defer cancel()
-	if err := h.quota.SetKillSwitch(wctx, req.On, actorOf(ctx)); err != nil {
+	if err := h.quota.SetKillSwitch(wctx, req.On, serverAdminActor(ctx)); err != nil {
 		sendDepError(ctx, h.mode, "set kill switch", err)
 		return
 	}

@@ -24,11 +24,6 @@ const ProjectManifestPath = APIPrefix + "/project/manifest"
 // so a sync never works from a truncated list.
 const MaxManifestFiles = 20000
 
-// ProjectAreas are the synced project areas, in manifest order.
-var ProjectAreas = []projectfs.Area{
-	projectfs.AreaAgents, projectfs.AreaBenchmarks, projectfs.AreaExperiments,
-	projectfs.AreaPolicies, projectfs.AreaUploads,
-}
 
 // ManifestFile is one file of the project manifest.
 type ManifestFile struct {

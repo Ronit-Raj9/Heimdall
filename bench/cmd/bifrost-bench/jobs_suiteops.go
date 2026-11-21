@@ -440,7 +440,7 @@ func runTasksMineJob(ctx context.Context, env jobEnv, j *jobs.Job, log jobs.Logg
 	if p.License != "" {
 		argv = append(argv, "-license", p.License)
 	}
-	if err := runCLI(ctx, env.ProjectRoot, argv, log); err != nil {
+	if _, err := runCLI(ctx, env, argv, log); err != nil {
 		return nil, err
 	}
 	return map[string]any{"suite": p.Suite, "dry_run": false}, nil

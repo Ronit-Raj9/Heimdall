@@ -58,14 +58,12 @@ func init() {
 		Kind: kindSuiteAdmit, Hosted: true, Opts: []jobs.KindOption{jobs.WithLimit(1, 1)},
 		Validate: validateHostedSuiteAdmit, Run: runHostedSuiteAdmit,
 	})
-	registerJobKind(jobKindSpec{
+	registerOrMergeJobKind(jobKindSpec{
 		Kind: kindCanaryRun, Hosted: true, Opts: []jobs.KindOption{jobs.WithLimit(1, 1)},
 		Validate: validateHostedCanaryRun, Run: runHostedCanaryRun,
 	})
 }
 
-// kindCanaryRun runs one drift canary look (or pins a new baseline).
-const kindCanaryRun = "canary.run"
 
 // Params of the bridge kinds.
 type (

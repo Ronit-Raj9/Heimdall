@@ -138,7 +138,7 @@ func (h *modelsHandler) orgID(ctx *fasthttp.RequestCtx) string {
 	return auth.LocalOrgID
 }
 
-func actorOf(ctx *fasthttp.RequestCtx) string {
+func modelsActor(ctx *fasthttp.RequestCtx) string {
 	p := auth.PrincipalFrom(ctx)
 	if p == nil {
 		return ""
@@ -243,7 +243,7 @@ func (h *modelsHandler) create(ctx *fasthttp.RequestCtx) {
 	if !ok {
 		return
 	}
-	k, err := s.Create(ctx, h.orgID(ctx), keystore.KindProvider, in, actorOf(ctx))
+	k, err := s.Create(ctx, h.orgID(ctx), keystore.KindProvider, in, modelsActor(ctx))
 	if err != nil {
 		h.keyError(ctx, err)
 		return
@@ -260,7 +260,7 @@ func (h *modelsHandler) update(ctx *fasthttp.RequestCtx) {
 	if !ok {
 		return
 	}
-	k, err := s.Update(ctx, h.orgID(ctx), pathID(ctx), in, actorOf(ctx))
+	k, err := s.Update(ctx, h.orgID(ctx), pathID(ctx), in, modelsActor(ctx))
 	if err != nil {
 		h.keyError(ctx, err)
 		return
@@ -273,7 +273,7 @@ func (h *modelsHandler) remove(ctx *fasthttp.RequestCtx) {
 	if s == nil {
 		return
 	}
-	if err := s.Delete(ctx, h.orgID(ctx), pathID(ctx), actorOf(ctx)); err != nil {
+	if err := s.Delete(ctx, h.orgID(ctx), pathID(ctx), modelsActor(ctx)); err != nil {
 		h.keyError(ctx, err)
 		return
 	}

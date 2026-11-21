@@ -47,8 +47,8 @@ func init() {
 const (
 	syncTokenEnv  = "HEIMDALL_TOKEN"
 	syncServerEnv = "HEIMDALL_SERVER"
-	// maxExportBytes caps the export zip a pull downloads.
-	maxExportBytes = 1 << 30
+	// maxPullExportBytes caps the export zip a pull downloads.
+	maxPullExportBytes = 1 << 30
 	// maxSyncFileBytes caps one file a pull writes.
 	maxSyncFileBytes = 256 << 20
 )
@@ -609,12 +609,12 @@ func (c *syncClient) pullExport(ctx context.Context, dir string, need map[string
 	}
 	defer os.Remove(tmp.Name())
 	defer tmp.Close()
-	n, err := io.Copy(tmp, io.LimitReader(resp.Body, maxExportBytes+1))
+	n, err := io.Copy(tmp, io.LimitReader(resp.Body, maxPullExportBytes+1))
 	if err != nil {
 		return fmt.Errorf("download export: %w", err)
 	}
-	if n > maxExportBytes {
-		return fmt.Errorf("export zip is over %d bytes", maxExportBytes)
+	if n > maxPullExportBytes {
+		return fmt.Errorf("export zip is over %d bytes", maxPullExportBytes)
 	}
 	zr, err := zip.NewReader(tmp, n)
 	if err != nil {

@@ -214,7 +214,7 @@ func (h policiesHandler) put(ctx *fasthttp.RequestCtx) {
 	if note == "" {
 		note = "policy editor"
 	}
-	if _, err := h.store.Write(ctx, projectfs.AreaPolicies, file, raw, projectfs.WriteOpts{Actor: actorOf(ctx), Note: note, IfMatch: req.IfMatch}); err != nil {
+	if _, err := h.store.Write(ctx, projectfs.AreaPolicies, file, raw, projectfs.WriteOpts{Actor: policiesActor(ctx), Note: note, IfMatch: req.IfMatch}); err != nil {
 		h.storeErr(ctx, err)
 		return
 	}
@@ -229,7 +229,7 @@ func (h policiesHandler) del(ctx *fasthttp.RequestCtx) {
 	if !ok {
 		return
 	}
-	if err := h.store.Delete(ctx, projectfs.AreaPolicies, file, projectfs.WriteOpts{Actor: actorOf(ctx), Note: "policy editor delete"}); err != nil {
+	if err := h.store.Delete(ctx, projectfs.AreaPolicies, file, projectfs.WriteOpts{Actor: policiesActor(ctx), Note: "policy editor delete"}); err != nil {
 		h.storeErr(ctx, err)
 		return
 	}
@@ -262,7 +262,7 @@ func (h policiesHandler) storeErr(ctx *fasthttp.RequestCtx, err error) {
 	}
 }
 
-func actorOf(ctx *fasthttp.RequestCtx) string {
+func policiesActor(ctx *fasthttp.RequestCtx) string {
 	if p := auth.PrincipalFrom(ctx); p != nil {
 		if p.Email != "" {
 			return p.Email

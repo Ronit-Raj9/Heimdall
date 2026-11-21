@@ -260,7 +260,7 @@ func stripTop(entries []zipEntry, top string) []zipEntry {
 	return out
 }
 
-func actorOf(ctx *fasthttp.RequestCtx) string {
+func uploadsActor(ctx *fasthttp.RequestCtx) string {
 	p := auth.PrincipalFrom(ctx)
 	switch {
 	case p.Email != "":
@@ -444,7 +444,7 @@ func (h *uploadsHandler) postProject(ctx *fasthttp.RequestCtx) {
 		return
 	}
 	rep := UploadFilesReport{Written: []UploadedFile{}, Refused: []UploadedFile{}, Skipped: nonNil(skipped)}
-	opts := projectfs.WriteOpts{Actor: actorOf(ctx), Note: "upload: project zip"}
+	opts := projectfs.WriteOpts{Actor: uploadsActor(ctx), Note: "upload: project zip"}
 	for _, t := range targets {
 		rep.add(ctx, ps, t.area, t.rel, t.e, opts)
 	}
@@ -494,7 +494,7 @@ func (h *uploadsHandler) postAgent(ctx *fasthttp.RequestCtx) {
 			return
 		}
 	}
-	opts := projectfs.WriteOpts{Actor: actorOf(ctx), Note: "upload: agent " + name}
+	opts := projectfs.WriteOpts{Actor: uploadsActor(ctx), Note: "upload: agent " + name}
 	rep := UploadFilesReport{Written: []UploadedFile{}, Refused: []UploadedFile{}, Skipped: nonNil(skipped)}
 	// projectfs.ExtractZip (L01) when it is implemented and the zip needs no
 	// renaming; otherwise the same checks file by file through Write.

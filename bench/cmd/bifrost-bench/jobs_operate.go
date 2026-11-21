@@ -78,7 +78,7 @@ func parseOperateParams(raw json.RawMessage) (operateParams, error) {
 	return p, nil
 }
 
-func checkID(field, v string, required bool) error {
+func operateCheckID(field, v string, required bool) error {
 	if v == "" {
 		if required {
 			return fmt.Errorf("%s is required", field)
@@ -140,7 +140,7 @@ func init() {
 		Validate: func(ctx context.Context, env jobEnv, raw json.RawMessage) (any, string, error) {
 			p, err := parseOperateParams(raw)
 			if err == nil {
-				err = checkID("suite", p.Suite, false)
+				err = operateCheckID("suite", p.Suite, false)
 			}
 			if err != nil {
 				return nil, "", operateInvalid(err)
@@ -150,16 +150,16 @@ func init() {
 		Run: runGPUCheckJob,
 	})
 	registerJobKind(operateCLI(kindVoiceCheck, func(p operateParams) ([]string, error) {
-		if err := checkID("suite", p.Suite, true); err != nil {
+		if err := operateCheckID("suite", p.Suite, true); err != nil {
 			return nil, err
 		}
 		return []string{"voice", "check", "-suite", p.Suite, "-json"}, nil
 	}))
 	registerJobKind(operateCLI(kindVisualCompare, func(p operateParams) ([]string, error) {
-		if err := checkID("suite", p.Suite, true); err != nil {
+		if err := operateCheckID("suite", p.Suite, true); err != nil {
 			return nil, err
 		}
-		if err := checkID("task", p.Task, true); err != nil {
+		if err := operateCheckID("task", p.Task, true); err != nil {
 			return nil, err
 		}
 		img, err := projectRel("image", p.Image)
@@ -175,17 +175,17 @@ func init() {
 		if (p.Desktop == "") == (p.Browser == "") {
 			return nil, errors.New("set exactly one of desktop or browser (a running container name)")
 		}
-		if err := checkID("desktop", p.Desktop, false); err != nil {
+		if err := operateCheckID("desktop", p.Desktop, false); err != nil {
 			return nil, err
 		}
-		if err := checkID("browser", p.Browser, false); err != nil {
+		if err := operateCheckID("browser", p.Browser, false); err != nil {
 			return nil, err
 		}
 		name := p.Out
 		if name == "" {
 			name = "capture.png"
 		}
-		if err := checkID("out", name, true); err != nil || !strings.HasSuffix(strings.ToLower(name), ".png") {
+		if err := operateCheckID("out", name, true); err != nil || !strings.HasSuffix(strings.ToLower(name), ".png") {
 			return nil, errors.New("out must be a plain .png file name, for example capture.png")
 		}
 		args := []string{"visual", "capture", "-out", filepath.Join("uploads", "visual", name)}
@@ -203,13 +203,13 @@ func init() {
 		return args, nil
 	}))
 	registerJobKind(operateCLI(kindSimulatorSpread, func(p operateParams) ([]string, error) {
-		if err := checkID("a", p.A, true); err != nil {
+		if err := operateCheckID("a", p.A, true); err != nil {
 			return nil, err
 		}
-		if err := checkID("b", p.B, true); err != nil {
+		if err := operateCheckID("b", p.B, true); err != nil {
 			return nil, err
 		}
-		if err := checkID("condition", p.Condition, false); err != nil {
+		if err := operateCheckID("condition", p.Condition, false); err != nil {
 			return nil, err
 		}
 		args := []string{"simulator", "spread", "-a", p.A, "-b", p.B, "-json"}
@@ -312,7 +312,7 @@ func runGPUCheckJob(ctx context.Context, env jobEnv, j *jobs.Job, log jobs.Logge
 func evidenceJob(sub string) jobKindSpec {
 	kind := "evidence." + sub
 	validate := func(p operateParams) error {
-		if err := checkID("exp", p.Exp, sub == "restore"); err != nil {
+		if err := operateCheckID("exp", p.Exp, sub == "restore"); err != nil {
 			return err
 		}
 		if p.Days != nil && (*p.Days < 0 || *p.Days > 3650) {
