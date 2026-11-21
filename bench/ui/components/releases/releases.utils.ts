@@ -1,4 +1,13 @@
-import type { Action, ReleasePolicyDecision, ReleaseRecord } from "@/lib/types/bench";
+import type { Action, ExperimentStatus, ReleasePolicyDecision, ReleaseRecord } from "@/lib/types/bench";
+
+/**
+ * The experiments a release can cite: only finished ones. Picking a running experiment would ask the
+ * server for its verdict, and the server analyzes on demand and saves that analysis into the running
+ * experiment's folder (a partial, usually invalid, verdict).
+ */
+export function releasableExperiments<T extends Pick<ExperimentStatus, "state">>(experiments: readonly T[]): T[] {
+	return experiments.filter((e) => e.state === "done");
+}
 
 /** Records newest first. The API returns log order, oldest first; equal times keep the later log line first. */
 export function newestFirst(releases: readonly ReleaseRecord[]): ReleaseRecord[] {
