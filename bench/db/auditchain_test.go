@@ -42,10 +42,16 @@ func TestAuditChainLinksAndVerifies(t *testing.T) {
 		if err != nil || !rep.OK || rep.Entries != 4 || rep.Chained != 3 || rep.Legacy != 1 || rep.HeadSeq != 3 || rep.HeadHash != rows[2].Hash {
 			t.Fatalf("verify %+v %v", rep, err)
 		}
-		// The paged reader returns the same rows the listing does.
+		// The listing carries the chain fields (rows of one millisecond
+		// list in id order, so look the head up by id).
 		page, err := d.ListAudit(ctx, db.AuditFilter{OrgID: "org_a"})
-		if err != nil || len(page.Entries) != 4 || page.Entries[0].Hash != rows[2].Hash {
+		if err != nil || len(page.Entries) != 4 {
 			t.Fatalf("list %+v %v", page, err)
+		}
+		for _, e := range page.Entries {
+			if e.ID == rows[2].ID && (e.Hash != rows[2].Hash || e.Seq != 3) {
+				t.Fatalf("listed head %+v", e)
+			}
 		}
 
 		// Tampering with a stored row breaks the chain at that row.
