@@ -1799,6 +1799,66 @@ export interface ReleaseRecord {
 	created_at: string;
 	prev_hash: string;
 	hash: string;
+	/** The agent this release put live, the version, and the version it replaced (absent or 0: none was live). */
+	agent_id?: string;
+	version?: number;
+	replaces_version?: number;
+	/** Set when the release covers a whole evaluation; exp_id then names its first benchmark. */
+	evaluation_id?: string;
+	children?: ReleaseChild[];
+	summary?: ReleaseSummary;
+	/** The evaluation's gate at release time: pass, fail or no_baseline. */
+	gate?: string;
+}
+
+/** One benchmark of a release that covers an evaluation. */
+export interface ReleaseChild {
+	benchmark: string;
+	exp_id: string;
+	analysis_id: string;
+	decision: Decision;
+	action: Action;
+	policy_name?: string;
+	policy_decision?: ReleasePolicyDecision;
+	manifest_hash: string;
+	seals_digest: string;
+	runs: number;
+}
+
+/** A score with its 95% interval and run count. */
+export interface ScoreCI {
+	score: number;
+	ci_low: number;
+	ci_high: number;
+	runs: number;
+}
+
+/** One agent version's numbers in a release summary; absent fields are unknown. */
+export interface ReleaseSide extends ScoreCI {
+	label: string;
+	agent: string;
+	version?: number;
+	model?: string;
+	evaluation_id?: string;
+	cost_per_solved_usd?: number;
+	/** Share of failed runs the agent claimed as solved. */
+	false_completion?: number;
+	/** Success rate on runs with a fault injected. */
+	fault_survival?: number;
+}
+
+export interface ReleaseCapabilityScore {
+	capability: string;
+	candidate: ScoreCI;
+	baseline?: ScoreCI;
+}
+
+/** Before (baseline) and after (candidate) of a release. */
+export interface ReleaseSummary {
+	candidate: ReleaseSide;
+	baseline?: ReleaseSide;
+	capabilities?: ReleaseCapabilityScore[];
+	note?: string;
 }
 
 /** POST /releases */

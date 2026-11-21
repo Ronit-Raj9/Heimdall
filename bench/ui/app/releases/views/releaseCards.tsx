@@ -1,5 +1,7 @@
 import { chainLinks, formatReleaseTime, newestFirst, shortHash } from "@/components/releases/releases.utils";
+import { ReleaseEvidence, releaseTitle } from "@/components/releases/releaseEvidence";
 import { EntityLink } from "@/components/shell";
+import { Link } from "@tanstack/react-router";
 import { CopyId } from "@/components/ui/copyId";
 import { releaseEvidenceUrl } from "@/lib/store/apis/benchApi";
 import type { ReleaseRecord } from "@/lib/types/bench";
@@ -55,7 +57,7 @@ function ReleaseCard({ record, linked }: { record: ReleaseRecord; linked: boolea
 	const [open, setOpen] = useState(false);
 	const id = record.release_id;
 	const ship = record.action === "ship";
-	const agent = record.agent_config_id || `Arm ${record.arm}`;
+	const agent = releaseTitle(record, t as never);
 	return (
 		<li className="relative" data-testid={`release-entry-${id}`}>
 			<span
@@ -148,6 +150,12 @@ function ReleaseCard({ record, linked }: { record: ReleaseRecord; linked: boolea
 					</span>
 				</div>
 
+				{record.summary && (
+					<div className="bg-muted/30 mt-4 rounded-lg px-3 py-2" data-testid={`release-evidence-strip-${id}`}>
+						<ReleaseEvidence summary={record.summary} testId={`release-numbers-${id}`} />
+					</div>
+				)}
+
 				{record.override && (
 					<p className="text-chart-error-ink mt-3 line-clamp-2 text-sm wrap-anywhere" data-testid={`release-override-${id}`}>
 						{record.override}
@@ -159,9 +167,38 @@ function ReleaseCard({ record, linked }: { record: ReleaseRecord; linked: boolea
 						className="bg-muted/40 mt-4 grid grid-cols-[max-content_minmax(0,1fr)] gap-x-4 gap-y-2 rounded-lg p-4 text-xs"
 						data-testid={`release-details-${id}`}
 					>
-						<Row label={t("releases.experiment")}>
-							<EntityLink kind="experiment" id={record.exp_id} className="text-xs" testId={`release-exp-${id}`} />
-						</Row>
+						{record.evaluation_id ? (
+							<>
+								<Row label={t("releases.evaluation")}>
+									<Link
+										to="/evaluations/$evalId"
+										params={{ evalId: record.evaluation_id }}
+										className="text-primary text-xs hover:underline"
+										data-testid={`release-evaluation-${id}`}
+									>
+										{record.evaluation_id}
+									</Link>
+								</Row>
+								<Row label={t("releases.benchmarks")}>
+									<span className="flex flex-wrap gap-x-3 gap-y-1">
+										{(record.children ?? []).map((c) => (
+											<EntityLink key={c.exp_id} kind="experiment" id={c.exp_id} className="text-xs">
+												{c.benchmark}
+											</EntityLink>
+										))}
+									</span>
+								</Row>
+								{record.gate && (
+									<Row label={t("releases.gate")}>
+										<span data-testid={`release-gate-${id}`}>{record.gate}</span>
+									</Row>
+								)}
+							</>
+						) : (
+							<Row label={t("releases.experiment")}>
+								<EntityLink kind="experiment" id={record.exp_id} className="text-xs" testId={`release-exp-${id}`} />
+							</Row>
+						)}
 						<Row label={t("releases.config")}>
 							<span className="font-mono" data-testid={`release-config-${id}`}>
 								{record.arm} · {shortHash(record.config_hash)}

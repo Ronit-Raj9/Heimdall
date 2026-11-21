@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useListReleasesQuery } from "@/lib/store";
 import { Plus, Rocket } from "lucide-react";
+import { parseAsString, useQueryState } from "nuqs";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { ChainBadge, ReleaseCards } from "./releaseCards";
@@ -17,7 +18,9 @@ export default function ReleasesView() {
 	const { t } = useTranslation("bench");
 	const { t: tu } = useTranslation("u14");
 	const releases = useListReleasesQuery();
-	const [open, setOpen] = useState(false);
+	// ?exp=<id>: "Promote this version" on a verdict opens the form with that comparison picked.
+	const [expParam, setExpParam] = useQueryState("exp", parseAsString);
+	const [open, setOpen] = useState(Boolean(expParam));
 	const list = releases.data?.releases ?? [];
 
 	return (
@@ -70,14 +73,17 @@ export default function ReleasesView() {
 			</div>
 			<GovDialog
 				open={open}
-				onClose={() => setOpen(false)}
+				onClose={() => {
+					setOpen(false);
+					void setExpParam(null);
+				}}
 				title={tu("releases.newTitle")}
 				description={tu("releases.newHint")}
 				closeLabel={tu("releases.close")}
 				testId="release-dialog"
 			>
 				<div className="[&_[data-slot=card-header]]:hidden [&>[data-testid=release-panel]]:border-0 [&>[data-testid=release-panel]]:bg-transparent [&>[data-testid=release-panel]]:py-0 [&_[data-slot=card-content]]:px-0">
-					<ReleasePanel />
+					<ReleasePanel initialExpId={expParam ?? undefined} />
 				</div>
 			</GovDialog>
 		</section>

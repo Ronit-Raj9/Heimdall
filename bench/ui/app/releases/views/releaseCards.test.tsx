@@ -38,4 +38,34 @@ describe("ReleaseCards", () => {
 		expect(initials("raj")).toBe("RA");
 		expect(initials("")).toBe("?");
 	});
+
+	it("titles a release of an evaluation as a version replacing the live one, with before and after numbers", () => {
+		const r = {
+			...fixture.releases[0],
+			agent_id: "codex",
+			version: 4,
+			replaces_version: 3,
+			evaluation_id: "ev_20261120_000000_abc",
+			children: [{ benchmark: "hd-harbor-tb2", exp_id: "e_1", analysis_id: "a_1", decision: "improved" as const, action: "ship" as const, manifest_hash: "m", seals_digest: "d", runs: 8 }],
+			summary: {
+				candidate: { label: "B", agent: "codex", version: 4, score: 0.6, ci_low: 0.4, ci_high: 0.8, runs: 16, cost_per_solved_usd: 0.42, false_completion: 0.05, fault_survival: 0.5 },
+				baseline: { label: "A", agent: "codex", version: 3, score: 0.4, ci_low: 0.2, ci_high: 0.6, runs: 16, cost_per_solved_usd: 0.61, false_completion: 0.1, fault_survival: 0.3 },
+				capabilities: [{ capability: "terminal", candidate: { score: 0.6, ci_low: 0.4, ci_high: 0.8, runs: 16 }, baseline: { score: 0.4, ci_low: 0.2, ci_high: 0.6, runs: 16 } }],
+			},
+		};
+		const html = renderToStaticMarkup(<ReleaseCards releases={[r]} chainOk />);
+		const id = r.release_id;
+		expect(html).toContain("codex v4 replaces v3");
+		expect(html).toContain(`data-testid="release-numbers-${id}-cap-terminal"`);
+		expect(html).toContain("60% (40-80%)");
+		expect(html).toContain("$0.420");
+		expect(html).toContain("Solved under faults");
+		expect(html).toContain("False completion");
+		expect(html).not.toContain("Arm B");
+	});
+
+	it("titles a first release", () => {
+		const r = { ...fixture.releases[0], agent_id: "support-bot", version: 1, replaces_version: 0 };
+		expect(renderToStaticMarkup(<ReleaseCards releases={[r]} chainOk />)).toContain("support-bot v1 is the first release");
+	});
 });

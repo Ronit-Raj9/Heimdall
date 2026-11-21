@@ -19,6 +19,8 @@ export interface AlertConfig {
 export interface Schedule {
 	name: string;
 	experiment?: string;
+	/** An evaluation to repeat: a saved evaluation id (ev_...) or a spec file; in place of experiment. */
+	evaluation?: string;
 	cron: string;
 	timezone?: string;
 	policy?: string;
@@ -45,7 +47,7 @@ export interface ScheduleRecord {
 }
 
 export interface ScheduleRow extends Schedule {
-	kind: "experiment" | "canary" | "job";
+	kind: "experiment" | "evaluation" | "canary" | "job";
 	source: "web" | "canary";
 	next?: string;
 	last?: ScheduleRecord;
