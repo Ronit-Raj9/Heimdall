@@ -151,13 +151,16 @@ type BenchBaseQuery = BaseQueryFn<string | FetchArgs, unknown, FetchBaseQueryErr
 const fetchBenchQuery: BenchBaseQuery = fetchBaseQuery({
 	baseUrl: BENCH_API_BASE,
 	credentials: "include",
-	prepareHeaders: (headers, { type, arg }) => prepareBenchHeaders(headers, writeType(type, arg)),
+	prepareHeaders: (headers, { type }) => prepareBenchHeaders(headers, type),
 });
 
 // A hosted 401 outside /auth/* means the session ended: the session provider sends the visitor to
 // the login page. In local mode a 401 is the write-token check and stays on the page.
+// The write check reads the resolved request (args), not the endpoint's argument: prepareHeaders
+// only sees the latter, which for a POST query is the request body.
 const httpBaseQuery: BenchBaseQuery = async (args, api, extraOptions) => {
-	const result = await fetchBenchQuery(args, api, extraOptions);
+	const type = writeType(api.type, args);
+	const result = await fetchBenchQuery(args, type === api.type ? api : { ...api, type }, extraOptions);
 	if (result.error && errorStatus(result.error) === 401) notifyUnauthorized(typeof args === "string" ? args : args.url);
 	return result;
 };
