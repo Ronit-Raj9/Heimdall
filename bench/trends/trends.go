@@ -75,6 +75,10 @@ func Build(r resultsindex.Reader, q Query, now time.Time) (*Response, error) {
 	var kept []resultsindex.RunRow
 	for _, row := range all {
 		if a, ok := newest[row.Experiment]; ok && a.Decision == string(schemas.DecisionInvalid) {
+			// Counted, so a live experiment that drops out of the chart is
+			// visible (live test l13: two INVALID live experiments vanished
+			// with invalid 0, as docs/trends.md promises they count).
+			resp.Invalid++
 			continue
 		}
 		if q.HeldOut != nil && q.HeldOut(row.Experiment, row.Task) {

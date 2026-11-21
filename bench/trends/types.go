@@ -67,7 +67,7 @@ type Response struct {
 	Lineages    []Lineage `json:"lineages"`     // ordered by agent then model
 	Points      int       `json:"points"`       // points over every lineage; the UI shows an empty state below 2
 	Rejected    int       `json:"rejected"`     // runs the index lists as rejected (seal failed); never charted
-	Invalid     int       `json:"invalid"`      // indexed runs with evidence problems (e.g. a slot with two counted runs); never charted
+	Invalid     int       `json:"invalid"`      // indexed runs of an experiment whose newest verdict is INVALID, or with evidence problems (e.g. a slot with two counted runs); never charted
 	IndexedAt   time.Time `json:"indexed_at"`   // when the index was last written
 	GeneratedAt time.Time `json:"generated_at"` // when this response was computed
 }
