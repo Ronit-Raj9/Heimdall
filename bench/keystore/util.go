@@ -25,7 +25,12 @@ const (
 )
 
 // Providers are the provider ids a provider key may name.
-var Providers = []string{"openai", "anthropic", "gemini", "openrouter", "groq", "sarvam", "openai-compatible"}
+var Providers = []string{"openai", "anthropic", "gemini", "openrouter", "groq", "sarvam", "openai-compatible",
+	// Every other provider in the /models catalog (Bifrost core providers and
+	// OpenAI-compatible vendors reached through a custom base URL).
+	"vertex", "azure", "bedrock", "sagemaker", "mistral", "deepseek", "minimax", "zai", "moonshot", "xiaomi", "qwen",
+	"fireworks", "cerebras", "xai", "cohere", "perplexity", "nebius", "huggingface", "parasail", "baseten", "databricks",
+	"cloudflare", "replicate", "byteplus", "github-copilot", "ollama", "vllm", "sgl", "elevenlabs"}
 
 // Limits on stored fields.
 const (

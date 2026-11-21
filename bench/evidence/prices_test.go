@@ -131,8 +131,32 @@ func TestShippedSnapshot(t *testing.T) {
 	if err := json.Unmarshal(raw, &sheet); err != nil {
 		t.Fatal(err)
 	}
+	// Rows outside the datasheet (other providers, added by hand) name
+	// their own official price page and capture date in model_sources.
+	snapRaw, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var extra struct {
+		ModelSources map[string]struct {
+			URL  string `json:"url"`
+			Date string `json:"date"`
+		} `json:"model_sources"`
+	}
+	if err := json.Unmarshal(snapRaw, &extra); err != nil {
+		t.Fatal(err)
+	}
 	for model, p := range pt.Models {
 		t.Run(model, func(t *testing.T) {
+			if src, own := extra.ModelSources[model]; own {
+				if _, inSheet := sheet[model]; inSheet {
+					t.Fatalf("%s is in %s; take its price from there", model, source)
+				}
+				if !strings.HasPrefix(src.URL, "https://") || len(src.Date) != len("2006-01-02") {
+					t.Fatalf("%s: source %+v needs an https URL and a date", model, src)
+				}
+				return
+			}
 			row, ok := sheet[model]
 			if !ok {
 				t.Fatalf("%s is not in %s", model, source)
