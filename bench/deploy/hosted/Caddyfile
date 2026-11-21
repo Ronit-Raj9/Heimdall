@@ -43,6 +43,23 @@
 		respond "not found" 404
 	}
 
+	# Zip uploads (runs, project and agent folders) get their own body cap,
+	# matching the server's 64 MiB upload limit (lib.MaxUploadBytes).
+	@uploads path /api/bench/uploads /api/bench/uploads/*
+	handle @uploads {
+		request_body {
+			max_size {$HEIMDALL_MAX_UPLOAD:64MiB}
+		}
+		reverse_proxy heimdall:8090 {
+			header_up X-Real-IP {remote_host}
+			transport http {
+				dial_timeout 5s
+				read_timeout 5m
+				write_timeout 5m
+			}
+		}
+	}
+
 	handle {
 		# The API caps bodies at 1 MiB (runner uploads are chunked below
 		# it); anything far above is refused here before it reaches it.
