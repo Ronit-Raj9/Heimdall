@@ -12,6 +12,7 @@ describe("navigation", () => {
 			"/experiments",
 			"/runs",
 			"/leaderboard",
+			"/improvements",
 			"/agents",
 			"/suites",
 			"/catalog",

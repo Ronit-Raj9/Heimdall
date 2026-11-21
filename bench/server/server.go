@@ -53,6 +53,8 @@ type Deps struct {
 	Calibration handlers.CalibrationSource
 	// W5 drift canary: canaries, their looks and a run behind the write token; nil answers 503 (handlers/canary.go).
 	Canaries handlers.CanarySource
+	// Improvement runs: list, report, lineage, create, approve and stop behind the write token; nil answers 503 (handlers/improve.go).
+	Improvements handlers.ImproveSource
 	// Forecast and matrix area: POST /estimate and GET /experiments/{id}/matrix; nil answers 503 (handlers/forecast.go).
 	Forecast handlers.ForecastSource
 	// W6 migration report and cost explanation: GET /experiments/{id}/migration, /cost-explain and /pareto; nil answers 503 (handlers/migration.go, handlers/costexplain.go).
@@ -216,6 +218,8 @@ func registerOrgRoutes(r *router.Router, cfg *lib.Config, deps Deps, write lib.M
 	handlers.NewCalibrationHandler(mode, deps.Calibration, write).WithHeldOut(deps.Suites, cfg.HeldOut.Visible).RegisterRoutes(r, common...)
 	// W5 drift canary: GET /canaries, GET /canaries/{name}, POST /canaries/{name}/run (handlers/canary.go, docs/drift-canary.md).
 	handlers.NewCanaryHandler(mode, deps.Canaries, write).RegisterRoutes(r, common...)
+	// Improvement runs: /improvements (handlers/improve.go, docs/improvement-runs.md).
+	handlers.NewImproveHandler(mode, deps.Improvements, write).RegisterRoutes(r, common...)
 	// W6 migration report, cost explanation and Pareto planes (handlers/migration.go, handlers/costexplain.go, docs/model-migration.md, docs/cost-explain.md).
 	handlers.NewMigrationHandler(mode, deps.Migration).RegisterRoutes(r, common...)
 	// U3: the held-out board's plane needs held_out.visible too.

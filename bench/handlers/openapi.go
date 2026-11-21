@@ -19,6 +19,7 @@ import (
 	"github.com/maximhq/bifrost/bench/clusters"
 	"github.com/maximhq/bifrost/bench/costexplain" // W6 cost explanation
 	"github.com/maximhq/bifrost/bench/importers"
+	"github.com/maximhq/bifrost/bench/improve" // improvement runs
 	"github.com/maximhq/bifrost/bench/jobs"
 	"github.com/maximhq/bifrost/bench/lib"
 	"github.com/maximhq/bifrost/bench/livescore" // X6 live scoring
@@ -312,6 +313,16 @@ var APIRoutes = []RouteDoc{
 	{Method: "GET", Path: APIPrefix + "/canaries/{name}", Tag: "canaries", Summary: "One canary: definition, baselines, looks newest first with tests and what changed, provider equivalence, and history as trends lineages", Response: canary.Detail{}},
 	{Method: "POST", Path: APIPrefix + "/canaries/{name}/run", Tag: "canaries", Summary: "Start one look (and its confirmation after a flag) in the background; 409 while the canary runs; refused under the daily cap",
 		Auth: AuthWrite, Status: fasthttp.StatusAccepted, Response: canary.RunAccepted{}},
+	// Improvement runs (improve.go, docs/improvement-runs.md).
+	{Method: "GET", Path: APIPrefix + "/improvements", Tag: "improvements", Summary: "Improvement runs: the agent improving its own prompt, notes and skills over rounds, with status, commits and verdict", Response: improve.List{}},
+	{Method: "POST", Path: APIPrefix + "/improvements", Tag: "improvements", Summary: "Create an improvement run from a spec (YAML or JSON) and start it in the background",
+		Auth: AuthWrite, Request: improve.Spec{}, Status: fasthttp.StatusAccepted, Response: improve.Summary{}},
+	{Method: "GET", Path: APIPrefix + "/improvements/{id}", Tag: "improvements", Summary: "The report: learning curves on dev, audit and held-out tasks against the control band, rounds, lineage, integrity and cost", Response: improve.Detail{}},
+	{Method: "GET", Path: APIPrefix + "/improvements/{id}/rounds/{k}", Tag: "improvements", Summary: "One round: candidate, bundle diff, integrity checks, screen, commit test and held-out score", Response: improve.RoundView{}},
+	{Method: "GET", Path: APIPrefix + "/improvements/{id}/lineage", Tag: "improvements", Summary: "The hash-chained version lineage, rejected candidates included, and whether the chain verifies", Response: improve.LineageView{}},
+	{Method: "POST", Path: APIPrefix + "/improvements/{id}/rounds/{k}/approve", Tag: "improvements", Summary: "Override a paused round's tripwires with a reason and continue; the override is recorded",
+		Auth: AuthWrite, Status: fasthttp.StatusAccepted, Request: ImproveApproveRequest{}, Response: improve.Summary{}},
+	{Method: "POST", Path: APIPrefix + "/improvements/{id}/stop", Tag: "improvements", Summary: "Stop an improvement run", Auth: AuthWrite, Response: improve.Summary{}},
 }
 
 var (

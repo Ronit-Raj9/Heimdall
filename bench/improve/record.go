@@ -55,6 +55,9 @@ var ErrNotFound = errors.New("improvement not found")
 // ErrBusy reports an improvement that is already running.
 var ErrBusy = errors.New("improvement is already running")
 
+// ErrOffline reports a server that cannot launch runs (serve -offline).
+var ErrOffline = errors.New("this server cannot launch improvement runs (offline: no gateway)")
+
 // ErrState reports an action the improvement's state does not allow.
 var ErrState = errors.New("not allowed in this state")
 

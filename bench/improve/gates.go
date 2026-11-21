@@ -90,7 +90,7 @@ func MonitorParity(parent, cand []string) GateResult {
 }
 
 func answerKeyGate(added string, prot Protected) GateResult {
-	g := GateResult{Name: GateAnswerKey, Detail: "no audit or sealed task id or secret text in the added lines"}
+	g := GateResult{Name: GateAnswerKey, Detail: "no gate or held-out task id or answer text in the added lines"}
 	low := strings.ToLower(added)
 	for _, id := range prot.TaskIDs {
 		if len(id) >= minIDLen && containsToken(low, strings.ToLower(id)) {
@@ -108,14 +108,14 @@ func answerKeyGate(added string, prot Protected) GateResult {
 	}
 	if len(g.Evidence) > 0 {
 		g.Fired = true
-		g.Detail = fmt.Sprintf("%d match(es) with audit or sealed task content", len(g.Evidence))
+		g.Detail = fmt.Sprintf("%d match(es) with gate or held-out task content", len(g.Evidence))
 		g.Evidence = capList(g.Evidence)
 	}
 	return g
 }
 
 func canaryGate(out Bundle, prot Protected) GateResult {
-	g := GateResult{Name: GateCanary, Detail: "no canary of an audit or sealed benchmark in the bundle"}
+	g := GateResult{Name: GateCanary, Detail: "no marker of a protected benchmark in what the agent wrote"}
 	for _, k := range slices.Sorted(maps.Keys(out)) {
 		low := strings.ToLower(out[k])
 		for _, c := range prot.Canaries {
@@ -126,7 +126,7 @@ func canaryGate(out Bundle, prot Protected) GateResult {
 	}
 	if len(g.Evidence) > 0 {
 		g.Fired = true
-		g.Detail = "the bundle carries a canary of a protected benchmark"
+		g.Detail = "what the agent wrote carries a marker of a protected benchmark"
 		g.Evidence = capList(g.Evidence)
 	}
 	return g

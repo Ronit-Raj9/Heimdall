@@ -55,7 +55,7 @@ func (r *Runner) budgetMatched(ctx context.Context, rec *Record) (*BudgetMatched
 	res, err := r.Exec.Score(ctx, ScoreRequest{ImprovementID: rec.ID, Spec: &rec.Spec, Phase: PhaseControl,
 		Arms: []Version{rec.Base}, Tasks: rec.Splits.Sealed, Trials: k})
 	if err != nil {
-		return nil, fmt.Errorf("budget-matched control: %w", err)
+		return nil, fmt.Errorf("comparison run with the same spend: %w", err)
 	}
 	s := score(res.Runs, 0)
 	bm := &BudgetMatched{ExpID: res.ExpID, Trials: k, LoopUSD: spent, Score: s, PerTrialUSD: sweep, CostUSD: res.CostUSD}
@@ -128,7 +128,7 @@ func (r *Runner) nullImprover(ctx context.Context, rec *Record) (*NullControl, e
 	res, err := r.Exec.Score(ctx, ScoreRequest{ImprovementID: rec.ID, Spec: &rec.Spec, Phase: PhaseControl,
 		Arms: []Version{v}, Tasks: rec.Splits.Sealed, Trials: rec.Spec.Sealed.Trials})
 	if err != nil {
-		return nil, fmt.Errorf("null improver control: %w", err)
+		return nil, fmt.Errorf("comparison run without feedback: %w", err)
 	}
 	nc.ExpID, nc.Final, nc.Score = res.ExpID, v, score(res.Runs, 0)
 	nc.CostUSD += res.CostUSD
@@ -178,34 +178,34 @@ func buildVerdict(rec *Record) *Verdict {
 	}
 	v.Notes = append(v.Notes, "a single loop: rerun the improvement from version 0 to show the gain holds across loops")
 	if v.GreedyExtra > 0 {
-		v.Notes = append(v.Notes, fmt.Sprintf("keep-if-better would have committed %d more candidate(s) the e-value test refused", v.GreedyExtra))
+		v.Notes = append(v.Notes, fmt.Sprintf("keeping every version that scored higher would have kept %d more the evidence test refused", v.GreedyExtra))
 	}
 	beatsControls, why := true, ""
 	if c := rec.Controls; c != nil {
 		if bm := c.BudgetMatched; bm != nil && final.Mean <= bm.BandHigh {
-			beatsControls, why = false, fmt.Sprintf("the final sealed score %.0f%% is inside the budget-matched band (up to %.0f%%)", 100*final.Mean, 100*bm.BandHigh)
+			beatsControls, why = false, fmt.Sprintf("the final held-out score %.0f%% is inside what version 0 reaches with the same spend (up to %.0f%%)", 100*final.Mean, 100*bm.BandHigh)
 		}
 		if nc := c.Null; nc != nil && final.Mean <= nc.Score.Mean {
-			beatsControls, why = false, fmt.Sprintf("the null improver scored %.0f%%, not below the final %.0f%%", 100*nc.Score.Mean, 100*final.Mean)
+			beatsControls, why = false, fmt.Sprintf("edits made without feedback scored %.0f%%, not below the final %.0f%%", 100*nc.Score.Mean, 100*final.Mean)
 		}
 	}
-	gain := fmt.Sprintf("%+.1f points on the sealed tasks", 100*v.SealedGain)
+	gain := fmt.Sprintf("%+.1f points on the held-out tasks", 100*v.SealedGain)
 	switch {
 	case v.Commits == 0:
-		v.State, v.Headline = VerdictNoChange, "no candidate was committed; the agent stays at version 0"
+		v.State, v.Headline = VerdictNoChange, "no new version was kept; the agent stays at version 0"
 	case v.SealedGain <= 0:
 		v.State, v.Headline = VerdictNotSupported, "improvement not supported: "+gain
 	case v.P != nil && *v.P < rec.Spec.Commit.Alpha && beatsControls && v.Overrides == 0:
-		v.State, v.Headline = VerdictSupported, "improvement supported: "+gain+", above both controls"
+		v.State, v.Headline = VerdictSupported, "improvement supported: "+gain+", above both comparisons"
 	default:
 		v.State, v.Headline = VerdictInconclusive, "inconclusive: "+gain
 		switch {
 		case v.Overrides > 0:
-			v.Notes = append(v.Notes, "a tripwire was overridden, so the gain cannot be claimed")
+			v.Notes = append(v.Notes, "a paused check was approved by a person, so the gain cannot be claimed")
 		case !beatsControls:
 			v.Notes = append(v.Notes, why)
 		default:
-			v.Notes = append(v.Notes, "the sealed gain is not significant with this many tasks")
+			v.Notes = append(v.Notes, "the held-out gain is not significant with this many tasks")
 		}
 	}
 	return v

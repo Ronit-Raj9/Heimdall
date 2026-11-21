@@ -209,7 +209,7 @@ func TestFailedExperimentResumes(t *testing.T) {
 		t.Fatal(err)
 	}
 	got, err := r.Run(context.Background(), rec.ID)
-	if err == nil || got.Status != improve.StatusFailed || !strings.Contains(got.Error, "audit") {
+	if err == nil || got.Status != improve.StatusFailed || !strings.Contains(got.Error, "gate check") {
 		t.Fatalf("expected a failed audit: %v %+v", err, got)
 	}
 	improves := x.Count("improve")

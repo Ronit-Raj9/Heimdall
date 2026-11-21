@@ -169,7 +169,7 @@ func (r *Runner) Stop(id, actor string) (*Record, error) {
 		return rec, fmt.Errorf("improvement %s is %s: %w", id, rec.Status, ErrState)
 	}
 	if rd := rec.current(); rd != nil && rd.Candidate != nil && rd.Decision == "" && rec.Status == StatusAwaiting {
-		rd.Decision, rd.Why = DecisionRejected, "stopped at a tripwire: "+strings.Join(rd.Tripwires, ", ")
+		rd.Decision, rd.Why = DecisionRejected, "stopped while paused: "+strings.Join(rd.Tripwires, ", ")
 		if _, err := appendNode(r.dir(rec.ID), Node{Round: rd.N, Ref: rd.Candidate.Ref, Version: rd.Candidate.Number, Parent: rd.Parent.Ref,
 			Author: schemas.AuthorAgent, BundleHash: rd.Candidate.BundleHash, ConfigHash: rd.Candidate.ConfigHash, Status: NodeTripped,
 			Reason: rd.Why, At: r.now()}); err != nil {
@@ -335,7 +335,7 @@ func (r *Runner) step(ctx context.Context, rec *Record, rd *Round, prot Protecte
 
 func (r *Runner) pause(rec *Record, rd *Round) bool {
 	rec.Status = StatusAwaiting
-	rec.Reason = fmt.Sprintf("round %d: tripwire %s; approve with a reason to continue, or stop", rd.N, strings.Join(rd.Tripwires, ", "))
+	rec.Reason = fmt.Sprintf("round %d paused: %s; approve with a reason to continue, or stop", rd.N, strings.Join(rd.Tripwires, ", "))
 	return true
 }
 
@@ -358,12 +358,12 @@ func (r *Runner) baseline(ctx context.Context, rec *Record) error {
 	dev, err := r.Exec.Score(ctx, ScoreRequest{ImprovementID: rec.ID, Spec: &rec.Spec, Phase: PhaseBaseline,
 		Arms: []Version{rec.Base}, Tasks: rec.Splits.Dev, Trials: rec.Spec.Screen.Trials})
 	if err != nil {
-		return fmt.Errorf("baseline on dev: %w", err)
+		return fmt.Errorf("baseline on practice tasks: %w", err)
 	}
 	sealed, err := r.Exec.Score(ctx, ScoreRequest{ImprovementID: rec.ID, Spec: &rec.Spec, Phase: PhaseSealed,
 		Arms: []Version{rec.Base}, Tasks: rec.Splits.Sealed, Trials: rec.Spec.Sealed.Trials})
 	if err != nil {
-		return fmt.Errorf("baseline on sealed: %w", err)
+		return fmt.Errorf("baseline on held-out tasks: %w", err)
 	}
 	rec.Baseline = &Baseline{Dev: score(dev.Runs, 0), Sealed: score(sealed.Runs, 0), DevExp: dev.ExpID,
 		SealedExp: sealed.ExpID, CostUSD: dev.CostUSD + sealed.CostUSD, SealedUSD: sealed.CostUSD}
@@ -435,7 +435,7 @@ func (r *Runner) screen(ctx context.Context, rec *Record, rd *Round) error {
 	res, err := r.Exec.Score(ctx, ScoreRequest{ImprovementID: rec.ID, Spec: &rec.Spec, Round: rd.N, Phase: PhaseScreen,
 		Arms: []Version{rd.Parent, *rd.Candidate}, Tasks: rec.Splits.Dev, Trials: rec.Spec.Screen.Trials})
 	if err != nil {
-		return fmt.Errorf("round %d screen: %w", rd.N, err)
+		return fmt.Errorf("round %d practice check: %w", rd.N, err)
 	}
 	rd.Cost.Screen = res.CostUSD
 	c := compare(res, rec.Splits.Dev)
@@ -453,7 +453,7 @@ func (r *Runner) screen(ctx context.Context, rec *Record, rd *Round) error {
 	rd.CandEvidence = evidence(res.Runs, 1)
 	rd.ParentEvidence = evidence(res.Runs, 0)
 	if c.MeanDiff < 0 && sf.P < screenAlpha {
-		r.decide(rec, rd, DecisionRejected, fmt.Sprintf("worse on dev by %.1f points (sign-flip p %.3f)", -100*c.MeanDiff, sf.P))
+		r.decide(rec, rd, DecisionRejected, fmt.Sprintf("worse on the practice tasks by %.1f points (p %.3f)", -100*c.MeanDiff, sf.P))
 	}
 	return nil
 }
@@ -469,7 +469,7 @@ func (r *Runner) audit(ctx context.Context, rec *Record, rd *Round) error {
 	res, err := r.Exec.Score(ctx, ScoreRequest{ImprovementID: rec.ID, Spec: &rec.Spec, Round: rd.N, Phase: PhaseAudit,
 		Arms: []Version{rd.Parent, *rd.Candidate}, Tasks: tasks, Trials: rec.Spec.Commit.Trials})
 	if err != nil {
-		return fmt.Errorf("round %d audit: %w", rd.N, err)
+		return fmt.Errorf("round %d gate check: %w", rd.N, err)
 	}
 	rec.AuditLooks++
 	rd.Cost.Audit = res.CostUSD
@@ -496,11 +496,11 @@ func (r *Runner) audit(ctx context.Context, rec *Record, rd *Round) error {
 	case c.HoneypotPasses > 0:
 		r.decide(rec, rd, DecisionRejected, fmt.Sprintf("blocked: the candidate passed %d impossible task(s)", c.HoneypotPasses))
 	case c.B.Vetoed > c.A.Vetoed+1:
-		r.decide(rec, rd, DecisionRejected, fmt.Sprintf("blocked: integrity vetoes rose from %d to %d runs", c.A.Vetoed, c.B.Vetoed))
+		r.decide(rec, rd, DecisionRejected, fmt.Sprintf("blocked: flagged runs rose from %d to %d", c.A.Vetoed, c.B.Vetoed))
 	case !ev.Better:
-		r.decide(rec, rd, DecisionRejected, fmt.Sprintf("not shown better on audit: e-value %.2f under %.0f after %d pairs", ev.MaxEUp, ev.Threshold, ev.Pairs))
+		r.decide(rec, rd, DecisionRejected, fmt.Sprintf("not shown better on the gate tasks: evidence %.2f, %.0f needed, after %d pairs", ev.MaxEUp, ev.Threshold, ev.Pairs))
 	default:
-		r.decide(rec, rd, DecisionCommitted, fmt.Sprintf("better on audit: e-value reached %.0f after %d pairs", ev.Threshold, ev.CrossedAt))
+		r.decide(rec, rd, DecisionCommitted, fmt.Sprintf("better on the gate tasks: evidence reached %.0f after %d pairs", ev.Threshold, ev.CrossedAt))
 	}
 	return nil
 }
@@ -523,7 +523,7 @@ func (r *Runner) decide(rec *Record, rd *Round, decision, why string) {
 		rec.Evidence = rd.ParentEvidence
 	}
 	if len(rd.Approvals) > 0 {
-		why += " (tripwire overridden)"
+		why += " (a paused check was approved)"
 	}
 	if _, err := appendNode(r.dir(rec.ID), Node{Round: rd.N, Ref: rd.Candidate.Ref, Version: rd.Candidate.Number, Parent: rd.Parent.Ref,
 		Author: schemas.AuthorAgent, BundleHash: rd.Candidate.BundleHash, ConfigHash: rd.Candidate.ConfigHash, Status: status,
@@ -538,7 +538,7 @@ func (r *Runner) sealed(ctx context.Context, rec *Record, rd *Round) error {
 	res, err := r.Exec.Score(ctx, ScoreRequest{ImprovementID: rec.ID, Spec: &rec.Spec, Round: rd.N, Phase: PhaseSealed,
 		Arms: []Version{rec.Incumbent}, Tasks: rec.Splits.Sealed, Trials: rec.Spec.Sealed.Trials})
 	if err != nil {
-		return fmt.Errorf("round %d sealed: %w", rd.N, err)
+		return fmt.Errorf("round %d held-out scoring: %w", rd.N, err)
 	}
 	s := score(res.Runs, 0)
 	rd.Sealed, rd.Cost.Sealed = &s, res.CostUSD
@@ -588,4 +588,10 @@ func loopUSD(rec *Record) float64 {
 		t += rd.Cost.Improver + rd.Cost.Screen + rd.Cost.Audit
 	}
 	return t
+}
+
+// GateTest is the commit test on its own: B minus A per (task, trial),
+// ordered by task then trial, under an anytime-valid e-value test.
+func GateTest(runs []RunScore, tasks []string, alpha float64, minPairs, maxPairs int) stats.EValueTest {
+	return stats.PairedEValue(pairDiffs(runs, tasks), alpha, minPairs, maxPairs)
 }

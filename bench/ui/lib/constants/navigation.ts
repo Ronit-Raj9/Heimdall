@@ -27,6 +27,7 @@ import {
 	Server,
 	Settings,
 	ShieldCheck,
+	TrendingUp,
 	type LucideIcon,
 } from "lucide-react";
 
@@ -41,6 +42,7 @@ export interface BenchNavItem {
 		| "/experiments"
 		| "/runs"
 		| "/leaderboard"
+		| "/improvements"
 		| "/agents"
 		| "/suites"
 		| "/canaries"
@@ -70,6 +72,7 @@ export interface BenchNavItem {
 		| "shell.nav.experiments"
 		| "shell.nav.runs"
 		| "shell.nav.leaderboard"
+		| "shell.nav.improvements"
 		| "shell.nav.agents"
 		| "shell.nav.suites"
 		| "shell.nav.canaries"
@@ -147,6 +150,7 @@ export const BENCH_NAV_GROUPS: readonly BenchNavGroup[] = [
 			},
 			{ to: "/runs", labelKey: "shell.nav.runs", icon: CirclePlay, testId: "nav-link-runs", also: ["/compare"] },
 			{ to: "/leaderboard", labelKey: "shell.nav.leaderboard", icon: ListOrdered, testId: "nav-link-leaderboard", also: ["/trends"] },
+			{ to: "/improvements", labelKey: "shell.nav.improvements", icon: TrendingUp, testId: "nav-link-improvements" },
 		],
 	},
 	{
