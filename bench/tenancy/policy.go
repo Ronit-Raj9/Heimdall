@@ -187,7 +187,10 @@ var PlatformPolicy = map[string]Rule{
 	key("POST", api+"/workers/connections/{id}/remove"):          org(admin),
 	key("POST", api+"/workers/connections/{id}/install-command"): org(admin),
 	key("PUT", api+"/workers/default"):                           org(admin),
-	key("GET", api+"/workers/kubernetes-manifest"):               org(viewer),
+	// Where runs go (handlers/workertarget.go): members read, admins set.
+	key("GET", api+"/workers/target"):              org(viewer),
+	key("PUT", api+"/workers/target"):              org(admin),
+	key("GET", api+"/workers/kubernetes-manifest"): org(viewer),
 }
 
 // OrgPolicy covers the org-scoped bench API: the routes every org's router

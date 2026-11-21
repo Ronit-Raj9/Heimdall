@@ -223,16 +223,36 @@ admin approved for that organization. Setup and guardrails:
   the seal proves the folder arrived as the runner sealed it, for the leased
   slot and attempt; admit only machines you control.
 
+## Where runs go
+
+Each organization has one setting for where its runs go (**Settings,
+Workers, Runs go to**; `GET` and `PUT /api/bench/workers/target`):
+
+| Target | Runs go to |
+|---|---|
+| `shared` | the shared worker (the default) |
+| `platform:<modal\|daytona\|e2b>` | a fresh sandbox per run on a connected platform (next section) |
+| `worker:<name>` | one of the organization's own workers (Runloop, Fly Machines, Kubernetes, a VM; section after next) |
+
+`GET` lists every choice with `per_evaluation`: an evaluation may name one
+of the organization's own workers in `worker` (`worker:<name>` or the bare
+name) whatever the setting, but a platform only while it is the setting,
+and `shared` not while a platform is (the platform's runs use the shared
+worker's queue). The older `POST /api/bench/worker-platforms/default` and
+`PUT /api/bench/workers/default` still work and set this same target: a
+platform default clears an own worker default and the other way round.
+Org admins set it; members read it.
+
 ## Cloud sandbox platforms (bring your own worker)
 
 An organization can run its agents in its own Modal, Daytona or E2B account
-instead of on the shared worker: **Settings, Workers, Connect a platform**.
+instead of on the shared worker: **Settings, Workers, A fresh sandbox per run**.
 The admin pastes the platform's API token; the server tests it with a cheap
 authenticated read and keeps it only when the platform accepts it, as an org
 secret in the keystore (AES-GCM, never returned, never logged; answers carry
-its last four characters). One connected platform can be chosen as the
-org's default worker; choosing the shared worker again, or disconnecting the
-platform, goes back to the shared worker.
+its last four characters). A connected platform becomes where runs go with
+`platform:<name>` (above); choosing the shared worker again, or
+disconnecting the platform, goes back to the shared worker.
 
 Code: `sandbox/` (platform clients, driver, connections), `handlers/workerplatforms.go`
 (routes under `/api/bench/worker-platforms`), `cmd/bifrost-bench/workerplatforms_hosted.go`,
@@ -309,4 +329,4 @@ The install script works as that one line: piped into `sh` it downloads itself a
 
 An uploaded kubeconfig may not name a file, run an exec plugin, skip TLS verification or point at a loopback, private or link-local address. Platform API addresses are fixed in code; an organization never chooses where Heimdall sends its token.
 
-Evaluations choose a worker with `worker` in the evaluation body (a worker's name, or `shared`); without one they run on the organization's default worker (`PUT /api/bench/workers/default`, the Workers page), else the shared worker. The child experiments then carry `runner.pool: <name>`.
+Evaluations choose a worker with `worker` in the evaluation body (`worker:<name>` or a worker's name, or `shared`); without one they go where runs go (above). The child experiments of an own worker then carry `runner.pool: <name>`.

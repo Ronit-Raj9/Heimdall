@@ -79,11 +79,11 @@ export const workerConnectionsApi = benchApi.injectEndpoints({
 		}),
 		createWorkerConnection: builder.mutation<WorkerConnectionCreated, WorkerConnectionCreate>({
 			query: (body) => ({ url: "/workers/connections", method: "POST", body }),
-			invalidatesTags: ["WorkerConnections", "Runners", "RunnerTokens", "AuditLog"],
+			invalidatesTags: ["WorkerConnections", "WorkerTarget", "Runners", "RunnerTokens", "AuditLog"],
 		}),
 		workerConnectionAction: builder.mutation<WorkerConnection, { id: string; action: WorkerAction }>({
 			query: ({ id: connId, action }) => ({ url: `/workers/connections/${id(connId)}/${action}`, method: "POST" }),
-			invalidatesTags: ["WorkerConnections", "Runners", "AuditLog"],
+			invalidatesTags: ["WorkerConnections", "WorkerTarget", "Runners", "AuditLog"],
 		}),
 		workerInstallCommand: builder.mutation<{ install: string }, string>({
 			query: (connId) => ({ url: `/workers/connections/${id(connId)}/install-command`, method: "POST" }),
@@ -91,7 +91,7 @@ export const workerConnectionsApi = benchApi.injectEndpoints({
 		}),
 		setDefaultWorker: builder.mutation<{ worker: string }, string>({
 			query: (worker) => ({ url: "/workers/default", method: "PUT", body: { worker } }),
-			invalidatesTags: ["WorkerConnections", "AuditLog"],
+			invalidatesTags: ["WorkerConnections", "WorkerTarget", "Runners", "AuditLog"],
 		}),
 	}),
 });

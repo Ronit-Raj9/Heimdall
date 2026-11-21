@@ -1,5 +1,5 @@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import type { Report, ReportCurvePoint, ReportRate } from "@/lib/store/apis/evaluationsApi";
+import type { Report, ReportLearningPoint, ReportRate } from "@/lib/store/apis/evaluationsApi";
 import { isAB, pct, points } from "./reportCard.utils";
 
 /** Rows of the learning section, or none when no benchmark ran as a task sequence. */
@@ -19,7 +19,7 @@ export function perDollar(rate: ReportRate | undefined): string {
 }
 
 /** Small learning curve. Decorative: every number is printed beside it. */
-export function Sparkline({ curve, width = 96, height = 24 }: { curve: ReportCurvePoint[]; width?: number; height?: number }) {
+export function Sparkline({ curve, width = 96, height = 24 }: { curve: ReportLearningPoint[]; width?: number; height?: number }) {
 	if (curve.length < 2) return <span className="text-muted-foreground text-xs">-</span>;
 	const first = curve[0].index;
 	const span = Math.max(curve[curve.length - 1].index - first, 1);
@@ -30,7 +30,14 @@ export function Sparkline({ curve, width = 96, height = 24 }: { curve: ReportCur
 		return `${x.toFixed(1)},${y.toFixed(1)}`;
 	});
 	return (
-		<svg aria-hidden="true" width={width} height={height} viewBox={`0 0 ${width} ${height}`} className="text-primary shrink-0" data-testid="learning-sparkline">
+		<svg
+			aria-hidden="true"
+			width={width}
+			height={height}
+			viewBox={`0 0 ${width} ${height}`}
+			className="text-primary shrink-0"
+			data-testid="learning-sparkline"
+		>
 			<line x1={pad} x2={width - pad} y1={height - pad} y2={height - pad} className="stroke-border" strokeWidth={1} />
 			<polyline points={xy.join(" ")} fill="none" stroke="currentColor" strokeWidth={1.5} strokeLinejoin="round" strokeLinecap="round" />
 		</svg>
@@ -88,7 +95,9 @@ export function LearningTable({ report }: { report: Report }) {
 							<TableCell className="text-right tabular-nums">{points(row.bwt)}</TableCell>
 							<TableCell className="text-right tabular-nums">{points(row.fwt)}</TableCell>
 							<TableCell className="text-right tabular-nums">
-								{row.episodes_to_threshold == null ? `Not reached (${pct(row.threshold)})` : `${row.episodes_to_threshold} (${pct(row.threshold)})`}
+								{row.episodes_to_threshold == null
+									? `Not reached (${pct(row.threshold)})`
+									: `${row.episodes_to_threshold} (${pct(row.threshold)})`}
 							</TableCell>
 						</TableRow>
 					))}

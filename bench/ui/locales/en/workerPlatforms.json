@@ -1,6 +1,6 @@
 {
-  "title": "Connect a platform",
-  "description": "Run your agents in your own Modal, Daytona or E2B account instead of the shared worker. Your token is tested before it is kept, stored encrypted, and never shown again.",
+  "title": "A fresh sandbox per run",
+  "description": "Run each agent run in its own new sandbox in your Modal, Daytona or E2B account. Your token is tested before it is kept, stored encrypted, and never shown again. Choose a connected platform under Runs go to.",
   "defaultLabel": "Default worker",
   "shared": "Shared worker",
   "sharedHint": "Runs on the Heimdall shared worker.",
@@ -14,8 +14,8 @@
   "cancel": "Cancel",
   "test": "Test connection",
   "testOk": "Connection works.",
-  "makeDefault": "Use as default",
-  "isDefault": "Default",
+  "makeDefault": "Send runs here",
+  "isDefault": "Runs go here",
   "useShared": "Use the shared worker",
   "disconnect": "Disconnect",
   "confirmDisconnect": "Disconnect {{platform}}? Its token is deleted; if it is the default, runs go back to the shared worker.",
@@ -29,6 +29,6 @@
   "lastTested": "Tested",
   "error": "Could not update {{platform}}",
   "loadError": "Could not load worker platforms",
-  "defaultNote": "New evaluations run on {{worker}}. Tasks with services, teams, sessions or non-gateway faults stay on the shared worker's Docker and are refused on a platform, with the reason.",
+  "defaultNote": "Tasks with services, teams, sessions or faults outside the model gateway stay on the shared worker's Docker and are refused on a platform, with the reason.",
   "off": "Worker platforms need the hosted server with a keystore master key."
 }

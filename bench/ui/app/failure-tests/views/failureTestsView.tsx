@@ -26,8 +26,8 @@ import { parseAsString, useQueryState } from "nuqs";
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 
-/** The PS2 faults a failure test can inject, in display order. */
-export type FailureFault = Exclude<EvaluationFault, "clean">;
+/** The PS2 faults a failure test can inject, in display order (EvaluationFault is any catalog id since X22). */
+export type FailureFault = Extract<EvaluationFault, string> & ("model-down" | "broken-tool" | "misleading-instruction");
 export const FAILURE_FAULTS: FailureFault[] = ["model-down", "broken-tool", "misleading-instruction"];
 
 /** Past failure tests listed. */
@@ -49,7 +49,15 @@ export function failureTestSpec(f: FailureTestForm): EvaluationSpec {
 	return {
 		name: `Failure test: ${f.agent}${f.version ? ` v${f.version}` : ""}`,
 		mode: "score",
-		arms: [{ label: "A", agent: f.agent, ...(f.version ? { version: f.version } : {}), model: f.model, ...(f.provider ? { provider: f.provider } : {}) }],
+		arms: [
+			{
+				label: "A",
+				agent: f.agent,
+				...(f.version ? { version: f.version } : {}),
+				model: f.model,
+				...(f.provider ? { provider: f.provider } : {}),
+			},
+		],
 		benchmarks: f.benchmarks,
 		tasks_per_benchmark: f.tasks,
 		trials: f.trials,
@@ -70,7 +78,11 @@ export function formProblem(f: FailureTestForm): "agent" | "model" | "benchmarks
 export function pastFailureTests(evaluations: readonly Evaluation[], agent: string, n = PAST_SHOWN): Evaluation[] {
 	return evaluations
 		.filter((e) => (e.spec?.faults ?? []).some((x) => x !== "clean"))
-		.filter((e) => !agent || (e.spec?.arms ?? []).some((a) => a.agent === agent || a.agent.replace(/^agents\//, "").replace(/\.ya?ml(@.*)?$/, "") === agent))
+		.filter(
+			(e) =>
+				!agent ||
+				(e.spec?.arms ?? []).some((a) => a.agent === agent || a.agent.replace(/^agents\//, "").replace(/\.ya?ml(@.*)?$/, "") === agent),
+		)
 		.sort((a, b) => b.created_at.localeCompare(a.created_at))
 		.slice(0, n);
 }
@@ -88,7 +100,16 @@ export default function FailureTestsView() {
 	const agents = useGetAgentsQuery();
 	const suites = useGetSuitesQuery();
 	const evals = useListEvaluationsQuery();
-	const [form, setForm] = useState<FailureTestForm>({ agent: agentParam ?? "", version: 0, provider: "", model: "", benchmarks: [], faults: [...FAILURE_FAULTS], tasks: 3, trials: 1 });
+	const [form, setForm] = useState<FailureTestForm>({
+		agent: agentParam ?? "",
+		version: 0,
+		provider: "",
+		model: "",
+		benchmarks: [],
+		faults: [...FAILURE_FAULTS],
+		tasks: 3,
+		trials: 1,
+	});
 	const versions = useGetAgentVersionsQuery(form.agent || skipToken);
 	const [create, createState] = useCreateEvaluationMutation();
 	const problem = formProblem(form);
@@ -205,8 +226,20 @@ export default function FailureTestsView() {
 					</fieldset>
 
 					<div className="flex flex-wrap items-end gap-4">
-						<NumberChoice label={t("ft.tasks")} value={form.tasks} options={[1, 3, 5, 10]} onPick={(n) => setForm((f) => ({ ...f, tasks: n }))} testId="ft-tasks" />
-						<NumberChoice label={t("ft.trials")} value={form.trials} options={[1, 2, 3]} onPick={(n) => setForm((f) => ({ ...f, trials: n }))} testId="ft-trials" />
+						<NumberChoice
+							label={t("ft.tasks")}
+							value={form.tasks}
+							options={[1, 3, 5, 10]}
+							onPick={(n) => setForm((f) => ({ ...f, tasks: n }))}
+							testId="ft-tasks"
+						/>
+						<NumberChoice
+							label={t("ft.trials")}
+							value={form.trials}
+							options={[1, 2, 3]}
+							onPick={(n) => setForm((f) => ({ ...f, trials: n }))}
+							testId="ft-trials"
+						/>
 						<div className="text-muted-foreground ml-auto text-sm" data-testid="ft-estimate">
 							{problem !== null
 								? t(`ft.need.${problem}`)
@@ -255,7 +288,19 @@ export default function FailureTestsView() {
 	);
 }
 
-function NumberChoice({ label, value, options, onPick, testId }: { label: string; value: number; options: number[]; onPick: (n: number) => void; testId: string }) {
+function NumberChoice({
+	label,
+	value,
+	options,
+	onPick,
+	testId,
+}: {
+	label: string;
+	value: number;
+	options: number[];
+	onPick: (n: number) => void;
+	testId: string;
+}) {
 	return (
 		<div className="flex flex-col gap-1 text-xs font-medium">
 			{label}
@@ -267,7 +312,9 @@ function NumberChoice({ label, value, options, onPick, testId }: { label: string
 						role="radio"
 						aria-checked={value === n}
 						onClick={() => onPick(n)}
-						className={value === n ? "bg-background rounded-md px-3 py-1 text-sm shadow-sm" : "text-muted-foreground rounded-md px-3 py-1 text-sm"}
+						className={
+							value === n ? "bg-background rounded-md px-3 py-1 text-sm shadow-sm" : "text-muted-foreground rounded-md px-3 py-1 text-sm"
+						}
 					>
 						{n}
 					</button>
@@ -292,9 +339,13 @@ function PastTest({ ev }: { ev: Evaluation }) {
 					{ev.spec?.name || ev.id}
 				</Link>
 				<span className="text-muted-foreground text-xs">
-					{[arm?.version ? `${arm.agent} v${arm.version}` : arm?.agent, arm?.model, new Date(ev.created_at).toLocaleString()].filter(Boolean).join(" · ")}
+					{[arm?.version ? `${arm.agent} v${arm.version}` : arm?.agent, arm?.model, new Date(ev.created_at).toLocaleString()]
+						.filter(Boolean)
+						.join(" · ")}
 				</span>
-				<span className="bg-muted ml-auto rounded-full px-2 py-0.5 text-xs">{t(`ft.status.${ev.status}`, { defaultValue: ev.status })}</span>
+				<span className="bg-muted ml-auto rounded-full px-2 py-0.5 text-xs">
+					{t(`ft.status.${ev.status}`, { defaultValue: ev.status })}
+				</span>
 			</div>
 			{!finished ? (
 				<p className="text-muted-foreground text-xs">{t("ft.running")}</p>
@@ -310,7 +361,9 @@ function PastTest({ ev }: { ev: Evaluation }) {
 							<li key={r.fault} className="rounded-md border px-2.5 py-1.5 text-xs">
 								<span className="text-muted-foreground">{faultName(r.fault)}</span>{" "}
 								<span className="font-semibold tabular-nums">{Math.round(s.score * 100)}%</span>{" "}
-								<span className={s.drop > 0 ? "text-chart-error-ink tabular-nums" : "text-muted-foreground tabular-nums"}>({points(-s.drop)})</span>
+								<span className={s.drop > 0 ? "text-chart-error-ink tabular-nums" : "text-muted-foreground tabular-nums"}>
+									({points(-s.drop)})
+								</span>
 							</li>
 						);
 					})}

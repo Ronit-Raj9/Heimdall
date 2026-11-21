@@ -93,6 +93,7 @@ describe("EvaluationBody", () => {
 		expect(html).not.toContain('data-testid="promote-mock"');
 		expect(html).not.toContain('data-testid="repeat-mock"');
 	});
+});
 
 describe("EvaluationBody delete (X16)", () => {
 	it("disables Delete while the evaluation runs and enables it once done", async () => {

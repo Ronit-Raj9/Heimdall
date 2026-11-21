@@ -1,5 +1,5 @@
 import { Button } from "@/components/ui/button";
-import { EvaluationWorkerPicker } from "@/components/workers/connectedWorkers";
+import { EvaluationWorkerPicker } from "@/components/workers/whereRunsGo";
 import { type EvaluationArm, type EvaluationSpec, useCreateEvaluationMutation } from "@/lib/store/apis/evaluationsApi";
 import { Link, useNavigate } from "@tanstack/react-router";
 import { useState } from "react";

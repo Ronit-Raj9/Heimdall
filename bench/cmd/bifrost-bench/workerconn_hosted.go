@@ -2,8 +2,8 @@ package main
 
 // Bring your own worker (package byoworker, FIX_BRIEF decision 6), hosted
 // wiring: the worker connections service over the database, the keystore
-// and the runners area, its platform routes, and the evaluation hook that
-// routes an evaluation to the worker it names (or the org's default).
+// and the runners area, and its platform routes. Evaluations are routed by
+// the one "where runs go" setting (workertarget_hosted.go).
 // Local mode never reaches this file.
 
 import (
@@ -51,17 +51,14 @@ func workerConnsOf(env *hostedEnv) *byoworker.Service {
 	}
 	v, _ := workerConns.LoadOrStore(env, svc)
 	s, _ := v.(*byoworker.Service)
-	if s != nil {
-		handlers.SetEvaluationPoolResolver(s.EvaluationPool)
-	}
-	return s
+	return s // evaluations are routed by the one "where runs go" setting (workertarget_hosted.go)
 }
 
 func init() {
 	hostedAreas = append(hostedAreas, func(env *hostedEnv) (server.RouteRegistrar, error) {
 		var api handlers.WorkerConnAdmin
 		if s := workerConnsOf(env); s != nil {
-			api = s
+			api = aliasedWorkers{WorkerConnAdmin: s, t: workerTargetsOf(env)} // PUT /workers/default sets the one target
 		}
 		return handlers.NewWorkerConnsHandler(env.base.cfg.Server.Mode, api,
 			handlers.WorkerConnErrors{Invalid: byoworker.ErrInvalid, NotFound: byoworker.ErrNotFound, Refused: byoworker.ErrRefused},

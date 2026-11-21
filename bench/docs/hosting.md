@@ -158,6 +158,12 @@ pick up.
 
 ## 6. Organization workers
 
+Each organization picks where its runs go on the Workers page (one setting,
+`PUT /api/bench/workers/target`): the shared worker, a fresh sandbox per run
+in its own Modal, Daytona or E2B account, or one of its own workers on
+Runloop, Fly Machines, its Kubernetes cluster or its own VM. Details:
+[runners.md](runners.md#where-runs-go).
+
 An organization that wants its agents on its own machines connects its own
 worker: any Linux machine or VM with Docker, in its own cloud account or
 data center. An org admin creates a worker token (`hmr_...`, one org, one

@@ -52,7 +52,7 @@ func init() {
 	hostedAreas = append(hostedAreas, func(env *hostedEnv) (server.RouteRegistrar, error) {
 		var api handlers.WorkerPlatforms
 		if c := platformConnections(env); c != nil {
-			api = c
+			api = aliasedPlatforms{Connections: c, t: workerTargetsOf(env)} // POST /worker-platforms/default sets the one target
 		}
 		return handlers.NewWorkerPlatformsHandler(env.base.cfg.Server.Mode, api, runnerAudit(env)), nil
 	})

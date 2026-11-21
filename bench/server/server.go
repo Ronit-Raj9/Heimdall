@@ -142,6 +142,7 @@ func New(cfg *lib.Config, deps Deps) (*Server, error) {
 	handlers.NewWorkerPlatformsHandler(mode, nil, nil).RegisterRoutes(r, common...) // X19a: cloud sandbox platforms are hosted only; local mode answers 503
 	// Bring your own worker: hosted only; local mode answers 503 (handlers/workerconns.go).
 	handlers.NewWorkerConnsHandler(mode, nil, handlers.WorkerConnErrors{}, nil).RegisterRoutes(r, common...)
+	handlers.NewWorkerTargetHandler(mode, nil, nil).RegisterRoutes(r, common...) // where runs go: hosted only; local mode answers 503 (handlers/workertarget.go)
 	if deps.UI != nil {
 		NewUIHandler(mode, deps.UI).RegisterRoutes(r)
 	}

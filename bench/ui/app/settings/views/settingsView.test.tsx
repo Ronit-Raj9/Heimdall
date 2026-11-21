@@ -24,7 +24,11 @@ import { errorQuery, loadingQuery, mutation, okQuery, render, tagOf } from "@/li
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import SettingsView, { settingsTab, settingsTabsFor } from "./settingsView";
 
-const api = vi.hoisted(() => ({ q: {} as Record<string, unknown>, m: {} as Record<string, Record<string, unknown>>, calls: [] as string[] }));
+const api = vi.hoisted(() => ({
+	q: {} as Record<string, unknown>,
+	m: {} as Record<string, Record<string, unknown>>,
+	calls: [] as string[],
+}));
 vi.mock("@tanstack/react-router", async () => (await import("@/lib/testing/routerMock")).routerMock);
 // X19a: Workers tab, connect a platform.
 vi.mock("@/lib/store/apis/workerPlatformsApi", async (importOriginal) => {
@@ -35,8 +39,34 @@ vi.mock("@/lib/store/apis/workerPlatformsApi", async (importOriginal) => {
 		useListWorkerPlatformsQuery: () => ({ data: { platforms: [], default: "" }, isLoading: false }),
 		useConnectWorkerPlatformMutation: () => m({}),
 		useTestWorkerPlatformMutation: () => m({}),
-		useSetDefaultWorkerMutation: () => m({}),
 		useDisconnectWorkerPlatformMutation: () => m({}),
+	};
+});
+// Where runs go and your own workers (one Workers settings page).
+vi.mock("@/lib/store/apis/workerTargetApi", async (importOriginal) => {
+	const real = await importOriginal<typeof import("@/lib/store/apis/workerTargetApi")>();
+	const { mutation: m } = await import("@/lib/testing/render");
+	return {
+		...real,
+		useGetWorkerTargetQuery: () => ({
+			data: {
+				target: "shared",
+				choices: [{ target: "shared", kind: "shared", name: "shared", title: "Shared worker", current: true, per_evaluation: true }],
+			},
+			isLoading: false,
+		}),
+		useSetWorkerTargetMutation: () => m({}),
+	};
+});
+vi.mock("@/lib/store/apis/workerConnectionsApi", async (importOriginal) => {
+	const real = await importOriginal<typeof import("@/lib/store/apis/workerConnectionsApi")>();
+	const { mutation: m } = await import("@/lib/testing/render");
+	return {
+		...real,
+		useListWorkerConnectionsQuery: () => ({ data: { connections: [], default_worker: "", platforms: [] }, isLoading: false }),
+		useCreateWorkerConnectionMutation: () => m({}),
+		useWorkerConnectionActionMutation: () => m({}),
+		useWorkerInstallCommandMutation: () => m({}),
 	};
 });
 vi.mock("@/lib/store/apis/accountSafetyApi", async () => {
@@ -122,8 +152,10 @@ describe("SettingsView", () => {
 		const html = render(<SettingsView tab="secrets" onTabChange={() => undefined} />, LOCAL_SESSION);
 		expect(html).toContain('data-testid="settings-local"');
 		expect(html).toContain("local mode");
-		for (const tab of ["keys", "runners", "usage", "files", "jobs", "integrations", "operations", "secrets"]) expect(html).toContain(`data-testid="settings-tab-${tab}"`);
-		for (const tab of ["members", "tokens", "github", "audit", "org", "account", "admin"]) expect(html).not.toContain(`data-testid="settings-tab-${tab}"`);
+		for (const tab of ["keys", "runners", "usage", "files", "jobs", "integrations", "operations", "secrets"])
+			expect(html).toContain(`data-testid="settings-tab-${tab}"`);
+		for (const tab of ["members", "tokens", "github", "audit", "org", "account", "admin"])
+			expect(html).not.toContain(`data-testid="settings-tab-${tab}"`);
 	});
 	it("lists Server admin only for server admins", () => {
 		const tabs = (session: Parameters<typeof settingsTabsFor>[0]) => settingsTabsFor(session);
@@ -146,7 +178,23 @@ describe("SettingsView", () => {
 	});
 	it("shows every tab and the organization in hosted mode", () => {
 		const html = render(<SettingsView tab="members" onTabChange={() => undefined} />, hostedSession());
-		for (const tab of ["keys", "runners", "usage", "files", "jobs", "integrations", "operations", "members", "tokens", "secrets", "github", "audit", "org", "account"]) expect(html).toContain(`data-testid="settings-tab-${tab}"`);
+		for (const tab of [
+			"keys",
+			"runners",
+			"usage",
+			"files",
+			"jobs",
+			"integrations",
+			"operations",
+			"members",
+			"tokens",
+			"secrets",
+			"github",
+			"audit",
+			"org",
+			"account",
+		])
+			expect(html).toContain(`data-testid="settings-tab-${tab}"`);
 		expect(html).toContain("API keys, workers and files for Acme Agents, and who can use it.");
 		expect(html).toContain('data-testid="settings-members"');
 	});
@@ -345,13 +393,17 @@ describe("audit export and integrity (X16)", () => {
 		expect(html).toContain("Reads of traces, evidence and exports are logged here too");
 	});
 	it("shows an intact chain with its head and the older unchained entries", () => {
-		api.m.verify = { data: { ok: true, entries: 120, chained: 118, legacy: 2, head_seq: 118, head_hash: "abcdef0123456789", broken_at: 0, reason: "" } };
+		api.m.verify = {
+			data: { ok: true, entries: 120, chained: 118, legacy: 2, head_seq: 118, head_hash: "abcdef0123456789", broken_at: 0, reason: "" },
+		};
 		const html = render(<AuditTab org={org} />, hostedSession("admin"));
 		expect(html).toContain("Audit log intact: 120 entries, chain head abcdef012345");
 		expect(html).toContain("2 older entries were written before the chain existed");
 	});
 	it("shows where a tampered chain breaks", () => {
-		api.m.verify = { data: { ok: false, entries: 120, chained: 118, legacy: 0, head_seq: 118, head_hash: "ff", broken_at: 57, reason: "hash mismatch" } };
+		api.m.verify = {
+			data: { ok: false, entries: 120, chained: 118, legacy: 0, head_seq: 118, head_hash: "ff", broken_at: 57, reason: "hash mismatch" },
+		};
 		const html = render(<AuditTab org={org} />, hostedSession("admin"));
 		expect(html).toContain('data-testid="audit-verify-broken"');
 		expect(html).toContain("the chain breaks at entry 57");

@@ -7,7 +7,6 @@ import {
 	kubernetesManifestUrl,
 	useCreateWorkerConnectionMutation,
 	useListWorkerConnectionsQuery,
-	useSetDefaultWorkerMutation,
 	useWorkerConnectionActionMutation,
 	useWorkerInstallCommandMutation,
 	type WorkerAction,
@@ -19,6 +18,7 @@ import {
 import { cn } from "@/lib/utils";
 import { Boxes, Cloud, Plus, Server, Ship } from "lucide-react";
 import { useId, useState, type ReactNode } from "react";
+import { useSetWorkerTargetMutation } from "@/lib/store/apis/workerTargetApi";
 import { useTranslation } from "react-i18next";
 
 import type byoworkerEn from "@/locales/en/byoworker.json";
@@ -86,7 +86,6 @@ export function ConnectedWorkers() {
 				</p>
 			) : !data ? null : (
 				<>
-					<DefaultWorkerPicker connections={data.connections} current={data.default_worker} />
 					{data.connections.length === 0 ? (
 						<p className="text-muted-foreground rounded-xl border border-dashed px-5 py-4 text-sm" data-testid="byo-empty">
 							{t("empty")}
@@ -106,47 +105,12 @@ export function ConnectedWorkers() {
 	);
 }
 
-/** Which worker new evaluations run on: the shared worker or one of the org's own. */
-export function DefaultWorkerPicker({ connections, current }: { connections: WorkerConnection[]; current: string }) {
-	const { t } = useTranslation("byoworker");
-	const [save, state] = useSetDefaultWorkerMutation();
-	const fieldId = useId();
-	return (
-		<div className="bg-card flex min-w-0 flex-wrap items-center gap-3 rounded-xl border px-5 py-3" data-testid="byo-default">
-			<label htmlFor={fieldId} className="text-foreground text-sm font-medium">
-				{t("default.label")}
-			</label>
-			<select
-				id={fieldId}
-				className="border-input bg-card h-8 rounded-md border px-2 text-sm"
-				value={current}
-				disabled={state.isLoading}
-				onChange={(e) => void save(e.target.value)}
-				data-testid="byo-default-select"
-			>
-				<option value="">{t("default.shared")}</option>
-				{connections.map((c) => (
-					<option key={c.id} value={c.pool}>
-						{c.name} ({c.platform_title})
-					</option>
-				))}
-			</select>
-			<span className="text-muted-foreground text-xs">{t("default.hint")}</span>
-			{state.isError && (
-				<span className="text-chart-error-ink text-xs" role="alert">
-					{apiError(state.error, "")}
-				</span>
-			)}
-		</div>
-	);
-}
-
 /** One worker: status, platform, capacity, last seen and its actions. */
 export function ConnectionCard({ conn }: { conn: WorkerConnection }) {
 	const { t } = useTranslation("byoworker");
 	const [act, actState] = useWorkerConnectionActionMutation();
 	const [reveal, revealState] = useWorkerInstallCommandMutation();
-	const [setDefault] = useSetDefaultWorkerMutation();
+	const [setTarget] = useSetWorkerTargetMutation();
 	const locale = getLocale();
 	const Icon = PLATFORM_ICON[conn.platform] ?? Boxes;
 	const runner = conn.runner;
@@ -157,9 +121,7 @@ export function ConnectionCard({ conn }: { conn: WorkerConnection }) {
 		if (action === "remove" && !window.confirm(t("actions.confirmRemove", { name: conn.name }))) return;
 		void act({ id: conn.id, action });
 	};
-	const capacity = runner
-		? t("card.slots", { used: runner.running_slots, total: runner.slots })
-		: (conn.health?.capacity ?? null);
+	const capacity = runner ? t("card.slots", { used: runner.running_slots, total: runner.slots }) : (conn.health?.capacity ?? null);
 	return (
 		<article
 			className="bg-card flex h-full min-w-0 flex-col gap-4 rounded-xl border p-5"
@@ -201,12 +163,19 @@ export function ConnectionCard({ conn }: { conn: WorkerConnection }) {
 				</Fact>
 			</dl>
 			{conn.health && (
-				<p className={cn("text-xs", conn.health.ok ? "text-muted-foreground" : "text-chart-error-ink")} data-testid={`byo-card-${conn.name}-health`}>
+				<p
+					className={cn("text-xs", conn.health.ok ? "text-muted-foreground" : "text-chart-error-ink")}
+					data-testid={`byo-card-${conn.name}-health`}
+				>
 					{conn.health.detail} {t("card.checked", { when: formatRelative(conn.health.checked_at, locale) ?? "" })}
 				</p>
 			)}
-			{runner?.version && <p className="text-muted-foreground truncate font-mono text-[11px]">{t("card.version", { version: runner.version })}</p>}
-			{revealState.data?.install && <CopyCodeBlock code={revealState.data.install} label={t("form.installTitle")} testId={`byo-card-${conn.name}-install`} />}
+			{runner?.version && (
+				<p className="text-muted-foreground truncate font-mono text-[11px]">{t("card.version", { version: runner.version })}</p>
+			)}
+			{revealState.data?.install && (
+				<CopyCodeBlock code={revealState.data.install} label={t("form.installTitle")} testId={`byo-card-${conn.name}-install`} />
+			)}
 			{(actState.isError || revealState.isError) && (
 				<p className="text-chart-error-ink text-xs" role="alert" data-testid={`byo-card-${conn.name}-error`}>
 					{apiError(actState.error ?? revealState.error, "")}
@@ -214,13 +183,25 @@ export function ConnectionCard({ conn }: { conn: WorkerConnection }) {
 			)}
 			<div className="mt-auto flex flex-wrap gap-2">
 				{starts && (
-					<Button size="sm" variant="outline" disabled={actState.isLoading} onClick={() => run("check")} data-testid={`byo-card-${conn.name}-check`}>
+					<Button
+						size="sm"
+						variant="outline"
+						disabled={actState.isLoading}
+						onClick={() => run("check")}
+						data-testid={`byo-card-${conn.name}-check`}
+					>
 						{t("actions.check")}
 					</Button>
 				)}
 				{starts &&
 					(running ? (
-						<Button size="sm" variant="outline" disabled={actState.isLoading} onClick={() => run("stop")} data-testid={`byo-card-${conn.name}-stop`}>
+						<Button
+							size="sm"
+							variant="outline"
+							disabled={actState.isLoading}
+							onClick={() => run("stop")}
+							data-testid={`byo-card-${conn.name}-stop`}
+						>
 							{t("actions.stop")}
 						</Button>
 					) : (
@@ -229,16 +210,34 @@ export function ConnectionCard({ conn }: { conn: WorkerConnection }) {
 						</Button>
 					))}
 				{!starts && !revealState.data && (
-					<Button size="sm" variant="outline" disabled={revealState.isLoading} onClick={() => void reveal(conn.id)} data-testid={`byo-card-${conn.name}-install-show`}>
+					<Button
+						size="sm"
+						variant="outline"
+						disabled={revealState.isLoading}
+						onClick={() => void reveal(conn.id)}
+						data-testid={`byo-card-${conn.name}-install-show`}
+					>
 						{t("actions.install")}
 					</Button>
 				)}
 				{!conn.default && (
-					<Button size="sm" variant="ghost" onClick={() => void setDefault(conn.pool)} data-testid={`byo-card-${conn.name}-default`}>
+					<Button
+						size="sm"
+						variant="ghost"
+						onClick={() => void setTarget(`worker:${conn.pool}`)}
+						data-testid={`byo-card-${conn.name}-default`}
+					>
 						{t("actions.makeDefault")}
 					</Button>
 				)}
-				<Button size="sm" variant="ghost" className="text-chart-error-ink" disabled={actState.isLoading} onClick={() => run("remove")} data-testid={`byo-card-${conn.name}-remove`}>
+				<Button
+					size="sm"
+					variant="ghost"
+					className="text-chart-error-ink"
+					disabled={actState.isLoading}
+					onClick={() => run("remove")}
+					data-testid={`byo-card-${conn.name}-remove`}
+				>
 					{t("actions.remove")}
 				</Button>
 			</div>
@@ -287,7 +286,12 @@ export function draftToCreate(d: ConnectDraft) {
 		case "runloop":
 			return { name: d.name.trim(), platform: d.platform, settings: pick("size", "blueprint", "hours"), secret: (f.secret ?? "").trim() };
 		case "fly":
-			return { name: d.name.trim(), platform: d.platform, settings: pick("app", "region", "cpus", "memory_mb", "cpu_kind", "image"), secret: (f.secret ?? "").trim() };
+			return {
+				name: d.name.trim(),
+				platform: d.platform,
+				settings: pick("app", "region", "cpus", "memory_mb", "cpu_kind", "image"),
+				secret: (f.secret ?? "").trim(),
+			};
 		case "kubernetes": {
 			const secret =
 				d.kubeMode === "kubeconfig"
@@ -304,7 +308,12 @@ export function draftToCreate(d: ConnectDraft) {
 
 export function ConnectWorkerForm({ platforms, onClose }: { platforms: WorkerPlatform[]; onClose(): void }) {
 	const { t } = useTranslation("byoworker");
-	const [draft, setDraft] = useState<ConnectDraft>({ platform: platforms[0]?.id ?? "vm", name: "", fields: { namespace: "heimdall" }, kubeMode: "kubeconfig" });
+	const [draft, setDraft] = useState<ConnectDraft>({
+		platform: platforms[0]?.id ?? "vm",
+		name: "",
+		fields: { namespace: "heimdall" },
+		kubeMode: "kubeconfig",
+	});
 	const [create, state] = useCreateWorkerConnectionMutation();
 	const [act, actState] = useWorkerConnectionActionMutation();
 	const [created, setCreated] = useState<WorkerConnectionCreated | null>(null);
@@ -361,7 +370,12 @@ export function ConnectWorkerForm({ platforms, onClose }: { platforms: WorkerPla
 				)}
 				<div className="flex gap-2">
 					{!created.install && !actState.isSuccess && (
-						<Button size="sm" disabled={actState.isLoading} onClick={() => void act({ id: c.id, action: "start" })} data-testid="byo-created-start">
+						<Button
+							size="sm"
+							disabled={actState.isLoading}
+							onClick={() => void act({ id: c.id, action: "start" })}
+							data-testid="byo-created-start"
+						>
 							{actState.isLoading ? t("actions.working") : t("form.startNow")}
 						</Button>
 					)}
@@ -420,7 +434,13 @@ export function ConnectWorkerForm({ platforms, onClose }: { platforms: WorkerPla
 					<>
 						{text("secret", t("runloop.secret"), t("form.secretHint"), "password")}
 						<Field label={t("runloop.size")} htmlFor={`${base}-size`}>
-							<select id={`${base}-size`} className={inputClass} value={draft.fields.size ?? "X_LARGE"} onChange={(e) => set("size", e.target.value)} data-testid="byo-form-size">
+							<select
+								id={`${base}-size`}
+								className={inputClass}
+								value={draft.fields.size ?? "X_LARGE"}
+								onChange={(e) => set("size", e.target.value)}
+								data-testid="byo-form-size"
+							>
 								{["MEDIUM", "LARGE", "X_LARGE", "XX_LARGE"].map((s) => (
 									<option key={s}>{s}</option>
 								))}
@@ -438,7 +458,12 @@ export function ConnectWorkerForm({ platforms, onClose }: { platforms: WorkerPla
 						{text("cpus", t("fly.cpus"), undefined, "number")}
 						{text("memory_mb", t("fly.memory"), undefined, "number")}
 						<Field label={t("fly.cpuKind")} htmlFor={`${base}-cpu_kind`}>
-							<select id={`${base}-cpu_kind`} className={inputClass} value={draft.fields.cpu_kind ?? "performance"} onChange={(e) => set("cpu_kind", e.target.value)}>
+							<select
+								id={`${base}-cpu_kind`}
+								className={inputClass}
+								value={draft.fields.cpu_kind ?? "performance"}
+								onChange={(e) => set("cpu_kind", e.target.value)}
+							>
 								<option>performance</option>
 								<option>shared</option>
 							</select>
@@ -474,7 +499,10 @@ export function ConnectWorkerForm({ platforms, onClose }: { platforms: WorkerPla
 								role="radio"
 								aria-checked={draft.kubeMode === m}
 								onClick={() => setDraft((d) => ({ ...d, kubeMode: m }))}
-								className={cn("rounded-lg border px-3 py-1 text-xs", draft.kubeMode === m ? "border-primary bg-primary/5 font-medium" : "text-muted-foreground")}
+								className={cn(
+									"rounded-lg border px-3 py-1 text-xs",
+									draft.kubeMode === m ? "border-primary bg-primary/5 font-medium" : "text-muted-foreground",
+								)}
 								data-testid={`byo-form-kube-${m}`}
 							>
 								{t(`kubernetes.${m}`)}
@@ -507,35 +535,5 @@ export function ConnectWorkerForm({ platforms, onClose }: { platforms: WorkerPla
 				</Button>
 			</div>
 		</form>
-	);
-}
-
-/** Evaluate wizard: pick the worker an evaluation runs on. Renders nothing without connected workers. */
-export function EvaluationWorkerPicker({ value, onChange }: { value: string; onChange(worker: string): void }) {
-	const { t } = useTranslation("byoworker");
-	const query = useListWorkerConnectionsQuery();
-	const fieldId = useId();
-	const data = query.data;
-	if (!data || data.connections.length === 0) return null;
-	const def = data.connections.find((c) => c.default);
-	return (
-		<section className="flex flex-col gap-1.5" data-testid="eval-worker">
-			<label htmlFor={fieldId} className="text-sm font-medium">
-				{t("default.label")}
-			</label>
-			<select id={fieldId} className="border-input bg-background h-8 w-64 rounded-md border px-2 text-sm" value={value} onChange={(e) => onChange(e.target.value)} data-testid="eval-worker-select">
-				<option value="">
-					{def ? `${def.name} (${t("default.badge").toLowerCase()})` : `${t("default.shared")} (${t("default.badge").toLowerCase()})`}
-				</option>
-				{def && <option value="shared">{t("default.shared")}</option>}
-				{data.connections
-					.filter((c) => !c.default)
-					.map((c) => (
-						<option key={c.id} value={c.pool}>
-							{c.name} ({c.platform_title}, {t(`status.${c.status}`, { defaultValue: c.status }).toLowerCase()})
-						</option>
-					))}
-			</select>
-		</section>
 	);
 }

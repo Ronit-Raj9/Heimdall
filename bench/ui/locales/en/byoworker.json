@@ -1,5 +1,5 @@
 {
-	"title": "Your workers",
+	"title": "Your own workers",
 	"subtitle": "Run your agents on compute you own: a cloud sandbox, your Kubernetes cluster or your own VM. Each worker shows up here with its health and capacity.",
 	"connect": "Connect a worker",
 	"cancel": "Cancel",
@@ -10,7 +10,7 @@
 		"shared": "Shared worker",
 		"hint": "An evaluation can still pick another worker when you launch it.",
 		"saved": "Saved",
-		"badge": "Default"
+		"badge": "Runs go here"
 	},
 	"status": {
 		"ready": "Ready",
@@ -35,7 +35,7 @@
 		"stop": "Stop",
 		"remove": "Remove",
 		"confirmRemove": "Remove {{name}}? Heimdall stops it, and its token stops working.",
-		"makeDefault": "Use for new evaluations",
+		"makeDefault": "Send runs here",
 		"install": "Show install command",
 		"working": "Working..."
 	},
@@ -87,5 +87,15 @@
 		"saToken": "Token",
 		"image": "Worker image",
 		"imageHint": "An image with bifrost-bench and your project. Leave empty to use the server's image."
+	},
+	"target": {
+		"label": "Runs go to",
+		"hint": "One setting for every run of the organization: the shared worker, a fresh sandbox per run on a platform you connected, or one of your own workers. An evaluation can still pick one of your own workers when you launch it.",
+		"sandbox": "a fresh sandbox per run",
+		"error": "Could not change where runs go",
+		"loadError": "Could not load where runs go",
+		"evalLabel": "This evaluation runs on",
+		"whereRunsGo": "where runs go",
+		"notForOne": "set it as where runs go on the Workers page"
 	}
 }

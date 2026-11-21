@@ -307,7 +307,7 @@ var APIRoutes = []RouteDoc{
 	// Bring your own worker (X19a, handlers/workerplatforms.go): the org's own cloud sandbox platforms.
 	{Method: "GET", Path: APIPrefix + "/worker-platforms", Tag: "runners", Summary: "Cloud sandbox platforms (Modal, Daytona, E2B), which are connected and the org's default worker; tokens are never returned",
 		Auth: AuthWrite, Response: sandbox.ConnectionsList{}},
-	{Method: "POST", Path: APIPrefix + "/worker-platforms/default", Tag: "runners", Summary: "Choose the org's default worker: a connected platform, or \"\" for the shared worker",
+	{Method: "POST", Path: APIPrefix + "/worker-platforms/default", Tag: "runners", Summary: "Alias of PUT /workers/target: platform:<name>, or the shared worker for \"\" (clears an own worker default)",
 		Auth: AuthWrite, Request: PlatformDefaultRequest{}, Response: sandbox.ConnectionsList{}},
 	{Method: "POST", Path: APIPrefix + "/worker-platforms/{platform}/connect", Tag: "runners", Summary: "Test a platform token and keep it as an org secret when the platform accepts it",
 		Auth: AuthWrite, Request: PlatformConnectRequest{}, Response: sandbox.ConnectionView{}},
@@ -325,7 +325,9 @@ var APIRoutes = []RouteDoc{
 	{Method: "POST", Path: APIPrefix + "/workers/connections/{id}/stop", Tag: "workers", Summary: "Stop and remove the worker's box on its platform", Auth: AuthWrite, Response: schemas.WorkerConnection{}},
 	{Method: "POST", Path: APIPrefix + "/workers/connections/{id}/remove", Tag: "workers", Summary: "Disconnect the worker: stop it, revoke its token, delete its stored credential", Auth: AuthWrite, Response: schemas.WorkerConnection{}},
 	{Method: "POST", Path: APIPrefix + "/workers/connections/{id}/install-command", Tag: "workers", Summary: "Show a VM worker's one-line install command again", Auth: AuthWrite, Response: schemas.WorkerInstallCommand{}},
-	{Method: "PUT", Path: APIPrefix + "/workers/default", Tag: "workers", Summary: "The worker new evaluations run on when they name none (empty: the shared worker)", Auth: AuthWrite, Request: schemas.WorkerDefault{}, Response: schemas.WorkerDefault{}},
+	{Method: "GET", Path: APIPrefix + "/workers/target", Tag: "workers", Summary: "Where runs go: shared, platform:<modal|daytona|e2b> (a fresh sandbox per run) or worker:<name> (one of the org's own workers), with every choice", Response: schemas.WorkerTargetView{}},
+	{Method: "PUT", Path: APIPrefix + "/workers/target", Tag: "workers", Summary: "Set where runs go; the platform and own worker defaults below are its two halves and are kept in step", Auth: AuthWrite, Request: schemas.WorkerTargetSet{}, Response: schemas.WorkerTargetView{}},
+	{Method: "PUT", Path: APIPrefix + "/workers/default", Tag: "workers", Summary: "Alias of PUT /workers/target: worker:<name>, or the shared worker when empty (clears a sandbox platform default)", Auth: AuthWrite, Request: schemas.WorkerDefault{}, Response: schemas.WorkerDefault{}},
 	{Method: "GET", Path: APIPrefix + "/workers/kubernetes-manifest", Tag: "workers", Summary: "RBAC to apply before connecting a Kubernetes cluster (?namespace=)", Raw: "application/yaml"},
 
 	// Jobs area (P4, handlers/jobs.go, docs/platform-design.md): background jobs of the caller's org.

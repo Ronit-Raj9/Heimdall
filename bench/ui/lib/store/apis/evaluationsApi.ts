@@ -427,7 +427,7 @@ export interface ReportOverall {
 }
 
 /** One point of a learning curve: mean success at one place in the task sequence. */
-export interface ReportCurvePoint {
+export interface ReportLearningPoint {
 	index: number;
 	success: number;
 	runs: number;
@@ -445,7 +445,7 @@ export interface ReportLearningRow {
 	fwt: number | null;
 	episodes_to_threshold: number | null;
 	threshold: number;
-	curve: ReportCurvePoint[];
+	curve: ReportLearningPoint[];
 	chains: number;
 }
 
@@ -486,6 +486,10 @@ export interface Report {
 	note?: string;
 	/** Per arm label, over every benchmark. */
 	totals?: Record<string, ReportTotals>;
+	/** Only when a benchmark ran as a task sequence with memory kept. */
+	learning?: ReportLearningRow[];
+	/** Only when runs reported resume, budget or success per dollar numbers. */
+	persistence?: ReportPersistenceRow[];
 }
 
 /** One arm's numbers over the whole evaluation; absent fields are unknown. */
@@ -502,10 +506,6 @@ export interface ReportTotals {
 	false_completion?: number;
 	fault_survival?: number;
 	fault_runs?: number;
-	/** Only when a benchmark ran as a task sequence with memory kept. */
-	learning?: ReportLearningRow[];
-	/** Only when runs reported resume, budget or success per dollar numbers. */
-	persistence?: ReportPersistenceRow[];
 }
 
 // Names other lanes use for the same shapes.

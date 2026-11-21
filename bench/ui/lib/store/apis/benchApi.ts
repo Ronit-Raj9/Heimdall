@@ -326,6 +326,7 @@ export const benchApi = createApi({
 		"Runners",
 		"RunnerTokens",
 		"WorkerConnections", // bring your own worker (workerConnectionsApi.ts)
+		"WorkerTarget", // where runs go (workerTargetApi.ts)
 		"AuditLog",
 		"Jobs",
 	],

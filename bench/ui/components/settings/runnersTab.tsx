@@ -25,6 +25,8 @@ import { useId, useState, type FormEvent } from "react";
 import { useTranslation } from "react-i18next";
 import { SettingsSection, TableFrame, When } from "./settingsBits";
 import { WorkerPlatformsSection } from "./workerPlatformsSection";
+import { ConnectedWorkers } from "@/components/workers/connectedWorkers";
+import { WhereRunsGo } from "@/components/workers/whereRunsGo";
 
 /** Where the start command reads the token from: its -token-file, or the default path. */
 export function tokenFileOf(command: string): string {
@@ -50,6 +52,9 @@ export function RunnersTab({ org }: { org: OrgSummary }) {
 	const list = runners.data?.runners ?? [];
 	return (
 		<div className="flex flex-col gap-12" data-testid="settings-runners">
+			<WhereRunsGo />
+			<WorkerPlatformsSection />
+			<ConnectedWorkers />
 			<SettingsSection
 				title={t("settings.runners.title")}
 				description={t("settings.runners.description", { org: org.name })}
@@ -58,7 +63,12 @@ export function RunnersTab({ org }: { org: OrgSummary }) {
 				{runners.isLoading ? (
 					<BlockSkeleton rows={3} testId="runners-loading" />
 				) : runners.isError || !runners.data ? (
-					<LoadError title={t("settings.runners.loadError")} error={runners.error} onRetry={() => void runners.refetch()} testId="runners-error" />
+					<LoadError
+						title={t("settings.runners.loadError")}
+						error={runners.error}
+						onRetry={() => void runners.refetch()}
+						testId="runners-error"
+					/>
 				) : list.length === 0 ? (
 					<EmptyNote testId="runners-empty">{t("settings.runners.empty")}</EmptyNote>
 				) : (
@@ -135,7 +145,6 @@ export function RunnersTab({ org }: { org: OrgSummary }) {
 						</p>
 					))}
 			</SettingsSection>
-			<WorkerPlatformsSection />
 			<SettingsSection title={tu("settings.startCommand")} description={tu("settings.startCommandHint")} testId="runner-start">
 				<CopyBlock
 					value={runnerStartCommand(typeof window === "undefined" ? "" : window.location.origin, list[0]?.pool ?? "default")}
@@ -189,7 +198,11 @@ function RunnerTokensSection() {
 		);
 
 	return (
-		<SettingsSection title={t("settings.runners.tokensTitle")} description={t("settings.runners.tokensDescription")} testId="settings-runner-tokens">
+		<SettingsSection
+			title={t("settings.runners.tokensTitle")}
+			description={t("settings.runners.tokensDescription")}
+			testId="settings-runner-tokens"
+		>
 			{created ? (
 				<OneTimeSecret
 					title={t("settings.runners.created", { pool: created.info.pool })}
