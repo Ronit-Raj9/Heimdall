@@ -360,10 +360,14 @@ services:
       BENCH_NETWORKS_EVAL: ${HEIMDALL_EVAL_NETWORK:-heimdall-evalnet}
       BIFROST_SETUP_TOKEN: ${BIFROST_SETUP_TOKEN:-}
       BENCH_FAULTPROXY_TOKEN: ${BENCH_FAULTPROXY_TOKEN:-}
+      HEIMDALL_SHARED_PROJECTS_DIR: /var/lib/heimdall/runs/projects
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
       - ${HEIMDALL_BENCH_DIR:?run through deploy/hosted/*.sh or set HEIMDALL_BENCH_DIR}:${HEIMDALL_BENCH_DIR:?run through deploy/hosted/*.sh or set HEIMDALL_BENCH_DIR}:ro
       - ${HEIMDALL_RUNNER_DIR:-/var/lib/heimdall-shared-runner}:${HEIMDALL_RUNNER_DIR:-/var/lib/heimdall-shared-runner}
+      # Each org's project (catalog adds, uploads, web edits), read-only: the
+      # shared runner plans an org's runs from its own suites and agents.
+      - heimdall-data:/var/lib/heimdall:ro
     tmpfs:
       - /tmp
     networks: [edge, upstream]

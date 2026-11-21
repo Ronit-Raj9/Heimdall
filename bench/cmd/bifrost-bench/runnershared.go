@@ -15,11 +15,16 @@ import (
 	"errors"
 	"flag"
 	"fmt"
+	"github.com/maximhq/bifrost/bench/adapters"
+	"github.com/maximhq/bifrost/bench/schemas"
+	"github.com/maximhq/bifrost/bench/suite"
+	"github.com/maximhq/bifrost/bench/tenancy"
 	"io"
 	"net/http"
 	"net/url"
 	"os"
 	"os/signal"
+	"path/filepath"
 	"strings"
 	"sync"
 	"syscall"
@@ -183,8 +188,9 @@ func runSharedRunner(args []string) int {
 			if len(name) > 128 {
 				name = name[:128]
 			}
-			w, err := engine.NewWorker(a.reg, engine.NewPipeline(a.reg, a.cfg.Root, a.logger),
-				engine.NewPlanner(a.reg, a.cfg.Root, a.logger, engine.WithIgnoreQuarantine(), engine.WithoutGPUCheck()).Plan,
+			reg, root := sharedOrgProject(a, org)
+			w, err := engine.NewWorker(reg, engine.NewPipeline(reg, root, a.logger),
+				engine.NewPlanner(reg, root, a.logger, engine.WithIgnoreQuarantine(), engine.WithoutGPUCheck()).Plan,
 				engine.WorkerOptions{Server: f.server, Token: token, WorkerID: name, Host: host, Version: benchVersion,
 					Slots: slots, Logger: a.logger, Pool: sharedpool.Pool, Labels: []string{"shared", "runtime=" + f.runtime},
 					Jobs: newRunnerJobExecutor(a)}) // gap G05: hosted CLI jobs (runnerjob.go)
@@ -225,4 +231,30 @@ func runSharedRunner(args []string) int {
 		case <-tick.C:
 		}
 	}
+}
+
+// sharedProjectsEnv names the server's per-org project folders as the shared
+// runner sees them (read-only mount, deploy/hosted/docker-compose.yml). With
+// it the runner plans each org's runs from that org's own suites and agents
+// (catalog adds, uploads, web edits); without it, from its own checkout.
+const sharedProjectsEnv = "HEIMDALL_SHARED_PROJECTS_DIR"
+
+// sharedOrgProject is the registry and project root the shared runner uses
+// for org: the org's project folder when it is mounted, else the runner's own.
+func sharedOrgProject(a *app, org string) (*schemas.Registry, string) {
+	dir := strings.TrimSpace(os.Getenv(sharedProjectsEnv))
+	if dir == "" || tenancy.ValidOrgID(org) != nil {
+		return a.reg, a.cfg.Root
+	}
+	root := filepath.Join(dir, org)
+	if fi, err := os.Stat(filepath.Join(root, "benchmarks")); err != nil || !fi.IsDir() {
+		return a.reg, a.cfg.Root
+	}
+	reg := *a.reg
+	reg.Loaders = suite.Builtin(filepath.Join(root, "benchmarks"))
+	reg.Adapters = adapters.Builtin(adapters.CommandConfig{
+		GatewayAgentURL: a.cfg.Gateway.AgentURL, EvalNetwork: a.cfg.Networks.Eval, BenchRoot: root,
+		GatewayPublicURL: a.cfg.Gateway.PublicURL,
+	})
+	return &reg, root
 }
