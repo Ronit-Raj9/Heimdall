@@ -50,3 +50,17 @@ describe("ExperimentForm write token", () => {
 		storedToken.value = "";
 	});
 });
+// QC2-27-10: a probe id two suites share shows the selected suite's layer, not the first catalog match.
+describe("ExperimentForm condition layers", () => {
+	it("resolves each condition's layer through the selected suite", () => {
+		const shared: Catalog = {
+			...catalog,
+			probes: [{ ...catalog.probes.find((p) => p.id === "stale-notes")!, layer: "gateway" }, ...catalog.probes],
+			suites: catalog.suites.map((s) => ({ ...s, probe_layers: { "stale-notes": "fixture", "model-outage": "gateway", "test-crash": "tool_shim", "empty-test-run": "tool_shim" } })),
+		};
+		const html = render(<ExperimentForm catalog={shared} defaults={defaultFormValues(shared, dateSeed(new Date("2026-11-18T06:00:00Z")))} onStarted={() => undefined} />);
+		const row = html.slice(html.indexOf('data-testid="experiment-condition-stale-notes"'));
+		expect(row.slice(0, row.indexOf("</label>"))).toContain("fixture probe");
+		expect(row.slice(0, row.indexOf("</label>"))).not.toContain("gateway probe");
+	});
+});

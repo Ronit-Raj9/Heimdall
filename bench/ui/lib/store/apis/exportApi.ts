@@ -12,6 +12,8 @@ export const exportApi = benchApi.injectEndpoints({
 		getExperimentRunTable: builder.query<ExportRunRow[], string>({
 			query: (expId) => ({ url: experimentExportPath(expId, "jsonl"), responseHandler: "text" }),
 			transformResponse: (body: string) => parseJSONLines<ExportRunRow>(body),
+			// Refetched with the experiment's other results when a run settles (QC2-28-05).
+			providesTags: (_result, _error, expId) => [{ type: "BenchExperimentResult", id: expId }],
 		}),
 	}),
 });

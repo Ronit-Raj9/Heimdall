@@ -711,7 +711,10 @@
 		"pairHeadingAfterTask": "under {{condition}}, trial {{trial}}",
 		"provenance": {
 			"scripted": "scripted",
-			"model": "model-played"
+			"model": "model-played",
+			"mixed": "scripted and model",
+			"unobserved": "no model call recorded",
+			"unavailable": "provenance unavailable"
 		},
 		"pairId": "pair {{id}}",
 		"experiment": "experiment {{id}}",
@@ -1817,6 +1820,7 @@
 				"primaryHint": "The one test the verdict rests on. Every other condition is descriptive.",
 				"conditionClean": "no probe",
 				"conditionProbe": "{{layer}} probe",
+				"conditionProbeUnresolved": "probe (layer not resolved for this suite)",
 				"tasksAll": "All {{count}} tasks",
 				"tasksChosen": "Chosen tasks",
 				"trials": "Trials",
@@ -2635,6 +2639,7 @@
 			"runs": "Runs",
 			"runsHint": "Runs are not filtered by task yet. The leaderboard shows this suite's results.",
 			"notFound": "There is no suite {{suite}} in this project.",
+			"versionMismatch": "The linked evidence ran version {{requested}} of this suite. This page shows the current version {{current}}: its tasks and verifier may differ.",
 			"allSuites": "All suites",
 			"settings": "Settings",
 			"settingsHint": "environment, grader, verifier, image and lock"

@@ -11,5 +11,6 @@ slots
 spent_usd
 analysis_id?
 suite?
+suite_version?
 arms?
 decision?

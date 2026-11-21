@@ -2,13 +2,13 @@
 	"_comment": "SYNTHETIC fixture for UI development. Not a benchmark result. GET /runs/{id}/reviews (schemas.RunReviews). Arm C of the three-arm pair p_synth3arms, copied from arm B.",
 	"mode": "synthetic",
 	"run_id": "r_synthc3arm",
-	"exp_id": "e_synthetic-codewins",
+	"exp_id": "e_synthetic-matrix",
 	"sealed_outcome": "pass",
 	"outcome": "pass",
 	"reviews": [
 		{
 			"review_id": "rv_synth0001",
-			"exp_id": "e_synthetic-codewins",
+			"exp_id": "e_synthetic-matrix",
 			"run_id": "r_synthc3arm",
 			"parent_seal": "sha256:40d705b189548bd2d5c8e36f2a73fa31b8a683d47261a1e59be0eee8a107ccb0",
 			"decision": "flag_only",

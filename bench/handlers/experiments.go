@@ -20,6 +20,7 @@ import (
 	"github.com/maximhq/bifrost/bench/schemas"
 	"github.com/maximhq/bifrost/bench/stats"
 	"github.com/maximhq/bifrost/bench/tenancy"
+	"github.com/maximhq/bifrost/bench/verdict"
 	"github.com/valyala/fasthttp"
 	"gopkg.in/yaml.v3"
 )
@@ -406,8 +407,25 @@ func (h *ExperimentsHandler) status(m *schemas.Manifest, runs []RunView, started
 	if ar, ok := h.launcher.(ActivityReporter); ok && !active {
 		active = ar.Active(m.ExpID)
 	}
-	return BuildStatus(m, runs, StatusFacts{Costs: runCosts(h.index, runs), Active: active, AnalysisID: h.latestAnalysis(m.ExpID),
-		Cancelled: !active && h.cancelledFact(m.ExpID)}) // Jobs area: cancelled state (experimentjobs.go)
+	metrics := runMetrics(h.index, runs)
+	return BuildStatus(m, runs, StatusFacts{Costs: costsOf(runs, metrics), Active: active, AnalysisID: h.latestAnalysis(m.ExpID),
+		Cancelled:   !active && h.cancelledFact(m.ExpID), // Jobs area: cancelled state (experimentjobs.go)
+		NotRequired: notRequiredSlots(m, runs, metrics)})
+}
+
+// notRequiredSlots replays the manifest's frozen adaptive rule over the
+// counted sealed runs, the way the verdict does, and returns the optional
+// slots it never released. Nil for a manifest without an adaptive plan.
+func notRequiredSlots(m *schemas.Manifest, runs []RunView, metrics map[string]runMetricsRead) map[string]bool {
+	if m == nil || m.Adaptive == nil {
+		return nil
+	}
+	var sealed []schemas.SealedRun
+	for _, rv := range countedRuns(runs) {
+		mr := metrics[rv.Run.RunID]
+		sealed = append(sealed, schemas.SealedRun{Slot: rv.Slot, Run: rv.Run, Metrics: mr.values})
+	}
+	return verdict.NotRequiredSlots(m, sealed)
 }
 
 // latestAnalysis returns the newest analysis id of an experiment: from the
@@ -426,12 +444,17 @@ func (h *ExperimentsHandler) latestAnalysis(expID string) string {
 	return ""
 }
 
-// runCosts reads cost_usd from every sealed run's metrics.json. A run with
-// no metrics.json gets no entry. A file that cannot be read or parsed, or
-// carries no cost, gives an unknown: a bad file never zeroes the spend and
-// never fails a status read.
-func runCosts(index ReadIndex, runs []RunView) map[string]schemas.Value {
-	out := map[string]schemas.Value{}
+// runMetricsRead is one sealed run's metrics.json as read: found reports
+// the file exists, err that it could not be read or parsed.
+type runMetricsRead struct {
+	values map[string]schemas.Value
+	found  bool
+	err    bool
+}
+
+// runMetrics reads every sealed run's metrics.json once.
+func runMetrics(index ReadIndex, runs []RunView) map[string]runMetricsRead {
+	out := map[string]runMetricsRead{}
 	for _, rv := range runs {
 		if !rv.Sealed {
 			continue
@@ -439,22 +462,52 @@ func runCosts(index ReadIndex, runs []RunView) map[string]schemas.Value {
 		id := rv.Run.RunID
 		data, found, err := readRunFile(index, id, FileMetrics)
 		if err != nil {
-			out[id] = schemas.Unknown("metrics_unreadable", schemas.EvidenceGateway)
+			out[id] = runMetricsRead{err: true}
 			continue
 		}
 		if !found {
+			out[id] = runMetricsRead{}
 			continue
 		}
 		var metrics map[string]schemas.Value
 		if err := json.Unmarshal(data, &metrics); err != nil {
-			out[id] = schemas.Unknown("metrics_unreadable", schemas.EvidenceGateway)
+			out[id] = runMetricsRead{err: true}
 			continue
 		}
-		c, ok := metrics[costMetric]
-		if !ok {
-			c = schemas.Unknown("cost_not_measured", schemas.EvidenceGateway)
+		out[id] = runMetricsRead{values: metrics, found: true}
+	}
+	return out
+}
+
+// runCosts reads cost_usd from every sealed run's metrics.json. A run with
+// no metrics.json gets no entry. A file that cannot be read or parsed, or
+// carries no cost, gives an unknown: a bad file never zeroes the spend and
+// never fails a status read.
+func runCosts(index ReadIndex, runs []RunView) map[string]schemas.Value {
+	return costsOf(runs, runMetrics(index, runs))
+}
+
+// costsOf maps each sealed run to its cost_usd: unknown when metrics.json is
+// unreadable or has no cost, absent when the run has no metrics.json.
+func costsOf(runs []RunView, metrics map[string]runMetricsRead) map[string]schemas.Value {
+	out := map[string]schemas.Value{}
+	for _, rv := range runs {
+		if !rv.Sealed {
+			continue
 		}
-		out[id] = c
+		id := rv.Run.RunID
+		mr := metrics[id]
+		switch {
+		case mr.err:
+			out[id] = schemas.Unknown("metrics_unreadable", schemas.EvidenceGateway)
+		case !mr.found:
+		default:
+			c, ok := mr.values[costMetric]
+			if !ok {
+				c = schemas.Unknown("cost_not_measured", schemas.EvidenceGateway)
+			}
+			out[id] = c
+		}
 	}
 	return out
 }

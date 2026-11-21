@@ -26,10 +26,12 @@ describe("organization switch", () => {
 	let requests: Request[];
 	let sessionOrg: string;
 	let local: Storage;
+	let meFails: boolean;
 
 	beforeEach(() => {
 		requests = [];
 		sessionOrg = "org_a";
+		meFails = false;
 		local = memoryStorage();
 		vi.stubGlobal("window", { location: { search: "" }, sessionStorage: memoryStorage(), localStorage: local });
 		const NodeRequest = globalThis.Request;
@@ -47,6 +49,9 @@ describe("organization switch", () => {
 				requests.push(request);
 				const path = new URL(request.url).pathname;
 				let body: unknown = { mode: "live" };
+				if (path.endsWith("/auth/me") && meFails) {
+					return new Response("{}", { status: 502, headers: { "Content-Type": "application/json" } });
+				}
 				if (path.endsWith("/auth/me")) {
 					body = {
 						mode: "live",
@@ -121,5 +126,15 @@ describe("organization switch", () => {
 		expect(new URL(post.url).pathname).toBe("/api/bench/auth/password");
 		expect(post.headers.get(CSRF_HEADER)).toBe("c");
 		expect(await post.json()).toEqual({ current_password: "old", new_password: "new-password-123" });
+	});
+
+	// QC2-28-07: a transient /auth/me failure keeps the hosted CSRF value, so writes keep working.
+	it("keeps hosted credentials when a refresh of /auth/me fails transiently", async () => {
+		const store = makeStore();
+		await store.dispatch(platformApi.endpoints.getMe.initiate()).unwrap();
+		expect(getAuthState()).toMatchObject({ mode: "hosted", csrf: "c", org: "org_a" });
+		meFails = true;
+		await store.dispatch(platformApi.endpoints.getMe.initiate(undefined, { forceRefetch: true }));
+		expect(getAuthState()).toMatchObject({ mode: "hosted", csrf: "c", org: "org_a" });
 	});
 });

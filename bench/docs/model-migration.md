@@ -55,8 +55,8 @@ notes the pair compares config versions.
 ### Verdicts
 
 For each pair, the per-task verified success rate of the new arm minus the
-old one's, over the tasks both ran, is tested with the exact two-sided
-sign-flip test (`stats.SignFlip`, as the verdict and the matrix):
+old one's, over the tasks both ran, is tested with the two-sided
+sign-flip test (`stats.SignFlip`, as the verdict and the matrix). Exact means full enumeration of the 2^n sign vectors, which `stats.SignFlip` does for up to 22 nonzero task differences; with 23 or more it estimates p by Monte Carlo (1,000,000 random sign vectors, `Exact=false` in the result), so a p near alpha on a large suite carries sampling error. The reports:
 
 - **Overall**, on the overall condition (the experiment's primary, `-condition`
   to change it), Holm-adjusted across the pairs.

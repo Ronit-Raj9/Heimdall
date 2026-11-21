@@ -21,7 +21,9 @@ export interface EntityTarget {
  *   suite       /suites/$suiteId
  *   task        /suites/$suiteId?tab=tasks&task=<id>  (needs the suite)
  *   agent       /agents?agent=<id>
- * A suite given as "<id>@<version>" (as verdicts and runs carry it) links to the suite id.
+ * A suite given as "<id>@<version>" (as verdicts and runs carry it) links to the suite id; a task
+ * keeps the version, so its suite page can say when the current revision differs from the one the
+ * evidence ran (QC2-27-09).
  * Returns null when the target cannot be built (a task without its suite, an empty id).
  */
 export function entityTarget(kind: EntityKind, id: string, opts: { suite?: string } = {}): EntityTarget | null {
@@ -34,10 +36,16 @@ export function entityTarget(kind: EntityKind, id: string, opts: { suite?: strin
 		case "suite":
 			return { to: "/suites/$suiteId", params: { suiteId: suiteIdOf(id) } };
 		case "task":
-			return opts.suite ? { to: "/suites/$suiteId", params: { suiteId: suiteIdOf(opts.suite) }, search: { tab: "tasks", task: id } } : null;
+			return opts.suite ? { to: "/suites/$suiteId", params: { suiteId: opts.suite }, search: { tab: "tasks", task: id } } : null;
 		case "agent":
 			return { to: "/agents", search: { agent: id } };
 	}
+}
+
+/** The "@<version>" suffix of a suite reference, or null when it has none. */
+export function suiteVersionOf(ref: string): string | null {
+	const at = ref.indexOf("@");
+	return at > 0 && at < ref.length - 1 ? ref.slice(at + 1) : null;
 }
 
 /** A suite reference without its "@<version>" suffix. */

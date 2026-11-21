@@ -13,7 +13,8 @@ import { cn } from "@/lib/utils";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useId, useState } from "react";
 import { Controller, useFieldArray, useForm, useWatch, type Control, type FieldError, type UseFormRegister } from "react-hook-form";
-import { probeLayerLabel } from "@/components/receipts/receipts.utils";
+import { catalogProbeFor, probeLayerLabel } from "@/components/receipts/receipts.utils";
+import type { TFunction } from "i18next";
 import { useTranslation } from "react-i18next";
 import {
 	conditionsFor,
@@ -316,7 +317,7 @@ export function ExperimentForm({ catalog, defaults, onStarted }: ExperimentFormP
 				</FormSection>
 
 				<FormSection title={t("experiments.new.sections.conditions")}>
-					<ConditionsEditor control={control} register={register} catalog={catalog} tasks={suite?.tasks ?? []} />
+					<ConditionsEditor control={control} register={register} catalog={catalog} suite={values.suite} tasks={suite?.tasks ?? []} />
 					{formState.errors.conditions?.message && (
 						<ErrorText message={formState.errors.conditions.message} testId="experiment-conditions-error" />
 					)}
@@ -461,11 +462,14 @@ function ConditionsEditor({
 	control,
 	register,
 	catalog,
+	suite,
 	tasks,
 }: {
 	control: Control<ExperimentFormValues>;
 	register: UseFormRegister<ExperimentFormValues>;
 	catalog: Catalog;
+	/** The selected suite reference: its probe_layers decide a probe id two suites share (QC2-27-10). */
+	suite: string | undefined;
 	tasks: readonly string[];
 }) {
 	const { t } = useTranslation("bench");
@@ -477,7 +481,7 @@ function ConditionsEditor({
 			{fields.map((field, index) => {
 				const current = conditions?.[index];
 				const enabled = Boolean(current?.enabled);
-				const probe = catalog.probes.find((p) => p.id === field.condition);
+				const probe = catalogProbeFor(catalog, suite, field.condition);
 				return (
 					<li
 						key={field.id}
@@ -494,9 +498,7 @@ function ConditionsEditor({
 								/>
 								<span className="font-mono text-sm">{field.condition}</span>
 								<span className="text-muted-foreground text-xs">
-									{probe
-										? t("experiments.new.fields.conditionProbe", { layer: probeLayerLabel(probe.layer, t) })
-										: t("experiments.new.fields.conditionClean")}
+									{conditionLayerText(field.condition, probe, t)}
 								</span>
 							</label>
 							<label className="flex items-center gap-2 text-xs">
@@ -668,4 +670,10 @@ function ErrorText({ message, id, testId }: { message: string; id?: string; test
 			{t(message as ValidationKey)}
 		</p>
 	);
+}
+
+/** The condition row's layer note: the suite's own probe layer, no probe for clean, else unresolved. */
+export function conditionLayerText(condition: string, probe: { layer: string } | undefined, t: TFunction<"bench">): string {
+	if (probe) return t("experiments.new.fields.conditionProbe", { layer: probeLayerLabel(probe.layer, t) });
+	return condition === "clean" ? t("experiments.new.fields.conditionClean") : t("experiments.new.fields.conditionProbeUnresolved");
 }

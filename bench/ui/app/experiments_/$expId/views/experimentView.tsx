@@ -26,7 +26,7 @@ import { parseAsString, useQueryState } from "nuqs";
 import { useEffect, useRef } from "react";
 import { useTranslation } from "react-i18next";
 import { CostTab } from "./costTab";
-import { EXPERIMENT_TABS, hiddenExperimentTabs, type ExperimentTabId } from "./experimentTabs";
+import { EXPERIMENT_TABS, defaultExperimentTab, hiddenExperimentTabs, type ExperimentTabId } from "./experimentTabs";
 import { IntegrityTab } from "./integrityTab";
 import { MatrixTab } from "./matrixTab";
 import { MigrationTab } from "./migrationTab";
@@ -65,7 +65,9 @@ export default function ExperimentView({ expId }: { expId: string }) {
 	const research = useGetExperimentResearchQuery(expId, { skip: !status.data });
 	const routing = useGetExperimentRoutingQuery(expId, { skip: !status.data });
 
-	if (status.isLoading) return <BlockSkeleton rows={8} testId="experiment-loading" />;
+	// RTK keeps the last result in data while a new argument loads; only a response for this id may
+	// drive the header and its write actions (QC2-28-04).
+	if (status.isLoading || (status.data && status.data.exp_id !== expId)) return <BlockSkeleton rows={8} testId="experiment-loading" />;
 	if (status.error || !status.data) {
 		if (errorStatus(status.error) === 404) {
 			return (
@@ -151,7 +153,7 @@ export default function ExperimentView({ expId }: { expId: string }) {
 				</Card>
 			)}
 
-			<RouteTabs tabs={tabs} defaultTab="verdict" label={t("experiments.page.tabsLabel")} testId="experiment-tabs">
+			<RouteTabs tabs={tabs} defaultTab={defaultExperimentTab(arms.length)} label={t("experiments.page.tabsLabel")} testId="experiment-tabs">
 				{(active) =>
 					notStarted && active === "verdict" ? (
 						<EmptyState icon={Hourglass} message={t("experiments.page.notStarted")} testId="experiment-not-started" />

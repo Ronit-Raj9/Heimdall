@@ -498,7 +498,7 @@ For the demo experiment (a sentence telling the agent that code beats stale note
 
 1. **Outcome mapping, intention-to-treat.** pass = 1. fail, timeout, budget exhausted, crash, refusal = 0. A fired veto gate (section 11) = 0 plus a flag. Unknown stays unknown. No slot is dropped [L02-019].
 2. **Per task:** d_i = mean over trials of Y_B minus mean over trials of Y_A. d_bar = mean of d_i.
-3. **Test:** exact two-sided sign-flip test over all 2^n sign vectors of d_i [L02-002]. The p-value is always computed from the actual vector. It can fall below 5% only when at least 6 tasks have a nonzero difference, and with exactly 6 they must all agree. That is a necessary condition, never a sufficient one.
+3. **Test:** two-sided sign-flip test over the 2^n sign vectors of d_i [L02-002], enumerated exactly for up to 22 nonzero differences and estimated by Monte Carlo (1,000,000 draws, reported `Exact=false`) beyond that. The p-value is always computed from the actual vector. It can fall below 5% only when at least 6 tasks have a nonzero difference, and with exactly 6 they must all agree. That is a necessary condition, never a sufficient one.
 4. **Interval:** paired t, descriptive only and labelled approximate. It takes no part in the decision. No percentile bootstrap below n = 30 [L02-003].
 5. **Missingness bounds:** computed at both extremes of the unknowns. A directional verdict must hold at both.
 6. **Verdict on the primary endpoint:**

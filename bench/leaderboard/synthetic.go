@@ -139,3 +139,52 @@ func scriptedEntry(e schemas.LedgerEntry) bool {
 	return e.Kind == "message" && e.Action == "pass" && e.Status == 200 &&
 		e.Tokens != nil && e.Tokens.Out == scriptedOutputTokens && scriptedResponseID.MatchString(e.ResponseID)
 }
+
+// Run provenance classes (LedgerProvenance, the pair API's PairRun.Provenance).
+const (
+	ProvenanceScripted    = "scripted"    // the scripted model answered every recorded model call
+	ProvenanceModel       = "model"       // a real model answered at least one recorded call, none scripted
+	ProvenanceMixed       = "mixed"       // both the scripted and a real model answered calls
+	ProvenanceUnobserved  = "unobserved"  // no recorded model call: no ledger, or one without a passed message
+	ProvenanceUnavailable = "unavailable" // the ledger could not be read or parsed
+)
+
+// LedgerProvenance classifies one run's proxy.ledger.jsonl by the model
+// evidence it records. A labelled proxy is taken at its word per line; an
+// unlabelled passed message falls back to the scripted fingerprint
+// (scriptedEntry), else counts as a real model call. A ledger with no passed
+// message call is unobserved: nothing shows a model played. It is pure.
+func LedgerProvenance(data []byte) (string, error) {
+	real, scripted := false, false
+	for i, line := range bytes.Split(data, []byte("\n")) {
+		if len(bytes.TrimSpace(line)) == 0 {
+			continue
+		}
+		var e schemas.LedgerEntry
+		if err := json.Unmarshal(line, &e); err != nil {
+			return ProvenanceUnavailable, fmt.Errorf("parse %s line %d: %w", fileLedger, i+1, err)
+		}
+		if e.Kind != "message" || e.Action != "pass" {
+			continue
+		}
+		switch {
+		case e.Upstream == schemas.LedgerUpstreamScripted:
+			scripted = true
+		case e.Upstream == schemas.LedgerUpstreamReal && e.Status >= 200 && e.Status < 300:
+			real = true
+		case e.Upstream == "" && scriptedEntry(e):
+			scripted = true
+		case e.Upstream == "" && e.Status >= 200 && e.Status < 300:
+			real = true
+		}
+	}
+	switch {
+	case real && scripted:
+		return ProvenanceMixed, nil
+	case scripted:
+		return ProvenanceScripted, nil
+	case real:
+		return ProvenanceModel, nil
+	}
+	return ProvenanceUnobserved, nil
+}

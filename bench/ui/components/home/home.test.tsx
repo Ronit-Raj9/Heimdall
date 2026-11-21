@@ -12,8 +12,12 @@ import { RecentExperiments } from "./recentExperiments";
 import { RunningCardBody, RunningExperiments } from "./runningExperiments";
 import { SuitesPanel } from "./suitesPanel";
 
-const api = vi.hoisted(() => ({ verdict: {} as unknown, verdictArgs: [] as unknown[] }));
+const api = vi.hoisted(() => ({ verdict: {} as unknown, verdictArgs: [] as unknown[], health: undefined as unknown }));
 vi.mock("@tanstack/react-router", async () => (await import("@/lib/testing/routerMock")).routerMock);
+vi.mock("@/lib/store/apis/benchApi", async (importOriginal) => ({
+	...(await importOriginal<typeof import("@/lib/store/apis/benchApi")>()),
+	useGetHealthQuery: () => ({ data: api.health }),
+}));
 vi.mock("@/lib/store", async (importOriginal) => ({
 	...(await importOriginal<typeof import("@/lib/store")>()),
 	useGetVerdictQuery: (arg: unknown, opts: { skip?: boolean }) => {
@@ -44,6 +48,7 @@ describe("home utils", () => {
 			"e_synthetic-codewins",
 			"e_synthetic-nightly",
 			"e_synthetic-draft",
+			"e_synthetic-matrix",
 			"e_synthetic-outage",
 		]);
 	});
@@ -139,6 +144,15 @@ describe("QuickActions and GetStartedCard", () => {
 		for (const key of ["newExperiment", "addSuite", "addAgent", "getStarted"]) expect(local).toContain(`home-action-${key}`);
 		expect(tagOf(local, "home-action-addSuite")).toContain('href="/imports"');
 		expect(render(<QuickActions />, demoSession())).not.toContain("home-action-newExperiment");
+	});
+	it("hides New experiment where the server has no launcher (QC2-27-03)", () => {
+		api.health = { mode: "live", launch: false };
+		try {
+			expect(render(<QuickActions />)).not.toContain("home-action-newExperiment");
+			expect(render(<GetStartedCard />)).not.toContain("home-get-started-new");
+		} finally {
+			api.health = undefined;
+		}
 	});
 	it("links the get-started card to the quickstart", () => {
 		const html = render(<GetStartedCard />);

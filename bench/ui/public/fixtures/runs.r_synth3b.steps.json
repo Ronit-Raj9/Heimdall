@@ -1,0 +1,69 @@
+{
+	"_comment": "SYNTHETIC fixture for UI development. Not a benchmark result. The workspace observer is missing, so file changes have no trusted witness.",
+	"mode": "synthetic",
+	"run_id": "r_synth3b",
+	"available": true,
+	"steps": [
+		{
+			"seq": 1,
+			"ts": "2026-11-14T18:42:02Z",
+			"kind": "model_turn",
+			"source": "gateway",
+			"proof": "verified",
+			"turn": 1,
+			"summary": "claude-haiku-4-5 answered: 1 tool call",
+			"request_id": "req_pww2l7yame_0",
+			"counted": true
+		},
+		{
+			"seq": 2,
+			"ts": "2026-11-14T18:42:02Z",
+			"kind": "tool_request",
+			"source": "gateway",
+			"proof": "verified",
+			"turn": 1,
+			"summary": "shell: cat README.md",
+			"tool_call_id": "call_1",
+			"tool_name": "shell",
+			"execution": "executed_with_proof",
+			"witnessed_by": [3]
+		},
+		{
+			"seq": 3,
+			"ts": "2026-11-14T18:42:03Z",
+			"kind": "command",
+			"source": "process_observer",
+			"proof": "strong",
+			"turn": 1,
+			"summary": "cat README.md",
+			"pid": 22,
+			"ppid": 7,
+			"exit_code": 0,
+			"witness_of": 2
+		},
+		{
+			"seq": 4,
+			"ts": "2026-11-14T18:42:06Z",
+			"kind": "model_turn",
+			"source": "gateway",
+			"proof": "verified",
+			"turn": 2,
+			"summary": "claude-haiku-4-5 answered: done",
+			"request_id": "req_pww2l7yame_1",
+			"counted": true
+		}
+	],
+	"observers": [
+		{
+			"observer": "process",
+			"state": "observed",
+			"mode": "proc_poll",
+			"interval_ms": 50,
+			"observer_coverage": "full",
+			"records": 1,
+			"pids_allocated": 2,
+			"pids_seen": 2
+		},
+		{ "observer": "workspace", "state": "missing", "reason": "inotify watch limit reached", "records": 0 }
+	]
+}

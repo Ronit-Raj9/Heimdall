@@ -23,6 +23,8 @@ export const FIXTURE_ANALYSED_EXP = "e_synthetic-codewins";
 /** The three-arm experiment the matrix fixture belongs to. */
 export const FIXTURE_MATRIX_EXP = "e_synthetic-matrix";
 const ANALYSED = [FIXTURE_ANALYSED_EXP] as const;
+/** The pairs with a pairs.{id}.json fixture. Other grid and picker pairs do not open (QC2-29-04). */
+export const FIXTURE_PAIRS: readonly string[] = ["p_ltosmymyqy", "p_synth3arms"];
 
 /**
  * Every route in DESIGN.md 16.7 that returns JSON. Experiment-level routes share one fixture
@@ -36,8 +38,6 @@ export const FIXTURE_ROUTES: readonly FixtureRoute[] = [
 	{ method: "GET", pattern: "/catalog", file: "catalog.json" },
 	{ method: "POST", pattern: "/experiments/plan", file: "experiments.plan.json" },
 	{ method: "POST", pattern: "/estimate", file: "estimate.json" },
-	{ method: "POST", pattern: "/experiments", file: "experiments.create.json" },
-	{ method: "POST", pattern: "/experiments/:id/start", file: "experiments.start.json" },
 	{ method: "GET", pattern: "/experiments", file: "experiments.list.json" },
 	// One status per listed experiment (and the matrix's own), keyed by id; unknown ids answer 404.
 	{ method: "GET", pattern: "/experiments/:id", file: "experiments.get.{id}.json" },
@@ -155,4 +155,80 @@ function matchPattern(pattern: string[], segments: string[]): string | null | un
 		}
 	}
 	return id;
+}
+/** A fixture-mode answer that is not a file: a refusal with the server's error shape. */
+export interface FixtureRefusal {
+	status: number;
+	message: string;
+}
+
+/**
+ * Requests fixture mode refuses instead of answering with a file that would contradict them:
+ * creating or starting an experiment (no fixture changes state, QC2-29-05), and a migration report
+ * for anything but the default selection the one fixture holds (QC2-29-01). Null when the request
+ * is answered from its file.
+ */
+export function fixtureRefusal(method: string, url: string, params?: Record<string, unknown>): FixtureRefusal | null {
+	const path = stripBase(url.split("?")[0] ?? "");
+	const segments = splitPath(path);
+	const post = method.toUpperCase() === "POST";
+	if (post && (path === "/experiments" || (segments.length === 3 && segments[0] === "experiments" && segments[2] === "start"))) {
+		return { status: 503, message: "Fixture mode cannot create or start experiments: no fixture changes state. Run a bench server to launch." };
+	}
+	if (!post && segments.length === 3 && segments[0] === "experiments" && segments[2] === "migration" && hasParams(url, params)) {
+		return {
+			status: 404,
+			message: "Fixture mode holds only the default migration report (from A to every other arm, default alpha, original grades).",
+		};
+	}
+	return null;
+}
+
+/**
+ * Narrows a fixture file's answer to the request where the file holds more than was asked: a
+ * run list asked for one experiment keeps only that experiment's rows, with its total and facets
+ * (QC2-29-03). Every other answer is returned unchanged.
+ */
+export function scopeFixture(method: string, url: string, params: Record<string, unknown> | undefined, data: unknown): unknown {
+	const path = stripBase(url.split("?")[0] ?? "");
+	if (method.toUpperCase() !== "GET" || path !== "/runs" || !data || typeof data !== "object") return data;
+	const exp = paramOf(url, params, "exp");
+	if (!exp) return data;
+	const body = data as { runs?: Record<string, unknown>[]; total?: number; facets?: Record<string, unknown> };
+	const runs = (body.runs ?? []).filter((run) => run.exp_id === exp);
+	// Facets list the values present in the scoped rows, as the server's would.
+	const facets = body.facets
+		? Object.fromEntries(
+				Object.keys(body.facets).map((key) => {
+					const field = RUN_FACET_FIELDS[key];
+					const values = field ? runs.map((run) => run[field]).filter((v): v is string => typeof v === "string" && v !== "") : [];
+					return [key, [...new Set(values)].sort()];
+				}),
+			)
+		: undefined;
+	return { ...body, runs, total: runs.length, facets };
+}
+
+/** The run-list facet each row field fills (handlers.RunList). */
+const RUN_FACET_FIELDS: Record<string, string> = {
+	experiments: "exp_id",
+	suites: "suite",
+	arms: "arm",
+	tasks: "task",
+	conditions: "condition",
+	outcomes: "outcome",
+	tracks: "track",
+};
+
+function hasParams(url: string, params?: Record<string, unknown>): boolean {
+	if (params && Object.values(params).some((value) => value !== undefined && value !== null && String(value) !== "")) return true;
+	const qs = url.split("?")[1];
+	return Boolean(qs && [...new URLSearchParams(qs).values()].some((value) => value !== ""));
+}
+
+function paramOf(url: string, params: Record<string, unknown> | undefined, key: string): string | null {
+	const value = params?.[key];
+	if (value !== undefined && value !== null && String(value) !== "") return String(value);
+	const qs = url.split("?")[1];
+	return qs ? new URLSearchParams(qs).get(key) : null;
 }

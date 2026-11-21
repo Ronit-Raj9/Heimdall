@@ -9,6 +9,7 @@ export const adaptiveApi = benchApi.injectEndpoints({
 	endpoints: (builder) => ({
 		getExperimentAdaptive: builder.query<AdaptiveViewResponse, string>({
 			query: (expId) => experimentAdaptivePath(expId),
+			providesTags: (_result, _error, expId) => [{ type: "BenchExperimentResult", id: expId }],
 		}),
 	}),
 });

@@ -41,3 +41,11 @@ export function hiddenExperimentTabs(facts: ExperimentFacts): ReadonlySet<Experi
 	if (!facts.probes) hidden.add("receipts");
 	return hidden;
 }
+/**
+ * The tab an experiment opens on without ?tab=: the matrix for three or more arms, whose ranked
+ * comparison covers every arm (the verdict reads only the primary pair), else the verdict
+ * (QC2-29-02).
+ */
+export function defaultExperimentTab(arms: number): ExperimentTabId {
+	return arms >= 3 ? "matrix" : "verdict";
+}

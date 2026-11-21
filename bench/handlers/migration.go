@@ -64,6 +64,13 @@ func (h *MigrationHandler) getMigration(ctx *fasthttp.RequestCtx) {
 			lib.SendError(ctx, h.mode, fasthttp.StatusBadRequest, lib.ErrTypeBadRequest, fmt.Sprintf("alpha %q is not a number", raw))
 			return
 		}
+		// An explicit alpha must be usable as given: zero would silently
+		// become the default (migration.Build), so the report would not be
+		// the one asked for (QC2-27-07).
+		if !(a > 0 && a < 1) {
+			lib.SendError(ctx, h.mode, fasthttp.StatusBadRequest, lib.ErrTypeBadRequest, fmt.Sprintf("alpha %q is not in (0, 1)", raw))
+			return
+		}
 		q.Alpha = a
 	}
 	gradeSource := string(args.Peek("grade_source"))
@@ -80,6 +87,9 @@ func (h *MigrationHandler) getMigration(ctx *fasthttp.RequestCtx) {
 	if err != nil {
 		sendDepError(ctx, h.mode, "migration report", err)
 		return
+	}
+	if rep.GradeSource == "" {
+		rep.GradeSource = gradeSource
 	}
 	lib.SendJSON(ctx, h.mode, fasthttp.StatusOK, rep)
 }

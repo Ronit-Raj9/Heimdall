@@ -43,7 +43,7 @@ import type {
 	WorkersResponse,
 } from "@/lib/types/bench";
 import { createApi, fetchBaseQuery, type BaseQueryFn, type FetchArgs, type FetchBaseQueryError } from "@reduxjs/toolkit/query/react";
-import { BENCH_API_BASE, detectFixtureMode, resolveFixture } from "./fixtures";
+import { BENCH_API_BASE, FIXTURE_PAIRS, detectFixtureMode, fixtureRefusal, resolveFixture, scopeFixture } from "./fixtures";
 import { CSRF_HEADER, errorStatus, getAuthState, notifyUnauthorized, ORG_HEADER } from "./session";
 
 /** Polling interval for experiment status when server-sent events are unavailable (DESIGN.md 16.7). */
@@ -54,6 +54,14 @@ export const IS_FIXTURE_MODE = detectFixtureMode(
 	typeof window === "undefined" ? "" : window.location.search,
 	import.meta.env.VITE_BENCH_FIXTURE,
 );
+
+/**
+ * Whether a pair can be opened: always against a server; in fixture mode only the pairs with a
+ * fixture file, so grid cells and picker buttons never lead to a missing fixture (QC2-29-04).
+ */
+export function pairOpenable(pairId: string, fixtureMode: boolean = IS_FIXTURE_MODE): boolean {
+	return !fixtureMode || FIXTURE_PAIRS.includes(pairId);
+}
 
 /**
  * sessionStorage key of the write token the server requires on every POST (lib.RequireWriteToken).
@@ -146,6 +154,9 @@ const httpBaseQuery: BenchBaseQuery = async (args, api, extraOptions) => {
 const fixtureBaseQuery: BenchBaseQuery = async (args) => {
 	const url = typeof args === "string" ? args : args.url;
 	const method = typeof args === "string" ? "GET" : (args.method ?? "GET");
+	const params = typeof args === "string" ? undefined : (args.params as Record<string, unknown> | undefined);
+	const refusal = fixtureRefusal(method, url, params);
+	if (refusal) return { error: { status: refusal.status, data: { error: { message: refusal.message } } } };
 	const file = resolveFixture(method, url);
 	if (!file) {
 		return { error: { status: 404, data: { error: { message: i18n.t("errors.noFixture", { ns: "bench", method, url }) } } } };
@@ -155,7 +166,7 @@ const fixtureBaseQuery: BenchBaseQuery = async (args) => {
 		if (!response.ok) {
 			return { error: { status: response.status, data: { error: { message: i18n.t("errors.fixtureLoad", { ns: "bench", file }) } } } };
 		}
-		return { data: (await response.json()) as unknown };
+		return { data: scopeFixture(method, url, params, (await response.json()) as unknown) };
 	} catch (error) {
 		return { error: { status: "FETCH_ERROR", error: String(error) } };
 	}
@@ -265,6 +276,12 @@ export const benchApi = createApi({
 		"BenchReviews",
 		"BenchMatrix",
 		"BenchClusters",
+		// Per-experiment derived results refreshed when a run settles (QC2-27-02): migration, cost,
+		// Pareto (migrationApi.ts) and the adaptive, support, research and routing summaries.
+		"BenchMigration",
+		"BenchCostExplain",
+		"BenchPareto",
+		"BenchExperimentResult",
 		// Hosted platform (platformApi.ts)
 		"AuthMe",
 		"Members",
@@ -539,5 +556,9 @@ export function experimentResultTags(expId: string) {
 		{ type: "BenchMatrix" as const, id: expId },
 		{ type: "BenchTriage" as const, id: expId },
 		{ type: "BenchRun" as const, id: "LIST" },
+		{ type: "BenchMigration" as const, id: expId },
+		{ type: "BenchCostExplain" as const, id: expId },
+		{ type: "BenchPareto" as const, id: expId },
+		{ type: "BenchExperimentResult" as const, id: expId },
 	];
 }

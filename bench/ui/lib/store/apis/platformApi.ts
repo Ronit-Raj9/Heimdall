@@ -95,8 +95,12 @@ export const platformApi = benchApi.injectEndpoints({
 					if (before && org && before !== org) dispatch(benchApi.util.resetApiState());
 				} catch (failure) {
 					const status = errorStatus((failure as { error?: unknown })?.error);
-					// Only a hosted server answers /auth/me with 401; anything else leaves local mode on.
-					setAuthState({ mode: status === 401 ? "hosted" : "local" });
+					// Only a hosted server answers /auth/me with 401. A transient failure (network, 5xx) of a
+					// tab already known hosted keeps its CSRF value and org, so its writes keep working; a
+					// first failure leaves local mode on (QC2-28-07).
+					const prior = getAuthState();
+					if (status === 401) setAuthState({ mode: "hosted" });
+					else if (prior.mode !== "hosted") setAuthState({ mode: "local" });
 				}
 			},
 		}),

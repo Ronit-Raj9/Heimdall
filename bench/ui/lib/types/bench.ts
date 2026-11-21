@@ -1243,7 +1243,14 @@ export interface PairRun {
 	metrics: Record<string, Value>;
 	/** The arm's own provenance (scripted control, smoke or scripted ledger), independent of the server mode. */
 	synthetic: boolean;
+	/** This run's own model evidence. Only "model" means a real model is recorded to have played it. */
+	provenance: RunProvenance;
+	/** Why provenance is unavailable. */
+	provenance_note?: string;
 }
+
+/** A pair run's model evidence (leaderboard.Provenance*). */
+export type RunProvenance = "scripted" | "model" | "mixed" | "unobserved" | "unavailable";
 
 /** Events of each arm matched on (event type, target). Null where a lane has no event. */
 export interface AlignedStep {
@@ -1267,6 +1274,8 @@ export interface Pair {
 	task: string;
 	/** The experiment's suite id, so the task links to its evidence. */
 	suite?: string;
+	/** The suite version the experiment froze, so a task link opens that exact revision. */
+	suite_version?: string;
 	condition: string;
 	trial: number;
 	runs: PairRun[];
@@ -1579,6 +1588,8 @@ export interface ExperimentStatus {
 	analysis_id?: string;
 	// U2 UI regroup: the manifest's suite and arm ids; on GET /experiments only, the newest analysis's decision.
 	suite?: string;
+	/** The suite version the manifest froze, so task links open that revision. */
+	suite_version?: string;
 	arms?: string[];
 	/** A Decision (improved, regressed, inconclusive, invalid); typed as text so a newer server's value still renders. */
 	decision?: string;
@@ -5178,6 +5189,8 @@ export interface MigrationReport {
 	condition: string;
 	conditions: string[];
 	alpha: number;
+	/** The grade the report read: original or reviewed. */
+	grade_source: string;
 	synthetic: boolean;
 	policy: string;
 	from: MigrationArmRef;
@@ -5837,3 +5850,9 @@ export interface RunServices {
 }
 
 export type RunServicesResponse = WithMode<RunServices>;
+
+/** A suite reference with the frozen version when known ("<id>@<version>"), for task links. */
+export function frozenSuiteRef(suite: string | undefined, version: string | undefined): string | undefined {
+	if (!suite) return undefined;
+	return version && !suite.includes("@") ? `${suite}@${version}` : suite;
+}

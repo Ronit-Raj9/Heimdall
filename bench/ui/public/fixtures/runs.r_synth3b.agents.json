@@ -1,0 +1,12 @@
+{
+	"_comment": "SYNTHETIC fixture for UI development. Not a benchmark result. A single-agent run: no agents.json, so lists are empty and tree and blame absent.",
+	"mode": "synthetic",
+	"run_id": "r_synth3b",
+	"available": false,
+	"members": [],
+	"spans": [],
+	"wall_ms": 0,
+	"busy_ms": 0,
+	"critical_ms": 0,
+	"handoffs": []
+}

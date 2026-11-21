@@ -174,7 +174,7 @@ The job log ends with one line, e.g. `bench gate: verdict=inconclusive action=no
 | Mode | Runner | What the job does |
 |---|---|---|
 | `-mode recorded` (default) | GitHub-hosted | re-checks the sealed experiment you commit under `.heimdall/recorded/` (copy one from `.heimdall/runs/<exp_id>`): no Docker, no gateway, no key, no secret |
-| `-mode live` | self-hosted, label `heimdall` | writes a baseline-vs-candidate experiment (`heimdall compare --baseline origin/<base branch> --candidate <PR head> --write-only`) and runs it with `check` against the stack on that runner. When both refs have the same agent files (a pull request that changes only suite data or the workflow), compare exits 6 and the job skips the gate and passes |
+| `-mode live` | self-hosted, label `heimdall` | writes a baseline-vs-candidate experiment (`heimdall compare --baseline origin/<base branch> --candidate <PR head> --budget-usd <cap> --write-only`; the budget must be positive for real agents, because `-write-only` still validates the budget it embeds in the new experiment) and runs it with `check` against the stack on that runner. When both refs have the same agent files (a pull request that changes only suite data or the workflow), compare exits 6 and the job skips the gate and passes |
 
 Both modes:
 

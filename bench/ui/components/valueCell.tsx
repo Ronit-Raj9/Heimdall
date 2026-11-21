@@ -2,6 +2,7 @@ import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip
 import { getLocale } from "@/lib/i18n";
 import type { Value, ValueKind } from "@/lib/types/bench";
 import { cn } from "@/lib/utils";
+import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { describeValue } from "./valueCell.utils";
 
@@ -27,7 +28,7 @@ export function ValueCell({ value, kind, className, testId }: ValueCellProps) {
 		// The evidence level is readable on hover and by assistive technology, not only in a data
 		// attribute, so a bare number still says where it was measured (DESIGN.md 8.1 rule 6).
 		const provenance = view.evidence ? t(`value.evidence.${view.evidence}`, { defaultValue: view.evidence }) : undefined;
-		return (
+		const cell = (
 			<span
 				data-slot="value-cell"
 				data-state="observed"
@@ -35,12 +36,20 @@ export function ValueCell({ value, kind, className, testId }: ValueCellProps) {
 				data-evidence={view.evidence}
 				data-testid={testId ?? "value-cell-observed"}
 				title={provenance}
-				className={cn("tabular-nums", className)}
+				// A focus stop and a tap target too, so sighted keyboard and touch users can reveal the
+				// source, as the unknown cell's trigger does (QC2-29-08).
+				tabIndex={provenance ? 0 : undefined}
+				className={cn(
+					"tabular-nums",
+					provenance && "focus-visible:ring-ring/50 cursor-help rounded-[2px] focus-visible:ring-[3px] focus-visible:outline-none",
+					className,
+				)}
 			>
 				{view.text}
 				{provenance && <span className="sr-only"> ({provenance})</span>}
 			</span>
 		);
+		return provenance ? <ObservedProvenance cell={cell} provenance={provenance} /> : cell;
 	}
 
 	if (view.state === "not_applicable") {
@@ -85,6 +94,22 @@ export function ValueCell({ value, kind, className, testId }: ValueCellProps) {
 				</span>
 			</TooltipTrigger>
 			<TooltipContent>{hint}</TooltipContent>
+		</Tooltip>
+	);
+}
+
+/**
+ * The observed cell's source in a tooltip that opens on hover, keyboard focus and a tap (Radix
+ * tooltips ignore touch, so the tap toggles it).
+ */
+function ObservedProvenance({ cell, provenance }: { cell: React.ReactElement; provenance: string }) {
+	const [open, setOpen] = useState(false);
+	return (
+		<Tooltip open={open} onOpenChange={setOpen}>
+			<TooltipTrigger asChild onClick={() => setOpen((was) => !was)}>
+				{cell}
+			</TooltipTrigger>
+			<TooltipContent data-testid="value-cell-provenance">{provenance}</TooltipContent>
 		</Tooltip>
 	);
 }

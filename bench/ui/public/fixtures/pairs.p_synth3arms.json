@@ -2,7 +2,7 @@
 	"_comment": "SYNTHETIC fixture for UI development. Not a benchmark result. A three-arm pair (A, B, C): the comparison shows every arm, not only the first two. Arm C copies arm B's records.",
 	"mode": "synthetic",
 	"pair_id": "p_synth3arms",
-	"exp_id": "e_synthetic-codewins",
+	"exp_id": "e_synthetic-matrix",
 	"task": "t02",
 	"condition": "stale-notes",
 	"trial": 1,
@@ -10,9 +10,9 @@
 		{
 			"arm": "A",
 			"slot": {
-				"slot_id": "s_x6bdd0a4jq",
+				"slot_id": "s_synth3a",
 				"pair_id": "p_synth3arms",
-				"exp_id": "e_synthetic-codewins",
+				"exp_id": "e_synthetic-matrix",
 				"suite": "coding-core",
 				"task": "t02",
 				"task_version": "1.0.0",
@@ -23,10 +23,10 @@
 				"counted": true
 			},
 			"run": {
-				"run_id": "r_fmw1z7ouim",
-				"slot_id": "s_x6bdd0a4jq",
+				"run_id": "r_synth3a",
+				"slot_id": "s_synth3a",
 				"pair_id": "p_synth3arms",
-				"exp_id": "e_synthetic-codewins",
+				"exp_id": "e_synthetic-matrix",
 				"attempt": 1,
 				"stage": "seal",
 				"manifest_hash": "sha256:52b5454d8f01de367a0a3baf9d55499ffab1b0b0343bd4585e4cc1c962fc9338",
@@ -60,7 +60,7 @@
 				"gateway": {
 					"virtual_key_id": "vk_fmw1z7ouim",
 					"key_slot": "slot-1",
-					"session_id": "r_fmw1z7ouim"
+					"session_id": "r_synth3a"
 				}
 			},
 			"metrics": {
@@ -114,14 +114,15 @@
 					"v": null
 				}
 			},
-			"synthetic": true
+			"synthetic": true,
+			"provenance": "scripted"
 		},
 		{
 			"arm": "B",
 			"slot": {
-				"slot_id": "s_of021eh7mw",
+				"slot_id": "s_synth3b",
 				"pair_id": "p_synth3arms",
-				"exp_id": "e_synthetic-codewins",
+				"exp_id": "e_synthetic-matrix",
 				"suite": "coding-core",
 				"task": "t02",
 				"task_version": "1.0.0",
@@ -132,10 +133,10 @@
 				"counted": true
 			},
 			"run": {
-				"run_id": "r_pww2l7yame",
-				"slot_id": "s_of021eh7mw",
+				"run_id": "r_synth3b",
+				"slot_id": "s_synth3b",
 				"pair_id": "p_synth3arms",
-				"exp_id": "e_synthetic-codewins",
+				"exp_id": "e_synthetic-matrix",
 				"attempt": 1,
 				"stage": "seal",
 				"manifest_hash": "sha256:52b5454d8f01de367a0a3baf9d55499ffab1b0b0343bd4585e4cc1c962fc9338",
@@ -169,7 +170,7 @@
 				"gateway": {
 					"virtual_key_id": "vk_pww2l7yame",
 					"key_slot": "slot-2",
-					"session_id": "r_pww2l7yame"
+					"session_id": "r_synth3b"
 				}
 			},
 			"metrics": {
@@ -228,14 +229,15 @@
 					"v": null
 				}
 			},
-			"synthetic": true
+			"synthetic": true,
+			"provenance": "scripted"
 		},
 		{
 			"arm": "C",
 			"slot": {
 				"slot_id": "s_synthc3arm",
-				"pair_id": "p_ltosmymyqy",
-				"exp_id": "e_synthetic-codewins",
+				"pair_id": "p_synth3arms",
+				"exp_id": "e_synthetic-matrix",
 				"suite": "coding-core",
 				"task": "t02",
 				"task_version": "1.0.0",
@@ -249,7 +251,7 @@
 				"run_id": "r_synthc3arm",
 				"slot_id": "s_synthc3arm",
 				"pair_id": "p_synth3arms",
-				"exp_id": "e_synthetic-codewins",
+				"exp_id": "e_synthetic-matrix",
 				"attempt": 1,
 				"stage": "seal",
 				"manifest_hash": "sha256:52b5454d8f01de367a0a3baf9d55499ffab1b0b0343bd4585e4cc1c962fc9338",
@@ -283,7 +285,7 @@
 				"gateway": {
 					"virtual_key_id": "vk_pww2l7yame",
 					"key_slot": "slot-2",
-					"session_id": "r_pww2l7yame"
+					"session_id": "r_synth3b"
 				}
 			},
 			"metrics": {
@@ -342,7 +344,8 @@
 					"v": null
 				}
 			},
-			"synthetic": true
+			"synthetic": true,
+			"provenance": "scripted"
 		}
 	],
 	"alignment": [
@@ -351,8 +354,8 @@
 			"type": "model_request",
 			"target": "claude-haiku-4-5",
 			"events": {
-				"A": "r_fmw1z7ouim:gateway:1",
-				"B": "r_pww2l7yame:gateway:1"
+				"A": "r_synth3a:gateway:1",
+				"B": "r_synth3b:gateway:1"
 			},
 			"diverged": false
 		},
@@ -361,8 +364,8 @@
 			"type": "model_response",
 			"target": "claude-haiku-4-5",
 			"events": {
-				"A": "r_fmw1z7ouim:gateway:2",
-				"B": "r_pww2l7yame:gateway:2"
+				"A": "r_synth3a:gateway:2",
+				"B": "r_synth3b:gateway:2"
 			},
 			"diverged": false
 		},
@@ -371,8 +374,8 @@
 			"type": "tool_call",
 			"target": "cat CLAUDE.md",
 			"events": {
-				"A": "r_fmw1z7ouim:gateway:3",
-				"B": "r_pww2l7yame:gateway:3"
+				"A": "r_synth3a:gateway:3",
+				"B": "r_synth3b:gateway:3"
 			},
 			"diverged": false
 		},
@@ -381,8 +384,8 @@
 			"type": "tool_result",
 			"target": "cat CLAUDE.md",
 			"events": {
-				"A": "r_fmw1z7ouim:agent_stream:1",
-				"B": "r_pww2l7yame:agent_stream:1"
+				"A": "r_synth3a:agent_stream:1",
+				"B": "r_synth3b:agent_stream:1"
 			},
 			"diverged": false
 		},
@@ -391,8 +394,8 @@
 			"type": "model_request",
 			"target": "claude-haiku-4-5",
 			"events": {
-				"A": "r_fmw1z7ouim:gateway:4",
-				"B": "r_pww2l7yame:gateway:4"
+				"A": "r_synth3a:gateway:4",
+				"B": "r_synth3b:gateway:4"
 			},
 			"diverged": false
 		},
@@ -401,8 +404,8 @@
 			"type": "model_response",
 			"target": "claude-haiku-4-5",
 			"events": {
-				"A": "r_fmw1z7ouim:gateway:5",
-				"B": "r_pww2l7yame:gateway:5"
+				"A": "r_synth3a:gateway:5",
+				"B": "r_synth3b:gateway:5"
 			},
 			"diverged": false
 		},
@@ -411,8 +414,8 @@
 			"type": "tool_call",
 			"target": "src/dates.py",
 			"events": {
-				"A": "r_fmw1z7ouim:gateway:6",
-				"B": "r_pww2l7yame:gateway:6"
+				"A": "r_synth3a:gateway:6",
+				"B": "r_synth3b:gateway:6"
 			},
 			"diverged": true
 		},
@@ -421,8 +424,8 @@
 			"type": "tool_result",
 			"target": "src/dates.py",
 			"events": {
-				"A": "r_fmw1z7ouim:agent_stream:2",
-				"B": "r_pww2l7yame:agent_stream:2"
+				"A": "r_synth3a:agent_stream:2",
+				"B": "r_synth3b:agent_stream:2"
 			},
 			"diverged": true
 		},
@@ -431,8 +434,8 @@
 			"type": "model_request",
 			"target": "claude-haiku-4-5",
 			"events": {
-				"A": "r_fmw1z7ouim:gateway:7",
-				"B": "r_pww2l7yame:gateway:7"
+				"A": "r_synth3a:gateway:7",
+				"B": "r_synth3b:gateway:7"
 			},
 			"diverged": false
 		},
@@ -441,8 +444,8 @@
 			"type": "model_response",
 			"target": "claude-haiku-4-5",
 			"events": {
-				"A": "r_fmw1z7ouim:gateway:8",
-				"B": "r_pww2l7yame:gateway:8"
+				"A": "r_synth3a:gateway:8",
+				"B": "r_synth3b:gateway:8"
 			},
 			"diverged": false
 		},
@@ -451,8 +454,8 @@
 			"type": "tool_call",
 			"target": "pytest -q",
 			"events": {
-				"A": "r_fmw1z7ouim:gateway:9",
-				"B": "r_pww2l7yame:gateway:9"
+				"A": "r_synth3a:gateway:9",
+				"B": "r_synth3b:gateway:9"
 			},
 			"diverged": true
 		},
@@ -461,8 +464,8 @@
 			"type": "tool_result",
 			"target": "pytest -q",
 			"events": {
-				"A": "r_fmw1z7ouim:agent_stream:3",
-				"B": "r_pww2l7yame:agent_stream:3"
+				"A": "r_synth3a:agent_stream:3",
+				"B": "r_synth3b:agent_stream:3"
 			},
 			"diverged": true
 		},
@@ -471,8 +474,8 @@
 			"type": "claim",
 			"target": "claim",
 			"events": {
-				"A": "r_fmw1z7ouim:agent_stream:4",
-				"B": "r_pww2l7yame:gateway:10"
+				"A": "r_synth3a:agent_stream:4",
+				"B": "r_synth3b:gateway:10"
 			},
 			"diverged": true
 		},
@@ -481,8 +484,8 @@
 			"type": "grade",
 			"target": "grade",
 			"events": {
-				"A": "r_fmw1z7ouim:grader:1",
-				"B": "r_pww2l7yame:agent_stream:4"
+				"A": "r_synth3a:grader:1",
+				"B": "r_synth3b:agent_stream:4"
 			},
 			"diverged": true
 		},
@@ -492,7 +495,7 @@
 			"target": "claim",
 			"events": {
 				"A": null,
-				"B": "r_pww2l7yame:agent_stream:5"
+				"B": "r_synth3b:agent_stream:5"
 			},
 			"diverged": true
 		},
@@ -502,7 +505,7 @@
 			"target": "grade",
 			"events": {
 				"A": null,
-				"B": "r_pww2l7yame:grader:1"
+				"B": "r_synth3b:grader:1"
 			},
 			"diverged": true
 		}
@@ -510,5 +513,7 @@
 	"first_divergence": {
 		"index": 6,
 		"note": "A edited src/dates.py after reading CLAUDE.md; B searched the code first. An observation, not a root cause."
-	}
+	},
+	"suite": "coding-core",
+	"suite_version": "1.0.0"
 }

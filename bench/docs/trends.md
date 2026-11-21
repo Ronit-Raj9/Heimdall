@@ -38,7 +38,7 @@ A number nobody observed is null, never zero.
 
 ## The regression flag
 
-Each point after the first is compared with the newest earlier point of its lineage on the same suite (`id@version`) and suite lock, on the tasks both ran. Task ids are paired only inside one locked suite: two suites, or two versions of one, can reuse an id such as `t01` for unrelated tasks, so a point with no earlier point of its suite is `cannot_tell`. The comparison is with the exact sign-flip test (`stats.SignFlip`, the test behind the verdict): the per-task differences are the newer task success rate minus the older one. `lineages[].regression` is the newest point's result.
+Each point after the first is compared with the newest earlier point of its lineage on the same suite (`id@version`) and suite lock, on the tasks both ran. Task ids are paired only inside one locked suite: two suites, or two versions of one, can reuse an id such as `t01` for unrelated tasks, so a point with no earlier point of its suite is `cannot_tell`. The comparison is with the sign-flip test (`stats.SignFlip`, the test behind the verdict). Exact means full enumeration of the 2^n sign vectors, which `stats.SignFlip` does for up to 22 nonzero task differences; with 23 or more it estimates p by Monte Carlo (1,000,000 random sign vectors, `Exact=false` in the result), so a p near alpha on a large suite carries sampling error. In it the per-task differences are the newer task success rate minus the older one. `lineages[].regression` is the newest point's result.
 
 | Status | When |
 |---|---|

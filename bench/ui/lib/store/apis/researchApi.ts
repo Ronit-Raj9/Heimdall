@@ -9,6 +9,7 @@ export const researchApi = benchApi.injectEndpoints({
 	endpoints: (builder) => ({
 		getExperimentResearch: builder.query<ResearchSummaryResponse, string>({
 			query: (expId) => experimentResearchPath(expId),
+			providesTags: (_result, _error, expId) => [{ type: "BenchExperimentResult", id: expId }],
 		}),
 	}),
 });

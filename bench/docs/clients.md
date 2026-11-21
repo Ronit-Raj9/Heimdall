@@ -63,9 +63,17 @@ A registered route missing from the table still appears, as a bare operation tag
 
 ## CI
 
+Demo against the shipped smoke manifest. It sets `smoke: true`, so its verdict is synthetic even on a live server and a strict-live gate refuses it with exit 3; the demo therefore passes `--allow-recorded`:
+
 ```sh
-HEIMDALL_URL=http://127.0.0.1:8090 BENCH_WRITE_TOKEN=... python3 bench/clients/examples/ci_gate.py experiments/smoke.yaml
-node --experimental-strip-types bench/clients/examples/ci-gate.ts experiments/smoke.yaml
+HEIMDALL_URL=http://127.0.0.1:8090 BENCH_WRITE_TOKEN=... python3 bench/clients/examples/ci_gate.py experiments/smoke.yaml --allow-recorded
+node --experimental-strip-types bench/clients/examples/ci-gate.ts experiments/smoke.yaml --allow-recorded
+```
+
+Production gate: point it at your own non-smoke experiment and leave `--allow-recorded` off, so anything but a live verdict fails the job:
+
+```sh
+HEIMDALL_URL=http://127.0.0.1:8090 BENCH_WRITE_TOKEN=... python3 bench/clients/examples/ci_gate.py experiments/my-release.yaml
 ```
 
 Both examples plan (and stop on planner errors), create and start, wait, then exit 0 when the gate passes, 1 when the release policy blocks (`--fail-on-warn` also fails on warn), 2 when the experiment did not finish, 3 when the server is not live, 4 when the plan was refused or a request failed. `--exp <id>` gates an experiment that already ran. Against the recorded bundle:

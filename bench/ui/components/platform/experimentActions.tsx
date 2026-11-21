@@ -3,9 +3,9 @@ import { ConfirmButton } from "@/components/platform/badges";
 import { ForbiddenNote, isRoleRefusal } from "@/components/platform/forbiddenNote";
 import { Button } from "@/components/ui/button";
 import { useSession } from "@/lib/session/sessionContext";
-import { getBenchErrorMessage, useRegradeMutation, useStartExperimentMutation } from "@/lib/store/apis/benchApi";
+import { getBenchErrorMessage, useGetHealthQuery, useRegradeMutation, useStartExperimentMutation } from "@/lib/store/apis/benchApi";
 import { useCancelExperimentMutation, useResumeExperimentMutation } from "@/lib/store/apis/platformApi";
-import type { ExperimentStatus, Role } from "@/lib/types/bench";
+import { launchAvailable, type ExperimentStatus, type Role } from "@/lib/types/bench";
 import { Link } from "@tanstack/react-router";
 import { ArrowRight, Play, RotateCcw } from "lucide-react";
 import { useTranslation } from "react-i18next";
@@ -30,11 +30,13 @@ export function ExperimentRunActions({ status }: { status: ExperimentStatus }) {
 	const [cancel, cancelState] = useCancelExperimentMutation();
 	const [resume, resumeState] = useResumeExperimentMutation();
 	const [start, startState] = useStartExperimentMutation();
+	const health = useGetHealthQuery();
 	const running = status.state === "running";
 	const resumable = status.state === "cancelled" || status.state === "failed";
 	// Frozen but never started (for example a create-and-start whose start failed): start it again
-	// under the same experiment ID.
-	const startable = status.state === "created";
+	// under the same experiment ID. Only where the server has a launcher: offline serve answers 503
+	// (QC2-27-03).
+	const startable = status.state === "created" && launchAvailable(health.data);
 	if (!running && !resumable && !startable) return null;
 	return (
 		<RoleGate min="member">

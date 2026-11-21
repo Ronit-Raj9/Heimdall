@@ -3,6 +3,7 @@ import { BlockSkeleton, LoadError } from "@/components/runs/screenStates";
 import { GradingBadge, TrackBadge } from "@/components/scenario/scenarioBadges";
 import { suiteGrading, suiteTrack } from "@/components/scenario/scenario.utils";
 import { EmptyState, PageHeader, RouteTabs, suiteIdOf, type RouteTab } from "@/components/shell";
+import { suiteVersionOf } from "@/components/shell/entityLink";
 import { LockBadge } from "@/components/suites/suiteBadges";
 import { BrokenSuite, SuiteDriftNotice, SuiteFacts } from "@/components/suites/suiteFacts";
 import { FingerprintDriftNotice } from "@/components/suites/suiteLockKind";
@@ -59,10 +60,21 @@ export default function SuiteView({ suiteId }: { suiteId: string }) {
 			</section>
 		);
 	}
-	return <SuiteBody suite={suite} mode={data.mode} crumbs={crumbs} />;
+	return <SuiteBody suite={suite} mode={data.mode} crumbs={crumbs} requestedVersion={suiteVersionOf(suiteId)} />;
 }
 
-function SuiteBody({ suite, mode, crumbs }: { suite: SuiteSummary; mode: string; crumbs: { label: string; to?: string }[] }) {
+function SuiteBody({
+	suite,
+	mode,
+	crumbs,
+	requestedVersion,
+}: {
+	suite: SuiteSummary;
+	mode: string;
+	crumbs: { label: string; to?: string }[];
+	/** The version a link asked for (an experiment's frozen suite), when it named one. */
+	requestedVersion?: string | null;
+}) {
 	const { t } = useTranslation("bench");
 	// Health is a separate request: a failure or a 503 (no run store) shows "health unavailable" and never blocks the page.
 	const healthQuery = useGetSuiteHealthQuery(suite.id, { skip: Boolean(suite.error) });
@@ -108,6 +120,16 @@ function SuiteBody({ suite, mode, crumbs }: { suite: SuiteSummary; mode: string;
 				}
 				testId="suite-header"
 			/>
+			{requestedVersion && requestedVersion !== suite.version && (
+				<p
+					role="note"
+					className="border-chart-warning/50 bg-chart-warning/10 text-foreground flex items-start gap-2 rounded-sm border px-4 py-2 text-sm"
+					data-testid="suite-version-mismatch"
+				>
+					<AlertTriangle className="text-chart-warning-ink mt-0.5 size-4 shrink-0" aria-hidden="true" />
+					{t("suites.detail.versionMismatch", { requested: requestedVersion, current: suite.version || "?" })}
+				</p>
+			)}
 			{mode === "synthetic" && (
 				<p
 					role="note"

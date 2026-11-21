@@ -1,6 +1,7 @@
 package main
 
 import (
+	"cmp"
 	"context"
 	"encoding/json"
 	"errors"
@@ -216,7 +217,12 @@ func (a *app) migrationReport(ctx context.Context, expID, gradeSource, policyFil
 	if in.Invalid, err = a.releaseInvalid(ctx, m, runs); err != nil {
 		return nil, err
 	}
-	return migration.Build(ctx, in, q)
+	rep, err := migration.Build(ctx, in, q)
+	if err != nil {
+		return nil, err
+	}
+	rep.GradeSource = cmp.Or(gradeSource, schemas.GradeSourceOriginal)
+	return rep, nil
 }
 
 // releaseInvalid is the release verdict's invalid reasons for m, computed

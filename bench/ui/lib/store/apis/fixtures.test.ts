@@ -14,7 +14,7 @@ import {
 import fs from "node:fs";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
-import { BENCH_API_BASE, FIXTURE_ROUTES, detectFixtureMode, resolveFixture } from "./fixtures";
+import { BENCH_API_BASE, FIXTURE_MATRIX_EXP, FIXTURE_PAIRS, FIXTURE_ROUTES, detectFixtureMode, fixtureRefusal, resolveFixture, scopeFixture } from "./fixtures";
 
 const FIXTURE_DIR = path.resolve(__dirname, "../../../public/fixtures");
 // The Go contract test reads the same key lists (bench/handlers/contract_test.go).
@@ -44,8 +44,9 @@ describe("resolveFixture", () => {
 		{ method: "POST", url: "/experiments/plan", want: "experiments.plan.json" },
 		{ method: "POST", url: `${BENCH_API_BASE}/estimate`, want: "estimate.json" },
 		{ method: "GET", url: "/experiments/e_synthetic-matrix/matrix?condition=clean&grade_source=original", want: "experiments.matrix.json" },
-		{ method: "POST", url: "/experiments", want: "experiments.create.json" },
-		{ method: "post", url: "/experiments/e_x/start", want: "experiments.start.json" },
+		// QC2-29-05: launches are refused (fixtureRefusal), never answered with a static experiment.
+		{ method: "POST", url: "/experiments", want: null },
+		{ method: "post", url: "/experiments/e_x/start", want: null },
 		{ method: "GET", url: "/experiments/e_x", want: "experiments.get.e_x.json" },
 		{ method: "GET", url: `${BENCH_API_BASE}/experiments`, want: "experiments.list.json" },
 		{ method: "GET", url: "/experiments/e_synthetic-nightly/events?since=48", want: "experiments.events.e_synthetic-nightly.json" }, // U1 home
@@ -132,8 +133,16 @@ describe("fixture files", () => {
 	it("give every arm of the three-arm pair its run fixtures", () => {
 		const pair = readFixture<PairResponse>("pairs.p_synth3arms.json");
 		expect(pair.runs.map((run) => run.arm)).toEqual(["A", "B", "C"]);
-		// Arms A and B reuse the two-arm pair's runs; arm C has its own run fixtures.
-		for (const { run, slot } of pair.runs) expect(readFixture<RunResponse>(`runs.${run.run_id}.json`).slot.arm).toBe(slot.arm);
+		// QC2-29-06: every arm has its own runs, whose slots point back to this pair and experiment.
+		for (const { run, slot } of pair.runs) {
+			const detail = readFixture<RunResponse>(`runs.${run.run_id}.json`);
+			expect(detail.slot.arm).toBe(slot.arm);
+			expect([slot.pair_id, run.pair_id, detail.slot.pair_id, detail.run.pair_id], run.run_id).toEqual(Array(4).fill(pair.pair_id));
+			expect([slot.exp_id, detail.slot.exp_id], run.run_id).toEqual([pair.exp_id, pair.exp_id]);
+		}
+		const twoArm = readFixture<PairResponse>("pairs.p_ltosmymyqy.json");
+		const shared = pair.runs.filter((r) => twoArm.runs.some((t) => t.run.run_id === r.run.run_id));
+		expect(shared).toEqual([]);
 	});
 
 	it("link every suite task to its detail fixture", () => {
@@ -229,8 +238,6 @@ function contractFor(file: string): { type: string; nested: Record<string, strin
 			type: "ModelMatrix",
 			nested: { "rows[]": "MatrixRow", "pairs[]": "MatrixPair", "excluded[]": "LeaderboardExclusion" },
 		},
-		"experiments.create.json": { type: "ExperimentCreated", nested: {} },
-		"experiments.start.json": { type: "ExperimentStatus", nested: { slots: "SlotProgress" } },
 		"experiments.list.json": { type: "ExperimentList", nested: { "experiments[]": "ExperimentStatus" } },
 		// U1 home: the poll form of the events route for the running fixture experiment.
 		"experiments.events.e_synthetic-nightly.json": {
@@ -519,5 +526,51 @@ describe("fixture run list", () => {
 			expect(fixtureFiles, row.run_id).toContain(resolveFixture("GET", `/runs/${row.run_id}`));
 			if (row.pair_id) expect(fixtureFiles, row.pair_id).toContain(resolveFixture("GET", `/pairs/${row.pair_id}`));
 		}
+	});
+});
+
+// QC2-29-01, QC2-29-05: fixture mode refuses what one static file cannot answer truthfully.
+describe("fixtureRefusal", () => {
+	it("refuses creating and starting experiments", () => {
+		expect(fixtureRefusal("POST", "/experiments")?.status).toBe(503);
+		expect(fixtureRefusal("post", `${BENCH_API_BASE}/experiments/e_synthetic-draft/start`)?.status).toBe(503);
+		expect(fixtureRefusal("POST", "/experiments/plan")).toBeNull();
+	});
+	it("answers only the default migration selection", () => {
+		expect(fixtureRefusal("GET", "/experiments/e_synthetic-codewins/migration")).toBeNull();
+		expect(fixtureRefusal("GET", "/experiments/e_synthetic-codewins/migration", { from: "B", alpha: "0.01" })?.status).toBe(404);
+		expect(fixtureRefusal("GET", "/experiments/e_synthetic-codewins/migration?grade_source=reviewed")?.status).toBe(404);
+	});
+});
+
+// QC2-29-03: a run list for one experiment holds only that experiment's runs.
+describe("scopeFixture", () => {
+	const list = readFixture<{ runs: { exp_id: string }[]; total: number; facets: Record<string, string[]> }>("runs.list.json");
+	it("returns an empty, empty-faceted list for an experiment with no runs", () => {
+		const out = scopeFixture("GET", "/runs", { exp: "e_synthetic-draft" }, list) as typeof list;
+		expect(out.runs).toEqual([]);
+		expect(out.total).toBe(0);
+		expect(Object.values(out.facets).every((values) => values.length === 0)).toBe(true);
+	});
+	it("keeps the analysed experiment's runs and leaves an unscoped list alone", () => {
+		const out = scopeFixture("GET", "/runs?exp=e_synthetic-codewins", undefined, list) as typeof list;
+		expect(out.runs.length).toBe(list.runs.length);
+		expect(out.facets.experiments).toEqual(["e_synthetic-codewins"]);
+		expect(scopeFixture("GET", "/runs", undefined, list)).toBe(list);
+	});
+});
+
+// QC2-29-02, QC2-29-04: the matrix experiment is listed, and every pair a grid or picker can open
+// has its fixture.
+describe("fixture navigation graph", () => {
+	it("lists the matrix experiment and answers its matrix", () => {
+		const list = readFixture<{ experiments: { exp_id: string; arms?: string[] }[] }>("experiments.list.json");
+		const matrix = list.experiments.find((exp) => exp.exp_id === FIXTURE_MATRIX_EXP);
+		expect(matrix?.arms?.length).toBeGreaterThanOrEqual(3);
+		expect(resolveFixture("GET", `/experiments/${FIXTURE_MATRIX_EXP}/matrix`)).toBe("experiments.matrix.json");
+	});
+	it("names exactly the pairs with a fixture file as openable", () => {
+		const files = fixtureFiles.filter((file) => /^pairs\.[^.]+\.json$/.test(file)).map((file) => file.slice(6, -5));
+		expect([...FIXTURE_PAIRS].sort()).toEqual(files.sort());
 	});
 });

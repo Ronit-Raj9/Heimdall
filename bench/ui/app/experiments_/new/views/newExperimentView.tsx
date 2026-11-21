@@ -5,7 +5,7 @@ import { BlockSkeleton, EmptyNote, LoadError } from "@/components/runs/screenSta
 import { PageHeader } from "@/components/shell/pageHeader";
 import { Card, CardContent } from "@/components/ui/card";
 import { EXPERIMENT_POLL_MS, useGetCatalogQuery, useGetExperimentQuery, useGetHealthQuery } from "@/lib/store/apis/benchApi";
-import { launchAvailable } from "@/lib/types/bench";
+import { launchAvailable, type ExperimentStatus } from "@/lib/types/bench";
 import { parseAsString, useQueryState } from "nuqs";
 import { useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
@@ -29,7 +29,7 @@ export default function NewExperimentView() {
 				subtitle={t("experiments.new.subtitle")}
 			/>
 
-			{expId && <LiveProgress expId={expId} capUsd={capUsd} onNew={() => void setExpId(null)} />}
+			{expId && <LiveProgress key={expId} expId={expId} capUsd={capUsd} onNew={() => void setExpId(null)} />}
 
 			{!launchAvailable(health.data) ? (
 				<EmptyNote testId="new-experiment-offline">{t("experiments.new.offline")}</EmptyNote>
@@ -61,18 +61,26 @@ export default function NewExperimentView() {
 	);
 }
 
+/** The progress card's polling: none once terminal, slower while created, else the live pace. */
+export function progressPollMs(state: ExperimentStatus["state"] | undefined): number {
+	if (state && TERMINAL_STATES.has(state)) return 0;
+	return state === "created" ? CREATED_POLL_MS : EXPERIMENT_POLL_MS;
+}
+
+/** How often a created, unstarted experiment is checked for a start made elsewhere. */
+export const CREATED_POLL_MS = 10_000;
+
 /** Polls GET /experiments/{id} every 2 s until the experiment reaches a terminal state. */
 function LiveProgress({ expId, capUsd, onNew }: { expId: string; capUsd: number | undefined; onNew: () => void }) {
 	const { t } = useTranslation("bench");
-	const [finished, setFinished] = useState(false);
-	const status = useGetExperimentQuery(expId, { pollingInterval: finished ? 0 : EXPERIMENT_POLL_MS, skipPollingIfUnfocused: true });
-	// A created experiment (its start failed) is idle until someone starts it: stop polling; the
-	// Start action invalidates this status, which resumes polling once it runs.
-	const terminal = status.data ? TERMINAL_STATES.has(status.data.state) || status.data.state === "created" : false;
-
+	// A created experiment (its start failed) is idle until someone starts it, here or from another
+	// tab or the CLI: keep watching it at a slower pace so that start shows (QC2-27-04). Stop only
+	// once it is terminal.
+	const [state, setState] = useState<ExperimentStatus["state"] | undefined>(undefined);
+	const status = useGetExperimentQuery(expId, { pollingInterval: progressPollMs(state), skipPollingIfUnfocused: true });
 	useEffect(() => {
-		setFinished(terminal);
-	}, [terminal]);
+		setState(status.data?.state);
+	}, [status.data?.state]);
 
 	return (
 		<Card className="py-4 shadow-none" data-testid="new-experiment-progress-card">

@@ -541,8 +541,17 @@ func TestKindLimitLeavesWorkersForOtherWork(t *testing.T) {
 	}
 	defer func() { close(block); r.Stop(ctx) }()
 	waitFor(t, "two waits", func() bool { return started.Load() == 2 })
-	if st := status(t, r, "org_a", waits[1].ID).Status; st != StatusQueued {
-		t.Fatalf("second org_a job past the per-org cap: %s", st)
+	// Either org_a job may run first: creation times tie at millisecond
+	// resolution and the tie-breaker is a random id. The cap is that at most
+	// one of them runs (QC2-31-03).
+	running := 0
+	for _, j := range waits[:2] {
+		if status(t, r, "org_a", j.ID).Status == StatusRunning {
+			running++
+		}
+	}
+	if running > 1 {
+		t.Fatalf("org_a has %d jobs running past the per-org cap of 1", running)
 	}
 	q, _ := r.Create(ctx, NewJob{OrgID: "org_d", Kind: "quick"})
 	waitFor(t, "quick job", func() bool { return status(t, r, "org_d", q.ID).Status == StatusSucceeded })

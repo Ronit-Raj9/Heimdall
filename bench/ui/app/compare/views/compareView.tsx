@@ -27,7 +27,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useGetCatalogQuery, useGetPairQuery, useGetRunEventsQuery, useGetRunQuery } from "@/lib/store/apis/benchApi";
-import type { Pair, PairResponse, PairRun } from "@/lib/types/bench";
+import { frozenSuiteRef, type Pair, type PairResponse, type PairRun, type RunProvenance } from "@/lib/types/bench";
 import { skipToken } from "@reduxjs/toolkit/query/react";
 import { ArrowLeft } from "lucide-react";
 import { parseAsString, useQueryState } from "nuqs";
@@ -311,7 +311,7 @@ function PairHeader({ pair, back }: { pair: PairResponse; back: React.ReactNode 
 			{back}
 			<div className="flex flex-wrap items-center gap-3">
 				<h2 className="text-foreground text-lg font-semibold" data-testid="runs-pair-heading">
-					<EntityLink kind="task" id={pair.task} suite={pair.suite} testId="runs-pair-task" />{" "}
+					<EntityLink kind="task" id={pair.task} suite={frozenSuiteRef(pair.suite, pair.suite_version)} testId="runs-pair-task" />{" "}
 					{t("runs.pairHeadingAfterTask", { condition: pair.condition, trial: pair.trial })}
 				</h2>
 				<ModeBadge mode={pair.mode} />
@@ -325,7 +325,7 @@ function PairHeader({ pair, back }: { pair: PairResponse; back: React.ReactNode 
 					{pair.runs.map((run) => (
 						<span key={run.run.run_id}>
 							{t("runs.arm", { arm: run.arm })} <EntityLink kind="run" id={run.run.run_id} testId={`runs-pair-run-${run.arm}`} />{" "}
-							<ArmProvenance synthetic={run.synthetic} arm={run.arm} />
+							<ArmProvenance provenance={run.provenance} note={run.provenance_note} arm={run.arm} />
 						</span>
 					))}
 				</span>
@@ -340,22 +340,23 @@ function PairHeader({ pair, back }: { pair: PairResponse; back: React.ReactNode 
 }
 
 /**
- * One arm's own provenance: scripted (a control agent, smoke run or scripted ledger) or model-played.
- * The server mode badge alone cannot say this: a live server can hold scripted controls.
+ * One run's own provenance (QC2-27-06): scripted, model-played only with recorded model evidence,
+ * mixed, unobserved (no recorded model call) or unavailable (its ledger could not be read). The
+ * server mode badge alone cannot say this: a live server can hold scripted controls.
  */
-export function ArmProvenance({ synthetic, arm }: { synthetic: boolean | undefined; arm: string }) {
+export function ArmProvenance({ provenance, note, arm }: { provenance: RunProvenance | undefined; note?: string; arm: string }) {
 	const { t } = useTranslation("bench");
-	if (synthetic === undefined) return null;
+	if (!provenance) return null;
+	const warn = provenance !== "model";
 	return (
 		<span
-			className={cn(
-				"rounded-sm border px-1 text-[10px] font-medium",
-				synthetic ? "border-chart-warning/60 text-chart-warning-ink" : "text-muted-foreground",
-			)}
+			className={cn("rounded-sm border px-1 text-[10px] font-medium", warn ? "border-chart-warning/60 text-chart-warning-ink" : "text-muted-foreground")}
 			data-testid={`runs-pair-provenance-${arm}`}
-			data-synthetic={synthetic}
+			data-provenance={provenance}
+			title={note}
 		>
-			{synthetic ? t("runs.provenance.scripted") : t("runs.provenance.model")}
+			{t(`runs.provenance.${provenance}`)}
+			{note && <span className="sr-only">: {note}</span>}
 		</span>
 	);
 }
