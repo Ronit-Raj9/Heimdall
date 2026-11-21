@@ -30,9 +30,33 @@ export function getAuthState(): Readonly<AuthState> {
 	return authState;
 }
 
+let authPending = false;
+let markAuthKnown: () => void = () => {};
+let authKnown = Promise.resolve();
+
+/** Called when /auth/me is sent: writes wait for its answer so they carry the CSRF value. */
+export function expectAuth(): void {
+	if (authPending) return;
+	authPending = true;
+	authKnown = new Promise<void>((resolve) => {
+		markAuthKnown = resolve;
+	});
+}
+
+/**
+ * Resolves once a pending /auth/me has answered (or after waitMs). A write sent before that would go
+ * out without its CSRF value, because the mode still reads "local" until the first answer.
+ */
+export function whenAuthKnown(waitMs = 8000): Promise<void> {
+	if (!authPending) return Promise.resolve();
+	return Promise.race([authKnown, new Promise<void>((resolve) => setTimeout(resolve, waitMs))]);
+}
+
 /** Records the mode, CSRF value and displayed organization from /auth/me. */
 export function setAuthState(next: { mode: AuthMode; csrf?: string; org?: string }): void {
 	authState = { mode: next.mode, csrf: next.csrf ?? "", org: next.org ?? "" };
+	authPending = false;
+	markAuthKnown();
 }
 
 /** Tells other open tabs that this tab switched organization. Best effort: no storage, no signal. */

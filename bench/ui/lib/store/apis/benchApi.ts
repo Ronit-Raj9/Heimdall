@@ -44,7 +44,7 @@ import type {
 } from "@/lib/types/bench";
 import { createApi, fetchBaseQuery, type BaseQueryFn, type FetchArgs, type FetchBaseQueryError } from "@reduxjs/toolkit/query/react";
 import { BENCH_API_BASE, FIXTURE_PAIRS, detectFixtureMode, fixtureRefusal, resolveFixture, scopeFixture } from "./fixtures";
-import { CSRF_HEADER, errorStatus, getAuthState, notifyUnauthorized, ORG_HEADER } from "./session";
+import { CSRF_HEADER, errorStatus, getAuthState, notifyUnauthorized, ORG_HEADER, whenAuthKnown } from "./session";
 
 /** Polling interval for experiment status when server-sent events are unavailable (DESIGN.md 16.7). */
 export const EXPERIMENT_POLL_MS = 2000;
@@ -160,6 +160,8 @@ const fetchBenchQuery: BenchBaseQuery = fetchBaseQuery({
 // only sees the latter, which for a POST query is the request body.
 const httpBaseQuery: BenchBaseQuery = async (args, api, extraOptions) => {
 	const type = writeType(api.type, args);
+	const url = typeof args === "string" ? args : args.url;
+	if (type === "mutation" && !url.startsWith("/auth/")) await whenAuthKnown();
 	const result = await fetchBenchQuery(args, type === api.type ? api : { ...api, type }, extraOptions);
 	if (result.error && errorStatus(result.error) === 401) notifyUnauthorized(typeof args === "string" ? args : args.url);
 	return result;

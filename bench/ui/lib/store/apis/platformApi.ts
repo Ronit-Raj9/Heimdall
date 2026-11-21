@@ -34,7 +34,7 @@ import type {
 } from "@/lib/types/bench";
 import { benchApi } from "./benchApi";
 import { BENCH_API_BASE } from "./fixtures";
-import { announceOrgSwitch, errorStatus, getAuthState, setAuthState } from "./session";
+import { announceOrgSwitch, errorStatus, expectAuth, getAuthState, setAuthState } from "./session";
 
 const id = (value: string) => encodeURIComponent(value);
 
@@ -85,6 +85,7 @@ export const platformApi = benchApi.injectEndpoints({
 			query: () => "/auth/me",
 			providesTags: ["AuthMe"],
 			async onQueryStarted(_arg, { dispatch, queryFulfilled }) {
+				expectAuth();
 				try {
 					const { data } = await queryFulfilled;
 					const before = getAuthState().org;
@@ -99,6 +100,7 @@ export const platformApi = benchApi.injectEndpoints({
 					// routes with 404. A transport error or a 5xx proves neither: the known mode is kept, so a hosted tab keeps its CSRF value and org (QC2-28-07).
 					if (status === 401) setAuthState({ mode: "hosted" });
 					else if (status === 404) setAuthState({ mode: "local" });
+					else setAuthState({ ...getAuthState() });
 				}
 			},
 		}),
