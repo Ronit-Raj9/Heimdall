@@ -53,7 +53,7 @@ describe("InboxTable", () => {
 
 	it("shows the suggested kind and suite", () => {
 		expect(html).toMatch(/data-testid="inbox-suggested-inc-3f9a1c2b7d10"[^>]*><div[^>]*><span>MCP<\/span><span[^>]*>support<\/span>/);
-		expect(html).toMatch(/data-testid="inbox-suggested-inc-9c11aa02f3b4"[^>]*><div[^>]*><span>Memory<\/span><span[^>]*>no suite<\/span>/);
+		expect(html).toMatch(/data-testid="inbox-suggested-inc-9c11aa02f3b4"[^>]*><div[^>]*><span>Memory<\/span><span[^>]*>no benchmark<\/span>/);
 	});
 
 	it("links the original trace only when the item has a link", () => {
@@ -72,10 +72,10 @@ describe("InboxTable", () => {
 	});
 
 	it("says what an accepted item became and how its task does", () => {
-		expect(html).toContain("accepted as support/warranty-period");
-		expect(textOf(html, "inbox-release-inc-7b20c4d9e811")).toBe("passes in e_123 (3/3)");
-		expect(textOf(html, "inbox-recurrences-inc-7b20c4d9e811")).toBe("recurred 1 time since accepted");
-		expect(html).toContain("accepted as support/address-change");
+		expect(html).toContain("task warranty-period in benchmark support");
+		expect(textOf(html, "inbox-release-inc-7b20c4d9e811")).toBe("solved in e_123 (3 of 3 runs)");
+		expect(textOf(html, "inbox-recurrences-inc-7b20c4d9e811")).toBe("happened again 1 time since it became a task");
+		expect(html).toContain("task address-change in benchmark support");
 		expect(textOf(html, "inbox-release-inc-2a3b4c5d6e7f")).toBe("not run yet");
 		expect(html).not.toContain("inbox-recurrences-inc-2a3b4c5d6e7f");
 	});
@@ -84,7 +84,7 @@ describe("InboxTable", () => {
 		const accepted = INBOX_LIST_FIXTURE.items.find((i) => i.id === "inc-7b20c4d9e811")!;
 		const item = { ...accepted, release: { status: "fails" as const, experiment: "e_200", passed: 1, runs: 3 } };
 		const out = renderToStaticMarkup(<InboxTable items={[item]} onSelect={noop} />);
-		expect(textOf(out, "inbox-release-inc-7b20c4d9e811")).toBe("fails in e_200 (1/3)");
+		expect(textOf(out, "inbox-release-inc-7b20c4d9e811")).toBe("not solved in e_200 (1 of 3 runs)");
 		expect(out).toContain('data-status="fails"');
 	});
 

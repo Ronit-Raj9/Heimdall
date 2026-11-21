@@ -23,10 +23,10 @@ describe("ClustersFilters", () => {
 	const html = renderToStaticMarkup(<ClustersFilters {...props} />);
 
 	it("labels every control and the group", () => {
-		for (const label of [">Suite<", ">Agent<", ">Experiments<", ">Since<", ">Minimum runs<", ">Runs<"]) expect(html).toContain(label);
-		expect(html).toContain('aria-label="Cluster filters"');
+		for (const label of [">Benchmark<", ">Agent<", ">Comparisons<", ">Since<", ">Smallest group shown<", ">Runs<"]) expect(html).toContain(label);
+		expect(html).toContain('aria-label="Filters"');
 		// A labelled field: the label points at the input.
-		expect(html).toMatch(/<label for="([^"]+)"[^>]*>Suite<\/label><input[^>]*id="\1"/);
+		expect(html).toMatch(/<label for="([^"]+)"[^>]*>Benchmark<\/label><input[^>]*id="\1"/);
 	});
 
 	it("shows the URL values in the fields", () => {

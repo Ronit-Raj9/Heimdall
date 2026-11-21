@@ -27,7 +27,7 @@ describe("InboxBody", () => {
 		expect(html).toMatch(/data-testid="inbox-count-all"[^>]*>6</);
 		expect(rows(html)).toEqual(["inc-3f9a1c2b7d10"]);
 		expect(html).toContain('data-testid="inbox-select-item"');
-		expect(html).toContain("2 regression tasks drafted from the inbox");
+		expect(html).toContain("2 new test tasks made from the inbox");
 		expect(html).toContain('data-testid="mode-badge-synthetic"');
 		expect(html).toContain('data-testid="inbox-sources-table"');
 		expect(html).not.toContain('data-testid="inbox-ingest-off"');
@@ -66,7 +66,6 @@ describe("InboxBody", () => {
 		const html = renderToStaticMarkup(<InboxBody {...base} data={data} />);
 		expect(html).toContain('data-testid="inbox-empty"');
 		expect(html).toContain("heimdall inbox pull");
-		expect(html).toContain("inbox/sources.yaml");
 		expect(html).toContain("docs/failure-inbox.md");
 		expect(html).toContain('data-testid="inbox-ingest-off"');
 		expect(html).toContain('data-testid="inbox-sources-none"');

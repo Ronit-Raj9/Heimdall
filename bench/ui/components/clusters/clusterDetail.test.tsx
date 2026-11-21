@@ -61,7 +61,7 @@ describe("ClusterDetailPanel", () => {
 		expect(html).toMatch(/href="\/runs\?pair=p_ltosmymyqy"[^>]*data-testid="cluster-run-link-r_fmw1z7ouim"[^>]*>r_fmw1z7ouim</);
 		expect(html).toContain('data-testid="cluster-run-id-r_tool000001"');
 		expect(html).toContain("Pair not in the grid");
-		expect(html).toMatch(/data-testid="cluster-run-r_tool000001".*?support-desk\/refund-01.*?tool-fault · arm B/);
+		expect(html).toMatch(/data-testid="cluster-run-r_tool000001".*?support-desk\/refund-01.*?tool-fault · Setup B/);
 	});
 
 	it("shows each run's last tool and error line as text", () => {
@@ -77,7 +77,7 @@ describe("ClusterDetailPanel", () => {
 	it("shows the config change notice and related clusters that open in the panel", () => {
 		const out = render({ ...CLUSTER_DETAIL_FIXTURE, cluster: limiter });
 		expect(out).toContain('data-testid="cluster-after-change"');
-		expect(out).toContain("claude-code-sonnet changed config from aaaaaaaa…1111 to cccccccc…3333");
+		expect(out).toContain("claude-code-sonnet changed settings from aaaaaaaa…1111 to cccccccc…3333");
 		expect(out).toMatch(/<button[^>]*data-testid="cluster-related-c_1122334455667788"/);
 		expect(out).toContain("3 runs");
 		expect(out).toContain("same task t03");
@@ -93,7 +93,7 @@ describe("hidden test names", () => {
 	it("are listed the way the run page lists grade.json's failed tests", () => {
 		const html = renderToStaticMarkup(<ClusterLayers layers={limiter.layers} />);
 		const list = html.match(/data-testid="cluster-hidden-tests".*?<\/ul>/)?.[0] ?? "";
-		expect(list).toContain(">Failed hidden tests<");
+		expect(list).toContain(">Failed hidden checks<");
 		expect(list).toContain('<li class="text-chart-error-ink font-mono text-[11px] break-all">test_limiter_window</li>');
 	});
 
@@ -116,7 +116,7 @@ describe("hidden test names", () => {
 		const html = renderToStaticMarkup(<ClusterLayers layers={[{ kind: "gates", label: "g1, g2", items: ["g1_protected_paths", "g2"] }]} />);
 		expect(html).not.toContain("cluster-hidden-tests");
 		expect(html).toContain(">g1_protected_paths<");
-		expect(html).toContain(">Gates fired<");
+		expect(html).toContain(">Safety checks triggered<");
 	});
 
 	it("label an unknown layer kind with its raw value", () => {
