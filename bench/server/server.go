@@ -78,6 +78,9 @@ type Deps struct {
 	// jobs, runners), described in each org router's OpenAPI document beside
 	// the org routes (audit 8-C-05). Nil in local mode.
 	PlatformRoutes map[string][]string
+	// Web parity: per-org services for the areas registered with
+	// handlers.RegisterOrgArea (handlers/orgareas.go); any field may be nil.
+	Services handlers.Services
 }
 
 // Server is the bench HTTP server.
@@ -146,8 +149,8 @@ func New(cfg *lib.Config, deps Deps) (*Server, error) {
 	s.server = &fasthttp.Server{
 		Handler:               s.handler,
 		Name:                  "bifrost-bench",
-		MaxRequestBodySize:    lib.MaxBodyBytes,
-		ErrorHandler:          lib.RequestErrorHandler(mode, lib.MaxBodyBytes),
+		MaxRequestBodySize:    lib.MaxUploadBytes, // per-route limits: lib.BodyLimit in common/upload middlewares
+		ErrorHandler:          lib.RequestErrorHandler(mode, lib.MaxUploadBytes),
 		ReadTimeout:           readTimeout,
 		IdleTimeout:           idleTimeout,
 		NoDefaultServerHeader: true,
@@ -218,7 +221,22 @@ func registerOrgRoutes(r *router.Router, cfg *lib.Config, deps Deps, write lib.M
 	handlers.NewComplianceHandler(mode, deps.Compliance).RegisterRoutes(r, common...) // Eval integrity area (S2): compliance pack (handlers/compliance.go)
 	// Eval integrity area (S2): monitor certification (handlers/monitorcert.go).
 	handlers.NewMonitorCertHandler(mode, deps.MonitorCerts).RegisterRoutes(r, common...)
+	// Web parity: every area registered with handlers.RegisterOrgArea (handlers/orgareas.go).
+	env := handlers.OrgEnv{Cfg: cfg, Mode: mode, Services: deps.Services, Write: write, Common: common, Upload: uploadMiddlewares(mode, common)}
+	for _, area := range handlers.OrgAreas() {
+		area(env, r)
+	}
 	return experiments
+}
+
+// uploadMiddlewares is common with its trailing body limit raised to
+// lib.MaxUploadBytes (the body limit is always common's last middleware).
+func uploadMiddlewares(mode schemas.Mode, common []lib.Middleware) []lib.Middleware {
+	if len(common) == 0 {
+		return nil
+	}
+	out := append([]lib.Middleware{}, common[:len(common)-1]...)
+	return append(out, lib.BodyLimit(mode, lib.MaxUploadBytes))
 }
 
 // Handler returns the root handler with every middleware applied.

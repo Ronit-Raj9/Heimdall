@@ -3605,6 +3605,8 @@ export interface AuthMe {
 	role?: Role;
 	/** Session CSRF value: sent as X-Heimdall-CSRF on every cookie-authenticated write. */
 	csrf?: string;
+	/** A user listed in HEIMDALL_SERVER_ADMINS (auth/serveradmin.go). */
+	server_admin?: boolean;
 }
 
 /** GET /auth/config (auth.AuthInfo): what the sign-in page offers, answered to anyone. */

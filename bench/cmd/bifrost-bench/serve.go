@@ -15,6 +15,7 @@ import (
 	"syscall"
 
 	"github.com/maximhq/bifrost/bench/attribution"
+	"github.com/maximhq/bifrost/bench/auth"
 	"github.com/maximhq/bifrost/bench/engine"
 	"github.com/maximhq/bifrost/bench/gates"
 	"github.com/maximhq/bifrost/bench/handlers"
@@ -67,6 +68,9 @@ func runServe(args []string) int {
 	if err != nil {
 		return fail("%v", err)
 	}
+	if err := runOrgInitHooks(localOrgPaths(a)); err != nil { // web parity (servicehooks.go)
+		return fail("%v", err)
+	}
 	if !*offline {
 		deps.Launcher = newLauncher(a, ix)
 	} else {
@@ -94,8 +98,9 @@ func runServe(args []string) int {
 	// resume after a restart) and the ops kinds serve /jobs (servejobs.go).
 	stopJobs := startLocalJobs(ctx, a, *config, deps.Launcher, ix, &deps)
 	defer stopJobs()
-	deps.Ready = readyChecks(a)           // Deploy area: /readyz checks (serveready.go)
-	serveEvidenceMirror(ctx, a, *offline) // Evidence storage area (P6): background mirror and sweeper when storage.mirror_dir or storage.s3 is set; seal hook evidenceOnSeal (evidence.go)
+	deps.Ready = readyChecks(a)                         // Deploy area: /readyz checks (serveready.go)
+	serveEvidenceMirror(ctx, a, *offline)               // Evidence storage area (P6): background mirror and sweeper when storage.mirror_dir or storage.s3 is set; seal hook evidenceOnSeal (evidence.go)
+	applyServiceHooks(a, &deps, auth.LocalOrgID, false) // web parity: deps.Services (servicehooks.go)
 	srv, err := server.New(a.cfg, deps)
 	if err != nil {
 		return fail("server: %v", err)

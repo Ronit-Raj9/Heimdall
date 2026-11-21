@@ -11,14 +11,26 @@ describe("navigation", () => {
 			"/leaderboard",
 			"/agents",
 			"/suites",
+			"/catalog",
+			"/models",
+			"/files",
 			"/canaries",
 			"/live",
 			"/inbox",
+			"/schedules",
 			"/review",
 			"/releases",
 			"/monitors",
+			"/policies",
 			"/workers",
 			"/settings",
+			"/jobs",
+			"/integrations",
+			"/operate",
+			"/usage",
+			"/upload",
+			"/docs",
+			"/admin",
 		]);
 	});
 
@@ -46,7 +58,7 @@ describe("navigation", () => {
 			["/clusters", "/inbox"],
 			["/triage", "/inbox"],
 			["/settings", "/settings"],
-			["/jobs/j_1", null],
+			["/jobs/j_1", "/jobs"],
 			["/runsx", null],
 		];
 		for (const [path, want] of cases) expect(activeNavItem(path)?.to ?? null, path).toBe(want);
@@ -55,6 +67,6 @@ describe("navigation", () => {
 	it("names the group of the current entry", () => {
 		expect(activeNavGroup("/inbox")).toBe("production");
 		expect(activeNavGroup("/workers")).toBe("operate");
-		expect(activeNavGroup("/jobs/j_1")).toBeNull();
+		expect(activeNavGroup("/jobs/j_1")).toBe("operate");
 	});
 });

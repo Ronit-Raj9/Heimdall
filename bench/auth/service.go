@@ -578,6 +578,8 @@ type Me struct {
 	Role       Role    `json:"role,omitempty"`
 	// CSRF is the value cookie-authenticated writes send in X-Heimdall-CSRF.
 	CSRF string `json:"csrf,omitempty"`
+	// ServerAdmin is true for a user listed in HEIMDALL_SERVER_ADMINS (serveradmin.go).
+	ServerAdmin bool `json:"server_admin"`
 }
 
 // LocalMe is GET /auth/me in local mode.
@@ -600,6 +602,7 @@ func (s *Service) Me(ctx context.Context, p *Principal) (*Me, error) {
 			return nil, err
 		}
 		me.User = u
+		me.ServerAdmin = IsServerAdmin(p) || isServerAdminEmail(u.Email)
 		orgs, err := s.st.memberships(ctx, s.st.d.SQL(), u.ID)
 		if err != nil {
 			return nil, err

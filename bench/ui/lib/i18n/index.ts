@@ -1,4 +1,4 @@
-import i18n from "i18next";
+import i18n, { type Resource } from "i18next";
 import { initReactI18next } from "react-i18next";
 
 import { NAMESPACES, resources } from "./resources";
@@ -7,7 +7,7 @@ export const DEFAULT_LOCALE = "en";
 
 if (!i18n.isInitialized) {
 	void i18n.use(initReactI18next).init({
-		resources,
+		resources: resources as unknown as Resource,
 		ns: [...NAMESPACES],
 		defaultNS: "bench",
 		// Namespaces are chosen via useTranslation(ns), never a "ns:key" prefix. Matches ui/.

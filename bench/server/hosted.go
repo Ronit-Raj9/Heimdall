@@ -107,8 +107,8 @@ func NewHosted(cfg *lib.Config, h Hosted) (*Server, error) {
 	s.server = &fasthttp.Server{
 		Handler:               s.handler,
 		Name:                  "heimdall",
-		MaxRequestBodySize:    lib.MaxBodyBytes,
-		ErrorHandler:          lib.RequestErrorHandler(mode, lib.MaxBodyBytes),
+		MaxRequestBodySize:    lib.MaxUploadBytes, // per-route limits: lib.BodyLimit in common/upload middlewares
+		ErrorHandler:          lib.RequestErrorHandler(mode, lib.MaxUploadBytes),
 		ReadTimeout:           readTimeout,
 		IdleTimeout:           idleTimeout,
 		NoDefaultServerHeader: true,

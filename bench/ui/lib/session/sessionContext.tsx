@@ -22,6 +22,8 @@ export interface SessionInfo {
 	role?: Role;
 	/** Hosted, with a session or token. */
 	signedIn: boolean;
+	/** A server admin (GET /auth/me server_admin): sees the Admin entry. */
+	serverAdmin?: boolean;
 	/** Hosted, anonymous visitor of a public-read organization: read only, no write controls. */
 	demo: boolean;
 	signup: AuthConfig["signup"];
@@ -85,6 +87,7 @@ export function sessionFromMe({ me, meError, meLoading, config, demoReadable = f
 			orgs,
 			role: signedIn ? (me.role ?? org?.role) : undefined,
 			signedIn,
+			serverAdmin: me.server_admin === true,
 			demo: false,
 			...offers,
 		};

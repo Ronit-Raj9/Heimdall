@@ -3984,7 +3984,19 @@
 			"releases": "Releases",
 			"monitors": "Monitors",
 			"workers": "Runners",
-			"settings": "Settings"
+			"settings": "Settings",
+			"catalog": "Catalog",
+			"models": "Models & keys",
+			"files": "Files",
+			"schedules": "Schedules",
+			"policies": "Policies",
+			"jobs": "Jobs",
+			"integrations": "Integrations",
+			"operate": "Operations",
+			"usage": "Usage",
+			"upload": "Upload",
+			"docs": "Docs",
+			"admin": "Admin"
 		},
 		"backHome": "Go to Home",
 		"error": {

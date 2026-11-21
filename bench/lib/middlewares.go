@@ -20,6 +20,9 @@ import (
 // experiment YAML or a pasted audit table, both far below 1 MB.
 const MaxBodyBytes = 1 << 20
 
+// MaxUploadBytes caps upload routes (OrgEnv.U) and the server body size.
+const MaxUploadBytes = 64 << 20
+
 // WriteTokenEnv names the environment variable holding the write token.
 const WriteTokenEnv = "BENCH_WRITE_TOKEN"
 

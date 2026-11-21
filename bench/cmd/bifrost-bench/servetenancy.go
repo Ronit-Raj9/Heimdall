@@ -179,6 +179,9 @@ func orgBuilder(env *hostedEnv) tenancy.Builder {
 		if err := tenancy.EnsureProject(p, seedBenchmarks(env.base.cfg)); err != nil {
 			return nil, err
 		}
+		if err := runOrgInitHooks(p); err != nil { // web parity (servicehooks.go)
+			return nil, err
+		}
 		oa, err := env.base.forOrg(org, p)
 		if err != nil {
 			return nil, err
@@ -198,6 +201,7 @@ func orgBuilder(env *hostedEnv) tenancy.Builder {
 		if orgLauncher != nil {
 			deps.Launcher, deps.Workers = orgLauncher(env, oa, ix)
 		}
+		applyServiceHooks(oa, &deps, org.ID, true) // web parity: deps.Services (servicehooks.go)
 		r := server.NewOrgRouter(oa.cfg, org.ID, deps)
 		rt := &tenancy.OrgRuntime{Handler: r.Handler, Routes: r.Routes, Close: func() error {
 			r.Close()

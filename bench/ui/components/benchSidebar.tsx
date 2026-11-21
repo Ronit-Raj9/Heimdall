@@ -48,7 +48,7 @@ function writeClosedGroups(ids: readonly BenchNavGroupId[]) {
 /** The groups and entries this session may see: Settings only for a signed-in hosted user. */
 export function visibleNavGroups(session: SessionInfo) {
 	const hosted = session.authMode === "hosted" && session.signedIn;
-	return BENCH_NAV_GROUPS.map((group) => ({ ...group, items: group.items.filter((item) => !item.hostedOnly || hosted) })).filter(
+	return BENCH_NAV_GROUPS.map((group) => ({ ...group, items: group.items.filter((item) => (!item.hostedOnly || hosted) && (!item.serverAdminOnly || session.serverAdmin === true)) })).filter(
 		(group) => group.items.length > 0,
 	);
 }

@@ -728,6 +728,7 @@ func (h *jobsHub) registerKinds() {
 		h.registerExperimentRun()
 	}
 	h.registerOps()
+	h.registerJobKinds() // web parity kinds (jobkinds.go); after registerOps so its early return cannot skip them
 }
 
 // registerExperimentRun registers experiment.run.
