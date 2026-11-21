@@ -38,22 +38,28 @@ import { useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { LeaderboardParetoPanel } from "@/components/migration/migrationReport"; // W6 cost against verified success
 import TrendsTab from "./trendsTab";
+import { AgentBoardTab } from "@/components/leaderboard/agentBoard"; // A17: agent leaderboard, the default tab
 
 /**
- * Leaderboard: /leaderboard?tab=. The board (default) and the Trends tab (the old /trends), which
- * share the suite, condition and synthetic filters in the URL.
+ * Leaderboard: /leaderboard?tab=. Agents (default: one row per agent version and model), the
+ * per-benchmark board ("By benchmark") and the Trends tab (the old /trends); the last two share
+ * the suite, condition and synthetic filters in the URL.
  */
 export default function LeaderboardView() {
 	const { t } = useTranslation("bench");
+	const { t: ta } = useTranslation("agentBoard");
+	// Links into one benchmark's board (?suite=) still land on it, not on Agents.
+	const [suiteParam] = useQueryState("suite", parseAsString);
 	const tabs: RouteTab[] = [
-		{ id: "leaderboard", label: t("leaderboard.tabs.board") },
+		{ id: "agents", label: ta("tabs.agents") },
+		{ id: "leaderboard", label: ta("tabs.byBenchmark") },
 		{ id: "trends", label: t("leaderboard.tabs.trends") },
 	];
 	return (
 		<section className="mx-auto flex w-full max-w-[1200px] min-w-0 flex-col gap-6" data-testid="leaderboard-page">
 			<PageHeader title={t("leaderboard.title")} subtitle={t("leaderboard.pageSubtitle")} />
-			<RouteTabs tabs={tabs} defaultTab="leaderboard" label={t("leaderboard.tabs.label")} testId="leaderboard-tabs">
-				{(active) => (active === "trends" ? <TrendsTab /> : <LeaderboardTab />)}
+			<RouteTabs tabs={tabs} defaultTab={suiteParam ? "leaderboard" : "agents"} label={t("leaderboard.tabs.label")} testId="leaderboard-tabs">
+				{(active) => (active === "trends" ? <TrendsTab /> : active === "leaderboard" ? <LeaderboardTab /> : <AgentBoardTab />)}
 			</RouteTabs>
 		</section>
 	);

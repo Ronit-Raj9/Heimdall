@@ -117,6 +117,9 @@ var APIRoutes = []RouteDoc{
 	{Method: "GET", Path: APIPrefix + "/experiments/{id}/pareto", Tag: "analysis", Summary: "Every arm on the cost against verified success plane, the frontier marked", Response: costexplain.Pareto{}, Query: []QueryDoc{
 		{Name: "x", Description: "cost_per_success (default) or cost_per_run"}, {Name: "condition", Description: "Condition; default the experiment's primary condition"},
 	}},
+	{Method: "GET", Path: APIPrefix + "/leaderboard/agents", Tag: "leaderboard", Summary: "One row per agent, version and model with a score per capability over each benchmark's newest version, clean runs", Response: AgentLeaderboard{}, Query: []QueryDoc{
+		{Name: "capability", Description: "Only rows with a score for this capability, ordered by it"}, {Name: "model", Description: "Only rows on this model"},
+	}},
 	{Method: "GET", Path: APIPrefix + "/leaderboard/pareto", Tag: "leaderboard", Summary: "The leaderboard's configs on the cost against verified success plane, the frontier marked", Response: costexplain.Pareto{}, Query: []QueryDoc{
 		{Name: "x", Description: "cost_per_success (default) or cost_per_run (median)"}, {Name: "suite", Description: "Suite id or id@version, as for GET /leaderboard"},
 		{Name: "condition", Description: "Condition, as for GET /leaderboard"}, {Name: "scope", Description: "all or common"}, {Name: "synthetic", Description: "exclude or only"},

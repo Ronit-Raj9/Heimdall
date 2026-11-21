@@ -42,6 +42,19 @@ type LeaderboardHandler struct {
 	// heldOutVisible serves the held-out board (split=held_out); false, the
 	// default, refuses it, as the suites API refuses held-out task detail.
 	heldOutVisible bool
+
+	// root is the project folder, for the agent versions index read by
+	// GET /leaderboard/agents; suites gives each benchmark's track. Both
+	// optional.
+	root   string
+	suites SuiteSource
+}
+
+// WithAgentBoard sets the project root and suite source GET
+// /leaderboard/agents reads versions and tracks from. Either may be empty.
+func (h *LeaderboardHandler) WithAgentBoard(root string, suites SuiteSource) *LeaderboardHandler {
+	h.root, h.suites = root, suites
+	return h
 }
 
 // NewLeaderboardHandler creates the leaderboard handler. index may be nil.
@@ -70,9 +83,10 @@ func refuseHeldOutBoard(ctx *fasthttp.RequestCtx, mode schemas.Mode, visible boo
 	return true
 }
 
-// RegisterRoutes registers GET /leaderboard.
+// RegisterRoutes registers GET /leaderboard and GET /leaderboard/agents.
 func (h *LeaderboardHandler) RegisterRoutes(r *router.Router, middlewares ...lib.Middleware) {
 	r.GET(APIPrefix+"/leaderboard", lib.ChainMiddlewares(h.getLeaderboard, middlewares...))
+	r.GET(APIPrefix+"/leaderboard/agents", lib.ChainMiddlewares(h.getAgentLeaderboard, middlewares...)) // A17: agent leaderboard (agentleaderboard.go)
 }
 
 // getLeaderboard handles GET
