@@ -46,7 +46,7 @@ describe("NewAgentView", () => {
 		expect(html).toContain('data-testid="template-http-url"');
 		expect(html).toContain("Coding CLIs");
 		expect(html).toContain("Bring your own");
-		expect(html).toContain("Pick a template on the left to continue.");
+		expect(html).toContain("Pick a template to continue.");
 	});
 
 	it("shows the form for the selected template with its params", () => {

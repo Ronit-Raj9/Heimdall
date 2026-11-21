@@ -9,12 +9,19 @@ import { useCreateAgentFromTemplateMutation, useGetAgentTemplatesQuery } from "@
 import type { AgentTemplate, TemplateCategory } from "@/lib/types/agentBuilder";
 import { cn } from "@/lib/utils";
 import { useNavigate } from "@tanstack/react-router";
-import { Bot, Check, Hammer } from "lucide-react";
+import { Bot, Check, ChevronRight, Code2, Hammer, Layers, Plug, SquareTerminal, type LucideIcon } from "lucide-react";
+import { AgentAvatar, useAdapterLabel } from "../../../agents/views/agentDisplay";
 import { parseAsString, useQueryState } from "nuqs";
 import { useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 
 const CATEGORIES: TemplateCategory[] = ["cli", "framework", "starter", "bring-your-own"];
+const CATEGORY_ICON: Record<TemplateCategory, LucideIcon> = {
+	cli: SquareTerminal,
+	framework: Layers,
+	starter: Code2,
+	"bring-your-own": Plug,
+};
 const ID_RE = /^[a-z0-9][a-z0-9._-]{0,62}$/;
 
 /** A free default name for template t: "my-<template>". */
@@ -28,6 +35,8 @@ export function defaultAgentName(t: AgentTemplate): string {
  */
 export default function NewAgentView() {
 	const { t } = useTranslation("agentBuilder");
+	const { t: tu } = useTranslation("agentsUx");
+	const adapterLabel = useAdapterLabel();
 	const canWrite = canUse(useSession(), "member");
 	const navigate = useNavigate();
 	const query = useGetAgentTemplatesQuery();
@@ -80,7 +89,7 @@ export default function NewAgentView() {
 	const error = createState.error ?? dryRunState.error;
 
 	return (
-		<section className="flex min-w-0 flex-col gap-6" data-testid="agents-new-screen">
+		<section className="mx-auto flex w-full max-w-[1200px] min-w-0 flex-col gap-8" data-testid="agents-new-screen">
 			<PageHeader title={t("new.title")} subtitle={t("new.subtitle")} />
 			{query.isLoading ? (
 				<BlockSkeleton rows={6} testId="agents-new-loading" />
@@ -89,16 +98,21 @@ export default function NewAgentView() {
 			) : templates.length === 0 ? (
 				<EmptyState icon={Bot} message={t("new.empty")} action={{ label: t("new.emptyAction"), to: "/upload" }} testId="agents-new-empty" />
 			) : (
-				<div className="grid min-w-0 grid-cols-1 items-start gap-6 xl:grid-cols-[minmax(0,1fr)_minmax(0,28rem)]">
-					<div className="flex min-w-0 flex-col gap-5">
-						<h2 className="text-sm font-semibold">{t("new.step1")}</h2>
+				<div className="grid min-w-0 grid-cols-1 items-start gap-8 lg:grid-cols-[minmax(0,1fr)_minmax(0,24rem)]">
+					<div className="flex min-w-0 flex-col gap-8">
+						<h2 className="sr-only">{tu("gallery.step1")}</h2>
 						{CATEGORIES.map((cat) => {
 							const items = templates.filter((x) => x.category === cat);
 							if (!items.length) return null;
+							const CatIcon = CATEGORY_ICON[cat];
 							return (
-								<div key={cat} className="flex flex-col gap-2">
-									<h3 className="text-muted-foreground text-xs font-medium tracking-wide uppercase">{t(`new.categories.${cat}`)}</h3>
-									<div className="grid grid-cols-1 gap-2 sm:grid-cols-2 2xl:grid-cols-3">
+								<div key={cat} className="flex flex-col gap-3">
+									<h3 className="text-foreground flex items-center gap-2 text-sm font-semibold">
+										<CatIcon className="text-muted-foreground size-4" aria-hidden="true" />
+										{t(`new.categories.${cat}`)}
+										<span className="text-muted-foreground font-normal tabular-nums">{items.length}</span>
+									</h3>
+									<div className="grid grid-cols-1 gap-3 sm:grid-cols-2 2xl:grid-cols-3">
 										{items.map((x) => {
 											const on = x.id === tpl?.id;
 											return (
@@ -108,19 +122,28 @@ export default function NewAgentView() {
 													aria-pressed={on}
 													onClick={() => void setTemplateId(x.id)}
 													className={cn(
-														"hover:border-primary/60 flex flex-col items-start gap-1 rounded-md border p-3 text-left text-sm transition-colors",
-														on && "border-primary bg-primary/5",
+														"bg-card hover:border-primary/50 flex min-w-0 items-start gap-3 rounded-xl border p-4 text-left transition hover:-translate-y-0.5 hover:shadow-md",
+														on && "border-primary ring-primary/30 ring-2",
 													)}
 													data-testid={`template-${x.id}`}
 												>
-													<span className="flex w-full items-center justify-between gap-2 font-medium">
-														{x.name}
-														{on && <Check className="text-primary size-4" aria-label={t("new.selected")} />}
-													</span>
-													<span className="text-muted-foreground text-xs">{x.description}</span>
-													<span className="text-muted-foreground mt-1 flex items-center gap-1 text-[11px]">
-														{x.builds && <Hammer className="size-3" aria-hidden="true" />}
-														{x.adapter} · {x.builds ? t("new.builds") : t("new.noBuild")}
+													<AgentAvatar name={x.name} />
+													<span className="flex min-w-0 flex-1 flex-col gap-1">
+														<span className="flex w-full items-center justify-between gap-2 text-sm font-semibold">
+															<span className="truncate">{x.name}</span>
+															{on && <Check className="text-primary size-4 shrink-0" aria-label={t("new.selected")} />}
+														</span>
+														<span className="text-muted-foreground line-clamp-2 text-xs">{x.description}</span>
+														<span className="text-muted-foreground mt-1 flex items-center gap-1 text-[11px]">
+															{adapterLabel(x.adapter)}
+															{x.builds && (
+																<span className="inline-flex items-center gap-1" title={tu("gallery.builds")}>
+																	<span aria-hidden="true">·</span>
+																	<Hammer className="size-3" aria-hidden="true" />
+																	<span className="sr-only">{tu("gallery.builds")}</span>
+																</span>
+															)}
+														</span>
 													</span>
 												</button>
 											);
@@ -130,10 +153,25 @@ export default function NewAgentView() {
 							);
 						})}
 					</div>
-					<div className="flex min-w-0 flex-col gap-4 rounded-md border p-4 xl:sticky xl:top-4" data-testid="agents-new-form">
-						<h2 className="text-sm font-semibold">{t("new.step2")}</h2>
+					<div className="bg-card flex min-w-0 flex-col gap-5 rounded-xl border p-6 shadow-sm lg:sticky lg:top-4" data-testid="agents-new-form">
+						{tpl ? (
+							<div className="flex min-w-0 items-center gap-3">
+								<AgentAvatar name={tpl.name} />
+								<div className="flex min-w-0 flex-col">
+									<h2 className="truncate text-base font-semibold tracking-tight">{tpl.name}</h2>
+									<span className="text-muted-foreground text-xs">{adapterLabel(tpl.adapter)}</span>
+								</div>
+							</div>
+						) : (
+							<h2 className="text-base font-semibold tracking-tight">{tu("gallery.step2")}</h2>
+						)}
 						{!tpl ? (
-							<p className="text-muted-foreground text-sm">{t("new.pickFirst")}</p>
+							<div className="flex flex-col items-center gap-3 py-8 text-center">
+								<span className="bg-muted flex size-12 items-center justify-center rounded-full">
+									<Bot className="text-muted-foreground size-6" aria-hidden="true" />
+								</span>
+								<p className="text-muted-foreground text-sm">{tu("gallery.pickFirst")}</p>
+							</div>
 						) : (
 							<form
 								className="flex flex-col gap-4"
@@ -180,6 +218,22 @@ export default function NewAgentView() {
 										{p.help && <span className="text-muted-foreground text-xs">{p.help}</span>}
 									</label>
 								))}
+								{error && (
+									<p role="alert" className="text-destructive text-sm" data-testid="agents-new-create-error">
+										{getBenchErrorMessage(error)}
+									</p>
+								)}
+								{!canWrite && (
+									<p className="text-muted-foreground text-xs" data-testid="agents-new-role-note">
+										{t("new.memberOnly")}
+									</p>
+								)}
+								<details className="group">
+									<summary className="text-muted-foreground hover:text-foreground flex w-fit cursor-pointer list-none items-center gap-1 text-xs">
+										<ChevronRight className="size-3.5 transition-transform group-open:rotate-90" aria-hidden="true" />
+										{tu("gallery.more")}
+									</summary>
+									<div className="mt-3 flex flex-col gap-4">
 								<label className="flex flex-col gap-1 text-sm">
 									<span className="font-medium">{t("new.notes")}</span>
 									<textarea
@@ -191,24 +245,18 @@ export default function NewAgentView() {
 									/>
 								</label>
 								{tpl.docs && <p className="text-muted-foreground text-xs">{t("new.docs", { docs: tpl.docs })}</p>}
-								{error && (
-									<p role="alert" className="text-destructive text-sm" data-testid="agents-new-create-error">
-										{getBenchErrorMessage(error)}
-									</p>
-								)}
-								{!canWrite && (
-									<p className="text-muted-foreground text-xs" data-testid="agents-new-role-note">
-										{t("new.memberOnly")}
-									</p>
-								)}
-								{canWrite && <div className="flex flex-wrap gap-2">
-									<Button type="submit" disabled={!nameOk || missingParam || createState.isLoading} data-testid="agent-create">
+										{canWrite && (
+											<Button type="button" variant="ghost" size="sm" className="w-fit" disabled={!nameOk || missingParam} onClick={() => void onPreview()}>
+												{preview !== null ? t("new.hidePreview") : t("new.preview")}
+											</Button>
+										)}
+									</div>
+								</details>
+								{canWrite && (
+									<Button type="submit" className="w-full" disabled={!nameOk || missingParam || createState.isLoading} data-testid="agent-create">
 										{createState.isLoading ? t("new.creating") : t("new.create")}
 									</Button>
-									<Button type="button" variant="outline" disabled={!nameOk || missingParam} onClick={() => void onPreview()}>
-										{preview !== null ? t("new.hidePreview") : t("new.preview")}
-									</Button>
-								</div>}
+								)}
 								{preview !== null && (
 									<pre className="bg-muted max-h-96 overflow-auto rounded-md p-3 font-mono text-xs" data-testid="agent-preview">
 										{preview}

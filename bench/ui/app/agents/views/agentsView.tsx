@@ -17,6 +17,7 @@ import { FrameworksTab } from "./frameworksTab";
 export default function AgentsView() {
 	const { t } = useTranslation("bench");
 	const { t: tb } = useTranslation("agentBuilder");
+	const { t: tu } = useTranslation("agentsUx");
 	const query = useGetAgentsQuery();
 	const data = query.data;
 	const tabs: RouteTab[] = [
@@ -28,7 +29,7 @@ export default function AgentsView() {
 		<section className="flex min-w-0 flex-col gap-6" data-testid="agents-screen">
 			<PageHeader
 				title={t("agents.title")}
-				subtitle={t("agents.subtitle")}
+				subtitle={tu("subtitle")}
 				actions={
 					<Button asChild size="sm" data-testid="agents-new">
 						<Link to="/agents/new">

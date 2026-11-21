@@ -1,0 +1,74 @@
+{
+	"subtitle": "The agents you benchmark. Pick one to run, check or edit.",
+	"adapter": {
+		"command": "CLI agent",
+		"remote_http": "HTTP endpoint",
+		"a2a": "A2A agent",
+		"scripted": "Test agent",
+		"other": "Custom"
+	},
+	"status": {
+		"passed": "Check passed",
+		"failed": "Check failed",
+		"running": "Checking",
+		"never": "Not checked",
+		"broken": "Config error"
+	},
+	"actions": {
+		"run": "Run",
+		"check": "Check",
+		"edit": "Edit",
+		"open": "Open {{name}}"
+	},
+	"list": {
+		"testAgents": "Test agents",
+		"testAgentsHint": "Scripted controls used for dry runs and admission. Not real agents.",
+		"noModel": "No default model",
+		"runs": "{{count}} runs",
+		"runs_one": "{{count}} run"
+	},
+	"gallery": {
+		"step1": "Pick a template",
+		"step2": "Name and model",
+		"more": "More options",
+		"pickFirst": "Pick a template to continue.",
+		"builds": "Builds an image"
+	},
+	"detail": {
+		"subtitle": "{{adapter}} on {{model}}",
+		"subtitleNoModel": "{{adapter}}"
+	},
+	"checks": {
+		"title": "Readiness",
+		"subtitle": "Run each step to make sure this agent is ready to benchmark.",
+		"lastRun": "Last run {{when}}",
+		"options": "Options",
+		"step": {
+			"check": "Conformance check",
+			"build": "Image build",
+			"diff": "Compare versions"
+		},
+		"hint": {
+			"check": "A free dry run on one task. No model key is used.",
+			"build": "Builds the agent's container image.",
+			"buildNone": "Uses a prebuilt image. Nothing to build.",
+			"diff": "What changed between the two newest versions."
+		},
+		"state": {
+			"passed": "Passed",
+			"failed": "Failed",
+			"running": "Running",
+			"never": "Not run yet",
+			"broken": "Config error",
+			"skipped": "Not needed"
+		}
+	},
+	"config": {
+		"basics": "Basics",
+		"basicsHint": "How the agent runs and which model it uses.",
+		"limits": "Limits",
+		"limitsHint": "Time and resources each task may use.",
+		"environment": "Environment",
+		"environmentHint": "Command line and variables passed to the agent."
+	}
+}

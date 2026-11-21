@@ -8,7 +8,7 @@ import { useGetAgentConfigQuery, usePutAgentConfigMutation, useValidateAgentConf
 import type { AgentConfigDoc, AgentConfigFields } from "@/lib/types/agentBuilder";
 import { cn } from "@/lib/utils";
 import { CheckCircle2, FileCode2 } from "lucide-react";
-import { useState } from "react";
+import { useState, type ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 
 /** "KEY=value" lines to an env map; blank lines and lines without "=" are skipped. */
@@ -56,8 +56,22 @@ export function ConfigTab({ agentId }: { agentId?: string } & Record<string, unk
 	return <ConfigEditor key={query.data.sha256} doc={query.data} onReload={() => void query.refetch()} />;
 }
 
+/** One titled group of the config form. */
+function FormSection({ title, hint, children }: { title: string; hint?: string; children: ReactNode }) {
+	return (
+		<section className="bg-card grid grid-cols-1 gap-6 rounded-xl border p-5 md:grid-cols-[14rem_minmax(0,1fr)]">
+			<div className="flex flex-col gap-1">
+				<h3 className="text-sm font-semibold">{title}</h3>
+				{hint && <p className="text-muted-foreground text-sm">{hint}</p>}
+			</div>
+			<div className="grid min-w-0 grid-cols-1 gap-4 md:grid-cols-2">{children}</div>
+		</section>
+	);
+}
+
 function ConfigEditor({ doc, onReload }: { doc: AgentConfigDoc; onReload: () => void }) {
 	const { t } = useTranslation("agentBuilder");
+	const { t: tu } = useTranslation("agentsUx");
 	const fileValid = doc.fields.adapter !== "";
 	const [view, setView] = useState<"form" | "yaml">(fileValid ? "form" : "yaml");
 	const [fields, setFields] = useState<AgentConfigFields>(doc.fields);
@@ -127,7 +141,7 @@ function ConfigEditor({ doc, onReload }: { doc: AgentConfigDoc; onReload: () => 
 	return (
 		<div className="flex min-w-0 flex-col gap-4" data-testid="config-tab">
 			<div className="flex flex-wrap items-center gap-2">
-				<div role="tablist" className="inline-flex rounded-md border p-0.5">
+				<div role="tablist" className="bg-muted inline-flex rounded-lg p-0.5">
 					{(["form", "yaml"] as const).map((v) => (
 						<button
 							key={v}
@@ -136,60 +150,66 @@ function ConfigEditor({ doc, onReload }: { doc: AgentConfigDoc; onReload: () => 
 							aria-selected={view === v}
 							disabled={v === "form" && !fileValid && view === "yaml" && yamlText === doc.yaml}
 							onClick={() => void switchTo(v)}
-							className={cn("rounded px-3 py-1 text-sm", view === v ? "bg-primary text-primary-foreground" : "text-muted-foreground")}
+							className={cn("rounded-md px-3 py-1 text-sm transition", view === v ? "bg-background text-foreground shadow-sm" : "text-muted-foreground")}
 							data-testid={`config-view-${v}`}
 						>
 							{t(`config.${v}`)}
 						</button>
 					))}
 				</div>
-				<span className="text-muted-foreground font-mono text-xs">{doc.path}</span>
+				<span className="text-muted-foreground ml-auto font-mono text-xs" title={doc.path}>{doc.path}</span>
 			</div>
 			{!fileValid && <p className="text-chart-warning-ink text-sm">{t("config.invalidFile")}</p>}
 
 			{view === "form" ? (
-				<div className="grid grid-cols-1 gap-4 md:grid-cols-2" data-testid="config-form">
-					<label className="flex flex-col gap-1 text-sm">
-						<span className="font-medium">{t("config.fields.adapter")}</span>
-						<Input value={fields.adapter} disabled />
-					</label>
-					{text("model", t("config.fields.model"))}
-					{text("provider", t("config.fields.provider"))}
-					{fields.adapter === "command" && text("image", t("config.fields.image"))}
-					{fields.adapter === "remote_http" && text("remote_url", t("config.fields.remote_url"))}
-					{fields.adapter === "a2a" && text("a2a_card_url", t("config.fields.a2a_card_url"))}
-					{num("wall_s", t("config.fields.wall_s"))}
-					{num("cpus", t("config.fields.cpus"))}
-					{num("mem_gb", t("config.fields.mem_gb"))}
-					{num("turns", t("config.fields.turns"))}
-					{fields.argv && fields.argv.length > 0 && (
-						<label className="flex flex-col gap-1 text-sm md:col-span-2">
-							<span className="font-medium">{t("config.fields.argv")}</span>
-							<Input value={fields.argv.join(" ")} disabled className="font-mono" />
+				<div className="flex flex-col gap-4" data-testid="config-form">
+					<FormSection title={tu("config.basics")} hint={tu("config.basicsHint")}>
+						<label className="flex flex-col gap-1 text-sm">
+							<span className="font-medium">{t("config.fields.adapter")}</span>
+							<Input value={fields.adapter} disabled />
 						</label>
-					)}
-					<label className="flex flex-col gap-1 text-sm md:col-span-2">
-						<span className="font-medium">{t("config.fields.env")}</span>
-						<textarea
-							className="border-input bg-card min-h-28 rounded-md border px-3 py-2 font-mono text-xs"
-							value={envText}
-							onChange={(e) => setEnvText(e.target.value)}
-							spellCheck={false}
-							data-testid="field-env"
-						/>
-						<span className="text-muted-foreground text-xs">
-							{t("config.fields.envHelp")} <code>{"{{run.key}}"}</code>
-						</span>
-					</label>
-					<label className="flex flex-col gap-1 text-sm md:col-span-2">
-						<span className="font-medium">{t("config.fields.description")}</span>
-						<textarea
-							className="border-input bg-card min-h-20 rounded-md border px-3 py-2 text-sm"
-							value={fields.description ?? ""}
-							onChange={(e) => set("description", e.target.value)}
-							data-testid="field-description"
-						/>
-					</label>
+						{text("model", t("config.fields.model"))}
+						{text("provider", t("config.fields.provider"))}
+						{fields.adapter === "command" && text("image", t("config.fields.image"))}
+						{fields.adapter === "remote_http" && text("remote_url", t("config.fields.remote_url"))}
+						{fields.adapter === "a2a" && text("a2a_card_url", t("config.fields.a2a_card_url"))}
+						<label className="flex flex-col gap-1 text-sm md:col-span-2">
+							<span className="font-medium">{t("config.fields.description")}</span>
+							<textarea
+								className="border-input bg-card min-h-20 rounded-md border px-3 py-2 text-sm"
+								value={fields.description ?? ""}
+								onChange={(e) => set("description", e.target.value)}
+								data-testid="field-description"
+							/>
+						</label>
+					</FormSection>
+					<FormSection title={tu("config.limits")} hint={tu("config.limitsHint")}>
+						{num("wall_s", t("config.fields.wall_s"))}
+						{num("cpus", t("config.fields.cpus"))}
+						{num("mem_gb", t("config.fields.mem_gb"))}
+						{num("turns", t("config.fields.turns"))}
+					</FormSection>
+					<FormSection title={tu("config.environment")} hint={tu("config.environmentHint")}>
+						{fields.argv && fields.argv.length > 0 && (
+							<label className="flex flex-col gap-1 text-sm md:col-span-2">
+								<span className="font-medium">{t("config.fields.argv")}</span>
+								<Input value={fields.argv.join(" ")} disabled className="font-mono" />
+							</label>
+						)}
+						<label className="flex flex-col gap-1 text-sm md:col-span-2">
+							<span className="font-medium">{t("config.fields.env")}</span>
+							<textarea
+								className="border-input bg-card min-h-28 rounded-md border px-3 py-2 font-mono text-xs"
+								value={envText}
+								onChange={(e) => setEnvText(e.target.value)}
+								spellCheck={false}
+								data-testid="field-env"
+							/>
+							<span className="text-muted-foreground text-xs">
+								{t("config.fields.envHelp")} <code>{"{{run.key}}"}</code>
+							</span>
+						</label>
+					</FormSection>
 				</div>
 			) : (
 				<textarea
