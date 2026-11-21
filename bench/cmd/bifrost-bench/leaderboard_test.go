@@ -293,6 +293,12 @@ func TestLeaderboardHints(t *testing.T) {
 		{"suite named", "webapp@0.1.0", two, nil, nil},
 		{"only scripted runs", "", empty, synth, []string{"no live runs to rank; scripted runs (control agents or the scripted model) exist for pyapp@0.1.0, webapp@0.1.0: add -synthetic only to see them"}},
 		{"no runs at all", "", empty, &schemas.Leaderboard{}, nil},
+		// live test l13: live runs that were all excluded are named, not
+		// reported as missing.
+		{"live runs excluded", "tb2@1.0.0", &schemas.Leaderboard{Suite: "tb2@1.0.0",
+			Excluded: []schemas.LeaderboardExclusion{{Reason: "experiment verdict invalid", Runs: 4, Experiments: []string{"e_tb2"}}}}, synth,
+			[]string{"no live runs ranked on tb2@1.0.0: every live run was excluded; experiment verdict invalid: 4 runs (e_tb2)",
+				"scripted runs (control agents or the scripted model) also exist for pyapp@0.1.0, webapp@0.1.0: add -synthetic only to see them"}},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
