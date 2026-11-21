@@ -71,6 +71,16 @@ describe("WorkersView", () => {
 		expect(html).toContain('title="shared-runner-org_abc"');
 		expect(html).not.toContain(">shared-runner-org_abc<");
 		expect(html).toContain("Open worker tokens");
+		expect(html).toContain('data-testid="workers-row-shared-runner-org_abc-shared-note"');
+		expect(html).toContain("It runs your agents in isolated containers.");
+		expect(html).toContain(`Up to ${shared.slots} ${shared.slots === 1 ? "run" : "runs"} at once.`);
+		expect(html).toContain('href="/settings?tab=runners#runner-token-setup"');
+		expect(html).toContain("Use your own machine instead");
+	});
+
+	it("shows no shared-worker note on a worker of your own", () => {
+		query.result = { ...idle, data: fixture };
+		expect(renderToStaticMarkup(<WorkersView />)).not.toContain("shared-note");
 	});
 
 	it("shows a skeleton while loading", () => {

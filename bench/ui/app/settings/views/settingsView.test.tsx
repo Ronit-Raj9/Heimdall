@@ -205,6 +205,17 @@ describe("RunnersTab", () => {
 		expect(html).toContain('data-testid="runner-token-form"');
 		expect(html).toContain('data-testid="runner-remove-rnr_2"');
 	});
+	it("explains the shared worker with its slots and links to your own machine", () => {
+		const shared = { ...RUNNERS.runners[0], id: "rnr_s", name: "shared-runner-org_abc", pool: "shared", slots: 3 };
+		api.q.runners = okQuery({ mode: "live", runners: [shared] });
+		const html = render(<RunnersTab org={org} />, hostedSession("admin"));
+		expect(html).toContain('data-testid="runner-row-rnr_s-shared-note"');
+		expect(html).toContain("provided by the owner of this Heimdall server");
+		expect(html).toContain("Up to 3 runs at once.");
+		expect(html).toContain('href="#runner-token-setup"');
+		expect(html).toContain('id="runner-token-setup"');
+		expect(html).toContain("Use your own machine instead");
+	});
 	it("says how to get a first runner", () => {
 		api.q.runners = okQuery({ mode: "live", runners: [] });
 		expect(render(<RunnersTab org={org} />, hostedSession())).toContain("Create a worker token below, then start the worker with it.");

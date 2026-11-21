@@ -1,7 +1,7 @@
 import { ModeBadge } from "@/components/modeBadge";
 import { PageHeader } from "@/components/shell";
 import { BlockSkeleton, EmptyNote, LoadError } from "@/components/runs/screenStates";
-import { isSharedWorker, WorkerStateBadge, WorkersOff } from "@/components/workers/workersTable";
+import { isSharedWorker, SharedWorkerNote, WorkerStateBadge, WorkersOff } from "@/components/workers/workersTable";
 import { formatRelative } from "@/components/platform/platform.utils";
 import { getLocale } from "@/lib/i18n";
 import type { WorkerInfo } from "@/lib/types/bench";
@@ -77,6 +77,7 @@ export function RunnerCard({ worker }: { worker: WorkerInfo }) {
 				</div>
 				<WorkerStateBadge state={worker.state} testId={`workers-row-${worker.id}-state`} />
 			</header>
+			{shared && <SharedWorkerNote slots={worker.slots} testId={`workers-row-${worker.id}-shared-note`} />}
 			<div className="flex flex-col gap-1.5">
 				<div className="flex items-baseline justify-between text-xs">
 					<span className="text-muted-foreground">{t("workers.cards.slots")}</span>

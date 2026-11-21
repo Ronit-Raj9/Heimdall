@@ -21,8 +21,8 @@
 		"open": "Open {{name}}"
 	},
 	"list": {
-		"testAgents": "Reference agents (used for checks)",
-		"testAgentsHint": "Built-in perfect and do-nothing agents. Heimdall uses them to check that tasks are fair. They are not real agents.",
+		"testAgents": "Test and demo agents (used by the example benchmarks)",
+		"testAgentsHint": "Built-in perfect and do-nothing agents, test doubles from the example benchmarks and leftover check agents. They are not real agents.",
 		"noModel": "No model chosen",
 		"runs": "{{count}} runs",
 		"runs_one": "{{count}} run"

@@ -6,7 +6,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { formatCount, formatDateTime } from "@/components/verdict/verdict.utils";
 import { getLocale } from "@/lib/i18n";
 import type { WorkerInfo, WorkerState } from "@/lib/types/bench";
-import { CircleDashed, CircleDot, CircleX, ServerOff, type LucideIcon } from "lucide-react";
+import { CircleDashed, CircleDot, CircleX, Info, ServerOff, type LucideIcon } from "lucide-react";
 import { useTranslation } from "react-i18next";
 
 const STATE_TONE: Record<WorkerState, Tone> = { idle: "neutral", running: "good", lost: "bad" };
@@ -22,6 +22,32 @@ function isWorkerState(value: string): value is WorkerState {
  */
 export function isSharedWorker(id: string, pool?: string): boolean {
 	return pool === "shared" || id.startsWith("shared-");
+}
+
+/** Where a user creates a worker token for their own machine (Settings, workers tab). */
+export const RUNNER_TOKEN_SETUP_HREF = "/settings?tab=runners#runner-token-setup";
+
+/**
+ * A plain explanation of the shared worker: who provides it, what it does, who pays, how many
+ * runs at once (its slots), and a link to run on your own machine instead.
+ */
+export function SharedWorkerNote({ slots, setupHref = RUNNER_TOKEN_SETUP_HREF, testId }: { slots: number; setupHref?: string; testId?: string }) {
+	const { t } = useTranslation("bench");
+	return (
+		<div className="bg-muted/40 flex min-w-0 items-start gap-2 rounded-lg border px-3 py-2.5 text-xs" role="note" data-testid={testId}>
+			<Info className="text-muted-foreground mt-0.5 size-3.5 shrink-0" aria-hidden="true" />
+			<div className="flex min-w-0 flex-col gap-1.5">
+				<p className="text-foreground leading-relaxed text-pretty">{t("workers.sharedExplain", { count: slots })}</p>
+				<a
+					href={setupHref}
+					className="text-primary w-fit font-medium underline-offset-4 hover:underline"
+					data-testid={testId ? `${testId}-own-machine` : undefined}
+				>
+					{t("workers.useOwnMachine")}
+				</a>
+			</div>
+		</div>
+	);
 }
 
 /** Idle, running or lost, with what it means. A state this UI does not know shows as sent. */

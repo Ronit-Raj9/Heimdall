@@ -3,11 +3,33 @@ import { cn } from "@/lib/utils";
 import { Bot, Code2, FlaskConical, Globe, Network, SquareTerminal, type LucideIcon } from "lucide-react";
 import { useTranslation } from "react-i18next";
 
-/** Scripted controls (and their usual ids) are grouped apart from real agents. */
-const TEST_IDS = new Set(["oracle", "noop", "toy", "broken", "exploit", "refuse"]);
+/**
+ * Scripted controls, the test doubles the example benchmarks ship (voice-broken, unsafe, storm, ...)
+ * and leftover live-check agents are grouped apart from real agents.
+ */
+const TEST_IDS = new Set([
+	"oracle",
+	"noop",
+	"toy",
+	"broken",
+	"exploit",
+	"refuse",
+	"voice-broken",
+	"unsafe",
+	"storm",
+	"a2a-broken",
+	"codex-task",
+]);
 
-export function isTestAgent(agent: Pick<AgentSummary, "id" | "scripted_kind" | "adapter">): boolean {
-	return Boolean(agent.scripted_kind) || agent.adapter === "scripted" || TEST_IDS.has(agent.id);
+/** A description or notes line that calls the agent a test double, stub, fake or demo agent. */
+const TEST_DOUBLE_TEXT = /\b(test[ -]?double|stub agent|fake agent|mock agent|demo agent|for (the )?example benchmarks?)\b/i;
+
+type TestAgentFields = Pick<AgentSummary, "id" | "scripted_kind" | "adapter"> & { description?: string; notes?: string };
+
+export function isTestAgent(agent: TestAgentFields): boolean {
+	if (agent.scripted_kind || agent.adapter === "scripted") return true;
+	if (TEST_IDS.has(agent.id) || agent.id.startsWith("live-")) return true;
+	return TEST_DOUBLE_TEXT.test(`${agent.description ?? ""} ${agent.notes ?? ""}`);
 }
 
 const KNOWN_ADAPTERS = ["command", "remote_http", "a2a", "scripted"] as const;
