@@ -295,7 +295,7 @@ function StepRow({ step, arm, model = false, depth = 0 }: { step: StepRecord; ar
 					</ToneBadge>
 				)}
 				{step.corroboration && <CorroborationBadge value={step.corroboration} testId={`step-row-${arm}-${step.seq}-corroboration`} />}
-				<ToneBadge tone={PROOF_TONE[step.proof] ?? "neutral"} testId={`step-row-${arm}-${step.seq}-proof`}>
+				<ToneBadge tone={PROOF_TONE[step.proof] ?? "neutral"} hint={t(`runs.steps.proofHint.${step.proof}`, { defaultValue: "" }) || undefined} testId={`step-row-${arm}-${step.seq}-proof`}>
 					{t("runs.steps.proof", { level: t(`runs.steps.proofLevel.${step.proof}`, { defaultValue: clipText(step.proof, 20) }) })}
 				</ToneBadge>
 				{step.kind === "tool_request" && step.execution && (

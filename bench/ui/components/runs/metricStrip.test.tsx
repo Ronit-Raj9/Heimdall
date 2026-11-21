@@ -36,14 +36,14 @@ describe("MetricStrip", () => {
 	it("shows turns answered, failed, attempts and agent steps together, each with what it counts", () => {
 		const metrics = { steps: obs(2), model_turns_failed: obs(30), model_attempts: obs(32), agent_steps: obs(9), tool_calls: obs(4) };
 		const html = renderToStaticMarkup(<MetricStrip lanes={[{ arm: "A", metrics }]} kinds={kinds} />);
-		expect(html).toContain("Steps (model turns answered)");
-		expect(html).toContain("Model turns failed");
-		expect(html).toContain("Model attempts (incl. retries, fallbacks)");
-		expect(html).toContain("Agent steps (all witnessed actions)");
+		expect(html).toContain("Model replies");
+		expect(html).toContain("Model calls that failed");
+		expect(html).toContain("Model calls incl. retries");
+		expect(html).toContain("Actions Heimdall saw");
 		expect(html).toContain('data-testid="run-metric-help-steps"');
 		expect(html).toContain("Not counted here: failed turns");
-		expect(html.indexOf("Steps (model turns answered)")).toBeLessThan(html.indexOf("Model turns failed"));
-		expect(html.indexOf("Agent steps (all witnessed actions)")).toBeLessThan(html.indexOf("Tool calls"));
+		expect(html.indexOf("Model replies")).toBeLessThan(html.indexOf("Model calls that failed"));
+		expect(html.indexOf("Actions Heimdall saw")).toBeLessThan(html.indexOf("Tool uses"));
 	});
 
 	it("shows the proof breakdown and opaque tool traffic when recorded", () => {
@@ -56,11 +56,11 @@ describe("MetricStrip", () => {
 			tool_traffic_unparsed: obs(1),
 		};
 		const html = renderToStaticMarkup(<MetricStrip lanes={[{ arm: "A", metrics }]} kinds={kinds} />);
-		expect(html).toContain("With trusted proof");
-		expect(html).toContain("Proof: tool proxy");
-		expect(html).toContain("Result returned only");
+		expect(html).toContain("Tool uses Heimdall saw run");
+		expect(html).toContain("Seen by the tool relay");
+		expect(html).toContain("Only a reply came back");
 		expect(html).toContain("does not prove the tool ran");
-		expect(html).toContain("Tool traffic recorded opaque");
-		expect(html).not.toContain("Proof: shim only");
+		expect(html).toContain("Tool traffic Heimdall could not read");
+		expect(html).not.toContain("Seen only inside the agent's box");
 	});
 });

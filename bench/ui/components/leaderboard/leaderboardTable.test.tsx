@@ -29,19 +29,19 @@ describe("LeaderboardTable", () => {
 		for (const e of board.entries) expect(html).toContain(`data-testid="leaderboard-row-${e.rank}"`);
 		const leader = row(html, 1);
 		expect(leader).toContain('data-tier="1"');
-		expect(leader).toContain(">Tier 1<");
+		expect(leader).toContain(">Top group<");
 		expect(leader).toContain(">tied with leader<");
 		expect(leader).toContain(">codex<");
 		expect(leader).toContain(">gpt-5.4-mini<");
 		expect(leader).toContain(">B: code-wins note<");
 		expect(leader).toContain('href="/experiments/e_synthetic-codewins"');
-		expect(row(html, 4)).toContain(">Tier 2<");
-		expect(row(html, 4)).toContain(">behind<");
+		expect(row(html, 4)).toContain(">Behind<");
+		expect(row(html, 4)).toContain(">clearly behind<");
 	});
 
 	it("puts the tier reason and the Holm-adjusted p in the tier badge's accessible name", () => {
 		const html = render();
-		expect(row(html, 4)).toContain('aria-label="Tier 2: p 0.012 on 8 common tasks. Holm-adjusted p vs leader: 0.012."');
+		expect(row(html, 4)).toContain('aria-label="Behind: p 0.012 on 8 common tasks. Holm-adjusted p vs leader: 0.012."');
 		expect(row(html, 1)).toContain("Leader: every other entry is compared with this one.");
 	});
 
@@ -49,8 +49,8 @@ describe("LeaderboardTable", () => {
 		const leader = row(render(), 1);
 		expect(leader).toContain('aria-label="Verified success 75%, 95% interval 52% to 98%"');
 		expect(leader).toContain('data-testid="leaderboard-interval-1"');
-		expect(leader).toContain("18/24 passes");
-		expect(leader).toContain(">pass^3<");
+		expect(leader).toContain("18 of 24 solved");
+		expect(leader).toContain(">solved all 3 tries<");
 	});
 
 	it("never shows an unknown as 0: hatched reliability, n/a cost, unknown tool calls", () => {
@@ -58,7 +58,7 @@ describe("LeaderboardTable", () => {
 		const custom = row(html, 4);
 		expect(custom).toMatch(/data-testid="leaderboard-reliability-4".*?data-state="unknown"/);
 		expect(custom).toContain("bench-hatched");
-		expect(custom).toContain(">pass^1<");
+		expect(custom).toContain(">solved all 1 tries<");
 		const mini = row(html, 5);
 		expect(mini).toMatch(/data-testid="leaderboard-metric-5-cost_per_success".*?data-state="not_applicable"/);
 		expect(mini).toMatch(/data-testid="leaderboard-metric-5-tool_calls".*?data-state="unknown"/);
@@ -74,12 +74,12 @@ describe("LeaderboardTable", () => {
 		expect(html).toMatch(
 			/data-testid="leaderboard-resilience-3-test-crash"><span aria-hidden="true"[^>]*><\/span><span class="sr-only">not run</,
 		);
-		expect(html).toContain(">model-outage vs clean<");
+		expect(html).toContain(">model-outage vs normal<");
 	});
 
 	it("leaves out resilience columns off the clean board", () => {
 		const html = render(DEFAULT_SORT, []);
-		expect(html).not.toContain("vs clean");
+		expect(html).not.toContain("vs normal");
 		expect(html).not.toContain("leaderboard-resilience-");
 	});
 
@@ -94,7 +94,7 @@ describe("LeaderboardTable", () => {
 			[3, 2],
 			[4, 1],
 		]);
-		expect(html).toContain("Tier 2: significantly behind the leader at alpha 0.05");
+		expect(html).toContain("Behind: clearly worse than the leader");
 		expect(html).toContain('colSpan="16"');
 	});
 

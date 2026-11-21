@@ -39,7 +39,7 @@ import { GradeSourceTag } from "@/components/verdict/gradeSourceTag";
 import { formatDateTime, shortHash } from "@/components/verdict/verdict.utils";
 import { RunVisualPanel } from "@/components/visual/runVisualPanel"; // X1 vision grading
 import { RunVoicePanel } from "@/components/voice/runVoicePanel"; // X8 voice agents
-import { getLocale } from "@/lib/i18n";
+import i18n, { getLocale } from "@/lib/i18n";
 import {
   useGetCatalogQuery,
   useGetRunEventsQuery,
@@ -140,7 +140,13 @@ export default function RunView({ runId }: { runId: string }) {
           },
           { label: t("runs.page.crumb", { id: runId }) },
         ]}
-        title={t("runs.page.title", { task: slot.task, arm: slot.arm })}
+        title={t("runs.page.title", {
+          task: slot.task,
+          arm: slot.arm,
+          outcome: d.sealed
+            ? t(`runs.outcome.${run.outcome}`)
+            : t("runs.list.inFlight"),
+        })}
         meta={
           <>
             {d.sealed ? (
@@ -444,7 +450,7 @@ function RunGates({ gates }: { gates: readonly GateResult[] }) {
 /** A metric value as short text, or a dash when it is not known. */
 function metricText(value: Value | undefined, unit?: "usd"): string {
   if (!value || typeof value.v !== "number" || value.state !== "observed")
-    return "-";
+    return unit === "usd" ? i18n.t("bench:runs.page.costUnknown") : "-";
   return unit === "usd"
     ? `$${value.v.toFixed(value.v < 1 ? 4 : 2)}`
     : value.v.toLocaleString();

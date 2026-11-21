@@ -44,7 +44,7 @@ describe("RunTable", () => {
 			<RunTable rows={[row("A", { grading: "judged" }), row("B", { sealed: false })]} showExperiment={false} />,
 		);
 		expect(html).toContain('data-testid="run-row-r_a1-judged"');
-		expect(html).toContain("In flight");
+		expect(html).toContain("Running");
 		expect(html).not.toContain('href="/experiments/e_x"');
 	});
 });

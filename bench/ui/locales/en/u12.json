@@ -1,12 +1,12 @@
 {
 	"runs": {
 		"title": "Runs",
-		"subtitle": "Every agent run, newest first.",
+		"subtitle": "Every attempt an agent made at a task, newest first.",
 		"search": "Search task or agent",
 		"searchLabel": "Search runs",
 		"filters": "Filters",
-		"outcome": "Outcome",
-		"suite": "Suite",
+		"outcome": "Result",
+		"suite": "Benchmark",
 		"agent": "Agent",
 		"all": "All",
 		"clear": "Clear",
@@ -15,7 +15,7 @@
 		"col": {
 			"task": "Task",
 			"agent": "Agent",
-			"outcome": "Outcome",
+			"outcome": "Result",
 			"steps": "Steps",
 			"tokens": "Tokens",
 			"cost": "Cost",
@@ -23,9 +23,9 @@
 			"when": "When"
 		},
 		"open": "Open run {{run}}",
-		"empty": "No runs yet. Start an experiment to see runs here.",
+		"empty": "No runs yet. Start a comparison to see runs here.",
 		"noMatch": "No runs match these filters.",
-		"newExperiment": "New experiment",
+		"newExperiment": "New comparison",
 		"loadError": "Could not load runs",
 		"showing": "{{first}}-{{last}} of {{total}}",
 		"prev": "Previous",
@@ -35,16 +35,16 @@
 	"board": {
 		"podium": "Top agents",
 		"place": "#{{rank}}",
-		"passRate": "pass rate",
-		"perSuccess": "per success",
+		"passRate": "solve rate",
+		"perSuccess": "per solved task",
 		"runs": "{{count}} runs",
 		"allSuites": "All",
-		"suiteTabs": "Suite",
+		"suiteTabs": "Benchmark",
 		"more": "More columns",
 		"less": "Fewer columns"
 	},
 	"trends": {
-		"title": "Score over time",
-		"subtitle": "How each agent scores across experiments."
+		"title": "Results over time",
+		"subtitle": "How each agent's results change across comparisons."
 	}
 }

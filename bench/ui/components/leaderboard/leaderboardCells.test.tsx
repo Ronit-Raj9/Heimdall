@@ -23,7 +23,7 @@ describe("TierBadge", () => {
 			<TierBadge entry={{ rank: 3, tier: 0, tier_reason: "p 0.04 on 9 common tasks", p_vs_leader: 0.04 }} />,
 		);
 		expect(html).toContain('data-tier="2"');
-		expect(html).toContain(">behind<");
+		expect(html).toContain(">clearly behind<");
 	});
 });
 
@@ -42,7 +42,7 @@ describe("AgentCell", () => {
 	it("badges a synthetic configuration", () => {
 		const html = renderToStaticMarkup(<AgentCell entry={{ ...base, synthetic: true }} />);
 		expect(html).toContain('data-testid="leaderboard-synthetic-2"');
-		expect(html).toContain(">synthetic<");
+		expect(html).toContain(">practice<");
 	});
 });
 
@@ -59,7 +59,7 @@ describe("SuccessCell", () => {
 		const html = renderToStaticMarkup(<SuccessCell entry={{ rank: 1, success: unknown, passes: { num: 0, den: 0, unknown: 3 } }} />);
 		expect(html).toContain('data-state="unknown"');
 		expect(html).not.toContain('role="img"');
-		expect(html).toContain("0/0 passes");
+		expect(html).toContain("0 of 0 solved");
 		expect(html).toContain("+3 unknown");
 		expect(html).not.toContain(">0%<");
 	});
@@ -69,7 +69,7 @@ describe("ReliabilityCell", () => {
 	it("names k", () => {
 		const html = renderToStaticMarkup(<ReliabilityCell entry={{ rank: 1, reliability: { state: "observed", v: 0.25 }, trials: 6 }} />);
 		expect(html).toContain(">25%<");
-		expect(html).toContain(">pass^6<");
+		expect(html).toContain(">solved all 6 tries<");
 	});
 });
 

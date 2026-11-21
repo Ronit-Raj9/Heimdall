@@ -35,15 +35,15 @@ describe("AlignedLanes", () => {
 			expect(html).toContain(`data-testid="aligned-step-${step.index}-A"`);
 			expect(html).toContain(`data-testid="aligned-step-${step.index}-B"`);
 		}
-		expect(html).toContain(">Arm A<");
-		expect(html).toContain(">Arm B<");
+		expect(html).toContain(">Setup A<");
+		expect(html).toContain(">Setup B<");
 	});
 
 	it("marks the first observed divergence as an observation, right before its step", () => {
 		const html = render();
 		expect(html.match(/data-testid="first-divergence-marker"/g)).toHaveLength(1);
-		expect(html).toContain(">First observed divergence<");
-		expect(html).toContain(">An observation, not a root cause.<");
+		expect(html).toContain(">First point where the setups did something different<");
+		expect(html).toContain(">This is where they split, not necessarily why.<");
 		expect(html).toContain(pair.first_divergence!.note);
 		const marker = html.indexOf('data-testid="first-divergence-marker"');
 		const step = html.indexOf(`data-testid="aligned-step-${pair.first_divergence!.index}"`);
@@ -58,7 +58,7 @@ describe("AlignedLanes", () => {
 		const html = render();
 		expect(html).toContain("grep -n parse_date src/dates.py tests/");
 		expect(html).toContain("edit src/dates.py");
-		expect(html).toMatch(/data-testid="aligned-step-14-A"[^>]*><span[^>]*data-state="empty"[^>]*>no event</);
+		expect(html).toMatch(/data-testid="aligned-step-14-A"[^>]*><span[^>]*data-state="empty"[^>]*>no step</);
 	});
 
 	it("shows no marker without a divergence", () => {

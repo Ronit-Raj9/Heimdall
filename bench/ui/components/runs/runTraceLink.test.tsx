@@ -26,12 +26,12 @@ describe("TraceDownloadLink", () => {
 	it("shows a note instead of a link for an unsealed run", () => {
 		const html = render({ sealed: false });
 		expect(html).not.toContain("<a");
-		expect(html).toContain("Trace export needs a sealed run");
+		expect(html).toContain("Trace download is available once the run is saved");
 	});
 
 	it("shows a note instead of a link when the run does not match its seal", () => {
 		const html = render({ sealError: "evidence.json changed" });
 		expect(html).not.toContain("<a");
-		expect(html).toContain("does not match its seal");
+		expect(html).toContain("files changed after the run was saved");
 	});
 });
