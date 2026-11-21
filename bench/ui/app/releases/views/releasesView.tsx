@@ -1,3 +1,4 @@
+import { ReleaseActions } from "@/components/govern/releaseActions";
 import { ReleasePanel } from "@/components/releases/releasePanel";
 import { ReleaseTimeline } from "@/components/releases/releaseTimeline";
 import { LoadError } from "@/components/runs/screenStates";
@@ -33,8 +34,9 @@ export default function ReleasesView() {
 						<ReleaseTimeline releases={releases.data?.releases ?? []} chainOk={releases.data?.chain_ok ?? false} />
 					)}
 				</div>
-				<aside className="min-w-0 xl:sticky xl:top-0">
+				<aside className="flex min-w-0 flex-col gap-6 xl:sticky xl:top-0">
 					<ReleasePanel />
+					<ReleaseActions releases={releases.data?.releases ?? []} onDone={() => void releases.refetch()} />
 				</aside>
 			</div>
 		</section>
