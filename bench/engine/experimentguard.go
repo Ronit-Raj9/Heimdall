@@ -36,3 +36,11 @@ func deferredGateway() *schemas.GatewayManifest {
 func WithFilesConfinedTo(root string) PlannerOption {
 	return func(p *Planner) { p.confine = root }
 }
+
+// WithAgentLibrary layers the built-in library root lib (suite.LibraryDir)
+// under the project: an agent config path agents/<file> that the project
+// does not hold resolves to lib/agents/<file>, read-only, and the files a
+// library config names resolve inside lib. Empty layers nothing.
+func WithAgentLibrary(lib string) PlannerOption {
+	return func(p *Planner) { p.library = lib }
+}

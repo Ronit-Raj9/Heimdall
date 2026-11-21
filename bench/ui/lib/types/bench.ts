@@ -2347,6 +2347,10 @@ export interface SuiteSummary {
 	probes: SuiteProbe[];
 	tasks: SuiteTask[];
 	error?: string;
+	/** Served from the server's read-only built-in library (HEIMDALL_LIBRARY_DIR). */
+	builtin?: boolean;
+	/** "library" for a built-in pack; absent for the org's own. */
+	source?: "library";
 	// Scenario fields (scenario.go).
 	/** Leaderboard track; the server sends coding when the suite sets none. */
 	track?: Track;

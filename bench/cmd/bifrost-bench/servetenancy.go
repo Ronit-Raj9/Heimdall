@@ -261,16 +261,17 @@ func (a *app) forOrg(org tenancy.Org, p tenancy.OrgPaths) (*app, error) {
 		return nil, fmt.Errorf("open org store: %w", err)
 	}
 	reg := *a.reg
-	reg.Loaders = suite.Builtin(p.BenchmarksRoot())
+	library := suite.LibraryDir() // the server-wide built-in benchmark layer, read-only (suite/library.go)
+	reg.Loaders = suite.Layered(p.BenchmarksRoot(), suite.LibraryBenchmarks(library))
 	reg.Adapters = adapters.Builtin(adapters.CommandConfig{
 		GatewayAgentURL: cfg.Gateway.AgentURL, EvalNetwork: cfg.Networks.Eval, BenchRoot: p.ProjectRoot,
 		GatewayPublicURL: cfg.Gateway.PublicURL,
 	})
 	reg.Store = st
 	oa := &app{cfg: &cfg, logger: a.logger, docker: a.docker, reg: &reg, store: st, upstreams: a.upstreams, prices: a.prices,
-		orgID: org.ID, releasesRoot: p.ReleasesRoot}
+		orgID: org.ID, releasesRoot: p.ReleasesRoot, library: library}
 	project := p.ProjectRoot
-	oa.planGuard = func(e *schemas.Experiment) error { return tenancy.CheckExperimentPaths(project, e) }
+	oa.planGuard = func(e *schemas.Experiment) error { return tenancy.CheckExperimentPathsWithLibrary(project, library, e) }
 	oa.planConfine = project
 	oa.deferGateway = true // the hosted server opens no gateway: manifests record gateway.deferred_to_runner
 	reg.Secrets = orgSecretSource{keys: sharedKeyStore(oa), orgID: org.ID} // G01: the org's own secrets, never the server's environment

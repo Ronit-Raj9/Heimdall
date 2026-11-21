@@ -4,7 +4,10 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
 import { FilterSelect, FilterTokens, SegmentedControl, ToolbarSearch, type FilterToken } from "@/components/ui/toolbar";
+import { isBuiltinSuite } from "@/components/suites/suiteDisplay";
+import { SuiteRunButton } from "@/components/suites/suiteRunButton";
 import { canUse, useSession } from "@/lib/session/sessionContext";
+import { useGetSuitesQuery } from "@/lib/store";
 import { useAddCatalogEntryMutation, useGetBenchCatalogQuery, useUploadCatalogDatasetMutation } from "@/lib/store/apis/catalogApi";
 import type { CatalogAddRequest, CatalogAddResponse, CatalogEntry } from "@/lib/types/catalog";
 import { cn } from "@/lib/utils";
@@ -88,6 +91,15 @@ export interface CatalogBodyProps {
 	lastAdded?: CatalogAddResponse | null;
 	error?: string | null;
 	jobPanel?: ReactNode;
+	/** Suite ids the server's built-in library serves: such entries show Built in and Run, listed first. */
+	builtinSuites?: ReadonlySet<string>;
+}
+
+/** The built-in library suite an entry stands for, or undefined. */
+export function builtinSuiteOf(e: CatalogEntry, builtin: ReadonlySet<string> | undefined): string | undefined {
+	if (!builtin || builtin.size === 0) return undefined;
+	if (e.suite_id && builtin.has(e.suite_id)) return e.suite_id;
+	return e.suites?.find((id) => builtin.has(id));
 }
 
 /** Quiet text tag, e.g. "Example". */
@@ -256,8 +268,15 @@ function ImportPanel(props: CatalogBodyProps & { importFor: CatalogEntry; import
 	);
 }
 
-function CardAction({ e, busy, canWrite, onAdd }: { e: CatalogEntry; busy: boolean; canWrite: boolean; onAdd(): void }) {
+function CardAction({ e, busy, canWrite, onAdd, builtinSuite }: { e: CatalogEntry; busy: boolean; canWrite: boolean; onAdd(): void; builtinSuite?: string }) {
 	const { t } = useTranslation("catalog");
+	if (builtinSuite)
+		return (
+			<span className="flex items-center gap-2" data-testid={`catalog-builtin-${e.id}`}>
+				<QuietTag>{t("builtIn")}</QuietTag>
+				<SuiteRunButton suiteId={builtinSuite} testId={`catalog-run-${e.id}`} />
+			</span>
+		);
 	if (e.installed)
 		return (
 			<Button size="sm" variant="outline" asChild>
@@ -305,7 +324,7 @@ function EntryCard({ e, props, canWrite }: { e: CatalogEntry; props: CatalogBody
 				>
 					{t("details")}
 				</button>
-				<CardAction e={e} busy={props.busyId === e.id} canWrite={canWrite} onAdd={() => props.onAdd(e)} />
+				<CardAction e={e} busy={props.busyId === e.id} canWrite={canWrite} onAdd={() => props.onAdd(e)} builtinSuite={builtinSuiteOf(e, props.builtinSuites)} />
 			</div>
 		</div>
 	);
@@ -316,7 +335,11 @@ export function CatalogBody(props: CatalogBodyProps) {
 	const { t } = useTranslation("catalog");
 	const canWrite = canUse(useSession(), "member");
 	const { filters } = props;
-	const shown = filterEntries(props.entries, filters);
+	// Built-in library entries first, the rest in their usual order (stable sort).
+	const shown = filterEntries(props.entries, filters)
+		.map((e, i) => ({ e, i, b: builtinSuiteOf(e, props.builtinSuites) ? 0 : 1 }))
+		.sort((x, y) => x.b - y.b || x.i - y.i)
+		.map((x) => x.e);
 	const present = useMemo(() => {
 		const s = new Set<Category>();
 		for (const e of props.entries) for (const c of entryCategories(e)) s.add(c);
@@ -459,6 +482,11 @@ function CatalogSkeleton() {
 export default function CatalogView() {
 	const { t } = useTranslation("catalog");
 	const { data, isLoading, isError, refetch } = useGetBenchCatalogQuery();
+	const suites = useGetSuitesQuery();
+	const builtinSuites = useMemo(
+		() => new Set((suites.data?.suites ?? []).filter((s) => isBuiltinSuite(s) && !s.error).map((s) => s.id)),
+		[suites.data],
+	);
 	const [addEntry] = useAddCatalogEntryMutation();
 	const [uploadDataset] = useUploadCatalogDatasetMutation();
 	const [filters, setFilters] = useState<CatalogFilters>(NO_FILTERS);
@@ -501,6 +529,7 @@ export default function CatalogView() {
 	return (
 		<CatalogBody
 			entries={entries}
+			builtinSuites={builtinSuites}
 			sourceAvailable={data.source_available}
 			filters={filters}
 			onFilters={setFilters}

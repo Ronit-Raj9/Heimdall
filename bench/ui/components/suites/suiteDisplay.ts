@@ -11,11 +11,28 @@ export interface SuiteDisplay {
 
 const SUITE_DISPLAY: Record<string, SuiteDisplay> = {
 	"coding-core": { name: "Coding basics", description: "Fix small Python projects so their hidden tests pass." },
+	// Built-in library (suite/library.go): full real benchmarks every org can run.
 	"hd-harbor-tb2": { name: "Terminal-Bench 2", description: "Hard command-line tasks in a real Linux shell." },
+	"hd-harbor-skills": { name: "SkillsBench", description: "Tasks that need the agent to find and use the right skill." },
+	"hd-swe-verified": { name: "SWE-bench Verified", description: "Fix real GitHub issues in popular Python projects." },
+	"hd-swe-rebench": { name: "SWE-rebench", description: "Fresh real GitHub issues the models have not seen in training." },
+	"hd-swe-ib-swe": {
+		name: "ImpossibleBench SWE",
+		description: "GitHub issues whose tests are rigged; passing means the agent cheated.",
+	},
 	"hd-swe-ib-lcb": {
-		name: "LiveCodeBench (honesty)",
+		name: "ImpossibleBench LiveCodeBench",
 		description: "Coding puzzles whose tests are rigged; passing means the agent cheated.",
 	},
+	longmemeval: { name: "LongMemEval", description: "Answer questions about long chat histories from many sessions." },
+	locomo: { name: "LoCoMo", description: "Remember facts across very long conversations." },
+	tau2: { name: "tau2-bench", description: "Help customers over chat while following company policy and tools." },
+	agentdojo: { name: "AgentDojo", description: "Do real tool tasks while resisting prompt injection attacks." },
+	mcpmark: { name: "MCPMark", description: "Get real jobs done through MCP tool servers." },
+	marble: { name: "MARBLE", description: "Several agents work together on shared tasks." },
+	"browsecomp-plus": { name: "BrowseComp-Plus", description: "Hard research questions answered by searching a fixed web corpus." },
+	kernelbench: { name: "KernelBench", description: "Write fast GPU kernels; needs a GPU worker." },
+	voicebench: { name: "VoiceBench", description: "Spoken questions answered by a voice agent." },
 	"acme-orders": { name: "Node.js bug fixing", description: "Find and fix bugs in a small Node.js order service." },
 	"acme-stack": { name: "App with database", description: "Change a web app and its database without breaking either." },
 	"acme-memory": { name: "Memory across sessions", description: "Remember what a user said earlier and use it later." },
@@ -84,4 +101,73 @@ export function suiteDisplayDescription(suite: Pick<SuiteSummary, "id" | "descri
 /** "Coding basics" plus its tooltip id, for places that want both. */
 export function suiteDisplay(suite: Pick<SuiteSummary, "id" | "description">): SuiteDisplay {
 	return { name: suiteDisplayName(suite.id), description: suiteDisplayDescription(suite) };
+}
+
+// Built-in library order (most wanted first); library ids not listed sort after, by name.
+const LIBRARY_ORDER = [
+	"hd-harbor-tb2",
+	"hd-swe-verified",
+	"hd-swe-rebench",
+	"hd-harbor-skills",
+	"hd-swe-ib-swe",
+	"hd-swe-ib-lcb",
+	"tau2",
+	"agentdojo",
+	"mcpmark",
+	"browsecomp-plus",
+	"longmemeval",
+	"locomo",
+	"marble",
+	"voicebench",
+	"kernelbench",
+];
+
+/** Every id the built-in library ships (catalog "Built in" badges use the server flag first). */
+export const LIBRARY_SUITE_IDS: readonly string[] = LIBRARY_ORDER;
+
+/** The small made-up practice suites: the Acme examples and the coding-core starter. */
+export function isPracticeSuite(id: string): boolean {
+	return id.startsWith("acme-") || id === "coding-core";
+}
+
+/** A pack served from the server's read-only built-in library. */
+export function isBuiltinSuite(suite: Pick<SuiteSummary, "builtin" | "source">): boolean {
+	return suite.builtin === true || suite.source === "library";
+}
+
+function libraryRank(id: string): number {
+	const i = LIBRARY_ORDER.indexOf(id);
+	return i < 0 ? LIBRARY_ORDER.length : i;
+}
+
+export interface SuiteSections<T> {
+	/** Built-in library benchmarks: full real suites, first. */
+	builtin: T[];
+	/** What the organization added itself (catalog imports, uploads, its own). */
+	org: T[];
+	/** Acme and coding-core: small, made-up data, shown collapsed. */
+	practice: T[];
+}
+
+type SectionFields = Pick<SuiteSummary, "id" | "builtin" | "source">;
+
+/** Splits suites into built-in, org-added and practice examples, each in display order. */
+export function suiteSections<T extends SectionFields>(suites: readonly T[]): SuiteSections<T> {
+	const out: SuiteSections<T> = { builtin: [], org: [], practice: [] };
+	for (const s of suites) {
+		if (isBuiltinSuite(s)) out.builtin.push(s);
+		else if (isPracticeSuite(s.id)) out.practice.push(s);
+		else out.org.push(s);
+	}
+	const byName = (a: T, b: T) => suiteDisplayName(a.id).localeCompare(suiteDisplayName(b.id)) || a.id.localeCompare(b.id);
+	out.builtin.sort((a, b) => libraryRank(a.id) - libraryRank(b.id) || byName(a, b));
+	out.org.sort(byName);
+	out.practice.sort((a, b) => Number(b.id === "coding-core") - Number(a.id === "coding-core") || byName(a, b));
+	return out;
+}
+
+/** Suites in display order: built-in first, then org-added, then practice examples. */
+export function orderSuites<T extends SectionFields>(suites: readonly T[]): T[] {
+	const s = suiteSections(suites);
+	return [...s.builtin, ...s.org, ...s.practice];
 }

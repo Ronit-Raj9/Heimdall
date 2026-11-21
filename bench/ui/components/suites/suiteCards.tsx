@@ -1,7 +1,7 @@
 import type { SuiteSummary } from "@/lib/types/bench";
 import { Link } from "@tanstack/react-router";
 import { useTranslation } from "react-i18next";
-import { suiteDisplay } from "./suiteDisplay";
+import { suiteDisplay, suiteSections } from "./suiteDisplay";
 import { SuiteStatusPill } from "./suiteIdentity";
 import { SuiteRunButton } from "./suiteRunButton";
 
@@ -22,6 +22,46 @@ export function SuiteCards({ suites }: SuiteCardsProps) {
 				<SuiteRow key={suite.id} suite={suite} />
 			))}
 		</ul>
+	);
+}
+
+/**
+ * The benchmarks list in three sections: the built-in library first ("Benchmarks", full real
+ * suites), then what the org added, then the small made-up practice examples, collapsed.
+ */
+export function SectionedSuiteCards({ suites }: SuiteCardsProps) {
+	const { t } = useTranslation("suitesUx");
+	const { builtin, org, practice } = suiteSections(suites);
+	const heading = "text-muted-foreground text-xs font-medium tracking-wide uppercase";
+	return (
+		<div className="flex min-w-0 flex-col gap-6" data-testid="suites-sections">
+			{builtin.length > 0 && (
+				<section className="flex min-w-0 flex-col gap-2" data-testid="suites-section-builtin">
+					<h2 className={heading}>{t("sections.builtin")}</h2>
+					<SuiteCards suites={builtin} />
+				</section>
+			)}
+			{org.length > 0 && (
+				<section className="flex min-w-0 flex-col gap-2" data-testid="suites-section-org">
+					{builtin.length > 0 && <h2 className={heading}>{t("sections.org")}</h2>}
+					<SuiteCards suites={org} />
+				</section>
+			)}
+			{practice.length > 0 && (
+				<details
+					className="group flex min-w-0 flex-col gap-2"
+					open={builtin.length === 0 && org.length === 0}
+					data-testid="suites-section-practice"
+				>
+					<summary className={`${heading} cursor-pointer list-none [&::-webkit-details-marker]:hidden`}>
+						{t("sections.practice")} ({practice.length})
+					</summary>
+					<div className="mt-2">
+						<SuiteCards suites={practice} />
+					</div>
+				</details>
+			)}
+		</div>
 	);
 }
 

@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io/fs"
 	"maps"
 	"math"
 	"math/rand/v2"
@@ -113,6 +114,7 @@ type Planner struct {
 	deferGateway bool                            // Tenancy area: a hosted server records the gateway preflight as the runners' (experimentguard.go)
 	skipGPU      bool                            // X7: a remote worker's replan skips the GPU check (gpu.go)
 	secrets      schemas.SecretSource            // G01: org secrets the plan's runs name must resolve (secrets.go)
+	library      string                          // built-in library root: agents/<file> missing from the project resolve there, read-only (experimentguard.go)
 
 }
 
@@ -1266,12 +1268,38 @@ func (p *Planner) configFile(name string) (string, error) {
 	if filepath.IsAbs(name) || strings.HasPrefix(name, "/") || strings.Contains(name, `\`) {
 		return "", fmt.Errorf("%q: want a path relative to the organization's project", name)
 	}
+	if lp, ok := p.libraryFile(name); ok {
+		return utils.ResolveInside(p.library, lp)
+	}
 	return utils.ResolveInside(p.confine, name)
+}
+
+// libraryFile maps a project-relative path to the built-in library when the
+// project has no such file and the library does: only agents/ is layered.
+// It returns the path relative to the library root.
+func (p *Planner) libraryFile(rel string) (string, bool) {
+	if p.library == "" || filepath.IsAbs(rel) {
+		return "", false
+	}
+	clean := filepath.ToSlash(filepath.Clean(rel))
+	if !strings.HasPrefix(clean, "agents/") || strings.Contains(clean, "..") {
+		return "", false
+	}
+	if _, err := os.Lstat(filepath.Join(p.benchRoot, clean)); !errors.Is(err, fs.ErrNotExist) {
+		return "", false // the project's own file (or link) wins, even a broken one
+	}
+	if fi, err := os.Stat(filepath.Join(p.library, clean)); err != nil || !fi.Mode().IsRegular() {
+		return "", false
+	}
+	return clean, true
 }
 
 func (p *Planner) abs(rel string) string {
 	if filepath.IsAbs(rel) {
 		return rel
+	}
+	if lp, ok := p.libraryFile(rel); ok {
+		return filepath.Join(p.library, lp)
 	}
 	return filepath.Join(p.benchRoot, rel)
 }

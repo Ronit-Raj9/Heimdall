@@ -1,7 +1,11 @@
 import { TERMINAL_STATES } from "@/components/experiments/experiments.utils";
 import { ModelPicker, type ModelRef } from "@/components/models/modelPicker";
 import { RunButton } from "@/components/run/runButton";
-import { suiteDisplayName } from "@/components/suites/suiteDisplay";
+import {
+  isBuiltinSuite,
+  isPracticeSuite,
+  suiteDisplayName,
+} from "@/components/suites/suiteDisplay";
 import { BlockSkeleton, LoadError } from "@/components/runs/screenStates";
 import { EmptyState } from "@/components/shell";
 import { Button } from "@/components/ui/button";
@@ -530,20 +534,45 @@ function SuitePicker({
     return SUITE_CATEGORIES.filter((c) => have.has(c));
   }, [sorted]);
   const shown = cat ? sorted.filter((s) => categoryOf(s) === cat) : sorted;
+  const { t: tu } = useTranslation("suitesUx");
+  const main = shown.filter((s) => !isPracticeSuite(s.id) || isBuiltinSuite(s));
+  const practice = shown.filter((s) => isPracticeSuite(s.id) && !isBuiltinSuite(s));
+  const tile = (s: SuiteSummary) => (
+    <SuiteTile
+      key={s.id}
+      suite={s}
+      selected={s.id === value}
+      onPick={() => onPick(s.id)}
+    />
+  );
+  const practiceOpen =
+    main.length === 0 || practice.some((s) => s.id === value);
   return (
     <>
       <CategoryChips present={present} value={cat} onChange={setCat} />
+      {main.length > 0 && (
+        <p className="text-muted-foreground text-xs font-medium tracking-wide uppercase">
+          {tu("sections.builtin")}
+        </p>
+      )}
       <ChoiceGrid>
-        {shown.map((s) => (
-          <SuiteTile
-            key={s.id}
-            suite={s}
-            selected={s.id === value}
-            onPick={() => onPick(s.id)}
-          />
-        ))}
+        {main.map(tile)}
         <CatalogTile />
       </ChoiceGrid>
+      {practice.length > 0 && (
+        <details
+          open={practiceOpen}
+          className="min-w-0"
+          data-testid="welcome-practice-suites"
+        >
+          <summary className="text-muted-foreground cursor-pointer text-xs font-medium tracking-wide uppercase">
+            {tu("sections.practice")} ({practice.length})
+          </summary>
+          <div className="mt-2">
+            <ChoiceGrid>{practice.map(tile)}</ChoiceGrid>
+          </div>
+        </details>
+      )}
     </>
   );
 }

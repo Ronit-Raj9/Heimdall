@@ -64,6 +64,10 @@ type SuiteSummary struct {
 	Probes           []SuiteProbe `json:"probes"`
 	Tasks            []SuiteTask  `json:"tasks"`
 	Error            string       `json:"error,omitempty"` // why the pack failed to load
+	// Built-in library (suite/library.go): Builtin is true and Source
+	// "library" when the pack loads from the server's read-only library.
+	Builtin bool   `json:"builtin,omitempty"`
+	Source  string `json:"source,omitempty"`
 
 	// Scenario fields (scenario.go).
 	Track    string        `json:"track,omitempty"`    // coding when the suite sets none

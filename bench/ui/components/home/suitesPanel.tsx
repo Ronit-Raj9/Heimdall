@@ -1,4 +1,4 @@
-import { suiteDisplay } from "@/components/suites/suiteDisplay";
+import { suiteDisplay, suiteSections } from "@/components/suites/suiteDisplay";
 import type { SuiteSummary } from "@/lib/types/bench";
 import "@/lib/types/homeI18n";
 import { cn } from "@/lib/utils";
@@ -12,14 +12,44 @@ const DOT: Record<"ready" | "attention" | "failed", string> = {
 	failed: "bg-chart-error",
 };
 
-/** Benchmarks as a plain list: human name, task count and a small Ready or Not ready yet dot. */
+/**
+ * Benchmarks as a plain list: human name, task count and a small Ready or Not ready yet dot. The
+ * built-in library comes first, then what the org added; the practice examples sit collapsed below.
+ */
 export function SuitesPanel({ suites, limit = 6 }: { suites: readonly SuiteSummary[]; limit?: number }) {
+	const { t } = useTranslation("suitesUx");
+	const { builtin, org, practice } = suiteSections(suites);
+	const main = [...builtin, ...org];
+	const list = "bg-card min-w-0 divide-y rounded-xl border";
+	if (main.length === 0) {
+		return (
+			<ul className={list} data-testid="home-suites-list">
+				{practice.slice(0, limit).map((suite) => (
+					<SuiteRow key={suite.id} suite={suite} />
+				))}
+			</ul>
+		);
+	}
 	return (
-		<ul className="bg-card min-w-0 divide-y rounded-xl border" data-testid="home-suites-list">
-			{suites.slice(0, limit).map((suite) => (
-				<SuiteRow key={suite.id} suite={suite} />
-			))}
-		</ul>
+		<div className="flex min-w-0 flex-col gap-2">
+			<ul className={list} data-testid="home-suites-list">
+				{main.slice(0, limit).map((suite) => (
+					<SuiteRow key={suite.id} suite={suite} />
+				))}
+			</ul>
+			{practice.length > 0 && (
+				<details className="min-w-0" data-testid="home-suites-practice">
+					<summary className="text-muted-foreground cursor-pointer px-1 text-xs">
+						{t("sections.practice")} ({practice.length})
+					</summary>
+					<ul className={`${list} mt-2`}>
+						{practice.slice(0, limit).map((suite) => (
+							<SuiteRow key={suite.id} suite={suite} />
+						))}
+					</ul>
+				</details>
+			)}
+		</div>
 	);
 }
 

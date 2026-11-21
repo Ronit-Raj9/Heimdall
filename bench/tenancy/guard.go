@@ -1,7 +1,10 @@
 package tenancy
 
 import (
+	"errors"
 	"fmt"
+	"io/fs"
+	"os"
 	"path/filepath"
 	"regexp"
 	"sort"
@@ -22,6 +25,15 @@ var suiteRefPattern = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9._-]*(@[A-Za-z0-
 // matrix agent configs and the release policy must be relative paths that
 // resolve, symlinks included, inside projectRoot.
 func CheckExperimentPaths(projectRoot string, exp *schemas.Experiment) error {
+	return CheckExperimentPathsWithLibrary(projectRoot, "", exp)
+}
+
+// CheckExperimentPathsWithLibrary is CheckExperimentPaths with the server's
+// built-in benchmark library (suite.LibraryDir) as a read-only layer: an
+// agent config agents/<file> the project does not hold may resolve inside
+// libraryRoot instead. Suite ids are looked up by the layered loader, so
+// they need nothing here. Empty libraryRoot equals CheckExperimentPaths.
+func CheckExperimentPathsWithLibrary(projectRoot, libraryRoot string, exp *schemas.Experiment) error {
 	if exp == nil {
 		return nil
 	}
@@ -38,7 +50,13 @@ func CheckExperimentPaths(projectRoot string, exp *schemas.Experiment) error {
 		if filepath.IsAbs(p) || strings.HasPrefix(p, "/") || strings.Contains(p, `\`) {
 			return fmt.Errorf("%s %q: want a path relative to the organization's project", field, p)
 		}
-		if _, err := utils.ResolveInside(projectRoot, p); err != nil {
+		_, err := utils.ResolveInside(projectRoot, p)
+		if err != nil && libraryRoot != "" && field != "policy" && strings.HasPrefix(filepath.ToSlash(filepath.Clean(p)), "agents/") && absentIn(projectRoot, p) {
+			if _, lerr := utils.ResolveInside(libraryRoot, p); lerr == nil {
+				err = nil
+			}
+		}
+		if err != nil {
 			return fmt.Errorf("%s: %w", field, err)
 		}
 		return nil
@@ -69,4 +87,11 @@ func CheckExperimentPaths(projectRoot string, exp *schemas.Experiment) error {
 		}
 	}
 	return check("policy", exp.Policy)
+}
+
+// absentIn reports that rel names nothing at all under root, not even a
+// link: only then may the library stand in for it.
+func absentIn(root, rel string) bool {
+	_, err := os.Lstat(filepath.Join(root, filepath.FromSlash(rel)))
+	return errors.Is(err, fs.ErrNotExist)
 }

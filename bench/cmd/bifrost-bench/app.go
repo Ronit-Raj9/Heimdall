@@ -58,6 +58,7 @@ type app struct {
 	planConfine  string                          // agent config files (notes) must resolve inside it (hosted)
 	deferGateway bool                            // the gateway preflight is the runners' (hosted: deferred_to_runner)
 	results      resultsindex.Source             // the org's database index (db.OrgIndex); nil uses the JSONL index
+	library      string                          // the server's built-in benchmark library (suite.LibraryDir); "" for none
 
 	// defaultPolicy is evaluated only when the experiment froze no policy
 	// (`check -default-policy`, the CI wrapper's implicit default). Unlike an
@@ -202,6 +203,9 @@ func (a *app) newPlanner() *engine.Planner {
 	}
 	if a.planConfine != "" {
 		opts = append(opts, engine.WithFilesConfinedTo(a.planConfine)) // and so do the files the resolved agent configs name (4-B-14)
+	}
+	if a.library != "" {
+		opts = append(opts, engine.WithAgentLibrary(a.library)) // built-in library: agents/<file> the project lacks (suite/library.go)
 	}
 	if a.deferGateway {
 		opts = append(opts, engine.WithGatewayDeferredToRunner()) // Tenancy area: a hosted server has no gateway; runners preflight theirs (servetenancy.go)

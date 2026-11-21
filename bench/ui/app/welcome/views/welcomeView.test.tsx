@@ -278,6 +278,21 @@ describe("welcome utils", () => {
       defaultSuite([suite("a", 0), suite("b"), suite("coding-core")] as never),
     ).toBe("coding-core");
     expect(defaultSuite([suite("a", 0), suite("b")] as never)).toBe("b");
+    // The first ready built-in library benchmark wins, in library order.
+    expect(
+      defaultSuite([
+        suite("coding-core"),
+        suite("hd-swe-verified", 500, { builtin: true, source: "library" }),
+        suite("hd-harbor-tb2", 89, { builtin: true, source: "library" }),
+      ] as never),
+    ).toBe("hd-harbor-tb2");
+    expect(
+      defaultSuite([
+        suite("coding-core"),
+        suite("hd-swe-verified", 500, { builtin: true }),
+        suite("hd-harbor-tb2", 89, { builtin: true, admitted_count: 0 }),
+      ] as never),
+    ).toBe("hd-swe-verified");
     expect(
       defaultAgent([
         agent("toy", { scripted_kind: "noop" }),

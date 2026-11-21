@@ -25,6 +25,9 @@ type serveSuites struct {
 	root string            // benchmarks folder
 	cfg  *lib.Config       // bench config for the helper and tool proxy image roles; nil leaves them out
 	reg  *schemas.Registry // the graders whose versions a task hash covers; nil means task hashes are unavailable
+	// library is the built-in library's benchmarks folder (suite/library.go):
+	// its packs are listed beside root's and win by suite.PickSuiteDir. "" for none.
+	library string
 }
 
 // TaskHash implements the Voice tab's task identity check: the hash a plan
@@ -39,12 +42,42 @@ func (s serveSuites) TaskHash(st *schemas.Suite, t *schemas.Task) (string, error
 // SuiteIDs lists the folders under the benchmarks root that hold a
 // suite.yaml. A missing benchmarks folder is an empty list.
 func (s serveSuites) SuiteIDs(context.Context) ([]string, error) {
-	entries, err := os.ReadDir(s.root)
+	ids, err := suiteIDsIn(s.root)
+	if err != nil || s.library == "" {
+		return ids, err
+	}
+	lib, err := suiteIDsIn(s.library)
+	if err != nil {
+		return nil, err
+	}
+	seen := make(map[string]bool, len(ids)+len(lib))
+	for _, id := range ids {
+		seen[id] = true
+	}
+	for _, id := range lib {
+		if !seen[id] {
+			ids = append(ids, id)
+		}
+	}
+	sort.Strings(ids)
+	return ids, nil
+}
+
+// SuiteBuiltin reports that suite id loads from the built-in library
+// (GET /suites marks it builtin, source "library").
+func (s serveSuites) SuiteBuiltin(id string) bool {
+	_, lib := suite.PickSuiteDir(s.root, s.library, id)
+	return lib
+}
+
+// suiteIDsIn lists the folders under root that hold a suite.yaml.
+func suiteIDsIn(root string) ([]string, error) {
+	entries, err := os.ReadDir(root)
 	if errors.Is(err, os.ErrNotExist) {
 		return nil, nil
 	}
 	if err != nil {
-		return nil, fmt.Errorf("read benchmarks folder %s: %w", s.root, err)
+		return nil, fmt.Errorf("read benchmarks folder %s: %w", root, err)
 	}
 	var ids []string
 	for _, e := range entries {
@@ -53,7 +86,7 @@ func (s serveSuites) SuiteIDs(context.Context) ([]string, error) {
 		if !e.IsDir() || strings.HasPrefix(name, ".") || strings.Contains(name, "@") {
 			continue
 		}
-		if fi, err := os.Stat(filepath.Join(s.root, name, suite.SuiteFile)); err != nil || !fi.Mode().IsRegular() {
+		if fi, err := os.Stat(filepath.Join(root, name, suite.SuiteFile)); err != nil || !fi.Mode().IsRegular() {
 			continue
 		}
 		ids = append(ids, name)
@@ -64,6 +97,9 @@ func (s serveSuites) SuiteIDs(context.Context) ([]string, error) {
 
 // LoadSuite loads one pack by id.
 func (s serveSuites) LoadSuite(ctx context.Context, id string) (*schemas.Suite, error) {
+	if s.library != "" {
+		return suite.Layered(s.root, s.library)[0].Load(ctx, id)
+	}
 	return loadSuite(ctx, s.root, id)
 }
 
@@ -115,7 +151,8 @@ func (s serveSuites) fingerprintOptions(ctx context.Context, st *schemas.Suite) 
 // serveAgents lists agents/*.yaml for GET /agents with the planner's
 // schema-checked decoder.
 type serveAgents struct {
-	root string // bench root
+	root    string // bench root
+	library string // built-in library root (suite/library.go): its agents/*.yaml are listed when root has no file of that name
 }
 
 // AgentConfigs reads every agents/*.yaml, sorted by file name. A file that
@@ -125,14 +162,19 @@ func (s serveAgents) AgentConfigs(context.Context) ([]handlers.AgentConfigFile, 
 	if err != nil {
 		return nil, fmt.Errorf("list agent configs: %w", err)
 	}
-	sort.Strings(files)
+	if s.library != "" {
+		lib, _ := filepath.Glob(filepath.Join(suite.LibraryAgents(s.library), "*.yaml"))
+		for _, f := range lib {
+			if _, err := os.Lstat(filepath.Join(s.root, "agents", filepath.Base(f))); errors.Is(err, os.ErrNotExist) {
+				files = append(files, f)
+			}
+		}
+	}
+	sort.Slice(files, func(i, j int) bool { return filepath.Base(files[i]) < filepath.Base(files[j]) })
 	out := make([]handlers.AgentConfigFile, 0, len(files))
 	for _, f := range files {
-		rel, err := filepath.Rel(s.root, f)
-		if err != nil {
-			rel = filepath.Base(f)
-		}
-		rel = filepath.ToSlash(rel)
+		// Library configs resolve as agents/<file> too (engine.WithAgentLibrary).
+		rel := "agents/" + filepath.Base(f)
 		var cfg schemas.AgentConfig
 		if err := suite.DecodeYAMLFile(f, rel, suite.SchemaAgent, &cfg); err != nil {
 			out = append(out, handlers.AgentConfigFile{Path: rel, Err: err})

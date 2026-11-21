@@ -16,6 +16,7 @@ import (
 
 	"github.com/maximhq/bifrost/bench/engine"
 	"github.com/maximhq/bifrost/bench/schemas"
+	"github.com/maximhq/bifrost/bench/suite"
 )
 
 // Runners area (docs/runners.md): `runner start` runs this machine as a
@@ -127,8 +128,9 @@ func runRunnerStart(cmd string, args []string) int {
 	if err != nil {
 		host = ""
 	}
+	a.reg = withLibrary(a.reg, a.cfg.Path(a.cfg.BenchmarksRoot)) // built-in library suites (suite/library.go), e.g. the demo runner
 	w, err := engine.NewWorker(a.reg, engine.NewPipeline(a.reg, a.cfg.Root, a.logger),
-		engine.NewPlanner(a.reg, a.cfg.Root, a.logger, engine.WithIgnoreQuarantine(), engine.WithoutGPUCheck()).Plan, // Suite health area: a replan reproduces a frozen manifest (engine/taskscreen.go); X7: no GPU check, the coordinator leases GPU slots by the GPUs a runner registers
+		engine.NewPlanner(a.reg, a.cfg.Root, a.logger, engine.WithIgnoreQuarantine(), engine.WithoutGPUCheck(), engine.WithAgentLibrary(suite.LibraryDir())).Plan, // Suite health area: a replan reproduces a frozen manifest (engine/taskscreen.go); X7: no GPU check, the coordinator leases GPU slots by the GPUs a runner registers
 		engine.WorkerOptions{Server: f.server, Token: token, WorkerID: f.name, Host: host, Version: benchVersion,
 			Slots: f.slots, Logger: a.logger, Pool: f.pool, Labels: f.labelList(),
 			SpendCapUSD: f.spendCap, SpendFile: filepath.Join(a.store.Root(), ".runner", "spend.json"),

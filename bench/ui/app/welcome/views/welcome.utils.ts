@@ -1,4 +1,5 @@
 import type { ModelRef, ProviderId } from "@/components/models/modelPicker";
+import { orderSuites, suiteSections } from "@/components/suites/suiteDisplay";
 import { suiteReadiness } from "@/components/suites/suiteIdentity";
 import type { AgentSummary, SuiteSummary } from "@/lib/types/bench";
 import type { ModelKey, ModelRefView } from "@/lib/types/models";
@@ -76,12 +77,18 @@ export function suiteState(suite: SuiteReadyFields): {
   };
 }
 
-/** The suite to pre-select: coding-core when pickable, else the first ready one, else the first pickable, else the first. */
+/**
+ * The suite to pre-select: the first ready built-in library benchmark (Terminal-Bench 2, then
+ * SWE-bench Verified, in library order), else coding-core when pickable, else the first ready one,
+ * else the first pickable, else the first.
+ */
 export function defaultSuite(
   suites: readonly SuiteSummary[],
 ): string | undefined {
   const pickable = (s: SuiteSummary) => suiteState(s).block === null;
+  const { builtin } = suiteSections(suites);
   return (
+    builtin.find((s) => !s.error && suiteState(s).ready) ??
     suites.find((s) => s.id === STARTER_SUITE && pickable(s)) ??
     suites.find((s) => suiteState(s).ready) ??
     suites.find(pickable) ??
@@ -89,13 +96,9 @@ export function defaultSuite(
   )?.id;
 }
 
-/** Suites sorted for the picker: the starter first, then by name. */
+/** Suites sorted for the picker: built-in library first, then the org's own, then practice examples. */
 export function sortSuites(suites: readonly SuiteSummary[]): SuiteSummary[] {
-  return [...suites].sort(
-    (a, b) =>
-      Number(b.id === STARTER_SUITE) - Number(a.id === STARTER_SUITE) ||
-      a.id.localeCompare(b.id),
-  );
+  return orderSuites(suites);
 }
 
 function starterRank(id: string): number {

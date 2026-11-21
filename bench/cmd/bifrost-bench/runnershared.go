@@ -191,7 +191,7 @@ func runSharedRunner(args []string) int {
 				name = name[:128]
 			}
 			reg, root := sharedOrgProject(lctx, a, org)
-			plan := engine.NewPlanner(reg, root, a.logger, engine.WithIgnoreQuarantine(), engine.WithoutGPUCheck()).Plan
+			plan := engine.NewPlanner(reg, root, a.logger, engine.WithIgnoreQuarantine(), engine.WithoutGPUCheck(), engine.WithAgentLibrary(suite.LibraryDir())).Plan
 			w, err := engine.NewWorker(reg, engine.NewPipeline(reg, root, a.logger),
 				sharedEnsureImages(a, reg, root, plan),
 				engine.WorkerOptions{Server: f.server, Token: token, WorkerID: name, Host: host, Version: benchVersion,
@@ -247,11 +247,11 @@ const sharedProjectsEnv = "HEIMDALL_SHARED_PROJECTS_DIR"
 func sharedOrgProject(ctx context.Context, a *app, org string) (*schemas.Registry, string) {
 	dir := strings.TrimSpace(os.Getenv(sharedProjectsEnv))
 	if dir == "" || tenancy.ValidOrgID(org) != nil {
-		return a.reg, a.cfg.Root
+		return withLibrary(a.reg, a.cfg.Path(a.cfg.BenchmarksRoot)), a.cfg.Root
 	}
 	root := filepath.Join(dir, org)
 	if fi, err := os.Stat(filepath.Join(root, "benchmarks")); err != nil || !fi.IsDir() {
-		return a.reg, a.cfg.Root
+		return withLibrary(a.reg, a.cfg.Path(a.cfg.BenchmarksRoot)), a.cfg.Root
 	}
 	// Agent and task containers are started by the host's docker daemon,
 	// which cannot see a path inside the server's volume: bind mounts of
@@ -280,12 +280,27 @@ func sharedOrgProject(ctx context.Context, a *app, org string) (*schemas.Registr
 		}
 	}
 	reg := *a.reg
-	reg.Loaders = suite.Builtin(filepath.Join(root, "benchmarks"))
+	// The built-in library is a host path mounted at the same path here, so
+	// it needs no mirror (suite/library.go).
+	reg.Loaders = suite.Layered(filepath.Join(root, "benchmarks"), suite.LibraryBenchmarks(suite.LibraryDir()))
 	reg.Adapters = adapters.Builtin(adapters.CommandConfig{
 		GatewayAgentURL: a.cfg.Gateway.AgentURL, EvalNetwork: a.cfg.Networks.Eval, BenchRoot: root,
 		GatewayPublicURL: a.cfg.Gateway.PublicURL,
 	})
 	return &reg, root
+}
+
+// withLibrary is reg with its suite loaders over benchRoot layered on the
+// server's built-in benchmark library (suite/library.go); reg itself when
+// HEIMDALL_LIBRARY_DIR is unset.
+func withLibrary(reg *schemas.Registry, benchRoot string) *schemas.Registry {
+	lib := suite.LibraryDir()
+	if lib == "" {
+		return reg
+	}
+	out := *reg
+	out.Loaders = suite.Layered(benchRoot, suite.LibraryBenchmarks(lib))
+	return &out
 }
 
 // sharedMirrorEnv names the folder (bind-mounted at the same path on the

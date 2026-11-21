@@ -73,5 +73,6 @@
 	"resultSkipped": "{{count}} already present, kept",
 	"openSuites": "Open benchmarks",
 	"importStarted": "Import started. The benchmark appears when the job below finishes.",
-	"addFailed": "Could not add: {{message}}"
+	"addFailed": "Could not add: {{message}}",
+	"builtIn": "Built in"
 }

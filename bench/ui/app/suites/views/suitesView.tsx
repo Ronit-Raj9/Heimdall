@@ -1,6 +1,6 @@
 import { BlockSkeleton, LoadError } from "@/components/runs/screenStates";
 import { EmptyState, PageHeader } from "@/components/shell";
-import { SuiteCards } from "@/components/suites/suiteCards";
+import { SectionedSuiteCards } from "@/components/suites/suiteCards";
 import { buttonVariants } from "@/components/ui/button";
 import { useGetSuitesQuery } from "@/lib/store";
 import { cn } from "@/lib/utils";
@@ -47,7 +47,7 @@ export default function SuitesView() {
 				/>
 			) : (
 				<div className={cn("min-w-0 transition-opacity", query.isFetching && "opacity-60")} aria-busy={query.isFetching}>
-					<SuiteCards suites={suites} />
+					<SectionedSuiteCards suites={suites} />
 				</div>
 			)}
 		</section>

@@ -47,5 +47,12 @@
 	"pageSubtitle_other": "A set of {{count}} tasks that test {{skill}}. Press Run to test an agent.",
 	"skillFallback": "an agent's skills",
 	"moreColumns": "More columns",
-	"fewerColumns": "Fewer columns"
+	"fewerColumns": "Fewer columns",
+	"sections": {
+		"builtin": "Benchmarks",
+		"builtinHint": "Full real benchmarks, ready to run.",
+		"org": "Added by your team",
+		"practice": "Practice examples (small, made-up data)"
+	},
+	"builtIn": "Built in"
 }

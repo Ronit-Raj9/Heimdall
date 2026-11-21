@@ -552,3 +552,31 @@ func TestSuiteHelpers(t *testing.T) {
 		}
 	})
 }
+
+// libraryFakeSuites marks some packs as loaded from the built-in library.
+type libraryFakeSuites struct {
+	*fakeSuites
+	builtin map[string]bool
+}
+
+func (l libraryFakeSuites) SuiteBuiltin(id string) bool { return l.builtin[id] }
+
+func TestSuitesListBuiltinFlag(t *testing.T) {
+	src := testSuites(t)
+	if len(src.ids) == 0 {
+		t.Fatal("no fixture suites")
+	}
+	lib := src.ids[0]
+	c := newSuitesClient(t, libraryFakeSuites{fakeSuites: src, builtin: map[string]bool{lib: true}}, nil, nil)
+	body := decodeBody(t, c.do(t, "GET", APIPrefix+"/suites", nil, nil))
+	for _, id := range src.ids {
+		s := suiteByID(t, body, id)
+		if id == lib {
+			if s["builtin"] != true || s["source"] != "library" {
+				t.Errorf("%s: builtin=%v source=%v", id, s["builtin"], s["source"])
+			}
+		} else if _, ok := s["builtin"]; ok {
+			t.Errorf("%s: org pack marked builtin", id)
+		}
+	}
+}

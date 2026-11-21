@@ -58,6 +58,13 @@ type SuiteSource interface {
 	FingerprintDrift(ctx context.Context, s *schemas.Suite) ([]schemas.FingerprintDrift, error)
 }
 
+// suiteOrigin is the optional SuiteSource method that reports a pack loaded
+// from the server's read-only built-in library (cmd/bifrost-bench
+// servesuites.go); GET /suites marks such a pack builtin.
+type suiteOrigin interface {
+	SuiteBuiltin(id string) bool
+}
+
 // SuitesHandler serves the benchmark packs on disk: what each suite holds,
 // whether its lock still matches its files, and per task its provenance and
 // admission record. It is read-only and never serves a hidden test, a
@@ -96,13 +103,18 @@ func (h *SuitesHandler) getSuites(ctx *fasthttp.RequestCtx) {
 		return
 	}
 	out := schemas.SuiteList{Suites: make([]schemas.SuiteSummary, 0, len(ids))}
+	origin, _ := h.suites.(suiteOrigin)
 	for _, id := range ids {
-		s, err := h.suites.LoadSuite(work, id)
-		if err != nil {
-			out.Suites = append(out.Suites, brokenSuite(id, err))
-			continue
+		var sum schemas.SuiteSummary
+		if s, err := h.suites.LoadSuite(work, id); err != nil {
+			sum = brokenSuite(id, err)
+		} else {
+			sum = h.summarize(work, s)
 		}
-		out.Suites = append(out.Suites, h.summarize(work, s))
+		if origin != nil && origin.SuiteBuiltin(id) {
+			sum.Builtin, sum.Source = true, "library"
+		}
+		out.Suites = append(out.Suites, sum)
 	}
 	lib.SendJSON(ctx, h.mode, fasthttp.StatusOK, &out)
 }

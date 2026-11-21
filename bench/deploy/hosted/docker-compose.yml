@@ -165,9 +165,14 @@ services:
       HEIMDALL_SERVER_ADMINS: ${HEIMDALL_SERVER_ADMINS:-}
       HEIMDALL_MASTER_KEY: ${HEIMDALL_MASTER_KEY:-}
       HEIMDALL_SHARED_RUNNER_SECRET: ${HEIMDALL_SHARED_RUNNER_SECRET:-}
+      HEIMDALL_LIBRARY_DIR: ${HEIMDALL_LIBRARY_DIR:-}
     volumes:
       - ./bench.hosted.yaml:/srv/heimdall/deploy/bench.yaml:ro
       - heimdall-data:/var/lib/heimdall
+      # Built-in benchmark library (HEIMDALL_LIBRARY_DIR in .env), read-only at
+      # its host path so runners hand task folders to the host's Docker
+      # unchanged. Unset binds /dev/null over itself: no library, as before.
+      - ${HEIMDALL_LIBRARY_DIR:-/dev/null}:${HEIMDALL_LIBRARY_DIR:-/dev/null}:ro
     tmpfs:
       - /tmp
     networks: [edge, backend]
@@ -297,10 +302,15 @@ services:
       BENCH_NETWORKS_EVAL: ${HEIMDALL_EVAL_NETWORK:-heimdall-evalnet}
       BIFROST_SETUP_TOKEN: ${BIFROST_SETUP_TOKEN:-}
       BENCH_FAULTPROXY_TOKEN: ${BENCH_FAULTPROXY_TOKEN:-}
+      HEIMDALL_LIBRARY_DIR: ${HEIMDALL_LIBRARY_DIR:-}
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
       - ${HEIMDALL_BENCH_DIR:?run through deploy/hosted/*.sh or set HEIMDALL_BENCH_DIR}:${HEIMDALL_BENCH_DIR:?run through deploy/hosted/*.sh or set HEIMDALL_BENCH_DIR}:ro
       - ${HEIMDALL_RUNNER_DIR:-/var/lib/heimdall-runner}:${HEIMDALL_RUNNER_DIR:-/var/lib/heimdall-runner}
+      # Built-in benchmark library (HEIMDALL_LIBRARY_DIR in .env), read-only at
+      # its host path so runners hand task folders to the host's Docker
+      # unchanged. Unset binds /dev/null over itself: no library, as before.
+      - ${HEIMDALL_LIBRARY_DIR:-/dev/null}:${HEIMDALL_LIBRARY_DIR:-/dev/null}:ro
     tmpfs:
       - /tmp
     networks: [edge, upstream]
@@ -362,6 +372,7 @@ services:
       BENCH_FAULTPROXY_TOKEN: ${BENCH_FAULTPROXY_TOKEN:-}
       HEIMDALL_SHARED_PROJECTS_DIR: /var/lib/heimdall/runs/projects
       HEIMDALL_SHARED_PROJECTS_MIRROR: ${HEIMDALL_RUNNER_DIR:-/var/lib/heimdall-shared-runner}/projects
+      HEIMDALL_LIBRARY_DIR: ${HEIMDALL_LIBRARY_DIR:-}
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
       - ${HEIMDALL_BENCH_DIR:?run through deploy/hosted/*.sh or set HEIMDALL_BENCH_DIR}:${HEIMDALL_BENCH_DIR:?run through deploy/hosted/*.sh or set HEIMDALL_BENCH_DIR}:ro
@@ -369,6 +380,10 @@ services:
       # Each org's project (catalog adds, uploads, web edits), read-only: the
       # shared runner plans an org's runs from its own suites and agents.
       - heimdall-data:/var/lib/heimdall:ro
+      # Built-in benchmark library (HEIMDALL_LIBRARY_DIR in .env), read-only at
+      # its host path so runners hand task folders to the host's Docker
+      # unchanged. Unset binds /dev/null over itself: no library, as before.
+      - ${HEIMDALL_LIBRARY_DIR:-/dev/null}:${HEIMDALL_LIBRARY_DIR:-/dev/null}:ro
     tmpfs:
       - /tmp
     networks: [edge, upstream]

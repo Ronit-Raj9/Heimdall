@@ -39,7 +39,8 @@ const (
 
 // localLoader resolves refs against a benchmarks folder on disk.
 type localLoader struct {
-	root string // benchmarks folder holding one sub-folder per pack
+	root    string // benchmarks folder holding one sub-folder per pack
+	library string // read-only built-in benchmarks folder (library.go); "" for none
 }
 
 func newLocalLoader(benchmarksRoot string) *localLoader {
@@ -185,7 +186,8 @@ func (l *localLoader) resolve(ref string) (dir, id, version string, err error) {
 	if strings.Contains(ref, "@") && version == "" {
 		return "", "", "", fmt.Errorf("suite ref %q: missing version after @", ref)
 	}
-	return filepath.Join(l.root, id), id, version, nil
+	dir, _ = PickSuiteDir(l.root, l.library, id) // built-in library layer (library.go)
+	return dir, id, version, nil
 }
 
 // loadTask reads tasks/<id>/task.yaml and checks that every file it names
