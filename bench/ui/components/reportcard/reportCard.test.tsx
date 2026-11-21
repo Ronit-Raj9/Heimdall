@@ -2,7 +2,7 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it, vi } from "vitest";
 import { ReportCard } from "./reportCard";
 import { abReport, scoreReport } from "./reportCard.fixtures";
-import { capabilityRows, compareArms, duration, headline, overallScore, points } from "./reportCard.utils";
+import { armDescription, capabilityRows, compareArms, costDisplay, duration, headline, overallScore, points } from "./reportCard.utils";
 
 vi.mock("@tanstack/react-router", () => ({
 	Link: ({ to, params, children, ...rest }: { to: string; params?: Record<string, string>; children: React.ReactNode }) => (
@@ -89,5 +89,34 @@ describe("ReportCard", () => {
 		expect(html).toContain('data-testid="report-card-practice"');
 		expect(html).toContain(note);
 		expect(renderToStaticMarkup(<ReportCard report={scoreReport} />)).not.toContain("report-card-practice");
+	});
+});
+
+describe("unpriced cost (N2)", () => {
+	it("never shows $0 for an unpriced model: not known, with the count and reason", () => {
+		const c = costDisplay({ runs: 8, cost_usd: null, cost_runs: 5, cost_note: "1 of 1 cost rows unpriced" });
+		expect(c).toMatchObject({ text: "Not known", known: false, detail: "3 of 8 runs unpriced" });
+		expect(c.reason).toBe("Cost not known, 3 of 8 runs unpriced: 1 of 1 cost rows unpriced");
+		expect(costDisplay({ runs: 8, cost_usd: 1.5, cost_runs: 8 }).text).toBe("$1.50");
+		expect(costDisplay({ runs: 0, cost_usd: null }).text).toBe("-");
+	});
+
+	it("renders Not known in the card, never $0.00", () => {
+		const unpriced = { ...scoreReport.benchmarks[0].arms.A, cost_usd: null, cost_runs: 0, cost_note: "no price for model gpt-x", tokens: null };
+		const report = {
+			...scoreReport,
+			capabilities: [{ ...scoreReport.capabilities[0], arms: { A: unpriced } }],
+			benchmarks: [{ ...scoreReport.benchmarks[0], arms: { A: unpriced } }],
+		};
+		const html = renderToStaticMarkup(<ReportCard report={report} />);
+		expect(html).toContain('data-testid="cost-not-known"');
+		expect(html).toContain("30 of 30 runs unpriced");
+		expect(html).toContain("no price for model gpt-x");
+		expect(html).not.toContain("$0.00");
+	});
+
+	it("names the version that was latest at launch", () => {
+		expect(armDescription({ label: "A", agent: "codex", version: 3, latest_at_launch: true, model: "m" })).toBe("codex v3 (latest at launch) on m");
+		expect(armDescription({ label: "A", agent: "codex", version: 3, model: "m" })).toBe("codex v3 on m");
 	});
 });

@@ -122,7 +122,13 @@ function ArmCard({ arm, single }: { arm: EvaluationArm; single: boolean }) {
 				<dt className="text-muted-foreground">{t("detail.armAgent")}</dt>
 				<dd className="font-medium">{arm.agent}</dd>
 				<dt className="text-muted-foreground">{t("detail.armVersion")}</dt>
-				<dd>{arm.version ? t("detail.versionN", { n: arm.version }) : t("detail.latestVersion")}</dd>
+				<dd data-testid={`evaluation-arm-version-${arm.label}`}>
+					{arm.version
+						? arm.latest_at_launch
+							? t("detail.versionLatestAtLaunch", { n: arm.version })
+							: t("detail.versionN", { n: arm.version })
+						: t("detail.latestVersion")}
+				</dd>
 				<dt className="text-muted-foreground">{t("detail.armModel")}</dt>
 				<dd className="break-all">{arm.provider ? `${arm.provider}/${arm.model}` : arm.model}</dd>
 			</dl>

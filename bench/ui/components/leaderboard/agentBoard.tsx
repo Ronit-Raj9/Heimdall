@@ -14,7 +14,7 @@ import { useNavigate } from "@tanstack/react-router";
 import { parseAsString, useQueryState } from "nuqs";
 import { useId, useMemo } from "react";
 import { useTranslation } from "react-i18next";
-import { ALL, filterParam, formatCost, formatShare, reportCardSearch, rowKey } from "./agentBoard.utils";
+import { ALL, DEFAULT_MIN_RUNS, DEFAULT_MIN_TASKS, filterParam, formatShare, reportCardSearch, rowCost, rowKey } from "./agentBoard.utils";
 
 declare module "@/lib/i18n/resources" {
 	interface LaneResources {
@@ -83,12 +83,23 @@ export function AgentBoardTab() {
 			) : board.isError || !data ? (
 				<LoadError title={t("loadError")} error={board.error} onRetry={() => void board.refetch()} testId="agent-board-error" />
 			) : (
-				<Section title={t("title")} description={t("description")} testId="agent-board-ranking">
+				<Section
+					title={t("title")}
+					description={t("description", { runs: data.min_runs ?? DEFAULT_MIN_RUNS, tasks: data.min_tasks ?? DEFAULT_MIN_TASKS })}
+					testId="agent-board-ranking"
+				>
 					{data.rows.length === 0 ? (
 						<EmptyNote testId="agent-board-empty">{hasFilters ? t("emptyFiltered") : t("empty")}</EmptyNote>
 					) : (
 						<div className={cn("bg-card min-w-0 overflow-x-auto rounded-xl border transition-opacity", board.isFetching && "opacity-60")}>
-							<AgentBoardTable rows={data.rows} capabilities={data.capabilities} onOpen={open} />
+							<AgentBoardTable
+								rows={data.rows}
+								capabilities={data.capabilities}
+								rankBy={params.capability}
+								minRuns={data.min_runs}
+								minTasks={data.min_tasks}
+								onOpen={open}
+							/>
 						</div>
 					)}
 				</Section>
@@ -192,16 +203,26 @@ export interface AgentBoardTableProps {
 	/** Capability columns, in display order. */
 	capabilities: readonly string[];
 	onOpen: (row: AgentLeaderboardRow) => void;
+	/** The capability rows are ranked by (the capability filter); a rank column shows only then. */
+	rankBy?: string;
+	minRuns?: number;
+	minTasks?: number;
 }
 
-/** The board: agent, version, model, a score per capability with its 95% range, cost per run. */
-export function AgentBoardTable({ rows, capabilities, onOpen }: AgentBoardTableProps) {
+/**
+ * The board: rank (with a capability filter), agent, version, model, a score per capability with
+ * its 95% range and sample, cost per run. A score under the minimum sample is shown but marked
+ * "not enough runs" and never ranked; an unpriced cost is "not known", never $0.
+ */
+export function AgentBoardTable({ rows, capabilities, onOpen, rankBy, minRuns, minTasks }: AgentBoardTableProps) {
 	const { t } = useTranslation("agentBoard");
 	const capLabel = useCapabilityLabel();
+	const mins = { minRuns: minRuns ?? DEFAULT_MIN_RUNS, minTasks: minTasks ?? DEFAULT_MIN_TASKS };
 	return (
 		<Table data-testid="agent-board-table">
 			<TableHeader>
 				<TableRow>
+					{rankBy && <TableHead className="w-12 text-right">{t("columns.rank")}</TableHead>}
 					<TableHead>{t("columns.agent")}</TableHead>
 					<TableHead>{t("columns.version")}</TableHead>
 					<TableHead>{t("columns.model")}</TableHead>
@@ -230,6 +251,11 @@ export function AgentBoardTable({ rows, capabilities, onOpen }: AgentBoardTableP
 						}}
 						data-testid={`agent-board-row-${row.agent}`}
 					>
+						{rankBy && (
+							<TableCell className="text-right tabular-nums" data-testid="agent-board-rank">
+								{row.rank ? row.rank : <span className="text-muted-foreground">-</span>}
+							</TableCell>
+						)}
 						<TableCell>
 							<div className="flex items-center gap-2">
 								<span className="font-medium">{row.agent}</span>
@@ -249,11 +275,22 @@ export function AgentBoardTable({ rows, capabilities, onOpen }: AgentBoardTableP
 									{s ? (
 										<span
 											className="inline-flex flex-col items-end leading-tight"
-											title={t("range", { low: formatShare(s.ci_low), high: formatShare(s.ci_high), runs: s.runs })}
+											title={
+												s.ranked === false
+													? t("notEnoughHint", { runs: s.runs, tasks: s.tasks ?? 0, ...mins })
+													: t("range", { low: formatShare(s.ci_low), high: formatShare(s.ci_high), runs: s.runs, tasks: s.tasks ?? 0 })
+											}
 										>
-											<span className="font-medium">{formatShare(s.score)}</span>
+											<span className={cn("font-medium", s.ranked === false && "text-muted-foreground")}>{formatShare(s.score)}</span>
 											<span className="text-muted-foreground text-[11px]">
 												{formatShare(s.ci_low)} to {formatShare(s.ci_high)}
+											</span>
+											<span className="text-muted-foreground text-[11px]">
+												{s.ranked === false ? (
+													<span data-testid="agent-board-not-enough">{t("notEnough")}</span>
+												) : (
+													t("sample", { runs: s.runs, tasks: s.tasks ?? 0 })
+												)}
 											</span>
 										</span>
 									) : (
@@ -262,10 +299,26 @@ export function AgentBoardTable({ rows, capabilities, onOpen }: AgentBoardTableP
 								</TableCell>
 							);
 						})}
-						<TableCell className="text-right font-mono text-xs tabular-nums">{formatCost(row.cost_usd)}</TableCell>
+						<TableCell className="text-right font-mono text-xs tabular-nums">
+							<CostCell row={row} />
+						</TableCell>
 					</TableRow>
 				))}
 			</TableBody>
 		</Table>
+	);
+}
+
+/** Cost per run, or "not known" with the count of unpriced runs (reason in the tooltip). */
+function CostCell({ row }: { row: AgentLeaderboardRow }) {
+	const { t } = useTranslation("agentBoard");
+	const c = rowCost(row);
+	if (c.known) return <>{c.text}</>;
+	const detail = t("costUnpriced", { count: c.unpriced, runs: c.runs });
+	return (
+		<span data-testid="agent-board-cost-unknown" title={c.note ? `${detail}: ${c.note}` : detail} className="inline-flex flex-col items-end leading-tight">
+			<span className="text-muted-foreground font-sans">{t("costNotKnown")}</span>
+			{c.runs > 0 && <span className="text-muted-foreground font-sans text-[11px]">{detail}</span>}
+		</span>
 	);
 }

@@ -6,6 +6,7 @@ import (
 	"crypto/rand"
 	"encoding/base64"
 	"encoding/hex"
+	"encoding/json"
 	"fmt"
 	"net/url"
 	"sort"
@@ -136,7 +137,47 @@ func normalize(k Kind, in Put, create bool) (Put, error) {
 		models = append(models, m)
 	}
 	in.Models = models
+	if in.Price != nil {
+		p := *in.Price
+		for _, v := range []float64{p.InputPerMTok, p.OutputPerMTok, p.CachePerMTok} {
+			if v < 0 || v > MaxPricePerMTok || v != v {
+				return in, fmt.Errorf("%w: each price must be between 0 and %d USD per million tokens", ErrInvalid, MaxPricePerMTok)
+			}
+		}
+		if k != KindProvider {
+			return in, fmt.Errorf("%w: only a provider key takes a price", ErrInvalid)
+		}
+		if p == (Price{}) {
+			in.Price = nil // all zero is no price, never a free model
+		} else {
+			in.Price = &p
+		}
+	}
 	return in, nil
+}
+
+// encodePrice is the stored form of a price: JSON, "" for none.
+func encodePrice(p *Price) string {
+	if p == nil {
+		return ""
+	}
+	b, err := json.Marshal(p)
+	if err != nil {
+		return ""
+	}
+	return string(b)
+}
+
+// decodePrice reads the stored form; "" or a bad value is no price.
+func decodePrice(s string) *Price {
+	if s == "" {
+		return nil
+	}
+	var p Price
+	if json.Unmarshal([]byte(s), &p) != nil || p == (Price{}) {
+		return nil
+	}
+	return &p
 }
 
 func newID() string {

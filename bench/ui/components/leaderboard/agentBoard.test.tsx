@@ -13,8 +13,10 @@ const rows: AgentLeaderboardRow[] = [
 		model: "gpt-5.4-mini",
 		label: "notes",
 		baseline: true,
-		capabilities: { coding: { score: 0.415, ci_low: 0.3, ci_high: 0.52, runs: 30 } },
+		rank: 1,
+		capabilities: { coding: { score: 0.415, ci_low: 0.3, ci_high: 0.52, runs: 30, tasks: 10, ranked: true } },
 		cost_usd: 0.1234,
+		runs: 30,
 		last_evaluation: "",
 	},
 	{
@@ -23,8 +25,11 @@ const rows: AgentLeaderboardRow[] = [
 		model: "deepseek-chat",
 		label: "A",
 		baseline: false,
-		capabilities: { terminal: { score: 1, ci_low: 0.6, ci_high: 1, runs: 6 } },
+		capabilities: { terminal: { score: 1, ci_low: 0.6, ci_high: 1, runs: 6, tasks: 3, ranked: false, note: "not enough runs" } },
 		cost_usd: null,
+		cost_runs: 2,
+		cost_note: "no price for model deepseek-chat",
+		runs: 6,
 		last_evaluation: "",
 	},
 ];
@@ -45,6 +50,23 @@ describe("agent board", () => {
 		expect(html.match(/data-testid="agent-board-baseline"/g)?.length).toBe(1);
 		expect(html).toContain(">baseline<");
 		expect(html).toContain('role="link"');
+	});
+
+	it("marks small samples, ranks only with a capability, and never shows $0 for unpriced runs", () => {
+		const html = renderToStaticMarkup(
+			<AgentBoardTable rows={rows} capabilities={["terminal", "coding"]} rankBy="coding" minRuns={10} minTasks={5} onOpen={() => undefined} />,
+		);
+		expect(html).toContain(">Rank<");
+		expect(html.match(/data-testid="agent-board-rank"/g)?.length).toBe(2);
+		expect(html).toContain('data-testid="agent-board-not-enough"');
+		expect(html).toContain("30 runs, 10 tasks");
+		expect(html).toContain("ranking needs 10 runs over 5 tasks");
+		expect(html).toContain('data-testid="agent-board-cost-unknown"');
+		expect(html).toContain("4 of 6 runs unpriced");
+		expect(html).toContain("no price for model deepseek-chat");
+		expect(html).not.toContain("$0<");
+		const plain = renderToStaticMarkup(<AgentBoardTable rows={rows} capabilities={["coding"]} onOpen={() => undefined} />);
+		expect(plain).not.toContain(">Rank<");
 	});
 
 	it("shows the clear button only when filtered", () => {

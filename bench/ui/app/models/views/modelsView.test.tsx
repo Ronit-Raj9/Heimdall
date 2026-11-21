@@ -6,7 +6,16 @@ import { errorQuery, okQuery, render, tagOf } from "@/lib/testing/render";
 import type { ModelsCatalogResponse } from "@/lib/types/models";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { familyServing, isOpenWeights, providerGroup } from "@/components/models/providerCatalog";
-import ModelsView, { addParam, credentialValue, filterProviders, keyRequestBody, missingCredentialFields, needsBaseUrl, parseModels } from "./modelsView";
+import ModelsView, {
+	addParam,
+	credentialValue,
+	filterProviders,
+	keyPrice,
+	keyRequestBody,
+	missingCredentialFields,
+	needsBaseUrl,
+	parseModels,
+} from "./modelsView";
 
 const api = vi.hoisted(() => ({ q: {} as Record<string, unknown> }));
 vi.mock("@tanstack/react-router", async () => (await import("@/lib/testing/routerMock")).routerMock);
@@ -211,6 +220,17 @@ describe("key form autofill guard", () => {
 		expect("value" in edit).toBe(false);
 		expect(edit).toEqual({ provider: "openai", label: "team", base_url: "", models: ["a", "b"], budget_usd: 5 });
 		expect(keyRequestBody({ ...base, value: " sk-new " }).value).toBe("sk-new");
+	});
+
+	it("sends a per-key price only when one is typed", () => {
+		const base = { provider: "openai" as const, label: "", baseUrl: "", modelsText: "", budget: "0", value: "" };
+		expect(keyRequestBody({ ...base, price: { input: "0.5", output: " 2 ", cache: "" } }).price).toEqual({
+			input_per_mtok: 0.5,
+			output_per_mtok: 2,
+			cache_per_mtok: 0,
+		});
+		expect("price" in keyRequestBody({ ...base, price: { input: "", output: "0", cache: "-1" } })).toBe(false);
+		expect(keyPrice(undefined)).toBeUndefined();
 	});
 });
 

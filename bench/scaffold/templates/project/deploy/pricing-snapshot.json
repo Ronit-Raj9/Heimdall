@@ -123,6 +123,8 @@
     "gpt-6-sol": {"input_per_mtok": 2, "output_per_mtok": 10, "cache_read_per_mtok": 0.2, "cache_write_per_mtok": 2.5},
     "gpt-6.1-sol": {"input_per_mtok": 2, "output_per_mtok": 10, "cache_read_per_mtok": 0.1, "cache_write_per_mtok": 2.5},
     "gpt-6.1-terra": {"input_per_mtok": 1, "output_per_mtok": 5, "cache_read_per_mtok": 0.05, "cache_write_per_mtok": 1.25},
+    "gpt-6.2-astra": {"input_per_mtok": 8, "output_per_mtok": 40, "cache_read_per_mtok": 0.4, "cache_write_per_mtok": 0},
+    "gpt-6.2-sol": {"input_per_mtok": 2, "output_per_mtok": 10, "cache_read_per_mtok": 0.1, "cache_write_per_mtok": 0},
     "gpt-daybreak-blue-latest": {"input_per_mtok": 4, "output_per_mtok": 20, "cache_read_per_mtok": 0.4, "cache_write_per_mtok": 5},
     "gpt-daybreak-red-latest": {"input_per_mtok": 12.5, "output_per_mtok": 75, "cache_read_per_mtok": 1.25, "cache_write_per_mtok": 15.625},
     "gpt-rosalind-discovery": {"input_per_mtok": 5, "output_per_mtok": 25, "cache_read_per_mtok": 0.5, "cache_write_per_mtok": 0},
@@ -176,6 +178,8 @@
     "z-ai/glm-5.3": {"input_per_mtok": 0.0699, "output_per_mtok": 1.4, "cache_read_per_mtok": 0.0689, "cache_write_per_mtok": 0}
   },
   "model_sources": {
+    "gpt-6.2-astra": {"url": "https://developers.openai.com/api/docs/pricing", "date": "2026-11-22", "note": "aggregator consensus, official page not fetched (smartscope.blog official-pricing summary); Standard tier; cached input as cache read; cache write not listed, so 0"},
+    "gpt-6.2-sol": {"url": "https://developers.openai.com/api/docs/pricing", "date": "2026-11-22", "note": "aggregator consensus, official page not fetched (eesel.ai/blog/gpt-6-2-sol-pricing, popularaitools.ai); Standard tier; cached input as cache read; cache write not listed, so 0"},
     "MiniMax-M3": {"url": "https://platform.minimax.io/docs/guides/pricing", "date": "2026-11-21", "note": "standard tier, <=512k input tokens for MiniMax-M3; cache write not listed, so 0"},
     "MiniMax-M3.1-Flash": {"url": "https://platform.minimax.io/docs/guides/pricing", "date": "2026-11-21", "note": "standard tier, <=512k input tokens for MiniMax-M3; cache write not listed, so 0"},
     "accounts/fireworks/models/deepseek-v4p1-flash": {"url": "https://fireworks.ai/pricing", "date": "2026-11-21", "note": "serverless standard tier; model ids from https://docs.fireworks.ai/nexus/open-models.md"},

@@ -51,6 +51,9 @@ type ModelKeyView struct {
 	CreatedAt       time.Time  `json:"created_at"`
 	UpdatedAt       time.Time  `json:"updated_at"`
 	LastTestedAt    *time.Time `json:"last_tested_at,omitempty"`
+	// Price is what the org pays on this key per million tokens. Runs of a
+	// model the pinned price snapshot does not list are costed from it.
+	Price *keystore.Price `json:"price,omitempty"`
 }
 
 // ModelKeyRequest creates or updates a provider key. On update an empty
@@ -62,6 +65,9 @@ type ModelKeyRequest struct {
 	Value     string   `json:"value,omitempty"`
 	Models    []string `json:"models,omitempty"`
 	BudgetUSD float64  `json:"budget_usd,omitempty"`
+	// Price per million tokens; omitted or all zero is no price. On update
+	// it replaces the stored price.
+	Price *keystore.Price `json:"price,omitempty"`
 }
 
 // ModelKeyResponse wraps one key.
@@ -123,7 +129,7 @@ func keyView(k keystore.Key) ModelKeyView {
 	}
 	return ModelKeyView{ID: k.ID, Provider: k.Provider, Label: k.Label, BaseURL: k.BaseURL, Last4: k.Last4, Status: k.Status,
 		Models: models, ModelsAvailable: avail, BudgetUSD: k.BudgetUSD, MonthSpentUSD: k.MonthSpentUSD, OverBudget: k.BudgetUSD > 0 && k.MonthSpentUSD >= k.BudgetUSD,
-		CreatedBy: k.CreatedBy, CreatedAt: k.CreatedAt, UpdatedAt: k.UpdatedAt, LastTestedAt: k.LastTestedAt}
+		CreatedBy: k.CreatedBy, CreatedAt: k.CreatedAt, UpdatedAt: k.UpdatedAt, LastTestedAt: k.LastTestedAt, Price: k.Price}
 }
 
 const keysUnavailable = "the key store is not configured on this server: set HEIMDALL_MASTER_KEY (base64 of 32 random bytes, e.g. `openssl rand -base64 32`) and a database, then restart"
@@ -230,7 +236,7 @@ func (h *modelsHandler) decode(ctx *fasthttp.RequestCtx) (keystore.Put, bool) {
 	var req ModelKeyRequest
 	if err := decodeJSONStrict(ctx.PostBody(), &req); err != nil {
 		lib.SendError(ctx, h.env.Mode, fasthttp.StatusBadRequest, lib.ErrTypeBadRequest,
-			"body must be JSON {provider, label, base_url, value, models, budget_usd}: "+err.Error())
+			"body must be JSON {provider, label, base_url, value, models, budget_usd, price}: "+err.Error())
 		return keystore.Put{}, false
 	}
 	if req.BaseURL != "" && h.env.Services.Hosted {
@@ -242,7 +248,7 @@ func (h *modelsHandler) decode(ctx *fasthttp.RequestCtx) (keystore.Put, bool) {
 	if req.BaseURL == "" {
 		req.BaseURL = catalogDefaultBaseURL(req.Provider)
 	}
-	return keystore.Put{Provider: req.Provider, Label: req.Label, BaseURL: req.BaseURL, Value: req.Value, Models: req.Models, BudgetUSD: req.BudgetUSD}, true
+	return keystore.Put{Provider: req.Provider, Label: req.Label, BaseURL: req.BaseURL, Value: req.Value, Models: req.Models, BudgetUSD: req.BudgetUSD, Price: req.Price}, true
 }
 
 // catalogDefaultBaseURL is the catalog's endpoint for a vendor served as a

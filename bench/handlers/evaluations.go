@@ -23,6 +23,7 @@ import (
 	"time"
 
 	"github.com/fasthttp/router"
+	"github.com/maximhq/bifrost/bench/agentversions"
 	"github.com/maximhq/bifrost/bench/auth"
 	"github.com/maximhq/bifrost/bench/compat"
 	"github.com/maximhq/bifrost/bench/evalstore"
@@ -395,11 +396,20 @@ func (h *evaluationsHandler) normalize(ctx context.Context, spec *schemas.Evalua
 			return err
 		}
 		a.Agent = strings.TrimSuffix(strings.TrimPrefix(path, "agents/"), ".yaml")
-		if _, _, err := h.env.Services.Projects.Read(ctx, projectfs.AreaAgents, a.Agent+".yaml"); err != nil {
+		doc, _, err := h.env.Services.Projects.Read(ctx, projectfs.AreaAgents, a.Agent+".yaml")
+		if err != nil {
 			if errors.Is(err, projectfs.ErrNotFound) {
 				return fmt.Errorf("%w: agent config %s does not exist: register your agent on the Agents page first", errQuickMissing, path)
 			}
 			return fmt.Errorf("read agent config %s: %w", path, err)
+		}
+		if a.Version == 0 {
+			a.Version, a.LatestAtLaunch = h.latestVersion(ctx, a.Agent, doc), true
+			if a.Version == 0 {
+				a.LatestAtLaunch = false // the config could not be versioned: the run still uses the current file
+			}
+		} else {
+			a.LatestAtLaunch = false
 		}
 	}
 	if spec.TasksPerBenchmark == 0 {
@@ -461,6 +471,22 @@ func (h *evaluationsHandler) normalize(ctx context.Context, spec *schemas.Evalua
 	}
 	spec.Benchmarks = benches
 	return nil
+}
+
+// latestVersion resolves "latest" for agent id at launch (N6): the current
+// agents/<id>.yaml is recorded as a version when it is new (a save normally
+// already did), and that version's number is returned; 0 when it cannot be
+// versioned.
+func (h *evaluationsHandler) latestVersion(ctx context.Context, id string, doc []byte) int {
+	store := h.env.Services.Projects
+	if store == nil || !agentversions.ValidID(id) {
+		return 0
+	}
+	v, _, err := agentversions.Record(store.Root(), id, agentFileHistory(ctx, store, id+".yaml", doc, "", ""))
+	if err != nil {
+		return 0
+	}
+	return v.Version
 }
 
 func contains(list []string, s string) bool {
@@ -667,9 +693,13 @@ func evalArms(spec schemas.EvaluationSpec) map[string]schemas.ArmSpec {
 			agentLabel += fmt.Sprintf(" v%d", a.Version)
 		}
 		arm.Label = agentLabel + " on " + arm.Label
-		if a.Agent != base || a.Version > 0 {
+		// A version resolved from "latest" at launch is the current file, so
+		// the run reads the file itself; an explicitly pinned version reads
+		// its frozen snapshot.
+		pinned := a.Version > 0 && !a.LatestAtLaunch
+		if a.Agent != base || pinned {
 			arm.Agent = "agents/" + a.Agent + ".yaml"
-			if a.Version > 0 {
+			if pinned {
 				arm.Agent += fmt.Sprintf("@v%d", a.Version)
 			}
 		}

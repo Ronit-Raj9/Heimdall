@@ -70,6 +70,9 @@ func TestEstimateEvaluationUnpricedNeverGuesses(t *testing.T) {
 	if est.EstCostUSD.Known || est.PerBenchmark[0].EstCostUSD.Known {
 		t.Fatal("unpriced model must leave the cost unknown")
 	}
+	if len(est.UnpricedModels) != 2 || est.EstCostUSD.Reason != "no price for gpt-x, glm-9" || est.PerBenchmark[0].EstCostUSD.Reason == "" {
+		t.Fatalf("unpriced %v reason %q", est.UnpricedModels, est.EstCostUSD.Reason)
+	}
 	if est.Runs != 2*1*1*EvalDefaultTrials {
 		t.Fatalf("runs %d", est.Runs)
 	}

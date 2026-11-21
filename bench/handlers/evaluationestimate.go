@@ -66,6 +66,8 @@ type EvalCostRange struct {
 	Low   float64 `json:"low"`
 	High  float64 `json:"high"`
 	Known bool    `json:"known"`
+	// Reason says why the cost is not known; empty when it is.
+	Reason string `json:"reason,omitempty"`
 }
 
 // EvalMinutesRange is a wall clock range in minutes, with the same meaning
@@ -98,6 +100,9 @@ type EvalEstimate struct {
 	EstMinutes   EvalMinutesRange        `json:"est_minutes"`
 	PerBenchmark []EvalBenchmarkEstimate `json:"per_benchmark"`
 	Notes        []string                `json:"notes"`
+	// UnpricedModels are the arm models the price snapshot does not list:
+	// the estimate has no cost for them (never $0).
+	UnpricedModels []string `json:"unpriced_models"`
 }
 
 // modelPricer is the optional ForecastSource method that says whether the
@@ -172,7 +177,7 @@ func EstimateEvaluationWith(ctx context.Context, suites SuiteSource, src Forecas
 	if err != nil {
 		return nil, err
 	}
-	out := &EvalEstimate{PerBenchmark: []EvalBenchmarkEstimate{}, Notes: notes}
+	out := &EvalEstimate{PerBenchmark: []EvalBenchmarkEstimate{}, Notes: notes, UnpricedModels: []string{}}
 	if src == nil {
 		out.Notes = append(out.Notes, "no forecast on this server: run counts only, cost and time unknown")
 	}
@@ -189,8 +194,9 @@ func EstimateEvaluationWith(ctx context.Context, suites SuiteSource, src Forecas
 		}
 	}
 	if pricer != nil {
+		out.UnpricedModels = append(out.UnpricedModels, unpriced...)
 		for _, m := range unpriced {
-			out.Notes = append(out.Notes, fmt.Sprintf("model %s has no official price in the price snapshot, so its cost is unknown", m))
+			out.Notes = append(out.Notes, fmt.Sprintf("model %s has no official price in the price snapshot, so its cost is not known; set a price on its key in Models & keys to cost its finished runs", m))
 		}
 	}
 	allKnown, timeKnown, ran := true, true, false
@@ -200,6 +206,9 @@ func EstimateEvaluationWith(ctx context.Context, suites SuiteSource, src Forecas
 			ran = true
 			if len(unpriced) > 0 {
 				be.EstCostUSD.Known = false
+				be.EstCostUSD.Reason = "no price for " + strings.Join(unpriced, ", ")
+			} else if !be.EstCostUSD.Known {
+				be.EstCostUSD.Reason = "no run history to estimate from"
 			}
 			allKnown = allKnown && be.EstCostUSD.Known
 			timeKnown = timeKnown && be.EstMinutes.Known
@@ -212,6 +221,19 @@ func EstimateEvaluationWith(ctx context.Context, suites SuiteSource, src Forecas
 		out.PerBenchmark = append(out.PerBenchmark, be)
 	}
 	out.EstCostUSD.Known = ran && allKnown
+	switch {
+	case out.EstCostUSD.Known:
+	case src == nil:
+		out.EstCostUSD.Reason = "no forecast on this server"
+	case pricer == nil:
+		out.EstCostUSD.Reason = "no price snapshot on this server"
+	case len(unpriced) > 0:
+		out.EstCostUSD.Reason = "no price for " + strings.Join(unpriced, ", ")
+	case !ran:
+		out.EstCostUSD.Reason = "no benchmark can run"
+	default:
+		out.EstCostUSD.Reason = "some benchmarks have no run history to estimate from"
+	}
 	out.EstMinutes.Known = ran && timeKnown
 	if !ran {
 		out.Notes = append(out.Notes, "no benchmark of this evaluation can run")

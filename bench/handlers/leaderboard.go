@@ -9,9 +9,11 @@ import (
 	"time"
 
 	"github.com/fasthttp/router"
+	"github.com/maximhq/bifrost/bench/keystore"
 	"github.com/maximhq/bifrost/bench/leaderboard"
 	"github.com/maximhq/bifrost/bench/lib"
 	"github.com/maximhq/bifrost/bench/schemas"
+	"github.com/maximhq/bifrost/bench/suite"
 	"github.com/valyala/fasthttp"
 )
 
@@ -48,12 +50,30 @@ type LeaderboardHandler struct {
 	// optional.
 	root   string
 	suites SuiteSource
+
+	// library is the built-in agent library (agent versions of library
+	// agents); keys and orgID give the org's key prices (N2); practice
+	// tells practice benchmarks, nil for PracticeBenchmark.
+	library  string
+	keys     KeyLister
+	orgID    string
+	practice func(id string) bool
 }
 
 // WithAgentBoard sets the project root and suite source GET
 // /leaderboard/agents reads versions and tracks from. Either may be empty.
 func (h *LeaderboardHandler) WithAgentBoard(root string, suites SuiteSource) *LeaderboardHandler {
-	h.root, h.suites = root, suites
+	h.root, h.suites, h.library = root, suites, suite.LibraryDir()
+	return h
+}
+
+// WithKeyPrices sets the org key store whose per-key prices cost runs of
+// models the price snapshot does not list (N2). keys may be nil.
+func (h *LeaderboardHandler) WithKeyPrices(keys keystore.Store, orgID string) *LeaderboardHandler {
+	if keys != nil {
+		h.keys = keys
+	}
+	h.orgID = orgID
 	return h
 }
 

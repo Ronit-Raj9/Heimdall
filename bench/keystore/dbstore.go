@@ -28,7 +28,7 @@ func newDBStore(d *db.DB, master []byte) (Store, error) {
 }
 
 const keyCols = `id, org_id, kind, provider, label, base_url, last4, status, created_by, models,
-	budget_usd, month_spent_usd, spend_month, created_at, updated_at, last_tested_at, models_available`
+	budget_usd, month_spent_usd, spend_month, created_at, updated_at, last_tested_at, models_available, price`
 
 type scanner interface{ Scan(dest ...any) error }
 
@@ -36,15 +36,16 @@ func scanKey(s scanner) (*Key, error) {
 	var (
 		k                   Key
 		kind, models, month string
-		available           string
+		available, price    string
 		created, updated    int64
 		tested              sql.NullInt64
 	)
 	if err := s.Scan(&k.ID, &k.OrgID, &kind, &k.Provider, &k.Label, &k.BaseURL, &k.Last4, &k.Status, &k.CreatedBy,
-		&models, &k.BudgetUSD, &k.MonthSpentUSD, &month, &created, &updated, &tested, &available); err != nil {
+		&models, &k.BudgetUSD, &k.MonthSpentUSD, &month, &created, &updated, &tested, &available, &price); err != nil {
 		return nil, err
 	}
 	k.Kind = Kind(kind)
+	k.Price = decodePrice(price)
 	if err := json.Unmarshal([]byte(models), &k.Models); err != nil || k.Models == nil {
 		k.Models = []string{}
 	}
@@ -107,9 +108,9 @@ func (s *dbStore) Create(ctx context.Context, orgID string, k Kind, in Put, acto
 	models, _ := json.Marshal(in.Models)
 	now := time.Now().UTC().UnixMilli()
 	_, err = s.d.Exec(ctx, `INSERT INTO model_keys (id, org_id, kind, provider, label, base_url, last4, status, created_by, models,
-		budget_usd, month_spent_usd, spend_month, value_enc, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, ?, ?, ?, ?)`,
+		budget_usd, month_spent_usd, spend_month, value_enc, created_at, updated_at, price) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, ?, ?, ?, ?, ?)`,
 		id, orgID, string(k), in.Provider, in.Label, in.BaseURL, last4(in.Value), StatusUntested, actor, string(models),
-		in.BudgetUSD, spendMonth(time.Now()), enc, now, now)
+		in.BudgetUSD, spendMonth(time.Now()), enc, now, now, encodePrice(in.Price))
 	if err != nil {
 		return nil, err
 	}
@@ -127,16 +128,16 @@ func (s *dbStore) Update(ctx context.Context, orgID, id string, in Put, actor st
 	models, _ := json.Marshal(in.Models)
 	now := time.Now().UTC().UnixMilli()
 	if in.Value == "" {
-		_, err = s.d.Exec(ctx, `UPDATE model_keys SET provider = ?, label = ?, base_url = ?, models = ?, budget_usd = ?, updated_at = ?
-			WHERE org_id = ? AND id = ?`, in.Provider, in.Label, in.BaseURL, string(models), in.BudgetUSD, now, orgID, id)
+		_, err = s.d.Exec(ctx, `UPDATE model_keys SET provider = ?, label = ?, base_url = ?, models = ?, budget_usd = ?, updated_at = ?, price = ?
+			WHERE org_id = ? AND id = ?`, in.Provider, in.Label, in.BaseURL, string(models), in.BudgetUSD, now, encodePrice(in.Price), orgID, id)
 	} else {
 		enc, serr := seal(s.master, orgID, id, in.Value)
 		if serr != nil {
 			return nil, serr
 		}
 		_, err = s.d.Exec(ctx, `UPDATE model_keys SET provider = ?, label = ?, base_url = ?, models = ?, budget_usd = ?, updated_at = ?,
-			value_enc = ?, last4 = ?, status = ?, last_tested_at = NULL WHERE org_id = ? AND id = ?`,
-			in.Provider, in.Label, in.BaseURL, string(models), in.BudgetUSD, now, enc, last4(in.Value), StatusUntested, orgID, id)
+			value_enc = ?, last4 = ?, status = ?, last_tested_at = NULL, price = ? WHERE org_id = ? AND id = ?`,
+			in.Provider, in.Label, in.BaseURL, string(models), in.BudgetUSD, now, enc, last4(in.Value), StatusUntested, encodePrice(in.Price), orgID, id)
 	}
 	if err != nil {
 		return nil, err

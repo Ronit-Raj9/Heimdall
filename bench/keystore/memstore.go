@@ -63,7 +63,7 @@ func (m *memStore) Create(ctx context.Context, orgID string, k Kind, in Put, act
 	now := time.Now().UTC()
 	e := &entry{value: in.Value, key: Key{ID: newID(), OrgID: orgID, Kind: k, Provider: in.Provider, Label: in.Label,
 		BaseURL: in.BaseURL, Last4: last4(in.Value), Status: StatusUntested, CreatedBy: actor, Models: in.Models,
-		BudgetUSD: in.BudgetUSD, CreatedAt: now, UpdatedAt: now}}
+		BudgetUSD: in.BudgetUSD, Price: in.Price, CreatedAt: now, UpdatedAt: now}}
 	m.keys[e.key.ID] = e
 	out := e.key
 	return &out, nil
@@ -80,7 +80,7 @@ func (m *memStore) Update(ctx context.Context, orgID, id string, in Put, actor s
 		return nil, err
 	}
 	e.key.Provider, e.key.Label, e.key.BaseURL = in.Provider, in.Label, in.BaseURL
-	e.key.Models, e.key.BudgetUSD = in.Models, in.BudgetUSD
+	e.key.Models, e.key.BudgetUSD, e.key.Price = in.Models, in.BudgetUSD, in.Price
 	if in.Value != "" {
 		e.value, e.key.Last4 = in.Value, last4(in.Value)
 		e.key.Status, e.key.LastTestedAt = StatusUntested, nil

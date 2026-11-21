@@ -201,3 +201,38 @@ func checkProviderShapes(ctx context.Context, t *testing.T, s keystore.Store) {
 		}
 	}
 }
+
+// TestStorePrice: a provider key keeps its per-key price through create,
+// update (replaced, never kept) and both stores; an all-zero price is no
+// price, and bad values are refused.
+func TestStorePrice(t *testing.T) {
+	ctx := context.Background()
+	for name, s := range stores(t) {
+		t.Run(name, func(t *testing.T) {
+			p := &keystore.Price{InputPerMTok: 0.5, OutputPerMTok: 2, CachePerMTok: 0.05}
+			k, err := s.Create(ctx, "org_a", keystore.KindProvider, keystore.Put{Provider: "xcodebest", BaseURL: "https://api.xcodebest.example/v1", Value: "sk-test-1234567890abcd", Price: p}, "u1")
+			if err != nil {
+				t.Fatal(err)
+			}
+			if k.Price == nil || *k.Price != *p {
+				t.Fatalf("created price = %+v", k.Price)
+			}
+			if g, _ := s.Get(ctx, "org_a", k.ID); g.Price == nil || *g.Price != *p {
+				t.Fatalf("read price = %+v", g.Price)
+			}
+			u, err := s.Update(ctx, "org_a", k.ID, keystore.Put{Provider: "xcodebest", BaseURL: "https://api.xcodebest.example/v1", Price: &keystore.Price{InputPerMTok: 1, OutputPerMTok: 3}}, "u1")
+			if err != nil || u.Price == nil || u.Price.InputPerMTok != 1 || u.Price.CacheRate() != 1 {
+				t.Fatalf("updated price = %+v, %v", u.Price, err)
+			}
+			u, err = s.Update(ctx, "org_a", k.ID, keystore.Put{Provider: "xcodebest", BaseURL: "https://api.xcodebest.example/v1", Price: &keystore.Price{}}, "u1")
+			if err != nil || u.Price != nil {
+				t.Fatalf("zero price = %+v, %v (want none)", u.Price, err)
+			}
+			for _, bad := range []keystore.Price{{InputPerMTok: -1}, {OutputPerMTok: keystore.MaxPricePerMTok + 1}} {
+				if _, err := s.Update(ctx, "org_a", k.ID, keystore.Put{Provider: "xcodebest", BaseURL: "https://api.xcodebest.example/v1", Price: &bad}, "u1"); !errors.Is(err, keystore.ErrInvalid) {
+					t.Errorf("price %+v: err = %v, want invalid", bad, err)
+				}
+			}
+		})
+	}
+}

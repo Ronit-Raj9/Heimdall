@@ -4,7 +4,7 @@
 		"byBenchmark": "By benchmark"
 	},
 	"title": "Agents",
-	"description": "One row per agent version and model. Each score is the share of runs solved on that capability's benchmarks (newest version of each, clean runs), with a 95% range.",
+	"description": "One row per agent version and model, from your organization's real runs. Each score is the share of runs solved on that capability's benchmarks (newest version of each, clean runs), with a 95% range over tasks. A score is ranked once it has {{runs}} runs over {{tasks}} tasks.",
 	"loadError": "Could not load the agent leaderboard.",
 	"empty": "No agent has finished runs yet. Run an evaluation to fill this board.",
 	"emptyFiltered": "No agent matches these filters.",
@@ -20,13 +20,14 @@
 		"version": "Version",
 		"model": "Model",
 		"cost": "Cost per run",
-		"runs": "Runs"
+		"runs": "Runs",
+		"rank": "Rank"
 	},
 	"baseline": "baseline",
 	"baselineHint": "A built-in agent, shown for comparison",
 	"noVersion": "unsaved",
 	"noScore": "not run",
-	"range": "95% range {{low}} to {{high}}, {{runs}} runs",
+	"range": "95% range {{low}} to {{high}}, {{runs}} runs over {{tasks}} tasks",
 	"openReportCard": "Open the report card for {{agent}}",
 	"capability": {
 		"terminal": "Terminal",
@@ -38,5 +39,10 @@
 		"safety": "Safety",
 		"team": "Team",
 		"gpu": "GPU"
-	}
+	},
+	"sample": "{{runs}} runs, {{tasks}} tasks",
+	"notEnough": "not enough runs",
+	"notEnoughHint": "Not ranked: {{runs}} runs over {{tasks}} tasks; ranking needs {{minRuns}} runs over {{minTasks}} tasks",
+	"costNotKnown": "not known",
+	"costUnpriced": "{{count}} of {{runs}} runs unpriced"
 }

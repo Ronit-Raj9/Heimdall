@@ -14,8 +14,14 @@ const AgentVersionsDir = ".heimdall/agent-versions"
 
 // AgentVersion is one entry of an agent's versions.json.
 type AgentVersion struct {
-	Version   int       `json:"version"`
-	Hash      string    `json:"hash"`
+	Version int    `json:"version"`
+	Hash    string `json:"hash"`
+	// AgentHash is the version identity: the config hash with the axes an
+	// evaluation sets per arm (model, gateway provider) left out, so every
+	// run of this version on any model maps back to it
+	// (agentversions.AgentHash). Older entries without it are filled from
+	// their snapshot when read.
+	AgentHash string    `json:"agent_hash,omitempty"`
 	CreatedAt time.Time `json:"created_at"`
 	CreatedBy string    `json:"created_by"`
 	Note      string    `json:"note"`

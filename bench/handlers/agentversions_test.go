@@ -12,6 +12,7 @@ import (
 	"github.com/maximhq/bifrost/bench/agentversions"
 	"github.com/maximhq/bifrost/bench/projectfs"
 	"github.com/maximhq/bifrost/bench/schemas"
+	"github.com/maximhq/bifrost/bench/suite"
 	"github.com/valyala/fasthttp"
 )
 
@@ -149,10 +150,17 @@ func TestAgentVersionsFromFileHistoryAndRuns(t *testing.T) {
 	if code != 200 || c.Created || c.Version != 2 {
 		t.Fatalf("post unchanged: %d %s", code, body)
 	}
-	idx := &versionsIndex{hash: c.Hash}
+	// Runs count by agent hash: an arm on another model and provider is
+	// still this version; another agent is not.
+	var cfg schemas.AgentConfig
+	if err := suite.DecodeYAML([]byte(strings.Replace(old, "900", "60", 1)), "agent", suite.SchemaAgent, &cfg); err != nil {
+		t.Fatal(err)
+	}
+	cfg.Model, cfg.Gateway.Provider = "gpt-6.2-sol", "openai"
+	idx := &versionsIndex{cfg: cfg}
 	h2 := &agentVersionsHandler{index: idx}
-	if got := h2.runsByHash()[c.Hash]; got != 3 {
-		t.Fatalf("runs %d", got)
+	if got := h2.runsByHash()[strings.TrimPrefix(c.AgentHash, "sha256:")]; got != 3 || c.AgentHash == "" {
+		t.Fatalf("runs %d (agent hash %q)", got, c.AgentHash)
 	}
 }
 
@@ -195,12 +203,14 @@ gateway:
 // from its manifest arm, one belongs to another config.
 type versionsIndex struct {
 	ReadIndex
-	hash string
+	cfg schemas.AgentConfig
 }
 
 func (v *versionsIndex) Experiments() []string { return []string{"exp_1"} }
 func (v *versionsIndex) Manifest(string) (*schemas.Manifest, bool) {
-	return &schemas.Manifest{Arms: map[string]schemas.ArmManifest{"A": {ConfigHash: v.hash}, "B": {ConfigHash: "other"}}}, true
+	other := v.cfg
+	other.ID = "someone-else"
+	return &schemas.Manifest{Arms: map[string]schemas.ArmManifest{"A": {ConfigHash: "h", Config: v.cfg}, "B": {ConfigHash: "other", Config: other}}}, true
 }
 func (v *versionsIndex) Runs(string) []RunView {
 	run := func(arm, hash string) RunView {
@@ -209,5 +219,5 @@ func (v *versionsIndex) Runs(string) []RunView {
 		rv.Run.Agent.ConfigHash = hash
 		return rv
 	}
-	return []RunView{run("A", v.hash), run("A", v.hash), run("A", ""), run("B", "")}
+	return []RunView{run("A", "h"), run("A", "h"), run("A", ""), run("B", "")}
 }

@@ -91,6 +91,11 @@ type LeaderboardEntry struct {
 	// over shared tasks of (success under the condition minus success clean),
 	// as a fraction (-0.25 = 25 points lower). Only on a clean board.
 	Resilience map[string]Value `json:"resilience"`
+
+	// TaskPasses is verified successes over graded runs per task in scope,
+	// for callers that need a task-clustered interval (the agent
+	// leaderboard). In process only: never serialized.
+	TaskPasses map[string]Ratio `json:"-"`
 }
 
 // LeaderboardExclusion counts runs the board left out for one reason, e.g.

@@ -5,6 +5,19 @@ export function formatShare(v: number): string {
 	return `${Math.round(v * 100)}%`;
 }
 
+/** Ranking needs this many runs and tasks unless the server says otherwise. */
+export const DEFAULT_MIN_RUNS = 10;
+export const DEFAULT_MIN_TASKS = 5;
+
+/** The row's cost display: the cost per run, or not known with how many runs are unpriced and why. */
+export function rowCost(row: AgentLeaderboardRow): { known: boolean; text: string; unpriced: number; runs: number; note: string } {
+	const runs = row.runs ?? 0;
+	if (row.cost_usd !== null && row.cost_usd !== undefined && Number.isFinite(row.cost_usd)) {
+		return { known: true, text: formatCost(row.cost_usd), unpriced: 0, runs, note: "" };
+	}
+	return { known: false, text: "", unpriced: Math.max(0, runs - (row.cost_runs ?? 0)), runs, note: row.cost_note ?? "" };
+}
+
 /** A cost per run in US dollars, "-" when never observed. */
 export function formatCost(v: number | null | undefined): string {
 	if (v === null || v === undefined || !Number.isFinite(v)) return "-";

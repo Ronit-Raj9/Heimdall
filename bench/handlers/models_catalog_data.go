@@ -152,7 +152,9 @@ func catalogProviders() []ModelProviderInfo {
 		{ID: "elevenlabs", Name: "ElevenLabs (speech)", DefaultBaseURL: "https://api.elevenlabs.io/v1",
 			KeyHint: "Create a key at elevenlabs.io/app/settings/api-keys; used for speech to text and text to speech", Models: []ModelOption{}},
 		// The proxy models below were seen live on the xcodebest
-		// OpenAI-compatible proxy; they carry no price on purpose.
+		// OpenAI-compatible proxy. The snapshot prices the gpt-6.2 ones
+		// (deploy/pricing-snapshot.json); any other model is costed from the
+		// price set on the org's key.
 		{ID: "openai-compatible", Name: "OpenAI-compatible endpoint", NeedsBaseURL: true, BifrostProvider: "openai", CustomBaseURL: true,
 			KeyHint: "Any server that speaks the OpenAI API (vLLM, Ollama, LiteLLM, Together, Fireworks, DeepSeek...): give its base URL ending in /v1",
 			Models: []ModelOption{modelChat("gpt-6.2-sol", 90, false), modelChat("gpt-6.2-astra", 90, false), modelChat("gpt-6.1-sol", 90, false),

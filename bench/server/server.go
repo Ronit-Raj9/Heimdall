@@ -178,7 +178,7 @@ func registerOrgRoutes(r *router.Router, cfg *lib.Config, deps Deps, write lib.M
 	handlers.NewPairsHandler(mode, deps.Index).WithHeldOutVisible(cfg.HeldOut.Visible).RegisterRoutes(r, common...)
 	handlers.NewTriageHandler(mode, deps.Index, deps.Catalog).RegisterRoutes(r, common...)
 	// U3: the held-out board needs held_out.visible, as held-out task detail does.
-	handlers.NewLeaderboardHandler(mode, deps.Index).WithHeldOutVisible(cfg.HeldOut.Visible).WithAgentBoard(cfg.Root, deps.Suites).RegisterRoutes(r, common...)
+	handlers.NewLeaderboardHandler(mode, deps.Index).WithHeldOutVisible(cfg.HeldOut.Visible).WithAgentBoard(cfg.Root, deps.Suites).WithKeyPrices(deps.Services.Keys, deps.Services.OrgID).RegisterRoutes(r, common...)
 	handlers.NewClustersHandler(mode, deps.Index).RegisterRoutes(r, common...) // Failure clusters area (handlers/clusters.go)
 	handlers.NewAuditHandler(mode, deps.Auditor, write).RegisterRoutes(r, common...)
 	handlers.NewReleasesHandler(mode, deps.Releases, write).RegisterRoutes(r, common...)

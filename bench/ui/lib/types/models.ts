@@ -21,6 +21,15 @@ export interface ModelKey {
 	created_at: string;
 	updated_at: string;
 	last_tested_at?: string;
+	/** What the org pays on this key per 1M tokens; prices runs of models the price list does not have. */
+	price?: ModelKeyPrice;
+}
+
+/** A key's price per 1M tokens (USD). cache_per_mtok 0 prices cached tokens at the input price. */
+export interface ModelKeyPrice {
+	input_per_mtok: number;
+	output_per_mtok: number;
+	cache_per_mtok: number;
 }
 
 export interface ModelKeyRequest {
@@ -31,6 +40,8 @@ export interface ModelKeyRequest {
 	value?: string;
 	models?: string[];
 	budget_usd?: number;
+	/** Replaces the stored price; left out clears it. */
+	price?: ModelKeyPrice;
 }
 
 export interface ModelOption {

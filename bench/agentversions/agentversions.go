@@ -13,6 +13,7 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"strings"
 	"sync"
 	"time"
 
@@ -39,22 +40,101 @@ func ValidID(id string) bool { return idRe.MatchString(id) }
 // utils.HashJSON, so it equals a manifest arm's config_hash for agents whose
 // image is not built per suite.
 func ConfigHash(doc []byte) (string, error) {
+	cfg, err := decodeConfig(doc)
+	if err != nil {
+		return "", err
+	}
+	return utils.HashJSON(&cfg)
+}
+
+// RepeatArmEnv is the env var the evaluation planner sets on the hidden
+// repeat arm of a score-mode evaluation (handlers/evaluations.go evalArms):
+// the same agent, so it is no part of the version identity.
+const RepeatArmEnv = "HEIMDALL_QUICKRUN_ARM"
+
+// AgentHash is the version identity of a resolved agent config: its
+// config hash with the axes an evaluation sets per arm left out (model and
+// gateway provider), the repeat arm's marker env var dropped, and, for an
+// agent whose image is built per suite, the resolved image tag dropped (its
+// build section stays). A run of a version on any model, and the version's
+// own snapshot, hash the same.
+func AgentHash(cfg schemas.AgentConfig) (string, error) {
+	cfg.Model = ""
+	cfg.Gateway.Provider = ""
+	if cfg.Build != nil {
+		cfg.Image = ""
+	}
+	if _, ok := cfg.Env[RepeatArmEnv]; ok {
+		env := make(map[string]string, len(cfg.Env))
+		for k, v := range cfg.Env {
+			if k != RepeatArmEnv {
+				env[k] = v
+			}
+		}
+		cfg.Env = env
+	}
+	if len(cfg.Env) == 0 {
+		cfg.Env = nil
+	}
+	return utils.HashJSON(&cfg)
+}
+
+// DocAgentHash is AgentHash of an agent YAML document, decoded as
+// ConfigHash decodes it.
+func DocAgentHash(doc []byte) (string, error) {
+	cfg, err := decodeConfig(doc)
+	if err != nil {
+		return "", err
+	}
+	return AgentHash(cfg)
+}
+
+// decodeConfig decodes an agent YAML document as engine.ResolveAgentConfig
+// does with no overrides.
+func decodeConfig(doc []byte) (schemas.AgentConfig, error) {
+	var cfg schemas.AgentConfig
 	var tree map[string]any
 	if err := yaml.Unmarshal(doc, &tree); err != nil {
-		return "", fmt.Errorf("parse agent config: %w", err)
+		return cfg, fmt.Errorf("parse agent config: %w", err)
 	}
 	if tree == nil {
 		tree = map[string]any{}
 	}
 	out, err := yaml.Marshal(tree)
 	if err != nil {
-		return "", fmt.Errorf("encode agent config: %w", err)
+		return cfg, fmt.Errorf("encode agent config: %w", err)
 	}
-	var cfg schemas.AgentConfig
 	if err := suite.DecodeYAML(out, "effective agent config", suite.SchemaAgent, &cfg); err != nil {
-		return "", err
+		return cfg, err
 	}
-	return utils.HashJSON(&cfg)
+	return cfg, nil
+}
+
+// VersionOf returns the version of agent id whose agent hash is
+// agentHash: the newest such project version, else 1 for a built-in
+// library agent (under lib) the project does not version whose library
+// file hashes the same, else 0.
+func VersionOf(root, lib, id, agentHash string) int {
+	if agentHash == "" || !ValidID(id) {
+		return 0
+	}
+	agentHash = strings.TrimPrefix(agentHash, "sha256:")
+	if root != "" {
+		if vs, err := List(root, id); err == nil && len(vs) > 0 {
+			for i := len(vs) - 1; i >= 0; i-- {
+				if strings.TrimPrefix(vs[i].AgentHash, "sha256:") == agentHash {
+					return vs[i].Version
+				}
+			}
+			return 0
+		}
+	}
+	if p := LibraryFile(lib, id); p != "" {
+		if _, v, err := LibraryVersion(p); err == nil && strings.TrimPrefix(v.AgentHash, "sha256:") == agentHash {
+			return 1
+		}
+	}
+	return 0
 }
 
 var (
@@ -101,6 +181,15 @@ func readIndex(dir string) ([]schemas.AgentVersion, error) {
 	}
 	if out == nil {
 		out = []schemas.AgentVersion{}
+	}
+	for i := range out {
+		if out[i].AgentHash != "" {
+			continue
+		}
+		// An entry from before agent hashes: fill it from its snapshot.
+		if doc, err := os.ReadFile(filepath.Join(dir, fmt.Sprintf("v%d.yaml", out[i].Version))); err == nil {
+			out[i].AgentHash, _ = DocAgentHash(doc)
+		}
 	}
 	return out, nil
 }
@@ -165,19 +254,22 @@ func Record(root, id string, history []Source) (schemas.AgentVersion, bool, erro
 		history = history[len(history)-1:]
 	}
 	// The current content must decode; older history entries may not.
-	lastHash, err := ConfigHash(history[len(history)-1].Doc)
+	lastHash, lastAgent, err := hashes(history[len(history)-1].Doc)
 	if err != nil {
 		return schemas.AgentVersion{}, false, err
 	}
 	created := false
 	for i, src := range history {
-		hash := lastHash
+		hash, agentHash := lastHash, lastAgent
 		if i < len(history)-1 {
-			if hash, err = ConfigHash(src.Doc); err != nil {
+			if hash, agentHash, err = hashes(src.Doc); err != nil {
 				continue
 			}
 		}
-		if len(vs) > 0 && vs[len(vs)-1].Hash == hash {
+		// A version is the agent without its model and provider (AgentHash):
+		// a change of default model alone is no new version, since every
+		// evaluation sets the model per arm anyway.
+		if len(vs) > 0 && (vs[len(vs)-1].Hash == hash || vs[len(vs)-1].AgentHash == agentHash) {
 			continue
 		}
 		next := 1
@@ -192,7 +284,7 @@ func Record(root, id string, history []Source) (schemas.AgentVersion, bool, erro
 		if len(note) > 200 {
 			note = note[:200]
 		}
-		v := schemas.AgentVersion{Version: next, Hash: hash, CreatedAt: at, CreatedBy: src.Actor, Note: note,
+		v := schemas.AgentVersion{Version: next, Hash: hash, AgentHash: agentHash, CreatedAt: at, CreatedBy: src.Actor, Note: note,
 			FileVersion: src.FileVersion, FileSHA256: src.FileSHA256}
 		if err := os.MkdirAll(dir, 0o755); err != nil {
 			return v, created, err
@@ -212,6 +304,19 @@ func Record(root, id string, history []Source) (schemas.AgentVersion, bool, erro
 		}
 	}
 	return vs[len(vs)-1], created, nil
+}
+
+// hashes returns a document's config hash and agent hash.
+func hashes(doc []byte) (hash, agentHash string, err error) {
+	cfg, err := decodeConfig(doc)
+	if err != nil {
+		return "", "", err
+	}
+	if hash, err = utils.HashJSON(&cfg); err != nil {
+		return "", "", err
+	}
+	agentHash, err = AgentHash(cfg)
+	return hash, agentHash, err
 }
 
 func writeAtomic(path string, data []byte) error {
@@ -261,8 +366,8 @@ func LibraryVersion(path string) ([]byte, schemas.AgentVersion, error) {
 	if fi, err := os.Stat(path); err == nil {
 		v.CreatedAt = fi.ModTime().UTC()
 	}
-	if v.Hash, err = ConfigHash(b); err != nil {
-		v.Hash = utils.SHA256Bytes(b)
+	if v.Hash, v.AgentHash, err = hashes(b); err != nil {
+		v.Hash, v.AgentHash = utils.SHA256Bytes(b), ""
 	}
 	return b, v, nil
 }
