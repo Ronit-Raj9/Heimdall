@@ -11,7 +11,7 @@ describe("CanaryDetailBody", () => {
 	const html = renderToStaticMarkup(<CanaryDetailBody detail={CANARY_DRIFTED_FIXTURE} />);
 
 	it("states the drift and why", () => {
-		expect(html).toMatch(/data-testid="canary-detail-state"[^>]*>Drifted</);
+		expect(html).toMatch(/data-testid="canary-detail-state"[^>]*>Got worse</);
 		expect(html).toContain("drift confirmed by two consecutive looks");
 		expect(html).toContain("Baseline e_canary_1");
 	});
@@ -41,7 +41,7 @@ describe("CanaryDetailBody", () => {
 
 	it("says when nothing moved on a steady canary without a provider pair", () => {
 		const steady = renderToStaticMarkup(<CanaryDetailBody detail={CANARY_STEADY_FIXTURE} />);
-		expect(steady).toMatch(/data-testid="canary-detail-state"[^>]*>Steady</);
+		expect(steady).toMatch(/data-testid="canary-detail-state"[^>]*>No change</);
 		expect(steady).not.toContain('data-testid="canary-equivalence"');
 		expect(steady).toContain('data-testid="canary-tests-table"');
 	});

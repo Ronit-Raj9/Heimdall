@@ -14,8 +14,8 @@ describe("LiveBody", () => {
 		expect(html).toContain("no ground truth");
 		expect(html).toMatch(/data-testid="live-source-url"[^>]*>http:\/\/127\.0\.0\.1:18080/);
 		expect(html).toContain("read-only");
-		expect(html).toMatch(/data-testid="live-grouping"[^>]*>160 by session id, 6 by idle gap/);
-		expect(html).toContain("numbers and flags only");
+		expect(html).toMatch(/data-testid="live-grouping"[^>]*>160 grouped by session id, 6 grouped by pauses between requests/);
+		expect(html).toContain("Only numbers and flags are kept");
 		expect(html).toContain('data-testid="live-judge"');
 		expect(html).toContain("never decide");
 	});
@@ -28,7 +28,7 @@ describe("LiveBody", () => {
 		expect(rows).toContain("loop");
 		expect(html).toMatch(/data-result="worse" data-testid="live-decision-abandoned"/);
 		expect(html).toMatch(/data-result="not_yet_known" data-testid="live-decision-loop"/);
-		expect(html).toContain("v2 against v1");
+		expect(html).toContain("New version v2 compared with current version v1");
 		expect(html).toContain("46.5%"); // abandoned share of the candidate
 		expect(html).toContain("Ville");
 	});
@@ -69,6 +69,6 @@ describe("LiveBody", () => {
 				}}
 			/>,
 		);
-		expect(broken).toContain("Live scoring is off: parse livescore/config.yaml: unknown key");
+		expect(broken).toContain("Live quality scoring is off: parse livescore/config.yaml: unknown key");
 	});
 });

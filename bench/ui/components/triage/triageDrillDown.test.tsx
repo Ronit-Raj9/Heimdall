@@ -50,7 +50,7 @@ describe("TriageDrillDown", () => {
 	it("links each run to its matched pair from the grid", () => {
 		// r_qolshdu5jg is t03 clean, arm A trial 3, pair p_gszjh69z4k in the grid fixture.
 		expect(html).toMatch(/href="\/runs\?pair=p_gszjh69z4k"[^>]*data-testid="triage-compare-r_qolshdu5jg"/);
-		expect(html).toMatch(/data-testid="triage-run-r_qolshdu5jg".*?t03.*?clean · trial 3/);
+		expect(html).toMatch(/data-testid="triage-run-r_qolshdu5jg".*?t03.*?clean · attempt 3/);
 	});
 
 	it("shows the triggering event ids and the summary from the reason", () => {
@@ -82,8 +82,8 @@ describe("TriageDrillDown", () => {
 
 describe("TriageRunEvidence", () => {
 	const cases = [
-		{ name: "loading", props: { value: undefined, isLoading: true, isError: false }, want: "Loading the run&#x27;s metrics" },
-		{ name: "error", props: { value: undefined, isLoading: false, isError: true }, want: "Could not load this run&#x27;s metrics." },
+		{ name: "loading", props: { value: undefined, isLoading: true, isError: false }, want: "Loading this run&#x27;s measurements" },
+		{ name: "error", props: { value: undefined, isLoading: false, isError: true }, want: "Could not load this run&#x27;s measurements." },
 		{
 			name: "caps the list",
 			props: {

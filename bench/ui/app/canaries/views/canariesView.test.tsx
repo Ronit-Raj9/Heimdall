@@ -24,6 +24,6 @@ describe("CanariesBody", () => {
 		);
 		expect(html).toContain('data-testid="canaries-empty"');
 		expect(html).toContain("canary init");
-		expect(html).toContain("Catch silent model drift");
+		expect(html).toContain("Catch your agent or model quietly getting worse");
 	});
 });

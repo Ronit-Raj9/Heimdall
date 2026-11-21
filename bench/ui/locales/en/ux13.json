@@ -1,51 +1,51 @@
 {
 	"live": {
-		"heroTitle": "Score real traffic",
-		"heroMessage": "Read real sessions from your gateway and compare two live versions, no labels needed.",
+		"heroTitle": "Compare versions on real traffic",
+		"heroMessage": "Heimdall reads real sessions from your gateway and tells you whether the new version of your agent does better or worse than the current one. No answer key needed.",
 		"heroAction": "Set up live scoring",
 		"setupTitle": "Set up live scoring",
-		"setupDescription": "Three steps. Heimdall writes the config for you.",
-		"stepSplit": "How do you tell the two versions apart?",
+		"setupDescription": "Three steps. Heimdall writes the settings file for you.",
+		"stepSplit": "How can Heimdall tell the two versions apart?",
 		"stepGateway": "Where is your gateway?",
 		"stepSave": "Save",
 		"close": "Close",
 		"reconfigure": "Change setup"
 	},
 	"canaries": {
-		"heroTitle": "Catch silent model drift",
-		"heroMessage": "A canary re-runs a small pinned suite on a schedule and flags when results move.",
-		"heroAction": "Create a canary",
-		"newAction": "New canary",
-		"cli": "Prefer the terminal? Run heimdall canary init.",
+		"heroTitle": "Catch your agent or model quietly getting worse",
+		"heroMessage": "A drift monitor re-runs a small, frozen test on a schedule and warns you when results drop.",
+		"heroAction": "Create a drift monitor",
+		"newAction": "New drift monitor",
+		"cli": "Prefer the terminal? heimdall canary init",
 		"stepWhat": "What to test",
 		"stepWhere": "Which models",
-		"stepWhen": "When and how much",
+		"stepWhen": "When, and how much to spend",
 		"close": "Close"
 	},
 	"schedules": {
-		"heroTitle": "Run experiments on autopilot",
-		"heroMessage": "Queue an experiment on a cron schedule with a daily spend cap.",
+		"heroTitle": "Run tests automatically",
+		"heroMessage": "Pick a comparison, a time and a daily spending limit. Heimdall starts it for you.",
 		"heroAction": "Add a schedule",
 		"newAction": "Add schedule",
 		"stepWhat": "What to run",
 		"stepWhen": "When",
-		"stepCap": "Spend cap",
+		"stepCap": "Daily spending limit",
 		"close": "Close",
 		"integrations": "Integrations",
-		"integrationsHint": "Webhook alerts for regressions and failed runs",
+		"integrationsHint": "Get a message when results get worse or a run fails",
 		"advanced": "Advanced",
-		"pillOk": "OK",
+		"pillOk": "Worked",
 		"pillFailed": "Failed",
 		"pillNever": "Not run yet",
-		"pillProblem": "Needs attention"
+		"pillProblem": "Needs your attention"
 	},
 	"inbox": {
 		"heroTitle": "Turn production failures into tests",
-		"heroMessage": "Pull failed traces from your gateway or tracing tool and keep the ones worth fixing.",
-		"heroAction": "Connect a trace source",
+		"heroMessage": "Connect your gateway or tracing tool. Heimdall collects failed requests so you can turn the important ones into new test tasks.",
+		"heroAction": "Connect a tool",
 		"integrations": "Integrations",
-		"integrationsHint": "Trace sources, push webhook and ingest tokens",
-		"sources": "Sources",
-		"cli": "Or pull from your terminal:"
+		"integrationsHint": "Tools to pull failures from, and access tokens for tools that send them in",
+		"sources": "Where failures come from",
+		"cli": "Or from a terminal:"
 	}
 }

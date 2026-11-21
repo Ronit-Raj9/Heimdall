@@ -36,8 +36,8 @@ describe("InboxItemDetailView", () => {
 		expect(html).toContain("issue_refund");
 		expect(html).toContain("timeout after &lt;n&gt;s");
 		for (const id of ["abc101", "abc117", "abc123"]) expect(html).toContain(`data-testid="inbox-detail-trace-${id}"`);
-		expect(html).toContain("Redacted before storage: 1 email.");
-		expect(html).toContain("MCP task in support");
+		expect(html).toContain("Removed before saving: 1 email.");
+		expect(html).toContain("MCP task in benchmark support");
 		expect(html).toContain('href="https://cloud.langfuse.com/project/p1/traces/abc123"');
 		expect(html).not.toContain('data-testid="inbox-detail-task"');
 	});
@@ -45,11 +45,11 @@ describe("InboxItemDetailView", () => {
 	it("shows what an accepted item became, how its task does and that it recurred", () => {
 		const html = renderToStaticMarkup(<InboxItemDetailView detail={INBOX_ACCEPTED_DETAIL_FIXTURE} />);
 		expect(html).toContain('data-testid="inbox-detail-task"');
-		expect(html).toContain("Accepted as support/warranty-period");
-		expect(html).toContain("passes in e_123 (3/3)");
+		expect(html).toContain("Turned into task warranty-period in benchmark support");
+		expect(html).toContain("solved in e_123 (3 of 3 runs)");
 		expect(html).toContain('href="/experiments/e_123"');
 		expect(html).toContain('data-testid="inbox-detail-recurrences"');
-		expect(html).toContain(">admitted<");
+		expect(html).toContain(">ready<");
 		// No link on the item or its traces: nothing to open.
 		expect(html).not.toContain('target="_blank"');
 	});
@@ -57,7 +57,7 @@ describe("InboxItemDetailView", () => {
 	it("shows a reject reason and the duplicate it points at", () => {
 		const dup = INBOX_LIST_FIXTURE.items.find((i) => i.state === "duplicate")!;
 		const html = renderToStaticMarkup(<InboxItemDetailView detail={{ item: dup, preview: "x" }} />);
-		expect(html).toContain("Duplicate of inc-3f9a1c2b7d10.");
+		expect(html).toContain("Same failure as inc-3f9a1c2b7d10.");
 		expect(html).toContain("Rejected: same refund timeout");
 	});
 
@@ -70,7 +70,7 @@ describe("InboxItemDetailView", () => {
 describe("InboxDraftResult", () => {
 	it("says plainly that the draft still needs a person, with the files and next steps", () => {
 		const html = renderToStaticMarkup(<InboxDraftResult draft={INBOX_ACCEPT_FIXTURE.draft} />);
-		expect(html).toContain("Draft task support/refund-timeout written");
+		expect(html).toContain("Draft task support/refund-timeout created");
 		expect(html).toContain("This is a draft, not a finished test.");
 		expect(html).toContain("EDIT ME");
 		expect(html).toContain("instruction.md");
@@ -102,10 +102,10 @@ describe("sources and empty state", () => {
 	it("explains how items get in", () => {
 		const html = renderToStaticMarkup(<InboxEmpty />);
 		expect(html).toContain("heimdall inbox pull");
-		expect(html).toContain("Connect a trace source");
+		expect(html).toContain("Connect a tool");
 	});
 
 	it("notes when push ingest is off", () => {
-		expect(renderToStaticMarkup(<InboxIngestOffNote />)).toContain("Push ingest is off");
+		expect(renderToStaticMarkup(<InboxIngestOffNote />)).toContain("does not accept failures sent in");
 	});
 });

@@ -119,7 +119,7 @@ describe("InboxActions", () => {
 		const accepted = INBOX_LIST_FIXTURE.items.find((i) => i.state === "accepted")!;
 		const html = renderToStaticMarkup(<InboxActions {...base} item={accepted} />);
 		expect(html).toContain('data-testid="inbox-actions-closed"');
-		expect(html).toContain("This item is accepted.");
+		expect(html).toContain("This failure is accepted.");
 		expect(html).not.toContain("inbox-accept-form");
 	});
 

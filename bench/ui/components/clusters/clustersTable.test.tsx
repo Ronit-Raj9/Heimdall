@@ -21,14 +21,14 @@ describe("ClustersTable", () => {
 
 	it("has every column", () => {
 		for (const head of [
-			">Cluster<",
+			">Group<",
 			">Runs<",
 			">Share<",
-			">Scope<",
+			">How widespread<",
 			">Tasks<",
 			">Agents<",
 			">Conditions<",
-			">Experiments<",
+			">Comparisons<",
 			">Last seen<",
 		]) {
 			expect(html).toContain(head);
@@ -39,7 +39,7 @@ describe("ClustersTable", () => {
 		expect(html).toMatch(new RegExp(`data-testid="clusters-count-${limiter.signature}">6<`));
 		expect(html).toMatch(new RegExp(`data-testid="clusters-share-${limiter.signature}">50%<`));
 		expect(html).toMatch(new RegExp(`data-testid="clusters-share-${toolError.signature}">16.7%<`));
-		expect(html).toMatch(new RegExp(`data-testid="clusters-scope-${limiter.signature}"[^>]*>Systemic<`));
+		expect(html).toMatch(new RegExp(`data-testid="clusters-scope-${limiter.signature}"[^>]*>Widespread<`));
 		expect(html).toMatch(new RegExp(`data-testid="clusters-scope-${loop.signature}"[^>]*>One agent, one task<`));
 	});
 
@@ -67,7 +67,7 @@ describe("ClustersTable", () => {
 describe("ClusterScopeBadge", () => {
 	it("labels known scopes with a hint and shows an unknown one raw", () => {
 		expect(renderToStaticMarkup(<ClusterScopeBadge scope="single_run" />)).toContain("One run");
-		expect(renderToStaticMarkup(<ClusterScopeBadge scope="task" />)).toContain('title="One task, more than one agent config."');
+		expect(renderToStaticMarkup(<ClusterScopeBadge scope="task" />)).toContain('title="One task, more than one agent setup."');
 		expect(renderToStaticMarkup(<ClusterScopeBadge scope="galaxy" />)).toContain(">galaxy<");
 	});
 });
@@ -75,19 +75,19 @@ describe("ClusterScopeBadge", () => {
 describe("ClustersSummary", () => {
 	it("says N failures in M verified runs, the experiments read and the runs left out by reason", () => {
 		const html = renderToStaticMarkup(<ClustersSummary data={CLUSTER_LIST_FIXTURE} />);
-		expect(html).toMatch(/data-testid="clusters-summary-line">12 failures in 30 verified runs</);
-		expect(html).toContain("from 2 experiments");
+		expect(html).toMatch(/data-testid="clusters-summary-line">12 failures in 30 checked runs</);
+		expect(html).toContain("from 2 comparisons");
 		expect(html).toMatch(/data-testid="clusters-excluded-not-sealed".*?not sealed.*?2 runs/);
 		expect(html).toMatch(/data-testid="clusters-excluded-synthetic".*?synthetic.*?1 run</);
-		expect(html).toContain("1 cluster below the minimum of 2 runs is not listed.");
+		expect(html).toContain("1 group with fewer than 2 runs is not shown.");
 	});
 
 	it("uses singular forms and says when nothing was left out", () => {
 		const html = renderToStaticMarkup(
 			<ClustersSummary data={{ ...CLUSTER_LIST_FIXTURE, runs: 1, failures: 1, experiments: [], excluded: [], hidden: 0 }} />,
 		);
-		expect(html).toContain("1 failure in 1 verified run");
-		expect(html).toContain("No runs left out.");
+		expect(html).toContain("1 failure in 1 checked run");
+		expect(html).toContain("Every run is counted.");
 		expect(html).not.toContain("clusters-summary-hidden");
 		expect(html).not.toContain("clusters-summary-experiments");
 	});
