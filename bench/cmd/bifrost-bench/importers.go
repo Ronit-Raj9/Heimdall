@@ -12,6 +12,7 @@ import (
 	_ "github.com/maximhq/bifrost/bench/importers/longmemeval"
 	_ "github.com/maximhq/bifrost/bench/importers/marble" // X5b: MultiAgentBench (MARBLE)
 	_ "github.com/maximhq/bifrost/bench/importers/mcpmark"
+	_ "github.com/maximhq/bifrost/bench/importers/msibench" // MSI-Bench v2 multi-speaker room calls
 	_ "github.com/maximhq/bifrost/bench/importers/swebench"
 	_ "github.com/maximhq/bifrost/bench/importers/tau2"
 	_ "github.com/maximhq/bifrost/bench/importers/voicebench" // B5: VoiceBench spoken questions
