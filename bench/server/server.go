@@ -16,6 +16,7 @@ import (
 	"github.com/maximhq/bifrost/bench/auth"
 	"github.com/maximhq/bifrost/bench/handlers"
 	"github.com/maximhq/bifrost/bench/lib"
+	"github.com/maximhq/bifrost/bench/packs"
 	"github.com/maximhq/bifrost/bench/schemas"
 	"github.com/maximhq/bifrost/bench/taskhealth"
 	"github.com/valyala/fasthttp"
@@ -180,8 +181,14 @@ func registerOrgRoutes(r *router.Router, cfg *lib.Config, deps Deps, write lib.M
 	handlers.NewClustersHandler(mode, deps.Index).RegisterRoutes(r, common...) // Failure clusters area (handlers/clusters.go)
 	handlers.NewAuditHandler(mode, deps.Auditor, write).RegisterRoutes(r, common...)
 	handlers.NewReleasesHandler(mode, deps.Releases, write).RegisterRoutes(r, common...)
-	handlers.NewSuitesHandler(mode, deps.Suites).WithHeldOutVisible(cfg.HeldOut.Visible).WarmCache().RegisterRoutes(r, common...) // Suite health area: held_out.visible; WarmCache: suite list cache
-	handlers.NewSuiteHealthHandler(mode, deps.Suites, deps.Health).RegisterRoutes(r, common...)                                   // Suite health area (handlers/suitehealth.go)
+	suitesHandler := handlers.NewSuitesHandler(mode, deps.Suites).WithHeldOutVisible(cfg.HeldOut.Visible).WarmCache()
+	suitesHandler.RegisterRoutes(r, common...) // Suite health area: held_out.visible; WarmCache: suite list cache
+	var packSuites packs.SuiteLister           // nil without a suite loader: GET /evaluation-packs answers 503
+	if deps.Suites != nil {
+		packSuites = suitesHandler
+	}
+	packs.NewHandler(mode, packSuites).RegisterRoutes(r, common...)                             // A03: GET /evaluation-packs (packs/handler.go)
+	handlers.NewSuiteHealthHandler(mode, deps.Suites, deps.Health).RegisterRoutes(r, common...) // Suite health area (handlers/suitehealth.go)
 	handlers.NewAgentsHandler(mode, deps.Agents, deps.Index).RegisterRoutes(r, common...)
 	// Agent diff area: two versions of an agent config compared (handlers/agentdiff.go, docs/agent-diff.md).
 	handlers.NewAgentDiffHandler(mode, deps.Index, cfg.Root).RegisterRoutes(r, common...)

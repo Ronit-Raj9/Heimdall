@@ -122,10 +122,25 @@ func (h *SuitesHandler) getSuites(ctx *fasthttp.RequestCtx) {
 	}
 	work, cancel := workContext(ctx, readTimeout)
 	defer cancel()
-	ids, err := h.suites.SuiteIDs(work)
+	list, err := h.ListSummaries(work)
 	if err != nil {
 		sendDepError(ctx, h.mode, "list suites", err)
 		return
+	}
+	out := schemas.SuiteList{Suites: list}
+	lib.SendJSON(ctx, h.mode, fasthttp.StatusOK, &out)
+}
+
+// ListSummaries is the GET /suites list: every pack with its summary, built-in
+// library packs marked. Evaluation packs (bench/packs) read ready task counts
+// from it.
+func (h *SuitesHandler) ListSummaries(work context.Context) ([]schemas.SuiteSummary, error) {
+	if h.suites == nil {
+		return nil, errors.New("suite loader is not available")
+	}
+	ids, err := h.suites.SuiteIDs(work)
+	if err != nil {
+		return nil, err
 	}
 	out := schemas.SuiteList{Suites: make([]schemas.SuiteSummary, len(ids))}
 	origin, _ := h.suites.(suiteOrigin)
@@ -160,7 +175,7 @@ func (h *SuitesHandler) getSuites(ctx *fasthttp.RequestCtx) {
 			out.Suites[i].Builtin, out.Suites[i].Source = true, "library"
 		}
 	}
-	lib.SendJSON(ctx, h.mode, fasthttp.StatusOK, &out)
+	return out.Suites, nil
 }
 
 // getSuiteTask handles GET /api/bench/suites/{id}/tasks/{task}: one task with
