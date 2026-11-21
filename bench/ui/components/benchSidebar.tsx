@@ -1,6 +1,6 @@
 import { HeimdallMark } from "@/components/heimdallMark";
 import { OrgSwitcher } from "@/components/platform/orgSwitcher";
-import { BENCH_NAV_GROUPS, DEFAULT_CLOSED_GROUPS, activeNavGroup, isNavActive, type BenchNavGroupId, type BenchNavItem } from "@/lib/constants/navigation";
+import { BENCH_NAV_GROUPS, DEFAULT_CLOSED_GROUPS, activeNavGroup, isNavActive, navHintKey, type BenchNavGroupId, type BenchNavItem } from "@/lib/constants/navigation";
 import { useSession, type SessionInfo } from "@/lib/session/sessionContext";
 import { cn } from "@/lib/utils";
 import { Link, useRouterState } from "@tanstack/react-router";
@@ -288,13 +288,15 @@ function NavLink({
 }) {
 	const { t } = useTranslation("bench");
 	const label = t(item.labelKey);
+	// One plain sentence on what the page is for, on hover (and the label too, for the icon rail).
+	const hint = t(navHintKey(item) as never, { defaultValue: "" }) as string;
 	const Icon = item.icon;
 	return (
 		<Link
 			to={item.to as never}
 			data-testid={item.testId}
 			data-active={active || undefined}
-			title={label}
+			title={hint ? `${label}: ${hint}` : label}
 			aria-current={active ? "page" : undefined}
 			onClick={onNavigate}
 			className={cn(
