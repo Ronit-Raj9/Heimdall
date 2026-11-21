@@ -45,7 +45,7 @@ func TestImportToy(t *testing.T) {
 	if ans := read("tasks/toy-01/verifier/answer.yaml"); !strings.Contains(ans, "reading /tmp/ref.txt is cheating") || !strings.Contains(ans, "answer") {
 		t.Fatalf("rubric:\n%s", ans)
 	}
-	if !strings.Contains(read("tasks/tooly-unbuilt/task.yaml"), "draft:mcp-grader-tool") {
+	if !strings.Contains(read("tasks/tooly-unbuilt/task.yaml"), "draft:workspace-grader") {
 		t.Fatal("tooly not a draft")
 	}
 	if read("tasks/gity-1/env/workspace/g/.git/HEAD") == "" || !strings.Contains(read("tasks/gity-1/task.yaml"), "workspace_path: /workspace") {

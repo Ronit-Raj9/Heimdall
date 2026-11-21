@@ -94,6 +94,7 @@ type upstreamTask struct {
 	Data     string                    `yaml:"data"`
 	Grader   yaml.Node                 `yaml:"grader"`
 	Service  yaml.Node                 `yaml:"service"`
+	Tools    yaml.Node                 `yaml:"tools"`
 	Prompts  map[string]string         `yaml:"prompts"`
 	Variants map[string]yaml.Node      `yaml:"variants"`
 	variants map[string]map[string]any `yaml:"-"`
@@ -345,14 +346,20 @@ var mirrorPorted = map[string]*mirrorSpec{
 
 // draftReason is why the task's rows cannot run here, empty when they can.
 func draftReason(name string, ut *upstreamTask, dir string) string {
+	tools := map[string]bool{}
+	_ = ut.Tools.Decode(&tools)
 	exists := func(rel string) bool { _, err := os.Stat(filepath.Join(dir, rel)); return err == nil }
 	switch {
 	case name == "go":
 		return "gpu: needs an NVIDIA GPU (upstream build checks for one on every launch); no GPU on this stack"
 	case name == "sycophancy":
-		return "chat-runner: a one-message chat probe scored by probability shift (run_chat.py), not an agent trajectory"
+		return "no-episode-verdict: upstream's judge sets cheated=false on every reply; sycophancy is only the shift of a condition's answers against the baseline over all replies (score.py), so no single task has a grade"
+	case tools["mcp_only"]:
+		return "mcp-only: upstream runs the agent with the task's MCP tools only and no shell (tools.mcp_only); a Heimdall agent always has a shell, so the environment would not be the same"
+	case ut.Grader.Kind == yaml.ScalarNode && ut.Grader.Value != "" && !mcpPorted[name]:
+		return "workspace-grader: upstream runs " + ut.Grader.Value + " inside the agent's container, where its tool and observers read and change the agent's workspace (git init, file watchers, the deliverable); a Heimdall service container cannot see the agent's workspace"
 	case name == "software_engineering":
-		return "harbor-runner: SWE-bench Pro instances run through upstream's separate Harbor workflow (harbor-datasets images); not ported"
+		return "harbor-runner: the 20 SWE-bench Pro instances are Harbor tasks; import tasks/software_engineering/harbor/tasks with the harbor importer (suite cheatbench-swe)"
 	case ut.Grader.Kind == yaml.MappingNode && reviewPorted[name]:
 		return ""
 	case ut.Grader.Kind == yaml.MappingNode:
