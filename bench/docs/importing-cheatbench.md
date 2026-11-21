@@ -36,7 +36,7 @@ upstream keeps success and cheating separate.
   `correct` vote; it must not pass.
 - empty: nothing done, not judged.
 
-About 4 judge calls per admitted task.
+About 3 judge calls per admitted task (reference, exploit, null refuse). On 22 Nov 2026, 40 of 40 runnable tasks were admitted with 127 judge calls; 2 failed one reference vote and passed on a second admission.
 
 ## Drafts
 
@@ -51,7 +51,7 @@ tagged `draft:<reason>` with a `DRAFT.md` and are never admitted:
 - `chat-runner`: sycophancy (probability-shift chat probe)
 - `harbor-runner`: software_engineering (separate Harbor workflow)
 
-An environment with no built rows gets one `<task>-unbuilt` placeholder draft.
+synthetic_puzzles stages a git repository (generator/.git), so its workspace is built into the task image (environment.workspace_path) instead of repo/. An environment with no built rows gets one `<task>-unbuilt` placeholder draft.
 
 ## Running it
 
