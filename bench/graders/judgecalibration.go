@@ -200,7 +200,7 @@ func RunCalibration(ctx context.Context, cfg JudgeConfig, plan *CalibrationPlan,
 	cast := func(prompt string) ([]string, error) {
 		votes := make([]string, 0, plan.Spec.Votes)
 		for i := 0; i < plan.Spec.Votes; i++ {
-			v, tok, model, err := g.call(ctx, key, plan.Spec, prompt)
+			v, tok, model, _, err := g.call(ctx, key, plan.Spec, prompt)
 			if err != nil {
 				return nil, err
 			}
