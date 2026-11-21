@@ -363,3 +363,31 @@ func TestProxiedGatewayServiceStaysOffEvalNetwork(t *testing.T) {
 		t.Fatalf("no gateway forwarder on the hidden network in:\n%s", strings.Join(all, "\n"))
 	}
 }
+
+// TestServiceGatewayEnvFileMaximHeaders: the service gets the run's
+// x-bf-maxim-* headers as one JSON line (X23); without headers the line is
+// left out.
+func TestServiceGatewayEnvFileMaximHeaders(t *testing.T) {
+	g := &schemas.ServiceGateway{Provider: "openai", Model: "m"}
+	key := &schemas.RunKey{Value: "sk-svc"}
+	f, err := serviceGatewayEnvFile("http://gw:8080/", g, key, map[string]string{"x-bf-maxim-heimdall-run": "r_1"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer os.Remove(f)
+	b, err := os.ReadFile(f)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(b), EnvServiceGatewayHeaders+`={"x-bf-maxim-heimdall-run":"r_1"}`) {
+		t.Fatalf("env file %s", b)
+	}
+	f2, err := serviceGatewayEnvFile("http://gw:8080/", g, key, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer os.Remove(f2)
+	if b, _ := os.ReadFile(f2); strings.Contains(string(b), EnvServiceGatewayHeaders) {
+		t.Fatalf("headers line without headers: %s", b)
+	}
+}

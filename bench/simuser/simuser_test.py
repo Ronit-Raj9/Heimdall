@@ -40,7 +40,8 @@ class FakeGateway:
 
             def do_POST(self):
                 body = json.loads(self.rfile.read(int(self.headers["Content-Length"])))
-                outer.requests.append({"path": self.path, "key": self.headers.get("x-bf-vk"), "body": body})
+                outer.requests.append({"path": self.path, "key": self.headers.get("x-bf-vk"), "body": body,
+                                       "maxim": {k.lower(): v for k, v in self.headers.items() if k.lower().startswith("x-bf-maxim-")}})
                 if outer.status != 200:
                     data = b'{"error":"boom secret-key"}'
                     self.send_response(outer.status)
@@ -149,6 +150,20 @@ class LLMTest(unittest.TestCase):
         self.assertEqual(len(t["sim_calls"]), 2)
         self.assertEqual(t["prompt_version"], "user-v1")
         self.assertNotIn("secret-key", json.dumps(t))
+
+    def test_maxim_headers_are_passed(self):
+        gw = FakeGateway(["Hi."])
+        self.addCleanup(gw.close)
+        env = self.env(gw)
+        env["BENCH_SVC_GATEWAY_HEADERS"] = json.dumps({"x-bf-maxim-heimdall-run": "r_1", "x-bf-maxim-session-id": "heimdall-e_1",
+                                                       "x-bf-vk": "override", "x-bf-maxim-bad": "a\nb", "x-bf-maxim-num": 3})
+        s = simuser.Session({"persona": PERSONA}, self.dir, env)
+        s.respond({"message": "Hello"})
+        req = gw.requests[0]
+        self.assertEqual(req["key"], "secret-key")
+        self.assertEqual(req["maxim"], {"x-bf-maxim-heimdall-run": "r_1", "x-bf-maxim-session-id": "heimdall-e_1"})
+        self.assertEqual(simuser.gateway_headers("not json"), {})
+        self.assertEqual(simuser.gateway_headers("[1]"), {})
 
     def test_prompt_hash_pinned(self):
         gw = FakeGateway([])

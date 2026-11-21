@@ -71,6 +71,7 @@ type fakeJudge struct {
 type recordedRequest struct {
 	path, vk, auth string
 	body           chatRequest
+	maxim          http.Header // x-bf-maxim-* headers (X23)
 }
 
 func (f *fakeJudge) ServeHTTP(w http.ResponseWriter, r *http.Request) {
@@ -79,7 +80,13 @@ func (f *fakeJudge) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	raw, _ := io.ReadAll(r.Body)
 	var body chatRequest
 	_ = json.Unmarshal(raw, &body)
-	f.requests = append(f.requests, recordedRequest{path: r.URL.Path, vk: r.Header.Get(virtualKeyHeader), auth: r.Header.Get("Authorization"), body: body})
+	maxim := http.Header{}
+	for k, v := range r.Header {
+		if strings.HasPrefix(strings.ToLower(k), "x-bf-maxim-") {
+			maxim[k] = v
+		}
+	}
+	f.requests = append(f.requests, recordedRequest{path: r.URL.Path, vk: r.Header.Get(virtualKeyHeader), auth: r.Header.Get("Authorization"), body: body, maxim: maxim})
 	if f.status != 0 {
 		w.WriteHeader(f.status)
 		_, _ = w.Write([]byte(`{"error":{"message":"boom"}}`))
@@ -166,6 +173,10 @@ func TestJudgeGradeVotes(t *testing.T) {
 				}
 				if r.body.Model != "openai/judge-model" || r.body.Temperature != 0 || r.body.MaxTokens != defaultJudgeTokens || len(r.body.Messages) != 1 {
 					t.Fatalf("request body %+v", r.body)
+				}
+				if r.maxim.Get("x-bf-maxim-heimdall-run") != rc.Run.RunID || r.maxim.Get("x-bf-maxim-heimdall-role") != "judge" ||
+					r.maxim.Get("x-bf-maxim-generation-name") != "heimdall judge" {
+					t.Fatalf("maxim headers %v", r.maxim)
 				}
 			}
 			if len(gw.minted) != 1 || len(gw.revoked) != 1 {
