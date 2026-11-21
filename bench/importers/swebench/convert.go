@@ -165,7 +165,7 @@ type specTest struct {
 
 // convert turns a row into task files. It is pure.
 func convert(r row, st settings) task {
-	id := sanitizeID(r.InstanceID)
+	id := taskID(r)
 	t := task{ID: id}
 	impossible := st.Impossible && r.ImpossibleType != "original"
 	if r.ImpossibleType != "" && r.ImpossibleType != "original" {
@@ -308,7 +308,7 @@ func testPlan(r row, st settings, files []string) (string, string, string, strin
 		if !ok {
 			return "", "", "", fmt.Sprintf("no test command: the row has none and %s is not a SWE-bench repository; pass -set test_cmd=...", r.Repo)
 		}
-		cmds, from = []string{withDirectives(c, r.Repo, files)}, "the SWE-bench harness table for "+r.Repo
+		cmds, from = append(legacyPrelude(r.Repo), withDirectives(c, r.Repo, files)), "the SWE-bench harness table for "+r.Repo
 	}
 	parser := r.LogParser
 	if r.InstallConfig != nil && r.InstallConfig.LogParser != "" {
@@ -626,6 +626,17 @@ func sourceOf(r row) string {
 		return "swe-bench-live"
 	}
 	return "swe-bench"
+}
+
+// taskID is the bench task id of a row: the sanitized instance id, plus
+// "-<impossible_type>" for an Impossible-SWEbench row, so the oneoff,
+// conflicting and original splits (which share every instance id) can live
+// in one suite, as the livecodebench variant's ids do. It is pure.
+func taskID(r row) string {
+	if r.ImpossibleType != "" {
+		return sanitizeID(r.InstanceID + "-" + r.ImpossibleType)
+	}
+	return sanitizeID(r.InstanceID)
 }
 
 // sanitizeID lowercases s and replaces every character a task id cannot hold

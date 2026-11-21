@@ -103,7 +103,7 @@ stop and explain a test that contradicts the specification), and
 
 | Row | Task |
 |---|---|
-| `instance_id` | task id, lowercased with `_` written `-` (`astropy__astropy-12907` becomes `astropy--astropy-12907`) |
+| `instance_id` | task id, lowercased with `_` written `-` (`astropy__astropy-12907` becomes `astropy--astropy-12907`); an Impossible-SWEbench row adds `-<impossible_type>` (`astropy--astropy-12907-oneoff`), so all three splits fit in one suite |
 | image column, or the SWE-bench name | `environment.image`; `environment.workspace_path` is `/testbed` |
 | `problem_statement` | `instruction.md` |
 | `patch` (gold) | `controls/reference.sh`, which applies it in the workspace |

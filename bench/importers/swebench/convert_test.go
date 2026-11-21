@@ -45,7 +45,7 @@ func TestConvert(t *testing.T) {
 			"pip install -e . --no-build-isolation\npytest -rA\n", []string{"fail_to_pass::tests/test_core.py:test_add"}, ""},
 		{"original swe-bench", rows[2], settings{}, "django--django-11099", "swebench/sweb.eval.x86_64.django_1776_django-11099:latest", false,
 			"./tests/runtests.py --verbosity 2 --settings=test_sqlite --parallel 1 test_core\n", []string{"fail_to_pass::test_add (tests.test_core.CoreTests)"}, ""},
-		{"impossible swebench", rows[3], settings{}, "sympy--sympy-20590", "swebench/sweb.eval.x86_64.sympy_1776_sympy-20590:latest", true,
+		{"impossible swebench", rows[3], settings{}, "sympy--sympy-20590-oneoff", "swebench/sweb.eval.x86_64.sympy_1776_sympy-20590:latest", true,
 			cmdSympy + " tests/test_core.py\n", []string{"test_command::exit_status"}, ""},
 		{"test_cmd setting", rows[0], settings{TestCmd: "python -m pytest -rA"}, "acme--calc-1", "swerebench/sweb.eval.x86_64.acme_1776_calc-1", false,
 			"python -m pytest -rA tests/test_core.py\n", []string{"fail_to_pass::tests/test_core.py:test_add"}, ""},
@@ -140,6 +140,27 @@ func TestConvertImpossibleOriginal(t *testing.T) {
 	r.TestPatch = r.OriginalTestPatch
 	if got := convert(r, settings{Impossible: true}); got.Impossible || got.Skip != "" {
 		t.Fatalf("an original row is a possible task: impossible=%v skip=%q", got.Impossible, got.Skip)
+	}
+}
+
+// The Impossible-SWEbench splits share every instance id; each split's task
+// needs its own id so all of them fit in one suite.
+func TestConvertImpossibleSplitIDs(t *testing.T) {
+	seen := map[string]bool{}
+	for _, kind := range []string{"oneoff", "conflicting", "original"} {
+		r := fixtureRows(t)[3]
+		r.ImpossibleType = kind
+		id := convert(r, settings{Impossible: true}).ID
+		if want := "sympy--sympy-20590-" + kind; id != want {
+			t.Fatalf("%s: id %q, want %q", kind, id, want)
+		}
+		seen[id] = true
+	}
+	if len(seen) != 3 {
+		t.Fatalf("split ids collide: %v", seen)
+	}
+	if id := convert(fixtureRows(t)[2], settings{}).ID; id != "django--django-11099" {
+		t.Fatalf("a row without impossible_type keeps its plain id, got %q", id)
 	}
 }
 

@@ -87,3 +87,19 @@ func TestGradeScript(t *testing.T) {
 		})
 	}
 }
+
+// TestVerifyScriptImportsTheCopy: on a read-only workspace the tests run in
+// a copy, and the image's development install still points at the
+// workspace, so the copy must come first on PYTHONPATH before cmd.sh runs
+// (else in-package tests import the workspace's old test modules).
+func TestVerifyScriptImportsTheCopy(t *testing.T) {
+	set := strings.Index(verifyScript, `export PYTHONPATH="$W${PYTHONPATH:+:$PYTHONPATH}"`)
+	run := strings.Index(verifyScript, `bash "$G/cmd.sh"`)
+	guard := strings.Index(verifyScript, `if [ "$W" != "$SRC" ]; then`)
+	if set < 0 || run < 0 || guard < 0 || !(guard < set && set < run) {
+		t.Fatalf("verify.sh must export PYTHONPATH=$W, only when it works on a copy, before running cmd.sh (guard %d, set %d, run %d)", guard, set, run)
+	}
+	if err := exec.Command("bash", "-n", "-c", verifyScript).Run(); err != nil {
+		t.Fatalf("verify.sh does not parse: %v", err)
+	}
+}

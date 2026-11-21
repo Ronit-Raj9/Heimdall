@@ -2,6 +2,7 @@ package swebench
 
 import (
 	"reflect"
+	"strings"
 	"testing"
 )
 
@@ -49,5 +50,22 @@ func TestParserTables(t *testing.T) {
 		if !impl[p] {
 			t.Errorf("repo %s uses %s, which grade.py does not implement", repo, p)
 		}
+	}
+}
+
+// TestLegacyPrelude: Sphinx's tox.ini is reset to the base commit by
+// verify.sh, so cmd.sh must re-apply upstream's -rA edit before tox runs.
+func TestLegacyPrelude(t *testing.T) {
+	r := row{InstanceID: "sphinx-doc__sphinx-1", Repo: "sphinx-doc/sphinx", Version: "5.0"}
+	cmd, _, _, why := testPlan(r, settings{}, []string{"tests/test_x.py"})
+	if why != "" {
+		t.Fatal(why)
+	}
+	sed, tox := strings.Index(cmd, "sed -i 's/pytest/pytest -rA/' tox.ini\n"), strings.Index(cmd, cmdSphinx+" tests/test_x.py")
+	if sed < 0 || tox < 0 || sed > tox {
+		t.Fatalf("cmd.sh must re-apply the -rA edit to tox.ini before tox:\n%s", cmd)
+	}
+	if legacyPrelude("django/django") != nil {
+		t.Fatal("only Sphinx has a prelude")
 	}
 }

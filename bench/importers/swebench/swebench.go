@@ -115,7 +115,7 @@ func (im *importer) Import(ctx context.Context, opts importers.Options) (*import
 			res.Skipped = append(res.Skipped, importers.Skip{ID: fmt.Sprintf("row %d", i+1), Reason: "not a SWE-bench row: " + err.Error()})
 			continue
 		}
-		if len(want) > 0 && !want[r.InstanceID] && !want[sanitizeID(r.InstanceID)] {
+		if len(want) > 0 && !want[r.InstanceID] && !want[sanitizeID(r.InstanceID)] && !want[taskID(r)] {
 			continue
 		}
 		t := convert(r, st)

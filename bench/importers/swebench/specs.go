@@ -76,6 +76,19 @@ var repoParsers = map[string]string{
 	"sympy/sympy":                  parserSympy,
 }
 
+// legacyPrelude returns the steps upstream's environment image applies to a
+// file verify.sh resets to the base commit, so they must run again before
+// the test command: the SWE-bench harness builds every Sphinx image with
+// `sed -i 's/pytest/pytest -rA/' tox.ini` (pre_install), without which tox
+// runs pytest with no per-test summary and the log parser finds no test. It
+// is pure.
+func legacyPrelude(repo string) []string {
+	if repo == "sphinx-doc/sphinx" {
+		return []string{"sed -i 's/pytest/pytest -rA/' tox.ini"}
+	}
+	return nil
+}
+
 // legacyTestCmd returns upstream's test command for a repository and version
 // of the original SWE-bench, and false for a repository it does not know.
 // It is pure.
