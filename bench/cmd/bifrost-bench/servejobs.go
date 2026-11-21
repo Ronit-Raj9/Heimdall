@@ -1174,3 +1174,27 @@ func init() {
 		return l, api
 	}
 }
+
+// hostedJobsAPI is an org's view of the hosted job hub, resolved at call
+// time: building an org runtime must not start the hub, whose runner builds
+// org runtimes itself.
+type hostedJobsAPI struct{ env *hostedEnv }
+
+var _ handlers.JobsAPI = hostedJobsAPI{}
+
+func (h hostedJobsAPI) Kinds() []string { return hostedHub(h.env).runner.Kinds() }
+func (h hostedJobsAPI) Create(ctx context.Context, n jobs.NewJob) (*jobs.Job, error) {
+	return hostedHub(h.env).runner.Create(ctx, n)
+}
+func (h hostedJobsAPI) Get(ctx context.Context, orgID, id string) (*jobs.Job, error) {
+	return hostedHub(h.env).runner.Get(ctx, orgID, id)
+}
+func (h hostedJobsAPI) List(ctx context.Context, orgID string, f jobs.Filter) (*jobs.Page, error) {
+	return hostedHub(h.env).runner.List(ctx, orgID, f)
+}
+func (h hostedJobsAPI) Logs(ctx context.Context, orgID, id string, since int64, limit int) (*jobs.LogPage, error) {
+	return hostedHub(h.env).runner.Logs(ctx, orgID, id, since, limit)
+}
+func (h hostedJobsAPI) Cancel(ctx context.Context, orgID, id string) (*jobs.Job, error) {
+	return hostedHub(h.env).runner.Cancel(ctx, orgID, id)
+}

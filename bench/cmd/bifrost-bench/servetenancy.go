@@ -202,6 +202,11 @@ func orgBuilder(env *hostedEnv) tenancy.Builder {
 			deps.Launcher, deps.Workers = orgLauncher(env, oa, ix)
 		}
 		applyServiceHooks(oa, &deps, org.ID, true) // web parity: deps.Services (servicehooks.go)
+		if deps.Services.Jobs == nil {
+			// Hosted jobs run on the platform hub; the org areas that queue
+			// one (catalog import, schedules) reach it through this adapter.
+			deps.Services.Jobs = hostedJobsAPI{env: env}
+		}
 		stopTicker := startHostedScheduleTicker(oa, deps.Services) // G14: stops with the runtime
 		r := server.NewOrgRouter(oa.cfg, org.ID, deps)
 		rt := &tenancy.OrgRuntime{Handler: r.Handler, Routes: r.Routes, Close: func() error {
