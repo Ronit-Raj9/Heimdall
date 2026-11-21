@@ -161,9 +161,32 @@ func cliJob(kind string, local, hosted bool, args cliArgs) jobKindSpec {
 			if err != nil {
 				return nil, err
 			}
-			return runCLI(ctx, env, argv, log)
+			return runCLI(ctx, env, withJobConfig(argv), log)
 		},
 	}
+}
+
+// withJobConfig makes sure a CLI job reads the server's resolved config: an
+// argv with no -config gets "-config {{config}}" before its first flag (or
+// at the end), so no subprocess falls back to deploy/bench.yaml in the
+// project folder.
+func withJobConfig(argv []string) []string {
+	for _, a := range argv {
+		if a == "-config" || a == "--config" || strings.HasPrefix(a, "-config=") || strings.HasPrefix(a, "--config=") {
+			return argv
+		}
+	}
+	at := len(argv)
+	for i, a := range argv {
+		if strings.HasPrefix(a, "-") {
+			at = i
+			break
+		}
+	}
+	out := make([]string, 0, len(argv)+2)
+	out = append(out, argv[:at]...)
+	out = append(out, "-config", cliConfig)
+	return append(out, argv[at:]...)
 }
 
 // cliTarget is what a CLI job acts on: the first of suite, exp_id, agent,

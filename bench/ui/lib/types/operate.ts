@@ -11,6 +11,17 @@ export interface OperateStatus {
 	hint?: string;
 }
 
+/** One evidence backup zip (GET /operate/backups). */
+export interface OperateBackup {
+	name: string;
+	size: number;
+	mod_time: string;
+}
+
+export interface OperateBackupList {
+	backups: OperateBackup[];
+}
+
 declare module "@/lib/i18n/resources" {
 	interface LaneResources {
 		operate: typeof import("@/locales/en/operate.json");

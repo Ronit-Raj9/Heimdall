@@ -425,11 +425,9 @@ func runTasksMineJob(ctx context.Context, env jobEnv, j *jobs.Job, log jobs.Logg
 	if p.DryRun {
 		return suiteOpsMinePreview(ctx, env, p, suiteDir, repo, log)
 	}
-	config := filepath.Join(env.ProjectRoot, "deploy", "bench.yaml")
-	if _, err := os.Stat(config); err != nil {
-		return nil, fmt.Errorf("tasks mine needs the project config %s; run init in the project first", config)
-	}
-	argv := []string{"tasks", "mine", "-config", config, "-suite", p.Suite, "-repo", repo,
+	// The server's resolved config (a redacted copy, runCLI), never the
+	// project's deploy/bench.yaml, which may be absent or another server's.
+	argv := []string{"tasks", "mine", "-config", cliConfig, "-suite", p.Suite, "-repo", repo,
 		"-limit", strconv.Itoa(p.Limit), "-min-tests", strconv.Itoa(p.MinTests)}
 	if p.Since != "" {
 		argv = append(argv, "-since", p.Since)

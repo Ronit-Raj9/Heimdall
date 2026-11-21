@@ -40,9 +40,9 @@ type releaseComplianceParams struct {
 }
 
 type monitorCertifyParams struct {
-	Monitor     string   `json:"monitor"`  // project-relative monitor config (YAML or JSON)
-	ExpIDs      []string `json:"exp_ids"`  // labelled experiments
-	FPR         string   `json:"fpr"`      // comma-separated target false-positive rates
+	Monitor     string   `json:"monitor"` // project-relative monitor config (YAML or JSON)
+	ExpIDs      []string `json:"exp_ids"` // labelled experiments
+	FPR         string   `json:"fpr"`     // comma-separated target false-positive rates
 	GradeSource string   `json:"grade_source"`
 	Parallel    int      `json:"parallel"`
 }
@@ -76,7 +76,7 @@ func monitorCertifyArgs(raw json.RawMessage) ([]string, error) {
 	if len(p.ExpIDs) == 0 || len(p.ExpIDs) > 20 {
 		return nil, errors.New("exp_ids: pick 1 to 20 labelled experiments")
 	}
-	argv := []string{"monitor", "certify", "-monitor", mon}
+	argv := []string{"monitor", "certify", "-config", cliConfig, "-monitor", mon}
 	for _, id := range p.ExpIDs {
 		if !govIDRe.MatchString(id) {
 			return nil, fmt.Errorf("exp_ids: %q is not an experiment id", id)

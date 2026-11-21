@@ -2,10 +2,18 @@ import { JobRunButton } from "@/components/jobs/jobRunButton";
 import { BlockSkeleton, LoadError } from "@/components/runs/screenStates";
 import { PageHeader } from "@/components/shell";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { useGetOperateStatusQuery } from "@/lib/store/apis/operateApi";
-import type { OperateStatus } from "@/lib/types/operate";
-import { Info } from "lucide-react";
+import {
+	operateApi,
+	operateBackupUrl,
+	useDeleteOperateBackupMutation,
+	useGetOperateBackupsQuery,
+	useGetOperateStatusQuery,
+} from "@/lib/store/apis/operateApi";
+import { useAppDispatch } from "@/lib/store/hooks";
+import type { OperateBackup, OperateStatus } from "@/lib/types/operate";
+import { Download, Info, Trash2 } from "lucide-react";
 import { useState, type ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 
@@ -57,9 +65,77 @@ function Note({ children, testId }: { children: ReactNode; testId: string }) {
 	);
 }
 
-/** The operate panels for a server status; exported for tests. */
-export function OperatePanels({ status }: { status: OperateStatus }) {
+function formatBytes(n: number): string {
+	if (n < 1024) return `${n} B`;
+	if (n < 1024 * 1024) return `${(n / 1024).toFixed(1)} KiB`;
+	if (n < 1024 * 1024 * 1024) return `${(n / 1024 / 1024).toFixed(1)} MiB`;
+	return `${(n / 1024 / 1024 / 1024).toFixed(2)} GiB`;
+}
+
+/** The backup zips list; exported for tests. */
+export function BackupRows({ backups, onDelete }: { backups: OperateBackup[]; onDelete?(name: string): void }) {
 	const { t } = useTranslation("operate");
+	if (backups.length === 0) {
+		return (
+			<p className="text-muted-foreground text-xs" data-testid="operate-backups-empty">
+				{t("evidence.backupsEmpty")}
+			</p>
+		);
+	}
+	return (
+		<ul className="flex flex-col gap-1" data-testid="operate-backups">
+			{backups.map((b) => (
+				<li key={b.name} className="flex min-w-0 flex-wrap items-center justify-between gap-2 rounded-sm border px-2 py-1 text-xs">
+					<span className="min-w-0 truncate font-mono">{b.name}</span>
+					<span className="flex items-center gap-2">
+						<span className="text-muted-foreground">{formatBytes(b.size)}</span>
+						<a
+							href={operateBackupUrl(b.name)}
+							download={b.name}
+							className="text-primary inline-flex items-center gap-1 underline-offset-4 hover:underline"
+							data-testid={`operate-backup-download-${b.name}`}
+						>
+							<Download className="size-3.5" aria-hidden="true" />
+							{t("evidence.download")}
+						</a>
+						{onDelete && (
+							<Button size="sm" variant="ghost" onClick={() => onDelete(b.name)} aria-label={`${t("evidence.delete")} ${b.name}`}>
+								<Trash2 className="size-3.5" aria-hidden="true" />
+							</Button>
+						)}
+					</span>
+				</li>
+			))}
+		</ul>
+	);
+}
+
+function BackupsList() {
+	const { t } = useTranslation("operate");
+	const query = useGetOperateBackupsQuery();
+	const [remove] = useDeleteOperateBackupMutation();
+	return (
+		<div className="flex flex-col gap-2" data-testid="operate-backups-section">
+			<p className="text-sm font-medium">{t("evidence.backupsTitle")}</p>
+			{query.isError ? (
+				<p className="text-muted-foreground flex items-center gap-2 text-xs">
+					{t("evidence.backupsError")}
+					<Button size="sm" variant="outline" onClick={() => void query.refetch()}>
+						{t("evidence.retry")}
+					</Button>
+				</p>
+			) : (
+				<BackupRows backups={query.data?.backups ?? []} onDelete={(name) => void remove(name)} />
+			)}
+		</div>
+	);
+}
+
+/** The operate panels for a server status; exported for tests. */
+export function OperatePanels({ status, backups, onBackupDone }: { status: OperateStatus; backups?: ReactNode; onBackupDone?(): void }) {
+	const { t } = useTranslation("operate");
+	const hosted = status.hosted;
+	const [days, setDays] = useState("");
 	const has = (kind: string) => status.kinds.includes(kind);
 	const [gpuSuite, setGpuSuite] = useState("");
 	const [exp, setExp] = useState("");
@@ -80,7 +156,7 @@ export function OperatePanels({ status }: { status: OperateStatus }) {
 
 	return (
 		<div className="grid min-w-0 gap-4 lg:grid-cols-2">
-			<Section title={t("health.title")} description={t("health.description")} testId="operate-health">
+			<Section title={t("health.title")} description={hosted ? t("health.hostedDescription") : t("health.description")} testId="operate-health">
 				{(status.gpu_mode || status.driver) && (
 					<p className="text-muted-foreground text-xs">
 						{status.gpu_mode && t("health.gpuMode", { mode: status.gpu_mode })} {status.driver && t("health.driver", { driver: status.driver })}
@@ -89,6 +165,11 @@ export function OperatePanels({ status }: { status: OperateStatus }) {
 				<div className="flex flex-wrap gap-2">
 					{has("operate.doctor") && <JobRunButton kind="operate.doctor" label={t("health.doctor")} />}
 					{has("k8s.status") && <JobRunButton kind="k8s.status" label={t("health.k8s")} variant="outline" />}
+					{hosted && (
+						<a href="/workers" className="text-primary self-center text-sm font-medium underline-offset-4 hover:underline" data-testid="operate-workers-link">
+							{t("health.runnersLink")}
+						</a>
+					)}
 				</div>
 				{has("gpu.check") && (
 					<div className="flex flex-wrap items-end gap-2">
@@ -99,8 +180,20 @@ export function OperatePanels({ status }: { status: OperateStatus }) {
 			</Section>
 
 			{showEvidence && (
-				<Section title={t("evidence.title")} description={t("evidence.description")} testId="operate-evidence">
-					{status.mirror ? (
+				<Section
+					title={t("evidence.title")}
+					description={hosted ? t("evidence.hostedDescription") : t("evidence.description")}
+					testId="operate-evidence"
+				>
+					{hosted ? (
+						status.mirror ? (
+							<p className="text-muted-foreground text-xs" data-testid="operate-mirror">
+								{t("evidence.hostedMirror")}
+							</p>
+						) : (
+							<Note testId="operate-no-mirror">{t("evidence.hostedNoMirror")}</Note>
+						)
+					) : status.mirror ? (
 						<p className="text-muted-foreground font-mono text-xs" data-testid="operate-mirror">
 							{t("evidence.mirrorAt", { location: status.mirror_location ?? status.mirror })}
 						</p>
@@ -109,28 +202,49 @@ export function OperatePanels({ status }: { status: OperateStatus }) {
 					)}
 					<Field label={t("evidence.exp")} value={exp} onChange={setExp} testId="operate-evidence-exp" />
 					<div className="flex flex-wrap gap-4">
-						<Check label={t("evidence.deep")} checked={deep} onChange={setDeep} testId="operate-evidence-deep" />
-						<Check label={t("evidence.dryRun")} checked={dryRun} onChange={setDryRun} testId="operate-evidence-dry-run" />
+						{status.mirror && <Check label={t("evidence.deep")} checked={deep} onChange={setDeep} testId="operate-evidence-deep" />}
+						{status.mirror && <Check label={t("evidence.dryRun")} checked={dryRun} onChange={setDryRun} testId="operate-evidence-dry-run" />}
 					</div>
-					{status.mirror && (
+					{hosted && status.mirror && !exp.trim() && (
+						<Field label={t("evidence.days")} value={days} onChange={setDays} testId="operate-evidence-days" />
+					)}
+					{(status.mirror || hosted) && (
 						<div className="flex flex-wrap gap-2">
-							{has("evidence.verify") && <JobRunButton kind="evidence.verify" params={compact({ exp, deep })} label={t("evidence.verify")} />}
+							{has("evidence.verify") && (
+								<JobRunButton kind="evidence.verify" params={compact({ exp, deep: status.mirror ? deep : false })} label={t("evidence.verify")} />
+							)}
 							{has("evidence.mirror") && (
 								<JobRunButton kind="evidence.mirror" params={compact({ exp })} label={t("evidence.mirror")} variant="outline" />
 							)}
-							{has("evidence.archive") && (
-								<JobRunButton kind="evidence.archive" params={compact({ exp, dry_run: dryRun })} label={t("evidence.archive")} variant="outline" />
+							{has("evidence.archive") && status.mirror && (
+								<JobRunButton
+									kind="evidence.archive"
+									params={{
+										...compact({ exp, dry_run: exp.trim() ? false : dryRun }),
+										...(hosted && !exp.trim() && Number(days) > 0 ? { days: Math.floor(Number(days)) } : {}),
+									}}
+									label={t("evidence.archive")}
+									variant="outline"
+								/>
 							)}
 							{has("evidence.backup") && (
-								<JobRunButton kind="evidence.backup" label={t("evidence.backup")} confirm={t("evidence.backupConfirm")} variant="outline" />
+								<JobRunButton
+									kind="evidence.backup"
+									params={hosted ? compact({ exp }) : undefined}
+									label={t("evidence.backup")}
+									confirm={hosted ? t("evidence.hostedBackupConfirm") : t("evidence.backupConfirm")}
+									variant="outline"
+									onDone={() => onBackupDone?.()}
+								/>
 							)}
 							{has("evidence.restore") &&
+								status.mirror &&
 								(exp.trim() ? (
 									<JobRunButton
 										kind="evidence.restore"
 										params={{ exp: exp.trim() }}
 										label={t("evidence.restore")}
-										confirm={t("evidence.restoreConfirm")}
+										confirm={hosted ? t("evidence.hostedRestoreConfirm") : t("evidence.restoreConfirm")}
 										variant="outline"
 									/>
 								) : (
@@ -138,6 +252,7 @@ export function OperatePanels({ status }: { status: OperateStatus }) {
 								))}
 						</div>
 					)}
+					{hosted && backups}
 				</Section>
 			)}
 
@@ -195,10 +310,11 @@ export function OperatePanels({ status }: { status: OperateStatus }) {
 	);
 }
 
-/** The /operate page: server health, GPU, voice and visual checks, evidence jobs. Each button runs a background job with a live log. */
+/** The /operate page: server health, GPU, voice and visual checks, evidence jobs (hosted: the org's own evidence and backups). Each button runs a background job with a live log. */
 export default function OperateView() {
 	const { t } = useTranslation("operate");
 	const query = useGetOperateStatusQuery();
+	const dispatch = useAppDispatch();
 	const status = query.data;
 	return (
 		<section className="flex min-w-0 flex-col gap-6 p-6" data-testid="operate-screen">
@@ -210,7 +326,11 @@ export default function OperateView() {
 			) : (
 				<>
 					{status.hosted && <Note testId="operate-hosted-note">{t("hostedNote")}</Note>}
-					<OperatePanels status={status} />
+					<OperatePanels
+						status={status}
+						backups={status.hosted ? <BackupsList /> : undefined}
+						onBackupDone={() => dispatch(operateApi.util.invalidateTags(["OperateBackups"]))}
+					/>
 				</>
 			)}
 		</section>

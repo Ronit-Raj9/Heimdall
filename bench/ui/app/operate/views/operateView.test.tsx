@@ -3,7 +3,7 @@ import "@/lib/i18n";
 import type { OperateStatus } from "@/lib/types/operate";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it, vi } from "vitest";
-import { OperatePanels } from "./operateView";
+import { BackupRows, OperatePanels } from "./operateView";
 
 // The job button needs the store; a plain button stands in for it.
 vi.mock("@/components/jobs/jobRunButton", () => ({
@@ -38,11 +38,42 @@ describe("OperatePanels", () => {
 		expect(html).not.toContain('data-testid="job-run-evidence.verify"');
 	});
 
-	it("shows only the doctor on a hosted server", () => {
-		const html = renderToStaticMarkup(<OperatePanels status={{ hosted: true, kinds: ["operate.doctor"], mirror: "" }} />);
-		expect(html).toContain('data-testid="job-run-operate.doctor"');
-		expect(html).not.toContain('data-testid="operate-evidence"');
+	it("offers doctor, verify and backup on a hosted server without a mirror, with a next step", () => {
+		const hosted: OperateStatus = {
+			hosted: true,
+			kinds: ["operate.doctor", "evidence.verify", "evidence.archive", "evidence.backup", "evidence.restore"],
+			mirror: "",
+		};
+		const html = renderToStaticMarkup(<OperatePanels status={hosted} backups={<BackupRows backups={[]} />} />);
+		for (const kind of ["operate.doctor", "evidence.verify", "evidence.backup"]) {
+			expect(html).toContain(`data-testid="job-run-${kind}"`);
+		}
+		expect(html).not.toContain('data-testid="job-run-evidence.archive"');
+		expect(html).not.toContain('data-testid="job-run-evidence.mirror"');
 		expect(html).not.toContain('data-testid="job-run-gpu.check"');
 		expect(html).not.toContain('data-testid="operate-simulator"');
+		expect(html).toContain('data-testid="operate-no-mirror"');
+		expect(html).toContain('data-testid="operate-workers-link"');
+		expect(html).toContain('data-testid="operate-backups-empty"');
+	});
+
+	it("offers archive and restore on a hosted server with a mirror, without its location", () => {
+		const hosted: OperateStatus = {
+			hosted: true,
+			kinds: ["operate.doctor", "evidence.verify", "evidence.archive", "evidence.backup", "evidence.restore"],
+			mirror: "s3",
+		};
+		const html = renderToStaticMarkup(<OperatePanels status={hosted} />);
+		expect(html).toContain('data-testid="job-run-evidence.archive"');
+		expect(html).toContain("Restore needs an experiment id.");
+		expect(html).not.toContain("s3://");
+	});
+
+	it("lists backups with download links", () => {
+		const html = renderToStaticMarkup(
+			<BackupRows backups={[{ name: "evidence-org_a-20261121-100000.zip", size: 2048, mod_time: "2026-11-21T10:00:00Z" }]} />,
+		);
+		expect(html).toContain('href="/api/bench/operate/backups/evidence-org_a-20261121-100000.zip"');
+		expect(html).toContain("2.0 KiB");
 	});
 });
