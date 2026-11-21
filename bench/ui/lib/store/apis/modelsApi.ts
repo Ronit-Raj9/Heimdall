@@ -1,4 +1,4 @@
-import type { ModelKey, ModelKeyRequest, ModelKeyTestResponse, ModelsCatalogResponse } from "@/lib/types/models";
+import type { BifrostProvidersResponse, ModelKey, ModelKeyRequest, ModelKeyTestResponse, ModelsCatalogResponse } from "@/lib/types/models";
 import { benchApi } from "./benchApi";
 
 /** Models and keys (handlers/models.go): the provider catalog, provider keys CRUD and the key test. */
@@ -7,6 +7,10 @@ export const modelsApi = benchApi.enhanceEndpoints({ addTagTypes: ["BenchModels"
 		getModels: builder.query<ModelsCatalogResponse, void>({
 			query: () => "/models",
 			providesTags: [{ type: "BenchModels", id: "LIST" }],
+		}),
+		/** Every Bifrost provider with its credential fields, base URL need and key test (A09). */
+		getModelProviders: builder.query<BifrostProvidersResponse, void>({
+			query: () => "/models/providers",
 		}),
 		createModelKey: builder.mutation<{ key: ModelKey }, ModelKeyRequest>({
 			query: (body) => ({ url: "/models/keys", method: "POST", body }),
@@ -27,5 +31,5 @@ export const modelsApi = benchApi.enhanceEndpoints({ addTagTypes: ["BenchModels"
 	}),
 });
 
-export const { useGetModelsQuery, useCreateModelKeyMutation, useUpdateModelKeyMutation, useDeleteModelKeyMutation, useTestModelKeyMutation } =
+export const { useGetModelsQuery, useGetModelProvidersQuery, useCreateModelKeyMutation, useUpdateModelKeyMutation, useDeleteModelKeyMutation, useTestModelKeyMutation } =
 	modelsApi;

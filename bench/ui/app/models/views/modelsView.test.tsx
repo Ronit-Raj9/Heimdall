@@ -6,7 +6,7 @@ import { errorQuery, okQuery, render, tagOf } from "@/lib/testing/render";
 import type { ModelsCatalogResponse } from "@/lib/types/models";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { familyServing, isOpenWeights, providerGroup } from "@/components/models/providerCatalog";
-import ModelsView, { addParam, filterProviders, keyRequestBody, needsBaseUrl, parseModels } from "./modelsView";
+import ModelsView, { addParam, credentialValue, filterProviders, keyRequestBody, missingCredentialFields, needsBaseUrl, parseModels } from "./modelsView";
 
 const api = vi.hoisted(() => ({ q: {} as Record<string, unknown> }));
 vi.mock("@tanstack/react-router", async () => (await import("@/lib/testing/routerMock")).routerMock);
@@ -14,6 +14,7 @@ vi.mock("@/lib/store/apis/modelsApi", async () => {
 	const { mutation } = await import("@/lib/testing/render");
 	return {
 		useGetModelsQuery: () => api.q.models,
+		useGetModelProvidersQuery: () => api.q.providers ?? { data: undefined },
 		useCreateModelKeyMutation: () => mutation(),
 		useUpdateModelKeyMutation: () => mutation(),
 		useDeleteModelKeyMutation: () => mutation(),
@@ -144,6 +145,44 @@ describe("ModelsView", () => {
 	it("shows a load error", () => {
 		api.q = { models: errorQuery(500) };
 		expect(render(<ModelsView />)).toContain('data-testid="models-error"');
+	});
+});
+
+describe("key form credential fields (GET /models/providers)", () => {
+	const providers = {
+		providers: [
+			{
+				id: "bedrock",
+				name: "AWS Bedrock",
+				fields: [
+					{ name: "access_key", label: "Access key id", required: true },
+					{ name: "secret_key", label: "Secret access key", secret: true, required: true },
+					{ name: "region", label: "Region", required: true },
+				],
+			},
+			{ id: "ollama", name: "Ollama", keyless: true, needs_base_url: true },
+		],
+		custom: { id: "custom", name: "custom" },
+	};
+	it("shows one input per field for a structured credential, secrets hidden", () => {
+		routerState.location.search = { add: "bedrock" };
+		api.q = { ...api.q, providers: okQuery(providers) };
+		try {
+			const html = render(<ModelsView />);
+			expect(html).toContain('data-testid="model-key-fields"');
+			expect(tagOf(html, "model-key-field-secret_key")).toContain('type="password"');
+			expect(tagOf(html, "model-key-field-region")).toContain('type="text"');
+			expect(html).not.toContain('data-testid="model-key-value"');
+		} finally {
+			routerState.location.search = {};
+			delete api.q.providers;
+		}
+	});
+	it("builds the JSON value and lists the required fields left", () => {
+		expect(credentialValue({ access_key: " AK ", secret_key: "SK", region: "" })).toBe('{"access_key":"AK","secret_key":"SK"}');
+		expect(credentialValue({ region: " " })).toBe("");
+		expect(missingCredentialFields(providers.providers[0], { access_key: "AK", region: "us-east-1" })).toEqual(["secret_key"]);
+		expect(missingCredentialFields(undefined, {})).toEqual([]);
 	});
 });
 

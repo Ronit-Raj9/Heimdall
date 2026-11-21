@@ -22,11 +22,12 @@ import { getBenchErrorMessage } from "@/lib/store/apis/benchApi";
 import {
 	useCreateModelKeyMutation,
 	useDeleteModelKeyMutation,
+	useGetModelProvidersQuery,
 	useGetModelsQuery,
 	useTestModelKeyMutation,
 	useUpdateModelKeyMutation,
 } from "@/lib/store/apis/modelsApi";
-import type { ModelKey, ModelKeyRequest, ModelKeyTestResult, ModelProviderInfo } from "@/lib/types/models";
+import type { BifrostProviderSpec, ModelKey, ModelKeyRequest, ModelKeyTestResult, ModelProviderInfo } from "@/lib/types/models";
 import { Link, useSearch } from "@tanstack/react-router";
 import { cn } from "@/lib/utils";
 import { KeyRound, Pencil, Plus, Sparkles, X } from "lucide-react";
@@ -586,6 +587,24 @@ export function keyRequestBody(f: {
 	};
 }
 
+/**
+ * The key value for a provider whose credential is several fields (Bedrock, Vertex, Cloudflare,
+ * Azure...): a JSON object of the filled fields. "" when none is filled.
+ */
+export function credentialValue(fields: Record<string, string>): string {
+	const filled = Object.fromEntries(
+		Object.entries(fields)
+			.filter(([, v]) => v.trim() !== "")
+			.map(([k, v]) => [k, v.trim()]),
+	);
+	return Object.keys(filled).length ? JSON.stringify(filled) : "";
+}
+
+/** The required credential fields still empty, by name. */
+export function missingCredentialFields(spec: Pick<BifrostProviderSpec, "fields"> | undefined, fields: Record<string, string>): string[] {
+	return (spec?.fields ?? []).filter((f) => f.required && !(fields[f.name] ?? "").trim()).map((f) => f.name);
+}
+
 /** Attributes that keep browsers and password managers from filling a field. */
 export const NO_AUTOFILL = {
 	"data-1p-ignore": "true",
@@ -615,11 +634,19 @@ function KeyForm({
 	const [create, createState] = useCreateModelKeyMutation();
 	const [update, updateState] = useUpdateModelKeyMutation();
 	const info = providers.find((p) => p.id === provider);
+	// GET /models/providers (A09): credential fields, base URL need, keyless servers.
+	const specs = useGetModelProvidersQuery();
+	const spec = specs.data?.providers?.find((p) => p.id === provider);
+	const credFields = spec?.fields ?? [];
+	const [fieldValues, setFieldValues] = useState<Record<string, string>>({});
+	const effectiveValue = credFields.length ? credentialValue(fieldValues) : value;
+	const missingFields = missingCredentialFields(spec, fieldValues);
+	const valueMissing = !editing && !spec?.keyless && (credFields.length ? missingFields.length > 0 || !effectiveValue : !value.trim());
 	const saving = createState.isLoading || updateState.isLoading;
 	const error = createState.error ?? updateState.error;
 
-	const valueError = touched && !editing && !value.trim() ? t("valueRequired") : undefined;
-	const urlRequired = needsBaseUrl(info);
+	const valueError = touched && valueMissing ? t("valueRequired") : undefined;
+	const urlRequired = needsBaseUrl(info) || Boolean(spec?.needs_base_url);
 	const urlError = touched && urlRequired && !baseUrl.trim() ? t("baseUrlRequired") : undefined;
 	const formProviders: Pick<ModelProviderInfo, "id" | "name" | "custom_base_url">[] = providers.length
 		? providers
@@ -628,19 +655,20 @@ function KeyForm({
 	const onSubmit = async (e: FormEvent) => {
 		e.preventDefault();
 		setTouched(true);
-		if ((!editing && !value.trim()) || (urlRequired && !baseUrl.trim())) return;
+		if (valueMissing || (urlRequired && !baseUrl.trim())) return;
 		const body = keyRequestBody({
 			provider,
 			label,
 			baseUrl,
 			modelsText,
 			budget,
-			value,
+			value: effectiveValue,
 		});
 		try {
 			if (editing) await update({ id: editing.id, body }).unwrap();
 			else await create(body).unwrap();
 			setValue("");
+			setFieldValues({});
 			onDone();
 		} catch {
 			// error renders below
@@ -691,34 +719,61 @@ function KeyForm({
 					data-testid="model-key-label"
 				/>
 			</div>
-			<div className={field}>
-				<label className={lbl} htmlFor={`${id}-value`}>
-					{t("value")}
-				</label>
-				<Input
-					id={`${id}-value`}
-					type="password"
-					name="heimdall-key-value"
-					autoComplete="new-password"
-					{...NO_AUTOFILL}
-					value={value}
-					placeholder={editing ? t("valueKeep") : (info?.key_prefix ?? "") + "..."}
-					onChange={(e) => setValue(e.target.value)}
-					aria-invalid={Boolean(valueError) || undefined}
-					data-testid="model-key-value"
-				/>
-				{valueError ? (
-					<p className="text-chart-error-ink text-xs">{valueError}</p>
-				) : editing ? (
-					<p className="text-muted-foreground text-xs" data-testid="model-key-value-keep">
-						{t("valueKeepHint")}
-					</p>
-				) : (
-					providerGroup({ id: provider, custom_base_url: info?.custom_base_url }) === "self-hosted" && (
-						<p className="text-muted-foreground text-xs">{t("selfHostedKeyHint")}</p>
-					)
-				)}
-			</div>
+			{credFields.length > 0 ? (
+				<fieldset className="flex min-w-0 flex-col gap-3" data-testid="model-key-fields">
+					<legend className={lbl}>{t("value")}</legend>
+					{credFields.map((f) => (
+						<div key={f.name} className={field}>
+							<label className="text-xs font-medium" htmlFor={`${id}-f-${f.name}`}>
+								{f.label}
+								{f.required ? " *" : ""}
+							</label>
+							<Input
+								id={`${id}-f-${f.name}`}
+								type={f.secret ? "password" : "text"}
+								name={`heimdall-key-field-${f.name}`}
+								autoComplete={f.secret ? "new-password" : "off"}
+								{...NO_AUTOFILL}
+								value={fieldValues[f.name] ?? ""}
+								placeholder={editing && f.secret ? t("valueKeep") : ""}
+								onChange={(e) => setFieldValues((v) => ({ ...v, [f.name]: e.target.value }))}
+								data-testid={`model-key-field-${f.name}`}
+							/>
+							{f.help && <p className="text-muted-foreground text-xs">{f.help}</p>}
+						</div>
+					))}
+					{valueError && <p className="text-chart-error-ink text-xs">{valueError}</p>}
+				</fieldset>
+			) : (
+				<div className={field}>
+					<label className={lbl} htmlFor={`${id}-value`}>
+						{t("value")}
+					</label>
+					<Input
+						id={`${id}-value`}
+						type="password"
+						name="heimdall-key-value"
+						autoComplete="new-password"
+						{...NO_AUTOFILL}
+						value={value}
+						placeholder={editing ? t("valueKeep") : (info?.key_prefix ?? "") + "..."}
+						onChange={(e) => setValue(e.target.value)}
+						aria-invalid={Boolean(valueError) || undefined}
+						data-testid="model-key-value"
+					/>
+					{valueError ? (
+						<p className="text-chart-error-ink text-xs">{valueError}</p>
+					) : editing ? (
+						<p className="text-muted-foreground text-xs" data-testid="model-key-value-keep">
+							{t("valueKeepHint")}
+						</p>
+					) : (
+						providerGroup({ id: provider, custom_base_url: info?.custom_base_url }) === "self-hosted" && (
+							<p className="text-muted-foreground text-xs">{t("selfHostedKeyHint")}</p>
+						)
+					)}
+				</div>
+			)}
 			<div className={field}>
 				<label className={lbl} htmlFor={`${id}-url`}>
 					{t("baseUrl")}

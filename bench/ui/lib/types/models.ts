@@ -91,3 +91,32 @@ declare module "@/lib/i18n/resources" {
 		models: typeof import("@/locales/en/models.json");
 	}
 }
+/** One credential field of a provider whose key is a JSON object (schemas.ProviderField). */
+export interface ProviderCredentialField {
+	name: string;
+	label: string;
+	secret?: boolean;
+	required?: boolean;
+	help?: string;
+}
+
+/** What the key form needs from a Bifrost provider (schemas.BifrostProviderSpec, GET /models/providers). */
+export interface BifrostProviderSpec {
+	id: string;
+	name: string;
+	route?: string;
+	base_url?: string;
+	test_base_url?: string;
+	needs_base_url?: boolean;
+	keyless?: boolean;
+	fields?: ProviderCredentialField[];
+	custom?: boolean;
+	docs?: string;
+	[key: string]: unknown;
+}
+
+/** GET /models/providers */
+export interface BifrostProvidersResponse {
+	providers: BifrostProviderSpec[];
+	custom: BifrostProviderSpec;
+}
