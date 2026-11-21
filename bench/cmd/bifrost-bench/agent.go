@@ -36,6 +36,11 @@ const agentUsage = `usage: bifrost-bench agent <init|build|check> ...
   agent check <agents/id.yaml> -suite <suite> [-task <task>] [-json] [-no-build] [-runs checks]
       free conformance run on the fault proxy's scripted model; exit 1 on any FAIL
 
+  agent versions <id> [-json]
+      saved versions of the agent config (server with -server, else .heimdall/agent-versions)
+  agent snapshot <id> [-note text] [-json]
+      save the current agent config as a new version
+
 every subcommand takes -config deploy/bench.yaml (the project root is its grandparent)`
 
 func init() {
@@ -56,6 +61,8 @@ func runAgent(args []string) int {
 		return runAgentCheck(args[1:], os.Stdout)
 	case "diff": // Agent diff area: two versions of an agent config (agentdiff.go)
 		return runAgentDiff(args[1:], os.Stdout)
+	case "versions", "snapshot": // A20: saved versions of an agent config (agentversions.go)
+		return runAgentVersionsCmd(args[0], args[1:], os.Stdout)
 	default:
 		fmt.Fprintf(os.Stderr, "unknown agent subcommand %q\n\n%s\n", args[0], agentUsage)
 		return exitUsage

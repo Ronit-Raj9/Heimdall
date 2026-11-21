@@ -12,6 +12,7 @@ means `/experiments/<id>`; its tabs are named in the table.
 | CLI command | Website location (page, button) | Status | Notes |
 |---|---|---|---|
 | `agent init` | Build > Agents, **New agent** (`/agents/new`) | web | templates by category |
+| `agent versions` / `agent snapshot` | Agent page, **Versions** tab (every save makes a version) | web | with `-server` calls `/api/bench/agents/{id}/versions`; local mode reads and writes `.heimdall/agent-versions/<id>/` |
 | `agent build` | Agent page, Checks tab, **Build** (job `agent.build`) | partial | local servers only; hosted orgs use prebuilt or admin-approved custom images, because builds would run Docker in the server |
 | `agent check` | Agent page, Checks tab, **Check** (job `agent.check`) | web | hosted: runs as a tiny experiment on a runner |
 | `audit` | Experiment page, Analysis tab, **Audit a published table** | web | CSV upload or paste |
@@ -34,6 +35,9 @@ means `/experiments/<id>`; its tabs are named in the table.
 | `db migrate` / `status` / `backup` | Operate > Operations, Evidence, **Back up** | partial | migrate and status run at server start; operator shell task |
 | `doctor` | Operate > Operations, Health, **Run doctor** (job `operate.doctor`) | web | |
 | `estimate` | Experiments > New experiment, **Estimate** | web | |
+| `eval run` | **Evaluate your agent** (`/evaluate`) wizard, **Launch**; estimate shows live in step 4 | web | `--agent codex@v2 [--vs agent@vM \| --vs-model M] --model M --pack coding \| --benchmarks a,b --tasks 5 --trials 2 --faults model-down,broken-tool [--estimate]`; with `-server` (or `HEIMDALL_SERVER`) it calls `POST /api/bench/evaluations`; local mode only records the evaluation, launching needs a server |
+| `eval list` / `show` / `cancel` | Evaluations (`/evaluations`), evaluation page (`/evaluations/<id>`), **Cancel** | web | |
+| `eval report` | Evaluation page (`/evaluations/<id>`), report card; agent page, **Report card** tab | web | prints a capability table, one row per benchmark with the A/B verdict, faults and safety; `--json` gives the API shape. Local mode reads a saved `<id>.report.json` only |
 | `eventcollector` | none | CLI only | internal per-run process the engine starts; not a user action |
 | `evidence verify` / `mirror` / `archive` / `restore` / `backup` | Operate > Operations, Evidence buttons | web | |
 | `evidence list` / `fetch-backup` | none | CLI only | operator shell tasks on the mirror |
