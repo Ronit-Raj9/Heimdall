@@ -182,7 +182,7 @@ func (s *Server) serveExternal(w http.ResponseWriter, r *http.Request, rest, age
 	}
 	row.Arguments, row.ArgsSHA256 = Capture(x.redactBytes(args))
 	ft, hit := s.faults.decide(id, row.Tool, agent) // Multi-agent area: a member's route names the member
-	if hit && ft.Mode == FaultInputDrift { // lane X22: a new-shape call is translated and forwarded
+	if hit && ft.Mode == FaultInputDrift {          // lane X22: a new-shape call is translated and forwarded
 		nb, stale := driftCall(ft, body)
 		if !stale {
 			hit, body = false, nb

@@ -102,7 +102,7 @@ func serveHosted(ctx context.Context, a *app, offline bool) int {
 	defer closeEnv()
 	// Lane X16: org deletions, retention and the webhook outbox (dataops.go).
 	startHostedDataOps(ctx, env)
-	startEvidenceMirror(ctx, a) // Evidence storage area (P6): mirror and sweeper over runs/orgs/*; seals notify through evidenceOnSeal (evidence.go)
+	startEvidenceMirror(ctx, a)                             // Evidence storage area (P6): mirror and sweeper over runs/orgs/*; seals notify through evidenceOnSeal (evidence.go)
 	serveMetrics(ctx, a.cfg.Server.MetricsListen, a.logger) // N9: Prometheus on the admin address (servemetrics.go)
 	srv, err := newHostedServer(env)
 	if err != nil {
@@ -289,7 +289,7 @@ func (a *app) forOrg(org tenancy.Org, p tenancy.OrgPaths) (*app, error) {
 	project := p.ProjectRoot
 	oa.planGuard = func(e *schemas.Experiment) error { return tenancy.CheckExperimentPathsWithLibrary(project, library, e) }
 	oa.planConfine = project
-	oa.deferGateway = true // the hosted server opens no gateway: manifests record gateway.deferred_to_runner
+	oa.deferGateway = true                                                 // the hosted server opens no gateway: manifests record gateway.deferred_to_runner
 	reg.Secrets = orgSecretSource{keys: sharedKeyStore(oa), orgID: org.ID} // G01: the org's own secrets, never the server's environment
 	return oa, nil
 }

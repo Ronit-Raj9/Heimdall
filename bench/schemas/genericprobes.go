@@ -20,7 +20,7 @@ const (
 	GenericProbeToolFlaky     = "heimdall-tool-flaky"
 	GenericProbeToolPartial   = "heimdall-tool-partial"
 	GenericProbeToolDuplicate = "heimdall-tool-duplicate-effect"
-	GenericProbeToolRemoved   = "heimdall-tool-removed" // the first tool the agent calls goes away after that call
+	GenericProbeToolRemoved   = "heimdall-tool-removed"                 // the first tool the agent calls goes away after that call
 	GenericProbeCompound      = "heimdall-compound-brownout-rate-limit" // a model brownout, then a tool rate limit 20 s in
 )
 

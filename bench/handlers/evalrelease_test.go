@@ -44,7 +44,9 @@ func (c *captureReleases) List(context.Context) (*schemas.ReleaseList, error) {
 func (c *captureReleases) Get(context.Context, string) (*schemas.ReleaseRecord, error) {
 	return nil, schemas.ErrNotFound
 }
-func (c *captureReleases) Evidence(context.Context, string) ([]byte, error) { return nil, schemas.ErrNotFound }
+func (c *captureReleases) Evidence(context.Context, string) ([]byte, error) {
+	return nil, schemas.ErrNotFound
+}
 
 func evalReleaseFixture(t *testing.T, gate *schemas.EvaluationGate) (*router.Router, string, *captureReleases, *schemas.Evaluation) {
 	t.Helper()

@@ -51,7 +51,7 @@ func meters(idx runIndex) []schemas.Meter {
 			schemas.KindRate, timeoutRate},
 	}
 	defs = withStepFamily(idx, defs)
-	defs = withSafetyFamily(idx, defs) // Safety probes area (S1): outage behaviour and silent compromise (safetymeters.go)
+	defs = withSafetyFamily(idx, defs)  // Safety probes area (S1): outage behaviour and silent compromise (safetymeters.go)
 	defs = withControlFamily(idx, defs) // Control evaluations: usefulness and side-task success (safetyevidence.go)
 	// B2 Bifrost features: gateway overhead, MCP witness agreement (bifrostmeters.go).
 	defs = withBifrostFamily(idx, defs)

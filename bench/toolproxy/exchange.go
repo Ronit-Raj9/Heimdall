@@ -20,7 +20,7 @@ type pending struct {
 	answered    bool
 	committed   bool
 	undelivered bool
-	noReply     bool // sent without an id: a notification, never answered
+	noReply     bool   // sent without an id: a notification, never answered
 	full        []byte // the whole result, kept only when it may carry an image (frames.go)
 }
 

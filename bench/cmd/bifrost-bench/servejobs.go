@@ -359,8 +359,8 @@ func (l *launcher) execute(ctx context.Context, m *schemas.Manifest, run *liveRu
 				prog.Sealed++
 				log.Printf("sealed %s (slot %s): %s", ev.RunID, ev.SlotID, ev.Outcome)
 				_ = l.rebuild(context.WithoutCancel(ctx))
-				evidenceOnSeal(l.org, m.ExpID)          // Evidence storage area (P6), wired by Tenancy: mirror the sealed run now (evidence.go)
-				l.chargeKeySpend(ctx, m, ev.RunID, log) // G10: the run's cost to its model key (keybudget.go)
+				evidenceOnSeal(l.org, m.ExpID)           // Evidence storage area (P6), wired by Tenancy: mirror the sealed run now (evidence.go)
+				l.chargeKeySpend(ctx, m, ev.RunID, log)  // G10: the run's cost to its model key (keybudget.go)
 				maximOnSeal(l.org, ev.RunID, l.a.logger) // X23: send the run to the org's Maxim log repository when it asks for that (maxim.go)
 			case engine.EventRunRecovered:
 				log.Warnf("sealed interrupted run %s (slot %s): %s", ev.RunID, ev.SlotID, ev.Outcome)
