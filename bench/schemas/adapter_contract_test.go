@@ -25,7 +25,7 @@ func TestAdapterContractFieldsRoundTrip(t *testing.T) {
 	cfg := AgentConfig{
 		ID: "agent", Adapter: "command", Image: "image:1", AgentVersion: "2.0.0",
 		ImageDigest: "sha256:" + "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
-		Capabilities: &AdapterCapabilities{
+		AdapterCaps: &AdapterCapabilities{
 			SupportsStructuredEvents: true,
 			SupportsToolEvents:       true,
 			TaskTypes:                []string{"coding"},
@@ -41,8 +41,8 @@ func TestAdapterContractFieldsRoundTrip(t *testing.T) {
 		t.Fatal(err)
 	}
 	if got.AgentVersion != cfg.AgentVersion || got.ImageDigest != cfg.ImageDigest ||
-		got.Capabilities == nil || !got.Capabilities.SupportsToolEvents ||
-		len(got.Capabilities.TaskTypes) != 1 || len(got.Capabilities.EvidenceLevels) != 2 {
+		got.AdapterCaps == nil || !got.AdapterCaps.SupportsToolEvents ||
+		len(got.AdapterCaps.TaskTypes) != 1 || len(got.AdapterCaps.EvidenceLevels) != 2 {
 		t.Fatalf("contract fields did not round trip: %+v", got)
 	}
 }

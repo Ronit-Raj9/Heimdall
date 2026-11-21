@@ -32,6 +32,10 @@ type Suite struct {
 
 	Simulator *SimulatorSpec `json:"simulator,omitempty" yaml:"simulator"` // W3 customer support: user simulator settings, pinned like a judge (scenario.go)
 
+	// Requires lists the agent capabilities the benchmark needs. Empty derives
+	// them from Track and Environment (suite.Requires).
+	Requires CapabilitySet `json:"requires,omitempty" yaml:"requires,omitempty"`
+
 	Tiers map[string]TaskSelector `json:"tiers,omitempty" yaml:"tiers,omitempty"` // W7 suite tiers: pr, nightly, headroom (docs/suite-tiers.md)
 
 	Root     string       `json:"-" yaml:"-"` // absolute folder of the pack

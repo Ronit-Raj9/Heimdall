@@ -17,6 +17,8 @@
 #   budget is larger than for the support desk.
 id: claude-code
 adapter: command
+# What this agent can do here: it drives the desktop through MCP tools.
+capabilities: [desktop, shell, tools, mcp]
 image: bench/agent-claude-code:1
 argv:
   - claude

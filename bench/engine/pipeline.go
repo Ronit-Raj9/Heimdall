@@ -352,7 +352,7 @@ func (p *Pipeline) begin(ctx context.Context, in SlotInput) (*runState, error) {
 		Outcome: schemas.OutcomeUnknown, Y: schemas.Unknown("not_finished", schemas.EvidenceOutcome),
 		Timing: schemas.RunTiming{Started: p.now().UTC()},
 		Agent: schemas.RunAgentInfo{ConfigID: cfg.ID, Adapter: cfg.Adapter, Parser: cfg.Parser, ConfigHash: arm.ConfigHash,
-			AgentVersion: cfg.AgentVersion, ImageDigest: cfg.ImageDigest, Capabilities: cfg.Capabilities, CapabilityGaps: arm.CapabilityGaps,
+			AgentVersion: cfg.AgentVersion, ImageDigest: cfg.ImageDigest, Capabilities: cfg.AdapterCaps, CapabilityGaps: arm.CapabilityGaps,
 			ParserVersion: p.parserVersion(cfg.Parser)},
 		Gateway: schemas.RunGatewayInfo{SessionID: runID},
 	}

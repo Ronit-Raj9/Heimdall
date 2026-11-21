@@ -51,10 +51,10 @@ type commandAdapter struct {
 // ValidateFault implements the strict opt-in adapter contract. A command is
 // eligible only when its image explicitly declares the requested hook.
 func (a *commandAdapter) ValidateFault(cfg *schemas.AgentConfig, rule schemas.AdapterFaultRule) error {
-	if cfg == nil || cfg.Capabilities == nil || cfg.Capabilities.FaultProtocolVersion != schemas.AdapterFaultProtocol {
+	if cfg == nil || cfg.AdapterCaps == nil || cfg.AdapterCaps.FaultProtocolVersion != schemas.AdapterFaultProtocol {
 		return fmt.Errorf("command adapter does not declare fault protocol %s", schemas.AdapterFaultProtocol)
 	}
-	for _, h := range cfg.Capabilities.FaultHooks {
+	for _, h := range cfg.AdapterCaps.FaultHooks {
 		if h.Kind == rule.Kind && h.Name == rule.Name {
 			for _, m := range h.Modes {
 				if m == rule.Mode {
@@ -85,8 +85,8 @@ func (a *commandAdapter) BindFaultRuntime(rc *schemas.RunContext, plan *schemas.
 	} else {
 		plan.Env["BENCH_FAULT_SESSION"] = "default"
 	}
-	if rc.Agent != nil && rc.Agent.Capabilities != nil {
-		hooks, err := json.Marshal(rc.Agent.Capabilities.FaultHooks)
+	if rc.Agent != nil && rc.Agent.AdapterCaps != nil {
+		hooks, err := json.Marshal(rc.Agent.AdapterCaps.FaultHooks)
 		if err != nil {
 			return fmt.Errorf("encode fault hooks: %w", err)
 		}

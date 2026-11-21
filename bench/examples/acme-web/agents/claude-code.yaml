@@ -15,6 +15,8 @@
 #   the browser tools, not the suite's toolchain.
 id: claude-code
 adapter: command
+# What this agent can do here: it drives the browser through MCP tools.
+capabilities: [browser, shell, tools, mcp]
 image: bench/agent-claude-code:1
 argv:
   - claude

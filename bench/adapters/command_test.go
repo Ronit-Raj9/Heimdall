@@ -18,7 +18,7 @@ func TestCommandFaultCapability(t *testing.T) {
 	if err := a.ValidateFault(&schemas.AgentConfig{}, rule); err == nil {
 		t.Fatal("undeclared fault hook accepted")
 	}
-	cfg := &schemas.AgentConfig{Capabilities: &schemas.AdapterCapabilities{FaultProtocolVersion: schemas.AdapterFaultProtocol, FaultHooks: []schemas.AdapterFaultHook{{Kind: "tool", Name: "search", Modes: []string{"error"}}}}}
+	cfg := &schemas.AgentConfig{AdapterCaps: &schemas.AdapterCapabilities{FaultProtocolVersion: schemas.AdapterFaultProtocol, FaultHooks: []schemas.AdapterFaultHook{{Kind: "tool", Name: "search", Modes: []string{"error"}}}}}
 	if err := a.ValidateFault(cfg, rule); err != nil {
 		t.Fatal(err)
 	}

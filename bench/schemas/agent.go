@@ -78,21 +78,26 @@ type AgentEventRecord struct {
 // AgentConfig is the system under test, read from agents/<id>.yaml and then
 // modified by an arm's `set:` overrides. Its content hash identifies it.
 type AgentConfig struct {
-	ID           string               `json:"id" yaml:"id"`
-	Adapter      string               `json:"adapter" yaml:"adapter"` // command | scripted
-	Image        string               `json:"image" yaml:"image"`
-	Build        *ImageSpec           `json:"build,omitempty" yaml:"build"` // optional: how to build Image
-	Argv         []string             `json:"argv" yaml:"argv"`
-	Env          map[string]string    `json:"env" yaml:"env"`
-	Files        map[string]string    `json:"files,omitempty" yaml:"files"` // container path -> content template
-	Model        string               `json:"model" yaml:"model"`
-	Notes        AgentNotes           `json:"notes" yaml:"notes"`
-	Parser       string               `json:"parser,omitempty" yaml:"parser"` // empty = gateway-level evidence only
-	AgentVersion string               `json:"agent_version,omitempty" yaml:"agent_version,omitempty"`
-	ImageDigest  string               `json:"image_digest,omitempty" yaml:"image_digest,omitempty"`
-	Capabilities *AdapterCapabilities `json:"capabilities,omitempty" yaml:"capabilities,omitempty"`
-	Budgets      Budgets              `json:"budgets" yaml:"budgets"`
-	Gateway      GatewayPolicy        `json:"gateway" yaml:"gateway"`
+	ID           string            `json:"id" yaml:"id"`
+	Adapter      string            `json:"adapter" yaml:"adapter"` // command | scripted
+	Image        string            `json:"image" yaml:"image"`
+	Build        *ImageSpec        `json:"build,omitempty" yaml:"build"` // optional: how to build Image
+	Argv         []string          `json:"argv" yaml:"argv"`
+	Env          map[string]string `json:"env" yaml:"env"`
+	Files        map[string]string `json:"files,omitempty" yaml:"files"` // container path -> content template
+	Model        string            `json:"model" yaml:"model"`
+	Notes        AgentNotes        `json:"notes" yaml:"notes"`
+	Parser       string            `json:"parser,omitempty" yaml:"parser"` // empty = gateway-level evidence only
+	AgentVersion string            `json:"agent_version,omitempty" yaml:"agent_version,omitempty"`
+	ImageDigest  string            `json:"image_digest,omitempty" yaml:"image_digest,omitempty"`
+	// Capabilities is what the agent can do (shell, tools, mcp, sessions,
+	// browser, desktop, voice, gpu; capabilities.go). Empty uses the
+	// defaults of its adapter (DefaultCapabilities).
+	Capabilities CapabilitySet `json:"capabilities,omitempty" yaml:"capabilities"`
+	// AdapterCaps declares optional adapter support (fault hooks, streaming).
+	AdapterCaps *AdapterCapabilities `json:"adapter_capabilities,omitempty" yaml:"adapter_capabilities,omitempty"`
+	Budgets     Budgets              `json:"budgets" yaml:"budgets"`
+	Gateway     GatewayPolicy        `json:"gateway" yaml:"gateway"`
 	// Scripted is read only by the scripted adapter.
 	Scripted *ScriptedSpec `json:"scripted,omitempty" yaml:"scripted"`
 
