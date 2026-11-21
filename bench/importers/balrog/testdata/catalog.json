@@ -1,0 +1,5 @@
+{"format": "heimdall-balrog-catalog/1", "episodes": [
+ {"env": "babyai", "task": "BabyAI-MixedTrainLocal-v0/goto", "seed": 0, "instruction": "    You are an agent playing a simple navigation game.\n    Your goal is to go to the red ball.", "max_steps": 64, "actions": ["turn left", "turn right", "go forward"], "reference": ["turn left", "go forward"], "mutant_fails": true},
+ {"env": "nle", "task": "NetHackChallenge-v0", "seed": 0, "instruction": "You are playing NetHack.", "max_steps": 100000, "actions": ["north"], "reference_note": "upstream ships no solver or walkthrough for this environment"},
+ {"env": "babaisai", "task": "env/goto_win", "seed": 1, "error": "ImportError: libxcb.so.1"}
+]}

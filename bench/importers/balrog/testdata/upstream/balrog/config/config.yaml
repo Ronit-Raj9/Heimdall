@@ -1,0 +1,2 @@
+tasks:
+  babyai_tasks: ["BabyAI-MixedTrainLocal-v0/goto"]
