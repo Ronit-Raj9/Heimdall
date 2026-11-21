@@ -92,6 +92,13 @@ type TaskEnvironment struct {
 	// VerifierImage is the image the verifier runs in under clean_room mode.
 	// Empty uses the task image.
 	VerifierImage string `json:"verifier_image,omitempty" yaml:"verifier_image"`
+	// VerifierArtifacts are absolute paths in the agent's container. With
+	// verifier mode snapshot and a VerifierImage they select a separate
+	// verifier (Harbor's environment_mode "separate"): each path is copied out
+	// of the frozen agent container into a fresh volume mounted read-only at
+	// /grader/collect (at the same path below it), and the verifier runs in
+	// VerifierImage instead of the snapshot.
+	VerifierArtifacts []string `json:"verifier_artifacts,omitempty" yaml:"verifier_artifacts"`
 	// BuildNetwork allows network during the image build only (most upstream
 	// Dockerfiles install packages). The run itself never gets it.
 	BuildNetwork bool `json:"build_network,omitempty" yaml:"build_network"`

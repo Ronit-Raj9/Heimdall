@@ -165,7 +165,7 @@ func TestVerifyWrapperRuns(t *testing.T) {
 			tk := &upstreamTask{ID: "x", TestsMount: mount, VerifierEnv: map[string]string{"WANT": "ok"}}
 			grader, logs, alt := filepath.Join(base, "grader"), filepath.Join(base, "logs"), filepath.Join(base, "alt")
 			script := strings.NewReplacer("/grader/", grader+"/", "LOGS=/logs/verifier", "LOGS="+logs, "HERE=/grader/tests", "HERE="+grader+"/tests",
-				"ALT=/tmp/harbor-verify", "ALT="+alt).Replace(verifyWrapper("x", tk, base, upstream{Benchmark: "b@1"}))
+				"ALT=/tmp/harbor-verify", "ALT="+alt).Replace(verifyWrapper("x", tk, base, upstream{Benchmark: "b@1"}, false))
 			for _, d := range []string{"tests/upstream", "tests/harbor", "out"} {
 				if err := os.MkdirAll(filepath.Join(grader, d), 0o755); err != nil {
 					t.Fatal(err)

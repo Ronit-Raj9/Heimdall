@@ -31,6 +31,7 @@ const (
 	SetAgent         = "agent"           // base agent config of the skills experiment; default agents/codex.yaml
 	SetKeepNetworked = "keep_networked"  // true imports tasks whose reference or test script downloads at run time (they fail admission: drafts)
 	SetImage         = "image"           // build (default) builds the upstream Dockerfile; prebuilt starts FROM the image task.toml names
+	SetVerifier      = "verifier"        // skip (default) or separate: import tasks with a separate verifier, graded in its prebuilt image with the task.toml artifacts copied in
 	SetHackVerify    = "hack_verifiable" // skip (default) or keep tasks with a planted honeypot (Hack-Verifiable Terminal-Bench)
 )
 
@@ -172,6 +173,7 @@ type settings struct {
 	benchmark, source, revision, license string
 	tasksDir, track, agent, image        string
 	keepNetworked, keepHoneypots         bool
+	separate                             bool
 }
 
 func readSettings(extra map[string]string) (settings, error) {
@@ -202,13 +204,18 @@ func readSettings(extra map[string]string) (settings, error) {
 				return cfg, fmt.Errorf("harbor: -set hack_verifiable=%s: want skip or keep", v)
 			}
 			cfg.keepHoneypots = v == "keep"
+		case SetVerifier:
+			if v != "skip" && v != "separate" {
+				return cfg, fmt.Errorf("harbor: -set verifier=%s: want skip or separate", v)
+			}
+			cfg.separate = v == "separate"
 		case SetImage:
 			if v != "build" && v != "prebuilt" {
 				return cfg, fmt.Errorf("harbor: -set image=%s: want build or prebuilt", v)
 			}
 			cfg.image = v
 		default:
-			return cfg, fmt.Errorf("harbor: unknown setting %q (known: benchmark, source, revision, license, tasks_dir, track, agent, keep_networked, image, hack_verifiable)", k)
+			return cfg, fmt.Errorf("harbor: unknown setting %q (known: benchmark, source, revision, license, tasks_dir, track, agent, keep_networked, image, verifier, hack_verifiable)", k)
 		}
 	}
 	return cfg, nil
@@ -327,6 +334,7 @@ type taskPlan struct {
 	solution   []byte       // tar.gz of the solution folder
 	skillsTar  []byte       // tar.gz of the skills folder, for the reference control
 	skillRoots []string     // folders the reference control installs the skills in
+	separate   bool         // graded in the upstream separate verifier image (-set verifier=separate)
 	compose    *composePlan // X2: the task's compose file, mapped (compose.go); nil without one
 }
 
@@ -339,8 +347,14 @@ func plan(t *upstreamTask, cfg settings) (*taskPlan, string) {
 	switch {
 	case t.GPUs > 0:
 		return nil, fmt.Sprintf("needs %d GPU(s); the bench schedules none", t.GPUs)
-	case t.SeparateVerifier:
-		return nil, "grades in a separate verifier container ([verifier] environment_mode, [verifier.environment] or [[verifier.collect]]), which the importer does not map; it grades in a snapshot of the agent's container"
+	case t.SeparateVerifier && cfg.separate && t.ArtifactsUnmapped != "":
+		return nil, "separate verifier with " + t.ArtifactsUnmapped + ", which the bench does not map (only plain artifact paths are copied from the agent's container)"
+	case t.SeparateVerifier && cfg.separate && t.VerifierImage == "":
+		return nil, "separate verifier without a prebuilt docker_image in [verifier.environment]"
+	case t.SeparateVerifier && cfg.separate && len(t.Artifacts) == 0:
+		return nil, "separate verifier with no artifacts listed, so nothing of the agent's work would reach it"
+	case t.SeparateVerifier && !cfg.separate:
+		return nil, "grades in a separate verifier container ([verifier] environment_mode, [verifier.environment] or [[verifier.collect]]), which the importer maps only with -set verifier=separate"
 	case t.MCPServers > 0:
 		return nil, "declares MCP servers in task.toml; the importer does not map them to services"
 	case !hasDockerfile && (cfg.image != "prebuilt" || t.DockerImage == ""):
@@ -374,7 +388,7 @@ func plan(t *upstreamTask, cfg settings) (*taskPlan, string) {
 	if err != nil {
 		return nil, err.Error()
 	}
-	p := &taskPlan{tests: tests, agentS: seconds(t.AgentTimeoutS, defaultAgentS), verifierS: seconds(t.VerifierTimeoutS, defaultVerifierS)}
+	p := &taskPlan{separate: t.SeparateVerifier, tests: tests, agentS: seconds(t.AgentTimeoutS, defaultAgentS), verifierS: seconds(t.VerifierTimeoutS, defaultVerifierS)}
 	var src string
 	if hasDockerfile {
 		b, err := os.ReadFile(dockerfile)

@@ -51,6 +51,13 @@ type upstreamTask struct {
 	// ([verifier] environment_mode = "separate", a [verifier.environment]
 	// table, or [[verifier.collect]] hooks that carry the agent's work there).
 	SeparateVerifier bool
+	// The separate verifier's prebuilt image ([verifier.environment]
+	// docker_image), the top-level artifacts list (plain paths only), and
+	// whether it holds a service-sourced entry or a [[verifier.collect]] hook,
+	// which the bench does not map.
+	VerifierImage     string
+	Artifacts         []string
+	ArtifactsUnmapped string
 
 	EnvEnv      map[string]string // [environment.env]: set in the task image
 	VerifierEnv map[string]string // [verifier.env]: set for test.sh
@@ -129,6 +136,19 @@ func (t *upstreamTask) readHarbor() error {
 	_, hasEnv := verifier["environment"].(map[string]any)
 	t.SeparateVerifier = tomlString(verifier, "environment_mode") == "separate" || hasEnv || len(tomlList(verifier, "collect")) > 0
 	t.DockerImage = tomlString(env, "docker_image")
+	if venv, ok := verifier["environment"].(map[string]any); ok {
+		t.VerifierImage = tomlString(venv, "docker_image")
+	}
+	if len(tomlList(verifier, "collect")) > 0 {
+		t.ArtifactsUnmapped = "[[verifier.collect]] hooks"
+	}
+	for _, a := range tomlList(doc, "artifacts") {
+		if s, ok := a.(string); ok {
+			t.Artifacts = append(t.Artifacts, s)
+		} else if t.ArtifactsUnmapped == "" {
+			t.ArtifactsUnmapped = "an artifact taken from a service container"
+		}
+	}
 	t.GPUs = int64(tomlNumber(env, "gpus"))
 	t.AllowInternet = tomlBool(env, "allow_internet")
 	t.MCPServers = len(tomlList(env, "mcp_servers"))

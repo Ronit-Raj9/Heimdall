@@ -111,6 +111,7 @@
         "context": {"$ref": "#/$defs/rel_path"},
         "workspace_path": {"type": "string", "pattern": "^/"},
         "verifier_image": {"type": "string", "minLength": 1},
+        "verifier_artifacts": {"type": "array", "items": {"type": "string", "pattern": "^/"}, "description": "Absolute paths copied out of the frozen agent container to /grader/collect for a separate verifier running in verifier_image (snapshot mode only)."},
         "build_network": {"type": "boolean"},
         "user": {"enum": ["root"], "description": "root runs the agent as root in the task's own image (docs/runner-safety.md)."},
         "env": {"type": "object", "additionalProperties": {"type": "string"}, "description": "Variables set in the agent's, a control's and the verifier's container, under the plan's own (docs/multi-container.md)."}

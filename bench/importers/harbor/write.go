@@ -74,7 +74,7 @@ func writeTask(dir, id string, t *upstreamTask, p *taskPlan, up upstream) error 
 	files := map[string]string{
 		"instruction.md":         t.Instruction,
 		harborDir + "/test.sh":   p.tests.Script,
-		harborDir + "/verify.sh": verifyWrapper(id, t, p.workdir, up),
+		harborDir + "/verify.sh": verifyWrapper(id, t, p.workdir, up, p.separate),
 		referenceFile:            referenceScript(t, p),
 		emptyFile:                emptyScript,
 		exploitFile:              exploitScript,
@@ -120,6 +120,11 @@ func taskRecord(id string, t *upstreamTask, p *taskPlan, up upstream) *schemas.T
 			BuildNetwork:  true,
 			User:          "root", // Harbor runs the agent, solve.sh and test.sh as root
 		},
+	}
+	if p.separate {
+		task.Environment.VerifierImage = t.VerifierImage
+		task.Environment.VerifierArtifacts = append([]string(nil), t.Artifacts...)
+		task.Tags = dedupe(append(task.Tags, "separate-verifier"))
 	}
 	if hexRE.MatchString(up.Revision) {
 		task.Provenance.BaseCommit = up.Revision
@@ -180,8 +185,14 @@ func tags(t *upstreamTask) []string {
 // /grader/out/reward.json. The folders are emptied first, so nothing the
 // agent left there can stand in for a reward. On a read-only root file
 // system it runs from /tmp instead, with the two paths rewritten in test.sh.
-func verifyWrapper(id string, t *upstreamTask, workdir string, up upstream) string {
+func verifyWrapper(id string, t *upstreamTask, workdir string, up upstream, separate bool) string {
 	var env strings.Builder
+	if separate {
+		// Harbor's separate verifier: the task.toml artifacts arrive from the
+		// agent's container at /grader/collect and are uploaded to their own
+		// paths in the verifier image, as Harbor uploads them.
+		env.WriteString("if [ -d /grader/collect ]; then cp -a /grader/collect/. / || fail \"cannot place the agent's artifacts\"; fi\n")
+	}
 	for _, k := range sortedEnvKeys(t.VerifierEnv) {
 		fmt.Fprintf(&env, "export %s=%s\n", k, shellQuote(t.VerifierEnv[k]))
 	}
