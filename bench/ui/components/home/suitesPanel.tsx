@@ -8,7 +8,7 @@ import { suiteReady } from "./home.utils";
 /** Suites as compact tiles: category icon, name, task count and a Ready or Needs attention pill. */
 export function SuitesPanel({ suites, limit = 6 }: { suites: readonly SuiteSummary[]; limit?: number }) {
 	return (
-		<ul className="grid gap-3 sm:grid-cols-2 lg:grid-cols-1 xl:grid-cols-2" data-testid="home-suites-list">
+		<ul className="grid gap-2 sm:grid-cols-2 lg:grid-cols-1" data-testid="home-suites-list">
 			{suites.slice(0, limit).map((suite) => (
 				<SuiteTile key={suite.id} suite={suite} />
 			))}
