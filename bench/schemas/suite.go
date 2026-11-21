@@ -101,7 +101,7 @@ func (s *Suite) ProbeByID(id string) *ProbeSpec {
 			return p
 		}
 	}
-	return nil
+	return GenericProbe(id) // lane A07: generic fault probes (genericprobes.go)
 }
 
 // SuiteLock pins every task and probe of a suite version by hash

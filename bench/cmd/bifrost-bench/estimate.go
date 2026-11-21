@@ -226,6 +226,10 @@ func (s serveForecast) Estimate(ctx context.Context, exp *schemas.Experiment) (*
 	return s.a.forecast(ctx, m)
 }
 
+// Priced reports whether the price snapshot lists model; the evaluation
+// estimate (handlers/evaluationestimate.go) leaves a cost unknown without it.
+func (s serveForecast) Priced(model string) bool { return s.a.priced(model) }
+
 // Matrix implements handlers.ForecastSource.
 func (s serveForecast) Matrix(ctx context.Context, expID string, q leaderboard.MatrixQuery) (*schemas.ModelMatrix, error) {
 	return s.a.matrix(ctx, expID, q)
