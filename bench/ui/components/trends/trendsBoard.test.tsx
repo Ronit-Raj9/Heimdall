@@ -14,13 +14,13 @@ describe("TrendsBoard", () => {
 		expect(html).toContain('data-testid="trends-chart"');
 		expect(html).toContain('data-testid="trends-table"');
 		expect(html).toMatch(/data-testid="trends-lineage-codex\|gpt-5.4-mini"/);
-		expect(html).toContain("Verified success over time");
+		expect(html).toContain("Solve rate over time");
 	});
 
 	it("says where the numbers come from and how many runs were rejected", () => {
 		const html = renderToStaticMarkup(<TrendsBoard data={data} />);
 		expect(html).toContain("never this index");
-		expect(html).toContain("1 run is listed as rejected because its seal did not verify.");
+		expect(html).toContain("1 run is left out because its files were changed after saving.");
 	});
 
 	it("shows the empty state below two points, with the point count", () => {

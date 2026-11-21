@@ -15,8 +15,8 @@ describe("TrendsChart", () => {
 	it("is an image with a title and a text summary of the newest values", () => {
 		const html = render();
 		expect(html).toMatch(/<svg role="img" aria-labelledby="[^"]+ [^"]+"/);
-		expect(html).toContain("Verified success over time: 2 lineages, 5 points.");
-		expect(html).toContain("codex (gpt-5.4-mini): 47.2% (Regressed)");
+		expect(html).toContain("Solve rate over time: 2 lineages, 5 points.");
+		expect(html).toContain("codex (gpt-5.4-mini): 47.2% (Got worse)");
 	});
 
 	it("draws one line per lineage in its own slot color", () => {
@@ -36,8 +36,8 @@ describe("TrendsChart", () => {
 
 	it("names the markers in the legend in words, not color alone", () => {
 		const html = render();
-		expect(html).toContain("Diamond: config hash changed from the previous point");
-		expect(html).toContain("Red ring: release verdict regressed or blocked");
+		expect(html).toContain("Diamond: the agent setup changed since the previous point");
+		expect(html).toContain("Red ring: the release got worse or was stopped");
 		expect(html).toContain("codex (gpt-5.4-mini)");
 		expect(html).toContain("claude-code-gpt (openai/gpt-5.1)");
 	});
@@ -60,6 +60,6 @@ describe("TrendsChart", () => {
 	it("gives each point a hover title with its experiment and regression reason", () => {
 		const html = render();
 		expect(html).toContain("e_synthetic-providers");
-		expect(html).toContain("Regressed: p 0.008 on 12 common tasks");
+		expect(html).toContain("Got worse: p 0.008 on 12 common tasks");
 	});
 });

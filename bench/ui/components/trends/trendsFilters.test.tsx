@@ -36,9 +36,9 @@ describe("TrendsFilters", () => {
 		]) {
 			expect(html).toContain(`data-testid="${id}"`);
 		}
-		for (const label of [">Suite<", ">Agent<", ">Metric<", ">Condition<", ">Runs<"]) expect(html).toContain(label);
+		for (const label of [">Benchmark<", ">Agent<", ">Measurement<", ">Conditions<", ">Runs<"]) expect(html).toContain(label);
 		// Each picker's label points at its trigger.
-		expect(html).toMatch(/<label for="([^"]+)"[^>]*>Metric<\/label><button[^>]*id="\1"/);
+		expect(html).toMatch(/<label for="([^"]+)"[^>]*>Measurement<\/label><button[^>]*id="\1"/);
 	});
 
 	it("maps the all option to no filter and keeps an unlisted current value", () => {

@@ -16,17 +16,17 @@ describe("TrendsTable", () => {
 
 	it("shows every column the chart summarizes", () => {
 		for (const head of [
-			"Lineage",
-			"Experiment",
+			"Agent",
+			"Comparison",
 			"Date",
-			"Arm",
-			"Config",
-			"Cost per success",
+			"Setup",
+			"Setup fingerprint",
+			"Cost per solved task",
 			"Tokens",
 			"Wall time",
-			"False completion",
-			"Verdict",
-			"Against previous",
+			"Said done but was not",
+			"Result",
+			"Compared with previous",
 		]) {
 			expect(html).toContain(`>${head}</th>`);
 		}
@@ -44,14 +44,14 @@ describe("TrendsTable", () => {
 	});
 
 	it("says not observed instead of zero for a missing number", () => {
-		expect(html).toContain("not observed");
+		expect(html).toContain("not measured");
 	});
 
 	it("shows the verdict, the policy and the release flag", () => {
 		expect(html).toContain("regressed");
-		expect(html).toContain("policy block");
+		expect(html).toContain("release rule: block");
 		expect(html.match(/data-testid="trends-release-flag"/g)).toHaveLength(2);
-		expect(html).toContain("Release regressed");
+		expect(html).toContain("Release got worse");
 	});
 
 	it("shows each regression status with its reason", () => {

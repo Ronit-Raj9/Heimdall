@@ -102,7 +102,7 @@ describe("MatrixTable", () => {
 		expect(textOf(html, "matrix-arm-A")).toBe("A");
 		expect(html).toContain('data-testid="leaderboard-interval-1"');
 		expect(html).toContain("75%");
-		expect(html).toContain(">pass^3<");
+		expect(html).toContain(">solved all 3 tries<");
 		const metrics = (arm: string, id: string) =>
 			html.match(new RegExp(`data-testid="matrix-metric-${arm}-${id}"[\\s\\S]*?</td>`))?.[0] ?? "";
 		expect(metrics("A", "cost_per_success")).toContain(">$0.061<");

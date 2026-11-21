@@ -36,7 +36,7 @@ describe("ReceiptFunnel", () => {
 			expect(html).toContain(`data-testid="receipt-step-${step}-B" data-state="not_applicable"`);
 		}
 		expect(html).toContain('aria-label="Not applicable to the fixture layer"');
-		expect(html.match(/>n\/a</g)).toHaveLength(6);
+		expect(html.match(/>does not apply</g)).toHaveLength(6);
 		for (const step of ["assigned", "armed", "visible", "acknowledged", "effect"] as const) {
 			expect(stepState(html, step), step).toBe("applicable");
 		}
@@ -53,8 +53,8 @@ describe("ReceiptFunnel", () => {
 
 	it("shows counts per arm with unknowns kept apart", () => {
 		const html = renderToStaticMarkup(<ReceiptFunnel layer="fixture" arms={["A", "B"]} ratios={FIXTURE_RATIOS} />);
-		expect(html).toContain(">2/12<");
-		expect(html).toContain(">9/12<");
+		expect(html).toContain(">2 of 12<");
+		expect(html).toContain(">9 of 12<");
 		expect(html).toContain(">1 unknown<");
 	});
 

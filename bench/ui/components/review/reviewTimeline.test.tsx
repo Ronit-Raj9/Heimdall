@@ -27,7 +27,7 @@ describe("ReviewTimeline", () => {
 		expect(html).toContain("maya");
 		expect(html).toContain("verifier is too strict");
 		expect(html).toContain("grade.json failed_tests");
-		expect(html).toContain("fail before, pass under this review");
+		expect(html).toContain("Not solved before, Solved under this review");
 	});
 
 	it("keeps an older decision as superseded, oldest first", () => {
