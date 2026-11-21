@@ -26,8 +26,57 @@ type LeaseCredentials struct {
 	// names of that slot, only to a runner token of the lease's org. The
 	// runner holds them in memory and hands them to the run's tool proxy
 	// and agent env; never logged or written to a run folder.
-	Secrets  map[string]string `json:"secrets,omitempty"`
-	IssuedAt time.Time         `json:"issued_at"`
+	Secrets map[string]string `json:"secrets,omitempty"`
+	// PromptLogging is the organization's gateway prompt logging policy
+	// (lane X03): the runner tags the lease's gateway keys with the
+	// organization and turns prompt text logging off when it says so. nil
+	// from an older server: keys stay untagged, as before.
+	PromptLogging *PromptLogPolicy `json:"prompt_logging,omitempty"`
+	IssuedAt      time.Time        `json:"issued_at"`
+}
+
+// Gateway log row metadata keys a hosted runner stamps on each virtual key
+// it mints for an organization's run. Bifrost copies them onto every log row
+// of the key, so the server lists and deletes one organization's rows with
+// the filter metadata_heimdall_org=<org>.
+const (
+	PromptLogOrgMetadataKey = "heimdall_org"
+	PromptLogRunMetadataKey = "heimdall_run"
+)
+
+// Prompt log retention bounds, in days. The shared gateway's own
+// log_retention_days (deploy/bifrost/config.json) is the hard ceiling.
+const (
+	PromptLogRetentionDefault = 7
+	PromptLogRetentionMax     = 30
+)
+
+// PromptLogPolicy is an organization's gateway prompt logging setting.
+type PromptLogPolicy struct {
+	// KeepContent keeps the prompt and response text of model calls in the
+	// gateway log. Off: the gateway stores token counts, cost and timing
+	// only.
+	KeepContent bool `json:"keep_content"`
+	// RetentionDays is how long the gateway keeps the organization's log
+	// rows (1 to PromptLogRetentionMax).
+	RetentionDays int `json:"retention_days"`
+}
+
+// DefaultPromptLogPolicy is the policy of an organization that never chose
+// one: text kept (traces and fault checks read it) for a week.
+func DefaultPromptLogPolicy() PromptLogPolicy {
+	return PromptLogPolicy{KeepContent: true, RetentionDays: PromptLogRetentionDefault}
+}
+
+// Normalize clamps RetentionDays into range; 0 means the default.
+func (p PromptLogPolicy) Normalize() PromptLogPolicy {
+	switch {
+	case p.RetentionDays <= 0:
+		p.RetentionDays = PromptLogRetentionDefault
+	case p.RetentionDays > PromptLogRetentionMax:
+		p.RetentionDays = PromptLogRetentionMax
+	}
+	return p
 }
 
 // LeaseHolder is who holds a coordinator lease: the worker, the runner token

@@ -12,6 +12,7 @@ import { cn } from "@/lib/utils";
 import { Check, Eye, EyeOff, TriangleAlert } from "lucide-react";
 import { useEffect, useId, useState, type FormEvent, type ReactNode } from "react";
 import { useTranslation } from "react-i18next";
+import { PromptLogsSection } from "./promptLogsSection";
 import { SettingsSection, When } from "./settingsBits";
 
 /** A failed write: the role refusal when it is one, the server's reason otherwise. */
@@ -178,6 +179,8 @@ function OrgSettings({ info }: { info: OrgInfo }) {
 					<WriteFailure error={publicState.error} title={t("settings.org.publicError")} testId="org-public-error" min="owner" />
 				)}
 			</SettingsSection>
+
+			<PromptLogsSection />
 
 			<SettingsSection title={t("settings.org.dangerTitle")} testId="settings-org-danger">
 				<div className="border-chart-error/40 divide-chart-error/20 flex flex-col divide-y rounded-lg border">

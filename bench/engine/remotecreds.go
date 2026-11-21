@@ -27,6 +27,12 @@ type OrgCredentialGateway interface {
 	BindExperimentOrg(expID, orgID string)
 }
 
+// OrgLogPolicyGateway is a gateway that tags an organization's keys and
+// applies its prompt logging policy (gateways/bifrost/orglogs.go; lane X03).
+type OrgLogPolicyGateway interface {
+	SetExperimentLogPolicy(expID, orgID string, p schemas.PromptLogPolicy)
+}
+
 // LeaseHolder reports who holds a live lease of this coordinator: the
 // worker, its runner token (hosted) and the experiment. ok is false for an
 // unknown or ended lease.
@@ -59,8 +65,10 @@ func (c *Coordinator) LeaseHolder(leaseID string) (schemas.LeaseHolder, bool) {
 // the runner-wide keys and is logged.
 func (w *Worker) applyLeaseCredentials(ctx context.Context, lease *schemas.WorkerLease) (map[string]string, string) {
 	var gw OrgCredentialGateway
+	var lg OrgLogPolicyGateway
 	if w.reg != nil && w.reg.Gateway != nil {
 		gw, _ = w.reg.Gateway.(OrgCredentialGateway)
+		lg, _ = w.reg.Gateway.(OrgLogPolicyGateway)
 	}
 	var out schemas.LeaseCredentials
 	err := w.call(ctx, http.MethodGet, workerAPI+"/leases/"+url.PathEscape(lease.LeaseID)+"/credentials", nil, &out)
@@ -74,6 +82,9 @@ func (w *Worker) applyLeaseCredentials(ctx context.Context, lease *schemas.Worke
 	secrets := out.Secrets
 	if secrets == nil {
 		secrets = map[string]string{} // the server answered: its org secrets are the run's only source
+	}
+	if lg != nil && out.PromptLogging != nil && out.OrgID != "" && lease.ExpID != "" {
+		lg.SetExperimentLogPolicy(lease.ExpID, out.OrgID, out.PromptLogging.Normalize()) // X03: before any key of the lease is minted
 	}
 	if gw == nil || len(out.Credentials) == 0 || out.OrgID == "" {
 		return secrets, ""
