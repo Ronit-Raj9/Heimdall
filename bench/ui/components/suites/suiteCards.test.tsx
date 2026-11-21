@@ -34,33 +34,33 @@ vi.mock("@tanstack/react-router", () => ({
 
 const list = JSON.parse(fs.readFileSync(path.resolve(__dirname, "../../public/fixtures/suites.json"), "utf8")) as SuiteList;
 const suite = (id: string) => list.suites.find((s) => s.id === id)!;
-const card = (html: string, id: string) => html.match(new RegExp(`data-testid="suites-card-${id}"[\\s\\S]*?</a>`))?.[0] ?? "";
+const card = (html: string, id: string) => html.match(new RegExp(`data-testid="suites-card-${id}"[\\s\\S]*?</article>`))?.[0] ?? "";
 
 describe("SuiteCards", () => {
 	const html = renderToStaticMarkup(<SuiteCards suites={list.suites} />);
 
-	it("links every card to its suite's page", () => {
-		expect(html).toMatch(/href="\/suites\/coding-core"[^>]*data-testid="suites-card-coding-core"/);
+	it("links every card to its suite's page by a readable name", () => {
+		expect(html).toMatch(/href="\/suites\/coding-core"[^>]*data-testid="suites-card-coding-core-link"[^>]*>Coding core</);
 	});
 
-	it("shows lock state, admitted count, drift and verifier format", () => {
+	it("shows one status pill and the task count, and hides engineering detail", () => {
 		const core = card(html, "coding-core");
-		expect(core).toMatch(/data-testid="suites-card-coding-core-lock" data-tone="good">.*Locked/);
-		expect(core).toMatch(/data-testid="suites-card-coding-core-admitted" data-tone="good">4 of 4 tasks admitted/);
-		expect(core).toContain("10 probes");
+		expect(core).toMatch(/data-testid="suites-card-coding-core-status" data-status="ready">.*Ready/);
+		expect(core).toContain("4 tasks");
+		expect(core).toContain('data-testid="suites-card-coding-core-run"');
 		const acme = card(html, "acme-payments");
-		expect(acme).toMatch(/data-tone="warn">.*Lock is stale/);
-		expect(acme).toContain("1 of 3 tasks admitted");
-		expect(acme).toContain("1 change since lock");
-		expect(card(html, "harbor-shell")).toContain(">Reward file<");
-		expect(card(html, "harbor-shell")).toContain("digest not pinned");
+		expect(acme).toMatch(/data-status="needsAdmission">.*2 tasks need admission/);
+		expect(card(html, "harbor-shell")).not.toContain("Reward file");
+		expect(card(html, "harbor-shell")).not.toContain("digest not pinned");
+		expect(core).not.toContain("probes");
 	});
 
-	it("shows a pack that failed to load with its error", () => {
+	it("shows a pack that failed to load with its error and no Run button", () => {
 		const broken = card(html, "acme-broken");
 		expect(broken).toContain('data-state="error"');
 		expect(broken).toContain("Failed to load");
 		expect(broken).toContain("verifier.tests: required field missing");
+		expect(broken).not.toContain("-run");
 	});
 });
 
@@ -109,12 +109,9 @@ describe("scenario facts", () => {
 		expect(html).toMatch(/data-testid="suites-imported".*?recall-example@1/);
 	});
 
-	it("puts the track on every card and marks judged suites", () => {
+	it("puts a category icon on every card", () => {
 		const html = renderToStaticMarkup(<SuiteCards suites={list.suites} />);
-		expect(card(html, "coding-core")).toMatch(/data-testid="suites-card-coding-core-track"[^>]*>Coding/);
-		expect(card(html, "harbor-shell")).toMatch(/data-testid="suites-card-harbor-shell-track"[^>]*>Terminal/);
-		expect(card(html, "memory-recall")).toContain('data-testid="suites-card-memory-recall-judged"');
-		expect(card(html, "coding-core")).not.toContain("-judged");
-		expect(card(html, "acme-broken")).not.toContain("-track");
+		expect(card(html, "coding-core")).toContain('data-track="coding"');
+		expect(card(html, "harbor-shell")).toContain('data-track="terminal"');
 	});
 });

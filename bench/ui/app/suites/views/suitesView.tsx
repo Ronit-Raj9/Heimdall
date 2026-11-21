@@ -15,14 +15,15 @@ import { useTranslation } from "react-i18next";
  */
 export default function SuitesView() {
 	const { t } = useTranslation("bench");
+	const { t: tu } = useTranslation("suitesUx");
 	const query = useGetSuitesQuery();
 	const data = query.data;
 	const suites = data?.suites ?? [];
 	return (
-		<section className="flex min-w-0 flex-col gap-6" data-testid="suites-screen">
+		<section className="mx-auto flex w-full max-w-[1200px] min-w-0 flex-col gap-8" data-testid="suites-screen">
 			<PageHeader
 				title={t("suites.title")}
-				subtitle={t("suites.subtitle")}
+				subtitle={tu("subtitle")}
 				meta={<ModeBadge mode={data?.mode} isLoading={query.isLoading} isError={query.isError && !data} />}
 				actions={
 					<div className="flex flex-wrap items-center gap-2">
@@ -34,7 +35,7 @@ export default function SuitesView() {
 			{data?.mode === "synthetic" && (
 				<p
 					role="note"
-					className="border-chart-warning/50 bg-chart-warning/10 text-foreground flex items-start gap-2 rounded-sm border px-4 py-2 text-sm"
+					className="border-chart-warning/50 bg-chart-warning/10 text-foreground flex items-start gap-2 rounded-xl border px-4 py-2.5 text-sm"
 					data-testid="suites-synthetic-banner"
 				>
 					<AlertTriangle className="text-chart-warning-ink mt-0.5 size-4 shrink-0" aria-hidden="true" />
@@ -65,7 +66,7 @@ export default function SuitesView() {
 export function NewSuiteButton() {
 	const { t } = useTranslation("suiteAuthoring");
 	return (
-		<Button size="sm" variant="outline" asChild>
+		<Button size="sm" variant="ghost" asChild>
 			<Link to="/suites/new" data-testid="suites-new-link">
 				<Plus className="size-4" aria-hidden="true" />
 				{t("new.title")}

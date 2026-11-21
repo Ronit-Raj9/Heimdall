@@ -1,10 +1,11 @@
 import { ModeBadge } from "@/components/modeBadge";
 import { BlockSkeleton, LoadError } from "@/components/runs/screenStates";
-import { GradingBadge, TrackBadge } from "@/components/scenario/scenarioBadges";
-import { suiteGrading, suiteTrack } from "@/components/scenario/scenario.utils";
+import { GradingBadge } from "@/components/scenario/scenarioBadges";
+import { suiteGrading } from "@/components/scenario/scenario.utils";
 import { EmptyState, PageHeader, RouteTabs, suiteIdOf, type RouteTab } from "@/components/shell";
 import { suiteVersionOf } from "@/components/shell/entityLink";
-import { LockBadge } from "@/components/suites/suiteBadges";
+import { SuiteIconTile, SuiteStatusPill, suiteDisplayName } from "@/components/suites/suiteIdentity";
+import { SuiteRunButton } from "@/components/suites/suiteRunButton";
 import { BrokenSuite, SuiteDriftNotice, SuiteFacts } from "@/components/suites/suiteFacts";
 import { FingerprintDriftNotice } from "@/components/suites/suiteLockKind";
 import { healthState } from "@/components/suites/suiteHealth.utils";
@@ -13,7 +14,8 @@ import { Button } from "@/components/ui/button";
 import { useGetSuiteHealthQuery, useGetSuitesQuery } from "@/lib/store";
 import type { SuiteSummary } from "@/lib/types/bench";
 import { Link } from "@tanstack/react-router";
-import { AlertTriangle, Boxes, ChevronRight, Trophy } from "lucide-react";
+import { AlertTriangle, Boxes, CircleCheck, History, ListChecks, type LucideIcon, Radar, Trophy } from "lucide-react";
+import { cn } from "@/lib/utils";
 import { useTranslation } from "react-i18next";
 import { SuiteCalibrationTab } from "./calibrationTab";
 import { OpsTab } from "./opsTab";
@@ -78,29 +80,37 @@ function SuiteBody({
 	requestedVersion?: string | null;
 }) {
 	const { t } = useTranslation("bench");
-	const { t: ta } = useTranslation("suiteAuthoring");
+	const { t: tu } = useTranslation("suitesUx");
 	// Health is a separate request: a failure or a 503 (no run store) shows "health unavailable" and never blocks the page.
 	const healthQuery = useGetSuiteHealthQuery(suite.id, { skip: Boolean(suite.error) });
 	const health = healthState(healthQuery);
 	const judged = suiteGrading(suite) === "judged";
 	const tasks = suite.tasks.length;
 	const tabs: RouteTab[] = [
-		{ id: "tasks", label: t("suites.tabs.tasks"), badge: tasks },
-		{ id: "health", label: t("suites.tabs.health") },
-		{ id: "tiers", label: t("suites.tabs.tiers"), badge: suite.tiers?.length || undefined },
-		{ id: "calibration", label: t("suites.tabs.calibration"), hidden: !judged },
-		{ id: "export", label: t("suites.tabs.export") },
-		{ id: "ops", label: t("tab", { ns: "suiteops" }) },
-		{ id: "edit", label: ta("tab") }, // L10 suite authoring
+		{ id: "tasks", label: tu("tabs.tasks"), badge: tasks },
+		{ id: "settings", label: tu("tabs.settings") },
+		{ id: "health", label: tu("tabs.health") },
+		{ id: "tiers", label: tu("tabs.tiers"), hidden: !suite.tiers?.length, badge: suite.tiers?.length || undefined },
+		{ id: "calibration", label: tu("tabs.calibration"), hidden: !judged },
+		{ id: "ops", label: tu("tabs.ops") },
+		{ id: "edit", label: tu("tabs.edit") }, // L10 suite authoring
+		{ id: "export", label: tu("tabs.export") },
 	];
+	const runs = health.state === "ready" ? health.health.runs : null;
 
 	return (
-		<section className="flex min-w-0 flex-col gap-6" data-testid="suite-screen">
+		<section className="mx-auto flex w-full max-w-[1200px] min-w-0 flex-col gap-8" data-testid="suite-screen">
 			<PageHeader
 				title={
-					<span className="flex flex-wrap items-baseline gap-x-2">
-						<span className="font-mono">{suite.id}</span>
-						{suite.version && <span className="text-muted-foreground font-mono text-sm font-normal">{suite.version}</span>}
+					<span className="flex min-w-0 items-center gap-4">
+						<SuiteIconTile suite={suite} size="lg" />
+						<span className="flex min-w-0 flex-col gap-0.5">
+							<span className="truncate text-2xl font-semibold tracking-tight sm:text-3xl">{suiteDisplayName(suite.id)}</span>
+							<span className="text-muted-foreground truncate font-mono text-xs font-normal">
+								{suite.id}
+								{suite.version && <span className="opacity-70">@{suite.version}</span>}
+							</span>
+						</span>
 					</span>
 				}
 				breadcrumbs={crumbs}
@@ -108,27 +118,42 @@ function SuiteBody({
 				meta={
 					<>
 						<ModeBadge mode={mode as never} />
-						{!suite.error && <TrackBadge track={suiteTrack(suite)} />}
+						<SuiteStatusPill suite={suite} testId="suite-status" />
 						{judged && <GradingBadge grading="judged" />}
-						{!suite.error && <LockBadge state={suite.lock_state} testId="suite-lock" />}
 					</>
 				}
 				actions={
 					!suite.error && (
-						<Button size="sm" variant="outline" asChild>
-							<Link to="/leaderboard" search={{ suite: leaderboardSuite(suite) }} data-testid="suite-leaderboard-link">
-								<Trophy className="size-4" aria-hidden="true" />
-								{t("suites.facts.leaderboard")}
-							</Link>
-						</Button>
+						<div className="flex flex-wrap items-center gap-2">
+							<Button size="sm" variant="ghost" asChild>
+								<Link to="/leaderboard" search={{ suite: leaderboardSuite(suite) }} data-testid="suite-leaderboard-link">
+									<Trophy className="size-4" aria-hidden="true" />
+									{t("suites.facts.leaderboard")}
+								</Link>
+							</Button>
+							<SuiteRunButton suiteId={suite.id} size="lg" testId="suite-run" />
+						</div>
 					)
 				}
 				testId="suite-header"
 			/>
+			{!suite.error && (
+				<div className="grid min-w-0 grid-cols-2 gap-4 lg:grid-cols-4" data-testid="suite-stats">
+					<StatTile icon={ListChecks} label={tu("stats.tasks")} value={suite.task_count} />
+					<StatTile
+						icon={CircleCheck}
+						label={tu("stats.admitted")}
+						value={`${suite.admitted_count}/${suite.task_count}`}
+						tone={suite.task_count > 0 && suite.admitted_count === suite.task_count ? "good" : "warn"}
+					/>
+					<StatTile icon={Radar} label={tu("stats.probes")} value={suite.probes.length} />
+					<StatTile icon={History} label={tu("stats.lastRun")} value={runs === null || runs === 0 ? tu("stats.never") : runs} />
+				</div>
+			)}
 			{requestedVersion && requestedVersion !== suite.version && (
 				<p
 					role="note"
-					className="border-chart-warning/50 bg-chart-warning/10 text-foreground flex items-start gap-2 rounded-sm border px-4 py-2 text-sm"
+					className="border-chart-warning/50 bg-chart-warning/10 text-foreground flex items-start gap-2 rounded-xl border px-4 py-2.5 text-sm"
 					data-testid="suite-version-mismatch"
 				>
 					<AlertTriangle className="text-chart-warning-ink mt-0.5 size-4 shrink-0" aria-hidden="true" />
@@ -138,7 +163,7 @@ function SuiteBody({
 			{mode === "synthetic" && (
 				<p
 					role="note"
-					className="border-chart-warning/50 bg-chart-warning/10 text-foreground flex items-start gap-2 rounded-sm border px-4 py-2 text-sm"
+					className="border-chart-warning/50 bg-chart-warning/10 text-foreground flex items-start gap-2 rounded-xl border px-4 py-2.5 text-sm"
 					data-testid="suites-synthetic-banner"
 				>
 					<AlertTriangle className="text-chart-warning-ink mt-0.5 size-4 shrink-0" aria-hidden="true" />
@@ -151,19 +176,13 @@ function SuiteBody({
 				<>
 					<SuiteDriftNotice suite={suite} />
 					<FingerprintDriftNotice suite={suite} />
-					<details className="group min-w-0 rounded-sm border px-3 py-2" data-testid="suite-settings">
-						<summary className="text-foreground flex cursor-pointer list-none items-center gap-1.5 text-sm font-medium">
-							<ChevronRight className="size-4 transition-transform group-open:rotate-90" aria-hidden="true" />
-							{t("suites.detail.settings")}
-							<span className="text-muted-foreground text-xs font-normal">{t("suites.detail.settingsHint")}</span>
-						</summary>
-						<div className="pt-3">
-							<SuiteFacts suite={suite} showLeaderboard={false} showImported={false} />
-						</div>
-					</details>
 					<RouteTabs tabs={tabs} defaultTab="tasks" label={t("suites.tabs.label")} testId="suite-tabs">
 						{(active) =>
-							active === "health" ? (
+							active === "settings" ? (
+								<div className="bg-card min-w-0 rounded-xl border p-5" data-testid="suite-settings">
+									<SuiteFacts suite={suite} showLeaderboard={false} showImported={false} />
+								</div>
+							) : active === "health" ? (
 								<SuiteHealthTab suite={suite} health={health} />
 							) : active === "tiers" ? (
 								<SuiteTiersTab suite={suite} />
@@ -183,5 +202,25 @@ function SuiteBody({
 				</>
 			)}
 		</section>
+	);
+}
+/** One headline number of the suite (local StatCard until the shared one lands). */
+function StatTile({ icon: Icon, label, value, tone }: { icon: LucideIcon; label: string; value: React.ReactNode; tone?: "good" | "warn" }) {
+	return (
+		<div className="bg-card flex min-w-0 flex-col gap-2 rounded-xl border p-5">
+			<span className="text-muted-foreground flex items-center gap-1.5 text-sm">
+				<Icon className="size-4" aria-hidden="true" />
+				{label}
+			</span>
+			<span
+				className={cn(
+					"text-2xl font-semibold tracking-tight tabular-nums",
+					tone === "good" && "text-chart-success-ink",
+					tone === "warn" && "text-chart-warning-ink",
+				)}
+			>
+				{value}
+			</span>
+		</div>
 	);
 }

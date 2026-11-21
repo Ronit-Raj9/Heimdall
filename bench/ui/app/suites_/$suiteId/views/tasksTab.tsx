@@ -35,6 +35,7 @@ export const TASK_QUERY = {
 /** Tasks tab: the filterable task table, the task in ?task= open beside it. */
 export function SuiteTasksTab({ suite, health }: { suite: SuiteSummary; health: HealthState }) {
 	const { t } = useTranslation("bench");
+	const { t: tu } = useTranslation("suitesUx");
 	const [q, setQ] = useQueryStates(TASK_QUERY);
 	const filters: TaskFilters = { kind: q.kind, difficulty: q.difficulty, capability: q.cap, status: q.status };
 	const sort = parseTaskSort(q.sort, q.dir);
@@ -57,7 +58,7 @@ export function SuiteTasksTab({ suite, health }: { suite: SuiteSummary; health: 
 
 	return (
 		<div className={cn("grid min-w-0 grid-cols-1 gap-4", openTask && "2xl:grid-cols-[minmax(0,1fr)_minmax(0,30rem)]")}>
-			<Section title={t("suites.tasks.title")} description={t("suites.tasks.description")} testId="suites-tasks" className="min-w-0">
+			<Section title={tu("tasksTitle")} description={tu("tasksDescription")} testId="suites-tasks" className="min-w-0">
 				<SuiteTaskFilters
 					filters={filters}
 					options={options}

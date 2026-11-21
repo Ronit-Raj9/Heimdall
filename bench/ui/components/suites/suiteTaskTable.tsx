@@ -25,19 +25,26 @@ export interface SuiteTaskTableProps {
  * One row per task. Each sortable header is a button with aria-sort; the task id opens its detail.
  * A held-out task the server withholds shows its id and a "held out" badge only, with no detail link.
  */
+/** Soft pill colours for the difficulty column (lane U04). */
+const DIFFICULTY_PILL: Record<string, string> = {
+	easy: "bg-chart-success/10 text-chart-success-ink",
+	medium: "bg-chart-warning/10 text-chart-warning-ink",
+	hard: "bg-chart-error/10 text-chart-error-ink",
+};
+
 export function SuiteTaskTable({ suiteId, rows, sort, onSort, selected, onOpen, health }: SuiteTaskTableProps) {
 	const { t } = useTranslation("bench");
 	const head = (key: TaskSortKey, label: string, align: "left" | "right" = "left") => (
 		<SortableHead sortKey={key} label={label} sort={sort} onSort={onSort} align={align} />
 	);
 	return (
-		<Table data-testid="suites-task-table" aria-label={t("suites.tasks.label", { suite: suiteId })} containerClassName="rounded-sm border">
+		<Table data-testid="suites-task-table" aria-label={t("suites.tasks.label", { suite: suiteId })} containerClassName="rounded-xl border">
 			<TableHeader>
 				<TableRow className="hover:bg-transparent">
 					{head("id", t("suites.tasks.task"))}
 					{head("kind", t("suites.tasks.kind"))}
 					{head("difficulty", t("suites.tasks.difficulty"))}
-					<TableHead>{t("suites.tasks.capabilities")}</TableHead>
+					<TableHead className="hidden xl:table-cell">{t("suites.tasks.capabilities")}</TableHead>
 					{head("admission", t("suites.tasks.admission"))}
 					{head("license", t("suites.tasks.license"))}
 					{head("hidden", t("suites.tasks.hiddenTests"), "right")}
@@ -65,24 +72,29 @@ export function SuiteTaskTable({ suiteId, rows, sort, onSort, selected, onOpen, 
 									className="focus-visible:ring-ring/50 group flex cursor-pointer flex-col items-start gap-0.5 rounded-sm text-left focus-visible:ring-[3px] focus-visible:outline-none"
 									data-testid={`suites-task-open-${task.id}`}
 								>
-									<span className="text-primary font-mono text-xs group-hover:underline">{task.id}</span>
-									<span className="text-foreground text-sm">{task.title}</span>
+									<span className="text-foreground text-sm font-medium group-hover:underline">{task.title}</span>
+									<span className="text-muted-foreground font-mono text-xs">{task.id}</span>
 								</button>
 								{isHeldOut(task) && <HeldOutBadge task={task} testId={`suites-task-held-out-${task.id}`} className="mt-1" />}
 							</TableCell>
 							<TableCell className="align-top font-mono text-xs">{task.kind}</TableCell>
 							<TableCell className="align-top text-xs">
 								{task.difficulty ? (
-									task.difficulty === "easy" || task.difficulty === "medium" || task.difficulty === "hard" ? (
-										t(`suites.difficulty.${task.difficulty}`)
-									) : (
-										task.difficulty
-									)
+									<span
+										className={cn(
+											"inline-flex rounded-full px-2 py-0.5 text-xs font-medium",
+											DIFFICULTY_PILL[task.difficulty] ?? "bg-muted text-muted-foreground",
+										)}
+									>
+										{task.difficulty === "easy" || task.difficulty === "medium" || task.difficulty === "hard"
+											? t(`suites.difficulty.${task.difficulty}`)
+											: task.difficulty}
+									</span>
 								) : (
 									<span className="text-muted-foreground">{t("suites.tasks.unset")}</span>
 								)}
 							</TableCell>
-							<TableCell className="max-w-64 align-top whitespace-normal">
+							<TableCell className="hidden max-w-64 align-top whitespace-normal xl:table-cell">
 								{task.capabilities.length > 0 ? (
 									<span className="flex flex-wrap gap-1">
 										{task.capabilities.map((capability) => (

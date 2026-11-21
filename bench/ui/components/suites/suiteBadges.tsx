@@ -23,7 +23,7 @@ export function ToneBadge({
 	return (
 		<span
 			className={cn(
-				"inline-flex w-fit shrink-0 items-center gap-1 rounded-sm border px-1.5 py-0.5 text-xs font-medium whitespace-nowrap",
+				"inline-flex w-fit shrink-0 items-center gap-1 rounded-full border px-2 py-0.5 text-xs font-medium whitespace-nowrap",
 				TONE_CLASS[tone],
 				className,
 			)}

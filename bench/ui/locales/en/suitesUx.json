@@ -1,0 +1,37 @@
+{
+	"run": "Run",
+	"runSuite": "Run {{suite}}",
+	"open": "Open {{suite}}",
+	"tasks_one": "{{count}} task",
+	"tasks_other": "{{count}} tasks",
+	"status": {
+		"ready": "Ready",
+		"needsAdmission_one": "{{count}} task needs admission",
+		"needsAdmission_other": "{{count}} tasks need admission",
+		"needsLock": "Needs re-lock",
+		"noTasks": "No tasks yet",
+		"error": "Failed to load"
+	},
+	"stats": {
+		"tasks": "Tasks",
+		"admitted": "Admitted",
+		"probes": "Probes",
+		"lastRun": "Runs recorded",
+		"never": "None yet"
+	},
+	"tabs": {
+		"tasks": "Tasks",
+		"settings": "Settings",
+		"health": "Health",
+		"tiers": "Tiers",
+		"calibration": "Calibration",
+		"ops": "Admission & ops",
+		"edit": "Edit",
+		"export": "Import/Export"
+	},
+	"details": "Details",
+	"detailsHint": "Image, lock, verifier and probes",
+	"tasksTitle": "Tasks",
+	"tasksDescription": "Click a task to see its details and checks.",
+	"subtitle": "Benchmark packs you can run against any agent."
+}
